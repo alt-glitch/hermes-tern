@@ -34,6 +34,7 @@ print("hello from hermes tern")
 def _calls(prompt: str, target: Path) -> list[dict] | None:
     words = prompt.lower()
     if "approve" in words:
+        target.mkdir(exist_ok=True)
         return [_call("terminal", {"command": f"rm -rf -- {target}"})]
     if "clarify" in words:
         return [_call("clarify", {"questions": [{"question": "Which colour?", "choices": ["red", "green", "blue"]}]})]

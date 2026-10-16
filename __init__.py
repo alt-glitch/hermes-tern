@@ -1,6 +1,6 @@
 """Hermes for Tern.
 
-``hermes tern [flags]`` runs ``hermes --tui [flags]`` with ``HERMES_TUI_DIR`` pointing at this
+``hermes tern [flags]`` runs ``hermes chat --tui [flags]`` with ``HERMES_TUI_DIR`` pointing at this
 plugin's prebuilt frontend (``frontend/dist/entry.js``), so Hermes' own TUI launcher keeps doing
 everything else: profile, cwd, resume, worktree, the gateway attach and the exit summary. The
 frontend exits ``NO_TSP_EXIT`` when the terminal does not answer the Tern Surface Protocol
@@ -22,7 +22,20 @@ NO_TSP_EXIT = 75
 def _setup(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "tui_args", nargs=argparse.REMAINDER, metavar="FLAGS",
-        help="flags for `hermes --tui`, e.g. --resume ID, -c, --model NAME, --worktree")
+        help="`hermes chat` flags, e.g. --resume ID, -c, -m MODEL, -q QUERY, --image PATH, --worktree")
+    parse = parser.parse_known_args
+
+    def passthrough(args=None, namespace=None):
+        # Every flag belongs to `hermes chat`, which validates them; argparse would refuse a leading
+        # `--image` here because REMAINDER only starts at a positional.
+        args = list(sys.argv[1:] if args is None else args)
+        if "-h" in args or "--help" in args:
+            return parse(args, namespace)
+        known, _ = parse([], namespace)
+        known.tui_args = args
+        return known, []
+
+    parser.parse_known_args = passthrough
 
 
 def _wait(argv: list[str], env: dict) -> int:
@@ -41,7 +54,7 @@ def _run(args: argparse.Namespace) -> None:
         print(f"hermes tern: {bundle} is missing; reinstall the plugin", file=sys.stderr)
         sys.exit(1)
     flags = [a for a in args.tui_args if a != "--"]
-    hermes = [sys.executable, "-m", "hermes_cli.main", "--tui", *flags]
+    hermes = [sys.executable, "-m", "hermes_cli.main", "chat", "--tui", *flags]
     code = _wait(hermes, {**os.environ, "HERMES_TUI_DIR": str(FRONTEND)})
     if code == NO_TSP_EXIT:
         print("hermes tern: this terminal does not speak the Tern Surface Protocol; "
@@ -54,4 +67,4 @@ def register(ctx) -> None:
     ctx.register_cli_command(
         name="tern", help="Chat in Tern's native UI (falls back to the regular TUI elsewhere)",
         setup_fn=_setup, handler_fn=_run,
-        description="Runs `hermes --tui` with the Tern frontend. Every --tui flag works.")
+        description="Runs `hermes chat --tui` with the Tern frontend; every `hermes chat` flag works.")

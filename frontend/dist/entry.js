@@ -1916,9 +1916,9 @@ var require_dispatcher_base = __commonJS({
       }
       close(callback) {
         if (callback === void 0) {
-          return new Promise((resolve3, reject) => {
+          return new Promise((resolve4, reject) => {
             this.close((err, data) => {
-              return err ? reject(err) : resolve3(data);
+              return err ? reject(err) : resolve4(data);
             });
           });
         }
@@ -1956,12 +1956,12 @@ var require_dispatcher_base = __commonJS({
           err = null;
         }
         if (callback === void 0) {
-          return new Promise((resolve3, reject) => {
+          return new Promise((resolve4, reject) => {
             this.destroy(err, (err2, data) => {
               return err2 ? (
                 /* istanbul ignore next: should never error */
                 reject(err2)
-              ) : resolve3(data);
+              ) : resolve4(data);
             });
           });
         }
@@ -4228,8 +4228,8 @@ var require_util2 = __commonJS({
     function createDeferredPromise() {
       let res;
       let rej;
-      const promise = new Promise((resolve3, reject) => {
-        res = resolve3;
+      const promise = new Promise((resolve4, reject) => {
+        res = resolve4;
         rej = reject;
       });
       return { promise, resolve: res, reject: rej };
@@ -6481,12 +6481,12 @@ upgrade: ${upgrade}\r
           cb();
         }
       }
-      const waitForDrain = () => new Promise((resolve3, reject) => {
+      const waitForDrain = () => new Promise((resolve4, reject) => {
         assert(callback === null);
         if (socket[kError]) {
           reject(socket[kError]);
         } else {
-          callback = resolve3;
+          callback = resolve4;
         }
       });
       socket.on("close", onDrain).on("drain", onDrain);
@@ -7158,12 +7158,12 @@ var require_client_h2 = __commonJS({
           cb();
         }
       }
-      const waitForDrain = () => new Promise((resolve3, reject) => {
+      const waitForDrain = () => new Promise((resolve4, reject) => {
         assert(callback === null);
         if (socket[kError]) {
           reject(socket[kError]);
         } else {
-          callback = resolve3;
+          callback = resolve4;
         }
       });
       h2stream.on("close", onDrain).on("drain", onDrain);
@@ -7641,16 +7641,16 @@ var require_client = __commonJS({
         return this[kNeedDrain] < 2;
       }
       async [kClose]() {
-        return new Promise((resolve3) => {
+        return new Promise((resolve4) => {
           if (this[kSize]) {
-            this[kClosedResolve] = resolve3;
+            this[kClosedResolve] = resolve4;
           } else {
-            resolve3(null);
+            resolve4(null);
           }
         });
       }
       async [kDestroy](err) {
-        return new Promise((resolve3) => {
+        return new Promise((resolve4) => {
           const requests = this[kQueue].splice(this[kPendingIdx]);
           for (let i = 0; i < requests.length; i++) {
             const request = requests[i];
@@ -7661,7 +7661,7 @@ var require_client = __commonJS({
               this[kClosedResolve]();
               this[kClosedResolve] = null;
             }
-            resolve3(null);
+            resolve4(null);
           };
           if (this[kHTTPContext]) {
             this[kHTTPContext].destroy(err, callback);
@@ -7712,7 +7712,7 @@ var require_client = __commonJS({
         });
       }
       try {
-        const socket = await new Promise((resolve3, reject) => {
+        const socket = await new Promise((resolve4, reject) => {
           client[kConnector]({
             host,
             hostname,
@@ -7724,7 +7724,7 @@ var require_client = __commonJS({
             if (err) {
               reject(err);
             } else {
-              resolve3(socket2);
+              resolve4(socket2);
             }
           });
         });
@@ -8060,8 +8060,8 @@ var require_pool_base = __commonJS({
         if (this[kQueue].isEmpty()) {
           await Promise.all(this[kClients].map((c) => c.close()));
         } else {
-          await new Promise((resolve3) => {
-            this[kClosedResolve] = resolve3;
+          await new Promise((resolve4) => {
+            this[kClosedResolve] = resolve4;
           });
         }
       }
@@ -9327,7 +9327,7 @@ var require_readable = __commonJS({
         if (this._readableState.closeEmitted) {
           return null;
         }
-        return await new Promise((resolve3, reject) => {
+        return await new Promise((resolve4, reject) => {
           if (this[kContentLength] > limit) {
             this.destroy(new AbortError());
           }
@@ -9340,7 +9340,7 @@ var require_readable = __commonJS({
             if (signal?.aborted) {
               reject(signal.reason ?? new AbortError());
             } else {
-              resolve3(null);
+              resolve4(null);
             }
           }).on("error", noop).on("data", function(chunk) {
             limit -= chunk.length;
@@ -9359,7 +9359,7 @@ var require_readable = __commonJS({
     }
     async function consume(stream, type) {
       assert(!stream[kConsume]);
-      return new Promise((resolve3, reject) => {
+      return new Promise((resolve4, reject) => {
         if (isUnusable(stream)) {
           const rState = stream._readableState;
           if (rState.destroyed && rState.closeEmitted === false) {
@@ -9376,7 +9376,7 @@ var require_readable = __commonJS({
             stream[kConsume] = {
               type,
               stream,
-              resolve: resolve3,
+              resolve: resolve4,
               reject,
               length: 0,
               body: []
@@ -9446,18 +9446,18 @@ var require_readable = __commonJS({
       return buffer;
     }
     function consumeEnd(consume2) {
-      const { type, body, resolve: resolve3, stream, length } = consume2;
+      const { type, body, resolve: resolve4, stream, length } = consume2;
       try {
         if (type === "text") {
-          resolve3(chunksDecode(body, length));
+          resolve4(chunksDecode(body, length));
         } else if (type === "json") {
-          resolve3(JSON.parse(chunksDecode(body, length)));
+          resolve4(JSON.parse(chunksDecode(body, length)));
         } else if (type === "arrayBuffer") {
-          resolve3(chunksConcat(body, length).buffer);
+          resolve4(chunksConcat(body, length).buffer);
         } else if (type === "blob") {
-          resolve3(new Blob(body, { type: stream[kContentType] }));
+          resolve4(new Blob(body, { type: stream[kContentType] }));
         } else if (type === "bytes") {
-          resolve3(chunksConcat(body, length));
+          resolve4(chunksConcat(body, length));
         }
         consumeFinish(consume2);
       } catch (err) {
@@ -9714,9 +9714,9 @@ var require_api_request = __commonJS({
     };
     function request(opts, callback) {
       if (callback === void 0) {
-        return new Promise((resolve3, reject) => {
+        return new Promise((resolve4, reject) => {
           request.call(this, opts, (err, data) => {
-            return err ? reject(err) : resolve3(data);
+            return err ? reject(err) : resolve4(data);
           });
         });
       }
@@ -9939,9 +9939,9 @@ var require_api_stream = __commonJS({
     };
     function stream(opts, factory, callback) {
       if (callback === void 0) {
-        return new Promise((resolve3, reject) => {
+        return new Promise((resolve4, reject) => {
           stream.call(this, opts, factory, (err, data) => {
-            return err ? reject(err) : resolve3(data);
+            return err ? reject(err) : resolve4(data);
           });
         });
       }
@@ -10226,9 +10226,9 @@ var require_api_upgrade = __commonJS({
     };
     function upgrade(opts, callback) {
       if (callback === void 0) {
-        return new Promise((resolve3, reject) => {
+        return new Promise((resolve4, reject) => {
           upgrade.call(this, opts, (err, data) => {
-            return err ? reject(err) : resolve3(data);
+            return err ? reject(err) : resolve4(data);
           });
         });
       }
@@ -10320,9 +10320,9 @@ var require_api_connect = __commonJS({
     };
     function connect2(opts, callback) {
       if (callback === void 0) {
-        return new Promise((resolve3, reject) => {
+        return new Promise((resolve4, reject) => {
           connect2.call(this, opts, (err, data) => {
-            return err ? reject(err) : resolve3(data);
+            return err ? reject(err) : resolve4(data);
           });
         });
       }
@@ -14184,7 +14184,7 @@ var require_fetch = __commonJS({
       function dispatch({ body }) {
         const url = requestCurrentURL(request);
         const agent = fetchParams.controller.dispatcher;
-        return new Promise((resolve3, reject) => agent.dispatch(
+        return new Promise((resolve4, reject) => agent.dispatch(
           {
             path: url.pathname + url.search,
             origin: url.origin,
@@ -14260,7 +14260,7 @@ var require_fetch = __commonJS({
                 }
               }
               const onError = this.onError.bind(this);
-              resolve3({
+              resolve4({
                 status,
                 statusText,
                 headersList,
@@ -14306,7 +14306,7 @@ var require_fetch = __commonJS({
               for (let i = 0; i < rawHeaders.length; i += 2) {
                 headersList.append(bufferToLowerCasedHeaderName(rawHeaders[i]), rawHeaders[i + 1].toString("latin1"), true);
               }
-              resolve3({
+              resolve4({
                 status,
                 statusText: STATUS_CODES[status],
                 headersList,
@@ -18037,8 +18037,8 @@ var require_util8 = __commonJS({
       return true;
     }
     function delay(ms) {
-      return new Promise((resolve3) => {
-        setTimeout(resolve3, ms).unref();
+      return new Promise((resolve4) => {
+        setTimeout(resolve4, ms).unref();
       });
     }
     module.exports = {
@@ -20648,9 +20648,9 @@ var Session = class {
     ownedInputs.add(this.#input);
     this.#ownsInput = true;
     this.#wasRaw = this.#input.isRaw === true;
-    const { promise, resolve: resolve3 } = Promise.withResolvers();
-    const timer = setTimeout(() => resolve3(false), options.timeout ?? 1e3);
-    this.#handshake = resolve3;
+    const { promise, resolve: resolve4 } = Promise.withResolvers();
+    const timer = setTimeout(() => resolve4(false), options.timeout ?? 1e3);
+    this.#handshake = resolve4;
     let connected = false;
     try {
       if (options.exitHooks ?? (options.input === void 0 && options.output === void 0))
@@ -20742,8 +20742,8 @@ var Session = class {
   blobs(ids) {
     if (this.#closed)
       return Promise.resolve([]);
-    const { promise, resolve: resolve3 } = Promise.withResolvers();
-    this.#blobWaiters.push(resolve3);
+    const { promise, resolve: resolve4 } = Promise.withResolvers();
+    this.#blobWaiters.push(resolve4);
     this.#send({ verb: "q", body: { q: "blobs", ids } });
     return promise;
   }
@@ -20759,8 +20759,8 @@ var Session = class {
     }
     if (this.#closed || this.#closing)
       return Promise.resolve(null);
-    const { promise, resolve: resolve3, reject } = Promise.withResolvers();
-    this.#waiters.push({ resolve: resolve3, reject });
+    const { promise, resolve: resolve4, reject } = Promise.withResolvers();
+    this.#waiters.push({ resolve: resolve4, reject });
     return promise;
   }
   /** Keys and unhandled events until the session closes. */
@@ -21152,7 +21152,7 @@ var JsonRpcRequestChannel = class {
       return Promise.reject(new DOMException("Aborted", "AbortError"));
     }
     const id = this.options.createRequestId(++this.nextId);
-    return new Promise((resolve3, reject) => {
+    return new Promise((resolve4, reject) => {
       let onAbort;
       const detachAbort = () => {
         if (onAbort && signal) {
@@ -21162,7 +21162,7 @@ var JsonRpcRequestChannel = class {
       const pending = {
         resolve: (value) => {
           detachAbort();
-          resolve3(value);
+          resolve4(value);
         },
         reject: (error) => {
           detachAbort();
@@ -24297,7 +24297,7 @@ var GatewayClient = class extends EventEmitter {
       let settled = false;
       this.ws = ws;
       this.channel.attach({ send: (text) => ws.send(text) });
-      const connectPromise = new Promise((resolve3, reject) => {
+      const connectPromise = new Promise((resolve4, reject) => {
         ws.addEventListener(
           "open",
           () => {
@@ -24306,7 +24306,7 @@ var GatewayClient = class extends EventEmitter {
             }
             if (!settled) {
               settled = true;
-              resolve3();
+              resolve4();
             }
             this.connectSidecarMirror();
             if (this.isCanonical) {
@@ -26543,6 +26543,47 @@ var writeActiveSessionFile = (sessionId, file2 = process.env.HERMES_TUI_ACTIVE_S
   }
 };
 
+// src/hermes/images.ts
+import { readFile } from "node:fs/promises";
+import { homedir as homedir3 } from "node:os";
+import { extname as extname2, resolve as resolve2 } from "node:path";
+var MAX_IMAGE_BYTES = 20 * 1024 * 1024;
+function imageFormat(bytes) {
+  if (bytes.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))) {
+    return { mime: "image/png", ext: ".png" };
+  }
+  if (bytes[0] === 255 && bytes[1] === 216 && bytes[2] === 255) {
+    return { mime: "image/jpeg", ext: ".jpg" };
+  }
+  if (/^GIF8[79]a$/.test(bytes.subarray(0, 6).toString("ascii"))) {
+    return { mime: "image/gif", ext: ".gif" };
+  }
+  if (bytes.subarray(0, 4).toString("ascii") === "RIFF" && bytes.subarray(8, 12).toString("ascii") === "WEBP") {
+    return { mime: "image/webp", ext: ".webp" };
+  }
+  return null;
+}
+async function uploadImage(gw2, sid, raw, cwd) {
+  const path = resolve2(cwd, raw.replace(/^~(?=$|\/)/, homedir3()));
+  const bytes = await readFile(path);
+  if (bytes.length > MAX_IMAGE_BYTES) {
+    throw new Error("the image is larger than 20 MB");
+  }
+  const format = imageFormat(bytes);
+  if (!format) {
+    throw new Error(`${extname2(path) || "this file"} is not a PNG, JPEG, GIF or WebP image`);
+  }
+  const r = await gw2.request("image.attach_bytes", {
+    session_id: sid,
+    filename: `image${format.ext}`,
+    content_base64: bytes.toString("base64")
+  });
+  if (!r?.path) {
+    throw new Error("the gateway did not store the image");
+  }
+  return { path: r.path, mime: format.mime };
+}
+
 // src/hermes/sharedPrompts.ts
 var sharedPromptId = (promptId) => `shared:${String(promptId)}`;
 function sharedPromptRequest(ev, gw2, onError) {
@@ -27413,12 +27454,12 @@ function fromSkin(colors, branding, bannerLogo = "", bannerHero = "", toolPrefix
 function paletteOf(skin) {
   const name = skin?.name || "default";
   return {
-    dark: tokensOf(resolve2(skin, "dark")),
-    light: tokensOf(resolve2(skin, "light")),
+    dark: tokensOf(resolve3(skin, "dark")),
+    light: tokensOf(resolve3(skin, "light")),
     name: { dark: name, light: name }
   };
 }
-function resolve2(skin, polarity) {
+function resolve3(skin, polarity) {
   const light = polarity === "light";
   const colors = { ...skin?.colors, ...light ? skin?.light_colors : skin?.dark_colors };
   const saved = process.env.HERMES_TUI_LIGHT;
@@ -28883,6 +28924,8 @@ var App = class {
   #approvalIds = /* @__PURE__ */ new Map();
   /** The launcher's startup image until it is attached to the first session (the queue waits for it). */
   #startupImage = process.env.HERMES_TUI_IMAGE?.trim() ?? "";
+  /** Uploaded images the next prompt carries (the shared gateway takes them on prompt.submit). */
+  #attachments = [];
   constructor(tern, gw2, version2) {
     this.#tern = tern;
     this.#gw = gw2;
@@ -29051,9 +29094,17 @@ var App = class {
       this.queue.unshift(text);
       return;
     }
+    const attachments = this.#attachments;
+    this.#attachments = [];
     this.transcript.user(display?.trim() || text);
     this.#startBusy("Working\u2026");
-    this.#gw.request("prompt.submit", { session_id: this.sid, submission_id: randomUUID3(), text, ...queued ? { queued } : {} }).catch((error) => {
+    this.#gw.request("prompt.submit", {
+      session_id: this.sid,
+      submission_id: randomUUID3(),
+      text,
+      ...queued ? { queued } : {},
+      ...attachments.length ? { attachments } : {}
+    }).catch((error) => {
       this.transcript.notice(error.message, "error");
       this.busy = null;
       this.changed();
@@ -29134,7 +29185,11 @@ var App = class {
   async #attachStartupImage(sid) {
     const path = this.#startupImage;
     try {
-      await this.#gw.request("image.attach", { path, session_id: sid });
+      if (this.#gw.isCanonical) {
+        this.#attachments.push(await uploadImage(this.#gw, sid, path, process.env.HERMES_CWD || process.cwd()));
+      } else {
+        await this.#gw.request("image.attach", { path, session_id: sid });
+      }
     } catch (error) {
       this.transcript.notice(
         `Could not attach ${path}: ${error instanceof Error ? error.message : String(error)}`,

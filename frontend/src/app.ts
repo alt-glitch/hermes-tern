@@ -27,6 +27,7 @@ import { Composer } from './composer.js'
 import { type Busy, busyFrom, ownsEvent, Switches } from './flow.js'
 import type { Overlay, OverlayHost } from './overlay.js'
 import { writeActiveSessionFile } from './hermes/activeSessionFile.js'
+import { type Attachment, uploadImage } from './hermes/images.js'
 import { sharedPromptId, sharedPromptRequest } from './hermes/sharedPrompts.js'
 import { Completion } from './overlays/completion.js'
 import { openModelPicker } from './overlays/models.js'
@@ -87,6 +88,8 @@ export class App implements OverlayHost {
   readonly #approvalIds = new Map<string, string>()
   /** The launcher's startup image until it is attached to the first session (the queue waits for it). */
   #startupImage = process.env.HERMES_TUI_IMAGE?.trim() ?? ''
+  /** Uploaded images the next prompt carries (the shared gateway takes them on prompt.submit). */
+  #attachments: Attachment[] = []
 
   constructor(tern: Session, gw: GatewayClient, version: string) {
     this.#tern = tern
@@ -315,11 +318,19 @@ export class App implements OverlayHost {
       return
     }
 
+    const attachments = this.#attachments
+    this.#attachments = []
     this.transcript.user(display?.trim() || text)
     this.#startBusy('Working…')
     this.#gw
       // The shared gateway admits a prompt by its submission id (a retry with the same id is one turn).
-      .request('prompt.submit', { session_id: this.sid, submission_id: randomUUID(), text, ...(queued ? { queued } : {}) })
+      .request('prompt.submit', {
+        session_id: this.sid,
+        submission_id: randomUUID(),
+        text,
+        ...(queued ? { queued } : {}),
+        ...(attachments.length ? { attachments } : {})
+      })
       .catch((error: Error) => {
         this.transcript.notice(error.message, 'error')
         this.busy = null
@@ -423,7 +434,11 @@ export class App implements OverlayHost {
     const path = this.#startupImage
 
     try {
-      await this.#gw.request('image.attach', { path, session_id: sid })
+      if (this.#gw.isCanonical) {
+        this.#attachments.push(await uploadImage(this.#gw, sid, path, process.env.HERMES_CWD || process.cwd()))
+      } else {
+        await this.#gw.request('image.attach', { path, session_id: sid })
+      }
     } catch (error) {
       this.transcript.notice(
         `Could not attach ${path}: ${error instanceof Error ? error.message : String(error)}`,
