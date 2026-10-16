@@ -23729,6 +23729,40 @@ function canonicalEvent(event) {
   const pending = pendingSubmissions(event.payload?.pending);
   return pending ? { ...event, payload: { ...event.payload, pending_submissions: pending } } : event;
 }
+function localCreationOptions(env = process.env) {
+  const fields = {
+    model: env.HERMES_MODEL,
+    provider: env.HERMES_TUI_PROVIDER,
+    cwd: env.HERMES_CWD
+  };
+  const options = Object.fromEntries(Object.entries(fields).filter(([, value]) => value));
+  if (env.HERMES_TUI_TOOLSETS) {
+    options.toolsets = env.HERMES_TUI_TOOLSETS.split(",");
+  }
+  const skills = [...new Set((env.HERMES_TUI_SKILLS ?? "").split(/[,\n]/).map((name) => name.trim()).filter(Boolean))];
+  if (skills.length) {
+    options.skills = skills;
+  }
+  if (env.HERMES_TUI_MAX_TURNS) {
+    const turns = Number(env.HERMES_TUI_MAX_TURNS);
+    options.max_turns = Number.isInteger(turns) ? turns : env.HERMES_TUI_MAX_TURNS.trim();
+  }
+  const truthy = (value) => ["1", "true", "yes", "on"].includes((value ?? "").trim().toLowerCase());
+  for (const [field, value] of [
+    ["yolo", env.HERMES_YOLO_MODE],
+    ["ignore_rules", env.HERMES_IGNORE_RULES],
+    ["safe_mode", env.HERMES_SAFE_MODE],
+    ["ignore_user_config", env.HERMES_IGNORE_USER_CONFIG],
+    ["checkpoints", env.HERMES_TUI_CHECKPOINTS],
+    ["pass_session_id", env.HERMES_TUI_PASS_SESSION_ID],
+    ["accept_hooks", env.HERMES_ACCEPT_HOOKS]
+  ]) {
+    if (truthy(value)) {
+      options[field] = true;
+    }
+  }
+  return options;
+}
 var TOOL_PROGRESS_MODES = /* @__PURE__ */ new Set(["off", "new", "all", "verbose"]);
 function launchToolProgress(env = process.env) {
   const raw = env.HERMES_TUI_TOOL_PROGRESS?.trim().toLowerCase();
@@ -26348,6 +26382,42 @@ var writeActiveSessionFile = (sessionId, file2 = process.env.HERMES_TUI_ACTIVE_S
   }
 };
 
+// src/hermes/sharedPrompts.ts
+var sharedPromptId = (promptId) => `shared:${String(promptId)}`;
+function sharedPromptRequest(ev, gw2, onError) {
+  const kind = ev.type === "approval.request" ? "approval" : ev.type === "clarify.request" ? "clarify" : null;
+  const shared = ev.payload ?? {};
+  if (!kind || !shared.prompt_id || !ev.session_id || typeof shared.execution_generation !== "number") {
+    return null;
+  }
+  const control = { session_id: ev.session_id, execution_generation: shared.execution_generation, prompt_id: shared.prompt_id };
+  const single = typeof shared.question === "string" ? shared.question.trim() : "";
+  const questions = kind === "clarify" && single && !Array.isArray(shared.questions) ? [{ choices: shared.choices ?? [], multi_select: shared.multi_select === true, qid: shared.prompt_id, question: single }] : shared.questions;
+  let answered = false;
+  const send = (method, params) => {
+    if (answered) {
+      return;
+    }
+    answered = true;
+    gw2.request(method, { ...params, ...control }).catch((error) => onError(error.message));
+  };
+  return {
+    id: sharedPromptId(shared.prompt_id),
+    method: kind,
+    params: { ...shared, questions, session_id: ev.session_id },
+    respond: (result) => kind === "approval" ? send("approval.respond", { choice: result.choice ?? "deny" }) : send("clarify.respond", { answer: firstAnswer(result.answers) }),
+    // Unanswered here: the prompt stays pending for another viewer or its own timeout.
+    fail: () => void 0
+  };
+}
+function firstAnswer(answers) {
+  if (!answers || typeof answers !== "object") {
+    return "";
+  }
+  const first = Object.values(answers)[0];
+  return Array.isArray(first) ? first.join(", ") : typeof first === "string" ? first : "";
+}
+
 // .hermes-src/ui-tui/src/domain/slash.ts
 var INLINE_SLASH_RE = /\s\/([a-zA-Z][\w-]*)?$/;
 var inlineSlashTrigger = (text) => {
@@ -28649,6 +28719,8 @@ var App = class {
   #switches = new Switches();
   /** Server requests for another session, kept while a switch is in flight. */
   #heldRequests = [];
+  /** Shared-gateway subscriptions this view holds, by session id. */
+  #subscriptions = /* @__PURE__ */ new Map();
   /** Open approval prompts' overlay keys → their approval-queue `request_id` (what approval.cancelled names). */
   #approvalIds = /* @__PURE__ */ new Map();
   /** The launcher's startup image until it is attached to the first session (the queue waits for it). */
@@ -28690,6 +28762,7 @@ var App = class {
     this.#surface.focus(INPUT_ID);
     void this.#readInput();
     const code2 = await this.#done.promise;
+    await Promise.all([...this.#subscriptions.keys()].map((sid) => this.#leave(sid, "tui_shutdown")));
     await this.#tern.close();
     this.#gw.kill("exit");
     return code2;
@@ -28941,15 +29014,16 @@ var App = class {
         return;
       }
       if (this.sid) {
-        await this.#gw.request("session.close", { session_id: this.sid }).catch(() => void 0);
+        await this.#leave(this.sid, "tui_close");
       }
       const cwd = process.env.HERMES_TUI_CWD?.trim();
-      const r = await this.#gw.request("session.create", {
-        cols: this.#tern.caps.cols,
-        ...cwd ? { cwd } : {}
-      });
+      const r = await this.#gw.request(
+        "session.create",
+        this.#gw.isCanonical ? { ...localCreationOptions(), ...cwd ? { cwd } : {} } : { cols: this.#tern.caps.cols, ...cwd ? { cwd } : {} }
+      );
       if (!this.#switches.current(token)) {
-        this.#gw.request("session.close", { session_id: r.session_id }).catch(() => void 0);
+        this.#subscribe(r);
+        void this.#leave(r.session_id, "tui_close");
         return;
       }
       this.transcript.clear();
@@ -28969,26 +29043,34 @@ var App = class {
     const previous = this.sid;
     const r = await this.#resume(id);
     if (r && previous && previous !== r.session_id) {
-      this.#gw.request("session.close", { session_id: previous }).catch(() => void 0);
+      void this.#leave(previous, "tui_close");
     }
   }
   /** Resumes and adopts stored session `id`; undefined when a later switch superseded this one. */
   async #resume(id) {
     const token = this.#switches.begin();
+    const hold = this.#gw.holdAttach(id);
+    let snapshot;
     try {
       const r = await this.#gw.request("session.resume", { cols: this.#tern.caps.cols, session_id: id });
       if (!this.#switches.current(token)) {
+        this.#subscribe(r);
+        void this.#leave(r.session_id, "tui_close");
         return void 0;
       }
       this.transcript.clear();
       this.transcript.push({ id: this.transcript.id("w"), kind: "welcome" });
       this.#adopt(r);
+      snapshot = r;
+      this.#gw.hydrateSharedPrompts(r);
       return r;
     } finally {
+      this.#gw.settleAttach(hold, snapshot);
       this.#settle(token);
     }
   }
   #adopt(r) {
+    this.#subscribe(r);
     this.sid = r.session_id;
     this.storedSid = r.info?.stored_session_id || r.stored_session_id || null;
     writeActiveSessionFile(this.storedSid ?? r.session_id);
@@ -29003,6 +29085,24 @@ var App = class {
       this.transcript.inflight(r.inflight, this.busy?.startedAt);
     }
     this.changed();
+  }
+  #subscribe(r) {
+    if (r.subscription_id) {
+      this.#subscriptions.set(r.session_id, r.subscription_id);
+    }
+  }
+  /** Stops showing session `sid`: a shared-gateway view detaches (the session keeps running for its other viewers); a private gateway closes it. */
+  async #leave(sid, endReason) {
+    const subscription = this.#subscriptions.get(sid);
+    if (!this.#gw.isCanonical) {
+      await this.#gw.request("session.close", { session_id: sid }).catch(() => void 0);
+      return;
+    }
+    if (!subscription) {
+      return;
+    }
+    this.#subscriptions.delete(sid);
+    await this.#gw.request("session.detach", { end_reason: endReason, session_id: sid, subscription_id: subscription }).catch(() => void 0);
   }
   /** Ends switch `token`; once none is in flight, held requests for the adopted session open and the queue drains. */
   #settle(token) {
@@ -29125,6 +29225,21 @@ var App = class {
       case "request.cancel":
         this.#heldRequests = this.#heldRequests.filter((r) => r.id !== ev.payload?.id);
         this.#dropPrompts((key2) => key2 === `prompt:${ev.payload?.id}`);
+        break;
+      case "approval.request":
+      case "clarify.request": {
+        const req = sharedPromptRequest(ev, this.#gw, (message) => {
+          t2.notice(message, "error");
+          this.changed();
+        });
+        if (req) {
+          this.#onRequest(req);
+        }
+        break;
+      }
+      case "approval.settled":
+      case "clarify.settled":
+        this.#dropPrompts((key2) => key2 === `prompt:${sharedPromptId(ev.payload?.prompt_id)}`);
         break;
       case "approval.cancelled":
         this.#dropPrompts((key2) => ev.payload?.request_ids.includes(this.#approvalIds.get(key2) ?? "") ?? false);

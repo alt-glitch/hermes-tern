@@ -14,6 +14,7 @@ import type {
 } from '@hermes/shared/gateway-events'
 import type { ServerRequest } from '@hermes/shared/json-rpc-channel'
 import type { Key, Session, Surface, TspEvent } from '@stencil-hq/tern'
+import { localCreationOptions } from '@tui/canonicalGateway.js'
 import type { GatewayClient } from '@tui/gatewayClient.js'
 import type { AnyGatewayEvent } from '@tui/gatewayTypes.js'
 
@@ -24,6 +25,7 @@ import { Composer } from './composer.js'
 import { type Busy, busyFrom, ownsEvent, Switches } from './flow.js'
 import type { Overlay, OverlayHost } from './overlay.js'
 import { writeActiveSessionFile } from './hermes/activeSessionFile.js'
+import { sharedPromptId, sharedPromptRequest } from './hermes/sharedPrompts.js'
 import { Completion } from './overlays/completion.js'
 import { openModelPicker } from './overlays/models.js'
 import { promptOverlay } from './overlays/prompts.js'
@@ -45,6 +47,8 @@ interface CreateResult extends Partial<
   Pick<SessionResumeResult, 'inflight' | 'running' | 'status' | 'turn_started_at'>
 > {
   session_id: string
+  /** This view's subscription on the shared gateway: what `session.detach` releases. */
+  subscription_id?: string
   stored_session_id?: string | null
   info?: SessionLiveInfo
   messages?: TranscriptMessage[]
@@ -75,6 +79,8 @@ export class App implements OverlayHost {
   readonly #switches = new Switches()
   /** Server requests for another session, kept while a switch is in flight. */
   #heldRequests: ServerRequest[] = []
+  /** Shared-gateway subscriptions this view holds, by session id. */
+  readonly #subscriptions = new Map<string, string>()
   /** Open approval prompts' overlay keys → their approval-queue `request_id` (what approval.cancelled names). */
   readonly #approvalIds = new Map<string, string>()
   /** The launcher's startup image until it is attached to the first session (the queue waits for it). */
@@ -127,6 +133,7 @@ export class App implements OverlayHost {
     void this.#readInput()
 
     const code = await this.#done.promise
+    await Promise.all([...this.#subscriptions.keys()].map(sid => this.#leave(sid, 'tui_shutdown')))
     await this.#tern.close()
     this.#gw.kill('exit')
 
@@ -459,19 +466,23 @@ export class App implements OverlayHost {
       }
 
       if (this.sid) {
-        await this.#gw.request('session.close', { session_id: this.sid }).catch(() => undefined)
+        await this.#leave(this.sid, 'tui_close')
       }
 
       const cwd = process.env.HERMES_TUI_CWD?.trim()
 
-      const r = await this.#gw.request<CreateResult>('session.create', {
-        cols: this.#tern.caps.cols,
-        ...(cwd ? { cwd } : {})
-      })
+      // The shared gateway takes the launch flags (`hermes tern -m … --yolo -s …`) as the session's creation policy.
+      const r = await this.#gw.request<CreateResult>(
+        'session.create',
+        this.#gw.isCanonical
+          ? { ...localCreationOptions(), ...(cwd ? { cwd } : {}) }
+          : { cols: this.#tern.caps.cols, ...(cwd ? { cwd } : {}) }
+      )
 
       if (!this.#switches.current(token)) {
         // A later switch won; nothing will ever show this session.
-        this.#gw.request('session.close', { session_id: r.session_id }).catch(() => undefined)
+        this.#subscribe(r)
+        void this.#leave(r.session_id, 'tui_close')
 
         return
       }
@@ -497,32 +508,43 @@ export class App implements OverlayHost {
     const r = await this.#resume(id)
 
     if (r && previous && previous !== r.session_id) {
-      this.#gw.request('session.close', { session_id: previous }).catch(() => undefined)
+      void this.#leave(previous, 'tui_close')
     }
   }
 
   /** Resumes and adopts stored session `id`; undefined when a later switch superseded this one. */
   async #resume(id: string): Promise<CreateResult | undefined> {
     const token = this.#switches.begin()
+    // Frames for `id` that beat the snapshot wait, then replay only what the snapshot lacks.
+    const hold = this.#gw.holdAttach(id)
+    let snapshot: CreateResult | undefined
 
     try {
       const r = await this.#gw.request<CreateResult>('session.resume', { cols: this.#tern.caps.cols, session_id: id })
 
       if (!this.#switches.current(token)) {
+        this.#subscribe(r)
+        void this.#leave(r.session_id, 'tui_close')
+
         return undefined
       }
 
       this.transcript.clear()
       this.transcript.push({ id: this.transcript.id('w'), kind: 'welcome' })
       this.#adopt(r)
+      snapshot = r
+      // An approval or question already waiting on the session opens its sheet.
+      this.#gw.hydrateSharedPrompts(r)
 
       return r
     } finally {
+      this.#gw.settleAttach(hold, snapshot)
       this.#settle(token)
     }
   }
 
   #adopt(r: CreateResult) {
+    this.#subscribe(r)
     this.sid = r.session_id
     this.storedSid = r.info?.stored_session_id || r.stored_session_id || null
     writeActiveSessionFile(this.storedSid ?? r.session_id)
@@ -541,6 +563,32 @@ export class App implements OverlayHost {
     }
 
     this.changed()
+  }
+
+  #subscribe(r: CreateResult) {
+    if (r.subscription_id) {
+      this.#subscriptions.set(r.session_id, r.subscription_id)
+    }
+  }
+
+  /** Stops showing session `sid`: a shared-gateway view detaches (the session keeps running for its other viewers); a private gateway closes it. */
+  async #leave(sid: string, endReason: 'tui_close' | 'tui_shutdown') {
+    const subscription = this.#subscriptions.get(sid)
+
+    if (!this.#gw.isCanonical) {
+      await this.#gw.request('session.close', { session_id: sid }).catch(() => undefined)
+
+      return
+    }
+
+    if (!subscription) {
+      return
+    }
+
+    this.#subscriptions.delete(sid)
+    await this.#gw
+      .request('session.detach', { end_reason: endReason, session_id: sid, subscription_id: subscription })
+      .catch(() => undefined)
   }
 
   /** Ends switch `token`; once none is in flight, held requests for the adopted session open and the queue drains. */
@@ -728,6 +776,29 @@ export class App implements OverlayHost {
       case 'request.cancel':
         this.#heldRequests = this.#heldRequests.filter(r => r.id !== ev.payload?.id)
         this.#dropPrompts(key => key === `prompt:${ev.payload?.id}`)
+
+        break
+
+      case 'approval.request':
+
+      case 'clarify.request': {
+        const req = sharedPromptRequest(ev, this.#gw, message => {
+          t.notice(message, 'error')
+          this.changed()
+        })
+
+        if (req) {
+          this.#onRequest(req)
+        }
+
+        break
+      }
+
+      case 'approval.settled':
+
+      case 'clarify.settled':
+        // Answered here or by another viewer: the sheet goes either way.
+        this.#dropPrompts(key => key === `prompt:${sharedPromptId(ev.payload?.prompt_id)}`)
 
         break
 
