@@ -5,8 +5,10 @@
 
 import type { CompletionItem } from '@hermes/shared/gateway-events'
 import type { JSX, Key } from '@stencil-hq/tern'
-import { applyCompletion, completionRequestForInput, completionToApplyOnSubmit } from '@tui/domain/slash.js'
+import { applyCompletion, completionToApplyOnSubmit } from '@tui/domain/slash.js'
 import type { GatewayClient } from '@tui/gatewayClient.js'
+
+import { completionRequestForInput } from '../hermes/completion.js'
 
 import type { Composer } from '../composer.js'
 import type { OverlayHost } from '../overlay.js'
@@ -68,7 +70,7 @@ export class Completion {
     const gen = ++this.#gen
     clearTimeout(this.#timer)
     this.#timer = undefined
-    const request = before.includes('\n') ? null : completionRequestForInput(before)
+    const request = before.includes('\n') ? null : completionRequestForInput(before, { sid: this.#sid() })
 
     if (!request) {
       this.dismiss()

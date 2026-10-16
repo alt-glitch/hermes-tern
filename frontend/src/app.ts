@@ -14,7 +14,7 @@ import type { ServerRequest } from '@hermes/shared/json-rpc-channel'
 import type { Key, Session, Surface, TspEvent } from '@stencil-hq/tern'
 import type { GatewayClient } from '@tui/gatewayClient.js'
 import type { AnyGatewayEvent } from '@tui/gatewayTypes.js'
-import { writeActiveSessionFile } from '@tui/lib/activeSessionFile.js'
+import { writeActiveSessionFile } from './hermes/activeSessionFile.js'
 
 import logo from '../assets/logo.png'
 

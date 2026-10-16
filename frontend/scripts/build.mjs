@@ -1,8 +1,8 @@
 #!/usr/bin/env node
-// The Tern frontend's esbuild recipe: one ESM file for node. `@tui/*` reaches
-// the renderer-free modules of ui-tui (gateway transport, skin palette).
-// scripts/build/tsp.mjs wraps this into the receipted `tsp` product; run
-// directly it is the fast developer build into `dist/entry.js` (or `$TSP_OUT`).
+// The Tern frontend's esbuild recipe: one self-contained ESM file for node.
+// `@tui/*` reaches the renderer-free modules of ui-tui (gateway transport, skin
+// palette) in the Hermes checkout `.hermes-src` points at (scripts/hermes-src.mjs).
+// Output: `dist/entry.js` (or `$TSP_OUT`).
 import { build } from 'esbuild'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -22,7 +22,9 @@ export async function bundle({ outfile, logLevel = 'warning' }) {
     jsx: 'automatic',
     jsxImportSource: '@stencil-hq/tern',
     loader: { '.png': 'binary' },
-    alias: { '@tui': resolve(root, '../ui-tui/src') },
+    alias: { '@tui': resolve(root, '.hermes-src/ui-tui/src') },
+    // Hermes sources resolve their npm imports (undici, nanostores) from this package.
+    preserveSymlinks: true,
     // CommonJS dependencies (undici) still call require().
     banner: {
       js: "import { createRequire as __createRequire } from 'node:module'; const require = __createRequire(import.meta.url);"

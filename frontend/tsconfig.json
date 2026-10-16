@@ -13,8 +13,9 @@
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
     "noEmit": true,
+    "preserveSymlinks": true,
     "paths": {
-      "@tui/*": ["../ui-tui/src/*"]
+      "@tui/*": ["./.hermes-src/ui-tui/src/*"]
     }
   },
   "include": ["src/**/*.ts", "src/**/*.tsx"],
