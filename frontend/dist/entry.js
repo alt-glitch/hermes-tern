@@ -24548,7 +24548,7 @@ var GatewayClient = class extends EventEmitter {
 };
 
 // src/app.ts
-import { randomUUID as randomUUID2 } from "node:crypto";
+import { randomUUID as randomUUID3 } from "node:crypto";
 
 // node_modules/@hermes/shared/src/slash.ts
 var SLASH_COMMAND_RE = /^\/[^\s/]*(?:\s|$)/;
@@ -24800,6 +24800,47 @@ var providerDisplayNames = (providers) => {
   );
 };
 
+// src/hermes/mutate.ts
+import { randomUUID as randomUUID2 } from "node:crypto";
+async function mutateSession(gw2, sid, operation, payload) {
+  const snapshot = await gw2.request("session.resume", { session_id: sid });
+  if (!Number.isSafeInteger(snapshot?.revision) || !Number.isSafeInteger(snapshot?.execution_generation)) {
+    throw new Error("The session did not report its revision; try again.");
+  }
+  const result = await gw2.request("session.mutate", {
+    session_id: sid,
+    request_id: randomUUID2(),
+    expected_revision: snapshot.revision,
+    expected_generation: snapshot.execution_generation,
+    operation,
+    payload
+  });
+  if (!result) {
+    throw new Error("session.mutate returned nothing");
+  }
+  return result;
+}
+function modelPayload(arg) {
+  const parts = arg.trim().split(/\s+/);
+  const model = parts.shift() ?? "";
+  if (!model || model.startsWith("--")) {
+    throw new Error("Usage: /model <name> [--provider <slug>]");
+  }
+  const payload = { model };
+  while (parts.length) {
+    const flag = parts.shift();
+    if (flag === "--session" || flag === "--tui-session") {
+      continue;
+    }
+    if (flag === "--provider" && parts[0] && !parts[0].startsWith("--")) {
+      payload.provider = parts.shift();
+      continue;
+    }
+    throw new Error(`/model: ${flag} is not supported here (the switch applies to this session)`);
+  }
+  return payload;
+}
+
 // src/overlays/search.ts
 var PAGE = 10;
 function editQuery(key2, query) {
@@ -24885,8 +24926,23 @@ function hitRuns(positions, limit) {
 // src/overlays/models.tsx
 var KEY2 = "models";
 var ALL = "all";
+var confirmTokens = /* @__PURE__ */ new Map();
+async function mutateModel(app, value, confirmed) {
+  const key2 = `${app.sid} ${value}`;
+  const confirm = confirmed ? confirmTokens.get(key2) : void 0;
+  confirmTokens.delete(key2);
+  const result = await mutateSession(app.gw, app.sid ?? "", "model", { ...modelPayload(value), ...confirm ? { confirm } : {} });
+  if (result.status === "confirmation_required" && typeof result.confirm === "string" && !confirmed) {
+    confirmTokens.set(key2, result.confirm);
+    return { confirm_message: result.confirm_message, confirm_required: true };
+  }
+  if (result.status === "confirmation_required") {
+    throw new Error(result.confirm_message || "The model switch needs confirming again; try once more.");
+  }
+  return { value: result.model ?? "" };
+}
 async function switchModel(app, value, confirmed = false) {
-  const r = await app.gw.request("config.set", {
+  const r = app.gw.isCanonical ? await mutateModel(app, value, confirmed) : await app.gw.request("config.set", {
     confirm_expensive_model: confirmed,
     key: "model",
     session_id: app.sid,
@@ -26173,7 +26229,7 @@ function openSessionPicker(app) {
   const remove = async (id) => {
     deleting = null;
     try {
-      await app.gw.request("session.delete", { session_id: id });
+      await (app.gw.isCanonical ? mutateSession(app.gw, id, "delete", {}) : app.gw.request("session.delete", { session_id: id }));
       rows = rows.filter((r) => r.id !== id);
     } catch (error) {
       app.transcript.notice(error instanceof Error ? error.message : String(error), "error");
@@ -28997,7 +29053,7 @@ var App = class {
     }
     this.transcript.user(display?.trim() || text);
     this.#startBusy("Working\u2026");
-    this.#gw.request("prompt.submit", { session_id: this.sid, submission_id: randomUUID2(), text, ...queued ? { queued } : {} }).catch((error) => {
+    this.#gw.request("prompt.submit", { session_id: this.sid, submission_id: randomUUID3(), text, ...queued ? { queued } : {} }).catch((error) => {
       this.transcript.notice(error.message, "error");
       this.busy = null;
       this.changed();

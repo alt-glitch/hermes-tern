@@ -9,6 +9,7 @@ import type { JSX, Key, KvItem, PickerColumn, PickerGroup, PickerItem, PickerSco
 import { providerDisplayNames } from '@tui/domain/providers.js'
 
 import type { App } from '../app.js'
+import { modelPayload, mutateSession } from '../hermes/mutate.js'
 import type { Overlay } from '../overlay.js'
 
 import { editQuery, hitRuns, moveSelection, rank } from './search.js'
@@ -28,14 +29,39 @@ interface Confirm {
   text: string
 }
 
-/** `config.set model` for `value` (`<model> [--provider <slug>] [--session|--global]`); reports the switch in the transcript unless it needs a confirmation. */
+/** The shared gateway's one-time tokens for guarded model targets the user was asked about, by `sid value`. */
+const confirmTokens = new Map<string, string>()
+
+/** A model switch on the shared gateway: a revision-fenced `session.mutate operation=model`, shaped like `config.set`'s reply. */
+async function mutateModel(app: App, value: string, confirmed: boolean): Promise<ConfigSetResult> {
+  const key = `${app.sid} ${value}`
+  const confirm = confirmed ? confirmTokens.get(key) : undefined
+  confirmTokens.delete(key)
+  const result = await mutateSession(app.gw, app.sid ?? '', 'model', { ...modelPayload(value), ...(confirm ? { confirm } : {}) })
+
+  if (result.status === 'confirmation_required' && typeof result.confirm === 'string' && !confirmed) {
+    confirmTokens.set(key, result.confirm)
+
+    return { confirm_message: result.confirm_message, confirm_required: true } as ConfigSetResult
+  }
+
+  if (result.status === 'confirmation_required') {
+    throw new Error(result.confirm_message || 'The model switch needs confirming again; try once more.')
+  }
+
+  return { value: result.model ?? '' } as ConfigSetResult
+}
+
+/** Switches the session's model to `value` (`<model> [--provider <slug>] [--session|--global]`); reports the switch in the transcript unless it needs a confirmation. */
 export async function switchModel(app: App, value: string, confirmed = false): Promise<ConfigSetResult> {
-  const r = await app.gw.request<ConfigSetResult>('config.set', {
-    confirm_expensive_model: confirmed,
-    key: 'model',
-    session_id: app.sid,
-    value
-  })
+  const r = app.gw.isCanonical
+    ? await mutateModel(app, value, confirmed)
+    : await app.gw.request<ConfigSetResult>('config.set', {
+        confirm_expensive_model: confirmed,
+        key: 'model',
+        session_id: app.sid,
+        value
+      })
 
   if (r.confirm_required) {
     return r

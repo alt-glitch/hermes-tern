@@ -10,6 +10,7 @@ import type { App } from '../app.js'
 import type { Overlay } from '../overlay.js'
 
 import { editQuery, hitRuns, moveSelection, rank } from './search.js'
+import { mutateSession } from '../hermes/mutate.js'
 
 const KEY = 'sessions'
 const LIMIT = 200
@@ -60,7 +61,8 @@ export function openSessionPicker(app: App) {
     deleting = null
 
     try {
-      await app.gw.request('session.delete', { session_id: id })
+      // The shared gateway deletes through a revision-fenced mutation (the whole lineage).
+      await (app.gw.isCanonical ? mutateSession(app.gw, id, 'delete', {}) : app.gw.request('session.delete', { session_id: id }))
       rows = rows.filter(r => r.id !== id)
     } catch (error) {
       app.transcript.notice(error instanceof Error ? error.message : String(error), 'error')
