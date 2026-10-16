@@ -1,0 +1,29 @@
+{
+  "name": "hermes-tsp",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Hermes for Tern: the chat UI described over the Tern Surface Protocol instead of painted cells",
+  "type": "module",
+  "scripts": {
+    "build": "node ../scripts/build/tsp.mjs",
+    "bundle": "node scripts/build.mjs",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run",
+    "lint": "eslint src/",
+    "fmt": "prettier --write 'src/**/*.{ts,tsx}'",
+    "fix": "eslint src/ --fix && npm run fmt",
+    "check": "npm run typecheck && npm run test && npm run lint"
+  },
+  "dependencies": {
+    "@hermes/shared": "file:../apps/shared",
+    "@stencil-hq/tern": "0.1.0",
+    "nanostores": "1.4.2",
+    "undici": "6.28.0"
+  },
+  "devDependencies": {
+    "@types/node": "22.20.1",
+    "esbuild": "0.28.1",
+    "typescript": "6.0.3",
+    "vitest": "4.1.10"
+  }
+}
