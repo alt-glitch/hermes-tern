@@ -65,7 +65,8 @@ function buildEntry(e: Exclude<Entry, { kind: 'welcome' }>, id: string, cx: Tran
     case 'panel':
       return (
         <card collapsible head={[{ s: 'strong', t: e.title }]} key={e.id} role="omp.custom" tone="neutral">
-          <md key="body">{e.text}</md>
+          {/* Command output is plain text in lines (and may carry SGR colours), not markdown. */}
+          <ansi key="body" text={e.text} />
         </card>
       )
   }

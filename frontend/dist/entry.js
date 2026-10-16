@@ -28782,7 +28782,7 @@ function buildEntry(e, id, cx) {
     case "notice":
       return noticeNode(e);
     case "panel":
-      return /* @__PURE__ */ jsx("card", { collapsible: true, head: [{ s: "strong", t: e.title }], role: "omp.custom", tone: "neutral", children: /* @__PURE__ */ jsx("md", { children: e.text }, "body") }, e.id);
+      return /* @__PURE__ */ jsx("card", { collapsible: true, head: [{ s: "strong", t: e.title }], role: "omp.custom", tone: "neutral", children: /* @__PURE__ */ jsx("ansi", { text: e.text }, "body") }, e.id);
   }
 }
 function userNode(e, cx) {
@@ -29382,7 +29382,7 @@ var App = class {
         this.#applySkin(ev.payload);
         break;
       case "session.info":
-        this.info = ev.payload ?? this.info;
+        this.info = ev.payload ? { ...this.info, ...ev.payload } : this.info;
         this.usage = ev.payload?.usage ?? this.usage;
         break;
       case "session.usage":

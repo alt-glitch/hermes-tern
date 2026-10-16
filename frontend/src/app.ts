@@ -705,7 +705,8 @@ export class App implements OverlayHost {
         break
 
       case 'session.info':
-        this.info = ev.payload ?? this.info
+        // The shared owner's idle fanout carries only pending/revision/generation: merge, never replace.
+        this.info = ev.payload ? { ...this.info, ...ev.payload } : this.info
         this.usage = ev.payload?.usage ?? this.usage
 
         break
