@@ -13,7 +13,9 @@ import type {
   Usage
 } from '@hermes/shared/gateway-events'
 import type { ServerRequest } from '@hermes/shared/json-rpc-channel'
+import { parseCommandDispatch } from '@hermes/shared/slash'
 import type { Key, Session, Surface, TspEvent } from '@stencil-hq/tern'
+import { describeSlashExecError, isUnsupportedCommand, shouldFallbackToDispatch } from '@tui/app/userMessages.js'
 import { localCreationOptions } from '@tui/canonicalGateway.js'
 import type { GatewayClient } from '@tui/gatewayClient.js'
 import type { AnyGatewayEvent } from '@tui/gatewayTypes.js'
@@ -305,7 +307,7 @@ export class App implements OverlayHost {
   }
 
   /** Sends `text` now; `queued` marks a drained queue entry (the gateway must queue it, never steer with it). */
-  #send(text: string, { queued = false }: { queued?: boolean } = {}) {
+  #send(text: string, { display, queued = false }: { display?: string; queued?: boolean } = {}) {
     // A session switch in flight: the prompt belongs to the session it adopts.
     if (!this.sid || this.#switches.pending) {
       this.queue.unshift(text)
@@ -313,7 +315,7 @@ export class App implements OverlayHost {
       return
     }
 
-    this.transcript.user(text)
+    this.transcript.user(display?.trim() || text)
     this.#startBusy('Working…')
     this.#gw
       // The shared gateway admits a prompt by its submission id (a retry with the same id is one turn).
@@ -348,26 +350,28 @@ export class App implements OverlayHost {
       return
     }
 
+    const title = `/${name}${arg ? ` ${arg}` : ''}`
+
     try {
-      const r = await this.#gw.request<{ output?: string; warning?: string; type?: string; message?: string }>(
-        'slash.exec',
-        {
-          command: text.slice(1),
-          session_id: this.sid
-        }
-      )
+      const r = await this.#gw.request<unknown>('slash.exec', { command: text.slice(1), session_id: this.sid })
 
-      if (r?.type === 'send' && r.message) {
-        this.#send(r.message)
-      } else if (r?.output?.trim()) {
-        this.transcript.panel(`/${name}${arg ? ` ${arg}` : ''}`, r.output)
-      }
-
-      if (r?.warning) {
-        this.transcript.notice(r.warning, 'warning')
-      }
+      await this.#dispatched(r, title, arg)
     } catch (error) {
-      this.transcript.notice(error instanceof Error ? error.message : String(error), 'error')
+      // Only "slash.exec does not own this command" (skills, bundles) falls through to command.dispatch;
+      // re-dispatching any other refusal could run a mutating command twice.
+      if (isUnsupportedCommand(error) || !shouldFallbackToDispatch(error)) {
+        this.transcript.notice(describeSlashExecError(name, error), isUnsupportedCommand(error) ? 'warning' : 'error')
+      } else {
+        try {
+          await this.#dispatched(
+            await this.#gw.request<unknown>('command.dispatch', { arg, name, session_id: this.sid }),
+            title,
+            arg
+          )
+        } catch (dispatchError) {
+          this.transcript.notice(describeSlashExecError(name, dispatchError), 'error')
+        }
+      }
     }
 
     this.changed()
@@ -589,6 +593,58 @@ export class App implements OverlayHost {
     await this.#gw
       .request('session.detach', { end_reason: endReason, session_id: sid, subscription_id: subscription })
       .catch(() => undefined)
+  }
+
+  /** Acts on a slash.exec / command.dispatch answer: output, a skill or message to send, an alias or a prefill. */
+  async #dispatched(raw: unknown, title: string, arg: string) {
+    const d = parseCommandDispatch(raw)
+    const legacy = (raw ?? {}) as { output?: string; warning?: string }
+
+    if (legacy.warning) {
+      this.transcript.notice(legacy.warning, 'warning')
+    }
+
+    if (!d) {
+      if (legacy.output?.trim()) {
+        this.transcript.panel(title, legacy.output)
+      }
+
+      return
+    }
+
+    switch (d.type) {
+      case 'exec':
+
+      case 'plugin':
+        if (d.output?.trim()) {
+          this.transcript.panel(title, d.output)
+        }
+
+        return
+
+      case 'alias':
+        return this.#slash(`/${d.target}${arg ? ` ${arg}` : ''}`)
+
+      case 'skill':
+        // `message` is the expanded skill body for the model; the transcript shows the invocation.
+        return d.message?.trim()
+          ? this.#send(d.message, { display: d.display || title })
+          : this.transcript.notice(`${title}: the skill sent no message`, 'error')
+
+      case 'send':
+        if (d.notice?.trim()) {
+          this.transcript.notice(d.notice)
+        }
+
+        return d.message?.trim() ? this.#send(d.message, { display: d.display }) : undefined
+
+      case 'prefill':
+        if (d.notice?.trim()) {
+          this.transcript.notice(d.notice)
+        }
+
+        this.composer.set(d.message)
+    }
   }
 
   /** Ends switch `token`; once none is in flight, held requests for the adopted session open and the queue drains. */
