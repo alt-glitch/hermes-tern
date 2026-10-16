@@ -3,6 +3,8 @@
 // transcript, keys go to the top overlay or the composer, and every change
 // schedules one render of the whole view; the SDK diffs it into frame ops.
 
+import { randomUUID } from 'node:crypto'
+
 import type {
   SessionLiveInfo,
   SessionResumeResult,
@@ -14,7 +16,6 @@ import type { ServerRequest } from '@hermes/shared/json-rpc-channel'
 import type { Key, Session, Surface, TspEvent } from '@stencil-hq/tern'
 import type { GatewayClient } from '@tui/gatewayClient.js'
 import type { AnyGatewayEvent } from '@tui/gatewayTypes.js'
-import { writeActiveSessionFile } from './hermes/activeSessionFile.js'
 
 import logo from '../assets/logo.png'
 
@@ -22,6 +23,7 @@ import { localCommand } from './commands.js'
 import { Composer } from './composer.js'
 import { type Busy, busyFrom, ownsEvent, Switches } from './flow.js'
 import type { Overlay, OverlayHost } from './overlay.js'
+import { writeActiveSessionFile } from './hermes/activeSessionFile.js'
 import { Completion } from './overlays/completion.js'
 import { openModelPicker } from './overlays/models.js'
 import { promptOverlay } from './overlays/prompts.js'
@@ -307,7 +309,8 @@ export class App implements OverlayHost {
     this.transcript.user(text)
     this.#startBusy('Working…')
     this.#gw
-      .request('prompt.submit', { session_id: this.sid, text, ...(queued ? { queued } : {}) })
+      // The shared gateway admits a prompt by its submission id (a retry with the same id is one turn).
+      .request('prompt.submit', { session_id: this.sid, submission_id: randomUUID(), text, ...(queued ? { queued } : {}) })
       .catch((error: Error) => {
         this.transcript.notice(error.message, 'error')
         this.busy = null
