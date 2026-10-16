@@ -34,10 +34,13 @@ export function sharedPromptRequest(
   // One card per question on this wire: the sheet's questions[] shape with the prompt id as its qid.
   const single = typeof shared.question === 'string' ? shared.question.trim() : ''
 
+  const batch = Array.isArray(shared.questions) && shared.questions.length ? shared.questions : null
+
   const questions =
-    kind === 'clarify' && single && !Array.isArray(shared.questions)
+    batch ??
+    (single
       ? [{ choices: shared.choices ?? [], multi_select: shared.multi_select === true, qid: shared.prompt_id, question: single }]
-      : shared.questions
+      : [])
 
   let answered = false
 

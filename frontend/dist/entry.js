@@ -26392,7 +26392,8 @@ function sharedPromptRequest(ev, gw2, onError) {
   }
   const control = { session_id: ev.session_id, execution_generation: shared.execution_generation, prompt_id: shared.prompt_id };
   const single = typeof shared.question === "string" ? shared.question.trim() : "";
-  const questions = kind === "clarify" && single && !Array.isArray(shared.questions) ? [{ choices: shared.choices ?? [], multi_select: shared.multi_select === true, qid: shared.prompt_id, question: single }] : shared.questions;
+  const batch2 = Array.isArray(shared.questions) && shared.questions.length ? shared.questions : null;
+  const questions = batch2 ?? (single ? [{ choices: shared.choices ?? [], multi_select: shared.multi_select === true, qid: shared.prompt_id, question: single }] : []);
   let answered = false;
   const send = (method, params) => {
     if (answered) {
