@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import type { Block, ToolCall, TurnEntry } from '../model.js'
-import { foldOf, formatDuration, liveLabel, parts, pieces, presentTense, stepLabel, summarize, thoughtLine, type WorkItem } from '../workLog.js'
+import { busyLabel, foldOf, formatDuration, liveLabel, parts, pieces, preparingLabel, presentTense, stepLabel, summarize, thoughtLine, type WorkItem } from '../workLog.js'
 
 const call = (name: string, args: Record<string, unknown> = {}, more: Partial<ToolCall> = {}): ToolCall => ({
   args,
@@ -181,5 +181,19 @@ describe('labels', () => {
 
   it('formats durations as t3code does', () => {
     expect([820, 4_300, 42_000, 62_000, 3_725_000].map(formatDuration)).toEqual(['820ms', '4.3s', '42s', '1m 2s', '1h 2m 5s'])
+  })
+})
+
+describe('busy labels', () => {
+  it('names the running call as its step reads, not by its wire name', () => {
+    const running = { status: 'running' as const }
+    expect(busyLabel(call('read_file', { path: '/x/a.ts' }, running))).toBe('Reading /x/a.ts…')
+    expect(busyLabel(call('terminal', { command: 'ls -la' }, running))).toBe('Running ls…')
+    expect(busyLabel(call('connectors__linear__LINEAR_CREATE_ISSUE', {}, running))).toMatch(/^Linear · .*issue.*…$/i)
+  })
+
+  it('names a call the model is still writing', () => {
+    expect(preparingLabel('connectors__linear__LINEAR_CREATE_ISSUE')).toMatch(/^Preparing Linear · .*issue.*…$/i)
+    expect(preparingLabel('read_file')).toBe('Preparing read file…')
   })
 })

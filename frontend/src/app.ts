@@ -56,6 +56,7 @@ import { loadSettings, saveSettings, type ThemeMode } from './settings.js'
 import { Transcript } from './transcript.js'
 import { dockNodes, todoProgress } from './view/dock.js'
 import { entryNode } from './view/transcript.js'
+import { busyLabel, preparingLabel } from './workLog.js'
 import { openSidebar, specOf } from './watch/spec.js'
 import { randomTip, type WelcomeContext } from './view/welcome.js'
 
@@ -1202,14 +1203,16 @@ export class App implements OverlayHost {
         break
 
       case 'tool.generating':
-        this.#label(`Preparing ${ev.payload?.name ?? 'a tool'}…`)
+        this.#label(ev.payload?.name ? preparingLabel(ev.payload.name) : 'Preparing a tool…')
 
         break
 
       case 'tool.start':
         if (ev.payload) {
           t.toolStart(ev.payload)
-          this.#label(`Running ${ev.payload.name}…`)
+          // The call as its step reads (a bridged or connector call as its app), not its wire name.
+          const call = t.call(ev.payload.tool_id)
+          this.#label(call ? busyLabel(call) : `Running ${ev.payload.name}…`)
         }
 
         break

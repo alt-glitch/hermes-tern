@@ -190,6 +190,9 @@ function cardOf(call: ToolCall, now: number): Card {
 
       break
 
+    // `todo` is the legacy name stored transcripts and older backends keep.
+    case 'todo':
+
     case 'todo_list':
       return {
         body: call.todos?.length ? [checklistNode(call.todos)] : [],
@@ -616,7 +619,7 @@ function taskCard(call: ToolCall, result: Record<string, unknown> | undefined, n
     ? agents.map(a => agentNode(a, now))
     : call.status === 'running' || result?.status === 'dispatched'
       ? goals.map((g, i) => <agent agent="task" key={`p${i}`} name={`Agent ${i + 1}`} status="pending" task={g} />)
-      : []
+      : settledRows(goals, result)
 
   const context = str(call.args.context) ?? (tasks.length === 1 ? str(tasks[0]?.context) : undefined)
 
@@ -663,6 +666,30 @@ function taskCard(call: ToolCall, result: Record<string, unknown> | undefined, n
     title: 'Task',
     took
   }
+}
+
+/**
+ * A settled delegation with no subagent events (a resumed session): its goals, each with the
+ * outcome `result.results` gives it, as the desktop's delegateRowsFromCall. History drops the
+ * result, so a goal with none reads idle rather than done or failed.
+ */
+function settledRows(goals: string[], result: Record<string, unknown> | undefined): JSX.Element[] {
+  const results = Array.isArray(result?.results) ? result.results.map(r => record(r)) : []
+  const titles = goals.length ? goals : results.map(() => 'Delegated task')
+
+  return titles.map((g, i) => {
+    const r = results[i]
+    const verdict = str(r?.status) ?? ''
+    // As the desktop's settledRowStatus: anything but a success (a timeout, an error) failed.
+    const status = !r ? 'idle' : verdict === '' || verdict === 'ok' || verdict === 'completed' ? 'done' : 'failed'
+    const summary = str(r?.summary) ?? str(r?.error)
+
+    return (
+      <agent agent="task" key={`s${i}`} name={`Agent ${i + 1}`} status={status} task={g}>
+        {summary ? <md key="o">{summary}</md> : null}
+      </agent>
+    )
+  })
 }
 
 /**
@@ -748,8 +775,10 @@ function askCard(call: ToolCall, result: Record<string, unknown> | undefined): C
       body.push(answerRow(`q${i}.a${j}`, typed, true))
     }
 
-    if (!answers.length && call.status !== 'running') {
-      body.push(<text key={`q${i}.none`} role="omp.tool.notice" spans={[{ s: 'muted', t: 'No answer' }]} />)
+    // History drops clarify's result: with none, the answer is unknown, not missing.
+    if (!answers.length && call.status !== 'running' && result !== undefined) {
+      const skipped = responses[i]?.status === 'skipped'
+      body.push(<text key={`q${i}.none`} role="omp.tool.notice" spans={[{ s: 'muted', t: skipped ? 'Skipped' : 'No answer' }]} />)
     }
   }
 
