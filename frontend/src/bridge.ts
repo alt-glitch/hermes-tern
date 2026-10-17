@@ -67,11 +67,14 @@ export function appTitle(slug: string): string {
     return known
   }
 
-  return slug
-    .split(/[-_\s]+/)
-    .filter(Boolean)
-    .map(w => w.charAt(0).toUpperCase() + w.slice(1))
-    .join(' ')
+  const words = slug.split(/[-_\s]+/).filter(Boolean)
+
+  // `granola_mcp` is Granola: the transport is not part of the app's name.
+  if (words.length > 1 && words.at(-1)!.toLowerCase() === 'mcp') {
+    words.pop()
+  }
+
+  return words.map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')
 }
 
 /** Hermes' `_action_phrase`: the tool slug in words, without the app's own prefix. */

@@ -11,6 +11,7 @@ describe('the tool_call bridge', () => {
     expect(appOf('connectors__linear__LINEAR_CREATE_ISSUE')).toEqual({ action: 'create issue', app: 'Linear', kind: 'connector' })
     expect(appOf('connectors__googlecalendar__GOOGLECALENDAR_FIND_EVENT', { connector_alias: 'work' })?.action).toBe('find event (work)')
     expect(appOf('mcp__my-server__do_thing')).toEqual({ action: 'do thing', app: 'My Server', kind: 'mcp' })
+    expect(appOf('connectors__granola_mcp__LIST_MEETINGS')?.app).toBe('Granola')
     expect(appOf('connectors__execute')).toBeUndefined()
     expect(appOf('terminal')).toBeUndefined()
   })
