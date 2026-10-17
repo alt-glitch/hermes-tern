@@ -447,6 +447,20 @@ export class Transcript {
     }
   }
 
+  /** Marks the turn holding `call` changed, after something outside the reducer updated it. */
+  touchCall(call: ToolCall) {
+    this.#touch(this.#findTool(c => c === call)?.turn)
+  }
+
+  /** The delegate_task calls in the transcript, oldest first. */
+  delegations(): ToolCall[] {
+    return this.entries.flatMap(e =>
+      e.kind === 'turn'
+        ? e.blocks.flatMap(b => (b.kind === 'tool' && b.call.name === 'delegate_task' ? [b.call] : []))
+        : []
+    )
+  }
+
   #tool(id: string): Located | undefined {
     return this.#findTool(call => call.id === id)
   }

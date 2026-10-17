@@ -9,12 +9,15 @@ the user's prompt, so one home covers every flow:
     "approve"   -> a terminal call Hermes flags as dangerous (approval sheet)
     "clarify"   -> a clarify call with choices (clarify sheet)
     "tool"      -> a harmless terminal call (tool card)
+    "delegate…" -> (at the start) a delegate_task batch of three subagents, each running two slow
+                   terminal calls before a slowly streamed answer
     anything else -> a streamed markdown reply
 """
 
 import argparse
 import json
 import os
+import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
@@ -31,8 +34,42 @@ print("hello from hermes tern")
 """
 
 
+SUBAGENT_MARKER = "You are a focused subagent"
+
+SUBAGENT_GOALS = [
+    "Survey the repository layout and name the top-level folders",
+    "Read the clock twice, a few seconds apart",
+    "Count the markdown files under the current folder",
+]
+
+SUBAGENT_STEPS = [
+    "sleep 3 && ls | head -5",
+    "sleep 4 && date && find . -maxdepth 2 -name '*.md' | wc -l",
+]
+
+SUBAGENT_REPLY = """Finished the delegated task.
+
+- ran two terminal steps
+- found nothing alarming
+
+The parent can take it from here.
+"""
+
+
+def _subagent_calls(messages: list[dict]) -> list[dict] | None:
+    """A subagent's next move: one slow terminal step per earlier tool result, then the answer."""
+    done = sum(1 for m in messages if m.get("role") == "tool")
+    if done >= len(SUBAGENT_STEPS):
+        return None
+    return [_call("terminal", {"command": SUBAGENT_STEPS[done]}, f"call-step{done}")]
+
+
 def _calls(prompt: str, target: Path) -> list[dict] | None:
     words = prompt.lower()
+    # Only a prompt that starts with it: the parent's completion notice quotes the delegation and
+    # would otherwise dispatch again, forever.
+    if words.lstrip().startswith("delegate"):
+        return [_call("delegate_task", {"tasks": [{"goal": g} for g in SUBAGENT_GOALS]})]
     if "approve" in words:
         target.mkdir(exist_ok=True)
         return [_call("terminal", {"command": f"rm -rf -- {target}"})]
@@ -43,8 +80,8 @@ def _calls(prompt: str, target: Path) -> list[dict] | None:
     return None
 
 
-def _call(name: str, arguments: dict) -> dict:
-    return {"id": f"call-{name}", "type": "function", "function": {"name": name, "arguments": json.dumps(arguments)}}
+def _call(name: str, arguments: dict, call_id: str = "") -> dict:
+    return {"id": call_id or f"call-{name}", "type": "function", "function": {"name": name, "arguments": json.dumps(arguments)}}
 
 
 class Server(ThreadingHTTPServer):
@@ -66,18 +103,25 @@ class Model(BaseHTTPRequestHandler):
         prompt = next((m.get("content") for m in reversed(messages) if m.get("role") == "user"), "") or ""
         if isinstance(prompt, list):
             prompt = " ".join(p.get("text", "") for p in prompt if isinstance(p, dict))
-        answered = bool(messages) and messages[-1].get("role") == "tool"
-        calls = None if answered else _calls(prompt, self.server.target)
-        content = "Done: the tool returned." if answered else (None if calls else REPLY)
+        system = next((m.get("content") for m in messages if m.get("role") == "system"), "") or ""
+        if isinstance(system, str) and SUBAGENT_MARKER in system:
+            calls = _subagent_calls(messages)
+            content = None if calls else SUBAGENT_REPLY
+            delay = 0.15
+        else:
+            answered = bool(messages) and messages[-1].get("role") == "tool"
+            calls = None if answered else _calls(prompt, self.server.target)
+            content = "Done: the tool returned." if answered else (None if calls else REPLY)
+            delay = 0.0
         if request.get("stream"):
-            self._stream(content, calls)
+            self._stream(content, calls, delay)
         else:
             message = {"role": "assistant", "content": content, **({"tool_calls": calls} if calls else {})}
             self._json({"id": "fake", "object": "chat.completion", "created": 1, "model": "fake-model",
                         "choices": [{"index": 0, "message": message, "finish_reason": "tool_calls" if calls else "stop"}],
                         "usage": {"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15}})
 
-    def _stream(self, content: str | None, calls: list[dict] | None):
+    def _stream(self, content: str | None, calls: list[dict] | None, delay: float = 0.0):
         self.send_response(200)
         self.send_header("Content-Type", "text/event-stream")
         self.end_headers()
@@ -91,7 +135,14 @@ class Model(BaseHTTPRequestHandler):
             deltas += [{"role": "assistant", "content": text[i:i + step]} for i in range(0, len(text), step)]
         for delta in deltas:
             self._chunk(delta, None)
+            if delay:
+                self.wfile.flush()
+                time.sleep(delay)
         self._chunk({}, "tool_calls" if calls else "stop")
+        # The usage chunk OpenAI sends last for stream_options.include_usage, so turns show their totals.
+        usage = {"prompt_tokens": 1200, "completion_tokens": 340, "total_tokens": 1540}
+        frame = {"id": "fake", "object": "chat.completion.chunk", "created": 1, "model": "fake-model", "choices": [], "usage": usage}
+        self.wfile.write(f"data: {json.dumps(frame)}\n\n".encode())
         self.wfile.write(b"data: [DONE]\n\n")
         self.wfile.flush()
 

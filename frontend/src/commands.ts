@@ -4,6 +4,7 @@
 
 import type { App } from './app.js'
 import { CONTROL_COMMANDS } from './controlCommands.js'
+import { openAgents } from './overlays/agents.js'
 import { openHelp } from './overlays/help.js'
 import { openModelPicker, switchModel } from './overlays/models.js'
 import { confirmOverlay } from './overlays/prompts.js'
@@ -69,6 +70,12 @@ const COMMANDS: readonly LocalCommand[] = [
 
       return arg === 'new' ? app.newSession() : app.resume(arg)
     }
+  },
+  {
+    // `/agents pause|resume|status` stay the backend's (delegation.pause and its status).
+    aliases: ['tasks'],
+    name: 'agents',
+    run: (app, arg) => (arg ? false : openAgents(app))
   },
   {
     // `/help <command>` is the backend's detailed usage.

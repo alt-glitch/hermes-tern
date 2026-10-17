@@ -4,6 +4,8 @@
 
 import type { SubagentEventPayload, Usage } from '@hermes/shared/gateway-events'
 
+import type { LiveLog } from './agents/liveLog.js'
+
 /** One todo item as the `todo_list` tool reports it. */
 export interface Todo {
   id: string
@@ -17,6 +19,10 @@ export interface Subagent {
   id: string
   goal: string
   index: number
+  /** The row's node key when it differs from `id`: a dispatch placeholder keeps it after the owner names the child. */
+  key?: string
+  /** Display name, for nested children (`Agent 2.1`); else `Agent <index + 1>`. */
+  name?: string
   status: 'cancelled' | 'done' | 'failed' | 'queued' | 'running'
   model?: string
   tool?: string
@@ -30,6 +36,20 @@ export interface Subagent {
   startedAt: number
   duration?: number
   last?: SubagentEventPayload
+  /** The dispatching delegation's id. */
+  delegationId?: string
+  /** Nesting below the delegating session: 0 for a child the session spawned. */
+  depth?: number
+  /** The subagent that spawned this one (nested delegation). */
+  parentId?: string
+  /** The live transcript log on this machine (`live_transcripts` of the dispatch result). */
+  logPath?: string
+  /** That log, parsed: the agent's timeline. */
+  log?: LiveLog
+  /** The owner takes steering text for it now (`accepting_steer`). */
+  steerable?: boolean
+  /** Why it ended, when the log says (max_iterations, …) or its error. */
+  exitReason?: string
 }
 
 /** One tool call, from `tool.start` to `tool.complete`. */

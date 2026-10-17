@@ -2039,7 +2039,7 @@ var require_timers = __commonJS({
     "use strict";
     var fastNow = 0;
     var RESOLUTION_MS = 1e3;
-    var TICK_MS = (RESOLUTION_MS >> 1) - 1;
+    var TICK_MS2 = (RESOLUTION_MS >> 1) - 1;
     var fastNowTimeout;
     var kFastTimer = /* @__PURE__ */ Symbol("kFastTimer");
     var fastTimers = [];
@@ -2048,13 +2048,13 @@ var require_timers = __commonJS({
     var PENDING = 0;
     var ACTIVE = 1;
     function onTick() {
-      fastNow += TICK_MS;
+      fastNow += TICK_MS2;
       let idx = 0;
       let len = fastTimers.length;
       while (idx < len) {
         const timer = fastTimers[idx];
         if (timer._state === PENDING) {
-          timer._idleStart = fastNow - TICK_MS;
+          timer._idleStart = fastNow - TICK_MS2;
           timer._state = ACTIVE;
         } else if (timer._state === ACTIVE && fastNow >= timer._idleStart + timer._idleTimeout) {
           timer._state = TO_BE_CLEARED;
@@ -2080,7 +2080,7 @@ var require_timers = __commonJS({
         fastNowTimeout.refresh();
       } else {
         clearTimeout(fastNowTimeout);
-        fastNowTimeout = setTimeout(onTick, TICK_MS);
+        fastNowTimeout = setTimeout(onTick, TICK_MS2);
         if (fastNowTimeout.unref) {
           fastNowTimeout.unref();
         }
@@ -19262,13 +19262,13 @@ function escapeAt(bytes, i) {
     j++;
   while (j < bytes.length && (bytes[j] ?? 0) >= 32 && (bytes[j] ?? 0) <= 47)
     j++;
-  const final = bytes[j];
-  if (final === void 0)
+  const final2 = bytes[j];
+  if (final2 === void 0)
     return j - i > 64 ? { kind: "pass", end: j } : { kind: "need" };
-  if (final < 64 || final > 126)
+  if (final2 < 64 || final2 > 126)
     return { kind: "pass", end: j };
   const end = j + 1;
-  if (final === 99 && bytes[i + 2] === 63) {
+  if (final2 === 99 && bytes[i + 2] === 63) {
     let da1 = true;
     for (let k = i + 3; k < j; k++) {
       const b = bytes[k] ?? 0;
@@ -19606,24 +19606,24 @@ function csiParams(params) {
     return head === "" ? void 0 : Number(head);
   });
 }
-function csiKey(params, final) {
+function csiKey(params, final2) {
   if (!/^[0-9:;]*$/.test(params))
     return null;
   const nums = csiParams(params);
   const mods2 = modsOf(nums[1]);
-  if (final === "u") {
+  if (final2 === "u") {
     const code2 = nums[0];
     return code2 === void 0 ? null : codeKey(code2, mods2);
   }
-  if (final === "~") {
+  if (final2 === "~") {
     if (nums[0] === 27 && nums[2] !== void 0)
       return codeKey(nums[2], mods2);
     const name2 = TILDE_KEYS[nums[0] ?? 0];
     return name2 === void 0 ? null : key(name2, mods2);
   }
-  if (final === "Z")
+  if (final2 === "Z")
     return key("tab", { ...mods2, shift: true });
-  const name = LETTER_KEYS[final];
+  const name = LETTER_KEYS[final2];
   return name === void 0 ? null : key(name, mods2);
 }
 var KeyDecoder = class {
@@ -19654,7 +19654,7 @@ var KeyDecoder = class {
     return out;
   }
   /** Decodes keys from `bytes` into `out`; returns how many bytes it used. */
-  #decode(bytes, out, final) {
+  #decode(bytes, out, final2) {
     let i = 0;
     while (i < bytes.length) {
       if (this.#paste) {
@@ -19670,7 +19670,7 @@ var KeyDecoder = class {
         i = at + PASTE_END2.length;
         continue;
       }
-      const used = this.#one(bytes, i, out, final);
+      const used = this.#one(bytes, i, out, final2);
       if (used === 0)
         return i;
       i += used;
@@ -19678,26 +19678,26 @@ var KeyDecoder = class {
     return i;
   }
   /** Decodes one key at `i`; returns the bytes it took, 0 when it needs more. */
-  #one(bytes, i, out, final) {
+  #one(bytes, i, out, final2) {
     const b = bytes[i] ?? 0;
     if (b !== ESC2)
-      return this.#plain(bytes, i, out, false, final);
+      return this.#plain(bytes, i, out, false, final2);
     const next = bytes[i + 1];
     if (next === void 0) {
-      if (!final)
+      if (!final2)
         return 0;
       out.push(key("escape", NO_MODS));
       return 1;
     }
     if (next === 91 || next === 79) {
-      return this.#sequence(bytes, i, i, out, false, final);
+      return this.#sequence(bytes, i, i, out, false, final2);
     }
     if (next === ESC2) {
       const after = bytes[i + 2];
-      if (after === void 0 && !final)
+      if (after === void 0 && !final2)
         return 0;
       if (after === 91 || after === 79) {
-        const used2 = this.#sequence(bytes, i + 1, i, out, true, final);
+        const used2 = this.#sequence(bytes, i + 1, i, out, true, final2);
         return used2;
       }
       out.push(key("escape", { ...NO_MODS, alt: true }));
@@ -19710,13 +19710,13 @@ var KeyDecoder = class {
         if (bytes[j] === ESC2 && bytes[j + 1] === 92)
           return j + 2 - i;
       }
-      return final ? bytes.length - i : 0;
+      return final2 ? bytes.length - i : 0;
     }
-    const used = this.#plain(bytes, i + 1, out, true, final);
+    const used = this.#plain(bytes, i + 1, out, true, final2);
     return used === 0 ? 0 : used + 1;
   }
   /** Decodes a CSI or SS3 sequence whose ESC is at `at` (`start` is where the key began). */
-  #sequence(bytes, at, start, out, alt, final) {
+  #sequence(bytes, at, start, out, alt, final2) {
     const intro = bytes[at + 1];
     let j = at + 2;
     while (j < bytes.length && (bytes[j] ?? 0) >= 48 && (bytes[j] ?? 0) <= 63)
@@ -19725,7 +19725,7 @@ var KeyDecoder = class {
       j++;
     const f = bytes[j];
     if (f === void 0) {
-      if (!final)
+      if (!final2)
         return 0;
       return bytes.length - start;
     }
@@ -19744,7 +19744,7 @@ var KeyDecoder = class {
     return j + 1 - start;
   }
   /** Decodes one typed character or control byte at `i`. */
-  #plain(bytes, i, out, alt, final) {
+  #plain(bytes, i, out, alt, final2) {
     const b = bytes[i] ?? 0;
     if (b < 32 || b === 127) {
       const found2 = controlKey(b, alt);
@@ -19754,7 +19754,7 @@ var KeyDecoder = class {
     }
     const len = utf8Length(b);
     if (i + len > bytes.length)
-      return final ? bytes.length - i : 0;
+      return final2 ? bytes.length - i : 0;
     const char = decoder3.decode(bytes.subarray(i, i + len));
     const code2 = char.codePointAt(0) ?? 65533;
     const found = codeKey(code2, { ...NO_MODS, alt }, false);
@@ -24658,6 +24658,826 @@ var shouldFallbackToDispatch = (err) => {
 // assets/logo.png
 var logo_default = __toBinaryNode("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");
 
+// src/agents/store.ts
+import { readFile, stat } from "node:fs/promises";
+
+// src/transcript.ts
+var Transcript = class {
+  entries = [];
+  /** Bumped on every change; views and the render loop compare it. */
+  rev = 0;
+  #next = 0;
+  /** The session's running usage at the last completed turn (message.complete reports session totals). */
+  #sessionUsage;
+  /** The streaming turn: set by start, cleared by complete, clear and load (notices may land after it). */
+  #live;
+  /** Sets the running usage turns count from (a resumed session's totals). */
+  usageBase(usage) {
+    this.#sessionUsage = usage;
+  }
+  /** A fresh id for an entry or block, unique within this transcript. */
+  id(prefix) {
+    return `${prefix}${(this.#next++).toString(36)}`;
+  }
+  get live() {
+    return this.#live;
+  }
+  clear() {
+    this.entries = [];
+    this.#live = void 0;
+    this.#touch();
+  }
+  push(entry) {
+    this.entries.push(entry);
+    this.#touch();
+  }
+  user(text, at = Date.now()) {
+    this.push({ at, id: this.id("u"), kind: "user", text });
+  }
+  notice(text, tone = "info") {
+    this.push({ id: this.id("n"), kind: "notice", text, tone });
+  }
+  panel(title, text) {
+    this.push({ id: this.id("p"), kind: "panel", text, title });
+  }
+  /** Opens a live turn unless one is already streaming. */
+  start(at = Date.now()) {
+    const live = this.live;
+    if (live) {
+      return live;
+    }
+    const turn = { blocks: [], id: this.id("t"), kind: "turn", rev: 0, startedAt: at, status: "live" };
+    this.push(turn);
+    this.#live = turn;
+    return turn;
+  }
+  reasoning(text, at = Date.now()) {
+    if (!text) {
+      return;
+    }
+    const turn = this.start(at);
+    const last = turn.blocks.at(-1);
+    if (last?.kind === "thinking" && last.endedAt === void 0) {
+      last.text += text;
+    } else {
+      turn.blocks.push({ id: this.id("k"), kind: "thinking", startedAt: at, text });
+    }
+    this.#touch(turn);
+  }
+  /**
+   * A whole reasoning block from a provider that doesn't stream it; ignored once reasoning streamed.
+   * Hermes also relays each response's visible text through `reasoning.available`, so text the
+   * turn already shows is not a thought either.
+   */
+  reasoningBlock(text, at = Date.now()) {
+    const turn = this.start(at);
+    const incoming = text.trim();
+    if (!incoming || turn.blocks.some((b) => b.kind === "thinking" || b.kind === "text" && b.text.includes(incoming))) {
+      return;
+    }
+    turn.blocks.push({ endedAt: at, id: this.id("k"), kind: "thinking", startedAt: at, text });
+    this.#touch(turn);
+  }
+  text(text, at = Date.now()) {
+    if (!text) {
+      return;
+    }
+    const turn = this.start(at);
+    this.#endThinking(turn, at);
+    const last = turn.blocks.at(-1);
+    if (last?.kind === "text") {
+      last.text += text;
+    } else {
+      turn.blocks.push({ id: this.id("x"), kind: "text", text });
+    }
+    this.#touch(turn);
+  }
+  /** Interim commentary: seals the streamed text so the next delta starts a new block. */
+  interim(text, { alreadyStreamed }, at = Date.now()) {
+    const turn = this.start(at);
+    this.#endThinking(turn, at);
+    if (!alreadyStreamed && text.trim()) {
+      turn.blocks.push({ id: this.id("x"), kind: "text", text });
+    }
+    turn.blocks.push({ id: this.id("x"), kind: "text", text: "" });
+    this.#touch(turn);
+  }
+  toolStart(p, at = Date.now()) {
+    const turn = this.start(at);
+    this.#endThinking(turn, at);
+    if (this.#tool(p.tool_id)) {
+      return;
+    }
+    const call = {
+      args: p.args ?? {},
+      argsText: p.args_text ?? "",
+      context: p.context ?? "",
+      id: p.tool_id,
+      name: p.name,
+      startedAt: at,
+      status: "running"
+    };
+    if (Array.isArray(call.args.todos)) {
+      call.todos = toTodos(call.args.todos);
+    }
+    turn.blocks.push({ call, id: p.tool_id, kind: "tool" });
+    this.#touch(turn);
+  }
+  toolComplete(p, at = Date.now()) {
+    let found = this.#tool(p.tool_id);
+    if (!found) {
+      this.toolStart({ args: p.args ?? {}, name: p.name, tool_id: p.tool_id }, at);
+      found = this.#tool(p.tool_id);
+    }
+    if (!found) {
+      return;
+    }
+    const { call, turn } = found;
+    const output = record(p.result)?.output;
+    const interrupted = p.name === "terminal" && typeof output === "string" && /\[Command interrupted\]\s*$/.test(output);
+    call.status = interrupted ? "cancelled" : isToolError(p) ? "error" : "done";
+    call.duration = typeof p.duration_s === "number" ? Math.round(p.duration_s * 1e3) : at - call.startedAt;
+    call.summary = p.summary ?? void 0;
+    call.resultText = p.result_text ?? void 0;
+    call.result = p.result;
+    call.diff = p.inline_diff ?? void 0;
+    if (p.args) {
+      call.args = p.args;
+    }
+    if (Array.isArray(p.todos)) {
+      call.todos = toTodos(p.todos);
+    }
+    this.#touch(turn);
+  }
+  /** The newest todo snapshot lands on the newest todo tool call. */
+  todos(todos) {
+    const found = this.#lastTool((c) => c.name === "todo_list");
+    if (found) {
+      found.call.todos = toTodos(todos);
+      this.#touch(found.turn);
+    }
+  }
+  subagent(type, p, at = Date.now()) {
+    const found = (p.delegation_id ? this.#findTool((c) => c.name === "delegate_task" && record(c.result)?.delegation_id === p.delegation_id) : void 0) ?? this.#lastTool((c) => c.name === "delegate_task");
+    if (!found) {
+      return;
+    }
+    const list = found.call.subagents ??= [];
+    const key2 = p.subagent_id ?? `task-${p.task_index}`;
+    let agent = list.find((a) => a.id === key2);
+    if (!agent) {
+      agent = {
+        calls: 0,
+        goal: p.goal,
+        id: key2,
+        index: p.task_index,
+        startedAt: at,
+        status: "queued",
+        tokens: 0,
+        toolCount: 0
+      };
+      list.push(agent);
+      list.sort((a, b) => a.index - b.index);
+    }
+    agent.last = p;
+    agent.goal = p.goal || agent.goal;
+    agent.model = p.model ?? agent.model;
+    agent.toolCount = p.tool_count ?? agent.toolCount;
+    agent.calls = p.api_calls ?? agent.calls;
+    agent.tokens = (p.input_tokens ?? 0) + (p.output_tokens ?? 0) || agent.tokens;
+    if (type === "subagent.start") {
+      agent.status = "running";
+      agent.startedAt = at;
+    } else if (type === "subagent.tool") {
+      agent.status = "running";
+      agent.tool = p.tool_name ?? agent.tool;
+      agent.toolPreview = p.tool_preview ?? p.text ?? void 0;
+      agent.toolSince = { at };
+    } else if (type === "subagent.complete") {
+      agent.status = p.status === "completed" ? "done" : p.status === "interrupted" ? "cancelled" : "failed";
+      agent.summary = p.summary ?? void 0;
+      agent.duration = typeof p.duration_seconds === "number" ? Math.round(p.duration_seconds * 1e3) : at - agent.startedAt;
+      agent.tool = void 0;
+    } else if (p.status === "running") {
+      agent.status = "running";
+    }
+    this.#touch(found.turn);
+  }
+  complete(p, at = Date.now()) {
+    const turn = this.live ?? this.start(at);
+    this.#endThinking(turn, at);
+    const final2 = typeof p.text === "string" ? p.text : "";
+    const tail = trailingText(turn);
+    if (final2.trim() && tail.trim() !== final2.trim() && !(p.status === "error" && !p.partial)) {
+      const last = turn.blocks.at(-1);
+      if (last?.kind === "text") {
+        last.text = final2;
+      } else {
+        turn.blocks.push({ id: this.id("x"), kind: "text", text: final2 });
+      }
+    }
+    turn.blocks = turn.blocks.filter((b) => b.kind !== "text" || b.text.trim());
+    for (const b of turn.blocks) {
+      if (b.kind === "tool" && b.call.status === "running") {
+        b.call.status = p.status === "error" ? "error" : p.status === "interrupted" ? "cancelled" : "done";
+        b.call.duration ??= at - b.call.startedAt;
+      }
+    }
+    turn.endedAt = at;
+    this.#live = void 0;
+    if (p.usage) {
+      turn.usage = usageSince(p.usage, this.#sessionUsage);
+      this.#sessionUsage = p.usage;
+    }
+    turn.warning = p.warning ?? void 0;
+    turn.status = p.status === "error" ? "error" : p.status === "interrupted" ? "interrupted" : "done";
+    if (turn.status === "error") {
+      const surfaced = p.error_surface?.message;
+      const error = typeof surfaced === "string" && surfaced || p.error || final2 || "The request failed";
+      const http = /^HTTP (\d{3}):\s*/.exec(error);
+      const code2 = p.error_surface?.code;
+      turn.error = http ? error.slice(http[0].length) : error;
+      turn.errorCode = http?.[1] ?? (typeof code2 === "string" && code2 ? code2 : void 0);
+      turn.errorHint = final2.split(/\n\s*\n/)[0]?.trim() || void 0;
+    }
+    this.#touch(turn);
+  }
+  /** Seals a live turn the user interrupted before the agent confirmed it. */
+  interrupt(at = Date.now()) {
+    const turn = this.live;
+    if (turn) {
+      this.complete({ status: "interrupted" }, at);
+    }
+  }
+  /** Rebuilds the entries of a resumed session from its stored messages. */
+  load(messages2) {
+    this.entries = this.entries.filter((e) => e.kind === "welcome");
+    this.#live = void 0;
+    let turn;
+    const calls = /* @__PURE__ */ new Map();
+    for (const m of messages2) {
+      const at = typeof m.timestamp === "number" ? m.timestamp * 1e3 : 0;
+      const text = typeof m.text === "string" ? m.text : typeof m.content === "string" ? m.content : "";
+      if (m.role === "user") {
+        turn = void 0;
+        this.entries.push({ at, id: this.id("u"), kind: "user", text });
+        continue;
+      }
+      if (m.role === "system") {
+        turn = void 0;
+        if (text.trim()) {
+          this.entries.push({ id: this.id("n"), kind: "notice", text, tone: "info" });
+        }
+        continue;
+      }
+      if (!turn) {
+        turn = { blocks: [], id: this.id("t"), kind: "turn", rev: 0, startedAt: at, status: "done" };
+        this.entries.push(turn);
+      }
+      if (m.role === "assistant") {
+        if (m.reasoning?.trim()) {
+          turn.blocks.push({ endedAt: at, id: this.id("k"), kind: "thinking", startedAt: at, text: m.reasoning });
+        }
+        if (text.trim()) {
+          turn.blocks.push({ id: this.id("x"), kind: "text", text });
+        }
+      } else if (m.role === "tool") {
+        const id = m.tool_call_id ?? this.id("c");
+        const result = typeof m.content === "string" && m.content ? m.content : void 0;
+        const existing = calls.get(id);
+        if (existing) {
+          existing.result = result ?? existing.result;
+          continue;
+        }
+        const bridged = m.name === "tool_call" ? bridgedCall(m.args ?? {}) : void 0;
+        const args = bridged?.args ?? m.args ?? {};
+        const call = {
+          args,
+          argsText: "",
+          context: m.context ?? "",
+          duration: 0,
+          id,
+          name: bridged?.name ?? m.name ?? "tool",
+          result,
+          startedAt: at,
+          status: record(result)?.error ? "error" : "done"
+        };
+        if (Array.isArray(args.todos)) {
+          call.todos = toTodos(args.todos);
+        }
+        calls.set(id, call);
+        turn.blocks.push({ call, id: this.id("c"), kind: "tool" });
+      }
+    }
+    this.#touch();
+  }
+  /** A resumed session's unfinished turn: its prompt, then a live turn holding what streamed so far. */
+  inflight(turn, at = Date.now()) {
+    const user = turn.user?.trim();
+    if (user) {
+      this.user(user, at);
+    }
+    if (turn.assistant || turn.streaming) {
+      this.start(at);
+      this.text(turn.assistant ?? "", at);
+    }
+  }
+  #endThinking(turn, at) {
+    for (const b of turn.blocks) {
+      if (b.kind === "thinking" && b.endedAt === void 0) {
+        b.endedAt = at;
+      }
+    }
+  }
+  /** Marks the turn holding `call` changed, after something outside the reducer updated it. */
+  touchCall(call) {
+    this.#touch(this.#findTool((c) => c === call)?.turn);
+  }
+  /** The delegate_task calls in the transcript, oldest first. */
+  delegations() {
+    return this.entries.flatMap(
+      (e) => e.kind === "turn" ? e.blocks.flatMap((b) => b.kind === "tool" && b.call.name === "delegate_task" ? [b.call] : []) : []
+    );
+  }
+  #tool(id) {
+    return this.#findTool((call) => call.id === id);
+  }
+  /** The newest call matching `match` in any turn, newest turn first. */
+  #findTool(match) {
+    for (let i = this.entries.length - 1; i >= 0; i--) {
+      const turn = this.entries[i];
+      if (turn?.kind !== "turn") {
+        continue;
+      }
+      const hit = turn.blocks.findLast((b) => b.kind === "tool" && match(b.call));
+      if (hit) {
+        return { call: hit.call, turn };
+      }
+    }
+    return void 0;
+  }
+  /** The newest call matching `match` in the live (else the last) turn only. */
+  #lastTool(match) {
+    const turn = this.live ?? this.entries.findLast((e) => e.kind === "turn");
+    if (turn?.kind !== "turn") {
+      return void 0;
+    }
+    const hit = turn.blocks.findLast((b) => b.kind === "tool" && match(b.call));
+    return hit && { call: hit.call, turn };
+  }
+  /** Marks a change: the transcript's, and the turn's when one changed. */
+  #touch(turn) {
+    this.rev++;
+    if (turn) {
+      turn.rev++;
+    }
+  }
+};
+function trailingText(turn) {
+  let out = "";
+  for (const b of turn.blocks) {
+    if (b.kind === "tool" || b.kind === "text" && !b.text) {
+      out = "";
+    } else if (b.kind === "text") {
+      out += b.text;
+    }
+  }
+  return out;
+}
+function isToolError(p) {
+  const r = record(p.result);
+  if (r?.error) {
+    return true;
+  }
+  if (p.name === "terminal" && typeof r?.exit_code === "number" && r.exit_code !== 0) {
+    return true;
+  }
+  return typeof p.summary === "string" && /^(error|failed)\b/i.test(p.summary);
+}
+function usageSince(now, before) {
+  const less = (key2) => {
+    const a = now[key2];
+    const b = before?.[key2];
+    return typeof a === "number" ? Math.max(0, a - (typeof b === "number" ? b : 0)) : void 0;
+  };
+  return { ...now, cost_usd: less("cost_usd"), input: less("input"), output: less("output"), total: less("total") };
+}
+function record(v) {
+  if (typeof v === "string") {
+    try {
+      return record(JSON.parse(v));
+    } catch {
+      return void 0;
+    }
+  }
+  return v && typeof v === "object" && !Array.isArray(v) ? v : void 0;
+}
+function bridgedCall(args) {
+  const calls = args.calls;
+  const entry = record(Array.isArray(calls) && calls.length === 1 ? calls[0] : args);
+  const name = entry?.name;
+  return typeof name === "string" && name ? { args: record(entry?.arguments) ?? {}, name } : void 0;
+}
+function toTodos(raw) {
+  const out = [];
+  for (const item of raw) {
+    if (!item || typeof item !== "object") {
+      continue;
+    }
+    const id = "id" in item ? String(item.id) : String(out.length);
+    const content = "content" in item ? String(item.content) : "";
+    const status = "status" in item ? String(item.status) : "pending";
+    const parent = "parent" in item && item.parent ? String(item.parent) : void 0;
+    out.push({
+      content,
+      id,
+      ...parent && { parent },
+      status: status === "completed" || status === "in_progress" || status === "cancelled" ? status : "pending"
+    });
+  }
+  return out;
+}
+
+// src/agents/liveLog.ts
+var LINE = /^(\d{2}:\d{2}:\d{2}) (\S+)\s*\| (.*)$/;
+var TOOL = /^-> ([^(]+)\((.*)\)$/;
+var RESULT = /^(\S+) (ok|ERROR)(?: ([\d.]+)s)?: ?(.*)$/;
+function parseLiveLog(text) {
+  const log = { entries: [] };
+  for (const raw of text.split("\n")) {
+    const m = LINE.exec(raw);
+    if (!m) {
+      continue;
+    }
+    const [, at, role, body] = m;
+    switch (role) {
+      case "user":
+        log.entries.push({ at, kind: "kickoff", text: body.replace(/^kickoff: /, "") });
+        break;
+      case "tool": {
+        const t2 = TOOL.exec(body);
+        log.entries.push({ args: t2?.[2] ?? "", at, kind: "tool", name: t2?.[1]?.trim() || body, status: "running" });
+        break;
+      }
+      case "result": {
+        const r = RESULT.exec(body);
+        const call = r && findLast(log.entries, (e) => e.kind === "tool" && e.status === "running" && e.name === r[1]);
+        if (call && call.kind === "tool" && r) {
+          call.status = r[2] === "ok" ? "ok" : "error";
+          call.result = r[4];
+          call.took = r[3] ? Math.round(Number(r[3]) * 1e3) : void 0;
+        }
+        break;
+      }
+      case "think":
+      case "assistant":
+        log.entries.push({ at, kind: role, text: body });
+        break;
+      case "start":
+        break;
+      case "final":
+        final(log, at, body);
+        break;
+      default:
+        log.entries.push({ at, kind: "note", text: body });
+    }
+  }
+  return log;
+}
+function final(log, at, body) {
+  const status = /(?:^|\s)status=(\S+)/.exec(body)?.[1];
+  if (status) {
+    log.status = status;
+  }
+  const duration2 = /(?:^|\s)duration=([\d.]+)s/.exec(body)?.[1];
+  if (duration2) {
+    log.duration = Number(duration2);
+  }
+  const summary2 = /summary: (.*)$/.exec(body)?.[1];
+  if (summary2) {
+    log.summary = summary2;
+  }
+  const reason = /exit_reason=(\S+)/.exec(body)?.[1];
+  if (reason) {
+    log.exitReason = reason;
+  }
+  const error = /error: (.*)$/.exec(body)?.[1];
+  if (error) {
+    log.error = error;
+  }
+  if (!status && !duration2 && !summary2) {
+    log.entries.push({ at, kind: "note", text: body });
+  }
+}
+function findLast(items, match) {
+  for (let i = items.length - 1; i >= 0; i--) {
+    if (match(items[i])) {
+      return items[i];
+    }
+  }
+  return void 0;
+}
+function runningTool(log) {
+  const last = findLast(log.entries, (e) => e.kind === "tool");
+  return last?.kind === "tool" && last.status === "running" ? last : void 0;
+}
+function clockToMs(clock, now = Date.now()) {
+  const [h = 0, m = 0, s = 0] = clock.split(":").map(Number);
+  const at = new Date(now).setHours(h, m, s, 0);
+  return at > now + 6e4 ? at - 864e5 : at;
+}
+
+// src/agents/store.ts
+var POLL_MS = 1e3;
+var MAX_LOG_BYTES = 2 * 1024 * 1024;
+var ENDED = /* @__PURE__ */ new Set(["cancelled", "done", "failed"]);
+function isRunning(a) {
+  return !ENDED.has(a.status);
+}
+function agentName(a) {
+  return a.name ?? `Agent ${a.index + 1}`;
+}
+var Agents = class {
+  #host;
+  #timer;
+  #ticking = false;
+  #tracked = /* @__PURE__ */ new WeakSet();
+  /** Log sizes at the last read, by path; a log that did not grow is not read again. */
+  #sizes = /* @__PURE__ */ new Map();
+  /** Logs this process cannot read (a gateway on another machine): `subagent.tail` instead. */
+  #unreadable = /* @__PURE__ */ new Set();
+  /** Ids `subagent.list` reported: one that leaves the list has finished. */
+  #listed = /* @__PURE__ */ new Set();
+  constructor(host) {
+    this.#host = host;
+  }
+  /** Every agent of the session's delegations, each delegation's rows in order. */
+  all() {
+    return [...this.#owners().keys()];
+  }
+  running() {
+    return this.all().filter(isRunning);
+  }
+  /** Takes over each dispatched delegate_task call not tracked yet, and polls while any agent runs. */
+  scan(at = Date.now()) {
+    for (const call of this.#host.transcript.delegations()) {
+      if (!this.#tracked.has(call) && this.#track(call, at)) {
+        this.#tracked.add(call);
+      }
+    }
+    if (this.running().length) {
+      this.#wake();
+    }
+  }
+  /** Queues steering text into a running agent; the owner answers `queued` or `rejected`. */
+  async steer(a, text) {
+    const r = await this.#host.gw.request("subagent.steer", {
+      session_id: this.#host.sid,
+      subagent_id: a.id,
+      text
+    });
+    return r?.status === "queued";
+  }
+  /** Interrupts a running agent; its partial result still returns to the parent. */
+  async stop(a) {
+    const r = await this.#host.gw.request("subagent.interrupt", {
+      session_id: this.#host.sid,
+      subagent_id: a.id
+    });
+    return Boolean(r?.found);
+  }
+  /** Reads `a`'s log now (the hub's timeline opening on it), whatever its state. */
+  async refresh(a) {
+    if (await this.#readLog(a, true)) {
+      this.#touch(a);
+      this.#host.changed();
+    }
+  }
+  dispose() {
+    clearInterval(this.#timer);
+    this.#timer = void 0;
+  }
+  #track(call, at) {
+    const r = record(call.result);
+    if (r?.status !== "dispatched" || typeof r.delegation_id !== "string") {
+      return false;
+    }
+    const goals = Array.isArray(r.goals) ? r.goals.map((g) => typeof g === "string" ? g : "") : [];
+    const ids = Array.isArray(r.subagent_ids) ? r.subagent_ids : [];
+    const paths = Array.isArray(r.live_transcripts) ? r.live_transcripts : [];
+    const list = call.subagents ??= [];
+    goals.forEach((goal, i) => {
+      const id = typeof ids[i] === "string" && ids[i] ? ids[i] : `task-${i}`;
+      let a = list.find((x) => x.id === id);
+      if (!a) {
+        a = { calls: 0, goal, id, index: i, startedAt: at, status: "queued", tokens: 0, toolCount: 0 };
+        list.push(a);
+      }
+      a.key ??= `p${i}`;
+      a.delegationId = r.delegation_id;
+      a.depth = 0;
+      a.logPath = typeof paths[i] === "string" ? paths[i] : void 0;
+    });
+    list.sort((a, b) => a.index - b.index || (a.depth ?? 0) - (b.depth ?? 0));
+    return true;
+  }
+  #wake() {
+    this.#timer ??= setInterval(() => void this.#tick(), POLL_MS);
+    void this.#tick();
+  }
+  async #tick() {
+    if (this.#ticking) {
+      return;
+    }
+    this.#ticking = true;
+    try {
+      const live = this.running();
+      if (!live.length) {
+        return this.dispose();
+      }
+      const changed = /* @__PURE__ */ new Set();
+      await this.#poll(changed);
+      const reads = await Promise.all(this.running().map(async (a) => await this.#readLog(a) ? a : void 0));
+      reads.forEach((a) => a && changed.add(a));
+      if (changed.size) {
+        changed.forEach((a) => this.#touch(a));
+        this.#host.changed();
+      }
+    } finally {
+      this.#ticking = false;
+    }
+  }
+  /** Folds `subagent.list` into the rows: new nested children, status, model, counts. */
+  async #poll(changed) {
+    const sid = this.#host.sid;
+    if (!sid) {
+      return;
+    }
+    let rows;
+    try {
+      rows = (await this.#host.gw.request("subagent.list", { session_id: sid }))?.subagents ?? [];
+    } catch {
+      return;
+    }
+    const owners = this.#owners();
+    const present = /* @__PURE__ */ new Set();
+    for (const row of rows) {
+      const id = row.subagent_id;
+      if (!id) {
+        continue;
+      }
+      present.add(id);
+      this.#listed.add(id);
+      const a = this.#find(owners, row) ?? this.#adopt(owners, row);
+      if (!a) {
+        continue;
+      }
+      a.id = id;
+      a.model = row.model ?? a.model;
+      a.toolCount = Math.max(a.toolCount, row.tool_count ?? 0);
+      a.steerable = row.accepting_steer ?? a.steerable;
+      a.startedAt = typeof row.started_at === "number" ? row.started_at * 1e3 : a.startedAt;
+      if (a.status === "queued" || a.status === "running") {
+        a.status = "running";
+        if (!a.log && row.last_tool && a.tool !== row.last_tool) {
+          a.tool = row.last_tool;
+          a.toolSince = { at: Date.now() };
+        }
+      }
+      changed.add(a);
+    }
+    for (const a of owners.keys()) {
+      if (isRunning(a) && this.#listed.has(a.id) && !present.has(a.id) && !this.#readableLog(a)) {
+        a.status = "done";
+        a.duration = Date.now() - a.startedAt;
+        a.tool = void 0;
+        changed.add(a);
+      }
+    }
+  }
+  /** The row `row` describes: by id, else a dispatch placeholder (`task-<i>`) of its delegation. */
+  #find(owners, row) {
+    const agents = [...owners.keys()];
+    const byId = agents.find((a) => a.id === row.subagent_id);
+    if (byId) {
+      return byId;
+    }
+    const index = Number(/^sa-(\d+)-/.exec(row.subagent_id ?? "")?.[1]);
+    return (row.depth ?? 0) === 0 && Number.isInteger(index) ? agents.find((a) => a.delegationId === row.delegation_id && a.id === `task-${index}`) : void 0;
+  }
+  /** A nested child (an orchestrator's worker): a row under its parent, in the parent's card. */
+  #adopt(owners, row) {
+    const parent = [...owners.keys()].find((a) => a.id === row.parent_id);
+    const call = parent && owners.get(parent);
+    if (!parent || !call?.subagents) {
+      return void 0;
+    }
+    const list = call.subagents;
+    const siblings = list.filter((a) => a.parentId === parent.id).length;
+    const child = {
+      calls: 0,
+      delegationId: row.delegation_id,
+      depth: (parent.depth ?? 0) + 1,
+      goal: row.goal ?? "",
+      id: row.subagent_id,
+      index: parent.index,
+      name: `${agentName(parent)}.${siblings + 1}`,
+      parentId: parent.id,
+      startedAt: Date.now(),
+      status: "running",
+      tokens: 0,
+      toolCount: 0
+    };
+    let at = list.indexOf(parent) + 1;
+    while (at < list.length && (list[at].depth ?? 0) > (parent.depth ?? 0)) {
+      at++;
+    }
+    list.splice(at, 0, child);
+    owners.set(child, call);
+    return child;
+  }
+  #readableLog(a) {
+    return Boolean(a.logPath && !this.#unreadable.has(a.logPath));
+  }
+  /** Reads `a`'s log from disk (else its tail over the gateway); true when it changed. */
+  async #readLog(a, force = false) {
+    let text;
+    if (this.#readableLog(a)) {
+      try {
+        const path = a.logPath;
+        const { size } = await stat(path);
+        if (!force && this.#sizes.get(path) === size) {
+          return false;
+        }
+        this.#sizes.set(path, size);
+        const bytes = await readFile(path);
+        text = bytes.subarray(Math.max(0, bytes.length - MAX_LOG_BYTES)).toString("utf8");
+      } catch {
+        this.#unreadable.add(a.logPath);
+      }
+    }
+    if (text === void 0 && this.#listed.has(a.id) && this.#host.sid) {
+      try {
+        const r = await this.#host.gw.request("subagent.tail", {
+          session_id: this.#host.sid,
+          subagent_id: a.id
+        });
+        text = r?.available ? r.text : void 0;
+      } catch {
+        text = void 0;
+      }
+    }
+    if (text === void 0) {
+      return false;
+    }
+    apply(a, parseLiveLog(text));
+    return true;
+  }
+  #touch(a) {
+    const call = this.#owners().get(a);
+    if (call) {
+      this.#host.transcript.touchCall(call);
+    }
+  }
+  /** Each agent with the delegate_task call whose card shows it. */
+  #owners() {
+    const owners = /* @__PURE__ */ new Map();
+    for (const call of this.#host.transcript.delegations()) {
+      for (const a of call.subagents ?? []) {
+        owners.set(a, call);
+      }
+    }
+    return owners;
+  }
+};
+function apply(a, log) {
+  a.log = log;
+  const tools2 = log.entries.filter((e) => e.kind === "tool").length;
+  a.toolCount = Math.max(a.toolCount, tools2);
+  if (log.status) {
+    a.status = log.status === "completed" ? "done" : log.status === "interrupted" ? "cancelled" : "failed";
+    a.summary = log.summary ?? a.summary;
+    a.duration = log.duration !== void 0 ? Math.round(log.duration * 1e3) : a.duration;
+    a.exitReason = log.exitReason ?? log.error ?? a.exitReason;
+    a.tool = void 0;
+    return;
+  }
+  if (log.entries.length && a.status === "queued") {
+    a.status = "running";
+  }
+  const now = runningTool(log);
+  if (!now) {
+    a.tool = void 0;
+    return;
+  }
+  const since = clockToMs(now.at);
+  if (a.tool !== now.name || a.toolSince?.at !== since) {
+    a.tool = now.name;
+    a.toolPreview = now.args || void 0;
+    a.toolSince = { at: since };
+  }
+}
+
 // src/clipboard.ts
 import { spawn } from "node:child_process";
 function copyToClipboard(text, env = process.env) {
@@ -24808,147 +25628,593 @@ var CONTROL_COMMANDS = [
   { name: "tools", run: tools }
 ];
 
-// src/overlays/help.tsx
-var KEY = "help";
-var HOTKEYS = [
-  {
-    group: "Editing",
-    rows: [
-      [["enter"], "Send message"],
-      [["shift+enter", "alt+enter"], "New line"],
-      [["up", "down"], "Move between lines / browse history"],
-      [["tab"], "Accept the completion"],
-      [["alt+left", "alt+right", "alt+b", "alt+f"], "Move by word"],
-      [["ctrl+a", "ctrl+e"], "Start / end of line"],
-      [["ctrl+w", "alt+backspace"], "Delete word backwards"],
-      [["ctrl+u"], "Delete to start of line"],
-      [["alt+d"], "Delete word forward"],
-      [["ctrl+k"], "Delete to end of line (joins the next line at its end)"],
-      [["ctrl+y"], "Paste the last deleted text"],
-      [["ctrl+z", "shift+ctrl+z"], "Undo / redo"]
-    ]
-  },
-  {
-    group: "Control",
-    rows: [
-      [["escape"], "Close the completion / interrupt the agent"],
-      [["shift+tab"], "Cycle the reasoning effort"],
-      [["alt+up"], "Edit the oldest queued prompt"],
-      [["ctrl+c"], "Clear the draft / interrupt / exit (twice)"],
-      [["ctrl+d"], "Delete forward / exit (empty prompt)"]
-    ]
+// src/view/time.ts
+var kAge = /* @__PURE__ */ Symbol("tsp.age");
+function age(owner, startedAt, now) {
+  const aged = owner;
+  return aged[kAge] ??= Math.max(0, now - startedAt);
+}
+function duration(ms) {
+  if (ms < 1e3) {
+    return `${Math.max(0, Math.round(ms))}ms`;
   }
-];
-async function openHelp(app) {
-  let catalog = {};
-  try {
-    catalog = await app.gw.request("commands.catalog", app.sid ? { session_id: app.sid } : {});
-  } catch (error) {
-    app.transcript.notice(
-      `Could not load the command list: ${error instanceof Error ? error.message : String(error)}`,
-      "warning"
+  const s = Math.round(ms / 100) / 10;
+  if (s < 60) {
+    return `${s < 10 ? s.toFixed(1) : Math.round(s)}s`;
+  }
+  const m = Math.floor(s / 60);
+  if (m < 60) {
+    return `${m}m ${String(Math.round(s % 60)).padStart(2, "0")}s`;
+  }
+  return `${Math.floor(m / 60)}h ${String(m % 60).padStart(2, "0")}m`;
+}
+function compact(n) {
+  if (n < 1e3) {
+    return String(n);
+  }
+  if (n < 1e6) {
+    const k = n / 1e3;
+    return `${k < 10 ? k.toFixed(1).replace(/\.0$/, "") : Math.round(k)}K`;
+  }
+  const m = n / 1e6;
+  return `${m < 10 ? m.toFixed(1).replace(/\.0$/, "") : Math.round(m)}M`;
+}
+
+// src/view/tools.tsx
+var str3 = (v) => typeof v === "string" && v ? v : void 0;
+function toolNode(call, now) {
+  const card = cardOf(call, now);
+  const status = card.status ?? call.status;
+  const running = status === "running";
+  const body = [...card.body];
+  const error = call.status === "error" ? errorOf(call) : void 0;
+  if (call.status === "cancelled") {
+    body.push(
+      /* @__PURE__ */ jsx(
+        "text",
+        {
+          role: "omp.tool.notice",
+          spans: [{ s: "muted", t: `Interrupted by user after ${duration(call.duration ?? 0)}` }]
+        },
+        "cancelled"
+      )
     );
   }
-  const categories = catalog.categories?.length ? catalog.categories : [{ name: "Commands", pairs: catalog.pairs ?? [] }];
-  const overlay = {
-    key: KEY,
-    modal: true,
-    node: () => /* @__PURE__ */ jsx("overlay", { anchor: "center", head: "Commands and shortcuts", modal: true, role: "omp.overlay.hotkeys", size: "lg", children: /* @__PURE__ */ jsxs("col", { gap: "lg", children: [
-      HOTKEYS.map(({ group, rows }) => /* @__PURE__ */ jsx("section", { head: group, role: "omp.hotkeys.group", children: /* @__PURE__ */ jsx(
-        "table",
-        {
-          cols: [
-            { head: "Key", id: "keys" },
-            { grow: 1, head: "Action", id: "action" }
-          ],
-          role: "omp.hotkeys.table",
-          rows: rows.map(([keys, action], i) => ({
-            cells: {
-              action: [{ t: action }],
-              keys: keys.flatMap((k, j) => [...j ? [{ s: "dim", t: " " }] : [], { s: "key", t: k }])
-            },
-            id: String(i)
-          }))
-        },
-        "table"
-      ) }, `keys-${group}`)),
-      categories.map((c) => /* @__PURE__ */ jsx("section", { head: c.name, role: "omp.hotkeys.group", children: /* @__PURE__ */ jsx(
-        "table",
-        {
-          cols: [
-            { head: "Command", id: "command" },
-            { grow: 1, head: "Description", id: "action" }
-          ],
-          role: "omp.hotkeys.table",
-          rows: (c.pairs ?? []).map(([command = "", text = ""], i) => ({
-            // The `(usage: …)` tail is `/help <command>`'s business; the table keeps the summary.
-            cells: {
-              action: [{ t: text.replace(/\s*\(usage: .+\)\s*$/, "") }],
-              command: [{ s: "mono", t: command }]
-            },
-            id: String(i)
-          }))
-        },
-        "table"
-      ) }, `cmd-${c.name}`)),
-      /* @__PURE__ */ jsxs("row", { align: "center", gap: "sm", role: "omp.actions", children: [
-        /* @__PURE__ */ jsx("spacer", { grow: 1 }, "fill"),
-        /* @__PURE__ */ jsxs(
-          "row",
-          {
-            align: "center",
-            gap: "xs",
-            onClick: () => app.close(overlay),
-            role: "omp.btn",
-            title: "Close  escape",
-            children: [
-              /* @__PURE__ */ jsx("text", { text: "Close" }, "label"),
-              /* @__PURE__ */ jsx("kbd", { keys: ["escape"] }, "keys")
-            ]
-          },
-          "close"
-        )
-      ] }, "actions")
-    ] }, "body") }, KEY),
-    onKey: (k) => {
-      if (k.name === "escape" || k.name === "enter" || k.name === "q") {
-        app.close(overlay);
-      }
-      return true;
-    }
-  };
-  app.open(overlay);
-}
-
-// node_modules/@hermes/shared/src/model-search-text.ts
-var MODEL_SEARCH_ALIASES = {
-  k3: ["kimi-k3", "kimi"],
-  // OpenCode Zen serves the "Ox Alpha" stealth model under an opaque
-  // preview slug; let users find it by its public codename.
-  "x-preview-f-free": ["ox-alpha", "ox"]
-};
-function modelSearchText(model) {
-  const id = model.trim();
-  if (!id) {
-    return model;
-  }
-  const aliases = MODEL_SEARCH_ALIASES[id.toLowerCase()];
-  if (!aliases?.length) {
-    return id;
-  }
-  return `${id} ${aliases.join(" ")}`;
-}
-
-// .hermes-src/ui-tui/src/domain/providers.ts
-var providerDisplayNames = (providers) => {
-  const counts = /* @__PURE__ */ new Map();
-  for (const p of providers) {
-    counts.set(p.name, (counts.get(p.name) ?? 0) + 1);
-  }
-  return providers.map(
-    (p) => (counts.get(p.name) ?? 0) > 1 && p.slug && p.slug !== p.name ? `${p.name} (${p.slug})` : p.name
+  const collapsed = call.status === "error" ? false : card.folded;
+  return node(
+    "tool",
+    {
+      age: running ? age(call, call.startedAt, now) : void 0,
+      badges: card.badges,
+      collapsed: body.length > 0 ? collapsed : void 0,
+      collapsible: body.length > 0 ? true : void 0,
+      exit: call.name === "terminal" && !running && call.status !== "cancelled" ? exitOf(call) : void 0,
+      frame: card.frame === "inline" && (running || !body.length || card.name !== "web_search") ? "inline" : void 0,
+      key: call.id,
+      lang: card.lang,
+      meta: card.meta?.length ? card.meta : void 0,
+      name: card.name,
+      note: call.status === "cancelled" ? "cancelled" : error && !card.body.length ? error : void 0,
+      preview: card.preview,
+      role: card.role,
+      status,
+      target: card.target,
+      targetKind: card.target ? card.targetKind : void 0,
+      title: card.title,
+      took: running ? void 0 : card.took ?? call.duration
+    },
+    body
   );
+}
+function cardOf(call, now) {
+  const result = record(call.result);
+  switch (call.name) {
+    case "terminal":
+      return bashCard(call, result);
+    case "read_file":
+      return readCard(call, result);
+    case "patch":
+    case "write_file":
+      return editCard(call, result);
+    case "search_files":
+      return searchCard(call, result);
+    case "web_search":
+      return webSearchCard(call, result);
+    case "web_extract":
+      return fetchCard(call, result);
+    case "todo_list":
+      return {
+        body: call.todos?.length ? [checklistNode(call.todos)] : [],
+        name: "todo",
+        target: todoCount(call.todos),
+        targetKind: "text",
+        title: "Todo"
+      };
+    case "delegate_task":
+      return taskCard(call, result, now);
+    case "clarify":
+      return askCard(call, result);
+    case "execute_code":
+      return evalCard(call, result);
+    case "memory":
+      return {
+        body: [],
+        frame: "inline",
+        meta: str3(result?.usage) ? [`${result?.usage}`] : void 0,
+        name: "memory",
+        target: call.context || str3(call.args.action),
+        targetKind: "text",
+        title: "Memory"
+      };
+    case "skills_list": {
+      const skills = Array.isArray(result?.skills) ? result.skills : [];
+      const names = skills.map((s) => str3(record(s)?.name) ?? str3(s)).filter((n) => n !== void 0);
+      return {
+        body: names.length ? [/* @__PURE__ */ jsx("text", { spans: [{ s: "muted", t: names.join(" \xB7 ") }], wrap: "word" }, "names")] : [],
+        folded: true,
+        frame: "inline",
+        meta: [
+          names.length ? `${names.length} skill${names.length === 1 ? "" : "s"}` : str3(result?.message) ?? "no skills"
+        ],
+        name: "skill",
+        title: "Skills"
+      };
+    }
+    case "skill_view":
+      return {
+        body: str3(result?.content) ? [/* @__PURE__ */ jsx("md", { children: clip(str3(result?.content) ?? "", 6e3) }, "body")] : [],
+        folded: true,
+        frame: "inline",
+        name: "skill",
+        target: str3(call.args.name) ?? call.context,
+        targetKind: "text",
+        title: "Skill"
+      };
+  }
+  const look = call.name.startsWith("browser") ? { name: "browser", title: humanize(call.name.replace(/^browser_?/, "")) || "Browser" } : call.name === "session_search" ? { name: "search", title: "Session search" } : call.name === "vision_analyze" ? { name: "image", title: "Vision" } : { name: call.name, title: humanize(call.name) };
+  return {
+    ...look,
+    body: genericBody(call),
+    folded: true,
+    frame: "inline",
+    target: str3(call.args.query) ?? str3(call.args.url) ?? (call.context || void 0),
+    targetKind: str3(call.args.url) ? "path" : str3(call.args.query) ? "query" : "text"
+  };
+}
+function bashCard(call, result) {
+  const output = (str3(result?.output) ?? call.resultText)?.replace(/\s*\[Command interrupted\]\s*$/, "");
+  const error = str3(result?.error);
+  return {
+    body: [
+      ...output ? [/* @__PURE__ */ jsx("ansi", { follow: call.status === "running", text: output }, "out")] : [],
+      ...error ? [/* @__PURE__ */ jsx("text", { role: "omp.tool.error", spans: [{ s: "error", t: error }], wrap: "word" }, "err")] : []
+    ],
+    folded: true,
+    lang: "bash",
+    name: "bash",
+    preview: { tail: 10 },
+    target: str3(call.args.command) ?? call.context,
+    targetKind: "command",
+    title: "Bash"
+  };
+}
+function readCard(call, result) {
+  const path = str3(call.args.path) ?? call.context;
+  const content = str3(result?.content);
+  const total = typeof result?.total_lines === "number" ? result.total_lines : void 0;
+  const numbered = content ? [...content.matchAll(/^ *(\d+)\|/gm)] : [];
+  const first = numbered.length ? Number(numbered[0]?.[1]) : void 0;
+  const last = numbered.length ? Number(numbered.at(-1)?.[1]) : void 0;
+  const whole = first === 1 && last !== void 0 && last === total;
+  const meta = first !== void 0 && last !== void 0 ? [whole ? `${total} lines` : `:${first}-${last}`] : [];
+  return {
+    body: content ? [/* @__PURE__ */ jsx("code", { lang: langOf(path), numbers: true, start: first, text: content.replace(/^ *\d+\|/gm, "") }, "code")] : [],
+    folded: true,
+    frame: "inline",
+    meta,
+    name: "read",
+    target: path,
+    targetKind: "path",
+    title: "Read"
+  };
+}
+function editCard(call, result) {
+  const path = str3(call.args.path) ?? call.context;
+  const lang = langOf(path);
+  const diff2 = hunks(str3(result?.diff)) ?? (call.diff ? plainDiff(call.diff) : void 0);
+  const content = str3(call.args.content);
+  const write = call.name === "write_file";
+  const head = {
+    name: write ? "write" : "edit",
+    target: path,
+    targetKind: "path",
+    title: write ? "Write" : "Edit"
+  };
+  if (write && content && (!diff2 || diff2.startsWith("@@ -0,0 "))) {
+    const text = content.replace(/\n$/, "");
+    const lines = text.split("\n").length;
+    return {
+      ...head,
+      badges: diff2 ? [{ text: "new file", tone: "success" }] : void 0,
+      body: [/* @__PURE__ */ jsx("code", { lang: lang ?? "text", numbers: true, text }, "code")],
+      folded: true,
+      meta: [`${lines} line${lines === 1 ? "" : "s"}`],
+      preview: { lines: 8 }
+    };
+  }
+  if (!diff2) {
+    return { ...head, body: [] };
+  }
+  const { added, removed } = diffStats(diff2);
+  return { ...head, body: [/* @__PURE__ */ jsx("diff", { lang, text: diff2 }, "diff")], meta: [`+${added} \u2212${removed}`] };
+}
+function searchCard(call, result) {
+  const pattern = str3(call.args.pattern) ?? call.context;
+  const where = str3(call.args.path);
+  const inPath = where && where !== "." ? ` \xB7 in ${where}` : "";
+  const files = Array.isArray(result?.files) ? result.files.map((f) => str3(f)).filter((f) => f !== void 0) : void 0;
+  if (files || call.args.target === "files") {
+    const list = (files ?? []).map((f) => f.replace(/^\.\//, ""));
+    const total2 = typeof result?.total_count === "number" ? result.total_count : list.length;
+    return {
+      body: list.slice(0, 200).map((f, i) => {
+        const slash = f.lastIndexOf("/");
+        return /* @__PURE__ */ jsx("row", { role: "omp.tool.file", title: slash > 0 ? f.slice(0, slash + 1) : void 0, children: /* @__PURE__ */ jsx("text", { spans: [{ s: "path", t: slash > 0 ? f.slice(slash + 1) : f }] }, "p") }, `f${i}`);
+      }),
+      folded: list.length > 20,
+      frame: "inline",
+      meta: files ? [`${total2} file${total2 === 1 ? "" : "s"}${inPath}`] : void 0,
+      name: "glob",
+      target: pattern,
+      targetKind: "pattern",
+      title: "Glob"
+    };
+  }
+  const matches = Array.isArray(result?.matches) ? result.matches.map((m) => record(m)).filter((m) => m !== void 0) : void 0;
+  const byFile = /* @__PURE__ */ new Map();
+  for (const m of matches ?? []) {
+    const path = (str3(m.path) ?? "").replace(/^\.\//, "");
+    const list = byFile.get(path) ?? [];
+    list.push({ line: typeof m.line === "number" ? m.line : 0, text: typeof m.content === "string" ? m.content : "" });
+    byFile.set(path, list);
+  }
+  const total = typeof result?.total_count === "number" ? result.total_count : matches?.length ?? 0;
+  const body = [];
+  let fileIndex = 0;
+  for (const [path, hits] of byFile) {
+    const f = `f${fileIndex++}`;
+    body.push(
+      /* @__PURE__ */ jsxs("row", { role: "omp.tool.file", children: [
+        /* @__PURE__ */ jsx("text", { spans: [{ s: "path", t: path }] }, "p"),
+        /* @__PURE__ */ jsx("text", { role: "omp.tool.chip", spans: [{ t: String(hits.length) }] }, "n")
+      ] }, f)
+    );
+    let run = [];
+    let runIndex = 0;
+    const flush = () => {
+      const start = run[0]?.line ?? 1;
+      if (runIndex > 0) {
+        body.push(/* @__PURE__ */ jsx("text", { role: "omp.tool.context", spans: [{ s: "muted", t: "\u2026" }] }, `${f}.g${runIndex}`));
+      }
+      body.push(
+        /* @__PURE__ */ jsx(
+          "code",
+          {
+            lang: langOf(path),
+            marks: run.map((h) => ({ line: h.line, tone: "accent" })),
+            numbers: true,
+            start,
+            text: run.map((h) => h.text).join("\n")
+          },
+          `${f}.c${runIndex++}`
+        )
+      );
+      run = [];
+    };
+    for (const hit of hits) {
+      if (run.length && hit.line !== (run.at(-1)?.line ?? 0) + 1) {
+        flush();
+      }
+      run.push(hit);
+    }
+    if (run.length) {
+      flush();
+    }
+  }
+  return {
+    body,
+    folded: total > 40,
+    frame: "inline",
+    meta: matches ? [`${total} match${total === 1 ? "" : "es"} \xB7 ${byFile.size} file${byFile.size === 1 ? "" : "s"}${inPath}`] : void 0,
+    name: "grep",
+    target: pattern,
+    targetKind: "pattern",
+    title: "Grep"
+  };
+}
+function webSearchCard(call, result) {
+  const data = record(result?.data);
+  const hits = (Array.isArray(data?.web) ? data.web : Array.isArray(result?.results) ? result.results : []).map((h) => record(h)).filter((h) => h !== void 0);
+  return {
+    body: hits.length ? [
+      /* @__PURE__ */ jsx("col", { role: "omp.tool.sources", children: hits.map((h, i) => sourceRow(`s${i}`, str3(h.title) ?? str3(h.url) ?? "", str3(h.url))) }, "s")
+    ] : [],
+    frame: "inline",
+    meta: hits.length ? [`${hits.length} source${hits.length === 1 ? "" : "s"}`] : void 0,
+    name: "web_search",
+    target: str3(call.args.query) ?? call.context,
+    targetKind: "query",
+    title: "Web search"
+  };
+}
+function fetchCard(call, result) {
+  const pages = (Array.isArray(result?.results) ? result.results : []).map((p) => record(p)).filter((p) => p !== void 0);
+  const urls = Array.isArray(call.args.urls) ? call.args.urls.map((u) => str3(u)).filter((u) => u !== void 0) : [];
+  const body = [];
+  for (const [i, p] of pages.entries()) {
+    body.push(sourceRow(`s${i}`, str3(p.title) ?? str3(p.url) ?? "", str3(p.url)));
+    const content = str3(p.content);
+    if (content) {
+      body.push(/* @__PURE__ */ jsx("md", { children: clip(content, 4e3) }, `b${i}`));
+    }
+  }
+  const chars = pages.reduce((n, p) => n + (str3(p.content)?.length ?? 0), 0);
+  return {
+    body,
+    folded: true,
+    meta: pages.length ? [`${pages.length} page${pages.length === 1 ? "" : "s"} \xB7 ${compact(chars)} chars`] : void 0,
+    name: "fetch",
+    preview: { lines: 6 },
+    target: urls.length > 1 ? `${urls[0]} +${urls.length - 1}` : urls[0] ?? str3(call.args.url) ?? call.context,
+    targetKind: "path",
+    title: "Fetch"
+  };
+}
+function sourceRow(key2, title, url) {
+  let host = "";
+  try {
+    host = url ? new URL(url).hostname.replace(/^www\./, "") : "";
+  } catch {
+    host = "";
+  }
+  return /* @__PURE__ */ jsxs("row", { role: "omp.tool.source", children: [
+    /* @__PURE__ */ jsx("text", { role: "omp.tool.chip", spans: [{ t: (host.charAt(0) || "\xB7").toUpperCase() }] }, "d"),
+    /* @__PURE__ */ jsx("text", { spans: [url ? { href: url, t: title } : { t: title }] }, "t"),
+    host ? /* @__PURE__ */ jsx("text", { spans: [{ s: "muted", t: host }] }, "m") : null
+  ] }, key2);
+}
+function taskCard(call, result, now) {
+  const tasks = Array.isArray(call.args.tasks) ? call.args.tasks.map((t2) => record(t2)).filter((t2) => t2 !== void 0) : [];
+  const goals = tasks.length ? tasks.map((t2) => str3(t2.goal) ?? "") : str3(call.args.goal) ? [str3(call.args.goal) ?? ""] : [];
+  const agents = call.subagents ?? [];
+  const rows = agents.length ? agents.map((a) => agentNode(a, now)) : call.status === "running" || result?.status === "dispatched" ? goals.map((g, i) => /* @__PURE__ */ jsx("agent", { agent: "task", name: `Agent ${i + 1}`, status: "pending", task: g }, `p${i}`)) : [];
+  const context = str3(call.args.context) ?? (tasks.length === 1 ? str3(tasks[0]?.context) : void 0);
+  const working = agents.some((a) => a.status === "running" || a.status === "queued") || !agents.length && result?.status === "dispatched";
+  const settled = agents.filter((a) => a.status !== "running" && a.status !== "queued");
+  const count = goals.length || agents.length;
+  let meta;
+  let took;
+  if (agents.length && !working) {
+    const ok = agents.filter((a) => a.status === "done").length;
+    const stopped = agents.filter((a) => a.status === "cancelled").length;
+    const failed = agents.length - ok - stopped;
+    const requests = agents.reduce((n, a) => n + a.calls, 0);
+    meta = [
+      `${ok} succeeded`,
+      failed ? `${failed} failed` : "",
+      stopped ? `${stopped} stopped` : "",
+      requests ? `${requests} req` : ""
+    ].filter(Boolean).join(" \xB7 ");
+    took = Math.max(...agents.map((a) => a.startedAt + (a.duration ?? 0))) - call.startedAt;
+  } else if (settled.length) {
+    meta = `${settled.length} of ${count} done`;
+  }
+  return {
+    badges: result?.mode === "background" ? [{ text: "background" }] : void 0,
+    body: [
+      ...context ? [/* @__PURE__ */ jsx("text", { role: "omp.tool.context", spans: [{ s: "muted", t: `Context: ${context}` }], wrap: "word" }, "ctx")] : [],
+      ...rows
+    ],
+    meta: meta ? [meta] : void 0,
+    name: "task",
+    status: working ? "running" : void 0,
+    target: count ? `${count} agent${count === 1 ? "" : "s"}` : void 0,
+    targetKind: "text",
+    title: "Task",
+    took
+  };
+}
+function agentNode(a, now, fresh = false) {
+  const ageOf2 = (owner, startedAt) => fresh ? Math.max(0, now - startedAt) : age(owner, startedAt, now);
+  const status = a.status === "done" ? "done" : a.status === "failed" ? "failed" : a.status === "cancelled" ? "aborted" : a.status === "queued" ? "pending" : "running";
+  const running = a.status === "running";
+  return /* @__PURE__ */ jsx(
+    "agent",
+    {
+      agent: "task",
+      badges: a.exitReason && a.status !== "done" ? [{ text: a.exitReason.replace(/_/g, " "), tone: "warning" }] : void 0,
+      collapsed: a.summary ? true : void 0,
+      collapsible: a.summary ? true : void 0,
+      depth: a.depth || void 0,
+      model: a.model,
+      name: agentName(a),
+      stats: {
+        requests: a.calls || void 0,
+        tokens: a.tokens || void 0,
+        tools: a.toolCount || void 0,
+        ...running ? { age: ageOf2(a, a.startedAt) } : { took: a.duration }
+      },
+      status,
+      task: a.goal,
+      tool: running && a.tool ? {
+        age: a.toolSince ? ageOf2(a.toolSince, a.toolSince.at) : void 0,
+        intent: a.toolPreview,
+        name: a.tool
+      } : void 0,
+      children: a.summary ? /* @__PURE__ */ jsx("md", { children: a.summary }, "o") : null
+    },
+    a.key ?? a.id
+  );
+}
+function askCard(call, result) {
+  const qs = (Array.isArray(call.args.questions) ? call.args.questions : str3(call.args.question) ? [call.args] : []).map((q) => record(q)).filter((q) => q !== void 0);
+  const responses = Array.isArray(result?.responses) ? result.responses.map((r) => record(r)) : [];
+  const body = [];
+  for (const [i, q] of qs.entries()) {
+    const choices = Array.isArray(q.choices) ? q.choices.map((c) => str3(c)).filter((c) => c !== void 0) : [];
+    const raw = responses[i]?.user_response;
+    const answers = (Array.isArray(raw) ? raw : [raw]).map((a) => str3(a)).filter((a) => a !== void 0);
+    if (qs.length > 1) {
+      body.push(/* @__PURE__ */ jsx("md", { children: str3(q.question) ?? "" }, `q${i}`));
+    }
+    for (const [j, c] of choices.entries()) {
+      body.push(answerRow(`q${i}.o${j}`, c, answers.includes(c)));
+    }
+    for (const [j, typed] of answers.filter((a) => !choices.includes(a)).entries()) {
+      body.push(answerRow(`q${i}.a${j}`, typed, true));
+    }
+    if (!answers.length && call.status !== "running") {
+      body.push(/* @__PURE__ */ jsx("text", { role: "omp.tool.notice", spans: [{ s: "muted", t: "No answer" }] }, `q${i}.none`));
+    }
+  }
+  return {
+    body,
+    name: "ask",
+    // Several questions each read in the body; the head counts them instead of repeating one.
+    target: qs.length > 1 ? `${qs.length} questions` : str3(qs[0]?.question) ?? call.context,
+    targetKind: "text",
+    title: "Ask"
+  };
+}
+function answerRow(key2, text, picked) {
+  return /* @__PURE__ */ jsxs("row", { role: picked ? "omp.tool.answer" : "omp.tool.answer.off", children: [
+    /* @__PURE__ */ jsx("text", { spans: [picked ? { s: "success", t: "\u2713" } : { s: "dim", t: "\xB7" }] }, "c"),
+    /* @__PURE__ */ jsx("text", { spans: [{ t: text }] }, "t")
+  ] }, key2);
+}
+function evalCard(call, result) {
+  const code2 = str3(call.args.code) ?? "";
+  const output = str3(result?.output) ?? str3(result?.stdout) ?? call.resultText;
+  const error = str3(result?.error) ?? str3(result?.stderr);
+  return {
+    badges: [{ text: "python" }],
+    body: [
+      /* @__PURE__ */ jsxs("col", { role: "omp.tool.eval.cell", children: [
+        /* @__PURE__ */ jsxs("row", { align: "start", role: "omp.tool.eval.input", children: [
+          /* @__PURE__ */ jsx("icon", { aria: "Input", name: "arrow-left", role: "omp.tool.eval.prompt" }, "0"),
+          /* @__PURE__ */ jsx("code", { lang: "python", numbers: false, text: code2 }, "code")
+        ] }, "input"),
+        output || error ? /* @__PURE__ */ jsxs("row", { align: "start", role: "omp.tool.eval.result", children: [
+          /* @__PURE__ */ jsx("icon", { aria: "Output", name: "arrow-right", role: "omp.tool.eval.prompt" }, "0"),
+          /* @__PURE__ */ jsxs("col", { role: "omp.tool.eval.outputs", children: [
+            output ? /* @__PURE__ */ jsx("ansi", { follow: false, role: "omp.tool.eval.output", text: output.replace(/\n$/, "") }, "out") : null,
+            error ? /* @__PURE__ */ jsx("text", { role: "omp.tool.error", spans: [{ s: "error", t: error }], wrap: "word" }, "err") : null
+          ] }, "outputs")
+        ] }, "result") : null
+      ] }, "cell-0")
+    ],
+    folded: false,
+    name: "eval",
+    role: "omp.tool.eval",
+    title: firstLine(code2)?.startsWith("#") ? firstLine(code2)?.replace(/^#+\s*/, "") ?? "Eval" : "Eval"
+  };
+}
+function genericBody(call) {
+  const text = call.resultText ?? (call.result === void 0 ? void 0 : pretty(call.result));
+  if (!text || call.status === "running") {
+    return [];
+  }
+  return [/* @__PURE__ */ jsx("code", { lang: /^\s*[[{]/.test(text) ? "json" : "text", text: clip(text, 4e3) }, "out")];
+}
+function errorOf(call) {
+  const result = record(call.result);
+  return str3(result?.error) ?? str3(call.summary) ?? (typeof call.result === "string" && !result ? call.result : void 0);
+}
+function exitOf(call) {
+  const code2 = record(call.result)?.exit_code;
+  return typeof code2 === "number" ? code2 : void 0;
+}
+function checklistNode(todos) {
+  const status = (t2) => t2.status === "completed" ? "done" : t2.status === "in_progress" ? "active" : t2.status === "cancelled" ? "dropped" : "pending";
+  const item = (t2) => ({ id: t2.id, status: status(t2), text: t2.content });
+  const roots = todos.filter((t2) => !t2.parent);
+  const nested = todos.some((t2) => t2.parent);
+  const phases = nested ? roots.map((r) => {
+    const kids = todos.filter((t2) => t2.parent === r.id);
+    return {
+      collapsed: kids.length > 0 && kids.every((k) => k.status === "completed"),
+      id: r.id,
+      items: kids.length ? kids.map(item) : [item(r)],
+      title: r.content
+    };
+  }) : [{ id: "all", items: roots.map(item) }];
+  return /* @__PURE__ */ jsx("checklist", { mode: "full", phases }, "list");
+}
+function plainDiff(raw) {
+  return hunks(raw.replace(/\x1b\[[0-9;]*m/g, ""));
+}
+function hunks(diff2) {
+  const lines = diff2?.split("\n") ?? [];
+  const start = lines.findIndex((l) => l.startsWith("@@"));
+  return start < 0 ? void 0 : lines.slice(start).join("\n").trimEnd();
+}
+function diffStats(diff2) {
+  let added = 0;
+  let removed = 0;
+  for (const line of diff2.split("\n")) {
+    if (line.startsWith("+") && !line.startsWith("+++")) {
+      added++;
+    } else if (line.startsWith("-") && !line.startsWith("---")) {
+      removed++;
+    }
+  }
+  return { added, removed };
+}
+var LANGS = {
+  c: "c",
+  cpp: "cpp",
+  css: "css",
+  go: "go",
+  html: "html",
+  java: "java",
+  js: "javascript",
+  json: "json",
+  jsx: "jsx",
+  md: "markdown",
+  py: "python",
+  rb: "ruby",
+  rs: "rust",
+  sh: "bash",
+  toml: "toml",
+  ts: "typescript",
+  tsx: "tsx",
+  yaml: "yaml",
+  yml: "yaml"
 };
+function langOf(path) {
+  const ext = path?.split(".").pop()?.toLowerCase();
+  return ext ? LANGS[ext] : void 0;
+}
+function todoCount(todos) {
+  if (!todos?.length) {
+    return void 0;
+  }
+  return `${todos.filter((t2) => t2.status === "completed").length}/${todos.length}`;
+}
+function firstLine(text) {
+  return text?.split("\n").find((l) => l.trim())?.trim();
+}
+function humanize(name) {
+  const words = name.replace(/[_-]+/g, " ").trim();
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}
+function pretty(v) {
+  return typeof v === "string" ? v : JSON.stringify(v, null, 2);
+}
+function clip(text, max) {
+  return text.length > max ? `${text.slice(0, max)}
+\u2026` : text;
+}
 
 // src/overlays/search.ts
 var PAGE = 10;
@@ -25032,8 +26298,579 @@ function hitRuns(positions, limit) {
   return runs;
 }
 
+// src/overlays/agents.tsx
+var KEY = "agents";
+var TICK_MS = 1e3;
+var RECENT = 6;
+var DOT = {
+  cancelled: "warning",
+  done: "success",
+  failed: "error",
+  queued: "muted",
+  running: "accent"
+};
+var STATUS = {
+  cancelled: "Stopped",
+  done: "Done",
+  failed: "Failed",
+  queued: "Queued",
+  running: "Running"
+};
+var TOOL_ICON = {
+  browser_navigate: "web",
+  execute_code: "python",
+  patch: "edit",
+  read_file: "read",
+  search_files: "search",
+  terminal: "bash",
+  web_extract: "web",
+  web_search: "web",
+  write_file: "write"
+};
+function openAgents(app, focus) {
+  const agents = () => app.agents.all();
+  let tab = app.agents.running().length ? "running" : "all";
+  let selected = focus?.id ?? agents().find(isRunning)?.id ?? agents()[0]?.id;
+  let watching;
+  let step;
+  let steer2;
+  let stopping = false;
+  const timer = setInterval(() => app.overlays.includes(overlay) ? app.changed() : clearInterval(timer), TICK_MS);
+  const close = () => {
+    clearInterval(timer);
+    app.close(overlay);
+  };
+  const current = () => agents().find((a) => a.id === (watching ?? selected));
+  const watch = (id) => {
+    const a = agents().find((x) => x.id === id);
+    if (!a) {
+      return;
+    }
+    watching = a.id;
+    step = void 0;
+    void app.agents.refresh(a);
+  };
+  const sendSteer = async () => {
+    const a = current();
+    const text = steer2?.trim();
+    steer2 = void 0;
+    if (!a || !text) {
+      return app.changed();
+    }
+    try {
+      const queued = await app.agents.steer(a, text);
+      app.transcript.notice(
+        queued ? `Steering queued for ${agentName(a)}.` : `${agentName(a)} is not taking steering now.`,
+        queued ? "info" : "warning"
+      );
+    } catch (error) {
+      app.transcript.notice(error instanceof Error ? error.message : String(error), "error");
+    }
+    app.changed();
+  };
+  const stop2 = async () => {
+    const a = current();
+    stopping = false;
+    if (!a || !isRunning(a)) {
+      return app.changed();
+    }
+    try {
+      if (!await app.agents.stop(a)) {
+        app.transcript.notice(`${agentName(a)} already finished.`, "warning");
+      }
+    } catch (error) {
+      app.transcript.notice(error instanceof Error ? error.message : String(error), "error");
+    }
+    app.changed();
+  };
+  const shown = () => tab === "running" ? agents().filter(isRunning) : agents();
+  const steps = (a) => a.log?.entries ?? [];
+  const overlay = {
+    key: KEY,
+    modal: true,
+    node: () => {
+      const now = Date.now();
+      const watched = watching ? agents().find((a) => a.id === watching) : void 0;
+      return watched ? timelineNode(watched, now) : hubNode(now);
+    },
+    onKey: (k) => {
+      const a = current();
+      if (steer2 !== void 0) {
+        if (k.name === "escape") {
+          steer2 = void 0;
+        } else if (k.name === "enter") {
+          void sendSteer();
+        } else {
+          steer2 = editQuery(k, steer2) ?? steer2;
+        }
+        return true;
+      }
+      if (stopping) {
+        if (k.name === "enter" || k.name === "y") {
+          void stop2();
+        } else if (k.name === "escape" || k.name === "n") {
+          stopping = false;
+        }
+        return true;
+      }
+      if (k.name === "escape") {
+        if (watching) {
+          selected = watching;
+          watching = void 0;
+        } else {
+          close();
+        }
+      } else if (k.name === "s" && !k.ctrl && !k.alt && a && isRunning(a)) {
+        steer2 = "";
+      } else if (k.name === "x" && !k.ctrl && !k.alt && a && isRunning(a)) {
+        stopping = true;
+      } else if (watching && a) {
+        const ids = steps(a).map((_, i) => `e${i}`);
+        const moved2 = moveSelection(k, ids, step ?? ids.at(-1));
+        if (moved2 !== void 0) {
+          step = moved2 === ids.at(-1) ? void 0 : moved2;
+        }
+      } else if (k.name === "enter") {
+        watch(selected);
+      } else if (k.name === "tab") {
+        tab = tab === "running" ? "all" : "running";
+      } else {
+        selected = moveSelection(
+          k,
+          shown().map((x) => x.id),
+          selected
+        ) ?? selected;
+      }
+      return true;
+    }
+  };
+  const steerProps = (a) => steer2 !== void 0 && a ? { placeholder: `Steer ${agentName(a)}: type, then Enter (Esc cancels)`, query: steer2 } : {};
+  const actions = (a, inTimeline) => {
+    const running = Boolean(a && isRunning(a));
+    if (steer2 !== void 0) {
+      return [
+        { end: true, id: "steer-cancel", keys: ["esc"], label: "Cancel" },
+        { id: "steer-send", keys: ["enter"], label: "Send", primary: true }
+      ];
+    }
+    return [
+      ...inTimeline ? [] : [{ id: "watch", keys: ["enter"], label: "Watch", primary: true }],
+      {
+        disabled: running ? a?.steerable === false ? "Not taking steering now" : void 0 : "Finished",
+        id: "steer",
+        keys: ["s"],
+        label: "Steer"
+      },
+      { danger: true, disabled: running ? void 0 : "Finished", id: "stop", keys: ["x"], label: "Stop" },
+      { end: true, id: "close", keys: ["esc"], label: inTimeline ? "Back" : "Close" }
+    ];
+  };
+  const handlers = {
+    cancel: () => {
+      stopping = false;
+      app.changed();
+    },
+    close: () => {
+      if (watching) {
+        selected = watching;
+        watching = void 0;
+        app.changed();
+      } else {
+        close();
+      }
+    },
+    confirm: () => void stop2(),
+    steer: () => {
+      steer2 = "";
+      app.changed();
+    },
+    "steer-cancel": () => {
+      steer2 = void 0;
+      app.changed();
+    },
+    "steer-send": () => void sendSteer(),
+    stop: () => {
+      stopping = true;
+      app.changed();
+    },
+    tab: (ev) => {
+      tab = ev.value === "running" ? "running" : "all";
+      app.changed();
+    },
+    watch: () => {
+      watch(selected);
+      app.changed();
+    }
+  };
+  function hubNode(now) {
+    const all = agents();
+    const list = shown();
+    const running = all.filter(isRunning).length;
+    if (!list.some((a2) => a2.id === selected)) {
+      selected = list[0]?.id;
+    }
+    const a = list.find((x) => x.id === selected);
+    const columns = [
+      { format: "num", head: "Tools", id: "tools", priority: 3 },
+      { format: "elapsed", head: "Time", id: "time", priority: 5 }
+    ];
+    return /* @__PURE__ */ jsx(
+      "picker",
+      {
+        actions: actions(a, false),
+        columns,
+        confirm: stopping && a ? { act: "confirm", label: "Stop", text: `Stop ${agentName(a)}? Its partial work returns to Hermes.` } : void 0,
+        empty: tab === "running" ? "No agents running. Tab shows finished ones." : "No subagents in this session yet",
+        icon: "agents",
+        items: all.map((x) => hubItem(x, now)),
+        layout: all.some((x) => x.depth) ? "tree" : "rows",
+        noun: "agents",
+        onAction: handlers,
+        onActivate: (ev) => {
+          watch(ev.item);
+          app.changed();
+        },
+        onSelect: (ev) => {
+          selected = ev.item;
+          stopping = false;
+          app.changed();
+        },
+        order: list.map((x) => x.id),
+        preview: "side",
+        selected,
+        size: "lg",
+        subtitle: [{ s: "muted", t: summary(all) }],
+        tab,
+        tabs: [
+          { count: running, id: "running", label: "Running" },
+          { count: all.length, id: "all", label: "All" }
+        ],
+        title: "Agents",
+        total: all.length,
+        ...steerProps(a),
+        children: a ? hubPreview(a, now) : null
+      },
+      KEY
+    );
+  }
+  function timelineNode(a, now) {
+    const entries = steps(a);
+    const ids = entries.map((_, i) => `e${i}`);
+    const sel = step && ids.includes(step) ? step : ids.at(-1);
+    const at = sel ? ids.indexOf(sel) : -1;
+    return /* @__PURE__ */ jsx(
+      "picker",
+      {
+        actions: actions(a, true),
+        columns: [
+          { format: "dim", head: "At", id: "at", min: 8, priority: 2 },
+          { format: "elapsed", head: "Took", id: "took", priority: 4 }
+        ],
+        confirm: stopping ? { act: "confirm", label: "Stop", text: `Stop ${agentName(a)}? Its partial work returns to Hermes.` } : void 0,
+        empty: a.logPath || a.log ? "Nothing logged yet" : "This agent has no live transcript",
+        icon: "agent",
+        items: entries.map((e, i) => stepItem(e, `e${i}`, a)),
+        layout: "timeline",
+        noun: "steps",
+        onAction: handlers,
+        onSelect: (ev) => {
+          step = ev.item === ids.at(-1) ? void 0 : ev.item;
+          app.changed();
+        },
+        preview: "side",
+        selected: sel,
+        size: "lg",
+        subtitle: [{ s: "muted", t: `${STATUS[a.status]} \xB7 ${a.goal}` }],
+        title: agentName(a),
+        total: entries.length,
+        ...steerProps(a),
+        children: at >= 0 ? stepPreview(entries[at]) : [agentNode(a, now)]
+      },
+      KEY
+    );
+  }
+  app.open(overlay);
+  if (focus?.watch) {
+    watch(focus.id);
+  }
+}
+function summary(all) {
+  const count = (s) => all.filter((a) => a.status === s).length;
+  const parts = [
+    [count("running") + count("queued"), "running"],
+    [count("done"), "done"],
+    [count("failed"), "failed"],
+    [count("cancelled"), "stopped"]
+  ];
+  return parts.filter(([n]) => n).map(([n, label]) => `${n} ${label}`).join(" \xB7 ") || "none yet";
+}
+function elapsed(a, now) {
+  return duration(isRunning(a) ? now - a.startedAt : a.duration ?? 0);
+}
+function hubItem(a, now) {
+  return {
+    chips: a.model ? [{ text: a.model.split("/").at(-1) ?? a.model }] : void 0,
+    depth: a.depth ?? 0,
+    detail: a.goal,
+    dot: DOT[a.status],
+    facts: { time: elapsed(a, now), tools: a.toolCount },
+    id: a.id,
+    label: agentName(a),
+    title: a.goal
+  };
+}
+function hubPreview(a, now) {
+  const recent = (a.log?.entries ?? []).slice(-RECENT);
+  return [
+    // A new node each time the selection moves: its timers need their true ages.
+    agentNode(a, now, true),
+    /* @__PURE__ */ jsx(
+      "kv",
+      {
+        items: [
+          { k: [{ t: "Status" }], v: [{ s: toneSpan(a.status), t: STATUS[a.status] }] },
+          ...a.model ? [{ k: [{ t: "Model" }], v: a.model }] : [],
+          { k: [{ t: "Time" }], v: elapsed(a, now) },
+          { k: [{ t: "Tools" }], v: String(a.toolCount) },
+          ...a.exitReason ? [{ k: [{ t: "Ended" }], v: a.exitReason.replace(/_/g, " ") }] : [],
+          ...isRunning(a) && a.steerable !== void 0 ? [{ k: [{ t: "Steering" }], v: a.steerable ? "open" : "closed" }] : [],
+          { k: [{ t: "ID" }], v: [{ s: "mono dim", t: a.id }] }
+        ],
+        role: "omp.hub.kv"
+      },
+      "facts"
+    ),
+    /* @__PURE__ */ jsx("section", { head: "Task", children: /* @__PURE__ */ jsx("md", { text: a.goal }, "goal") }, "task"),
+    ...a.summary ? [
+      /* @__PURE__ */ jsx("section", { head: "Result", children: /* @__PURE__ */ jsx("md", { text: a.summary }, "summary") }, "result")
+    ] : [],
+    ...recent.length ? [
+      /* @__PURE__ */ jsx("section", { head: "Recent activity", role: "omp.hub.activity", children: recent.map((e, i) => /* @__PURE__ */ jsxs("row", { gap: "sm", role: "omp.hub.activity.row", children: [
+        /* @__PURE__ */ jsx("text", { spans: [{ s: "dim mono", t: e.at }], wrap: "none" }, "at"),
+        /* @__PURE__ */ jsx("text", { grow: 1, spans: stepSpans(e), truncate: "end", wrap: "none" }, "what")
+      ] }, `r${i}`)) }, "recent")
+    ] : []
+  ];
+}
+function stepItem(e, id, a) {
+  if (e.kind === "tool") {
+    return {
+      detail: e.args,
+      dot: e.status === "error" ? "error" : e.status === "running" && isRunning(a) ? "accent" : void 0,
+      facts: { at: e.at, took: e.took !== void 0 ? duration(e.took) : "" },
+      icon: TOOL_ICON[e.name] ?? "wrench",
+      id,
+      label: e.name,
+      mono: true,
+      node: "tool",
+      tone: e.status === "error" ? "error" : void 0
+    };
+  }
+  return {
+    facts: { at: e.at },
+    id,
+    label: e.kind === "kickoff" ? `Task: ${e.text}` : e.kind === "think" ? `Thinking: ${e.text}` : e.text,
+    node: e.kind === "kickoff" ? "user" : "assistant",
+    tone: e.kind === "think" || e.kind === "note" ? "muted" : void 0
+  };
+}
+function stepPreview(e) {
+  if (e.kind !== "tool") {
+    const head = { assistant: "Answer", kickoff: "Task", note: "Note", think: "Thinking" }[e.kind];
+    return [
+      /* @__PURE__ */ jsx("text", { role: "omp.hub.title", text: head }, "title"),
+      /* @__PURE__ */ jsx("text", { spans: [{ s: "dim mono", t: e.at }] }, "at"),
+      /* @__PURE__ */ jsx("md", { text: e.text, tone: e.kind === "think" ? "muted" : void 0 }, "body")
+    ];
+  }
+  return [
+    /* @__PURE__ */ jsx("text", { role: "omp.hub.title", spans: [{ s: "mono strong", t: e.name }] }, "title"),
+    /* @__PURE__ */ jsx(
+      "kv",
+      {
+        items: [
+          {
+            k: [{ t: "Status" }],
+            v: [{ s: e.status === "error" ? "error" : e.status === "ok" ? "success" : "accent", t: e.status === "ok" ? "ok" : e.status }]
+          },
+          { k: [{ t: "Started" }], v: e.at },
+          ...e.took !== void 0 ? [{ k: [{ t: "Took" }], v: duration(e.took) }] : []
+        ],
+        role: "omp.hub.kv"
+      },
+      "facts"
+    ),
+    ...e.args ? [
+      /* @__PURE__ */ jsx("section", { head: "Arguments", children: /* @__PURE__ */ jsx("code", { text: e.args, wrap: true }, "code") }, "args")
+    ] : [],
+    ...e.result ? [
+      /* @__PURE__ */ jsx("section", { head: "Result", children: /* @__PURE__ */ jsx("code", { text: e.result, wrap: true }, "code") }, "result")
+    ] : []
+  ];
+}
+function stepSpans(e) {
+  switch (e.kind) {
+    case "tool":
+      return [
+        { s: e.status === "error" ? "error mono" : "mono", t: e.name },
+        { s: "muted", t: ` ${e.args}` }
+      ];
+    case "think":
+      return [{ s: "muted", t: e.text }];
+    case "kickoff":
+      return [{ s: "dim", t: "Task: " }, { t: e.text }];
+    default:
+      return [{ t: e.text }];
+  }
+}
+function toneSpan(status) {
+  return { cancelled: "warning", done: "success", failed: "error", queued: "muted", running: "accent" }[status];
+}
+
+// src/overlays/help.tsx
+var KEY2 = "help";
+var HOTKEYS = [
+  {
+    group: "Editing",
+    rows: [
+      [["enter"], "Send message"],
+      [["shift+enter", "alt+enter"], "New line"],
+      [["up", "down"], "Move between lines / browse history"],
+      [["tab"], "Accept the completion"],
+      [["alt+left", "alt+right", "alt+b", "alt+f"], "Move by word"],
+      [["ctrl+a", "ctrl+e"], "Start / end of line"],
+      [["ctrl+w", "alt+backspace"], "Delete word backwards"],
+      [["ctrl+u"], "Delete to start of line"],
+      [["alt+d"], "Delete word forward"],
+      [["ctrl+k"], "Delete to end of line (joins the next line at its end)"],
+      [["ctrl+y"], "Paste the last deleted text"],
+      [["ctrl+z", "shift+ctrl+z"], "Undo / redo"]
+    ]
+  },
+  {
+    group: "Control",
+    rows: [
+      [["escape"], "Close the completion / interrupt the agent"],
+      [["shift+tab"], "Cycle the reasoning effort"],
+      [["alt+up"], "Edit the oldest queued prompt"],
+      [["ctrl+c"], "Clear the draft / interrupt / exit (twice)"],
+      [["ctrl+d"], "Delete forward / exit (empty prompt)"]
+    ]
+  }
+];
+async function openHelp(app) {
+  let catalog = {};
+  try {
+    catalog = await app.gw.request("commands.catalog", app.sid ? { session_id: app.sid } : {});
+  } catch (error) {
+    app.transcript.notice(
+      `Could not load the command list: ${error instanceof Error ? error.message : String(error)}`,
+      "warning"
+    );
+  }
+  const categories = catalog.categories?.length ? catalog.categories : [{ name: "Commands", pairs: catalog.pairs ?? [] }];
+  const overlay = {
+    key: KEY2,
+    modal: true,
+    node: () => /* @__PURE__ */ jsx("overlay", { anchor: "center", head: "Commands and shortcuts", modal: true, role: "omp.overlay.hotkeys", size: "lg", children: /* @__PURE__ */ jsxs("col", { gap: "lg", children: [
+      HOTKEYS.map(({ group, rows }) => /* @__PURE__ */ jsx("section", { head: group, role: "omp.hotkeys.group", children: /* @__PURE__ */ jsx(
+        "table",
+        {
+          cols: [
+            { head: "Key", id: "keys" },
+            { grow: 1, head: "Action", id: "action" }
+          ],
+          role: "omp.hotkeys.table",
+          rows: rows.map(([keys, action], i) => ({
+            cells: {
+              action: [{ t: action }],
+              keys: keys.flatMap((k, j) => [...j ? [{ s: "dim", t: " " }] : [], { s: "key", t: k }])
+            },
+            id: String(i)
+          }))
+        },
+        "table"
+      ) }, `keys-${group}`)),
+      categories.map((c) => /* @__PURE__ */ jsx("section", { head: c.name, role: "omp.hotkeys.group", children: /* @__PURE__ */ jsx(
+        "table",
+        {
+          cols: [
+            { head: "Command", id: "command" },
+            { grow: 1, head: "Description", id: "action" }
+          ],
+          role: "omp.hotkeys.table",
+          rows: (c.pairs ?? []).map(([command = "", text = ""], i) => ({
+            // The `(usage: …)` tail is `/help <command>`'s business; the table keeps the summary.
+            cells: {
+              action: [{ t: text.replace(/\s*\(usage: .+\)\s*$/, "") }],
+              command: [{ s: "mono", t: command }]
+            },
+            id: String(i)
+          }))
+        },
+        "table"
+      ) }, `cmd-${c.name}`)),
+      /* @__PURE__ */ jsxs("row", { align: "center", gap: "sm", role: "omp.actions", children: [
+        /* @__PURE__ */ jsx("spacer", { grow: 1 }, "fill"),
+        /* @__PURE__ */ jsxs(
+          "row",
+          {
+            align: "center",
+            gap: "xs",
+            onClick: () => app.close(overlay),
+            role: "omp.btn",
+            title: "Close  escape",
+            children: [
+              /* @__PURE__ */ jsx("text", { text: "Close" }, "label"),
+              /* @__PURE__ */ jsx("kbd", { keys: ["escape"] }, "keys")
+            ]
+          },
+          "close"
+        )
+      ] }, "actions")
+    ] }, "body") }, KEY2),
+    onKey: (k) => {
+      if (k.name === "escape" || k.name === "enter" || k.name === "q") {
+        app.close(overlay);
+      }
+      return true;
+    }
+  };
+  app.open(overlay);
+}
+
+// node_modules/@hermes/shared/src/model-search-text.ts
+var MODEL_SEARCH_ALIASES = {
+  k3: ["kimi-k3", "kimi"],
+  // OpenCode Zen serves the "Ox Alpha" stealth model under an opaque
+  // preview slug; let users find it by its public codename.
+  "x-preview-f-free": ["ox-alpha", "ox"]
+};
+function modelSearchText(model) {
+  const id = model.trim();
+  if (!id) {
+    return model;
+  }
+  const aliases = MODEL_SEARCH_ALIASES[id.toLowerCase()];
+  if (!aliases?.length) {
+    return id;
+  }
+  return `${id} ${aliases.join(" ")}`;
+}
+
+// .hermes-src/ui-tui/src/domain/providers.ts
+var providerDisplayNames = (providers) => {
+  const counts = /* @__PURE__ */ new Map();
+  for (const p of providers) {
+    counts.set(p.name, (counts.get(p.name) ?? 0) + 1);
+  }
+  return providers.map(
+    (p) => (counts.get(p.name) ?? 0) > 1 && p.slug && p.slug !== p.name ? `${p.name} (${p.slug})` : p.name
+  );
+};
+
 // src/overlays/models.tsx
-var KEY2 = "models";
+var KEY3 = "models";
 var ALL = "all";
 var confirmTokens = /* @__PURE__ */ new Map();
 async function mutateModel(app, value, confirmed) {
@@ -25164,7 +27001,7 @@ function openModelPicker(app) {
     return { hits, order };
   };
   const overlay = {
-    key: KEY2,
+    key: KEY3,
     modal: true,
     node: () => {
       const { hits, order } = view();
@@ -25241,7 +27078,7 @@ function openModelPicker(app) {
           total: rows.length,
           children: row ? preview2(row, row.id === current) : null
         },
-        KEY2
+        KEY3
       );
     },
     onKey: (k) => {
@@ -25777,7 +27614,7 @@ function unmaskEdit(secret, ev) {
 
 // src/overlays/prompts.tsx
 var RECOMMENDED = /\s*\(recommended\)\s*$/i;
-var str3 = (v) => typeof v === "string" ? v : "";
+var str4 = (v) => typeof v === "string" ? v : "";
 function actionsRow(buttons) {
   return /* @__PURE__ */ jsxs("row", { align: "center", gap: "sm", role: "omp.actions", children: [
     /* @__PURE__ */ jsx("spacer", { grow: 1 }, "fill"),
@@ -25871,8 +27708,8 @@ var APPROVALS = [
 ];
 function approvalOverlay(host, req) {
   const p = req.params;
-  const command = str3(p.command);
-  const description = str3(p.description);
+  const command = str4(p.command);
+  const description = str4(p.description);
   const smartDenied = p.smart_denied === true;
   const offered = Array.isArray(p.choices) ? p.choices.filter((c) => typeof c === "string") : [];
   const allowed = new Set(
@@ -25955,8 +27792,8 @@ function questionsOf(raw) {
       return [];
     }
     const choices = "choices" in q && Array.isArray(q.choices) ? q.choices.filter((c) => typeof c === "string") : [];
-    const question = str3(q.question).trim();
-    return question ? [{ choices, multi: "multi_select" in q && q.multi_select === true, qid: str3(q.qid), question }] : [];
+    const question = str4(q.question).trim();
+    return question ? [{ choices, multi: "multi_select" in q && q.multi_select === true, qid: str4(q.qid), question }] : [];
   });
 }
 function tabLabel(question) {
@@ -26186,15 +28023,15 @@ function clarifyOverlay(host, req) {
 function maskedOverlay(host, req) {
   const p = req.params;
   const key2 = `prompt:${req.id}`;
-  const site = str3(p.site) || str3(p.origin);
+  const site = str4(p.site) || str4(p.origin);
   const login = req.method === "vault.save_login";
   const fields = login ? [
     { id: "identifier", label: "Username or email", masked: false, value: new Composer() },
     { id: "password", label: "Password", masked: true, value: new Composer() }
   ] : [{ id: "value", label: "Hidden while you type", masked: true, value: new Composer() }];
   let at = 0;
-  const title = req.method === "sudo" ? "Password for sudo" : req.method === "secret" ? str3(p.prompt) || `Value for ${str3(p.env_var) || "a secret"}` : req.method === "vault.unlock_prompt" ? `Master password for ${str3(p.display_name) || str3(p.backend) || "the password manager"}` : login ? `Save a login for ${site || "this site"}` : `Code for ${site || "this site"}`;
-  const note = req.method === "secret" ? str3(p.env_var) : req.method === "vault.code" ? str3(p.hint) : "";
+  const title = req.method === "sudo" ? "Password for sudo" : req.method === "secret" ? str4(p.prompt) || `Value for ${str4(p.env_var) || "a secret"}` : req.method === "vault.unlock_prompt" ? `Master password for ${str4(p.display_name) || str4(p.backend) || "the password manager"}` : login ? `Save a login for ${site || "this site"}` : `Code for ${site || "this site"}`;
+  const note = req.method === "secret" ? str4(p.env_var) : req.method === "vault.code" ? str4(p.hint) : "";
   const finish = (cancel) => {
     const [first, second] = fields;
     req.respond({
@@ -26209,7 +28046,7 @@ function maskedOverlay(host, req) {
     node: () => /* @__PURE__ */ jsx("overlay", { anchor: "bottom", modal: true, role: "omp.overlay.ask", size: "md", children: /* @__PURE__ */ jsxs("col", { gap: "md", children: [
       /* @__PURE__ */ jsx("md", { role: "omp.ask.question", text: title }, "question"),
       note ? /* @__PURE__ */ jsx("text", { spans: [{ s: req.method === "secret" ? "mono dim" : "muted", t: note }], wrap: "word" }, "note") : null,
-      str3(p.command) ? /* @__PURE__ */ jsx("code", { lang: "bash", text: str3(p.command) }, "command") : null,
+      str4(p.command) ? /* @__PURE__ */ jsx("code", { lang: "bash", text: str4(p.command) }, "command") : null,
       fields.map((f, i) => /* @__PURE__ */ jsx(
         "input",
         {
@@ -26300,7 +28137,7 @@ function confirmOverlay(host, ask) {
 }
 
 // src/overlays/sessions.tsx
-var KEY3 = "sessions";
+var KEY4 = "sessions";
 var LIMIT = 200;
 var DAY = 864e5;
 function openSessionPicker(app) {
@@ -26379,7 +28216,7 @@ function openSessionPicker(app) {
     return { hits, order };
   };
   const overlay = {
-    key: KEY3,
+    key: KEY4,
     modal: true,
     node: () => {
       const now = Date.now();
@@ -26444,7 +28281,7 @@ function openSessionPicker(app) {
           total: rows.length,
           children: row ? preview3(row, row.id === app.storedSid) : null
         },
-        KEY3
+        KEY4
       );
     },
     onKey: (k) => {
@@ -26586,6 +28423,12 @@ var COMMANDS = [
     }
   },
   {
+    // `/agents pause|resume|status` stay the backend's (delegation.pause and its status).
+    aliases: ["tasks"],
+    name: "agents",
+    run: (app, arg) => arg ? false : openAgents(app)
+  },
+  {
     // `/help <command>` is the backend's detailed usage.
     name: "help",
     run: (app, arg) => arg ? false : openHelp(app)
@@ -26654,7 +28497,7 @@ var writeActiveSessionFile = (sessionId, file2 = process.env.HERMES_TUI_ACTIVE_S
 };
 
 // src/hermes/images.ts
-import { readFile } from "node:fs/promises";
+import { readFile as readFile2 } from "node:fs/promises";
 import { homedir as homedir3 } from "node:os";
 import { extname as extname2, resolve as resolve2 } from "node:path";
 var MAX_IMAGE_BYTES = 20 * 1024 * 1024;
@@ -26675,7 +28518,7 @@ function imageFormat(bytes) {
 }
 async function uploadImage(gw2, sid, raw, cwd) {
   const path = resolve2(cwd, raw.replace(/^~(?=$|\/)/, homedir3()));
-  const bytes = await readFile(path);
+  const bytes = await readFile2(path);
   if (bytes.length > MAX_IMAGE_BYTES) {
     throw new Error("the image is larger than 20 MB");
   }
@@ -27640,465 +29483,6 @@ function tokensOf(c) {
   return out;
 }
 
-// src/transcript.ts
-var Transcript = class {
-  entries = [];
-  /** Bumped on every change; views and the render loop compare it. */
-  rev = 0;
-  #next = 0;
-  /** The session's running usage at the last completed turn (message.complete reports session totals). */
-  #sessionUsage;
-  /** The streaming turn: set by start, cleared by complete, clear and load (notices may land after it). */
-  #live;
-  /** Sets the running usage turns count from (a resumed session's totals). */
-  usageBase(usage) {
-    this.#sessionUsage = usage;
-  }
-  /** A fresh id for an entry or block, unique within this transcript. */
-  id(prefix) {
-    return `${prefix}${(this.#next++).toString(36)}`;
-  }
-  get live() {
-    return this.#live;
-  }
-  clear() {
-    this.entries = [];
-    this.#live = void 0;
-    this.#touch();
-  }
-  push(entry) {
-    this.entries.push(entry);
-    this.#touch();
-  }
-  user(text, at = Date.now()) {
-    this.push({ at, id: this.id("u"), kind: "user", text });
-  }
-  notice(text, tone = "info") {
-    this.push({ id: this.id("n"), kind: "notice", text, tone });
-  }
-  panel(title, text) {
-    this.push({ id: this.id("p"), kind: "panel", text, title });
-  }
-  /** Opens a live turn unless one is already streaming. */
-  start(at = Date.now()) {
-    const live = this.live;
-    if (live) {
-      return live;
-    }
-    const turn = { blocks: [], id: this.id("t"), kind: "turn", rev: 0, startedAt: at, status: "live" };
-    this.push(turn);
-    this.#live = turn;
-    return turn;
-  }
-  reasoning(text, at = Date.now()) {
-    if (!text) {
-      return;
-    }
-    const turn = this.start(at);
-    const last = turn.blocks.at(-1);
-    if (last?.kind === "thinking" && last.endedAt === void 0) {
-      last.text += text;
-    } else {
-      turn.blocks.push({ id: this.id("k"), kind: "thinking", startedAt: at, text });
-    }
-    this.#touch(turn);
-  }
-  /**
-   * A whole reasoning block from a provider that doesn't stream it; ignored once reasoning streamed.
-   * Hermes also relays each response's visible text through `reasoning.available`, so text the
-   * turn already shows is not a thought either.
-   */
-  reasoningBlock(text, at = Date.now()) {
-    const turn = this.start(at);
-    const incoming = text.trim();
-    if (!incoming || turn.blocks.some((b) => b.kind === "thinking" || b.kind === "text" && b.text.includes(incoming))) {
-      return;
-    }
-    turn.blocks.push({ endedAt: at, id: this.id("k"), kind: "thinking", startedAt: at, text });
-    this.#touch(turn);
-  }
-  text(text, at = Date.now()) {
-    if (!text) {
-      return;
-    }
-    const turn = this.start(at);
-    this.#endThinking(turn, at);
-    const last = turn.blocks.at(-1);
-    if (last?.kind === "text") {
-      last.text += text;
-    } else {
-      turn.blocks.push({ id: this.id("x"), kind: "text", text });
-    }
-    this.#touch(turn);
-  }
-  /** Interim commentary: seals the streamed text so the next delta starts a new block. */
-  interim(text, { alreadyStreamed }, at = Date.now()) {
-    const turn = this.start(at);
-    this.#endThinking(turn, at);
-    if (!alreadyStreamed && text.trim()) {
-      turn.blocks.push({ id: this.id("x"), kind: "text", text });
-    }
-    turn.blocks.push({ id: this.id("x"), kind: "text", text: "" });
-    this.#touch(turn);
-  }
-  toolStart(p, at = Date.now()) {
-    const turn = this.start(at);
-    this.#endThinking(turn, at);
-    if (this.#tool(p.tool_id)) {
-      return;
-    }
-    const call = {
-      args: p.args ?? {},
-      argsText: p.args_text ?? "",
-      context: p.context ?? "",
-      id: p.tool_id,
-      name: p.name,
-      startedAt: at,
-      status: "running"
-    };
-    if (Array.isArray(call.args.todos)) {
-      call.todos = toTodos(call.args.todos);
-    }
-    turn.blocks.push({ call, id: p.tool_id, kind: "tool" });
-    this.#touch(turn);
-  }
-  toolComplete(p, at = Date.now()) {
-    let found = this.#tool(p.tool_id);
-    if (!found) {
-      this.toolStart({ args: p.args ?? {}, name: p.name, tool_id: p.tool_id }, at);
-      found = this.#tool(p.tool_id);
-    }
-    if (!found) {
-      return;
-    }
-    const { call, turn } = found;
-    const output = record(p.result)?.output;
-    const interrupted = p.name === "terminal" && typeof output === "string" && /\[Command interrupted\]\s*$/.test(output);
-    call.status = interrupted ? "cancelled" : isToolError(p) ? "error" : "done";
-    call.duration = typeof p.duration_s === "number" ? Math.round(p.duration_s * 1e3) : at - call.startedAt;
-    call.summary = p.summary ?? void 0;
-    call.resultText = p.result_text ?? void 0;
-    call.result = p.result;
-    call.diff = p.inline_diff ?? void 0;
-    if (p.args) {
-      call.args = p.args;
-    }
-    if (Array.isArray(p.todos)) {
-      call.todos = toTodos(p.todos);
-    }
-    this.#touch(turn);
-  }
-  /** The newest todo snapshot lands on the newest todo tool call. */
-  todos(todos) {
-    const found = this.#lastTool((c) => c.name === "todo_list");
-    if (found) {
-      found.call.todos = toTodos(todos);
-      this.#touch(found.turn);
-    }
-  }
-  subagent(type, p, at = Date.now()) {
-    const found = (p.delegation_id ? this.#findTool((c) => c.name === "delegate_task" && record(c.result)?.delegation_id === p.delegation_id) : void 0) ?? this.#lastTool((c) => c.name === "delegate_task");
-    if (!found) {
-      return;
-    }
-    const list = found.call.subagents ??= [];
-    const key2 = p.subagent_id ?? `task-${p.task_index}`;
-    let agent = list.find((a) => a.id === key2);
-    if (!agent) {
-      agent = {
-        calls: 0,
-        goal: p.goal,
-        id: key2,
-        index: p.task_index,
-        startedAt: at,
-        status: "queued",
-        tokens: 0,
-        toolCount: 0
-      };
-      list.push(agent);
-      list.sort((a, b) => a.index - b.index);
-    }
-    agent.last = p;
-    agent.goal = p.goal || agent.goal;
-    agent.model = p.model ?? agent.model;
-    agent.toolCount = p.tool_count ?? agent.toolCount;
-    agent.calls = p.api_calls ?? agent.calls;
-    agent.tokens = (p.input_tokens ?? 0) + (p.output_tokens ?? 0) || agent.tokens;
-    if (type === "subagent.start") {
-      agent.status = "running";
-      agent.startedAt = at;
-    } else if (type === "subagent.tool") {
-      agent.status = "running";
-      agent.tool = p.tool_name ?? agent.tool;
-      agent.toolPreview = p.tool_preview ?? p.text ?? void 0;
-      agent.toolSince = { at };
-    } else if (type === "subagent.complete") {
-      agent.status = p.status === "completed" ? "done" : p.status === "interrupted" ? "cancelled" : "failed";
-      agent.summary = p.summary ?? void 0;
-      agent.duration = typeof p.duration_seconds === "number" ? Math.round(p.duration_seconds * 1e3) : at - agent.startedAt;
-      agent.tool = void 0;
-    } else if (p.status === "running") {
-      agent.status = "running";
-    }
-    this.#touch(found.turn);
-  }
-  complete(p, at = Date.now()) {
-    const turn = this.live ?? this.start(at);
-    this.#endThinking(turn, at);
-    const final = typeof p.text === "string" ? p.text : "";
-    const tail = trailingText(turn);
-    if (final.trim() && tail.trim() !== final.trim() && !(p.status === "error" && !p.partial)) {
-      const last = turn.blocks.at(-1);
-      if (last?.kind === "text") {
-        last.text = final;
-      } else {
-        turn.blocks.push({ id: this.id("x"), kind: "text", text: final });
-      }
-    }
-    turn.blocks = turn.blocks.filter((b) => b.kind !== "text" || b.text.trim());
-    for (const b of turn.blocks) {
-      if (b.kind === "tool" && b.call.status === "running") {
-        b.call.status = p.status === "error" ? "error" : p.status === "interrupted" ? "cancelled" : "done";
-        b.call.duration ??= at - b.call.startedAt;
-      }
-    }
-    turn.endedAt = at;
-    this.#live = void 0;
-    if (p.usage) {
-      turn.usage = usageSince(p.usage, this.#sessionUsage);
-      this.#sessionUsage = p.usage;
-    }
-    turn.warning = p.warning ?? void 0;
-    turn.status = p.status === "error" ? "error" : p.status === "interrupted" ? "interrupted" : "done";
-    if (turn.status === "error") {
-      const surfaced = p.error_surface?.message;
-      const error = typeof surfaced === "string" && surfaced || p.error || final || "The request failed";
-      const http = /^HTTP (\d{3}):\s*/.exec(error);
-      const code2 = p.error_surface?.code;
-      turn.error = http ? error.slice(http[0].length) : error;
-      turn.errorCode = http?.[1] ?? (typeof code2 === "string" && code2 ? code2 : void 0);
-      turn.errorHint = final.split(/\n\s*\n/)[0]?.trim() || void 0;
-    }
-    this.#touch(turn);
-  }
-  /** Seals a live turn the user interrupted before the agent confirmed it. */
-  interrupt(at = Date.now()) {
-    const turn = this.live;
-    if (turn) {
-      this.complete({ status: "interrupted" }, at);
-    }
-  }
-  /** Rebuilds the entries of a resumed session from its stored messages. */
-  load(messages2) {
-    this.entries = this.entries.filter((e) => e.kind === "welcome");
-    this.#live = void 0;
-    let turn;
-    const calls = /* @__PURE__ */ new Map();
-    for (const m of messages2) {
-      const at = typeof m.timestamp === "number" ? m.timestamp * 1e3 : 0;
-      const text = typeof m.text === "string" ? m.text : typeof m.content === "string" ? m.content : "";
-      if (m.role === "user") {
-        turn = void 0;
-        this.entries.push({ at, id: this.id("u"), kind: "user", text });
-        continue;
-      }
-      if (m.role === "system") {
-        turn = void 0;
-        if (text.trim()) {
-          this.entries.push({ id: this.id("n"), kind: "notice", text, tone: "info" });
-        }
-        continue;
-      }
-      if (!turn) {
-        turn = { blocks: [], id: this.id("t"), kind: "turn", rev: 0, startedAt: at, status: "done" };
-        this.entries.push(turn);
-      }
-      if (m.role === "assistant") {
-        if (m.reasoning?.trim()) {
-          turn.blocks.push({ endedAt: at, id: this.id("k"), kind: "thinking", startedAt: at, text: m.reasoning });
-        }
-        if (text.trim()) {
-          turn.blocks.push({ id: this.id("x"), kind: "text", text });
-        }
-      } else if (m.role === "tool") {
-        const id = m.tool_call_id ?? this.id("c");
-        const result = typeof m.content === "string" && m.content ? m.content : void 0;
-        const existing = calls.get(id);
-        if (existing) {
-          existing.result = result ?? existing.result;
-          continue;
-        }
-        const bridged = m.name === "tool_call" ? bridgedCall(m.args ?? {}) : void 0;
-        const args = bridged?.args ?? m.args ?? {};
-        const call = {
-          args,
-          argsText: "",
-          context: m.context ?? "",
-          duration: 0,
-          id,
-          name: bridged?.name ?? m.name ?? "tool",
-          result,
-          startedAt: at,
-          status: record(result)?.error ? "error" : "done"
-        };
-        if (Array.isArray(args.todos)) {
-          call.todos = toTodos(args.todos);
-        }
-        calls.set(id, call);
-        turn.blocks.push({ call, id: this.id("c"), kind: "tool" });
-      }
-    }
-    this.#touch();
-  }
-  /** A resumed session's unfinished turn: its prompt, then a live turn holding what streamed so far. */
-  inflight(turn, at = Date.now()) {
-    const user = turn.user?.trim();
-    if (user) {
-      this.user(user, at);
-    }
-    if (turn.assistant || turn.streaming) {
-      this.start(at);
-      this.text(turn.assistant ?? "", at);
-    }
-  }
-  #endThinking(turn, at) {
-    for (const b of turn.blocks) {
-      if (b.kind === "thinking" && b.endedAt === void 0) {
-        b.endedAt = at;
-      }
-    }
-  }
-  #tool(id) {
-    return this.#findTool((call) => call.id === id);
-  }
-  /** The newest call matching `match` in any turn, newest turn first. */
-  #findTool(match) {
-    for (let i = this.entries.length - 1; i >= 0; i--) {
-      const turn = this.entries[i];
-      if (turn?.kind !== "turn") {
-        continue;
-      }
-      const hit = turn.blocks.findLast((b) => b.kind === "tool" && match(b.call));
-      if (hit) {
-        return { call: hit.call, turn };
-      }
-    }
-    return void 0;
-  }
-  /** The newest call matching `match` in the live (else the last) turn only. */
-  #lastTool(match) {
-    const turn = this.live ?? this.entries.findLast((e) => e.kind === "turn");
-    if (turn?.kind !== "turn") {
-      return void 0;
-    }
-    const hit = turn.blocks.findLast((b) => b.kind === "tool" && match(b.call));
-    return hit && { call: hit.call, turn };
-  }
-  /** Marks a change: the transcript's, and the turn's when one changed. */
-  #touch(turn) {
-    this.rev++;
-    if (turn) {
-      turn.rev++;
-    }
-  }
-};
-function trailingText(turn) {
-  let out = "";
-  for (const b of turn.blocks) {
-    if (b.kind === "tool" || b.kind === "text" && !b.text) {
-      out = "";
-    } else if (b.kind === "text") {
-      out += b.text;
-    }
-  }
-  return out;
-}
-function isToolError(p) {
-  const r = record(p.result);
-  if (r?.error) {
-    return true;
-  }
-  if (p.name === "terminal" && typeof r?.exit_code === "number" && r.exit_code !== 0) {
-    return true;
-  }
-  return typeof p.summary === "string" && /^(error|failed)\b/i.test(p.summary);
-}
-function usageSince(now, before) {
-  const less = (key2) => {
-    const a = now[key2];
-    const b = before?.[key2];
-    return typeof a === "number" ? Math.max(0, a - (typeof b === "number" ? b : 0)) : void 0;
-  };
-  return { ...now, cost_usd: less("cost_usd"), input: less("input"), output: less("output"), total: less("total") };
-}
-function record(v) {
-  if (typeof v === "string") {
-    try {
-      return record(JSON.parse(v));
-    } catch {
-      return void 0;
-    }
-  }
-  return v && typeof v === "object" && !Array.isArray(v) ? v : void 0;
-}
-function bridgedCall(args) {
-  const calls = args.calls;
-  const entry = record(Array.isArray(calls) && calls.length === 1 ? calls[0] : args);
-  const name = entry?.name;
-  return typeof name === "string" && name ? { args: record(entry?.arguments) ?? {}, name } : void 0;
-}
-function toTodos(raw) {
-  const out = [];
-  for (const item of raw) {
-    if (!item || typeof item !== "object") {
-      continue;
-    }
-    const id = "id" in item ? String(item.id) : String(out.length);
-    const content = "content" in item ? String(item.content) : "";
-    const status = "status" in item ? String(item.status) : "pending";
-    const parent = "parent" in item && item.parent ? String(item.parent) : void 0;
-    out.push({
-      content,
-      id,
-      ...parent && { parent },
-      status: status === "completed" || status === "in_progress" || status === "cancelled" ? status : "pending"
-    });
-  }
-  return out;
-}
-
-// src/view/time.ts
-var kAge = /* @__PURE__ */ Symbol("tsp.age");
-function age(owner, startedAt, now) {
-  const aged = owner;
-  return aged[kAge] ??= Math.max(0, now - startedAt);
-}
-function duration(ms) {
-  if (ms < 1e3) {
-    return `${Math.max(0, Math.round(ms))}ms`;
-  }
-  const s = Math.round(ms / 100) / 10;
-  if (s < 60) {
-    return `${s < 10 ? s.toFixed(1) : Math.round(s)}s`;
-  }
-  const m = Math.floor(s / 60);
-  if (m < 60) {
-    return `${m}m ${String(Math.round(s % 60)).padStart(2, "0")}s`;
-  }
-  return `${Math.floor(m / 60)}h ${String(m % 60).padStart(2, "0")}m`;
-}
-function compact(n) {
-  if (n < 1e3) {
-    return String(n);
-  }
-  if (n < 1e6) {
-    const k = n / 1e3;
-    return `${k < 10 ? k.toFixed(1).replace(/\.0$/, "") : Math.round(k)}K`;
-  }
-  const m = n / 1e6;
-  return `${m < 10 ? m.toFixed(1).replace(/\.0$/, "") : Math.round(m)}M`;
-}
-
 // src/view/dock.tsx
 function dockNodes(cx) {
   const nodes = [];
@@ -28120,8 +29504,20 @@ function dockNodes(cx) {
       ] }, `q${i}`)) }, "queue")
     );
   }
+  if (cx.agents?.running) {
+    nodes.push(
+      /* @__PURE__ */ jsx("row", { role: "omp.hud", children: agentsPill(cx.agents.running, cx.agents.onOpen) }, "agents")
+    );
+  }
   nodes.push(composerNode(cx));
   return nodes;
+}
+function agentsPill(running, onOpen) {
+  return /* @__PURE__ */ jsxs("row", { align: "center", gap: "xs", onClick: onOpen, role: "omp.hud.pill", title: "Agents  \u2325A", children: [
+    /* @__PURE__ */ jsx("icon", { name: "users" }, "icon"),
+    /* @__PURE__ */ jsx("spinner", { style: "dots", tone: "accent" }, "spin"),
+    /* @__PURE__ */ jsx("text", { text: `${running} agent${running === 1 ? "" : "s"} running`, wrap: "none" }, "text")
+  ] }, "pill");
 }
 function workingNode(cx) {
   const busy = cx.busy;
@@ -28276,553 +29672,6 @@ ${compact(ctx.used)} of ${compact(ctx.max)} tokens`,
   ] }, "composer");
 }
 
-// src/view/tools.tsx
-var str4 = (v) => typeof v === "string" && v ? v : void 0;
-function toolNode(call, now) {
-  const card = cardOf(call, now);
-  const status = card.status ?? call.status;
-  const running = status === "running";
-  const body = [...card.body];
-  const error = call.status === "error" ? errorOf(call) : void 0;
-  if (call.status === "cancelled") {
-    body.push(
-      /* @__PURE__ */ jsx(
-        "text",
-        {
-          role: "omp.tool.notice",
-          spans: [{ s: "muted", t: `Interrupted by user after ${duration(call.duration ?? 0)}` }]
-        },
-        "cancelled"
-      )
-    );
-  }
-  const collapsed = call.status === "error" ? false : card.folded;
-  return node(
-    "tool",
-    {
-      age: running ? age(call, call.startedAt, now) : void 0,
-      badges: card.badges,
-      collapsed: body.length > 0 ? collapsed : void 0,
-      collapsible: body.length > 0 ? true : void 0,
-      exit: call.name === "terminal" && !running && call.status !== "cancelled" ? exitOf(call) : void 0,
-      frame: card.frame === "inline" && (running || !body.length || card.name !== "web_search") ? "inline" : void 0,
-      key: call.id,
-      lang: card.lang,
-      meta: card.meta?.length ? card.meta : void 0,
-      name: card.name,
-      note: call.status === "cancelled" ? "cancelled" : error && !card.body.length ? error : void 0,
-      preview: card.preview,
-      role: card.role,
-      status,
-      target: card.target,
-      targetKind: card.target ? card.targetKind : void 0,
-      title: card.title,
-      took: running ? void 0 : card.took ?? call.duration
-    },
-    body
-  );
-}
-function cardOf(call, now) {
-  const result = record(call.result);
-  switch (call.name) {
-    case "terminal":
-      return bashCard(call, result);
-    case "read_file":
-      return readCard(call, result);
-    case "patch":
-    case "write_file":
-      return editCard(call, result);
-    case "search_files":
-      return searchCard(call, result);
-    case "web_search":
-      return webSearchCard(call, result);
-    case "web_extract":
-      return fetchCard(call, result);
-    case "todo_list":
-      return {
-        body: call.todos?.length ? [checklistNode(call.todos)] : [],
-        name: "todo",
-        target: todoCount(call.todos),
-        targetKind: "text",
-        title: "Todo"
-      };
-    case "delegate_task":
-      return taskCard(call, result, now);
-    case "clarify":
-      return askCard(call, result);
-    case "execute_code":
-      return evalCard(call, result);
-    case "memory":
-      return {
-        body: [],
-        frame: "inline",
-        meta: str4(result?.usage) ? [`${result?.usage}`] : void 0,
-        name: "memory",
-        target: call.context || str4(call.args.action),
-        targetKind: "text",
-        title: "Memory"
-      };
-    case "skills_list": {
-      const skills = Array.isArray(result?.skills) ? result.skills : [];
-      const names = skills.map((s) => str4(record(s)?.name) ?? str4(s)).filter((n) => n !== void 0);
-      return {
-        body: names.length ? [/* @__PURE__ */ jsx("text", { spans: [{ s: "muted", t: names.join(" \xB7 ") }], wrap: "word" }, "names")] : [],
-        folded: true,
-        frame: "inline",
-        meta: [
-          names.length ? `${names.length} skill${names.length === 1 ? "" : "s"}` : str4(result?.message) ?? "no skills"
-        ],
-        name: "skill",
-        title: "Skills"
-      };
-    }
-    case "skill_view":
-      return {
-        body: str4(result?.content) ? [/* @__PURE__ */ jsx("md", { children: clip(str4(result?.content) ?? "", 6e3) }, "body")] : [],
-        folded: true,
-        frame: "inline",
-        name: "skill",
-        target: str4(call.args.name) ?? call.context,
-        targetKind: "text",
-        title: "Skill"
-      };
-  }
-  const look = call.name.startsWith("browser") ? { name: "browser", title: humanize(call.name.replace(/^browser_?/, "")) || "Browser" } : call.name === "session_search" ? { name: "search", title: "Session search" } : call.name === "vision_analyze" ? { name: "image", title: "Vision" } : { name: call.name, title: humanize(call.name) };
-  return {
-    ...look,
-    body: genericBody(call),
-    folded: true,
-    frame: "inline",
-    target: str4(call.args.query) ?? str4(call.args.url) ?? (call.context || void 0),
-    targetKind: str4(call.args.url) ? "path" : str4(call.args.query) ? "query" : "text"
-  };
-}
-function bashCard(call, result) {
-  const output = (str4(result?.output) ?? call.resultText)?.replace(/\s*\[Command interrupted\]\s*$/, "");
-  const error = str4(result?.error);
-  return {
-    body: [
-      ...output ? [/* @__PURE__ */ jsx("ansi", { follow: call.status === "running", text: output }, "out")] : [],
-      ...error ? [/* @__PURE__ */ jsx("text", { role: "omp.tool.error", spans: [{ s: "error", t: error }], wrap: "word" }, "err")] : []
-    ],
-    folded: true,
-    lang: "bash",
-    name: "bash",
-    preview: { tail: 10 },
-    target: str4(call.args.command) ?? call.context,
-    targetKind: "command",
-    title: "Bash"
-  };
-}
-function readCard(call, result) {
-  const path = str4(call.args.path) ?? call.context;
-  const content = str4(result?.content);
-  const total = typeof result?.total_lines === "number" ? result.total_lines : void 0;
-  const numbered = content ? [...content.matchAll(/^ *(\d+)\|/gm)] : [];
-  const first = numbered.length ? Number(numbered[0]?.[1]) : void 0;
-  const last = numbered.length ? Number(numbered.at(-1)?.[1]) : void 0;
-  const whole = first === 1 && last !== void 0 && last === total;
-  const meta = first !== void 0 && last !== void 0 ? [whole ? `${total} lines` : `:${first}-${last}`] : [];
-  return {
-    body: content ? [/* @__PURE__ */ jsx("code", { lang: langOf(path), numbers: true, start: first, text: content.replace(/^ *\d+\|/gm, "") }, "code")] : [],
-    folded: true,
-    frame: "inline",
-    meta,
-    name: "read",
-    target: path,
-    targetKind: "path",
-    title: "Read"
-  };
-}
-function editCard(call, result) {
-  const path = str4(call.args.path) ?? call.context;
-  const lang = langOf(path);
-  const diff2 = hunks(str4(result?.diff)) ?? (call.diff ? plainDiff(call.diff) : void 0);
-  const content = str4(call.args.content);
-  const write = call.name === "write_file";
-  const head = {
-    name: write ? "write" : "edit",
-    target: path,
-    targetKind: "path",
-    title: write ? "Write" : "Edit"
-  };
-  if (write && content && (!diff2 || diff2.startsWith("@@ -0,0 "))) {
-    const text = content.replace(/\n$/, "");
-    const lines = text.split("\n").length;
-    return {
-      ...head,
-      badges: diff2 ? [{ text: "new file", tone: "success" }] : void 0,
-      body: [/* @__PURE__ */ jsx("code", { lang: lang ?? "text", numbers: true, text }, "code")],
-      folded: true,
-      meta: [`${lines} line${lines === 1 ? "" : "s"}`],
-      preview: { lines: 8 }
-    };
-  }
-  if (!diff2) {
-    return { ...head, body: [] };
-  }
-  const { added, removed } = diffStats(diff2);
-  return { ...head, body: [/* @__PURE__ */ jsx("diff", { lang, text: diff2 }, "diff")], meta: [`+${added} \u2212${removed}`] };
-}
-function searchCard(call, result) {
-  const pattern = str4(call.args.pattern) ?? call.context;
-  const where = str4(call.args.path);
-  const inPath = where && where !== "." ? ` \xB7 in ${where}` : "";
-  const files = Array.isArray(result?.files) ? result.files.map((f) => str4(f)).filter((f) => f !== void 0) : void 0;
-  if (files || call.args.target === "files") {
-    const list = (files ?? []).map((f) => f.replace(/^\.\//, ""));
-    const total2 = typeof result?.total_count === "number" ? result.total_count : list.length;
-    return {
-      body: list.slice(0, 200).map((f, i) => {
-        const slash = f.lastIndexOf("/");
-        return /* @__PURE__ */ jsx("row", { role: "omp.tool.file", title: slash > 0 ? f.slice(0, slash + 1) : void 0, children: /* @__PURE__ */ jsx("text", { spans: [{ s: "path", t: slash > 0 ? f.slice(slash + 1) : f }] }, "p") }, `f${i}`);
-      }),
-      folded: list.length > 20,
-      frame: "inline",
-      meta: files ? [`${total2} file${total2 === 1 ? "" : "s"}${inPath}`] : void 0,
-      name: "glob",
-      target: pattern,
-      targetKind: "pattern",
-      title: "Glob"
-    };
-  }
-  const matches = Array.isArray(result?.matches) ? result.matches.map((m) => record(m)).filter((m) => m !== void 0) : void 0;
-  const byFile = /* @__PURE__ */ new Map();
-  for (const m of matches ?? []) {
-    const path = (str4(m.path) ?? "").replace(/^\.\//, "");
-    const list = byFile.get(path) ?? [];
-    list.push({ line: typeof m.line === "number" ? m.line : 0, text: typeof m.content === "string" ? m.content : "" });
-    byFile.set(path, list);
-  }
-  const total = typeof result?.total_count === "number" ? result.total_count : matches?.length ?? 0;
-  const body = [];
-  let fileIndex = 0;
-  for (const [path, hits] of byFile) {
-    const f = `f${fileIndex++}`;
-    body.push(
-      /* @__PURE__ */ jsxs("row", { role: "omp.tool.file", children: [
-        /* @__PURE__ */ jsx("text", { spans: [{ s: "path", t: path }] }, "p"),
-        /* @__PURE__ */ jsx("text", { role: "omp.tool.chip", spans: [{ t: String(hits.length) }] }, "n")
-      ] }, f)
-    );
-    let run = [];
-    let runIndex = 0;
-    const flush = () => {
-      const start = run[0]?.line ?? 1;
-      if (runIndex > 0) {
-        body.push(/* @__PURE__ */ jsx("text", { role: "omp.tool.context", spans: [{ s: "muted", t: "\u2026" }] }, `${f}.g${runIndex}`));
-      }
-      body.push(
-        /* @__PURE__ */ jsx(
-          "code",
-          {
-            lang: langOf(path),
-            marks: run.map((h) => ({ line: h.line, tone: "accent" })),
-            numbers: true,
-            start,
-            text: run.map((h) => h.text).join("\n")
-          },
-          `${f}.c${runIndex++}`
-        )
-      );
-      run = [];
-    };
-    for (const hit of hits) {
-      if (run.length && hit.line !== (run.at(-1)?.line ?? 0) + 1) {
-        flush();
-      }
-      run.push(hit);
-    }
-    if (run.length) {
-      flush();
-    }
-  }
-  return {
-    body,
-    folded: total > 40,
-    frame: "inline",
-    meta: matches ? [`${total} match${total === 1 ? "" : "es"} \xB7 ${byFile.size} file${byFile.size === 1 ? "" : "s"}${inPath}`] : void 0,
-    name: "grep",
-    target: pattern,
-    targetKind: "pattern",
-    title: "Grep"
-  };
-}
-function webSearchCard(call, result) {
-  const data = record(result?.data);
-  const hits = (Array.isArray(data?.web) ? data.web : Array.isArray(result?.results) ? result.results : []).map((h) => record(h)).filter((h) => h !== void 0);
-  return {
-    body: hits.length ? [
-      /* @__PURE__ */ jsx("col", { role: "omp.tool.sources", children: hits.map((h, i) => sourceRow(`s${i}`, str4(h.title) ?? str4(h.url) ?? "", str4(h.url))) }, "s")
-    ] : [],
-    frame: "inline",
-    meta: hits.length ? [`${hits.length} source${hits.length === 1 ? "" : "s"}`] : void 0,
-    name: "web_search",
-    target: str4(call.args.query) ?? call.context,
-    targetKind: "query",
-    title: "Web search"
-  };
-}
-function fetchCard(call, result) {
-  const pages = (Array.isArray(result?.results) ? result.results : []).map((p) => record(p)).filter((p) => p !== void 0);
-  const urls = Array.isArray(call.args.urls) ? call.args.urls.map((u) => str4(u)).filter((u) => u !== void 0) : [];
-  const body = [];
-  for (const [i, p] of pages.entries()) {
-    body.push(sourceRow(`s${i}`, str4(p.title) ?? str4(p.url) ?? "", str4(p.url)));
-    const content = str4(p.content);
-    if (content) {
-      body.push(/* @__PURE__ */ jsx("md", { children: clip(content, 4e3) }, `b${i}`));
-    }
-  }
-  const chars = pages.reduce((n, p) => n + (str4(p.content)?.length ?? 0), 0);
-  return {
-    body,
-    folded: true,
-    meta: pages.length ? [`${pages.length} page${pages.length === 1 ? "" : "s"} \xB7 ${compact(chars)} chars`] : void 0,
-    name: "fetch",
-    preview: { lines: 6 },
-    target: urls.length > 1 ? `${urls[0]} +${urls.length - 1}` : urls[0] ?? str4(call.args.url) ?? call.context,
-    targetKind: "path",
-    title: "Fetch"
-  };
-}
-function sourceRow(key2, title, url) {
-  let host = "";
-  try {
-    host = url ? new URL(url).hostname.replace(/^www\./, "") : "";
-  } catch {
-    host = "";
-  }
-  return /* @__PURE__ */ jsxs("row", { role: "omp.tool.source", children: [
-    /* @__PURE__ */ jsx("text", { role: "omp.tool.chip", spans: [{ t: (host.charAt(0) || "\xB7").toUpperCase() }] }, "d"),
-    /* @__PURE__ */ jsx("text", { spans: [url ? { href: url, t: title } : { t: title }] }, "t"),
-    host ? /* @__PURE__ */ jsx("text", { spans: [{ s: "muted", t: host }] }, "m") : null
-  ] }, key2);
-}
-function taskCard(call, result, now) {
-  const tasks = Array.isArray(call.args.tasks) ? call.args.tasks.map((t2) => record(t2)).filter((t2) => t2 !== void 0) : [];
-  const goals = tasks.length ? tasks.map((t2) => str4(t2.goal) ?? "") : str4(call.args.goal) ? [str4(call.args.goal) ?? ""] : [];
-  const agents = call.subagents ?? [];
-  const rows = agents.length ? agents.map((a) => agentNode(a, now)) : call.status === "running" || result?.status === "dispatched" ? goals.map((g, i) => /* @__PURE__ */ jsx("agent", { agent: "task", name: `Agent ${i + 1}`, status: "pending", task: g }, `p${i}`)) : [];
-  const context = str4(call.args.context) ?? (tasks.length === 1 ? str4(tasks[0]?.context) : void 0);
-  const working = agents.some((a) => a.status === "running" || a.status === "queued") || !agents.length && result?.status === "dispatched";
-  const settled = agents.filter((a) => a.status !== "running" && a.status !== "queued");
-  const count = goals.length || agents.length;
-  let meta;
-  let took;
-  if (agents.length && !working) {
-    const ok = agents.filter((a) => a.status === "done").length;
-    const failed = agents.length - ok;
-    const requests = agents.reduce((n, a) => n + a.calls, 0);
-    meta = [`${ok} succeeded`, failed ? `${failed} failed` : "", requests ? `${requests} req` : ""].filter(Boolean).join(" \xB7 ");
-    took = Math.max(...agents.map((a) => a.startedAt + (a.duration ?? 0))) - call.startedAt;
-  } else if (settled.length) {
-    meta = `${settled.length} of ${count} done`;
-  }
-  return {
-    badges: result?.mode === "background" ? [{ text: "background" }] : void 0,
-    body: [
-      ...context ? [/* @__PURE__ */ jsx("text", { role: "omp.tool.context", spans: [{ s: "muted", t: `Context: ${context}` }], wrap: "word" }, "ctx")] : [],
-      ...rows
-    ],
-    meta: meta ? [meta] : void 0,
-    name: "task",
-    status: working ? "running" : void 0,
-    target: count ? `${count} agent${count === 1 ? "" : "s"}` : void 0,
-    targetKind: "text",
-    title: "Task",
-    took
-  };
-}
-function agentNode(a, now) {
-  const status = a.status === "done" ? "done" : a.status === "failed" ? "failed" : a.status === "cancelled" ? "aborted" : a.status === "queued" ? "pending" : "running";
-  const running = a.status === "running";
-  return /* @__PURE__ */ jsx(
-    "agent",
-    {
-      agent: "task",
-      collapsed: a.summary ? true : void 0,
-      collapsible: a.summary ? true : void 0,
-      model: a.model,
-      name: `Agent ${a.index + 1}`,
-      stats: {
-        requests: a.calls || void 0,
-        tokens: a.tokens || void 0,
-        tools: a.toolCount || void 0,
-        ...running ? { age: age(a, a.startedAt, now) } : { took: a.duration }
-      },
-      status,
-      task: a.goal,
-      tool: running && a.tool ? {
-        age: a.toolSince ? age(a.toolSince, a.toolSince.at, now) : void 0,
-        intent: a.toolPreview,
-        name: a.tool
-      } : void 0,
-      children: a.summary ? /* @__PURE__ */ jsx("md", { children: a.summary }, "o") : null
-    },
-    a.id
-  );
-}
-function askCard(call, result) {
-  const qs = (Array.isArray(call.args.questions) ? call.args.questions : str4(call.args.question) ? [call.args] : []).map((q) => record(q)).filter((q) => q !== void 0);
-  const responses = Array.isArray(result?.responses) ? result.responses.map((r) => record(r)) : [];
-  const body = [];
-  for (const [i, q] of qs.entries()) {
-    const choices = Array.isArray(q.choices) ? q.choices.map((c) => str4(c)).filter((c) => c !== void 0) : [];
-    const raw = responses[i]?.user_response;
-    const answers = (Array.isArray(raw) ? raw : [raw]).map((a) => str4(a)).filter((a) => a !== void 0);
-    if (qs.length > 1) {
-      body.push(/* @__PURE__ */ jsx("md", { children: str4(q.question) ?? "" }, `q${i}`));
-    }
-    for (const [j, c] of choices.entries()) {
-      body.push(answerRow(`q${i}.o${j}`, c, answers.includes(c)));
-    }
-    for (const [j, typed] of answers.filter((a) => !choices.includes(a)).entries()) {
-      body.push(answerRow(`q${i}.a${j}`, typed, true));
-    }
-    if (!answers.length && call.status !== "running") {
-      body.push(/* @__PURE__ */ jsx("text", { role: "omp.tool.notice", spans: [{ s: "muted", t: "No answer" }] }, `q${i}.none`));
-    }
-  }
-  return {
-    body,
-    name: "ask",
-    // Several questions each read in the body; the head counts them instead of repeating one.
-    target: qs.length > 1 ? `${qs.length} questions` : str4(qs[0]?.question) ?? call.context,
-    targetKind: "text",
-    title: "Ask"
-  };
-}
-function answerRow(key2, text, picked) {
-  return /* @__PURE__ */ jsxs("row", { role: picked ? "omp.tool.answer" : "omp.tool.answer.off", children: [
-    /* @__PURE__ */ jsx("text", { spans: [picked ? { s: "success", t: "\u2713" } : { s: "dim", t: "\xB7" }] }, "c"),
-    /* @__PURE__ */ jsx("text", { spans: [{ t: text }] }, "t")
-  ] }, key2);
-}
-function evalCard(call, result) {
-  const code2 = str4(call.args.code) ?? "";
-  const output = str4(result?.output) ?? str4(result?.stdout) ?? call.resultText;
-  const error = str4(result?.error) ?? str4(result?.stderr);
-  return {
-    badges: [{ text: "python" }],
-    body: [
-      /* @__PURE__ */ jsxs("col", { role: "omp.tool.eval.cell", children: [
-        /* @__PURE__ */ jsxs("row", { align: "start", role: "omp.tool.eval.input", children: [
-          /* @__PURE__ */ jsx("icon", { aria: "Input", name: "arrow-left", role: "omp.tool.eval.prompt" }, "0"),
-          /* @__PURE__ */ jsx("code", { lang: "python", numbers: false, text: code2 }, "code")
-        ] }, "input"),
-        output || error ? /* @__PURE__ */ jsxs("row", { align: "start", role: "omp.tool.eval.result", children: [
-          /* @__PURE__ */ jsx("icon", { aria: "Output", name: "arrow-right", role: "omp.tool.eval.prompt" }, "0"),
-          /* @__PURE__ */ jsxs("col", { role: "omp.tool.eval.outputs", children: [
-            output ? /* @__PURE__ */ jsx("ansi", { follow: false, role: "omp.tool.eval.output", text: output.replace(/\n$/, "") }, "out") : null,
-            error ? /* @__PURE__ */ jsx("text", { role: "omp.tool.error", spans: [{ s: "error", t: error }], wrap: "word" }, "err") : null
-          ] }, "outputs")
-        ] }, "result") : null
-      ] }, "cell-0")
-    ],
-    folded: false,
-    name: "eval",
-    role: "omp.tool.eval",
-    title: firstLine(code2)?.startsWith("#") ? firstLine(code2)?.replace(/^#+\s*/, "") ?? "Eval" : "Eval"
-  };
-}
-function genericBody(call) {
-  const text = call.resultText ?? (call.result === void 0 ? void 0 : pretty(call.result));
-  if (!text || call.status === "running") {
-    return [];
-  }
-  return [/* @__PURE__ */ jsx("code", { lang: /^\s*[[{]/.test(text) ? "json" : "text", text: clip(text, 4e3) }, "out")];
-}
-function errorOf(call) {
-  const result = record(call.result);
-  return str4(result?.error) ?? str4(call.summary) ?? (typeof call.result === "string" && !result ? call.result : void 0);
-}
-function exitOf(call) {
-  const code2 = record(call.result)?.exit_code;
-  return typeof code2 === "number" ? code2 : void 0;
-}
-function checklistNode(todos) {
-  const status = (t2) => t2.status === "completed" ? "done" : t2.status === "in_progress" ? "active" : t2.status === "cancelled" ? "dropped" : "pending";
-  const item = (t2) => ({ id: t2.id, status: status(t2), text: t2.content });
-  const roots = todos.filter((t2) => !t2.parent);
-  const nested = todos.some((t2) => t2.parent);
-  const phases = nested ? roots.map((r) => {
-    const kids = todos.filter((t2) => t2.parent === r.id);
-    return {
-      collapsed: kids.length > 0 && kids.every((k) => k.status === "completed"),
-      id: r.id,
-      items: kids.length ? kids.map(item) : [item(r)],
-      title: r.content
-    };
-  }) : [{ id: "all", items: roots.map(item) }];
-  return /* @__PURE__ */ jsx("checklist", { mode: "full", phases }, "list");
-}
-function plainDiff(raw) {
-  return hunks(raw.replace(/\x1b\[[0-9;]*m/g, ""));
-}
-function hunks(diff2) {
-  const lines = diff2?.split("\n") ?? [];
-  const start = lines.findIndex((l) => l.startsWith("@@"));
-  return start < 0 ? void 0 : lines.slice(start).join("\n").trimEnd();
-}
-function diffStats(diff2) {
-  let added = 0;
-  let removed = 0;
-  for (const line of diff2.split("\n")) {
-    if (line.startsWith("+") && !line.startsWith("+++")) {
-      added++;
-    } else if (line.startsWith("-") && !line.startsWith("---")) {
-      removed++;
-    }
-  }
-  return { added, removed };
-}
-var LANGS = {
-  c: "c",
-  cpp: "cpp",
-  css: "css",
-  go: "go",
-  html: "html",
-  java: "java",
-  js: "javascript",
-  json: "json",
-  jsx: "jsx",
-  md: "markdown",
-  py: "python",
-  rb: "ruby",
-  rs: "rust",
-  sh: "bash",
-  toml: "toml",
-  ts: "typescript",
-  tsx: "tsx",
-  yaml: "yaml",
-  yml: "yaml"
-};
-function langOf(path) {
-  const ext = path?.split(".").pop()?.toLowerCase();
-  return ext ? LANGS[ext] : void 0;
-}
-function todoCount(todos) {
-  if (!todos?.length) {
-    return void 0;
-  }
-  return `${todos.filter((t2) => t2.status === "completed").length}/${todos.length}`;
-}
-function firstLine(text) {
-  return text?.split("\n").find((l) => l.trim())?.trim();
-}
-function humanize(name) {
-  const words = name.replace(/[_-]+/g, " ").trim();
-  return words.charAt(0).toUpperCase() + words.slice(1);
-}
-function pretty(v) {
-  return typeof v === "string" ? v : JSON.stringify(v, null, 2);
-}
-function clip(text, max) {
-  return text.length > max ? `${text.slice(0, max)}
-\u2026` : text;
-}
-
 // src/view/welcome.tsx
 import { readFileSync as readFileSync2 } from "node:fs";
 import { join as join3 } from "node:path";
@@ -28874,7 +29723,7 @@ function entryNode(e, id, cx) {
   }
   const holder = e;
   const built = holder;
-  const rev = e.kind === "turn" ? e.rev : e.kind === "user" && cx.copied === e.id ? 1 : 0;
+  const rev = `${e.kind === "turn" ? e.rev : 0}${cx.copied === e.id ? "+copied" : ""}`;
   const cached = built[kNode];
   if (cached?.rev === rev) {
     return cached.node;
@@ -28908,16 +29757,7 @@ function userNode(e, cx) {
         },
         "time"
       ),
-      /* @__PURE__ */ jsx(
-        "text",
-        {
-          onClick: () => cx.copy(e.text, e.id),
-          role: "omp.user.tool",
-          text: cx.copied === e.id ? "Copied" : "Copy",
-          title: "Copy message"
-        },
-        "copy"
-      )
+      copyButton(e.text, e.id, "omp.user.tool", "Copy message", cx)
     ] }, "tools"),
     /* @__PURE__ */ jsx("md", { children: e.text }, "body")
   ] }, e.id);
@@ -28954,8 +29794,9 @@ function turnNode(turn, id, cx) {
   if (turn.warning) {
     children2.push(/* @__PURE__ */ jsx("text", { role: "omp.notice", spans: [{ s: "warning", t: turn.warning }], wrap: "word" }, "warning"));
   }
-  if (!live && turn.endedAt && (turn.usage?.total || turn.usage?.input || turn.usage?.output)) {
-    children2.push(usageNode(turn));
+  const answer = answerText(turn);
+  if (!live && turn.endedAt && (answer || turn.usage?.total || turn.usage?.input || turn.usage?.output)) {
+    children2.push(usageNode(turn, answer, cx));
   }
   return /* @__PURE__ */ jsx("col", { role: "omp.assistant", children: children2 }, turn.id);
 }
@@ -28991,7 +29832,23 @@ function thinkingNode(b, id, cx) {
     ]
   );
 }
-function usageNode(turn) {
+function copyButton(text, id, role, title, cx) {
+  const copied = cx.copied === id;
+  return /* @__PURE__ */ jsx(
+    "icon",
+    {
+      name: copied ? "check" : "copy",
+      onClick: () => cx.copy(text, id),
+      role,
+      title: copied ? "Copied" : title
+    },
+    "copy"
+  );
+}
+function answerText(turn) {
+  return turn.blocks.flatMap((b) => b.kind === "text" && b.text.trim() ? [b.text.trim()] : []).join("\n\n");
+}
+function usageNode(turn, answer, cx) {
   const u = turn.usage ?? {};
   const ms = (turn.endedAt ?? turn.startedAt) - turn.startedAt;
   const input = u.input ?? u.prompt ?? 0;
@@ -28999,9 +29856,10 @@ function usageNode(turn) {
   const total = u.total ?? input + output;
   const cost = typeof u.cost_usd === "number" && u.cost_usd > 0 ? ` \xB7 $${u.cost_usd.toFixed(2)}` : "";
   const title = `This turn: ${duration(ms)} \xB7 ${total.toLocaleString()} tokens (${input.toLocaleString()} in \xB7 ${output.toLocaleString()} out)${cost}`;
-  return /* @__PURE__ */ jsxs("row", { align: "center", gap: "xs", role: "omp.turn.usage", title, children: [
-    /* @__PURE__ */ jsx("icon", { name: "time" }, "icon"),
-    /* @__PURE__ */ jsx("text", { children: `${duration(ms)} \xB7 ${compact(total)} tok${cost} this turn` }, "text")
+  return /* @__PURE__ */ jsxs("row", { align: "center", gap: "xs", role: "omp.turn.usage", title: total ? title : void 0, children: [
+    answer ? copyButton(answer, turn.id, "omp.turn.copy", "Copy answer", cx) : null,
+    total ? /* @__PURE__ */ jsx("icon", { name: "time" }, "icon") : null,
+    total ? /* @__PURE__ */ jsx("text", { children: `${duration(ms)} \xB7 ${compact(total)} tok${cost} this turn` }, "text") : null
   ] }, "usage");
 }
 function noticeNode(e) {
@@ -29016,6 +29874,8 @@ var COPIED_MS = 1500;
 var EFFORTS = ["none", "low", "medium", "high", "xhigh"];
 var App = class {
   transcript = new Transcript();
+  /** The session's subagents, followed while they run (Task cards, the pill, the hub). */
+  agents = new Agents(this);
   composer = new Composer();
   overlays = [];
   sid = null;
@@ -29159,6 +30019,9 @@ var App = class {
     }
     if (key2.shift && key2.name === "tab") {
       return this.#cycleEffort();
+    }
+    if (key2.alt && key2.name === "a" || key2.name === "\xE5") {
+      return openAgents(this);
     }
     if (key2.alt && key2.name === "up" && this.queue.length) {
       return this.#dequeue();
@@ -29440,6 +30303,7 @@ var App = class {
     this.transcript.usageBase(r.info?.usage ?? void 0);
     if (r.messages?.length) {
       this.transcript.load(r.messages);
+      this.agents.scan();
     }
     if (r.inflight) {
       this.transcript.inflight(r.inflight, this.busy?.startedAt);
@@ -29575,6 +30439,7 @@ var App = class {
       case "tool.complete":
         if (ev.payload) {
           t2.toolComplete(ev.payload);
+          this.agents.scan();
         }
         break;
       case "todo.updated":
@@ -29770,6 +30635,7 @@ ${this.composer.text}` : next);
           this.composer.undo();
           this.changed();
         },
+        agents: { onOpen: () => openAgents(this), running: this.agents.running().length },
         placeholder: "Ask Hermes \u2014 / commands \xB7 @ files",
         queued: this.queue,
         ready: this.sid !== null
