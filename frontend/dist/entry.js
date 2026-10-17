@@ -29777,12 +29777,12 @@ function composerNode(cx) {
       "meter",
       {
         label: `${Math.round(share * 100)}%`,
-        onClick: cx.onContext,
         role: "omp.composer.context",
         style: "bar",
         thresholds: { bad: 0.85, warn: 0.6 },
         title: `Context ${Math.round(share * 100)}% used
-${compact(ctx.used)} of ${compact(ctx.max)} tokens`,
+${compact(ctx.used)} of ${compact(ctx.max)} tokens
+/usage shows the breakdown`,
         total: compact(ctx.max),
         value: share
       },
@@ -31063,7 +31063,6 @@ ${this.composer.text}` : next);
         inputId: INPUT_ID,
         model: info?.model ?? "",
         now,
-        onContext: () => void this.#slash("/usage"),
         onEdit: (ev) => {
           this.composer.edit(ev);
           this.changed();
@@ -31467,7 +31466,6 @@ var WatchApp = class {
         inputId: INPUT_ID2,
         model: a.model ?? "",
         now,
-        onContext: () => void 0,
         onEdit: (ev) => {
           this.composer.edit(ev);
           this.changed();
