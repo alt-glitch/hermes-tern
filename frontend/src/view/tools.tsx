@@ -528,8 +528,8 @@ export function agentNode(a: Subagent, now: number): JSX.Element {
 
   return (
     <agent
-      // Double-click or the context menu opens the agent beside the chat (App handles the action).
-      actions={{ dblclick: `open-agent=${a.id}`, menu: [`open-agent=${a.id}`] }}
+      // A click (or the context menu) opens the agent beside the chat; App handles the action.
+      actions={{ click: `open-agent=${a.id}`, menu: [`open-agent=${a.id}`] }}
       agent="task"
       badges={a.exitReason && a.status !== 'done' ? [{ text: a.exitReason.replace(/_/g, ' '), tone: 'warning' }] : undefined}
       collapsed={a.summary ? true : undefined}
@@ -546,6 +546,7 @@ export function agentNode(a: Subagent, now: number): JSX.Element {
       }}
       status={status}
       task={a.goal}
+      title={`Open ${agentName(a)} beside the chat`}
       tool={
         running && a.tool
           ? {

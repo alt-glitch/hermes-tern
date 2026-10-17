@@ -26134,7 +26134,7 @@ function agentNode(a, now) {
   return /* @__PURE__ */ jsx(
     "agent",
     {
-      actions: { dblclick: `open-agent=${a.id}`, menu: [`open-agent=${a.id}`] },
+      actions: { click: `open-agent=${a.id}`, menu: [`open-agent=${a.id}`] },
       agent: "task",
       badges: a.exitReason && a.status !== "done" ? [{ text: a.exitReason.replace(/_/g, " "), tone: "warning" }] : void 0,
       collapsed: a.summary ? true : void 0,
@@ -26150,6 +26150,7 @@ function agentNode(a, now) {
       },
       status,
       task: a.goal,
+      title: `Open ${agentName(a)} beside the chat`,
       tool: running && a.tool ? {
         age: a.toolSince ? age(a.toolSince, a.toolSince.at, now) : void 0,
         intent: a.toolPreview,
