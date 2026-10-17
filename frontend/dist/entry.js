@@ -30505,7 +30505,7 @@ function limitsTable(items) {
                 value: used
               }
             },
-            left: [{ s: "num", t: `${compactCount(l.left)} / ${compactCount(l.limit)}` }],
+            left: [{ s: "num", t: compactCount(l.left) }, { s: "dim", t: ` left of ${compactCount(l.limit)}` }],
             name: [{ s: "muted mono", t: l.name }],
             reset: [{ s: "dim", t: l.reset ? `resets ${l.reset}` : "" }]
           },
