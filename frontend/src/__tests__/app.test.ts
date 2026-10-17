@@ -105,6 +105,25 @@ afterEach(() => {
   vi.useRealTimers()
 })
 
+describe('App: a refused prompt', () => {
+  it('goes back to the composer with its images, and is not re-sent', async () => {
+    const { app, attach, press, sent, type } = setup({
+      'prompt.submit': () => {
+        throw new Error('session_busy')
+      }
+    })
+    await attach()
+    await type('ship it')
+    await press(key('enter'))
+    await settle()
+
+    expect(sent('prompt.submit')).toHaveLength(1)
+    expect(app.busy).toBeNull()
+    expect(app.composer.text).toBe('ship it')
+    expect(app.transcript.entries.at(-1)).toMatchObject({ kind: 'notice', text: expect.stringContaining('Not sent: session_busy') })
+  })
+})
+
 describe('App: images in the draft', () => {
   it('a prompt queued behind the turn takes the images attached with it', async () => {
     const { app, attach, emit, press, sent, type } = setup()

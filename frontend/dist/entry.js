@@ -37164,6 +37164,7 @@ var INPUT_ID = "dock.composer.line.input";
 var EXIT_ARM_MS = 1500;
 var COPIED_MS3 = 1500;
 var EFFORTS = ["none", "low", "medium", "high", "xhigh"];
+var QUIT_DETACH_MS = 1500;
 var App = class {
   transcript = new Transcript();
   /** The session's subagents, followed while they run (Task cards, the pill, the hub). */
@@ -37284,7 +37285,10 @@ var App = class {
     this.#surface.focus(INPUT_ID);
     void this.#readInput();
     const code2 = await this.#done.promise;
-    await Promise.all([...this.#subscriptions.keys()].map((sid) => this.#leave(sid, "tui_shutdown")));
+    await Promise.race([
+      Promise.all([...this.#subscriptions.keys()].map((sid) => this.#leave(sid, "tui_shutdown"))),
+      new Promise((resolve5) => setTimeout(resolve5, QUIT_DETACH_MS))
+    ]);
     await this.#tern.close();
     this.#gw.kill("exit");
     return code2;
@@ -37724,8 +37728,10 @@ var App = class {
       ...queued ? { queued } : {},
       ...attachments.length ? { attachments } : {}
     }).catch((error) => {
-      this.transcript.notice(error.message, "error");
+      this.transcript.notice(`Not sent: ${error.message}. Your message is back in the composer.`, "error");
       this.busy = null;
+      this.#restore(item3);
+      this.#drainQueue();
       this.changed();
     });
   }
@@ -37805,7 +37811,14 @@ ${this.composer.text}` : text2);
     if (this.busy) {
       this.busy.label = "Stopping\u2026";
     }
-    interruptTurn(this.#gw, this.sid).catch(() => void 0);
+    interruptTurn(this.#gw, this.sid).catch((error) => {
+      const why = error instanceof Error ? error.message : String(error);
+      if (this.busy && !why.includes("stale_generation")) {
+        this.busy.label = "Working\u2026";
+        this.transcript.notice(`Could not stop the turn: ${why}`, "error");
+        this.changed();
+      }
+    });
     this.changed();
   }
   /** The gateway-backed commands' view of this app (/steer, /queue, /stop, /tools, /undo, /compress, …). */
