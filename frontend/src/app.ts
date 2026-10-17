@@ -1326,7 +1326,14 @@ export class App implements OverlayHost {
 
       case 'btw.complete':
         if (ev.payload && 'text' in ev.payload && typeof ev.payload.text === 'string' && ev.payload.text.trim()) {
-          t.panel(ev.type === 'btw.complete' ? '/btw' : 'Background task', ev.payload.text)
+          // Titled as Ink labels them: the task id /bg named, the question /btw asked.
+          const question = 'question' in ev.payload && typeof ev.payload.question === 'string' ? ev.payload.question.trim() : ''
+          const task = 'task_id' in ev.payload && typeof ev.payload.task_id === 'string' ? ` ${ev.payload.task_id}` : ''
+
+          t.panel(
+            ev.type === 'btw.complete' ? `/btw${question ? ` ${question}` : ''}` : `Background task${task}`,
+            ev.payload.text
+          )
         }
 
         break
