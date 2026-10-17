@@ -44,6 +44,9 @@ export type Source = 'branch' | 'linked' | 'stack'
 const BRANCH_HIT_MS = 60_000
 const BRANCH_MISS_MS = 300_000
 
+/** GraphQL's answer when the schema has no `stack` field (GHES, an older API). */
+const NO_STACK_FIELD = /Field '?stack'? doesn't exist/i
+
 /** What the sheet knows of one linked PR. */
 export interface Entry {
   ref: PrRef
@@ -55,9 +58,23 @@ export interface Entry {
   error?: string
   activity?: ActivityItem[]
   files?: PrFile[]
-  /** The `updatedAt` the activity and files were read at; a newer PR reads them again. */
-  detailAt?: string
+  /** The `updatedAt` the activity was read at; a newer PR reads it again. */
+  activityAt?: string
+  /** The `updatedAt` the files were read at, kept apart: one tab's read says nothing of the other. */
+  filesAt?: string
+  /** GitHub's answer when the last activity read failed. */
+  activityError?: string
+  /** GitHub's answer when the last files read failed. */
+  filesError?: string
 }
+
+/** The data a tab reads on demand. */
+type Detail = 'activity' | 'files'
+
+const STAMP = { activity: 'activityAt', files: 'filesAt' } as const
+const FAILURE = { activity: 'activityError', files: 'filesError' } as const
+/** How soon a failed activity or files read is tried again. */
+const RETRY_MS = 30_000
 
 export type PrAction = 'close' | 'draft' | 'merge' | 'ready' | 'reopen' | 'rerun' | 'update-branch'
 
@@ -92,6 +109,10 @@ export class PullRequests {
   #again = false
   #disposed = false
   readonly #busy = new Set<string>()
+  /** The activity and files reads in flight (`key:activity`, `key:files`). */
+  readonly #reading = new Set<string>()
+  /** When each of those last failed. */
+  readonly #failedAt = new Map<string, number>()
 
   constructor(
     host: PullRequestsHost,
@@ -208,41 +229,60 @@ export class PullRequests {
   }
 
   /** Comments, reviews and commits of `key`, read once per PR update. */
-  async activity(key: string): Promise<void> {
-    const e = this.#entries.get(key)
-
-    if (!e?.pr || (e.activity && e.detailAt === e.pr.updatedAt)) {
-      return
-    }
-
-    const [o, r] = e.ref.repository.split('/')
-    const data = await this.#gh.graphql(e.ref.host, ACTIVITY_QUERY, { n: e.ref.number, o, r })
-    e.activity = parseActivity(data)
-    e.detailAt = e.pr.updatedAt
-    this.#host.changed()
+  activity(key: string): Promise<void> {
+    return this.#detail(key, 'activity', async e => {
+      const [o, r] = e.ref.repository.split('/')
+      e.activity = parseActivity(await this.#gh.graphql(e.ref.host, ACTIVITY_QUERY, { n: e.ref.number, o, r }))
+    })
   }
 
   /** The changed files of `key` with their patches (the first 300). */
-  async files(key: string): Promise<void> {
-    const e = this.#entries.get(key)
+  files(key: string): Promise<void> {
+    return this.#detail(key, 'files', async e => {
+      const files: PrFile[] = []
 
-    if (!e?.pr || (e.files && e.detailAt === e.pr.updatedAt)) {
+      for (let page = 1; page <= 3; page++) {
+        const rows = await this.#gh.rest<unknown[]>(e.ref.host, 'GET', `/repos/${e.ref.repository}/pulls/${e.ref.number}/files?per_page=100&page=${page}`)
+        files.push(...parseFiles(rows))
+
+        if (rows.length < 100) {
+          break
+        }
+      }
+
+      e.files = files
+    })
+  }
+
+  /**
+   * Reads one tab's data of `key` once per PR update, so the sheet may ask on every frame: one read
+   * at a time, and a failed one (its error on the entry) again after `RETRY_MS`.
+   */
+  async #detail(key: string, what: Detail, read: (e: Entry) => Promise<void>): Promise<void> {
+    const e = this.#entries.get(key)
+    const id = `${key}:${what}`
+    const failed = this.#failedAt.get(id)
+
+    if (!e?.pr || this.#reading.has(id) || (e[what] && e[STAMP[what]] === e.pr.updatedAt) || (failed && Date.now() - failed < RETRY_MS)) {
       return
     }
 
-    const files: PrFile[] = []
+    const at = e.pr.updatedAt
+    this.#reading.add(id)
 
-    for (let page = 1; page <= 3; page++) {
-      const rows = await this.#gh.rest<unknown[]>(e.ref.host, 'GET', `/repos/${e.ref.repository}/pulls/${e.ref.number}/files?per_page=100&page=${page}`)
-      files.push(...parseFiles(rows))
-
-      if (rows.length < 100) {
-        break
-      }
+    try {
+      await read(e)
+      e[STAMP[what]] = at
+      e[FAILURE[what]] = undefined
+      this.#failedAt.delete(id)
+    } catch (error) {
+      e[FAILURE[what]] = error instanceof Error ? error.message : String(error)
+      this.#failedAt.set(id, Date.now())
+      throw error
+    } finally {
+      this.#reading.delete(id)
+      this.#host.changed()
     }
-
-    e.files = files
-    this.#host.changed()
   }
 
   /** Changes PR `key` on GitHub; throws GitHub's error. `merge` uses `method`, the repository's first by default. */
@@ -373,8 +413,12 @@ export class PullRequests {
 
       try {
         data = await this.#gh.graphql(host, query, variables)
-      } catch {
-        this.#noStacks.add(host)
+      } catch (error) {
+        // Only a schema without the field turns stacks off; a timeout, a 5xx or a rate limit tries again next round.
+        if (NO_STACK_FIELD.test(error instanceof Error ? error.message : String(error))) {
+          this.#noStacks.add(host)
+        }
+
         continue
       }
 

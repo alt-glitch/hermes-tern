@@ -37,11 +37,18 @@ async function git(cwd: string, ...args: string[]): Promise<string> {
 
 const KIND: Record<string, string> = { A: 'added', C: 'copied', D: 'deleted', M: 'modified', R: 'renamed', T: 'modified' }
 
-/** `git status --porcelain=2 --branch` (no `-z`): the branch lines and one entry per changed path. */
+/**
+ * `git status --porcelain=2 --branch -z`: the branch lines and one entry per changed path. `-z`
+ * leaves paths raw (no C quoting of a non-ASCII or odd name) and gives a rename's origin as the
+ * next NUL record.
+ */
 export function parseStatus(text: string): Omit<GitState, 'root'> {
   const state: Omit<GitState, 'root'> = { ahead: 0, behind: 0, files: [] }
+  const records = text.split('\0')
 
-  for (const line of text.split('\n')) {
+  for (let i = 0; i < records.length; i++) {
+    const line = records[i]!
+
     if (line.startsWith('# branch.head ')) {
       const head = line.slice(14)
       state.branch = head === '(detached)' ? undefined : head
@@ -54,10 +61,10 @@ export function parseStatus(text: string): Omit<GitState, 'root'> {
     } else if (line.startsWith('1 ') || line.startsWith('2 ')) {
       const parts = line.split(' ')
       const xy = parts[1] ?? '..'
-      const rest = parts.slice(line.startsWith('1 ') ? 8 : 9).join(' ')
-      const [path, from] = rest.split('\t')
+      const path = parts.slice(line.startsWith('1 ') ? 8 : 9).join(' ')
+      const from = line.startsWith('2 ') ? records[++i] : undefined
       const code = xy[0] !== '.' ? xy[0]! : xy[1]!
-      state.files.push({ additions: 0, deletions: 0, from, path: path!, staged: xy[0] !== '.', status: KIND[code] ?? 'modified' })
+      state.files.push({ additions: 0, deletions: 0, from, path, staged: xy[0] !== '.', status: KIND[code] ?? 'modified' })
     } else if (line.startsWith('u ')) {
       state.files.push({ additions: 0, deletions: 0, path: line.split(' ').slice(10).join(' '), staged: false, status: 'conflicted' })
     } else if (line.startsWith('? ')) {
@@ -68,17 +75,21 @@ export function parseStatus(text: string): Omit<GitState, 'root'> {
   return state
 }
 
-/** `git diff --numstat` lines onto `files` (a binary file's `-` counts as 0). */
+/** `git diff --numstat -z` records onto `files` (a binary file's `-` counts as 0). */
 export function applyNumstat(files: ChangedFile[], text: string) {
   const byPath = new Map(files.map(f => [f.path, f]))
+  const records = text.split('\0')
 
-  for (const line of text.split('\n')) {
-    const [add, del, ...rest] = line.split('\t')
-    // A rename reads `old => new` or `dir/{old => new}`; the new path is what status names.
-    const path = rest
-      .join('\t')
-      .replace(/^(.*)\{(?:.*) => (.*)\}(.*)$/, '$1$2$3')
-      .replace(/^.* => /, '')
+  for (let i = 0; i < records.length; i++) {
+    const [add, del, ...rest] = records[i]!.split('\t')
+    // A rename has an empty path, then two records: old and new. The new one is what status names.
+    let path = rest.join('\t')
+
+    if (rest.length && !path) {
+      path = records[i + 2] ?? ''
+      i += 2
+    }
+
     const f = byPath.get(path)
 
     if (f) {
@@ -92,15 +103,15 @@ export function applyNumstat(files: ChangedFile[], text: string) {
 export async function gitState(cwd: string): Promise<GitState | undefined> {
   try {
     const root = (await git(cwd, 'rev-parse', '--show-toplevel')).trim()
-    const state = parseStatus(await git(root, 'status', '--porcelain=2', '--branch', '--untracked-files=all'))
+    const state = parseStatus(await git(root, 'status', '--porcelain=2', '--branch', '--untracked-files=all', '-z'))
     // Against HEAD: staged and unstaged together. A repository with no commit yet has no HEAD.
-    const numstat = await git(root, 'diff', '--numstat', '-M', 'HEAD').catch(() => '')
+    const numstat = await git(root, 'diff', '--numstat', '-z', '-M', 'HEAD').catch(() => '')
     applyNumstat(state.files, numstat)
 
     // A new file's lines are all added; count them for the first few.
     for (const f of state.files.filter(x => x.status === 'untracked').slice(0, 50)) {
-      const out = await git(root, 'diff', '--no-index', '--numstat', '--', '/dev/null', f.path).catch((e: { stdout?: string }) => e.stdout ?? '')
-      // `--no-index` exits 1 when they differ; its numstat names the file `/dev/null => path`.
+      const out = await git(root, 'diff', '--no-index', '--numstat', '-z', '--', '/dev/null', f.path).catch((e: { stdout?: string }) => e.stdout ?? '')
+      // `--no-index` exits 1 when they differ; its numstat reads as a rename from `/dev/null`.
       applyNumstat([f], out)
     }
 

@@ -34,7 +34,7 @@ import { type Busy, busyFrom, ownsEvent, Switches } from './flow.js'
 import { hudKey, type Pill } from './hud.js'
 import type { Overlay, OverlayHost } from './overlay.js'
 import { writeActiveSessionFile } from './hermes/activeSessionFile.js'
-import { clipboardImage, imagePathOf } from './hermes/clipboardImage.js'
+import { imagePathOf, withClipboardImage } from './hermes/clipboardImage.js'
 import { type Attachment, uploadImage } from './hermes/images.js'
 import { sharedPromptId, sharedPromptRequest } from './hermes/sharedPrompts.js'
 import { openAgents } from './overlays/agents.js'
@@ -570,11 +570,13 @@ export class App implements OverlayHost {
   /** Attaches the clipboard's image to the next prompt (`quiet`: an empty paste, which may hold none). */
   async attachClipboardImage(quiet: boolean) {
     try {
-      const path = await clipboardImage()
-
-      if (path) {
+      const found = await withClipboardImage(async path => {
         await this.#attachImage(path, `pasted image ${this.#attachments.length + 1}`)
-      } else if (!quiet) {
+
+        return true
+      })
+
+      if (!found && !quiet) {
         this.transcript.notice('No image on the clipboard.', 'warning')
         this.changed()
       }

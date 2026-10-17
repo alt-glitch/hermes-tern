@@ -6,7 +6,7 @@
 
 import { execFile } from 'node:child_process'
 import { existsSync } from 'node:fs'
-import { mkdtemp } from 'node:fs/promises'
+import { mkdtemp, rm } from 'node:fs/promises'
 import { homedir, tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { promisify } from 'node:util'
@@ -15,23 +15,46 @@ const run = promisify(execFile)
 
 const IMAGE = /\.(png|jpe?g|gif|webp)$/i
 
-/** Writes the clipboard's image to a new file; its path, or undefined when the clipboard holds none. */
-export async function clipboardImage(env: NodeJS.ProcessEnv = process.env): Promise<string | undefined> {
+/** Has Hermes' extractor write the clipboard's image to `path`; false when the clipboard holds none. */
+async function extractClipboardImage(path: string, env: NodeJS.ProcessEnv): Promise<boolean> {
   const root = env.HERMES_PYTHON_SRC_ROOT
   const python = env.HERMES_PYTHON?.trim() || 'python3'
 
   if (!root) {
-    return undefined
+    return false
   }
 
-  const path = join(await mkdtemp(join(tmpdir(), 'hermes-tern-clipboard-')), 'clipboard.png')
   const { stdout } = await run(python, [join(root, 'ui-tui/scripts/clipboard_image.py'), path], {
     cwd: root,
     env: { ...env, PYTHONPATH: root },
     timeout: 15_000
   })
 
-  return stdout.trim() === 'true' && existsSync(path) ? path : undefined
+  return stdout.trim() === 'true' && existsSync(path)
+}
+
+/**
+ * Writes the clipboard's image to a temporary file and hands its path to `use` (which uploads its
+ * bytes); undefined when the clipboard holds none. The folder goes afterwards, image or not, as in
+ * Ink's stageClipboardImage (ui-tui/src/lib/imageAttachments.ts).
+ */
+export async function withClipboardImage<T>(
+  use: (path: string) => Promise<T>,
+  env: NodeJS.ProcessEnv = process.env,
+  extract: (path: string, env: NodeJS.ProcessEnv) => Promise<boolean> = extractClipboardImage
+): Promise<T | undefined> {
+  if (!env.HERMES_PYTHON_SRC_ROOT) {
+    return undefined
+  }
+
+  const dir = await mkdtemp(join(tmpdir(), 'hermes-tern-clipboard-'))
+  const path = join(dir, 'clipboard.png')
+
+  try {
+    return (await extract(path, env)) ? await use(path) : undefined
+  } finally {
+    await rm(dir, { force: true, recursive: true })
+  }
 }
 
 /**
