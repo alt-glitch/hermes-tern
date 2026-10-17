@@ -250,6 +250,19 @@ export const STYLES = css`
     font: 400 13px/22px var(--sans) !important;
   }
 
+  /* An image the next prompt carries: a chip in the composer; a click drops it. */
+  [data-role='hermes.composer.image'] {
+    padding: 1px 8px !important;
+    border-radius: 999px;
+    background: var(--l1);
+    font: 500 12px/20px var(--sans) !important;
+    cursor: pointer;
+  }
+
+  [data-role='hermes.composer.image']:hover {
+    background: var(--l2);
+  }
+
   /* omp's ask theme draws a radio at the start of each option without moving the text over. */
   [data-role='omp.ask.option'] {
     padding-left: 34px !important;

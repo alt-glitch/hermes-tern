@@ -58,6 +58,8 @@ export interface DockContext {
   todos?: TodosPill
   /** The status strip under the composer. */
   status?: StatusLine
+  /** Images the next prompt carries, as chips in the composer; a click on one drops it. */
+  attachments?: { label: string; onRemove(): void }[]
   /** The pill holding the keyboard (Down from an empty prompt). */
   focused?: Pill
 }
@@ -408,7 +410,15 @@ function composerNode(cx: DockContext): JSX.Element {
           value={share}
         />
       )}
-      <row gap="sm" hidden key="chips" role="omp.composer.chips" wrap />
+      <row gap="sm" hidden={!cx.attachments?.length} key="chips" role="omp.composer.chips" wrap>
+        {(cx.attachments ?? []).map((a, i) => (
+          <row align="center" gap="xs" key={`a${i}`} onClick={a.onRemove} role="hermes.composer.image" title="Remove this image">
+            <icon key="i" name="image" />
+            <text key="t" text={a.label} wrap="none" />
+            <icon key="x" name="x" />
+          </row>
+        ))}
+      </row>
       <row align="start" gap="sm" key="line" role="omp.composer.line">
         <editor
           cursor={composer.cursor}

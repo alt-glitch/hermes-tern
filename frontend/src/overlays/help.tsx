@@ -39,6 +39,7 @@ const HOTKEYS: { group: string; rows: [string[], string][] }[] = [
       [['alt+b'], 'Background processes and cron jobs (/ps)'],
       [['alt+p'], 'Pull requests Hermes linked (/prs)'],
       [['alt+s'], 'Session sidebar: branch, PRs, changes (/sidebar)'],
+      [['ctrl+v'], 'Attach the clipboard image (also ⌘V of an image, a dropped image file, /paste)'],
       [['down'], 'Focus the agents / shells / PR pills (empty prompt); ← → switch, Enter opens, Esc returns'],
       [['ctrl+c'], 'Clear the draft / interrupt / exit (twice)'],
       [['ctrl+d'], 'Delete forward / exit (empty prompt)']

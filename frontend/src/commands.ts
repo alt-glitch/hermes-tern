@@ -120,6 +120,12 @@ const COMMANDS: readonly LocalCommand[] = [
     }
   },
   {
+    // The Ink TUI's `/paste`: the clipboard's image on the next prompt.
+    aliases: ['image'],
+    name: 'paste',
+    run: (app, arg) => (arg ? false : void app.attachClipboardImage(false))
+  },
+  {
     aliases: ['side'],
     name: 'sidebar',
     run: app => app.toggleSidebar()
