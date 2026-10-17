@@ -11,6 +11,8 @@ export interface ControlHost {
   gw: Pick<GatewayClient, 'request'>
   sid: string | null
   busy: boolean
+  /** How many prompts wait on the next-prompt queue. */
+  queued: number
   /** Submits `text` as a normal prompt: sent now when idle, queued behind the turn otherwise. */
   submit(text: string): void
   /** Puts `text` on the next-prompt queue. */
@@ -84,7 +86,7 @@ async function steer(host: ControlHost, text: string) {
 
 function queue(host: ControlHost, text: string) {
   if (!text) {
-    return host.notice('Usage: /queue <prompt to run after the current turn>', 'warning')
+    return host.notice(`${host.queued} queued message${host.queued === 1 ? '' : 's'}`)
   }
 
   host.submit(text)
@@ -151,8 +153,7 @@ async function tools(host: ControlHost, arg: string) {
 
 export const CONTROL_COMMANDS: readonly ControlCommand[] = [
   { aliases: ['s'], name: 'steer', run: steer },
-  // `/q` stays quit's alias here (Hermes' registry maps it to /queue).
-  { name: 'queue', run: queue },
+  { aliases: ['q'], name: 'queue', run: queue },
   { name: 'stop', run: stop },
   { name: 'tools', run: tools }
 ]

@@ -20,6 +20,7 @@ function host(over: Partial<ControlHost> = {}, replies: Record<string, unknown> 
     enqueue: vi.fn(),
     gw: { request } as unknown as ControlHost['gw'],
     notice: vi.fn(),
+    queued: 0,
     sid: 'sid-1',
     submit: vi.fn(),
     ...over

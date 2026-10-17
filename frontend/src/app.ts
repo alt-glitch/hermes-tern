@@ -29,13 +29,14 @@ import { agentName, Agents } from './agents/store.js'
 import { copyToClipboard } from './clipboard.js'
 import { localCommand } from './commands.js'
 import { Composer } from './composer.js'
-import { type ControlHost, interruptTurn, steerTurn } from './controlCommands.js'
+import { interruptTurn, steerTurn } from './controlCommands.js'
 import { type Busy, busyFrom, ownsEvent, Switches } from './flow.js'
 import { hudKey, type Pill } from './hud.js'
 import type { Overlay, OverlayHost } from './overlay.js'
 import { writeActiveSessionFile } from './hermes/activeSessionFile.js'
 import { clipboardImage, imagePathOf } from './hermes/clipboardImage.js'
 import { type Attachment, uploadImage } from './hermes/images.js'
+import { mutateSession } from './hermes/mutate.js'
 import { sharedPromptId, sharedPromptRequest } from './hermes/sharedPrompts.js'
 import { openAgents } from './overlays/agents.js'
 import { openBackground } from './overlays/background.js'
@@ -51,6 +52,7 @@ import { LINK_TOOLS } from './github/links.js'
 import { PullRequests } from './github/store.js'
 import { Cron } from './processes/cron.js'
 import { Sidebar } from './sidebar.js'
+import type { SessionHost } from './sessionCommands.js'
 import { isRunning as processRuns, Processes, processTone } from './processes/store.js'
 import { loadSettings, saveSettings, type ThemeMode } from './settings.js'
 import { Transcript } from './transcript.js'
@@ -584,6 +586,19 @@ export class App implements OverlayHost {
     }
   }
 
+  /** `/image <path>`: attaches that image file (resolved against the session's folder) to the next prompt. */
+  async attachImagePath(raw: string) {
+    const path = imagePathOf(raw, this.info?.cwd || process.env.HERMES_CWD || process.cwd())
+
+    if (!path) {
+      this.transcript.notice(`Not an image file: ${raw.trim()} (PNG, JPEG, GIF or WebP)`, 'warning')
+
+      return this.changed()
+    }
+
+    await this.#attachImage(path, basename(path))
+  }
+
   async #attachImage(path: string, name: string) {
     const sid = this.sid
 
@@ -784,21 +799,44 @@ export class App implements OverlayHost {
     this.changed()
   }
 
-  /** The gateway-backed turn controls' view of this app (/steer, /queue, /stop, /tools). */
-  control(): ControlHost {
+  /** The gateway-backed commands' view of this app (/steer, /queue, /stop, /tools, /undo, /compress, …). */
+  control(): SessionHost {
+    const sid = this.sid
+
     return {
       busy: Boolean(this.busy),
+      canonical: this.#gw.isCanonical,
       enqueue: text => {
         this.queue.push(text)
         this.changed()
       },
       gw: this.#gw,
-      notice: (text, tone) => this.transcript.notice(text, tone),
+      notice: (text, tone) => {
+        this.transcript.notice(text, tone)
+        this.changed()
+      },
+      open: async id => {
+        await this.resume(id)
+
+        return this.sid === id
+      },
+      panel: (title, text) => {
+        this.transcript.panel(title, text)
+        this.changed()
+      },
+      queued: this.queue.length,
+      reload: async () => {
+        if (sid && this.sid === sid) {
+          await this.#resume(sid)
+        }
+      },
+      send: text => this.#send(text),
+      sid,
+      stale: () => this.sid !== sid,
       steered: text => {
         this.transcript.steer(text)
         this.changed()
       },
-      sid: this.sid,
       submit: text => this.#submit(text)
     }
   }
@@ -869,8 +907,8 @@ export class App implements OverlayHost {
     this.changed()
   }
 
-  /** Closes the open session and starts a fresh one with an empty transcript. */
-  async newSession() {
+  /** Closes the open session and starts a fresh one with an empty transcript, named `title` if given. */
+  async newSession(title?: string) {
     const token = this.#switches.begin()
 
     try {
@@ -913,6 +951,26 @@ export class App implements OverlayHost {
       this.#adopt(r)
     } finally {
       this.#settle(token)
+    }
+
+    if (title && this.sid) {
+      await this.#rename(this.sid, title)
+    }
+  }
+
+  /** Names session `sid` (`/new <title>`): the shared gateway's rename mutation, a private one's `session.title`. */
+  async #rename(sid: string, title: string) {
+    try {
+      const r = this.#gw.isCanonical
+        ? await mutateSession(this.#gw, sid, 'rename', { title })
+        : await this.#gw.request<{ title?: string } | null>('session.title', { session_id: sid, title })
+
+      if (sid === this.sid && this.#setTitle(String(r?.title ?? title))) {
+        this.changed()
+      }
+    } catch (error) {
+      this.transcript.notice(`Could not name the session: ${error instanceof Error ? error.message : String(error)}`, 'warning')
+      this.changed()
     }
   }
 
