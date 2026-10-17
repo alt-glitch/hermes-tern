@@ -22,6 +22,7 @@ import type { AnyGatewayEvent } from '@tui/gatewayTypes.js'
 
 import logo from '../assets/logo.png'
 
+import { copyToClipboard } from './clipboard.js'
 import { localCommand } from './commands.js'
 import { Composer } from './composer.js'
 import { type ControlHost, interruptTurn } from './controlCommands.js'
@@ -43,6 +44,8 @@ import { randomTip, type WelcomeContext } from './view/welcome.js'
 export const INPUT_ID = 'dock.composer.line.input'
 
 const EXIT_ARM_MS = 1500
+/** How long a prompt's Copy button reads Copied. */
+const COPIED_MS = 1500
 /** What Shift+Tab / the effort chip cycle through (hermes's `none` turns reasoning off). */
 const EFFORTS = ['none', 'low', 'medium', 'high', 'xhigh']
 
@@ -91,6 +94,9 @@ export class App implements OverlayHost {
   #startupImage = process.env.HERMES_TUI_IMAGE?.trim() ?? ''
   /** Uploaded images the next prompt carries (the shared gateway takes them on prompt.submit). */
   #attachments: Attachment[] = []
+  /** The prompt whose Copy button reads Copied, until the timer clears it. */
+  #copied: string | undefined
+  #copiedTimer: NodeJS.Timeout | undefined
 
   constructor(tern: Session, gw: GatewayClient, version: string) {
     this.#tern = tern
@@ -280,6 +286,18 @@ export class App implements OverlayHost {
 
     this.#exitArmed = now
     this.transcript.notice('Press Ctrl+C again to exit.')
+  }
+
+  #copy(text: string, id: string) {
+    copyToClipboard(text)
+    this.#copied = id
+    // Node handlers consume their event, so the input loop's re-render never sees this one.
+    this.changed()
+    clearTimeout(this.#copiedTimer)
+    this.#copiedTimer = setTimeout(() => {
+      this.#copied = undefined
+      this.changed()
+    }, COPIED_MS)
   }
 
   quit(code = 0) {
@@ -1005,7 +1023,8 @@ export class App implements OverlayHost {
     const backend = info?.version && info.version !== 'unknown' ? `v${info.version}` : ''
 
     const cx = {
-      copy: (text: string) => copyToClipboard(text),
+      copied: this.#copied,
+      copy: (text: string, id: string) => this.#copy(text, id),
       now,
       welcome: { ...this.#welcome, version: this.#welcome.version || backend }
     }
@@ -1085,7 +1104,3 @@ function shortPath(path: string): string {
   return home && path.startsWith(home) ? `~${path.slice(home.length)}` : path
 }
 
-/** Copies through OSC 52, which Tern (and most terminals) honor. */
-function copyToClipboard(text: string) {
-  process.stdout.write(`\x1b]52;c;${Buffer.from(text).toString('base64')}\x07`)
-}
