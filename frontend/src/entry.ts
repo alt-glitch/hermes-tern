@@ -1,12 +1,15 @@
 // Hermes for Tern. Asks the terminal for the Tern Surface Protocol; without it
 // exits with NO_TSP so the launcher falls back to the Ink TUI. With it, starts
 // the gateway (python -m tui_gateway.entry, or HERMES_TUI_GATEWAY_URL) and
-// runs the app until the user quits.
+// runs the app until the user quits: the chat, or (opened as a sidebar by the
+// chat) one subagent's pane.
 
 import { connect } from '@stencil-hq/tern'
 import { GatewayClient } from '@tui/gatewayClient.js'
 
 import { App } from './app.js'
+import { readWatchSpec } from './watch/spec.js'
+import { WatchApp } from './watch/watchApp.js'
 
 /** Exit code telling the launcher this terminal doesn't speak TSP. */
 export const NO_TSP = 75
@@ -21,5 +24,6 @@ if (!session) {
 const gw = new GatewayClient()
 gw.start()
 
-const code = await new App(session, gw, version).run()
+const watch = readWatchSpec()
+const code = await (watch ? new WatchApp(session, gw, watch) : new App(session, gw, version)).run()
 process.exit(code)

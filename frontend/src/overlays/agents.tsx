@@ -1,10 +1,10 @@
 // The agents hub (`/agents`, ⌥A, the agents pill): every subagent of the session in one
 // `picker` sheet, as omp's hub draws them (a tree when orchestrators spawned workers, status
 // dots, tool counts and timers), the selected one previewed as its live `agent` row, facts and
-// latest activity. Enter watches one: the same sheet switches to that agent's timeline (its
-// live transcript log, one row per step, following the newest), the preview showing the
-// selected step in full. S steers a running agent (the search line becomes the message),
-// X stops it.
+// latest activity. Enter opens the agent beside the chat (watch/: its full transcript, live,
+// with a composer that steers it). T opens its timeline in this sheet instead (its live
+// transcript log, one row per step, following the newest). S steers a running agent (the
+// search line becomes the message), X stops it.
 
 import type { JSX, Key, PickerColumn, PickerItem, Tone } from '@stencil-hq/tern'
 
@@ -88,6 +88,14 @@ export function openAgents(app: App, focus?: { id: string; watch?: boolean }) {
     watching = a.id
     step = undefined
     void app.agents.refresh(a)
+  }
+
+  /** Opens the agent in a split beside the chat and closes the hub; its timeline here when no split can open. */
+  const beside = (id: string | undefined) => {
+    if (id) {
+      close()
+      void app.openAgent(id)
+    }
   }
 
   const sendSteer = async () => {
@@ -189,6 +197,8 @@ export function openAgents(app: App, focus?: { id: string; watch?: boolean }) {
           step = moved === ids.at(-1) ? undefined : moved
         }
       } else if (k.name === 'enter') {
+        beside(selected)
+      } else if (k.name === 't' && !k.ctrl && !k.alt) {
         watch(selected)
       } else if (k.name === 'tab') {
         tab = tab === 'running' ? 'all' : 'running'
@@ -220,7 +230,12 @@ export function openAgents(app: App, focus?: { id: string; watch?: boolean }) {
     }
 
     return [
-      ...(inTimeline ? [] : [{ id: 'watch', keys: ['enter'], label: 'Watch', primary: true }]),
+      ...(inTimeline
+        ? []
+        : [
+            { id: 'watch', keys: ['t'], label: 'Timeline' },
+            { id: 'beside', keys: ['enter'], label: 'Open beside', primary: true }
+          ]),
       {
         disabled: running ? (a?.steerable === false ? ('Not taking steering now' as const) : undefined) : ('Finished' as const),
         id: 'steer',
@@ -264,6 +279,7 @@ export function openAgents(app: App, focus?: { id: string; watch?: boolean }) {
       tab = ev.value === 'running' ? 'running' : 'all'
       app.changed()
     },
+    beside: () => beside(selected),
     watch: () => {
       watch(selected)
       app.changed()
@@ -297,10 +313,7 @@ export function openAgents(app: App, focus?: { id: string; watch?: boolean }) {
         layout={all.some(x => x.depth) ? 'tree' : 'rows'}
         noun="agents"
         onAction={handlers}
-        onActivate={ev => {
-          watch(ev.item)
-          app.changed()
-        }}
+        onActivate={ev => beside(ev.item)}
         onSelect={ev => {
           selected = ev.item
           stopping = false
