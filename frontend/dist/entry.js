@@ -28749,7 +28749,7 @@ var Completion = class {
     const gen = ++this.#gen;
     clearTimeout(this.#timer);
     this.#timer = void 0;
-    const request = before.includes("\n") ? null : completionRequestForInput(before, { sid: this.#sid() });
+    const request = requestFor(before, this.#sid());
     if (!request) {
       this.dismiss();
       return;
@@ -28914,6 +28914,14 @@ function labelOf2(item, typed, replaceFrom) {
     { s: base ? `${base} mark` : "mark", t: label.slice(at, at + query.length) },
     { s: base, t: label.slice(at + query.length) }
   ].filter((s) => s.t);
+}
+function requestFor(before, sid) {
+  const lineStart2 = before.lastIndexOf("\n") + 1;
+  const request = completionRequestForInput(before.slice(lineStart2), { sid });
+  if (!request || !lineStart2) {
+    return request;
+  }
+  return request.method === "complete.slash" ? { ...request, replaceFrom: request.replaceFrom + lineStart2, skillsOnly: true } : { ...request, replaceFrom: request.replaceFrom + lineStart2 };
 }
 
 // .hermes-src/node_modules/@hermes/shared/src/color.ts
