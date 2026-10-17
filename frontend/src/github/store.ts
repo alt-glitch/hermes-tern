@@ -1,10 +1,12 @@
-// The session's pull requests for the PR pill and sheet: the PRs the agent linked, each read from
-// GitHub. Polling only, as T3 Code does: every minute while one is open, every 30 s while its
+// The session's pull requests for the PR pill and sheet: the PRs the agent linked, the PR of the
+// session's branch (its checkout or worktree), and the other layers of a GitHub stack any of them
+// sits in, each read from GitHub. Polling only, as T3 Code does: every minute while one is open, every 30 s while its
 // checks run, and at once when the sheet opens or a PR is linked. Comments and files are read when
 // the sheet shows them.
 
 import type { ToolCall } from '../model.js'
 
+import { type BranchTarget, branchPullRequest, branchTarget, parseStacks, type Stack, stackQuery } from './branch.js'
 import { type GitHub, github } from './client.js'
 import { linkedFromResult, prKey, storedLinks } from './links.js'
 import {
@@ -30,12 +32,24 @@ const BATCH = 20
 export interface PullRequestsHost {
   /** The session the links belong to (the stored session id the link tools see). */
   sid(): string | null
+  /** The session's working directory, for its branch's PR. */
+  cwd(): string | null
   changed(): void
 }
+
+/** How a PR came to be on the list. */
+export type Source = 'branch' | 'linked' | 'stack'
+
+/** How long the branch's PR lookup is trusted (T3 Code: 60 s with a PR, 5 min without). */
+const BRANCH_HIT_MS = 60_000
+const BRANCH_MISS_MS = 300_000
 
 /** What the sheet knows of one linked PR. */
 export interface Entry {
   ref: PrRef
+  source: Source
+  /** The native stack it is a layer of. */
+  stack?: Stack
   pr?: PullRequest
   /** GitHub's answer when it could not read this PR. */
   error?: string
@@ -65,6 +79,12 @@ export class PullRequests {
   #sid: string | null = null
   #refs: PrRef[] = []
   readonly #entries = new Map<string, Entry>()
+  #branch: { at: number; cwd: string; ref?: PrRef; target?: BranchTarget } | undefined
+  /** Native stacks by key, from the PRs' stack membership. */
+  readonly #stacks = new Map<string, Stack>()
+  /** Hosts whose GraphQL has no stack fields (GHES): not asked again. */
+  readonly #noStacks = new Set<string>()
+  readonly #branchOf: (cwd: string) => Promise<BranchTarget | undefined>
   /** Why nothing could be read at all (no token). */
   #error: string | undefined
   #timer: NodeJS.Timeout | undefined
@@ -73,15 +93,57 @@ export class PullRequests {
   #disposed = false
   readonly #busy = new Set<string>()
 
-  constructor(host: PullRequestsHost, gh: GitHub = github(), links: (sid: string) => PrRef[] = sid => storedLinks(sid)) {
+  constructor(
+    host: PullRequestsHost,
+    gh: GitHub = github(),
+    links: (sid: string) => PrRef[] = sid => storedLinks(sid),
+    branchOf: (cwd: string) => Promise<BranchTarget | undefined> = branchTarget
+  ) {
     this.#host = host
     this.#gh = gh
     this.#links = links
+    this.#branchOf = branchOf
   }
 
-  /** The linked PRs, oldest link first. */
+  /** The linked PRs (oldest link first), then the branch's PR, then stack layers none of them are. */
   entries(): Entry[] {
-    return this.#refs.map(ref => this.#entry(ref))
+    const seen = new Set<string>()
+    const out: Entry[] = []
+    const add = (ref: PrRef, source: Source) => {
+      const key = prKey(ref)
+
+      if (!seen.has(key)) {
+        seen.add(key)
+        const e = this.#entry(ref)
+        e.source = source
+        out.push(e)
+      }
+    }
+
+    this.#refs.forEach(r => add(r, 'linked'))
+
+    if (this.#branch?.ref) {
+      add(this.#branch.ref, 'branch')
+    }
+
+    const inStack = (s: Stack, ref: PrRef) => ref.host === s.host && ref.repository === s.repository && s.layers.some(l => l.number === ref.number)
+
+    for (const s of this.#stacks.values()) {
+      if (out.some(e => inStack(s, e.ref))) {
+        s.layers.forEach(l => add({ host: s.host, number: l.number, repository: s.repository, url: `https://${s.host}/${s.repository}/pull/${l.number}` }, 'stack'))
+      }
+    }
+
+    for (const e of out) {
+      e.stack = [...this.#stacks.values()].find(s => inStack(s, e.ref))
+    }
+
+    return out
+  }
+
+  /** The native stacks the list's PRs sit in. */
+  stacks(): Stack[] {
+    return [...this.#stacks.values()]
   }
 
   get(key: string): Entry | undefined {
@@ -110,6 +172,8 @@ export class PullRequests {
 
     this.#sid = sid
     this.#refs = sid ? this.#links(sid) : []
+    this.#branch = undefined
+    this.#stacks.clear()
     this.#host.changed()
     this.poke()
   }
@@ -221,7 +285,7 @@ export class PullRequests {
     let e = this.#entries.get(key)
 
     if (!e) {
-      e = { ref }
+      e = { ref, source: 'linked' }
       this.#entries.set(key, e)
     }
 
@@ -261,7 +325,94 @@ export class PullRequests {
     }
   }
 
+  /** The branch's PR, looked up again once its last answer is old or the session moved. */
+  async #readBranch() {
+    const cwd = this.#host.cwd()
+    const now = Date.now()
+    const b = this.#branch
+
+    if (!cwd) {
+      this.#branch = undefined
+
+      return
+    }
+
+    const target = await this.#branchOf(cwd)
+    const same = b && b.cwd === cwd && b.target?.head === target?.head && b.target?.repository === target?.repository
+
+    if (same && now - b.at < (b.ref ? BRANCH_HIT_MS : BRANCH_MISS_MS)) {
+      return
+    }
+
+    let ref: PrRef | undefined
+
+    try {
+      ref = target ? await branchPullRequest(this.#gh, target) : undefined
+    } catch {
+      // No token or no network: the linked PRs say why.
+      ref = same ? b.ref : undefined
+    }
+
+    this.#branch = { at: now, cwd, ref, target }
+  }
+
+  /** Which PRs sit in a GitHub stack, and that stack's layers; new layers are read next round. */
+  async #readStacks(entries: Entry[]): Promise<boolean> {
+    const before = [...this.#stacks.keys()].join()
+    const byHost = new Map<string, Entry[]>()
+
+    for (const e of entries) {
+      if (e.pr && !this.#noStacks.has(e.ref.host) && e.ref.host === 'github.com') {
+        byHost.set(e.ref.host, [...(byHost.get(e.ref.host) ?? []), e])
+      }
+    }
+
+    for (const [host, list] of byHost) {
+      const { query, variables } = stackQuery(list.slice(0, BATCH).map(e => e.ref))
+      let data: Record<string, { pullRequest?: { stack?: { number?: number } | null } | null } | null>
+
+      try {
+        data = await this.#gh.graphql(host, query, variables)
+      } catch {
+        this.#noStacks.add(host)
+        continue
+      }
+
+      const asked = new Set<string>()
+
+      for (const [i, e] of list.slice(0, BATCH).entries()) {
+        const n = data[`p${i}`]?.pullRequest?.stack?.number
+        const key = `${host}/${e.ref.repository}#stack:${n}`
+
+        if (typeof n !== 'number' || asked.has(key)) {
+          continue
+        }
+
+        asked.add(key)
+
+        try {
+          const rows = await this.#gh.rest(host, 'GET', `/repos/${e.ref.repository}/stacks?pull_request=${e.ref.number}`)
+          parseStacks(host, e.ref.repository, rows).forEach(s => this.#stacks.set(s.key, s))
+        } catch {
+          // A stack we cannot read stays a single PR.
+        }
+      }
+    }
+
+    return [...this.#stacks.keys()].join() !== before
+  }
+
   async #read() {
+    await this.#readBranch()
+    await this.#readPrs()
+
+    // Stack layers not read yet: read them now, once.
+    if (await this.#readStacks(this.entries())) {
+      await this.#readPrs()
+    }
+  }
+
+  async #readPrs() {
     const entries = this.entries()
     const byHost = new Map<string, Entry[]>()
 

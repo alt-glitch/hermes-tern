@@ -10868,7 +10868,7 @@ var require_mock_interceptor = __commonJS({
 var require_mock_client = __commonJS({
   ".hermes-src/ui-tui/node_modules/undici/lib/mock/mock-client.js"(exports, module) {
     "use strict";
-    var { promisify: promisify4 } = __require("node:util");
+    var { promisify: promisify5 } = __require("node:util");
     var Client = require_client();
     var { buildMockDispatch } = require_mock_utils();
     var {
@@ -10908,7 +10908,7 @@ var require_mock_client = __commonJS({
         return new MockInterceptor(opts, this[kDispatches]);
       }
       async [kClose]() {
-        await promisify4(this[kOriginalClose])();
+        await promisify5(this[kOriginalClose])();
         this[kConnected] = 0;
         this[kMockAgent][Symbols.kClients].delete(this[kOrigin]);
       }
@@ -10921,7 +10921,7 @@ var require_mock_client = __commonJS({
 var require_mock_pool = __commonJS({
   ".hermes-src/ui-tui/node_modules/undici/lib/mock/mock-pool.js"(exports, module) {
     "use strict";
-    var { promisify: promisify4 } = __require("node:util");
+    var { promisify: promisify5 } = __require("node:util");
     var Pool = require_pool();
     var { buildMockDispatch } = require_mock_utils();
     var {
@@ -10961,7 +10961,7 @@ var require_mock_pool = __commonJS({
         return new MockInterceptor(opts, this[kDispatches]);
       }
       async [kClose]() {
-        await promisify4(this[kOriginalClose])();
+        await promisify5(this[kOriginalClose])();
         this[kConnected] = 0;
         this[kMockAgent][Symbols.kClients].delete(this[kOrigin]);
       }
@@ -19968,25 +19968,25 @@ var PLAIN_TEXT = {
   badge: true,
   toast: true
 };
-function textProps(run3) {
-  if (run3.every((part) => typeof part === "string"))
-    return { text: run3.join("") };
-  return { spans: run3.map((part) => typeof part === "string" ? part : toJson(part) ?? null) };
+function textProps(run4) {
+  if (run4.every((part) => typeof part === "string"))
+    return { text: run4.join("") };
+  return { spans: run4.map((part) => typeof part === "string" ? part : toJson(part) ?? null) };
 }
 function containerChildren(parts2) {
   const out = [];
-  let run3 = [];
+  let run4 = [];
   const end = () => {
-    if (run3.length > 0)
-      out.push(new Node("text", textProps(run3)));
-    run3 = [];
+    if (run4.length > 0)
+      out.push(new Node("text", textProps(run4)));
+    run4 = [];
   };
   for (const part of parts2) {
     if (part instanceof Node) {
       end();
       out.push(part);
     } else {
-      run3.push(part);
+      run4.push(part);
     }
   }
   end();
@@ -20013,17 +20013,17 @@ function createNode(kind, input, children2) {
   const parts2 = flatten([fromProps, children2]);
   let nodes2 = [];
   if (SPAN_TEXT[kind] || PLAIN_TEXT[kind]) {
-    const run3 = [];
+    const run4 = [];
     for (const part of parts2) {
       if (part instanceof Node && kind === "seg")
         nodes2.push(part);
       else if (part instanceof Node || part instanceof Span && PLAIN_TEXT[kind]) {
         throw new TypeError(`${kind} takes text children, got ${describe(part)}`);
       } else
-        run3.push(part);
+        run4.push(part);
     }
-    if (run3.length > 0)
-      Object.assign(props, textProps(run3));
+    if (run4.length > 0)
+      Object.assign(props, textProps(run4));
   } else if (kind === "el") {
     let text2 = "";
     for (const part of parts2) {
@@ -26737,10 +26737,10 @@ function searchCard(call, result) {
         /* @__PURE__ */ jsx("text", { role: "omp.tool.chip", spans: [{ t: String(hits.length) }] }, "n")
       ] }, f)
     );
-    let run3 = [];
+    let run4 = [];
     let runIndex = 0;
     const flush = () => {
-      const start = run3[0]?.line ?? 1;
+      const start = run4[0]?.line ?? 1;
       if (runIndex > 0) {
         body.push(/* @__PURE__ */ jsx("text", { role: "omp.tool.context", spans: [{ s: "muted", t: "\u2026" }] }, `${f}.g${runIndex}`));
       }
@@ -26749,23 +26749,23 @@ function searchCard(call, result) {
           "code",
           {
             lang: langOf(path),
-            marks: run3.map((h) => ({ line: h.line, tone: "accent" })),
+            marks: run4.map((h) => ({ line: h.line, tone: "accent" })),
             numbers: true,
             start,
-            text: run3.map((h) => h.text).join("\n")
+            text: run4.map((h) => h.text).join("\n")
           },
           `${f}.c${runIndex++}`
         )
       );
-      run3 = [];
+      run4 = [];
     };
     for (const hit of hits) {
-      if (run3.length && hit.line !== (run3.at(-1)?.line ?? 0) + 1) {
+      if (run4.length && hit.line !== (run4.at(-1)?.line ?? 0) + 1) {
         flush();
       }
-      run3.push(hit);
+      run4.push(hit);
     }
-    if (run3.length) {
+    if (run4.length) {
       flush();
     }
   }
@@ -28799,7 +28799,7 @@ function openPullRequests(app, focus) {
       return true;
     }
   };
-  const prKeys = () => app.prs.entries().map((e) => prKey(e.ref)).toReversed();
+  const prKeys = () => prOrder(app.prs.entries()).flatMap((o) => typeof o === "string" ? [o] : []);
   const handlers = {
     activate,
     cancel: () => {
@@ -28897,7 +28897,7 @@ function openPullRequests(app, focus) {
           confirm = void 0;
           app.changed();
         },
-        order: tab === "prs" ? keys : ids,
+        order: tab === "prs" ? prOrder(entries) : ids,
         preview: tab === "files" || tab === "activity" ? "below" : "side",
         selected: tab === "prs" ? selected : rows[tab],
         size: "lg",
@@ -29008,15 +29008,31 @@ function summary3(entries) {
   ];
   return parts2.filter(([n]) => n).map(([n, l]) => `${n} ${l}`).join(" \xB7 ") || (entries.length ? "loading\u2026" : "none yet");
 }
+function prOrder(entries) {
+  const stacks = [...new Set(entries.flatMap((e) => e.stack ? [e.stack] : []))];
+  if (!stacks.length) {
+    return entries.map((e) => prKey(e.ref)).toReversed();
+  }
+  const rest = entries.filter((e) => !e.stack).toReversed();
+  return [
+    ...stacks.flatMap((s) => {
+      const layers = s.layers.map((l) => entries.find((e) => e.ref.number === l.number && e.stack === s)).filter((e) => Boolean(e)).toReversed();
+      return [{ count: s.layers.length, group: s.key, label: `Stack on ${s.base || "its base"}` }, ...layers.map((e) => prKey(e.ref))];
+    }),
+    ...rest.length ? [{ group: "prs", label: "Pull requests" }, ...rest.map((e) => prKey(e.ref))] : []
+  ];
+}
 function prItem(e, now) {
   const pr = e.pr;
   const review = pr?.reviewDecision ? REVIEW[pr.reviewDecision] : void 0;
+  const layer = e.stack ? e.stack.layers.findIndex((l) => l.number === e.ref.number) + 1 : 0;
   return {
     badges: pr ? [
       { text: stateLabel(pr), tone: stateTone(pr) },
+      ...e.source === "branch" ? [{ text: "this branch", title: "The PR of the session\u2019s branch; Hermes did not link it", tone: "accent" }] : [],
       ...pr.mergeable === "conflicting" && pr.state === "open" ? [{ text: "conflicts", tone: "error" }] : []
     ] : e.error ? [{ text: "unreadable", title: e.error, tone: "error" }] : [],
-    detail: `${e.ref.repository} #${e.ref.number}`,
+    detail: `${e.ref.repository} #${e.ref.number}${layer ? ` \xB7 layer ${layer} of ${e.stack.layers.length}` : ""}`,
     dot: pr ? pr.state === "open" ? checksTone(pr) : stateTone(pr) : "muted",
     facts: pr ? {
       checks: pr.checks.length ? [{ s: checksTone(pr), t: checksState(pr.checks) }] : "none",
@@ -29081,9 +29097,25 @@ function overview(e, now) {
   if (!pr) {
     return [...header(e), /* @__PURE__ */ jsx("text", { spans: [{ s: e.error ? "error" : "muted", t: e.error ?? "Reading GitHub\u2026" }] }, "state")];
   }
+  const SOURCE = { branch: "The PR of this session\u2019s branch", linked: "Linked by Hermes", stack: "A layer of the stack" };
   return [
     ...header(e),
-    /* @__PURE__ */ jsx("kv", { items: facts(pr, now), role: "omp.hub.kv" }, "facts"),
+    /* @__PURE__ */ jsx("kv", { items: [...facts(pr, now), { k: [{ t: "Shown because" }], v: SOURCE[e.source] }], role: "omp.hub.kv" }, "facts"),
+    ...e.stack ? [
+      /* @__PURE__ */ jsx("section", { head: `Stack \xB7 ${e.stack.layers.length} layers on ${e.stack.base}`, children: e.stack.layers.toReversed().map((l) => /* @__PURE__ */ jsx(
+        "text",
+        {
+          spans: [
+            { s: l.number === e.ref.number ? "strong" : void 0, t: `#${l.number} ` },
+            { s: "mono dim", t: l.head },
+            { s: l.state === "merged" ? "info" : l.state === "closed" ? "error" : "muted", t: ` \xB7 ${l.state}` }
+          ],
+          truncate: "end",
+          wrap: "none"
+        },
+        `l${l.number}`
+      )) }, "stack")
+    ] : [],
     /* @__PURE__ */ jsx("section", { head: "Description", children: /* @__PURE__ */ jsx("md", { text: pr.body.trim() || "_No description._" }, "text") }, "body")
   ];
 }
@@ -32218,10 +32250,92 @@ function semantic(c) {
   return out;
 }
 
-// src/github/client.ts
+// src/github/branch.ts
 import { execFile as execFile3 } from "node:child_process";
 import { promisify as promisify2 } from "node:util";
 var run = promisify2(execFile3);
+function parseRemote(url) {
+  const m = url.match(/^[\w.-]+@([^:/]+):([^/]+\/[^/]+?)(?:\.git)?\/?$/) ?? url.match(/^(?:https?|ssh|git):\/\/(?:[^@/]+@)?([^/:]+)(?::\d+)?\/([^/]+\/[^/]+?)(?:\.git)?\/?$/);
+  if (!m) {
+    return void 0;
+  }
+  const host = m[1].toLowerCase();
+  return host === "github.com" || host.split(".").includes("github") ? { host, repository: m[2].toLowerCase() } : void 0;
+}
+async function git(cwd, ...args) {
+  const { stdout } = await run("git", ["-C", cwd, ...args], { timeout: 5e3 });
+  return stdout.trim();
+}
+async function branchTarget(cwd) {
+  try {
+    const branch = await git(cwd, "symbolic-ref", "--quiet", "--short", "HEAD");
+    const [remote = "", ref = ""] = (await git(cwd, "for-each-ref", "--format=%(upstream:remotename)%00%(upstream:remoteref)", `refs/heads/${branch}`)).split("\0");
+    const name = remote || "origin";
+    const parsed = parseRemote(await git(cwd, "remote", "get-url", name));
+    const head2 = ref.replace(/^refs\/heads\//, "") || branch;
+    const fallback = ["main", "master"];
+    const defaultBranch = (await git(cwd, "symbolic-ref", "--quiet", "--short", `refs/remotes/${name}/HEAD`).catch(() => "")).replace(
+      `${name}/`,
+      ""
+    );
+    if (!parsed || !head2 || (defaultBranch ? head2 === defaultBranch : fallback.includes(head2))) {
+      return void 0;
+    }
+    return { ...parsed, head: head2 };
+  } catch {
+    return void 0;
+  }
+}
+var BY_HEAD = `query($o: String!, $r: String!, $h: String!) {
+  repository(owner: $o, name: $r) {
+    pullRequests(headRefName: $h, first: 10, orderBy: {field: UPDATED_AT, direction: DESC}, states: [OPEN, MERGED, CLOSED]) {
+      nodes { number url state headRepositoryOwner { login } }
+    }
+  }
+}`;
+async function branchPullRequest(gh, target) {
+  const [o, r] = target.repository.split("/");
+  const data = await gh.graphql(target.host, BY_HEAD, { h: target.head, o, r });
+  const prs = (data.repository?.pullRequests?.nodes ?? []).filter((p) => (p.headRepositoryOwner?.login ?? "").toLowerCase() === o);
+  const pr = prs.find((p) => p.state === "OPEN") ?? prs[0];
+  return pr ? { host: target.host, number: pr.number, repository: target.repository, url: pr.url } : void 0;
+}
+function stackQuery(refs) {
+  const variables = {};
+  const decls = [];
+  const parts2 = refs.map((ref, i) => {
+    const [owner, name] = ref.repository.split("/");
+    variables[`o${i}`] = owner;
+    variables[`r${i}`] = name;
+    variables[`n${i}`] = ref.number;
+    decls.push(`$o${i}: String!, $r${i}: String!, $n${i}: Int!`);
+    return `p${i}: repository(owner: $o${i}, name: $r${i}) { pullRequest(number: $n${i}) { stack { number } } }`;
+  });
+  return { query: `query(${decls.join(", ")}) { ${parts2.join("\n")} }`, variables };
+}
+function parseStacks(host, repository, rows) {
+  return (Array.isArray(rows) ? rows : []).flatMap((row) => {
+    const s = row;
+    if (typeof s?.number !== "number" || !Array.isArray(s.pull_requests)) {
+      return [];
+    }
+    return [
+      {
+        base: typeof s.base === "string" ? s.base : s.base?.ref ?? "",
+        host,
+        key: `${host}/${repository}#stack:${s.number}`,
+        layers: s.pull_requests.filter((p) => typeof p.number === "number").map((p) => ({ head: p.head?.ref ?? "", number: p.number, state: p.merged_at ? "merged" : p.state ?? "open" })),
+        number: s.number,
+        repository
+      }
+    ];
+  });
+}
+
+// src/github/client.ts
+import { execFile as execFile4 } from "node:child_process";
+import { promisify as promisify3 } from "node:util";
+var run2 = promisify3(execFile4);
 var GitHubError = class extends Error {
   constructor(message, status) {
     super(message);
@@ -32249,7 +32363,7 @@ async function read(host, env) {
     return own;
   }
   try {
-    const { stdout } = await run("gh", ["auth", "token", "--hostname", host], { timeout: 1e4 });
+    const { stdout } = await run2("gh", ["auth", "token", "--hostname", host], { timeout: 1e4 });
     const token = stdout.trim();
     if (token) {
       return token;
@@ -32303,6 +32417,8 @@ function github(token = tokens()) {
 var OPEN_MS = 6e4;
 var PENDING_MS = 3e4;
 var BATCH = 20;
+var BRANCH_HIT_MS = 6e4;
+var BRANCH_MISS_MS = 3e5;
 var MUTATIONS = {
   close: "mutation($id: ID!) { closePullRequest(input: {pullRequestId: $id}) { clientMutationId } }",
   draft: "mutation($id: ID!) { convertPullRequestToDraft(input: {pullRequestId: $id}) { clientMutationId } }",
@@ -32318,6 +32434,12 @@ var PullRequests = class {
   #sid = null;
   #refs = [];
   #entries = /* @__PURE__ */ new Map();
+  #branch;
+  /** Native stacks by key, from the PRs' stack membership. */
+  #stacks = /* @__PURE__ */ new Map();
+  /** Hosts whose GraphQL has no stack fields (GHES): not asked again. */
+  #noStacks = /* @__PURE__ */ new Set();
+  #branchOf;
   /** Why nothing could be read at all (no token). */
   #error;
   #timer;
@@ -32325,14 +32447,43 @@ var PullRequests = class {
   #again = false;
   #disposed = false;
   #busy = /* @__PURE__ */ new Set();
-  constructor(host, gh = github(), links = (sid) => storedLinks(sid)) {
+  constructor(host, gh = github(), links = (sid) => storedLinks(sid), branchOf = branchTarget) {
     this.#host = host;
     this.#gh = gh;
     this.#links = links;
+    this.#branchOf = branchOf;
   }
-  /** The linked PRs, oldest link first. */
+  /** The linked PRs (oldest link first), then the branch's PR, then stack layers none of them are. */
   entries() {
-    return this.#refs.map((ref) => this.#entry(ref));
+    const seen = /* @__PURE__ */ new Set();
+    const out = [];
+    const add = (ref, source) => {
+      const key2 = prKey(ref);
+      if (!seen.has(key2)) {
+        seen.add(key2);
+        const e = this.#entry(ref);
+        e.source = source;
+        out.push(e);
+      }
+    };
+    this.#refs.forEach((r) => add(r, "linked"));
+    if (this.#branch?.ref) {
+      add(this.#branch.ref, "branch");
+    }
+    const inStack = (s, ref) => ref.host === s.host && ref.repository === s.repository && s.layers.some((l) => l.number === ref.number);
+    for (const s of this.#stacks.values()) {
+      if (out.some((e) => inStack(s, e.ref))) {
+        s.layers.forEach((l) => add({ host: s.host, number: l.number, repository: s.repository, url: `https://${s.host}/${s.repository}/pull/${l.number}` }, "stack"));
+      }
+    }
+    for (const e of out) {
+      e.stack = [...this.#stacks.values()].find((s) => inStack(s, e.ref));
+    }
+    return out;
+  }
+  /** The native stacks the list's PRs sit in. */
+  stacks() {
+    return [...this.#stacks.values()];
   }
   get(key2) {
     return this.#entries.get(key2);
@@ -32354,6 +32505,8 @@ var PullRequests = class {
     }
     this.#sid = sid;
     this.#refs = sid ? this.#links(sid) : [];
+    this.#branch = void 0;
+    this.#stacks.clear();
     this.#host.changed();
     this.poke();
   }
@@ -32442,7 +32595,7 @@ var PullRequests = class {
     const key2 = prKey(ref);
     let e = this.#entries.get(key2);
     if (!e) {
-      e = { ref };
+      e = { ref, source: "linked" };
       this.#entries.set(key2, e);
     }
     return e;
@@ -32473,7 +32626,71 @@ var PullRequests = class {
       this.#host.changed();
     }
   }
+  /** The branch's PR, looked up again once its last answer is old or the session moved. */
+  async #readBranch() {
+    const cwd = this.#host.cwd();
+    const now = Date.now();
+    const b = this.#branch;
+    if (!cwd) {
+      this.#branch = void 0;
+      return;
+    }
+    const target = await this.#branchOf(cwd);
+    const same = b && b.cwd === cwd && b.target?.head === target?.head && b.target?.repository === target?.repository;
+    if (same && now - b.at < (b.ref ? BRANCH_HIT_MS : BRANCH_MISS_MS)) {
+      return;
+    }
+    let ref;
+    try {
+      ref = target ? await branchPullRequest(this.#gh, target) : void 0;
+    } catch {
+      ref = same ? b.ref : void 0;
+    }
+    this.#branch = { at: now, cwd, ref, target };
+  }
+  /** Which PRs sit in a GitHub stack, and that stack's layers; new layers are read next round. */
+  async #readStacks(entries) {
+    const before = [...this.#stacks.keys()].join();
+    const byHost = /* @__PURE__ */ new Map();
+    for (const e of entries) {
+      if (e.pr && !this.#noStacks.has(e.ref.host) && e.ref.host === "github.com") {
+        byHost.set(e.ref.host, [...byHost.get(e.ref.host) ?? [], e]);
+      }
+    }
+    for (const [host, list] of byHost) {
+      const { query, variables } = stackQuery(list.slice(0, BATCH).map((e) => e.ref));
+      let data;
+      try {
+        data = await this.#gh.graphql(host, query, variables);
+      } catch {
+        this.#noStacks.add(host);
+        continue;
+      }
+      const asked = /* @__PURE__ */ new Set();
+      for (const [i, e] of list.slice(0, BATCH).entries()) {
+        const n = data[`p${i}`]?.pullRequest?.stack?.number;
+        const key2 = `${host}/${e.ref.repository}#stack:${n}`;
+        if (typeof n !== "number" || asked.has(key2)) {
+          continue;
+        }
+        asked.add(key2);
+        try {
+          const rows = await this.#gh.rest(host, "GET", `/repos/${e.ref.repository}/stacks?pull_request=${e.ref.number}`);
+          parseStacks(host, e.ref.repository, rows).forEach((s) => this.#stacks.set(s.key, s));
+        } catch {
+        }
+      }
+    }
+    return [...this.#stacks.keys()].join() !== before;
+  }
   async #read() {
+    await this.#readBranch();
+    await this.#readPrs();
+    if (await this.#readStacks(this.entries())) {
+      await this.#readPrs();
+    }
+  }
+  async #readPrs() {
     const entries = this.entries();
     const byHost = /* @__PURE__ */ new Map();
     for (const e of entries) {
@@ -34836,9 +35053,9 @@ function noticeNode(e) {
 }
 
 // src/watch/spec.ts
-import { execFile as execFile4 } from "node:child_process";
-import { promisify as promisify3 } from "node:util";
-var run2 = promisify3(execFile4);
+import { execFile as execFile5 } from "node:child_process";
+import { promisify as promisify4 } from "node:util";
+var run3 = promisify4(execFile5);
 var WATCH_ENV = "HERMES_TERN_WATCH";
 function readWatchSpec(env = process.env) {
   try {
@@ -34870,7 +35087,7 @@ async function openSidebar(spec, cwd, env = process.env) {
     return false;
   }
   if (sidebar) {
-    await run2("tern", ["close", sidebar]).catch(() => void 0);
+    await run3("tern", ["close", sidebar]).catch(() => void 0);
     sidebar = void 0;
   }
   const command = [
@@ -34884,7 +35101,7 @@ async function openSidebar(spec, cwd, env = process.env) {
     "tern"
   ];
   try {
-    const { stdout } = await run2("tern", ["split", pane, "right", "--cwd", cwd, "--", ...command]);
+    const { stdout } = await run3("tern", ["split", pane, "right", "--cwd", cwd, "--", ...command]);
     sidebar = stdout.trim().split(/\s+/).at(-1) || void 0;
     return true;
   } catch {
@@ -34905,7 +35122,11 @@ var App = class {
   processes = new Processes(this);
   cron = new Cron(this);
   /** The conversation's PRs; links are stored under the stored session id the tools see. */
-  prs = new PullRequests({ changed: () => this.changed(), sid: () => this.storedSid ?? this.sid });
+  prs = new PullRequests({
+    changed: () => this.changed(),
+    cwd: () => this.info?.cwd || null,
+    sid: () => this.storedSid ?? this.sid
+  });
   composer = new Composer();
   overlays = [];
   sid = null;
@@ -35500,10 +35721,15 @@ var App = class {
       case "skin.changed":
         this.#applySkin(ev.payload);
         break;
-      case "session.info":
+      case "session.info": {
+        const cwd = this.info?.cwd;
         this.info = ev.payload ? { ...this.info, ...ev.payload } : this.info;
         this.usage = ev.payload?.usage ?? this.usage;
+        if (this.info?.cwd && this.info.cwd !== cwd) {
+          this.prs.poke();
+        }
         break;
+      }
       case "session.usage": {
         const tick = usageFromTick(ev.payload);
         this.usage = tick ? { ...this.usage, ...tick } : this.usage;
@@ -35592,6 +35818,7 @@ var App = class {
         t2.complete(ev.payload ?? {});
         this.busy = null;
         this.#drainQueue();
+        this.prs.poke();
         break;
       case "status.update":
         if (this.busy && ev.payload?.text && ev.payload.kind === "status") {

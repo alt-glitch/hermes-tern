@@ -84,7 +84,11 @@ export class App implements OverlayHost {
   readonly processes: Processes = new Processes(this)
   readonly cron: Cron = new Cron(this)
   /** The conversation's PRs; links are stored under the stored session id the tools see. */
-  readonly prs: PullRequests = new PullRequests({ changed: () => this.changed(), sid: () => this.storedSid ?? this.sid })
+  readonly prs: PullRequests = new PullRequests({
+    changed: () => this.changed(),
+    cwd: () => this.info?.cwd || null,
+    sid: () => this.storedSid ?? this.sid
+  })
   readonly composer = new Composer()
   readonly overlays: Overlay[] = []
   sid: string | null = null
@@ -865,12 +869,19 @@ export class App implements OverlayHost {
 
         break
 
-      case 'session.info':
+      case 'session.info': {
+        const cwd = this.info?.cwd
         // The shared owner's idle fanout carries only pending/revision/generation: merge, never replace.
         this.info = ev.payload ? { ...this.info, ...ev.payload } : this.info
         this.usage = ev.payload?.usage ?? this.usage
 
+        // Another folder: another branch, maybe another PR.
+        if (this.info?.cwd && this.info.cwd !== cwd) {
+          this.prs.poke()
+        }
+
         break
+      }
 
       case 'session.usage': {
         // The shared owner sends its counters at the top level; older gateways nest them.
@@ -1002,6 +1013,8 @@ export class App implements OverlayHost {
         t.complete(ev.payload ?? {})
         this.busy = null
         this.#drainQueue()
+        // The turn may have pushed a branch or opened a PR.
+        this.prs.poke()
 
         break
 
