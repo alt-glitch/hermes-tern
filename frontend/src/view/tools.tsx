@@ -93,6 +93,39 @@ export function toolNode(call: ToolCall, now: number, place: ToolPlace = {}): JS
   )
 }
 
+/**
+ * What a step's line opens to in a work group: its card's body without the card (a command
+ * and its output, a diff, a file), and why it failed or stopped.
+ */
+export function toolDetail(call: ToolCall, now: number): JSX.Element[] {
+  const card = cardOf(call, now)
+  const body = [...card.body]
+  const command = call.name === 'terminal' ? (str(call.args.command) ?? call.context ?? '').trim() : ''
+
+  // A short command sat in the card's head, so its body lacks it.
+  if (command && command === commandLine(command)) {
+    body.unshift(<code key="cmd" lang="bash" max={{ h: '12lines' }} role="omp.tool.command" text={command} />)
+  }
+
+  const exit = call.name === 'terminal' && call.status !== 'running' && !isBackgroundCall(call) ? exitOf(call) : undefined
+
+  if (exit) {
+    body.push(<text key="exit" spans={[{ s: 'error', t: `exit ${exit}` }]} />)
+  }
+
+  const error = call.status === 'error' && !card.body.length ? errorOf(call) : undefined
+
+  if (error) {
+    body.push(<text key="err" role="omp.tool.error" spans={[{ s: 'error', t: error }]} wrap="word" />)
+  }
+
+  if (call.status === 'cancelled') {
+    body.push(<text key="cancelled" spans={[{ s: 'muted', t: `Interrupted by user after ${duration(call.duration ?? 0)}` }]} />)
+  }
+
+  return body
+}
+
 function cardOf(call: ToolCall, now: number): Card {
   const result = record(call.result)
 

@@ -1,18 +1,19 @@
 // Transcript entries as nodes of the `main` region, in the roles Tern's chat
 // styles (Reader, Spine, Console) are written against: `omp.user` cards,
-// `omp.assistant` columns holding `omp.thinking` sections, streamed `md` and
-// `tool` nodes, and an `omp.turn.usage` footer.
+// `omp.assistant` columns holding streamed `md`, work groups (workLog.tsx) and
+// `tool` cards, and an `omp.turn.usage` footer.
 
 import { type JSX, node } from '@stencil-hq/tern'
 
 import type { Block, Entry, NoticeEntry, TurnEntry, UserEntry } from '../model.js'
 import { steerState } from '../transcript.js'
+import { foldOf, pieces } from '../workLog.js'
 
-import { age, compact, duration } from './time.js'
-import { groupRuns, toolRunNode } from './toolRuns.js'
+import { compact, duration } from './time.js'
 import { slashBody } from './slash.js'
 import { toolNode } from './tools.js'
 import { type WelcomeContext, welcomeNode } from './welcome.js'
+import { foldNode, thinkingRow, workingNode, workNode } from './workLog.js'
 
 /** What entry views need from the app. */
 export interface TranscriptContext {
@@ -98,24 +99,36 @@ function userNode(e: UserEntry, cx: TranscriptContext): JSX.Element {
 
 function turnNode(turn: TurnEntry, id: string, cx: TranscriptContext): JSX.Element {
   const live = turn.status === 'live'
-  const lastText = turn.blocks.findLast(b => b.kind === 'text')
-  const children = groupRuns(turn.blocks).map(b =>
-    Array.isArray(b)
-      ? toolRunNode(b, id, cx.now, inner => blockNode(inner, `${id}.r${b[0]!.id}.${inner.id}`, false, cx))
-      : b.kind === 'steer'
-        ? steerNode(b, steerState(turn, turn.blocks.indexOf(b)))
-        : blockNode(b, `${id}.${b.id}`, live && b === lastText, cx)
-  )
+  const children: (JSX.Element | null)[] = []
 
   // A turn Hermes started by itself gets a quiet line saying why, so it does not read as part
   // of the answer above it.
   if (turn.continued) {
-    children.unshift(
+    children.push(
       <row align="center" gap="sm" key="continued" role="omp.turn.continued">
         <icon key="icon" name={continuedIcon(turn.continued)} />
         <text key="why" spans={[{ s: 'muted', t: turn.continued }]} />
       </row>
     )
+  }
+
+  if (live) {
+    children.push(workingNode(turn, cx.now))
+  }
+
+  // A finished turn shows its answer under "Worked for 54s"; the steps and notes before it fold.
+  const fold = foldOf(turn)
+
+  if (fold) {
+    children.push(foldNode(fold, id, pieceNodes(turn, turn.blocks.filter(b => fold.hidden.has(b.id)), `${id}.fold`, cx)))
+  }
+
+  children.push(...pieceNodes(turn, fold ? turn.blocks.filter(b => !fold.hidden.has(b.id)) : turn.blocks, id, cx))
+
+  const last = pieces(turn.blocks).at(-1)
+
+  if (live && (!last || (last.kind === 'block' && last.block.kind !== 'text'))) {
+    children.push(thinkingRow())
   }
 
   if (turn.status === 'error') {
@@ -158,24 +171,40 @@ function turnNode(turn: TurnEntry, id: string, cx: TranscriptContext): JSX.Eleme
   )
 }
 
-function blockNode(b: Block, id: string, streaming: boolean, cx: TranscriptContext): JSX.Element {
-  switch (b.kind) {
-    case 'text':
-      return (
-        <md key={b.id} stream={streaming || undefined}>
-          {b.text}
-        </md>
-      )
+/**
+ * `blocks` (some of the turn's) under the node `parent`, in order: text, steers and cards alone,
+ * the work between them grouped. While the turn runs, its last group is the live line.
+ */
+function pieceNodes(turn: TurnEntry, blocks: readonly Block[], parent: string, cx: TranscriptContext): (JSX.Element | null)[] {
+  const live = turn.status === 'live'
+  const ps = pieces(blocks)
+  const lastText = blocks.findLast(b => b.kind === 'text')
 
-    case 'tool':
-      return toolNode(b.call, cx.now)
+  return ps.map((p, i) => {
+    if (p.kind === 'work') {
+      return workNode(p.items, parent, live && i === ps.length - 1, cx.now)
+    }
 
-    case 'thinking':
-      return thinkingNode(b, id, cx)
+    const b = p.block
 
-    case 'steer':
-      return steerNode(b, 'landed')
-  }
+    switch (b.kind) {
+      case 'text':
+        return (
+          <md key={b.id} stream={(live && b === lastText) || undefined}>
+            {b.text}
+          </md>
+        )
+
+      case 'tool':
+        return toolNode(b.call, cx.now)
+
+      case 'steer':
+        return steerNode(b, steerState(turn, turn.blocks.indexOf(b)))
+
+      case 'thinking':
+        return null
+    }
+  })
 }
 
 /** The reason line's icon: agents, a background command, a watcher, or Hermes going on. */
@@ -198,38 +227,6 @@ function steerNode(b: Extract<Block, { kind: 'steer' }>, state: keyof typeof STE
   )
 }
 
-function thinkingNode(b: Extract<Block, { kind: 'thinking' }>, id: string, cx: TranscriptContext): JSX.Element {
-  const head = `${id}.head`
-
-  if (b.endedAt === undefined) {
-    return (
-      <section collapsed={false} collapsible head={head} key={b.id} role="omp.thinking.live">
-        <row gap="sm" key="head">
-          <spinner key="spin" role="omp.thinking.spin" style="starburst" />
-          <text key="label" spans={[{ s: 'muted', t: 'Thinking…' }]} />
-          <elapsed age={age(b, b.startedAt, cx.now)} format="short" key="age" />
-        </row>
-        <md key="body" stream>
-          {b.text}
-        </md>
-      </section>
-    )
-  }
-
-  const took = b.endedAt - b.startedAt
-
-  // `took` isn't a typed section prop: Tern reads it on `omp.thinking` to
-  // chain consecutive thoughts into one "Thought for Ns" disclosure.
-  return node(
-    'section',
-    { collapsed: true, collapsible: true, head, key: b.id, role: 'omp.thinking', took: took > 0 ? took : undefined },
-    [
-      <text key="head" spans={[{ s: 'muted', t: took >= 1000 ? `Thought for ${duration(took)}` : 'Thought' }]} />,
-      <md key="body">{b.text}</md>
-    ]
-  )
-}
-
 /**
  * A copy button as omp's: an `icon` in a role Tern draws as a 24px hover button (`omp.user.tool`
  * under a prompt, `omp.turn.copy` under an answer), a check for a moment after a click.
@@ -248,11 +245,11 @@ function copyButton(text: string, id: string, role: string, title: string, cx: T
   )
 }
 
-/** The answer's text blocks, as one Markdown document. */
+/** The answer: the turn's last text, the one its fold leaves in view (notes before it fold away). */
 function answerText(turn: TurnEntry): string {
-  return turn.blocks
-    .flatMap(b => (b.kind === 'text' && b.text.trim() ? [b.text.trim()] : []))
-    .join('\n\n')
+  const last = turn.blocks.findLast(b => b.kind === 'text' && b.text.trim())
+
+  return last?.kind === 'text' ? last.text.trim() : ''
 }
 
 function usageNode(turn: TurnEntry, answer: string, cx: TranscriptContext): JSX.Element {
