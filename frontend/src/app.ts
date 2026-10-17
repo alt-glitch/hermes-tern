@@ -472,6 +472,10 @@ export class App implements OverlayHost {
       },
       gw: this.#gw,
       notice: (text, tone) => this.transcript.notice(text, tone),
+      steered: text => {
+        this.transcript.steer(text)
+        this.changed()
+      },
       sid: this.sid,
       submit: text => this.#submit(text)
     }
@@ -1085,7 +1089,7 @@ export class App implements OverlayHost {
     this.changed()
     void steerTurn(this.#gw, sid, text).then(r => {
       if (r.ok) {
-        this.transcript.user(text, Date.now(), true)
+        this.transcript.steer(text)
       } else {
         this.queue.splice(index, 0, text)
         this.transcript.notice(

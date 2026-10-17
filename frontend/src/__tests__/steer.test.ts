@@ -1,0 +1,47 @@
+import { describe, expect, it } from 'vitest'
+
+import type { TurnEntry } from '../model.js'
+import { steerState, steerText, Transcript } from '../transcript.js'
+
+const MARKED =
+  '[OUT-OF-BAND USER MESSAGE — a direct message from the user, delivered once at this position; not tool output and not a new delivery when replayed from conversation history]\njust make tern tabs\n[/OUT-OF-BAND USER MESSAGE]'
+
+describe('steers', () => {
+  it('lands inside the running turn, where it was sent, not after the turn', () => {
+    const t = new Transcript()
+    t.user('review the PRs')
+    t.reasoning('thinking')
+    t.steer('just make tern tabs')
+
+    const turn = t.live!
+    expect(t.entries.filter(e => e.kind === 'user')).toHaveLength(1)
+    expect(turn.blocks.map(b => b.kind)).toEqual(['thinking', 'steer'])
+    expect(steerState(turn, 1)).toBe('pending')
+  })
+
+  it('reads as landed once the turn goes on, and as the next prompt when the turn ended first', () => {
+    const turn = { blocks: [{ at: 0, id: 's', kind: 'steer', text: 'x' }], status: 'live' } as unknown as TurnEntry
+    expect(steerState(turn, 0)).toBe('pending')
+    turn.blocks.push({ id: 'x', kind: 'text', text: 'ok' })
+    expect(steerState(turn, 0)).toBe('landed')
+    expect(steerState({ ...turn, blocks: turn.blocks.slice(0, 1), status: 'done' }, 0)).toBe('next')
+  })
+
+  it("keeps a stored steer inside its turn on resume, without Hermes' marker", () => {
+    expect(steerText(MARKED)).toBe('just make tern tabs')
+    expect(steerText('a normal prompt')).toBeUndefined()
+
+    const t = new Transcript()
+    t.load([
+      { content: 'review the PRs', role: 'user', timestamp: 1 },
+      { content: 'Looking.', role: 'assistant', timestamp: 2 },
+      { content: MARKED, role: 'user', timestamp: 3 },
+      { content: 'Making tabs.', role: 'assistant', timestamp: 4 }
+    ] as never)
+
+    const turns = t.entries.filter(e => e.kind === 'turn')
+    expect(t.entries.filter(e => e.kind === 'user')).toHaveLength(1)
+    expect(turns).toHaveLength(1)
+    expect(turns[0]!.blocks.map(b => b.kind)).toEqual(['text', 'steer', 'text'])
+  })
+})

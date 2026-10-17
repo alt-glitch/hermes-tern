@@ -16,6 +16,8 @@ export interface ControlHost {
   /** Puts `text` on the next-prompt queue. */
   enqueue(text: string): void
   notice(text: string, tone?: NoticeEntry['tone']): void
+  /** Shows a steer the running turn accepted, in that turn. */
+  steered?(text: string): void
 }
 
 export interface ControlCommand {
@@ -69,7 +71,7 @@ async function steer(host: ControlHost, text: string) {
   const r = await steerTurn(host.gw, host.sid, text)
 
   if (r.ok) {
-    return host.notice(`Steer queued for the active turn: ${preview(text)}`)
+    return host.steered ? host.steered(text) : host.notice(`Steer queued for the active turn: ${preview(text)}`)
   }
 
   if (r.error) {

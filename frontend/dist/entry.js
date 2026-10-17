@@ -24791,6 +24791,18 @@ var Transcript = class {
     this.entries.push(entry);
     this.#touch();
   }
+  /**
+   * A steer the gateway took for the running turn: it shows inside that turn, where it was sent,
+   * since the agent reads it before its next step. With no turn running it is a plain prompt.
+   */
+  steer(text2, at = Date.now()) {
+    const turn = this.live;
+    if (!turn) {
+      return this.user(text2, at);
+    }
+    turn.blocks.push({ at, id: this.id("s"), kind: "steer", text: text2 });
+    turn.rev++;
+  }
   user(text2, at = Date.now(), steered = false) {
     this.push({ at, id: this.id("u"), kind: "user", text: text2, ...steered ? { steered } : {} });
   }
@@ -25029,6 +25041,11 @@ var Transcript = class {
     for (const m of messages2) {
       const at = typeof m.timestamp === "number" ? m.timestamp * 1e3 : 0;
       const text2 = typeof m.text === "string" ? m.text : typeof m.content === "string" ? m.content : "";
+      const steered = m.role === "user" ? steerText(text2) : void 0;
+      if (steered !== void 0 && turn) {
+        turn.blocks.push({ at, id: this.id("s"), kind: "steer", text: steered });
+        continue;
+      }
       if (m.role === "user") {
         turn = void 0;
         if (ASYNC_DONE.test(text2)) {
@@ -25223,6 +25240,23 @@ function continuation(prev) {
     (b) => b.kind === "tool" && b.call.name === "delegate_task" && record(b.call.result)?.mode === "background"
   );
   return background ? "Subagents finished" : "Continued on its own";
+}
+var STEER_OPEN = "[OUT-OF-BAND USER MESSAGE";
+var STEER_CLOSE = "[/OUT-OF-BAND USER MESSAGE]";
+function steerText(content) {
+  const text2 = content.trim();
+  if (!text2.startsWith(STEER_OPEN)) {
+    return void 0;
+  }
+  const body = text2.slice(text2.indexOf("]") + 1);
+  const end = body.lastIndexOf(STEER_CLOSE);
+  return (end >= 0 ? body.slice(0, end) : body).trim();
+}
+function steerState(turn, index) {
+  if (turn.blocks.slice(index + 1).some((b) => b.kind !== "steer")) {
+    return "landed";
+  }
+  return turn.status === "live" ? "pending" : "next";
 }
 
 // src/agents/liveLog.ts
@@ -25691,7 +25725,7 @@ async function steer(host, text2) {
   }
   const r = await steerTurn(host.gw, host.sid, text2);
   if (r.ok) {
-    return host.notice(`Steer queued for the active turn: ${preview(text2)}`);
+    return host.steered ? host.steered(text2) : host.notice(`Steer queued for the active turn: ${preview(text2)}`);
   }
   if (r.error) {
     return host.notice(`/steer failed: ${r.error}`, "error");
@@ -29333,6 +29367,11 @@ var STYLES = css`
     padding-left: 34px !important;
   }
 
+  /* A steer's status under its words is a note, not code. */
+  [data-role='omp.user.steered'] {
+    font-family: var(--sans) !important;
+  }
+
   /* A turn Hermes started by itself: set apart from the answer above, like a new prompt is. */
   [data-role='omp.turn.continued'] {
     margin-top: 28px !important;
@@ -30718,15 +30757,14 @@ function userNode(e, cx) {
       ),
       copyButton(e.text, e.id, "omp.user.tool", "Copy message", cx)
     ] }, "tools"),
-    /* @__PURE__ */ jsx("md", { children: e.text }, "body"),
-    e.steered ? /* @__PURE__ */ jsx("text", { role: "omp.user.steered", spans: [{ s: "dim", t: "\u21B3 steered" }] }, "steered") : null
+    /* @__PURE__ */ jsx("md", { children: e.text }, "body")
   ] }, e.id);
 }
 function turnNode(turn, id, cx) {
   const live = turn.status === "live";
   const lastText = turn.blocks.findLast((b) => b.kind === "text");
   const children2 = groupRuns(turn.blocks).map(
-    (b) => Array.isArray(b) ? toolRunNode(b, id, cx.now, (inner) => blockNode(inner, `${id}.r${b[0].id}.${inner.id}`, false, cx)) : blockNode(b, `${id}.${b.id}`, live && b === lastText, cx)
+    (b) => Array.isArray(b) ? toolRunNode(b, id, cx.now, (inner) => blockNode(inner, `${id}.r${b[0].id}.${inner.id}`, false, cx)) : b.kind === "steer" ? steerNode(b, steerState(turn, turn.blocks.indexOf(b))) : blockNode(b, `${id}.${b.id}`, live && b === lastText, cx)
   );
   if (turn.continued) {
     children2.unshift(
@@ -30778,7 +30816,19 @@ function blockNode(b, id, streaming, cx) {
       return toolNode(b.call, cx.now);
     case "thinking":
       return thinkingNode(b, id, cx);
+    case "steer":
+      return steerNode(b, "landed");
   }
+}
+var STEER_NOTE = { landed: "", next: " \xB7 sent as the next prompt", pending: " \xB7 reaches Hermes after this step" };
+function steerNode(b, state) {
+  return /* @__PURE__ */ jsxs("card", { role: "omp.user", tone: "user", children: [
+    /* @__PURE__ */ jsx("md", { children: b.text }, "body"),
+    /* @__PURE__ */ jsxs("row", { align: "center", gap: "xs", role: "omp.user.steered", children: [
+      /* @__PURE__ */ jsx("icon", { name: "corner-down-right" }, "icon"),
+      /* @__PURE__ */ jsx("text", { spans: [{ s: "dim", t: `Steered${STEER_NOTE[state]}` }] }, "state")
+    ] }, "how")
+  ] }, b.id);
 }
 function thinkingNode(b, id, cx) {
   const head2 = `${id}.head`;
@@ -31230,6 +31280,10 @@ var App = class {
       },
       gw: this.#gw,
       notice: (text2, tone) => this.transcript.notice(text2, tone),
+      steered: (text2) => {
+        this.transcript.steer(text2);
+        this.changed();
+      },
       sid: this.sid,
       submit: (text2) => this.#submit(text2)
     };
@@ -31671,7 +31725,7 @@ ${this.composer.text}` : next);
     this.changed();
     void steerTurn(this.#gw, sid, text2).then((r) => {
       if (r.ok) {
-        this.transcript.user(text2, Date.now(), true);
+        this.transcript.steer(text2);
       } else {
         this.queue.splice(index, 0, text2);
         this.transcript.notice(
