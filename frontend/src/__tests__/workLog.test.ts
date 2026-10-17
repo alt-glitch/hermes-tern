@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import type { Block, ToolCall, TurnEntry } from '../model.js'
-import { foldOf, formatDuration, liveLabel, pieces, stepLabel, summarize, thoughtLine, type WorkItem } from '../workLog.js'
+import { foldOf, formatDuration, liveLabel, parts, pieces, stepLabel, summarize, thoughtLine, type WorkItem } from '../workLog.js'
 
 const call = (name: string, args: Record<string, unknown> = {}, more: Partial<ToolCall> = {}): ToolCall => ({
   args,
@@ -111,6 +111,32 @@ describe('foldOf', () => {
     const agents = tool('d', call('delegate_task', {}, { subagents: [{ calls: 0, goal: 'g', id: 'x', index: 0, startedAt: 0, status: 'running', tokens: 0, toolCount: 0 }] }))
 
     expect([...(foldOf(turn([bg, agents, tool('a', call('terminal')), text('answer')]))?.hidden ?? [])]).toEqual(['a'])
+  })
+})
+
+describe('parts', () => {
+  const steer = (id: string, at: number): Block => ({ at, id, kind: 'steer', text: 'also check the tests' })
+
+  it('keeps a steer in view and folds each stretch around it by its own time', () => {
+    const t = turn([tool('a', call('terminal')), steer('s', 20_000), tool('b', call('terminal')), text('answer')])
+
+    expect(parts(t).map(p => (p.kind === 'fold' ? `${p.label}: ${p.blocks.map(b => b.id)}` : p.blocks.map(b => b.id).join()))).toEqual([
+      'Worked for 20s: a',
+      's',
+      'Worked for 34s: b',
+      'answer'
+    ])
+  })
+
+  it('shows a background card after its stretch fold, not between two folds', () => {
+    const bg = tool('bg', call('terminal', { background: true, command: 'sleep 9' }))
+    const t = turn([tool('a', call('terminal')), bg, tool('b', call('terminal')), text('answer')])
+
+    expect(parts(t).map(p => p.kind + ':' + p.blocks.map(b => b.id).join())).toEqual(['fold:a,b', 'shown:bg,answer'])
+  })
+
+  it('is one shown part when the turn does not fold', () => {
+    expect(parts(turn([text('answer')]))).toEqual([{ blocks: [text('answer')], kind: 'shown' }])
   })
 })
 

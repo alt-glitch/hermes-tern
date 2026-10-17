@@ -77,7 +77,8 @@ export function foldOf(turn: TurnEntry): Fold | undefined {
   const hidden = new Set<string>()
 
   for (const [i, b] of turn.blocks.entries()) {
-    if (i === answer) {
+    // The answer stays, and so do the user's own words: a steer is never folded away.
+    if (i === answer || b.kind === 'steer') {
       continue
     }
 
@@ -98,7 +99,65 @@ export function foldOf(turn: TurnEntry): Fold | undefined {
 
   const ms = (turn.endedAt ?? turn.startedAt) - turn.startedAt
 
-  return { hidden, label: ms > 0 ? `Worked for ${formatDuration(ms)}` : 'Worked' }
+  return { hidden, label: workedFor(ms) }
+}
+
+const workedFor = (ms: number) => (ms > 0 ? `Worked for ${formatDuration(ms)}` : 'Worked')
+
+/** A turn in reading order: folds ("Worked for 20s") and the blocks that stay in view. */
+export type Part = { blocks: Block[]; key: string; kind: 'fold'; label: string } | { blocks: Block[]; kind: 'shown' }
+
+/**
+ * A turn as it reads once finished. Its steers split it, as a new prompt splits t3code's runs:
+ * each stretch folds behind how long it took (from the steer before it, or the turn's start, to
+ * the steer after it, or the end), what stays in view follows its fold, then the steer itself.
+ * A turn that does not fold is one shown part.
+ */
+export function parts(turn: TurnEntry): Part[] {
+  const fold = foldOf(turn)
+
+  if (!fold) {
+    return [{ blocks: [...turn.blocks], kind: 'shown' }]
+  }
+
+  const out: Part[] = []
+  const show = (b: Block) => {
+    const last = out.at(-1)
+
+    if (last?.kind === 'shown') {
+      last.blocks.push(b)
+    } else {
+      out.push({ blocks: [b], kind: 'shown' })
+    }
+  }
+
+  let stretch: Block[] = []
+  let from = turn.startedAt
+
+  const flush = (to: number) => {
+    const hidden = stretch.filter(b => fold.hidden.has(b.id))
+
+    if (hidden.length) {
+      out.push({ blocks: hidden, key: `fold${hidden[0]!.id}`, kind: 'fold', label: workedFor(to - from) })
+    }
+
+    stretch.filter(b => !fold.hidden.has(b.id)).forEach(show)
+    stretch = []
+  }
+
+  for (const b of turn.blocks) {
+    if (b.kind === 'steer') {
+      flush(b.at)
+      show(b)
+      from = b.at
+    } else {
+      stretch.push(b)
+    }
+  }
+
+  flush(turn.endedAt ?? from)
+
+  return out
 }
 
 /** t3code's `formatDuration` (packages/shared/src/orchestrationTiming.ts): 820ms, 4.3s, 42s, 1m 2s. */

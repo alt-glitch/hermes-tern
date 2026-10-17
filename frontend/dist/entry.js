@@ -18938,13 +18938,13 @@ function chunks(body, limit) {
   }
   return out;
 }
-function concatBytes(parts) {
+function concatBytes(parts2) {
   let size = 0;
-  for (const part of parts)
+  for (const part of parts2)
     size += part.length;
   const out = new Uint8Array(size);
   let at = 0;
-  for (const part of parts) {
+  for (const part of parts2) {
     out.set(part, at);
     at += part.length;
   }
@@ -19793,9 +19793,9 @@ var Node = class {
 var FragmentNode = class extends Node {
   /** The children, strings and spans kept for text kinds. */
   parts;
-  constructor(parts, props = {}) {
+  constructor(parts2, props = {}) {
     super("#fragment", props, []);
-    this.parts = parts;
+    this.parts = parts2;
   }
 };
 var Span = class {
@@ -19973,7 +19973,7 @@ function textProps(run2) {
     return { text: run2.join("") };
   return { spans: run2.map((part) => typeof part === "string" ? part : toJson(part) ?? null) };
 }
-function containerChildren(parts) {
+function containerChildren(parts2) {
   const out = [];
   let run2 = [];
   const end = () => {
@@ -19981,7 +19981,7 @@ function containerChildren(parts) {
       out.push(new Node("text", textProps(run2)));
     run2 = [];
   };
-  for (const part of parts) {
+  for (const part of parts2) {
     if (part instanceof Node) {
       end();
       out.push(part);
@@ -20010,11 +20010,11 @@ function createNode(kind, input, children2) {
         props[key2] = json;
     }
   }
-  const parts = flatten([fromProps, children2]);
+  const parts2 = flatten([fromProps, children2]);
   let nodes = [];
   if (SPAN_TEXT[kind] || PLAIN_TEXT[kind]) {
     const run2 = [];
-    for (const part of parts) {
+    for (const part of parts2) {
       if (part instanceof Node && kind === "seg")
         nodes.push(part);
       else if (part instanceof Node || part instanceof Span && PLAIN_TEXT[kind]) {
@@ -20026,7 +20026,7 @@ function createNode(kind, input, children2) {
       Object.assign(props, textProps(run2));
   } else if (kind === "el") {
     let text2 = "";
-    for (const part of parts) {
+    for (const part of parts2) {
       if (part instanceof Span)
         throw new TypeError("el takes no spans; use html.span");
       if (typeof part === "string") {
@@ -20041,7 +20041,7 @@ function createNode(kind, input, children2) {
     if (text2 !== "")
       props["text"] = text2;
   } else {
-    nodes = containerChildren(parts);
+    nodes = containerChildren(parts2);
   }
   const any = Object.keys(handlers).length > 0;
   if (any)
@@ -22379,7 +22379,7 @@ var libTextEn = {
       /** {0} = count */
       migratedOther: (count) => `migrated ${count} legacy bindings to CSI u encoding`,
       /** {0} = comma-joined summary parts, {1} = keybindings.json path */
-      summaryIn: (parts, file2) => `${parts} in ${file2}`,
+      summaryIn: (parts2, file2) => `${parts2} in ${file2}`,
       /** {0} = IDE label, {1} = error text */
       configureFailed: (label, error) => `Failed to configure ${label} terminal shortcuts: ${error}`,
       noSupportedIde: "No supported IDE terminal detected. Supported: VS Code, Cursor, Windsurf."
@@ -22931,7 +22931,7 @@ var slashCmdCoreEn = {
     widgetsReload: {
       loaded: (names) => `loaded: ${names}`,
       none: "no user widgets found",
-      summary: (parts) => `widgets \u2014 ${parts}`
+      summary: (parts2) => `widgets \u2014 ${parts2}`
     },
     heapdump: {
       // {0}=heap size, {1}=rss size (pre-formatted)
@@ -25717,19 +25717,19 @@ async function mutateSession(gw2, sid, operation, payload) {
   return result;
 }
 function modelPayload(arg) {
-  const parts = arg.trim().split(/\s+/);
-  const model = parts.shift() ?? "";
+  const parts2 = arg.trim().split(/\s+/);
+  const model = parts2.shift() ?? "";
   if (!model || model.startsWith("--")) {
     throw new Error("Usage: /model <name> [--provider <slug>]");
   }
   const payload = { model };
-  while (parts.length) {
-    const flag = parts.shift();
+  while (parts2.length) {
+    const flag = parts2.shift();
     if (flag === "--session" || flag === "--tui-session") {
       continue;
     }
-    if (flag === "--provider" && parts[0] && !parts[0].startsWith("--")) {
-      payload.provider = parts.shift();
+    if (flag === "--provider" && parts2[0] && !parts2[0].startsWith("--")) {
+      payload.provider = parts2.shift();
       continue;
     }
     throw new Error(`/model: ${flag} is not supported here (the switch applies to this session)`);
@@ -27435,13 +27435,13 @@ function openAgents(app, focus) {
 }
 function summary(all) {
   const count = (s) => all.filter((a) => a.status === s).length;
-  const parts = [
+  const parts2 = [
     [count("running") + count("queued"), "running"],
     [count("done"), "done"],
     [count("failed"), "failed"],
     [count("cancelled"), "stopped"]
   ];
-  return parts.filter(([n]) => n).map(([n, label]) => `${n} ${label}`).join(" \xB7 ") || "none yet";
+  return parts2.filter(([n]) => n).map(([n, label]) => `${n} ${label}`).join(" \xB7 ") || "none yet";
 }
 function elapsed(a, now) {
   return duration(isRunning(a) ? now - a.startedAt : a.duration ?? 0);
@@ -27787,13 +27787,13 @@ function callOf(app, id) {
 }
 function summary2(all) {
   const count = (s) => all.filter((p) => p.status === s).length;
-  const parts = [
+  const parts2 = [
     [count("running"), "running"],
     [count("done"), "exited"],
     [count("failed"), "failed"],
     [count("killed") + count("lost"), "stopped"]
   ];
-  return parts.filter(([n]) => n).map(([n, label]) => `${n} ${label}`).join(" \xB7 ") || "none yet";
+  return parts2.filter(([n]) => n).map(([n, label]) => `${n} ${label}`).join(" \xB7 ") || "none yet";
 }
 function item(p, now, stopping) {
   return {
@@ -32324,7 +32324,7 @@ function foldOf(turn) {
   const answer = turn.blocks.findLastIndex((b) => b.kind === "text" && b.text.trim());
   const hidden = /* @__PURE__ */ new Set();
   for (const [i, b] of turn.blocks.entries()) {
-    if (i === answer) {
+    if (i === answer || b.kind === "steer") {
       continue;
     }
     if (b.kind === "tool" && (isBackgroundCall(b.call) || b.call.subagents?.some((a) => a.status === "running" || a.status === "queued"))) {
@@ -32339,7 +32339,44 @@ function foldOf(turn) {
     return void 0;
   }
   const ms = (turn.endedAt ?? turn.startedAt) - turn.startedAt;
-  return { hidden, label: ms > 0 ? `Worked for ${formatDuration(ms)}` : "Worked" };
+  return { hidden, label: workedFor(ms) };
+}
+var workedFor = (ms) => ms > 0 ? `Worked for ${formatDuration(ms)}` : "Worked";
+function parts(turn) {
+  const fold = foldOf(turn);
+  if (!fold) {
+    return [{ blocks: [...turn.blocks], kind: "shown" }];
+  }
+  const out = [];
+  const show = (b) => {
+    const last = out.at(-1);
+    if (last?.kind === "shown") {
+      last.blocks.push(b);
+    } else {
+      out.push({ blocks: [b], kind: "shown" });
+    }
+  };
+  let stretch = [];
+  let from = turn.startedAt;
+  const flush = (to) => {
+    const hidden = stretch.filter((b) => fold.hidden.has(b.id));
+    if (hidden.length) {
+      out.push({ blocks: hidden, key: `fold${hidden[0].id}`, kind: "fold", label: workedFor(to - from) });
+    }
+    stretch.filter((b) => !fold.hidden.has(b.id)).forEach(show);
+    stretch = [];
+  };
+  for (const b of turn.blocks) {
+    if (b.kind === "steer") {
+      flush(b.at);
+      show(b);
+      from = b.at;
+    } else {
+      stretch.push(b);
+    }
+  }
+  flush(turn.endedAt ?? from);
+  return out;
 }
 function formatDuration(ms) {
   if (!Number.isFinite(ms) || ms < 0) {
@@ -32902,9 +32939,9 @@ function thinkingRow() {
     /* @__PURE__ */ jsx("text", { grow: 1, spans: [{ fx: "shimmer", s: "muted", t: "Thinking" }], wrap: "none" }, "label")
   ] }, "thinking");
 }
-function foldNode(fold, id, children2) {
-  return node("section", { collapsed: true, collapsible: true, head: `${id}.fold.head`, key: "fold", role: "hermes.turn.fold" }, [
-    /* @__PURE__ */ jsx("row", { align: "center", gap: "xs", children: /* @__PURE__ */ jsx("text", { spans: [{ s: "muted", t: fold.label }], wrap: "none" }, "label") }, "head"),
+function foldNode(part, id, children2) {
+  return node("section", { collapsed: true, collapsible: true, head: `${id}.head`, key: part.key, role: "hermes.turn.fold" }, [
+    /* @__PURE__ */ jsx("row", { align: "center", gap: "xs", children: /* @__PURE__ */ jsx("text", { spans: [{ s: "muted", t: part.label }], wrap: "none" }, "label") }, "head"),
     ...children2
   ]);
 }
@@ -33036,11 +33073,11 @@ function turnNode(turn, id, cx) {
   if (live) {
     children2.push(workingNode2(turn, cx.now));
   }
-  const fold = foldOf(turn);
-  if (fold) {
-    children2.push(foldNode(fold, id, pieceNodes(turn, turn.blocks.filter((b) => fold.hidden.has(b.id)), `${id}.fold`, cx)));
+  for (const part of parts(turn)) {
+    children2.push(
+      ...part.kind === "fold" ? [foldNode(part, `${id}.${part.key}`, pieceNodes(turn, part.blocks, `${id}.${part.key}`, cx))] : pieceNodes(turn, part.blocks, id, cx)
+    );
   }
-  children2.push(...pieceNodes(turn, fold ? turn.blocks.filter((b) => !fold.hidden.has(b.id)) : turn.blocks, id, cx));
   const last = pieces(turn.blocks).at(-1);
   if (live && (!last || last.kind === "block" && last.block.kind !== "text")) {
     children2.push(thinkingRow());
