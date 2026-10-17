@@ -46,7 +46,9 @@ prove it.
 | #17 | A steer shows inside the turn it joined, where it landed |
 | #18 | Background processes: pill, sheet and live terminal cards |
 | #19 | Hermes' own notices become a reason line, not a user bubble |
-| next | The work log as t3code draws it: "Working for", work groups, thought rows, "Worked for" folds |
+| #20 | The work log as t3code draws it: "Working for", work groups, thought rows, "Worked for" folds |
+| #21 | A steer stays in view; each stretch around it folds on its own |
+| next | Live process output; the Background sheet's Cron tab (every cron job and monitor: pause, resume, remove) |
 
 ## Milestones
 

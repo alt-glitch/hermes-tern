@@ -4,6 +4,7 @@
 // schedules one render of the whole view; the SDK diffs it into frame ops.
 
 import { randomUUID } from 'node:crypto'
+import { appendFileSync } from 'node:fs'
 
 import type {
   SessionLiveInfo,
@@ -41,6 +42,7 @@ import { openModelPicker } from './overlays/models.js'
 import { promptOverlay } from './overlays/prompts.js'
 import { STYLES } from './view/styles.js'
 import { paletteFor } from './palette.js'
+import { Cron } from './processes/cron.js'
 import { isRunning as processRuns, Processes, processTone } from './processes/store.js'
 import { loadSettings, saveSettings, type ThemeMode } from './settings.js'
 import { Transcript } from './transcript.js'
@@ -77,6 +79,7 @@ export class App implements OverlayHost {
   readonly agents: Agents = new Agents(this)
   /** The session's background processes (the shells pill, the Background sheet, background cards). */
   readonly processes: Processes = new Processes(this)
+  readonly cron: Cron = new Cron(this)
   readonly composer = new Composer()
   readonly overlays: Overlay[] = []
   sid: string | null = null
@@ -149,7 +152,16 @@ export class App implements OverlayHost {
       this.queue.push(query || 'What do you see in this image?')
     }
 
-    this.#gw.on('event', (ev: AnyGatewayEvent) => this.#onGatewayEvent(ev))
+    const log = process.env.HERMES_TERN_EVENT_LOG
+
+    this.#gw.on('event', (ev: AnyGatewayEvent) => {
+      // Development: every gateway event, one JSON line each, for the lab.
+      if (log) {
+        appendFileSync(log, `${JSON.stringify(ev)}\n`)
+      }
+
+      this.#onGatewayEvent(ev)
+    })
     this.#gw.on('request', (req: ServerRequest) => this.#onRequest(req))
     this.#gw.on('exit', (code: null | number) => {
       this.transcript.notice(`The agent backend exited${code === null ? '' : ` (${code})`}.`, 'error')
@@ -934,6 +946,13 @@ export class App implements OverlayHost {
         }
 
         break
+
+      case 'agent.terminal.output':
+        if (ev.payload?.process_id) {
+          this.processes.output(ev.payload.process_id, ev.payload.chunk ?? '')
+        }
+
+        return
 
       case 'todo.updated':
         t.todos(ev.payload?.todos ?? [])

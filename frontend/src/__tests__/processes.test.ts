@@ -154,4 +154,25 @@ describe('Processes', () => {
     expect(store.all().map(p => p.id)).toEqual(['proc_a'])
     store.dispose()
   })
+
+  it('adds printed output to its process as it arrives, and polls for a process it does not know', async () => {
+    vi.useFakeTimers({ now: NOW })
+    const transcript = new Transcript()
+    const rows: ProcessEntry[] = [{ command: 'sleep 90', output_tail: 'tick 1\n', session_id: 'proc_a', status: 'running' }]
+    const request = vi.fn(async () => ({ processes: rows }))
+    const store = new Processes({ changed: vi.fn(), gw: { request } as unknown as Pick<GatewayClient, 'request'>, sid: 's1', transcript })
+
+    store.poke()
+    await vi.advanceTimersByTimeAsync(0)
+    store.output('proc_a', 'tick 2\n')
+
+    expect(store.get('proc_a')?.output).toBe('tick 1\ntick 2\n')
+    expect(store.get('proc_a')?.lastLine).toBe('tick 2')
+
+    request.mockClear()
+    store.output('proc_new', 'hello\n')
+    await vi.advanceTimersByTimeAsync(0)
+    expect(request).toHaveBeenCalledWith('process.list', { session_id: 's1' })
+    store.dispose()
+  })
 })
