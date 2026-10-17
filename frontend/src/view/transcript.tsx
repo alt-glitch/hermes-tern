@@ -7,7 +7,7 @@ import { type JSX, node } from '@stencil-hq/tern'
 
 import type { Block, Entry, NoticeEntry, TurnEntry, UserEntry } from '../model.js'
 import { steerState } from '../transcript.js'
-import { foldOf, pieces } from '../workLog.js'
+import { parts, pieces } from '../workLog.js'
 
 import { compact, duration } from './time.js'
 import { slashBody } from './slash.js'
@@ -116,14 +116,15 @@ function turnNode(turn: TurnEntry, id: string, cx: TranscriptContext): JSX.Eleme
     children.push(workingNode(turn, cx.now))
   }
 
-  // A finished turn shows its answer under "Worked for 54s"; the steps and notes before it fold.
-  const fold = foldOf(turn)
-
-  if (fold) {
-    children.push(foldNode(fold, id, pieceNodes(turn, turn.blocks.filter(b => fold.hidden.has(b.id)), `${id}.fold`, cx)))
+  // A finished turn shows its answer (and the user's steers) under "Worked for 54s"; the steps
+  // and notes before them fold.
+  for (const part of parts(turn)) {
+    children.push(
+      ...(part.kind === 'fold'
+        ? [foldNode(part, `${id}.${part.key}`, pieceNodes(turn, part.blocks, `${id}.${part.key}`, cx))]
+        : pieceNodes(turn, part.blocks, id, cx))
+    )
   }
-
-  children.push(...pieceNodes(turn, fold ? turn.blocks.filter(b => !fold.hidden.has(b.id)) : turn.blocks, id, cx))
 
   const last = pieces(turn.blocks).at(-1)
 

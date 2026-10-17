@@ -11,9 +11,9 @@ import {
   actionIcon,
   actionOf,
   clock,
-  type Fold,
   groupIcon,
   liveLabel,
+  type Part,
   stepLabel,
   summarize,
   thoughtLine,
@@ -44,11 +44,11 @@ export function thinkingRow(): JSX.Element {
   )
 }
 
-/** "Worked for 54s": the finished turn's steps and notes, folded until a click. */
-export function foldNode(fold: Fold, id: string, children: (JSX.Element | null)[]): JSX.Element {
-  return node('section', { collapsed: true, collapsible: true, head: `${id}.fold.head`, key: 'fold', role: 'hermes.turn.fold' }, [
+/** "Worked for 54s": a finished stretch of the turn's steps and notes, folded until a click; `id` is its node id. */
+export function foldNode(part: Extract<Part, { kind: 'fold' }>, id: string, children: (JSX.Element | null)[]): JSX.Element {
+  return node('section', { collapsed: true, collapsible: true, head: `${id}.head`, key: part.key, role: 'hermes.turn.fold' }, [
     <row align="center" gap="xs" key="head">
-      <text key="label" spans={[{ s: 'muted', t: fold.label }]} wrap="none" />
+      <text key="label" spans={[{ s: 'muted', t: part.label }]} wrap="none" />
     </row>,
     ...children
   ])
