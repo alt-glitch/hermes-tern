@@ -35278,7 +35278,7 @@ ${compact(ctx.used)} of ${compact(ctx.max)} tokens
         },
         "effort"
       ) : null,
-      /* @__PURE__ */ jsx("row", { grow: 1 }, "fill"),
+      /* @__PURE__ */ jsx("status", { grow: 1, role: "omp.composer.extras", transparent: true }, "extras"),
       cx.busy ? /* @__PURE__ */ jsx(
         "text",
         {
@@ -36262,6 +36262,46 @@ var App = class {
     }
     return out.consumed;
   }
+  /**
+   * The session's name, on the status strip and on Tern's tab: OSC 2 names the pane, and the tab
+   * follows it (the surface's own `hermes` title stands only until a program sets one).
+   */
+  #titleTimer;
+  /**
+   * Reads the session's title from the session list, a moment after the list changed: the shared
+   * gateway tells viewers only that (`sessions.changed`) when /title or the auto-titler names it,
+   * and serves no `session.title`. The session is among the newest rows; its stored id finds it.
+   */
+  #readTitle() {
+    clearTimeout(this.#titleTimer);
+    this.#titleTimer = setTimeout(() => void this.#fetchTitle(), 400);
+  }
+  async #fetchTitle() {
+    const sid = this.sid;
+    const ids = new Set([sid, this.storedSid].filter(Boolean));
+    if (!sid) {
+      return;
+    }
+    try {
+      const r = await this.#gw.request("session.list", {
+        limit: 20
+      });
+      const row = r?.sessions?.find((x) => ids.has(x.id ?? "") || ids.has(x.resolved_id ?? ""));
+      if (sid === this.sid && this.#setTitle(row?.title)) {
+        this.changed();
+      }
+    } catch {
+    }
+  }
+  #setTitle(title) {
+    const next2 = title?.trim();
+    if (!next2 || next2 === this.title) {
+      return false;
+    }
+    this.title = next2;
+    process.stdout.write(`\x1B]2;${next2.replace(/[\x00-\x1f]/g, " ")}\x07`);
+    return true;
+  }
   /** Opens or closes the session sidebar (Tern's aside); says why where Tern has none. */
   toggleSidebar() {
     if (!this.#tern.caps.features.includes("aside")) {
@@ -36546,6 +36586,9 @@ var App = class {
     writeActiveSessionFile(this.storedSid ?? r.session_id);
     this.info = r.info ?? this.info;
     this.usage = r.info?.usage ?? null;
+    this.title = "";
+    this.#setTitle(typeof r.info?.title === "string" ? r.info.title : void 0);
+    this.#readTitle();
     this.busy = busyFrom(r);
     this.transcript.usageBase(r.info?.usage ?? void 0);
     if (r.messages?.length) {
@@ -36645,6 +36688,7 @@ var App = class {
         const cwd = this.info?.cwd;
         this.info = ev.payload ? { ...this.info, ...ev.payload } : this.info;
         this.usage = ev.payload?.usage ?? this.usage;
+        this.#setTitle(typeof ev.payload?.title === "string" ? ev.payload.title : void 0);
         if (this.info?.cwd && this.info.cwd !== cwd) {
           this.prs.poke();
         }
@@ -36665,11 +36709,12 @@ var App = class {
         break;
       }
       case "session.title":
-        this.title = ev.payload?.title || this.title;
-        if (ev.payload?.title) {
-          process.stdout.write(`\x1B]2;${ev.payload.title.replace(/[\x00-\x1f]/g, " ")}\x07`);
-        }
+        this.#setTitle(ev.payload?.title);
         break;
+      // A title set by /title or Hermes' auto-titler reaches viewers only as a changed session list.
+      case "sessions.changed":
+        this.#readTitle();
+        return;
       case "message.start":
         if (!this.busy) {
           this.#startBusy("Working\u2026");

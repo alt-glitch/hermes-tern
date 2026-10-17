@@ -452,7 +452,9 @@ function composerNode(cx: DockContext): JSX.Element {
             <text key="level" text={effortLabel(cx.effort)} wrap="none" />
           </row>
         ) : null}
-        <row grow={1} key="fill" />
+        {/* Tern puts its folder chip right before the composer's status node: an empty one keeps
+            the chip there and the send key at the end. */}
+        <status grow={1} key="extras" role="omp.composer.extras" transparent />
         {cx.busy ? (
           <text
             key="stop"

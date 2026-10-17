@@ -403,6 +403,58 @@ export class App implements OverlayHost {
     return out.consumed
   }
 
+  /**
+   * The session's name, on the status strip and on Tern's tab: OSC 2 names the pane, and the tab
+   * follows it (the surface's own `hermes` title stands only until a program sets one).
+   */
+  #titleTimer: NodeJS.Timeout | undefined
+
+  /**
+   * Reads the session's title from the session list, a moment after the list changed: the shared
+   * gateway tells viewers only that (`sessions.changed`) when /title or the auto-titler names it,
+   * and serves no `session.title`. The session is among the newest rows; its stored id finds it.
+   */
+  #readTitle() {
+    clearTimeout(this.#titleTimer)
+    this.#titleTimer = setTimeout(() => void this.#fetchTitle(), 400)
+  }
+
+  async #fetchTitle() {
+    const sid = this.sid
+    const ids = new Set([sid, this.storedSid].filter(Boolean))
+
+    if (!sid) {
+      return
+    }
+
+    try {
+      const r = await this.#gw.request<{ sessions?: { id?: string; resolved_id?: string | null; title?: string }[] }>('session.list', {
+        limit: 20
+      })
+      const row = r?.sessions?.find(x => ids.has(x.id ?? '') || ids.has(x.resolved_id ?? ''))
+
+      if (sid === this.sid && this.#setTitle(row?.title)) {
+        this.changed()
+      }
+    } catch {
+      // No session list: the title still arrives with session.info.
+    }
+  }
+
+  #setTitle(title: string | undefined): boolean {
+    const next = title?.trim()
+
+    if (!next || next === this.title) {
+      return false
+    }
+
+    this.title = next
+    // eslint-disable-next-line no-control-regex -- a title must not end the OSC early
+    process.stdout.write(`\x1b]2;${next.replace(/[\x00-\x1f]/g, ' ')}\x07`)
+
+    return true
+  }
+
   /** Opens or closes the session sidebar (Tern's aside); says why where Tern has none. */
   toggleSidebar() {
     if (!this.#tern.caps.features.includes('aside')) {
@@ -771,6 +823,10 @@ export class App implements OverlayHost {
     writeActiveSessionFile(this.storedSid ?? r.session_id)
     this.info = r.info ?? this.info
     this.usage = r.info?.usage ?? null
+    // Another session: its own name (or none yet) on the tab.
+    this.title = ''
+    this.#setTitle(typeof r.info?.title === 'string' ? r.info.title : undefined)
+    this.#readTitle()
     // A resumed session may be mid-turn: Esc stops it and new prompts queue behind it.
     this.busy = busyFrom(r)
     this.transcript.usageBase(r.info?.usage ?? undefined)
@@ -916,6 +972,7 @@ export class App implements OverlayHost {
         // The shared owner's idle fanout carries only pending/revision/generation: merge, never replace.
         this.info = ev.payload ? { ...this.info, ...ev.payload } : this.info
         this.usage = ev.payload?.usage ?? this.usage
+        this.#setTitle(typeof ev.payload?.title === 'string' ? ev.payload.title : undefined)
 
         // Another folder: another branch, maybe another PR.
         if (this.info?.cwd && this.info.cwd !== cwd) {
@@ -944,14 +1001,16 @@ export class App implements OverlayHost {
       }
 
       case 'session.title':
-        this.title = ev.payload?.title || this.title
-
-        if (ev.payload?.title) {
-          // eslint-disable-next-line no-control-regex -- a title must not end the OSC early
-          process.stdout.write(`\x1b]2;${ev.payload.title.replace(/[\x00-\x1f]/g, ' ')}\x07`)
-        }
+        this.#setTitle(ev.payload?.title)
 
         break
+
+      // A title set by /title or Hermes' auto-titler reaches viewers only as a changed session list.
+      case 'sessions.changed':
+        this.#readTitle()
+
+        return
+
 
       case 'message.start':
         if (!this.busy) {
