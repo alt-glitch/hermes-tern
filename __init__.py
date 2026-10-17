@@ -9,7 +9,6 @@ handshake; the Ink TUI then runs in its place.
 
 import argparse
 import os
-import subprocess
 import sys
 from pathlib import Path
 
@@ -38,14 +37,28 @@ def _setup(parser: argparse.ArgumentParser) -> None:
     parser.parse_known_args = passthrough
 
 
-def _wait(argv: list[str], env: dict) -> int:
-    proc = subprocess.Popen(argv, env=env)
-    while True:
-        try:
-            return proc.wait()
-        except KeyboardInterrupt:
-            # The TUI owns Ctrl-C in raw mode; a stray SIGINT must not orphan it.
-            continue
+def _chat(flags: list[str], tui_dir: str | None) -> int:
+    """``hermes chat --tui FLAGS`` in this process: a second interpreter would boot Hermes again
+    (bootstrap, the PM check, imports), which is most of what ``hermes tern`` spends starting."""
+    from hermes_cli.main import main
+
+    argv, saved = sys.argv, os.environ.get("HERMES_TUI_DIR")
+    sys.argv = [argv[0], "chat", "--tui", *flags]
+    if tui_dir:
+        os.environ["HERMES_TUI_DIR"] = tui_dir
+    else:
+        os.environ.pop("HERMES_TUI_DIR", None)
+    try:
+        code = main()
+    except SystemExit as done:
+        code = done.code
+    finally:
+        sys.argv = argv
+        if saved is None:
+            os.environ.pop("HERMES_TUI_DIR", None)
+        else:
+            os.environ["HERMES_TUI_DIR"] = saved
+    return code if isinstance(code, int) else (0 if code is None else 1)
 
 
 def _run(args: argparse.Namespace) -> None:
@@ -54,12 +67,11 @@ def _run(args: argparse.Namespace) -> None:
         print(f"hermes tern: {bundle} is missing; reinstall the plugin", file=sys.stderr)
         sys.exit(1)
     flags = [a for a in args.tui_args if a != "--"]
-    hermes = [sys.executable, "-m", "hermes_cli.main", "chat", "--tui", *flags]
-    code = _wait(hermes, {**os.environ, "HERMES_TUI_DIR": str(FRONTEND)})
+    code = _chat(flags, str(FRONTEND))
     if code == NO_TSP_EXIT:
         print("hermes tern: this terminal does not speak the Tern Surface Protocol; "
               "starting the regular TUI", file=sys.stderr)
-        code = _wait(hermes, dict(os.environ))
+        code = _chat(flags, None)
     sys.exit(code)
 
 
