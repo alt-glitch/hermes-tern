@@ -69,7 +69,12 @@ export interface Ranked<T> {
  * scattered subsequence, and earlier and word-start hits rank higher. An
  * empty query keeps every item in order.
  */
-export function rank<T>(items: readonly T[], query: string, textOf: (item: T) => string): Ranked<T>[] {
+export function rank<T>(
+  items: readonly T[],
+  query: string,
+  textOf: (item: T) => string,
+  { scattered = true }: { scattered?: boolean } = {}
+): Ranked<T>[] {
   const words = query.toLowerCase().split(/\s+/).filter(Boolean)
 
   if (!words.length) {
@@ -95,6 +100,12 @@ export function rank<T>(items: readonly T[], query: string, textOf: (item: T) =>
         }
 
         continue
+      }
+
+      // Long texts (a session's prompt and folder) take whole words only: letters scattered over
+      // hundreds of characters match nearly anything.
+      if (!scattered) {
+        return
       }
 
       // A scattered subsequence: each letter after the previous one.

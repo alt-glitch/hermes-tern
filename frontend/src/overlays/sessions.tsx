@@ -1,59 +1,76 @@
-// The session picker (`/resume`, `/sessions`): stored sessions as omp's
-// session sheet draws them (two-line cards grouped by day, ages, message
-// counts, the selected one's preview). Enter resumes it in place of the
-// current transcript; ⌫ on an empty search deletes it after a confirm.
+// The session picker (`/resume`, `/sessions`): stored conversations from the profile's state.db
+// (hermes/sessionIndex.ts), scoped the way `hermes -c` scopes them. The first tab holds this
+// project's sessions (the pane's repo, or its folder); All holds every local one with this
+// project's first. Rows are grouped by last activity, pinned ones on top; a search ranks title,
+// first prompt, folder, branch and id across the tab. The preview shows where the session ran,
+// its first prompt and its last reply. Enter resumes; Tab switches the scope; ⌫ on an empty
+// search deletes after a confirm.
 
-import type { SessionListResult, SessionListRow } from '@hermes/shared/gateway-events'
-import type { JSX, Key, PickerGroup, PickerItem } from '@stencil-hq/tern'
+import { basename } from 'node:path'
+
+import type { JSX, Key, PickerGroup, PickerItem, Span } from '@stencil-hq/tern'
 
 import type { App } from '../app.js'
+import { mutateSession } from '../hermes/mutate.js'
+import { inWorkspace, lastReply, sessionLabel, type StoredSession, storedSessions, workspaceOf } from '../hermes/sessionIndex.js'
 import type { Overlay } from '../overlay.js'
 
 import { editQuery, hitRuns, moveSelection, rank } from './search.js'
-import { mutateSession } from '../hermes/mutate.js'
 
 const KEY = 'sessions'
-const LIMIT = 200
+const LIMIT = 400
 const DAY = 86_400_000
+
+type Tab = 'all' | 'here'
 
 /** Opens the session picker; picking a row resumes that session. */
 export function openSessionPicker(app: App) {
   let state: 'loading' | 'ready' | 'error' = 'loading'
-  let message = ''
-  let rows: SessionListRow[] = []
+  let sessions: StoredSession[] = []
+  let running = new Set<string>()
+  let workspace = ''
+  let tab: Tab = 'here'
   let query = ''
   let selected: string | undefined
   let deleting: string | null = null
   let shown: string[] = []
+  const replies = new Map<string, string>()
+  const current = app.storedSid ?? app.sid ?? ''
 
   const load = async () => {
     state = 'loading'
     app.changed()
 
-    try {
-      const r = await app.gw.request<SessionListResult>('session.list', { limit: LIMIT })
-      rows = [...(r.sessions ?? [])].sort((a, b) => (b.started_at ?? 0) - (a.started_at ?? 0))
-      selected = rows.find(r => r.id !== app.storedSid)?.id ?? rows[0]?.id
-      state = 'ready'
-    } catch (error) {
-      state = 'error'
-      message = error instanceof Error ? error.message : String(error)
-    }
+    const cwd = app.info?.cwd || process.env.HERMES_CWD || process.cwd()
+    // The open session may have no messages yet; every other empty one is litter.
+    const [key, live] = await Promise.all([
+      workspaceOf(cwd),
+      app.gw.request<{ sessions?: { id?: string; running?: boolean }[] }>('session.list', { limit: 200 }).catch(() => ({ sessions: [] }))
+    ])
 
+    workspace = key
+    running = new Set((live.sessions ?? []).filter(s => s.running && s.id).map(s => s.id!))
+    sessions = storedSessions(LIMIT).filter(s => s.messages > 0 || s.id === current)
+    tab = sessions.some(s => inWorkspace(s, workspace)) ? 'here' : 'all'
+    selected = rows().find(s => s.id !== current)?.id ?? rows()[0]?.id
+    state = 'ready'
     app.changed()
   }
 
-  const resume = (id: string | undefined) => {
-    const row = rows.find(r => r.id === id)
+  const here = (s: StoredSession) => inWorkspace(s, workspace)
+  const rows = () => (tab === 'here' ? sessions.filter(here) : sessions)
 
-    if (!row) {
+  const resume = (id: string | undefined) => {
+    const s = sessions.find(x => x.id === id)
+
+    if (!s) {
       return
     }
 
     app.close(overlay)
 
-    if (row.id !== app.storedSid) {
-      void app.resume(row.resolved_id || row.id)
+    if (s.id !== current) {
+      void app.resume(s.id)
     }
   }
 
@@ -63,7 +80,7 @@ export function openSessionPicker(app: App) {
     try {
       // The shared gateway deletes through a revision-fenced mutation (the whole lineage).
       await (app.gw.isCanonical ? mutateSession(app.gw, id, 'delete', {}) : app.gw.request('session.delete', { session_id: id }))
-      rows = rows.filter(r => r.id !== id)
+      sessions = sessions.filter(s => s.id !== id)
     } catch (error) {
       app.transcript.notice(error instanceof Error ? error.message : String(error), 'error')
     }
@@ -76,36 +93,49 @@ export function openSessionPicker(app: App) {
       return
     }
 
-    if (selected === app.storedSid) {
+    if (selected === current) {
       app.transcript.notice('The open session cannot be deleted; start a new one first.', 'warning')
     } else {
       deleting = selected
     }
   }
 
+  const setTab = (t: Tab) => {
+    tab = t
+    deleting = null
+  }
+
   const view = (now: number) => {
-    const ranked = rank(rows, query, r => `${labelOf(r)} ${r.preview ?? ''}`)
+    // Browsing All: pinned first, then this project's, then the rest, each newest first.
+    const rank0 = (x: StoredSession) => (x.pinned ? 0 : tab === 'all' && here(x) ? 1 : 2)
+    const list = query ? rows() : [...rows()].sort((a, b) => rank0(a) - rank0(b))
+    // The label leads the searched text, so a title hit ranks first and its marks land in the label.
+    const ranked = rank(list, query, s => `${sessionLabel(s)}\n${s.preview} ${s.cwd} ${s.branch} ${s.id}`, { scattered: false })
     const hits: Record<string, [number, number][]> = {}
-    const buckets = new Map<string, { label: string; ids: string[] }>()
+    const order: (string | PickerGroup)[] = []
 
-    for (const { item, positions } of ranked) {
-      const label = query ? 'Matches' : dayOf(item.started_at, now)
-      const bucket = buckets.get(label) ?? { ids: [], label }
-      bucket.ids.push(item.id)
-      buckets.set(label, bucket)
+    if (query) {
+      order.push({ count: ranked.length, group: 'matches', label: 'Matches' }, ...ranked.map(r => r.item.id))
+    } else {
+      const groups = new Map<string, string[]>()
+      const add = (label: string, id: string) => groups.set(label, [...(groups.get(label) ?? []), id])
 
-      if (positions.length) {
-        hits[item.id] = hitRuns(positions, labelOf(item).length)
+      for (const s of list) {
+        add(s.pinned ? 'Pinned' : tab === 'all' && here(s) && workspace ? `In ${basename(workspace)}` : dayOf(s.lastActive, now), s.id)
+      }
+
+      for (const [label, ids] of groups) {
+        order.push({ count: ids.length, group: label, label }, ...ids)
       }
     }
 
-    const order: (string | PickerGroup)[] = []
-
-    for (const { ids, label } of buckets.values()) {
-      order.push({ count: ids.length, group: label, label }, ...ids)
+    for (const { item, positions } of ranked) {
+      if (positions.length) {
+        hits[item.id] = hitRuns(positions, sessionLabel(item).length)
+      }
     }
 
-    shown = ranked.map(r => r.item.id)
+    shown = order.filter((o): o is string => typeof o === 'string')
 
     if (!selected || !shown.includes(selected)) {
       selected = shown[0]
@@ -120,32 +150,33 @@ export function openSessionPicker(app: App) {
     node: () => {
       const now = Date.now()
       const { hits, order } = view(now)
-      const row = rows.find(r => r.id === selected)
+      const s = sessions.find(x => x.id === selected)
+      const hereCount = sessions.filter(here).length
+      const project = workspace ? basename(workspace) : 'This folder'
+
+      if (s && !replies.has(s.id)) {
+        replies.set(s.id, lastReply(s.id))
+      }
 
       return (
         <picker
           actions={[
-            { id: 'resume', keys: ['enter'], label: 'Resume', primary: true },
             { id: 'delete', keys: ['backspace'], label: 'Delete' },
-            { end: true, id: 'close', keys: ['esc'], label: 'Close' }
+            { end: true, id: 'close', keys: ['esc'], label: 'Close' },
+            { disabled: s ? undefined : 'No session', id: 'resume', keys: ['enter'], label: s?.id === current ? 'Back to it' : 'Resume', primary: true }
           ]}
           columns={[
-            { format: 'time', id: 'when' },
-            { format: 'dim', id: 'size' }
+            { format: 'dim', id: 'size', priority: 1 },
+            { format: 'time', id: 'when', priority: 2 }
           ]}
-          confirm={
-            deleting
-              ? { act: 'confirm', label: 'Delete', text: `Delete “${labelOf(rows.find(r => r.id === deleting))}”?` }
-              : undefined
-          }
-          current={app.storedSid ? [app.storedSid] : []}
-          empty="No saved sessions yet"
+          confirm={deleting ? { act: 'confirm', label: 'Delete', text: `Delete “${sessionLabel(sessions.find(x => x.id === deleting) ?? { preview: '', title: '' })}”?` } : undefined}
+          current={current ? [current] : []}
+          empty={tab === 'here' ? `No sessions in ${project} yet. Tab shows every folder.` : 'No saved sessions yet'}
           hits={hits}
           icon="history"
-          items={rows.map(r => itemOf(r, now))}
+          items={rows().map(x => itemOf(x, now, running.has(x.id), tab === 'all' && !here(x)))}
           key={KEY}
           layout="cards"
-          message={state === 'error' ? message : undefined}
           noun="sessions"
           onAction={{
             cancel: () => {
@@ -167,7 +198,11 @@ export function openSessionPicker(app: App) {
               app.changed()
             },
             resume: () => resume(selected),
-            retry: () => void load()
+            retry: () => void load(),
+            tab: ev => {
+              setTab(ev.value === 'here' ? 'here' : 'all')
+              app.changed()
+            }
           }}
           onActivate={ev => resume(ev.item)}
           onSelect={ev => {
@@ -176,15 +211,22 @@ export function openSessionPicker(app: App) {
             app.changed()
           }}
           order={order}
-          placeholder="Search sessions…"
+          placeholder="Search titles, prompts, folders, branches…"
           preview="side"
           query={query}
           selected={selected}
           size="lg"
           state={state}
-          total={rows.length}
+          subtitle={[{ s: 'muted', t: workspace ? shortPath(workspace) : '' }]}
+          tab={tab}
+          tabs={[
+            { count: hereCount, id: 'here', label: project },
+            { count: sessions.length, id: 'all', label: 'All folders' }
+          ]}
+          title="Sessions"
+          total={rows().length}
         >
-          {row ? preview(row, row.id === app.storedSid) : null}
+          {s ? preview(s, now, s.id === current, running.has(s.id), replies.get(s.id) ?? '') : null}
         </picker>
       )
     },
@@ -200,9 +242,15 @@ export function openSessionPicker(app: App) {
       }
 
       if (k.name === 'escape') {
-        app.close(overlay)
+        if (query) {
+          query = ''
+        } else {
+          app.close(overlay)
+        }
       } else if (k.name === 'enter') {
         resume(selected)
+      } else if (k.name === 'tab') {
+        setTab(tab === 'here' ? 'all' : 'here')
       } else if (k.name === 'backspace' && !query) {
         askDelete()
       } else {
@@ -221,53 +269,70 @@ export function openSessionPicker(app: App) {
   }
 
   app.open(overlay)
-  void load()
+  // After the sheet is up: the read is synchronous.
+  setTimeout(() => void load(), 0)
 }
 
-/** A session's title, else its first prompt. */
-function labelOf(row: SessionListRow | undefined): string {
-  return row?.title?.trim() || row?.preview?.trim() || 'Untitled session'
-}
-
-function itemOf(row: SessionListRow, now: number): PickerItem {
-  const count = row.live_message_count ?? row.message_count ?? 0
+function itemOf(s: StoredSession, now: number, running: boolean, elsewhere: boolean): PickerItem {
+  const label = sessionLabel(s)
 
   return {
-    badges: row.source && row.source !== 'tui' && row.source !== 'cli' ? [{ text: row.source }] : undefined,
-    detail: row.title?.trim() && row.preview?.trim() ? row.preview.trim() : undefined,
-    facts: {
-      size: `${count} msg${count === 1 ? '' : 's'}`,
-      when: row.started_at ? ageOf(row.started_at * 1000, now) : ''
-    },
-    id: row.id,
-    label: labelOf(row),
-    title: row.started_at ? dateOf(row.started_at) : undefined
+    badges: [
+      ...(running ? [{ text: 'running', tone: 'accent' as const }] : []),
+      ...(s.branch ? [{ text: s.branch, title: `Branch ${s.branch}` }] : []),
+      ...(elsewhere && s.cwd ? [{ text: basename(s.cwd), title: s.cwd }] : [])
+    ],
+    detail: s.title && s.preview ? s.preview : undefined,
+    facts: { size: `${s.messages} msg${s.messages === 1 ? '' : 's'}`, when: ageOf(s.lastActive, now) },
+    id: s.id,
+    label,
+    title: s.cwd || undefined
   }
 }
 
-function preview(row: SessionListRow, isCurrent: boolean): JSX.Element[] {
-  const count = row.live_message_count ?? row.message_count ?? 0
+function preview(s: StoredSession, now: number, isCurrent: boolean, running: boolean, reply: string): JSX.Element[] {
+  const status: Span[] | undefined = isCurrent
+    ? [{ s: 'success', t: 'open here' }]
+    : running
+      ? [{ s: 'accent', t: 'running in another pane' }]
+      : undefined
 
   return [
-    <text key="title" role="omp.picker.title" text={labelOf(row)} />,
+    <text key="title" role="omp.picker.title" text={sessionLabel(s)} />,
     <kv
       items={[
-        ...(row.started_at ? [{ k: [{ t: 'Started' }], v: dateOf(row.started_at) }] : []),
-        { k: [{ t: 'Messages' }], v: String(count) },
-        ...(row.source ? [{ k: [{ t: 'Source' }], v: row.source }] : []),
-        ...(isCurrent ? [{ k: [{ t: 'Status' }], v: [{ s: 'success', t: 'open' }] }] : []),
-        { k: [{ t: 'ID' }], v: [{ s: 'mono dim', t: row.id }] }
+        ...(status ? [{ k: [{ t: 'Status' }], v: status }] : []),
+        ...(s.cwd ? [{ k: [{ t: 'Folder' }], v: [{ s: 'mono', t: shortPath(s.cwd) }] as Span[] }] : []),
+        ...(s.branch ? [{ k: [{ t: 'Branch' }], v: [{ s: 'mono', t: s.branch }] as Span[] }] : []),
+        { k: [{ t: 'Last active' }], v: `${dateOf(s.lastActive)} · ${ageOf(s.lastActive, now)} ago` },
+        { k: [{ t: 'Started' }], v: dateOf(s.startedAt) },
+        { k: [{ t: 'Messages' }], v: String(s.messages) },
+        ...(s.model ? [{ k: [{ t: 'Model' }], v: [{ s: 'mono', t: s.model }] as Span[] }] : []),
+        { k: [{ t: 'Session' }], v: [{ s: 'mono dim', t: `${s.source} · ${s.id.replace(/^(local-)?(.{12}).*$/, '$1$2…')}` }] }
       ]}
       key="facts"
     />,
-    ...(row.preview?.trim()
+    ...(s.preview
       ? [
-          <section head="Conversation" key="conversation">
-            <md key="first" text={row.preview.trim()} tone="user" />
+          <section head="First prompt" key="first">
+            <md key="text" max={{ h: '8lines' }} text={s.preview} tone="user" />
+          </section>
+        ]
+      : []),
+    ...(reply
+      ? [
+          <section head="Last reply" key="last">
+            <md key="text" max={{ h: '14lines' }} text={reply.slice(0, 2000)} />
           </section>
         ]
       : [])
   ]
+}
+
+function shortPath(path: string): string {
+  const home = process.env.HOME
+
+  return home && path.startsWith(home) ? `~${path.slice(home.length)}` : path
 }
 
 /** `25m`, `2h`, `3d`, `1w`, `2mo`, `1y`: how long ago, as omp's session list writes it. */
@@ -286,19 +351,12 @@ function ageOf(at: number, now: number): string {
 
   const d = Math.round(h / 24)
 
-  return d < 7
-    ? `${d}d`
-    : d < 30
-      ? `${Math.round(d / 7)}w`
-      : d < 365
-        ? `${Math.round(d / 30)}mo`
-        : `${Math.round(d / 365)}y`
+  return d < 7 ? `${d}d` : d < 30 ? `${Math.round(d / 7)}w` : d < 365 ? `${Math.round(d / 30)}mo` : `${Math.round(d / 365)}y`
 }
 
-/** Today / Yesterday / This week / Earlier, by local calendar day. */
-function dayOf(startedAt: number | undefined, now: number): string {
+/** Today / Yesterday / This week / This month / Earlier, by local calendar day. */
+function dayOf(at: number, now: number): string {
   const midnight = new Date(now).setHours(0, 0, 0, 0)
-  const at = (startedAt ?? 0) * 1000
 
   return at >= midnight
     ? 'Today'
@@ -306,9 +364,11 @@ function dayOf(startedAt: number | undefined, now: number): string {
       ? 'Yesterday'
       : at >= midnight - 6 * DAY
         ? 'This week'
-        : 'Earlier'
+        : at >= midnight - 30 * DAY
+          ? 'This month'
+          : 'Earlier'
 }
 
-function dateOf(startedAt: number): string {
-  return new Date(startedAt * 1000).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' })
+function dateOf(at: number): string {
+  return new Date(at).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' })
 }

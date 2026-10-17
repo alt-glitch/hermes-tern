@@ -10868,7 +10868,7 @@ var require_mock_interceptor = __commonJS({
 var require_mock_client = __commonJS({
   ".hermes-src/ui-tui/node_modules/undici/lib/mock/mock-client.js"(exports, module) {
     "use strict";
-    var { promisify: promisify6 } = __require("node:util");
+    var { promisify: promisify7 } = __require("node:util");
     var Client = require_client();
     var { buildMockDispatch } = require_mock_utils();
     var {
@@ -10908,7 +10908,7 @@ var require_mock_client = __commonJS({
         return new MockInterceptor(opts, this[kDispatches]);
       }
       async [kClose]() {
-        await promisify6(this[kOriginalClose])();
+        await promisify7(this[kOriginalClose])();
         this[kConnected] = 0;
         this[kMockAgent][Symbols.kClients].delete(this[kOrigin]);
       }
@@ -10921,7 +10921,7 @@ var require_mock_client = __commonJS({
 var require_mock_pool = __commonJS({
   ".hermes-src/ui-tui/node_modules/undici/lib/mock/mock-pool.js"(exports, module) {
     "use strict";
-    var { promisify: promisify6 } = __require("node:util");
+    var { promisify: promisify7 } = __require("node:util");
     var Pool = require_pool();
     var { buildMockDispatch } = require_mock_utils();
     var {
@@ -10961,7 +10961,7 @@ var require_mock_pool = __commonJS({
         return new MockInterceptor(opts, this[kDispatches]);
       }
       async [kClose]() {
-        await promisify6(this[kOriginalClose])();
+        await promisify7(this[kOriginalClose])();
         this[kConnected] = 0;
         this[kMockAgent][Symbols.kClients].delete(this[kOrigin]);
       }
@@ -19968,25 +19968,25 @@ var PLAIN_TEXT = {
   badge: true,
   toast: true
 };
-function textProps(run5) {
-  if (run5.every((part) => typeof part === "string"))
-    return { text: run5.join("") };
-  return { spans: run5.map((part) => typeof part === "string" ? part : toJson(part) ?? null) };
+function textProps(run6) {
+  if (run6.every((part) => typeof part === "string"))
+    return { text: run6.join("") };
+  return { spans: run6.map((part) => typeof part === "string" ? part : toJson(part) ?? null) };
 }
 function containerChildren(parts2) {
   const out = [];
-  let run5 = [];
+  let run6 = [];
   const end = () => {
-    if (run5.length > 0)
-      out.push(new Node("text", textProps(run5)));
-    run5 = [];
+    if (run6.length > 0)
+      out.push(new Node("text", textProps(run6)));
+    run6 = [];
   };
   for (const part of parts2) {
     if (part instanceof Node) {
       end();
       out.push(part);
     } else {
-      run5.push(part);
+      run6.push(part);
     }
   }
   end();
@@ -20013,17 +20013,17 @@ function createNode(kind, input, children2) {
   const parts2 = flatten([fromProps, children2]);
   let nodes2 = [];
   if (SPAN_TEXT[kind] || PLAIN_TEXT[kind]) {
-    const run5 = [];
+    const run6 = [];
     for (const part of parts2) {
       if (part instanceof Node && kind === "seg")
         nodes2.push(part);
       else if (part instanceof Node || part instanceof Span && PLAIN_TEXT[kind]) {
         throw new TypeError(`${kind} takes text children, got ${describe(part)}`);
       } else
-        run5.push(part);
+        run6.push(part);
     }
-    if (run5.length > 0)
-      Object.assign(props, textProps(run5));
+    if (run6.length > 0)
+      Object.assign(props, textProps(run6));
   } else if (kind === "el") {
     let text2 = "";
     for (const part of parts2) {
@@ -28032,8 +28032,8 @@ function describeCommand(command) {
   return clip(title.charAt(0).toUpperCase() + title.slice(1), MAX);
 }
 function commandLine(command, n = 96) {
-  const flat2 = command.replace(/<<-?\s*['"]?(\w+)['"]?[\s\S]*?\n\s*\1\s*(?=\n|$)/g, "<<'$1' \u2026").replace(/\s+/g, " ").trim();
-  return clip(flat2, n);
+  const flat3 = command.replace(/<<-?\s*['"]?(\w+)['"]?[\s\S]*?\n\s*\1\s*(?=\n|$)/g, "<<'$1' \u2026").replace(/\s+/g, " ").trim();
+  return clip(flat3, n);
 }
 
 // src/view/tools.tsx
@@ -28359,10 +28359,10 @@ function searchCard(call, result) {
         /* @__PURE__ */ jsx("text", { role: "omp.tool.chip", spans: [{ t: String(hits.length) }] }, "n")
       ] }, f)
     );
-    let run5 = [];
+    let run6 = [];
     let runIndex = 0;
     const flush = () => {
-      const start = run5[0]?.line ?? 1;
+      const start = run6[0]?.line ?? 1;
       if (runIndex > 0) {
         body.push(/* @__PURE__ */ jsx("text", { role: "omp.tool.context", spans: [{ s: "muted", t: "\u2026" }] }, `${f}.g${runIndex}`));
       }
@@ -28371,23 +28371,23 @@ function searchCard(call, result) {
           "code",
           {
             lang: langOf(path),
-            marks: run5.map((h) => ({ line: h.line, tone: "accent" })),
+            marks: run6.map((h) => ({ line: h.line, tone: "accent" })),
             numbers: true,
             start,
-            text: run5.map((h) => h.text).join("\n")
+            text: run6.map((h) => h.text).join("\n")
           },
           `${f}.c${runIndex++}`
         )
       );
-      run5 = [];
+      run6 = [];
     };
     for (const hit of hits) {
-      if (run5.length && hit.line !== (run5.at(-1)?.line ?? 0) + 1) {
+      if (run6.length && hit.line !== (run6.at(-1)?.line ?? 0) + 1) {
         flush();
       }
-      run5.push(hit);
+      run6.push(hit);
     }
-    if (run5.length) {
+    if (run6.length) {
       flush();
     }
   }
@@ -28740,7 +28740,7 @@ function moveSelection(key2, ids, selected) {
   }
   return void 0;
 }
-function rank(items, query, textOf) {
+function rank(items, query, textOf, { scattered = true } = {}) {
   const words2 = query.toLowerCase().split(/\s+/).filter(Boolean);
   if (!words2.length) {
     return items.map((item3) => ({ item: item3, positions: [] }));
@@ -28759,6 +28759,9 @@ function rank(items, query, textOf) {
           positions.add(i);
         }
         continue;
+      }
+      if (!scattered) {
+        return;
       }
       let from = 0;
       for (const ch of word) {
@@ -32592,46 +32595,167 @@ function confirmOverlay(host, ask) {
 }
 
 // src/overlays/sessions.tsx
+import { basename as basename2 } from "node:path";
+
+// src/hermes/sessionIndex.ts
+import { execFile as execFile4 } from "node:child_process";
+import { DatabaseSync as DatabaseSync3 } from "node:sqlite";
+import { promisify as promisify3 } from "node:util";
+var run2 = promisify3(execFile4);
+var SOURCES = ["acp", "cli", "desktop", "gui", "local", "tui"];
+var LISTABLE = `(s.parent_session_id IS NULL
+  OR json_extract(s.model_config, '$._branched_from') IS NOT NULL
+  OR json_extract(s.model_config, '$._reset_from') IS NOT NULL)`;
+var QUERY = `
+WITH RECURSIVE chain(root, cur) AS (
+  SELECT s.id, s.id FROM sessions s
+  WHERE s.source IN (${SOURCES.map(() => "?").join(",")})
+    AND ${LISTABLE}
+    AND (s.pinned = 1 OR (COALESCE(s.archived, 0) = 0 AND COALESCE(s.hidden, 0) = 0))
+  UNION ALL
+  SELECT c.root, child.id FROM chain c
+  JOIN sessions parent ON parent.id = c.cur
+  JOIN sessions child ON child.parent_session_id = c.cur
+  WHERE parent.end_reason = 'compression'
+    AND json_extract(child.model_config, '$._branched_from') IS NULL
+    AND json_extract(child.model_config, '$._delegate_from') IS NULL
+    AND json_extract(child.model_config, '$._reset_from') IS NULL
+),
+spans AS (
+  SELECT c.root,
+    MAX(COALESCE(t.last_activity_at, t.ended_at, t.started_at)) AS last_active,
+    (SELECT c2.cur FROM chain c2 JOIN sessions t2 ON t2.id = c2.cur WHERE c2.root = c.root ORDER BY t2.started_at DESC LIMIT 1) AS tip
+  FROM chain c JOIN sessions t ON t.id = c.cur
+  GROUP BY c.root
+)
+SELECT r.id, COALESCE(NULLIF(r.display_name, ''), r.title, '') AS title, r.source, COALESCE(tip.cwd, r.cwd, '') AS cwd,
+  COALESCE(NULLIF(tip.git_repo_root, ''), r.git_repo_root, '') AS repo_root,
+  COALESCE(NULLIF(tip.git_branch, ''), r.git_branch, '') AS branch, COALESCE(tip.model, r.model, '') AS model,
+  r.started_at, sp.last_active, COALESCE(tip.message_count, r.message_count, 0) AS messages, COALESCE(r.pinned, 0) AS pinned,
+  (SELECT m.content FROM messages m WHERE m.session_id = r.id AND m.role = 'user' ORDER BY m.id LIMIT 1) AS preview
+FROM spans sp JOIN sessions r ON r.id = sp.root LEFT JOIN sessions tip ON tip.id = sp.tip
+ORDER BY sp.last_active DESC
+LIMIT ?`;
+function flat2(text2) {
+  return (text2 ?? "").replace(/^\[[A-Z][A-Z -]+\][^\n]*\n?/gm, "").replace(/\s+/g, " ").trim();
+}
+function storedSessions(limit = 400, db = stateDbPath()) {
+  let conn;
+  try {
+    conn = new DatabaseSync3(db, { readOnly: true });
+    const rows = conn.prepare(QUERY).all(...SOURCES, limit);
+    return rows.map((r) => ({
+      branch: r.branch ?? "",
+      cwd: r.cwd ?? "",
+      id: r.id,
+      lastActive: Math.round((r.last_active ?? r.started_at ?? 0) * 1e3),
+      messages: Number(r.messages) || 0,
+      model: r.model ?? "",
+      pinned: r.pinned === 1,
+      preview: flat2(r.preview).slice(0, 400),
+      repoRoot: r.repo_root ?? "",
+      source: r.source ?? "",
+      startedAt: Math.round((r.started_at ?? 0) * 1e3),
+      title: (r.title ?? "").trim()
+    }));
+  } catch {
+    return [];
+  } finally {
+    conn?.close();
+  }
+}
+function lastReply(id, db = stateDbPath()) {
+  let conn;
+  try {
+    conn = new DatabaseSync3(db, { readOnly: true });
+    const row = conn.prepare(
+      `WITH RECURSIVE chain(cur) AS (SELECT ? UNION ALL SELECT child.id FROM chain c
+           JOIN sessions parent ON parent.id = c.cur JOIN sessions child ON child.parent_session_id = c.cur
+           WHERE parent.end_reason = 'compression')
+         SELECT m.content FROM messages m WHERE m.session_id IN (SELECT cur FROM chain)
+           AND m.role = 'assistant' AND m.content IS NOT NULL AND m.content != ''
+         ORDER BY m.timestamp DESC, m.id DESC LIMIT 1`
+    ).get(id);
+    return (row?.content ?? "").trim();
+  } catch {
+    return "";
+  } finally {
+    conn?.close();
+  }
+}
+async function workspaceOf(cwd) {
+  try {
+    const { stdout } = await run2("git", ["-C", cwd, "rev-parse", "--show-toplevel"], { timeout: 3e3 });
+    return stdout.trim() || cwd;
+  } catch {
+    return cwd;
+  }
+}
+var trim = (p) => p.replace(/\/+$/, "");
+function inWorkspace(s, key2) {
+  const k = trim(key2);
+  if (!k) {
+    return false;
+  }
+  if (s.repoRoot) {
+    return trim(s.repoRoot) === k;
+  }
+  const cwd = trim(s.cwd);
+  return cwd === k || cwd.startsWith(`${k}/`);
+}
+function sessionLabel(s) {
+  return s.title || s.preview.split(/(?<=[.?!])\s/)[0]?.slice(0, 110) || "Untitled session";
+}
+
+// src/overlays/sessions.tsx
 var KEY8 = "sessions";
-var LIMIT = 200;
+var LIMIT = 400;
 var DAY = 864e5;
 function openSessionPicker(app) {
   let state = "loading";
-  let message = "";
-  let rows = [];
+  let sessions = [];
+  let running = /* @__PURE__ */ new Set();
+  let workspace = "";
+  let tab = "here";
   let query = "";
   let selected;
   let deleting = null;
   let shown = [];
+  const replies = /* @__PURE__ */ new Map();
+  const current = app.storedSid ?? app.sid ?? "";
   const load2 = async () => {
     state = "loading";
     app.changed();
-    try {
-      const r = await app.gw.request("session.list", { limit: LIMIT });
-      rows = [...r.sessions ?? []].sort((a, b) => (b.started_at ?? 0) - (a.started_at ?? 0));
-      selected = rows.find((r2) => r2.id !== app.storedSid)?.id ?? rows[0]?.id;
-      state = "ready";
-    } catch (error) {
-      state = "error";
-      message = error instanceof Error ? error.message : String(error);
-    }
+    const cwd = app.info?.cwd || process.env.HERMES_CWD || process.cwd();
+    const [key2, live] = await Promise.all([
+      workspaceOf(cwd),
+      app.gw.request("session.list", { limit: 200 }).catch(() => ({ sessions: [] }))
+    ]);
+    workspace = key2;
+    running = new Set((live.sessions ?? []).filter((s) => s.running && s.id).map((s) => s.id));
+    sessions = storedSessions(LIMIT).filter((s) => s.messages > 0 || s.id === current);
+    tab = sessions.some((s) => inWorkspace(s, workspace)) ? "here" : "all";
+    selected = rows().find((s) => s.id !== current)?.id ?? rows()[0]?.id;
+    state = "ready";
     app.changed();
   };
+  const here = (s) => inWorkspace(s, workspace);
+  const rows = () => tab === "here" ? sessions.filter(here) : sessions;
   const resume = (id) => {
-    const row = rows.find((r) => r.id === id);
-    if (!row) {
+    const s = sessions.find((x) => x.id === id);
+    if (!s) {
       return;
     }
     app.close(overlay);
-    if (row.id !== app.storedSid) {
-      void app.resume(row.resolved_id || row.id);
+    if (s.id !== current) {
+      void app.resume(s.id);
     }
   };
   const remove = async (id) => {
     deleting = null;
     try {
       await (app.gw.isCanonical ? mutateSession(app.gw, id, "delete", {}) : app.gw.request("session.delete", { session_id: id }));
-      rows = rows.filter((r) => r.id !== id);
+      sessions = sessions.filter((s) => s.id !== id);
     } catch (error) {
       app.transcript.notice(error instanceof Error ? error.message : String(error), "error");
     }
@@ -32641,30 +32765,41 @@ function openSessionPicker(app) {
     if (!selected) {
       return;
     }
-    if (selected === app.storedSid) {
+    if (selected === current) {
       app.transcript.notice("The open session cannot be deleted; start a new one first.", "warning");
     } else {
       deleting = selected;
     }
   };
+  const setTab = (t2) => {
+    tab = t2;
+    deleting = null;
+  };
   const view = (now) => {
-    const ranked = rank(rows, query, (r) => `${labelOf(r)} ${r.preview ?? ""}`);
+    const rank0 = (x) => x.pinned ? 0 : tab === "all" && here(x) ? 1 : 2;
+    const list = query ? rows() : [...rows()].sort((a, b) => rank0(a) - rank0(b));
+    const ranked = rank(list, query, (s) => `${sessionLabel(s)}
+${s.preview} ${s.cwd} ${s.branch} ${s.id}`, { scattered: false });
     const hits = {};
-    const buckets = /* @__PURE__ */ new Map();
-    for (const { item: item3, positions } of ranked) {
-      const label = query ? "Matches" : dayOf(item3.started_at, now);
-      const bucket = buckets.get(label) ?? { ids: [], label };
-      bucket.ids.push(item3.id);
-      buckets.set(label, bucket);
-      if (positions.length) {
-        hits[item3.id] = hitRuns(positions, labelOf(item3).length);
+    const order = [];
+    if (query) {
+      order.push({ count: ranked.length, group: "matches", label: "Matches" }, ...ranked.map((r) => r.item.id));
+    } else {
+      const groups = /* @__PURE__ */ new Map();
+      const add = (label, id) => groups.set(label, [...groups.get(label) ?? [], id]);
+      for (const s of list) {
+        add(s.pinned ? "Pinned" : tab === "all" && here(s) && workspace ? `In ${basename2(workspace)}` : dayOf(s.lastActive, now), s.id);
+      }
+      for (const [label, ids] of groups) {
+        order.push({ count: ids.length, group: label, label }, ...ids);
       }
     }
-    const order = [];
-    for (const { ids, label } of buckets.values()) {
-      order.push({ count: ids.length, group: label, label }, ...ids);
+    for (const { item: item3, positions } of ranked) {
+      if (positions.length) {
+        hits[item3.id] = hitRuns(positions, sessionLabel(item3).length);
+      }
     }
-    shown = ranked.map((r) => r.item.id);
+    shown = order.filter((o) => typeof o === "string");
     if (!selected || !shown.includes(selected)) {
       selected = shown[0];
     }
@@ -32676,27 +32811,31 @@ function openSessionPicker(app) {
     node: () => {
       const now = Date.now();
       const { hits, order } = view(now);
-      const row = rows.find((r) => r.id === selected);
+      const s = sessions.find((x) => x.id === selected);
+      const hereCount = sessions.filter(here).length;
+      const project = workspace ? basename2(workspace) : "This folder";
+      if (s && !replies.has(s.id)) {
+        replies.set(s.id, lastReply(s.id));
+      }
       return /* @__PURE__ */ jsx(
         "picker",
         {
           actions: [
-            { id: "resume", keys: ["enter"], label: "Resume", primary: true },
             { id: "delete", keys: ["backspace"], label: "Delete" },
-            { end: true, id: "close", keys: ["esc"], label: "Close" }
+            { end: true, id: "close", keys: ["esc"], label: "Close" },
+            { disabled: s ? void 0 : "No session", id: "resume", keys: ["enter"], label: s?.id === current ? "Back to it" : "Resume", primary: true }
           ],
           columns: [
-            { format: "time", id: "when" },
-            { format: "dim", id: "size" }
+            { format: "dim", id: "size", priority: 1 },
+            { format: "time", id: "when", priority: 2 }
           ],
-          confirm: deleting ? { act: "confirm", label: "Delete", text: `Delete \u201C${labelOf(rows.find((r) => r.id === deleting))}\u201D?` } : void 0,
-          current: app.storedSid ? [app.storedSid] : [],
-          empty: "No saved sessions yet",
+          confirm: deleting ? { act: "confirm", label: "Delete", text: `Delete \u201C${sessionLabel(sessions.find((x) => x.id === deleting) ?? { preview: "", title: "" })}\u201D?` } : void 0,
+          current: current ? [current] : [],
+          empty: tab === "here" ? `No sessions in ${project} yet. Tab shows every folder.` : "No saved sessions yet",
           hits,
           icon: "history",
-          items: rows.map((r) => itemOf2(r, now)),
+          items: rows().map((x) => itemOf2(x, now, running.has(x.id), tab === "all" && !here(x))),
           layout: "cards",
-          message: state === "error" ? message : void 0,
           noun: "sessions",
           onAction: {
             cancel: () => {
@@ -32718,7 +32857,11 @@ function openSessionPicker(app) {
               app.changed();
             },
             resume: () => resume(selected),
-            retry: () => void load2()
+            retry: () => void load2(),
+            tab: (ev) => {
+              setTab(ev.value === "here" ? "here" : "all");
+              app.changed();
+            }
           },
           onActivate: (ev) => resume(ev.item),
           onSelect: (ev) => {
@@ -32727,14 +32870,21 @@ function openSessionPicker(app) {
             app.changed();
           },
           order,
-          placeholder: "Search sessions\u2026",
+          placeholder: "Search titles, prompts, folders, branches\u2026",
           preview: "side",
           query,
           selected,
           size: "lg",
           state,
-          total: rows.length,
-          children: row ? preview4(row, row.id === app.storedSid) : null
+          subtitle: [{ s: "muted", t: workspace ? shortPath2(workspace) : "" }],
+          tab,
+          tabs: [
+            { count: hereCount, id: "here", label: project },
+            { count: sessions.length, id: "all", label: "All folders" }
+          ],
+          title: "Sessions",
+          total: rows().length,
+          children: s ? preview4(s, now, s.id === current, running.has(s.id), replies.get(s.id) ?? "") : null
         },
         KEY8
       );
@@ -32749,9 +32899,15 @@ function openSessionPicker(app) {
         return true;
       }
       if (k.name === "escape") {
-        app.close(overlay);
+        if (query) {
+          query = "";
+        } else {
+          app.close(overlay);
+        }
       } else if (k.name === "enter") {
         resume(selected);
+      } else if (k.name === "tab") {
+        setTab(tab === "here" ? "all" : "here");
       } else if (k.name === "backspace" && !query) {
         askDelete();
       } else {
@@ -32767,46 +32923,54 @@ function openSessionPicker(app) {
     }
   };
   app.open(overlay);
-  void load2();
+  setTimeout(() => void load2(), 0);
 }
-function labelOf(row) {
-  return row?.title?.trim() || row?.preview?.trim() || "Untitled session";
-}
-function itemOf2(row, now) {
-  const count = row.live_message_count ?? row.message_count ?? 0;
+function itemOf2(s, now, running, elsewhere) {
+  const label = sessionLabel(s);
   return {
-    badges: row.source && row.source !== "tui" && row.source !== "cli" ? [{ text: row.source }] : void 0,
-    detail: row.title?.trim() && row.preview?.trim() ? row.preview.trim() : void 0,
-    facts: {
-      size: `${count} msg${count === 1 ? "" : "s"}`,
-      when: row.started_at ? ageOf(row.started_at * 1e3, now) : ""
-    },
-    id: row.id,
-    label: labelOf(row),
-    title: row.started_at ? dateOf(row.started_at) : void 0
+    badges: [
+      ...running ? [{ text: "running", tone: "accent" }] : [],
+      ...s.branch ? [{ text: s.branch, title: `Branch ${s.branch}` }] : [],
+      ...elsewhere && s.cwd ? [{ text: basename2(s.cwd), title: s.cwd }] : []
+    ],
+    detail: s.title && s.preview ? s.preview : void 0,
+    facts: { size: `${s.messages} msg${s.messages === 1 ? "" : "s"}`, when: ageOf(s.lastActive, now) },
+    id: s.id,
+    label,
+    title: s.cwd || void 0
   };
 }
-function preview4(row, isCurrent) {
-  const count = row.live_message_count ?? row.message_count ?? 0;
+function preview4(s, now, isCurrent, running, reply) {
+  const status = isCurrent ? [{ s: "success", t: "open here" }] : running ? [{ s: "accent", t: "running in another pane" }] : void 0;
   return [
-    /* @__PURE__ */ jsx("text", { role: "omp.picker.title", text: labelOf(row) }, "title"),
+    /* @__PURE__ */ jsx("text", { role: "omp.picker.title", text: sessionLabel(s) }, "title"),
     /* @__PURE__ */ jsx(
       "kv",
       {
         items: [
-          ...row.started_at ? [{ k: [{ t: "Started" }], v: dateOf(row.started_at) }] : [],
-          { k: [{ t: "Messages" }], v: String(count) },
-          ...row.source ? [{ k: [{ t: "Source" }], v: row.source }] : [],
-          ...isCurrent ? [{ k: [{ t: "Status" }], v: [{ s: "success", t: "open" }] }] : [],
-          { k: [{ t: "ID" }], v: [{ s: "mono dim", t: row.id }] }
+          ...status ? [{ k: [{ t: "Status" }], v: status }] : [],
+          ...s.cwd ? [{ k: [{ t: "Folder" }], v: [{ s: "mono", t: shortPath2(s.cwd) }] }] : [],
+          ...s.branch ? [{ k: [{ t: "Branch" }], v: [{ s: "mono", t: s.branch }] }] : [],
+          { k: [{ t: "Last active" }], v: `${dateOf(s.lastActive)} \xB7 ${ageOf(s.lastActive, now)} ago` },
+          { k: [{ t: "Started" }], v: dateOf(s.startedAt) },
+          { k: [{ t: "Messages" }], v: String(s.messages) },
+          ...s.model ? [{ k: [{ t: "Model" }], v: [{ s: "mono", t: s.model }] }] : [],
+          { k: [{ t: "Session" }], v: [{ s: "mono dim", t: `${s.source} \xB7 ${s.id.replace(/^(local-)?(.{12}).*$/, "$1$2\u2026")}` }] }
         ]
       },
       "facts"
     ),
-    ...row.preview?.trim() ? [
-      /* @__PURE__ */ jsx("section", { head: "Conversation", children: /* @__PURE__ */ jsx("md", { text: row.preview.trim(), tone: "user" }, "first") }, "conversation")
+    ...s.preview ? [
+      /* @__PURE__ */ jsx("section", { head: "First prompt", children: /* @__PURE__ */ jsx("md", { max: { h: "8lines" }, text: s.preview, tone: "user" }, "text") }, "first")
+    ] : [],
+    ...reply ? [
+      /* @__PURE__ */ jsx("section", { head: "Last reply", children: /* @__PURE__ */ jsx("md", { max: { h: "14lines" }, text: reply.slice(0, 2e3) }, "text") }, "last")
     ] : []
   ];
+}
+function shortPath2(path) {
+  const home = process.env.HOME;
+  return home && path.startsWith(home) ? `~${path.slice(home.length)}` : path;
 }
 function ageOf(at, now) {
   const m = Math.max(0, Math.round((now - at) / 6e4));
@@ -32820,13 +32984,12 @@ function ageOf(at, now) {
   const d = Math.round(h / 24);
   return d < 7 ? `${d}d` : d < 30 ? `${Math.round(d / 7)}w` : d < 365 ? `${Math.round(d / 30)}mo` : `${Math.round(d / 365)}y`;
 }
-function dayOf(startedAt, now) {
+function dayOf(at, now) {
   const midnight = new Date(now).setHours(0, 0, 0, 0);
-  const at = (startedAt ?? 0) * 1e3;
-  return at >= midnight ? "Today" : at >= midnight - DAY ? "Yesterday" : at >= midnight - 6 * DAY ? "This week" : "Earlier";
+  return at >= midnight ? "Today" : at >= midnight - DAY ? "Yesterday" : at >= midnight - 6 * DAY ? "This week" : at >= midnight - 30 * DAY ? "This month" : "Earlier";
 }
-function dateOf(startedAt) {
-  return new Date(startedAt * 1e3).toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" });
+function dateOf(at) {
+  return new Date(at).toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" });
 }
 
 // src/overlays/theme.tsx
@@ -33354,7 +33517,7 @@ var Completion = class {
             {
               detail: item3.meta && item3.meta !== "dir" ? item3.meta : void 0,
               icon: iconOf(item3),
-              label: labelOf2(item3, this.#for, this.#replaceFrom)
+              label: labelOf(item3, this.#for, this.#replaceFrom)
             },
             String(i)
           ))
@@ -33417,7 +33580,7 @@ function iconOf(item3) {
   }
   return COMMAND_ICONS[item3.text.replace(/^\//, "").split(/\s/)[0] ?? ""] ?? "slash";
 }
-function labelOf2(item3, typed, replaceFrom) {
+function labelOf(item3, typed, replaceFrom) {
   const label = (item3.display || item3.text).replace(/^\//, "");
   const base2 = isPath(item3) ? "strong" : void 0;
   const query = typed.slice(replaceFrom).replace(/^[/@]/, "").replace(/^(file|folder):/, "").split("/").pop() ?? "";
@@ -34346,9 +34509,9 @@ function semantic(c) {
 }
 
 // src/github/branch.ts
-import { execFile as execFile4 } from "node:child_process";
-import { promisify as promisify3 } from "node:util";
-var run2 = promisify3(execFile4);
+import { execFile as execFile5 } from "node:child_process";
+import { promisify as promisify4 } from "node:util";
+var run3 = promisify4(execFile5);
 function parseRemote(url) {
   const m = url.match(/^[\w.-]+@([^:/]+):([^/]+\/[^/]+?)(?:\.git)?\/?$/) ?? url.match(/^(?:https?|ssh|git):\/\/(?:[^@/]+@)?([^/:]+)(?::\d+)?\/([^/]+\/[^/]+?)(?:\.git)?\/?$/);
   if (!m) {
@@ -34358,7 +34521,7 @@ function parseRemote(url) {
   return host === "github.com" || host.split(".").includes("github") ? { host, repository: m[2].toLowerCase() } : void 0;
 }
 async function git2(cwd, ...args) {
-  const { stdout } = await run2("git", ["-C", cwd, ...args], { timeout: 5e3 });
+  const { stdout } = await run3("git", ["-C", cwd, ...args], { timeout: 5e3 });
   return stdout.trim();
 }
 async function branchTarget(cwd) {
@@ -34428,9 +34591,9 @@ function parseStacks(host, repository, rows) {
 }
 
 // src/github/client.ts
-import { execFile as execFile5 } from "node:child_process";
-import { promisify as promisify4 } from "node:util";
-var run3 = promisify4(execFile5);
+import { execFile as execFile6 } from "node:child_process";
+import { promisify as promisify5 } from "node:util";
+var run4 = promisify5(execFile6);
 var GitHubError = class extends Error {
   constructor(message, status) {
     super(message);
@@ -34458,7 +34621,7 @@ async function read(host, env) {
     return own;
   }
   try {
-    const { stdout } = await run3("gh", ["auth", "token", "--hostname", host], { timeout: 1e4 });
+    const { stdout } = await run4("gh", ["auth", "token", "--hostname", host], { timeout: 1e4 });
     const token = stdout.trim();
     if (token) {
       return token;
@@ -35942,9 +36105,9 @@ function noticeNode(e) {
 }
 
 // src/watch/spec.ts
-import { execFile as execFile6 } from "node:child_process";
-import { promisify as promisify5 } from "node:util";
-var run4 = promisify5(execFile6);
+import { execFile as execFile7 } from "node:child_process";
+import { promisify as promisify6 } from "node:util";
+var run5 = promisify6(execFile7);
 var WATCH_ENV = "HERMES_TERN_WATCH";
 function readWatchSpec(env = process.env) {
   try {
@@ -35976,7 +36139,7 @@ async function openSidebar(spec, cwd, env = process.env) {
     return false;
   }
   if (sidebar) {
-    await run4("tern", ["close", sidebar]).catch(() => void 0);
+    await run5("tern", ["close", sidebar]).catch(() => void 0);
     sidebar = void 0;
   }
   const command = [
@@ -35990,7 +36153,7 @@ async function openSidebar(spec, cwd, env = process.env) {
     "tern"
   ];
   try {
-    const { stdout } = await run4("tern", ["split", pane, "right", "--cwd", cwd, "--", ...command]);
+    const { stdout } = await run5("tern", ["split", pane, "right", "--cwd", cwd, "--", ...command]);
     sidebar = stdout.trim().split(/\s+/).at(-1) || void 0;
     return true;
   } catch {
@@ -37004,7 +37167,7 @@ ${this.composer.text}` : next2);
         composer: this.composer,
         context: max > 0 ? { max, used } : void 0,
         cost: usage?.cost_usd ?? void 0,
-        cwd: info?.cwd ? shortPath2(info.cwd) : "",
+        cwd: info?.cwd ? shortPath3(info.cwd) : "",
         effort: info?.reasoning_effort ?? "",
         ghost: modal ? "" : this.#completion.ghost,
         inputId: INPUT_ID,
@@ -37084,7 +37247,7 @@ function kaomojiLabel(text2) {
   const word = text2.match(/([A-Za-z][A-Za-z ]*[A-Za-z])\.{2,}\s*$/)?.[1];
   return word ? `${word.charAt(0).toUpperCase()}${word.slice(1)}\u2026` : "";
 }
-function shortPath2(path) {
+function shortPath3(path) {
   const home = process.env.HOME;
   return home && path.startsWith(home) ? `~${path.slice(home.length)}` : path;
 }
