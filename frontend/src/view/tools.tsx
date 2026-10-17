@@ -854,13 +854,18 @@ function connectCard(call: ToolCall): Card {
     body: [
       ...rows,
       ...(call.connectDone
-        ? [<text key="done" spans={[{ s: 'muted', t: 'Sent to Hermes.' }]} />]
+        ? [<text key="done" spans={[{ s: 'muted', t: open.length ? 'Sent to Hermes.' : 'All connected. Hermes carries on.' }]} />]
         : [
             <row align="center" gap="sm" key="foot">
               <text
                 grow={1}
                 key="hint"
-                spans={[{ s: 'muted', t: open.length ? 'Authorize in the browser, then continue.' : 'All set.' }]}
+                spans={[
+                  {
+                    s: 'muted',
+                    t: open.length ? 'Authorize in the browser. Hermes hears when every app is connected.' : 'All set.'
+                  }
+                ]}
                 wrap="word"
               />
               <row actions={{ click: `connect-continue=${call.id}` }} align="center" key="go" role="hermes.connect.continue">
@@ -870,8 +875,7 @@ function connectCard(call: ToolCall): Card {
           ])
     ],
     name: 'plug',
-    status: open.length && !call.connectDone ? 'running' : undefined,
-    target: targets.map(t => t.title).join(', '),
+    target: `${targets.filter(t => t.state === 'connected').length} of ${targets.length} connected`,
     targetKind: 'text',
     title: open.length ? 'Connect apps' : 'Apps connected'
   }
