@@ -1,7 +1,8 @@
 // The model picker (`/model`, the composer's model chip): every configured
 // provider's models in one `picker` sheet like omp's (search, a provider
 // scope column, facts, a preview pane, the current model checked), switching
-// the session's model through `config.set` as the Ink TUI's picker does.
+// the session's model through `config.set` as the Ink TUI's picker does. The effort strip picks the
+// reasoning effort to go with it (Ctrl+E steps it); Save as default keeps both for new sessions.
 
 import type { ConfigSetResult, ModelOptionProvider, ModelOptionsResult } from '@hermes/shared/gateway-events'
 import { modelSearchText } from '@hermes/shared/model-search-text'
@@ -11,6 +12,8 @@ import { providerDisplayNames } from '@tui/domain/providers.js'
 import type { App } from '../app.js'
 import { modelPayload, mutateSession } from '../hermes/mutate.js'
 import type { Overlay } from '../overlay.js'
+
+import { LEVELS } from './effort.js'
 
 import { editQuery, hitRuns, moveSelection, rank } from './search.js'
 
@@ -94,6 +97,9 @@ export function openModelPicker(app: App) {
   let scope = ALL
   let selected: string | undefined
   let global = false
+  /** The session's effort when the picker opened, and the one picked on the strip. */
+  const startEffort = app.info?.reasoning_effort || ''
+  let effort = startEffort || 'medium'
   let confirm: Confirm | null = null
   let busy = false
   /** The ids shown, in order, for ↑/↓. */
@@ -151,6 +157,11 @@ export function openModelPicker(app: App) {
         confirm = { row, text: r.confirm_message || r.warning || `${row.model} is expensive. Switch anyway?` }
       } else {
         app.close(overlay)
+
+        // The effort goes with the model: saved with it as the default, or set when it changed.
+        if (global || effort !== startEffort) {
+          await app.setEffort(effort, global ? 'global' : 'session')
+        }
       }
     } catch (error) {
       app.transcript.notice(error instanceof Error ? error.message : String(error), 'error')
@@ -222,6 +233,7 @@ export function openModelPicker(app: App) {
       ]
 
       const row = rows.find(r => r.id === selected)
+      const reasons = row?.provider.capabilities?.[row.model]?.reasoning !== false
 
       return (
         <picker
@@ -261,6 +273,10 @@ export function openModelPicker(app: App) {
               scope = ev.value ?? ALL
               app.changed()
             },
+            strip: ev => {
+              effort = LEVELS.find(l => l.id === ev.value)?.id ?? effort
+              app.changed()
+            },
             use: () => void choose(selected)
           }}
           onActivate={ev => void choose(ev.item)}
@@ -278,6 +294,15 @@ export function openModelPicker(app: App) {
           selected={selected}
           size="lg"
           state={state}
+          strip={
+            reasons
+              ? {
+                  items: LEVELS.map(l => ({ id: l.id, label: l.label, on: l.id === effort })),
+                  label: 'Effort  ⌃E',
+                  selected: effort
+                }
+              : undefined
+          }
           title="Models"
           total={rows.length}
         >
@@ -310,6 +335,13 @@ export function openModelPicker(app: App) {
 
       if (k.ctrl && k.name === 'g') {
         global = !global
+
+        return true
+      }
+
+      if (k.ctrl && k.name === 'e') {
+        const at = LEVELS.findIndex(l => l.id === effort)
+        effort = LEVELS[(at + (k.shift ? LEVELS.length - 1 : 1)) % LEVELS.length]!.id
 
         return true
       }

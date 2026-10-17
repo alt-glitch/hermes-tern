@@ -39,6 +39,7 @@ import { openAgents } from './overlays/agents.js'
 import { openBackground } from './overlays/background.js'
 import { Completion } from './overlays/completion.js'
 import { openModelPicker } from './overlays/models.js'
+import { openEffortPicker } from './overlays/effort.js'
 import { promptOverlay } from './overlays/prompts.js'
 import { openPullRequests, prsPill } from './overlays/pullRequests.js'
 import { STYLES } from './view/styles.js'
@@ -1204,19 +1205,36 @@ export class App implements OverlayHost {
 
   /** Steps the session's reasoning effort up hermes's ladder; session.info echoes it back. */
   #cycleEffort() {
+    const at = EFFORTS.indexOf(this.info?.reasoning_effort ?? '')
+
+    void this.setEffort(EFFORTS[at < 0 ? EFFORTS.indexOf('medium') : (at + 1) % EFFORTS.length]!, 'session')
+  }
+
+  /**
+   * Sets the reasoning effort: `session` for this session only (the pill, ⇧⇥), `global` also as
+   * config.yaml's `agent.reasoning_effort`, the default of every new session (Hermes' `/reasoning
+   * <level> --global`).
+   */
+  async setEffort(value: string, scope: 'global' | 'session') {
     if (!this.sid) {
       return
     }
 
-    const at = EFFORTS.indexOf(this.info?.reasoning_effort ?? '')
-    const value = EFFORTS[at < 0 ? EFFORTS.indexOf('medium') : (at + 1) % EFFORTS.length]!
     // Shown at once (and a quick second press steps from it); session.info confirms.
     this.info = this.info && { ...this.info, reasoning_effort: value }
     this.changed()
-    this.#gw.request('config.set', { key: 'reasoning', session_id: this.sid, value }).catch((error: Error) => {
-      this.transcript.notice(error.message, 'error')
-      this.changed()
-    })
+
+    try {
+      await this.#gw.request('config.set', { key: 'reasoning', scope, session_id: this.sid, value })
+
+      if (scope === 'global') {
+        this.transcript.notice(`Reasoning effort ${value === 'none' ? 'off' : value} is now the default for new sessions.`)
+      }
+    } catch (error) {
+      this.transcript.notice(error instanceof Error ? error.message : String(error), 'error')
+    }
+
+    this.changed()
   }
 
   /** Alt+Up / the queue's Edit: the oldest queued prompt back into an empty composer. */
@@ -1321,6 +1339,10 @@ export class App implements OverlayHost {
           this.changed()
         },
         onEffort: () => this.#cycleEffort(),
+        onEffortMenu: {
+          'choose-effort': () => openEffortPicker(this),
+          'save-effort-as-default': () => void this.setEffort(this.info?.reasoning_effort || 'medium', 'global')
+        },
         onInterrupt: () => this.#interrupt(),
         onModel: () => openModelPicker(this),
         onQueueEdit: () => this.#dequeue(),
