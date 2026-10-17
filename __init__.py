@@ -12,7 +12,7 @@ import os
 import sys
 from pathlib import Path
 
-from . import pull_requests
+from . import connections, pull_requests
 
 FRONTEND = Path(__file__).resolve().parent / "frontend"
 
@@ -83,3 +83,4 @@ def register(ctx) -> None:
         setup_fn=_setup, handler_fn=_run,
         description="Runs `hermes chat --tui` with the Tern frontend; every `hermes chat` flag works.")
     pull_requests.register(ctx)
+    connections.register(ctx)

@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest'
 
-import { applyStatus, connectTargets, continueMessage, isConnectCall } from '../connections.js'
+import { mkdtempSync, writeFileSync, mkdirSync, existsSync, readFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+
+import { connectedMessage, connectTargets, continueMessage, isConnectCall, markViewer, readCard } from '../connections.js'
 import type { ToolCall, TurnEntry } from '../model.js'
 import { foldOf, ownsCard } from '../workLog.js'
 
@@ -38,18 +42,41 @@ describe('manage_connections without its card', () => {
     expect(isConnectCall(call({ name: 'terminal' }))).toBe(false)
   })
 
-  it('marks an app connected when connectors.list says so, and a failed one failed', () => {
-    const next = applyStatus(connectTargets(call()), [
-      { connected: true, connector: 'googledrive' },
-      { connected: false, connection_status: 'expired', connector: 'gmail' }
-    ])
+  it('takes the links and live states from the watcher file when the result has none', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'tern-connect-'))
+    mkdirSync(join(dir, 'connections'))
+    writeFileSync(
+      join(dir, 'connections', 'c1.json'),
+      JSON.stringify({ targets: [{ connect_url: 'https://portal/x', name: 'googledrive', state: 'connected' }, { connect_url: 'https://portal/y', name: 'gmail', state: 'initiated' }], watching: true })
+    )
+    const stripped = call({ result: JSON.stringify({ status: 'initiated', targets: [{ name: 'googledrive', state: 'initiated' }, { name: 'gmail', state: 'initiated' }] }) })
+    const card = readCard('c1', dir)
 
-    expect(next.map(t => t.state)).toEqual(['connected', 'expired', 'connected'])
+    expect(connectTargets(stripped).some(t => t.url)).toBe(false)
+    expect(connectTargets(stripped, card).map(t => [t.title, t.state, t.url])).toEqual([
+      ['Google Drive', 'connected', 'https://portal/x'],
+      ['Gmail', 'initiated', 'https://portal/y']
+    ])
+    expect(card?.watching).toBe(true)
+    expect(readCard('missing', dir)).toBeUndefined()
   })
 
-  it('tells the agent which apps the user authorized', () => {
+  it('marks this pane as the viewer of one session at a time', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'tern-viewers-'))
+
+    markViewer('s1', null, dir)
+    expect(JSON.parse(readFileSync(join(dir, 'viewers', 's1.json'), 'utf8'))).toEqual({ pid: process.pid })
+    markViewer('s2', 's1', dir)
+    expect(existsSync(join(dir, 'viewers', 's1.json'))).toBe(false)
+    expect(existsSync(join(dir, 'viewers', 's2.json'))).toBe(true)
+  })
+
+  it('tells the agent which apps the user authorized, or that all are connected', () => {
     expect(continueMessage(connectTargets(call()))).toBe(
       "I've authorized Google Drive, Gmail and Slack. Check with manage_connections status and carry on."
+    )
+    expect(connectedMessage(connectTargets(call()).map(t => ({ ...t, state: 'connected' })))).toBe(
+      'Google Drive, Gmail and Slack are connected now. Carry on.'
     )
   })
 

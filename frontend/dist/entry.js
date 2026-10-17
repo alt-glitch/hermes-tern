@@ -26001,15 +26001,43 @@ function compact(n) {
 }
 
 // src/connections.ts
+import { mkdirSync as mkdirSync2, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { homedir as homedir2 } from "node:os";
+import { join as join2 } from "node:path";
 var CONNECT_TOOL = "manage_connections";
-var POLL_MS2 = 4e3;
-var POLL_FOR_MS = 15 * 6e4;
-function connectTargets(call) {
+var POLL_MS2 = 2e3;
+var POLL_FOR_MS = 16 * 6e4;
+var dataDir = (env = process.env) => join2(env.HERMES_HOME || join2(homedir2(), ".hermes"), "plugin-data", "hermes-tern");
+function readCard(id, dir2 = dataDir()) {
+  try {
+    const data = JSON.parse(readFileSync(join2(dir2, "connections", `${id}.json`), "utf8"));
+    return Array.isArray(data.targets) ? { error: data.error, targets: data.targets, watching: data.watching === true } : void 0;
+  } catch {
+    return void 0;
+  }
+}
+function markViewer(sid, previous, dir2 = dataDir()) {
+  const viewers = join2(dir2, "viewers");
+  try {
+    if (previous && previous !== sid) {
+      rmSync(join2(viewers, `${previous}.json`), { force: true });
+    }
+    if (sid) {
+      mkdirSync2(viewers, { recursive: true });
+      writeFileSync(join2(viewers, `${sid}.json`), JSON.stringify({ pid: process.pid }));
+    }
+  } catch {
+  }
+}
+function connectTargets(call, card) {
   if (call.name !== CONNECT_TOOL) {
     return [];
   }
-  const targets = record2(call.result)?.targets;
-  return (Array.isArray(targets) ? targets : []).flatMap((t2) => {
+  const targets = card?.targets ?? record2(call.result)?.targets;
+  return parseTargets(Array.isArray(targets) ? targets : []);
+}
+function parseTargets(targets) {
+  return targets.flatMap((t2) => {
     const r = record2(t2);
     const name = typeof r?.name === "string" ? r.name : "";
     return name ? [
@@ -26026,25 +26054,15 @@ function connectTargets(call) {
 }
 var waiting = (t2) => t2.state === "initiated" || t2.state === "pending";
 function isConnectCall(call) {
-  return connectTargets(call).some((t2) => t2.url);
+  return (call.connect ?? connectTargets(call)).some((t2) => t2.url);
 }
-function applyStatus(targets, rows) {
-  const byName = new Map(rows.map((r) => [String(r.connector ?? "").toLowerCase(), r]));
-  return targets.map((t2) => {
-    const row = byName.get(t2.name.toLowerCase());
-    if (!row || !waiting(t2)) {
-      return t2;
-    }
-    if (row.connected) {
-      return { ...t2, state: "connected" };
-    }
-    return row.connection_status === "failed" || row.connection_status === "expired" ? { ...t2, state: row.connection_status } : t2;
-  });
-}
+var and = (names) => names.length < 3 ? names.join(" and ") : `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`;
 function continueMessage(targets) {
   const names = targets.filter((t2) => t2.state === "connected" || waiting(t2)).map((t2) => t2.title);
-  const list = names.length < 3 ? names.join(" and ") : `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`;
-  return `I've authorized ${list || "the apps"}. Check with manage_connections status and carry on.`;
+  return `I've authorized ${and(names) || "the apps"}. Check with manage_connections status and carry on.`;
+}
+function connectedMessage(targets) {
+  return `${and(targets.filter((t2) => t2.state === "connected").map((t2) => t2.title))} ${targets.length === 1 ? "is" : "are"} connected now. Carry on.`;
 }
 
 // src/processes/store.ts
@@ -26373,7 +26391,7 @@ function snapshot(p) {
 }
 
 // src/workLog.ts
-import { homedir as homedir2 } from "node:os";
+import { homedir as homedir3 } from "node:os";
 
 // src/vendor/t3code/commandLabel.ts
 var MAX_COMMAND_SEGMENTS = 64;
@@ -27619,13 +27637,13 @@ function actionOf(call) {
   return call.name.startsWith("browser") ? "browser" : "other";
 }
 var plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
-var and = (words2) => words2.length < 3 ? words2.join(" and ") : `${words2.slice(0, -1).join(", ")}, and ${words2.at(-1)}`;
+var and2 = (words2) => words2.length < 3 ? words2.join(" and ") : `${words2.slice(0, -1).join(", ")}, and ${words2.at(-1)}`;
 function actionLabel(action, n, calls = []) {
   switch (action) {
     case "app": {
       const apps = [...new Set(calls.flatMap(appsOf))];
       const uses = calls.reduce((k, c) => k + (c.batch?.length ?? 1), 0);
-      return apps.length === 1 ? `Used ${apps[0]}${uses > 1 ? ` ${uses} times` : ""}` : `Used ${and(apps)}`;
+      return apps.length === 1 ? `Used ${apps[0]}${uses > 1 ? ` ${uses} times` : ""}` : `Used ${and2(apps)}`;
     }
     case "command":
       return `Ran ${plural(n, "command", "commands")}`;
@@ -27726,7 +27744,7 @@ function shortPath(path, cwd = process.env.HERMES_CWD || process.cwd()) {
   if (root && path.startsWith(`${root}/`)) {
     return path.slice(root.length + 1);
   }
-  const home = homedir2();
+  const home = homedir3();
   return home && path.startsWith(`${home}/`) ? `~${path.slice(home.length)}` : path.replace(/^\.\//, "");
 }
 function stepLabel(call) {
@@ -28183,7 +28201,7 @@ function cardOf(call, now) {
     case "terminal":
       return isBackgroundCall(call) ? backgroundCard(call, result, now) : bashCard(call, result);
     case "read_file":
-      return readCard(call, result);
+      return readCard2(call, result);
     case "patch":
     case "write_file":
       return editCard(call, result);
@@ -28320,7 +28338,7 @@ function processLine(call, id, now) {
     "process"
   );
 }
-function readCard(call, result) {
+function readCard2(call, result) {
   const path = str4(call.args.path) ?? call.context;
   const content = str4(result?.content);
   const total = typeof result?.total_lines === "number" ? result.total_lines : void 0;
@@ -28679,13 +28697,18 @@ function connectCard(call) {
   return {
     body: [
       ...rows,
-      ...call.connectDone ? [/* @__PURE__ */ jsx("text", { spans: [{ s: "muted", t: "Sent to Hermes." }] }, "done")] : [
+      ...call.connectDone ? [/* @__PURE__ */ jsx("text", { spans: [{ s: "muted", t: open.length ? "Sent to Hermes." : "All connected. Hermes carries on." }] }, "done")] : [
         /* @__PURE__ */ jsxs("row", { align: "center", gap: "sm", children: [
           /* @__PURE__ */ jsx(
             "text",
             {
               grow: 1,
-              spans: [{ s: "muted", t: open.length ? "Authorize in the browser, then continue." : "All set." }],
+              spans: [
+                {
+                  s: "muted",
+                  t: open.length ? "Authorize in the browser. Hermes hears when every app is connected." : "All set."
+                }
+              ],
               wrap: "word"
             },
             "hint"
@@ -28695,8 +28718,7 @@ function connectCard(call) {
       ]
     ],
     name: "plug",
-    status: open.length && !call.connectDone ? "running" : void 0,
-    target: targets.map((t2) => t2.title).join(", "),
+    target: `${targets.filter((t2) => t2.state === "connected").length} of ${targets.length} connected`,
     targetKind: "text",
     title: open.length ? "Connect apps" : "Apps connected"
   };
@@ -30226,17 +30248,17 @@ function openEffortPicker(app, global2 = false) {
 import { execFile as execFile3 } from "node:child_process";
 
 // src/github/links.ts
-import { readFileSync } from "node:fs";
-import { homedir as homedir4 } from "node:os";
-import { join as join3 } from "node:path";
+import { readFileSync as readFileSync2 } from "node:fs";
+import { homedir as homedir5 } from "node:os";
+import { join as join4 } from "node:path";
 import { DatabaseSync as DatabaseSync2 } from "node:sqlite";
 
 // src/watch/child.ts
-import { homedir as homedir3 } from "node:os";
-import { join as join2 } from "node:path";
+import { homedir as homedir4 } from "node:os";
+import { join as join3 } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 function stateDbPath(env = process.env) {
-  return join2(env.HERMES_HOME || join2(homedir3(), ".hermes"), "state.db");
+  return join3(env.HERMES_HOME || join3(homedir4(), ".hermes"), "state.db");
 }
 var ChildStore = class {
   #db;
@@ -30333,7 +30355,7 @@ function parseArgs(raw) {
 // src/github/links.ts
 var LINK_TOOLS = /* @__PURE__ */ new Set(["link_pull_request", "list_pull_requests", "unlink_pull_request"]);
 function linksPath(env = process.env) {
-  return join3(env.HERMES_HOME || join3(homedir4(), ".hermes"), "plugin-data", "hermes-tern", "pull-requests.json");
+  return join4(env.HERMES_HOME || join4(homedir5(), ".hermes"), "plugin-data", "hermes-tern", "pull-requests.json");
 }
 var prKey = (ref) => `${ref.host}/${ref.repository}#${ref.number}`;
 function refOf(v) {
@@ -30373,7 +30395,7 @@ function ancestry(sid, db = stateDbPath()) {
 function storedLinks(sid, file2 = linksPath(), lineage = ancestry) {
   let data;
   try {
-    data = JSON.parse(readFileSync(file2, "utf8"));
+    data = JSON.parse(readFileSync2(file2, "utf8"));
   } catch {
     return [];
   }
@@ -31746,12 +31768,12 @@ function preview3(row, isCurrent) {
 }
 
 // .hermes-src/ui-tui/src/lib/history.ts
-import { appendFileSync as appendFileSync3, existsSync, mkdirSync as mkdirSync2, readFileSync as readFileSync2 } from "node:fs";
-import { homedir as homedir5 } from "node:os";
-import { join as join4 } from "node:path";
+import { appendFileSync as appendFileSync3, existsSync, mkdirSync as mkdirSync3, readFileSync as readFileSync3 } from "node:fs";
+import { homedir as homedir6 } from "node:os";
+import { join as join5 } from "node:path";
 var MAX2 = 1e3;
-var dir = process.env.HERMES_HOME ?? join4(homedir5(), ".hermes");
-var file = join4(dir, ".hermes_history");
+var dir = process.env.HERMES_HOME ?? join5(homedir6(), ".hermes");
+var file = join5(dir, ".hermes_history");
 var cache = null;
 function load() {
   if (cache) {
@@ -31764,7 +31786,7 @@ function load() {
     }
     const entries = [];
     let current = [];
-    for (const line of readFileSync2(file, "utf8").split("\n")) {
+    for (const line of readFileSync3(file, "utf8").split("\n")) {
       if (line.startsWith("+")) {
         current.push(line.slice(1));
       } else if (current.length) {
@@ -31796,7 +31818,7 @@ function append(line) {
   }
   try {
     if (!existsSync(dir)) {
-      mkdirSync2(dir, { recursive: true });
+      mkdirSync3(dir, { recursive: true });
     }
     const ts = (/* @__PURE__ */ new Date()).toISOString().replace("T", " ").replace("Z", "");
     const encoded = trimmed.split("\n").map((l) => `+${l}`).join("\n");
@@ -33354,20 +33376,20 @@ function hudKey(k, cx) {
 }
 
 // src/hermes/activeSessionFile.ts
-import { writeFileSync } from "node:fs";
+import { writeFileSync as writeFileSync2 } from "node:fs";
 var writeActiveSessionFile = (sessionId, file2 = process.env.HERMES_TUI_ACTIVE_SESSION_FILE) => {
   if (!file2 || !sessionId) {
     return;
   }
   try {
-    writeFileSync(file2, JSON.stringify({ session_id: sessionId }), { mode: 384 });
+    writeFileSync2(file2, JSON.stringify({ session_id: sessionId }), { mode: 384 });
   } catch {
   }
 };
 
 // src/hermes/images.ts
 import { readFile as readFile2 } from "node:fs/promises";
-import { homedir as homedir6 } from "node:os";
+import { homedir as homedir7 } from "node:os";
 import { extname as extname2, resolve as resolve2 } from "node:path";
 var MAX_IMAGE_BYTES = 20 * 1024 * 1024;
 function imageFormat(bytes) {
@@ -33386,7 +33408,7 @@ function imageFormat(bytes) {
   return null;
 }
 async function uploadImage(gw2, sid, raw, cwd) {
-  const path = resolve2(cwd, raw.replace(/^~(?=$|\/)/, homedir6()));
+  const path = resolve2(cwd, raw.replace(/^~(?=$|\/)/, homedir7()));
   const bytes = await readFile2(path);
   if (bytes.length > MAX_IMAGE_BYTES) {
     throw new Error("the image is larger than 20 MB");
@@ -35269,15 +35291,15 @@ var Sidebar = class {
 };
 
 // src/settings.ts
-import { mkdirSync as mkdirSync3, readFileSync as readFileSync3, writeFileSync as writeFileSync2 } from "node:fs";
-import { homedir as homedir7 } from "node:os";
-import { dirname, join as join5 } from "node:path";
+import { mkdirSync as mkdirSync4, readFileSync as readFileSync4, writeFileSync as writeFileSync3 } from "node:fs";
+import { homedir as homedir8 } from "node:os";
+import { dirname, join as join6 } from "node:path";
 function settingsFile(env = process.env) {
-  return join5(env.HERMES_HOME || join5(homedir7(), ".hermes"), "hermes-tern", "settings.json");
+  return join6(env.HERMES_HOME || join6(homedir8(), ".hermes"), "hermes-tern", "settings.json");
 }
 function loadSettings(file2 = settingsFile()) {
   try {
-    const parsed = JSON.parse(readFileSync3(file2, "utf8"));
+    const parsed = JSON.parse(readFileSync4(file2, "utf8"));
     return parsed && typeof parsed === "object" ? parsed : {};
   } catch {
     return {};
@@ -35285,8 +35307,8 @@ function loadSettings(file2 = settingsFile()) {
 }
 function saveSettings(patch, file2 = settingsFile()) {
   const next2 = { ...loadSettings(file2), ...patch };
-  mkdirSync3(dirname(file2), { recursive: true });
-  writeFileSync2(file2, `${JSON.stringify(next2, null, 2)}
+  mkdirSync4(dirname(file2), { recursive: true });
+  writeFileSync3(file2, `${JSON.stringify(next2, null, 2)}
 `);
   return next2;
 }
@@ -35915,8 +35937,8 @@ function breakdownBody(items) {
 }
 
 // src/view/welcome.tsx
-import { readFileSync as readFileSync4 } from "node:fs";
-import { join as join6 } from "node:path";
+import { readFileSync as readFileSync5 } from "node:fs";
+import { join as join7 } from "node:path";
 function welcomeNode(key2, cx) {
   return /* @__PURE__ */ jsxs("card", { role: "omp.welcome", children: [
     /* @__PURE__ */ jsxs("row", { align: "center", gap: "md", role: "omp.welcome.lockup", children: [
@@ -35936,7 +35958,7 @@ var TIP_LINE = /^\s+t\d+:\s+"((?:[^"\\]|\\.)*)"\s*$/;
 function randomTip(root) {
   let text2;
   try {
-    text2 = readFileSync4(join6(root, "locales", "en.yaml"), "utf8");
+    text2 = readFileSync5(join7(root, "locales", "en.yaml"), "utf8");
   } catch {
     return "";
   }
@@ -36614,45 +36636,49 @@ var App = class {
     return true;
   }
   #connectTimer;
-  /** The gateway refused connectors.list for this session: the cards keep their first states. */
-  #connectBlind = false;
-  /** The connect cards still waiting on the user, newest first. */
+  /** Connect cards this pane saw with an app still waiting. */
+  #connectSeen = /* @__PURE__ */ new Set();
+  /** The connect cards still waiting on the user. */
   #connectCalls() {
     const since = Date.now() - POLL_FOR_MS;
-    return this.transcript.calls(CONNECT_TOOL).filter((c) => isConnectCall(c) && !c.connectDone && c.startedAt > since && (c.connect ?? connectTargets(c)).some(waiting));
+    return this.transcript.calls(CONNECT_TOOL).filter((c) => !c.connectDone && c.startedAt > since);
   }
-  /** Keeps each waiting connect card's app states current from `connectors.list`, every few seconds. */
+  /**
+   * Keeps each connect card current from the file the plugin's watcher writes (links and states),
+   * and tells the agent once every app of a card is connected, as the desktop's card settles the call.
+   */
   #watchConnections() {
-    if (this.#connectTimer || this.#connectBlind) {
+    if (this.#connectTimer) {
       return;
     }
-    const tick = async () => {
+    const tick = () => {
       this.#connectTimer = void 0;
-      const calls = this.#connectCalls();
-      const sid = this.sid;
-      if (!calls.length || !sid) {
-        return;
-      }
-      try {
-        const r = await this.#gw.request(
-          "connectors.list",
-          { owner: { session_id: sid, type: "session" } }
-        );
-        for (const call of calls) {
-          const before = JSON.stringify(call.connect ?? connectTargets(call));
-          call.connect = applyStatus(call.connect ?? connectTargets(call), r?.connectors ?? []);
-          if (JSON.stringify(call.connect) !== before) {
-            this.transcript.touchCall(call);
-            this.changed();
-          }
+      let open = false;
+      for (const call of this.#connectCalls()) {
+        const card = readCard(call.id);
+        const next2 = connectTargets(call, card);
+        if (JSON.stringify(next2) !== JSON.stringify(call.connect)) {
+          call.connect = next2;
+          this.transcript.touchCall(call);
+          this.changed();
         }
-      } catch {
-        this.#connectBlind = true;
-        return;
+        if (next2.some(waiting)) {
+          this.#connectSeen.add(call.id);
+        }
+        if (this.#connectSeen.has(call.id) && next2.length && next2.every((t2) => t2.state === "connected")) {
+          call.connectDone = true;
+          this.transcript.touchCall(call);
+          this.#submit(connectedMessage(next2));
+          this.changed();
+        } else if (next2.some(waiting) && (card?.watching ?? true)) {
+          open = true;
+        }
       }
-      this.#connectTimer = setTimeout(() => void tick(), POLL_MS2);
+      if (open) {
+        this.#connectTimer = setTimeout(tick, POLL_MS2);
+      }
     };
-    this.#connectTimer = setTimeout(() => void tick(), POLL_MS2);
+    tick();
   }
   /** A connect card's Continue: tell the agent which apps the user authorized, as the tool asks. */
   #connectContinue(id) {
@@ -36662,7 +36688,7 @@ var App = class {
     }
     call.connectDone = true;
     this.transcript.touchCall(call);
-    this.#submit(continueMessage(call.connect ?? connectTargets(call)));
+    this.#submit(continueMessage(call.connect ?? connectTargets(call, readCard(call.id))));
     this.changed();
   }
   /** Opens or closes the session sidebar (Tern's aside); says why where Tern has none. */
@@ -36711,6 +36737,7 @@ var App = class {
     }, COPIED_MS3);
   }
   quit(code2 = 0) {
+    markViewer(null, this.storedSid ?? this.sid);
     this.#done.resolve(code2);
   }
   // ── Prompts and commands ───────────────────────────────────────────
@@ -36945,7 +36972,9 @@ var App = class {
     this.#subscribe(r);
     this.sid = r.session_id;
     this.#showThoughts(r.session_id);
+    const previousStored = this.storedSid;
     this.storedSid = r.info?.stored_session_id || r.stored_session_id || null;
+    markViewer(this.storedSid ?? r.session_id, previousStored);
     writeActiveSessionFile(this.storedSid ?? r.session_id);
     this.info = r.info ?? this.info;
     this.usage = r.info?.usage ?? null;
@@ -36959,6 +36988,7 @@ var App = class {
       this.agents.scan();
     }
     this.processes.poke();
+    this.#watchConnections();
     this.prs.adopt();
     if (r.inflight) {
       this.transcript.inflight(r.inflight, this.busy?.startedAt);

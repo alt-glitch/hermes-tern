@@ -44,7 +44,7 @@ import { promptOverlay } from './overlays/prompts.js'
 import { openPullRequests, openUrl, prsPill } from './overlays/pullRequests.js'
 import { STYLES } from './view/styles.js'
 import { paletteFor } from './palette.js'
-import { applyStatus, CONNECT_TOOL, connectTargets, continueMessage, isConnectCall, POLL_FOR_MS, POLL_MS, waiting } from './connections.js'
+import { CONNECT_TOOL, connectedMessage, connectTargets, continueMessage, markViewer, POLL_FOR_MS, POLL_MS, readCard, waiting } from './connections.js'
 import { LINK_TOOLS } from './github/links.js'
 import { PullRequests } from './github/store.js'
 import { Cron } from './processes/cron.js'
@@ -466,58 +466,60 @@ export class App implements OverlayHost {
   }
 
   #connectTimer: NodeJS.Timeout | undefined
-  /** The gateway refused connectors.list for this session: the cards keep their first states. */
-  #connectBlind = false
+  /** Connect cards this pane saw with an app still waiting. */
+  readonly #connectSeen = new Set<string>()
 
-  /** The connect cards still waiting on the user, newest first. */
+  /** The connect cards still waiting on the user. */
   #connectCalls() {
     const since = Date.now() - POLL_FOR_MS
 
-    return this.transcript
-      .calls(CONNECT_TOOL)
-      .filter(c => isConnectCall(c) && !c.connectDone && c.startedAt > since && (c.connect ?? connectTargets(c)).some(waiting))
+    return this.transcript.calls(CONNECT_TOOL).filter(c => !c.connectDone && c.startedAt > since)
   }
 
-  /** Keeps each waiting connect card's app states current from `connectors.list`, every few seconds. */
+  /**
+   * Keeps each connect card current from the file the plugin's watcher writes (links and states),
+   * and tells the agent once every app of a card is connected, as the desktop's card settles the call.
+   */
   #watchConnections() {
-    if (this.#connectTimer || this.#connectBlind) {
+    if (this.#connectTimer) {
       return
     }
 
-    const tick = async () => {
+    const tick = () => {
       this.#connectTimer = undefined
-      const calls = this.#connectCalls()
-      const sid = this.sid
+      let open = false
 
-      if (!calls.length || !sid) {
-        return
-      }
+      for (const call of this.#connectCalls()) {
+        const card = readCard(call.id)
+        const next = connectTargets(call, card)
 
-      try {
-        const r = await this.#gw.request<{ connectors?: { connector?: string; connected?: boolean; connection_status?: string | null }[] }>(
-          'connectors.list',
-          { owner: { session_id: sid, type: 'session' } }
-        )
-
-        for (const call of calls) {
-          const before = JSON.stringify(call.connect ?? connectTargets(call))
-          call.connect = applyStatus(call.connect ?? connectTargets(call), r?.connectors ?? [])
-
-          if (JSON.stringify(call.connect) !== before) {
-            this.transcript.touchCall(call)
-            this.changed()
-          }
+        if (JSON.stringify(next) !== JSON.stringify(call.connect)) {
+          call.connect = next
+          this.transcript.touchCall(call)
+          this.changed()
         }
-      } catch {
-        this.#connectBlind = true
 
-        return
+        if (next.some(waiting)) {
+          this.#connectSeen.add(call.id)
+        }
+
+        // Only a card this pane saw waiting: a resumed session's long-settled card stays quiet.
+        if (this.#connectSeen.has(call.id) && next.length && next.every(t => t.state === 'connected')) {
+          call.connectDone = true
+          this.transcript.touchCall(call)
+          this.#submit(connectedMessage(next))
+          this.changed()
+        } else if (next.some(waiting) && (card?.watching ?? true)) {
+          open = true
+        }
       }
 
-      this.#connectTimer = setTimeout(() => void tick(), POLL_MS)
+      if (open) {
+        this.#connectTimer = setTimeout(tick, POLL_MS)
+      }
     }
 
-    this.#connectTimer = setTimeout(() => void tick(), POLL_MS)
+    tick()
   }
 
   /** A connect card's Continue: tell the agent which apps the user authorized, as the tool asks. */
@@ -530,7 +532,7 @@ export class App implements OverlayHost {
 
     call.connectDone = true
     this.transcript.touchCall(call)
-    this.#submit(continueMessage(call.connect ?? connectTargets(call)))
+    this.#submit(continueMessage(call.connect ?? connectTargets(call, readCard(call.id))))
     this.changed()
   }
 
@@ -595,6 +597,7 @@ export class App implements OverlayHost {
   }
 
   quit(code = 0) {
+    markViewer(null, this.storedSid ?? this.sid)
     this.#done.resolve(code)
   }
 
@@ -898,7 +901,10 @@ export class App implements OverlayHost {
     this.#subscribe(r)
     this.sid = r.session_id
     this.#showThoughts(r.session_id)
+    const previousStored = this.storedSid
     this.storedSid = r.info?.stored_session_id || r.stored_session_id || null
+    // This pane shows the session now: the plugin's Python half sends its connect results here as a card.
+    markViewer(this.storedSid ?? r.session_id, previousStored)
     writeActiveSessionFile(this.storedSid ?? r.session_id)
     this.info = r.info ?? this.info
     this.usage = r.info?.usage ?? null
@@ -915,8 +921,9 @@ export class App implements OverlayHost {
       this.agents.scan()
     }
 
-    // The new session's processes and PRs (and none of the last one's).
+    // The new session's processes and PRs (and none of the last one's), and its open connect cards.
     this.processes.poke()
+    this.#watchConnections()
     this.prs.adopt()
 
     if (r.inflight) {

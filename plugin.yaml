@@ -8,4 +8,4 @@ license: MIT
 homepage: https://github.com/alt-glitch/hermes-tern
 tags: [tern, tui, frontend]
 provides_tools: [link_pull_request, unlink_pull_request, list_pull_requests]
-provides_hooks: []
+provides_hooks: [transform_tool_result]
