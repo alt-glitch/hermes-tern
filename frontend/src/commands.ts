@@ -3,6 +3,7 @@
 // the gateway's `slash.exec`.
 
 import type { App } from './app.js'
+import { CONTROL_COMMANDS } from './controlCommands.js'
 import { openHelp } from './overlays/help.js'
 import { openModelPicker, switchModel } from './overlays/models.js'
 import { confirmOverlay } from './overlays/prompts.js'
@@ -73,7 +74,8 @@ const COMMANDS: readonly LocalCommand[] = [
     // `/help <command>` is the backend's detailed usage.
     name: 'help',
     run: (app, arg) => (arg ? false : openHelp(app))
-  }
+  },
+  ...CONTROL_COMMANDS.map(c => ({ ...c, run: (app: App, arg: string) => c.run(app.control(), arg) }))
 ]
 
 /** The client-side command `name` (without the slash) answers to, if any. */

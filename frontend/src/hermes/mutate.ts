@@ -22,6 +22,17 @@ interface Snapshot {
   execution_generation?: number
 }
 
+/** Session `sid`'s current execution generation (the fence for steer/interrupt). */
+export async function currentGeneration(gw: Pick<GatewayClient, 'request'>, sid: string): Promise<number> {
+  const snapshot = await gw.request<Snapshot>('session.resume', { session_id: sid })
+
+  if (!Number.isSafeInteger(snapshot?.execution_generation)) {
+    throw new Error('The session did not report its execution generation; try again.')
+  }
+
+  return snapshot.execution_generation!
+}
+
 /** Mutates session `sid` at its current revision and generation; throws the owner's refusal. */
 export async function mutateSession(
   gw: Pick<GatewayClient, 'request'>,
