@@ -418,14 +418,17 @@ export class Transcript {
     this.#live = undefined
     let turn: TurnEntry | undefined
     let pendingContinued: string | undefined
+    // When the row that opened the next turn (a prompt or a notice) was written.
+    let promptAt = 0
     const calls = new Map<string, ToolCall>()
 
     for (const m of messages) {
       const at = typeof m.timestamp === 'number' ? m.timestamp * 1000 : 0
       const text = typeof m.text === 'string' ? m.text : typeof m.content === 'string' ? m.content : ''
 
-      // A steer is stored as its own user row, wrapped in Hermes' marker, inside the turn it joined.
-      const steered = m.role === 'user' ? steerText(text) : undefined
+      // A steer is stored as its own user row inside the turn it joined. The display projection
+      // tags it `steer` and already unwraps Hermes' marker; a raw snapshot still carries the marker.
+      const steered = m.role === 'user' ? (m.display_kind === 'steer' ? text.trim() : steerText(text)) : undefined
 
       if (steered !== undefined && turn) {
         turn.blocks.push({ at, id: this.id('s'), kind: 'steer', text: steered })
@@ -435,15 +438,19 @@ export class Transcript {
 
       if (m.role === 'user') {
         turn = undefined
+        promptAt = at
 
         // Notices Hermes sends itself (subagents or a background command finished, a watcher
-        // fired) are not the user's words: they become the next turn's reason line.
-        const notice = internalNotice(text)
+        // fired, a crashed turn resumed) are not the user's words: they become the next turn's
+        // reason line. Typed rows say so in display_kind; older untyped rows are sniffed.
+        const notice = displayNotice(m.display_kind, m.display_metadata) ?? internalNotice(text)
 
         if (notice) {
           pendingContinued = notice
         } else {
-          this.entries.push({ at, id: this.id('u'), kind: 'user', text })
+          // A notice whose reply Hermes hid has no turn: its reason must not fall on this prompt's.
+          pendingContinued = undefined
+          this.entries.push({ at, id: this.id('u'), kind: 'user', text: steered ?? text })
         }
 
         continue
@@ -461,9 +468,15 @@ export class Transcript {
 
       if (!turn) {
         const continued = pendingContinued ?? continuation(this.entries.findLast(e => e.kind !== 'notice'))
-        turn = { blocks: [], continued, id: this.id('t'), kind: 'turn', rev: 0, startedAt: at, status: 'done' }
+        turn = { blocks: [], continued, id: this.id('t'), kind: 'turn', rev: 0, startedAt: promptAt || at, status: 'done' }
         pendingContinued = undefined
+        promptAt = 0
         this.entries.push(turn)
+      }
+
+      // The turn ended with its last stored row (the footer and the fold's duration read it).
+      if (at > 0) {
+        turn.endedAt = Math.max(turn.endedAt ?? at, at)
       }
 
       if (m.role === 'assistant') {
@@ -525,7 +538,7 @@ export class Transcript {
   /** A resumed session's unfinished turn: its prompt, then a live turn holding what streamed so far. */
   inflight(turn: InflightTurn, at = Date.now()) {
     const user = turn.user?.trim()
-    const notice = user ? internalNotice(user) : undefined
+    const notice = user ? (displayNotice(turn.display_kind, turn.display_metadata) ?? internalNotice(user)) : undefined
 
     if (notice) {
       this.#continued = notice
@@ -726,6 +739,35 @@ function toTodos(raw: unknown[]): Todo[] {
   }
 
   return out
+}
+
+/**
+ * The reason line for a row Hermes typed as its own notice (tui_gateway/session_history.py), as
+ * Ink's and the desktop's timeline events word it; undefined for any other display_kind.
+ */
+export function displayNotice(kind: string | null | undefined, metadata: unknown): string | undefined {
+  if (kind === 'auto_continue') {
+    return 'Resumed interrupted turn'
+  }
+
+  if (kind !== 'async_delegation_complete' && kind !== 'process_complete') {
+    return undefined
+  }
+
+  const meta = record(metadata)
+  const shown = typeof meta?.display_text === 'string' ? meta.display_text.trim() : ''
+
+  if (shown) {
+    return shown
+  }
+
+  if (kind === 'process_complete') {
+    return 'Background command finished'
+  }
+
+  const count = typeof meta?.task_count === 'number' ? meta.task_count : undefined
+
+  return count === 1 ? 'Subagent finished' : count === undefined ? 'Subagents finished' : `${count} subagents finished`
 }
 
 /** The footer Hermes' gateway appends to every notice it sends the agent as a user row. */

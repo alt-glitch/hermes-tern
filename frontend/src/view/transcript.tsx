@@ -211,7 +211,7 @@ function pieceNodes(turn: TurnEntry, blocks: readonly Block[], parent: string, c
 
 /** The reason line's icon: agents, a background command, a watcher, or Hermes going on. */
 function continuedIcon(why: string): string {
-  return why.startsWith('Subagents') ? 'users' : why.startsWith('Watcher') ? 'eye' : why.startsWith('Background') ? 'terminal' : 'loop'
+  return /^(\d+ )?subagent/i.test(why) ? 'users' : why.startsWith('Watcher') ? 'eye' : why.startsWith('Background') ? 'terminal' : 'loop'
 }
 
 const STEER_NOTE = { landed: '', next: ' · sent as the next prompt', pending: ' · reaches Hermes after this step' }
