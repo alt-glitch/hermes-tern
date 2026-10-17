@@ -4132,9 +4132,9 @@ var require_util2 = __commonJS({
       }
       const strongest = getStrongestMetadata(parsedMetadata);
       const metadata = filterMetadataListByAlgorithm(parsedMetadata, strongest);
-      for (const item2 of metadata) {
-        const algorithm = item2.algo;
-        const expectedValue = item2.hash;
+      for (const item3 of metadata) {
+        const algorithm = item3.algo;
+        const expectedValue = item3.hash;
         let actualValue = crypto.createHash(algorithm).update(bytes).digest("base64");
         if (actualValue[actualValue.length - 1] === "=") {
           if (actualValue[actualValue.length - 2] === "=") {
@@ -7996,12 +7996,12 @@ var require_pool_base = __commonJS({
           const queue2 = pool[kQueue];
           let needDrain = false;
           while (!needDrain) {
-            const item2 = queue2.shift();
-            if (!item2) {
+            const item3 = queue2.shift();
+            if (!item3) {
               break;
             }
             pool[kQueued]--;
-            needDrain = !this.dispatch(item2.opts, item2.handler);
+            needDrain = !this.dispatch(item3.opts, item3.handler);
           }
           this[kNeedDrain] = needDrain;
           if (!this[kNeedDrain] && pool[kNeedDrain]) {
@@ -8067,11 +8067,11 @@ var require_pool_base = __commonJS({
       }
       async [kDestroy](err) {
         while (true) {
-          const item2 = this[kQueue].shift();
-          if (!item2) {
+          const item3 = this[kQueue].shift();
+          if (!item3) {
             break;
           }
-          item2.handler.onError(err);
+          item3.handler.onError(err);
         }
         await Promise.all(this[kClients].map((c) => c.destroy(err)));
       }
@@ -10868,7 +10868,7 @@ var require_mock_interceptor = __commonJS({
 var require_mock_client = __commonJS({
   ".hermes-src/ui-tui/node_modules/undici/lib/mock/mock-client.js"(exports, module) {
     "use strict";
-    var { promisify: promisify5 } = __require("node:util");
+    var { promisify: promisify6 } = __require("node:util");
     var Client = require_client();
     var { buildMockDispatch } = require_mock_utils();
     var {
@@ -10908,7 +10908,7 @@ var require_mock_client = __commonJS({
         return new MockInterceptor(opts, this[kDispatches]);
       }
       async [kClose]() {
-        await promisify5(this[kOriginalClose])();
+        await promisify6(this[kOriginalClose])();
         this[kConnected] = 0;
         this[kMockAgent][Symbols.kClients].delete(this[kOrigin]);
       }
@@ -10921,7 +10921,7 @@ var require_mock_client = __commonJS({
 var require_mock_pool = __commonJS({
   ".hermes-src/ui-tui/node_modules/undici/lib/mock/mock-pool.js"(exports, module) {
     "use strict";
-    var { promisify: promisify5 } = __require("node:util");
+    var { promisify: promisify6 } = __require("node:util");
     var Pool = require_pool();
     var { buildMockDispatch } = require_mock_utils();
     var {
@@ -10961,7 +10961,7 @@ var require_mock_pool = __commonJS({
         return new MockInterceptor(opts, this[kDispatches]);
       }
       async [kClose]() {
-        await promisify5(this[kOriginalClose])();
+        await promisify6(this[kOriginalClose])();
         this[kConnected] = 0;
         this[kMockAgent][Symbols.kClients].delete(this[kOrigin]);
       }
@@ -17572,9 +17572,9 @@ var require_sender = __commonJS({
       constructor(socket) {
         this.#socket = socket;
       }
-      add(item2, cb, hint) {
+      add(item3, cb, hint) {
         if (hint !== sendHints.blob) {
-          const frame = createFrame(item2, hint);
+          const frame = createFrame(item3, hint);
           if (!this.#running) {
             this.#socket.write(frame, cb);
           } else {
@@ -17588,7 +17588,7 @@ var require_sender = __commonJS({
           return;
         }
         const node2 = {
-          promise: item2.arrayBuffer().then((ab) => {
+          promise: item3.arrayBuffer().then((ab) => {
             node2.promise = null;
             node2.frame = createFrame(ab, hint);
           }),
@@ -19011,9 +19011,9 @@ function strings(raw, key2) {
   if (!Array.isArray(v))
     return void 0;
   const out = [];
-  for (const item2 of v)
-    if (typeof item2 === "string")
-      out.push(item2);
+  for (const item3 of v)
+    if (typeof item3 === "string")
+      out.push(item3);
   return out;
 }
 function cell(raw) {
@@ -19091,10 +19091,10 @@ function decodeEvent(raw) {
     }
     case "select":
     case "activate": {
-      const item2 = str(raw, "item") ?? id;
-      if (sf === void 0 || id === void 0 || item2 === void 0)
+      const item3 = str(raw, "item") ?? id;
+      if (sf === void 0 || id === void 0 || item3 === void 0)
         return unknown();
-      return defined({ ev, sf, id, item: item2, raw }, { values: formValues(raw) });
+      return defined({ ev, sf, id, item: item3, raw }, { values: formValues(raw) });
     }
     case "action": {
       const act = str(raw, "act");
@@ -19821,8 +19821,8 @@ function flatten(input, out = []) {
   else if (typeof input === "number")
     out.push(String(input));
   else if (Array.isArray(input))
-    for (const item2 of input)
-      flatten(item2, out);
+    for (const item3 of input)
+      flatten(item3, out);
   else if (input instanceof FragmentNode)
     for (const part of input.parts)
       out.push(part);
@@ -19845,7 +19845,7 @@ function toJson(value) {
       if (value instanceof Node)
         throw new TypeError(`a ${value.kind} node can't be a prop value`);
       if (Array.isArray(value))
-        return value.map((item2) => toJson(item2) ?? null);
+        return value.map((item3) => toJson(item3) ?? null);
       const out = {};
       for (const key2 in value) {
         const json = toJson(Reflect.get(value, key2));
@@ -19968,25 +19968,25 @@ var PLAIN_TEXT = {
   badge: true,
   toast: true
 };
-function textProps(run4) {
-  if (run4.every((part) => typeof part === "string"))
-    return { text: run4.join("") };
-  return { spans: run4.map((part) => typeof part === "string" ? part : toJson(part) ?? null) };
+function textProps(run5) {
+  if (run5.every((part) => typeof part === "string"))
+    return { text: run5.join("") };
+  return { spans: run5.map((part) => typeof part === "string" ? part : toJson(part) ?? null) };
 }
 function containerChildren(parts2) {
   const out = [];
-  let run4 = [];
+  let run5 = [];
   const end = () => {
-    if (run4.length > 0)
-      out.push(new Node("text", textProps(run4)));
-    run4 = [];
+    if (run5.length > 0)
+      out.push(new Node("text", textProps(run5)));
+    run5 = [];
   };
   for (const part of parts2) {
     if (part instanceof Node) {
       end();
       out.push(part);
     } else {
-      run4.push(part);
+      run5.push(part);
     }
   }
   end();
@@ -20013,17 +20013,17 @@ function createNode(kind, input, children2) {
   const parts2 = flatten([fromProps, children2]);
   let nodes2 = [];
   if (SPAN_TEXT[kind] || PLAIN_TEXT[kind]) {
-    const run4 = [];
+    const run5 = [];
     for (const part of parts2) {
       if (part instanceof Node && kind === "seg")
         nodes2.push(part);
       else if (part instanceof Node || part instanceof Span && PLAIN_TEXT[kind]) {
         throw new TypeError(`${kind} takes text children, got ${describe(part)}`);
       } else
-        run4.push(part);
+        run5.push(part);
     }
-    if (run4.length > 0)
-      Object.assign(props, textProps(run4));
+    if (run5.length > 0)
+      Object.assign(props, textProps(run5));
   } else if (kind === "el") {
     let text2 = "";
     for (const part of parts2) {
@@ -20944,10 +20944,10 @@ var Session = class {
       this.#deliver({ type: "key", key: key2 });
   }
   #items(items) {
-    for (const item2 of items) {
-      switch (item2.type) {
+    for (const item3 of items) {
+      switch (item3.type) {
         case "keys":
-          for (const key2 of this.#keys.feed(item2.bytes))
+          for (const key2 of this.#keys.feed(item3.bytes))
             this.#deliver({ type: "key", key: key2 });
           break;
         case "da1":
@@ -20955,15 +20955,15 @@ var Session = class {
           this.#handshake = void 0;
           break;
         case "reply":
-          this.#recordLine("in", "r", {}, item2.reply.raw);
-          if (item2.reply.r === "hello")
-            this.#hello(item2.reply);
-          else if (item2.reply.r === "blobs")
-            this.#blobWaiters.shift()?.([...item2.reply.have]);
+          this.#recordLine("in", "r", {}, item3.reply.raw);
+          if (item3.reply.r === "hello")
+            this.#hello(item3.reply);
+          else if (item3.reply.r === "blobs")
+            this.#blobWaiters.shift()?.([...item3.reply.have]);
           break;
         case "event":
-          this.#recordLine("in", "e", {}, item2.event.raw);
-          this.#event(item2.event);
+          this.#recordLine("in", "e", {}, item3.event.raw);
+          this.#event(item3.event);
           break;
       }
     }
@@ -23793,8 +23793,8 @@ var CircularBuffer = class {
   buf;
   head = 0;
   len = 0;
-  push(item2) {
-    this.buf[this.head] = item2;
+  push(item3) {
+    this.buf[this.head] = item3;
     this.head = (this.head + 1) % this.capacity;
     if (this.len < this.capacity) {
       this.len++;
@@ -25237,14 +25237,14 @@ function bridgedCall(args) {
 }
 function toTodos(raw) {
   const out = [];
-  for (const item2 of raw) {
-    if (!item2 || typeof item2 !== "object") {
+  for (const item3 of raw) {
+    if (!item3 || typeof item3 !== "object") {
       continue;
     }
-    const id = "id" in item2 ? String(item2.id) : String(out.length);
-    const content = "content" in item2 ? String(item2.content) : "";
-    const status = "status" in item2 ? String(item2.status) : "pending";
-    const parent = "parent" in item2 && item2.parent ? String(item2.parent) : void 0;
+    const id = "id" in item3 ? String(item3.id) : String(out.length);
+    const content = "content" in item3 ? String(item3.content) : "";
+    const status = "status" in item3 ? String(item3.status) : "pending";
+    const parent = "parent" in item3 && item3.parent ? String(item3.parent) : void 0;
     out.push({
       content,
       id,
@@ -26737,10 +26737,10 @@ function searchCard(call, result) {
         /* @__PURE__ */ jsx("text", { role: "omp.tool.chip", spans: [{ t: String(hits.length) }] }, "n")
       ] }, f)
     );
-    let run4 = [];
+    let run5 = [];
     let runIndex = 0;
     const flush = () => {
-      const start = run4[0]?.line ?? 1;
+      const start = run5[0]?.line ?? 1;
       if (runIndex > 0) {
         body.push(/* @__PURE__ */ jsx("text", { role: "omp.tool.context", spans: [{ s: "muted", t: "\u2026" }] }, `${f}.g${runIndex}`));
       }
@@ -26749,23 +26749,23 @@ function searchCard(call, result) {
           "code",
           {
             lang: langOf(path),
-            marks: run4.map((h) => ({ line: h.line, tone: "accent" })),
+            marks: run5.map((h) => ({ line: h.line, tone: "accent" })),
             numbers: true,
             start,
-            text: run4.map((h) => h.text).join("\n")
+            text: run5.map((h) => h.text).join("\n")
           },
           `${f}.c${runIndex++}`
         )
       );
-      run4 = [];
+      run5 = [];
     };
     for (const hit of hits) {
-      if (run4.length && hit.line !== (run4.at(-1)?.line ?? 0) + 1) {
+      if (run5.length && hit.line !== (run5.at(-1)?.line ?? 0) + 1) {
         flush();
       }
-      run4.push(hit);
+      run5.push(hit);
     }
-    if (run4.length) {
+    if (run5.length) {
       flush();
     }
   }
@@ -26985,7 +26985,7 @@ function exitOf(call) {
 }
 function checklistNode(todos) {
   const status = (t2) => t2.status === "completed" ? "done" : t2.status === "in_progress" ? "active" : t2.status === "cancelled" ? "dropped" : "pending";
-  const item2 = (t2) => ({ id: t2.id, status: status(t2), text: t2.content });
+  const item3 = (t2) => ({ id: t2.id, status: status(t2), text: t2.content });
   const roots = todos.filter((t2) => !t2.parent);
   const nested = todos.some((t2) => t2.parent);
   const phases = nested ? roots.map((r) => {
@@ -26993,10 +26993,10 @@ function checklistNode(todos) {
     return {
       collapsed: kids.length > 0 && kids.every((k) => k.status === "completed"),
       id: r.id,
-      items: kids.length ? kids.map(item2) : [item2(r)],
+      items: kids.length ? kids.map(item3) : [item3(r)],
       title: r.content
     };
-  }) : [{ id: "all", items: roots.map(item2) }];
+  }) : [{ id: "all", items: roots.map(item3) }];
   return /* @__PURE__ */ jsx("checklist", { mode: "full", phases }, "list");
 }
 function plainDiff(raw) {
@@ -27099,11 +27099,11 @@ function moveSelection(key2, ids, selected) {
 function rank(items, query, textOf) {
   const words2 = query.toLowerCase().split(/\s+/).filter(Boolean);
   if (!words2.length) {
-    return items.map((item2) => ({ item: item2, positions: [] }));
+    return items.map((item3) => ({ item: item3, positions: [] }));
   }
   const scored = [];
-  items.forEach((item2, index) => {
-    const text2 = textOf(item2).toLowerCase();
+  items.forEach((item3, index) => {
+    const text2 = textOf(item3).toLowerCase();
     const positions = /* @__PURE__ */ new Set();
     let score = 0;
     for (const word of words2) {
@@ -27127,9 +27127,9 @@ function rank(items, query, textOf) {
       }
       score += 10;
     }
-    scored.push({ index, item: item2, positions: [...positions].sort((a, b) => a - b), score });
+    scored.push({ index, item: item3, positions: [...positions].sort((a, b) => a - b), score });
   });
-  return scored.sort((a, b) => b.score - a.score || a.index - b.index).map(({ item: item2, positions }) => ({ item: item2, positions }));
+  return scored.sort((a, b) => b.score - a.score || a.index - b.index).map(({ item: item3, positions }) => ({ item: item3, positions }));
 }
 function hitRuns(positions, limit) {
   const runs = [];
@@ -28179,8 +28179,208 @@ function clock(ms) {
   return new Date(ms).toLocaleTimeString([], { hour: "2-digit", hour12: false, minute: "2-digit", second: "2-digit" });
 }
 
-// src/overlays/pullRequests.tsx
+// src/git/status.ts
 import { execFile as execFile2 } from "node:child_process";
+import { promisify as promisify2 } from "node:util";
+var run = promisify2(execFile2);
+async function git(cwd, ...args) {
+  const { stdout } = await run("git", ["-C", cwd, ...args], { maxBuffer: 16 * 1024 * 1024, timeout: 1e4 });
+  return stdout;
+}
+var KIND = { A: "added", C: "copied", D: "deleted", M: "modified", R: "renamed", T: "modified" };
+function parseStatus(text2) {
+  const state = { ahead: 0, behind: 0, files: [] };
+  for (const line of text2.split("\n")) {
+    if (line.startsWith("# branch.head ")) {
+      const head2 = line.slice(14);
+      state.branch = head2 === "(detached)" ? void 0 : head2;
+    } else if (line.startsWith("# branch.upstream ")) {
+      state.upstream = line.slice(18);
+    } else if (line.startsWith("# branch.ab ")) {
+      const [, a, b] = line.match(/\+(\d+) -(\d+)/) ?? [];
+      state.ahead = Number(a ?? 0);
+      state.behind = Number(b ?? 0);
+    } else if (line.startsWith("1 ") || line.startsWith("2 ")) {
+      const parts2 = line.split(" ");
+      const xy = parts2[1] ?? "..";
+      const rest = parts2.slice(line.startsWith("1 ") ? 8 : 9).join(" ");
+      const [path, from] = rest.split("	");
+      const code2 = xy[0] !== "." ? xy[0] : xy[1];
+      state.files.push({ additions: 0, deletions: 0, from, path, staged: xy[0] !== ".", status: KIND[code2] ?? "modified" });
+    } else if (line.startsWith("u ")) {
+      state.files.push({ additions: 0, deletions: 0, path: line.split(" ").slice(10).join(" "), staged: false, status: "conflicted" });
+    } else if (line.startsWith("? ")) {
+      state.files.push({ additions: 0, deletions: 0, path: line.slice(2), staged: false, status: "untracked" });
+    }
+  }
+  return state;
+}
+function applyNumstat(files, text2) {
+  const byPath = new Map(files.map((f) => [f.path, f]));
+  for (const line of text2.split("\n")) {
+    const [add, del, ...rest] = line.split("	");
+    const path = rest.join("	").replace(/^(.*)\{(?:.*) => (.*)\}(.*)$/, "$1$2$3").replace(/^.* => /, "");
+    const f = byPath.get(path);
+    if (f) {
+      f.additions = Number(add) || 0;
+      f.deletions = Number(del) || 0;
+    }
+  }
+}
+async function gitState(cwd) {
+  try {
+    const root = (await git(cwd, "rev-parse", "--show-toplevel")).trim();
+    const state = parseStatus(await git(root, "status", "--porcelain=2", "--branch", "--untracked-files=all"));
+    const numstat = await git(root, "diff", "--numstat", "-M", "HEAD").catch(() => "");
+    applyNumstat(state.files, numstat);
+    for (const f of state.files.filter((x) => x.status === "untracked").slice(0, 50)) {
+      const out = await git(root, "diff", "--no-index", "--numstat", "--", "/dev/null", f.path).catch((e) => e.stdout ?? "");
+      applyNumstat([f], out);
+    }
+    return { root, ...state };
+  } catch {
+    return void 0;
+  }
+}
+async function fileDiff(root, f) {
+  if (f.status === "untracked") {
+    return git(root, "diff", "--no-index", "--", "/dev/null", f.path).catch((e) => e.stdout ?? "");
+  }
+  return git(root, "diff", "-M", "HEAD", "--", ...f.from ? [f.from, f.path] : [f.path]).catch(() => "");
+}
+
+// src/overlays/changes.tsx
+var KEY3 = "changes";
+var TONE2 = {
+  added: "success",
+  conflicted: "error",
+  deleted: "error",
+  renamed: "info",
+  untracked: "success"
+};
+function openChanges(app, focus) {
+  let state = app.sidebar.state;
+  let selected = focus;
+  let failed = false;
+  const diffs = /* @__PURE__ */ new Map();
+  const read2 = async () => {
+    const cwd = app.info?.cwd;
+    state = cwd ? await gitState(cwd) : void 0;
+    failed = !state;
+    diffs.clear();
+    app.changed();
+  };
+  const load2 = (f) => {
+    if (!f || !state || diffs.has(f.path)) {
+      return;
+    }
+    diffs.set(f.path, null);
+    void fileDiff(state.root, f).then((text2) => {
+      diffs.set(f.path, text2);
+      app.changed();
+    });
+  };
+  void read2();
+  const files = () => state?.files ?? [];
+  const current = () => files().find((f) => f.path === selected);
+  const overlay = {
+    key: KEY3,
+    modal: true,
+    node: () => sheetNode(),
+    onKey: (k) => {
+      if (k.name === "escape") {
+        app.close(overlay);
+      } else if (k.name === "c" && !k.ctrl && !k.alt && !k.meta && current()) {
+        copyToClipboard(current().path);
+      } else if (k.name === "r" && k.shift) {
+        void read2();
+      } else {
+        selected = moveSelection(
+          k,
+          files().map((f) => f.path),
+          selected
+        ) ?? selected;
+      }
+      return true;
+    }
+  };
+  function sheetNode() {
+    const list = files();
+    if (!list.some((f2) => f2.path === selected)) {
+      selected = list[0]?.path;
+    }
+    const f = current();
+    load2(f);
+    const diff2 = f ? diffs.get(f.path) : void 0;
+    const added = list.reduce((n, x) => n + x.additions, 0);
+    const removed = list.reduce((n, x) => n + x.deletions, 0);
+    return /* @__PURE__ */ jsx(
+      "picker",
+      {
+        actions: [
+          { disabled: f ? void 0 : "No file", id: "copy", keys: ["c"], label: "Copy path" },
+          { id: "refresh", keys: ["shift+r"], label: "Refresh" },
+          { end: true, id: "close", keys: ["esc"], label: "Close", primary: true }
+        ],
+        columns: [{ format: "dim", head: "Changes", id: "changes", priority: 2 }],
+        empty: failed ? "This folder is not in a git repository." : state ? "Nothing changed since the last commit." : "Reading git\u2026",
+        icon: "diff",
+        items: list.map(item2),
+        noun: "files",
+        onAction: {
+          close: () => app.close(overlay),
+          copy: () => f && copyToClipboard(f.path),
+          refresh: () => void read2()
+        },
+        onSelect: (ev) => {
+          selected = ev.item;
+          app.changed();
+        },
+        order: list.map((x) => x.path),
+        preview: "below",
+        selected,
+        size: "lg",
+        state: state || failed ? "ready" : "loading",
+        subtitle: [
+          { s: "muted", t: state?.branch ? `${state.branch} \xB7 ` : "" },
+          { s: "success", t: `+${added}` },
+          { t: " " },
+          { s: "error", t: `\u2212${removed}` }
+        ],
+        title: "Changes",
+        total: list.length,
+        children: f ? diffView(f, diff2) : null
+      },
+      KEY3
+    );
+  }
+  app.open(overlay);
+}
+function item2(f) {
+  return {
+    badges: [
+      ...f.status !== "modified" ? [{ text: f.status, tone: TONE2[f.status] }] : [],
+      ...f.staged ? [{ text: "staged" }] : []
+    ],
+    detail: f.from ? `from ${f.from}` : void 0,
+    facts: { changes: [{ s: "success", t: `+${f.additions}` }, { t: " " }, { s: "error", t: `\u2212${f.deletions}` }] },
+    id: f.path,
+    label: f.path,
+    mono: true
+  };
+}
+function diffView(f, diff2) {
+  if (diff2 === void 0 || diff2 === null) {
+    return [/* @__PURE__ */ jsx("text", { spans: [{ s: "muted", t: "Reading the diff\u2026" }] }, "wait")];
+  }
+  if (!diff2.trim()) {
+    return [/* @__PURE__ */ jsx("text", { spans: [{ s: "muted", t: "No line changed (a mode or a rename only)." }] }, "none")];
+  }
+  return /^Binary files /m.test(diff2) ? [/* @__PURE__ */ jsx("text", { spans: [{ s: "muted", t: "Binary file." }] }, "bin")] : [/* @__PURE__ */ jsx("diff", { path: f.path, text: diff2 }, `d:${f.path}`)];
+}
+
+// src/overlays/pullRequests.tsx
+import { execFile as execFile3 } from "node:child_process";
 
 // src/github/links.ts
 import { readFileSync } from "node:fs";
@@ -28601,13 +28801,13 @@ function failedRuns(checks) {
 }
 
 // src/overlays/pullRequests.tsx
-var KEY3 = "pull-requests";
+var KEY4 = "pull-requests";
 var TICK_MS3 = 3e4;
 var COPIED_MS2 = 1500;
 var TABS2 = ["prs", "checks", "activity", "files"];
 var METHOD_LABEL = { merge: "Merge", rebase: "Rebase and merge", squash: "Squash and merge" };
 function openUrl(url) {
-  execFile2(process.platform === "darwin" ? "open" : "xdg-open", [url], () => {
+  execFile3(process.platform === "darwin" ? "open" : "xdg-open", [url], () => {
   });
 }
 function stateLabel(pr) {
@@ -28752,7 +28952,7 @@ function openPullRequests(app, focus) {
     }
   };
   const overlay = {
-    key: KEY3,
+    key: KEY4,
     modal: true,
     node: () => sheetNode(Date.now()),
     onKey: (k) => {
@@ -28914,7 +29114,7 @@ function openPullRequests(app, focus) {
         total: tab === "prs" ? entries.length : ids.length,
         children: preview5
       },
-      KEY3
+      KEY4
     );
   }
   app.open(overlay);
@@ -29225,7 +29425,7 @@ function prsPill(entries, onOpen) {
 }
 
 // src/overlays/help.tsx
-var KEY4 = "help";
+var KEY5 = "help";
 var HOTKEYS = [
   {
     group: "Editing",
@@ -29253,6 +29453,7 @@ var HOTKEYS = [
       [["alt+a"], "Agents"],
       [["alt+b"], "Background processes and cron jobs (/ps)"],
       [["alt+p"], "Pull requests Hermes linked (/prs)"],
+      [["alt+s"], "Session sidebar: branch, PRs, changes (/sidebar)"],
       [["down"], "Focus the agents / shells / PR pills (empty prompt); \u2190 \u2192 switch, Enter opens, Esc returns"],
       [["ctrl+c"], "Clear the draft / interrupt / exit (twice)"],
       [["ctrl+d"], "Delete forward / exit (empty prompt)"]
@@ -29271,7 +29472,7 @@ async function openHelp(app) {
   }
   const categories = catalog.categories?.length ? catalog.categories : [{ name: "Commands", pairs: catalog.pairs ?? [] }];
   const overlay = {
-    key: KEY4,
+    key: KEY5,
     modal: true,
     node: () => /* @__PURE__ */ jsx("overlay", { anchor: "center", head: "Commands and shortcuts", modal: true, role: "omp.overlay.hotkeys", size: "lg", children: /* @__PURE__ */ jsxs("col", { gap: "lg", children: [
       HOTKEYS.map(({ group, rows }) => /* @__PURE__ */ jsx("section", { head: group, role: "omp.hotkeys.group", children: /* @__PURE__ */ jsx(
@@ -29329,7 +29530,7 @@ async function openHelp(app) {
           "close"
         )
       ] }, "actions")
-    ] }, "body") }, KEY4),
+    ] }, "body") }, KEY5),
     onKey: (k) => {
       if (k.name === "escape" || k.name === "enter" || k.name === "q") {
         app.close(overlay);
@@ -29371,7 +29572,7 @@ var providerDisplayNames = (providers) => {
 };
 
 // src/overlays/models.tsx
-var KEY5 = "models";
+var KEY6 = "models";
 var ALL = "all";
 var confirmTokens = /* @__PURE__ */ new Map();
 async function mutateModel(app, value, confirmed) {
@@ -29488,10 +29689,10 @@ function openModelPicker(app) {
       if (scope === ALL) {
         order.push({ count: mine.length, group: provider.slug, label: name });
       }
-      for (const { item: item2, positions } of mine) {
-        order.push(item2.id);
+      for (const { item: item3, positions } of mine) {
+        order.push(item3.id);
         if (positions.length) {
-          hits[item2.id] = hitRuns(positions, item2.model.length);
+          hits[item3.id] = hitRuns(positions, item3.model.length);
         }
       }
     }
@@ -29502,7 +29703,7 @@ function openModelPicker(app) {
     return { hits, order };
   };
   const overlay = {
-    key: KEY5,
+    key: KEY6,
     modal: true,
     node: () => {
       const { hits, order } = view();
@@ -29579,7 +29780,7 @@ function openModelPicker(app) {
           total: rows.length,
           children: row ? preview3(row, row.id === current) : null
         },
-        KEY5
+        KEY6
       );
     },
     onKey: (k) => {
@@ -30142,7 +30343,7 @@ function actionsRow(buttons) {
   ] }, "actions");
 }
 function optionList(listKey, id, options, selected, select, pick) {
-  const at = (item2) => options.findIndex((o) => `${id}.${o.id}` === item2);
+  const at = (item3) => options.findIndex((o) => `${id}.${o.id}` === item3);
   return /* @__PURE__ */ jsx(
     "list",
     {
@@ -30642,7 +30843,7 @@ function confirmOverlay(host, ask) {
 }
 
 // src/overlays/sessions.tsx
-var KEY6 = "sessions";
+var KEY7 = "sessions";
 var LIMIT = 200;
 var DAY = 864e5;
 function openSessionPicker(app) {
@@ -30701,13 +30902,13 @@ function openSessionPicker(app) {
     const ranked = rank(rows, query, (r) => `${labelOf(r)} ${r.preview ?? ""}`);
     const hits = {};
     const buckets = /* @__PURE__ */ new Map();
-    for (const { item: item2, positions } of ranked) {
-      const label = query ? "Matches" : dayOf(item2.started_at, now);
+    for (const { item: item3, positions } of ranked) {
+      const label = query ? "Matches" : dayOf(item3.started_at, now);
       const bucket = buckets.get(label) ?? { ids: [], label };
-      bucket.ids.push(item2.id);
+      bucket.ids.push(item3.id);
       buckets.set(label, bucket);
       if (positions.length) {
-        hits[item2.id] = hitRuns(positions, labelOf(item2).length);
+        hits[item3.id] = hitRuns(positions, labelOf(item3).length);
       }
     }
     const order = [];
@@ -30721,7 +30922,7 @@ function openSessionPicker(app) {
     return { hits, order };
   };
   const overlay = {
-    key: KEY6,
+    key: KEY7,
     modal: true,
     node: () => {
       const now = Date.now();
@@ -30786,7 +30987,7 @@ function openSessionPicker(app) {
           total: rows.length,
           children: row ? preview4(row, row.id === app.storedSid) : null
         },
-        KEY6
+        KEY7
       );
     },
     onKey: (k) => {
@@ -30880,7 +31081,7 @@ function dateOf(startedAt) {
 }
 
 // src/overlays/theme.tsx
-var KEY7 = "theme";
+var KEY8 = "theme";
 var MODES = [
   { detail: "Your Tern theme, light and dark, with no colors of its own", icon: "palette", id: "tern", label: "Tern" },
   { detail: "Bone ink and quiet grays; gold only for the moments that earn it", icon: "sparkle", id: "nous", label: "Nous" },
@@ -30899,7 +31100,7 @@ function openThemePicker(app) {
     }
   };
   const overlay = {
-    key: KEY7,
+    key: KEY8,
     modal: true,
     node: () => /* @__PURE__ */ jsx(
       "picker",
@@ -30929,7 +31130,7 @@ function openThemePicker(app) {
         size: "md",
         title: "Theme"
       },
-      KEY7
+      KEY8
     ),
     onKey: (k) => {
       if (k.name === "escape") {
@@ -31018,6 +31219,16 @@ var COMMANDS2 = [
     aliases: ["bashes", "shells", "processes"],
     name: "ps",
     run: (app) => openBackground(app)
+  },
+  {
+    aliases: ["side"],
+    name: "sidebar",
+    run: (app) => app.toggleSidebar()
+  },
+  {
+    aliases: ["diff"],
+    name: "changes",
+    run: (app) => openChanges(app)
   },
   {
     aliases: ["pr", "pulls"],
@@ -31376,12 +31587,12 @@ var Completion = class {
           onActivate: (ev) => this.#pick(ev.item, listId, { accept: true }),
           onSelect: (ev) => this.#pick(ev.item, listId, { accept: false }),
           selected: `${listId}.${this.selected}`,
-          children: this.items.map((item2, i) => /* @__PURE__ */ jsx(
+          children: this.items.map((item3, i) => /* @__PURE__ */ jsx(
             "item",
             {
-              detail: item2.meta && item2.meta !== "dir" ? item2.meta : void 0,
-              icon: iconOf(item2),
-              label: labelOf2(item2, this.#for, this.#replaceFrom)
+              detail: item3.meta && item3.meta !== "dir" ? item3.meta : void 0,
+              icon: iconOf(item3),
+              label: labelOf2(item3, this.#for, this.#replaceFrom)
             },
             String(i)
           ))
@@ -31432,21 +31643,21 @@ var COMMAND_ICONS = {
   usage: "gauge",
   yolo: "shield-alert"
 };
-function isPath(item2) {
-  return !item2.kind && !item2.text.startsWith("/");
+function isPath(item3) {
+  return !item3.kind && !item3.text.startsWith("/");
 }
-function iconOf(item2) {
-  if (isPath(item2)) {
-    return (item2.display || item2.text).endsWith("/") ? "folder" : "file";
+function iconOf(item3) {
+  if (isPath(item3)) {
+    return (item3.display || item3.text).endsWith("/") ? "folder" : "file";
   }
-  if (item2.kind === "skill") {
+  if (item3.kind === "skill") {
     return "skill";
   }
-  return COMMAND_ICONS[item2.text.replace(/^\//, "").split(/\s/)[0] ?? ""] ?? "slash";
+  return COMMAND_ICONS[item3.text.replace(/^\//, "").split(/\s/)[0] ?? ""] ?? "slash";
 }
-function labelOf2(item2, typed, replaceFrom) {
-  const label = (item2.display || item2.text).replace(/^\//, "");
-  const base2 = isPath(item2) ? "strong" : void 0;
+function labelOf2(item3, typed, replaceFrom) {
+  const label = (item3.display || item3.text).replace(/^\//, "");
+  const base2 = isPath(item3) ? "strong" : void 0;
   const query = typed.slice(replaceFrom).replace(/^[/@]/, "").replace(/^(file|folder):/, "").split("/").pop() ?? "";
   const at = query ? label.toLowerCase().indexOf(query.toLowerCase()) : -1;
   if (at < 0) {
@@ -31561,6 +31772,22 @@ var STYLES = css`
   [data-role='hermes.work.detail'] {
     font-family: var(--mono) !important;
     font-size: 13px !important;
+  }
+
+  /* The session sidebar is a prefs sheet for its dock, not for settings: no search, no one-page
+     strip, no page heading over the folder line. */
+  .sf-prefs[data-id='layer.sidebar'] .pf-mark,
+  .sf-prefs[data-id='layer.sidebar'] .pf-search,
+  .sf-prefs[data-id='layer.sidebar'] .pf-groups,
+  .sf-prefs[data-id='layer.sidebar'] .pf-eyebrow,
+  .sf-prefs[data-id='layer.sidebar'] .pf-title {
+    display: none !important;
+  }
+
+  .sf-prefs[data-id='layer.sidebar'] .pf-lead {
+    font-family: var(--mono) !important;
+    font-size: 12px !important;
+    margin-top: 0 !important;
   }
 
   /* omp's ask theme draws a radio at the start of each option without moving the text over. */
@@ -32251,9 +32478,9 @@ function semantic(c) {
 }
 
 // src/github/branch.ts
-import { execFile as execFile3 } from "node:child_process";
-import { promisify as promisify2 } from "node:util";
-var run = promisify2(execFile3);
+import { execFile as execFile4 } from "node:child_process";
+import { promisify as promisify3 } from "node:util";
+var run2 = promisify3(execFile4);
 function parseRemote(url) {
   const m = url.match(/^[\w.-]+@([^:/]+):([^/]+\/[^/]+?)(?:\.git)?\/?$/) ?? url.match(/^(?:https?|ssh|git):\/\/(?:[^@/]+@)?([^/:]+)(?::\d+)?\/([^/]+\/[^/]+?)(?:\.git)?\/?$/);
   if (!m) {
@@ -32262,19 +32489,19 @@ function parseRemote(url) {
   const host = m[1].toLowerCase();
   return host === "github.com" || host.split(".").includes("github") ? { host, repository: m[2].toLowerCase() } : void 0;
 }
-async function git(cwd, ...args) {
-  const { stdout } = await run("git", ["-C", cwd, ...args], { timeout: 5e3 });
+async function git2(cwd, ...args) {
+  const { stdout } = await run2("git", ["-C", cwd, ...args], { timeout: 5e3 });
   return stdout.trim();
 }
 async function branchTarget(cwd) {
   try {
-    const branch = await git(cwd, "symbolic-ref", "--quiet", "--short", "HEAD");
-    const [remote = "", ref = ""] = (await git(cwd, "for-each-ref", "--format=%(upstream:remotename)%00%(upstream:remoteref)", `refs/heads/${branch}`)).split("\0");
+    const branch = await git2(cwd, "symbolic-ref", "--quiet", "--short", "HEAD");
+    const [remote = "", ref = ""] = (await git2(cwd, "for-each-ref", "--format=%(upstream:remotename)%00%(upstream:remoteref)", `refs/heads/${branch}`)).split("\0");
     const name = remote || "origin";
-    const parsed = parseRemote(await git(cwd, "remote", "get-url", name));
+    const parsed = parseRemote(await git2(cwd, "remote", "get-url", name));
     const head2 = ref.replace(/^refs\/heads\//, "") || branch;
     const fallback = ["main", "master"];
-    const defaultBranch = (await git(cwd, "symbolic-ref", "--quiet", "--short", `refs/remotes/${name}/HEAD`).catch(() => "")).replace(
+    const defaultBranch = (await git2(cwd, "symbolic-ref", "--quiet", "--short", `refs/remotes/${name}/HEAD`).catch(() => "")).replace(
       `${name}/`,
       ""
     );
@@ -32333,9 +32560,9 @@ function parseStacks(host, repository, rows) {
 }
 
 // src/github/client.ts
-import { execFile as execFile4 } from "node:child_process";
-import { promisify as promisify3 } from "node:util";
-var run2 = promisify3(execFile4);
+import { execFile as execFile5 } from "node:child_process";
+import { promisify as promisify4 } from "node:util";
+var run3 = promisify4(execFile5);
 var GitHubError = class extends Error {
   constructor(message, status) {
     super(message);
@@ -32363,7 +32590,7 @@ async function read(host, env) {
     return own;
   }
   try {
-    const { stdout } = await run2("gh", ["auth", "token", "--hostname", host], { timeout: 1e4 });
+    const { stdout } = await run3("gh", ["auth", "token", "--hostname", host], { timeout: 1e4 });
     const token = stdout.trim();
     if (token) {
       return token;
@@ -32715,6 +32942,156 @@ var PullRequests = class {
       }
     }
     this.#error = entries.length && entries.every((e) => e.error && !e.pr) ? failed : void 0;
+  }
+};
+
+// src/sidebar.tsx
+var POLL_MS2 = 5e3;
+var ACTS = ["close", "page", "copy-branch", "open-pr", "diff", "all-files"];
+var MAX_FILES = 40;
+var Sidebar = class {
+  #app;
+  #open = false;
+  #state;
+  #cwd = null;
+  #timer;
+  #reading = false;
+  #copied = false;
+  #copiedTimer;
+  constructor(app) {
+    this.#app = app;
+  }
+  get open() {
+    return this.#open;
+  }
+  get state() {
+    return this.#state;
+  }
+  toggle() {
+    this.#open = !this.#open;
+    clearTimeout(this.#timer);
+    if (this.#open) {
+      void this.refresh();
+    }
+    this.#app.changed();
+  }
+  /** Reads git again now (a tool changed files, the turn ended). */
+  poke() {
+    if (this.#open) {
+      void this.refresh();
+    }
+  }
+  dispose() {
+    this.#open = false;
+    clearTimeout(this.#timer);
+  }
+  async refresh() {
+    const cwd = this.#app.info?.cwd || null;
+    if (this.#reading) {
+      return;
+    }
+    this.#reading = true;
+    clearTimeout(this.#timer);
+    try {
+      this.#state = cwd ? await gitState(cwd) : void 0;
+      this.#cwd = cwd;
+    } finally {
+      this.#reading = false;
+      if (this.#open) {
+        this.#timer = setTimeout(() => void this.refresh(), POLL_MS2);
+      }
+      this.#app.changed();
+    }
+  }
+  node(id) {
+    if (!this.#open) {
+      return null;
+    }
+    const app = this.#app;
+    const git3 = this.#state;
+    const prs = app.prs.entries().toReversed();
+    const files = git3?.files ?? [];
+    const added = files.reduce((n, f) => n + f.additions, 0);
+    const removed = files.reduce((n, f) => n + f.deletions, 0);
+    const where = git3?.upstream ? git3.ahead || git3.behind ? [git3.ahead && `${git3.ahead} ahead`, git3.behind && `${git3.behind} behind`].filter(Boolean).join(", ") + ` of ${git3.upstream}` : `Up to date with ${git3.upstream}` : "Not pushed: no upstream";
+    const branchRows = git3 ? [
+      {
+        control: git3.branch ? { act: "copy-branch", k: "action", label: this.#copied ? "Copied" : "Copy" } : void 0,
+        hint: git3.branch ? where : "Detached HEAD",
+        id: "branch",
+        label: git3.branch ?? "No branch"
+      }
+    ] : [{ disabled: this.#cwd ? "This folder is not in a git repository." : "The session has no folder yet.", id: "branch", label: "No git" }];
+    const prRows = prs.length ? prs.map((e) => ({
+      control: { act: "open-pr", k: "action", label: "Open" },
+      hint: e.pr ? [
+        stateLabel(e.pr),
+        e.pr.checks.length ? `checks ${checksState(e.pr.checks)}` : "",
+        e.source === "branch" ? "this branch" : e.source === "stack" ? "stack layer" : ""
+      ].filter(Boolean).join(" \xB7 ") : e.error ?? "Reading GitHub\u2026",
+      id: `pr:${prKey(e.ref)}`,
+      label: `#${e.ref.number} ${e.pr?.title ?? e.ref.repository}`,
+      warning: e.pr?.state === "open" && e.pr.mergeable === "conflicting" ? "Conflicts with its base branch" : void 0
+    })) : [{ disabled: "Hermes links each PR it opens; the branch\u2019s PR shows here too.", id: "no-prs", label: "None yet" }];
+    const fileRows = files.length ? files.slice(0, MAX_FILES).map((f) => ({
+      control: { act: "diff", k: "action", label: "Diff" },
+      hint: `${f.status}${f.staged ? ", staged" : ""} \xB7 +${f.additions} \u2212${f.deletions}`,
+      id: `file:${f.path}`,
+      label: f.path
+    })) : git3 ? [{ disabled: "Nothing changed since the last commit.", id: "no-files", label: "Clean" }] : [];
+    return /* @__PURE__ */ jsx(
+      "prefs",
+      {
+        lead: git3 ? git3.root.replace(process.env.HOME ?? "\0", "~") : app.info?.cwd ?? "",
+        onAction: Object.fromEntries(ACTS.map((act) => [act, (ev) => this.#action(act, ev.value)])),
+        page: "session",
+        pages: [{ icon: "branch", id: "session", label: "Session" }],
+        sections: [
+          { id: "branch", rows: branchRows, title: "Branch" },
+          { id: "prs", rows: prRows, title: `Pull requests${prs.length ? ` \xB7 ${prs.length}` : ""}` },
+          ...fileRows.length ? [
+            {
+              id: "files",
+              rows: [
+                ...fileRows,
+                ...files.length > MAX_FILES ? [{ control: { act: "all-files", k: "action", label: "Show all" }, id: "more", label: `${files.length - MAX_FILES} more` }] : []
+              ],
+              title: files.length ? `Changes \xB7 ${files.length} files \xB7 +${added} \u2212${removed}` : "Changes"
+            }
+          ] : []
+        ],
+        title: "Session"
+      },
+      "sidebar"
+    );
+  }
+  #action(act, value) {
+    const row = typeof value === "string" ? value : "";
+    switch (act) {
+      case "close":
+        if (!row) {
+          this.toggle();
+        }
+        return;
+      case "copy-branch":
+        if (this.#state?.branch) {
+          copyToClipboard(this.#state.branch);
+          this.#copied = true;
+          clearTimeout(this.#copiedTimer);
+          this.#copiedTimer = setTimeout(() => {
+            this.#copied = false;
+            this.#app.changed();
+          }, 1500);
+          this.#app.changed();
+        }
+        return;
+      case "open-pr":
+        return openPullRequests(this.#app, row.replace(/^pr:/, ""));
+      case "diff":
+        return openChanges(this.#app, row.replace(/^file:/, ""));
+      case "all-files":
+        return openChanges(this.#app);
+    }
   }
 };
 
@@ -34397,11 +34774,11 @@ function stepLabel(call) {
   const label = name.charAt(0).toUpperCase() + name.slice(1);
   return call.context ? `${label}: ${flat(call.context)}` : label;
 }
-function liveLabel(item2) {
-  if (item2.kind === "thinking") {
-    return thoughtLine(item2.text) || (item2.endedAt === void 0 ? "Thinking" : "Thought");
+function liveLabel(item3) {
+  if (item3.kind === "thinking") {
+    return thoughtLine(item3.text) || (item3.endedAt === void 0 ? "Thinking" : "Thought");
   }
-  const call = item2.call;
+  const call = item3.call;
   const command = call.name === "terminal" ? str6(call.args.command) ?? call.context : void 0;
   if (!command) {
     return stepLabel(call);
@@ -34822,22 +35199,22 @@ function workNode(items, parent, live, now) {
     ...shown.map((i) => itemNode(i, id, now))
   ]);
 }
-function itemNode(item2, parent, now, key2 = item2.id) {
+function itemNode(item3, parent, now, key2 = item3.id) {
   const id = `${parent}.${key2}`;
-  if (item2.kind === "thinking") {
+  if (item3.kind === "thinking") {
     return node("section", { collapsed: true, collapsible: true, head: `${id}.head`, key: key2, role: "hermes.work.row" }, [
       /* @__PURE__ */ jsxs("row", { align: "center", gap: "sm", children: [
         /* @__PURE__ */ jsx("icon", { name: "brain" }, "icon"),
-        /* @__PURE__ */ jsx("text", { grow: 1, spans: [{ s: "muted", t: thoughtLine(item2.text) }], truncate: "end", wrap: "none" }, "label")
+        /* @__PURE__ */ jsx("text", { grow: 1, spans: [{ s: "muted", t: thoughtLine(item3.text) }], truncate: "end", wrap: "none" }, "label")
       ] }, "head"),
-      /* @__PURE__ */ jsx("md", { role: "hermes.work.thought", stream: item2.endedAt === void 0 || void 0, children: item2.text }, "body")
+      /* @__PURE__ */ jsx("md", { role: "hermes.work.thought", stream: item3.endedAt === void 0 || void 0, children: item3.text }, "body")
     ]);
   }
-  const call = item2.call;
+  const call = item3.call;
   const detail = toolDetail(call, now);
   const running = call.status === "running";
   const head2 = /* @__PURE__ */ jsxs("row", { align: "center", gap: "sm", title: call.context || void 0, children: [
-    /* @__PURE__ */ jsx("icon", { name: itemIcon(item2), tone: call.status === "error" ? "error" : void 0 }, "icon"),
+    /* @__PURE__ */ jsx("icon", { name: itemIcon(item3), tone: call.status === "error" ? "error" : void 0 }, "icon"),
     /* @__PURE__ */ jsx(
       "text",
       {
@@ -34858,10 +35235,10 @@ function itemNode(item2, parent, now, key2 = item2.id) {
     /* @__PURE__ */ jsx("col", { gap: "xs", role: "hermes.work.detail", children: detail }, "detail")
   ]);
 }
-function itemIcon(item2) {
-  return item2.kind === "thinking" ? "brain" : actionIcon(actionOf(item2.call));
+function itemIcon(item3) {
+  return item3.kind === "thinking" ? "brain" : actionIcon(actionOf(item3.call));
 }
-var startOf = (item2) => item2.kind === "tool" ? item2.call.startedAt : item2.startedAt;
+var startOf = (item3) => item3.kind === "tool" ? item3.call.startedAt : item3.startedAt;
 
 // src/view/transcript.tsx
 var kNode = /* @__PURE__ */ Symbol("tsp.node");
@@ -35053,9 +35430,9 @@ function noticeNode(e) {
 }
 
 // src/watch/spec.ts
-import { execFile as execFile5 } from "node:child_process";
-import { promisify as promisify4 } from "node:util";
-var run3 = promisify4(execFile5);
+import { execFile as execFile6 } from "node:child_process";
+import { promisify as promisify5 } from "node:util";
+var run4 = promisify5(execFile6);
 var WATCH_ENV = "HERMES_TERN_WATCH";
 function readWatchSpec(env = process.env) {
   try {
@@ -35087,7 +35464,7 @@ async function openSidebar(spec, cwd, env = process.env) {
     return false;
   }
   if (sidebar) {
-    await run3("tern", ["close", sidebar]).catch(() => void 0);
+    await run4("tern", ["close", sidebar]).catch(() => void 0);
     sidebar = void 0;
   }
   const command = [
@@ -35101,7 +35478,7 @@ async function openSidebar(spec, cwd, env = process.env) {
     "tern"
   ];
   try {
-    const { stdout } = await run3("tern", ["split", pane, "right", "--cwd", cwd, "--", ...command]);
+    const { stdout } = await run4("tern", ["split", pane, "right", "--cwd", cwd, "--", ...command]);
     sidebar = stdout.trim().split(/\s+/).at(-1) || void 0;
     return true;
   } catch {
@@ -35121,6 +35498,7 @@ var App = class {
   /** The session's background processes (the shells pill, the Background sheet, background cards). */
   processes = new Processes(this);
   cron = new Cron(this);
+  sidebar = new Sidebar(this);
   /** The conversation's PRs; links are stored under the stored session id the tools see. */
   prs = new PullRequests({
     changed: () => this.changed(),
@@ -35295,6 +35673,9 @@ var App = class {
     if (key2.alt && key2.name === "b" && !key2.ctrl && !key2.meta || key2.name === "\u222B") {
       return openBackground(this);
     }
+    if (key2.alt && key2.name === "s" && !key2.ctrl && !key2.meta || key2.name === "\xDF") {
+      return this.toggleSidebar();
+    }
     if (key2.alt && key2.name === "p" && !key2.ctrl && !key2.meta || key2.name === "\u03C0") {
       return openPullRequests(this);
     }
@@ -35350,6 +35731,15 @@ var App = class {
       openPullRequests(this);
     }
     return out.consumed;
+  }
+  /** Opens or closes the session sidebar (Tern's aside); says why where Tern has none. */
+  toggleSidebar() {
+    if (!this.#tern.caps.features.includes("aside")) {
+      this.transcript.notice("This Tern has no side panel (the aside feature). /changes and /prs still work.", "warning");
+      this.changed();
+      return;
+    }
+    this.sidebar.toggle();
   }
   /** Shows subagent `id` beside the chat in a Tern split; its timeline sheet where no split can open. */
   async openAgent(id) {
@@ -35791,6 +36181,9 @@ var App = class {
               this.prs.onCall(call);
             }
           }
+          if (["patch", "terminal", "write_file", "execute_code"].includes(ev.payload.name)) {
+            this.sidebar.poke();
+          }
           if (ev.payload.name === "terminal") {
             this.processes.poke();
           }
@@ -35819,6 +36212,7 @@ var App = class {
         this.busy = null;
         this.#drainQueue();
         this.prs.poke();
+        this.sidebar.poke();
         break;
       case "status.update":
         if (this.busy && ev.payload?.text && ev.payload.kind === "status") {
@@ -36067,7 +36461,11 @@ ${this.composer.text}` : next2);
         queued: this.queue,
         ready: this.sid !== null
       }),
-      layer: [...this.overlays.map((o) => o.node(`layer.${o.key}`)), ...modal ? [] : this.#completion.nodes(INPUT_ID)],
+      layer: [
+        ...this.#tern.caps.features.includes("aside") ? [this.sidebar.node("layer.sidebar")].filter((n) => n !== null) : [],
+        ...this.overlays.map((o) => o.node(`layer.${o.key}`)),
+        ...modal ? [] : this.#completion.nodes(INPUT_ID)
+      ],
       main: this.transcript.entries.map((e) => entryNode(e, `main.${e.id}`, cx))
     });
     const top = this.overlays.at(-1);
@@ -36090,7 +36488,7 @@ function shortPath2(path) {
 // src/watch/watchApp.ts
 import { readFile as readFile3 } from "node:fs/promises";
 var INPUT_ID2 = "dock.composer.line.input";
-var POLL_MS2 = 1e3;
+var POLL_MS3 = 1e3;
 var EXIT_ARM_MS2 = 1500;
 var WatchApp = class {
   transcript = new Transcript();
@@ -36143,7 +36541,7 @@ var WatchApp = class {
     } catch (error) {
       this.transcript.notice(`The session database is not readable here: ${String(error)}`, "warning");
     }
-    this.#timer = setInterval(() => void this.#tick(), POLL_MS2);
+    this.#timer = setInterval(() => void this.#tick(), POLL_MS3);
     void this.#tick();
     this.#render();
     this.#surface.focus(INPUT_ID2);

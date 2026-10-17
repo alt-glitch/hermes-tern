@@ -50,7 +50,8 @@ prove it.
 | #21 | A steer stays in view; each stretch around it folds on its own |
 | #22 | Live process output; the Background sheet's Cron tab (every cron job and monitor: pause, resume, remove) |
 | #23 | `link_pull_request` and the Pull requests sheet: PRs, checks, activity, files, merge and close |
-| next | The PR of the session's branch or worktree, and the layers of a GitHub stack |
+| #24 | The PR of the session's branch or worktree, and the layers of a GitHub stack |
+| next | The session sidebar (Tern's aside): branch, PRs, changed files; the Changes sheet |
 
 ## Milestones
 
