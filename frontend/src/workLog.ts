@@ -470,6 +470,12 @@ export function stepLabel(call: ToolCall): string {
     case 'list_pull_requests':
       return 'Listed linked pull requests'
 
+    case 'skill_view':
+      return str(a.name) ? `Read skill ${a.name}` : 'Read a skill'
+
+    case 'skills_list':
+      return 'Listed skills'
+
     case 'tool_search': {
       const q = Array.isArray(a.queries) ? a.queries.filter(x => typeof x === 'string') : [str(a.queries) ?? str(a.query)].filter(Boolean)
 
@@ -477,9 +483,16 @@ export function stepLabel(call: ToolCall): string {
     }
 
     case 'tool_describe': {
-      const names = Array.isArray(a.names) ? a.names.filter(x => typeof x === 'string') : [str(a.names)].filter(Boolean)
+      const names = (Array.isArray(a.names) ? a.names : [a.names]).filter((x): x is string => typeof x === 'string' && x !== '')
 
-      return names.length ? `Read how to call ${names.join(', ')}` : 'Read tool details'
+      // Connector names read as their app and action, as the calls themselves do.
+      const named = names.map(n => {
+        const app = callApp({ args: {}, name: n })
+
+        return app ? `${app.app} · ${app.action}` : n.replace(/_/g, ' ')
+      })
+
+      return named.length ? `Read how to call ${named.join(', ')}` : 'Read tool details'
     }
   }
 
@@ -490,21 +503,46 @@ export function stepLabel(call: ToolCall): string {
 }
 
 /** The live line of a running group, after t3code's `liveWorkEntryLabel`: "Running ls". */
-export function liveLabel(item: WorkItem): string {
+/**
+ * The live group's line for its newest step. `active` (the turn is still at work on it) keeps a
+ * step that already ended in the present tense, as t3code's `liveActivityToolStatus` does: the
+ * agent is still busy, so "Running sed" stays until the next step or the answer replaces it.
+ */
+export function liveLabel(item: WorkItem, active = false): string {
   if (item.kind === 'thinking') {
-    return thoughtLine(item.text) || (item.endedAt === undefined ? 'Thinking' : 'Thought')
+    return thoughtLine(item.text) || (item.endedAt === undefined || active ? 'Thinking' : 'Thought')
   }
 
   const call = item.call
+  const status = active && call.status === 'done' ? 'running' : call.status
   const command = call.name === 'terminal' ? (str(call.args.command) ?? call.context) : undefined
 
   if (!command) {
-    return stepLabel(call)
+    return status === 'running' ? presentTense(stepLabel(call)) : stepLabel(call)
   }
 
-  const verb = { cancelled: 'Stopped', done: 'Ran', error: 'Failed', running: 'Running' }[call.status]
+  const verb = { cancelled: 'Stopped', done: 'Ran', error: 'Failed', running: 'Running' }[status]
 
   return `${verb} ${commandProgramName(command) ?? 'command'}`
+}
+
+const PRESENT: Record<string, string> = {
+  Edited: 'Editing',
+  Linked: 'Linking',
+  Listed: 'Listing',
+  Looked: 'Looking',
+  Read: 'Reading',
+  Searched: 'Searching',
+  Unlinked: 'Unlinking',
+  Used: 'Using',
+  Wrote: 'Writing'
+}
+
+/** `Read a.ts` → `Reading a.ts`: a step label's leading past-tense verb in the present tense. */
+export function presentTense(label: string): string {
+  const [verb = '', ...rest] = label.split(' ')
+
+  return PRESENT[verb] ? [PRESENT[verb], ...rest].join(' ') : label
 }
 
 /** A thought on one line: its Markdown dropped, its whitespace collapsed. */

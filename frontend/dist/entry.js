@@ -24772,7 +24772,11 @@ function appTitle(slug) {
   if (known) {
     return known;
   }
-  return slug.split(/[-_\s]+/).filter(Boolean).map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
+  const words2 = slug.split(/[-_\s]+/).filter(Boolean);
+  if (words2.length > 1 && words2.at(-1).toLowerCase() === "mcp") {
+    words2.pop();
+  }
+  return words2.map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
 }
 function actionPhrase(tool, app = "") {
   const prefix = `${app.replace(/-/g, "_").toUpperCase()}_`;
@@ -27709,30 +27713,54 @@ function stepLabel(call) {
     }
     case "list_pull_requests":
       return "Listed linked pull requests";
+    case "skill_view":
+      return str3(a.name) ? `Read skill ${a.name}` : "Read a skill";
+    case "skills_list":
+      return "Listed skills";
     case "tool_search": {
       const q = Array.isArray(a.queries) ? a.queries.filter((x) => typeof x === "string") : [str3(a.queries) ?? str3(a.query)].filter(Boolean);
       return q.length ? `Searched tools for ${q.join(", ")}` : "Searched tools";
     }
     case "tool_describe": {
-      const names = Array.isArray(a.names) ? a.names.filter((x) => typeof x === "string") : [str3(a.names)].filter(Boolean);
-      return names.length ? `Read how to call ${names.join(", ")}` : "Read tool details";
+      const names = (Array.isArray(a.names) ? a.names : [a.names]).filter((x) => typeof x === "string" && x !== "");
+      const named = names.map((n) => {
+        const app2 = callApp({ args: {}, name: n });
+        return app2 ? `${app2.app} \xB7 ${app2.action}` : n.replace(/_/g, " ");
+      });
+      return named.length ? `Read how to call ${named.join(", ")}` : "Read tool details";
     }
   }
   const name = call.name.replace(/_/g, " ");
   const label = name.charAt(0).toUpperCase() + name.slice(1);
   return call.context ? `${label}: ${flat(call.context)}` : label;
 }
-function liveLabel(item3) {
+function liveLabel(item3, active = false) {
   if (item3.kind === "thinking") {
-    return thoughtLine(item3.text) || (item3.endedAt === void 0 ? "Thinking" : "Thought");
+    return thoughtLine(item3.text) || (item3.endedAt === void 0 || active ? "Thinking" : "Thought");
   }
   const call = item3.call;
+  const status = active && call.status === "done" ? "running" : call.status;
   const command = call.name === "terminal" ? str3(call.args.command) ?? call.context : void 0;
   if (!command) {
-    return stepLabel(call);
+    return status === "running" ? presentTense(stepLabel(call)) : stepLabel(call);
   }
-  const verb = { cancelled: "Stopped", done: "Ran", error: "Failed", running: "Running" }[call.status];
+  const verb = { cancelled: "Stopped", done: "Ran", error: "Failed", running: "Running" }[status];
   return `${verb} ${commandProgramName(command) ?? "command"}`;
+}
+var PRESENT = {
+  Edited: "Editing",
+  Linked: "Linking",
+  Listed: "Listing",
+  Looked: "Looking",
+  Read: "Reading",
+  Searched: "Searching",
+  Unlinked: "Unlinking",
+  Used: "Using",
+  Wrote: "Writing"
+};
+function presentTense(label) {
+  const [verb = "", ...rest] = label.split(" ");
+  return PRESENT[verb] ? [PRESENT[verb], ...rest].join(" ") : label;
 }
 function thoughtLine(markdown) {
   return flat(
@@ -33392,6 +33420,71 @@ var STYLES = css`
     margin-top: 0 !important;
   }
 
+  /* An open group's steps hang from its summary: a guide line down from its icon, the rows a size
+     smaller, so the summary reads as the parent and not as one more step. */
+  [data-role='hermes.work.group'] > .sf-section-body {
+    margin: 2px 0 6px 7px !important;
+    padding-left: 17px !important;
+    border-left: 1px solid rgba(128, 128, 128, 0.28) !important;
+  }
+
+  [data-role='hermes.work.group'] > .sf-section-body [data-role='hermes.work.row'] > .sf-section-head,
+  [data-role='hermes.work.group'] > .sf-section-body .sf-col[data-role='hermes.work.row'] {
+    font-size: 13px !important;
+    line-height: 22px !important;
+    min-height: 22px;
+  }
+
+  /* The group's own chevron sits right after its summary and turns as it opens (Tern's is hidden). */
+  [data-role='hermes.work.chev'] {
+    opacity: 0.45;
+    transition: transform 0.15s ease, opacity 0.15s ease;
+  }
+
+  .sf-section.collapsed > .sf-section-head [data-role='hermes.work.chev'] {
+    transform: rotate(-90deg);
+  }
+
+  [data-role='hermes.work.group'] > .sf-section-head:hover [data-role='hermes.work.chev'] {
+    opacity: 0.85;
+  }
+
+  /* The live line: a band of the primary text color sweeps across its words every 2.2 s, as
+     t3code's live-tool-shine does, so a running step reads as running at a glance. Tern's CSS takes
+     one background layer and no rem, so the band is a stop in a gradient three times as wide. */
+  @keyframes hermes-shine {
+    from {
+      background-position: 100% 0;
+    }
+
+    to {
+      background-position: 0% 0;
+    }
+  }
+
+  [data-role='hermes.work.live'] {
+    color: transparent !important;
+    background-image: linear-gradient(to right, var(--t3) 0%, var(--t3) 44%, var(--t1) 50%, var(--t3) 56%, var(--t3) 100%);
+    background-size: 300% 100%;
+    background-repeat: no-repeat;
+    -webkit-background-clip: text;
+    background-clip: text;
+    animation: hermes-shine 2.2s linear infinite;
+  }
+
+  [data-role='hermes.work.live'] * {
+    color: transparent !important;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    [data-role='hermes.work.live'],
+    [data-role='hermes.work.live'] * {
+      color: var(--t3) !important;
+      background-image: none !important;
+      animation: none !important;
+    }
+  }
+
   /* omp's ask theme draws a radio at the start of each option without moving the text over. */
   [data-role='omp.ask.option'] {
     padding-left: 34px !important;
@@ -35363,10 +35456,14 @@ function workingNode2(turn, now) {
     /* @__PURE__ */ jsx("elapsed", { age: age(turn, turn.startedAt, now), format: "short" }, "age")
   ] }, "working");
 }
+function latestFailed(items) {
+  const last = items.findLast((i) => i.kind === "tool");
+  return last?.kind === "tool" && last.call.status === "error";
+}
 function thinkingRow() {
   return /* @__PURE__ */ jsxs("row", { align: "center", gap: "sm", role: "hermes.work.row", children: [
     /* @__PURE__ */ jsx("icon", { name: "brain" }, "icon"),
-    /* @__PURE__ */ jsx("text", { grow: 1, spans: [{ fx: "shimmer", s: "muted", t: "Thinking" }], wrap: "none" }, "label")
+    /* @__PURE__ */ jsx("text", { role: "hermes.work.live", spans: [{ s: "muted", t: "Thinking" }], wrap: "none" }, "label")
   ] }, "thinking");
 }
 function foldNode(part, id, children2) {
@@ -35390,10 +35487,13 @@ function workNode(items, parent, live, now) {
   const latest = shown.findLast((i) => i.kind === "tool" && i.call.status === "running") ?? shown.at(-1);
   const head2 = live ? /* @__PURE__ */ jsxs("row", { align: "center", gap: "sm", children: [
     /* @__PURE__ */ jsx("icon", { name: itemIcon(latest) }, "icon"),
-    /* @__PURE__ */ jsx("text", { grow: 1, spans: [{ fx: "shimmer", s: "muted", t: liveLabel(latest) }], truncate: "end", wrap: "none" }, "label")
+    /* @__PURE__ */ jsx("text", { role: "hermes.work.live", spans: [{ s: "muted", t: liveLabel(latest, true) }], truncate: "end", wrap: "none" }, "label"),
+    /* @__PURE__ */ jsx("icon", { name: "chev", role: "hermes.work.chev" }, "chev")
   ] }, "head") : /* @__PURE__ */ jsxs("row", { align: "center", gap: "sm", children: [
     /* @__PURE__ */ jsx("icon", { name: groupIcon(shown), tone: failed ? "error" : void 0 }, "icon"),
-    /* @__PURE__ */ jsx("text", { grow: 1, spans: [{ s: "muted", t: summarize(shown) }], truncate: "end", wrap: "none" }, "label"),
+    /* @__PURE__ */ jsx("text", { spans: [{ s: "muted", t: summarize(shown) }], truncate: "end", wrap: "none" }, "label"),
+    /* @__PURE__ */ jsx("icon", { name: "chev", role: "hermes.work.chev" }, "chev"),
+    /* @__PURE__ */ jsx("spacer", { grow: 1 }, "gap"),
     /* @__PURE__ */ jsx("text", { role: "hermes.work.time", spans: [{ s: "dim", t: clock(startOf(shown[0])) }], wrap: "none" }, "time")
   ] }, "head");
   return node("section", { collapsed: true, collapsible: true, head: `${id}.head`, key: key2, role: "hermes.work.group" }, [
@@ -35420,8 +35520,9 @@ function itemNode(item3, parent, now, key2 = item3.id) {
     /* @__PURE__ */ jsx(
       "text",
       {
-        grow: 1,
-        spans: labelSpans(call, running),
+        grow: running ? void 0 : 1,
+        role: running ? "hermes.work.live" : void 0,
+        spans: labelSpans(call),
         truncate: "end",
         wrap: "none"
       },
@@ -35437,16 +35538,15 @@ function itemNode(item3, parent, now, key2 = item3.id) {
     /* @__PURE__ */ jsx("col", { gap: "xs", role: "hermes.work.detail", children: detail }, "detail")
   ]);
 }
-function labelSpans(call, running) {
-  const fx = running ? "shimmer" : void 0;
+function labelSpans(call) {
   const entries = (call.batch ?? [call]).map((e) => callApp({ args: e.args, name: e.name }));
   if (!entries.every(Boolean)) {
-    return [{ fx, s: "muted", t: stepLabel(call) }];
+    return [{ s: "muted", t: stepLabel(call) }];
   }
   return entries.flatMap((app, i) => [
-    ...i ? [{ fx, s: "muted", t: ", " }] : [],
-    { fx, t: app.app },
-    { fx, s: "muted", t: ` \xB7 ${app.action}` }
+    ...i ? [{ s: "muted", t: ", " }] : [],
+    { t: app.app },
+    { s: "muted", t: ` \xB7 ${app.action}` }
   ]);
 }
 function itemIcon(item3) {
@@ -35521,7 +35621,7 @@ function turnNode(turn, id, cx) {
     );
   }
   const last = pieces(turn.blocks).at(-1);
-  if (live && (!last || last.kind === "block" && last.block.kind !== "text")) {
+  if (live && (!last || last.kind === "block" && last.block.kind !== "text" || last.kind === "work" && latestFailed(last.items))) {
     children2.push(thinkingRow());
   }
   if (turn.status === "error") {
@@ -35564,7 +35664,7 @@ function pieceNodes(turn, blocks, parent, cx) {
   const lastText = blocks.findLast((b) => b.kind === "text");
   return ps.map((p, i) => {
     if (p.kind === "work") {
-      return workNode(p.items, parent, live && i === ps.length - 1, cx.now);
+      return workNode(p.items, parent, live && i === ps.length - 1 && !latestFailed(p.items), cx.now);
     }
     const b = p.block;
     switch (b.kind) {

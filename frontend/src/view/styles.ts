@@ -113,6 +113,71 @@ export const STYLES = css`
     margin-top: 0 !important;
   }
 
+  /* An open group's steps hang from its summary: a guide line down from its icon, the rows a size
+     smaller, so the summary reads as the parent and not as one more step. */
+  [data-role='hermes.work.group'] > .sf-section-body {
+    margin: 2px 0 6px 7px !important;
+    padding-left: 17px !important;
+    border-left: 1px solid rgba(128, 128, 128, 0.28) !important;
+  }
+
+  [data-role='hermes.work.group'] > .sf-section-body [data-role='hermes.work.row'] > .sf-section-head,
+  [data-role='hermes.work.group'] > .sf-section-body .sf-col[data-role='hermes.work.row'] {
+    font-size: 13px !important;
+    line-height: 22px !important;
+    min-height: 22px;
+  }
+
+  /* The group's own chevron sits right after its summary and turns as it opens (Tern's is hidden). */
+  [data-role='hermes.work.chev'] {
+    opacity: 0.45;
+    transition: transform 0.15s ease, opacity 0.15s ease;
+  }
+
+  .sf-section.collapsed > .sf-section-head [data-role='hermes.work.chev'] {
+    transform: rotate(-90deg);
+  }
+
+  [data-role='hermes.work.group'] > .sf-section-head:hover [data-role='hermes.work.chev'] {
+    opacity: 0.85;
+  }
+
+  /* The live line: a band of the primary text color sweeps across its words every 2.2 s, as
+     t3code's live-tool-shine does, so a running step reads as running at a glance. Tern's CSS takes
+     one background layer and no rem, so the band is a stop in a gradient three times as wide. */
+  @keyframes hermes-shine {
+    from {
+      background-position: 100% 0;
+    }
+
+    to {
+      background-position: 0% 0;
+    }
+  }
+
+  [data-role='hermes.work.live'] {
+    color: transparent !important;
+    background-image: linear-gradient(to right, var(--t3) 0%, var(--t3) 44%, var(--t1) 50%, var(--t3) 56%, var(--t3) 100%);
+    background-size: 300% 100%;
+    background-repeat: no-repeat;
+    -webkit-background-clip: text;
+    background-clip: text;
+    animation: hermes-shine 2.2s linear infinite;
+  }
+
+  [data-role='hermes.work.live'] * {
+    color: transparent !important;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    [data-role='hermes.work.live'],
+    [data-role='hermes.work.live'] * {
+      color: var(--t3) !important;
+      background-image: none !important;
+      animation: none !important;
+    }
+  }
+
   /* omp's ask theme draws a radio at the start of each option without moving the text over. */
   [data-role='omp.ask.option'] {
     padding-left: 34px !important;

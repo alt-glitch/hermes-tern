@@ -36,11 +36,18 @@ export function workingNode(turn: TurnEntry, now: number): JSX.Element {
 }
 
 /** "Thinking", shining, at the end of a running turn with nothing else moving. */
+/** The newest step of `items` failed: the group no longer stands for live work. */
+export function latestFailed(items: readonly WorkItem[]): boolean {
+  const last = items.findLast(i => i.kind === 'tool')
+
+  return last?.kind === 'tool' && last.call.status === 'error'
+}
+
 export function thinkingRow(): JSX.Element {
   return (
     <row align="center" gap="sm" key="thinking" role="hermes.work.row">
       <icon key="icon" name="brain" />
-      <text grow={1} key="label" spans={[{ fx: 'shimmer', s: 'muted', t: 'Thinking' }]} wrap="none" />
+      <text key="label" role="hermes.work.live" spans={[{ s: 'muted', t: 'Thinking' }]} wrap="none" />
     </row>
   )
 }
@@ -81,12 +88,15 @@ export function workNode(items: readonly WorkItem[], parent: string, live: boole
   const head = live ? (
     <row align="center" gap="sm" key="head">
       <icon key="icon" name={itemIcon(latest)} />
-      <text grow={1} key="label" spans={[{ fx: 'shimmer', s: 'muted', t: liveLabel(latest) }]} truncate="end" wrap="none" />
+      <text key="label" role="hermes.work.live" spans={[{ s: 'muted', t: liveLabel(latest, true) }]} truncate="end" wrap="none" />
+      <icon key="chev" name="chev" role="hermes.work.chev" />
     </row>
   ) : (
     <row align="center" gap="sm" key="head">
       <icon key="icon" name={groupIcon(shown)} tone={failed ? 'error' : undefined} />
-      <text grow={1} key="label" spans={[{ s: 'muted', t: summarize(shown) }]} truncate="end" wrap="none" />
+      <text key="label" spans={[{ s: 'muted', t: summarize(shown) }]} truncate="end" wrap="none" />
+      <icon key="chev" name="chev" role="hermes.work.chev" />
+      <spacer grow={1} key="gap" />
       <text key="time" role="hermes.work.time" spans={[{ s: 'dim', t: clock(startOf(shown[0]!)) }]} wrap="none" />
     </row>
   )
@@ -121,9 +131,10 @@ function itemNode(item: WorkItem, parent: string, now: number, key = item.id): J
     <row align="center" gap="sm" key="head" title={call.context || undefined}>
       <icon key="icon" name={itemIcon(item)} tone={call.status === 'error' ? 'error' : undefined} />
       <text
-        grow={1}
+        grow={running ? undefined : 1}
         key="label"
-        spans={labelSpans(call, running)}
+        role={running ? 'hermes.work.live' : undefined}
+        spans={labelSpans(call)}
         truncate="end"
         wrap="none"
       />
@@ -148,18 +159,17 @@ function itemNode(item: WorkItem, parent: string, now: number, key = item.id): J
 }
 
 /** A step's words; a connector's app stands out from what it did there ("Linear · create issue"). */
-function labelSpans(call: ToolCall, running: boolean): Span[] {
-  const fx = running ? ('shimmer' as const) : undefined
+function labelSpans(call: ToolCall): Span[] {
   const entries = (call.batch ?? [call]).map(e => callApp({ args: e.args, name: e.name }))
 
   if (!entries.every(Boolean)) {
-    return [{ fx, s: 'muted', t: stepLabel(call) }]
+    return [{ s: 'muted', t: stepLabel(call) }]
   }
 
   return entries.flatMap((app, i) => [
-    ...(i ? [{ fx, s: 'muted', t: ', ' }] : []),
-    { fx, t: app!.app },
-    { fx, s: 'muted', t: ` · ${app!.action}` }
+    ...(i ? [{ s: 'muted', t: ', ' }] : []),
+    { t: app!.app },
+    { s: 'muted', t: ` · ${app!.action}` }
   ])
 }
 

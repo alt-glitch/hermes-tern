@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import type { Block, ToolCall, TurnEntry } from '../model.js'
-import { foldOf, formatDuration, liveLabel, parts, pieces, stepLabel, summarize, thoughtLine, type WorkItem } from '../workLog.js'
+import { foldOf, formatDuration, liveLabel, parts, pieces, presentTense, stepLabel, summarize, thoughtLine, type WorkItem } from '../workLog.js'
 
 const call = (name: string, args: Record<string, unknown> = {}, more: Partial<ToolCall> = {}): ToolCall => ({
   args,
@@ -147,6 +147,23 @@ describe('labels', () => {
     expect(liveLabel(running('ls -la && git log'))).toBe('Running ls')
     expect(liveLabel(running("bash -lc 'npm test'"))).toBe('Running npm')
     expect(liveLabel(tool('a', call('terminal', { command: 'ls' }, { status: 'error' })))).toBe('Failed ls')
+  })
+
+  it('keeps the live step in the present tense while the turn works on, as t3code does', () => {
+    const done = (c: ToolCall) => tool('a', c)
+
+    expect(liveLabel(done(call('terminal', { command: 'sed -n 1p a' })), true)).toBe('Running sed')
+    expect(liveLabel(done(call('terminal', { command: 'sed -n 1p a' })))).toBe('Ran sed')
+    expect(liveLabel(done(call('read_file', { path: 'a.ts' })), true)).toBe('Reading a.ts')
+    expect(liveLabel(done(call('terminal', { command: 'x' }, { status: 'error' })), true)).toBe('Failed x')
+    expect(presentTense('Searched tools for x')).toBe('Searching tools for x')
+  })
+
+  it('names skills and tool lookups in words', () => {
+    expect(stepLabel(call('skill_view', { name: 'composio' }))).toBe('Read skill composio')
+    expect(stepLabel(call('tool_describe', { names: ['connectors__granola_mcp__LIST_MEETINGS', 'cronjob_manage'] }))).toBe(
+      'Read how to call Granola · list meetings, cronjob manage'
+    )
   })
 
   it('shows a command as its text on one line', () => {

@@ -13,7 +13,7 @@ import { compact, duration } from './time.js'
 import { slashBody } from './slash.js'
 import { toolNode } from './tools.js'
 import { type WelcomeContext, welcomeNode } from './welcome.js'
-import { foldNode, thinkingRow, workingNode, workNode } from './workLog.js'
+import { foldNode, latestFailed, thinkingRow, workingNode, workNode } from './workLog.js'
 
 /** What entry views need from the app. */
 export interface TranscriptContext {
@@ -128,7 +128,8 @@ function turnNode(turn: TurnEntry, id: string, cx: TranscriptContext): JSX.Eleme
 
   const last = pieces(turn.blocks).at(-1)
 
-  if (live && (!last || (last.kind === 'block' && last.block.kind !== 'text'))) {
+  // t3code: once the newest step failed, its group stops shining and "Thinking" carries the turn.
+  if (live && (!last || (last.kind === 'block' && last.block.kind !== 'text') || (last.kind === 'work' && latestFailed(last.items)))) {
     children.push(thinkingRow())
   }
 
@@ -183,7 +184,7 @@ function pieceNodes(turn: TurnEntry, blocks: readonly Block[], parent: string, c
 
   return ps.map((p, i) => {
     if (p.kind === 'work') {
-      return workNode(p.items, parent, live && i === ps.length - 1, cx.now)
+      return workNode(p.items, parent, live && i === ps.length - 1 && !latestFailed(p.items), cx.now)
     }
 
     const b = p.block
