@@ -6,8 +6,10 @@ import type { EditEvent, JSX, SendEvent, Tone } from '@stencil-hq/tern'
 
 import type { Composer } from '../composer.js'
 import type { Pill } from '../hud.js'
+import type { Todo } from '../model.js'
 
 import { age, compact } from './time.js'
+import { checklistNode } from './tools.js'
 
 /** What the dock shows. */
 export interface DockContext {
@@ -52,8 +54,36 @@ export interface DockContext {
   shells?: ShellsPill
   /** The conversation's pull requests: the PR pill that opens the Pull requests sheet. */
   prs?: PrsPill
+  /** The agent's todo list: its pill (on the working line while a turn runs) and the panel it opens. */
+  todos?: TodosPill
+  /** The status strip under the composer. */
+  status?: StatusLine
   /** The pill holding the keyboard (Down from an empty prompt). */
   focused?: Pill
+}
+
+/** The agent's todo list as a pill: a ring that fills as items are done, and the one under way. */
+export interface TodosPill {
+  list: Todo[]
+  open: boolean
+  onToggle(): void
+}
+
+/** The flat strip under the composer: where the session is and what it has spent. */
+export interface StatusLine {
+  title?: string
+  tokens?: number
+  /** Context used, 0–1. */
+  context?: number
+}
+
+/** Done and total (cancelled ones drop out), and the item under way (else the next one). */
+export function todoProgress(list: readonly Todo[]): { done: number; total: number; current: string } {
+  const live = list.filter(t => t.status !== 'cancelled')
+  const done = live.filter(t => t.status === 'completed').length
+  const current = live.find(t => t.status === 'in_progress') ?? live.find(t => t.status === 'pending')
+
+  return { current: current?.content ?? '', done, total: live.length }
 }
 
 /** The PR pill: the newest linked PR, or how many there are, toned by their checks. */
@@ -119,7 +149,17 @@ export function dockNodes(cx: DockContext): JSX.Element[] {
     )
   }
 
+  if (cx.todos?.open) {
+    nodes.push(
+      <col key="todos" role="hermes.todos">
+        {checklistNode(cx.todos.list)}
+      </col>
+    )
+  }
+
   const pills = [
+    // While a turn runs the todo pill rides the working line instead.
+    cx.todos && !cx.busy ? todosPillNode(cx.todos, cx.focused === 'todos') : null,
     cx.agents?.running ? agentsPill(cx.agents.running, cx.agents.onOpen, cx.focused === 'agents') : null,
     cx.shells && (cx.shells.running || cx.shells.exited) ? shellsPill(cx.shells, cx.focused === 'shells') : null,
     cx.prs ? prsPillNode(cx.prs, cx.focused === 'prs') : null
@@ -135,8 +175,100 @@ export function dockNodes(cx: DockContext): JSX.Element[] {
   }
 
   nodes.push(composerNode(cx))
+  nodes.push(statusLine(cx))
 
   return nodes
+}
+
+/** The todo pill: a ring that fills as items are done, `2/5`, and the item under way. */
+function todosPillNode(t: TodosPill, focused: boolean): JSX.Element | null {
+  const { current, done, total } = todoProgress(t.list)
+
+  if (!total) {
+    return null
+  }
+
+  const finished = done === total
+
+  return (
+    <row
+      align="center"
+      key="todos"
+      mark={focused ? 'pick' : undefined}
+      onClick={t.onToggle}
+      role="omp.hud.pill"
+      title={t.open ? 'Hide the todo list' : 'Show the todo list'}
+    >
+      <row align="center" gap="xs" key="seg" role="hermes.todos.pill">
+        <meter key="ring" size="sm" style="ring" value={done / total} />
+        <text key="count" spans={[{ s: 'muted', t: 'todos ' }, { t: `${done}/${total}` }, { s: 'muted', t: ' · ' }]} wrap="none" />
+        <text
+          key="now"
+          role="hermes.todos.now"
+          spans={[{ s: finished ? 'success' : undefined, t: finished ? 'all done' : current }]}
+          truncate="end"
+          wrap="none"
+        />
+      </row>
+    </row>
+  )
+}
+
+/**
+ * The flat strip under everything (hermes-for-tern's console bar): the brand, the session's title
+ * and branch on the left; tokens, context, cache, speed, cost and the send or stop key on the right.
+ */
+function statusLine(cx: DockContext): JSX.Element {
+  const s = cx.status ?? {}
+  const context = s.context ?? (cx.context && cx.context.max > 0 ? cx.context.used / cx.context.max : undefined)
+
+  return (
+    <status key="statusline" role="hermes.statusline">
+      <seg key="brand" priority={9} role="hermes.statusline.brand" spans={[{ t: '☤ hermes' }]} />
+      {s.title ? <seg key="title" priority={3} spans={[{ t: s.title }]} title={s.title} /> : null}
+      {cx.branch ? (
+        <seg icon="git-branch" key="git" priority={4} spans={[{ s: 'statusLineGitClean', t: cx.branch }]} title={`Branch ${cx.branch}`} />
+      ) : null}
+      {s.tokens ? <seg key="tokens" priority={2} side="right" spans={[{ t: `${s.tokens.toLocaleString()} tokens` }]} /> : null}
+      {context !== undefined ? (
+        <seg
+          key="context"
+          priority={5}
+          role={context >= 0.85 ? 'hermes.statusline.bad' : context >= 0.6 ? 'hermes.statusline.warn' : undefined}
+          side="right"
+          spans={[{ t: `${Math.round(context * 100)}% context` }]}
+          title="/usage shows the breakdown"
+        />
+      ) : null}
+      {cx.rates?.cache !== undefined ? (
+        <seg
+          icon="cache"
+          key="cache"
+          priority={1}
+          side="right"
+          spans={[{ t: `${Math.round(cx.rates.cache)}%` }]}
+          title="Prompt tokens served from the provider's cache, this session"
+        />
+      ) : null}
+      {cx.rates?.tps ? (
+        <seg
+          icon="fast"
+          key="tps"
+          priority={1}
+          side="right"
+          spans={[{ t: `${Math.round(cx.rates.tps)} t/s` }]}
+          title="Output tokens per second over the recent model calls"
+        />
+      ) : null}
+      {cx.cost ? <seg key="cost" priority={3} side="right" spans={[{ t: `$${cx.cost.toFixed(2)}` }]} title="Session cost" /> : null}
+      <seg key="newline" priority={1} side="right" spans={[{ s: 'muted', t: '⇧⏎ newline' }]} />
+      {cx.busy ? (
+        <seg key="action" onClick={cx.onInterrupt} priority={10} role="hermes.statusline.stop" side="right" spans={[{ t: 'esc stop' }]} />
+      ) : (
+        <seg key="action" onClick={cx.onSubmit} priority={10} role="hermes.statusline.send" side="right" spans={[{ t: '⏎ send' }]} />
+      )}
+    </status>
+  )
 }
 
 /**
@@ -228,6 +360,7 @@ function workingNode(cx: DockContext): JSX.Element {
       <text key="sep" role="omp.working.sep" text="·" />
       <elapsed age={age(busy.since, busy.startedAt, cx.now)} format="short" key="elapsed" />
       <row grow={1} key="fill" />
+      {cx.todos ? todosPillNode(cx.todos, false) : null}
       <row align="center" gap="xs" key="stop" onClick={cx.onInterrupt} role="omp.working.stop" title="Stop  esc">
         <kbd key="k" keys={['esc']} />
         <text key="t" text="Stop" />
@@ -262,6 +395,7 @@ function composerNode(cx: DockContext): JSX.Element {
 
   return (
     <col key="composer" role="omp.editor">
+      {cx.busy ? <row key="streak" role="hermes.streak" /> : null}
       {share === undefined ? null : (
         <meter
           key="context"
@@ -318,57 +452,7 @@ function composerNode(cx: DockContext): JSX.Element {
             <text key="level" text={effortLabel(cx.effort)} wrap="none" />
           </row>
         ) : null}
-        <status grow={1} key="extras" role="omp.composer.extras" transparent>
-          {cx.cwd ? (
-            <seg
-              icon="folder"
-              key="cwd"
-              priority={5}
-              role="omp.composer.fact"
-              spans={pathSpans(cx.cwd)}
-              title={cx.cwd}
-            />
-          ) : null}
-          {cx.rates?.cache !== undefined ? (
-            <seg
-              icon="cache"
-              key="cache"
-              priority={2}
-              role="omp.composer.fact"
-              spans={[{ t: `${Math.round(cx.rates.cache)}%` }]}
-              title="Prompt tokens served from the provider's cache, this session"
-            />
-          ) : null}
-          {cx.rates?.tps ? (
-            <seg
-              icon="fast"
-              key="tps"
-              priority={1}
-              role="omp.composer.rate"
-              spans={[{ t: `${Math.round(cx.rates.tps)} t/s` }]}
-              title="Output tokens per second over the recent model calls"
-            />
-          ) : null}
-          {cx.branch ? (
-            <seg
-              icon="git-branch"
-              key="git"
-              priority={4}
-              role="omp.composer.fact"
-              spans={[{ s: 'statusLineGitClean', t: cx.branch }]}
-              title={`Branch ${cx.branch}`}
-            />
-          ) : null}
-        </status>
-        {cx.cost ? (
-          <text
-            key="usage"
-            role="omp.composer.usage"
-            text={`$${cx.cost.toFixed(2)}`}
-            title="Session cost"
-            wrap="none"
-          />
-        ) : null}
+        <row grow={1} key="fill" />
         {cx.busy ? (
           <text
             key="stop"
