@@ -17,6 +17,7 @@ import { paletteFor } from '../palette.js'
 import { loadSettings } from '../settings.js'
 import { Transcript } from '../transcript.js'
 import { dockNodes } from '../view/dock.js'
+import { STYLES } from '../view/styles.js'
 import { agentNode } from '../view/tools.js'
 import { entryNode } from '../view/transcript.js'
 
@@ -76,6 +77,7 @@ export class WatchApp {
 
   async run(): Promise<number> {
     this.#surface = this.#tern.open({ id: 'hermes', mode: 'inline', role: 'omp.session', title: this.#spec.name })
+    this.#surface.stylesheet('hermes-tern', STYLES)
     this.#surface.palette(paletteFor(loadSettings().theme ?? 'tern', undefined))
     this.#gw.on('event', (ev: AnyGatewayEvent) => {
       if (ev.type === 'gateway.ready') {
@@ -244,6 +246,11 @@ export class WatchApp {
   #onEvent(ev: TspEvent) {
     if (ev.ev === 'focus' && ev.id === INPUT_ID) {
       this.#surface.focus(INPUT_ID)
+    }
+
+    // As in the main chat: what opens keeps its head in view.
+    if (ev.ev === 'toggle' && !ev.collapsed && ev.id.startsWith('main.')) {
+      this.#surface.reveal(ev.id, 'start')
     }
   }
 

@@ -37,6 +37,7 @@ import { openAgents } from './overlays/agents.js'
 import { Completion } from './overlays/completion.js'
 import { openModelPicker } from './overlays/models.js'
 import { promptOverlay } from './overlays/prompts.js'
+import { STYLES } from './view/styles.js'
 import { paletteFor } from './palette.js'
 import { loadSettings, saveSettings, type ThemeMode } from './settings.js'
 import { Transcript } from './transcript.js'
@@ -125,6 +126,7 @@ export class App implements OverlayHost {
 
   async run(): Promise<number> {
     this.#surface = this.#tern.open({ id: 'hermes', mode: 'inline', role: 'omp.session', title: 'hermes' })
+    this.#surface.stylesheet('hermes-tern', STYLES)
     this.#applyTheme()
 
     if (this.#tern.caps.features.includes('blobs')) {
@@ -289,6 +291,12 @@ export class App implements OverlayHost {
     if (ev.ev === 'focus' && ev.id === INPUT_ID && !this.overlays.at(-1)?.modal) {
       this.#focus = INPUT_ID
       this.#surface.focus(INPUT_ID)
+    }
+
+    // The transcript sticks to its bottom, so what opens grows upward and its head (with the
+    // fold control) leaves the screen; keep the head in view instead.
+    if (ev.ev === 'toggle' && !ev.collapsed && ev.id.startsWith('main.')) {
+      this.#surface.reveal(ev.id, 'start')
     }
   }
 

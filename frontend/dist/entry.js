@@ -5825,7 +5825,7 @@ var require_client_h1 = __commonJS({
           util.destroy(this.socket, new HeadersOverflowError());
         }
       }
-      onUpgrade(head) {
+      onUpgrade(head2) {
         const { upgrade, client, socket, headers, statusCode, statusText } = this;
         assert(upgrade);
         assert(client[kSocket] === socket);
@@ -5840,7 +5840,7 @@ var require_client_h1 = __commonJS({
         this.shouldKeepAlive = null;
         this.headers = [];
         this.headersSize = 0;
-        socket.unshift(head);
+        socket.unshift(head2);
         socket[kParser].destroy();
         socket[kParser] = null;
         socket[kClient] = null;
@@ -18951,10 +18951,10 @@ function concatBytes(parts) {
   return out;
 }
 function apc(verb, params, body) {
-  let head = `${verb};`;
+  let head2 = `${verb};`;
   for (const [key2, value] of params)
-    head += `${key2}=${value};`;
-  return concatBytes([APC_START, encoder.encode(head), body, ST]);
+    head2 += `${key2}=${value};`;
+  return concatBytes([APC_START, encoder.encode(head2), body, ST]);
 }
 function encodeMessage(verb, body, options = {}) {
   const bytes = typeof body === "string" ? encoder.encode(body) : body;
@@ -18967,10 +18967,10 @@ function encodeMessage(verb, body, options = {}) {
   const out = [];
   pieces.forEach((piece, i) => {
     const last = i === pieces.length - 1;
-    const head = i === 0 ? [...params, ["c", id]] : [["c", id]];
+    const head2 = i === 0 ? [...params, ["c", id]] : [["c", id]];
     if (!last)
-      head.push(["m", "1"]);
-    out.push(apc(verb, head, piece));
+      head2.push(["m", "1"]);
+    out.push(apc(verb, head2, piece));
   });
   return concatBytes(out);
 }
@@ -19602,8 +19602,8 @@ function csiParams(params) {
   if (params === "")
     return [];
   return params.split(";").map((part) => {
-    const head = part.split(":")[0] ?? "";
-    return head === "" ? void 0 : Number(head);
+    const head2 = part.split(":")[0] ?? "";
+    return head2 === "" ? void 0 : Number(head2);
   });
 }
 function csiKey(params, final2) {
@@ -20097,6 +20097,11 @@ function jsx(type, props, key2) {
 }
 var jsxs = jsx;
 
+// node_modules/@stencil-hq/tern/dist/css.js
+function css(strings2, ...values) {
+  return String.raw(strings2, ...values);
+}
+
 // node_modules/@stencil-hq/tern/dist/reconcile.js
 var REGIONS = ["main", "dock", "layer"];
 var ViewError = class extends Error {
@@ -20394,12 +20399,12 @@ var Surface = class {
     this.#pump();
   }
   /** Installs (or with `null` removes) stylesheet `name`. */
-  stylesheet(name, css) {
+  stylesheet(name, css2) {
     if (this.#closed)
       return;
     this.#link.send({
       verb: "s",
-      body: css === null || css === "" ? { sf: this.id, name } : { sf: this.id, name, css }
+      body: css2 === null || css2 === "" ? { sf: this.id, name } : { sf: this.id, name, css: css2 }
     });
   }
   /** Sends the program palette. */
@@ -25716,8 +25721,8 @@ async function tools(host, arg) {
   }
   try {
     const r = await host.gw.request("tools.show", { session_id: host.sid });
-    const sections = (r?.sections ?? []).filter((s) => s.tools?.length);
-    const lines = sections.map((s) => `[${s.name}] ${s.tools.map((t2) => t2.name).join(", ")}`);
+    const sections2 = (r?.sections ?? []).filter((s) => s.tools?.length);
+    const lines = sections2.map((s) => `[${s.name}] ${s.tools.map((t2) => t2.name).join(", ")}`);
     host.notice(lines.length ? [...lines, `Total: ${r?.total ?? 0} tools`].join("\n") : "No tools available.");
   } catch (e) {
     host.notice(`/tools failed: ${errorText(e)}`, "error");
@@ -25763,9 +25768,255 @@ function compact(n) {
   return `${m < 10 ? m.toFixed(1).replace(/\.0$/, "") : Math.round(m)}M`;
 }
 
+// src/view/describe.ts
+var MAX = 72;
+function words(segment) {
+  const out = [];
+  const re = /'([^']*)'|"((?:\\.|[^"\\])*)"|(\S+)/g;
+  for (const m of segment.matchAll(re)) {
+    out.push(m[1] ?? m[2] ?? m[3] ?? "");
+  }
+  return out;
+}
+var base = (path) => path.replace(/\/+$/, "").split(/[/\\]/).at(-1) || path;
+var quote = (s) => `'${clip(s, 32)}'`;
+var clip = (s, n) => s.length > n ? `${s.slice(0, n - 1)}\u2026` : s;
+function operand(args, valued = /* @__PURE__ */ new Set()) {
+  for (let i = 0; i < args.length; i++) {
+    const a = args[i];
+    if (valued.has(a)) {
+      i++;
+    } else if (!a.startsWith("-") || a === "-") {
+      return a;
+    }
+  }
+  return void 0;
+}
+var operands = (args) => args.filter((a) => !a.startsWith("-"));
+var GIT = {
+  add: "Stage changes",
+  blame: "Blame",
+  branch: "List branches",
+  checkout: "Switch branch",
+  "cherry-pick": "Cherry-pick",
+  clone: "Clone repository",
+  commit: "Commit",
+  diff: "Diff changes",
+  fetch: "Fetch",
+  log: "Read git history",
+  merge: "Merge",
+  pull: "Pull",
+  push: "Push",
+  rebase: "Rebase",
+  remote: "List remotes",
+  reset: "Reset",
+  restore: "Restore files",
+  "rev-parse": "Resolve revision",
+  show: "Show commit",
+  stash: "Stash changes",
+  status: "Check git status",
+  switch: "Switch branch",
+  worktree: "Manage worktrees"
+};
+var COMMANDS = {
+  cat: (a) => operand(a) ? `Read ${base(operand(a))}` : "Read input",
+  cd: (a) => `Go to ${base(operand(a) ?? "~")}`,
+  chmod: (a) => `Change mode of ${base(operands(a).at(-1) ?? "files")}`,
+  cp: (a) => `Copy ${base(operands(a)[0] ?? "files")}`,
+  curl: (a) => {
+    const url = a.find((x) => /^https?:\/\//.test(x));
+    return url ? `Fetch ${new URL(url).host}` : "Fetch a URL";
+  },
+  docker: (a) => `Docker ${operand(a) ?? ""}`.trim(),
+  echo: () => "Print text",
+  fd: (a) => operand(a) ? `Find ${quote(operand(a))}` : "Find files",
+  find: (a) => {
+    const name = a[a.indexOf("-name") + 1];
+    return a.includes("-name") && name ? `Find ${quote(name)}` : `Find files in ${base(operand(a) ?? ".")}`;
+  },
+  gh: (a) => `GitHub ${operands(a).slice(0, 2).join(" ")}`.trim(),
+  git: (a) => {
+    const sub = operand(a, /* @__PURE__ */ new Set(["-C", "-c"]));
+    return sub ? GIT[sub] ?? `Git ${sub}` : "Git";
+  },
+  grep: (a) => searchTitle(a),
+  head: (a) => operand(a, /* @__PURE__ */ new Set(["-n", "-c"])) ? `Read the start of ${base(operand(a, /* @__PURE__ */ new Set(["-n", "-c"])))}` : "Read the start",
+  kill: () => "Stop a process",
+  less: (a) => `Read ${base(operand(a) ?? "output")}`,
+  ls: (a) => `List ${base(operand(a) ?? "files")}`,
+  make: (a) => `Make ${operand(a) ?? ""}`.trim(),
+  mkdir: (a) => `Create ${base(operands(a).at(-1) ?? "a folder")}`,
+  mv: (a) => `Move ${base(operands(a)[0] ?? "files")}`,
+  node: (a) => operand(a) ? `Run ${base(operand(a))}` : "Run Node",
+  npm: (a) => npmTitle(a),
+  npx: (a) => `Run ${operand(a) ?? "a package"}`,
+  pkill: (a) => `Stop ${operand(a) ?? "processes"}`,
+  pnpm: (a) => npmTitle(a),
+  powershell: (a) => powershellTitle(a),
+  ps: () => "List processes",
+  pwsh: (a) => powershellTitle(a),
+  python: (a) => pythonTitle(a),
+  python3: (a) => pythonTitle(a),
+  rg: (a) => searchTitle(a),
+  rm: (a) => `Delete ${base(operands(a).at(-1) ?? "files")}`,
+  scp: (a) => `Copy ${base(operands(a)[0] ?? "files")} to ${hostOf(operands(a).at(-1) ?? "") ?? "a host"}`,
+  bash: (a) => shellTitle(a),
+  sed: (a) => a.includes("-i") ? `Edit ${base(operands(a).at(-1) ?? "a file")}` : `Read ${base(operands(a).at(-1) ?? "a file")}`,
+  sh: (a) => shellTitle(a),
+  sleep: (a) => `Wait ${operand(a) ?? ""}s`.replace(" s", ""),
+  sort: () => "Sort output",
+  tail: (a) => a.includes("-f") ? `Follow ${base(operands(a).at(-1) ?? "a log")}` : `Read the end of ${base(operands(a).at(-1) ?? "output")}`,
+  tern: (a) => `Tern ${operands(a).slice(0, 2).join(" ")}`.trim(),
+  touch: (a) => `Create ${base(operands(a).at(-1) ?? "a file")}`,
+  uv: (a) => a[0] === "run" ? pythonTitle(a.slice(1).filter((x) => x !== "python")) ?? "Run with uv" : `uv ${operand(a) ?? ""}`.trim(),
+  vitest: () => "Run tests",
+  wc: (a) => `Count lines in ${base(operands(a).at(-1) ?? "files")}`,
+  zsh: (a) => shellTitle(a),
+  which: (a) => `Locate ${operand(a) ?? "a command"}`
+};
+function shellTitle(a) {
+  const script = operand(a, /* @__PURE__ */ new Set(["-c", "-o"]));
+  return a.includes("-c") ? "Run a shell snippet" : script ? `Run ${base(script)}` : "Run a shell";
+}
+function searchTitle(a) {
+  const pattern = operand(a, /* @__PURE__ */ new Set(["-e", "-g", "--glob", "-t", "--type", "-A", "-B", "-C", "-m"]));
+  const where = operands(a).at(-1);
+  const target = where && where !== pattern ? ` in ${base(where)}` : "";
+  return pattern ? `Search for ${quote(pattern)}${target}` : "Search";
+}
+function npmTitle(a) {
+  const [sub, script] = operands(a);
+  if (sub === "run" && script) {
+    return /test/.test(script) ? "Run tests" : `Run ${script}`;
+  }
+  return sub === "test" ? "Run tests" : sub === "install" || sub === "i" || sub === "ci" ? "Install packages" : `npm ${sub ?? ""}`.trim();
+}
+function pythonTitle(a) {
+  const m = a.indexOf("-m");
+  if (m >= 0 && a[m + 1]) {
+    return a[m + 1] === "pytest" ? "Run tests" : `Run ${a[m + 1]}`;
+  }
+  if (a.includes("-c") || a.includes("-")) {
+    return "Run Python";
+  }
+  const script = operand(a);
+  return script ? `Run ${base(script)}` : "Run Python";
+}
+function powershellTitle(a) {
+  const file2 = a[a.findIndex((x) => /^-file$/i.test(x)) + 1];
+  return a.some((x) => /^-file$/i.test(x)) && file2 ? `Run ${base(file2)}` : "Run PowerShell";
+}
+var CMDLETS = {
+  "get-childitem": "list files",
+  "get-content": "read files",
+  "get-counter": "read counters",
+  "get-itemproperty": "read the registry",
+  "get-process": "list processes",
+  "get-service": "list services",
+  "get-winevent": "read the event log",
+  "remove-item": "delete files",
+  "set-content": "write files",
+  "start-process": "start a process",
+  "stop-process": "stop a process"
+};
+function powershellScript(text2) {
+  const used = [...new Set([...text2.matchAll(/\b([A-Z][a-z]+-[A-Z][A-Za-z]+)\b/g)].map((m) => m[1].toLowerCase()))];
+  const said = [...new Set(used.map((c) => CMDLETS[c] ?? (c.startsWith("get-") ? `read ${c.slice(4)}` : void 0)).filter(Boolean))];
+  return said.length ? said.slice(0, 2).join(" and ") : void 0;
+}
+function hostOf(target) {
+  const m = /^(?:[^@\s]+@)?([A-Za-z0-9][\w.-]*):/.exec(target) ?? /^[^@\s]+@([\w.-]+)$/.exec(target);
+  return m?.[1];
+}
+function sections(script) {
+  const out = [];
+  for (const line of script.split("\n")) {
+    const m = /^\s*(?:echo\s+|Write-Host\s+)?["']?\s*(?:={2,}|-{3,}|#{2,})\s*(.+?)\s*(?:={2,}|-{3,}|#{2,})\s*["']?\s*$/.exec(line) ?? /^\s*#\s+([A-Z][^#]{3,60})$/.exec(line);
+    if (m?.[1] && !/^!/.test(m[1])) {
+      out.push(m[1].replace(/\s+/g, " "));
+    }
+  }
+  return out;
+}
+function head(segment) {
+  const w = words(segment);
+  while (w.length && (/^[A-Za-z_]\w*=/.test(w[0]) || w[0] === "sudo" || w[0] === "env" || w[0] === "time" || w[0] === "exec")) {
+    w.shift();
+  }
+  const cmd = w.shift();
+  return cmd ? { args: w, cmd: base(cmd), raw: cmd } : void 0;
+}
+function segments(line) {
+  const out = [];
+  let cur = "";
+  let q;
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i];
+    if (q) {
+      cur += c;
+      if (c === q && line[i - 1] !== "\\") {
+        q = void 0;
+      }
+    } else if (c === "'" || c === '"') {
+      q = c;
+      cur += c;
+    } else if (c === "\n" || c === ";" || c === "|" || c === "&" && line[i + 1] === "&") {
+      out.push(cur);
+      cur = "";
+      if (line[i + 1] === c) {
+        i++;
+      }
+    } else {
+      cur += c;
+    }
+  }
+  out.push(cur);
+  return out.map((s) => s.trim()).filter(Boolean);
+}
+var SETUP = /* @__PURE__ */ new Set(["cd", "export", "set", "source", ".", "true", "clear", "pushd", "popd"]);
+var FILTERS = /* @__PURE__ */ new Set(["head", "tail", "grep", "sort", "uniq", "wc", "cut", "tr", "awk", "jq", "tee", "column", "less", "cat", "xargs", "sed"]);
+function describeCommand(command) {
+  const text2 = command.trim();
+  if (!text2) {
+    return "Run a command";
+  }
+  const docs = [];
+  const line = text2.replace(/<<-?\s*['"]?(\w+)['"]?([^\n]*)\n([\s\S]*?)\n\s*\1\s*(?=\n|$)/g, (_m, _tag, rest, body) => {
+    docs.push(body);
+    return rest;
+  });
+  const labels = docs.flatMap(sections);
+  const steps = segments(line).flatMap((s) => head(s) ?? []);
+  const real = steps.filter((s) => !SETUP.has(s.cmd));
+  const remote = real.find((s) => s.cmd === "ssh");
+  let title;
+  if (remote) {
+    const host = operand(remote.args, /* @__PURE__ */ new Set(["-p", "-i", "-o", "-l", "-J", "-F"]))?.replace(/^[^@]+@/, "");
+    const after = remote.args.slice(remote.args.findIndex((a) => a.replace(/^[^@]+@/, "") === host) + 1).join(" ");
+    const inner = after ? describeCommand(after) : "Open a shell";
+    title = host ? `${inner} on ${host}` : inner;
+  } else {
+    const main = real.find((s) => !FILTERS.has(s.cmd)) ?? real[0];
+    const ps = main && !COMMANDS[main.cmd] && /^\$|^[A-Z][a-z]+-[A-Z]/.test(main.raw) ? powershellScript(line) : void 0;
+    title = ps ? ps : main ? COMMANDS[main.cmd]?.(main.args) ?? `Run ${main.cmd}` : steps[0] ? `Run ${steps[0].cmd}` : void 0;
+  }
+  title ??= "Run a command";
+  if (labels.length) {
+    const two = `${title}: ${labels.slice(0, 2).join(", ")}${labels.length > 2 ? ` +${labels.length - 2}` : ""}`;
+    title = two.length <= MAX ? two : `${title}: ${clip(labels[0], 32)}${labels.length > 1 ? ` +${labels.length - 1}` : ""}`;
+  } else if (docs.length && /^Read input|^Read /.test(title) && real[0]?.cmd === "cat") {
+    title = `Write ${base(operands(real[0].args).at(-1) ?? "a file")}`;
+  }
+  return clip(title.charAt(0).toUpperCase() + title.slice(1), MAX);
+}
+function commandLine(command, n = 96) {
+  const flat = command.replace(/<<-?\s*['"]?(\w+)['"]?[\s\S]*?\n\s*\1\s*(?=\n|$)/g, "<<'$1' \u2026").replace(/\s+/g, " ").trim();
+  return clip(flat, n);
+}
+
 // src/view/tools.tsx
 var str3 = (v) => typeof v === "string" && v ? v : void 0;
-function toolNode(call, now) {
+function toolNode(call, now, place = {}) {
   const card = cardOf(call, now);
   const status = card.status ?? call.status;
   const running = status === "running";
@@ -25798,7 +26049,8 @@ function toolNode(call, now) {
       meta: card.meta?.length ? card.meta : void 0,
       name: card.name,
       note: call.status === "cancelled" ? "cancelled" : error && !card.body.length ? error : void 0,
-      preview: card.preview,
+      // A run's steps are one line each; the run's head says what is running.
+      preview: place.inRun ? void 0 : card.preview,
       role: card.role,
       status,
       target: card.target,
@@ -25865,7 +26117,7 @@ function cardOf(call, now) {
     }
     case "skill_view":
       return {
-        body: str3(result?.content) ? [/* @__PURE__ */ jsx("md", { children: clip(str3(result?.content) ?? "", 6e3) }, "body")] : [],
+        body: str3(result?.content) ? [/* @__PURE__ */ jsx("md", { children: clip2(str3(result?.content) ?? "", 6e3) }, "body")] : [],
         folded: true,
         frame: "inline",
         name: "skill",
@@ -25887,19 +26139,32 @@ function cardOf(call, now) {
 function bashCard(call, result) {
   const output = (str3(result?.output) ?? call.resultText)?.replace(/\s*\[Command interrupted\]\s*$/, "");
   const error = str3(result?.error);
+  const command = (str3(call.args.command) ?? call.context ?? "").trim();
+  const line = commandLine(command);
+  const running = call.status === "running";
   return {
     body: [
-      ...output ? [/* @__PURE__ */ jsx("ansi", { follow: call.status === "running", text: output }, "out")] : [],
+      ...command && command !== line ? [/* @__PURE__ */ jsx("code", { lang: "bash", max: { h: "12lines" }, role: "omp.tool.command", text: command }, "cmd")] : [],
+      ...output ? [/* @__PURE__ */ jsx("ansi", { follow: true, max: { h: "20lines" }, text: output }, "out")] : [],
       ...error ? [/* @__PURE__ */ jsx("text", { role: "omp.tool.error", spans: [{ s: "error", t: error }], wrap: "word" }, "err")] : []
     ],
     folded: true,
     lang: "bash",
     name: "bash",
-    preview: { tail: 10 },
-    target: str3(call.args.command) ?? call.context,
+    preview: { tail: running ? 4 : 3 },
+    // A short command is the head's target; a longer one shows whole in the body instead.
+    target: command === line ? line || void 0 : void 0,
     targetKind: "command",
-    title: "Bash"
+    title: describeCommand(command)
   };
+}
+function stepTitle(call) {
+  if (call.name === "terminal") {
+    return describeCommand(str3(call.args.command) ?? call.context ?? "");
+  }
+  const card = cardOf(call, Date.now());
+  const target = card.target ? card.targetKind === "path" ? card.target.split("/").at(-1) : card.target : void 0;
+  return target ? `${card.title} ${target}` : card.title;
 }
 function readCard(call, result) {
   const path = str3(call.args.path) ?? call.context;
@@ -25927,7 +26192,7 @@ function editCard(call, result) {
   const diff2 = hunks(str3(result?.diff)) ?? (call.diff ? plainDiff(call.diff) : void 0);
   const content = str3(call.args.content);
   const write = call.name === "write_file";
-  const head = {
+  const head2 = {
     name: write ? "write" : "edit",
     target: path,
     targetKind: "path",
@@ -25937,7 +26202,7 @@ function editCard(call, result) {
     const text2 = content.replace(/\n$/, "");
     const lines = text2.split("\n").length;
     return {
-      ...head,
+      ...head2,
       badges: diff2 ? [{ text: "new file", tone: "success" }] : void 0,
       body: [/* @__PURE__ */ jsx("code", { lang: lang ?? "text", numbers: true, text: text2 }, "code")],
       folded: true,
@@ -25946,10 +26211,10 @@ function editCard(call, result) {
     };
   }
   if (!diff2) {
-    return { ...head, body: [] };
+    return { ...head2, body: [] };
   }
   const { added, removed } = diffStats(diff2);
-  return { ...head, body: [/* @__PURE__ */ jsx("diff", { lang, text: diff2 }, "diff")], meta: [`+${added} \u2212${removed}`] };
+  return { ...head2, body: [/* @__PURE__ */ jsx("diff", { lang, text: diff2 }, "diff")], meta: [`+${added} \u2212${removed}`] };
 }
 function searchCard(call, result) {
   const pattern = str3(call.args.pattern) ?? call.context;
@@ -26058,7 +26323,7 @@ function fetchCard(call, result) {
     body.push(sourceRow(`s${i}`, str3(p.title) ?? str3(p.url) ?? "", str3(p.url)));
     const content = str3(p.content);
     if (content) {
-      body.push(/* @__PURE__ */ jsx("md", { children: clip(content, 4e3) }, `b${i}`));
+      body.push(/* @__PURE__ */ jsx("md", { children: clip2(content, 4e3) }, `b${i}`));
     }
   }
   const chars = pages.reduce((n, p) => n + (str3(p.content)?.length ?? 0), 0);
@@ -26228,7 +26493,7 @@ function genericBody(call) {
   if (!text2 || call.status === "running") {
     return [];
   }
-  return [/* @__PURE__ */ jsx("code", { lang: /^\s*[[{]/.test(text2) ? "json" : "text", text: clip(text2, 4e3) }, "out")];
+  return [/* @__PURE__ */ jsx("code", { lang: /^\s*[[{]/.test(text2) ? "json" : "text", text: clip2(text2, 4e3) }, "out")];
 }
 function errorOf(call) {
   const result = record(call.result);
@@ -26309,13 +26574,13 @@ function firstLine(text2) {
   return text2?.split("\n").find((l) => l.trim())?.trim();
 }
 function humanize(name) {
-  const words = name.replace(/[_-]+/g, " ").trim();
-  return words.charAt(0).toUpperCase() + words.slice(1);
+  const words2 = name.replace(/[_-]+/g, " ").trim();
+  return words2.charAt(0).toUpperCase() + words2.slice(1);
 }
 function pretty(v) {
   return typeof v === "string" ? v : JSON.stringify(v, null, 2);
 }
-function clip(text2, max) {
+function clip2(text2, max) {
   return text2.length > max ? `${text2.slice(0, max)}
 \u2026` : text2;
 }
@@ -26352,8 +26617,8 @@ function moveSelection(key2, ids, selected) {
   return void 0;
 }
 function rank(items, query, textOf) {
-  const words = query.toLowerCase().split(/\s+/).filter(Boolean);
-  if (!words.length) {
+  const words2 = query.toLowerCase().split(/\s+/).filter(Boolean);
+  if (!words2.length) {
     return items.map((item) => ({ item, positions: [] }));
   }
   const scored = [];
@@ -26361,7 +26626,7 @@ function rank(items, query, textOf) {
     const text2 = textOf(item).toLowerCase();
     const positions = /* @__PURE__ */ new Set();
     let score = 0;
-    for (const word of words) {
+    for (const word of words2) {
       const at = text2.indexOf(word);
       if (at >= 0) {
         const boundary = at === 0 || /[\s/_.:-]/.test(text2[at - 1] ?? "");
@@ -26789,9 +27054,9 @@ function stepItem(e, id, a) {
 }
 function stepPreview(e) {
   if (e.kind !== "tool") {
-    const head = { assistant: "Answer", kickoff: "Task", note: "Note", think: "Thinking" }[e.kind];
+    const head2 = { assistant: "Answer", kickoff: "Task", note: "Note", think: "Thinking" }[e.kind];
     return [
-      /* @__PURE__ */ jsx("text", { role: "omp.hub.title", text: head }, "title"),
+      /* @__PURE__ */ jsx("text", { role: "omp.hub.title", text: head2 }, "title"),
       /* @__PURE__ */ jsx("text", { spans: [{ s: "dim mono", t: e.at }] }, "at"),
       /* @__PURE__ */ jsx("md", { text: e.text, tone: e.kind === "think" ? "muted" : void 0 }, "body")
     ];
@@ -27297,7 +27562,7 @@ function preview2(row, isCurrent) {
 import { appendFileSync as appendFileSync3, existsSync, mkdirSync as mkdirSync2, readFileSync } from "node:fs";
 import { homedir as homedir2 } from "node:os";
 import { join as join2 } from "node:path";
-var MAX = 1e3;
+var MAX2 = 1e3;
 var dir = process.env.HERMES_HOME ?? join2(homedir2(), ".hermes");
 var file = join2(dir, ".hermes_history");
 var cache = null;
@@ -27323,7 +27588,7 @@ function load() {
     if (current.length) {
       entries.push(current.join("\n"));
     }
-    cache = entries.slice(-MAX);
+    cache = entries.slice(-MAX2);
   } catch {
     cache = [];
   }
@@ -27339,8 +27604,8 @@ function append(line) {
     return;
   }
   items.push(trimmed);
-  if (items.length > MAX) {
-    items.splice(0, items.length - MAX);
+  if (items.length > MAX2) {
+    items.splice(0, items.length - MAX2);
   }
   try {
     if (!existsSync(dir)) {
@@ -27910,8 +28175,8 @@ function questionsOf(raw) {
   });
 }
 function tabLabel(question) {
-  const words = question.replace(/[?.!:]+$/, "").split(/\s+/);
-  return words.length > 4 ? `${words.slice(0, 4).join(" ")}\u2026` : words.join(" ");
+  const words2 = question.replace(/[?.!:]+$/, "").split(/\s+/);
+  return words2.length > 4 ? `${words2.slice(0, 4).join(" ")}\u2026` : words2.join(" ");
 }
 function clarifyOverlay(host, req) {
   const questions = questionsOf(req.params.questions);
@@ -28555,7 +28820,7 @@ function openThemePicker(app) {
 }
 
 // src/commands.ts
-var COMMANDS = [
+var COMMANDS2 = [
   {
     aliases: ["exit", "q"],
     name: "quit",
@@ -28629,7 +28894,7 @@ var COMMANDS = [
   ...CONTROL_COMMANDS.map((c) => ({ ...c, run: (app, arg) => c.run(app.control(), arg) }))
 ];
 function localCommand(name) {
-  return COMMANDS.find((c) => c.name === name || c.aliases?.includes(name));
+  return COMMANDS2.find((c) => c.name === name || c.aliases?.includes(name));
 }
 
 // src/flow.ts
@@ -29017,16 +29282,16 @@ function iconOf(item) {
 }
 function labelOf2(item, typed, replaceFrom) {
   const label = (item.display || item.text).replace(/^\//, "");
-  const base = isPath(item) ? "strong" : void 0;
+  const base2 = isPath(item) ? "strong" : void 0;
   const query = typed.slice(replaceFrom).replace(/^[/@]/, "").replace(/^(file|folder):/, "").split("/").pop() ?? "";
   const at = query ? label.toLowerCase().indexOf(query.toLowerCase()) : -1;
   if (at < 0) {
-    return [{ s: base, t: label }];
+    return [{ s: base2, t: label }];
   }
   return [
-    { s: base, t: label.slice(0, at) },
-    { s: base ? `${base} mark` : "mark", t: label.slice(at, at + query.length) },
-    { s: base, t: label.slice(at + query.length) }
+    { s: base2, t: label.slice(0, at) },
+    { s: base2 ? `${base2} mark` : "mark", t: label.slice(at, at + query.length) },
+    { s: base2, t: label.slice(at + query.length) }
   ].filter((s) => s.t);
 }
 function requestFor(before, sid) {
@@ -29037,6 +29302,19 @@ function requestFor(before, sid) {
   }
   return request.method === "complete.slash" ? { ...request, replaceFrom: request.replaceFrom + lineStart2, skillsOnly: true } : { ...request, replaceFrom: request.replaceFrom + lineStart2 };
 }
+
+// src/view/styles.ts
+var STYLES = css`
+  /* A run's summary is prose ("Ran 2 commands, read 1 file"), not code: the UI face, not mono. */
+  [data-role='omp.tools.run'] > .sf-section-head .sf-head {
+    font-family: var(--sans) !important;
+  }
+
+  /* omp's ask theme draws a radio at the start of each option without moving the text over. */
+  [data-role='omp.ask.option'] {
+    padding-left: 34px !important;
+  }
+`;
 
 // .hermes-src/node_modules/@hermes/shared/src/color.ts
 var HEX6_RE = /^#?([0-9a-f]{6})$/i;
@@ -29387,7 +29665,7 @@ var ADAPTIVE_BACKGROUNDS = [
 ];
 var LIGHT_BG_MIN_LUMINANCE = 0.4;
 var DARK_BG_MAX_LUMINANCE = 0.35;
-function adaptColorsToBackground(colors, isLight, base, bg) {
+function adaptColorsToBackground(colors, isLight, base2, bg) {
   const out = { ...colors };
   const displayFloor = isLight ? LIGHT_DISPLAY_MIN_CONTRAST : DISPLAY_MIN_CONTRAST;
   const semanticFloor = isLight ? LIGHT_SEMANTIC_MIN_CONTRAST : SEMANTIC_MIN_CONTRAST;
@@ -29403,7 +29681,7 @@ function adaptColorsToBackground(colors, isLight, base, bg) {
       continue;
     }
     if (isLight ? luminance < LIGHT_BG_MIN_LUMINANCE : luminance > DARK_BG_MAX_LUMINANCE) {
-      out[key2] = base[key2];
+      out[key2] = base2[key2];
     }
   }
   return out;
@@ -29522,27 +29800,27 @@ function fromSkin(colors, branding, bannerLogo = "", bannerHero = "", toolPrefix
   const skinBg = authoredBackground(colors["background"]);
   const isLight = skinIsLight(colors);
   const bg = skinBg ?? referenceBackground(isLight);
-  const base = isLight ? LIGHT_SEEDS : DARK_SEEDS;
+  const base2 = isLight ? LIGHT_SEEDS : DARK_SEEDS;
   const d = isLight ? LIGHT_THEME : DARK_THEME;
   const c = (k) => colors[k];
   const hasSkinColors = Object.keys(colors).length > 0;
-  const identityFills = hasSkinColors ? {} : { activeRow: base.activeRow, muted: base.muted, selection: base.selection, surface: base.surface };
+  const identityFills = hasSkinColors ? {} : { activeRow: base2.activeRow, muted: base2.muted, selection: base2.selection, surface: base2.surface };
   const seeds = {
     ...identityFills,
-    accent: c("ui_accent") ?? c("banner_accent") ?? base.accent,
+    accent: c("ui_accent") ?? c("banner_accent") ?? base2.accent,
     bg,
-    border: c("ui_border") ?? c("banner_border") ?? base.border,
-    error: c("ui_error") ?? base.error,
-    ok: c("ui_ok") ?? base.ok,
-    primary: c("ui_primary") ?? c("banner_title") ?? base.primary,
-    prompt: c("prompt") ?? c("banner_text") ?? base.prompt,
-    shellDollar: c("shell_dollar") ?? base.shellDollar,
-    statusBad: c("status_bar_bad") ?? base.statusBad,
-    statusCritical: c("status_bar_critical") ?? c("ui_error") ?? base.statusCritical,
-    statusGood: c("status_bar_good") ?? c("ui_ok") ?? base.statusGood,
-    statusWarn: c("status_bar_warn") ?? c("ui_warn") ?? base.statusWarn,
-    text: c("ui_text") ?? c("banner_text") ?? base.text,
-    warn: c("ui_warn") ?? base.warn
+    border: c("ui_border") ?? c("banner_border") ?? base2.border,
+    error: c("ui_error") ?? base2.error,
+    ok: c("ui_ok") ?? base2.ok,
+    primary: c("ui_primary") ?? c("banner_title") ?? base2.primary,
+    prompt: c("prompt") ?? c("banner_text") ?? base2.prompt,
+    shellDollar: c("shell_dollar") ?? base2.shellDollar,
+    statusBad: c("status_bar_bad") ?? base2.statusBad,
+    statusCritical: c("status_bar_critical") ?? c("ui_error") ?? base2.statusCritical,
+    statusGood: c("status_bar_good") ?? c("ui_ok") ?? base2.statusGood,
+    statusWarn: c("status_bar_warn") ?? c("ui_warn") ?? base2.statusWarn,
+    text: c("ui_text") ?? c("banner_text") ?? base2.text,
+    warn: c("ui_warn") ?? base2.warn
   };
   const derived = buildPalette(seeds, isLight);
   const surface = c("completion_menu_bg") ?? c("background") ?? derived.completionBg;
@@ -29998,21 +30276,17 @@ function toolRunNode(run2, id, now, blockNode2) {
   const first = calls[0];
   const ended = Math.max(...calls.map((c) => c.startedAt + (c.duration ?? 0)));
   const key2 = `r${run2[0].id}`;
-  const spans = [
-    { t: summarize(calls) },
-    ...failed ? [{ s: "error", t: `, ${failed} failed` }] : [],
-    ...live ? [{ s: "muted", t: `, now ${live.name}` }] : []
-  ];
+  const spans = live ? [{ t: stepTitle(live) }, ...calls.length > 1 ? [{ s: "muted", t: `  step ${calls.indexOf(live) + 1} of ${calls.length}` }] : []] : [{ t: summarize(calls) }, ...failed ? [{ s: "error", t: `, ${failed} failed` }] : []];
   return node(
     "section",
-    { collapsed: true, collapsible: true, head: `${id}.${key2}.head`, key: key2, role: "omp.tools.run" },
+    { collapsed: !live, collapsible: true, head: `${id}.${key2}.head`, key: key2, role: "omp.tools.run" },
     [
       /* @__PURE__ */ jsxs("row", { align: "center", gap: "sm", children: [
         live ? /* @__PURE__ */ jsx("spinner", { style: "dots", tone: "accent" }, "mark") : /* @__PURE__ */ jsx("icon", { name: failed ? "warning" : "tools" }, "mark"),
-        /* @__PURE__ */ jsx("text", { grow: 1, spans, wrap: "word" }, "label"),
+        /* @__PURE__ */ jsx("text", { grow: 1, spans, wrap: "none" }, "label"),
         live ? /* @__PURE__ */ jsx("elapsed", { age: age(first, first.startedAt, now), format: "short" }, "time") : /* @__PURE__ */ jsx("text", { spans: [{ s: "dim", t: duration(Math.max(0, ended - first.startedAt)) }] }, "time")
       ] }, "head"),
-      ...run2.map((b) => b.kind === "tool" ? toolNode(b.call, now) : blockNode2(b))
+      ...run2.map((b) => b.kind === "tool" ? toolNode(b.call, now, { inRun: true }) : blockNode2(b))
     ]
   );
 }
@@ -30133,39 +30407,39 @@ function text(title, inline, lines) {
   return { kind: "text", text: [inline, ...lines].filter(Boolean).join("\n"), title };
 }
 function parseUsage(raw) {
-  const sections = [];
-  let head;
+  const sections2 = [];
+  let head2;
   const preamble = [];
   const flush = () => {
-    if (head) {
-      sections.push(build(head.title, head.inline, head.body));
+    if (head2) {
+      sections2.push(build(head2.title, head2.inline, head2.body));
     }
   };
   for (const line of raw.replace(/\r/g, "").split("\n")) {
     const h = HEADER.exec(line);
     if (h) {
       flush();
-      head = { body: [], inline: h[2].trim(), title: h[1] };
-    } else if (head) {
-      head.body.push(line);
+      head2 = { body: [], inline: h[2].trim(), title: h[1] };
+    } else if (head2) {
+      head2.body.push(line);
     } else if (line.trim()) {
       preamble.push(line);
     }
   }
   flush();
-  if (!sections.some((s) => s.kind !== "text")) {
+  if (!sections2.some((s) => s.kind !== "text")) {
     return null;
   }
-  return preamble.length ? [{ kind: "text", text: preamble.join("\n"), title: "" }, ...sections] : sections;
+  return preamble.length ? [{ kind: "text", text: preamble.join("\n"), title: "" }, ...sections2] : sections2;
 }
 
 // src/view/slash.tsx
 var THRESHOLDS = { bad: 0.95, warn: 0.8 };
 function slashBody(e) {
   if (/^\/usage\b/.test(e.title)) {
-    const sections = parseUsage(e.text);
-    if (sections) {
-      return sections.map((s, i) => usageSection(s, i));
+    const sections2 = parseUsage(e.text);
+    if (sections2) {
+      return sections2.map((s, i) => usageSection(s, i));
     }
   }
   return [textBody(e.text, "body")];
@@ -30474,9 +30748,9 @@ function blockNode(b, id, streaming, cx) {
   }
 }
 function thinkingNode(b, id, cx) {
-  const head = `${id}.head`;
+  const head2 = `${id}.head`;
   if (b.endedAt === void 0) {
-    return /* @__PURE__ */ jsxs("section", { collapsed: false, collapsible: true, head, role: "omp.thinking.live", children: [
+    return /* @__PURE__ */ jsxs("section", { collapsed: false, collapsible: true, head: head2, role: "omp.thinking.live", children: [
       /* @__PURE__ */ jsxs("row", { gap: "sm", children: [
         /* @__PURE__ */ jsx("spinner", { role: "omp.thinking.spin", style: "starburst" }, "spin"),
         /* @__PURE__ */ jsx("text", { spans: [{ s: "muted", t: "Thinking\u2026" }] }, "label"),
@@ -30488,7 +30762,7 @@ function thinkingNode(b, id, cx) {
   const took = b.endedAt - b.startedAt;
   return node(
     "section",
-    { collapsed: true, collapsible: true, head, key: b.id, role: "omp.thinking", took: took > 0 ? took : void 0 },
+    { collapsed: true, collapsible: true, head: head2, key: b.id, role: "omp.thinking", took: took > 0 ? took : void 0 },
     [
       /* @__PURE__ */ jsx("text", { spans: [{ s: "muted", t: took >= 1e3 ? `Thought for ${duration(took)}` : "Thought" }] }, "head"),
       /* @__PURE__ */ jsx("md", { children: b.text }, "body")
@@ -30662,6 +30936,7 @@ var App = class {
   }
   async run() {
     this.#surface = this.#tern.open({ id: "hermes", mode: "inline", role: "omp.session", title: "hermes" });
+    this.#surface.stylesheet("hermes-tern", STYLES);
     this.#applyTheme();
     if (this.#tern.caps.features.includes("blobs")) {
       this.#welcome.logo = this.#tern.blob(logo_default, "image/png");
@@ -30784,6 +31059,9 @@ var App = class {
     if (ev.ev === "focus" && ev.id === INPUT_ID && !this.overlays.at(-1)?.modal) {
       this.#focus = INPUT_ID;
       this.#surface.focus(INPUT_ID);
+    }
+    if (ev.ev === "toggle" && !ev.collapsed && ev.id.startsWith("main.")) {
+      this.#surface.reveal(ev.id, "start");
     }
   }
   /** Shows subagent `id` beside the chat in a Tern split; its timeline sheet where no split can open. */
@@ -31612,6 +31890,7 @@ var WatchApp = class {
   }
   async run() {
     this.#surface = this.#tern.open({ id: "hermes", mode: "inline", role: "omp.session", title: this.#spec.name });
+    this.#surface.stylesheet("hermes-tern", STYLES);
     this.#surface.palette(paletteFor(loadSettings().theme ?? "tern", void 0));
     this.#gw.on("event", (ev) => {
       if (ev.type === "gateway.ready") {
@@ -31741,6 +32020,9 @@ var WatchApp = class {
   #onEvent(ev) {
     if (ev.ev === "focus" && ev.id === INPUT_ID2) {
       this.#surface.focus(INPUT_ID2);
+    }
+    if (ev.ev === "toggle" && !ev.collapsed && ev.id.startsWith("main.")) {
+      this.#surface.reveal(ev.id, "start");
     }
   }
   #onKey(key2) {
