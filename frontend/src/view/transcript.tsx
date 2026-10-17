@@ -112,7 +112,7 @@ function turnNode(turn: TurnEntry, id: string, cx: TranscriptContext): JSX.Eleme
   if (turn.continued) {
     children.unshift(
       <row align="center" gap="sm" key="continued" role="omp.turn.continued">
-        <icon key="icon" name={turn.continued.startsWith('Subagents') ? 'users' : 'loop'} />
+        <icon key="icon" name={continuedIcon(turn.continued)} />
         <text key="why" spans={[{ s: 'muted', t: turn.continued }]} />
       </row>
     )
@@ -176,6 +176,11 @@ function blockNode(b: Block, id: string, streaming: boolean, cx: TranscriptConte
     case 'steer':
       return steerNode(b, 'landed')
   }
+}
+
+/** The reason line's icon: agents, a background command, a watcher, or Hermes going on. */
+function continuedIcon(why: string): string {
+  return why.startsWith('Subagents') ? 'users' : why.startsWith('Watcher') ? 'eye' : why.startsWith('Background') ? 'terminal' : 'loop'
 }
 
 const STEER_NOTE = { landed: '', next: ' · sent as the next prompt', pending: ' · reaches Hermes after this step' }
