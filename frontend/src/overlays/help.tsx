@@ -19,7 +19,7 @@ const HOTKEYS: { group: string; rows: [string[], string][] }[] = [
       [['shift+enter', 'alt+enter'], 'New line'],
       [['up', 'down'], 'Move between lines / browse history'],
       [['tab'], 'Accept the completion'],
-      [['alt+left', 'alt+right', 'alt+b', 'alt+f'], 'Move by word'],
+      [['alt+left', 'alt+right', 'alt+f'], 'Move by word'],
       [['ctrl+a', 'ctrl+e'], 'Start / end of line'],
       [['ctrl+w', 'alt+backspace'], 'Delete word backwards'],
       [['ctrl+u'], 'Delete to start of line'],
@@ -35,6 +35,9 @@ const HOTKEYS: { group: string; rows: [string[], string][] }[] = [
       [['escape'], 'Close the completion / interrupt the agent'],
       [['shift+tab'], 'Cycle the reasoning effort'],
       [['alt+up'], 'Edit the oldest queued prompt'],
+      [['alt+a'], 'Agents'],
+      [['alt+b'], 'Background processes (/ps)'],
+      [['down'], 'Focus the agents / shells pills (empty prompt); ← → switch, Enter opens, Esc returns'],
       [['ctrl+c'], 'Clear the draft / interrupt / exit (twice)'],
       [['ctrl+d'], 'Delete forward / exit (empty prompt)']
     ]

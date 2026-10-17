@@ -2,9 +2,10 @@
 // the glass composer (omp.editor) with its model chip, effort, context
 // hairline and session cost. Roles match omp's so Tern's composer sheets apply.
 
-import type { EditEvent, JSX, SendEvent } from '@stencil-hq/tern'
+import type { EditEvent, JSX, SendEvent, Tone } from '@stencil-hq/tern'
 
 import type { Composer } from '../composer.js'
+import type { Pill } from '../hud.js'
 
 import { age, compact } from './time.js'
 
@@ -45,6 +46,20 @@ export interface DockContext {
   rates?: { cache?: number; tps?: number }
   /** Running subagents: the pill above the composer that opens the agents hub. */
   agents?: { running: number; onOpen(): void }
+  /** Background processes: the shells pill that opens the Background sheet. */
+  shells?: ShellsPill
+  /** The pill holding the keyboard (Down from an empty prompt). */
+  focused?: Pill
+}
+
+/** The shells pill: how many run, else how the recently exited ones ended. */
+export interface ShellsPill {
+  running: number
+  /** Exited within the retention window; shown only while none runs. */
+  exited: number
+  /** The newest exit's tone (success, error, warning). */
+  tone: Tone
+  onOpen(): void
 }
 
 /** The `dock` region's nodes: the working row, the queued prompts and the composer. */
@@ -93,10 +108,16 @@ export function dockNodes(cx: DockContext): JSX.Element[] {
     )
   }
 
-  if (cx.agents?.running) {
+  const pills = [
+    cx.agents?.running ? agentsPill(cx.agents.running, cx.agents.onOpen, cx.focused === 'agents') : null,
+    cx.shells && (cx.shells.running || cx.shells.exited) ? shellsPill(cx.shells, cx.focused === 'shells') : null
+  ].filter(p => p !== null)
+
+  if (pills.length) {
     nodes.push(
       <row key="agents" role="omp.hud">
-        {agentsPill(cx.agents.running, cx.agents.onOpen)}
+        {cx.focused ? hudHint() : null}
+        {pills}
       </row>
     )
   }
@@ -106,13 +127,63 @@ export function dockNodes(cx: DockContext): JSX.Element[] {
   return nodes
 }
 
-/** omp's agents pill: a click (or ⌥A) opens the hub. Keyed so updates keep its node and its entrance plays once. */
-function agentsPill(running: number, onOpen: () => void): JSX.Element {
+/**
+ * omp's agents pill: a click (or ⌥A) opens the hub. Keyed so updates keep its node and its
+ * entrance plays once. The content sits in an `omp.hud.seg`, omp's padded, hoverable pill part.
+ */
+function agentsPill(running: number, onOpen: () => void, focused: boolean): JSX.Element {
   return (
-    <row align="center" gap="xs" key="pill" onClick={onOpen} role="omp.hud.pill" title="Agents  ⌥A">
-      <icon key="icon" name="users" />
-      <spinner key="spin" style="dots" tone="accent" />
-      <text key="text" text={`${running} agent${running === 1 ? '' : 's'} running`} wrap="none" />
+    <row align="center" key="pill" mark={focused ? 'pick' : undefined} onClick={onOpen} role="omp.hud.pill" title="Agents  ⌥A">
+      <row align="center" gap="xs" key="seg" role="omp.hud.seg">
+        <icon key="icon" name="users" />
+        <spinner key="spin" style="dots" tone="accent" />
+        <text key="text" text={`${running} agent${running === 1 ? '' : 's'} running`} wrap="none" />
+      </row>
+    </row>
+  )
+}
+
+/** The shells pill, in the agents pill's style: `2 shells` with a live dot, then `1 shell exited` for a minute. */
+function shellsPill(s: ShellsPill, focused: boolean): JSX.Element {
+  const live = s.running > 0
+  const n = live ? s.running : s.exited
+
+  return (
+    <row
+      align="center"
+      key="shells"
+      mark={focused ? 'pick' : undefined}
+      onClick={s.onOpen}
+      role="omp.hud.pill"
+      title="Background processes  ⌥B"
+    >
+      <row align="center" gap="xs" key="seg" role="omp.hud.seg">
+        <icon key="icon" name="terminal" />
+        {live ? (
+          <spinner key="spin" style="dots" tone="accent" />
+        ) : (
+          <icon key="end" name={s.tone === 'success' ? 'done' : s.tone === 'error' ? 'failed' : 'aborted'} tone={s.tone} />
+        )}
+        <text
+          key="text"
+          spans={[{ s: live ? undefined : 'muted', t: `${n} shell${n === 1 ? '' : 's'}${live ? '' : ' exited'}` }]}
+          wrap="none"
+        />
+      </row>
+    </row>
+  )
+}
+
+/** What the keys do while a pill holds them. */
+function hudHint(): JSX.Element {
+  return (
+    <row align="center" gap="xs" key="hint" role="omp.hud.hint">
+      <kbd key="enter" keys={['enter']} />
+      <text key="open" text="open" />
+      <kbd key="lr" keys={['left', 'right']} />
+      <text key="move" text="switch" />
+      <kbd key="esc" keys={['esc']} />
+      <text key="back" text="back" />
     </row>
   )
 }

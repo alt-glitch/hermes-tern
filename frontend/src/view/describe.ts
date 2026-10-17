@@ -84,6 +84,8 @@ const COMMANDS: Record<string, Describer> = {
 
     return a.includes('-name') && name ? `Find ${quote(name)}` : `Find files in ${base(operand(a) ?? '.')}`
   },
+  // A shell loop names no purpose of its own; its body's steps are past a `;`.
+  for: () => 'Run a loop',
   gh: a => `GitHub ${operands(a).slice(0, 2).join(' ')}`.trim(),
   git: a => {
     const sub = operand(a, new Set(['-C', '-c']))
@@ -119,9 +121,11 @@ const COMMANDS: Record<string, Describer> = {
   tail: a => (a.includes('-f') ? `Follow ${base(operands(a).at(-1) ?? 'a log')}` : `Read the end of ${base(operands(a).at(-1) ?? 'output')}`),
   tern: a => `Tern ${operands(a).slice(0, 2).join(' ')}`.trim(),
   touch: a => `Create ${base(operands(a).at(-1) ?? 'a file')}`,
+  until: () => 'Run a loop',
   uv: a => (a[0] === 'run' ? (pythonTitle(a.slice(1).filter(x => x !== 'python')) ?? 'Run with uv') : `uv ${operand(a) ?? ''}`.trim()),
   vitest: () => 'Run tests',
   wc: a => `Count lines in ${base(operands(a).at(-1) ?? 'files')}`,
+  while: () => 'Run a loop',
   zsh: a => shellTitle(a),
   which: a => `Locate ${operand(a) ?? 'a command'}`
 }

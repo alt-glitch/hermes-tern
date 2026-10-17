@@ -32,6 +32,11 @@ export class Composer {
   #browse = -1
   #draft = ''
 
+  /** Up/Down are walking the prompt history (Down still has somewhere to go). */
+  get browsing(): boolean {
+    return this.#browse >= 0
+  }
+
   set(text: string, cursor = text.length) {
     this.#record({ merge: false })
     this.text = text

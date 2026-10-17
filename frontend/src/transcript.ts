@@ -532,6 +532,13 @@ export class Transcript {
     )
   }
 
+  /** The terminal calls that run on as background processes, oldest first. */
+  backgroundCalls(): ToolCall[] {
+    return this.entries.flatMap(e =>
+      e.kind === 'turn' ? e.blocks.flatMap(b => (b.kind === 'tool' && isBackgroundCall(b.call) ? [b.call] : [])) : []
+    )
+  }
+
   #tool(id: string): Located | undefined {
     return this.#findTool(call => call.id === id)
   }
@@ -621,6 +628,15 @@ function usageSince(now: Usage, before: Usage | undefined): Usage {
 }
 
 /** A JSON object, parsing JSON text (stored tool results are strings). */
+/**
+ * A terminal call that started a background process: `background: true`, or a foreground call
+ * Hermes moved to the background (a long timeout, a message arriving mid-run), whose result
+ * then names the process (`session_id`).
+ */
+export function isBackgroundCall(call: ToolCall): boolean {
+  return call.name === 'terminal' && (call.args.background === true || typeof record(call.result)?.session_id === 'string')
+}
+
 export function record(v: unknown): Record<string, unknown> | undefined {
   if (typeof v === 'string') {
     try {

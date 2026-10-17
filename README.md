@@ -45,7 +45,8 @@ npm run bundle                                    # rebuilds dist/entry.js
 ```
 
 `lab/fake_model.py --home DIR` writes a disposable `HERMES_HOME` pointed at a loopback model
-and serves it: prompts containing "approve", "clarify" or "tool" drive those flows, anything
+and serves it: prompts containing "approve", "clarify" or "tool" drive those flows (and ones starting "background" or
+"watch" start a ticking background process), anything
 else streams markdown. Pair it with a headless Tern (`tern serve --control PORT`, then
 `tern ctl --control PORT run|type|key|shot …`) to check the UI without credentials.
 

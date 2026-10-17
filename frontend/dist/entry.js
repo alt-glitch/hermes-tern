@@ -2039,7 +2039,7 @@ var require_timers = __commonJS({
     "use strict";
     var fastNow = 0;
     var RESOLUTION_MS = 1e3;
-    var TICK_MS2 = (RESOLUTION_MS >> 1) - 1;
+    var TICK_MS3 = (RESOLUTION_MS >> 1) - 1;
     var fastNowTimeout;
     var kFastTimer = /* @__PURE__ */ Symbol("kFastTimer");
     var fastTimers = [];
@@ -2048,13 +2048,13 @@ var require_timers = __commonJS({
     var PENDING = 0;
     var ACTIVE = 1;
     function onTick() {
-      fastNow += TICK_MS2;
+      fastNow += TICK_MS3;
       let idx = 0;
       let len = fastTimers.length;
       while (idx < len) {
         const timer = fastTimers[idx];
         if (timer._state === PENDING) {
-          timer._idleStart = fastNow - TICK_MS2;
+          timer._idleStart = fastNow - TICK_MS3;
           timer._state = ACTIVE;
         } else if (timer._state === ACTIVE && fastNow >= timer._idleStart + timer._idleTimeout) {
           timer._state = TO_BE_CLEARED;
@@ -2080,7 +2080,7 @@ var require_timers = __commonJS({
         fastNowTimeout.refresh();
       } else {
         clearTimeout(fastNowTimeout);
-        fastNowTimeout = setTimeout(onTick, TICK_MS2);
+        fastNowTimeout = setTimeout(onTick, TICK_MS3);
         if (fastNowTimeout.unref) {
           fastNowTimeout.unref();
         }
@@ -4132,9 +4132,9 @@ var require_util2 = __commonJS({
       }
       const strongest = getStrongestMetadata(parsedMetadata);
       const metadata = filterMetadataListByAlgorithm(parsedMetadata, strongest);
-      for (const item of metadata) {
-        const algorithm = item.algo;
-        const expectedValue = item.hash;
+      for (const item2 of metadata) {
+        const algorithm = item2.algo;
+        const expectedValue = item2.hash;
         let actualValue = crypto.createHash(algorithm).update(bytes).digest("base64");
         if (actualValue[actualValue.length - 1] === "=") {
           if (actualValue[actualValue.length - 2] === "=") {
@@ -7996,12 +7996,12 @@ var require_pool_base = __commonJS({
           const queue2 = pool[kQueue];
           let needDrain = false;
           while (!needDrain) {
-            const item = queue2.shift();
-            if (!item) {
+            const item2 = queue2.shift();
+            if (!item2) {
               break;
             }
             pool[kQueued]--;
-            needDrain = !this.dispatch(item.opts, item.handler);
+            needDrain = !this.dispatch(item2.opts, item2.handler);
           }
           this[kNeedDrain] = needDrain;
           if (!this[kNeedDrain] && pool[kNeedDrain]) {
@@ -8067,11 +8067,11 @@ var require_pool_base = __commonJS({
       }
       async [kDestroy](err) {
         while (true) {
-          const item = this[kQueue].shift();
-          if (!item) {
+          const item2 = this[kQueue].shift();
+          if (!item2) {
             break;
           }
-          item.handler.onError(err);
+          item2.handler.onError(err);
         }
         await Promise.all(this[kClients].map((c) => c.destroy(err)));
       }
@@ -17572,9 +17572,9 @@ var require_sender = __commonJS({
       constructor(socket) {
         this.#socket = socket;
       }
-      add(item, cb, hint) {
+      add(item2, cb, hint) {
         if (hint !== sendHints.blob) {
-          const frame = createFrame(item, hint);
+          const frame = createFrame(item2, hint);
           if (!this.#running) {
             this.#socket.write(frame, cb);
           } else {
@@ -17588,7 +17588,7 @@ var require_sender = __commonJS({
           return;
         }
         const node2 = {
-          promise: item.arrayBuffer().then((ab) => {
+          promise: item2.arrayBuffer().then((ab) => {
             node2.promise = null;
             node2.frame = createFrame(ab, hint);
           }),
@@ -19011,9 +19011,9 @@ function strings(raw, key2) {
   if (!Array.isArray(v))
     return void 0;
   const out = [];
-  for (const item of v)
-    if (typeof item === "string")
-      out.push(item);
+  for (const item2 of v)
+    if (typeof item2 === "string")
+      out.push(item2);
   return out;
 }
 function cell(raw) {
@@ -19091,10 +19091,10 @@ function decodeEvent(raw) {
     }
     case "select":
     case "activate": {
-      const item = str(raw, "item") ?? id;
-      if (sf === void 0 || id === void 0 || item === void 0)
+      const item2 = str(raw, "item") ?? id;
+      if (sf === void 0 || id === void 0 || item2 === void 0)
         return unknown();
-      return defined({ ev, sf, id, item, raw }, { values: formValues(raw) });
+      return defined({ ev, sf, id, item: item2, raw }, { values: formValues(raw) });
     }
     case "action": {
       const act = str(raw, "act");
@@ -19821,8 +19821,8 @@ function flatten(input, out = []) {
   else if (typeof input === "number")
     out.push(String(input));
   else if (Array.isArray(input))
-    for (const item of input)
-      flatten(item, out);
+    for (const item2 of input)
+      flatten(item2, out);
   else if (input instanceof FragmentNode)
     for (const part of input.parts)
       out.push(part);
@@ -19845,7 +19845,7 @@ function toJson(value) {
       if (value instanceof Node)
         throw new TypeError(`a ${value.kind} node can't be a prop value`);
       if (Array.isArray(value))
-        return value.map((item) => toJson(item) ?? null);
+        return value.map((item2) => toJson(item2) ?? null);
       const out = {};
       for (const key2 in value) {
         const json = toJson(Reflect.get(value, key2));
@@ -20098,8 +20098,8 @@ function jsx(type, props, key2) {
 var jsxs = jsx;
 
 // node_modules/@stencil-hq/tern/dist/css.js
-function css(strings2, ...values) {
-  return String.raw(strings2, ...values);
+function css(strings3, ...values) {
+  return String.raw(strings3, ...values);
 }
 
 // node_modules/@stencil-hq/tern/dist/reconcile.js
@@ -20944,10 +20944,10 @@ var Session = class {
       this.#deliver({ type: "key", key: key2 });
   }
   #items(items) {
-    for (const item of items) {
-      switch (item.type) {
+    for (const item2 of items) {
+      switch (item2.type) {
         case "keys":
-          for (const key2 of this.#keys.feed(item.bytes))
+          for (const key2 of this.#keys.feed(item2.bytes))
             this.#deliver({ type: "key", key: key2 });
           break;
         case "da1":
@@ -20955,15 +20955,15 @@ var Session = class {
           this.#handshake = void 0;
           break;
         case "reply":
-          this.#recordLine("in", "r", {}, item.reply.raw);
-          if (item.reply.r === "hello")
-            this.#hello(item.reply);
-          else if (item.reply.r === "blobs")
-            this.#blobWaiters.shift()?.([...item.reply.have]);
+          this.#recordLine("in", "r", {}, item2.reply.raw);
+          if (item2.reply.r === "hello")
+            this.#hello(item2.reply);
+          else if (item2.reply.r === "blobs")
+            this.#blobWaiters.shift()?.([...item2.reply.have]);
           break;
         case "event":
-          this.#recordLine("in", "e", {}, item.event.raw);
-          this.#event(item.event);
+          this.#recordLine("in", "e", {}, item2.event.raw);
+          this.#event(item2.event);
           break;
       }
     }
@@ -22128,7 +22128,7 @@ var gatewayMsgEn = {
     },
     protocol: {
       noiseDetected: "protocol noise detected \xB7 /logs to inspect",
-      noise: (preview4) => `protocol noise: ${preview4}`
+      noise: (preview5) => `protocol noise: ${preview5}`
     },
     moa: {
       // {0}=references done {1}=references total (pre-formatted strings)
@@ -22910,12 +22910,12 @@ var slashCmdCoreEn = {
     queue: {
       countOne: (count2) => `${count2} queued message`,
       countOther: (count2) => `${count2} queued messages`,
-      queued: (preview4) => `queued: "${preview4}"`
+      queued: (preview5) => `queued: "${preview5}"`
     },
     steer: {
       usage: "usage: /steer <prompt>",
-      noActiveTurnQueued: (preview4) => `no active turn \u2014 queued for next: "${preview4}"`,
-      queued: (preview4) => `steer queued \u2014 arrives after next tool call: "${preview4}"`,
+      noActiveTurnQueued: (preview5) => `no active turn \u2014 queued for next: "${preview5}"`,
+      queued: (preview5) => `steer queued \u2014 arrives after next tool call: "${preview5}"`,
       rejected: "steer rejected \u2014 no active turn, queued for next turn"
     },
     undo: {
@@ -23793,8 +23793,8 @@ var CircularBuffer = class {
   buf;
   head = 0;
   len = 0;
-  push(item) {
-    this.buf[this.head] = item;
+  push(item2) {
+    this.buf[this.head] = item2;
     this.head = (this.head + 1) % this.capacity;
     if (this.len < this.capacity) {
       this.len++;
@@ -24198,12 +24198,12 @@ var GatewayClient = class extends EventEmitter {
   }
   /** End a hold: with the applied snapshot, replay only frames it does not contain; without one
    * (failed or superseded attach), deliver what was held. A replaced hold is a no-op. */
-  settleAttach(hold, snapshot) {
+  settleAttach(hold, snapshot2) {
     if (!hold || this.attachHold !== hold) {
       return;
     }
     this.attachHold = null;
-    const fence = snapshot;
+    const fence = snapshot2;
     for (const ev of hold.frames) {
       const { replay_epoch: epoch, seq } = ev;
       if (!fence || epoch === fence.replay_epoch && typeof seq === "number" && seq > Number(fence.last_sequence ?? -1)) {
@@ -24211,11 +24211,11 @@ var GatewayClient = class extends EventEmitter {
       }
     }
   }
-  hydrateSharedPrompts(snapshot) {
+  hydrateSharedPrompts(snapshot2) {
     if (!this.isCanonical) {
       return;
     }
-    const result = snapshot;
+    const result = snapshot2;
     for (const prompt of result.prompts ?? []) {
       this.publishLocalEvent({
         type: `${prompt.kind}.request`,
@@ -24244,9 +24244,9 @@ var GatewayClient = class extends EventEmitter {
     }
   }
   protocolError(what, text2, emptyLabel) {
-    const preview4 = text2.trim().slice(0, MAX_LOG_PREVIEW) || emptyLabel;
-    this.pushLog(`[protocol] ${what}: ${preview4}`);
-    this.publish({ type: "gateway.protocol_error", payload: { preview: preview4 } });
+    const preview5 = text2.trim().slice(0, MAX_LOG_PREVIEW) || emptyLabel;
+    this.pushLog(`[protocol] ${what}: ${preview5}`);
+    this.publish({ type: "gateway.protocol_error", payload: { preview: preview5 } });
   }
   startLocalGateway() {
     const generation = ++this.localGeneration;
@@ -25133,6 +25133,12 @@ var Transcript = class {
       (e) => e.kind === "turn" ? e.blocks.flatMap((b) => b.kind === "tool" && b.call.name === "delegate_task" ? [b.call] : []) : []
     );
   }
+  /** The terminal calls that run on as background processes, oldest first. */
+  backgroundCalls() {
+    return this.entries.flatMap(
+      (e) => e.kind === "turn" ? e.blocks.flatMap((b) => b.kind === "tool" && isBackgroundCall(b.call) ? [b.call] : []) : []
+    );
+  }
   #tool(id) {
     return this.#findTool((call) => call.id === id);
   }
@@ -25196,6 +25202,9 @@ function usageSince(now, before) {
   };
   return { ...now, cost_usd: less("cost_usd"), input: less("input"), output: less("output"), total: less("total") };
 }
+function isBackgroundCall(call) {
+  return call.name === "terminal" && (call.args.background === true || typeof record(call.result)?.session_id === "string");
+}
 function record(v) {
   if (typeof v === "string") {
     try {
@@ -25214,14 +25223,14 @@ function bridgedCall(args) {
 }
 function toTodos(raw) {
   const out = [];
-  for (const item of raw) {
-    if (!item || typeof item !== "object") {
+  for (const item2 of raw) {
+    if (!item2 || typeof item2 !== "object") {
       continue;
     }
-    const id = "id" in item ? String(item.id) : String(out.length);
-    const content = "content" in item ? String(item.content) : "";
-    const status = "status" in item ? String(item.status) : "pending";
-    const parent = "parent" in item && item.parent ? String(item.parent) : void 0;
+    const id = "id" in item2 ? String(item2.id) : String(out.length);
+    const content = "content" in item2 ? String(item2.content) : "";
+    const status = "status" in item2 ? String(item2.status) : "pending";
+    const parent = "parent" in item2 && item2.parent ? String(item2.parent) : void 0;
     out.push({
       content,
       id,
@@ -25314,9 +25323,9 @@ function final(log, at, body) {
   if (duration2) {
     log.duration = Number(duration2);
   }
-  const summary2 = /summary: (.*)$/.exec(body)?.[1];
-  if (summary2) {
-    log.summary = summary2;
+  const summary3 = /summary: (.*)$/.exec(body)?.[1];
+  if (summary3) {
+    log.summary = summary3;
   }
   const reason = /exit_reason=(\S+)/.exec(body)?.[1];
   if (reason) {
@@ -25326,7 +25335,7 @@ function final(log, at, body) {
   if (error) {
     log.error = error;
   }
-  if (!status && !duration2 && !summary2) {
+  if (!status && !duration2 && !summary3) {
     log.entries.push({ at, kind: "note", text: body });
   }
 }
@@ -25342,8 +25351,8 @@ function runningTool(log) {
   const last = findLast(log.entries, (e) => e.kind === "tool");
   return last?.kind === "tool" && last.status === "running" ? last : void 0;
 }
-function clockToMs(clock, now = Date.now()) {
-  const [h = 0, m = 0, s = 0] = clock.split(":").map(Number);
+function clockToMs(clock2, now = Date.now()) {
+  const [h = 0, m = 0, s = 0] = clock2.split(":").map(Number);
   const at = new Date(now).setHours(h, m, s, 0);
   return at > now + 6e4 ? at - 864e5 : at;
 }
@@ -25654,22 +25663,22 @@ function copyToClipboard(text2, env = process.env) {
 // src/hermes/mutate.ts
 import { randomUUID as randomUUID2 } from "node:crypto";
 async function currentGeneration(gw2, sid) {
-  const snapshot = await gw2.request("session.resume", { session_id: sid });
-  if (!Number.isSafeInteger(snapshot?.execution_generation)) {
+  const snapshot2 = await gw2.request("session.resume", { session_id: sid });
+  if (!Number.isSafeInteger(snapshot2?.execution_generation)) {
     throw new Error("The session did not report its execution generation; try again.");
   }
-  return snapshot.execution_generation;
+  return snapshot2.execution_generation;
 }
 async function mutateSession(gw2, sid, operation, payload) {
-  const snapshot = await gw2.request("session.resume", { session_id: sid });
-  if (!Number.isSafeInteger(snapshot?.revision) || !Number.isSafeInteger(snapshot?.execution_generation)) {
+  const snapshot2 = await gw2.request("session.resume", { session_id: sid });
+  if (!Number.isSafeInteger(snapshot2?.revision) || !Number.isSafeInteger(snapshot2?.execution_generation)) {
     throw new Error("The session did not report its revision; try again.");
   }
   const result = await gw2.request("session.mutate", {
     session_id: sid,
     request_id: randomUUID2(),
-    expected_revision: snapshot.revision,
-    expected_generation: snapshot.execution_generation,
+    expected_revision: snapshot2.revision,
+    expected_generation: snapshot2.execution_generation,
     operation,
     payload
   });
@@ -25820,6 +25829,319 @@ function compact(n) {
   return `${m < 10 ? m.toFixed(1).replace(/\.0$/, "") : Math.round(m)}M`;
 }
 
+// src/processes/store.ts
+var RETAIN_MS = 6e4;
+var FAST_MS = 1e3;
+var IDLE_MS = 5e3;
+var REASON_STATUS = { failed_start: "failed", killed: "killed", lost: "lost" };
+function processStatus(entry) {
+  if (entry.status !== "exited") {
+    return "running";
+  }
+  return REASON_STATUS[entry.completion_reason ?? ""] ?? (entry.exit_code ? "failed" : "done");
+}
+var ESCAPES = /\x1b\[[0-?]*[ -/]*[@-~]|\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)|\x1b[@-_]/g;
+function lastLine(output) {
+  const lines = output.replace(ESCAPES, "").split("\n");
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const draws = lines[i].split("\r");
+    const text2 = (draws.findLast((d) => d.trim()) ?? "").replace(/\s+/g, " ").trim();
+    if (text2) {
+      return text2;
+    }
+  }
+  return "";
+}
+function foldEntry(prev, entry, now) {
+  const status = processStatus(entry);
+  const output = entry.output_tail ?? entry.output_preview ?? prev?.output ?? "";
+  const startedAt = typeof entry.started_epoch === "number" ? entry.started_epoch * 1e3 : prev?.startedAt ?? now - Math.max(0, entry.uptime_seconds ?? 0) * 1e3;
+  const p = prev ?? { command: "", id: entry.session_id, lastLine: "", output: "", startedAt, status };
+  p.command = (entry.command ?? "").trim() || p.command || "background process";
+  p.status = status;
+  p.startedAt = startedAt;
+  p.output = output;
+  p.lastLine = lastLine(output);
+  p.exitCode = typeof entry.exit_code === "number" && status !== "running" ? entry.exit_code : void 0;
+  p.reason = status !== "running" ? entry.completion_reason ?? void 0 : void 0;
+  p.exitedAt = status === "running" ? void 0 : typeof entry.exited_at === "number" && entry.exited_at ? entry.exited_at * 1e3 : p.exitedAt;
+  return p;
+}
+function isRunning2(p) {
+  return p.status === "running";
+}
+function isRecent(p, now) {
+  return isRunning2(p) || p.exitedAt !== void 0 && now - p.exitedAt <= RETAIN_MS;
+}
+function sortProcesses(list) {
+  return [...list].sort(
+    (a, b) => isRunning2(a) !== isRunning2(b) ? isRunning2(a) ? -1 : 1 : isRunning2(a) ? a.startedAt - b.startedAt : (b.exitedAt ?? 0) - (a.exitedAt ?? 0)
+  );
+}
+function processElapsed(p, now) {
+  return Math.max(0, (p.exitedAt ?? (isRunning2(p) ? now : p.startedAt)) - p.startedAt);
+}
+var TONE = {
+  done: "success",
+  failed: "error",
+  killed: "warning",
+  lost: "warning",
+  running: "accent"
+};
+function processTone(status) {
+  return TONE[status];
+}
+function processVerdict(p) {
+  switch (p.status) {
+    case "running":
+      return "running";
+    case "killed":
+    case "lost":
+      return p.status;
+    default:
+      return p.reason === "failed_start" ? "failed to start" : `exit ${p.exitCode ?? "?"}`;
+  }
+}
+var strings2 = (v) => Array.isArray(v) ? v.filter((x) => typeof x === "string" && x !== "") : [];
+function watchersOf(call) {
+  const r = record(call.result);
+  if (typeof r?.session_id === "string") {
+    return {
+      heartbeat: typeof r.heartbeat_seconds === "number" ? r.heartbeat_seconds : 0,
+      notify: r.notify_on_complete === true,
+      patterns: strings2(r.watch_patterns)
+    };
+  }
+  const a = call.args;
+  const beat = typeof a.heartbeat === "number" && a.heartbeat > 0 ? Math.max(60, Math.floor(a.heartbeat)) : 0;
+  let notify = a.notify_on_complete === true;
+  let patterns = strings2(a.watch_patterns);
+  if (typeof a.notify === "boolean") {
+    notify = a.notify;
+    patterns = [];
+  } else if (Array.isArray(a.notify)) {
+    notify = false;
+    patterns = strings2(a.notify);
+  }
+  notify ||= beat > 0;
+  return { heartbeat: beat, notify, patterns: notify ? [] : patterns };
+}
+function processIdOf(call) {
+  const id = record(call.result)?.session_id;
+  return typeof id === "string" && id ? id : void 0;
+}
+var Processes = class {
+  #host;
+  #byId = /* @__PURE__ */ new Map();
+  #sid = null;
+  #timer;
+  #ticking = false;
+  #again = false;
+  /** Open sheets wanting the fast cadence. */
+  #watchers = 0;
+  /** The pill's rows at the last tick, to re-render when one ages out. */
+  #shown = "";
+  #disposed = false;
+  /** Ids a stop was sent for and that still run: the registry can take seconds to end one. */
+  #stopping = /* @__PURE__ */ new Set();
+  constructor(host) {
+    this.#host = host;
+  }
+  /** Everything the gateway still lists for the session, in roster order. */
+  all() {
+    return sortProcesses([...this.#byId.values()]);
+  }
+  running() {
+    return this.all().filter(isRunning2);
+  }
+  /** The pill's rows: running ones and those that exited within the last minute. */
+  recent(now = Date.now()) {
+    return this.all().filter((p) => isRecent(p, now));
+  }
+  get(id) {
+    return this.#byId.get(id);
+  }
+  /** A stop was sent for `id` and it has not ended yet. */
+  stopping(id) {
+    const p = this.#byId.get(id);
+    return this.#stopping.has(id) && Boolean(p && isRunning2(p));
+  }
+  /** Polls now (a background command just started, the sheet opened, a stop landed). */
+  poke() {
+    clearTimeout(this.#timer);
+    this.#timer = void 0;
+    void this.#tick();
+  }
+  /** The fast cadence while the returned release has not run (an open sheet). */
+  watch() {
+    this.#watchers++;
+    this.poke();
+    let released = false;
+    return () => {
+      if (!released) {
+        released = true;
+        this.#watchers--;
+      }
+    };
+  }
+  /** Stops one process (`process.kill`); the registry's answer status (`killed`, `already_exited`, …). */
+  async kill(id) {
+    this.#stopping.add(id);
+    this.#host.changed();
+    try {
+      const r = await this.#host.gw.request("process.kill", { process_id: id, session_id: this.#host.sid });
+      return r?.status;
+    } finally {
+      this.#stopping.delete(id);
+      this.poke();
+    }
+  }
+  /** Stops every process of the session (`process.stop`); how many it stopped. */
+  async stopAll() {
+    const ids = this.running().map((p) => p.id);
+    ids.forEach((id) => this.#stopping.add(id));
+    this.#host.changed();
+    try {
+      const r = await this.#host.gw.request("process.stop", { session_id: this.#host.sid });
+      return typeof r?.killed === "number" ? r.killed : 0;
+    } finally {
+      ids.forEach((id) => this.#stopping.delete(id));
+      this.poke();
+    }
+  }
+  dispose() {
+    this.#disposed = true;
+    clearTimeout(this.#timer);
+    this.#timer = void 0;
+  }
+  #schedule() {
+    if (this.#disposed) {
+      return;
+    }
+    clearTimeout(this.#timer);
+    const fast = this.#watchers > 0 || [...this.#byId.values()].some(isRunning2);
+    this.#timer = setTimeout(() => void this.#tick(), fast ? FAST_MS : IDLE_MS);
+  }
+  async #tick() {
+    if (this.#ticking) {
+      this.#again = true;
+      return;
+    }
+    this.#ticking = true;
+    try {
+      do {
+        this.#again = false;
+        await this.#poll();
+      } while (this.#again);
+    } finally {
+      this.#ticking = false;
+      this.#schedule();
+    }
+  }
+  async #poll() {
+    const sid = this.#host.sid;
+    let changed = false;
+    if (sid !== this.#sid) {
+      changed = this.#byId.size > 0;
+      this.#byId.clear();
+      this.#sid = sid;
+    }
+    if (!sid) {
+      return changed ? this.#host.changed() : void 0;
+    }
+    let rows;
+    try {
+      rows = (await this.#host.gw.request("process.list", { session_id: sid }))?.processes ?? [];
+    } catch {
+      return changed ? this.#host.changed() : void 0;
+    }
+    if (sid !== this.#host.sid) {
+      return;
+    }
+    const now = Date.now();
+    const touched = /* @__PURE__ */ new Set();
+    const listed = /* @__PURE__ */ new Set();
+    for (const row of rows) {
+      if (typeof row?.session_id !== "string" || !row.session_id) {
+        continue;
+      }
+      listed.add(row.session_id);
+      const prev = this.#byId.get(row.session_id);
+      const before = prev && snapshot(prev);
+      const p = foldEntry(prev, row, now);
+      this.#byId.set(p.id, p);
+      if (snapshot(p) !== before) {
+        touched.add(p);
+      }
+    }
+    for (const p of [...this.#byId.values()]) {
+      if (listed.has(p.id)) {
+        continue;
+      }
+      if (isRunning2(p)) {
+        p.status = "lost";
+        p.exitedAt = now;
+        touched.add(p);
+      } else if (!isRecent(p, now)) {
+        this.#byId.delete(p.id);
+        changed = true;
+      }
+    }
+    changed = this.#link(touched) || touched.size > 0 || changed;
+    const shown = this.recent(now).map((p) => `${p.id}:${p.status}`).join();
+    if (shown !== this.#shown) {
+      this.#shown = shown;
+      changed = true;
+    }
+    if (changed) {
+      this.#host.changed();
+    }
+  }
+  /** Points each background terminal card at its process; true when a card changed. */
+  #link(touched) {
+    const calls = this.#host.transcript.backgroundCalls();
+    const owners = linkCalls(calls, [...this.#byId.values()]);
+    let changed = false;
+    for (const call of calls) {
+      const p = owners.get(call);
+      if (p && (call.process !== p || touched.has(p))) {
+        call.process = p;
+        this.#host.transcript.touchCall(call);
+        changed = true;
+      }
+    }
+    return changed;
+  }
+};
+function linkCalls(calls, procs) {
+  const byId = new Map(procs.map((p) => [p.id, p]));
+  const owners = /* @__PURE__ */ new Map();
+  const claimed = /* @__PURE__ */ new Set();
+  for (const call of calls) {
+    const p = byId.get(processIdOf(call) ?? "");
+    if (p) {
+      owners.set(call, p);
+      claimed.add(p.id);
+    }
+  }
+  const free = [...procs].sort((a, b) => a.startedAt - b.startedAt);
+  for (const call of calls) {
+    const command = typeof call.args.command === "string" ? call.args.command.trim() : "";
+    if (owners.has(call) || processIdOf(call) || !command) {
+      continue;
+    }
+    const p = free.find((x) => !claimed.has(x.id) && x.command && command.startsWith(x.command));
+    if (p) {
+      owners.set(call, p);
+      claimed.add(p.id);
+    }
+  }
+  return owners;
+}
+function snapshot(p) {
+  return `${p.status}|${p.exitCode}|${p.exitedAt}|${p.startedAt}|${p.output.slice(-120)}|${p.lastLine}|${p.command}`;
+}
+
 // src/view/describe.ts
 var MAX = 72;
 function words(segment) {
@@ -25886,6 +26208,8 @@ var COMMANDS = {
     const name = a[a.indexOf("-name") + 1];
     return a.includes("-name") && name ? `Find ${quote(name)}` : `Find files in ${base(operand(a) ?? ".")}`;
   },
+  // A shell loop names no purpose of its own; its body's steps are past a `;`.
+  for: () => "Run a loop",
   gh: (a) => `GitHub ${operands(a).slice(0, 2).join(" ")}`.trim(),
   git: (a) => {
     const sub = operand(a, /* @__PURE__ */ new Set(["-C", "-c"]));
@@ -25920,9 +26244,11 @@ var COMMANDS = {
   tail: (a) => a.includes("-f") ? `Follow ${base(operands(a).at(-1) ?? "a log")}` : `Read the end of ${base(operands(a).at(-1) ?? "output")}`,
   tern: (a) => `Tern ${operands(a).slice(0, 2).join(" ")}`.trim(),
   touch: (a) => `Create ${base(operands(a).at(-1) ?? "a file")}`,
+  until: () => "Run a loop",
   uv: (a) => a[0] === "run" ? pythonTitle(a.slice(1).filter((x) => x !== "python")) ?? "Run with uv" : `uv ${operand(a) ?? ""}`.trim(),
   vitest: () => "Run tests",
   wc: (a) => `Count lines in ${base(operands(a).at(-1) ?? "files")}`,
+  while: () => "Run a loop",
   zsh: (a) => shellTitle(a),
   which: (a) => `Locate ${operand(a) ?? "a command"}`
 };
@@ -26094,7 +26420,8 @@ function toolNode(call, now, place = {}) {
       badges: card.badges,
       collapsed: body.length > 0 ? collapsed : void 0,
       collapsible: body.length > 0 ? true : void 0,
-      exit: call.name === "terminal" && !running && call.status !== "cancelled" ? exitOf(call) : void 0,
+      // A background start's exit 0 only says it started; its process line tells how it ended.
+      exit: call.name === "terminal" && !running && call.status !== "cancelled" && !isBackgroundCall(call) ? exitOf(call) : void 0,
       frame: card.frame === "inline" && (running || !body.length || card.name !== "web_search") ? "inline" : void 0,
       key: call.id,
       lang: card.lang,
@@ -26117,7 +26444,7 @@ function cardOf(call, now) {
   const result = record(call.result);
   switch (call.name) {
     case "terminal":
-      return bashCard(call, result);
+      return isBackgroundCall(call) ? backgroundCard(call, result, now) : bashCard(call, result);
     case "read_file":
       return readCard(call, result);
     case "patch":
@@ -26188,7 +26515,7 @@ function cardOf(call, now) {
     targetKind: str3(call.args.url) ? "path" : str3(call.args.query) ? "query" : "text"
   };
 }
-function bashCard(call, result) {
+function bashCard(call, result, instead) {
   const output = (str3(result?.output) ?? call.resultText)?.replace(/\s*\[Command interrupted\]\s*$/, "");
   const error = str3(result?.error);
   const command = (str3(call.args.command) ?? call.context ?? "").trim();
@@ -26197,7 +26524,7 @@ function bashCard(call, result) {
   return {
     body: [
       ...command && command !== line ? [/* @__PURE__ */ jsx("code", { lang: "bash", max: { h: "12lines" }, role: "omp.tool.command", text: command }, "cmd")] : [],
-      ...output ? [/* @__PURE__ */ jsx("ansi", { follow: true, max: { h: "20lines" }, text: output }, "out")] : [],
+      ...instead ? [instead] : output ? [/* @__PURE__ */ jsx("ansi", { follow: true, max: { h: "20lines" }, text: output }, "out")] : [],
       ...error ? [/* @__PURE__ */ jsx("text", { role: "omp.tool.error", spans: [{ s: "error", t: error }], wrap: "word" }, "err")] : []
     ],
     folded: true,
@@ -26209,6 +26536,47 @@ function bashCard(call, result) {
     targetKind: "command",
     title: describeCommand(command)
   };
+}
+function backgroundCard(call, result, now) {
+  const w = watchersOf(call);
+  const id = processIdOf(call) ?? call.process?.id;
+  const line = id ? processLine(call, id, now) : void 0;
+  const card = bashCard(call, result, line);
+  return {
+    ...card,
+    badges: [
+      { text: "background" },
+      ...w.notify ? [{ text: "notify on exit" }] : [],
+      ...w.patterns.map((p) => ({ text: `watch: ${clip2(p, 32)}` })),
+      ...w.heartbeat ? [{ text: `every ${w.heartbeat}s` }] : []
+    ],
+    folded: line ? false : card.folded
+  };
+}
+function processLine(call, id, now) {
+  const p = call.process;
+  const live = !p || isRunning2(p);
+  const tone = p ? processTone(p.status) : "muted";
+  return /* @__PURE__ */ jsxs(
+    "row",
+    {
+      actions: { click: `open-process=${id}`, menu: [`open-process=${id}`] },
+      align: "center",
+      gap: "xs",
+      role: "omp.tool.process",
+      title: "Open in the Background sheet  \u2325B",
+      children: [
+        p && live ? /* @__PURE__ */ jsx("spinner", { style: "dots", tone: "accent" }, "state-icon") : /* @__PURE__ */ jsx("icon", { name: p ? p.status === "done" ? "done" : p.status === "failed" ? "failed" : "aborted" : "pending", tone }, "state-icon"),
+        /* @__PURE__ */ jsx("text", { spans: [{ s: tone, t: p ? processVerdict(p) : "starting" }], wrap: "none" }, "state"),
+        p ? /* @__PURE__ */ jsx("text", { spans: [{ s: "dim", t: "\xB7" }], wrap: "none" }, "sep1") : null,
+        p && live ? /* @__PURE__ */ jsx("elapsed", { age: age(p, p.startedAt, now), format: "short" }, "time") : null,
+        p && !live ? /* @__PURE__ */ jsx("text", { spans: [{ s: "muted", t: duration(processElapsed(p, now)) }], wrap: "none" }, "took") : null,
+        p?.lastLine ? /* @__PURE__ */ jsx("text", { spans: [{ s: "dim", t: "\xB7" }], wrap: "none" }, "sep2") : null,
+        p?.lastLine ? /* @__PURE__ */ jsx("text", { grow: 1, spans: [{ s: "muted mono", t: p.lastLine }], truncate: "end", wrap: "none" }, "last") : null
+      ]
+    },
+    "process"
+  );
 }
 function stepTitle(call) {
   if (call.name === "terminal") {
@@ -26557,7 +26925,7 @@ function exitOf(call) {
 }
 function checklistNode(todos) {
   const status = (t2) => t2.status === "completed" ? "done" : t2.status === "in_progress" ? "active" : t2.status === "cancelled" ? "dropped" : "pending";
-  const item = (t2) => ({ id: t2.id, status: status(t2), text: t2.content });
+  const item2 = (t2) => ({ id: t2.id, status: status(t2), text: t2.content });
   const roots = todos.filter((t2) => !t2.parent);
   const nested = todos.some((t2) => t2.parent);
   const phases = nested ? roots.map((r) => {
@@ -26565,10 +26933,10 @@ function checklistNode(todos) {
     return {
       collapsed: kids.length > 0 && kids.every((k) => k.status === "completed"),
       id: r.id,
-      items: kids.length ? kids.map(item) : [item(r)],
+      items: kids.length ? kids.map(item2) : [item2(r)],
       title: r.content
     };
-  }) : [{ id: "all", items: roots.map(item) }];
+  }) : [{ id: "all", items: roots.map(item2) }];
   return /* @__PURE__ */ jsx("checklist", { mode: "full", phases }, "list");
 }
 function plainDiff(raw) {
@@ -26671,11 +27039,11 @@ function moveSelection(key2, ids, selected) {
 function rank(items, query, textOf) {
   const words2 = query.toLowerCase().split(/\s+/).filter(Boolean);
   if (!words2.length) {
-    return items.map((item) => ({ item, positions: [] }));
+    return items.map((item2) => ({ item: item2, positions: [] }));
   }
   const scored = [];
-  items.forEach((item, index) => {
-    const text2 = textOf(item).toLowerCase();
+  items.forEach((item2, index) => {
+    const text2 = textOf(item2).toLowerCase();
     const positions = /* @__PURE__ */ new Set();
     let score = 0;
     for (const word of words2) {
@@ -26699,9 +27067,9 @@ function rank(items, query, textOf) {
       }
       score += 10;
     }
-    scored.push({ index, item, positions: [...positions].sort((a, b) => a - b), score });
+    scored.push({ index, item: item2, positions: [...positions].sort((a, b) => a - b), score });
   });
-  return scored.sort((a, b) => b.score - a.score || a.index - b.index).map(({ item, positions }) => ({ item, positions }));
+  return scored.sort((a, b) => b.score - a.score || a.index - b.index).map(({ item: item2, positions }) => ({ item: item2, positions }));
 }
 function hitRuns(positions, limit) {
   const runs = [];
@@ -27157,8 +27525,306 @@ function toneSpan(status) {
   return { cancelled: "warning", done: "success", failed: "error", queued: "muted", running: "accent" }[status];
 }
 
+// src/overlays/background.tsx
+var KEY2 = "background";
+var TICK_MS2 = 1e3;
+var COPIED_MS = 1500;
+var STATUS2 = {
+  done: "Exited",
+  failed: "Failed",
+  killed: "Stopped",
+  lost: "Lost",
+  running: "Running"
+};
+function openBackground(app, focus) {
+  const procs = () => app.processes.all();
+  const focused = focus ? app.processes.get(focus) : void 0;
+  let tab = focused ? isRunning2(focused) ? "running" : "all" : app.processes.running().length ? "running" : "all";
+  let selected = focus ?? procs().find(isRunning2)?.id ?? procs()[0]?.id;
+  let expanded = false;
+  let confirm;
+  let copied;
+  let copiedTimer;
+  const release = app.processes.watch();
+  const timer = setInterval(() => app.overlays.includes(overlay) ? app.changed() : end(), TICK_MS2);
+  function end() {
+    clearInterval(timer);
+    clearTimeout(copiedTimer);
+    release();
+  }
+  const close = () => {
+    end();
+    app.close(overlay);
+  };
+  const shown = () => tab === "running" ? procs().filter(isRunning2) : procs();
+  const current = () => procs().find((p) => p.id === selected);
+  const stopOne = async () => {
+    const p = current();
+    confirm = void 0;
+    if (!p || !isRunning2(p)) {
+      return app.changed();
+    }
+    try {
+      const status = await app.processes.kill(p.id);
+      if (status && status !== "killed") {
+        app.transcript.notice(`${describeCommand(p.command)}: ${status.replace(/_/g, " ")}.`, "warning");
+      }
+    } catch (error) {
+      app.transcript.notice(error instanceof Error ? error.message : String(error), "error");
+    }
+    app.changed();
+  };
+  const stopAll = async () => {
+    confirm = void 0;
+    try {
+      const n = await app.processes.stopAll();
+      app.transcript.notice(`Stopped ${n} background process${n === 1 ? "" : "es"}.`);
+    } catch (error) {
+      app.transcript.notice(error instanceof Error ? error.message : String(error), "error");
+    }
+    app.changed();
+  };
+  const copy = () => {
+    const p = current();
+    if (!p) {
+      return;
+    }
+    copyToClipboard(p.command);
+    copied = p.id;
+    clearTimeout(copiedTimer);
+    copiedTimer = setTimeout(() => {
+      copied = void 0;
+      app.changed();
+    }, COPIED_MS);
+    app.changed();
+  };
+  const ask = (what) => {
+    const p = current();
+    if (what === "one" ? p && isRunning2(p) && !app.processes.stopping(p.id) : app.processes.running().length) {
+      confirm = what;
+    }
+  };
+  const overlay = {
+    key: KEY2,
+    modal: true,
+    node: () => sheetNode(Date.now()),
+    onKey: (k) => {
+      if (confirm) {
+        if (k.name === "enter" || k.name === "y") {
+          void (confirm === "all" ? stopAll() : stopOne());
+        } else if (k.name === "escape" || k.name === "n") {
+          confirm = void 0;
+        }
+        return true;
+      }
+      const bare = !k.ctrl && !k.alt && !k.meta;
+      if (k.name === "escape") {
+        if (expanded) {
+          expanded = false;
+        } else {
+          close();
+        }
+      } else if (k.name === "enter") {
+        expanded = Boolean(current()) && !expanded;
+      } else if (k.name === "k" && bare) {
+        ask(k.shift ? "all" : "one");
+      } else if (k.name === "c" && bare && !k.shift) {
+        copy();
+      } else if (k.name === "tab" && !expanded) {
+        tab = tab === "running" ? "all" : "running";
+      } else {
+        selected = moveSelection(
+          k,
+          shown().map((p) => p.id),
+          selected
+        ) ?? selected;
+      }
+      return true;
+    }
+  };
+  const handlers = {
+    all: () => {
+      ask("all");
+      app.changed();
+    },
+    cancel: () => {
+      confirm = void 0;
+      app.changed();
+    },
+    close: () => {
+      if (expanded) {
+        expanded = false;
+        app.changed();
+      } else {
+        close();
+      }
+    },
+    confirm: () => void (confirm === "all" ? stopAll() : stopOne()),
+    copy,
+    expand: () => {
+      expanded = Boolean(current()) && !expanded;
+      app.changed();
+    },
+    stop: () => {
+      ask("one");
+      app.changed();
+    },
+    tab: (ev) => {
+      tab = ev.value === "running" ? "running" : "all";
+      app.changed();
+    }
+  };
+  function sheetNode(now) {
+    const all = procs();
+    const list = shown();
+    const running = all.filter(isRunning2).length;
+    if (!list.some((p2) => p2.id === selected)) {
+      selected = list[0]?.id;
+    }
+    const p = list.find((x) => x.id === selected);
+    const call = p && callOf(app, p.id);
+    const columns = [
+      { format: "dim", head: "Last output", id: "last", min: 16, priority: 1 },
+      { format: "dim", head: "Status", id: "status", priority: 3 },
+      { format: "elapsed", head: "Time", id: "time", priority: 5 }
+    ];
+    return /* @__PURE__ */ jsx(
+      "picker",
+      {
+        actions: [
+          { id: "expand", keys: ["enter"], label: expanded ? "List" : "Output", primary: true },
+          { id: "copy", keys: ["c"], label: copied && copied === p?.id ? "Copied" : "Copy command" },
+          {
+            danger: true,
+            disabled: p && isRunning2(p) ? app.processes.stopping(p.id) ? "Stopping" : void 0 : "Not running",
+            id: "stop",
+            keys: ["k"],
+            label: p && app.processes.stopping(p.id) ? "Stopping\u2026" : "Stop"
+          },
+          { danger: true, disabled: running ? void 0 : "None running", id: "all", keys: ["shift+k"], label: "Stop all" },
+          { end: true, id: "close", keys: ["esc"], label: expanded ? "Back" : "Close" }
+        ],
+        columns,
+        confirm: confirm === "all" ? { act: "confirm", label: "Stop all", text: `Stop ${running} background process${running === 1 ? "" : "es"}?` } : confirm === "one" && p ? { act: "confirm", label: "Stop", text: `Stop ${describeCommand(p.command)}?` } : void 0,
+        empty: tab === "running" ? "No background processes running. Tab shows the finished ones." : "No background processes in this session",
+        focus: expanded ? "preview" : void 0,
+        icon: "terminal",
+        items: all.map((x) => item(x, now, app.processes.stopping(x.id))),
+        noun: "processes",
+        onAction: handlers,
+        onActivate: (ev) => {
+          selected = ev.item;
+          expanded = true;
+          app.changed();
+        },
+        onSelect: (ev) => {
+          selected = ev.item;
+          confirm = void 0;
+          app.changed();
+        },
+        order: list.map((x) => x.id),
+        preview: "side",
+        selected,
+        size: "lg",
+        subtitle: [{ s: "muted", t: summary2(all) }],
+        tab,
+        tabs: [
+          { count: running, id: "running", label: "Running" },
+          { count: all.length, id: "all", label: "All" }
+        ],
+        title: "Background",
+        total: all.length,
+        children: p ? expanded ? outputView(p, now) : preview2(p, call, now) : null
+      },
+      KEY2
+    );
+  }
+  app.open(overlay);
+}
+function callOf(app, id) {
+  return app.transcript.backgroundCalls().find((c) => (processIdOf(c) ?? c.process?.id) === id);
+}
+function summary2(all) {
+  const count2 = (s) => all.filter((p) => p.status === s).length;
+  const parts = [
+    [count2("running"), "running"],
+    [count2("done"), "exited"],
+    [count2("failed"), "failed"],
+    [count2("killed") + count2("lost"), "stopped"]
+  ];
+  return parts.filter(([n]) => n).map(([n, label]) => `${n} ${label}`).join(" \xB7 ") || "none yet";
+}
+function item(p, now, stopping) {
+  return {
+    detail: commandLine(p.command, 120),
+    dot: processTone(p.status),
+    facts: {
+      last: p.lastLine || (isRunning2(p) ? "starting\u2026" : ""),
+      status: stopping ? "stopping\u2026" : isRunning2(p) ? "running" : processVerdict(p),
+      time: duration(processElapsed(p, now))
+    },
+    id: p.id,
+    label: describeCommand(p.command),
+    title: p.command,
+    tone: isRunning2(p) ? void 0 : "muted"
+  };
+}
+function preview2(p, call, now) {
+  const w = call ? watchersOf(call) : void 0;
+  return [
+    /* @__PURE__ */ jsx("text", { role: "omp.hub.title", text: describeCommand(p.command) }, "title"),
+    /* @__PURE__ */ jsx("code", { lang: "bash", max: { h: "6lines" }, role: "omp.tool.command", text: p.command, wrap: true }, "cmd"),
+    /* @__PURE__ */ jsx(
+      "kv",
+      {
+        items: [
+          { k: [{ t: "Status" }], v: [{ s: processTone(p.status), t: isRunning2(p) ? STATUS2.running : `${STATUS2[p.status]} \xB7 ${processVerdict(p)}` }] },
+          { k: [{ t: "Started" }], v: clock(p.startedAt) },
+          { k: [{ t: isRunning2(p) ? "Running for" : "Ran for" }], v: duration(processElapsed(p, now)) },
+          ...p.exitedAt ? [{ k: [{ t: "Exited" }], v: `${clock(p.exitedAt)} \xB7 ${duration(now - p.exitedAt)} ago` }] : [],
+          ...p.reason && p.status !== "running" ? [{ k: [{ t: "Reason" }], v: p.reason.replace(/_/g, " ") }] : [],
+          ...w ? watcherFacts(w) : [],
+          { k: [{ t: "Process" }], v: [{ s: "mono dim", t: p.id }] }
+        ],
+        role: "omp.hub.kv"
+      },
+      "facts"
+    ),
+    /* @__PURE__ */ jsx("section", { head: "Output", children: outputNodes(p) }, "output")
+  ];
+}
+function outputNodes(p, lines = 14) {
+  return p.output ? [/* @__PURE__ */ jsx("ansi", { follow: true, max: { h: `${lines}lines` }, text: p.output.replace(/\n$/, "") }, "out")] : [/* @__PURE__ */ jsx("text", { spans: [{ s: "muted", t: isRunning2(p) ? "No output yet" : "It printed nothing" }] }, "none")];
+}
+function outputView(p, now) {
+  return [
+    /* @__PURE__ */ jsx("text", { role: "omp.hub.title", text: describeCommand(p.command) }, "title"),
+    /* @__PURE__ */ jsx(
+      "text",
+      {
+        spans: [
+          { s: processTone(p.status), t: isRunning2(p) ? "running" : processVerdict(p) },
+          { s: "muted", t: ` \xB7 ${duration(processElapsed(p, now))}` }
+        ]
+      },
+      "state"
+    ),
+    ...outputNodes(p, 34)
+  ];
+}
+function watcherFacts(w) {
+  return [
+    { k: [{ t: "Notify" }], v: w.notify ? "when it exits" : w.patterns.length ? "on a matching line" : "off" },
+    ...w.patterns.length ? [{ k: [{ t: "Watch" }], v: w.patterns.join(" \xB7 ") }] : [],
+    ...w.heartbeat ? [{ k: [{ t: "Heartbeat" }], v: `every ${w.heartbeat}s` }] : []
+  ];
+}
+function clock(ms) {
+  return new Date(ms).toLocaleTimeString([], { hour: "2-digit", hour12: false, minute: "2-digit", second: "2-digit" });
+}
+
 // src/overlays/help.tsx
-var KEY2 = "help";
+var KEY3 = "help";
 var HOTKEYS = [
   {
     group: "Editing",
@@ -27167,7 +27833,7 @@ var HOTKEYS = [
       [["shift+enter", "alt+enter"], "New line"],
       [["up", "down"], "Move between lines / browse history"],
       [["tab"], "Accept the completion"],
-      [["alt+left", "alt+right", "alt+b", "alt+f"], "Move by word"],
+      [["alt+left", "alt+right", "alt+f"], "Move by word"],
       [["ctrl+a", "ctrl+e"], "Start / end of line"],
       [["ctrl+w", "alt+backspace"], "Delete word backwards"],
       [["ctrl+u"], "Delete to start of line"],
@@ -27183,6 +27849,9 @@ var HOTKEYS = [
       [["escape"], "Close the completion / interrupt the agent"],
       [["shift+tab"], "Cycle the reasoning effort"],
       [["alt+up"], "Edit the oldest queued prompt"],
+      [["alt+a"], "Agents"],
+      [["alt+b"], "Background processes (/ps)"],
+      [["down"], "Focus the agents / shells pills (empty prompt); \u2190 \u2192 switch, Enter opens, Esc returns"],
       [["ctrl+c"], "Clear the draft / interrupt / exit (twice)"],
       [["ctrl+d"], "Delete forward / exit (empty prompt)"]
     ]
@@ -27200,7 +27869,7 @@ async function openHelp(app) {
   }
   const categories = catalog.categories?.length ? catalog.categories : [{ name: "Commands", pairs: catalog.pairs ?? [] }];
   const overlay = {
-    key: KEY2,
+    key: KEY3,
     modal: true,
     node: () => /* @__PURE__ */ jsx("overlay", { anchor: "center", head: "Commands and shortcuts", modal: true, role: "omp.overlay.hotkeys", size: "lg", children: /* @__PURE__ */ jsxs("col", { gap: "lg", children: [
       HOTKEYS.map(({ group, rows }) => /* @__PURE__ */ jsx("section", { head: group, role: "omp.hotkeys.group", children: /* @__PURE__ */ jsx(
@@ -27258,7 +27927,7 @@ async function openHelp(app) {
           "close"
         )
       ] }, "actions")
-    ] }, "body") }, KEY2),
+    ] }, "body") }, KEY3),
     onKey: (k) => {
       if (k.name === "escape" || k.name === "enter" || k.name === "q") {
         app.close(overlay);
@@ -27300,7 +27969,7 @@ var providerDisplayNames = (providers) => {
 };
 
 // src/overlays/models.tsx
-var KEY3 = "models";
+var KEY4 = "models";
 var ALL = "all";
 var confirmTokens = /* @__PURE__ */ new Map();
 async function mutateModel(app, value, confirmed) {
@@ -27417,10 +28086,10 @@ function openModelPicker(app) {
       if (scope === ALL) {
         order.push({ count: mine.length, group: provider.slug, label: name });
       }
-      for (const { item, positions } of mine) {
-        order.push(item.id);
+      for (const { item: item2, positions } of mine) {
+        order.push(item2.id);
         if (positions.length) {
-          hits[item.id] = hitRuns(positions, item.model.length);
+          hits[item2.id] = hitRuns(positions, item2.model.length);
         }
       }
     }
@@ -27431,7 +28100,7 @@ function openModelPicker(app) {
     return { hits, order };
   };
   const overlay = {
-    key: KEY3,
+    key: KEY4,
     modal: true,
     node: () => {
       const { hits, order } = view();
@@ -27506,9 +28175,9 @@ function openModelPicker(app) {
           state,
           title: "Models",
           total: rows.length,
-          children: row ? preview2(row, row.id === current) : null
+          children: row ? preview3(row, row.id === current) : null
         },
-        KEY3
+        KEY4
       );
     },
     onKey: (k) => {
@@ -27570,7 +28239,7 @@ function itemOf(row) {
     title: `${row.providerName} \xB7 ${row.model}`
   };
 }
-function preview2(row, isCurrent) {
+function preview3(row, isCurrent) {
   const caps = row.provider.capabilities?.[row.model];
   const price = row.provider.pricing?.[row.model];
   const facts = [
@@ -27689,6 +28358,10 @@ var Composer = class {
   /** Index into history while browsing it; history.length means the draft. */
   #browse = -1;
   #draft = "";
+  /** Up/Down are walking the prompt history (Down still has somewhere to go). */
+  get browsing() {
+    return this.#browse >= 0;
+  }
   set(text2, cursor = text2.length) {
     this.#record({ merge: false });
     this.text = text2;
@@ -28067,7 +28740,7 @@ function actionsRow(buttons) {
   ] }, "actions");
 }
 function optionList(listKey, id, options, selected, select, pick) {
-  const at = (item) => options.findIndex((o) => `${id}.${o.id}` === item);
+  const at = (item2) => options.findIndex((o) => `${id}.${o.id}` === item2);
   return /* @__PURE__ */ jsx(
     "list",
     {
@@ -28567,7 +29240,7 @@ function confirmOverlay(host, ask) {
 }
 
 // src/overlays/sessions.tsx
-var KEY4 = "sessions";
+var KEY5 = "sessions";
 var LIMIT = 200;
 var DAY = 864e5;
 function openSessionPicker(app) {
@@ -28626,13 +29299,13 @@ function openSessionPicker(app) {
     const ranked = rank(rows, query, (r) => `${labelOf(r)} ${r.preview ?? ""}`);
     const hits = {};
     const buckets = /* @__PURE__ */ new Map();
-    for (const { item, positions } of ranked) {
-      const label = query ? "Matches" : dayOf(item.started_at, now);
+    for (const { item: item2, positions } of ranked) {
+      const label = query ? "Matches" : dayOf(item2.started_at, now);
       const bucket = buckets.get(label) ?? { ids: [], label };
-      bucket.ids.push(item.id);
+      bucket.ids.push(item2.id);
       buckets.set(label, bucket);
       if (positions.length) {
-        hits[item.id] = hitRuns(positions, labelOf(item).length);
+        hits[item2.id] = hitRuns(positions, labelOf(item2).length);
       }
     }
     const order = [];
@@ -28646,7 +29319,7 @@ function openSessionPicker(app) {
     return { hits, order };
   };
   const overlay = {
-    key: KEY4,
+    key: KEY5,
     modal: true,
     node: () => {
       const now = Date.now();
@@ -28709,9 +29382,9 @@ function openSessionPicker(app) {
           size: "lg",
           state,
           total: rows.length,
-          children: row ? preview3(row, row.id === app.storedSid) : null
+          children: row ? preview4(row, row.id === app.storedSid) : null
         },
-        KEY4
+        KEY5
       );
     },
     onKey: (k) => {
@@ -28761,7 +29434,7 @@ function itemOf2(row, now) {
     title: row.started_at ? dateOf(row.started_at) : void 0
   };
 }
-function preview3(row, isCurrent) {
+function preview4(row, isCurrent) {
   const count2 = row.live_message_count ?? row.message_count ?? 0;
   return [
     /* @__PURE__ */ jsx("text", { role: "omp.picker.title", text: labelOf(row) }, "title"),
@@ -28805,7 +29478,7 @@ function dateOf(startedAt) {
 }
 
 // src/overlays/theme.tsx
-var KEY5 = "theme";
+var KEY6 = "theme";
 var MODES = [
   { detail: "Your Tern theme, light and dark, with no colors of its own", icon: "palette", id: "tern", label: "Tern" },
   { detail: "Bone ink and quiet grays; gold only for the moments that earn it", icon: "sparkle", id: "nous", label: "Nous" },
@@ -28824,7 +29497,7 @@ function openThemePicker(app) {
     }
   };
   const overlay = {
-    key: KEY5,
+    key: KEY6,
     modal: true,
     node: () => /* @__PURE__ */ jsx(
       "picker",
@@ -28854,7 +29527,7 @@ function openThemePicker(app) {
         size: "md",
         title: "Theme"
       },
-      KEY5
+      KEY6
     ),
     onKey: (k) => {
       if (k.name === "escape") {
@@ -28939,6 +29612,12 @@ var COMMANDS2 = [
     run: (app, arg) => arg ? false : openAgents(app)
   },
   {
+    // Hermes has no command by these names (its `/bg` runs a prompt in a background session).
+    aliases: ["bashes", "shells", "processes"],
+    name: "ps",
+    run: (app) => openBackground(app)
+  },
+  {
     // `/help <command>` is the backend's detailed usage.
     name: "help",
     run: (app, arg) => arg ? false : openHelp(app)
@@ -28992,6 +29671,32 @@ function busyFrom(r, now = Date.now()) {
     return null;
   }
   return { label: "Working\u2026", since: {}, startedAt: r.turn_started_at ? r.turn_started_at * 1e3 : now };
+}
+
+// src/hud.ts
+var plain = (k) => !k.ctrl && !k.alt && !k.meta && !k.shift;
+function hudKey(k, cx) {
+  const { focused, pills } = cx;
+  if (!focused || !pills.includes(focused)) {
+    return k.name === "down" && plain(k) && cx.idle && pills.length ? { consumed: true, focused: pills[0] } : { consumed: false };
+  }
+  const at = pills.indexOf(focused);
+  switch (plain(k) ? k.name : "") {
+    case "left":
+      return { consumed: true, focused: pills[Math.max(0, at - 1)] };
+    case "right":
+      return { consumed: true, focused: pills[Math.min(pills.length - 1, at + 1)] };
+    case "enter":
+    case "space":
+      return { consumed: true, open: focused };
+    case "escape":
+    case "up":
+      return { consumed: true };
+    case "down":
+      return { consumed: true, focused };
+    default:
+      return { consumed: false };
+  }
 }
 
 // src/hermes/activeSessionFile.ts
@@ -29264,12 +29969,12 @@ var Completion = class {
           onActivate: (ev) => this.#pick(ev.item, listId, { accept: true }),
           onSelect: (ev) => this.#pick(ev.item, listId, { accept: false }),
           selected: `${listId}.${this.selected}`,
-          children: this.items.map((item, i) => /* @__PURE__ */ jsx(
+          children: this.items.map((item2, i) => /* @__PURE__ */ jsx(
             "item",
             {
-              detail: item.meta && item.meta !== "dir" ? item.meta : void 0,
-              icon: iconOf(item),
-              label: labelOf2(item, this.#for, this.#replaceFrom)
+              detail: item2.meta && item2.meta !== "dir" ? item2.meta : void 0,
+              icon: iconOf(item2),
+              label: labelOf2(item2, this.#for, this.#replaceFrom)
             },
             String(i)
           ))
@@ -29320,21 +30025,21 @@ var COMMAND_ICONS = {
   usage: "gauge",
   yolo: "shield-alert"
 };
-function isPath(item) {
-  return !item.kind && !item.text.startsWith("/");
+function isPath(item2) {
+  return !item2.kind && !item2.text.startsWith("/");
 }
-function iconOf(item) {
-  if (isPath(item)) {
-    return (item.display || item.text).endsWith("/") ? "folder" : "file";
+function iconOf(item2) {
+  if (isPath(item2)) {
+    return (item2.display || item2.text).endsWith("/") ? "folder" : "file";
   }
-  if (item.kind === "skill") {
+  if (item2.kind === "skill") {
     return "skill";
   }
-  return COMMAND_ICONS[item.text.replace(/^\//, "").split(/\s/)[0] ?? ""] ?? "slash";
+  return COMMAND_ICONS[item2.text.replace(/^\//, "").split(/\s/)[0] ?? ""] ?? "slash";
 }
-function labelOf2(item, typed, replaceFrom) {
-  const label = (item.display || item.text).replace(/^\//, "");
-  const base2 = isPath(item) ? "strong" : void 0;
+function labelOf2(item2, typed, replaceFrom) {
+  const label = (item2.display || item2.text).replace(/^\//, "");
+  const base2 = isPath(item2) ? "strong" : void 0;
   const query = typed.slice(replaceFrom).replace(/^[/@]/, "").replace(/^(file|folder):/, "").split("/").pop() ?? "";
   const at = query ? label.toLowerCase().indexOf(query.toLowerCase()) : -1;
   if (at < 0) {
@@ -29370,6 +30075,41 @@ var STYLES = css`
   /* A steer's status under its words is a note, not code. */
   [data-role='omp.user.steered'] {
     font-family: var(--sans) !important;
+  }
+
+  /* A pill holding the keys (Down from an empty prompt): ringed in the accent, without the pick mark's side bar. */
+  .sf-row[data-role='omp.hud.pill'][data-mark='pick'] {
+    box-shadow: inset 0 0 0 1px var(--accent) !important;
+    color: var(--t1) !important;
+  }
+
+  .sf-row[data-role='omp.hud.pill'][data-mark='pick']::after {
+    display: none;
+  }
+
+  /* What the keys do while a pill holds them, beside the pills. */
+  .sf-row[data-role='omp.hud.hint'] {
+    flex: none;
+    gap: 4px;
+    margin-right: 6px;
+    font: 500 11px/1 var(--sans);
+    color: var(--t3);
+  }
+
+  [data-role='omp.hud.hint'] .kbd {
+    height: 15px;
+    min-width: 18px;
+    font-size: 10px;
+  }
+
+  /* A background card's process line opens the Background sheet. */
+  .sf-row[data-role='omp.tool.process'] {
+    cursor: pointer;
+    border-radius: 4px;
+  }
+
+  .sf-row[data-role='omp.tool.process']:hover {
+    background: var(--l1);
   }
 
   /* A turn Hermes started by itself: set apart from the answer above, like a new prompt is. */
@@ -30074,20 +30814,64 @@ function dockNodes(cx) {
       ] }, `q${i}`)) }, "queue")
     );
   }
-  if (cx.agents?.running) {
+  const pills = [
+    cx.agents?.running ? agentsPill(cx.agents.running, cx.agents.onOpen, cx.focused === "agents") : null,
+    cx.shells && (cx.shells.running || cx.shells.exited) ? shellsPill(cx.shells, cx.focused === "shells") : null
+  ].filter((p) => p !== null);
+  if (pills.length) {
     nodes.push(
-      /* @__PURE__ */ jsx("row", { role: "omp.hud", children: agentsPill(cx.agents.running, cx.agents.onOpen) }, "agents")
+      /* @__PURE__ */ jsxs("row", { role: "omp.hud", children: [
+        cx.focused ? hudHint() : null,
+        pills
+      ] }, "agents")
     );
   }
   nodes.push(composerNode(cx));
   return nodes;
 }
-function agentsPill(running, onOpen) {
-  return /* @__PURE__ */ jsxs("row", { align: "center", gap: "xs", onClick: onOpen, role: "omp.hud.pill", title: "Agents  \u2325A", children: [
+function agentsPill(running, onOpen, focused) {
+  return /* @__PURE__ */ jsx("row", { align: "center", mark: focused ? "pick" : void 0, onClick: onOpen, role: "omp.hud.pill", title: "Agents  \u2325A", children: /* @__PURE__ */ jsxs("row", { align: "center", gap: "xs", role: "omp.hud.seg", children: [
     /* @__PURE__ */ jsx("icon", { name: "users" }, "icon"),
     /* @__PURE__ */ jsx("spinner", { style: "dots", tone: "accent" }, "spin"),
     /* @__PURE__ */ jsx("text", { text: `${running} agent${running === 1 ? "" : "s"} running`, wrap: "none" }, "text")
-  ] }, "pill");
+  ] }, "seg") }, "pill");
+}
+function shellsPill(s, focused) {
+  const live = s.running > 0;
+  const n = live ? s.running : s.exited;
+  return /* @__PURE__ */ jsx(
+    "row",
+    {
+      align: "center",
+      mark: focused ? "pick" : void 0,
+      onClick: s.onOpen,
+      role: "omp.hud.pill",
+      title: "Background processes  \u2325B",
+      children: /* @__PURE__ */ jsxs("row", { align: "center", gap: "xs", role: "omp.hud.seg", children: [
+        /* @__PURE__ */ jsx("icon", { name: "terminal" }, "icon"),
+        live ? /* @__PURE__ */ jsx("spinner", { style: "dots", tone: "accent" }, "spin") : /* @__PURE__ */ jsx("icon", { name: s.tone === "success" ? "done" : s.tone === "error" ? "failed" : "aborted", tone: s.tone }, "end"),
+        /* @__PURE__ */ jsx(
+          "text",
+          {
+            spans: [{ s: live ? void 0 : "muted", t: `${n} shell${n === 1 ? "" : "s"}${live ? "" : " exited"}` }],
+            wrap: "none"
+          },
+          "text"
+        )
+      ] }, "seg")
+    },
+    "shells"
+  );
+}
+function hudHint() {
+  return /* @__PURE__ */ jsxs("row", { align: "center", gap: "xs", role: "omp.hud.hint", children: [
+    /* @__PURE__ */ jsx("kbd", { keys: ["enter"] }, "enter"),
+    /* @__PURE__ */ jsx("text", { text: "open" }, "open"),
+    /* @__PURE__ */ jsx("kbd", { keys: ["left", "right"] }, "lr"),
+    /* @__PURE__ */ jsx("text", { text: "switch" }, "move"),
+    /* @__PURE__ */ jsx("kbd", { keys: ["esc"] }, "esc"),
+    /* @__PURE__ */ jsx("text", { text: "back" }, "back")
+  ] }, "hint");
 }
 function workingNode(cx) {
   const busy = cx.busy;
@@ -30962,12 +31746,14 @@ async function openSidebar(spec, cwd, env = process.env) {
 // src/app.ts
 var INPUT_ID = "dock.composer.line.input";
 var EXIT_ARM_MS = 1500;
-var COPIED_MS = 1500;
+var COPIED_MS2 = 1500;
 var EFFORTS = ["none", "low", "medium", "high", "xhigh"];
 var App = class {
   transcript = new Transcript();
   /** The session's subagents, followed while they run (Task cards, the pill, the hub). */
   agents = new Agents(this);
+  /** The session's background processes (the shells pill, the Background sheet, background cards). */
+  processes = new Processes(this);
   composer = new Composer();
   overlays = [];
   sid = null;
@@ -31004,6 +31790,8 @@ var App = class {
   /** The prompt whose Copy button reads Copied, until the timer clears it. */
   #copied;
   #copiedTimer;
+  /** The pill above the composer holding the keys (Down from an empty prompt), if any. */
+  #hud;
   constructor(tern, gw2, version2) {
     this.#tern = tern;
     this.#gw = gw2;
@@ -31039,6 +31827,7 @@ var App = class {
       this.changed();
     });
     this.#gw.drain();
+    this.processes.poke();
     this.#render();
     this.#surface.focus(INPUT_ID);
     void this.#readInput();
@@ -31105,6 +31894,9 @@ var App = class {
     if (top?.modal) {
       return;
     }
+    if (this.#hudKey(key2)) {
+      return;
+    }
     if (this.#completion.onKey(key2)) {
       return;
     }
@@ -31119,6 +31911,9 @@ var App = class {
     }
     if (key2.alt && key2.name === "a" || key2.name === "\xE5") {
       return openAgents(this);
+    }
+    if (key2.alt && key2.name === "b" && !key2.ctrl && !key2.meta || key2.name === "\u222B") {
+      return openBackground(this);
     }
     if (key2.alt && key2.name === "up" && this.queue.length) {
       return this.#dequeue();
@@ -31139,10 +31934,36 @@ var App = class {
       void this.openAgent(ev.value);
       return;
     }
+    if (ev.ev === "action" && ev.act === "open-process" && ev.value) {
+      return openBackground(this, ev.value);
+    }
     if (ev.ev === "focus" && ev.id === INPUT_ID && !this.overlays.at(-1)?.modal) {
+      this.#hud = void 0;
       this.#focus = INPUT_ID;
       this.#surface.focus(INPUT_ID);
     }
+  }
+  /** The pills above the composer, left to right. */
+  #pills(now = Date.now()) {
+    return [
+      ...this.agents.running().length ? ["agents"] : [],
+      ...this.processes.recent(now).length ? ["shells"] : []
+    ];
+  }
+  /** Down from an empty prompt focuses the pills; ←/→, Enter and Esc/↑ while one holds the keys. */
+  #hudKey(key2) {
+    const out = hudKey(key2, {
+      focused: this.#hud,
+      idle: !this.composer.text && !this.composer.browsing && !this.#completion.open,
+      pills: this.#pills()
+    });
+    this.#hud = out.focused;
+    if (out.open === "agents") {
+      openAgents(this);
+    } else if (out.open === "shells") {
+      openBackground(this);
+    }
+    return out.consumed;
   }
   /** Shows subagent `id` beside the chat in a Tern split; its timeline sheet where no split can open. */
   async openAgent(id) {
@@ -31178,7 +31999,7 @@ var App = class {
     this.#copiedTimer = setTimeout(() => {
       this.#copied = void 0;
       this.changed();
-    }, COPIED_MS);
+    }, COPIED_MS2);
   }
   quit(code2 = 0) {
     this.#done.resolve(code2);
@@ -31392,7 +32213,7 @@ var App = class {
   async #resume(id) {
     const token = this.#switches.begin();
     const hold = this.#gw.holdAttach(id);
-    let snapshot;
+    let snapshot2;
     try {
       const r = await this.#gw.request("session.resume", { cols: this.#tern.caps.cols, session_id: id });
       if (!this.#switches.current(token)) {
@@ -31403,11 +32224,11 @@ var App = class {
       this.transcript.clear();
       this.transcript.push({ id: this.transcript.id("w"), kind: "welcome" });
       this.#adopt(r);
-      snapshot = r;
+      snapshot2 = r;
       this.#gw.hydrateSharedPrompts(r);
       return r;
     } finally {
-      this.#gw.settleAttach(hold, snapshot);
+      this.#gw.settleAttach(hold, snapshot2);
       this.#settle(token);
     }
   }
@@ -31424,6 +32245,7 @@ var App = class {
       this.transcript.load(r.messages);
       this.agents.scan();
     }
+    this.processes.poke();
     if (r.inflight) {
       this.transcript.inflight(r.inflight, this.busy?.startedAt);
     }
@@ -31570,6 +32392,9 @@ var App = class {
         if (ev.payload) {
           t2.toolComplete(ev.payload);
           this.agents.scan();
+          if (ev.payload.name === "terminal") {
+            this.processes.poke();
+          }
         }
         break;
       case "todo.updated":
@@ -31762,6 +32587,10 @@ ${this.composer.text}` : next);
       now,
       welcome: { ...this.#welcome, version: this.#welcome.version || backend }
     };
+    const pills = this.#pills(now);
+    this.#hud = this.#hud && pills.includes(this.#hud) ? this.#hud : void 0;
+    const recent = this.processes.recent(now);
+    const exited = recent.filter((p) => !isRunning2(p));
     const used = usage?.context_used ?? 0;
     const max = usage?.context_max ?? 0;
     const modal = this.overlays.at(-1)?.modal === true;
@@ -31803,6 +32632,14 @@ ${this.composer.text}` : next);
           this.changed();
         },
         agents: { onOpen: () => openAgents(this), running: this.agents.running().length },
+        focused: modal ? void 0 : this.#hud,
+        shells: {
+          exited: exited.length,
+          onOpen: () => openBackground(this),
+          running: recent.length - exited.length,
+          // The roster puts the newest exit first.
+          tone: exited[0] ? processTone(exited[0].status) : "muted"
+        },
         rates: {
           cache: typeof usage?.cache_hit_pct === "number" ? usage.cache_hit_pct : void 0,
           tps: typeof usage?.avg_tps === "number" && usage.avg_tps > 0 ? usage.avg_tps : void 0
@@ -31815,7 +32652,7 @@ ${this.composer.text}` : next);
       main: this.transcript.entries.map((e) => entryNode(e, `main.${e.id}`, cx))
     });
     const top = this.overlays.at(-1);
-    const focus = top?.focus ? top.focus(`layer.${top.key}`) : top?.modal ? null : INPUT_ID;
+    const focus = top?.focus ? top.focus(`layer.${top.key}`) : top?.modal || this.#hud ? null : INPUT_ID;
     if (focus !== this.#focus) {
       this.#focus = focus;
       this.#surface.focus(focus);

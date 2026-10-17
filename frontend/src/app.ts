@@ -29,16 +29,19 @@ import { localCommand } from './commands.js'
 import { Composer } from './composer.js'
 import { type ControlHost, interruptTurn, steerTurn } from './controlCommands.js'
 import { type Busy, busyFrom, ownsEvent, Switches } from './flow.js'
+import { hudKey, type Pill } from './hud.js'
 import type { Overlay, OverlayHost } from './overlay.js'
 import { writeActiveSessionFile } from './hermes/activeSessionFile.js'
 import { type Attachment, uploadImage } from './hermes/images.js'
 import { sharedPromptId, sharedPromptRequest } from './hermes/sharedPrompts.js'
 import { openAgents } from './overlays/agents.js'
+import { openBackground } from './overlays/background.js'
 import { Completion } from './overlays/completion.js'
 import { openModelPicker } from './overlays/models.js'
 import { promptOverlay } from './overlays/prompts.js'
 import { STYLES } from './view/styles.js'
 import { paletteFor } from './palette.js'
+import { isRunning as processRuns, Processes, processTone } from './processes/store.js'
 import { loadSettings, saveSettings, type ThemeMode } from './settings.js'
 import { Transcript } from './transcript.js'
 import { dockNodes } from './view/dock.js'
@@ -72,6 +75,8 @@ export class App implements OverlayHost {
   readonly transcript = new Transcript()
   /** The session's subagents, followed while they run (Task cards, the pill, the hub). */
   readonly agents: Agents = new Agents(this)
+  /** The session's background processes (the shells pill, the Background sheet, background cards). */
+  readonly processes: Processes = new Processes(this)
   readonly composer = new Composer()
   readonly overlays: Overlay[] = []
   sid: string | null = null
@@ -108,6 +113,8 @@ export class App implements OverlayHost {
   /** The prompt whose Copy button reads Copied, until the timer clears it. */
   #copied: string | undefined
   #copiedTimer: NodeJS.Timeout | undefined
+  /** The pill above the composer holding the keys (Down from an empty prompt), if any. */
+  #hud: Pill | undefined
 
   constructor(tern: Session, gw: GatewayClient, version: string) {
     this.#tern = tern
@@ -153,6 +160,7 @@ export class App implements OverlayHost {
       this.changed()
     })
     this.#gw.drain()
+    this.processes.poke()
     this.#render()
     this.#surface.focus(INPUT_ID)
     void this.#readInput()
@@ -242,6 +250,11 @@ export class App implements OverlayHost {
       return
     }
 
+    // Before the completion: Enter on a focused pill opens it.
+    if (this.#hudKey(key)) {
+      return
+    }
+
     if (this.#completion.onKey(key)) {
       return
     }
@@ -260,6 +273,11 @@ export class App implements OverlayHost {
 
     if ((key.alt && key.name === 'a') || key.name === 'å') {
       return openAgents(this)
+    }
+
+    // ⌥B (macOS Option without Meta types ∫). Word-back stays on Alt+Left.
+    if ((key.alt && key.name === 'b' && !key.ctrl && !key.meta) || key.name === '∫') {
+      return openBackground(this)
     }
 
     if (key.alt && key.name === 'up' && this.queue.length) {
@@ -288,10 +306,42 @@ export class App implements OverlayHost {
       return
     }
 
+    if (ev.ev === 'action' && ev.act === 'open-process' && ev.value) {
+      return openBackground(this, ev.value)
+    }
+
     if (ev.ev === 'focus' && ev.id === INPUT_ID && !this.overlays.at(-1)?.modal) {
+      this.#hud = undefined
       this.#focus = INPUT_ID
       this.#surface.focus(INPUT_ID)
     }
+  }
+
+  /** The pills above the composer, left to right. */
+  #pills(now = Date.now()): Pill[] {
+    return [
+      ...(this.agents.running().length ? (['agents'] as const) : []),
+      ...(this.processes.recent(now).length ? (['shells'] as const) : [])
+    ]
+  }
+
+  /** Down from an empty prompt focuses the pills; ←/→, Enter and Esc/↑ while one holds the keys. */
+  #hudKey(key: Key): boolean {
+    const out = hudKey(key, {
+      focused: this.#hud,
+      idle: !this.composer.text && !this.composer.browsing && !this.#completion.open,
+      pills: this.#pills()
+    })
+
+    this.#hud = out.focused
+
+    if (out.open === 'agents') {
+      openAgents(this)
+    } else if (out.open === 'shells') {
+      openBackground(this)
+    }
+
+    return out.consumed
   }
 
   /** Shows subagent `id` beside the chat in a Tern split; its timeline sheet where no split can open. */
@@ -658,6 +708,9 @@ export class App implements OverlayHost {
       this.agents.scan()
     }
 
+    // The new session's processes (and none of the last one's).
+    this.processes.poke()
+
     if (r.inflight) {
       this.transcript.inflight(r.inflight, this.busy?.startedAt)
     }
@@ -872,6 +925,11 @@ export class App implements OverlayHost {
           t.toolComplete(ev.payload)
           // A dispatched delegation: its agents' rows start following the owner.
           this.agents.scan()
+
+          if (ev.payload.name === 'terminal') {
+            // Maybe a background start: its card's live line begins now, not at the next idle poll.
+            this.processes.poke()
+          }
         }
 
         break
@@ -1137,6 +1195,11 @@ export class App implements OverlayHost {
       welcome: { ...this.#welcome, version: this.#welcome.version || backend }
     }
 
+    const pills = this.#pills(now)
+    // A pill that left (its last process aged out) hands the keys back.
+    this.#hud = this.#hud && pills.includes(this.#hud) ? this.#hud : undefined
+    const recent = this.processes.recent(now)
+    const exited = recent.filter(p => !processRuns(p))
     const used = usage?.context_used ?? 0
     const max = usage?.context_max ?? 0
     const modal = this.overlays.at(-1)?.modal === true
@@ -1181,6 +1244,14 @@ export class App implements OverlayHost {
           this.changed()
         },
         agents: { onOpen: () => openAgents(this), running: this.agents.running().length },
+        focused: modal ? undefined : this.#hud,
+        shells: {
+          exited: exited.length,
+          onOpen: () => openBackground(this),
+          running: recent.length - exited.length,
+          // The roster puts the newest exit first.
+          tone: exited[0] ? processTone(exited[0].status) : 'muted'
+        },
         rates: {
           cache: typeof usage?.cache_hit_pct === 'number' ? usage.cache_hit_pct : undefined,
           tps: typeof usage?.avg_tps === 'number' && usage.avg_tps > 0 ? usage.avg_tps : undefined
@@ -1195,7 +1266,7 @@ export class App implements OverlayHost {
 
     // The top overlay's field holds the caret; a modal sheet without one takes it from the composer.
     const top = this.overlays.at(-1)
-    const focus = top?.focus ? top.focus(`layer.${top.key}`) : top?.modal ? null : INPUT_ID
+    const focus = top?.focus ? top.focus(`layer.${top.key}`) : top?.modal || this.#hud ? null : INPUT_ID
 
     if (focus !== this.#focus) {
       this.#focus = focus

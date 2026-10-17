@@ -52,6 +52,25 @@ export interface Subagent {
   exitReason?: string
 }
 
+/** A tracked background process (`terminal(background=true)`), as `process.list` last reported it. */
+export interface BackgroundProcess {
+  /** The registry's process id (`proc_…`): `process.list`'s `session_id`, the terminal result's `session_id`. */
+  id: string
+  command: string
+  status: 'done' | 'failed' | 'killed' | 'lost' | 'running'
+  /** Epoch milliseconds. */
+  startedAt: number
+  /** Epoch milliseconds, once it exited and the gateway says when. */
+  exitedAt?: number
+  exitCode?: number
+  /** The registry's `completion_reason` (killed, lost, failed_start, …). */
+  reason?: string
+  /** The newest output the gateway sends (its tail). */
+  output: string
+  /** The last non-empty output line, plain text. */
+  lastLine: string
+}
+
 /** One tool call, from `tool.start` to `tool.complete`. */
 export interface ToolCall {
   id: string
@@ -71,6 +90,8 @@ export interface ToolCall {
   diff?: string
   todos?: Todo[]
   subagents?: Subagent[]
+  /** The background process a `terminal(background=true)` call started, while the store follows it. */
+  process?: BackgroundProcess
 }
 
 /** A part of an assistant turn, in the order it streamed. */
