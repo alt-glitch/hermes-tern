@@ -120,6 +120,29 @@ const COMMANDS: readonly LocalCommand[] = [
     }
   },
   {
+    // The shared gateway refuses /skin in slash.exec; Ink sets the profile's skin through config.set,
+    // and the skin.changed broadcast repaints.
+    name: 'skin',
+    run: async (app, arg) => {
+      if (!arg.trim()) {
+        const r = await app.gw.request<{ value?: string }>('config.get', { key: 'skin' })
+        app.transcript.notice(`skin: ${r?.value || 'default'}`)
+      } else {
+        const r = await app.gw.request<{ value?: string }>('config.set', { key: 'skin', value: arg.trim() })
+        app.transcript.notice(`skin → ${r?.value || arg.trim()}`)
+      }
+
+      if (app.theme !== 'skin') {
+        app.transcript.notice('Hermes wears the skin in the skin theme: /theme skin')
+      }
+    }
+  },
+  {
+    // The shared gateway refuses /compress in slash.exec; a private gateway still runs it there.
+    name: 'compress',
+    run: (app, arg) => app.compress(arg)
+  },
+  {
     // The Ink TUI's `/paste`: the clipboard's image on the next prompt.
     aliases: ['image'],
     name: 'paste',

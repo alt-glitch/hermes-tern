@@ -34,6 +34,8 @@ import { type Busy, busyFrom, ownsEvent, Switches } from './flow.js'
 import { hudKey, type Pill } from './hud.js'
 import type { Overlay, OverlayHost } from './overlay.js'
 import { writeActiveSessionFile } from './hermes/activeSessionFile.js'
+import { compressPayload, compressReport } from './hermes/compress.js'
+import { mutateSession } from './hermes/mutate.js'
 import { clipboardImage, imagePathOf } from './hermes/clipboardImage.js'
 import { type Attachment, uploadImage } from './hermes/images.js'
 import { sharedPromptId, sharedPromptRequest } from './hermes/sharedPrompts.js'
@@ -51,6 +53,7 @@ import { LINK_TOOLS } from './github/links.js'
 import { PullRequests } from './github/store.js'
 import { Cron } from './processes/cron.js'
 import { Sidebar } from './sidebar.js'
+import { isLoginNotice, Notices, statusEffect } from './status.js'
 import { isRunning as processRuns, Processes, processTone } from './processes/store.js'
 import { loadSettings, saveSettings, type ThemeMode } from './settings.js'
 import { Transcript } from './transcript.js'
@@ -137,6 +140,13 @@ export class App implements OverlayHost {
   #copiedTimer: NodeJS.Timeout | undefined
   /** The pill above the composer holding the keys (Down from an empty prompt), if any. */
   #hud: Pill | undefined
+  /** The gateway's keyed notices (credits, a slow start); the newest rides the status strip. */
+  readonly #notices = new Notices()
+  #noticeTimer: NodeJS.Timeout | undefined
+  /** Auto-compaction runs: the working line says so until its done edge. */
+  #compacting = false
+  /** The status warning shown last, so a repeated one stays one line. */
+  #lastStatusNote: string | undefined
 
   constructor(tern: Session, gw: GatewayClient, version: string) {
     this.#tern = tern
@@ -981,6 +991,10 @@ export class App implements OverlayHost {
     this.#readTitle()
     // A resumed session may be mid-turn: Esc stops it and new prompts queue behind it.
     this.busy = busyFrom(r)
+    // The last session's notices and status lines are not this one's.
+    this.#notices.reset()
+    this.#compacting = false
+    this.#lastStatusNote = undefined
     this.transcript.usageBase(r.info?.usage ?? undefined)
 
     if (r.messages?.length) {
@@ -998,6 +1012,70 @@ export class App implements OverlayHost {
     }
 
     this.changed()
+  }
+
+  /**
+   * `/compress [here [N] | --preview | focus]` on the shared gateway: a revision-fenced
+   * `session.mutate operation=compress`, then the compressed history replaces the transcript, as
+   * Ink's applyCompressResult does. False hands it to a private gateway's slash.exec.
+   */
+  async compress(arg: string): Promise<boolean | void> {
+    const sid = this.sid
+
+    if (!this.#gw.isCanonical) {
+      return false
+    }
+
+    if (!sid) {
+      return
+    }
+
+    if (this.busy) {
+      this.transcript.notice('Wait for the current turn to finish (or press Esc) before compressing.', 'warning')
+
+      return
+    }
+
+    // The summary is an LLM call: say it started (a `--preview` only reads).
+    if (!/(^|\s)--preview(\s|$)/.test(arg)) {
+      this.transcript.notice('Compressing the conversation…')
+      this.changed()
+    }
+
+    const report = compressReport(await mutateSession(this.#gw, sid, 'compress', compressPayload(arg)))
+
+    if (sid !== this.sid) {
+      return
+    }
+
+    if (report.preview !== undefined) {
+      this.transcript.panel(`/compress ${arg.trim()}`, report.preview || 'Nothing to compress.')
+
+      return
+    }
+
+    if (report.committed) {
+      const r = await this.#gw.request<CreateResult>('session.resume', { session_id: sid })
+
+      // A turn that started meanwhile owns the transcript now; only the summary lands.
+      if (sid !== this.sid) {
+        return
+      }
+
+      if (!this.busy && Array.isArray(r?.messages)) {
+        this.info = r.info ? { ...this.info, ...r.info } : this.info
+        this.usage = r.info?.usage ?? this.usage
+        this.transcript.clear()
+        this.transcript.push({ id: this.transcript.id('w'), kind: 'welcome' })
+        this.transcript.usageBase(r.info?.usage ?? undefined)
+        this.transcript.load(r.messages)
+        this.agents.scan()
+      }
+    }
+
+    for (const line of report.lines) {
+      this.transcript.notice(line.text, line.tone)
+    }
   }
 
   #subscribe(r: CreateResult) {
@@ -1276,6 +1354,7 @@ export class App implements OverlayHost {
       case 'message.complete':
         t.complete(ev.payload ?? {})
         this.busy = null
+        this.#compacting = false
         this.#drainQueue()
         // The turn may have pushed a branch, opened a PR or changed files.
         this.prs.poke()
@@ -1283,10 +1362,49 @@ export class App implements OverlayHost {
 
         break
 
-      case 'status.update':
-        if (this.busy && ev.payload?.text && ev.payload.kind === 'status') {
-          this.#label(ev.payload.text)
+      case 'status.update': {
+        // Lifecycle lines (retries, fallbacks) label the working line; warnings, compaction and goal
+        // verdicts are transcript lines.
+        const effect = statusEffect(ev.payload, this.#lastStatusNote)
+
+        if (effect.compacting !== undefined) {
+          this.#compacting = effect.compacting
         }
+
+        if (effect.label) {
+          this.#label(effect.label, true)
+        }
+
+        if (effect.notice) {
+          this.#lastStatusNote = effect.note ?? this.#lastStatusNote
+          t.notice(effect.notice.text, effect.notice.tone)
+        }
+
+        break
+      }
+
+      case 'notification.show': {
+        const p = ev.payload
+
+        // A /login step (its link and code, then the result) is read and clicked, so it goes in the transcript.
+        if (p && isLoginNotice(p)) {
+          if (p.text?.trim()) {
+            t.panel('/login', p.text)
+          }
+
+          break
+        }
+
+        if (p) {
+          this.#notices.show(p)
+          this.#armNotices()
+        }
+
+        break
+      }
+
+      case 'notification.clear':
+        this.#notices.clear(ev.payload?.key)
 
         break
 
@@ -1422,8 +1540,23 @@ export class App implements OverlayHost {
     this.changed()
   }
 
-  #label(label: string) {
-    if (this.busy && label) {
+  /** Re-renders when the next `ttl` notice expires, so the strip drops it on time. */
+  #armNotices() {
+    clearTimeout(this.#noticeTimer)
+    const at = this.#notices.nextExpiry()
+
+    if (at !== undefined) {
+      this.#noticeTimer = setTimeout(() => {
+        this.#notices.current()
+        this.#armNotices()
+        this.changed()
+      }, Math.max(0, at - Date.now()) + 10)
+    }
+  }
+
+  /** Relabels the working line; the stream's labels wait while the context is compacted (`status`: a status line's own). */
+  #label(label: string, status = false) {
+    if (this.busy && label && (status || !this.#compacting)) {
       this.busy.label = label
     }
   }
@@ -1608,7 +1741,12 @@ export class App implements OverlayHost {
             this.changed()
           }
         })),
-        status: { title: this.title || undefined, tokens: typeof usage?.total === 'number' ? usage.total : undefined },
+        status: {
+          compressions: typeof usage?.compressions === 'number' ? usage.compressions : undefined,
+          notice: this.#notices.current(now),
+          title: this.title || undefined,
+          tokens: typeof usage?.total === 'number' ? usage.total : undefined
+        },
         todos: (() => {
           const list = this.#todos()
 
