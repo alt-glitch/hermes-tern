@@ -35541,20 +35541,22 @@ function composerNode(cx) {
   const share = ctx && ctx.max > 0 ? ctx.used / ctx.max : void 0;
   return /* @__PURE__ */ jsxs("col", { role: "omp.editor", children: [
     cx.busy ? /* @__PURE__ */ jsx("row", { role: "hermes.streak" }, "streak") : null,
-    share === void 0 ? null : /* @__PURE__ */ jsx(
-      "meter",
-      {
-        label: `${Math.round(share * 100)}%`,
-        role: "omp.composer.context",
-        style: "bar",
-        thresholds: { bad: 0.85, warn: 0.6 },
-        title: `Context ${Math.round(share * 100)}% used
+    share === void 0 || share < 0.01 ? null : (
+      // The bar alone on the composer's edge: its % and total sat in the pills' row and collided
+      // with them; the status strip says the % and the tooltip the rest.
+      /* @__PURE__ */ jsx(
+        "meter",
+        {
+          role: "omp.composer.context",
+          style: "bar",
+          thresholds: { bad: 0.85, warn: 0.6 },
+          title: `Context ${Math.round(share * 100)}% used
 ${compact(ctx.used)} of ${compact(ctx.max)} tokens
 /usage shows the breakdown`,
-        total: compact(ctx.max),
-        value: share
-      },
-      "context"
+          value: share
+        },
+        "context"
+      )
     ),
     /* @__PURE__ */ jsx("row", { gap: "sm", hidden: true, role: "omp.composer.chips", wrap: true }, "chips"),
     /* @__PURE__ */ jsx("row", { align: "start", gap: "sm", role: "omp.composer.line", children: /* @__PURE__ */ jsx(
