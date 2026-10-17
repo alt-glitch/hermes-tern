@@ -1916,9 +1916,9 @@ var require_dispatcher_base = __commonJS({
       }
       close(callback) {
         if (callback === void 0) {
-          return new Promise((resolve4, reject) => {
+          return new Promise((resolve5, reject) => {
             this.close((err, data) => {
-              return err ? reject(err) : resolve4(data);
+              return err ? reject(err) : resolve5(data);
             });
           });
         }
@@ -1956,12 +1956,12 @@ var require_dispatcher_base = __commonJS({
           err = null;
         }
         if (callback === void 0) {
-          return new Promise((resolve4, reject) => {
+          return new Promise((resolve5, reject) => {
             this.destroy(err, (err2, data) => {
               return err2 ? (
                 /* istanbul ignore next: should never error */
                 reject(err2)
-              ) : resolve4(data);
+              ) : resolve5(data);
             });
           });
         }
@@ -4228,8 +4228,8 @@ var require_util2 = __commonJS({
     function createDeferredPromise() {
       let res;
       let rej;
-      const promise = new Promise((resolve4, reject) => {
-        res = resolve4;
+      const promise = new Promise((resolve5, reject) => {
+        res = resolve5;
         rej = reject;
       });
       return { promise, resolve: res, reject: rej };
@@ -6481,12 +6481,12 @@ upgrade: ${upgrade}\r
           cb();
         }
       }
-      const waitForDrain = () => new Promise((resolve4, reject) => {
+      const waitForDrain = () => new Promise((resolve5, reject) => {
         assert(callback === null);
         if (socket[kError]) {
           reject(socket[kError]);
         } else {
-          callback = resolve4;
+          callback = resolve5;
         }
       });
       socket.on("close", onDrain).on("drain", onDrain);
@@ -7158,12 +7158,12 @@ var require_client_h2 = __commonJS({
           cb();
         }
       }
-      const waitForDrain = () => new Promise((resolve4, reject) => {
+      const waitForDrain = () => new Promise((resolve5, reject) => {
         assert(callback === null);
         if (socket[kError]) {
           reject(socket[kError]);
         } else {
-          callback = resolve4;
+          callback = resolve5;
         }
       });
       h2stream.on("close", onDrain).on("drain", onDrain);
@@ -7641,16 +7641,16 @@ var require_client = __commonJS({
         return this[kNeedDrain] < 2;
       }
       async [kClose]() {
-        return new Promise((resolve4) => {
+        return new Promise((resolve5) => {
           if (this[kSize]) {
-            this[kClosedResolve] = resolve4;
+            this[kClosedResolve] = resolve5;
           } else {
-            resolve4(null);
+            resolve5(null);
           }
         });
       }
       async [kDestroy](err) {
-        return new Promise((resolve4) => {
+        return new Promise((resolve5) => {
           const requests = this[kQueue].splice(this[kPendingIdx]);
           for (let i = 0; i < requests.length; i++) {
             const request = requests[i];
@@ -7661,7 +7661,7 @@ var require_client = __commonJS({
               this[kClosedResolve]();
               this[kClosedResolve] = null;
             }
-            resolve4(null);
+            resolve5(null);
           };
           if (this[kHTTPContext]) {
             this[kHTTPContext].destroy(err, callback);
@@ -7712,7 +7712,7 @@ var require_client = __commonJS({
         });
       }
       try {
-        const socket = await new Promise((resolve4, reject) => {
+        const socket = await new Promise((resolve5, reject) => {
           client[kConnector]({
             host,
             hostname,
@@ -7724,7 +7724,7 @@ var require_client = __commonJS({
             if (err) {
               reject(err);
             } else {
-              resolve4(socket2);
+              resolve5(socket2);
             }
           });
         });
@@ -8060,8 +8060,8 @@ var require_pool_base = __commonJS({
         if (this[kQueue].isEmpty()) {
           await Promise.all(this[kClients].map((c) => c.close()));
         } else {
-          await new Promise((resolve4) => {
-            this[kClosedResolve] = resolve4;
+          await new Promise((resolve5) => {
+            this[kClosedResolve] = resolve5;
           });
         }
       }
@@ -9327,7 +9327,7 @@ var require_readable = __commonJS({
         if (this._readableState.closeEmitted) {
           return null;
         }
-        return await new Promise((resolve4, reject) => {
+        return await new Promise((resolve5, reject) => {
           if (this[kContentLength] > limit) {
             this.destroy(new AbortError());
           }
@@ -9340,7 +9340,7 @@ var require_readable = __commonJS({
             if (signal?.aborted) {
               reject(signal.reason ?? new AbortError());
             } else {
-              resolve4(null);
+              resolve5(null);
             }
           }).on("error", noop).on("data", function(chunk) {
             limit -= chunk.length;
@@ -9359,7 +9359,7 @@ var require_readable = __commonJS({
     }
     async function consume(stream, type) {
       assert(!stream[kConsume]);
-      return new Promise((resolve4, reject) => {
+      return new Promise((resolve5, reject) => {
         if (isUnusable(stream)) {
           const rState = stream._readableState;
           if (rState.destroyed && rState.closeEmitted === false) {
@@ -9376,7 +9376,7 @@ var require_readable = __commonJS({
             stream[kConsume] = {
               type,
               stream,
-              resolve: resolve4,
+              resolve: resolve5,
               reject,
               length: 0,
               body: []
@@ -9446,18 +9446,18 @@ var require_readable = __commonJS({
       return buffer;
     }
     function consumeEnd(consume2) {
-      const { type, body, resolve: resolve4, stream, length } = consume2;
+      const { type, body, resolve: resolve5, stream, length } = consume2;
       try {
         if (type === "text") {
-          resolve4(chunksDecode(body, length));
+          resolve5(chunksDecode(body, length));
         } else if (type === "json") {
-          resolve4(JSON.parse(chunksDecode(body, length)));
+          resolve5(JSON.parse(chunksDecode(body, length)));
         } else if (type === "arrayBuffer") {
-          resolve4(chunksConcat(body, length).buffer);
+          resolve5(chunksConcat(body, length).buffer);
         } else if (type === "blob") {
-          resolve4(new Blob(body, { type: stream[kContentType] }));
+          resolve5(new Blob(body, { type: stream[kContentType] }));
         } else if (type === "bytes") {
-          resolve4(chunksConcat(body, length));
+          resolve5(chunksConcat(body, length));
         }
         consumeFinish(consume2);
       } catch (err) {
@@ -9714,9 +9714,9 @@ var require_api_request = __commonJS({
     };
     function request(opts, callback) {
       if (callback === void 0) {
-        return new Promise((resolve4, reject) => {
+        return new Promise((resolve5, reject) => {
           request.call(this, opts, (err, data) => {
-            return err ? reject(err) : resolve4(data);
+            return err ? reject(err) : resolve5(data);
           });
         });
       }
@@ -9939,9 +9939,9 @@ var require_api_stream = __commonJS({
     };
     function stream(opts, factory, callback) {
       if (callback === void 0) {
-        return new Promise((resolve4, reject) => {
+        return new Promise((resolve5, reject) => {
           stream.call(this, opts, factory, (err, data) => {
-            return err ? reject(err) : resolve4(data);
+            return err ? reject(err) : resolve5(data);
           });
         });
       }
@@ -10226,9 +10226,9 @@ var require_api_upgrade = __commonJS({
     };
     function upgrade(opts, callback) {
       if (callback === void 0) {
-        return new Promise((resolve4, reject) => {
+        return new Promise((resolve5, reject) => {
           upgrade.call(this, opts, (err, data) => {
-            return err ? reject(err) : resolve4(data);
+            return err ? reject(err) : resolve5(data);
           });
         });
       }
@@ -10320,9 +10320,9 @@ var require_api_connect = __commonJS({
     };
     function connect2(opts, callback) {
       if (callback === void 0) {
-        return new Promise((resolve4, reject) => {
+        return new Promise((resolve5, reject) => {
           connect2.call(this, opts, (err, data) => {
-            return err ? reject(err) : resolve4(data);
+            return err ? reject(err) : resolve5(data);
           });
         });
       }
@@ -10868,7 +10868,7 @@ var require_mock_interceptor = __commonJS({
 var require_mock_client = __commonJS({
   ".hermes-src/ui-tui/node_modules/undici/lib/mock/mock-client.js"(exports, module) {
     "use strict";
-    var { promisify: promisify7 } = __require("node:util");
+    var { promisify: promisify8 } = __require("node:util");
     var Client = require_client();
     var { buildMockDispatch } = require_mock_utils();
     var {
@@ -10908,7 +10908,7 @@ var require_mock_client = __commonJS({
         return new MockInterceptor(opts, this[kDispatches]);
       }
       async [kClose]() {
-        await promisify7(this[kOriginalClose])();
+        await promisify8(this[kOriginalClose])();
         this[kConnected] = 0;
         this[kMockAgent][Symbols.kClients].delete(this[kOrigin]);
       }
@@ -10921,7 +10921,7 @@ var require_mock_client = __commonJS({
 var require_mock_pool = __commonJS({
   ".hermes-src/ui-tui/node_modules/undici/lib/mock/mock-pool.js"(exports, module) {
     "use strict";
-    var { promisify: promisify7 } = __require("node:util");
+    var { promisify: promisify8 } = __require("node:util");
     var Pool = require_pool();
     var { buildMockDispatch } = require_mock_utils();
     var {
@@ -10961,7 +10961,7 @@ var require_mock_pool = __commonJS({
         return new MockInterceptor(opts, this[kDispatches]);
       }
       async [kClose]() {
-        await promisify7(this[kOriginalClose])();
+        await promisify8(this[kOriginalClose])();
         this[kConnected] = 0;
         this[kMockAgent][Symbols.kClients].delete(this[kOrigin]);
       }
@@ -14184,7 +14184,7 @@ var require_fetch = __commonJS({
       function dispatch({ body }) {
         const url = requestCurrentURL(request);
         const agent = fetchParams.controller.dispatcher;
-        return new Promise((resolve4, reject) => agent.dispatch(
+        return new Promise((resolve5, reject) => agent.dispatch(
           {
             path: url.pathname + url.search,
             origin: url.origin,
@@ -14260,7 +14260,7 @@ var require_fetch = __commonJS({
                 }
               }
               const onError = this.onError.bind(this);
-              resolve4({
+              resolve5({
                 status,
                 statusText,
                 headersList,
@@ -14306,7 +14306,7 @@ var require_fetch = __commonJS({
               for (let i = 0; i < rawHeaders.length; i += 2) {
                 headersList.append(bufferToLowerCasedHeaderName(rawHeaders[i]), rawHeaders[i + 1].toString("latin1"), true);
               }
-              resolve4({
+              resolve5({
                 status,
                 statusText: STATUS_CODES[status],
                 headersList,
@@ -18037,8 +18037,8 @@ var require_util8 = __commonJS({
       return true;
     }
     function delay(ms) {
-      return new Promise((resolve4) => {
-        setTimeout(resolve4, ms).unref();
+      return new Promise((resolve5) => {
+        setTimeout(resolve5, ms).unref();
       });
     }
     module.exports = {
@@ -19968,25 +19968,25 @@ var PLAIN_TEXT = {
   badge: true,
   toast: true
 };
-function textProps(run6) {
-  if (run6.every((part) => typeof part === "string"))
-    return { text: run6.join("") };
-  return { spans: run6.map((part) => typeof part === "string" ? part : toJson(part) ?? null) };
+function textProps(run7) {
+  if (run7.every((part) => typeof part === "string"))
+    return { text: run7.join("") };
+  return { spans: run7.map((part) => typeof part === "string" ? part : toJson(part) ?? null) };
 }
 function containerChildren(parts2) {
   const out = [];
-  let run6 = [];
+  let run7 = [];
   const end = () => {
-    if (run6.length > 0)
-      out.push(new Node("text", textProps(run6)));
-    run6 = [];
+    if (run7.length > 0)
+      out.push(new Node("text", textProps(run7)));
+    run7 = [];
   };
   for (const part of parts2) {
     if (part instanceof Node) {
       end();
       out.push(part);
     } else {
-      run6.push(part);
+      run7.push(part);
     }
   }
   end();
@@ -20013,17 +20013,17 @@ function createNode(kind, input, children2) {
   const parts2 = flatten([fromProps, children2]);
   let nodes2 = [];
   if (SPAN_TEXT[kind] || PLAIN_TEXT[kind]) {
-    const run6 = [];
+    const run7 = [];
     for (const part of parts2) {
       if (part instanceof Node && kind === "seg")
         nodes2.push(part);
       else if (part instanceof Node || part instanceof Span && PLAIN_TEXT[kind]) {
         throw new TypeError(`${kind} takes text children, got ${describe(part)}`);
       } else
-        run6.push(part);
+        run7.push(part);
     }
-    if (run6.length > 0)
-      Object.assign(props, textProps(run6));
+    if (run7.length > 0)
+      Object.assign(props, textProps(run7));
   } else if (kind === "el") {
     let text2 = "";
     for (const part of parts2) {
@@ -20653,9 +20653,9 @@ var Session = class {
     ownedInputs.add(this.#input);
     this.#ownsInput = true;
     this.#wasRaw = this.#input.isRaw === true;
-    const { promise, resolve: resolve4 } = Promise.withResolvers();
-    const timer = setTimeout(() => resolve4(false), options.timeout ?? 1e3);
-    this.#handshake = resolve4;
+    const { promise, resolve: resolve5 } = Promise.withResolvers();
+    const timer = setTimeout(() => resolve5(false), options.timeout ?? 1e3);
+    this.#handshake = resolve5;
     let connected = false;
     try {
       if (options.exitHooks ?? (options.input === void 0 && options.output === void 0))
@@ -20747,8 +20747,8 @@ var Session = class {
   blobs(ids) {
     if (this.#closed)
       return Promise.resolve([]);
-    const { promise, resolve: resolve4 } = Promise.withResolvers();
-    this.#blobWaiters.push(resolve4);
+    const { promise, resolve: resolve5 } = Promise.withResolvers();
+    this.#blobWaiters.push(resolve5);
     this.#send({ verb: "q", body: { q: "blobs", ids } });
     return promise;
   }
@@ -20764,8 +20764,8 @@ var Session = class {
     }
     if (this.#closed || this.#closing)
       return Promise.resolve(null);
-    const { promise, resolve: resolve4, reject } = Promise.withResolvers();
-    this.#waiters.push({ resolve: resolve4, reject });
+    const { promise, resolve: resolve5, reject } = Promise.withResolvers();
+    this.#waiters.push({ resolve: resolve5, reject });
     return promise;
   }
   /** Keys and unhandled events until the session closes. */
@@ -21157,7 +21157,7 @@ var JsonRpcRequestChannel = class {
       return Promise.reject(new DOMException("Aborted", "AbortError"));
     }
     const id = this.options.createRequestId(++this.nextId);
-    return new Promise((resolve4, reject) => {
+    return new Promise((resolve5, reject) => {
       let onAbort;
       const detachAbort = () => {
         if (onAbort && signal) {
@@ -21167,7 +21167,7 @@ var JsonRpcRequestChannel = class {
       const pending = {
         resolve: (value) => {
           detachAbort();
-          resolve4(value);
+          resolve5(value);
         },
         reject: (error) => {
           detachAbort();
@@ -24302,7 +24302,7 @@ var GatewayClient = class extends EventEmitter {
       let settled = false;
       this.ws = ws;
       this.channel.attach({ send: (text2) => ws.send(text2) });
-      const connectPromise = new Promise((resolve4, reject) => {
+      const connectPromise = new Promise((resolve5, reject) => {
         ws.addEventListener(
           "open",
           () => {
@@ -24311,7 +24311,7 @@ var GatewayClient = class extends EventEmitter {
             }
             if (!settled) {
               settled = true;
-              resolve4();
+              resolve5();
             }
             this.connectSidecarMirror();
             if (this.isCanonical) {
@@ -24555,6 +24555,7 @@ var GatewayClient = class extends EventEmitter {
 // src/app.ts
 import { randomUUID as randomUUID3 } from "node:crypto";
 import { appendFileSync as appendFileSync4 } from "node:fs";
+import { basename as basename3 } from "node:path";
 
 // node_modules/@hermes/shared/src/slash.ts
 var SLASH_COMMAND_RE = /^\/[^\s/]*(?:\s|$)/;
@@ -28429,10 +28430,10 @@ function searchCard(call, result) {
         /* @__PURE__ */ jsx("text", { role: "omp.tool.chip", spans: [{ t: String(hits.length) }] }, "n")
       ] }, f)
     );
-    let run6 = [];
+    let run7 = [];
     let runIndex = 0;
     const flush = () => {
-      const start = run6[0]?.line ?? 1;
+      const start = run7[0]?.line ?? 1;
       if (runIndex > 0) {
         body.push(/* @__PURE__ */ jsx("text", { role: "omp.tool.context", spans: [{ s: "muted", t: "\u2026" }] }, `${f}.g${runIndex}`));
       }
@@ -28441,23 +28442,23 @@ function searchCard(call, result) {
           "code",
           {
             lang: langOf(path),
-            marks: run6.map((h) => ({ line: h.line, tone: "accent" })),
+            marks: run7.map((h) => ({ line: h.line, tone: "accent" })),
             numbers: true,
             start,
-            text: run6.map((h) => h.text).join("\n")
+            text: run7.map((h) => h.text).join("\n")
           },
           `${f}.c${runIndex++}`
         )
       );
-      run6 = [];
+      run7 = [];
     };
     for (const hit of hits) {
-      if (run6.length && hit.line !== (run6.at(-1)?.line ?? 0) + 1) {
+      if (run7.length && hit.line !== (run7.at(-1)?.line ?? 0) + 1) {
         flush();
       }
-      run6.push(hit);
+      run7.push(hit);
     }
-    if (run6.length) {
+    if (run7.length) {
       flush();
     }
   }
@@ -31319,6 +31320,7 @@ var HOTKEYS = [
       [["alt+b"], "Background processes and cron jobs (/ps)"],
       [["alt+p"], "Pull requests Hermes linked (/prs)"],
       [["alt+s"], "Session sidebar: branch, PRs, changes (/sidebar)"],
+      [["ctrl+v"], "Attach the clipboard image (also \u2318V of an image, a dropped image file, /paste)"],
       [["down"], "Focus the agents / shells / PR pills (empty prompt); \u2190 \u2192 switch, Enter opens, Esc returns"],
       [["ctrl+c"], "Clear the draft / interrupt / exit (twice)"],
       [["ctrl+d"], "Delete forward / exit (empty prompt)"]
@@ -33279,6 +33281,12 @@ var COMMANDS2 = [
     }
   },
   {
+    // The Ink TUI's `/paste`: the clipboard's image on the next prompt.
+    aliases: ["image"],
+    name: "paste",
+    run: (app, arg) => arg ? false : void app.attachClipboardImage(false)
+  },
+  {
     aliases: ["side"],
     name: "sidebar",
     run: (app) => app.toggleSidebar()
@@ -33387,10 +33395,54 @@ var writeActiveSessionFile = (sessionId, file2 = process.env.HERMES_TUI_ACTIVE_S
   }
 };
 
+// src/hermes/clipboardImage.ts
+import { execFile as execFile5 } from "node:child_process";
+import { existsSync as existsSync2 } from "node:fs";
+import { mkdtemp } from "node:fs/promises";
+import { homedir as homedir7, tmpdir } from "node:os";
+import { join as join6, resolve as resolve2 } from "node:path";
+import { promisify as promisify4 } from "node:util";
+var run3 = promisify4(execFile5);
+var IMAGE = /\.(png|jpe?g|gif|webp)$/i;
+async function clipboardImage(env = process.env) {
+  const root = env.HERMES_PYTHON_SRC_ROOT;
+  const python = env.HERMES_PYTHON?.trim() || "python3";
+  if (!root) {
+    return void 0;
+  }
+  const path = join6(await mkdtemp(join6(tmpdir(), "hermes-tern-clipboard-")), "clipboard.png");
+  const { stdout } = await run3(python, [join6(root, "ui-tui/scripts/clipboard_image.py"), path], {
+    cwd: root,
+    env: { ...env, PYTHONPATH: root },
+    timeout: 15e3
+  });
+  return stdout.trim() === "true" && existsSync2(path) ? path : void 0;
+}
+function imagePathOf(text2, cwd) {
+  let raw = text2.trim();
+  if (!raw || raw.includes("\n")) {
+    return void 0;
+  }
+  raw = raw.replace(/^(['"])(.*)\1$/, "$2");
+  if (raw.startsWith("file://")) {
+    try {
+      raw = decodeURIComponent(new URL(raw).pathname);
+    } catch {
+      return void 0;
+    }
+  }
+  raw = raw.replace(/\\(.)/g, "$1").replace(/^~(?=$|\/)/, homedir7());
+  if (!IMAGE.test(raw)) {
+    return void 0;
+  }
+  const path = resolve2(cwd, raw);
+  return existsSync2(path) ? path : void 0;
+}
+
 // src/hermes/images.ts
 import { readFile as readFile2 } from "node:fs/promises";
-import { homedir as homedir7 } from "node:os";
-import { extname as extname2, resolve as resolve2 } from "node:path";
+import { homedir as homedir8 } from "node:os";
+import { extname as extname2, resolve as resolve3 } from "node:path";
 var MAX_IMAGE_BYTES = 20 * 1024 * 1024;
 function imageFormat(bytes) {
   if (bytes.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))) {
@@ -33408,7 +33460,7 @@ function imageFormat(bytes) {
   return null;
 }
 async function uploadImage(gw2, sid, raw, cwd) {
-  const path = resolve2(cwd, raw.replace(/^~(?=$|\/)/, homedir7()));
+  const path = resolve3(cwd, raw.replace(/^~(?=$|\/)/, homedir8()));
   const bytes = await readFile2(path);
   if (bytes.length > MAX_IMAGE_BYTES) {
     throw new Error("the image is larger than 20 MB");
@@ -33983,6 +34035,19 @@ var STYLES = css`
   [data-role='hermes.connect.row'] {
     min-height: 28px;
     font: 400 13px/22px var(--sans) !important;
+  }
+
+  /* An image the next prompt carries: a chip in the composer; a click drops it. */
+  [data-role='hermes.composer.image'] {
+    padding: 1px 8px !important;
+    border-radius: 999px;
+    background: var(--l1);
+    font: 500 12px/20px var(--sans) !important;
+    cursor: pointer;
+  }
+
+  [data-role='hermes.composer.image']:hover {
+    background: var(--l2);
   }
 
   /* omp's ask theme draws a radio at the start of each option without moving the text over. */
@@ -34632,14 +34697,14 @@ function paletteFor(mode, skin) {
   if (mode === "skin" && skin) {
     const name = skin.name || "default";
     return {
-      dark: semantic(resolve3(skin, "dark")),
-      light: semantic(resolve3(skin, "light")),
+      dark: semantic(resolve4(skin, "dark")),
+      light: semantic(resolve4(skin, "light")),
       name: { dark: name, light: name }
     };
   }
   return { dark: {}, light: {}, name: { dark: "tern", light: "tern" } };
 }
-function resolve3(skin, polarity) {
+function resolve4(skin, polarity) {
   const light = polarity === "light";
   const colors = { ...skin.colors, ...light ? skin.light_colors : skin.dark_colors };
   const saved = process.env.HERMES_TUI_LIGHT;
@@ -34673,9 +34738,9 @@ function semantic(c) {
 }
 
 // src/github/branch.ts
-import { execFile as execFile5 } from "node:child_process";
-import { promisify as promisify4 } from "node:util";
-var run3 = promisify4(execFile5);
+import { execFile as execFile6 } from "node:child_process";
+import { promisify as promisify5 } from "node:util";
+var run4 = promisify5(execFile6);
 function parseRemote(url) {
   const m = url.match(/^[\w.-]+@([^:/]+):([^/]+\/[^/]+?)(?:\.git)?\/?$/) ?? url.match(/^(?:https?|ssh|git):\/\/(?:[^@/]+@)?([^/:]+)(?::\d+)?\/([^/]+\/[^/]+?)(?:\.git)?\/?$/);
   if (!m) {
@@ -34685,7 +34750,7 @@ function parseRemote(url) {
   return host === "github.com" || host.split(".").includes("github") ? { host, repository: m[2].toLowerCase() } : void 0;
 }
 async function git2(cwd, ...args) {
-  const { stdout } = await run3("git", ["-C", cwd, ...args], { timeout: 5e3 });
+  const { stdout } = await run4("git", ["-C", cwd, ...args], { timeout: 5e3 });
   return stdout.trim();
 }
 async function branchTarget(cwd) {
@@ -34755,9 +34820,9 @@ function parseStacks(host, repository, rows) {
 }
 
 // src/github/client.ts
-import { execFile as execFile6 } from "node:child_process";
-import { promisify as promisify5 } from "node:util";
-var run4 = promisify5(execFile6);
+import { execFile as execFile7 } from "node:child_process";
+import { promisify as promisify6 } from "node:util";
+var run5 = promisify6(execFile7);
 var GitHubError = class extends Error {
   constructor(message, status) {
     super(message);
@@ -34785,7 +34850,7 @@ async function read(host, env) {
     return own;
   }
   try {
-    const { stdout } = await run4("gh", ["auth", "token", "--hostname", host], { timeout: 1e4 });
+    const { stdout } = await run5("gh", ["auth", "token", "--hostname", host], { timeout: 1e4 });
     const token = stdout.trim();
     if (token) {
       return token;
@@ -35292,10 +35357,10 @@ var Sidebar = class {
 
 // src/settings.ts
 import { mkdirSync as mkdirSync4, readFileSync as readFileSync4, writeFileSync as writeFileSync3 } from "node:fs";
-import { homedir as homedir8 } from "node:os";
-import { dirname, join as join6 } from "node:path";
+import { homedir as homedir9 } from "node:os";
+import { dirname, join as join7 } from "node:path";
 function settingsFile(env = process.env) {
-  return join6(env.HERMES_HOME || join6(homedir8(), ".hermes"), "hermes-tern", "settings.json");
+  return join7(env.HERMES_HOME || join7(homedir9(), ".hermes"), "hermes-tern", "settings.json");
 }
 function loadSettings(file2 = settingsFile()) {
   try {
@@ -35558,7 +35623,11 @@ ${compact(ctx.used)} of ${compact(ctx.max)} tokens
         "context"
       )
     ),
-    /* @__PURE__ */ jsx("row", { gap: "sm", hidden: true, role: "omp.composer.chips", wrap: true }, "chips"),
+    /* @__PURE__ */ jsx("row", { gap: "sm", hidden: !cx.attachments?.length, role: "omp.composer.chips", wrap: true, children: (cx.attachments ?? []).map((a, i) => /* @__PURE__ */ jsxs("row", { align: "center", gap: "xs", onClick: a.onRemove, role: "hermes.composer.image", title: "Remove this image", children: [
+      /* @__PURE__ */ jsx("icon", { name: "image" }, "i"),
+      /* @__PURE__ */ jsx("text", { text: a.label, wrap: "none" }, "t"),
+      /* @__PURE__ */ jsx("icon", { name: "x" }, "x")
+    ] }, `a${i}`)) }, "chips"),
     /* @__PURE__ */ jsx("row", { align: "start", gap: "sm", role: "omp.composer.line", children: /* @__PURE__ */ jsx(
       "editor",
       {
@@ -35940,7 +36009,7 @@ function breakdownBody(items) {
 
 // src/view/welcome.tsx
 import { readFileSync as readFileSync5 } from "node:fs";
-import { join as join7 } from "node:path";
+import { join as join8 } from "node:path";
 function welcomeNode(key2, cx) {
   return /* @__PURE__ */ jsxs("card", { role: "omp.welcome", children: [
     /* @__PURE__ */ jsxs("row", { align: "center", gap: "md", role: "omp.welcome.lockup", children: [
@@ -35960,7 +36029,7 @@ var TIP_LINE = /^\s+t\d+:\s+"((?:[^"\\]|\\.)*)"\s*$/;
 function randomTip(root) {
   let text2;
   try {
-    text2 = readFileSync5(join7(root, "locales", "en.yaml"), "utf8");
+    text2 = readFileSync5(join8(root, "locales", "en.yaml"), "utf8");
   } catch {
     return "";
   }
@@ -36271,9 +36340,9 @@ function noticeNode(e) {
 }
 
 // src/watch/spec.ts
-import { execFile as execFile7 } from "node:child_process";
-import { promisify as promisify6 } from "node:util";
-var run5 = promisify6(execFile7);
+import { execFile as execFile8 } from "node:child_process";
+import { promisify as promisify7 } from "node:util";
+var run6 = promisify7(execFile8);
 var WATCH_ENV = "HERMES_TERN_WATCH";
 function readWatchSpec(env = process.env) {
   try {
@@ -36305,7 +36374,7 @@ async function openSidebar(spec, cwd, env = process.env) {
     return false;
   }
   if (sidebar) {
-    await run5("tern", ["close", sidebar]).catch(() => void 0);
+    await run6("tern", ["close", sidebar]).catch(() => void 0);
     sidebar = void 0;
   }
   const command = [
@@ -36319,7 +36388,7 @@ async function openSidebar(spec, cwd, env = process.env) {
     "tern"
   ];
   try {
-    const { stdout } = await run5("tern", ["split", pane, "right", "--cwd", cwd, "--", ...command]);
+    const { stdout } = await run6("tern", ["split", pane, "right", "--cwd", cwd, "--", ...command]);
     sidebar = stdout.trim().split(/\s+/).at(-1) || void 0;
     return true;
   } catch {
@@ -36378,7 +36447,7 @@ var App = class {
   #approvalIds = /* @__PURE__ */ new Map();
   /** The launcher's startup image until it is attached to the first session (the queue waits for it). */
   #startupImage = process.env.HERMES_TUI_IMAGE?.trim() ?? "";
-  /** Uploaded images the next prompt carries (the shared gateway takes them on prompt.submit). */
+  /** Uploaded images the next prompt carries (the shared gateway takes them on prompt.submit), with the names the chips show. */
   #attachments = [];
   /** The skin the gateway last reported; only the `skin` theme mode wears it. */
   #skin;
@@ -36532,6 +36601,12 @@ var App = class {
     }
     if (key2.ctrl && key2.name === "d" && !this.composer.text) {
       return this.quit();
+    }
+    if (key2.name === "paste" && this.#pasteImage(key2.text ?? "")) {
+      return;
+    }
+    if (key2.ctrl && key2.name === "v" && !key2.alt && !key2.meta) {
+      return void this.attachClipboardImage(false);
     }
     const action = this.composer.key(key2);
     if (action === "submit") {
@@ -36693,6 +36768,47 @@ var App = class {
     this.#submit(continueMessage(call.connect ?? connectTargets(call, readCard(call.id))));
     this.changed();
   }
+  /** A paste that is an image (no text: the clipboard's; one image path: that file); false for text. */
+  #pasteImage(text2) {
+    if (!text2.trim()) {
+      void this.attachClipboardImage(true);
+      return true;
+    }
+    const path = imagePathOf(text2, this.info?.cwd || process.env.HERMES_CWD || process.cwd());
+    if (path) {
+      void this.#attachImage(path, basename3(path));
+      return true;
+    }
+    return false;
+  }
+  /** Attaches the clipboard's image to the next prompt (`quiet`: an empty paste, which may hold none). */
+  async attachClipboardImage(quiet) {
+    try {
+      const path = await clipboardImage();
+      if (path) {
+        await this.#attachImage(path, `pasted image ${this.#attachments.length + 1}`);
+      } else if (!quiet) {
+        this.transcript.notice("No image on the clipboard.", "warning");
+        this.changed();
+      }
+    } catch (error) {
+      this.transcript.notice(`Could not read the clipboard image: ${error instanceof Error ? error.message : String(error)}`, "error");
+      this.changed();
+    }
+  }
+  async #attachImage(path, name) {
+    const sid = this.sid;
+    if (!sid) {
+      this.transcript.notice("Wait for the session to start before attaching an image.", "warning");
+      return this.changed();
+    }
+    try {
+      this.#attachments.push({ ...await uploadImage(this.#gw, sid, path, process.env.HERMES_CWD || process.cwd()), name });
+    } catch (error) {
+      this.transcript.notice(`Could not attach ${name}: ${error instanceof Error ? error.message : String(error)}`, "error");
+    }
+    this.changed();
+  }
   /** Opens or closes the session sidebar (Tern's aside); says why where Tern has none. */
   toggleSidebar() {
     if (!this.#tern.caps.features.includes("aside")) {
@@ -36764,9 +36880,12 @@ var App = class {
       this.queue.unshift(text2);
       return;
     }
-    const attachments = this.#attachments;
+    const attachments = this.#attachments.map(({ mime, path }) => ({ mime, path }));
+    const images = this.#attachments.length;
     this.#attachments = [];
-    this.transcript.user(display?.trim() || text2);
+    this.transcript.user(`${display?.trim() || text2}${images ? `
+
+\u{1F4CE} ${images} image${images === 1 ? "" : "s"}` : ""}`);
     this.#startBusy("Working\u2026");
     this.#gw.request("prompt.submit", {
       session_id: this.sid,
@@ -36874,7 +36993,7 @@ var App = class {
     const path = this.#startupImage;
     try {
       if (this.#gw.isCanonical) {
-        this.#attachments.push(await uploadImage(this.#gw, sid, path, process.env.HERMES_CWD || process.cwd()));
+        this.#attachments.push({ ...await uploadImage(this.#gw, sid, path, process.env.HERMES_CWD || process.cwd()), name: basename3(path) });
       } else {
         await this.#gw.request("image.attach", { path, session_id: sid });
       }
@@ -37435,6 +37554,13 @@ ${this.composer.text}` : next2);
         },
         agents: { onOpen: () => openAgents(this), running: this.agents.running().length },
         prs: prsPill(this.prs.entries(), () => openPullRequests(this)),
+        attachments: this.#attachments.map((a, i) => ({
+          label: a.name,
+          onRemove: () => {
+            this.#attachments.splice(i, 1);
+            this.changed();
+          }
+        })),
         status: { title: this.title || void 0, tokens: typeof usage?.total === "number" ? usage.total : void 0 },
         todos: (() => {
           const list = this.#todos();

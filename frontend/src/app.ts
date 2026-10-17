@@ -5,6 +5,7 @@
 
 import { randomUUID } from 'node:crypto'
 import { appendFileSync } from 'node:fs'
+import { basename } from 'node:path'
 
 import type {
   SessionLiveInfo,
@@ -33,6 +34,7 @@ import { type Busy, busyFrom, ownsEvent, Switches } from './flow.js'
 import { hudKey, type Pill } from './hud.js'
 import type { Overlay, OverlayHost } from './overlay.js'
 import { writeActiveSessionFile } from './hermes/activeSessionFile.js'
+import { clipboardImage, imagePathOf } from './hermes/clipboardImage.js'
 import { type Attachment, uploadImage } from './hermes/images.js'
 import { sharedPromptId, sharedPromptRequest } from './hermes/sharedPrompts.js'
 import { openAgents } from './overlays/agents.js'
@@ -125,8 +127,8 @@ export class App implements OverlayHost {
   readonly #approvalIds = new Map<string, string>()
   /** The launcher's startup image until it is attached to the first session (the queue waits for it). */
   #startupImage = process.env.HERMES_TUI_IMAGE?.trim() ?? ''
-  /** Uploaded images the next prompt carries (the shared gateway takes them on prompt.submit). */
-  #attachments: Attachment[] = []
+  /** Uploaded images the next prompt carries (the shared gateway takes them on prompt.submit), with the names the chips show. */
+  #attachments: (Attachment & { name: string })[] = []
   /** The skin the gateway last reported; only the `skin` theme mode wears it. */
   #skin: SkinPayload | undefined
   #theme: ThemeMode = loadSettings().theme ?? 'tern'
@@ -329,6 +331,16 @@ export class App implements OverlayHost {
 
     if (key.ctrl && key.name === 'd' && !this.composer.text) {
       return this.quit()
+    }
+
+    // An image: a paste with no text (what a terminal sends for a clipboard image), a pasted or
+    // dropped image path, or Ctrl+V.
+    if (key.name === 'paste' && this.#pasteImage(key.text ?? '')) {
+      return
+    }
+
+    if (key.ctrl && key.name === 'v' && !key.alt && !key.meta) {
+      return void this.attachClipboardImage(false)
     }
 
     const action = this.composer.key(key)
@@ -536,6 +548,60 @@ export class App implements OverlayHost {
     this.changed()
   }
 
+  /** A paste that is an image (no text: the clipboard's; one image path: that file); false for text. */
+  #pasteImage(text: string): boolean {
+    if (!text.trim()) {
+      void this.attachClipboardImage(true)
+
+      return true
+    }
+
+    const path = imagePathOf(text, this.info?.cwd || process.env.HERMES_CWD || process.cwd())
+
+    if (path) {
+      void this.#attachImage(path, basename(path))
+
+      return true
+    }
+
+    return false
+  }
+
+  /** Attaches the clipboard's image to the next prompt (`quiet`: an empty paste, which may hold none). */
+  async attachClipboardImage(quiet: boolean) {
+    try {
+      const path = await clipboardImage()
+
+      if (path) {
+        await this.#attachImage(path, `pasted image ${this.#attachments.length + 1}`)
+      } else if (!quiet) {
+        this.transcript.notice('No image on the clipboard.', 'warning')
+        this.changed()
+      }
+    } catch (error) {
+      this.transcript.notice(`Could not read the clipboard image: ${error instanceof Error ? error.message : String(error)}`, 'error')
+      this.changed()
+    }
+  }
+
+  async #attachImage(path: string, name: string) {
+    const sid = this.sid
+
+    if (!sid) {
+      this.transcript.notice('Wait for the session to start before attaching an image.', 'warning')
+
+      return this.changed()
+    }
+
+    try {
+      this.#attachments.push({ ...(await uploadImage(this.#gw, sid, path, process.env.HERMES_CWD || process.cwd())), name })
+    } catch (error) {
+      this.transcript.notice(`Could not attach ${name}: ${error instanceof Error ? error.message : String(error)}`, 'error')
+    }
+
+    this.changed()
+  }
+
   /** Opens or closes the session sidebar (Tern's aside); says why where Tern has none. */
   toggleSidebar() {
     if (!this.#tern.caps.features.includes('aside')) {
@@ -634,9 +700,10 @@ export class App implements OverlayHost {
       return
     }
 
-    const attachments = this.#attachments
+    const attachments = this.#attachments.map(({ mime, path }) => ({ mime, path }))
+    const images = this.#attachments.length
     this.#attachments = []
-    this.transcript.user(display?.trim() || text)
+    this.transcript.user(`${display?.trim() || text}${images ? `\n\n📎 ${images} image${images === 1 ? '' : 's'}` : ''}`)
     this.#startBusy('Working…')
     this.#gw
       // The shared gateway admits a prompt by its submission id (a retry with the same id is one turn).
@@ -770,7 +837,7 @@ export class App implements OverlayHost {
 
     try {
       if (this.#gw.isCanonical) {
-        this.#attachments.push(await uploadImage(this.#gw, sid, path, process.env.HERMES_CWD || process.cwd()))
+        this.#attachments.push({ ...(await uploadImage(this.#gw, sid, path, process.env.HERMES_CWD || process.cwd())), name: basename(path) })
       } else {
         await this.#gw.request('image.attach', { path, session_id: sid })
       }
@@ -1534,6 +1601,13 @@ export class App implements OverlayHost {
         },
         agents: { onOpen: () => openAgents(this), running: this.agents.running().length },
         prs: prsPill(this.prs.entries(), () => openPullRequests(this)),
+        attachments: this.#attachments.map((a, i) => ({
+          label: a.name,
+          onRemove: () => {
+            this.#attachments.splice(i, 1)
+            this.changed()
+          }
+        })),
         status: { title: this.title || undefined, tokens: typeof usage?.total === 'number' ? usage.total : undefined },
         todos: (() => {
           const list = this.#todos()
