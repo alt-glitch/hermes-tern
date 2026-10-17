@@ -15,7 +15,10 @@ import { type WelcomeContext, welcomeNode } from './welcome.js'
 export interface TranscriptContext {
   now: number
   welcome: WelcomeContext
-  copy(text: string): void
+  /** Copies a prompt's text; `id` is the prompt's entry id. */
+  copy(text: string, id: string): void
+  /** The prompt copied a moment ago, whose button reads Copied. */
+  copied?: string
 }
 
 const kNode = Symbol('tsp.node')
@@ -38,7 +41,7 @@ export function entryNode(e: Entry, id: string, cx: TranscriptContext): JSX.Elem
   // Entries are plain objects; the symbol slot rides on them (weak type: widen first).
   const holder: object = e
   const built: Built = holder
-  const rev = e.kind === 'turn' ? e.rev : 0
+  const rev = e.kind === 'turn' ? e.rev : e.kind === 'user' && cx.copied === e.id ? 1 : 0
   const cached = built[kNode]
 
   if (cached?.rev === rev) {
@@ -84,7 +87,13 @@ function userNode(e: UserEntry, cx: TranscriptContext): JSX.Element {
           spans={[{ s: 'dim mono', t: at.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }]}
           title={at.toLocaleString()}
         />
-        <text key="copy" onClick={() => cx.copy(e.text)} role="omp.user.tool" text="Copy" title="Copy message" />
+        <text
+          key="copy"
+          onClick={() => cx.copy(e.text, e.id)}
+          role="omp.user.tool"
+          text={cx.copied === e.id ? 'Copied' : 'Copy'}
+          title="Copy message"
+        />
       </row>
       <md key="body">{e.text}</md>
     </card>
