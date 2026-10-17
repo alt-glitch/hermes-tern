@@ -7,6 +7,7 @@ import { CONTROL_COMMANDS } from './controlCommands.js'
 import { openAgents } from './overlays/agents.js'
 import { openBackground } from './overlays/background.js'
 import { openChanges } from './overlays/changes.js'
+import { LEVELS, openEffortPicker } from './overlays/effort.js'
 import { openPullRequests } from './overlays/pullRequests.js'
 import { openHelp } from './overlays/help.js'
 import { openModelPicker, switchModel } from './overlays/models.js'
@@ -102,6 +103,21 @@ const COMMANDS: readonly LocalCommand[] = [
     aliases: ['bashes', 'shells', 'processes'],
     name: 'ps',
     run: app => openBackground(app)
+  },
+  {
+    // Hermes' own `/reasoning` stays the backend's (show/hide, levels, --global).
+    name: 'effort',
+    run: (app, arg) => {
+      const words = arg.trim().split(/\s+/).filter(Boolean)
+      const global = words.includes('--global') || words.includes('default')
+      const level = words.find(w => LEVELS.some(l => l.id === w || l.label === w))
+
+      if (!level) {
+        return openEffortPicker(app, global)
+      }
+
+      void app.setEffort(LEVELS.find(l => l.id === level || l.label === level)!.id, global ? 'global' : 'session')
+    }
   },
   {
     aliases: ['side'],

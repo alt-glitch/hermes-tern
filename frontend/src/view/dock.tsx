@@ -38,6 +38,8 @@ export interface DockContext {
   onUndo(): void
   onModel(): void
   onEffort(): void
+  /** The effort pill's context menu, by action: choose a level, save the current one as the default. */
+  onEffortMenu?: Record<string, () => void>
   /** Pull the oldest queued prompt back into the composer. */
   onQueueEdit(): void
   /** Inject the queued prompt at `index` into the running turn; absent when no turn runs. */
@@ -308,8 +310,9 @@ function composerNode(cx: DockContext): JSX.Element {
             gap="xs"
             key="effort"
             onClick={cx.onEffort}
+            onMenu={cx.onEffortMenu}
             role="omp.composer.effort"
-            title={`Reasoning effort: ${effortLabel(cx.effort)} · click to cycle  ⇧⇥`}
+            title={`Reasoning effort: ${effortLabel(cx.effort)} · click to cycle  ⇧⇥ · right-click to choose or save as default`}
           >
             <effort key="glyph" level={effortLabel(cx.effort)} />
             <text key="level" text={effortLabel(cx.effort)} wrap="none" />

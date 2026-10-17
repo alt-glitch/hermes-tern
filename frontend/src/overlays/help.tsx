@@ -33,7 +33,7 @@ const HOTKEYS: { group: string; rows: [string[], string][] }[] = [
     group: 'Control',
     rows: [
       [['escape'], 'Close the completion / interrupt the agent'],
-      [['shift+tab'], 'Cycle the reasoning effort'],
+      [['shift+tab'], 'Cycle the reasoning effort (/effort picks one; Ctrl+G there saves it as the default)'],
       [['alt+up'], 'Edit the oldest queued prompt'],
       [['alt+a'], 'Agents'],
       [['alt+b'], 'Background processes and cron jobs (/ps)'],

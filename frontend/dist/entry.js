@@ -30009,6 +30009,91 @@ function diffView(f, diff2) {
   return /^Binary files /m.test(diff2) ? [/* @__PURE__ */ jsx("text", { spans: [{ s: "muted", t: "Binary file." }] }, "bin")] : [/* @__PURE__ */ jsx("diff", { path: f.path, text: diff2 }, `d:${f.path}`)];
 }
 
+// src/overlays/effort.tsx
+var KEY4 = "effort";
+var LEVELS = [
+  { detail: "No reasoning tokens", id: "none", label: "off" },
+  { detail: "The least thinking a model allows", id: "minimal", label: "minimal" },
+  { detail: "Quick answers", id: "low", label: "low" },
+  { detail: "The usual balance", id: "medium", label: "medium" },
+  { detail: "Harder problems", id: "high", label: "high" },
+  { detail: "More than high, where the model has it", id: "xhigh", label: "xhigh" },
+  { detail: "Everything the model can spend", id: "max", label: "max" }
+];
+function openEffortPicker(app, global2 = false) {
+  const current = app.info?.reasoning_effort ?? "";
+  let selected = LEVELS.some((l) => l.id === current) ? current : "medium";
+  let saveDefault = global2;
+  const pick = async (id) => {
+    if (!id) {
+      return;
+    }
+    app.close(overlay);
+    await app.setEffort(id, saveDefault ? "global" : "session");
+  };
+  const overlay = {
+    key: KEY4,
+    modal: true,
+    node: () => /* @__PURE__ */ jsx(
+      "picker",
+      {
+        actions: [
+          { id: "global", keys: ["ctrl+g"], label: "Save as default", on: saveDefault },
+          { end: true, id: "close", keys: ["esc"], label: "Close" },
+          { id: "use", keys: ["enter"], label: saveDefault ? "Set and save" : "Set", primary: true }
+        ],
+        current: current ? [current] : [],
+        icon: "brain",
+        items: LEVELS.map(
+          (l) => ({
+            detail: l.detail,
+            id: l.id,
+            label: l.label
+          })
+        ),
+        noun: "levels",
+        onAction: {
+          close: () => app.close(overlay),
+          global: () => {
+            saveDefault = !saveDefault;
+            app.changed();
+          },
+          use: () => void pick(selected)
+        },
+        onActivate: (ev) => void pick(ev.item),
+        onSelect: (ev) => {
+          selected = ev.item;
+          app.changed();
+        },
+        order: LEVELS.map((l) => l.id),
+        preview: "none",
+        selected,
+        size: "md",
+        subtitle: [{ s: "muted", t: saveDefault ? "for this session and every new one" : "for this session" }],
+        title: "Reasoning effort"
+      },
+      KEY4
+    ),
+    onKey: (k) => {
+      if (k.name === "escape") {
+        app.close(overlay);
+      } else if (k.name === "enter") {
+        void pick(selected);
+      } else if (k.ctrl && k.name === "g") {
+        saveDefault = !saveDefault;
+      } else {
+        selected = moveSelection(
+          k,
+          LEVELS.map((l) => l.id),
+          selected
+        ) ?? selected;
+      }
+      return true;
+    }
+  };
+  app.open(overlay);
+}
+
 // src/overlays/pullRequests.tsx
 import { execFile as execFile3 } from "node:child_process";
 
@@ -30431,7 +30516,7 @@ function failedRuns(checks) {
 }
 
 // src/overlays/pullRequests.tsx
-var KEY4 = "pull-requests";
+var KEY5 = "pull-requests";
 var TICK_MS3 = 3e4;
 var COPIED_MS2 = 1500;
 var TABS2 = ["prs", "checks", "activity", "files"];
@@ -30582,7 +30667,7 @@ function openPullRequests(app, focus) {
     }
   };
   const overlay = {
-    key: KEY4,
+    key: KEY5,
     modal: true,
     node: () => sheetNode(Date.now()),
     onKey: (k) => {
@@ -30744,7 +30829,7 @@ function openPullRequests(app, focus) {
         total: tab === "prs" ? entries.length : ids.length,
         children: preview5
       },
-      KEY4
+      KEY5
     );
   }
   app.open(overlay);
@@ -31055,7 +31140,7 @@ function prsPill(entries, onOpen) {
 }
 
 // src/overlays/help.tsx
-var KEY5 = "help";
+var KEY6 = "help";
 var HOTKEYS = [
   {
     group: "Editing",
@@ -31078,7 +31163,7 @@ var HOTKEYS = [
     group: "Control",
     rows: [
       [["escape"], "Close the completion / interrupt the agent"],
-      [["shift+tab"], "Cycle the reasoning effort"],
+      [["shift+tab"], "Cycle the reasoning effort (/effort picks one; Ctrl+G there saves it as the default)"],
       [["alt+up"], "Edit the oldest queued prompt"],
       [["alt+a"], "Agents"],
       [["alt+b"], "Background processes and cron jobs (/ps)"],
@@ -31102,7 +31187,7 @@ async function openHelp(app) {
   }
   const categories = catalog.categories?.length ? catalog.categories : [{ name: "Commands", pairs: catalog.pairs ?? [] }];
   const overlay = {
-    key: KEY5,
+    key: KEY6,
     modal: true,
     node: () => /* @__PURE__ */ jsx("overlay", { anchor: "center", head: "Commands and shortcuts", modal: true, role: "omp.overlay.hotkeys", size: "lg", children: /* @__PURE__ */ jsxs("col", { gap: "lg", children: [
       HOTKEYS.map(({ group, rows }) => /* @__PURE__ */ jsx("section", { head: group, role: "omp.hotkeys.group", children: /* @__PURE__ */ jsx(
@@ -31160,7 +31245,7 @@ async function openHelp(app) {
           "close"
         )
       ] }, "actions")
-    ] }, "body") }, KEY5),
+    ] }, "body") }, KEY6),
     onKey: (k) => {
       if (k.name === "escape" || k.name === "enter" || k.name === "q") {
         app.close(overlay);
@@ -31202,7 +31287,7 @@ var providerDisplayNames = (providers) => {
 };
 
 // src/overlays/models.tsx
-var KEY6 = "models";
+var KEY7 = "models";
 var ALL = "all";
 var confirmTokens = /* @__PURE__ */ new Map();
 async function mutateModel(app, value, confirmed) {
@@ -31250,6 +31335,8 @@ function openModelPicker(app) {
   let scope = ALL;
   let selected;
   let global2 = false;
+  const startEffort = app.info?.reasoning_effort || "";
+  let effort = startEffort || "medium";
   let confirm = null;
   let busy = false;
   let shown = [];
@@ -31295,6 +31382,9 @@ function openModelPicker(app) {
         confirm = { row, text: r.confirm_message || r.warning || `${row.model} is expensive. Switch anyway?` };
       } else {
         app.close(overlay);
+        if (global2 || effort !== startEffort) {
+          await app.setEffort(effort, global2 ? "global" : "session");
+        }
       }
     } catch (error) {
       app.transcript.notice(error instanceof Error ? error.message : String(error), "error");
@@ -31333,7 +31423,7 @@ function openModelPicker(app) {
     return { hits, order };
   };
   const overlay = {
-    key: KEY6,
+    key: KEY7,
     modal: true,
     node: () => {
       const { hits, order } = view();
@@ -31351,6 +31441,7 @@ function openModelPicker(app) {
         }))
       ];
       const row = rows.find((r) => r.id === selected);
+      const reasons = row?.provider.capabilities?.[row.model]?.reasoning !== false;
       return /* @__PURE__ */ jsx(
         "picker",
         {
@@ -31389,6 +31480,10 @@ function openModelPicker(app) {
               scope = ev.value ?? ALL;
               app.changed();
             },
+            strip: (ev) => {
+              effort = LEVELS.find((l) => l.id === ev.value)?.id ?? effort;
+              app.changed();
+            },
             use: () => void choose(selected)
           },
           onActivate: (ev) => void choose(ev.item),
@@ -31406,11 +31501,16 @@ function openModelPicker(app) {
           selected,
           size: "lg",
           state,
+          strip: reasons ? {
+            items: LEVELS.map((l) => ({ id: l.id, label: l.label, on: l.id === effort })),
+            label: "Effort  \u2303E",
+            selected: effort
+          } : void 0,
           title: "Models",
           total: rows.length,
           children: row ? preview3(row, row.id === current) : null
         },
-        KEY6
+        KEY7
       );
     },
     onKey: (k) => {
@@ -31432,6 +31532,11 @@ function openModelPicker(app) {
       }
       if (k.ctrl && k.name === "g") {
         global2 = !global2;
+        return true;
+      }
+      if (k.ctrl && k.name === "e") {
+        const at = LEVELS.findIndex((l) => l.id === effort);
+        effort = LEVELS[(at + (k.shift ? LEVELS.length - 1 : 1)) % LEVELS.length].id;
         return true;
       }
       if (k.name === "tab") {
@@ -32473,7 +32578,7 @@ function confirmOverlay(host, ask) {
 }
 
 // src/overlays/sessions.tsx
-var KEY7 = "sessions";
+var KEY8 = "sessions";
 var LIMIT = 200;
 var DAY = 864e5;
 function openSessionPicker(app) {
@@ -32552,7 +32657,7 @@ function openSessionPicker(app) {
     return { hits, order };
   };
   const overlay = {
-    key: KEY7,
+    key: KEY8,
     modal: true,
     node: () => {
       const now = Date.now();
@@ -32617,7 +32722,7 @@ function openSessionPicker(app) {
           total: rows.length,
           children: row ? preview4(row, row.id === app.storedSid) : null
         },
-        KEY7
+        KEY8
       );
     },
     onKey: (k) => {
@@ -32711,7 +32816,7 @@ function dateOf(startedAt) {
 }
 
 // src/overlays/theme.tsx
-var KEY8 = "theme";
+var KEY9 = "theme";
 var MODES = [
   { detail: "Your Tern theme, light and dark, with no colors of its own", icon: "palette", id: "tern", label: "Tern" },
   { detail: "Bone ink and quiet grays; gold only for the moments that earn it", icon: "sparkle", id: "nous", label: "Nous" },
@@ -32730,7 +32835,7 @@ function openThemePicker(app) {
     }
   };
   const overlay = {
-    key: KEY8,
+    key: KEY9,
     modal: true,
     node: () => /* @__PURE__ */ jsx(
       "picker",
@@ -32760,7 +32865,7 @@ function openThemePicker(app) {
         size: "md",
         title: "Theme"
       },
-      KEY8
+      KEY9
     ),
     onKey: (k) => {
       if (k.name === "escape") {
@@ -32849,6 +32954,19 @@ var COMMANDS2 = [
     aliases: ["bashes", "shells", "processes"],
     name: "ps",
     run: (app) => openBackground(app)
+  },
+  {
+    // Hermes' own `/reasoning` stays the backend's (show/hide, levels, --global).
+    name: "effort",
+    run: (app, arg) => {
+      const words2 = arg.trim().split(/\s+/).filter(Boolean);
+      const global2 = words2.includes("--global") || words2.includes("default");
+      const level = words2.find((w) => LEVELS.some((l) => l.id === w || l.label === w));
+      if (!level) {
+        return openEffortPicker(app, global2);
+      }
+      void app.setEffort(LEVELS.find((l) => l.id === level || l.label === level).id, global2 ? "global" : "session");
+    }
   },
   {
     aliases: ["side"],
@@ -35011,8 +35129,9 @@ ${compact(ctx.used)} of ${compact(ctx.max)} tokens
           align: "center",
           gap: "xs",
           onClick: cx.onEffort,
+          onMenu: cx.onEffortMenu,
           role: "omp.composer.effort",
-          title: `Reasoning effort: ${effortLabel(cx.effort)} \xB7 click to cycle  \u21E7\u21E5`,
+          title: `Reasoning effort: ${effortLabel(cx.effort)} \xB7 click to cycle  \u21E7\u21E5 \xB7 right-click to choose or save as default`,
           children: [
             /* @__PURE__ */ jsx("effort", { level: effortLabel(cx.effort) }, "glyph"),
             /* @__PURE__ */ jsx("text", { text: effortLabel(cx.effort), wrap: "none" }, "level")
@@ -36645,17 +36764,29 @@ var App = class {
   }
   /** Steps the session's reasoning effort up hermes's ladder; session.info echoes it back. */
   #cycleEffort() {
+    const at = EFFORTS.indexOf(this.info?.reasoning_effort ?? "");
+    void this.setEffort(EFFORTS[at < 0 ? EFFORTS.indexOf("medium") : (at + 1) % EFFORTS.length], "session");
+  }
+  /**
+   * Sets the reasoning effort: `session` for this session only (the pill, ⇧⇥), `global` also as
+   * config.yaml's `agent.reasoning_effort`, the default of every new session (Hermes' `/reasoning
+   * <level> --global`).
+   */
+  async setEffort(value, scope) {
     if (!this.sid) {
       return;
     }
-    const at = EFFORTS.indexOf(this.info?.reasoning_effort ?? "");
-    const value = EFFORTS[at < 0 ? EFFORTS.indexOf("medium") : (at + 1) % EFFORTS.length];
     this.info = this.info && { ...this.info, reasoning_effort: value };
     this.changed();
-    this.#gw.request("config.set", { key: "reasoning", session_id: this.sid, value }).catch((error) => {
-      this.transcript.notice(error.message, "error");
-      this.changed();
-    });
+    try {
+      await this.#gw.request("config.set", { key: "reasoning", scope, session_id: this.sid, value });
+      if (scope === "global") {
+        this.transcript.notice(`Reasoning effort ${value === "none" ? "off" : value} is now the default for new sessions.`);
+      }
+    } catch (error) {
+      this.transcript.notice(error instanceof Error ? error.message : String(error), "error");
+    }
+    this.changed();
   }
   /** Alt+Up / the queue's Edit: the oldest queued prompt back into an empty composer. */
   #dequeue() {
@@ -36741,6 +36872,10 @@ ${this.composer.text}` : next2);
           this.changed();
         },
         onEffort: () => this.#cycleEffort(),
+        onEffortMenu: {
+          "choose-effort": () => openEffortPicker(this),
+          "save-effort-as-default": () => void this.setEffort(this.info?.reasoning_effort || "medium", "global")
+        },
         onInterrupt: () => this.#interrupt(),
         onModel: () => openModelPicker(this),
         onQueueEdit: () => this.#dequeue(),
