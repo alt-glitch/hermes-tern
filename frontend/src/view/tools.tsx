@@ -507,12 +507,12 @@ function taskCard(call: ToolCall, result: Record<string, unknown> | undefined, n
 }
 
 /**
- * One subagent as a Tern `agent` row, as the Task card and the agents hub show it. `fresh` sends
- * its timers' true ages (a node built anew, like the hub's preview): the Task card's row keeps the
- * age it was first sent with, which only a node that was there all along may reuse.
+ * One subagent as a Tern `agent` row, as the Task card and the agents hub show it. Its timer
+ * gets the true age each time: Tern starts an agent's timer over whenever `stats` changes (a new
+ * tool count, a status), so an age fixed at the first send would run late. The row is only
+ * rebuilt when something about the agent changed, so this sends no extra frames.
  */
-export function agentNode(a: Subagent, now: number, fresh = false): JSX.Element {
-  const ageOf = (owner: object, startedAt: number) => (fresh ? Math.max(0, now - startedAt) : age(owner, startedAt, now))
+export function agentNode(a: Subagent, now: number): JSX.Element {
   const status =
     a.status === 'done'
       ? 'done'
@@ -540,14 +540,14 @@ export function agentNode(a: Subagent, now: number, fresh = false): JSX.Element 
         requests: a.calls || undefined,
         tokens: a.tokens || undefined,
         tools: a.toolCount || undefined,
-        ...(running ? { age: ageOf(a, a.startedAt) } : { took: a.duration })
+        ...(running ? { age: Math.max(0, now - a.startedAt) } : { took: a.duration })
       }}
       status={status}
       task={a.goal}
       tool={
         running && a.tool
           ? {
-              age: a.toolSince ? ageOf(a.toolSince, a.toolSince.at) : undefined,
+              age: a.toolSince ? age(a.toolSince, a.toolSince.at, now) : undefined,
               intent: a.toolPreview,
               name: a.tool
             }

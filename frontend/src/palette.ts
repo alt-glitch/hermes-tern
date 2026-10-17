@@ -1,23 +1,59 @@
-// Hermes skins as a Tern program palette (the `t` verb). Tern reads omp's
-// theme token names (accent, mdHeading, statusLineModel, syntax*, toolDiff*,
-// thinking*), so the skin's resolved Theme is mapped onto those, once per
-// appearance.
+// The program palette (the `t` verb) for each theme mode. A `t` replaces the previous palette
+// whole and an empty one leaves every token to Tern, so:
+//
+// - `tern` (the default) sends nothing: the user's Tern theme colors everything, light and dark.
+// - `nous` is the Nous look (video-lab taste): bone ink, quiet grays, blue links, and gold kept
+//   for the few accent moments (a finished agent, the selected row), never for text at large.
+// - `skin` takes the Hermes skin's semantic colors only (accent, success, warning, error).
+//   Muted and dim text stay Tern's: Hermes derives them from the accent, which turned every
+//   secondary line gold.
 
 import type { HermesSkin } from '@hermes/shared/skin'
 import type { Palette } from '@stencil-hq/tern'
 import { fromSkin, type ThemeColors } from '@tui/theme.js'
 
+import type { ThemeMode } from './settings.js'
+
 type Tokens = Record<string, string>
 
-/** The palette for `skin`, in a dark and a light variant. */
-export function paletteOf(skin: HermesSkin | undefined): Palette {
-  const name = skin?.name || 'default'
-
-  return {
-    dark: tokensOf(resolve(skin, 'dark')),
-    light: tokensOf(resolve(skin, 'light')),
-    name: { dark: name, light: name }
+const NOUS: { dark: Tokens; light: Tokens } = {
+  dark: {
+    accent: '#F5B820',
+    dim: '#77746D',
+    error: '#E5484D',
+    mdLink: '#7A9CFF',
+    muted: '#9A968C',
+    selectedBg: '#26262A',
+    statusLinePath: '#9A968C',
+    text: '#EDE8DC'
+  },
+  light: {
+    accent: '#956E00',
+    dim: '#8A867C',
+    error: '#C93C42',
+    mdLink: '#2F5BD8',
+    muted: '#6B675E',
+    statusLinePath: '#6B675E'
   }
+}
+
+/** The palette `mode` sends; `skin` only matters in `skin` mode. */
+export function paletteFor(mode: ThemeMode, skin: HermesSkin | undefined): Palette {
+  if (mode === 'nous') {
+    return { dark: NOUS.dark, light: NOUS.light, name: { dark: 'nous', light: 'nous' } }
+  }
+
+  if (mode === 'skin' && skin) {
+    const name = skin.name || 'default'
+
+    return {
+      dark: semantic(resolve(skin, 'dark')),
+      light: semantic(resolve(skin, 'light')),
+      name: { dark: name, light: name }
+    }
+  }
+
+  return { dark: {}, light: {}, name: { dark: 'tern', light: 'tern' } }
 }
 
 /**
@@ -25,14 +61,14 @@ export function paletteOf(skin: HermesSkin | undefined): Palette {
  * environment (`HERMES_TUI_LIGHT`), so pin it for the call; the overlay a
  * skin authors for that polarity wins over its base colors.
  */
-function resolve(skin: HermesSkin | undefined, polarity: 'dark' | 'light'): ThemeColors {
+function resolve(skin: HermesSkin, polarity: 'dark' | 'light'): ThemeColors {
   const light = polarity === 'light'
-  const colors = { ...skin?.colors, ...(light ? skin?.light_colors : skin?.dark_colors) }
+  const colors = { ...skin.colors, ...(light ? skin.light_colors : skin.dark_colors) }
   const saved = process.env.HERMES_TUI_LIGHT
   process.env.HERMES_TUI_LIGHT = light ? '1' : '0'
 
   try {
-    return fromSkin(colors, skin?.branding ?? {}).color
+    return fromSkin(colors, skin.branding ?? {}).color
   } finally {
     if (saved === undefined) {
       delete process.env.HERMES_TUI_LIGHT
@@ -42,52 +78,14 @@ function resolve(skin: HermesSkin | undefined, polarity: 'dark' | 'light'): Them
   }
 }
 
-function tokensOf(c: ThemeColors): Tokens {
+function semantic(c: ThemeColors): Tokens {
   const out: Tokens = {
     accent: c.accent,
-    border: c.border,
     borderAccent: c.accent,
-    borderMuted: c.sessionBorder,
-    dim: c.sessionBorder,
     error: c.error,
-    mdCode: c.syntaxString,
-    mdCodeBlockBorder: c.border,
-    mdHeading: c.primary,
-    mdHr: c.border,
-    mdLink: c.accent,
-    mdLinkUrl: c.muted,
     mdListBullet: c.accent,
-    mdQuote: c.muted,
-    mdQuoteBorder: c.border,
-    muted: c.muted,
-    selectedBg: c.selectionBg,
-    statusLineContext: c.label,
-    statusLineCost: c.ok,
-    statusLineDirty: c.warn,
-    statusLineGitClean: c.ok,
-    statusLineGitDirty: c.warn,
     statusLineModel: c.accent,
-    statusLinePath: c.label,
-    statusLineSep: c.sessionBorder,
-    statusLineStaged: c.ok,
-    statusLineUntracked: c.muted,
     success: c.ok,
-    syntaxComment: c.syntaxComment,
-    syntaxFunction: c.accent,
-    syntaxKeyword: c.syntaxKeyword,
-    syntaxNumber: c.syntaxNumber,
-    syntaxString: c.syntaxString,
-    syntaxType: c.primary,
-    thinkingHigh: c.warn,
-    thinkingLow: c.statusGood,
-    thinkingMedium: c.accent,
-    thinkingMinimal: c.muted,
-    thinkingText: c.thinking,
-    thinkingXhigh: c.statusBad,
-    toolDiffAdded: c.diffAdded,
-    toolDiffContext: c.muted,
-    toolDiffRemoved: c.diffRemoved,
-    toolOutput: c.muted,
     warning: c.warn
   }
 

@@ -404,7 +404,7 @@ function hubPreview(a: Subagent, now: number): JSX.Element[] {
 
   return [
     // A new node each time the selection moves: its timers need their true ages.
-    agentNode(a, now, true),
+    agentNode(a, now),
     <kv
       items={[
         { k: [{ t: 'Status' }], v: [{ s: toneSpan(a.status), t: STATUS[a.status] }] },
