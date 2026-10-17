@@ -26024,8 +26024,7 @@ function taskCard(call, result, now) {
     took
   };
 }
-function agentNode(a, now, fresh = false) {
-  const ageOf2 = (owner, startedAt) => fresh ? Math.max(0, now - startedAt) : age(owner, startedAt, now);
+function agentNode(a, now) {
   const status = a.status === "done" ? "done" : a.status === "failed" ? "failed" : a.status === "cancelled" ? "aborted" : a.status === "queued" ? "pending" : "running";
   const running = a.status === "running";
   return /* @__PURE__ */ jsx(
@@ -26042,12 +26041,12 @@ function agentNode(a, now, fresh = false) {
         requests: a.calls || void 0,
         tokens: a.tokens || void 0,
         tools: a.toolCount || void 0,
-        ...running ? { age: ageOf2(a, a.startedAt) } : { took: a.duration }
+        ...running ? { age: Math.max(0, now - a.startedAt) } : { took: a.duration }
       },
       status,
       task: a.goal,
       tool: running && a.tool ? {
-        age: a.toolSince ? ageOf2(a.toolSince, a.toolSince.at) : void 0,
+        age: a.toolSince ? age(a.toolSince, a.toolSince.at, now) : void 0,
         intent: a.toolPreview,
         name: a.tool
       } : void 0,
@@ -26623,7 +26622,7 @@ function hubPreview(a, now) {
   const recent = (a.log?.entries ?? []).slice(-RECENT);
   return [
     // A new node each time the selection moves: its timers need their true ages.
-    agentNode(a, now, true),
+    agentNode(a, now),
     /* @__PURE__ */ jsx(
       "kv",
       {
@@ -28374,6 +28373,73 @@ function dateOf(startedAt) {
   return new Date(startedAt * 1e3).toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" });
 }
 
+// src/overlays/theme.tsx
+var KEY5 = "theme";
+var MODES = [
+  { detail: "Your Tern theme, light and dark, with no colors of its own", icon: "palette", id: "tern", label: "Tern" },
+  { detail: "Bone ink and quiet grays; gold only for the moments that earn it", icon: "sparkle", id: "nous", label: "Nous" },
+  { detail: "The Hermes skin's accent and status colors (/skin picks the skin)", icon: "appearance", id: "skin", label: "Hermes skin" }
+];
+function isThemeMode(v) {
+  return MODES.some((m) => m.id === v);
+}
+function openThemePicker(app) {
+  const before = app.theme;
+  let selected = before;
+  const pick = (mode) => {
+    if (mode) {
+      selected = mode;
+      app.setTheme(mode);
+    }
+  };
+  const overlay = {
+    key: KEY5,
+    modal: true,
+    node: () => /* @__PURE__ */ jsx(
+      "picker",
+      {
+        actions: [
+          { end: true, id: "cancel", keys: ["esc"], label: "Cancel" },
+          { id: "use", keys: ["enter"], label: "Use", primary: true }
+        ],
+        current: [before],
+        icon: "palette",
+        items: [...MODES],
+        noun: "themes",
+        onAction: {
+          cancel: () => {
+            app.setTheme(before);
+            app.close(overlay);
+          },
+          close: () => app.close(overlay),
+          use: () => app.close(overlay)
+        },
+        onActivate: (ev) => {
+          pick(ev.item);
+          app.close(overlay);
+        },
+        onSelect: (ev) => pick(ev.item),
+        selected,
+        size: "md",
+        title: "Theme"
+      },
+      KEY5
+    ),
+    onKey: (k) => {
+      if (k.name === "escape") {
+        app.setTheme(before);
+        app.close(overlay);
+      } else if (k.name === "enter") {
+        app.close(overlay);
+      } else {
+        pick(moveSelection(k, MODES.map((m) => m.id), selected));
+      }
+      return true;
+    }
+  };
+  app.open(overlay);
+}
+
 // src/commands.ts
 var COMMANDS = [
   {
@@ -28420,6 +28486,19 @@ var COMMANDS = [
         return openSessionPicker(app);
       }
       return arg === "new" ? app.newSession() : app.resume(arg);
+    }
+  },
+  {
+    name: "theme",
+    run: (app, arg) => {
+      if (!arg) {
+        return openThemePicker(app);
+      }
+      if (!isThemeMode(arg)) {
+        app.transcript.notice("Usage: /theme [tern|nous|skin]", "warning");
+        return;
+      }
+      app.setTheme(arg);
     }
   },
   {
@@ -29404,21 +29483,47 @@ function fromSkin(colors, branding, bannerLogo = "", bannerHero = "", toolPrefix
 }
 
 // src/palette.ts
-function paletteOf(skin) {
-  const name = skin?.name || "default";
-  return {
-    dark: tokensOf(resolve3(skin, "dark")),
-    light: tokensOf(resolve3(skin, "light")),
-    name: { dark: name, light: name }
-  };
+var NOUS = {
+  dark: {
+    accent: "#F5B820",
+    dim: "#77746D",
+    error: "#E5484D",
+    mdLink: "#7A9CFF",
+    muted: "#9A968C",
+    selectedBg: "#26262A",
+    statusLinePath: "#9A968C",
+    text: "#EDE8DC"
+  },
+  light: {
+    accent: "#956E00",
+    dim: "#8A867C",
+    error: "#C93C42",
+    mdLink: "#2F5BD8",
+    muted: "#6B675E",
+    statusLinePath: "#6B675E"
+  }
+};
+function paletteFor(mode, skin) {
+  if (mode === "nous") {
+    return { dark: NOUS.dark, light: NOUS.light, name: { dark: "nous", light: "nous" } };
+  }
+  if (mode === "skin" && skin) {
+    const name = skin.name || "default";
+    return {
+      dark: semantic(resolve3(skin, "dark")),
+      light: semantic(resolve3(skin, "light")),
+      name: { dark: name, light: name }
+    };
+  }
+  return { dark: {}, light: {}, name: { dark: "tern", light: "tern" } };
 }
 function resolve3(skin, polarity) {
   const light = polarity === "light";
-  const colors = { ...skin?.colors, ...light ? skin?.light_colors : skin?.dark_colors };
+  const colors = { ...skin.colors, ...light ? skin.light_colors : skin.dark_colors };
   const saved = process.env.HERMES_TUI_LIGHT;
   process.env.HERMES_TUI_LIGHT = light ? "1" : "0";
   try {
-    return fromSkin(colors, skin?.branding ?? {}).color;
+    return fromSkin(colors, skin.branding ?? {}).color;
   } finally {
     if (saved === void 0) {
       delete process.env.HERMES_TUI_LIGHT;
@@ -29427,52 +29532,14 @@ function resolve3(skin, polarity) {
     }
   }
 }
-function tokensOf(c) {
+function semantic(c) {
   const out = {
     accent: c.accent,
-    border: c.border,
     borderAccent: c.accent,
-    borderMuted: c.sessionBorder,
-    dim: c.sessionBorder,
     error: c.error,
-    mdCode: c.syntaxString,
-    mdCodeBlockBorder: c.border,
-    mdHeading: c.primary,
-    mdHr: c.border,
-    mdLink: c.accent,
-    mdLinkUrl: c.muted,
     mdListBullet: c.accent,
-    mdQuote: c.muted,
-    mdQuoteBorder: c.border,
-    muted: c.muted,
-    selectedBg: c.selectionBg,
-    statusLineContext: c.label,
-    statusLineCost: c.ok,
-    statusLineDirty: c.warn,
-    statusLineGitClean: c.ok,
-    statusLineGitDirty: c.warn,
     statusLineModel: c.accent,
-    statusLinePath: c.label,
-    statusLineSep: c.sessionBorder,
-    statusLineStaged: c.ok,
-    statusLineUntracked: c.muted,
     success: c.ok,
-    syntaxComment: c.syntaxComment,
-    syntaxFunction: c.accent,
-    syntaxKeyword: c.syntaxKeyword,
-    syntaxNumber: c.syntaxNumber,
-    syntaxString: c.syntaxString,
-    syntaxType: c.primary,
-    thinkingHigh: c.warn,
-    thinkingLow: c.statusGood,
-    thinkingMedium: c.accent,
-    thinkingMinimal: c.muted,
-    thinkingText: c.thinking,
-    thinkingXhigh: c.statusBad,
-    toolDiffAdded: c.diffAdded,
-    toolDiffContext: c.muted,
-    toolDiffRemoved: c.diffRemoved,
-    toolOutput: c.muted,
     warning: c.warn
   };
   for (const key2 in out) {
@@ -29481,6 +29548,29 @@ function tokensOf(c) {
     }
   }
   return out;
+}
+
+// src/settings.ts
+import { mkdirSync as mkdirSync3, readFileSync as readFileSync2, writeFileSync as writeFileSync2 } from "node:fs";
+import { homedir as homedir4 } from "node:os";
+import { dirname, join as join3 } from "node:path";
+function settingsFile(env = process.env) {
+  return join3(env.HERMES_HOME || join3(homedir4(), ".hermes"), "hermes-tern", "settings.json");
+}
+function loadSettings(file2 = settingsFile()) {
+  try {
+    const parsed = JSON.parse(readFileSync2(file2, "utf8"));
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+function saveSettings(patch, file2 = settingsFile()) {
+  const next = { ...loadSettings(file2), ...patch };
+  mkdirSync3(dirname(file2), { recursive: true });
+  writeFileSync2(file2, `${JSON.stringify(next, null, 2)}
+`);
+  return next;
 }
 
 // src/view/dock.tsx
@@ -29673,8 +29763,8 @@ ${compact(ctx.used)} of ${compact(ctx.max)} tokens`,
 }
 
 // src/view/welcome.tsx
-import { readFileSync as readFileSync2 } from "node:fs";
-import { join as join3 } from "node:path";
+import { readFileSync as readFileSync3 } from "node:fs";
+import { join as join4 } from "node:path";
 function welcomeNode(key2, cx) {
   return /* @__PURE__ */ jsxs("card", { role: "omp.welcome", children: [
     /* @__PURE__ */ jsxs("row", { align: "center", gap: "md", role: "omp.welcome.lockup", children: [
@@ -29694,7 +29784,7 @@ var TIP_LINE = /^\s+t\d+:\s+"((?:[^"\\]|\\.)*)"\s*$/;
 function randomTip(root) {
   let text;
   try {
-    text = readFileSync2(join3(root, "locales", "en.yaml"), "utf8");
+    text = readFileSync3(join4(root, "locales", "en.yaml"), "utf8");
   } catch {
     return "";
   }
@@ -29906,6 +29996,9 @@ var App = class {
   #startupImage = process.env.HERMES_TUI_IMAGE?.trim() ?? "";
   /** Uploaded images the next prompt carries (the shared gateway takes them on prompt.submit). */
   #attachments = [];
+  /** The skin the gateway last reported; only the `skin` theme mode wears it. */
+  #skin;
+  #theme = loadSettings().theme ?? "tern";
   /** The prompt whose Copy button reads Copied, until the timer clears it. */
   #copied;
   #copiedTimer;
@@ -29924,6 +30017,7 @@ var App = class {
   }
   async run() {
     this.#surface = this.#tern.open({ id: "hermes", mode: "inline", role: "omp.session", title: "hermes" });
+    this.#applyTheme();
     if (this.#tern.caps.features.includes("blobs")) {
       this.#welcome.logo = this.#tern.blob(logo_default, "image/png");
     }
@@ -30539,8 +30633,23 @@ var App = class {
   }
   #applySkin(skin) {
     if (skin) {
-      this.#surface.palette(paletteOf(skin));
+      this.#skin = skin;
+      this.#applyTheme();
     }
+  }
+  #applyTheme() {
+    this.#surface.palette(paletteFor(this.#theme, this.#skin));
+  }
+  /** Whose colors the surface wears (`/theme`). */
+  get theme() {
+    return this.#theme;
+  }
+  /** Switches the theme mode now and keeps it for the next launch. */
+  setTheme(mode) {
+    this.#theme = mode;
+    saveSettings({ theme: mode });
+    this.#applyTheme();
+    this.changed();
   }
   #label(label) {
     if (this.busy && label) {

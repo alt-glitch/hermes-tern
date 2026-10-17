@@ -36,7 +36,8 @@ import { openAgents } from './overlays/agents.js'
 import { Completion } from './overlays/completion.js'
 import { openModelPicker } from './overlays/models.js'
 import { promptOverlay } from './overlays/prompts.js'
-import { paletteOf } from './palette.js'
+import { paletteFor } from './palette.js'
+import { loadSettings, saveSettings, type ThemeMode } from './settings.js'
 import { Transcript } from './transcript.js'
 import { dockNodes } from './view/dock.js'
 import { entryNode } from './view/transcript.js'
@@ -98,6 +99,9 @@ export class App implements OverlayHost {
   #startupImage = process.env.HERMES_TUI_IMAGE?.trim() ?? ''
   /** Uploaded images the next prompt carries (the shared gateway takes them on prompt.submit). */
   #attachments: Attachment[] = []
+  /** The skin the gateway last reported; only the `skin` theme mode wears it. */
+  #skin: SkinPayload | undefined
+  #theme: ThemeMode = loadSettings().theme ?? 'tern'
   /** The prompt whose Copy button reads Copied, until the timer clears it. */
   #copied: string | undefined
   #copiedTimer: NodeJS.Timeout | undefined
@@ -119,6 +123,7 @@ export class App implements OverlayHost {
 
   async run(): Promise<number> {
     this.#surface = this.#tern.open({ id: 'hermes', mode: 'inline', role: 'omp.session', title: 'hermes' })
+    this.#applyTheme()
 
     if (this.#tern.caps.features.includes('blobs')) {
       this.#welcome.logo = this.#tern.blob(logo, 'image/png')
@@ -971,8 +976,26 @@ export class App implements OverlayHost {
 
   #applySkin(skin: SkinPayload | null | undefined) {
     if (skin) {
-      this.#surface.palette(paletteOf(skin))
+      this.#skin = skin
+      this.#applyTheme()
     }
+  }
+
+  #applyTheme() {
+    this.#surface.palette(paletteFor(this.#theme, this.#skin))
+  }
+
+  /** Whose colors the surface wears (`/theme`). */
+  get theme(): ThemeMode {
+    return this.#theme
+  }
+
+  /** Switches the theme mode now and keeps it for the next launch. */
+  setTheme(mode: ThemeMode) {
+    this.#theme = mode
+    saveSettings({ theme: mode })
+    this.#applyTheme()
+    this.changed()
   }
 
   #label(label: string) {

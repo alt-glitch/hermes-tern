@@ -9,6 +9,7 @@ import { openHelp } from './overlays/help.js'
 import { openModelPicker, switchModel } from './overlays/models.js'
 import { confirmOverlay } from './overlays/prompts.js'
 import { openSessionPicker } from './overlays/sessions.js'
+import { isThemeMode, openThemePicker } from './overlays/theme.js'
 
 /** A client-side slash command. */
 export interface LocalCommand {
@@ -69,6 +70,22 @@ const COMMANDS: readonly LocalCommand[] = [
       }
 
       return arg === 'new' ? app.newSession() : app.resume(arg)
+    }
+  },
+  {
+    name: 'theme',
+    run: (app, arg) => {
+      if (!arg) {
+        return openThemePicker(app)
+      }
+
+      if (!isThemeMode(arg)) {
+        app.transcript.notice('Usage: /theme [tern|nous|skin]', 'warning')
+
+        return
+      }
+
+      app.setTheme(arg)
     }
   },
   {
