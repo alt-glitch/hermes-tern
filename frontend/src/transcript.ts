@@ -12,6 +12,7 @@ import type {
   Usage
 } from '@hermes/shared/gateway-events'
 
+import { settleBridge, unwrap } from './bridge.js'
 import type { Block, Counters, Entry, NoticeEntry, Todo, ToolCall, TurnEntry } from './model.js'
 
 type ToolBlock = Extract<Block, { kind: 'tool' }>
@@ -215,14 +216,18 @@ export class Transcript {
       return
     }
 
+    // A bridge call shows as the tool it runs (a connector batch as its entries).
+    const u = unwrap(p.name, p.args ?? {})
     const call: ToolCall = {
-      args: p.args ?? {},
+      args: u.args,
       argsText: p.args_text ?? '',
+      batch: u.batch,
       context: p.context ?? '',
       id: p.tool_id,
-      name: p.name,
+      name: u.name,
       startedAt: at,
-      status: 'running'
+      status: 'running',
+      via: u.via
     }
 
     // The call's own list shows while it runs; tool.complete's snapshot replaces it.
@@ -254,7 +259,6 @@ export class Transcript {
     const interrupted =
       p.name === 'terminal' && typeof output === 'string' && /\[Command interrupted\]\s*$/.test(output)
 
-    call.status = interrupted ? 'cancelled' : isToolError(p) ? 'error' : 'done'
     call.duration = typeof p.duration_s === 'number' ? Math.round(p.duration_s * 1000) : at - call.startedAt
     call.summary = p.summary ?? undefined
     call.resultText = p.result_text ?? undefined
@@ -262,8 +266,16 @@ export class Transcript {
     call.diff = p.inline_diff ?? undefined
 
     if (p.args) {
-      call.args = p.args
+      const u = unwrap(p.name, p.args)
+      call.args = u.args
+      call.name = u.name
+      call.via = u.via ?? call.via
+      call.batch = u.batch
     }
+
+    // A connector call's outcome is its entry in the batch result.
+    const bridged = settleBridge(call)
+    call.status = interrupted ? 'cancelled' : (bridged ?? isToolError(p)) ? 'error' : 'done'
 
     if (Array.isArray(p.todos)) {
       call.todos = toTodos(p.todos)
@@ -471,24 +483,32 @@ export class Transcript {
         if (existing) {
           existing.result = result ?? existing.result
 
+          if (settleBridge(existing)) {
+            existing.status = 'error'
+          }
+
           continue
         }
 
-        // Deferred tools (todo_list, …) are stored as the `tool_call` bridge that ran them.
-        const bridged = m.name === 'tool_call' ? bridgedCall(m.args ?? {}) : undefined
-        const args = bridged?.args ?? m.args ?? {}
+        // Deferred tools (todo_list, connectors, …) are stored as the `tool_call` bridge that ran them.
+        const u = unwrap(m.name ?? 'tool', m.args ?? {})
+        const args = u.args
 
         const call: ToolCall = {
           args,
           argsText: '',
+          batch: u.batch,
           context: m.context ?? '',
           duration: 0,
           id,
-          name: bridged?.name ?? m.name ?? 'tool',
+          name: u.name,
           result,
           startedAt: at,
-          status: record(result)?.error ? 'error' : 'done'
+          status: 'done',
+          via: u.via
         }
+
+        call.status = (settleBridge(call) ?? Boolean(record(call.result)?.error)) ? 'error' : 'done'
 
         if (Array.isArray(args.todos)) {
           call.todos = toTodos(args.todos)
@@ -663,15 +683,6 @@ export function record(v: unknown): Record<string, unknown> | undefined {
   }
 
   return v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : undefined
-}
-
-/** The one call a stored `tool_call` bridge ran (`{name, arguments}` or `{calls: [one]}`). */
-function bridgedCall(args: Record<string, unknown>): { name: string; args: Record<string, unknown> } | undefined {
-  const calls = args.calls
-  const entry = record(Array.isArray(calls) && calls.length === 1 ? calls[0] : args)
-  const name = entry?.name
-
-  return typeof name === 'string' && name ? { args: record(entry?.arguments) ?? {}, name } : undefined
 }
 
 function toTodos(raw: unknown[]): Todo[] {

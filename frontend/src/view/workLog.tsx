@@ -4,9 +4,10 @@
 // and a thought to its text. The group still running is a single shining line ("Running
 // ls"). Tern keeps each section's open state, so a click needs no round trip.
 
-import { type JSX, node } from '@stencil-hq/tern'
+import { type JSX, node, type Span } from '@stencil-hq/tern'
 
-import type { TurnEntry } from '../model.js'
+import { callApp } from '../bridge.js'
+import type { ToolCall, TurnEntry } from '../model.js'
 import {
   actionIcon,
   actionOf,
@@ -122,7 +123,7 @@ function itemNode(item: WorkItem, parent: string, now: number, key = item.id): J
       <text
         grow={1}
         key="label"
-        spans={[{ fx: running ? 'shimmer' : undefined, s: 'muted', t: stepLabel(call) }]}
+        spans={labelSpans(call, running)}
         truncate="end"
         wrap="none"
       />
@@ -143,6 +144,22 @@ function itemNode(item: WorkItem, parent: string, now: number, key = item.id): J
     <col gap="xs" key="detail" role="hermes.work.detail">
       {detail}
     </col>
+  ])
+}
+
+/** A step's words; a connector's app stands out from what it did there ("Linear · create issue"). */
+function labelSpans(call: ToolCall, running: boolean): Span[] {
+  const fx = running ? ('shimmer' as const) : undefined
+  const entries = (call.batch ?? [call]).map(e => callApp({ args: e.args, name: e.name }))
+
+  if (!entries.every(Boolean)) {
+    return [{ fx, s: 'muted', t: stepLabel(call) }]
+  }
+
+  return entries.flatMap((app, i) => [
+    ...(i ? [{ fx, s: 'muted', t: ', ' }] : []),
+    { fx, t: app!.app },
+    { fx, s: 'muted', t: ` · ${app!.action}` }
   ])
 }
 

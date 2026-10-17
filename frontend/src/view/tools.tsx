@@ -6,9 +6,11 @@
 import { type JSX, node } from '@stencil-hq/tern'
 
 import { agentName } from '../agents/store.js'
+import { callApp } from '../bridge.js'
 import type { Subagent, Todo, ToolCall } from '../model.js'
 import { isRunning as processRuns, processElapsed, processIdOf, processTone, processVerdict, watchersOf } from '../processes/store.js'
 import { isBackgroundCall, record } from '../transcript.js'
+import { appsOf } from '../workLog.js'
 
 import { commandLine, describeCommand } from './describe.js'
 import { age, compact, duration } from './time.js'
@@ -128,6 +130,36 @@ export function toolDetail(call: ToolCall, now: number): JSX.Element[] {
 
 function cardOf(call: ToolCall, now: number): Card {
   const result = record(call.result)
+  const app = callApp(call)
+
+  // A connector or MCP tool: the app it acted in heads the card, its arguments and answer below.
+  if (app) {
+    return {
+      badges: [{ text: app.kind === 'mcp' ? 'MCP' : 'connector' }],
+      body: call.batch ? batchBody(call) : appBody(call),
+      folded: true,
+      frame: 'inline',
+      name: 'plug',
+      target: app.action,
+      targetKind: 'text',
+      title: app.app
+    }
+  }
+
+  if (call.batch) {
+    const apps = appsOf(call)
+
+    return {
+      badges: apps.length ? [{ text: 'connectors' }] : undefined,
+      body: batchBody(call),
+      folded: true,
+      frame: 'inline',
+      name: 'plug',
+      target: `${call.batch.length} calls`,
+      targetKind: 'text',
+      title: apps.length ? apps.join(', ') : 'Tool calls'
+    }
+  }
 
   switch (call.name) {
     case 'terminal':
@@ -763,6 +795,42 @@ function evalCard(call: ToolCall, result: Record<string, unknown> | undefined): 
     role: 'omp.tool.eval',
     title: firstLine(code)?.startsWith('#') ? (firstLine(code)?.replace(/^#+\s*/, '') ?? 'Eval') : 'Eval'
   }
+}
+
+/** A connector call: what it was asked (as facts), then what it answered. */
+function appBody(call: ToolCall): JSX.Element[] {
+  const facts = Object.entries(call.args)
+    .filter(([k, v]) => k !== 'connector_alias' && v !== undefined && v !== null && v !== '')
+    .slice(0, 12)
+    .map(([k, v]) => ({ k: [{ t: k.replace(/_/g, ' ') }], v: clip(typeof v === 'string' ? v : JSON.stringify(v), 300) }))
+
+  const error = call.status === 'error' ? errorOf(call) : undefined
+
+  return [
+    ...(facts.length ? [<kv items={facts} key="args" />] : []),
+    ...(error ? [<text key="error" spans={[{ s: 'error', t: clip(error, 1200) }]} wrap="word" />] : genericBody(call))
+  ]
+}
+
+/** A batch: one line per entry with its outcome, then each answer. */
+function batchBody(call: ToolCall): JSX.Element[] {
+  return (call.batch ?? []).flatMap((e, i) => {
+    const app = callApp({ args: e.args, name: e.name })
+    const tone = e.status === 'error' ? 'error' : e.status === 'running' ? 'pending' : 'success'
+    const answer = e.error ?? (e.result === undefined ? undefined : pretty(e.result))
+
+    return [
+      <row align="center" gap="sm" key={`e${i}`}>
+        <icon key="i" name={e.status === 'error' ? 'x' : e.status === 'running' ? 'clock' : 'check'} tone={tone} />
+        <text grow={1} key="t" spans={[{ t: app ? `${app.app} · ${app.action}` : humanize(e.name) }]} truncate="end" wrap="none" />
+      </row>,
+      ...(e.error
+        ? [<text key={`r${i}`} spans={[{ s: 'error', t: clip(e.error, 600) }]} wrap="word" />]
+        : answer && call.status !== 'running'
+          ? [<code key={`r${i}`} lang={/^\s*[[{]/.test(answer) ? 'json' : 'text'} max={{ h: '8lines' }} text={clip(answer, 2000)} wrap />]
+          : [])
+    ]
+  })
 }
 
 function genericBody(call: ToolCall): JSX.Element[] {

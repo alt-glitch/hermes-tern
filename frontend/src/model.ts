@@ -5,6 +5,7 @@
 import type { SubagentEventPayload, Usage } from '@hermes/shared/gateway-events'
 
 import type { LiveLog } from './agents/liveLog.js'
+import type { BatchEntry } from './bridge.js'
 
 /** One todo item as the `todo_list` tool reports it. */
 export interface Todo {
@@ -92,6 +93,10 @@ export interface ToolCall {
   subagents?: Subagent[]
   /** The background process a `terminal(background=true)` call started, while the store follows it. */
   process?: BackgroundProcess
+  /** It ran through Tool Search's `tool_call` bridge; `name` and `args` are the tool it ran. */
+  via?: 'tool_call'
+  /** A bridge call of several tools (a connector batch): each with its own outcome. */
+  batch?: BatchEntry[]
 }
 
 /** A part of an assistant turn, in the order it streamed. */
