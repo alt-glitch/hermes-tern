@@ -51,7 +51,8 @@ prove it.
 | #22 | Live process output; the Background sheet's Cron tab (every cron job and monitor: pause, resume, remove) |
 | #23 | `link_pull_request` and the Pull requests sheet: PRs, checks, activity, files, merge and close |
 | #24 | The PR of the session's branch or worktree, and the layers of a GitHub stack |
-| next | The session sidebar (Tern's aside): branch, PRs, changed files; the Changes sheet |
+| #25 | The session sidebar (Tern's aside): branch, PRs, changed files; the Changes sheet |
+| next | `tool_call` bridge calls show as the tools they ran; connectors and MCP tools show their app |
 
 ## Milestones
 

@@ -18,6 +18,7 @@ the user's prompt, so one home covers every flow:
                    terminal calls before a slowly streamed answer
     "background…" -> (at the start) a 90 s ticking background process that notifies on exit
     "watch…"    -> (at the start) a 2 min ticking background process watching for "tick 10"
+    "connector…" -> (at the start) a tool search, a two-app connector batch and one connector call
     "pr…"       -> (at the start) links a real public PR (link_pull_request)
     "cron…"     -> (at the start) two cron jobs: a 30 min digest and a 15 min page monitor
     anything else -> a streamed markdown reply
@@ -140,6 +141,17 @@ def _calls(prompt: str, target: Path) -> list[dict] | None:
     if words.lstrip().startswith("watch"):
         # `notify` is the advertised flag (tools/terminal_tool.py): a list watches for those lines.
         return [_call("terminal", {"command": TICKS.format(n=120), "background": True, "notify": ["tick 10"]})]
+    if words.lstrip().startswith("connector"):
+        # Connectors come through the tool_call bridge as a batch; the lab has none connected,
+        # so each entry fails, which is what the batch view must show too.
+        return [
+            _call("tool_search", {"queries": ["create a linear issue"]}, "call-search"),
+            _call("tool_call", {"calls": [
+                {"name": "connectors__linear__LINEAR_CREATE_ISSUE", "arguments": {"title": "Lab issue", "team": "ENG"}},
+                {"name": "connectors__slack__SLACK_SEND_MESSAGE", "arguments": {"channel": "#lab", "text": "hi"}},
+            ]}, "call-batch"),
+            _call("tool_call", {"name": "connectors__linear__LINEAR_LIST_ISSUES", "arguments": {"limit": 3}}, "call-one"),
+        ]
     if words.lstrip().startswith("pr"):
         # A real public PR, linked the way an agent links one it opened (through the tool_call bridge
         # in case Tool Search defers the plugin's tools).

@@ -6,6 +6,7 @@
 
 import { homedir } from 'node:os'
 
+import { callApp } from './bridge.js'
 import type { Block, ToolCall, TurnEntry } from './model.js'
 import { isBackgroundCall } from './transcript.js'
 import { commandDisplayText, commandProgramName } from './vendor/t3code/commandLabel.js'
@@ -189,10 +190,20 @@ export function formatDuration(ms: number): string {
 }
 
 /** What a call counts as in a summary, after t3code's `toolGroupAction`. */
-export type Action = 'browser' | 'code-search' | 'command' | 'edit' | 'fetch' | 'other' | 'read' | 'search'
+export type Action = 'app' | 'browser' | 'code-search' | 'command' | 'edit' | 'fetch' | 'lookup' | 'other' | 'read' | 'search'
 
 export function actionOf(call: ToolCall): Action {
+  // A connector or MCP tool acts in an app, whatever its name says; so does a batch of them.
+  if (appsOf(call).length) {
+    return 'app'
+  }
+
   switch (call.name) {
+    case 'tool_search':
+
+    case 'tool_describe':
+      return 'lookup'
+
     case 'terminal':
 
     case 'execute_code':
@@ -222,9 +233,18 @@ export function actionOf(call: ToolCall): Action {
 }
 
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`
+const and = (words: readonly string[]) => (words.length < 3 ? words.join(' and ') : `${words.slice(0, -1).join(', ')}, and ${words.at(-1)}`)
 
-function actionLabel(action: Action, n: number): string {
+function actionLabel(action: Action, n: number, calls: readonly ToolCall[] = []): string {
   switch (action) {
+    case 'app': {
+      // "Used Linear 3 times", "Used Linear and Slack": the apps, as connectors are not interchangeable.
+      const apps = [...new Set(calls.flatMap(appsOf))]
+      const uses = calls.reduce((k, c) => k + (c.batch?.length ?? 1), 0)
+
+      return apps.length === 1 ? `Used ${apps[0]}${uses > 1 ? ` ${uses} times` : ''}` : `Used ${and(apps)}`
+    }
+
     case 'command':
       return `Ran ${plural(n, 'command', 'commands')}`
 
@@ -246,13 +266,23 @@ function actionLabel(action: Action, n: number): string {
     case 'browser':
       return `Used browser ${plural(n, 'time', 'times')}`
 
+    case 'lookup':
+      return `Looked up tools${n > 1 ? ` ${n} times` : ''}`
+
     case 'other':
       return `Used ${plural(n, 'tool', 'tools')}`
   }
 }
 
-/** Changes outrank looking around, which outranks everything else. */
-const priority = (a: Action) => (a === 'command' || a === 'edit' ? 0 : a === 'other' ? 2 : 1)
+/** The apps a call acted in: a connector's, or each of a batch's (none when any entry is local). */
+export function appsOf(call: ToolCall): string[] {
+  const apps = (call.batch ?? [call]).map(e => callApp({ args: e.args, name: e.name })?.app)
+
+  return apps.every(Boolean) ? [...new Set(apps as string[])] : []
+}
+
+/** Changes and work in other apps outrank looking around, which outranks everything else. */
+const priority = (a: Action) => (a === 'command' || a === 'edit' || a === 'app' ? 0 : a === 'other' || a === 'lookup' ? 2 : 1)
 
 /**
  * t3code's `summarizeToolGroup`: calls counted by action, the two that matter most kept in
@@ -276,7 +306,7 @@ export function summarize(items: readonly WorkItem[]): string {
   const all = [...groups].map(([action, list], index) => ({
     count: list.length,
     index,
-    label: actionLabel(action, action === 'edit' ? editedFiles(list) : list.length),
+    label: actionLabel(action, action === 'edit' ? editedFiles(list) : list.length, list),
     priority: priority(action)
   }))
 
@@ -327,6 +357,12 @@ export function groupIcon(items: readonly WorkItem[]): string {
 
 export function actionIcon(action: Action): string {
   switch (action) {
+    case 'app':
+      return 'plug'
+
+    case 'lookup':
+      return 'search'
+
     case 'command':
       return 'terminal'
 
@@ -374,6 +410,15 @@ export function shortPath(path: string, cwd = process.env.HERMES_CWD || process.
 export function stepLabel(call: ToolCall): string {
   const a = call.args
   const path = str(a.path)
+  const app = callApp(call)
+
+  if (app) {
+    return `${app.app} · ${app.action}`
+  }
+
+  if (call.batch) {
+    return call.batch.map(e => stepLabel({ ...call, args: e.args, batch: undefined, name: e.name })).join(', ')
+  }
 
   switch (call.name) {
     case 'terminal': {
@@ -424,6 +469,18 @@ export function stepLabel(call: ToolCall): string {
 
     case 'list_pull_requests':
       return 'Listed linked pull requests'
+
+    case 'tool_search': {
+      const q = Array.isArray(a.queries) ? a.queries.filter(x => typeof x === 'string') : [str(a.queries) ?? str(a.query)].filter(Boolean)
+
+      return q.length ? `Searched tools for ${q.join(', ')}` : 'Searched tools'
+    }
+
+    case 'tool_describe': {
+      const names = Array.isArray(a.names) ? a.names.filter(x => typeof x === 'string') : [str(a.names)].filter(Boolean)
+
+      return names.length ? `Read how to call ${names.join(', ')}` : 'Read tool details'
+    }
   }
 
   const name = call.name.replace(/_/g, ' ')

@@ -11549,16 +11549,16 @@ var require_dns = __commonJS({
       setRecords(origin, addresses) {
         const timestamp = Date.now();
         const records = { records: { 4: null, 6: null } };
-        for (const record2 of addresses) {
-          record2.timestamp = timestamp;
-          if (typeof record2.ttl === "number") {
-            record2.ttl = Math.min(record2.ttl, this.#maxTTL);
+        for (const record3 of addresses) {
+          record3.timestamp = timestamp;
+          if (typeof record3.ttl === "number") {
+            record3.ttl = Math.min(record3.ttl, this.#maxTTL);
           } else {
-            record2.ttl = this.#maxTTL;
+            record3.ttl = this.#maxTTL;
           }
-          const familyRecords = records.records[record2.family] ?? { ips: [] };
-          familyRecords.ips.push(record2);
-          records.records[record2.family] = familyRecords;
+          const familyRecords = records.records[record3.family] ?? { ips: [] };
+          familyRecords.ips.push(record3);
+          records.records[record3.family] = familyRecords;
         }
         this.#records.set(origin.hostname, records);
       }
@@ -20614,8 +20614,8 @@ var Session = class {
     this.#input = input;
     this.#output = output;
     this.#options = options;
-    const record2 = options.record ?? (options.env ?? process.env)["TERN_TSP_RECORD"];
-    this.#record = record2 === "" ? void 0 : record2;
+    const record3 = options.record ?? (options.env ?? process.env)["TERN_TSP_RECORD"];
+    this.#record = record3 === "" ? void 0 : record3;
     this.#caps = {
       term: "",
       ver: "",
@@ -24738,6 +24738,115 @@ var logo_default = __toBinaryNode("iVBORw0KGgoAAAANSUhEUgAAAQAAAAEACAYAAABccqhmA
 // src/agents/store.ts
 import { readFile, stat } from "node:fs/promises";
 
+// src/bridge.ts
+var record = (v) => {
+  if (typeof v === "string") {
+    try {
+      return record(JSON.parse(v));
+    } catch {
+      return void 0;
+    }
+  }
+  return v && typeof v === "object" && !Array.isArray(v) ? v : void 0;
+};
+var BRIDGE = "tool_call";
+var BATCH = "connectors__execute";
+var TITLES = {
+  discord: "Discord",
+  figma: "Figma",
+  github: "GitHub",
+  gmail: "Gmail",
+  googlecalendar: "Google Calendar",
+  googledocs: "Google Docs",
+  googledrive: "Google Drive",
+  jira: "Jira",
+  linear: "Linear",
+  notion: "Notion",
+  outlook: "Outlook",
+  slack: "Slack",
+  stripe_mcp: "Stripe",
+  todoist: "Todoist"
+};
+function appTitle(slug) {
+  const known = TITLES[slug.trim().toLowerCase()];
+  if (known) {
+    return known;
+  }
+  return slug.split(/[-_\s]+/).filter(Boolean).map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
+}
+function actionPhrase(tool, app = "") {
+  const prefix = `${app.replace(/-/g, "_").toUpperCase()}_`;
+  const text2 = app && tool.toUpperCase().startsWith(prefix) ? tool.slice(prefix.length) : tool;
+  return text2.split(/[-_\s]+/).filter(Boolean).join(" ").toLowerCase();
+}
+function appOf(name, args) {
+  const [prefix, connector, ...tool] = name.split("__");
+  if (prefix === "connectors" && connector && tool.length && name !== BATCH) {
+    const alias = typeof args?.connector_alias === "string" && args.connector_alias.trim() ? ` (${args.connector_alias.trim()})` : "";
+    return { action: actionPhrase(tool.join("__"), connector) + alias, app: appTitle(connector), kind: "connector" };
+  }
+  const mcp = name.match(/^mcp__(.+?)__(.+)$/);
+  return mcp ? { action: actionPhrase(mcp[2]), app: appTitle(mcp[1]), kind: "mcp" } : void 0;
+}
+function entriesOf(args) {
+  const list = Array.isArray(args.calls) ? args.calls : [args];
+  return list.flatMap((e) => {
+    const r = record(e);
+    const name = r?.name;
+    return typeof name === "string" && name ? [{ args: record(r?.arguments) ?? {}, name }] : [];
+  });
+}
+function unwrap(name, args) {
+  if (name !== BRIDGE && name !== BATCH) {
+    return { args, name };
+  }
+  const entries = entriesOf(args);
+  if (entries.length === 1) {
+    return { ...entries[0], via: "tool_call" };
+  }
+  return entries.length ? { args, batch: entries.map((e) => ({ ...e, status: "running" })), name, via: "tool_call" } : { args, name };
+}
+function batchResults(result) {
+  const results = record(result)?.results;
+  if (!Array.isArray(results)) {
+    return void 0;
+  }
+  return results.map((e) => {
+    const r = record(e) ?? {};
+    const err = r.error;
+    return err === void 0 || err === null ? { result: r.response } : { error: typeof err === "string" ? err : String(record(err)?.message ?? "") || JSON.stringify(err) };
+  });
+}
+function settleBridge(call) {
+  if (call.via !== "tool_call") {
+    return void 0;
+  }
+  const outcomes = batchResults(call.result);
+  if (!outcomes) {
+    return void 0;
+  }
+  if (call.batch) {
+    call.batch.forEach((e, i) => {
+      const o2 = outcomes[i];
+      e.status = o2?.error ? "error" : "done";
+      e.result = o2?.result;
+      e.error = o2?.error;
+    });
+    return call.batch.every((e) => e.status === "error");
+  }
+  const o = outcomes[0];
+  call.result = o?.error ? { error: o.error } : o?.result;
+  return Boolean(o?.error);
+}
+function callApp(call) {
+  if (call.batch) {
+    const apps = call.batch.map((e) => appOf(e.name, e.args));
+    const first = apps[0];
+    return first && apps.every((a) => a?.app === first.app) ? { ...first, action: `${call.batch.length} calls` } : void 0;
+  }
+  return appOf(call.name, call.args);
+}
+
 // src/transcript.ts
 var Transcript = class {
   entries = [];
@@ -24894,14 +25003,17 @@ var Transcript = class {
     if (this.#tool(p.tool_id)) {
       return;
     }
+    const u = unwrap(p.name, p.args ?? {});
     const call = {
-      args: p.args ?? {},
+      args: u.args,
       argsText: p.args_text ?? "",
+      batch: u.batch,
       context: p.context ?? "",
       id: p.tool_id,
-      name: p.name,
+      name: u.name,
       startedAt: at,
-      status: "running"
+      status: "running",
+      via: u.via
     };
     if (Array.isArray(call.args.todos)) {
       call.todos = toTodos(call.args.todos);
@@ -24919,17 +25031,22 @@ var Transcript = class {
       return;
     }
     const { call, turn } = found;
-    const output = record(p.result)?.output;
+    const output = record2(p.result)?.output;
     const interrupted = p.name === "terminal" && typeof output === "string" && /\[Command interrupted\]\s*$/.test(output);
-    call.status = interrupted ? "cancelled" : isToolError(p) ? "error" : "done";
     call.duration = typeof p.duration_s === "number" ? Math.round(p.duration_s * 1e3) : at - call.startedAt;
     call.summary = p.summary ?? void 0;
     call.resultText = p.result_text ?? void 0;
     call.result = p.result;
     call.diff = p.inline_diff ?? void 0;
     if (p.args) {
-      call.args = p.args;
+      const u = unwrap(p.name, p.args);
+      call.args = u.args;
+      call.name = u.name;
+      call.via = u.via ?? call.via;
+      call.batch = u.batch;
     }
+    const bridged = settleBridge(call);
+    call.status = interrupted ? "cancelled" : bridged ?? isToolError(p) ? "error" : "done";
     if (Array.isArray(p.todos)) {
       call.todos = toTodos(p.todos);
     }
@@ -24944,7 +25061,7 @@ var Transcript = class {
     }
   }
   subagent(type, p, at = Date.now()) {
-    const found = (p.delegation_id ? this.#findTool((c) => c.name === "delegate_task" && record(c.result)?.delegation_id === p.delegation_id) : void 0) ?? this.#lastTool((c) => c.name === "delegate_task");
+    const found = (p.delegation_id ? this.#findTool((c) => c.name === "delegate_task" && record2(c.result)?.delegation_id === p.delegation_id) : void 0) ?? this.#lastTool((c) => c.name === "delegate_task");
     if (!found) {
       return;
     }
@@ -25086,21 +25203,27 @@ var Transcript = class {
         const existing = calls.get(id);
         if (existing) {
           existing.result = result ?? existing.result;
+          if (settleBridge(existing)) {
+            existing.status = "error";
+          }
           continue;
         }
-        const bridged = m.name === "tool_call" ? bridgedCall(m.args ?? {}) : void 0;
-        const args = bridged?.args ?? m.args ?? {};
+        const u = unwrap(m.name ?? "tool", m.args ?? {});
+        const args = u.args;
         const call = {
           args,
           argsText: "",
+          batch: u.batch,
           context: m.context ?? "",
           duration: 0,
           id,
-          name: bridged?.name ?? m.name ?? "tool",
+          name: u.name,
           result,
           startedAt: at,
-          status: record(result)?.error ? "error" : "done"
+          status: "done",
+          via: u.via
         };
+        call.status = settleBridge(call) ?? Boolean(record2(call.result)?.error) ? "error" : "done";
         if (Array.isArray(args.todos)) {
           call.todos = toTodos(args.todos);
         }
@@ -25199,7 +25322,7 @@ function trailingText(turn) {
   return out;
 }
 function isToolError(p) {
-  const r = record(p.result);
+  const r = record2(p.result);
   if (r?.error) {
     return true;
   }
@@ -25217,23 +25340,17 @@ function usageSince(now, before) {
   return { ...now, cost_usd: less("cost_usd"), input: less("input"), output: less("output"), total: less("total") };
 }
 function isBackgroundCall(call) {
-  return call.name === "terminal" && (call.args.background === true || typeof record(call.result)?.session_id === "string");
+  return call.name === "terminal" && (call.args.background === true || typeof record2(call.result)?.session_id === "string");
 }
-function record(v) {
+function record2(v) {
   if (typeof v === "string") {
     try {
-      return record(JSON.parse(v));
+      return record2(JSON.parse(v));
     } catch {
       return void 0;
     }
   }
   return v && typeof v === "object" && !Array.isArray(v) ? v : void 0;
-}
-function bridgedCall(args) {
-  const calls = args.calls;
-  const entry = record(Array.isArray(calls) && calls.length === 1 ? calls[0] : args);
-  const name = entry?.name;
-  return typeof name === "string" && name ? { args: record(entry?.arguments) ?? {}, name } : void 0;
 }
 function toTodos(raw) {
   const out = [];
@@ -25278,7 +25395,7 @@ function continuation(prev) {
     return void 0;
   }
   const background = prev.blocks.some(
-    (b) => b.kind === "tool" && b.call.name === "delegate_task" && record(b.call.result)?.mode === "background"
+    (b) => b.kind === "tool" && b.call.name === "delegate_task" && record2(b.call.result)?.mode === "background"
   );
   if (background) {
     return "Subagents finished";
@@ -25464,7 +25581,7 @@ var Agents = class {
     this.#timer = void 0;
   }
   #track(call, at) {
-    const r = record(call.result);
+    const r = record2(call.result);
     if (r?.status !== "dispatched" || typeof r.delegation_id !== "string") {
       return false;
     }
@@ -25941,7 +26058,7 @@ function processVerdict(p) {
 }
 var strings2 = (v) => Array.isArray(v) ? v.filter((x) => typeof x === "string" && x !== "") : [];
 function watchersOf(call) {
-  const r = record(call.result);
+  const r = record2(call.result);
   if (typeof r?.session_id === "string") {
     return {
       heartbeat: typeof r.heartbeat_seconds === "number" ? r.heartbeat_seconds : 0,
@@ -25964,7 +26081,7 @@ function watchersOf(call) {
   return { heartbeat: beat, notify, patterns: notify ? [] : patterns };
 }
 function processIdOf(call) {
-  const id = record(call.result)?.session_id;
+  const id = record2(call.result)?.session_id;
   return typeof id === "string" && id ? id : void 0;
 }
 var Processes = class {
@@ -26188,6 +26305,1443 @@ function linkCalls(calls, procs) {
 }
 function snapshot(p) {
   return `${p.status}|${p.exitCode}|${p.exitedAt}|${p.startedAt}|${p.output.slice(-120)}|${p.lastLine}|${p.command}`;
+}
+
+// src/workLog.ts
+import { homedir as homedir2 } from "node:os";
+
+// src/vendor/t3code/commandLabel.ts
+var MAX_COMMAND_SEGMENTS = 64;
+var SHELL_PROGRAMS = /* @__PURE__ */ new Set(["sh", "bash", "zsh", "dash", "ash", "ksh", "fish"]);
+var WINDOWS_SHELL_PROGRAMS = /* @__PURE__ */ new Set([
+  "cmd",
+  "cmd.exe",
+  "powershell",
+  "powershell.exe",
+  "pwsh",
+  "pwsh.exe"
+]);
+var SHELL_OPTIONS_WITH_VALUE = /* @__PURE__ */ new Set(["-o", "-O", "--rcfile", "--init-file"]);
+var SHELL_COMMAND_WRAPPERS = /* @__PURE__ */ new Set(["builtin", "command", "exec"]);
+var SHELL_PRECOMMAND_MODIFIERS = /* @__PURE__ */ new Set(["nocorrect", "noglob", "time"]);
+var POWERSHELL_SETUP_PROGRAMS = /* @__PURE__ */ new Set(["pop-location", "push-location", "set-location"]);
+var POWERSHELL_FLAGS = /* @__PURE__ */ new Set(["-mta", "-nologo", "-noninteractive", "-noprofile", "-sta"]);
+var POWERSHELL_OPTIONS_WITH_VALUE = /* @__PURE__ */ new Set([
+  "-configurationname",
+  "-executionpolicy",
+  "-inputformat",
+  "-outputformat",
+  "-version",
+  "-windowstyle",
+  "-workingdirectory"
+]);
+var START_PROCESS_FLAGS = /* @__PURE__ */ new Set([
+  "-confirm",
+  "-debug",
+  "-loaduserprofile",
+  "-nonewwindow",
+  "-passthru",
+  "-usenewenvironment",
+  "-verbose",
+  "-wait",
+  "-whatif"
+]);
+var START_PROCESS_OPTIONS_WITH_VALUE = /* @__PURE__ */ new Set([
+  "-argumentlist",
+  "-credential",
+  "-environment",
+  "-erroraction",
+  "-errorvariable",
+  "-informationaction",
+  "-informationvariable",
+  "-outbuffer",
+  "-outvariable",
+  "-pipelinevariable",
+  "-progressaction",
+  "-redirectstandarderror",
+  "-redirectstandardinput",
+  "-redirectstandardoutput",
+  "-verb",
+  "-warningaction",
+  "-warningvariable",
+  "-windowstyle",
+  "-workingdirectory"
+]);
+var SKIPPABLE_SUDO_PROBES = /* @__PURE__ */ new Set(["[", "[[", "test", "true"]);
+var NON_PROGRAM_PREFIX_CHARACTERS = "<>(){}[];|&$`#!%@:";
+var NON_PROGRAM_SUFFIX_CHARACTERS = "){]}`";
+var NON_DESCRIPTIVE_SHELL_PROGRAMS = /* @__PURE__ */ new Set([
+  "!",
+  "#",
+  ".",
+  ":",
+  "[",
+  "[[",
+  "alias",
+  "and",
+  "autoload",
+  "begin",
+  "bg",
+  "bind",
+  "bindkey",
+  "break",
+  "builtin",
+  "caller",
+  "case",
+  "catch",
+  "cd",
+  "command",
+  "compgen",
+  "complete",
+  "compopt",
+  "continue",
+  "coproc",
+  "declare",
+  "dirs",
+  "disown",
+  "do",
+  "done",
+  "elif",
+  "else",
+  "enable",
+  "end",
+  "esac",
+  "eval",
+  "exec",
+  "exit",
+  "export",
+  "false",
+  "fc",
+  "fg",
+  "fi",
+  "finally",
+  "for",
+  "foreach",
+  "function",
+  "getopts",
+  "history",
+  "if",
+  "in",
+  "jobs",
+  "let",
+  "local",
+  "logout",
+  "mapfile",
+  "nocorrect",
+  "noglob",
+  "not",
+  "or",
+  "popd",
+  "pushd",
+  "read",
+  "readarray",
+  "readonly",
+  "repeat",
+  "return",
+  "select",
+  "set",
+  "setopt",
+  "shift",
+  "shopt",
+  "source",
+  "switch",
+  "suspend",
+  "test",
+  "then",
+  "time",
+  "times",
+  "trap",
+  "try",
+  "true",
+  "type",
+  "typeset",
+  "ulimit",
+  "umask",
+  "unalias",
+  "until",
+  "unset",
+  "unsetopt",
+  "wait",
+  "while"
+]);
+var TERMINAL_SHELL_PROGRAMS = /* @__PURE__ */ new Set([
+  "and",
+  "begin",
+  "break",
+  "case",
+  "catch",
+  "continue",
+  "coproc",
+  "do",
+  "done",
+  "elif",
+  "else",
+  "end",
+  "esac",
+  "eval",
+  "exec",
+  "exit",
+  "false",
+  "fi",
+  "finally",
+  "for",
+  "foreach",
+  "function",
+  "if",
+  "in",
+  "not",
+  "or",
+  "repeat",
+  "return",
+  "select",
+  "switch",
+  "then",
+  "try",
+  "until",
+  "while"
+]);
+function shellCommandArgumentIndex(tokens2, start) {
+  for (let index = start; index < tokens2.length; index += 1) {
+    const option = tokens2[index];
+    if (option === "--" || !option.startsWith("-")) return null;
+    if (SHELL_OPTIONS_WITH_VALUE.has(option)) {
+      index += 1;
+      continue;
+    }
+    if (option === "--command" || /^-[a-zA-Z]*c[a-zA-Z]*$/.test(option)) return index + 1;
+  }
+  return null;
+}
+var COMMAND_WRAPPER_OPTIONS_WITH_VALUE = {
+  env: /* @__PURE__ */ new Set(["-C", "--chdir", "-S", "--split-string", "-u", "--unset"]),
+  sudo: /* @__PURE__ */ new Set(["-C", "--close-from", "-D", "--chdir", "-g", "--group", "-u", "--user"])
+};
+var COMMAND_WRAPPER_FLAGS = {
+  env: /* @__PURE__ */ new Set(["-0", "--null", "-i", "--ignore-environment", "--debug", "-v"]),
+  sudo: /* @__PURE__ */ new Set(["-A", "--askpass", "-b", "--background", "-E", "-H", "-i", "-n", "-S"])
+};
+function tokenizeShellCommand(command) {
+  const input = command.trim();
+  const tokens2 = [];
+  let current = "";
+  let quote2 = null;
+  let escaping = false;
+  let inBackticks = false;
+  let substitutionDepth = 0;
+  let parameterExpansionDepth = 0;
+  let tokenStarted = false;
+  for (let index = 0; index < input.length; index += 1) {
+    const character = input[index];
+    if (escaping) {
+      current += character;
+      escaping = false;
+      tokenStarted = true;
+      continue;
+    }
+    if (character === "\\" && quote2 !== "'") {
+      const nextCharacter = input[index + 1];
+      const isWindowsPath = quote2 === null && /^(?:[A-Za-z]:|\.{1,2})(?:\\[^\s]*)?$/u.test(current);
+      if ((quote2 === '"' || isWindowsPath) && nextCharacter !== void 0 && nextCharacter !== '"' && nextCharacter !== "\\" && nextCharacter !== "$" && nextCharacter !== "`" && nextCharacter !== "\n") {
+        current += character;
+        tokenStarted = true;
+        continue;
+      }
+      escaping = true;
+      tokenStarted = true;
+      continue;
+    }
+    if (inBackticks) {
+      current += character;
+      if (character === "`") inBackticks = false;
+      tokenStarted = true;
+      continue;
+    }
+    if (quote2 !== null) {
+      if (character === quote2) {
+        quote2 = null;
+      } else {
+        current += character;
+      }
+      tokenStarted = true;
+      continue;
+    }
+    if (character === "`") {
+      current += character;
+      inBackticks = true;
+      tokenStarted = true;
+      continue;
+    }
+    if (character === "$" && input[index + 1] === "{") {
+      current += "${";
+      parameterExpansionDepth += 1;
+      tokenStarted = true;
+      index += 1;
+      continue;
+    }
+    if (character === "{" && parameterExpansionDepth > 0) {
+      current += character;
+      parameterExpansionDepth += 1;
+      tokenStarted = true;
+      continue;
+    }
+    if (character === "}" && parameterExpansionDepth > 0) {
+      current += character;
+      parameterExpansionDepth -= 1;
+      tokenStarted = true;
+      continue;
+    }
+    if (character === "$" && input[index + 1] === "(") {
+      current += "$(";
+      substitutionDepth += 1;
+      tokenStarted = true;
+      index += 1;
+      continue;
+    }
+    if (character === "(") {
+      current += character;
+      substitutionDepth += 1;
+      tokenStarted = true;
+      continue;
+    }
+    if (character === ")" && substitutionDepth > 0) {
+      current += character;
+      substitutionDepth -= 1;
+      tokenStarted = true;
+      continue;
+    }
+    if (character === '"' || character === "'") {
+      quote2 = character;
+      tokenStarted = true;
+      continue;
+    }
+    if (/\s/u.test(character)) {
+      if (substitutionDepth > 0 || parameterExpansionDepth > 0) {
+        current += character;
+        tokenStarted = true;
+        continue;
+      }
+      if (tokenStarted) {
+        tokens2.push(current);
+        current = "";
+        tokenStarted = false;
+      }
+      continue;
+    }
+    current += character;
+    tokenStarted = true;
+  }
+  if (quote2 !== null || escaping || inBackticks || substitutionDepth > 0 || parameterExpansionDepth > 0) {
+    return null;
+  }
+  if (tokenStarted) tokens2.push(current);
+  return tokens2;
+}
+function commandWithoutShellComments(command, end, comments) {
+  let result = "";
+  let cursor = 0;
+  for (const comment of comments) {
+    if (comment.start >= end) break;
+    result += command.slice(cursor, comment.start);
+    cursor = Math.min(comment.end, end);
+  }
+  return result + command.slice(cursor, end);
+}
+function readHeredocDelimiter(command, start, stripTabs) {
+  let index = start;
+  while (command[index] === " " || command[index] === "	") index += 1;
+  let delimiter = "";
+  let quote2 = null;
+  let escaping = false;
+  for (; index < command.length; index += 1) {
+    const character = command[index];
+    if (escaping) {
+      delimiter += character;
+      escaping = false;
+      continue;
+    }
+    if (character === "\\" && quote2 !== "'") {
+      escaping = true;
+      continue;
+    }
+    if (quote2 !== null) {
+      if (character === quote2) quote2 = null;
+      else delimiter += character;
+      continue;
+    }
+    if (character === '"' || character === "'") {
+      quote2 = character;
+      continue;
+    }
+    if (/\s/u.test(character) || ";&|<>()".includes(character)) break;
+    delimiter += character;
+  }
+  if (!delimiter || quote2 !== null || escaping) return null;
+  return { heredoc: { delimiter, stripTabs }, end: index };
+}
+function commandAfterHeredocs(command, start, heredocs) {
+  let cursor = start;
+  for (const heredoc of heredocs) {
+    let foundDelimiter = false;
+    while (cursor <= command.length) {
+      const newlineIndex = command.indexOf("\n", cursor);
+      const lineEnd2 = newlineIndex === -1 ? command.length : newlineIndex;
+      const line = command.slice(cursor, lineEnd2).replace(/\r$/u, "");
+      const comparableLine = heredoc.stripTabs ? line.replace(/^\t+/u, "") : line;
+      cursor = newlineIndex === -1 ? command.length : newlineIndex + 1;
+      if (comparableLine === heredoc.delimiter) {
+        foundDelimiter = true;
+        break;
+      }
+      if (newlineIndex === -1) break;
+    }
+    if (!foundDelimiter) return null;
+  }
+  return command.slice(cursor).trim() || null;
+}
+function splitFirstShellCommand(command) {
+  let quote2 = null;
+  let powerShellHereStringQuote = null;
+  let escaping = false;
+  let inBackticks = false;
+  let inComment = false;
+  let substitutionDepth = 0;
+  let parameterExpansionDepth = 0;
+  const heredocs = [];
+  const comments = [];
+  let commentStart = 0;
+  let separatorBeforeHeredocs = null;
+  for (let index = 0; index < command.length; index += 1) {
+    const character = command[index];
+    if (powerShellHereStringQuote !== null) {
+      if (character === powerShellHereStringQuote && command[index + 1] === "@" && (index === 0 || command[index - 1] === "\n")) {
+        powerShellHereStringQuote = null;
+        index += 1;
+      }
+      continue;
+    }
+    if (inComment) {
+      if (character !== "\n") continue;
+      inComment = false;
+      comments.push({ start: commentStart, end: index });
+    }
+    if (escaping) {
+      escaping = false;
+      continue;
+    }
+    if (character === "\\" && quote2 !== "'") {
+      escaping = true;
+      continue;
+    }
+    if (inBackticks) {
+      if (character === "`") inBackticks = false;
+      continue;
+    }
+    if (quote2 !== null) {
+      if (character === quote2) quote2 = null;
+      continue;
+    }
+    if (character === "@" && (command[index + 1] === '"' || command[index + 1] === "'") && (command[index + 2] === "\n" || command[index + 2] === "\r" && command[index + 3] === "\n")) {
+      powerShellHereStringQuote = command[index + 1];
+      index += 1;
+      continue;
+    }
+    if (character === '"' || character === "'") {
+      quote2 = character;
+      continue;
+    }
+    if (character === "`") {
+      inBackticks = true;
+      continue;
+    }
+    if (character === "#" && (index === 0 || /\s/u.test(command[index - 1]) || ";&|(".includes(command[index - 1]))) {
+      inComment = true;
+      commentStart = index;
+      continue;
+    }
+    if (character === "$" && command[index + 1] === "{") {
+      parameterExpansionDepth += 1;
+      index += 1;
+      continue;
+    }
+    if (character === "{" && parameterExpansionDepth > 0) {
+      parameterExpansionDepth += 1;
+      continue;
+    }
+    if (character === "}" && parameterExpansionDepth > 0) {
+      parameterExpansionDepth -= 1;
+      continue;
+    }
+    if (character === "(") {
+      substitutionDepth += 1;
+      continue;
+    }
+    if (character === ")" && substitutionDepth > 0) {
+      substitutionDepth -= 1;
+      continue;
+    }
+    if (substitutionDepth > 0 || parameterExpansionDepth > 0) continue;
+    if (character === "<" && command[index + 1] === "<" && command[index + 2] !== "<") {
+      const stripTabs = command[index + 2] === "-";
+      const delimiter = readHeredocDelimiter(command, index + (stripTabs ? 3 : 2), stripTabs);
+      if (delimiter === null) {
+        return { firstCommand: command.trim(), remainingCommand: null, separator: null };
+      }
+      heredocs.push(delimiter.heredoc);
+      index = delimiter.end - 1;
+      continue;
+    }
+    const isDoubleOperator = character === "&" && command[index + 1] === "&" || character === "|" && (command[index + 1] === "|" || command[index + 1] === "&");
+    const isRedirectionAmpersand = character === "&" && (command[index - 1] === ">" || command[index - 1] === "<" || command[index + 1] === ">");
+    if (!isDoubleOperator && !";&|\n".includes(character) || isRedirectionAmpersand) continue;
+    if (character === "\n" && heredocs.length > 0) {
+      const separator = separatorBeforeHeredocs;
+      const firstCommand2 = commandWithoutShellComments(
+        command,
+        separator?.index ?? index,
+        comments
+      ).trimStart();
+      const commandBeforeHeredocs = separator ? command.slice(separator.index + separator.length, index).trim() : "";
+      const commandFollowingHeredocs = commandAfterHeredocs(command, index + 1, heredocs);
+      const remainingCommand = [commandBeforeHeredocs, commandFollowingHeredocs].filter((part) => Boolean(part)).join("\n");
+      return {
+        firstCommand: firstCommand2,
+        remainingCommand: remainingCommand || null,
+        separator: separator ? command.slice(separator.index, separator.index + separator.length) : "\n"
+      };
+    }
+    if (heredocs.length > 0) {
+      separatorBeforeHeredocs ??= {
+        index,
+        length: isDoubleOperator ? 2 : 1
+      };
+      if (isDoubleOperator) index += 1;
+      continue;
+    }
+    const firstCommand = commandWithoutShellComments(command, index, comments).trimStart();
+    let nextCommandIndex = index + (isDoubleOperator ? 2 : 1);
+    while (/\s/u.test(command[nextCommandIndex] ?? "")) nextCommandIndex += 1;
+    const nextCommand = command.slice(nextCommandIndex).trim();
+    return {
+      firstCommand,
+      remainingCommand: nextCommand || null,
+      separator: isDoubleOperator ? command.slice(index, index + 2) : character
+    };
+  }
+  if (inComment) comments.push({ start: commentStart, end: command.length });
+  return {
+    firstCommand: commandWithoutShellComments(command, command.length, comments).trim(),
+    remainingCommand: null,
+    separator: null
+  };
+}
+function commandWithoutLeadingShellComments(command) {
+  let remainingCommand = command.trimStart();
+  while (remainingCommand.startsWith("#")) {
+    const newlineIndex = remainingCommand.indexOf("\n");
+    if (newlineIndex === -1) return null;
+    remainingCommand = remainingCommand.slice(newlineIndex + 1).trimStart();
+  }
+  return remainingCommand || null;
+}
+function withoutShellLineContinuations(command) {
+  let normalizedCommand = "";
+  let quote2 = null;
+  let escaping = false;
+  for (let index = 0; index < command.length; index += 1) {
+    const character = command[index];
+    if (escaping) {
+      normalizedCommand += character;
+      escaping = false;
+      continue;
+    }
+    if (character === "\\" && quote2 !== "'") {
+      if (command[index + 1] === "\n") {
+        index += 1;
+        continue;
+      }
+      if (command[index + 1] === "\r" && command[index + 2] === "\n") {
+        index += 2;
+        continue;
+      }
+      normalizedCommand += character;
+      escaping = true;
+      continue;
+    }
+    if (quote2 !== null) {
+      if (character === quote2) quote2 = null;
+    } else if (character === '"' || character === "'") {
+      quote2 = character;
+    }
+    normalizedCommand += character;
+  }
+  return normalizedCommand;
+}
+function indexAfterShellRedirection(tokens2, index) {
+  const token = tokens2[index];
+  if (!token || /^[<>]\(/u.test(token)) return null;
+  const match = token.match(
+    /^(?:(?:(?:\d+|\*|\{[A-Za-z_][A-Za-z0-9_]*\})?(?:<<<|<<-|<<|<>|>>|>\||<&|>&|<|>))|&>>|&>)(.*)$/u
+  );
+  if (!match) return null;
+  if (match[1]) return index + 1;
+  return tokens2[index + 1] === void 0 ? tokens2.length + 1 : index + 2;
+}
+function serializeShellTokens(tokens2) {
+  return tokens2.map((token) => `'${token.replaceAll("'", "'\\''")}'`).join(" ");
+}
+function transparentWrapperCommandIndex(wrapper, tokens2, index) {
+  if (wrapper === "bundle") {
+    return tokens2[index + 1] === "exec" && tokens2[index + 2] !== void 0 ? index + 2 : null;
+  }
+  if (wrapper === "nohup") {
+    let targetIndex = index + 1;
+    if (tokens2[targetIndex] === "--") targetIndex += 1;
+    const target = tokens2[targetIndex];
+    return target && !target.startsWith("-") ? targetIndex : null;
+  }
+  if (wrapper === "script") {
+    return /^-[adkpqr]+$/u.test(tokens2[index + 1] ?? "") && tokens2[index + 3] !== void 0 ? index + 3 : null;
+  }
+  if (wrapper === "arch") {
+    if (/^-(?:arm64|arm64e|i386|x86_64)$/u.test(tokens2[index + 1] ?? "")) {
+      return tokens2[index + 2] !== void 0 ? index + 2 : null;
+    }
+    return tokens2[index + 1] === "-arch" && tokens2[index + 3] !== void 0 ? index + 3 : null;
+  }
+  if (wrapper === "timeout" || wrapper === "gtimeout") {
+    return /^(?:\d+(?:\.\d*)?|\.\d+)[smhd]?$/u.test(tokens2[index + 1] ?? "") && tokens2[index + 2] !== void 0 ? index + 2 : null;
+  }
+  return null;
+}
+function staticProgramName(value) {
+  const trimmedValue = value.trim();
+  if (!trimmedValue || /^[A-Za-z][A-Za-z0-9+.-]*:(?![\\/])/u.test(trimmedValue)) return null;
+  const program = trimmedValue.split(/[\\/]/u).at(-1);
+  if (!program || /\s/u.test(program) && !/[\\/]/u.test(trimmedValue) || NON_PROGRAM_PREFIX_CHARACTERS.includes(program[0] ?? "") || NON_PROGRAM_SUFFIX_CHARACTERS.includes(program.at(-1) ?? "")) {
+    return null;
+  }
+  return program;
+}
+function leadingPowerShellLiteral(command) {
+  const input = command.trimStart();
+  const quote2 = input[0];
+  if (quote2 !== '"' && quote2 !== "'") return staticProgramName(input.match(/^\S+/u)?.[0] ?? "");
+  let value = "";
+  for (let index = 1; index < input.length; index += 1) {
+    const character = input[index];
+    if (character === "`" && input[index + 1] !== void 0) {
+      value += input[index + 1];
+      index += 1;
+      continue;
+    }
+    if (character === quote2) {
+      if (quote2 === "'" && input[index + 1] === "'") {
+        value += "'";
+        index += 1;
+        continue;
+      }
+      return staticProgramName(value);
+    }
+    value += character;
+  }
+  return null;
+}
+function powerShellCallOperatorProgramName(command) {
+  const match = command.match(/^\s*&\s+([\s\S]*)$/u);
+  return match ? leadingPowerShellLiteral(match[1]) : void 0;
+}
+function powerShellAssignmentProgramName(command, depth, remainingCommand, segmentsRemaining) {
+  const assignment = command.match(
+    /^\s*\$(?:(env|global|local|script):)?[A-Za-z_][A-Za-z0-9_]*\s*=\s*([\s\S]*)$/iu
+  );
+  if (!assignment) return { matched: false, program: null };
+  if (assignment[1]?.toLowerCase() === "env") {
+    return {
+      matched: true,
+      program: remainingCommand ? commandProgramNameInternal(remainingCommand, depth, "shell", segmentsRemaining - 1) : null
+    };
+  }
+  const value = assignment[2].trim();
+  if (/^(?:\[ordered\]\s*)?@\s*[{(]/iu.test(value)) {
+    return { matched: true, program: null };
+  }
+  const calledProgram = powerShellCallOperatorProgramName(value);
+  if (calledProgram !== void 0) return { matched: true, program: calledProgram };
+  const directCommand = value.match(/^(?:@?\(\s*)?([A-Za-z][A-Za-z0-9_.-]*)\b/u)?.[1];
+  if (directCommand && !NON_DESCRIPTIVE_SHELL_PROGRAMS.has(directCommand.toLowerCase())) {
+    const parsedCommand = commandProgramNameInternal(value, depth + 1, "shell", segmentsRemaining);
+    return { matched: true, program: parsedCommand ?? directCommand };
+  }
+  return {
+    matched: true,
+    program: remainingCommand ? commandProgramNameInternal(remainingCommand, depth, "shell", segmentsRemaining - 1) : null
+  };
+}
+function windowsShellPayloadProgramName(shell, tokens2, start, depth, remainingCommand, separator, segmentsRemaining) {
+  const parsePayload = (payload) => {
+    if (!payload) return null;
+    const command = remainingCommand && separator ? `${payload} ${separator} ${remainingCommand}` : payload;
+    return commandProgramNameInternal(command, depth + 1, "shell", segmentsRemaining);
+  };
+  if (shell === "cmd" || shell === "cmd.exe") {
+    for (let index = start; index < tokens2.length; index += 1) {
+      const option = tokens2[index].toLowerCase();
+      if (option !== "/c" && option !== "/k") continue;
+      const payload = tokens2[index + 1];
+      return {
+        matched: true,
+        program: parsePayload(payload)
+      };
+    }
+    return { matched: false, program: null };
+  }
+  for (let index = start; index < tokens2.length; index += 1) {
+    const option = tokens2[index].toLowerCase();
+    if (option === "-command" || option === "-c") {
+      const payload = tokens2[index + 1];
+      return {
+        matched: true,
+        program: parsePayload(payload)
+      };
+    }
+    if (option === "-file" || option === "-f") {
+      return { matched: true, program: staticProgramName(tokens2[index + 1] ?? "") };
+    }
+    if (option === "-encodedcommand" || option === "-enc" || option === "-e") {
+      return { matched: true, program: null };
+    }
+    if (POWERSHELL_OPTIONS_WITH_VALUE.has(option)) {
+      index += 1;
+      continue;
+    }
+    if (POWERSHELL_FLAGS.has(option)) continue;
+    if (!option.startsWith("-")) {
+      return { matched: true, program: staticProgramName(tokens2[index]) };
+    }
+  }
+  return { matched: false, program: null };
+}
+function startProcessProgramName(tokens2, start) {
+  for (let index = start; index < tokens2.length; index += 1) {
+    const token = tokens2[index];
+    const option = token.toLowerCase();
+    if (option === "-filepath") return staticProgramName(tokens2[index + 1] ?? "");
+    if (START_PROCESS_FLAGS.has(option)) continue;
+    if (START_PROCESS_OPTIONS_WITH_VALUE.has(option)) {
+      if (tokens2[index + 1] === void 0) return null;
+      index += 1;
+      continue;
+    }
+    if (token.startsWith("-")) return null;
+    return staticProgramName(token);
+  }
+  return null;
+}
+function literalAssignmentProgram(token) {
+  const assignment = token.match(/^([A-Za-z_][A-Za-z0-9_]*)=(.*)$/su);
+  if (!assignment) return null;
+  const name = assignment[1];
+  let value = assignment[2].trim();
+  if (!value || /[$`]/u.test(value)) return { name, program: null };
+  if (value.startsWith("(") && value.endsWith(")")) {
+    const arrayTokens = tokenizeShellCommand(value.slice(1, -1));
+    value = arrayTokens?.[0] ?? "";
+  } else if (/\s/u.test(value) && !/[\\/]/u.test(value)) {
+    return { name, program: null };
+  }
+  return { name, program: staticProgramName(value) };
+}
+function referencedCommandAlias(token) {
+  const reference = token.match(
+    /^\$(?:([A-Za-z_][A-Za-z0-9_]*)|\{([A-Za-z_][A-Za-z0-9_]*)(?:\[@\])?\})$/u
+  );
+  return reference?.[1] ?? reference?.[2] ?? null;
+}
+function literalCommandAliasProgramName(command) {
+  const aliases = /* @__PURE__ */ new Map();
+  let remainingCommand = command;
+  let controlFlowDepth = 0;
+  for (let segmentCount = 0; remainingCommand && segmentCount < 64; segmentCount += 1) {
+    const commandWithoutComments = commandWithoutLeadingShellComments(remainingCommand);
+    if (commandWithoutComments === null) return null;
+    const commandSplit = splitFirstShellCommand(commandWithoutComments);
+    const tokens2 = tokenizeShellCommand(withoutShellLineContinuations(commandSplit.firstCommand));
+    if (tokens2 === null) return null;
+    let commandIndex = tokens2[0] === "do" || tokens2[0] === "then" ? 1 : 0;
+    while (commandIndex < tokens2.length) {
+      const indexAfterRedirection = indexAfterShellRedirection(tokens2, commandIndex);
+      if (indexAfterRedirection !== null && indexAfterRedirection <= tokens2.length) {
+        commandIndex = indexAfterRedirection;
+        continue;
+      }
+      if (/^[A-Za-z_][A-Za-z0-9_]*\+?=/u.test(tokens2[commandIndex] ?? "")) {
+        commandIndex += 1;
+        continue;
+      }
+      break;
+    }
+    const aliasName = referencedCommandAlias(tokens2[commandIndex] ?? "");
+    const aliasedProgram = aliasName ? aliases.get(aliasName) : void 0;
+    if (aliasedProgram) return aliasedProgram;
+    const leadingToken = tokens2[0];
+    if (leadingToken === "fi" || leadingToken === "done" || leadingToken === "esac") {
+      controlFlowDepth = Math.max(0, controlFlowDepth - 1);
+    }
+    if (leadingToken === "if" || leadingToken === "for" || leadingToken === "while" || leadingToken === "until" || leadingToken === "select" || leadingToken === "case") {
+      controlFlowDepth += 1;
+    }
+    if (controlFlowDepth === 0 && leadingToken === "unset") {
+      for (const name of tokens2.slice(1)) aliases.delete(name);
+    }
+    const assignmentStart = tokens2[0] === "export" ? 1 : 0;
+    const assignments = tokens2.slice(assignmentStart).map(literalAssignmentProgram);
+    if (controlFlowDepth === 0 && assignments.length > 0 && assignments.every((assignment) => assignment !== null)) {
+      for (const assignment of assignments) {
+        if (assignment.program) aliases.set(assignment.name, assignment.program);
+        else aliases.delete(assignment.name);
+      }
+    }
+    remainingCommand = commandSplit.remainingCommand;
+  }
+  return null;
+}
+function wrappedShellCommandProgramName(wrapper, tokens2, start, depth, remainingCommand, segmentsRemaining) {
+  let index = start;
+  if (wrapper === "command") {
+    while (index < tokens2.length) {
+      const option = tokens2[index];
+      if (option === "--") {
+        index += 1;
+        break;
+      }
+      if (!option.startsWith("-") || option === "-") break;
+      if (option !== "-p") return null;
+      index += 1;
+    }
+  } else if (wrapper === "builtin") {
+    if (tokens2[index] === "--") index += 1;
+    else if (tokens2[index]?.startsWith("-")) return null;
+  } else if (wrapper === "exec") {
+    while (index < tokens2.length) {
+      const option = tokens2[index];
+      if (option === "--") {
+        index += 1;
+        break;
+      }
+      if (option === "-a") {
+        if (tokens2[index + 1] === void 0) return null;
+        index += 2;
+        continue;
+      }
+      if (/^-a.+/u.test(option) || /^-[cl]+$/u.test(option)) {
+        index += 1;
+        continue;
+      }
+      if (option.startsWith("-") && option !== "-") return null;
+      break;
+    }
+  }
+  const wrappedTokens = tokens2.slice(index);
+  if (wrappedTokens.length === 0) return null;
+  let targetIndex = 0;
+  while (targetIndex < wrappedTokens.length) {
+    const indexAfterRedirection = indexAfterShellRedirection(wrappedTokens, targetIndex);
+    if (indexAfterRedirection === null || indexAfterRedirection > wrappedTokens.length) break;
+    targetIndex = indexAfterRedirection;
+  }
+  const target = wrappedTokens[targetIndex];
+  if (target && /^[A-Za-z_][A-Za-z0-9_]*\+?=/u.test(target)) return null;
+  const wrappedProgram = commandProgramNameInternal(
+    serializeShellTokens(wrappedTokens),
+    depth + 1,
+    wrapper === "exec" ? "exec" : "shell",
+    segmentsRemaining
+  );
+  if (wrappedProgram !== null) return wrappedProgram;
+  if (wrapper !== "exec" && target && target === target.toLowerCase() && NON_DESCRIPTIVE_SHELL_PROGRAMS.has(target) && !TERMINAL_SHELL_PROGRAMS.has(target) && remainingCommand) {
+    return commandProgramNameInternal(remainingCommand, depth, "shell", segmentsRemaining - 1);
+  }
+  return null;
+}
+function parseCommandProgramName(command, depth, context, segmentsRemaining) {
+  if (depth >= 8 || segmentsRemaining <= 0) return null;
+  const commandWithoutComments = commandWithoutLeadingShellComments(command);
+  if (commandWithoutComments === null) return null;
+  if (/^(?:catch|finally|for|foreach|function|if|param|switch|try|while)\s*[{(]/iu.test(
+    commandWithoutComments
+  )) {
+    return null;
+  }
+  if (/^[A-Za-z_][A-Za-z0-9_]*\s*\(\s*\)\s*\{/u.test(commandWithoutComments)) return null;
+  if (commandWithoutComments.startsWith("[[")) return null;
+  const commandSplit = splitFirstShellCommand(commandWithoutComments);
+  if (/^@["'](?:\r?\n)/u.test(commandSplit.firstCommand.trimStart())) {
+    return commandSplit.remainingCommand ? commandProgramNameInternal(
+      commandSplit.remainingCommand,
+      depth,
+      "shell",
+      segmentsRemaining - 1
+    ) : null;
+  }
+  const powerShellAssignment = powerShellAssignmentProgramName(
+    commandSplit.firstCommand,
+    depth,
+    commandSplit.remainingCommand,
+    segmentsRemaining
+  );
+  if (powerShellAssignment.matched) return powerShellAssignment.program;
+  const windowsPath = commandSplit.firstCommand.match(
+    /^\s*((?:\.{1,2}|%[A-Za-z_][A-Za-z0-9_]*%|\$env:[A-Za-z_][A-Za-z0-9_]*)\\\S+)/iu
+  )?.[1];
+  if (windowsPath) return staticProgramName(windowsPath);
+  const tokens2 = tokenizeShellCommand(withoutShellLineContinuations(commandSplit.firstCommand));
+  if (tokens2 === null) return null;
+  const firstCharacter = commandSplit.firstCommand.trimStart()[0];
+  if (tokens2.length === 1 && (firstCharacter === '"' || firstCharacter === "'") && /[\s()=]/u.test(tokens2[0] ?? "") && !/[\\/]/u.test(tokens2[0] ?? "")) {
+    return commandSplit.remainingCommand ? commandProgramNameInternal(
+      commandSplit.remainingCommand,
+      depth,
+      context,
+      segmentsRemaining - 1
+    ) : null;
+  }
+  let index = 0;
+  let wrapper = null;
+  let executionContext = context;
+  let sawAssignment = false;
+  let sawRedirection = false;
+  while (index < tokens2.length) {
+    const token = tokens2[index];
+    if (!token) return null;
+    const indexAfterRedirection = indexAfterShellRedirection(tokens2, index);
+    if (indexAfterRedirection !== null) {
+      if (indexAfterRedirection > tokens2.length) return null;
+      sawRedirection = true;
+      index = indexAfterRedirection;
+      continue;
+    }
+    if (/^[A-Za-z_][A-Za-z0-9_]*\+?=/.test(token)) {
+      sawAssignment = true;
+      index += 1;
+      continue;
+    }
+    if (executionContext === "shell" && token === ":") {
+      return commandSplit.remainingCommand ? commandProgramNameInternal(
+        commandSplit.remainingCommand,
+        depth,
+        executionContext,
+        segmentsRemaining - 1
+      ) : null;
+    }
+    if (NON_PROGRAM_PREFIX_CHARACTERS.includes(token[0] ?? "") && !(token.startsWith("$") && token.includes("/"))) {
+      return executionContext === "shell" && token.startsWith("[") && commandSplit.remainingCommand ? commandProgramNameInternal(
+        commandSplit.remainingCommand,
+        depth,
+        executionContext,
+        segmentsRemaining - 1
+      ) : null;
+    }
+    const tokenProgram = token.split(/[\\/]/).at(-1);
+    const isUnqualifiedToken = token === tokenProgram;
+    if (tokenProgram === "env" || tokenProgram === "sudo") {
+      wrapper = tokenProgram;
+      executionContext = "exec";
+      index += 1;
+      continue;
+    }
+    if (wrapper !== null && token === "--") {
+      wrapper = null;
+      index += 1;
+      continue;
+    }
+    if (wrapper !== null && token.startsWith("-")) {
+      if (wrapper === "env" && (token === "-S" || token === "--split-string")) {
+        const splitCommand = tokens2[index + 1];
+        return splitCommand ? commandProgramNameInternal(splitCommand, depth + 1, executionContext, segmentsRemaining) : null;
+      }
+      if (wrapper === "env" && token.startsWith("--split-string=")) {
+        return commandProgramNameInternal(
+          token.slice("--split-string=".length),
+          depth + 1,
+          executionContext,
+          segmentsRemaining
+        );
+      }
+      if (COMMAND_WRAPPER_OPTIONS_WITH_VALUE[wrapper].has(token)) {
+        if (tokens2[index + 1] === void 0) return null;
+        index += 2;
+        continue;
+      }
+      if (COMMAND_WRAPPER_FLAGS[wrapper].has(token)) {
+        index += 1;
+        continue;
+      }
+      const equalsIndex = token.indexOf("=");
+      if (token.startsWith("--") && equalsIndex > 2) {
+        if (!COMMAND_WRAPPER_OPTIONS_WITH_VALUE[wrapper].has(token.slice(0, equalsIndex))) {
+          return null;
+        }
+        index += 1;
+        continue;
+      }
+      if (/^-[A-Za-z].+/.test(token) && !token.startsWith("--")) {
+        let consumesNextToken = false;
+        for (const [optionIndex, option] of token.slice(1).split("").entries()) {
+          const shortOption = `-${option}`;
+          if (COMMAND_WRAPPER_OPTIONS_WITH_VALUE[wrapper].has(shortOption)) {
+            consumesNextToken = optionIndex === token.length - 2;
+            break;
+          }
+          if (!COMMAND_WRAPPER_FLAGS[wrapper].has(shortOption)) return null;
+        }
+        if (consumesNextToken && tokens2[index + 1] === void 0) return null;
+        index += consumesNextToken ? 2 : 1;
+        continue;
+      }
+      return null;
+    }
+    if (tokenProgram && SHELL_PROGRAMS.has(tokenProgram.replace(/\.exe$/i, "").toLowerCase())) {
+      const scriptIndex = shellCommandArgumentIndex(tokens2, index + 1);
+      if (scriptIndex !== null) {
+        const script = tokens2[scriptIndex];
+        return script ? commandProgramNameInternal(script, depth + 1, "shell", segmentsRemaining) : null;
+      }
+    }
+    const lowerTokenProgram = tokenProgram?.toLowerCase();
+    if (lowerTokenProgram && WINDOWS_SHELL_PROGRAMS.has(lowerTokenProgram)) {
+      const payload = windowsShellPayloadProgramName(
+        lowerTokenProgram,
+        tokens2,
+        index + 1,
+        depth,
+        commandSplit.remainingCommand,
+        commandSplit.separator,
+        segmentsRemaining
+      );
+      if (payload.matched) return payload.program;
+    }
+    if (lowerTokenProgram === "start-process") {
+      const startedProgram = startProcessProgramName(tokens2, index + 1);
+      if (startedProgram !== null) return startedProgram;
+    }
+    if (executionContext === "shell" && isUnqualifiedToken && tokenProgram && SHELL_PRECOMMAND_MODIFIERS.has(tokenProgram)) {
+      index += 1;
+      if (tokenProgram === "time" && tokens2[index] === "-p") index += 1;
+      if (tokens2[index]?.startsWith("-")) return null;
+      continue;
+    }
+    if (isUnqualifiedToken && tokenProgram) {
+      const targetIndex = transparentWrapperCommandIndex(tokenProgram, tokens2, index);
+      if (targetIndex !== null) {
+        const wrappedProgram = commandProgramNameInternal(
+          serializeShellTokens(tokens2.slice(targetIndex)),
+          depth + 1,
+          "exec",
+          segmentsRemaining
+        );
+        if (wrappedProgram !== null) return wrappedProgram;
+      }
+    }
+    if (isUnqualifiedToken && tokenProgram && SHELL_COMMAND_WRAPPERS.has(tokenProgram)) {
+      return wrappedShellCommandProgramName(
+        tokenProgram,
+        tokens2,
+        index + 1,
+        depth,
+        commandSplit.remainingCommand,
+        segmentsRemaining
+      );
+    }
+    if ((executionContext === "shell" || wrapper === "sudo" && tokenProgram && SKIPPABLE_SUDO_PROBES.has(tokenProgram)) && isUnqualifiedToken && tokenProgram && NON_DESCRIPTIVE_SHELL_PROGRAMS.has(tokenProgram) && (!TERMINAL_SHELL_PROGRAMS.has(tokenProgram) || tokenProgram === "false" && commandSplit.separator !== "&&") && commandSplit.remainingCommand) {
+      return commandProgramNameInternal(
+        commandSplit.remainingCommand,
+        depth,
+        "shell",
+        segmentsRemaining - 1
+      );
+    }
+    if (executionContext === "shell" && isUnqualifiedToken && lowerTokenProgram && POWERSHELL_SETUP_PROGRAMS.has(lowerTokenProgram) && commandSplit.remainingCommand) {
+      return commandProgramNameInternal(
+        commandSplit.remainingCommand,
+        depth,
+        "shell",
+        segmentsRemaining - 1
+      );
+    }
+    if (!tokenProgram || isUnqualifiedToken && NON_DESCRIPTIVE_SHELL_PROGRAMS.has(tokenProgram) || NON_PROGRAM_PREFIX_CHARACTERS.includes(tokenProgram[0] ?? "") || NON_PROGRAM_SUFFIX_CHARACTERS.includes(tokenProgram.at(-1) ?? "") || tokenProgram.endsWith("()") || /^[A-Za-z_][A-Za-z0-9_]*\(\)\{$/u.test(tokenProgram)) {
+      return null;
+    }
+    return tokenProgram || null;
+  }
+  if ((sawAssignment || sawRedirection) && wrapper === null && commandSplit.remainingCommand) {
+    return commandProgramNameInternal(
+      commandSplit.remainingCommand,
+      depth,
+      executionContext,
+      segmentsRemaining - 1
+    );
+  }
+  return null;
+}
+function commandProgramNameInternal(command, depth, context, segmentsRemaining = MAX_COMMAND_SEGMENTS) {
+  if (segmentsRemaining <= 0) return null;
+  const calledProgram = powerShellCallOperatorProgramName(command);
+  if (calledProgram !== void 0) return calledProgram;
+  return parseCommandProgramName(command, depth, context, segmentsRemaining) ?? (context === "shell" ? literalCommandAliasProgramName(command) : null);
+}
+function commandProgramName(command, depth = 0) {
+  return commandProgramNameInternal(command, depth, "shell", MAX_COMMAND_SEGMENTS);
+}
+var CONTROL_CHARACTERS = /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/gu;
+function commandDisplayText(command) {
+  return withVisibleControlCharacters(withoutShellWrapper(command));
+}
+function withVisibleControlCharacters(text2) {
+  return text2.replace(
+    CONTROL_CHARACTERS,
+    (character) => character === "\x7F" ? "\u2421" : String.fromCharCode(9216 + character.charCodeAt(0))
+  );
+}
+function withoutShellWrapper(command) {
+  const trimmed = command.trim();
+  const split = splitFirstShellCommand(trimmed);
+  if (split.remainingCommand !== null) return trimmed;
+  const tokens2 = tokenizeShellCommand(trimmed);
+  const program = tokens2?.[0]?.split(/[\\/]/u).at(-1)?.replace(/\.exe$/iu, "");
+  if (!tokens2 || !program || !SHELL_PROGRAMS.has(program)) return trimmed;
+  const scriptIndex = shellCommandArgumentIndex(tokens2, 1);
+  if (scriptIndex === null || scriptIndex !== tokens2.length - 1) return trimmed;
+  return tokens2[scriptIndex]?.trim() || trimmed;
+}
+var POWERSHELL_VERBS = new Set(
+  `Add Approve Assert Backup Block Build Checkpoint Clear Close Compare Complete Compress Confirm Connect Convert ConvertFrom ConvertTo Copy Debug Deny Deploy Disable Disconnect Dismount Edit Enable Enter Exit Expand Export Find ForEach Format Get Grant Group Hide Import Initialize Install Invoke Join Limit Lock Measure Merge Mount Move New Open Optimize Out Ping Pop Protect Publish Push Read Receive Redo Register Remove Rename Repair Request Reset Resize Resolve Restart Restore Resume Revoke Save Search Select Send Set Show Skip Sort Split Start Step Stop Submit Suspend Switch Sync Tee Test Trace Unblock Undo Uninstall Unlock Unprotect Unpublish Unregister Update Use Wait Watch Where Write`.split(
+    " "
+  )
+);
+
+// src/workLog.ts
+var SOLO = /* @__PURE__ */ new Set(["clarify", "delegate_task", "todo", "todo_list"]);
+function ownsCard(call) {
+  return SOLO.has(call.name) || isBackgroundCall(call);
+}
+function pieces(blocks) {
+  const out = [];
+  let items = [];
+  for (const b of blocks) {
+    if (b.kind === "thinking" || b.kind === "tool" && !ownsCard(b.call)) {
+      items.push(b);
+      continue;
+    }
+    if (items.length) {
+      out.push({ items, kind: "work" });
+      items = [];
+    }
+    out.push({ block: b, kind: "block" });
+  }
+  if (items.length) {
+    out.push({ items, kind: "work" });
+  }
+  return out;
+}
+function visibleItems(items) {
+  return items.filter((i) => i.kind === "tool" || i.text.trim());
+}
+function foldOf(turn) {
+  if (turn.status !== "done") {
+    return void 0;
+  }
+  const answer = turn.blocks.findLastIndex((b) => b.kind === "text" && b.text.trim());
+  const hidden = /* @__PURE__ */ new Set();
+  for (const [i, b] of turn.blocks.entries()) {
+    if (i === answer || b.kind === "steer") {
+      continue;
+    }
+    if (b.kind === "tool" && (isBackgroundCall(b.call) || b.call.subagents?.some((a) => a.status === "running" || a.status === "queued"))) {
+      continue;
+    }
+    if (answer >= 0 && i > answer && b.kind === "tool" && b.call.status !== "done") {
+      continue;
+    }
+    hidden.add(b.id);
+  }
+  if (hidden.size === 0) {
+    return void 0;
+  }
+  const ms = (turn.endedAt ?? turn.startedAt) - turn.startedAt;
+  return { hidden, label: workedFor(ms) };
+}
+var workedFor = (ms) => ms > 0 ? `Worked for ${formatDuration(ms)}` : "Worked";
+function parts(turn) {
+  const fold = foldOf(turn);
+  if (!fold) {
+    return [{ blocks: [...turn.blocks], kind: "shown" }];
+  }
+  const out = [];
+  const show = (b) => {
+    const last = out.at(-1);
+    if (last?.kind === "shown") {
+      last.blocks.push(b);
+    } else {
+      out.push({ blocks: [b], kind: "shown" });
+    }
+  };
+  let stretch = [];
+  let from = turn.startedAt;
+  const flush = (to) => {
+    const hidden = stretch.filter((b) => fold.hidden.has(b.id));
+    if (hidden.length) {
+      out.push({ blocks: hidden, key: `fold${hidden[0].id}`, kind: "fold", label: workedFor(to - from) });
+    }
+    stretch.filter((b) => !fold.hidden.has(b.id)).forEach(show);
+    stretch = [];
+  };
+  for (const b of turn.blocks) {
+    if (b.kind === "steer") {
+      flush(b.at);
+      show(b);
+      from = b.at;
+    } else {
+      stretch.push(b);
+    }
+  }
+  flush(turn.endedAt ?? from);
+  return out;
+}
+function formatDuration(ms) {
+  if (!Number.isFinite(ms) || ms < 0) {
+    return "0ms";
+  }
+  if (ms < 1e3) {
+    return `${Math.max(1, Math.round(ms))}ms`;
+  }
+  if (ms < 1e4) {
+    const tenths = Math.round(ms / 100) / 10;
+    return tenths >= 10 ? "10s" : `${tenths.toFixed(1)}s`;
+  }
+  if (ms < 6e4) {
+    return `${Math.round(ms / 1e3)}s`;
+  }
+  const total = Math.round(ms / 1e3);
+  const h = Math.floor(total / 3600);
+  const m = Math.floor(total % 3600 / 60);
+  const s = total % 60;
+  return [h ? `${h}h` : "", m ? `${m}m` : "", s ? `${s}s` : ""].filter(Boolean).join(" ");
+}
+function actionOf(call) {
+  if (appsOf(call).length) {
+    return "app";
+  }
+  switch (call.name) {
+    case "tool_search":
+    case "tool_describe":
+      return "lookup";
+    case "terminal":
+    case "execute_code":
+    case "process":
+      return "command";
+    case "read_file":
+      return "read";
+    case "patch":
+    case "write_file":
+      return "edit";
+    case "search_files":
+      return "code-search";
+    case "web_search":
+      return "search";
+    case "web_extract":
+      return "fetch";
+  }
+  return call.name.startsWith("browser") ? "browser" : "other";
+}
+var plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+var and = (words2) => words2.length < 3 ? words2.join(" and ") : `${words2.slice(0, -1).join(", ")}, and ${words2.at(-1)}`;
+function actionLabel(action, n, calls = []) {
+  switch (action) {
+    case "app": {
+      const apps = [...new Set(calls.flatMap(appsOf))];
+      const uses = calls.reduce((k, c) => k + (c.batch?.length ?? 1), 0);
+      return apps.length === 1 ? `Used ${apps[0]}${uses > 1 ? ` ${uses} times` : ""}` : `Used ${and(apps)}`;
+    }
+    case "command":
+      return `Ran ${plural(n, "command", "commands")}`;
+    case "read":
+      return `Read ${plural(n, "file", "files")}`;
+    case "edit":
+      return `Changed ${plural(n, "file", "files")}`;
+    case "code-search":
+      return `Searched code ${plural(n, "time", "times")}`;
+    case "search":
+      return `Searched the web ${plural(n, "time", "times")}`;
+    case "fetch":
+      return `Read ${plural(n, "page", "pages")}`;
+    case "browser":
+      return `Used browser ${plural(n, "time", "times")}`;
+    case "lookup":
+      return `Looked up tools${n > 1 ? ` ${n} times` : ""}`;
+    case "other":
+      return `Used ${plural(n, "tool", "tools")}`;
+  }
+}
+function appsOf(call) {
+  const apps = (call.batch ?? [call]).map((e) => callApp({ args: e.args, name: e.name })?.app);
+  return apps.every(Boolean) ? [...new Set(apps)] : [];
+}
+var priority = (a) => a === "command" || a === "edit" || a === "app" ? 0 : a === "other" || a === "lookup" ? 2 : 1;
+function summarize(items) {
+  const calls = items.flatMap((i) => i.kind === "tool" ? [i.call] : []);
+  if (!calls.length) {
+    return items.length === 1 ? "Thought" : `Thought (\xD7${items.length})`;
+  }
+  const groups = /* @__PURE__ */ new Map();
+  for (const c of calls) {
+    const a = actionOf(c);
+    groups.set(a, [...groups.get(a) ?? [], c]);
+  }
+  const all = [...groups].map(([action, list], index) => ({
+    count: list.length,
+    index,
+    label: actionLabel(action, action === "edit" ? editedFiles(list) : list.length, list),
+    priority: priority(action)
+  }));
+  const picked = [...all].sort((a, b) => a.priority - b.priority || a.index - b.index).slice(0, 2).sort((a, b) => a.index - b.index);
+  const labels = picked.map((p) => p.label);
+  const rest = calls.length - picked.reduce((n, p) => n + p.count, 0);
+  if (rest > 0) {
+    labels.push(`Performed ${plural(rest, "other action", "other actions")}`);
+  }
+  const words2 = labels.map((l, i) => i === 0 ? l : l.charAt(0).toLowerCase() + l.slice(1));
+  return words2.length < 3 ? words2.join(" and ") : `${words2.slice(0, -1).join(", ")}, and ${words2.at(-1)}`;
+}
+function editedFiles(calls) {
+  const paths = /* @__PURE__ */ new Set();
+  let unnamed = 0;
+  for (const c of calls) {
+    const path = str3(c.args.path);
+    if (path) {
+      paths.add(path);
+    } else {
+      unnamed++;
+    }
+  }
+  return paths.size + unnamed;
+}
+function groupIcon(items) {
+  const actions = new Set(items.flatMap((i) => i.kind === "tool" ? [actionOf(i.call)] : []));
+  if (!actions.size) {
+    return "brain";
+  }
+  return actions.size === 1 ? actionIcon([...actions][0]) : "hammer";
+}
+function actionIcon(action) {
+  switch (action) {
+    case "app":
+      return "plug";
+    case "lookup":
+      return "search";
+    case "command":
+      return "terminal";
+    case "read":
+      return "eye";
+    case "edit":
+      return "pencil";
+    case "code-search":
+      return "search";
+    case "search":
+    case "fetch":
+      return "globe";
+    case "browser":
+      return "compass";
+    case "other":
+      return "wrench";
+  }
+}
+var str3 = (v) => typeof v === "string" && v ? v : void 0;
+function shortPath(path, cwd = process.env.HERMES_CWD || process.cwd()) {
+  const root = cwd.replace(/\/+$/, "");
+  if (root && path.startsWith(`${root}/`)) {
+    return path.slice(root.length + 1);
+  }
+  const home = homedir2();
+  return home && path.startsWith(`${home}/`) ? `~${path.slice(home.length)}` : path.replace(/^\.\//, "");
+}
+function stepLabel(call) {
+  const a = call.args;
+  const path = str3(a.path);
+  const app = callApp(call);
+  if (app) {
+    return `${app.app} \xB7 ${app.action}`;
+  }
+  if (call.batch) {
+    return call.batch.map((e) => stepLabel({ ...call, args: e.args, batch: void 0, name: e.name })).join(", ");
+  }
+  switch (call.name) {
+    case "terminal": {
+      const command = str3(a.command) ?? call.context;
+      return command ? flat(commandDisplayText(command)) : "Command";
+    }
+    case "read_file":
+      return path ? `Read ${shortPath(path)}` : "Read file";
+    case "patch":
+      return path ? `Edited ${shortPath(path)}` : "Edited a file";
+    case "write_file":
+      return path ? `Wrote ${shortPath(path)}` : "Wrote a file";
+    case "search_files": {
+      const pattern = str3(a.pattern) ?? call.context;
+      const where = path && path !== "." ? ` in ${shortPath(path)}` : "";
+      return a.target === "files" ? `Searched files ${pattern}${where}` : `Searched ${pattern}${where}`;
+    }
+    case "web_search":
+      return str3(a.query) ? `Searched the web for ${a.query}` : "Web search";
+    case "web_extract": {
+      const urls = Array.isArray(a.urls) ? a.urls.filter((u) => typeof u === "string") : [];
+      const first = urls[0] ?? str3(a.url);
+      return first ? `Read ${first}${urls.length > 1 ? ` +${urls.length - 1} more` : ""}` : "Read a page";
+    }
+    case "execute_code":
+      return call.context ? flat(call.context) : "Ran a script";
+    case "link_pull_request":
+    case "unlink_pull_request": {
+      const verb = call.name === "link_pull_request" ? "Linked" : "Unlinked";
+      const pr = str3(a.url)?.match(/github[^/]*\/([^/]+\/[^/]+)\/pull\/(\d+)/);
+      const repo = pr?.[1] ?? str3(a.repository);
+      const number = pr?.[2] ?? (typeof a.number === "number" ? String(a.number) : void 0);
+      return repo && number ? `${verb} ${repo}#${number}` : `${verb} a pull request`;
+    }
+    case "list_pull_requests":
+      return "Listed linked pull requests";
+    case "tool_search": {
+      const q = Array.isArray(a.queries) ? a.queries.filter((x) => typeof x === "string") : [str3(a.queries) ?? str3(a.query)].filter(Boolean);
+      return q.length ? `Searched tools for ${q.join(", ")}` : "Searched tools";
+    }
+    case "tool_describe": {
+      const names = Array.isArray(a.names) ? a.names.filter((x) => typeof x === "string") : [str3(a.names)].filter(Boolean);
+      return names.length ? `Read how to call ${names.join(", ")}` : "Read tool details";
+    }
+  }
+  const name = call.name.replace(/_/g, " ");
+  const label = name.charAt(0).toUpperCase() + name.slice(1);
+  return call.context ? `${label}: ${flat(call.context)}` : label;
+}
+function liveLabel(item3) {
+  if (item3.kind === "thinking") {
+    return thoughtLine(item3.text) || (item3.endedAt === void 0 ? "Thinking" : "Thought");
+  }
+  const call = item3.call;
+  const command = call.name === "terminal" ? str3(call.args.command) ?? call.context : void 0;
+  if (!command) {
+    return stepLabel(call);
+  }
+  const verb = { cancelled: "Stopped", done: "Ran", error: "Failed", running: "Running" }[call.status];
+  return `${verb} ${commandProgramName(command) ?? "command"}`;
+}
+function thoughtLine(markdown) {
+  return flat(
+    markdown.replace(/!?\[([^\]]*)\]\([^)]*\)/g, "$1").replace(/^[ \t]*(?:#{1,6}|[-*+]|\d+\.)[ \t]+/gm, "").replace(/`+|\*\*|~~/g, "").replace(/(^|[^\w*])[*_]([^*_\n]+)[*_](?![\w*])/g, "$1$2")
+  );
+}
+var flat = (text2) => text2.replace(/\s+/g, " ").trim();
+function clock(at) {
+  return new Date(at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }).toLowerCase();
 }
 
 // src/view/describe.ts
@@ -26441,7 +27995,7 @@ function commandLine(command, n = 96) {
 }
 
 // src/view/tools.tsx
-var str3 = (v) => typeof v === "string" && v ? v : void 0;
+var str4 = (v) => typeof v === "string" && v ? v : void 0;
 function toolNode(call, now, place = {}) {
   const card = cardOf(call, now);
   const status = card.status ?? call.status;
@@ -26491,7 +28045,7 @@ function toolNode(call, now, place = {}) {
 function toolDetail(call, now) {
   const card = cardOf(call, now);
   const body = [...card.body];
-  const command = call.name === "terminal" ? (str3(call.args.command) ?? call.context ?? "").trim() : "";
+  const command = call.name === "terminal" ? (str4(call.args.command) ?? call.context ?? "").trim() : "";
   if (command && command === commandLine(command)) {
     body.unshift(/* @__PURE__ */ jsx("code", { lang: "bash", max: { h: "12lines" }, role: "omp.tool.command", text: command }, "cmd"));
   }
@@ -26509,7 +28063,33 @@ function toolDetail(call, now) {
   return body;
 }
 function cardOf(call, now) {
-  const result = record(call.result);
+  const result = record2(call.result);
+  const app = callApp(call);
+  if (app) {
+    return {
+      badges: [{ text: app.kind === "mcp" ? "MCP" : "connector" }],
+      body: call.batch ? batchBody(call) : appBody(call),
+      folded: true,
+      frame: "inline",
+      name: "plug",
+      target: app.action,
+      targetKind: "text",
+      title: app.app
+    };
+  }
+  if (call.batch) {
+    const apps = appsOf(call);
+    return {
+      badges: apps.length ? [{ text: "connectors" }] : void 0,
+      body: batchBody(call),
+      folded: true,
+      frame: "inline",
+      name: "plug",
+      target: `${call.batch.length} calls`,
+      targetKind: "text",
+      title: apps.length ? apps.join(", ") : "Tool calls"
+    };
+  }
   switch (call.name) {
     case "terminal":
       return isBackgroundCall(call) ? backgroundCard(call, result, now) : bashCard(call, result);
@@ -26542,21 +28122,21 @@ function cardOf(call, now) {
       return {
         body: [],
         frame: "inline",
-        meta: str3(result?.usage) ? [`${result?.usage}`] : void 0,
+        meta: str4(result?.usage) ? [`${result?.usage}`] : void 0,
         name: "memory",
-        target: call.context || str3(call.args.action),
+        target: call.context || str4(call.args.action),
         targetKind: "text",
         title: "Memory"
       };
     case "skills_list": {
       const skills = Array.isArray(result?.skills) ? result.skills : [];
-      const names = skills.map((s) => str3(record(s)?.name) ?? str3(s)).filter((n) => n !== void 0);
+      const names = skills.map((s) => str4(record2(s)?.name) ?? str4(s)).filter((n) => n !== void 0);
       return {
         body: names.length ? [/* @__PURE__ */ jsx("text", { spans: [{ s: "muted", t: names.join(" \xB7 ") }], wrap: "word" }, "names")] : [],
         folded: true,
         frame: "inline",
         meta: [
-          names.length ? `${names.length} skill${names.length === 1 ? "" : "s"}` : str3(result?.message) ?? "no skills"
+          names.length ? `${names.length} skill${names.length === 1 ? "" : "s"}` : str4(result?.message) ?? "no skills"
         ],
         name: "skill",
         title: "Skills"
@@ -26564,11 +28144,11 @@ function cardOf(call, now) {
     }
     case "skill_view":
       return {
-        body: str3(result?.content) ? [/* @__PURE__ */ jsx("md", { children: clip2(str3(result?.content) ?? "", 6e3) }, "body")] : [],
+        body: str4(result?.content) ? [/* @__PURE__ */ jsx("md", { children: clip2(str4(result?.content) ?? "", 6e3) }, "body")] : [],
         folded: true,
         frame: "inline",
         name: "skill",
-        target: str3(call.args.name) ?? call.context,
+        target: str4(call.args.name) ?? call.context,
         targetKind: "text",
         title: "Skill"
       };
@@ -26579,14 +28159,14 @@ function cardOf(call, now) {
     body: genericBody(call),
     folded: true,
     frame: "inline",
-    target: str3(call.args.query) ?? str3(call.args.url) ?? (call.context || void 0),
-    targetKind: str3(call.args.url) ? "path" : str3(call.args.query) ? "query" : "text"
+    target: str4(call.args.query) ?? str4(call.args.url) ?? (call.context || void 0),
+    targetKind: str4(call.args.url) ? "path" : str4(call.args.query) ? "query" : "text"
   };
 }
 function bashCard(call, result, instead) {
-  const output = (str3(result?.output) ?? call.resultText)?.replace(/\s*\[Command interrupted\]\s*$/, "");
-  const error = str3(result?.error);
-  const command = (str3(call.args.command) ?? call.context ?? "").trim();
+  const output = (str4(result?.output) ?? call.resultText)?.replace(/\s*\[Command interrupted\]\s*$/, "");
+  const error = str4(result?.error);
+  const command = (str4(call.args.command) ?? call.context ?? "").trim();
   const line = commandLine(command);
   const running = call.status === "running";
   return {
@@ -26647,8 +28227,8 @@ function processLine(call, id, now) {
   );
 }
 function readCard(call, result) {
-  const path = str3(call.args.path) ?? call.context;
-  const content = str3(result?.content);
+  const path = str4(call.args.path) ?? call.context;
+  const content = str4(result?.content);
   const total = typeof result?.total_lines === "number" ? result.total_lines : void 0;
   const numbered = content ? [...content.matchAll(/^ *(\d+)\|/gm)] : [];
   const first = numbered.length ? Number(numbered[0]?.[1]) : void 0;
@@ -26667,10 +28247,10 @@ function readCard(call, result) {
   };
 }
 function editCard(call, result) {
-  const path = str3(call.args.path) ?? call.context;
+  const path = str4(call.args.path) ?? call.context;
   const lang = langOf(path);
-  const diff2 = hunks(str3(result?.diff)) ?? (call.diff ? plainDiff(call.diff) : void 0);
-  const content = str3(call.args.content);
+  const diff2 = hunks(str4(result?.diff)) ?? (call.diff ? plainDiff(call.diff) : void 0);
+  const content = str4(call.args.content);
   const write = call.name === "write_file";
   const head2 = {
     name: write ? "write" : "edit",
@@ -26697,10 +28277,10 @@ function editCard(call, result) {
   return { ...head2, body: [/* @__PURE__ */ jsx("diff", { lang, text: diff2 }, "diff")], meta: [`+${added} \u2212${removed}`] };
 }
 function searchCard(call, result) {
-  const pattern = str3(call.args.pattern) ?? call.context;
-  const where = str3(call.args.path);
+  const pattern = str4(call.args.pattern) ?? call.context;
+  const where = str4(call.args.path);
   const inPath = where && where !== "." ? ` \xB7 in ${where}` : "";
-  const files = Array.isArray(result?.files) ? result.files.map((f) => str3(f)).filter((f) => f !== void 0) : void 0;
+  const files = Array.isArray(result?.files) ? result.files.map((f) => str4(f)).filter((f) => f !== void 0) : void 0;
   if (files || call.args.target === "files") {
     const list = (files ?? []).map((f) => f.replace(/^\.\//, ""));
     const total2 = typeof result?.total_count === "number" ? result.total_count : list.length;
@@ -26718,10 +28298,10 @@ function searchCard(call, result) {
       title: "Glob"
     };
   }
-  const matches = Array.isArray(result?.matches) ? result.matches.map((m) => record(m)).filter((m) => m !== void 0) : void 0;
+  const matches = Array.isArray(result?.matches) ? result.matches.map((m) => record2(m)).filter((m) => m !== void 0) : void 0;
   const byFile = /* @__PURE__ */ new Map();
   for (const m of matches ?? []) {
-    const path = (str3(m.path) ?? "").replace(/^\.\//, "");
+    const path = (str4(m.path) ?? "").replace(/^\.\//, "");
     const list = byFile.get(path) ?? [];
     list.push({ line: typeof m.line === "number" ? m.line : 0, text: typeof m.content === "string" ? m.content : "" });
     byFile.set(path, list);
@@ -26781,39 +28361,39 @@ function searchCard(call, result) {
   };
 }
 function webSearchCard(call, result) {
-  const data = record(result?.data);
-  const hits = (Array.isArray(data?.web) ? data.web : Array.isArray(result?.results) ? result.results : []).map((h) => record(h)).filter((h) => h !== void 0);
+  const data = record2(result?.data);
+  const hits = (Array.isArray(data?.web) ? data.web : Array.isArray(result?.results) ? result.results : []).map((h) => record2(h)).filter((h) => h !== void 0);
   return {
     body: hits.length ? [
-      /* @__PURE__ */ jsx("col", { role: "omp.tool.sources", children: hits.map((h, i) => sourceRow(`s${i}`, str3(h.title) ?? str3(h.url) ?? "", str3(h.url))) }, "s")
+      /* @__PURE__ */ jsx("col", { role: "omp.tool.sources", children: hits.map((h, i) => sourceRow(`s${i}`, str4(h.title) ?? str4(h.url) ?? "", str4(h.url))) }, "s")
     ] : [],
     frame: "inline",
     meta: hits.length ? [`${hits.length} source${hits.length === 1 ? "" : "s"}`] : void 0,
     name: "web_search",
-    target: str3(call.args.query) ?? call.context,
+    target: str4(call.args.query) ?? call.context,
     targetKind: "query",
     title: "Web search"
   };
 }
 function fetchCard(call, result) {
-  const pages = (Array.isArray(result?.results) ? result.results : []).map((p) => record(p)).filter((p) => p !== void 0);
-  const urls = Array.isArray(call.args.urls) ? call.args.urls.map((u) => str3(u)).filter((u) => u !== void 0) : [];
+  const pages = (Array.isArray(result?.results) ? result.results : []).map((p) => record2(p)).filter((p) => p !== void 0);
+  const urls = Array.isArray(call.args.urls) ? call.args.urls.map((u) => str4(u)).filter((u) => u !== void 0) : [];
   const body = [];
   for (const [i, p] of pages.entries()) {
-    body.push(sourceRow(`s${i}`, str3(p.title) ?? str3(p.url) ?? "", str3(p.url)));
-    const content = str3(p.content);
+    body.push(sourceRow(`s${i}`, str4(p.title) ?? str4(p.url) ?? "", str4(p.url)));
+    const content = str4(p.content);
     if (content) {
       body.push(/* @__PURE__ */ jsx("md", { children: clip2(content, 4e3) }, `b${i}`));
     }
   }
-  const chars = pages.reduce((n, p) => n + (str3(p.content)?.length ?? 0), 0);
+  const chars = pages.reduce((n, p) => n + (str4(p.content)?.length ?? 0), 0);
   return {
     body,
     folded: true,
     meta: pages.length ? [`${pages.length} page${pages.length === 1 ? "" : "s"} \xB7 ${compact(chars)} chars`] : void 0,
     name: "fetch",
     preview: { lines: 6 },
-    target: urls.length > 1 ? `${urls[0]} +${urls.length - 1}` : urls[0] ?? str3(call.args.url) ?? call.context,
+    target: urls.length > 1 ? `${urls[0]} +${urls.length - 1}` : urls[0] ?? str4(call.args.url) ?? call.context,
     targetKind: "path",
     title: "Fetch"
   };
@@ -26832,11 +28412,11 @@ function sourceRow(key2, title, url) {
   ] }, key2);
 }
 function taskCard(call, result, now) {
-  const tasks = Array.isArray(call.args.tasks) ? call.args.tasks.map((t2) => record(t2)).filter((t2) => t2 !== void 0) : [];
-  const goals = tasks.length ? tasks.map((t2) => str3(t2.goal) ?? "") : str3(call.args.goal) ? [str3(call.args.goal) ?? ""] : [];
+  const tasks = Array.isArray(call.args.tasks) ? call.args.tasks.map((t2) => record2(t2)).filter((t2) => t2 !== void 0) : [];
+  const goals = tasks.length ? tasks.map((t2) => str4(t2.goal) ?? "") : str4(call.args.goal) ? [str4(call.args.goal) ?? ""] : [];
   const agents = call.subagents ?? [];
   const rows = agents.length ? agents.map((a) => agentNode(a, now)) : call.status === "running" || result?.status === "dispatched" ? goals.map((g, i) => /* @__PURE__ */ jsx("agent", { agent: "task", name: `Agent ${i + 1}`, status: "pending", task: g }, `p${i}`)) : [];
-  const context = str3(call.args.context) ?? (tasks.length === 1 ? str3(tasks[0]?.context) : void 0);
+  const context = str4(call.args.context) ?? (tasks.length === 1 ? str4(tasks[0]?.context) : void 0);
   const working = agents.some((a) => a.status === "running" || a.status === "queued") || !agents.length && result?.status === "dispatched";
   const settled = agents.filter((a) => a.status !== "running" && a.status !== "queued");
   const count = goals.length || agents.length;
@@ -26906,15 +28486,15 @@ function agentNode(a, now) {
   );
 }
 function askCard(call, result) {
-  const qs = (Array.isArray(call.args.questions) ? call.args.questions : str3(call.args.question) ? [call.args] : []).map((q) => record(q)).filter((q) => q !== void 0);
-  const responses = Array.isArray(result?.responses) ? result.responses.map((r) => record(r)) : [];
+  const qs = (Array.isArray(call.args.questions) ? call.args.questions : str4(call.args.question) ? [call.args] : []).map((q) => record2(q)).filter((q) => q !== void 0);
+  const responses = Array.isArray(result?.responses) ? result.responses.map((r) => record2(r)) : [];
   const body = [];
   for (const [i, q] of qs.entries()) {
-    const choices = Array.isArray(q.choices) ? q.choices.map((c) => str3(c)).filter((c) => c !== void 0) : [];
+    const choices = Array.isArray(q.choices) ? q.choices.map((c) => str4(c)).filter((c) => c !== void 0) : [];
     const raw = responses[i]?.user_response;
-    const answers = (Array.isArray(raw) ? raw : [raw]).map((a) => str3(a)).filter((a) => a !== void 0);
+    const answers = (Array.isArray(raw) ? raw : [raw]).map((a) => str4(a)).filter((a) => a !== void 0);
     if (qs.length > 1) {
-      body.push(/* @__PURE__ */ jsx("md", { children: str3(q.question) ?? "" }, `q${i}`));
+      body.push(/* @__PURE__ */ jsx("md", { children: str4(q.question) ?? "" }, `q${i}`));
     }
     for (const [j, c] of choices.entries()) {
       body.push(answerRow(`q${i}.o${j}`, c, answers.includes(c)));
@@ -26930,7 +28510,7 @@ function askCard(call, result) {
     body,
     name: "ask",
     // Several questions each read in the body; the head counts them instead of repeating one.
-    target: qs.length > 1 ? `${qs.length} questions` : str3(qs[0]?.question) ?? call.context,
+    target: qs.length > 1 ? `${qs.length} questions` : str4(qs[0]?.question) ?? call.context,
     targetKind: "text",
     title: "Ask"
   };
@@ -26942,9 +28522,9 @@ function answerRow(key2, text2, picked) {
   ] }, key2);
 }
 function evalCard(call, result) {
-  const code2 = str3(call.args.code) ?? "";
-  const output = str3(result?.output) ?? str3(result?.stdout) ?? call.resultText;
-  const error = str3(result?.error) ?? str3(result?.stderr);
+  const code2 = str4(call.args.code) ?? "";
+  const output = str4(result?.output) ?? str4(result?.stdout) ?? call.resultText;
+  const error = str4(result?.error) ?? str4(result?.stderr);
   return {
     badges: [{ text: "python" }],
     body: [
@@ -26968,6 +28548,28 @@ function evalCard(call, result) {
     title: firstLine(code2)?.startsWith("#") ? firstLine(code2)?.replace(/^#+\s*/, "") ?? "Eval" : "Eval"
   };
 }
+function appBody(call) {
+  const facts2 = Object.entries(call.args).filter(([k, v]) => k !== "connector_alias" && v !== void 0 && v !== null && v !== "").slice(0, 12).map(([k, v]) => ({ k: [{ t: k.replace(/_/g, " ") }], v: clip2(typeof v === "string" ? v : JSON.stringify(v), 300) }));
+  const error = call.status === "error" ? errorOf(call) : void 0;
+  return [
+    ...facts2.length ? [/* @__PURE__ */ jsx("kv", { items: facts2 }, "args")] : [],
+    ...error ? [/* @__PURE__ */ jsx("text", { spans: [{ s: "error", t: clip2(error, 1200) }], wrap: "word" }, "error")] : genericBody(call)
+  ];
+}
+function batchBody(call) {
+  return (call.batch ?? []).flatMap((e, i) => {
+    const app = callApp({ args: e.args, name: e.name });
+    const tone = e.status === "error" ? "error" : e.status === "running" ? "pending" : "success";
+    const answer = e.error ?? (e.result === void 0 ? void 0 : pretty(e.result));
+    return [
+      /* @__PURE__ */ jsxs("row", { align: "center", gap: "sm", children: [
+        /* @__PURE__ */ jsx("icon", { name: e.status === "error" ? "x" : e.status === "running" ? "clock" : "check", tone }, "i"),
+        /* @__PURE__ */ jsx("text", { grow: 1, spans: [{ t: app ? `${app.app} \xB7 ${app.action}` : humanize(e.name) }], truncate: "end", wrap: "none" }, "t")
+      ] }, `e${i}`),
+      ...e.error ? [/* @__PURE__ */ jsx("text", { spans: [{ s: "error", t: clip2(e.error, 600) }], wrap: "word" }, `r${i}`)] : answer && call.status !== "running" ? [/* @__PURE__ */ jsx("code", { lang: /^\s*[[{]/.test(answer) ? "json" : "text", max: { h: "8lines" }, text: clip2(answer, 2e3), wrap: true }, `r${i}`)] : []
+    ];
+  });
+}
 function genericBody(call) {
   const text2 = call.resultText ?? (call.result === void 0 ? void 0 : pretty(call.result));
   if (!text2 || call.status === "running") {
@@ -26976,11 +28578,11 @@ function genericBody(call) {
   return [/* @__PURE__ */ jsx("code", { lang: /^\s*[[{]/.test(text2) ? "json" : "text", text: clip2(text2, 4e3) }, "out")];
 }
 function errorOf(call) {
-  const result = record(call.result);
-  return str3(result?.error) ?? str3(call.summary) ?? (typeof call.result === "string" && !result ? call.result : void 0);
+  const result = record2(call.result);
+  return str4(result?.error) ?? str4(call.summary) ?? (typeof call.result === "string" && !result ? call.result : void 0);
 }
 function exitOf(call) {
-  const code2 = record(call.result)?.exit_code;
+  const code2 = record2(call.result)?.exit_code;
   return typeof code2 === "number" ? code2 : void 0;
 }
 function checklistNode(todos) {
@@ -27602,8 +29204,8 @@ function jobTone(job) {
 function ownJobs(calls) {
   const ids = /* @__PURE__ */ new Set();
   for (const c of calls) {
-    const r = record(c.result);
-    const job = record(r?.job);
+    const r = record2(c.result);
+    const job = record2(r?.job);
     const id = r?.job_id ?? job?.job_id ?? job?.id;
     if (c.name === "cronjob_manage" && typeof id === "string" && id) {
       ids.add(id);
@@ -28061,7 +29663,7 @@ function jobItem(j, now, own, busy) {
   };
 }
 function jobPreview(j, now, own) {
-  const at = (iso) => iso ? `${clock(Date.parse(iso))} \xB7 ${relative(iso, now)}` : "\u2014";
+  const at = (iso) => iso ? `${clock2(Date.parse(iso))} \xB7 ${relative(iso, now)}` : "\u2014";
   const error = jobError(j);
   const fact = (k, v) => v ? [{ k: [{ t: k }], v }] : [];
   return [
@@ -28135,9 +29737,9 @@ function preview2(p, call, now) {
       {
         items: [
           { k: [{ t: "Status" }], v: [{ s: processTone(p.status), t: isRunning2(p) ? STATUS2.running : `${STATUS2[p.status]} \xB7 ${processVerdict(p)}` }] },
-          { k: [{ t: "Started" }], v: clock(p.startedAt) },
+          { k: [{ t: "Started" }], v: clock2(p.startedAt) },
           { k: [{ t: isRunning2(p) ? "Running for" : "Ran for" }], v: duration(processElapsed(p, now)) },
-          ...p.exitedAt ? [{ k: [{ t: "Exited" }], v: `${clock(p.exitedAt)} \xB7 ${duration(now - p.exitedAt)} ago` }] : [],
+          ...p.exitedAt ? [{ k: [{ t: "Exited" }], v: `${clock2(p.exitedAt)} \xB7 ${duration(now - p.exitedAt)} ago` }] : [],
           ...p.reason && p.status !== "running" ? [{ k: [{ t: "Reason" }], v: p.reason.replace(/_/g, " ") }] : [],
           ...w ? watcherFacts(w) : [],
           { k: [{ t: "Process" }], v: [{ s: "mono dim", t: p.id }] }
@@ -28175,7 +29777,7 @@ function watcherFacts(w) {
     ...w.heartbeat ? [{ k: [{ t: "Heartbeat" }], v: `every ${w.heartbeat}s` }] : []
   ];
 }
-function clock(ms) {
+function clock2(ms) {
   return new Date(ms).toLocaleTimeString([], { hour: "2-digit", hour12: false, minute: "2-digit", second: "2-digit" });
 }
 
@@ -28384,16 +29986,16 @@ import { execFile as execFile3 } from "node:child_process";
 
 // src/github/links.ts
 import { readFileSync } from "node:fs";
-import { homedir as homedir3 } from "node:os";
+import { homedir as homedir4 } from "node:os";
 import { join as join3 } from "node:path";
 import { DatabaseSync as DatabaseSync2 } from "node:sqlite";
 
 // src/watch/child.ts
-import { homedir as homedir2 } from "node:os";
+import { homedir as homedir3 } from "node:os";
 import { join as join2 } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 function stateDbPath(env = process.env) {
-  return join2(env.HERMES_HOME || join2(homedir2(), ".hermes"), "state.db");
+  return join2(env.HERMES_HOME || join2(homedir3(), ".hermes"), "state.db");
 }
 var ChildStore = class {
   #db;
@@ -28490,11 +30092,11 @@ function parseArgs(raw) {
 // src/github/links.ts
 var LINK_TOOLS = /* @__PURE__ */ new Set(["link_pull_request", "list_pull_requests", "unlink_pull_request"]);
 function linksPath(env = process.env) {
-  return join3(env.HERMES_HOME || join3(homedir3(), ".hermes"), "plugin-data", "hermes-tern", "pull-requests.json");
+  return join3(env.HERMES_HOME || join3(homedir4(), ".hermes"), "plugin-data", "hermes-tern", "pull-requests.json");
 }
 var prKey = (ref) => `${ref.host}/${ref.repository}#${ref.number}`;
 function refOf(v) {
-  const r = record(v);
+  const r = record2(v);
   const host = typeof r?.host === "string" ? r.host : "";
   const repository = typeof r?.repository === "string" ? r.repository : "";
   const number = typeof r?.number === "number" ? r.number : 0;
@@ -28504,7 +30106,7 @@ function linkedFromResult(call) {
   if (!LINK_TOOLS.has(call.name) || call.status !== "done") {
     return void 0;
   }
-  const linked = record(call.result)?.linked;
+  const linked = record2(call.result)?.linked;
   return Array.isArray(linked) ? linked.map(refOf).filter((r) => Boolean(r)) : void 0;
 }
 function ancestry(sid, db = stateDbPath()) {
@@ -28576,7 +30178,7 @@ function batchQuery(refs) {
   return { query: `query(${decls.join(", ")}) { ${parts2.join("\n")} }`, variables };
 }
 var obj = (v) => v && typeof v === "object" && !Array.isArray(v) ? v : void 0;
-var str4 = (v) => typeof v === "string" ? v : "";
+var str5 = (v) => typeof v === "string" ? v : "";
 var num3 = (v) => typeof v === "number" ? v : 0;
 var nodes = (v) => {
   const list = obj(v)?.nodes;
@@ -28610,20 +30212,20 @@ function checkStatus(status, conclusion) {
 function parseCheck(n) {
   if (n.__typename === "StatusContext") {
     return {
-      description: str4(n.description) || void 0,
-      name: str4(n.context),
-      startedAt: str4(n.createdAt) || void 0,
-      status: checkStatus("COMPLETED", str4(n.state)),
-      url: str4(n.targetUrl) || void 0
+      description: str5(n.description) || void 0,
+      name: str5(n.context),
+      startedAt: str5(n.createdAt) || void 0,
+      status: checkStatus("COMPLETED", str5(n.state)),
+      url: str5(n.targetUrl) || void 0
     };
   }
-  const workflow = str4(obj(obj(obj(n.checkSuite)?.workflowRun)?.workflow)?.name);
+  const workflow = str5(obj(obj(obj(n.checkSuite)?.workflowRun)?.workflow)?.name);
   return {
-    completedAt: str4(n.completedAt) || void 0,
-    name: str4(n.name),
-    startedAt: str4(n.startedAt) || void 0,
-    status: checkStatus(str4(n.status), str4(n.conclusion)),
-    url: str4(n.detailsUrl) || void 0,
+    completedAt: str5(n.completedAt) || void 0,
+    name: str5(n.name),
+    startedAt: str5(n.startedAt) || void 0,
+    status: checkStatus(str5(n.status), str5(n.conclusion)),
+    url: str5(n.detailsUrl) || void 0,
     workflow: workflow || void 0
   };
 }
@@ -28682,15 +30284,15 @@ function parsePullRequest(ref, repo) {
   const reviews = /* @__PURE__ */ new Map();
   for (const n of nodes(p.reviewRequests)) {
     const who = obj(n.requestedReviewer);
-    const login = str4(who?.login) || str4(who?.name);
+    const login = str5(who?.login) || str5(who?.name);
     if (login) {
       reviews.set(login, "PENDING");
     }
   }
   for (const n of nodes(p.latestReviews)) {
-    const login = str4(obj(n.author)?.login);
+    const login = str5(obj(n.author)?.login);
     if (login && !reviews.has(login)) {
-      reviews.set(login, str4(n.state));
+      reviews.set(login, str5(n.state));
     }
   }
   const rollup = obj(obj(obj(nodes(p.commits)[0]?.commit)?.statusCheckRollup)?.contexts);
@@ -28703,32 +30305,32 @@ function parsePullRequest(ref, repo) {
   return {
     ...ref,
     additions: num3(p.additions),
-    author: str4(obj(p.author)?.login) || "ghost",
-    autoMerge: str4(obj(p.autoMergeRequest)?.mergeMethod) || null,
-    base: str4(p.baseRefName),
+    author: str5(obj(p.author)?.login) || "ghost",
+    autoMerge: str5(obj(p.autoMergeRequest)?.mergeMethod) || null,
+    base: str5(p.baseRefName),
     behindBy: typeof behind === "number" ? behind : null,
-    body: str4(p.body),
+    body: str5(p.body),
     canUpdate: p.viewerCanUpdate === true,
     changedFiles: num3(p.changedFiles),
     checks: dedupeChecks(nodes(rollup).map(parseCheck)),
-    closedAt: str4(p.closedAt) || null,
-    createdAt: str4(p.createdAt),
+    closedAt: str5(p.closedAt) || null,
+    createdAt: str5(p.createdAt),
     deletions: num3(p.deletions),
     draft: p.isDraft === true,
-    head: str4(p.headRefName),
-    headOid: str4(p.headRefOid),
-    id: str4(p.id),
-    labels: nodes(p.labels).map((n) => str4(n.name)),
+    head: str5(p.headRefName),
+    headOid: str5(p.headRefOid),
+    id: str5(p.id),
+    labels: nodes(p.labels).map((n) => str5(n.name)),
     mergeMethods: methods,
-    mergeState: str4(p.mergeStateStatus),
-    mergeable: MERGEABLE[str4(p.mergeable)] ?? "unknown",
-    mergedAt: str4(p.mergedAt) || null,
-    reviewDecision: str4(p.reviewDecision) || null,
+    mergeState: str5(p.mergeStateStatus),
+    mergeable: MERGEABLE[str5(p.mergeable)] ?? "unknown",
+    mergedAt: str5(p.mergedAt) || null,
+    reviewDecision: str5(p.reviewDecision) || null,
     reviewers: [...reviews].map(([login, state]) => ({ login, state })),
-    state: STATE[str4(p.state)] ?? "open",
-    title: str4(p.title),
-    updatedAt: str4(p.updatedAt),
-    url: str4(p.url) || ref.url
+    state: STATE[str5(p.state)] ?? "open",
+    title: str5(p.title),
+    updatedAt: str5(p.updatedAt),
+    url: str5(p.url) || ref.url
   };
 }
 var ACTIVITY_QUERY = `query($o: String!, $r: String!, $n: Int!) {
@@ -28744,24 +30346,24 @@ function parseActivity(data) {
   if (!p) {
     return [];
   }
-  const who = (n) => str4(obj(n.author)?.login) || "ghost";
+  const who = (n) => str5(obj(n.author)?.login) || "ghost";
   const items = [
-    ...nodes(p.comments).map((n) => ({ at: str4(n.createdAt), author: who(n), body: str4(n.body), kind: "comment", url: str4(n.url) })),
-    ...nodes(p.reviews).filter((n) => str4(n.body).trim() || str4(n.state) !== "COMMENTED").map((n) => ({ at: str4(n.submittedAt), author: who(n), body: str4(n.body), kind: "review", state: str4(n.state), url: str4(n.url) })),
+    ...nodes(p.comments).map((n) => ({ at: str5(n.createdAt), author: who(n), body: str5(n.body), kind: "comment", url: str5(n.url) })),
+    ...nodes(p.reviews).filter((n) => str5(n.body).trim() || str5(n.state) !== "COMMENTED").map((n) => ({ at: str5(n.submittedAt), author: who(n), body: str5(n.body), kind: "review", state: str5(n.state), url: str5(n.url) })),
     ...nodes(p.reviewThreads).flatMap((t2) => {
       const [first, ...rest] = nodes(t2.comments);
       return first ? [
         {
-          at: str4(first.createdAt),
+          at: str5(first.createdAt),
           author: who(first),
-          body: str4(first.body),
+          body: str5(first.body),
           kind: "thread",
           line: typeof t2.line === "number" ? t2.line : null,
           outdated: t2.isOutdated === true,
-          path: str4(t2.path),
-          replies: rest.map((n) => ({ at: str4(n.createdAt), author: who(n), body: str4(n.body) })),
+          path: str5(t2.path),
+          replies: rest.map((n) => ({ at: str5(n.createdAt), author: who(n), body: str5(n.body) })),
           resolved: t2.isResolved === true,
-          url: str4(first.url)
+          url: str5(first.url)
         }
       ] : [];
     }),
@@ -28769,11 +30371,11 @@ function parseActivity(data) {
       const c = obj(n.commit) ?? {};
       const a = obj(c.author);
       return {
-        at: str4(c.committedDate),
-        author: str4(obj(a?.user)?.login) || str4(a?.name) || "ghost",
-        body: str4(c.messageHeadline),
+        at: str5(c.committedDate),
+        author: str5(obj(a?.user)?.login) || str5(a?.name) || "ghost",
+        body: str5(c.messageHeadline),
         kind: "commit",
-        url: str4(c.url)
+        url: str5(c.url)
       };
     })
   ];
@@ -28783,10 +30385,10 @@ function parseFiles(rows) {
   return (Array.isArray(rows) ? rows : []).map(obj).filter((r) => Boolean(r)).map((r) => ({
     additions: num3(r.additions),
     deletions: num3(r.deletions),
-    patch: str4(r.patch) || void 0,
-    path: str4(r.filename),
-    previous: str4(r.previous_filename) || void 0,
-    status: str4(r.status)
+    patch: str5(r.patch) || void 0,
+    path: str5(r.filename),
+    previous: str5(r.previous_filename) || void 0,
+    status: str5(r.status)
   }));
 }
 function failedRuns(checks) {
@@ -29884,10 +31486,10 @@ function preview3(row, isCurrent) {
 
 // .hermes-src/ui-tui/src/lib/history.ts
 import { appendFileSync as appendFileSync3, existsSync, mkdirSync as mkdirSync2, readFileSync as readFileSync2 } from "node:fs";
-import { homedir as homedir4 } from "node:os";
+import { homedir as homedir5 } from "node:os";
 import { join as join4 } from "node:path";
 var MAX2 = 1e3;
-var dir = process.env.HERMES_HOME ?? join4(homedir4(), ".hermes");
+var dir = process.env.HERMES_HOME ?? join4(homedir5(), ".hermes");
 var file = join4(dir, ".hermes_history");
 var cache = null;
 function load() {
@@ -30320,7 +31922,7 @@ function unmaskEdit(secret, ev) {
 
 // src/overlays/prompts.tsx
 var RECOMMENDED = /\s*\(recommended\)\s*$/i;
-var str5 = (v) => typeof v === "string" ? v : "";
+var str6 = (v) => typeof v === "string" ? v : "";
 function actionsRow(buttons) {
   return /* @__PURE__ */ jsxs("row", { align: "center", gap: "sm", role: "omp.actions", children: [
     /* @__PURE__ */ jsx("spacer", { grow: 1 }, "fill"),
@@ -30414,8 +32016,8 @@ var APPROVALS = [
 ];
 function approvalOverlay(host, req) {
   const p = req.params;
-  const command = str5(p.command);
-  const description = str5(p.description);
+  const command = str6(p.command);
+  const description = str6(p.description);
   const smartDenied = p.smart_denied === true;
   const offered = Array.isArray(p.choices) ? p.choices.filter((c) => typeof c === "string") : [];
   const allowed = new Set(
@@ -30498,8 +32100,8 @@ function questionsOf(raw) {
       return [];
     }
     const choices = "choices" in q && Array.isArray(q.choices) ? q.choices.filter((c) => typeof c === "string") : [];
-    const question = str5(q.question).trim();
-    return question ? [{ choices, multi: "multi_select" in q && q.multi_select === true, qid: str5(q.qid), question }] : [];
+    const question = str6(q.question).trim();
+    return question ? [{ choices, multi: "multi_select" in q && q.multi_select === true, qid: str6(q.qid), question }] : [];
   });
 }
 function tabLabel(question) {
@@ -30729,15 +32331,15 @@ function clarifyOverlay(host, req) {
 function maskedOverlay(host, req) {
   const p = req.params;
   const key2 = `prompt:${req.id}`;
-  const site = str5(p.site) || str5(p.origin);
+  const site = str6(p.site) || str6(p.origin);
   const login = req.method === "vault.save_login";
   const fields = login ? [
     { id: "identifier", label: "Username or email", masked: false, value: new Composer() },
     { id: "password", label: "Password", masked: true, value: new Composer() }
   ] : [{ id: "value", label: "Hidden while you type", masked: true, value: new Composer() }];
   let at = 0;
-  const title = req.method === "sudo" ? "Password for sudo" : req.method === "secret" ? str5(p.prompt) || `Value for ${str5(p.env_var) || "a secret"}` : req.method === "vault.unlock_prompt" ? `Master password for ${str5(p.display_name) || str5(p.backend) || "the password manager"}` : login ? `Save a login for ${site || "this site"}` : `Code for ${site || "this site"}`;
-  const note = req.method === "secret" ? str5(p.env_var) : req.method === "vault.code" ? str5(p.hint) : "";
+  const title = req.method === "sudo" ? "Password for sudo" : req.method === "secret" ? str6(p.prompt) || `Value for ${str6(p.env_var) || "a secret"}` : req.method === "vault.unlock_prompt" ? `Master password for ${str6(p.display_name) || str6(p.backend) || "the password manager"}` : login ? `Save a login for ${site || "this site"}` : `Code for ${site || "this site"}`;
+  const note = req.method === "secret" ? str6(p.env_var) : req.method === "vault.code" ? str6(p.hint) : "";
   const finish = (cancel) => {
     const [first, second] = fields;
     req.respond({
@@ -30752,7 +32354,7 @@ function maskedOverlay(host, req) {
     node: () => /* @__PURE__ */ jsx("overlay", { anchor: "bottom", modal: true, role: "omp.overlay.ask", size: "md", children: /* @__PURE__ */ jsxs("col", { gap: "md", children: [
       /* @__PURE__ */ jsx("md", { role: "omp.ask.question", text: title }, "question"),
       note ? /* @__PURE__ */ jsx("text", { spans: [{ s: req.method === "secret" ? "mono dim" : "muted", t: note }], wrap: "word" }, "note") : null,
-      str5(p.command) ? /* @__PURE__ */ jsx("code", { lang: "bash", text: str5(p.command) }, "command") : null,
+      str6(p.command) ? /* @__PURE__ */ jsx("code", { lang: "bash", text: str6(p.command) }, "command") : null,
       fields.map((f, i) => /* @__PURE__ */ jsx(
         "input",
         {
@@ -31331,7 +32933,7 @@ var writeActiveSessionFile = (sessionId, file2 = process.env.HERMES_TUI_ACTIVE_S
 
 // src/hermes/images.ts
 import { readFile as readFile2 } from "node:fs/promises";
-import { homedir as homedir5 } from "node:os";
+import { homedir as homedir6 } from "node:os";
 import { extname as extname2, resolve as resolve2 } from "node:path";
 var MAX_IMAGE_BYTES = 20 * 1024 * 1024;
 function imageFormat(bytes) {
@@ -31350,7 +32952,7 @@ function imageFormat(bytes) {
   return null;
 }
 async function uploadImage(gw2, sid, raw, cwd) {
-  const path = resolve2(cwd, raw.replace(/^~(?=$|\/)/, homedir5()));
+  const path = resolve2(cwd, raw.replace(/^~(?=$|\/)/, homedir6()));
   const bytes = await readFile2(path);
   if (bytes.length > MAX_IMAGE_BYTES) {
     throw new Error("the image is larger than 20 MB");
@@ -32643,7 +34245,7 @@ function github(token = tokens()) {
 // src/github/store.ts
 var OPEN_MS = 6e4;
 var PENDING_MS = 3e4;
-var BATCH = 20;
+var BATCH2 = 20;
 var BRANCH_HIT_MS = 6e4;
 var BRANCH_MISS_MS = 3e5;
 var MUTATIONS = {
@@ -32885,7 +34487,7 @@ var PullRequests = class {
       }
     }
     for (const [host, list] of byHost) {
-      const { query, variables } = stackQuery(list.slice(0, BATCH).map((e) => e.ref));
+      const { query, variables } = stackQuery(list.slice(0, BATCH2).map((e) => e.ref));
       let data;
       try {
         data = await this.#gh.graphql(host, query, variables);
@@ -32894,7 +34496,7 @@ var PullRequests = class {
         continue;
       }
       const asked = /* @__PURE__ */ new Set();
-      for (const [i, e] of list.slice(0, BATCH).entries()) {
+      for (const [i, e] of list.slice(0, BATCH2).entries()) {
         const n = data[`p${i}`]?.pullRequest?.stack?.number;
         const key2 = `${host}/${e.ref.repository}#stack:${n}`;
         if (typeof n !== "number" || asked.has(key2)) {
@@ -32925,8 +34527,8 @@ var PullRequests = class {
     }
     let failed;
     for (const [host, list] of byHost) {
-      for (let i = 0; i < list.length; i += BATCH) {
-        const chunk = list.slice(i, i + BATCH);
+      for (let i = 0; i < list.length; i += BATCH2) {
+        const chunk = list.slice(i, i + BATCH2);
         const { query, variables } = batchQuery(chunk.map((e) => e.ref));
         try {
           const data = await this.#gh.graphql(host, query, variables);
@@ -33097,10 +34699,10 @@ var Sidebar = class {
 
 // src/settings.ts
 import { mkdirSync as mkdirSync3, readFileSync as readFileSync3, writeFileSync as writeFileSync2 } from "node:fs";
-import { homedir as homedir6 } from "node:os";
+import { homedir as homedir7 } from "node:os";
 import { dirname, join as join5 } from "node:path";
 function settingsFile(env = process.env) {
-  return join5(env.HERMES_HOME || join5(homedir6(), ".hermes"), "hermes-tern", "settings.json");
+  return join5(env.HERMES_HOME || join5(homedir7(), ".hermes"), "hermes-tern", "settings.json");
 }
 function loadSettings(file2 = settingsFile()) {
   try {
@@ -33394,1406 +34996,6 @@ ${compact(ctx.used)} of ${compact(ctx.max)} tokens
       ) : /* @__PURE__ */ jsx("kbd", { keys: ["enter"], onClick: cx.onSubmit, role: "omp.composer.send", title: "Send  \u23CE" }, "send")
     ] }, "bar")
   ] }, "composer");
-}
-
-// src/workLog.ts
-import { homedir as homedir7 } from "node:os";
-
-// src/vendor/t3code/commandLabel.ts
-var MAX_COMMAND_SEGMENTS = 64;
-var SHELL_PROGRAMS = /* @__PURE__ */ new Set(["sh", "bash", "zsh", "dash", "ash", "ksh", "fish"]);
-var WINDOWS_SHELL_PROGRAMS = /* @__PURE__ */ new Set([
-  "cmd",
-  "cmd.exe",
-  "powershell",
-  "powershell.exe",
-  "pwsh",
-  "pwsh.exe"
-]);
-var SHELL_OPTIONS_WITH_VALUE = /* @__PURE__ */ new Set(["-o", "-O", "--rcfile", "--init-file"]);
-var SHELL_COMMAND_WRAPPERS = /* @__PURE__ */ new Set(["builtin", "command", "exec"]);
-var SHELL_PRECOMMAND_MODIFIERS = /* @__PURE__ */ new Set(["nocorrect", "noglob", "time"]);
-var POWERSHELL_SETUP_PROGRAMS = /* @__PURE__ */ new Set(["pop-location", "push-location", "set-location"]);
-var POWERSHELL_FLAGS = /* @__PURE__ */ new Set(["-mta", "-nologo", "-noninteractive", "-noprofile", "-sta"]);
-var POWERSHELL_OPTIONS_WITH_VALUE = /* @__PURE__ */ new Set([
-  "-configurationname",
-  "-executionpolicy",
-  "-inputformat",
-  "-outputformat",
-  "-version",
-  "-windowstyle",
-  "-workingdirectory"
-]);
-var START_PROCESS_FLAGS = /* @__PURE__ */ new Set([
-  "-confirm",
-  "-debug",
-  "-loaduserprofile",
-  "-nonewwindow",
-  "-passthru",
-  "-usenewenvironment",
-  "-verbose",
-  "-wait",
-  "-whatif"
-]);
-var START_PROCESS_OPTIONS_WITH_VALUE = /* @__PURE__ */ new Set([
-  "-argumentlist",
-  "-credential",
-  "-environment",
-  "-erroraction",
-  "-errorvariable",
-  "-informationaction",
-  "-informationvariable",
-  "-outbuffer",
-  "-outvariable",
-  "-pipelinevariable",
-  "-progressaction",
-  "-redirectstandarderror",
-  "-redirectstandardinput",
-  "-redirectstandardoutput",
-  "-verb",
-  "-warningaction",
-  "-warningvariable",
-  "-windowstyle",
-  "-workingdirectory"
-]);
-var SKIPPABLE_SUDO_PROBES = /* @__PURE__ */ new Set(["[", "[[", "test", "true"]);
-var NON_PROGRAM_PREFIX_CHARACTERS = "<>(){}[];|&$`#!%@:";
-var NON_PROGRAM_SUFFIX_CHARACTERS = "){]}`";
-var NON_DESCRIPTIVE_SHELL_PROGRAMS = /* @__PURE__ */ new Set([
-  "!",
-  "#",
-  ".",
-  ":",
-  "[",
-  "[[",
-  "alias",
-  "and",
-  "autoload",
-  "begin",
-  "bg",
-  "bind",
-  "bindkey",
-  "break",
-  "builtin",
-  "caller",
-  "case",
-  "catch",
-  "cd",
-  "command",
-  "compgen",
-  "complete",
-  "compopt",
-  "continue",
-  "coproc",
-  "declare",
-  "dirs",
-  "disown",
-  "do",
-  "done",
-  "elif",
-  "else",
-  "enable",
-  "end",
-  "esac",
-  "eval",
-  "exec",
-  "exit",
-  "export",
-  "false",
-  "fc",
-  "fg",
-  "fi",
-  "finally",
-  "for",
-  "foreach",
-  "function",
-  "getopts",
-  "history",
-  "if",
-  "in",
-  "jobs",
-  "let",
-  "local",
-  "logout",
-  "mapfile",
-  "nocorrect",
-  "noglob",
-  "not",
-  "or",
-  "popd",
-  "pushd",
-  "read",
-  "readarray",
-  "readonly",
-  "repeat",
-  "return",
-  "select",
-  "set",
-  "setopt",
-  "shift",
-  "shopt",
-  "source",
-  "switch",
-  "suspend",
-  "test",
-  "then",
-  "time",
-  "times",
-  "trap",
-  "try",
-  "true",
-  "type",
-  "typeset",
-  "ulimit",
-  "umask",
-  "unalias",
-  "until",
-  "unset",
-  "unsetopt",
-  "wait",
-  "while"
-]);
-var TERMINAL_SHELL_PROGRAMS = /* @__PURE__ */ new Set([
-  "and",
-  "begin",
-  "break",
-  "case",
-  "catch",
-  "continue",
-  "coproc",
-  "do",
-  "done",
-  "elif",
-  "else",
-  "end",
-  "esac",
-  "eval",
-  "exec",
-  "exit",
-  "false",
-  "fi",
-  "finally",
-  "for",
-  "foreach",
-  "function",
-  "if",
-  "in",
-  "not",
-  "or",
-  "repeat",
-  "return",
-  "select",
-  "switch",
-  "then",
-  "try",
-  "until",
-  "while"
-]);
-function shellCommandArgumentIndex(tokens2, start) {
-  for (let index = start; index < tokens2.length; index += 1) {
-    const option = tokens2[index];
-    if (option === "--" || !option.startsWith("-")) return null;
-    if (SHELL_OPTIONS_WITH_VALUE.has(option)) {
-      index += 1;
-      continue;
-    }
-    if (option === "--command" || /^-[a-zA-Z]*c[a-zA-Z]*$/.test(option)) return index + 1;
-  }
-  return null;
-}
-var COMMAND_WRAPPER_OPTIONS_WITH_VALUE = {
-  env: /* @__PURE__ */ new Set(["-C", "--chdir", "-S", "--split-string", "-u", "--unset"]),
-  sudo: /* @__PURE__ */ new Set(["-C", "--close-from", "-D", "--chdir", "-g", "--group", "-u", "--user"])
-};
-var COMMAND_WRAPPER_FLAGS = {
-  env: /* @__PURE__ */ new Set(["-0", "--null", "-i", "--ignore-environment", "--debug", "-v"]),
-  sudo: /* @__PURE__ */ new Set(["-A", "--askpass", "-b", "--background", "-E", "-H", "-i", "-n", "-S"])
-};
-function tokenizeShellCommand(command) {
-  const input = command.trim();
-  const tokens2 = [];
-  let current = "";
-  let quote2 = null;
-  let escaping = false;
-  let inBackticks = false;
-  let substitutionDepth = 0;
-  let parameterExpansionDepth = 0;
-  let tokenStarted = false;
-  for (let index = 0; index < input.length; index += 1) {
-    const character = input[index];
-    if (escaping) {
-      current += character;
-      escaping = false;
-      tokenStarted = true;
-      continue;
-    }
-    if (character === "\\" && quote2 !== "'") {
-      const nextCharacter = input[index + 1];
-      const isWindowsPath = quote2 === null && /^(?:[A-Za-z]:|\.{1,2})(?:\\[^\s]*)?$/u.test(current);
-      if ((quote2 === '"' || isWindowsPath) && nextCharacter !== void 0 && nextCharacter !== '"' && nextCharacter !== "\\" && nextCharacter !== "$" && nextCharacter !== "`" && nextCharacter !== "\n") {
-        current += character;
-        tokenStarted = true;
-        continue;
-      }
-      escaping = true;
-      tokenStarted = true;
-      continue;
-    }
-    if (inBackticks) {
-      current += character;
-      if (character === "`") inBackticks = false;
-      tokenStarted = true;
-      continue;
-    }
-    if (quote2 !== null) {
-      if (character === quote2) {
-        quote2 = null;
-      } else {
-        current += character;
-      }
-      tokenStarted = true;
-      continue;
-    }
-    if (character === "`") {
-      current += character;
-      inBackticks = true;
-      tokenStarted = true;
-      continue;
-    }
-    if (character === "$" && input[index + 1] === "{") {
-      current += "${";
-      parameterExpansionDepth += 1;
-      tokenStarted = true;
-      index += 1;
-      continue;
-    }
-    if (character === "{" && parameterExpansionDepth > 0) {
-      current += character;
-      parameterExpansionDepth += 1;
-      tokenStarted = true;
-      continue;
-    }
-    if (character === "}" && parameterExpansionDepth > 0) {
-      current += character;
-      parameterExpansionDepth -= 1;
-      tokenStarted = true;
-      continue;
-    }
-    if (character === "$" && input[index + 1] === "(") {
-      current += "$(";
-      substitutionDepth += 1;
-      tokenStarted = true;
-      index += 1;
-      continue;
-    }
-    if (character === "(") {
-      current += character;
-      substitutionDepth += 1;
-      tokenStarted = true;
-      continue;
-    }
-    if (character === ")" && substitutionDepth > 0) {
-      current += character;
-      substitutionDepth -= 1;
-      tokenStarted = true;
-      continue;
-    }
-    if (character === '"' || character === "'") {
-      quote2 = character;
-      tokenStarted = true;
-      continue;
-    }
-    if (/\s/u.test(character)) {
-      if (substitutionDepth > 0 || parameterExpansionDepth > 0) {
-        current += character;
-        tokenStarted = true;
-        continue;
-      }
-      if (tokenStarted) {
-        tokens2.push(current);
-        current = "";
-        tokenStarted = false;
-      }
-      continue;
-    }
-    current += character;
-    tokenStarted = true;
-  }
-  if (quote2 !== null || escaping || inBackticks || substitutionDepth > 0 || parameterExpansionDepth > 0) {
-    return null;
-  }
-  if (tokenStarted) tokens2.push(current);
-  return tokens2;
-}
-function commandWithoutShellComments(command, end, comments) {
-  let result = "";
-  let cursor = 0;
-  for (const comment of comments) {
-    if (comment.start >= end) break;
-    result += command.slice(cursor, comment.start);
-    cursor = Math.min(comment.end, end);
-  }
-  return result + command.slice(cursor, end);
-}
-function readHeredocDelimiter(command, start, stripTabs) {
-  let index = start;
-  while (command[index] === " " || command[index] === "	") index += 1;
-  let delimiter = "";
-  let quote2 = null;
-  let escaping = false;
-  for (; index < command.length; index += 1) {
-    const character = command[index];
-    if (escaping) {
-      delimiter += character;
-      escaping = false;
-      continue;
-    }
-    if (character === "\\" && quote2 !== "'") {
-      escaping = true;
-      continue;
-    }
-    if (quote2 !== null) {
-      if (character === quote2) quote2 = null;
-      else delimiter += character;
-      continue;
-    }
-    if (character === '"' || character === "'") {
-      quote2 = character;
-      continue;
-    }
-    if (/\s/u.test(character) || ";&|<>()".includes(character)) break;
-    delimiter += character;
-  }
-  if (!delimiter || quote2 !== null || escaping) return null;
-  return { heredoc: { delimiter, stripTabs }, end: index };
-}
-function commandAfterHeredocs(command, start, heredocs) {
-  let cursor = start;
-  for (const heredoc of heredocs) {
-    let foundDelimiter = false;
-    while (cursor <= command.length) {
-      const newlineIndex = command.indexOf("\n", cursor);
-      const lineEnd2 = newlineIndex === -1 ? command.length : newlineIndex;
-      const line = command.slice(cursor, lineEnd2).replace(/\r$/u, "");
-      const comparableLine = heredoc.stripTabs ? line.replace(/^\t+/u, "") : line;
-      cursor = newlineIndex === -1 ? command.length : newlineIndex + 1;
-      if (comparableLine === heredoc.delimiter) {
-        foundDelimiter = true;
-        break;
-      }
-      if (newlineIndex === -1) break;
-    }
-    if (!foundDelimiter) return null;
-  }
-  return command.slice(cursor).trim() || null;
-}
-function splitFirstShellCommand(command) {
-  let quote2 = null;
-  let powerShellHereStringQuote = null;
-  let escaping = false;
-  let inBackticks = false;
-  let inComment = false;
-  let substitutionDepth = 0;
-  let parameterExpansionDepth = 0;
-  const heredocs = [];
-  const comments = [];
-  let commentStart = 0;
-  let separatorBeforeHeredocs = null;
-  for (let index = 0; index < command.length; index += 1) {
-    const character = command[index];
-    if (powerShellHereStringQuote !== null) {
-      if (character === powerShellHereStringQuote && command[index + 1] === "@" && (index === 0 || command[index - 1] === "\n")) {
-        powerShellHereStringQuote = null;
-        index += 1;
-      }
-      continue;
-    }
-    if (inComment) {
-      if (character !== "\n") continue;
-      inComment = false;
-      comments.push({ start: commentStart, end: index });
-    }
-    if (escaping) {
-      escaping = false;
-      continue;
-    }
-    if (character === "\\" && quote2 !== "'") {
-      escaping = true;
-      continue;
-    }
-    if (inBackticks) {
-      if (character === "`") inBackticks = false;
-      continue;
-    }
-    if (quote2 !== null) {
-      if (character === quote2) quote2 = null;
-      continue;
-    }
-    if (character === "@" && (command[index + 1] === '"' || command[index + 1] === "'") && (command[index + 2] === "\n" || command[index + 2] === "\r" && command[index + 3] === "\n")) {
-      powerShellHereStringQuote = command[index + 1];
-      index += 1;
-      continue;
-    }
-    if (character === '"' || character === "'") {
-      quote2 = character;
-      continue;
-    }
-    if (character === "`") {
-      inBackticks = true;
-      continue;
-    }
-    if (character === "#" && (index === 0 || /\s/u.test(command[index - 1]) || ";&|(".includes(command[index - 1]))) {
-      inComment = true;
-      commentStart = index;
-      continue;
-    }
-    if (character === "$" && command[index + 1] === "{") {
-      parameterExpansionDepth += 1;
-      index += 1;
-      continue;
-    }
-    if (character === "{" && parameterExpansionDepth > 0) {
-      parameterExpansionDepth += 1;
-      continue;
-    }
-    if (character === "}" && parameterExpansionDepth > 0) {
-      parameterExpansionDepth -= 1;
-      continue;
-    }
-    if (character === "(") {
-      substitutionDepth += 1;
-      continue;
-    }
-    if (character === ")" && substitutionDepth > 0) {
-      substitutionDepth -= 1;
-      continue;
-    }
-    if (substitutionDepth > 0 || parameterExpansionDepth > 0) continue;
-    if (character === "<" && command[index + 1] === "<" && command[index + 2] !== "<") {
-      const stripTabs = command[index + 2] === "-";
-      const delimiter = readHeredocDelimiter(command, index + (stripTabs ? 3 : 2), stripTabs);
-      if (delimiter === null) {
-        return { firstCommand: command.trim(), remainingCommand: null, separator: null };
-      }
-      heredocs.push(delimiter.heredoc);
-      index = delimiter.end - 1;
-      continue;
-    }
-    const isDoubleOperator = character === "&" && command[index + 1] === "&" || character === "|" && (command[index + 1] === "|" || command[index + 1] === "&");
-    const isRedirectionAmpersand = character === "&" && (command[index - 1] === ">" || command[index - 1] === "<" || command[index + 1] === ">");
-    if (!isDoubleOperator && !";&|\n".includes(character) || isRedirectionAmpersand) continue;
-    if (character === "\n" && heredocs.length > 0) {
-      const separator = separatorBeforeHeredocs;
-      const firstCommand2 = commandWithoutShellComments(
-        command,
-        separator?.index ?? index,
-        comments
-      ).trimStart();
-      const commandBeforeHeredocs = separator ? command.slice(separator.index + separator.length, index).trim() : "";
-      const commandFollowingHeredocs = commandAfterHeredocs(command, index + 1, heredocs);
-      const remainingCommand = [commandBeforeHeredocs, commandFollowingHeredocs].filter((part) => Boolean(part)).join("\n");
-      return {
-        firstCommand: firstCommand2,
-        remainingCommand: remainingCommand || null,
-        separator: separator ? command.slice(separator.index, separator.index + separator.length) : "\n"
-      };
-    }
-    if (heredocs.length > 0) {
-      separatorBeforeHeredocs ??= {
-        index,
-        length: isDoubleOperator ? 2 : 1
-      };
-      if (isDoubleOperator) index += 1;
-      continue;
-    }
-    const firstCommand = commandWithoutShellComments(command, index, comments).trimStart();
-    let nextCommandIndex = index + (isDoubleOperator ? 2 : 1);
-    while (/\s/u.test(command[nextCommandIndex] ?? "")) nextCommandIndex += 1;
-    const nextCommand = command.slice(nextCommandIndex).trim();
-    return {
-      firstCommand,
-      remainingCommand: nextCommand || null,
-      separator: isDoubleOperator ? command.slice(index, index + 2) : character
-    };
-  }
-  if (inComment) comments.push({ start: commentStart, end: command.length });
-  return {
-    firstCommand: commandWithoutShellComments(command, command.length, comments).trim(),
-    remainingCommand: null,
-    separator: null
-  };
-}
-function commandWithoutLeadingShellComments(command) {
-  let remainingCommand = command.trimStart();
-  while (remainingCommand.startsWith("#")) {
-    const newlineIndex = remainingCommand.indexOf("\n");
-    if (newlineIndex === -1) return null;
-    remainingCommand = remainingCommand.slice(newlineIndex + 1).trimStart();
-  }
-  return remainingCommand || null;
-}
-function withoutShellLineContinuations(command) {
-  let normalizedCommand = "";
-  let quote2 = null;
-  let escaping = false;
-  for (let index = 0; index < command.length; index += 1) {
-    const character = command[index];
-    if (escaping) {
-      normalizedCommand += character;
-      escaping = false;
-      continue;
-    }
-    if (character === "\\" && quote2 !== "'") {
-      if (command[index + 1] === "\n") {
-        index += 1;
-        continue;
-      }
-      if (command[index + 1] === "\r" && command[index + 2] === "\n") {
-        index += 2;
-        continue;
-      }
-      normalizedCommand += character;
-      escaping = true;
-      continue;
-    }
-    if (quote2 !== null) {
-      if (character === quote2) quote2 = null;
-    } else if (character === '"' || character === "'") {
-      quote2 = character;
-    }
-    normalizedCommand += character;
-  }
-  return normalizedCommand;
-}
-function indexAfterShellRedirection(tokens2, index) {
-  const token = tokens2[index];
-  if (!token || /^[<>]\(/u.test(token)) return null;
-  const match = token.match(
-    /^(?:(?:(?:\d+|\*|\{[A-Za-z_][A-Za-z0-9_]*\})?(?:<<<|<<-|<<|<>|>>|>\||<&|>&|<|>))|&>>|&>)(.*)$/u
-  );
-  if (!match) return null;
-  if (match[1]) return index + 1;
-  return tokens2[index + 1] === void 0 ? tokens2.length + 1 : index + 2;
-}
-function serializeShellTokens(tokens2) {
-  return tokens2.map((token) => `'${token.replaceAll("'", "'\\''")}'`).join(" ");
-}
-function transparentWrapperCommandIndex(wrapper, tokens2, index) {
-  if (wrapper === "bundle") {
-    return tokens2[index + 1] === "exec" && tokens2[index + 2] !== void 0 ? index + 2 : null;
-  }
-  if (wrapper === "nohup") {
-    let targetIndex = index + 1;
-    if (tokens2[targetIndex] === "--") targetIndex += 1;
-    const target = tokens2[targetIndex];
-    return target && !target.startsWith("-") ? targetIndex : null;
-  }
-  if (wrapper === "script") {
-    return /^-[adkpqr]+$/u.test(tokens2[index + 1] ?? "") && tokens2[index + 3] !== void 0 ? index + 3 : null;
-  }
-  if (wrapper === "arch") {
-    if (/^-(?:arm64|arm64e|i386|x86_64)$/u.test(tokens2[index + 1] ?? "")) {
-      return tokens2[index + 2] !== void 0 ? index + 2 : null;
-    }
-    return tokens2[index + 1] === "-arch" && tokens2[index + 3] !== void 0 ? index + 3 : null;
-  }
-  if (wrapper === "timeout" || wrapper === "gtimeout") {
-    return /^(?:\d+(?:\.\d*)?|\.\d+)[smhd]?$/u.test(tokens2[index + 1] ?? "") && tokens2[index + 2] !== void 0 ? index + 2 : null;
-  }
-  return null;
-}
-function staticProgramName(value) {
-  const trimmedValue = value.trim();
-  if (!trimmedValue || /^[A-Za-z][A-Za-z0-9+.-]*:(?![\\/])/u.test(trimmedValue)) return null;
-  const program = trimmedValue.split(/[\\/]/u).at(-1);
-  if (!program || /\s/u.test(program) && !/[\\/]/u.test(trimmedValue) || NON_PROGRAM_PREFIX_CHARACTERS.includes(program[0] ?? "") || NON_PROGRAM_SUFFIX_CHARACTERS.includes(program.at(-1) ?? "")) {
-    return null;
-  }
-  return program;
-}
-function leadingPowerShellLiteral(command) {
-  const input = command.trimStart();
-  const quote2 = input[0];
-  if (quote2 !== '"' && quote2 !== "'") return staticProgramName(input.match(/^\S+/u)?.[0] ?? "");
-  let value = "";
-  for (let index = 1; index < input.length; index += 1) {
-    const character = input[index];
-    if (character === "`" && input[index + 1] !== void 0) {
-      value += input[index + 1];
-      index += 1;
-      continue;
-    }
-    if (character === quote2) {
-      if (quote2 === "'" && input[index + 1] === "'") {
-        value += "'";
-        index += 1;
-        continue;
-      }
-      return staticProgramName(value);
-    }
-    value += character;
-  }
-  return null;
-}
-function powerShellCallOperatorProgramName(command) {
-  const match = command.match(/^\s*&\s+([\s\S]*)$/u);
-  return match ? leadingPowerShellLiteral(match[1]) : void 0;
-}
-function powerShellAssignmentProgramName(command, depth, remainingCommand, segmentsRemaining) {
-  const assignment = command.match(
-    /^\s*\$(?:(env|global|local|script):)?[A-Za-z_][A-Za-z0-9_]*\s*=\s*([\s\S]*)$/iu
-  );
-  if (!assignment) return { matched: false, program: null };
-  if (assignment[1]?.toLowerCase() === "env") {
-    return {
-      matched: true,
-      program: remainingCommand ? commandProgramNameInternal(remainingCommand, depth, "shell", segmentsRemaining - 1) : null
-    };
-  }
-  const value = assignment[2].trim();
-  if (/^(?:\[ordered\]\s*)?@\s*[{(]/iu.test(value)) {
-    return { matched: true, program: null };
-  }
-  const calledProgram = powerShellCallOperatorProgramName(value);
-  if (calledProgram !== void 0) return { matched: true, program: calledProgram };
-  const directCommand = value.match(/^(?:@?\(\s*)?([A-Za-z][A-Za-z0-9_.-]*)\b/u)?.[1];
-  if (directCommand && !NON_DESCRIPTIVE_SHELL_PROGRAMS.has(directCommand.toLowerCase())) {
-    const parsedCommand = commandProgramNameInternal(value, depth + 1, "shell", segmentsRemaining);
-    return { matched: true, program: parsedCommand ?? directCommand };
-  }
-  return {
-    matched: true,
-    program: remainingCommand ? commandProgramNameInternal(remainingCommand, depth, "shell", segmentsRemaining - 1) : null
-  };
-}
-function windowsShellPayloadProgramName(shell, tokens2, start, depth, remainingCommand, separator, segmentsRemaining) {
-  const parsePayload = (payload) => {
-    if (!payload) return null;
-    const command = remainingCommand && separator ? `${payload} ${separator} ${remainingCommand}` : payload;
-    return commandProgramNameInternal(command, depth + 1, "shell", segmentsRemaining);
-  };
-  if (shell === "cmd" || shell === "cmd.exe") {
-    for (let index = start; index < tokens2.length; index += 1) {
-      const option = tokens2[index].toLowerCase();
-      if (option !== "/c" && option !== "/k") continue;
-      const payload = tokens2[index + 1];
-      return {
-        matched: true,
-        program: parsePayload(payload)
-      };
-    }
-    return { matched: false, program: null };
-  }
-  for (let index = start; index < tokens2.length; index += 1) {
-    const option = tokens2[index].toLowerCase();
-    if (option === "-command" || option === "-c") {
-      const payload = tokens2[index + 1];
-      return {
-        matched: true,
-        program: parsePayload(payload)
-      };
-    }
-    if (option === "-file" || option === "-f") {
-      return { matched: true, program: staticProgramName(tokens2[index + 1] ?? "") };
-    }
-    if (option === "-encodedcommand" || option === "-enc" || option === "-e") {
-      return { matched: true, program: null };
-    }
-    if (POWERSHELL_OPTIONS_WITH_VALUE.has(option)) {
-      index += 1;
-      continue;
-    }
-    if (POWERSHELL_FLAGS.has(option)) continue;
-    if (!option.startsWith("-")) {
-      return { matched: true, program: staticProgramName(tokens2[index]) };
-    }
-  }
-  return { matched: false, program: null };
-}
-function startProcessProgramName(tokens2, start) {
-  for (let index = start; index < tokens2.length; index += 1) {
-    const token = tokens2[index];
-    const option = token.toLowerCase();
-    if (option === "-filepath") return staticProgramName(tokens2[index + 1] ?? "");
-    if (START_PROCESS_FLAGS.has(option)) continue;
-    if (START_PROCESS_OPTIONS_WITH_VALUE.has(option)) {
-      if (tokens2[index + 1] === void 0) return null;
-      index += 1;
-      continue;
-    }
-    if (token.startsWith("-")) return null;
-    return staticProgramName(token);
-  }
-  return null;
-}
-function literalAssignmentProgram(token) {
-  const assignment = token.match(/^([A-Za-z_][A-Za-z0-9_]*)=(.*)$/su);
-  if (!assignment) return null;
-  const name = assignment[1];
-  let value = assignment[2].trim();
-  if (!value || /[$`]/u.test(value)) return { name, program: null };
-  if (value.startsWith("(") && value.endsWith(")")) {
-    const arrayTokens = tokenizeShellCommand(value.slice(1, -1));
-    value = arrayTokens?.[0] ?? "";
-  } else if (/\s/u.test(value) && !/[\\/]/u.test(value)) {
-    return { name, program: null };
-  }
-  return { name, program: staticProgramName(value) };
-}
-function referencedCommandAlias(token) {
-  const reference = token.match(
-    /^\$(?:([A-Za-z_][A-Za-z0-9_]*)|\{([A-Za-z_][A-Za-z0-9_]*)(?:\[@\])?\})$/u
-  );
-  return reference?.[1] ?? reference?.[2] ?? null;
-}
-function literalCommandAliasProgramName(command) {
-  const aliases = /* @__PURE__ */ new Map();
-  let remainingCommand = command;
-  let controlFlowDepth = 0;
-  for (let segmentCount = 0; remainingCommand && segmentCount < 64; segmentCount += 1) {
-    const commandWithoutComments = commandWithoutLeadingShellComments(remainingCommand);
-    if (commandWithoutComments === null) return null;
-    const commandSplit = splitFirstShellCommand(commandWithoutComments);
-    const tokens2 = tokenizeShellCommand(withoutShellLineContinuations(commandSplit.firstCommand));
-    if (tokens2 === null) return null;
-    let commandIndex = tokens2[0] === "do" || tokens2[0] === "then" ? 1 : 0;
-    while (commandIndex < tokens2.length) {
-      const indexAfterRedirection = indexAfterShellRedirection(tokens2, commandIndex);
-      if (indexAfterRedirection !== null && indexAfterRedirection <= tokens2.length) {
-        commandIndex = indexAfterRedirection;
-        continue;
-      }
-      if (/^[A-Za-z_][A-Za-z0-9_]*\+?=/u.test(tokens2[commandIndex] ?? "")) {
-        commandIndex += 1;
-        continue;
-      }
-      break;
-    }
-    const aliasName = referencedCommandAlias(tokens2[commandIndex] ?? "");
-    const aliasedProgram = aliasName ? aliases.get(aliasName) : void 0;
-    if (aliasedProgram) return aliasedProgram;
-    const leadingToken = tokens2[0];
-    if (leadingToken === "fi" || leadingToken === "done" || leadingToken === "esac") {
-      controlFlowDepth = Math.max(0, controlFlowDepth - 1);
-    }
-    if (leadingToken === "if" || leadingToken === "for" || leadingToken === "while" || leadingToken === "until" || leadingToken === "select" || leadingToken === "case") {
-      controlFlowDepth += 1;
-    }
-    if (controlFlowDepth === 0 && leadingToken === "unset") {
-      for (const name of tokens2.slice(1)) aliases.delete(name);
-    }
-    const assignmentStart = tokens2[0] === "export" ? 1 : 0;
-    const assignments = tokens2.slice(assignmentStart).map(literalAssignmentProgram);
-    if (controlFlowDepth === 0 && assignments.length > 0 && assignments.every((assignment) => assignment !== null)) {
-      for (const assignment of assignments) {
-        if (assignment.program) aliases.set(assignment.name, assignment.program);
-        else aliases.delete(assignment.name);
-      }
-    }
-    remainingCommand = commandSplit.remainingCommand;
-  }
-  return null;
-}
-function wrappedShellCommandProgramName(wrapper, tokens2, start, depth, remainingCommand, segmentsRemaining) {
-  let index = start;
-  if (wrapper === "command") {
-    while (index < tokens2.length) {
-      const option = tokens2[index];
-      if (option === "--") {
-        index += 1;
-        break;
-      }
-      if (!option.startsWith("-") || option === "-") break;
-      if (option !== "-p") return null;
-      index += 1;
-    }
-  } else if (wrapper === "builtin") {
-    if (tokens2[index] === "--") index += 1;
-    else if (tokens2[index]?.startsWith("-")) return null;
-  } else if (wrapper === "exec") {
-    while (index < tokens2.length) {
-      const option = tokens2[index];
-      if (option === "--") {
-        index += 1;
-        break;
-      }
-      if (option === "-a") {
-        if (tokens2[index + 1] === void 0) return null;
-        index += 2;
-        continue;
-      }
-      if (/^-a.+/u.test(option) || /^-[cl]+$/u.test(option)) {
-        index += 1;
-        continue;
-      }
-      if (option.startsWith("-") && option !== "-") return null;
-      break;
-    }
-  }
-  const wrappedTokens = tokens2.slice(index);
-  if (wrappedTokens.length === 0) return null;
-  let targetIndex = 0;
-  while (targetIndex < wrappedTokens.length) {
-    const indexAfterRedirection = indexAfterShellRedirection(wrappedTokens, targetIndex);
-    if (indexAfterRedirection === null || indexAfterRedirection > wrappedTokens.length) break;
-    targetIndex = indexAfterRedirection;
-  }
-  const target = wrappedTokens[targetIndex];
-  if (target && /^[A-Za-z_][A-Za-z0-9_]*\+?=/u.test(target)) return null;
-  const wrappedProgram = commandProgramNameInternal(
-    serializeShellTokens(wrappedTokens),
-    depth + 1,
-    wrapper === "exec" ? "exec" : "shell",
-    segmentsRemaining
-  );
-  if (wrappedProgram !== null) return wrappedProgram;
-  if (wrapper !== "exec" && target && target === target.toLowerCase() && NON_DESCRIPTIVE_SHELL_PROGRAMS.has(target) && !TERMINAL_SHELL_PROGRAMS.has(target) && remainingCommand) {
-    return commandProgramNameInternal(remainingCommand, depth, "shell", segmentsRemaining - 1);
-  }
-  return null;
-}
-function parseCommandProgramName(command, depth, context, segmentsRemaining) {
-  if (depth >= 8 || segmentsRemaining <= 0) return null;
-  const commandWithoutComments = commandWithoutLeadingShellComments(command);
-  if (commandWithoutComments === null) return null;
-  if (/^(?:catch|finally|for|foreach|function|if|param|switch|try|while)\s*[{(]/iu.test(
-    commandWithoutComments
-  )) {
-    return null;
-  }
-  if (/^[A-Za-z_][A-Za-z0-9_]*\s*\(\s*\)\s*\{/u.test(commandWithoutComments)) return null;
-  if (commandWithoutComments.startsWith("[[")) return null;
-  const commandSplit = splitFirstShellCommand(commandWithoutComments);
-  if (/^@["'](?:\r?\n)/u.test(commandSplit.firstCommand.trimStart())) {
-    return commandSplit.remainingCommand ? commandProgramNameInternal(
-      commandSplit.remainingCommand,
-      depth,
-      "shell",
-      segmentsRemaining - 1
-    ) : null;
-  }
-  const powerShellAssignment = powerShellAssignmentProgramName(
-    commandSplit.firstCommand,
-    depth,
-    commandSplit.remainingCommand,
-    segmentsRemaining
-  );
-  if (powerShellAssignment.matched) return powerShellAssignment.program;
-  const windowsPath = commandSplit.firstCommand.match(
-    /^\s*((?:\.{1,2}|%[A-Za-z_][A-Za-z0-9_]*%|\$env:[A-Za-z_][A-Za-z0-9_]*)\\\S+)/iu
-  )?.[1];
-  if (windowsPath) return staticProgramName(windowsPath);
-  const tokens2 = tokenizeShellCommand(withoutShellLineContinuations(commandSplit.firstCommand));
-  if (tokens2 === null) return null;
-  const firstCharacter = commandSplit.firstCommand.trimStart()[0];
-  if (tokens2.length === 1 && (firstCharacter === '"' || firstCharacter === "'") && /[\s()=]/u.test(tokens2[0] ?? "") && !/[\\/]/u.test(tokens2[0] ?? "")) {
-    return commandSplit.remainingCommand ? commandProgramNameInternal(
-      commandSplit.remainingCommand,
-      depth,
-      context,
-      segmentsRemaining - 1
-    ) : null;
-  }
-  let index = 0;
-  let wrapper = null;
-  let executionContext = context;
-  let sawAssignment = false;
-  let sawRedirection = false;
-  while (index < tokens2.length) {
-    const token = tokens2[index];
-    if (!token) return null;
-    const indexAfterRedirection = indexAfterShellRedirection(tokens2, index);
-    if (indexAfterRedirection !== null) {
-      if (indexAfterRedirection > tokens2.length) return null;
-      sawRedirection = true;
-      index = indexAfterRedirection;
-      continue;
-    }
-    if (/^[A-Za-z_][A-Za-z0-9_]*\+?=/.test(token)) {
-      sawAssignment = true;
-      index += 1;
-      continue;
-    }
-    if (executionContext === "shell" && token === ":") {
-      return commandSplit.remainingCommand ? commandProgramNameInternal(
-        commandSplit.remainingCommand,
-        depth,
-        executionContext,
-        segmentsRemaining - 1
-      ) : null;
-    }
-    if (NON_PROGRAM_PREFIX_CHARACTERS.includes(token[0] ?? "") && !(token.startsWith("$") && token.includes("/"))) {
-      return executionContext === "shell" && token.startsWith("[") && commandSplit.remainingCommand ? commandProgramNameInternal(
-        commandSplit.remainingCommand,
-        depth,
-        executionContext,
-        segmentsRemaining - 1
-      ) : null;
-    }
-    const tokenProgram = token.split(/[\\/]/).at(-1);
-    const isUnqualifiedToken = token === tokenProgram;
-    if (tokenProgram === "env" || tokenProgram === "sudo") {
-      wrapper = tokenProgram;
-      executionContext = "exec";
-      index += 1;
-      continue;
-    }
-    if (wrapper !== null && token === "--") {
-      wrapper = null;
-      index += 1;
-      continue;
-    }
-    if (wrapper !== null && token.startsWith("-")) {
-      if (wrapper === "env" && (token === "-S" || token === "--split-string")) {
-        const splitCommand = tokens2[index + 1];
-        return splitCommand ? commandProgramNameInternal(splitCommand, depth + 1, executionContext, segmentsRemaining) : null;
-      }
-      if (wrapper === "env" && token.startsWith("--split-string=")) {
-        return commandProgramNameInternal(
-          token.slice("--split-string=".length),
-          depth + 1,
-          executionContext,
-          segmentsRemaining
-        );
-      }
-      if (COMMAND_WRAPPER_OPTIONS_WITH_VALUE[wrapper].has(token)) {
-        if (tokens2[index + 1] === void 0) return null;
-        index += 2;
-        continue;
-      }
-      if (COMMAND_WRAPPER_FLAGS[wrapper].has(token)) {
-        index += 1;
-        continue;
-      }
-      const equalsIndex = token.indexOf("=");
-      if (token.startsWith("--") && equalsIndex > 2) {
-        if (!COMMAND_WRAPPER_OPTIONS_WITH_VALUE[wrapper].has(token.slice(0, equalsIndex))) {
-          return null;
-        }
-        index += 1;
-        continue;
-      }
-      if (/^-[A-Za-z].+/.test(token) && !token.startsWith("--")) {
-        let consumesNextToken = false;
-        for (const [optionIndex, option] of token.slice(1).split("").entries()) {
-          const shortOption = `-${option}`;
-          if (COMMAND_WRAPPER_OPTIONS_WITH_VALUE[wrapper].has(shortOption)) {
-            consumesNextToken = optionIndex === token.length - 2;
-            break;
-          }
-          if (!COMMAND_WRAPPER_FLAGS[wrapper].has(shortOption)) return null;
-        }
-        if (consumesNextToken && tokens2[index + 1] === void 0) return null;
-        index += consumesNextToken ? 2 : 1;
-        continue;
-      }
-      return null;
-    }
-    if (tokenProgram && SHELL_PROGRAMS.has(tokenProgram.replace(/\.exe$/i, "").toLowerCase())) {
-      const scriptIndex = shellCommandArgumentIndex(tokens2, index + 1);
-      if (scriptIndex !== null) {
-        const script = tokens2[scriptIndex];
-        return script ? commandProgramNameInternal(script, depth + 1, "shell", segmentsRemaining) : null;
-      }
-    }
-    const lowerTokenProgram = tokenProgram?.toLowerCase();
-    if (lowerTokenProgram && WINDOWS_SHELL_PROGRAMS.has(lowerTokenProgram)) {
-      const payload = windowsShellPayloadProgramName(
-        lowerTokenProgram,
-        tokens2,
-        index + 1,
-        depth,
-        commandSplit.remainingCommand,
-        commandSplit.separator,
-        segmentsRemaining
-      );
-      if (payload.matched) return payload.program;
-    }
-    if (lowerTokenProgram === "start-process") {
-      const startedProgram = startProcessProgramName(tokens2, index + 1);
-      if (startedProgram !== null) return startedProgram;
-    }
-    if (executionContext === "shell" && isUnqualifiedToken && tokenProgram && SHELL_PRECOMMAND_MODIFIERS.has(tokenProgram)) {
-      index += 1;
-      if (tokenProgram === "time" && tokens2[index] === "-p") index += 1;
-      if (tokens2[index]?.startsWith("-")) return null;
-      continue;
-    }
-    if (isUnqualifiedToken && tokenProgram) {
-      const targetIndex = transparentWrapperCommandIndex(tokenProgram, tokens2, index);
-      if (targetIndex !== null) {
-        const wrappedProgram = commandProgramNameInternal(
-          serializeShellTokens(tokens2.slice(targetIndex)),
-          depth + 1,
-          "exec",
-          segmentsRemaining
-        );
-        if (wrappedProgram !== null) return wrappedProgram;
-      }
-    }
-    if (isUnqualifiedToken && tokenProgram && SHELL_COMMAND_WRAPPERS.has(tokenProgram)) {
-      return wrappedShellCommandProgramName(
-        tokenProgram,
-        tokens2,
-        index + 1,
-        depth,
-        commandSplit.remainingCommand,
-        segmentsRemaining
-      );
-    }
-    if ((executionContext === "shell" || wrapper === "sudo" && tokenProgram && SKIPPABLE_SUDO_PROBES.has(tokenProgram)) && isUnqualifiedToken && tokenProgram && NON_DESCRIPTIVE_SHELL_PROGRAMS.has(tokenProgram) && (!TERMINAL_SHELL_PROGRAMS.has(tokenProgram) || tokenProgram === "false" && commandSplit.separator !== "&&") && commandSplit.remainingCommand) {
-      return commandProgramNameInternal(
-        commandSplit.remainingCommand,
-        depth,
-        "shell",
-        segmentsRemaining - 1
-      );
-    }
-    if (executionContext === "shell" && isUnqualifiedToken && lowerTokenProgram && POWERSHELL_SETUP_PROGRAMS.has(lowerTokenProgram) && commandSplit.remainingCommand) {
-      return commandProgramNameInternal(
-        commandSplit.remainingCommand,
-        depth,
-        "shell",
-        segmentsRemaining - 1
-      );
-    }
-    if (!tokenProgram || isUnqualifiedToken && NON_DESCRIPTIVE_SHELL_PROGRAMS.has(tokenProgram) || NON_PROGRAM_PREFIX_CHARACTERS.includes(tokenProgram[0] ?? "") || NON_PROGRAM_SUFFIX_CHARACTERS.includes(tokenProgram.at(-1) ?? "") || tokenProgram.endsWith("()") || /^[A-Za-z_][A-Za-z0-9_]*\(\)\{$/u.test(tokenProgram)) {
-      return null;
-    }
-    return tokenProgram || null;
-  }
-  if ((sawAssignment || sawRedirection) && wrapper === null && commandSplit.remainingCommand) {
-    return commandProgramNameInternal(
-      commandSplit.remainingCommand,
-      depth,
-      executionContext,
-      segmentsRemaining - 1
-    );
-  }
-  return null;
-}
-function commandProgramNameInternal(command, depth, context, segmentsRemaining = MAX_COMMAND_SEGMENTS) {
-  if (segmentsRemaining <= 0) return null;
-  const calledProgram = powerShellCallOperatorProgramName(command);
-  if (calledProgram !== void 0) return calledProgram;
-  return parseCommandProgramName(command, depth, context, segmentsRemaining) ?? (context === "shell" ? literalCommandAliasProgramName(command) : null);
-}
-function commandProgramName(command, depth = 0) {
-  return commandProgramNameInternal(command, depth, "shell", MAX_COMMAND_SEGMENTS);
-}
-var CONTROL_CHARACTERS = /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/gu;
-function commandDisplayText(command) {
-  return withVisibleControlCharacters(withoutShellWrapper(command));
-}
-function withVisibleControlCharacters(text2) {
-  return text2.replace(
-    CONTROL_CHARACTERS,
-    (character) => character === "\x7F" ? "\u2421" : String.fromCharCode(9216 + character.charCodeAt(0))
-  );
-}
-function withoutShellWrapper(command) {
-  const trimmed = command.trim();
-  const split = splitFirstShellCommand(trimmed);
-  if (split.remainingCommand !== null) return trimmed;
-  const tokens2 = tokenizeShellCommand(trimmed);
-  const program = tokens2?.[0]?.split(/[\\/]/u).at(-1)?.replace(/\.exe$/iu, "");
-  if (!tokens2 || !program || !SHELL_PROGRAMS.has(program)) return trimmed;
-  const scriptIndex = shellCommandArgumentIndex(tokens2, 1);
-  if (scriptIndex === null || scriptIndex !== tokens2.length - 1) return trimmed;
-  return tokens2[scriptIndex]?.trim() || trimmed;
-}
-var POWERSHELL_VERBS = new Set(
-  `Add Approve Assert Backup Block Build Checkpoint Clear Close Compare Complete Compress Confirm Connect Convert ConvertFrom ConvertTo Copy Debug Deny Deploy Disable Disconnect Dismount Edit Enable Enter Exit Expand Export Find ForEach Format Get Grant Group Hide Import Initialize Install Invoke Join Limit Lock Measure Merge Mount Move New Open Optimize Out Ping Pop Protect Publish Push Read Receive Redo Register Remove Rename Repair Request Reset Resize Resolve Restart Restore Resume Revoke Save Search Select Send Set Show Skip Sort Split Start Step Stop Submit Suspend Switch Sync Tee Test Trace Unblock Undo Uninstall Unlock Unprotect Unpublish Unregister Update Use Wait Watch Where Write`.split(
-    " "
-  )
-);
-
-// src/workLog.ts
-var SOLO = /* @__PURE__ */ new Set(["clarify", "delegate_task", "todo", "todo_list"]);
-function ownsCard(call) {
-  return SOLO.has(call.name) || isBackgroundCall(call);
-}
-function pieces(blocks) {
-  const out = [];
-  let items = [];
-  for (const b of blocks) {
-    if (b.kind === "thinking" || b.kind === "tool" && !ownsCard(b.call)) {
-      items.push(b);
-      continue;
-    }
-    if (items.length) {
-      out.push({ items, kind: "work" });
-      items = [];
-    }
-    out.push({ block: b, kind: "block" });
-  }
-  if (items.length) {
-    out.push({ items, kind: "work" });
-  }
-  return out;
-}
-function visibleItems(items) {
-  return items.filter((i) => i.kind === "tool" || i.text.trim());
-}
-function foldOf(turn) {
-  if (turn.status !== "done") {
-    return void 0;
-  }
-  const answer = turn.blocks.findLastIndex((b) => b.kind === "text" && b.text.trim());
-  const hidden = /* @__PURE__ */ new Set();
-  for (const [i, b] of turn.blocks.entries()) {
-    if (i === answer || b.kind === "steer") {
-      continue;
-    }
-    if (b.kind === "tool" && (isBackgroundCall(b.call) || b.call.subagents?.some((a) => a.status === "running" || a.status === "queued"))) {
-      continue;
-    }
-    if (answer >= 0 && i > answer && b.kind === "tool" && b.call.status !== "done") {
-      continue;
-    }
-    hidden.add(b.id);
-  }
-  if (hidden.size === 0) {
-    return void 0;
-  }
-  const ms = (turn.endedAt ?? turn.startedAt) - turn.startedAt;
-  return { hidden, label: workedFor(ms) };
-}
-var workedFor = (ms) => ms > 0 ? `Worked for ${formatDuration(ms)}` : "Worked";
-function parts(turn) {
-  const fold = foldOf(turn);
-  if (!fold) {
-    return [{ blocks: [...turn.blocks], kind: "shown" }];
-  }
-  const out = [];
-  const show = (b) => {
-    const last = out.at(-1);
-    if (last?.kind === "shown") {
-      last.blocks.push(b);
-    } else {
-      out.push({ blocks: [b], kind: "shown" });
-    }
-  };
-  let stretch = [];
-  let from = turn.startedAt;
-  const flush = (to) => {
-    const hidden = stretch.filter((b) => fold.hidden.has(b.id));
-    if (hidden.length) {
-      out.push({ blocks: hidden, key: `fold${hidden[0].id}`, kind: "fold", label: workedFor(to - from) });
-    }
-    stretch.filter((b) => !fold.hidden.has(b.id)).forEach(show);
-    stretch = [];
-  };
-  for (const b of turn.blocks) {
-    if (b.kind === "steer") {
-      flush(b.at);
-      show(b);
-      from = b.at;
-    } else {
-      stretch.push(b);
-    }
-  }
-  flush(turn.endedAt ?? from);
-  return out;
-}
-function formatDuration(ms) {
-  if (!Number.isFinite(ms) || ms < 0) {
-    return "0ms";
-  }
-  if (ms < 1e3) {
-    return `${Math.max(1, Math.round(ms))}ms`;
-  }
-  if (ms < 1e4) {
-    const tenths = Math.round(ms / 100) / 10;
-    return tenths >= 10 ? "10s" : `${tenths.toFixed(1)}s`;
-  }
-  if (ms < 6e4) {
-    return `${Math.round(ms / 1e3)}s`;
-  }
-  const total = Math.round(ms / 1e3);
-  const h = Math.floor(total / 3600);
-  const m = Math.floor(total % 3600 / 60);
-  const s = total % 60;
-  return [h ? `${h}h` : "", m ? `${m}m` : "", s ? `${s}s` : ""].filter(Boolean).join(" ");
-}
-function actionOf(call) {
-  switch (call.name) {
-    case "terminal":
-    case "execute_code":
-    case "process":
-      return "command";
-    case "read_file":
-      return "read";
-    case "patch":
-    case "write_file":
-      return "edit";
-    case "search_files":
-      return "code-search";
-    case "web_search":
-      return "search";
-    case "web_extract":
-      return "fetch";
-  }
-  return call.name.startsWith("browser") ? "browser" : "other";
-}
-var plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
-function actionLabel(action, n) {
-  switch (action) {
-    case "command":
-      return `Ran ${plural(n, "command", "commands")}`;
-    case "read":
-      return `Read ${plural(n, "file", "files")}`;
-    case "edit":
-      return `Changed ${plural(n, "file", "files")}`;
-    case "code-search":
-      return `Searched code ${plural(n, "time", "times")}`;
-    case "search":
-      return `Searched the web ${plural(n, "time", "times")}`;
-    case "fetch":
-      return `Read ${plural(n, "page", "pages")}`;
-    case "browser":
-      return `Used browser ${plural(n, "time", "times")}`;
-    case "other":
-      return `Used ${plural(n, "tool", "tools")}`;
-  }
-}
-var priority = (a) => a === "command" || a === "edit" ? 0 : a === "other" ? 2 : 1;
-function summarize(items) {
-  const calls = items.flatMap((i) => i.kind === "tool" ? [i.call] : []);
-  if (!calls.length) {
-    return items.length === 1 ? "Thought" : `Thought (\xD7${items.length})`;
-  }
-  const groups = /* @__PURE__ */ new Map();
-  for (const c of calls) {
-    const a = actionOf(c);
-    groups.set(a, [...groups.get(a) ?? [], c]);
-  }
-  const all = [...groups].map(([action, list], index) => ({
-    count: list.length,
-    index,
-    label: actionLabel(action, action === "edit" ? editedFiles(list) : list.length),
-    priority: priority(action)
-  }));
-  const picked = [...all].sort((a, b) => a.priority - b.priority || a.index - b.index).slice(0, 2).sort((a, b) => a.index - b.index);
-  const labels = picked.map((p) => p.label);
-  const rest = calls.length - picked.reduce((n, p) => n + p.count, 0);
-  if (rest > 0) {
-    labels.push(`Performed ${plural(rest, "other action", "other actions")}`);
-  }
-  const words2 = labels.map((l, i) => i === 0 ? l : l.charAt(0).toLowerCase() + l.slice(1));
-  return words2.length < 3 ? words2.join(" and ") : `${words2.slice(0, -1).join(", ")}, and ${words2.at(-1)}`;
-}
-function editedFiles(calls) {
-  const paths = /* @__PURE__ */ new Set();
-  let unnamed = 0;
-  for (const c of calls) {
-    const path = str6(c.args.path);
-    if (path) {
-      paths.add(path);
-    } else {
-      unnamed++;
-    }
-  }
-  return paths.size + unnamed;
-}
-function groupIcon(items) {
-  const actions = new Set(items.flatMap((i) => i.kind === "tool" ? [actionOf(i.call)] : []));
-  if (!actions.size) {
-    return "brain";
-  }
-  return actions.size === 1 ? actionIcon([...actions][0]) : "hammer";
-}
-function actionIcon(action) {
-  switch (action) {
-    case "command":
-      return "terminal";
-    case "read":
-      return "eye";
-    case "edit":
-      return "pencil";
-    case "code-search":
-      return "search";
-    case "search":
-    case "fetch":
-      return "globe";
-    case "browser":
-      return "compass";
-    case "other":
-      return "wrench";
-  }
-}
-var str6 = (v) => typeof v === "string" && v ? v : void 0;
-function shortPath(path, cwd = process.env.HERMES_CWD || process.cwd()) {
-  const root = cwd.replace(/\/+$/, "");
-  if (root && path.startsWith(`${root}/`)) {
-    return path.slice(root.length + 1);
-  }
-  const home = homedir7();
-  return home && path.startsWith(`${home}/`) ? `~${path.slice(home.length)}` : path.replace(/^\.\//, "");
-}
-function stepLabel(call) {
-  const a = call.args;
-  const path = str6(a.path);
-  switch (call.name) {
-    case "terminal": {
-      const command = str6(a.command) ?? call.context;
-      return command ? flat(commandDisplayText(command)) : "Command";
-    }
-    case "read_file":
-      return path ? `Read ${shortPath(path)}` : "Read file";
-    case "patch":
-      return path ? `Edited ${shortPath(path)}` : "Edited a file";
-    case "write_file":
-      return path ? `Wrote ${shortPath(path)}` : "Wrote a file";
-    case "search_files": {
-      const pattern = str6(a.pattern) ?? call.context;
-      const where = path && path !== "." ? ` in ${shortPath(path)}` : "";
-      return a.target === "files" ? `Searched files ${pattern}${where}` : `Searched ${pattern}${where}`;
-    }
-    case "web_search":
-      return str6(a.query) ? `Searched the web for ${a.query}` : "Web search";
-    case "web_extract": {
-      const urls = Array.isArray(a.urls) ? a.urls.filter((u) => typeof u === "string") : [];
-      const first = urls[0] ?? str6(a.url);
-      return first ? `Read ${first}${urls.length > 1 ? ` +${urls.length - 1} more` : ""}` : "Read a page";
-    }
-    case "execute_code":
-      return call.context ? flat(call.context) : "Ran a script";
-    case "link_pull_request":
-    case "unlink_pull_request": {
-      const verb = call.name === "link_pull_request" ? "Linked" : "Unlinked";
-      const pr = str6(a.url)?.match(/github[^/]*\/([^/]+\/[^/]+)\/pull\/(\d+)/);
-      const repo = pr?.[1] ?? str6(a.repository);
-      const number = pr?.[2] ?? (typeof a.number === "number" ? String(a.number) : void 0);
-      return repo && number ? `${verb} ${repo}#${number}` : `${verb} a pull request`;
-    }
-    case "list_pull_requests":
-      return "Listed linked pull requests";
-  }
-  const name = call.name.replace(/_/g, " ");
-  const label = name.charAt(0).toUpperCase() + name.slice(1);
-  return call.context ? `${label}: ${flat(call.context)}` : label;
-}
-function liveLabel(item3) {
-  if (item3.kind === "thinking") {
-    return thoughtLine(item3.text) || (item3.endedAt === void 0 ? "Thinking" : "Thought");
-  }
-  const call = item3.call;
-  const command = call.name === "terminal" ? str6(call.args.command) ?? call.context : void 0;
-  if (!command) {
-    return stepLabel(call);
-  }
-  const verb = { cancelled: "Stopped", done: "Ran", error: "Failed", running: "Running" }[call.status];
-  return `${verb} ${commandProgramName(command) ?? "command"}`;
-}
-function thoughtLine(markdown) {
-  return flat(
-    markdown.replace(/!?\[([^\]]*)\]\([^)]*\)/g, "$1").replace(/^[ \t]*(?:#{1,6}|[-*+]|\d+\.)[ \t]+/gm, "").replace(/`+|\*\*|~~/g, "").replace(/(^|[^\w*])[*_]([^*_\n]+)[*_](?![\w*])/g, "$1$2")
-  );
-}
-var flat = (text2) => text2.replace(/\s+/g, " ").trim();
-function clock2(at) {
-  return new Date(at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }).toLowerCase();
 }
 
 // src/preformatted.ts
@@ -35192,7 +35394,7 @@ function workNode(items, parent, live, now) {
   ] }, "head") : /* @__PURE__ */ jsxs("row", { align: "center", gap: "sm", children: [
     /* @__PURE__ */ jsx("icon", { name: groupIcon(shown), tone: failed ? "error" : void 0 }, "icon"),
     /* @__PURE__ */ jsx("text", { grow: 1, spans: [{ s: "muted", t: summarize(shown) }], truncate: "end", wrap: "none" }, "label"),
-    /* @__PURE__ */ jsx("text", { role: "hermes.work.time", spans: [{ s: "dim", t: clock2(startOf(shown[0])) }], wrap: "none" }, "time")
+    /* @__PURE__ */ jsx("text", { role: "hermes.work.time", spans: [{ s: "dim", t: clock(startOf(shown[0])) }], wrap: "none" }, "time")
   ] }, "head");
   return node("section", { collapsed: true, collapsible: true, head: `${id}.head`, key: key2, role: "hermes.work.group" }, [
     head2,
@@ -35219,7 +35421,7 @@ function itemNode(item3, parent, now, key2 = item3.id) {
       "text",
       {
         grow: 1,
-        spans: [{ fx: running ? "shimmer" : void 0, s: "muted", t: stepLabel(call) }],
+        spans: labelSpans(call, running),
         truncate: "end",
         wrap: "none"
       },
@@ -35233,6 +35435,18 @@ function itemNode(item3, parent, now, key2 = item3.id) {
   return node("section", { collapsed: true, collapsible: true, head: `${id}.head`, key: key2, role: "hermes.work.row" }, [
     head2,
     /* @__PURE__ */ jsx("col", { gap: "xs", role: "hermes.work.detail", children: detail }, "detail")
+  ]);
+}
+function labelSpans(call, running) {
+  const fx = running ? "shimmer" : void 0;
+  const entries = (call.batch ?? [call]).map((e) => callApp({ args: e.args, name: e.name }));
+  if (!entries.every(Boolean)) {
+    return [{ fx, s: "muted", t: stepLabel(call) }];
+  }
+  return entries.flatMap((app, i) => [
+    ...i ? [{ fx, s: "muted", t: ", " }] : [],
+    { fx, t: app.app },
+    { fx, s: "muted", t: ` \xB7 ${app.action}` }
   ]);
 }
 function itemIcon(item3) {
