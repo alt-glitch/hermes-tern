@@ -22,6 +22,7 @@ import type { AnyGatewayEvent } from '@tui/gatewayTypes.js'
 
 import logo from '../assets/logo.png'
 
+import { Agents } from './agents/store.js'
 import { copyToClipboard } from './clipboard.js'
 import { localCommand } from './commands.js'
 import { Composer } from './composer.js'
@@ -31,6 +32,7 @@ import type { Overlay, OverlayHost } from './overlay.js'
 import { writeActiveSessionFile } from './hermes/activeSessionFile.js'
 import { type Attachment, uploadImage } from './hermes/images.js'
 import { sharedPromptId, sharedPromptRequest } from './hermes/sharedPrompts.js'
+import { openAgents } from './overlays/agents.js'
 import { Completion } from './overlays/completion.js'
 import { openModelPicker } from './overlays/models.js'
 import { promptOverlay } from './overlays/prompts.js'
@@ -64,6 +66,8 @@ interface CreateResult extends Partial<
 /** Runs the Tern frontend until the user quits; resolves the exit code. */
 export class App implements OverlayHost {
   readonly transcript = new Transcript()
+  /** The session's subagents, followed while they run (Task cards, the pill, the hub). */
+  readonly agents: Agents = new Agents(this)
   readonly composer = new Composer()
   readonly overlays: Overlay[] = []
   sid: string | null = null
@@ -243,6 +247,10 @@ export class App implements OverlayHost {
 
     if (key.shift && key.name === 'tab') {
       return this.#cycleEffort()
+    }
+
+    if ((key.alt && key.name === 'a') || key.name === 'å') {
+      return openAgents(this)
     }
 
     if (key.alt && key.name === 'up' && this.queue.length) {
@@ -609,6 +617,7 @@ export class App implements OverlayHost {
 
     if (r.messages?.length) {
       this.transcript.load(r.messages)
+      this.agents.scan()
     }
 
     if (r.inflight) {
@@ -810,6 +819,8 @@ export class App implements OverlayHost {
       case 'tool.complete':
         if (ev.payload) {
           t.toolComplete(ev.payload)
+          // A dispatched delegation: its agents' rows start following the owner.
+          this.agents.scan()
         }
 
         break
@@ -1072,6 +1083,7 @@ export class App implements OverlayHost {
           this.composer.undo()
           this.changed()
         },
+        agents: { onOpen: () => openAgents(this), running: this.agents.running().length },
         placeholder: 'Ask Hermes — / commands · @ files',
         queued: this.queue,
         ready: this.sid !== null

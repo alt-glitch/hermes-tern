@@ -5,6 +5,7 @@
 
 import { type JSX, node } from '@stencil-hq/tern'
 
+import { agentName } from '../agents/store.js'
 import type { Subagent, Todo, ToolCall } from '../model.js'
 import { record } from '../transcript.js'
 
@@ -471,9 +472,15 @@ function taskCard(call: ToolCall, result: Record<string, unknown> | undefined, n
 
   if (agents.length && !working) {
     const ok = agents.filter(a => a.status === 'done').length
-    const failed = agents.length - ok
+    const stopped = agents.filter(a => a.status === 'cancelled').length
+    const failed = agents.length - ok - stopped
     const requests = agents.reduce((n, a) => n + a.calls, 0)
-    meta = [`${ok} succeeded`, failed ? `${failed} failed` : '', requests ? `${requests} req` : '']
+    meta = [
+      `${ok} succeeded`,
+      failed ? `${failed} failed` : '',
+      stopped ? `${stopped} stopped` : '',
+      requests ? `${requests} req` : ''
+    ]
       .filter(Boolean)
       .join(' · ')
     took = Math.max(...agents.map(a => a.startedAt + (a.duration ?? 0))) - call.startedAt
@@ -499,7 +506,13 @@ function taskCard(call: ToolCall, result: Record<string, unknown> | undefined, n
   }
 }
 
-function agentNode(a: Subagent, now: number): JSX.Element {
+/**
+ * One subagent as a Tern `agent` row, as the Task card and the agents hub show it. `fresh` sends
+ * its timers' true ages (a node built anew, like the hub's preview): the Task card's row keeps the
+ * age it was first sent with, which only a node that was there all along may reuse.
+ */
+export function agentNode(a: Subagent, now: number, fresh = false): JSX.Element {
+  const ageOf = (owner: object, startedAt: number) => (fresh ? Math.max(0, now - startedAt) : age(owner, startedAt, now))
   const status =
     a.status === 'done'
       ? 'done'
@@ -516,23 +529,25 @@ function agentNode(a: Subagent, now: number): JSX.Element {
   return (
     <agent
       agent="task"
+      badges={a.exitReason && a.status !== 'done' ? [{ text: a.exitReason.replace(/_/g, ' '), tone: 'warning' }] : undefined}
       collapsed={a.summary ? true : undefined}
       collapsible={a.summary ? true : undefined}
-      key={a.id}
+      depth={a.depth || undefined}
+      key={a.key ?? a.id}
       model={a.model}
-      name={`Agent ${a.index + 1}`}
+      name={agentName(a)}
       stats={{
         requests: a.calls || undefined,
         tokens: a.tokens || undefined,
         tools: a.toolCount || undefined,
-        ...(running ? { age: age(a, a.startedAt, now) } : { took: a.duration })
+        ...(running ? { age: ageOf(a, a.startedAt) } : { took: a.duration })
       }}
       status={status}
       task={a.goal}
       tool={
         running && a.tool
           ? {
-              age: a.toolSince ? age(a.toolSince, a.toolSince.at, now) : undefined,
+              age: a.toolSince ? ageOf(a.toolSince, a.toolSince.at) : undefined,
               intent: a.toolPreview,
               name: a.tool
             }

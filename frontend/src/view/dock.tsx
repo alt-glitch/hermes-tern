@@ -40,6 +40,8 @@ export interface DockContext {
   /** Pull the oldest queued prompt back into the composer. */
   onQueueEdit(): void
   onContext(): void
+  /** Running subagents: the pill above the composer that opens the agents hub. */
+  agents?: { running: number; onOpen(): void }
 }
 
 /** The `dock` region's nodes: the working row, the queued prompts and the composer. */
@@ -74,9 +76,28 @@ export function dockNodes(cx: DockContext): JSX.Element[] {
     )
   }
 
+  if (cx.agents?.running) {
+    nodes.push(
+      <row key="agents" role="omp.hud">
+        {agentsPill(cx.agents.running, cx.agents.onOpen)}
+      </row>
+    )
+  }
+
   nodes.push(composerNode(cx))
 
   return nodes
+}
+
+/** omp's agents pill: a click (or ⌥A) opens the hub. Keyed so updates keep its node and its entrance plays once. */
+function agentsPill(running: number, onOpen: () => void): JSX.Element {
+  return (
+    <row align="center" gap="xs" key="pill" onClick={onOpen} role="omp.hud.pill" title="Agents  ⌥A">
+      <icon key="icon" name="users" />
+      <spinner key="spin" style="dots" tone="accent" />
+      <text key="text" text={`${running} agent${running === 1 ? '' : 's'} running`} wrap="none" />
+    </row>
+  )
 }
 
 function workingNode(cx: DockContext): JSX.Element {
