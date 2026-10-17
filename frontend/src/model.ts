@@ -93,6 +93,8 @@ export interface UserEntry {
 export interface TurnEntry {
   kind: 'turn'
   id: string
+  /** Why a turn with no prompt of its own started ("Subagents finished"): Hermes went on by itself. */
+  continued?: string
   /** Bumped on every change to the turn, so views rebuild only the turns that changed. */
   rev: number
   blocks: Block[]

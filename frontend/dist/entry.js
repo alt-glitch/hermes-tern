@@ -24808,6 +24808,7 @@ var Transcript = class {
     }
     const turn = {
       blocks: [],
+      continued: continuation(this.entries.findLast((e) => e.kind !== "notice")),
       // A session's first turn starts from zero; later ones from the last tick.
       countersAtStart: this.#counters ?? (this.entries.some((e) => e.kind === "turn") ? void 0 : { prompt: 0, read: 0, total: 0 }),
       id: this.id("t"),
@@ -25023,13 +25024,18 @@ var Transcript = class {
     this.entries = this.entries.filter((e) => e.kind === "welcome");
     this.#live = void 0;
     let turn;
+    let pendingContinued;
     const calls = /* @__PURE__ */ new Map();
     for (const m of messages2) {
       const at = typeof m.timestamp === "number" ? m.timestamp * 1e3 : 0;
       const text2 = typeof m.text === "string" ? m.text : typeof m.content === "string" ? m.content : "";
       if (m.role === "user") {
         turn = void 0;
-        this.entries.push({ at, id: this.id("u"), kind: "user", text: text2 });
+        if (ASYNC_DONE.test(text2)) {
+          pendingContinued = "Subagents finished";
+        } else {
+          this.entries.push({ at, id: this.id("u"), kind: "user", text: text2 });
+        }
         continue;
       }
       if (m.role === "system") {
@@ -25040,7 +25046,9 @@ var Transcript = class {
         continue;
       }
       if (!turn) {
-        turn = { blocks: [], id: this.id("t"), kind: "turn", rev: 0, startedAt: at, status: "done" };
+        const continued = pendingContinued ?? continuation(this.entries.findLast((e) => e.kind !== "notice"));
+        turn = { blocks: [], continued, id: this.id("t"), kind: "turn", rev: 0, startedAt: at, status: "done" };
+        pendingContinued = void 0;
         this.entries.push(turn);
       }
       if (m.role === "assistant") {
@@ -25205,6 +25213,16 @@ function toTodos(raw) {
     });
   }
   return out;
+}
+var ASYNC_DONE = /^\[ASYNC DELEGATION BATCH COMPLETE/;
+function continuation(prev) {
+  if (prev?.kind !== "turn") {
+    return void 0;
+  }
+  const background = prev.blocks.some(
+    (b) => b.kind === "tool" && b.call.name === "delegate_task" && record(b.call.result)?.mode === "background"
+  );
+  return background ? "Subagents finished" : "Continued on its own";
 }
 
 // src/agents/liveLog.ts
@@ -29314,6 +29332,13 @@ var STYLES = css`
   [data-role='omp.ask.option'] {
     padding-left: 34px !important;
   }
+
+  /* A turn Hermes started by itself: set apart from the answer above, like a new prompt is. */
+  [data-role='omp.turn.continued'] {
+    margin-top: 28px !important;
+    margin-bottom: 4px !important;
+    font-family: var(--sans) !important;
+  }
 `;
 
 // .hermes-src/node_modules/@hermes/shared/src/color.ts
@@ -30703,6 +30728,14 @@ function turnNode(turn, id, cx) {
   const children2 = groupRuns(turn.blocks).map(
     (b) => Array.isArray(b) ? toolRunNode(b, id, cx.now, (inner) => blockNode(inner, `${id}.r${b[0].id}.${inner.id}`, false, cx)) : blockNode(b, `${id}.${b.id}`, live && b === lastText, cx)
   );
+  if (turn.continued) {
+    children2.unshift(
+      /* @__PURE__ */ jsxs("row", { align: "center", gap: "sm", role: "omp.turn.continued", children: [
+        /* @__PURE__ */ jsx("icon", { name: turn.continued.startsWith("Subagents") ? "users" : "loop" }, "icon"),
+        /* @__PURE__ */ jsx("text", { spans: [{ s: "muted", t: turn.continued }] }, "why")
+      ] }, "continued")
+    );
+  }
   if (turn.status === "error") {
     children2.push(
       node("card", { head: `${id}.error.head`, key: "error", role: "omp.error", tone: "error" }, [
@@ -31059,9 +31092,6 @@ var App = class {
     if (ev.ev === "focus" && ev.id === INPUT_ID && !this.overlays.at(-1)?.modal) {
       this.#focus = INPUT_ID;
       this.#surface.focus(INPUT_ID);
-    }
-    if (ev.ev === "toggle" && !ev.collapsed && ev.id.startsWith("main.")) {
-      this.#surface.reveal(ev.id, "start");
     }
   }
   /** Shows subagent `id` beside the chat in a Tern split; its timeline sheet where no split can open. */
@@ -32020,9 +32050,6 @@ var WatchApp = class {
   #onEvent(ev) {
     if (ev.ev === "focus" && ev.id === INPUT_ID2) {
       this.#surface.focus(INPUT_ID2);
-    }
-    if (ev.ev === "toggle" && !ev.collapsed && ev.id.startsWith("main.")) {
-      this.#surface.reveal(ev.id, "start");
     }
   }
   #onKey(key2) {

@@ -247,11 +247,6 @@ export class WatchApp {
     if (ev.ev === 'focus' && ev.id === INPUT_ID) {
       this.#surface.focus(INPUT_ID)
     }
-
-    // As in the main chat: what opens keeps its head in view.
-    if (ev.ev === 'toggle' && !ev.collapsed && ev.id.startsWith('main.')) {
-      this.#surface.reveal(ev.id, 'start')
-    }
   }
 
   #onKey(key: Key) {

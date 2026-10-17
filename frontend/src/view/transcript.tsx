@@ -105,6 +105,17 @@ function turnNode(turn: TurnEntry, id: string, cx: TranscriptContext): JSX.Eleme
       : blockNode(b, `${id}.${b.id}`, live && b === lastText, cx)
   )
 
+  // A turn Hermes started by itself gets a quiet line saying why, so it does not read as part
+  // of the answer above it.
+  if (turn.continued) {
+    children.unshift(
+      <row align="center" gap="sm" key="continued" role="omp.turn.continued">
+        <icon key="icon" name={turn.continued.startsWith('Subagents') ? 'users' : 'loop'} />
+        <text key="why" spans={[{ s: 'muted', t: turn.continued }]} />
+      </row>
+    )
+  }
+
   if (turn.status === 'error') {
     children.push(
       node('card', { head: `${id}.error.head`, key: 'error', role: 'omp.error', tone: 'error' }, [
