@@ -18,6 +18,41 @@ export const STYLES = css`
     font-family: var(--sans) !important;
   }
 
+  /* A pill holding the keys (Down from an empty prompt): ringed in the accent, without the pick mark's side bar. */
+  .sf-row[data-role='omp.hud.pill'][data-mark='pick'] {
+    box-shadow: inset 0 0 0 1px var(--accent) !important;
+    color: var(--t1) !important;
+  }
+
+  .sf-row[data-role='omp.hud.pill'][data-mark='pick']::after {
+    display: none;
+  }
+
+  /* What the keys do while a pill holds them, beside the pills. */
+  .sf-row[data-role='omp.hud.hint'] {
+    flex: none;
+    gap: 4px;
+    margin-right: 6px;
+    font: 500 11px/1 var(--sans);
+    color: var(--t3);
+  }
+
+  [data-role='omp.hud.hint'] .kbd {
+    height: 15px;
+    min-width: 18px;
+    font-size: 10px;
+  }
+
+  /* A background card's process line opens the Background sheet. */
+  .sf-row[data-role='omp.tool.process'] {
+    cursor: pointer;
+    border-radius: 4px;
+  }
+
+  .sf-row[data-role='omp.tool.process']:hover {
+    background: var(--l1);
+  }
+
   /* A turn Hermes started by itself: set apart from the answer above, like a new prompt is. */
   [data-role='omp.turn.continued'] {
     margin-top: 28px !important;

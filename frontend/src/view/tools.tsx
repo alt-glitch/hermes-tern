@@ -7,7 +7,8 @@ import { type JSX, node } from '@stencil-hq/tern'
 
 import { agentName } from '../agents/store.js'
 import type { Subagent, Todo, ToolCall } from '../model.js'
-import { record } from '../transcript.js'
+import { isRunning as processRuns, processElapsed, processIdOf, processTone, processVerdict, watchersOf } from '../processes/store.js'
+import { isBackgroundCall, record } from '../transcript.js'
 
 import { commandLine, describeCommand } from './describe.js'
 import { age, compact, duration } from './time.js'
@@ -70,7 +71,9 @@ export function toolNode(call: ToolCall, now: number, place: ToolPlace = {}): JS
       badges: card.badges,
       collapsed: body.length > 0 ? collapsed : undefined,
       collapsible: body.length > 0 ? true : undefined,
-      exit: call.name === 'terminal' && !running && call.status !== 'cancelled' ? exitOf(call) : undefined,
+      // A background start's exit 0 only says it started; its process line tells how it ended.
+      exit:
+        call.name === 'terminal' && !running && call.status !== 'cancelled' && !isBackgroundCall(call) ? exitOf(call) : undefined,
       frame: card.frame === 'inline' && (running || !body.length || card.name !== 'web_search') ? 'inline' : undefined,
       key: call.id,
       lang: card.lang,
@@ -95,7 +98,7 @@ function cardOf(call: ToolCall, now: number): Card {
 
   switch (call.name) {
     case 'terminal':
-      return bashCard(call, result)
+      return isBackgroundCall(call) ? backgroundCard(call, result, now) : bashCard(call, result)
 
     case 'read_file':
       return readCard(call, result)
@@ -188,7 +191,8 @@ function cardOf(call: ToolCall, now: number): Card {
   }
 }
 
-function bashCard(call: ToolCall, result: Record<string, unknown> | undefined): Card {
+/** `instead`, when given, takes the output's place (a background call's process line). */
+function bashCard(call: ToolCall, result: Record<string, unknown> | undefined, instead?: JSX.Element): Card {
   // The cancelled card's notice already says the command was interrupted.
   const output = (str(result?.output) ?? call.resultText)?.replace(/\s*\[Command interrupted\]\s*$/, '')
   const error = str(result?.error)
@@ -203,7 +207,7 @@ function bashCard(call: ToolCall, result: Record<string, unknown> | undefined): 
       ...(command && command !== line
         ? [<code key="cmd" lang="bash" max={{ h: '12lines' }} role="omp.tool.command" text={command} />]
         : []),
-      ...(output ? [<ansi follow key="out" max={{ h: '20lines' }} text={output} />] : []),
+      ...(instead ? [instead] : output ? [<ansi follow key="out" max={{ h: '20lines' }} text={output} />] : []),
       ...(error ? [<text key="err" role="omp.tool.error" spans={[{ s: 'error', t: error }]} wrap="word" />] : [])
     ],
     folded: true,
@@ -215,6 +219,60 @@ function bashCard(call: ToolCall, result: Record<string, unknown> | undefined): 
     targetKind: 'command',
     title: describeCommand(command)
   }
+}
+
+/**
+ * A `terminal(background=true)` call: the bash card with a `background` badge and the watchers
+ * Hermes armed, and, in place of the start notice, the process's live line from the store
+ * (running · run time · last output line, then how it ended). A click on that line opens the
+ * Background sheet on the process.
+ */
+function backgroundCard(call: ToolCall, result: Record<string, unknown> | undefined, now: number): Card {
+  const w = watchersOf(call)
+  const id = processIdOf(call) ?? call.process?.id
+  const line = id ? processLine(call, id, now) : undefined
+  // The start result ("Background process started") says nothing the process line does not.
+  const card = bashCard(call, result, line)
+
+  return {
+    ...card,
+    badges: [
+      { text: 'background' },
+      ...(w.notify ? [{ text: 'notify on exit' }] : []),
+      ...w.patterns.map(p => ({ text: `watch: ${clip(p, 32)}` })),
+      ...(w.heartbeat ? [{ text: `every ${w.heartbeat}s` }] : [])
+    ],
+    folded: line ? false : card.folded
+  }
+}
+
+function processLine(call: ToolCall, id: string, now: number): JSX.Element {
+  const p = call.process
+  const live = !p || processRuns(p)
+  const tone = p ? processTone(p.status) : 'muted'
+
+  return (
+    <row
+      actions={{ click: `open-process=${id}`, menu: [`open-process=${id}`] }}
+      align="center"
+      gap="xs"
+      key="process"
+      role="omp.tool.process"
+      title="Open in the Background sheet  ⌥B"
+    >
+      {p && live ? (
+        <spinner key="state-icon" style="dots" tone="accent" />
+      ) : (
+        <icon key="state-icon" name={p ? (p.status === 'done' ? 'done' : p.status === 'failed' ? 'failed' : 'aborted') : 'pending'} tone={tone} />
+      )}
+      <text key="state" spans={[{ s: tone, t: p ? processVerdict(p) : 'starting' }]} wrap="none" />
+      {p ? <text key="sep1" spans={[{ s: 'dim', t: '·' }]} wrap="none" /> : null}
+      {p && live ? <elapsed age={age(p, p.startedAt, now)} format="short" key="time" /> : null}
+      {p && !live ? <text key="took" spans={[{ s: 'muted', t: duration(processElapsed(p, now)) }]} wrap="none" /> : null}
+      {p?.lastLine ? <text key="sep2" spans={[{ s: 'dim', t: '·' }]} wrap="none" /> : null}
+      {p?.lastLine ? <text grow={1} key="last" spans={[{ s: 'muted mono', t: p.lastLine }]} truncate="end" wrap="none" /> : null}
+    </row>
+  )
 }
 
 /** One call in a few words, for a run's head: "Check git status", "Read README.md". */

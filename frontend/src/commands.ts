@@ -5,6 +5,7 @@
 import type { App } from './app.js'
 import { CONTROL_COMMANDS } from './controlCommands.js'
 import { openAgents } from './overlays/agents.js'
+import { openBackground } from './overlays/background.js'
 import { openHelp } from './overlays/help.js'
 import { openModelPicker, switchModel } from './overlays/models.js'
 import { confirmOverlay } from './overlays/prompts.js'
@@ -93,6 +94,12 @@ const COMMANDS: readonly LocalCommand[] = [
     aliases: ['tasks'],
     name: 'agents',
     run: (app, arg) => (arg ? false : openAgents(app))
+  },
+  {
+    // Hermes has no command by these names (its `/bg` runs a prompt in a background session).
+    aliases: ['bashes', 'shells', 'processes'],
+    name: 'ps',
+    run: app => openBackground(app)
   },
   {
     // `/help <command>` is the backend's detailed usage.

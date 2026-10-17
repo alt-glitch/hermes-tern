@@ -17,6 +17,11 @@ scp -q /Users/sid/.hermes/cache/scratch/vq7.ps1 sidbin@vespyr:vq7.ps1 && ssh sid
     expect(describeCommand(cmd)).toBe('Run vq7.ps1 on vespyr: steam userdata 3669870 +2')
   })
 
+  it('names a shell loop as a loop, not by its keyword', () => {
+    expect(describeCommand('for i in $(seq 1 90); do echo tick $i; sleep 1; done')).toBe('Run a loop')
+    expect(describeCommand('while true; do date; sleep 5; done')).toBe('Run a loop')
+  })
+
   it('names an inline PowerShell one-liner over ssh by its cmdlets', () => {
     const cmd = `ssh sidbin@vespyr '$lib="C:\\Program Files (x86)\\Steam\\steamapps"; Get-ChildItem "$lib\\appmanifest_*.acf" | % { $t=Get-Content $_ -Raw }; Get-Process steam' 2>&1`
 
