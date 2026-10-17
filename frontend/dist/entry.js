@@ -16234,7 +16234,7 @@ var require_cookies = __commonJS({
       if (!cookies) {
         return [];
       }
-      return cookies.map((pair) => parseSetCookie(pair));
+      return cookies.map((pair2) => parseSetCookie(pair2));
     }
     function setCookie(headers, cookie) {
       webidl.argumentLengthCheck(arguments, 2, "setCookie");
@@ -16782,8 +16782,8 @@ var require_util7 = __commonJS({
       const position = { position: 0 };
       const extensionList = /* @__PURE__ */ new Map();
       while (position.position < extensions.length) {
-        const pair = collectASequenceOfCodePointsFast(";", extensions, position);
-        const [name, value = ""] = pair.split("=");
+        const pair2 = collectASequenceOfCodePointsFast(";", extensions, position);
+        const [name, value = ""] = pair2.split("=");
         extensionList.set(
           removeHTTPWhitespace(name, true, false),
           removeHTTPWhitespace(value, false, true)
@@ -19119,17 +19119,17 @@ function decodeEvent(raw) {
     case "edit": {
       const from = num(raw, "from");
       const to = num(raw, "to");
-      const text = str(raw, "text");
+      const text2 = str(raw, "text");
       const cursor = num(raw, "cursor");
       const len = num(raw, "len");
-      if (sf === void 0 || id === void 0 || from === void 0 || to === void 0 || text === void 0 || cursor === void 0 || len === void 0) {
+      if (sf === void 0 || id === void 0 || from === void 0 || to === void 0 || text2 === void 0 || cursor === void 0 || len === void 0) {
         return unknown();
       }
-      return { ev, sf, id, from, to, text, cursor, len, raw };
+      return { ev, sf, id, from, to, text: text2, cursor, len, raw };
     }
     case "send": {
-      const text = str(raw, "text");
-      return sf !== void 0 && id !== void 0 && text !== void 0 ? { ev, sf, id, text, raw } : unknown();
+      const text2 = str(raw, "text");
+      return sf !== void 0 && id !== void 0 && text2 !== void 0 ? { ev, sf, id, text: text2, raw } : unknown();
     }
     case "error":
       return defined({ ev, msg: str(raw, "msg") ?? "", raw }, { sf, s: num(raw, "s"), op: num(raw, "op"), sheet: str(raw, "sheet"), id });
@@ -19450,8 +19450,8 @@ function modsOf(param) {
     meta: (bits & 8) !== 0
   };
 }
-function key(name, mods2, text) {
-  return text === void 0 ? { name, ...mods2 } : { name, text, ...mods2 };
+function key(name, mods2, text2) {
+  return text2 === void 0 ? { name, ...mods2 } : { name, text: text2, ...mods2 };
 }
 var LETTER_KEYS = {
   A: "up",
@@ -20025,21 +20025,21 @@ function createNode(kind, input, children2) {
     if (run2.length > 0)
       Object.assign(props, textProps(run2));
   } else if (kind === "el") {
-    let text = "";
+    let text2 = "";
     for (const part of parts) {
       if (part instanceof Span)
         throw new TypeError("el takes no spans; use html.span");
       if (typeof part === "string") {
         if (nodes.length === 0)
-          text += part;
+          text2 += part;
         else
           nodes.push(new Node("el", { tag: "span", text: part }));
       } else {
         nodes.push(part);
       }
     }
-    if (text !== "")
-      props["text"] = text;
+    if (text2 !== "")
+      props["text"] = text2;
   } else {
     nodes = containerChildren(parts);
   }
@@ -20238,11 +20238,11 @@ var View = class _View {
   }
 };
 function diff(old, now, ops) {
-  const text = isTextKind(now.kind);
+  const text2 = isTextKind(now.kind);
   const set = {};
   let changed = false;
   for (const key2 in now.props) {
-    if (text && key2 === "text")
+    if (text2 && key2 === "text")
       continue;
     const value = now.props[key2];
     if (value === void 0 || jsonEqual(old.props[key2], value))
@@ -20251,14 +20251,14 @@ function diff(old, now, ops) {
     changed = true;
   }
   for (const key2 in old.props) {
-    if (!(text && key2 === "text") && !(key2 in now.props)) {
+    if (!(text2 && key2 === "text") && !(key2 in now.props)) {
       set[key2] = null;
       changed = true;
     }
   }
   if (changed)
     ops.push(["set", now.id, set]);
-  if (text) {
+  if (text2) {
     const before = old.props["text"];
     const after = now.props["text"];
     if (!jsonEqual(before, after)) {
@@ -21285,10 +21285,10 @@ var JsonRpcRequestChannel = class {
    * on it too (mirror it, record seq, …) or `null` when the text was not
    * JSON or not a JSON object (`null`, a scalar).
    */
-  handleFrame(text) {
+  handleFrame(text2) {
     let frame;
     try {
-      frame = JSON.parse(text);
+      frame = JSON.parse(text2);
     } catch {
       return null;
     }
@@ -21676,7 +21676,7 @@ var canonicalEn = {
     queue: {
       unconfirmedPrefix: "[unconfirmed \xB7 Alt+K retry] ",
       // {0}=admission status identifier (unknown; queued rows render plain), {1}=input text
-      serverRow: (status, text) => `[${status}] ${text}`,
+      serverRow: (status, text2) => `[${status}] ${text2}`,
       discardFailed: (message) => `discard failed: ${message}`,
       journalCleanupFailed: (message) => `input delivered; journal cleanup failed: ${message}`,
       notSavedQueueKept: (message) => `input not saved: ${message} \u2014 queue kept`,
@@ -23096,7 +23096,7 @@ var slashCmdOpsEn = {
     },
     ownedBy: (surface) => `owned by ${surface}`,
     // {0}=text, {1}=hint from the gateway
-    withHint: (text, hint) => `${text} \u2014 ${hint}`,
+    withHint: (text2, hint) => `${text2} \u2014 ${hint}`,
     notStarted: (reason) => `wake: not started \u2014 ${reason}`,
     forPhrase: (phrase) => `for \u201C${phrase}\u201D`,
     // {0}=detail suffix (" for “phrase” · provider · enabled in config" or empty)
@@ -23449,7 +23449,7 @@ var subscriptionEn = {
 var userMessagesEn = {
   userMessages: {
     /** `{0}` = the (already clipped) raw detail text. */
-    details: (text) => `Details: ${text}`,
+    details: (text2) => `Details: ${text2}`,
     backend: {
       restarting: "Hermes stopped unexpectedly \u2014 restarting and reopening your chat (the reply in progress was lost).",
       restartingActivity: "Hermes stopped unexpectedly \xB7 restarting\u2026",
@@ -24225,21 +24225,21 @@ var GatewayClient = class extends EventEmitter {
     this.publish(ev);
   }
   handleWebSocketFrame(raw) {
-    const text = wireFrameText(raw);
-    if (!text) {
+    const text2 = wireFrameText(raw);
+    if (!text2) {
       return;
     }
-    const frame = this.channel.handleFrame(text);
+    const frame = this.channel.handleFrame(text2);
     if (!frame) {
-      this.protocolError("malformed websocket frame", text, "(empty frame)");
+      this.protocolError("malformed websocket frame", text2, "(empty frame)");
       return;
     }
     if (frame.method === "event") {
-      this.mirrorEventToSidecar(text);
+      this.mirrorEventToSidecar(text2);
     }
   }
-  protocolError(what, text, emptyLabel) {
-    const preview4 = text.trim().slice(0, MAX_LOG_PREVIEW) || emptyLabel;
+  protocolError(what, text2, emptyLabel) {
+    const preview4 = text2.trim().slice(0, MAX_LOG_PREVIEW) || emptyLabel;
     this.pushLog(`[protocol] ${what}: ${preview4}`);
     this.publish({ type: "gateway.protocol_error", payload: { preview: preview4 } });
   }
@@ -24296,7 +24296,7 @@ var GatewayClient = class extends EventEmitter {
       const ws = new WebSocketCtor(attachUrl, protocols);
       let settled = false;
       this.ws = ws;
-      this.channel.attach({ send: (text) => ws.send(text) });
+      this.channel.attach({ send: (text2) => ws.send(text2) });
       const connectPromise = new Promise((resolve4, reject) => {
         ws.addEventListener(
           "open",
@@ -24552,7 +24552,7 @@ import { randomUUID as randomUUID3 } from "node:crypto";
 
 // node_modules/@hermes/shared/src/slash.ts
 var SLASH_COMMAND_RE = /^\/[^\s/]*(?:\s|$)/;
-var looksLikeSlashCommand = (text) => SLASH_COMMAND_RE.test(text);
+var looksLikeSlashCommand = (text2) => SLASH_COMMAND_RE.test(text2);
 var str2 = (value) => typeof value === "string" ? value : void 0;
 function parseCommandDispatch(raw) {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
@@ -24584,11 +24584,11 @@ var RPC_UNKNOWN_METHOD = -32601;
 var DETAIL_LIMIT = 300;
 var rpcShape = (err) => err instanceof Error ? { code: err.code, message: err.message } : {};
 var detailLine = (raw) => {
-  const text = (raw ?? "").replace(/\s+/g, " ").trim();
-  if (!text) {
+  const text2 = (raw ?? "").replace(/\s+/g, " ").trim();
+  if (!text2) {
     return null;
   }
-  return t("userMessages.details", text.length > DETAIL_LIMIT ? `${text.slice(0, DETAIL_LIMIT - 1)}\u2026` : text);
+  return t("userMessages.details", text2.length > DETAIL_LIMIT ? `${text2.slice(0, DETAIL_LIMIT - 1)}\u2026` : text2);
 };
 var VERSION_SKEW_RE = /Extra inputs are not permitted|^unknown method:/;
 var isVersionSkewError = (err) => {
@@ -24601,44 +24601,44 @@ var NOT_CONNECTED_RE = /^gateway not (?:connected|running)\b/;
 var TIMED_OUT_RE = /^request timed out after (\d+)s/;
 var RPC_ERROR_ROWS = [
   [
-    (code2, text) => (code2 === RPC_SESSION_NOT_FOUND || code2 === void 0) && SESSION_NOT_FOUND_RE.test(text),
+    (code2, text2) => (code2 === RPC_SESSION_NOT_FOUND || code2 === void 0) && SESSION_NOT_FOUND_RE.test(text2),
     () => t("userMessages.rpc.sessionNotFound")
   ],
-  [(_code, text) => NOT_CONNECTED_RE.test(text), () => t("userMessages.rpc.notConnected")],
-  [(_code, text) => TIMED_OUT_RE.exec(text), (m) => t("userMessages.rpc.timedOut", m?.[1] ?? "?")]
+  [(_code, text2) => NOT_CONNECTED_RE.test(text2), () => t("userMessages.rpc.notConnected")],
+  [(_code, text2) => TIMED_OUT_RE.exec(text2), (m) => t("userMessages.rpc.timedOut", m?.[1] ?? "?")]
 ];
 var rpcErrorLogSink = null;
-var logReplacedWireText = (code2, text) => {
-  rpcErrorLogSink?.(`[rpc] ${code2 === void 0 ? "" : `code=${code2} `}${text}`);
+var logReplacedWireText = (code2, text2) => {
+  rpcErrorLogSink?.(`[rpc] ${code2 === void 0 ? "" : `code=${code2} `}${text2}`);
 };
 var describeRpcError = (err) => {
   const { code: code2, message } = rpcShape(err);
-  const text = message ?? (typeof err === "string" && err.trim() ? err : t("rpc.requestFailed"));
+  const text2 = message ?? (typeof err === "string" && err.trim() ? err : t("rpc.requestFailed"));
   if (isVersionSkewError(err)) {
-    logReplacedWireText(code2, text);
+    logReplacedWireText(code2, text2);
     return versionSkewMessage();
   }
   for (const [matcher, render2] of RPC_ERROR_ROWS) {
-    const m = matcher(code2, text);
+    const m = matcher(code2, text2);
     if (m) {
-      logReplacedWireText(code2, text);
+      logReplacedWireText(code2, text2);
       return render2(m === true ? null : m);
     }
   }
-  return text;
+  return text2;
 };
 var isUnsupportedCommand = (err) => err?.data?.reason === "unsupported_command";
 var describeSlashExecError = (command, err) => {
   const { message } = rpcShape(err);
-  const text = message ?? "";
+  const text2 = message ?? "";
   if (isUnsupportedCommand(err)) {
     return t("canonical.controls.notAvailable", command);
   }
-  if (/slash worker timed out/.test(text)) {
+  if (/slash worker timed out/.test(text2)) {
     return t("userMessages.rpc.slashTimedOut", command);
   }
-  if (/slash worker (?:exited|closed pipe|start failed)/.test(text)) {
-    const detail = detailLine(text.replace(/^slash worker (?:exited|closed pipe:?|start failed:?)\s*/, ""));
+  if (/slash worker (?:exited|closed pipe|start failed)/.test(text2)) {
+    const detail = detailLine(text2.replace(/^slash worker (?:exited|closed pipe:?|start failed:?)\s*/, ""));
     return [t("userMessages.rpc.slashCrashed", command), detail].filter(Boolean).join("\n");
   }
   return describeRpcError(err);
@@ -24786,14 +24786,14 @@ var Transcript = class {
     this.entries.push(entry);
     this.#touch();
   }
-  user(text, at = Date.now()) {
-    this.push({ at, id: this.id("u"), kind: "user", text });
+  user(text2, at = Date.now()) {
+    this.push({ at, id: this.id("u"), kind: "user", text: text2 });
   }
-  notice(text, tone = "info") {
-    this.push({ id: this.id("n"), kind: "notice", text, tone });
+  notice(text2, tone = "info") {
+    this.push({ id: this.id("n"), kind: "notice", text: text2, tone });
   }
-  panel(title, text) {
-    this.push({ id: this.id("p"), kind: "panel", text, title });
+  panel(title, text2) {
+    this.push({ id: this.id("p"), kind: "panel", text: text2, title });
   }
   /** Opens a live turn unless one is already streaming. */
   start(at = Date.now()) {
@@ -24815,16 +24815,16 @@ var Transcript = class {
     this.#live = turn;
     return turn;
   }
-  reasoning(text, at = Date.now()) {
-    if (!text) {
+  reasoning(text2, at = Date.now()) {
+    if (!text2) {
       return;
     }
     const turn = this.start(at);
     const last = turn.blocks.at(-1);
     if (last?.kind === "thinking" && last.endedAt === void 0) {
-      last.text += text;
+      last.text += text2;
     } else {
-      turn.blocks.push({ id: this.id("k"), kind: "thinking", startedAt: at, text });
+      turn.blocks.push({ id: this.id("k"), kind: "thinking", startedAt: at, text: text2 });
     }
     this.#touch(turn);
   }
@@ -24833,35 +24833,35 @@ var Transcript = class {
    * Hermes also relays each response's visible text through `reasoning.available`, so text the
    * turn already shows is not a thought either.
    */
-  reasoningBlock(text, at = Date.now()) {
+  reasoningBlock(text2, at = Date.now()) {
     const turn = this.start(at);
-    const incoming = text.trim();
+    const incoming = text2.trim();
     if (!incoming || turn.blocks.some((b) => b.kind === "thinking" || b.kind === "text" && b.text.includes(incoming))) {
       return;
     }
-    turn.blocks.push({ endedAt: at, id: this.id("k"), kind: "thinking", startedAt: at, text });
+    turn.blocks.push({ endedAt: at, id: this.id("k"), kind: "thinking", startedAt: at, text: text2 });
     this.#touch(turn);
   }
-  text(text, at = Date.now()) {
-    if (!text) {
+  text(text2, at = Date.now()) {
+    if (!text2) {
       return;
     }
     const turn = this.start(at);
     this.#endThinking(turn, at);
     const last = turn.blocks.at(-1);
     if (last?.kind === "text") {
-      last.text += text;
+      last.text += text2;
     } else {
-      turn.blocks.push({ id: this.id("x"), kind: "text", text });
+      turn.blocks.push({ id: this.id("x"), kind: "text", text: text2 });
     }
     this.#touch(turn);
   }
   /** Interim commentary: seals the streamed text so the next delta starts a new block. */
-  interim(text, { alreadyStreamed }, at = Date.now()) {
+  interim(text2, { alreadyStreamed }, at = Date.now()) {
     const turn = this.start(at);
     this.#endThinking(turn, at);
-    if (!alreadyStreamed && text.trim()) {
-      turn.blocks.push({ id: this.id("x"), kind: "text", text });
+    if (!alreadyStreamed && text2.trim()) {
+      turn.blocks.push({ id: this.id("x"), kind: "text", text: text2 });
     }
     turn.blocks.push({ id: this.id("x"), kind: "text", text: "" });
     this.#touch(turn);
@@ -25021,16 +25021,16 @@ var Transcript = class {
     const calls = /* @__PURE__ */ new Map();
     for (const m of messages2) {
       const at = typeof m.timestamp === "number" ? m.timestamp * 1e3 : 0;
-      const text = typeof m.text === "string" ? m.text : typeof m.content === "string" ? m.content : "";
+      const text2 = typeof m.text === "string" ? m.text : typeof m.content === "string" ? m.content : "";
       if (m.role === "user") {
         turn = void 0;
-        this.entries.push({ at, id: this.id("u"), kind: "user", text });
+        this.entries.push({ at, id: this.id("u"), kind: "user", text: text2 });
         continue;
       }
       if (m.role === "system") {
         turn = void 0;
-        if (text.trim()) {
-          this.entries.push({ id: this.id("n"), kind: "notice", text, tone: "info" });
+        if (text2.trim()) {
+          this.entries.push({ id: this.id("n"), kind: "notice", text: text2, tone: "info" });
         }
         continue;
       }
@@ -25042,8 +25042,8 @@ var Transcript = class {
         if (m.reasoning?.trim()) {
           turn.blocks.push({ endedAt: at, id: this.id("k"), kind: "thinking", startedAt: at, text: m.reasoning });
         }
-        if (text.trim()) {
-          turn.blocks.push({ id: this.id("x"), kind: "text", text });
+        if (text2.trim()) {
+          turn.blocks.push({ id: this.id("x"), kind: "text", text: text2 });
         }
       } else if (m.role === "tool") {
         const id = m.tool_call_id ?? this.id("c");
@@ -25206,9 +25206,9 @@ function toTodos(raw) {
 var LINE = /^(\d{2}:\d{2}:\d{2}) (\S+)\s*\| (.*)$/;
 var TOOL = /^-> ([^(]+)\((.*)\)$/;
 var RESULT = /^(\S+) (ok|ERROR)(?: ([\d.]+)s)?: ?(.*)$/;
-function parseLiveLog(text) {
+function parseLiveLog(text2) {
   const log = { entries: [] };
-  for (const raw of text.split("\n")) {
+  for (const raw of text2.split("\n")) {
     const m = LINE.exec(raw);
     if (!m) {
       continue;
@@ -25334,11 +25334,11 @@ var Agents = class {
     }
   }
   /** Queues steering text into a running agent; the owner answers `queued` or `rejected`. */
-  async steer(a, text) {
+  async steer(a, text2) {
     const r = await this.#host.gw.request("subagent.steer", {
       session_id: this.#host.sid,
       subagent_id: a.id,
-      text
+      text: text2
     });
     return r?.status === "queued";
   }
@@ -25505,7 +25505,7 @@ var Agents = class {
   }
   /** Reads `a`'s log from disk (else its tail over the gateway); true when it changed. */
   async #readLog(a, force = false) {
-    let text;
+    let text2;
     if (this.#readableLog(a)) {
       try {
         const path = a.logPath;
@@ -25515,26 +25515,26 @@ var Agents = class {
         }
         this.#sizes.set(path, size);
         const bytes = await readFile(path);
-        text = bytes.subarray(Math.max(0, bytes.length - MAX_LOG_BYTES)).toString("utf8");
+        text2 = bytes.subarray(Math.max(0, bytes.length - MAX_LOG_BYTES)).toString("utf8");
       } catch {
         this.#unreadable.add(a.logPath);
       }
     }
-    if (text === void 0 && this.#listed.has(a.id) && this.#host.sid) {
+    if (text2 === void 0 && this.#listed.has(a.id) && this.#host.sid) {
       try {
         const r = await this.#host.gw.request("subagent.tail", {
           session_id: this.#host.sid,
           subagent_id: a.id
         });
-        text = r?.available ? r.text : void 0;
+        text2 = r?.available ? r.text : void 0;
       } catch {
-        text = void 0;
+        text2 = void 0;
       }
     }
-    if (text === void 0) {
+    if (text2 === void 0) {
       return false;
     }
-    applyLog(a, parseLiveLog(text));
+    applyLog(a, parseLiveLog(text2));
     return true;
   }
   #touch(a) {
@@ -25584,13 +25584,13 @@ function applyLog(a, log) {
 
 // src/clipboard.ts
 import { spawn } from "node:child_process";
-function copyToClipboard(text, env = process.env) {
-  process.stdout.write(`\x1B]52;c;${Buffer.from(text).toString("base64")}\x07`);
+function copyToClipboard(text2, env = process.env) {
+  process.stdout.write(`\x1B]52;c;${Buffer.from(text2).toString("base64")}\x07`);
   if (process.platform === "darwin" && !env.SSH_CONNECTION && !env.SSH_TTY) {
     const child = spawn("pbcopy", [], { stdio: ["pipe", "ignore", "ignore"] });
     child.on("error", () => {
     });
-    child.stdin.end(text);
+    child.stdin.end(text2);
   }
 }
 
@@ -25643,19 +25643,19 @@ function modelPayload(arg) {
 }
 
 // src/controlCommands.ts
-var preview = (text) => text.length > 60 ? `${text.slice(0, 57)}\u2026` : text;
+var preview = (text2) => text2.length > 60 ? `${text2.slice(0, 57)}\u2026` : text2;
 var errorText = (e) => e instanceof Error ? e.message : String(e);
 async function interruptTurn(gw2, sid) {
   const execution_generation = await currentGeneration(gw2, sid);
   await gw2.request("session.interrupt", { session_id: sid, execution_generation });
 }
-async function steer(host, text) {
-  if (!text) {
+async function steer(host, text2) {
+  if (!text2) {
     return host.notice("Usage: /steer <guidance for the active turn>", "warning");
   }
   if (!host.busy || !host.sid) {
-    host.enqueue(text);
-    return host.notice(`No active turn \u2014 queued as next prompt: ${preview(text)}`);
+    host.enqueue(text2);
+    return host.notice(`No active turn \u2014 queued as next prompt: ${preview(text2)}`);
   }
   let status;
   try {
@@ -25663,7 +25663,7 @@ async function steer(host, text) {
     const r = await host.gw.request("session.steer", {
       session_id: host.sid,
       execution_generation,
-      text
+      text: text2
     });
     status = r?.status;
   } catch (e) {
@@ -25672,16 +25672,16 @@ async function steer(host, text) {
     }
   }
   if (status === "queued") {
-    return host.notice(`Steer queued for the active turn: ${preview(text)}`);
+    return host.notice(`Steer queued for the active turn: ${preview(text2)}`);
   }
-  host.enqueue(text);
+  host.enqueue(text2);
   host.notice("Turn ended before the steer landed \u2014 queued as next prompt", "warning");
 }
-function queue(host, text) {
-  if (!text) {
+function queue(host, text2) {
+  if (!text2) {
     return host.notice("Usage: /queue <prompt to run after the current turn>", "warning");
   }
-  host.submit(text);
+  host.submit(text2);
 }
 async function stop(host) {
   if (!host.sid) {
@@ -25935,12 +25935,12 @@ function editCard(call, result) {
     title: write ? "Write" : "Edit"
   };
   if (write && content && (!diff2 || diff2.startsWith("@@ -0,0 "))) {
-    const text = content.replace(/\n$/, "");
-    const lines = text.split("\n").length;
+    const text2 = content.replace(/\n$/, "");
+    const lines = text2.split("\n").length;
     return {
       ...head,
       badges: diff2 ? [{ text: "new file", tone: "success" }] : void 0,
-      body: [/* @__PURE__ */ jsx("code", { lang: lang ?? "text", numbers: true, text }, "code")],
+      body: [/* @__PURE__ */ jsx("code", { lang: lang ?? "text", numbers: true, text: text2 }, "code")],
       folded: true,
       meta: [`${lines} line${lines === 1 ? "" : "s"}`],
       preview: { lines: 8 }
@@ -26191,10 +26191,10 @@ function askCard(call, result) {
     title: "Ask"
   };
 }
-function answerRow(key2, text, picked) {
+function answerRow(key2, text2, picked) {
   return /* @__PURE__ */ jsxs("row", { role: picked ? "omp.tool.answer" : "omp.tool.answer.off", children: [
     /* @__PURE__ */ jsx("text", { spans: [picked ? { s: "success", t: "\u2713" } : { s: "dim", t: "\xB7" }] }, "c"),
-    /* @__PURE__ */ jsx("text", { spans: [{ t: text }] }, "t")
+    /* @__PURE__ */ jsx("text", { spans: [{ t: text2 }] }, "t")
   ] }, key2);
 }
 function evalCard(call, result) {
@@ -26225,11 +26225,11 @@ function evalCard(call, result) {
   };
 }
 function genericBody(call) {
-  const text = call.resultText ?? (call.result === void 0 ? void 0 : pretty(call.result));
-  if (!text || call.status === "running") {
+  const text2 = call.resultText ?? (call.result === void 0 ? void 0 : pretty(call.result));
+  if (!text2 || call.status === "running") {
     return [];
   }
-  return [/* @__PURE__ */ jsx("code", { lang: /^\s*[[{]/.test(text) ? "json" : "text", text: clip(text, 4e3) }, "out")];
+  return [/* @__PURE__ */ jsx("code", { lang: /^\s*[[{]/.test(text2) ? "json" : "text", text: clip(text2, 4e3) }, "out")];
 }
 function errorOf(call) {
   const result = record(call.result);
@@ -26306,8 +26306,8 @@ function todoCount(todos) {
   }
   return `${todos.filter((t2) => t2.status === "completed").length}/${todos.length}`;
 }
-function firstLine(text) {
-  return text?.split("\n").find((l) => l.trim())?.trim();
+function firstLine(text2) {
+  return text2?.split("\n").find((l) => l.trim())?.trim();
 }
 function humanize(name) {
   const words = name.replace(/[_-]+/g, " ").trim();
@@ -26316,9 +26316,9 @@ function humanize(name) {
 function pretty(v) {
   return typeof v === "string" ? v : JSON.stringify(v, null, 2);
 }
-function clip(text, max) {
-  return text.length > max ? `${text.slice(0, max)}
-\u2026` : text;
+function clip(text2, max) {
+  return text2.length > max ? `${text2.slice(0, max)}
+\u2026` : text2;
 }
 
 // src/overlays/search.ts
@@ -26359,13 +26359,13 @@ function rank(items, query, textOf) {
   }
   const scored = [];
   items.forEach((item, index) => {
-    const text = textOf(item).toLowerCase();
+    const text2 = textOf(item).toLowerCase();
     const positions = /* @__PURE__ */ new Set();
     let score = 0;
     for (const word of words) {
-      const at = text.indexOf(word);
+      const at = text2.indexOf(word);
       if (at >= 0) {
-        const boundary = at === 0 || /[\s/_.:-]/.test(text[at - 1] ?? "");
+        const boundary = at === 0 || /[\s/_.:-]/.test(text2[at - 1] ?? "");
         score += 100 - Math.min(at, 50) + (boundary ? 25 : 0);
         for (let i = at; i < at + word.length; i++) {
           positions.add(i);
@@ -26374,7 +26374,7 @@ function rank(items, query, textOf) {
       }
       let from = 0;
       for (const ch of word) {
-        const i = text.indexOf(ch, from);
+        const i = text2.indexOf(ch, from);
         if (i < 0) {
           return;
         }
@@ -26463,13 +26463,13 @@ function openAgents(app, focus) {
   };
   const sendSteer = async () => {
     const a = current();
-    const text = steer2?.trim();
+    const text2 = steer2?.trim();
     steer2 = void 0;
-    if (!a || !text) {
+    if (!a || !text2) {
       return app.changed();
     }
     try {
-      const queued = await app.agents.steer(a, text);
+      const queued = await app.agents.steer(a, text2);
       app.transcript.notice(
         queued ? `Steering queued for ${agentName(a)}.` : `${agentName(a)} is not taking steering now.`,
         queued ? "info" : "warning"
@@ -26913,10 +26913,10 @@ async function openHelp(app) {
             { grow: 1, head: "Description", id: "action" }
           ],
           role: "omp.hotkeys.table",
-          rows: (c.pairs ?? []).map(([command = "", text = ""], i) => ({
+          rows: (c.pairs ?? []).map(([command = "", text2 = ""], i) => ({
             // The `(usage: …)` tail is `/help <command>`'s business; the table keeps the summary.
             cells: {
-              action: [{ t: text.replace(/\s*\(usage: .+\)\s*$/, "") }],
+              action: [{ t: text2.replace(/\s*\(usage: .+\)\s*$/, "") }],
               command: [{ s: "mono", t: command }]
             },
             id: String(i)
@@ -27373,23 +27373,23 @@ var Composer = class {
   /** Index into history while browsing it; history.length means the draft. */
   #browse = -1;
   #draft = "";
-  set(text, cursor = text.length) {
+  set(text2, cursor = text2.length) {
     this.#record({ merge: false });
-    this.text = text;
-    this.cursor = clamp(cursor, text.length);
+    this.text = text2;
+    this.cursor = clamp(cursor, text2.length);
     this.#changed();
   }
   /** Clears the draft after a submit, remembering it in the prompt history. */
   take() {
-    const text = this.text;
-    append(text);
+    const text2 = this.text;
+    append(text2);
     this.#undo = [];
     this.#redo = [];
     this.#browse = -1;
     this.text = "";
     this.cursor = 0;
     this.#changed();
-    return text;
+    return text2;
   }
   insert(s) {
     this.#record({ merge: true });
@@ -27575,12 +27575,12 @@ var Composer = class {
       return true;
     }
     this.#browse = at;
-    const text = at === items.length ? this.#draft : items[at] ?? "";
+    const text2 = at === items.length ? this.#draft : items[at] ?? "";
     if (at === items.length) {
       this.#browse = -1;
     }
-    this.text = text;
-    this.cursor = text.length;
+    this.text = text2;
+    this.cursor = text2.length;
     this.#changed();
     return true;
   }
@@ -27631,19 +27631,19 @@ var Composer = class {
 function clamp(n, max) {
   return Math.max(0, Math.min(max, n));
 }
-function lineStart(text, at) {
-  return at <= 0 ? 0 : text.lastIndexOf("\n", at - 1) + 1;
+function lineStart(text2, at) {
+  return at <= 0 ? 0 : text2.lastIndexOf("\n", at - 1) + 1;
 }
-function lineEnd(text, at) {
-  const i = text.indexOf("\n", at);
-  return i < 0 ? text.length : i;
+function lineEnd(text2, at) {
+  const i = text2.indexOf("\n", at);
+  return i < 0 ? text2.length : i;
 }
-function boundaryAt(text, at) {
-  if (at >= text.length) {
-    return text.length;
+function boundaryAt(text2, at) {
+  if (at >= text2.length) {
+    return text2.length;
   }
   let floor = 0;
-  for (const { index } of graphemes.segment(text)) {
+  for (const { index } of graphemes.segment(text2)) {
     if (index > at) {
       break;
     }
@@ -27651,9 +27651,9 @@ function boundaryAt(text, at) {
   }
   return floor;
 }
-function prevGrapheme(text, at) {
+function prevGrapheme(text2, at) {
   let prev = 0;
-  for (const { index } of graphemes.segment(text)) {
+  for (const { index } of graphemes.segment(text2)) {
     if (index >= at) {
       break;
     }
@@ -27661,30 +27661,30 @@ function prevGrapheme(text, at) {
   }
   return prev;
 }
-function nextGrapheme(text, at) {
-  for (const { index, segment } of graphemes.segment(text)) {
+function nextGrapheme(text2, at) {
+  for (const { index, segment } of graphemes.segment(text2)) {
     if (index >= at) {
       return index + segment.length;
     }
   }
-  return text.length;
+  return text2.length;
 }
-function prevWord(text, at) {
+function prevWord(text2, at) {
   let i = at;
-  while (i > 0 && !WORD.test(text[i - 1] ?? "")) {
+  while (i > 0 && !WORD.test(text2[i - 1] ?? "")) {
     i--;
   }
-  while (i > 0 && WORD.test(text[i - 1] ?? "")) {
+  while (i > 0 && WORD.test(text2[i - 1] ?? "")) {
     i--;
   }
   return i;
 }
-function nextWord(text, at) {
+function nextWord(text2, at) {
   let i = at;
-  while (i < text.length && !WORD.test(text[i] ?? "")) {
+  while (i < text2.length && !WORD.test(text2[i] ?? "")) {
     i++;
   }
-  while (i < text.length && WORD.test(text[i] ?? "")) {
+  while (i < text2.length && WORD.test(text2[i] ?? "")) {
     i++;
   }
   return i;
@@ -28770,17 +28770,17 @@ function firstAnswer(answers) {
 
 // .hermes-src/ui-tui/src/domain/slash.ts
 var INLINE_SLASH_RE = /\s\/([a-zA-Z][\w-]*)?$/;
-var inlineSlashTrigger = (text) => {
-  const match = INLINE_SLASH_RE.exec(text);
+var inlineSlashTrigger = (text2) => {
+  const match = INLINE_SLASH_RE.exec(text2);
   if (!match) {
     return null;
   }
   const query = match[1] ?? "";
-  return { query, start: text.length - query.length - 1 };
+  return { query, start: text2.length - query.length - 1 };
 };
 var applyCompletion = (value, rowText2, compReplace) => {
-  const text = value[compReplace - 1] === "/" && rowText2.startsWith("/") ? rowText2.slice(1) : rowText2;
-  return value.slice(0, compReplace) + text;
+  const text2 = value[compReplace - 1] === "/" && rowText2.startsWith("/") ? rowText2.slice(1) : rowText2;
+  return value.slice(0, compReplace) + text2;
 };
 var completionToApplyOnSubmit = (value, rowText2, compReplace, isLocalCommand = () => false) => {
   const typed = value.trim();
@@ -29417,7 +29417,7 @@ function referenceBackground(isLight, env = process.env) {
   return isLight ? "#ffffff" : "#101014";
 }
 function deriveTones(seeds) {
-  const { accent, bg, text } = seeds;
+  const { accent, bg, text: text2 } = seeds;
   const isLight = (relativeLuminance(bg) ?? 0) > 0.5;
   const surface = mix(bg, desaturate(accent, 0.15), isLight ? 0.045 : 0.09);
   return {
@@ -29426,8 +29426,8 @@ function deriveTones(seeds) {
     // to ink blends: muted #946C08 ≈ desat(accent .05), label #8E6B13 ≈
     // desat(mix(accent, text, .03), .15), statusFg #6F6F6F ≈ gray 30% lift.
     muted: isLight ? desaturate(accent, 0.05) : desaturate(mix(accent, bg, 0.19), 0.16),
-    label: isLight ? desaturate(mix(accent, text, 0.03), 0.15) : desaturate(mix(accent, bg, 0.13), 0.16),
-    statusFg: grayOf(mix(text, bg, isLight ? 0.3 : 0.24)),
+    label: isLight ? desaturate(mix(accent, text2, 0.03), 0.15) : desaturate(mix(accent, bg, 0.13), 0.16),
+    statusFg: grayOf(mix(text2, bg, isLight ? 0.3 : 0.24)),
     surface,
     activeRow: mix(surface, accent, 0.25),
     selection: isLight && seeds.shellDollar ? mix(bg, seeds.shellDollar, 0.2) : mix(surface, accent, 0.28),
@@ -29706,9 +29706,9 @@ function dockNodes(cx) {
   }
   if (cx.queued.length) {
     nodes.push(
-      /* @__PURE__ */ jsx("col", { gap: "xs", role: "omp.queue", children: cx.queued.map((text, i) => /* @__PURE__ */ jsxs("row", { align: "center", gap: "sm", role: "omp.queue.item", title: "Queued", children: [
+      /* @__PURE__ */ jsx("col", { gap: "xs", role: "omp.queue", children: cx.queued.map((text2, i) => /* @__PURE__ */ jsxs("row", { align: "center", gap: "sm", role: "omp.queue.item", title: "Queued", children: [
         /* @__PURE__ */ jsx("icon", { name: "corner-down-right" }, "icon"),
-        /* @__PURE__ */ jsx("text", { grow: 1, text: text.replace(/\s*\r?\n\s*/g, " \u21B5 "), truncate: "end", wrap: "none" }, "text"),
+        /* @__PURE__ */ jsx("text", { grow: 1, text: text2.replace(/\s*\r?\n\s*/g, " \u21B5 "), truncate: "end", wrap: "none" }, "text"),
         i === 0 && cx.queued.length > 1 ? /* @__PURE__ */ jsx("badge", { role: "omp.queue.count", text: `${cx.queued.length}` }, "count") : null,
         /* @__PURE__ */ jsxs("row", { align: "center", gap: "xs", onClick: cx.onQueueEdit, role: "omp.queue.edit", title: "Edit  \u2325\u2191", children: [
           /* @__PURE__ */ jsx("kbd", { keys: ["alt", "up"] }, "k"),
@@ -30002,6 +30002,321 @@ function toolRunNode(run2, id, now, blockNode2) {
   );
 }
 
+// src/preformatted.ts
+var BOX = /[─-╿]/;
+var RULE = /^\s*\+[-=+]{3,}\+?\s*$/;
+var COLUMNS = /^\s{0,4}[^\s•\-*>#`|][^\n]*?\S {2,}\S/;
+var ESC3 = String.fromCharCode(27);
+function isPreformatted(text2) {
+  if (text2.includes(`${ESC3}[`) || BOX.test(text2)) {
+    return true;
+  }
+  const lines = text2.split("\n").filter((l) => l.trim());
+  if (lines.some((l) => RULE.test(l))) {
+    return true;
+  }
+  const aligned = lines.filter((l) => COLUMNS.test(l)).length;
+  return aligned >= 3 && aligned >= lines.length / 2;
+}
+function hardBreaks(text2) {
+  let fenced = false;
+  return text2.split("\n").map((line, i, all) => {
+    if (/^\s*(```|~~~)/.test(line)) {
+      fenced = !fenced;
+      return line;
+    }
+    const next = all[i + 1];
+    return fenced || !line.trim() || next === void 0 || !next.trim() ? line : `${line}  `;
+  }).join("\n");
+}
+
+// src/usage.ts
+var HEADER = /^\s*(?:[^\p{L}\p{N}*\s]\S*\s+)?\*\*(.+?)\*\*\s*(.*)$/u;
+var SUFFIX = { b: 1e9, k: 1e3, m: 1e6 };
+function parseCount(raw) {
+  const m = /^~?\s*([\d,]*\.?\d+)\s*([kmb])?$/i.exec(raw.trim());
+  if (!m) {
+    return NaN;
+  }
+  return Number(m[1].replace(/,/g, "")) * (m[2] ? SUFFIX[m[2].toLowerCase()] : 1);
+}
+function compactCount(n) {
+  const unit = (v, s) => `${v >= 100 ? Math.round(v) : Number(v.toFixed(1))}${s}`;
+  if (n >= 1e9) {
+    return unit(n / 1e9, "B");
+  }
+  if (n >= 1e6) {
+    return unit(n / 1e6, "M");
+  }
+  return n >= 1e3 ? unit(n / 1e3, "K") : String(Math.round(n));
+}
+function limits(inline) {
+  const out = [];
+  for (const part of inline.split("|")) {
+    const m = /^\s*([A-Za-z]+):\s*([\d.,]+\s*[kmb]?)\s*\/\s*([\d.,]+\s*[kmb]?)(?:\s*\(resets?\s+(.+?)\))?\s*$/i.exec(part);
+    const left = m ? parseCount(m[2]) : NaN;
+    const limit = m ? parseCount(m[3]) : NaN;
+    if (m && Number.isFinite(left) && limit > 0) {
+      out.push({ left, limit, name: m[1].toUpperCase(), reset: m[4] });
+    }
+  }
+  return out;
+}
+function pair(line) {
+  const m = /^\s*([^:]{1,40}):\s+(.+?)\s*$/.exec(line);
+  return m ? { key: m[1], value: m[2].replace(/^`(.*)`$/, "$1") } : void 0;
+}
+function crumb(line) {
+  const m = /^\s*[•\-*]\s*(.+?):\s*(~?[\d.,]+\s*[kmb]?)(?:\s*\(~?(\d+(?:\.\d+)?)%\))?\s*$/i.exec(line);
+  const tokens = m ? parseCount(m[2]) : NaN;
+  return m && Number.isFinite(tokens) ? { label: m[1], pct: m[3] ? Number(m[3]) : void 0, tokens } : void 0;
+}
+function build(title, inline, body) {
+  const name = title.replace(/:$/, "").trim();
+  const lower = name.toLowerCase();
+  const lines = body.filter((l) => l.trim());
+  if (lower.includes("rate limit")) {
+    const items = limits(inline || lines.join(" | "));
+    return items.length ? { items, kind: "limits", title: name } : text(name, inline, lines);
+  }
+  if (lower.includes("context breakdown")) {
+    const items = lines.flatMap((l) => crumb(l) ?? []);
+    return items.length ? { items, kind: "breakdown", note: /_\((.*?)\)_/.exec(inline)?.[1], title: name } : text(name, inline, lines);
+  }
+  if (lower.includes("session") || lower.includes("token usage")) {
+    const rows = [];
+    let context;
+    for (const l of lines) {
+      const p = pair(l);
+      const c = p && /^context$/i.test(p.key) ? /^([\d.,]+\s*[kmb]?)\s*\/\s*([\d.,]+\s*[kmb]?)/i.exec(p.value) : null;
+      const used = c ? parseCount(c[1]) : NaN;
+      const max = c ? parseCount(c[2]) : NaN;
+      if (Number.isFinite(used) && max > 0) {
+        context = { max, used };
+      } else if (p) {
+        rows.push(p);
+      }
+    }
+    return rows.length || context ? { context, kind: "session", rows, title: name } : text(name, inline, lines);
+  }
+  if (lower.includes("credit")) {
+    const rows = [];
+    const notes = [];
+    for (const l of lines) {
+      const p = pair(l);
+      if (p) {
+        rows.push(p);
+      } else {
+        notes.push(l.trim());
+      }
+    }
+    return rows.length ? { kind: "credits", notes, rows, title: name } : text(name, inline, lines);
+  }
+  return text(name, inline, lines);
+}
+function text(title, inline, lines) {
+  return { kind: "text", text: [inline, ...lines].filter(Boolean).join("\n"), title };
+}
+function parseUsage(raw) {
+  const sections = [];
+  let head;
+  const preamble = [];
+  const flush = () => {
+    if (head) {
+      sections.push(build(head.title, head.inline, head.body));
+    }
+  };
+  for (const line of raw.replace(/\r/g, "").split("\n")) {
+    const h = HEADER.exec(line);
+    if (h) {
+      flush();
+      head = { body: [], inline: h[2].trim(), title: h[1] };
+    } else if (head) {
+      head.body.push(line);
+    } else if (line.trim()) {
+      preamble.push(line);
+    }
+  }
+  flush();
+  if (!sections.some((s) => s.kind !== "text")) {
+    return null;
+  }
+  return preamble.length ? [{ kind: "text", text: preamble.join("\n"), title: "" }, ...sections] : sections;
+}
+
+// src/view/slash.tsx
+var THRESHOLDS = { bad: 0.95, warn: 0.8 };
+function slashBody(e) {
+  if (/^\/usage\b/.test(e.title)) {
+    const sections = parseUsage(e.text);
+    if (sections) {
+      return sections.map((s, i) => usageSection(s, i));
+    }
+  }
+  return [textBody(e.text, "body")];
+}
+function textBody(text2, key2) {
+  return isPreformatted(text2) ? /* @__PURE__ */ jsx("ansi", { text: text2 }, key2) : /* @__PURE__ */ jsx("md", { children: hardBreaks(text2) }, key2);
+}
+function heading(icon, title, note) {
+  return /* @__PURE__ */ jsxs("row", { align: "center", gap: "xs", children: [
+    /* @__PURE__ */ jsx("icon", { name: icon }, "icon"),
+    /* @__PURE__ */ jsx("text", { spans: [{ s: "strong", t: title }, ...note ? [{ s: "dim", t: `  ${note}` }] : []] }, "title")
+  ] }, "head");
+}
+function usageSection(s, i) {
+  const key2 = `s${i}`;
+  switch (s.kind) {
+    case "limits":
+      return /* @__PURE__ */ jsxs("col", { gap: "xs", children: [
+        heading("gauge", s.title),
+        limitsTable(s.items)
+      ] }, key2);
+    case "session":
+      return /* @__PURE__ */ jsxs("col", { gap: "xs", children: [
+        heading("tokens", s.title),
+        sessionBody(s.rows, s.context)
+      ] }, key2);
+    case "breakdown":
+      return /* @__PURE__ */ jsxs("col", { gap: "xs", children: [
+        heading("stack", s.title, s.note),
+        breakdownBody(s.items)
+      ] }, key2);
+    case "credits":
+      return /* @__PURE__ */ jsxs("col", { gap: "xs", children: [
+        heading("cost", s.title),
+        pairTable(s.rows, "credits"),
+        s.notes.map((n, j) => /* @__PURE__ */ jsx("text", { spans: [{ s: "dim", t: n }] }, `note${j}`))
+      ] }, key2);
+    case "text":
+      return /* @__PURE__ */ jsxs("col", { gap: "xs", children: [
+        s.title ? heading("info", s.title) : null,
+        textBody(s.text, "text")
+      ] }, key2);
+  }
+}
+function limitsTable(items) {
+  return /* @__PURE__ */ jsx(
+    "table",
+    {
+      cols: [
+        { id: "name" },
+        { grow: 1, id: "bar" },
+        { align: "end", id: "left" },
+        { align: "end", id: "reset" }
+      ],
+      rows: items.map((l) => {
+        const used = Math.min(1, Math.max(0, (l.limit - l.left) / l.limit));
+        return {
+          cells: {
+            bar: {
+              meter: {
+                thresholds: THRESHOLDS,
+                title: `${l.left.toLocaleString()} of ${l.limit.toLocaleString()} left`,
+                value: used
+              }
+            },
+            left: [{ s: "num", t: `${compactCount(l.left)} / ${compactCount(l.limit)}` }],
+            name: [{ s: "muted mono", t: l.name }],
+            reset: [{ s: "dim", t: l.reset ? `resets ${l.reset}` : "" }]
+          },
+          id: l.name
+        };
+      })
+    },
+    "limits"
+  );
+}
+function sessionBody(rows, context) {
+  const model = rows.find((r) => /^model$/i.test(r.key));
+  const rest = rows.filter((r) => r !== model);
+  const out = [];
+  if (model) {
+    out.push(
+      /* @__PURE__ */ jsxs("row", { align: "center", gap: "sm", children: [
+        /* @__PURE__ */ jsx("text", { spans: [{ s: "muted", t: "Model" }] }, "k"),
+        /* @__PURE__ */ jsx("badge", { text: model.value }, "v")
+      ] }, "model")
+    );
+  }
+  if (rest.length) {
+    out.push(pairTable(rest, "session"));
+  }
+  if (context) {
+    const share = Math.min(1, context.used / context.max);
+    out.push(
+      /* @__PURE__ */ jsx(
+        "table",
+        {
+          cols: [{ id: "k" }, { grow: 1, id: "bar" }, { align: "end", id: "v" }],
+          rows: [
+            {
+              cells: {
+                bar: {
+                  meter: {
+                    thresholds: { bad: 0.85, warn: 0.6 },
+                    title: `${context.used.toLocaleString()} of ${context.max.toLocaleString()} tokens (${Math.round(share * 100)}%)`,
+                    value: share
+                  }
+                },
+                k: [{ s: "muted", t: "Context" }],
+                v: [{ s: "num", t: `${compactCount(context.used)} / ${compactCount(context.max)}` }]
+              },
+              id: "context"
+            }
+          ]
+        },
+        "context"
+      )
+    );
+  }
+  return out;
+}
+function pairTable(rows, id) {
+  return /* @__PURE__ */ jsx(
+    "table",
+    {
+      cols: [
+        { id: "k", truncate: "end" },
+        { align: "end", id: "v", grow: 1 }
+      ],
+      rows: rows.map((r, i) => ({
+        cells: {
+          k: [{ s: "muted", t: r.key }],
+          v: /^https?:\/\//.test(r.value) ? [{ href: r.value, s: "link", t: r.value }] : [{ s: /^[\d$,.%\s-]+$/.test(r.value) ? "num" : "", t: r.value }]
+        },
+        id: `${id}${i}`
+      }))
+    },
+    id
+  );
+}
+function breakdownBody(items) {
+  const sorted = [...items].sort((a, b) => b.tokens - a.tokens);
+  const total = sorted.reduce((n, c) => n + c.tokens, 0);
+  return [
+    /* @__PURE__ */ jsx(
+      "table",
+      {
+        cols: [
+          { id: "name", truncate: "end" },
+          { align: "end", id: "tokens" },
+          { align: "end", id: "share", grow: 1 }
+        ],
+        rows: sorted.map((c, i) => ({
+          cells: {
+            name: [{ s: "muted", t: c.label }],
+            share: { meter: { value: c.tokens / total } },
+            tokens: [{ s: "num", t: `~${compactCount(c.tokens)}${c.pct === void 0 ? "" : ` (${c.pct}%)`}` }]
+          },
+          id: `b${i}`
+        }))
+      },
+      "list"
+    )
+  ];
+}
+
 // src/view/welcome.tsx
 import { readFileSync as readFileSync3 } from "node:fs";
 import { join as join4 } from "node:path";
@@ -30022,18 +30337,18 @@ function welcomeNode(key2, cx) {
 }
 var TIP_LINE = /^\s+t\d+:\s+"((?:[^"\\]|\\.)*)"\s*$/;
 function randomTip(root) {
-  let text;
+  let text2;
   try {
-    text = readFileSync3(join4(root, "locales", "en.yaml"), "utf8");
+    text2 = readFileSync3(join4(root, "locales", "en.yaml"), "utf8");
   } catch {
     return "";
   }
-  const start = text.search(/^tips:\s*$/m);
+  const start = text2.search(/^tips:\s*$/m);
   if (start < 0) {
     return "";
   }
   const tips = [];
-  for (const line of text.slice(start).split("\n").slice(1)) {
+  for (const line of text2.slice(start).split("\n").slice(1)) {
     if (/^\S/.test(line)) {
       break;
     }
@@ -30071,7 +30386,7 @@ function buildEntry(e, id, cx) {
     case "notice":
       return noticeNode(e);
     case "panel":
-      return /* @__PURE__ */ jsx("card", { collapsible: true, head: [{ s: "strong", t: e.title }], role: "omp.custom", tone: "neutral", children: /* @__PURE__ */ jsx("ansi", { text: e.text }, "body") }, e.id);
+      return /* @__PURE__ */ jsx("card", { collapsible: true, head: [{ s: "strong", t: e.title }], role: "omp.custom", tone: "neutral", children: slashBody(e) }, e.id);
   }
 }
 function userNode(e, cx) {
@@ -30164,13 +30479,13 @@ function thinkingNode(b, id, cx) {
     ]
   );
 }
-function copyButton(text, id, role, title, cx) {
+function copyButton(text2, id, role, title, cx) {
   const copied = cx.copied === id;
   return /* @__PURE__ */ jsx(
     "icon",
     {
       name: copied ? "check" : "copy",
-      onClick: () => cx.copy(text, id),
+      onClick: () => cx.copy(text2, id),
       role,
       title: copied ? "Copied" : title
     },
@@ -30478,8 +30793,8 @@ var App = class {
     this.#exitArmed = now;
     this.transcript.notice("Press Ctrl+C again to exit.");
   }
-  #copy(text, id) {
-    copyToClipboard(text);
+  #copy(text2, id) {
+    copyToClipboard(text2);
     this.#copied = id;
     this.changed();
     clearTimeout(this.#copiedTimer);
@@ -30493,34 +30808,34 @@ var App = class {
   }
   // ── Prompts and commands ───────────────────────────────────────────
   #submit(raw) {
-    const text = raw.trim();
-    if (!text) {
+    const text2 = raw.trim();
+    if (!text2) {
       return;
     }
-    if (text.startsWith("/")) {
-      void this.#slash(text);
+    if (text2.startsWith("/")) {
+      void this.#slash(text2);
       return;
     }
     if (this.busy || !this.sid || this.#switches.pending) {
-      this.queue.push(text);
+      this.queue.push(text2);
       return;
     }
-    this.#send(text);
+    this.#send(text2);
   }
   /** Sends `text` now; `queued` marks a drained queue entry (the gateway must queue it, never steer with it). */
-  #send(text, { display, queued = false } = {}) {
+  #send(text2, { display, queued = false } = {}) {
     if (!this.sid || this.#switches.pending) {
-      this.queue.unshift(text);
+      this.queue.unshift(text2);
       return;
     }
     const attachments = this.#attachments;
     this.#attachments = [];
-    this.transcript.user(display?.trim() || text);
+    this.transcript.user(display?.trim() || text2);
     this.#startBusy("Working\u2026");
     this.#gw.request("prompt.submit", {
       session_id: this.sid,
       submission_id: randomUUID3(),
-      text,
+      text: text2,
       ...queued ? { queued } : {},
       ...attachments.length ? { attachments } : {}
     }).catch((error) => {
@@ -30529,8 +30844,8 @@ var App = class {
       this.changed();
     });
   }
-  async #slash(text) {
-    const [name = "", ...rest] = text.slice(1).split(/\s+/);
+  async #slash(text2) {
+    const [name = "", ...rest] = text2.slice(1).split(/\s+/);
     const arg = rest.join(" ");
     const local = localCommand(name);
     if (local) {
@@ -30549,7 +30864,7 @@ var App = class {
     }
     const title = `/${name}${arg ? ` ${arg}` : ""}`;
     try {
-      const r = await this.#gw.request("slash.exec", { command: text.slice(1), session_id: this.sid });
+      const r = await this.#gw.request("slash.exec", { command: text2.slice(1), session_id: this.sid });
       await this.#dispatched(r, title, arg);
     } catch (error) {
       if (isUnsupportedCommand(error) || !shouldFallbackToDispatch(error)) {
@@ -30582,14 +30897,14 @@ var App = class {
   control() {
     return {
       busy: Boolean(this.busy),
-      enqueue: (text) => {
-        this.queue.push(text);
+      enqueue: (text2) => {
+        this.queue.push(text2);
         this.changed();
       },
       gw: this.#gw,
-      notice: (text, tone) => this.transcript.notice(text, tone),
+      notice: (text2, tone) => this.transcript.notice(text2, tone),
       sid: this.sid,
-      submit: (text) => this.#submit(text)
+      submit: (text2) => this.#submit(text2)
     };
   }
   #startBusy(label) {
@@ -31040,7 +31355,7 @@ ${this.composer.text}` : next);
     const backend = info?.version && info.version !== "unknown" ? `v${info.version}` : "";
     const cx = {
       copied: this.#copied,
-      copy: (text, id) => this.#copy(text, id),
+      copy: (text2, id) => this.#copy(text2, id),
       now,
       welcome: { ...this.#welcome, version: this.#welcome.version || backend }
     };
@@ -31103,8 +31418,8 @@ ${this.composer.text}` : next);
     }
   }
 };
-function kaomojiLabel(text) {
-  const word = text.match(/([A-Za-z][A-Za-z ]*[A-Za-z])\.{2,}\s*$/)?.[1];
+function kaomojiLabel(text2) {
+  const word = text2.match(/([A-Za-z][A-Za-z ]*[A-Za-z])\.{2,}\s*$/)?.[1];
   return word ? `${word.charAt(0).toUpperCase()}${word.slice(1)}\u2026` : "";
 }
 function shortPath(path) {
@@ -31335,12 +31650,12 @@ var WatchApp = class {
       return false;
     }
     try {
-      const text = await readFile3(path, "utf8");
-      if (text.length === this.#logSize) {
+      const text2 = await readFile3(path, "utf8");
+      if (text2.length === this.#logSize) {
         return false;
       }
-      this.#logSize = text.length;
-      applyLog(this.#agent, parseLiveLog(text));
+      this.#logSize = text2.length;
+      applyLog(this.#agent, parseLiveLog(text2));
       return true;
     } catch {
       return false;
@@ -31408,12 +31723,12 @@ var WatchApp = class {
     }
   }
   async #submit(raw) {
-    const text = raw.trim();
+    const text2 = raw.trim();
     const a = this.#agent;
-    if (!text) {
+    if (!text2) {
       return;
     }
-    if (text === "/stop") {
+    if (text2 === "/stop") {
       return this.#stop();
     }
     if (!isRunning(a)) {
@@ -31424,7 +31739,7 @@ var WatchApp = class {
       const r = await this.#gw.request("subagent.steer", {
         session_id: this.#spec.sid,
         subagent_id: a.id,
-        text
+        text: text2
       });
       this.transcript.notice(
         r?.status === "queued" ? `Steering sent: it reaches ${a.name} after its current step.` : `${a.name} is not taking steering now.`,
