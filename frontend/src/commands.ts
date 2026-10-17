@@ -1,6 +1,7 @@
-// Slash commands this frontend runs itself: quitting, clearing, and the ones
-// that open a native sheet (model, sessions, help). Everything else goes to
-// the gateway's `slash.exec`.
+// Slash commands this frontend runs itself: quitting, new sessions, the ones
+// that open a native sheet (model, sessions, help), and the ones the shared
+// gateway serves only through their own RPCs. Everything else goes to the
+// gateway's `slash.exec`.
 
 import type { App } from './app.js'
 import { CONTROL_COMMANDS } from './controlCommands.js'
@@ -14,6 +15,7 @@ import { openModelPicker, switchModel } from './overlays/models.js'
 import { confirmOverlay } from './overlays/prompts.js'
 import { openSessionPicker } from './overlays/sessions.js'
 import { isThemeMode, openThemePicker } from './overlays/theme.js'
+import { SESSION_COMMANDS } from './sessionCommands.js'
 
 /** A client-side slash command. */
 export interface LocalCommand {
@@ -28,20 +30,21 @@ export interface LocalCommand {
 
 const COMMANDS: readonly LocalCommand[] = [
   {
-    aliases: ['exit', 'q'],
+    // `/q` is Hermes' /queue.
+    aliases: ['exit'],
     name: 'quit',
     run: app => app.quit()
   },
   {
-    aliases: ['reset'],
+    // Hermes' `/clear` clears the screen AND starts a new session: the agent forgets the old one.
+    aliases: ['reset', 'clear'],
     name: 'new',
-    run: app => app.newSession()
-  },
-  {
-    name: 'clear',
-    run: app => {
-      app.transcript.clear()
-      app.transcript.push({ id: app.transcript.id('w'), kind: 'welcome' })
+    run: (app, arg) => {
+      if (app.busy) {
+        return app.transcript.notice('Wait for the current turn to finish (or press Esc) before starting a new session.', 'warning')
+      }
+
+      return app.newSession(arg.trim() || undefined)
     }
   },
   {
@@ -121,9 +124,13 @@ const COMMANDS: readonly LocalCommand[] = [
   },
   {
     // The Ink TUI's `/paste`: the clipboard's image on the next prompt.
-    aliases: ['image'],
     name: 'paste',
-    run: (app, arg) => (arg ? false : void app.attachClipboardImage(false))
+    run: (app, arg) => (arg ? app.transcript.notice('Usage: /paste', 'warning') : void app.attachClipboardImage(false))
+  },
+  {
+    // Hermes' `/image <path>`: that file on the next prompt.
+    name: 'image',
+    run: (app, arg) => (arg.trim() ? app.attachImagePath(arg) : app.transcript.notice('Usage: /image <path>', 'warning'))
   },
   {
     aliases: ['side'],
@@ -145,7 +152,8 @@ const COMMANDS: readonly LocalCommand[] = [
     name: 'help',
     run: (app, arg) => (arg ? false : openHelp(app))
   },
-  ...CONTROL_COMMANDS.map(c => ({ ...c, run: (app: App, arg: string) => c.run(app.control(), arg) }))
+  ...CONTROL_COMMANDS.map(c => ({ ...c, run: (app: App, arg: string) => c.run(app.control(), arg) })),
+  ...SESSION_COMMANDS.map(c => ({ ...c, run: (app: App, arg: string) => c.run(app.control(), arg) }))
 ]
 
 /** `/agents` opens the hub; `pause|resume` gate new spawns gateway-wide (`delegation.pause`). */
