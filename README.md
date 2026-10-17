@@ -21,6 +21,11 @@ The plugin gives the agent three tools: `link_pull_request`, `unlink_pull_reques
 works on, as T3 Code does. Links are kept per conversation in
 `$HERMES_HOME/plugin-data/hermes-tern/pull-requests.json`, so they stay after compression and resume.
 
+The sheet also shows two kinds of PR that the agent did not link:
+
+- the PR of the session's branch, in its checkout or worktree;
+- the other layers of a GitHub stack that a listed PR is part of.
+
 In `hermes tern`, the PR pill above the composer and `/prs` (⌥P) open the Pull requests sheet.
 The sheet reads each PR from GitHub with your own token (`GH_TOKEN`, else `gh auth token`). It shows:
 

@@ -287,11 +287,7 @@ export function openPullRequests(app: App, focus?: string) {
     }
   }
 
-  const prKeys = () =>
-    app.prs
-      .entries()
-      .map(e => prKey(e.ref))
-      .toReversed()
+  const prKeys = () => prOrder(app.prs.entries()).flatMap(o => (typeof o === 'string' ? [o] : []))
 
   const handlers = {
     activate,
@@ -414,7 +410,7 @@ export function openPullRequests(app: App, focus?: string) {
           confirm = undefined
           app.changed()
         }}
-        order={tab === 'prs' ? keys : ids}
+        order={tab === 'prs' ? prOrder(entries) : ids}
         preview={tab === 'files' || tab === 'activity' ? 'below' : 'side'}
         selected={tab === 'prs' ? selected : rows[tab]}
         size="lg"
@@ -561,20 +557,48 @@ function summary(entries: Entry[]): string {
   )
 }
 
+/**
+ * The PRs tab's rows: newest first, except that the layers of a stack sit together under a header,
+ * top layer first, as T3 Code lists a chain.
+ */
+export function prOrder(entries: Entry[]): (string | { group: string; label: string; count?: number })[] {
+  const stacks = [...new Set(entries.flatMap(e => (e.stack ? [e.stack] : [])))]
+
+  if (!stacks.length) {
+    return entries.map(e => prKey(e.ref)).toReversed()
+  }
+
+  const rest = entries.filter(e => !e.stack).toReversed()
+
+  return [
+    ...stacks.flatMap(s => {
+      const layers = s.layers
+        .map(l => entries.find(e => e.ref.number === l.number && e.stack === s))
+        .filter((e): e is Entry => Boolean(e))
+        .toReversed()
+
+      return [{ count: s.layers.length, group: s.key, label: `Stack on ${s.base || 'its base'}` }, ...layers.map(e => prKey(e.ref))]
+    }),
+    ...(rest.length ? [{ group: 'prs', label: 'Pull requests' }, ...rest.map(e => prKey(e.ref))] : [])
+  ]
+}
+
 function prItem(e: Entry, now: number): PickerItem {
   const pr = e.pr
   const review = pr?.reviewDecision ? REVIEW[pr.reviewDecision] : undefined
+  const layer = e.stack ? e.stack.layers.findIndex(l => l.number === e.ref.number) + 1 : 0
 
   return {
     badges: pr
       ? [
           { text: stateLabel(pr), tone: stateTone(pr) },
+          ...(e.source === 'branch' ? [{ text: 'this branch', title: 'The PR of the session’s branch; Hermes did not link it', tone: 'accent' as const }] : []),
           ...(pr.mergeable === 'conflicting' && pr.state === 'open' ? [{ text: 'conflicts', tone: 'error' as const }] : [])
         ]
       : e.error
         ? [{ text: 'unreadable', title: e.error, tone: 'error' as const }]
         : [],
-    detail: `${e.ref.repository} #${e.ref.number}`,
+    detail: `${e.ref.repository} #${e.ref.number}${layer ? ` · layer ${layer} of ${e.stack!.layers.length}` : ''}`,
     dot: pr ? (pr.state === 'open' ? checksTone(pr) : stateTone(pr)) : 'muted',
     facts: pr
       ? {
@@ -663,9 +687,29 @@ function overview(e: Entry, now: number): JSX.Element[] {
     return [...header(e), <text key="state" spans={[{ s: e.error ? 'error' : 'muted', t: e.error ?? 'Reading GitHub…' }]} />]
   }
 
+  const SOURCE = { branch: 'The PR of this session’s branch', linked: 'Linked by Hermes', stack: 'A layer of the stack' }
+
   return [
     ...header(e),
-    <kv items={facts(pr, now)} key="facts" role="omp.hub.kv" />,
+    <kv items={[...facts(pr, now), { k: [{ t: 'Shown because' }], v: SOURCE[e.source] }]} key="facts" role="omp.hub.kv" />,
+    ...(e.stack
+      ? [
+          <section head={`Stack · ${e.stack.layers.length} layers on ${e.stack.base}`} key="stack">
+            {e.stack.layers.toReversed().map(l => (
+              <text
+                key={`l${l.number}`}
+                spans={[
+                  { s: l.number === e.ref.number ? 'strong' : undefined, t: `#${l.number} ` },
+                  { s: 'mono dim', t: l.head },
+                  { s: l.state === 'merged' ? 'info' : l.state === 'closed' ? 'error' : 'muted', t: ` · ${l.state}` }
+                ]}
+                truncate="end"
+                wrap="none"
+              />
+            ))}
+          </section>
+        ]
+      : []),
     <section head="Description" key="body">
       <md key="text" text={pr.body.trim() || '_No description._'} />
     </section>

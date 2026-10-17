@@ -49,7 +49,8 @@ prove it.
 | #20 | The work log as t3code draws it: "Working for", work groups, thought rows, "Worked for" folds |
 | #21 | A steer stays in view; each stretch around it folds on its own |
 | #22 | Live process output; the Background sheet's Cron tab (every cron job and monitor: pause, resume, remove) |
-| next | `link_pull_request` and the Pull requests sheet: PRs, checks, activity, files, merge and close |
+| #23 | `link_pull_request` and the Pull requests sheet: PRs, checks, activity, files, merge and close |
+| next | The PR of the session's branch or worktree, and the layers of a GitHub stack |
 
 ## Milestones
 

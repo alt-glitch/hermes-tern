@@ -4,6 +4,7 @@ import { join } from 'node:path'
 
 import { describe, expect, it, vi } from 'vitest'
 
+import { parseRemote, parseStacks } from '../github/branch.js'
 import type { GitHub } from '../github/client.js'
 import { linkedFromResult, prKey, storedLinks } from '../github/links.js'
 import {
@@ -184,7 +185,7 @@ describe('PullRequests', () => {
     const graphql = vi.fn(async () => ({ p0: prJson() }))
     const gh = { graphql, rest: vi.fn() } as unknown as GitHub
     const changed = vi.fn()
-    const store = new PullRequests({ changed, sid: () => 's1' }, gh, () => [])
+    const store = new PullRequests({ changed, cwd: () => null, sid: () => 's1' }, gh, () => [])
 
     store.adopt()
     store.onCall(linkCall([ref(5)]))
@@ -198,10 +199,62 @@ describe('PullRequests', () => {
 
   it('says once why nothing could be read', async () => {
     const gh = { graphql: vi.fn(async () => Promise.reject(new Error('Not logged in to github.com.'))), rest: vi.fn() } as unknown as GitHub
-    const store = new PullRequests({ changed: vi.fn(), sid: () => 's1' }, gh, () => [ref(1), ref(2)])
+    const store = new PullRequests({ changed: vi.fn(), cwd: () => null, sid: () => 's1' }, gh, () => [ref(1), ref(2)])
 
     store.adopt()
     await vi.waitFor(() => expect(store.error).toBe('Not logged in to github.com.'))
+    store.dispose()
+  })
+})
+
+describe('branch and stacks', () => {
+  it('reads GitHub remotes in every URL form, and nothing else', () => {
+    expect(parseRemote('git@github.com:Acme/App.git')).toEqual({ host: 'github.com', repository: 'acme/app' })
+    expect(parseRemote('https://github.com/acme/app')).toEqual({ host: 'github.com', repository: 'acme/app' })
+    expect(parseRemote('ssh://git@github.example.com:22/acme/app.git')).toEqual({ host: 'github.example.com', repository: 'acme/app' })
+    expect(parseRemote('git@gitlab.com:acme/app.git')).toBeUndefined()
+  })
+
+  it('decodes /stacks bottom first, merged layers as merged', () => {
+    const [s] = parseStacks('github.com', 'acme/app', [
+      { base: { ref: 'main' }, number: 3, pull_requests: [{ head: { ref: 'a' }, merged_at: '2026-01-01', number: 1 }, { head: { ref: 'b' }, number: 2, state: 'open' }] }
+    ])
+
+    expect(s?.layers).toEqual([
+      { head: 'a', number: 1, state: 'merged' },
+      { head: 'b', number: 2, state: 'open' }
+    ])
+    expect(s?.key).toBe('github.com/acme/app#stack:3')
+  })
+
+  it('adds the branch PR and the other layers of a stack a listed PR sits in', async () => {
+    const graphql = vi.fn(async (_host: string, query: string, variables: Record<string, unknown>) => {
+      if (query.includes('pullRequests(headRefName')) {
+        return { repository: { pullRequests: { nodes: [{ headRepositoryOwner: { login: 'acme' }, number: 9, state: 'OPEN', url: 'https://github.com/acme/app/pull/9' }] } } }
+      }
+
+      if (query.includes('stack { number }')) {
+        return Object.fromEntries(Object.keys(variables).filter(k => k.startsWith('n')).map(k => [`p${k.slice(1)}`, { pullRequest: { stack: variables[k] === 9 ? { number: 4 } : null } }]))
+      }
+
+      return Object.fromEntries(
+        Object.keys(variables)
+          .filter(k => k.startsWith('n'))
+          .map(k => [`p${k.slice(1)}`, prJson({ number: variables[k], title: `PR ${variables[k]}` })])
+      )
+    })
+    const rest = vi.fn(async () => [{ base: 'main', number: 4, pull_requests: [{ head: { ref: 'x' }, number: 8 }, { head: { ref: 'y' }, number: 9 }] }])
+    const store = new PullRequests(
+      { changed: vi.fn(), cwd: () => '/wt', sid: () => 's1' },
+      { graphql, rest } as unknown as GitHub,
+      () => [ref(5)],
+      async () => ({ head: 'y', host: 'github.com', repository: 'acme/app' })
+    )
+
+    store.adopt()
+    await vi.waitFor(() => expect(store.entries().map(e => `${e.ref.number}:${e.source}`)).toEqual(['5:linked', '9:branch', '8:stack']))
+    await vi.waitFor(() => expect(store.entries().every(e => e.pr)).toBe(true))
+    expect(store.entries().find(e => e.ref.number === 8)?.stack?.layers.map(l => l.number)).toEqual([8, 9])
     store.dispose()
   })
 })
