@@ -108,6 +108,7 @@ export class Transcript {
 
     const turn: TurnEntry = {
       blocks: [],
+      continued: continuation(this.entries.findLast(e => e.kind !== 'notice')),
       // A session's first turn starts from zero; later ones from the last tick.
       countersAtStart: this.#counters ?? (this.entries.some(e => e.kind === 'turn') ? undefined : { prompt: 0, read: 0, total: 0 }),
       id: this.id('t'),
@@ -386,6 +387,7 @@ export class Transcript {
     this.entries = this.entries.filter(e => e.kind === 'welcome')
     this.#live = undefined
     let turn: TurnEntry | undefined
+    let pendingContinued: string | undefined
     const calls = new Map<string, ToolCall>()
 
     for (const m of messages) {
@@ -394,7 +396,13 @@ export class Transcript {
 
       if (m.role === 'user') {
         turn = undefined
-        this.entries.push({ at, id: this.id('u'), kind: 'user', text })
+
+        // The notice Hermes sends itself when background subagents finish is not the user's.
+        if (ASYNC_DONE.test(text)) {
+          pendingContinued = 'Subagents finished'
+        } else {
+          this.entries.push({ at, id: this.id('u'), kind: 'user', text })
+        }
 
         continue
       }
@@ -410,7 +418,9 @@ export class Transcript {
       }
 
       if (!turn) {
-        turn = { blocks: [], id: this.id('t'), kind: 'turn', rev: 0, startedAt: at, status: 'done' }
+        const continued = pendingContinued ?? continuation(this.entries.findLast(e => e.kind !== 'notice'))
+        turn = { blocks: [], continued, id: this.id('t'), kind: 'turn', rev: 0, startedAt: at, status: 'done' }
+        pendingContinued = undefined
         this.entries.push(turn)
       }
 
@@ -630,4 +640,23 @@ function toTodos(raw: unknown[]): Todo[] {
   }
 
   return out
+}
+
+/** The prompt Hermes queues for itself once a background delegation's subagents all finish. */
+const ASYNC_DONE = /^\[ASYNC DELEGATION BATCH COMPLETE/
+
+/**
+ * Why a turn that follows `prev` started with no prompt: undefined after a prompt, "Subagents
+ * finished" after a turn that sent subagents off in the background, else "Continued on its own".
+ */
+export function continuation(prev: Entry | undefined): string | undefined {
+  if (prev?.kind !== 'turn') {
+    return undefined
+  }
+
+  const background = prev.blocks.some(
+    b => b.kind === 'tool' && b.call.name === 'delegate_task' && record(b.call.result)?.mode === 'background'
+  )
+
+  return background ? 'Subagents finished' : 'Continued on its own'
 }

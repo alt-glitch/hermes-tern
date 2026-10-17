@@ -292,12 +292,6 @@ export class App implements OverlayHost {
       this.#focus = INPUT_ID
       this.#surface.focus(INPUT_ID)
     }
-
-    // The transcript sticks to its bottom, so what opens grows upward and its head (with the
-    // fold control) leaves the screen; keep the head in view instead.
-    if (ev.ev === 'toggle' && !ev.collapsed && ev.id.startsWith('main.')) {
-      this.#surface.reveal(ev.id, 'start')
-    }
   }
 
   /** Shows subagent `id` beside the chat in a Tern split; its timeline sheet where no split can open. */

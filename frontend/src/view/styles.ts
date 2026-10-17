@@ -12,4 +12,11 @@ export const STYLES = css`
   [data-role='omp.ask.option'] {
     padding-left: 34px !important;
   }
+
+  /* A turn Hermes started by itself: set apart from the answer above, like a new prompt is. */
+  [data-role='omp.turn.continued'] {
+    margin-top: 28px !important;
+    margin-bottom: 4px !important;
+    font-family: var(--sans) !important;
+  }
 `
