@@ -39,6 +39,22 @@ interface SteerResult {
   status?: string
 }
 
+/** Why a steer did not land; the text is for the user. */
+export type SteerOutcome = { ok: true } | { ok: false; error?: string }
+
+/** Injects `text` into session `sid`'s running turn. `ok` means the agent takes it after its current step. */
+export async function steerTurn(gw: ControlHost['gw'], sid: string, text: string): Promise<SteerOutcome> {
+  try {
+    const execution_generation = await currentGeneration(gw, sid)
+    const r = await gw.request<SteerResult | null>('session.steer', { session_id: sid, execution_generation, text })
+
+    return r?.status === 'queued' ? { ok: true } : { ok: false }
+  } catch (e) {
+    // A stale generation means the turn ended first; anything else is a real failure.
+    return errorText(e).includes('stale_generation') ? { ok: false } : { error: errorText(e), ok: false }
+  }
+}
+
 async function steer(host: ControlHost, text: string) {
   if (!text) {
     return host.notice('Usage: /steer <guidance for the active turn>', 'warning')
@@ -50,25 +66,14 @@ async function steer(host: ControlHost, text: string) {
     return host.notice(`No active turn — queued as next prompt: ${preview(text)}`)
   }
 
-  let status: string | undefined
+  const r = await steerTurn(host.gw, host.sid, text)
 
-  try {
-    const execution_generation = await currentGeneration(host.gw, host.sid)
-    const r = await host.gw.request<SteerResult | null>('session.steer', {
-      session_id: host.sid,
-      execution_generation,
-      text
-    })
-
-    status = r?.status
-  } catch (e) {
-    if (!errorText(e).includes('stale_generation')) {
-      return host.notice(`/steer failed: ${errorText(e)}`, 'error')
-    }
+  if (r.ok) {
+    return host.notice(`Steer queued for the active turn: ${preview(text)}`)
   }
 
-  if (status === 'queued') {
-    return host.notice(`Steer queued for the active turn: ${preview(text)}`)
+  if (r.error) {
+    return host.notice(`/steer failed: ${r.error}`, 'error')
   }
 
   host.enqueue(text)

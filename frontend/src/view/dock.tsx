@@ -39,6 +39,8 @@ export interface DockContext {
   onEffort(): void
   /** Pull the oldest queued prompt back into the composer. */
   onQueueEdit(): void
+  /** Inject the queued prompt at `index` into the running turn; absent when no turn runs. */
+  onQueueSteer?(index: number): void
   /** The session's cache hit (percent) and recent tokens per second, when known. */
   rates?: { cache?: number; tps?: number }
   /** Running subagents: the pill above the composer that opens the agents hub. */
@@ -66,6 +68,20 @@ export function dockNodes(cx: DockContext): JSX.Element[] {
             <text grow={1} key="text" text={text.replace(/\s*\r?\n\s*/g, ' ↵ ')} truncate="end" wrap="none" />
             {i === 0 && cx.queued.length > 1 ? (
               <badge key="count" role="omp.queue.count" text={`${cx.queued.length}`} />
+            ) : null}
+            {cx.onQueueSteer ? (
+              <row
+                align="center"
+                gap="xs"
+                key="steer"
+                onClick={() => cx.onQueueSteer?.(i)}
+                role="omp.queue.steer"
+                title="Steer the running turn with this  ⌥↵"
+              >
+                <icon key="i" name="corner-up-right" />
+                <kbd key="k" keys={['alt', 'enter']} />
+                <text key="t" text="Steer" />
+              </row>
             ) : null}
             <row align="center" gap="xs" key="edit" onClick={cx.onQueueEdit} role="omp.queue.edit" title="Edit  ⌥↑">
               <kbd key="k" keys={['alt', 'up']} />
