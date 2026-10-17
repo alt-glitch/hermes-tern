@@ -6,6 +6,7 @@ import type { App } from './app.js'
 import { CONTROL_COMMANDS } from './controlCommands.js'
 import { openAgents } from './overlays/agents.js'
 import { openBackground } from './overlays/background.js'
+import { openChanges } from './overlays/changes.js'
 import { openPullRequests } from './overlays/pullRequests.js'
 import { openHelp } from './overlays/help.js'
 import { openModelPicker, switchModel } from './overlays/models.js'
@@ -101,6 +102,16 @@ const COMMANDS: readonly LocalCommand[] = [
     aliases: ['bashes', 'shells', 'processes'],
     name: 'ps',
     run: app => openBackground(app)
+  },
+  {
+    aliases: ['side'],
+    name: 'sidebar',
+    run: app => app.toggleSidebar()
+  },
+  {
+    aliases: ['diff'],
+    name: 'changes',
+    run: app => openChanges(app)
   },
   {
     aliases: ['pr', 'pulls'],

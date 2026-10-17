@@ -46,6 +46,7 @@ import { paletteFor } from './palette.js'
 import { LINK_TOOLS } from './github/links.js'
 import { PullRequests } from './github/store.js'
 import { Cron } from './processes/cron.js'
+import { Sidebar } from './sidebar.js'
 import { isRunning as processRuns, Processes, processTone } from './processes/store.js'
 import { loadSettings, saveSettings, type ThemeMode } from './settings.js'
 import { Transcript } from './transcript.js'
@@ -83,6 +84,7 @@ export class App implements OverlayHost {
   /** The session's background processes (the shells pill, the Background sheet, background cards). */
   readonly processes: Processes = new Processes(this)
   readonly cron: Cron = new Cron(this)
+  readonly sidebar: Sidebar = new Sidebar(this)
   /** The conversation's PRs; links are stored under the stored session id the tools see. */
   readonly prs: PullRequests = new PullRequests({
     changed: () => this.changed(),
@@ -301,6 +303,11 @@ export class App implements OverlayHost {
       return openBackground(this)
     }
 
+    // ⌥S (macOS Option without Meta types ß).
+    if ((key.alt && key.name === 's' && !key.ctrl && !key.meta) || key.name === 'ß') {
+      return this.toggleSidebar()
+    }
+
     // ⌥P (macOS Option without Meta types π).
     if ((key.alt && key.name === 'p' && !key.ctrl && !key.meta) || key.name === 'π') {
       return openPullRequests(this)
@@ -371,6 +378,18 @@ export class App implements OverlayHost {
     }
 
     return out.consumed
+  }
+
+  /** Opens or closes the session sidebar (Tern's aside); says why where Tern has none. */
+  toggleSidebar() {
+    if (!this.#tern.caps.features.includes('aside')) {
+      this.transcript.notice('This Tern has no side panel (the aside feature). /changes and /prs still work.', 'warning')
+      this.changed()
+
+      return
+    }
+
+    this.sidebar.toggle()
   }
 
   /** Shows subagent `id` beside the chat in a Tern split; its timeline sheet where no split can open. */
@@ -972,6 +991,10 @@ export class App implements OverlayHost {
             }
           }
 
+          if (['patch', 'terminal', 'write_file', 'execute_code'].includes(ev.payload.name)) {
+            this.sidebar.poke()
+          }
+
           if (ev.payload.name === 'terminal') {
             // Maybe a background start: its card's live line begins now, not at the next idle poll.
             this.processes.poke()
@@ -1013,8 +1036,9 @@ export class App implements OverlayHost {
         t.complete(ev.payload ?? {})
         this.busy = null
         this.#drainQueue()
-        // The turn may have pushed a branch or opened a PR.
+        // The turn may have pushed a branch, opened a PR or changed files.
         this.prs.poke()
+        this.sidebar.poke()
 
         break
 
@@ -1331,7 +1355,11 @@ export class App implements OverlayHost {
         queued: this.queue,
         ready: this.sid !== null
       }),
-      layer: [...this.overlays.map(o => o.node(`layer.${o.key}`)), ...(modal ? [] : this.#completion.nodes(INPUT_ID))],
+      layer: [
+        ...(this.#tern.caps.features.includes('aside') ? [this.sidebar.node('layer.sidebar')].filter(n => n !== null) : []),
+        ...this.overlays.map(o => o.node(`layer.${o.key}`)),
+        ...(modal ? [] : this.#completion.nodes(INPUT_ID))
+      ],
       main: this.transcript.entries.map(e => entryNode(e, `main.${e.id}`, cx))
     })
 

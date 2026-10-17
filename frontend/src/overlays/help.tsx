@@ -38,6 +38,7 @@ const HOTKEYS: { group: string; rows: [string[], string][] }[] = [
       [['alt+a'], 'Agents'],
       [['alt+b'], 'Background processes and cron jobs (/ps)'],
       [['alt+p'], 'Pull requests Hermes linked (/prs)'],
+      [['alt+s'], 'Session sidebar: branch, PRs, changes (/sidebar)'],
       [['down'], 'Focus the agents / shells / PR pills (empty prompt); ← → switch, Enter opens, Esc returns'],
       [['ctrl+c'], 'Clear the draft / interrupt / exit (twice)'],
       [['ctrl+d'], 'Delete forward / exit (empty prompt)']

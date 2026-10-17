@@ -37,6 +37,18 @@ The sheet reads each PR from GitHub with your own token (`GH_TOKEN`, else `gh au
 Its actions are merge (asks first), close (asks first), ready for review, update branch, re-run
 failed jobs, open on GitHub and copy URL. The tools and the prompt section start in new sessions.
 
+## Sidebar
+
+⌥S (`/sidebar`) docks a session sidebar at the pane's right edge, using Tern's `aside`. The chat
+narrows beside it and keeps the keys. The sidebar shows:
+
+- the branch, and how far it is ahead of or behind its upstream;
+- the session's pull requests;
+- the changed files, with added and removed lines.
+
+A PR row opens the Pull requests sheet. A file row opens the Changes sheet (`/changes`), which
+shows each file's diff against HEAD.
+
 ## How it works
 
 - `__init__.py` registers `hermes tern`. It runs `hermes chat --tui <flags>` with

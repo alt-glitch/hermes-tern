@@ -97,6 +97,22 @@ export const STYLES = css`
     font-size: 13px !important;
   }
 
+  /* The session sidebar is a prefs sheet for its dock, not for settings: no search, no one-page
+     strip, no page heading over the folder line. */
+  .sf-prefs[data-id='layer.sidebar'] .pf-mark,
+  .sf-prefs[data-id='layer.sidebar'] .pf-search,
+  .sf-prefs[data-id='layer.sidebar'] .pf-groups,
+  .sf-prefs[data-id='layer.sidebar'] .pf-eyebrow,
+  .sf-prefs[data-id='layer.sidebar'] .pf-title {
+    display: none !important;
+  }
+
+  .sf-prefs[data-id='layer.sidebar'] .pf-lead {
+    font-family: var(--mono) !important;
+    font-size: 12px !important;
+    margin-top: 0 !important;
+  }
+
   /* omp's ask theme draws a radio at the start of each option without moving the text over. */
   [data-role='omp.ask.option'] {
     padding-left: 34px !important;
