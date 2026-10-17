@@ -12,6 +12,8 @@ import os
 import sys
 from pathlib import Path
 
+from . import pull_requests
+
 FRONTEND = Path(__file__).resolve().parent / "frontend"
 
 # frontend/src/entry.ts NO_TSP: the terminal never answered the TSP handshake.
@@ -80,3 +82,4 @@ def register(ctx) -> None:
         name="tern", help="Chat in Tern's native UI (falls back to the regular TUI elsewhere)",
         setup_fn=_setup, handler_fn=_run,
         description="Runs `hermes chat --tui` with the Tern frontend; every `hermes chat` flag works.")
+    pull_requests.register(ctx)

@@ -40,8 +40,11 @@ import { openBackground } from './overlays/background.js'
 import { Completion } from './overlays/completion.js'
 import { openModelPicker } from './overlays/models.js'
 import { promptOverlay } from './overlays/prompts.js'
+import { openPullRequests, prsPill } from './overlays/pullRequests.js'
 import { STYLES } from './view/styles.js'
 import { paletteFor } from './palette.js'
+import { LINK_TOOLS } from './github/links.js'
+import { PullRequests } from './github/store.js'
 import { Cron } from './processes/cron.js'
 import { isRunning as processRuns, Processes, processTone } from './processes/store.js'
 import { loadSettings, saveSettings, type ThemeMode } from './settings.js'
@@ -80,6 +83,8 @@ export class App implements OverlayHost {
   /** The session's background processes (the shells pill, the Background sheet, background cards). */
   readonly processes: Processes = new Processes(this)
   readonly cron: Cron = new Cron(this)
+  /** The conversation's PRs; links are stored under the stored session id the tools see. */
+  readonly prs: PullRequests = new PullRequests({ changed: () => this.changed(), sid: () => this.storedSid ?? this.sid })
   readonly composer = new Composer()
   readonly overlays: Overlay[] = []
   sid: string | null = null
@@ -292,6 +297,11 @@ export class App implements OverlayHost {
       return openBackground(this)
     }
 
+    // ⌥P (macOS Option without Meta types π).
+    if ((key.alt && key.name === 'p' && !key.ctrl && !key.meta) || key.name === 'π') {
+      return openPullRequests(this)
+    }
+
     if (key.alt && key.name === 'up' && this.queue.length) {
       return this.#dequeue()
     }
@@ -333,7 +343,8 @@ export class App implements OverlayHost {
   #pills(now = Date.now()): Pill[] {
     return [
       ...(this.agents.running().length ? (['agents'] as const) : []),
-      ...(this.processes.recent(now).length ? (['shells'] as const) : [])
+      ...(this.processes.recent(now).length ? (['shells'] as const) : []),
+      ...(this.prs.entries().length ? (['prs'] as const) : [])
     ]
   }
 
@@ -351,6 +362,8 @@ export class App implements OverlayHost {
       openAgents(this)
     } else if (out.open === 'shells') {
       openBackground(this)
+    } else if (out.open === 'prs') {
+      openPullRequests(this)
     }
 
     return out.consumed
@@ -721,8 +734,9 @@ export class App implements OverlayHost {
       this.agents.scan()
     }
 
-    // The new session's processes (and none of the last one's).
+    // The new session's processes and PRs (and none of the last one's).
     this.processes.poke()
+    this.prs.adopt()
 
     if (r.inflight) {
       this.transcript.inflight(r.inflight, this.busy?.startedAt)
@@ -938,6 +952,14 @@ export class App implements OverlayHost {
           t.toolComplete(ev.payload)
           // A dispatched delegation: its agents' rows start following the owner.
           this.agents.scan()
+
+          if (LINK_TOOLS.has(ev.payload.name)) {
+            const call = this.transcript.calls(ev.payload.name).at(-1)
+
+            if (call) {
+              this.prs.onCall(call)
+            }
+          }
 
           if (ev.payload.name === 'terminal') {
             // Maybe a background start: its card's live line begins now, not at the next idle poll.
@@ -1279,6 +1301,7 @@ export class App implements OverlayHost {
           this.changed()
         },
         agents: { onOpen: () => openAgents(this), running: this.agents.running().length },
+        prs: prsPill(this.prs.entries(), () => openPullRequests(this)),
         focused: modal ? undefined : this.#hud,
         shells: {
           exited: exited.length,

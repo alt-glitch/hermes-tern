@@ -48,8 +48,17 @@ export interface DockContext {
   agents?: { running: number; onOpen(): void }
   /** Background processes: the shells pill that opens the Background sheet. */
   shells?: ShellsPill
+  /** The conversation's pull requests: the PR pill that opens the Pull requests sheet. */
+  prs?: PrsPill
   /** The pill holding the keyboard (Down from an empty prompt). */
   focused?: Pill
+}
+
+/** The PR pill: the newest linked PR, or how many there are, toned by their checks. */
+export interface PrsPill {
+  text: string
+  tone: Tone
+  onOpen(): void
 }
 
 /** The shells pill: how many run, else how the recently exited ones ended. */
@@ -110,7 +119,8 @@ export function dockNodes(cx: DockContext): JSX.Element[] {
 
   const pills = [
     cx.agents?.running ? agentsPill(cx.agents.running, cx.agents.onOpen, cx.focused === 'agents') : null,
-    cx.shells && (cx.shells.running || cx.shells.exited) ? shellsPill(cx.shells, cx.focused === 'shells') : null
+    cx.shells && (cx.shells.running || cx.shells.exited) ? shellsPill(cx.shells, cx.focused === 'shells') : null,
+    cx.prs ? prsPillNode(cx.prs, cx.focused === 'prs') : null
   ].filter(p => p !== null)
 
   if (pills.length) {
@@ -169,6 +179,18 @@ function shellsPill(s: ShellsPill, focused: boolean): JSX.Element {
           spans={[{ s: live ? undefined : 'muted', t: `${n} shell${n === 1 ? '' : 's'}${live ? '' : ' exited'}` }]}
           wrap="none"
         />
+      </row>
+    </row>
+  )
+}
+
+/** The PR pill, in the shells pill's style. */
+function prsPillNode(p: PrsPill, focused: boolean): JSX.Element {
+  return (
+    <row align="center" key="prs" mark={focused ? 'pick' : undefined} onClick={p.onOpen} role="omp.hud.pill" title="Pull requests  ⌥P">
+      <row align="center" gap="xs" key="seg" role="omp.hud.seg">
+        <icon key="icon" name="merge" tone={p.tone === 'muted' ? undefined : p.tone} />
+        <text key="text" text={p.text} wrap="none" />
       </row>
     </row>
   )

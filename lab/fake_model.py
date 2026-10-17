@@ -18,6 +18,7 @@ the user's prompt, so one home covers every flow:
                    terminal calls before a slowly streamed answer
     "background…" -> (at the start) a 90 s ticking background process that notifies on exit
     "watch…"    -> (at the start) a 2 min ticking background process watching for "tick 10"
+    "pr…"       -> (at the start) links a real public PR (link_pull_request)
     "cron…"     -> (at the start) two cron jobs: a 30 min digest and a 15 min page monitor
     anything else -> a streamed markdown reply
 """
@@ -139,6 +140,11 @@ def _calls(prompt: str, target: Path) -> list[dict] | None:
     if words.lstrip().startswith("watch"):
         # `notify` is the advertised flag (tools/terminal_tool.py): a list watches for those lines.
         return [_call("terminal", {"command": TICKS.format(n=120), "background": True, "notify": ["tick 10"]})]
+    if words.lstrip().startswith("pr"):
+        # A real public PR, linked the way an agent links one it opened (through the tool_call bridge
+        # in case Tool Search defers the plugin's tools).
+        return [_call("tool_call", {"name": "link_pull_request", "arguments": {
+            "url": "https://github.com/alt-glitch/hermes-tern/pull/22"}}, "call-link")]
     if words.lstrip().startswith("cron"):
         # cronjob_manage is a deferred tool: the model reaches it through the tool_call bridge.
         return [

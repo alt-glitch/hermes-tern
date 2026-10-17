@@ -774,8 +774,8 @@ var require_util = __commonJS({
     }
     function nop() {
     }
-    function isStream(obj) {
-      return obj && typeof obj === "object" && typeof obj.pipe === "function" && typeof obj.on === "function";
+    function isStream(obj2) {
+      return obj2 && typeof obj2 === "object" && typeof obj2.pipe === "function" && typeof obj2.on === "function";
     }
     function isBlobLike(object) {
       if (object === null) {
@@ -880,14 +880,14 @@ var require_util = __commonJS({
       }
       return servername;
     }
-    function deepClone(obj) {
-      return JSON.parse(JSON.stringify(obj));
+    function deepClone(obj2) {
+      return JSON.parse(JSON.stringify(obj2));
     }
-    function isAsyncIterable(obj) {
-      return !!(obj != null && typeof obj[Symbol.asyncIterator] === "function");
+    function isAsyncIterable(obj2) {
+      return !!(obj2 != null && typeof obj2[Symbol.asyncIterator] === "function");
     }
-    function isIterable(obj) {
-      return !!(obj != null && (typeof obj[Symbol.iterator] === "function" || typeof obj[Symbol.asyncIterator] === "function"));
+    function isIterable(obj2) {
+      return !!(obj2 != null && (typeof obj2[Symbol.iterator] === "function" || typeof obj2[Symbol.asyncIterator] === "function"));
     }
     function bodyLength(body) {
       if (body == null) {
@@ -934,30 +934,30 @@ var require_util = __commonJS({
     function bufferToLowerCasedHeaderName(value) {
       return tree.lookup(value) ?? value.toString("latin1").toLowerCase();
     }
-    function parseHeaders(headers, obj) {
-      if (obj === void 0) obj = {};
+    function parseHeaders(headers, obj2) {
+      if (obj2 === void 0) obj2 = {};
       for (let i = 0; i < headers.length; i += 2) {
         const key2 = headerNameToString(headers[i]);
-        let val = obj[key2];
+        let val = obj2[key2];
         if (val) {
           if (typeof val === "string") {
             val = [val];
-            obj[key2] = val;
+            obj2[key2] = val;
           }
           val.push(headers[i + 1].toString("utf8"));
         } else {
           const headersValue = headers[i + 1];
           if (typeof headersValue === "string") {
-            obj[key2] = headersValue;
+            obj2[key2] = headersValue;
           } else {
-            obj[key2] = Array.isArray(headersValue) ? headersValue.map((x) => x.toString("utf8")) : headersValue.toString("utf8");
+            obj2[key2] = Array.isArray(headersValue) ? headersValue.map((x) => x.toString("utf8")) : headersValue.toString("utf8");
           }
         }
       }
-      if ("content-length" in obj && "content-disposition" in obj) {
-        obj["content-disposition"] = Buffer.from(obj["content-disposition"]).toString("latin1");
+      if ("content-length" in obj2 && "content-disposition" in obj2) {
+        obj2["content-disposition"] = Buffer.from(obj2["content-disposition"]).toString("latin1");
       }
-      return obj;
+      return obj2;
     }
     function parseRawHeaders(headers) {
       const len = headers.length;
@@ -1135,17 +1135,17 @@ var require_util = __commonJS({
         size: m[3] ? parseInt(m[3]) : null
       } : null;
     }
-    function addListener(obj, name, listener) {
-      const listeners = obj[kListeners] ??= [];
+    function addListener(obj2, name, listener) {
+      const listeners = obj2[kListeners] ??= [];
       listeners.push([name, listener]);
-      obj.on(name, listener);
-      return obj;
+      obj2.on(name, listener);
+      return obj2;
     }
-    function removeAllListeners(obj) {
-      for (const [name, listener] of obj[kListeners] ?? []) {
-        obj.removeListener(name, listener);
+    function removeAllListeners(obj2) {
+      for (const [name, listener] of obj2[kListeners] ?? []) {
+        obj2.removeListener(name, listener);
       }
-      obj[kListeners] = null;
+      obj2[kListeners] = null;
     }
     function errorRequest(client, request, err) {
       try {
@@ -1546,11 +1546,11 @@ var require_request = __commonJS({
           }
         } else if (headers && typeof headers === "object") {
           if (headers[Symbol.iterator]) {
-            for (const header of headers) {
-              if (!Array.isArray(header) || header.length !== 2) {
+            for (const header2 of headers) {
+              if (!Array.isArray(header2) || header2.length !== 2) {
                 throw new InvalidArgumentError("headers must be in key-value pair format");
               }
-              processHeader(this, header[0], header[1]);
+              processHeader(this, header2[0], header2[1]);
             }
           } else {
             const keys = Object.keys(headers);
@@ -1750,11 +1750,11 @@ var require_request = __commonJS({
           } else if (typeof val[i] === "object") {
             throw new InvalidArgumentError(`invalid ${key2} header`);
           } else {
-            const str6 = `${val[i]}`;
-            if (!isValidHeaderValue(str6)) {
+            const str7 = `${val[i]}`;
+            if (!isValidHeaderValue(str7)) {
               throw new InvalidArgumentError(`invalid ${key2} header`);
             }
-            arr.push(str6);
+            arr.push(str7);
           }
         }
         val = arr;
@@ -2039,7 +2039,7 @@ var require_timers = __commonJS({
     "use strict";
     var fastNow = 0;
     var RESOLUTION_MS = 1e3;
-    var TICK_MS3 = (RESOLUTION_MS >> 1) - 1;
+    var TICK_MS4 = (RESOLUTION_MS >> 1) - 1;
     var fastNowTimeout;
     var kFastTimer = /* @__PURE__ */ Symbol("kFastTimer");
     var fastTimers = [];
@@ -2048,13 +2048,13 @@ var require_timers = __commonJS({
     var PENDING = 0;
     var ACTIVE = 1;
     function onTick() {
-      fastNow += TICK_MS3;
+      fastNow += TICK_MS4;
       let idx = 0;
       let len = fastTimers.length;
       while (idx < len) {
         const timer = fastTimers[idx];
         if (timer._state === PENDING) {
-          timer._idleStart = fastNow - TICK_MS3;
+          timer._idleStart = fastNow - TICK_MS4;
           timer._state = ACTIVE;
         } else if (timer._state === ACTIVE && fastNow >= timer._idleStart + timer._idleTimeout) {
           timer._state = TO_BE_CLEARED;
@@ -2080,7 +2080,7 @@ var require_timers = __commonJS({
         fastNowTimeout.refresh();
       } else {
         clearTimeout(fastNowTimeout);
-        fastNowTimeout = setTimeout(onTick, TICK_MS3);
+        fastNowTimeout = setTimeout(onTick, TICK_MS4);
         if (fastNowTimeout.unref) {
           fastNowTimeout.unref();
         }
@@ -2450,10 +2450,10 @@ var require_utils = __commonJS({
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.enumToMap = void 0;
-    function enumToMap(obj) {
+    function enumToMap(obj2) {
       const res = {};
-      Object.keys(obj).forEach((key2) => {
-        const value = obj[key2];
+      Object.keys(obj2).forEach((key2) => {
+        const value = obj2[key2];
         if (typeof value === "number") {
           res[key2] = value;
         }
@@ -3319,25 +3319,25 @@ var require_data_url = __commonJS({
     function isHTTPWhiteSpace(char) {
       return char === 13 || char === 10 || char === 9 || char === 32;
     }
-    function removeHTTPWhitespace(str6, leading = true, trailing = true) {
-      return removeChars(str6, leading, trailing, isHTTPWhiteSpace);
+    function removeHTTPWhitespace(str7, leading = true, trailing = true) {
+      return removeChars(str7, leading, trailing, isHTTPWhiteSpace);
     }
     function isASCIIWhitespace(char) {
       return char === 13 || char === 10 || char === 9 || char === 12 || char === 32;
     }
-    function removeASCIIWhitespace(str6, leading = true, trailing = true) {
-      return removeChars(str6, leading, trailing, isASCIIWhitespace);
+    function removeASCIIWhitespace(str7, leading = true, trailing = true) {
+      return removeChars(str7, leading, trailing, isASCIIWhitespace);
     }
-    function removeChars(str6, leading, trailing, predicate) {
+    function removeChars(str7, leading, trailing, predicate) {
       let lead = 0;
-      let trail = str6.length - 1;
+      let trail = str7.length - 1;
       if (leading) {
-        while (lead < str6.length && predicate(str6.charCodeAt(lead))) lead++;
+        while (lead < str7.length && predicate(str7.charCodeAt(lead))) lead++;
       }
       if (trailing) {
-        while (trail > 0 && predicate(str6.charCodeAt(trail))) trail--;
+        while (trail > 0 && predicate(str7.charCodeAt(trail))) trail--;
       }
-      return lead === 0 && trail === str6.length - 1 ? str6 : str6.slice(lead, trail + 1);
+      return lead === 0 && trail === str7.length - 1 ? str7 : str7.slice(lead, trail + 1);
     }
     function isomorphicDecode(input) {
       const length = input.length;
@@ -3939,9 +3939,9 @@ var require_util2 = __commonJS({
       return "success";
     }
     function appendFetchMetadata(httpRequest) {
-      let header = null;
-      header = httpRequest.mode;
-      httpRequest.headersList.set("sec-fetch-mode", header, true);
+      let header2 = null;
+      header2 = httpRequest.mode;
+      httpRequest.headersList.set("sec-fetch-mode", header2, true);
     }
     function appendRequestOriginHeader(request) {
       let serializedOrigin = request.origin;
@@ -5256,7 +5256,7 @@ var require_body = __commonJS({
         const boundary = `----formdata-undici-0${`${random(1e11)}`.padStart(11, "0")}`;
         const prefix = `--${boundary}\r
 Content-Disposition: form-data`;
-        const escape = (str6) => str6.replace(/\n/g, "%0A").replace(/\r/g, "%0D").replace(/"/g, "%22");
+        const escape = (str7) => str7.replace(/\n/g, "%0A").replace(/\r/g, "%0D").replace(/"/g, "%22");
         const normalizeLinefeeds = (value) => value.replace(/\r?\n|\r/g, "\r\n");
         const blobParts = [];
         const rn = new Uint8Array([13, 10]);
@@ -6294,22 +6294,22 @@ var require_client_h1 = __commonJS({
       if (blocking) {
         socket[kBlocking] = true;
       }
-      let header = `${method} ${path} HTTP/1.1\r
+      let header2 = `${method} ${path} HTTP/1.1\r
 `;
       if (typeof host === "string") {
-        header += `host: ${host}\r
+        header2 += `host: ${host}\r
 `;
       } else {
-        header += client[kHostHeader];
+        header2 += client[kHostHeader];
       }
       if (upgrade) {
-        header += `connection: upgrade\r
+        header2 += `connection: upgrade\r
 upgrade: ${upgrade}\r
 `;
       } else if (client[kPipelining] && !socket[kReset]) {
-        header += "connection: keep-alive\r\n";
+        header2 += "connection: keep-alive\r\n";
       } else {
-        header += "connection: close\r\n";
+        header2 += "connection: close\r\n";
       }
       if (Array.isArray(headers)) {
         for (let n = 0; n < headers.length; n += 2) {
@@ -6317,41 +6317,41 @@ upgrade: ${upgrade}\r
           const val = headers[n + 1];
           if (Array.isArray(val)) {
             for (let i = 0; i < val.length; i++) {
-              header += `${key2}: ${val[i]}\r
+              header2 += `${key2}: ${val[i]}\r
 `;
             }
           } else {
-            header += `${key2}: ${val}\r
+            header2 += `${key2}: ${val}\r
 `;
           }
         }
       }
       if (channels.sendHeaders.hasSubscribers) {
-        channels.sendHeaders.publish({ request, headers: header, socket });
+        channels.sendHeaders.publish({ request, headers: header2, socket });
       }
       if (!body || bodyLength === 0) {
-        writeBuffer(abort, null, client, request, socket, contentLength, header, expectsPayload);
+        writeBuffer(abort, null, client, request, socket, contentLength, header2, expectsPayload);
       } else if (util.isBuffer(body)) {
-        writeBuffer(abort, body, client, request, socket, contentLength, header, expectsPayload);
+        writeBuffer(abort, body, client, request, socket, contentLength, header2, expectsPayload);
       } else if (util.isBlobLike(body)) {
         if (typeof body.stream === "function") {
-          writeIterable(abort, body.stream(), client, request, socket, contentLength, header, expectsPayload);
+          writeIterable(abort, body.stream(), client, request, socket, contentLength, header2, expectsPayload);
         } else {
-          writeBlob(abort, body, client, request, socket, contentLength, header, expectsPayload);
+          writeBlob(abort, body, client, request, socket, contentLength, header2, expectsPayload);
         }
       } else if (util.isStream(body)) {
-        writeStream(abort, body, client, request, socket, contentLength, header, expectsPayload);
+        writeStream(abort, body, client, request, socket, contentLength, header2, expectsPayload);
       } else if (util.isIterable(body)) {
-        writeIterable(abort, body, client, request, socket, contentLength, header, expectsPayload);
+        writeIterable(abort, body, client, request, socket, contentLength, header2, expectsPayload);
       } else {
         assert(false);
       }
       return true;
     }
-    function writeStream(abort, body, client, request, socket, contentLength, header, expectsPayload) {
+    function writeStream(abort, body, client, request, socket, contentLength, header2, expectsPayload) {
       assert(contentLength !== 0 || client[kRunning] === 0, "stream body cannot be pipelined");
       let finished = false;
-      const writer = new AsyncWriter({ abort, socket, request, contentLength, client, expectsPayload, header });
+      const writer = new AsyncWriter({ abort, socket, request, contentLength, client, expectsPayload, header: header2 });
       const onData = function(chunk) {
         if (finished) {
           return;
@@ -6417,22 +6417,22 @@ upgrade: ${upgrade}\r
         setImmediate(onClose);
       }
     }
-    function writeBuffer(abort, body, client, request, socket, contentLength, header, expectsPayload) {
+    function writeBuffer(abort, body, client, request, socket, contentLength, header2, expectsPayload) {
       try {
         if (!body) {
           if (contentLength === 0) {
-            socket.write(`${header}content-length: 0\r
+            socket.write(`${header2}content-length: 0\r
 \r
 `, "latin1");
           } else {
             assert(contentLength === null, "no body must not have content length");
-            socket.write(`${header}\r
+            socket.write(`${header2}\r
 `, "latin1");
           }
         } else if (util.isBuffer(body)) {
           assert(contentLength === body.byteLength, "buffer body must have content length");
           socket.cork();
-          socket.write(`${header}content-length: ${contentLength}\r
+          socket.write(`${header2}content-length: ${contentLength}\r
 \r
 `, "latin1");
           socket.write(body);
@@ -6448,7 +6448,7 @@ upgrade: ${upgrade}\r
         abort(err);
       }
     }
-    async function writeBlob(abort, body, client, request, socket, contentLength, header, expectsPayload) {
+    async function writeBlob(abort, body, client, request, socket, contentLength, header2, expectsPayload) {
       assert(contentLength === body.size, "blob body must have content length");
       try {
         if (contentLength != null && contentLength !== body.size) {
@@ -6456,7 +6456,7 @@ upgrade: ${upgrade}\r
         }
         const buffer = Buffer.from(await body.arrayBuffer());
         socket.cork();
-        socket.write(`${header}content-length: ${contentLength}\r
+        socket.write(`${header2}content-length: ${contentLength}\r
 \r
 `, "latin1");
         socket.write(buffer);
@@ -6471,7 +6471,7 @@ upgrade: ${upgrade}\r
         abort(err);
       }
     }
-    async function writeIterable(abort, body, client, request, socket, contentLength, header, expectsPayload) {
+    async function writeIterable(abort, body, client, request, socket, contentLength, header2, expectsPayload) {
       assert(contentLength !== 0 || client[kRunning] === 0, "iterator body cannot be pipelined");
       let callback = null;
       function onDrain() {
@@ -6490,7 +6490,7 @@ upgrade: ${upgrade}\r
         }
       });
       socket.on("close", onDrain).on("drain", onDrain);
-      const writer = new AsyncWriter({ abort, socket, request, contentLength, client, expectsPayload, header });
+      const writer = new AsyncWriter({ abort, socket, request, contentLength, client, expectsPayload, header: header2 });
       try {
         for await (const chunk of body) {
           if (socket[kError]) {
@@ -6508,19 +6508,19 @@ upgrade: ${upgrade}\r
       }
     }
     var AsyncWriter = class {
-      constructor({ abort, socket, request, contentLength, client, expectsPayload, header }) {
+      constructor({ abort, socket, request, contentLength, client, expectsPayload, header: header2 }) {
         this.socket = socket;
         this.request = request;
         this.contentLength = contentLength;
         this.client = client;
         this.bytesWritten = 0;
         this.expectsPayload = expectsPayload;
-        this.header = header;
+        this.header = header2;
         this.abort = abort;
         socket[kWriting] = true;
       }
       write(chunk) {
-        const { socket, request, contentLength, client, bytesWritten, expectsPayload, header } = this;
+        const { socket, request, contentLength, client, bytesWritten, expectsPayload, header: header2 } = this;
         if (socket[kError]) {
           throw socket[kError];
         }
@@ -6543,10 +6543,10 @@ upgrade: ${upgrade}\r
             socket[kReset] = true;
           }
           if (contentLength === null) {
-            socket.write(`${header}transfer-encoding: chunked\r
+            socket.write(`${header2}transfer-encoding: chunked\r
 `, "latin1");
           } else {
-            socket.write(`${header}content-length: ${contentLength}\r
+            socket.write(`${header2}content-length: ${contentLength}\r
 \r
 `, "latin1");
           }
@@ -6570,7 +6570,7 @@ ${len.toString(16)}\r
         return ret;
       }
       end() {
-        const { socket, contentLength, client, bytesWritten, expectsPayload, header, request } = this;
+        const { socket, contentLength, client, bytesWritten, expectsPayload, header: header2, request } = this;
         request.onRequestSent();
         socket[kWriting] = false;
         if (socket[kError]) {
@@ -6581,11 +6581,11 @@ ${len.toString(16)}\r
         }
         if (bytesWritten === 0) {
           if (expectsPayload) {
-            socket.write(`${header}content-length: 0\r
+            socket.write(`${header2}content-length: 0\r
 \r
 `, "latin1");
           } else {
-            socket.write(`${header}\r
+            socket.write(`${header2}\r
 `, "latin1");
           }
         } else if (contentLength === null) {
@@ -7317,15 +7317,15 @@ var require_redirect_handler = __commonJS({
         }
       }
     }
-    function shouldRemoveHeader(header, removeContent, unknownOrigin) {
-      if (header.length === 4) {
-        return util.headerNameToString(header) === "host";
+    function shouldRemoveHeader(header2, removeContent, unknownOrigin) {
+      if (header2.length === 4) {
+        return util.headerNameToString(header2) === "host";
       }
-      if (removeContent && util.headerNameToString(header).startsWith("content-")) {
+      if (removeContent && util.headerNameToString(header2).startsWith("content-")) {
         return true;
       }
-      if (unknownOrigin && (header.length === 13 || header.length === 6 || header.length === 19)) {
-        const name = util.headerNameToString(header);
+      if (unknownOrigin && (header2.length === 13 || header2.length === 6 || header2.length === 19)) {
+        const name = util.headerNameToString(header2);
         return name === "authorization" || name === "cookie" || name === "proxy-authorization";
       }
       return false;
@@ -10868,7 +10868,7 @@ var require_mock_interceptor = __commonJS({
 var require_mock_client = __commonJS({
   ".hermes-src/ui-tui/node_modules/undici/lib/mock/mock-client.js"(exports, module) {
     "use strict";
-    var { promisify: promisify3 } = __require("node:util");
+    var { promisify: promisify4 } = __require("node:util");
     var Client = require_client();
     var { buildMockDispatch } = require_mock_utils();
     var {
@@ -10908,7 +10908,7 @@ var require_mock_client = __commonJS({
         return new MockInterceptor(opts, this[kDispatches]);
       }
       async [kClose]() {
-        await promisify3(this[kOriginalClose])();
+        await promisify4(this[kOriginalClose])();
         this[kConnected] = 0;
         this[kMockAgent][Symbols.kClients].delete(this[kOrigin]);
       }
@@ -10921,7 +10921,7 @@ var require_mock_client = __commonJS({
 var require_mock_pool = __commonJS({
   ".hermes-src/ui-tui/node_modules/undici/lib/mock/mock-pool.js"(exports, module) {
     "use strict";
-    var { promisify: promisify3 } = __require("node:util");
+    var { promisify: promisify4 } = __require("node:util");
     var Pool = require_pool();
     var { buildMockDispatch } = require_mock_utils();
     var {
@@ -10961,7 +10961,7 @@ var require_mock_pool = __commonJS({
         return new MockInterceptor(opts, this[kDispatches]);
       }
       async [kClose]() {
-        await promisify3(this[kOriginalClose])();
+        await promisify4(this[kOriginalClose])();
         this[kConnected] = 0;
         this[kMockAgent][Symbols.kClients].delete(this[kOrigin]);
       }
@@ -11709,14 +11709,14 @@ var require_headers = __commonJS({
     function fill(headers, object) {
       if (Array.isArray(object)) {
         for (let i = 0; i < object.length; ++i) {
-          const header = object[i];
-          if (header.length !== 2) {
+          const header2 = object[i];
+          if (header2.length !== 2) {
             throw webidl.errors.exception({
               header: "Headers constructor",
-              message: `expected name/value pair to be length 2, found ${header.length}.`
+              message: `expected name/value pair to be length 2, found ${header2.length}.`
             });
           }
-          appendHeader(headers, header[0], header[1]);
+          appendHeader(headers, header2[0], header2[1]);
         }
       } else if (typeof object === "object" && object !== null) {
         const keys = Object.keys(object);
@@ -13362,7 +13362,7 @@ var require_fetch = __commonJS({
     function handleFetchDone(response) {
       finalizeAndReportTiming(response, "fetch");
     }
-    function fetch(input, init = void 0) {
+    function fetch2(input, init = void 0) {
       webidl.argumentLengthCheck(arguments, 1, "globalThis.fetch");
       let p = createDeferredPromise();
       let requestObject;
@@ -14319,7 +14319,7 @@ var require_fetch = __commonJS({
       }
     }
     module.exports = {
-      fetch,
+      fetch: fetch2,
       Fetch,
       fetching,
       finalizeAndReportTiming
@@ -15162,10 +15162,10 @@ var require_util5 = __commonJS({
       const serializedB = URLSerializer(B, excludeFragment);
       return serializedA === serializedB;
     }
-    function getFieldValues(header) {
-      assert(header !== null);
+    function getFieldValues(header2) {
+      assert(header2 !== null);
       const values = [];
-      for (let value of header.split(",")) {
+      for (let value of header2.split(",")) {
         value = value.trim();
         if (isValidHeaderName(value)) {
           values.push(value);
@@ -16064,20 +16064,20 @@ var require_parse = __commonJS({
     var { isCTLExcludingHtab } = require_util6();
     var { collectASequenceOfCodePointsFast } = require_data_url();
     var assert = __require("node:assert");
-    function parseSetCookie(header) {
-      if (isCTLExcludingHtab(header)) {
+    function parseSetCookie(header2) {
+      if (isCTLExcludingHtab(header2)) {
         return null;
       }
       let nameValuePair = "";
       let unparsedAttributes = "";
       let name = "";
       let value = "";
-      if (header.includes(";")) {
+      if (header2.includes(";")) {
         const position = { position: 0 };
-        nameValuePair = collectASequenceOfCodePointsFast(";", header, position);
-        unparsedAttributes = header.slice(position.position);
+        nameValuePair = collectASequenceOfCodePointsFast(";", header2, position);
+        unparsedAttributes = header2.slice(position.position);
       } else {
-        nameValuePair = header;
+        nameValuePair = header2;
       }
       if (!nameValuePair.includes("=")) {
         value = nameValuePair;
@@ -16240,9 +16240,9 @@ var require_cookies = __commonJS({
       webidl.argumentLengthCheck(arguments, 2, "setCookie");
       webidl.brandCheck(headers, Headers, { strict: false });
       cookie = webidl.converters.Cookie(cookie);
-      const str6 = stringify(cookie);
-      if (str6) {
-        headers.append("Set-Cookie", str6);
+      const str7 = stringify(cookie);
+      if (str7) {
+        headers.append("Set-Cookie", str7);
       }
     }
     webidl.converters.DeleteCookieAttributes = webidl.dictionaryConverter([
@@ -16802,8 +16802,8 @@ var require_util7 = __commonJS({
           return false;
         }
       }
-      const num3 = Number.parseInt(value, 10);
-      return num3 >= 8 && num3 <= 15;
+      const num4 = Number.parseInt(value, 10);
+      return num4 >= 8 && num4 <= 15;
     }
     var hasIntl = typeof process.versions.icu === "string";
     var fatalDecoder = hasIntl ? new TextDecoder("utf-8", { fatal: true }) : void 0;
@@ -18701,7 +18701,7 @@ var require_undici = __commonJS({
     var errors = require_errors();
     var util = require_util();
     var { InvalidArgumentError } = errors;
-    var api = require_api();
+    var api2 = require_api();
     var buildConnector = require_connect();
     var MockClient = require_mock_client();
     var MockAgent = require_mock_agent();
@@ -18712,7 +18712,7 @@ var require_undici = __commonJS({
     var DecoratorHandler = require_decorator_handler();
     var RedirectHandler = require_redirect_handler();
     var createRedirectInterceptor = require_redirect_interceptor();
-    Object.assign(Dispatcher.prototype, api);
+    Object.assign(Dispatcher.prototype, api2);
     module.exports.Dispatcher = Dispatcher;
     module.exports.Client = Client;
     module.exports.Pool = Pool;
@@ -18779,7 +18779,7 @@ var require_undici = __commonJS({
     module.exports.setGlobalDispatcher = setGlobalDispatcher;
     module.exports.getGlobalDispatcher = getGlobalDispatcher;
     var fetchImpl = require_fetch().fetch;
-    module.exports.fetch = async function fetch(init, options = void 0) {
+    module.exports.fetch = async function fetch2(init, options = void 0) {
       try {
         return await fetchImpl(init, options);
       } catch (err) {
@@ -18814,11 +18814,11 @@ var require_undici = __commonJS({
     module.exports.CloseEvent = CloseEvent;
     module.exports.ErrorEvent = ErrorEvent;
     module.exports.MessageEvent = MessageEvent;
-    module.exports.request = makeDispatcher(api.request);
-    module.exports.stream = makeDispatcher(api.stream);
-    module.exports.pipeline = makeDispatcher(api.pipeline);
-    module.exports.connect = makeDispatcher(api.connect);
-    module.exports.upgrade = makeDispatcher(api.upgrade);
+    module.exports.request = makeDispatcher(api2.request);
+    module.exports.stream = makeDispatcher(api2.stream);
+    module.exports.pipeline = makeDispatcher(api2.pipeline);
+    module.exports.connect = makeDispatcher(api2.connect);
+    module.exports.upgrade = makeDispatcher(api2.upgrade);
     module.exports.MockClient = MockClient;
     module.exports.MockPool = MockPool;
     module.exports.MockAgent = MockAgent;
@@ -19968,25 +19968,25 @@ var PLAIN_TEXT = {
   badge: true,
   toast: true
 };
-function textProps(run2) {
-  if (run2.every((part) => typeof part === "string"))
-    return { text: run2.join("") };
-  return { spans: run2.map((part) => typeof part === "string" ? part : toJson(part) ?? null) };
+function textProps(run3) {
+  if (run3.every((part) => typeof part === "string"))
+    return { text: run3.join("") };
+  return { spans: run3.map((part) => typeof part === "string" ? part : toJson(part) ?? null) };
 }
 function containerChildren(parts2) {
   const out = [];
-  let run2 = [];
+  let run3 = [];
   const end = () => {
-    if (run2.length > 0)
-      out.push(new Node("text", textProps(run2)));
-    run2 = [];
+    if (run3.length > 0)
+      out.push(new Node("text", textProps(run3)));
+    run3 = [];
   };
   for (const part of parts2) {
     if (part instanceof Node) {
       end();
       out.push(part);
     } else {
-      run2.push(part);
+      run3.push(part);
     }
   }
   end();
@@ -20011,42 +20011,42 @@ function createNode(kind, input, children2) {
     }
   }
   const parts2 = flatten([fromProps, children2]);
-  let nodes = [];
+  let nodes2 = [];
   if (SPAN_TEXT[kind] || PLAIN_TEXT[kind]) {
-    const run2 = [];
+    const run3 = [];
     for (const part of parts2) {
       if (part instanceof Node && kind === "seg")
-        nodes.push(part);
+        nodes2.push(part);
       else if (part instanceof Node || part instanceof Span && PLAIN_TEXT[kind]) {
         throw new TypeError(`${kind} takes text children, got ${describe(part)}`);
       } else
-        run2.push(part);
+        run3.push(part);
     }
-    if (run2.length > 0)
-      Object.assign(props, textProps(run2));
+    if (run3.length > 0)
+      Object.assign(props, textProps(run3));
   } else if (kind === "el") {
     let text2 = "";
     for (const part of parts2) {
       if (part instanceof Span)
         throw new TypeError("el takes no spans; use html.span");
       if (typeof part === "string") {
-        if (nodes.length === 0)
+        if (nodes2.length === 0)
           text2 += part;
         else
-          nodes.push(new Node("el", { tag: "span", text: part }));
+          nodes2.push(new Node("el", { tag: "span", text: part }));
       } else {
-        nodes.push(part);
+        nodes2.push(part);
       }
     }
     if (text2 !== "")
       props["text"] = text2;
   } else {
-    nodes = containerChildren(parts2);
+    nodes2 = containerChildren(parts2);
   }
   const any = Object.keys(handlers).length > 0;
   if (any)
     withActions(props, handlers);
-  return new Node(kind, props, nodes, any ? handlers : void 0);
+  return new Node(kind, props, nodes2, any ? handlers : void 0);
 }
 function describe(part) {
   if (part instanceof Node)
@@ -20149,14 +20149,14 @@ var Tree = class _Tree {
   }
 };
 function column(children2) {
-  const nodes = [];
+  const nodes2 = [];
   for (const part of flatten(children2)) {
     if (!(part instanceof Node)) {
       throw new ViewError("a region lists nodes; wrap text in a text node");
     }
-    nodes.push(part);
+    nodes2.push(part);
   }
-  return new Node("col", {}, nodes);
+  return new Node("col", {}, nodes2);
 }
 function regionRoot(region) {
   if (region === null || region === void 0 || typeof region === "boolean")
@@ -21755,7 +21755,7 @@ var chatBitsEn = {
       statusRunning: "running",
       toolsOne: (count) => `${count} tool`,
       toolsOther: (count) => `${count} tools`,
-      tokShort: (tokens) => `${tokens} tok`,
+      tokShort: (tokens2) => `${tokens2} tok`,
       subtreeTools: (count) => `+${count}t sub`,
       // {0} = depth of the spawned children, {1} = total descendants.
       spawnedSuffix: (depth, total) => `d${depth} \xB7 ${total} total`,
@@ -22212,7 +22212,7 @@ var hubsEn = {
         tokens: "tokens",
         // {0} formatted input tokens, {1} formatted output tokens
         tokensValue: (input, output) => `${input} in \xB7 ${output} out`,
-        reasoningSuffix: (tokens) => ` \xB7 ${tokens} reasoning`,
+        reasoningSuffix: (tokens2) => ` \xB7 ${tokens2} reasoning`,
         subtreeTokens: "subtree tokens",
         filesMore: (count) => `\u2026+${count} more`
       },
@@ -23145,7 +23145,7 @@ var slashCmdSessionEn = {
       compressedOther: (count) => `compressed ${count} messages`,
       nothing: "nothing to compress",
       // {0}=compact token count, appended to compressedOne/Other
-      tokSuffix: (tokens) => ` \xB7 ${tokens} tok`
+      tokSuffix: (tokens2) => ` \xB7 ${tokens2} tok`
     },
     fast: {
       mode: (mode) => `fast mode: ${mode}`,
@@ -24770,10 +24770,10 @@ var Transcript = class {
     }
     const prompt = counters.prompt - start.prompt;
     const hit = prompt > 0 ? Math.round((counters.read - start.read) / prompt * 100) : void 0;
-    const tokens = counters.total - start.total || void 0;
-    if (hit !== turn.cacheHit || tokens !== turn.tickTokens || tps !== turn.tps) {
+    const tokens2 = counters.total - start.total || void 0;
+    if (hit !== turn.cacheHit || tokens2 !== turn.tickTokens || tps !== turn.tps) {
       turn.cacheHit = hit;
-      turn.tickTokens = tokens;
+      turn.tickTokens = tokens2;
       turn.tps = tps;
       this.#touch(turn);
     }
@@ -25355,13 +25355,13 @@ function final(log, at, body) {
   if (status) {
     log.status = status;
   }
-  const duration2 = /(?:^|\s)duration=([\d.]+)s/.exec(body)?.[1];
-  if (duration2) {
-    log.duration = Number(duration2);
+  const duration3 = /(?:^|\s)duration=([\d.]+)s/.exec(body)?.[1];
+  if (duration3) {
+    log.duration = Number(duration3);
   }
-  const summary3 = /summary: (.*)$/.exec(body)?.[1];
-  if (summary3) {
-    log.summary = summary3;
+  const summary4 = /summary: (.*)$/.exec(body)?.[1];
+  if (summary4) {
+    log.summary = summary4;
   }
   const reason = /exit_reason=(\S+)/.exec(body)?.[1];
   if (reason) {
@@ -25371,7 +25371,7 @@ function final(log, at, body) {
   if (error) {
     log.error = error;
   }
-  if (!status && !duration2 && !summary3) {
+  if (!status && !duration3 && !summary4) {
     log.entries.push({ at, kind: "note", text: body });
   }
 }
@@ -26737,10 +26737,10 @@ function searchCard(call, result) {
         /* @__PURE__ */ jsx("text", { role: "omp.tool.chip", spans: [{ t: String(hits.length) }] }, "n")
       ] }, f)
     );
-    let run2 = [];
+    let run3 = [];
     let runIndex = 0;
     const flush = () => {
-      const start = run2[0]?.line ?? 1;
+      const start = run3[0]?.line ?? 1;
       if (runIndex > 0) {
         body.push(/* @__PURE__ */ jsx("text", { role: "omp.tool.context", spans: [{ s: "muted", t: "\u2026" }] }, `${f}.g${runIndex}`));
       }
@@ -26749,23 +26749,23 @@ function searchCard(call, result) {
           "code",
           {
             lang: langOf(path),
-            marks: run2.map((h) => ({ line: h.line, tone: "accent" })),
+            marks: run3.map((h) => ({ line: h.line, tone: "accent" })),
             numbers: true,
             start,
-            text: run2.map((h) => h.text).join("\n")
+            text: run3.map((h) => h.text).join("\n")
           },
           `${f}.c${runIndex++}`
         )
       );
-      run2 = [];
+      run3 = [];
     };
     for (const hit of hits) {
-      if (run2.length && hit.line !== (run2.at(-1)?.line ?? 0) + 1) {
+      if (run3.length && hit.line !== (run3.at(-1)?.line ?? 0) + 1) {
         flush();
       }
-      run2.push(hit);
+      run3.push(hit);
     }
-    if (run2.length) {
+    if (run3.length) {
       flush();
     }
   }
@@ -26841,7 +26841,7 @@ function taskCard(call, result, now) {
   const settled = agents.filter((a) => a.status !== "running" && a.status !== "queued");
   const count = goals.length || agents.length;
   let meta;
-  let took;
+  let took2;
   if (agents.length && !working) {
     const ok = agents.filter((a) => a.status === "done").length;
     const stopped = agents.filter((a) => a.status === "cancelled").length;
@@ -26853,7 +26853,7 @@ function taskCard(call, result, now) {
       stopped ? `${stopped} stopped` : "",
       requests ? `${requests} req` : ""
     ].filter(Boolean).join(" \xB7 ");
-    took = Math.max(...agents.map((a) => a.startedAt + (a.duration ?? 0))) - call.startedAt;
+    took2 = Math.max(...agents.map((a) => a.startedAt + (a.duration ?? 0))) - call.startedAt;
   } else if (settled.length) {
     meta = `${settled.length} of ${count} done`;
   }
@@ -26869,7 +26869,7 @@ function taskCard(call, result, now) {
     target: count ? `${count} agent${count === 1 ? "" : "s"}` : void 0,
     targetKind: "text",
     title: "Task",
-    took
+    took: took2
   };
 }
 function agentNode(a, now) {
@@ -28179,8 +28179,1021 @@ function clock(ms) {
   return new Date(ms).toLocaleTimeString([], { hour: "2-digit", hour12: false, minute: "2-digit", second: "2-digit" });
 }
 
+// src/overlays/pullRequests.tsx
+import { execFile as execFile2 } from "node:child_process";
+
+// src/github/links.ts
+import { readFileSync } from "node:fs";
+import { homedir as homedir3 } from "node:os";
+import { join as join3 } from "node:path";
+import { DatabaseSync as DatabaseSync2 } from "node:sqlite";
+
+// src/watch/child.ts
+import { homedir as homedir2 } from "node:os";
+import { join as join2 } from "node:path";
+import { DatabaseSync } from "node:sqlite";
+function stateDbPath(env = process.env) {
+  return join2(env.HERMES_HOME || join2(homedir2(), ".hermes"), "state.db");
+}
+var ChildStore = class {
+  #db;
+  constructor(path = stateDbPath()) {
+    this.#db = new DatabaseSync(path, { readOnly: true });
+  }
+  /**
+   * The child session of `parents` whose first prompt is `goal`: a child's first user turn is
+   * its goal. The newest wins, as a goal can repeat across delegations; `since` (epoch ms)
+   * skips older ones.
+   */
+  find(parents, goal, since = 0) {
+    const ids = parents.filter(Boolean);
+    if (!ids.length) {
+      return void 0;
+    }
+    const row = this.#db.prepare(
+      `SELECT s.id AS id FROM sessions s
+         WHERE s.parent_session_id IN (${ids.map(() => "?").join(",")}) AND s.source = 'subagent'
+           AND s.started_at >= ?
+           AND (SELECT m.content FROM messages m WHERE m.session_id = s.id AND m.role = 'user'
+                ORDER BY m.id LIMIT 1) = ?
+         ORDER BY s.started_at DESC LIMIT 1`
+    ).get(...ids, Math.max(0, since / 1e3 - 5), goal);
+    return row?.id;
+  }
+  /** The child's active messages as the gateway's transcript messages, oldest first. */
+  messages(session2) {
+    const rows = this.#db.prepare(
+      `SELECT id, role, content, tool_call_id, tool_calls, tool_name, timestamp, reasoning
+         FROM messages WHERE session_id = ? AND active = 1 ORDER BY id`
+    ).all(session2);
+    return toTranscript(rows);
+  }
+  /** The newest message id of `session`, to tell whether anything changed. */
+  last(session2) {
+    const row = this.#db.prepare("SELECT MAX(id) AS id FROM messages WHERE session_id = ?").get(session2);
+    return row?.id ?? 0;
+  }
+  close() {
+    this.#db.close();
+  }
+};
+function toTranscript(rows) {
+  const out = [];
+  for (const r of rows) {
+    const timestamp = r.timestamp;
+    if (r.role === "user" || r.role === "system") {
+      out.push({ content: r.content ?? "", role: r.role, timestamp });
+      continue;
+    }
+    if (r.role === "assistant") {
+      out.push({ content: r.content ?? "", reasoning: r.reasoning ?? void 0, role: "assistant", timestamp });
+      for (const call of parseCalls(r.tool_calls)) {
+        out.push({
+          args: parseArgs(call.function?.arguments),
+          name: call.function?.name ?? "tool",
+          role: "tool",
+          timestamp,
+          tool_call_id: call.id ?? call.call_id
+        });
+      }
+      continue;
+    }
+    if (r.role === "tool") {
+      out.push({
+        content: r.content ?? "",
+        name: r.tool_name ?? void 0,
+        role: "tool",
+        timestamp,
+        tool_call_id: r.tool_call_id ?? void 0
+      });
+    }
+  }
+  return out;
+}
+function parseCalls(raw) {
+  try {
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+function parseArgs(raw) {
+  try {
+    const parsed = raw ? JSON.parse(raw) : {};
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+// src/github/links.ts
+var LINK_TOOLS = /* @__PURE__ */ new Set(["link_pull_request", "list_pull_requests", "unlink_pull_request"]);
+function linksPath(env = process.env) {
+  return join3(env.HERMES_HOME || join3(homedir3(), ".hermes"), "plugin-data", "hermes-tern", "pull-requests.json");
+}
+var prKey = (ref) => `${ref.host}/${ref.repository}#${ref.number}`;
+function refOf(v) {
+  const r = record(v);
+  const host = typeof r?.host === "string" ? r.host : "";
+  const repository = typeof r?.repository === "string" ? r.repository : "";
+  const number = typeof r?.number === "number" ? r.number : 0;
+  return host && repository && number > 0 ? { host, number, repository, url: typeof r?.url === "string" ? r.url : `https://${host}/${repository}/pull/${number}` } : void 0;
+}
+function linkedFromResult(call) {
+  if (!LINK_TOOLS.has(call.name) || call.status !== "done") {
+    return void 0;
+  }
+  const linked = record(call.result)?.linked;
+  return Array.isArray(linked) ? linked.map(refOf).filter((r) => Boolean(r)) : void 0;
+}
+function ancestry(sid, db = stateDbPath()) {
+  const chain = [sid];
+  try {
+    const conn = new DatabaseSync2(db, { readOnly: true });
+    try {
+      const parent = conn.prepare("SELECT parent_session_id AS p FROM sessions WHERE id = ?");
+      for (let i = 0; i < 100; i++) {
+        const row = parent.get(chain.at(-1));
+        if (!row?.p || chain.includes(row.p)) {
+          break;
+        }
+        chain.push(row.p);
+      }
+    } finally {
+      conn.close();
+    }
+  } catch {
+  }
+  return chain;
+}
+function storedLinks(sid, file2 = linksPath(), lineage = ancestry) {
+  let data;
+  try {
+    data = JSON.parse(readFileSync(file2, "utf8"));
+  } catch {
+    return [];
+  }
+  const aliases = data.aliases ?? {};
+  const root = lineage(sid).find((id) => aliases[id] || data.conversations?.[id]);
+  if (!root) {
+    return [];
+  }
+  const links = data.conversations?.[aliases[root] ?? root];
+  return Array.isArray(links) ? links.map(refOf).filter((r) => Boolean(r)) : [];
+}
+
+// src/github/pullRequest.ts
+var CHECK_FIELDS = `
+  __typename
+  ... on CheckRun { name status conclusion startedAt completedAt detailsUrl
+    checkSuite { workflowRun { workflow { name } } } }
+  ... on StatusContext { context state targetUrl description createdAt }`;
+var PR_FIELDS = `
+  id number title url body state isDraft mergeable mergeStateStatus reviewDecision
+  additions deletions changedFiles createdAt updatedAt mergedAt closedAt
+  headRefName baseRefName headRefOid viewerCanUpdate
+  author { login }
+  autoMergeRequest { mergeMethod }
+  baseRef { compare(headRef: $head) { behindBy } }
+  labels(first: 20) { nodes { name } }
+  reviewRequests(first: 20) { nodes { requestedReviewer { __typename ... on User { login } ... on Bot { login } ... on Team { name } } } }
+  latestReviews(first: 20) { nodes { author { login } state } }
+  commits(last: 1) { nodes { commit { statusCheckRollup { contexts(first: 100) { nodes { ${CHECK_FIELDS} } } } } } }`;
+var REPO_FIELDS = "mergeCommitAllowed squashMergeAllowed rebaseMergeAllowed";
+function batchQuery(refs) {
+  const variables = {};
+  const decls = [];
+  const parts2 = refs.map((ref, i) => {
+    const [owner, name] = ref.repository.split("/");
+    variables[`o${i}`] = owner;
+    variables[`r${i}`] = name;
+    variables[`n${i}`] = ref.number;
+    variables[`h${i}`] = `refs/pull/${ref.number}/head`;
+    decls.push(`$o${i}: String!, $r${i}: String!, $n${i}: Int!, $h${i}: String!`);
+    return `p${i}: repository(owner: $o${i}, name: $r${i}) { ${REPO_FIELDS} pullRequest(number: $n${i}) { ${PR_FIELDS.replace("$head", `$h${i}`)} } }`;
+  });
+  return { query: `query(${decls.join(", ")}) { ${parts2.join("\n")} }`, variables };
+}
+var obj = (v) => v && typeof v === "object" && !Array.isArray(v) ? v : void 0;
+var str4 = (v) => typeof v === "string" ? v : "";
+var num3 = (v) => typeof v === "number" ? v : 0;
+var nodes = (v) => {
+  const list = obj(v)?.nodes;
+  return Array.isArray(list) ? list.map(obj).filter((x) => Boolean(x)) : [];
+};
+function checkStatus(status, conclusion) {
+  if (status && status !== "COMPLETED") {
+    return "pending";
+  }
+  switch (conclusion) {
+    case "SUCCESS":
+      return "success";
+    case "ACTION_REQUIRED":
+      return "action-required";
+    case "FAILURE":
+    case "ERROR":
+    case "TIMED_OUT":
+    case "STARTUP_FAILURE":
+      return "failure";
+    case "CANCELLED":
+      return "cancelled";
+    case "SKIPPED":
+      return "skipped";
+    case "PENDING":
+    case "EXPECTED":
+      return "pending";
+    default:
+      return "neutral";
+  }
+}
+function parseCheck(n) {
+  if (n.__typename === "StatusContext") {
+    return {
+      description: str4(n.description) || void 0,
+      name: str4(n.context),
+      startedAt: str4(n.createdAt) || void 0,
+      status: checkStatus("COMPLETED", str4(n.state)),
+      url: str4(n.targetUrl) || void 0
+    };
+  }
+  const workflow = str4(obj(obj(obj(n.checkSuite)?.workflowRun)?.workflow)?.name);
+  return {
+    completedAt: str4(n.completedAt) || void 0,
+    name: str4(n.name),
+    startedAt: str4(n.startedAt) || void 0,
+    status: checkStatus(str4(n.status), str4(n.conclusion)),
+    url: str4(n.detailsUrl) || void 0,
+    workflow: workflow || void 0
+  };
+}
+function dedupeChecks(checks) {
+  const newest = /* @__PURE__ */ new Map();
+  const time = (c) => Date.parse(c.completedAt ?? c.startedAt ?? "") || 0;
+  for (const c of checks) {
+    const key2 = `${c.workflow ?? ""}\0${c.name}`;
+    const prev = newest.get(key2);
+    if (!prev || time(c) >= time(prev)) {
+      newest.set(key2, c);
+    }
+  }
+  const list = [...newest.values()];
+  const workflows = /* @__PURE__ */ new Map();
+  for (const c of list) {
+    workflows.set(c.name, (workflows.get(c.name) ?? /* @__PURE__ */ new Set()).add(c.workflow ?? ""));
+  }
+  return list.map((c) => (workflows.get(c.name)?.size ?? 0) > 1 && c.workflow ? { ...c, name: `${c.workflow} / ${c.name}` } : c);
+}
+function checksState(checks) {
+  if (!checks.length) {
+    return "none";
+  }
+  if (checks.some((c) => c.status === "failure" || c.status === "cancelled")) {
+    return "failing";
+  }
+  return checks.some((c) => c.status === "pending" || c.status === "action-required") ? "pending" : "passing";
+}
+function checkGroup(c) {
+  return c.status === "failure" || c.status === "cancelled" || c.status === "action-required" ? "attention" : c.status === "pending" ? "running" : "completed";
+}
+function checksSummary(checks) {
+  if (!checks.length) {
+    return "No checks";
+  }
+  const count = (s) => checks.filter((c) => s.includes(c.status)).length;
+  const parts2 = [
+    [count(["failure"]), "failing"],
+    [count(["cancelled"]), "cancelled"],
+    [count(["action-required"]), "waiting for approval"],
+    [count(["pending"]), "pending"],
+    [count(["success"]), "passing"],
+    [count(["skipped", "neutral"]), "skipped"]
+  ];
+  return parts2.filter(([n]) => n).map(([n, label]) => `${n} ${label}`).join(", ");
+}
+var STATE = { CLOSED: "closed", MERGED: "merged", OPEN: "open" };
+var MERGEABLE = { CONFLICTING: "conflicting", MERGEABLE: "mergeable" };
+function parsePullRequest(ref, repo) {
+  const r = obj(repo);
+  const p = obj(r?.pullRequest);
+  if (!r || !p) {
+    return void 0;
+  }
+  const reviews = /* @__PURE__ */ new Map();
+  for (const n of nodes(p.reviewRequests)) {
+    const who = obj(n.requestedReviewer);
+    const login = str4(who?.login) || str4(who?.name);
+    if (login) {
+      reviews.set(login, "PENDING");
+    }
+  }
+  for (const n of nodes(p.latestReviews)) {
+    const login = str4(obj(n.author)?.login);
+    if (login && !reviews.has(login)) {
+      reviews.set(login, str4(n.state));
+    }
+  }
+  const rollup = obj(obj(obj(nodes(p.commits)[0]?.commit)?.statusCheckRollup)?.contexts);
+  const methods = [
+    ...r.squashMergeAllowed ? ["squash"] : [],
+    ...r.mergeCommitAllowed ? ["merge"] : [],
+    ...r.rebaseMergeAllowed ? ["rebase"] : []
+  ];
+  const behind = obj(obj(p.baseRef)?.compare)?.behindBy;
+  return {
+    ...ref,
+    additions: num3(p.additions),
+    author: str4(obj(p.author)?.login) || "ghost",
+    autoMerge: str4(obj(p.autoMergeRequest)?.mergeMethod) || null,
+    base: str4(p.baseRefName),
+    behindBy: typeof behind === "number" ? behind : null,
+    body: str4(p.body),
+    canUpdate: p.viewerCanUpdate === true,
+    changedFiles: num3(p.changedFiles),
+    checks: dedupeChecks(nodes(rollup).map(parseCheck)),
+    closedAt: str4(p.closedAt) || null,
+    createdAt: str4(p.createdAt),
+    deletions: num3(p.deletions),
+    draft: p.isDraft === true,
+    head: str4(p.headRefName),
+    headOid: str4(p.headRefOid),
+    id: str4(p.id),
+    labels: nodes(p.labels).map((n) => str4(n.name)),
+    mergeMethods: methods,
+    mergeState: str4(p.mergeStateStatus),
+    mergeable: MERGEABLE[str4(p.mergeable)] ?? "unknown",
+    mergedAt: str4(p.mergedAt) || null,
+    reviewDecision: str4(p.reviewDecision) || null,
+    reviewers: [...reviews].map(([login, state]) => ({ login, state })),
+    state: STATE[str4(p.state)] ?? "open",
+    title: str4(p.title),
+    updatedAt: str4(p.updatedAt),
+    url: str4(p.url) || ref.url
+  };
+}
+var ACTIVITY_QUERY = `query($o: String!, $r: String!, $n: Int!) {
+  repository(owner: $o, name: $r) { pullRequest(number: $n) {
+    comments(last: 50) { nodes { author { login } body createdAt url } }
+    reviews(last: 30) { nodes { author { login } state body submittedAt url } }
+    reviewThreads(last: 50) { nodes { isResolved isOutdated path line
+      comments(first: 20) { nodes { author { login } body createdAt url } } } }
+    commits(last: 30) { nodes { commit { oid messageHeadline committedDate url author { name user { login } } } } }
+  } } }`;
+function parseActivity(data) {
+  const p = obj(obj(obj(data)?.repository)?.pullRequest);
+  if (!p) {
+    return [];
+  }
+  const who = (n) => str4(obj(n.author)?.login) || "ghost";
+  const items = [
+    ...nodes(p.comments).map((n) => ({ at: str4(n.createdAt), author: who(n), body: str4(n.body), kind: "comment", url: str4(n.url) })),
+    ...nodes(p.reviews).filter((n) => str4(n.body).trim() || str4(n.state) !== "COMMENTED").map((n) => ({ at: str4(n.submittedAt), author: who(n), body: str4(n.body), kind: "review", state: str4(n.state), url: str4(n.url) })),
+    ...nodes(p.reviewThreads).flatMap((t2) => {
+      const [first, ...rest] = nodes(t2.comments);
+      return first ? [
+        {
+          at: str4(first.createdAt),
+          author: who(first),
+          body: str4(first.body),
+          kind: "thread",
+          line: typeof t2.line === "number" ? t2.line : null,
+          outdated: t2.isOutdated === true,
+          path: str4(t2.path),
+          replies: rest.map((n) => ({ at: str4(n.createdAt), author: who(n), body: str4(n.body) })),
+          resolved: t2.isResolved === true,
+          url: str4(first.url)
+        }
+      ] : [];
+    }),
+    ...nodes(p.commits).map((n) => {
+      const c = obj(n.commit) ?? {};
+      const a = obj(c.author);
+      return {
+        at: str4(c.committedDate),
+        author: str4(obj(a?.user)?.login) || str4(a?.name) || "ghost",
+        body: str4(c.messageHeadline),
+        kind: "commit",
+        url: str4(c.url)
+      };
+    })
+  ];
+  return items.sort((a, b) => Date.parse(a.at) - Date.parse(b.at));
+}
+function parseFiles(rows) {
+  return (Array.isArray(rows) ? rows : []).map(obj).filter((r) => Boolean(r)).map((r) => ({
+    additions: num3(r.additions),
+    deletions: num3(r.deletions),
+    patch: str4(r.patch) || void 0,
+    path: str4(r.filename),
+    previous: str4(r.previous_filename) || void 0,
+    status: str4(r.status)
+  }));
+}
+function failedRuns(checks) {
+  const ids = /* @__PURE__ */ new Set();
+  for (const c of checks) {
+    const id = c.status === "failure" || c.status === "cancelled" ? c.url?.match(/\/actions\/runs\/(\d+)/)?.[1] : void 0;
+    if (id) {
+      ids.add(Number(id));
+    }
+  }
+  return [...ids];
+}
+
+// src/overlays/pullRequests.tsx
+var KEY3 = "pull-requests";
+var TICK_MS3 = 3e4;
+var COPIED_MS2 = 1500;
+var TABS2 = ["prs", "checks", "activity", "files"];
+var METHOD_LABEL = { merge: "Merge", rebase: "Rebase and merge", squash: "Squash and merge" };
+function openUrl(url) {
+  execFile2(process.platform === "darwin" ? "open" : "xdg-open", [url], () => {
+  });
+}
+function stateLabel(pr) {
+  return pr.state === "open" ? pr.draft ? "Draft" : "Open" : pr.state === "merged" ? "Merged" : "Closed";
+}
+function stateTone(pr) {
+  return pr.state === "merged" ? "info" : pr.state === "closed" ? "error" : pr.draft ? "muted" : "success";
+}
+var CHECK_TONE = {
+  "action-required": "warning",
+  cancelled: "muted",
+  failure: "error",
+  neutral: "muted",
+  pending: "pending",
+  skipped: "muted",
+  success: "success"
+};
+var CHECK_WORD = {
+  "action-required": "waiting for approval",
+  cancelled: "cancelled",
+  failure: "failed",
+  neutral: "neutral",
+  pending: "running",
+  skipped: "skipped",
+  success: "passed"
+};
+function checksTone(pr) {
+  const s = checksState(pr.checks);
+  return s === "failing" ? "error" : s === "pending" ? "pending" : s === "passing" ? "success" : "muted";
+}
+var REVIEW = {
+  APPROVED: ["Approved", "success"],
+  CHANGES_REQUESTED: ["Changes requested", "error"],
+  COMMENTED: ["Commented", "muted"],
+  DISMISSED: ["Dismissed", "muted"],
+  REVIEW_REQUIRED: ["Review required", "warning"]
+};
+var FILE_TONE = { added: "success", removed: "error", renamed: "info" };
+function openPullRequests(app, focus) {
+  const newest = app.prs.entries().at(-1);
+  let selected = focus ?? (newest ? prKey(newest.ref) : void 0);
+  let tab = "prs";
+  const rows = {};
+  let confirm;
+  let copied;
+  let copiedTimer;
+  app.prs.poke();
+  const timer = setInterval(() => app.overlays.includes(overlay) ? app.changed() : end(), TICK_MS3);
+  function end() {
+    clearInterval(timer);
+    clearTimeout(copiedTimer);
+  }
+  const close = () => {
+    end();
+    app.close(overlay);
+  };
+  const current = () => selected ? app.prs.get(selected) : void 0;
+  const fail = (error) => {
+    app.transcript.notice(error instanceof Error ? error.message : String(error), "error");
+    app.changed();
+  };
+  const load2 = () => {
+    if (!current()?.pr) {
+      return;
+    }
+    if (tab === "activity") {
+      app.prs.activity(selected).catch(fail);
+    } else if (tab === "files") {
+      app.prs.files(selected).catch(fail);
+    }
+  };
+  const setTab = (t2) => {
+    tab = t2;
+    confirm = void 0;
+    load2();
+  };
+  const act = async (action) => {
+    confirm = void 0;
+    if (!current()?.pr || app.prs.busy(selected)) {
+      return app.changed();
+    }
+    try {
+      await app.prs.act(action, selected);
+    } catch (error) {
+      fail(error);
+    }
+    app.changed();
+  };
+  const copy = () => {
+    const e = current();
+    if (!e) {
+      return;
+    }
+    copyToClipboard(e.pr?.url ?? e.ref.url);
+    copied = selected;
+    clearTimeout(copiedTimer);
+    copiedTimer = setTimeout(() => {
+      copied = void 0;
+      app.changed();
+    }, COPIED_MS2);
+  };
+  const can = (action) => {
+    const pr = current()?.pr;
+    if (!pr || app.prs.busy(selected)) {
+      return false;
+    }
+    switch (action) {
+      case "merge":
+        return pr.state === "open" && !pr.draft && pr.canUpdate && pr.mergeable !== "conflicting";
+      case "ready":
+        return pr.state === "open" && pr.draft && pr.canUpdate;
+      case "close":
+        return pr.state === "open" && pr.canUpdate;
+      case "reopen":
+        return pr.state === "closed" && pr.canUpdate;
+      case "update-branch":
+        return pr.state === "open" && (pr.behindBy ?? 0) > 0;
+      case "rerun":
+        return pr.state === "open" && failedRuns(pr.checks).length > 0;
+      default:
+        return false;
+    }
+  };
+  const ask = (what) => {
+    if (can(what)) {
+      confirm = what;
+    }
+  };
+  const openPr = () => {
+    const e = current();
+    if (e) {
+      openUrl(e.pr?.url ?? e.ref.url);
+    }
+  };
+  const activate = () => {
+    if (tab === "prs") {
+      return current() && setTab("checks");
+    }
+    const url = rowUrl(tab, current(), rows[tab]);
+    if (url) {
+      openUrl(url);
+    }
+  };
+  const overlay = {
+    key: KEY3,
+    modal: true,
+    node: () => sheetNode(Date.now()),
+    onKey: (k) => {
+      if (confirm) {
+        if (k.name === "enter" || k.name === "y") {
+          void act(confirm);
+        } else if (k.name === "escape" || k.name === "n") {
+          confirm = void 0;
+        }
+        return true;
+      }
+      const bare = !k.ctrl && !k.alt && !k.meta;
+      if (k.name === "escape") {
+        if (tab === "prs") {
+          close();
+        } else {
+          setTab("prs");
+        }
+      } else if (k.name === "enter") {
+        activate();
+      } else if (k.name === "tab") {
+        setTab(TABS2[(TABS2.indexOf(tab) + (k.shift ? TABS2.length - 1 : 1)) % TABS2.length]);
+      } else if (bare && k.name === "o") {
+        openPr();
+      } else if (bare && k.name === "c" && !k.shift) {
+        copy();
+      } else if (bare && k.name === "m") {
+        ask("merge");
+      } else if (bare && k.name === "x") {
+        ask("close");
+      } else if (bare && k.name === "d" && can("ready")) {
+        void act("ready");
+      } else if (bare && k.name === "u" && can("update-branch")) {
+        void act("update-branch");
+      } else if (bare && k.name === "f" && can("rerun")) {
+        void act("rerun");
+      } else if (bare && k.name === "r" && k.shift) {
+        app.prs.poke();
+      } else if (tab === "prs") {
+        selected = moveSelection(k, prKeys(), selected) ?? selected;
+      } else {
+        rows[tab] = moveSelection(k, rowIds(tab, current()), rows[tab]) ?? rows[tab];
+      }
+      return true;
+    }
+  };
+  const prKeys = () => app.prs.entries().map((e) => prKey(e.ref)).toReversed();
+  const handlers = {
+    activate,
+    cancel: () => {
+      confirm = void 0;
+      app.changed();
+    },
+    close: () => {
+      if (tab === "prs") {
+        close();
+      } else {
+        setTab("prs");
+        app.changed();
+      }
+    },
+    "close-pr": () => {
+      ask("close");
+      app.changed();
+    },
+    confirm: () => void (confirm && act(confirm)),
+    copy: () => {
+      copy();
+      app.changed();
+    },
+    merge: () => {
+      ask("merge");
+      app.changed();
+    },
+    open: openPr,
+    ready: () => void act("ready"),
+    refresh: () => app.prs.poke(),
+    reopen: () => void act("reopen"),
+    rerun: () => void act("rerun"),
+    tab: (ev) => {
+      setTab(TABS2.find((t2) => t2 === ev.value) ?? "prs");
+      app.changed();
+    },
+    "update-branch": () => void act("update-branch")
+  };
+  function sheetNode(now) {
+    const entries = app.prs.entries();
+    const keys = prKeys();
+    if (!selected || !keys.includes(selected)) {
+      selected = keys[0];
+    }
+    const e = current();
+    const pr = e?.pr;
+    const busy = selected ? app.prs.busy(selected) : false;
+    const method = pr?.mergeMethods[0] ?? "merge";
+    const ids = rowIds(tab, e);
+    const row = rows[tab];
+    if (tab !== "prs" && (!row || !ids.includes(row))) {
+      rows[tab] = ids[0];
+    }
+    const view = tabView(tab, e, now);
+    const preview5 = tab === "activity" ? activityPreview(e?.activity?.[Number(rows.activity?.slice(1))], now) : tab === "files" ? filePreview(e?.files?.find((f) => f.path === rows.files)) : view.preview;
+    return /* @__PURE__ */ jsx(
+      "picker",
+      {
+        actions: [
+          ...can("ready") ? [{ id: "ready", keys: ["d"], label: "Ready for review" }] : [],
+          ...can("update-branch") ? [{ id: "update-branch", keys: ["u"], label: "Update branch" }] : [],
+          ...can("rerun") ? [{ id: "rerun", keys: ["f"], label: "Re-run failed" }] : [],
+          ...can("close") ? [{ danger: true, id: "close-pr", keys: ["x"], label: "Close PR" }] : [],
+          ...can("reopen") ? [{ id: "reopen", label: "Reopen" }] : [],
+          { disabled: e ? void 0 : "No pull request", id: "copy", keys: ["c"], label: copied && copied === selected ? "Copied" : "Copy URL" },
+          { disabled: e ? void 0 : "No pull request", id: "open", keys: ["o"], label: "Open on GitHub" },
+          ...can("merge") ? [{ id: "merge", keys: ["m"], label: busy ? "Working\u2026" : METHOD_LABEL[method] }] : [],
+          { end: true, id: "close", keys: ["esc"], label: tab === "prs" ? "Close" : "Back" },
+          ...tab === "prs" ? [{ disabled: e ? void 0 : "No pull request", id: "activate", keys: ["enter"], label: "Checks", primary: true }] : rowUrl(tab, e, rows[tab]) ? [{ id: "activate", keys: ["enter"], label: "Open", primary: true }] : []
+        ],
+        columns: view.columns,
+        confirm: confirm === "merge" && pr ? { act: "confirm", label: METHOD_LABEL[method], text: `${METHOD_LABEL[method]} #${pr.number} into ${pr.base}?` } : confirm === "close" && pr ? { act: "confirm", label: "Close PR", text: `Close #${pr.number} without merging?` } : void 0,
+        empty: view.empty,
+        icon: "merge",
+        items: tab === "prs" ? entries.map((x) => prItem(x, now)) : view.items,
+        layout: tab === "activity" ? "timeline" : "rows",
+        message: app.prs.error,
+        noun: view.noun,
+        onAction: handlers,
+        onActivate: (ev) => {
+          if (tab === "prs") {
+            selected = ev.item;
+          } else {
+            rows[tab] = ev.item;
+          }
+          activate();
+          app.changed();
+        },
+        onSelect: (ev) => {
+          if (tab === "prs") {
+            selected = ev.item;
+          } else {
+            rows[tab] = ev.item;
+          }
+          confirm = void 0;
+          app.changed();
+        },
+        order: tab === "prs" ? keys : ids,
+        preview: tab === "files" || tab === "activity" ? "below" : "side",
+        selected: tab === "prs" ? selected : rows[tab],
+        size: "lg",
+        state: app.prs.error ? "error" : view.loading ? "loading" : "ready",
+        subtitle: [{ s: "muted", t: tab === "prs" ? summary3(entries) : pr ? `#${pr.number} ${pr.title}` : "" }],
+        tab,
+        tabs: [
+          { count: entries.length, id: "prs", label: "PRs" },
+          { count: pr?.checks.length, id: "checks", label: "Checks" },
+          { count: e?.activity?.length, id: "activity", label: "Activity" },
+          { count: pr?.changedFiles, id: "files", label: "Files" }
+        ],
+        title: "Pull requests",
+        total: tab === "prs" ? entries.length : ids.length,
+        children: preview5
+      },
+      KEY3
+    );
+  }
+  app.open(overlay);
+}
+function rowIds(tab, e) {
+  switch (tab) {
+    case "checks":
+      return sortedChecks(e?.pr?.checks ?? []).map((c) => c.name);
+    case "activity":
+      return (e?.activity ?? []).map((_, i) => `a${i}`).toReversed();
+    case "files":
+      return (e?.files ?? []).map((f) => f.path);
+    default:
+      return [];
+  }
+}
+function rowUrl(tab, e, row) {
+  if (!e || !row) {
+    return void 0;
+  }
+  switch (tab) {
+    case "checks":
+      return e.pr?.checks.find((c) => c.name === row)?.url;
+    case "activity":
+      return e.activity?.[Number(row.slice(1))]?.url || void 0;
+    case "files":
+      return e.pr ? `${e.pr.url}/files` : void 0;
+    default:
+      return void 0;
+  }
+}
+function tabView(tab, e, now) {
+  const pr = e?.pr;
+  switch (tab) {
+    case "checks":
+      return {
+        columns: [
+          { format: "dim", head: "Status", id: "status", priority: 3 },
+          { format: "dim", head: "Time", id: "time", priority: 2 }
+        ],
+        empty: pr ? "No checks ran on the latest commit." : "Pick a pull request first.",
+        items: sortedChecks(pr?.checks ?? []).map((c) => checkItem(c, now)),
+        loading: false,
+        noun: "checks",
+        preview: pr ? checksPreview(pr) : null
+      };
+    case "activity":
+      return {
+        columns: [{ format: "dim", head: "When", id: "when", priority: 2 }],
+        empty: pr ? "No comments, reviews or commits yet." : "Pick a pull request first.",
+        items: (e?.activity ?? []).map((a, i) => activityItem(a, `a${i}`, now)),
+        loading: Boolean(pr && !e?.activity),
+        noun: "events",
+        preview: null
+      };
+    case "files":
+      return {
+        columns: [{ format: "dim", head: "Changes", id: "changes", priority: 2 }],
+        empty: pr ? "No files changed." : "Pick a pull request first.",
+        items: (e?.files ?? []).map(fileItem),
+        loading: Boolean(pr && !e?.files),
+        noun: "files",
+        preview: null
+      };
+    default:
+      return {
+        columns: [
+          { format: "dim", head: "Checks", id: "checks", min: 10, priority: 3 },
+          { format: "dim", head: "Review", id: "review", priority: 2 },
+          { format: "dim", head: "Updated", id: "updated", priority: 1 }
+        ],
+        empty: "No pull requests linked yet. Hermes links each PR it opens or works on.",
+        items: [],
+        loading: false,
+        noun: "pull requests",
+        preview: e ? overview(e, now) : null
+      };
+  }
+}
+function sortedChecks(checks) {
+  const rank2 = { attention: 0, completed: 2, running: 1 };
+  return [...checks].sort((a, b) => rank2[checkGroup(a)] - rank2[checkGroup(b)] || a.name.localeCompare(b.name));
+}
+function summary3(entries) {
+  const prs = entries.flatMap((e) => e.pr ? [e.pr] : []);
+  const parts2 = [
+    [prs.filter((p) => p.state === "open" && !p.draft).length, "open"],
+    [prs.filter((p) => p.state === "open" && p.draft).length, "draft"],
+    [prs.filter((p) => p.state === "merged").length, "merged"],
+    [prs.filter((p) => p.state === "closed").length, "closed"]
+  ];
+  return parts2.filter(([n]) => n).map(([n, l]) => `${n} ${l}`).join(" \xB7 ") || (entries.length ? "loading\u2026" : "none yet");
+}
+function prItem(e, now) {
+  const pr = e.pr;
+  const review = pr?.reviewDecision ? REVIEW[pr.reviewDecision] : void 0;
+  return {
+    badges: pr ? [
+      { text: stateLabel(pr), tone: stateTone(pr) },
+      ...pr.mergeable === "conflicting" && pr.state === "open" ? [{ text: "conflicts", tone: "error" }] : []
+    ] : e.error ? [{ text: "unreadable", title: e.error, tone: "error" }] : [],
+    detail: `${e.ref.repository} #${e.ref.number}`,
+    dot: pr ? pr.state === "open" ? checksTone(pr) : stateTone(pr) : "muted",
+    facts: pr ? {
+      checks: pr.checks.length ? [{ s: checksTone(pr), t: checksState(pr.checks) }] : "none",
+      review: review?.[0] ?? "",
+      updated: relative(pr.updatedAt, now)
+    } : {},
+    id: prKey(e.ref),
+    label: pr?.title ?? `#${e.ref.number}`,
+    title: e.error ?? pr?.url ?? e.ref.url,
+    tone: pr && pr.state !== "open" ? "muted" : void 0
+  };
+}
+function header(e) {
+  const pr = e.pr;
+  return [
+    /* @__PURE__ */ jsx("text", { role: "omp.hub.title", text: pr?.title ?? `#${e.ref.number}` }, "title"),
+    /* @__PURE__ */ jsxs("row", { align: "center", gap: "sm", wrap: true, children: [
+      pr ? /* @__PURE__ */ jsx("badge", { text: stateLabel(pr), tone: stateTone(pr) }, "state") : null,
+      /* @__PURE__ */ jsx("text", { spans: [{ href: pr?.url ?? e.ref.url, s: "dim", t: `${e.ref.repository}#${e.ref.number}` }], wrap: "none" }, "ref")
+    ] }, "sub"),
+    ...pr ? [
+      /* @__PURE__ */ jsx(
+        "text",
+        {
+          spans: [{ s: "muted", t: `${pr.author} \xB7 ` }, { s: "mono", t: pr.head }, { s: "muted", t: " \u2192 " }, { s: "mono", t: pr.base }],
+          truncate: "end",
+          wrap: "none"
+        },
+        "branch"
+      )
+    ] : []
+  ];
+}
+function facts(pr, now) {
+  const review = pr.reviewDecision ? REVIEW[pr.reviewDecision] : void 0;
+  const merge = pr.state !== "open" ? void 0 : pr.mergeable === "conflicting" ? [{ s: "error", t: "Conflicts with the base branch" }] : pr.behindBy ? [{ s: "warning", t: `${pr.behindBy} commit${pr.behindBy === 1 ? "" : "s"} behind ${pr.base}` }] : pr.mergeable === "mergeable" ? [{ s: "success", t: "No conflicts" }] : "Checking\u2026";
+  return [
+    { k: [{ t: "Checks" }], v: [{ s: checksTone(pr), t: checksSummary(pr.checks) }] },
+    ...review ? [{ k: [{ t: "Review" }], v: [{ s: review[1], t: review[0] }] }] : [],
+    ...merge ? [{ k: [{ t: "Merge" }], v: merge }] : [],
+    ...pr.autoMerge ? [{ k: [{ t: "Auto-merge" }], v: `on (${pr.autoMerge.toLowerCase()})` }] : [],
+    {
+      k: [{ t: "Changes" }],
+      v: [
+        { s: "success", t: `+${pr.additions}` },
+        { t: " " },
+        { s: "error", t: `\u2212${pr.deletions}` },
+        { s: "muted", t: ` in ${pr.changedFiles} file${pr.changedFiles === 1 ? "" : "s"}` }
+      ]
+    },
+    ...pr.reviewers.length ? [{ k: [{ t: "Reviewers" }], v: pr.reviewers.map((r) => `${r.login} ${reviewWord(r.state)}`).join(", ") }] : [],
+    ...pr.labels.length ? [{ k: [{ t: "Labels" }], v: pr.labels.join(", ") }] : [],
+    ...pr.mergedAt ? [{ k: [{ t: "Merged" }], v: relative(pr.mergedAt, now) }] : pr.closedAt ? [{ k: [{ t: "Closed" }], v: relative(pr.closedAt, now) }] : [{ k: [{ t: "Opened" }], v: relative(pr.createdAt, now) }],
+    { k: [{ t: "Updated" }], v: relative(pr.updatedAt, now) }
+  ];
+}
+function reviewWord(state) {
+  return state === "PENDING" ? "(requested)" : `(${(REVIEW[state]?.[0] ?? "commented").toLowerCase()})`;
+}
+function overview(e, now) {
+  const pr = e.pr;
+  if (!pr) {
+    return [...header(e), /* @__PURE__ */ jsx("text", { spans: [{ s: e.error ? "error" : "muted", t: e.error ?? "Reading GitHub\u2026" }] }, "state")];
+  }
+  return [
+    ...header(e),
+    /* @__PURE__ */ jsx("kv", { items: facts(pr, now), role: "omp.hub.kv" }, "facts"),
+    /* @__PURE__ */ jsx("section", { head: "Description", children: /* @__PURE__ */ jsx("md", { text: pr.body.trim() || "_No description._" }, "text") }, "body")
+  ];
+}
+function took(c, now) {
+  return c.startedAt && c.completedAt ? duration2(Date.parse(c.completedAt) - Date.parse(c.startedAt)) : c.startedAt && c.status === "pending" ? `${duration2(now - Date.parse(c.startedAt))}\u2026` : "";
+}
+function checkItem(c, now) {
+  return {
+    detail: c.workflow && !c.name.startsWith(`${c.workflow} /`) ? c.workflow : c.description,
+    dot: CHECK_TONE[c.status],
+    facts: { status: [{ s: CHECK_TONE[c.status], t: CHECK_WORD[c.status] }], time: took(c, now) },
+    id: c.name,
+    label: c.name,
+    title: c.url,
+    tone: c.status === "skipped" || c.status === "neutral" ? "muted" : void 0
+  };
+}
+function checksPreview(pr) {
+  const runs = failedRuns(pr.checks).length;
+  return [
+    /* @__PURE__ */ jsx("text", { role: "omp.hub.title", text: "Checks" }, "title"),
+    /* @__PURE__ */ jsx("text", { spans: [{ s: checksTone(pr), t: checksSummary(pr.checks) }] }, "sum"),
+    /* @__PURE__ */ jsx(
+      "text",
+      {
+        spans: [
+          {
+            s: "muted",
+            t: `On ${pr.head} at ${pr.headOid.slice(0, 7)}. Enter opens a check's log${runs ? `; F re-runs the failed jobs of ${runs} workflow run${runs === 1 ? "" : "s"}` : ""}.`
+          }
+        ]
+      },
+      "hint"
+    )
+  ];
+}
+var VERB = { comment: "commented", commit: "pushed", review: "reviewed", thread: "commented on" };
+function activityItem(a, id, now) {
+  const verdict = a.kind === "review" && a.state ? REVIEW[a.state] : void 0;
+  const words2 = a.kind === "commit" ? a.body : a.body.replace(/\s+/g, " ").trim();
+  return {
+    badges: [
+      ...verdict && a.state !== "COMMENTED" ? [{ text: verdict[0].toLowerCase(), tone: verdict[1] }] : [],
+      ...a.resolved ? [{ text: "resolved", tone: "success" }] : [],
+      ...a.outdated ? [{ text: "outdated" }] : []
+    ],
+    detail: a.kind === "thread" && a.path ? `${a.path}${a.line ? `:${a.line}` : ""}${words2 ? ` \xB7 ${words2}` : ""}` : words2,
+    facts: { when: relative(a.at, now) },
+    id,
+    label: [{ s: "strong", t: a.author }, { s: "muted", t: ` ${verdict && a.state !== "COMMENTED" ? "reviewed" : VERB[a.kind]}` }],
+    node: a.kind === "commit" ? "tool" : a.kind === "review" ? "user" : void 0,
+    title: a.url
+  };
+}
+function activityPreview(a, now) {
+  if (!a) {
+    return null;
+  }
+  return [
+    /* @__PURE__ */ jsx("text", { spans: [{ s: "strong", t: a.author }, { s: "muted", t: ` ${VERB[a.kind]}` }, { s: "dim", t: ` \xB7 ${relative(a.at, now)}` }] }, "h"),
+    ...a.kind === "thread" && a.path ? [/* @__PURE__ */ jsx("text", { spans: [{ s: "mono dim", t: `${a.path}${a.line ? `:${a.line}` : ""}` }] }, "p")] : [],
+    a.body.trim() ? /* @__PURE__ */ jsx("md", { text: a.body }, "b") : /* @__PURE__ */ jsx("text", { spans: [{ s: "muted", t: "No words." }] }, "b"),
+    ...(a.replies ?? []).map((r, j) => /* @__PURE__ */ jsxs("col", { gap: "xs", role: "hermes.pr.reply", children: [
+      /* @__PURE__ */ jsx("text", { spans: [{ s: "strong", t: r.author }, { s: "dim", t: ` \xB7 ${relative(r.at, now)}` }] }, "h"),
+      /* @__PURE__ */ jsx("md", { text: r.body }, "b")
+    ] }, `r${j}`))
+  ];
+}
+function fileItem(f) {
+  return {
+    badges: f.status !== "modified" ? [{ text: f.status, tone: FILE_TONE[f.status] }] : [],
+    detail: f.previous ? `from ${f.previous}` : void 0,
+    facts: { changes: [{ s: "success", t: `+${f.additions}` }, { t: " " }, { s: "error", t: `\u2212${f.deletions}` }] },
+    id: f.path,
+    label: f.path,
+    mono: true
+  };
+}
+function filePreview(f) {
+  if (!f) {
+    return null;
+  }
+  return f.patch ? [/* @__PURE__ */ jsx("diff", { path: f.path, text: f.patch }, `d:${f.path}`)] : [/* @__PURE__ */ jsx("text", { spans: [{ s: "muted", t: "Binary, or too large to show here. Enter opens it on GitHub." }] }, "none")];
+}
+function duration2(ms) {
+  const s = Math.max(0, Math.round(ms / 1e3));
+  return s < 60 ? `${s}s` : s < 3600 ? `${Math.floor(s / 60)}m ${s % 60}s` : `${Math.floor(s / 3600)}h ${Math.floor(s % 3600 / 60)}m`;
+}
+function prsPill(entries, onOpen) {
+  const newest = entries.at(-1);
+  if (!newest) {
+    return void 0;
+  }
+  const open = entries.flatMap((e) => e.pr?.state === "open" ? [e.pr] : []);
+  const pr = newest.pr;
+  if (entries.length === 1) {
+    const what = !pr ? "" : pr.state !== "open" ? stateLabel(pr).toLowerCase() : pr.checks.length ? `checks ${checksState(pr.checks)}` : stateLabel(pr).toLowerCase();
+    return { onOpen, text: `#${newest.ref.number}${what ? ` \xB7 ${what}` : ""}`, tone: pr ? pr.state === "open" ? checksTone(pr) : stateTone(pr) : "muted" };
+  }
+  const failing = open.some((p) => checksState(p.checks) === "failing");
+  const pending = open.some((p) => checksState(p.checks) === "pending");
+  return {
+    onOpen,
+    text: `${entries.length} PRs${open.length ? ` \xB7 ${open.length} open` : ""}`,
+    tone: failing ? "error" : pending ? "pending" : open.length ? "success" : "muted"
+  };
+}
+
 // src/overlays/help.tsx
-var KEY3 = "help";
+var KEY4 = "help";
 var HOTKEYS = [
   {
     group: "Editing",
@@ -28206,8 +29219,9 @@ var HOTKEYS = [
       [["shift+tab"], "Cycle the reasoning effort"],
       [["alt+up"], "Edit the oldest queued prompt"],
       [["alt+a"], "Agents"],
-      [["alt+b"], "Background processes (/ps)"],
-      [["down"], "Focus the agents / shells pills (empty prompt); \u2190 \u2192 switch, Enter opens, Esc returns"],
+      [["alt+b"], "Background processes and cron jobs (/ps)"],
+      [["alt+p"], "Pull requests Hermes linked (/prs)"],
+      [["down"], "Focus the agents / shells / PR pills (empty prompt); \u2190 \u2192 switch, Enter opens, Esc returns"],
       [["ctrl+c"], "Clear the draft / interrupt / exit (twice)"],
       [["ctrl+d"], "Delete forward / exit (empty prompt)"]
     ]
@@ -28225,7 +29239,7 @@ async function openHelp(app) {
   }
   const categories = catalog.categories?.length ? catalog.categories : [{ name: "Commands", pairs: catalog.pairs ?? [] }];
   const overlay = {
-    key: KEY3,
+    key: KEY4,
     modal: true,
     node: () => /* @__PURE__ */ jsx("overlay", { anchor: "center", head: "Commands and shortcuts", modal: true, role: "omp.overlay.hotkeys", size: "lg", children: /* @__PURE__ */ jsxs("col", { gap: "lg", children: [
       HOTKEYS.map(({ group, rows }) => /* @__PURE__ */ jsx("section", { head: group, role: "omp.hotkeys.group", children: /* @__PURE__ */ jsx(
@@ -28283,7 +29297,7 @@ async function openHelp(app) {
           "close"
         )
       ] }, "actions")
-    ] }, "body") }, KEY3),
+    ] }, "body") }, KEY4),
     onKey: (k) => {
       if (k.name === "escape" || k.name === "enter" || k.name === "q") {
         app.close(overlay);
@@ -28325,7 +29339,7 @@ var providerDisplayNames = (providers) => {
 };
 
 // src/overlays/models.tsx
-var KEY4 = "models";
+var KEY5 = "models";
 var ALL = "all";
 var confirmTokens = /* @__PURE__ */ new Map();
 async function mutateModel(app, value, confirmed) {
@@ -28456,7 +29470,7 @@ function openModelPicker(app) {
     return { hits, order };
   };
   const overlay = {
-    key: KEY4,
+    key: KEY5,
     modal: true,
     node: () => {
       const { hits, order } = view();
@@ -28533,7 +29547,7 @@ function openModelPicker(app) {
           total: rows.length,
           children: row ? preview3(row, row.id === current) : null
         },
-        KEY4
+        KEY5
       );
     },
     onKey: (k) => {
@@ -28598,7 +29612,7 @@ function itemOf(row) {
 function preview3(row, isCurrent) {
   const caps = row.provider.capabilities?.[row.model];
   const price = row.provider.pricing?.[row.model];
-  const facts = [
+  const facts2 = [
     { k: [{ t: "Provider" }], v: row.providerName },
     ...price && (price.input || price.free) ? [
       {
@@ -28630,18 +29644,18 @@ function preview3(row, isCurrent) {
       caps?.fast || caps?.ultrafast ? /* @__PURE__ */ jsx("badge", { text: caps.ultrafast ? "ultrafast" : "fast", tone: "info" }, "fast") : null,
       price?.free ? /* @__PURE__ */ jsx("badge", { text: "free", tone: "success" }, "free") : null
     ] }, "badges"),
-    /* @__PURE__ */ jsx("kv", { items: facts }, "facts"),
+    /* @__PURE__ */ jsx("kv", { items: facts2 }, "facts"),
     ...row.provider.warning ? [/* @__PURE__ */ jsx("text", { spans: [{ s: "warning", t: row.provider.warning }], wrap: "word" }, "warning")] : []
   ];
 }
 
 // .hermes-src/ui-tui/src/lib/history.ts
-import { appendFileSync as appendFileSync3, existsSync, mkdirSync as mkdirSync2, readFileSync } from "node:fs";
-import { homedir as homedir2 } from "node:os";
-import { join as join2 } from "node:path";
+import { appendFileSync as appendFileSync3, existsSync, mkdirSync as mkdirSync2, readFileSync as readFileSync2 } from "node:fs";
+import { homedir as homedir4 } from "node:os";
+import { join as join4 } from "node:path";
 var MAX2 = 1e3;
-var dir = process.env.HERMES_HOME ?? join2(homedir2(), ".hermes");
-var file = join2(dir, ".hermes_history");
+var dir = process.env.HERMES_HOME ?? join4(homedir4(), ".hermes");
+var file = join4(dir, ".hermes_history");
 var cache = null;
 function load() {
   if (cache) {
@@ -28654,7 +29668,7 @@ function load() {
     }
     const entries = [];
     let current = [];
-    for (const line of readFileSync(file, "utf8").split("\n")) {
+    for (const line of readFileSync2(file, "utf8").split("\n")) {
       if (line.startsWith("+")) {
         current.push(line.slice(1));
       } else if (current.length) {
@@ -29073,7 +30087,7 @@ function unmaskEdit(secret, ev) {
 
 // src/overlays/prompts.tsx
 var RECOMMENDED = /\s*\(recommended\)\s*$/i;
-var str4 = (v) => typeof v === "string" ? v : "";
+var str5 = (v) => typeof v === "string" ? v : "";
 function actionsRow(buttons) {
   return /* @__PURE__ */ jsxs("row", { align: "center", gap: "sm", role: "omp.actions", children: [
     /* @__PURE__ */ jsx("spacer", { grow: 1 }, "fill"),
@@ -29167,8 +30181,8 @@ var APPROVALS = [
 ];
 function approvalOverlay(host, req) {
   const p = req.params;
-  const command = str4(p.command);
-  const description = str4(p.description);
+  const command = str5(p.command);
+  const description = str5(p.description);
   const smartDenied = p.smart_denied === true;
   const offered = Array.isArray(p.choices) ? p.choices.filter((c) => typeof c === "string") : [];
   const allowed = new Set(
@@ -29251,8 +30265,8 @@ function questionsOf(raw) {
       return [];
     }
     const choices = "choices" in q && Array.isArray(q.choices) ? q.choices.filter((c) => typeof c === "string") : [];
-    const question = str4(q.question).trim();
-    return question ? [{ choices, multi: "multi_select" in q && q.multi_select === true, qid: str4(q.qid), question }] : [];
+    const question = str5(q.question).trim();
+    return question ? [{ choices, multi: "multi_select" in q && q.multi_select === true, qid: str5(q.qid), question }] : [];
   });
 }
 function tabLabel(question) {
@@ -29482,15 +30496,15 @@ function clarifyOverlay(host, req) {
 function maskedOverlay(host, req) {
   const p = req.params;
   const key2 = `prompt:${req.id}`;
-  const site = str4(p.site) || str4(p.origin);
+  const site = str5(p.site) || str5(p.origin);
   const login = req.method === "vault.save_login";
   const fields = login ? [
     { id: "identifier", label: "Username or email", masked: false, value: new Composer() },
     { id: "password", label: "Password", masked: true, value: new Composer() }
   ] : [{ id: "value", label: "Hidden while you type", masked: true, value: new Composer() }];
   let at = 0;
-  const title = req.method === "sudo" ? "Password for sudo" : req.method === "secret" ? str4(p.prompt) || `Value for ${str4(p.env_var) || "a secret"}` : req.method === "vault.unlock_prompt" ? `Master password for ${str4(p.display_name) || str4(p.backend) || "the password manager"}` : login ? `Save a login for ${site || "this site"}` : `Code for ${site || "this site"}`;
-  const note = req.method === "secret" ? str4(p.env_var) : req.method === "vault.code" ? str4(p.hint) : "";
+  const title = req.method === "sudo" ? "Password for sudo" : req.method === "secret" ? str5(p.prompt) || `Value for ${str5(p.env_var) || "a secret"}` : req.method === "vault.unlock_prompt" ? `Master password for ${str5(p.display_name) || str5(p.backend) || "the password manager"}` : login ? `Save a login for ${site || "this site"}` : `Code for ${site || "this site"}`;
+  const note = req.method === "secret" ? str5(p.env_var) : req.method === "vault.code" ? str5(p.hint) : "";
   const finish = (cancel) => {
     const [first, second] = fields;
     req.respond({
@@ -29505,7 +30519,7 @@ function maskedOverlay(host, req) {
     node: () => /* @__PURE__ */ jsx("overlay", { anchor: "bottom", modal: true, role: "omp.overlay.ask", size: "md", children: /* @__PURE__ */ jsxs("col", { gap: "md", children: [
       /* @__PURE__ */ jsx("md", { role: "omp.ask.question", text: title }, "question"),
       note ? /* @__PURE__ */ jsx("text", { spans: [{ s: req.method === "secret" ? "mono dim" : "muted", t: note }], wrap: "word" }, "note") : null,
-      str4(p.command) ? /* @__PURE__ */ jsx("code", { lang: "bash", text: str4(p.command) }, "command") : null,
+      str5(p.command) ? /* @__PURE__ */ jsx("code", { lang: "bash", text: str5(p.command) }, "command") : null,
       fields.map((f, i) => /* @__PURE__ */ jsx(
         "input",
         {
@@ -29596,7 +30610,7 @@ function confirmOverlay(host, ask) {
 }
 
 // src/overlays/sessions.tsx
-var KEY5 = "sessions";
+var KEY6 = "sessions";
 var LIMIT = 200;
 var DAY = 864e5;
 function openSessionPicker(app) {
@@ -29675,7 +30689,7 @@ function openSessionPicker(app) {
     return { hits, order };
   };
   const overlay = {
-    key: KEY5,
+    key: KEY6,
     modal: true,
     node: () => {
       const now = Date.now();
@@ -29740,7 +30754,7 @@ function openSessionPicker(app) {
           total: rows.length,
           children: row ? preview4(row, row.id === app.storedSid) : null
         },
-        KEY5
+        KEY6
       );
     },
     onKey: (k) => {
@@ -29834,7 +30848,7 @@ function dateOf(startedAt) {
 }
 
 // src/overlays/theme.tsx
-var KEY6 = "theme";
+var KEY7 = "theme";
 var MODES = [
   { detail: "Your Tern theme, light and dark, with no colors of its own", icon: "palette", id: "tern", label: "Tern" },
   { detail: "Bone ink and quiet grays; gold only for the moments that earn it", icon: "sparkle", id: "nous", label: "Nous" },
@@ -29853,7 +30867,7 @@ function openThemePicker(app) {
     }
   };
   const overlay = {
-    key: KEY6,
+    key: KEY7,
     modal: true,
     node: () => /* @__PURE__ */ jsx(
       "picker",
@@ -29883,7 +30897,7 @@ function openThemePicker(app) {
         size: "md",
         title: "Theme"
       },
-      KEY6
+      KEY7
     ),
     onKey: (k) => {
       if (k.name === "escape") {
@@ -29972,6 +30986,11 @@ var COMMANDS2 = [
     aliases: ["bashes", "shells", "processes"],
     name: "ps",
     run: (app) => openBackground(app)
+  },
+  {
+    aliases: ["pr", "pulls"],
+    name: "prs",
+    run: (app) => openPullRequests(app)
   },
   {
     // `/help <command>` is the backend's detailed usage.
@@ -30069,7 +31088,7 @@ var writeActiveSessionFile = (sessionId, file2 = process.env.HERMES_TUI_ACTIVE_S
 
 // src/hermes/images.ts
 import { readFile as readFile2 } from "node:fs/promises";
-import { homedir as homedir3 } from "node:os";
+import { homedir as homedir5 } from "node:os";
 import { extname as extname2, resolve as resolve2 } from "node:path";
 var MAX_IMAGE_BYTES = 20 * 1024 * 1024;
 function imageFormat(bytes) {
@@ -30088,7 +31107,7 @@ function imageFormat(bytes) {
   return null;
 }
 async function uploadImage(gw2, sid, raw, cwd) {
-  const path = resolve2(cwd, raw.replace(/^~(?=$|\/)/, homedir3()));
+  const path = resolve2(cwd, raw.replace(/^~(?=$|\/)/, homedir5()));
   const bytes = await readFile2(path);
   if (bytes.length > MAX_IMAGE_BYTES) {
     throw new Error("the image is larger than 20 MB");
@@ -31199,16 +32218,299 @@ function semantic(c) {
   return out;
 }
 
+// src/github/client.ts
+import { execFile as execFile3 } from "node:child_process";
+import { promisify as promisify2 } from "node:util";
+var run = promisify2(execFile3);
+var GitHubError = class extends Error {
+  constructor(message, status) {
+    super(message);
+    this.status = status;
+  }
+  status;
+};
+var api = (host) => host === "github.com" ? "https://api.github.com" : `https://${host}/api/v3`;
+var graphqlUrl = (host) => host === "github.com" ? "https://api.github.com/graphql" : `https://${host}/api/graphql`;
+function tokens(env = process.env) {
+  const cache2 = /* @__PURE__ */ new Map();
+  return (host) => {
+    let token = cache2.get(host);
+    if (!token) {
+      token = read(host, env);
+      cache2.set(host, token);
+      token.catch(() => cache2.delete(host));
+    }
+    return token;
+  };
+}
+async function read(host, env) {
+  const own = host === "github.com" ? env.GH_TOKEN || env.GITHUB_TOKEN : env.GH_ENTERPRISE_TOKEN || env.GITHUB_ENTERPRISE_TOKEN;
+  if (own) {
+    return own;
+  }
+  try {
+    const { stdout } = await run("gh", ["auth", "token", "--hostname", host], { timeout: 1e4 });
+    const token = stdout.trim();
+    if (token) {
+      return token;
+    }
+  } catch (error) {
+    if (error.code === "ENOENT") {
+      throw new GitHubError("The GitHub CLI (gh) is not installed. Install it and run `gh auth login`, or set GH_TOKEN.");
+    }
+  }
+  throw new GitHubError(`Not logged in to ${host}. Run \`gh auth login --hostname ${host}\`, or set GH_TOKEN.`);
+}
+function github(token = tokens()) {
+  async function call(host, url, init) {
+    const res = await fetch(url, {
+      ...init,
+      headers: {
+        Accept: "application/vnd.github+json",
+        Authorization: `Bearer ${await token(host)}`,
+        "User-Agent": "hermes-tern",
+        "X-GitHub-Api-Version": "2022-11-28",
+        ...init.body ? { "Content-Type": "application/json" } : {}
+      },
+      signal: AbortSignal.timeout(3e4)
+    });
+    const text2 = await res.text();
+    const json = text2 ? JSON.parse(text2) : void 0;
+    if (!res.ok) {
+      const message = json?.message;
+      throw new GitHubError(message ? `GitHub: ${message}` : `GitHub answered ${res.status}`, res.status);
+    }
+    return json;
+  }
+  return {
+    async graphql(host, query, variables = {}) {
+      const out = await call(host, graphqlUrl(host), {
+        body: JSON.stringify({ query, variables }),
+        method: "POST"
+      });
+      if (!out.data) {
+        throw new GitHubError(out.errors?.map((e) => e.message).join("; ") || "GitHub sent no data");
+      }
+      return out.data;
+    },
+    rest(host, method, path, body) {
+      return call(host, `${api(host)}${path}`, { body: body === void 0 ? void 0 : JSON.stringify(body), method });
+    }
+  };
+}
+
+// src/github/store.ts
+var OPEN_MS = 6e4;
+var PENDING_MS = 3e4;
+var BATCH = 20;
+var MUTATIONS = {
+  close: "mutation($id: ID!) { closePullRequest(input: {pullRequestId: $id}) { clientMutationId } }",
+  draft: "mutation($id: ID!) { convertPullRequestToDraft(input: {pullRequestId: $id}) { clientMutationId } }",
+  merge: "mutation($id: ID!, $m: PullRequestMergeMethod!, $oid: GitObjectID) { mergePullRequest(input: {pullRequestId: $id, mergeMethod: $m, expectedHeadOid: $oid}) { clientMutationId } }",
+  ready: "mutation($id: ID!) { markPullRequestReadyForReview(input: {pullRequestId: $id}) { clientMutationId } }",
+  reopen: "mutation($id: ID!) { reopenPullRequest(input: {pullRequestId: $id}) { clientMutationId } }",
+  "update-branch": "mutation($id: ID!, $oid: GitObjectID) { updatePullRequestBranch(input: {pullRequestId: $id, expectedHeadOid: $oid}) { clientMutationId } }"
+};
+var PullRequests = class {
+  #host;
+  #gh;
+  #links;
+  #sid = null;
+  #refs = [];
+  #entries = /* @__PURE__ */ new Map();
+  /** Why nothing could be read at all (no token). */
+  #error;
+  #timer;
+  #loading = false;
+  #again = false;
+  #disposed = false;
+  #busy = /* @__PURE__ */ new Set();
+  constructor(host, gh = github(), links = (sid) => storedLinks(sid)) {
+    this.#host = host;
+    this.#gh = gh;
+    this.#links = links;
+  }
+  /** The linked PRs, oldest link first. */
+  entries() {
+    return this.#refs.map((ref) => this.#entry(ref));
+  }
+  get(key2) {
+    return this.#entries.get(key2);
+  }
+  get error() {
+    return this.#error;
+  }
+  get loading() {
+    return this.#loading;
+  }
+  busy(key2) {
+    return this.#busy.has(key2);
+  }
+  /** A session was adopted (a resume, a switch): its stored links replace the old ones. */
+  adopt() {
+    const sid = this.#host.sid();
+    if (sid === this.#sid) {
+      return;
+    }
+    this.#sid = sid;
+    this.#refs = sid ? this.#links(sid) : [];
+    this.#host.changed();
+    this.poke();
+  }
+  /** A finished tool call: a link tool's result is the conversation's whole list. */
+  onCall(call) {
+    const linked = linkedFromResult(call);
+    if (!linked) {
+      return;
+    }
+    const before = this.#refs.map(prKey).join();
+    this.#refs = linked;
+    if (linked.map(prKey).join() !== before) {
+      this.#host.changed();
+      this.poke();
+    }
+  }
+  /** Reads every linked PR now. */
+  poke() {
+    clearTimeout(this.#timer);
+    this.#timer = void 0;
+    void this.#tick();
+  }
+  dispose() {
+    this.#disposed = true;
+    clearTimeout(this.#timer);
+  }
+  /** Comments, reviews and commits of `key`, read once per PR update. */
+  async activity(key2) {
+    const e = this.#entries.get(key2);
+    if (!e?.pr || e.activity && e.detailAt === e.pr.updatedAt) {
+      return;
+    }
+    const [o, r] = e.ref.repository.split("/");
+    const data = await this.#gh.graphql(e.ref.host, ACTIVITY_QUERY, { n: e.ref.number, o, r });
+    e.activity = parseActivity(data);
+    e.detailAt = e.pr.updatedAt;
+    this.#host.changed();
+  }
+  /** The changed files of `key` with their patches (the first 300). */
+  async files(key2) {
+    const e = this.#entries.get(key2);
+    if (!e?.pr || e.files && e.detailAt === e.pr.updatedAt) {
+      return;
+    }
+    const files = [];
+    for (let page = 1; page <= 3; page++) {
+      const rows = await this.#gh.rest(e.ref.host, "GET", `/repos/${e.ref.repository}/pulls/${e.ref.number}/files?per_page=100&page=${page}`);
+      files.push(...parseFiles(rows));
+      if (rows.length < 100) {
+        break;
+      }
+    }
+    e.files = files;
+    this.#host.changed();
+  }
+  /** Changes PR `key` on GitHub; throws GitHub's error. `merge` uses `method`, the repository's first by default. */
+  async act(action, key2, method) {
+    const pr = this.#entries.get(key2)?.pr;
+    if (!pr) {
+      throw new Error("That pull request has not loaded yet.");
+    }
+    this.#busy.add(key2);
+    this.#host.changed();
+    try {
+      if (action === "rerun") {
+        const runs = failedRuns(pr.checks);
+        if (!runs.length) {
+          throw new Error("No failed GitHub Actions run to re-run.");
+        }
+        for (const id of runs) {
+          await this.#gh.rest(pr.host, "POST", `/repos/${pr.repository}/actions/runs/${id}/rerun-failed-jobs`);
+        }
+      } else {
+        await this.#gh.graphql(pr.host, MUTATIONS[action], {
+          id: pr.id,
+          ...action === "merge" ? { m: (method ?? pr.mergeMethods[0] ?? "merge").toUpperCase(), oid: pr.headOid } : {},
+          ...action === "update-branch" ? { oid: pr.headOid } : {}
+        });
+      }
+    } finally {
+      this.#busy.delete(key2);
+      this.poke();
+    }
+  }
+  #entry(ref) {
+    const key2 = prKey(ref);
+    let e = this.#entries.get(key2);
+    if (!e) {
+      e = { ref };
+      this.#entries.set(key2, e);
+    }
+    return e;
+  }
+  #schedule() {
+    clearTimeout(this.#timer);
+    const open = this.entries().filter((e) => !e.pr || e.pr.state === "open");
+    if (this.#disposed || !open.length) {
+      return;
+    }
+    const pending = open.some((e) => e.pr && checksState(e.pr.checks) === "pending");
+    this.#timer = setTimeout(() => void this.#tick(), pending ? PENDING_MS : OPEN_MS);
+  }
+  async #tick() {
+    if (this.#loading) {
+      this.#again = true;
+      return;
+    }
+    this.#loading = true;
+    try {
+      do {
+        this.#again = false;
+        await this.#read();
+      } while (this.#again);
+    } finally {
+      this.#loading = false;
+      this.#schedule();
+      this.#host.changed();
+    }
+  }
+  async #read() {
+    const entries = this.entries();
+    const byHost = /* @__PURE__ */ new Map();
+    for (const e of entries) {
+      byHost.set(e.ref.host, [...byHost.get(e.ref.host) ?? [], e]);
+    }
+    let failed;
+    for (const [host, list] of byHost) {
+      for (let i = 0; i < list.length; i += BATCH) {
+        const chunk = list.slice(i, i + BATCH);
+        const { query, variables } = batchQuery(chunk.map((e) => e.ref));
+        try {
+          const data = await this.#gh.graphql(host, query, variables);
+          chunk.forEach((e, j) => {
+            const pr = parsePullRequest(e.ref, data[`p${j}`]);
+            e.pr = pr ?? e.pr;
+            e.error = pr ? void 0 : "GitHub has no such pull request, or this token cannot see it.";
+          });
+        } catch (error) {
+          failed = error instanceof Error ? error.message : String(error);
+          chunk.forEach((e) => e.error = failed);
+        }
+      }
+    }
+    this.#error = entries.length && entries.every((e) => e.error && !e.pr) ? failed : void 0;
+  }
+};
+
 // src/settings.ts
-import { mkdirSync as mkdirSync3, readFileSync as readFileSync2, writeFileSync as writeFileSync2 } from "node:fs";
-import { homedir as homedir4 } from "node:os";
-import { dirname, join as join3 } from "node:path";
+import { mkdirSync as mkdirSync3, readFileSync as readFileSync3, writeFileSync as writeFileSync2 } from "node:fs";
+import { homedir as homedir6 } from "node:os";
+import { dirname, join as join5 } from "node:path";
 function settingsFile(env = process.env) {
-  return join3(env.HERMES_HOME || join3(homedir4(), ".hermes"), "hermes-tern", "settings.json");
+  return join5(env.HERMES_HOME || join5(homedir6(), ".hermes"), "hermes-tern", "settings.json");
 }
 function loadSettings(file2 = settingsFile()) {
   try {
-    const parsed = JSON.parse(readFileSync2(file2, "utf8"));
+    const parsed = JSON.parse(readFileSync3(file2, "utf8"));
     return parsed && typeof parsed === "object" ? parsed : {};
   } catch {
     return {};
@@ -31224,14 +32526,14 @@ function saveSettings(patch, file2 = settingsFile()) {
 
 // src/view/dock.tsx
 function dockNodes(cx) {
-  const nodes = [];
+  const nodes2 = [];
   if (cx.busy) {
-    nodes.push(
+    nodes2.push(
       /* @__PURE__ */ jsx("col", { role: "omp.hud.status", children: workingNode(cx) }, "hud")
     );
   }
   if (cx.queued.length) {
-    nodes.push(
+    nodes2.push(
       /* @__PURE__ */ jsx("col", { gap: "xs", role: "omp.queue", children: cx.queued.map((text2, i) => /* @__PURE__ */ jsxs("row", { align: "center", gap: "sm", role: "omp.queue.item", title: "Queued", children: [
         /* @__PURE__ */ jsx("icon", { name: "corner-down-right" }, "icon"),
         /* @__PURE__ */ jsx("text", { grow: 1, text: text2.replace(/\s*\r?\n\s*/g, " \u21B5 "), truncate: "end", wrap: "none" }, "text"),
@@ -31261,18 +32563,19 @@ function dockNodes(cx) {
   }
   const pills = [
     cx.agents?.running ? agentsPill(cx.agents.running, cx.agents.onOpen, cx.focused === "agents") : null,
-    cx.shells && (cx.shells.running || cx.shells.exited) ? shellsPill(cx.shells, cx.focused === "shells") : null
+    cx.shells && (cx.shells.running || cx.shells.exited) ? shellsPill(cx.shells, cx.focused === "shells") : null,
+    cx.prs ? prsPillNode(cx.prs, cx.focused === "prs") : null
   ].filter((p) => p !== null);
   if (pills.length) {
-    nodes.push(
+    nodes2.push(
       /* @__PURE__ */ jsxs("row", { role: "omp.hud", children: [
         cx.focused ? hudHint() : null,
         pills
       ] }, "agents")
     );
   }
-  nodes.push(composerNode(cx));
-  return nodes;
+  nodes2.push(composerNode(cx));
+  return nodes2;
 }
 function agentsPill(running, onOpen, focused) {
   return /* @__PURE__ */ jsx("row", { align: "center", mark: focused ? "pick" : void 0, onClick: onOpen, role: "omp.hud.pill", title: "Agents  \u2325A", children: /* @__PURE__ */ jsxs("row", { align: "center", gap: "xs", role: "omp.hud.seg", children: [
@@ -31307,6 +32610,12 @@ function shellsPill(s, focused) {
     },
     "shells"
   );
+}
+function prsPillNode(p, focused) {
+  return /* @__PURE__ */ jsx("row", { align: "center", mark: focused ? "pick" : void 0, onClick: p.onOpen, role: "omp.hud.pill", title: "Pull requests  \u2325P", children: /* @__PURE__ */ jsxs("row", { align: "center", gap: "xs", role: "omp.hud.seg", children: [
+    /* @__PURE__ */ jsx("icon", { name: "merge", tone: p.tone === "muted" ? void 0 : p.tone }, "icon"),
+    /* @__PURE__ */ jsx("text", { text: p.text, wrap: "none" }, "text")
+  ] }, "seg") }, "prs");
 }
 function hudHint() {
   return /* @__PURE__ */ jsxs("row", { align: "center", gap: "xs", role: "omp.hud.hint", children: [
@@ -31494,7 +32803,7 @@ ${compact(ctx.used)} of ${compact(ctx.max)} tokens
 }
 
 // src/workLog.ts
-import { homedir as homedir5 } from "node:os";
+import { homedir as homedir7 } from "node:os";
 
 // src/vendor/t3code/commandLabel.ts
 var MAX_COMMAND_SEGMENTS = 64;
@@ -31686,9 +32995,9 @@ var TERMINAL_SHELL_PROGRAMS = /* @__PURE__ */ new Set([
   "until",
   "while"
 ]);
-function shellCommandArgumentIndex(tokens, start) {
-  for (let index = start; index < tokens.length; index += 1) {
-    const option = tokens[index];
+function shellCommandArgumentIndex(tokens2, start) {
+  for (let index = start; index < tokens2.length; index += 1) {
+    const option = tokens2[index];
     if (option === "--" || !option.startsWith("-")) return null;
     if (SHELL_OPTIONS_WITH_VALUE.has(option)) {
       index += 1;
@@ -31708,7 +33017,7 @@ var COMMAND_WRAPPER_FLAGS = {
 };
 function tokenizeShellCommand(command) {
   const input = command.trim();
-  const tokens = [];
+  const tokens2 = [];
   let current = "";
   let quote2 = null;
   let escaping = false;
@@ -31807,7 +33116,7 @@ function tokenizeShellCommand(command) {
         continue;
       }
       if (tokenStarted) {
-        tokens.push(current);
+        tokens2.push(current);
         current = "";
         tokenStarted = false;
       }
@@ -31819,8 +33128,8 @@ function tokenizeShellCommand(command) {
   if (quote2 !== null || escaping || inBackticks || substitutionDepth > 0 || parameterExpansionDepth > 0) {
     return null;
   }
-  if (tokenStarted) tokens.push(current);
-  return tokens;
+  if (tokenStarted) tokens2.push(current);
+  return tokens2;
 }
 function commandWithoutShellComments(command, end, comments) {
   let result = "";
@@ -32062,40 +33371,40 @@ function withoutShellLineContinuations(command) {
   }
   return normalizedCommand;
 }
-function indexAfterShellRedirection(tokens, index) {
-  const token = tokens[index];
+function indexAfterShellRedirection(tokens2, index) {
+  const token = tokens2[index];
   if (!token || /^[<>]\(/u.test(token)) return null;
   const match = token.match(
     /^(?:(?:(?:\d+|\*|\{[A-Za-z_][A-Za-z0-9_]*\})?(?:<<<|<<-|<<|<>|>>|>\||<&|>&|<|>))|&>>|&>)(.*)$/u
   );
   if (!match) return null;
   if (match[1]) return index + 1;
-  return tokens[index + 1] === void 0 ? tokens.length + 1 : index + 2;
+  return tokens2[index + 1] === void 0 ? tokens2.length + 1 : index + 2;
 }
-function serializeShellTokens(tokens) {
-  return tokens.map((token) => `'${token.replaceAll("'", "'\\''")}'`).join(" ");
+function serializeShellTokens(tokens2) {
+  return tokens2.map((token) => `'${token.replaceAll("'", "'\\''")}'`).join(" ");
 }
-function transparentWrapperCommandIndex(wrapper, tokens, index) {
+function transparentWrapperCommandIndex(wrapper, tokens2, index) {
   if (wrapper === "bundle") {
-    return tokens[index + 1] === "exec" && tokens[index + 2] !== void 0 ? index + 2 : null;
+    return tokens2[index + 1] === "exec" && tokens2[index + 2] !== void 0 ? index + 2 : null;
   }
   if (wrapper === "nohup") {
     let targetIndex = index + 1;
-    if (tokens[targetIndex] === "--") targetIndex += 1;
-    const target = tokens[targetIndex];
+    if (tokens2[targetIndex] === "--") targetIndex += 1;
+    const target = tokens2[targetIndex];
     return target && !target.startsWith("-") ? targetIndex : null;
   }
   if (wrapper === "script") {
-    return /^-[adkpqr]+$/u.test(tokens[index + 1] ?? "") && tokens[index + 3] !== void 0 ? index + 3 : null;
+    return /^-[adkpqr]+$/u.test(tokens2[index + 1] ?? "") && tokens2[index + 3] !== void 0 ? index + 3 : null;
   }
   if (wrapper === "arch") {
-    if (/^-(?:arm64|arm64e|i386|x86_64)$/u.test(tokens[index + 1] ?? "")) {
-      return tokens[index + 2] !== void 0 ? index + 2 : null;
+    if (/^-(?:arm64|arm64e|i386|x86_64)$/u.test(tokens2[index + 1] ?? "")) {
+      return tokens2[index + 2] !== void 0 ? index + 2 : null;
     }
-    return tokens[index + 1] === "-arch" && tokens[index + 3] !== void 0 ? index + 3 : null;
+    return tokens2[index + 1] === "-arch" && tokens2[index + 3] !== void 0 ? index + 3 : null;
   }
   if (wrapper === "timeout" || wrapper === "gtimeout") {
-    return /^(?:\d+(?:\.\d*)?|\.\d+)[smhd]?$/u.test(tokens[index + 1] ?? "") && tokens[index + 2] !== void 0 ? index + 2 : null;
+    return /^(?:\d+(?:\.\d*)?|\.\d+)[smhd]?$/u.test(tokens2[index + 1] ?? "") && tokens2[index + 2] !== void 0 ? index + 2 : null;
   }
   return null;
 }
@@ -32163,17 +33472,17 @@ function powerShellAssignmentProgramName(command, depth, remainingCommand, segme
     program: remainingCommand ? commandProgramNameInternal(remainingCommand, depth, "shell", segmentsRemaining - 1) : null
   };
 }
-function windowsShellPayloadProgramName(shell, tokens, start, depth, remainingCommand, separator, segmentsRemaining) {
+function windowsShellPayloadProgramName(shell, tokens2, start, depth, remainingCommand, separator, segmentsRemaining) {
   const parsePayload = (payload) => {
     if (!payload) return null;
     const command = remainingCommand && separator ? `${payload} ${separator} ${remainingCommand}` : payload;
     return commandProgramNameInternal(command, depth + 1, "shell", segmentsRemaining);
   };
   if (shell === "cmd" || shell === "cmd.exe") {
-    for (let index = start; index < tokens.length; index += 1) {
-      const option = tokens[index].toLowerCase();
+    for (let index = start; index < tokens2.length; index += 1) {
+      const option = tokens2[index].toLowerCase();
       if (option !== "/c" && option !== "/k") continue;
-      const payload = tokens[index + 1];
+      const payload = tokens2[index + 1];
       return {
         matched: true,
         program: parsePayload(payload)
@@ -32181,17 +33490,17 @@ function windowsShellPayloadProgramName(shell, tokens, start, depth, remainingCo
     }
     return { matched: false, program: null };
   }
-  for (let index = start; index < tokens.length; index += 1) {
-    const option = tokens[index].toLowerCase();
+  for (let index = start; index < tokens2.length; index += 1) {
+    const option = tokens2[index].toLowerCase();
     if (option === "-command" || option === "-c") {
-      const payload = tokens[index + 1];
+      const payload = tokens2[index + 1];
       return {
         matched: true,
         program: parsePayload(payload)
       };
     }
     if (option === "-file" || option === "-f") {
-      return { matched: true, program: staticProgramName(tokens[index + 1] ?? "") };
+      return { matched: true, program: staticProgramName(tokens2[index + 1] ?? "") };
     }
     if (option === "-encodedcommand" || option === "-enc" || option === "-e") {
       return { matched: true, program: null };
@@ -32202,19 +33511,19 @@ function windowsShellPayloadProgramName(shell, tokens, start, depth, remainingCo
     }
     if (POWERSHELL_FLAGS.has(option)) continue;
     if (!option.startsWith("-")) {
-      return { matched: true, program: staticProgramName(tokens[index]) };
+      return { matched: true, program: staticProgramName(tokens2[index]) };
     }
   }
   return { matched: false, program: null };
 }
-function startProcessProgramName(tokens, start) {
-  for (let index = start; index < tokens.length; index += 1) {
-    const token = tokens[index];
+function startProcessProgramName(tokens2, start) {
+  for (let index = start; index < tokens2.length; index += 1) {
+    const token = tokens2[index];
     const option = token.toLowerCase();
-    if (option === "-filepath") return staticProgramName(tokens[index + 1] ?? "");
+    if (option === "-filepath") return staticProgramName(tokens2[index + 1] ?? "");
     if (START_PROCESS_FLAGS.has(option)) continue;
     if (START_PROCESS_OPTIONS_WITH_VALUE.has(option)) {
-      if (tokens[index + 1] === void 0) return null;
+      if (tokens2[index + 1] === void 0) return null;
       index += 1;
       continue;
     }
@@ -32251,25 +33560,25 @@ function literalCommandAliasProgramName(command) {
     const commandWithoutComments = commandWithoutLeadingShellComments(remainingCommand);
     if (commandWithoutComments === null) return null;
     const commandSplit = splitFirstShellCommand(commandWithoutComments);
-    const tokens = tokenizeShellCommand(withoutShellLineContinuations(commandSplit.firstCommand));
-    if (tokens === null) return null;
-    let commandIndex = tokens[0] === "do" || tokens[0] === "then" ? 1 : 0;
-    while (commandIndex < tokens.length) {
-      const indexAfterRedirection = indexAfterShellRedirection(tokens, commandIndex);
-      if (indexAfterRedirection !== null && indexAfterRedirection <= tokens.length) {
+    const tokens2 = tokenizeShellCommand(withoutShellLineContinuations(commandSplit.firstCommand));
+    if (tokens2 === null) return null;
+    let commandIndex = tokens2[0] === "do" || tokens2[0] === "then" ? 1 : 0;
+    while (commandIndex < tokens2.length) {
+      const indexAfterRedirection = indexAfterShellRedirection(tokens2, commandIndex);
+      if (indexAfterRedirection !== null && indexAfterRedirection <= tokens2.length) {
         commandIndex = indexAfterRedirection;
         continue;
       }
-      if (/^[A-Za-z_][A-Za-z0-9_]*\+?=/u.test(tokens[commandIndex] ?? "")) {
+      if (/^[A-Za-z_][A-Za-z0-9_]*\+?=/u.test(tokens2[commandIndex] ?? "")) {
         commandIndex += 1;
         continue;
       }
       break;
     }
-    const aliasName = referencedCommandAlias(tokens[commandIndex] ?? "");
+    const aliasName = referencedCommandAlias(tokens2[commandIndex] ?? "");
     const aliasedProgram = aliasName ? aliases.get(aliasName) : void 0;
     if (aliasedProgram) return aliasedProgram;
-    const leadingToken = tokens[0];
+    const leadingToken = tokens2[0];
     if (leadingToken === "fi" || leadingToken === "done" || leadingToken === "esac") {
       controlFlowDepth = Math.max(0, controlFlowDepth - 1);
     }
@@ -32277,10 +33586,10 @@ function literalCommandAliasProgramName(command) {
       controlFlowDepth += 1;
     }
     if (controlFlowDepth === 0 && leadingToken === "unset") {
-      for (const name of tokens.slice(1)) aliases.delete(name);
+      for (const name of tokens2.slice(1)) aliases.delete(name);
     }
-    const assignmentStart = tokens[0] === "export" ? 1 : 0;
-    const assignments = tokens.slice(assignmentStart).map(literalAssignmentProgram);
+    const assignmentStart = tokens2[0] === "export" ? 1 : 0;
+    const assignments = tokens2.slice(assignmentStart).map(literalAssignmentProgram);
     if (controlFlowDepth === 0 && assignments.length > 0 && assignments.every((assignment) => assignment !== null)) {
       for (const assignment of assignments) {
         if (assignment.program) aliases.set(assignment.name, assignment.program);
@@ -32291,11 +33600,11 @@ function literalCommandAliasProgramName(command) {
   }
   return null;
 }
-function wrappedShellCommandProgramName(wrapper, tokens, start, depth, remainingCommand, segmentsRemaining) {
+function wrappedShellCommandProgramName(wrapper, tokens2, start, depth, remainingCommand, segmentsRemaining) {
   let index = start;
   if (wrapper === "command") {
-    while (index < tokens.length) {
-      const option = tokens[index];
+    while (index < tokens2.length) {
+      const option = tokens2[index];
       if (option === "--") {
         index += 1;
         break;
@@ -32305,17 +33614,17 @@ function wrappedShellCommandProgramName(wrapper, tokens, start, depth, remaining
       index += 1;
     }
   } else if (wrapper === "builtin") {
-    if (tokens[index] === "--") index += 1;
-    else if (tokens[index]?.startsWith("-")) return null;
+    if (tokens2[index] === "--") index += 1;
+    else if (tokens2[index]?.startsWith("-")) return null;
   } else if (wrapper === "exec") {
-    while (index < tokens.length) {
-      const option = tokens[index];
+    while (index < tokens2.length) {
+      const option = tokens2[index];
       if (option === "--") {
         index += 1;
         break;
       }
       if (option === "-a") {
-        if (tokens[index + 1] === void 0) return null;
+        if (tokens2[index + 1] === void 0) return null;
         index += 2;
         continue;
       }
@@ -32327,7 +33636,7 @@ function wrappedShellCommandProgramName(wrapper, tokens, start, depth, remaining
       break;
     }
   }
-  const wrappedTokens = tokens.slice(index);
+  const wrappedTokens = tokens2.slice(index);
   if (wrappedTokens.length === 0) return null;
   let targetIndex = 0;
   while (targetIndex < wrappedTokens.length) {
@@ -32380,10 +33689,10 @@ function parseCommandProgramName(command, depth, context, segmentsRemaining) {
     /^\s*((?:\.{1,2}|%[A-Za-z_][A-Za-z0-9_]*%|\$env:[A-Za-z_][A-Za-z0-9_]*)\\\S+)/iu
   )?.[1];
   if (windowsPath) return staticProgramName(windowsPath);
-  const tokens = tokenizeShellCommand(withoutShellLineContinuations(commandSplit.firstCommand));
-  if (tokens === null) return null;
+  const tokens2 = tokenizeShellCommand(withoutShellLineContinuations(commandSplit.firstCommand));
+  if (tokens2 === null) return null;
   const firstCharacter = commandSplit.firstCommand.trimStart()[0];
-  if (tokens.length === 1 && (firstCharacter === '"' || firstCharacter === "'") && /[\s()=]/u.test(tokens[0] ?? "") && !/[\\/]/u.test(tokens[0] ?? "")) {
+  if (tokens2.length === 1 && (firstCharacter === '"' || firstCharacter === "'") && /[\s()=]/u.test(tokens2[0] ?? "") && !/[\\/]/u.test(tokens2[0] ?? "")) {
     return commandSplit.remainingCommand ? commandProgramNameInternal(
       commandSplit.remainingCommand,
       depth,
@@ -32396,12 +33705,12 @@ function parseCommandProgramName(command, depth, context, segmentsRemaining) {
   let executionContext = context;
   let sawAssignment = false;
   let sawRedirection = false;
-  while (index < tokens.length) {
-    const token = tokens[index];
+  while (index < tokens2.length) {
+    const token = tokens2[index];
     if (!token) return null;
-    const indexAfterRedirection = indexAfterShellRedirection(tokens, index);
+    const indexAfterRedirection = indexAfterShellRedirection(tokens2, index);
     if (indexAfterRedirection !== null) {
-      if (indexAfterRedirection > tokens.length) return null;
+      if (indexAfterRedirection > tokens2.length) return null;
       sawRedirection = true;
       index = indexAfterRedirection;
       continue;
@@ -32442,7 +33751,7 @@ function parseCommandProgramName(command, depth, context, segmentsRemaining) {
     }
     if (wrapper !== null && token.startsWith("-")) {
       if (wrapper === "env" && (token === "-S" || token === "--split-string")) {
-        const splitCommand = tokens[index + 1];
+        const splitCommand = tokens2[index + 1];
         return splitCommand ? commandProgramNameInternal(splitCommand, depth + 1, executionContext, segmentsRemaining) : null;
       }
       if (wrapper === "env" && token.startsWith("--split-string=")) {
@@ -32454,7 +33763,7 @@ function parseCommandProgramName(command, depth, context, segmentsRemaining) {
         );
       }
       if (COMMAND_WRAPPER_OPTIONS_WITH_VALUE[wrapper].has(token)) {
-        if (tokens[index + 1] === void 0) return null;
+        if (tokens2[index + 1] === void 0) return null;
         index += 2;
         continue;
       }
@@ -32480,16 +33789,16 @@ function parseCommandProgramName(command, depth, context, segmentsRemaining) {
           }
           if (!COMMAND_WRAPPER_FLAGS[wrapper].has(shortOption)) return null;
         }
-        if (consumesNextToken && tokens[index + 1] === void 0) return null;
+        if (consumesNextToken && tokens2[index + 1] === void 0) return null;
         index += consumesNextToken ? 2 : 1;
         continue;
       }
       return null;
     }
     if (tokenProgram && SHELL_PROGRAMS.has(tokenProgram.replace(/\.exe$/i, "").toLowerCase())) {
-      const scriptIndex = shellCommandArgumentIndex(tokens, index + 1);
+      const scriptIndex = shellCommandArgumentIndex(tokens2, index + 1);
       if (scriptIndex !== null) {
-        const script = tokens[scriptIndex];
+        const script = tokens2[scriptIndex];
         return script ? commandProgramNameInternal(script, depth + 1, "shell", segmentsRemaining) : null;
       }
     }
@@ -32497,7 +33806,7 @@ function parseCommandProgramName(command, depth, context, segmentsRemaining) {
     if (lowerTokenProgram && WINDOWS_SHELL_PROGRAMS.has(lowerTokenProgram)) {
       const payload = windowsShellPayloadProgramName(
         lowerTokenProgram,
-        tokens,
+        tokens2,
         index + 1,
         depth,
         commandSplit.remainingCommand,
@@ -32507,20 +33816,20 @@ function parseCommandProgramName(command, depth, context, segmentsRemaining) {
       if (payload.matched) return payload.program;
     }
     if (lowerTokenProgram === "start-process") {
-      const startedProgram = startProcessProgramName(tokens, index + 1);
+      const startedProgram = startProcessProgramName(tokens2, index + 1);
       if (startedProgram !== null) return startedProgram;
     }
     if (executionContext === "shell" && isUnqualifiedToken && tokenProgram && SHELL_PRECOMMAND_MODIFIERS.has(tokenProgram)) {
       index += 1;
-      if (tokenProgram === "time" && tokens[index] === "-p") index += 1;
-      if (tokens[index]?.startsWith("-")) return null;
+      if (tokenProgram === "time" && tokens2[index] === "-p") index += 1;
+      if (tokens2[index]?.startsWith("-")) return null;
       continue;
     }
     if (isUnqualifiedToken && tokenProgram) {
-      const targetIndex = transparentWrapperCommandIndex(tokenProgram, tokens, index);
+      const targetIndex = transparentWrapperCommandIndex(tokenProgram, tokens2, index);
       if (targetIndex !== null) {
         const wrappedProgram = commandProgramNameInternal(
-          serializeShellTokens(tokens.slice(targetIndex)),
+          serializeShellTokens(tokens2.slice(targetIndex)),
           depth + 1,
           "exec",
           segmentsRemaining
@@ -32531,7 +33840,7 @@ function parseCommandProgramName(command, depth, context, segmentsRemaining) {
     if (isUnqualifiedToken && tokenProgram && SHELL_COMMAND_WRAPPERS.has(tokenProgram)) {
       return wrappedShellCommandProgramName(
         tokenProgram,
-        tokens,
+        tokens2,
         index + 1,
         depth,
         commandSplit.remainingCommand,
@@ -32592,12 +33901,12 @@ function withoutShellWrapper(command) {
   const trimmed = command.trim();
   const split = splitFirstShellCommand(trimmed);
   if (split.remainingCommand !== null) return trimmed;
-  const tokens = tokenizeShellCommand(trimmed);
-  const program = tokens?.[0]?.split(/[\\/]/u).at(-1)?.replace(/\.exe$/iu, "");
-  if (!tokens || !program || !SHELL_PROGRAMS.has(program)) return trimmed;
-  const scriptIndex = shellCommandArgumentIndex(tokens, 1);
-  if (scriptIndex === null || scriptIndex !== tokens.length - 1) return trimmed;
-  return tokens[scriptIndex]?.trim() || trimmed;
+  const tokens2 = tokenizeShellCommand(trimmed);
+  const program = tokens2?.[0]?.split(/[\\/]/u).at(-1)?.replace(/\.exe$/iu, "");
+  if (!tokens2 || !program || !SHELL_PROGRAMS.has(program)) return trimmed;
+  const scriptIndex = shellCommandArgumentIndex(tokens2, 1);
+  if (scriptIndex === null || scriptIndex !== tokens2.length - 1) return trimmed;
+  return tokens2[scriptIndex]?.trim() || trimmed;
 }
 var POWERSHELL_VERBS = new Set(
   `Add Approve Assert Backup Block Build Checkpoint Clear Close Compare Complete Compress Confirm Connect Convert ConvertFrom ConvertTo Copy Debug Deny Deploy Disable Disconnect Dismount Edit Enable Enter Exit Expand Export Find ForEach Format Get Grant Group Hide Import Initialize Install Invoke Join Limit Lock Measure Merge Mount Move New Open Optimize Out Ping Pop Protect Publish Push Read Receive Redo Register Remove Rename Repair Request Reset Resize Resolve Restart Restore Resume Revoke Save Search Select Send Set Show Skip Sort Split Start Step Stop Submit Suspend Switch Sync Tee Test Trace Unblock Undo Uninstall Unlock Unprotect Unpublish Unregister Update Use Wait Watch Where Write`.split(
@@ -32784,7 +34093,7 @@ function editedFiles(calls) {
   const paths = /* @__PURE__ */ new Set();
   let unnamed = 0;
   for (const c of calls) {
-    const path = str5(c.args.path);
+    const path = str6(c.args.path);
     if (path) {
       paths.add(path);
     } else {
@@ -32819,21 +34128,21 @@ function actionIcon(action) {
       return "wrench";
   }
 }
-var str5 = (v) => typeof v === "string" && v ? v : void 0;
+var str6 = (v) => typeof v === "string" && v ? v : void 0;
 function shortPath(path, cwd = process.env.HERMES_CWD || process.cwd()) {
   const root = cwd.replace(/\/+$/, "");
   if (root && path.startsWith(`${root}/`)) {
     return path.slice(root.length + 1);
   }
-  const home = homedir5();
+  const home = homedir7();
   return home && path.startsWith(`${home}/`) ? `~${path.slice(home.length)}` : path.replace(/^\.\//, "");
 }
 function stepLabel(call) {
   const a = call.args;
-  const path = str5(a.path);
+  const path = str6(a.path);
   switch (call.name) {
     case "terminal": {
-      const command = str5(a.command) ?? call.context;
+      const command = str6(a.command) ?? call.context;
       return command ? flat(commandDisplayText(command)) : "Command";
     }
     case "read_file":
@@ -32843,19 +34152,29 @@ function stepLabel(call) {
     case "write_file":
       return path ? `Wrote ${shortPath(path)}` : "Wrote a file";
     case "search_files": {
-      const pattern = str5(a.pattern) ?? call.context;
+      const pattern = str6(a.pattern) ?? call.context;
       const where = path && path !== "." ? ` in ${shortPath(path)}` : "";
       return a.target === "files" ? `Searched files ${pattern}${where}` : `Searched ${pattern}${where}`;
     }
     case "web_search":
-      return str5(a.query) ? `Searched the web for ${a.query}` : "Web search";
+      return str6(a.query) ? `Searched the web for ${a.query}` : "Web search";
     case "web_extract": {
       const urls = Array.isArray(a.urls) ? a.urls.filter((u) => typeof u === "string") : [];
-      const first = urls[0] ?? str5(a.url);
+      const first = urls[0] ?? str6(a.url);
       return first ? `Read ${first}${urls.length > 1 ? ` +${urls.length - 1} more` : ""}` : "Read a page";
     }
     case "execute_code":
       return call.context ? flat(call.context) : "Ran a script";
+    case "link_pull_request":
+    case "unlink_pull_request": {
+      const verb = call.name === "link_pull_request" ? "Linked" : "Unlinked";
+      const pr = str6(a.url)?.match(/github[^/]*\/([^/]+\/[^/]+)\/pull\/(\d+)/);
+      const repo = pr?.[1] ?? str6(a.repository);
+      const number = pr?.[2] ?? (typeof a.number === "number" ? String(a.number) : void 0);
+      return repo && number ? `${verb} ${repo}#${number}` : `${verb} a pull request`;
+    }
+    case "list_pull_requests":
+      return "Listed linked pull requests";
   }
   const name = call.name.replace(/_/g, " ");
   const label = name.charAt(0).toUpperCase() + name.slice(1);
@@ -32866,7 +34185,7 @@ function liveLabel(item2) {
     return thoughtLine(item2.text) || (item2.endedAt === void 0 ? "Thinking" : "Thought");
   }
   const call = item2.call;
-  const command = call.name === "terminal" ? str5(call.args.command) ?? call.context : void 0;
+  const command = call.name === "terminal" ? str6(call.args.command) ?? call.context : void 0;
   if (!command) {
     return stepLabel(call);
   }
@@ -32949,8 +34268,8 @@ function pair(line) {
 }
 function crumb(line) {
   const m = /^\s*[•\-*]\s*(.+?):\s*(~?[\d.,]+\s*[kmb]?)(?:\s*\(~?(\d+(?:\.\d+)?)%\))?\s*$/i.exec(line);
-  const tokens = m ? parseCount(m[2]) : NaN;
-  return m && Number.isFinite(tokens) ? { label: m[1], pct: m[3] ? Number(m[3]) : void 0, tokens } : void 0;
+  const tokens2 = m ? parseCount(m[2]) : NaN;
+  return m && Number.isFinite(tokens2) ? { label: m[1], pct: m[3] ? Number(m[3]) : void 0, tokens: tokens2 } : void 0;
 }
 function build(title, inline, body) {
   const name = title.replace(/:$/, "").trim();
@@ -33199,8 +34518,8 @@ function breakdownBody(items) {
 }
 
 // src/view/welcome.tsx
-import { readFileSync as readFileSync3 } from "node:fs";
-import { join as join4 } from "node:path";
+import { readFileSync as readFileSync4 } from "node:fs";
+import { join as join6 } from "node:path";
 function welcomeNode(key2, cx) {
   return /* @__PURE__ */ jsxs("card", { role: "omp.welcome", children: [
     /* @__PURE__ */ jsxs("row", { align: "center", gap: "md", role: "omp.welcome.lockup", children: [
@@ -33220,7 +34539,7 @@ var TIP_LINE = /^\s+t\d+:\s+"((?:[^"\\]|\\.)*)"\s*$/;
 function randomTip(root) {
   let text2;
   try {
-    text2 = readFileSync3(join4(root, "locales", "en.yaml"), "utf8");
+    text2 = readFileSync4(join6(root, "locales", "en.yaml"), "utf8");
   } catch {
     return "";
   }
@@ -33491,7 +34810,7 @@ function usageNode(turn, answer, cx) {
   const cost = typeof u.cost_usd === "number" && u.cost_usd > 0 ? ` \xB7 $${u.cost_usd.toFixed(2)}` : "";
   const title = `This turn: ${duration(ms)} \xB7 ${total.toLocaleString()} tokens (${input.toLocaleString()} in \xB7 ${output.toLocaleString()} out)${cost}`;
   const tps = (typeof u.avg_tps === "number" && u.avg_tps > 0 ? u.avg_tps : void 0) ?? turn.tps;
-  const facts = total ? [
+  const facts2 = total ? [
     ["time", "time", duration(ms)],
     ["tokens", "tokens", compact(total)],
     ...turn.cacheHit !== void 0 ? [["cache", "cache", `${turn.cacheHit}%`]] : [],
@@ -33505,7 +34824,7 @@ function usageNode(turn, answer, cx) {
   ].filter(Boolean).join("\n");
   return /* @__PURE__ */ jsxs("row", { align: "center", gap: "xs", role: "omp.turn.usage", title: total ? detail : void 0, children: [
     answer ? copyButton(answer, turn.id, "omp.turn.copy", "Copy answer", cx) : null,
-    facts.flatMap(([key2, icon, value]) => [
+    facts2.flatMap(([key2, icon, value]) => [
       /* @__PURE__ */ jsx("icon", { name: icon }, `${key2}.icon`),
       /* @__PURE__ */ jsx("text", { text: value }, key2)
     ])
@@ -33517,9 +34836,9 @@ function noticeNode(e) {
 }
 
 // src/watch/spec.ts
-import { execFile as execFile2 } from "node:child_process";
-import { promisify as promisify2 } from "node:util";
-var run = promisify2(execFile2);
+import { execFile as execFile4 } from "node:child_process";
+import { promisify as promisify3 } from "node:util";
+var run2 = promisify3(execFile4);
 var WATCH_ENV = "HERMES_TERN_WATCH";
 function readWatchSpec(env = process.env) {
   try {
@@ -33551,7 +34870,7 @@ async function openSidebar(spec, cwd, env = process.env) {
     return false;
   }
   if (sidebar) {
-    await run("tern", ["close", sidebar]).catch(() => void 0);
+    await run2("tern", ["close", sidebar]).catch(() => void 0);
     sidebar = void 0;
   }
   const command = [
@@ -33565,7 +34884,7 @@ async function openSidebar(spec, cwd, env = process.env) {
     "tern"
   ];
   try {
-    const { stdout } = await run("tern", ["split", pane, "right", "--cwd", cwd, "--", ...command]);
+    const { stdout } = await run2("tern", ["split", pane, "right", "--cwd", cwd, "--", ...command]);
     sidebar = stdout.trim().split(/\s+/).at(-1) || void 0;
     return true;
   } catch {
@@ -33576,7 +34895,7 @@ async function openSidebar(spec, cwd, env = process.env) {
 // src/app.ts
 var INPUT_ID = "dock.composer.line.input";
 var EXIT_ARM_MS = 1500;
-var COPIED_MS2 = 1500;
+var COPIED_MS3 = 1500;
 var EFFORTS = ["none", "low", "medium", "high", "xhigh"];
 var App = class {
   transcript = new Transcript();
@@ -33585,6 +34904,8 @@ var App = class {
   /** The session's background processes (the shells pill, the Background sheet, background cards). */
   processes = new Processes(this);
   cron = new Cron(this);
+  /** The conversation's PRs; links are stored under the stored session id the tools see. */
+  prs = new PullRequests({ changed: () => this.changed(), sid: () => this.storedSid ?? this.sid });
   composer = new Composer();
   overlays = [];
   sid = null;
@@ -33753,6 +35074,9 @@ var App = class {
     if (key2.alt && key2.name === "b" && !key2.ctrl && !key2.meta || key2.name === "\u222B") {
       return openBackground(this);
     }
+    if (key2.alt && key2.name === "p" && !key2.ctrl && !key2.meta || key2.name === "\u03C0") {
+      return openPullRequests(this);
+    }
     if (key2.alt && key2.name === "up" && this.queue.length) {
       return this.#dequeue();
     }
@@ -33785,7 +35109,8 @@ var App = class {
   #pills(now = Date.now()) {
     return [
       ...this.agents.running().length ? ["agents"] : [],
-      ...this.processes.recent(now).length ? ["shells"] : []
+      ...this.processes.recent(now).length ? ["shells"] : [],
+      ...this.prs.entries().length ? ["prs"] : []
     ];
   }
   /** Down from an empty prompt focuses the pills; ←/→, Enter and Esc/↑ while one holds the keys. */
@@ -33800,6 +35125,8 @@ var App = class {
       openAgents(this);
     } else if (out.open === "shells") {
       openBackground(this);
+    } else if (out.open === "prs") {
+      openPullRequests(this);
     }
     return out.consumed;
   }
@@ -33837,7 +35164,7 @@ var App = class {
     this.#copiedTimer = setTimeout(() => {
       this.#copied = void 0;
       this.changed();
-    }, COPIED_MS2);
+    }, COPIED_MS3);
   }
   quit(code2 = 0) {
     this.#done.resolve(code2);
@@ -34085,6 +35412,7 @@ var App = class {
       this.agents.scan();
     }
     this.processes.poke();
+    this.prs.adopt();
     if (r.inflight) {
       this.transcript.inflight(r.inflight, this.busy?.startedAt);
     }
@@ -34231,6 +35559,12 @@ var App = class {
         if (ev.payload) {
           t2.toolComplete(ev.payload);
           this.agents.scan();
+          if (LINK_TOOLS.has(ev.payload.name)) {
+            const call = this.transcript.calls(ev.payload.name).at(-1);
+            if (call) {
+              this.prs.onCall(call);
+            }
+          }
           if (ev.payload.name === "terminal") {
             this.processes.poke();
           }
@@ -34489,6 +35823,7 @@ ${this.composer.text}` : next2);
           this.changed();
         },
         agents: { onOpen: () => openAgents(this), running: this.agents.running().length },
+        prs: prsPill(this.prs.entries(), () => openPullRequests(this)),
         focused: modal ? void 0 : this.#hud,
         shells: {
           exited: exited.length,
@@ -34527,107 +35862,6 @@ function shortPath2(path) {
 
 // src/watch/watchApp.ts
 import { readFile as readFile3 } from "node:fs/promises";
-
-// src/watch/child.ts
-import { homedir as homedir6 } from "node:os";
-import { join as join5 } from "node:path";
-import { DatabaseSync } from "node:sqlite";
-function stateDbPath(env = process.env) {
-  return join5(env.HERMES_HOME || join5(homedir6(), ".hermes"), "state.db");
-}
-var ChildStore = class {
-  #db;
-  constructor(path = stateDbPath()) {
-    this.#db = new DatabaseSync(path, { readOnly: true });
-  }
-  /**
-   * The child session of `parents` whose first prompt is `goal`: a child's first user turn is
-   * its goal. The newest wins, as a goal can repeat across delegations; `since` (epoch ms)
-   * skips older ones.
-   */
-  find(parents, goal, since = 0) {
-    const ids = parents.filter(Boolean);
-    if (!ids.length) {
-      return void 0;
-    }
-    const row = this.#db.prepare(
-      `SELECT s.id AS id FROM sessions s
-         WHERE s.parent_session_id IN (${ids.map(() => "?").join(",")}) AND s.source = 'subagent'
-           AND s.started_at >= ?
-           AND (SELECT m.content FROM messages m WHERE m.session_id = s.id AND m.role = 'user'
-                ORDER BY m.id LIMIT 1) = ?
-         ORDER BY s.started_at DESC LIMIT 1`
-    ).get(...ids, Math.max(0, since / 1e3 - 5), goal);
-    return row?.id;
-  }
-  /** The child's active messages as the gateway's transcript messages, oldest first. */
-  messages(session2) {
-    const rows = this.#db.prepare(
-      `SELECT id, role, content, tool_call_id, tool_calls, tool_name, timestamp, reasoning
-         FROM messages WHERE session_id = ? AND active = 1 ORDER BY id`
-    ).all(session2);
-    return toTranscript(rows);
-  }
-  /** The newest message id of `session`, to tell whether anything changed. */
-  last(session2) {
-    const row = this.#db.prepare("SELECT MAX(id) AS id FROM messages WHERE session_id = ?").get(session2);
-    return row?.id ?? 0;
-  }
-  close() {
-    this.#db.close();
-  }
-};
-function toTranscript(rows) {
-  const out = [];
-  for (const r of rows) {
-    const timestamp = r.timestamp;
-    if (r.role === "user" || r.role === "system") {
-      out.push({ content: r.content ?? "", role: r.role, timestamp });
-      continue;
-    }
-    if (r.role === "assistant") {
-      out.push({ content: r.content ?? "", reasoning: r.reasoning ?? void 0, role: "assistant", timestamp });
-      for (const call of parseCalls(r.tool_calls)) {
-        out.push({
-          args: parseArgs(call.function?.arguments),
-          name: call.function?.name ?? "tool",
-          role: "tool",
-          timestamp,
-          tool_call_id: call.id ?? call.call_id
-        });
-      }
-      continue;
-    }
-    if (r.role === "tool") {
-      out.push({
-        content: r.content ?? "",
-        name: r.tool_name ?? void 0,
-        role: "tool",
-        timestamp,
-        tool_call_id: r.tool_call_id ?? void 0
-      });
-    }
-  }
-  return out;
-}
-function parseCalls(raw) {
-  try {
-    const parsed = raw ? JSON.parse(raw) : [];
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
-}
-function parseArgs(raw) {
-  try {
-    const parsed = raw ? JSON.parse(raw) : {};
-    return parsed && typeof parsed === "object" ? parsed : {};
-  } catch {
-    return {};
-  }
-}
-
-// src/watch/watchApp.ts
 var INPUT_ID2 = "dock.composer.line.input";
 var POLL_MS2 = 1e3;
 var EXIT_ARM_MS2 = 1500;

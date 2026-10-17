@@ -48,7 +48,8 @@ prove it.
 | #19 | Hermes' own notices become a reason line, not a user bubble |
 | #20 | The work log as t3code draws it: "Working for", work groups, thought rows, "Worked for" folds |
 | #21 | A steer stays in view; each stretch around it folds on its own |
-| next | Live process output; the Background sheet's Cron tab (every cron job and monitor: pause, resume, remove) |
+| #22 | Live process output; the Background sheet's Cron tab (every cron job and monitor: pause, resume, remove) |
+| next | `link_pull_request` and the Pull requests sheet: PRs, checks, activity, files, merge and close |
 
 ## Milestones
 
