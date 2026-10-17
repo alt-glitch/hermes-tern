@@ -7,6 +7,7 @@
 import { homedir } from 'node:os'
 
 import { callApp } from './bridge.js'
+import { isConnectCall } from './connections.js'
 import type { Block, ToolCall, TurnEntry } from './model.js'
 import { isBackgroundCall } from './transcript.js'
 import { commandDisplayText, commandProgramName } from './vendor/t3code/commandLabel.js'
@@ -22,7 +23,7 @@ const SOLO = new Set(['clarify', 'delegate_task', 'todo', 'todo_list'])
 
 /** A call that keeps its card: a solo tool, or a background process with its live line. */
 export function ownsCard(call: ToolCall): boolean {
-  return SOLO.has(call.name) || isBackgroundCall(call)
+  return SOLO.has(call.name) || isBackgroundCall(call) || isConnectCall(call)
 }
 
 /** Splits blocks into text, steers and card-owning calls, and the work groups between them. */
@@ -83,7 +84,12 @@ export function foldOf(turn: TurnEntry): Fold | undefined {
       continue
     }
 
-    if (b.kind === 'tool' && (isBackgroundCall(b.call) || b.call.subagents?.some(a => a.status === 'running' || a.status === 'queued'))) {
+    // Cards that still want the user stay out of the fold: a background process, running agents,
+    // apps to authorize.
+    if (
+      b.kind === 'tool' &&
+      (isBackgroundCall(b.call) || isConnectCall(b.call) || b.call.subagents?.some(a => a.status === 'running' || a.status === 'queued'))
+    ) {
       continue
     }
 
