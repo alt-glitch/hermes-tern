@@ -17,7 +17,7 @@ import {
   type Part,
   stepLabel,
   summarize,
-  thoughtLine,
+  thoughtTitle,
   visibleItems,
   type WorkItem
 } from '../workLog.js'
@@ -128,7 +128,7 @@ function itemNode(item: WorkItem, parent: string, now: number, key = item.id): J
     return node('section', { collapsed: true, collapsible: true, head: `${id}.head`, key, role: 'hermes.work.row' }, [
       <row align="center" gap="sm" key="head">
         <icon key="icon" name="brain" />
-        <text grow={1} key="label" spans={[{ s: 'muted', t: thoughtLine(item.text) }]} truncate="end" wrap="none" />
+        <text grow={1} key="label" spans={[{ s: 'muted', t: thoughtTitle(item) }]} truncate="end" wrap="none" />
       </row>,
       <md key="body" role="hermes.work.thought" stream={item.endedAt === undefined || undefined}>
         {item.text}

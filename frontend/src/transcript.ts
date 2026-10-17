@@ -168,11 +168,19 @@ export class Transcript {
     const turn = this.start(at)
     const incoming = text.trim()
 
-    if (!incoming || turn.blocks.some(b => b.kind === 'thinking' || (b.kind === 'text' && b.text.includes(incoming)))) {
+    if (!incoming || turn.blocks.some(b => (b.kind === 'thinking' && !b.label) || (b.kind === 'text' && b.text.includes(incoming)))) {
       return
     }
 
     turn.blocks.push({ endedAt: at, id: this.id('k'), kind: 'thinking', startedAt: at, text })
+    this.#touch(turn)
+  }
+
+  /** A Mixture-of-Agents reference model's answer: a sealed thought block of its own, under `label`. */
+  reference(label: string, text: string, at = Date.now()) {
+    const turn = this.start(at)
+    this.#endThinking(turn, at)
+    turn.blocks.push({ endedAt: at, id: this.id('k'), kind: 'thinking', label, startedAt: at, text: text.trim() })
     this.#touch(turn)
   }
 

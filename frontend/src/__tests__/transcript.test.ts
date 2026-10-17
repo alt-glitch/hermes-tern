@@ -143,6 +143,29 @@ describe('Transcript', () => {
     expect(kinds(turnOf(t.entries))).toEqual(['thinking', 'text'])
   })
 
+  it('keeps a Mixture-of-Agents reference as its own labelled, sealed thought', () => {
+    const t = new Transcript()
+    t.start(0)
+    t.reasoning('Planning.', 1)
+    t.reference('Reference 1/2 · gpt-5', '  Use SQLite.  ', 2)
+    t.reasoning('Next.', 3)
+
+    expect(turnOf(t.entries).blocks).toMatchObject([
+      { endedAt: 2, kind: 'thinking', text: 'Planning.' },
+      { endedAt: 2, kind: 'thinking', label: 'Reference 1/2 · gpt-5', text: 'Use SQLite.' },
+      { kind: 'thinking', text: 'Next.' }
+    ])
+  })
+
+  it('keeps reasoning.available after a reference answer (it is not the agent’s own thought)', () => {
+    const t = new Transcript()
+    t.start(0)
+    t.reference('Reference · gpt-5', 'Use SQLite.', 1)
+    t.reasoningBlock('Weighing the references.', 2)
+
+    expect(kinds(turnOf(t.entries))).toEqual(['thinking', 'thinking'])
+  })
+
   it('opens a call from tool.complete without tool.start', () => {
     const t = new Transcript()
     t.start(0)

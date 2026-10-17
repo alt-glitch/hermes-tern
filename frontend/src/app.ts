@@ -31,7 +31,9 @@ import { localCommand } from './commands.js'
 import { Composer } from './composer.js'
 import { interruptTurn, steerTurn } from './controlCommands.js'
 import { type Busy, busyFrom, ownsEvent, Switches } from './flow.js'
+import { protocolNote, slowStartNotes } from './backendNotes.js'
 import { hudKey, type Pill } from './hud.js'
+import { moaLabel, moaReferenceLabel } from './moa.js'
 import type { Overlay, OverlayHost } from './overlay.js'
 import { writeActiveSessionFile } from './hermes/activeSessionFile.js'
 import { imagePathOf, withClipboardImage } from './hermes/clipboardImage.js'
@@ -155,6 +157,8 @@ export class App implements OverlayHost {
   #hud: Pill | undefined
   /** The gateway connection is down until the next gateway.ready (its one notice is shown). */
   #offline = false
+  /** Stray backend output was reported once already. */
+  #protocolWarned = false
   /** The gateway's keyed notices (credits, a slow start); the newest rides the status strip. */
   readonly #notices = new Notices()
   #noticeTimer: NodeJS.Timeout | undefined
@@ -1387,7 +1391,6 @@ export class App implements OverlayHost {
 
         return
 
-
       case 'message.start':
         if (!this.busy) {
           this.#startBusy('Working…')
@@ -1411,6 +1414,23 @@ export class App implements OverlayHost {
 
       case 'reasoning.available':
         t.reasoningBlock(ev.payload?.text ?? '')
+
+        break
+
+      // Mixture-of-Agents: each reference model's answer, then the aggregator's turn.
+      case 'moa.reference':
+        if (ev.payload) {
+          t.reference(moaReferenceLabel(ev.payload.label || 'reference', ev.payload.index, ev.payload.count), ev.payload.text ?? '')
+        }
+
+        break
+
+      case 'moa.progress':
+
+      case 'moa.phase':
+
+      case 'moa.aggregating':
+        this.#label(moaLabel(ev.type, ev.payload as Record<string, unknown> | undefined) ?? '')
 
         break
 
@@ -1555,6 +1575,19 @@ export class App implements OverlayHost {
 
         break
 
+      // What the background self-improvement review saved to memory or skills.
+      case 'review.summary': {
+        const text = String(ev.payload?.text ?? '').trim()
+
+        if (!text) {
+          return
+        }
+
+        t.notice(text)
+
+        break
+      }
+
       case 'notice':
         t.notice(ev.payload?.message ?? '')
 
@@ -1566,14 +1599,25 @@ export class App implements OverlayHost {
         break
 
       case 'gateway.start_timeout':
-        t.notice('The agent backend did not start in time.', 'error')
+        // The client keeps waiting for ready; the stderr lines say why it is slow (wrong python, a missing dependency).
+        for (const note of slowStartNotes(ev.payload?.stderr_tail)) {
+          t.notice(note.text, note.tone)
+        }
 
         break
 
-      case 'gateway.protocol_error':
-        t.notice(`Protocol error from the agent backend: ${ev.payload?.preview ?? ''}`, 'error')
+      case 'gateway.protocol_error': {
+        const note = protocolNote(ev.payload?.preview, this.#protocolWarned)
+        this.#protocolWarned = true
+
+        if (!note) {
+          return
+        }
+
+        t.notice(note.text, note.tone)
 
         break
+      }
 
       case 'background.complete':
 
