@@ -90,6 +90,9 @@ interface CreateResult extends Partial<
 /** An uploaded image a prompt carries (the shared gateway takes it on prompt.submit), with the name its chip shows. */
 type Image = Attachment & { name: string }
 
+/** How long quitting waits for the sessions to detach. */
+const QUIT_DETACH_MS = 1500
+
 /** A prompt waiting for the turn, with the images that were attached when it was entered. */
 export interface Queued {
   text: string
@@ -236,7 +239,11 @@ export class App implements OverlayHost {
     void this.#readInput()
 
     const code = await this.#done.promise
-    await Promise.all([...this.#subscriptions.keys()].map(sid => this.#leave(sid, 'tui_shutdown')))
+    // Bounded, as Ink's deferExitForClose: a dead socket must not hold the terminal.
+    await Promise.race([
+      Promise.all([...this.#subscriptions.keys()].map(sid => this.#leave(sid, 'tui_shutdown'))),
+      new Promise(resolve => setTimeout(resolve, QUIT_DETACH_MS))
+    ])
     await this.#tern.close()
     this.#gw.kill('exit')
 
@@ -822,8 +829,11 @@ export class App implements OverlayHost {
         ...(attachments.length ? { attachments } : {})
       })
       .catch((error: Error) => {
-        this.transcript.notice(error.message, 'error')
+        // Back to the composer, not re-sent: a timeout may come after the gateway admitted it.
+        this.transcript.notice(`Not sent: ${error.message}. Your message is back in the composer.`, 'error')
         this.busy = null
+        this.#restore(item)
+        this.#drainQueue()
         this.changed()
       })
   }
@@ -925,7 +935,16 @@ export class App implements OverlayHost {
       this.busy.label = 'Stopping…'
     }
 
-    interruptTurn(this.#gw, this.sid).catch(() => undefined)
+    interruptTurn(this.#gw, this.sid).catch((error: unknown) => {
+      const why = error instanceof Error ? error.message : String(error)
+
+      // A stale generation means the turn already ended: nothing to say.
+      if (this.busy && !why.includes('stale_generation')) {
+        this.busy.label = 'Working…'
+        this.transcript.notice(`Could not stop the turn: ${why}`, 'error')
+        this.changed()
+      }
+    })
     this.changed()
   }
 
