@@ -26000,6 +26000,53 @@ function compact(n) {
   return `${m < 10 ? m.toFixed(1).replace(/\.0$/, "") : Math.round(m)}M`;
 }
 
+// src/connections.ts
+var CONNECT_TOOL = "manage_connections";
+var POLL_MS2 = 4e3;
+var POLL_FOR_MS = 15 * 6e4;
+function connectTargets(call) {
+  if (call.name !== CONNECT_TOOL) {
+    return [];
+  }
+  const targets = record2(call.result)?.targets;
+  return (Array.isArray(targets) ? targets : []).flatMap((t2) => {
+    const r = record2(t2);
+    const name = typeof r?.name === "string" ? r.name : "";
+    return name ? [
+      {
+        alias: typeof r?.alias === "string" && r.alias ? r.alias : void 0,
+        detail: typeof r?.detail === "string" && r.detail ? r.detail : void 0,
+        name,
+        state: typeof r?.state === "string" ? r.state : "pending",
+        title: appTitle(name),
+        url: typeof r?.connect_url === "string" && r.connect_url ? r.connect_url : void 0
+      }
+    ] : [];
+  });
+}
+var waiting = (t2) => t2.state === "initiated" || t2.state === "pending";
+function isConnectCall(call) {
+  return connectTargets(call).some((t2) => t2.url);
+}
+function applyStatus(targets, rows) {
+  const byName = new Map(rows.map((r) => [String(r.connector ?? "").toLowerCase(), r]));
+  return targets.map((t2) => {
+    const row = byName.get(t2.name.toLowerCase());
+    if (!row || !waiting(t2)) {
+      return t2;
+    }
+    if (row.connected) {
+      return { ...t2, state: "connected" };
+    }
+    return row.connection_status === "failed" || row.connection_status === "expired" ? { ...t2, state: row.connection_status } : t2;
+  });
+}
+function continueMessage(targets) {
+  const names = targets.filter((t2) => t2.state === "connected" || waiting(t2)).map((t2) => t2.title);
+  const list = names.length < 3 ? names.join(" and ") : `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`;
+  return `I've authorized ${list || "the apps"}. Check with manage_connections status and carry on.`;
+}
+
 // src/processes/store.ts
 var OUTPUT_MAX = 32e3;
 var RETAIN_MS = 6e4;
@@ -27440,7 +27487,7 @@ var POWERSHELL_VERBS = new Set(
 // src/workLog.ts
 var SOLO = /* @__PURE__ */ new Set(["clarify", "delegate_task", "todo", "todo_list"]);
 function ownsCard(call) {
-  return SOLO.has(call.name) || isBackgroundCall(call);
+  return SOLO.has(call.name) || isBackgroundCall(call) || isConnectCall(call);
 }
 function pieces(blocks) {
   const out = [];
@@ -27474,7 +27521,7 @@ function foldOf(turn) {
     if (i === answer || b.kind === "steer") {
       continue;
     }
-    if (b.kind === "tool" && (isBackgroundCall(b.call) || b.call.subagents?.some((a) => a.status === "running" || a.status === "queued"))) {
+    if (b.kind === "tool" && (isBackgroundCall(b.call) || isConnectCall(b.call) || b.call.subagents?.some((a) => a.status === "running" || a.status === "queued"))) {
       continue;
     }
     if (answer >= 0 && i > answer && b.kind === "tool" && b.call.status !== "done") {
@@ -28146,6 +28193,11 @@ function cardOf(call, now) {
       return webSearchCard(call, result);
     case "web_extract":
       return fetchCard(call, result);
+    case CONNECT_TOOL:
+      if (isConnectCall(call)) {
+        return connectCard(call);
+      }
+      break;
     case "todo_list":
       return {
         body: call.todos?.length ? [checklistNode(call.todos)] : [],
@@ -28588,6 +28640,65 @@ function evalCard(call, result) {
     name: "eval",
     role: "omp.tool.eval",
     title: firstLine(code2)?.startsWith("#") ? firstLine(code2)?.replace(/^#+\s*/, "") ?? "Eval" : "Eval"
+  };
+}
+var CONNECT_STATE = {
+  connected: { icon: "check", tone: "success", word: "connected" },
+  expired: { icon: "clock", tone: "error", word: "link expired" },
+  failed: { icon: "x", tone: "error", word: "failed" },
+  initiated: { icon: "clock", tone: "pending", word: "waiting for you" },
+  not_connected: { icon: "minus", tone: "muted", word: "not connected" },
+  pending: { icon: "clock", tone: "pending", word: "waiting for you" },
+  skipped: { icon: "minus", tone: "muted", word: "skipped" }
+};
+function connectCard(call) {
+  const targets = call.connect ?? connectTargets(call);
+  const open = targets.filter(waiting);
+  const rows = targets.map((t2, i) => {
+    const look = CONNECT_STATE[t2.state] ?? CONNECT_STATE.pending;
+    return /* @__PURE__ */ jsxs("row", { align: "center", gap: "sm", role: "hermes.connect.row", children: [
+      /* @__PURE__ */ jsx("icon", { name: look.icon, tone: look.tone }, "i"),
+      /* @__PURE__ */ jsx(
+        "text",
+        {
+          grow: 1,
+          spans: [
+            { s: "strong", t: t2.title },
+            ...t2.alias ? [{ s: "muted", t: ` (${t2.alias})` }] : [],
+            { s: look.tone ?? "muted", t: `  ${look.word}` },
+            ...t2.detail && look.tone === "error" ? [{ s: "muted", t: ` \xB7 ${t2.detail}` }] : []
+          ],
+          truncate: "end",
+          wrap: "none"
+        },
+        "n"
+      ),
+      t2.url && waiting(t2) ? /* @__PURE__ */ jsx("row", { actions: { click: `open-url=${t2.url}` }, align: "center", gap: "xs", role: "hermes.connect.open", title: t2.url, children: /* @__PURE__ */ jsx("text", { text: "Authorize \u2197" }, "t") }, "go") : null
+    ] }, `t${i}`);
+  });
+  return {
+    body: [
+      ...rows,
+      ...call.connectDone ? [/* @__PURE__ */ jsx("text", { spans: [{ s: "muted", t: "Sent to Hermes." }] }, "done")] : [
+        /* @__PURE__ */ jsxs("row", { align: "center", gap: "sm", children: [
+          /* @__PURE__ */ jsx(
+            "text",
+            {
+              grow: 1,
+              spans: [{ s: "muted", t: open.length ? "Authorize in the browser, then continue." : "All set." }],
+              wrap: "word"
+            },
+            "hint"
+          ),
+          /* @__PURE__ */ jsx("row", { actions: { click: `connect-continue=${call.id}` }, align: "center", role: "hermes.connect.continue", children: /* @__PURE__ */ jsx("text", { text: "Done, continue" }, "t") }, "go")
+        ] }, "foot")
+      ]
+    ],
+    name: "plug",
+    status: open.length && !call.connectDone ? "running" : void 0,
+    target: targets.map((t2) => t2.title).join(", "),
+    targetKind: "text",
+    title: open.length ? "Connect apps" : "Apps connected"
   };
 }
 function appBody(call) {
@@ -33821,6 +33932,37 @@ var STYLES = css`
     max-width: 360px;
   }
 
+  /* The connect card's buttons: Authorize per app, Continue at the foot. */
+  [data-role='hermes.connect.open'],
+  [data-role='hermes.connect.continue'] {
+    flex: none;
+    padding: 2px 10px !important;
+    border-radius: 999px;
+    box-shadow: inset 0 0 0 1px var(--l3);
+    font: 500 12px/20px var(--sans) !important;
+    cursor: pointer;
+  }
+
+  [data-role='hermes.connect.open'] {
+    color: var(--accent) !important;
+  }
+
+  [data-role='hermes.connect.continue'] {
+    background: var(--t1);
+    color: var(--l0, #fff) !important;
+    box-shadow: none;
+  }
+
+  [data-role='hermes.connect.open']:hover,
+  [data-role='hermes.connect.continue']:hover {
+    opacity: 0.85;
+  }
+
+  [data-role='hermes.connect.row'] {
+    min-height: 28px;
+    font: 400 13px/22px var(--sans) !important;
+  }
+
   /* omp's ask theme draws a radio at the start of each option without moving the text over. */
   [data-role='omp.ask.option'] {
     padding-left: 34px !important;
@@ -34977,7 +35119,7 @@ var PullRequests = class {
 };
 
 // src/sidebar.tsx
-var POLL_MS2 = 5e3;
+var POLL_MS3 = 5e3;
 var ACTS = ["close", "page", "copy-branch", "open-pr", "diff", "all-files"];
 var MAX_FILES = 40;
 var Sidebar = class {
@@ -35029,7 +35171,7 @@ var Sidebar = class {
     } finally {
       this.#reading = false;
       if (this.#open) {
-        this.#timer = setTimeout(() => void this.refresh(), POLL_MS2);
+        this.#timer = setTimeout(() => void this.refresh(), POLL_MS3);
       }
       this.#app.changed();
     }
@@ -36380,6 +36522,12 @@ var App = class {
     if (ev.ev === "action" && ev.act === "open-process" && ev.value) {
       return openBackground(this, ev.value);
     }
+    if (ev.ev === "action" && ev.act === "open-url" && ev.value) {
+      return openUrl(ev.value);
+    }
+    if (ev.ev === "action" && ev.act === "connect-continue" && ev.value) {
+      return this.#connectContinue(ev.value);
+    }
     if (ev.ev === "focus" && ev.id === INPUT_ID && !this.overlays.at(-1)?.modal) {
       this.#hud = void 0;
       this.#focus = INPUT_ID;
@@ -36464,6 +36612,58 @@ var App = class {
     this.title = next2;
     process.stdout.write(`\x1B]2;${next2.replace(/[\x00-\x1f]/g, " ")}\x07`);
     return true;
+  }
+  #connectTimer;
+  /** The gateway refused connectors.list for this session: the cards keep their first states. */
+  #connectBlind = false;
+  /** The connect cards still waiting on the user, newest first. */
+  #connectCalls() {
+    const since = Date.now() - POLL_FOR_MS;
+    return this.transcript.calls(CONNECT_TOOL).filter((c) => isConnectCall(c) && !c.connectDone && c.startedAt > since && (c.connect ?? connectTargets(c)).some(waiting));
+  }
+  /** Keeps each waiting connect card's app states current from `connectors.list`, every few seconds. */
+  #watchConnections() {
+    if (this.#connectTimer || this.#connectBlind) {
+      return;
+    }
+    const tick = async () => {
+      this.#connectTimer = void 0;
+      const calls = this.#connectCalls();
+      const sid = this.sid;
+      if (!calls.length || !sid) {
+        return;
+      }
+      try {
+        const r = await this.#gw.request(
+          "connectors.list",
+          { owner: { session_id: sid, type: "session" } }
+        );
+        for (const call of calls) {
+          const before = JSON.stringify(call.connect ?? connectTargets(call));
+          call.connect = applyStatus(call.connect ?? connectTargets(call), r?.connectors ?? []);
+          if (JSON.stringify(call.connect) !== before) {
+            this.transcript.touchCall(call);
+            this.changed();
+          }
+        }
+      } catch {
+        this.#connectBlind = true;
+        return;
+      }
+      this.#connectTimer = setTimeout(() => void tick(), POLL_MS2);
+    };
+    this.#connectTimer = setTimeout(() => void tick(), POLL_MS2);
+  }
+  /** A connect card's Continue: tell the agent which apps the user authorized, as the tool asks. */
+  #connectContinue(id) {
+    const call = this.transcript.calls(CONNECT_TOOL).find((c) => c.id === id);
+    if (!call || call.connectDone) {
+      return;
+    }
+    call.connectDone = true;
+    this.transcript.touchCall(call);
+    this.#submit(continueMessage(call.connect ?? connectTargets(call)));
+    this.changed();
   }
   /** Opens or closes the session sidebar (Tern's aside); says why where Tern has none. */
   toggleSidebar() {
@@ -36923,6 +37123,9 @@ var App = class {
           if (["patch", "terminal", "write_file", "execute_code"].includes(ev.payload.name)) {
             this.sidebar.poke();
           }
+          if (ev.payload.name === CONNECT_TOOL) {
+            this.#watchConnections();
+          }
           if (ev.payload.name === "terminal") {
             this.processes.poke();
           }
@@ -37255,7 +37458,7 @@ function shortPath3(path) {
 // src/watch/watchApp.ts
 import { readFile as readFile3 } from "node:fs/promises";
 var INPUT_ID2 = "dock.composer.line.input";
-var POLL_MS3 = 1e3;
+var POLL_MS4 = 1e3;
 var EXIT_ARM_MS2 = 1500;
 var WatchApp = class {
   transcript = new Transcript();
@@ -37308,7 +37511,7 @@ var WatchApp = class {
     } catch (error) {
       this.transcript.notice(`The session database is not readable here: ${String(error)}`, "warning");
     }
-    this.#timer = setInterval(() => void this.#tick(), POLL_MS3);
+    this.#timer = setInterval(() => void this.#tick(), POLL_MS4);
     void this.#tick();
     this.#render();
     this.#surface.focus(INPUT_ID2);

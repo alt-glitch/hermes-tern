@@ -41,9 +41,10 @@ import { Completion } from './overlays/completion.js'
 import { openModelPicker } from './overlays/models.js'
 import { openEffortPicker } from './overlays/effort.js'
 import { promptOverlay } from './overlays/prompts.js'
-import { openPullRequests, prsPill } from './overlays/pullRequests.js'
+import { openPullRequests, openUrl, prsPill } from './overlays/pullRequests.js'
 import { STYLES } from './view/styles.js'
 import { paletteFor } from './palette.js'
+import { applyStatus, CONNECT_TOOL, connectTargets, continueMessage, isConnectCall, POLL_FOR_MS, POLL_MS, waiting } from './connections.js'
 import { LINK_TOOLS } from './github/links.js'
 import { PullRequests } from './github/store.js'
 import { Cron } from './processes/cron.js'
@@ -348,6 +349,15 @@ export class App implements OverlayHost {
       return openBackground(this, ev.value)
     }
 
+    // A connect card's Authorize: the app's link in the browser.
+    if (ev.ev === 'action' && ev.act === 'open-url' && ev.value) {
+      return openUrl(ev.value)
+    }
+
+    if (ev.ev === 'action' && ev.act === 'connect-continue' && ev.value) {
+      return this.#connectContinue(ev.value)
+    }
+
     if (ev.ev === 'focus' && ev.id === INPUT_ID && !this.overlays.at(-1)?.modal) {
       this.#hud = undefined
       this.#focus = INPUT_ID
@@ -453,6 +463,75 @@ export class App implements OverlayHost {
     process.stdout.write(`\x1b]2;${next.replace(/[\x00-\x1f]/g, ' ')}\x07`)
 
     return true
+  }
+
+  #connectTimer: NodeJS.Timeout | undefined
+  /** The gateway refused connectors.list for this session: the cards keep their first states. */
+  #connectBlind = false
+
+  /** The connect cards still waiting on the user, newest first. */
+  #connectCalls() {
+    const since = Date.now() - POLL_FOR_MS
+
+    return this.transcript
+      .calls(CONNECT_TOOL)
+      .filter(c => isConnectCall(c) && !c.connectDone && c.startedAt > since && (c.connect ?? connectTargets(c)).some(waiting))
+  }
+
+  /** Keeps each waiting connect card's app states current from `connectors.list`, every few seconds. */
+  #watchConnections() {
+    if (this.#connectTimer || this.#connectBlind) {
+      return
+    }
+
+    const tick = async () => {
+      this.#connectTimer = undefined
+      const calls = this.#connectCalls()
+      const sid = this.sid
+
+      if (!calls.length || !sid) {
+        return
+      }
+
+      try {
+        const r = await this.#gw.request<{ connectors?: { connector?: string; connected?: boolean; connection_status?: string | null }[] }>(
+          'connectors.list',
+          { owner: { session_id: sid, type: 'session' } }
+        )
+
+        for (const call of calls) {
+          const before = JSON.stringify(call.connect ?? connectTargets(call))
+          call.connect = applyStatus(call.connect ?? connectTargets(call), r?.connectors ?? [])
+
+          if (JSON.stringify(call.connect) !== before) {
+            this.transcript.touchCall(call)
+            this.changed()
+          }
+        }
+      } catch {
+        this.#connectBlind = true
+
+        return
+      }
+
+      this.#connectTimer = setTimeout(() => void tick(), POLL_MS)
+    }
+
+    this.#connectTimer = setTimeout(() => void tick(), POLL_MS)
+  }
+
+  /** A connect card's Continue: tell the agent which apps the user authorized, as the tool asks. */
+  #connectContinue(id: string) {
+    const call = this.transcript.calls(CONNECT_TOOL).find(c => c.id === id)
+
+    if (!call || call.connectDone) {
+      return
+    }
+
+    call.connectDone = true
+    this.transcript.touchCall(call)
+    this.#submit(continueMessage(call.connect ?? connectTargets(call)))
+    this.changed()
   }
 
   /** Opens or closes the session sidebar (Tern's aside); says why where Tern has none. */
@@ -1077,6 +1156,10 @@ export class App implements OverlayHost {
 
           if (['patch', 'terminal', 'write_file', 'execute_code'].includes(ev.payload.name)) {
             this.sidebar.poke()
+          }
+
+          if (ev.payload.name === CONNECT_TOOL) {
+            this.#watchConnections()
           }
 
           if (ev.payload.name === 'terminal') {

@@ -219,6 +219,37 @@ export const STYLES = css`
     max-width: 360px;
   }
 
+  /* The connect card's buttons: Authorize per app, Continue at the foot. */
+  [data-role='hermes.connect.open'],
+  [data-role='hermes.connect.continue'] {
+    flex: none;
+    padding: 2px 10px !important;
+    border-radius: 999px;
+    box-shadow: inset 0 0 0 1px var(--l3);
+    font: 500 12px/20px var(--sans) !important;
+    cursor: pointer;
+  }
+
+  [data-role='hermes.connect.open'] {
+    color: var(--accent) !important;
+  }
+
+  [data-role='hermes.connect.continue'] {
+    background: var(--t1);
+    color: var(--l0, #fff) !important;
+    box-shadow: none;
+  }
+
+  [data-role='hermes.connect.open']:hover,
+  [data-role='hermes.connect.continue']:hover {
+    opacity: 0.85;
+  }
+
+  [data-role='hermes.connect.row'] {
+    min-height: 28px;
+    font: 400 13px/22px var(--sans) !important;
+  }
+
   /* omp's ask theme draws a radio at the start of each option without moving the text over. */
   [data-role='omp.ask.option'] {
     padding-left: 34px !important;

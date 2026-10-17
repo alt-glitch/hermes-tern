@@ -7,6 +7,7 @@ import { type JSX, node } from '@stencil-hq/tern'
 
 import { agentName } from '../agents/store.js'
 import { callApp } from '../bridge.js'
+import { CONNECT_TOOL, connectTargets, isConnectCall, waiting } from '../connections.js'
 import type { Subagent, Todo, ToolCall } from '../model.js'
 import { isRunning as processRuns, processElapsed, processIdOf, processTone, processVerdict, watchersOf } from '../processes/store.js'
 import { isBackgroundCall, record } from '../transcript.js'
@@ -181,6 +182,13 @@ function cardOf(call: ToolCall, now: number): Card {
 
     case 'web_extract':
       return fetchCard(call, result)
+
+    case CONNECT_TOOL:
+      if (isConnectCall(call)) {
+        return connectCard(call)
+      }
+
+      break
 
     case 'todo_list':
       return {
@@ -794,6 +802,78 @@ function evalCard(call: ToolCall, result: Record<string, unknown> | undefined): 
     name: 'eval',
     role: 'omp.tool.eval',
     title: firstLine(code)?.startsWith('#') ? (firstLine(code)?.replace(/^#+\s*/, '') ?? 'Eval') : 'Eval'
+  }
+}
+
+const CONNECT_STATE: Record<string, { icon: string; tone?: 'error' | 'muted' | 'pending' | 'success'; word: string }> = {
+  connected: { icon: 'check', tone: 'success', word: 'connected' },
+  expired: { icon: 'clock', tone: 'error', word: 'link expired' },
+  failed: { icon: 'x', tone: 'error', word: 'failed' },
+  initiated: { icon: 'clock', tone: 'pending', word: 'waiting for you' },
+  not_connected: { icon: 'minus', tone: 'muted', word: 'not connected' },
+  pending: { icon: 'clock', tone: 'pending', word: 'waiting for you' },
+  skipped: { icon: 'minus', tone: 'muted', word: 'skipped' }
+}
+
+/**
+ * The connect card `manage_connections` gets on the desktop, for its no-card result: one row per
+ * app with its state and an Authorize button that opens its link, then Continue, which tells the
+ * agent the user is done (the tool's own note asks it to wait for that, then check status).
+ */
+function connectCard(call: ToolCall): Card {
+  const targets = call.connect ?? connectTargets(call)
+  const open = targets.filter(waiting)
+  const rows = targets.map((t, i) => {
+    const look = CONNECT_STATE[t.state] ?? CONNECT_STATE.pending!
+
+    return (
+      <row align="center" gap="sm" key={`t${i}`} role="hermes.connect.row">
+        <icon key="i" name={look.icon} tone={look.tone} />
+        <text
+          grow={1}
+          key="n"
+          spans={[
+            { s: 'strong', t: t.title },
+            ...(t.alias ? [{ s: 'muted', t: ` (${t.alias})` }] : []),
+            { s: look.tone ?? 'muted', t: `  ${look.word}` },
+            ...(t.detail && look.tone === 'error' ? [{ s: 'muted', t: ` · ${t.detail}` }] : [])
+          ]}
+          truncate="end"
+          wrap="none"
+        />
+        {t.url && waiting(t) ? (
+          <row actions={{ click: `open-url=${t.url}` }} align="center" gap="xs" key="go" role="hermes.connect.open" title={t.url}>
+            <text key="t" text="Authorize ↗" />
+          </row>
+        ) : null}
+      </row>
+    )
+  })
+
+  return {
+    body: [
+      ...rows,
+      ...(call.connectDone
+        ? [<text key="done" spans={[{ s: 'muted', t: 'Sent to Hermes.' }]} />]
+        : [
+            <row align="center" gap="sm" key="foot">
+              <text
+                grow={1}
+                key="hint"
+                spans={[{ s: 'muted', t: open.length ? 'Authorize in the browser, then continue.' : 'All set.' }]}
+                wrap="word"
+              />
+              <row actions={{ click: `connect-continue=${call.id}` }} align="center" key="go" role="hermes.connect.continue">
+                <text key="t" text="Done, continue" />
+              </row>
+            </row>
+          ])
+    ],
+    name: 'plug',
+    status: open.length && !call.connectDone ? 'running' : undefined,
+    target: targets.map(t => t.title).join(', '),
+    targetKind: 'text',
+    title: open.length ? 'Connect apps' : 'Apps connected'
   }
 }
 
