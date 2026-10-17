@@ -119,7 +119,12 @@ export function modelPayload(arg: string): Record<string, string> {
       continue
     }
 
-    throw new Error(`/model: ${flag} is not supported here (the switch applies to this session)`)
+    // The shared gateway switches a session only: no RPC here writes the profile's default model.
+    throw new Error(
+      flag === '--global'
+        ? '/model: --global is not supported here: the switch applies to this session only (`hermes model` sets the default)'
+        : `/model: ${flag} is not supported here (the switch applies to this session)`
+    )
   }
 
   return payload

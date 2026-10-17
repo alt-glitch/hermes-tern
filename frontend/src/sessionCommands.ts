@@ -95,7 +95,17 @@ async function compress(host: SessionHost, arg: string) {
     return host.notice('No active session.', 'warning')
   }
 
+  if (host.busy) {
+    return host.notice('Wait for the current turn to finish (or press Esc) before compressing.', 'warning')
+  }
+
   const focus = arg.trim()
+
+  // The summary is an LLM call: say it started (a `--preview` only reads).
+  if (!/(^|\s)--preview(\s|$)/.test(focus)) {
+    host.notice('Compressing the conversation…')
+  }
+
   const result: MutationResult = await mutateSession(host.gw, host.sid, 'compress', focus ? { focus } : {})
 
   if (host.stale()) {

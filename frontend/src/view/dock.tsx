@@ -77,6 +77,10 @@ export interface StatusLine {
   tokens?: number
   /** Context used, 0–1. */
   context?: number
+  /** Times the context was compressed this session (Ink's `cmp N`). */
+  compressions?: number
+  /** The gateway's newest out-of-band notice (credits, a slow start), in its tone. */
+  notice?: { text: string; tone: 'error' | 'info' | 'success' | 'warning' }
 }
 
 /** Done and total (cancelled ones drop out), and the item under way (else the next one). */
@@ -228,6 +232,15 @@ function statusLine(cx: DockContext): JSX.Element {
     <status key="statusline" role="hermes.statusline">
       <seg key="brand" priority={9} role="hermes.statusline.brand" spans={[{ t: '☤ hermes' }]} />
       {s.title ? <seg key="title" priority={3} spans={[{ t: s.title }]} title={s.title} /> : null}
+      {s.notice ? (
+        <seg
+          key="notice"
+          priority={6}
+          role={s.notice.tone === 'info' ? undefined : `hermes.statusline.${s.notice.tone === 'warning' ? 'warn' : s.notice.tone === 'error' ? 'bad' : 'good'}`}
+          spans={[{ t: s.notice.text }]}
+          title={s.notice.text}
+        />
+      ) : null}
       {cx.branch ? (
         <seg icon="git-branch" key="git" priority={4} spans={[{ s: 'statusLineGitClean', t: cx.branch }]} title={`Branch ${cx.branch}`} />
       ) : null}
@@ -240,6 +253,16 @@ function statusLine(cx: DockContext): JSX.Element {
           side="right"
           spans={[{ t: `${Math.round(context * 100)}% context` }]}
           title="/usage shows the breakdown"
+        />
+      ) : null}
+      {s.compressions ? (
+        <seg
+          key="compressions"
+          priority={2}
+          role={s.compressions >= 10 ? 'hermes.statusline.bad' : s.compressions >= 5 ? 'hermes.statusline.warn' : undefined}
+          side="right"
+          spans={[{ t: `cmp ${s.compressions}` }]}
+          title="Times the context was compressed this session"
         />
       ) : null}
       {cx.rates?.cache !== undefined ? (

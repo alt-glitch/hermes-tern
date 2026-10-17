@@ -173,6 +173,10 @@ export const STYLES = css`
     color: var(--sf-c-error, var(--t2)) !important;
   }
 
+  [data-role='hermes.statusline.good'] {
+    color: var(--sf-c-success, var(--t2)) !important;
+  }
+
   /* While a turn runs, an accent streak sweeps the composer's top edge. */
   @keyframes hermes-streak {
     from {
