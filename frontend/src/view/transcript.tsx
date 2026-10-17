@@ -8,6 +8,7 @@ import { type JSX, node } from '@stencil-hq/tern'
 import type { Block, Entry, NoticeEntry, TurnEntry, UserEntry } from '../model.js'
 
 import { age, compact, duration } from './time.js'
+import { groupRuns, toolRunNode } from './toolRuns.js'
 import { toolNode } from './tools.js'
 import { type WelcomeContext, welcomeNode } from './welcome.js'
 
@@ -97,7 +98,11 @@ function userNode(e: UserEntry, cx: TranscriptContext): JSX.Element {
 function turnNode(turn: TurnEntry, id: string, cx: TranscriptContext): JSX.Element {
   const live = turn.status === 'live'
   const lastText = turn.blocks.findLast(b => b.kind === 'text')
-  const children = turn.blocks.map(b => blockNode(b, `${id}.${b.id}`, live && b === lastText, cx))
+  const children = groupRuns(turn.blocks).map(b =>
+    Array.isArray(b)
+      ? toolRunNode(b, id, cx.now, inner => blockNode(inner, `${id}.r${b[0]!.id}.${inner.id}`, false, cx))
+      : blockNode(b, `${id}.${b.id}`, live && b === lastText, cx)
+  )
 
   if (turn.status === 'error') {
     children.push(

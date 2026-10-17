@@ -9,6 +9,7 @@ the user's prompt, so one home covers every flow:
     "approve"   -> a terminal call Hermes flags as dangerous (approval sheet)
     "clarify"   -> a clarify call with choices (clarify sheet)
     "tool"      -> a harmless terminal call (tool card)
+    "steps"     -> four calls in a row (commands, a read, a search), then an answer
     "delegate…" -> (at the start) a delegate_task batch of three subagents, each running two slow
                    terminal calls before a slowly streamed answer
     anything else -> a streamed markdown reply
@@ -33,6 +34,13 @@ print("hello from hermes tern")
 ```
 """
 
+
+STEPS = [
+    ("terminal", {"command": "ls"}),
+    ("read_file", {"path": "README.md"}),
+    ("terminal", {"command": "git log --oneline -3"}),
+    ("search_files", {"pattern": "def ", "path": "lab"}),
+]
 
 SUBAGENT_MARKER = "You are a focused subagent"
 
@@ -108,6 +116,13 @@ class Model(BaseHTTPRequestHandler):
             calls = _subagent_calls(messages)
             content = None if calls else SUBAGENT_REPLY
             delay = 0.15
+        elif "steps" in prompt.lower():
+            # One call per request until the steps run out; the tool results so far count them.
+            last_user = max(i for i, m in enumerate(messages) if m.get("role") == "user")
+            done = sum(1 for m in messages[last_user:] if m.get("role") == "tool")
+            calls = [_call(*STEPS[done], f"call-s{done}")] if done < len(STEPS) else None
+            content = None if calls else "All four steps ran."
+            delay = 0.0
         else:
             answered = bool(messages) and messages[-1].get("role") == "tool"
             calls = None if answered else _calls(prompt, self.server.target)
