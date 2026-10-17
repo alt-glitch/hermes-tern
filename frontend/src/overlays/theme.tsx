@@ -36,6 +36,11 @@ export function openThemePicker(app: App) {
   const overlay: Overlay = {
     key: KEY,
     modal: true,
+    // As Esc: the theme being previewed goes back.
+    cancel: () => {
+      app.setTheme(before)
+      app.close(overlay)
+    },
     node: () => (
       <picker
         actions={[

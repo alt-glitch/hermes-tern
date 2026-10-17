@@ -36,6 +36,7 @@ import type { Overlay, OverlayHost } from './overlay.js'
 import { writeActiveSessionFile } from './hermes/activeSessionFile.js'
 import { clipboardImage, imagePathOf } from './hermes/clipboardImage.js'
 import { type Attachment, uploadImage } from './hermes/images.js'
+import { hasInterpolation, interpolate, shellError, shellExec, shellLines } from './hermes/shell.js'
 import { sharedPromptId, sharedPromptRequest } from './hermes/sharedPrompts.js'
 import { openAgents } from './overlays/agents.js'
 import { openBackground } from './overlays/background.js'
@@ -80,6 +81,17 @@ interface CreateResult extends Partial<
   messages?: TranscriptMessage[]
 }
 
+/** An uploaded image a prompt carries (the shared gateway takes it on prompt.submit), with the name its chip shows. */
+type Image = Attachment & { name: string }
+
+/** A prompt waiting for the turn, with the images that were attached when it was entered. */
+export interface Queued {
+  text: string
+  images: Image[]
+  /** Typed by the user: its `{!cmd}`s run when it is sent. */
+  expand?: boolean
+}
+
 /** Runs the Tern frontend until the user quits; resolves the exit code. */
 export class App implements OverlayHost {
   readonly transcript = new Transcript()
@@ -107,7 +119,7 @@ export class App implements OverlayHost {
   info: SessionLiveInfo | null = null
   usage: Usage | null = null
   busy: Busy | null = null
-  queue: string[] = []
+  queue: Queued[] = []
   readonly #tern: Session
   readonly #gw: GatewayClient
   readonly #completion: Completion
@@ -127,8 +139,8 @@ export class App implements OverlayHost {
   readonly #approvalIds = new Map<string, string>()
   /** The launcher's startup image until it is attached to the first session (the queue waits for it). */
   #startupImage = process.env.HERMES_TUI_IMAGE?.trim() ?? ''
-  /** Uploaded images the next prompt carries (the shared gateway takes them on prompt.submit), with the names the chips show. */
-  #attachments: (Attachment & { name: string })[] = []
+  /** The images attached to the draft: the next prompt entered takes them. */
+  #attachments: Image[] = []
   /** The skin the gateway last reported; only the `skin` theme mode wears it. */
   #skin: SkinPayload | undefined
   #theme: ThemeMode = loadSettings().theme ?? 'tern'
@@ -168,7 +180,7 @@ export class App implements OverlayHost {
     const query = process.env.HERMES_TUI_QUERY?.trim()
 
     if (query || this.#startupImage) {
-      this.queue.push(query || 'What do you see in this image?')
+      this.queue.push({ images: [], text: query || 'What do you see in this image?' })
     }
 
     const log = process.env.HERMES_TERN_EVENT_LOG
@@ -270,6 +282,11 @@ export class App implements OverlayHost {
     const top = this.overlays.at(-1)
 
     if (key.ctrl && key.name === 'c') {
+      // The sheet on top answers first: a prompt's safe answer (deny, skip, cancel), a picker closes.
+      if (top) {
+        return top.cancel ? top.cancel() : this.close(top)
+      }
+
       return this.#ctrlC()
     }
 
@@ -329,7 +346,7 @@ export class App implements OverlayHost {
       return this.#steerQueued(0)
     }
 
-    if (key.ctrl && key.name === 'd' && !this.composer.text) {
+    if (key.ctrl && key.name === 'd' && !this.#hasDraft()) {
       return this.quit()
     }
 
@@ -519,7 +536,7 @@ export class App implements OverlayHost {
         if (this.#connectSeen.has(call.id) && next.length && next.every(t => t.state === 'connected')) {
           call.connectDone = true
           this.transcript.touchCall(call)
-          this.#submit(connectedMessage(next))
+          this.#submit(connectedMessage(next), false)
           this.changed()
         } else if (next.some(waiting) && (card?.watching ?? true)) {
           open = true
@@ -544,7 +561,7 @@ export class App implements OverlayHost {
 
     call.connectDone = true
     this.transcript.touchCall(call)
-    this.#submit(continueMessage(call.connect ?? connectTargets(call, readCard(call.id))))
+    this.#submit(continueMessage(call.connect ?? connectTargets(call, readCard(call.id))), false)
     this.changed()
   }
 
@@ -629,9 +646,15 @@ export class App implements OverlayHost {
     }
   }
 
+  /** Text or images in the composer: Ctrl+C clears them before it interrupts, Ctrl+D never exits over them. */
+  #hasDraft(): boolean {
+    return Boolean(this.composer.text || this.#attachments.length)
+  }
+
   #ctrlC() {
-    if (this.composer.text) {
+    if (this.#hasDraft()) {
       this.composer.set('')
+      this.#attachments = []
 
       return
     }
@@ -669,7 +692,8 @@ export class App implements OverlayHost {
 
   // ── Prompts and commands ───────────────────────────────────────────
 
-  #submit(raw: string) {
+  /** Sends or queues a prompt, or runs a command; `draft`: the user entered it (it takes the draft's images). */
+  #submit(raw: string, draft = true) {
     const text = raw.trim()
 
     if (!text) {
@@ -682,33 +706,68 @@ export class App implements OverlayHost {
       return
     }
 
-    if (this.busy || !this.sid || this.#switches.pending) {
-      this.queue.push(text)
+    // `!cmd` runs a shell command now, beside any turn (Ink's shellExec).
+    if (text.startsWith('!') && text.slice(1).trim()) {
+      void this.#shell(text.slice(1).trim())
 
       return
     }
 
-    this.#send(text)
+    // The draft's images go with this prompt, whenever it is sent; a message the app writes leaves them.
+    const item: Queued = { expand: true, images: draft ? this.#takeImages() : [], text }
+
+    if (this.busy || !this.sid || this.#switches.pending) {
+      this.queue.push(item)
+
+      return
+    }
+
+    this.#send(item)
   }
 
-  /** Sends `text` now; `queued` marks a drained queue entry (the gateway must queue it, never steer with it). */
-  #send(text: string, { display, queued = false }: { display?: string; queued?: boolean } = {}) {
+  /**
+   * Sends `item` now; `queued` marks a drained queue entry (the gateway must queue it, never steer
+   * with it). A typed prompt's `{!cmd}`s run first and their output takes their place; `display` is
+   * what the transcript shows.
+   */
+  #send(item: Queued, { display, queued = false }: { display?: string; queued?: boolean } = {}) {
+    const sid = this.sid
+
     // A session switch in flight: the prompt belongs to the session it adopts.
-    if (!this.sid || this.#switches.pending) {
-      this.queue.unshift(text)
+    if (!sid || this.#switches.pending) {
+      this.queue.unshift(item)
 
       return
     }
 
-    const attachments = this.#attachments.map(({ mime, path }) => ({ mime, path }))
-    const images = this.#attachments.length
-    this.#attachments = []
-    this.transcript.user(`${display?.trim() || text}${images ? `\n\n📎 ${images} image${images === 1 ? '' : 's'}` : ''}`)
+    if (item.expand && hasInterpolation(item.text)) {
+      this.#startBusy('Running {!…}')
+      void interpolate(this.#gw, sid, item.text).then(
+        text => {
+          this.busy = null
+          this.#send({ images: item.images, text }, { display: item.text, queued })
+        },
+        (error: unknown) => {
+          // A command that could not run refuses the whole prompt: it goes back to the composer to edit.
+          this.busy = null
+          this.transcript.notice(`Not sent: a {!…} command failed: ${shellError(error)}.`, 'error')
+          this.#restore(item)
+          this.#drainQueue()
+          this.changed()
+        }
+      )
+
+      return
+    }
+
+    const { images, text } = item
+    const attachments = images.map(({ mime, path }) => ({ mime, path }))
+    this.transcript.user(`${display?.trim() || text}${images.length ? `\n\n📎 ${images.length} image${images.length === 1 ? '' : 's'}` : ''}`)
     this.#startBusy('Working…')
     this.#gw
       // The shared gateway admits a prompt by its submission id (a retry with the same id is one turn).
       .request('prompt.submit', {
-        session_id: this.sid,
+        session_id: sid,
         submission_id: randomUUID(),
         text,
         ...(queued ? { queued } : {}),
@@ -719,6 +778,44 @@ export class App implements OverlayHost {
         this.busy = null
         this.changed()
       })
+  }
+
+  /** The draft's images, which leave the composer with the prompt that takes them. */
+  #takeImages(): Image[] {
+    const images = this.#attachments
+    this.#attachments = []
+
+    return images
+  }
+
+  /** Puts a prompt that did not go back into the composer, before any text there, with its images. */
+  #restore({ images, text }: Queued) {
+    this.composer.set(this.composer.text ? `${text}\n${this.composer.text}` : text)
+    this.#attachments = [...images, ...this.#attachments]
+  }
+
+  /** `!cmd`: runs `command` in the session's folder and shows its output; nothing reaches the model. */
+  async #shell(command: string) {
+    const sid = this.sid
+
+    if (!sid) {
+      this.transcript.notice('Wait for the session to start before running a shell command.', 'warning')
+
+      return this.changed()
+    }
+
+    this.transcript.user(`!${command}`)
+    this.changed()
+
+    try {
+      for (const line of shellLines(await shellExec(this.#gw, sid, command))) {
+        this.transcript.notice(line.text, line.failed ? 'warning' : 'info')
+      }
+    } catch (error) {
+      this.transcript.notice(`!${command} did not run: ${shellError(error)}.`, 'error')
+    }
+
+    this.changed()
   }
 
   async #slash(text: string) {
@@ -788,8 +885,9 @@ export class App implements OverlayHost {
   control(): ControlHost {
     return {
       busy: Boolean(this.busy),
+      // A steer that fell back to the queue: steering carries no images.
       enqueue: text => {
-        this.queue.push(text)
+        this.queue.push({ images: [], text })
         this.changed()
       },
       gw: this.#gw,
@@ -837,7 +935,10 @@ export class App implements OverlayHost {
 
     try {
       if (this.#gw.isCanonical) {
-        this.#attachments.push({ ...(await uploadImage(this.#gw, sid, path, process.env.HERMES_CWD || process.cwd())), name: basename(path) })
+        const image = { ...(await uploadImage(this.#gw, sid, path, process.env.HERMES_CWD || process.cwd())), name: basename(path) }
+        // The startup query waits at the queue's head for this image.
+        const images = this.queue[0]?.images ?? this.#attachments
+        images.push(image)
       } else {
         await this.#gw.request('image.attach', { path, session_id: sid })
       }
@@ -1059,7 +1160,7 @@ export class App implements OverlayHost {
       case 'skill':
         // `message` is the expanded skill body for the model; the transcript shows the invocation.
         return d.message?.trim()
-          ? this.#send(d.message, { display: d.display || title })
+          ? this.#send({ images: this.#takeImages(), text: d.message }, { display: d.display || title })
           : this.transcript.notice(`${title}: the skill sent no message`, 'error')
 
       case 'send':
@@ -1067,7 +1168,7 @@ export class App implements OverlayHost {
           this.transcript.notice(d.notice)
         }
 
-        return d.message?.trim() ? this.#send(d.message, { display: d.display }) : undefined
+        return d.message?.trim() ? this.#send({ images: this.#takeImages(), text: d.message }, { display: d.display }) : undefined
 
       case 'prefill':
         if (d.notice?.trim()) {
@@ -1482,7 +1583,7 @@ export class App implements OverlayHost {
     const next = this.queue.shift()
 
     if (next !== undefined) {
-      this.composer.set(this.composer.text ? `${next}\n${this.composer.text}` : next)
+      this.#restore(next)
       this.changed()
     }
   }
@@ -1490,18 +1591,27 @@ export class App implements OverlayHost {
   /** Alt+Enter / the queue's Steer: injects queued prompt `index` into the running turn instead of waiting for it to end. */
   #steerQueued(index: number) {
     const sid = this.sid
-    const [text] = this.busy && sid ? this.queue.splice(index, 1) : []
+    const item = this.queue[index]
 
-    if (text === undefined || !sid) {
+    if (!this.busy || !sid || !item) {
       return
     }
 
+    // A steer is text only: a prompt with images waits for its own turn.
+    if (item.images.length) {
+      this.transcript.notice('A queued prompt with images cannot steer the turn. It stays queued.', 'warning')
+
+      return this.changed()
+    }
+
+    const { text } = item
+    this.queue.splice(index, 1)
     this.changed()
     void steerTurn(this.#gw, sid, text).then(r => {
       if (r.ok) {
         this.transcript.steer(text)
       } else {
-        this.queue.splice(index, 0, text)
+        this.queue.splice(index, 0, item)
         this.transcript.notice(
           r.error
             ? `Steer failed: ${r.error}. It stays queued.`
@@ -1636,7 +1746,7 @@ export class App implements OverlayHost {
           tps: typeof usage?.avg_tps === 'number' && usage.avg_tps > 0 ? usage.avg_tps : undefined
         },
         placeholder: 'Ask Hermes — / commands · @ files',
-        queued: this.queue,
+        queued: this.queue.map(q => q.text),
         ready: this.sid !== null
       }),
       layer: [

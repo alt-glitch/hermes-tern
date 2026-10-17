@@ -41,7 +41,7 @@ const HOTKEYS: { group: string; rows: [string[], string][] }[] = [
       [['alt+s'], 'Session sidebar: branch, PRs, changes (/sidebar)'],
       [['ctrl+v'], 'Attach the clipboard image (also ⌘V of an image, a dropped image file, /paste)'],
       [['down'], 'Focus the agents / shells / PR pills (empty prompt); ← → switch, Enter opens, Esc returns'],
-      [['ctrl+c'], 'Clear the draft / interrupt / exit (twice)'],
+      [['ctrl+c'], 'Answer no to the open sheet / clear the draft and images / interrupt / exit (twice)'],
       [['ctrl+d'], 'Delete forward / exit (empty prompt)']
     ]
   }

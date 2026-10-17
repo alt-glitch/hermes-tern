@@ -146,6 +146,7 @@ export function openAgents(app: App, focus?: { id: string; watch?: boolean }) {
   const overlay: Overlay = {
     key: KEY,
     modal: true,
+    cancel: close,
     node: () => {
       const now = Date.now()
       const watched = watching ? agents().find(a => a.id === watching) : undefined

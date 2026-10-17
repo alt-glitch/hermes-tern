@@ -19,6 +19,11 @@ export interface Overlay {
   node(id: string): JSX.Element
   /** A key while this overlay is on top: true when it consumed the key. */
   onKey(key: Key): boolean
+  /**
+   * Ctrl+C while this overlay is on top: give the safe answer (deny, skip, cancel) and close.
+   * Unset: the app closes the overlay.
+   */
+  cancel?(): void
 }
 
 /** What overlays reach of the app. */

@@ -106,6 +106,7 @@ export class Composer {
     this.text = prev.text
     this.cursor = prev.cursor
     this.#lastEdit = 0
+    this.#browse = -1
     this.#changed()
   }
 
@@ -120,6 +121,7 @@ export class Composer {
     this.text = next.text
     this.cursor = next.cursor
     this.#lastEdit = 0
+    this.#browse = -1
     this.#changed()
   }
 
@@ -368,9 +370,11 @@ export class Composer {
     return true
   }
 
-  /** Saves an undo step; typing bursts merge into one. */
+  /** Saves an undo step; typing bursts merge into one. Every edit runs it, so it also ends a history walk. */
   #record({ merge }: { merge: boolean }) {
     const now = Date.now()
+    // An edited history entry is the draft now: the next Up saves it and starts from the newest entry.
+    this.#browse = -1
 
     if (!merge || now - this.#lastEdit > UNDO_MERGE_MS || !this.#undo.length) {
       this.#undo.push({ cursor: this.cursor, text: this.text })
