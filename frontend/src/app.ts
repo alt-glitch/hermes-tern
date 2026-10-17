@@ -695,6 +695,7 @@ export class App implements OverlayHost {
   #adopt(r: CreateResult) {
     this.#subscribe(r)
     this.sid = r.session_id
+    this.#showThoughts(r.session_id)
     this.storedSid = r.info?.stored_session_id || r.stored_session_id || null
     writeActiveSessionFile(this.storedSid ?? r.session_id)
     this.info = r.info ?? this.info
@@ -1106,6 +1107,21 @@ export class App implements OverlayHost {
     if (this.busy && label) {
       this.busy.label = label
     }
+  }
+
+  /**
+   * The shared gateway streams a session's reasoning only to a viewer that asks (a session flag,
+   * not a settings write); the work log shows it as thought rows.
+   */
+  #showThoughts(sid: string) {
+    if (loadSettings().thoughts === false) {
+      return
+    }
+
+    this.#gw.request('config.set', { key: 'show_reasoning', session_id: sid, value: 'on' }).catch((error: Error) => {
+      this.transcript.notice(`Could not turn on thoughts: ${error.message}`, 'warning')
+      this.changed()
+    })
   }
 
   /** Steps the session's reasoning effort up hermes's ladder; session.info echoes it back. */

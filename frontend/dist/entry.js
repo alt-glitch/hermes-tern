@@ -1750,11 +1750,11 @@ var require_request = __commonJS({
           } else if (typeof val[i] === "object") {
             throw new InvalidArgumentError(`invalid ${key2} header`);
           } else {
-            const str5 = `${val[i]}`;
-            if (!isValidHeaderValue(str5)) {
+            const str6 = `${val[i]}`;
+            if (!isValidHeaderValue(str6)) {
               throw new InvalidArgumentError(`invalid ${key2} header`);
             }
-            arr.push(str5);
+            arr.push(str6);
           }
         }
         val = arr;
@@ -3319,25 +3319,25 @@ var require_data_url = __commonJS({
     function isHTTPWhiteSpace(char) {
       return char === 13 || char === 10 || char === 9 || char === 32;
     }
-    function removeHTTPWhitespace(str5, leading = true, trailing = true) {
-      return removeChars(str5, leading, trailing, isHTTPWhiteSpace);
+    function removeHTTPWhitespace(str6, leading = true, trailing = true) {
+      return removeChars(str6, leading, trailing, isHTTPWhiteSpace);
     }
     function isASCIIWhitespace(char) {
       return char === 13 || char === 10 || char === 9 || char === 12 || char === 32;
     }
-    function removeASCIIWhitespace(str5, leading = true, trailing = true) {
-      return removeChars(str5, leading, trailing, isASCIIWhitespace);
+    function removeASCIIWhitespace(str6, leading = true, trailing = true) {
+      return removeChars(str6, leading, trailing, isASCIIWhitespace);
     }
-    function removeChars(str5, leading, trailing, predicate) {
+    function removeChars(str6, leading, trailing, predicate) {
       let lead = 0;
-      let trail = str5.length - 1;
+      let trail = str6.length - 1;
       if (leading) {
-        while (lead < str5.length && predicate(str5.charCodeAt(lead))) lead++;
+        while (lead < str6.length && predicate(str6.charCodeAt(lead))) lead++;
       }
       if (trailing) {
-        while (trail > 0 && predicate(str5.charCodeAt(trail))) trail--;
+        while (trail > 0 && predicate(str6.charCodeAt(trail))) trail--;
       }
-      return lead === 0 && trail === str5.length - 1 ? str5 : str5.slice(lead, trail + 1);
+      return lead === 0 && trail === str6.length - 1 ? str6 : str6.slice(lead, trail + 1);
     }
     function isomorphicDecode(input) {
       const length = input.length;
@@ -3424,8 +3424,8 @@ var require_webidl = __commonJS({
       return new TypeError(`${message.header}: ${message.message}`);
     };
     webidl.errors.conversionFailed = function(context) {
-      const plural = context.types.length === 1 ? "" : " one of";
-      const message = `${context.argument} could not be converted to${plural}: ${context.types.join(", ")}.`;
+      const plural2 = context.types.length === 1 ? "" : " one of";
+      const message = `${context.argument} could not be converted to${plural2}: ${context.types.join(", ")}.`;
       return webidl.errors.exception({
         header: context.prefix,
         message
@@ -5256,7 +5256,7 @@ var require_body = __commonJS({
         const boundary = `----formdata-undici-0${`${random(1e11)}`.padStart(11, "0")}`;
         const prefix = `--${boundary}\r
 Content-Disposition: form-data`;
-        const escape = (str5) => str5.replace(/\n/g, "%0A").replace(/\r/g, "%0D").replace(/"/g, "%22");
+        const escape = (str6) => str6.replace(/\n/g, "%0A").replace(/\r/g, "%0D").replace(/"/g, "%22");
         const normalizeLinefeeds = (value) => value.replace(/\r?\n|\r/g, "\r\n");
         const blobParts = [];
         const rn = new Uint8Array([13, 10]);
@@ -10987,15 +10987,15 @@ var require_pluralizer = __commonJS({
       this: "these"
     };
     module.exports = class Pluralizer {
-      constructor(singular, plural) {
+      constructor(singular, plural2) {
         this.singular = singular;
-        this.plural = plural;
+        this.plural = plural2;
       }
-      pluralize(count2) {
-        const one = count2 === 1;
+      pluralize(count) {
+        const one = count === 1;
         const keys = one ? singulars : plurals;
         const noun = one ? this.singular : this.plural;
-        return { ...keys, count: count2, noun };
+        return { ...keys, count, noun };
       }
     };
   }
@@ -16240,9 +16240,9 @@ var require_cookies = __commonJS({
       webidl.argumentLengthCheck(arguments, 2, "setCookie");
       webidl.brandCheck(headers, Headers, { strict: false });
       cookie = webidl.converters.Cookie(cookie);
-      const str5 = stringify(cookie);
-      if (str5) {
-        headers.append("Set-Cookie", str5);
+      const str6 = stringify(cookie);
+      if (str6) {
+        headers.append("Set-Cookie", str6);
       }
     }
     webidl.converters.DeleteCookieAttributes = webidl.dictionaryConverter([
@@ -18341,15 +18341,15 @@ ${value}`;
           pos = 0;
         }
       }
-      discardLeadingBytes(count2) {
-        while (count2 > 0 && this.lineChunkIndex < this.chunks.length) {
+      discardLeadingBytes(count) {
+        while (count > 0 && this.lineChunkIndex < this.chunks.length) {
           const chunk = this.chunks[this.lineChunkIndex];
           const remaining = chunk.length - this.linePos;
-          if (count2 < remaining) {
-            this.linePos += count2;
-            count2 = 0;
+          if (count < remaining) {
+            this.linePos += count;
+            count = 0;
           } else {
-            count2 -= remaining;
+            count -= remaining;
             this.lineChunkIndex++;
             this.linePos = 0;
           }
@@ -18963,10 +18963,10 @@ function encodeMessage(verb, body, options = {}) {
   if (bytes.length <= limit)
     return apc(verb, params, bytes);
   const id = options.chunk ? options.chunk() : "0";
-  const pieces = chunks(bytes, limit);
+  const pieces2 = chunks(bytes, limit);
   const out = [];
-  pieces.forEach((piece, i) => {
-    const last = i === pieces.length - 1;
+  pieces2.forEach((piece, i) => {
+    const last = i === pieces2.length - 1;
     const head2 = i === 0 ? [...params, ["c", id]] : [["c", id]];
     if (!last)
       head2.push(["m", "1"]);
@@ -21558,7 +21558,7 @@ var billingEn = {
       monthlyLimit: "Monthly limit",
       card: (card) => `Card: ${card}`,
       noCardHint: "No saved card on file \u2014 \u201CAdd funds\u201D walks you through adding one.",
-      hint: (count2) => `\u2191/\u2193 select \xB7 1-${count2} quick pick \xB7 Enter confirm \xB7 Esc close`
+      hint: (count) => `\u2191/\u2193 select \xB7 1-${count} quick pick \xB7 Enter confirm \xB7 Esc close`
     },
     buy: {
       title: "Add funds",
@@ -21577,7 +21577,7 @@ var billingEn = {
       noSavedCardLine: "No saved card on file.",
       addCardOnce: "Add a card once on the portal billing page \u2014 after that you can top up right from the terminal.",
       checkingForCard: "Checking for a card\u2026",
-      hint: (count2) => `\u2191/\u2193 select \xB7 1-${count2} quick pick \xB7 Enter confirm \xB7 Esc back`
+      hint: (count) => `\u2191/\u2193 select \xB7 1-${count} quick pick \xB7 Enter confirm \xB7 Esc back`
     },
     confirm: {
       title: "Confirm purchase",
@@ -21639,7 +21639,7 @@ var billingEn = {
       usageDefaultCeiling: (spent, limit) => `${spent} of ${limit} used this month (default ceiling)`,
       noCapVisible: "No monthly cap visible (managed on the portal).",
       readOnly: "The monthly limit is set on the portal \u2014 shown here read-only.",
-      hint: (count2) => `\u2191/\u2193 select \xB7 1-${count2} quick pick \xB7 Enter confirm \xB7 Esc back`
+      hint: (count) => `\u2191/\u2193 select \xB7 1-${count} quick pick \xB7 Enter confirm \xB7 Esc back`
     }
   }
 };
@@ -21714,10 +21714,10 @@ var chatBitsEn = {
       tagFull: "Nous Research \xB7 Messenger of the Digital Gods",
       tagMid: "Messenger of the Digital Gods",
       scanningSkills: "scanning skills",
-      moreCategories: (count2) => `(and ${count2} more categories\u2026)`,
-      moreToolsets: (count2) => `(and ${count2} more toolsets\u2026)`,
-      toolsOne: (count2) => `${count2} tool`,
-      toolsOther: (count2) => `${count2} tools`,
+      moreCategories: (count) => `(and ${count} more categories\u2026)`,
+      moreToolsets: (count) => `(and ${count} more toolsets\u2026)`,
+      toolsOne: (count) => `${count} tool`,
+      toolsOther: (count) => `${count} tools`,
       lazy: "(lazy)",
       disabled: "disabled",
       connecting: "connecting",
@@ -21727,19 +21727,19 @@ var chatBitsEn = {
       sessionLabel: "Session: ",
       availableTools: "Available Tools",
       availableSkills: "Available Skills",
-      inCategoriesOne: (count2) => `in ${count2} category`,
-      inCategoriesOther: (count2) => `in ${count2} categories`,
+      inCategoriesOne: (count) => `in ${count} category`,
+      inCategoriesOther: (count) => `in ${count} categories`,
       systemPrompt: "System Prompt",
-      charsSuffix: (count2) => `\u2014 ${count2} chars`,
+      charsSuffix: (count) => `\u2014 ${count} chars`,
       mcpServers: "MCP Servers",
       connected: "connected",
       // `count` is a number, or '…' while a lazy boot is still counting.
-      toolsSummary: (count2) => `${count2} tools`,
-      skillsSummary: (count2) => `${count2} skills`,
-      mcpSummary: (count2) => `${count2} MCP`,
+      toolsSummary: (count) => `${count} tools`,
+      skillsSummary: (count) => `${count} skills`,
+      mcpSummary: (count) => `${count} MCP`,
       helpHint: "/help for commands",
-      commitsBehindOne: (count2) => `! ${count2} commit behind`,
-      commitsBehindOther: (count2) => `! ${count2} commits behind`,
+      commitsBehindOne: (count) => `! ${count} commit behind`,
+      commitsBehindOther: (count) => `! ${count} commits behind`,
       runPrefix: " - run ",
       toUpdate: " to update"
     },
@@ -21753,24 +21753,24 @@ var chatBitsEn = {
       subagentFallback: (index) => `Subagent ${index}`,
       statusQueued: "queued",
       statusRunning: "running",
-      toolsOne: (count2) => `${count2} tool`,
-      toolsOther: (count2) => `${count2} tools`,
+      toolsOne: (count) => `${count} tool`,
+      toolsOther: (count) => `${count} tools`,
       tokShort: (tokens) => `${tokens} tok`,
-      subtreeTools: (count2) => `+${count2}t sub`,
+      subtreeTools: (count) => `+${count}t sub`,
       // {0} = depth of the spawned children, {1} = total descendants.
       spawnedSuffix: (depth, total) => `d${depth} \xB7 ${total} total`,
       drafting: "drafting...",
       analyzingToolOutput: "analyzing tool output\u2026",
       argsHeader: "Args:",
-      approxTokens: (count2) => `~${count2} tokens`,
-      approxTotal: (count2) => `~${count2} total`,
+      approxTokens: (count) => `~${count} tokens`,
+      approxTotal: (count) => `~${count} total`,
       agentsToMonitor: "(/agents to monitor)",
       agentsHint: "(/agents)"
     },
     messageLine: {
       emptyToolResult: "(empty tool result)",
       systemMessage: "(system message)",
-      chars: (count2) => `${count2} chars`,
+      chars: (count) => `${count} chars`,
       longMessage: "[long message]",
       response: "Response"
     },
@@ -21780,9 +21780,9 @@ var chatBitsEn = {
       incompleteOther: (pending) => `\xB7 incomplete \xB7 ${pending} still pending/in_progress`
     },
     queued: {
-      header: (count2) => `queued (${count2})`,
+      header: (count) => `queued (${count})`,
       editing: (position) => ` \xB7 editing ${position} \xB7 Ctrl+X delete \xB7 Esc cancel`,
-      more: (count2) => `\u2026and ${count2} more`
+      more: (count) => `\u2026and ${count} more`
     },
     entry: {
       noTty: "hermes-tui: no TTY",
@@ -21804,12 +21804,12 @@ var chromeEn = {
     mcpReloaded: "MCP reloaded after config change",
     compacting: "compacting",
     devCredits: " (dev credits)",
-    sessionCount: (count2) => `${count2} ${count2 === 1 ? "session" : "sessions"}`,
+    sessionCount: (count) => `${count} ${count === 1 ? "session" : "sessions"}`,
     paused: "\u23F8 paused",
     resumesWhenSubagentFinishes: "\u21A9 resumes when subagent finishes",
-    resumesWhenSubagentsFinish: (count2) => `\u21A9 resumes when ${count2} subagents finish`,
-    bgTasks: (count2) => `${count2} bg`,
-    compressions: (count2) => `cmp ${count2}`,
+    resumesWhenSubagentsFinish: (count) => `\u21A9 resumes when ${count} subagents finish`,
+    bgTasks: (count) => `${count} bg`,
+    compressions: (count) => `cmp ${count}`,
     fast: "fast"
   },
   composer: {
@@ -21883,7 +21883,7 @@ var connectionEn = {
     header: {
       // {0} title, {1} account name
       account: (title, alias) => `${title} \xB7 ${alias}`,
-      moreToAnswer: (count2) => `${count2} more to answer after this one.`
+      moreToAnswer: (count) => `${count} more to answer after this one.`
     },
     field: {
       set: "Set",
@@ -21934,10 +21934,10 @@ var connectionEn = {
     },
     confirmDelete: (label) => `delete ${label}? y/N`,
     slice: {
-      skillsOne: (count2) => `${count2} skill`,
-      skillsOther: (count2) => `${count2} skills`,
-      memoriesOne: (count2) => `${count2} memory`,
-      memoriesOther: (count2) => `${count2} memories`
+      skillsOne: (count) => `${count} skill`,
+      skillsOther: (count) => `${count} skills`,
+      memoriesOne: (count) => `${count} memory`,
+      memoriesOther: (count) => `${count} memories`
     },
     hint: {
       item: "\u2191\u2193/jk scroll \xB7 PgUp/PgDn page \xB7 e edit \xB7 d delete \xB7 Esc/\u2190 back \xB7 q close",
@@ -21959,8 +21959,8 @@ var connectorsEn = {
     loading: "loading accounts\u2026",
     empty: "No connector accounts yet. Press a to add one.",
     unnamedTag: "(unnamed)",
-    retiredFolded: (count2) => `${count2} retired (Tab to show)`,
-    retiredShown: (count2) => `${count2} retired shown (Tab to hide)`,
+    retiredFolded: (count) => `${count} retired (Tab to show)`,
+    retiredShown: (count) => `${count} retired shown (Tab to hide)`,
     status: {
       active: "active",
       expired: "expired",
@@ -22146,8 +22146,8 @@ var hubsEn = {
   hubs: {
     // Shared list-window affordances for the Skills / Plugins hubs.
     list: {
-      moreAbove: (count2) => ` \u2191 ${count2} more`,
-      moreBelow: (count2) => ` \u2193 ${count2} more`,
+      moreAbove: (count) => ` \u2191 ${count} more`,
+      moreBelow: (count) => ` \u2193 ${count} more`,
       errorLine: (message) => `error: ${message}`
     },
     agents: {
@@ -22204,8 +22204,8 @@ var hubsEn = {
         toolsValue: (own, subtree) => `${own} (subtree ${subtree})`,
         subtree: "subtree",
         // {0} descendant count, {1} max depth below, {2} active count
-        subtreeValueOne: (count2, depth, active) => `${count2} agent \xB7 d${depth} \xB7 \u26A1${active}`,
-        subtreeValueOther: (count2, depth, active) => `${count2} agents \xB7 d${depth} \xB7 \u26A1${active}`,
+        subtreeValueOne: (count, depth, active) => `${count} agent \xB7 d${depth} \xB7 \u26A1${active}`,
+        subtreeValueOther: (count, depth, active) => `${count} agents \xB7 d${depth} \xB7 \u26A1${active}`,
         elapsed: "elapsed",
         iteration: "iteration",
         apiCalls: "api calls",
@@ -22214,7 +22214,7 @@ var hubsEn = {
         tokensValue: (input, output) => `${input} in \xB7 ${output} out`,
         reasoningSuffix: (tokens) => ` \xB7 ${tokens} reasoning`,
         subtreeTokens: "subtree tokens",
-        filesMore: (count2) => `\u2026+${count2} more`
+        filesMore: (count) => `\u2026+${count} more`
       },
       diff: {
         title: "Replay diff",
@@ -22234,8 +22234,8 @@ var hubsEn = {
         killing: (id) => `killing ${id}`,
         notFound: (id) => `not found: ${id}`,
         killFailed: (id) => `kill failed: ${id}`,
-        killingSubtreeOne: (count2) => `killing subtree \xB7 ${count2} node`,
-        killingSubtreeOther: (count2) => `killing subtree \xB7 ${count2} nodes`,
+        killingSubtreeOne: (count) => `killing subtree \xB7 ${count} node`,
+        killingSubtreeOther: (count) => `killing subtree \xB7 ${count} nodes`,
         spawningPaused: "spawning paused",
         spawningResumed: "spawning resumed",
         pauseFailed: "pause failed",
@@ -22261,12 +22261,12 @@ var hubsEn = {
       }
     },
     agentsPanel: {
-      running: (count2) => `${count2} running`,
-      done: (count2) => `${count2} done`,
-      liveAgents: (count2) => `${count2} live agents`,
-      procs: (count2) => `${count2} procs`,
-      procsDone: (count2) => `${count2} done`,
-      moreHidden: (count2) => ` \xB7 +${count2} more`,
+      running: (count) => `${count} running`,
+      done: (count) => `${count} done`,
+      liveAgents: (count) => `${count} live agents`,
+      procs: (count) => `${count} procs`,
+      procsDone: (count) => `${count} done`,
+      moreHidden: (count) => ` \xB7 +${count} more`,
       processes: "Processes",
       collapsedHint: " \xB7 Ctrl+T expand \xB7 Ctrl+R restore",
       expandedHint: " \xB7 Ctrl+T expand \xB7 Ctrl+R collapse"
@@ -22292,8 +22292,8 @@ var hubsEn = {
       installing: "installing\u2026",
       selectCategory: "select a category",
       // {0} category name, {1} skill count
-      categoryRow: (category, count2) => `${category} \xB7 ${count2} skills`,
-      skillCount: (count2) => `${count2} skill(s)`,
+      categoryRow: (category, count) => `${category} \xB7 ${count} skills`,
+      skillCount: (count) => `${count} skill(s)`,
       emptyCategory: "no skills in this category",
       pathLine: (path) => `path: ${path}`,
       hintCancel: "Esc/q cancel",
@@ -22314,9 +22314,9 @@ var hubsEn = {
         notEnabled: "not enabled"
       },
       bundledTag: " [bundled]",
-      userScope: (count2) => `${count2} user plugin(s)`,
-      bundledSuffix: (count2) => ` \xB7 +${count2} bundled (Tab)`,
-      allScope: (count2) => `all ${count2} plugins`,
+      userScope: (count) => `${count} user plugin(s)`,
+      bundledSuffix: (count) => ` \xB7 +${count} bundled (Tab)`,
+      allScope: (count) => `all ${count} plugins`,
       hintClose: "Esc/q close",
       hintList: "\u2191/\u2193 select \xB7 Enter/Space toggle \xB7 Tab user/all \xB7 1-9,0 quick \xB7 Esc/q close"
     }
@@ -22371,13 +22371,13 @@ var libTextEn = {
       conflicts: (file2, keys) => `Existing terminal keybindings would conflict in ${file2}: ${keys}`,
       alreadyConfigured: (label) => `${label} terminal keybindings already configured.`,
       /** {0} = count, {1} = IDE label */
-      addedOne: (count2, label) => `Added ${count2} ${label} terminal keybinding`,
+      addedOne: (count, label) => `Added ${count} ${label} terminal keybinding`,
       /** {0} = count, {1} = IDE label */
-      addedOther: (count2, label) => `Added ${count2} ${label} terminal keybindings`,
+      addedOther: (count, label) => `Added ${count} ${label} terminal keybindings`,
       /** {0} = count */
-      migratedOne: (count2) => `migrated ${count2} legacy binding to CSI u encoding`,
+      migratedOne: (count) => `migrated ${count} legacy binding to CSI u encoding`,
       /** {0} = count */
-      migratedOther: (count2) => `migrated ${count2} legacy bindings to CSI u encoding`,
+      migratedOther: (count) => `migrated ${count} legacy bindings to CSI u encoding`,
       /** {0} = comma-joined summary parts, {1} = keybindings.json path */
       summaryIn: (parts, file2) => `${parts} in ${file2}`,
       /** {0} = IDE label, {1} = error text */
@@ -22409,15 +22409,15 @@ var libTextEn = {
     // lib/subagentTree.ts — the `d2 · 7 agents · 124 tools · 2m 14s` summary chip.
     subagentTree: {
       /** {0} = pre-formatted count */
-      agentsOne: (count2) => `${count2} agent`,
+      agentsOne: (count) => `${count} agent`,
       /** {0} = pre-formatted count */
-      agentsOther: (count2) => `${count2} agents`,
+      agentsOther: (count) => `${count} agents`,
       /** {0} = pre-formatted count */
-      toolsOne: (count2) => `${count2} tool`,
+      toolsOne: (count) => `${count} tool`,
       /** {0} = pre-formatted count */
-      toolsOther: (count2) => `${count2} tools`,
+      toolsOther: (count) => `${count} tools`,
       /** {0} = compact token count (`12k`) */
-      tokens: (count2) => `${count2} tok`
+      tokens: (count) => `${count} tok`
     },
     // lib/text.ts — transcript trail / clarify prose.
     text: {
@@ -22430,9 +22430,9 @@ var libTextEn = {
       resultLabel: "Result",
       errorLabel: "Error",
       /** {0} = pre-formatted line count; sits inside a `[[ … ]]` composer token */
-      pasteLinesChip: (count2) => `[${count2} lines]`,
+      pasteLinesChip: (count) => `[${count} lines]`,
       /** {0} = question count */
-      clarifyHead: (count2) => `ask (${count2} questions)`,
+      clarifyHead: (count) => `ask (${count} questions)`,
       /** {0} = question, {1} = locked answer */
       clarifyAnswered: (question, answer) => `\u2713 ${question} \u2192 ${answer}`,
       /** {0} = question */
@@ -22457,9 +22457,9 @@ var libTextEn = {
       backgroundProcessFinished: "background process finished",
       backgroundAgentWorkFinished: "background agent work finished",
       /** {0} = count */
-      backgroundAgentsFinishedOne: (count2) => `${count2} background agent finished`,
+      backgroundAgentsFinishedOne: (count) => `${count} background agent finished`,
       /** {0} = count */
-      backgroundAgentsFinishedOther: (count2) => `${count2} background agents finished`
+      backgroundAgentsFinishedOther: (count) => `${count} background agents finished`
     },
     // domain/attachments.ts — the composer token an attached image renders as.
     attachments: {
@@ -22479,7 +22479,7 @@ var overlaysEn = {
   prompt: {
     approval: {
       title: "\u26A0 approval required",
-      moreLines: (count2) => `\u2026 +${count2} more line${count2 === 1 ? "" : "s"} (full text above)`,
+      moreLines: (count) => `\u2026 +${count} more line${count === 1 ? "" : "s"} (full text above)`,
       once: "Allow once",
       session: "Allow this session",
       always: "Always allow",
@@ -22510,8 +22510,8 @@ var pickersEn = {
       error: (message) => `error: ${message}`,
       // {0} = the RPC method name (e.g. `model.options`) — not translated.
       invalidResponse: (method) => `invalid response: ${method}`,
-      moreAbove: (count2) => ` \u2191 ${count2} more`,
-      moreBelow: (count2) => ` \u2193 ${count2} more`,
+      moreAbove: (count) => ` \u2191 ${count} more`,
+      moreBelow: (count) => ` \u2193 ${count} more`,
       filter: (query) => `filter: ${query}`,
       typeToFilter: "type to filter"
     },
@@ -22552,8 +22552,8 @@ var pickersEn = {
         unknown: "(unknown)",
         noKey: "(no key)",
         needsSetup: "(needs setup)",
-        modelCountOne: (count2) => `${count2} model`,
-        modelCountOther: (count2) => `${count2} models`,
+        modelCountOne: (count) => `${count} model`,
+        modelCountOther: (count) => `${count} models`,
         filterHint: "type to filter \xB7 \u2191/\u2193 select",
         // {0} = provider warning text from the backend.
         warning: (warning) => `warning: ${warning}`,
@@ -22590,8 +22590,8 @@ var pickersEn = {
       loading: "loading sessions\u2026",
       modelUnknown: "model?",
       currentOrDefault: "current/default",
-      liveSessionsOne: (count2) => `${count2} live session`,
-      liveSessionsOther: (count2) => `${count2} live sessions`,
+      liveSessionsOne: (count) => `${count} live session`,
+      liveSessionsOther: (count) => `${count} live sessions`,
       // {0} = live session count, {1} = resumable session count.
       counts: (liveCount, resumableCount) => `${liveCount} live \xB7 ${resumableCount} resumable`,
       age: {
@@ -22618,7 +22618,7 @@ var pickersEn = {
         closing: "closing\u2026",
         deleting: "deleting\u2026",
         pressDAgain: "press d again to delete",
-        messageCount: (count2) => `${count2} msgs`
+        messageCount: (count) => `${count} msgs`
       },
       noOtherSessions: "no other sessions \u2014 Enter on +new to start one",
       promptLabel: "prompt \u203A ",
@@ -22649,8 +22649,8 @@ var pickersEn = {
       title: "Pets",
       loading: "loading pets\u2026",
       adopting: "adopting\u2026",
-      petCountOne: (count2) => `${count2} pet`,
-      petCountOther: (count2) => `${count2} pets`,
+      petCountOne: (count) => `${count} pet`,
+      petCountOther: (count) => `${count} pets`,
       // {0} = the filter text the user typed.
       noMatches: (query) => `no pets match "${query}"`,
       noneAvailable: "no pets available",
@@ -22728,8 +22728,8 @@ var sessionEn = {
       widgetRemoved: (id) => `widget /${id} removed (file deleted)`,
       // {0}=file {1}=message
       widgetFailedToLoad: (file2, message) => `widget ${file2} failed to load: ${message}`,
-      clarifyQuestionsOne: (count2) => `${count2} question`,
-      clarifyQuestionsOther: (count2) => `${count2} questions`,
+      clarifyQuestionsOne: (count) => `${count} question`,
+      clarifyQuestionsOther: (count) => `${count} questions`,
       skipped: "(skipped)",
       voiceRec: "\u25CF REC",
       voiceStt: "\u25C9 STT",
@@ -22785,7 +22785,7 @@ var slashEn = {
 var slashCmdCoreEn = {
   core: {
     help: {
-      skillCommandsAvailable: (count2) => `${count2} skill commands available \u2014 /skills to browse`,
+      skillCommandsAvailable: (count) => `${count} skill commands available \u2014 /skills to browse`,
       connectors: "manage connector accounts (rename, add another, reconnect, remove)",
       detailsGlobal: "set global agent detail visibility mode",
       detailsSection: "override one section (thinking/tools/subagents/activity)",
@@ -22850,8 +22850,8 @@ var slashCmdCoreEn = {
       usage: "usage: /fortune [random|daily]"
     },
     copy: {
-      copiedCharsOne: (count2) => `copied ${count2} character`,
-      copiedCharsOther: (count2) => `copied ${count2} characters`,
+      copiedCharsOne: (count) => `copied ${count} character`,
+      copiedCharsOther: (count) => `copied ${count} characters`,
       clipboardFailed: "clipboard copy failed \u2014 try HERMES_TUI_FORCE_OSC52=1 to force the escape sequence",
       usage: "usage: /copy [number]",
       nothingToCopy: "nothing to copy \u2014 start a conversation first",
@@ -22878,8 +22878,8 @@ var slashCmdCoreEn = {
       noConversation: "no conversation yet",
       youTag: (index) => `You #${index}`,
       hermesTag: (index) => `Hermes #${index}`,
-      toolCallsOne: (count2) => `(${count2} tool call)`,
-      toolCallsOther: (count2) => `(${count2} tool calls)`,
+      toolCallsOne: (count) => `(${count} tool call)`,
+      toolCallsOther: (count) => `(${count} tool calls)`,
       empty: "(empty)",
       pageTitle: "History"
     },
@@ -22908,8 +22908,8 @@ var slashCmdCoreEn = {
       usage: "usage: /battery [on|off|status]"
     },
     queue: {
-      countOne: (count2) => `${count2} queued message`,
-      countOther: (count2) => `${count2} queued messages`,
+      countOne: (count) => `${count} queued message`,
+      countOther: (count) => `${count} queued messages`,
       queued: (preview5) => `queued: "${preview5}"`
     },
     steer: {
@@ -22920,8 +22920,8 @@ var slashCmdCoreEn = {
     },
     undo: {
       nothing: "nothing to undo",
-      undidOne: (count2) => `undid ${count2} message`,
-      undidOther: (count2) => `undid ${count2} messages`
+      undidOne: (count) => `undid ${count} message`,
+      undidOther: (count) => `undid ${count} messages`
     },
     retry: {
       nothing: "nothing to retry"
@@ -22958,7 +22958,7 @@ var slashCmdCoreEn = {
       arrayBuffers: "array buffers",
       rss: "rss",
       uptime: "uptime",
-      seconds: (count2) => `${count2}s`
+      seconds: (count) => `${count}s`
     }
   },
   setup: {
@@ -22972,8 +22972,8 @@ var slashCmdCoreEn = {
 var slashCmdOpsEn = {
   ops: {
     stop: {
-      stoppedOne: (count2) => `stopped ${count2} background process`,
-      stoppedOther: (count2) => `stopped ${count2} background processes`
+      stoppedOne: (count) => `stopped ${count} background process`,
+      stoppedOther: (count) => `stopped ${count} background processes`
     },
     reloadMcp: {
       confirmRequired: "/reload-mcp requires confirmation",
@@ -22982,8 +22982,8 @@ var slashCmdOpsEn = {
       complete: "reload complete"
     },
     reloadEnv: {
-      reloadedOne: (count2) => `reloaded .env (${count2} var updated)`,
-      reloadedOther: (count2) => `reloaded .env (${count2} vars updated)`
+      reloadedOne: (count) => `reloaded .env (${count} var updated)`,
+      reloadedOther: (count) => `reloaded .env (${count} vars updated)`
     },
     browser: {
       usage: "usage: /browser [connect|disconnect|status|use] [url] \xB7 persistent: set browser.cdp_url in config.yaml",
@@ -23027,7 +23027,7 @@ var slashCmdOpsEn = {
     },
     replay: {
       noneOnDisk: "no archived spawn trees on disk for this session",
-      subagentsLabel: (count2) => `${count2} subagents`,
+      subagentsLabel: (count) => `${count} subagents`,
       archivedTitle: "Archived spawn trees",
       usageLoad: "usage: /replay load <path>",
       snapshotEmpty: "snapshot empty or unreadable",
@@ -23036,7 +23036,7 @@ var slashCmdOpsEn = {
     },
     replayDiff: {
       usage: "usage: /replay-diff <a> <b>  (e.g. /replay-diff 1 2 for last two)",
-      unresolved: (count2) => `replay-diff: could not resolve indices \xB7 history has ${count2} entries`
+      unresolved: (count) => `replay-diff: could not resolve indices \xB7 history has ${count} entries`
     },
     reloadSkills: {
       reloaded: "skills reloaded",
@@ -23073,7 +23073,7 @@ var slashCmdOpsEn = {
       noneOnPageWithTotal: (page, total) => `no skills on page ${page} (total ${total})`,
       // {0}=page, {1}=total pages
       pageOf: (page, total) => `page ${page} of ${total}`,
-      skillsTotal: (count2) => `${count2} skills total`,
+      skillsTotal: (count) => `${count} skills total`,
       browseMore: (nextPage) => `/skills browse ${nextPage} for more`,
       browseTitle: "Browse Skills",
       browseTitlePage: (page) => `Browse Skills \u2014 p${page}`
@@ -23141,8 +23141,8 @@ var slashCmdSessionEn = {
     },
     compress: {
       // {0}=message count (pre-formatted)
-      compressedOne: (count2) => `compressed ${count2} message`,
-      compressedOther: (count2) => `compressed ${count2} messages`,
+      compressedOne: (count) => `compressed ${count} message`,
+      compressedOther: (count) => `compressed ${count} messages`,
       nothing: "nothing to compress",
       // {0}=compact token count, appended to compressedOne/Other
       tokSuffix: (tokens) => ` \xB7 ${tokens} tok`
@@ -23198,7 +23198,7 @@ ${body}`
     },
     usage: {
       balanceTitle: "Balance",
-      compressions: (count2) => `Compressions: ${count2}`,
+      compressions: (count) => `Compressions: ${count}`,
       // {0}=used tokens (with ~ mark when estimated), {1}=max tokens, {2}=percent (with ~ mark)
       context: (used, max, percent) => `Context: ${used} / ${max} (${percent}%)`,
       cta: "Run /subscription to change plan \xB7 /topup to add to your balance",
@@ -25380,8 +25380,8 @@ function runningTool(log) {
   const last = findLast(log.entries, (e) => e.kind === "tool");
   return last?.kind === "tool" && last.status === "running" ? last : void 0;
 }
-function clockToMs(clock2, now = Date.now()) {
-  const [h = 0, m = 0, s = 0] = clock2.split(":").map(Number);
+function clockToMs(clock3, now = Date.now()) {
+  const [h = 0, m = 0, s = 0] = clock3.split(":").map(Number);
   const at = new Date(now).setHours(h, m, s, 0);
   return at > now + 6e4 ? at - 864e5 : at;
 }
@@ -26417,8 +26417,8 @@ function describeCommand(command) {
   return clip(title.charAt(0).toUpperCase() + title.slice(1), MAX);
 }
 function commandLine(command, n = 96) {
-  const flat = command.replace(/<<-?\s*['"]?(\w+)['"]?[\s\S]*?\n\s*\1\s*(?=\n|$)/g, "<<'$1' \u2026").replace(/\s+/g, " ").trim();
-  return clip(flat, n);
+  const flat2 = command.replace(/<<-?\s*['"]?(\w+)['"]?[\s\S]*?\n\s*\1\s*(?=\n|$)/g, "<<'$1' \u2026").replace(/\s+/g, " ").trim();
+  return clip(flat2, n);
 }
 
 // src/view/tools.tsx
@@ -26468,6 +26468,26 @@ function toolNode(call, now, place = {}) {
     },
     body
   );
+}
+function toolDetail(call, now) {
+  const card = cardOf(call, now);
+  const body = [...card.body];
+  const command = call.name === "terminal" ? (str3(call.args.command) ?? call.context ?? "").trim() : "";
+  if (command && command === commandLine(command)) {
+    body.unshift(/* @__PURE__ */ jsx("code", { lang: "bash", max: { h: "12lines" }, role: "omp.tool.command", text: command }, "cmd"));
+  }
+  const exit = call.name === "terminal" && call.status !== "running" && !isBackgroundCall(call) ? exitOf(call) : void 0;
+  if (exit) {
+    body.push(/* @__PURE__ */ jsx("text", { spans: [{ s: "error", t: `exit ${exit}` }] }, "exit"));
+  }
+  const error = call.status === "error" && !card.body.length ? errorOf(call) : void 0;
+  if (error) {
+    body.push(/* @__PURE__ */ jsx("text", { role: "omp.tool.error", spans: [{ s: "error", t: error }], wrap: "word" }, "err"));
+  }
+  if (call.status === "cancelled") {
+    body.push(/* @__PURE__ */ jsx("text", { spans: [{ s: "muted", t: `Interrupted by user after ${duration(call.duration ?? 0)}` }] }, "cancelled"));
+  }
+  return body;
 }
 function cardOf(call, now) {
   const result = record(call.result);
@@ -26606,14 +26626,6 @@ function processLine(call, id, now) {
     },
     "process"
   );
-}
-function stepTitle(call) {
-  if (call.name === "terminal") {
-    return describeCommand(str3(call.args.command) ?? call.context ?? "");
-  }
-  const card = cardOf(call, Date.now());
-  const target = card.target ? card.targetKind === "path" ? card.target.split("/").at(-1) : card.target : void 0;
-  return target ? `${card.title} ${target}` : card.title;
 }
 function readCard(call, result) {
   const path = str3(call.args.path) ?? call.context;
@@ -26808,7 +26820,7 @@ function taskCard(call, result, now) {
   const context = str3(call.args.context) ?? (tasks.length === 1 ? str3(tasks[0]?.context) : void 0);
   const working = agents.some((a) => a.status === "running" || a.status === "queued") || !agents.length && result?.status === "dispatched";
   const settled = agents.filter((a) => a.status !== "running" && a.status !== "queued");
-  const count2 = goals.length || agents.length;
+  const count = goals.length || agents.length;
   let meta;
   let took;
   if (agents.length && !working) {
@@ -26824,7 +26836,7 @@ function taskCard(call, result, now) {
     ].filter(Boolean).join(" \xB7 ");
     took = Math.max(...agents.map((a) => a.startedAt + (a.duration ?? 0))) - call.startedAt;
   } else if (settled.length) {
-    meta = `${settled.length} of ${count2} done`;
+    meta = `${settled.length} of ${count} done`;
   }
   return {
     badges: result?.mode === "background" ? [{ text: "background" }] : void 0,
@@ -26835,7 +26847,7 @@ function taskCard(call, result, now) {
     meta: meta ? [meta] : void 0,
     name: "task",
     status: working ? "running" : void 0,
-    target: count2 ? `${count2} agent${count2 === 1 ? "" : "s"}` : void 0,
+    target: count ? `${count} agent${count === 1 ? "" : "s"}` : void 0,
     targetKind: "text",
     title: "Task",
     took
@@ -27422,12 +27434,12 @@ function openAgents(app, focus) {
   }
 }
 function summary(all) {
-  const count2 = (s) => all.filter((a) => a.status === s).length;
+  const count = (s) => all.filter((a) => a.status === s).length;
   const parts = [
-    [count2("running") + count2("queued"), "running"],
-    [count2("done"), "done"],
-    [count2("failed"), "failed"],
-    [count2("cancelled"), "stopped"]
+    [count("running") + count("queued"), "running"],
+    [count("done"), "done"],
+    [count("failed"), "failed"],
+    [count("cancelled"), "stopped"]
   ];
   return parts.filter(([n]) => n).map(([n, label]) => `${n} ${label}`).join(" \xB7 ") || "none yet";
 }
@@ -27774,12 +27786,12 @@ function callOf(app, id) {
   return app.transcript.backgroundCalls().find((c) => (processIdOf(c) ?? c.process?.id) === id);
 }
 function summary2(all) {
-  const count2 = (s) => all.filter((p) => p.status === s).length;
+  const count = (s) => all.filter((p) => p.status === s).length;
   const parts = [
-    [count2("running"), "running"],
-    [count2("done"), "exited"],
-    [count2("failed"), "failed"],
-    [count2("killed") + count2("lost"), "stopped"]
+    [count("running"), "running"],
+    [count("done"), "exited"],
+    [count("failed"), "failed"],
+    [count("killed") + count("lost"), "stopped"]
   ];
   return parts.filter(([n]) => n).map(([n, label]) => `${n} ${label}`).join(" \xB7 ") || "none yet";
 }
@@ -28732,11 +28744,11 @@ function maskedOffset(secret, at) {
 }
 function unmaskEdit(secret, ev) {
   const bounds = boundaries(secret);
-  const count2 = bounds.length - 1;
-  if (ev.len !== count2) {
+  const count = bounds.length - 1;
+  if (ev.len !== count) {
     return null;
   }
-  const real = (masked) => bounds[Math.max(0, Math.min(count2, masked))] ?? secret.length;
+  const real = (masked) => bounds[Math.max(0, Math.min(count, masked))] ?? secret.length;
   const from = real(ev.from);
   const to = real(ev.to);
   const after = ev.cursor - ev.from - ev.text.length;
@@ -28803,12 +28815,12 @@ function optionList(listKey, id, options, selected, select, pick) {
     listKey
   );
 }
-function moved(key2, at, count2) {
+function moved(key2, at, count) {
   if (key2.name === "up" || key2.ctrl && key2.name === "p") {
-    return (at - 1 + count2) % count2;
+    return (at - 1 + count) % count;
   }
   if (key2.name === "down" || key2.ctrl && key2.name === "n") {
-    return (at + 1) % count2;
+    return (at + 1) % count;
   }
   return void 0;
 }
@@ -29113,7 +29125,7 @@ function clarifyOverlay(host, req) {
         return true;
       }
       const typing = d.typing || !q.choices.length;
-      const count2 = q.choices.length + 1;
+      const count = q.choices.length + 1;
       if (k.name === "tab" && questions.length > 1) {
         go(step + (k.shift ? -1 : 1));
       } else if (k.name === "escape" && typing && q.choices.length) {
@@ -29125,7 +29137,7 @@ function clarifyOverlay(host, req) {
       } else if (k.name === "enter") {
         activate(d.selected);
       } else if (typing) {
-        const to = q.choices.length ? moved(k, d.selected, count2) : void 0;
+        const to = q.choices.length ? moved(k, d.selected, count) : void 0;
         if (to !== void 0) {
           d.typing = false;
           d.selected = to;
@@ -29133,13 +29145,13 @@ function clarifyOverlay(host, req) {
           d.other.key(k);
         }
       } else {
-        const to = moved(k, d.selected, count2);
+        const to = moved(k, d.selected, count);
         const n = Number.parseInt(k.name, 10);
         if (to !== void 0) {
           d.selected = to;
         } else if (k.name === "space" && q.multi) {
           activate(d.selected);
-        } else if (n >= 1 && n <= count2) {
+        } else if (n >= 1 && n <= count) {
           activate(n - 1);
         } else if (k.text && !k.ctrl && !k.meta && k.name !== "space") {
           d.selected = q.choices.length;
@@ -29450,12 +29462,12 @@ function labelOf(row) {
   return row?.title?.trim() || row?.preview?.trim() || "Untitled session";
 }
 function itemOf2(row, now) {
-  const count2 = row.live_message_count ?? row.message_count ?? 0;
+  const count = row.live_message_count ?? row.message_count ?? 0;
   return {
     badges: row.source && row.source !== "tui" && row.source !== "cli" ? [{ text: row.source }] : void 0,
     detail: row.title?.trim() && row.preview?.trim() ? row.preview.trim() : void 0,
     facts: {
-      size: `${count2} msg${count2 === 1 ? "" : "s"}`,
+      size: `${count} msg${count === 1 ? "" : "s"}`,
       when: row.started_at ? ageOf(row.started_at * 1e3, now) : ""
     },
     id: row.id,
@@ -29464,7 +29476,7 @@ function itemOf2(row, now) {
   };
 }
 function preview4(row, isCurrent) {
-  const count2 = row.live_message_count ?? row.message_count ?? 0;
+  const count = row.live_message_count ?? row.message_count ?? 0;
   return [
     /* @__PURE__ */ jsx("text", { role: "omp.picker.title", text: labelOf(row) }, "title"),
     /* @__PURE__ */ jsx(
@@ -29472,7 +29484,7 @@ function preview4(row, isCurrent) {
       {
         items: [
           ...row.started_at ? [{ k: [{ t: "Started" }], v: dateOf(row.started_at) }] : [],
-          { k: [{ t: "Messages" }], v: String(count2) },
+          { k: [{ t: "Messages" }], v: String(count) },
           ...row.source ? [{ k: [{ t: "Source" }], v: row.source }] : [],
           ...isCurrent ? [{ k: [{ t: "Status" }], v: [{ s: "success", t: "open" }] }] : [],
           { k: [{ t: "ID" }], v: [{ s: "mono dim", t: row.id }] }
@@ -30091,9 +30103,98 @@ function requestFor(before, sid) {
 
 // src/view/styles.ts
 var STYLES = css`
-  /* A run's summary is prose ("Ran 2 commands, read 1 file"), not code: the UI face, not mono. */
-  [data-role='omp.tools.run'] > .sf-section-head .sf-head {
+  /* The work log, as t3code draws it: quiet 14px rows in the UI face, a 24px line each. */
+  [data-role='hermes.turn.working'],
+  [data-role='hermes.turn.fold'] > .sf-section-head,
+  [data-role='hermes.work.group'] > .sf-section-head,
+  [data-role='hermes.work.row'] > .sf-section-head,
+  .sf-col[data-role='hermes.work.row'],
+  .sf-row[data-role='hermes.work.row'] {
+    font: 400 14px/24px var(--sans) !important;
+    min-height: 24px;
+  }
+
+  /* "Working for 12s" and "Worked for 54s" head the turn, ruled off from what follows. */
+  [data-role='hermes.turn.working'],
+  [data-role='hermes.turn.fold'] > .sf-section-head {
+    padding-bottom: 8px !important;
+    margin-bottom: 6px !important;
+    box-shadow: inset 0 -1px 0 rgba(128, 128, 128, 0.22) !important;
+  }
+
+  /* An open fold or group lists its steps and notes where they were, not in an indented code
+     column: no guide line, no indent, the UI face at the answer's size. */
+  :is([data-role='hermes.turn.fold'], [data-role='hermes.work.group'], [data-role='hermes.work.row']),
+  :is([data-role='hermes.turn.fold'], [data-role='hermes.work.group'], [data-role='hermes.work.row']) > .sf-section-body {
+    margin-left: 0 !important;
+    padding-left: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+    background: none !important;
+  }
+
+  :is([data-role='hermes.turn.fold'], [data-role='hermes.work.group'], [data-role='hermes.work.row'])::before,
+  :is([data-role='hermes.turn.fold'], [data-role='hermes.work.group'], [data-role='hermes.work.row'])::after,
+  :is([data-role='hermes.turn.fold'], [data-role='hermes.work.group'], [data-role='hermes.work.row']) > .sf-section-body::before,
+  :is([data-role='hermes.turn.fold'], [data-role='hermes.work.group'], [data-role='hermes.work.row']) > .sf-section-body::after {
+    display: none !important;
+  }
+
+  :is([data-role='hermes.turn.fold'], [data-role='hermes.work.group'], [data-role='hermes.work.row']) > .sf-section-body {
     font-family: var(--sans) !important;
+    font-size: 14px !important;
+  }
+
+  [data-role='hermes.turn.fold'] > .sf-section-body > .sf-md {
+    margin: 4px 0 10px !important;
+  }
+
+  [data-role='hermes.turn.working'] .sf-elapsed {
+    margin-left: 4px;
+  }
+
+  /* The chevron follows the label: right after "Worked for", at the row's end on a step. */
+  [data-role='hermes.turn.fold'] > .sf-section-head > .sf-chev,
+  [data-role='hermes.work.row'] > .sf-section-head > .sf-chev {
+    order: 2;
+    opacity: 0.7;
+  }
+
+  [data-role='hermes.work.row'] > .sf-section-head > .sf-head {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  /* A group's summary has no chevron; when it started shows on hover. */
+  [data-role='hermes.work.group'] > .sf-section-head > .sf-chev {
+    display: none;
+  }
+
+  [data-role='hermes.work.group'] > .sf-section-head > .sf-head {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  [data-role='hermes.work.time'] {
+    opacity: 0;
+    font-size: 12px !important;
+    font-variant-numeric: tabular-nums;
+  }
+
+  [data-role='hermes.work.group'] > .sf-section-head:hover [data-role='hermes.work.time'] {
+    opacity: 1;
+  }
+
+  /* What a step or thought opens to sits under its label, past the icon column: a call's
+     command and output in the code face, a thought as prose. */
+  [data-role='hermes.work.detail'],
+  [data-role='hermes.work.thought'] {
+    margin: 2px 0 8px 28px !important;
+  }
+
+  [data-role='hermes.work.detail'] {
+    font-family: var(--mono) !important;
+    font-size: 13px !important;
   }
 
   /* omp's ask theme draws a radio at the start of each option without moving the text over. */
@@ -31077,95 +31178,1357 @@ ${compact(ctx.used)} of ${compact(ctx.max)} tokens
   ] }, "composer");
 }
 
-// src/view/toolRuns.tsx
-var SOLO = /* @__PURE__ */ new Set(["clarify", "delegate_task", "todo", "todo_list"]);
-var MIN_RUN = 2;
-var KINDS2 = {
-  browser_click: ["page action", "page actions", "Took"],
-  browser_navigate: ["page", "pages", "Opened"],
-  execute_code: ["script", "scripts", "Ran"],
-  patch: ["file", "files", "Edited"],
-  process: ["process check", "process checks", "Made"],
-  read_file: ["file", "files", "Read"],
-  search_files: ["time", "times", "Searched"],
-  skill_view: ["skill", "skills", "Read"],
-  terminal: ["command", "commands", "Ran"],
-  vision_analyze: ["image", "images", "Looked at"],
-  web_extract: ["page", "pages", "Read"],
-  web_search: ["time on the web", "times on the web", "Searched"],
-  write_file: ["file", "files", "Wrote"]
+// src/workLog.ts
+import { homedir as homedir5 } from "node:os";
+
+// src/vendor/t3code/commandLabel.ts
+var MAX_COMMAND_SEGMENTS = 64;
+var SHELL_PROGRAMS = /* @__PURE__ */ new Set(["sh", "bash", "zsh", "dash", "ash", "ksh", "fish"]);
+var WINDOWS_SHELL_PROGRAMS = /* @__PURE__ */ new Set([
+  "cmd",
+  "cmd.exe",
+  "powershell",
+  "powershell.exe",
+  "pwsh",
+  "pwsh.exe"
+]);
+var SHELL_OPTIONS_WITH_VALUE = /* @__PURE__ */ new Set(["-o", "-O", "--rcfile", "--init-file"]);
+var SHELL_COMMAND_WRAPPERS = /* @__PURE__ */ new Set(["builtin", "command", "exec"]);
+var SHELL_PRECOMMAND_MODIFIERS = /* @__PURE__ */ new Set(["nocorrect", "noglob", "time"]);
+var POWERSHELL_SETUP_PROGRAMS = /* @__PURE__ */ new Set(["pop-location", "push-location", "set-location"]);
+var POWERSHELL_FLAGS = /* @__PURE__ */ new Set(["-mta", "-nologo", "-noninteractive", "-noprofile", "-sta"]);
+var POWERSHELL_OPTIONS_WITH_VALUE = /* @__PURE__ */ new Set([
+  "-configurationname",
+  "-executionpolicy",
+  "-inputformat",
+  "-outputformat",
+  "-version",
+  "-windowstyle",
+  "-workingdirectory"
+]);
+var START_PROCESS_FLAGS = /* @__PURE__ */ new Set([
+  "-confirm",
+  "-debug",
+  "-loaduserprofile",
+  "-nonewwindow",
+  "-passthru",
+  "-usenewenvironment",
+  "-verbose",
+  "-wait",
+  "-whatif"
+]);
+var START_PROCESS_OPTIONS_WITH_VALUE = /* @__PURE__ */ new Set([
+  "-argumentlist",
+  "-credential",
+  "-environment",
+  "-erroraction",
+  "-errorvariable",
+  "-informationaction",
+  "-informationvariable",
+  "-outbuffer",
+  "-outvariable",
+  "-pipelinevariable",
+  "-progressaction",
+  "-redirectstandarderror",
+  "-redirectstandardinput",
+  "-redirectstandardoutput",
+  "-verb",
+  "-warningaction",
+  "-warningvariable",
+  "-windowstyle",
+  "-workingdirectory"
+]);
+var SKIPPABLE_SUDO_PROBES = /* @__PURE__ */ new Set(["[", "[[", "test", "true"]);
+var NON_PROGRAM_PREFIX_CHARACTERS = "<>(){}[];|&$`#!%@:";
+var NON_PROGRAM_SUFFIX_CHARACTERS = "){]}`";
+var NON_DESCRIPTIVE_SHELL_PROGRAMS = /* @__PURE__ */ new Set([
+  "!",
+  "#",
+  ".",
+  ":",
+  "[",
+  "[[",
+  "alias",
+  "and",
+  "autoload",
+  "begin",
+  "bg",
+  "bind",
+  "bindkey",
+  "break",
+  "builtin",
+  "caller",
+  "case",
+  "catch",
+  "cd",
+  "command",
+  "compgen",
+  "complete",
+  "compopt",
+  "continue",
+  "coproc",
+  "declare",
+  "dirs",
+  "disown",
+  "do",
+  "done",
+  "elif",
+  "else",
+  "enable",
+  "end",
+  "esac",
+  "eval",
+  "exec",
+  "exit",
+  "export",
+  "false",
+  "fc",
+  "fg",
+  "fi",
+  "finally",
+  "for",
+  "foreach",
+  "function",
+  "getopts",
+  "history",
+  "if",
+  "in",
+  "jobs",
+  "let",
+  "local",
+  "logout",
+  "mapfile",
+  "nocorrect",
+  "noglob",
+  "not",
+  "or",
+  "popd",
+  "pushd",
+  "read",
+  "readarray",
+  "readonly",
+  "repeat",
+  "return",
+  "select",
+  "set",
+  "setopt",
+  "shift",
+  "shopt",
+  "source",
+  "switch",
+  "suspend",
+  "test",
+  "then",
+  "time",
+  "times",
+  "trap",
+  "try",
+  "true",
+  "type",
+  "typeset",
+  "ulimit",
+  "umask",
+  "unalias",
+  "until",
+  "unset",
+  "unsetopt",
+  "wait",
+  "while"
+]);
+var TERMINAL_SHELL_PROGRAMS = /* @__PURE__ */ new Set([
+  "and",
+  "begin",
+  "break",
+  "case",
+  "catch",
+  "continue",
+  "coproc",
+  "do",
+  "done",
+  "elif",
+  "else",
+  "end",
+  "esac",
+  "eval",
+  "exec",
+  "exit",
+  "false",
+  "fi",
+  "finally",
+  "for",
+  "foreach",
+  "function",
+  "if",
+  "in",
+  "not",
+  "or",
+  "repeat",
+  "return",
+  "select",
+  "switch",
+  "then",
+  "try",
+  "until",
+  "while"
+]);
+function shellCommandArgumentIndex(tokens, start) {
+  for (let index = start; index < tokens.length; index += 1) {
+    const option = tokens[index];
+    if (option === "--" || !option.startsWith("-")) return null;
+    if (SHELL_OPTIONS_WITH_VALUE.has(option)) {
+      index += 1;
+      continue;
+    }
+    if (option === "--command" || /^-[a-zA-Z]*c[a-zA-Z]*$/.test(option)) return index + 1;
+  }
+  return null;
+}
+var COMMAND_WRAPPER_OPTIONS_WITH_VALUE = {
+  env: /* @__PURE__ */ new Set(["-C", "--chdir", "-S", "--split-string", "-u", "--unset"]),
+  sudo: /* @__PURE__ */ new Set(["-C", "--close-from", "-D", "--chdir", "-g", "--group", "-u", "--user"])
 };
-function groupRuns(blocks) {
-  const out = [];
-  let run2 = [];
-  const flush = () => {
-    const tail = [];
-    while (run2.at(-1)?.kind === "thinking") {
-      tail.unshift(run2.pop());
+var COMMAND_WRAPPER_FLAGS = {
+  env: /* @__PURE__ */ new Set(["-0", "--null", "-i", "--ignore-environment", "--debug", "-v"]),
+  sudo: /* @__PURE__ */ new Set(["-A", "--askpass", "-b", "--background", "-E", "-H", "-i", "-n", "-S"])
+};
+function tokenizeShellCommand(command) {
+  const input = command.trim();
+  const tokens = [];
+  let current = "";
+  let quote2 = null;
+  let escaping = false;
+  let inBackticks = false;
+  let substitutionDepth = 0;
+  let parameterExpansionDepth = 0;
+  let tokenStarted = false;
+  for (let index = 0; index < input.length; index += 1) {
+    const character = input[index];
+    if (escaping) {
+      current += character;
+      escaping = false;
+      tokenStarted = true;
+      continue;
     }
-    if (run2.filter((b) => b.kind === "tool").length >= MIN_RUN) {
-      out.push(run2);
-    } else {
-      out.push(...run2);
+    if (character === "\\" && quote2 !== "'") {
+      const nextCharacter = input[index + 1];
+      const isWindowsPath = quote2 === null && /^(?:[A-Za-z]:|\.{1,2})(?:\\[^\s]*)?$/u.test(current);
+      if ((quote2 === '"' || isWindowsPath) && nextCharacter !== void 0 && nextCharacter !== '"' && nextCharacter !== "\\" && nextCharacter !== "$" && nextCharacter !== "`" && nextCharacter !== "\n") {
+        current += character;
+        tokenStarted = true;
+        continue;
+      }
+      escaping = true;
+      tokenStarted = true;
+      continue;
     }
-    out.push(...tail);
-    run2 = [];
+    if (inBackticks) {
+      current += character;
+      if (character === "`") inBackticks = false;
+      tokenStarted = true;
+      continue;
+    }
+    if (quote2 !== null) {
+      if (character === quote2) {
+        quote2 = null;
+      } else {
+        current += character;
+      }
+      tokenStarted = true;
+      continue;
+    }
+    if (character === "`") {
+      current += character;
+      inBackticks = true;
+      tokenStarted = true;
+      continue;
+    }
+    if (character === "$" && input[index + 1] === "{") {
+      current += "${";
+      parameterExpansionDepth += 1;
+      tokenStarted = true;
+      index += 1;
+      continue;
+    }
+    if (character === "{" && parameterExpansionDepth > 0) {
+      current += character;
+      parameterExpansionDepth += 1;
+      tokenStarted = true;
+      continue;
+    }
+    if (character === "}" && parameterExpansionDepth > 0) {
+      current += character;
+      parameterExpansionDepth -= 1;
+      tokenStarted = true;
+      continue;
+    }
+    if (character === "$" && input[index + 1] === "(") {
+      current += "$(";
+      substitutionDepth += 1;
+      tokenStarted = true;
+      index += 1;
+      continue;
+    }
+    if (character === "(") {
+      current += character;
+      substitutionDepth += 1;
+      tokenStarted = true;
+      continue;
+    }
+    if (character === ")" && substitutionDepth > 0) {
+      current += character;
+      substitutionDepth -= 1;
+      tokenStarted = true;
+      continue;
+    }
+    if (character === '"' || character === "'") {
+      quote2 = character;
+      tokenStarted = true;
+      continue;
+    }
+    if (/\s/u.test(character)) {
+      if (substitutionDepth > 0 || parameterExpansionDepth > 0) {
+        current += character;
+        tokenStarted = true;
+        continue;
+      }
+      if (tokenStarted) {
+        tokens.push(current);
+        current = "";
+        tokenStarted = false;
+      }
+      continue;
+    }
+    current += character;
+    tokenStarted = true;
+  }
+  if (quote2 !== null || escaping || inBackticks || substitutionDepth > 0 || parameterExpansionDepth > 0) {
+    return null;
+  }
+  if (tokenStarted) tokens.push(current);
+  return tokens;
+}
+function commandWithoutShellComments(command, end, comments) {
+  let result = "";
+  let cursor = 0;
+  for (const comment of comments) {
+    if (comment.start >= end) break;
+    result += command.slice(cursor, comment.start);
+    cursor = Math.min(comment.end, end);
+  }
+  return result + command.slice(cursor, end);
+}
+function readHeredocDelimiter(command, start, stripTabs) {
+  let index = start;
+  while (command[index] === " " || command[index] === "	") index += 1;
+  let delimiter = "";
+  let quote2 = null;
+  let escaping = false;
+  for (; index < command.length; index += 1) {
+    const character = command[index];
+    if (escaping) {
+      delimiter += character;
+      escaping = false;
+      continue;
+    }
+    if (character === "\\" && quote2 !== "'") {
+      escaping = true;
+      continue;
+    }
+    if (quote2 !== null) {
+      if (character === quote2) quote2 = null;
+      else delimiter += character;
+      continue;
+    }
+    if (character === '"' || character === "'") {
+      quote2 = character;
+      continue;
+    }
+    if (/\s/u.test(character) || ";&|<>()".includes(character)) break;
+    delimiter += character;
+  }
+  if (!delimiter || quote2 !== null || escaping) return null;
+  return { heredoc: { delimiter, stripTabs }, end: index };
+}
+function commandAfterHeredocs(command, start, heredocs) {
+  let cursor = start;
+  for (const heredoc of heredocs) {
+    let foundDelimiter = false;
+    while (cursor <= command.length) {
+      const newlineIndex = command.indexOf("\n", cursor);
+      const lineEnd2 = newlineIndex === -1 ? command.length : newlineIndex;
+      const line = command.slice(cursor, lineEnd2).replace(/\r$/u, "");
+      const comparableLine = heredoc.stripTabs ? line.replace(/^\t+/u, "") : line;
+      cursor = newlineIndex === -1 ? command.length : newlineIndex + 1;
+      if (comparableLine === heredoc.delimiter) {
+        foundDelimiter = true;
+        break;
+      }
+      if (newlineIndex === -1) break;
+    }
+    if (!foundDelimiter) return null;
+  }
+  return command.slice(cursor).trim() || null;
+}
+function splitFirstShellCommand(command) {
+  let quote2 = null;
+  let powerShellHereStringQuote = null;
+  let escaping = false;
+  let inBackticks = false;
+  let inComment = false;
+  let substitutionDepth = 0;
+  let parameterExpansionDepth = 0;
+  const heredocs = [];
+  const comments = [];
+  let commentStart = 0;
+  let separatorBeforeHeredocs = null;
+  for (let index = 0; index < command.length; index += 1) {
+    const character = command[index];
+    if (powerShellHereStringQuote !== null) {
+      if (character === powerShellHereStringQuote && command[index + 1] === "@" && (index === 0 || command[index - 1] === "\n")) {
+        powerShellHereStringQuote = null;
+        index += 1;
+      }
+      continue;
+    }
+    if (inComment) {
+      if (character !== "\n") continue;
+      inComment = false;
+      comments.push({ start: commentStart, end: index });
+    }
+    if (escaping) {
+      escaping = false;
+      continue;
+    }
+    if (character === "\\" && quote2 !== "'") {
+      escaping = true;
+      continue;
+    }
+    if (inBackticks) {
+      if (character === "`") inBackticks = false;
+      continue;
+    }
+    if (quote2 !== null) {
+      if (character === quote2) quote2 = null;
+      continue;
+    }
+    if (character === "@" && (command[index + 1] === '"' || command[index + 1] === "'") && (command[index + 2] === "\n" || command[index + 2] === "\r" && command[index + 3] === "\n")) {
+      powerShellHereStringQuote = command[index + 1];
+      index += 1;
+      continue;
+    }
+    if (character === '"' || character === "'") {
+      quote2 = character;
+      continue;
+    }
+    if (character === "`") {
+      inBackticks = true;
+      continue;
+    }
+    if (character === "#" && (index === 0 || /\s/u.test(command[index - 1]) || ";&|(".includes(command[index - 1]))) {
+      inComment = true;
+      commentStart = index;
+      continue;
+    }
+    if (character === "$" && command[index + 1] === "{") {
+      parameterExpansionDepth += 1;
+      index += 1;
+      continue;
+    }
+    if (character === "{" && parameterExpansionDepth > 0) {
+      parameterExpansionDepth += 1;
+      continue;
+    }
+    if (character === "}" && parameterExpansionDepth > 0) {
+      parameterExpansionDepth -= 1;
+      continue;
+    }
+    if (character === "(") {
+      substitutionDepth += 1;
+      continue;
+    }
+    if (character === ")" && substitutionDepth > 0) {
+      substitutionDepth -= 1;
+      continue;
+    }
+    if (substitutionDepth > 0 || parameterExpansionDepth > 0) continue;
+    if (character === "<" && command[index + 1] === "<" && command[index + 2] !== "<") {
+      const stripTabs = command[index + 2] === "-";
+      const delimiter = readHeredocDelimiter(command, index + (stripTabs ? 3 : 2), stripTabs);
+      if (delimiter === null) {
+        return { firstCommand: command.trim(), remainingCommand: null, separator: null };
+      }
+      heredocs.push(delimiter.heredoc);
+      index = delimiter.end - 1;
+      continue;
+    }
+    const isDoubleOperator = character === "&" && command[index + 1] === "&" || character === "|" && (command[index + 1] === "|" || command[index + 1] === "&");
+    const isRedirectionAmpersand = character === "&" && (command[index - 1] === ">" || command[index - 1] === "<" || command[index + 1] === ">");
+    if (!isDoubleOperator && !";&|\n".includes(character) || isRedirectionAmpersand) continue;
+    if (character === "\n" && heredocs.length > 0) {
+      const separator = separatorBeforeHeredocs;
+      const firstCommand2 = commandWithoutShellComments(
+        command,
+        separator?.index ?? index,
+        comments
+      ).trimStart();
+      const commandBeforeHeredocs = separator ? command.slice(separator.index + separator.length, index).trim() : "";
+      const commandFollowingHeredocs = commandAfterHeredocs(command, index + 1, heredocs);
+      const remainingCommand = [commandBeforeHeredocs, commandFollowingHeredocs].filter((part) => Boolean(part)).join("\n");
+      return {
+        firstCommand: firstCommand2,
+        remainingCommand: remainingCommand || null,
+        separator: separator ? command.slice(separator.index, separator.index + separator.length) : "\n"
+      };
+    }
+    if (heredocs.length > 0) {
+      separatorBeforeHeredocs ??= {
+        index,
+        length: isDoubleOperator ? 2 : 1
+      };
+      if (isDoubleOperator) index += 1;
+      continue;
+    }
+    const firstCommand = commandWithoutShellComments(command, index, comments).trimStart();
+    let nextCommandIndex = index + (isDoubleOperator ? 2 : 1);
+    while (/\s/u.test(command[nextCommandIndex] ?? "")) nextCommandIndex += 1;
+    const nextCommand = command.slice(nextCommandIndex).trim();
+    return {
+      firstCommand,
+      remainingCommand: nextCommand || null,
+      separator: isDoubleOperator ? command.slice(index, index + 2) : character
+    };
+  }
+  if (inComment) comments.push({ start: commentStart, end: command.length });
+  return {
+    firstCommand: commandWithoutShellComments(command, command.length, comments).trim(),
+    remainingCommand: null,
+    separator: null
   };
-  for (const b of blocks) {
-    if (b.kind === "tool" && !SOLO.has(b.call.name)) {
-      run2.push(b);
-    } else if (b.kind === "thinking" && run2.length) {
-      run2.push(b);
-    } else {
-      flush();
-      out.push(b);
+}
+function commandWithoutLeadingShellComments(command) {
+  let remainingCommand = command.trimStart();
+  while (remainingCommand.startsWith("#")) {
+    const newlineIndex = remainingCommand.indexOf("\n");
+    if (newlineIndex === -1) return null;
+    remainingCommand = remainingCommand.slice(newlineIndex + 1).trimStart();
+  }
+  return remainingCommand || null;
+}
+function withoutShellLineContinuations(command) {
+  let normalizedCommand = "";
+  let quote2 = null;
+  let escaping = false;
+  for (let index = 0; index < command.length; index += 1) {
+    const character = command[index];
+    if (escaping) {
+      normalizedCommand += character;
+      escaping = false;
+      continue;
+    }
+    if (character === "\\" && quote2 !== "'") {
+      if (command[index + 1] === "\n") {
+        index += 1;
+        continue;
+      }
+      if (command[index + 1] === "\r" && command[index + 2] === "\n") {
+        index += 2;
+        continue;
+      }
+      normalizedCommand += character;
+      escaping = true;
+      continue;
+    }
+    if (quote2 !== null) {
+      if (character === quote2) quote2 = null;
+    } else if (character === '"' || character === "'") {
+      quote2 = character;
+    }
+    normalizedCommand += character;
+  }
+  return normalizedCommand;
+}
+function indexAfterShellRedirection(tokens, index) {
+  const token = tokens[index];
+  if (!token || /^[<>]\(/u.test(token)) return null;
+  const match = token.match(
+    /^(?:(?:(?:\d+|\*|\{[A-Za-z_][A-Za-z0-9_]*\})?(?:<<<|<<-|<<|<>|>>|>\||<&|>&|<|>))|&>>|&>)(.*)$/u
+  );
+  if (!match) return null;
+  if (match[1]) return index + 1;
+  return tokens[index + 1] === void 0 ? tokens.length + 1 : index + 2;
+}
+function serializeShellTokens(tokens) {
+  return tokens.map((token) => `'${token.replaceAll("'", "'\\''")}'`).join(" ");
+}
+function transparentWrapperCommandIndex(wrapper, tokens, index) {
+  if (wrapper === "bundle") {
+    return tokens[index + 1] === "exec" && tokens[index + 2] !== void 0 ? index + 2 : null;
+  }
+  if (wrapper === "nohup") {
+    let targetIndex = index + 1;
+    if (tokens[targetIndex] === "--") targetIndex += 1;
+    const target = tokens[targetIndex];
+    return target && !target.startsWith("-") ? targetIndex : null;
+  }
+  if (wrapper === "script") {
+    return /^-[adkpqr]+$/u.test(tokens[index + 1] ?? "") && tokens[index + 3] !== void 0 ? index + 3 : null;
+  }
+  if (wrapper === "arch") {
+    if (/^-(?:arm64|arm64e|i386|x86_64)$/u.test(tokens[index + 1] ?? "")) {
+      return tokens[index + 2] !== void 0 ? index + 2 : null;
+    }
+    return tokens[index + 1] === "-arch" && tokens[index + 3] !== void 0 ? index + 3 : null;
+  }
+  if (wrapper === "timeout" || wrapper === "gtimeout") {
+    return /^(?:\d+(?:\.\d*)?|\.\d+)[smhd]?$/u.test(tokens[index + 1] ?? "") && tokens[index + 2] !== void 0 ? index + 2 : null;
+  }
+  return null;
+}
+function staticProgramName(value) {
+  const trimmedValue = value.trim();
+  if (!trimmedValue || /^[A-Za-z][A-Za-z0-9+.-]*:(?![\\/])/u.test(trimmedValue)) return null;
+  const program = trimmedValue.split(/[\\/]/u).at(-1);
+  if (!program || /\s/u.test(program) && !/[\\/]/u.test(trimmedValue) || NON_PROGRAM_PREFIX_CHARACTERS.includes(program[0] ?? "") || NON_PROGRAM_SUFFIX_CHARACTERS.includes(program.at(-1) ?? "")) {
+    return null;
+  }
+  return program;
+}
+function leadingPowerShellLiteral(command) {
+  const input = command.trimStart();
+  const quote2 = input[0];
+  if (quote2 !== '"' && quote2 !== "'") return staticProgramName(input.match(/^\S+/u)?.[0] ?? "");
+  let value = "";
+  for (let index = 1; index < input.length; index += 1) {
+    const character = input[index];
+    if (character === "`" && input[index + 1] !== void 0) {
+      value += input[index + 1];
+      index += 1;
+      continue;
+    }
+    if (character === quote2) {
+      if (quote2 === "'" && input[index + 1] === "'") {
+        value += "'";
+        index += 1;
+        continue;
+      }
+      return staticProgramName(value);
+    }
+    value += character;
+  }
+  return null;
+}
+function powerShellCallOperatorProgramName(command) {
+  const match = command.match(/^\s*&\s+([\s\S]*)$/u);
+  return match ? leadingPowerShellLiteral(match[1]) : void 0;
+}
+function powerShellAssignmentProgramName(command, depth, remainingCommand, segmentsRemaining) {
+  const assignment = command.match(
+    /^\s*\$(?:(env|global|local|script):)?[A-Za-z_][A-Za-z0-9_]*\s*=\s*([\s\S]*)$/iu
+  );
+  if (!assignment) return { matched: false, program: null };
+  if (assignment[1]?.toLowerCase() === "env") {
+    return {
+      matched: true,
+      program: remainingCommand ? commandProgramNameInternal(remainingCommand, depth, "shell", segmentsRemaining - 1) : null
+    };
+  }
+  const value = assignment[2].trim();
+  if (/^(?:\[ordered\]\s*)?@\s*[{(]/iu.test(value)) {
+    return { matched: true, program: null };
+  }
+  const calledProgram = powerShellCallOperatorProgramName(value);
+  if (calledProgram !== void 0) return { matched: true, program: calledProgram };
+  const directCommand = value.match(/^(?:@?\(\s*)?([A-Za-z][A-Za-z0-9_.-]*)\b/u)?.[1];
+  if (directCommand && !NON_DESCRIPTIVE_SHELL_PROGRAMS.has(directCommand.toLowerCase())) {
+    const parsedCommand = commandProgramNameInternal(value, depth + 1, "shell", segmentsRemaining);
+    return { matched: true, program: parsedCommand ?? directCommand };
+  }
+  return {
+    matched: true,
+    program: remainingCommand ? commandProgramNameInternal(remainingCommand, depth, "shell", segmentsRemaining - 1) : null
+  };
+}
+function windowsShellPayloadProgramName(shell, tokens, start, depth, remainingCommand, separator, segmentsRemaining) {
+  const parsePayload = (payload) => {
+    if (!payload) return null;
+    const command = remainingCommand && separator ? `${payload} ${separator} ${remainingCommand}` : payload;
+    return commandProgramNameInternal(command, depth + 1, "shell", segmentsRemaining);
+  };
+  if (shell === "cmd" || shell === "cmd.exe") {
+    for (let index = start; index < tokens.length; index += 1) {
+      const option = tokens[index].toLowerCase();
+      if (option !== "/c" && option !== "/k") continue;
+      const payload = tokens[index + 1];
+      return {
+        matched: true,
+        program: parsePayload(payload)
+      };
+    }
+    return { matched: false, program: null };
+  }
+  for (let index = start; index < tokens.length; index += 1) {
+    const option = tokens[index].toLowerCase();
+    if (option === "-command" || option === "-c") {
+      const payload = tokens[index + 1];
+      return {
+        matched: true,
+        program: parsePayload(payload)
+      };
+    }
+    if (option === "-file" || option === "-f") {
+      return { matched: true, program: staticProgramName(tokens[index + 1] ?? "") };
+    }
+    if (option === "-encodedcommand" || option === "-enc" || option === "-e") {
+      return { matched: true, program: null };
+    }
+    if (POWERSHELL_OPTIONS_WITH_VALUE.has(option)) {
+      index += 1;
+      continue;
+    }
+    if (POWERSHELL_FLAGS.has(option)) continue;
+    if (!option.startsWith("-")) {
+      return { matched: true, program: staticProgramName(tokens[index]) };
     }
   }
-  flush();
+  return { matched: false, program: null };
+}
+function startProcessProgramName(tokens, start) {
+  for (let index = start; index < tokens.length; index += 1) {
+    const token = tokens[index];
+    const option = token.toLowerCase();
+    if (option === "-filepath") return staticProgramName(tokens[index + 1] ?? "");
+    if (START_PROCESS_FLAGS.has(option)) continue;
+    if (START_PROCESS_OPTIONS_WITH_VALUE.has(option)) {
+      if (tokens[index + 1] === void 0) return null;
+      index += 1;
+      continue;
+    }
+    if (token.startsWith("-")) return null;
+    return staticProgramName(token);
+  }
+  return null;
+}
+function literalAssignmentProgram(token) {
+  const assignment = token.match(/^([A-Za-z_][A-Za-z0-9_]*)=(.*)$/su);
+  if (!assignment) return null;
+  const name = assignment[1];
+  let value = assignment[2].trim();
+  if (!value || /[$`]/u.test(value)) return { name, program: null };
+  if (value.startsWith("(") && value.endsWith(")")) {
+    const arrayTokens = tokenizeShellCommand(value.slice(1, -1));
+    value = arrayTokens?.[0] ?? "";
+  } else if (/\s/u.test(value) && !/[\\/]/u.test(value)) {
+    return { name, program: null };
+  }
+  return { name, program: staticProgramName(value) };
+}
+function referencedCommandAlias(token) {
+  const reference = token.match(
+    /^\$(?:([A-Za-z_][A-Za-z0-9_]*)|\{([A-Za-z_][A-Za-z0-9_]*)(?:\[@\])?\})$/u
+  );
+  return reference?.[1] ?? reference?.[2] ?? null;
+}
+function literalCommandAliasProgramName(command) {
+  const aliases = /* @__PURE__ */ new Map();
+  let remainingCommand = command;
+  let controlFlowDepth = 0;
+  for (let segmentCount = 0; remainingCommand && segmentCount < 64; segmentCount += 1) {
+    const commandWithoutComments = commandWithoutLeadingShellComments(remainingCommand);
+    if (commandWithoutComments === null) return null;
+    const commandSplit = splitFirstShellCommand(commandWithoutComments);
+    const tokens = tokenizeShellCommand(withoutShellLineContinuations(commandSplit.firstCommand));
+    if (tokens === null) return null;
+    let commandIndex = tokens[0] === "do" || tokens[0] === "then" ? 1 : 0;
+    while (commandIndex < tokens.length) {
+      const indexAfterRedirection = indexAfterShellRedirection(tokens, commandIndex);
+      if (indexAfterRedirection !== null && indexAfterRedirection <= tokens.length) {
+        commandIndex = indexAfterRedirection;
+        continue;
+      }
+      if (/^[A-Za-z_][A-Za-z0-9_]*\+?=/u.test(tokens[commandIndex] ?? "")) {
+        commandIndex += 1;
+        continue;
+      }
+      break;
+    }
+    const aliasName = referencedCommandAlias(tokens[commandIndex] ?? "");
+    const aliasedProgram = aliasName ? aliases.get(aliasName) : void 0;
+    if (aliasedProgram) return aliasedProgram;
+    const leadingToken = tokens[0];
+    if (leadingToken === "fi" || leadingToken === "done" || leadingToken === "esac") {
+      controlFlowDepth = Math.max(0, controlFlowDepth - 1);
+    }
+    if (leadingToken === "if" || leadingToken === "for" || leadingToken === "while" || leadingToken === "until" || leadingToken === "select" || leadingToken === "case") {
+      controlFlowDepth += 1;
+    }
+    if (controlFlowDepth === 0 && leadingToken === "unset") {
+      for (const name of tokens.slice(1)) aliases.delete(name);
+    }
+    const assignmentStart = tokens[0] === "export" ? 1 : 0;
+    const assignments = tokens.slice(assignmentStart).map(literalAssignmentProgram);
+    if (controlFlowDepth === 0 && assignments.length > 0 && assignments.every((assignment) => assignment !== null)) {
+      for (const assignment of assignments) {
+        if (assignment.program) aliases.set(assignment.name, assignment.program);
+        else aliases.delete(assignment.name);
+      }
+    }
+    remainingCommand = commandSplit.remainingCommand;
+  }
+  return null;
+}
+function wrappedShellCommandProgramName(wrapper, tokens, start, depth, remainingCommand, segmentsRemaining) {
+  let index = start;
+  if (wrapper === "command") {
+    while (index < tokens.length) {
+      const option = tokens[index];
+      if (option === "--") {
+        index += 1;
+        break;
+      }
+      if (!option.startsWith("-") || option === "-") break;
+      if (option !== "-p") return null;
+      index += 1;
+    }
+  } else if (wrapper === "builtin") {
+    if (tokens[index] === "--") index += 1;
+    else if (tokens[index]?.startsWith("-")) return null;
+  } else if (wrapper === "exec") {
+    while (index < tokens.length) {
+      const option = tokens[index];
+      if (option === "--") {
+        index += 1;
+        break;
+      }
+      if (option === "-a") {
+        if (tokens[index + 1] === void 0) return null;
+        index += 2;
+        continue;
+      }
+      if (/^-a.+/u.test(option) || /^-[cl]+$/u.test(option)) {
+        index += 1;
+        continue;
+      }
+      if (option.startsWith("-") && option !== "-") return null;
+      break;
+    }
+  }
+  const wrappedTokens = tokens.slice(index);
+  if (wrappedTokens.length === 0) return null;
+  let targetIndex = 0;
+  while (targetIndex < wrappedTokens.length) {
+    const indexAfterRedirection = indexAfterShellRedirection(wrappedTokens, targetIndex);
+    if (indexAfterRedirection === null || indexAfterRedirection > wrappedTokens.length) break;
+    targetIndex = indexAfterRedirection;
+  }
+  const target = wrappedTokens[targetIndex];
+  if (target && /^[A-Za-z_][A-Za-z0-9_]*\+?=/u.test(target)) return null;
+  const wrappedProgram = commandProgramNameInternal(
+    serializeShellTokens(wrappedTokens),
+    depth + 1,
+    wrapper === "exec" ? "exec" : "shell",
+    segmentsRemaining
+  );
+  if (wrappedProgram !== null) return wrappedProgram;
+  if (wrapper !== "exec" && target && target === target.toLowerCase() && NON_DESCRIPTIVE_SHELL_PROGRAMS.has(target) && !TERMINAL_SHELL_PROGRAMS.has(target) && remainingCommand) {
+    return commandProgramNameInternal(remainingCommand, depth, "shell", segmentsRemaining - 1);
+  }
+  return null;
+}
+function parseCommandProgramName(command, depth, context, segmentsRemaining) {
+  if (depth >= 8 || segmentsRemaining <= 0) return null;
+  const commandWithoutComments = commandWithoutLeadingShellComments(command);
+  if (commandWithoutComments === null) return null;
+  if (/^(?:catch|finally|for|foreach|function|if|param|switch|try|while)\s*[{(]/iu.test(
+    commandWithoutComments
+  )) {
+    return null;
+  }
+  if (/^[A-Za-z_][A-Za-z0-9_]*\s*\(\s*\)\s*\{/u.test(commandWithoutComments)) return null;
+  if (commandWithoutComments.startsWith("[[")) return null;
+  const commandSplit = splitFirstShellCommand(commandWithoutComments);
+  if (/^@["'](?:\r?\n)/u.test(commandSplit.firstCommand.trimStart())) {
+    return commandSplit.remainingCommand ? commandProgramNameInternal(
+      commandSplit.remainingCommand,
+      depth,
+      "shell",
+      segmentsRemaining - 1
+    ) : null;
+  }
+  const powerShellAssignment = powerShellAssignmentProgramName(
+    commandSplit.firstCommand,
+    depth,
+    commandSplit.remainingCommand,
+    segmentsRemaining
+  );
+  if (powerShellAssignment.matched) return powerShellAssignment.program;
+  const windowsPath = commandSplit.firstCommand.match(
+    /^\s*((?:\.{1,2}|%[A-Za-z_][A-Za-z0-9_]*%|\$env:[A-Za-z_][A-Za-z0-9_]*)\\\S+)/iu
+  )?.[1];
+  if (windowsPath) return staticProgramName(windowsPath);
+  const tokens = tokenizeShellCommand(withoutShellLineContinuations(commandSplit.firstCommand));
+  if (tokens === null) return null;
+  const firstCharacter = commandSplit.firstCommand.trimStart()[0];
+  if (tokens.length === 1 && (firstCharacter === '"' || firstCharacter === "'") && /[\s()=]/u.test(tokens[0] ?? "") && !/[\\/]/u.test(tokens[0] ?? "")) {
+    return commandSplit.remainingCommand ? commandProgramNameInternal(
+      commandSplit.remainingCommand,
+      depth,
+      context,
+      segmentsRemaining - 1
+    ) : null;
+  }
+  let index = 0;
+  let wrapper = null;
+  let executionContext = context;
+  let sawAssignment = false;
+  let sawRedirection = false;
+  while (index < tokens.length) {
+    const token = tokens[index];
+    if (!token) return null;
+    const indexAfterRedirection = indexAfterShellRedirection(tokens, index);
+    if (indexAfterRedirection !== null) {
+      if (indexAfterRedirection > tokens.length) return null;
+      sawRedirection = true;
+      index = indexAfterRedirection;
+      continue;
+    }
+    if (/^[A-Za-z_][A-Za-z0-9_]*\+?=/.test(token)) {
+      sawAssignment = true;
+      index += 1;
+      continue;
+    }
+    if (executionContext === "shell" && token === ":") {
+      return commandSplit.remainingCommand ? commandProgramNameInternal(
+        commandSplit.remainingCommand,
+        depth,
+        executionContext,
+        segmentsRemaining - 1
+      ) : null;
+    }
+    if (NON_PROGRAM_PREFIX_CHARACTERS.includes(token[0] ?? "") && !(token.startsWith("$") && token.includes("/"))) {
+      return executionContext === "shell" && token.startsWith("[") && commandSplit.remainingCommand ? commandProgramNameInternal(
+        commandSplit.remainingCommand,
+        depth,
+        executionContext,
+        segmentsRemaining - 1
+      ) : null;
+    }
+    const tokenProgram = token.split(/[\\/]/).at(-1);
+    const isUnqualifiedToken = token === tokenProgram;
+    if (tokenProgram === "env" || tokenProgram === "sudo") {
+      wrapper = tokenProgram;
+      executionContext = "exec";
+      index += 1;
+      continue;
+    }
+    if (wrapper !== null && token === "--") {
+      wrapper = null;
+      index += 1;
+      continue;
+    }
+    if (wrapper !== null && token.startsWith("-")) {
+      if (wrapper === "env" && (token === "-S" || token === "--split-string")) {
+        const splitCommand = tokens[index + 1];
+        return splitCommand ? commandProgramNameInternal(splitCommand, depth + 1, executionContext, segmentsRemaining) : null;
+      }
+      if (wrapper === "env" && token.startsWith("--split-string=")) {
+        return commandProgramNameInternal(
+          token.slice("--split-string=".length),
+          depth + 1,
+          executionContext,
+          segmentsRemaining
+        );
+      }
+      if (COMMAND_WRAPPER_OPTIONS_WITH_VALUE[wrapper].has(token)) {
+        if (tokens[index + 1] === void 0) return null;
+        index += 2;
+        continue;
+      }
+      if (COMMAND_WRAPPER_FLAGS[wrapper].has(token)) {
+        index += 1;
+        continue;
+      }
+      const equalsIndex = token.indexOf("=");
+      if (token.startsWith("--") && equalsIndex > 2) {
+        if (!COMMAND_WRAPPER_OPTIONS_WITH_VALUE[wrapper].has(token.slice(0, equalsIndex))) {
+          return null;
+        }
+        index += 1;
+        continue;
+      }
+      if (/^-[A-Za-z].+/.test(token) && !token.startsWith("--")) {
+        let consumesNextToken = false;
+        for (const [optionIndex, option] of token.slice(1).split("").entries()) {
+          const shortOption = `-${option}`;
+          if (COMMAND_WRAPPER_OPTIONS_WITH_VALUE[wrapper].has(shortOption)) {
+            consumesNextToken = optionIndex === token.length - 2;
+            break;
+          }
+          if (!COMMAND_WRAPPER_FLAGS[wrapper].has(shortOption)) return null;
+        }
+        if (consumesNextToken && tokens[index + 1] === void 0) return null;
+        index += consumesNextToken ? 2 : 1;
+        continue;
+      }
+      return null;
+    }
+    if (tokenProgram && SHELL_PROGRAMS.has(tokenProgram.replace(/\.exe$/i, "").toLowerCase())) {
+      const scriptIndex = shellCommandArgumentIndex(tokens, index + 1);
+      if (scriptIndex !== null) {
+        const script = tokens[scriptIndex];
+        return script ? commandProgramNameInternal(script, depth + 1, "shell", segmentsRemaining) : null;
+      }
+    }
+    const lowerTokenProgram = tokenProgram?.toLowerCase();
+    if (lowerTokenProgram && WINDOWS_SHELL_PROGRAMS.has(lowerTokenProgram)) {
+      const payload = windowsShellPayloadProgramName(
+        lowerTokenProgram,
+        tokens,
+        index + 1,
+        depth,
+        commandSplit.remainingCommand,
+        commandSplit.separator,
+        segmentsRemaining
+      );
+      if (payload.matched) return payload.program;
+    }
+    if (lowerTokenProgram === "start-process") {
+      const startedProgram = startProcessProgramName(tokens, index + 1);
+      if (startedProgram !== null) return startedProgram;
+    }
+    if (executionContext === "shell" && isUnqualifiedToken && tokenProgram && SHELL_PRECOMMAND_MODIFIERS.has(tokenProgram)) {
+      index += 1;
+      if (tokenProgram === "time" && tokens[index] === "-p") index += 1;
+      if (tokens[index]?.startsWith("-")) return null;
+      continue;
+    }
+    if (isUnqualifiedToken && tokenProgram) {
+      const targetIndex = transparentWrapperCommandIndex(tokenProgram, tokens, index);
+      if (targetIndex !== null) {
+        const wrappedProgram = commandProgramNameInternal(
+          serializeShellTokens(tokens.slice(targetIndex)),
+          depth + 1,
+          "exec",
+          segmentsRemaining
+        );
+        if (wrappedProgram !== null) return wrappedProgram;
+      }
+    }
+    if (isUnqualifiedToken && tokenProgram && SHELL_COMMAND_WRAPPERS.has(tokenProgram)) {
+      return wrappedShellCommandProgramName(
+        tokenProgram,
+        tokens,
+        index + 1,
+        depth,
+        commandSplit.remainingCommand,
+        segmentsRemaining
+      );
+    }
+    if ((executionContext === "shell" || wrapper === "sudo" && tokenProgram && SKIPPABLE_SUDO_PROBES.has(tokenProgram)) && isUnqualifiedToken && tokenProgram && NON_DESCRIPTIVE_SHELL_PROGRAMS.has(tokenProgram) && (!TERMINAL_SHELL_PROGRAMS.has(tokenProgram) || tokenProgram === "false" && commandSplit.separator !== "&&") && commandSplit.remainingCommand) {
+      return commandProgramNameInternal(
+        commandSplit.remainingCommand,
+        depth,
+        "shell",
+        segmentsRemaining - 1
+      );
+    }
+    if (executionContext === "shell" && isUnqualifiedToken && lowerTokenProgram && POWERSHELL_SETUP_PROGRAMS.has(lowerTokenProgram) && commandSplit.remainingCommand) {
+      return commandProgramNameInternal(
+        commandSplit.remainingCommand,
+        depth,
+        "shell",
+        segmentsRemaining - 1
+      );
+    }
+    if (!tokenProgram || isUnqualifiedToken && NON_DESCRIPTIVE_SHELL_PROGRAMS.has(tokenProgram) || NON_PROGRAM_PREFIX_CHARACTERS.includes(tokenProgram[0] ?? "") || NON_PROGRAM_SUFFIX_CHARACTERS.includes(tokenProgram.at(-1) ?? "") || tokenProgram.endsWith("()") || /^[A-Za-z_][A-Za-z0-9_]*\(\)\{$/u.test(tokenProgram)) {
+      return null;
+    }
+    return tokenProgram || null;
+  }
+  if ((sawAssignment || sawRedirection) && wrapper === null && commandSplit.remainingCommand) {
+    return commandProgramNameInternal(
+      commandSplit.remainingCommand,
+      depth,
+      executionContext,
+      segmentsRemaining - 1
+    );
+  }
+  return null;
+}
+function commandProgramNameInternal(command, depth, context, segmentsRemaining = MAX_COMMAND_SEGMENTS) {
+  if (segmentsRemaining <= 0) return null;
+  const calledProgram = powerShellCallOperatorProgramName(command);
+  if (calledProgram !== void 0) return calledProgram;
+  return parseCommandProgramName(command, depth, context, segmentsRemaining) ?? (context === "shell" ? literalCommandAliasProgramName(command) : null);
+}
+function commandProgramName(command, depth = 0) {
+  return commandProgramNameInternal(command, depth, "shell", MAX_COMMAND_SEGMENTS);
+}
+var CONTROL_CHARACTERS = /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/gu;
+function commandDisplayText(command) {
+  return withVisibleControlCharacters(withoutShellWrapper(command));
+}
+function withVisibleControlCharacters(text2) {
+  return text2.replace(
+    CONTROL_CHARACTERS,
+    (character) => character === "\x7F" ? "\u2421" : String.fromCharCode(9216 + character.charCodeAt(0))
+  );
+}
+function withoutShellWrapper(command) {
+  const trimmed = command.trim();
+  const split = splitFirstShellCommand(trimmed);
+  if (split.remainingCommand !== null) return trimmed;
+  const tokens = tokenizeShellCommand(trimmed);
+  const program = tokens?.[0]?.split(/[\\/]/u).at(-1)?.replace(/\.exe$/iu, "");
+  if (!tokens || !program || !SHELL_PROGRAMS.has(program)) return trimmed;
+  const scriptIndex = shellCommandArgumentIndex(tokens, 1);
+  if (scriptIndex === null || scriptIndex !== tokens.length - 1) return trimmed;
+  return tokens[scriptIndex]?.trim() || trimmed;
+}
+var POWERSHELL_VERBS = new Set(
+  `Add Approve Assert Backup Block Build Checkpoint Clear Close Compare Complete Compress Confirm Connect Convert ConvertFrom ConvertTo Copy Debug Deny Deploy Disable Disconnect Dismount Edit Enable Enter Exit Expand Export Find ForEach Format Get Grant Group Hide Import Initialize Install Invoke Join Limit Lock Measure Merge Mount Move New Open Optimize Out Ping Pop Protect Publish Push Read Receive Redo Register Remove Rename Repair Request Reset Resize Resolve Restart Restore Resume Revoke Save Search Select Send Set Show Skip Sort Split Start Step Stop Submit Suspend Switch Sync Tee Test Trace Unblock Undo Uninstall Unlock Unprotect Unpublish Unregister Update Use Wait Watch Where Write`.split(
+    " "
+  )
+);
+
+// src/workLog.ts
+var SOLO = /* @__PURE__ */ new Set(["clarify", "delegate_task", "todo", "todo_list"]);
+function ownsCard(call) {
+  return SOLO.has(call.name) || isBackgroundCall(call);
+}
+function pieces(blocks) {
+  const out = [];
+  let items = [];
+  for (const b of blocks) {
+    if (b.kind === "thinking" || b.kind === "tool" && !ownsCard(b.call)) {
+      items.push(b);
+      continue;
+    }
+    if (items.length) {
+      out.push({ items, kind: "work" });
+      items = [];
+    }
+    out.push({ block: b, kind: "block" });
+  }
+  if (items.length) {
+    out.push({ items, kind: "work" });
+  }
   return out;
 }
-function summarize(calls) {
-  const counts = /* @__PURE__ */ new Map();
+function visibleItems(items) {
+  return items.filter((i) => i.kind === "tool" || i.text.trim());
+}
+function foldOf(turn) {
+  if (turn.status !== "done") {
+    return void 0;
+  }
+  const answer = turn.blocks.findLastIndex((b) => b.kind === "text" && b.text.trim());
+  const hidden = /* @__PURE__ */ new Set();
+  for (const [i, b] of turn.blocks.entries()) {
+    if (i === answer) {
+      continue;
+    }
+    if (b.kind === "tool" && (isBackgroundCall(b.call) || b.call.subagents?.some((a) => a.status === "running" || a.status === "queued"))) {
+      continue;
+    }
+    if (answer >= 0 && i > answer && b.kind === "tool" && b.call.status !== "done") {
+      continue;
+    }
+    hidden.add(b.id);
+  }
+  if (hidden.size === 0) {
+    return void 0;
+  }
+  const ms = (turn.endedAt ?? turn.startedAt) - turn.startedAt;
+  return { hidden, label: ms > 0 ? `Worked for ${formatDuration(ms)}` : "Worked" };
+}
+function formatDuration(ms) {
+  if (!Number.isFinite(ms) || ms < 0) {
+    return "0ms";
+  }
+  if (ms < 1e3) {
+    return `${Math.max(1, Math.round(ms))}ms`;
+  }
+  if (ms < 1e4) {
+    const tenths = Math.round(ms / 100) / 10;
+    return tenths >= 10 ? "10s" : `${tenths.toFixed(1)}s`;
+  }
+  if (ms < 6e4) {
+    return `${Math.round(ms / 1e3)}s`;
+  }
+  const total = Math.round(ms / 1e3);
+  const h = Math.floor(total / 3600);
+  const m = Math.floor(total % 3600 / 60);
+  const s = total % 60;
+  return [h ? `${h}h` : "", m ? `${m}m` : "", s ? `${s}s` : ""].filter(Boolean).join(" ");
+}
+function actionOf(call) {
+  switch (call.name) {
+    case "terminal":
+    case "execute_code":
+    case "process":
+      return "command";
+    case "read_file":
+      return "read";
+    case "patch":
+    case "write_file":
+      return "edit";
+    case "search_files":
+      return "code-search";
+    case "web_search":
+      return "search";
+    case "web_extract":
+      return "fetch";
+  }
+  return call.name.startsWith("browser") ? "browser" : "other";
+}
+var plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+function actionLabel(action, n) {
+  switch (action) {
+    case "command":
+      return `Ran ${plural(n, "command", "commands")}`;
+    case "read":
+      return `Read ${plural(n, "file", "files")}`;
+    case "edit":
+      return `Changed ${plural(n, "file", "files")}`;
+    case "code-search":
+      return `Searched code ${plural(n, "time", "times")}`;
+    case "search":
+      return `Searched the web ${plural(n, "time", "times")}`;
+    case "fetch":
+      return `Read ${plural(n, "page", "pages")}`;
+    case "browser":
+      return `Used browser ${plural(n, "time", "times")}`;
+    case "other":
+      return `Used ${plural(n, "tool", "tools")}`;
+  }
+}
+var priority = (a) => a === "command" || a === "edit" ? 0 : a === "other" ? 2 : 1;
+function summarize(items) {
+  const calls = items.flatMap((i) => i.kind === "tool" ? [i.call] : []);
+  if (!calls.length) {
+    return items.length === 1 ? "Thought" : `Thought (\xD7${items.length})`;
+  }
+  const groups = /* @__PURE__ */ new Map();
   for (const c of calls) {
-    const kind = KINDS2[c.name] ?? [`${c.name} call`, `${c.name} calls`, "Made"];
-    const key2 = `${kind[2]}|${kind[0]}`;
-    const seen = counts.get(key2) ?? { kind, n: 0 };
-    seen.n++;
-    counts.set(key2, seen);
+    const a = actionOf(c);
+    groups.set(a, [...groups.get(a) ?? [], c]);
   }
-  const parts = [...counts.values()].map(({ kind: [one, many, verb], n }, i) => {
-    const phrase = `${verb.toLowerCase()} ${count(n, one, many)}`;
-    return i === 0 ? phrase.charAt(0).toUpperCase() + phrase.slice(1) : phrase;
-  });
-  return parts.length > 1 ? `${parts.slice(0, -1).join(", ")} and ${parts.at(-1)}` : parts[0] ?? "";
-}
-function count(n, one, many) {
-  if (one.startsWith("time")) {
-    const rest = one.slice("time".length);
-    return n === 1 ? `once${rest}` : n === 2 ? `twice${rest}` : `${n} ${many}`;
+  const all = [...groups].map(([action, list], index) => ({
+    count: list.length,
+    index,
+    label: actionLabel(action, action === "edit" ? editedFiles(list) : list.length),
+    priority: priority(action)
+  }));
+  const picked = [...all].sort((a, b) => a.priority - b.priority || a.index - b.index).slice(0, 2).sort((a, b) => a.index - b.index);
+  const labels = picked.map((p) => p.label);
+  const rest = calls.length - picked.reduce((n, p) => n + p.count, 0);
+  if (rest > 0) {
+    labels.push(`Performed ${plural(rest, "other action", "other actions")}`);
   }
-  return `${n} ${n === 1 ? one : many}`;
+  const words2 = labels.map((l, i) => i === 0 ? l : l.charAt(0).toLowerCase() + l.slice(1));
+  return words2.length < 3 ? words2.join(" and ") : `${words2.slice(0, -1).join(", ")}, and ${words2.at(-1)}`;
 }
-function toolRunNode(run2, id, now, blockNode2) {
-  const calls = run2.flatMap((b) => b.kind === "tool" ? [b.call] : []);
-  const live = calls.find((c) => c.status === "running");
-  const failed = calls.filter((c) => c.status === "error").length;
-  const first = calls[0];
-  const ended = Math.max(...calls.map((c) => c.startedAt + (c.duration ?? 0)));
-  const key2 = `r${run2[0].id}`;
-  const spans = live ? [{ t: stepTitle(live) }, ...calls.length > 1 ? [{ s: "muted", t: `  step ${calls.indexOf(live) + 1} of ${calls.length}` }] : []] : [{ t: summarize(calls) }, ...failed ? [{ s: "error", t: `, ${failed} failed` }] : []];
-  return node(
-    "section",
-    { collapsed: !live, collapsible: true, head: `${id}.${key2}.head`, key: key2, role: "omp.tools.run" },
-    [
-      /* @__PURE__ */ jsxs("row", { align: "center", gap: "sm", children: [
-        live ? /* @__PURE__ */ jsx("spinner", { style: "dots", tone: "accent" }, "mark") : /* @__PURE__ */ jsx("icon", { name: failed ? "warning" : "tools" }, "mark"),
-        /* @__PURE__ */ jsx("text", { grow: 1, spans, wrap: "none" }, "label"),
-        live ? /* @__PURE__ */ jsx("elapsed", { age: age(first, first.startedAt, now), format: "short" }, "time") : /* @__PURE__ */ jsx("text", { spans: [{ s: "dim", t: duration(Math.max(0, ended - first.startedAt)) }] }, "time")
-      ] }, "head"),
-      ...run2.map((b) => b.kind === "tool" ? toolNode(b.call, now, { inRun: true }) : blockNode2(b))
-    ]
+function editedFiles(calls) {
+  const paths = /* @__PURE__ */ new Set();
+  let unnamed = 0;
+  for (const c of calls) {
+    const path = str5(c.args.path);
+    if (path) {
+      paths.add(path);
+    } else {
+      unnamed++;
+    }
+  }
+  return paths.size + unnamed;
+}
+function groupIcon(items) {
+  const actions = new Set(items.flatMap((i) => i.kind === "tool" ? [actionOf(i.call)] : []));
+  if (!actions.size) {
+    return "brain";
+  }
+  return actions.size === 1 ? actionIcon([...actions][0]) : "hammer";
+}
+function actionIcon(action) {
+  switch (action) {
+    case "command":
+      return "terminal";
+    case "read":
+      return "eye";
+    case "edit":
+      return "pencil";
+    case "code-search":
+      return "search";
+    case "search":
+    case "fetch":
+      return "globe";
+    case "browser":
+      return "compass";
+    case "other":
+      return "wrench";
+  }
+}
+var str5 = (v) => typeof v === "string" && v ? v : void 0;
+function shortPath(path, cwd = process.env.HERMES_CWD || process.cwd()) {
+  const root = cwd.replace(/\/+$/, "");
+  if (root && path.startsWith(`${root}/`)) {
+    return path.slice(root.length + 1);
+  }
+  const home = homedir5();
+  return home && path.startsWith(`${home}/`) ? `~${path.slice(home.length)}` : path.replace(/^\.\//, "");
+}
+function stepLabel(call) {
+  const a = call.args;
+  const path = str5(a.path);
+  switch (call.name) {
+    case "terminal": {
+      const command = str5(a.command) ?? call.context;
+      return command ? flat(commandDisplayText(command)) : "Command";
+    }
+    case "read_file":
+      return path ? `Read ${shortPath(path)}` : "Read file";
+    case "patch":
+      return path ? `Edited ${shortPath(path)}` : "Edited a file";
+    case "write_file":
+      return path ? `Wrote ${shortPath(path)}` : "Wrote a file";
+    case "search_files": {
+      const pattern = str5(a.pattern) ?? call.context;
+      const where = path && path !== "." ? ` in ${shortPath(path)}` : "";
+      return a.target === "files" ? `Searched files ${pattern}${where}` : `Searched ${pattern}${where}`;
+    }
+    case "web_search":
+      return str5(a.query) ? `Searched the web for ${a.query}` : "Web search";
+    case "web_extract": {
+      const urls = Array.isArray(a.urls) ? a.urls.filter((u) => typeof u === "string") : [];
+      const first = urls[0] ?? str5(a.url);
+      return first ? `Read ${first}${urls.length > 1 ? ` +${urls.length - 1} more` : ""}` : "Read a page";
+    }
+    case "execute_code":
+      return call.context ? flat(call.context) : "Ran a script";
+  }
+  const name = call.name.replace(/_/g, " ");
+  const label = name.charAt(0).toUpperCase() + name.slice(1);
+  return call.context ? `${label}: ${flat(call.context)}` : label;
+}
+function liveLabel(item2) {
+  if (item2.kind === "thinking") {
+    return thoughtLine(item2.text) || (item2.endedAt === void 0 ? "Thinking" : "Thought");
+  }
+  const call = item2.call;
+  const command = call.name === "terminal" ? str5(call.args.command) ?? call.context : void 0;
+  if (!command) {
+    return stepLabel(call);
+  }
+  const verb = { cancelled: "Stopped", done: "Ran", error: "Failed", running: "Running" }[call.status];
+  return `${verb} ${commandProgramName(command) ?? "command"}`;
+}
+function thoughtLine(markdown) {
+  return flat(
+    markdown.replace(/!?\[([^\]]*)\]\([^)]*\)/g, "$1").replace(/^[ \t]*(?:#{1,6}|[-*+]|\d+\.)[ \t]+/gm, "").replace(/`+|\*\*|~~/g, "").replace(/(^|[^\w*])[*_]([^*_\n]+)[*_](?![\w*])/g, "$1$2")
   );
+}
+var flat = (text2) => text2.replace(/\s+/g, " ").trim();
+function clock2(at) {
+  return new Date(at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }).toLowerCase();
 }
 
 // src/preformatted.ts
@@ -31526,6 +32889,92 @@ function randomTip(root) {
   return tips[Math.floor(Math.random() * tips.length)] ?? "";
 }
 
+// src/view/workLog.tsx
+function workingNode2(turn, now) {
+  return /* @__PURE__ */ jsxs("row", { align: "center", gap: "xs", role: "hermes.turn.working", children: [
+    /* @__PURE__ */ jsx("text", { spans: [{ s: "muted", t: "Working for" }], wrap: "none" }, "label"),
+    /* @__PURE__ */ jsx("elapsed", { age: age(turn, turn.startedAt, now), format: "short" }, "age")
+  ] }, "working");
+}
+function thinkingRow() {
+  return /* @__PURE__ */ jsxs("row", { align: "center", gap: "sm", role: "hermes.work.row", children: [
+    /* @__PURE__ */ jsx("icon", { name: "brain" }, "icon"),
+    /* @__PURE__ */ jsx("text", { grow: 1, spans: [{ fx: "shimmer", s: "muted", t: "Thinking" }], wrap: "none" }, "label")
+  ] }, "thinking");
+}
+function foldNode(fold, id, children2) {
+  return node("section", { collapsed: true, collapsible: true, head: `${id}.fold.head`, key: "fold", role: "hermes.turn.fold" }, [
+    /* @__PURE__ */ jsx("row", { align: "center", gap: "xs", children: /* @__PURE__ */ jsx("text", { spans: [{ s: "muted", t: fold.label }], wrap: "none" }, "label") }, "head"),
+    ...children2
+  ]);
+}
+function workNode(items, parent, live, now) {
+  const shown = visibleItems(items);
+  if (!shown.length) {
+    return null;
+  }
+  const key2 = `w${items[0].id}`;
+  const id = `${parent}.${key2}`;
+  if (!live && shown.length === 1) {
+    return itemNode(shown[0], parent, now, key2);
+  }
+  const calls = shown.flatMap((i) => i.kind === "tool" ? [i.call] : []);
+  const failed = calls.at(-1)?.status === "error";
+  const latest = shown.findLast((i) => i.kind === "tool" && i.call.status === "running") ?? shown.at(-1);
+  const head2 = live ? /* @__PURE__ */ jsxs("row", { align: "center", gap: "sm", children: [
+    /* @__PURE__ */ jsx("icon", { name: itemIcon(latest) }, "icon"),
+    /* @__PURE__ */ jsx("text", { grow: 1, spans: [{ fx: "shimmer", s: "muted", t: liveLabel(latest) }], truncate: "end", wrap: "none" }, "label")
+  ] }, "head") : /* @__PURE__ */ jsxs("row", { align: "center", gap: "sm", children: [
+    /* @__PURE__ */ jsx("icon", { name: groupIcon(shown), tone: failed ? "error" : void 0 }, "icon"),
+    /* @__PURE__ */ jsx("text", { grow: 1, spans: [{ s: "muted", t: summarize(shown) }], truncate: "end", wrap: "none" }, "label"),
+    /* @__PURE__ */ jsx("text", { role: "hermes.work.time", spans: [{ s: "dim", t: clock2(startOf(shown[0])) }], wrap: "none" }, "time")
+  ] }, "head");
+  return node("section", { collapsed: true, collapsible: true, head: `${id}.head`, key: key2, role: "hermes.work.group" }, [
+    head2,
+    ...shown.map((i) => itemNode(i, id, now))
+  ]);
+}
+function itemNode(item2, parent, now, key2 = item2.id) {
+  const id = `${parent}.${key2}`;
+  if (item2.kind === "thinking") {
+    return node("section", { collapsed: true, collapsible: true, head: `${id}.head`, key: key2, role: "hermes.work.row" }, [
+      /* @__PURE__ */ jsxs("row", { align: "center", gap: "sm", children: [
+        /* @__PURE__ */ jsx("icon", { name: "brain" }, "icon"),
+        /* @__PURE__ */ jsx("text", { grow: 1, spans: [{ s: "muted", t: thoughtLine(item2.text) }], truncate: "end", wrap: "none" }, "label")
+      ] }, "head"),
+      /* @__PURE__ */ jsx("md", { role: "hermes.work.thought", stream: item2.endedAt === void 0 || void 0, children: item2.text }, "body")
+    ]);
+  }
+  const call = item2.call;
+  const detail = toolDetail(call, now);
+  const running = call.status === "running";
+  const head2 = /* @__PURE__ */ jsxs("row", { align: "center", gap: "sm", title: call.context || void 0, children: [
+    /* @__PURE__ */ jsx("icon", { name: itemIcon(item2), tone: call.status === "error" ? "error" : void 0 }, "icon"),
+    /* @__PURE__ */ jsx(
+      "text",
+      {
+        grow: 1,
+        spans: [{ fx: running ? "shimmer" : void 0, s: "muted", t: stepLabel(call) }],
+        truncate: "end",
+        wrap: "none"
+      },
+      "label"
+    ),
+    call.status === "error" ? /* @__PURE__ */ jsx("icon", { name: "x", tone: "error" }, "failed") : null
+  ] }, "head");
+  if (!detail.length) {
+    return /* @__PURE__ */ jsx("col", { role: "hermes.work.row", children: head2 }, key2);
+  }
+  return node("section", { collapsed: true, collapsible: true, head: `${id}.head`, key: key2, role: "hermes.work.row" }, [
+    head2,
+    /* @__PURE__ */ jsx("col", { gap: "xs", role: "hermes.work.detail", children: detail }, "detail")
+  ]);
+}
+function itemIcon(item2) {
+  return item2.kind === "thinking" ? "brain" : actionIcon(actionOf(item2.call));
+}
+var startOf = (item2) => item2.kind === "tool" ? item2.call.startedAt : item2.startedAt;
+
 // src/view/transcript.tsx
 var kNode = /* @__PURE__ */ Symbol("tsp.node");
 function entryNode(e, id, cx) {
@@ -31575,17 +33024,26 @@ function userNode(e, cx) {
 }
 function turnNode(turn, id, cx) {
   const live = turn.status === "live";
-  const lastText = turn.blocks.findLast((b) => b.kind === "text");
-  const children2 = groupRuns(turn.blocks).map(
-    (b) => Array.isArray(b) ? toolRunNode(b, id, cx.now, (inner) => blockNode(inner, `${id}.r${b[0].id}.${inner.id}`, false, cx)) : b.kind === "steer" ? steerNode(b, steerState(turn, turn.blocks.indexOf(b))) : blockNode(b, `${id}.${b.id}`, live && b === lastText, cx)
-  );
+  const children2 = [];
   if (turn.continued) {
-    children2.unshift(
+    children2.push(
       /* @__PURE__ */ jsxs("row", { align: "center", gap: "sm", role: "omp.turn.continued", children: [
         /* @__PURE__ */ jsx("icon", { name: continuedIcon(turn.continued) }, "icon"),
         /* @__PURE__ */ jsx("text", { spans: [{ s: "muted", t: turn.continued }] }, "why")
       ] }, "continued")
     );
+  }
+  if (live) {
+    children2.push(workingNode2(turn, cx.now));
+  }
+  const fold = foldOf(turn);
+  if (fold) {
+    children2.push(foldNode(fold, id, pieceNodes(turn, turn.blocks.filter((b) => fold.hidden.has(b.id)), `${id}.fold`, cx)));
+  }
+  children2.push(...pieceNodes(turn, fold ? turn.blocks.filter((b) => !fold.hidden.has(b.id)) : turn.blocks, id, cx));
+  const last = pieces(turn.blocks).at(-1);
+  if (live && (!last || last.kind === "block" && last.block.kind !== "text")) {
+    children2.push(thinkingRow());
   }
   if (turn.status === "error") {
     children2.push(
@@ -31621,17 +33079,26 @@ function turnNode(turn, id, cx) {
   }
   return /* @__PURE__ */ jsx("col", { role: "omp.assistant", children: children2 }, turn.id);
 }
-function blockNode(b, id, streaming, cx) {
-  switch (b.kind) {
-    case "text":
-      return /* @__PURE__ */ jsx("md", { stream: streaming || void 0, children: b.text }, b.id);
-    case "tool":
-      return toolNode(b.call, cx.now);
-    case "thinking":
-      return thinkingNode(b, id, cx);
-    case "steer":
-      return steerNode(b, "landed");
-  }
+function pieceNodes(turn, blocks, parent, cx) {
+  const live = turn.status === "live";
+  const ps = pieces(blocks);
+  const lastText = blocks.findLast((b) => b.kind === "text");
+  return ps.map((p, i) => {
+    if (p.kind === "work") {
+      return workNode(p.items, parent, live && i === ps.length - 1, cx.now);
+    }
+    const b = p.block;
+    switch (b.kind) {
+      case "text":
+        return /* @__PURE__ */ jsx("md", { stream: live && b === lastText || void 0, children: b.text }, b.id);
+      case "tool":
+        return toolNode(b.call, cx.now);
+      case "steer":
+        return steerNode(b, steerState(turn, turn.blocks.indexOf(b)));
+      case "thinking":
+        return null;
+    }
+  });
 }
 function continuedIcon(why) {
   return why.startsWith("Subagents") ? "users" : why.startsWith("Watcher") ? "eye" : why.startsWith("Background") ? "terminal" : "loop";
@@ -31645,28 +33112,6 @@ function steerNode(b, state) {
       /* @__PURE__ */ jsx("text", { spans: [{ s: "dim", t: `Steered${STEER_NOTE[state]}` }] }, "state")
     ] }, "how")
   ] }, b.id);
-}
-function thinkingNode(b, id, cx) {
-  const head2 = `${id}.head`;
-  if (b.endedAt === void 0) {
-    return /* @__PURE__ */ jsxs("section", { collapsed: false, collapsible: true, head: head2, role: "omp.thinking.live", children: [
-      /* @__PURE__ */ jsxs("row", { gap: "sm", children: [
-        /* @__PURE__ */ jsx("spinner", { role: "omp.thinking.spin", style: "starburst" }, "spin"),
-        /* @__PURE__ */ jsx("text", { spans: [{ s: "muted", t: "Thinking\u2026" }] }, "label"),
-        /* @__PURE__ */ jsx("elapsed", { age: age(b, b.startedAt, cx.now), format: "short" }, "age")
-      ] }, "head"),
-      /* @__PURE__ */ jsx("md", { stream: true, children: b.text }, "body")
-    ] }, b.id);
-  }
-  const took = b.endedAt - b.startedAt;
-  return node(
-    "section",
-    { collapsed: true, collapsible: true, head: head2, key: b.id, role: "omp.thinking", took: took > 0 ? took : void 0 },
-    [
-      /* @__PURE__ */ jsx("text", { spans: [{ s: "muted", t: took >= 1e3 ? `Thought for ${duration(took)}` : "Thought" }] }, "head"),
-      /* @__PURE__ */ jsx("md", { children: b.text }, "body")
-    ]
-  );
 }
 function copyButton(text2, id, role, title, cx) {
   const copied = cx.copied === id;
@@ -31682,7 +33127,8 @@ function copyButton(text2, id, role, title, cx) {
   );
 }
 function answerText(turn) {
-  return turn.blocks.flatMap((b) => b.kind === "text" && b.text.trim() ? [b.text.trim()] : []).join("\n\n");
+  const last = turn.blocks.findLast((b) => b.kind === "text" && b.text.trim());
+  return last?.kind === "text" ? last.text.trim() : "";
 }
 function usageNode(turn, answer, cx) {
   const u = turn.usage ?? {};
@@ -32267,6 +33713,7 @@ var App = class {
   #adopt(r) {
     this.#subscribe(r);
     this.sid = r.session_id;
+    this.#showThoughts(r.session_id);
     this.storedSid = r.info?.stored_session_id || r.stored_session_id || null;
     writeActiveSessionFile(this.storedSid ?? r.session_id);
     this.info = r.info ?? this.info;
@@ -32549,6 +33996,19 @@ var App = class {
       this.busy.label = label;
     }
   }
+  /**
+   * The shared gateway streams a session's reasoning only to a viewer that asks (a session flag,
+   * not a settings write); the work log shows it as thought rows.
+   */
+  #showThoughts(sid) {
+    if (loadSettings().thoughts === false) {
+      return;
+    }
+    this.#gw.request("config.set", { key: "show_reasoning", session_id: sid, value: "on" }).catch((error) => {
+      this.transcript.notice(`Could not turn on thoughts: ${error.message}`, "warning");
+      this.changed();
+    });
+  }
   /** Steps the session's reasoning effort up hermes's ladder; session.info echoes it back. */
   #cycleEffort() {
     if (!this.sid) {
@@ -32636,7 +34096,7 @@ ${this.composer.text}` : next);
         composer: this.composer,
         context: max > 0 ? { max, used } : void 0,
         cost: usage?.cost_usd ?? void 0,
-        cwd: info?.cwd ? shortPath(info.cwd) : "",
+        cwd: info?.cwd ? shortPath2(info.cwd) : "",
         effort: info?.reasoning_effort ?? "",
         ghost: modal ? "" : this.#completion.ghost,
         inputId: INPUT_ID,
@@ -32695,7 +34155,7 @@ function kaomojiLabel(text2) {
   const word = text2.match(/([A-Za-z][A-Za-z ]*[A-Za-z])\.{2,}\s*$/)?.[1];
   return word ? `${word.charAt(0).toUpperCase()}${word.slice(1)}\u2026` : "";
 }
-function shortPath(path) {
+function shortPath2(path) {
   const home = process.env.HOME;
   return home && path.startsWith(home) ? `~${path.slice(home.length)}` : path;
 }
@@ -32704,11 +34164,11 @@ function shortPath(path) {
 import { readFile as readFile3 } from "node:fs/promises";
 
 // src/watch/child.ts
-import { homedir as homedir5 } from "node:os";
+import { homedir as homedir6 } from "node:os";
 import { join as join5 } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 function stateDbPath(env = process.env) {
-  return join5(env.HERMES_HOME || join5(homedir5(), ".hermes"), "state.db");
+  return join5(env.HERMES_HOME || join5(homedir6(), ".hermes"), "state.db");
 }
 var ChildStore = class {
   #db;

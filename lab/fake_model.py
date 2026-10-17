@@ -10,6 +10,8 @@ the user's prompt, so one home covers every flow:
     "clarify"   -> a clarify call with choices (clarify sheet)
     "tool"      -> a harmless terminal call (tool card)
     "steps"     -> four calls in a row (commands, a read, a search), then an answer
+    "work…"     -> (at the start) a turn like a real one: reasoning, short notes and tool calls
+                   in rounds (commands, reads, a search, a slow command), then a long answer
     "script"    -> a heredoc script with sections and long output, run alone
     "slow"      -> one 8-second command, long enough to queue or steer a message
     "delegate…" -> (at the start) a delegate_task batch of three subagents, each running two slow
@@ -44,6 +46,41 @@ STEPS = [
     ("read_file", {"path": "README.md"}),
     ("terminal", {"command": "git log --oneline -3"}),
     ("search_files", {"pattern": "def ", "path": "lab"}),
+]
+
+# One round per model request: (reasoning, a note to the user, tool calls). The last has no calls.
+WORK = [
+    ("I should start by exploring the project to get oriented: the layout, the docs, and the recent history.",
+     "I'll start by reading the repo layout, the docs, and recent history.",
+     [("terminal", {"command": "ls -la && echo --- && git log --oneline | wc -l && git log --oneline | head -5"}),
+      ("terminal", {"command": "cat README.md | head -20 && echo --- && cat plugin.yaml"}),
+      ("terminal", {"command": "git log --reverse --format='%h %ad %s' --date=short | head -10"})]),
+    ("There's a lab directory with the fake model; I should check it out.",
+     "The README points to `lab/` for the fake model. I'll look there next.",
+     [("read_file", {"path": "lab/fake_model.py"}),
+      ("search_files", {"pattern": "def ", "path": "lab"}),
+      ("read_file", {"path": "docs/spec.md"})]),
+    ("The spec lists milestones. Let me check the frontend tests and run a slower step.",
+     None,
+     [("terminal", {"command": "sleep 3 && ls frontend/src | head -20"}),
+      ("write_file", {"path": "/tmp/hermes-tern-lab-note-{n}.md", "content": "lab note\n"})]),
+    ("**Summarizing**\n\nI have enough to answer now: the plugin, the lab and the spec.",
+     """Here is what I found.
+
+## The plugin
+
+`hermes tern` is a **Tern-native** frontend for Hermes. It lives in `frontend/` and ships as a
+committed bundle.
+
+- The lab drives it with a fake model.
+- The spec lists milestones M1 to M8.
+
+## Next steps
+
+1. Read `docs/spec.md` for the order.
+2. Run the lab before each change.
+""",
+     []),
 ]
 
 SCRIPT = """cat > /tmp/hermes-tern-lab.sh <<'EOF'
@@ -143,6 +180,19 @@ class Model(BaseHTTPRequestHandler):
             calls = _subagent_calls(messages)
             content = None if calls else SUBAGENT_REPLY
             delay = 0.15
+        elif prompt.lower().lstrip().startswith("work"):
+            # One round per request: the assistant messages since the prompt count the rounds done.
+            last_user = max(i for i, m in enumerate(messages) if m.get("role") == "user")
+            done = sum(1 for m in messages[last_user:] if m.get("role") == "assistant")
+            thought, note, round_calls = WORK[min(done, len(WORK) - 1)]
+            # A fresh note file per turn: Hermes refuses to overwrite a file the task has not read.
+            fresh = lambda a: {k: v.replace("{n}", str(time.time_ns())) if k == "path" else v for k, v in a.items()}
+            calls = [_call(name, fresh(args), f"call-w{done}-{i}") for i, (name, args) in enumerate(round_calls)] or None
+            if request.get("stream"):
+                self._stream(note, calls, 0.12, thought)
+                return
+            content = note
+            delay = 0.0
         elif "steps" in prompt.lower():
             # One call per request until the steps run out; the tool results so far count them.
             last_user = max(i for i, m in enumerate(messages) if m.get("role") == "user")
@@ -163,18 +213,21 @@ class Model(BaseHTTPRequestHandler):
                         "choices": [{"index": 0, "message": message, "finish_reason": "tool_calls" if calls else "stop"}],
                         "usage": {"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15}})
 
-    def _stream(self, content: str | None, calls: list[dict] | None, delay: float = 0.0):
+    def _stream(self, content: str | None, calls: list[dict] | None, delay: float = 0.0, reasoning: str | None = None):
         self.send_response(200)
         self.send_header("Content-Type", "text/event-stream")
         self.end_headers()
         deltas = []
-        if calls:
-            deltas.append({"role": "assistant", "tool_calls": [{**c, "index": i} for i, c in enumerate(calls)]})
-        else:
+        if reasoning:
+            step = max(1, len(reasoning) // 5)
+            deltas += [{"role": "assistant", "reasoning_content": reasoning[i:i + step]} for i in range(0, len(reasoning), step)]
+        if content and (calls or reasoning) or not calls:
             # A few chunks so the transcript visibly streams.
             text = content or ""
             step = max(1, len(text) // 6)
             deltas += [{"role": "assistant", "content": text[i:i + step]} for i in range(0, len(text), step)]
+        if calls:
+            deltas.append({"role": "assistant", "tool_calls": [{**c, "index": i} for i, c in enumerate(calls)]})
         for delta in deltas:
             self._chunk(delta, None)
             if delay:

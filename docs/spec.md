@@ -31,6 +31,22 @@ prove it.
 | #2 | Live subagents: Task card rows, the agents pill, the agents hub with timelines, steer and stop; copy buttons as icons, one under each answer |
 | #3 | Tern's theme by default; `/theme` (Tern, Nous, Hermes skin); correct agent timers |
 | #4 | Skill and path completion on every line of a draft |
+| #5 | This spec |
+| #6 | Subagent sidebar: the full transcript beside the chat, steerable |
+| #7 | Summarised tool runs |
+| #8 | Cache hit and tokens per second |
+| #9 | A click on an agent row opens it beside the chat |
+| #10 | `chat --tui` runs in the plugin's own process (faster start) |
+| #11 | A click on the context meter no longer runs /usage |
+| #12 | Slash output as Markdown; a structured /usage view |
+| #13 | Steer the running turn from a queued prompt (Steer button, Alt+Enter) |
+| #14 | Tool cards say what a step is for; runs list one line per step |
+| #15 | /usage rate limits say how much is left |
+| #16 | Opening a card no longer scrolls; turns Hermes starts by itself are marked |
+| #17 | A steer shows inside the turn it joined, where it landed |
+| #18 | Background processes: pill, sheet and live terminal cards |
+| #19 | Hermes' own notices become a reason line, not a user bubble |
+| next | The work log as t3code draws it: "Working for", work groups, thought rows, "Worked for" folds |
 
 ## Milestones
 

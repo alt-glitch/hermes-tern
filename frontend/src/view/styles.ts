@@ -3,9 +3,98 @@
 import { css } from '@stencil-hq/tern'
 
 export const STYLES = css`
-  /* A run's summary is prose ("Ran 2 commands, read 1 file"), not code: the UI face, not mono. */
-  [data-role='omp.tools.run'] > .sf-section-head .sf-head {
+  /* The work log, as t3code draws it: quiet 14px rows in the UI face, a 24px line each. */
+  [data-role='hermes.turn.working'],
+  [data-role='hermes.turn.fold'] > .sf-section-head,
+  [data-role='hermes.work.group'] > .sf-section-head,
+  [data-role='hermes.work.row'] > .sf-section-head,
+  .sf-col[data-role='hermes.work.row'],
+  .sf-row[data-role='hermes.work.row'] {
+    font: 400 14px/24px var(--sans) !important;
+    min-height: 24px;
+  }
+
+  /* "Working for 12s" and "Worked for 54s" head the turn, ruled off from what follows. */
+  [data-role='hermes.turn.working'],
+  [data-role='hermes.turn.fold'] > .sf-section-head {
+    padding-bottom: 8px !important;
+    margin-bottom: 6px !important;
+    box-shadow: inset 0 -1px 0 rgba(128, 128, 128, 0.22) !important;
+  }
+
+  /* An open fold or group lists its steps and notes where they were, not in an indented code
+     column: no guide line, no indent, the UI face at the answer's size. */
+  :is([data-role='hermes.turn.fold'], [data-role='hermes.work.group'], [data-role='hermes.work.row']),
+  :is([data-role='hermes.turn.fold'], [data-role='hermes.work.group'], [data-role='hermes.work.row']) > .sf-section-body {
+    margin-left: 0 !important;
+    padding-left: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+    background: none !important;
+  }
+
+  :is([data-role='hermes.turn.fold'], [data-role='hermes.work.group'], [data-role='hermes.work.row'])::before,
+  :is([data-role='hermes.turn.fold'], [data-role='hermes.work.group'], [data-role='hermes.work.row'])::after,
+  :is([data-role='hermes.turn.fold'], [data-role='hermes.work.group'], [data-role='hermes.work.row']) > .sf-section-body::before,
+  :is([data-role='hermes.turn.fold'], [data-role='hermes.work.group'], [data-role='hermes.work.row']) > .sf-section-body::after {
+    display: none !important;
+  }
+
+  :is([data-role='hermes.turn.fold'], [data-role='hermes.work.group'], [data-role='hermes.work.row']) > .sf-section-body {
     font-family: var(--sans) !important;
+    font-size: 14px !important;
+  }
+
+  [data-role='hermes.turn.fold'] > .sf-section-body > .sf-md {
+    margin: 4px 0 10px !important;
+  }
+
+  [data-role='hermes.turn.working'] .sf-elapsed {
+    margin-left: 4px;
+  }
+
+  /* The chevron follows the label: right after "Worked for", at the row's end on a step. */
+  [data-role='hermes.turn.fold'] > .sf-section-head > .sf-chev,
+  [data-role='hermes.work.row'] > .sf-section-head > .sf-chev {
+    order: 2;
+    opacity: 0.7;
+  }
+
+  [data-role='hermes.work.row'] > .sf-section-head > .sf-head {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  /* A group's summary has no chevron; when it started shows on hover. */
+  [data-role='hermes.work.group'] > .sf-section-head > .sf-chev {
+    display: none;
+  }
+
+  [data-role='hermes.work.group'] > .sf-section-head > .sf-head {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  [data-role='hermes.work.time'] {
+    opacity: 0;
+    font-size: 12px !important;
+    font-variant-numeric: tabular-nums;
+  }
+
+  [data-role='hermes.work.group'] > .sf-section-head:hover [data-role='hermes.work.time'] {
+    opacity: 1;
+  }
+
+  /* What a step or thought opens to sits under its label, past the icon column: a call's
+     command and output in the code face, a thought as prose. */
+  [data-role='hermes.work.detail'],
+  [data-role='hermes.work.thought'] {
+    margin: 2px 0 8px 28px !important;
+  }
+
+  [data-role='hermes.work.detail'] {
+    font-family: var(--mono) !important;
+    font-size: 13px !important;
   }
 
   /* omp's ask theme draws a radio at the start of each option without moving the text over. */
