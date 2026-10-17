@@ -10991,11 +10991,11 @@ var require_pluralizer = __commonJS({
         this.singular = singular;
         this.plural = plural;
       }
-      pluralize(count) {
-        const one = count === 1;
+      pluralize(count2) {
+        const one = count2 === 1;
         const keys = one ? singulars : plurals;
         const noun = one ? this.singular : this.plural;
-        return { ...keys, count, noun };
+        return { ...keys, count: count2, noun };
       }
     };
   }
@@ -18341,15 +18341,15 @@ ${value}`;
           pos = 0;
         }
       }
-      discardLeadingBytes(count) {
-        while (count > 0 && this.lineChunkIndex < this.chunks.length) {
+      discardLeadingBytes(count2) {
+        while (count2 > 0 && this.lineChunkIndex < this.chunks.length) {
           const chunk = this.chunks[this.lineChunkIndex];
           const remaining = chunk.length - this.linePos;
-          if (count < remaining) {
-            this.linePos += count;
-            count = 0;
+          if (count2 < remaining) {
+            this.linePos += count2;
+            count2 = 0;
           } else {
-            count -= remaining;
+            count2 -= remaining;
             this.lineChunkIndex++;
             this.linePos = 0;
           }
@@ -21553,7 +21553,7 @@ var billingEn = {
       monthlyLimit: "Monthly limit",
       card: (card) => `Card: ${card}`,
       noCardHint: "No saved card on file \u2014 \u201CAdd funds\u201D walks you through adding one.",
-      hint: (count) => `\u2191/\u2193 select \xB7 1-${count} quick pick \xB7 Enter confirm \xB7 Esc close`
+      hint: (count2) => `\u2191/\u2193 select \xB7 1-${count2} quick pick \xB7 Enter confirm \xB7 Esc close`
     },
     buy: {
       title: "Add funds",
@@ -21572,7 +21572,7 @@ var billingEn = {
       noSavedCardLine: "No saved card on file.",
       addCardOnce: "Add a card once on the portal billing page \u2014 after that you can top up right from the terminal.",
       checkingForCard: "Checking for a card\u2026",
-      hint: (count) => `\u2191/\u2193 select \xB7 1-${count} quick pick \xB7 Enter confirm \xB7 Esc back`
+      hint: (count2) => `\u2191/\u2193 select \xB7 1-${count2} quick pick \xB7 Enter confirm \xB7 Esc back`
     },
     confirm: {
       title: "Confirm purchase",
@@ -21634,7 +21634,7 @@ var billingEn = {
       usageDefaultCeiling: (spent, limit) => `${spent} of ${limit} used this month (default ceiling)`,
       noCapVisible: "No monthly cap visible (managed on the portal).",
       readOnly: "The monthly limit is set on the portal \u2014 shown here read-only.",
-      hint: (count) => `\u2191/\u2193 select \xB7 1-${count} quick pick \xB7 Enter confirm \xB7 Esc back`
+      hint: (count2) => `\u2191/\u2193 select \xB7 1-${count2} quick pick \xB7 Enter confirm \xB7 Esc back`
     }
   }
 };
@@ -21709,10 +21709,10 @@ var chatBitsEn = {
       tagFull: "Nous Research \xB7 Messenger of the Digital Gods",
       tagMid: "Messenger of the Digital Gods",
       scanningSkills: "scanning skills",
-      moreCategories: (count) => `(and ${count} more categories\u2026)`,
-      moreToolsets: (count) => `(and ${count} more toolsets\u2026)`,
-      toolsOne: (count) => `${count} tool`,
-      toolsOther: (count) => `${count} tools`,
+      moreCategories: (count2) => `(and ${count2} more categories\u2026)`,
+      moreToolsets: (count2) => `(and ${count2} more toolsets\u2026)`,
+      toolsOne: (count2) => `${count2} tool`,
+      toolsOther: (count2) => `${count2} tools`,
       lazy: "(lazy)",
       disabled: "disabled",
       connecting: "connecting",
@@ -21722,19 +21722,19 @@ var chatBitsEn = {
       sessionLabel: "Session: ",
       availableTools: "Available Tools",
       availableSkills: "Available Skills",
-      inCategoriesOne: (count) => `in ${count} category`,
-      inCategoriesOther: (count) => `in ${count} categories`,
+      inCategoriesOne: (count2) => `in ${count2} category`,
+      inCategoriesOther: (count2) => `in ${count2} categories`,
       systemPrompt: "System Prompt",
-      charsSuffix: (count) => `\u2014 ${count} chars`,
+      charsSuffix: (count2) => `\u2014 ${count2} chars`,
       mcpServers: "MCP Servers",
       connected: "connected",
       // `count` is a number, or '…' while a lazy boot is still counting.
-      toolsSummary: (count) => `${count} tools`,
-      skillsSummary: (count) => `${count} skills`,
-      mcpSummary: (count) => `${count} MCP`,
+      toolsSummary: (count2) => `${count2} tools`,
+      skillsSummary: (count2) => `${count2} skills`,
+      mcpSummary: (count2) => `${count2} MCP`,
       helpHint: "/help for commands",
-      commitsBehindOne: (count) => `! ${count} commit behind`,
-      commitsBehindOther: (count) => `! ${count} commits behind`,
+      commitsBehindOne: (count2) => `! ${count2} commit behind`,
+      commitsBehindOther: (count2) => `! ${count2} commits behind`,
       runPrefix: " - run ",
       toUpdate: " to update"
     },
@@ -21748,24 +21748,24 @@ var chatBitsEn = {
       subagentFallback: (index) => `Subagent ${index}`,
       statusQueued: "queued",
       statusRunning: "running",
-      toolsOne: (count) => `${count} tool`,
-      toolsOther: (count) => `${count} tools`,
+      toolsOne: (count2) => `${count2} tool`,
+      toolsOther: (count2) => `${count2} tools`,
       tokShort: (tokens) => `${tokens} tok`,
-      subtreeTools: (count) => `+${count}t sub`,
+      subtreeTools: (count2) => `+${count2}t sub`,
       // {0} = depth of the spawned children, {1} = total descendants.
       spawnedSuffix: (depth, total) => `d${depth} \xB7 ${total} total`,
       drafting: "drafting...",
       analyzingToolOutput: "analyzing tool output\u2026",
       argsHeader: "Args:",
-      approxTokens: (count) => `~${count} tokens`,
-      approxTotal: (count) => `~${count} total`,
+      approxTokens: (count2) => `~${count2} tokens`,
+      approxTotal: (count2) => `~${count2} total`,
       agentsToMonitor: "(/agents to monitor)",
       agentsHint: "(/agents)"
     },
     messageLine: {
       emptyToolResult: "(empty tool result)",
       systemMessage: "(system message)",
-      chars: (count) => `${count} chars`,
+      chars: (count2) => `${count2} chars`,
       longMessage: "[long message]",
       response: "Response"
     },
@@ -21775,9 +21775,9 @@ var chatBitsEn = {
       incompleteOther: (pending) => `\xB7 incomplete \xB7 ${pending} still pending/in_progress`
     },
     queued: {
-      header: (count) => `queued (${count})`,
+      header: (count2) => `queued (${count2})`,
       editing: (position) => ` \xB7 editing ${position} \xB7 Ctrl+X delete \xB7 Esc cancel`,
-      more: (count) => `\u2026and ${count} more`
+      more: (count2) => `\u2026and ${count2} more`
     },
     entry: {
       noTty: "hermes-tui: no TTY",
@@ -21799,12 +21799,12 @@ var chromeEn = {
     mcpReloaded: "MCP reloaded after config change",
     compacting: "compacting",
     devCredits: " (dev credits)",
-    sessionCount: (count) => `${count} ${count === 1 ? "session" : "sessions"}`,
+    sessionCount: (count2) => `${count2} ${count2 === 1 ? "session" : "sessions"}`,
     paused: "\u23F8 paused",
     resumesWhenSubagentFinishes: "\u21A9 resumes when subagent finishes",
-    resumesWhenSubagentsFinish: (count) => `\u21A9 resumes when ${count} subagents finish`,
-    bgTasks: (count) => `${count} bg`,
-    compressions: (count) => `cmp ${count}`,
+    resumesWhenSubagentsFinish: (count2) => `\u21A9 resumes when ${count2} subagents finish`,
+    bgTasks: (count2) => `${count2} bg`,
+    compressions: (count2) => `cmp ${count2}`,
     fast: "fast"
   },
   composer: {
@@ -21878,7 +21878,7 @@ var connectionEn = {
     header: {
       // {0} title, {1} account name
       account: (title, alias) => `${title} \xB7 ${alias}`,
-      moreToAnswer: (count) => `${count} more to answer after this one.`
+      moreToAnswer: (count2) => `${count2} more to answer after this one.`
     },
     field: {
       set: "Set",
@@ -21929,10 +21929,10 @@ var connectionEn = {
     },
     confirmDelete: (label) => `delete ${label}? y/N`,
     slice: {
-      skillsOne: (count) => `${count} skill`,
-      skillsOther: (count) => `${count} skills`,
-      memoriesOne: (count) => `${count} memory`,
-      memoriesOther: (count) => `${count} memories`
+      skillsOne: (count2) => `${count2} skill`,
+      skillsOther: (count2) => `${count2} skills`,
+      memoriesOne: (count2) => `${count2} memory`,
+      memoriesOther: (count2) => `${count2} memories`
     },
     hint: {
       item: "\u2191\u2193/jk scroll \xB7 PgUp/PgDn page \xB7 e edit \xB7 d delete \xB7 Esc/\u2190 back \xB7 q close",
@@ -21954,8 +21954,8 @@ var connectorsEn = {
     loading: "loading accounts\u2026",
     empty: "No connector accounts yet. Press a to add one.",
     unnamedTag: "(unnamed)",
-    retiredFolded: (count) => `${count} retired (Tab to show)`,
-    retiredShown: (count) => `${count} retired shown (Tab to hide)`,
+    retiredFolded: (count2) => `${count2} retired (Tab to show)`,
+    retiredShown: (count2) => `${count2} retired shown (Tab to hide)`,
     status: {
       active: "active",
       expired: "expired",
@@ -22141,8 +22141,8 @@ var hubsEn = {
   hubs: {
     // Shared list-window affordances for the Skills / Plugins hubs.
     list: {
-      moreAbove: (count) => ` \u2191 ${count} more`,
-      moreBelow: (count) => ` \u2193 ${count} more`,
+      moreAbove: (count2) => ` \u2191 ${count2} more`,
+      moreBelow: (count2) => ` \u2193 ${count2} more`,
       errorLine: (message) => `error: ${message}`
     },
     agents: {
@@ -22199,8 +22199,8 @@ var hubsEn = {
         toolsValue: (own, subtree) => `${own} (subtree ${subtree})`,
         subtree: "subtree",
         // {0} descendant count, {1} max depth below, {2} active count
-        subtreeValueOne: (count, depth, active) => `${count} agent \xB7 d${depth} \xB7 \u26A1${active}`,
-        subtreeValueOther: (count, depth, active) => `${count} agents \xB7 d${depth} \xB7 \u26A1${active}`,
+        subtreeValueOne: (count2, depth, active) => `${count2} agent \xB7 d${depth} \xB7 \u26A1${active}`,
+        subtreeValueOther: (count2, depth, active) => `${count2} agents \xB7 d${depth} \xB7 \u26A1${active}`,
         elapsed: "elapsed",
         iteration: "iteration",
         apiCalls: "api calls",
@@ -22209,7 +22209,7 @@ var hubsEn = {
         tokensValue: (input, output) => `${input} in \xB7 ${output} out`,
         reasoningSuffix: (tokens) => ` \xB7 ${tokens} reasoning`,
         subtreeTokens: "subtree tokens",
-        filesMore: (count) => `\u2026+${count} more`
+        filesMore: (count2) => `\u2026+${count2} more`
       },
       diff: {
         title: "Replay diff",
@@ -22229,8 +22229,8 @@ var hubsEn = {
         killing: (id) => `killing ${id}`,
         notFound: (id) => `not found: ${id}`,
         killFailed: (id) => `kill failed: ${id}`,
-        killingSubtreeOne: (count) => `killing subtree \xB7 ${count} node`,
-        killingSubtreeOther: (count) => `killing subtree \xB7 ${count} nodes`,
+        killingSubtreeOne: (count2) => `killing subtree \xB7 ${count2} node`,
+        killingSubtreeOther: (count2) => `killing subtree \xB7 ${count2} nodes`,
         spawningPaused: "spawning paused",
         spawningResumed: "spawning resumed",
         pauseFailed: "pause failed",
@@ -22256,12 +22256,12 @@ var hubsEn = {
       }
     },
     agentsPanel: {
-      running: (count) => `${count} running`,
-      done: (count) => `${count} done`,
-      liveAgents: (count) => `${count} live agents`,
-      procs: (count) => `${count} procs`,
-      procsDone: (count) => `${count} done`,
-      moreHidden: (count) => ` \xB7 +${count} more`,
+      running: (count2) => `${count2} running`,
+      done: (count2) => `${count2} done`,
+      liveAgents: (count2) => `${count2} live agents`,
+      procs: (count2) => `${count2} procs`,
+      procsDone: (count2) => `${count2} done`,
+      moreHidden: (count2) => ` \xB7 +${count2} more`,
       processes: "Processes",
       collapsedHint: " \xB7 Ctrl+T expand \xB7 Ctrl+R restore",
       expandedHint: " \xB7 Ctrl+T expand \xB7 Ctrl+R collapse"
@@ -22287,8 +22287,8 @@ var hubsEn = {
       installing: "installing\u2026",
       selectCategory: "select a category",
       // {0} category name, {1} skill count
-      categoryRow: (category, count) => `${category} \xB7 ${count} skills`,
-      skillCount: (count) => `${count} skill(s)`,
+      categoryRow: (category, count2) => `${category} \xB7 ${count2} skills`,
+      skillCount: (count2) => `${count2} skill(s)`,
       emptyCategory: "no skills in this category",
       pathLine: (path) => `path: ${path}`,
       hintCancel: "Esc/q cancel",
@@ -22309,9 +22309,9 @@ var hubsEn = {
         notEnabled: "not enabled"
       },
       bundledTag: " [bundled]",
-      userScope: (count) => `${count} user plugin(s)`,
-      bundledSuffix: (count) => ` \xB7 +${count} bundled (Tab)`,
-      allScope: (count) => `all ${count} plugins`,
+      userScope: (count2) => `${count2} user plugin(s)`,
+      bundledSuffix: (count2) => ` \xB7 +${count2} bundled (Tab)`,
+      allScope: (count2) => `all ${count2} plugins`,
       hintClose: "Esc/q close",
       hintList: "\u2191/\u2193 select \xB7 Enter/Space toggle \xB7 Tab user/all \xB7 1-9,0 quick \xB7 Esc/q close"
     }
@@ -22366,13 +22366,13 @@ var libTextEn = {
       conflicts: (file2, keys) => `Existing terminal keybindings would conflict in ${file2}: ${keys}`,
       alreadyConfigured: (label) => `${label} terminal keybindings already configured.`,
       /** {0} = count, {1} = IDE label */
-      addedOne: (count, label) => `Added ${count} ${label} terminal keybinding`,
+      addedOne: (count2, label) => `Added ${count2} ${label} terminal keybinding`,
       /** {0} = count, {1} = IDE label */
-      addedOther: (count, label) => `Added ${count} ${label} terminal keybindings`,
+      addedOther: (count2, label) => `Added ${count2} ${label} terminal keybindings`,
       /** {0} = count */
-      migratedOne: (count) => `migrated ${count} legacy binding to CSI u encoding`,
+      migratedOne: (count2) => `migrated ${count2} legacy binding to CSI u encoding`,
       /** {0} = count */
-      migratedOther: (count) => `migrated ${count} legacy bindings to CSI u encoding`,
+      migratedOther: (count2) => `migrated ${count2} legacy bindings to CSI u encoding`,
       /** {0} = comma-joined summary parts, {1} = keybindings.json path */
       summaryIn: (parts, file2) => `${parts} in ${file2}`,
       /** {0} = IDE label, {1} = error text */
@@ -22404,15 +22404,15 @@ var libTextEn = {
     // lib/subagentTree.ts — the `d2 · 7 agents · 124 tools · 2m 14s` summary chip.
     subagentTree: {
       /** {0} = pre-formatted count */
-      agentsOne: (count) => `${count} agent`,
+      agentsOne: (count2) => `${count2} agent`,
       /** {0} = pre-formatted count */
-      agentsOther: (count) => `${count} agents`,
+      agentsOther: (count2) => `${count2} agents`,
       /** {0} = pre-formatted count */
-      toolsOne: (count) => `${count} tool`,
+      toolsOne: (count2) => `${count2} tool`,
       /** {0} = pre-formatted count */
-      toolsOther: (count) => `${count} tools`,
+      toolsOther: (count2) => `${count2} tools`,
       /** {0} = compact token count (`12k`) */
-      tokens: (count) => `${count} tok`
+      tokens: (count2) => `${count2} tok`
     },
     // lib/text.ts — transcript trail / clarify prose.
     text: {
@@ -22425,9 +22425,9 @@ var libTextEn = {
       resultLabel: "Result",
       errorLabel: "Error",
       /** {0} = pre-formatted line count; sits inside a `[[ … ]]` composer token */
-      pasteLinesChip: (count) => `[${count} lines]`,
+      pasteLinesChip: (count2) => `[${count2} lines]`,
       /** {0} = question count */
-      clarifyHead: (count) => `ask (${count} questions)`,
+      clarifyHead: (count2) => `ask (${count2} questions)`,
       /** {0} = question, {1} = locked answer */
       clarifyAnswered: (question, answer) => `\u2713 ${question} \u2192 ${answer}`,
       /** {0} = question */
@@ -22452,9 +22452,9 @@ var libTextEn = {
       backgroundProcessFinished: "background process finished",
       backgroundAgentWorkFinished: "background agent work finished",
       /** {0} = count */
-      backgroundAgentsFinishedOne: (count) => `${count} background agent finished`,
+      backgroundAgentsFinishedOne: (count2) => `${count2} background agent finished`,
       /** {0} = count */
-      backgroundAgentsFinishedOther: (count) => `${count} background agents finished`
+      backgroundAgentsFinishedOther: (count2) => `${count2} background agents finished`
     },
     // domain/attachments.ts — the composer token an attached image renders as.
     attachments: {
@@ -22474,7 +22474,7 @@ var overlaysEn = {
   prompt: {
     approval: {
       title: "\u26A0 approval required",
-      moreLines: (count) => `\u2026 +${count} more line${count === 1 ? "" : "s"} (full text above)`,
+      moreLines: (count2) => `\u2026 +${count2} more line${count2 === 1 ? "" : "s"} (full text above)`,
       once: "Allow once",
       session: "Allow this session",
       always: "Always allow",
@@ -22505,8 +22505,8 @@ var pickersEn = {
       error: (message) => `error: ${message}`,
       // {0} = the RPC method name (e.g. `model.options`) — not translated.
       invalidResponse: (method) => `invalid response: ${method}`,
-      moreAbove: (count) => ` \u2191 ${count} more`,
-      moreBelow: (count) => ` \u2193 ${count} more`,
+      moreAbove: (count2) => ` \u2191 ${count2} more`,
+      moreBelow: (count2) => ` \u2193 ${count2} more`,
       filter: (query) => `filter: ${query}`,
       typeToFilter: "type to filter"
     },
@@ -22547,8 +22547,8 @@ var pickersEn = {
         unknown: "(unknown)",
         noKey: "(no key)",
         needsSetup: "(needs setup)",
-        modelCountOne: (count) => `${count} model`,
-        modelCountOther: (count) => `${count} models`,
+        modelCountOne: (count2) => `${count2} model`,
+        modelCountOther: (count2) => `${count2} models`,
         filterHint: "type to filter \xB7 \u2191/\u2193 select",
         // {0} = provider warning text from the backend.
         warning: (warning) => `warning: ${warning}`,
@@ -22585,8 +22585,8 @@ var pickersEn = {
       loading: "loading sessions\u2026",
       modelUnknown: "model?",
       currentOrDefault: "current/default",
-      liveSessionsOne: (count) => `${count} live session`,
-      liveSessionsOther: (count) => `${count} live sessions`,
+      liveSessionsOne: (count2) => `${count2} live session`,
+      liveSessionsOther: (count2) => `${count2} live sessions`,
       // {0} = live session count, {1} = resumable session count.
       counts: (liveCount, resumableCount) => `${liveCount} live \xB7 ${resumableCount} resumable`,
       age: {
@@ -22613,7 +22613,7 @@ var pickersEn = {
         closing: "closing\u2026",
         deleting: "deleting\u2026",
         pressDAgain: "press d again to delete",
-        messageCount: (count) => `${count} msgs`
+        messageCount: (count2) => `${count2} msgs`
       },
       noOtherSessions: "no other sessions \u2014 Enter on +new to start one",
       promptLabel: "prompt \u203A ",
@@ -22644,8 +22644,8 @@ var pickersEn = {
       title: "Pets",
       loading: "loading pets\u2026",
       adopting: "adopting\u2026",
-      petCountOne: (count) => `${count} pet`,
-      petCountOther: (count) => `${count} pets`,
+      petCountOne: (count2) => `${count2} pet`,
+      petCountOther: (count2) => `${count2} pets`,
       // {0} = the filter text the user typed.
       noMatches: (query) => `no pets match "${query}"`,
       noneAvailable: "no pets available",
@@ -22723,8 +22723,8 @@ var sessionEn = {
       widgetRemoved: (id) => `widget /${id} removed (file deleted)`,
       // {0}=file {1}=message
       widgetFailedToLoad: (file2, message) => `widget ${file2} failed to load: ${message}`,
-      clarifyQuestionsOne: (count) => `${count} question`,
-      clarifyQuestionsOther: (count) => `${count} questions`,
+      clarifyQuestionsOne: (count2) => `${count2} question`,
+      clarifyQuestionsOther: (count2) => `${count2} questions`,
       skipped: "(skipped)",
       voiceRec: "\u25CF REC",
       voiceStt: "\u25C9 STT",
@@ -22780,7 +22780,7 @@ var slashEn = {
 var slashCmdCoreEn = {
   core: {
     help: {
-      skillCommandsAvailable: (count) => `${count} skill commands available \u2014 /skills to browse`,
+      skillCommandsAvailable: (count2) => `${count2} skill commands available \u2014 /skills to browse`,
       connectors: "manage connector accounts (rename, add another, reconnect, remove)",
       detailsGlobal: "set global agent detail visibility mode",
       detailsSection: "override one section (thinking/tools/subagents/activity)",
@@ -22845,8 +22845,8 @@ var slashCmdCoreEn = {
       usage: "usage: /fortune [random|daily]"
     },
     copy: {
-      copiedCharsOne: (count) => `copied ${count} character`,
-      copiedCharsOther: (count) => `copied ${count} characters`,
+      copiedCharsOne: (count2) => `copied ${count2} character`,
+      copiedCharsOther: (count2) => `copied ${count2} characters`,
       clipboardFailed: "clipboard copy failed \u2014 try HERMES_TUI_FORCE_OSC52=1 to force the escape sequence",
       usage: "usage: /copy [number]",
       nothingToCopy: "nothing to copy \u2014 start a conversation first",
@@ -22873,8 +22873,8 @@ var slashCmdCoreEn = {
       noConversation: "no conversation yet",
       youTag: (index) => `You #${index}`,
       hermesTag: (index) => `Hermes #${index}`,
-      toolCallsOne: (count) => `(${count} tool call)`,
-      toolCallsOther: (count) => `(${count} tool calls)`,
+      toolCallsOne: (count2) => `(${count2} tool call)`,
+      toolCallsOther: (count2) => `(${count2} tool calls)`,
       empty: "(empty)",
       pageTitle: "History"
     },
@@ -22903,8 +22903,8 @@ var slashCmdCoreEn = {
       usage: "usage: /battery [on|off|status]"
     },
     queue: {
-      countOne: (count) => `${count} queued message`,
-      countOther: (count) => `${count} queued messages`,
+      countOne: (count2) => `${count2} queued message`,
+      countOther: (count2) => `${count2} queued messages`,
       queued: (preview4) => `queued: "${preview4}"`
     },
     steer: {
@@ -22915,8 +22915,8 @@ var slashCmdCoreEn = {
     },
     undo: {
       nothing: "nothing to undo",
-      undidOne: (count) => `undid ${count} message`,
-      undidOther: (count) => `undid ${count} messages`
+      undidOne: (count2) => `undid ${count2} message`,
+      undidOther: (count2) => `undid ${count2} messages`
     },
     retry: {
       nothing: "nothing to retry"
@@ -22953,7 +22953,7 @@ var slashCmdCoreEn = {
       arrayBuffers: "array buffers",
       rss: "rss",
       uptime: "uptime",
-      seconds: (count) => `${count}s`
+      seconds: (count2) => `${count2}s`
     }
   },
   setup: {
@@ -22967,8 +22967,8 @@ var slashCmdCoreEn = {
 var slashCmdOpsEn = {
   ops: {
     stop: {
-      stoppedOne: (count) => `stopped ${count} background process`,
-      stoppedOther: (count) => `stopped ${count} background processes`
+      stoppedOne: (count2) => `stopped ${count2} background process`,
+      stoppedOther: (count2) => `stopped ${count2} background processes`
     },
     reloadMcp: {
       confirmRequired: "/reload-mcp requires confirmation",
@@ -22977,8 +22977,8 @@ var slashCmdOpsEn = {
       complete: "reload complete"
     },
     reloadEnv: {
-      reloadedOne: (count) => `reloaded .env (${count} var updated)`,
-      reloadedOther: (count) => `reloaded .env (${count} vars updated)`
+      reloadedOne: (count2) => `reloaded .env (${count2} var updated)`,
+      reloadedOther: (count2) => `reloaded .env (${count2} vars updated)`
     },
     browser: {
       usage: "usage: /browser [connect|disconnect|status|use] [url] \xB7 persistent: set browser.cdp_url in config.yaml",
@@ -23022,7 +23022,7 @@ var slashCmdOpsEn = {
     },
     replay: {
       noneOnDisk: "no archived spawn trees on disk for this session",
-      subagentsLabel: (count) => `${count} subagents`,
+      subagentsLabel: (count2) => `${count2} subagents`,
       archivedTitle: "Archived spawn trees",
       usageLoad: "usage: /replay load <path>",
       snapshotEmpty: "snapshot empty or unreadable",
@@ -23031,7 +23031,7 @@ var slashCmdOpsEn = {
     },
     replayDiff: {
       usage: "usage: /replay-diff <a> <b>  (e.g. /replay-diff 1 2 for last two)",
-      unresolved: (count) => `replay-diff: could not resolve indices \xB7 history has ${count} entries`
+      unresolved: (count2) => `replay-diff: could not resolve indices \xB7 history has ${count2} entries`
     },
     reloadSkills: {
       reloaded: "skills reloaded",
@@ -23068,7 +23068,7 @@ var slashCmdOpsEn = {
       noneOnPageWithTotal: (page, total) => `no skills on page ${page} (total ${total})`,
       // {0}=page, {1}=total pages
       pageOf: (page, total) => `page ${page} of ${total}`,
-      skillsTotal: (count) => `${count} skills total`,
+      skillsTotal: (count2) => `${count2} skills total`,
       browseMore: (nextPage) => `/skills browse ${nextPage} for more`,
       browseTitle: "Browse Skills",
       browseTitlePage: (page) => `Browse Skills \u2014 p${page}`
@@ -23136,8 +23136,8 @@ var slashCmdSessionEn = {
     },
     compress: {
       // {0}=message count (pre-formatted)
-      compressedOne: (count) => `compressed ${count} message`,
-      compressedOther: (count) => `compressed ${count} messages`,
+      compressedOne: (count2) => `compressed ${count2} message`,
+      compressedOther: (count2) => `compressed ${count2} messages`,
       nothing: "nothing to compress",
       // {0}=compact token count, appended to compressedOne/Other
       tokSuffix: (tokens) => ` \xB7 ${tokens} tok`
@@ -23193,7 +23193,7 @@ ${body}`
     },
     usage: {
       balanceTitle: "Balance",
-      compressions: (count) => `Compressions: ${count}`,
+      compressions: (count2) => `Compressions: ${count2}`,
       // {0}=used tokens (with ~ mark when estimated), {1}=max tokens, {2}=percent (with ~ mark)
       context: (used, max, percent) => `Context: ${used} / ${max} (${percent}%)`,
       cta: "Run /subscription to change plan \xB7 /topup to add to your balance",
@@ -25991,7 +25991,7 @@ function taskCard(call, result, now) {
   const context = str3(call.args.context) ?? (tasks.length === 1 ? str3(tasks[0]?.context) : void 0);
   const working = agents.some((a) => a.status === "running" || a.status === "queued") || !agents.length && result?.status === "dispatched";
   const settled = agents.filter((a) => a.status !== "running" && a.status !== "queued");
-  const count = goals.length || agents.length;
+  const count2 = goals.length || agents.length;
   let meta;
   let took;
   if (agents.length && !working) {
@@ -26007,7 +26007,7 @@ function taskCard(call, result, now) {
     ].filter(Boolean).join(" \xB7 ");
     took = Math.max(...agents.map((a) => a.startedAt + (a.duration ?? 0))) - call.startedAt;
   } else if (settled.length) {
-    meta = `${settled.length} of ${count} done`;
+    meta = `${settled.length} of ${count2} done`;
   }
   return {
     badges: result?.mode === "background" ? [{ text: "background" }] : void 0,
@@ -26018,7 +26018,7 @@ function taskCard(call, result, now) {
     meta: meta ? [meta] : void 0,
     name: "task",
     status: working ? "running" : void 0,
-    target: count ? `${count} agent${count === 1 ? "" : "s"}` : void 0,
+    target: count2 ? `${count2} agent${count2 === 1 ? "" : "s"}` : void 0,
     targetKind: "text",
     title: "Task",
     took
@@ -26604,12 +26604,12 @@ function openAgents(app, focus) {
   }
 }
 function summary(all) {
-  const count = (s) => all.filter((a) => a.status === s).length;
+  const count2 = (s) => all.filter((a) => a.status === s).length;
   const parts = [
-    [count("running") + count("queued"), "running"],
-    [count("done"), "done"],
-    [count("failed"), "failed"],
-    [count("cancelled"), "stopped"]
+    [count2("running") + count2("queued"), "running"],
+    [count2("done"), "done"],
+    [count2("failed"), "failed"],
+    [count2("cancelled"), "stopped"]
   ];
   return parts.filter(([n]) => n).map(([n, label]) => `${n} ${label}`).join(" \xB7 ") || "none yet";
 }
@@ -27609,11 +27609,11 @@ function maskedOffset(secret, at) {
 }
 function unmaskEdit(secret, ev) {
   const bounds = boundaries(secret);
-  const count = bounds.length - 1;
-  if (ev.len !== count) {
+  const count2 = bounds.length - 1;
+  if (ev.len !== count2) {
     return null;
   }
-  const real = (masked) => bounds[Math.max(0, Math.min(count, masked))] ?? secret.length;
+  const real = (masked) => bounds[Math.max(0, Math.min(count2, masked))] ?? secret.length;
   const from = real(ev.from);
   const to = real(ev.to);
   const after = ev.cursor - ev.from - ev.text.length;
@@ -27680,12 +27680,12 @@ function optionList(listKey, id, options, selected, select, pick) {
     listKey
   );
 }
-function moved(key2, at, count) {
+function moved(key2, at, count2) {
   if (key2.name === "up" || key2.ctrl && key2.name === "p") {
-    return (at - 1 + count) % count;
+    return (at - 1 + count2) % count2;
   }
   if (key2.name === "down" || key2.ctrl && key2.name === "n") {
-    return (at + 1) % count;
+    return (at + 1) % count2;
   }
   return void 0;
 }
@@ -27990,7 +27990,7 @@ function clarifyOverlay(host, req) {
         return true;
       }
       const typing = d.typing || !q.choices.length;
-      const count = q.choices.length + 1;
+      const count2 = q.choices.length + 1;
       if (k.name === "tab" && questions.length > 1) {
         go(step + (k.shift ? -1 : 1));
       } else if (k.name === "escape" && typing && q.choices.length) {
@@ -28002,7 +28002,7 @@ function clarifyOverlay(host, req) {
       } else if (k.name === "enter") {
         activate(d.selected);
       } else if (typing) {
-        const to = q.choices.length ? moved(k, d.selected, count) : void 0;
+        const to = q.choices.length ? moved(k, d.selected, count2) : void 0;
         if (to !== void 0) {
           d.typing = false;
           d.selected = to;
@@ -28010,13 +28010,13 @@ function clarifyOverlay(host, req) {
           d.other.key(k);
         }
       } else {
-        const to = moved(k, d.selected, count);
+        const to = moved(k, d.selected, count2);
         const n = Number.parseInt(k.name, 10);
         if (to !== void 0) {
           d.selected = to;
         } else if (k.name === "space" && q.multi) {
           activate(d.selected);
-        } else if (n >= 1 && n <= count) {
+        } else if (n >= 1 && n <= count2) {
           activate(n - 1);
         } else if (k.text && !k.ctrl && !k.meta && k.name !== "space") {
           d.selected = q.choices.length;
@@ -28327,12 +28327,12 @@ function labelOf(row) {
   return row?.title?.trim() || row?.preview?.trim() || "Untitled session";
 }
 function itemOf2(row, now) {
-  const count = row.live_message_count ?? row.message_count ?? 0;
+  const count2 = row.live_message_count ?? row.message_count ?? 0;
   return {
     badges: row.source && row.source !== "tui" && row.source !== "cli" ? [{ text: row.source }] : void 0,
     detail: row.title?.trim() && row.preview?.trim() ? row.preview.trim() : void 0,
     facts: {
-      size: `${count} msg${count === 1 ? "" : "s"}`,
+      size: `${count2} msg${count2 === 1 ? "" : "s"}`,
       when: row.started_at ? ageOf(row.started_at * 1e3, now) : ""
     },
     id: row.id,
@@ -28341,7 +28341,7 @@ function itemOf2(row, now) {
   };
 }
 function preview3(row, isCurrent) {
-  const count = row.live_message_count ?? row.message_count ?? 0;
+  const count2 = row.live_message_count ?? row.message_count ?? 0;
   return [
     /* @__PURE__ */ jsx("text", { role: "omp.picker.title", text: labelOf(row) }, "title"),
     /* @__PURE__ */ jsx(
@@ -28349,7 +28349,7 @@ function preview3(row, isCurrent) {
       {
         items: [
           ...row.started_at ? [{ k: [{ t: "Started" }], v: dateOf(row.started_at) }] : [],
-          { k: [{ t: "Messages" }], v: String(count) },
+          { k: [{ t: "Messages" }], v: String(count2) },
           ...row.source ? [{ k: [{ t: "Source" }], v: row.source }] : [],
           ...isCurrent ? [{ k: [{ t: "Status" }], v: [{ s: "success", t: "open" }] }] : [],
           { k: [{ t: "ID" }], v: [{ s: "mono dim", t: row.id }] }
@@ -29780,6 +29780,101 @@ ${compact(ctx.used)} of ${compact(ctx.max)} tokens`,
   ] }, "composer");
 }
 
+// src/view/toolRuns.tsx
+var SOLO = /* @__PURE__ */ new Set(["clarify", "delegate_task", "todo", "todo_list"]);
+var MIN_RUN = 2;
+var KINDS2 = {
+  browser_click: ["page action", "page actions", "Took"],
+  browser_navigate: ["page", "pages", "Opened"],
+  execute_code: ["script", "scripts", "Ran"],
+  patch: ["file", "files", "Edited"],
+  process: ["process check", "process checks", "Made"],
+  read_file: ["file", "files", "Read"],
+  search_files: ["time", "times", "Searched"],
+  skill_view: ["skill", "skills", "Read"],
+  terminal: ["command", "commands", "Ran"],
+  vision_analyze: ["image", "images", "Looked at"],
+  web_extract: ["page", "pages", "Read"],
+  web_search: ["time on the web", "times on the web", "Searched"],
+  write_file: ["file", "files", "Wrote"]
+};
+function groupRuns(blocks) {
+  const out = [];
+  let run2 = [];
+  const flush = () => {
+    const tail = [];
+    while (run2.at(-1)?.kind === "thinking") {
+      tail.unshift(run2.pop());
+    }
+    if (run2.filter((b) => b.kind === "tool").length >= MIN_RUN) {
+      out.push(run2);
+    } else {
+      out.push(...run2);
+    }
+    out.push(...tail);
+    run2 = [];
+  };
+  for (const b of blocks) {
+    if (b.kind === "tool" && !SOLO.has(b.call.name)) {
+      run2.push(b);
+    } else if (b.kind === "thinking" && run2.length) {
+      run2.push(b);
+    } else {
+      flush();
+      out.push(b);
+    }
+  }
+  flush();
+  return out;
+}
+function summarize(calls) {
+  const counts = /* @__PURE__ */ new Map();
+  for (const c of calls) {
+    const kind = KINDS2[c.name] ?? [`${c.name} call`, `${c.name} calls`, "Made"];
+    const key2 = `${kind[2]}|${kind[0]}`;
+    const seen = counts.get(key2) ?? { kind, n: 0 };
+    seen.n++;
+    counts.set(key2, seen);
+  }
+  const parts = [...counts.values()].map(({ kind: [one, many, verb], n }, i) => {
+    const phrase = `${verb.toLowerCase()} ${count(n, one, many)}`;
+    return i === 0 ? phrase.charAt(0).toUpperCase() + phrase.slice(1) : phrase;
+  });
+  return parts.length > 1 ? `${parts.slice(0, -1).join(", ")} and ${parts.at(-1)}` : parts[0] ?? "";
+}
+function count(n, one, many) {
+  if (one.startsWith("time")) {
+    const rest = one.slice("time".length);
+    return n === 1 ? `once${rest}` : n === 2 ? `twice${rest}` : `${n} ${many}`;
+  }
+  return `${n} ${n === 1 ? one : many}`;
+}
+function toolRunNode(run2, id, now, blockNode2) {
+  const calls = run2.flatMap((b) => b.kind === "tool" ? [b.call] : []);
+  const live = calls.find((c) => c.status === "running");
+  const failed = calls.filter((c) => c.status === "error").length;
+  const first = calls[0];
+  const ended = Math.max(...calls.map((c) => c.startedAt + (c.duration ?? 0)));
+  const key2 = `r${run2[0].id}`;
+  const spans = [
+    { t: summarize(calls) },
+    ...failed ? [{ s: "error", t: `, ${failed} failed` }] : [],
+    ...live ? [{ s: "muted", t: `, now ${live.name}` }] : []
+  ];
+  return node(
+    "section",
+    { collapsed: true, collapsible: true, head: `${id}.${key2}.head`, key: key2, role: "omp.tools.run" },
+    [
+      /* @__PURE__ */ jsxs("row", { align: "center", gap: "sm", children: [
+        live ? /* @__PURE__ */ jsx("spinner", { style: "dots", tone: "accent" }, "mark") : /* @__PURE__ */ jsx("icon", { name: failed ? "warning" : "tools" }, "mark"),
+        /* @__PURE__ */ jsx("text", { grow: 1, spans, wrap: "word" }, "label"),
+        live ? /* @__PURE__ */ jsx("elapsed", { age: age(first, first.startedAt, now), format: "short" }, "time") : /* @__PURE__ */ jsx("text", { spans: [{ s: "dim", t: duration(Math.max(0, ended - first.startedAt)) }] }, "time")
+      ] }, "head"),
+      ...run2.map((b) => b.kind === "tool" ? toolNode(b.call, now) : blockNode2(b))
+    ]
+  );
+}
+
 // src/view/welcome.tsx
 import { readFileSync as readFileSync3 } from "node:fs";
 import { join as join4 } from "node:path";
@@ -29873,7 +29968,9 @@ function userNode(e, cx) {
 function turnNode(turn, id, cx) {
   const live = turn.status === "live";
   const lastText = turn.blocks.findLast((b) => b.kind === "text");
-  const children2 = turn.blocks.map((b) => blockNode(b, `${id}.${b.id}`, live && b === lastText, cx));
+  const children2 = groupRuns(turn.blocks).map(
+    (b) => Array.isArray(b) ? toolRunNode(b, id, cx.now, (inner) => blockNode(inner, `${id}.r${b[0].id}.${inner.id}`, false, cx)) : blockNode(b, `${id}.${b.id}`, live && b === lastText, cx)
+  );
   if (turn.status === "error") {
     children2.push(
       node("card", { head: `${id}.error.head`, key: "error", role: "omp.error", tone: "error" }, [
