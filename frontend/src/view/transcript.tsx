@@ -15,9 +15,9 @@ import { type WelcomeContext, welcomeNode } from './welcome.js'
 export interface TranscriptContext {
   now: number
   welcome: WelcomeContext
-  /** Copies a prompt's text; `id` is the prompt's entry id. */
+  /** Copies a prompt's or an answer's text; `id` is its entry id. */
   copy(text: string, id: string): void
-  /** The prompt copied a moment ago, whose button reads Copied. */
+  /** The entry copied a moment ago, whose copy button shows a check. */
   copied?: string
 }
 
@@ -25,7 +25,7 @@ const kNode = Symbol('tsp.node')
 
 /** An entry carrying its last built node and the revision it was built at. */
 interface Built {
-  [kNode]?: { rev: number; node: JSX.Element }
+  [kNode]?: { rev: string; node: JSX.Element }
 }
 
 /**
@@ -41,7 +41,7 @@ export function entryNode(e: Entry, id: string, cx: TranscriptContext): JSX.Elem
   // Entries are plain objects; the symbol slot rides on them (weak type: widen first).
   const holder: object = e
   const built: Built = holder
-  const rev = e.kind === 'turn' ? e.rev : e.kind === 'user' && cx.copied === e.id ? 1 : 0
+  const rev = `${e.kind === 'turn' ? e.rev : 0}${cx.copied === e.id ? '+copied' : ''}`
   const cached = built[kNode]
 
   if (cached?.rev === rev) {
@@ -87,13 +87,7 @@ function userNode(e: UserEntry, cx: TranscriptContext): JSX.Element {
           spans={[{ s: 'dim mono', t: at.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }]}
           title={at.toLocaleString()}
         />
-        <text
-          key="copy"
-          onClick={() => cx.copy(e.text, e.id)}
-          role="omp.user.tool"
-          text={cx.copied === e.id ? 'Copied' : 'Copy'}
-          title="Copy message"
-        />
+        {copyButton(e.text, e.id, 'omp.user.tool', 'Copy message', cx)}
       </row>
       <md key="body">{e.text}</md>
     </card>
@@ -132,8 +126,10 @@ function turnNode(turn: TurnEntry, id: string, cx: TranscriptContext): JSX.Eleme
     children.push(<text key="warning" role="omp.notice" spans={[{ s: 'warning', t: turn.warning }]} wrap="word" />)
   }
 
-  if (!live && turn.endedAt && (turn.usage?.total || turn.usage?.input || turn.usage?.output)) {
-    children.push(usageNode(turn))
+  const answer = answerText(turn)
+
+  if (!live && turn.endedAt && (answer || turn.usage?.total || turn.usage?.input || turn.usage?.output)) {
+    children.push(usageNode(turn, answer, cx))
   }
 
   return (
@@ -192,7 +188,32 @@ function thinkingNode(b: Extract<Block, { kind: 'thinking' }>, id: string, cx: T
   )
 }
 
-function usageNode(turn: TurnEntry): JSX.Element {
+/**
+ * A copy button as omp's: an `icon` in a role Tern draws as a 24px hover button (`omp.user.tool`
+ * under a prompt, `omp.turn.copy` under an answer), a check for a moment after a click.
+ */
+function copyButton(text: string, id: string, role: string, title: string, cx: TranscriptContext): JSX.Element {
+  const copied = cx.copied === id
+
+  return (
+    <icon
+      key="copy"
+      name={copied ? 'check' : 'copy'}
+      onClick={() => cx.copy(text, id)}
+      role={role}
+      title={copied ? 'Copied' : title}
+    />
+  )
+}
+
+/** The answer's text blocks, as one Markdown document. */
+function answerText(turn: TurnEntry): string {
+  return turn.blocks
+    .flatMap(b => (b.kind === 'text' && b.text.trim() ? [b.text.trim()] : []))
+    .join('\n\n')
+}
+
+function usageNode(turn: TurnEntry, answer: string, cx: TranscriptContext): JSX.Element {
   const u = turn.usage ?? {}
   const ms = (turn.endedAt ?? turn.startedAt) - turn.startedAt
   const input = u.input ?? u.prompt ?? 0
@@ -202,9 +223,10 @@ function usageNode(turn: TurnEntry): JSX.Element {
   const title = `This turn: ${duration(ms)} · ${total.toLocaleString()} tokens (${input.toLocaleString()} in · ${output.toLocaleString()} out)${cost}`
 
   return (
-    <row align="center" gap="xs" key="usage" role="omp.turn.usage" title={title}>
-      <icon key="icon" name="time" />
-      <text key="text">{`${duration(ms)} · ${compact(total)} tok${cost} this turn`}</text>
+    <row align="center" gap="xs" key="usage" role="omp.turn.usage" title={total ? title : undefined}>
+      {answer ? copyButton(answer, turn.id, 'omp.turn.copy', 'Copy answer', cx) : null}
+      {total ? <icon key="icon" name="time" /> : null}
+      {total ? <text key="text">{`${duration(ms)} · ${compact(total)} tok${cost} this turn`}</text> : null}
     </row>
   )
 }
