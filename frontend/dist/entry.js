@@ -25262,6 +25262,20 @@ var Transcript = class {
   touchCall(call) {
     this.#touch(this.#findTool((c) => c === call)?.turn);
   }
+  /** The agent's todo list as its newest snapshot left it (any turn), if it ever made one. */
+  currentTodos() {
+    for (let i = this.entries.length - 1; i >= 0; i--) {
+      const e = this.entries[i];
+      if (e?.kind !== "turn") {
+        continue;
+      }
+      const hit = e.blocks.findLast((b) => b.kind === "tool" && b.call.todos?.length);
+      if (hit?.kind === "tool") {
+        return hit.call.todos;
+      }
+    }
+    return void 0;
+  }
   /** The delegate_task calls in the transcript, oldest first. */
   delegations() {
     return this.entries.flatMap(
@@ -33567,40 +33581,81 @@ var STYLES = css`
     opacity: 0.85;
   }
 
-  /* The live line: a band of the primary text color sweeps across its words every 2.2 s, as
-     t3code's live-tool-shine does, so a running step reads as running at a glance. Tern's CSS takes
-     one background layer and no rem, so the band is a stop in a gradient three times as wide. */
-  @keyframes hermes-shine {
+  /* The status strip under everything (hermes-for-tern's console bar): one quiet mono line, the
+     brand in the accent, the send or stop key the strongest thing on it. */
+  [data-role='hermes.statusline'] {
+    margin-top: 6px !important;
+    font: 400 11.5px/20px var(--mono) !important;
+    color: var(--t3) !important;
+  }
+
+  [data-role='hermes.statusline.brand'] {
+    color: var(--accent) !important;
+    font-weight: 600 !important;
+  }
+
+  [data-role='hermes.statusline.send'],
+  [data-role='hermes.statusline.stop'] {
+    color: var(--t1) !important;
+    cursor: pointer;
+  }
+
+  [data-role='hermes.statusline.stop'] {
+    color: var(--sf-c-error, var(--t1)) !important;
+  }
+
+  [data-role='hermes.statusline.warn'] {
+    color: var(--sf-c-warning, var(--t2)) !important;
+  }
+
+  [data-role='hermes.statusline.bad'] {
+    color: var(--sf-c-error, var(--t2)) !important;
+  }
+
+  /* While a turn runs, an accent streak sweeps the composer's top edge. */
+  @keyframes hermes-streak {
     from {
-      background-position: 100% 0;
+      background-position: 0% 0;
     }
 
     to {
-      background-position: 0% 0;
+      background-position: 100% 0;
     }
   }
 
-  [data-role='hermes.work.live'] {
-    color: transparent !important;
-    background-image: linear-gradient(to right, var(--t3) 0%, var(--t3) 44%, var(--t1) 50%, var(--t3) 56%, var(--t3) 100%);
-    background-size: 300% 100%;
+  [data-role='hermes.streak'] {
+    height: 1px;
+    margin: 0 18px -1px;
+    background-image: linear-gradient(to right, transparent, var(--accent), transparent);
+    background-size: 30% 100%;
     background-repeat: no-repeat;
-    -webkit-background-clip: text;
-    background-clip: text;
-    animation: hermes-shine 2.2s linear infinite;
-  }
-
-  [data-role='hermes.work.live'] * {
-    color: transparent !important;
+    animation: hermes-streak 1.8s ease-in-out infinite alternate;
   }
 
   @media (prefers-reduced-motion: reduce) {
-    [data-role='hermes.work.live'],
-    [data-role='hermes.work.live'] * {
-      color: var(--t3) !important;
-      background-image: none !important;
-      animation: none !important;
+    [data-role='hermes.streak'] {
+      animation: none;
+      background-position: 50% 0;
     }
+  }
+
+  /* The todo list, opened from its pill: a panel above the composer. */
+  [data-role='hermes.todos'] {
+    width: min(736px, calc(100% - 8px));
+    margin: 0 auto 8px !important;
+    padding: 8px 12px !important;
+    border-radius: 10px;
+    background: var(--l1);
+    max-height: 260px;
+    overflow: auto;
+  }
+
+  [data-role='hermes.todos.pill'] .sf-meter {
+    flex: none;
+  }
+
+  [data-role='hermes.todos.now'] {
+    max-width: 360px;
   }
 
   /* omp's ask theme draws a radio at the start of each option without moving the text over. */
@@ -34932,6 +34987,12 @@ function saveSettings(patch, file2 = settingsFile()) {
 }
 
 // src/view/dock.tsx
+function todoProgress(list) {
+  const live = list.filter((t2) => t2.status !== "cancelled");
+  const done = live.filter((t2) => t2.status === "completed").length;
+  const current = live.find((t2) => t2.status === "in_progress") ?? live.find((t2) => t2.status === "pending");
+  return { current: current?.content ?? "", done, total: live.length };
+}
 function dockNodes(cx) {
   const nodes2 = [];
   if (cx.busy) {
@@ -34968,7 +35029,14 @@ function dockNodes(cx) {
       ] }, `q${i}`)) }, "queue")
     );
   }
+  if (cx.todos?.open) {
+    nodes2.push(
+      /* @__PURE__ */ jsx("col", { role: "hermes.todos", children: checklistNode(cx.todos.list) }, "todos")
+    );
+  }
   const pills = [
+    // While a turn runs the todo pill rides the working line instead.
+    cx.todos && !cx.busy ? todosPillNode(cx.todos, cx.focused === "todos") : null,
     cx.agents?.running ? agentsPill(cx.agents.running, cx.agents.onOpen, cx.focused === "agents") : null,
     cx.shells && (cx.shells.running || cx.shells.exited) ? shellsPill(cx.shells, cx.focused === "shells") : null,
     cx.prs ? prsPillNode(cx.prs, cx.focused === "prs") : null
@@ -34982,7 +35050,86 @@ function dockNodes(cx) {
     );
   }
   nodes2.push(composerNode(cx));
+  nodes2.push(statusLine(cx));
   return nodes2;
+}
+function todosPillNode(t2, focused) {
+  const { current, done, total } = todoProgress(t2.list);
+  if (!total) {
+    return null;
+  }
+  const finished = done === total;
+  return /* @__PURE__ */ jsx(
+    "row",
+    {
+      align: "center",
+      mark: focused ? "pick" : void 0,
+      onClick: t2.onToggle,
+      role: "omp.hud.pill",
+      title: t2.open ? "Hide the todo list" : "Show the todo list",
+      children: /* @__PURE__ */ jsxs("row", { align: "center", gap: "xs", role: "hermes.todos.pill", children: [
+        /* @__PURE__ */ jsx("meter", { size: "sm", style: "ring", value: done / total }, "ring"),
+        /* @__PURE__ */ jsx("text", { spans: [{ s: "muted", t: "todos " }, { t: `${done}/${total}` }, { s: "muted", t: " \xB7 " }], wrap: "none" }, "count"),
+        /* @__PURE__ */ jsx(
+          "text",
+          {
+            role: "hermes.todos.now",
+            spans: [{ s: finished ? "success" : void 0, t: finished ? "all done" : current }],
+            truncate: "end",
+            wrap: "none"
+          },
+          "now"
+        )
+      ] }, "seg")
+    },
+    "todos"
+  );
+}
+function statusLine(cx) {
+  const s = cx.status ?? {};
+  const context = s.context ?? (cx.context && cx.context.max > 0 ? cx.context.used / cx.context.max : void 0);
+  return /* @__PURE__ */ jsxs("status", { role: "hermes.statusline", children: [
+    /* @__PURE__ */ jsx("seg", { priority: 9, role: "hermes.statusline.brand", spans: [{ t: "\u2624 hermes" }] }, "brand"),
+    s.title ? /* @__PURE__ */ jsx("seg", { priority: 3, spans: [{ t: s.title }], title: s.title }, "title") : null,
+    cx.branch ? /* @__PURE__ */ jsx("seg", { icon: "git-branch", priority: 4, spans: [{ s: "statusLineGitClean", t: cx.branch }], title: `Branch ${cx.branch}` }, "git") : null,
+    s.tokens ? /* @__PURE__ */ jsx("seg", { priority: 2, side: "right", spans: [{ t: `${s.tokens.toLocaleString()} tokens` }] }, "tokens") : null,
+    context !== void 0 ? /* @__PURE__ */ jsx(
+      "seg",
+      {
+        priority: 5,
+        role: context >= 0.85 ? "hermes.statusline.bad" : context >= 0.6 ? "hermes.statusline.warn" : void 0,
+        side: "right",
+        spans: [{ t: `${Math.round(context * 100)}% context` }],
+        title: "/usage shows the breakdown"
+      },
+      "context"
+    ) : null,
+    cx.rates?.cache !== void 0 ? /* @__PURE__ */ jsx(
+      "seg",
+      {
+        icon: "cache",
+        priority: 1,
+        side: "right",
+        spans: [{ t: `${Math.round(cx.rates.cache)}%` }],
+        title: "Prompt tokens served from the provider's cache, this session"
+      },
+      "cache"
+    ) : null,
+    cx.rates?.tps ? /* @__PURE__ */ jsx(
+      "seg",
+      {
+        icon: "fast",
+        priority: 1,
+        side: "right",
+        spans: [{ t: `${Math.round(cx.rates.tps)} t/s` }],
+        title: "Output tokens per second over the recent model calls"
+      },
+      "tps"
+    ) : null,
+    cx.cost ? /* @__PURE__ */ jsx("seg", { priority: 3, side: "right", spans: [{ t: `$${cx.cost.toFixed(2)}` }], title: "Session cost" }, "cost") : null,
+    /* @__PURE__ */ jsx("seg", { priority: 1, side: "right", spans: [{ s: "muted", t: "\u21E7\u23CE newline" }] }, "newline"),
+    cx.busy ? /* @__PURE__ */ jsx("seg", { onClick: cx.onInterrupt, priority: 10, role: "hermes.statusline.stop", side: "right", spans: [{ t: "esc stop" }] }, "action") : /* @__PURE__ */ jsx("seg", { onClick: cx.onSubmit, priority: 10, role: "hermes.statusline.send", side: "right", spans: [{ t: "\u23CE send" }] }, "action")
+  ] }, "statusline");
 }
 function agentsPill(running, onOpen, focused) {
   return /* @__PURE__ */ jsx("row", { align: "center", mark: focused ? "pick" : void 0, onClick: onOpen, role: "omp.hud.pill", title: "Agents  \u2325A", children: /* @__PURE__ */ jsxs("row", { align: "center", gap: "xs", role: "omp.hud.seg", children: [
@@ -35051,6 +35198,7 @@ function workingNode(cx) {
     /* @__PURE__ */ jsx("text", { role: "omp.working.sep", text: "\xB7" }, "sep"),
     /* @__PURE__ */ jsx("elapsed", { age: age(busy.since, busy.startedAt, cx.now), format: "short" }, "elapsed"),
     /* @__PURE__ */ jsx("row", { grow: 1 }, "fill"),
+    cx.todos ? todosPillNode(cx.todos, false) : null,
     /* @__PURE__ */ jsxs("row", { align: "center", gap: "xs", onClick: cx.onInterrupt, role: "omp.working.stop", title: "Stop  esc", children: [
       /* @__PURE__ */ jsx("kbd", { keys: ["esc"] }, "k"),
       /* @__PURE__ */ jsx("text", { text: "Stop" }, "t")
@@ -35060,21 +35208,12 @@ function workingNode(cx) {
 function effortLabel(effort) {
   return effort === "none" ? "off" : effort;
 }
-function pathSpans(path) {
-  const slash = path.lastIndexOf("/", path.length - 2);
-  if (slash < 0 || slash + 1 >= path.length) {
-    return [{ s: "statusLinePath strong", t: path }];
-  }
-  return [
-    { s: "statusLinePath dim", t: path.slice(0, slash + 1) },
-    { s: "statusLinePath strong", t: path.slice(slash + 1) }
-  ];
-}
 function composerNode(cx) {
   const { composer } = cx;
   const ctx = cx.context;
   const share = ctx && ctx.max > 0 ? ctx.used / ctx.max : void 0;
   return /* @__PURE__ */ jsxs("col", { role: "omp.editor", children: [
+    cx.busy ? /* @__PURE__ */ jsx("row", { role: "hermes.streak" }, "streak") : null,
     share === void 0 ? null : /* @__PURE__ */ jsx(
       "meter",
       {
@@ -35139,62 +35278,7 @@ ${compact(ctx.used)} of ${compact(ctx.max)} tokens
         },
         "effort"
       ) : null,
-      /* @__PURE__ */ jsxs("status", { grow: 1, role: "omp.composer.extras", transparent: true, children: [
-        cx.cwd ? /* @__PURE__ */ jsx(
-          "seg",
-          {
-            icon: "folder",
-            priority: 5,
-            role: "omp.composer.fact",
-            spans: pathSpans(cx.cwd),
-            title: cx.cwd
-          },
-          "cwd"
-        ) : null,
-        cx.rates?.cache !== void 0 ? /* @__PURE__ */ jsx(
-          "seg",
-          {
-            icon: "cache",
-            priority: 2,
-            role: "omp.composer.fact",
-            spans: [{ t: `${Math.round(cx.rates.cache)}%` }],
-            title: "Prompt tokens served from the provider's cache, this session"
-          },
-          "cache"
-        ) : null,
-        cx.rates?.tps ? /* @__PURE__ */ jsx(
-          "seg",
-          {
-            icon: "fast",
-            priority: 1,
-            role: "omp.composer.rate",
-            spans: [{ t: `${Math.round(cx.rates.tps)} t/s` }],
-            title: "Output tokens per second over the recent model calls"
-          },
-          "tps"
-        ) : null,
-        cx.branch ? /* @__PURE__ */ jsx(
-          "seg",
-          {
-            icon: "git-branch",
-            priority: 4,
-            role: "omp.composer.fact",
-            spans: [{ s: "statusLineGitClean", t: cx.branch }],
-            title: `Branch ${cx.branch}`
-          },
-          "git"
-        ) : null
-      ] }, "extras"),
-      cx.cost ? /* @__PURE__ */ jsx(
-        "text",
-        {
-          role: "omp.composer.usage",
-          text: `$${cx.cost.toFixed(2)}`,
-          title: "Session cost",
-          wrap: "none"
-        },
-        "usage"
-      ) : null,
+      /* @__PURE__ */ jsx("row", { grow: 1 }, "fill"),
       cx.busy ? /* @__PURE__ */ jsx(
         "text",
         {
@@ -35575,6 +35659,11 @@ function workingNode2(turn, now) {
     /* @__PURE__ */ jsx("elapsed", { age: age(turn, turn.startedAt, now), format: "short" }, "age")
   ] }, "working");
 }
+var LIVE_MAX = 120;
+function liveText(label) {
+  const text2 = label.length > LIVE_MAX ? `${label.slice(0, LIVE_MAX - 1)}\u2026` : label;
+  return /* @__PURE__ */ jsx("shimmer", { mode: "classic", palette: { high: "accent", low: "dim", mid: "muted" }, role: "hermes.work.live", spans: [{ s: "muted", t: text2 }] }, "label");
+}
 function latestFailed(items) {
   const last = items.findLast((i) => i.kind === "tool");
   return last?.kind === "tool" && last.call.status === "error";
@@ -35582,7 +35671,7 @@ function latestFailed(items) {
 function thinkingRow() {
   return /* @__PURE__ */ jsxs("row", { align: "center", gap: "sm", role: "hermes.work.row", children: [
     /* @__PURE__ */ jsx("icon", { name: "brain" }, "icon"),
-    /* @__PURE__ */ jsx("text", { role: "hermes.work.live", spans: [{ s: "muted", t: "Thinking" }], wrap: "none" }, "label")
+    liveText("Thinking")
   ] }, "thinking");
 }
 function foldNode(part, id, children2) {
@@ -35606,7 +35695,7 @@ function workNode(items, parent, live, now) {
   const latest = shown.findLast((i) => i.kind === "tool" && i.call.status === "running") ?? shown.at(-1);
   const head2 = live ? /* @__PURE__ */ jsxs("row", { align: "center", gap: "sm", children: [
     /* @__PURE__ */ jsx("icon", { name: itemIcon(latest) }, "icon"),
-    /* @__PURE__ */ jsx("text", { role: "hermes.work.live", spans: [{ s: "muted", t: liveLabel(latest, true) }], truncate: "end", wrap: "none" }, "label"),
+    liveText(liveLabel(latest, true)),
     /* @__PURE__ */ jsx("icon", { name: "chev", role: "hermes.work.chev" }, "chev")
   ] }, "head") : /* @__PURE__ */ jsxs("row", { align: "center", gap: "sm", children: [
     /* @__PURE__ */ jsx("icon", { name: groupIcon(shown), tone: failed ? "error" : void 0 }, "icon"),
@@ -35636,17 +35725,7 @@ function itemNode(item3, parent, now, key2 = item3.id) {
   const running = call.status === "running";
   const head2 = /* @__PURE__ */ jsxs("row", { align: "center", gap: "sm", title: call.context || void 0, children: [
     /* @__PURE__ */ jsx("icon", { name: itemIcon(item3), tone: call.status === "error" ? "error" : void 0 }, "icon"),
-    /* @__PURE__ */ jsx(
-      "text",
-      {
-        grow: running ? void 0 : 1,
-        role: running ? "hermes.work.live" : void 0,
-        spans: labelSpans(call),
-        truncate: "end",
-        wrap: "none"
-      },
-      "label"
-    ),
+    running ? liveText(stepLabel(call)) : /* @__PURE__ */ jsx("text", { grow: 1, spans: labelSpans(call), truncate: "end", wrap: "none" }, "label"),
     call.status === "error" ? /* @__PURE__ */ jsx("icon", { name: "x", tone: "error" }, "failed") : null
   ] }, "head");
   if (!detail.length) {
@@ -35932,6 +36011,10 @@ var App = class {
   processes = new Processes(this);
   cron = new Cron(this);
   sidebar = new Sidebar(this);
+  /** The session's title, as Hermes names it (`session.title`). */
+  title = "";
+  /** The todo panel above the composer is open. */
+  #todosOpen = false;
   /** The conversation's PRs; links are stored under the stored session id the tools see. */
   prs = new PullRequests({
     changed: () => this.changed(),
@@ -36140,9 +36223,20 @@ var App = class {
       this.#surface.focus(INPUT_ID);
     }
   }
+  /** The agent's todo list while it matters: a turn runs, or something on it is still open. */
+  #todos() {
+    const list = this.transcript.currentTodos();
+    if (!list?.length) {
+      return void 0;
+    }
+    const { done, total } = todoProgress(list);
+    return total && (this.busy || done < total) ? list : void 0;
+  }
   /** The pills above the composer, left to right. */
   #pills(now = Date.now()) {
     return [
+      // While a turn runs the todo pill rides the working line, where the keys don't reach it.
+      ...this.#todos() && !this.busy ? ["todos"] : [],
       ...this.agents.running().length ? ["agents"] : [],
       ...this.processes.recent(now).length ? ["shells"] : [],
       ...this.prs.entries().length ? ["prs"] : []
@@ -36162,6 +36256,9 @@ var App = class {
       openBackground(this);
     } else if (out.open === "prs") {
       openPullRequests(this);
+    } else if (out.open === "todos") {
+      this.#todosOpen = !this.#todosOpen;
+      this.changed();
     }
     return out.consumed;
   }
@@ -36568,6 +36665,7 @@ var App = class {
         break;
       }
       case "session.title":
+        this.title = ev.payload?.title || this.title;
         if (ev.payload?.title) {
           process.stdout.write(`\x1B]2;${ev.payload.title.replace(/[\x00-\x1f]/g, " ")}\x07`);
         }
@@ -36894,6 +36992,18 @@ ${this.composer.text}` : next2);
         },
         agents: { onOpen: () => openAgents(this), running: this.agents.running().length },
         prs: prsPill(this.prs.entries(), () => openPullRequests(this)),
+        status: { title: this.title || void 0, tokens: typeof usage?.total === "number" ? usage.total : void 0 },
+        todos: (() => {
+          const list = this.#todos();
+          return list ? {
+            list,
+            onToggle: () => {
+              this.#todosOpen = !this.#todosOpen;
+              this.changed();
+            },
+            open: this.#todosOpen
+          } : void 0;
+        })(),
         focused: modal ? void 0 : this.#hud,
         shells: {
           exited: exited.length,

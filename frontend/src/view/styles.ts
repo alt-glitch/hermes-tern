@@ -142,40 +142,81 @@ export const STYLES = css`
     opacity: 0.85;
   }
 
-  /* The live line: a band of the primary text color sweeps across its words every 2.2 s, as
-     t3code's live-tool-shine does, so a running step reads as running at a glance. Tern's CSS takes
-     one background layer and no rem, so the band is a stop in a gradient three times as wide. */
-  @keyframes hermes-shine {
+  /* The status strip under everything (hermes-for-tern's console bar): one quiet mono line, the
+     brand in the accent, the send or stop key the strongest thing on it. */
+  [data-role='hermes.statusline'] {
+    margin-top: 6px !important;
+    font: 400 11.5px/20px var(--mono) !important;
+    color: var(--t3) !important;
+  }
+
+  [data-role='hermes.statusline.brand'] {
+    color: var(--accent) !important;
+    font-weight: 600 !important;
+  }
+
+  [data-role='hermes.statusline.send'],
+  [data-role='hermes.statusline.stop'] {
+    color: var(--t1) !important;
+    cursor: pointer;
+  }
+
+  [data-role='hermes.statusline.stop'] {
+    color: var(--sf-c-error, var(--t1)) !important;
+  }
+
+  [data-role='hermes.statusline.warn'] {
+    color: var(--sf-c-warning, var(--t2)) !important;
+  }
+
+  [data-role='hermes.statusline.bad'] {
+    color: var(--sf-c-error, var(--t2)) !important;
+  }
+
+  /* While a turn runs, an accent streak sweeps the composer's top edge. */
+  @keyframes hermes-streak {
     from {
-      background-position: 100% 0;
+      background-position: 0% 0;
     }
 
     to {
-      background-position: 0% 0;
+      background-position: 100% 0;
     }
   }
 
-  [data-role='hermes.work.live'] {
-    color: transparent !important;
-    background-image: linear-gradient(to right, var(--t3) 0%, var(--t3) 44%, var(--t1) 50%, var(--t3) 56%, var(--t3) 100%);
-    background-size: 300% 100%;
+  [data-role='hermes.streak'] {
+    height: 1px;
+    margin: 0 18px -1px;
+    background-image: linear-gradient(to right, transparent, var(--accent), transparent);
+    background-size: 30% 100%;
     background-repeat: no-repeat;
-    -webkit-background-clip: text;
-    background-clip: text;
-    animation: hermes-shine 2.2s linear infinite;
-  }
-
-  [data-role='hermes.work.live'] * {
-    color: transparent !important;
+    animation: hermes-streak 1.8s ease-in-out infinite alternate;
   }
 
   @media (prefers-reduced-motion: reduce) {
-    [data-role='hermes.work.live'],
-    [data-role='hermes.work.live'] * {
-      color: var(--t3) !important;
-      background-image: none !important;
-      animation: none !important;
+    [data-role='hermes.streak'] {
+      animation: none;
+      background-position: 50% 0;
     }
+  }
+
+  /* The todo list, opened from its pill: a panel above the composer. */
+  [data-role='hermes.todos'] {
+    width: min(736px, calc(100% - 8px));
+    margin: 0 auto 8px !important;
+    padding: 8px 12px !important;
+    border-radius: 10px;
+    background: var(--l1);
+    max-height: 260px;
+    overflow: auto;
+  }
+
+  [data-role='hermes.todos.pill'] .sf-meter {
+    flex: none;
+  }
+
+  [data-role='hermes.todos.now'] {
+    max-width: 360px;
   }
 
   /* omp's ask theme draws a radio at the start of each option without moving the text over. */

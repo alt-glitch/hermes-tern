@@ -36,6 +36,19 @@ export function workingNode(turn: TurnEntry, now: number): JSX.Element {
 }
 
 /** "Thinking", shining, at the end of a running turn with nothing else moving. */
+/** The longest live label: Tern's shimmer splits the text per character and does not truncate. */
+const LIVE_MAX = 120
+
+/**
+ * A live label in Tern's own shimmer, the working line's: a highlight sweeps character by
+ * character from the muted text through the accent, so a running step reads as running.
+ */
+function liveText(label: string): JSX.Element {
+  const text = label.length > LIVE_MAX ? `${label.slice(0, LIVE_MAX - 1)}…` : label
+
+  return <shimmer key="label" mode="classic" palette={{ high: 'accent', low: 'dim', mid: 'muted' }} role="hermes.work.live" spans={[{ s: 'muted', t: text }]} />
+}
+
 /** The newest step of `items` failed: the group no longer stands for live work. */
 export function latestFailed(items: readonly WorkItem[]): boolean {
   const last = items.findLast(i => i.kind === 'tool')
@@ -47,7 +60,7 @@ export function thinkingRow(): JSX.Element {
   return (
     <row align="center" gap="sm" key="thinking" role="hermes.work.row">
       <icon key="icon" name="brain" />
-      <text key="label" role="hermes.work.live" spans={[{ s: 'muted', t: 'Thinking' }]} wrap="none" />
+      {liveText('Thinking')}
     </row>
   )
 }
@@ -88,7 +101,7 @@ export function workNode(items: readonly WorkItem[], parent: string, live: boole
   const head = live ? (
     <row align="center" gap="sm" key="head">
       <icon key="icon" name={itemIcon(latest)} />
-      <text key="label" role="hermes.work.live" spans={[{ s: 'muted', t: liveLabel(latest, true) }]} truncate="end" wrap="none" />
+      {liveText(liveLabel(latest, true))}
       <icon key="chev" name="chev" role="hermes.work.chev" />
     </row>
   ) : (
@@ -130,14 +143,7 @@ function itemNode(item: WorkItem, parent: string, now: number, key = item.id): J
   const head = (
     <row align="center" gap="sm" key="head" title={call.context || undefined}>
       <icon key="icon" name={itemIcon(item)} tone={call.status === 'error' ? 'error' : undefined} />
-      <text
-        grow={running ? undefined : 1}
-        key="label"
-        role={running ? 'hermes.work.live' : undefined}
-        spans={labelSpans(call)}
-        truncate="end"
-        wrap="none"
-      />
+      {running ? liveText(stepLabel(call)) : <text grow={1} key="label" spans={labelSpans(call)} truncate="end" wrap="none" />}
       {call.status === 'error' ? <icon key="failed" name="x" tone="error" /> : null}
     </row>
   )

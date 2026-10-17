@@ -857,7 +857,7 @@ function exitOf(call: ToolCall): number | undefined {
   return typeof code === 'number' ? code : undefined
 }
 
-function checklistNode(todos: Todo[]): JSX.Element {
+export function checklistNode(todos: Todo[]): JSX.Element {
   const status = (t: Todo) =>
     t.status === 'completed'
       ? 'done'

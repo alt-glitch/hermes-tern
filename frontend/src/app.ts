@@ -51,7 +51,7 @@ import { Sidebar } from './sidebar.js'
 import { isRunning as processRuns, Processes, processTone } from './processes/store.js'
 import { loadSettings, saveSettings, type ThemeMode } from './settings.js'
 import { Transcript } from './transcript.js'
-import { dockNodes } from './view/dock.js'
+import { dockNodes, todoProgress } from './view/dock.js'
 import { entryNode } from './view/transcript.js'
 import { openSidebar, specOf } from './watch/spec.js'
 import { randomTip, type WelcomeContext } from './view/welcome.js'
@@ -86,6 +86,10 @@ export class App implements OverlayHost {
   readonly processes: Processes = new Processes(this)
   readonly cron: Cron = new Cron(this)
   readonly sidebar: Sidebar = new Sidebar(this)
+  /** The session's title, as Hermes names it (`session.title`). */
+  title = ''
+  /** The todo panel above the composer is open. */
+  #todosOpen = false
   /** The conversation's PRs; links are stored under the stored session id the tools see. */
   readonly prs: PullRequests = new PullRequests({
     changed: () => this.changed(),
@@ -351,9 +355,24 @@ export class App implements OverlayHost {
     }
   }
 
+  /** The agent's todo list while it matters: a turn runs, or something on it is still open. */
+  #todos() {
+    const list = this.transcript.currentTodos()
+
+    if (!list?.length) {
+      return undefined
+    }
+
+    const { done, total } = todoProgress(list)
+
+    return total && (this.busy || done < total) ? list : undefined
+  }
+
   /** The pills above the composer, left to right. */
   #pills(now = Date.now()): Pill[] {
     return [
+      // While a turn runs the todo pill rides the working line, where the keys don't reach it.
+      ...(this.#todos() && !this.busy ? (['todos'] as const) : []),
       ...(this.agents.running().length ? (['agents'] as const) : []),
       ...(this.processes.recent(now).length ? (['shells'] as const) : []),
       ...(this.prs.entries().length ? (['prs'] as const) : [])
@@ -376,6 +395,9 @@ export class App implements OverlayHost {
       openBackground(this)
     } else if (out.open === 'prs') {
       openPullRequests(this)
+    } else if (out.open === 'todos') {
+      this.#todosOpen = !this.#todosOpen
+      this.changed()
     }
 
     return out.consumed
@@ -922,6 +944,8 @@ export class App implements OverlayHost {
       }
 
       case 'session.title':
+        this.title = ev.payload?.title || this.title
+
         if (ev.payload?.title) {
           // eslint-disable-next-line no-control-regex -- a title must not end the OSC early
           process.stdout.write(`\x1b]2;${ev.payload.title.replace(/[\x00-\x1f]/g, ' ')}\x07`)
@@ -1361,6 +1385,21 @@ export class App implements OverlayHost {
         },
         agents: { onOpen: () => openAgents(this), running: this.agents.running().length },
         prs: prsPill(this.prs.entries(), () => openPullRequests(this)),
+        status: { title: this.title || undefined, tokens: typeof usage?.total === 'number' ? usage.total : undefined },
+        todos: (() => {
+          const list = this.#todos()
+
+          return list
+            ? {
+                list,
+                onToggle: () => {
+                  this.#todosOpen = !this.#todosOpen
+                  this.changed()
+                },
+                open: this.#todosOpen
+              }
+            : undefined
+        })(),
         focused: modal ? undefined : this.#hud,
         shells: {
           exited: exited.length,

@@ -552,6 +552,25 @@ export class Transcript {
     this.#touch(this.#findTool(c => c === call)?.turn)
   }
 
+  /** The agent's todo list as its newest snapshot left it (any turn), if it ever made one. */
+  currentTodos(): Todo[] | undefined {
+    for (let i = this.entries.length - 1; i >= 0; i--) {
+      const e = this.entries[i]
+
+      if (e?.kind !== 'turn') {
+        continue
+      }
+
+      const hit = e.blocks.findLast(b => b.kind === 'tool' && b.call.todos?.length)
+
+      if (hit?.kind === 'tool') {
+        return hit.call.todos
+      }
+    }
+
+    return undefined
+  }
+
   /** The delegate_task calls in the transcript, oldest first. */
   delegations(): ToolCall[] {
     return this.entries.flatMap(e =>

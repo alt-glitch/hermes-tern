@@ -18,6 +18,7 @@ the user's prompt, so one home covers every flow:
                    terminal calls before a slowly streamed answer
     "background…" -> (at the start) a 90 s ticking background process that notifies on exit
     "watch…"    -> (at the start) a 2 min ticking background process watching for "tick 10"
+    "errands…"  -> (at the start) a four-item todo list worked through over slow steps
     "connector…" -> (at the start) a tool search, a two-app connector batch and one connector call
     "pr…"       -> (at the start) links a real public PR (link_pull_request)
     "cron…"     -> (at the start) two cron jobs: a 30 min digest and a 15 min page monitor
@@ -118,6 +119,22 @@ SUBAGENT_REPLY = """Finished the delegated task.
 
 The parent can take it from here.
 """
+
+
+def _todos(*statuses: str) -> tuple[str, dict]:
+    items = ["Read the failing test", "Run the test suite", "Fix the timing assumption", "Run the suite again"]
+    todos = [{"id": str(i + 1), "content": c, "status": st} for i, (c, st) in enumerate(zip(items, statuses))]
+    # todo_list is deferred behind Tool Search: the bridge reaches it.
+    return ("tool_call", {"name": "todo_list", "arguments": {"todos": todos}})
+
+
+ERRANDS = [
+    ("I'll plan this as four errands.", [_todos("in_progress", "pending", "pending", "pending")]),
+    ("Reading the test first.", [("terminal", {"command": "sleep 2 && echo read"})]),
+    ("Now the suite.", [_todos("completed", "in_progress", "pending", "pending"), ("terminal", {"command": "sleep 3 && echo '3 failed'"})]),
+    ("Fixing it.", [_todos("completed", "completed", "in_progress", "pending"), ("terminal", {"command": "sleep 2 && echo fixed"})]),
+    ("All four errands are done.", []),
+]
 
 
 def _subagent_calls(messages: list[dict]) -> list[dict] | None:
@@ -221,6 +238,17 @@ class Model(BaseHTTPRequestHandler):
             calls = [_call(name, fresh(args), f"call-w{done}-{i}") for i, (name, args) in enumerate(round_calls)] or None
             if request.get("stream"):
                 self._stream(note, calls, 0.12, thought)
+                return
+            content = note
+            delay = 0.0
+        elif prompt.lower().lstrip().startswith("errands"):
+            # A todo list worked through: one round per request, as the work prompt does.
+            last_user = max(i for i, m in enumerate(messages) if m.get("role") == "user")
+            done = sum(1 for m in messages[last_user:] if m.get("role") == "assistant")
+            note, round_calls = ERRANDS[min(done, len(ERRANDS) - 1)]
+            calls = [_call(name, args, f"call-e{done}-{i}") for i, (name, args) in enumerate(round_calls)] or None
+            if request.get("stream"):
+                self._stream(note, calls, 0.05)
                 return
             content = note
             delay = 0.0
