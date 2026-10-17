@@ -1121,7 +1121,6 @@ export class App implements OverlayHost {
         inputId: INPUT_ID,
         model: info?.model ?? '',
         now,
-        onContext: () => void this.#slash('/usage'),
         onEdit: ev => {
           this.composer.edit(ev)
           this.changed()

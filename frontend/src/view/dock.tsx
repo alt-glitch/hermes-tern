@@ -39,7 +39,6 @@ export interface DockContext {
   onEffort(): void
   /** Pull the oldest queued prompt back into the composer. */
   onQueueEdit(): void
-  onContext(): void
   /** The session's cache hit (percent) and recent tokens per second, when known. */
   rates?: { cache?: number; tps?: number }
   /** Running subagents: the pill above the composer that opens the agents hub. */
@@ -156,11 +155,10 @@ function composerNode(cx: DockContext): JSX.Element {
         <meter
           key="context"
           label={`${Math.round(share * 100)}%`}
-          onClick={cx.onContext}
           role="omp.composer.context"
           style="bar"
           thresholds={{ bad: 0.85, warn: 0.6 }}
-          title={`Context ${Math.round(share * 100)}% used\n${compact(ctx!.used)} of ${compact(ctx!.max)} tokens`}
+          title={`Context ${Math.round(share * 100)}% used\n${compact(ctx!.used)} of ${compact(ctx!.max)} tokens\n/usage shows the breakdown`}
           total={compact(ctx!.max)}
           value={share}
         />

@@ -349,7 +349,6 @@ export class WatchApp {
         inputId: INPUT_ID,
         model: a.model ?? '',
         now,
-        onContext: () => undefined,
         onEdit: ev => {
           this.composer.edit(ev)
           this.changed()
