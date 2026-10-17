@@ -396,15 +396,15 @@ function composerNode(cx: DockContext): JSX.Element {
   return (
     <col key="composer" role="omp.editor">
       {cx.busy ? <row key="streak" role="hermes.streak" /> : null}
-      {share === undefined ? null : (
+      {share === undefined || share < 0.01 ? null : (
+        // The bar alone on the composer's edge: its % and total sat in the pills' row and collided
+        // with them; the status strip says the % and the tooltip the rest.
         <meter
           key="context"
-          label={`${Math.round(share * 100)}%`}
           role="omp.composer.context"
           style="bar"
           thresholds={{ bad: 0.85, warn: 0.6 }}
           title={`Context ${Math.round(share * 100)}% used\n${compact(ctx!.used)} of ${compact(ctx!.max)} tokens\n/usage shows the breakdown`}
-          total={compact(ctx!.max)}
           value={share}
         />
       )}
