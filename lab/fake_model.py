@@ -11,6 +11,7 @@ the user's prompt, so one home covers every flow:
     "tool"      -> a harmless terminal call (tool card)
     "steps"     -> four calls in a row (commands, a read, a search), then an answer
     "script"    -> a heredoc script with sections and long output, run alone
+    "slow"      -> one 8-second command, long enough to queue or steer a message
     "delegate…" -> (at the start) a delegate_task batch of three subagents, each running two slow
                    terminal calls before a slowly streamed answer
     anything else -> a streamed markdown reply
@@ -89,6 +90,8 @@ def _calls(prompt: str, target: Path) -> list[dict] | None:
     # would otherwise dispatch again, forever.
     if words.lstrip().startswith("delegate"):
         return [_call("delegate_task", {"tasks": [{"goal": g} for g in SUBAGENT_GOALS]})]
+    if words.lstrip().startswith("slow"):
+        return [_call("terminal", {"command": "sleep 8 && echo slept"})]
     if words.lstrip().startswith("script"):
         return [_call("terminal", {"command": SCRIPT})]
     if "approve" in words:

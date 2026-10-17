@@ -13,6 +13,11 @@ export const STYLES = css`
     padding-left: 34px !important;
   }
 
+  /* A steer's status under its words is a note, not code. */
+  [data-role='omp.user.steered'] {
+    font-family: var(--sans) !important;
+  }
+
   /* A turn Hermes started by itself: set apart from the answer above, like a new prompt is. */
   [data-role='omp.turn.continued'] {
     margin-top: 28px !important;

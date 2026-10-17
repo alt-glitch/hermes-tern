@@ -86,6 +86,21 @@ export class Transcript {
     this.#touch()
   }
 
+  /**
+   * A steer the gateway took for the running turn: it shows inside that turn, where it was sent,
+   * since the agent reads it before its next step. With no turn running it is a plain prompt.
+   */
+  steer(text: string, at = Date.now()) {
+    const turn = this.live
+
+    if (!turn) {
+      return this.user(text, at)
+    }
+
+    turn.blocks.push({ at, id: this.id('s'), kind: 'steer', text })
+    turn.rev++
+  }
+
   user(text: string, at = Date.now(), steered = false) {
     this.push({ at, id: this.id('u'), kind: 'user', text, ...(steered ? { steered } : {}) })
   }
@@ -394,6 +409,15 @@ export class Transcript {
       const at = typeof m.timestamp === 'number' ? m.timestamp * 1000 : 0
       const text = typeof m.text === 'string' ? m.text : typeof m.content === 'string' ? m.content : ''
 
+      // A steer is stored as its own user row, wrapped in Hermes' marker, inside the turn it joined.
+      const steered = m.role === 'user' ? steerText(text) : undefined
+
+      if (steered !== undefined && turn) {
+        turn.blocks.push({ at, id: this.id('s'), kind: 'steer', text: steered })
+
+        continue
+      }
+
       if (m.role === 'user') {
         turn = undefined
 
@@ -659,4 +683,34 @@ export function continuation(prev: Entry | undefined): string | undefined {
   )
 
   return background ? 'Subagents finished' : 'Continued on its own'
+}
+
+const STEER_OPEN = '[OUT-OF-BAND USER MESSAGE'
+const STEER_CLOSE = '[/OUT-OF-BAND USER MESSAGE]'
+
+/** The user's words inside Hermes' steer marker; undefined for any other row. */
+export function steerText(content: string): string | undefined {
+  const text = content.trim()
+
+  if (!text.startsWith(STEER_OPEN)) {
+    return undefined
+  }
+
+  const body = text.slice(text.indexOf(']') + 1)
+  const end = body.lastIndexOf(STEER_CLOSE)
+
+  return (end >= 0 ? body.slice(0, end) : body).trim()
+}
+
+/**
+ * Where a steer stands: `landed` once the turn went on after it, `pending` while the running
+ * turn has not taken its next step, `next` when the turn ended first (Hermes then sends it as the
+ * next prompt).
+ */
+export function steerState(turn: TurnEntry, index: number): 'landed' | 'pending' | 'next' {
+  if (turn.blocks.slice(index + 1).some(b => b.kind !== 'steer')) {
+    return 'landed'
+  }
+
+  return turn.status === 'live' ? 'pending' : 'next'
 }

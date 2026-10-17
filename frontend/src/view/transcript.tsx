@@ -6,6 +6,7 @@
 import { type JSX, node } from '@stencil-hq/tern'
 
 import type { Block, Entry, NoticeEntry, TurnEntry, UserEntry } from '../model.js'
+import { steerState } from '../transcript.js'
 
 import { age, compact, duration } from './time.js'
 import { groupRuns, toolRunNode } from './toolRuns.js'
@@ -91,7 +92,6 @@ function userNode(e: UserEntry, cx: TranscriptContext): JSX.Element {
         {copyButton(e.text, e.id, 'omp.user.tool', 'Copy message', cx)}
       </row>
       <md key="body">{e.text}</md>
-      {e.steered ? <text key="steered" role="omp.user.steered" spans={[{ s: 'dim', t: '↳ steered' }]} /> : null}
     </card>
   )
 }
@@ -102,7 +102,9 @@ function turnNode(turn: TurnEntry, id: string, cx: TranscriptContext): JSX.Eleme
   const children = groupRuns(turn.blocks).map(b =>
     Array.isArray(b)
       ? toolRunNode(b, id, cx.now, inner => blockNode(inner, `${id}.r${b[0]!.id}.${inner.id}`, false, cx))
-      : blockNode(b, `${id}.${b.id}`, live && b === lastText, cx)
+      : b.kind === 'steer'
+        ? steerNode(b, steerState(turn, turn.blocks.indexOf(b)))
+        : blockNode(b, `${id}.${b.id}`, live && b === lastText, cx)
   )
 
   // A turn Hermes started by itself gets a quiet line saying why, so it does not read as part
@@ -170,7 +172,25 @@ function blockNode(b: Block, id: string, streaming: boolean, cx: TranscriptConte
 
     case 'thinking':
       return thinkingNode(b, id, cx)
+
+    case 'steer':
+      return steerNode(b, 'landed')
   }
+}
+
+const STEER_NOTE = { landed: '', next: ' · sent as the next prompt', pending: ' · reaches Hermes after this step' }
+
+/** A steer, where it joined the turn: the user's words as a small bubble, and whether it landed. */
+function steerNode(b: Extract<Block, { kind: 'steer' }>, state: keyof typeof STEER_NOTE): JSX.Element {
+  return (
+    <card key={b.id} role="omp.user" tone="user">
+      <md key="body">{b.text}</md>
+      <row align="center" gap="xs" key="how" role="omp.user.steered">
+        <icon key="icon" name="corner-down-right" />
+        <text key="state" spans={[{ s: 'dim', t: `Steered${STEER_NOTE[state]}` }]} />
+      </row>
+    </card>
+  )
 }
 
 function thinkingNode(b: Extract<Block, { kind: 'thinking' }>, id: string, cx: TranscriptContext): JSX.Element {

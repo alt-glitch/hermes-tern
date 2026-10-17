@@ -78,6 +78,8 @@ export type Block =
   | { kind: 'text'; id: string; text: string }
   | { kind: 'thinking'; id: string; text: string; startedAt: number; endedAt?: number }
   | { kind: 'tool'; id: string; call: ToolCall }
+  /** Guidance the user sent into this turn while it ran; it lands before the agent's next step. */
+  | { kind: 'steer'; id: string; text: string; at: number }
 
 /** A user prompt. */
 export interface UserEntry {
