@@ -18,6 +18,7 @@ the user's prompt, so one home covers every flow:
                    terminal calls before a slowly streamed answer
     "background…" -> (at the start) a 90 s ticking background process that notifies on exit
     "watch…"    -> (at the start) a 2 min ticking background process watching for "tick 10"
+    "cron…"     -> (at the start) two cron jobs: a 30 min digest and a 15 min page monitor
     anything else -> a streamed markdown reply
 """
 
@@ -138,6 +139,15 @@ def _calls(prompt: str, target: Path) -> list[dict] | None:
     if words.lstrip().startswith("watch"):
         # `notify` is the advertised flag (tools/terminal_tool.py): a list watches for those lines.
         return [_call("terminal", {"command": TICKS.format(n=120), "background": True, "notify": ["tick 10"]})]
+    if words.lstrip().startswith("cron"):
+        # cronjob_manage is a deferred tool: the model reaches it through the tool_call bridge.
+        return [
+            _call("tool_call", {"name": "cronjob_manage", "arguments": {
+                "action": "create", "name": "lab digest", "schedule": "every 30m", "prompt": "Summarise the lab notes."}}, "call-cron"),
+            _call("tool_call", {"name": "cronjob_manage", "arguments": {
+                "action": "create", "name": "lab page watch", "schedule": "every 15m",
+                "prompt": "Say what changed on the page.", "monitor": "https://example.com"}}, "call-monitor"),
+        ]
     if words.lstrip().startswith("script"):
         return [_call("terminal", {"command": SCRIPT})]
     if "approve" in words:
@@ -171,7 +181,10 @@ class Model(BaseHTTPRequestHandler):
         arrived = time.time()
         request = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
         messages = request.get("messages", [])
-        print(f"ARRIVE {arrived:.3f} msgs={len(messages)} tools={len(request.get('tools') or [])} bytes={self.headers['Content-Length']}", flush=True)
+        names = sorted(t.get("function", {}).get("name", "") for t in request.get("tools") or [])
+        print(f"ARRIVE {arrived:.3f} msgs={len(messages)} tools={len(names)} bytes={self.headers['Content-Length']}", flush=True)
+        if os.environ.get("FAKE_MODEL_TOOLS"):
+            print("TOOLS " + " ".join(names), flush=True)
         prompt = next((m.get("content") for m in reversed(messages) if m.get("role") == "user"), "") or ""
         if isinstance(prompt, list):
             prompt = " ".join(p.get("text", "") for p in prompt if isinstance(p, dict))

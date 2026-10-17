@@ -1,7 +1,7 @@
 // The session's background processes (`terminal(background=true)`), for the shells pill, the
-// Background sheet and the live line on each background terminal card. The gateway sends no
-// process events to viewers, so this polls `process.list` (session-scoped): every second while
-// the sheet is open or a process runs, else every five. Exited processes stay on the pill for
+// Background sheet and the live line on each background terminal card. Output arrives as it is
+// printed (`agent.terminal.output`); status and exits come from polling `process.list`
+// (session-scoped): every second while the sheet is open or a process runs, else every five. Exited processes stay on the pill for
 // Hermes' 60 s (ui-tui/src/app/processRoster.ts); the sheet's All tab keeps whatever the
 // gateway still lists.
 
@@ -36,6 +36,9 @@ export interface ProcessEntry {
   output_tail?: string
   output_preview?: string
 }
+
+/** How much output a process keeps between polls: the shared gateway's `output_tail` is 32k. */
+export const OUTPUT_MAX = 32_000
 
 /** How long an exited process stays on the pill (Hermes' PROCESS_RETAIN_SECONDS). */
 export const RETAIN_MS = 60_000
@@ -268,6 +271,20 @@ export class Processes {
         this.#watchers--
       }
     }
+  }
+
+  /** A chunk `id` printed (`agent.terminal.output`); a process the store does not know yet polls. */
+  output(id: string, chunk: string) {
+    const p = this.#byId.get(id)
+
+    if (!p) {
+      return this.poke()
+    }
+
+    p.output = (p.output + chunk).slice(-OUTPUT_MAX)
+    p.lastLine = lastLine(p.output)
+    this.#link(new Set([p]))
+    this.#host.changed()
   }
 
   /** Stops one process (`process.kill`); the registry's answer status (`killed`, `already_exited`, …). */

@@ -541,6 +541,13 @@ export class Transcript {
     )
   }
 
+  /** The calls of tool `name` in the transcript, oldest first. */
+  calls(name: string): ToolCall[] {
+    return this.entries.flatMap(e =>
+      e.kind === 'turn' ? e.blocks.flatMap(b => (b.kind === 'tool' && b.call.name === name ? [b.call] : [])) : []
+    )
+  }
+
   /** The terminal calls that run on as background processes, oldest first. */
   backgroundCalls(): ToolCall[] {
     return this.entries.flatMap(e =>

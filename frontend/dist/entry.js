@@ -7923,11 +7923,11 @@ var require_fixed_queue = __commonJS({
       }
       shift() {
         const tail = this.tail;
-        const next = tail.shift();
+        const next2 = tail.shift();
         if (tail.isEmpty() && tail.next !== null) {
           this.tail = tail.next;
         }
-        return next;
+        return next2;
       }
     };
   }
@@ -17427,18 +17427,18 @@ var require_receiver = __commonJS({
         const buffer = Buffer.allocUnsafe(n);
         let offset = 0;
         while (offset !== n) {
-          const next = this.#buffers[0];
-          const { length } = next;
+          const next2 = this.#buffers[0];
+          const { length } = next2;
           if (length + offset === n) {
             buffer.set(this.#buffers.shift(), offset);
             break;
           } else if (length + offset > n) {
-            buffer.set(next.subarray(0, n - offset), offset);
-            this.#buffers[0] = next.subarray(n - offset);
+            buffer.set(next2.subarray(0, n - offset), offset);
+            this.#buffers[0] = next2.subarray(n - offset);
             break;
           } else {
             buffer.set(this.#buffers.shift(), offset);
-            offset += next.length;
+            offset += next2.length;
           }
         }
         this.#byteOffset -= n;
@@ -19246,16 +19246,16 @@ function matchPrefix(bytes, at, prefix) {
   return at + prefix.length;
 }
 function escapeAt(bytes, i) {
-  const next = bytes[i + 1];
-  if (next === void 0)
+  const next2 = bytes[i + 1];
+  if (next2 === void 0)
     return { kind: "need" };
-  if (next === 95 || next === 93) {
-    const end2 = matchPrefix(bytes, i + 2, next === 95 ? APC_TSP : OSC_TSP);
+  if (next2 === 95 || next2 === 93) {
+    const end2 = matchPrefix(bytes, i + 2, next2 === 95 ? APC_TSP : OSC_TSP);
     if (end2 === "need")
       return { kind: "need" };
     return end2 < 0 ? { kind: "pass", end: i + 2 } : { kind: "tsp", start: end2 };
   }
-  if (next !== 91)
+  if (next2 !== 91)
     return { kind: "pass", end: i + 1 };
   let j = i + 2;
   while (j < bytes.length && (bytes[j] ?? 0) >= 48 && (bytes[j] ?? 0) <= 63)
@@ -19682,17 +19682,17 @@ var KeyDecoder = class {
     const b = bytes[i] ?? 0;
     if (b !== ESC2)
       return this.#plain(bytes, i, out, false, final2);
-    const next = bytes[i + 1];
-    if (next === void 0) {
+    const next2 = bytes[i + 1];
+    if (next2 === void 0) {
       if (!final2)
         return 0;
       out.push(key("escape", NO_MODS));
       return 1;
     }
-    if (next === 91 || next === 79) {
+    if (next2 === 91 || next2 === 79) {
       return this.#sequence(bytes, i, i, out, false, final2);
     }
-    if (next === ESC2) {
+    if (next2 === ESC2) {
       const after = bytes[i + 2];
       if (after === void 0 && !final2)
         return 0;
@@ -19703,7 +19703,7 @@ var KeyDecoder = class {
       out.push(key("escape", { ...NO_MODS, alt: true }));
       return 2;
     }
-    if (next === 93 || next === 95) {
+    if (next2 === 93 || next2 === 95) {
       for (let j = i + 2; j < bytes.length; j++) {
         if (bytes[j] === 7)
           return j + 1 - i;
@@ -20224,11 +20224,11 @@ var View = class _View {
     return this.#index.get(id);
   }
   /** The ops turning this view into `next` in surface `surface`. */
-  ops(next, surface) {
+  ops(next2, surface) {
     const ops = [];
     REGIONS.forEach((_, i) => {
       const old = this.regions[i];
-      const now = next.regions[i];
+      const now = next2.regions[i];
       if (old && !now)
         ops.push(["del", old.id]);
       else if (!old && now)
@@ -20318,23 +20318,23 @@ function children(old, now, ops) {
       same.push({ at, was: o.at });
   });
   const stay = new Set(rising(same.map((s) => s.was)).map((k) => same[k]?.at));
-  let next = null;
+  let next2 = null;
   for (let at = now.children.length - 1; at >= 0; at--) {
     const child = now.children[at];
     if (!child)
       continue;
     const o = before.get(child.id);
     if (!o) {
-      ops.push(["add", child.id, now.id, next, child.wire()]);
+      ops.push(["add", child.id, now.id, next2, child.wire()]);
     } else if (o.tree.kind !== child.kind) {
       ops.push(["del", child.id]);
-      ops.push(["add", child.id, now.id, next, child.wire()]);
+      ops.push(["add", child.id, now.id, next2, child.wire()]);
     } else {
       if (!stay.has(at))
-        ops.push(["move", child.id, now.id, next]);
+        ops.push(["move", child.id, now.id, next2]);
       diff(o.tree, child, ops);
     }
-    next = child.id;
+    next2 = child.id;
   }
 }
 
@@ -20393,9 +20393,9 @@ var Surface = class {
   render(view) {
     if (this.#closed)
       return;
-    const next = View.from(view);
-    this.#latest = next;
-    this.#pending = next;
+    const next2 = View.from(view);
+    this.#latest = next2;
+    this.#pending = next2;
     this.#pump();
   }
   /** Installs (or with `null` removes) stylesheet `name`. */
@@ -20548,11 +20548,11 @@ var Surface = class {
   /** Sends the pending difference and queued ops as one frame, when there are any. */
   #flush() {
     const ops = [];
-    const next = this.#pending;
-    if (this.#resetMain && (next || this.#queue.length > 0))
+    const next2 = this.#pending;
+    if (this.#resetMain && (next2 || this.#queue.length > 0))
       ops.push(["del", "main"]);
-    if (next)
-      ops.push(...this.#sent.ops(next, this.id));
+    if (next2)
+      ops.push(...this.#sent.ops(next2, this.id));
     ops.push(...this.#queue);
     if (ops.length > 0) {
       const seq = this.#seq + 1;
@@ -20561,8 +20561,8 @@ var Surface = class {
       this.#resetMain = false;
     }
     this.#queue = [];
-    if (next) {
-      this.#sent = next;
+    if (next2) {
+      this.#sent = next2;
       this.#pending = void 0;
     }
   }
@@ -24554,6 +24554,7 @@ var GatewayClient = class extends EventEmitter {
 
 // src/app.ts
 import { randomUUID as randomUUID3 } from "node:crypto";
+import { appendFileSync as appendFileSync4 } from "node:fs";
 
 // node_modules/@hermes/shared/src/slash.ts
 var SLASH_COMMAND_RE = /^\/[^\s/]*(?:\s|$)/;
@@ -25138,6 +25139,12 @@ var Transcript = class {
   delegations() {
     return this.entries.flatMap(
       (e) => e.kind === "turn" ? e.blocks.flatMap((b) => b.kind === "tool" && b.call.name === "delegate_task" ? [b.call] : []) : []
+    );
+  }
+  /** The calls of tool `name` in the transcript, oldest first. */
+  calls(name) {
+    return this.entries.flatMap(
+      (e) => e.kind === "turn" ? e.blocks.flatMap((b) => b.kind === "tool" && b.call.name === name ? [b.call] : []) : []
     );
   }
   /** The terminal calls that run on as background processes, oldest first. */
@@ -25859,6 +25866,7 @@ function compact(n) {
 }
 
 // src/processes/store.ts
+var OUTPUT_MAX = 32e3;
 var RETAIN_MS = 6e4;
 var FAST_MS = 1e3;
 var IDLE_MS = 5e3;
@@ -26012,6 +26020,17 @@ var Processes = class {
         this.#watchers--;
       }
     };
+  }
+  /** A chunk `id` printed (`agent.terminal.output`); a process the store does not know yet polls. */
+  output(id, chunk) {
+    const p = this.#byId.get(id);
+    if (!p) {
+      return this.poke();
+    }
+    p.output = (p.output + chunk).slice(-OUTPUT_MAX);
+    p.lastLine = lastLine(p.output);
+    this.#link(/* @__PURE__ */ new Set([p]));
+    this.#host.changed();
   }
   /** Stops one process (`process.kill`); the registry's answer status (`killed`, `already_exited`, …). */
   async kill(id) {
@@ -27566,10 +27585,132 @@ function toneSpan(status) {
   return { cancelled: "warning", done: "success", failed: "error", queued: "muted", running: "accent" }[status];
 }
 
+// src/processes/cron.ts
+var CRON_POLL_MS = 5e3;
+function isMonitor(job) {
+  return Boolean(job.monitor_script || job.monitor_url);
+}
+function isPaused(job) {
+  return job.enabled === false || job.state === "paused";
+}
+function jobError(job) {
+  return job.last_error || job.last_fire_error || job.last_delivery_error || void 0;
+}
+function jobTone(job) {
+  return isPaused(job) ? "muted" : jobError(job) || job.last_status === "error" ? "error" : "accent";
+}
+function ownJobs(calls) {
+  const ids = /* @__PURE__ */ new Set();
+  for (const c of calls) {
+    const r = record(c.result);
+    const job = record(r?.job);
+    const id = r?.job_id ?? job?.job_id ?? job?.id;
+    if (c.name === "cronjob_manage" && typeof id === "string" && id) {
+      ids.add(id);
+    }
+  }
+  return ids;
+}
+var Cron = class {
+  #host;
+  #jobs = [];
+  #error;
+  #warning;
+  #loaded = false;
+  #watchers = 0;
+  #timer;
+  #busy = /* @__PURE__ */ new Set();
+  constructor(host) {
+    this.#host = host;
+  }
+  jobs() {
+    return this.#jobs;
+  }
+  /** Why the list could not load (an old gateway, a refused scope). */
+  get error() {
+    return this.#error;
+  }
+  /** The gateway's note that no scheduler runs (the jobs are saved but do not fire). */
+  get warning() {
+    return this.#warning;
+  }
+  get loaded() {
+    return this.#loaded;
+  }
+  /** An action is in flight for `id`. */
+  busy(id) {
+    return this.#busy.has(id);
+  }
+  /** Polls while the returned release has not run (the Cron tab shows). */
+  watch() {
+    this.#watchers++;
+    if (this.#watchers === 1) {
+      void this.#tick();
+    }
+    let released = false;
+    return () => {
+      if (!released) {
+        released = true;
+        if (--this.#watchers === 0) {
+          clearTimeout(this.#timer);
+          this.#timer = void 0;
+        }
+      }
+    };
+  }
+  /** Pauses, resumes or removes job `id`; throws the gateway's error. */
+  async act(action, id) {
+    this.#busy.add(id);
+    this.#host.changed();
+    try {
+      const r = await this.#host.gw.request("cron.manage", { action, name: id });
+      if (r?.success === false || r?.error) {
+        throw new Error(r.error || `Could not ${action} the job`);
+      }
+    } finally {
+      this.#busy.delete(id);
+      await this.refresh();
+    }
+  }
+  async refresh() {
+    try {
+      const r = await this.#host.gw.request("cron.manage", { action: "list", include_disabled: true });
+      if (r?.success === false && r.error) {
+        throw new Error(r.error);
+      }
+      this.#jobs = (r?.jobs ?? []).filter((j) => typeof j?.job_id === "string");
+      this.#warning = r?.warning ?? void 0;
+      this.#error = void 0;
+    } catch (error) {
+      this.#error = error instanceof Error ? error.message : String(error);
+    }
+    this.#loaded = true;
+    this.#host.changed();
+  }
+  async #tick() {
+    await this.refresh();
+    if (this.#watchers > 0) {
+      clearTimeout(this.#timer);
+      this.#timer = setTimeout(() => void this.#tick(), CRON_POLL_MS);
+    }
+  }
+};
+function relative(iso, now) {
+  const at = iso ? Date.parse(iso) : NaN;
+  if (Number.isNaN(at)) {
+    return "";
+  }
+  const d = at - now;
+  const s = Math.abs(d) / 1e3;
+  const [n, unit] = s < 45 ? [0, ""] : s < 3600 ? [Math.round(s / 60), "m"] : s < 86400 ? [Math.round(s / 3600), "h"] : [Math.round(s / 86400), "d"];
+  return n === 0 ? "now" : d > 0 ? `in ${n}${unit}` : `${n}${unit} ago`;
+}
+
 // src/overlays/background.tsx
 var KEY2 = "background";
 var TICK_MS2 = 1e3;
 var COPIED_MS = 1500;
+var TABS = ["running", "all", "cron"];
 var STATUS2 = {
   done: "Exited",
   failed: "Failed",
@@ -27584,14 +27725,17 @@ function openBackground(app, focus) {
   let selected = focus ?? procs().find(isRunning2)?.id ?? procs()[0]?.id;
   let expanded = false;
   let confirm;
+  let job;
   let copied;
   let copiedTimer;
   const release = app.processes.watch();
+  const releaseCron = app.cron.watch();
   const timer = setInterval(() => app.overlays.includes(overlay) ? app.changed() : end(), TICK_MS2);
   function end() {
     clearInterval(timer);
     clearTimeout(copiedTimer);
     release();
+    releaseCron();
   }
   const close = () => {
     end();
@@ -27645,6 +27789,32 @@ function openBackground(app, focus) {
       confirm = what;
     }
   };
+  const currentJob = () => app.cron.jobs().find((j) => j.job_id === job);
+  const actJob = async (action) => {
+    const j = currentJob();
+    confirm = void 0;
+    if (!j || app.cron.busy(j.job_id)) {
+      return app.changed();
+    }
+    try {
+      await app.cron.act(action, j.job_id);
+    } catch (error) {
+      app.transcript.notice(error instanceof Error ? error.message : String(error), "error");
+    }
+    app.changed();
+  };
+  const toggleJob = () => {
+    const j = currentJob();
+    if (j) {
+      void actJob(isPaused(j) ? "resume" : "pause");
+    }
+  };
+  const askRemove = () => {
+    if (currentJob()) {
+      confirm = "job";
+    }
+  };
+  const settle = () => void (confirm === "all" ? stopAll() : confirm === "job" ? actJob("remove") : stopOne());
   const overlay = {
     key: KEY2,
     modal: true,
@@ -27652,7 +27822,7 @@ function openBackground(app, focus) {
     onKey: (k) => {
       if (confirm) {
         if (k.name === "enter" || k.name === "y") {
-          void (confirm === "all" ? stopAll() : stopOne());
+          settle();
         } else if (k.name === "escape" || k.name === "n") {
           confirm = void 0;
         }
@@ -27665,6 +27835,20 @@ function openBackground(app, focus) {
         } else {
           close();
         }
+      } else if (tab === "cron") {
+        if (k.name === "tab") {
+          tab = next(tab, k.shift);
+        } else if (k.name === "p" && bare && !k.shift) {
+          toggleJob();
+        } else if (k.name === "d" && bare && !k.shift) {
+          askRemove();
+        } else {
+          job = moveSelection(
+            k,
+            app.cron.jobs().map((j) => j.job_id),
+            job
+          ) ?? job;
+        }
       } else if (k.name === "enter") {
         expanded = Boolean(current()) && !expanded;
       } else if (k.name === "k" && bare) {
@@ -27672,7 +27856,7 @@ function openBackground(app, focus) {
       } else if (k.name === "c" && bare && !k.shift) {
         copy();
       } else if (k.name === "tab" && !expanded) {
-        tab = tab === "running" ? "all" : "running";
+        tab = next(tab, k.shift);
       } else {
         selected = moveSelection(
           k,
@@ -27700,10 +27884,14 @@ function openBackground(app, focus) {
         close();
       }
     },
-    confirm: () => void (confirm === "all" ? stopAll() : stopOne()),
+    confirm: settle,
     copy,
     expand: () => {
       expanded = Boolean(current()) && !expanded;
+      app.changed();
+    },
+    remove: () => {
+      askRemove();
       app.changed();
     },
     stop: () => {
@@ -27711,11 +27899,75 @@ function openBackground(app, focus) {
       app.changed();
     },
     tab: (ev) => {
-      tab = ev.value === "running" ? "running" : "all";
+      tab = TABS.find((t2) => t2 === ev.value) ?? "all";
+      expanded = false;
+      confirm = void 0;
       app.changed();
-    }
+    },
+    toggle: toggleJob
   };
   function sheetNode(now) {
+    return tab === "cron" ? cronNode(now) : processNode(now);
+  }
+  const tabs = () => [
+    { count: app.processes.running().length, id: "running", label: "Running" },
+    { count: procs().length, id: "all", label: "All" },
+    { count: app.cron.loaded ? app.cron.jobs().length : void 0, id: "cron", label: "Cron" }
+  ];
+  function cronNode(now) {
+    const jobs = app.cron.jobs();
+    const own = ownJobs(app.transcript.calls("cronjob_manage"));
+    if (!jobs.some((j2) => j2.job_id === job)) {
+      job = jobs[0]?.job_id;
+    }
+    const j = jobs.find((x) => x.job_id === job);
+    const busy = j ? app.cron.busy(j.job_id) : false;
+    const columns = [
+      { format: "dim", head: "Schedule", id: "schedule", min: 10, priority: 1 },
+      { format: "dim", head: "Next", id: "next", priority: 3 },
+      { format: "dim", head: "Last", id: "last", priority: 5 }
+    ];
+    return /* @__PURE__ */ jsx(
+      "picker",
+      {
+        actions: [
+          {
+            disabled: j ? busy ? "Working" : void 0 : "No job",
+            id: "toggle",
+            keys: ["p"],
+            label: j && isPaused(j) ? "Resume" : "Pause",
+            primary: true
+          },
+          { danger: true, disabled: j ? busy ? "Working" : void 0 : "No job", id: "remove", keys: ["d"], label: "Remove" },
+          { end: true, id: "close", keys: ["esc"], label: "Close" }
+        ],
+        columns,
+        confirm: confirm === "job" && j ? { act: "confirm", label: "Remove", text: `Remove ${j.name || j.job_id}? It will not run again.` } : void 0,
+        empty: app.cron.error ? `Could not list cron jobs: ${app.cron.error}` : app.cron.loaded ? "No cron jobs. Ask Hermes to schedule one or to watch something." : "Loading cron jobs\u2026",
+        icon: "clock",
+        items: jobs.map((x) => jobItem(x, now, own.has(x.job_id), app.cron.busy(x.job_id))),
+        noun: "jobs",
+        onAction: handlers,
+        onSelect: (ev) => {
+          job = ev.item;
+          confirm = void 0;
+          app.changed();
+        },
+        order: jobs.map((x) => x.job_id),
+        preview: "side",
+        selected: job,
+        size: "lg",
+        subtitle: [{ s: "muted", t: app.cron.warning ?? cronSummary(jobs) }],
+        tab,
+        tabs: tabs(),
+        title: "Background",
+        total: jobs.length,
+        children: j ? jobPreview(j, now, own.has(j.job_id)) : null
+      },
+      KEY2
+    );
+  }
+  function processNode(now) {
     const all = procs();
     const list = shown();
     const running = all.filter(isRunning2).length;
@@ -27769,10 +28021,7 @@ function openBackground(app, focus) {
         size: "lg",
         subtitle: [{ s: "muted", t: summary2(all) }],
         tab,
-        tabs: [
-          { count: running, id: "running", label: "Running" },
-          { count: all.length, id: "all", label: "All" }
-        ],
+        tabs: tabs(),
         title: "Background",
         total: all.length,
         children: p ? expanded ? outputView(p, now) : preview2(p, call, now) : null
@@ -27781,6 +28030,72 @@ function openBackground(app, focus) {
     );
   }
   app.open(overlay);
+}
+function next(tab, back) {
+  return TABS[(TABS.indexOf(tab) + (back ? TABS.length - 1 : 1)) % TABS.length];
+}
+function cronSummary(jobs) {
+  const paused = jobs.filter(isPaused).length;
+  const monitors = jobs.filter(isMonitor).length;
+  const parts2 = [
+    [jobs.length - paused, "active"],
+    [paused, "paused"],
+    [monitors, monitors === 1 ? "monitor" : "monitors"]
+  ];
+  return parts2.filter(([n]) => n).map(([n, label]) => `${n} ${label}`).join(" \xB7 ") || "none yet";
+}
+function jobItem(j, now, own, busy) {
+  const error = jobError(j);
+  return {
+    badges: [...isMonitor(j) ? [{ text: "monitor" }] : [], ...own ? [{ text: "this session", tone: "accent" }] : []],
+    detail: j.prompt_preview || j.monitor_url || j.monitor_script || void 0,
+    dot: jobTone(j),
+    facts: {
+      last: busy ? "working\u2026" : error ? "failed" : j.last_run_at ? `${j.last_status ?? "ran"} ${relative(j.last_run_at, now)}` : "never ran",
+      next: isPaused(j) ? "paused" : relative(j.next_run_at, now),
+      schedule: j.schedule ?? ""
+    },
+    id: j.job_id,
+    label: j.name || j.job_id,
+    tone: isPaused(j) ? "muted" : void 0
+  };
+}
+function jobPreview(j, now, own) {
+  const at = (iso) => iso ? `${clock(Date.parse(iso))} \xB7 ${relative(iso, now)}` : "\u2014";
+  const error = jobError(j);
+  const fact = (k, v) => v ? [{ k: [{ t: k }], v }] : [];
+  return [
+    /* @__PURE__ */ jsx("text", { role: "omp.hub.title", text: j.name || j.job_id }, "title"),
+    /* @__PURE__ */ jsx(
+      "kv",
+      {
+        items: [
+          { k: [{ t: "State" }], v: [{ s: jobTone(j), t: isPaused(j) ? `Paused${j.paused_reason ? ` \xB7 ${j.paused_reason}` : ""}` : "Active" }] },
+          ...fact("Schedule", j.schedule),
+          ...isPaused(j) ? [] : fact("Next run", at(j.next_run_at)),
+          { k: [{ t: "Last run" }], v: j.last_run_at ? `${at(j.last_run_at)}${j.last_status ? ` \xB7 ${j.last_status}` : ""}` : "never" },
+          ...fact("Repeat", j.repeat === null || j.repeat === void 0 ? void 0 : String(j.repeat)),
+          ...fact("Delivers to", j.deliver),
+          ...fact("Watches", j.monitor_url ?? j.monitor_script),
+          ...fact("Script", j.script),
+          ...fact("Folder", j.workdir),
+          ...fact("Model", j.model),
+          ...fact("Skills", j.skills?.join(" \xB7 ")),
+          ...own ? [{ k: [{ t: "Made by" }], v: "this session" }] : [],
+          { k: [{ t: "Job" }], v: [{ s: "mono dim", t: j.job_id }] }
+        ],
+        role: "omp.hub.kv"
+      },
+      "facts"
+    ),
+    ...error ? [/* @__PURE__ */ jsx("text", { spans: [{ s: "error", t: error }] }, "error")] : [],
+    ...j.prompt_preview ? [
+      /* @__PURE__ */ jsx("section", { head: "Prompt", children: /* @__PURE__ */ jsx("md", { text: j.prompt_preview }, "text") }, "prompt")
+    ] : [],
+    ...j.monitor_state !== void 0 && j.monitor_state !== null ? [
+      /* @__PURE__ */ jsx("section", { head: "Last seen", children: /* @__PURE__ */ jsx("code", { lang: "json", max: { h: "10lines" }, text: JSON.stringify(j.monitor_state, null, 2), wrap: true }, "json") }, "state")
+    ] : []
+  ];
 }
 function callOf(app, id) {
   return app.transcript.backgroundCalls().find((c) => (processIdOf(c) ?? c.process?.id) === id);
@@ -28462,13 +28777,13 @@ var Composer = class {
     this.#changed();
   }
   redo() {
-    const next = this.#redo.pop();
-    if (!next) {
+    const next2 = this.#redo.pop();
+    if (!next2) {
       return;
     }
     this.#undo.push({ cursor: this.cursor, text: this.text });
-    this.text = next.text;
-    this.cursor = next.cursor;
+    this.text = next2.text;
+    this.cursor = next2.cursor;
     this.#lastEdit = 0;
     this.#changed();
   }
@@ -28982,10 +29297,10 @@ function clarifyOverlay(host, req) {
     if (q) {
       answers[q.qid] = answer;
     }
-    const next = questions.findIndex((other, i) => i > step && !(other.qid in answers));
+    const next2 = questions.findIndex((other, i) => i > step && !(other.qid in answers));
     const first = questions.findIndex((other) => !(other.qid in answers));
-    if (next >= 0 || first >= 0) {
-      step = next >= 0 ? next : first;
+    if (next2 >= 0 || first >= 0) {
+      step = next2 >= 0 ? next2 : first;
       host.changed();
       return;
     }
@@ -29849,8 +30164,8 @@ var completionToApplyOnSubmit = (value, rowText2, compReplace, isLocalCommand = 
   if (!rowText2 || /^\/[\w-]+$/.test(typed) && isLocalCommand(typed.slice(1))) {
     return null;
   }
-  const next = applyCompletion(value, rowText2, compReplace);
-  return next !== value && next.trimEnd() !== value.trimEnd() ? next : null;
+  const next2 = applyCompletion(value, rowText2, compReplace);
+  return next2 !== value && next2.trimEnd() !== value.trimEnd() ? next2 : null;
 };
 
 // src/hermes/completion.ts
@@ -29912,8 +30227,8 @@ var Completion = class {
     if (!row || !composer || composer.cursor !== composer.text.length) {
       return "";
     }
-    const next = applyCompletion(this.#for, row.text, this.#replaceFrom);
-    return next.startsWith(composer.text) ? next.slice(composer.text.length) : "";
+    const next2 = applyCompletion(this.#for, row.text, this.#replaceFrom);
+    return next2.startsWith(composer.text) ? next2.slice(composer.text.length) : "";
   }
   /** Re-queries when the text before the composer's caret changed since the last query; cheap otherwise. */
   update(composer) {
@@ -29985,12 +30300,12 @@ var Completion = class {
         if (key2.shift || key2.alt || composer.text.slice(0, composer.cursor) !== this.#for) {
           return false;
         }
-        const next = completionToApplyOnSubmit(this.#for, this.items[this.selected]?.text, this.#replaceFrom);
-        if (next === null) {
+        const next2 = completionToApplyOnSubmit(this.#for, this.items[this.selected]?.text, this.#replaceFrom);
+        if (next2 === null) {
           this.dismiss();
           return false;
         }
-        return this.#accept(next);
+        return this.#accept(next2);
       }
     }
     return false;
@@ -30900,11 +31215,11 @@ function loadSettings(file2 = settingsFile()) {
   }
 }
 function saveSettings(patch, file2 = settingsFile()) {
-  const next = { ...loadSettings(file2), ...patch };
+  const next2 = { ...loadSettings(file2), ...patch };
   mkdirSync3(dirname(file2), { recursive: true });
-  writeFileSync2(file2, `${JSON.stringify(next, null, 2)}
+  writeFileSync2(file2, `${JSON.stringify(next2, null, 2)}
 `);
-  return next;
+  return next2;
 }
 
 // src/view/dock.tsx
@@ -32591,8 +32906,8 @@ function hardBreaks(text2) {
       fenced = !fenced;
       return line;
     }
-    const next = all[i + 1];
-    return fenced || !line.trim() || next === void 0 || !next.trim() ? line : `${line}  `;
+    const next2 = all[i + 1];
+    return fenced || !line.trim() || next2 === void 0 || !next2.trim() ? line : `${line}  `;
   }).join("\n");
 }
 
@@ -33269,6 +33584,7 @@ var App = class {
   agents = new Agents(this);
   /** The session's background processes (the shells pill, the Background sheet, background cards). */
   processes = new Processes(this);
+  cron = new Cron(this);
   composer = new Composer();
   overlays = [];
   sid = null;
@@ -33332,7 +33648,14 @@ var App = class {
     if (query || this.#startupImage) {
       this.queue.push(query || "What do you see in this image?");
     }
-    this.#gw.on("event", (ev) => this.#onGatewayEvent(ev));
+    const log = process.env.HERMES_TERN_EVENT_LOG;
+    this.#gw.on("event", (ev) => {
+      if (log) {
+        appendFileSync4(log, `${JSON.stringify(ev)}
+`);
+      }
+      this.#onGatewayEvent(ev);
+    });
     this.#gw.on("request", (req) => this.#onRequest(req));
     this.#gw.on("exit", (code3) => {
       this.transcript.notice(`The agent backend exited${code3 === null ? "" : ` (${code3})`}.`, "error");
@@ -33913,6 +34236,11 @@ var App = class {
           }
         }
         break;
+      case "agent.terminal.output":
+        if (ev.payload?.process_id) {
+          this.processes.output(ev.payload.process_id, ev.payload.chunk ?? "");
+        }
+        return;
       case "todo.updated":
         t2.todos(ev.payload?.todos ?? []);
         break;
@@ -34062,10 +34390,10 @@ var App = class {
   }
   /** Alt+Up / the queue's Edit: the oldest queued prompt back into an empty composer. */
   #dequeue() {
-    const next = this.queue.shift();
-    if (next !== void 0) {
-      this.composer.set(this.composer.text ? `${next}
-${this.composer.text}` : next);
+    const next2 = this.queue.shift();
+    if (next2 !== void 0) {
+      this.composer.set(this.composer.text ? `${next2}
+${this.composer.text}` : next2);
       this.changed();
     }
   }
@@ -34096,9 +34424,9 @@ ${this.composer.text}` : next);
     if (this.busy || !this.sid || this.#switches.pending || this.#startupImage) {
       return;
     }
-    const next = this.queue.shift();
-    if (next) {
-      this.#send(next, { queued: true });
+    const next2 = this.queue.shift();
+    if (next2) {
+      this.#send(next2, { queued: true });
     }
   }
   // ── View ───────────────────────────────────────────────────────────
