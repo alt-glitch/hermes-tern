@@ -70,7 +70,11 @@ export function openSessionPicker(app: App) {
     app.close(overlay)
 
     if (s.id !== current) {
-      void app.resume(s.id)
+      // A refusal (deleted elsewhere, gateway down) is a notice; the view stays where it was.
+      app.resume(s.id).catch((error: unknown) => {
+        app.transcript.notice(`Could not resume: ${error instanceof Error ? error.message : String(error)}`, 'error')
+        app.changed()
+      })
     }
   }
 

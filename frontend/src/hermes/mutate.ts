@@ -15,6 +15,10 @@ export interface MutationResult extends Record<string, unknown> {
   confirm_message?: string
   target_model?: string
   execution_generation?: number
+  /** A `branch`'s child session. */
+  branched_session_id?: string
+  /** A `rename`'s stored title. */
+  title?: string
 }
 
 /** The `session.resume` snapshot a mutation's CAS tuple is read from; a payload may name its target from it. */

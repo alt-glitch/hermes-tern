@@ -152,6 +152,8 @@ export class App implements OverlayHost {
   #copiedTimer: NodeJS.Timeout | undefined
   /** The pill above the composer holding the keys (Down from an empty prompt), if any. */
   #hud: Pill | undefined
+  /** The gateway connection is down until the next gateway.ready (its one notice is shown). */
+  #offline = false
 
   constructor(tern: Session, gw: GatewayClient, version: string) {
     this.#tern = tern
@@ -198,7 +200,17 @@ export class App implements OverlayHost {
     })
     this.#gw.on('request', (req: ServerRequest) => this.#onRequest(req))
     this.#gw.on('exit', (code: null | number) => {
-      this.transcript.notice(`The agent backend exited${code === null ? '' : ` (${code})`}.`, 'error')
+      // Once per outage: each failed redial emits another exit. An attached gateway (and its turn) lives on.
+      if (!this.#offline) {
+        this.transcript.notice(
+          this.#gw.attached
+            ? 'Lost the connection to Hermes; reconnecting…'
+            : `The agent backend exited${code === null ? '' : ` (${code})`}.`,
+          this.#gw.attached ? 'warning' : 'error'
+        )
+      }
+
+      this.#offline = true
       // The runtime session died with the process: prompts queue until the next gateway.ready reattaches.
       this.sid = null
       this.busy = null
@@ -259,6 +271,12 @@ export class App implements OverlayHost {
       this.#scheduled = false
       this.#render()
     })
+  }
+
+  /** An error nothing caught (a rejected promise no caller awaited): shown, so the pane lives on. */
+  fault(reason: unknown) {
+    this.transcript.notice(`Unexpected error: ${reason instanceof Error ? reason.message : String(reason)}`, 'error')
+    this.changed()
   }
 
   // ── Input ──────────────────────────────────────────────────────────
@@ -995,11 +1013,11 @@ export class App implements OverlayHost {
     this.changed()
   }
 
-  /** After a reconnect: resumes the shown session in the new backend (its runtime id died with the old one). */
-  async #reattach(id: string) {
+  /** After a reconnect (or a replay gap): resumes the shown session (its runtime id or subscription died). */
+  async #reattach(id: string, notice = 'Reconnected to the agent backend.') {
     try {
       if (await this.#resume(id)) {
-        this.transcript.notice('Reconnected to the agent backend.')
+        this.transcript.notice(notice)
       }
     } catch (error) {
       this.transcript.notice(
@@ -1013,6 +1031,11 @@ export class App implements OverlayHost {
 
   /** Closes the open session and starts a fresh one with an empty transcript, named `title` if given. */
   async newSession(title?: string) {
+    if (this.#busySwitch()) {
+      return
+    }
+
+    const previous = this.sid
     const token = this.#switches.begin()
 
     try {
@@ -1026,10 +1049,6 @@ export class App implements OverlayHost {
         this.transcript.notice('No model provider is configured. Run `hermes setup`, then start again.', 'warning')
 
         return
-      }
-
-      if (this.sid) {
-        await this.#leave(this.sid, 'tui_close')
       }
 
       const cwd = process.env.HERMES_TUI_CWD?.trim()
@@ -1053,6 +1072,11 @@ export class App implements OverlayHost {
       this.transcript.clear()
       this.transcript.push({ id: this.transcript.id('w'), kind: 'welcome' })
       this.#adopt(r)
+
+      // Only now: a failed create leaves the view on the session it still receives.
+      if (previous && previous !== r.session_id) {
+        void this.#leave(previous, 'tui_close')
+      }
     } finally {
       this.#settle(token)
     }
@@ -1078,12 +1102,21 @@ export class App implements OverlayHost {
     }
   }
 
+  /** Refuses a session switch while a turn runs (its queue and prompts belong to this session); true when refused. */
+  #busySwitch(): boolean {
+    if (!this.busy) {
+      return false
+    }
+
+    this.transcript.notice('Wait for the current turn to finish (or press Esc) before switching sessions.', 'warning')
+    this.changed()
+
+    return true
+  }
+
   /** Resumes stored session `id`: its history replaces the transcript, and the session it leaves is closed. */
   async resume(id: string) {
-    if (this.busy) {
-      this.transcript.notice('Wait for the current turn to finish (or press Esc) before switching sessions.', 'warning')
-      this.changed()
-
+    if (this.#busySwitch()) {
       return
     }
 
@@ -1128,6 +1161,12 @@ export class App implements OverlayHost {
 
   #adopt(r: CreateResult) {
     this.#subscribe(r)
+
+    if (r.session_id !== this.sid) {
+      // The last session's approvals and questions are not this one's (a resume hydrates its own after).
+      this.#dropPrompts(() => true)
+    }
+
     this.sid = r.session_id
     this.#showThoughts(r.session_id)
     const previousStored = this.storedSid
@@ -1271,6 +1310,7 @@ export class App implements OverlayHost {
 
     switch (ev.type) {
       case 'gateway.ready':
+        this.#offline = false
         this.#applySkin(ev.payload?.skin)
         // A reconnect's ready reattaches the shown session; only a sessionless app bootstraps.
         void (this.storedSid ? this.#reattach(this.storedSid) : this.#bootstrap())
@@ -1323,6 +1363,15 @@ export class App implements OverlayHost {
       // A title set by /title or Hermes' auto-titler reaches viewers only as a changed session list.
       case 'sessions.changed':
         this.#readTitle()
+
+        return
+
+      // The view fell behind and the owner retired its subscription (the socket is fine, so no
+      // reconnect re-attaches it): a fresh resume brings the snapshot and a new subscription.
+      case 'session.replay_gap':
+        if (this.sid && ev.session_id === this.sid) {
+          void this.#reattach(this.storedSid ?? this.sid, 'Reloaded the session: this view fell behind its events.')
+        }
 
         return
 
