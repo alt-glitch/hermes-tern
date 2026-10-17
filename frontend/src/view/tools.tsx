@@ -9,6 +9,7 @@ import { agentName } from '../agents/store.js'
 import type { Subagent, Todo, ToolCall } from '../model.js'
 import { record } from '../transcript.js'
 
+import { commandLine, describeCommand } from './describe.js'
 import { age, compact, duration } from './time.js'
 
 /** How one call presents: omp's tool props (minus status and timing) and its body. */
@@ -35,8 +36,13 @@ interface Card {
 
 const str = (v: unknown): string | undefined => (typeof v === 'string' && v ? v : undefined)
 
+/** Where a card shows: alone, or as one step of a folded run (one line until opened). */
+export interface ToolPlace {
+  inRun?: boolean
+}
+
 /** The `tool` node of one call. */
-export function toolNode(call: ToolCall, now: number): JSX.Element {
+export function toolNode(call: ToolCall, now: number, place: ToolPlace = {}): JSX.Element {
   const card = cardOf(call, now)
   const status = card.status ?? call.status
   const running = status === 'running'
@@ -71,7 +77,8 @@ export function toolNode(call: ToolCall, now: number): JSX.Element {
       meta: card.meta?.length ? card.meta : undefined,
       name: card.name,
       note: call.status === 'cancelled' ? 'cancelled' : error && !card.body.length ? error : undefined,
-      preview: card.preview,
+      // A run's steps are one line each; the run's head says what is running.
+      preview: place.inRun ? undefined : card.preview,
       role: card.role,
       status,
       target: card.target,
@@ -185,20 +192,41 @@ function bashCard(call: ToolCall, result: Record<string, unknown> | undefined): 
   // The cancelled card's notice already says the command was interrupted.
   const output = (str(result?.output) ?? call.resultText)?.replace(/\s*\[Command interrupted\]\s*$/, '')
   const error = str(result?.error)
+  const command = (str(call.args.command) ?? call.context ?? '').trim()
+  const line = commandLine(command)
+  const running = call.status === 'running'
 
+  // The head says what the step is for and shows the command on one line, so it never grows
+  // when the card opens; a command longer than that line opens into the body, above its output.
   return {
     body: [
-      ...(output ? [<ansi follow={call.status === 'running'} key="out" text={output} />] : []),
+      ...(command && command !== line
+        ? [<code key="cmd" lang="bash" max={{ h: '12lines' }} role="omp.tool.command" text={command} />]
+        : []),
+      ...(output ? [<ansi follow key="out" max={{ h: '20lines' }} text={output} />] : []),
       ...(error ? [<text key="err" role="omp.tool.error" spans={[{ s: 'error', t: error }]} wrap="word" />] : [])
     ],
     folded: true,
     lang: 'bash',
     name: 'bash',
-    preview: { tail: 10 },
-    target: str(call.args.command) ?? call.context,
+    preview: { tail: running ? 4 : 3 },
+    // A short command is the head's target; a longer one shows whole in the body instead.
+    target: command === line ? line || undefined : undefined,
     targetKind: 'command',
-    title: 'Bash'
+    title: describeCommand(command)
   }
+}
+
+/** One call in a few words, for a run's head: "Check git status", "Read README.md". */
+export function stepTitle(call: ToolCall): string {
+  if (call.name === 'terminal') {
+    return describeCommand(str(call.args.command) ?? call.context ?? '')
+  }
+
+  const card = cardOf(call, Date.now())
+  const target = card.target ? (card.targetKind === 'path' ? card.target.split('/').at(-1) : card.target) : undefined
+
+  return target ? `${card.title} ${target}` : card.title
 }
 
 function readCard(call: ToolCall, result: Record<string, unknown> | undefined): Card {

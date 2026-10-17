@@ -10,6 +10,7 @@ the user's prompt, so one home covers every flow:
     "clarify"   -> a clarify call with choices (clarify sheet)
     "tool"      -> a harmless terminal call (tool card)
     "steps"     -> four calls in a row (commands, a read, a search), then an answer
+    "script"    -> a heredoc script with sections and long output, run alone
     "delegate…" -> (at the start) a delegate_task batch of three subagents, each running two slow
                    terminal calls before a slowly streamed answer
     anything else -> a streamed markdown reply
@@ -41,6 +42,16 @@ STEPS = [
     ("terminal", {"command": "git log --oneline -3"}),
     ("search_files", {"pattern": "def ", "path": "lab"}),
 ]
+
+SCRIPT = """cat > /tmp/hermes-tern-lab.sh <<'EOF'
+echo "== disk usage =="
+df -h / | tail -1
+echo "== biggest folders =="
+ls -1 /usr | head -5
+echo "== numbers =="
+seq 1 120
+EOF
+sh /tmp/hermes-tern-lab.sh 2>&1 | cut -c1-120"""
 
 SUBAGENT_MARKER = "You are a focused subagent"
 
@@ -78,6 +89,8 @@ def _calls(prompt: str, target: Path) -> list[dict] | None:
     # would otherwise dispatch again, forever.
     if words.lstrip().startswith("delegate"):
         return [_call("delegate_task", {"tasks": [{"goal": g} for g in SUBAGENT_GOALS]})]
+    if words.lstrip().startswith("script"):
+        return [_call("terminal", {"command": SCRIPT})]
     if "approve" in words:
         target.mkdir(exist_ok=True)
         return [_call("terminal", {"command": f"rm -rf -- {target}"})]
@@ -106,8 +119,10 @@ class Model(BaseHTTPRequestHandler):
         self._json({"data": [{"id": "fake-model", "object": "model"}]})
 
     def do_POST(self):
+        arrived = time.time()
         request = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
         messages = request.get("messages", [])
+        print(f"ARRIVE {arrived:.3f} msgs={len(messages)} tools={len(request.get('tools') or [])} bytes={self.headers['Content-Length']}", flush=True)
         prompt = next((m.get("content") for m in reversed(messages) if m.get("role") == "user"), "") or ""
         if isinstance(prompt, list):
             prompt = " ".join(p.get("text", "") for p in prompt if isinstance(p, dict))

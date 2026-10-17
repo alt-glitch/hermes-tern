@@ -8,7 +8,7 @@ import { type JSX, node } from '@stencil-hq/tern'
 import type { Block, ToolCall } from '../model.js'
 
 import { age, duration } from './time.js'
-import { toolNode } from './tools.js'
+import { stepTitle, toolNode } from './tools.js'
 
 /** Calls that always show on their own. */
 const SOLO = new Set(['clarify', 'delegate_task', 'todo', 'todo_list'])
@@ -108,7 +108,11 @@ function count(n: number, one: string, many: string): string {
   return `${n} ${n === 1 ? one : many}`
 }
 
-/** One run as a folded section: the summary as its head, the blocks' own nodes inside. */
+/**
+ * One run as a section: the summary as its head, each call one line inside (it opens to its
+ * command and output). Open while it runs, so the steps so far stay in view, with the head
+ * naming the one running now; folded to the summary once it ends.
+ */
 export function toolRunNode(
   run: Run,
   id: string,
@@ -122,26 +126,24 @@ export function toolRunNode(
   const ended = Math.max(...calls.map(c => c.startedAt + (c.duration ?? 0)))
   const key = `r${run[0]!.id}`
 
-  const spans = [
-    { t: summarize(calls) },
-    ...(failed ? [{ s: 'error', t: `, ${failed} failed` }] : []),
-    ...(live ? [{ s: 'muted', t: `, now ${live.name}` }] : [])
-  ]
+  const spans = live
+    ? [{ t: stepTitle(live) }, ...(calls.length > 1 ? [{ s: 'muted', t: `  step ${calls.indexOf(live) + 1} of ${calls.length}` }] : [])]
+    : [{ t: summarize(calls) }, ...(failed ? [{ s: 'error', t: `, ${failed} failed` }] : [])]
 
   return node(
     'section',
-    { collapsed: true, collapsible: true, head: `${id}.${key}.head`, key, role: 'omp.tools.run' },
+    { collapsed: !live, collapsible: true, head: `${id}.${key}.head`, key, role: 'omp.tools.run' },
     [
       <row align="center" gap="sm" key="head">
         {live ? <spinner key="mark" style="dots" tone="accent" /> : <icon key="mark" name={failed ? 'warning' : 'tools'} />}
-        <text grow={1} key="label" spans={spans} wrap="word" />
+        <text grow={1} key="label" spans={spans} wrap="none" />
         {live ? (
           <elapsed age={age(first, first.startedAt, now)} format="short" key="time" />
         ) : (
           <text key="time" spans={[{ s: 'dim', t: duration(Math.max(0, ended - first.startedAt)) }]} />
         )}
       </row>,
-      ...run.map(b => (b.kind === 'tool' ? toolNode(b.call, now) : blockNode(b)))
+      ...run.map(b => (b.kind === 'tool' ? toolNode(b.call, now, { inRun: true }) : blockNode(b)))
     ]
   )
 }
