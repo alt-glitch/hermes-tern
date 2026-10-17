@@ -34,6 +34,7 @@ import { type Busy, busyFrom, ownsEvent, Switches } from './flow.js'
 import { hudKey, type Pill } from './hud.js'
 import type { Overlay, OverlayHost } from './overlay.js'
 import { writeActiveSessionFile } from './hermes/activeSessionFile.js'
+import { mutateSession } from './hermes/mutate.js'
 import { clipboardImage, imagePathOf } from './hermes/clipboardImage.js'
 import { type Attachment, uploadImage } from './hermes/images.js'
 import { sharedPromptId, sharedPromptRequest } from './hermes/sharedPrompts.js'
@@ -137,6 +138,8 @@ export class App implements OverlayHost {
   #copiedTimer: NodeJS.Timeout | undefined
   /** The pill above the composer holding the keys (Down from an empty prompt), if any. */
   #hud: Pill | undefined
+  /** The gateway connection is down until the next gateway.ready (its one notice is shown). */
+  #offline = false
 
   constructor(tern: Session, gw: GatewayClient, version: string) {
     this.#tern = tern
@@ -183,7 +186,17 @@ export class App implements OverlayHost {
     })
     this.#gw.on('request', (req: ServerRequest) => this.#onRequest(req))
     this.#gw.on('exit', (code: null | number) => {
-      this.transcript.notice(`The agent backend exited${code === null ? '' : ` (${code})`}.`, 'error')
+      // Once per outage: each failed redial emits another exit. An attached gateway (and its turn) lives on.
+      if (!this.#offline) {
+        this.transcript.notice(
+          this.#gw.attached
+            ? 'Lost the connection to Hermes; reconnecting…'
+            : `The agent backend exited${code === null ? '' : ` (${code})`}.`,
+          this.#gw.attached ? 'warning' : 'error'
+        )
+      }
+
+      this.#offline = true
       // The runtime session died with the process: prompts queue until the next gateway.ready reattaches.
       this.sid = null
       this.busy = null
@@ -244,6 +257,12 @@ export class App implements OverlayHost {
       this.#scheduled = false
       this.#render()
     })
+  }
+
+  /** An error nothing caught (a rejected promise no caller awaited): shown, so the pane lives on. */
+  fault(reason: unknown) {
+    this.transcript.notice(`Unexpected error: ${reason instanceof Error ? reason.message : String(reason)}`, 'error')
+    this.changed()
   }
 
   // ── Input ──────────────────────────────────────────────────────────
@@ -853,11 +872,11 @@ export class App implements OverlayHost {
     this.changed()
   }
 
-  /** After a reconnect: resumes the shown session in the new backend (its runtime id died with the old one). */
-  async #reattach(id: string) {
+  /** After a reconnect (or a replay gap): resumes the shown session (its runtime id or subscription died). */
+  async #reattach(id: string, notice = 'Reconnected to the agent backend.') {
     try {
       if (await this.#resume(id)) {
-        this.transcript.notice('Reconnected to the agent backend.')
+        this.transcript.notice(notice)
       }
     } catch (error) {
       this.transcript.notice(
@@ -869,8 +888,13 @@ export class App implements OverlayHost {
     this.changed()
   }
 
-  /** Closes the open session and starts a fresh one with an empty transcript. */
-  async newSession() {
+  /** Starts a fresh session (named `title`, if given) with an empty transcript; the session it leaves is closed. */
+  async newSession(title = '') {
+    if (this.#busySwitch()) {
+      return
+    }
+
+    const previous = this.sid
     const token = this.#switches.begin()
 
     try {
@@ -884,10 +908,6 @@ export class App implements OverlayHost {
         this.transcript.notice('No model provider is configured. Run `hermes setup`, then start again.', 'warning')
 
         return
-      }
-
-      if (this.sid) {
-        await this.#leave(this.sid, 'tui_close')
       }
 
       const cwd = process.env.HERMES_TUI_CWD?.trim()
@@ -911,17 +931,83 @@ export class App implements OverlayHost {
       this.transcript.clear()
       this.transcript.push({ id: this.transcript.id('w'), kind: 'welcome' })
       this.#adopt(r)
+
+      // Only now: a failed create leaves the view on the session it still receives.
+      if (previous && previous !== r.session_id) {
+        void this.#leave(previous, 'tui_close')
+      }
+
+      if (title) {
+        void this.#rename(r.session_id, title)
+      }
     } finally {
       this.#settle(token)
     }
   }
 
+  /** `/new <title>`: names the new session, as Hermes' `/title` would. */
+  async #rename(sid: string, title: string) {
+    try {
+      const r = this.#gw.isCanonical
+        ? await mutateSession(this.#gw, sid, 'rename', { title })
+        : await this.#gw.request<{ title?: string } | null>('session.title', { session_id: sid, title })
+
+      if (sid === this.sid) {
+        const next = String(r?.title ?? title).trim()
+        this.#setTitle(next)
+        this.transcript.notice(`Session title set: ${next}`)
+      }
+    } catch (error) {
+      if (sid === this.sid) {
+        this.transcript.notice(`Could not set the title: ${error instanceof Error ? error.message : String(error)}`, 'warning')
+      }
+    }
+
+    this.changed()
+  }
+
+  /** Refuses a session switch while a turn runs (its queue and prompts belong to this session); true when refused. */
+  #busySwitch(): boolean {
+    if (!this.busy) {
+      return false
+    }
+
+    this.transcript.notice('Wait for the current turn to finish (or press Esc) before switching sessions.', 'warning')
+    this.changed()
+
+    return true
+  }
+
+  /** `/branch [title]` on the shared gateway: copies the session (a `branch` mutation) and moves this view to the copy. */
+  async branch(title: string) {
+    const sid = this.sid
+
+    if (!sid || this.#busySwitch()) {
+      return
+    }
+
+    const r = await mutateSession(this.#gw, sid, 'branch', title ? { title } : {})
+    const child = typeof r.branched_session_id === 'string' ? r.branched_session_id : ''
+
+    if (!child) {
+      throw new Error('The gateway did not report the branched session.')
+    }
+
+    await this.resume(child)
+
+    if (this.sid !== child && this.storedSid !== child) {
+      return
+    }
+
+    // The owner names the child ("Slash lane #2" for an untitled branch of "Slash lane").
+    const info = await this.#gw.request<{ title?: null | string } | null>('session.info', { session_id: child }).catch(() => null)
+    this.transcript.notice(`Branched to ${info?.title?.trim() || title || child}.`)
+    this.changed()
+  }
+
   /** Resumes stored session `id`: its history replaces the transcript, and the session it leaves is closed. */
   async resume(id: string) {
-    if (this.busy) {
-      this.transcript.notice('Wait for the current turn to finish (or press Esc) before switching sessions.', 'warning')
-      this.changed()
-
+    if (this.#busySwitch()) {
       return
     }
 
@@ -966,6 +1052,12 @@ export class App implements OverlayHost {
 
   #adopt(r: CreateResult) {
     this.#subscribe(r)
+
+    if (r.session_id !== this.sid) {
+      // The last session's approvals and questions are not this one's (a resume hydrates its own after).
+      this.#dropPrompts(() => true)
+    }
+
     this.sid = r.session_id
     this.#showThoughts(r.session_id)
     const previousStored = this.storedSid
@@ -1109,6 +1201,7 @@ export class App implements OverlayHost {
 
     switch (ev.type) {
       case 'gateway.ready':
+        this.#offline = false
         this.#applySkin(ev.payload?.skin)
         // A reconnect's ready reattaches the shown session; only a sessionless app bootstraps.
         void (this.storedSid ? this.#reattach(this.storedSid) : this.#bootstrap())
@@ -1161,6 +1254,15 @@ export class App implements OverlayHost {
       // A title set by /title or Hermes' auto-titler reaches viewers only as a changed session list.
       case 'sessions.changed':
         this.#readTitle()
+
+        return
+
+      // The view fell behind and the owner retired its subscription (the socket is fine, so no
+      // reconnect re-attaches it): a fresh resume brings the snapshot and a new subscription.
+      case 'session.replay_gap':
+        if (this.sid && ev.session_id === this.sid) {
+          void this.#reattach(this.storedSid ?? this.sid, 'Reloaded the session: this view fell behind its events.')
+        }
 
         return
 

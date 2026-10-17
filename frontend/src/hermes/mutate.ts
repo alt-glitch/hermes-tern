@@ -6,7 +6,7 @@ import { randomUUID } from 'node:crypto'
 
 import type { GatewayClient } from '@tui/gatewayClient.js'
 
-export type SessionOperation = 'model' | 'delete'
+export type SessionOperation = 'model' | 'delete' | 'rename' | 'branch'
 
 export interface MutationResult extends Record<string, unknown> {
   status?: string
@@ -15,6 +15,10 @@ export interface MutationResult extends Record<string, unknown> {
   confirm_message?: string
   target_model?: string
   execution_generation?: number
+  /** A `branch`'s child session. */
+  branched_session_id?: string
+  /** A `rename`'s stored title. */
+  title?: string
 }
 
 interface Snapshot {

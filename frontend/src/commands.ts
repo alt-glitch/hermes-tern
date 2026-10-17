@@ -33,9 +33,16 @@ const COMMANDS: readonly LocalCommand[] = [
     run: app => app.quit()
   },
   {
+    // `/new <title>` names the new session.
     aliases: ['reset'],
     name: 'new',
-    run: app => app.newSession()
+    run: (app, arg) => app.newSession(arg.trim())
+  },
+  {
+    // The shared gateway branches through session.mutate (its slash.exec refuses /branch).
+    aliases: ['fork'],
+    name: 'branch',
+    run: (app, arg) => (app.gw.isCanonical ? app.branch(arg.trim()) : false)
   },
   {
     name: 'clear',

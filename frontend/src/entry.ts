@@ -25,5 +25,14 @@ const gw = new GatewayClient()
 gw.start()
 
 const watch = readWatchSpec()
-const code = await (watch ? new WatchApp(session, gw, watch) : new App(session, gw, version)).run()
+const app = watch ? new WatchApp(session, gw, watch) : new App(session, gw, version)
+
+// Node exits on an unhandled rejection: a stray failed promise is a notice in the chat, not a closed pane.
+process.on('unhandledRejection', reason => {
+  if (app instanceof App) {
+    app.fault(reason)
+  }
+})
+
+const code = await app.run()
 process.exit(code)
