@@ -214,6 +214,7 @@ function approvalOverlay(host: OverlayHost, req: ServerRequest): Overlay {
   const overlay: Overlay = {
     key,
     modal: true,
+    cancel: () => answer('deny'),
     node: id => (
       <overlay anchor="bottom" key={key} modal role="omp.overlay.ask" size="md">
         <col gap="md" key="body">
@@ -448,6 +449,11 @@ function clarifyOverlay(host: OverlayHost, req: ServerRequest): Overlay {
   const overlay: Overlay = {
     key,
     modal: true,
+    // Every question at once: an empty answer is the contract's cancel ('' skips on the shared wire).
+    cancel: () => {
+      req.respond({})
+      host.close(overlay)
+    },
     focus: id => {
       const q = questions[step]
       const d = drafts[step]
@@ -658,6 +664,7 @@ function maskedOverlay(host: OverlayHost, req: ServerRequest): Overlay {
   const overlay: Overlay = {
     key,
     modal: true,
+    cancel: () => finish(true),
     focus: id => `${id}.body.${fields[at]?.id ?? 'value'}`,
     node: () => (
       <overlay anchor="bottom" key={key} modal role="omp.overlay.ask" size="md">
@@ -745,6 +752,7 @@ export function confirmOverlay(
   const overlay: Overlay = {
     key,
     modal: true,
+    cancel: () => answer(false),
     node: () => (
       <overlay anchor="bottom" key={key} modal role="omp.overlay.ask" size="md">
         <col gap="md" key="body">

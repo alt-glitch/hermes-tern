@@ -73,6 +73,35 @@ describe('Composer', () => {
     expect(c.text).toBe('draft')
   })
 
+  it('keeps an edited history entry as the draft on the next Up/Down', () => {
+    history.push('first', 'second', 'third')
+    const c = new Composer()
+    c.key(key('up'))
+    c.key(key('up'))
+    expect(c.text).toBe('second')
+    typed(c, '!')
+    expect(c.browsing).toBe(false)
+    // Down has nowhere to go from a draft: the edit stays.
+    c.key(key('down'))
+    expect(c.text).toBe('second!')
+    // Up walks from the newest entry again, and Down brings the edit back.
+    c.key(key('up'))
+    expect(c.text).toBe('third')
+    c.key(key('down'))
+    expect(c.text).toBe('second!')
+  })
+
+  it('a cleared draft ends a history walk', () => {
+    history.push('first', 'second')
+    const c = new Composer()
+    c.key(key('up'))
+    c.set('')
+    expect(c.browsing).toBe(false)
+    c.key(key('up'))
+    c.key(key('down'))
+    expect(c.text).toBe('')
+  })
+
   it('moves between lines before reaching history', () => {
     history.push('old')
     const c = new Composer()

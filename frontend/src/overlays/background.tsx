@@ -174,6 +174,7 @@ export function openBackground(app: App, focus?: string) {
   const overlay: Overlay = {
     key: KEY,
     modal: true,
+    cancel: close,
     node: () => sheetNode(Date.now()),
     onKey: (k: Key) => {
       if (confirm) {
