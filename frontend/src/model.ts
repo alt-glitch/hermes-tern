@@ -98,12 +98,27 @@ export interface TurnEntry {
   endedAt?: number
   status: 'done' | 'error' | 'interrupted' | 'live'
   usage?: Usage
+  /** The session's cumulative counters when the turn began (from `session.usage` ticks). */
+  countersAtStart?: Counters
+  /** This turn's share of prompt tokens read from the provider's cache, in percent. */
+  cacheHit?: number
+  /** Tokens this turn used, from the ticks (message.complete does not always carry usage). */
+  tickTokens?: number
+  /** Output tokens per second over the recent model calls, at the turn's last tick. */
+  tps?: number
   error?: string
   /** The HTTP status or error code of a failed request, for the error card's badge. */
   errorCode?: string
   /** The gateway's advice on a failed request (what to try next). */
   errorHint?: string
   warning?: string
+}
+
+/** A session's cumulative token counters, as `session.usage` ticks report them. */
+export interface Counters {
+  prompt: number
+  read: number
+  total: number
 }
 
 /** A line from the app or the gateway: a notice, a warning, an error. */
