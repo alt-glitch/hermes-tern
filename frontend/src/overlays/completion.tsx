@@ -70,7 +70,7 @@ export class Completion {
     const gen = ++this.#gen
     clearTimeout(this.#timer)
     this.#timer = undefined
-    const request = before.includes('\n') ? null : completionRequestForInput(before, { sid: this.#sid() })
+    const request = requestFor(before, this.#sid())
 
     if (!request) {
       this.dismiss()
@@ -296,4 +296,21 @@ function labelOf(item: CompletionItem, typed: string, replaceFrom: number) {
     { s: base ? `${base} mark` : 'mark', t: label.slice(at, at + query.length) },
     { s: base, t: label.slice(at + query.length) }
   ].filter(s => s.t)
+}
+
+/**
+ * The completion for the caret's line. Past the first line only skill references and paths
+ * complete: a slash command is the draft's first token, so `/name` there is a skill reference too.
+ */
+function requestFor(before: string, sid: string | null) {
+  const lineStart = before.lastIndexOf('\n') + 1
+  const request = completionRequestForInput(before.slice(lineStart), { sid })
+
+  if (!request || !lineStart) {
+    return request
+  }
+
+  return request.method === 'complete.slash'
+    ? { ...request, replaceFrom: request.replaceFrom + lineStart, skillsOnly: true }
+    : { ...request, replaceFrom: request.replaceFrom + lineStart }
 }
