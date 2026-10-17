@@ -1,9 +1,9 @@
-import { mkdtemp, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 import type { GatewayClient } from '@tui/gatewayClient.js'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { parseLiveLog } from '../agents/liveLog.js'
 import { Agents } from '../agents/store.js'
@@ -94,5 +94,72 @@ describe('Agents', () => {
     expect(agent).toMatchObject({ duration: 8870, status: 'done', summary: 'Finished the delegated task.', toolCount: 2 })
     expect(store.running()).toEqual([])
     expect(changes).toBeGreaterThan(0)
+  })
+
+  it('finds a resumed session\'s running children, whose dispatch result the history dropped', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'hermes-tern-home-'))
+    const dir = join(home, 'cache', 'delegation', 'live', 'deleg_9')
+    const path = join(dir, 'task-1.log')
+    await mkdir(dir, { recursive: true })
+    await writeFile(path, '12:00:01 tool     | -> read_file(a.md)\n')
+    await writeFile(join(dir, 'manifest.json'), JSON.stringify({ tasks: [{ index: 0 }, { index: 1, log: path }] }))
+    const before = process.env.HERMES_HOME
+    process.env.HERMES_HOME = home
+
+    // The display projection: a delegate_task row with its args and no result.
+    const transcript = new Transcript()
+    transcript.load([
+      { role: 'user', text: 'survey it' },
+      {
+        args: { tasks: [{ goal: 'Read the docs' }, { goal: 'Survey the layout' }] },
+        name: 'delegate_task',
+        role: 'tool',
+        tool_call_id: 'c1'
+      }
+    ] as never)
+    const row = { delegation_id: 'deleg_9', depth: 0, goal: 'Survey the layout', status: 'running', subagent_id: 'sa-1-beef', tool_count: 2 }
+    const request = vi.fn(async (method: string) => (method === 'subagent.list' ? { subagents: [row] } : {}))
+    let changes = 0
+    store = new Agents({ changed: () => changes++, gw: { request } as unknown as GatewayClient, sid: 's1', transcript })
+
+    try {
+      store.scan()
+      await vi.waitFor(() => expect(store!.running()).toHaveLength(1))
+    } finally {
+      process.env.HERMES_HOME = before
+    }
+
+    const [agent] = store.running()
+
+    expect(request).toHaveBeenCalledWith('subagent.list', { session_id: 's1' })
+    expect(agent).toMatchObject({ delegationId: 'deleg_9', depth: 0, id: 'sa-1-beef', index: 1, logPath: path, status: 'running' })
+    expect(transcript.delegations()[0]!.subagents).toEqual([agent])
+    await vi.waitFor(() => expect(agent!.tool).toBe('read_file'))
+    expect(changes).toBeGreaterThan(0)
+  })
+
+  it('does not probe a session with no delegate_task call', () => {
+    const request = vi.fn(async () => ({ subagents: [] }))
+    const transcript = new Transcript()
+    transcript.load([{ role: 'user', text: 'hi' }] as never)
+    store = new Agents({ changed: () => undefined, gw: { request } as unknown as GatewayClient, sid: 's1', transcript })
+
+    store.scan()
+
+    expect(request).not.toHaveBeenCalled()
+  })
+
+  it('pauses and resumes new spawns through delegation.pause, keeping the flag', async () => {
+    const request = vi.fn(async (_method: string, params: { paused: boolean }) => ({ paused: params.paused }))
+    let changes = 0
+    store = new Agents({ changed: () => changes++, gw: { request } as unknown as GatewayClient, sid: 's1', transcript: new Transcript() })
+
+    expect(store.paused).toBeUndefined()
+    expect(await store.pause(true)).toBe(true)
+    expect(request).toHaveBeenCalledWith('delegation.pause', { paused: true, session_id: 's1' })
+    expect(store.paused).toBe(true)
+    expect(await store.pause(false)).toBe(false)
+    expect(store.paused).toBe(false)
+    expect(changes).toBe(2)
   })
 })

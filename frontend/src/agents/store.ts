@@ -3,9 +3,13 @@
 // owner's live registry: status, model, tool count, steerability) and each child's live
 // transcript log (tools/delegation_live_log.py), whose path the dispatch result names. The log
 // outlives the child, so a finished agent keeps its timeline and final status. Where a gateway
-// does send `subagent.*` events, Transcript.subagent folds them into the same rows.
+// does send `subagent.*` events, Transcript.subagent folds them into the same rows. A resumed
+// session's history drops the dispatch result, so its still-running children are found by one
+// `subagent.list` probe and attached to the delegate_task call that asked for their goals.
 
 import { readFile, stat } from 'node:fs/promises'
+import { homedir } from 'node:os'
+import { join } from 'node:path'
 
 import type { GatewayClient } from '@tui/gatewayClient.js'
 
@@ -62,6 +66,11 @@ export class Agents {
   readonly #unreadable = new Set<string>()
   /** Ids `subagent.list` reported: one that leaves the list has finished. */
   readonly #listed = new Set<string>()
+  /**
+   * New delegate_task spawns are blocked, as this pane last set it (`delegation.pause`); undefined
+   * until then (the shared gateway serves no `delegation.status`). The gate is gateway-wide.
+   */
+  paused: boolean | undefined
 
   constructor(host: AgentsHost) {
     this.#host = host
@@ -76,16 +85,30 @@ export class Agents {
     return this.all().filter(isRunning)
   }
 
-  /** Takes over each dispatched delegate_task call not tracked yet, and polls while any agent runs. */
+  /**
+   * Takes over each dispatched delegate_task call not tracked yet, and polls while any agent runs.
+   * A call history brought back without its result (a resumed session) gets one `subagent.list`
+   * probe: its children still running are attached to it and followed from then on.
+   */
   scan(at = Date.now()) {
+    let bare = false
+
     for (const call of this.#host.transcript.delegations()) {
-      if (!this.#tracked.has(call) && this.#track(call, at)) {
+      if (this.#tracked.has(call)) {
+        continue
+      }
+
+      if (this.#track(call, at)) {
         this.#tracked.add(call)
+      } else if (call.result === undefined && call.status !== 'running' && !call.subagents?.length) {
+        bare = true
       }
     }
 
     if (this.running().length) {
       this.#wake()
+    } else if (bare) {
+      void this.#tick(true)
     }
   }
 
@@ -108,6 +131,19 @@ export class Agents {
     })
 
     return Boolean(r?.found)
+  }
+
+  /** Blocks (or unblocks) new subagent spawns on the gateway; running children keep going. */
+  async pause(paused: boolean): Promise<boolean> {
+    const r = await this.#host.gw.request<{ paused?: boolean }>('delegation.pause', {
+      paused,
+      ...(this.#host.sid ? { session_id: this.#host.sid } : {})
+    })
+
+    this.paused = typeof r?.paused === 'boolean' ? r.paused : paused
+    this.#host.changed()
+
+    return this.paused
   }
 
   /** Reads `a`'s log now (the hub's timeline opening on it), whatever its state. */
@@ -161,7 +197,8 @@ export class Agents {
     void this.#tick()
   }
 
-  async #tick() {
+  /** One poll and log read; `probe` polls even with nothing running yet (a resumed session). */
+  async #tick(probe = false) {
     if (this.#ticking) {
       return
     }
@@ -169,9 +206,7 @@ export class Agents {
     this.#ticking = true
 
     try {
-      const live = this.running()
-
-      if (!live.length) {
+      if (!probe && !this.running().length) {
         return this.dispose()
       }
 
@@ -183,6 +218,11 @@ export class Agents {
       if (changed.size) {
         changed.forEach(a => this.#touch(a))
         this.#host.changed()
+      }
+
+      // A probe that found live children keeps following them.
+      if (probe && this.running().length) {
+        this.#timer ??= setInterval(() => void this.#tick(), POLL_MS)
       }
     } finally {
       this.#ticking = false
@@ -218,7 +258,7 @@ export class Agents {
 
       present.add(id)
       this.#listed.add(id)
-      const a = this.#find(owners, row) ?? this.#adopt(owners, row)
+      const a = this.#find(owners, row) ?? this.#adopt(owners, row) ?? (await this.#attach(owners, row))
 
       if (!a) {
         continue
@@ -262,9 +302,9 @@ export class Agents {
       return byId
     }
 
-    const index = Number(/^sa-(\d+)-/.exec(row.subagent_id ?? '')?.[1])
+    const index = taskIndex(row)
 
-    return (row.depth ?? 0) === 0 && Number.isInteger(index)
+    return (row.depth ?? 0) === 0 && index !== undefined
       ? agents.find(a => a.delegationId === row.delegation_id && a.id === `task-${index}`)
       : undefined
   }
@@ -306,6 +346,50 @@ export class Agents {
     owners.set(child, call)
 
     return child
+  }
+
+  /**
+   * A top-level child whose dispatch result the history dropped (a resumed session): a row on the
+   * newest result-less delegate_task call whose task `sa-<i>-` asked for its goal, its log found
+   * through the delegation's manifest (else read with `subagent.tail`).
+   */
+  async #attach(owners: Map<Subagent, ToolCall>, row: ListRow): Promise<Subagent | undefined> {
+    const index = taskIndex(row)
+    const goal = row.goal?.trim()
+
+    if ((row.depth ?? 0) !== 0 || index === undefined || !goal) {
+      return undefined
+    }
+
+    const call = this.#host.transcript
+      .delegations()
+      .findLast(c => c.result === undefined && taskGoals(c)[index] === goal && !c.subagents?.some(a => !a.depth && a.index === index))
+
+    if (!call) {
+      return undefined
+    }
+
+    const a: Subagent = {
+      calls: 0,
+      delegationId: row.delegation_id,
+      depth: 0,
+      goal: row.goal!,
+      id: row.subagent_id!,
+      index,
+      key: `p${index}`,
+      logPath: row.delegation_id ? await manifestLog(row.delegation_id, index) : undefined,
+      startedAt: Date.now(),
+      status: 'running',
+      tokens: 0,
+      toolCount: 0
+    }
+    const list = (call.subagents ??= [])
+
+    list.push(a)
+    list.sort((x, y) => x.index - y.index || (x.depth ?? 0) - (y.depth ?? 0))
+    owners.set(a, call)
+
+    return a
   }
 
   #readableLog(a: Subagent): boolean {
@@ -375,6 +459,64 @@ export class Agents {
 
     return owners
   }
+}
+
+/** The task index a top-level child's id names (`sa-<i>-…`, tools/delegate_tool.py). */
+function taskIndex(row: ListRow): number | undefined {
+  const index = Number(/^sa-(\d+)-/.exec(row.subagent_id ?? '')?.[1])
+
+  return Number.isInteger(index) ? index : undefined
+}
+
+/** The goals a delegate_task call asked for, by task index: its `tasks`, else its one `goal`. */
+function taskGoals(call: ToolCall): string[] {
+  let tasks = call.args.tasks
+
+  if (typeof tasks === 'string') {
+    try {
+      tasks = JSON.parse(tasks)
+    } catch {
+      tasks = undefined
+    }
+  }
+
+  if (Array.isArray(tasks) && tasks.length) {
+    return tasks.map(t => {
+      const goal = record(t)?.goal
+
+      return typeof goal === 'string' ? goal.trim() : ''
+    })
+  }
+
+  return typeof call.args.goal === 'string' ? [call.args.goal.trim()] : []
+}
+
+/**
+ * Task `index`'s log path from its delegation's manifest.json, under this machine's Hermes home
+ * (tools/delegation_live_log.py live_transcript_root: a populated legacy `delegation_cache/` first).
+ */
+async function manifestLog(delegationId: string, index: number, env = process.env): Promise<string | undefined> {
+  if (!/^[\w-]+$/.test(delegationId)) {
+    return undefined
+  }
+
+  const home = env.HERMES_HOME || join(homedir(), '.hermes')
+
+  for (const root of [join(home, 'delegation_cache', 'live'), join(home, 'cache', 'delegation', 'live')]) {
+    try {
+      const text = await readFile(join(root, delegationId, 'manifest.json'), 'utf8')
+      const tasks = record(text.replace(/^\uFEFF/, ''))?.tasks
+      const log = Array.isArray(tasks) ? record(tasks.find(t => record(t)?.index === index))?.log : undefined
+
+      if (typeof log === 'string' && log) {
+        return log
+      }
+    } catch {
+      // No manifest under this root.
+    }
+  }
+
+  return undefined
 }
 
 /** Folds a parsed log into its row: timeline, current tool, counts and, once it ended, the outcome. */

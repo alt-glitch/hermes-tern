@@ -90,6 +90,41 @@ describe('control commands', () => {
     expect(request).toHaveBeenCalledWith('tools.show', { session_id: 'sid-1' })
     expect(h.notice).toHaveBeenCalledWith('[web] web_search\nTotal: 1 tools')
   })
+
+  it('/bg (and /background) starts a side agent through prompt.background, not slash.exec', async () => {
+    const { h, request } = host({ busy: false }, { 'prompt.background': { task_id: 'bg_1a2b3c' } })
+
+    expect(CONTROL_COMMANDS.find(c => c.aliases?.includes('background'))?.name).toBe('bg')
+
+    await run('bg', h, 'summarize the repo')
+
+    expect(request).toHaveBeenCalledWith('prompt.background', { session_id: 'sid-1', text: 'summarize the repo' })
+    expect(h.notice).toHaveBeenCalledWith('Background task bg_1a2b3c started: summarize the repo')
+  })
+
+  it('/btw asks a side question through prompt.btw', async () => {
+    const { h, request } = host({}, { 'prompt.btw': { task_id: 'btw_9f' } })
+
+    await run('btw', h, 'what changed?')
+
+    expect(request).toHaveBeenCalledWith('prompt.btw', { session_id: 'sid-1', text: 'what changed?' })
+    expect(h.notice).toHaveBeenCalledWith('btw btw_9f: answering from a snapshot of this conversation')
+  })
+
+  it('/bg and /btw show their usage with no text, and report a refusal', async () => {
+    const empty = host()
+    await run('bg', empty.h)
+    await run('btw', empty.h)
+
+    expect(empty.request).not.toHaveBeenCalled()
+    expect(empty.h.notice).toHaveBeenCalledWith('Usage: /bg <prompt>', 'warning')
+    expect(empty.h.notice).toHaveBeenCalledWith('Usage: /btw <question>', 'warning')
+
+    const refused = host({}, { 'prompt.btw': new Error('permission_denied') })
+    await run('btw', refused.h, 'why?')
+
+    expect(refused.h.notice).toHaveBeenCalledWith('/btw failed: permission_denied', 'error')
+  })
 })
 
 describe('steerTurn', () => {

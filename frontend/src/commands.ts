@@ -93,13 +93,13 @@ const COMMANDS: readonly LocalCommand[] = [
     }
   },
   {
-    // `/agents pause|resume|status` stay the backend's (delegation.pause and its status).
+    // Ink's `/agents pause|resume|status`: the shared gateway's slash.exec refuses them.
     aliases: ['tasks'],
     name: 'agents',
-    run: (app, arg) => (arg ? false : openAgents(app))
+    run: (app, arg) => agents(app, arg)
   },
   {
-    // Hermes has no command by these names (its `/bg` runs a prompt in a background session).
+    // Hermes has no command by these names (its `/bg` runs a prompt in a side agent: controlCommands.ts).
     aliases: ['bashes', 'shells', 'processes'],
     name: 'ps',
     run: app => openBackground(app)
@@ -147,6 +147,37 @@ const COMMANDS: readonly LocalCommand[] = [
   },
   ...CONTROL_COMMANDS.map(c => ({ ...c, run: (app: App, arg: string) => c.run(app.control(), arg) }))
 ]
+
+/** `/agents` opens the hub; `pause|resume` gate new spawns gateway-wide (`delegation.pause`). */
+async function agents(app: App, arg: string) {
+  const sub = arg.trim().toLowerCase()
+
+  if (!sub) {
+    return openAgents(app)
+  }
+
+  if (sub === 'pause' || sub === 'resume' || sub === 'unpause') {
+    const paused = await app.agents.pause(sub === 'pause')
+
+    return app.transcript.notice(
+      paused
+        ? 'Subagent spawning paused for every chat on this gateway. Running agents keep going.'
+        : 'Subagent spawning resumed.'
+    )
+  }
+
+  if (sub === 'status') {
+    const paused = app.agents.paused
+
+    return app.transcript.notice(
+      paused === undefined
+        ? 'Subagent spawning: active, unless another client paused it (the gateway does not report it).'
+        : `Subagent spawning: ${paused ? 'paused (gateway-wide)' : 'active'}.`
+    )
+  }
+
+  app.transcript.notice('Usage: /agents [pause|resume|status]', 'warning')
+}
 
 /** The client-side command `name` (without the slash) answers to, if any. */
 export function localCommand(name: string): LocalCommand | undefined {
