@@ -1,0 +1,99 @@
+// The PRs the agent linked to this conversation (`link_pull_request`, the plugin's own tool).
+// The tool keeps them in `<HERMES_HOME>/plugin-data/hermes-tern/pull-requests.json` under the
+// conversation's root session (pull_requests.py); a live turn's link calls carry the whole list in
+// their results, so the sheet follows them without reading the file again.
+
+import { readFileSync } from 'node:fs'
+import { homedir } from 'node:os'
+import { join } from 'node:path'
+import { DatabaseSync } from 'node:sqlite'
+
+import type { ToolCall } from '../model.js'
+import { record } from '../transcript.js'
+import { stateDbPath } from '../watch/child.js'
+
+import type { PrRef } from './pullRequest.js'
+
+export const LINK_TOOLS = new Set(['link_pull_request', 'list_pull_requests', 'unlink_pull_request'])
+
+export function linksPath(env: NodeJS.ProcessEnv = process.env): string {
+  return join(env.HERMES_HOME || join(homedir(), '.hermes'), 'plugin-data', 'hermes-tern', 'pull-requests.json')
+}
+
+export const prKey = (ref: Pick<PrRef, 'host' | 'number' | 'repository'>) => `${ref.host}/${ref.repository}#${ref.number}`
+
+function refOf(v: unknown): PrRef | undefined {
+  const r = record(v)
+  const host = typeof r?.host === 'string' ? r.host : ''
+  const repository = typeof r?.repository === 'string' ? r.repository : ''
+  const number = typeof r?.number === 'number' ? r.number : 0
+
+  return host && repository && number > 0
+    ? { host, number, repository, url: typeof r?.url === 'string' ? r.url : `https://${host}/${repository}/pull/${number}` }
+    : undefined
+}
+
+/** The list a link tool's result carries (`linked`), when the call succeeded. */
+export function linkedFromResult(call: Pick<ToolCall, 'name' | 'result' | 'status'>): PrRef[] | undefined {
+  if (!LINK_TOOLS.has(call.name) || call.status !== 'done') {
+    return undefined
+  }
+
+  const linked = record(call.result)?.linked
+
+  return Array.isArray(linked) ? linked.map(refOf).filter((r): r is PrRef => Boolean(r)) : undefined
+}
+
+/**
+ * Session `sid`'s ancestors, itself first: compression gives a conversation a new session whose
+ * `parent_session_id` is the one it continues. Read-only, and empty when the database is not there.
+ */
+export function ancestry(sid: string, db = stateDbPath()): string[] {
+  const chain = [sid]
+
+  try {
+    const conn = new DatabaseSync(db, { readOnly: true })
+
+    try {
+      const parent = conn.prepare('SELECT parent_session_id AS p FROM sessions WHERE id = ?')
+
+      for (let i = 0; i < 100; i++) {
+        const row = parent.get(chain.at(-1)!) as { p?: string | null } | undefined
+
+        if (!row?.p || chain.includes(row.p)) {
+          break
+        }
+
+        chain.push(row.p)
+      }
+    } finally {
+      conn.close()
+    }
+  } catch {
+    // No database (another profile layout, a fresh install): the session alone.
+  }
+
+  return chain
+}
+
+/** The links stored for session `sid`'s conversation, oldest first. */
+export function storedLinks(sid: string, file = linksPath(), lineage: (sid: string) => string[] = ancestry): PrRef[] {
+  let data: { aliases?: Record<string, string>; conversations?: Record<string, unknown[]> }
+
+  try {
+    data = JSON.parse(readFileSync(file, 'utf8')) as typeof data
+  } catch {
+    return []
+  }
+
+  const aliases = data.aliases ?? {}
+  const root = lineage(sid).find(id => aliases[id] || data.conversations?.[id])
+
+  if (!root) {
+    return []
+  }
+
+  const links = data.conversations?.[aliases[root] ?? root]
+
+  return Array.isArray(links) ? links.map(refOf).filter((r): r is PrRef => Boolean(r)) : []
+}

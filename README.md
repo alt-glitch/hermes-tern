@@ -14,6 +14,24 @@ Outside Tern (or inside tmux/screen/zellij) the frontend gets no TSP answer and 
 starts the regular TUI instead. To open Hermes in Tern's agent pane, set Tern's agent command
 (`agent_command` in Tern's settings) to `hermes tern`.
 
+## Pull requests
+
+The plugin gives the agent three tools: `link_pull_request`, `unlink_pull_request` and
+`list_pull_requests`. A short system prompt section tells the agent to link every PR it opens or
+works on, as T3 Code does. Links are kept per conversation in
+`$HERMES_HOME/plugin-data/hermes-tern/pull-requests.json`, so they stay after compression and resume.
+
+In `hermes tern`, the PR pill above the composer and `/prs` (⌥P) open the Pull requests sheet.
+The sheet reads each PR from GitHub with your own token (`GH_TOKEN`, else `gh auth token`). It shows:
+
+- **PRs**: state, checks, review and description.
+- **Checks**: each check run, with its log link.
+- **Activity**: comments, reviews, review threads and commits.
+- **Files**: each diff.
+
+Its actions are merge (asks first), close (asks first), ready for review, update branch, re-run
+failed jobs, open on GitHub and copy URL. The tools and the prompt section start in new sessions.
+
 ## How it works
 
 - `__init__.py` registers `hermes tern`. It runs `hermes chat --tui <flags>` with

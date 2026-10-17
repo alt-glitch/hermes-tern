@@ -36,8 +36,9 @@ const HOTKEYS: { group: string; rows: [string[], string][] }[] = [
       [['shift+tab'], 'Cycle the reasoning effort'],
       [['alt+up'], 'Edit the oldest queued prompt'],
       [['alt+a'], 'Agents'],
-      [['alt+b'], 'Background processes (/ps)'],
-      [['down'], 'Focus the agents / shells pills (empty prompt); ← → switch, Enter opens, Esc returns'],
+      [['alt+b'], 'Background processes and cron jobs (/ps)'],
+      [['alt+p'], 'Pull requests Hermes linked (/prs)'],
+      [['down'], 'Focus the agents / shells / PR pills (empty prompt); ← → switch, Enter opens, Esc returns'],
       [['ctrl+c'], 'Clear the draft / interrupt / exit (twice)'],
       [['ctrl+d'], 'Delete forward / exit (empty prompt)']
     ]

@@ -410,6 +410,20 @@ export function stepLabel(call: ToolCall): string {
 
     case 'execute_code':
       return call.context ? flat(call.context) : 'Ran a script'
+
+    case 'link_pull_request':
+
+    case 'unlink_pull_request': {
+      const verb = call.name === 'link_pull_request' ? 'Linked' : 'Unlinked'
+      const pr = str(a.url)?.match(/github[^/]*\/([^/]+\/[^/]+)\/pull\/(\d+)/)
+      const repo = pr?.[1] ?? str(a.repository)
+      const number = pr?.[2] ?? (typeof a.number === 'number' ? String(a.number) : undefined)
+
+      return repo && number ? `${verb} ${repo}#${number}` : `${verb} a pull request`
+    }
+
+    case 'list_pull_requests':
+      return 'Listed linked pull requests'
   }
 
   const name = call.name.replace(/_/g, ' ')

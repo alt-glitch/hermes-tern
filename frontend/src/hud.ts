@@ -5,7 +5,7 @@
 
 import type { Key } from '@stencil-hq/tern'
 
-export type Pill = 'agents' | 'shells'
+export type Pill = 'agents' | 'prs' | 'shells'
 
 /** What the composer looks like to the pill keys. */
 export interface HudContext {
