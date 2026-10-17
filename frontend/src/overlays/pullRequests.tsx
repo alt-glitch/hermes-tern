@@ -124,16 +124,19 @@ export function openPullRequests(app: App, focus?: string) {
     app.changed()
   }
 
-  /** Reads what the tab lists, once per PR update. */
+  /**
+   * Reads what the tab lists, once per PR update. Asked on every frame, so a PR that loads late, a
+   * newer PR or a failed read (its error shows in the tab) is read without leaving the tab.
+   */
   const load = () => {
     if (!current()?.pr) {
       return
     }
 
     if (tab === 'activity') {
-      app.prs.activity(selected!).catch(fail)
+      app.prs.activity(selected!).catch(() => {})
     } else if (tab === 'files') {
-      app.prs.files(selected!).catch(fail)
+      app.prs.files(selected!).catch(() => {})
     }
   }
 
@@ -336,6 +339,8 @@ export function openPullRequests(app: App, focus?: string) {
       selected = keys[0]
     }
 
+    load()
+
     const e = current()
     const pr = e?.pr
     const busy = selected ? app.prs.busy(selected) : false
@@ -387,7 +392,7 @@ export function openPullRequests(app: App, focus?: string) {
         items={tab === 'prs' ? entries.map(x => prItem(x, now)) : view.items}
         key={KEY}
         layout={tab === 'activity' ? 'timeline' : 'rows'}
-        message={app.prs.error}
+        message={app.prs.error ?? view.error}
         noun={view.noun}
         onAction={handlers}
         onActivate={ev => {
@@ -414,7 +419,7 @@ export function openPullRequests(app: App, focus?: string) {
         preview={tab === 'files' || tab === 'activity' ? 'below' : 'side'}
         selected={tab === 'prs' ? selected : rows[tab]}
         size="lg"
-        state={app.prs.error ? 'error' : view.loading ? 'loading' : 'ready'}
+        state={app.prs.error || view.error ? 'error' : view.loading ? 'loading' : 'ready'}
         subtitle={[{ s: 'muted', t: tab === 'prs' ? summary(entries) : pr ? `#${pr.number} ${pr.title}` : '' }]}
         tab={tab}
         tabs={[
@@ -441,6 +446,8 @@ interface TabView {
   empty: string
   noun: string
   loading: boolean
+  /** Why the tab's list could not be read. */
+  error?: string
 }
 
 /** The ids a tab lists for PR `e`, in order. */
@@ -480,7 +487,7 @@ function rowUrl(tab: Tab, e: Entry | undefined, row: string | undefined): string
   }
 }
 
-function tabView(tab: Tab, e: Entry | undefined, now: number): TabView {
+export function tabView(tab: Tab, e: Entry | undefined, now: number): TabView {
   const pr = e?.pr
 
   switch (tab) {
@@ -501,8 +508,10 @@ function tabView(tab: Tab, e: Entry | undefined, now: number): TabView {
       return {
         columns: [{ format: 'dim', head: 'When', id: 'when', priority: 2 }],
         empty: pr ? 'No comments, reviews or commits yet.' : 'Pick a pull request first.',
+        // A failed read with nothing to show says why; an older list stays up while it is tried again.
+        error: pr && !e?.activity ? e?.activityError : undefined,
         items: (e?.activity ?? []).map((a, i) => activityItem(a, `a${i}`, now)),
-        loading: Boolean(pr && !e?.activity),
+        loading: Boolean(pr && !e?.activity && !e?.activityError),
         noun: 'events',
         preview: null
       }
@@ -511,8 +520,9 @@ function tabView(tab: Tab, e: Entry | undefined, now: number): TabView {
       return {
         columns: [{ format: 'dim', head: 'Changes', id: 'changes', priority: 2 }],
         empty: pr ? 'No files changed.' : 'Pick a pull request first.',
+        error: pr && !e?.files ? e?.filesError : undefined,
         items: (e?.files ?? []).map(fileItem),
-        loading: Boolean(pr && !e?.files),
+        loading: Boolean(pr && !e?.files && !e?.filesError),
         noun: 'files',
         preview: null
       }
