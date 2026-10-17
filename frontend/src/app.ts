@@ -24,6 +24,7 @@ import logo from '../assets/logo.png'
 
 import { localCommand } from './commands.js'
 import { Composer } from './composer.js'
+import { type ControlHost, interruptTurn } from './controlCommands.js'
 import { type Busy, busyFrom, ownsEvent, Switches } from './flow.js'
 import type { Overlay, OverlayHost } from './overlay.js'
 import { writeActiveSessionFile } from './hermes/activeSessionFile.js'
@@ -397,8 +398,23 @@ export class App implements OverlayHost {
       this.busy.label = 'Stopping…'
     }
 
-    this.#gw.request('session.interrupt', { session_id: this.sid }).catch(() => undefined)
+    interruptTurn(this.#gw, this.sid).catch(() => undefined)
     this.changed()
+  }
+
+  /** The gateway-backed turn controls' view of this app (/steer, /queue, /stop, /tools). */
+  control(): ControlHost {
+    return {
+      busy: Boolean(this.busy),
+      enqueue: text => {
+        this.queue.push(text)
+        this.changed()
+      },
+      gw: this.#gw,
+      notice: (text, tone) => this.transcript.notice(text, tone),
+      sid: this.sid,
+      submit: text => this.#submit(text)
+    }
   }
 
   #startBusy(label: string) {
