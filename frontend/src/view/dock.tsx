@@ -40,6 +40,8 @@ export interface DockContext {
   /** Pull the oldest queued prompt back into the composer. */
   onQueueEdit(): void
   onContext(): void
+  /** The session's cache hit (percent) and recent tokens per second, when known. */
+  rates?: { cache?: number; tps?: number }
   /** Running subagents: the pill above the composer that opens the agents hub. */
   agents?: { running: number; onOpen(): void }
 }
@@ -215,6 +217,26 @@ function composerNode(cx: DockContext): JSX.Element {
               role="omp.composer.fact"
               spans={pathSpans(cx.cwd)}
               title={cx.cwd}
+            />
+          ) : null}
+          {cx.rates?.cache !== undefined ? (
+            <seg
+              icon="cache"
+              key="cache"
+              priority={2}
+              role="omp.composer.fact"
+              spans={[{ t: `${Math.round(cx.rates.cache)}%` }]}
+              title="Prompt tokens served from the provider's cache, this session"
+            />
+          ) : null}
+          {cx.rates?.tps ? (
+            <seg
+              icon="fast"
+              key="tps"
+              priority={1}
+              role="omp.composer.rate"
+              spans={[{ t: `${Math.round(cx.rates.tps)} t/s` }]}
+              title="Output tokens per second over the recent model calls"
             />
           ) : null}
           {cx.branch ? (

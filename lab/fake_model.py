@@ -155,7 +155,8 @@ class Model(BaseHTTPRequestHandler):
                 time.sleep(delay)
         self._chunk({}, "tool_calls" if calls else "stop")
         # The usage chunk OpenAI sends last for stream_options.include_usage, so turns show their totals.
-        usage = {"prompt_tokens": 1200, "completion_tokens": 340, "total_tokens": 1540}
+        usage = {"prompt_tokens": 1200, "completion_tokens": 340, "total_tokens": 1540,
+                 "prompt_tokens_details": {"cached_tokens": 900}}
         frame = {"id": "fake", "object": "chat.completion.chunk", "created": 1, "model": "fake-model", "choices": [], "usage": usage}
         self.wfile.write(f"data: {json.dumps(frame)}\n\n".encode())
         self.wfile.write(b"data: [DONE]\n\n")

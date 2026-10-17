@@ -12,7 +12,7 @@ import type {
   Usage
 } from '@hermes/shared/gateway-events'
 
-import type { Block, Entry, NoticeEntry, Todo, ToolCall, TurnEntry } from './model.js'
+import type { Block, Counters, Entry, NoticeEntry, Todo, ToolCall, TurnEntry } from './model.js'
 
 type ToolBlock = Extract<Block, { kind: 'tool' }>
 
@@ -30,12 +30,40 @@ export class Transcript {
   #next = 0
   /** The session's running usage at the last completed turn (message.complete reports session totals). */
   #sessionUsage: Usage | undefined
+  /** The session's cumulative counters at the last `session.usage` tick. */
+  #counters: Counters | undefined
   /** The streaming turn: set by start, cleared by complete, clear and load (notices may land after it). */
   #live: TurnEntry | undefined
 
   /** Sets the running usage turns count from (a resumed session's totals). */
   usageBase(usage: Usage | undefined) {
     this.#sessionUsage = usage
+  }
+
+  /**
+   * Takes a `session.usage` tick's cumulative counters and rate. The turn running (or, as the
+   * last tick can trail message.complete, the one that just ended) gets its share: tokens and
+   * the part of its prompt read from the cache.
+   */
+  usageTick(counters: Counters, tps: number | undefined) {
+    this.#counters = counters
+    const turn = this.live ?? this.entries.findLast(e => e.kind === 'turn')
+    const start = turn?.kind === 'turn' ? turn.countersAtStart : undefined
+
+    if (turn?.kind !== 'turn' || !start) {
+      return
+    }
+
+    const prompt = counters.prompt - start.prompt
+    const hit = prompt > 0 ? Math.round(((counters.read - start.read) / prompt) * 100) : undefined
+    const tokens = counters.total - start.total || undefined
+
+    if (hit !== turn.cacheHit || tokens !== turn.tickTokens || tps !== turn.tps) {
+      turn.cacheHit = hit
+      turn.tickTokens = tokens
+      turn.tps = tps
+      this.#touch(turn)
+    }
   }
 
   /** A fresh id for an entry or block, unique within this transcript. */
@@ -78,7 +106,16 @@ export class Transcript {
       return live
     }
 
-    const turn: TurnEntry = { blocks: [], id: this.id('t'), kind: 'turn', rev: 0, startedAt: at, status: 'live' }
+    const turn: TurnEntry = {
+      blocks: [],
+      // A session's first turn starts from zero; later ones from the last tick.
+      countersAtStart: this.#counters ?? (this.entries.some(e => e.kind === 'turn') ? undefined : { prompt: 0, read: 0, total: 0 }),
+      id: this.id('t'),
+      kind: 'turn',
+      rev: 0,
+      startedAt: at,
+      status: 'live'
+    }
     this.push(turn)
     this.#live = turn
 

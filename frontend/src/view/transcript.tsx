@@ -133,7 +133,7 @@ function turnNode(turn: TurnEntry, id: string, cx: TranscriptContext): JSX.Eleme
 
   const answer = answerText(turn)
 
-  if (!live && turn.endedAt && (answer || turn.usage?.total || turn.usage?.input || turn.usage?.output)) {
+  if (!live && turn.endedAt && (answer || turn.usage?.total || turn.tickTokens)) {
     children.push(usageNode(turn, answer, cx))
   }
 
@@ -223,15 +223,36 @@ function usageNode(turn: TurnEntry, answer: string, cx: TranscriptContext): JSX.
   const ms = (turn.endedAt ?? turn.startedAt) - turn.startedAt
   const input = u.input ?? u.prompt ?? 0
   const output = u.output ?? u.completion ?? 0
-  const total = u.total ?? input + output
+  const total = u.total || input + output || turn.tickTokens || 0
   const cost = typeof u.cost_usd === 'number' && u.cost_usd > 0 ? ` · $${u.cost_usd.toFixed(2)}` : ''
   const title = `This turn: ${duration(ms)} · ${total.toLocaleString()} tokens (${input.toLocaleString()} in · ${output.toLocaleString()} out)${cost}`
 
+  const tps = (typeof u.avg_tps === 'number' && u.avg_tps > 0 ? u.avg_tps : undefined) ?? turn.tps
+  const facts: [string, string, string][] = total
+    ? [
+        ['time', 'time', duration(ms)],
+        ['tokens', 'tokens', compact(total)],
+        ...(turn.cacheHit !== undefined ? [['cache', 'cache', `${turn.cacheHit}%`] as [string, string, string]] : []),
+        ...(tps ? [['speed', 'fast', `${Math.round(tps)} t/s`] as [string, string, string]] : []),
+        ...(cost ? [['cost', 'cost', cost.replace(/^ · /, '')] as [string, string, string]] : [])
+      ]
+    : []
+  const detail = [
+    title,
+    turn.cacheHit !== undefined ? `${turn.cacheHit}% of the prompt came from the cache` : '',
+    tps ? `${tps.toFixed(1)} tokens per second (recent calls)` : ''
+  ]
+    .filter(Boolean)
+    .join('\n')
+
+  // Each fact its own icon and value, in a fixed order: time, tokens, cache, speed, cost.
   return (
-    <row align="center" gap="xs" key="usage" role="omp.turn.usage" title={total ? title : undefined}>
+    <row align="center" gap="xs" key="usage" role="omp.turn.usage" title={total ? detail : undefined}>
       {answer ? copyButton(answer, turn.id, 'omp.turn.copy', 'Copy answer', cx) : null}
-      {total ? <icon key="icon" name="time" /> : null}
-      {total ? <text key="text">{`${duration(ms)} · ${compact(total)} tok${cost} this turn`}</text> : null}
+      {facts.flatMap(([key, icon, value]) => [
+        <icon key={`${key}.icon`} name={icon} />,
+        <text key={key} text={value} />
+      ])}
     </row>
   )
 }

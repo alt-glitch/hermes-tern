@@ -17,6 +17,7 @@ import { parseCommandDispatch } from '@hermes/shared/slash'
 import type { Key, Session, Surface, TspEvent } from '@stencil-hq/tern'
 import { describeSlashExecError, isUnsupportedCommand, shouldFallbackToDispatch } from '@tui/app/userMessages.js'
 import { localCreationOptions } from '@tui/canonicalGateway.js'
+import { usageFromTick } from '@tui/domain/usage.js'
 import type { GatewayClient } from '@tui/gatewayClient.js'
 import type { AnyGatewayEvent } from '@tui/gatewayTypes.js'
 
@@ -781,10 +782,23 @@ export class App implements OverlayHost {
 
         break
 
-      case 'session.usage':
-        this.usage = ev.payload?.usage ?? this.usage
+      case 'session.usage': {
+        // The shared owner sends its counters at the top level; older gateways nest them.
+        const tick = usageFromTick(ev.payload)
+        this.usage = tick ? { ...this.usage, ...tick } : this.usage
+        const raw = ev.payload as Record<string, unknown> | undefined
+        const counters = {
+          prompt: Number(raw?.prompt_tokens ?? 0),
+          read: Number(raw?.cache_read_tokens ?? 0),
+          total: Number(raw?.total_tokens ?? 0)
+        }
+
+        if (Object.values(counters).every(Number.isFinite)) {
+          t.usageTick(counters, typeof raw?.tokens_per_s === 'number' ? raw.tokens_per_s : undefined)
+        }
 
         break
+      }
 
       case 'session.title':
         if (ev.payload?.title) {
@@ -1129,6 +1143,10 @@ export class App implements OverlayHost {
           this.changed()
         },
         agents: { onOpen: () => openAgents(this), running: this.agents.running().length },
+        rates: {
+          cache: typeof usage?.cache_hit_pct === 'number' ? usage.cache_hit_pct : undefined,
+          tps: typeof usage?.avg_tps === 'number' && usage.avg_tps > 0 ? usage.avg_tps : undefined
+        },
         placeholder: 'Ask Hermes — / commands · @ files',
         queued: this.queue,
         ready: this.sid !== null
