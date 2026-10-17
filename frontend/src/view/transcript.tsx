@@ -9,6 +9,7 @@ import type { Block, Entry, NoticeEntry, TurnEntry, UserEntry } from '../model.j
 
 import { age, compact, duration } from './time.js'
 import { groupRuns, toolRunNode } from './toolRuns.js'
+import { slashBody } from './slash.js'
 import { toolNode } from './tools.js'
 import { type WelcomeContext, welcomeNode } from './welcome.js'
 
@@ -69,8 +70,7 @@ function buildEntry(e: Exclude<Entry, { kind: 'welcome' }>, id: string, cx: Tran
     case 'panel':
       return (
         <card collapsible head={[{ s: 'strong', t: e.title }]} key={e.id} role="omp.custom" tone="neutral">
-          {/* Command output is plain text in lines (and may carry SGR colours), not markdown. */}
-          <ansi key="body" text={e.text} />
+          {slashBody(e)}
         </card>
       )
   }
