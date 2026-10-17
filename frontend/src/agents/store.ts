@@ -350,7 +350,7 @@ export class Agents {
       return false
     }
 
-    apply(a, parseLiveLog(text))
+    applyLog(a, parseLiveLog(text))
 
     return true
   }
@@ -378,7 +378,7 @@ export class Agents {
 }
 
 /** Folds a parsed log into its row: timeline, current tool, counts and, once it ended, the outcome. */
-function apply(a: Subagent, log: LiveLog) {
+export function applyLog(a: Subagent, log: LiveLog) {
   a.log = log
   const tools = log.entries.filter(e => e.kind === 'tool').length
   a.toolCount = Math.max(a.toolCount, tools)

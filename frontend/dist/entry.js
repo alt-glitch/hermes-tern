@@ -10868,7 +10868,7 @@ var require_mock_interceptor = __commonJS({
 var require_mock_client = __commonJS({
   ".hermes-src/ui-tui/node_modules/undici/lib/mock/mock-client.js"(exports, module) {
     "use strict";
-    var { promisify: promisify2 } = __require("node:util");
+    var { promisify: promisify3 } = __require("node:util");
     var Client = require_client();
     var { buildMockDispatch } = require_mock_utils();
     var {
@@ -10908,7 +10908,7 @@ var require_mock_client = __commonJS({
         return new MockInterceptor(opts, this[kDispatches]);
       }
       async [kClose]() {
-        await promisify2(this[kOriginalClose])();
+        await promisify3(this[kOriginalClose])();
         this[kConnected] = 0;
         this[kMockAgent][Symbols.kClients].delete(this[kOrigin]);
       }
@@ -10921,7 +10921,7 @@ var require_mock_client = __commonJS({
 var require_mock_pool = __commonJS({
   ".hermes-src/ui-tui/node_modules/undici/lib/mock/mock-pool.js"(exports, module) {
     "use strict";
-    var { promisify: promisify2 } = __require("node:util");
+    var { promisify: promisify3 } = __require("node:util");
     var Pool = require_pool();
     var { buildMockDispatch } = require_mock_utils();
     var {
@@ -10961,7 +10961,7 @@ var require_mock_pool = __commonJS({
         return new MockInterceptor(opts, this[kDispatches]);
       }
       async [kClose]() {
-        await promisify2(this[kOriginalClose])();
+        await promisify3(this[kOriginalClose])();
         this[kConnected] = 0;
         this[kMockAgent][Symbols.kClients].delete(this[kOrigin]);
       }
@@ -19968,25 +19968,25 @@ var PLAIN_TEXT = {
   badge: true,
   toast: true
 };
-function textProps(run) {
-  if (run.every((part) => typeof part === "string"))
-    return { text: run.join("") };
-  return { spans: run.map((part) => typeof part === "string" ? part : toJson(part) ?? null) };
+function textProps(run2) {
+  if (run2.every((part) => typeof part === "string"))
+    return { text: run2.join("") };
+  return { spans: run2.map((part) => typeof part === "string" ? part : toJson(part) ?? null) };
 }
 function containerChildren(parts) {
   const out = [];
-  let run = [];
+  let run2 = [];
   const end = () => {
-    if (run.length > 0)
-      out.push(new Node("text", textProps(run)));
-    run = [];
+    if (run2.length > 0)
+      out.push(new Node("text", textProps(run2)));
+    run2 = [];
   };
   for (const part of parts) {
     if (part instanceof Node) {
       end();
       out.push(part);
     } else {
-      run.push(part);
+      run2.push(part);
     }
   }
   end();
@@ -20013,17 +20013,17 @@ function createNode(kind, input, children2) {
   const parts = flatten([fromProps, children2]);
   let nodes = [];
   if (SPAN_TEXT[kind] || PLAIN_TEXT[kind]) {
-    const run = [];
+    const run2 = [];
     for (const part of parts) {
       if (part instanceof Node && kind === "seg")
         nodes.push(part);
       else if (part instanceof Node || part instanceof Span && PLAIN_TEXT[kind]) {
         throw new TypeError(`${kind} takes text children, got ${describe(part)}`);
       } else
-        run.push(part);
+        run2.push(part);
     }
-    if (run.length > 0)
-      Object.assign(props, textProps(run));
+    if (run2.length > 0)
+      Object.assign(props, textProps(run2));
   } else if (kind === "el") {
     let text = "";
     for (const part of parts) {
@@ -25430,7 +25430,7 @@ var Agents = class {
     if (text === void 0) {
       return false;
     }
-    apply(a, parseLiveLog(text));
+    applyLog(a, parseLiveLog(text));
     return true;
   }
   #touch(a) {
@@ -25450,7 +25450,7 @@ var Agents = class {
     return owners;
   }
 };
-function apply(a, log) {
+function applyLog(a, log) {
   a.log = log;
   const tools2 = log.entries.filter((e) => e.kind === "tool").length;
   a.toolCount = Math.max(a.toolCount, tools2);
@@ -25889,10 +25889,10 @@ function searchCard(call, result) {
         /* @__PURE__ */ jsx("text", { role: "omp.tool.chip", spans: [{ t: String(hits.length) }] }, "n")
       ] }, f)
     );
-    let run = [];
+    let run2 = [];
     let runIndex = 0;
     const flush = () => {
-      const start = run[0]?.line ?? 1;
+      const start = run2[0]?.line ?? 1;
       if (runIndex > 0) {
         body.push(/* @__PURE__ */ jsx("text", { role: "omp.tool.context", spans: [{ s: "muted", t: "\u2026" }] }, `${f}.g${runIndex}`));
       }
@@ -25901,23 +25901,23 @@ function searchCard(call, result) {
           "code",
           {
             lang: langOf(path),
-            marks: run.map((h) => ({ line: h.line, tone: "accent" })),
+            marks: run2.map((h) => ({ line: h.line, tone: "accent" })),
             numbers: true,
             start,
-            text: run.map((h) => h.text).join("\n")
+            text: run2.map((h) => h.text).join("\n")
           },
           `${f}.c${runIndex++}`
         )
       );
-      run = [];
+      run2 = [];
     };
     for (const hit of hits) {
-      if (run.length && hit.line !== (run.at(-1)?.line ?? 0) + 1) {
+      if (run2.length && hit.line !== (run2.at(-1)?.line ?? 0) + 1) {
         flush();
       }
-      run.push(hit);
+      run2.push(hit);
     }
-    if (run.length) {
+    if (run2.length) {
       flush();
     }
   }
@@ -26030,6 +26030,7 @@ function agentNode(a, now) {
   return /* @__PURE__ */ jsx(
     "agent",
     {
+      actions: { dblclick: `open-agent=${a.id}`, menu: [`open-agent=${a.id}`] },
       agent: "task",
       badges: a.exitReason && a.status !== "done" ? [{ text: a.exitReason.replace(/_/g, " "), tone: "warning" }] : void 0,
       collapsed: a.summary ? true : void 0,
@@ -26340,7 +26341,7 @@ function openAgents(app, focus) {
     app.close(overlay);
   };
   const current = () => agents().find((a) => a.id === (watching ?? selected));
-  const watch = (id) => {
+  const watch2 = (id) => {
     const a = agents().find((x) => x.id === id);
     if (!a) {
       return;
@@ -26348,6 +26349,12 @@ function openAgents(app, focus) {
     watching = a.id;
     step = void 0;
     void app.agents.refresh(a);
+  };
+  const beside = (id) => {
+    if (id) {
+      close();
+      void app.openAgent(id);
+    }
   };
   const sendSteer = async () => {
     const a = current();
@@ -26430,7 +26437,9 @@ function openAgents(app, focus) {
           step = moved2 === ids.at(-1) ? void 0 : moved2;
         }
       } else if (k.name === "enter") {
-        watch(selected);
+        beside(selected);
+      } else if (k.name === "t" && !k.ctrl && !k.alt) {
+        watch2(selected);
       } else if (k.name === "tab") {
         tab = tab === "running" ? "all" : "running";
       } else {
@@ -26453,7 +26462,10 @@ function openAgents(app, focus) {
       ];
     }
     return [
-      ...inTimeline ? [] : [{ id: "watch", keys: ["enter"], label: "Watch", primary: true }],
+      ...inTimeline ? [] : [
+        { id: "watch", keys: ["t"], label: "Timeline" },
+        { id: "beside", keys: ["enter"], label: "Open beside", primary: true }
+      ],
       {
         disabled: running ? a?.steerable === false ? "Not taking steering now" : void 0 : "Finished",
         id: "steer",
@@ -26496,8 +26508,9 @@ function openAgents(app, focus) {
       tab = ev.value === "running" ? "running" : "all";
       app.changed();
     },
+    beside: () => beside(selected),
     watch: () => {
-      watch(selected);
+      watch2(selected);
       app.changed();
     }
   };
@@ -26525,10 +26538,7 @@ function openAgents(app, focus) {
         layout: all.some((x) => x.depth) ? "tree" : "rows",
         noun: "agents",
         onAction: handlers,
-        onActivate: (ev) => {
-          watch(ev.item);
-          app.changed();
-        },
+        onActivate: (ev) => beside(ev.item),
         onSelect: (ev) => {
           selected = ev.item;
           stopping = false;
@@ -26590,7 +26600,7 @@ function openAgents(app, focus) {
   }
   app.open(overlay);
   if (focus?.watch) {
-    watch(focus.id);
+    watch2(focus.id);
   }
 }
 function summary(all) {
@@ -29965,6 +29975,63 @@ function noticeNode(e) {
   return /* @__PURE__ */ jsx("text", { role: `omp.notice.${e.tone}`, spans: [{ s: tone, t: e.text }], wrap: "word" }, e.id);
 }
 
+// src/watch/spec.ts
+import { execFile as execFile2 } from "node:child_process";
+import { promisify as promisify2 } from "node:util";
+var run = promisify2(execFile2);
+var WATCH_ENV = "HERMES_TERN_WATCH";
+function readWatchSpec(env = process.env) {
+  try {
+    const raw = env[WATCH_ENV];
+    const spec = raw ? JSON.parse(raw) : void 0;
+    return spec && typeof spec.sid === "string" && typeof spec.subagent === "string" ? spec : void 0;
+  } catch {
+    return void 0;
+  }
+}
+function specOf(a, name, sid, stored) {
+  return {
+    goal: a.goal,
+    index: a.index,
+    log: a.logPath,
+    name,
+    sid,
+    startedAt: a.startedAt,
+    stored: stored && stored !== sid ? stored : void 0,
+    subagent: a.id
+  };
+}
+var sidebar;
+async function openSidebar(spec, cwd, env = process.env) {
+  const pane = env.TERN_PANE;
+  const python = env.HERMES_PYTHON;
+  const src = env.HERMES_PYTHON_SRC_ROOT;
+  if (!pane || !python || !src) {
+    return false;
+  }
+  if (sidebar) {
+    await run("tern", ["close", sidebar]).catch(() => void 0);
+    sidebar = void 0;
+  }
+  const command = [
+    "env",
+    `PYTHONPATH=${src}`,
+    ...env.HERMES_HOME ? [`HERMES_HOME=${env.HERMES_HOME}`] : [],
+    `${WATCH_ENV}=${JSON.stringify(spec)}`,
+    python,
+    "-m",
+    "hermes_cli.main",
+    "tern"
+  ];
+  try {
+    const { stdout } = await run("tern", ["split", pane, "right", "--cwd", cwd, "--", ...command]);
+    sidebar = stdout.trim().split(/\s+/).at(-1) || void 0;
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 // src/app.ts
 var INPUT_ID = "dock.composer.line.input";
 var EXIT_ARM_MS = 1500;
@@ -30137,9 +30204,24 @@ var App = class {
     }
   }
   #onTernEvent(ev) {
+    if (ev.ev === "action" && ev.act === "open-agent" && ev.value) {
+      void this.openAgent(ev.value);
+      return;
+    }
     if (ev.ev === "focus" && ev.id === INPUT_ID && !this.overlays.at(-1)?.modal) {
       this.#focus = INPUT_ID;
       this.#surface.focus(INPUT_ID);
+    }
+  }
+  /** Shows subagent `id` beside the chat in a Tern split; its timeline sheet where no split can open. */
+  async openAgent(id) {
+    const a = this.agents.all().find((x) => x.id === id);
+    if (!a || !this.sid) {
+      return;
+    }
+    const cwd = this.info?.cwd || process.env.HOME || "/";
+    if (!await openSidebar(specOf(a, agentName(a), this.sid, this.storedSid), cwd)) {
+      openAgents(this, { id, watch: true });
     }
   }
   #ctrlC() {
@@ -30777,6 +30859,394 @@ function shortPath(path) {
   return home && path.startsWith(home) ? `~${path.slice(home.length)}` : path;
 }
 
+// src/watch/watchApp.ts
+import { readFile as readFile3 } from "node:fs/promises";
+
+// src/watch/child.ts
+import { homedir as homedir5 } from "node:os";
+import { join as join5 } from "node:path";
+import { DatabaseSync } from "node:sqlite";
+function stateDbPath(env = process.env) {
+  return join5(env.HERMES_HOME || join5(homedir5(), ".hermes"), "state.db");
+}
+var ChildStore = class {
+  #db;
+  constructor(path = stateDbPath()) {
+    this.#db = new DatabaseSync(path, { readOnly: true });
+  }
+  /**
+   * The child session of `parents` whose first prompt is `goal`: a child's first user turn is
+   * its goal. The newest wins, as a goal can repeat across delegations; `since` (epoch ms)
+   * skips older ones.
+   */
+  find(parents, goal, since = 0) {
+    const ids = parents.filter(Boolean);
+    if (!ids.length) {
+      return void 0;
+    }
+    const row = this.#db.prepare(
+      `SELECT s.id AS id FROM sessions s
+         WHERE s.parent_session_id IN (${ids.map(() => "?").join(",")}) AND s.source = 'subagent'
+           AND s.started_at >= ?
+           AND (SELECT m.content FROM messages m WHERE m.session_id = s.id AND m.role = 'user'
+                ORDER BY m.id LIMIT 1) = ?
+         ORDER BY s.started_at DESC LIMIT 1`
+    ).get(...ids, Math.max(0, since / 1e3 - 5), goal);
+    return row?.id;
+  }
+  /** The child's active messages as the gateway's transcript messages, oldest first. */
+  messages(session2) {
+    const rows = this.#db.prepare(
+      `SELECT id, role, content, tool_call_id, tool_calls, tool_name, timestamp, reasoning
+         FROM messages WHERE session_id = ? AND active = 1 ORDER BY id`
+    ).all(session2);
+    return toTranscript(rows);
+  }
+  /** The newest message id of `session`, to tell whether anything changed. */
+  last(session2) {
+    const row = this.#db.prepare("SELECT MAX(id) AS id FROM messages WHERE session_id = ?").get(session2);
+    return row?.id ?? 0;
+  }
+  close() {
+    this.#db.close();
+  }
+};
+function toTranscript(rows) {
+  const out = [];
+  for (const r of rows) {
+    const timestamp = r.timestamp;
+    if (r.role === "user" || r.role === "system") {
+      out.push({ content: r.content ?? "", role: r.role, timestamp });
+      continue;
+    }
+    if (r.role === "assistant") {
+      out.push({ content: r.content ?? "", reasoning: r.reasoning ?? void 0, role: "assistant", timestamp });
+      for (const call of parseCalls(r.tool_calls)) {
+        out.push({
+          args: parseArgs(call.function?.arguments),
+          name: call.function?.name ?? "tool",
+          role: "tool",
+          timestamp,
+          tool_call_id: call.id ?? call.call_id
+        });
+      }
+      continue;
+    }
+    if (r.role === "tool") {
+      out.push({
+        content: r.content ?? "",
+        name: r.tool_name ?? void 0,
+        role: "tool",
+        timestamp,
+        tool_call_id: r.tool_call_id ?? void 0
+      });
+    }
+  }
+  return out;
+}
+function parseCalls(raw) {
+  try {
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+function parseArgs(raw) {
+  try {
+    const parsed = raw ? JSON.parse(raw) : {};
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+// src/watch/watchApp.ts
+var INPUT_ID2 = "dock.composer.line.input";
+var POLL_MS2 = 1e3;
+var EXIT_ARM_MS2 = 1500;
+var WatchApp = class {
+  transcript = new Transcript();
+  composer = new Composer();
+  #tern;
+  #gw;
+  #spec;
+  #agent;
+  #store;
+  #child;
+  #lastMessage = 0;
+  #logSize = -1;
+  #listed = false;
+  #ready = false;
+  #surface;
+  #timer;
+  #scheduled = false;
+  #exitArmed = 0;
+  #done = Promise.withResolvers();
+  constructor(tern, gw2, spec) {
+    this.#tern = tern;
+    this.#gw = gw2;
+    this.#spec = spec;
+    this.#agent = {
+      calls: 0,
+      goal: spec.goal,
+      id: spec.subagent,
+      index: spec.index,
+      logPath: spec.log,
+      name: spec.name,
+      startedAt: spec.startedAt,
+      status: "running",
+      tokens: 0,
+      toolCount: 0
+    };
+  }
+  async run() {
+    this.#surface = this.#tern.open({ id: "hermes", mode: "inline", role: "omp.session", title: this.#spec.name });
+    this.#surface.palette(paletteFor(loadSettings().theme ?? "tern", void 0));
+    this.#gw.on("event", (ev) => {
+      if (ev.type === "gateway.ready") {
+        this.#ready = true;
+        void this.#tick();
+      }
+    });
+    this.#gw.drain();
+    try {
+      this.#store = new ChildStore();
+    } catch (error) {
+      this.transcript.notice(`The session database is not readable here: ${String(error)}`, "warning");
+    }
+    this.#timer = setInterval(() => void this.#tick(), POLL_MS2);
+    void this.#tick();
+    this.#render();
+    this.#surface.focus(INPUT_ID2);
+    void this.#readInput();
+    const code2 = await this.#done.promise;
+    clearInterval(this.#timer);
+    this.#store?.close();
+    await this.#tern.close();
+    this.#gw.kill("exit");
+    return code2;
+  }
+  changed() {
+    if (this.#scheduled) {
+      return;
+    }
+    this.#scheduled = true;
+    setImmediate(() => {
+      this.#scheduled = false;
+      this.#render();
+    });
+  }
+  async #tick() {
+    const a = this.#agent;
+    let changed = false;
+    if (this.#ready && isRunning(a)) {
+      changed = await this.#poll() || changed;
+    }
+    changed = await this.#readLog() || changed;
+    changed = this.#readTranscript() || changed;
+    if (changed) {
+      this.changed();
+    }
+    if (!isRunning(a) && this.#child && this.#timer) {
+      clearInterval(this.#timer);
+      this.#timer = void 0;
+    }
+  }
+  async #poll() {
+    const a = this.#agent;
+    try {
+      const r = await this.#gw.request("subagent.list", { session_id: this.#spec.sid });
+      const row = r?.subagents?.find((x) => x.subagent_id === a.id);
+      if (!row) {
+        if (this.#listed && !a.logPath) {
+          a.status = "done";
+          a.duration = Date.now() - a.startedAt;
+          return true;
+        }
+        return false;
+      }
+      this.#listed = true;
+      a.model = row.model ?? a.model;
+      a.toolCount = Math.max(a.toolCount, row.tool_count ?? 0);
+      a.steerable = row.accepting_steer ?? a.steerable;
+      a.startedAt = typeof row.started_at === "number" ? row.started_at * 1e3 : a.startedAt;
+      return true;
+    } catch {
+      return false;
+    }
+  }
+  async #readLog() {
+    const path = this.#agent.logPath;
+    if (!path) {
+      return false;
+    }
+    try {
+      const text = await readFile3(path, "utf8");
+      if (text.length === this.#logSize) {
+        return false;
+      }
+      this.#logSize = text.length;
+      applyLog(this.#agent, parseLiveLog(text));
+      return true;
+    } catch {
+      return false;
+    }
+  }
+  #readTranscript() {
+    const store = this.#store;
+    if (!store) {
+      return false;
+    }
+    try {
+      this.#child ??= store.find([this.#spec.sid, this.#spec.stored ?? ""], this.#spec.goal, this.#spec.startedAt);
+      if (!this.#child) {
+        return false;
+      }
+      const last = store.last(this.#child);
+      if (last === this.#lastMessage) {
+        return false;
+      }
+      this.#lastMessage = last;
+      this.transcript.load(store.messages(this.#child));
+      return true;
+    } catch {
+      return false;
+    }
+  }
+  async #readInput() {
+    try {
+      for await (const input of this.#tern) {
+        if (input.type === "key") {
+          this.#onKey(input.key);
+        } else {
+          this.#onEvent(input.event);
+        }
+        this.changed();
+      }
+    } catch {
+    }
+    this.#done.resolve(0);
+  }
+  #onEvent(ev) {
+    if (ev.ev === "focus" && ev.id === INPUT_ID2) {
+      this.#surface.focus(INPUT_ID2);
+    }
+  }
+  #onKey(key2) {
+    if (key2.ctrl && key2.name === "c") {
+      if (this.composer.text) {
+        this.composer.set("");
+        return;
+      }
+      const now = Date.now();
+      if (now - this.#exitArmed < EXIT_ARM_MS2) {
+        return this.#done.resolve(0);
+      }
+      this.#exitArmed = now;
+      this.transcript.notice("Press Ctrl+C again to close this pane.");
+      return;
+    }
+    if (key2.ctrl && key2.name === "d" && !this.composer.text) {
+      return this.#done.resolve(0);
+    }
+    if (this.composer.key(key2) === "submit") {
+      void this.#submit(this.composer.take());
+    }
+  }
+  async #submit(raw) {
+    const text = raw.trim();
+    const a = this.#agent;
+    if (!text) {
+      return;
+    }
+    if (text === "/stop") {
+      return this.#stop();
+    }
+    if (!isRunning(a)) {
+      this.transcript.notice(`${a.name} has finished; there is nothing to steer.`, "warning");
+      return this.changed();
+    }
+    try {
+      const r = await this.#gw.request("subagent.steer", {
+        session_id: this.#spec.sid,
+        subagent_id: a.id,
+        text
+      });
+      this.transcript.notice(
+        r?.status === "queued" ? `Steering sent: it reaches ${a.name} after its current step.` : `${a.name} is not taking steering now.`,
+        r?.status === "queued" ? "info" : "warning"
+      );
+    } catch (error) {
+      this.transcript.notice(error instanceof Error ? error.message : String(error), "error");
+    }
+    this.changed();
+  }
+  async #stop() {
+    const a = this.#agent;
+    if (!isRunning(a)) {
+      return;
+    }
+    try {
+      const r = await this.#gw.request("subagent.interrupt", {
+        session_id: this.#spec.sid,
+        subagent_id: a.id
+      });
+      this.transcript.notice(r?.found ? `Stopping ${a.name}\u2026` : `${a.name} already finished.`, "info");
+    } catch (error) {
+      this.transcript.notice(error instanceof Error ? error.message : String(error), "error");
+    }
+    this.changed();
+  }
+  #render() {
+    const now = Date.now();
+    const a = this.#agent;
+    const running = isRunning(a);
+    const cx = { copy: () => void 0, now, welcome: { tip: "", version: "" } };
+    this.#surface.render({
+      dock: dockNodes({
+        branch: "",
+        busy: running ? { label: a.tool ? `Running ${a.tool}\u2026` : "Working\u2026", since: a, startedAt: a.startedAt } : void 0,
+        composer: this.composer,
+        cwd: "",
+        effort: "",
+        inputId: INPUT_ID2,
+        model: a.model ?? "",
+        now,
+        onContext: () => void 0,
+        onEdit: (ev) => {
+          this.composer.edit(ev);
+          this.changed();
+        },
+        onEffort: () => void 0,
+        onInterrupt: () => void this.#stop(),
+        onModel: () => void 0,
+        onQueueEdit: () => void 0,
+        onSend: (ev) => {
+          void this.#submit(ev.text);
+          this.changed();
+        },
+        onSubmit: () => {
+          void this.#submit(this.composer.take());
+          this.changed();
+        },
+        onUndo: () => {
+          this.composer.undo();
+          this.changed();
+        },
+        placeholder: running ? `Steer ${a.name} \u2014 /stop ends it` : `${a.name} has finished`,
+        queued: [],
+        ready: running
+      }),
+      main: [
+        // The agent row heads the pane: status, model, tools, timer, the step it runs.
+        agentNode({ ...a, summary: void 0 }, now),
+        ...this.transcript.entries.map((e) => entryNode(e, `main.${e.id}`, cx))
+      ]
+    });
+  }
+};
+
 // src/entry.ts
 var NO_TSP = 75;
 var version = process.env.HERMES_VERSION ?? "";
@@ -30786,7 +31256,8 @@ if (!session) {
 }
 var gw = new GatewayClient();
 gw.start();
-var code = await new App(session, gw, version).run();
+var watch = readWatchSpec();
+var code = await (watch ? new WatchApp(session, gw, watch) : new App(session, gw, version)).run();
 process.exit(code);
 export {
   NO_TSP

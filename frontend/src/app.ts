@@ -22,7 +22,7 @@ import type { AnyGatewayEvent } from '@tui/gatewayTypes.js'
 
 import logo from '../assets/logo.png'
 
-import { Agents } from './agents/store.js'
+import { agentName, Agents } from './agents/store.js'
 import { copyToClipboard } from './clipboard.js'
 import { localCommand } from './commands.js'
 import { Composer } from './composer.js'
@@ -41,6 +41,7 @@ import { loadSettings, saveSettings, type ThemeMode } from './settings.js'
 import { Transcript } from './transcript.js'
 import { dockNodes } from './view/dock.js'
 import { entryNode } from './view/transcript.js'
+import { openSidebar, specOf } from './watch/spec.js'
 import { randomTip, type WelcomeContext } from './view/welcome.js'
 
 /** The composer's `editor` node id (dock → composer → line → input). */
@@ -274,9 +275,30 @@ export class App implements OverlayHost {
   }
 
   #onTernEvent(ev: TspEvent) {
+    if (ev.ev === 'action' && ev.act === 'open-agent' && ev.value) {
+      void this.openAgent(ev.value)
+
+      return
+    }
+
     if (ev.ev === 'focus' && ev.id === INPUT_ID && !this.overlays.at(-1)?.modal) {
       this.#focus = INPUT_ID
       this.#surface.focus(INPUT_ID)
+    }
+  }
+
+  /** Shows subagent `id` beside the chat in a Tern split; its timeline sheet where no split can open. */
+  async openAgent(id: string) {
+    const a = this.agents.all().find(x => x.id === id)
+
+    if (!a || !this.sid) {
+      return
+    }
+
+    const cwd = this.info?.cwd || process.env.HOME || '/'
+
+    if (!(await openSidebar(specOf(a, agentName(a), this.sid, this.storedSid), cwd))) {
+      openAgents(this, { id, watch: true })
     }
   }
 
