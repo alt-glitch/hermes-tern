@@ -143,6 +143,29 @@ describe('Transcript', () => {
     expect(kinds(turnOf(t.entries))).toEqual(['thinking', 'text'])
   })
 
+  it('keeps a Mixture-of-Agents reference as its own labelled, sealed thought', () => {
+    const t = new Transcript()
+    t.start(0)
+    t.reasoning('Planning.', 1)
+    t.reference('Reference 1/2 · gpt-5', '  Use SQLite.  ', 2)
+    t.reasoning('Next.', 3)
+
+    expect(turnOf(t.entries).blocks).toMatchObject([
+      { endedAt: 2, kind: 'thinking', text: 'Planning.' },
+      { endedAt: 2, kind: 'thinking', label: 'Reference 1/2 · gpt-5', text: 'Use SQLite.' },
+      { kind: 'thinking', text: 'Next.' }
+    ])
+  })
+
+  it('keeps reasoning.available after a reference answer (it is not the agent’s own thought)', () => {
+    const t = new Transcript()
+    t.start(0)
+    t.reference('Reference · gpt-5', 'Use SQLite.', 1)
+    t.reasoningBlock('Weighing the references.', 2)
+
+    expect(kinds(turnOf(t.entries))).toEqual(['thinking', 'thinking'])
+  })
+
   it('opens a call from tool.complete without tool.start', () => {
     const t = new Transcript()
     t.start(0)
@@ -318,5 +341,50 @@ describe('Transcript', () => {
     expect(tools(turn)[0]?.todos).toEqual([{ content: 'Look', id: '1', status: 'completed' }])
     expect(tools(turn)[2]?.result).toContain('@@ -1 +1 @@')
     expect(turn.status).toBe('done')
+  })
+
+  it('applies a merge:true todo call as a patch on the list before it, live and resumed', () => {
+    const full = { todos: [{ content: 'Plan', id: '1', status: 'in_progress' }, { content: 'Build', id: '2', status: 'pending' }] }
+    const patch = { merge: true, todos: [{ id: '1', status: 'completed' }, { content: 'Ship', id: '3', status: 'pending' }, { id: '4' }] }
+
+    const merged = [
+      { content: 'Plan', id: '1', status: 'completed' },
+      { content: 'Build', id: '2', status: 'pending' },
+      { content: 'Ship', id: '3', status: 'pending' }
+    ]
+
+    const live = new Transcript()
+    live.start(0)
+    live.toolStart({ args: full, name: 'todo_list', tool_id: 'c1' }, 1)
+    live.toolComplete({ name: 'todo_list', tool_id: 'c1' }, 2)
+    live.toolStart({ args: patch, name: 'todo_list', tool_id: 'c2' }, 3)
+    expect(tools(turnOf(live.entries))[1]?.todos).toEqual(merged)
+    expect(live.currentTodos()).toEqual(merged)
+
+    const resumed = new Transcript()
+    resumed.load([
+      { role: 'user', text: 'go', timestamp: 1 },
+      { args: full, name: 'todo_list', role: 'tool', tool_call_id: 'c1' },
+      { args: { arguments: patch, name: 'todo_list' }, name: 'tool_call', role: 'tool', tool_call_id: 'c2' }
+    ])
+    expect(resumed.currentTodos()).toEqual(merged)
+    // The full list's own call keeps its own snapshot.
+    expect(tools(turnOf(resumed.entries))[0]?.todos?.map(x => x.status)).toEqual(['in_progress', 'pending'])
+  })
+
+  it('treats the legacy `todo` tool as the todo list', () => {
+    const t = new Transcript()
+    t.start(0)
+    t.toolStart({ args: { todos: [{ content: 'Plan', id: '1', status: 'pending' }] }, name: 'todo', tool_id: 'c1' }, 1)
+    t.todos([{ content: 'Plan', id: '1', status: 'completed' }])
+    expect(tools(turnOf(t.entries))[0]?.todos).toEqual([{ content: 'Plan', id: '1', status: 'completed' }])
+  })
+
+  it('finds a call by its tool id', () => {
+    const t = new Transcript()
+    t.start(0)
+    t.toolStart({ args: { path: 'a.ts' }, name: 'read_file', tool_id: 'c1' }, 1)
+    expect(t.call('c1')?.name).toBe('read_file')
+    expect(t.call('nope')).toBeUndefined()
   })
 })

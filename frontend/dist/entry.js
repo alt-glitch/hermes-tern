@@ -3424,8 +3424,8 @@ var require_webidl = __commonJS({
       return new TypeError(`${message.header}: ${message.message}`);
     };
     webidl.errors.conversionFailed = function(context) {
-      const plural2 = context.types.length === 1 ? "" : " one of";
-      const message = `${context.argument} could not be converted to${plural2}: ${context.types.join(", ")}.`;
+      const plural3 = context.types.length === 1 ? "" : " one of";
+      const message = `${context.argument} could not be converted to${plural3}: ${context.types.join(", ")}.`;
       return webidl.errors.exception({
         header: context.prefix,
         message
@@ -10987,9 +10987,9 @@ var require_pluralizer = __commonJS({
       this: "these"
     };
     module.exports = class Pluralizer {
-      constructor(singular, plural2) {
+      constructor(singular, plural3) {
         this.singular = singular;
-        this.plural = plural2;
+        this.plural = plural3;
       }
       pluralize(count) {
         const one = count === 1;
@@ -21879,7 +21879,7 @@ var connectionEn = {
       reconnect: "Reconnect"
     },
     // {0} app, {1} account name the agent chose
-    namedAccount: (app, alias) => `Hermes named this ${app} account ${alias}. Rename it anytime.`,
+    namedAccount: (app2, alias) => `Hermes named this ${app2} account ${alias}. Rename it anytime.`,
     header: {
       // {0} title, {1} account name
       account: (title, alias) => `${title} \xB7 ${alias}`,
@@ -21972,34 +21972,34 @@ var connectorsEn = {
     },
     rename: {
       // {0} app, {1} current name
-      title: (app, name) => `Rename ${app} account ${name}`,
+      title: (app2, name) => `Rename ${app2} account ${name}`,
       hint: "Enter save \xB7 Esc cancel"
     },
     add: {
       pickApp: "Add an account to which app?",
       pickHint: "\u2191/\u2193 select \xB7 Enter choose \xB7 Esc cancel",
       noApps: "No connectors are available to add.",
-      name: (app) => `Name the new ${app} account`,
+      name: (app2) => `Name the new ${app2} account`,
       nameHint: "Enter connect \xB7 Esc cancel"
     },
     link: {
       // {0} app, {1} name
-      title: (app, name) => `Connect ${app} account ${name}`,
-      reconnectTitle: (app, name) => `Reconnect ${app} account ${name}`,
+      title: (app2, name) => `Connect ${app2} account ${name}`,
+      reconnectTitle: (app2, name) => `Reconnect ${app2} account ${name}`,
       waiting: "Waiting for you to finish in the browser\u2026",
       hint: "Enter open in browser \xB7 Esc stop waiting",
       starting: "Starting\u2026"
     },
     remove: {
       // {0} app, {1} name
-      confirm: (app, name) => `Remove ${app} account ${name}? This signs Hermes out of it.`
+      confirm: (app2, name) => `Remove ${app2} account ${name}? This signs Hermes out of it.`
     },
     notice: {
       // {0} app, {1} name
-      connected: (app, name) => `${app} account ${name} is connected.`,
-      renamed: (app, name) => `Renamed to ${name} (${app}).`,
-      removed: (app, name) => `Removed ${app} account ${name}.`,
-      notConnected: (app) => `${app} did not connect. Try again.`,
+      connected: (app2, name) => `${app2} account ${name} is connected.`,
+      renamed: (app2, name) => `Renamed to ${name} (${app2}).`,
+      removed: (app2, name) => `Removed ${app2} account ${name}.`,
+      notConnected: (app2) => `${app2} did not connect. Try again.`,
       stopped: "Stopped waiting. The link still works until it expires.",
       waitEnded: "Stopped waiting: the link expired. The list shows where the account stands.",
       nameInvalid: "Use 1-32 lowercase letters, digits or -, starting with a letter or digit.",
@@ -24597,6 +24597,8 @@ var detailLine = (raw) => {
   }
   return t("userMessages.details", text2.length > DETAIL_LIMIT ? `${text2.slice(0, DETAIL_LIMIT - 1)}\u2026` : text2);
 };
+var STDERR_PROBLEM_RE = /Traceback|\b[A-Z][A-Za-z]*(?:Error|Exception)\b:|CRITICAL|\[gateway-turn\]|\[gateway-exit\]|^gateway (?:absent|conflict|draining|inaccessible|incompatible|starting): /;
+var stderrLooksLikeProblem = (line) => STDERR_PROBLEM_RE.test(line);
 var VERSION_SKEW_RE = /Extra inputs are not permitted|^unknown method:/;
 var isVersionSkewError = (err) => {
   const { code: code2, message } = rpcShape(err);
@@ -24738,6 +24740,8 @@ var logo_default = __toBinaryNode("iVBORw0KGgoAAAANSUhEUgAAAQAAAAEACAYAAABccqhmA
 
 // src/agents/store.ts
 import { readFile, stat } from "node:fs/promises";
+import { homedir as homedir2 } from "node:os";
+import { join as join2 } from "node:path";
 
 // src/bridge.ts
 var record = (v) => {
@@ -24779,9 +24783,9 @@ function appTitle(slug) {
   }
   return words2.map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
 }
-function actionPhrase(tool, app = "") {
-  const prefix = `${app.replace(/-/g, "_").toUpperCase()}_`;
-  const text2 = app && tool.toUpperCase().startsWith(prefix) ? tool.slice(prefix.length) : tool;
+function actionPhrase(tool, app2 = "") {
+  const prefix = `${app2.replace(/-/g, "_").toUpperCase()}_`;
+  const text2 = app2 && tool.toUpperCase().startsWith(prefix) ? tool.slice(prefix.length) : tool;
   return text2.split(/[-_\s]+/).filter(Boolean).join(" ").toLowerCase();
 }
 function appOf(name, args) {
@@ -24972,10 +24976,17 @@ var Transcript = class {
   reasoningBlock(text2, at = Date.now()) {
     const turn = this.start(at);
     const incoming = text2.trim();
-    if (!incoming || turn.blocks.some((b) => b.kind === "thinking" || b.kind === "text" && b.text.includes(incoming))) {
+    if (!incoming || turn.blocks.some((b) => b.kind === "thinking" && !b.label || b.kind === "text" && b.text.includes(incoming))) {
       return;
     }
     turn.blocks.push({ endedAt: at, id: this.id("k"), kind: "thinking", startedAt: at, text: text2 });
+    this.#touch(turn);
+  }
+  /** A Mixture-of-Agents reference model's answer: a sealed thought block of its own, under `label`. */
+  reference(label, text2, at = Date.now()) {
+    const turn = this.start(at);
+    this.#endThinking(turn, at);
+    turn.blocks.push({ endedAt: at, id: this.id("k"), kind: "thinking", label, startedAt: at, text: text2.trim() });
     this.#touch(turn);
   }
   text(text2, at = Date.now()) {
@@ -25021,7 +25032,7 @@ var Transcript = class {
       via: u.via
     };
     if (Array.isArray(call.args.todos)) {
-      call.todos = toTodos(call.args.todos);
+      call.todos = todosOf(call.args, this.currentTodos());
     }
     turn.blocks.push({ call, id: p.tool_id, kind: "tool" });
     this.#touch(turn);
@@ -25059,7 +25070,7 @@ var Transcript = class {
   }
   /** The newest todo snapshot lands on the newest todo tool call. */
   todos(todos) {
-    const found = this.#lastTool((c) => c.name === "todo_list");
+    const found = this.#lastTool((c) => isTodoName(c.name));
     if (found) {
       found.call.todos = toTodos(todos);
       this.#touch(found.turn);
@@ -25163,22 +25174,26 @@ var Transcript = class {
     this.#live = void 0;
     let turn;
     let pendingContinued;
+    let promptAt = 0;
     const calls = /* @__PURE__ */ new Map();
+    let todos;
     for (const m of messages2) {
       const at = typeof m.timestamp === "number" ? m.timestamp * 1e3 : 0;
       const text2 = typeof m.text === "string" ? m.text : typeof m.content === "string" ? m.content : "";
-      const steered = m.role === "user" ? steerText(text2) : void 0;
+      const steered = m.role === "user" ? m.display_kind === "steer" ? text2.trim() : steerText(text2) : void 0;
       if (steered !== void 0 && turn) {
         turn.blocks.push({ at, id: this.id("s"), kind: "steer", text: steered });
         continue;
       }
       if (m.role === "user") {
         turn = void 0;
-        const notice = internalNotice(text2);
+        promptAt = at;
+        const notice = displayNotice(m.display_kind, m.display_metadata) ?? internalNotice(text2);
         if (notice) {
           pendingContinued = notice;
         } else {
-          this.entries.push({ at, id: this.id("u"), kind: "user", text: text2 });
+          pendingContinued = void 0;
+          this.entries.push({ at, id: this.id("u"), kind: "user", text: steered ?? text2 });
         }
         continue;
       }
@@ -25191,9 +25206,13 @@ var Transcript = class {
       }
       if (!turn) {
         const continued = pendingContinued ?? continuation(this.entries.findLast((e) => e.kind !== "notice"));
-        turn = { blocks: [], continued, id: this.id("t"), kind: "turn", rev: 0, startedAt: at, status: "done" };
+        turn = { blocks: [], continued, id: this.id("t"), kind: "turn", rev: 0, startedAt: promptAt || at, status: "done" };
         pendingContinued = void 0;
+        promptAt = 0;
         this.entries.push(turn);
+      }
+      if (at > 0) {
+        turn.endedAt = Math.max(turn.endedAt ?? at, at);
       }
       if (m.role === "assistant") {
         if (m.reasoning?.trim()) {
@@ -25230,7 +25249,8 @@ var Transcript = class {
         };
         call.status = settleBridge(call) ?? Boolean(record2(call.result)?.error) ? "error" : "done";
         if (Array.isArray(args.todos)) {
-          call.todos = toTodos(args.todos);
+          call.todos = todosOf(args, todos);
+          todos = call.todos;
         }
         calls.set(id, call);
         turn.blocks.push({ call, id: this.id("c"), kind: "tool" });
@@ -25241,7 +25261,7 @@ var Transcript = class {
   /** A resumed session's unfinished turn: its prompt, then a live turn holding what streamed so far. */
   inflight(turn, at = Date.now()) {
     const user = turn.user?.trim();
-    const notice = user ? internalNotice(user) : void 0;
+    const notice = user ? displayNotice(turn.display_kind, turn.display_metadata) ?? internalNotice(user) : void 0;
     if (notice) {
       this.#continued = notice;
     } else if (user) {
@@ -25288,6 +25308,10 @@ var Transcript = class {
     return this.entries.flatMap(
       (e) => e.kind === "turn" ? e.blocks.flatMap((b) => b.kind === "tool" && b.call.name === name ? [b.call] : []) : []
     );
+  }
+  /** The call with tool id `id`, in any turn. */
+  call(id) {
+    return this.#tool(id)?.call;
   }
   /** The terminal calls that run on as background processes, oldest first. */
   backgroundCalls() {
@@ -25371,6 +25395,47 @@ function record2(v) {
   }
   return v && typeof v === "object" && !Array.isArray(v) ? v : void 0;
 }
+function isTodoName(name) {
+  return name === "todo_list" || name === "todo";
+}
+function todosOf(args, current) {
+  const raw = Array.isArray(args.todos) ? args.todos : [];
+  return args.merge === true ? mergeTodos(current ?? [], raw) : toTodos(raw);
+}
+function mergeTodos(current, patch) {
+  const out = current.map((t2) => ({ ...t2 }));
+  for (const item3 of patch) {
+    const r = record2(item3);
+    const id = String(r?.id ?? "").trim();
+    if (!r || !id) {
+      continue;
+    }
+    const cur = out.find((t2) => t2.id === id);
+    if (!cur) {
+      if (String(r.content ?? "").trim()) {
+        out.push(...toTodos([{ ...r, id }]));
+      }
+      continue;
+    }
+    const content = String(r.content ?? "").trim();
+    const status = String(r.status ?? "").trim().toLowerCase();
+    if (content) {
+      cur.content = content;
+    }
+    if (status === "pending" || status === "in_progress" || status === "completed" || status === "cancelled") {
+      cur.status = status;
+    }
+    if ("parent" in r) {
+      const parent = String(r.parent ?? "").trim();
+      if (parent && parent !== id) {
+        cur.parent = parent;
+      } else {
+        delete cur.parent;
+      }
+    }
+  }
+  return out;
+}
 function toTodos(raw) {
   const out = [];
   for (const item3 of raw) {
@@ -25389,6 +25454,24 @@ function toTodos(raw) {
     });
   }
   return out;
+}
+function displayNotice(kind, metadata) {
+  if (kind === "auto_continue") {
+    return "Resumed interrupted turn";
+  }
+  if (kind !== "async_delegation_complete" && kind !== "process_complete") {
+    return void 0;
+  }
+  const meta = record2(metadata);
+  const shown = typeof meta?.display_text === "string" ? meta.display_text.trim() : "";
+  if (shown) {
+    return shown;
+  }
+  if (kind === "process_complete") {
+    return "Background command finished";
+  }
+  const count = typeof meta?.task_count === "number" ? meta.task_count : void 0;
+  return count === 1 ? "Subagent finished" : count === void 0 ? "Subagents finished" : `${count} subagents finished`;
 }
 var INTERNAL_FOOTER = "[INTERNAL NOTIFICATION \u2014 generated by the Hermes gateway";
 function internalNotice(content) {
@@ -25550,6 +25633,11 @@ var Agents = class {
   #unreadable = /* @__PURE__ */ new Set();
   /** Ids `subagent.list` reported: one that leaves the list has finished. */
   #listed = /* @__PURE__ */ new Set();
+  /**
+   * New delegate_task spawns are blocked, as this pane last set it (`delegation.pause`); undefined
+   * until then (the shared gateway serves no `delegation.status`). The gate is gateway-wide.
+   */
+  paused;
   constructor(host) {
     this.#host = host;
   }
@@ -25560,15 +25648,27 @@ var Agents = class {
   running() {
     return this.all().filter(isRunning);
   }
-  /** Takes over each dispatched delegate_task call not tracked yet, and polls while any agent runs. */
+  /**
+   * Takes over each dispatched delegate_task call not tracked yet, and polls while any agent runs.
+   * A call history brought back without its result (a resumed session) gets one `subagent.list`
+   * probe: its children still running are attached to it and followed from then on.
+   */
   scan(at = Date.now()) {
+    let bare = false;
     for (const call of this.#host.transcript.delegations()) {
-      if (!this.#tracked.has(call) && this.#track(call, at)) {
+      if (this.#tracked.has(call)) {
+        continue;
+      }
+      if (this.#track(call, at)) {
         this.#tracked.add(call);
+      } else if (call.result === void 0 && call.status !== "running" && !call.subagents?.length) {
+        bare = true;
       }
     }
     if (this.running().length) {
       this.#wake();
+    } else if (bare) {
+      void this.#tick(true);
     }
   }
   /** Queues steering text into a running agent; the owner answers `queued` or `rejected`. */
@@ -25587,6 +25687,16 @@ var Agents = class {
       subagent_id: a.id
     });
     return Boolean(r?.found);
+  }
+  /** Blocks (or unblocks) new subagent spawns on the gateway; running children keep going. */
+  async pause(paused) {
+    const r = await this.#host.gw.request("delegation.pause", {
+      paused,
+      ...this.#host.sid ? { session_id: this.#host.sid } : {}
+    });
+    this.paused = typeof r?.paused === "boolean" ? r.paused : paused;
+    this.#host.changed();
+    return this.paused;
   }
   /** Reads `a`'s log now (the hub's timeline opening on it), whatever its state. */
   async refresh(a) {
@@ -25627,14 +25737,14 @@ var Agents = class {
     this.#timer ??= setInterval(() => void this.#tick(), POLL_MS);
     void this.#tick();
   }
-  async #tick() {
+  /** One poll and log read; `probe` polls even with nothing running yet (a resumed session). */
+  async #tick(probe = false) {
     if (this.#ticking) {
       return;
     }
     this.#ticking = true;
     try {
-      const live = this.running();
-      if (!live.length) {
+      if (!probe && !this.running().length) {
         return this.dispose();
       }
       const changed = /* @__PURE__ */ new Set();
@@ -25644,6 +25754,9 @@ var Agents = class {
       if (changed.size) {
         changed.forEach((a) => this.#touch(a));
         this.#host.changed();
+      }
+      if (probe && this.running().length) {
+        this.#timer ??= setInterval(() => void this.#tick(), POLL_MS);
       }
     } finally {
       this.#ticking = false;
@@ -25670,7 +25783,7 @@ var Agents = class {
       }
       present.add(id);
       this.#listed.add(id);
-      const a = this.#find(owners, row) ?? this.#adopt(owners, row);
+      const a = this.#find(owners, row) ?? this.#adopt(owners, row) ?? await this.#attach(owners, row);
       if (!a) {
         continue;
       }
@@ -25699,13 +25812,13 @@ var Agents = class {
   }
   /** The row `row` describes: by id, else a dispatch placeholder (`task-<i>`) of its delegation. */
   #find(owners, row) {
-    const agents = [...owners.keys()];
-    const byId = agents.find((a) => a.id === row.subagent_id);
+    const agents2 = [...owners.keys()];
+    const byId = agents2.find((a) => a.id === row.subagent_id);
     if (byId) {
       return byId;
     }
-    const index = Number(/^sa-(\d+)-/.exec(row.subagent_id ?? "")?.[1]);
-    return (row.depth ?? 0) === 0 && Number.isInteger(index) ? agents.find((a) => a.delegationId === row.delegation_id && a.id === `task-${index}`) : void 0;
+    const index = taskIndex(row);
+    return (row.depth ?? 0) === 0 && index !== void 0 ? agents2.find((a) => a.delegationId === row.delegation_id && a.id === `task-${index}`) : void 0;
   }
   /** A nested child (an orchestrator's worker): a row under its parent, in the parent's card. */
   #adopt(owners, row) {
@@ -25737,6 +25850,41 @@ var Agents = class {
     list.splice(at, 0, child);
     owners.set(child, call);
     return child;
+  }
+  /**
+   * A top-level child whose dispatch result the history dropped (a resumed session): a row on the
+   * newest result-less delegate_task call whose task `sa-<i>-` asked for its goal, its log found
+   * through the delegation's manifest (else read with `subagent.tail`).
+   */
+  async #attach(owners, row) {
+    const index = taskIndex(row);
+    const goal = row.goal?.trim();
+    if ((row.depth ?? 0) !== 0 || index === void 0 || !goal) {
+      return void 0;
+    }
+    const call = this.#host.transcript.delegations().findLast((c) => c.result === void 0 && taskGoals(c)[index] === goal && !c.subagents?.some((a2) => !a2.depth && a2.index === index));
+    if (!call) {
+      return void 0;
+    }
+    const a = {
+      calls: 0,
+      delegationId: row.delegation_id,
+      depth: 0,
+      goal: row.goal,
+      id: row.subagent_id,
+      index,
+      key: `p${index}`,
+      logPath: row.delegation_id ? await manifestLog(row.delegation_id, index) : void 0,
+      startedAt: Date.now(),
+      status: "running",
+      tokens: 0,
+      toolCount: 0
+    };
+    const list = call.subagents ??= [];
+    list.push(a);
+    list.sort((x, y) => x.index - y.index || (x.depth ?? 0) - (y.depth ?? 0));
+    owners.set(a, call);
+    return a;
   }
   #readableLog(a) {
     return Boolean(a.logPath && !this.#unreadable.has(a.logPath));
@@ -25792,6 +25940,45 @@ var Agents = class {
     return owners;
   }
 };
+function taskIndex(row) {
+  const index = Number(/^sa-(\d+)-/.exec(row.subagent_id ?? "")?.[1]);
+  return Number.isInteger(index) ? index : void 0;
+}
+function taskGoals(call) {
+  let tasks = call.args.tasks;
+  if (typeof tasks === "string") {
+    try {
+      tasks = JSON.parse(tasks);
+    } catch {
+      tasks = void 0;
+    }
+  }
+  if (Array.isArray(tasks) && tasks.length) {
+    return tasks.map((t2) => {
+      const goal = record2(t2)?.goal;
+      return typeof goal === "string" ? goal.trim() : "";
+    });
+  }
+  return typeof call.args.goal === "string" ? [call.args.goal.trim()] : [];
+}
+async function manifestLog(delegationId, index, env = process.env) {
+  if (!/^[\w-]+$/.test(delegationId)) {
+    return void 0;
+  }
+  const home = env.HERMES_HOME || join2(homedir2(), ".hermes");
+  for (const root of [join2(home, "delegation_cache", "live"), join2(home, "cache", "delegation", "live")]) {
+    try {
+      const text2 = await readFile(join2(root, delegationId, "manifest.json"), "utf8");
+      const tasks = record2(text2.replace(/^\uFEFF/, ""))?.tasks;
+      const log = Array.isArray(tasks) ? record2(tasks.find((t2) => record2(t2)?.index === index))?.log : void 0;
+      if (typeof log === "string" && log) {
+        return log;
+      }
+    } catch {
+    }
+  }
+  return void 0;
+}
 function applyLog(a, log) {
   a.log = log;
   const tools2 = log.entries.filter((e) => e.kind === "tool").length;
@@ -25846,13 +26033,17 @@ async function mutateSession(gw2, sid, operation, payload) {
   if (!Number.isSafeInteger(snapshot2?.revision) || !Number.isSafeInteger(snapshot2?.execution_generation)) {
     throw new Error("The session did not report its revision; try again.");
   }
+  const body = typeof payload === "function" ? payload(snapshot2) : payload;
+  if (!body) {
+    return null;
+  }
   const result = await gw2.request("session.mutate", {
     session_id: sid,
     request_id: randomUUID2(),
     expected_revision: snapshot2.revision,
-    expected_generation: snapshot2.execution_generation,
+    ...operation === "rename" ? {} : { expected_generation: snapshot2.execution_generation },
     operation,
-    payload
+    payload: body
   });
   if (!result) {
     throw new Error("session.mutate returned nothing");
@@ -25875,7 +26066,9 @@ function modelPayload(arg) {
       payload.provider = parts2.shift();
       continue;
     }
-    throw new Error(`/model: ${flag} is not supported here (the switch applies to this session)`);
+    throw new Error(
+      flag === "--global" ? "/model: --global is not supported here: the switch applies to this session only (`hermes model` sets the default)" : `/model: ${flag} is not supported here (the switch applies to this session)`
+    );
   }
   return payload;
 }
@@ -25916,7 +26109,7 @@ async function steer(host, text2) {
 }
 function queue(host, text2) {
   if (!text2) {
-    return host.notice("Usage: /queue <prompt to run after the current turn>", "warning");
+    return host.notice(`${host.queued} queued message${host.queued === 1 ? "" : "s"}`);
   }
   host.submit(text2);
 }
@@ -25961,12 +26154,34 @@ async function tools(host, arg) {
     host.notice(`/tools failed: ${errorText(e)}`, "error");
   }
 }
+async function side(host, text2, kind) {
+  if (!text2) {
+    return host.notice(kind === "bg" ? "Usage: /bg <prompt>" : "Usage: /btw <question>", "warning");
+  }
+  if (!host.sid) {
+    return host.notice("No active session.", "warning");
+  }
+  try {
+    const r = await host.gw.request(kind === "bg" ? "prompt.background" : "prompt.btw", {
+      session_id: host.sid,
+      text: text2
+    });
+    if (r?.task_id) {
+      host.notice(
+        kind === "bg" ? `Background task ${r.task_id} started: ${preview(text2)}` : `btw ${r.task_id}: answering from a snapshot of this conversation`
+      );
+    }
+  } catch (e) {
+    host.notice(`/${kind} failed: ${errorText(e)}`, "error");
+  }
+}
 var CONTROL_COMMANDS = [
   { aliases: ["s"], name: "steer", run: steer },
-  // `/q` stays quit's alias here (Hermes' registry maps it to /queue).
-  { name: "queue", run: queue },
+  { aliases: ["q"], name: "queue", run: queue },
   { name: "stop", run: stop },
-  { name: "tools", run: tools }
+  { name: "tools", run: tools },
+  { aliases: ["background"], name: "bg", run: (host, arg) => side(host, arg, "bg") },
+  { name: "btw", run: (host, arg) => side(host, arg, "btw") }
 ];
 
 // src/view/time.ts
@@ -26003,29 +26218,29 @@ function compact(n) {
 
 // src/connections.ts
 import { mkdirSync as mkdirSync2, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { homedir as homedir2 } from "node:os";
-import { join as join2 } from "node:path";
+import { homedir as homedir3 } from "node:os";
+import { join as join3 } from "node:path";
 var CONNECT_TOOL = "manage_connections";
 var POLL_MS2 = 2e3;
 var POLL_FOR_MS = 16 * 6e4;
-var dataDir = (env = process.env) => join2(env.HERMES_HOME || join2(homedir2(), ".hermes"), "plugin-data", "hermes-tern");
+var dataDir = (env = process.env) => join3(env.HERMES_HOME || join3(homedir3(), ".hermes"), "plugin-data", "hermes-tern");
 function readCard(id, dir2 = dataDir()) {
   try {
-    const data = JSON.parse(readFileSync(join2(dir2, "connections", `${id}.json`), "utf8"));
+    const data = JSON.parse(readFileSync(join3(dir2, "connections", `${id}.json`), "utf8"));
     return Array.isArray(data.targets) ? { error: data.error, targets: data.targets, watching: data.watching === true } : void 0;
   } catch {
     return void 0;
   }
 }
 function markViewer(sid, previous, dir2 = dataDir()) {
-  const viewers = join2(dir2, "viewers");
+  const viewers = join3(dir2, "viewers");
   try {
     if (previous && previous !== sid) {
-      rmSync(join2(viewers, `${previous}.json`), { force: true });
+      rmSync(join3(viewers, `${previous}.json`), { force: true });
     }
     if (sid) {
       mkdirSync2(viewers, { recursive: true });
-      writeFileSync(join2(viewers, `${sid}.json`), JSON.stringify({ pid: process.pid }));
+      writeFileSync(join3(viewers, `${sid}.json`), JSON.stringify({ pid: process.pid }));
     }
   } catch {
   }
@@ -26392,7 +26607,7 @@ function snapshot(p) {
 }
 
 // src/workLog.ts
-import { homedir as homedir3 } from "node:os";
+import { homedir as homedir4 } from "node:os";
 
 // src/vendor/t3code/commandLabel.ts
 var MAX_COMMAND_SEGMENTS = 64;
@@ -27745,15 +27960,15 @@ function shortPath(path, cwd = process.env.HERMES_CWD || process.cwd()) {
   if (root && path.startsWith(`${root}/`)) {
     return path.slice(root.length + 1);
   }
-  const home = homedir3();
+  const home = homedir4();
   return home && path.startsWith(`${home}/`) ? `~${path.slice(home.length)}` : path.replace(/^\.\//, "");
 }
 function stepLabel(call) {
   const a = call.args;
   const path = str3(a.path);
-  const app = callApp(call);
-  if (app) {
-    return `${app.app} \xB7 ${app.action}`;
+  const app2 = callApp(call);
+  if (app2) {
+    return `${app2.app} \xB7 ${app2.action}`;
   }
   if (call.batch) {
     return call.batch.map((e) => stepLabel({ ...call, args: e.args, batch: void 0, name: e.name })).join(", ");
@@ -27804,8 +28019,8 @@ function stepLabel(call) {
     case "tool_describe": {
       const names = (Array.isArray(a.names) ? a.names : [a.names]).filter((x) => typeof x === "string" && x !== "");
       const named = names.map((n) => {
-        const app2 = callApp({ args: {}, name: n });
-        return app2 ? `${app2.app} \xB7 ${app2.action}` : n.replace(/_/g, " ");
+        const app3 = callApp({ args: {}, name: n });
+        return app3 ? `${app3.app} \xB7 ${app3.action}` : n.replace(/_/g, " ");
       });
       return named.length ? `Read how to call ${named.join(", ")}` : "Read tool details";
     }
@@ -27816,7 +28031,7 @@ function stepLabel(call) {
 }
 function liveLabel(item3, active = false) {
   if (item3.kind === "thinking") {
-    return thoughtLine(item3.text) || (item3.endedAt === void 0 || active ? "Thinking" : "Thought");
+    return thoughtTitle(item3) || (item3.endedAt === void 0 || active ? "Thinking" : "Thought");
   }
   const call = item3.call;
   const status = active && call.status === "done" ? "running" : call.status;
@@ -27826,6 +28041,13 @@ function liveLabel(item3, active = false) {
   }
   const verb = { cancelled: "Stopped", done: "Ran", error: "Failed", running: "Running" }[status];
   return `${verb} ${commandProgramName(command) ?? "command"}`;
+}
+function busyLabel(call) {
+  return `${liveLabel({ call, id: call.id, kind: "tool" }, true)}\u2026`;
+}
+function preparingLabel(name) {
+  const app2 = callApp({ args: {}, name });
+  return `Preparing ${app2 ? `${app2.app} \xB7 ${app2.action}` : name.replace(/_/g, " ")}\u2026`;
 }
 var PRESENT = {
   Edited: "Editing",
@@ -27846,6 +28068,10 @@ function thoughtLine(markdown) {
   return flat(
     markdown.replace(/!?\[([^\]]*)\]\([^)]*\)/g, "$1").replace(/^[ \t]*(?:#{1,6}|[-*+]|\d+\.)[ \t]+/gm, "").replace(/`+|\*\*|~~/g, "").replace(/(^|[^\w*])[*_]([^*_\n]+)[*_](?![\w*])/g, "$1$2")
   );
+}
+function thoughtTitle(item3) {
+  const line = thoughtLine(item3.text);
+  return item3.label ? line ? `${item3.label}: ${line}` : item3.label : line;
 }
 var flat = (text2) => text2.replace(/\s+/g, " ").trim();
 function clock(at) {
@@ -28172,17 +28398,17 @@ function toolDetail(call, now) {
 }
 function cardOf(call, now) {
   const result = record2(call.result);
-  const app = callApp(call);
-  if (app) {
+  const app2 = callApp(call);
+  if (app2) {
     return {
-      badges: [{ text: app.kind === "mcp" ? "MCP" : "connector" }],
+      badges: [{ text: app2.kind === "mcp" ? "MCP" : "connector" }],
       body: call.batch ? batchBody(call) : appBody(call),
       folded: true,
       frame: "inline",
       name: "plug",
-      target: app.action,
+      target: app2.action,
       targetKind: "text",
-      title: app.app
+      title: app2.app
     };
   }
   if (call.batch) {
@@ -28217,6 +28443,8 @@ function cardOf(call, now) {
         return connectCard(call);
       }
       break;
+    // `todo` is the legacy name stored transcripts and older backends keep.
+    case "todo":
     case "todo_list":
       return {
         body: call.todos?.length ? [checklistNode(call.todos)] : [],
@@ -28527,26 +28755,26 @@ function sourceRow(key2, title, url) {
 function taskCard(call, result, now) {
   const tasks = Array.isArray(call.args.tasks) ? call.args.tasks.map((t2) => record2(t2)).filter((t2) => t2 !== void 0) : [];
   const goals = tasks.length ? tasks.map((t2) => str4(t2.goal) ?? "") : str4(call.args.goal) ? [str4(call.args.goal) ?? ""] : [];
-  const agents = call.subagents ?? [];
-  const rows = agents.length ? agents.map((a) => agentNode(a, now)) : call.status === "running" || result?.status === "dispatched" ? goals.map((g, i) => /* @__PURE__ */ jsx("agent", { agent: "task", name: `Agent ${i + 1}`, status: "pending", task: g }, `p${i}`)) : [];
+  const agents2 = call.subagents ?? [];
+  const rows = agents2.length ? agents2.map((a) => agentNode(a, now)) : call.status === "running" || result?.status === "dispatched" ? goals.map((g, i) => /* @__PURE__ */ jsx("agent", { agent: "task", name: `Agent ${i + 1}`, status: "pending", task: g }, `p${i}`)) : settledRows(goals, result);
   const context = str4(call.args.context) ?? (tasks.length === 1 ? str4(tasks[0]?.context) : void 0);
-  const working = agents.some((a) => a.status === "running" || a.status === "queued") || !agents.length && result?.status === "dispatched";
-  const settled = agents.filter((a) => a.status !== "running" && a.status !== "queued");
-  const count = goals.length || agents.length;
+  const working = agents2.some((a) => a.status === "running" || a.status === "queued") || !agents2.length && result?.status === "dispatched";
+  const settled = agents2.filter((a) => a.status !== "running" && a.status !== "queued");
+  const count = goals.length || agents2.length;
   let meta;
   let took2;
-  if (agents.length && !working) {
-    const ok = agents.filter((a) => a.status === "done").length;
-    const stopped = agents.filter((a) => a.status === "cancelled").length;
-    const failed = agents.length - ok - stopped;
-    const requests = agents.reduce((n, a) => n + a.calls, 0);
+  if (agents2.length && !working) {
+    const ok = agents2.filter((a) => a.status === "done").length;
+    const stopped = agents2.filter((a) => a.status === "cancelled").length;
+    const failed = agents2.length - ok - stopped;
+    const requests = agents2.reduce((n, a) => n + a.calls, 0);
     meta = [
       `${ok} succeeded`,
       failed ? `${failed} failed` : "",
       stopped ? `${stopped} stopped` : "",
       requests ? `${requests} req` : ""
     ].filter(Boolean).join(" \xB7 ");
-    took2 = Math.max(...agents.map((a) => a.startedAt + (a.duration ?? 0))) - call.startedAt;
+    took2 = Math.max(...agents2.map((a) => a.startedAt + (a.duration ?? 0))) - call.startedAt;
   } else if (settled.length) {
     meta = `${settled.length} of ${count} done`;
   }
@@ -28564,6 +28792,17 @@ function taskCard(call, result, now) {
     title: "Task",
     took: took2
   };
+}
+function settledRows(goals, result) {
+  const results = Array.isArray(result?.results) ? result.results.map((r) => record2(r)) : [];
+  const titles = goals.length ? goals : results.map(() => "Delegated task");
+  return titles.map((g, i) => {
+    const r = results[i];
+    const verdict = str4(r?.status) ?? "";
+    const status = !r ? "idle" : verdict === "" || verdict === "ok" || verdict === "completed" ? "done" : "failed";
+    const summary4 = str4(r?.summary) ?? str4(r?.error);
+    return /* @__PURE__ */ jsx("agent", { agent: "task", name: `Agent ${i + 1}`, status, task: g, children: summary4 ? /* @__PURE__ */ jsx("md", { children: summary4 }, "o") : null }, `s${i}`);
+  });
 }
 function agentNode(a, now) {
   const status = a.status === "done" ? "done" : a.status === "failed" ? "failed" : a.status === "cancelled" ? "aborted" : a.status === "queued" ? "pending" : "running";
@@ -28615,8 +28854,9 @@ function askCard(call, result) {
     for (const [j, typed] of answers.filter((a) => !choices.includes(a)).entries()) {
       body.push(answerRow(`q${i}.a${j}`, typed, true));
     }
-    if (!answers.length && call.status !== "running") {
-      body.push(/* @__PURE__ */ jsx("text", { role: "omp.tool.notice", spans: [{ s: "muted", t: "No answer" }] }, `q${i}.none`));
+    if (!answers.length && call.status !== "running" && result !== void 0) {
+      const skipped = responses[i]?.status === "skipped";
+      body.push(/* @__PURE__ */ jsx("text", { role: "omp.tool.notice", spans: [{ s: "muted", t: skipped ? "Skipped" : "No answer" }] }, `q${i}.none`));
     }
   }
   return {
@@ -28734,13 +28974,13 @@ function appBody(call) {
 }
 function batchBody(call) {
   return (call.batch ?? []).flatMap((e, i) => {
-    const app = callApp({ args: e.args, name: e.name });
+    const app2 = callApp({ args: e.args, name: e.name });
     const tone = e.status === "error" ? "error" : e.status === "running" ? "pending" : "success";
     const answer = e.error ?? (e.result === void 0 ? void 0 : pretty(e.result));
     return [
       /* @__PURE__ */ jsxs("row", { align: "center", gap: "sm", children: [
         /* @__PURE__ */ jsx("icon", { name: e.status === "error" ? "x" : e.status === "running" ? "clock" : "check", tone }, "i"),
-        /* @__PURE__ */ jsx("text", { grow: 1, spans: [{ t: app ? `${app.app} \xB7 ${app.action}` : humanize(e.name) }], truncate: "end", wrap: "none" }, "t")
+        /* @__PURE__ */ jsx("text", { grow: 1, spans: [{ t: app2 ? `${app2.app} \xB7 ${app2.action}` : humanize(e.name) }], truncate: "end", wrap: "none" }, "t")
       ] }, `e${i}`),
       ...e.error ? [/* @__PURE__ */ jsx("text", { spans: [{ s: "error", t: clip2(e.error, 600) }], wrap: "word" }, `r${i}`)] : answer && call.status !== "running" ? [/* @__PURE__ */ jsx("code", { lang: /^\s*[[{]/.test(answer) ? "json" : "text", max: { h: "8lines" }, text: clip2(answer, 2e3), wrap: true }, `r${i}`)] : []
     ];
@@ -28957,33 +29197,33 @@ var TOOL_ICON = {
   web_search: "web",
   write_file: "write"
 };
-function openAgents(app, focus) {
-  const agents = () => app.agents.all();
-  let tab = app.agents.running().length ? "running" : "all";
-  let selected = focus?.id ?? agents().find(isRunning)?.id ?? agents()[0]?.id;
+function openAgents(app2, focus) {
+  const agents2 = () => app2.agents.all();
+  let tab = app2.agents.running().length ? "running" : "all";
+  let selected = focus?.id ?? agents2().find(isRunning)?.id ?? agents2()[0]?.id;
   let watching;
   let step;
   let steer2;
   let stopping = false;
-  const timer = setInterval(() => app.overlays.includes(overlay) ? app.changed() : clearInterval(timer), TICK_MS);
+  const timer = setInterval(() => app2.overlays.includes(overlay) ? app2.changed() : clearInterval(timer), TICK_MS);
   const close = () => {
     clearInterval(timer);
-    app.close(overlay);
+    app2.close(overlay);
   };
-  const current = () => agents().find((a) => a.id === (watching ?? selected));
+  const current = () => agents2().find((a) => a.id === (watching ?? selected));
   const watch2 = (id) => {
-    const a = agents().find((x) => x.id === id);
+    const a = agents2().find((x) => x.id === id);
     if (!a) {
       return;
     }
     watching = a.id;
     step = void 0;
-    void app.agents.refresh(a);
+    void app2.agents.refresh(a);
   };
   const beside = (id) => {
     if (id) {
       close();
-      void app.openAgent(id);
+      void app2.openAgent(id);
     }
   };
   const sendSteer = async () => {
@@ -28991,42 +29231,52 @@ function openAgents(app, focus) {
     const text2 = steer2?.trim();
     steer2 = void 0;
     if (!a || !text2) {
-      return app.changed();
+      return app2.changed();
     }
     try {
-      const queued = await app.agents.steer(a, text2);
-      app.transcript.notice(
+      const queued = await app2.agents.steer(a, text2);
+      app2.transcript.notice(
         queued ? `Steering queued for ${agentName(a)}.` : `${agentName(a)} is not taking steering now.`,
         queued ? "info" : "warning"
       );
     } catch (error) {
-      app.transcript.notice(error instanceof Error ? error.message : String(error), "error");
+      app2.transcript.notice(error instanceof Error ? error.message : String(error), "error");
     }
-    app.changed();
+    app2.changed();
   };
   const stop2 = async () => {
     const a = current();
     stopping = false;
     if (!a || !isRunning(a)) {
-      return app.changed();
+      return app2.changed();
     }
     try {
-      if (!await app.agents.stop(a)) {
-        app.transcript.notice(`${agentName(a)} already finished.`, "warning");
+      if (!await app2.agents.stop(a)) {
+        app2.transcript.notice(`${agentName(a)} already finished.`, "warning");
       }
     } catch (error) {
-      app.transcript.notice(error instanceof Error ? error.message : String(error), "error");
+      app2.transcript.notice(error instanceof Error ? error.message : String(error), "error");
     }
-    app.changed();
+    app2.changed();
   };
-  const shown = () => tab === "running" ? agents().filter(isRunning) : agents();
+  const togglePause = async () => {
+    try {
+      const paused = await app2.agents.pause(!app2.agents.paused);
+      app2.transcript.notice(paused ? "Subagent spawning paused for every chat on this gateway." : "Subagent spawning resumed.");
+    } catch (error) {
+      app2.transcript.notice(error instanceof Error ? error.message : String(error), "error");
+    }
+    app2.changed();
+  };
+  const shown = () => tab === "running" ? agents2().filter(isRunning) : agents2();
   const steps = (a) => a.log?.entries ?? [];
   const overlay = {
     key: KEY,
     modal: true,
+    cancel: close,
     node: () => {
       const now = Date.now();
-      const watched = watching ? agents().find((a) => a.id === watching) : void 0;
+      const watched = watching ? agents2().find((a) => a.id === watching) : void 0;
       return watched ? timelineNode(watched, now) : hubNode(now);
     },
     onKey: (k) => {
@@ -29070,6 +29320,8 @@ function openAgents(app, focus) {
         beside(selected);
       } else if (k.name === "t" && !k.ctrl && !k.alt) {
         watch2(selected);
+      } else if (k.name === "p" && !k.ctrl && !k.alt) {
+        void togglePause();
       } else if (k.name === "tab") {
         tab = tab === "running" ? "all" : "running";
       } else {
@@ -29094,7 +29346,8 @@ function openAgents(app, focus) {
     return [
       ...inTimeline ? [] : [
         { id: "watch", keys: ["t"], label: "Timeline" },
-        { id: "beside", keys: ["enter"], label: "Open beside", primary: true }
+        { id: "beside", keys: ["enter"], label: "Open beside", primary: true },
+        { id: "pause", keys: ["p"], label: app2.agents.paused ? "Resume spawns" : "Pause spawns" }
       ],
       {
         disabled: running ? a?.steerable === false ? "Not taking steering now" : void 0 : "Finished",
@@ -29109,43 +29362,44 @@ function openAgents(app, focus) {
   const handlers = {
     cancel: () => {
       stopping = false;
-      app.changed();
+      app2.changed();
     },
     close: () => {
       if (watching) {
         selected = watching;
         watching = void 0;
-        app.changed();
+        app2.changed();
       } else {
         close();
       }
     },
     confirm: () => void stop2(),
+    pause: () => void togglePause(),
     steer: () => {
       steer2 = "";
-      app.changed();
+      app2.changed();
     },
     "steer-cancel": () => {
       steer2 = void 0;
-      app.changed();
+      app2.changed();
     },
     "steer-send": () => void sendSteer(),
     stop: () => {
       stopping = true;
-      app.changed();
+      app2.changed();
     },
     tab: (ev) => {
       tab = ev.value === "running" ? "running" : "all";
-      app.changed();
+      app2.changed();
     },
     beside: () => beside(selected),
     watch: () => {
       watch2(selected);
-      app.changed();
+      app2.changed();
     }
   };
   function hubNode(now) {
-    const all = agents();
+    const all = agents2();
     const list = shown();
     const running = all.filter(isRunning).length;
     if (!list.some((a2) => a2.id === selected)) {
@@ -29172,13 +29426,16 @@ function openAgents(app, focus) {
         onSelect: (ev) => {
           selected = ev.item;
           stopping = false;
-          app.changed();
+          app2.changed();
         },
         order: list.map((x) => x.id),
         preview: "side",
         selected,
         size: "lg",
-        subtitle: [{ s: "muted", t: summary(all) }],
+        subtitle: [
+          { s: "muted", t: summary(all) },
+          ...app2.agents.paused ? [{ s: "warning", t: " \xB7 spawns paused (gateway-wide)" }] : []
+        ],
         tab,
         tabs: [
           { count: running, id: "running", label: "Running" },
@@ -29214,7 +29471,7 @@ function openAgents(app, focus) {
         onAction: handlers,
         onSelect: (ev) => {
           step = ev.item === ids.at(-1) ? void 0 : ev.item;
-          app.changed();
+          app2.changed();
         },
         preview: "side",
         selected: sel,
@@ -29228,7 +29485,7 @@ function openAgents(app, focus) {
       KEY
     );
   }
-  app.open(overlay);
+  app2.open(overlay);
   if (focus?.watch) {
     watch2(focus.id);
   }
@@ -29499,19 +29756,19 @@ var STATUS2 = {
   lost: "Lost",
   running: "Running"
 };
-function openBackground(app, focus) {
-  const procs = () => app.processes.all();
-  const focused = focus ? app.processes.get(focus) : void 0;
-  let tab = focused ? isRunning2(focused) ? "running" : "all" : app.processes.running().length ? "running" : "all";
+function openBackground(app2, focus) {
+  const procs = () => app2.processes.all();
+  const focused = focus ? app2.processes.get(focus) : void 0;
+  let tab = focused ? isRunning2(focused) ? "running" : "all" : app2.processes.running().length ? "running" : "all";
   let selected = focus ?? procs().find(isRunning2)?.id ?? procs()[0]?.id;
   let expanded = false;
   let confirm;
   let job;
   let copied;
   let copiedTimer;
-  const release = app.processes.watch();
-  const releaseCron = app.cron.watch();
-  const timer = setInterval(() => app.overlays.includes(overlay) ? app.changed() : end(), TICK_MS2);
+  const release = app2.processes.watch();
+  const releaseCron = app2.cron.watch();
+  const timer = setInterval(() => app2.overlays.includes(overlay) ? app2.changed() : end(), TICK_MS2);
   function end() {
     clearInterval(timer);
     clearTimeout(copiedTimer);
@@ -29520,7 +29777,7 @@ function openBackground(app, focus) {
   }
   const close = () => {
     end();
-    app.close(overlay);
+    app2.close(overlay);
   };
   const shown = () => tab === "running" ? procs().filter(isRunning2) : procs();
   const current = () => procs().find((p) => p.id === selected);
@@ -29528,27 +29785,27 @@ function openBackground(app, focus) {
     const p = current();
     confirm = void 0;
     if (!p || !isRunning2(p)) {
-      return app.changed();
+      return app2.changed();
     }
     try {
-      const status = await app.processes.kill(p.id);
+      const status = await app2.processes.kill(p.id);
       if (status && status !== "killed") {
-        app.transcript.notice(`${describeCommand(p.command)}: ${status.replace(/_/g, " ")}.`, "warning");
+        app2.transcript.notice(`${describeCommand(p.command)}: ${status.replace(/_/g, " ")}.`, "warning");
       }
     } catch (error) {
-      app.transcript.notice(error instanceof Error ? error.message : String(error), "error");
+      app2.transcript.notice(error instanceof Error ? error.message : String(error), "error");
     }
-    app.changed();
+    app2.changed();
   };
   const stopAll = async () => {
     confirm = void 0;
     try {
-      const n = await app.processes.stopAll();
-      app.transcript.notice(`Stopped ${n} background process${n === 1 ? "" : "es"}.`);
+      const n = await app2.processes.stopAll();
+      app2.transcript.notice(`Stopped ${n} background process${n === 1 ? "" : "es"}.`);
     } catch (error) {
-      app.transcript.notice(error instanceof Error ? error.message : String(error), "error");
+      app2.transcript.notice(error instanceof Error ? error.message : String(error), "error");
     }
-    app.changed();
+    app2.changed();
   };
   const copy = () => {
     const p = current();
@@ -29560,29 +29817,29 @@ function openBackground(app, focus) {
     clearTimeout(copiedTimer);
     copiedTimer = setTimeout(() => {
       copied = void 0;
-      app.changed();
+      app2.changed();
     }, COPIED_MS);
-    app.changed();
+    app2.changed();
   };
   const ask = (what) => {
     const p = current();
-    if (what === "one" ? p && isRunning2(p) && !app.processes.stopping(p.id) : app.processes.running().length) {
+    if (what === "one" ? p && isRunning2(p) && !app2.processes.stopping(p.id) : app2.processes.running().length) {
       confirm = what;
     }
   };
-  const currentJob = () => app.cron.jobs().find((j) => j.job_id === job);
+  const currentJob = () => app2.cron.jobs().find((j) => j.job_id === job);
   const actJob = async (action) => {
     const j = currentJob();
     confirm = void 0;
-    if (!j || app.cron.busy(j.job_id)) {
-      return app.changed();
+    if (!j || app2.cron.busy(j.job_id)) {
+      return app2.changed();
     }
     try {
-      await app.cron.act(action, j.job_id);
+      await app2.cron.act(action, j.job_id);
     } catch (error) {
-      app.transcript.notice(error instanceof Error ? error.message : String(error), "error");
+      app2.transcript.notice(error instanceof Error ? error.message : String(error), "error");
     }
-    app.changed();
+    app2.changed();
   };
   const toggleJob = () => {
     const j = currentJob();
@@ -29599,6 +29856,7 @@ function openBackground(app, focus) {
   const overlay = {
     key: KEY2,
     modal: true,
+    cancel: close,
     node: () => sheetNode(Date.now()),
     onKey: (k) => {
       if (confirm) {
@@ -29626,7 +29884,7 @@ function openBackground(app, focus) {
         } else {
           job = moveSelection(
             k,
-            app.cron.jobs().map((j) => j.job_id),
+            app2.cron.jobs().map((j) => j.job_id),
             job
           ) ?? job;
         }
@@ -29651,16 +29909,16 @@ function openBackground(app, focus) {
   const handlers = {
     all: () => {
       ask("all");
-      app.changed();
+      app2.changed();
     },
     cancel: () => {
       confirm = void 0;
-      app.changed();
+      app2.changed();
     },
     close: () => {
       if (expanded) {
         expanded = false;
-        app.changed();
+        app2.changed();
       } else {
         close();
       }
@@ -29669,21 +29927,21 @@ function openBackground(app, focus) {
     copy,
     expand: () => {
       expanded = Boolean(current()) && !expanded;
-      app.changed();
+      app2.changed();
     },
     remove: () => {
       askRemove();
-      app.changed();
+      app2.changed();
     },
     stop: () => {
       ask("one");
-      app.changed();
+      app2.changed();
     },
     tab: (ev) => {
       tab = TABS.find((t2) => t2 === ev.value) ?? "all";
       expanded = false;
       confirm = void 0;
-      app.changed();
+      app2.changed();
     },
     toggle: toggleJob
   };
@@ -29691,18 +29949,18 @@ function openBackground(app, focus) {
     return tab === "cron" ? cronNode(now) : processNode(now);
   }
   const tabs = () => [
-    { count: app.processes.running().length, id: "running", label: "Running" },
+    { count: app2.processes.running().length, id: "running", label: "Running" },
     { count: procs().length, id: "all", label: "All" },
-    { count: app.cron.loaded ? app.cron.jobs().length : void 0, id: "cron", label: "Cron" }
+    { count: app2.cron.loaded ? app2.cron.jobs().length : void 0, id: "cron", label: "Cron" }
   ];
   function cronNode(now) {
-    const jobs = app.cron.jobs();
-    const own = ownJobs(app.transcript.calls("cronjob_manage"));
+    const jobs = app2.cron.jobs();
+    const own = ownJobs(app2.transcript.calls("cronjob_manage"));
     if (!jobs.some((j2) => j2.job_id === job)) {
       job = jobs[0]?.job_id;
     }
     const j = jobs.find((x) => x.job_id === job);
-    const busy = j ? app.cron.busy(j.job_id) : false;
+    const busy = j ? app2.cron.busy(j.job_id) : false;
     const columns = [
       { format: "dim", head: "Schedule", id: "schedule", min: 10, priority: 1 },
       { format: "dim", head: "Next", id: "next", priority: 3 },
@@ -29724,21 +29982,21 @@ function openBackground(app, focus) {
         ],
         columns,
         confirm: confirm === "job" && j ? { act: "confirm", label: "Remove", text: `Remove ${j.name || j.job_id}? It will not run again.` } : void 0,
-        empty: app.cron.error ? `Could not list cron jobs: ${app.cron.error}` : app.cron.loaded ? "No cron jobs. Ask Hermes to schedule one or to watch something." : "Loading cron jobs\u2026",
+        empty: app2.cron.error ? `Could not list cron jobs: ${app2.cron.error}` : app2.cron.loaded ? "No cron jobs. Ask Hermes to schedule one or to watch something." : "Loading cron jobs\u2026",
         icon: "clock",
-        items: jobs.map((x) => jobItem(x, now, own.has(x.job_id), app.cron.busy(x.job_id))),
+        items: jobs.map((x) => jobItem(x, now, own.has(x.job_id), app2.cron.busy(x.job_id))),
         noun: "jobs",
         onAction: handlers,
         onSelect: (ev) => {
           job = ev.item;
           confirm = void 0;
-          app.changed();
+          app2.changed();
         },
         order: jobs.map((x) => x.job_id),
         preview: "side",
         selected: job,
         size: "lg",
-        subtitle: [{ s: "muted", t: app.cron.warning ?? cronSummary(jobs) }],
+        subtitle: [{ s: "muted", t: app2.cron.warning ?? cronSummary(jobs) }],
         tab,
         tabs: tabs(),
         title: "Background",
@@ -29756,7 +30014,7 @@ function openBackground(app, focus) {
       selected = list[0]?.id;
     }
     const p = list.find((x) => x.id === selected);
-    const call = p && callOf(app, p.id);
+    const call = p && callOf(app2, p.id);
     const columns = [
       { format: "dim", head: "Last output", id: "last", min: 16, priority: 1 },
       { format: "dim", head: "Status", id: "status", priority: 3 },
@@ -29770,10 +30028,10 @@ function openBackground(app, focus) {
           { id: "copy", keys: ["c"], label: copied && copied === p?.id ? "Copied" : "Copy command" },
           {
             danger: true,
-            disabled: p && isRunning2(p) ? app.processes.stopping(p.id) ? "Stopping" : void 0 : "Not running",
+            disabled: p && isRunning2(p) ? app2.processes.stopping(p.id) ? "Stopping" : void 0 : "Not running",
             id: "stop",
             keys: ["k"],
-            label: p && app.processes.stopping(p.id) ? "Stopping\u2026" : "Stop"
+            label: p && app2.processes.stopping(p.id) ? "Stopping\u2026" : "Stop"
           },
           { danger: true, disabled: running ? void 0 : "None running", id: "all", keys: ["shift+k"], label: "Stop all" },
           { end: true, id: "close", keys: ["esc"], label: expanded ? "Back" : "Close" }
@@ -29783,18 +30041,18 @@ function openBackground(app, focus) {
         empty: tab === "running" ? "No background processes running. Tab shows the finished ones." : "No background processes in this session",
         focus: expanded ? "preview" : void 0,
         icon: "terminal",
-        items: all.map((x) => item(x, now, app.processes.stopping(x.id))),
+        items: all.map((x) => item(x, now, app2.processes.stopping(x.id))),
         noun: "processes",
         onAction: handlers,
         onActivate: (ev) => {
           selected = ev.item;
           expanded = true;
-          app.changed();
+          app2.changed();
         },
         onSelect: (ev) => {
           selected = ev.item;
           confirm = void 0;
-          app.changed();
+          app2.changed();
         },
         order: list.map((x) => x.id),
         preview: "side",
@@ -29810,7 +30068,7 @@ function openBackground(app, focus) {
       KEY2
     );
   }
-  app.open(overlay);
+  app2.open(overlay);
 }
 function next(tab, back) {
   return TABS[(TABS.indexOf(tab) + (back ? TABS.length - 1 : 1)) % TABS.length];
@@ -29878,8 +30136,8 @@ function jobPreview(j, now, own) {
     ] : []
   ];
 }
-function callOf(app, id) {
-  return app.transcript.backgroundCalls().find((c) => (processIdOf(c) ?? c.process?.id) === id);
+function callOf(app2, id) {
+  return app2.transcript.backgroundCalls().find((c) => (processIdOf(c) ?? c.process?.id) === id);
 }
 function summary2(all) {
   const count = (s) => all.filter((p) => p.status === s).length;
@@ -29971,7 +30229,9 @@ async function git(cwd, ...args) {
 var KIND = { A: "added", C: "copied", D: "deleted", M: "modified", R: "renamed", T: "modified" };
 function parseStatus(text2) {
   const state = { ahead: 0, behind: 0, files: [] };
-  for (const line of text2.split("\n")) {
+  const records = text2.split("\0");
+  for (let i = 0; i < records.length; i++) {
+    const line = records[i];
     if (line.startsWith("# branch.head ")) {
       const head2 = line.slice(14);
       state.branch = head2 === "(detached)" ? void 0 : head2;
@@ -29984,8 +30244,8 @@ function parseStatus(text2) {
     } else if (line.startsWith("1 ") || line.startsWith("2 ")) {
       const parts2 = line.split(" ");
       const xy = parts2[1] ?? "..";
-      const rest = parts2.slice(line.startsWith("1 ") ? 8 : 9).join(" ");
-      const [path, from] = rest.split("	");
+      const path = parts2.slice(line.startsWith("1 ") ? 8 : 9).join(" ");
+      const from = line.startsWith("2 ") ? records[++i] : void 0;
       const code2 = xy[0] !== "." ? xy[0] : xy[1];
       state.files.push({ additions: 0, deletions: 0, from, path, staged: xy[0] !== ".", status: KIND[code2] ?? "modified" });
     } else if (line.startsWith("u ")) {
@@ -29998,9 +30258,14 @@ function parseStatus(text2) {
 }
 function applyNumstat(files, text2) {
   const byPath = new Map(files.map((f) => [f.path, f]));
-  for (const line of text2.split("\n")) {
-    const [add, del, ...rest] = line.split("	");
-    const path = rest.join("	").replace(/^(.*)\{(?:.*) => (.*)\}(.*)$/, "$1$2$3").replace(/^.* => /, "");
+  const records = text2.split("\0");
+  for (let i = 0; i < records.length; i++) {
+    const [add, del, ...rest] = records[i].split("	");
+    let path = rest.join("	");
+    if (rest.length && !path) {
+      path = records[i + 2] ?? "";
+      i += 2;
+    }
     const f = byPath.get(path);
     if (f) {
       f.additions = Number(add) || 0;
@@ -30011,11 +30276,11 @@ function applyNumstat(files, text2) {
 async function gitState(cwd) {
   try {
     const root = (await git(cwd, "rev-parse", "--show-toplevel")).trim();
-    const state = parseStatus(await git(root, "status", "--porcelain=2", "--branch", "--untracked-files=all"));
-    const numstat = await git(root, "diff", "--numstat", "-M", "HEAD").catch(() => "");
+    const state = parseStatus(await git(root, "status", "--porcelain=2", "--branch", "--untracked-files=all", "-z"));
+    const numstat = await git(root, "diff", "--numstat", "-z", "-M", "HEAD").catch(() => "");
     applyNumstat(state.files, numstat);
     for (const f of state.files.filter((x) => x.status === "untracked").slice(0, 50)) {
-      const out = await git(root, "diff", "--no-index", "--numstat", "--", "/dev/null", f.path).catch((e) => e.stdout ?? "");
+      const out = await git(root, "diff", "--no-index", "--numstat", "-z", "--", "/dev/null", f.path).catch((e) => e.stdout ?? "");
       applyNumstat([f], out);
     }
     return { root, ...state };
@@ -30039,17 +30304,17 @@ var TONE2 = {
   renamed: "info",
   untracked: "success"
 };
-function openChanges(app, focus) {
-  let state = app.sidebar.state;
+function openChanges(app2, focus) {
+  let state = app2.sidebar.state;
   let selected = focus;
   let failed = false;
   const diffs = /* @__PURE__ */ new Map();
   const read2 = async () => {
-    const cwd = app.info?.cwd;
+    const cwd = app2.info?.cwd;
     state = cwd ? await gitState(cwd) : void 0;
     failed = !state;
     diffs.clear();
-    app.changed();
+    app2.changed();
   };
   const load2 = (f) => {
     if (!f || !state || diffs.has(f.path)) {
@@ -30058,7 +30323,7 @@ function openChanges(app, focus) {
     diffs.set(f.path, null);
     void fileDiff(state.root, f).then((text2) => {
       diffs.set(f.path, text2);
-      app.changed();
+      app2.changed();
     });
   };
   void read2();
@@ -30070,7 +30335,7 @@ function openChanges(app, focus) {
     node: () => sheetNode(),
     onKey: (k) => {
       if (k.name === "escape") {
-        app.close(overlay);
+        app2.close(overlay);
       } else if (k.name === "c" && !k.ctrl && !k.alt && !k.meta && current()) {
         copyToClipboard(current().path);
       } else if (k.name === "r" && k.shift) {
@@ -30109,13 +30374,13 @@ function openChanges(app, focus) {
         items: list.map(item2),
         noun: "files",
         onAction: {
-          close: () => app.close(overlay),
+          close: () => app2.close(overlay),
           copy: () => f && copyToClipboard(f.path),
           refresh: () => void read2()
         },
         onSelect: (ev) => {
           selected = ev.item;
-          app.changed();
+          app2.changed();
         },
         order: list.map((x) => x.path),
         preview: "below",
@@ -30135,7 +30400,7 @@ function openChanges(app, focus) {
       KEY3
     );
   }
-  app.open(overlay);
+  app2.open(overlay);
 }
 function item2(f) {
   return {
@@ -30171,16 +30436,16 @@ var LEVELS = [
   { detail: "More than high, where the model has it", id: "xhigh", label: "xhigh" },
   { detail: "Everything the model can spend", id: "max", label: "max" }
 ];
-function openEffortPicker(app, global2 = false) {
-  const current = app.info?.reasoning_effort ?? "";
+function openEffortPicker(app2, global2 = false) {
+  const current = app2.info?.reasoning_effort ?? "";
   let selected = LEVELS.some((l) => l.id === current) ? current : "medium";
   let saveDefault = global2;
   const pick = async (id) => {
     if (!id) {
       return;
     }
-    app.close(overlay);
-    await app.setEffort(id, saveDefault ? "global" : "session");
+    app2.close(overlay);
+    await app2.setEffort(id, saveDefault ? "global" : "session");
   };
   const overlay = {
     key: KEY4,
@@ -30204,17 +30469,17 @@ function openEffortPicker(app, global2 = false) {
         ),
         noun: "levels",
         onAction: {
-          close: () => app.close(overlay),
+          close: () => app2.close(overlay),
           global: () => {
             saveDefault = !saveDefault;
-            app.changed();
+            app2.changed();
           },
           use: () => void pick(selected)
         },
         onActivate: (ev) => void pick(ev.item),
         onSelect: (ev) => {
           selected = ev.item;
-          app.changed();
+          app2.changed();
         },
         order: LEVELS.map((l) => l.id),
         preview: "none",
@@ -30227,7 +30492,7 @@ function openEffortPicker(app, global2 = false) {
     ),
     onKey: (k) => {
       if (k.name === "escape") {
-        app.close(overlay);
+        app2.close(overlay);
       } else if (k.name === "enter") {
         void pick(selected);
       } else if (k.ctrl && k.name === "g") {
@@ -30242,7 +30507,7 @@ function openEffortPicker(app, global2 = false) {
       return true;
     }
   };
-  app.open(overlay);
+  app2.open(overlay);
 }
 
 // src/overlays/pullRequests.tsx
@@ -30250,16 +30515,16 @@ import { execFile as execFile3 } from "node:child_process";
 
 // src/github/links.ts
 import { readFileSync as readFileSync2 } from "node:fs";
-import { homedir as homedir5 } from "node:os";
-import { join as join4 } from "node:path";
+import { homedir as homedir6 } from "node:os";
+import { join as join5 } from "node:path";
 import { DatabaseSync as DatabaseSync2 } from "node:sqlite";
 
 // src/watch/child.ts
-import { homedir as homedir4 } from "node:os";
-import { join as join3 } from "node:path";
+import { homedir as homedir5 } from "node:os";
+import { join as join4 } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 function stateDbPath(env = process.env) {
-  return join3(env.HERMES_HOME || join3(homedir4(), ".hermes"), "state.db");
+  return join4(env.HERMES_HOME || join4(homedir5(), ".hermes"), "state.db");
 }
 var ChildStore = class {
   #db;
@@ -30356,7 +30621,7 @@ function parseArgs(raw) {
 // src/github/links.ts
 var LINK_TOOLS = /* @__PURE__ */ new Set(["link_pull_request", "list_pull_requests", "unlink_pull_request"]);
 function linksPath(env = process.env) {
-  return join4(env.HERMES_HOME || join4(homedir5(), ".hermes"), "plugin-data", "hermes-tern", "pull-requests.json");
+  return join5(env.HERMES_HOME || join5(homedir6(), ".hermes"), "plugin-data", "hermes-tern", "pull-requests.json");
 }
 var prKey = (ref) => `${ref.host}/${ref.repository}#${ref.number}`;
 function refOf(v) {
@@ -30373,12 +30638,16 @@ function linkedFromResult(call) {
   const linked = record2(call.result)?.linked;
   return Array.isArray(linked) ? linked.map(refOf).filter((r) => Boolean(r)) : void 0;
 }
+var marker = (k) => `COALESCE(json_extract(CASE WHEN json_valid(c.model_config) THEN c.model_config ELSE '{}' END, '$.${k}'), '') != p.id`;
+var CONTINUES = `SELECT p.id AS p FROM sessions c JOIN sessions p ON p.id = c.parent_session_id
+  WHERE c.id = ? AND p.end_reason = 'compression' AND COALESCE(c.source, '') != 'tool'
+    AND ${["_branched_from", "_delegate_from", "_reset_from"].map(marker).join(" AND ")}`;
 function ancestry(sid, db = stateDbPath()) {
   const chain = [sid];
   try {
     const conn = new DatabaseSync2(db, { readOnly: true });
     try {
-      const parent = conn.prepare("SELECT parent_session_id AS p FROM sessions WHERE id = ?");
+      const parent = conn.prepare(CONTINUES);
       for (let i = 0; i < 100; i++) {
         const row = parent.get(chain.at(-1));
         if (!row?.p || chain.includes(row.p)) {
@@ -30712,37 +30981,39 @@ var REVIEW = {
   REVIEW_REQUIRED: ["Review required", "warning"]
 };
 var FILE_TONE = { added: "success", removed: "error", renamed: "info" };
-function openPullRequests(app, focus) {
-  const newest = app.prs.entries().at(-1);
+function openPullRequests(app2, focus) {
+  const newest = app2.prs.entries().at(-1);
   let selected = focus ?? (newest ? prKey(newest.ref) : void 0);
   let tab = "prs";
   const rows = {};
   let confirm;
   let copied;
   let copiedTimer;
-  app.prs.poke();
-  const timer = setInterval(() => app.overlays.includes(overlay) ? app.changed() : end(), TICK_MS3);
+  app2.prs.poke();
+  const timer = setInterval(() => app2.overlays.includes(overlay) ? app2.changed() : end(), TICK_MS3);
   function end() {
     clearInterval(timer);
     clearTimeout(copiedTimer);
   }
   const close = () => {
     end();
-    app.close(overlay);
+    app2.close(overlay);
   };
-  const current = () => selected ? app.prs.get(selected) : void 0;
+  const current = () => selected ? app2.prs.get(selected) : void 0;
   const fail = (error) => {
-    app.transcript.notice(error instanceof Error ? error.message : String(error), "error");
-    app.changed();
+    app2.transcript.notice(error instanceof Error ? error.message : String(error), "error");
+    app2.changed();
   };
   const load2 = () => {
     if (!current()?.pr) {
       return;
     }
     if (tab === "activity") {
-      app.prs.activity(selected).catch(fail);
+      app2.prs.activity(selected).catch(() => {
+      });
     } else if (tab === "files") {
-      app.prs.files(selected).catch(fail);
+      app2.prs.files(selected).catch(() => {
+      });
     }
   };
   const setTab = (t2) => {
@@ -30752,15 +31023,15 @@ function openPullRequests(app, focus) {
   };
   const act = async (action) => {
     confirm = void 0;
-    if (!current()?.pr || app.prs.busy(selected)) {
-      return app.changed();
+    if (!current()?.pr || app2.prs.busy(selected)) {
+      return app2.changed();
     }
     try {
-      await app.prs.act(action, selected);
+      await app2.prs.act(action, selected);
     } catch (error) {
       fail(error);
     }
-    app.changed();
+    app2.changed();
   };
   const copy = () => {
     const e = current();
@@ -30772,12 +31043,12 @@ function openPullRequests(app, focus) {
     clearTimeout(copiedTimer);
     copiedTimer = setTimeout(() => {
       copied = void 0;
-      app.changed();
+      app2.changed();
     }, COPIED_MS2);
   };
   const can = (action) => {
     const pr = current()?.pr;
-    if (!pr || app.prs.busy(selected)) {
+    if (!pr || app2.prs.busy(selected)) {
       return false;
     }
     switch (action) {
@@ -30820,6 +31091,7 @@ function openPullRequests(app, focus) {
   const overlay = {
     key: KEY5,
     modal: true,
+    cancel: close,
     node: () => sheetNode(Date.now()),
     onKey: (k) => {
       if (confirm) {
@@ -30856,7 +31128,7 @@ function openPullRequests(app, focus) {
       } else if (bare && k.name === "f" && can("rerun")) {
         void act("rerun");
       } else if (bare && k.name === "r" && k.shift) {
-        app.prs.poke();
+        app2.prs.poke();
       } else if (tab === "prs") {
         selected = moveSelection(k, prKeys(), selected) ?? selected;
       } else {
@@ -30865,54 +31137,55 @@ function openPullRequests(app, focus) {
       return true;
     }
   };
-  const prKeys = () => prOrder(app.prs.entries()).flatMap((o) => typeof o === "string" ? [o] : []);
+  const prKeys = () => prOrder(app2.prs.entries()).flatMap((o) => typeof o === "string" ? [o] : []);
   const handlers = {
     activate,
     cancel: () => {
       confirm = void 0;
-      app.changed();
+      app2.changed();
     },
     close: () => {
       if (tab === "prs") {
         close();
       } else {
         setTab("prs");
-        app.changed();
+        app2.changed();
       }
     },
     "close-pr": () => {
       ask("close");
-      app.changed();
+      app2.changed();
     },
     confirm: () => void (confirm && act(confirm)),
     copy: () => {
       copy();
-      app.changed();
+      app2.changed();
     },
     merge: () => {
       ask("merge");
-      app.changed();
+      app2.changed();
     },
     open: openPr,
     ready: () => void act("ready"),
-    refresh: () => app.prs.poke(),
+    refresh: () => app2.prs.poke(),
     reopen: () => void act("reopen"),
     rerun: () => void act("rerun"),
     tab: (ev) => {
       setTab(TABS2.find((t2) => t2 === ev.value) ?? "prs");
-      app.changed();
+      app2.changed();
     },
     "update-branch": () => void act("update-branch")
   };
   function sheetNode(now) {
-    const entries = app.prs.entries();
+    const entries = app2.prs.entries();
     const keys = prKeys();
     if (!selected || !keys.includes(selected)) {
       selected = keys[0];
     }
+    load2();
     const e = current();
     const pr = e?.pr;
-    const busy = selected ? app.prs.busy(selected) : false;
+    const busy = selected ? app2.prs.busy(selected) : false;
     const method = pr?.mergeMethods[0] ?? "merge";
     const ids = rowIds(tab, e);
     const row = rows[tab];
@@ -30942,7 +31215,7 @@ function openPullRequests(app, focus) {
         icon: "merge",
         items: tab === "prs" ? entries.map((x) => prItem(x, now)) : view.items,
         layout: tab === "activity" ? "timeline" : "rows",
-        message: app.prs.error,
+        message: app2.prs.error ?? view.error,
         noun: view.noun,
         onAction: handlers,
         onActivate: (ev) => {
@@ -30952,7 +31225,7 @@ function openPullRequests(app, focus) {
             rows[tab] = ev.item;
           }
           activate();
-          app.changed();
+          app2.changed();
         },
         onSelect: (ev) => {
           if (tab === "prs") {
@@ -30961,13 +31234,13 @@ function openPullRequests(app, focus) {
             rows[tab] = ev.item;
           }
           confirm = void 0;
-          app.changed();
+          app2.changed();
         },
         order: tab === "prs" ? prOrder(entries) : ids,
         preview: tab === "files" || tab === "activity" ? "below" : "side",
         selected: tab === "prs" ? selected : rows[tab],
         size: "lg",
-        state: app.prs.error ? "error" : view.loading ? "loading" : "ready",
+        state: app2.prs.error || view.error ? "error" : view.loading ? "loading" : "ready",
         subtitle: [{ s: "muted", t: tab === "prs" ? summary3(entries) : pr ? `#${pr.number} ${pr.title}` : "" }],
         tab,
         tabs: [
@@ -30983,7 +31256,7 @@ function openPullRequests(app, focus) {
       KEY5
     );
   }
-  app.open(overlay);
+  app2.open(overlay);
 }
 function rowIds(tab, e) {
   switch (tab) {
@@ -31031,8 +31304,10 @@ function tabView(tab, e, now) {
       return {
         columns: [{ format: "dim", head: "When", id: "when", priority: 2 }],
         empty: pr ? "No comments, reviews or commits yet." : "Pick a pull request first.",
+        // A failed read with nothing to show says why; an older list stays up while it is tried again.
+        error: pr && !e?.activity ? e?.activityError : void 0,
         items: (e?.activity ?? []).map((a, i) => activityItem(a, `a${i}`, now)),
-        loading: Boolean(pr && !e?.activity),
+        loading: Boolean(pr && !e?.activity && !e?.activityError),
         noun: "events",
         preview: null
       };
@@ -31040,8 +31315,9 @@ function tabView(tab, e, now) {
       return {
         columns: [{ format: "dim", head: "Changes", id: "changes", priority: 2 }],
         empty: pr ? "No files changed." : "Pick a pull request first.",
+        error: pr && !e?.files ? e?.filesError : void 0,
         items: (e?.files ?? []).map(fileItem),
-        loading: Boolean(pr && !e?.files),
+        loading: Boolean(pr && !e?.files && !e?.filesError),
         noun: "files",
         preview: null
       };
@@ -31322,17 +31598,17 @@ var HOTKEYS = [
       [["alt+s"], "Session sidebar: branch, PRs, changes (/sidebar)"],
       [["ctrl+v"], "Attach the clipboard image (also \u2318V of an image, a dropped image file, /paste)"],
       [["down"], "Focus the agents / shells / PR pills (empty prompt); \u2190 \u2192 switch, Enter opens, Esc returns"],
-      [["ctrl+c"], "Clear the draft / interrupt / exit (twice)"],
+      [["ctrl+c"], "Answer no to the open sheet / clear the draft and images / interrupt / exit (twice)"],
       [["ctrl+d"], "Delete forward / exit (empty prompt)"]
     ]
   }
 ];
-async function openHelp(app) {
+async function openHelp(app2) {
   let catalog = {};
   try {
-    catalog = await app.gw.request("commands.catalog", app.sid ? { session_id: app.sid } : {});
+    catalog = await app2.gw.request("commands.catalog", app2.sid ? { session_id: app2.sid } : {});
   } catch (error) {
-    app.transcript.notice(
+    app2.transcript.notice(
       `Could not load the command list: ${error instanceof Error ? error.message : String(error)}`,
       "warning"
     );
@@ -31386,7 +31662,7 @@ async function openHelp(app) {
           {
             align: "center",
             gap: "xs",
-            onClick: () => app.close(overlay),
+            onClick: () => app2.close(overlay),
             role: "omp.btn",
             title: "Close  escape",
             children: [
@@ -31400,12 +31676,12 @@ async function openHelp(app) {
     ] }, "body") }, KEY6),
     onKey: (k) => {
       if (k.name === "escape" || k.name === "enter" || k.name === "q") {
-        app.close(overlay);
+        app2.close(overlay);
       }
       return true;
     }
   };
-  app.open(overlay);
+  app2.open(overlay);
 }
 
 // node_modules/@hermes/shared/src/model-search-text.ts
@@ -31442,11 +31718,11 @@ var providerDisplayNames = (providers) => {
 var KEY7 = "models";
 var ALL = "all";
 var confirmTokens = /* @__PURE__ */ new Map();
-async function mutateModel(app, value, confirmed) {
-  const key2 = `${app.sid} ${value}`;
+async function mutateModel(app2, value, confirmed) {
+  const key2 = `${app2.sid} ${value}`;
   const confirm = confirmed ? confirmTokens.get(key2) : void 0;
   confirmTokens.delete(key2);
-  const result = await mutateSession(app.gw, app.sid ?? "", "model", { ...modelPayload(value), ...confirm ? { confirm } : {} });
+  const result = await mutateSession(app2.gw, app2.sid ?? "", "model", { ...modelPayload(value), ...confirm ? { confirm } : {} });
   if (result.status === "confirmation_required" && typeof result.confirm === "string" && !confirmed) {
     confirmTokens.set(key2, result.confirm);
     return { confirm_message: result.confirm_message, confirm_required: true };
@@ -31456,11 +31732,11 @@ async function mutateModel(app, value, confirmed) {
   }
   return { value: result.model ?? "" };
 }
-async function switchModel(app, value, confirmed = false) {
-  const r = app.gw.isCanonical ? await mutateModel(app, value, confirmed) : await app.gw.request("config.set", {
+async function switchModel(app2, value, confirmed = false) {
+  const r = app2.gw.isCanonical ? await mutateModel(app2, value, confirmed) : await app2.gw.request("config.set", {
     confirm_expensive_model: confirmed,
     key: "model",
-    session_id: app.sid,
+    session_id: app2.sid,
     value
   });
   if (r.confirm_required) {
@@ -31468,16 +31744,19 @@ async function switchModel(app, value, confirmed = false) {
   }
   const model = typeof r.value === "string" ? r.value : "";
   if (model) {
-    app.info = { ...app.info, model };
-    app.transcript.notice(r.deferred ? `Model switches to ${model} from the next turn.` : `Switched to ${model}.`);
+    app2.info = { ...app2.info, model };
+    app2.transcript.notice(r.deferred ? `Model switches to ${model} from the next turn.` : `Switched to ${model}.`);
   }
   if (r.warning) {
-    app.transcript.notice(r.warning, "warning");
+    app2.transcript.notice(r.warning, "warning");
   }
-  app.changed();
+  app2.changed();
   return r;
 }
-function openModelPicker(app) {
+function pickerValue(model, provider, global2) {
+  return `${model} --provider ${provider} ${global2 ? "--global" : "--session"}`;
+}
+function openModelPicker(app2) {
   let state = "loading";
   let message = "";
   let rows = [];
@@ -31487,16 +31766,17 @@ function openModelPicker(app) {
   let scope = ALL;
   let selected;
   let global2 = false;
-  const startEffort = app.info?.reasoning_effort || "";
+  const canSave = !app2.gw.isCanonical;
+  const startEffort = app2.info?.reasoning_effort || "";
   let effort = startEffort || "medium";
   let confirm = null;
   let busy = false;
   let shown = [];
   const load2 = async () => {
     state = "loading";
-    app.changed();
+    app2.changed();
     try {
-      const r = await app.gw.request("model.options", app.sid ? { session_id: app.sid } : {});
+      const r = await app2.gw.request("model.options", app2.sid ? { session_id: app2.sid } : {});
       const list = r.providers ?? [];
       const names = providerDisplayNames(list);
       providers = list.map((provider, i) => ({ name: names[i] ?? provider.name, provider }));
@@ -31516,7 +31796,7 @@ function openModelPicker(app) {
       state = "error";
       message = error instanceof Error ? error.message : String(error);
     }
-    app.changed();
+    app2.changed();
   };
   const choose = async (id, confirmed = false) => {
     const row = rows.find((r) => r.id === id);
@@ -31525,25 +31805,21 @@ function openModelPicker(app) {
     }
     busy = true;
     try {
-      const r = await switchModel(
-        app,
-        `${row.model} --provider ${row.provider.slug} ${global2 ? "--global" : "--session"}`,
-        confirmed
-      );
+      const r = await switchModel(app2, pickerValue(row.model, row.provider.slug, canSave && global2), confirmed);
       if (r.confirm_required) {
         confirm = { row, text: r.confirm_message || r.warning || `${row.model} is expensive. Switch anyway?` };
       } else {
-        app.close(overlay);
-        if (global2 || effort !== startEffort) {
-          await app.setEffort(effort, global2 ? "global" : "session");
+        app2.close(overlay);
+        if (canSave && global2 || effort !== startEffort) {
+          await app2.setEffort(effort, canSave && global2 ? "global" : "session");
         }
       }
     } catch (error) {
-      app.transcript.notice(error instanceof Error ? error.message : String(error), "error");
-      app.close(overlay);
+      app2.transcript.notice(error instanceof Error ? error.message : String(error), "error");
+      app2.close(overlay);
     }
     busy = false;
-    app.changed();
+    app2.changed();
   };
   const view = () => {
     const inScope = scope === ALL ? rows : rows.filter((r) => `provider:${r.provider.slug}` === scope);
@@ -31598,7 +31874,7 @@ function openModelPicker(app) {
         "picker",
         {
           actions: [
-            { id: "global", keys: ["ctrl+g"], label: "Save as default", on: global2 },
+            ...canSave ? [{ id: "global", keys: ["ctrl+g"], label: "Save as default", on: global2 }] : [],
             { end: true, id: "close", keys: ["esc"], label: "Close" },
             { id: "use", keys: ["enter"], label: "Switch", primary: true }
           ],
@@ -31615,26 +31891,26 @@ function openModelPicker(app) {
           onAction: {
             cancel: () => {
               confirm = null;
-              app.changed();
+              app2.changed();
             },
             clear: () => {
               query = "";
-              app.changed();
+              app2.changed();
             },
-            close: () => app.close(overlay),
+            close: () => app2.close(overlay),
             confirm: () => void choose(confirm?.row.id, true),
             global: () => {
               global2 = !global2;
-              app.changed();
+              app2.changed();
             },
             retry: () => void load2(),
             scope: (ev) => {
               scope = ev.value ?? ALL;
-              app.changed();
+              app2.changed();
             },
             strip: (ev) => {
               effort = LEVELS.find((l) => l.id === ev.value)?.id ?? effort;
-              app.changed();
+              app2.changed();
             },
             use: () => void choose(selected)
           },
@@ -31642,7 +31918,7 @@ function openModelPicker(app) {
           onSelect: (ev) => {
             selected = ev.item;
             confirm = null;
-            app.changed();
+            app2.changed();
           },
           order,
           placeholder: "Search models\u2026",
@@ -31675,14 +31951,14 @@ function openModelPicker(app) {
         return true;
       }
       if (k.name === "escape") {
-        app.close(overlay);
+        app2.close(overlay);
         return true;
       }
       if (k.name === "enter") {
         void choose(selected);
         return true;
       }
-      if (k.ctrl && k.name === "g") {
+      if (canSave && k.ctrl && k.name === "g") {
         global2 = !global2;
         return true;
       }
@@ -31708,7 +31984,7 @@ function openModelPicker(app) {
       return true;
     }
   };
-  app.open(overlay);
+  app2.open(overlay);
   void load2();
 }
 function itemOf(row) {
@@ -31771,11 +32047,11 @@ function preview3(row, isCurrent) {
 
 // .hermes-src/ui-tui/src/lib/history.ts
 import { appendFileSync as appendFileSync3, existsSync, mkdirSync as mkdirSync3, readFileSync as readFileSync3 } from "node:fs";
-import { homedir as homedir6 } from "node:os";
-import { join as join5 } from "node:path";
+import { homedir as homedir7 } from "node:os";
+import { join as join6 } from "node:path";
 var MAX2 = 1e3;
-var dir = process.env.HERMES_HOME ?? join5(homedir6(), ".hermes");
-var file = join5(dir, ".hermes_history");
+var dir = process.env.HERMES_HOME ?? join6(homedir7(), ".hermes");
+var file = join6(dir, ".hermes_history");
 var cache = null;
 function load() {
   if (cache) {
@@ -31908,6 +32184,7 @@ var Composer = class {
     this.text = prev.text;
     this.cursor = prev.cursor;
     this.#lastEdit = 0;
+    this.#browse = -1;
     this.#changed();
   }
   redo() {
@@ -31919,6 +32196,7 @@ var Composer = class {
     this.text = next2.text;
     this.cursor = next2.cursor;
     this.#lastEdit = 0;
+    this.#browse = -1;
     this.#changed();
   }
   /** Handles one editing key; false when the key isn't the composer's. */
@@ -32091,9 +32369,10 @@ var Composer = class {
     }
     return true;
   }
-  /** Saves an undo step; typing bursts merge into one. */
+  /** Saves an undo step; typing bursts merge into one. Every edit runs it, so it also ends a history walk. */
   #record({ merge }) {
     const now = Date.now();
+    this.#browse = -1;
     if (!merge || now - this.#lastEdit > UNDO_MERGE_MS || !this.#undo.length) {
       this.#undo.push({ cursor: this.cursor, text: this.text });
       if (this.#undo.length > 200) {
@@ -32208,6 +32487,18 @@ function unmaskEdit(secret, ev) {
 // src/overlays/prompts.tsx
 var RECOMMENDED = /\s*\(recommended\)\s*$/i;
 var str6 = (v) => typeof v === "string" ? v : "";
+var isCtrlC = (k) => k.ctrl && k.name === "c";
+var TIMEOUT_NOTICES = {
+  approval: "Approval timed out: the command was not run. Ask Hermes to try again when you are ready to answer.",
+  secret: "Secret prompt closed: no answer in time, so the step that needed it was skipped. Send your request again when you are ready to enter it.",
+  sudo: "Password prompt closed: no answer in time, so the command was skipped. Send your request again when you are ready to enter it.",
+  "vault.code": "Verification-code prompt closed: no answer in time, so the sign-in was skipped. Send your request again when you have the code.",
+  "vault.save_login": "Save-login prompt closed: no answer in time, so nothing was saved. Send your request again when you are ready.",
+  "vault.unlock_prompt": "Unlock prompt closed: no answer in time, so the password manager stayed locked. Send your request again when you are ready to unlock it."
+};
+function promptTimeoutNotice(method, reason) {
+  return reason === "timeout" && typeof method === "string" ? TIMEOUT_NOTICES[method] ?? null : null;
+}
 function actionsRow(buttons) {
   return /* @__PURE__ */ jsxs("row", { align: "center", gap: "sm", role: "omp.actions", children: [
     /* @__PURE__ */ jsx("spacer", { grow: 1 }, "fill"),
@@ -32321,6 +32612,7 @@ function approvalOverlay(host, req) {
   const overlay = {
     key: key2,
     modal: true,
+    cancel: () => answer("deny"),
     node: (id) => /* @__PURE__ */ jsx("overlay", { anchor: "bottom", modal: true, role: "omp.overlay.ask", size: "md", children: /* @__PURE__ */ jsxs("col", { gap: "md", children: [
       /* @__PURE__ */ jsx("md", { role: "omp.ask.question", text: "Allow this command?" }, "question"),
       command ? /* @__PURE__ */ jsx("code", { lang: "bash", text: command }, "command") : null,
@@ -32360,7 +32652,9 @@ function approvalOverlay(host, req) {
     onKey: (k) => {
       const n = Number.parseInt(k.name, 10);
       const to = moved(k, selected, options.length);
-      if (to !== void 0) {
+      if (isCtrlC(k)) {
+        answer("deny");
+      } else if (to !== void 0) {
         selected = to;
       } else if (n >= 1 && n <= options.length) {
         answer(options[n - 1]?.id ?? "deny");
@@ -32487,6 +32781,11 @@ function clarifyOverlay(host, req) {
   const overlay = {
     key: key2,
     modal: true,
+    // Every question at once: an empty answer is the contract's cancel ('' skips on the shared wire).
+    cancel: () => {
+      req.respond({});
+      host.close(overlay);
+    },
     focus: (id) => {
       const q = questions[step];
       const d = drafts[step];
@@ -32575,7 +32874,10 @@ function clarifyOverlay(host, req) {
       }
       const typing = d.typing || !q.choices.length;
       const count = q.choices.length + 1;
-      if (k.name === "tab" && questions.length > 1) {
+      if (isCtrlC(k)) {
+        req.respond({});
+        host.close(overlay);
+      } else if (k.name === "tab" && questions.length > 1) {
         go(step + (k.shift ? -1 : 1));
       } else if (k.name === "escape" && typing && q.choices.length) {
         d.typing = false;
@@ -32618,13 +32920,14 @@ function maskedOverlay(host, req) {
   const key2 = `prompt:${req.id}`;
   const site = str6(p.site) || str6(p.origin);
   const login = req.method === "vault.save_login";
+  const code2 = req.method === "vault.code";
   const fields = login ? [
     { id: "identifier", label: "Username or email", masked: false, value: new Composer() },
     { id: "password", label: "Password", masked: true, value: new Composer() }
-  ] : [{ id: "value", label: "Hidden while you type", masked: true, value: new Composer() }];
+  ] : [{ id: "value", label: code2 ? "Type the code" : "Hidden while you type", masked: !code2, value: new Composer() }];
   let at = 0;
   const title = req.method === "sudo" ? "Password for sudo" : req.method === "secret" ? str6(p.prompt) || `Value for ${str6(p.env_var) || "a secret"}` : req.method === "vault.unlock_prompt" ? `Master password for ${str6(p.display_name) || str6(p.backend) || "the password manager"}` : login ? `Save a login for ${site || "this site"}` : `Code for ${site || "this site"}`;
-  const note = req.method === "secret" ? str6(p.env_var) : req.method === "vault.code" ? str6(p.hint) : "";
+  const note = req.method === "secret" ? str6(p.env_var) : code2 ? [str6(p.hint), "typed into the page only \xB7 never shown to the model"].filter(Boolean).join(" \xB7 ") : "";
   const finish = (cancel) => {
     const [first, second] = fields;
     req.respond({
@@ -32635,6 +32938,7 @@ function maskedOverlay(host, req) {
   const overlay = {
     key: key2,
     modal: true,
+    cancel: () => finish(true),
     focus: (id) => `${id}.body.${fields[at]?.id ?? "value"}`,
     node: () => /* @__PURE__ */ jsx("overlay", { anchor: "bottom", modal: true, role: "omp.overlay.ask", size: "md", children: /* @__PURE__ */ jsxs("col", { gap: "md", children: [
       /* @__PURE__ */ jsx("md", { role: "omp.ask.question", text: title }, "question"),
@@ -32675,7 +32979,7 @@ function maskedOverlay(host, req) {
       ])
     ] }, "body") }, key2),
     onKey: (k) => {
-      if (k.name === "escape") {
+      if (k.name === "escape" || isCtrlC(k)) {
         finish(true);
       } else if (k.name === "tab" && fields.length > 1) {
         at = (at + 1) % fields.length;
@@ -32702,6 +33006,7 @@ function confirmOverlay(host, ask) {
   const overlay = {
     key: key2,
     modal: true,
+    cancel: () => answer(false),
     node: () => /* @__PURE__ */ jsx("overlay", { anchor: "bottom", modal: true, role: "omp.overlay.ask", size: "md", children: /* @__PURE__ */ jsxs("col", { gap: "md", children: [
       /* @__PURE__ */ jsx("md", { role: "omp.ask.question", text: ask.title }, "question"),
       ask.detail ? /* @__PURE__ */ jsx("text", { text: ask.detail, wrap: "word" }, "detail") : null,
@@ -32846,7 +33151,7 @@ function sessionLabel(s) {
 var KEY8 = "sessions";
 var LIMIT = 400;
 var DAY = 864e5;
-function openSessionPicker(app) {
+function openSessionPicker(app2) {
   let state = "loading";
   let sessions = [];
   let running = /* @__PURE__ */ new Set();
@@ -32857,14 +33162,14 @@ function openSessionPicker(app) {
   let deleting = null;
   let shown = [];
   const replies = /* @__PURE__ */ new Map();
-  const current = app.storedSid ?? app.sid ?? "";
+  const current = app2.storedSid ?? app2.sid ?? "";
   const load2 = async () => {
     state = "loading";
-    app.changed();
-    const cwd = app.info?.cwd || process.env.HERMES_CWD || process.cwd();
+    app2.changed();
+    const cwd = app2.info?.cwd || process.env.HERMES_CWD || process.cwd();
     const [key2, live] = await Promise.all([
       workspaceOf(cwd),
-      app.gw.request("session.list", { limit: 200 }).catch(() => ({ sessions: [] }))
+      app2.gw.request("session.list", { limit: 200 }).catch(() => ({ sessions: [] }))
     ]);
     workspace = key2;
     running = new Set((live.sessions ?? []).filter((s) => s.running && s.id).map((s) => s.id));
@@ -32872,7 +33177,7 @@ function openSessionPicker(app) {
     tab = sessions.some((s) => inWorkspace(s, workspace)) ? "here" : "all";
     selected = rows().find((s) => s.id !== current)?.id ?? rows()[0]?.id;
     state = "ready";
-    app.changed();
+    app2.changed();
   };
   const here = (s) => inWorkspace(s, workspace);
   const rows = () => tab === "here" ? sessions.filter(here) : sessions;
@@ -32881,27 +33186,30 @@ function openSessionPicker(app) {
     if (!s) {
       return;
     }
-    app.close(overlay);
+    app2.close(overlay);
     if (s.id !== current) {
-      void app.resume(s.id);
+      app2.resume(s.id).catch((error) => {
+        app2.transcript.notice(`Could not resume: ${error instanceof Error ? error.message : String(error)}`, "error");
+        app2.changed();
+      });
     }
   };
   const remove = async (id) => {
     deleting = null;
     try {
-      await (app.gw.isCanonical ? mutateSession(app.gw, id, "delete", {}) : app.gw.request("session.delete", { session_id: id }));
+      await (app2.gw.isCanonical ? mutateSession(app2.gw, id, "delete", {}) : app2.gw.request("session.delete", { session_id: id }));
       sessions = sessions.filter((s) => s.id !== id);
     } catch (error) {
-      app.transcript.notice(error instanceof Error ? error.message : String(error), "error");
+      app2.transcript.notice(error instanceof Error ? error.message : String(error), "error");
     }
-    app.changed();
+    app2.changed();
   };
   const askDelete = () => {
     if (!selected) {
       return;
     }
     if (selected === current) {
-      app.transcript.notice("The open session cannot be deleted; start a new one first.", "warning");
+      app2.transcript.notice("The open session cannot be deleted; start a new one first.", "warning");
     } else {
       deleting = selected;
     }
@@ -32975,13 +33283,13 @@ ${s.preview} ${s.cwd} ${s.branch} ${s.id}`, { scattered: false });
           onAction: {
             cancel: () => {
               deleting = null;
-              app.changed();
+              app2.changed();
             },
             clear: () => {
               query = "";
-              app.changed();
+              app2.changed();
             },
-            close: () => app.close(overlay),
+            close: () => app2.close(overlay),
             confirm: () => {
               if (deleting) {
                 void remove(deleting);
@@ -32989,20 +33297,20 @@ ${s.preview} ${s.cwd} ${s.branch} ${s.id}`, { scattered: false });
             },
             delete: () => {
               askDelete();
-              app.changed();
+              app2.changed();
             },
             resume: () => resume(selected),
             retry: () => void load2(),
             tab: (ev) => {
               setTab(ev.value === "here" ? "here" : "all");
-              app.changed();
+              app2.changed();
             }
           },
           onActivate: (ev) => resume(ev.item),
           onSelect: (ev) => {
             selected = ev.item;
             deleting = null;
-            app.changed();
+            app2.changed();
           },
           order,
           placeholder: "Search titles, prompts, folders, branches\u2026",
@@ -33037,7 +33345,7 @@ ${s.preview} ${s.cwd} ${s.branch} ${s.id}`, { scattered: false });
         if (query) {
           query = "";
         } else {
-          app.close(overlay);
+          app2.close(overlay);
         }
       } else if (k.name === "enter") {
         resume(selected);
@@ -33057,7 +33365,7 @@ ${s.preview} ${s.cwd} ${s.branch} ${s.id}`, { scattered: false });
       return true;
     }
   };
-  app.open(overlay);
+  app2.open(overlay);
   setTimeout(() => void load2(), 0);
 }
 function itemOf2(s, now, running, elsewhere) {
@@ -33137,18 +33445,23 @@ var MODES = [
 function isThemeMode(v) {
   return MODES.some((m) => m.id === v);
 }
-function openThemePicker(app) {
-  const before = app.theme;
+function openThemePicker(app2) {
+  const before = app2.theme;
   let selected = before;
   const pick = (mode) => {
     if (mode) {
       selected = mode;
-      app.setTheme(mode);
+      app2.setTheme(mode);
     }
   };
   const overlay = {
     key: KEY9,
     modal: true,
+    // As Esc: the theme being previewed goes back.
+    cancel: () => {
+      app2.setTheme(before);
+      app2.close(overlay);
+    },
     node: () => /* @__PURE__ */ jsx(
       "picker",
       {
@@ -33162,15 +33475,15 @@ function openThemePicker(app) {
         noun: "themes",
         onAction: {
           cancel: () => {
-            app.setTheme(before);
-            app.close(overlay);
+            app2.setTheme(before);
+            app2.close(overlay);
           },
-          close: () => app.close(overlay),
-          use: () => app.close(overlay)
+          close: () => app2.close(overlay),
+          use: () => app2.close(overlay)
         },
         onActivate: (ev) => {
           pick(ev.item);
-          app.close(overlay);
+          app2.close(overlay);
         },
         onSelect: (ev) => pick(ev.item),
         selected,
@@ -33181,51 +33494,238 @@ function openThemePicker(app) {
     ),
     onKey: (k) => {
       if (k.name === "escape") {
-        app.setTheme(before);
-        app.close(overlay);
+        app2.setTheme(before);
+        app2.close(overlay);
       } else if (k.name === "enter") {
-        app.close(overlay);
+        app2.close(overlay);
       } else {
         pick(moveSelection(k, MODES.map((m) => m.id), selected));
       }
       return true;
     }
   };
-  app.open(overlay);
+  app2.open(overlay);
 }
 
-// src/commands.ts
+// src/hermes/rewind.ts
+var COMPACTION_MARKERS = ["[CONTEXT COMPACTION", "[CONTEXT SUMMARY]:", "[END OF PRIOR CONTEXT"];
+var isUserTurn = (row) => row.role === "user" && (!row.display_kind || row.display_kind === "steer") && Number.isSafeInteger(row.row_id) && !(typeof row.content === "string" && COMPACTION_MARKERS.some((marker2) => row.content.includes(marker2)));
+var lastUserTurn = (snapshot2) => (snapshot2.stored_messages ?? snapshot2.messages ?? []).findLast(isUserTurn);
+function lastTurnRewind(snapshot2) {
+  const target = lastUserTurn(snapshot2);
+  return target ? { target_message_id: target.row_id } : null;
+}
+var TEXT_PARTS = /* @__PURE__ */ new Set(["input_text", "output_text", "text"]);
+function retryText(content) {
+  let text2 = "";
+  for (const part of typeof content === "string" ? [content] : Array.isArray(content) ? content : [null]) {
+    if (typeof part === "string") {
+      text2 += part;
+    } else if (part?.type && TEXT_PARTS.has(part.type) && typeof part.text === "string" && Object.keys(part).length === 2) {
+      text2 += part.text;
+    } else {
+      return null;
+    }
+  }
+  return text2.trim() ? text2 : "";
+}
+function retryTurnRewind(snapshot2) {
+  const target = lastUserTurn(snapshot2);
+  const text2 = target ? retryText(target.content) : "";
+  if (text2 === null) {
+    throw new Error("/retry: retry does not support media or unknown content parts");
+  }
+  return target && text2 ? { target_message_id: target.row_id } : null;
+}
+
+// src/sessionCommands.ts
+var plural2 = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
+var errorText2 = (e) => e instanceof Error ? e.message : String(e);
+async function rewind(host, intent) {
+  if (!host.canonical) {
+    return false;
+  }
+  if (!host.sid) {
+    return host.notice(`Nothing to ${intent}.`);
+  }
+  const result = await mutateSession(host.gw, host.sid, "rewind", intent === "retry" ? retryTurnRewind : lastTurnRewind);
+  const removed = Number(result?.rewound_count ?? 0);
+  if (host.stale()) {
+    return;
+  }
+  if (!result || removed <= 0) {
+    return host.notice(`Nothing to ${intent}.`);
+  }
+  await host.reload();
+  if (host.stale()) {
+    return;
+  }
+  if (intent === "undo") {
+    return host.notice(`Undid ${plural2(removed, "message")}.`);
+  }
+  const text2 = retryText(result.target_message?.content);
+  return text2 ? host.send(text2) : host.notice("Nothing to retry.");
+}
+function compressReport(summary4) {
+  const head2 = summary4?.headline ? `${summary4.noop ? "" : "\u2713 "}${summary4.headline}` : "\u2713 Transcript compressed.";
+  return [head2, ...[summary4?.token_line, summary4?.note].filter(Boolean).map((line) => `  ${line}`)].join("\n");
+}
+async function compress(host, arg) {
+  if (!host.canonical) {
+    return false;
+  }
+  if (!host.sid) {
+    return host.notice("No active session.", "warning");
+  }
+  if (host.busy) {
+    return host.notice("Wait for the current turn to finish (or press Esc) before compressing.", "warning");
+  }
+  const focus = arg.trim();
+  if (!/(^|\s)--preview(\s|$)/.test(focus)) {
+    host.notice("Compressing the conversation\u2026");
+  }
+  const result = await mutateSession(host.gw, host.sid, "compress", focus ? { focus } : {});
+  if (host.stale()) {
+    return;
+  }
+  if (result.status === "preview") {
+    return host.notice(Array.isArray(result.lines) ? result.lines.join("\n") : "Nothing to preview.");
+  }
+  if (result.status !== "noop") {
+    await host.reload();
+    if (host.stale()) {
+      return;
+    }
+  }
+  host.notice(compressReport(result.summary));
+}
+async function branch(host, arg) {
+  if (!host.canonical) {
+    return false;
+  }
+  if (!host.sid) {
+    return host.notice("No active session.", "warning");
+  }
+  const title = arg.trim();
+  const result = await mutateSession(host.gw, host.sid, "branch", title ? { title } : {});
+  const child = result.branched_session_id;
+  if (typeof child !== "string" || !child) {
+    throw new Error("the gateway did not name the branch");
+  }
+  if (host.stale() || !await host.open(child)) {
+    return;
+  }
+  const info = await host.gw.request("session.info", { session_id: child }).catch(() => null);
+  host.notice(`Branched \u2192 ${info?.title?.trim() || title || child}`);
+}
+async function save(host) {
+  if (!host.sid) {
+    return host.notice("No active session: nothing to save.", "warning");
+  }
+  const r = await host.gw.request("session.save", { session_id: host.sid });
+  host.notice(r?.file ? `Conversation saved to: ${r.file}` : "Could not save the conversation.", r?.file ? "info" : "error");
+}
+async function reloadEnv(host) {
+  const r = await host.gw.request("reload.env", host.sid ? { session_id: host.sid } : {});
+  host.notice(`Reloaded .env (${plural2(Number(r?.updated ?? 0), "var")} updated).`);
+}
+async function reloadSkills(host) {
+  const r = await host.gw.request("skills.reload", host.sid ? { session_id: host.sid } : {});
+  host.panel("Reload Skills", r?.output?.trim() || "Skills reloaded.");
+}
+async function rollback(host, arg) {
+  if (!host.sid) {
+    return host.notice("No active session: nothing to roll back.", "warning");
+  }
+  const [first = "", ...rest] = arg.trim().split(/\s+/).filter(Boolean);
+  const sub = first.toLowerCase();
+  if (!sub || sub === "list" || sub === "ls") {
+    const r2 = await host.gw.request("rollback.list", { session_id: host.sid });
+    const checkpoints = r2?.checkpoints ?? [];
+    if (!r2?.enabled) {
+      return host.notice("Checkpoints are not enabled.");
+    }
+    if (!checkpoints.length) {
+      return host.notice("No checkpoints found.");
+    }
+    return host.panel(
+      "Rollback checkpoints",
+      checkpoints.map((c, i) => `${i + 1}. ${c.hash.slice(0, 10)}  ${[c.timestamp, c.message].filter(Boolean).join(" \xB7 ") || "(no metadata)"}`).join("\n")
+    );
+  }
+  if (sub === "diff") {
+    if (!rest[0]) {
+      return host.notice("Usage: /rollback diff <checkpoint>", "warning");
+    }
+    const r2 = await host.gw.request("rollback.diff", { hash: rest[0], session_id: host.sid });
+    const text2 = [r2?.stat?.trim(), r2?.diff?.trim()].filter(Boolean).join("\n\n");
+    return text2 ? host.panel("Rollback diff", text2) : host.notice("No changes since this checkpoint.");
+  }
+  const file2 = rest.join(" ").trim();
+  const r = await host.gw.request("rollback.restore", {
+    ...file2 ? { file_path: file2 } : {},
+    hash: first,
+    session_id: host.sid
+  });
+  if (!r?.success) {
+    return host.notice(`Rollback failed: ${r?.error || r?.message || "unknown error"}`, "error");
+  }
+  if ((r.history_removed ?? 0) > 0) {
+    await host.reload();
+  }
+  host.notice(`Rollback restored ${file2 || "the workspace"}: ${r.reason || r.message || r.restored_to || "restored"}`);
+}
+var guarded = (name, run7) => async (host, arg) => {
+  try {
+    return await run7(host, arg);
+  } catch (e) {
+    host.notice(`/${name} failed: ${errorText2(e)}`, "error");
+  }
+};
 var COMMANDS2 = [
+  { name: "undo", run: (host) => rewind(host, "undo") },
+  { name: "retry", run: (host) => rewind(host, "retry") },
+  { aliases: ["compact"], name: "compress", run: compress },
+  { aliases: ["fork"], name: "branch", run: branch },
+  { name: "save", run: save },
+  { name: "reload", run: reloadEnv },
+  { aliases: ["reload_skills"], name: "reload-skills", run: reloadSkills },
+  { name: "rollback", run: rollback }
+];
+var SESSION_COMMANDS = COMMANDS2.map((c) => ({ ...c, run: guarded(c.name, c.run) }));
+
+// src/commands.ts
+var COMMANDS3 = [
   {
-    aliases: ["exit", "q"],
+    // `/q` is Hermes' /queue.
+    aliases: ["exit"],
     name: "quit",
-    run: (app) => app.quit()
+    run: (app2) => app2.quit()
   },
   {
-    aliases: ["reset"],
+    // Hermes' `/clear` clears the screen AND starts a new session: the agent forgets the old one.
+    aliases: ["reset", "clear"],
     name: "new",
-    run: (app) => app.newSession()
-  },
-  {
-    name: "clear",
-    run: (app) => {
-      app.transcript.clear();
-      app.transcript.push({ id: app.transcript.id("w"), kind: "welcome" });
+    run: (app2, arg) => {
+      if (app2.busy) {
+        return app2.transcript.notice("Wait for the current turn to finish (or press Esc) before starting a new session.", "warning");
+      }
+      return app2.newSession(arg.trim() || void 0);
     }
   },
   {
     name: "model",
-    run: async (app, arg) => {
+    run: async (app2, arg) => {
       if (!arg) {
-        return openModelPicker(app);
+        return openModelPicker(app2);
       }
-      const r = await switchModel(app, arg);
+      const r = await switchModel(app2, arg);
       if (r.confirm_required) {
-        app.open(
-          confirmOverlay(app, {
+        app2.open(
+          confirmOverlay(app2, {
             confirm: "Switch anyway",
             detail: r.confirm_message || r.warning || "",
-            onConfirm: () => void switchModel(app, arg, true),
+            onConfirm: () => void switchModel(app2, arg, true),
             title: "Switch to an expensive model?"
           })
         );
@@ -33235,81 +33735,122 @@ var COMMANDS2 = [
   {
     aliases: ["resume", "session", "switch"],
     name: "sessions",
-    run: (app, arg) => {
+    run: (app2, arg) => {
       if (!arg) {
-        return openSessionPicker(app);
+        return openSessionPicker(app2);
       }
-      return arg === "new" ? app.newSession() : app.resume(arg);
+      return arg === "new" ? app2.newSession() : app2.resume(arg);
     }
   },
   {
     name: "theme",
-    run: (app, arg) => {
+    run: (app2, arg) => {
       if (!arg) {
-        return openThemePicker(app);
+        return openThemePicker(app2);
       }
       if (!isThemeMode(arg)) {
-        app.transcript.notice("Usage: /theme [tern|nous|skin]", "warning");
+        app2.transcript.notice("Usage: /theme [tern|nous|skin]", "warning");
         return;
       }
-      app.setTheme(arg);
+      app2.setTheme(arg);
     }
   },
   {
-    // `/agents pause|resume|status` stay the backend's (delegation.pause and its status).
+    // Ink's `/agents pause|resume|status`: the shared gateway's slash.exec refuses them.
     aliases: ["tasks"],
     name: "agents",
-    run: (app, arg) => arg ? false : openAgents(app)
+    run: (app2, arg) => agents(app2, arg)
   },
   {
-    // Hermes has no command by these names (its `/bg` runs a prompt in a background session).
+    // Hermes has no command by these names (its `/bg` runs a prompt in a side agent: controlCommands.ts).
     aliases: ["bashes", "shells", "processes"],
     name: "ps",
-    run: (app) => openBackground(app)
+    run: (app2) => openBackground(app2)
   },
   {
     // Hermes' own `/reasoning` stays the backend's (show/hide, levels, --global).
     name: "effort",
-    run: (app, arg) => {
+    run: (app2, arg) => {
       const words2 = arg.trim().split(/\s+/).filter(Boolean);
       const global2 = words2.includes("--global") || words2.includes("default");
       const level = words2.find((w) => LEVELS.some((l) => l.id === w || l.label === w));
       if (!level) {
-        return openEffortPicker(app, global2);
+        return openEffortPicker(app2, global2);
       }
-      void app.setEffort(LEVELS.find((l) => l.id === level || l.label === level).id, global2 ? "global" : "session");
+      void app2.setEffort(LEVELS.find((l) => l.id === level || l.label === level).id, global2 ? "global" : "session");
+    }
+  },
+  {
+    // The shared gateway refuses /skin in slash.exec; Ink sets the profile's skin through config.set,
+    // and the skin.changed broadcast repaints.
+    name: "skin",
+    run: async (app2, arg) => {
+      if (!arg.trim()) {
+        const r = await app2.gw.request("config.get", { key: "skin" });
+        app2.transcript.notice(`skin: ${r?.value || "default"}`);
+      } else {
+        const r = await app2.gw.request("config.set", { key: "skin", value: arg.trim() });
+        app2.transcript.notice(`skin \u2192 ${r?.value || arg.trim()}`);
+      }
+      if (app2.theme !== "skin") {
+        app2.transcript.notice("Hermes wears the skin in the skin theme: /theme skin");
+      }
     }
   },
   {
     // The Ink TUI's `/paste`: the clipboard's image on the next prompt.
-    aliases: ["image"],
     name: "paste",
-    run: (app, arg) => arg ? false : void app.attachClipboardImage(false)
+    run: (app2, arg) => arg ? app2.transcript.notice("Usage: /paste", "warning") : void app2.attachClipboardImage(false)
+  },
+  {
+    // Hermes' `/image <path>`: that file on the next prompt.
+    name: "image",
+    run: (app2, arg) => arg.trim() ? app2.attachImagePath(arg) : app2.transcript.notice("Usage: /image <path>", "warning")
   },
   {
     aliases: ["side"],
     name: "sidebar",
-    run: (app) => app.toggleSidebar()
+    run: (app2) => app2.toggleSidebar()
   },
   {
     aliases: ["diff"],
     name: "changes",
-    run: (app) => openChanges(app)
+    run: (app2) => openChanges(app2)
   },
   {
     aliases: ["pr", "pulls"],
     name: "prs",
-    run: (app) => openPullRequests(app)
+    run: (app2) => openPullRequests(app2)
   },
   {
     // `/help <command>` is the backend's detailed usage.
     name: "help",
-    run: (app, arg) => arg ? false : openHelp(app)
+    run: (app2, arg) => arg ? false : openHelp(app2)
   },
-  ...CONTROL_COMMANDS.map((c) => ({ ...c, run: (app, arg) => c.run(app.control(), arg) }))
+  ...CONTROL_COMMANDS.map((c) => ({ ...c, run: (app2, arg) => c.run(app2.control(), arg) })),
+  ...SESSION_COMMANDS.map((c) => ({ ...c, run: (app2, arg) => c.run(app2.control(), arg) }))
 ];
+async function agents(app2, arg) {
+  const sub = arg.trim().toLowerCase();
+  if (!sub) {
+    return openAgents(app2);
+  }
+  if (sub === "pause" || sub === "resume" || sub === "unpause") {
+    const paused = await app2.agents.pause(sub === "pause");
+    return app2.transcript.notice(
+      paused ? "Subagent spawning paused for every chat on this gateway. Running agents keep going." : "Subagent spawning resumed."
+    );
+  }
+  if (sub === "status") {
+    const paused = app2.agents.paused;
+    return app2.transcript.notice(
+      paused === void 0 ? "Subagent spawning: active, unless another client paused it (the gateway does not report it)." : `Subagent spawning: ${paused ? "paused (gateway-wide)" : "active"}.`
+    );
+  }
+  app2.transcript.notice("Usage: /agents [pause|resume|status]", "warning");
+}
 function localCommand(name) {
-  return COMMANDS2.find((c) => c.name === name || c.aliases?.includes(name));
+  return COMMANDS3.find((c) => c.name === name || c.aliases?.includes(name));
 }
 
 // src/flow.ts
@@ -33357,6 +33898,38 @@ function busyFrom(r, now = Date.now()) {
   return { label: "Working\u2026", since: {}, startedAt: r.turn_started_at ? r.turn_started_at * 1e3 : now };
 }
 
+// src/backendNotes.ts
+var STDERR_LINE_CAP = 120;
+var STDERR_LINES_MAX = 4;
+function slowStartNotes(stderrTail) {
+  const problems = (stderrTail ?? "").split("\n").map((l) => l.trim()).filter((l) => l && stderrLooksLikeProblem(l)).slice(-STDERR_LINES_MAX);
+  return [
+    { text: "The agent backend is slow to start. Still waiting\u2026", tone: "warning" },
+    ...problems.map((l) => ({ text: l.slice(0, STDERR_LINE_CAP), tone: "error" }))
+  ];
+}
+function protocolNote(preview5, warned2) {
+  return warned2 ? void 0 : { text: `The agent backend wrote unexpected output: ${String(preview5 ?? "").slice(0, STDERR_LINE_CAP)}`, tone: "info" };
+}
+function isDeadStream(err) {
+  const code2 = err?.code;
+  return code2 === "EIO" || code2 === "EPIPE";
+}
+var FaultBudget = class {
+  constructor(max = 10, windowMs = 5e3) {
+    this.max = max;
+    this.windowMs = windowMs;
+  }
+  max;
+  windowMs;
+  #at = [];
+  /** Records a fault at `now`; false once more than `max` landed within the window. */
+  take(now = Date.now()) {
+    this.#at = [...this.#at.filter((t2) => now - t2 < this.windowMs), now];
+    return this.#at.length <= this.max;
+  }
+};
+
 // src/hud.ts
 var plain = (k) => !k.ctrl && !k.alt && !k.meta && !k.shift;
 function hudKey(k, cx) {
@@ -33383,6 +33956,20 @@ function hudKey(k, cx) {
   }
 }
 
+// src/moa.ts
+function moaLabel(type, payload) {
+  if (type === "moa.progress" && typeof payload?.refs_done === "number" && typeof payload.refs_total === "number") {
+    return `MoA: refs ${payload.refs_done}/${payload.refs_total}`;
+  }
+  if (type === "moa.aggregating" || type === "moa.phase" && payload?.phase === "aggregator") {
+    return "Aggregating\u2026";
+  }
+  return void 0;
+}
+function moaReferenceLabel(label, index, count) {
+  return index && count ? `Reference ${index}/${count} \xB7 ${label}` : `Reference \xB7 ${label}`;
+}
+
 // src/hermes/activeSessionFile.ts
 import { writeFileSync as writeFileSync2 } from "node:fs";
 var writeActiveSessionFile = (sessionId, file2 = process.env.HERMES_TUI_ACTIVE_SESSION_FILE) => {
@@ -33398,25 +33985,36 @@ var writeActiveSessionFile = (sessionId, file2 = process.env.HERMES_TUI_ACTIVE_S
 // src/hermes/clipboardImage.ts
 import { execFile as execFile5 } from "node:child_process";
 import { existsSync as existsSync2 } from "node:fs";
-import { mkdtemp } from "node:fs/promises";
-import { homedir as homedir7, tmpdir } from "node:os";
-import { join as join6, resolve as resolve2 } from "node:path";
+import { mkdtemp, rm } from "node:fs/promises";
+import { homedir as homedir8, tmpdir } from "node:os";
+import { join as join7, resolve as resolve2 } from "node:path";
 import { promisify as promisify4 } from "node:util";
 var run3 = promisify4(execFile5);
 var IMAGE = /\.(png|jpe?g|gif|webp)$/i;
-async function clipboardImage(env = process.env) {
+async function extractClipboardImage(path, env) {
   const root = env.HERMES_PYTHON_SRC_ROOT;
   const python = env.HERMES_PYTHON?.trim() || "python3";
   if (!root) {
-    return void 0;
+    return false;
   }
-  const path = join6(await mkdtemp(join6(tmpdir(), "hermes-tern-clipboard-")), "clipboard.png");
-  const { stdout } = await run3(python, [join6(root, "ui-tui/scripts/clipboard_image.py"), path], {
+  const { stdout } = await run3(python, [join7(root, "ui-tui/scripts/clipboard_image.py"), path], {
     cwd: root,
     env: { ...env, PYTHONPATH: root },
     timeout: 15e3
   });
-  return stdout.trim() === "true" && existsSync2(path) ? path : void 0;
+  return stdout.trim() === "true" && existsSync2(path);
+}
+async function withClipboardImage(use, env = process.env, extract = extractClipboardImage) {
+  if (!env.HERMES_PYTHON_SRC_ROOT) {
+    return void 0;
+  }
+  const dir2 = await mkdtemp(join7(tmpdir(), "hermes-tern-clipboard-"));
+  const path = join7(dir2, "clipboard.png");
+  try {
+    return await extract(path, env) ? await use(path) : void 0;
+  } finally {
+    await rm(dir2, { force: true, recursive: true });
+  }
 }
 function imagePathOf(text2, cwd) {
   let raw = text2.trim();
@@ -33431,7 +34029,7 @@ function imagePathOf(text2, cwd) {
       return void 0;
     }
   }
-  raw = raw.replace(/\\(.)/g, "$1").replace(/^~(?=$|\/)/, homedir7());
+  raw = raw.replace(/\\(.)/g, "$1").replace(/^~(?=$|\/)/, homedir8());
   if (!IMAGE.test(raw)) {
     return void 0;
   }
@@ -33441,7 +34039,7 @@ function imagePathOf(text2, cwd) {
 
 // src/hermes/images.ts
 import { readFile as readFile2 } from "node:fs/promises";
-import { homedir as homedir8 } from "node:os";
+import { homedir as homedir9 } from "node:os";
 import { extname as extname2, resolve as resolve3 } from "node:path";
 var MAX_IMAGE_BYTES = 20 * 1024 * 1024;
 function imageFormat(bytes) {
@@ -33460,7 +34058,7 @@ function imageFormat(bytes) {
   return null;
 }
 async function uploadImage(gw2, sid, raw, cwd) {
-  const path = resolve3(cwd, raw.replace(/^~(?=$|\/)/, homedir8()));
+  const path = resolve3(cwd, raw.replace(/^~(?=$|\/)/, homedir9()));
   const bytes = await readFile2(path);
   if (bytes.length > MAX_IMAGE_BYTES) {
     throw new Error("the image is larger than 20 MB");
@@ -33478,6 +34076,51 @@ async function uploadImage(gw2, sid, raw, cwd) {
     throw new Error("the gateway did not store the image");
   }
   return { path: r.path, mime: format.mime };
+}
+
+// .hermes-src/ui-tui/src/protocol/interpolation.ts
+var INTERPOLATION_RE = /\{!(.+?)\}/g;
+var hasInterpolation = (s) => /\{!.+?\}/.test(s);
+
+// src/hermes/shell.ts
+var REFUSALS = [
+  ["dangerous_command", "Hermes refused to run a dangerous command"],
+  ["unsupported_terminal_backend", "this session runs commands in a sandbox, not on this machine"],
+  ["permission_denied", "shell commands run only for a local terminal session"],
+  ["command_timeout", "the command ran longer than 30 seconds"],
+  ["cwd_unavailable", "the session's folder no longer exists"],
+  ["command_failed", "the command could not start"]
+];
+function shellError(error) {
+  const text2 = error instanceof Error ? error.message : String(error);
+  return REFUSALS.find(([code2]) => text2.includes(code2))?.[1] ?? describeRpcError(error);
+}
+async function shellExec(gw2, sid, command) {
+  const r = await gw2.request("shell.exec", { command, session_id: sid });
+  if (!r || typeof r !== "object") {
+    throw new Error("invalid response: shell.exec");
+  }
+  return { code: typeof r.code === "number" ? r.code : 0, stderr: r.stderr ?? "", stdout: r.stdout ?? "" };
+}
+function shellLines(r) {
+  const out = [r.stdout, r.stderr].filter(Boolean).join("\n").trim();
+  return [
+    ...out ? [{ failed: false, text: out }] : [],
+    ...r.code !== 0 || !out ? [{ failed: r.code !== 0, text: `exit ${r.code}` }] : []
+  ];
+}
+async function interpolate(gw2, sid, text2) {
+  const matches = [...text2.matchAll(new RegExp(INTERPOLATION_RE.source, "g"))];
+  const results = await Promise.all(
+    matches.map(async (m) => {
+      const r = await shellExec(gw2, sid, m[1] ?? "");
+      return [r.stdout, r.stderr].filter(Boolean).join("\n").trim();
+    })
+  );
+  return matches.reduceRight(
+    (acc, m, i) => acc.slice(0, m.index) + (results[i] ?? "") + acc.slice((m.index ?? 0) + m[0].length),
+    text2
+  );
 }
 
 // src/hermes/sharedPrompts.ts
@@ -33654,6 +34297,9 @@ var Completion = class {
   onKey(key2) {
     const composer = this.#composer;
     if (!this.open || !composer) {
+      return false;
+    }
+    if (composer.browsing && (key2.name === "up" || key2.name === "down")) {
       return false;
     }
     switch (key2.name) {
@@ -33958,6 +34604,10 @@ var STYLES = css`
 
   [data-role='hermes.statusline.bad'] {
     color: var(--sf-c-error, var(--t2)) !important;
+  }
+
+  [data-role='hermes.statusline.good'] {
+    color: var(--sf-c-success, var(--t2)) !important;
   }
 
   /* While a turn runs, an accent streak sweeps the composer's top edge. */
@@ -34755,11 +35405,11 @@ async function git2(cwd, ...args) {
 }
 async function branchTarget(cwd) {
   try {
-    const branch = await git2(cwd, "symbolic-ref", "--quiet", "--short", "HEAD");
-    const [remote = "", ref = ""] = (await git2(cwd, "for-each-ref", "--format=%(upstream:remotename)%00%(upstream:remoteref)", `refs/heads/${branch}`)).split("\0");
+    const branch2 = await git2(cwd, "symbolic-ref", "--quiet", "--short", "HEAD");
+    const [remote = "", ref = ""] = (await git2(cwd, "for-each-ref", "--format=%(upstream:remotename)%00%(upstream:remoteref)", `refs/heads/${branch2}`)).split("\0");
     const name = remote || "origin";
     const parsed = parseRemote(await git2(cwd, "remote", "get-url", name));
-    const head2 = ref.replace(/^refs\/heads\//, "") || branch;
+    const head2 = ref.replace(/^refs\/heads\//, "") || branch2;
     const fallback = ["main", "master"];
     const defaultBranch = (await git2(cwd, "symbolic-ref", "--quiet", "--short", `refs/remotes/${name}/HEAD`).catch(() => "")).replace(
       `${name}/`,
@@ -34906,6 +35556,10 @@ var PENDING_MS = 3e4;
 var BATCH2 = 20;
 var BRANCH_HIT_MS = 6e4;
 var BRANCH_MISS_MS = 3e5;
+var NO_STACK_FIELD = /Field '?stack'? doesn't exist/i;
+var STAMP = { activity: "activityAt", files: "filesAt" };
+var FAILURE = { activity: "activityError", files: "filesError" };
+var RETRY_MS = 3e4;
 var MUTATIONS = {
   close: "mutation($id: ID!) { closePullRequest(input: {pullRequestId: $id}) { clientMutationId } }",
   draft: "mutation($id: ID!) { convertPullRequestToDraft(input: {pullRequestId: $id}) { clientMutationId } }",
@@ -34934,6 +35588,10 @@ var PullRequests = class {
   #again = false;
   #disposed = false;
   #busy = /* @__PURE__ */ new Set();
+  /** The activity and files reads in flight (`key:activity`, `key:files`). */
+  #reading = /* @__PURE__ */ new Set();
+  /** When each of those last failed. */
+  #failedAt = /* @__PURE__ */ new Map();
   constructor(host, gh = github(), links = (sid) => storedLinks(sid), branchOf = branchTarget) {
     this.#host = host;
     this.#gh = gh;
@@ -35021,33 +35679,52 @@ var PullRequests = class {
     clearTimeout(this.#timer);
   }
   /** Comments, reviews and commits of `key`, read once per PR update. */
-  async activity(key2) {
-    const e = this.#entries.get(key2);
-    if (!e?.pr || e.activity && e.detailAt === e.pr.updatedAt) {
-      return;
-    }
-    const [o, r] = e.ref.repository.split("/");
-    const data = await this.#gh.graphql(e.ref.host, ACTIVITY_QUERY, { n: e.ref.number, o, r });
-    e.activity = parseActivity(data);
-    e.detailAt = e.pr.updatedAt;
-    this.#host.changed();
+  activity(key2) {
+    return this.#detail(key2, "activity", async (e) => {
+      const [o, r] = e.ref.repository.split("/");
+      e.activity = parseActivity(await this.#gh.graphql(e.ref.host, ACTIVITY_QUERY, { n: e.ref.number, o, r }));
+    });
   }
   /** The changed files of `key` with their patches (the first 300). */
-  async files(key2) {
+  files(key2) {
+    return this.#detail(key2, "files", async (e) => {
+      const files = [];
+      for (let page = 1; page <= 3; page++) {
+        const rows = await this.#gh.rest(e.ref.host, "GET", `/repos/${e.ref.repository}/pulls/${e.ref.number}/files?per_page=100&page=${page}`);
+        files.push(...parseFiles(rows));
+        if (rows.length < 100) {
+          break;
+        }
+      }
+      e.files = files;
+    });
+  }
+  /**
+   * Reads one tab's data of `key` once per PR update, so the sheet may ask on every frame: one read
+   * at a time, and a failed one (its error on the entry) again after `RETRY_MS`.
+   */
+  async #detail(key2, what, read2) {
     const e = this.#entries.get(key2);
-    if (!e?.pr || e.files && e.detailAt === e.pr.updatedAt) {
+    const id = `${key2}:${what}`;
+    const failed = this.#failedAt.get(id);
+    if (!e?.pr || this.#reading.has(id) || e[what] && e[STAMP[what]] === e.pr.updatedAt || failed && Date.now() - failed < RETRY_MS) {
       return;
     }
-    const files = [];
-    for (let page = 1; page <= 3; page++) {
-      const rows = await this.#gh.rest(e.ref.host, "GET", `/repos/${e.ref.repository}/pulls/${e.ref.number}/files?per_page=100&page=${page}`);
-      files.push(...parseFiles(rows));
-      if (rows.length < 100) {
-        break;
-      }
+    const at = e.pr.updatedAt;
+    this.#reading.add(id);
+    try {
+      await read2(e);
+      e[STAMP[what]] = at;
+      e[FAILURE[what]] = void 0;
+      this.#failedAt.delete(id);
+    } catch (error) {
+      e[FAILURE[what]] = error instanceof Error ? error.message : String(error);
+      this.#failedAt.set(id, Date.now());
+      throw error;
+    } finally {
+      this.#reading.delete(id);
+      this.#host.changed();
     }
-    e.files = files;
-    this.#host.changed();
   }
   /** Changes PR `key` on GitHub; throws GitHub's error. `merge` uses `method`, the repository's first by default. */
   async act(action, key2, method) {
@@ -35149,8 +35826,10 @@ var PullRequests = class {
       let data;
       try {
         data = await this.#gh.graphql(host, query, variables);
-      } catch {
-        this.#noStacks.add(host);
+      } catch (error) {
+        if (NO_STACK_FIELD.test(error instanceof Error ? error.message : String(error))) {
+          this.#noStacks.add(host);
+        }
         continue;
       }
       const asked = /* @__PURE__ */ new Set();
@@ -35218,8 +35897,8 @@ var Sidebar = class {
   #reading = false;
   #copied = false;
   #copiedTimer;
-  constructor(app) {
-    this.#app = app;
+  constructor(app2) {
+    this.#app = app2;
   }
   get open() {
     return this.#open;
@@ -35267,9 +35946,9 @@ var Sidebar = class {
     if (!this.#open) {
       return null;
     }
-    const app = this.#app;
+    const app2 = this.#app;
     const git3 = this.#state;
-    const prs = app.prs.entries().toReversed();
+    const prs = app2.prs.entries().toReversed();
     const files = git3?.files ?? [];
     const added = files.reduce((n, f) => n + f.additions, 0);
     const removed = files.reduce((n, f) => n + f.deletions, 0);
@@ -35302,7 +35981,7 @@ var Sidebar = class {
     return /* @__PURE__ */ jsx(
       "prefs",
       {
-        lead: git3 ? git3.root.replace(process.env.HOME ?? "\0", "~") : app.info?.cwd ?? "",
+        lead: git3 ? git3.root.replace(process.env.HOME ?? "\0", "~") : app2.info?.cwd ?? "",
         onAction: Object.fromEntries(ACTS.map((act) => [act, (ev) => this.#action(act, ev.value)])),
         page: "session",
         pages: [{ icon: "branch", id: "session", label: "Session" }],
@@ -35355,12 +36034,75 @@ var Sidebar = class {
   }
 };
 
+// src/status.ts
+var COMPACTING_LABEL = "Compressing context\u2026";
+function statusEffect(payload, last) {
+  const text2 = payload?.text?.trim();
+  const kind = payload?.kind ?? "";
+  if (!text2) {
+    return {};
+  }
+  if (kind === "goal") {
+    return { notice: { text: text2, tone: text2.startsWith("\u2713") ? "success" : "info" } };
+  }
+  if (kind === "compacting" || kind === "compressing") {
+    return { compacting: true, label: COMPACTING_LABEL, notice: { text: text2, tone: "info" } };
+  }
+  if (kind === "compacted" || kind === "ready") {
+    return { compacting: false, label: text2 };
+  }
+  if (kind === "warn" || kind === "approval" || kind === "error") {
+    return text2 === last ? {} : { note: text2, notice: { text: text2, tone: kind === "error" ? "error" : "warning" } };
+  }
+  return { label: text2 };
+}
+var TONES = { error: "error", success: "success", warn: "warning", warning: "warning" };
+var Notices = class {
+  #list = [];
+  #seq = 0;
+  /** Adds or replaces the notice; returns it (undefined for an empty one). */
+  show(p, now = Date.now()) {
+    const text2 = p.text?.trim();
+    if (!text2) {
+      return void 0;
+    }
+    const key2 = p.key || p.id || `n${++this.#seq}`;
+    const ttl = p.kind === "ttl" && typeof p.ttl_ms === "number" && p.ttl_ms > 0 ? p.ttl_ms : void 0;
+    const notice = { key: key2, text: text2, tone: TONES[p.level ?? ""] ?? "info", ...ttl ? { expires: now + ttl } : {} };
+    this.#list = [...this.#list.filter((n) => n.key !== key2), notice];
+    return notice;
+  }
+  /** Drops the notice with `key`; true when one went. */
+  clear(key2) {
+    const before = this.#list.length;
+    this.#list = this.#list.filter((n) => n.key !== key2);
+    return this.#list.length !== before;
+  }
+  /** The newest notice still live at `now`. */
+  current(now = Date.now()) {
+    this.#list = this.#list.filter((n) => !n.expires || n.expires > now);
+    return this.#list.at(-1);
+  }
+  /** When the next `ttl` notice expires, if one is live. */
+  nextExpiry() {
+    const at = this.#list.flatMap((n) => n.expires ? [n.expires] : []);
+    return at.length ? Math.min(...at) : void 0;
+  }
+  /** Forgets every notice (another session is shown). */
+  reset() {
+    this.#list = [];
+  }
+};
+function isLoginNotice(p) {
+  return Boolean(p.key?.startsWith("login:"));
+}
+
 // src/settings.ts
 import { mkdirSync as mkdirSync4, readFileSync as readFileSync4, writeFileSync as writeFileSync3 } from "node:fs";
-import { homedir as homedir9 } from "node:os";
-import { dirname, join as join7 } from "node:path";
+import { homedir as homedir10 } from "node:os";
+import { dirname, join as join8 } from "node:path";
 function settingsFile(env = process.env) {
-  return join7(env.HERMES_HOME || join7(homedir9(), ".hermes"), "hermes-tern", "settings.json");
+  return join8(env.HERMES_HOME || join8(homedir10(), ".hermes"), "hermes-tern", "settings.json");
 }
 function loadSettings(file2 = settingsFile()) {
   try {
@@ -35483,6 +36225,16 @@ function statusLine(cx) {
   return /* @__PURE__ */ jsxs("status", { role: "hermes.statusline", children: [
     /* @__PURE__ */ jsx("seg", { priority: 9, role: "hermes.statusline.brand", spans: [{ t: "\u2624 hermes" }] }, "brand"),
     s.title ? /* @__PURE__ */ jsx("seg", { priority: 3, spans: [{ t: s.title }], title: s.title }, "title") : null,
+    s.notice ? /* @__PURE__ */ jsx(
+      "seg",
+      {
+        priority: 6,
+        role: s.notice.tone === "info" ? void 0 : `hermes.statusline.${s.notice.tone === "warning" ? "warn" : s.notice.tone === "error" ? "bad" : "good"}`,
+        spans: [{ t: s.notice.text }],
+        title: s.notice.text
+      },
+      "notice"
+    ) : null,
     cx.branch ? /* @__PURE__ */ jsx("seg", { icon: "git-branch", priority: 4, spans: [{ s: "statusLineGitClean", t: cx.branch }], title: `Branch ${cx.branch}` }, "git") : null,
     s.tokens ? /* @__PURE__ */ jsx("seg", { priority: 2, side: "right", spans: [{ t: `${s.tokens.toLocaleString()} tokens` }] }, "tokens") : null,
     context !== void 0 ? /* @__PURE__ */ jsx(
@@ -35495,6 +36247,17 @@ function statusLine(cx) {
         title: "/usage shows the breakdown"
       },
       "context"
+    ) : null,
+    s.compressions ? /* @__PURE__ */ jsx(
+      "seg",
+      {
+        priority: 2,
+        role: s.compressions >= 10 ? "hermes.statusline.bad" : s.compressions >= 5 ? "hermes.statusline.warn" : void 0,
+        side: "right",
+        spans: [{ t: `cmp ${s.compressions}` }],
+        title: "Times the context was compressed this session"
+      },
+      "compressions"
     ) : null,
     cx.rates?.cache !== void 0 ? /* @__PURE__ */ jsx(
       "seg",
@@ -36009,7 +36772,7 @@ function breakdownBody(items) {
 
 // src/view/welcome.tsx
 import { readFileSync as readFileSync5 } from "node:fs";
-import { join as join8 } from "node:path";
+import { join as join9 } from "node:path";
 function welcomeNode(key2, cx) {
   return /* @__PURE__ */ jsxs("card", { role: "omp.welcome", children: [
     /* @__PURE__ */ jsxs("row", { align: "center", gap: "md", role: "omp.welcome.lockup", children: [
@@ -36029,7 +36792,7 @@ var TIP_LINE = /^\s+t\d+:\s+"((?:[^"\\]|\\.)*)"\s*$/;
 function randomTip(root) {
   let text2;
   try {
-    text2 = readFileSync5(join8(root, "locales", "en.yaml"), "utf8");
+    text2 = readFileSync5(join9(root, "locales", "en.yaml"), "utf8");
   } catch {
     return "";
   }
@@ -36113,7 +36876,7 @@ function itemNode(item3, parent, now, key2 = item3.id) {
     return node("section", { collapsed: true, collapsible: true, head: `${id}.head`, key: key2, role: "hermes.work.row" }, [
       /* @__PURE__ */ jsxs("row", { align: "center", gap: "sm", children: [
         /* @__PURE__ */ jsx("icon", { name: "brain" }, "icon"),
-        /* @__PURE__ */ jsx("text", { grow: 1, spans: [{ s: "muted", t: thoughtLine(item3.text) }], truncate: "end", wrap: "none" }, "label")
+        /* @__PURE__ */ jsx("text", { grow: 1, spans: [{ s: "muted", t: thoughtTitle(item3) }], truncate: "end", wrap: "none" }, "label")
       ] }, "head"),
       /* @__PURE__ */ jsx("md", { role: "hermes.work.thought", stream: item3.endedAt === void 0 || void 0, children: item3.text }, "body")
     ]);
@@ -36139,10 +36902,10 @@ function labelSpans(call) {
   if (!entries.every(Boolean)) {
     return [{ s: "muted", t: stepLabel(call) }];
   }
-  return entries.flatMap((app, i) => [
+  return entries.flatMap((app2, i) => [
     ...i ? [{ s: "muted", t: ", " }] : [],
-    { t: app.app },
-    { s: "muted", t: ` \xB7 ${app.action}` }
+    { t: app2.app },
+    { s: "muted", t: ` \xB7 ${app2.action}` }
   ]);
 }
 function itemIcon(item3) {
@@ -36276,7 +37039,7 @@ function pieceNodes(turn, blocks, parent, cx) {
   });
 }
 function continuedIcon(why) {
-  return why.startsWith("Subagents") ? "users" : why.startsWith("Watcher") ? "eye" : why.startsWith("Background") ? "terminal" : "loop";
+  return /^(\d+ )?subagent/i.test(why) ? "users" : why.startsWith("Watcher") ? "eye" : why.startsWith("Background") ? "terminal" : "loop";
 }
 var STEER_NOTE = { landed: "", next: " \xB7 sent as the next prompt", pending: " \xB7 reaches Hermes after this step" };
 function steerNode(b, state) {
@@ -36447,7 +37210,7 @@ var App = class {
   #approvalIds = /* @__PURE__ */ new Map();
   /** The launcher's startup image until it is attached to the first session (the queue waits for it). */
   #startupImage = process.env.HERMES_TUI_IMAGE?.trim() ?? "";
-  /** Uploaded images the next prompt carries (the shared gateway takes them on prompt.submit), with the names the chips show. */
+  /** The images attached to the draft: the next prompt entered takes them. */
   #attachments = [];
   /** The skin the gateway last reported; only the `skin` theme mode wears it. */
   #skin;
@@ -36457,6 +37220,17 @@ var App = class {
   #copiedTimer;
   /** The pill above the composer holding the keys (Down from an empty prompt), if any. */
   #hud;
+  /** The gateway connection is down until the next gateway.ready (its one notice is shown). */
+  #offline = false;
+  /** Stray backend output was reported once already. */
+  #protocolWarned = false;
+  /** The gateway's keyed notices (credits, a slow start); the newest rides the status strip. */
+  #notices = new Notices();
+  #noticeTimer;
+  /** Auto-compaction runs: the working line says so until its done edge. */
+  #compacting = false;
+  /** The status warning shown last, so a repeated one stays one line. */
+  #lastStatusNote;
   constructor(tern, gw2, version2) {
     this.#tern = tern;
     this.#gw = gw2;
@@ -36480,7 +37254,7 @@ var App = class {
     this.transcript.push({ id: "welcome", kind: "welcome" });
     const query = process.env.HERMES_TUI_QUERY?.trim();
     if (query || this.#startupImage) {
-      this.queue.push(query || "What do you see in this image?");
+      this.queue.push({ images: [], text: query || "What do you see in this image?" });
     }
     const log = process.env.HERMES_TERN_EVENT_LOG;
     this.#gw.on("event", (ev) => {
@@ -36492,7 +37266,13 @@ var App = class {
     });
     this.#gw.on("request", (req) => this.#onRequest(req));
     this.#gw.on("exit", (code3) => {
-      this.transcript.notice(`The agent backend exited${code3 === null ? "" : ` (${code3})`}.`, "error");
+      if (!this.#offline) {
+        this.transcript.notice(
+          this.#gw.attached ? "Lost the connection to Hermes; reconnecting\u2026" : `The agent backend exited${code3 === null ? "" : ` (${code3})`}.`,
+          this.#gw.attached ? "warning" : "error"
+        );
+      }
+      this.#offline = true;
       this.sid = null;
       this.busy = null;
       this.transcript.interrupt();
@@ -36539,6 +37319,11 @@ var App = class {
       this.#render();
     });
   }
+  /** An error nothing caught (a rejected promise no caller awaited): shown, so the pane lives on. */
+  fault(reason) {
+    this.transcript.notice(`Unexpected error: ${reason instanceof Error ? reason.message : String(reason)}`, "error");
+    this.changed();
+  }
   // ── Input ──────────────────────────────────────────────────────────
   async #readInput() {
     try {
@@ -36558,6 +37343,9 @@ var App = class {
   #onKey(key2) {
     const top = this.overlays.at(-1);
     if (key2.ctrl && key2.name === "c") {
+      if (top) {
+        return top.cancel ? top.cancel() : this.close(top);
+      }
       return this.#ctrlC();
     }
     if (top?.onKey(key2)) {
@@ -36599,7 +37387,7 @@ var App = class {
     if (key2.alt && key2.name === "enter" && this.busy && this.queue.length && !this.composer.text) {
       return this.#steerQueued(0);
     }
-    if (key2.ctrl && key2.name === "d" && !this.composer.text) {
+    if (key2.ctrl && key2.name === "d" && !this.#hasDraft()) {
       return this.quit();
     }
     if (key2.name === "paste" && this.#pasteImage(key2.text ?? "")) {
@@ -36745,7 +37533,7 @@ var App = class {
         if (this.#connectSeen.has(call.id) && next2.length && next2.every((t2) => t2.state === "connected")) {
           call.connectDone = true;
           this.transcript.touchCall(call);
-          this.#submit(connectedMessage(next2));
+          this.#submit(connectedMessage(next2), false);
           this.changed();
         } else if (next2.some(waiting) && (card?.watching ?? true)) {
           open = true;
@@ -36765,7 +37553,7 @@ var App = class {
     }
     call.connectDone = true;
     this.transcript.touchCall(call);
-    this.#submit(continueMessage(call.connect ?? connectTargets(call, readCard(call.id))));
+    this.#submit(continueMessage(call.connect ?? connectTargets(call, readCard(call.id))), false);
     this.changed();
   }
   /** A paste that is an image (no text: the clipboard's; one image path: that file); false for text. */
@@ -36784,10 +37572,11 @@ var App = class {
   /** Attaches the clipboard's image to the next prompt (`quiet`: an empty paste, which may hold none). */
   async attachClipboardImage(quiet) {
     try {
-      const path = await clipboardImage();
-      if (path) {
+      const found = await withClipboardImage(async (path) => {
         await this.#attachImage(path, `pasted image ${this.#attachments.length + 1}`);
-      } else if (!quiet) {
+        return true;
+      });
+      if (!found && !quiet) {
         this.transcript.notice("No image on the clipboard.", "warning");
         this.changed();
       }
@@ -36795,6 +37584,15 @@ var App = class {
       this.transcript.notice(`Could not read the clipboard image: ${error instanceof Error ? error.message : String(error)}`, "error");
       this.changed();
     }
+  }
+  /** `/image <path>`: attaches that image file (resolved against the session's folder) to the next prompt. */
+  async attachImagePath(raw) {
+    const path = imagePathOf(raw, this.info?.cwd || process.env.HERMES_CWD || process.cwd());
+    if (!path) {
+      this.transcript.notice(`Not an image file: ${raw.trim()} (PNG, JPEG, GIF or WebP)`, "warning");
+      return this.changed();
+    }
+    await this.#attachImage(path, basename3(path));
   }
   async #attachImage(path, name) {
     const sid = this.sid;
@@ -36829,9 +37627,14 @@ var App = class {
       openAgents(this, { id, watch: true });
     }
   }
+  /** Text or images in the composer: Ctrl+C clears them before it interrupts, Ctrl+D never exits over them. */
+  #hasDraft() {
+    return Boolean(this.composer.text || this.#attachments.length);
+  }
   #ctrlC() {
-    if (this.composer.text) {
+    if (this.#hasDraft()) {
       this.composer.set("");
+      this.#attachments = [];
       return;
     }
     if (this.busy) {
@@ -36859,7 +37662,8 @@ var App = class {
     this.#done.resolve(code2);
   }
   // ── Prompts and commands ───────────────────────────────────────────
-  #submit(raw) {
+  /** Sends or queues a prompt, or runs a command; `draft`: the user entered it (it takes the draft's images). */
+  #submit(raw, draft = true) {
     const text2 = raw.trim();
     if (!text2) {
       return;
@@ -36868,27 +37672,53 @@ var App = class {
       void this.#slash(text2);
       return;
     }
+    if (text2.startsWith("!") && text2.slice(1).trim()) {
+      void this.#shell(text2.slice(1).trim());
+      return;
+    }
+    const item3 = { expand: true, images: draft ? this.#takeImages() : [], text: text2 };
     if (this.busy || !this.sid || this.#switches.pending) {
-      this.queue.push(text2);
+      this.queue.push(item3);
       return;
     }
-    this.#send(text2);
+    this.#send(item3);
   }
-  /** Sends `text` now; `queued` marks a drained queue entry (the gateway must queue it, never steer with it). */
-  #send(text2, { display, queued = false } = {}) {
-    if (!this.sid || this.#switches.pending) {
-      this.queue.unshift(text2);
+  /**
+   * Sends `item` now; `queued` marks a drained queue entry (the gateway must queue it, never steer
+   * with it). A typed prompt's `{!cmd}`s run first and their output takes their place; `display` is
+   * what the transcript shows.
+   */
+  #send(item3, { display, queued = false } = {}) {
+    const sid = this.sid;
+    if (!sid || this.#switches.pending) {
+      this.queue.unshift(item3);
       return;
     }
-    const attachments = this.#attachments.map(({ mime, path }) => ({ mime, path }));
-    const images = this.#attachments.length;
-    this.#attachments = [];
-    this.transcript.user(`${display?.trim() || text2}${images ? `
+    if (item3.expand && hasInterpolation(item3.text)) {
+      this.#startBusy("Running {!\u2026}");
+      void interpolate(this.#gw, sid, item3.text).then(
+        (text3) => {
+          this.busy = null;
+          this.#send({ images: item3.images, text: text3 }, { display: item3.text, queued });
+        },
+        (error) => {
+          this.busy = null;
+          this.transcript.notice(`Not sent: a {!\u2026} command failed: ${shellError(error)}.`, "error");
+          this.#restore(item3);
+          this.#drainQueue();
+          this.changed();
+        }
+      );
+      return;
+    }
+    const { images, text: text2 } = item3;
+    const attachments = images.map(({ mime, path }) => ({ mime, path }));
+    this.transcript.user(`${display?.trim() || text2}${images.length ? `
 
-\u{1F4CE} ${images} image${images === 1 ? "" : "s"}` : ""}`);
+\u{1F4CE} ${images.length} image${images.length === 1 ? "" : "s"}` : ""}`);
     this.#startBusy("Working\u2026");
     this.#gw.request("prompt.submit", {
-      session_id: this.sid,
+      session_id: sid,
       submission_id: randomUUID3(),
       text: text2,
       ...queued ? { queued } : {},
@@ -36898,6 +37728,36 @@ var App = class {
       this.busy = null;
       this.changed();
     });
+  }
+  /** The draft's images, which leave the composer with the prompt that takes them. */
+  #takeImages() {
+    const images = this.#attachments;
+    this.#attachments = [];
+    return images;
+  }
+  /** Puts a prompt that did not go back into the composer, before any text there, with its images. */
+  #restore({ images, text: text2 }) {
+    this.composer.set(this.composer.text ? `${text2}
+${this.composer.text}` : text2);
+    this.#attachments = [...images, ...this.#attachments];
+  }
+  /** `!cmd`: runs `command` in the session's folder and shows its output; nothing reaches the model. */
+  async #shell(command) {
+    const sid = this.sid;
+    if (!sid) {
+      this.transcript.notice("Wait for the session to start before running a shell command.", "warning");
+      return this.changed();
+    }
+    this.transcript.user(`!${command}`);
+    this.changed();
+    try {
+      for (const line of shellLines(await shellExec(this.#gw, sid, command))) {
+        this.transcript.notice(line.text, line.failed ? "warning" : "info");
+      }
+    } catch (error) {
+      this.transcript.notice(`!${command} did not run: ${shellError(error)}.`, "error");
+    }
+    this.changed();
   }
   async #slash(text2) {
     const [name = "", ...rest] = text2.slice(1).split(/\s+/);
@@ -36948,21 +37808,43 @@ var App = class {
     interruptTurn(this.#gw, this.sid).catch(() => void 0);
     this.changed();
   }
-  /** The gateway-backed turn controls' view of this app (/steer, /queue, /stop, /tools). */
+  /** The gateway-backed commands' view of this app (/steer, /queue, /stop, /tools, /undo, /compress, …). */
   control() {
+    const sid = this.sid;
     return {
       busy: Boolean(this.busy),
+      // A steer that fell back to the queue: steering carries no images.
+      canonical: this.#gw.isCanonical,
       enqueue: (text2) => {
-        this.queue.push(text2);
+        this.queue.push({ images: [], text: text2 });
         this.changed();
       },
       gw: this.#gw,
-      notice: (text2, tone) => this.transcript.notice(text2, tone),
+      notice: (text2, tone) => {
+        this.transcript.notice(text2, tone);
+        this.changed();
+      },
+      open: async (id) => {
+        await this.resume(id);
+        return this.sid === id;
+      },
+      panel: (title, text2) => {
+        this.transcript.panel(title, text2);
+        this.changed();
+      },
+      queued: this.queue.length,
+      reload: async () => {
+        if (sid && this.sid === sid) {
+          await this.#resume(sid);
+        }
+      },
+      send: (text2) => this.#send({ images: [], text: text2 }),
+      sid,
+      stale: () => this.sid !== sid,
       steered: (text2) => {
         this.transcript.steer(text2);
         this.changed();
       },
-      sid: this.sid,
       submit: (text2) => this.#submit(text2)
     };
   }
@@ -36993,7 +37875,9 @@ var App = class {
     const path = this.#startupImage;
     try {
       if (this.#gw.isCanonical) {
-        this.#attachments.push({ ...await uploadImage(this.#gw, sid, path, process.env.HERMES_CWD || process.cwd()), name: basename3(path) });
+        const image = { ...await uploadImage(this.#gw, sid, path, process.env.HERMES_CWD || process.cwd()), name: basename3(path) };
+        const images = this.queue[0]?.images ?? this.#attachments;
+        images.push(image);
       } else {
         await this.#gw.request("image.attach", { path, session_id: sid });
       }
@@ -37007,11 +37891,11 @@ var App = class {
     this.#drainQueue();
     this.changed();
   }
-  /** After a reconnect: resumes the shown session in the new backend (its runtime id died with the old one). */
-  async #reattach(id) {
+  /** After a reconnect (or a replay gap): resumes the shown session (its runtime id or subscription died). */
+  async #reattach(id, notice = "Reconnected to the agent backend.") {
     try {
       if (await this.#resume(id)) {
-        this.transcript.notice("Reconnected to the agent backend.");
+        this.transcript.notice(notice);
       }
     } catch (error) {
       this.transcript.notice(
@@ -37021,8 +37905,12 @@ var App = class {
     }
     this.changed();
   }
-  /** Closes the open session and starts a fresh one with an empty transcript. */
-  async newSession() {
+  /** Closes the open session and starts a fresh one with an empty transcript, named `title` if given. */
+  async newSession(title) {
+    if (this.#busySwitch()) {
+      return;
+    }
+    const previous = this.sid;
     const token = this.#switches.begin();
     try {
       const setup = await this.#gw.request("setup.status", {});
@@ -37032,9 +37920,6 @@ var App = class {
       if (setup?.provider_configured === false) {
         this.transcript.notice("No model provider is configured. Run `hermes setup`, then start again.", "warning");
         return;
-      }
-      if (this.sid) {
-        await this.#leave(this.sid, "tui_close");
       }
       const cwd = process.env.HERMES_TUI_CWD?.trim();
       const r = await this.#gw.request(
@@ -37049,15 +37934,40 @@ var App = class {
       this.transcript.clear();
       this.transcript.push({ id: this.transcript.id("w"), kind: "welcome" });
       this.#adopt(r);
+      if (previous && previous !== r.session_id) {
+        void this.#leave(previous, "tui_close");
+      }
     } finally {
       this.#settle(token);
     }
+    if (title && this.sid) {
+      await this.#rename(this.sid, title);
+    }
+  }
+  /** Names session `sid` (`/new <title>`): the shared gateway's rename mutation, a private one's `session.title`. */
+  async #rename(sid, title) {
+    try {
+      const r = this.#gw.isCanonical ? await mutateSession(this.#gw, sid, "rename", { title }) : await this.#gw.request("session.title", { session_id: sid, title });
+      if (sid === this.sid && this.#setTitle(String(r?.title ?? title))) {
+        this.changed();
+      }
+    } catch (error) {
+      this.transcript.notice(`Could not name the session: ${error instanceof Error ? error.message : String(error)}`, "warning");
+      this.changed();
+    }
+  }
+  /** Refuses a session switch while a turn runs (its queue and prompts belong to this session); true when refused. */
+  #busySwitch() {
+    if (!this.busy) {
+      return false;
+    }
+    this.transcript.notice("Wait for the current turn to finish (or press Esc) before switching sessions.", "warning");
+    this.changed();
+    return true;
   }
   /** Resumes stored session `id`: its history replaces the transcript, and the session it leaves is closed. */
   async resume(id) {
-    if (this.busy) {
-      this.transcript.notice("Wait for the current turn to finish (or press Esc) before switching sessions.", "warning");
-      this.changed();
+    if (this.#busySwitch()) {
       return;
     }
     const previous = this.sid;
@@ -37091,6 +38001,9 @@ var App = class {
   }
   #adopt(r) {
     this.#subscribe(r);
+    if (r.session_id !== this.sid) {
+      this.#dropPrompts(() => true);
+    }
     this.sid = r.session_id;
     this.#showThoughts(r.session_id);
     const previousStored = this.storedSid;
@@ -37103,6 +38016,9 @@ var App = class {
     this.#setTitle(typeof r.info?.title === "string" ? r.info.title : void 0);
     this.#readTitle();
     this.busy = busyFrom(r);
+    this.#notices.reset();
+    this.#compacting = false;
+    this.#lastStatusNote = void 0;
     this.transcript.usageBase(r.info?.usage ?? void 0);
     if (r.messages?.length) {
       this.transcript.load(r.messages);
@@ -37157,12 +38073,12 @@ var App = class {
       case "alias":
         return this.#slash(`/${d.target}${arg ? ` ${arg}` : ""}`);
       case "skill":
-        return d.message?.trim() ? this.#send(d.message, { display: d.display || title }) : this.transcript.notice(`${title}: the skill sent no message`, "error");
+        return d.message?.trim() ? this.#send({ images: this.#takeImages(), text: d.message }, { display: d.display || title }) : this.transcript.notice(`${title}: the skill sent no message`, "error");
       case "send":
         if (d.notice?.trim()) {
           this.transcript.notice(d.notice);
         }
-        return d.message?.trim() ? this.#send(d.message, { display: d.display }) : void 0;
+        return d.message?.trim() ? this.#send({ images: this.#takeImages(), text: d.message }, { display: d.display }) : void 0;
       case "prefill":
         if (d.notice?.trim()) {
           this.transcript.notice(d.notice);
@@ -37192,6 +38108,7 @@ var App = class {
     const t2 = this.transcript;
     switch (ev.type) {
       case "gateway.ready":
+        this.#offline = false;
         this.#applySkin(ev.payload?.skin);
         void (this.storedSid ? this.#reattach(this.storedSid) : this.#bootstrap());
         break;
@@ -37229,6 +38146,13 @@ var App = class {
       case "sessions.changed":
         this.#readTitle();
         return;
+      // The view fell behind and the owner retired its subscription (the socket is fine, so no
+      // reconnect re-attaches it): a fresh resume brings the snapshot and a new subscription.
+      case "session.replay_gap":
+        if (this.sid && ev.session_id === this.sid) {
+          void this.#reattach(this.storedSid ?? this.sid, "Reloaded the session: this view fell behind its events.");
+        }
+        return;
       case "message.start":
         if (!this.busy) {
           this.#startBusy("Working\u2026");
@@ -37246,6 +38170,17 @@ var App = class {
       case "reasoning.available":
         t2.reasoningBlock(ev.payload?.text ?? "");
         break;
+      // Mixture-of-Agents: each reference model's answer, then the aggregator's turn.
+      case "moa.reference":
+        if (ev.payload) {
+          t2.reference(moaReferenceLabel(ev.payload.label || "reference", ev.payload.index, ev.payload.count), ev.payload.text ?? "");
+        }
+        break;
+      case "moa.progress":
+      case "moa.phase":
+      case "moa.aggregating":
+        this.#label(moaLabel(ev.type, ev.payload) ?? "");
+        break;
       case "thinking.delta":
         this.#label(kaomojiLabel(ev.payload?.text ?? ""));
         break;
@@ -37253,12 +38188,13 @@ var App = class {
         t2.interim(ev.payload?.text ?? "", { alreadyStreamed: Boolean(ev.payload?.already_streamed) });
         break;
       case "tool.generating":
-        this.#label(`Preparing ${ev.payload?.name ?? "a tool"}\u2026`);
+        this.#label(ev.payload?.name ? preparingLabel(ev.payload.name) : "Preparing a tool\u2026");
         break;
       case "tool.start":
         if (ev.payload) {
           t2.toolStart(ev.payload);
-          this.#label(`Running ${ev.payload.name}\u2026`);
+          const call = t2.call(ev.payload.tool_id);
+          this.#label(call ? busyLabel(call) : `Running ${ev.payload.name}\u2026`);
         }
         break;
       case "tool.complete":
@@ -37303,15 +38239,51 @@ var App = class {
       case "message.complete":
         t2.complete(ev.payload ?? {});
         this.busy = null;
+        this.#compacting = false;
         this.#drainQueue();
         this.prs.poke();
         this.sidebar.poke();
         break;
-      case "status.update":
-        if (this.busy && ev.payload?.text && ev.payload.kind === "status") {
-          this.#label(ev.payload.text);
+      case "status.update": {
+        const effect = statusEffect(ev.payload, this.#lastStatusNote);
+        if (effect.compacting !== void 0) {
+          this.#compacting = effect.compacting;
+        }
+        if (effect.label) {
+          this.#label(effect.label, true);
+        }
+        if (effect.notice) {
+          this.#lastStatusNote = effect.note ?? this.#lastStatusNote;
+          t2.notice(effect.notice.text, effect.notice.tone);
         }
         break;
+      }
+      case "notification.show": {
+        const p = ev.payload;
+        if (p && isLoginNotice(p)) {
+          if (p.text?.trim()) {
+            t2.panel("/login", p.text);
+          }
+          break;
+        }
+        if (p) {
+          this.#notices.show(p);
+          this.#armNotices();
+        }
+        break;
+      }
+      case "notification.clear":
+        this.#notices.clear(ev.payload?.key);
+        break;
+      // What the background self-improvement review saved to memory or skills.
+      case "review.summary": {
+        const text2 = String(ev.payload?.text ?? "").trim();
+        if (!text2) {
+          return;
+        }
+        t2.notice(text2);
+        break;
+      }
       case "notice":
         t2.notice(ev.payload?.message ?? "");
         break;
@@ -37319,21 +38291,41 @@ var App = class {
         t2.notice(ev.payload?.message ?? "error", "error");
         break;
       case "gateway.start_timeout":
-        t2.notice("The agent backend did not start in time.", "error");
+        for (const note of slowStartNotes(ev.payload?.stderr_tail)) {
+          t2.notice(note.text, note.tone);
+        }
         break;
-      case "gateway.protocol_error":
-        t2.notice(`Protocol error from the agent backend: ${ev.payload?.preview ?? ""}`, "error");
+      case "gateway.protocol_error": {
+        const note = protocolNote(ev.payload?.preview, this.#protocolWarned);
+        this.#protocolWarned = true;
+        if (!note) {
+          return;
+        }
+        t2.notice(note.text, note.tone);
         break;
+      }
       case "background.complete":
       case "btw.complete":
         if (ev.payload && "text" in ev.payload && typeof ev.payload.text === "string" && ev.payload.text.trim()) {
-          t2.panel(ev.type === "btw.complete" ? "/btw" : "Background task", ev.payload.text);
+          const question = "question" in ev.payload && typeof ev.payload.question === "string" ? ev.payload.question.trim() : "";
+          const task = "task_id" in ev.payload && typeof ev.payload.task_id === "string" ? ` ${ev.payload.task_id}` : "";
+          t2.panel(
+            ev.type === "btw.complete" ? `/btw${question ? ` ${question}` : ""}` : `Background task${task}`,
+            ev.payload.text
+          );
         }
         break;
-      case "request.cancel":
-        this.#heldRequests = this.#heldRequests.filter((r) => r.id !== ev.payload?.id);
-        this.#dropPrompts((key2) => key2 === `prompt:${ev.payload?.id}`);
+      case "request.cancel": {
+        const id = ev.payload?.id;
+        const notice = promptTimeoutNotice(ev.payload?.method, ev.payload?.reason);
+        const shown = this.#heldRequests.some((r) => r.id === id) || this.overlays.some((o) => o.key === `prompt:${id}`);
+        this.#heldRequests = this.#heldRequests.filter((r) => r.id !== id);
+        this.#dropPrompts((key2) => key2 === `prompt:${id}`);
+        if (notice && shown) {
+          t2.notice(notice, "warning");
+        }
         break;
+      }
       case "approval.request":
       case "clarify.request": {
         const req = sharedPromptRequest(ev, this.#gw, (message) => {
@@ -37404,8 +38396,21 @@ var App = class {
     this.#applyTheme();
     this.changed();
   }
-  #label(label) {
-    if (this.busy && label) {
+  /** Re-renders when the next `ttl` notice expires, so the strip drops it on time. */
+  #armNotices() {
+    clearTimeout(this.#noticeTimer);
+    const at = this.#notices.nextExpiry();
+    if (at !== void 0) {
+      this.#noticeTimer = setTimeout(() => {
+        this.#notices.current();
+        this.#armNotices();
+        this.changed();
+      }, Math.max(0, at - Date.now()) + 10);
+    }
+  }
+  /** Relabels the working line; the stream's labels wait while the context is compacted (`status`: a status line's own). */
+  #label(label, status = false) {
+    if (this.busy && label && (status || !this.#compacting)) {
       this.busy.label = label;
     }
   }
@@ -37452,24 +38457,29 @@ var App = class {
   #dequeue() {
     const next2 = this.queue.shift();
     if (next2 !== void 0) {
-      this.composer.set(this.composer.text ? `${next2}
-${this.composer.text}` : next2);
+      this.#restore(next2);
       this.changed();
     }
   }
   /** Alt+Enter / the queue's Steer: injects queued prompt `index` into the running turn instead of waiting for it to end. */
   #steerQueued(index) {
     const sid = this.sid;
-    const [text2] = this.busy && sid ? this.queue.splice(index, 1) : [];
-    if (text2 === void 0 || !sid) {
+    const item3 = this.queue[index];
+    if (!this.busy || !sid || !item3) {
       return;
     }
+    if (item3.images.length) {
+      this.transcript.notice("A queued prompt with images cannot steer the turn. It stays queued.", "warning");
+      return this.changed();
+    }
+    const { text: text2 } = item3;
+    this.queue.splice(index, 1);
     this.changed();
     void steerTurn(this.#gw, sid, text2).then((r) => {
       if (r.ok) {
         this.transcript.steer(text2);
       } else {
-        this.queue.splice(index, 0, text2);
+        this.queue.splice(index, 0, item3);
         this.transcript.notice(
           r.error ? `Steer failed: ${r.error}. It stays queued.` : "The turn ended before the steer landed. It will send as the next prompt.",
           "warning"
@@ -37561,7 +38571,12 @@ ${this.composer.text}` : next2);
             this.changed();
           }
         })),
-        status: { title: this.title || void 0, tokens: typeof usage?.total === "number" ? usage.total : void 0 },
+        status: {
+          compressions: typeof usage?.compressions === "number" ? usage.compressions : void 0,
+          notice: this.#notices.current(now),
+          title: this.title || void 0,
+          tokens: typeof usage?.total === "number" ? usage.total : void 0
+        },
         todos: (() => {
           const list = this.#todos();
           return list ? {
@@ -37586,7 +38601,7 @@ ${this.composer.text}` : next2);
           tps: typeof usage?.avg_tps === "number" && usage.avg_tps > 0 ? usage.avg_tps : void 0
         },
         placeholder: "Ask Hermes \u2014 / commands \xB7 @ files",
-        queued: this.queue,
+        queued: this.queue.map((q) => q.text),
         ready: this.sid !== null
       }),
       layer: [
@@ -37910,7 +38925,20 @@ if (!session) {
 var gw = new GatewayClient();
 gw.start();
 var watch = readWatchSpec();
-var code = await (watch ? new WatchApp(session, gw, watch) : new App(session, gw, version)).run();
+var app = watch ? new WatchApp(session, gw, watch) : new App(session, gw, version);
+var faults = new FaultBudget();
+var fault = (err) => {
+  if (!(app instanceof App) || isDeadStream(err) || !faults.take()) {
+    process.stderr.write(`hermes tern: ${err instanceof Error ? err.stack ?? err.message : String(err)}
+`);
+    gw.kill("exit");
+    process.exit(1);
+  }
+  app.fault(err);
+};
+process.on("unhandledRejection", fault);
+process.on("uncaughtException", fault);
+var code = await app.run();
 process.exit(code);
 export {
   NO_TSP

@@ -131,6 +131,11 @@ export class Completion {
       return false
     }
 
+    // Walking the prompt history: ↑/↓ keep walking it, though a recalled entry opened the list.
+    if (composer.browsing && (key.name === 'up' || key.name === 'down')) {
+      return false
+    }
+
     switch (key.name) {
       case 'up':
         this.selected = (this.selected - 1 + this.items.length) % this.items.length

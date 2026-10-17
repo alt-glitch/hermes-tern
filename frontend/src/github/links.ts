@@ -44,6 +44,15 @@ export function linkedFromResult(call: Pick<ToolCall, 'name' | 'result' | 'statu
   return Array.isArray(linked) ? linked.map(refOf).filter((r): r is PrRef => Boolean(r)) : undefined
 }
 
+// The parent a session continues: one that ended in compression. A /branch, delegate, reset or tool
+// child also names its parent, but it is its own conversation. Its marker names that parent (a
+// continuation copies `model_config`, so a marker naming another row is inherited). Core's rule
+// (get_compression_lineage, which the link tools in pull_requests.py use).
+const marker = (k: string) => `COALESCE(json_extract(CASE WHEN json_valid(c.model_config) THEN c.model_config ELSE '{}' END, '$.${k}'), '') != p.id`
+const CONTINUES = `SELECT p.id AS p FROM sessions c JOIN sessions p ON p.id = c.parent_session_id
+  WHERE c.id = ? AND p.end_reason = 'compression' AND COALESCE(c.source, '') != 'tool'
+    AND ${['_branched_from', '_delegate_from', '_reset_from'].map(marker).join(' AND ')}`
+
 /**
  * Session `sid`'s ancestors, itself first: compression gives a conversation a new session whose
  * `parent_session_id` is the one it continues. Read-only, and empty when the database is not there.
@@ -55,7 +64,7 @@ export function ancestry(sid: string, db = stateDbPath()): string[] {
     const conn = new DatabaseSync(db, { readOnly: true })
 
     try {
-      const parent = conn.prepare('SELECT parent_session_id AS p FROM sessions WHERE id = ?')
+      const parent = conn.prepare(CONTINUES)
 
       for (let i = 0; i < 100; i++) {
         const row = parent.get(chain.at(-1)!) as { p?: string | null } | undefined

@@ -29,20 +29,24 @@ import { agentName, Agents } from './agents/store.js'
 import { copyToClipboard } from './clipboard.js'
 import { localCommand } from './commands.js'
 import { Composer } from './composer.js'
-import { type ControlHost, interruptTurn, steerTurn } from './controlCommands.js'
+import { interruptTurn, steerTurn } from './controlCommands.js'
 import { type Busy, busyFrom, ownsEvent, Switches } from './flow.js'
+import { protocolNote, slowStartNotes } from './backendNotes.js'
 import { hudKey, type Pill } from './hud.js'
+import { moaLabel, moaReferenceLabel } from './moa.js'
 import type { Overlay, OverlayHost } from './overlay.js'
 import { writeActiveSessionFile } from './hermes/activeSessionFile.js'
-import { clipboardImage, imagePathOf } from './hermes/clipboardImage.js'
+import { imagePathOf, withClipboardImage } from './hermes/clipboardImage.js'
 import { type Attachment, uploadImage } from './hermes/images.js'
+import { hasInterpolation, interpolate, shellError, shellExec, shellLines } from './hermes/shell.js'
+import { mutateSession } from './hermes/mutate.js'
 import { sharedPromptId, sharedPromptRequest } from './hermes/sharedPrompts.js'
 import { openAgents } from './overlays/agents.js'
 import { openBackground } from './overlays/background.js'
 import { Completion } from './overlays/completion.js'
 import { openModelPicker } from './overlays/models.js'
 import { openEffortPicker } from './overlays/effort.js'
-import { promptOverlay } from './overlays/prompts.js'
+import { promptOverlay, promptTimeoutNotice } from './overlays/prompts.js'
 import { openPullRequests, openUrl, prsPill } from './overlays/pullRequests.js'
 import { STYLES } from './view/styles.js'
 import { paletteFor } from './palette.js'
@@ -51,11 +55,14 @@ import { LINK_TOOLS } from './github/links.js'
 import { PullRequests } from './github/store.js'
 import { Cron } from './processes/cron.js'
 import { Sidebar } from './sidebar.js'
+import type { SessionHost } from './sessionCommands.js'
+import { isLoginNotice, Notices, statusEffect } from './status.js'
 import { isRunning as processRuns, Processes, processTone } from './processes/store.js'
 import { loadSettings, saveSettings, type ThemeMode } from './settings.js'
 import { Transcript } from './transcript.js'
 import { dockNodes, todoProgress } from './view/dock.js'
 import { entryNode } from './view/transcript.js'
+import { busyLabel, preparingLabel } from './workLog.js'
 import { openSidebar, specOf } from './watch/spec.js'
 import { randomTip, type WelcomeContext } from './view/welcome.js'
 
@@ -78,6 +85,17 @@ interface CreateResult extends Partial<
   stored_session_id?: string | null
   info?: SessionLiveInfo
   messages?: TranscriptMessage[]
+}
+
+/** An uploaded image a prompt carries (the shared gateway takes it on prompt.submit), with the name its chip shows. */
+type Image = Attachment & { name: string }
+
+/** A prompt waiting for the turn, with the images that were attached when it was entered. */
+export interface Queued {
+  text: string
+  images: Image[]
+  /** Typed by the user: its `{!cmd}`s run when it is sent. */
+  expand?: boolean
 }
 
 /** Runs the Tern frontend until the user quits; resolves the exit code. */
@@ -107,7 +125,7 @@ export class App implements OverlayHost {
   info: SessionLiveInfo | null = null
   usage: Usage | null = null
   busy: Busy | null = null
-  queue: string[] = []
+  queue: Queued[] = []
   readonly #tern: Session
   readonly #gw: GatewayClient
   readonly #completion: Completion
@@ -127,8 +145,8 @@ export class App implements OverlayHost {
   readonly #approvalIds = new Map<string, string>()
   /** The launcher's startup image until it is attached to the first session (the queue waits for it). */
   #startupImage = process.env.HERMES_TUI_IMAGE?.trim() ?? ''
-  /** Uploaded images the next prompt carries (the shared gateway takes them on prompt.submit), with the names the chips show. */
-  #attachments: (Attachment & { name: string })[] = []
+  /** The images attached to the draft: the next prompt entered takes them. */
+  #attachments: Image[] = []
   /** The skin the gateway last reported; only the `skin` theme mode wears it. */
   #skin: SkinPayload | undefined
   #theme: ThemeMode = loadSettings().theme ?? 'tern'
@@ -137,6 +155,17 @@ export class App implements OverlayHost {
   #copiedTimer: NodeJS.Timeout | undefined
   /** The pill above the composer holding the keys (Down from an empty prompt), if any. */
   #hud: Pill | undefined
+  /** The gateway connection is down until the next gateway.ready (its one notice is shown). */
+  #offline = false
+  /** Stray backend output was reported once already. */
+  #protocolWarned = false
+  /** The gateway's keyed notices (credits, a slow start); the newest rides the status strip. */
+  readonly #notices = new Notices()
+  #noticeTimer: NodeJS.Timeout | undefined
+  /** Auto-compaction runs: the working line says so until its done edge. */
+  #compacting = false
+  /** The status warning shown last, so a repeated one stays one line. */
+  #lastStatusNote: string | undefined
 
   constructor(tern: Session, gw: GatewayClient, version: string) {
     this.#tern = tern
@@ -168,7 +197,7 @@ export class App implements OverlayHost {
     const query = process.env.HERMES_TUI_QUERY?.trim()
 
     if (query || this.#startupImage) {
-      this.queue.push(query || 'What do you see in this image?')
+      this.queue.push({ images: [], text: query || 'What do you see in this image?' })
     }
 
     const log = process.env.HERMES_TERN_EVENT_LOG
@@ -183,7 +212,17 @@ export class App implements OverlayHost {
     })
     this.#gw.on('request', (req: ServerRequest) => this.#onRequest(req))
     this.#gw.on('exit', (code: null | number) => {
-      this.transcript.notice(`The agent backend exited${code === null ? '' : ` (${code})`}.`, 'error')
+      // Once per outage: each failed redial emits another exit. An attached gateway (and its turn) lives on.
+      if (!this.#offline) {
+        this.transcript.notice(
+          this.#gw.attached
+            ? 'Lost the connection to Hermes; reconnecting…'
+            : `The agent backend exited${code === null ? '' : ` (${code})`}.`,
+          this.#gw.attached ? 'warning' : 'error'
+        )
+      }
+
+      this.#offline = true
       // The runtime session died with the process: prompts queue until the next gateway.ready reattaches.
       this.sid = null
       this.busy = null
@@ -246,6 +285,12 @@ export class App implements OverlayHost {
     })
   }
 
+  /** An error nothing caught (a rejected promise no caller awaited): shown, so the pane lives on. */
+  fault(reason: unknown) {
+    this.transcript.notice(`Unexpected error: ${reason instanceof Error ? reason.message : String(reason)}`, 'error')
+    this.changed()
+  }
+
   // ── Input ──────────────────────────────────────────────────────────
 
   async #readInput() {
@@ -270,6 +315,11 @@ export class App implements OverlayHost {
     const top = this.overlays.at(-1)
 
     if (key.ctrl && key.name === 'c') {
+      // The sheet on top answers first: a prompt's safe answer (deny, skip, cancel), a picker closes.
+      if (top) {
+        return top.cancel ? top.cancel() : this.close(top)
+      }
+
       return this.#ctrlC()
     }
 
@@ -329,7 +379,7 @@ export class App implements OverlayHost {
       return this.#steerQueued(0)
     }
 
-    if (key.ctrl && key.name === 'd' && !this.composer.text) {
+    if (key.ctrl && key.name === 'd' && !this.#hasDraft()) {
       return this.quit()
     }
 
@@ -519,7 +569,7 @@ export class App implements OverlayHost {
         if (this.#connectSeen.has(call.id) && next.length && next.every(t => t.state === 'connected')) {
           call.connectDone = true
           this.transcript.touchCall(call)
-          this.#submit(connectedMessage(next))
+          this.#submit(connectedMessage(next), false)
           this.changed()
         } else if (next.some(waiting) && (card?.watching ?? true)) {
           open = true
@@ -544,7 +594,7 @@ export class App implements OverlayHost {
 
     call.connectDone = true
     this.transcript.touchCall(call)
-    this.#submit(continueMessage(call.connect ?? connectTargets(call, readCard(call.id))))
+    this.#submit(continueMessage(call.connect ?? connectTargets(call, readCard(call.id))), false)
     this.changed()
   }
 
@@ -570,11 +620,13 @@ export class App implements OverlayHost {
   /** Attaches the clipboard's image to the next prompt (`quiet`: an empty paste, which may hold none). */
   async attachClipboardImage(quiet: boolean) {
     try {
-      const path = await clipboardImage()
-
-      if (path) {
+      const found = await withClipboardImage(async path => {
         await this.#attachImage(path, `pasted image ${this.#attachments.length + 1}`)
-      } else if (!quiet) {
+
+        return true
+      })
+
+      if (!found && !quiet) {
         this.transcript.notice('No image on the clipboard.', 'warning')
         this.changed()
       }
@@ -582,6 +634,19 @@ export class App implements OverlayHost {
       this.transcript.notice(`Could not read the clipboard image: ${error instanceof Error ? error.message : String(error)}`, 'error')
       this.changed()
     }
+  }
+
+  /** `/image <path>`: attaches that image file (resolved against the session's folder) to the next prompt. */
+  async attachImagePath(raw: string) {
+    const path = imagePathOf(raw, this.info?.cwd || process.env.HERMES_CWD || process.cwd())
+
+    if (!path) {
+      this.transcript.notice(`Not an image file: ${raw.trim()} (PNG, JPEG, GIF or WebP)`, 'warning')
+
+      return this.changed()
+    }
+
+    await this.#attachImage(path, basename(path))
   }
 
   async #attachImage(path: string, name: string) {
@@ -629,9 +694,15 @@ export class App implements OverlayHost {
     }
   }
 
+  /** Text or images in the composer: Ctrl+C clears them before it interrupts, Ctrl+D never exits over them. */
+  #hasDraft(): boolean {
+    return Boolean(this.composer.text || this.#attachments.length)
+  }
+
   #ctrlC() {
-    if (this.composer.text) {
+    if (this.#hasDraft()) {
       this.composer.set('')
+      this.#attachments = []
 
       return
     }
@@ -669,7 +740,8 @@ export class App implements OverlayHost {
 
   // ── Prompts and commands ───────────────────────────────────────────
 
-  #submit(raw: string) {
+  /** Sends or queues a prompt, or runs a command; `draft`: the user entered it (it takes the draft's images). */
+  #submit(raw: string, draft = true) {
     const text = raw.trim()
 
     if (!text) {
@@ -682,33 +754,68 @@ export class App implements OverlayHost {
       return
     }
 
-    if (this.busy || !this.sid || this.#switches.pending) {
-      this.queue.push(text)
+    // `!cmd` runs a shell command now, beside any turn (Ink's shellExec).
+    if (text.startsWith('!') && text.slice(1).trim()) {
+      void this.#shell(text.slice(1).trim())
 
       return
     }
 
-    this.#send(text)
+    // The draft's images go with this prompt, whenever it is sent; a message the app writes leaves them.
+    const item: Queued = { expand: true, images: draft ? this.#takeImages() : [], text }
+
+    if (this.busy || !this.sid || this.#switches.pending) {
+      this.queue.push(item)
+
+      return
+    }
+
+    this.#send(item)
   }
 
-  /** Sends `text` now; `queued` marks a drained queue entry (the gateway must queue it, never steer with it). */
-  #send(text: string, { display, queued = false }: { display?: string; queued?: boolean } = {}) {
+  /**
+   * Sends `item` now; `queued` marks a drained queue entry (the gateway must queue it, never steer
+   * with it). A typed prompt's `{!cmd}`s run first and their output takes their place; `display` is
+   * what the transcript shows.
+   */
+  #send(item: Queued, { display, queued = false }: { display?: string; queued?: boolean } = {}) {
+    const sid = this.sid
+
     // A session switch in flight: the prompt belongs to the session it adopts.
-    if (!this.sid || this.#switches.pending) {
-      this.queue.unshift(text)
+    if (!sid || this.#switches.pending) {
+      this.queue.unshift(item)
 
       return
     }
 
-    const attachments = this.#attachments.map(({ mime, path }) => ({ mime, path }))
-    const images = this.#attachments.length
-    this.#attachments = []
-    this.transcript.user(`${display?.trim() || text}${images ? `\n\n📎 ${images} image${images === 1 ? '' : 's'}` : ''}`)
+    if (item.expand && hasInterpolation(item.text)) {
+      this.#startBusy('Running {!…}')
+      void interpolate(this.#gw, sid, item.text).then(
+        text => {
+          this.busy = null
+          this.#send({ images: item.images, text }, { display: item.text, queued })
+        },
+        (error: unknown) => {
+          // A command that could not run refuses the whole prompt: it goes back to the composer to edit.
+          this.busy = null
+          this.transcript.notice(`Not sent: a {!…} command failed: ${shellError(error)}.`, 'error')
+          this.#restore(item)
+          this.#drainQueue()
+          this.changed()
+        }
+      )
+
+      return
+    }
+
+    const { images, text } = item
+    const attachments = images.map(({ mime, path }) => ({ mime, path }))
+    this.transcript.user(`${display?.trim() || text}${images.length ? `\n\n📎 ${images.length} image${images.length === 1 ? '' : 's'}` : ''}`)
     this.#startBusy('Working…')
     this.#gw
       // The shared gateway admits a prompt by its submission id (a retry with the same id is one turn).
       .request('prompt.submit', {
-        session_id: this.sid,
+        session_id: sid,
         submission_id: randomUUID(),
         text,
         ...(queued ? { queued } : {}),
@@ -719,6 +826,44 @@ export class App implements OverlayHost {
         this.busy = null
         this.changed()
       })
+  }
+
+  /** The draft's images, which leave the composer with the prompt that takes them. */
+  #takeImages(): Image[] {
+    const images = this.#attachments
+    this.#attachments = []
+
+    return images
+  }
+
+  /** Puts a prompt that did not go back into the composer, before any text there, with its images. */
+  #restore({ images, text }: Queued) {
+    this.composer.set(this.composer.text ? `${text}\n${this.composer.text}` : text)
+    this.#attachments = [...images, ...this.#attachments]
+  }
+
+  /** `!cmd`: runs `command` in the session's folder and shows its output; nothing reaches the model. */
+  async #shell(command: string) {
+    const sid = this.sid
+
+    if (!sid) {
+      this.transcript.notice('Wait for the session to start before running a shell command.', 'warning')
+
+      return this.changed()
+    }
+
+    this.transcript.user(`!${command}`)
+    this.changed()
+
+    try {
+      for (const line of shellLines(await shellExec(this.#gw, sid, command))) {
+        this.transcript.notice(line.text, line.failed ? 'warning' : 'info')
+      }
+    } catch (error) {
+      this.transcript.notice(`!${command} did not run: ${shellError(error)}.`, 'error')
+    }
+
+    this.changed()
   }
 
   async #slash(text: string) {
@@ -784,21 +929,45 @@ export class App implements OverlayHost {
     this.changed()
   }
 
-  /** The gateway-backed turn controls' view of this app (/steer, /queue, /stop, /tools). */
-  control(): ControlHost {
+  /** The gateway-backed commands' view of this app (/steer, /queue, /stop, /tools, /undo, /compress, …). */
+  control(): SessionHost {
+    const sid = this.sid
+
     return {
       busy: Boolean(this.busy),
+      // A steer that fell back to the queue: steering carries no images.
+      canonical: this.#gw.isCanonical,
       enqueue: text => {
-        this.queue.push(text)
+        this.queue.push({ images: [], text })
         this.changed()
       },
       gw: this.#gw,
-      notice: (text, tone) => this.transcript.notice(text, tone),
+      notice: (text, tone) => {
+        this.transcript.notice(text, tone)
+        this.changed()
+      },
+      open: async id => {
+        await this.resume(id)
+
+        return this.sid === id
+      },
+      panel: (title, text) => {
+        this.transcript.panel(title, text)
+        this.changed()
+      },
+      queued: this.queue.length,
+      reload: async () => {
+        if (sid && this.sid === sid) {
+          await this.#resume(sid)
+        }
+      },
+      send: text => this.#send({ images: [], text }),
+      sid,
+      stale: () => this.sid !== sid,
       steered: text => {
         this.transcript.steer(text)
         this.changed()
       },
-      sid: this.sid,
       submit: text => this.#submit(text)
     }
   }
@@ -837,7 +1006,10 @@ export class App implements OverlayHost {
 
     try {
       if (this.#gw.isCanonical) {
-        this.#attachments.push({ ...(await uploadImage(this.#gw, sid, path, process.env.HERMES_CWD || process.cwd())), name: basename(path) })
+        const image = { ...(await uploadImage(this.#gw, sid, path, process.env.HERMES_CWD || process.cwd())), name: basename(path) }
+        // The startup query waits at the queue's head for this image.
+        const images = this.queue[0]?.images ?? this.#attachments
+        images.push(image)
       } else {
         await this.#gw.request('image.attach', { path, session_id: sid })
       }
@@ -853,11 +1025,11 @@ export class App implements OverlayHost {
     this.changed()
   }
 
-  /** After a reconnect: resumes the shown session in the new backend (its runtime id died with the old one). */
-  async #reattach(id: string) {
+  /** After a reconnect (or a replay gap): resumes the shown session (its runtime id or subscription died). */
+  async #reattach(id: string, notice = 'Reconnected to the agent backend.') {
     try {
       if (await this.#resume(id)) {
-        this.transcript.notice('Reconnected to the agent backend.')
+        this.transcript.notice(notice)
       }
     } catch (error) {
       this.transcript.notice(
@@ -869,8 +1041,13 @@ export class App implements OverlayHost {
     this.changed()
   }
 
-  /** Closes the open session and starts a fresh one with an empty transcript. */
-  async newSession() {
+  /** Closes the open session and starts a fresh one with an empty transcript, named `title` if given. */
+  async newSession(title?: string) {
+    if (this.#busySwitch()) {
+      return
+    }
+
+    const previous = this.sid
     const token = this.#switches.begin()
 
     try {
@@ -884,10 +1061,6 @@ export class App implements OverlayHost {
         this.transcript.notice('No model provider is configured. Run `hermes setup`, then start again.', 'warning')
 
         return
-      }
-
-      if (this.sid) {
-        await this.#leave(this.sid, 'tui_close')
       }
 
       const cwd = process.env.HERMES_TUI_CWD?.trim()
@@ -911,17 +1084,51 @@ export class App implements OverlayHost {
       this.transcript.clear()
       this.transcript.push({ id: this.transcript.id('w'), kind: 'welcome' })
       this.#adopt(r)
+
+      // Only now: a failed create leaves the view on the session it still receives.
+      if (previous && previous !== r.session_id) {
+        void this.#leave(previous, 'tui_close')
+      }
     } finally {
       this.#settle(token)
     }
+
+    if (title && this.sid) {
+      await this.#rename(this.sid, title)
+    }
+  }
+
+  /** Names session `sid` (`/new <title>`): the shared gateway's rename mutation, a private one's `session.title`. */
+  async #rename(sid: string, title: string) {
+    try {
+      const r = this.#gw.isCanonical
+        ? await mutateSession(this.#gw, sid, 'rename', { title })
+        : await this.#gw.request<{ title?: string } | null>('session.title', { session_id: sid, title })
+
+      if (sid === this.sid && this.#setTitle(String(r?.title ?? title))) {
+        this.changed()
+      }
+    } catch (error) {
+      this.transcript.notice(`Could not name the session: ${error instanceof Error ? error.message : String(error)}`, 'warning')
+      this.changed()
+    }
+  }
+
+  /** Refuses a session switch while a turn runs (its queue and prompts belong to this session); true when refused. */
+  #busySwitch(): boolean {
+    if (!this.busy) {
+      return false
+    }
+
+    this.transcript.notice('Wait for the current turn to finish (or press Esc) before switching sessions.', 'warning')
+    this.changed()
+
+    return true
   }
 
   /** Resumes stored session `id`: its history replaces the transcript, and the session it leaves is closed. */
   async resume(id: string) {
-    if (this.busy) {
-      this.transcript.notice('Wait for the current turn to finish (or press Esc) before switching sessions.', 'warning')
-      this.changed()
-
+    if (this.#busySwitch()) {
       return
     }
 
@@ -966,6 +1173,12 @@ export class App implements OverlayHost {
 
   #adopt(r: CreateResult) {
     this.#subscribe(r)
+
+    if (r.session_id !== this.sid) {
+      // The last session's approvals and questions are not this one's (a resume hydrates its own after).
+      this.#dropPrompts(() => true)
+    }
+
     this.sid = r.session_id
     this.#showThoughts(r.session_id)
     const previousStored = this.storedSid
@@ -981,6 +1194,10 @@ export class App implements OverlayHost {
     this.#readTitle()
     // A resumed session may be mid-turn: Esc stops it and new prompts queue behind it.
     this.busy = busyFrom(r)
+    // The last session's notices and status lines are not this one's.
+    this.#notices.reset()
+    this.#compacting = false
+    this.#lastStatusNote = undefined
     this.transcript.usageBase(r.info?.usage ?? undefined)
 
     if (r.messages?.length) {
@@ -1059,7 +1276,7 @@ export class App implements OverlayHost {
       case 'skill':
         // `message` is the expanded skill body for the model; the transcript shows the invocation.
         return d.message?.trim()
-          ? this.#send(d.message, { display: d.display || title })
+          ? this.#send({ images: this.#takeImages(), text: d.message }, { display: d.display || title })
           : this.transcript.notice(`${title}: the skill sent no message`, 'error')
 
       case 'send':
@@ -1067,7 +1284,7 @@ export class App implements OverlayHost {
           this.transcript.notice(d.notice)
         }
 
-        return d.message?.trim() ? this.#send(d.message, { display: d.display }) : undefined
+        return d.message?.trim() ? this.#send({ images: this.#takeImages(), text: d.message }, { display: d.display }) : undefined
 
       case 'prefill':
         if (d.notice?.trim()) {
@@ -1109,6 +1326,7 @@ export class App implements OverlayHost {
 
     switch (ev.type) {
       case 'gateway.ready':
+        this.#offline = false
         this.#applySkin(ev.payload?.skin)
         // A reconnect's ready reattaches the shown session; only a sessionless app bootstraps.
         void (this.storedSid ? this.#reattach(this.storedSid) : this.#bootstrap())
@@ -1164,6 +1382,14 @@ export class App implements OverlayHost {
 
         return
 
+      // The view fell behind and the owner retired its subscription (the socket is fine, so no
+      // reconnect re-attaches it): a fresh resume brings the snapshot and a new subscription.
+      case 'session.replay_gap':
+        if (this.sid && ev.session_id === this.sid) {
+          void this.#reattach(this.storedSid ?? this.sid, 'Reloaded the session: this view fell behind its events.')
+        }
+
+        return
 
       case 'message.start':
         if (!this.busy) {
@@ -1191,6 +1417,23 @@ export class App implements OverlayHost {
 
         break
 
+      // Mixture-of-Agents: each reference model's answer, then the aggregator's turn.
+      case 'moa.reference':
+        if (ev.payload) {
+          t.reference(moaReferenceLabel(ev.payload.label || 'reference', ev.payload.index, ev.payload.count), ev.payload.text ?? '')
+        }
+
+        break
+
+      case 'moa.progress':
+
+      case 'moa.phase':
+
+      case 'moa.aggregating':
+        this.#label(moaLabel(ev.type, ev.payload as Record<string, unknown> | undefined) ?? '')
+
+        break
+
       case 'thinking.delta':
         this.#label(kaomojiLabel(ev.payload?.text ?? ''))
 
@@ -1202,14 +1445,16 @@ export class App implements OverlayHost {
         break
 
       case 'tool.generating':
-        this.#label(`Preparing ${ev.payload?.name ?? 'a tool'}…`)
+        this.#label(ev.payload?.name ? preparingLabel(ev.payload.name) : 'Preparing a tool…')
 
         break
 
       case 'tool.start':
         if (ev.payload) {
           t.toolStart(ev.payload)
-          this.#label(`Running ${ev.payload.name}…`)
+          // The call as its step reads (a bridged or connector call as its app), not its wire name.
+          const call = t.call(ev.payload.tool_id)
+          this.#label(call ? busyLabel(call) : `Running ${ev.payload.name}…`)
         }
 
         break
@@ -1276,6 +1521,7 @@ export class App implements OverlayHost {
       case 'message.complete':
         t.complete(ev.payload ?? {})
         this.busy = null
+        this.#compacting = false
         this.#drainQueue()
         // The turn may have pushed a branch, opened a PR or changed files.
         this.prs.poke()
@@ -1283,12 +1529,64 @@ export class App implements OverlayHost {
 
         break
 
-      case 'status.update':
-        if (this.busy && ev.payload?.text && ev.payload.kind === 'status') {
-          this.#label(ev.payload.text)
+      case 'status.update': {
+        // Lifecycle lines (retries, fallbacks) label the working line; warnings, compaction and goal
+        // verdicts are transcript lines.
+        const effect = statusEffect(ev.payload, this.#lastStatusNote)
+
+        if (effect.compacting !== undefined) {
+          this.#compacting = effect.compacting
+        }
+
+        if (effect.label) {
+          this.#label(effect.label, true)
+        }
+
+        if (effect.notice) {
+          this.#lastStatusNote = effect.note ?? this.#lastStatusNote
+          t.notice(effect.notice.text, effect.notice.tone)
         }
 
         break
+      }
+
+      case 'notification.show': {
+        const p = ev.payload
+
+        // A /login step (its link and code, then the result) is read and clicked, so it goes in the transcript.
+        if (p && isLoginNotice(p)) {
+          if (p.text?.trim()) {
+            t.panel('/login', p.text)
+          }
+
+          break
+        }
+
+        if (p) {
+          this.#notices.show(p)
+          this.#armNotices()
+        }
+
+        break
+      }
+
+      case 'notification.clear':
+        this.#notices.clear(ev.payload?.key)
+
+        break
+
+      // What the background self-improvement review saved to memory or skills.
+      case 'review.summary': {
+        const text = String(ev.payload?.text ?? '').trim()
+
+        if (!text) {
+          return
+        }
+
+        t.notice(text)
+
+        break
+      }
 
       case 'notice':
         t.notice(ev.payload?.message ?? '')
@@ -1301,29 +1599,58 @@ export class App implements OverlayHost {
         break
 
       case 'gateway.start_timeout':
-        t.notice('The agent backend did not start in time.', 'error')
+        // The client keeps waiting for ready; the stderr lines say why it is slow (wrong python, a missing dependency).
+        for (const note of slowStartNotes(ev.payload?.stderr_tail)) {
+          t.notice(note.text, note.tone)
+        }
 
         break
 
-      case 'gateway.protocol_error':
-        t.notice(`Protocol error from the agent backend: ${ev.payload?.preview ?? ''}`, 'error')
+      case 'gateway.protocol_error': {
+        const note = protocolNote(ev.payload?.preview, this.#protocolWarned)
+        this.#protocolWarned = true
+
+        if (!note) {
+          return
+        }
+
+        t.notice(note.text, note.tone)
 
         break
+      }
 
       case 'background.complete':
 
       case 'btw.complete':
         if (ev.payload && 'text' in ev.payload && typeof ev.payload.text === 'string' && ev.payload.text.trim()) {
-          t.panel(ev.type === 'btw.complete' ? '/btw' : 'Background task', ev.payload.text)
+          // Titled as Ink labels them: the task id /bg named, the question /btw asked.
+          const question = 'question' in ev.payload && typeof ev.payload.question === 'string' ? ev.payload.question.trim() : ''
+          const task = 'task_id' in ev.payload && typeof ev.payload.task_id === 'string' ? ` ${ev.payload.task_id}` : ''
+
+          t.panel(
+            ev.type === 'btw.complete' ? `/btw${question ? ` ${question}` : ''}` : `Background task${task}`,
+            ev.payload.text
+          )
         }
 
         break
 
-      case 'request.cancel':
-        this.#heldRequests = this.#heldRequests.filter(r => r.id !== ev.payload?.id)
-        this.#dropPrompts(key => key === `prompt:${ev.payload?.id}`)
+      case 'request.cancel': {
+        const id = ev.payload?.id
+        const notice = promptTimeoutNotice(ev.payload?.method, ev.payload?.reason)
+        // Only for a card this window still shows (or holds): an answered one needs no line.
+        const shown =
+          this.#heldRequests.some(r => r.id === id) || this.overlays.some(o => o.key === `prompt:${id}`)
+
+        this.#heldRequests = this.#heldRequests.filter(r => r.id !== id)
+        this.#dropPrompts(key => key === `prompt:${id}`)
+
+        if (notice && shown) {
+          t.notice(notice, 'warning')
+        }
 
         break
+      }
 
       case 'approval.request':
 
@@ -1422,8 +1749,23 @@ export class App implements OverlayHost {
     this.changed()
   }
 
-  #label(label: string) {
-    if (this.busy && label) {
+  /** Re-renders when the next `ttl` notice expires, so the strip drops it on time. */
+  #armNotices() {
+    clearTimeout(this.#noticeTimer)
+    const at = this.#notices.nextExpiry()
+
+    if (at !== undefined) {
+      this.#noticeTimer = setTimeout(() => {
+        this.#notices.current()
+        this.#armNotices()
+        this.changed()
+      }, Math.max(0, at - Date.now()) + 10)
+    }
+  }
+
+  /** Relabels the working line; the stream's labels wait while the context is compacted (`status`: a status line's own). */
+  #label(label: string, status = false) {
+    if (this.busy && label && (status || !this.#compacting)) {
       this.busy.label = label
     }
   }
@@ -1482,7 +1824,7 @@ export class App implements OverlayHost {
     const next = this.queue.shift()
 
     if (next !== undefined) {
-      this.composer.set(this.composer.text ? `${next}\n${this.composer.text}` : next)
+      this.#restore(next)
       this.changed()
     }
   }
@@ -1490,18 +1832,27 @@ export class App implements OverlayHost {
   /** Alt+Enter / the queue's Steer: injects queued prompt `index` into the running turn instead of waiting for it to end. */
   #steerQueued(index: number) {
     const sid = this.sid
-    const [text] = this.busy && sid ? this.queue.splice(index, 1) : []
+    const item = this.queue[index]
 
-    if (text === undefined || !sid) {
+    if (!this.busy || !sid || !item) {
       return
     }
 
+    // A steer is text only: a prompt with images waits for its own turn.
+    if (item.images.length) {
+      this.transcript.notice('A queued prompt with images cannot steer the turn. It stays queued.', 'warning')
+
+      return this.changed()
+    }
+
+    const { text } = item
+    this.queue.splice(index, 1)
     this.changed()
     void steerTurn(this.#gw, sid, text).then(r => {
       if (r.ok) {
         this.transcript.steer(text)
       } else {
-        this.queue.splice(index, 0, text)
+        this.queue.splice(index, 0, item)
         this.transcript.notice(
           r.error
             ? `Steer failed: ${r.error}. It stays queued.`
@@ -1608,7 +1959,12 @@ export class App implements OverlayHost {
             this.changed()
           }
         })),
-        status: { title: this.title || undefined, tokens: typeof usage?.total === 'number' ? usage.total : undefined },
+        status: {
+          compressions: typeof usage?.compressions === 'number' ? usage.compressions : undefined,
+          notice: this.#notices.current(now),
+          title: this.title || undefined,
+          tokens: typeof usage?.total === 'number' ? usage.total : undefined
+        },
         todos: (() => {
           const list = this.#todos()
 
@@ -1636,7 +1992,7 @@ export class App implements OverlayHost {
           tps: typeof usage?.avg_tps === 'number' && usage.avg_tps > 0 ? usage.avg_tps : undefined
         },
         placeholder: 'Ask Hermes — / commands · @ files',
-        queued: this.queue,
+        queued: this.queue.map(q => q.text),
         ready: this.sid !== null
       }),
       layer: [

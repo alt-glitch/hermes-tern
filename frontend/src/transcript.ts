@@ -168,11 +168,19 @@ export class Transcript {
     const turn = this.start(at)
     const incoming = text.trim()
 
-    if (!incoming || turn.blocks.some(b => b.kind === 'thinking' || (b.kind === 'text' && b.text.includes(incoming)))) {
+    if (!incoming || turn.blocks.some(b => (b.kind === 'thinking' && !b.label) || (b.kind === 'text' && b.text.includes(incoming)))) {
       return
     }
 
     turn.blocks.push({ endedAt: at, id: this.id('k'), kind: 'thinking', startedAt: at, text })
+    this.#touch(turn)
+  }
+
+  /** A Mixture-of-Agents reference model's answer: a sealed thought block of its own, under `label`. */
+  reference(label: string, text: string, at = Date.now()) {
+    const turn = this.start(at)
+    this.#endThinking(turn, at)
+    turn.blocks.push({ endedAt: at, id: this.id('k'), kind: 'thinking', label, startedAt: at, text: text.trim() })
     this.#touch(turn)
   }
 
@@ -230,9 +238,10 @@ export class Transcript {
       via: u.via
     }
 
-    // The call's own list shows while it runs; tool.complete's snapshot replaces it.
+    // The call's own list shows while it runs (a merge patches the current one); tool.complete's
+    // snapshot replaces it.
     if (Array.isArray(call.args.todos)) {
-      call.todos = toTodos(call.args.todos)
+      call.todos = todosOf(call.args, this.currentTodos())
     }
 
     turn.blocks.push({ call, id: p.tool_id, kind: 'tool' })
@@ -286,7 +295,7 @@ export class Transcript {
 
   /** The newest todo snapshot lands on the newest todo tool call. */
   todos(todos: unknown[]) {
-    const found = this.#lastTool(c => c.name === 'todo_list')
+    const found = this.#lastTool(c => isTodoName(c.name))
 
     if (found) {
       found.call.todos = toTodos(todos)
@@ -418,14 +427,19 @@ export class Transcript {
     this.#live = undefined
     let turn: TurnEntry | undefined
     let pendingContinued: string | undefined
+    // When the row that opened the next turn (a prompt or a notice) was written.
+    let promptAt = 0
     const calls = new Map<string, ToolCall>()
+    // The list as the calls so far left it: what the next merge patches.
+    let todos: Todo[] | undefined
 
     for (const m of messages) {
       const at = typeof m.timestamp === 'number' ? m.timestamp * 1000 : 0
       const text = typeof m.text === 'string' ? m.text : typeof m.content === 'string' ? m.content : ''
 
-      // A steer is stored as its own user row, wrapped in Hermes' marker, inside the turn it joined.
-      const steered = m.role === 'user' ? steerText(text) : undefined
+      // A steer is stored as its own user row inside the turn it joined. The display projection
+      // tags it `steer` and already unwraps Hermes' marker; a raw snapshot still carries the marker.
+      const steered = m.role === 'user' ? (m.display_kind === 'steer' ? text.trim() : steerText(text)) : undefined
 
       if (steered !== undefined && turn) {
         turn.blocks.push({ at, id: this.id('s'), kind: 'steer', text: steered })
@@ -435,15 +449,19 @@ export class Transcript {
 
       if (m.role === 'user') {
         turn = undefined
+        promptAt = at
 
         // Notices Hermes sends itself (subagents or a background command finished, a watcher
-        // fired) are not the user's words: they become the next turn's reason line.
-        const notice = internalNotice(text)
+        // fired, a crashed turn resumed) are not the user's words: they become the next turn's
+        // reason line. Typed rows say so in display_kind; older untyped rows are sniffed.
+        const notice = displayNotice(m.display_kind, m.display_metadata) ?? internalNotice(text)
 
         if (notice) {
           pendingContinued = notice
         } else {
-          this.entries.push({ at, id: this.id('u'), kind: 'user', text })
+          // A notice whose reply Hermes hid has no turn: its reason must not fall on this prompt's.
+          pendingContinued = undefined
+          this.entries.push({ at, id: this.id('u'), kind: 'user', text: steered ?? text })
         }
 
         continue
@@ -461,9 +479,15 @@ export class Transcript {
 
       if (!turn) {
         const continued = pendingContinued ?? continuation(this.entries.findLast(e => e.kind !== 'notice'))
-        turn = { blocks: [], continued, id: this.id('t'), kind: 'turn', rev: 0, startedAt: at, status: 'done' }
+        turn = { blocks: [], continued, id: this.id('t'), kind: 'turn', rev: 0, startedAt: promptAt || at, status: 'done' }
         pendingContinued = undefined
+        promptAt = 0
         this.entries.push(turn)
+      }
+
+      // The turn ended with its last stored row (the footer and the fold's duration read it).
+      if (at > 0) {
+        turn.endedAt = Math.max(turn.endedAt ?? at, at)
       }
 
       if (m.role === 'assistant') {
@@ -510,8 +534,10 @@ export class Transcript {
 
         call.status = (settleBridge(call) ?? Boolean(record(call.result)?.error)) ? 'error' : 'done'
 
+        // History drops todo results: the list is the stored args, a merge patching the one before.
         if (Array.isArray(args.todos)) {
-          call.todos = toTodos(args.todos)
+          call.todos = todosOf(args, todos)
+          todos = call.todos
         }
 
         calls.set(id, call)
@@ -525,7 +551,7 @@ export class Transcript {
   /** A resumed session's unfinished turn: its prompt, then a live turn holding what streamed so far. */
   inflight(turn: InflightTurn, at = Date.now()) {
     const user = turn.user?.trim()
-    const notice = user ? internalNotice(user) : undefined
+    const notice = user ? (displayNotice(turn.display_kind, turn.display_metadata) ?? internalNotice(user)) : undefined
 
     if (notice) {
       this.#continued = notice
@@ -585,6 +611,11 @@ export class Transcript {
     return this.entries.flatMap(e =>
       e.kind === 'turn' ? e.blocks.flatMap(b => (b.kind === 'tool' && b.call.name === name ? [b.call] : [])) : []
     )
+  }
+
+  /** The call with tool id `id`, in any turn. */
+  call(id: string): ToolCall | undefined {
+    return this.#tool(id)?.call
   }
 
   /** The terminal calls that run on as background processes, oldest first. */
@@ -704,6 +735,66 @@ export function record(v: unknown): Record<string, unknown> | undefined {
   return v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : undefined
 }
 
+/** The task tool's names: `todo_list`, and `todo`, the legacy alias in stored transcripts. */
+export function isTodoName(name: string): boolean {
+  return name === 'todo_list' || name === 'todo'
+}
+
+/** A todo call's list from its args: the whole list, or with `merge: true` a patch on `current`. */
+function todosOf(args: Record<string, unknown>, current: Todo[] | undefined): Todo[] {
+  const raw = Array.isArray(args.todos) ? args.todos : []
+
+  return args.merge === true ? mergeTodos(current ?? [], raw) : toTodos(raw)
+}
+
+/** As TodoStore.write(merge=True): items update by id in the fields given, new ids append. */
+function mergeTodos(current: Todo[], patch: unknown[]): Todo[] {
+  const out = current.map(t => ({ ...t }))
+
+  for (const item of patch) {
+    const r = record(item)
+    const id = String(r?.id ?? '').trim()
+
+    if (!r || !id) {
+      continue
+    }
+
+    const cur = out.find(t => t.id === id)
+
+    if (!cur) {
+      // Hermes rejects a new item with no text, so it never joins the list.
+      if (String(r.content ?? '').trim()) {
+        out.push(...toTodos([{ ...r, id }]))
+      }
+
+      continue
+    }
+
+    const content = String(r.content ?? '').trim()
+    const status = String(r.status ?? '').trim().toLowerCase()
+
+    if (content) {
+      cur.content = content
+    }
+
+    if (status === 'pending' || status === 'in_progress' || status === 'completed' || status === 'cancelled') {
+      cur.status = status
+    }
+
+    if ('parent' in r) {
+      const parent = String(r.parent ?? '').trim()
+
+      if (parent && parent !== id) {
+        cur.parent = parent
+      } else {
+        delete cur.parent
+      }
+    }
+  }
+
+  return out
+}
+
 function toTodos(raw: unknown[]): Todo[] {
   const out: Todo[] = []
 
@@ -726,6 +817,35 @@ function toTodos(raw: unknown[]): Todo[] {
   }
 
   return out
+}
+
+/**
+ * The reason line for a row Hermes typed as its own notice (tui_gateway/session_history.py), as
+ * Ink's and the desktop's timeline events word it; undefined for any other display_kind.
+ */
+export function displayNotice(kind: string | null | undefined, metadata: unknown): string | undefined {
+  if (kind === 'auto_continue') {
+    return 'Resumed interrupted turn'
+  }
+
+  if (kind !== 'async_delegation_complete' && kind !== 'process_complete') {
+    return undefined
+  }
+
+  const meta = record(metadata)
+  const shown = typeof meta?.display_text === 'string' ? meta.display_text.trim() : ''
+
+  if (shown) {
+    return shown
+  }
+
+  if (kind === 'process_complete') {
+    return 'Background command finished'
+  }
+
+  const count = typeof meta?.task_count === 'number' ? meta.task_count : undefined
+
+  return count === 1 ? 'Subagent finished' : count === undefined ? 'Subagents finished' : `${count} subagents finished`
 }
 
 /** The footer Hermes' gateway appends to every notice it sends the agent as a user row. */

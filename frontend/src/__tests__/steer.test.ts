@@ -69,3 +69,114 @@ describe("Hermes' own notices", () => {
     expect(t.entries.filter(e => e.kind === 'turn').map(e => e.continued)).toEqual([undefined, 'Background command exited'])
   })
 })
+
+describe('stored history as the display projection sends it', () => {
+  it('keeps a projected steer (display_kind steer, marker already removed) inside its turn', () => {
+    const t = new Transcript()
+    t.load([
+      { role: 'user', text: 'review the PRs', timestamp: 1 },
+      { role: 'assistant', text: 'Looking.', timestamp: 2 },
+      { display_kind: 'steer', role: 'user', text: 'just make tern tabs', timestamp: 3 },
+      { role: 'assistant', text: 'Making tabs.', timestamp: 4 }
+    ] as never)
+
+    const turns = t.entries.filter(e => e.kind === 'turn')
+    expect(t.entries.filter(e => e.kind === 'user')).toHaveLength(1)
+    expect(turns).toHaveLength(1)
+    expect(turns[0]!.blocks.map(b => b.kind)).toEqual(['text', 'steer', 'text'])
+    expect(turns[0]!.blocks[1]).toMatchObject({ kind: 'steer', text: 'just make tern tabs' })
+  })
+
+  it('times a resumed turn from its prompt to its last row', () => {
+    const t = new Transcript()
+    t.load([
+      { role: 'user', text: 'run the tests', timestamp: 10 },
+      { role: 'assistant', text: '', reasoning: 'plan', timestamp: 12 },
+      { name: 'terminal', role: 'tool', timestamp: 30, tool_call_id: 'c1' },
+      { role: 'assistant', text: 'All green.', timestamp: 50 }
+    ] as never)
+
+    const turn = t.entries.find(e => e.kind === 'turn') as TurnEntry
+    expect(turn.startedAt).toBe(10_000)
+    expect(turn.endedAt).toBe(50_000)
+  })
+
+  it("drops a notice's reason when its reply was hidden and the user asked next", () => {
+    const t = new Transcript()
+    t.load([
+      { role: 'user', text: 'start the job', timestamp: 1 },
+      { role: 'assistant', text: 'Started.', timestamp: 2 },
+      { display_kind: 'async_delegation_complete', role: 'user', text: '[ASYNC DELEGATION BATCH COMPLETE — d1] done', timestamp: 3 },
+      { role: 'user', text: 'wyd', timestamp: 4 },
+      { role: 'assistant', text: 'Waiting on you.', timestamp: 5 }
+    ] as never)
+
+    expect(t.entries.flatMap(e => (e.kind === 'user' ? [e.text] : []))).toEqual(['start the job', 'wyd'])
+    expect(t.entries.filter(e => e.kind === 'turn').map(e => e.continued)).toEqual([undefined, undefined])
+  })
+
+  it("reads Hermes' typed notices from display_kind and display_metadata, not their text", async () => {
+    const { displayNotice } = await import('../transcript.js')
+
+    expect(displayNotice('async_delegation_complete', { display_text: 'Subagent Task Completed: Build the catalog' })).toBe(
+      'Subagent Task Completed: Build the catalog'
+    )
+    expect(displayNotice('async_delegation_complete', { task_count: 3 })).toBe('3 subagents finished')
+    expect(displayNotice('async_delegation_complete', { task_count: 1 })).toBe('Subagent finished')
+    expect(displayNotice('process_complete', undefined)).toBe('Background command finished')
+    expect(displayNotice('auto_continue', undefined)).toBe('Resumed interrupted turn')
+    expect(displayNotice('steer', undefined)).toBeUndefined()
+    expect(displayNotice(undefined, undefined)).toBeUndefined()
+
+    const t = new Transcript()
+    t.load([
+      { role: 'user', text: 'fan out', timestamp: 1 },
+      { role: 'assistant', text: 'Sent.', timestamp: 2 },
+      {
+        display_kind: 'async_delegation_complete',
+        display_metadata: { display_text: 'Subagent Task Failed: Build the catalog' },
+        role: 'user',
+        text: '[ASYNC DELEGATION TASK FAILED — d1] boom',
+        timestamp: 3
+      },
+      { role: 'assistant', text: 'One failed.', timestamp: 4 },
+      {
+        display_kind: 'process_complete',
+        display_metadata: { display_text: '2 Background Processes Finished' },
+        role: 'user',
+        text: '[IMPORTANT: 2 background processes completed.]',
+        timestamp: 5
+      },
+      { role: 'assistant', text: 'Both done.', timestamp: 6 },
+      {
+        display_kind: 'auto_continue',
+        role: 'user',
+        text: '[System note: Your previous turn was interrupted mid-run. Continue.]',
+        timestamp: 7
+      },
+      { role: 'assistant', text: 'Picking up.', timestamp: 8 }
+    ] as never)
+
+    expect(t.entries.filter(e => e.kind === 'user')).toHaveLength(1)
+    expect(t.entries.filter(e => e.kind === 'turn').map(e => e.continued)).toEqual([
+      undefined,
+      'Subagent Task Failed: Build the catalog',
+      '2 Background Processes Finished',
+      'Resumed interrupted turn'
+    ])
+  })
+
+  it('reads a typed notice on an unfinished turn too', () => {
+    const t = new Transcript()
+    t.inflight({
+      assistant: 'Working',
+      display_kind: 'process_complete',
+      display_metadata: { display_text: 'Background Process Finished: npm test' },
+      streaming: true,
+      user: '[IMPORTANT: 1 background processes completed.]'
+    })
+
+    expect(t.entries.filter(e => e.kind === 'user')).toHaveLength(0)
+    expect(t.live?.continued).toBe('Background Process Finished: npm test')
+  })
+})

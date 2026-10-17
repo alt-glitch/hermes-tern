@@ -107,7 +107,8 @@ export interface ToolCall {
 /** A part of an assistant turn, in the order it streamed. */
 export type Block =
   | { kind: 'text'; id: string; text: string }
-  | { kind: 'thinking'; id: string; text: string; startedAt: number; endedAt?: number }
+  /** A thought; `label` names one that is not the agent's own (a Mixture-of-Agents reference answer). */
+  | { kind: 'thinking'; id: string; text: string; startedAt: number; endedAt?: number; label?: string }
   | { kind: 'tool'; id: string; call: ToolCall }
   /** Guidance the user sent into this turn while it ran; it lands before the agent's next step. */
   | { kind: 'steer'; id: string; text: string; at: number }

@@ -2,7 +2,8 @@
 // provider's models in one `picker` sheet like omp's (search, a provider
 // scope column, facts, a preview pane, the current model checked), switching
 // the session's model through `config.set` as the Ink TUI's picker does. The effort strip picks the
-// reasoning effort to go with it (Ctrl+E steps it); Save as default keeps both for new sessions.
+// reasoning effort to go with it (Ctrl+E steps it); Save as default keeps both for new sessions
+// where the gateway can write the default (a private one: the shared gateway switches the session only).
 
 import type { ConfigSetResult, ModelOptionProvider, ModelOptionsResult } from '@hermes/shared/gateway-events'
 import { modelSearchText } from '@hermes/shared/model-search-text'
@@ -86,6 +87,11 @@ export async function switchModel(app: App, value: string, confirmed = false): P
   return r
 }
 
+/** The switch the picker sends for a model row: this session's, or (`global`) also the default. */
+export function pickerValue(model: string, provider: string, global: boolean): string {
+  return `${model} --provider ${provider} ${global ? '--global' : '--session'}`
+}
+
 /** Opens the model picker over the session. */
 export function openModelPicker(app: App) {
   let state: 'loading' | 'ready' | 'error' = 'loading'
@@ -97,6 +103,8 @@ export function openModelPicker(app: App) {
   let scope = ALL
   let selected: string | undefined
   let global = false
+  // The shared gateway's model mutation switches this session only (as Desktop's and Ink's pickers there).
+  const canSave = !app.gw.isCanonical
   /** The session's effort when the picker opened, and the one picked on the strip. */
   const startEffort = app.info?.reasoning_effort || ''
   let effort = startEffort || 'medium'
@@ -147,11 +155,7 @@ export function openModelPicker(app: App) {
     busy = true
 
     try {
-      const r = await switchModel(
-        app,
-        `${row.model} --provider ${row.provider.slug} ${global ? '--global' : '--session'}`,
-        confirmed
-      )
+      const r = await switchModel(app, pickerValue(row.model, row.provider.slug, canSave && global), confirmed)
 
       if (r.confirm_required) {
         confirm = { row, text: r.confirm_message || r.warning || `${row.model} is expensive. Switch anyway?` }
@@ -159,8 +163,8 @@ export function openModelPicker(app: App) {
         app.close(overlay)
 
         // The effort goes with the model: saved with it as the default, or set when it changed.
-        if (global || effort !== startEffort) {
-          await app.setEffort(effort, global ? 'global' : 'session')
+        if ((canSave && global) || effort !== startEffort) {
+          await app.setEffort(effort, canSave && global ? 'global' : 'session')
         }
       }
     } catch (error) {
@@ -238,7 +242,7 @@ export function openModelPicker(app: App) {
       return (
         <picker
           actions={[
-            { id: 'global', keys: ['ctrl+g'], label: 'Save as default', on: global },
+            ...(canSave ? [{ id: 'global', keys: ['ctrl+g'], label: 'Save as default', on: global }] : []),
             { end: true, id: 'close', keys: ['esc'], label: 'Close' },
             { id: 'use', keys: ['enter'], label: 'Switch', primary: true }
           ]}
@@ -333,7 +337,7 @@ export function openModelPicker(app: App) {
         return true
       }
 
-      if (k.ctrl && k.name === 'g') {
+      if (canSave && k.ctrl && k.name === 'g') {
         global = !global
 
         return true

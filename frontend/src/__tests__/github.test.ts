@@ -1,13 +1,15 @@
 import { mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { DatabaseSync } from 'node:sqlite'
 
 import { describe, expect, it, vi } from 'vitest'
 
 import { parseRemote, parseStacks } from '../github/branch.js'
 import type { GitHub } from '../github/client.js'
-import { linkedFromResult, prKey, storedLinks } from '../github/links.js'
+import { ancestry, linkedFromResult, prKey, storedLinks } from '../github/links.js'
 import {
+  ACTIVITY_QUERY,
   batchQuery,
   checksState,
   checksSummary,
@@ -20,6 +22,7 @@ import {
 } from '../github/pullRequest.js'
 import { PullRequests } from '../github/store.js'
 import type { ToolCall } from '../model.js'
+import { tabView } from '../overlays/pullRequests.js'
 
 const ref = (number: number, repository = 'acme/app'): PrRef => ({
   host: 'github.com',
@@ -101,6 +104,29 @@ describe('links', () => {
     expect(storedLinks('tip', file, () => ['tip', 'mid', 'root']).map(r => r.number)).toEqual([7])
     expect(storedLinks('other', file, () => ['other'])).toEqual([])
     expect(storedLinks('tip', join(file, 'missing'), () => ['tip'])).toEqual([])
+  })
+
+  it('climbs only compression continuations, not a /branch, delegate, reset or tool child', () => {
+    const db = join(mkdtempSync(join(tmpdir(), 'tern-lineage-')), 'state.db')
+    const conn = new DatabaseSync(db)
+    conn.exec('CREATE TABLE sessions (id TEXT PRIMARY KEY, source TEXT, parent_session_id TEXT, model_config TEXT, end_reason TEXT)')
+    const add = conn.prepare('INSERT INTO sessions VALUES (?,?,?,?,?)')
+    add.run('root', 'tui', null, '{}', 'compression')
+    // A continuation copies model_config, so it may carry an older marker that names another row.
+    add.run('mid', 'tui', 'root', '{"_branched_from":"elder"}', 'compression')
+    add.run('tip', 'tui', 'mid', 'not json', null)
+    add.run('branch', 'tui', 'tip', '{"_branched_from":"tip"}', null)
+    add.run('fork', 'tui', 'mid', '{"_branched_from":"mid"}', null)
+    add.run('reset', 'tui', 'mid', '{"_reset_from":"mid"}', null)
+    add.run('agent', 'tui', 'mid', '{"_delegate_from":"mid"}', null)
+    add.run('tool', 'tool', 'mid', '{}', null)
+    add.run('open', 'tui', 'tip', '{}', null)
+    conn.close()
+
+    expect(ancestry('tip', db)).toEqual(['tip', 'mid', 'root'])
+    expect(['branch', 'fork', 'reset', 'agent', 'tool'].map(id => ancestry(id, db))).toEqual([['branch'], ['fork'], ['reset'], ['agent'], ['tool']])
+    // `tip` did not end in compression, so a plain child of it is not its continuation.
+    expect(ancestry('open', db)).toEqual(['open'])
   })
 })
 
@@ -203,6 +229,110 @@ describe('PullRequests', () => {
 
     store.adopt()
     await vi.waitFor(() => expect(store.error).toBe('Not logged in to github.com.'))
+    store.dispose()
+  })
+
+  /** A store on PR #5 whose `updatedAt` the test moves, with its activity and files reads counted. */
+  const detailStore = () => {
+    const at = { fail: false, now: 'A' }
+    const graphql = vi.fn(async (_host: string, query: string) => {
+      if (query !== ACTIVITY_QUERY) {
+        return { p0: prJson({ updatedAt: at.now }) }
+      }
+
+      if (at.fail) {
+        throw new Error('rate limited')
+      }
+
+      return { repository: { pullRequest: { comments: { nodes: [{ author: { login: 'a' }, body: at.now, createdAt: '2026-01-02T00:00:00Z' }] } } } }
+    })
+    const rest = vi.fn(async () => [{ filename: `${at.now}.ts`, status: 'modified' }])
+    const store = new PullRequests({ changed: vi.fn(), cwd: () => null, sid: () => 's1' }, { graphql, rest } as unknown as GitHub, () => [ref(5)])
+    const reads = () => graphql.mock.calls.filter(c => c[1] === ACTIVITY_QUERY).length
+
+    return { at, reads, rest, store }
+  }
+  const KEY = 'github.com/acme/app#5'
+
+  it('keeps the files and the activity fresh apart: one tab read does not vouch for the other', async () => {
+    const { at, rest, store } = detailStore()
+    store.adopt()
+    await vi.waitFor(() => expect(store.get(KEY)?.pr?.updatedAt).toBe('A'))
+
+    await store.files(KEY)
+    at.now = 'B'
+    store.poke()
+    await vi.waitFor(() => expect(store.get(KEY)?.pr?.updatedAt).toBe('B'))
+    await store.activity(KEY)
+    await store.files(KEY)
+
+    expect(store.get(KEY)?.files?.map(f => f.path)).toEqual(['B.ts'])
+    // Read once per update, even with no activity read yet.
+    await store.files(KEY)
+    expect(rest).toHaveBeenCalledTimes(2)
+    store.dispose()
+  })
+
+  it('records a failed tab read, reads once at a time and tries again after a while', async () => {
+    const { at, reads, store } = detailStore()
+    store.adopt()
+    await vi.waitFor(() => expect(store.get(KEY)?.pr).toBeDefined())
+    const now = vi.spyOn(Date, 'now').mockReturnValue(1_000_000)
+
+    at.fail = true
+    await expect(store.activity(KEY)).rejects.toThrow('rate limited')
+    expect(store.get(KEY)?.activityError).toBe('rate limited')
+    // The sheet asks on every frame: no new read until the wait is over.
+    await store.activity(KEY)
+    expect(reads()).toBe(1)
+
+    at.fail = false
+    now.mockReturnValue(1_000_000 + 30_000)
+    await Promise.all([store.activity(KEY), store.activity(KEY)])
+    expect(reads()).toBe(2)
+    expect(store.get(KEY)?.activityError).toBeUndefined()
+    expect(store.get(KEY)?.activity?.length).toBe(1)
+    now.mockRestore()
+    store.dispose()
+  })
+
+  it('shows a failed tab read in the tab instead of loading forever', () => {
+    const pr = parsePullRequest(ref(5), prJson())!
+    const entry = { pr, ref: ref(5), source: 'linked' as const }
+
+    expect(tabView('activity', entry, 0)).toMatchObject({ error: undefined, loading: true })
+    expect(tabView('activity', { ...entry, activityError: 'GitHub answered 502' }, 0)).toMatchObject({ error: 'GitHub answered 502', loading: false })
+    expect(tabView('files', { ...entry, filesError: 'timeout' }, 0)).toMatchObject({ error: 'timeout', loading: false })
+    // An older list stays up while a newer read fails.
+    expect(tabView('files', { ...entry, files: [], filesError: 'timeout' }, 0)).toMatchObject({ error: undefined, loading: false })
+  })
+
+  it('turns stack grouping off only for a schema with no stack field, not for a failed request', async () => {
+    let failure = 'GitHub answered 502'
+    const graphql = vi.fn(async (_host: string, query: string) => {
+      if (query.includes('stack { number }')) {
+        throw new Error(failure)
+      }
+
+      return { p0: prJson() }
+    })
+    const store = new PullRequests({ changed: vi.fn(), cwd: () => null, sid: () => 's1' }, { graphql, rest: vi.fn() } as unknown as GitHub, () => [ref(5)])
+    const asked = () => graphql.mock.calls.filter(c => c[1].includes('stack { number }')).length
+
+    const round = async () => {
+      store.poke()
+      await vi.waitFor(() => expect(store.loading).toBe(false))
+    }
+
+    store.adopt()
+    await vi.waitFor(() => expect(store.loading).toBe(false))
+    await round()
+    expect(asked()).toBe(2)
+
+    failure = "Field 'stack' doesn't exist on type 'PullRequest'"
+    await round()
+    await round()
+    expect(asked()).toBe(3)
     store.dispose()
   })
 })

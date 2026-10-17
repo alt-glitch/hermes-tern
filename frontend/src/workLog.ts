@@ -516,7 +516,7 @@ export function stepLabel(call: ToolCall): string {
  */
 export function liveLabel(item: WorkItem, active = false): string {
   if (item.kind === 'thinking') {
-    return thoughtLine(item.text) || (item.endedAt === undefined || active ? 'Thinking' : 'Thought')
+    return thoughtTitle(item) || (item.endedAt === undefined || active ? 'Thinking' : 'Thought')
   }
 
   const call = item.call
@@ -530,6 +530,18 @@ export function liveLabel(item: WorkItem, active = false): string {
   const verb = { cancelled: 'Stopped', done: 'Ran', error: 'Failed', running: 'Running' }[status]
 
   return `${verb} ${commandProgramName(command) ?? 'command'}`
+}
+
+/** The working line for a call that just started: its live step ("Reading a.ts…", "Linear · create issue…"). */
+export function busyLabel(call: ToolCall): string {
+  return `${liveLabel({ call, id: call.id, kind: 'tool' }, true)}…`
+}
+
+/** The working line while the model writes a call: only its name is known yet. */
+export function preparingLabel(name: string): string {
+  const app = callApp({ args: {}, name })
+
+  return `Preparing ${app ? `${app.app} · ${app.action}` : name.replace(/_/g, ' ')}…`
 }
 
 const PRESENT: Record<string, string> = {
@@ -560,6 +572,13 @@ export function thoughtLine(markdown: string): string {
       .replace(/`+|\*\*|~~/g, '')
       .replace(/(^|[^\w*])[*_]([^*_\n]+)[*_](?![\w*])/g, '$1$2')
   )
+}
+
+/** A thought's row: its line, after the label of one that is not the agent's own ("Reference 1/3 · gpt-5: …"). */
+export function thoughtTitle(item: { label?: string; text: string }): string {
+  const line = thoughtLine(item.text)
+
+  return item.label ? (line ? `${item.label}: ${line}` : item.label) : line
 }
 
 const flat = (text: string) => text.replace(/\s+/g, ' ').trim()

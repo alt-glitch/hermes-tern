@@ -1,6 +1,7 @@
 // Turn controls routed to the shared gateway's dedicated RPCs (session.steer,
-// session.interrupt, process.stop, tools.show) instead of `slash.exec`.
-// Mirrors Hermes' ui-tui/src/app/slash/commands/core.ts (/steer, /queue, /stop, /tools).
+// session.interrupt, process.stop, tools.show, prompt.background, prompt.btw) instead of
+// `slash.exec`. Mirrors Hermes' ui-tui/src/app/slash/commands/core.ts (/steer, /queue, /stop,
+// /tools) and session.ts (/bg, /btw).
 import type { GatewayClient } from '@tui/gatewayClient.js'
 
 import { currentGeneration } from './hermes/mutate.js'
@@ -11,6 +12,8 @@ export interface ControlHost {
   gw: Pick<GatewayClient, 'request'>
   sid: string | null
   busy: boolean
+  /** How many prompts wait on the next-prompt queue. */
+  queued: number
   /** Submits `text` as a normal prompt: sent now when idle, queued behind the turn otherwise. */
   submit(text: string): void
   /** Puts `text` on the next-prompt queue. */
@@ -84,7 +87,7 @@ async function steer(host: ControlHost, text: string) {
 
 function queue(host: ControlHost, text: string) {
   if (!text) {
-    return host.notice('Usage: /queue <prompt to run after the current turn>', 'warning')
+    return host.notice(`${host.queued} queued message${host.queued === 1 ? '' : 's'}`)
   }
 
   host.submit(text)
@@ -149,10 +152,42 @@ async function tools(host: ControlHost, arg: string) {
   }
 }
 
+/**
+ * `/bg <prompt>` and `/btw <question>`: a detached side agent on the session's route. The gateway
+ * answers `{task_id}` now and the reply later as `background.complete` / `btw.complete`.
+ */
+async function side(host: ControlHost, text: string, kind: 'bg' | 'btw') {
+  if (!text) {
+    return host.notice(kind === 'bg' ? 'Usage: /bg <prompt>' : 'Usage: /btw <question>', 'warning')
+  }
+
+  if (!host.sid) {
+    return host.notice('No active session.', 'warning')
+  }
+
+  try {
+    const r = await host.gw.request<{ task_id?: string } | null>(kind === 'bg' ? 'prompt.background' : 'prompt.btw', {
+      session_id: host.sid,
+      text
+    })
+
+    if (r?.task_id) {
+      host.notice(
+        kind === 'bg'
+          ? `Background task ${r.task_id} started: ${preview(text)}`
+          : `btw ${r.task_id}: answering from a snapshot of this conversation`
+      )
+    }
+  } catch (e) {
+    host.notice(`/${kind} failed: ${errorText(e)}`, 'error')
+  }
+}
+
 export const CONTROL_COMMANDS: readonly ControlCommand[] = [
   { aliases: ['s'], name: 'steer', run: steer },
-  // `/q` stays quit's alias here (Hermes' registry maps it to /queue).
-  { name: 'queue', run: queue },
+  { aliases: ['q'], name: 'queue', run: queue },
   { name: 'stop', run: stop },
-  { name: 'tools', run: tools }
+  { name: 'tools', run: tools },
+  { aliases: ['background'], name: 'bg', run: (host, arg) => side(host, arg, 'bg') },
+  { name: 'btw', run: (host, arg) => side(host, arg, 'btw') }
 ]

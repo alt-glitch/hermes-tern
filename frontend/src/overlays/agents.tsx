@@ -4,7 +4,7 @@
 // latest activity. Enter opens the agent beside the chat (watch/: its full transcript, live,
 // with a composer that steers it). T opens its timeline in this sheet instead (its live
 // transcript log, one row per step, following the newest). S steers a running agent (the
-// search line becomes the message), X stops it.
+// search line becomes the message), X stops it. P pauses (or resumes) new spawns, gateway-wide.
 
 import type { JSX, Key, PickerColumn, PickerItem, Tone } from '@stencil-hq/tern'
 
@@ -139,6 +139,18 @@ export function openAgents(app: App, focus?: { id: string; watch?: boolean }) {
     app.changed()
   }
 
+  /** Blocks or unblocks new spawns (`delegation.pause`, every chat on the gateway); running agents keep going. */
+  const togglePause = async () => {
+    try {
+      const paused = await app.agents.pause(!app.agents.paused)
+      app.transcript.notice(paused ? 'Subagent spawning paused for every chat on this gateway.' : 'Subagent spawning resumed.')
+    } catch (error) {
+      app.transcript.notice(error instanceof Error ? error.message : String(error), 'error')
+    }
+
+    app.changed()
+  }
+
   const shown = (): Subagent[] => (tab === 'running' ? agents().filter(isRunning) : agents())
 
   const steps = (a: Subagent): LogEntry[] => a.log?.entries ?? []
@@ -146,6 +158,7 @@ export function openAgents(app: App, focus?: { id: string; watch?: boolean }) {
   const overlay: Overlay = {
     key: KEY,
     modal: true,
+    cancel: close,
     node: () => {
       const now = Date.now()
       const watched = watching ? agents().find(a => a.id === watching) : undefined
@@ -200,6 +213,8 @@ export function openAgents(app: App, focus?: { id: string; watch?: boolean }) {
         beside(selected)
       } else if (k.name === 't' && !k.ctrl && !k.alt) {
         watch(selected)
+      } else if (k.name === 'p' && !k.ctrl && !k.alt) {
+        void togglePause()
       } else if (k.name === 'tab') {
         tab = tab === 'running' ? 'all' : 'running'
       } else {
@@ -234,7 +249,8 @@ export function openAgents(app: App, focus?: { id: string; watch?: boolean }) {
         ? []
         : [
             { id: 'watch', keys: ['t'], label: 'Timeline' },
-            { id: 'beside', keys: ['enter'], label: 'Open beside', primary: true }
+            { id: 'beside', keys: ['enter'], label: 'Open beside', primary: true },
+            { id: 'pause', keys: ['p'], label: app.agents.paused ? 'Resume spawns' : 'Pause spawns' }
           ]),
       {
         disabled: running ? (a?.steerable === false ? ('Not taking steering now' as const) : undefined) : ('Finished' as const),
@@ -262,6 +278,7 @@ export function openAgents(app: App, focus?: { id: string; watch?: boolean }) {
       }
     },
     confirm: () => void stop(),
+    pause: () => void togglePause(),
     steer: () => {
       steer = ''
       app.changed()
@@ -323,7 +340,10 @@ export function openAgents(app: App, focus?: { id: string; watch?: boolean }) {
         preview="side"
         selected={selected}
         size="lg"
-        subtitle={[{ s: 'muted', t: summary(all) }]}
+        subtitle={[
+          { s: 'muted', t: summary(all) },
+          ...(app.agents.paused ? [{ s: 'warning', t: ' · spawns paused (gateway-wide)' }] : [])
+        ]}
         tab={tab}
         tabs={[
           { count: running, id: 'running', label: 'Running' },

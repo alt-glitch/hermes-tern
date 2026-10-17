@@ -8,6 +8,7 @@ import { connect } from '@stencil-hq/tern'
 import { GatewayClient } from '@tui/gatewayClient.js'
 
 import { App } from './app.js'
+import { FaultBudget, isDeadStream } from './backendNotes.js'
 import { readWatchSpec } from './watch/spec.js'
 import { WatchApp } from './watch/watchApp.js'
 
@@ -25,5 +26,24 @@ const gw = new GatewayClient()
 gw.start()
 
 const watch = readWatchSpec()
-const code = await (watch ? new WatchApp(session, gw, watch) : new App(session, gw, version)).run()
+const app = watch ? new WatchApp(session, gw, watch) : new App(session, gw, version)
+
+// Node exits on an unhandled rejection or throw: a stray one is a notice in the chat, not a closed
+// pane, as Ink's setupGracefulExit does. A closed terminal (EIO, EPIPE) can show nothing, and a
+// fault that repeats itself (a throwing render) would only loop, so those exit.
+const faults = new FaultBudget()
+const fault = (err: unknown) => {
+  if (!(app instanceof App) || isDeadStream(err) || !faults.take()) {
+    process.stderr.write(`hermes tern: ${err instanceof Error ? (err.stack ?? err.message) : String(err)}\n`)
+    gw.kill('exit')
+    process.exit(1)
+  }
+
+  app.fault(err)
+}
+
+process.on('unhandledRejection', fault)
+process.on('uncaughtException', fault)
+
+const code = await app.run()
 process.exit(code)

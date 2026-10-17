@@ -6,7 +6,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Composer } from '../composer.js'
 import { Completion } from '../overlays/completion.js'
 
-vi.mock('@tui/lib/history.js', () => ({ append: () => undefined, load: () => [] }))
+const history: string[] = []
+
+vi.mock('@tui/lib/history.js', () => ({ append: () => undefined, load: () => history }))
 
 interface Reply {
   items?: CompletionItem[]
@@ -44,6 +46,7 @@ const escape = { alt: false, ctrl: false, meta: false, name: 'escape', shift: fa
 
 beforeEach(() => {
   pending.length = 0
+  history.length = 0
   vi.useFakeTimers()
 })
 
@@ -96,5 +99,26 @@ describe('Completion', () => {
     expect(completion.onKey({ ...escape, name: 'tab' })).toBe(false)
     expect(composer.text).toBe('/hx')
     expect(completion.ghost).toBe('')
+  })
+
+  it('leaves Up/Down to the prompt history while a recalled entry opened the list', async () => {
+    history.push('/help', '/new')
+    const { completion, composer } = setup()
+    const up = { ...escape, name: 'up' }
+    composer.key(up)
+    completion.update(composer)
+    vi.advanceTimersByTime(100)
+    pending[0]?.resolve({ items: [row('/new'), row('/news')] })
+    await vi.runAllTimersAsync()
+    expect(completion.open).toBe(true)
+
+    expect(completion.onKey(up)).toBe(false)
+    expect(completion.onKey({ ...escape, name: 'down' })).toBe(false)
+    composer.key(up)
+    expect(composer.text).toBe('/help')
+
+    // Typed text is a draft again: the list owns the arrows.
+    composer.insert('x')
+    expect(completion.onKey(up)).toBe(true)
   })
 })
