@@ -24786,8 +24786,8 @@ var Transcript = class {
     this.entries.push(entry);
     this.#touch();
   }
-  user(text2, at = Date.now()) {
-    this.push({ at, id: this.id("u"), kind: "user", text: text2 });
+  user(text2, at = Date.now(), steered = false) {
+    this.push({ at, id: this.id("u"), kind: "user", text: text2, ...steered ? { steered } : {} });
   }
   notice(text2, tone = "info") {
     this.push({ id: this.id("n"), kind: "notice", text: text2, tone });
@@ -25649,6 +25649,15 @@ async function interruptTurn(gw2, sid) {
   const execution_generation = await currentGeneration(gw2, sid);
   await gw2.request("session.interrupt", { session_id: sid, execution_generation });
 }
+async function steerTurn(gw2, sid, text2) {
+  try {
+    const execution_generation = await currentGeneration(gw2, sid);
+    const r = await gw2.request("session.steer", { session_id: sid, execution_generation, text: text2 });
+    return r?.status === "queued" ? { ok: true } : { ok: false };
+  } catch (e) {
+    return errorText(e).includes("stale_generation") ? { ok: false } : { error: errorText(e), ok: false };
+  }
+}
 async function steer(host, text2) {
   if (!text2) {
     return host.notice("Usage: /steer <guidance for the active turn>", "warning");
@@ -25657,22 +25666,12 @@ async function steer(host, text2) {
     host.enqueue(text2);
     return host.notice(`No active turn \u2014 queued as next prompt: ${preview(text2)}`);
   }
-  let status;
-  try {
-    const execution_generation = await currentGeneration(host.gw, host.sid);
-    const r = await host.gw.request("session.steer", {
-      session_id: host.sid,
-      execution_generation,
-      text: text2
-    });
-    status = r?.status;
-  } catch (e) {
-    if (!errorText(e).includes("stale_generation")) {
-      return host.notice(`/steer failed: ${errorText(e)}`, "error");
-    }
-  }
-  if (status === "queued") {
+  const r = await steerTurn(host.gw, host.sid, text2);
+  if (r.ok) {
     return host.notice(`Steer queued for the active turn: ${preview(text2)}`);
+  }
+  if (r.error) {
+    return host.notice(`/steer failed: ${r.error}`, "error");
   }
   host.enqueue(text2);
   host.notice("Turn ended before the steer landed \u2014 queued as next prompt", "warning");
@@ -29710,6 +29709,22 @@ function dockNodes(cx) {
         /* @__PURE__ */ jsx("icon", { name: "corner-down-right" }, "icon"),
         /* @__PURE__ */ jsx("text", { grow: 1, text: text2.replace(/\s*\r?\n\s*/g, " \u21B5 "), truncate: "end", wrap: "none" }, "text"),
         i === 0 && cx.queued.length > 1 ? /* @__PURE__ */ jsx("badge", { role: "omp.queue.count", text: `${cx.queued.length}` }, "count") : null,
+        cx.onQueueSteer ? /* @__PURE__ */ jsxs(
+          "row",
+          {
+            align: "center",
+            gap: "xs",
+            onClick: () => cx.onQueueSteer?.(i),
+            role: "omp.queue.steer",
+            title: "Steer the running turn with this  \u2325\u21B5",
+            children: [
+              /* @__PURE__ */ jsx("icon", { name: "corner-up-right" }, "i"),
+              /* @__PURE__ */ jsx("kbd", { keys: ["alt", "enter"] }, "k"),
+              /* @__PURE__ */ jsx("text", { text: "Steer" }, "t")
+            ]
+          },
+          "steer"
+        ) : null,
         /* @__PURE__ */ jsxs("row", { align: "center", gap: "xs", onClick: cx.onQueueEdit, role: "omp.queue.edit", title: "Edit  \u2325\u2191", children: [
           /* @__PURE__ */ jsx("kbd", { keys: ["alt", "up"] }, "k"),
           /* @__PURE__ */ jsx("text", { text: "Edit" }, "t")
@@ -30404,7 +30419,8 @@ function userNode(e, cx) {
       ),
       copyButton(e.text, e.id, "omp.user.tool", "Copy message", cx)
     ] }, "tools"),
-    /* @__PURE__ */ jsx("md", { children: e.text }, "body")
+    /* @__PURE__ */ jsx("md", { children: e.text }, "body"),
+    e.steered ? /* @__PURE__ */ jsx("text", { role: "omp.user.steered", spans: [{ s: "dim", t: "\u21B3 steered" }] }, "steered") : null
   ] }, e.id);
 }
 function turnNode(turn, id, cx) {
@@ -30748,6 +30764,9 @@ var App = class {
     }
     if (key2.alt && key2.name === "up" && this.queue.length) {
       return this.#dequeue();
+    }
+    if (key2.alt && key2.name === "enter" && this.busy && this.queue.length && !this.composer.text) {
+      return this.#steerQueued(0);
     }
     if (key2.ctrl && key2.name === "d" && !this.composer.text) {
       return this.quit();
@@ -31334,6 +31353,28 @@ ${this.composer.text}` : next);
       this.changed();
     }
   }
+  /** Alt+Enter / the queue's Steer: injects queued prompt `index` into the running turn instead of waiting for it to end. */
+  #steerQueued(index) {
+    const sid = this.sid;
+    const [text2] = this.busy && sid ? this.queue.splice(index, 1) : [];
+    if (text2 === void 0 || !sid) {
+      return;
+    }
+    this.changed();
+    void steerTurn(this.#gw, sid, text2).then((r) => {
+      if (r.ok) {
+        this.transcript.user(text2, Date.now(), true);
+      } else {
+        this.queue.splice(index, 0, text2);
+        this.transcript.notice(
+          r.error ? `Steer failed: ${r.error}. It stays queued.` : "The turn ended before the steer landed. It will send as the next prompt.",
+          "warning"
+        );
+        this.#drainQueue();
+      }
+      this.changed();
+    });
+  }
   /** Sends the oldest queued prompt once the session is adopted and idle (no turn, switch or startup image pending). */
   #drainQueue() {
     if (this.busy || !this.sid || this.#switches.pending || this.#startupImage) {
@@ -31386,6 +31427,7 @@ ${this.composer.text}` : next);
         onInterrupt: () => this.#interrupt(),
         onModel: () => openModelPicker(this),
         onQueueEdit: () => this.#dequeue(),
+        onQueueSteer: this.busy ? (i) => this.#steerQueued(i) : void 0,
         onSend: (ev) => {
           this.#submit(ev.text);
           this.changed();

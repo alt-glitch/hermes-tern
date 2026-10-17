@@ -27,7 +27,7 @@ import { agentName, Agents } from './agents/store.js'
 import { copyToClipboard } from './clipboard.js'
 import { localCommand } from './commands.js'
 import { Composer } from './composer.js'
-import { type ControlHost, interruptTurn } from './controlCommands.js'
+import { type ControlHost, interruptTurn, steerTurn } from './controlCommands.js'
 import { type Busy, busyFrom, ownsEvent, Switches } from './flow.js'
 import type { Overlay, OverlayHost } from './overlay.js'
 import { writeActiveSessionFile } from './hermes/activeSessionFile.js'
@@ -262,6 +262,10 @@ export class App implements OverlayHost {
 
     if (key.alt && key.name === 'up' && this.queue.length) {
       return this.#dequeue()
+    }
+
+    if (key.alt && key.name === 'enter' && this.busy && this.queue.length && !this.composer.text) {
+      return this.#steerQueued(0)
     }
 
     if (key.ctrl && key.name === 'd' && !this.composer.text) {
@@ -1067,6 +1071,34 @@ export class App implements OverlayHost {
     }
   }
 
+  /** Alt+Enter / the queue's Steer: injects queued prompt `index` into the running turn instead of waiting for it to end. */
+  #steerQueued(index: number) {
+    const sid = this.sid
+    const [text] = this.busy && sid ? this.queue.splice(index, 1) : []
+
+    if (text === undefined || !sid) {
+      return
+    }
+
+    this.changed()
+    void steerTurn(this.#gw, sid, text).then(r => {
+      if (r.ok) {
+        this.transcript.user(text, Date.now(), true)
+      } else {
+        this.queue.splice(index, 0, text)
+        this.transcript.notice(
+          r.error
+            ? `Steer failed: ${r.error}. It stays queued.`
+            : 'The turn ended before the steer landed. It will send as the next prompt.',
+          'warning'
+        )
+        this.#drainQueue()
+      }
+
+      this.changed()
+    })
+  }
+
   /** Sends the oldest queued prompt once the session is adopted and idle (no turn, switch or startup image pending). */
   #drainQueue() {
     if (this.busy || !this.sid || this.#switches.pending || this.#startupImage) {
@@ -1129,6 +1161,7 @@ export class App implements OverlayHost {
         onInterrupt: () => this.#interrupt(),
         onModel: () => openModelPicker(this),
         onQueueEdit: () => this.#dequeue(),
+        onQueueSteer: this.busy ? i => this.#steerQueued(i) : undefined,
         onSend: ev => {
           this.#submit(ev.text)
           this.changed()

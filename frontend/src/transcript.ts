@@ -86,8 +86,8 @@ export class Transcript {
     this.#touch()
   }
 
-  user(text: string, at = Date.now()) {
-    this.push({ at, id: this.id('u'), kind: 'user', text })
+  user(text: string, at = Date.now(), steered = false) {
+    this.push({ at, id: this.id('u'), kind: 'user', text, ...(steered ? { steered } : {}) })
   }
 
   notice(text: string, tone: NoticeEntry['tone'] = 'info') {

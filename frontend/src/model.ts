@@ -85,6 +85,8 @@ export interface UserEntry {
   id: string
   text: string
   at: number
+  /** Injected into a running turn rather than starting one. */
+  steered?: boolean
 }
 
 /** One assistant turn: thinking, text and tool calls as they arrived. */

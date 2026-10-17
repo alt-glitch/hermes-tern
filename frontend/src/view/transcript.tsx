@@ -91,6 +91,7 @@ function userNode(e: UserEntry, cx: TranscriptContext): JSX.Element {
         {copyButton(e.text, e.id, 'omp.user.tool', 'Copy message', cx)}
       </row>
       <md key="body">{e.text}</md>
+      {e.steered ? <text key="steered" role="omp.user.steered" spans={[{ s: 'dim', t: '↳ steered' }]} /> : null}
     </card>
   )
 }

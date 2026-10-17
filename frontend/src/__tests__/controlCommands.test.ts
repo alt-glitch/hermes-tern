@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 
-import { CONTROL_COMMANDS, type ControlHost } from '../controlCommands.js'
+import { CONTROL_COMMANDS, type ControlHost, steerTurn } from '../controlCommands.js'
 
 const run = (name: string, host: ControlHost, arg = '') => CONTROL_COMMANDS.find(c => c.name === name)!.run(host, arg)
 
@@ -89,5 +89,41 @@ describe('control commands', () => {
 
     expect(request).toHaveBeenCalledWith('tools.show', { session_id: 'sid-1' })
     expect(h.notice).toHaveBeenCalledWith('[web] web_search\nTotal: 1 tools')
+  })
+})
+
+describe('steerTurn', () => {
+  const gw = (steer: unknown) =>
+    ({
+      request: vi.fn(async (m: string) => {
+        if (m === 'session.resume') {
+          return { execution_generation: 4 }
+        }
+
+        if (steer instanceof Error) {
+          throw steer
+        }
+
+        return steer
+      })
+    }) as unknown as ControlHost['gw']
+
+  it('lands at the current generation when the gateway queues it', async () => {
+    const g = gw({ status: 'queued' })
+
+    expect(await steerTurn(g, 's', 'hi')).toEqual({ ok: true })
+    expect(g.request).toHaveBeenCalledWith('session.steer', { execution_generation: 4, session_id: 's', text: 'hi' })
+  })
+
+  it('reports a rejection or a stale generation without an error', async () => {
+    expect(await steerTurn(gw({ status: 'rejected' }), 's', 'hi')).toEqual({ ok: false })
+    expect(await steerTurn(gw(new Error('stale_generation')), 's', 'hi')).toEqual({ ok: false })
+  })
+
+  it('carries other failures as an error', async () => {
+    expect(await steerTurn(gw(new Error('execution_not_ready')), 's', 'hi')).toEqual({
+      error: 'execution_not_ready',
+      ok: false
+    })
   })
 })
