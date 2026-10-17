@@ -36,6 +36,29 @@ interface Button {
 
 const str = (v: unknown): string => (typeof v === 'string' ? v : '')
 
+/** Ctrl+C on a question sheet declines it, as Esc does (the TUI's `cancelOverlayFromCtrlC`). */
+const isCtrlC = (k: Key) => k.ctrl && k.name === 'c'
+
+/** What the TUI says when an unanswered password, secret or vault card times out (and desktop, for a legacy approval). */
+const TIMEOUT_NOTICES: Record<string, string> = {
+  approval:
+    'Approval timed out: the command was not run. Ask Hermes to try again when you are ready to answer.',
+  secret:
+    'Secret prompt closed: no answer in time, so the step that needed it was skipped. Send your request again when you are ready to enter it.',
+  sudo: 'Password prompt closed: no answer in time, so the command was skipped. Send your request again when you are ready to enter it.',
+  'vault.code':
+    'Verification-code prompt closed: no answer in time, so the sign-in was skipped. Send your request again when you have the code.',
+  'vault.save_login':
+    'Save-login prompt closed: no answer in time, so nothing was saved. Send your request again when you are ready.',
+  'vault.unlock_prompt':
+    'Unlock prompt closed: no answer in time, so the password manager stayed locked. Send your request again when you are ready to unlock it.'
+}
+
+/** The transcript line for a `request.cancel`, or null (not a timeout; clarify records its own via tool.complete). */
+export function promptTimeoutNotice(method: unknown, reason: unknown): string | null {
+  return reason === 'timeout' && typeof method === 'string' ? (TIMEOUT_NOTICES[method] ?? null) : null
+}
+
 function actionsRow(buttons: Button[]): JSX.Element {
   return (
     <row align="center" gap="sm" key="actions" role="omp.actions">
@@ -234,7 +257,9 @@ function approvalOverlay(host: OverlayHost, req: ServerRequest): Overlay {
       const n = Number.parseInt(k.name, 10)
       const to = moved(k, selected, options.length)
 
-      if (to !== undefined) {
+      if (isCtrlC(k)) {
+        answer('deny')
+      } else if (to !== undefined) {
         selected = to
       } else if (n >= 1 && n <= options.length) {
         answer(options[n - 1]?.id ?? 'deny')
@@ -523,7 +548,11 @@ function clarifyOverlay(host: OverlayHost, req: ServerRequest): Overlay {
       const typing = d.typing || !q.choices.length
       const count = q.choices.length + 1
 
-      if (k.name === 'tab' && questions.length > 1) {
+      if (isCtrlC(k)) {
+        // The whole card, not just this question: an empty answer is cancel-all ('' on the shared wire).
+        req.respond({})
+        host.close(overlay)
+      } else if (k.name === 'tab' && questions.length > 1) {
         go(step + (k.shift ? -1 : 1))
       } else if (k.name === 'escape' && typing && q.choices.length) {
         // Leave the Other field first; Esc on the list skips the question.
@@ -583,12 +612,15 @@ function maskedOverlay(host: OverlayHost, req: ServerRequest): Overlay {
   const site = str(p.site) || str(p.origin)
   const login = req.method === 'vault.save_login'
 
+  // A one-time code shows as typed, as the TUI's VaultCodePrompt does: a short code is easy to mistype.
+  const code = req.method === 'vault.code'
+
   const fields: Field[] = login
     ? [
         { id: 'identifier', label: 'Username or email', masked: false, value: new Composer() },
         { id: 'password', label: 'Password', masked: true, value: new Composer() }
       ]
-    : [{ id: 'value', label: 'Hidden while you type', masked: true, value: new Composer() }]
+    : [{ id: 'value', label: code ? 'Type the code' : 'Hidden while you type', masked: !code, value: new Composer() }]
 
   let at = 0
 
@@ -603,7 +635,12 @@ function maskedOverlay(host: OverlayHost, req: ServerRequest): Overlay {
             ? `Save a login for ${site || 'this site'}`
             : `Code for ${site || 'this site'}`
 
-  const note = req.method === 'secret' ? str(p.env_var) : req.method === 'vault.code' ? str(p.hint) : ''
+  const note =
+    req.method === 'secret'
+      ? str(p.env_var)
+      : code
+        ? [str(p.hint), 'typed into the page only · never shown to the model'].filter(Boolean).join(' · ')
+        : ''
 
   // `''` is the contract's "skipped / declined".
   const finish = (cancel: boolean) => {
@@ -669,7 +706,7 @@ function maskedOverlay(host: OverlayHost, req: ServerRequest): Overlay {
       </overlay>
     ),
     onKey: k => {
-      if (k.name === 'escape') {
+      if (k.name === 'escape' || isCtrlC(k)) {
         finish(true)
       } else if (k.name === 'tab' && fields.length > 1) {
         at = (at + 1) % fields.length

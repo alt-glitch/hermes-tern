@@ -42,7 +42,7 @@ import { openBackground } from './overlays/background.js'
 import { Completion } from './overlays/completion.js'
 import { openModelPicker } from './overlays/models.js'
 import { openEffortPicker } from './overlays/effort.js'
-import { promptOverlay } from './overlays/prompts.js'
+import { promptOverlay, promptTimeoutNotice } from './overlays/prompts.js'
 import { openPullRequests, openUrl, prsPill } from './overlays/pullRequests.js'
 import { STYLES } from './view/styles.js'
 import { paletteFor } from './palette.js'
@@ -270,6 +270,13 @@ export class App implements OverlayHost {
     const top = this.overlays.at(-1)
 
     if (key.ctrl && key.name === 'c') {
+      // A question sheet declines on Ctrl+C; the draft under it and the turn waiting on it stay.
+      if (top?.key.startsWith('prompt:')) {
+        top.onKey(key)
+
+        return
+      }
+
       return this.#ctrlC()
     }
 
@@ -1319,11 +1326,22 @@ export class App implements OverlayHost {
 
         break
 
-      case 'request.cancel':
-        this.#heldRequests = this.#heldRequests.filter(r => r.id !== ev.payload?.id)
-        this.#dropPrompts(key => key === `prompt:${ev.payload?.id}`)
+      case 'request.cancel': {
+        const id = ev.payload?.id
+        const notice = promptTimeoutNotice(ev.payload?.method, ev.payload?.reason)
+        // Only for a card this window still shows (or holds): an answered one needs no line.
+        const shown =
+          this.#heldRequests.some(r => r.id === id) || this.overlays.some(o => o.key === `prompt:${id}`)
+
+        this.#heldRequests = this.#heldRequests.filter(r => r.id !== id)
+        this.#dropPrompts(key => key === `prompt:${id}`)
+
+        if (notice && shown) {
+          t.notice(notice, 'warning')
+        }
 
         break
+      }
 
       case 'approval.request':
 
