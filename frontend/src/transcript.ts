@@ -230,9 +230,10 @@ export class Transcript {
       via: u.via
     }
 
-    // The call's own list shows while it runs; tool.complete's snapshot replaces it.
+    // The call's own list shows while it runs (a merge patches the current one); tool.complete's
+    // snapshot replaces it.
     if (Array.isArray(call.args.todos)) {
-      call.todos = toTodos(call.args.todos)
+      call.todos = todosOf(call.args, this.currentTodos())
     }
 
     turn.blocks.push({ call, id: p.tool_id, kind: 'tool' })
@@ -286,7 +287,7 @@ export class Transcript {
 
   /** The newest todo snapshot lands on the newest todo tool call. */
   todos(todos: unknown[]) {
-    const found = this.#lastTool(c => c.name === 'todo_list')
+    const found = this.#lastTool(c => isTodoName(c.name))
 
     if (found) {
       found.call.todos = toTodos(todos)
@@ -419,6 +420,8 @@ export class Transcript {
     let turn: TurnEntry | undefined
     let pendingContinued: string | undefined
     const calls = new Map<string, ToolCall>()
+    // The list as the calls so far left it: what the next merge patches.
+    let todos: Todo[] | undefined
 
     for (const m of messages) {
       const at = typeof m.timestamp === 'number' ? m.timestamp * 1000 : 0
@@ -510,8 +513,10 @@ export class Transcript {
 
         call.status = (settleBridge(call) ?? Boolean(record(call.result)?.error)) ? 'error' : 'done'
 
+        // History drops todo results: the list is the stored args, a merge patching the one before.
         if (Array.isArray(args.todos)) {
-          call.todos = toTodos(args.todos)
+          call.todos = todosOf(args, todos)
+          todos = call.todos
         }
 
         calls.set(id, call)
@@ -585,6 +590,11 @@ export class Transcript {
     return this.entries.flatMap(e =>
       e.kind === 'turn' ? e.blocks.flatMap(b => (b.kind === 'tool' && b.call.name === name ? [b.call] : [])) : []
     )
+  }
+
+  /** The call with tool id `id`, in any turn. */
+  call(id: string): ToolCall | undefined {
+    return this.#tool(id)?.call
   }
 
   /** The terminal calls that run on as background processes, oldest first. */
@@ -702,6 +712,66 @@ export function record(v: unknown): Record<string, unknown> | undefined {
   }
 
   return v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : undefined
+}
+
+/** The task tool's names: `todo_list`, and `todo`, the legacy alias in stored transcripts. */
+export function isTodoName(name: string): boolean {
+  return name === 'todo_list' || name === 'todo'
+}
+
+/** A todo call's list from its args: the whole list, or with `merge: true` a patch on `current`. */
+function todosOf(args: Record<string, unknown>, current: Todo[] | undefined): Todo[] {
+  const raw = Array.isArray(args.todos) ? args.todos : []
+
+  return args.merge === true ? mergeTodos(current ?? [], raw) : toTodos(raw)
+}
+
+/** As TodoStore.write(merge=True): items update by id in the fields given, new ids append. */
+function mergeTodos(current: Todo[], patch: unknown[]): Todo[] {
+  const out = current.map(t => ({ ...t }))
+
+  for (const item of patch) {
+    const r = record(item)
+    const id = String(r?.id ?? '').trim()
+
+    if (!r || !id) {
+      continue
+    }
+
+    const cur = out.find(t => t.id === id)
+
+    if (!cur) {
+      // Hermes rejects a new item with no text, so it never joins the list.
+      if (String(r.content ?? '').trim()) {
+        out.push(...toTodos([{ ...r, id }]))
+      }
+
+      continue
+    }
+
+    const content = String(r.content ?? '').trim()
+    const status = String(r.status ?? '').trim().toLowerCase()
+
+    if (content) {
+      cur.content = content
+    }
+
+    if (status === 'pending' || status === 'in_progress' || status === 'completed' || status === 'cancelled') {
+      cur.status = status
+    }
+
+    if ('parent' in r) {
+      const parent = String(r.parent ?? '').trim()
+
+      if (parent && parent !== id) {
+        cur.parent = parent
+      } else {
+        delete cur.parent
+      }
+    }
+  }
+
+  return out
 }
 
 function toTodos(raw: unknown[]): Todo[] {
