@@ -34184,7 +34184,7 @@ var completionToApplyOnSubmit = (value, rowText2, compReplace, isLocalCommand = 
 };
 
 // src/hermes/completion.ts
-var TAB_PATH_RE = /((?:["']?(?:[A-Za-z]:[\\/]|\.{1,2}\/|~\/|\/|@|[^"'`\s]+\/))[^\s]*)$/;
+var TAB_PATH_RE = /(?<=^|\s)((?:["']?(?:[A-Za-z]:[\\/]|\.{1,2}\/|~\/|\/|@|[^"'`\s]+\/))[^\s]*)$/;
 function completionRequestForInput(input, scope = {}) {
   const isSlashCommand = looksLikeSlashCommand(input);
   const pathWord = isSlashCommand ? null : input.match(TAB_PATH_RE)?.[1] ?? null;
@@ -34373,7 +34373,9 @@ var Completion = class {
     if (!composer || composer.text.slice(0, composer.cursor) !== this.#for) {
       return false;
     }
-    composer.splice(0, composer.cursor, before);
+    const finished = /(?:^|\s)@[^\s]*[^\s/:]$/.test(before);
+    const spaced = finished && composer.text[composer.cursor] === " ";
+    composer.splice(0, composer.cursor + (spaced ? 1 : 0), finished ? `${before} ` : before);
     this.dismiss();
     this.update(composer);
     return true;
