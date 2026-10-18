@@ -7,7 +7,7 @@ import { lineTokens } from './compaction.js'
 import type { NoticeEntry } from './model.js'
 
 /** The working line while the context is compacted; the stream's own labels wait for the done edge. */
-export const COMPACTING_LABEL = 'Compressing context…'
+export const COMPACTING_LABEL = 'Compacting context…'
 
 /** What one `status.update` does to the view. */
 export interface StatusEffect {

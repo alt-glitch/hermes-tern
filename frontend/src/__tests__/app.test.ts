@@ -381,6 +381,48 @@ const session = (mode: string): Record<string, Reply> => ({
 
 const users = (app: InstanceType<typeof App>) => app.transcript.entries.flatMap(e => (e.kind === 'user' ? [e.text] : []))
 
+describe('App: compaction', () => {
+  const status = (kind: string, text = '') => ({ payload: { kind, text }, session_id: 's1', type: 'status.update' })
+
+  it('a prompt sent while /compress runs (no turn) waits in the queue, with no Steer, and shows in the dock', async () => {
+    const { app, emit, press, queuedRows, sent, type } = setup({ 'prompt.submit': () => ({ admission_id: 'a1', status: 'queued' }) })
+    emit('event', status('compressing', '⠋ compressing 12 messages (~40,000 tok)…'))
+    await type('after it')
+    await press(key('enter'))
+
+    expect(sent('prompt.submit')).toMatchObject([{ queued: true, text: 'after it' }])
+    expect(users(app)).toEqual([])
+    expect(queuedRows()).toEqual([{ actions: ['edit'], text: 'after it' }])
+    expect(JSON.stringify(app.transcript.entries)).toContain('"status":"running"')
+  })
+
+  it('on a private gateway the held prompt goes when the compaction ends', async () => {
+    const { app, emit, press, sent, type } = setup({}, { canonical: false })
+    emit('event', status('compressing', 'compressing'))
+    await type('after it')
+    await press(key('enter'))
+    expect(sent('prompt.submit')).toEqual([])
+    expect(app.queue).toMatchObject([{ text: 'after it' }])
+
+    emit('event', status('ready'))
+    await settle()
+    expect(sent('prompt.submit')).toMatchObject([{ text: 'after it' }])
+  })
+
+  it('a compaction inside a turn still offers Steer on a queued prompt (Hermes holds it until the compaction ends)', async () => {
+    const { app, emit, press, queuedRows, type } = setup({ 'prompt.submit': () => ({ admission_id: 'a1', status: 'queued' }) })
+    app.busy = { ...busy }
+    emit('event', { payload: {}, session_id: 's1', type: 'message.start' })
+    emit('event', status('compacting', '🗜️ Compacting context — summarizing earlier conversation so I can continue...'))
+    await settle()
+    expect(app.busy?.label).toBe('Compacting context…')
+
+    await type('look at the tests too')
+    await press(key('enter'))
+    expect(queuedRows()).toEqual([{ actions: ['steer', 'edit'], text: 'look at the tests too' }])
+  })
+})
+
 describe('App: Enter while a turn runs (busy_input_mode)', () => {
   it('queue: admits the prompt to the gateway at once, shows it queued, and paints its bubble when it starts', async () => {
     const { app, attach, emit, press, queuedRows, sent, type } = setup({ 'prompt.submit': () => ({ admission_id: 'a1', status: 'queued' }) })
