@@ -60,6 +60,22 @@ export async function steerTurn(gw: ControlHost['gw'], sid: string, text: string
   }
 }
 
+/**
+ * Redirects session `sid`'s running turn with `text` (`display.busy_input_mode: interrupt`): the
+ * agent drops its current model request and goes on with the correction as a user message; during
+ * a tool it degrades to a steer. `ok` means the gateway took it.
+ */
+export async function redirectTurn(gw: ControlHost['gw'], sid: string, text: string): Promise<SteerOutcome> {
+  try {
+    const execution_generation = await currentGeneration(gw, sid)
+    const r = await gw.request<SteerResult | null>('session.redirect', { session_id: sid, execution_generation, text })
+
+    return r?.status === 'redirected' || r?.status === 'queued' ? { ok: true } : { ok: false }
+  } catch (e) {
+    return errorText(e).includes('stale_generation') ? { ok: false } : { error: errorText(e), ok: false }
+  }
+}
+
 async function steer(host: ControlHost, text: string) {
   if (!text) {
     return host.notice('Usage: /steer <guidance for the active turn>', 'warning')

@@ -23,15 +23,15 @@ function key(name: string, mods: Partial<Key> = {}): Key {
   return { alt: false, ctrl: false, meta: false, name, shift: false, ...mods } as Key
 }
 
-/** The app on a fake Tern and gateway: keys go in, gateway requests come out. */
-function setup(replies: Record<string, Reply> = {}) {
+/** The app on a fake Tern and gateway: keys go in, gateway requests come out (`canonical`: the shared gateway). */
+function setup(replies: Record<string, Reply> = {}, { canonical = true } = {}) {
   const handlers = new Map<string, Handler>()
   const requests: { method: string; params: Record<string, unknown> }[] = []
   let uploads = 0
 
   const gw = {
     drain: () => undefined,
-    isCanonical: true,
+    isCanonical: canonical,
     kill: () => undefined,
     on: (name: string, fn: Handler) => void handlers.set(name, fn),
     request: (method: string, params: Record<string, unknown>) => {
@@ -52,7 +52,14 @@ function setup(replies: Record<string, Reply> = {}) {
   }
 
   const waiting: ((r: IteratorResult<{ type: 'key'; key: Key }>) => void)[] = []
-  const surface = { closed: false, focus: () => undefined, palette: () => undefined, render: () => undefined, stylesheet: () => undefined }
+  let rendered: unknown
+  const surface = {
+    closed: false,
+    focus: () => undefined,
+    palette: () => undefined,
+    render: (tree: unknown) => void (rendered = tree),
+    stylesheet: () => undefined
+  }
 
   const tern = {
     blob: () => 'blob',
@@ -90,7 +97,18 @@ function setup(replies: Record<string, Reply> = {}) {
   const emit = (name: string, arg: unknown) => handlers.get(name)?.(arg)
   const sent = (method: string) => requests.filter(r => r.method === method).map(r => r.params)
 
-  return { app, attach, emit, press, requests, sent, type }
+  /** The dock's queued rows as last rendered: their text and which actions they offer. */
+  const queuedRows = () => {
+    const dock = JSON.parse(JSON.stringify((rendered as { dock: unknown[] }).dock)) as { k: string; p?: { key?: string; role?: string; text?: string }; c?: never[] }[]
+    const rows = dock.find(n => n.p?.role === 'omp.queue')?.c ?? []
+
+    return rows.map((r: { c: { p?: { role?: string; text?: string } }[] }) => ({
+      actions: r.c.flatMap(c => (c.p?.role === 'omp.queue.steer' ? ['steer'] : c.p?.role === 'omp.queue.edit' ? ['edit'] : [])),
+      text: r.c.find(c => c.p?.text !== undefined)?.p?.text
+    }))
+  }
+
+  return { app, attach, emit, press, queuedRows, requests, sent, type }
 }
 
 const settle = () => new Promise(resolve => setTimeout(resolve, 5))
@@ -125,8 +143,8 @@ describe('App: a refused prompt', () => {
 })
 
 describe('App: images in the draft', () => {
-  it('a prompt queued behind the turn takes the images attached with it', async () => {
-    const { app, attach, emit, press, sent, type } = setup()
+  it('a prompt queued behind the turn (private gateway) takes the images attached with it', async () => {
+    const { app, attach, emit, press, sent, type } = setup({}, { canonical: false })
     app.busy = { ...busy }
     await attach()
     await type('first')
@@ -159,8 +177,8 @@ describe('App: images in the draft', () => {
     expect(sent('prompt.submit')[0]).not.toHaveProperty('attachments')
   })
 
-  it('Alt+Up brings a queued prompt back with its images', async () => {
-    const { app, attach, press, type } = setup()
+  it('Alt+Up brings a queued prompt (private gateway) back with its images', async () => {
+    const { app, attach, press, type } = setup({}, { canonical: false })
     app.busy = { ...busy }
     await attach()
     await type('edit me')
@@ -245,5 +263,208 @@ describe('App: shell commands', () => {
     expect(sent('prompt.submit')).toEqual([])
     expect(app.composer.text).toBe('x {!rm -rf /}')
     expect(app.transcript.entries.at(-1)).toMatchObject({ kind: 'notice', tone: 'error' })
+  })
+})
+
+/** The session as the shared gateway starts it, with `mode` as its busy_input_mode. */
+const session = (mode: string): Record<string, Reply> => ({
+  'config.get': p => (p.key === 'busy' ? { key: 'busy', value: mode } : {}),
+  'session.create': () => ({ info: {}, session_id: 's1', subscription_id: 'sub1' }),
+  'session.resume': () => ({ execution_generation: 7 }),
+  'setup.status': () => ({ provider_configured: true })
+})
+
+const users = (app: InstanceType<typeof App>) => app.transcript.entries.flatMap(e => (e.kind === 'user' ? [e.text] : []))
+
+describe('App: Enter while a turn runs (busy_input_mode)', () => {
+  it('queue: admits the prompt to the gateway at once, shows it queued, and paints its bubble when it starts', async () => {
+    const { app, attach, emit, press, queuedRows, sent, type } = setup({ 'prompt.submit': () => ({ admission_id: 'a1', status: 'queued' }) })
+    app.busy = { ...busy }
+    await attach()
+    await type('next one')
+    await press(key('enter'))
+
+    const [submit] = sent('prompt.submit')
+    expect(submit).toMatchObject({ attachments: [{ path: '/uploads/1.png' }], queued: true, session_id: 's1', text: 'next one' })
+    expect(app.queue).toEqual([])
+    expect(users(app)).toEqual([])
+    expect(queuedRows()).toEqual([{ actions: ['edit'], text: 'next one ↵ 📎 1 image' }])
+
+    const row = { admission_id: 'a1', input_id: submit!.submission_id, status: 'queued', user: 'next one' }
+    emit('event', { payload: { pending_submissions: [row] }, session_id: 's1', type: 'session.info' })
+    emit('event', { payload: { text: 'first reply' }, session_id: 's1', type: 'message.complete' })
+    emit('event', { payload: {}, session_id: 's1', type: 'message.start' })
+    emit('event', { payload: { pending_submissions: [{ ...row, status: 'started' }] }, session_id: 's1', type: 'session.info' })
+    await settle()
+
+    // After the reply it waited for, before the turn it opened; and only once.
+    expect(users(app)).toEqual(['next one\n\n📎 1 image'])
+    expect(app.transcript.entries.map(e => e.kind).slice(-2)).toEqual(['user', 'turn'])
+    expect(queuedRows()).toEqual([])
+  })
+
+  it('a prompt sent while idle gets one bubble, even when the gateway reports it queued then started', async () => {
+    const { app, emit, press, sent, type } = setup()
+    await type('hello')
+    await press(key('enter'))
+    const row = { admission_id: 'a1', input_id: sent('prompt.submit')[0]!.submission_id, status: 'queued', user: 'hello' }
+
+    emit('event', { payload: { pending_submissions: [row] }, session_id: 's1', type: 'session.info' })
+    emit('event', { payload: { pending_submissions: [{ ...row, status: 'started' }] }, session_id: 's1', type: 'session.info' })
+    await settle()
+
+    expect(users(app)).toEqual(['hello'])
+  })
+
+  it("shows another window's queued prompt read-only, and its bubble when it starts", async () => {
+    const { app, emit, queuedRows } = setup()
+    app.busy = { ...busy }
+    const row = { admission_id: 'b1', input_id: 'theirs', status: 'queued', user: 'from desktop' }
+
+    emit('event', { payload: { pending_submissions: [row] }, session_id: 's1', type: 'session.info' })
+    await settle()
+    expect(queuedRows()).toEqual([{ actions: [], text: 'from desktop' }])
+
+    emit('event', { payload: { pending_submissions: [{ ...row, status: 'started' }] }, session_id: 's1', type: 'session.info' })
+    await settle()
+    expect(users(app)).toEqual(['from desktop'])
+  })
+
+  it("a queued row's Steer withdraws it from the gateway's queue and steers the turn; its cancelled completion does not end the turn", async () => {
+    const { app, emit, press, queuedRows, sent, type } = setup({
+      'prompt.cancel': () => ({ admission_id: 'a1', outcome: 'cancelled', status: 'terminal' }),
+      'prompt.submit': () => ({ admission_id: 'a1', status: 'queued' }),
+      'session.resume': () => ({ execution_generation: 7 }),
+      'session.steer': () => ({ status: 'queued' })
+    })
+    app.busy = { ...busy }
+    app.transcript.start()
+    await type('use tabs')
+    await press(key('enter'))
+    const row = { admission_id: 'a1', input_id: sent('prompt.submit')[0]!.submission_id, status: 'queued', user: 'use tabs' }
+    emit('event', { payload: { pending_submissions: [row] }, session_id: 's1', type: 'session.info' })
+    await settle()
+    expect(queuedRows()).toEqual([{ actions: ['steer', 'edit'], text: 'use tabs' }])
+
+    await press(key('enter', { alt: true }))
+    await vi.waitFor(() => expect(sent('session.steer')).toHaveLength(1))
+    emit('event', { payload: { admission_id: 'a1', content: '', outcome: 'cancelled', text: '' }, session_id: 's1', type: 'message.complete' })
+    emit('event', { payload: { pending_submissions: [] }, session_id: 's1', type: 'session.info' })
+    await settle()
+
+    expect(sent('prompt.cancel')).toEqual([{ admission_id: 'a1', session_id: 's1' }])
+    expect(sent('session.steer')[0]).toMatchObject({ execution_generation: 7, session_id: 's1', text: 'use tabs' })
+    expect(app.transcript.live?.blocks.map(b => b.kind)).toEqual(['steer'])
+    expect(app.busy).not.toBeNull()
+    expect(queuedRows()).toEqual([])
+  })
+
+  it("a queued row's Edit takes it out of the gateway's queue and back into the composer", async () => {
+    const { app, emit, press, sent, type } = setup({
+      'prompt.cancel': () => ({ status: 'terminal' }),
+      'prompt.submit': () => ({ admission_id: 'a1', status: 'queued' })
+    })
+    app.busy = { ...busy }
+    await type('fix me')
+    await press(key('enter'))
+    const row = { admission_id: 'a1', input_id: sent('prompt.submit')[0]!.submission_id, status: 'queued', user: 'fix me' }
+    emit('event', { payload: { pending_submissions: [row] }, session_id: 's1', type: 'session.info' })
+
+    await press(key('up', { alt: true }))
+    await vi.waitFor(() => expect(app.composer.text).toBe('fix me'))
+    expect(sent('prompt.cancel')).toHaveLength(1)
+  })
+
+  it('steer: injects the prompt into the turn; a refused steer is queued instead', async () => {
+    let steer = { status: 'queued' }
+    const { app, emit, press, sent, type } = setup({
+      ...session('steer'),
+      'prompt.submit': () => ({ admission_id: 'a1', status: 'queued' }),
+      'session.steer': () => steer
+    })
+    emit('event', { payload: {}, type: 'gateway.ready' })
+    await vi.waitFor(() => expect(sent('config.get')).toContainEqual({ key: 'busy', session_id: 's1' }))
+    await settle()
+    app.busy = { ...busy }
+    app.transcript.start()
+
+    await type('look at the tests too')
+    await press(key('enter'))
+    await vi.waitFor(() => expect(sent('session.steer')).toHaveLength(1))
+    expect(sent('session.steer')[0]).toMatchObject({ execution_generation: 7, text: 'look at the tests too' })
+    expect(app.transcript.live?.blocks.at(-1)).toMatchObject({ kind: 'steer', text: 'look at the tests too' })
+    expect(sent('prompt.submit')).toEqual([])
+
+    steer = { status: 'rejected' }
+    await type('then this')
+    await press(key('enter'))
+    await vi.waitFor(() => expect(sent('prompt.submit')).toHaveLength(1))
+    expect(sent('prompt.submit')[0]).toMatchObject({ queued: true, text: 'then this' })
+  })
+
+  it('interrupt: redirects the turn with the prompt (session.redirect)', async () => {
+    const { app, emit, press, sent, type } = setup({ ...session('interrupt'), 'session.redirect': () => ({ status: 'redirected' }) })
+    emit('event', { payload: {}, type: 'gateway.ready' })
+    await vi.waitFor(() => expect(sent('config.get')).toContainEqual({ key: 'busy', session_id: 's1' }))
+    await settle()
+    app.busy = { ...busy }
+
+    await type('no, use rust')
+    await press(key('enter'))
+    await vi.waitFor(() => expect(sent('session.redirect')).toHaveLength(1))
+    expect(sent('session.redirect')[0]).toEqual({ execution_generation: 7, session_id: 's1', text: 'no, use rust' })
+    expect(sent('prompt.submit')).toEqual([])
+  })
+
+  it('/queue queues behind the turn whatever the mode says', async () => {
+    const { app, emit, press, sent, type } = setup({ ...session('steer'), 'prompt.submit': () => ({ admission_id: 'a1' }) })
+    emit('event', { payload: {}, type: 'gateway.ready' })
+    await vi.waitFor(() => expect(sent('config.get')).toContainEqual({ key: 'busy', session_id: 's1' }))
+    await settle()
+    app.busy = { ...busy }
+
+    await type('/queue later please')
+    await press(key('enter'))
+    await vi.waitFor(() => expect(sent('prompt.submit')).toHaveLength(1))
+    expect(sent('session.steer')).toEqual([])
+  })
+})
+
+describe('App: Esc', () => {
+  it('one Esc never stops the turn; two quick ones do', async () => {
+    const { app, press, sent } = setup({ 'session.resume': () => ({ execution_generation: 2 }) })
+    app.busy = { ...busy }
+
+    await press(key('escape'))
+    expect(sent('session.interrupt')).toEqual([])
+
+    await press(key('escape'))
+    await vi.waitFor(() => expect(sent('session.interrupt')).toEqual([{ execution_generation: 2, session_id: 's1' }]))
+  })
+
+  it('two Esc with a draft clear it into the history instead of stopping the turn', async () => {
+    const { app, press, sent, type } = setup()
+    app.busy = { ...busy }
+    await type('half a thought')
+
+    await press(key('escape'))
+    expect(app.composer.text).toBe('half a thought')
+    await press(key('escape'))
+
+    expect(app.composer.text).toBe('')
+    expect(sent('session.interrupt')).toEqual([])
+    expect(app.busy).not.toBeNull()
+  })
+})
+
+describe('App: Option characters', () => {
+  it('a typed å, ∫, ß or π is text; Alt+letter still opens its panel', async () => {
+    const { app, press, type } = setup()
+    await type('åßπ∫')
+    expect(app.composer.text).toBe('åßπ∫')
+    expect(app.overlays).toEqual([])
+
+    await press(key('a', { alt: true }))
+    expect(app.overlays.map(o => o.key)).toContain('agents')
   })
 })
