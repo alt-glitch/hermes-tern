@@ -418,13 +418,14 @@ export class App implements OverlayHost {
     }
 
     // By the Alt modifier only: a typed å, ∫, ß or π (macOS Option without Meta, or a keyboard
-    // that has the letter) is text for the composer. Word-back stays on Alt+Left.
+    // that has the letter) is text for the composer. Alt+B/F/D stay the composer's readline word
+    // keys: a Mac terminal sends Option+←/→ as ESC b / ESC f, which arrive as Alt+B / Alt+F.
     if (key.alt && !key.ctrl && !key.meta) {
       switch (key.name) {
         case 'a':
           return openAgents(this)
 
-        case 'b':
+        case 'j':
           return openBackground(this)
 
         case 's':

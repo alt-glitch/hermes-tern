@@ -355,7 +355,7 @@ function processLine(call: ToolCall, id: string, now: number): JSX.Element {
       gap="xs"
       key="process"
       role="omp.tool.process"
-      title="Open in the Background sheet  ⌥B"
+      title="Open in the Background sheet  ⌥J"
     >
       {p && live ? (
         <spinner key="state-icon" style="dots" tone="accent" />

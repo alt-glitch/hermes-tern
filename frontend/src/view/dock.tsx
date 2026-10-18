@@ -393,7 +393,7 @@ function shellsPill(s: ShellsPill, focused: boolean): JSX.Element {
       mark={focused ? 'pick' : undefined}
       onClick={s.onOpen}
       role="omp.hud.pill"
-      title="Background processes  ⌥B"
+      title="Background processes  ⌥J"
     >
       <row align="center" gap="xs" key="seg" role="omp.hud.seg">
         <icon key="icon" name="terminal" />

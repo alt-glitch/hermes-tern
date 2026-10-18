@@ -1,4 +1,4 @@
-// The Background sheet (`/ps`, ⌥B, the shells pill, a background terminal card): the session's
+// The Background sheet (`/ps`, ⌥J, the shells pill, a background terminal card): the session's
 // background processes in one `picker`, as Claude Code lists its background shells. Each row is
 // the command's readable title with the command dim, its status, its run time and its last
 // output line; the preview shows the process's facts and its output, following the end. Enter
