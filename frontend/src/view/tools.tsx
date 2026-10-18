@@ -7,7 +7,7 @@ import { type JSX, node } from '@stencil-hq/tern'
 
 import { agentName, OUTCOME_UNKNOWN } from '../agents/store.js'
 import { callApp } from '../bridge.js'
-import { CONNECT_TOOL, connectTargets, isConnectCall, waiting } from '../connections.js'
+import { allConnected, CONNECT_TOOL, type ConnectTarget, connectTargets, isConnectCall, type SettleReason, waiting } from '../connections.js'
 import type { Subagent, Todo, ToolCall } from '../model.js'
 import { isRunning as processRuns, processElapsed, processIdOf, processTone, processVerdict, watchersOf } from '../processes/store.js'
 import { isBackgroundCall, record } from '../transcript.js'
@@ -843,22 +843,42 @@ const CONNECT_STATE: Record<string, { icon: string; tone?: 'error' | 'muted' | '
   connected: { icon: 'check', tone: 'success', word: 'connected' },
   expired: { icon: 'clock', tone: 'error', word: 'link expired' },
   failed: { icon: 'x', tone: 'error', word: 'failed' },
-  initiated: { icon: 'clock', tone: 'pending', word: 'waiting for you' },
+  initiated: { icon: 'clock', tone: 'pending', word: 'waiting for your browser' },
   not_connected: { icon: 'minus', tone: 'muted', word: 'not connected' },
-  pending: { icon: 'clock', tone: 'pending', word: 'waiting for you' },
-  skipped: { icon: 'minus', tone: 'muted', word: 'skipped' }
+  // Minted, not opened yet: the desktop's waiting cue belongs to a row the user opened.
+  pending: { icon: 'clock', tone: 'muted', word: 'needs authorizing' },
+  skipped: { icon: 'minus', tone: 'muted', word: 'skipped' },
+  superseded: { icon: 'minus', tone: 'muted', word: 'asked again below' }
+}
+
+/** Why a settled card stopped short of connecting every app. */
+const SETTLED_NOTE: Record<SettleReason, string> = {
+  all_resolved: 'All connected.',
+  deadline: 'Stopped waiting after 15 minutes. Ask Hermes to connect again.',
+  error: 'Hermes stopped watching these links.',
+  stopped: 'Hermes stopped watching these links. Ask Hermes to connect again.',
+  superseded: 'A later request replaced this one.'
 }
 
 /**
  * The connect card `manage_connections` gets on the desktop, for its no-card result: one row per
  * app with its state and an Authorize button that opens its link, then Continue, which tells the
- * agent the user is done (the tool's own note asks it to wait for that, then check status).
+ * agent the user is done (the tool's own note asks it to wait for that, then check status). Settled,
+ * it is the desktop's static summary: the rows as they ended, no controls.
  */
 function connectCard(call: ToolCall): Card {
-  const targets = call.connect ?? connectTargets(call)
-  const open = targets.filter(waiting)
+  const card = call.connect ?? { opened: [], targets: connectTargets(call), told: false }
+  const { settled, targets } = card
+  const ref = card.key ?? call.id
+
+  // A settled card's unresolved rows did not connect (the desktop's settle).
+  const stateOf = (t: ConnectTarget) =>
+    settled && waiting(t) ? 'not_connected' : t.state === 'initiated' && !card.opened.includes(t.name) ? 'pending' : t.state
+
+  const open = settled ? [] : targets.filter(waiting)
+
   const rows = targets.map((t, i) => {
-    const look = CONNECT_STATE[t.state] ?? CONNECT_STATE.pending!
+    const look = CONNECT_STATE[stateOf(t)] ?? CONNECT_STATE.pending!
 
     return (
       <row align="center" gap="sm" key={`t${i}`} role="hermes.connect.row">
@@ -875,8 +895,8 @@ function connectCard(call: ToolCall): Card {
           truncate="end"
           wrap="none"
         />
-        {t.url && waiting(t) ? (
-          <row actions={{ click: `open-url=${t.url}` }} align="center" gap="xs" key="go" role="hermes.connect.open" title={t.url}>
+        {t.url && !settled && waiting(t) ? (
+          <row actions={{ click: `connect-open=${ref}:${t.name}` }} align="center" gap="xs" key="go" role="hermes.connect.open" title={t.url}>
             <text key="t" text="Authorize ↗" />
           </row>
         ) : null}
@@ -884,11 +904,19 @@ function connectCard(call: ToolCall): Card {
     )
   })
 
+  const note = card.told
+    ? open.length || (settled && settled !== 'all_resolved')
+      ? 'Sent to Hermes.'
+      : 'All connected. Hermes carries on.'
+    : settled
+      ? `${SETTLED_NOTE[settled]}${settled === 'error' && card.error ? ` ${card.error}` : ''}`
+      : undefined
+
   return {
     body: [
       ...rows,
-      ...(call.connectDone
-        ? [<text key="done" spans={[{ s: 'muted', t: open.length ? 'Sent to Hermes.' : 'All connected. Hermes carries on.' }]} />]
+      ...(note
+        ? [<text key="done" spans={[{ s: 'muted', t: note }]} wrap="word" />]
         : [
             <row align="center" gap="sm" key="foot">
               <text
@@ -902,16 +930,18 @@ function connectCard(call: ToolCall): Card {
                 ]}
                 wrap="word"
               />
-              <row actions={{ click: `connect-continue=${call.id}` }} align="center" key="go" role="hermes.connect.continue">
-                <text key="t" text="Done, continue" />
-              </row>
+              {open.length ? (
+                <row actions={{ click: `connect-continue=${ref}` }} align="center" key="go" role="hermes.connect.continue">
+                  <text key="t" text="Done, continue" />
+                </row>
+              ) : null}
             </row>
           ])
     ],
     name: 'plug',
-    target: `${targets.filter(t => t.state === 'connected').length} of ${targets.length} connected`,
+    target: `${targets.filter(t => t.state === 'connected').length} of ${targets.filter(t => t.state !== 'superseded').length} connected`,
     targetKind: 'text',
-    title: open.length ? 'Connect apps' : 'Apps connected'
+    title: allConnected(card) ? 'Apps connected' : 'Connect apps'
   }
 }
 

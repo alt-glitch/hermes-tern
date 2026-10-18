@@ -54,7 +54,7 @@ import { promptOverlay, promptTimeoutNotice } from './overlays/prompts.js'
 import { openPullRequests, openUrl, prsPill } from './overlays/pullRequests.js'
 import { STYLES } from './view/styles.js'
 import { paletteFor } from './palette.js'
-import { CONNECT_TOOL, connectedMessage, connectTargets, continueMessage, markViewer, POLL_FOR_MS, POLL_MS, readCard, waiting } from './connections.js'
+import { allConnected, claimTold, CONNECT_TOOL, connectedMessage, continueMessage, loadConnect, markViewer, POLL_MS, waiting } from './connections.js'
 import { LINK_TOOLS } from './github/links.js'
 import { PullRequests } from './github/store.js'
 import { Cron } from './processes/cron.js'
@@ -445,6 +445,13 @@ export class App implements OverlayHost {
       return this.#connectContinue(ev.value)
     }
 
+    // `<card>:<app>`: the card names the row, as call ids repeat.
+    if (ev.ev === 'action' && ev.act === 'connect-open' && ev.value) {
+      const at = ev.value.lastIndexOf(':')
+
+      return this.#connectOpen(ev.value.slice(0, at), ev.value.slice(at + 1))
+    }
+
     if (ev.ev === 'focus' && ev.id === INPUT_ID && !this.overlays.at(-1)?.modal) {
       this.#hud = undefined
       this.#focus = INPUT_ID
@@ -557,32 +564,36 @@ export class App implements OverlayHost {
   }
 
   #connectTimer: NodeJS.Timeout | undefined
-  /** Connect cards this pane saw with an app still waiting. */
+  /** Connect cards (by file) this pane saw with an app still waiting. */
   readonly #connectSeen = new Set<string>()
-
-  /** The connect cards still waiting on the user. */
-  #connectCalls() {
-    const since = Date.now() - POLL_FOR_MS
-
-    return this.transcript.calls(CONNECT_TOOL).filter(c => !c.connectDone && c.startedAt > since)
-  }
+  /** Connect calls that drew no card (a status read, a call with nothing to authorize): never again. */
+  readonly #noCard = new WeakSet<object>()
 
   /**
    * Keeps each connect card current from the file the plugin's watcher writes (links and states),
    * and tells the agent once every app of a card is connected, as the desktop's card settles the call.
+   * A settled card never moves again, so the poll runs only while some card is watched.
    */
   #watchConnections() {
-    if (this.#connectTimer) {
-      return
-    }
+    // A new call or a reloaded transcript reads now, not at the next poll.
+    clearTimeout(this.#connectTimer)
 
     const tick = () => {
       this.#connectTimer = undefined
       let open = false
 
-      for (const call of this.#connectCalls()) {
-        const card = readCard(call.id)
-        const next = connectTargets(call, card)
+      for (const call of this.transcript.calls(CONNECT_TOOL)) {
+        // A running call has no card yet; by its call id alone it would take an earlier call's.
+        if (call.connect?.settled || call.status === 'running' || this.#noCard.has(call)) {
+          continue
+        }
+
+        const next = loadConnect(call)
+
+        if (!next) {
+          this.#noCard.add(call)
+          continue
+        }
 
         if (JSON.stringify(next) !== JSON.stringify(call.connect)) {
           call.connect = next
@@ -590,17 +601,20 @@ export class App implements OverlayHost {
           this.changed()
         }
 
-        if (next.some(waiting)) {
-          this.#connectSeen.add(call.id)
+        const seen = next.key ?? call.id
+
+        if (next.targets.some(waiting) && !next.settled) {
+          this.#connectSeen.add(seen)
         }
 
-        // Only a card this pane saw waiting: a resumed session's long-settled card stays quiet.
-        if (this.#connectSeen.has(call.id) && next.length && next.every(t => t.state === 'connected')) {
-          call.connectDone = true
+        // Only a card this pane saw waiting: a resumed session's long-settled card stays quiet. Only
+        // one pane tells: the claim is the card's.
+        if (!next.told && this.#connectSeen.has(seen) && allConnected(next) && (!next.key || claimTold(next.key))) {
+          next.told = true
           this.transcript.touchCall(call)
-          this.#submit(connectedMessage(next), false)
+          this.#submit(connectedMessage(next.targets), false)
           this.changed()
-        } else if (next.some(waiting) && (card?.watching ?? true)) {
+        } else if (next.key && !next.settled) {
           open = true
         }
       }
@@ -613,17 +627,43 @@ export class App implements OverlayHost {
     tick()
   }
 
-  /** A connect card's Continue: tell the agent which apps the user authorized, as the tool asks. */
-  #connectContinue(id: string) {
-    const call = this.transcript.calls(CONNECT_TOOL).find(c => c.id === id)
+  /** The connect card `ref` names (its file, or its call id when it has none). */
+  #connectCall(ref: string) {
+    return this.transcript.calls(CONNECT_TOOL).findLast(c => (c.connect?.key ?? c.id) === ref)
+  }
 
-    if (!call || call.connectDone) {
+  /** A connect card's Continue: tell the agent which apps the user authorized, as the tool asks. */
+  #connectContinue(ref: string) {
+    const call = this.#connectCall(ref)
+    const card = call?.connect
+
+    if (!call || !card || card.told || card.settled) {
       return
     }
 
-    call.connectDone = true
+    card.told = true
     this.transcript.touchCall(call)
-    this.#submit(continueMessage(call.connect ?? connectTargets(call, readCard(call.id))), false)
+
+    // Another pane's message already told the agent.
+    if (!card.key || claimTold(card.key)) {
+      this.#submit(continueMessage(card.targets), false)
+    }
+
+    this.changed()
+  }
+
+  /** A connect card's Authorize: the app's link in the browser, and its row waits on the browser now. */
+  #connectOpen(ref: string, name: string) {
+    const call = this.#connectCall(ref)
+    const target = call?.connect?.targets.find(t => t.name === name)
+
+    if (!call?.connect || !target?.url) {
+      return
+    }
+
+    openUrl(target.url)
+    call.connect.opened = [...new Set([...call.connect.opened, name])]
+    this.transcript.touchCall(call)
     this.changed()
   }
 
