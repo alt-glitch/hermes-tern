@@ -5,7 +5,7 @@
 
 import { type JSX, node } from '@stencil-hq/tern'
 
-import { agentName } from '../agents/store.js'
+import { agentName, OUTCOME_UNKNOWN } from '../agents/store.js'
 import { callApp } from '../bridge.js'
 import { CONNECT_TOOL, connectTargets, isConnectCall, waiting } from '../connections.js'
 import type { Subagent, Todo, ToolCall } from '../model.js'
@@ -717,7 +717,12 @@ export function agentNode(a: Subagent, now: number): JSX.Element {
       // A click (or the context menu) opens the agent beside the chat; App handles the action.
       actions={{ click: `open-agent=${a.id}`, menu: [`open-agent=${a.id}`] }}
       agent="task"
-      badges={a.exitReason && a.status !== 'done' ? [{ text: a.exitReason.replace(/_/g, ' '), tone: 'warning' }] : undefined}
+      // A done row whose outcome nothing reported says so, rather than reading as a success.
+      badges={
+        a.exitReason && (a.status !== 'done' || a.exitReason === OUTCOME_UNKNOWN)
+          ? [{ text: a.exitReason.replace(/_/g, ' '), tone: 'warning' }]
+          : undefined
+      }
       collapsed={a.summary ? true : undefined}
       collapsible={a.summary ? true : undefined}
       depth={a.depth || undefined}

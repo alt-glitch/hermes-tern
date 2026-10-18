@@ -3,7 +3,8 @@
 // rows to a native transport), with no folder, prompt or activity. The rules follow Hermes'
 // own listing (hermes_state_sessions.list_sessions_rich): human sources only, archived and hidden
 // rows out unless pinned, subagent runs and compression continuations folded into their root, a
-// chain shown with its tip's activity and size. The folder rule is the CLI's `hermes -c` one
+// chain shown with its tip's activity and size, a local conversation reset in place listed once by
+// its newest segment. The folder rule is the CLI's `hermes -c` one
 // (hermes_state_sessions.workspace_key): the same repo root, or the folder or one under it.
 
 import { execFile } from 'node:child_process'
@@ -40,12 +41,59 @@ const LISTABLE = `(s.parent_session_id IS NULL
   OR json_extract(s.model_config, '$._branched_from') IS NOT NULL
   OR json_extract(s.model_config, '$._reset_from') IS NOT NULL)`
 
+/** The shared gateway's local creation receipts (hermes_state_local.POLICY_PREFIX). */
+const POLICY_PREFIX = 'gateway.local_policy.v1:'
+
+/**
+ * The listable roots of earlier reset segments, which core leaves out of its listing
+ * (hermes_state_local.local_lineage_index): a local session reset in place keeps one receipt whose
+ * lineage holds every segment, and a segment starts after one that ended `session_reset`. Only the
+ * newest such start stands for the conversation.
+ */
+function supersededSegments(conn: DatabaseSync): string[] {
+  let receipts: { value: string }[]
+
+  try {
+    receipts = conn
+      .prepare(
+        `SELECT value FROM state_meta WHERE key GLOB ? AND json_valid(value) AND json_array_length(value, '$.lineage') > 1`
+      )
+      .all(`${POLICY_PREFIX}*`) as unknown as { value: string }[]
+  } catch {
+    // No state_meta (an older database): no local lineages.
+    return []
+  }
+
+  const superseded: string[] = []
+
+  for (const { value } of receipts) {
+    const receipt = JSON.parse(value) as { lineage?: unknown[]; session_id?: unknown }
+    const lineage = receipt.lineage ?? []
+
+    if (typeof receipt.session_id !== 'string' || !lineage.every(id => typeof id === 'string')) {
+      continue
+    }
+
+    const ids = lineage as string[]
+    const rows = conn
+      .prepare(`SELECT id, end_reason FROM sessions WHERE id IN (${ids.map(() => '?').join(',')})`)
+      .all(...ids) as unknown as { id: string; end_reason: string | null }[]
+    const ended = new Map(rows.map(r => [r.id, r.end_reason]))
+    const starts = ids.filter((_, i) => i === 0 || ended.get(ids[i - 1]!) === 'session_reset')
+
+    superseded.push(...starts.slice(0, -1))
+  }
+
+  return superseded
+}
+
 /** Roots and their compression continuations, newest activity first, `limit` chains. */
 const QUERY = `
 WITH RECURSIVE chain(root, cur) AS (
   SELECT s.id, s.id FROM sessions s
   WHERE s.source IN (${SOURCES.map(() => '?').join(',')})
     AND ${LISTABLE}
+    AND s.id NOT IN (SELECT value FROM json_each(?))
     AND (s.pinned = 1 OR (COALESCE(s.archived, 0) = 0 AND COALESCE(s.hidden, 0) = 0))
   UNION ALL
   SELECT c.root, child.id FROM chain c
@@ -101,7 +149,7 @@ export function storedSessions(limit = 400, db = stateDbPath()): StoredSession[]
 
   try {
     conn = new DatabaseSync(db, { readOnly: true })
-    const rows = conn.prepare(QUERY).all(...SOURCES, limit) as unknown as Row[]
+    const rows = conn.prepare(QUERY).all(...SOURCES, JSON.stringify(supersededSegments(conn)), limit) as unknown as Row[]
 
     return rows.map(r => ({
       branch: r.branch ?? '',

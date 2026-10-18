@@ -70,3 +70,33 @@ def test_unlink_and_errors(prs):
 
     assert (out["was_linked"], out["linked"]) == (True, [])
     assert "error" in json.loads(prs.link_pull_request({"url": "not a pr"}, session_id="s1"))
+
+
+def test_a_subagent_links_to_the_conversation_that_delegated_it(prs, monkeypatch):
+    # Core's delegate children: `_delegate_from` names the parent (a compression tip here), and a
+    # nested child's parent is itself a subagent. A /branch names its parent too, but is its own chat.
+    rows = {
+        "child": {"parent_session_id": "tip", "model_config": json.dumps({"_delegate_from": "tip"})},
+        "grandchild": {"parent_session_id": "child", "model_config": {"_delegate_from": "child"}},
+        "tool-run": {"parent_session_id": "root", "source": "tool"},
+        "branch": {"parent_session_id": "root", "model_config": {"_branched_from": "root"}},
+        "inherited": {"parent_session_id": "root", "model_config": {"_delegate_from": "older"}},
+    }
+    state = types.ModuleType("hermes_state")
+    state.SessionDB = lambda read_only=False: types.SimpleNamespace(get_session=rows.get)
+    monkeypatch.setitem(sys.modules, "hermes_state", state)
+
+    prs.link_pull_request({"url": "https://github.com/a/b/pull/1"}, session_id="tip")
+    linked = json.loads(prs.link_pull_request({"url": "https://github.com/a/b/pull/2"}, session_id="grandchild"))["linked"]
+    prs.link_pull_request({"url": "https://github.com/a/b/pull/3"}, session_id="tool-run")
+    prs.link_pull_request({"url": "https://github.com/a/b/pull/4"}, session_id="branch")
+    prs.link_pull_request({"url": "https://github.com/a/b/pull/5"}, session_id="inherited")
+
+    assert [p["number"] for p in linked] == [1, 2]
+    data = json.loads(prs.data_file().read_text())
+    assert [p["number"] for p in data["conversations"]["root"]] == [1, 2, 3]
+    assert data["conversations"]["root"][1]["session_id"] == "grandchild"
+    assert [p["number"] for p in data["conversations"]["branch"]] == [4]
+    assert [p["number"] for p in data["conversations"]["inherited"]] == [5]
+    assert data["aliases"]["grandchild"] == "root"
+    assert [p["number"] for p in json.loads(prs.list_pull_requests({}, session_id="child"))["linked"]] == [1, 2, 3]

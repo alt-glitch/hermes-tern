@@ -144,6 +144,10 @@ export class App implements OverlayHost {
   #heldRequests: ServerRequest[] = []
   /** Shared-gateway subscriptions this view holds, by session id. */
   readonly #subscriptions = new Map<string, string>()
+  /** What superseded switches attached; disposed once no switch is in flight (see #disposeStale). */
+  #stale: CreateResult[] = []
+  /** The last `session.detach` in flight per session: a resume of that id waits for it (they share a subscription id). */
+  readonly #detaching = new Map<string, Promise<unknown>>()
   /** Open approval prompts' overlay keys → their approval-queue `request_id` (what approval.cancelled names). */
   readonly #approvalIds = new Map<string, string>()
   /** The launcher's startup image until it is attached to the first session (the queue waits for it). */
@@ -686,6 +690,11 @@ export class App implements OverlayHost {
     this.sidebar.toggle()
   }
 
+  /** A subagent ended: the PRs it linked are filed under this conversation (pull_requests.py). */
+  agentEnded() {
+    this.prs.relink()
+  }
+
   /** Shows subagent `id` beside the chat in a Tern split; its timeline sheet where no split can open. */
   async openAgent(id: string) {
     const a = this.agents.all().find(x => x.id === id)
@@ -1094,8 +1103,7 @@ export class App implements OverlayHost {
 
       if (!this.#switches.current(token)) {
         // A later switch won; nothing will ever show this session.
-        this.#subscribe(r)
-        void this.#leave(r.session_id, 'tui_close')
+        this.#stale.push(r)
 
         return
       }
@@ -1167,11 +1175,21 @@ export class App implements OverlayHost {
     let snapshot: CreateResult | undefined
 
     try {
+      const detaching = this.#detaching.get(id)
+
+      if (detaching) {
+        // A detach that lands after this attach would drop the subscription the attach reuses.
+        await detaching
+
+        if (!this.#switches.current(token)) {
+          return undefined
+        }
+      }
+
       const r = await this.#gw.request<CreateResult>('session.resume', { cols: this.#tern.caps.cols, session_id: id })
 
       if (!this.#switches.current(token)) {
-        this.#subscribe(r)
-        void this.#leave(r.session_id, 'tui_close')
+        this.#stale.push(r)
 
         return undefined
       }
@@ -1257,9 +1275,48 @@ export class App implements OverlayHost {
     }
 
     this.#subscriptions.delete(sid)
-    await this.#gw
-      .request('session.detach', { end_reason: endReason, session_id: sid, subscription_id: subscription })
-      .catch(() => undefined)
+    await this.#detach(sid, subscription, endReason)
+  }
+
+  /** Sends `session.detach`, one at a time per session; `endReason` lets the owner end it once no viewer remains. */
+  #detach(sid: string, subscription: string, endReason?: 'tui_close' | 'tui_shutdown') {
+    const send = () =>
+      this.#gw.request('session.detach', {
+        ...(endReason ? { end_reason: endReason } : {}),
+        session_id: sid,
+        subscription_id: subscription
+      })
+    const run = (this.#detaching.get(sid)?.then(send) ?? send()).catch(() => undefined)
+    this.#detaching.set(sid, run)
+    void run.then(() => {
+      if (this.#detaching.get(sid) === run) {
+        this.#detaching.delete(sid)
+      }
+    })
+
+    return run
+  }
+
+  /**
+   * Releases what superseded switches attached, once the adopted session is known. The gateway gives
+   * this view one subscription per session, so a stale result for the shown session is the live
+   * view's own and stays; others detach with no end reason (nobody chose to close them).
+   */
+  #disposeStale() {
+    const stale = this.#stale
+    this.#stale = []
+
+    for (const r of stale) {
+      if (r.session_id === this.sid || (r.subscription_id && this.#subscriptions.get(r.session_id) === r.subscription_id)) {
+        continue
+      }
+
+      if (!this.#gw.isCanonical) {
+        void this.#gw.request('session.close', { session_id: r.session_id }).catch(() => undefined)
+      } else if (r.subscription_id) {
+        void this.#detach(r.session_id, r.subscription_id)
+      }
+    }
   }
 
   /** Acts on a slash.exec / command.dispatch answer: output, a skill or message to send, an alias or a prefill. */
@@ -1322,6 +1379,7 @@ export class App implements OverlayHost {
       return
     }
 
+    this.#disposeStale()
     const held = this.#heldRequests
     this.#heldRequests = []
 
@@ -1417,6 +1475,12 @@ export class App implements OverlayHost {
 
         t.start()
 
+        // A delegation's completion turn carries its model text: each task's outcome, which a log
+        // this process cannot read (a remote gateway) never told.
+        if (ev.payload?.display_kind === 'async_delegation_complete' && ev.payload.text) {
+          this.agents.settle(ev.payload.text)
+        }
+
         break
 
       case 'message.delta':
@@ -1484,6 +1548,11 @@ export class App implements OverlayHost {
           // A dispatched delegation: its agents' rows start following the owner.
           this.agents.scan()
 
+          if (ev.payload.name === 'delegate_task') {
+            // Its subagents (a foreground call's have ended) may have linked PRs.
+            this.prs.relink()
+          }
+
           if (LINK_TOOLS.has(ev.payload.name)) {
             const call = this.transcript.calls(ev.payload.name).at(-1)
 
@@ -1533,6 +1602,10 @@ export class App implements OverlayHost {
       case 'subagent.complete':
         if (ev.payload) {
           t.subagent(ev.type, ev.payload)
+        }
+
+        if (ev.type === 'subagent.complete') {
+          this.agentEnded()
         }
 
         break
