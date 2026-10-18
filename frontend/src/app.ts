@@ -4,7 +4,7 @@
 // schedules one render of the whole view; the SDK diffs it into frame ops.
 
 import { randomUUID } from 'node:crypto'
-import { appendFileSync } from 'node:fs'
+import { appendFileSync, existsSync } from 'node:fs'
 import { basename } from 'node:path'
 
 import type {
@@ -39,7 +39,9 @@ import { moaLabel, moaReferenceLabel } from './moa.js'
 import type { Overlay, OverlayHost } from './overlay.js'
 import { writeActiveSessionFile } from './hermes/activeSessionFile.js'
 import { imagePathOf, withClipboardImage } from './hermes/clipboardImage.js'
-import { type Attachment, uploadImage } from './hermes/images.js'
+import { type Attachment, imageSize, uploadImage } from './hermes/images.js'
+import { Media } from './media.js'
+import type { ImageSource, ToolCall, UserAttachment } from './model.js'
 import { hasInterpolation, interpolate, shellError, shellExec, shellLines } from './hermes/shell.js'
 import { mutateSession } from './hermes/mutate.js'
 import { sharedPromptId, sharedPromptRequest } from './hermes/sharedPrompts.js'
@@ -93,8 +95,17 @@ interface CreateResult extends Partial<
   messages?: TranscriptMessage[]
 }
 
-/** An uploaded image a prompt carries (the shared gateway takes it on prompt.submit), with the name its chip shows. */
-type Image = Attachment & { name: string }
+/**
+ * An uploaded image a prompt carries (the shared gateway takes it on prompt.submit), with the name
+ * its chip shows, and the thumbnail and size the chip and the prompt's bubble show.
+ */
+type Image = Attachment & { name: string; preview?: ImageSource; caption?: string }
+
+/**
+ * What a prompt of images alone asks, as Ink (ui-tui/src/app/submissionCore.ts) and the desktop
+ * (use-prompt-actions/submit.ts) send it: Hermes takes no empty prompt text.
+ */
+const IMAGE_ONLY_PROMPT = 'What do you see in this image?'
 
 /** How long quitting waits for the sessions to detach. */
 const QUIT_DETACH_MS = 1500
@@ -116,6 +127,8 @@ interface Admitted {
 /** Runs the Tern frontend until the user quits; resolves the exit code. */
 export class App implements OverlayHost {
   readonly transcript = new Transcript()
+  /** Images tool calls showed, a URL's bytes fetched once and sent as a blob. */
+  readonly media = new Media({ blob: (bytes, mime) => this.#blob(bytes, mime) })
   /** The session's subagents, followed while they run (Task cards, the pill, the hub). */
   readonly agents: Agents = new Agents(this)
   /** The session's background processes (the shells pill, the Background sheet, background cards). */
@@ -176,6 +189,8 @@ export class App implements OverlayHost {
   #startupImage = process.env.HERMES_TUI_IMAGE?.trim() ?? ''
   /** The images attached to the draft: the next prompt entered takes them. */
   #attachments: Image[] = []
+  /** Images being read or uploaded for the draft: an "attaching…" chip each until they land. */
+  #attaching: { name: string }[] = []
   /** The skin the gateway last reported; only the `skin` theme mode wears it. */
   #skin: SkinPayload | undefined
   #theme: ThemeMode = loadSettings().theme ?? 'tern'
@@ -710,19 +725,23 @@ export class App implements OverlayHost {
 
   /** Attaches the clipboard's image to the next prompt (`quiet`: an empty paste, which may hold none). */
   async attachClipboardImage(quiet: boolean) {
+    // The chip shows at once; reading the clipboard and uploading fill it in.
+    const slot = this.#startAttaching(`pasted image ${this.#attachments.length + this.#attaching.length + 1}`)
+
     try {
       const found = await withClipboardImage(async path => {
-        await this.#attachImage(path, `pasted image ${this.#attachments.length + 1}`)
+        await this.#attachImage(path, slot.name, slot)
 
         return true
       })
 
       if (!found && !quiet) {
         this.transcript.notice('No image on the clipboard.', 'warning')
-        this.changed()
       }
     } catch (error) {
       this.transcript.notice(`Could not read the clipboard image: ${error instanceof Error ? error.message : String(error)}`, 'error')
+    } finally {
+      this.#endAttaching(slot)
       this.changed()
     }
   }
@@ -740,21 +759,79 @@ export class App implements OverlayHost {
     await this.#attachImage(path, basename(path))
   }
 
-  async #attachImage(path: string, name: string) {
+  /** Uploads `path` for the next prompt; its chip says "attaching…" (in `slot`) until it lands or fails. */
+  async #attachImage(path: string, name: string, slot = this.#startAttaching(name)) {
     const sid = this.sid
 
-    if (!sid) {
-      this.transcript.notice('Wait for the session to start before attaching an image.', 'warning')
+    try {
+      if (!sid) {
+        this.transcript.notice('Wait for the session to start before attaching an image.', 'warning')
 
-      return this.changed()
+        return
+      }
+
+      const image = this.#image(await uploadImage(this.#gw, sid, path, process.env.HERMES_CWD || process.cwd()), name)
+
+      // Its chip was removed (✕, Ctrl+C) while it uploaded: the prompt does not take it.
+      if (this.#attaching.includes(slot)) {
+        this.#attachments.push(image)
+      }
+    } catch (error) {
+      this.transcript.notice(`Could not attach ${name}: ${error instanceof Error ? error.message : String(error)}`, 'error')
+    } finally {
+      this.#endAttaching(slot)
+      this.changed()
+    }
+  }
+
+  #startAttaching(name: string): { name: string } {
+    const slot = { name }
+    this.#attaching.push(slot)
+    this.changed()
+
+    return slot
+  }
+
+  #endAttaching(slot: { name: string }) {
+    this.#attaching = this.#attaching.filter(s => s !== slot)
+  }
+
+  /**
+   * An uploaded image with its thumbnail: its bytes as a blob, else the gateway's copy where that
+   * is on this machine. The bytes are not kept.
+   */
+  #image({ bytes, ...attachment }: Attachment & { bytes: Buffer }, name: string): Image {
+    const size = imageSize(bytes)
+    const kb = bytes.length / 1024
+    const blob = this.#blob(bytes, attachment.mime)
+    const preview = blob ? { blob } : existsSync(attachment.path) ? { path: attachment.path } : undefined
+    const caption = [size && `${size.w}×${size.h}`, kb >= 1024 ? `${(kb / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(kb))} KB`]
+
+    return { ...attachment, caption: caption.filter(Boolean).join(' · '), name, ...(preview ? { preview } : {}) }
+  }
+
+  /** `bytes` sent to Tern as a blob; undefined where it takes none, or for more than a blob holds. */
+  #blob(bytes: Uint8Array, mime: string): string | undefined {
+    if (!this.#tern.caps.features.includes('blobs')) {
+      return undefined
     }
 
     try {
-      this.#attachments.push({ ...(await uploadImage(this.#gw, sid, path, process.env.HERMES_CWD || process.cwd())), name })
-    } catch (error) {
-      this.transcript.notice(`Could not attach ${name}: ${error instanceof Error ? error.message : String(error)}`, 'error')
+      return this.#tern.blob(bytes, mime)
+    } catch {
+      return undefined
     }
+  }
 
+  /** Has `call`'s image (a URL's) fetched; its card shows it once it lands. */
+  #showImage(call: ToolCall | undefined) {
+    if (call) {
+      this.media.show(call, () => this.#imageLanded(call))
+    }
+  }
+
+  #imageLanded(call: ToolCall) {
+    this.transcript.touchCall(call)
     this.changed()
   }
 
@@ -792,7 +869,7 @@ export class App implements OverlayHost {
 
   /** Text or images in the composer: Ctrl+C clears them before it interrupts, Ctrl+D never exits over them. */
   #hasDraft(): boolean {
-    return Boolean(this.composer.text || this.#attachments.length)
+    return Boolean(this.composer.text || this.#attachments.length || this.#attaching.length)
   }
 
   /** Esc Esc: the draft's text goes to the prompt history (Up brings it back), its images go. */
@@ -810,6 +887,7 @@ export class App implements OverlayHost {
     if (this.#hasDraft()) {
       this.composer.set('')
       this.#attachments = []
+      this.#attaching = []
 
       return
     }
@@ -855,7 +933,16 @@ export class App implements OverlayHost {
   #submit(raw: string, draft = true, busy: BusyMode = draft ? this.#busyMode : 'queue') {
     const text = raw.trim()
 
-    if (!text) {
+    // An image still uploading would miss the prompt: the words wait in the composer for it.
+    if (draft && this.#attaching.length && !text.startsWith('/')) {
+      this.composer.set(raw)
+      this.transcript.notice('An image is still attaching. Send again in a moment.', 'warning')
+
+      return
+    }
+
+    // Images alone are a prompt: the bubble shows just them (the gateway gets Ink's stand-in words).
+    if (!text && !(draft && this.#attachments.length)) {
       return
     }
 
@@ -961,7 +1048,7 @@ export class App implements OverlayHost {
         queued: true,
         session_id: sid,
         submission_id: own.inputId,
-        text: ready.text,
+        text: ready.text || (attachments.length ? IMAGE_ONLY_PROMPT : ''),
         ...(attachments.length ? { attachments } : {})
       })
 
@@ -1030,10 +1117,11 @@ export class App implements OverlayHost {
       return
     }
 
-    const { images, text } = item
+    const { images } = item
+    const text = item.text || (images.length ? IMAGE_ONLY_PROMPT : '')
     const attachments = images.map(({ mime, path }) => ({ mime, path }))
     const submission = randomUUID()
-    this.transcript.user(userText(display?.trim() || text, images))
+    this.transcript.user(display?.trim() || item.text, undefined, false, userImages(images))
     // Its bubble is up: the gateway's queued → started for it owes none.
     this.#server.shown(submission)
     this.#startBusy('Working…')
@@ -1066,7 +1154,7 @@ export class App implements OverlayHost {
 
   /** Puts a prompt that did not go back into the composer, before any text there, with its images. */
   #restore({ images, text }: Queued) {
-    this.composer.set(this.composer.text ? `${text}\n${this.composer.text}` : text)
+    this.composer.set(text && this.composer.text ? `${text}\n${this.composer.text}` : text || this.composer.text)
     this.#attachments = [...images, ...this.#attachments]
   }
 
@@ -1287,7 +1375,7 @@ export class App implements OverlayHost {
 
     try {
       if (this.#gw.isCanonical) {
-        const image = { ...(await uploadImage(this.#gw, sid, path, process.env.HERMES_CWD || process.cwd())), name: basename(path) }
+        const image = this.#image(await uploadImage(this.#gw, sid, path, process.env.HERMES_CWD || process.cwd()), basename(path))
         // The startup query waits at the queue's head for this image.
         const images = this.queue[0]?.images ?? this.#attachments
         images.push(image)
@@ -1502,6 +1590,7 @@ export class App implements OverlayHost {
     if (r.messages?.length) {
       this.transcript.load(r.messages)
       this.agents.scan()
+      this.media.showAll(this.transcript.entries, call => this.#imageLanded(call))
     }
 
     // The new session's processes and PRs (and none of the last one's), and its open connect cards.
@@ -1703,7 +1792,8 @@ export class App implements OverlayHost {
 
         // A queued prompt the gateway started gets its bubble now, after the reply it waited for.
         for (const started of this.#server.update(pendingRows(ev.payload))) {
-          t.started(started.text)
+          const own = started.own?.item.item
+          t.started(own ? own.text : started.text, undefined, own ? userImages(own.images) : [])
         }
 
         this.#setTitle(typeof ev.payload?.title === 'string' ? ev.payload.title : undefined)
@@ -1824,6 +1914,8 @@ export class App implements OverlayHost {
           // The call as its step reads (a bridged or connector call as its app), not its wire name.
           const call = t.call(ev.payload.tool_id)
           this.#label(call ? busyLabel(call) : `Running ${ev.payload.name}…`)
+          // vision_analyze names its image up front.
+          this.#showImage(call)
         }
 
         break
@@ -1831,6 +1923,7 @@ export class App implements OverlayHost {
       case 'tool.complete':
         if (ev.payload) {
           t.toolComplete(ev.payload)
+          this.#showImage(t.call(ev.payload.tool_id))
           // A dispatched delegation: its agents' rows start following the owner.
           this.agents.scan()
 
@@ -2244,7 +2337,7 @@ export class App implements OverlayHost {
     const steer = Boolean(this.busy)
 
     return [
-      ...this.queue.map(q => ({ edit: true, steer, text: q.text })),
+      ...this.queue.map(q => ({ edit: true, steer, text: userText(q.text, q.images) })),
       ...this.#server.queued().map((q): QueuedRow => {
         if (!q.own) {
           return { note: q.row?.status === 'unknown' ? 'unknown' : 'elsewhere', text: q.text }
@@ -2519,13 +2612,25 @@ export class App implements OverlayHost {
         },
         agents: { onOpen: () => openAgents(this), running: this.agents.running().length },
         prs: prsPill(this.prs.entries(), () => openPullRequests(this)),
-        attachments: this.#attachments.map((a, i) => ({
-          label: a.name,
-          onRemove: () => {
-            this.#attachments.splice(i, 1)
-            this.changed()
-          }
-        })),
+        attachments: [
+          ...this.#attachments.map((a, i) => ({
+            caption: a.caption,
+            image: a.preview,
+            label: a.name,
+            onRemove: () => {
+              this.#attachments.splice(i, 1)
+              this.changed()
+            }
+          })),
+          ...this.#attaching.map(slot => ({
+            label: slot.name,
+            onRemove: () => {
+              this.#endAttaching(slot)
+              this.changed()
+            },
+            pending: true
+          }))
+        ],
         status: {
           compressions: typeof usage?.compressions === 'number' ? usage.compressions : undefined,
           notice: this.#notices.current(now),
@@ -2582,8 +2687,16 @@ export class App implements OverlayHost {
 }
 
 /** A prompt's bubble: its text, and how many images went with it. */
+/** A queued prompt's dock line: its words and how many images it carries. */
 function userText(text: string, images: readonly unknown[]): string {
-  return `${text}${images.length ? `\n\n📎 ${images.length} image${images.length === 1 ? '' : 's'}` : ''}`
+  const count = images.length ? `📎 ${images.length} image${images.length === 1 ? '' : 's'}` : ''
+
+  return [text, count].filter(Boolean).join('\n\n')
+}
+
+/** A sent prompt's images, drawn as thumbnails in its bubble. */
+function userImages(images: readonly Image[]): UserAttachment[] {
+  return images.map(i => ({ kind: 'image', name: i.name, ...(i.preview ? { source: i.preview } : {}) }))
 }
 
 /** The shared gateway's FIFO on a session.info or snapshot `info` (the client maps `pending` to it). */

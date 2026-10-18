@@ -8,6 +8,7 @@ import { type JSX, node } from '@stencil-hq/tern'
 import { agentName, OUTCOME_UNKNOWN } from '../agents/store.js'
 import { callApp } from '../bridge.js'
 import { allConnected, CONNECT_TOOL, type ConnectTarget, connectTargets, isConnectCall, type SettleReason, waiting } from '../connections.js'
+import { localSource, shownImage } from '../media.js'
 import type { Subagent, Todo, ToolCall } from '../model.js'
 import { isRunning as processRuns, processElapsed, processIdOf, processTone, processVerdict, watchersOf } from '../processes/store.js'
 import { isBackgroundCall, record } from '../transcript.js'
@@ -255,7 +256,27 @@ function cardOf(call: ToolCall, now: number): Card {
       ? { name: 'search', title: 'Session search' }
       : call.name === 'vision_analyze'
         ? { name: 'image', title: 'Vision' }
-        : { name: call.name, title: humanize(call.name) }
+        : call.name === 'image_generate'
+          ? { name: 'image', title: 'Image' }
+          : { name: call.name, title: humanize(call.name) }
+
+  const src = shownImage(call)
+
+  // The image itself, open; what the tool said of it under it (not the JSON it came in).
+  if (src || call.name === 'image_generate') {
+    const said = call.status === 'running' ? undefined : (str(result?.analysis) ?? str(result?.text_summary))
+
+    return {
+      ...look,
+      body: [
+        ...(src ? [imageNode(call, src)] : []),
+        ...(said ? [<text key="said" lines={6} spans={[{ s: 'muted', t: clip(said, 2000) }]} wrap="word" />] : [])
+      ],
+      folded: false,
+      target: str(call.args.prompt) ?? str(call.args.question) ?? (call.context || undefined),
+      targetKind: 'text'
+    }
+  }
 
   return {
     ...look,
@@ -979,6 +1000,27 @@ function batchBody(call: ToolCall): JSX.Element[] {
           : [])
     ]
   })
+}
+
+/** The image a call showed; a click opens it large in Tern's lightbox. A URL shows once its bytes came. */
+function imageNode(call: ToolCall, src: string): JSX.Element {
+  const source = localSource(src) ?? call.image
+  const alt = str(call.args.prompt) ?? 'Image'
+
+  if (source) {
+    return <image alt={clip(alt, 200)} key="image" role="hermes.tool.image" {...source} />
+  }
+
+  // A data URL is no address to show; an http(s) one is, as a link.
+  const link = /^https?:\/\//i.test(src) ? [{ href: src, t: clip(src, 120) }] : []
+
+  return (
+    <text
+      key="image"
+      spans={[{ s: 'muted', t: call.image === null ? `Could not load the image${link.length ? ': ' : '.'}` : 'Loading the image…' }, ...(call.image === null ? link : [])]}
+      wrap="word"
+    />
+  )
 }
 
 function genericBody(call: ToolCall): JSX.Element[] {

@@ -24,7 +24,7 @@ function key(name: string, mods: Partial<Key> = {}): Key {
 }
 
 /** The app on a fake Tern and gateway: keys go in, gateway requests come out (`canonical`: the shared gateway). */
-function setup(replies: Record<string, Reply> = {}, { canonical = true } = {}) {
+function setup(replies: Record<string, Reply> = {}, { canonical = true, features = [] as string[] } = {}) {
   const handlers = new Map<string, Handler>()
   const requests: { method: string; params: Record<string, unknown> }[] = []
   let uploads = 0
@@ -37,7 +37,7 @@ function setup(replies: Record<string, Reply> = {}, { canonical = true } = {}) {
     request: (method: string, params: Record<string, unknown>) => {
       requests.push({ method, params })
 
-      if (method === 'image.attach_bytes') {
+      if (method === 'image.attach_bytes' && !replies[method]) {
         return Promise.resolve({ path: `/uploads/${++uploads}.png` })
       }
 
@@ -63,7 +63,7 @@ function setup(replies: Record<string, Reply> = {}, { canonical = true } = {}) {
 
   const tern = {
     blob: () => 'blob',
-    caps: { cols: 100, features: [] as string[] },
+    caps: { cols: 100, features },
     close: async () => undefined,
     open: () => surface,
     [Symbol.asyncIterator]: () => ({
@@ -195,6 +195,111 @@ describe('App: images in the draft', () => {
   })
 })
 
+describe('App: an attached image shows', () => {
+  it('as a thumbnail in the composer and in the sent prompt, not as a 📎 count', async () => {
+    const { app, attach, press, type } = setup({}, { features: ['blobs'] })
+    await attach()
+    await type('what is this')
+    await press(key('enter'))
+
+    const user = app.transcript.entries.findLast(e => e.kind === 'user')
+    expect(user).toMatchObject({ attachments: [{ kind: 'image', name: 'shot.png', source: { blob: 'blob' } }], text: 'what is this' })
+    expect(JSON.stringify(user)).not.toContain('📎')
+  })
+
+  it('as its name alone where Tern takes no blobs and the gateway’s copy is not on this machine', async () => {
+    const { app, attach, press, type } = setup()
+    await attach()
+    await type('x')
+    await press(key('enter'))
+
+    const user = app.transcript.entries.findLast(e => e.kind === 'user')
+    expect(user).toMatchObject({ attachments: [{ kind: 'image', name: 'shot.png' }] })
+    expect(user).not.toHaveProperty('attachments.0.source')
+  })
+})
+
+describe('App: a prompt of images alone', () => {
+  it('sends with an empty composer, as Ink does, and the bubble shows just the image', async () => {
+    const { app, attach, press, sent } = setup({}, { features: ['blobs'] })
+    await press(key('enter'))
+    expect(sent('prompt.submit')).toEqual([])
+
+    await attach()
+    await press(key('enter'))
+
+    expect(sent('prompt.submit')).toMatchObject([{ attachments: [{ path: '/uploads/1.png' }], text: 'What do you see in this image?' }])
+    expect(app.transcript.entries.findLast(e => e.kind === 'user')).toMatchObject({ attachments: [{ name: 'shot.png' }], text: '' })
+  })
+
+  it('a private gateway queues it behind a running turn; it goes when the turn ends', async () => {
+    const { app, attach, emit, press, sent } = setup({}, { canonical: false })
+    app.busy = { ...busy }
+    await attach()
+    await press(key('enter'))
+    expect(app.queue).toMatchObject([{ images: [{ path: '/uploads/1.png' }], text: '' }])
+
+    emit('event', { payload: { text: 'done' }, session_id: 's1', type: 'message.complete' })
+    await settle()
+    expect(sent('prompt.submit')).toMatchObject([{ attachments: [{ path: '/uploads/1.png' }], text: 'What do you see in this image?' }])
+  })
+
+  it('the shared gateway admits it to its queue at once', async () => {
+    const { app, attach, press, sent } = setup()
+    app.busy = { ...busy }
+    await attach()
+    await press(key('enter'))
+    await settle()
+    expect(sent('prompt.submit')).toMatchObject([
+      { attachments: [{ path: '/uploads/1.png' }], queued: true, text: 'What do you see in this image?' }
+    ])
+  })
+})
+
+describe('App: an image while it attaches', () => {
+  function slowUpload() {
+    let finish: (v: unknown) => void = () => undefined
+    const upload = () => new Promise(resolve => (finish = resolve))
+
+    return { finish: (path: string) => finish({ path }), upload }
+  }
+
+  it('holds the prompt until it lands, then goes with it', async () => {
+    const u = slowUpload()
+    const { app, press, sent, type } = setup({ 'image.attach_bytes': u.upload })
+    await press(key('paste', { text: png }))
+    await type('look')
+    await press(key('enter'))
+
+    expect(sent('prompt.submit')).toEqual([])
+    expect(app.composer.text).toBe('look')
+    expect(app.transcript.entries.at(-1)).toMatchObject({ kind: 'notice', text: expect.stringContaining('still attaching') })
+
+    u.finish('/uploads/slow.png')
+    await settle()
+    app.composer.set('')
+    await type('look')
+    await press(key('enter'))
+    expect(sent('prompt.submit')).toMatchObject([{ attachments: [{ path: '/uploads/slow.png' }], text: 'look' }])
+  })
+
+  it('is dropped when Ctrl+C clears the draft before it lands', async () => {
+    const u = slowUpload()
+    const { app, press, sent, type } = setup({ 'image.attach_bytes': u.upload })
+    await press(key('paste', { text: png }))
+    const quit = vi.spyOn(app, 'quit')
+    await press(key('d', { ctrl: true }))
+    expect(quit).not.toHaveBeenCalled()
+
+    await press(key('c', { ctrl: true }))
+    u.finish('/uploads/late.png')
+    await settle()
+    await type('later')
+    await press(key('enter'))
+    expect(sent('prompt.submit')[0]).not.toHaveProperty('attachments')
+  })
+})
+
 describe('App: Ctrl+C with a sheet open', () => {
   it('denies an approval instead of clearing the hidden draft or interrupting the turn', async () => {
     const { app, emit, press, sent, type } = setup()
@@ -298,7 +403,8 @@ describe('App: Enter while a turn runs (busy_input_mode)', () => {
     await settle()
 
     // After the reply it waited for, before the turn it opened; and only once.
-    expect(users(app)).toEqual(['next one\n\n📎 1 image'])
+    expect(users(app)).toEqual(['next one'])
+    expect(app.transcript.entries.findLast(e => e.kind === 'user')).toMatchObject({ attachments: [{ kind: 'image' }] })
     expect(app.transcript.entries.map(e => e.kind).slice(-2)).toEqual(['user', 'turn'])
     expect(queuedRows()).toEqual([])
   })

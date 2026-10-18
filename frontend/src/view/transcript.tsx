@@ -5,7 +5,7 @@
 
 import { type JSX, node } from '@stencil-hq/tern'
 
-import type { Block, Entry, NoticeEntry, TurnEntry, UserEntry } from '../model.js'
+import type { Block, Entry, NoticeEntry, TurnEntry, UserAttachment, UserEntry } from '../model.js'
 import { steerState } from '../transcript.js'
 import { parts, pieces } from '../workLog.js'
 
@@ -92,8 +92,36 @@ function userNode(e: UserEntry, cx: TranscriptContext): JSX.Element {
         />
         {copyButton(e.text, e.id, 'omp.user.tool', 'Copy message', cx)}
       </row>
-      <md key="body">{e.text}</md>
+      {e.attachments?.length ? attachmentsRow(e.attachments) : null}
+      {e.text ? <md key="body">{e.text}</md> : null}
     </card>
+  )
+}
+
+/**
+ * A prompt's attachments over its words, as omp's bubble shows them: each image a thumbnail
+ * (a click opens Tern's lightbox, which steps through the others), a file or a gone image a chip.
+ */
+function attachmentsRow(list: readonly UserAttachment[]): JSX.Element {
+  return (
+    <row align="start" gap="sm" key="images" role="omp.user.images" wrap>
+      {list.map((a, i) =>
+        a.source ? (
+          <image alt={a.name} key={`a${i}`} title={a.name} {...a.source} />
+        ) : (
+          <row
+            align="center"
+            gap="xs"
+            key={`a${i}`}
+            role="hermes.user.attachment"
+            title={a.kind === 'image' ? `${a.name} (the file is gone)` : a.name}
+          >
+            <icon key="i" name={a.kind === 'image' ? 'image' : 'file'} />
+            <text key="t" text={a.name} truncate="middle" wrap="none" />
+          </row>
+        )
+      )}
+    </row>
   )
 }
 

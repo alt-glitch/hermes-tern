@@ -13,7 +13,8 @@ import type {
 } from '@hermes/shared/gateway-events'
 
 import { settleBridge, unwrap } from './bridge.js'
-import type { Block, Counters, Entry, NoticeEntry, Todo, ToolCall, TurnEntry } from './model.js'
+import type { Block, Counters, Entry, NoticeEntry, Todo, ToolCall, TurnEntry, UserAttachment } from './model.js'
+import { promptAttachments, splitPrompt } from './promptRefs.js'
 
 type ToolBlock = Extract<Block, { kind: 'tool' }>
 
@@ -104,19 +105,25 @@ export class Transcript {
     turn.rev++
   }
 
-  user(text: string, at = Date.now(), steered = false) {
-    this.push({ at, id: this.id('u'), kind: 'user', text, ...(steered ? { steered } : {}) })
+  user(text: string, at = Date.now(), steered = false, attachments: UserAttachment[] = []) {
+    this.push({ at, id: this.id('u'), kind: 'user', text, ...(steered ? { steered } : {}), ...(attachments.length ? { attachments } : {}) })
+  }
+
+  /** A stored prompt: its words, and as attachments the image refs and attached context Hermes stored with them. */
+  #storedUser(raw: string, at: number) {
+    const parts = splitPrompt(raw)
+    this.user(parts.text, at, false, promptAttachments(parts))
   }
 
   /**
    * A queued prompt the shared gateway just started. Its message.start came first, so the bubble
    * goes before the turn it opened while that turn is still empty; else at the end.
    */
-  started(text: string, at = Date.now()) {
+  started(text: string, at = Date.now(), attachments: UserAttachment[] = []) {
     const live = this.live
 
     if (live && !live.blocks.length && this.entries.at(-1) === live) {
-      this.entries.splice(-1, 0, { at, id: this.id('u'), kind: 'user', text })
+      this.entries.splice(-1, 0, { at, id: this.id('u'), kind: 'user', text, ...(attachments.length ? { attachments } : {}) })
       // It answers this prompt; it did not go on on its own.
       live.continued = undefined
       this.#touch(live)
@@ -124,7 +131,7 @@ export class Transcript {
       return
     }
 
-    this.user(text, at)
+    this.user(text, at, false, attachments)
   }
 
   notice(text: string, tone: NoticeEntry['tone'] = 'info') {
@@ -483,7 +490,7 @@ export class Transcript {
         } else {
           // A notice whose reply Hermes hid has no turn: its reason must not fall on this prompt's.
           pendingContinued = undefined
-          this.entries.push({ at, id: this.id('u'), kind: 'user', text: steered ?? text })
+          this.#storedUser(steered ?? text, at)
         }
 
         continue
@@ -617,7 +624,7 @@ export class Transcript {
     if (notice) {
       this.#continued = notice
     } else if (user) {
-      this.user(user, at)
+      this.#storedUser(user, at)
     }
 
     if (turn.assistant || turn.streaming) {
