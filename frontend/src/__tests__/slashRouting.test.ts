@@ -129,7 +129,7 @@ beforeEach(() => {
     subscription_id: `sub-${p.session_id}`
   }))
   gw.handlers.set('commands.catalog', () => ({
-    canon: { '/heartbeat': '/heartbeat', '/save': '/save', '/sessions': '/sessions', '/status': '/status', '/statusbar': '/statusbar', '/mouse': '/mouse' },
+    canon: { '/heartbeat': '/heartbeat', '/save': '/save', '/sessions': '/sessions', '/status': '/status', '/statusbar': '/statusbar', '/bundles': '/bundles', '/busy': '/busy', '/mouse': '/mouse' },
     skills: { '/stat-skill': {} }
   }))
 })
@@ -146,10 +146,10 @@ describe('slash name resolution', () => {
   it('says which commands an ambiguous prefix could mean, and runs none', async () => {
     const { app, submit } = await started()
 
-    await submit('/stat')
+    await submit('/bu')
 
     expect(gw.methods('slash.exec')).toHaveLength(0)
-    expect(notices(app).at(-1)).toBe('/stat could mean /status, /statusbar. Type more of the name.')
+    expect(notices(app).at(-1)).toBe('/bu could mean /bundles, /busy. Type more of the name.')
   })
 
   it("matches this frontend's own commands in any case", async () => {

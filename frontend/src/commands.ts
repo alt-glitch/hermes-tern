@@ -18,6 +18,7 @@ import { openModelPicker, switchModel } from './overlays/models.js'
 import { confirmOverlay } from './overlays/prompts.js'
 import { openSessionPicker } from './overlays/sessions.js'
 import { isThemeMode, openThemePicker } from './overlays/theme.js'
+import { REFUSED_COMMANDS } from './refusedCommands.js'
 import { SESSION_COMMANDS } from './sessionCommands.js'
 import { answerText } from './view/transcript.js'
 
@@ -216,14 +217,15 @@ const COMMANDS: readonly LocalCommand[] = [
     run: (app, arg) => (arg ? false : openHelp(app))
   },
   ...CONTROL_COMMANDS.map(c => ({ ...c, run: (app: App, arg: string) => c.run(app.control(), arg) })),
-  ...SESSION_COMMANDS.map(c => ({ ...c, run: (app: App, arg: string) => c.run(app.control(), arg) }))
+  ...SESSION_COMMANDS.map(c => ({ ...c, run: (app: App, arg: string) => c.run(app.control(), arg) })),
+  ...REFUSED_COMMANDS
 ]
 
 /**
- * Commands the gateway lists (complete.slash's TUI extras, the catalog's TUI section) that only the
- * Ink TUI runs: this frontend neither offers nor resolves them.
+ * Commands the gateway lists that only the Ink TUI or a messaging platform runs (refusedCommands.ts):
+ * this frontend neither offers nor resolves them, and answers one typed whole with why.
  */
-export const INK_ONLY_COMMANDS: ReadonlySet<string> = new Set(['density', 'details', 'logs', 'mouse'])
+export { HIDDEN_COMMANDS } from './refusedCommands.js'
 
 /** `/copy [n]`: the last (or `n`th) answer to the clipboard. */
 function copyAnswer(app: App, arg: string) {

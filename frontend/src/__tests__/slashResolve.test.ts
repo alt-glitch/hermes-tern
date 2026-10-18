@@ -8,6 +8,8 @@ import { CommandCatalog, resolveSlashName } from '../slashResolve.js'
 
 const catalog = {
   canon: {
+    '/bundles': '/bundles',
+    '/busy': '/busy',
     '/heartbeat': '/heartbeat',
     '/hb': '/heartbeat',
     '/mouse': '/mouse',
@@ -35,7 +37,9 @@ describe('resolveSlashName', () => {
   })
 
   it('names every command a prefix ties, and lets a prefix beat a substring', () => {
-    expect(resolveSlashName('stat', catalog)).toEqual({ ambiguous: ['/status', '/statusbar'] })
+    expect(resolveSlashName('bu', catalog)).toEqual({ ambiguous: ['/bundles', '/busy'] })
+    // /statusbar is hidden (Ink-only): `stat` means /status alone.
+    expect(resolveSlashName('stat', catalog)).toEqual({ name: 'status' })
     // `beat` is only a substring of /heartbeat: the lone match runs.
     expect(resolveSlashName('beat', catalog)).toEqual({ name: 'heartbeat' })
   })
@@ -77,10 +81,10 @@ describe('CommandCatalog', () => {
 const row = (text: string, kind = 'command', meta = ''): CompletionItem => ({ display: text, kind, meta, text })
 
 describe('slashItems', () => {
-  it("drops the Ink-only commands and adds this frontend's own by name", () => {
+  it("drops the hidden commands and adds this frontend's own by name", () => {
     const items = slashItems([row('/plan'), row('/mouse'), row('/pet'), row('/pdf', 'skill')], '/p')
 
-    expect(items.map(i => i.text)).toEqual(['/plan', '/pet', '/ps', '/prs', '/pdf'])
+    expect(items.map(i => i.text)).toEqual(['/plan', '/ps', '/prs', '/pdf'])
     expect(items.find(i => i.text === '/ps')).toMatchObject({ kind: 'command', meta: 'Background processes and cron jobs' })
   })
 

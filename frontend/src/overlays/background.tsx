@@ -44,11 +44,17 @@ const STATUS: Record<BackgroundProcess['status'], string> = {
   running: 'Running'
 }
 
-/** Opens the sheet, on process `focus` when given. */
-export function openBackground(app: App, focus?: string) {
+/** Opens the sheet, on process `focus` when given, or on the Cron tab (`/cron`). */
+export function openBackground(app: App, at?: string | { tab: 'cron' }) {
   const procs = () => app.processes.all()
+  const focus = typeof at === 'string' ? at : undefined
   const focused = focus ? app.processes.get(focus) : undefined
   let tab: Tab = focused ? (isRunning(focused) ? 'running' : 'all') : app.processes.running().length ? 'running' : 'all'
+
+  if (typeof at === 'object') {
+    tab = at.tab
+  }
+
   let selected = focus ?? procs().find(isRunning)?.id ?? procs()[0]?.id
   /** Enter: the output takes the whole sheet. */
   let expanded = false
