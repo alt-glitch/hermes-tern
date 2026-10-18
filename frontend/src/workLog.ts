@@ -8,8 +8,8 @@ import { homedir } from 'node:os'
 
 import { callApp } from './bridge.js'
 import { isConnectCall } from './connections.js'
-import type { Block, ToolCall, TurnEntry } from './model.js'
-import { isBackgroundCall } from './transcript.js'
+import type { Block, Todo, ToolCall, TurnEntry } from './model.js'
+import { isBackgroundCall, isTodoName } from './transcript.js'
 import { commandDisplayText, commandProgramName } from './vendor/t3code/commandLabel.js'
 
 /** A step of a work group: a tool call or a thought. */
@@ -26,13 +26,18 @@ export function ownsCard(call: ToolCall): boolean {
   return SOLO.has(call.name) || isBackgroundCall(call) || isConnectCall(call)
 }
 
-/** Splits blocks into text, steers and card-owning calls, and the work groups between them. */
-export function pieces(blocks: readonly Block[]): Piece[] {
+/**
+ * Splits blocks (some of the turn's `turn`) into text, steers and card-owning calls, and the work
+ * groups between them. Only the turn's newest todo list keeps its checklist card; the ones before
+ * it are steps saying what they changed ("Plan updated: ✓ Write tests").
+ */
+export function pieces(blocks: readonly Block[], turn: readonly Block[] = blocks): Piece[] {
   const out: Piece[] = []
   let items: WorkItem[] = []
+  const plan = turn.findLast(b => b.kind === 'tool' && isTodoName(b.call.name) && b.call.todos?.length)
 
   for (const b of blocks) {
-    if (b.kind === 'thinking' || (b.kind === 'tool' && !ownsCard(b.call))) {
+    if (b.kind === 'thinking' || (b.kind === 'tool' && (!ownsCard(b.call) || (isTodoName(b.call.name) && b !== plan)))) {
       items.push(b)
       continue
     }
@@ -196,12 +201,27 @@ export function formatDuration(ms: number): string {
 }
 
 /** What a call counts as in a summary, after t3code's `toolGroupAction`. */
-export type Action = 'app' | 'browser' | 'code-search' | 'command' | 'edit' | 'fetch' | 'lookup' | 'other' | 'read' | 'search'
+export type Action =
+  | 'app'
+  | 'browser'
+  | 'code-search'
+  | 'command'
+  | 'edit'
+  | 'fetch'
+  | 'lookup'
+  | 'other'
+  | 'plan'
+  | 'read'
+  | 'search'
 
 export function actionOf(call: ToolCall): Action {
   // A connector or MCP tool acts in an app, whatever its name says; so does a batch of them.
   if (appsOf(call).length) {
     return 'app'
+  }
+
+  if (isTodoName(call.name)) {
+    return 'plan'
   }
 
   switch (call.name) {
@@ -274,6 +294,9 @@ function actionLabel(action: Action, n: number, calls: readonly ToolCall[] = [])
 
     case 'lookup':
       return `Looked up tools${n > 1 ? ` ${n} times` : ''}`
+
+    case 'plan':
+      return `Updated the plan${n > 1 ? ` ${n} times` : ''}`
 
     case 'other':
       return `Used ${plural(n, 'tool', 'tools')}`
@@ -369,6 +392,9 @@ export function actionIcon(action: Action): string {
     case 'lookup':
       return 'search'
 
+    case 'plan':
+      return 'list-checks'
+
     case 'command':
       return 'terminal'
 
@@ -424,6 +450,10 @@ export function stepLabel(call: ToolCall): string {
 
   if (call.batch) {
     return call.batch.map(e => stepLabel({ ...call, args: e.args, batch: undefined, name: e.name })).join(', ')
+  }
+
+  if (isTodoName(call.name)) {
+    return planStep(call.todosBefore, call.todos)
   }
 
   switch (call.name) {
@@ -506,6 +536,31 @@ export function stepLabel(call: ToolCall): string {
   const label = name.charAt(0).toUpperCase() + name.slice(1)
 
   return call.context ? `${label}: ${flat(call.context)}` : label
+}
+
+const MARK: Record<Todo['status'], string> = { cancelled: '✗', completed: '✓', in_progress: '→', pending: '○' }
+
+/**
+ * A todo call as one step, in t3code's words for a plan change ("Plan updated"): what it changed
+ * in the list before it, each item marked with its new state ("✓ Write tests, → Run the suite");
+ * an item it added reads "+ …". The first list reads "Planned 4 steps".
+ */
+export function planStep(before: readonly Todo[] | undefined, after: readonly Todo[] | undefined): string {
+  if (!after?.length) {
+    return 'Plan updated'
+  }
+
+  if (!before?.length) {
+    return `Planned ${plural(after.length, 'step', 'steps')}`
+  }
+
+  const changes = after.flatMap(t => {
+    const was = before.find(b => b.id === t.id)
+
+    return !was ? [`+ ${t.content}`] : was.status !== t.status ? [`${MARK[t.status]} ${t.content}`] : []
+  })
+
+  return changes.length ? `Plan updated: ${changes.join(', ')}` : 'Plan updated'
 }
 
 /** The live line of a running group, after t3code's `liveWorkEntryLabel`: "Running ls". */

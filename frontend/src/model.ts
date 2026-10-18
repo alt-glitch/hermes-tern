@@ -91,6 +91,8 @@ export interface ToolCall {
   /** A unified diff of the files the call changed. */
   diff?: string
   todos?: Todo[]
+  /** A todo call's list as the call found it: what its step line says it changed. */
+  todosBefore?: Todo[]
   subagents?: Subagent[]
   /** The background process a `terminal(background=true)` call started, while the store follows it. */
   process?: BackgroundProcess

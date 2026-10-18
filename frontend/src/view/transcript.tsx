@@ -140,13 +140,10 @@ function turnNode(turn: TurnEntry, id: string, cx: TranscriptContext): JSX.Eleme
           <text key="title" spans={[{ s: 'error strong', t: 'Request failed' }]} />
           {turn.errorCode ? <badge key="code" role="omp.error.code" text={turn.errorCode} tone="error" /> : null}
         </row>,
-        <text
-          key="message"
-          lines={8}
-          role="omp.error.message"
-          spans={[{ s: 'mono', t: turn.error ?? '' }]}
-          wrap="word"
-        />,
+        // A failed turn reloaded from an older store knows only Hermes' advice, not the error.
+        turn.error ? (
+          <text key="message" lines={8} role="omp.error.message" spans={[{ s: 'mono', t: turn.error }]} wrap="word" />
+        ) : null,
         turn.errorHint ? <md key="hint">{turn.errorHint}</md> : null
       ])
     )
@@ -179,7 +176,7 @@ function turnNode(turn: TurnEntry, id: string, cx: TranscriptContext): JSX.Eleme
  */
 function pieceNodes(turn: TurnEntry, blocks: readonly Block[], parent: string, cx: TranscriptContext): (JSX.Element | null)[] {
   const live = turn.status === 'live'
-  const ps = pieces(blocks)
+  const ps = pieces(blocks, turn.blocks)
   const lastText = blocks.findLast(b => b.kind === 'text')
 
   return ps.map((p, i) => {
