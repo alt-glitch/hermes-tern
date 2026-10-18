@@ -41,7 +41,7 @@ const COMMANDS: readonly LocalCommand[] = [
     name: 'new',
     run: (app, arg) => {
       if (app.busy) {
-        return app.transcript.notice('Wait for the current turn to finish (or press Esc) before starting a new session.', 'warning')
+        return app.transcript.notice('Wait for the current turn to finish (or press Esc twice) before starting a new session.', 'warning')
       }
 
       return app.newSession(arg.trim() || undefined)

@@ -96,7 +96,7 @@ async function compress(host: SessionHost, arg: string) {
   }
 
   if (host.busy) {
-    return host.notice('Wait for the current turn to finish (or press Esc) before compressing.', 'warning')
+    return host.notice('Wait for the current turn to finish (or press Esc twice) before compressing.', 'warning')
   }
 
   const focus = arg.trim()

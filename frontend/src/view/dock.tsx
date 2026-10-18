@@ -20,7 +20,7 @@ export interface DockContext {
   /** The agent accepts prompts (for Tern's `send`). */
   ready: boolean
   busy?: { since: object; startedAt: number; label: string }
-  queued: readonly string[]
+  queued: readonly QueuedRow[]
   model: string
   /** Hermes's reasoning effort (`none` = off); empty hides the chip. */
   effort: string
@@ -42,8 +42,8 @@ export interface DockContext {
   onEffort(): void
   /** The effort pill's context menu, by action: choose a level, save the current one as the default. */
   onEffortMenu?: Record<string, () => void>
-  /** Pull the oldest queued prompt back into the composer. */
-  onQueueEdit(): void
+  /** Pull the queued prompt at `index` back into the composer. */
+  onQueueEdit(index: number): void
   /** Inject the queued prompt at `index` into the running turn; absent when no turn runs. */
   onQueueSteer?(index: number): void
   /** The session's cache hit (percent) and recent tokens per second, when known. */
@@ -62,6 +62,19 @@ export interface DockContext {
   attachments?: { label: string; onRemove(): void }[]
   /** The pill holding the keyboard (Down from an empty prompt). */
   focused?: Pill
+}
+
+/**
+ * A prompt waiting behind the turn (t3code's queued row): what its Edit and Steer can do. A row
+ * still on its way to the gateway is `pending`; another window's row (`note`) is shown, not acted on.
+ */
+export interface QueuedRow {
+  text: string
+  edit?: boolean
+  steer?: boolean
+  pending?: boolean
+  /** `elsewhere`: queued by another window (or before a reconnect); `unknown`: its turn's outcome is unknown. */
+  note?: 'elsewhere' | 'unknown'
 }
 
 /** The agent's todo list as a pill: a ring that fills as items are done, and the one under way. */
@@ -124,31 +137,41 @@ export function dockNodes(cx: DockContext): JSX.Element[] {
   if (cx.queued.length) {
     nodes.push(
       <col gap="xs" key="queue" role="omp.queue">
-        {cx.queued.map((text, i) => (
-          <row align="center" gap="sm" key={`q${i}`} role="omp.queue.item" title="Queued">
-            <icon key="icon" name="corner-down-right" />
-            <text grow={1} key="text" text={text.replace(/\s*\r?\n\s*/g, ' ↵ ')} truncate="end" wrap="none" />
+        {cx.queued.map((q, i) => (
+          <row align="center" gap="sm" key={`q${i}`} role="omp.queue.item" title={queuedTitle(q)}>
+            <icon key="icon" name={q.pending ? 'clock' : 'corner-down-right'} />
+            <text grow={1} key="text" text={q.text.replace(/\s*\r?\n\s*/g, ' ↵ ')} truncate="end" wrap="none" />
             {i === 0 && cx.queued.length > 1 ? (
               <badge key="count" role="omp.queue.count" text={`${cx.queued.length}`} />
             ) : null}
-            {cx.onQueueSteer ? (
+            {q.note === 'unknown' ? <badge key="note" text="unknown" tone="warning" /> : null}
+            {cx.onQueueSteer && q.steer ? (
               <row
                 align="center"
                 gap="xs"
                 key="steer"
                 onClick={() => cx.onQueueSteer?.(i)}
                 role="omp.queue.steer"
-                title="Steer the running turn with this  ⌥↵"
+                title={`Steer the running turn with this instead${i === 0 ? '  ⌥↵' : ''}`}
               >
                 <icon key="i" name="corner-up-right" />
-                <kbd key="k" keys={['alt', 'enter']} />
+                {i === 0 ? <kbd key="k" keys={['alt', 'enter']} /> : null}
                 <text key="t" text="Steer" />
               </row>
             ) : null}
-            <row align="center" gap="xs" key="edit" onClick={cx.onQueueEdit} role="omp.queue.edit" title="Edit  ⌥↑">
-              <kbd key="k" keys={['alt', 'up']} />
-              <text key="t" text="Edit" />
-            </row>
+            {q.edit ? (
+              <row
+                align="center"
+                gap="xs"
+                key="edit"
+                onClick={() => cx.onQueueEdit(i)}
+                role="omp.queue.edit"
+                title={`Edit in the composer${i === 0 ? '  ⌥↑' : ''}`}
+              >
+                {i === 0 ? <kbd key="k" keys={['alt', 'up']} /> : null}
+                <text key="t" text="Edit" />
+              </row>
+            ) : null}
           </row>
         ))}
       </col>
@@ -184,6 +207,16 @@ export function dockNodes(cx: DockContext): JSX.Element[] {
   nodes.push(statusLine(cx))
 
   return nodes
+}
+
+function queuedTitle(q: QueuedRow): string {
+  return q.pending
+    ? 'Queuing…'
+    : q.note === 'elsewhere'
+      ? 'Queued by another window (or before a reconnect)'
+      : q.note === 'unknown'
+        ? 'Queued behind a turn whose outcome is unknown'
+        : 'Queued'
 }
 
 /** The todo pill: a ring that fills as items are done, `2/5`, and the item under way. */
@@ -288,7 +321,7 @@ function statusLine(cx: DockContext): JSX.Element {
       {cx.cost ? <seg key="cost" priority={3} side="right" spans={[{ t: `$${cx.cost.toFixed(2)}` }]} title="Session cost" /> : null}
       <seg key="newline" priority={1} side="right" spans={[{ s: 'muted', t: '⇧⏎ newline' }]} />
       {cx.busy ? (
-        <seg key="action" onClick={cx.onInterrupt} priority={10} role="hermes.statusline.stop" side="right" spans={[{ t: 'esc stop' }]} />
+        <seg key="action" onClick={cx.onInterrupt} priority={10} role="hermes.statusline.stop" side="right" spans={[{ t: 'esc esc stop' }]} />
       ) : (
         <seg key="action" onClick={cx.onSubmit} priority={10} role="hermes.statusline.send" side="right" spans={[{ t: '⏎ send' }]} />
       )}
@@ -386,8 +419,9 @@ function workingNode(cx: DockContext): JSX.Element {
       <elapsed age={age(busy.since, busy.startedAt, cx.now)} format="short" key="elapsed" />
       <row grow={1} key="fill" />
       {cx.todos ? todosPillNode(cx.todos, false) : null}
-      <row align="center" gap="xs" key="stop" onClick={cx.onInterrupt} role="omp.working.stop" title="Stop  esc">
+      <row align="center" gap="xs" key="stop" onClick={cx.onInterrupt} role="omp.working.stop" title="Stop  esc esc">
         <kbd key="k" keys={['esc']} />
+        <kbd key="k2" keys={['esc']} />
         <text key="t" text="Stop" />
       </row>
     </row>
@@ -444,7 +478,9 @@ function composerNode(cx: DockContext): JSX.Element {
       </row>
       <row align="start" gap="sm" key="line" role="omp.composer.line">
         <editor
+          anchor={composer.anchor}
           cursor={composer.cursor}
+          decor={composer.decor}
           ghost={cx.ghost || undefined}
           key="input"
           maxLines={18}
@@ -494,7 +530,7 @@ function composerNode(cx: DockContext): JSX.Element {
             onClick={cx.onInterrupt}
             role="omp.composer.stop"
             text="Stop"
-            title="Stop  esc"
+            title="Stop  esc esc"
             tone="error"
           />
         ) : (

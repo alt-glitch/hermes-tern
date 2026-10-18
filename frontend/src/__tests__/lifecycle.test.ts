@@ -161,6 +161,27 @@ describe('session lifecycle', () => {
     expect(app.sid).toBe('s1')
   })
 
+  it("shows a resumed session's prompts still waiting in the gateway's queue", async () => {
+    const app = await started(gw)
+    gw.handlers.set('session.resume', p => ({
+      info: {
+        pending_submissions: [
+          { admission_id: 'a1', input_id: 'i1', status: 'started', user: 'running now' },
+          { admission_id: 'a2', input_id: 'i2', status: 'queued', user: 'after that' }
+        ],
+        stored_session_id: p.session_id
+      },
+      running: true,
+      session_id: p.session_id,
+      subscription_id: 'sub-old'
+    }))
+    app.busy = null
+
+    await app.resume('old')
+
+    expect(app.control().queued).toBe(1)
+  })
+
   it('shows an otherwise unhandled error in the chat', async () => {
     const app = await started(gw)
     app.fault(new Error('boom'))

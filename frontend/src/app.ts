@@ -29,7 +29,7 @@ import { agentName, Agents } from './agents/store.js'
 import { copyToClipboard } from './clipboard.js'
 import { localCommand } from './commands.js'
 import { Composer } from './composer.js'
-import { interruptTurn, steerTurn } from './controlCommands.js'
+import { interruptTurn, redirectTurn, steerTurn } from './controlCommands.js'
 import { type Busy, busyFrom, ownsEvent, Switches } from './flow.js'
 import { protocolNote, slowStartNotes } from './backendNotes.js'
 import { hudKey, type Pill } from './hud.js'
@@ -59,8 +59,9 @@ import type { SessionHost } from './sessionCommands.js'
 import { isLoginNotice, Notices, statusEffect } from './status.js'
 import { isRunning as processRuns, Processes, processTone } from './processes/store.js'
 import { loadSettings, saveSettings, type ThemeMode } from './settings.js'
+import { type BusyMode, busyModeOf, type OwnAdmission, type PendingRow, ServerQueue, type ServerQueued } from './serverQueue.js'
 import { Transcript } from './transcript.js'
-import { dockNodes, todoProgress } from './view/dock.js'
+import { dockNodes, type QueuedRow, todoProgress } from './view/dock.js'
 import { entryNode } from './view/transcript.js'
 import { busyLabel, preparingLabel } from './workLog.js'
 import { openSidebar, specOf } from './watch/spec.js'
@@ -70,6 +71,8 @@ import { randomTip, type WelcomeContext } from './view/welcome.js'
 export const INPUT_ID = 'dock.composer.line.input'
 
 const EXIT_ARM_MS = 1500
+/** Two Esc presses within this window are a double Esc (Ink's DOUBLE_ESC_MS). */
+const DOUBLE_ESC_MS = 500
 /** How long a prompt's Copy button reads Copied. */
 const COPIED_MS = 1500
 /** What Shift+Tab / the effort chip cycle through (hermes's `none` turns reasoning off). */
@@ -101,6 +104,12 @@ export interface Queued {
   expand?: boolean
 }
 
+/** A prompt this pane admitted into the shared gateway's queue: as typed (for Edit), and as sent. */
+interface Admitted {
+  item: Queued
+  text: string
+}
+
 /** Runs the Tern frontend until the user quits; resolves the exit code. */
 export class App implements OverlayHost {
   readonly transcript = new Transcript()
@@ -128,7 +137,12 @@ export class App implements OverlayHost {
   info: SessionLiveInfo | null = null
   usage: Usage | null = null
   busy: Busy | null = null
+  /** Prompts held here until they can be sent: no session yet, a switch in flight, or a private gateway's busy turn. */
   queue: Queued[] = []
+  /** The shared gateway's queue for this session: its FIFO, this pane's admissions, the bubbles they owe. */
+  readonly #server = new ServerQueue<Admitted>()
+  /** What Enter does while a turn runs (`display.busy_input_mode`); queue until the gateway says. */
+  #busyMode: BusyMode = 'queue'
   readonly #tern: Session
   readonly #gw: GatewayClient
   readonly #completion: Completion
@@ -138,6 +152,7 @@ export class App implements OverlayHost {
   /** The field holding Tern's caret, as last sent. */
   #focus: string | null = INPUT_ID
   #exitArmed = 0
+  #lastEsc = 0
   #done = Promise.withResolvers<number>()
   readonly #switches = new Switches()
   /** Server requests for another session, kept while a switch is in flight. */
@@ -347,8 +362,16 @@ export class App implements OverlayHost {
       return
     }
 
+    // A single Esc never cancels work (Ink's resolveDoubleEscAction): a second one within
+    // DOUBLE_ESC_MS clears a draft into the prompt history, else stops the running turn.
     if (key.name === 'escape') {
-      if (this.busy) {
+      const now = Date.now()
+      const double = now - this.#lastEsc <= DOUBLE_ESC_MS
+      this.#lastEsc = double ? 0 : now
+
+      if (double && this.#hasDraft()) {
+        this.#clearDraft()
+      } else if (double && this.busy) {
         this.#interrupt()
       }
 
@@ -359,30 +382,29 @@ export class App implements OverlayHost {
       return this.#cycleEffort()
     }
 
-    if ((key.alt && key.name === 'a') || key.name === 'å') {
-      return openAgents(this)
+    // By the Alt modifier only: a typed å, ∫, ß or π (macOS Option without Meta, or a keyboard
+    // that has the letter) is text for the composer. Word-back stays on Alt+Left.
+    if (key.alt && !key.ctrl && !key.meta) {
+      switch (key.name) {
+        case 'a':
+          return openAgents(this)
+
+        case 'b':
+          return openBackground(this)
+
+        case 's':
+          return this.toggleSidebar()
+
+        case 'p':
+          return openPullRequests(this)
+      }
     }
 
-    // ⌥B (macOS Option without Meta types ∫). Word-back stays on Alt+Left.
-    if ((key.alt && key.name === 'b' && !key.ctrl && !key.meta) || key.name === '∫') {
-      return openBackground(this)
+    if (key.alt && key.name === 'up' && this.#queuedCount()) {
+      return this.#dequeue(0)
     }
 
-    // ⌥S (macOS Option without Meta types ß).
-    if ((key.alt && key.name === 's' && !key.ctrl && !key.meta) || key.name === 'ß') {
-      return this.toggleSidebar()
-    }
-
-    // ⌥P (macOS Option without Meta types π).
-    if ((key.alt && key.name === 'p' && !key.ctrl && !key.meta) || key.name === 'π') {
-      return openPullRequests(this)
-    }
-
-    if (key.alt && key.name === 'up' && this.queue.length) {
-      return this.#dequeue()
-    }
-
-    if (key.alt && key.name === 'enter' && this.busy && this.queue.length && !this.composer.text) {
+    if (key.alt && key.name === 'enter' && this.busy && this.#queuedCount() && !this.composer.text) {
       return this.#steerQueued(0)
     }
 
@@ -706,6 +728,17 @@ export class App implements OverlayHost {
     return Boolean(this.composer.text || this.#attachments.length)
   }
 
+  /** Esc Esc: the draft's text goes to the prompt history (Up brings it back), its images go. */
+  #clearDraft() {
+    if (this.composer.text.trim()) {
+      this.composer.take()
+    } else {
+      this.composer.set('')
+    }
+
+    this.#attachments = []
+  }
+
   #ctrlC() {
     if (this.#hasDraft()) {
       this.composer.set('')
@@ -747,8 +780,12 @@ export class App implements OverlayHost {
 
   // ── Prompts and commands ───────────────────────────────────────────
 
-  /** Sends or queues a prompt, or runs a command; `draft`: the user entered it (it takes the draft's images). */
-  #submit(raw: string, draft = true) {
+  /**
+   * Sends or queues a prompt, or runs a command; `draft`: the user entered it (it takes the draft's
+   * images). While a turn runs the prompt goes as `busy` says: the session's busy_input_mode for
+   * a typed one; a message the app writes (a connect result) waits behind the turn.
+   */
+  #submit(raw: string, draft = true, busy: BusyMode = draft ? this.#busyMode : 'queue') {
     const text = raw.trim()
 
     if (!text) {
@@ -771,13 +808,124 @@ export class App implements OverlayHost {
     // The draft's images go with this prompt, whenever it is sent; a message the app writes leaves them.
     const item: Queued = { expand: true, images: draft ? this.#takeImages() : [], text }
 
-    if (this.busy || !this.sid || this.#switches.pending) {
+    if (!this.sid || this.#switches.pending) {
       this.queue.push(item)
 
       return
     }
 
+    if (this.busy) {
+      return void this.#busyInput(item, busy)
+    }
+
     this.#send(item)
+  }
+
+  /**
+   * A prompt entered while a turn runs, as Ink's handleBusyInput: `steer` injects it into the turn,
+   * `interrupt` redirects the turn with it, `queue` puts it behind the turn. A steer or redirect
+   * carries no images, and one the gateway refuses is queued instead.
+   */
+  async #busyInput(item: Queued, mode: BusyMode) {
+    const sid = this.sid
+
+    if (!sid || mode === 'queue' || item.images.length) {
+      return this.#queueBehind(item)
+    }
+
+    const ready = await this.#expanded(sid, item)
+
+    if (!ready || sid !== this.sid) {
+      return
+    }
+
+    const r = await (mode === 'steer' ? steerTurn : redirectTurn)(this.#gw, sid, ready.text)
+
+    if (sid !== this.sid) {
+      return
+    }
+
+    if (r.ok) {
+      this.transcript.steer(item.text)
+    } else {
+      if (r.error) {
+        this.transcript.notice(`${mode === 'steer' ? 'Steer' : 'Redirect'} failed: ${r.error}. Queued instead.`, 'warning')
+      }
+
+      this.#queueBehind(item)
+    }
+
+    this.changed()
+  }
+
+  /** Puts `item` behind the running turn: into the shared gateway's queue at once, else held here. */
+  #queueBehind(item: Queued) {
+    const sid = this.sid
+
+    if (!this.#gw.isCanonical || !sid || this.#switches.pending) {
+      this.queue.push(item)
+      this.#drainQueue()
+
+      return this.changed()
+    }
+
+    void this.#admit(sid, item)
+  }
+
+  /**
+   * Admits `item` into session `sid`'s FIFO now (Ink's busy-time admission): crash-durable, and in
+   * every viewer's queue. Its bubble waits until the gateway starts it; a refusal puts it back in
+   * the composer. `text`: what to send instead of expanding the item again (a re-queued steer).
+   */
+  async #admit(sid: string, item: Queued, text?: string) {
+    const ready = text === undefined ? await this.#expanded(sid, item) : { images: item.images, text }
+
+    if (!ready || sid !== this.sid) {
+      return
+    }
+
+    const own: OwnAdmission<Admitted> = { display: userText(item.text, item.images), inputId: randomUUID(), item: { item, text: ready.text } }
+    const attachments = ready.images.map(({ mime, path }) => ({ mime, path }))
+    this.#server.admit(own)
+    this.changed()
+
+    try {
+      const r = await this.#gw.request<{ admission_id?: string } | null>('prompt.submit', {
+        queued: true,
+        session_id: sid,
+        submission_id: own.inputId,
+        text: ready.text,
+        ...(attachments.length ? { attachments } : {})
+      })
+
+      own.admissionId = r?.admission_id
+    } catch (error) {
+      this.#server.drop(own)
+
+      if (sid === this.sid) {
+        this.transcript.notice(`Not queued: ${error instanceof Error ? error.message : String(error)}. Your message is back in the composer.`, 'error')
+        this.#restore(item)
+      }
+    }
+
+    this.changed()
+  }
+
+  /** `item` with its `{!cmd}`s run (a typed prompt's); undefined when one failed (the prompt is back in the composer). */
+  async #expanded(sid: string, item: Queued): Promise<{ images: Image[]; text: string } | undefined> {
+    if (!item.expand || !hasInterpolation(item.text)) {
+      return item
+    }
+
+    try {
+      return { images: item.images, text: await interpolate(this.#gw, sid, item.text) }
+    } catch (error) {
+      this.transcript.notice(`Not sent: a {!…} command failed: ${shellError(error)}.`, 'error')
+      this.#restore(item)
+      this.changed()
+
+      return undefined
+    }
   }
 
   /**
@@ -817,13 +965,16 @@ export class App implements OverlayHost {
 
     const { images, text } = item
     const attachments = images.map(({ mime, path }) => ({ mime, path }))
-    this.transcript.user(`${display?.trim() || text}${images.length ? `\n\n📎 ${images.length} image${images.length === 1 ? '' : 's'}` : ''}`)
+    const submission = randomUUID()
+    this.transcript.user(userText(display?.trim() || text, images))
+    // Its bubble is up: the gateway's queued → started for it owes none.
+    this.#server.shown(submission)
     this.#startBusy('Working…')
     this.#gw
       // The shared gateway admits a prompt by its submission id (a retry with the same id is one turn).
       .request('prompt.submit', {
         session_id: sid,
-        submission_id: randomUUID(),
+        submission_id: submission,
         text,
         ...(queued ? { queued } : {}),
         ...(attachments.length ? { attachments } : {})
@@ -956,10 +1107,7 @@ export class App implements OverlayHost {
       busy: Boolean(this.busy),
       // A steer that fell back to the queue: steering carries no images.
       canonical: this.#gw.isCanonical,
-      enqueue: text => {
-        this.queue.push({ images: [], text })
-        this.changed()
-      },
+      enqueue: text => this.#queueBehind({ images: [], text }),
       gw: this.#gw,
       notice: (text, tone) => {
         this.transcript.notice(text, tone)
@@ -974,7 +1122,7 @@ export class App implements OverlayHost {
         this.transcript.panel(title, text)
         this.changed()
       },
-      queued: this.queue.length,
+      queued: this.#queuedCount(),
       reload: async () => {
         if (sid && this.sid === sid) {
           await this.#resume(sid)
@@ -987,7 +1135,8 @@ export class App implements OverlayHost {
         this.transcript.steer(text)
         this.changed()
       },
-      submit: text => this.#submit(text)
+      // /queue: behind the turn whatever busy_input_mode says.
+      submit: text => this.#submit(text, true, 'queue')
     }
   }
 
@@ -1139,7 +1288,7 @@ export class App implements OverlayHost {
       return false
     }
 
-    this.transcript.notice('Wait for the current turn to finish (or press Esc) before switching sessions.', 'warning')
+    this.transcript.notice('Wait for the current turn to finish (or press Esc twice) before switching sessions.', 'warning')
     this.changed()
 
     return true
@@ -1196,7 +1345,14 @@ export class App implements OverlayHost {
     if (r.session_id !== this.sid) {
       // The last session's approvals and questions are not this one's (a resume hydrates its own after).
       this.#dropPrompts(() => true)
+      this.#busyMode = 'queue'
     }
+
+    // Read on every adopt: a reconnect may land on a gateway whose config changed.
+    void this.#readBusyMode(r.session_id)
+
+    // The session's own queue, from the snapshot (a reattach's rows of this pane become read-only rows).
+    this.#server.reset(pendingRows(r.info))
 
     this.sid = r.session_id
     this.#showThoughts(r.session_id)
@@ -1211,7 +1367,7 @@ export class App implements OverlayHost {
     this.title = ''
     this.#setTitle(typeof r.info?.title === 'string' ? r.info.title : undefined)
     this.#readTitle()
-    // A resumed session may be mid-turn: Esc stops it and new prompts queue behind it.
+    // A resumed session may be mid-turn: Esc Esc stops it and new prompts go as busy_input_mode says.
     this.busy = busyFrom(r)
     // The last session's notices and status lines are not this one's.
     this.#notices.reset()
@@ -1362,6 +1518,12 @@ export class App implements OverlayHost {
         // The shared owner's idle fanout carries only pending/revision/generation: merge, never replace.
         this.info = ev.payload ? { ...this.info, ...ev.payload } : this.info
         this.usage = ev.payload?.usage ?? this.usage
+
+        // A queued prompt the gateway started gets its bubble now, after the reply it waited for.
+        for (const started of this.#server.update(pendingRows(ev.payload))) {
+          t.started(started.text)
+        }
+
         this.#setTitle(typeof ev.payload?.title === 'string' ? ev.payload.title : undefined)
 
         // Another folder: another branch, maybe another PR.
@@ -1538,6 +1700,11 @@ export class App implements OverlayHost {
         break
 
       case 'message.complete':
+        // prompt.cancel settles a withdrawn queued row with a completion of its own.
+        if (this.#server.settlesQueuedRow(ev.payload)) {
+          return
+        }
+
         t.complete(ev.payload ?? {})
         this.busy = null
         this.#compacting = false
@@ -1838,22 +2005,108 @@ export class App implements OverlayHost {
     this.changed()
   }
 
-  /** Alt+Up / the queue's Edit: the oldest queued prompt back into an empty composer. */
-  #dequeue() {
-    const next = this.queue.shift()
-
-    if (next !== undefined) {
-      this.#restore(next)
-      this.changed()
-    }
+  /** Prompts waiting behind the turn: this pane's own queue, then the shared gateway's. */
+  #queuedCount(): number {
+    return this.queue.length + this.#server.queued().length
   }
 
-  /** Alt+Enter / the queue's Steer: injects queued prompt `index` into the running turn instead of waiting for it to end. */
+  /** The dock's queued rows, in #queuedCount's order, with what each one's Edit and Steer can do. */
+  #queuedRows(): QueuedRow[] {
+    const steer = Boolean(this.busy)
+
+    return [
+      ...this.queue.map(q => ({ edit: true, steer, text: q.text })),
+      ...this.#server.queued().map((q): QueuedRow => {
+        if (!q.own) {
+          return { note: q.row?.status === 'unknown' ? 'unknown' : 'elsewhere', text: q.text }
+        }
+
+        // Withdrawing it needs the gateway's id for it: until prompt.submit answers it is on its way.
+        return q.own.admissionId
+          ? { edit: true, steer: steer && !q.own.item.item.images.length, text: q.text }
+          : { pending: true, text: q.text }
+      })
+    ]
+  }
+
+  /** The shared gateway's queued row at dock index `index`, if this pane can act on it. */
+  #serverQueued(index: number): ServerQueued<Admitted> | undefined {
+    const q = this.#server.queued()[index - this.queue.length]
+
+    return q?.own?.admissionId ? q : undefined
+  }
+
+  /**
+   * Takes this pane's admission out of the gateway's queue (prompt.cancel); true once withdrawn,
+   * false when it started meanwhile (it runs as its own turn) or the gateway refused.
+   */
+  async #withdraw(sid: string, q: ServerQueued<Admitted>): Promise<boolean> {
+    const own = q.own!
+    // Its `cancelled` completion can come before the reply.
+    this.#server.withdrawn(own.admissionId!)
+
+    try {
+      const r = await this.#gw.request<{ status?: string } | null>('prompt.cancel', { admission_id: own.admissionId, session_id: sid })
+
+      if (r?.status !== 'terminal') {
+        return false
+      }
+    } catch (error) {
+      this.transcript.notice(`Could not take the prompt out of the queue: ${error instanceof Error ? error.message : String(error)}`, 'error')
+      this.changed()
+
+      return false
+    }
+
+    this.#server.drop(own)
+
+    return true
+  }
+
+  /** Alt+Up / a queued row's Edit: queued prompt `index` (the oldest by default) back into the composer. */
+  #dequeue(index = 0) {
+    if (index < this.queue.length) {
+      const [next] = this.queue.splice(index, 1)
+
+      if (next) {
+        this.#restore(next)
+        this.changed()
+      }
+
+      return
+    }
+
+    const sid = this.sid
+    const q = this.#serverQueued(index)
+
+    if (!sid || !q) {
+      return
+    }
+
+    void this.#withdraw(sid, q).then(out => {
+      if (out && sid === this.sid) {
+        this.#restore(q.own!.item.item)
+      }
+
+      this.changed()
+    })
+  }
+
+  /** Alt+Enter / a queued row's Steer: injects queued prompt `index` into the running turn instead of waiting for it to end. */
   #steerQueued(index: number) {
     const sid = this.sid
+
+    if (!this.busy || !sid) {
+      return
+    }
+
+    if (index >= this.queue.length) {
+      return void this.#steerServerQueued(sid, index)
+    }
+
     const item = this.queue[index]
 
-    if (!this.busy || !sid || !item) {
+    if (!item) {
       return
     }
 
@@ -1883,6 +2136,61 @@ export class App implements OverlayHost {
 
       this.changed()
     })
+  }
+
+  /**
+   * A Steer on a row in the gateway's queue: withdrawn from it, then steered into the turn; a steer
+   * that does not land goes back into the queue, at its end.
+   */
+  async #steerServerQueued(sid: string, index: number) {
+    const q = this.#serverQueued(index)
+
+    if (!q) {
+      return
+    }
+
+    const { item, text } = q.own!.item
+
+    if (item.images.length) {
+      this.transcript.notice('A queued prompt with images cannot steer the turn. It stays queued.', 'warning')
+
+      return this.changed()
+    }
+
+    if (!(await this.#withdraw(sid, q)) || sid !== this.sid) {
+      return
+    }
+
+    const r = await steerTurn(this.#gw, sid, text)
+
+    if (sid !== this.sid) {
+      return
+    }
+
+    if (r.ok) {
+      this.transcript.steer(item.text)
+    } else {
+      this.transcript.notice(
+        r.error ? `Steer failed: ${r.error}. Queued again, at the end.` : 'The turn ended before the steer landed. Queued again.',
+        'warning'
+      )
+      void this.#admit(sid, item, text)
+    }
+
+    this.changed()
+  }
+
+  /** Reads session `sid`'s busy_input_mode; an older gateway without it leaves Enter queueing (the TUI default). */
+  async #readBusyMode(sid: string) {
+    try {
+      const r = await this.#gw.request<{ value?: unknown } | null>('config.get', { key: 'busy', session_id: sid })
+
+      if (sid === this.sid) {
+        this.#busyMode = busyModeOf(r?.value)
+      }
+    } catch {
+      // Keeps `queue`.
+    }
   }
 
   /** Sends the oldest queued prompt once the session is adopted and idle (no turn, switch or startup image pending). */
@@ -1955,7 +2263,7 @@ export class App implements OverlayHost {
         },
         onInterrupt: () => this.#interrupt(),
         onModel: () => openModelPicker(this),
-        onQueueEdit: () => this.#dequeue(),
+        onQueueEdit: i => this.#dequeue(i),
         onQueueSteer: this.busy ? i => this.#steerQueued(i) : undefined,
         onSend: ev => {
           this.#submit(ev.text)
@@ -2011,7 +2319,7 @@ export class App implements OverlayHost {
           tps: typeof usage?.avg_tps === 'number' && usage.avg_tps > 0 ? usage.avg_tps : undefined
         },
         placeholder: 'Ask Hermes — / commands · @ files',
-        queued: this.queue.map(q => q.text),
+        queued: this.#queuedRows(),
         ready: this.sid !== null
       }),
       layer: [
@@ -2031,6 +2339,18 @@ export class App implements OverlayHost {
       this.#surface.focus(focus)
     }
   }
+}
+
+/** A prompt's bubble: its text, and how many images went with it. */
+function userText(text: string, images: readonly unknown[]): string {
+  return `${text}${images.length ? `\n\n📎 ${images.length} image${images.length === 1 ? '' : 's'}` : ''}`
+}
+
+/** The shared gateway's FIFO on a session.info or snapshot `info` (the client maps `pending` to it). */
+function pendingRows(info: unknown): PendingRow[] | undefined {
+  const rows = (info as { pending_submissions?: unknown } | null | undefined)?.pending_submissions
+
+  return Array.isArray(rows) ? (rows as PendingRow[]) : undefined
 }
 
 /** `( •_•)>⌐■-■ cogitating...` → `Cogitating…`: hermes's kawaii status without the face. */

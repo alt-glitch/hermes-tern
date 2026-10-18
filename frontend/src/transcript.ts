@@ -108,6 +108,25 @@ export class Transcript {
     this.push({ at, id: this.id('u'), kind: 'user', text, ...(steered ? { steered } : {}) })
   }
 
+  /**
+   * A queued prompt the shared gateway just started. Its message.start came first, so the bubble
+   * goes before the turn it opened while that turn is still empty; else at the end.
+   */
+  started(text: string, at = Date.now()) {
+    const live = this.live
+
+    if (live && !live.blocks.length && this.entries.at(-1) === live) {
+      this.entries.splice(-1, 0, { at, id: this.id('u'), kind: 'user', text })
+      // It answers this prompt; it did not go on on its own.
+      live.continued = undefined
+      this.#touch(live)
+
+      return
+    }
+
+    this.user(text, at)
+  }
+
   notice(text: string, tone: NoticeEntry['tone'] = 'info') {
     this.push({ id: this.id('n'), kind: 'notice', text, tone })
   }
