@@ -182,6 +182,8 @@ describe('async delegation notices without display_kind', () => {
     expect(internalNotice('[Continuing toward your standing goal]\nGoal: make the tests pass')).toBe('Continuing toward the goal')
     expect(internalNotice('[/loop wakeup #3, every 2m] Recurring task: say hi')).toBe('Loop run #3 · every 2m')
     expect(internalNotice('[/loop wakeup #1]\nRecurring task')).toBe('Loop run #1')
+    expect(internalNotice('[IMPORTANT: Background process proc_1 completed normally (exit code 0). Command: ls]')).toBe('Background command finished')
+    expect(internalNotice('[IMPORTANT: Background process proc_1 exited (exit code 2). Command: ls]')).toBe('Background command exited (exit 2)')
 
     const t = load([
       { role: 'user', text: 'fan out', timestamp: 1 },
