@@ -92,8 +92,10 @@ describe('toggleMark', () => {
     expect(toggleMark(text, 8, 16, '**')).toEqual({ anchor: 8, cursor: 12, from: 8, text: 'bold', to: 16 })
   })
 
-  it('at the caret: opens an empty pair, steps out at its end, unwraps inside a run', () => {
-    expect(toggleMark('ab', 2, 2, '**')).toEqual({ cursor: 4, from: 2, text: '****', to: 2 })
+  it('at the caret: marks the word it touches, else opens an empty pair; steps out at its end, unwraps inside a run', () => {
+    expect(toggleMark('make it bold', 12, 12, '**')).toEqual({ cursor: 14, from: 8, text: '**bold**', to: 12 })
+    expect(toggleMark('make it bold', 9, 9, '_')).toEqual({ cursor: 10, from: 8, text: '_bold_', to: 12 })
+    expect(toggleMark('ab ', 3, 3, '**')).toEqual({ cursor: 5, from: 3, text: '****', to: 3 })
     expect(toggleMark('ab****', 4, 4, '**')).toEqual({ cursor: 2, from: 2, text: '', to: 6 })
     expect(toggleMark('**x**', 3, 3, '**')).toEqual({ cursor: 5, from: 3, text: '', to: 3 })
     expect(toggleMark('a _word_ b', 4, 4, '_')).toEqual({ cursor: 3, from: 2, text: 'word', to: 8 })

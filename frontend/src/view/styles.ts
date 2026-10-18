@@ -337,9 +337,12 @@ export const STYLES = css`
     color: var(--t2);
   }
 
+  /* Each capsule takes its content's width and gives way by truncating its words, never its count. */
   .sf-row[data-role='hermes.automation.item'] {
-    flex: 1 1 0;
+    flex: 0 1 auto;
+    max-width: 100%;
     min-width: 0;
+    overflow: hidden;
     padding: 1px 10px !important;
     border-radius: 999px;
     background: var(--l1);
@@ -366,8 +369,22 @@ export const STYLES = css`
   }
 
   [data-role='hermes.automation.what'] {
+    flex: 0 1 auto !important;
     min-width: 0;
+    overflow: hidden;
     color: var(--t2);
+  }
+
+  [data-role='hermes.automation.item'] > :not([data-role='hermes.automation.what']) {
+    flex: none;
+  }
+
+  [data-role='hermes.automation.when'] {
+    margin-left: 6px;
+  }
+
+  [data-role='hermes.automation.item'] .sf-meter {
+    margin-left: 6px;
   }
 
   [data-role='hermes.automation.item'] .sf-meter {

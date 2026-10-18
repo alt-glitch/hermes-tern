@@ -237,7 +237,33 @@ export function toggleMark(text: string, from: number, to: number, marker: strin
     return { cursor: at - n, from: run.open, text: inner, to: run.close + n }
   }
 
+  // Tern keeps a Shift or mouse selection to itself, so the caret stands in for it: the word it
+  // touches is marked, as Google Docs does.
+  const word = wordAt(text, at)
+
+  if (word) {
+    return { cursor: at + n, from: word.from, text: `${marker}${text.slice(word.from, word.to)}${marker}`, to: word.to }
+  }
+
   return { cursor: at + n, from: at, text: `${marker}${marker}`, to: at }
+}
+
+const WORD = /[\p{L}\p{N}'’-]/u
+
+/** The word the caret is in or touches (the one before it first); undefined between spaces. */
+function wordAt(text: string, at: number): { from: number; to: number } | undefined {
+  let from = at
+  let to = at
+
+  while (from > 0 && WORD.test(text[from - 1] ?? '')) {
+    from--
+  }
+
+  while (to < text.length && WORD.test(text[to] ?? '')) {
+    to++
+  }
+
+  return from < to ? { from, to } : undefined
 }
 
 /** `_` next to another `_` (or `*` to `*`) is a different mark: `__bold__` is not italic. */

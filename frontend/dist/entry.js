@@ -1750,11 +1750,11 @@ var require_request = __commonJS({
           } else if (typeof val[i] === "object") {
             throw new InvalidArgumentError(`invalid ${key2} header`);
           } else {
-            const str7 = `${val[i]}`;
-            if (!isValidHeaderValue(str7)) {
+            const str9 = `${val[i]}`;
+            if (!isValidHeaderValue(str9)) {
               throw new InvalidArgumentError(`invalid ${key2} header`);
             }
-            arr.push(str7);
+            arr.push(str9);
           }
         }
         val = arr;
@@ -3319,25 +3319,25 @@ var require_data_url = __commonJS({
     function isHTTPWhiteSpace(char) {
       return char === 13 || char === 10 || char === 9 || char === 32;
     }
-    function removeHTTPWhitespace(str7, leading = true, trailing = true) {
-      return removeChars(str7, leading, trailing, isHTTPWhiteSpace);
+    function removeHTTPWhitespace(str9, leading = true, trailing = true) {
+      return removeChars(str9, leading, trailing, isHTTPWhiteSpace);
     }
     function isASCIIWhitespace(char) {
       return char === 13 || char === 10 || char === 9 || char === 12 || char === 32;
     }
-    function removeASCIIWhitespace(str7, leading = true, trailing = true) {
-      return removeChars(str7, leading, trailing, isASCIIWhitespace);
+    function removeASCIIWhitespace(str9, leading = true, trailing = true) {
+      return removeChars(str9, leading, trailing, isASCIIWhitespace);
     }
-    function removeChars(str7, leading, trailing, predicate) {
+    function removeChars(str9, leading, trailing, predicate) {
       let lead = 0;
-      let trail = str7.length - 1;
+      let trail = str9.length - 1;
       if (leading) {
-        while (lead < str7.length && predicate(str7.charCodeAt(lead))) lead++;
+        while (lead < str9.length && predicate(str9.charCodeAt(lead))) lead++;
       }
       if (trailing) {
-        while (trail > 0 && predicate(str7.charCodeAt(trail))) trail--;
+        while (trail > 0 && predicate(str9.charCodeAt(trail))) trail--;
       }
-      return lead === 0 && trail === str7.length - 1 ? str7 : str7.slice(lead, trail + 1);
+      return lead === 0 && trail === str9.length - 1 ? str9 : str9.slice(lead, trail + 1);
     }
     function isomorphicDecode(input) {
       const length = input.length;
@@ -5256,7 +5256,7 @@ var require_body = __commonJS({
         const boundary = `----formdata-undici-0${`${random(1e11)}`.padStart(11, "0")}`;
         const prefix = `--${boundary}\r
 Content-Disposition: form-data`;
-        const escape = (str7) => str7.replace(/\n/g, "%0A").replace(/\r/g, "%0D").replace(/"/g, "%22");
+        const escape = (str9) => str9.replace(/\n/g, "%0A").replace(/\r/g, "%0D").replace(/"/g, "%22");
         const normalizeLinefeeds = (value) => value.replace(/\r?\n|\r/g, "\r\n");
         const blobParts = [];
         const rn = new Uint8Array([13, 10]);
@@ -16240,9 +16240,9 @@ var require_cookies = __commonJS({
       webidl.argumentLengthCheck(arguments, 2, "setCookie");
       webidl.brandCheck(headers, Headers, { strict: false });
       cookie = webidl.converters.Cookie(cookie);
-      const str7 = stringify(cookie);
-      if (str7) {
-        headers.append("Set-Cookie", str7);
+      const str9 = stringify(cookie);
+      if (str9) {
+        headers.append("Set-Cookie", str9);
       }
     }
     webidl.converters.DeleteCookieAttributes = webidl.dictionaryConverter([
@@ -18919,12 +18919,12 @@ function chunkEnd(body, start, limit) {
   const target = start + Math.max(1, limit);
   if (target >= body.length)
     return body.length;
-  const safe = (at) => ((body[at] ?? 0) & 192) !== 128 && !leadsWithParameter(body, at);
+  const safe2 = (at) => ((body[at] ?? 0) & 192) !== 128 && !leadsWithParameter(body, at);
   for (let at = target; at > start; at--)
-    if (safe(at))
+    if (safe2(at))
       return at;
   for (let at = target + 1; at < body.length; at++)
-    if (safe(at))
+    if (safe2(at))
       return at;
   return body.length;
 }
@@ -19968,25 +19968,25 @@ var PLAIN_TEXT = {
   badge: true,
   toast: true
 };
-function textProps(run7) {
-  if (run7.every((part) => typeof part === "string"))
-    return { text: run7.join("") };
-  return { spans: run7.map((part) => typeof part === "string" ? part : toJson(part) ?? null) };
+function textProps(run6) {
+  if (run6.every((part) => typeof part === "string"))
+    return { text: run6.join("") };
+  return { spans: run6.map((part) => typeof part === "string" ? part : toJson(part) ?? null) };
 }
 function containerChildren(parts2) {
   const out = [];
-  let run7 = [];
+  let run6 = [];
   const end = () => {
-    if (run7.length > 0)
-      out.push(new Node("text", textProps(run7)));
-    run7 = [];
+    if (run6.length > 0)
+      out.push(new Node("text", textProps(run6)));
+    run6 = [];
   };
   for (const part of parts2) {
     if (part instanceof Node) {
       end();
       out.push(part);
     } else {
-      run7.push(part);
+      run6.push(part);
     }
   }
   end();
@@ -20013,17 +20013,17 @@ function createNode(kind, input, children2) {
   const parts2 = flatten([fromProps, children2]);
   let nodes2 = [];
   if (SPAN_TEXT[kind] || PLAIN_TEXT[kind]) {
-    const run7 = [];
+    const run6 = [];
     for (const part of parts2) {
       if (part instanceof Node && kind === "seg")
         nodes2.push(part);
       else if (part instanceof Node || part instanceof Span && PLAIN_TEXT[kind]) {
         throw new TypeError(`${kind} takes text children, got ${describe(part)}`);
       } else
-        run7.push(part);
+        run6.push(part);
     }
-    if (run7.length > 0)
-      Object.assign(props, textProps(run7));
+    if (run6.length > 0)
+      Object.assign(props, textProps(run6));
   } else if (kind === "el") {
     let text2 = "";
     for (const part of parts2) {
@@ -20451,11 +20451,11 @@ var Surface = class {
   close(options = {}) {
     if (this.#closed)
       return Promise.resolve();
-    let failure;
+    let failure2;
     try {
       this.#flush();
     } catch (error) {
-      failure = { error };
+      failure2 = { error };
     }
     try {
       const keep = options.keep ?? true;
@@ -20464,10 +20464,10 @@ var Surface = class {
       this.#closed = true;
       this.#link.dropped(this);
     } catch (error) {
-      failure ??= { error };
+      failure2 ??= { error };
     }
-    if (failure)
-      throw failure.error;
+    if (failure2)
+      throw failure2.error;
     return Promise.resolve();
   }
   /** Closes with `keep`, for `await using`. */
@@ -20810,12 +20810,12 @@ var Session = class {
   }
   /** Attempts every close and mode reset, even after an output failure. */
   #leave() {
-    let failure;
+    let failure2;
     const attempt = (fn) => {
       try {
         fn();
       } catch (error) {
-        failure ??= { error };
+        failure2 ??= { error };
       }
     };
     for (const surface of this.#surfaces.values())
@@ -20833,8 +20833,8 @@ var Session = class {
         });
       this.#modesArmed = false;
     }
-    if (failure)
-      throw failure.error;
+    if (failure2)
+      throw failure2.error;
   }
   /** Stops reading, restores the tty and ends the input loop. */
   #finish() {
@@ -24554,8 +24554,8 @@ var GatewayClient = class extends EventEmitter {
 
 // src/app.ts
 import { randomUUID as randomUUID3 } from "node:crypto";
-import { appendFileSync as appendFileSync4 } from "node:fs";
-import { basename as basename3 } from "node:path";
+import { appendFileSync as appendFileSync4, existsSync as existsSync5 } from "node:fs";
+import { basename as basename4 } from "node:path";
 
 // node_modules/@hermes/shared/src/slash.ts
 var SLASH_COMMAND_RE = /^\/[^\s/]*(?:\s|$)/;
@@ -24773,9 +24773,9 @@ var TITLES = {
   todoist: "Todoist"
 };
 function appTitle(slug) {
-  const known = TITLES[slug.trim().toLowerCase()];
-  if (known) {
-    return known;
+  const known2 = TITLES[slug.trim().toLowerCase()];
+  if (known2) {
+    return known2;
   }
   const words2 = slug.split(/[-_\s]+/).filter(Boolean);
   if (words2.length > 1 && words2.at(-1).toLowerCase() === "mcp") {
@@ -24856,6 +24856,66 @@ function callApp(call) {
   return appOf(call.name, call.args);
 }
 
+// src/promptRefs.ts
+import { existsSync } from "node:fs";
+import { basename as basename2 } from "node:path";
+var VALUE = "(`[^`\\n]+`|\"[^\"\\n]+\"|'[^'\\n]+'|\\S+)";
+var IMAGE_LINE = new RegExp(`^@image:${VALUE}[ \\t]*$`, "gm");
+var SCREENSHOT_LINE = /^\[screenshot\][ \t]*(?:\n|$)/gm;
+var HINTS = /\n\n((?:\[Image attached(?: at)?: [^\n]+\]\n?)+)((?:\[screenshot\](?:\n|$))*)$/;
+var ATTACHED_CONTEXT = /(?:^|\n)--- Attached Context ---\s*\n/;
+var CONTEXT_WARNINGS = /(?:^|\n)--- Context Warnings ---[\s\S]*$/;
+var CONTEXT_REF = new RegExp(`^(?:\\S+ )?@(file|folder|url|image):${VALUE}`, "gm");
+var IMAGE_FILE = /\.(png|jpe?g|gif|webp)$/i;
+var unquote = (v) => /^([`"']).*\1$/.test(v) ? v.slice(1, -1) : v;
+function splitPrompt(raw) {
+  let text2 = raw;
+  let hinted = [];
+  const hints = HINTS.exec(text2);
+  if (hints) {
+    const paths = [...(hints[1] ?? "").matchAll(/^\[Image attached(?: at)?: (.+)\]$/gm)].map((m) => m[1]);
+    const placeholders = (hints[2] ?? "").split("[screenshot]").length - 1;
+    if (placeholders === 0 || placeholders === paths.length) {
+      text2 = text2.slice(0, hints.index);
+      hinted = paths;
+    }
+  }
+  const refs = [];
+  text2 = text2.replace(IMAGE_LINE, (_line, value) => {
+    refs.push(unquote(value));
+    return "";
+  });
+  if (refs.length) {
+    text2 = text2.replace(SCREENSHOT_LINE, "");
+  }
+  const files = [];
+  const marker2 = ATTACHED_CONTEXT.exec(text2);
+  if (marker2) {
+    const context = text2.slice(marker2.index + marker2[0].length);
+    text2 = text2.slice(0, marker2.index);
+    for (const m of context.matchAll(CONTEXT_REF)) {
+      const ref = `@${m[1]}:${m[2]}`;
+      const end = context.indexOf("\n", m.index);
+      const line = context.slice(m.index, end < 0 ? void 0 : end);
+      const disk = /available on disk at `([^`]+)`/.exec(line)?.[1];
+      if (!text2.includes(ref) && !files.some((f) => f.ref === ref)) {
+        files.push({ ref, ...disk ? { path: disk } : {} });
+      }
+    }
+  }
+  return { files, images: [...refs, ...hinted], text: text2.replace(CONTEXT_WARNINGS, "").replace(/\n{3,}/g, "\n\n").trim() };
+}
+function promptAttachments(parts2, exists = existsSync) {
+  const local = (p) => p.startsWith("/") && exists(p);
+  return [
+    ...parts2.images.map((p) => ({ kind: "image", name: basename2(p), ...local(p) ? { source: { path: p } } : {} })),
+    ...parts2.files.map(({ path, ref }) => {
+      const name = basename2(unquote(ref.replace(/^@\w+:/, "")));
+      return path && IMAGE_FILE.test(path) && local(path) ? { kind: "image", name, source: { path } } : { kind: "file", name };
+    })
+  ];
+}
+
 // src/transcript.ts
 var Transcript = class {
   entries = [];
@@ -24924,8 +24984,37 @@ var Transcript = class {
     turn.blocks.push({ at, id: this.id("s"), kind: "steer", text: text2 });
     turn.rev++;
   }
-  user(text2, at = Date.now(), steered = false) {
-    this.push({ at, id: this.id("u"), kind: "user", text: text2, ...steered ? { steered } : {} });
+  user(text2, at = Date.now(), steered = false, attachments = []) {
+    this.push({ at, id: this.id("u"), kind: "user", text: text2, ...steered ? { steered } : {}, ...attachments.length ? { attachments } : {} });
+  }
+  /** A stored prompt: its words, and as attachments the image refs and attached context Hermes stored with them. */
+  #storedUser(raw, at) {
+    const parts2 = splitPrompt(raw);
+    this.user(parts2.text, at, false, promptAttachments(parts2));
+  }
+  /**
+   * A queued prompt the shared gateway just started. Its message.start came first, so the bubble
+   * goes before the turn it opened while that turn is still empty; else at the end.
+   */
+  started(text2, at = Date.now(), attachments = []) {
+    const live = this.live;
+    const notice = attachments.length ? void 0 : internalNotice(text2);
+    if (notice) {
+      if (live && !live.blocks.length) {
+        live.continued = notice;
+        this.#touch(live);
+      } else {
+        this.#continued = notice;
+      }
+      return;
+    }
+    if (live && !live.blocks.length && this.entries.at(-1) === live) {
+      this.entries.splice(-1, 0, { at, id: this.id("u"), kind: "user", text: text2, ...attachments.length ? { attachments } : {} });
+      live.continued = void 0;
+      this.#touch(live);
+      return;
+    }
+    this.user(text2, at, false, attachments);
   }
   notice(text2, tone = "info") {
     this.push({ id: this.id("n"), kind: "notice", text: text2, tone });
@@ -25031,8 +25120,12 @@ var Transcript = class {
       status: "running",
       via: u.via
     };
+    const before = this.currentTodos();
+    if (isTodoName(call.name)) {
+      call.todosBefore = before;
+    }
     if (Array.isArray(call.args.todos)) {
-      call.todos = todosOf(call.args, this.currentTodos());
+      call.todos = todosOf(call.args, before);
     }
     turn.blocks.push({ call, id: p.tool_id, kind: "tool" });
     this.#touch(turn);
@@ -25153,10 +25246,7 @@ var Transcript = class {
     if (turn.status === "error") {
       const surfaced = p.error_surface?.message;
       const error = typeof surfaced === "string" && surfaced || p.error || final2 || "The request failed";
-      const http = /^HTTP (\d{3}):\s*/.exec(error);
-      const code2 = p.error_surface?.code;
-      turn.error = http ? error.slice(http[0].length) : error;
-      turn.errorCode = http?.[1] ?? (typeof code2 === "string" && code2 ? code2 : void 0);
+      Object.assign(turn, failure(error, p.error_surface?.code));
       turn.errorHint = final2.split(/\n\s*\n/)[0]?.trim() || void 0;
     }
     this.#touch(turn);
@@ -25193,7 +25283,7 @@ var Transcript = class {
           pendingContinued = notice;
         } else {
           pendingContinued = void 0;
-          this.entries.push({ at, id: this.id("u"), kind: "user", text: steered ?? text2 });
+          this.#storedUser(steered ?? text2, at);
         }
         continue;
       }
@@ -25215,18 +25305,39 @@ var Transcript = class {
         turn.endedAt = Math.max(turn.endedAt ?? at, at);
       }
       if (m.role === "assistant") {
-        if (m.reasoning?.trim()) {
-          turn.blocks.push({ endedAt: at, id: this.id("k"), kind: "thinking", startedAt: at, text: m.reasoning });
+        const meta = record2(m.display_metadata);
+        const thought = storedThought(m);
+        if (thought.trim()) {
+          turn.blocks.push({ endedAt: at, id: this.id("k"), kind: "thinking", startedAt: at, text: thought });
         }
-        if (text2.trim()) {
-          turn.blocks.push({ id: this.id("x"), kind: "text", text: text2 });
+        if (m.display_kind === "failed_turn") {
+          const surface = record2(meta?.error_surface);
+          const error = str3(meta?.error) ?? str3(surface?.message);
+          turn.status = "error";
+          Object.assign(turn, error ? failure(error, surface?.code) : {});
+          turn.errorHint = text2.trim() || void 0;
+          continue;
+        }
+        const reply = typeof m.display_content === "string" ? m.display_content : text2;
+        const notes = Array.isArray(m.display_commentary) ? m.display_commentary.filter((n) => typeof n === "string" && Boolean(n.trim())) : [];
+        const flat3 = (s) => s.replace(/\s+/g, " ").trim();
+        if (!reply.trim() || flat3(notes.join("\n\n")) !== flat3(reply)) {
+          turn.blocks.push(...notes.map((n) => ({ id: this.id("x"), kind: "text", text: n })));
+        }
+        if (reply.trim()) {
+          turn.blocks.push({ id: this.id("x"), kind: "text", text: reply });
+        }
+        if (meta?.interrupted === true) {
+          turn.status = "interrupted";
         }
       } else if (m.role === "tool") {
         const id = m.tool_call_id ?? this.id("c");
         const result = typeof m.content === "string" && m.content ? m.content : void 0;
+        const diff2 = str3(record2(record2(m.display_metadata)?.tool_result_metadata)?.inline_diff);
         const existing = calls.get(id);
         if (existing) {
           existing.result = result ?? existing.result;
+          existing.diff = diff2 ?? existing.diff;
           if (settleBridge(existing)) {
             existing.status = "error";
           }
@@ -25239,6 +25350,7 @@ var Transcript = class {
           argsText: "",
           batch: u.batch,
           context: m.context ?? "",
+          diff: diff2,
           duration: 0,
           id,
           name: u.name,
@@ -25248,6 +25360,9 @@ var Transcript = class {
           via: u.via
         };
         call.status = settleBridge(call) ?? Boolean(record2(call.result)?.error) ? "error" : "done";
+        if (isTodoName(call.name)) {
+          call.todosBefore = todos;
+        }
         if (Array.isArray(args.todos)) {
           call.todos = todosOf(args, todos);
           todos = call.todos;
@@ -25265,7 +25380,7 @@ var Transcript = class {
     if (notice) {
       this.#continued = notice;
     } else if (user) {
-      this.user(user, at);
+      this.#storedUser(user, at);
     }
     if (turn.assistant || turn.streaming) {
       this.start(at);
@@ -25363,6 +25478,47 @@ function trailingText(turn) {
     }
   }
   return out;
+}
+function failure(error, code2) {
+  const http = /^HTTP (\d{3}):\s*/.exec(error);
+  return {
+    error: http ? error.slice(http[0].length) : error,
+    errorCode: http?.[1] ?? (typeof code2 === "string" && code2 ? code2 : void 0)
+  };
+}
+var str3 = (v) => typeof v === "string" && v.trim() ? v : void 0;
+function storedThought(m) {
+  if (typeof m.display_reasoning === "string") {
+    return detailsText(m.display_reasoning);
+  }
+  return str3(m.reasoning) ?? str3(m.reasoning_content) ?? detailsText(m.reasoning_details);
+}
+function detailsText(details) {
+  let blocks = details;
+  if (typeof blocks === "string") {
+    const text2 = blocks.trim();
+    if (!text2.startsWith("[") && !text2.startsWith("{")) {
+      return text2;
+    }
+    try {
+      blocks = JSON.parse(text2);
+    } catch {
+      return text2;
+    }
+  }
+  const out = [];
+  for (const block of Array.isArray(blocks) ? blocks : [blocks]) {
+    const r = typeof block === "string" ? { text: block } : record2(block);
+    if (!r || r.type === "reasoning.encrypted") {
+      continue;
+    }
+    const summary4 = Array.isArray(r.summary) ? r.summary.map((s) => typeof s === "string" ? s : str3(record2(s)?.text) ?? "").join("\n\n") : r.summary;
+    const text2 = [summary4, r.thinking, r.content, r.text].map(str3).find(Boolean)?.trim();
+    if (text2 && !out.includes(text2)) {
+      out.push(text2);
+    }
+  }
+  return out.join("\n\n");
 }
 function isToolError(p) {
   const r = record2(p.result);
@@ -25478,6 +25634,19 @@ function internalNotice(content) {
   const text2 = content.trim();
   if (text2.startsWith("[ASYNC DELEGATION BATCH COMPLETE")) {
     return "Subagents finished";
+  }
+  if (text2.startsWith("[ASYNC DELEGATION COMPLETE")) {
+    return "Subagent finished";
+  }
+  if (text2.startsWith("[ASYNC DELEGATION TASK FAILED")) {
+    return "Subagent failed";
+  }
+  if (text2.startsWith("[Continuing toward your standing goal]")) {
+    return "Continuing toward the goal";
+  }
+  const wakeup = /^\[\/loop wakeup #(\d+)(?:, ([^\]]+))?\]/.exec(text2);
+  if (wakeup) {
+    return `Loop run #${wakeup[1]}${wakeup[2] ? ` \xB7 ${wakeup[2]}` : ""}`;
   }
   const watch2 = /^\[IMPORTANT: Background process \S+ matched watch pattern "([^"]*)"/.exec(text2);
   if (watch2) {
@@ -25606,8 +25775,8 @@ function runningTool(log) {
   const last = findLast(log.entries, (e) => e.kind === "tool");
   return last?.kind === "tool" && last.status === "running" ? last : void 0;
 }
-function clockToMs(clock3, now = Date.now()) {
-  const [h = 0, m = 0, s = 0] = clock3.split(":").map(Number);
+function clockToMs(clock4, now = Date.now()) {
+  const [h = 0, m = 0, s = 0] = clock4.split(":").map(Number);
   const at = new Date(now).setHours(h, m, s, 0);
   return at > now + 6e4 ? at - 864e5 : at;
 }
@@ -25616,6 +25785,8 @@ function clockToMs(clock3, now = Date.now()) {
 var POLL_MS = 1e3;
 var MAX_LOG_BYTES = 2 * 1024 * 1024;
 var ENDED = /* @__PURE__ */ new Set(["cancelled", "done", "failed"]);
+var GRACE_POLLS = 3;
+var OUTCOME_UNKNOWN = "outcome unknown";
 function isRunning(a) {
   return !ENDED.has(a.status);
 }
@@ -25633,6 +25804,12 @@ var Agents = class {
   #unreadable = /* @__PURE__ */ new Set();
   /** Ids `subagent.list` reported: one that leaves the list has finished. */
   #listed = /* @__PURE__ */ new Set();
+  /** Polls each unlisted row without a readable log has gone unseen. */
+  #unseen = /* @__PURE__ */ new WeakMap();
+  /** Rows whose end the host heard of. */
+  #ended = /* @__PURE__ */ new WeakSet();
+  /** The `subagent.tail` text read so far, by subagent id: each tail (the last 16 KB) is merged onto it. */
+  #tails = /* @__PURE__ */ new Map();
   /**
    * New delegate_task spawns are blocked, as this pane last set it (`delegation.pause`); undefined
    * until then (the shared gateway serves no `delegation.status`). The gate is gateway-wide.
@@ -25697,6 +25874,38 @@ var Agents = class {
     this.paused = typeof r?.paused === "boolean" ? r.paused : paused;
     this.#host.changed();
     return this.paused;
+  }
+  /**
+   * Applies an async-delegation completion (the model text of its `message.start`,
+   * tools/process_registry_notifications.py) to the rows whose log never told their outcome.
+   */
+  settle(text2) {
+    const done = completionOutcomes(text2);
+    if (!done) {
+      return;
+    }
+    let changed = false;
+    for (const a of this.all()) {
+      const status = a.depth ? void 0 : done.outcomes.get(a.index);
+      if (a.delegationId !== done.delegationId || status === void 0 || a.log?.status) {
+        continue;
+      }
+      const ended = endedStatus(status);
+      if (!ended) {
+        continue;
+      }
+      if (isRunning(a)) {
+        a.duration = Date.now() - a.startedAt;
+      }
+      a.status = ended;
+      a.tool = void 0;
+      a.exitReason = status === "unknown" ? OUTCOME_UNKNOWN : PLAIN_OUTCOMES.has(status) ? void 0 : status;
+      this.#touch(a);
+      changed = true;
+    }
+    if (changed) {
+      this.#host.changed();
+    }
   }
   /** Reads `a`'s log now (the hub's timeline opening on it), whatever its state. */
   async refresh(a) {
@@ -25788,6 +25997,11 @@ var Agents = class {
         continue;
       }
       a.id = id;
+      if (a.status === "done" && a.exitReason === OUTCOME_UNKNOWN) {
+        a.status = "running";
+        a.exitReason = void 0;
+        this.#ended.delete(a);
+      }
       a.model = row.model ?? a.model;
       a.toolCount = Math.max(a.toolCount, row.tool_count ?? 0);
       a.steerable = row.accepting_steer ?? a.steerable;
@@ -25802,12 +26016,21 @@ var Agents = class {
       changed.add(a);
     }
     for (const a of owners.keys()) {
-      if (isRunning(a) && this.#listed.has(a.id) && !present.has(a.id) && !this.#readableLog(a)) {
-        a.status = "done";
-        a.duration = Date.now() - a.startedAt;
-        a.tool = void 0;
-        changed.add(a);
+      if (!isRunning(a) || present.has(a.id) || this.#readableLog(a)) {
+        continue;
       }
+      if (!this.#listed.has(a.id)) {
+        const unseen = (this.#unseen.get(a) ?? 0) + 1;
+        this.#unseen.set(a, unseen);
+        if (unseen < GRACE_POLLS) {
+          continue;
+        }
+      }
+      a.status = "done";
+      a.exitReason = OUTCOME_UNKNOWN;
+      a.duration = Date.now() - a.startedAt;
+      a.tool = void 0;
+      changed.add(a);
     }
   }
   /** The row `row` describes: by id, else a dispatch placeholder (`task-<i>`) of its delegation. */
@@ -25912,7 +26135,10 @@ var Agents = class {
           session_id: this.#host.sid,
           subagent_id: a.id
         });
-        text2 = r?.available ? r.text : void 0;
+        if (r?.available && typeof r.text === "string") {
+          text2 = r.truncated ? mergeTail(this.#tails.get(a.id) ?? "", r.text) : r.text;
+          this.#tails.set(a.id, text2);
+        }
       } catch {
         text2 = void 0;
       }
@@ -25928,6 +26154,10 @@ var Agents = class {
     if (call) {
       this.#host.transcript.touchCall(call);
     }
+    if (!isRunning(a) && !this.#ended.has(a)) {
+      this.#ended.add(a);
+      this.#host.agentEnded?.();
+    }
   }
   /** Each agent with the delegate_task call whose card shows it. */
   #owners() {
@@ -25940,6 +26170,48 @@ var Agents = class {
     return owners;
   }
 };
+function mergeTail(seen, tail) {
+  const lines = seen.split(/(?<=\n)/);
+  let merged;
+  for (let n = Math.min(4, lines.length); n > 0 && merged === void 0; n--) {
+    const anchor = lines.slice(-n).join("");
+    const at = tail.indexOf(anchor);
+    if (at >= 0) {
+      merged = seen + tail.slice(at + anchor.length);
+    }
+  }
+  merged ??= seen + (seen && !seen.endsWith("\n") ? "\n" : "") + tail.slice(tail.indexOf("\n") + 1);
+  return merged.length > MAX_LOG_BYTES ? merged.slice(merged.indexOf("\n", merged.length - MAX_LOG_BYTES) + 1) : merged;
+}
+function completionOutcomes(text2) {
+  const head2 = /^\[ASYNC DELEGATION (BATCH COMPLETE|COMPLETE|TASK FAILED) — ([^\],]+)(?:, task (\d+)\/\d+)?\]/.exec(text2.trim());
+  if (!head2) {
+    return void 0;
+  }
+  const [, kind, delegationId, task] = head2;
+  const outcomes = /* @__PURE__ */ new Map();
+  if (kind === "BATCH COMPLETE") {
+    for (const m of text2.matchAll(/^--- \S+ TASK (\d+)\/\d+.*\(status=([^,)\s]+)/gm)) {
+      outcomes.set(Number(m[1]) - 1, m[2]);
+    }
+  } else {
+    const status = /^Status: (\S+)/m.exec(text2)?.[1];
+    if (status) {
+      outcomes.set(kind === "TASK FAILED" ? Number(task) - 1 : 0, status);
+    }
+  }
+  return { delegationId: delegationId.trim(), outcomes };
+}
+var PLAIN_OUTCOMES = /* @__PURE__ */ new Set(["cancelled", "completed", "error", "failed", "interrupted", "success"]);
+function endedStatus(status) {
+  if (status === "?") {
+    return void 0;
+  }
+  if (status === "completed" || status === "success" || status === "unknown") {
+    return "done";
+  }
+  return status === "interrupted" || status === "cancelled" ? "cancelled" : "failed";
+}
 function taskIndex(row) {
   const index = Number(/^sa-(\d+)-/.exec(row.subagent_id ?? "")?.[1]);
   return Number.isInteger(index) ? index : void 0;
@@ -26006,6 +26278,150 @@ function applyLog(a, log) {
     a.toolSince = { at: since };
   }
 }
+
+// src/automation.ts
+function cadence(loop) {
+  if (loop.mode === "self_paced") {
+    return "self-paced";
+  }
+  const s = loop.interval_seconds;
+  return `every ${s % 3600 === 0 ? `${s / 3600}h` : s % 60 === 0 ? `${s / 60}m` : `${s}s`}`;
+}
+var clock = (epochSeconds) => new Date(epochSeconds * 1e3).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+function goalView(goal) {
+  if (!goal || goal.status !== "active" && goal.status !== "paused") {
+    return null;
+  }
+  const barrier = goal.status === "active" ? goal.wait_barrier : null;
+  const wait = barrier ? [barrier.type === "until" ? `until ${clock(barrier.until_at)}` : `on ${barrier.type} ${barrier.target}`, barrier.reason].filter(Boolean).join(" \xB7 ") : "";
+  return {
+    criteria: goal.subgoals ?? [],
+    detail: barrier ? wait : goal.status === "paused" ? goal.paused_reason ?? "" : "",
+    maxTurns: goal.max_turns,
+    reason: goal.last_reason ?? void 0,
+    state: goal.status === "paused" ? "paused" : barrier ? "waiting" : goal.last_verdict === "blocked" ? "blocked" : "active",
+    title: goal.title,
+    turns: goal.turns_used,
+    verdict: goal.last_verdict ?? void 0
+  };
+}
+function loopView(loop, now = Date.now()) {
+  if (!loop || loop.status !== "active" && loop.status !== "paused") {
+    return null;
+  }
+  const dueAt = loop.next_due_at > 0 ? loop.next_due_at * 1e3 : void 0;
+  const state = loop.status === "paused" ? "paused" : loop.awaiting_response ? "running" : loop.deferred_by_goal ? "deferred" : dueAt !== void 0 && dueAt > now ? "active" : "due";
+  return {
+    cadence: cadence(loop),
+    detail: loop.status === "paused" ? loop.paused_reason ?? "" : "",
+    dueAt: state === "active" ? dueAt : void 0,
+    fired: loop.ticks_fired,
+    prompt: loop.prompt,
+    runs: loop.times ? `${loop.ticks_fired}/${loop.times} runs` : `${loop.ticks_fired} run${loop.ticks_fired === 1 ? "" : "s"}`,
+    state,
+    times: loop.times,
+    until: loop.until ?? ""
+  };
+}
+var ACTION_LABELS = {
+  "goal.clear": "clear the goal",
+  "goal.pause": "pause the goal",
+  "goal.resume": "resume the goal",
+  "goal.unwait": "stop the goal waiting",
+  "loop.pause": "pause the loop",
+  "loop.resume": "resume the loop",
+  "loop.stop": "stop the loop"
+};
+var Automation = class {
+  #host;
+  #sid = null;
+  #snapshot = null;
+  /** Bumped by every update, so a read that started before one never overwrites it. */
+  #seq = 0;
+  #timer;
+  /** The verb in flight, if any (the sheet's buttons wait for it). */
+  pending;
+  constructor(host) {
+    this.#host = host;
+  }
+  get goal() {
+    return goalView(this.#snapshot?.goal);
+  }
+  loop(now = Date.now()) {
+    return loopView(this.#snapshot?.loop, now);
+  }
+  /** The loop's raw snapshot: a new object per update, so its countdown re-anchors only then. */
+  get loopSnapshot() {
+    return this.#snapshot?.loop ?? null;
+  }
+  /** Another session is shown: forget the last one's state and read this one's. */
+  adopt(sid) {
+    this.#sid = sid;
+    this.#set(null);
+    void this.#read(sid);
+  }
+  /** A `session.control.update` (or a verb's reply) for session `sid`. */
+  apply(sid, control) {
+    if (sid && sid !== this.#sid) {
+      return;
+    }
+    this.#seq++;
+    this.#set(control ?? null);
+  }
+  async #read(sid) {
+    const seq = this.#seq;
+    try {
+      const r = await this.#host.gw.request("session.control.read", { session_id: sid });
+      if (sid === this.#sid && seq === this.#seq) {
+        this.#set(r?.control ?? null);
+      }
+    } catch {
+    }
+  }
+  /** Runs `action` on the open session; the reply's snapshot repaints, its dispatch runs as a typed command's. */
+  async act(action) {
+    const sid = this.#sid;
+    if (!sid || this.pending) {
+      return;
+    }
+    this.pending = action;
+    this.#host.changed();
+    try {
+      const r = await this.#host.gw.request(
+        "session.control",
+        { action, session_id: sid }
+      );
+      this.apply(sid, r?.control);
+      if (r?.dispatch?.type && sid === this.#host.sid) {
+        await this.#host.runDispatch(r.dispatch, `/${action.replace(".", " ")}`);
+      }
+    } catch (error) {
+      this.#host.transcript.notice(
+        `Could not ${ACTION_LABELS[action]}: ${error instanceof Error ? error.message : String(error)}`,
+        "error"
+      );
+    } finally {
+      this.pending = void 0;
+      this.#host.changed();
+    }
+  }
+  #set(control) {
+    if (JSON.stringify(control) !== JSON.stringify(this.#snapshot)) {
+      this.#snapshot = control;
+      this.#host.changed();
+    }
+    this.#arm();
+  }
+  /** Re-renders when the loop falls due, so its countdown turns into "due". Tern ticks the countdown itself. */
+  #arm() {
+    clearTimeout(this.#timer);
+    const due = this.loop()?.dueAt;
+    if (due !== void 0) {
+      this.#timer = setTimeout(() => this.#host.changed(), Math.max(0, due - Date.now()) + 50);
+      this.#timer.unref?.();
+    }
+  }
+};
 
 // src/clipboard.ts
 import { spawn } from "node:child_process";
@@ -26085,6 +26501,15 @@ async function steerTurn(gw2, sid, text2) {
     const execution_generation = await currentGeneration(gw2, sid);
     const r = await gw2.request("session.steer", { session_id: sid, execution_generation, text: text2 });
     return r?.status === "queued" ? { ok: true } : { ok: false };
+  } catch (e) {
+    return errorText(e).includes("stale_generation") ? { ok: false } : { error: errorText(e), ok: false };
+  }
+}
+async function redirectTurn(gw2, sid, text2) {
+  try {
+    const execution_generation = await currentGeneration(gw2, sid);
+    const r = await gw2.request("session.redirect", { session_id: sid, execution_generation, text: text2 });
+    return r?.status === "redirected" || r?.status === "queued" ? { ok: true } : { ok: false };
   } catch (e) {
     return errorText(e).includes("stale_generation") ? { ok: false } : { error: errorText(e), ok: false };
   }
@@ -26184,11 +26609,62 @@ var CONTROL_COMMANDS = [
   { name: "btw", run: (host, arg) => side(host, arg, "btw") }
 ];
 
+// src/fast.ts
+var TIERS = { fast: "priority", normal: "", ultrafast: "ultrafast" };
+var fastWord = (value) => value === "fast" || value === "ultrafast" ? value : "normal";
+function fastTier(info) {
+  return info?.fast ? info.service_tier === "ultrafast" ? "ultrafast" : "fast" : void 0;
+}
+function fastValue(arg) {
+  const word = arg.trim().toLowerCase();
+  return { "": "toggle", fast: "fast", normal: "normal", off: "normal", on: "fast", toggle: "toggle", ultrafast: "ultrafast" }[word] ?? null;
+}
+var describe2 = (word) => word === "normal" ? "Fast mode off." : `${word === "fast" ? "Fast" : "Ultrafast"} mode on: priority processing, billed higher.`;
+async function setFast(host, value) {
+  const sid = host.sid;
+  if (!sid) {
+    return false;
+  }
+  try {
+    const r = await host.gw.request("config.set", { key: "fast", session_id: sid, value });
+    const word = fastWord(r?.value);
+    if (sid === host.sid) {
+      host.info = { ...host.info, fast: word !== "normal", service_tier: TIERS[word] };
+    }
+    host.transcript.notice(describe2(word));
+    return true;
+  } catch (error) {
+    const why = error instanceof Error ? error.message : String(error);
+    host.transcript.notice(
+      why.includes("fast_unavailable") ? "This model has no fast mode on its current route." : `Could not set fast mode: ${why}`,
+      "warning"
+    );
+    return false;
+  } finally {
+    host.changed();
+  }
+}
+async function fastCommand(host, arg) {
+  if (arg.trim().toLowerCase() === "status") {
+    const r = await host.gw.request("config.get", { key: "fast", session_id: host.sid });
+    return host.transcript.notice(`Fast mode: ${fastWord(r?.value)}.`);
+  }
+  const value = fastValue(arg);
+  if (!value) {
+    return host.transcript.notice("Usage: /fast [on|off|ultrafast|status]", "warning");
+  }
+  await setFast(host, value);
+}
+
 // src/view/time.ts
 var kAge = /* @__PURE__ */ Symbol("tsp.age");
 function age(owner, startedAt, now) {
   const aged = owner;
   return aged[kAge] ??= Math.max(0, now - startedAt);
+}
+function countdownAge(owner, dueAt, now) {
+  const aged = owner;
+  return aged[kAge] ??= Math.min(0, now - dueAt);
 }
 function duration(ms) {
   if (ms < 1e3) {
@@ -26217,19 +26693,84 @@ function compact(n) {
 }
 
 // src/connections.ts
-import { mkdirSync as mkdirSync2, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync as existsSync2, mkdirSync as mkdirSync2, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { homedir as homedir3 } from "node:os";
 import { join as join3 } from "node:path";
 var CONNECT_TOOL = "manage_connections";
 var POLL_MS2 = 2e3;
-var POLL_FOR_MS = 16 * 6e4;
+var STALE_MS = 2 * 6e4;
 var dataDir = (env = process.env) => join3(env.HERMES_HOME || join3(homedir3(), ".hermes"), "plugin-data", "hermes-tern");
-function readCard(id, dir2 = dataDir()) {
+var REASONS = /* @__PURE__ */ new Set(["all_resolved", "deadline", "error", "superseded"]);
+var safe = (part) => part.replace(/[^A-Za-z0-9_-]/g, "_");
+var cardStem = (callId, opId) => opId ? `${safe(callId)}.${safe(opId)}` : safe(callId);
+var alive = (pid) => {
+  if (typeof pid !== "number") {
+    return true;
+  }
   try {
-    const data = JSON.parse(readFileSync(join3(dir2, "connections", `${id}.json`), "utf8"));
-    return Array.isArray(data.targets) ? { error: data.error, targets: data.targets, watching: data.watching === true } : void 0;
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    return error.code === "EPERM";
+  }
+};
+function readCard(key2, dir2 = dataDir(), now = Date.now()) {
+  const file2 = join3(dir2, "connections", `${key2}.json`);
+  try {
+    const data = JSON.parse(readFileSync(file2, "utf8"));
+    if (!Array.isArray(data.targets)) {
+      return void 0;
+    }
+    const error = typeof data.error === "string" && data.error ? data.error : void 0;
+    const updated = typeof data.updated_at === "number" ? data.updated_at * 1e3 : now;
+    let settled;
+    if (typeof data.settled_by === "string" && REASONS.has(data.settled_by)) {
+      settled = data.settled_by;
+    } else if (data.watching !== true) {
+      settled = error ? "error" : data.targets.some((t2) => waiting({ state: String(record2(t2)?.state ?? "") })) ? "deadline" : "all_resolved";
+    } else if (!alive(data.pid) || now - updated > STALE_MS) {
+      settled = "stopped";
+    }
+    return { error, key: key2, settled, targets: data.targets, told: existsSync2(join3(dir2, "connections", `${key2}.told`)) };
   } catch {
     return void 0;
+  }
+}
+function findCard(call, dir2 = dataDir()) {
+  const op = record2(call.result)?.op_id;
+  const prefix = `${safe(call.id)}.`;
+  if (typeof op === "string" && op) {
+    return existsSync2(join3(dir2, "connections", `${cardStem(call.id, op)}.json`)) ? cardStem(call.id, op) : void 0;
+  }
+  let names;
+  try {
+    names = readdirSync(join3(dir2, "connections"));
+  } catch {
+    return void 0;
+  }
+  const keys = names.flatMap((n) => {
+    const key2 = n.endsWith(".json") ? n.slice(0, -5) : "";
+    return key2 === safe(call.id) || key2.startsWith(prefix) && !key2.slice(prefix.length).includes(".") ? [key2] : [];
+  });
+  if (keys.length < 2) {
+    return keys[0];
+  }
+  const createdAt = (key2) => {
+    try {
+      const at = record2(readFileSync(join3(dir2, "connections", `${key2}.json`), "utf8"))?.created_at;
+      return typeof at === "number" ? at * 1e3 : 0;
+    } catch {
+      return 0;
+    }
+  };
+  return keys.map((key2) => ({ gap: Math.abs(createdAt(key2) - call.startedAt), key: key2 })).sort((a, b) => a.gap - b.gap)[0]?.key;
+}
+function claimTold(key2, dir2 = dataDir()) {
+  try {
+    writeFileSync(join3(dir2, "connections", `${key2}.told`), "", { flag: "wx" });
+    return true;
+  } catch {
+    return false;
   }
 }
 function markViewer(sid, previous, dir2 = dataDir()) {
@@ -26252,6 +26793,25 @@ function connectTargets(call, card) {
   const targets = card?.targets ?? record2(call.result)?.targets;
   return parseTargets(Array.isArray(targets) ? targets : []);
 }
+function loadConnect(call, dir2 = dataDir(), now = Date.now()) {
+  if (call.name !== CONNECT_TOOL) {
+    return void 0;
+  }
+  const key2 = call.connect?.key ?? findCard(call, dir2);
+  const file2 = key2 ? readCard(key2, dir2, now) : void 0;
+  const targets = connectTargets(call, file2);
+  if (!targets.length) {
+    return void 0;
+  }
+  return {
+    error: file2?.error,
+    key: file2?.key,
+    opened: call.connect?.opened ?? [],
+    settled: file2?.settled,
+    targets,
+    told: Boolean(file2?.told || call.connect?.told)
+  };
+}
 function parseTargets(targets) {
   return targets.flatMap((t2) => {
     const r = record2(t2);
@@ -26269,8 +26829,13 @@ function parseTargets(targets) {
   });
 }
 var waiting = (t2) => t2.state === "initiated" || t2.state === "pending";
+var allConnected = (card) => {
+  const own = card.targets.filter((t2) => t2.state !== "superseded");
+  return own.length > 0 && own.every((t2) => t2.state === "connected");
+};
 function isConnectCall(call) {
-  return (call.connect ?? connectTargets(call)).some((t2) => t2.url);
+  const card = call.connect;
+  return card ? card.settled !== "superseded" && card.targets.some((t2) => t2.url) : connectTargets(call).some((t2) => t2.url);
 }
 var and = (names) => names.length < 3 ? names.join(" and ") : `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`;
 function continueMessage(targets) {
@@ -26278,8 +26843,199 @@ function continueMessage(targets) {
   return `I've authorized ${and(names) || "the apps"}. Check with manage_connections status and carry on.`;
 }
 function connectedMessage(targets) {
-  return `${and(targets.filter((t2) => t2.state === "connected").map((t2) => t2.title))} ${targets.length === 1 ? "is" : "are"} connected now. Carry on.`;
+  const names = targets.filter((t2) => t2.state === "connected").map((t2) => t2.title);
+  return `${and(names)} ${names.length === 1 ? "is" : "are"} connected now. Carry on.`;
 }
+
+// src/media.ts
+import { homedir as homedir5 } from "node:os";
+import { isAbsolute } from "node:path";
+import { fileURLToPath } from "node:url";
+
+// src/hermes/images.ts
+import { readFile as readFile2 } from "node:fs/promises";
+import { homedir as homedir4 } from "node:os";
+import { extname as extname2, resolve as resolve2 } from "node:path";
+var MAX_IMAGE_BYTES = 20 * 1024 * 1024;
+function imageFormat(bytes) {
+  if (bytes.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))) {
+    return { mime: "image/png", ext: ".png" };
+  }
+  if (bytes[0] === 255 && bytes[1] === 216 && bytes[2] === 255) {
+    return { mime: "image/jpeg", ext: ".jpg" };
+  }
+  if (/^GIF8[79]a$/.test(bytes.subarray(0, 6).toString("ascii"))) {
+    return { mime: "image/gif", ext: ".gif" };
+  }
+  if (bytes.subarray(0, 4).toString("ascii") === "RIFF" && bytes.subarray(8, 12).toString("ascii") === "WEBP") {
+    return { mime: "image/webp", ext: ".webp" };
+  }
+  return null;
+}
+function imageSize(bytes) {
+  const format = imageFormat(bytes)?.mime;
+  const size = (w, h) => w > 0 && h > 0 ? { h, w } : void 0;
+  try {
+    if (format === "image/png") {
+      return size(bytes.readUInt32BE(16), bytes.readUInt32BE(20));
+    }
+    if (format === "image/gif") {
+      return size(bytes.readUInt16LE(6), bytes.readUInt16LE(8));
+    }
+    if (format === "image/webp") {
+      const chunk = bytes.subarray(12, 16).toString("ascii");
+      if (chunk === "VP8X") {
+        return size(bytes.readUIntLE(24, 3) + 1, bytes.readUIntLE(27, 3) + 1);
+      }
+      if (chunk === "VP8L") {
+        const b = bytes.readUInt32LE(21);
+        return size((b & 16383) + 1, (b >> 14 & 16383) + 1);
+      }
+      return size(bytes.readUInt16LE(26) & 16383, bytes.readUInt16LE(28) & 16383);
+    }
+    if (format === "image/jpeg") {
+      for (let i = 2; i + 9 < bytes.length; ) {
+        if (bytes[i] !== 255) {
+          return void 0;
+        }
+        const marker2 = bytes[i + 1];
+        if (marker2 >= 192 && marker2 <= 207 && marker2 !== 196 && marker2 !== 200 && marker2 !== 204) {
+          return size(bytes.readUInt16BE(i + 7), bytes.readUInt16BE(i + 5));
+        }
+        i += 2 + bytes.readUInt16BE(i + 2);
+      }
+    }
+  } catch {
+  }
+  return void 0;
+}
+async function uploadImage(gw2, sid, raw, cwd) {
+  const path = resolve2(cwd, raw.replace(/^~(?=$|\/)/, homedir4()));
+  const bytes = await readFile2(path);
+  if (bytes.length > MAX_IMAGE_BYTES) {
+    throw new Error("the image is larger than 20 MB");
+  }
+  const format = imageFormat(bytes);
+  if (!format) {
+    throw new Error(`${extname2(path) || "this file"} is not a PNG, JPEG, GIF or WebP image`);
+  }
+  const r = await gw2.request("image.attach_bytes", {
+    session_id: sid,
+    filename: `image${format.ext}`,
+    content_base64: bytes.toString("base64")
+  });
+  if (!r?.path) {
+    throw new Error("the gateway did not store the image");
+  }
+  return { bytes, mime: format.mime, path: r.path };
+}
+
+// src/media.ts
+var str4 = (v) => typeof v === "string" && v.trim() ? v.trim() : void 0;
+var MAX_BYTES = 16 * 1024 * 1024;
+var FETCH_MS = 2e4;
+function shownImage(call) {
+  if (call.status === "error" || call.status === "cancelled") {
+    return void 0;
+  }
+  const r = record2(call.result);
+  if (r?.success === false) {
+    return void 0;
+  }
+  if (call.name === "image_generate") {
+    return str4(r?.host_image) ?? str4(r?.image);
+  }
+  if (call.name === "vision_analyze") {
+    return str4(call.args.image_url);
+  }
+  if (call.name.startsWith("browser")) {
+    const summary4 = call.resultText ?? str4(r?.text_summary) ?? "";
+    return str4(record2(r?.meta)?.screenshot_path) ?? str4(r?.screenshot_path) ?? /Screenshot path: (\S+)/.exec(summary4)?.[1];
+  }
+  return void 0;
+}
+function localSource(src) {
+  if (/^file:\/\//i.test(src)) {
+    try {
+      return { path: fileURLToPath(src) };
+    } catch {
+      return void 0;
+    }
+  }
+  const path = src.replace(/^~(?=\/)/, homedir5());
+  return isAbsolute(path) ? { path } : void 0;
+}
+var Media = class {
+  #host;
+  #fetch;
+  #loads = /* @__PURE__ */ new Map();
+  /** What each settled load gave, so a call rebuilt from history gets it before the next frame. */
+  #loaded = /* @__PURE__ */ new Map();
+  constructor(host, fetcher = (url, init) => fetch(url, init)) {
+    this.#host = host;
+    this.#fetch = fetcher;
+  }
+  /**
+   * Gets the image `call` shows ready: a URL's bytes land on `call.image` (null when they could
+   * not be had) and `done` runs. A local file needs nothing; Tern reads it.
+   */
+  show(call, done) {
+    const src = shownImage(call);
+    if (!src || localSource(src) || call.image !== void 0) {
+      return;
+    }
+    if (this.#loaded.has(src)) {
+      call.image = this.#loaded.get(src);
+      return;
+    }
+    void this.load(src).then((image) => {
+      call.image = image;
+      done();
+    });
+  }
+  /** `show` for every call of `entries` (a transcript loaded from history). */
+  showAll(entries, done) {
+    for (const e of entries) {
+      for (const b of e.kind === "turn" ? e.blocks : []) {
+        if (b.kind === "tool") {
+          this.show(b.call, () => done(b.call));
+        }
+      }
+    }
+  }
+  /** `src` (a data or http(s) URL) as a blob; null when it is no image or cannot be fetched. */
+  load(src) {
+    let load2 = this.#loads.get(src);
+    if (!load2) {
+      load2 = this.#bytes(src).then(
+        (bytes) => this.#blob(bytes),
+        () => null
+      ).then((image) => {
+        this.#loaded.set(src, image);
+        return image;
+      });
+      this.#loads.set(src, load2);
+    }
+    return load2;
+  }
+  async #bytes(src) {
+    const data = /^data:image\/[\w.+-]+;base64,(.*)$/s.exec(src);
+    if (data) {
+      return Buffer.from(data[1] ?? "", "base64");
+    }
+    if (!/^https?:\/\//i.test(src)) {
+      return void 0;
+    }
+    const r = await this.#fetch(src, { signal: AbortSignal.timeout(FETCH_MS) });
+    const size = Number(r.headers.get("content-length") ?? 0);
+    return r.ok && size <= MAX_BYTES ? Buffer.from(await r.arrayBuffer()) : void 0;
+  }
+  #blob(bytes) {
+    const format = bytes && bytes.length <= MAX_BYTES ? imageFormat(bytes) : null;
+    const blob = format && bytes ? this.#host.blob(bytes, format.mime) : void 0;
+    return blob ? { blob } : null;
+  }
+};
 
 // src/processes/store.ts
 var OUTPUT_MAX = 32e3;
@@ -26607,7 +27363,7 @@ function snapshot(p) {
 }
 
 // src/workLog.ts
-import { homedir as homedir4 } from "node:os";
+import { homedir as homedir6 } from "node:os";
 
 // src/vendor/t3code/commandLabel.ts
 var MAX_COMMAND_SEGMENTS = 64;
@@ -27721,13 +28477,17 @@ var POWERSHELL_VERBS = new Set(
 // src/workLog.ts
 var SOLO = /* @__PURE__ */ new Set(["clarify", "delegate_task", "todo", "todo_list"]);
 function ownsCard(call) {
-  return SOLO.has(call.name) || isBackgroundCall(call) || isConnectCall(call);
+  return SOLO.has(call.name) || isBackgroundCall(call) || isConnectCall(call) || call.name === "image_generate" || showsImage(call);
 }
-function pieces(blocks) {
+function showsImage(call) {
+  return shownImage(call) !== void 0;
+}
+function pieces(blocks, turn = blocks) {
   const out = [];
   let items = [];
+  const plan = turn.findLast((b) => b.kind === "tool" && isTodoName(b.call.name) && b.call.todos?.length);
   for (const b of blocks) {
-    if (b.kind === "thinking" || b.kind === "tool" && !ownsCard(b.call)) {
+    if (b.kind === "thinking" || b.kind === "tool" && (!ownsCard(b.call) || isTodoName(b.call.name) && b !== plan)) {
       items.push(b);
       continue;
     }
@@ -27755,7 +28515,7 @@ function foldOf(turn) {
     if (i === answer || b.kind === "steer") {
       continue;
     }
-    if (b.kind === "tool" && (isBackgroundCall(b.call) || isConnectCall(b.call) || b.call.subagents?.some((a) => a.status === "running" || a.status === "queued"))) {
+    if (b.kind === "tool" && (isBackgroundCall(b.call) || isConnectCall(b.call) || showsImage(b.call) || b.call.subagents?.some((a) => a.status === "running" || a.status === "queued"))) {
       continue;
     }
     if (answer >= 0 && i > answer && b.kind === "tool" && b.call.status !== "done") {
@@ -27830,6 +28590,9 @@ function actionOf(call) {
   if (appsOf(call).length) {
     return "app";
   }
+  if (isTodoName(call.name)) {
+    return "plan";
+  }
   switch (call.name) {
     case "tool_search":
     case "tool_describe":
@@ -27877,6 +28640,8 @@ function actionLabel(action, n, calls = []) {
       return `Used browser ${plural(n, "time", "times")}`;
     case "lookup":
       return `Looked up tools${n > 1 ? ` ${n} times` : ""}`;
+    case "plan":
+      return `Updated the plan${n > 1 ? ` ${n} times` : ""}`;
     case "other":
       return `Used ${plural(n, "tool", "tools")}`;
   }
@@ -27915,7 +28680,7 @@ function editedFiles(calls) {
   const paths = /* @__PURE__ */ new Set();
   let unnamed = 0;
   for (const c of calls) {
-    const path = str3(c.args.path);
+    const path = str5(c.args.path);
     if (path) {
       paths.add(path);
     } else {
@@ -27937,6 +28702,8 @@ function actionIcon(action) {
       return "plug";
     case "lookup":
       return "search";
+    case "plan":
+      return "list-checks";
     case "command":
       return "terminal";
     case "read":
@@ -27954,18 +28721,18 @@ function actionIcon(action) {
       return "wrench";
   }
 }
-var str3 = (v) => typeof v === "string" && v ? v : void 0;
+var str5 = (v) => typeof v === "string" && v ? v : void 0;
 function shortPath(path, cwd = process.env.HERMES_CWD || process.cwd()) {
   const root = cwd.replace(/\/+$/, "");
   if (root && path.startsWith(`${root}/`)) {
     return path.slice(root.length + 1);
   }
-  const home = homedir4();
+  const home = homedir6();
   return home && path.startsWith(`${home}/`) ? `~${path.slice(home.length)}` : path.replace(/^\.\//, "");
 }
 function stepLabel(call) {
   const a = call.args;
-  const path = str3(a.path);
+  const path = str5(a.path);
   const app2 = callApp(call);
   if (app2) {
     return `${app2.app} \xB7 ${app2.action}`;
@@ -27973,9 +28740,12 @@ function stepLabel(call) {
   if (call.batch) {
     return call.batch.map((e) => stepLabel({ ...call, args: e.args, batch: void 0, name: e.name })).join(", ");
   }
+  if (isTodoName(call.name)) {
+    return planStep(call.todosBefore, call.todos);
+  }
   switch (call.name) {
     case "terminal": {
-      const command = str3(a.command) ?? call.context;
+      const command = str5(a.command) ?? call.context;
       return command ? flat(commandDisplayText(command)) : "Command";
     }
     case "read_file":
@@ -27985,15 +28755,15 @@ function stepLabel(call) {
     case "write_file":
       return path ? `Wrote ${shortPath(path)}` : "Wrote a file";
     case "search_files": {
-      const pattern = str3(a.pattern) ?? call.context;
+      const pattern = str5(a.pattern) ?? call.context;
       const where = path && path !== "." ? ` in ${shortPath(path)}` : "";
       return a.target === "files" ? `Searched files ${pattern}${where}` : `Searched ${pattern}${where}`;
     }
     case "web_search":
-      return str3(a.query) ? `Searched the web for ${a.query}` : "Web search";
+      return str5(a.query) ? `Searched the web for ${a.query}` : "Web search";
     case "web_extract": {
       const urls = Array.isArray(a.urls) ? a.urls.filter((u) => typeof u === "string") : [];
-      const first = urls[0] ?? str3(a.url);
+      const first = urls[0] ?? str5(a.url);
       return first ? `Read ${first}${urls.length > 1 ? ` +${urls.length - 1} more` : ""}` : "Read a page";
     }
     case "execute_code":
@@ -28001,19 +28771,19 @@ function stepLabel(call) {
     case "link_pull_request":
     case "unlink_pull_request": {
       const verb = call.name === "link_pull_request" ? "Linked" : "Unlinked";
-      const pr = str3(a.url)?.match(/github[^/]*\/([^/]+\/[^/]+)\/pull\/(\d+)/);
-      const repo = pr?.[1] ?? str3(a.repository);
+      const pr = str5(a.url)?.match(/github[^/]*\/([^/]+\/[^/]+)\/pull\/(\d+)/);
+      const repo = pr?.[1] ?? str5(a.repository);
       const number = pr?.[2] ?? (typeof a.number === "number" ? String(a.number) : void 0);
       return repo && number ? `${verb} ${repo}#${number}` : `${verb} a pull request`;
     }
     case "list_pull_requests":
       return "Listed linked pull requests";
     case "skill_view":
-      return str3(a.name) ? `Read skill ${a.name}` : "Read a skill";
+      return str5(a.name) ? `Read skill ${a.name}` : "Read a skill";
     case "skills_list":
       return "Listed skills";
     case "tool_search": {
-      const q = Array.isArray(a.queries) ? a.queries.filter((x) => typeof x === "string") : [str3(a.queries) ?? str3(a.query)].filter(Boolean);
+      const q = Array.isArray(a.queries) ? a.queries.filter((x) => typeof x === "string") : [str5(a.queries) ?? str5(a.query)].filter(Boolean);
       return q.length ? `Searched tools for ${q.join(", ")}` : "Searched tools";
     }
     case "tool_describe": {
@@ -28029,13 +28799,27 @@ function stepLabel(call) {
   const label = name.charAt(0).toUpperCase() + name.slice(1);
   return call.context ? `${label}: ${flat(call.context)}` : label;
 }
+var MARK = { cancelled: "\u2717", completed: "\u2713", in_progress: "\u2192", pending: "\u25CB" };
+function planStep(before, after) {
+  if (!after?.length) {
+    return "Plan updated";
+  }
+  if (!before?.length) {
+    return `Planned ${plural(after.length, "step", "steps")}`;
+  }
+  const changes = after.flatMap((t2) => {
+    const was = before.find((b) => b.id === t2.id);
+    return !was ? [`+ ${t2.content}`] : was.status !== t2.status ? [`${MARK[t2.status]} ${t2.content}`] : [];
+  });
+  return changes.length ? `Plan updated: ${changes.join(", ")}` : "Plan updated";
+}
 function liveLabel(item3, active = false) {
   if (item3.kind === "thinking") {
     return thoughtTitle(item3) || (item3.endedAt === void 0 || active ? "Thinking" : "Thought");
   }
   const call = item3.call;
   const status = active && call.status === "done" ? "running" : call.status;
-  const command = call.name === "terminal" ? str3(call.args.command) ?? call.context : void 0;
+  const command = call.name === "terminal" ? str5(call.args.command) ?? call.context : void 0;
   if (!command) {
     return status === "running" ? presentTense(stepLabel(call)) : stepLabel(call);
   }
@@ -28074,7 +28858,7 @@ function thoughtTitle(item3) {
   return item3.label ? line ? `${item3.label}: ${line}` : item3.label : line;
 }
 var flat = (text2) => text2.replace(/\s+/g, " ").trim();
-function clock(at) {
+function clock2(at) {
   return new Date(at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }).toLowerCase();
 }
 
@@ -28329,7 +29113,7 @@ function commandLine(command, n = 96) {
 }
 
 // src/view/tools.tsx
-var str4 = (v) => typeof v === "string" && v ? v : void 0;
+var str6 = (v) => typeof v === "string" && v ? v : void 0;
 function toolNode(call, now, place = {}) {
   const card = cardOf(call, now);
   const status = card.status ?? call.status;
@@ -28379,7 +29163,7 @@ function toolNode(call, now, place = {}) {
 function toolDetail(call, now) {
   const card = cardOf(call, now);
   const body = [...card.body];
-  const command = call.name === "terminal" ? (str4(call.args.command) ?? call.context ?? "").trim() : "";
+  const command = call.name === "terminal" ? (str6(call.args.command) ?? call.context ?? "").trim() : "";
   if (command && command === commandLine(command)) {
     body.unshift(/* @__PURE__ */ jsx("code", { lang: "bash", max: { h: "12lines" }, role: "omp.tool.command", text: command }, "cmd"));
   }
@@ -28463,21 +29247,21 @@ function cardOf(call, now) {
       return {
         body: [],
         frame: "inline",
-        meta: str4(result?.usage) ? [`${result?.usage}`] : void 0,
+        meta: str6(result?.usage) ? [`${result?.usage}`] : void 0,
         name: "memory",
-        target: call.context || str4(call.args.action),
+        target: call.context || str6(call.args.action),
         targetKind: "text",
         title: "Memory"
       };
     case "skills_list": {
       const skills = Array.isArray(result?.skills) ? result.skills : [];
-      const names = skills.map((s) => str4(record2(s)?.name) ?? str4(s)).filter((n) => n !== void 0);
+      const names = skills.map((s) => str6(record2(s)?.name) ?? str6(s)).filter((n) => n !== void 0);
       return {
         body: names.length ? [/* @__PURE__ */ jsx("text", { spans: [{ s: "muted", t: names.join(" \xB7 ") }], wrap: "word" }, "names")] : [],
         folded: true,
         frame: "inline",
         meta: [
-          names.length ? `${names.length} skill${names.length === 1 ? "" : "s"}` : str4(result?.message) ?? "no skills"
+          names.length ? `${names.length} skill${names.length === 1 ? "" : "s"}` : str6(result?.message) ?? "no skills"
         ],
         name: "skill",
         title: "Skills"
@@ -28485,29 +29269,43 @@ function cardOf(call, now) {
     }
     case "skill_view":
       return {
-        body: str4(result?.content) ? [/* @__PURE__ */ jsx("md", { children: clip2(str4(result?.content) ?? "", 6e3) }, "body")] : [],
+        body: str6(result?.content) ? [/* @__PURE__ */ jsx("md", { children: clip2(str6(result?.content) ?? "", 6e3) }, "body")] : [],
         folded: true,
         frame: "inline",
         name: "skill",
-        target: str4(call.args.name) ?? call.context,
+        target: str6(call.args.name) ?? call.context,
         targetKind: "text",
         title: "Skill"
       };
   }
-  const look = call.name.startsWith("browser") ? { name: "browser", title: humanize(call.name.replace(/^browser_?/, "")) || "Browser" } : call.name === "session_search" ? { name: "search", title: "Session search" } : call.name === "vision_analyze" ? { name: "image", title: "Vision" } : { name: call.name, title: humanize(call.name) };
+  const look = call.name.startsWith("browser") ? { name: "browser", title: humanize(call.name.replace(/^browser_?/, "")) || "Browser" } : call.name === "session_search" ? { name: "search", title: "Session search" } : call.name === "vision_analyze" ? { name: "image", title: "Vision" } : call.name === "image_generate" ? { name: "image", title: "Image" } : { name: call.name, title: humanize(call.name) };
+  const src = shownImage(call);
+  if (src || call.name === "image_generate") {
+    const said = call.status === "running" ? void 0 : str6(result?.analysis) ?? str6(result?.text_summary);
+    return {
+      ...look,
+      body: [
+        ...src ? [imageNode(call, src)] : [],
+        ...said ? [/* @__PURE__ */ jsx("text", { lines: 6, spans: [{ s: "muted", t: clip2(said, 2e3) }], wrap: "word" }, "said")] : []
+      ],
+      folded: false,
+      target: str6(call.args.prompt) ?? str6(call.args.question) ?? (call.context || void 0),
+      targetKind: "text"
+    };
+  }
   return {
     ...look,
     body: genericBody(call),
     folded: true,
     frame: "inline",
-    target: str4(call.args.query) ?? str4(call.args.url) ?? (call.context || void 0),
-    targetKind: str4(call.args.url) ? "path" : str4(call.args.query) ? "query" : "text"
+    target: str6(call.args.query) ?? str6(call.args.url) ?? (call.context || void 0),
+    targetKind: str6(call.args.url) ? "path" : str6(call.args.query) ? "query" : "text"
   };
 }
 function bashCard(call, result, instead) {
-  const output = (str4(result?.output) ?? call.resultText)?.replace(/\s*\[Command interrupted\]\s*$/, "");
-  const error = str4(result?.error);
-  const command = (str4(call.args.command) ?? call.context ?? "").trim();
+  const output = (str6(result?.output) ?? call.resultText)?.replace(/\s*\[Command interrupted\]\s*$/, "");
+  const error = str6(result?.error);
+  const command = (str6(call.args.command) ?? call.context ?? "").trim();
   const line = commandLine(command);
   const running = call.status === "running";
   return {
@@ -28568,8 +29366,8 @@ function processLine(call, id, now) {
   );
 }
 function readCard2(call, result) {
-  const path = str4(call.args.path) ?? call.context;
-  const content = str4(result?.content);
+  const path = str6(call.args.path) ?? call.context;
+  const content = str6(result?.content);
   const total = typeof result?.total_lines === "number" ? result.total_lines : void 0;
   const numbered = content ? [...content.matchAll(/^ *(\d+)\|/gm)] : [];
   const first = numbered.length ? Number(numbered[0]?.[1]) : void 0;
@@ -28588,10 +29386,10 @@ function readCard2(call, result) {
   };
 }
 function editCard(call, result) {
-  const path = str4(call.args.path) ?? call.context;
+  const path = str6(call.args.path) ?? call.context;
   const lang = langOf(path);
-  const diff2 = hunks(str4(result?.diff)) ?? (call.diff ? plainDiff(call.diff) : void 0);
-  const content = str4(call.args.content);
+  const diff2 = hunks(str6(result?.diff)) ?? (call.diff ? plainDiff(call.diff) : void 0);
+  const content = str6(call.args.content);
   const write = call.name === "write_file";
   const head2 = {
     name: write ? "write" : "edit",
@@ -28618,10 +29416,10 @@ function editCard(call, result) {
   return { ...head2, body: [/* @__PURE__ */ jsx("diff", { lang, text: diff2 }, "diff")], meta: [`+${added} \u2212${removed}`] };
 }
 function searchCard(call, result) {
-  const pattern = str4(call.args.pattern) ?? call.context;
-  const where = str4(call.args.path);
+  const pattern = str6(call.args.pattern) ?? call.context;
+  const where = str6(call.args.path);
   const inPath = where && where !== "." ? ` \xB7 in ${where}` : "";
-  const files = Array.isArray(result?.files) ? result.files.map((f) => str4(f)).filter((f) => f !== void 0) : void 0;
+  const files = Array.isArray(result?.files) ? result.files.map((f) => str6(f)).filter((f) => f !== void 0) : void 0;
   if (files || call.args.target === "files") {
     const list = (files ?? []).map((f) => f.replace(/^\.\//, ""));
     const total2 = typeof result?.total_count === "number" ? result.total_count : list.length;
@@ -28642,7 +29440,7 @@ function searchCard(call, result) {
   const matches = Array.isArray(result?.matches) ? result.matches.map((m) => record2(m)).filter((m) => m !== void 0) : void 0;
   const byFile = /* @__PURE__ */ new Map();
   for (const m of matches ?? []) {
-    const path = (str4(m.path) ?? "").replace(/^\.\//, "");
+    const path = (str6(m.path) ?? "").replace(/^\.\//, "");
     const list = byFile.get(path) ?? [];
     list.push({ line: typeof m.line === "number" ? m.line : 0, text: typeof m.content === "string" ? m.content : "" });
     byFile.set(path, list);
@@ -28658,10 +29456,10 @@ function searchCard(call, result) {
         /* @__PURE__ */ jsx("text", { role: "omp.tool.chip", spans: [{ t: String(hits.length) }] }, "n")
       ] }, f)
     );
-    let run7 = [];
+    let run6 = [];
     let runIndex = 0;
     const flush = () => {
-      const start = run7[0]?.line ?? 1;
+      const start = run6[0]?.line ?? 1;
       if (runIndex > 0) {
         body.push(/* @__PURE__ */ jsx("text", { role: "omp.tool.context", spans: [{ s: "muted", t: "\u2026" }] }, `${f}.g${runIndex}`));
       }
@@ -28670,23 +29468,23 @@ function searchCard(call, result) {
           "code",
           {
             lang: langOf(path),
-            marks: run7.map((h) => ({ line: h.line, tone: "accent" })),
+            marks: run6.map((h) => ({ line: h.line, tone: "accent" })),
             numbers: true,
             start,
-            text: run7.map((h) => h.text).join("\n")
+            text: run6.map((h) => h.text).join("\n")
           },
           `${f}.c${runIndex++}`
         )
       );
-      run7 = [];
+      run6 = [];
     };
     for (const hit of hits) {
-      if (run7.length && hit.line !== (run7.at(-1)?.line ?? 0) + 1) {
+      if (run6.length && hit.line !== (run6.at(-1)?.line ?? 0) + 1) {
         flush();
       }
-      run7.push(hit);
+      run6.push(hit);
     }
-    if (run7.length) {
+    if (run6.length) {
       flush();
     }
   }
@@ -28706,35 +29504,35 @@ function webSearchCard(call, result) {
   const hits = (Array.isArray(data?.web) ? data.web : Array.isArray(result?.results) ? result.results : []).map((h) => record2(h)).filter((h) => h !== void 0);
   return {
     body: hits.length ? [
-      /* @__PURE__ */ jsx("col", { role: "omp.tool.sources", children: hits.map((h, i) => sourceRow(`s${i}`, str4(h.title) ?? str4(h.url) ?? "", str4(h.url))) }, "s")
+      /* @__PURE__ */ jsx("col", { role: "omp.tool.sources", children: hits.map((h, i) => sourceRow(`s${i}`, str6(h.title) ?? str6(h.url) ?? "", str6(h.url))) }, "s")
     ] : [],
     frame: "inline",
     meta: hits.length ? [`${hits.length} source${hits.length === 1 ? "" : "s"}`] : void 0,
     name: "web_search",
-    target: str4(call.args.query) ?? call.context,
+    target: str6(call.args.query) ?? call.context,
     targetKind: "query",
     title: "Web search"
   };
 }
 function fetchCard(call, result) {
   const pages = (Array.isArray(result?.results) ? result.results : []).map((p) => record2(p)).filter((p) => p !== void 0);
-  const urls = Array.isArray(call.args.urls) ? call.args.urls.map((u) => str4(u)).filter((u) => u !== void 0) : [];
+  const urls = Array.isArray(call.args.urls) ? call.args.urls.map((u) => str6(u)).filter((u) => u !== void 0) : [];
   const body = [];
   for (const [i, p] of pages.entries()) {
-    body.push(sourceRow(`s${i}`, str4(p.title) ?? str4(p.url) ?? "", str4(p.url)));
-    const content = str4(p.content);
+    body.push(sourceRow(`s${i}`, str6(p.title) ?? str6(p.url) ?? "", str6(p.url)));
+    const content = str6(p.content);
     if (content) {
       body.push(/* @__PURE__ */ jsx("md", { children: clip2(content, 4e3) }, `b${i}`));
     }
   }
-  const chars = pages.reduce((n, p) => n + (str4(p.content)?.length ?? 0), 0);
+  const chars = pages.reduce((n, p) => n + (str6(p.content)?.length ?? 0), 0);
   return {
     body,
     folded: true,
     meta: pages.length ? [`${pages.length} page${pages.length === 1 ? "" : "s"} \xB7 ${compact(chars)} chars`] : void 0,
     name: "fetch",
     preview: { lines: 6 },
-    target: urls.length > 1 ? `${urls[0]} +${urls.length - 1}` : urls[0] ?? str4(call.args.url) ?? call.context,
+    target: urls.length > 1 ? `${urls[0]} +${urls.length - 1}` : urls[0] ?? str6(call.args.url) ?? call.context,
     targetKind: "path",
     title: "Fetch"
   };
@@ -28754,10 +29552,10 @@ function sourceRow(key2, title, url) {
 }
 function taskCard(call, result, now) {
   const tasks = Array.isArray(call.args.tasks) ? call.args.tasks.map((t2) => record2(t2)).filter((t2) => t2 !== void 0) : [];
-  const goals = tasks.length ? tasks.map((t2) => str4(t2.goal) ?? "") : str4(call.args.goal) ? [str4(call.args.goal) ?? ""] : [];
+  const goals = tasks.length ? tasks.map((t2) => str6(t2.goal) ?? "") : str6(call.args.goal) ? [str6(call.args.goal) ?? ""] : [];
   const agents2 = call.subagents ?? [];
   const rows = agents2.length ? agents2.map((a) => agentNode(a, now)) : call.status === "running" || result?.status === "dispatched" ? goals.map((g, i) => /* @__PURE__ */ jsx("agent", { agent: "task", name: `Agent ${i + 1}`, status: "pending", task: g }, `p${i}`)) : settledRows(goals, result);
-  const context = str4(call.args.context) ?? (tasks.length === 1 ? str4(tasks[0]?.context) : void 0);
+  const context = str6(call.args.context) ?? (tasks.length === 1 ? str6(tasks[0]?.context) : void 0);
   const working = agents2.some((a) => a.status === "running" || a.status === "queued") || !agents2.length && result?.status === "dispatched";
   const settled = agents2.filter((a) => a.status !== "running" && a.status !== "queued");
   const count = goals.length || agents2.length;
@@ -28798,9 +29596,9 @@ function settledRows(goals, result) {
   const titles = goals.length ? goals : results.map(() => "Delegated task");
   return titles.map((g, i) => {
     const r = results[i];
-    const verdict = str4(r?.status) ?? "";
+    const verdict = str6(r?.status) ?? "";
     const status = !r ? "idle" : verdict === "" || verdict === "ok" || verdict === "completed" ? "done" : "failed";
-    const summary4 = str4(r?.summary) ?? str4(r?.error);
+    const summary4 = str6(r?.summary) ?? str6(r?.error);
     return /* @__PURE__ */ jsx("agent", { agent: "task", name: `Agent ${i + 1}`, status, task: g, children: summary4 ? /* @__PURE__ */ jsx("md", { children: summary4 }, "o") : null }, `s${i}`);
   });
 }
@@ -28812,7 +29610,7 @@ function agentNode(a, now) {
     {
       actions: { click: `open-agent=${a.id}`, menu: [`open-agent=${a.id}`] },
       agent: "task",
-      badges: a.exitReason && a.status !== "done" ? [{ text: a.exitReason.replace(/_/g, " "), tone: "warning" }] : void 0,
+      badges: a.exitReason && (a.status !== "done" || a.exitReason === OUTCOME_UNKNOWN) ? [{ text: a.exitReason.replace(/_/g, " "), tone: "warning" }] : void 0,
       collapsed: a.summary ? true : void 0,
       collapsible: a.summary ? true : void 0,
       depth: a.depth || void 0,
@@ -28838,15 +29636,15 @@ function agentNode(a, now) {
   );
 }
 function askCard(call, result) {
-  const qs = (Array.isArray(call.args.questions) ? call.args.questions : str4(call.args.question) ? [call.args] : []).map((q) => record2(q)).filter((q) => q !== void 0);
+  const qs = (Array.isArray(call.args.questions) ? call.args.questions : str6(call.args.question) ? [call.args] : []).map((q) => record2(q)).filter((q) => q !== void 0);
   const responses = Array.isArray(result?.responses) ? result.responses.map((r) => record2(r)) : [];
   const body = [];
   for (const [i, q] of qs.entries()) {
-    const choices = Array.isArray(q.choices) ? q.choices.map((c) => str4(c)).filter((c) => c !== void 0) : [];
+    const choices = Array.isArray(q.choices) ? q.choices.map((c) => str6(c)).filter((c) => c !== void 0) : [];
     const raw = responses[i]?.user_response;
-    const answers = (Array.isArray(raw) ? raw : [raw]).map((a) => str4(a)).filter((a) => a !== void 0);
+    const answers = (Array.isArray(raw) ? raw : [raw]).map((a) => str6(a)).filter((a) => a !== void 0);
     if (qs.length > 1) {
-      body.push(/* @__PURE__ */ jsx("md", { children: str4(q.question) ?? "" }, `q${i}`));
+      body.push(/* @__PURE__ */ jsx("md", { children: str6(q.question) ?? "" }, `q${i}`));
     }
     for (const [j, c] of choices.entries()) {
       body.push(answerRow(`q${i}.o${j}`, c, answers.includes(c)));
@@ -28863,7 +29661,7 @@ function askCard(call, result) {
     body,
     name: "ask",
     // Several questions each read in the body; the head counts them instead of repeating one.
-    target: qs.length > 1 ? `${qs.length} questions` : str4(qs[0]?.question) ?? call.context,
+    target: qs.length > 1 ? `${qs.length} questions` : str6(qs[0]?.question) ?? call.context,
     targetKind: "text",
     title: "Ask"
   };
@@ -28875,9 +29673,9 @@ function answerRow(key2, text2, picked) {
   ] }, key2);
 }
 function evalCard(call, result) {
-  const code2 = str4(call.args.code) ?? "";
-  const output = str4(result?.output) ?? str4(result?.stdout) ?? call.resultText;
-  const error = str4(result?.error) ?? str4(result?.stderr);
+  const code2 = str6(call.args.code) ?? "";
+  const output = str6(result?.output) ?? str6(result?.stdout) ?? call.resultText;
+  const error = str6(result?.error) ?? str6(result?.stderr);
   return {
     badges: [{ text: "python" }],
     body: [
@@ -28905,16 +29703,28 @@ var CONNECT_STATE = {
   connected: { icon: "check", tone: "success", word: "connected" },
   expired: { icon: "clock", tone: "error", word: "link expired" },
   failed: { icon: "x", tone: "error", word: "failed" },
-  initiated: { icon: "clock", tone: "pending", word: "waiting for you" },
+  initiated: { icon: "clock", tone: "pending", word: "waiting for your browser" },
   not_connected: { icon: "minus", tone: "muted", word: "not connected" },
-  pending: { icon: "clock", tone: "pending", word: "waiting for you" },
-  skipped: { icon: "minus", tone: "muted", word: "skipped" }
+  // Minted, not opened yet: the desktop's waiting cue belongs to a row the user opened.
+  pending: { icon: "clock", tone: "muted", word: "needs authorizing" },
+  skipped: { icon: "minus", tone: "muted", word: "skipped" },
+  superseded: { icon: "minus", tone: "muted", word: "asked again below" }
+};
+var SETTLED_NOTE = {
+  all_resolved: "All connected.",
+  deadline: "Stopped waiting after 15 minutes. Ask Hermes to connect again.",
+  error: "Hermes stopped watching these links.",
+  stopped: "Hermes stopped watching these links. Ask Hermes to connect again.",
+  superseded: "A later request replaced this one."
 };
 function connectCard(call) {
-  const targets = call.connect ?? connectTargets(call);
-  const open = targets.filter(waiting);
+  const card = call.connect ?? { opened: [], targets: connectTargets(call), told: false };
+  const { settled, targets } = card;
+  const ref = card.key ?? call.id;
+  const stateOf = (t2) => settled && waiting(t2) ? "not_connected" : t2.state === "initiated" && !card.opened.includes(t2.name) ? "pending" : t2.state;
+  const open = settled ? [] : targets.filter(waiting);
   const rows = targets.map((t2, i) => {
-    const look = CONNECT_STATE[t2.state] ?? CONNECT_STATE.pending;
+    const look = CONNECT_STATE[stateOf(t2)] ?? CONNECT_STATE.pending;
     return /* @__PURE__ */ jsxs("row", { align: "center", gap: "sm", role: "hermes.connect.row", children: [
       /* @__PURE__ */ jsx("icon", { name: look.icon, tone: look.tone }, "i"),
       /* @__PURE__ */ jsx(
@@ -28932,13 +29742,14 @@ function connectCard(call) {
         },
         "n"
       ),
-      t2.url && waiting(t2) ? /* @__PURE__ */ jsx("row", { actions: { click: `open-url=${t2.url}` }, align: "center", gap: "xs", role: "hermes.connect.open", title: t2.url, children: /* @__PURE__ */ jsx("text", { text: "Authorize \u2197" }, "t") }, "go") : null
+      t2.url && !settled && waiting(t2) ? /* @__PURE__ */ jsx("row", { actions: { click: `connect-open=${ref}:${t2.name}` }, align: "center", gap: "xs", role: "hermes.connect.open", title: t2.url, children: /* @__PURE__ */ jsx("text", { text: "Authorize \u2197" }, "t") }, "go") : null
     ] }, `t${i}`);
   });
+  const note = card.told ? open.length || settled && settled !== "all_resolved" ? "Sent to Hermes." : "All connected. Hermes carries on." : settled ? `${SETTLED_NOTE[settled]}${settled === "error" && card.error ? ` ${card.error}` : ""}` : void 0;
   return {
     body: [
       ...rows,
-      ...call.connectDone ? [/* @__PURE__ */ jsx("text", { spans: [{ s: "muted", t: open.length ? "Sent to Hermes." : "All connected. Hermes carries on." }] }, "done")] : [
+      ...note ? [/* @__PURE__ */ jsx("text", { spans: [{ s: "muted", t: note }], wrap: "word" }, "done")] : [
         /* @__PURE__ */ jsxs("row", { align: "center", gap: "sm", children: [
           /* @__PURE__ */ jsx(
             "text",
@@ -28954,14 +29765,14 @@ function connectCard(call) {
             },
             "hint"
           ),
-          /* @__PURE__ */ jsx("row", { actions: { click: `connect-continue=${call.id}` }, align: "center", role: "hermes.connect.continue", children: /* @__PURE__ */ jsx("text", { text: "Done, continue" }, "t") }, "go")
+          open.length ? /* @__PURE__ */ jsx("row", { actions: { click: `connect-continue=${ref}` }, align: "center", role: "hermes.connect.continue", children: /* @__PURE__ */ jsx("text", { text: "Done, continue" }, "t") }, "go") : null
         ] }, "foot")
       ]
     ],
     name: "plug",
-    target: `${targets.filter((t2) => t2.state === "connected").length} of ${targets.length} connected`,
+    target: `${targets.filter((t2) => t2.state === "connected").length} of ${targets.filter((t2) => t2.state !== "superseded").length} connected`,
     targetKind: "text",
-    title: open.length ? "Connect apps" : "Apps connected"
+    title: allConnected(card) ? "Apps connected" : "Connect apps"
   };
 }
 function appBody(call) {
@@ -28986,6 +29797,22 @@ function batchBody(call) {
     ];
   });
 }
+function imageNode(call, src) {
+  const source = localSource(src) ?? call.image;
+  const alt = str6(call.args.prompt) ?? "Image";
+  if (source) {
+    return /* @__PURE__ */ jsx("image", { alt: clip2(alt, 200), role: "hermes.tool.image", ...source }, "image");
+  }
+  const link = /^https?:\/\//i.test(src) ? [{ href: src, t: clip2(src, 120) }] : [];
+  return /* @__PURE__ */ jsx(
+    "text",
+    {
+      spans: [{ s: "muted", t: call.image === null ? `Could not load the image${link.length ? ": " : "."}` : "Loading the image\u2026" }, ...call.image === null ? link : []],
+      wrap: "word"
+    },
+    "image"
+  );
+}
 function genericBody(call) {
   const text2 = call.resultText ?? (call.result === void 0 ? void 0 : pretty(call.result));
   if (!text2 || call.status === "running") {
@@ -28995,7 +29822,7 @@ function genericBody(call) {
 }
 function errorOf(call) {
   const result = record2(call.result);
-  return str4(result?.error) ?? str4(call.summary) ?? (typeof call.result === "string" && !result ? call.result : void 0);
+  return str6(result?.error) ?? str6(call.summary) ?? (typeof call.result === "string" && !result ? call.result : void 0);
 }
 function exitOf(call) {
   const code2 = record2(call.result)?.exit_code;
@@ -29153,19 +29980,19 @@ function rank(items, query, textOf, { scattered = true } = {}) {
   return scored.sort((a, b) => b.score - a.score || a.index - b.index).map(({ item: item3, positions }) => ({ item: item3, positions }));
 }
 function hitRuns(positions, limit) {
-  const runs = [];
+  const runs2 = [];
   for (const p of positions) {
     if (p >= limit) {
       break;
     }
-    const last = runs.at(-1);
+    const last = runs2.at(-1);
     if (last && last[1] === p) {
       last[1] = p + 1;
     } else {
-      runs.push([p, p + 1]);
+      runs2.push([p, p + 1]);
     }
   }
-  return runs;
+  return runs2;
 }
 
 // src/overlays/agents.tsx
@@ -30100,7 +30927,7 @@ function jobItem(j, now, own, busy) {
   };
 }
 function jobPreview(j, now, own) {
-  const at = (iso) => iso ? `${clock2(Date.parse(iso))} \xB7 ${relative(iso, now)}` : "\u2014";
+  const at = (iso) => iso ? `${clock3(Date.parse(iso))} \xB7 ${relative(iso, now)}` : "\u2014";
   const error = jobError(j);
   const fact = (k, v) => v ? [{ k: [{ t: k }], v }] : [];
   return [
@@ -30174,9 +31001,9 @@ function preview2(p, call, now) {
       {
         items: [
           { k: [{ t: "Status" }], v: [{ s: processTone(p.status), t: isRunning2(p) ? STATUS2.running : `${STATUS2[p.status]} \xB7 ${processVerdict(p)}` }] },
-          { k: [{ t: "Started" }], v: clock2(p.startedAt) },
+          { k: [{ t: "Started" }], v: clock3(p.startedAt) },
           { k: [{ t: isRunning2(p) ? "Running for" : "Ran for" }], v: duration(processElapsed(p, now)) },
-          ...p.exitedAt ? [{ k: [{ t: "Exited" }], v: `${clock2(p.exitedAt)} \xB7 ${duration(now - p.exitedAt)} ago` }] : [],
+          ...p.exitedAt ? [{ k: [{ t: "Exited" }], v: `${clock3(p.exitedAt)} \xB7 ${duration(now - p.exitedAt)} ago` }] : [],
           ...p.reason && p.status !== "running" ? [{ k: [{ t: "Reason" }], v: p.reason.replace(/_/g, " ") }] : [],
           ...w ? watcherFacts(w) : [],
           { k: [{ t: "Process" }], v: [{ s: "mono dim", t: p.id }] }
@@ -30214,7 +31041,7 @@ function watcherFacts(w) {
     ...w.heartbeat ? [{ k: [{ t: "Heartbeat" }], v: `every ${w.heartbeat}s` }] : []
   ];
 }
-function clock2(ms) {
+function clock3(ms) {
   return new Date(ms).toLocaleTimeString([], { hour: "2-digit", hour12: false, minute: "2-digit", second: "2-digit" });
 }
 
@@ -30425,6 +31252,35 @@ function diffView(f, diff2) {
   return /^Binary files /m.test(diff2) ? [/* @__PURE__ */ jsx("text", { spans: [{ s: "muted", t: "Binary file." }] }, "bin")] : [/* @__PURE__ */ jsx("diff", { path: f.path, text: diff2 }, `d:${f.path}`)];
 }
 
+// src/modelCaps.ts
+var known = /* @__PURE__ */ new Map();
+function rememberCaps(providers) {
+  for (const p of providers) {
+    for (const [model, caps2] of Object.entries(p.capabilities ?? {})) {
+      known.set(`${p.slug}	${model}`, caps2);
+    }
+  }
+}
+function capsOf(info) {
+  const model = info?.model;
+  if (!model) {
+    return void 0;
+  }
+  const exact = info.provider ? known.get(`${info.provider}	${model}`) : void 0;
+  if (exact) {
+    return exact;
+  }
+  const same = [...known].filter(([k]) => k.endsWith(`	${model}`)).map(([, caps2]) => caps2);
+  return same.length && same.every((c) => JSON.stringify(c) === JSON.stringify(same[0])) ? same[0] : void 0;
+}
+async function loadCaps(gw2, sid) {
+  try {
+    const r = await gw2.request("model.options", sid ? { session_id: sid } : {});
+    rememberCaps(r?.providers ?? []);
+  } catch {
+  }
+}
+
 // src/overlays/effort.tsx
 var KEY4 = "effort";
 var LEVELS = [
@@ -30434,14 +31290,42 @@ var LEVELS = [
   { detail: "The usual balance", id: "medium", label: "medium" },
   { detail: "Harder problems", id: "high", label: "high" },
   { detail: "More than high, where the model has it", id: "xhigh", label: "xhigh" },
-  { detail: "Everything the model can spend", id: "max", label: "max" }
+  { detail: "Everything the model can spend", id: "max", label: "max" },
+  { detail: "Past max where the route has it; elsewhere it sends max", id: "ultra", label: "ultra" }
 ];
+var DEFAULT_EFFORT = "medium";
+var CYCLE = ["none", "low", "medium", "high", "xhigh"];
+function levelsFor(caps2) {
+  if (caps2?.reasoning === false) {
+    return [];
+  }
+  return caps2?.can_disable_reasoning === false ? LEVELS.filter((l) => l.id !== "none") : LEVELS;
+}
+function nextEffort(current, caps2) {
+  const offered = new Set(levelsFor(caps2).map((l) => l.id));
+  const cycle = CYCLE.filter((id) => offered.has(id));
+  const rank2 = (id) => LEVELS.findIndex((l) => l.id === id);
+  const at = rank2(current || DEFAULT_EFFORT);
+  return cycle.find((id) => rank2(id) > at) ?? cycle[0];
+}
+function effortText(effort, wire) {
+  const shown = effort === "none" ? "off" : effort || DEFAULT_EFFORT;
+  return wire && effort && wire !== effort && effort !== "none" ? `${shown}\u2192${wire}` : shown;
+}
 function openEffortPicker(app2, global2 = false) {
-  const current = app2.info?.reasoning_effort ?? "";
-  let selected = LEVELS.some((l) => l.id === current) ? current : "medium";
+  const current = app2.info?.reasoning_effort || DEFAULT_EFFORT;
+  let levels = levelsFor(capsOf(app2.info));
+  let selected = levels.some((l) => l.id === current) ? current : DEFAULT_EFFORT;
   let saveDefault = global2;
+  if (!capsOf(app2.info)) {
+    void loadCaps(app2.gw, app2.sid).then(() => {
+      levels = levelsFor(capsOf(app2.info));
+      selected = levels.some((l) => l.id === selected) ? selected : levels[0]?.id ?? selected;
+      app2.changed();
+    });
+  }
   const pick = async (id) => {
-    if (!id) {
+    if (!id || !levels.some((l) => l.id === id)) {
       return;
     }
     app2.close(overlay);
@@ -30458,9 +31342,10 @@ function openEffortPicker(app2, global2 = false) {
           { end: true, id: "close", keys: ["esc"], label: "Close" },
           { id: "use", keys: ["enter"], label: saveDefault ? "Set and save" : "Set", primary: true }
         ],
-        current: current ? [current] : [],
+        current: [current],
+        empty: "This model has no reasoning effort to set",
         icon: "brain",
-        items: LEVELS.map(
+        items: levels.map(
           (l) => ({
             detail: l.detail,
             id: l.id,
@@ -30481,11 +31366,16 @@ function openEffortPicker(app2, global2 = false) {
           selected = ev.item;
           app2.changed();
         },
-        order: LEVELS.map((l) => l.id),
+        order: levels.map((l) => l.id),
         preview: "none",
         selected,
         size: "md",
-        subtitle: [{ s: "muted", t: saveDefault ? "for this session and every new one" : "for this session" }],
+        subtitle: [
+          {
+            s: "muted",
+            t: `${saveDefault ? "for this session and every new one" : "for this session"}${app2.info?.reasoning_effort ? "" : ` \xB7 ${DEFAULT_EFFORT} is the default`}`
+          }
+        ],
         title: "Reasoning effort"
       },
       KEY4
@@ -30500,7 +31390,7 @@ function openEffortPicker(app2, global2 = false) {
       } else {
         selected = moveSelection(
           k,
-          LEVELS.map((l) => l.id),
+          levels.map((l) => l.id),
           selected
         ) ?? selected;
       }
@@ -30515,16 +31405,16 @@ import { execFile as execFile3 } from "node:child_process";
 
 // src/github/links.ts
 import { readFileSync as readFileSync2 } from "node:fs";
-import { homedir as homedir6 } from "node:os";
+import { homedir as homedir8 } from "node:os";
 import { join as join5 } from "node:path";
 import { DatabaseSync as DatabaseSync2 } from "node:sqlite";
 
 // src/watch/child.ts
-import { homedir as homedir5 } from "node:os";
+import { homedir as homedir7 } from "node:os";
 import { join as join4 } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 function stateDbPath(env = process.env) {
-  return join4(env.HERMES_HOME || join4(homedir5(), ".hermes"), "state.db");
+  return join4(env.HERMES_HOME || join4(homedir7(), ".hermes"), "state.db");
 }
 var ChildStore = class {
   #db;
@@ -30621,7 +31511,7 @@ function parseArgs(raw) {
 // src/github/links.ts
 var LINK_TOOLS = /* @__PURE__ */ new Set(["link_pull_request", "list_pull_requests", "unlink_pull_request"]);
 function linksPath(env = process.env) {
-  return join5(env.HERMES_HOME || join5(homedir6(), ".hermes"), "plugin-data", "hermes-tern", "pull-requests.json");
+  return join5(env.HERMES_HOME || join5(homedir8(), ".hermes"), "plugin-data", "hermes-tern", "pull-requests.json");
 }
 var prKey = (ref) => `${ref.host}/${ref.repository}#${ref.number}`;
 function refOf(v) {
@@ -30711,7 +31601,7 @@ function batchQuery(refs) {
   return { query: `query(${decls.join(", ")}) { ${parts2.join("\n")} }`, variables };
 }
 var obj = (v) => v && typeof v === "object" && !Array.isArray(v) ? v : void 0;
-var str5 = (v) => typeof v === "string" ? v : "";
+var str7 = (v) => typeof v === "string" ? v : "";
 var num3 = (v) => typeof v === "number" ? v : 0;
 var nodes = (v) => {
   const list = obj(v)?.nodes;
@@ -30745,20 +31635,20 @@ function checkStatus(status, conclusion) {
 function parseCheck(n) {
   if (n.__typename === "StatusContext") {
     return {
-      description: str5(n.description) || void 0,
-      name: str5(n.context),
-      startedAt: str5(n.createdAt) || void 0,
-      status: checkStatus("COMPLETED", str5(n.state)),
-      url: str5(n.targetUrl) || void 0
+      description: str7(n.description) || void 0,
+      name: str7(n.context),
+      startedAt: str7(n.createdAt) || void 0,
+      status: checkStatus("COMPLETED", str7(n.state)),
+      url: str7(n.targetUrl) || void 0
     };
   }
-  const workflow = str5(obj(obj(obj(n.checkSuite)?.workflowRun)?.workflow)?.name);
+  const workflow = str7(obj(obj(obj(n.checkSuite)?.workflowRun)?.workflow)?.name);
   return {
-    completedAt: str5(n.completedAt) || void 0,
-    name: str5(n.name),
-    startedAt: str5(n.startedAt) || void 0,
-    status: checkStatus(str5(n.status), str5(n.conclusion)),
-    url: str5(n.detailsUrl) || void 0,
+    completedAt: str7(n.completedAt) || void 0,
+    name: str7(n.name),
+    startedAt: str7(n.startedAt) || void 0,
+    status: checkStatus(str7(n.status), str7(n.conclusion)),
+    url: str7(n.detailsUrl) || void 0,
     workflow: workflow || void 0
   };
 }
@@ -30817,15 +31707,15 @@ function parsePullRequest(ref, repo) {
   const reviews = /* @__PURE__ */ new Map();
   for (const n of nodes(p.reviewRequests)) {
     const who = obj(n.requestedReviewer);
-    const login = str5(who?.login) || str5(who?.name);
+    const login = str7(who?.login) || str7(who?.name);
     if (login) {
       reviews.set(login, "PENDING");
     }
   }
   for (const n of nodes(p.latestReviews)) {
-    const login = str5(obj(n.author)?.login);
+    const login = str7(obj(n.author)?.login);
     if (login && !reviews.has(login)) {
-      reviews.set(login, str5(n.state));
+      reviews.set(login, str7(n.state));
     }
   }
   const rollup = obj(obj(obj(nodes(p.commits)[0]?.commit)?.statusCheckRollup)?.contexts);
@@ -30838,32 +31728,32 @@ function parsePullRequest(ref, repo) {
   return {
     ...ref,
     additions: num3(p.additions),
-    author: str5(obj(p.author)?.login) || "ghost",
-    autoMerge: str5(obj(p.autoMergeRequest)?.mergeMethod) || null,
-    base: str5(p.baseRefName),
+    author: str7(obj(p.author)?.login) || "ghost",
+    autoMerge: str7(obj(p.autoMergeRequest)?.mergeMethod) || null,
+    base: str7(p.baseRefName),
     behindBy: typeof behind === "number" ? behind : null,
-    body: str5(p.body),
+    body: str7(p.body),
     canUpdate: p.viewerCanUpdate === true,
     changedFiles: num3(p.changedFiles),
     checks: dedupeChecks(nodes(rollup).map(parseCheck)),
-    closedAt: str5(p.closedAt) || null,
-    createdAt: str5(p.createdAt),
+    closedAt: str7(p.closedAt) || null,
+    createdAt: str7(p.createdAt),
     deletions: num3(p.deletions),
     draft: p.isDraft === true,
-    head: str5(p.headRefName),
-    headOid: str5(p.headRefOid),
-    id: str5(p.id),
-    labels: nodes(p.labels).map((n) => str5(n.name)),
+    head: str7(p.headRefName),
+    headOid: str7(p.headRefOid),
+    id: str7(p.id),
+    labels: nodes(p.labels).map((n) => str7(n.name)),
     mergeMethods: methods,
-    mergeState: str5(p.mergeStateStatus),
-    mergeable: MERGEABLE[str5(p.mergeable)] ?? "unknown",
-    mergedAt: str5(p.mergedAt) || null,
-    reviewDecision: str5(p.reviewDecision) || null,
+    mergeState: str7(p.mergeStateStatus),
+    mergeable: MERGEABLE[str7(p.mergeable)] ?? "unknown",
+    mergedAt: str7(p.mergedAt) || null,
+    reviewDecision: str7(p.reviewDecision) || null,
     reviewers: [...reviews].map(([login, state]) => ({ login, state })),
-    state: STATE[str5(p.state)] ?? "open",
-    title: str5(p.title),
-    updatedAt: str5(p.updatedAt),
-    url: str5(p.url) || ref.url
+    state: STATE[str7(p.state)] ?? "open",
+    title: str7(p.title),
+    updatedAt: str7(p.updatedAt),
+    url: str7(p.url) || ref.url
   };
 }
 var ACTIVITY_QUERY = `query($o: String!, $r: String!, $n: Int!) {
@@ -30879,24 +31769,24 @@ function parseActivity(data) {
   if (!p) {
     return [];
   }
-  const who = (n) => str5(obj(n.author)?.login) || "ghost";
+  const who = (n) => str7(obj(n.author)?.login) || "ghost";
   const items = [
-    ...nodes(p.comments).map((n) => ({ at: str5(n.createdAt), author: who(n), body: str5(n.body), kind: "comment", url: str5(n.url) })),
-    ...nodes(p.reviews).filter((n) => str5(n.body).trim() || str5(n.state) !== "COMMENTED").map((n) => ({ at: str5(n.submittedAt), author: who(n), body: str5(n.body), kind: "review", state: str5(n.state), url: str5(n.url) })),
+    ...nodes(p.comments).map((n) => ({ at: str7(n.createdAt), author: who(n), body: str7(n.body), kind: "comment", url: str7(n.url) })),
+    ...nodes(p.reviews).filter((n) => str7(n.body).trim() || str7(n.state) !== "COMMENTED").map((n) => ({ at: str7(n.submittedAt), author: who(n), body: str7(n.body), kind: "review", state: str7(n.state), url: str7(n.url) })),
     ...nodes(p.reviewThreads).flatMap((t2) => {
       const [first, ...rest] = nodes(t2.comments);
       return first ? [
         {
-          at: str5(first.createdAt),
+          at: str7(first.createdAt),
           author: who(first),
-          body: str5(first.body),
+          body: str7(first.body),
           kind: "thread",
           line: typeof t2.line === "number" ? t2.line : null,
           outdated: t2.isOutdated === true,
-          path: str5(t2.path),
-          replies: rest.map((n) => ({ at: str5(n.createdAt), author: who(n), body: str5(n.body) })),
+          path: str7(t2.path),
+          replies: rest.map((n) => ({ at: str7(n.createdAt), author: who(n), body: str7(n.body) })),
           resolved: t2.isResolved === true,
-          url: str5(first.url)
+          url: str7(first.url)
         }
       ] : [];
     }),
@@ -30904,11 +31794,11 @@ function parseActivity(data) {
       const c = obj(n.commit) ?? {};
       const a = obj(c.author);
       return {
-        at: str5(c.committedDate),
-        author: str5(obj(a?.user)?.login) || str5(a?.name) || "ghost",
-        body: str5(c.messageHeadline),
+        at: str7(c.committedDate),
+        author: str7(obj(a?.user)?.login) || str7(a?.name) || "ghost",
+        body: str7(c.messageHeadline),
         kind: "commit",
-        url: str5(c.url)
+        url: str7(c.url)
       };
     })
   ];
@@ -30918,10 +31808,10 @@ function parseFiles(rows) {
   return (Array.isArray(rows) ? rows : []).map(obj).filter((r) => Boolean(r)).map((r) => ({
     additions: num3(r.additions),
     deletions: num3(r.deletions),
-    patch: str5(r.patch) || void 0,
-    path: str5(r.filename),
-    previous: str5(r.previous_filename) || void 0,
-    status: str5(r.status)
+    patch: str7(r.patch) || void 0,
+    path: str7(r.filename),
+    previous: str7(r.previous_filename) || void 0,
+    status: str7(r.status)
   }));
 }
 function failedRuns(checks) {
@@ -31476,7 +32366,7 @@ function checkItem(c, now) {
   };
 }
 function checksPreview(pr) {
-  const runs = failedRuns(pr.checks).length;
+  const runs2 = failedRuns(pr.checks).length;
   return [
     /* @__PURE__ */ jsx("text", { role: "omp.hub.title", text: "Checks" }, "title"),
     /* @__PURE__ */ jsx("text", { spans: [{ s: checksTone(pr), t: checksSummary(pr.checks) }] }, "sum"),
@@ -31486,7 +32376,7 @@ function checksPreview(pr) {
         spans: [
           {
             s: "muted",
-            t: `On ${pr.head} at ${pr.headOid.slice(0, 7)}. Enter opens a check's log${runs ? `; F re-runs the failed jobs of ${runs} workflow run${runs === 1 ? "" : "s"}` : ""}.`
+            t: `On ${pr.head} at ${pr.headOid.slice(0, 7)}. Enter opens a check's log${runs2 ? `; F re-runs the failed jobs of ${runs2} workflow run${runs2 === 1 ? "" : "s"}` : ""}.`
           }
         ]
       },
@@ -31583,15 +32473,20 @@ var HOTKEYS = [
       [["alt+d"], "Delete word forward"],
       [["ctrl+k"], "Delete to end of line (joins the next line at its end)"],
       [["ctrl+y"], "Paste the last deleted text"],
-      [["ctrl+z", "shift+ctrl+z"], "Undo / redo"]
+      [["ctrl+z", "shift+ctrl+z"], "Undo / redo"],
+      [["cmd+b", "cmd+i"], "Bold / italic (Markdown) on the selection or at the caret"],
+      [["shift+left", "shift+right"], "Select"],
+      [["shift+enter"], "In a list item: the next item (an empty item ends the list)"]
     ]
   },
   {
     group: "Control",
     rows: [
-      [["escape"], "Close the completion / interrupt the agent"],
+      [["escape"], "Close the completion"],
+      [["escape escape"], "Clear the draft into the history (Up brings it back) / stop the agent"],
       [["shift+tab"], "Cycle the reasoning effort (/effort picks one; Ctrl+G there saves it as the default)"],
       [["alt+up"], "Edit the oldest queued prompt"],
+      [["alt+enter"], "Steer the running turn with the oldest queued prompt (empty prompt)"],
       [["alt+a"], "Agents"],
       [["alt+b"], "Background processes and cron jobs (/ps)"],
       [["alt+p"], "Pull requests Hermes linked (/prs)"],
@@ -31613,7 +32508,14 @@ async function openHelp(app2) {
       "warning"
     );
   }
-  const categories = catalog.categories?.length ? catalog.categories : [{ name: "Commands", pairs: catalog.pairs ?? [] }];
+  const own = localCommands().flatMap(
+    (c) => c.help ? [[[`/${c.name}`, ...(c.aliases ?? []).map((a) => `/${a}`)].join(" \xB7 "), c.help]] : []
+  );
+  const runs2 = ([command = ""]) => !INK_ONLY_COMMANDS.has(command.replace(/^\//, "").split(/\s/)[0] ?? "");
+  const categories = [
+    { name: "Tern", pairs: own },
+    ...(catalog.categories?.length ? catalog.categories : [{ name: "Commands", pairs: catalog.pairs ?? [] }]).map((c) => ({ ...c, pairs: (c.pairs ?? []).filter(runs2) })).filter((c) => c.pairs.length)
+  ];
   const overlay = {
     key: KEY6,
     modal: true,
@@ -31769,6 +32671,8 @@ function openModelPicker(app2) {
   const canSave = !app2.gw.isCanonical;
   const startEffort = app2.info?.reasoning_effort || "";
   let effort = startEffort || "medium";
+  let fast = Boolean(app2.info?.fast);
+  let fastTouched = false;
   let confirm = null;
   let busy = false;
   let shown = [];
@@ -31778,6 +32682,7 @@ function openModelPicker(app2) {
     try {
       const r = await app2.gw.request("model.options", app2.sid ? { session_id: app2.sid } : {});
       const list = r.providers ?? [];
+      rememberCaps(list);
       const names = providerDisplayNames(list);
       providers = list.map((provider, i) => ({ name: names[i] ?? provider.name, provider }));
       rows = providers.flatMap(
@@ -31810,8 +32715,11 @@ function openModelPicker(app2) {
         confirm = { row, text: r.confirm_message || r.warning || `${row.model} is expensive. Switch anyway?` };
       } else {
         app2.close(overlay);
-        if (canSave && global2 || effort !== startEffort) {
+        if (levelsFor(caps(row)).some((l) => l.id === effort) && (canSave && global2 || effort !== startEffort)) {
           await app2.setEffort(effort, canSave && global2 ? "global" : "session");
+        }
+        if (fastTouched && fastable(row)) {
+          await setFast(app2, fast ? "fast" : "normal");
         }
       }
     } catch (error) {
@@ -31869,11 +32777,12 @@ function openModelPicker(app2) {
         }))
       ];
       const row = rows.find((r) => r.id === selected);
-      const reasons = row?.provider.capabilities?.[row.model]?.reasoning !== false;
+      const levels = levelsFor(row && caps(row));
       return /* @__PURE__ */ jsx(
         "picker",
         {
           actions: [
+            ...row && fastable(row) ? [{ id: "fast", keys: ["ctrl+f"], label: "\u26A1 Fast", on: fast }] : [],
             ...canSave ? [{ id: "global", keys: ["ctrl+g"], label: "Save as default", on: global2 }] : [],
             { end: true, id: "close", keys: ["esc"], label: "Close" },
             { id: "use", keys: ["enter"], label: "Switch", primary: true }
@@ -31899,6 +32808,11 @@ function openModelPicker(app2) {
             },
             close: () => app2.close(overlay),
             confirm: () => void choose(confirm?.row.id, true),
+            fast: () => {
+              fast = !fast;
+              fastTouched = true;
+              app2.changed();
+            },
             global: () => {
               global2 = !global2;
               app2.changed();
@@ -31909,7 +32823,7 @@ function openModelPicker(app2) {
               app2.changed();
             },
             strip: (ev) => {
-              effort = LEVELS.find((l) => l.id === ev.value)?.id ?? effort;
+              effort = levels.find((l) => l.id === ev.value)?.id ?? effort;
               app2.changed();
             },
             use: () => void choose(selected)
@@ -31929,8 +32843,8 @@ function openModelPicker(app2) {
           selected,
           size: "lg",
           state,
-          strip: reasons ? {
-            items: LEVELS.map((l) => ({ id: l.id, label: l.label, on: l.id === effort })),
+          strip: levels.length ? {
+            items: levels.map((l) => ({ id: l.id, label: l.label, on: l.id === effort })),
             label: "Effort  \u2303E",
             selected: effort
           } : void 0,
@@ -31963,8 +32877,18 @@ function openModelPicker(app2) {
         return true;
       }
       if (k.ctrl && k.name === "e") {
-        const at = LEVELS.findIndex((l) => l.id === effort);
-        effort = LEVELS[(at + (k.shift ? LEVELS.length - 1 : 1)) % LEVELS.length].id;
+        const row = rows.find((r) => r.id === selected);
+        const levels = levelsFor(row && caps(row));
+        const at = levels.findIndex((l) => l.id === effort);
+        effort = levels.length ? levels[(at + (k.shift ? levels.length - 1 : 1)) % levels.length].id : effort;
+        return true;
+      }
+      if (k.ctrl && k.name === "f") {
+        const row = rows.find((r) => r.id === selected);
+        if (row && fastable(row)) {
+          fast = !fast;
+          fastTouched = true;
+        }
         return true;
       }
       if (k.name === "tab") {
@@ -31987,15 +32911,17 @@ function openModelPicker(app2) {
   app2.open(overlay);
   void load2();
 }
+var caps = (row) => row.provider.capabilities?.[row.model];
+var fastable = (row) => Boolean(caps(row)?.fast || caps(row)?.ultrafast);
 function itemOf(row) {
   const price = row.provider.pricing?.[row.model];
-  const caps = row.provider.capabilities?.[row.model];
+  const caps2 = row.provider.capabilities?.[row.model];
   const free = Boolean(price?.free);
   const unavailable = row.provider.unavailable_models?.includes(row.model);
   return {
     badges: [
       ...free ? [{ text: "free", tone: "success" }] : [],
-      ...caps?.ultrafast ? [{ text: "ultrafast", tone: "info" }] : caps?.fast ? [{ text: "fast", tone: "info" }] : []
+      ...caps2?.ultrafast ? [{ text: "ultrafast", tone: "info" }] : caps2?.fast ? [{ text: "fast", tone: "info" }] : []
     ],
     disabled: unavailable ? `${row.providerName} doesn't offer ${row.model} on this plan` : void 0,
     facts: price && !free && price.input ? { price: `${price.input}\xB7${price.output}` } : free ? { price: "free" } : void 0,
@@ -32006,7 +32932,7 @@ function itemOf(row) {
   };
 }
 function preview3(row, isCurrent) {
-  const caps = row.provider.capabilities?.[row.model];
+  const caps2 = row.provider.capabilities?.[row.model];
   const price = row.provider.pricing?.[row.model];
   const facts2 = [
     { k: [{ t: "Provider" }], v: row.providerName },
@@ -32016,9 +32942,9 @@ function preview3(row, isCurrent) {
         v: [{ s: "mono", t: price.free ? "free" : `${price.input} in \xB7 ${price.output} out` }]
       }
     ] : [],
-    ...caps ? [
-      { k: [{ t: "Reasoning" }], v: [{ s: "mono", t: caps.reasoning ? "yes" : "no" }] },
-      { k: [{ t: "Fast mode" }], v: [{ s: "mono", t: caps.fast || caps.ultrafast ? "yes" : "no" }] }
+    ...caps2 ? [
+      { k: [{ t: "Reasoning" }], v: [{ s: "mono", t: caps2.reasoning ? "yes" : "no" }] },
+      { k: [{ t: "Fast mode" }], v: [{ s: "mono", t: caps2.fast || caps2.ultrafast ? "yes" : "no" }] }
     ] : [],
     ...row.provider.api_url ? [{ k: [{ t: "Endpoint" }], v: [{ s: "mono dim", t: row.provider.api_url }] }] : []
   ];
@@ -32036,8 +32962,8 @@ function preview3(row, isCurrent) {
     ),
     /* @__PURE__ */ jsxs("row", { gap: "xs", wrap: true, children: [
       isCurrent ? /* @__PURE__ */ jsx("badge", { text: "current", tone: "success" }, "current") : null,
-      caps?.reasoning ? /* @__PURE__ */ jsx("badge", { text: "reasoning" }, "reasoning") : null,
-      caps?.fast || caps?.ultrafast ? /* @__PURE__ */ jsx("badge", { text: caps.ultrafast ? "ultrafast" : "fast", tone: "info" }, "fast") : null,
+      caps2?.reasoning ? /* @__PURE__ */ jsx("badge", { text: "reasoning" }, "reasoning") : null,
+      caps2?.fast || caps2?.ultrafast ? /* @__PURE__ */ jsx("badge", { text: caps2.ultrafast ? "ultrafast" : "fast", tone: "info" }, "fast") : null,
       price?.free ? /* @__PURE__ */ jsx("badge", { text: "free", tone: "success" }, "free") : null
     ] }, "badges"),
     /* @__PURE__ */ jsx("kv", { items: facts2 }, "facts"),
@@ -32046,11 +32972,11 @@ function preview3(row, isCurrent) {
 }
 
 // .hermes-src/ui-tui/src/lib/history.ts
-import { appendFileSync as appendFileSync3, existsSync, mkdirSync as mkdirSync3, readFileSync as readFileSync3 } from "node:fs";
-import { homedir as homedir7 } from "node:os";
+import { appendFileSync as appendFileSync3, existsSync as existsSync3, mkdirSync as mkdirSync3, readFileSync as readFileSync3 } from "node:fs";
+import { homedir as homedir9 } from "node:os";
 import { join as join6 } from "node:path";
 var MAX2 = 1e3;
-var dir = process.env.HERMES_HOME ?? join6(homedir7(), ".hermes");
+var dir = process.env.HERMES_HOME ?? join6(homedir9(), ".hermes");
 var file = join6(dir, ".hermes_history");
 var cache = null;
 function load() {
@@ -32058,7 +32984,7 @@ function load() {
     return cache;
   }
   try {
-    if (!existsSync(file)) {
+    if (!existsSync3(file)) {
       cache = [];
       return cache;
     }
@@ -32095,7 +33021,7 @@ function append(line) {
     items.splice(0, items.length - MAX2);
   }
   try {
-    if (!existsSync(dir)) {
+    if (!existsSync3(dir)) {
       mkdirSync3(dir, { recursive: true });
     }
     const ts = (/* @__PURE__ */ new Date()).toISOString().replace("T", " ").replace("Z", "");
@@ -32108,13 +33034,211 @@ ${encoded}
   }
 }
 
+// src/markdown.ts
+var FENCE = /^\s*(```|~~~)/;
+var HEADING = /^(#{1,6})(\s+)/;
+var QUOTE = /^(\s*>+\s?)/;
+var LIST = /^(\s*)([-*+]|\d{1,9}[.)])(\s+)(\[[ xX]\](?:\s+|$))?/;
+var RULE = /^\s*([-*_])(\s*\1){2,}\s*$/;
+var CODE_SPAN = /(`+)(?!`)([^\n]*?[^`\n])\1(?!`)/g;
+var BOLD = /(\*\*|__)(?=\S)([^\n]*?\S)\1/g;
+var ITALIC_STAR = /(?<![*\\])\*(?=[^\s*])([^\n*]*?[^\s*\\])\*(?!\*)/g;
+var ITALIC_UNDERSCORE = /(?<![\w\\])_(?=[^\s_])([^\n_]*?[^\s_\\])_(?![\w])/g;
+var STRIKE = /~~(?=\S)([^\n]*?\S)~~/g;
+var LINK = /\[([^\]\n]+)\]\(([^)\s]+)\)/g;
+function markdownDecor(text2) {
+  if (!text2) {
+    return [];
+  }
+  const marks = Array.from({ length: text2.length }, () => []);
+  const mark = (from, to, s) => {
+    for (let i = from; i < to; i++) {
+      if (!marks[i].includes(s)) {
+        marks[i].push(s);
+      }
+    }
+  };
+  let at = 0;
+  let fenced = false;
+  for (const line of text2.split("\n")) {
+    const end = at + line.length;
+    if (FENCE.test(line)) {
+      mark(at, end, "dim");
+      fenced = !fenced;
+    } else if (fenced) {
+      mark(at, end, "code");
+    } else {
+      blockMarks(line, at, mark);
+    }
+    at = end + 1;
+  }
+  return runs(marks);
+}
+function blockMarks(line, at, mark) {
+  if (RULE.test(line)) {
+    return mark(at, at + line.length, "dim");
+  }
+  let body = 0;
+  const heading2 = HEADING.exec(line);
+  const quote2 = heading2 ? null : QUOTE.exec(line);
+  if (heading2) {
+    mark(at, at + heading2[1].length, "dim");
+    body = heading2[0].length;
+    mark(at + body, at + line.length, "strong");
+  } else if (quote2) {
+    mark(at, at + quote2[1].length, "dim");
+    body = quote2[1].length;
+    mark(at + body, at + line.length, "muted");
+  }
+  const list = LIST.exec(line.slice(body));
+  if (list) {
+    const start = body + list[1].length;
+    mark(at + start, at + start + list[2].length, "accent");
+    if (list[4]) {
+      const box = body + list[0].length - list[4].length;
+      mark(at + box, at + box + 3, "accent");
+    }
+    body += list[0].length;
+  }
+  inlineMarks(line, body, at, mark);
+}
+function inlineMarks(line, from, at, mark) {
+  let rest = " ".repeat(from) + line.slice(from);
+  const take = (start, len) => {
+    rest = rest.slice(0, start) + "\0".repeat(len) + rest.slice(start + len);
+  };
+  for (const m of [...rest.matchAll(CODE_SPAN)]) {
+    const tick = m[1].length;
+    mark(at + m.index, at + m.index + tick, "dim");
+    mark(at + m.index + tick, at + m.index + m[0].length - tick, "code");
+    mark(at + m.index + m[0].length - tick, at + m.index + m[0].length, "dim");
+    take(m.index, m[0].length);
+  }
+  for (const m of [...rest.matchAll(LINK)]) {
+    const label = m[1].length;
+    mark(at + m.index, at + m.index + 1, "dim");
+    mark(at + m.index + 1, at + m.index + 1 + label, "link");
+    mark(at + m.index + 1 + label, at + m.index + m[0].length, "dim");
+    take(m.index + 2 + label, m[0].length - 2 - label);
+  }
+  const pair2 = (re, marker2, s) => {
+    for (const m of [...rest.matchAll(re)]) {
+      const len = m[0].length;
+      mark(at + m.index, at + m.index + marker2, "dim");
+      mark(at + m.index + marker2, at + m.index + len - marker2, s);
+      mark(at + m.index + len - marker2, at + m.index + len, "dim");
+      take(m.index, marker2);
+      take(m.index + len - marker2, marker2);
+    }
+  };
+  pair2(BOLD, 2, "strong");
+  pair2(STRIKE, 2, "del");
+  pair2(ITALIC_STAR, 1, "em");
+  pair2(ITALIC_UNDERSCORE, 1, "em");
+}
+function runs(marks) {
+  const out = [];
+  let from = 0;
+  for (let i = 1; i <= marks.length; i++) {
+    const s = marks[from].join(" ");
+    if (i < marks.length && marks[i].join(" ") === s) {
+      continue;
+    }
+    if (s) {
+      out.push({ from, s, to: i });
+    }
+    from = i;
+  }
+  return out;
+}
+function listNewline(text2, cursor) {
+  const start = text2.lastIndexOf("\n", cursor - 1) + 1;
+  const nl = text2.indexOf("\n", cursor);
+  const end = nl < 0 ? text2.length : nl;
+  const line = text2.slice(start, end);
+  const m = LIST.exec(line);
+  if (!m || cursor - start < m[0].length) {
+    return void 0;
+  }
+  if (!line.slice(m[0].length).trim()) {
+    return { cursor: start, from: start, text: "", to: end };
+  }
+  const [, indent = "", bullet = "", gap = " ", box] = m;
+  const n = /^\d+/.exec(bullet)?.[0];
+  const next2 = n ? `${Number(n) + 1}${bullet.slice(n.length)}` : bullet;
+  const insert = `
+${indent}${next2}${gap}${box ? "[ ] " : ""}`;
+  return { cursor: cursor + insert.length, from: cursor, text: insert, to: cursor };
+}
+function toggleMark(text2, from, to, marker2) {
+  const n = marker2.length;
+  if (from !== to) {
+    if (text2.slice(from - n, from) === marker2 && text2.slice(to, to + n) === marker2 && !doubled(text2, from - n, to + n, marker2)) {
+      return { anchor: from - n, cursor: to - n, from: from - n, text: text2.slice(from, to), to: to + n };
+    }
+    const inner = text2.slice(from, to);
+    if (inner.length > 2 * n && inner.startsWith(marker2) && inner.endsWith(marker2)) {
+      return { anchor: from, cursor: to - 2 * n, from, text: inner.slice(n, -n), to };
+    }
+    return { anchor: from + n, cursor: to + n, from, text: `${marker2}${inner}${marker2}`, to };
+  }
+  const at = from;
+  if (text2.slice(at - n, at) === marker2 && text2.slice(at, at + n) === marker2) {
+    return { cursor: at - n, from: at - n, text: "", to: at + n };
+  }
+  const run6 = markedRun(text2, at, marker2);
+  if (run6 && at === run6.close) {
+    return { cursor: at + n, from: at, text: "", to: at };
+  }
+  if (run6) {
+    const inner = text2.slice(run6.open + n, run6.close);
+    return { cursor: at - n, from: run6.open, text: inner, to: run6.close + n };
+  }
+  const word = wordAt(text2, at);
+  if (word) {
+    return { cursor: at + n, from: word.from, text: `${marker2}${text2.slice(word.from, word.to)}${marker2}`, to: word.to };
+  }
+  return { cursor: at + n, from: at, text: `${marker2}${marker2}`, to: at };
+}
+var WORD = /[\p{L}\p{N}'’-]/u;
+function wordAt(text2, at) {
+  let from = at;
+  let to = at;
+  while (from > 0 && WORD.test(text2[from - 1] ?? "")) {
+    from--;
+  }
+  while (to < text2.length && WORD.test(text2[to] ?? "")) {
+    to++;
+  }
+  return from < to ? { from, to } : void 0;
+}
+function doubled(text2, open, close, marker2) {
+  return marker2.length === 1 && (text2[open - 1] === marker2 || text2[close] === marker2);
+}
+function markedRun(text2, at, marker2) {
+  const start = text2.lastIndexOf("\n", at - 1) + 1;
+  const nl = text2.indexOf("\n", at);
+  const line = text2.slice(start, nl < 0 ? text2.length : nl);
+  const re = marker2 === "**" ? /\*\*(?=\S)([^\n]*?\S)\*\*/g : /(?<![\w_])_(?=[^\s_])([^\n_]*?[^\s_])_(?![\w_])/g;
+  for (const m of line.matchAll(re)) {
+    const open = start + m.index;
+    const close = open + m[0].length - marker2.length;
+    if (at > open + marker2.length - 1 && at <= close) {
+      return { close, open };
+    }
+  }
+  return void 0;
+}
+
 // src/composer.ts
 var graphemes = new Intl.Segmenter(void 0, { granularity: "grapheme" });
 var UNDO_MERGE_MS = 800;
-var WORD = /[\p{L}\p{N}_]/u;
+var WORD2 = /[\p{L}\p{N}_]/u;
 var Composer = class {
   text = "";
   cursor = 0;
+  /** The selection's other end, while text is selected (Shift+arrows, or Tern's native selection). */
+  anchor;
   /** Bumped on every change, so the app knows to render. */
   rev = 0;
   #undo = [];
@@ -32124,6 +33248,19 @@ var Composer = class {
   /** Index into history while browsing it; history.length means the draft. */
   #browse = -1;
   #draft = "";
+  #decor = { decor: [], text: "" };
+  /** The selected range, or the caret twice. */
+  get selection() {
+    const a = this.anchor ?? this.cursor;
+    return a < this.cursor ? [a, this.cursor] : [this.cursor, a];
+  }
+  /** The draft's Markdown styling for the `editor` node, recomputed only when the text changed (not on caret moves). */
+  get decor() {
+    if (this.#decor.text !== this.text) {
+      this.#decor = { decor: markdownDecor(this.text), text: this.text };
+    }
+    return this.#decor.decor;
+  }
   /** Up/Down are walking the prompt history (Down still has somewhere to go). */
   get browsing() {
     return this.#browse >= 0;
@@ -32143,13 +33280,16 @@ var Composer = class {
     this.#browse = -1;
     this.text = "";
     this.cursor = 0;
+    this.anchor = void 0;
     this.#changed();
     return text2;
   }
+  /** Types `s` at the caret, over the selection if there is one. */
   insert(s) {
-    this.#record({ merge: true });
-    this.text = this.text.slice(0, this.cursor) + s + this.text.slice(this.cursor);
-    this.cursor += s.length;
+    const [from, to] = this.selection;
+    this.#record({ merge: from === to });
+    this.text = this.text.slice(0, from) + s + this.text.slice(to);
+    this.cursor = from + s.length;
     this.#changed();
   }
   /** Replaces `[from, to)`: native edits from Tern and completions. */
@@ -32162,15 +33302,26 @@ var Composer = class {
     this.cursor = clamp(cursor, this.text.length);
     this.#changed();
   }
-  /** A TSP `edit` event; ignored when the text changed since Tern saw it. */
+  /**
+   * A TSP `edit` event; ignored when the text changed since Tern saw it. A caret move may carry
+   * Tern's selection anchor in its raw frame; a new line typed in a list item continues the list.
+   */
   edit(ev) {
     if (ev.len !== this.text.length) {
       return;
     }
     if (ev.from === ev.to && !ev.text) {
       this.cursor = clamp(ev.cursor, this.text.length);
+      const anchor = ev.raw?.anchor;
+      this.anchor = typeof anchor === "number" && anchor !== this.cursor ? clamp(anchor, this.text.length) : void 0;
       this.#changed();
       return;
+    }
+    if (ev.from === ev.to && ev.text === "\n") {
+      const list = listNewline(this.text, ev.from);
+      if (list) {
+        return this.#apply(list);
+      }
     }
     const typed = ev.from === ev.to && [...ev.text].length === 1 && ev.text !== "\n";
     this.#replace({ cursor: ev.cursor, from: ev.from, merge: typed, s: ev.text, to: ev.to });
@@ -32183,6 +33334,7 @@ var Composer = class {
     this.#redo.push({ cursor: this.cursor, text: this.text });
     this.text = prev.text;
     this.cursor = prev.cursor;
+    this.anchor = void 0;
     this.#lastEdit = 0;
     this.#browse = -1;
     this.#changed();
@@ -32195,6 +33347,7 @@ var Composer = class {
     this.#undo.push({ cursor: this.cursor, text: this.text });
     this.text = next2.text;
     this.cursor = next2.cursor;
+    this.anchor = void 0;
     this.#lastEdit = 0;
     this.#browse = -1;
     this.#changed();
@@ -32205,19 +33358,28 @@ var Composer = class {
     const name = key2.name;
     if (name === "paste") {
       const s = (key2.text ?? "").replace(/\r\n?/g, "\n");
-      this.splice(this.cursor, this.cursor, s);
+      const [from, to] = this.selection;
+      this.splice(from, to, s);
       return true;
     }
     if (name === "enter") {
       if (shift || alt) {
-        this.insert("\n");
-        return true;
+        return this.#newline();
       }
       if (this.text.slice(0, this.cursor).endsWith("\\")) {
-        this.splice(this.cursor - 1, this.cursor, "\n");
+        const at = this.cursor - 1;
+        const list = listNewline(this.text.slice(0, at) + this.text.slice(this.cursor), at);
+        if (list) {
+          return this.#apply({ ...list, to: list.to + 1 });
+        }
+        this.splice(at, this.cursor, "\n");
         return true;
       }
       return "submit";
+    }
+    if (meta && !ctrl && !alt && (name === "b" || name === "i")) {
+      const [from, to] = this.selection;
+      return this.#apply(toggleMark(this.text, from, to, name === "b" ? "**" : "_"));
     }
     if ((ctrl || meta) && name === "z") {
       shift ? this.redo() : this.undo();
@@ -32272,7 +33434,27 @@ var Composer = class {
           return this.#cut(this.cursor, nextWord(this.text, this.cursor));
       }
     }
-    switch (name) {
+    const selecting = shift && ["left", "right", "home", "end"].includes(name);
+    const anchor = selecting ? this.anchor ?? this.cursor : void 0;
+    if (!selecting && this.anchor !== void 0 && (name === "backspace" || name === "delete")) {
+      const [from, to] = this.selection;
+      return this.#cut(from, to);
+    }
+    const moved2 = this.#motion(key2);
+    if (moved2 !== void 0) {
+      this.anchor = anchor !== void 0 && anchor !== this.cursor ? anchor : void 0;
+      return moved2;
+    }
+    if (key2.text && !ctrl && !meta) {
+      this.insert(key2.text);
+      return true;
+    }
+    return false;
+  }
+  /** The editing and motion keys without modifiers that change their meaning; undefined for others. */
+  #motion(key2) {
+    const { alt, meta } = key2;
+    switch (key2.name) {
       case "backspace":
         if (meta) {
           return this.#cut(lineStart(this.text, this.cursor), this.cursor);
@@ -32297,11 +33479,22 @@ var Composer = class {
       case "down":
         return meta ? this.#move(this.text.length) : this.#vertical(1);
     }
-    if (key2.text && !ctrl && !meta) {
-      this.insert(key2.text);
-      return true;
+    return void 0;
+  }
+  /** A new line at the caret; in a list item, the next item's marker comes with it. */
+  #newline() {
+    const list = this.anchor === void 0 ? listNewline(this.text, this.cursor) : void 0;
+    if (list) {
+      return this.#apply(list);
     }
-    return false;
+    this.insert("\n");
+    return true;
+  }
+  /** Applies a Markdown edit as one undo step, with the selection it leaves. */
+  #apply({ anchor, cursor, from, text: text2, to }) {
+    this.#replace({ cursor, from, merge: false, s: text2, to });
+    this.anchor = anchor !== void 0 && anchor !== this.cursor ? anchor : void 0;
+    return true;
   }
   #vertical(dir2) {
     const start = lineStart(this.text, this.cursor);
@@ -32338,12 +33531,14 @@ var Composer = class {
     }
     this.text = text2;
     this.cursor = text2.length;
+    this.anchor = void 0;
     this.#changed();
     return true;
   }
   #move(to) {
-    if (to !== this.cursor) {
+    if (to !== this.cursor || this.anchor !== void 0) {
       this.cursor = clamp(to, this.text.length);
+      this.anchor = void 0;
       this.#lastEdit = 0;
       this.#changed();
     }
@@ -32373,6 +33568,7 @@ var Composer = class {
   #record({ merge }) {
     const now = Date.now();
     this.#browse = -1;
+    this.anchor = void 0;
     if (!merge || now - this.#lastEdit > UNDO_MERGE_MS || !this.#undo.length) {
       this.#undo.push({ cursor: this.cursor, text: this.text });
       if (this.#undo.length > 200) {
@@ -32429,20 +33625,20 @@ function nextGrapheme(text2, at) {
 }
 function prevWord(text2, at) {
   let i = at;
-  while (i > 0 && !WORD.test(text2[i - 1] ?? "")) {
+  while (i > 0 && !WORD2.test(text2[i - 1] ?? "")) {
     i--;
   }
-  while (i > 0 && WORD.test(text2[i - 1] ?? "")) {
+  while (i > 0 && WORD2.test(text2[i - 1] ?? "")) {
     i--;
   }
   return i;
 }
 function nextWord(text2, at) {
   let i = at;
-  while (i < text2.length && !WORD.test(text2[i] ?? "")) {
+  while (i < text2.length && !WORD2.test(text2[i] ?? "")) {
     i++;
   }
-  while (i < text2.length && WORD.test(text2[i] ?? "")) {
+  while (i < text2.length && WORD2.test(text2[i] ?? "")) {
     i++;
   }
   return i;
@@ -32486,7 +33682,7 @@ function unmaskEdit(secret, ev) {
 
 // src/overlays/prompts.tsx
 var RECOMMENDED = /\s*\(recommended\)\s*$/i;
-var str6 = (v) => typeof v === "string" ? v : "";
+var str8 = (v) => typeof v === "string" ? v : "";
 var isCtrlC = (k) => k.ctrl && k.name === "c";
 var TIMEOUT_NOTICES = {
   approval: "Approval timed out: the command was not run. Ask Hermes to try again when you are ready to answer.",
@@ -32555,6 +33751,45 @@ function optionList(listKey, id, options, selected, select, pick) {
     listKey
   );
 }
+function answerWith(host, overlay, req, state, result) {
+  if (state.busy) {
+    return;
+  }
+  const sent = req.respond(result);
+  if (!isThenable(sent)) {
+    return host.close(overlay);
+  }
+  state.busy = true;
+  state.error = "";
+  host.changed();
+  sent.then(
+    () => host.close(overlay),
+    (error) => {
+      state.busy = false;
+      state.error = error instanceof Error ? error.message : String(error);
+      host.changed();
+    }
+  );
+}
+var isThenable = (v) => typeof v === "object" && v !== null && typeof v.then === "function";
+function settleQuietly(sent) {
+  if (isThenable(sent)) {
+    sent.then(void 0, () => void 0);
+  }
+}
+function sendingLine(state) {
+  if (state.error) {
+    return /* @__PURE__ */ jsx(
+      "text",
+      {
+        spans: [{ s: "error", t: `Not answered: ${state.error}. Answer again, or Esc to close without answering.` }],
+        wrap: "word"
+      },
+      "sending"
+    );
+  }
+  return state.busy ? /* @__PURE__ */ jsx("text", { spans: [{ s: "dim", t: "Sending\u2026" }] }, "sending") : null;
+}
 function moved(key2, at, count) {
   if (key2.name === "up" || key2.ctrl && key2.name === "p") {
     return (at - 1 + count) % count;
@@ -32570,7 +33805,7 @@ function promptOverlay(host, req) {
       return approvalOverlay(host, req);
     case "clarify":
       if (!questionsOf(req.params.questions).length) {
-        req.respond({});
+        settleQuietly(req.respond({}));
         return null;
       }
       return clarifyOverlay(host, req);
@@ -32592,8 +33827,8 @@ var APPROVALS = [
 ];
 function approvalOverlay(host, req) {
   const p = req.params;
-  const command = str6(p.command);
-  const description = str6(p.description);
+  const command = str8(p.command);
+  const description = str8(p.description);
   const smartDenied = p.smart_denied === true;
   const offered = Array.isArray(p.choices) ? p.choices.filter((c) => typeof c === "string") : [];
   const allowed = new Set(
@@ -32604,15 +33839,14 @@ function approvalOverlay(host, req) {
   }
   const options = APPROVALS.filter((o) => allowed.has(o.id));
   const key2 = `prompt:${req.id}`;
+  const sending = { busy: false, error: "" };
   let selected = 0;
-  const answer = (choice) => {
-    req.respond({ choice });
-    host.close(overlay);
-  };
+  const answer = (choice) => answerWith(host, overlay, req, sending, { choice });
+  const decline = () => sending.error ? host.close(overlay) : answer("deny");
   const overlay = {
     key: key2,
     modal: true,
-    cancel: () => answer("deny"),
+    cancel: decline,
     node: (id) => /* @__PURE__ */ jsx("overlay", { anchor: "bottom", modal: true, role: "omp.overlay.ask", size: "md", children: /* @__PURE__ */ jsxs("col", { gap: "md", children: [
       /* @__PURE__ */ jsx("md", { role: "omp.ask.question", text: "Allow this command?" }, "question"),
       command ? /* @__PURE__ */ jsx("code", { lang: "bash", text: command }, "command") : null,
@@ -32637,6 +33871,7 @@ function approvalOverlay(host, req) {
         },
         (i) => answer(options[i]?.id ?? "deny")
       ),
+      sendingLine(sending),
       actionsRow([
         { hint: "n \xB7 escape", key: "deny", keys: ["escape"], label: "Deny", onClick: () => answer("deny") },
         {
@@ -32652,15 +33887,15 @@ function approvalOverlay(host, req) {
     onKey: (k) => {
       const n = Number.parseInt(k.name, 10);
       const to = moved(k, selected, options.length);
-      if (isCtrlC(k)) {
-        answer("deny");
+      if (isCtrlC(k) || k.name === "escape") {
+        decline();
       } else if (to !== void 0) {
         selected = to;
       } else if (n >= 1 && n <= options.length) {
         answer(options[n - 1]?.id ?? "deny");
       } else if (k.name === "enter") {
         answer(options[selected]?.id ?? "deny");
-      } else if (k.name === "escape" || k.name === "n") {
+      } else if (k.name === "n") {
         answer("deny");
       } else if (k.name === "y") {
         answer("once");
@@ -32679,8 +33914,8 @@ function questionsOf(raw) {
       return [];
     }
     const choices = "choices" in q && Array.isArray(q.choices) ? q.choices.filter((c) => typeof c === "string") : [];
-    const question = str6(q.question).trim();
-    return question ? [{ choices, multi: "multi_select" in q && q.multi_select === true, qid: str6(q.qid), question }] : [];
+    const question = str8(q.question).trim();
+    return question ? [{ choices, multi: "multi_select" in q && q.multi_select === true, qid: str8(q.qid), question }] : [];
   });
 }
 function tabLabel(question) {
@@ -32706,6 +33941,9 @@ function clarifyOverlay(host, req) {
     typing: false
   }));
   const key2 = `prompt:${req.id}`;
+  const sending = { busy: false, error: "" };
+  const respond = (result) => answerWith(host, overlay, req, sending, result);
+  const cancel = () => sending.error ? host.close(overlay) : respond({});
   let step = Math.max(
     0,
     questions.findIndex((q) => !(q.qid in answers))
@@ -32732,8 +33970,7 @@ function clarifyOverlay(host, req) {
       host.changed();
       return;
     }
-    req.respond({ answers });
-    host.close(overlay);
+    respond({ answers });
   };
   const submit = () => {
     const q = questions[step];
@@ -32782,10 +34019,7 @@ function clarifyOverlay(host, req) {
     key: key2,
     modal: true,
     // Every question at once: an empty answer is the contract's cancel ('' skips on the shared wire).
-    cancel: () => {
-      req.respond({});
-      host.close(overlay);
-    },
+    cancel,
     focus: (id) => {
       const q = questions[step];
       const d = drafts[step];
@@ -32853,6 +34087,7 @@ function clarifyOverlay(host, req) {
           },
           "answer"
         ) : null,
+        sendingLine(sending),
         actionsRow([
           { hint: "escape", key: "skip", keys: ["escape"], label: "Skip", onClick: () => commit(null) },
           {
@@ -32874,9 +34109,8 @@ function clarifyOverlay(host, req) {
       }
       const typing = d.typing || !q.choices.length;
       const count = q.choices.length + 1;
-      if (isCtrlC(k)) {
-        req.respond({});
-        host.close(overlay);
+      if (isCtrlC(k) || k.name === "escape" && sending.error) {
+        cancel();
       } else if (k.name === "tab" && questions.length > 1) {
         go(step + (k.shift ? -1 : 1));
       } else if (k.name === "escape" && typing && q.choices.length) {
@@ -32918,7 +34152,7 @@ function clarifyOverlay(host, req) {
 function maskedOverlay(host, req) {
   const p = req.params;
   const key2 = `prompt:${req.id}`;
-  const site = str6(p.site) || str6(p.origin);
+  const site = str8(p.site) || str8(p.origin);
   const login = req.method === "vault.save_login";
   const code2 = req.method === "vault.code";
   const fields = login ? [
@@ -32926,14 +34160,17 @@ function maskedOverlay(host, req) {
     { id: "password", label: "Password", masked: true, value: new Composer() }
   ] : [{ id: "value", label: code2 ? "Type the code" : "Hidden while you type", masked: !code2, value: new Composer() }];
   let at = 0;
-  const title = req.method === "sudo" ? "Password for sudo" : req.method === "secret" ? str6(p.prompt) || `Value for ${str6(p.env_var) || "a secret"}` : req.method === "vault.unlock_prompt" ? `Master password for ${str6(p.display_name) || str6(p.backend) || "the password manager"}` : login ? `Save a login for ${site || "this site"}` : `Code for ${site || "this site"}`;
-  const note = req.method === "secret" ? str6(p.env_var) : code2 ? [str6(p.hint), "typed into the page only \xB7 never shown to the model"].filter(Boolean).join(" \xB7 ") : "";
+  const title = req.method === "sudo" ? "Password for sudo" : req.method === "secret" ? str8(p.prompt) || `Value for ${str8(p.env_var) || "a secret"}` : req.method === "vault.unlock_prompt" ? `Master password for ${str8(p.display_name) || str8(p.backend) || "the password manager"}` : login ? `Save a login for ${site || "this site"}` : `Code for ${site || "this site"}`;
+  const note = req.method === "secret" ? str8(p.env_var) : code2 ? [str8(p.hint), "typed into the page only \xB7 never shown to the model"].filter(Boolean).join(" \xB7 ") : "";
+  const sending = { busy: false, error: "" };
   const finish = (cancel) => {
     const [first, second] = fields;
-    req.respond({
+    if (cancel && sending.error) {
+      return host.close(overlay);
+    }
+    answerWith(host, overlay, req, sending, {
       value: cancel ? "" : login ? JSON.stringify({ identifier: first?.value.text ?? "", password: second?.value.text ?? "" }) : first?.value.text ?? ""
     });
-    host.close(overlay);
   };
   const overlay = {
     key: key2,
@@ -32943,7 +34180,7 @@ function maskedOverlay(host, req) {
     node: () => /* @__PURE__ */ jsx("overlay", { anchor: "bottom", modal: true, role: "omp.overlay.ask", size: "md", children: /* @__PURE__ */ jsxs("col", { gap: "md", children: [
       /* @__PURE__ */ jsx("md", { role: "omp.ask.question", text: title }, "question"),
       note ? /* @__PURE__ */ jsx("text", { spans: [{ s: req.method === "secret" ? "mono dim" : "muted", t: note }], wrap: "word" }, "note") : null,
-      str6(p.command) ? /* @__PURE__ */ jsx("code", { lang: "bash", text: str6(p.command) }, "command") : null,
+      str8(p.command) ? /* @__PURE__ */ jsx("code", { lang: "bash", text: str8(p.command) }, "command") : null,
       fields.map((f, i) => /* @__PURE__ */ jsx(
         "input",
         {
@@ -32966,6 +34203,7 @@ function maskedOverlay(host, req) {
         },
         f.id
       )),
+      sendingLine(sending),
       actionsRow([
         { hint: "escape", key: "cancel", keys: ["escape"], label: "Cancel", onClick: () => finish(true) },
         {
@@ -33035,7 +34273,7 @@ function confirmOverlay(host, ask) {
 }
 
 // src/overlays/sessions.tsx
-import { basename as basename2 } from "node:path";
+import { basename as basename3 } from "node:path";
 
 // src/hermes/sessionIndex.ts
 import { execFile as execFile4 } from "node:child_process";
@@ -33046,11 +34284,37 @@ var SOURCES = ["acp", "cli", "desktop", "gui", "local", "tui"];
 var LISTABLE = `(s.parent_session_id IS NULL
   OR json_extract(s.model_config, '$._branched_from') IS NOT NULL
   OR json_extract(s.model_config, '$._reset_from') IS NOT NULL)`;
+var POLICY_PREFIX = "gateway.local_policy.v1:";
+function supersededSegments(conn) {
+  let receipts;
+  try {
+    receipts = conn.prepare(
+      `SELECT value FROM state_meta WHERE key GLOB ? AND json_valid(value) AND json_array_length(value, '$.lineage') > 1`
+    ).all(`${POLICY_PREFIX}*`);
+  } catch {
+    return [];
+  }
+  const superseded = [];
+  for (const { value } of receipts) {
+    const receipt = JSON.parse(value);
+    const lineage = receipt.lineage ?? [];
+    if (typeof receipt.session_id !== "string" || !lineage.every((id) => typeof id === "string")) {
+      continue;
+    }
+    const ids = lineage;
+    const rows = conn.prepare(`SELECT id, end_reason FROM sessions WHERE id IN (${ids.map(() => "?").join(",")})`).all(...ids);
+    const ended = new Map(rows.map((r) => [r.id, r.end_reason]));
+    const starts = ids.filter((_, i) => i === 0 || ended.get(ids[i - 1]) === "session_reset");
+    superseded.push(...starts.slice(0, -1));
+  }
+  return superseded;
+}
 var QUERY = `
 WITH RECURSIVE chain(root, cur) AS (
   SELECT s.id, s.id FROM sessions s
   WHERE s.source IN (${SOURCES.map(() => "?").join(",")})
     AND ${LISTABLE}
+    AND s.id NOT IN (SELECT value FROM json_each(?))
     AND (s.pinned = 1 OR (COALESCE(s.archived, 0) = 0 AND COALESCE(s.hidden, 0) = 0))
   UNION ALL
   SELECT c.root, child.id FROM chain c
@@ -33083,7 +34347,7 @@ function storedSessions(limit = 400, db = stateDbPath()) {
   let conn;
   try {
     conn = new DatabaseSync3(db, { readOnly: true });
-    const rows = conn.prepare(QUERY).all(...SOURCES, limit);
+    const rows = conn.prepare(QUERY).all(...SOURCES, JSON.stringify(supersededSegments(conn)), limit);
     return rows.map((r) => ({
       branch: r.branch ?? "",
       cwd: r.cwd ?? "",
@@ -33231,7 +34495,7 @@ ${s.preview} ${s.cwd} ${s.branch} ${s.id}`, { scattered: false });
       const groups = /* @__PURE__ */ new Map();
       const add = (label, id) => groups.set(label, [...groups.get(label) ?? [], id]);
       for (const s of list) {
-        add(s.pinned ? "Pinned" : tab === "all" && here(s) && workspace ? `In ${basename2(workspace)}` : dayOf(s.lastActive, now), s.id);
+        add(s.pinned ? "Pinned" : tab === "all" && here(s) && workspace ? `In ${basename3(workspace)}` : dayOf(s.lastActive, now), s.id);
       }
       for (const [label, ids] of groups) {
         order.push({ count: ids.length, group: label, label }, ...ids);
@@ -33256,7 +34520,7 @@ ${s.preview} ${s.cwd} ${s.branch} ${s.id}`, { scattered: false });
       const { hits, order } = view(now);
       const s = sessions.find((x) => x.id === selected);
       const hereCount = sessions.filter(here).length;
-      const project = workspace ? basename2(workspace) : "This folder";
+      const project = workspace ? basename3(workspace) : "This folder";
       if (s && !replies.has(s.id)) {
         replies.set(s.id, lastReply(s.id));
       }
@@ -33374,7 +34638,7 @@ function itemOf2(s, now, running, elsewhere) {
     badges: [
       ...running ? [{ text: "running", tone: "accent" }] : [],
       ...s.branch ? [{ text: s.branch, title: `Branch ${s.branch}` }] : [],
-      ...elsewhere && s.cwd ? [{ text: basename2(s.cwd), title: s.cwd }] : []
+      ...elsewhere && s.cwd ? [{ text: basename3(s.cwd), title: s.cwd }] : []
     ],
     detail: s.title && s.preview ? s.preview : void 0,
     facts: { size: `${s.messages} msg${s.messages === 1 ? "" : "s"}`, when: ageOf(s.lastActive, now) },
@@ -33578,7 +34842,7 @@ async function compress(host, arg) {
     return host.notice("No active session.", "warning");
   }
   if (host.busy) {
-    return host.notice("Wait for the current turn to finish (or press Esc) before compressing.", "warning");
+    return host.notice("Wait for the current turn to finish (or press Esc twice) before compressing.", "warning");
   }
   const focus = arg.trim();
   if (!/(^|\s)--preview(\s|$)/.test(focus)) {
@@ -33675,9 +34939,9 @@ async function rollback(host, arg) {
   }
   host.notice(`Rollback restored ${file2 || "the workspace"}: ${r.reason || r.message || r.restored_to || "restored"}`);
 }
-var guarded = (name, run7) => async (host, arg) => {
+var guarded = (name, run6) => async (host, arg) => {
   try {
-    return await run7(host, arg);
+    return await run6(host, arg);
   } catch (e) {
     host.notice(`/${name} failed: ${errorText2(e)}`, "error");
   }
@@ -33694,6 +34958,664 @@ var COMMANDS2 = [
 ];
 var SESSION_COMMANDS = COMMANDS2.map((c) => ({ ...c, run: guarded(c.name, c.run) }));
 
+// src/preformatted.ts
+var BOX = /[─-╿]/;
+var RULE2 = /^\s*\+[-=+]{3,}\+?\s*$/;
+var COLUMNS = /^\s{0,4}[^\s•\-*>#`|][^\n]*?\S {2,}\S/;
+var ESC3 = String.fromCharCode(27);
+function isPreformatted(text2) {
+  if (text2.includes(`${ESC3}[`) || BOX.test(text2)) {
+    return true;
+  }
+  const lines = text2.split("\n").filter((l) => l.trim());
+  if (lines.some((l) => RULE2.test(l))) {
+    return true;
+  }
+  const aligned = lines.filter((l) => COLUMNS.test(l)).length;
+  return aligned >= 3 && aligned >= lines.length / 2;
+}
+function hardBreaks(text2) {
+  let fenced = false;
+  return text2.split("\n").map((line, i, all) => {
+    if (/^\s*(```|~~~)/.test(line)) {
+      fenced = !fenced;
+      return line;
+    }
+    const next2 = all[i + 1];
+    return fenced || !line.trim() || next2 === void 0 || !next2.trim() ? line : `${line}  `;
+  }).join("\n");
+}
+
+// src/usage.ts
+var HEADER = /^\s*(?:[^\p{L}\p{N}*\s]\S*\s+)?\*\*(.+?)\*\*\s*(.*)$/u;
+var SUFFIX = { b: 1e9, k: 1e3, m: 1e6 };
+function parseCount(raw) {
+  const m = /^~?\s*([\d,]*\.?\d+)\s*([kmb])?$/i.exec(raw.trim());
+  if (!m) {
+    return NaN;
+  }
+  return Number(m[1].replace(/,/g, "")) * (m[2] ? SUFFIX[m[2].toLowerCase()] : 1);
+}
+function compactCount(n) {
+  const unit = (v, s) => `${v >= 100 ? Math.round(v) : Number(v.toFixed(1))}${s}`;
+  if (n >= 1e9) {
+    return unit(n / 1e9, "B");
+  }
+  if (n >= 1e6) {
+    return unit(n / 1e6, "M");
+  }
+  return n >= 1e3 ? unit(n / 1e3, "K") : String(Math.round(n));
+}
+function limits(inline) {
+  const out = [];
+  for (const part of inline.split("|")) {
+    const m = /^\s*([A-Za-z]+):\s*([\d.,]+\s*[kmb]?)\s*\/\s*([\d.,]+\s*[kmb]?)(?:\s*\(resets?\s+(.+?)\))?\s*$/i.exec(part);
+    const left = m ? parseCount(m[2]) : NaN;
+    const limit = m ? parseCount(m[3]) : NaN;
+    if (m && Number.isFinite(left) && limit > 0) {
+      out.push({ left, limit, name: m[1].toUpperCase(), reset: m[4] });
+    }
+  }
+  return out;
+}
+function pair(line) {
+  const m = /^\s*([^:]{1,40}):\s+(.+?)\s*$/.exec(line);
+  return m ? { key: m[1], value: m[2].replace(/^`(.*)`$/, "$1") } : void 0;
+}
+function crumb(line) {
+  const m = /^\s*[•\-*]\s*(.+?):\s*(~?[\d.,]+\s*[kmb]?)(?:\s*\(~?(\d+(?:\.\d+)?)%\))?\s*$/i.exec(line);
+  const tokens2 = m ? parseCount(m[2]) : NaN;
+  return m && Number.isFinite(tokens2) ? { label: m[1], pct: m[3] ? Number(m[3]) : void 0, tokens: tokens2 } : void 0;
+}
+function build(title, inline, body) {
+  const name = title.replace(/:$/, "").trim();
+  const lower = name.toLowerCase();
+  const lines = body.filter((l) => l.trim());
+  if (lower.includes("rate limit")) {
+    const items = limits(inline || lines.join(" | "));
+    return items.length ? { items, kind: "limits", title: name } : text(name, inline, lines);
+  }
+  if (lower.includes("context breakdown")) {
+    const items = lines.flatMap((l) => crumb(l) ?? []);
+    return items.length ? { items, kind: "breakdown", note: /_\((.*?)\)_/.exec(inline)?.[1], title: name } : text(name, inline, lines);
+  }
+  if (lower.includes("session") || lower.includes("token usage")) {
+    const rows = [];
+    let context;
+    for (const l of lines) {
+      const p = pair(l);
+      const c = p && /^context$/i.test(p.key) ? /^([\d.,]+\s*[kmb]?)\s*\/\s*([\d.,]+\s*[kmb]?)/i.exec(p.value) : null;
+      const used = c ? parseCount(c[1]) : NaN;
+      const max = c ? parseCount(c[2]) : NaN;
+      if (Number.isFinite(used) && max > 0) {
+        context = { max, used };
+      } else if (p) {
+        rows.push(p);
+      }
+    }
+    return rows.length || context ? { context, kind: "session", rows, title: name } : text(name, inline, lines);
+  }
+  if (lower.includes("credit")) {
+    const rows = [];
+    const notes = [];
+    for (const l of lines) {
+      const p = pair(l);
+      if (p) {
+        rows.push(p);
+      } else {
+        notes.push(l.trim());
+      }
+    }
+    return rows.length ? { kind: "credits", notes, rows, title: name } : text(name, inline, lines);
+  }
+  return text(name, inline, lines);
+}
+function text(title, inline, lines) {
+  return { kind: "text", text: [inline, ...lines].filter(Boolean).join("\n"), title };
+}
+function parseUsage(raw) {
+  const sections2 = [];
+  let head2;
+  const preamble = [];
+  const flush = () => {
+    if (head2) {
+      sections2.push(build(head2.title, head2.inline, head2.body));
+    }
+  };
+  for (const line of raw.replace(/\r/g, "").split("\n")) {
+    const h = HEADER.exec(line);
+    if (h) {
+      flush();
+      head2 = { body: [], inline: h[2].trim(), title: h[1] };
+    } else if (head2) {
+      head2.body.push(line);
+    } else if (line.trim()) {
+      preamble.push(line);
+    }
+  }
+  flush();
+  if (!sections2.some((s) => s.kind !== "text")) {
+    return null;
+  }
+  return preamble.length ? [{ kind: "text", text: preamble.join("\n"), title: "" }, ...sections2] : sections2;
+}
+
+// src/view/slash.tsx
+var THRESHOLDS = { bad: 0.95, warn: 0.8 };
+function slashBody(e) {
+  if (/^\/usage\b/.test(e.title)) {
+    const sections2 = parseUsage(e.text);
+    if (sections2) {
+      return sections2.map((s, i) => usageSection(s, i));
+    }
+  }
+  return [textBody(e.text, "body")];
+}
+function textBody(text2, key2) {
+  return isPreformatted(text2) ? /* @__PURE__ */ jsx("ansi", { text: text2 }, key2) : /* @__PURE__ */ jsx("md", { children: hardBreaks(text2) }, key2);
+}
+function heading(icon, title, note) {
+  return /* @__PURE__ */ jsxs("row", { align: "center", gap: "xs", children: [
+    /* @__PURE__ */ jsx("icon", { name: icon }, "icon"),
+    /* @__PURE__ */ jsx("text", { spans: [{ s: "strong", t: title }, ...note ? [{ s: "dim", t: `  ${note}` }] : []] }, "title")
+  ] }, "head");
+}
+function usageSection(s, i) {
+  const key2 = `s${i}`;
+  switch (s.kind) {
+    case "limits":
+      return /* @__PURE__ */ jsxs("col", { gap: "xs", children: [
+        heading("gauge", s.title),
+        limitsTable(s.items)
+      ] }, key2);
+    case "session":
+      return /* @__PURE__ */ jsxs("col", { gap: "xs", children: [
+        heading("tokens", s.title),
+        sessionBody(s.rows, s.context)
+      ] }, key2);
+    case "breakdown":
+      return /* @__PURE__ */ jsxs("col", { gap: "xs", children: [
+        heading("stack", s.title, s.note),
+        breakdownBody(s.items)
+      ] }, key2);
+    case "credits":
+      return /* @__PURE__ */ jsxs("col", { gap: "xs", children: [
+        heading("cost", s.title),
+        pairTable(s.rows, "credits"),
+        s.notes.map((n, j) => /* @__PURE__ */ jsx("text", { spans: [{ s: "dim", t: n }] }, `note${j}`))
+      ] }, key2);
+    case "text":
+      return /* @__PURE__ */ jsxs("col", { gap: "xs", children: [
+        s.title ? heading("info", s.title) : null,
+        textBody(s.text, "text")
+      ] }, key2);
+  }
+}
+function limitsTable(items) {
+  return /* @__PURE__ */ jsx(
+    "table",
+    {
+      cols: [
+        { id: "name" },
+        { grow: 1, id: "bar" },
+        { align: "end", id: "left" },
+        { align: "end", id: "reset" }
+      ],
+      rows: items.map((l) => {
+        const used = Math.min(1, Math.max(0, (l.limit - l.left) / l.limit));
+        return {
+          cells: {
+            bar: {
+              meter: {
+                thresholds: THRESHOLDS,
+                title: `${l.left.toLocaleString()} of ${l.limit.toLocaleString()} left`,
+                value: used
+              }
+            },
+            left: [{ s: "num", t: compactCount(l.left) }, { s: "dim", t: ` left of ${compactCount(l.limit)}` }],
+            name: [{ s: "muted mono", t: l.name }],
+            reset: [{ s: "dim", t: l.reset ? `resets ${l.reset}` : "" }]
+          },
+          id: l.name
+        };
+      })
+    },
+    "limits"
+  );
+}
+function sessionBody(rows, context) {
+  const model = rows.find((r) => /^model$/i.test(r.key));
+  const rest = rows.filter((r) => r !== model);
+  const out = [];
+  if (model) {
+    out.push(
+      /* @__PURE__ */ jsxs("row", { align: "center", gap: "sm", children: [
+        /* @__PURE__ */ jsx("text", { spans: [{ s: "muted", t: "Model" }] }, "k"),
+        /* @__PURE__ */ jsx("badge", { text: model.value }, "v")
+      ] }, "model")
+    );
+  }
+  if (rest.length) {
+    out.push(pairTable(rest, "session"));
+  }
+  if (context) {
+    const share = Math.min(1, context.used / context.max);
+    out.push(
+      /* @__PURE__ */ jsx(
+        "table",
+        {
+          cols: [{ id: "k" }, { grow: 1, id: "bar" }, { align: "end", id: "v" }],
+          rows: [
+            {
+              cells: {
+                bar: {
+                  meter: {
+                    thresholds: { bad: 0.85, warn: 0.6 },
+                    title: `${context.used.toLocaleString()} of ${context.max.toLocaleString()} tokens (${Math.round(share * 100)}%)`,
+                    value: share
+                  }
+                },
+                k: [{ s: "muted", t: "Context" }],
+                v: [{ s: "num", t: `${compactCount(context.used)} / ${compactCount(context.max)}` }]
+              },
+              id: "context"
+            }
+          ]
+        },
+        "context"
+      )
+    );
+  }
+  return out;
+}
+function pairTable(rows, id) {
+  return /* @__PURE__ */ jsx(
+    "table",
+    {
+      cols: [
+        { id: "k", truncate: "end" },
+        { align: "end", id: "v", grow: 1 }
+      ],
+      rows: rows.map((r, i) => ({
+        cells: {
+          k: [{ s: "muted", t: r.key }],
+          v: /^https?:\/\//.test(r.value) ? [{ href: r.value, s: "link", t: r.value }] : [{ s: /^[\d$,.%\s-]+$/.test(r.value) ? "num" : "", t: r.value }]
+        },
+        id: `${id}${i}`
+      }))
+    },
+    id
+  );
+}
+function breakdownBody(items) {
+  const sorted = [...items].sort((a, b) => b.tokens - a.tokens);
+  const total = sorted.reduce((n, c) => n + c.tokens, 0);
+  return [
+    /* @__PURE__ */ jsx(
+      "table",
+      {
+        cols: [
+          { id: "name", truncate: "end" },
+          { align: "end", id: "tokens" },
+          { align: "end", id: "share", grow: 1 }
+        ],
+        rows: sorted.map((c, i) => ({
+          cells: {
+            name: [{ s: "muted", t: c.label }],
+            share: { meter: { value: c.tokens / total } },
+            tokens: [{ s: "num", t: `~${compactCount(c.tokens)}${c.pct === void 0 ? "" : ` (${c.pct}%)`}` }]
+          },
+          id: `b${i}`
+        }))
+      },
+      "list"
+    )
+  ];
+}
+
+// src/view/welcome.tsx
+import { readFileSync as readFileSync4 } from "node:fs";
+import { join as join7 } from "node:path";
+function welcomeNode(key2, cx) {
+  return /* @__PURE__ */ jsxs("card", { role: "omp.welcome", children: [
+    /* @__PURE__ */ jsxs("row", { align: "center", gap: "md", role: "omp.welcome.lockup", children: [
+      cx.logo ? /* @__PURE__ */ jsx("image", { alt: "Hermes", blob: cx.logo, h: 52, role: "omp.welcome.logo", w: 52 }, "logo") : null,
+      /* @__PURE__ */ jsxs("col", { role: "omp.welcome.mark", children: [
+        /* @__PURE__ */ jsx("text", { role: "omp.welcome.wordmark", spans: [{ s: "strong", t: "hermes" }], wrap: "none" }, "wordmark"),
+        cx.version ? /* @__PURE__ */ jsx("text", { role: "omp.welcome.version", spans: [{ s: "dim mono", t: cx.version }], wrap: "none" }, "version") : null
+      ] }, "mark")
+    ] }, "lockup"),
+    cx.tip ? /* @__PURE__ */ jsxs("row", { align: "start", gap: "sm", role: "omp.welcome.tip", children: [
+      /* @__PURE__ */ jsx("icon", { name: "lightbulb", role: "omp.welcome.tip-icon" }, "icon"),
+      /* @__PURE__ */ jsx("text", { role: "omp.welcome.tip-text", text: cx.tip, wrap: "word" }, "text")
+    ] }, "tip") : null
+  ] }, key2);
+}
+var TIP_LINE = /^\s+t\d+:\s+"((?:[^"\\]|\\.)*)"\s*$/;
+function randomTip(root) {
+  let text2;
+  try {
+    text2 = readFileSync4(join7(root, "locales", "en.yaml"), "utf8");
+  } catch {
+    return "";
+  }
+  const start = text2.search(/^tips:\s*$/m);
+  if (start < 0) {
+    return "";
+  }
+  const tips = [];
+  for (const line of text2.slice(start).split("\n").slice(1)) {
+    if (/^\S/.test(line)) {
+      break;
+    }
+    const quoted = TIP_LINE.exec(line)?.[1];
+    if (quoted) {
+      tips.push(JSON.parse(`"${quoted}"`));
+    }
+  }
+  return tips[Math.floor(Math.random() * tips.length)] ?? "";
+}
+
+// src/view/workLog.tsx
+function workingNode(turn, now) {
+  return /* @__PURE__ */ jsxs("row", { align: "center", gap: "xs", role: "hermes.turn.working", children: [
+    /* @__PURE__ */ jsx("text", { spans: [{ s: "muted", t: "Working for" }], wrap: "none" }, "label"),
+    /* @__PURE__ */ jsx("elapsed", { age: age(turn, turn.startedAt, now), format: "short" }, "age")
+  ] }, "working");
+}
+var LIVE_MAX = 120;
+function liveText(label) {
+  const text2 = label.length > LIVE_MAX ? `${label.slice(0, LIVE_MAX - 1)}\u2026` : label;
+  return /* @__PURE__ */ jsx("shimmer", { mode: "classic", palette: { high: "accent", low: "dim", mid: "muted" }, role: "hermes.work.live", spans: [{ s: "muted", t: text2 }] }, "label");
+}
+function latestFailed(items) {
+  const last = items.findLast((i) => i.kind === "tool");
+  return last?.kind === "tool" && last.call.status === "error";
+}
+function thinkingRow() {
+  return /* @__PURE__ */ jsxs("row", { align: "center", gap: "sm", role: "hermes.work.row", children: [
+    /* @__PURE__ */ jsx("icon", { name: "brain" }, "icon"),
+    liveText("Thinking")
+  ] }, "thinking");
+}
+function foldNode(part, id, children2) {
+  return node("section", { collapsed: true, collapsible: true, head: `${id}.head`, key: part.key, role: "hermes.turn.fold" }, [
+    /* @__PURE__ */ jsx("row", { align: "center", gap: "xs", children: /* @__PURE__ */ jsx("text", { spans: [{ s: "muted", t: part.label }], wrap: "none" }, "label") }, "head"),
+    ...children2
+  ]);
+}
+function workNode(items, parent, live, now) {
+  const shown = visibleItems(items);
+  if (!shown.length) {
+    return null;
+  }
+  const key2 = `w${items[0].id}`;
+  const id = `${parent}.${key2}`;
+  if (!live && shown.length === 1) {
+    return itemNode(shown[0], parent, now, key2);
+  }
+  const calls = shown.flatMap((i) => i.kind === "tool" ? [i.call] : []);
+  const failed = calls.at(-1)?.status === "error";
+  const latest = shown.findLast((i) => i.kind === "tool" && i.call.status === "running") ?? shown.at(-1);
+  const head2 = live ? /* @__PURE__ */ jsxs("row", { align: "center", gap: "sm", children: [
+    /* @__PURE__ */ jsx("icon", { name: itemIcon(latest) }, "icon"),
+    liveText(liveLabel(latest, true)),
+    /* @__PURE__ */ jsx("icon", { name: "chev", role: "hermes.work.chev" }, "chev")
+  ] }, "head") : /* @__PURE__ */ jsxs("row", { align: "center", gap: "sm", children: [
+    /* @__PURE__ */ jsx("icon", { name: groupIcon(shown), tone: failed ? "error" : void 0 }, "icon"),
+    /* @__PURE__ */ jsx("text", { spans: [{ s: "muted", t: summarize(shown) }], truncate: "end", wrap: "none" }, "label"),
+    /* @__PURE__ */ jsx("icon", { name: "chev", role: "hermes.work.chev" }, "chev"),
+    /* @__PURE__ */ jsx("spacer", { grow: 1 }, "gap"),
+    /* @__PURE__ */ jsx("text", { role: "hermes.work.time", spans: [{ s: "dim", t: clock2(startOf(shown[0])) }], wrap: "none" }, "time")
+  ] }, "head");
+  return node("section", { collapsed: true, collapsible: true, head: `${id}.head`, key: key2, role: "hermes.work.group" }, [
+    head2,
+    ...shown.map((i) => itemNode(i, id, now))
+  ]);
+}
+function itemNode(item3, parent, now, key2 = item3.id) {
+  const id = `${parent}.${key2}`;
+  if (item3.kind === "thinking") {
+    return node("section", { collapsed: true, collapsible: true, head: `${id}.head`, key: key2, role: "hermes.work.row" }, [
+      /* @__PURE__ */ jsxs("row", { align: "center", gap: "sm", children: [
+        /* @__PURE__ */ jsx("icon", { name: "brain" }, "icon"),
+        /* @__PURE__ */ jsx("text", { grow: 1, spans: [{ s: "muted", t: thoughtTitle(item3) }], truncate: "end", wrap: "none" }, "label")
+      ] }, "head"),
+      /* @__PURE__ */ jsx("md", { role: "hermes.work.thought", stream: item3.endedAt === void 0 || void 0, children: item3.text }, "body")
+    ]);
+  }
+  const call = item3.call;
+  const detail = toolDetail(call, now);
+  const running = call.status === "running";
+  const head2 = /* @__PURE__ */ jsxs("row", { align: "center", gap: "sm", title: call.context || void 0, children: [
+    /* @__PURE__ */ jsx("icon", { name: itemIcon(item3), tone: call.status === "error" ? "error" : void 0 }, "icon"),
+    running ? liveText(stepLabel(call)) : /* @__PURE__ */ jsx("text", { grow: 1, spans: labelSpans(call), truncate: "end", wrap: "none" }, "label"),
+    call.status === "error" ? /* @__PURE__ */ jsx("icon", { name: "x", tone: "error" }, "failed") : null
+  ] }, "head");
+  if (!detail.length) {
+    return /* @__PURE__ */ jsx("col", { role: "hermes.work.row", children: head2 }, key2);
+  }
+  return node("section", { collapsed: true, collapsible: true, head: `${id}.head`, key: key2, role: "hermes.work.row" }, [
+    head2,
+    /* @__PURE__ */ jsx("col", { gap: "xs", role: "hermes.work.detail", children: detail }, "detail")
+  ]);
+}
+function labelSpans(call) {
+  const entries = (call.batch ?? [call]).map((e) => callApp({ args: e.args, name: e.name }));
+  if (!entries.every(Boolean)) {
+    return [{ s: "muted", t: stepLabel(call) }];
+  }
+  return entries.flatMap((app2, i) => [
+    ...i ? [{ s: "muted", t: ", " }] : [],
+    { t: app2.app },
+    { s: "muted", t: ` \xB7 ${app2.action}` }
+  ]);
+}
+function itemIcon(item3) {
+  return item3.kind === "thinking" ? "brain" : actionIcon(actionOf(item3.call));
+}
+var startOf = (item3) => item3.kind === "tool" ? item3.call.startedAt : item3.startedAt;
+
+// src/view/transcript.tsx
+var kNode = /* @__PURE__ */ Symbol("tsp.node");
+function entryNode(e, id, cx) {
+  if (e.kind === "welcome") {
+    return welcomeNode(e.id, cx.welcome);
+  }
+  const holder = e;
+  const built = holder;
+  const rev = `${e.kind === "turn" ? e.rev : 0}${cx.copied === e.id ? "+copied" : ""}`;
+  const cached = built[kNode];
+  if (cached?.rev === rev) {
+    return cached.node;
+  }
+  const node2 = buildEntry(e, id, cx);
+  built[kNode] = { node: node2, rev };
+  return node2;
+}
+function buildEntry(e, id, cx) {
+  switch (e.kind) {
+    case "user":
+      return userNode(e, cx);
+    case "turn":
+      return turnNode(e, id, cx);
+    case "notice":
+      return noticeNode(e);
+    case "panel":
+      return /* @__PURE__ */ jsx("card", { collapsible: true, head: [{ s: "strong", t: e.title }], role: "omp.custom", tone: "neutral", children: slashBody(e) }, e.id);
+  }
+}
+function userNode(e, cx) {
+  const at = new Date(e.at || Date.now());
+  return /* @__PURE__ */ jsxs("card", { role: "omp.user", tone: "user", children: [
+    /* @__PURE__ */ jsxs("row", { gap: "xs", role: "omp.user.tools", children: [
+      /* @__PURE__ */ jsx(
+        "text",
+        {
+          role: "omp.user.time",
+          spans: [{ s: "dim mono", t: at.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) }],
+          title: at.toLocaleString()
+        },
+        "time"
+      ),
+      copyButton(e.text, e.id, "omp.user.tool", "Copy message", cx)
+    ] }, "tools"),
+    e.attachments?.length ? attachmentsRow(e.attachments) : null,
+    e.text ? /* @__PURE__ */ jsx("md", { children: e.text }, "body") : null
+  ] }, e.id);
+}
+function attachmentsRow(list) {
+  return /* @__PURE__ */ jsx("row", { align: "start", gap: "sm", role: "omp.user.images", wrap: true, children: list.map(
+    (a, i) => a.source ? /* @__PURE__ */ jsx("image", { alt: a.name, title: a.name, ...a.source }, `a${i}`) : /* @__PURE__ */ jsxs(
+      "row",
+      {
+        align: "center",
+        gap: "xs",
+        role: "hermes.user.attachment",
+        title: a.kind === "image" ? `${a.name} (the file is gone)` : a.name,
+        children: [
+          /* @__PURE__ */ jsx("icon", { name: a.kind === "image" ? "image" : "file" }, "i"),
+          /* @__PURE__ */ jsx("text", { text: a.name, truncate: "middle", wrap: "none" }, "t")
+        ]
+      },
+      `a${i}`
+    )
+  ) }, "images");
+}
+function turnNode(turn, id, cx) {
+  const live = turn.status === "live";
+  const children2 = [];
+  if (turn.continued) {
+    children2.push(
+      /* @__PURE__ */ jsxs("row", { align: "center", gap: "sm", role: "omp.turn.continued", children: [
+        /* @__PURE__ */ jsx("icon", { name: continuedIcon(turn.continued) }, "icon"),
+        /* @__PURE__ */ jsx("text", { spans: [{ s: "muted", t: turn.continued }] }, "why")
+      ] }, "continued")
+    );
+  }
+  if (live) {
+    children2.push(workingNode(turn, cx.now));
+  }
+  for (const part of parts(turn)) {
+    children2.push(
+      ...part.kind === "fold" ? [foldNode(part, `${id}.${part.key}`, pieceNodes(turn, part.blocks, `${id}.${part.key}`, cx))] : pieceNodes(turn, part.blocks, id, cx)
+    );
+  }
+  const last = pieces(turn.blocks).at(-1);
+  if (live && (!last || last.kind === "block" && last.block.kind !== "text" || last.kind === "work" && latestFailed(last.items))) {
+    children2.push(thinkingRow());
+  }
+  if (turn.status === "error") {
+    children2.push(
+      node("card", { head: `${id}.error.head`, key: "error", role: "omp.error", tone: "error" }, [
+        /* @__PURE__ */ jsxs("row", { gap: "sm", children: [
+          /* @__PURE__ */ jsx("text", { spans: [{ s: "error strong", t: "Request failed" }] }, "title"),
+          turn.errorCode ? /* @__PURE__ */ jsx("badge", { role: "omp.error.code", text: turn.errorCode, tone: "error" }, "code") : null
+        ] }, "head"),
+        // A failed turn reloaded from an older store knows only Hermes' advice, not the error.
+        turn.error ? /* @__PURE__ */ jsx("text", { lines: 8, role: "omp.error.message", spans: [{ s: "mono", t: turn.error }], wrap: "word" }, "message") : null,
+        turn.errorHint ? /* @__PURE__ */ jsx("md", { children: turn.errorHint }, "hint") : null
+      ])
+    );
+  } else if (turn.status === "interrupted") {
+    children2.push(
+      /* @__PURE__ */ jsx("text", { role: "omp.assistant.abort", spans: [{ s: "error", t: "Interrupted" }], wrap: "word" }, "abort")
+    );
+  }
+  if (turn.warning) {
+    children2.push(/* @__PURE__ */ jsx("text", { role: "omp.notice", spans: [{ s: "warning", t: turn.warning }], wrap: "word" }, "warning"));
+  }
+  const answer = answerText(turn);
+  if (!live && turn.endedAt && (answer || turn.usage?.total || turn.tickTokens)) {
+    children2.push(usageNode(turn, answer, cx));
+  }
+  return /* @__PURE__ */ jsx("col", { role: "omp.assistant", children: children2 }, turn.id);
+}
+function pieceNodes(turn, blocks, parent, cx) {
+  const live = turn.status === "live";
+  const ps = pieces(blocks, turn.blocks);
+  const lastText = blocks.findLast((b) => b.kind === "text");
+  return ps.map((p, i) => {
+    if (p.kind === "work") {
+      return workNode(p.items, parent, live && i === ps.length - 1 && !latestFailed(p.items), cx.now);
+    }
+    const b = p.block;
+    switch (b.kind) {
+      case "text":
+        return /* @__PURE__ */ jsx("md", { stream: live && b === lastText || void 0, children: b.text }, b.id);
+      case "tool":
+        return toolNode(b.call, cx.now);
+      case "steer":
+        return steerNode(b, steerState(turn, turn.blocks.indexOf(b)));
+      case "thinking":
+        return null;
+    }
+  });
+}
+function continuedIcon(why) {
+  return /^(\d+ )?subagent/i.test(why) ? "users" : why.startsWith("Watcher") ? "eye" : why.startsWith("Background") ? "terminal" : "loop";
+}
+var STEER_NOTE = { landed: "", next: " \xB7 sent as the next prompt", pending: " \xB7 reaches Hermes after this step" };
+function steerNode(b, state) {
+  return /* @__PURE__ */ jsxs("card", { role: "omp.user", tone: "user", children: [
+    /* @__PURE__ */ jsx("md", { children: b.text }, "body"),
+    /* @__PURE__ */ jsxs("row", { align: "center", gap: "xs", role: "omp.user.steered", children: [
+      /* @__PURE__ */ jsx("icon", { name: "corner-down-right" }, "icon"),
+      /* @__PURE__ */ jsx("text", { spans: [{ s: "dim", t: `Steered${STEER_NOTE[state]}` }] }, "state")
+    ] }, "how")
+  ] }, b.id);
+}
+function copyButton(text2, id, role, title, cx) {
+  const copied = cx.copied === id;
+  return /* @__PURE__ */ jsx(
+    "icon",
+    {
+      name: copied ? "check" : "copy",
+      onClick: () => cx.copy(text2, id),
+      role,
+      title: copied ? "Copied" : title
+    },
+    "copy"
+  );
+}
+function answerText(turn) {
+  const last = turn.blocks.findLast((b) => b.kind === "text" && b.text.trim());
+  return last?.kind === "text" ? last.text.trim() : "";
+}
+function usageNode(turn, answer, cx) {
+  const u = turn.usage ?? {};
+  const ms = (turn.endedAt ?? turn.startedAt) - turn.startedAt;
+  const input = u.input ?? u.prompt ?? 0;
+  const output = u.output ?? u.completion ?? 0;
+  const total = u.total || input + output || turn.tickTokens || 0;
+  const cost = typeof u.cost_usd === "number" && u.cost_usd > 0 ? ` \xB7 $${u.cost_usd.toFixed(2)}` : "";
+  const title = `This turn: ${duration(ms)} \xB7 ${total.toLocaleString()} tokens (${input.toLocaleString()} in \xB7 ${output.toLocaleString()} out)${cost}`;
+  const tps = (typeof u.avg_tps === "number" && u.avg_tps > 0 ? u.avg_tps : void 0) ?? turn.tps;
+  const facts2 = total ? [
+    ["time", "time", duration(ms)],
+    ["tokens", "tokens", compact(total)],
+    ...turn.cacheHit !== void 0 ? [["cache", "cache", `${turn.cacheHit}%`]] : [],
+    ...tps ? [["speed", "fast", `${Math.round(tps)} t/s`]] : [],
+    ...cost ? [["cost", "cost", cost.replace(/^ · /, "")]] : []
+  ] : [];
+  const detail = [
+    title,
+    turn.cacheHit !== void 0 ? `${turn.cacheHit}% of the prompt came from the cache` : "",
+    tps ? `${tps.toFixed(1)} tokens per second (recent calls)` : ""
+  ].filter(Boolean).join("\n");
+  return /* @__PURE__ */ jsxs("row", { align: "center", gap: "xs", role: "omp.turn.usage", title: total ? detail : void 0, children: [
+    answer ? copyButton(answer, turn.id, "omp.turn.copy", "Copy answer", cx) : null,
+    facts2.flatMap(([key2, icon, value]) => [
+      /* @__PURE__ */ jsx("icon", { name: icon }, `${key2}.icon`),
+      /* @__PURE__ */ jsx("text", { text: value }, key2)
+    ])
+  ] }, "usage");
+}
+function noticeNode(e) {
+  const tone = e.tone === "info" ? "muted" : e.tone;
+  return /* @__PURE__ */ jsx("text", { role: `omp.notice.${e.tone}`, spans: [{ s: tone, t: e.text }], wrap: "word" }, e.id);
+}
+
 // src/commands.ts
 var COMMANDS3 = [
   {
@@ -33708,7 +35630,7 @@ var COMMANDS3 = [
     name: "new",
     run: (app2, arg) => {
       if (app2.busy) {
-        return app2.transcript.notice("Wait for the current turn to finish (or press Esc) before starting a new session.", "warning");
+        return app2.transcript.notice("Wait for the current turn to finish (or press Esc twice) before starting a new session.", "warning");
       }
       return app2.newSession(arg.trim() || void 0);
     }
@@ -33743,6 +35665,7 @@ var COMMANDS3 = [
     }
   },
   {
+    help: "Pick the colors: Tern, Nous or the Hermes skin [tern|nous|skin]",
     name: "theme",
     run: (app2, arg) => {
       if (!arg) {
@@ -33764,11 +35687,12 @@ var COMMANDS3 = [
   {
     // Hermes has no command by these names (its `/bg` runs a prompt in a side agent: controlCommands.ts).
     aliases: ["bashes", "shells", "processes"],
+    help: "Background processes and cron jobs",
     name: "ps",
     run: (app2) => openBackground(app2)
   },
   {
-    // Hermes' own `/reasoning` stays the backend's (show/hide, levels, --global).
+    help: "Pick the reasoning effort [level] [--global]",
     name: "effort",
     run: (app2, arg) => {
       const words2 = arg.trim().split(/\s+/).filter(Boolean);
@@ -33779,6 +35703,26 @@ var COMMANDS3 = [
       }
       void app2.setEffort(LEVELS.find((l) => l.id === level || l.label === level).id, global2 ? "global" : "session");
     }
+  },
+  {
+    // `/reasoning <level> [--global]` sets the level as the pill does (on the shared gateway, the
+    // session mutation every viewer sees); its other forms (show, hide, status) stay the backend's.
+    name: "reasoning",
+    run: (app2, arg) => {
+      const words2 = arg.trim().toLowerCase().split(/\s+/).filter(Boolean);
+      const global2 = words2.includes("--global");
+      const rest = words2.filter((w) => w !== "--global");
+      const level = rest.length === 1 ? LEVELS.find((l) => l.id === rest[0] || l.label === rest[0]) : void 0;
+      if (!level) {
+        return false;
+      }
+      void app2.setEffort(level.id, global2 ? "global" : "session");
+    }
+  },
+  {
+    // The shared gateway sends no session.info after a typed /fast, so the bolt would not move.
+    name: "fast",
+    run: (app2, arg) => fastCommand(app2, arg)
   },
   {
     // The shared gateway refuses /skin in slash.exec; Ink sets the profile's skin through config.set,
@@ -33809,18 +35753,30 @@ var COMMANDS3 = [
   },
   {
     aliases: ["side"],
+    help: "Show or hide the session sidebar: branch, PRs, changes",
     name: "sidebar",
     run: (app2) => app2.toggleSidebar()
   },
   {
     aliases: ["diff"],
+    help: "The working tree changes, file by file",
     name: "changes",
     run: (app2) => openChanges(app2)
   },
   {
     aliases: ["pr", "pulls"],
+    help: "Pull requests Hermes linked",
     name: "prs",
     run: (app2) => openPullRequests(app2)
+  },
+  {
+    // The gateway refuses its own /copy and /history (cli_only); Ink runs them on its transcript, as these do.
+    name: "copy",
+    run: (app2, arg) => copyAnswer(app2, arg)
+  },
+  {
+    name: "history",
+    run: (app2, arg) => app2.transcript.panel("/history", historyText(app2.transcript.entries, arg))
   },
   {
     // `/help <command>` is the backend's detailed usage.
@@ -33830,6 +35786,37 @@ var COMMANDS3 = [
   ...CONTROL_COMMANDS.map((c) => ({ ...c, run: (app2, arg) => c.run(app2.control(), arg) })),
   ...SESSION_COMMANDS.map((c) => ({ ...c, run: (app2, arg) => c.run(app2.control(), arg) }))
 ];
+var INK_ONLY_COMMANDS = /* @__PURE__ */ new Set(["density", "details", "logs", "mouse"]);
+function copyAnswer(app2, arg) {
+  const n = arg.trim() ? Number.parseInt(arg, 10) : void 0;
+  if (n !== void 0 && !(n >= 1)) {
+    return app2.transcript.notice("Usage: /copy [n] (n counts answers from the first)", "warning");
+  }
+  const answers = app2.transcript.entries.flatMap((e) => e.kind === "turn" && answerText(e) ? [answerText(e)] : []);
+  const at = n === void 0 ? answers.length : Math.min(n, answers.length);
+  const text2 = answers[at - 1];
+  if (!text2) {
+    return app2.transcript.notice("No answer to copy yet.", "warning");
+  }
+  copyToClipboard(text2);
+  app2.transcript.notice(`Copied ${n === void 0 ? "the last answer" : `answer ${at}`} (${text2.length} characters).`);
+}
+function historyText(entries, arg) {
+  const preview5 = Math.max(80, Number.parseInt(arg, 10) || 400);
+  let n = 0;
+  const lines = entries.flatMap((e) => {
+    if (e.kind !== "user" && e.kind !== "turn") {
+      return [];
+    }
+    const tools2 = e.kind === "turn" ? e.blocks.filter((b) => b.kind === "tool").length : 0;
+    const said = e.kind === "user" ? e.text.trim() : answerText(e);
+    const body = said || (tools2 ? `(${tools2} tool call${tools2 === 1 ? "" : "s"})` : "(empty)");
+    const clipped = body.length > preview5 ? `${body.slice(0, preview5).trimEnd()}\u2026` : body;
+    return [`**${e.kind === "user" ? "You" : "Hermes"} #${++n}**
+${clipped}`];
+  });
+  return lines.length ? lines.join("\n\n") : "No conversation yet.";
+}
 async function agents(app2, arg) {
   const sub = arg.trim().toLowerCase();
   if (!sub) {
@@ -33850,8 +35837,10 @@ async function agents(app2, arg) {
   app2.transcript.notice("Usage: /agents [pause|resume|status]", "warning");
 }
 function localCommand(name) {
-  return COMMANDS3.find((c) => c.name === name || c.aliases?.includes(name));
+  const lower = name.toLowerCase();
+  return COMMANDS3.find((c) => c.name === lower || c.aliases?.includes(lower));
 }
+var localCommands = () => COMMANDS3;
 
 // src/flow.ts
 var Switches = class {
@@ -33860,6 +35849,10 @@ var Switches = class {
   /** Whether a switch is in flight. */
   get pending() {
     return this.#pending;
+  }
+  /** Bumped by every `begin`: read before an await, it tells whether a switch began since. */
+  get generation() {
+    return this.#generation;
   }
   /** Starts a switch and returns its token; earlier tokens go stale. */
   begin() {
@@ -33984,34 +35977,64 @@ var writeActiveSessionFile = (sessionId, file2 = process.env.HERMES_TUI_ACTIVE_S
 
 // src/hermes/clipboardImage.ts
 import { execFile as execFile5 } from "node:child_process";
-import { existsSync as existsSync2 } from "node:fs";
+import { existsSync as existsSync4 } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
-import { homedir as homedir8, tmpdir } from "node:os";
-import { join as join7, resolve as resolve2 } from "node:path";
+import { homedir as homedir10, tmpdir } from "node:os";
+import { join as join8, resolve as resolve3 } from "node:path";
 import { promisify as promisify4 } from "node:util";
-var run3 = promisify4(execFile5);
+var execFileP = promisify4(execFile5);
+var runFile = async (file2, args, options) => (await execFileP(file2, args, options)).stdout;
 var IMAGE = /\.(png|jpe?g|gif|webp)$/i;
-async function extractClipboardImage(path, env) {
+var MAC_SCRIPT = `ObjC.import('AppKit');
+function run(argv) {
+  const pb = $.NSPasteboard.generalPasteboard;
+  const url = pb.stringForType('public.file-url');
+  if (url && !url.isNil()) {
+    const path = $.NSURL.URLWithString(url).path;
+    if (path && !path.isNil()) return 'file:' + path.js;
+  }
+  let d = pb.dataForType('public.png');
+  if (!d || d.isNil()) {
+    const t = pb.dataForType('public.tiff');
+    if (!t || t.isNil()) return 'false';
+    const rep = $.NSBitmapImageRep.imageRepWithData(t);
+    if (!rep || rep.isNil()) return 'false';
+    d = rep.representationUsingTypeProperties($.NSBitmapImageFileTypePNG, $({}));
+  }
+  return d && !d.isNil() && d.writeToFileAtomically(argv[0], true) ? 'true' : 'false';
+}`;
+async function extractClipboardImage(dest, env, platform = process.platform, run6 = runFile) {
+  if (platform === "darwin") {
+    let answer;
+    try {
+      answer = (await run6("osascript", ["-l", "JavaScript", "-e", MAC_SCRIPT, dest], { timeout: 5e3 })).trim();
+    } catch {
+    }
+    if (answer?.startsWith("file:")) {
+      const file2 = answer.slice("file:".length);
+      return IMAGE.test(file2) && existsSync4(file2) ? file2 : void 0;
+    }
+    if (answer !== void 0) {
+      return answer === "true" && existsSync4(dest) ? dest : void 0;
+    }
+  }
   const root = env.HERMES_PYTHON_SRC_ROOT;
   const python = env.HERMES_PYTHON?.trim() || "python3";
   if (!root) {
-    return false;
+    return void 0;
   }
-  const { stdout } = await run3(python, [join7(root, "ui-tui/scripts/clipboard_image.py"), path], {
+  const stdout = await run6(python, [join8(root, "ui-tui/scripts/clipboard_image.py"), dest], {
     cwd: root,
     env: { ...env, PYTHONPATH: root },
     timeout: 15e3
   });
-  return stdout.trim() === "true" && existsSync2(path);
+  return stdout.trim() === "true" && existsSync4(dest) ? dest : void 0;
 }
 async function withClipboardImage(use, env = process.env, extract = extractClipboardImage) {
-  if (!env.HERMES_PYTHON_SRC_ROOT) {
-    return void 0;
-  }
-  const dir2 = await mkdtemp(join7(tmpdir(), "hermes-tern-clipboard-"));
-  const path = join7(dir2, "clipboard.png");
+  const dir2 = await mkdtemp(join8(tmpdir(), "hermes-tern-clipboard-"));
   try {
-    return await extract(path, env) ? await use(path) : void 0;
+    const path = await extract(join8(dir2, "clipboard.png"), env);
+    return path ? await use(path) : void 0;
   } finally {
     await rm(dir2, { force: true, recursive: true });
   }
@@ -34029,53 +36052,12 @@ function imagePathOf(text2, cwd) {
       return void 0;
     }
   }
-  raw = raw.replace(/\\(.)/g, "$1").replace(/^~(?=$|\/)/, homedir8());
+  raw = raw.replace(/\\(.)/g, "$1").replace(/^~(?=$|\/)/, homedir10());
   if (!IMAGE.test(raw)) {
     return void 0;
   }
-  const path = resolve2(cwd, raw);
-  return existsSync2(path) ? path : void 0;
-}
-
-// src/hermes/images.ts
-import { readFile as readFile2 } from "node:fs/promises";
-import { homedir as homedir9 } from "node:os";
-import { extname as extname2, resolve as resolve3 } from "node:path";
-var MAX_IMAGE_BYTES = 20 * 1024 * 1024;
-function imageFormat(bytes) {
-  if (bytes.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))) {
-    return { mime: "image/png", ext: ".png" };
-  }
-  if (bytes[0] === 255 && bytes[1] === 216 && bytes[2] === 255) {
-    return { mime: "image/jpeg", ext: ".jpg" };
-  }
-  if (/^GIF8[79]a$/.test(bytes.subarray(0, 6).toString("ascii"))) {
-    return { mime: "image/gif", ext: ".gif" };
-  }
-  if (bytes.subarray(0, 4).toString("ascii") === "RIFF" && bytes.subarray(8, 12).toString("ascii") === "WEBP") {
-    return { mime: "image/webp", ext: ".webp" };
-  }
-  return null;
-}
-async function uploadImage(gw2, sid, raw, cwd) {
-  const path = resolve3(cwd, raw.replace(/^~(?=$|\/)/, homedir9()));
-  const bytes = await readFile2(path);
-  if (bytes.length > MAX_IMAGE_BYTES) {
-    throw new Error("the image is larger than 20 MB");
-  }
-  const format = imageFormat(bytes);
-  if (!format) {
-    throw new Error(`${extname2(path) || "this file"} is not a PNG, JPEG, GIF or WebP image`);
-  }
-  const r = await gw2.request("image.attach_bytes", {
-    session_id: sid,
-    filename: `image${format.ext}`,
-    content_base64: bytes.toString("base64")
-  });
-  if (!r?.path) {
-    throw new Error("the gateway did not store the image");
-  }
-  return { path: r.path, mime: format.mime };
+  const path = resolve3(cwd, raw);
+  return existsSync4(path) ? path : void 0;
 }
 
 // .hermes-src/ui-tui/src/protocol/interpolation.ts
@@ -34125,7 +36107,7 @@ async function interpolate(gw2, sid, text2) {
 
 // src/hermes/sharedPrompts.ts
 var sharedPromptId = (promptId) => `shared:${String(promptId)}`;
-function sharedPromptRequest(ev, gw2, onError) {
+function sharedPromptRequest(ev, gw2, onNotice) {
   const kind = ev.type === "approval.request" ? "approval" : ev.type === "clarify.request" ? "clarify" : null;
   const shared = ev.payload ?? {};
   if (!kind || !shared.prompt_id || !ev.session_id || typeof shared.execution_generation !== "number") {
@@ -34135,13 +36117,20 @@ function sharedPromptRequest(ev, gw2, onError) {
   const single = typeof shared.question === "string" ? shared.question.trim() : "";
   const batch2 = Array.isArray(shared.questions) && shared.questions.length ? shared.questions : null;
   const questions = batch2 ?? (single ? [{ choices: shared.choices ?? [], multi_select: shared.multi_select === true, qid: shared.prompt_id, question: single }] : []);
-  let answered = false;
+  let answered;
   const send = (method, params) => {
-    if (answered) {
-      return;
-    }
-    answered = true;
-    gw2.request(method, { ...params, ...control }).catch((error) => onError(error.message));
+    answered ??= gw2.request(method, { ...params, ...control }).then(
+      (r) => {
+        if (r?.status === "already_resolved") {
+          onNotice("That question was already answered (by another window, or it timed out).");
+        }
+      },
+      (error) => {
+        answered = void 0;
+        throw error;
+      }
+    );
+    return answered;
   };
   return {
     id: sharedPromptId(shared.prompt_id),
@@ -34158,6 +36147,282 @@ function firstAnswer(answers) {
   }
   const first = Object.values(answers)[0];
   return Array.isArray(first) ? first.join(", ") : typeof first === "string" ? first : "";
+}
+
+// src/view/automation.tsx
+var GOAL_LOOK = {
+  active: { icon: "goal", label: "Goal", tone: "accent" },
+  blocked: { icon: "goal", label: "Goal blocked", tone: "error" },
+  paused: { icon: "pause", label: "Goal paused", tone: "warning" },
+  waiting: { icon: "timer", label: "Goal waiting", tone: "warning" }
+};
+function turnsText(g) {
+  return g.maxTurns > 0 ? `${g.turns}/${g.maxTurns} turns` : g.turns ? `turn ${g.turns}` : "not started";
+}
+function loopWhen(l) {
+  switch (l.state) {
+    case "running":
+      return "running now";
+    case "deferred":
+      return "waits for the goal";
+    case "due":
+      return "due, waiting for idle";
+    case "paused":
+      return l.detail || "paused";
+    default:
+      return "next in";
+  }
+}
+function automationNode(a, now, focused) {
+  const parts2 = [
+    a?.goal ? goalPart(a.goal, a.onGoal, focused === "goal") : null,
+    a?.loop ? loopPart(a.loop, a.loopOwner ?? a.loop, a.onLoop, now, focused === "loop") : null
+  ].filter((p) => p !== null);
+  return parts2.length ? /* @__PURE__ */ jsx("row", { align: "center", gap: "sm", role: "hermes.automation", wrap: true, children: parts2 }, "automation") : null;
+}
+function goalPart(g, onOpen, focused) {
+  const look = GOAL_LOOK[g.state];
+  const judged = g.verdict ? `
+Last check: ${g.verdict}${g.reason ? ` \xB7 ${g.reason}` : ""}` : "";
+  return /* @__PURE__ */ jsxs(
+    "row",
+    {
+      align: "center",
+      gap: "xs",
+      mark: focused ? "pick" : void 0,
+      onClick: onOpen,
+      role: "hermes.automation.item",
+      title: `${look.label}: ${g.title}
+${turnsText(g)}${g.detail ? ` \xB7 ${g.detail}` : ""}${judged}
+Click for details and controls`,
+      children: [
+        /* @__PURE__ */ jsx("icon", { name: look.icon, tone: look.tone }, "icon"),
+        /* @__PURE__ */ jsx("text", { role: "hermes.automation.label", text: look.label, wrap: "none" }, "label"),
+        /* @__PURE__ */ jsx("text", { grow: 1, role: "hermes.automation.what", text: g.title, truncate: "end", wrap: "none" }, "what"),
+        g.maxTurns > 0 ? /* @__PURE__ */ jsx("meter", { size: "sm", style: "bar", thresholds: { bad: 0.9, warn: 0.75 }, value: Math.min(1, g.turns / g.maxTurns) }, "turns") : null,
+        /* @__PURE__ */ jsx("text", { role: "hermes.automation.count", spans: [{ s: "muted", t: g.maxTurns > 0 ? `${g.turns}/${g.maxTurns}` : turnsText(g) }], wrap: "none" }, "count")
+      ]
+    },
+    "goal"
+  );
+}
+function loopPart(l, owner, onOpen, now, focused) {
+  const paused = l.state === "paused";
+  const when = loopWhen(l);
+  return /* @__PURE__ */ jsxs(
+    "row",
+    {
+      align: "center",
+      gap: "xs",
+      mark: focused ? "pick" : void 0,
+      onClick: onOpen,
+      role: "hermes.automation.item",
+      title: `${paused ? "Loop paused" : "Loop"}: ${l.prompt}
+${l.cadence} \xB7 ${l.runs}${l.until ? ` \xB7 until ${l.until}` : ""}
+Click for details and controls`,
+      children: [
+        l.state === "running" ? /* @__PURE__ */ jsx("spinner", { style: "dots", tone: "accent" }, "icon") : /* @__PURE__ */ jsx("icon", { name: paused ? "pause" : "loop", tone: paused ? "warning" : l.state === "deferred" ? "muted" : "accent" }, "icon"),
+        /* @__PURE__ */ jsx("text", { role: "hermes.automation.label", text: paused ? "Loop paused" : "Loop", wrap: "none" }, "label"),
+        /* @__PURE__ */ jsx("text", { grow: 1, role: "hermes.automation.what", text: l.prompt, truncate: "end", wrap: "none" }, "what"),
+        /* @__PURE__ */ jsx("text", { role: "hermes.automation.when", spans: [{ s: "muted", t: `${l.cadence} \xB7 ${when}` }], wrap: "none" }, "cadence"),
+        l.dueAt !== void 0 ? /* @__PURE__ */ jsx("elapsed", { age: countdownAge(owner, l.dueAt, now), format: "short", role: "hermes.automation.count" }, "countdown") : null
+      ]
+    },
+    "loop"
+  );
+}
+function reconnectNode(r, now) {
+  if (!r) {
+    return null;
+  }
+  const waiting2 = r.dueAt > now;
+  return /* @__PURE__ */ jsxs(
+    "row",
+    {
+      align: "center",
+      gap: "xs",
+      role: "hermes.reconnect",
+      title: "The connection to Hermes dropped. Tern keeps retrying; prompts you send wait for it.",
+      children: [
+        /* @__PURE__ */ jsx("spinner", { style: "dots", tone: "warning" }, "spin"),
+        /* @__PURE__ */ jsx("text", { text: "Reconnecting to Hermes", wrap: "none" }, "text"),
+        /* @__PURE__ */ jsx("text", { spans: [{ s: "muted", t: ` \xB7 attempt ${r.attempt} \xB7 ${waiting2 ? "next try in" : "trying now\u2026"}` }], wrap: "none" }, "attempt"),
+        waiting2 ? /* @__PURE__ */ jsx("elapsed", { age: countdownAge(r, r.dueAt, now), format: "short" }, "countdown") : null
+      ]
+    },
+    "reconnect"
+  );
+}
+
+// src/overlays/automation.tsx
+function automationButtons(which, view) {
+  if (which === "goal") {
+    return [
+      view.state === "paused" ? { action: "goal.resume", keys: ["p"], label: "Resume" } : { action: "goal.pause", keys: ["p"], label: "Pause" },
+      ...view.state === "waiting" ? [{ action: "goal.unwait", keys: ["w"], label: "Stop waiting" }] : [],
+      { action: "goal.clear", confirm: "Clear the goal?", keys: ["x"], label: "Clear" }
+    ];
+  }
+  return [
+    view.state === "paused" ? { action: "loop.resume", keys: ["p"], label: "Resume" } : { action: "loop.pause", keys: ["p"], label: "Pause" },
+    { action: "loop.stop", confirm: "Stop the loop?", keys: ["x"], label: "Stop" }
+  ];
+}
+var kv = (k, v, s) => ({ k: [{ t: k }], v: [{ s, t: v }] });
+function goalBody(g) {
+  const facts2 = [
+    kv("State", g.state),
+    kv("Progress", turnsText(g)),
+    ...g.detail ? [kv(g.state === "waiting" ? "Waiting" : "Why", g.detail)] : [],
+    ...g.verdict ? [kv("Last check", g.reason ? `${g.verdict} \xB7 ${g.reason}` : g.verdict)] : []
+  ];
+  return [
+    /* @__PURE__ */ jsx("md", { role: "hermes.automation.title", text: g.title }, "title"),
+    ...g.maxTurns > 0 ? [
+      /* @__PURE__ */ jsx(
+        "meter",
+        {
+          label: [{ s: "muted", t: "turns" }],
+          style: "bar",
+          thresholds: { bad: 0.9, warn: 0.75 },
+          total: [{ t: `${g.turns}/${g.maxTurns}` }],
+          value: Math.min(1, g.turns / g.maxTurns)
+        },
+        "turns"
+      )
+    ] : [],
+    /* @__PURE__ */ jsx("kv", { items: facts2 }, "facts"),
+    ...g.criteria.length ? [
+      /* @__PURE__ */ jsxs("col", { gap: "xs", children: [
+        /* @__PURE__ */ jsx("text", { spans: [{ s: "muted", t: "Criteria" }] }, "head"),
+        g.criteria.map((c, i) => /* @__PURE__ */ jsx("text", { text: `${i + 1}. ${c}`, wrap: "word" }, `c${i}`))
+      ] }, "criteria")
+    ] : []
+  ];
+}
+function loopBody(l, owner, now) {
+  const facts2 = [
+    kv("Cadence", l.cadence),
+    kv("Runs", l.runs),
+    ...l.until ? [kv("Until", l.until)] : [],
+    ...l.dueAt === void 0 ? [kv("Next run", loopWhen(l))] : []
+  ];
+  return [
+    /* @__PURE__ */ jsx("md", { role: "hermes.automation.title", text: l.prompt }, "title"),
+    ...l.dueAt !== void 0 ? [
+      /* @__PURE__ */ jsxs("row", { align: "center", gap: "xs", children: [
+        /* @__PURE__ */ jsx("icon", { name: "timer", tone: "accent" }, "i"),
+        /* @__PURE__ */ jsx("text", { spans: [{ s: "muted", t: "Next run in" }] }, "t"),
+        /* @__PURE__ */ jsx("elapsed", { age: countdownAge(owner, l.dueAt, now), format: "short" }, "countdown")
+      ] }, "next")
+    ] : [],
+    ...l.times > 0 ? [/* @__PURE__ */ jsx("meter", { label: [{ s: "muted", t: "runs" }], style: "bar", total: [{ t: `${l.fired}/${l.times}` }], value: Math.min(1, l.fired / l.times) }, "runs")] : [],
+    /* @__PURE__ */ jsx("kv", { items: facts2 }, "facts")
+  ];
+}
+function openAutomation(app2, which) {
+  const key2 = `automation:${which}`;
+  const run6 = (b) => {
+    if (app2.automation.pending) {
+      return;
+    }
+    if (b.confirm) {
+      app2.open(
+        confirmOverlay(app2, {
+          confirm: b.label,
+          detail: which === "goal" ? "Hermes stops working toward it. /goal sets a new one." : "No more runs. /loop starts a new one.",
+          onConfirm: () => void app2.automation.act(b.action),
+          title: b.confirm
+        })
+      );
+      return;
+    }
+    void app2.automation.act(b.action);
+  };
+  const current = () => which === "goal" ? app2.automation.goal : app2.automation.loop();
+  const overlay = {
+    key: key2,
+    modal: true,
+    node: () => {
+      const now = Date.now();
+      const view = current();
+      if (!view) {
+        queueMicrotask(() => app2.close(overlay));
+        return /* @__PURE__ */ jsx("overlay", { anchor: "bottom", modal: true, size: "md" }, key2);
+      }
+      const pending = app2.automation.pending;
+      const buttons = [
+        { hint: "escape", key: "close", keys: ["escape"], label: "Close", onClick: () => app2.close(overlay) },
+        ...automationButtons(which, view).map((b, i) => ({
+          hint: i === 0 ? `enter \xB7 ${b.keys.join(" \xB7 ")}` : b.keys.join(" \xB7 "),
+          key: b.action,
+          keys: b.keys,
+          label: pending === b.action ? `${b.label}\u2026` : b.label,
+          onClick: () => run6(b),
+          primary: i === 0
+        }))
+      ];
+      return /* @__PURE__ */ jsx(
+        "overlay",
+        {
+          anchor: "bottom",
+          head: [{ t: which === "goal" ? "Goal" : "Loop" }],
+          modal: true,
+          role: "hermes.automation.sheet",
+          size: "md",
+          children: /* @__PURE__ */ jsxs("col", { gap: "md", children: [
+            which === "goal" ? goalBody(view) : loopBody(view, app2.automation.loopSnapshot ?? view, now),
+            actionsRow(buttons)
+          ] }, "body")
+        },
+        key2
+      );
+    },
+    onKey: (k) => {
+      if (k.name === "escape") {
+        app2.close(overlay);
+        return true;
+      }
+      const view = current();
+      const b = view ? automationButtons(which, view).find((b2) => b2.keys.includes(k.name) && !k.ctrl && !k.meta) : void 0;
+      if (b) {
+        run6(b);
+      } else if (k.name === "enter" && view) {
+        run6(automationButtons(which, view)[0]);
+      }
+      return true;
+    }
+  };
+  app2.open(overlay);
+}
+
+// .hermes-src/ui-tui/src/app/slash/fuzzyScore.ts
+function tokenizeSearchText(value) {
+  const normalized = value.toLowerCase();
+  return [normalized, ...normalized.split(/[^a-z0-9]+/).filter(Boolean)];
+}
+function scoreFields(fields, query, offset) {
+  for (const field of fields) {
+    if (field === query || `/${field}` === query) {
+      return offset;
+    }
+  }
+  for (const field of fields) {
+    if (field.startsWith(query) || `/${field}`.startsWith(query)) {
+      return offset + 1;
+    }
+  }
+  for (const field of fields) {
+    if (field.includes(query)) {
+      return offset + 2;
+    }
+  }
+  return Number.POSITIVE_INFINITY;
+}
+function scoreSlashMenuItem(item3, query) {
+  const commandFields = [item3.id, item3.label ?? "", ...item3.aliases ?? []].filter(Boolean).flatMap(tokenizeSearchText);
+  const descriptionFields = tokenizeSearchText(item3.description ?? "");
+  return Math.min(scoreFields(commandFields, query, 0), scoreFields(descriptionFields, query, 3));
 }
 
 // .hermes-src/ui-tui/src/domain/slash.ts
@@ -34270,7 +36535,7 @@ var Completion = class {
           return;
         }
         const items = r?.items ?? [];
-        this.items = request.method === "complete.slash" && request.skillsOnly ? items.filter((i) => i.kind === "skill") : items;
+        this.items = request.method !== "complete.slash" ? items : request.skillsOnly ? items.filter((i) => i.kind === "skill") : slashItems(items, before);
         this.selected = 0;
         this.#for = before;
         this.#replaceFrom = request.method === "complete.slash" && !request.skillsOnly ? r?.replace_from ?? 1 : request.replaceFrom;
@@ -34381,6 +36646,28 @@ var Completion = class {
     return true;
   }
 };
+function slashItems(items, typed) {
+  const word = (text2) => text2.replace(/^\//, "").split(/\s/)[0]?.toLowerCase() ?? "";
+  if (INK_ONLY_COMMANDS.has(word(typed))) {
+    return [];
+  }
+  const kept = items.filter((i) => !(i.kind === "command" && INK_ONLY_COMMANDS.has(word(i.text))));
+  if (/\s/.test(typed)) {
+    return kept;
+  }
+  const query = typed.slice(1).toLowerCase();
+  const listed = new Set(kept.map((i) => word(i.text)));
+  const rank2 = (item3, aliases = []) => query ? scoreSlashMenuItem({ aliases: [...aliases], description: item3.meta ?? "", id: word(item3.text) }, query) : 1;
+  const own = localCommands().flatMap(
+    (c) => c.help && !listed.has(c.name) ? [{ aliases: c.aliases, item: { display: `/${c.name}`, kind: "command", meta: c.help, text: `/${c.name}` } }] : []
+  );
+  const commands = [
+    ...kept.filter((i) => i.kind !== "skill").map((item3) => ({ item: item3, score: rank2(item3) })),
+    // Ours match by name or alias only: their help words ("the", "and") would flood every query.
+    ...own.map((o) => ({ item: o.item, score: rank2(o.item, o.aliases) })).filter((o) => o.score < 3)
+  ].sort((a, b) => a.score - b.score).map((o) => o.item);
+  return [...commands, ...kept.filter((i) => i.kind === "skill")];
+}
 var COMMAND_ICONS = {
   clear: "eraser",
   compress: "compress",
@@ -34689,17 +36976,32 @@ var STYLES = css`
     font: 400 13px/22px var(--sans) !important;
   }
 
-  /* An image the next prompt carries: a chip in the composer; a click drops it. */
-  [data-role='hermes.composer.image'] {
+  /* An image the next prompt carries: Tern's omp chip (thumbnail, name, size) with a ✕ after
+     them, in a third column of its grid. */
+  .sf-card[data-role='omp.composer.chip'] > .sf-card-body > [data-role='hermes.composer.remove'] {
+    grid-column: 3;
+    grid-row: 1 / 3;
+    align-self: center;
+    width: 20px;
+    height: 20px;
+    margin-right: -6px;
+    border-radius: 6px;
+    color: var(--t3);
+    cursor: pointer;
+  }
+
+  .sf-card[data-role='omp.composer.chip'] > .sf-card-body > [data-role='hermes.composer.remove']:hover {
+    background: var(--l2);
+    color: var(--t1);
+  }
+
+  /* A prompt's file, or an image whose file is gone: a quiet chip beside its thumbnails. */
+  [data-role='hermes.user.attachment'] {
+    max-width: 240px;
     padding: 1px 8px !important;
     border-radius: 999px;
     background: var(--l1);
     font: 500 12px/20px var(--sans) !important;
-    cursor: pointer;
-  }
-
-  [data-role='hermes.composer.image']:hover {
-    background: var(--l2);
   }
 
   /* omp's ask theme draws a radio at the start of each option without moving the text over. */
@@ -34735,6 +37037,94 @@ var STYLES = css`
     height: 15px;
     min-width: 18px;
     font-size: 10px;
+  }
+
+  /* The standing goal and loop, and the reconnect notice: quiet lines above the pills, as wide as
+     the composer. A goal or loop part is a soft capsule that opens its sheet. */
+  [data-role='hermes.automation'],
+  [data-role='hermes.reconnect'] {
+    width: min(736px, calc(100% - 8px));
+    margin: 0 auto 6px !important;
+    font: 400 12.5px/22px var(--sans) !important;
+    color: var(--t2);
+  }
+
+  [data-role='hermes.reconnect'] {
+    padding: 0 10px !important;
+  }
+
+  [data-role='hermes.reconnect'] .sf-elapsed,
+  [data-role='hermes.automation.count'] {
+    font-variant-numeric: tabular-nums;
+    color: var(--t2);
+  }
+
+  /* Each capsule takes its content's width and gives way by truncating its words, never its count. */
+  .sf-row[data-role='hermes.automation.item'] {
+    flex: 0 1 auto;
+    max-width: 100%;
+    min-width: 0;
+    overflow: hidden;
+    padding: 1px 10px !important;
+    border-radius: 999px;
+    background: var(--l1);
+    cursor: pointer;
+    transition: background 0.15s ease;
+  }
+
+  .sf-row[data-role='hermes.automation.item']:hover {
+    background: var(--l2);
+  }
+
+  .sf-row[data-role='hermes.automation.item'][data-mark='pick'] {
+    box-shadow: inset 0 0 0 1px var(--accent) !important;
+  }
+
+  .sf-row[data-role='hermes.automation.item'][data-mark='pick']::after {
+    display: none;
+  }
+
+  [data-role='hermes.automation.label'] {
+    flex: none;
+    color: var(--t1);
+    font-weight: 500;
+  }
+
+  [data-role='hermes.automation.what'] {
+    flex: 0 1 auto !important;
+    min-width: 0;
+    overflow: hidden;
+    color: var(--t2);
+  }
+
+  [data-role='hermes.automation.item'] > :not([data-role='hermes.automation.what']) {
+    flex: none;
+  }
+
+  [data-role='hermes.automation.when'] {
+    margin-left: 6px;
+  }
+
+  [data-role='hermes.automation.item'] .sf-meter {
+    margin-left: 6px;
+  }
+
+  [data-role='hermes.automation.item'] .sf-meter {
+    flex: none;
+    width: 44px;
+  }
+
+  [data-role='hermes.automation.title'] {
+    font-size: 15px !important;
+  }
+
+  /* Fast mode: a bolt on the model chip. */
+  [data-role='hermes.composer.fast'] {
+    margin-left: -2px;
+  }
+
+  [data-role='hermes.composer.fast'] + [data-role='hermes.composer.fast'] {
+    margin-left: -7px;
   }
 
   /* A background card's process line opens the Background sheet. */
@@ -35392,7 +37782,7 @@ function semantic(c) {
 // src/github/branch.ts
 import { execFile as execFile6 } from "node:child_process";
 import { promisify as promisify5 } from "node:util";
-var run4 = promisify5(execFile6);
+var run3 = promisify5(execFile6);
 function parseRemote(url) {
   const m = url.match(/^[\w.-]+@([^:/]+):([^/]+\/[^/]+?)(?:\.git)?\/?$/) ?? url.match(/^(?:https?|ssh|git):\/\/(?:[^@/]+@)?([^/:]+)(?::\d+)?\/([^/]+\/[^/]+?)(?:\.git)?\/?$/);
   if (!m) {
@@ -35402,7 +37792,7 @@ function parseRemote(url) {
   return host === "github.com" || host.split(".").includes("github") ? { host, repository: m[2].toLowerCase() } : void 0;
 }
 async function git2(cwd, ...args) {
-  const { stdout } = await run4("git", ["-C", cwd, ...args], { timeout: 5e3 });
+  const { stdout } = await run3("git", ["-C", cwd, ...args], { timeout: 5e3 });
   return stdout.trim();
 }
 async function branchTarget(cwd) {
@@ -35474,7 +37864,7 @@ function parseStacks(host, repository, rows) {
 // src/github/client.ts
 import { execFile as execFile7 } from "node:child_process";
 import { promisify as promisify6 } from "node:util";
-var run5 = promisify6(execFile7);
+var run4 = promisify6(execFile7);
 var GitHubError = class extends Error {
   constructor(message, status) {
     super(message);
@@ -35502,7 +37892,7 @@ async function read(host, env) {
     return own;
   }
   try {
-    const { stdout } = await run5("gh", ["auth", "token", "--hostname", host], { timeout: 1e4 });
+    const { stdout } = await run4("gh", ["auth", "token", "--hostname", host], { timeout: 1e4 });
     const token = stdout.trim();
     if (token) {
       return token;
@@ -35670,6 +38060,22 @@ var PullRequests = class {
       this.poke();
     }
   }
+  /**
+   * Reads the stored links again. A subagent runs in a session of its own and links under this
+   * conversation (pull_requests.py), with no link result in this transcript.
+   */
+  relink() {
+    const sid = this.#host.sid();
+    if (!sid || sid !== this.#sid) {
+      return;
+    }
+    const linked = this.#links(sid);
+    if (linked.map(prKey).join() !== this.#refs.map(prKey).join()) {
+      this.#refs = linked;
+      this.#host.changed();
+      this.poke();
+    }
+  }
   /** Reads every linked PR now. */
   poke() {
     clearTimeout(this.#timer);
@@ -35738,11 +38144,11 @@ var PullRequests = class {
     this.#host.changed();
     try {
       if (action === "rerun") {
-        const runs = failedRuns(pr.checks);
-        if (!runs.length) {
+        const runs2 = failedRuns(pr.checks);
+        if (!runs2.length) {
           throw new Error("No failed GitHub Actions run to re-run.");
         }
-        for (const id of runs) {
+        for (const id of runs2) {
           await this.#gh.rest(pr.host, "POST", `/repos/${pr.repository}/actions/runs/${id}/rerun-failed-jobs`);
         }
       } else {
@@ -36036,6 +38442,69 @@ var Sidebar = class {
   }
 };
 
+// src/slashResolve.ts
+function canonOf(catalog) {
+  const canon = /* @__PURE__ */ new Map();
+  for (const [alias, target] of Object.entries(catalog?.canon ?? {})) {
+    if (!INK_ONLY_COMMANDS.has(target.replace(/^\//, "").toLowerCase())) {
+      canon.set(alias.toLowerCase(), target);
+    }
+  }
+  for (const c of localCommands()) {
+    for (const n of [c.name, ...c.aliases ?? []]) {
+      if (!canon.has(`/${n}`)) {
+        canon.set(`/${n}`, `/${c.name}`);
+      }
+    }
+  }
+  return canon;
+}
+function resolveSlashName(name, catalog) {
+  const needle = `/${name.toLowerCase()}`;
+  if (!name || Object.keys(catalog?.skills ?? {}).some((k) => k.toLowerCase() === needle)) {
+    return null;
+  }
+  const canon = canonOf(catalog);
+  const exact = canon.get(needle);
+  if (exact) {
+    return exact.toLowerCase() === needle ? null : { name: exact.slice(1) };
+  }
+  const scored = [...canon].map(([alias, target]) => ({ score: scoreSlashMenuItem({ id: alias.slice(1) }, name.toLowerCase()), target })).filter((s) => s.score < 3);
+  const best = Math.min(...scored.map((s) => s.score));
+  const matches = [...new Set(scored.filter((s) => s.score === best).map((s) => s.target))];
+  if (matches.length === 1 && matches[0].toLowerCase() !== needle) {
+    return { name: matches[0].slice(1) };
+  }
+  return matches.length > 1 ? { ambiguous: matches } : null;
+}
+function ambiguousNotice(name, matches) {
+  return `/${name} could mean ${matches.slice(0, 6).join(", ")}${matches.length > 6 ? ", \u2026" : ""}. Type more of the name.`;
+}
+var CommandCatalog = class {
+  #sid;
+  #pending;
+  #gw;
+  constructor(gw2) {
+    this.#gw = gw2;
+  }
+  get(sid) {
+    if (!this.#pending || this.#sid !== sid) {
+      this.#sid = sid;
+      const pending = this.#gw.request("commands.catalog", { session_id: sid }).catch(() => {
+        if (this.#pending === pending) {
+          this.#pending = void 0;
+        }
+        return void 0;
+      });
+      this.#pending = pending;
+    }
+    return this.#pending;
+  }
+  reset() {
+    this.#pending = void 0;
+  }
+};
+
 // src/status.ts
 var COMPACTING_LABEL = "Compressing context\u2026";
 function statusEffect(payload, last) {
@@ -36100,15 +38569,15 @@ function isLoginNotice(p) {
 }
 
 // src/settings.ts
-import { mkdirSync as mkdirSync4, readFileSync as readFileSync4, writeFileSync as writeFileSync3 } from "node:fs";
-import { homedir as homedir10 } from "node:os";
-import { dirname, join as join8 } from "node:path";
+import { mkdirSync as mkdirSync4, readFileSync as readFileSync5, writeFileSync as writeFileSync3 } from "node:fs";
+import { homedir as homedir11 } from "node:os";
+import { dirname, join as join9 } from "node:path";
 function settingsFile(env = process.env) {
-  return join8(env.HERMES_HOME || join8(homedir10(), ".hermes"), "hermes-tern", "settings.json");
+  return join9(env.HERMES_HOME || join9(homedir11(), ".hermes"), "hermes-tern", "settings.json");
 }
 function loadSettings(file2 = settingsFile()) {
   try {
-    const parsed = JSON.parse(readFileSync4(file2, "utf8"));
+    const parsed = JSON.parse(readFileSync5(file2, "utf8"));
     return parsed && typeof parsed === "object" ? parsed : {};
   } catch {
     return {};
@@ -36122,6 +38591,113 @@ function saveSettings(patch, file2 = settingsFile()) {
   return next2;
 }
 
+// src/serverQueue.ts
+function busyModeOf(raw) {
+  const v = typeof raw === "string" ? raw.trim().toLowerCase() : "";
+  return v === "interrupt" || v === "steer" ? v : "queue";
+}
+var isServerQueued = (row) => row.status === "queued" || row.status === "unknown";
+var ServerQueue = class {
+  rows = [];
+  #own = [];
+  /** Input ids whose bubble this pane painted (an idle send, or a started admission). */
+  #shown = /* @__PURE__ */ new Set();
+  /** Admissions seen queued and never started: a `cancelled` completion of one is not the turn's. */
+  #queuedOnly = /* @__PURE__ */ new Set();
+  /** Input ids of own admissions the FIFO has listed. */
+  #listed = /* @__PURE__ */ new Set();
+  /** Another session: its FIFO from the resume snapshot, and none of the last one's bookkeeping. */
+  reset(rows) {
+    this.#own.length = 0;
+    this.#shown.clear();
+    this.#queuedOnly.clear();
+    this.#listed.clear();
+    this.rows = [];
+    this.update(rows);
+  }
+  /** A prompt about to be admitted behind the turn; its row shows at once. */
+  admit(own) {
+    this.#own.push(own);
+  }
+  /** Forgets an own admission (refused, withdrawn, or back in the composer). */
+  drop(own) {
+    const at = this.#own.indexOf(own);
+    if (at >= 0) {
+      this.#own.splice(at, 1);
+    }
+  }
+  /** A prompt whose bubble this pane painted when it sent it. */
+  shown(inputId) {
+    this.#shown.add(inputId);
+  }
+  /**
+   * Takes the FIFO from a session.info (or a reconnect's resume) and returns the bubbles owed,
+   * in order: this pane's admissions that started, and another viewer's rows this pane saw move
+   * from queued to started (a resume snapshot's started row is already in the replayed history).
+   */
+  update(rows) {
+    if (!rows) {
+      return [];
+    }
+    const was = new Set(this.rows.filter((r) => r.status === "queued").map((r) => r.admission_id));
+    const owed = [];
+    for (const row of rows) {
+      if (row.status === "queued") {
+        this.#queuedOnly.add(row.admission_id);
+      }
+      if (row.status !== "started") {
+        continue;
+      }
+      this.#queuedOnly.delete(row.admission_id);
+      if (row.input_id && this.#shown.has(row.input_id)) {
+        continue;
+      }
+      const own = this.#own.find((o) => o.inputId === row.input_id);
+      if (own || was.has(row.admission_id)) {
+        if (row.input_id) {
+          this.#shown.add(row.input_id);
+        }
+        if (own) {
+          this.drop(own);
+        }
+        owed.push({ own, text: own?.display ?? row.user });
+      }
+    }
+    this.rows = rows;
+    const listed = new Set(rows.map((r) => r.input_id));
+    for (const own of [...this.#own]) {
+      if (listed.has(own.inputId)) {
+        this.#listed.add(own.inputId);
+      } else if (this.#listed.has(own.inputId)) {
+        this.drop(own);
+      }
+    }
+    return owed;
+  }
+  /** Withdrawn by this pane: its row's `cancelled` completion must not end the running turn. */
+  withdrawn(admissionId) {
+    this.#queuedOnly.add(admissionId);
+  }
+  /** A message.complete that only settles a queued row nobody started (prompt.cancel's), not the running turn. */
+  settlesQueuedRow(payload) {
+    const p = payload ?? {};
+    return p.outcome === "cancelled" && typeof p.admission_id === "string" && this.#queuedOnly.has(p.admission_id);
+  }
+  /** The rows that still wait, oldest first: the FIFO's, then admissions it does not list yet. */
+  queued() {
+    const rows = this.rows.filter(isServerQueued).map((row) => ({
+      own: this.#own.find((o) => o.inputId === row.input_id),
+      row,
+      text: row.user
+    }));
+    const listed = new Set(this.rows.map((r) => r.input_id));
+    return [
+      ...rows.map((r) => r.own ? { ...r, text: r.own.display } : r),
+      ...this.#own.filter((o) => !listed.has(o.inputId)).map((own) => ({ own, text: own.display }))
+    ];
+  }
+};
+
 // src/view/dock.tsx
 function todoProgress(list) {
   const live = list.filter((t2) => t2.status !== "cancelled");
@@ -36133,35 +38709,47 @@ function dockNodes(cx) {
   const nodes2 = [];
   if (cx.busy) {
     nodes2.push(
-      /* @__PURE__ */ jsx("col", { role: "omp.hud.status", children: workingNode(cx) }, "hud")
+      /* @__PURE__ */ jsx("col", { role: "omp.hud.status", children: workingNode2(cx) }, "hud")
     );
   }
   if (cx.queued.length) {
     nodes2.push(
-      /* @__PURE__ */ jsx("col", { gap: "xs", role: "omp.queue", children: cx.queued.map((text2, i) => /* @__PURE__ */ jsxs("row", { align: "center", gap: "sm", role: "omp.queue.item", title: "Queued", children: [
-        /* @__PURE__ */ jsx("icon", { name: "corner-down-right" }, "icon"),
-        /* @__PURE__ */ jsx("text", { grow: 1, text: text2.replace(/\s*\r?\n\s*/g, " \u21B5 "), truncate: "end", wrap: "none" }, "text"),
+      /* @__PURE__ */ jsx("col", { gap: "xs", role: "omp.queue", children: cx.queued.map((q, i) => /* @__PURE__ */ jsxs("row", { align: "center", gap: "sm", role: "omp.queue.item", title: queuedTitle(q), children: [
+        /* @__PURE__ */ jsx("icon", { name: q.pending ? "clock" : "corner-down-right" }, "icon"),
+        /* @__PURE__ */ jsx("text", { grow: 1, text: q.text.replace(/\s*\r?\n\s*/g, " \u21B5 "), truncate: "end", wrap: "none" }, "text"),
         i === 0 && cx.queued.length > 1 ? /* @__PURE__ */ jsx("badge", { role: "omp.queue.count", text: `${cx.queued.length}` }, "count") : null,
-        cx.onQueueSteer ? /* @__PURE__ */ jsxs(
+        q.note === "unknown" ? /* @__PURE__ */ jsx("badge", { text: "unknown", tone: "warning" }, "note") : null,
+        cx.onQueueSteer && q.steer ? /* @__PURE__ */ jsxs(
           "row",
           {
             align: "center",
             gap: "xs",
             onClick: () => cx.onQueueSteer?.(i),
             role: "omp.queue.steer",
-            title: "Steer the running turn with this  \u2325\u21B5",
+            title: `Steer the running turn with this instead${i === 0 ? "  \u2325\u21B5" : ""}`,
             children: [
               /* @__PURE__ */ jsx("icon", { name: "corner-up-right" }, "i"),
-              /* @__PURE__ */ jsx("kbd", { keys: ["alt", "enter"] }, "k"),
+              i === 0 ? /* @__PURE__ */ jsx("kbd", { keys: ["alt", "enter"] }, "k") : null,
               /* @__PURE__ */ jsx("text", { text: "Steer" }, "t")
             ]
           },
           "steer"
         ) : null,
-        /* @__PURE__ */ jsxs("row", { align: "center", gap: "xs", onClick: cx.onQueueEdit, role: "omp.queue.edit", title: "Edit  \u2325\u2191", children: [
-          /* @__PURE__ */ jsx("kbd", { keys: ["alt", "up"] }, "k"),
-          /* @__PURE__ */ jsx("text", { text: "Edit" }, "t")
-        ] }, "edit")
+        q.edit ? /* @__PURE__ */ jsxs(
+          "row",
+          {
+            align: "center",
+            gap: "xs",
+            onClick: () => cx.onQueueEdit(i),
+            role: "omp.queue.edit",
+            title: `Edit in the composer${i === 0 ? "  \u2325\u2191" : ""}`,
+            children: [
+              i === 0 ? /* @__PURE__ */ jsx("kbd", { keys: ["alt", "up"] }, "k") : null,
+              /* @__PURE__ */ jsx("text", { text: "Edit" }, "t")
+            ]
+          },
+          "edit"
+        ) : null
       ] }, `q${i}`)) }, "queue")
     );
   }
@@ -36169,6 +38757,14 @@ function dockNodes(cx) {
     nodes2.push(
       /* @__PURE__ */ jsx("col", { role: "hermes.todos", children: checklistNode(cx.todos.list) }, "todos")
     );
+  }
+  const reconnect = reconnectNode(cx.reconnecting, cx.now);
+  if (reconnect) {
+    nodes2.push(reconnect);
+  }
+  const automation = automationNode(cx.automation, cx.now, cx.focused);
+  if (automation) {
+    nodes2.push(automation);
   }
   const pills = [
     // While a turn runs the todo pill rides the working line instead.
@@ -36188,6 +38784,9 @@ function dockNodes(cx) {
   nodes2.push(composerNode(cx));
   nodes2.push(statusLine(cx));
   return nodes2;
+}
+function queuedTitle(q) {
+  return q.pending ? "Queuing\u2026" : q.note === "elsewhere" ? "Queued by another window (or before a reconnect)" : q.note === "unknown" ? "Queued behind a turn whose outcome is unknown" : "Queued";
 }
 function todosPillNode(t2, focused) {
   const { current, done, total } = todoProgress(t2.list);
@@ -36285,7 +38884,7 @@ function statusLine(cx) {
     ) : null,
     cx.cost ? /* @__PURE__ */ jsx("seg", { priority: 3, side: "right", spans: [{ t: `$${cx.cost.toFixed(2)}` }], title: "Session cost" }, "cost") : null,
     /* @__PURE__ */ jsx("seg", { priority: 1, side: "right", spans: [{ s: "muted", t: "\u21E7\u23CE newline" }] }, "newline"),
-    cx.busy ? /* @__PURE__ */ jsx("seg", { onClick: cx.onInterrupt, priority: 10, role: "hermes.statusline.stop", side: "right", spans: [{ t: "esc stop" }] }, "action") : /* @__PURE__ */ jsx("seg", { onClick: cx.onSubmit, priority: 10, role: "hermes.statusline.send", side: "right", spans: [{ t: "\u23CE send" }] }, "action")
+    cx.busy ? /* @__PURE__ */ jsx("seg", { onClick: cx.onInterrupt, priority: 10, role: "hermes.statusline.stop", side: "right", spans: [{ t: "esc esc stop" }] }, "action") : /* @__PURE__ */ jsx("seg", { onClick: cx.onSubmit, priority: 10, role: "hermes.statusline.send", side: "right", spans: [{ t: "\u23CE send" }] }, "action")
   ] }, "statusline");
 }
 function agentsPill(running, onOpen, focused) {
@@ -36338,7 +38937,7 @@ function hudHint() {
     /* @__PURE__ */ jsx("text", { text: "back" }, "back")
   ] }, "hint");
 }
-function workingNode(cx) {
+function workingNode2(cx) {
   const busy = cx.busy;
   return /* @__PURE__ */ jsxs("row", { align: "center", gap: "sm", role: "omp.working", children: [
     /* @__PURE__ */ jsx("spinner", { style: "starburst", tone: "accent" }, "spinner"),
@@ -36356,14 +38955,33 @@ function workingNode(cx) {
     /* @__PURE__ */ jsx("elapsed", { age: age(busy.since, busy.startedAt, cx.now), format: "short" }, "elapsed"),
     /* @__PURE__ */ jsx("row", { grow: 1 }, "fill"),
     cx.todos ? todosPillNode(cx.todos, false) : null,
-    /* @__PURE__ */ jsxs("row", { align: "center", gap: "xs", onClick: cx.onInterrupt, role: "omp.working.stop", title: "Stop  esc", children: [
+    /* @__PURE__ */ jsxs("row", { align: "center", gap: "xs", onClick: cx.onInterrupt, role: "omp.working.stop", title: "Stop  esc esc", children: [
       /* @__PURE__ */ jsx("kbd", { keys: ["esc"] }, "k"),
+      /* @__PURE__ */ jsx("kbd", { keys: ["esc"] }, "k2"),
       /* @__PURE__ */ jsx("text", { text: "Stop" }, "t")
     ] }, "stop")
   ] }, "working");
 }
-function effortLabel(effort) {
-  return effort === "none" ? "off" : effort;
+function effortChip(cx) {
+  const text2 = effortText(cx.effort, cx.effortWire);
+  const glyph = cx.effort === "none" ? "off" : cx.effortWire || cx.effort || DEFAULT_EFFORT;
+  const clamp2 = text2.includes("\u2192") ? ` (this route sends ${cx.effortWire})` : "";
+  return /* @__PURE__ */ jsxs(
+    "row",
+    {
+      align: "center",
+      gap: "xs",
+      onClick: cx.onEffort,
+      onMenu: cx.onEffortMenu,
+      role: "omp.composer.effort",
+      title: `Reasoning effort: ${text2}${cx.effort ? clamp2 : " (the default)"} \xB7 click to cycle  \u21E7\u21E5 \xB7 right-click to choose or save as default`,
+      children: [
+        /* @__PURE__ */ jsx("effort", { level: glyph }, "glyph"),
+        /* @__PURE__ */ jsx("text", { spans: [{ s: cx.effort ? void 0 : "muted", t: text2 }], wrap: "none" }, "level")
+      ]
+    },
+    "effort"
+  );
 }
 function composerNode(cx) {
   const { composer } = cx;
@@ -36388,15 +39006,13 @@ ${compact(ctx.used)} of ${compact(ctx.max)} tokens
         "context"
       )
     ),
-    /* @__PURE__ */ jsx("row", { gap: "sm", hidden: !cx.attachments?.length, role: "omp.composer.chips", wrap: true, children: (cx.attachments ?? []).map((a, i) => /* @__PURE__ */ jsxs("row", { align: "center", gap: "xs", onClick: a.onRemove, role: "hermes.composer.image", title: "Remove this image", children: [
-      /* @__PURE__ */ jsx("icon", { name: "image" }, "i"),
-      /* @__PURE__ */ jsx("text", { text: a.label, wrap: "none" }, "t"),
-      /* @__PURE__ */ jsx("icon", { name: "x" }, "x")
-    ] }, `a${i}`)) }, "chips"),
+    /* @__PURE__ */ jsx("row", { gap: "sm", hidden: !cx.attachments?.length, role: "omp.composer.chips", wrap: true, children: (cx.attachments ?? []).map(imageChip) }, "chips"),
     /* @__PURE__ */ jsx("row", { align: "start", gap: "sm", role: "omp.composer.line", children: /* @__PURE__ */ jsx(
       "editor",
       {
+        anchor: composer.anchor,
         cursor: composer.cursor,
+        decor: composer.decor,
         ghost: cx.ghost || void 0,
         maxLines: 18,
         onEdit: cx.onEdit,
@@ -36416,31 +39032,18 @@ ${compact(ctx.used)} of ${compact(ctx.max)} tokens
           gap: "xs",
           onClick: cx.onModel,
           role: "omp.composer.model",
-          title: `Model: ${cx.model} \xB7 click to switch`,
+          title: `Model: ${cx.model}${cx.fast ? ` \xB7 ${cx.fast === "ultrafast" ? "ultrafast" : "fast"} mode (priority processing, billed higher; /fast turns it off)` : ""} \xB7 click to switch`,
           children: [
             /* @__PURE__ */ jsx("icon", { name: "model" }, "icon"),
             /* @__PURE__ */ jsx("text", { spans: [{ t: cx.model }], wrap: "none" }, "name"),
+            cx.fast ? /* @__PURE__ */ jsx("icon", { name: "bolt", role: "hermes.composer.fast", tone: "warning" }, "fast") : null,
+            cx.fast === "ultrafast" ? /* @__PURE__ */ jsx("icon", { name: "bolt", role: "hermes.composer.fast", tone: "warning" }, "fast2") : null,
             /* @__PURE__ */ jsx("icon", { name: "chev" }, "chev")
           ]
         },
         "model"
       ) : null,
-      cx.effort ? /* @__PURE__ */ jsxs(
-        "row",
-        {
-          align: "center",
-          gap: "xs",
-          onClick: cx.onEffort,
-          onMenu: cx.onEffortMenu,
-          role: "omp.composer.effort",
-          title: `Reasoning effort: ${effortLabel(cx.effort)} \xB7 click to cycle  \u21E7\u21E5 \xB7 right-click to choose or save as default`,
-          children: [
-            /* @__PURE__ */ jsx("effort", { level: effortLabel(cx.effort) }, "glyph"),
-            /* @__PURE__ */ jsx("text", { text: effortLabel(cx.effort), wrap: "none" }, "level")
-          ]
-        },
-        "effort"
-      ) : null,
+      cx.reasons !== false ? effortChip(cx) : null,
       /* @__PURE__ */ jsx("status", { grow: 1, role: "omp.composer.extras", transparent: true }, "extras"),
       cx.busy ? /* @__PURE__ */ jsx(
         "text",
@@ -36448,7 +39051,7 @@ ${compact(ctx.used)} of ${compact(ctx.max)} tokens
           onClick: cx.onInterrupt,
           role: "omp.composer.stop",
           text: "Stop",
-          title: "Stop  esc",
+          title: "Stop  esc esc",
           tone: "error"
         },
         "stop"
@@ -36456,658 +39059,25 @@ ${compact(ctx.used)} of ${compact(ctx.max)} tokens
     ] }, "bar")
   ] }, "composer");
 }
-
-// src/preformatted.ts
-var BOX = /[─-╿]/;
-var RULE = /^\s*\+[-=+]{3,}\+?\s*$/;
-var COLUMNS = /^\s{0,4}[^\s•\-*>#`|][^\n]*?\S {2,}\S/;
-var ESC3 = String.fromCharCode(27);
-function isPreformatted(text2) {
-  if (text2.includes(`${ESC3}[`) || BOX.test(text2)) {
-    return true;
-  }
-  const lines = text2.split("\n").filter((l) => l.trim());
-  if (lines.some((l) => RULE.test(l))) {
-    return true;
-  }
-  const aligned = lines.filter((l) => COLUMNS.test(l)).length;
-  return aligned >= 3 && aligned >= lines.length / 2;
-}
-function hardBreaks(text2) {
-  let fenced = false;
-  return text2.split("\n").map((line, i, all) => {
-    if (/^\s*(```|~~~)/.test(line)) {
-      fenced = !fenced;
-      return line;
-    }
-    const next2 = all[i + 1];
-    return fenced || !line.trim() || next2 === void 0 || !next2.trim() ? line : `${line}  `;
-  }).join("\n");
-}
-
-// src/usage.ts
-var HEADER = /^\s*(?:[^\p{L}\p{N}*\s]\S*\s+)?\*\*(.+?)\*\*\s*(.*)$/u;
-var SUFFIX = { b: 1e9, k: 1e3, m: 1e6 };
-function parseCount(raw) {
-  const m = /^~?\s*([\d,]*\.?\d+)\s*([kmb])?$/i.exec(raw.trim());
-  if (!m) {
-    return NaN;
-  }
-  return Number(m[1].replace(/,/g, "")) * (m[2] ? SUFFIX[m[2].toLowerCase()] : 1);
-}
-function compactCount(n) {
-  const unit = (v, s) => `${v >= 100 ? Math.round(v) : Number(v.toFixed(1))}${s}`;
-  if (n >= 1e9) {
-    return unit(n / 1e9, "B");
-  }
-  if (n >= 1e6) {
-    return unit(n / 1e6, "M");
-  }
-  return n >= 1e3 ? unit(n / 1e3, "K") : String(Math.round(n));
-}
-function limits(inline) {
-  const out = [];
-  for (const part of inline.split("|")) {
-    const m = /^\s*([A-Za-z]+):\s*([\d.,]+\s*[kmb]?)\s*\/\s*([\d.,]+\s*[kmb]?)(?:\s*\(resets?\s+(.+?)\))?\s*$/i.exec(part);
-    const left = m ? parseCount(m[2]) : NaN;
-    const limit = m ? parseCount(m[3]) : NaN;
-    if (m && Number.isFinite(left) && limit > 0) {
-      out.push({ left, limit, name: m[1].toUpperCase(), reset: m[4] });
-    }
-  }
-  return out;
-}
-function pair(line) {
-  const m = /^\s*([^:]{1,40}):\s+(.+?)\s*$/.exec(line);
-  return m ? { key: m[1], value: m[2].replace(/^`(.*)`$/, "$1") } : void 0;
-}
-function crumb(line) {
-  const m = /^\s*[•\-*]\s*(.+?):\s*(~?[\d.,]+\s*[kmb]?)(?:\s*\(~?(\d+(?:\.\d+)?)%\))?\s*$/i.exec(line);
-  const tokens2 = m ? parseCount(m[2]) : NaN;
-  return m && Number.isFinite(tokens2) ? { label: m[1], pct: m[3] ? Number(m[3]) : void 0, tokens: tokens2 } : void 0;
-}
-function build(title, inline, body) {
-  const name = title.replace(/:$/, "").trim();
-  const lower = name.toLowerCase();
-  const lines = body.filter((l) => l.trim());
-  if (lower.includes("rate limit")) {
-    const items = limits(inline || lines.join(" | "));
-    return items.length ? { items, kind: "limits", title: name } : text(name, inline, lines);
-  }
-  if (lower.includes("context breakdown")) {
-    const items = lines.flatMap((l) => crumb(l) ?? []);
-    return items.length ? { items, kind: "breakdown", note: /_\((.*?)\)_/.exec(inline)?.[1], title: name } : text(name, inline, lines);
-  }
-  if (lower.includes("session") || lower.includes("token usage")) {
-    const rows = [];
-    let context;
-    for (const l of lines) {
-      const p = pair(l);
-      const c = p && /^context$/i.test(p.key) ? /^([\d.,]+\s*[kmb]?)\s*\/\s*([\d.,]+\s*[kmb]?)/i.exec(p.value) : null;
-      const used = c ? parseCount(c[1]) : NaN;
-      const max = c ? parseCount(c[2]) : NaN;
-      if (Number.isFinite(used) && max > 0) {
-        context = { max, used };
-      } else if (p) {
-        rows.push(p);
-      }
-    }
-    return rows.length || context ? { context, kind: "session", rows, title: name } : text(name, inline, lines);
-  }
-  if (lower.includes("credit")) {
-    const rows = [];
-    const notes = [];
-    for (const l of lines) {
-      const p = pair(l);
-      if (p) {
-        rows.push(p);
-      } else {
-        notes.push(l.trim());
-      }
-    }
-    return rows.length ? { kind: "credits", notes, rows, title: name } : text(name, inline, lines);
-  }
-  return text(name, inline, lines);
-}
-function text(title, inline, lines) {
-  return { kind: "text", text: [inline, ...lines].filter(Boolean).join("\n"), title };
-}
-function parseUsage(raw) {
-  const sections2 = [];
-  let head2;
-  const preamble = [];
-  const flush = () => {
-    if (head2) {
-      sections2.push(build(head2.title, head2.inline, head2.body));
-    }
-  };
-  for (const line of raw.replace(/\r/g, "").split("\n")) {
-    const h = HEADER.exec(line);
-    if (h) {
-      flush();
-      head2 = { body: [], inline: h[2].trim(), title: h[1] };
-    } else if (head2) {
-      head2.body.push(line);
-    } else if (line.trim()) {
-      preamble.push(line);
-    }
-  }
-  flush();
-  if (!sections2.some((s) => s.kind !== "text")) {
-    return null;
-  }
-  return preamble.length ? [{ kind: "text", text: preamble.join("\n"), title: "" }, ...sections2] : sections2;
-}
-
-// src/view/slash.tsx
-var THRESHOLDS = { bad: 0.95, warn: 0.8 };
-function slashBody(e) {
-  if (/^\/usage\b/.test(e.title)) {
-    const sections2 = parseUsage(e.text);
-    if (sections2) {
-      return sections2.map((s, i) => usageSection(s, i));
-    }
-  }
-  return [textBody(e.text, "body")];
-}
-function textBody(text2, key2) {
-  return isPreformatted(text2) ? /* @__PURE__ */ jsx("ansi", { text: text2 }, key2) : /* @__PURE__ */ jsx("md", { children: hardBreaks(text2) }, key2);
-}
-function heading(icon, title, note) {
-  return /* @__PURE__ */ jsxs("row", { align: "center", gap: "xs", children: [
-    /* @__PURE__ */ jsx("icon", { name: icon }, "icon"),
-    /* @__PURE__ */ jsx("text", { spans: [{ s: "strong", t: title }, ...note ? [{ s: "dim", t: `  ${note}` }] : []] }, "title")
-  ] }, "head");
-}
-function usageSection(s, i) {
-  const key2 = `s${i}`;
-  switch (s.kind) {
-    case "limits":
-      return /* @__PURE__ */ jsxs("col", { gap: "xs", children: [
-        heading("gauge", s.title),
-        limitsTable(s.items)
-      ] }, key2);
-    case "session":
-      return /* @__PURE__ */ jsxs("col", { gap: "xs", children: [
-        heading("tokens", s.title),
-        sessionBody(s.rows, s.context)
-      ] }, key2);
-    case "breakdown":
-      return /* @__PURE__ */ jsxs("col", { gap: "xs", children: [
-        heading("stack", s.title, s.note),
-        breakdownBody(s.items)
-      ] }, key2);
-    case "credits":
-      return /* @__PURE__ */ jsxs("col", { gap: "xs", children: [
-        heading("cost", s.title),
-        pairTable(s.rows, "credits"),
-        s.notes.map((n, j) => /* @__PURE__ */ jsx("text", { spans: [{ s: "dim", t: n }] }, `note${j}`))
-      ] }, key2);
-    case "text":
-      return /* @__PURE__ */ jsxs("col", { gap: "xs", children: [
-        s.title ? heading("info", s.title) : null,
-        textBody(s.text, "text")
-      ] }, key2);
-  }
-}
-function limitsTable(items) {
-  return /* @__PURE__ */ jsx(
-    "table",
-    {
-      cols: [
-        { id: "name" },
-        { grow: 1, id: "bar" },
-        { align: "end", id: "left" },
-        { align: "end", id: "reset" }
-      ],
-      rows: items.map((l) => {
-        const used = Math.min(1, Math.max(0, (l.limit - l.left) / l.limit));
-        return {
-          cells: {
-            bar: {
-              meter: {
-                thresholds: THRESHOLDS,
-                title: `${l.left.toLocaleString()} of ${l.limit.toLocaleString()} left`,
-                value: used
-              }
-            },
-            left: [{ s: "num", t: compactCount(l.left) }, { s: "dim", t: ` left of ${compactCount(l.limit)}` }],
-            name: [{ s: "muted mono", t: l.name }],
-            reset: [{ s: "dim", t: l.reset ? `resets ${l.reset}` : "" }]
-          },
-          id: l.name
-        };
-      })
-    },
-    "limits"
-  );
-}
-function sessionBody(rows, context) {
-  const model = rows.find((r) => /^model$/i.test(r.key));
-  const rest = rows.filter((r) => r !== model);
-  const out = [];
-  if (model) {
-    out.push(
-      /* @__PURE__ */ jsxs("row", { align: "center", gap: "sm", children: [
-        /* @__PURE__ */ jsx("text", { spans: [{ s: "muted", t: "Model" }] }, "k"),
-        /* @__PURE__ */ jsx("badge", { text: model.value }, "v")
-      ] }, "model")
-    );
-  }
-  if (rest.length) {
-    out.push(pairTable(rest, "session"));
-  }
-  if (context) {
-    const share = Math.min(1, context.used / context.max);
-    out.push(
-      /* @__PURE__ */ jsx(
-        "table",
-        {
-          cols: [{ id: "k" }, { grow: 1, id: "bar" }, { align: "end", id: "v" }],
-          rows: [
-            {
-              cells: {
-                bar: {
-                  meter: {
-                    thresholds: { bad: 0.85, warn: 0.6 },
-                    title: `${context.used.toLocaleString()} of ${context.max.toLocaleString()} tokens (${Math.round(share * 100)}%)`,
-                    value: share
-                  }
-                },
-                k: [{ s: "muted", t: "Context" }],
-                v: [{ s: "num", t: `${compactCount(context.used)} / ${compactCount(context.max)}` }]
-              },
-              id: "context"
-            }
-          ]
-        },
-        "context"
-      )
-    );
-  }
-  return out;
-}
-function pairTable(rows, id) {
-  return /* @__PURE__ */ jsx(
-    "table",
-    {
-      cols: [
-        { id: "k", truncate: "end" },
-        { align: "end", id: "v", grow: 1 }
-      ],
-      rows: rows.map((r, i) => ({
-        cells: {
-          k: [{ s: "muted", t: r.key }],
-          v: /^https?:\/\//.test(r.value) ? [{ href: r.value, s: "link", t: r.value }] : [{ s: /^[\d$,.%\s-]+$/.test(r.value) ? "num" : "", t: r.value }]
-        },
-        id: `${id}${i}`
-      }))
-    },
-    id
-  );
-}
-function breakdownBody(items) {
-  const sorted = [...items].sort((a, b) => b.tokens - a.tokens);
-  const total = sorted.reduce((n, c) => n + c.tokens, 0);
-  return [
+function imageChip(a, i) {
+  return /* @__PURE__ */ jsxs("card", { head: [{ s: "strong", t: a.label }], role: "omp.composer.chip", title: a.label, tone: "accent", children: [
+    a.image ? /* @__PURE__ */ jsx("image", { alt: a.label, ...a.image }, "thumb") : /* @__PURE__ */ jsx("icon", { name: "image" }, "thumb"),
     /* @__PURE__ */ jsx(
-      "table",
+      "text",
       {
-        cols: [
-          { id: "name", truncate: "end" },
-          { align: "end", id: "tokens" },
-          { align: "end", id: "share", grow: 1 }
-        ],
-        rows: sorted.map((c, i) => ({
-          cells: {
-            name: [{ s: "muted", t: c.label }],
-            share: { meter: { value: c.tokens / total } },
-            tokens: [{ s: "num", t: `~${compactCount(c.tokens)}${c.pct === void 0 ? "" : ` (${c.pct}%)`}` }]
-          },
-          id: `b${i}`
-        }))
+        spans: [a.pending ? { fx: "shimmer", s: "dim", t: "Attaching\u2026" } : { s: "dim", t: a.caption ?? "image" }],
+        wrap: "none"
       },
-      "list"
-    )
-  ];
-}
-
-// src/view/welcome.tsx
-import { readFileSync as readFileSync5 } from "node:fs";
-import { join as join9 } from "node:path";
-function welcomeNode(key2, cx) {
-  return /* @__PURE__ */ jsxs("card", { role: "omp.welcome", children: [
-    /* @__PURE__ */ jsxs("row", { align: "center", gap: "md", role: "omp.welcome.lockup", children: [
-      cx.logo ? /* @__PURE__ */ jsx("image", { alt: "Hermes", blob: cx.logo, h: 52, role: "omp.welcome.logo", w: 52 }, "logo") : null,
-      /* @__PURE__ */ jsxs("col", { role: "omp.welcome.mark", children: [
-        /* @__PURE__ */ jsx("text", { role: "omp.welcome.wordmark", spans: [{ s: "strong", t: "hermes" }], wrap: "none" }, "wordmark"),
-        cx.version ? /* @__PURE__ */ jsx("text", { role: "omp.welcome.version", spans: [{ s: "dim mono", t: cx.version }], wrap: "none" }, "version") : null
-      ] }, "mark")
-    ] }, "lockup"),
-    cx.tip ? /* @__PURE__ */ jsxs("row", { align: "start", gap: "sm", role: "omp.welcome.tip", children: [
-      /* @__PURE__ */ jsx("icon", { name: "lightbulb", role: "omp.welcome.tip-icon" }, "icon"),
-      /* @__PURE__ */ jsx("text", { role: "omp.welcome.tip-text", text: cx.tip, wrap: "word" }, "text")
-    ] }, "tip") : null
-  ] }, key2);
-}
-var TIP_LINE = /^\s+t\d+:\s+"((?:[^"\\]|\\.)*)"\s*$/;
-function randomTip(root) {
-  let text2;
-  try {
-    text2 = readFileSync5(join9(root, "locales", "en.yaml"), "utf8");
-  } catch {
-    return "";
-  }
-  const start = text2.search(/^tips:\s*$/m);
-  if (start < 0) {
-    return "";
-  }
-  const tips = [];
-  for (const line of text2.slice(start).split("\n").slice(1)) {
-    if (/^\S/.test(line)) {
-      break;
-    }
-    const quoted = TIP_LINE.exec(line)?.[1];
-    if (quoted) {
-      tips.push(JSON.parse(`"${quoted}"`));
-    }
-  }
-  return tips[Math.floor(Math.random() * tips.length)] ?? "";
-}
-
-// src/view/workLog.tsx
-function workingNode2(turn, now) {
-  return /* @__PURE__ */ jsxs("row", { align: "center", gap: "xs", role: "hermes.turn.working", children: [
-    /* @__PURE__ */ jsx("text", { spans: [{ s: "muted", t: "Working for" }], wrap: "none" }, "label"),
-    /* @__PURE__ */ jsx("elapsed", { age: age(turn, turn.startedAt, now), format: "short" }, "age")
-  ] }, "working");
-}
-var LIVE_MAX = 120;
-function liveText(label) {
-  const text2 = label.length > LIVE_MAX ? `${label.slice(0, LIVE_MAX - 1)}\u2026` : label;
-  return /* @__PURE__ */ jsx("shimmer", { mode: "classic", palette: { high: "accent", low: "dim", mid: "muted" }, role: "hermes.work.live", spans: [{ s: "muted", t: text2 }] }, "label");
-}
-function latestFailed(items) {
-  const last = items.findLast((i) => i.kind === "tool");
-  return last?.kind === "tool" && last.call.status === "error";
-}
-function thinkingRow() {
-  return /* @__PURE__ */ jsxs("row", { align: "center", gap: "sm", role: "hermes.work.row", children: [
-    /* @__PURE__ */ jsx("icon", { name: "brain" }, "icon"),
-    liveText("Thinking")
-  ] }, "thinking");
-}
-function foldNode(part, id, children2) {
-  return node("section", { collapsed: true, collapsible: true, head: `${id}.head`, key: part.key, role: "hermes.turn.fold" }, [
-    /* @__PURE__ */ jsx("row", { align: "center", gap: "xs", children: /* @__PURE__ */ jsx("text", { spans: [{ s: "muted", t: part.label }], wrap: "none" }, "label") }, "head"),
-    ...children2
-  ]);
-}
-function workNode(items, parent, live, now) {
-  const shown = visibleItems(items);
-  if (!shown.length) {
-    return null;
-  }
-  const key2 = `w${items[0].id}`;
-  const id = `${parent}.${key2}`;
-  if (!live && shown.length === 1) {
-    return itemNode(shown[0], parent, now, key2);
-  }
-  const calls = shown.flatMap((i) => i.kind === "tool" ? [i.call] : []);
-  const failed = calls.at(-1)?.status === "error";
-  const latest = shown.findLast((i) => i.kind === "tool" && i.call.status === "running") ?? shown.at(-1);
-  const head2 = live ? /* @__PURE__ */ jsxs("row", { align: "center", gap: "sm", children: [
-    /* @__PURE__ */ jsx("icon", { name: itemIcon(latest) }, "icon"),
-    liveText(liveLabel(latest, true)),
-    /* @__PURE__ */ jsx("icon", { name: "chev", role: "hermes.work.chev" }, "chev")
-  ] }, "head") : /* @__PURE__ */ jsxs("row", { align: "center", gap: "sm", children: [
-    /* @__PURE__ */ jsx("icon", { name: groupIcon(shown), tone: failed ? "error" : void 0 }, "icon"),
-    /* @__PURE__ */ jsx("text", { spans: [{ s: "muted", t: summarize(shown) }], truncate: "end", wrap: "none" }, "label"),
-    /* @__PURE__ */ jsx("icon", { name: "chev", role: "hermes.work.chev" }, "chev"),
-    /* @__PURE__ */ jsx("spacer", { grow: 1 }, "gap"),
-    /* @__PURE__ */ jsx("text", { role: "hermes.work.time", spans: [{ s: "dim", t: clock(startOf(shown[0])) }], wrap: "none" }, "time")
-  ] }, "head");
-  return node("section", { collapsed: true, collapsible: true, head: `${id}.head`, key: key2, role: "hermes.work.group" }, [
-    head2,
-    ...shown.map((i) => itemNode(i, id, now))
-  ]);
-}
-function itemNode(item3, parent, now, key2 = item3.id) {
-  const id = `${parent}.${key2}`;
-  if (item3.kind === "thinking") {
-    return node("section", { collapsed: true, collapsible: true, head: `${id}.head`, key: key2, role: "hermes.work.row" }, [
-      /* @__PURE__ */ jsxs("row", { align: "center", gap: "sm", children: [
-        /* @__PURE__ */ jsx("icon", { name: "brain" }, "icon"),
-        /* @__PURE__ */ jsx("text", { grow: 1, spans: [{ s: "muted", t: thoughtTitle(item3) }], truncate: "end", wrap: "none" }, "label")
-      ] }, "head"),
-      /* @__PURE__ */ jsx("md", { role: "hermes.work.thought", stream: item3.endedAt === void 0 || void 0, children: item3.text }, "body")
-    ]);
-  }
-  const call = item3.call;
-  const detail = toolDetail(call, now);
-  const running = call.status === "running";
-  const head2 = /* @__PURE__ */ jsxs("row", { align: "center", gap: "sm", title: call.context || void 0, children: [
-    /* @__PURE__ */ jsx("icon", { name: itemIcon(item3), tone: call.status === "error" ? "error" : void 0 }, "icon"),
-    running ? liveText(stepLabel(call)) : /* @__PURE__ */ jsx("text", { grow: 1, spans: labelSpans(call), truncate: "end", wrap: "none" }, "label"),
-    call.status === "error" ? /* @__PURE__ */ jsx("icon", { name: "x", tone: "error" }, "failed") : null
-  ] }, "head");
-  if (!detail.length) {
-    return /* @__PURE__ */ jsx("col", { role: "hermes.work.row", children: head2 }, key2);
-  }
-  return node("section", { collapsed: true, collapsible: true, head: `${id}.head`, key: key2, role: "hermes.work.row" }, [
-    head2,
-    /* @__PURE__ */ jsx("col", { gap: "xs", role: "hermes.work.detail", children: detail }, "detail")
-  ]);
-}
-function labelSpans(call) {
-  const entries = (call.batch ?? [call]).map((e) => callApp({ args: e.args, name: e.name }));
-  if (!entries.every(Boolean)) {
-    return [{ s: "muted", t: stepLabel(call) }];
-  }
-  return entries.flatMap((app2, i) => [
-    ...i ? [{ s: "muted", t: ", " }] : [],
-    { t: app2.app },
-    { s: "muted", t: ` \xB7 ${app2.action}` }
-  ]);
-}
-function itemIcon(item3) {
-  return item3.kind === "thinking" ? "brain" : actionIcon(actionOf(item3.call));
-}
-var startOf = (item3) => item3.kind === "tool" ? item3.call.startedAt : item3.startedAt;
-
-// src/view/transcript.tsx
-var kNode = /* @__PURE__ */ Symbol("tsp.node");
-function entryNode(e, id, cx) {
-  if (e.kind === "welcome") {
-    return welcomeNode(e.id, cx.welcome);
-  }
-  const holder = e;
-  const built = holder;
-  const rev = `${e.kind === "turn" ? e.rev : 0}${cx.copied === e.id ? "+copied" : ""}`;
-  const cached = built[kNode];
-  if (cached?.rev === rev) {
-    return cached.node;
-  }
-  const node2 = buildEntry(e, id, cx);
-  built[kNode] = { node: node2, rev };
-  return node2;
-}
-function buildEntry(e, id, cx) {
-  switch (e.kind) {
-    case "user":
-      return userNode(e, cx);
-    case "turn":
-      return turnNode(e, id, cx);
-    case "notice":
-      return noticeNode(e);
-    case "panel":
-      return /* @__PURE__ */ jsx("card", { collapsible: true, head: [{ s: "strong", t: e.title }], role: "omp.custom", tone: "neutral", children: slashBody(e) }, e.id);
-  }
-}
-function userNode(e, cx) {
-  const at = new Date(e.at || Date.now());
-  return /* @__PURE__ */ jsxs("card", { role: "omp.user", tone: "user", children: [
-    /* @__PURE__ */ jsxs("row", { gap: "xs", role: "omp.user.tools", children: [
-      /* @__PURE__ */ jsx(
-        "text",
-        {
-          role: "omp.user.time",
-          spans: [{ s: "dim mono", t: at.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) }],
-          title: at.toLocaleString()
-        },
-        "time"
-      ),
-      copyButton(e.text, e.id, "omp.user.tool", "Copy message", cx)
-    ] }, "tools"),
-    /* @__PURE__ */ jsx("md", { children: e.text }, "body")
-  ] }, e.id);
-}
-function turnNode(turn, id, cx) {
-  const live = turn.status === "live";
-  const children2 = [];
-  if (turn.continued) {
-    children2.push(
-      /* @__PURE__ */ jsxs("row", { align: "center", gap: "sm", role: "omp.turn.continued", children: [
-        /* @__PURE__ */ jsx("icon", { name: continuedIcon(turn.continued) }, "icon"),
-        /* @__PURE__ */ jsx("text", { spans: [{ s: "muted", t: turn.continued }] }, "why")
-      ] }, "continued")
-    );
-  }
-  if (live) {
-    children2.push(workingNode2(turn, cx.now));
-  }
-  for (const part of parts(turn)) {
-    children2.push(
-      ...part.kind === "fold" ? [foldNode(part, `${id}.${part.key}`, pieceNodes(turn, part.blocks, `${id}.${part.key}`, cx))] : pieceNodes(turn, part.blocks, id, cx)
-    );
-  }
-  const last = pieces(turn.blocks).at(-1);
-  if (live && (!last || last.kind === "block" && last.block.kind !== "text" || last.kind === "work" && latestFailed(last.items))) {
-    children2.push(thinkingRow());
-  }
-  if (turn.status === "error") {
-    children2.push(
-      node("card", { head: `${id}.error.head`, key: "error", role: "omp.error", tone: "error" }, [
-        /* @__PURE__ */ jsxs("row", { gap: "sm", children: [
-          /* @__PURE__ */ jsx("text", { spans: [{ s: "error strong", t: "Request failed" }] }, "title"),
-          turn.errorCode ? /* @__PURE__ */ jsx("badge", { role: "omp.error.code", text: turn.errorCode, tone: "error" }, "code") : null
-        ] }, "head"),
-        /* @__PURE__ */ jsx(
-          "text",
-          {
-            lines: 8,
-            role: "omp.error.message",
-            spans: [{ s: "mono", t: turn.error ?? "" }],
-            wrap: "word"
-          },
-          "message"
-        ),
-        turn.errorHint ? /* @__PURE__ */ jsx("md", { children: turn.errorHint }, "hint") : null
-      ])
-    );
-  } else if (turn.status === "interrupted") {
-    children2.push(
-      /* @__PURE__ */ jsx("text", { role: "omp.assistant.abort", spans: [{ s: "error", t: "Interrupted" }], wrap: "word" }, "abort")
-    );
-  }
-  if (turn.warning) {
-    children2.push(/* @__PURE__ */ jsx("text", { role: "omp.notice", spans: [{ s: "warning", t: turn.warning }], wrap: "word" }, "warning"));
-  }
-  const answer = answerText(turn);
-  if (!live && turn.endedAt && (answer || turn.usage?.total || turn.tickTokens)) {
-    children2.push(usageNode(turn, answer, cx));
-  }
-  return /* @__PURE__ */ jsx("col", { role: "omp.assistant", children: children2 }, turn.id);
-}
-function pieceNodes(turn, blocks, parent, cx) {
-  const live = turn.status === "live";
-  const ps = pieces(blocks);
-  const lastText = blocks.findLast((b) => b.kind === "text");
-  return ps.map((p, i) => {
-    if (p.kind === "work") {
-      return workNode(p.items, parent, live && i === ps.length - 1 && !latestFailed(p.items), cx.now);
-    }
-    const b = p.block;
-    switch (b.kind) {
-      case "text":
-        return /* @__PURE__ */ jsx("md", { stream: live && b === lastText || void 0, children: b.text }, b.id);
-      case "tool":
-        return toolNode(b.call, cx.now);
-      case "steer":
-        return steerNode(b, steerState(turn, turn.blocks.indexOf(b)));
-      case "thinking":
-        return null;
-    }
-  });
-}
-function continuedIcon(why) {
-  return /^(\d+ )?subagent/i.test(why) ? "users" : why.startsWith("Watcher") ? "eye" : why.startsWith("Background") ? "terminal" : "loop";
-}
-var STEER_NOTE = { landed: "", next: " \xB7 sent as the next prompt", pending: " \xB7 reaches Hermes after this step" };
-function steerNode(b, state) {
-  return /* @__PURE__ */ jsxs("card", { role: "omp.user", tone: "user", children: [
-    /* @__PURE__ */ jsx("md", { children: b.text }, "body"),
-    /* @__PURE__ */ jsxs("row", { align: "center", gap: "xs", role: "omp.user.steered", children: [
-      /* @__PURE__ */ jsx("icon", { name: "corner-down-right" }, "icon"),
-      /* @__PURE__ */ jsx("text", { spans: [{ s: "dim", t: `Steered${STEER_NOTE[state]}` }] }, "state")
-    ] }, "how")
-  ] }, b.id);
-}
-function copyButton(text2, id, role, title, cx) {
-  const copied = cx.copied === id;
-  return /* @__PURE__ */ jsx(
-    "icon",
-    {
-      name: copied ? "check" : "copy",
-      onClick: () => cx.copy(text2, id),
-      role,
-      title: copied ? "Copied" : title
-    },
-    "copy"
-  );
-}
-function answerText(turn) {
-  const last = turn.blocks.findLast((b) => b.kind === "text" && b.text.trim());
-  return last?.kind === "text" ? last.text.trim() : "";
-}
-function usageNode(turn, answer, cx) {
-  const u = turn.usage ?? {};
-  const ms = (turn.endedAt ?? turn.startedAt) - turn.startedAt;
-  const input = u.input ?? u.prompt ?? 0;
-  const output = u.output ?? u.completion ?? 0;
-  const total = u.total || input + output || turn.tickTokens || 0;
-  const cost = typeof u.cost_usd === "number" && u.cost_usd > 0 ? ` \xB7 $${u.cost_usd.toFixed(2)}` : "";
-  const title = `This turn: ${duration(ms)} \xB7 ${total.toLocaleString()} tokens (${input.toLocaleString()} in \xB7 ${output.toLocaleString()} out)${cost}`;
-  const tps = (typeof u.avg_tps === "number" && u.avg_tps > 0 ? u.avg_tps : void 0) ?? turn.tps;
-  const facts2 = total ? [
-    ["time", "time", duration(ms)],
-    ["tokens", "tokens", compact(total)],
-    ...turn.cacheHit !== void 0 ? [["cache", "cache", `${turn.cacheHit}%`]] : [],
-    ...tps ? [["speed", "fast", `${Math.round(tps)} t/s`]] : [],
-    ...cost ? [["cost", "cost", cost.replace(/^ · /, "")]] : []
-  ] : [];
-  const detail = [
-    title,
-    turn.cacheHit !== void 0 ? `${turn.cacheHit}% of the prompt came from the cache` : "",
-    tps ? `${tps.toFixed(1)} tokens per second (recent calls)` : ""
-  ].filter(Boolean).join("\n");
-  return /* @__PURE__ */ jsxs("row", { align: "center", gap: "xs", role: "omp.turn.usage", title: total ? detail : void 0, children: [
-    answer ? copyButton(answer, turn.id, "omp.turn.copy", "Copy answer", cx) : null,
-    facts2.flatMap(([key2, icon, value]) => [
-      /* @__PURE__ */ jsx("icon", { name: icon }, `${key2}.icon`),
-      /* @__PURE__ */ jsx("text", { text: value }, key2)
-    ])
-  ] }, "usage");
-}
-function noticeNode(e) {
-  const tone = e.tone === "info" ? "muted" : e.tone;
-  return /* @__PURE__ */ jsx("text", { role: `omp.notice.${e.tone}`, spans: [{ s: tone, t: e.text }], wrap: "word" }, e.id);
+      "caption"
+    ),
+    /* @__PURE__ */ jsx("icon", { name: "x", onClick: a.onRemove, role: "hermes.composer.remove", title: `Remove ${a.label}` }, "remove")
+  ] }, `a${i}`);
 }
 
 // src/watch/spec.ts
 import { execFile as execFile8 } from "node:child_process";
 import { promisify as promisify7 } from "node:util";
-var run6 = promisify7(execFile8);
+var run5 = promisify7(execFile8);
 var WATCH_ENV = "HERMES_TERN_WATCH";
 function readWatchSpec(env = process.env) {
   try {
@@ -37139,7 +39109,7 @@ async function openSidebar(spec, cwd, env = process.env) {
     return false;
   }
   if (sidebar) {
-    await run6("tern", ["close", sidebar]).catch(() => void 0);
+    await run5("tern", ["close", sidebar]).catch(() => void 0);
     sidebar = void 0;
   }
   const command = [
@@ -37153,7 +39123,7 @@ async function openSidebar(spec, cwd, env = process.env) {
     "tern"
   ];
   try {
-    const { stdout } = await run6("tern", ["split", pane, "right", "--cwd", cwd, "--", ...command]);
+    const { stdout } = await run5("tern", ["split", pane, "right", "--cwd", cwd, "--", ...command]);
     sidebar = stdout.trim().split(/\s+/).at(-1) || void 0;
     return true;
   } catch {
@@ -37164,17 +39134,22 @@ async function openSidebar(spec, cwd, env = process.env) {
 // src/app.ts
 var INPUT_ID = "dock.composer.line.input";
 var EXIT_ARM_MS = 1500;
+var DOUBLE_ESC_MS = 500;
 var COPIED_MS3 = 1500;
-var EFFORTS = ["none", "low", "medium", "high", "xhigh"];
+var IMAGE_ONLY_PROMPT = "What do you see in this image?";
 var QUIT_DETACH_MS = 1500;
 var App = class {
   transcript = new Transcript();
+  /** Images tool calls showed, a URL's bytes fetched once and sent as a blob. */
+  media = new Media({ blob: (bytes, mime) => this.#blob(bytes, mime) });
   /** The session's subagents, followed while they run (Task cards, the pill, the hub). */
   agents = new Agents(this);
   /** The session's background processes (the shells pill, the Background sheet, background cards). */
   processes = new Processes(this);
   cron = new Cron(this);
   sidebar = new Sidebar(this);
+  /** The session's standing /goal and /loop (the dock line above the pills and its sheets). */
+  automation = new Automation(this);
   /** The session's title, as Hermes names it (`session.title`). */
   title = "";
   /** The todo panel above the composer is open. */
@@ -37193,28 +39168,42 @@ var App = class {
   info = null;
   usage = null;
   busy = null;
+  /** Prompts held here until they can be sent: no session yet, a switch in flight, or a private gateway's busy turn. */
   queue = [];
+  /** The shared gateway's queue for this session: its FIFO, this pane's admissions, the bubbles they owe. */
+  #server = new ServerQueue();
+  /** What Enter does while a turn runs (`display.busy_input_mode`); queue until the gateway says. */
+  #busyMode = "queue";
   #tern;
   #gw;
   #completion;
+  /** `commands.catalog`, for resolving a typed alias or prefix (`/hea` → /heartbeat). */
+  #catalog;
   #welcome;
   #surface;
   #scheduled = false;
   /** The field holding Tern's caret, as last sent. */
   #focus = INPUT_ID;
   #exitArmed = 0;
+  #lastEsc = 0;
   #done = Promise.withResolvers();
   #switches = new Switches();
   /** Server requests for another session, kept while a switch is in flight. */
   #heldRequests = [];
   /** Shared-gateway subscriptions this view holds, by session id. */
   #subscriptions = /* @__PURE__ */ new Map();
+  /** What superseded switches attached; disposed once no switch is in flight (see #disposeStale). */
+  #stale = [];
+  /** The last `session.detach` in flight per session: a resume of that id waits for it (they share a subscription id). */
+  #detaching = /* @__PURE__ */ new Map();
   /** Open approval prompts' overlay keys → their approval-queue `request_id` (what approval.cancelled names). */
   #approvalIds = /* @__PURE__ */ new Map();
   /** The launcher's startup image until it is attached to the first session (the queue waits for it). */
   #startupImage = process.env.HERMES_TUI_IMAGE?.trim() ?? "";
   /** The images attached to the draft: the next prompt entered takes them. */
   #attachments = [];
+  /** Images being read or uploaded for the draft: an "attaching…" chip each until they land. */
+  #attaching = [];
   /** The skin the gateway last reported; only the `skin` theme mode wears it. */
   #skin;
   #theme = loadSettings().theme ?? "tern";
@@ -37234,10 +39223,14 @@ var App = class {
   #compacting = false;
   /** The status warning shown last, so a repeated one stays one line. */
   #lastStatusNote;
+  /** The gateway is being redialled (`gateway.reconnecting`) until the next gateway.ready. */
+  #reconnecting;
+  #reconnectTimer;
   constructor(tern, gw2, version2) {
     this.#tern = tern;
     this.#gw = gw2;
     this.#completion = new Completion(this, gw2, () => this.sid);
+    this.#catalog = new CommandCatalog(gw2);
     this.#welcome = {
       tip: randomTip(process.env.HERMES_PYTHON_SRC_ROOT ?? ""),
       version: version2 && version2 !== "unknown" ? `v${version2}` : ""
@@ -37278,6 +39271,8 @@ var App = class {
       this.#offline = true;
       this.sid = null;
       this.busy = null;
+      this.#heldRequests = [];
+      this.#dropPrompts(() => true);
       this.transcript.interrupt();
       this.changed();
     });
@@ -37367,7 +39362,12 @@ var App = class {
       return;
     }
     if (key2.name === "escape") {
-      if (this.busy) {
+      const now = Date.now();
+      const double = now - this.#lastEsc <= DOUBLE_ESC_MS;
+      this.#lastEsc = double ? 0 : now;
+      if (double && this.#hasDraft()) {
+        this.#clearDraft();
+      } else if (double && this.busy) {
         this.#interrupt();
       }
       return;
@@ -37375,22 +39375,22 @@ var App = class {
     if (key2.shift && key2.name === "tab") {
       return this.#cycleEffort();
     }
-    if (key2.alt && key2.name === "a" || key2.name === "\xE5") {
-      return openAgents(this);
+    if (key2.alt && !key2.ctrl && !key2.meta) {
+      switch (key2.name) {
+        case "a":
+          return openAgents(this);
+        case "b":
+          return openBackground(this);
+        case "s":
+          return this.toggleSidebar();
+        case "p":
+          return openPullRequests(this);
+      }
     }
-    if (key2.alt && key2.name === "b" && !key2.ctrl && !key2.meta || key2.name === "\u222B") {
-      return openBackground(this);
+    if (key2.alt && key2.name === "up" && this.#queuedCount()) {
+      return this.#dequeue(0);
     }
-    if (key2.alt && key2.name === "s" && !key2.ctrl && !key2.meta || key2.name === "\xDF") {
-      return this.toggleSidebar();
-    }
-    if (key2.alt && key2.name === "p" && !key2.ctrl && !key2.meta || key2.name === "\u03C0") {
-      return openPullRequests(this);
-    }
-    if (key2.alt && key2.name === "up" && this.queue.length) {
-      return this.#dequeue();
-    }
-    if (key2.alt && key2.name === "enter" && this.busy && this.queue.length && !this.composer.text) {
+    if (key2.alt && key2.name === "enter" && this.busy && this.#queuedCount() && !this.composer.text) {
       return this.#steerQueued(0);
     }
     if (key2.ctrl && key2.name === "d" && !this.#hasDraft()) {
@@ -37421,6 +39421,10 @@ var App = class {
     if (ev.ev === "action" && ev.act === "connect-continue" && ev.value) {
       return this.#connectContinue(ev.value);
     }
+    if (ev.ev === "action" && ev.act === "connect-open" && ev.value) {
+      const at = ev.value.lastIndexOf(":");
+      return this.#connectOpen(ev.value.slice(0, at), ev.value.slice(at + 1));
+    }
     if (ev.ev === "focus" && ev.id === INPUT_ID && !this.overlays.at(-1)?.modal) {
       this.#hud = void 0;
       this.#focus = INPUT_ID;
@@ -37443,7 +39447,9 @@ var App = class {
       ...this.#todos() && !this.busy ? ["todos"] : [],
       ...this.agents.running().length ? ["agents"] : [],
       ...this.processes.recent(now).length ? ["shells"] : [],
-      ...this.prs.entries().length ? ["prs"] : []
+      ...this.prs.entries().length ? ["prs"] : [],
+      ...this.automation.goal ? ["goal"] : [],
+      ...this.automation.loop(now) ? ["loop"] : []
     ];
   }
   /** Down from an empty prompt focuses the pills; ←/→, Enter and Esc/↑ while one holds the keys. */
@@ -37460,6 +39466,8 @@ var App = class {
       openBackground(this);
     } else if (out.open === "prs") {
       openPullRequests(this);
+    } else if (out.open === "goal" || out.open === "loop") {
+      openAutomation(this, out.open);
     } else if (out.open === "todos") {
       this.#todosOpen = !this.#todosOpen;
       this.changed();
@@ -37507,41 +39515,44 @@ var App = class {
     return true;
   }
   #connectTimer;
-  /** Connect cards this pane saw with an app still waiting. */
+  /** Connect cards (by file) this pane saw with an app still waiting. */
   #connectSeen = /* @__PURE__ */ new Set();
-  /** The connect cards still waiting on the user. */
-  #connectCalls() {
-    const since = Date.now() - POLL_FOR_MS;
-    return this.transcript.calls(CONNECT_TOOL).filter((c) => !c.connectDone && c.startedAt > since);
-  }
+  /** Connect calls that drew no card (a status read, a call with nothing to authorize): never again. */
+  #noCard = /* @__PURE__ */ new WeakSet();
   /**
    * Keeps each connect card current from the file the plugin's watcher writes (links and states),
    * and tells the agent once every app of a card is connected, as the desktop's card settles the call.
+   * A settled card never moves again, so the poll runs only while some card is watched.
    */
   #watchConnections() {
-    if (this.#connectTimer) {
-      return;
-    }
+    clearTimeout(this.#connectTimer);
     const tick = () => {
       this.#connectTimer = void 0;
       let open = false;
-      for (const call of this.#connectCalls()) {
-        const card = readCard(call.id);
-        const next2 = connectTargets(call, card);
+      for (const call of this.transcript.calls(CONNECT_TOOL)) {
+        if (call.connect?.settled || call.status === "running" || this.#noCard.has(call)) {
+          continue;
+        }
+        const next2 = loadConnect(call);
+        if (!next2) {
+          this.#noCard.add(call);
+          continue;
+        }
         if (JSON.stringify(next2) !== JSON.stringify(call.connect)) {
           call.connect = next2;
           this.transcript.touchCall(call);
           this.changed();
         }
-        if (next2.some(waiting)) {
-          this.#connectSeen.add(call.id);
+        const seen = next2.key ?? call.id;
+        if (next2.targets.some(waiting) && !next2.settled) {
+          this.#connectSeen.add(seen);
         }
-        if (this.#connectSeen.has(call.id) && next2.length && next2.every((t2) => t2.state === "connected")) {
-          call.connectDone = true;
+        if (!next2.told && this.#connectSeen.has(seen) && allConnected(next2) && (!next2.key || claimTold(next2.key))) {
+          next2.told = true;
           this.transcript.touchCall(call);
-          this.#submit(connectedMessage(next2), false);
+          this.#submit(connectedMessage(next2.targets), false);
           this.changed();
-        } else if (next2.some(waiting) && (card?.watching ?? true)) {
+        } else if (next2.key && !next2.settled) {
           open = true;
         }
       }
@@ -37551,15 +39562,34 @@ var App = class {
     };
     tick();
   }
+  /** The connect card `ref` names (its file, or its call id when it has none). */
+  #connectCall(ref) {
+    return this.transcript.calls(CONNECT_TOOL).findLast((c) => (c.connect?.key ?? c.id) === ref);
+  }
   /** A connect card's Continue: tell the agent which apps the user authorized, as the tool asks. */
-  #connectContinue(id) {
-    const call = this.transcript.calls(CONNECT_TOOL).find((c) => c.id === id);
-    if (!call || call.connectDone) {
+  #connectContinue(ref) {
+    const call = this.#connectCall(ref);
+    const card = call?.connect;
+    if (!call || !card || card.told || card.settled) {
       return;
     }
-    call.connectDone = true;
+    card.told = true;
     this.transcript.touchCall(call);
-    this.#submit(continueMessage(call.connect ?? connectTargets(call, readCard(call.id))), false);
+    if (!card.key || claimTold(card.key)) {
+      this.#submit(continueMessage(card.targets), false);
+    }
+    this.changed();
+  }
+  /** A connect card's Authorize: the app's link in the browser, and its row waits on the browser now. */
+  #connectOpen(ref, name) {
+    const call = this.#connectCall(ref);
+    const target = call?.connect?.targets.find((t2) => t2.name === name);
+    if (!call?.connect || !target?.url) {
+      return;
+    }
+    openUrl(target.url);
+    call.connect.opened = [.../* @__PURE__ */ new Set([...call.connect.opened, name])];
+    this.transcript.touchCall(call);
     this.changed();
   }
   /** A paste that is an image (no text: the clipboard's; one image path: that file); false for text. */
@@ -37570,24 +39600,26 @@ var App = class {
     }
     const path = imagePathOf(text2, this.info?.cwd || process.env.HERMES_CWD || process.cwd());
     if (path) {
-      void this.#attachImage(path, basename3(path));
+      void this.#attachImage(path, basename4(path));
       return true;
     }
     return false;
   }
   /** Attaches the clipboard's image to the next prompt (`quiet`: an empty paste, which may hold none). */
   async attachClipboardImage(quiet) {
+    const slot = this.#startAttaching(`pasted image ${this.#attachments.length + this.#attaching.length + 1}`);
     try {
       const found = await withClipboardImage(async (path) => {
-        await this.#attachImage(path, `pasted image ${this.#attachments.length + 1}`);
+        await this.#attachImage(path, slot.name, slot);
         return true;
       });
       if (!found && !quiet) {
         this.transcript.notice("No image on the clipboard.", "warning");
-        this.changed();
       }
     } catch (error) {
       this.transcript.notice(`Could not read the clipboard image: ${error instanceof Error ? error.message : String(error)}`, "error");
+    } finally {
+      this.#endAttaching(slot);
       this.changed();
     }
   }
@@ -37598,19 +39630,67 @@ var App = class {
       this.transcript.notice(`Not an image file: ${raw.trim()} (PNG, JPEG, GIF or WebP)`, "warning");
       return this.changed();
     }
-    await this.#attachImage(path, basename3(path));
+    await this.#attachImage(path, basename4(path));
   }
-  async #attachImage(path, name) {
+  /** Uploads `path` for the next prompt; its chip says "attaching…" (in `slot`) until it lands or fails. */
+  async #attachImage(path, name, slot = this.#startAttaching(name)) {
     const sid = this.sid;
-    if (!sid) {
-      this.transcript.notice("Wait for the session to start before attaching an image.", "warning");
-      return this.changed();
-    }
     try {
-      this.#attachments.push({ ...await uploadImage(this.#gw, sid, path, process.env.HERMES_CWD || process.cwd()), name });
+      if (!sid) {
+        this.transcript.notice("Wait for the session to start before attaching an image.", "warning");
+        return;
+      }
+      const image = this.#image(await uploadImage(this.#gw, sid, path, process.env.HERMES_CWD || process.cwd()), name);
+      if (this.#attaching.includes(slot)) {
+        this.#attachments.push(image);
+      }
     } catch (error) {
       this.transcript.notice(`Could not attach ${name}: ${error instanceof Error ? error.message : String(error)}`, "error");
+    } finally {
+      this.#endAttaching(slot);
+      this.changed();
     }
+  }
+  #startAttaching(name) {
+    const slot = { name };
+    this.#attaching.push(slot);
+    this.changed();
+    return slot;
+  }
+  #endAttaching(slot) {
+    this.#attaching = this.#attaching.filter((s) => s !== slot);
+  }
+  /**
+   * An uploaded image with its thumbnail: its bytes as a blob, else the gateway's copy where that
+   * is on this machine. The bytes are not kept.
+   */
+  #image({ bytes, ...attachment }, name) {
+    const size = imageSize(bytes);
+    const kb = bytes.length / 1024;
+    const blob = this.#blob(bytes, attachment.mime);
+    const preview5 = blob ? { blob } : existsSync5(attachment.path) ? { path: attachment.path } : void 0;
+    const caption = [size && `${size.w}\xD7${size.h}`, kb >= 1024 ? `${(kb / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(kb))} KB`];
+    return { ...attachment, caption: caption.filter(Boolean).join(" \xB7 "), name, ...preview5 ? { preview: preview5 } : {} };
+  }
+  /** `bytes` sent to Tern as a blob; undefined where it takes none, or for more than a blob holds. */
+  #blob(bytes, mime) {
+    if (!this.#tern.caps.features.includes("blobs")) {
+      return void 0;
+    }
+    try {
+      return this.#tern.blob(bytes, mime);
+    } catch {
+      return void 0;
+    }
+  }
+  /** Has `call`'s image (a URL's) fetched; its card shows it once it lands. */
+  #showImage(call) {
+    if (call) {
+      this.media.show(call, () => this.#imageLanded(call));
+    }
+  }
+  #imageLanded(call) {
+    this.transcript.touchCall(call);
     this.changed();
   }
   /** Opens or closes the session sidebar (Tern's aside); says why where Tern has none. */
@@ -37621,6 +39701,10 @@ var App = class {
       return;
     }
     this.sidebar.toggle();
+  }
+  /** A subagent ended: the PRs it linked are filed under this conversation (pull_requests.py). */
+  agentEnded() {
+    this.prs.relink();
   }
   /** Shows subagent `id` beside the chat in a Tern split; its timeline sheet where no split can open. */
   async openAgent(id) {
@@ -37635,12 +39719,22 @@ var App = class {
   }
   /** Text or images in the composer: Ctrl+C clears them before it interrupts, Ctrl+D never exits over them. */
   #hasDraft() {
-    return Boolean(this.composer.text || this.#attachments.length);
+    return Boolean(this.composer.text || this.#attachments.length || this.#attaching.length);
+  }
+  /** Esc Esc: the draft's text goes to the prompt history (Up brings it back), its images go. */
+  #clearDraft() {
+    if (this.composer.text.trim()) {
+      this.composer.take();
+    } else {
+      this.composer.set("");
+    }
+    this.#attachments = [];
   }
   #ctrlC() {
     if (this.#hasDraft()) {
       this.composer.set("");
       this.#attachments = [];
+      this.#attaching = [];
       return;
     }
     if (this.busy) {
@@ -37668,10 +39762,19 @@ var App = class {
     this.#done.resolve(code2);
   }
   // ── Prompts and commands ───────────────────────────────────────────
-  /** Sends or queues a prompt, or runs a command; `draft`: the user entered it (it takes the draft's images). */
-  #submit(raw, draft = true) {
+  /**
+   * Sends or queues a prompt, or runs a command; `draft`: the user entered it (it takes the draft's
+   * images). While a turn runs the prompt goes as `busy` says: the session's busy_input_mode for
+   * a typed one; a message the app writes (a connect result) waits behind the turn.
+   */
+  #submit(raw, draft = true, busy = draft ? this.#busyMode : "queue") {
     const text2 = raw.trim();
-    if (!text2) {
+    if (draft && this.#attaching.length && !text2.startsWith("/")) {
+      this.composer.set(raw);
+      this.transcript.notice("An image is still attaching. Send again in a moment.", "warning");
+      return;
+    }
+    if (!text2 && !(draft && this.#attachments.length)) {
       return;
     }
     if (text2.startsWith("/")) {
@@ -37683,11 +39786,98 @@ var App = class {
       return;
     }
     const item3 = { expand: true, images: draft ? this.#takeImages() : [], text: text2 };
-    if (this.busy || !this.sid || this.#switches.pending) {
+    if (!this.sid || this.#switches.pending) {
       this.queue.push(item3);
       return;
     }
+    if (this.busy) {
+      return void this.#busyInput(item3, busy);
+    }
     this.#send(item3);
+  }
+  /**
+   * A prompt entered while a turn runs, as Ink's handleBusyInput: `steer` injects it into the turn,
+   * `interrupt` redirects the turn with it, `queue` puts it behind the turn. A steer or redirect
+   * carries no images, and one the gateway refuses is queued instead.
+   */
+  async #busyInput(item3, mode) {
+    const sid = this.sid;
+    if (!sid || mode === "queue" || item3.images.length) {
+      return this.#queueBehind(item3);
+    }
+    const ready = await this.#expanded(sid, item3);
+    if (!ready || sid !== this.sid) {
+      return;
+    }
+    const r = await (mode === "steer" ? steerTurn : redirectTurn)(this.#gw, sid, ready.text);
+    if (sid !== this.sid) {
+      return;
+    }
+    if (r.ok) {
+      this.transcript.steer(item3.text);
+    } else {
+      if (r.error) {
+        this.transcript.notice(`${mode === "steer" ? "Steer" : "Redirect"} failed: ${r.error}. Queued instead.`, "warning");
+      }
+      this.#queueBehind(item3);
+    }
+    this.changed();
+  }
+  /** Puts `item` behind the running turn: into the shared gateway's queue at once, else held here. */
+  #queueBehind(item3) {
+    const sid = this.sid;
+    if (!this.#gw.isCanonical || !sid || this.#switches.pending) {
+      this.queue.push(item3);
+      this.#drainQueue();
+      return this.changed();
+    }
+    void this.#admit(sid, item3);
+  }
+  /**
+   * Admits `item` into session `sid`'s FIFO now (Ink's busy-time admission): crash-durable, and in
+   * every viewer's queue. Its bubble waits until the gateway starts it; a refusal puts it back in
+   * the composer. `text`: what to send instead of expanding the item again (a re-queued steer).
+   */
+  async #admit(sid, item3, text2) {
+    const ready = text2 === void 0 ? await this.#expanded(sid, item3) : { images: item3.images, text: text2 };
+    if (!ready || sid !== this.sid) {
+      return;
+    }
+    const own = { display: userText(item3.text, item3.images), inputId: randomUUID3(), item: { item: item3, text: ready.text } };
+    const attachments = ready.images.map(({ mime, path }) => ({ mime, path }));
+    this.#server.admit(own);
+    this.changed();
+    try {
+      const r = await this.#gw.request("prompt.submit", {
+        queued: true,
+        session_id: sid,
+        submission_id: own.inputId,
+        text: ready.text || (attachments.length ? IMAGE_ONLY_PROMPT : ""),
+        ...attachments.length ? { attachments } : {}
+      });
+      own.admissionId = r?.admission_id;
+    } catch (error) {
+      this.#server.drop(own);
+      if (sid === this.sid) {
+        this.transcript.notice(`Not queued: ${error instanceof Error ? error.message : String(error)}. Your message is back in the composer.`, "error");
+        this.#restore(item3);
+      }
+    }
+    this.changed();
+  }
+  /** `item` with its `{!cmd}`s run (a typed prompt's); undefined when one failed (the prompt is back in the composer). */
+  async #expanded(sid, item3) {
+    if (!item3.expand || !hasInterpolation(item3.text)) {
+      return item3;
+    }
+    try {
+      return { images: item3.images, text: await interpolate(this.#gw, sid, item3.text) };
+    } catch (error) {
+      this.transcript.notice(`Not sent: a {!\u2026} command failed: ${shellError(error)}.`, "error");
+      this.#restore(item3);
+      this.changed();
+      return void 0;
+    }
   }
   /**
    * Sends `item` now; `queued` marks a drained queue entry (the gateway must queue it, never steer
@@ -37717,15 +39907,16 @@ var App = class {
       );
       return;
     }
-    const { images, text: text2 } = item3;
+    const { images } = item3;
+    const text2 = item3.text || (images.length ? IMAGE_ONLY_PROMPT : "");
     const attachments = images.map(({ mime, path }) => ({ mime, path }));
-    this.transcript.user(`${display?.trim() || text2}${images.length ? `
-
-\u{1F4CE} ${images.length} image${images.length === 1 ? "" : "s"}` : ""}`);
+    const submission = randomUUID3();
+    this.transcript.user(display?.trim() || item3.text, void 0, false, userImages(images));
+    this.#server.shown(submission);
     this.#startBusy("Working\u2026");
     this.#gw.request("prompt.submit", {
       session_id: sid,
-      submission_id: randomUUID3(),
+      submission_id: submission,
       text: text2,
       ...queued ? { queued } : {},
       ...attachments.length ? { attachments } : {}
@@ -37745,8 +39936,8 @@ var App = class {
   }
   /** Puts a prompt that did not go back into the composer, before any text there, with its images. */
   #restore({ images, text: text2 }) {
-    this.composer.set(this.composer.text ? `${text2}
-${this.composer.text}` : text2);
+    this.composer.set(text2 && this.composer.text ? `${text2}
+${this.composer.text}` : text2 || this.composer.text);
     this.#attachments = [...images, ...this.#attachments];
   }
   /** `!cmd`: runs `command` in the session's folder and shows its output; nothing reaches the model. */
@@ -37767,13 +39958,18 @@ ${this.composer.text}` : text2);
     }
     this.changed();
   }
-  async #slash(text2) {
-    const [name = "", ...rest] = text2.slice(1).split(/\s+/);
+  /** Runs `/name arg`; `resolve`: expand a typed alias or prefix through the catalog first. */
+  async #slash(text2, resolve5 = true) {
+    const [typed = "", ...rest] = text2.slice(1).split(/\s+/);
+    const name = typed.toLowerCase();
     const arg = rest.join(" ");
     const local = localCommand(name);
     if (local) {
       try {
         const handled = await local.run(this, arg);
+        if (local.name === "reload-skills") {
+          this.#catalog.reset();
+        }
         if (handled !== false) {
           return this.changed();
         }
@@ -37782,24 +39978,49 @@ ${this.composer.text}` : text2);
         return this.changed();
       }
     }
-    if (!this.sid) {
+    const sid = this.sid;
+    const generation = this.#switches.generation;
+    const stale = () => this.sid !== sid || this.#switches.pending && this.#switches.generation !== generation;
+    if (resolve5) {
+      const to = resolveSlashName(name, sid ? await this.#catalog.get(sid) : void 0);
+      if (stale()) {
+        return;
+      }
+      if (to && "ambiguous" in to) {
+        this.transcript.notice(ambiguousNotice(name, to.ambiguous), "warning");
+        return this.changed();
+      }
+      if (to) {
+        return this.#slash(`/${to.name}${arg ? ` ${arg}` : ""}`, false);
+      }
+    }
+    if (!sid) {
       return;
     }
     const title = `/${name}${arg ? ` ${arg}` : ""}`;
     try {
-      const r = await this.#gw.request("slash.exec", { command: text2.slice(1), session_id: this.sid });
+      const r = await this.#gw.request("slash.exec", { command: text2.slice(1), session_id: sid });
+      if (stale()) {
+        return;
+      }
       await this.#dispatched(r, title, arg);
     } catch (error) {
+      if (stale()) {
+        return;
+      }
       if (isUnsupportedCommand(error) || !shouldFallbackToDispatch(error)) {
         this.transcript.notice(describeSlashExecError(name, error), isUnsupportedCommand(error) ? "warning" : "error");
       } else {
         try {
-          await this.#dispatched(
-            await this.#gw.request("command.dispatch", { arg, name, session_id: this.sid }),
-            title,
-            arg
-          );
+          const r = await this.#gw.request("command.dispatch", { arg, name, session_id: sid });
+          if (stale()) {
+            return;
+          }
+          await this.#dispatched(r, title, arg);
         } catch (dispatchError) {
+          if (stale()) {
+            return;
+          }
           this.transcript.notice(describeSlashExecError(name, dispatchError), "error");
         }
       }
@@ -37830,10 +40051,7 @@ ${this.composer.text}` : text2);
       busy: Boolean(this.busy),
       // A steer that fell back to the queue: steering carries no images.
       canonical: this.#gw.isCanonical,
-      enqueue: (text2) => {
-        this.queue.push({ images: [], text: text2 });
-        this.changed();
-      },
+      enqueue: (text2) => this.#queueBehind({ images: [], text: text2 }),
       gw: this.#gw,
       notice: (text2, tone) => {
         this.transcript.notice(text2, tone);
@@ -37847,7 +40065,7 @@ ${this.composer.text}` : text2);
         this.transcript.panel(title, text2);
         this.changed();
       },
-      queued: this.queue.length,
+      queued: this.#queuedCount(),
       reload: async () => {
         if (sid && this.sid === sid) {
           await this.#resume(sid);
@@ -37860,7 +40078,8 @@ ${this.composer.text}` : text2);
         this.transcript.steer(text2);
         this.changed();
       },
-      submit: (text2) => this.#submit(text2)
+      // /queue: behind the turn whatever busy_input_mode says.
+      submit: (text2) => this.#submit(text2, true, "queue")
     };
   }
   #startBusy(label) {
@@ -37890,7 +40109,7 @@ ${this.composer.text}` : text2);
     const path = this.#startupImage;
     try {
       if (this.#gw.isCanonical) {
-        const image = { ...await uploadImage(this.#gw, sid, path, process.env.HERMES_CWD || process.cwd()), name: basename3(path) };
+        const image = this.#image(await uploadImage(this.#gw, sid, path, process.env.HERMES_CWD || process.cwd()), basename4(path));
         const images = this.queue[0]?.images ?? this.#attachments;
         images.push(image);
       } else {
@@ -37942,8 +40161,7 @@ ${this.composer.text}` : text2);
         this.#gw.isCanonical ? { ...localCreationOptions(), ...cwd ? { cwd } : {} } : { cols: this.#tern.caps.cols, ...cwd ? { cwd } : {} }
       );
       if (!this.#switches.current(token)) {
-        this.#subscribe(r);
-        void this.#leave(r.session_id, "tui_close");
+        this.#stale.push(r);
         return;
       }
       this.transcript.clear();
@@ -37976,7 +40194,7 @@ ${this.composer.text}` : text2);
     if (!this.busy) {
       return false;
     }
-    this.transcript.notice("Wait for the current turn to finish (or press Esc) before switching sessions.", "warning");
+    this.transcript.notice("Wait for the current turn to finish (or press Esc twice) before switching sessions.", "warning");
     this.changed();
     return true;
   }
@@ -37997,16 +40215,23 @@ ${this.composer.text}` : text2);
     const hold = this.#gw.holdAttach(id);
     let snapshot2;
     try {
+      const detaching = this.#detaching.get(id);
+      if (detaching) {
+        await detaching;
+        if (!this.#switches.current(token)) {
+          return void 0;
+        }
+      }
       const r = await this.#gw.request("session.resume", { cols: this.#tern.caps.cols, session_id: id });
       if (!this.#switches.current(token)) {
-        this.#subscribe(r);
-        void this.#leave(r.session_id, "tui_close");
+        this.#stale.push(r);
         return void 0;
       }
       this.transcript.clear();
       this.transcript.push({ id: this.transcript.id("w"), kind: "welcome" });
       this.#adopt(r);
       snapshot2 = r;
+      this.#dropPrompts((key2) => key2.startsWith(`prompt:${sharedPromptId("")}`));
       this.#gw.hydrateSharedPrompts(r);
       return r;
     } finally {
@@ -38018,7 +40243,10 @@ ${this.composer.text}` : text2);
     this.#subscribe(r);
     if (r.session_id !== this.sid) {
       this.#dropPrompts(() => true);
+      this.#busyMode = "queue";
     }
+    void this.#readBusyMode(r.session_id);
+    this.#server.reset(pendingRows(r.info));
     this.sid = r.session_id;
     this.#showThoughts(r.session_id);
     const previousStored = this.storedSid;
@@ -38038,10 +40266,12 @@ ${this.composer.text}` : text2);
     if (r.messages?.length) {
       this.transcript.load(r.messages);
       this.agents.scan();
+      this.media.showAll(this.transcript.entries, (call) => this.#imageLanded(call));
     }
     this.processes.poke();
     this.#watchConnections();
     this.prs.adopt();
+    this.automation.adopt(r.session_id);
     if (r.inflight) {
       this.transcript.inflight(r.inflight, this.busy?.startedAt);
     }
@@ -38063,7 +40293,46 @@ ${this.composer.text}` : text2);
       return;
     }
     this.#subscriptions.delete(sid);
-    await this.#gw.request("session.detach", { end_reason: endReason, session_id: sid, subscription_id: subscription }).catch(() => void 0);
+    await this.#detach(sid, subscription, endReason);
+  }
+  /** Sends `session.detach`, one at a time per session; `endReason` lets the owner end it once no viewer remains. */
+  #detach(sid, subscription, endReason) {
+    const send = () => this.#gw.request("session.detach", {
+      ...endReason ? { end_reason: endReason } : {},
+      session_id: sid,
+      subscription_id: subscription
+    });
+    const run6 = (this.#detaching.get(sid)?.then(send) ?? send()).catch(() => void 0);
+    this.#detaching.set(sid, run6);
+    void run6.then(() => {
+      if (this.#detaching.get(sid) === run6) {
+        this.#detaching.delete(sid);
+      }
+    });
+    return run6;
+  }
+  /**
+   * Releases what superseded switches attached, once the adopted session is known. The gateway gives
+   * this view one subscription per session, so a stale result for the shown session is the live
+   * view's own and stays; others detach with no end reason (nobody chose to close them).
+   */
+  #disposeStale() {
+    const stale = this.#stale;
+    this.#stale = [];
+    for (const r of stale) {
+      if (r.session_id === this.sid || r.subscription_id && this.#subscriptions.get(r.session_id) === r.subscription_id) {
+        continue;
+      }
+      if (!this.#gw.isCanonical) {
+        void this.#gw.request("session.close", { session_id: r.session_id }).catch(() => void 0);
+      } else if (r.subscription_id) {
+        void this.#detach(r.session_id, r.subscription_id);
+      }
+    }
+  }
+  /** Acts on a command's dispatch envelope from outside a typed command (a goal or loop sheet's button). */
+  runDispatch(raw, title) {
+    return this.#dispatched(raw, title, "");
   }
   /** Acts on a slash.exec / command.dispatch answer: output, a skill or message to send, an alias or a prefill. */
   async #dispatched(raw, title, arg) {
@@ -38107,6 +40376,7 @@ ${this.composer.text}` : text2);
     if (this.#switches.pending) {
       return;
     }
+    this.#disposeStale();
     const held = this.#heldRequests;
     this.#heldRequests = [];
     for (const req of held) {
@@ -38124,16 +40394,28 @@ ${this.composer.text}` : text2);
     switch (ev.type) {
       case "gateway.ready":
         this.#offline = false;
+        this.#reconnected();
         this.#applySkin(ev.payload?.skin);
         void (this.storedSid ? this.#reattach(this.storedSid) : this.#bootstrap());
         break;
       case "skin.changed":
         this.#applySkin(ev.payload);
         break;
+      // The goal and loop line: every set, pause, resume, stop, wakeup and judged turn.
+      case "session.control.update":
+        this.automation.apply(ev.session_id ?? this.sid, ev.payload?.control);
+        return;
+      case "gateway.reconnecting":
+        this.#reconnect(ev.payload?.attempt ?? 1, ev.payload?.delay_ms ?? 0);
+        break;
       case "session.info": {
         const cwd = this.info?.cwd;
         this.info = ev.payload ? { ...this.info, ...ev.payload } : this.info;
         this.usage = ev.payload?.usage ?? this.usage;
+        for (const started of this.#server.update(pendingRows(ev.payload))) {
+          const own = started.own?.item.item;
+          t2.started(own ? own.text : started.text, void 0, own ? userImages(own.images) : []);
+        }
         this.#setTitle(typeof ev.payload?.title === "string" ? ev.payload.title : void 0);
         if (this.info?.cwd && this.info.cwd !== cwd) {
           this.prs.poke();
@@ -38173,6 +40455,9 @@ ${this.composer.text}` : text2);
           this.#startBusy("Working\u2026");
         }
         t2.start();
+        if (ev.payload?.display_kind === "async_delegation_complete" && ev.payload.text) {
+          this.agents.settle(ev.payload.text);
+        }
         break;
       case "message.delta":
         t2.text(ev.payload?.text ?? "");
@@ -38210,12 +40495,17 @@ ${this.composer.text}` : text2);
           t2.toolStart(ev.payload);
           const call = t2.call(ev.payload.tool_id);
           this.#label(call ? busyLabel(call) : `Running ${ev.payload.name}\u2026`);
+          this.#showImage(call);
         }
         break;
       case "tool.complete":
         if (ev.payload) {
           t2.toolComplete(ev.payload);
+          this.#showImage(t2.call(ev.payload.tool_id));
           this.agents.scan();
+          if (ev.payload.name === "delegate_task") {
+            this.prs.relink();
+          }
           if (LINK_TOOLS.has(ev.payload.name)) {
             const call = this.transcript.calls(ev.payload.name).at(-1);
             if (call) {
@@ -38250,8 +40540,14 @@ ${this.composer.text}` : text2);
         if (ev.payload) {
           t2.subagent(ev.type, ev.payload);
         }
+        if (ev.type === "subagent.complete") {
+          this.agentEnded();
+        }
         break;
       case "message.complete":
+        if (this.#server.settlesQueuedRow(ev.payload)) {
+          return;
+        }
         t2.complete(ev.payload ?? {});
         this.busy = null;
         this.#compacting = false;
@@ -38344,7 +40640,7 @@ ${this.composer.text}` : text2);
       case "approval.request":
       case "clarify.request": {
         const req = sharedPromptRequest(ev, this.#gw, (message) => {
-          t2.notice(message, "error");
+          t2.notice(message, "warning");
           this.changed();
         });
         if (req) {
@@ -38390,6 +40686,17 @@ ${this.composer.text}` : text2);
         this.close(o);
       }
     }
+  }
+  /** One line for the whole outage: each try replaces it, and re-renders when the wait ends. */
+  #reconnect(attempt, delayMs) {
+    clearTimeout(this.#reconnectTimer);
+    this.#reconnecting = { attempt, dueAt: Date.now() + delayMs };
+    this.#reconnectTimer = setTimeout(() => this.changed(), delayMs + 50);
+    this.#reconnectTimer.unref?.();
+  }
+  #reconnected() {
+    clearTimeout(this.#reconnectTimer);
+    this.#reconnecting = void 0;
   }
   #applySkin(skin) {
     if (skin) {
@@ -38442,45 +40749,121 @@ ${this.composer.text}` : text2);
       this.changed();
     });
   }
-  /** Steps the session's reasoning effort up hermes's ladder; session.info echoes it back. */
+  /** Steps the session's reasoning effort up the levels its model takes; session.info echoes it back. */
   #cycleEffort() {
-    const at = EFFORTS.indexOf(this.info?.reasoning_effort ?? "");
-    void this.setEffort(EFFORTS[at < 0 ? EFFORTS.indexOf("medium") : (at + 1) % EFFORTS.length], "session");
+    const next2 = nextEffort(this.info?.reasoning_effort ?? "", capsOf(this.info));
+    if (!next2) {
+      this.transcript.notice("This model has no reasoning effort to set.", "warning");
+      return this.changed();
+    }
+    void this.setEffort(next2, "session");
   }
   /**
    * Sets the reasoning effort: `session` for this session only (the pill, ⇧⇥), `global` also as
    * config.yaml's `agent.reasoning_effort`, the default of every new session (Hermes' `/reasoning
-   * <level> --global`).
+   * <level> --global`). On the shared gateway the session level is its revision-fenced `reasoning`
+   * mutation, as Ink and desktop send it: stored with the session, and session.info to every viewer.
    */
   async setEffort(value, scope) {
-    if (!this.sid) {
+    const sid = this.sid;
+    if (!sid) {
       return;
     }
-    this.info = this.info && { ...this.info, reasoning_effort: value };
+    const before = this.info && { reasoning_effort: this.info.reasoning_effort, reasoning_effort_wire: this.info.reasoning_effort_wire };
+    this.info = this.info && { ...this.info, reasoning_effort: value, reasoning_effort_wire: void 0 };
     this.changed();
     try {
-      await this.#gw.request("config.set", { key: "reasoning", scope, session_id: this.sid, value });
+      if (scope === "session" && this.#gw.isCanonical) {
+        await mutateSession(this.#gw, sid, "reasoning", { effort: value });
+      } else {
+        await this.#gw.request("config.set", { key: "reasoning", scope, session_id: sid, value });
+      }
       if (scope === "global") {
         this.transcript.notice(`Reasoning effort ${value === "none" ? "off" : value} is now the default for new sessions.`);
       }
     } catch (error) {
-      this.transcript.notice(error instanceof Error ? error.message : String(error), "error");
+      if (sid === this.sid && this.info && before && this.info.reasoning_effort === value) {
+        this.info = { ...this.info, ...before };
+      }
+      this.transcript.notice(`Could not set the reasoning effort: ${error instanceof Error ? error.message : String(error)}`, "error");
     }
     this.changed();
   }
-  /** Alt+Up / the queue's Edit: the oldest queued prompt back into an empty composer. */
-  #dequeue() {
-    const next2 = this.queue.shift();
-    if (next2 !== void 0) {
-      this.#restore(next2);
-      this.changed();
-    }
+  /** Prompts waiting behind the turn: this pane's own queue, then the shared gateway's. */
+  #queuedCount() {
+    return this.queue.length + this.#server.queued().length;
   }
-  /** Alt+Enter / the queue's Steer: injects queued prompt `index` into the running turn instead of waiting for it to end. */
+  /** The dock's queued rows, in #queuedCount's order, with what each one's Edit and Steer can do. */
+  #queuedRows() {
+    const steer2 = Boolean(this.busy);
+    return [
+      ...this.queue.map((q) => ({ edit: true, steer: steer2, text: userText(q.text, q.images) })),
+      ...this.#server.queued().map((q) => {
+        if (!q.own) {
+          return { note: q.row?.status === "unknown" ? "unknown" : "elsewhere", text: internalNotice(q.text) ?? q.text };
+        }
+        return q.own.admissionId ? { edit: true, steer: steer2 && !q.own.item.item.images.length, text: q.text } : { pending: true, text: q.text };
+      })
+    ];
+  }
+  /** The shared gateway's queued row at dock index `index`, if this pane can act on it. */
+  #serverQueued(index) {
+    const q = this.#server.queued()[index - this.queue.length];
+    return q?.own?.admissionId ? q : void 0;
+  }
+  /**
+   * Takes this pane's admission out of the gateway's queue (prompt.cancel); true once withdrawn,
+   * false when it started meanwhile (it runs as its own turn) or the gateway refused.
+   */
+  async #withdraw(sid, q) {
+    const own = q.own;
+    this.#server.withdrawn(own.admissionId);
+    try {
+      const r = await this.#gw.request("prompt.cancel", { admission_id: own.admissionId, session_id: sid });
+      if (r?.status !== "terminal") {
+        return false;
+      }
+    } catch (error) {
+      this.transcript.notice(`Could not take the prompt out of the queue: ${error instanceof Error ? error.message : String(error)}`, "error");
+      this.changed();
+      return false;
+    }
+    this.#server.drop(own);
+    return true;
+  }
+  /** Alt+Up / a queued row's Edit: queued prompt `index` (the oldest by default) back into the composer. */
+  #dequeue(index = 0) {
+    if (index < this.queue.length) {
+      const [next2] = this.queue.splice(index, 1);
+      if (next2) {
+        this.#restore(next2);
+        this.changed();
+      }
+      return;
+    }
+    const sid = this.sid;
+    const q = this.#serverQueued(index);
+    if (!sid || !q) {
+      return;
+    }
+    void this.#withdraw(sid, q).then((out) => {
+      if (out && sid === this.sid) {
+        this.#restore(q.own.item.item);
+      }
+      this.changed();
+    });
+  }
+  /** Alt+Enter / a queued row's Steer: injects queued prompt `index` into the running turn instead of waiting for it to end. */
   #steerQueued(index) {
     const sid = this.sid;
+    if (!this.busy || !sid) {
+      return;
+    }
+    if (index >= this.queue.length) {
+      return void this.#steerServerQueued(sid, index);
+    }
     const item3 = this.queue[index];
-    if (!this.busy || !sid || !item3) {
+    if (!item3) {
       return;
     }
     if (item3.images.length) {
@@ -38503,6 +40886,48 @@ ${this.composer.text}` : text2);
       }
       this.changed();
     });
+  }
+  /**
+   * A Steer on a row in the gateway's queue: withdrawn from it, then steered into the turn; a steer
+   * that does not land goes back into the queue, at its end.
+   */
+  async #steerServerQueued(sid, index) {
+    const q = this.#serverQueued(index);
+    if (!q) {
+      return;
+    }
+    const { item: item3, text: text2 } = q.own.item;
+    if (item3.images.length) {
+      this.transcript.notice("A queued prompt with images cannot steer the turn. It stays queued.", "warning");
+      return this.changed();
+    }
+    if (!await this.#withdraw(sid, q) || sid !== this.sid) {
+      return;
+    }
+    const r = await steerTurn(this.#gw, sid, text2);
+    if (sid !== this.sid) {
+      return;
+    }
+    if (r.ok) {
+      this.transcript.steer(item3.text);
+    } else {
+      this.transcript.notice(
+        r.error ? `Steer failed: ${r.error}. Queued again, at the end.` : "The turn ended before the steer landed. Queued again.",
+        "warning"
+      );
+      void this.#admit(sid, item3, text2);
+    }
+    this.changed();
+  }
+  /** Reads session `sid`'s busy_input_mode; an older gateway without it leaves Enter queueing (the TUI default). */
+  async #readBusyMode(sid) {
+    try {
+      const r = await this.#gw.request("config.get", { key: "busy", session_id: sid });
+      if (sid === this.sid) {
+        this.#busyMode = busyModeOf(r?.value);
+      }
+    } catch {
+    }
   }
   /** Sends the oldest queued prompt once the session is adopted and idle (no turn, switch or startup image pending). */
   #drainQueue() {
@@ -38548,6 +40973,17 @@ ${this.composer.text}` : text2);
         cost: usage?.cost_usd ?? void 0,
         cwd: info?.cwd ? shortPath3(info.cwd) : "",
         effort: info?.reasoning_effort ?? "",
+        effortWire: info?.reasoning_effort_wire || void 0,
+        fast: fastTier(info),
+        reasons: capsOf(info)?.reasoning,
+        automation: {
+          goal: this.automation.goal,
+          loop: this.automation.loop(now),
+          loopOwner: this.automation.loopSnapshot,
+          onGoal: () => openAutomation(this, "goal"),
+          onLoop: () => openAutomation(this, "loop")
+        },
+        reconnecting: this.#reconnecting,
         ghost: modal ? "" : this.#completion.ghost,
         inputId: INPUT_ID,
         model: info?.model ?? "",
@@ -38559,11 +40995,11 @@ ${this.composer.text}` : text2);
         onEffort: () => this.#cycleEffort(),
         onEffortMenu: {
           "choose-effort": () => openEffortPicker(this),
-          "save-effort-as-default": () => void this.setEffort(this.info?.reasoning_effort || "medium", "global")
+          "save-effort-as-default": () => void this.setEffort(this.info?.reasoning_effort || DEFAULT_EFFORT, "global")
         },
         onInterrupt: () => this.#interrupt(),
         onModel: () => openModelPicker(this),
-        onQueueEdit: () => this.#dequeue(),
+        onQueueEdit: (i) => this.#dequeue(i),
         onQueueSteer: this.busy ? (i) => this.#steerQueued(i) : void 0,
         onSend: (ev) => {
           this.#submit(ev.text);
@@ -38579,13 +41015,25 @@ ${this.composer.text}` : text2);
         },
         agents: { onOpen: () => openAgents(this), running: this.agents.running().length },
         prs: prsPill(this.prs.entries(), () => openPullRequests(this)),
-        attachments: this.#attachments.map((a, i) => ({
-          label: a.name,
-          onRemove: () => {
-            this.#attachments.splice(i, 1);
-            this.changed();
-          }
-        })),
+        attachments: [
+          ...this.#attachments.map((a, i) => ({
+            caption: a.caption,
+            image: a.preview,
+            label: a.name,
+            onRemove: () => {
+              this.#attachments.splice(i, 1);
+              this.changed();
+            }
+          })),
+          ...this.#attaching.map((slot) => ({
+            label: slot.name,
+            onRemove: () => {
+              this.#endAttaching(slot);
+              this.changed();
+            },
+            pending: true
+          }))
+        ],
         status: {
           compressions: typeof usage?.compressions === "number" ? usage.compressions : void 0,
           notice: this.#notices.current(now),
@@ -38616,7 +41064,7 @@ ${this.composer.text}` : text2);
           tps: typeof usage?.avg_tps === "number" && usage.avg_tps > 0 ? usage.avg_tps : void 0
         },
         placeholder: "Ask Hermes \u2014 / commands \xB7 @ files",
-        queued: this.queue.map((q) => q.text),
+        queued: this.#queuedRows(),
         ready: this.sid !== null
       }),
       layer: [
@@ -38634,6 +41082,17 @@ ${this.composer.text}` : text2);
     }
   }
 };
+function userText(text2, images) {
+  const count = images.length ? `\u{1F4CE} ${images.length} image${images.length === 1 ? "" : "s"}` : "";
+  return [text2, count].filter(Boolean).join("\n\n");
+}
+function userImages(images) {
+  return images.map((i) => ({ kind: "image", name: i.name, ...i.preview ? { source: i.preview } : {} }));
+}
+function pendingRows(info) {
+  const rows = info?.pending_submissions;
+  return Array.isArray(rows) ? rows : void 0;
+}
 function kaomojiLabel(text2) {
   const word = text2.match(/([A-Za-z][A-Za-z ]*[A-Za-z])\.{2,}\s*$/)?.[1];
   return word ? `${word.charAt(0).toUpperCase()}${word.slice(1)}\u2026` : "";
@@ -38651,6 +41110,7 @@ var EXIT_ARM_MS2 = 1500;
 var WatchApp = class {
   transcript = new Transcript();
   composer = new Composer();
+  #media = new Media({ blob: (bytes, mime) => this.#tern.caps.features.includes("blobs") ? this.#tern.blob(bytes, mime) : void 0 });
   #tern;
   #gw;
   #spec;
@@ -38793,6 +41253,10 @@ var WatchApp = class {
       }
       this.#lastMessage = last;
       this.transcript.load(store.messages(this.#child));
+      this.#media.showAll(this.transcript.entries, (call) => {
+        this.transcript.touchCall(call);
+        this.changed();
+      });
       return true;
     } catch {
       return false;

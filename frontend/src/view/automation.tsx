@@ -88,8 +88,8 @@ function goalPart(g: GoalView, onOpen: () => void, focused: boolean): JSX.Elemen
     >
       <icon key="icon" name={look.icon} tone={look.tone} />
       <text key="label" role="hermes.automation.label" text={look.label} wrap="none" />
+      {/* The judge's reason can run long: the tooltip and the sheet carry it, the line stays one line. */}
       <text grow={1} key="what" role="hermes.automation.what" text={g.title} truncate="end" wrap="none" />
-      {g.detail ? <text key="detail" spans={[{ s: 'muted', t: g.detail }]} truncate="end" wrap="none" /> : null}
       {g.maxTurns > 0 ? (
         <meter key="turns" size="sm" style="bar" thresholds={{ bad: 0.9, warn: 0.75 }} value={Math.min(1, g.turns / g.maxTurns)} />
       ) : null}
@@ -119,7 +119,7 @@ function loopPart(l: LoopView, owner: object, onOpen: () => void, now: number, f
       )}
       <text key="label" role="hermes.automation.label" text={paused ? 'Loop paused' : 'Loop'} wrap="none" />
       <text grow={1} key="what" role="hermes.automation.what" text={l.prompt} truncate="end" wrap="none" />
-      <text key="cadence" spans={[{ s: 'muted', t: `${l.cadence} · ${when}` }]} wrap="none" />
+      <text key="cadence" role="hermes.automation.when" spans={[{ s: 'muted', t: `${l.cadence} · ${when}` }]} wrap="none" />
       {l.dueAt !== undefined ? (
         <elapsed age={countdownAge(owner, l.dueAt, now)} format="short" key="countdown" role="hermes.automation.count" />
       ) : null}

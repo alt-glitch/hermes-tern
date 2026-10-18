@@ -67,7 +67,7 @@ import { isLoginNotice, Notices, statusEffect } from './status.js'
 import { isRunning as processRuns, Processes, processTone } from './processes/store.js'
 import { loadSettings, saveSettings, type ThemeMode } from './settings.js'
 import { type BusyMode, busyModeOf, type OwnAdmission, type PendingRow, ServerQueue, type ServerQueued } from './serverQueue.js'
-import { Transcript } from './transcript.js'
+import { internalNotice, Transcript } from './transcript.js'
 import type { Reconnecting } from './view/automation.js'
 import { dockNodes, type QueuedRow, todoProgress } from './view/dock.js'
 import { entryNode } from './view/transcript.js'
@@ -2340,7 +2340,7 @@ export class App implements OverlayHost {
       ...this.queue.map(q => ({ edit: true, steer, text: userText(q.text, q.images) })),
       ...this.#server.queued().map((q): QueuedRow => {
         if (!q.own) {
-          return { note: q.row?.status === 'unknown' ? 'unknown' : 'elsewhere', text: q.text }
+          return { note: q.row?.status === 'unknown' ? 'unknown' : 'elsewhere', text: internalNotice(q.text) ?? q.text }
         }
 
         // Withdrawing it needs the gateway's id for it: until prompt.submit answers it is on its way.

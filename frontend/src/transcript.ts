@@ -121,6 +121,19 @@ export class Transcript {
    */
   started(text: string, at = Date.now(), attachments: UserAttachment[] = []) {
     const live = this.live
+    // A goal continuation or loop run Hermes queued itself: a reason line on its turn, not a bubble.
+    const notice = attachments.length ? undefined : internalNotice(text)
+
+    if (notice) {
+      if (live && !live.blocks.length) {
+        live.continued = notice
+        this.#touch(live)
+      } else {
+        this.#continued = notice
+      }
+
+      return
+    }
 
     if (live && !live.blocks.length && this.entries.at(-1) === live) {
       this.entries.splice(-1, 0, { at, id: this.id('u'), kind: 'user', text, ...(attachments.length ? { attachments } : {}) })
@@ -1005,6 +1018,17 @@ export function internalNotice(content: string): string | undefined {
   // One child of a fan-out failed while its siblings still run.
   if (text.startsWith('[ASYNC DELEGATION TASK FAILED')) {
     return 'Subagent failed'
+  }
+
+  // The goal's and the loop's own prompts (hermes_cli/goals.py, hermes_cli/loops.py): the dock tracks both.
+  if (text.startsWith('[Continuing toward your standing goal]')) {
+    return 'Continuing toward the goal'
+  }
+
+  const wakeup = /^\[\/loop wakeup #(\d+)(?:, ([^\]]+))?\]/.exec(text)
+
+  if (wakeup) {
+    return `Loop run #${wakeup[1]}${wakeup[2] ? ` · ${wakeup[2]}` : ''}`
   }
 
   const watch = /^\[IMPORTANT: Background process \S+ matched watch pattern "([^"]*)"/.exec(text)

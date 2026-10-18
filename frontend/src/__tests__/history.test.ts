@@ -179,6 +179,9 @@ describe('async delegation notices without display_kind', () => {
   it('names a single finished and a failed subagent', () => {
     expect(internalNotice('[ASYNC DELEGATION COMPLETE — deleg_1]\nA background subagent…')).toBe('Subagent finished')
     expect(internalNotice('[ASYNC DELEGATION TASK FAILED — deleg_1, task 2/3]\nOne subagent…')).toBe('Subagent failed')
+    expect(internalNotice('[Continuing toward your standing goal]\nGoal: make the tests pass')).toBe('Continuing toward the goal')
+    expect(internalNotice('[/loop wakeup #3, every 2m] Recurring task: say hi')).toBe('Loop run #3 · every 2m')
+    expect(internalNotice('[/loop wakeup #1]\nRecurring task')).toBe('Loop run #1')
 
     const t = load([
       { role: 'user', text: 'fan out', timestamp: 1 },
@@ -189,5 +192,23 @@ describe('async delegation notices without display_kind', () => {
 
     expect(t.entries.filter(e => e.kind === 'user')).toHaveLength(1)
     expect(turns(t.entries).map(e => e.continued)).toEqual([undefined, 'Subagent failed'])
+  })
+})
+
+describe('Transcript.started: a prompt Hermes queued itself', () => {
+  it('a loop run becomes the reason line of the turn it opens, not a bubble', () => {
+    const t = new Transcript()
+    t.start()
+    t.started('[/loop wakeup #2, every 2m] Recurring task: say hi')
+    expect(t.entries.map(e => e.kind)).toEqual(['turn'])
+    expect(t.live?.continued).toBe('Loop run #2 · every 2m')
+  })
+
+  it('before its turn starts, the turn takes it', () => {
+    const t = new Transcript()
+    t.started('[Continuing toward your standing goal]\nGoal: ship')
+    t.start()
+    expect(t.entries.map(e => e.kind)).toEqual(['turn'])
+    expect(t.live?.continued).toBe('Continuing toward the goal')
   })
 })
