@@ -29349,7 +29349,7 @@ function processLine(call, id, now) {
       align: "center",
       gap: "xs",
       role: "omp.tool.process",
-      title: "Open in the Background sheet  \u2325B",
+      title: "Open in the Background sheet  \u2325J",
       children: [
         p && live ? /* @__PURE__ */ jsx("spinner", { style: "dots", tone: "accent" }, "state-icon") : /* @__PURE__ */ jsx("icon", { name: p ? p.status === "done" ? "done" : p.status === "failed" ? "failed" : "aborted" : "pending", tone }, "state-icon"),
         /* @__PURE__ */ jsx("text", { spans: [{ s: tone, t: p ? processVerdict(p) : "starting" }], wrap: "none" }, "state"),
@@ -32491,7 +32491,7 @@ var HOTKEYS = [
       [["alt+up"], "Edit the oldest queued prompt"],
       [["alt+enter"], "Steer the running turn with the oldest queued prompt (empty prompt)"],
       [["alt+a"], "Agents"],
-      [["alt+b"], "Background processes and cron jobs (/ps)"],
+      [["alt+j"], "Background processes and cron jobs (/ps)"],
       [["alt+p"], "Pull requests Hermes linked (/prs)"],
       [["alt+s"], "Session sidebar: branch, PRs, changes (/sidebar)"],
       [["ctrl+v"], "Attach the clipboard image (also \u2318V of an image, a dropped image file, /paste)"],
@@ -39226,7 +39226,7 @@ function shellsPill(s, focused) {
       mark: focused ? "pick" : void 0,
       onClick: s.onOpen,
       role: "omp.hud.pill",
-      title: "Background processes  \u2325B",
+      title: "Background processes  \u2325J",
       children: /* @__PURE__ */ jsxs("row", { align: "center", gap: "xs", role: "omp.hud.seg", children: [
         /* @__PURE__ */ jsx("icon", { name: "terminal" }, "icon"),
         live ? /* @__PURE__ */ jsx("spinner", { style: "dots", tone: "accent" }, "spin") : /* @__PURE__ */ jsx("icon", { name: s.tone === "success" ? "done" : s.tone === "error" ? "failed" : "aborted", tone: s.tone }, "end"),
@@ -39644,7 +39644,7 @@ var App = class {
       switch (key2.name) {
         case "a":
           return openAgents(this);
-        case "b":
+        case "j":
           return openBackground(this);
         case "s":
           return this.toggleSidebar();

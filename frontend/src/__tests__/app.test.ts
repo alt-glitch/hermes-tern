@@ -601,3 +601,23 @@ describe('App: Option characters', () => {
     expect(app.overlays.map(o => o.key)).toContain('agents')
   })
 })
+
+describe('App: Option+← and Option+→ in a Mac terminal', () => {
+  it('Alt+B / Alt+F (ESC b / ESC f) move the caret by a word and open no panel', async () => {
+    const { app, press, type } = setup()
+    await type('hello brave world')
+    await press(key('b', { alt: true }))
+    expect(app.composer.cursor).toBe('hello brave '.length)
+    await press(key('b', { alt: true }))
+    expect(app.composer.cursor).toBe('hello '.length)
+    await press(key('f', { alt: true }))
+    expect(app.composer.cursor).toBe('hello brave'.length)
+    expect(app.overlays).toEqual([])
+  })
+
+  it('Alt+J opens the Background sheet', async () => {
+    const { app, press } = setup()
+    await press(key('j', { alt: true }))
+    expect(app.overlays.map(o => o.key)).toContain('background')
+  })
+})

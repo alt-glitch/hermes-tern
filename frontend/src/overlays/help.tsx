@@ -43,7 +43,7 @@ const HOTKEYS: { group: string; rows: [string[], string][] }[] = [
       [['alt+up'], 'Edit the oldest queued prompt'],
       [['alt+enter'], 'Steer the running turn with the oldest queued prompt (empty prompt)'],
       [['alt+a'], 'Agents'],
-      [['alt+b'], 'Background processes and cron jobs (/ps)'],
+      [['alt+j'], 'Background processes and cron jobs (/ps)'],
       [['alt+p'], 'Pull requests Hermes linked (/prs)'],
       [['alt+s'], 'Session sidebar: branch, PRs, changes (/sidebar)'],
       [['ctrl+v'], 'Attach the clipboard image (also ⌘V of an image, a dropped image file, /paste)'],
