@@ -1,8 +1,12 @@
 import { describe, expect, it, vi } from 'vitest'
 
 import type { App } from '../app.js'
-import { localCommand } from '../commands.js'
+import { copyToClipboard } from '../clipboard.js'
+import { historyText, localCommand } from '../commands.js'
 import { CONTROL_COMMANDS, type ControlHost } from '../controlCommands.js'
+import type { Entry } from '../model.js'
+
+vi.mock('../clipboard.js', () => ({ copyToClipboard: vi.fn() }))
 
 /** The slice of App `/agents <sub>` reaches. */
 function app(paused?: boolean) {
@@ -122,5 +126,60 @@ describe('local commands', () => {
     CONTROL_COMMANDS.find(c => c.name === 'queue')!.run({ notice, queued: 2 } as unknown as ControlHost, '')
 
     expect(notice).toHaveBeenCalledWith('2 queued messages')
+  })
+})
+
+const turn = (id: string, text: string, tools = 0): Entry => ({
+  blocks: [
+    ...Array.from({ length: tools }, (_, i) => ({ call: {} as never, id: `${id}c${i}`, kind: 'tool' as const })),
+    ...(text ? [{ id: `${id}x`, kind: 'text' as const, text }] : [])
+  ],
+  id,
+  kind: 'turn',
+  rev: 0,
+  startedAt: 0,
+  status: 'done'
+})
+
+const user = (id: string, text: string): Entry => ({ at: 0, id, kind: 'user', text })
+
+describe('/copy and /history', () => {
+  const entries = [user('u1', 'hi'), turn('t1', 'first answer'), user('u2', 'more'), turn('t2', '', 2), turn('t3', 'last answer')]
+  const withTranscript = () => {
+    const transcript = { entries, notice: vi.fn(), panel: vi.fn() }
+
+    return Object.assign(local({ transcript }), { transcript })
+  }
+
+  it('/copy takes the last answer, /copy n the nth, clamped to the last', async () => {
+    const a = withTranscript()
+
+    await localCommand('copy')!.run(a, '')
+    expect(copyToClipboard).toHaveBeenLastCalledWith('last answer')
+
+    await localCommand('copy')!.run(a, '1')
+    expect(copyToClipboard).toHaveBeenLastCalledWith('first answer')
+    expect(a.transcript.notice).toHaveBeenLastCalledWith('Copied answer 1 (12 characters).')
+
+    await localCommand('copy')!.run(a, '9')
+    expect(copyToClipboard).toHaveBeenLastCalledWith('last answer')
+
+    await localCommand('copy')!.run(a, 'x')
+    expect(a.transcript.notice).toHaveBeenLastCalledWith('Usage: /copy [n] (n counts answers from the first)', 'warning')
+  })
+
+  it('/history shows the prompts and answers, a tool-only turn by its calls, clipped to [chars]', () => {
+    expect(historyText(entries, '')).toBe(
+      ['**You #1**\nhi', '**Hermes #2**\nfirst answer', '**You #3**\nmore', '**Hermes #4**\n(2 tool calls)', '**Hermes #5**\nlast answer'].join('\n\n')
+    )
+    expect(historyText([user('u', 'x'.repeat(100))], '80')).toBe(`**You #1**\n${'x'.repeat(80)}…`)
+    expect(historyText([], '')).toBe('No conversation yet.')
+  })
+
+  it('/history is a panel in the transcript', async () => {
+    const a = withTranscript()
+
+    await localCommand('history')!.run(a, '')
+    expect(a.transcript.panel).toHaveBeenCalledWith('/history', expect.stringContaining('last answer'))
   })
 })

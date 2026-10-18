@@ -87,7 +87,8 @@ describe('Completion', () => {
     await vi.runAllTimersAsync()
     pending[0]?.reject(new Error('late'))
     await vi.runAllTimersAsync()
-    expect(completion.items.map(i => i.text)).toEqual(['/help'])
+    // This frontend's own /theme and /ps (alias /shells) hold `he` too.
+    expect(completion.items.map(i => i.text)).toEqual(['/help', '/theme', '/ps'])
   })
 
   it('Tab on a list answering older text leaves the newer text alone', async () => {

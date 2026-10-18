@@ -5,9 +5,11 @@
 
 import type { CompletionItem } from '@hermes/shared/gateway-events'
 import type { JSX, Key } from '@stencil-hq/tern'
+import { scoreSlashMenuItem } from '@tui/app/slash/fuzzyScore.js'
 import { applyCompletion, completionToApplyOnSubmit } from '@tui/domain/slash.js'
 import type { GatewayClient } from '@tui/gatewayClient.js'
 
+import { INK_ONLY_COMMANDS, localCommands } from '../commands.js'
 import { completionRequestForInput } from '../hermes/completion.js'
 
 import type { Composer } from '../composer.js'
@@ -94,7 +96,11 @@ export class Completion {
 
           const items = r?.items ?? []
           this.items =
-            request.method === 'complete.slash' && request.skillsOnly ? items.filter(i => i.kind === 'skill') : items
+            request.method !== 'complete.slash'
+              ? items
+              : request.skillsOnly
+                ? items.filter(i => i.kind === 'skill')
+                : slashItems(items, before)
           this.selected = 0
           this.#for = before
           this.#replaceFrom =
@@ -240,6 +246,49 @@ export class Completion {
 
     return true
   }
+}
+
+/**
+ * A command's completion rows for `typed` (the draft's `/…` text): the gateway's, minus the Ink-only
+ * commands this frontend cannot run, and this frontend's own commands (/ps, /prs, …) that match the
+ * typed name, ranked among the gateway's commands by the same name tiers (skills stay last).
+ */
+export function slashItems(items: readonly CompletionItem[], typed: string): CompletionItem[] {
+  const word = (text: string) => text.replace(/^\//, '').split(/\s/)[0]?.toLowerCase() ?? ''
+
+  // An Ink-only command's own arguments (`/details hidden`) are no use either.
+  if (INK_ONLY_COMMANDS.has(word(typed))) {
+    return []
+  }
+
+  const kept = items.filter(i => !(i.kind === 'command' && INK_ONLY_COMMANDS.has(word(i.text))))
+
+  // Past the name (`/theme `) the rows are the command's arguments.
+  if (/\s/.test(typed)) {
+    return kept
+  }
+
+  const query = typed.slice(1).toLowerCase()
+  const listed = new Set(kept.map(i => word(i.text)))
+  const rank = (item: CompletionItem, aliases: readonly string[] = []) =>
+    query ? scoreSlashMenuItem({ aliases: [...aliases], description: item.meta ?? '', id: word(item.text) }, query) : 1
+
+  const own = localCommands().flatMap(c =>
+    c.help && !listed.has(c.name)
+      ? [{ aliases: c.aliases, item: { display: `/${c.name}`, kind: 'command', meta: c.help, text: `/${c.name}` } }]
+      : []
+  )
+
+  const commands = [
+    ...kept.filter(i => i.kind !== 'skill').map(item => ({ item, score: rank(item) })),
+    // Ours match by name or alias only: their help words ("the", "and") would flood every query.
+    ...own.map(o => ({ item: o.item, score: rank(o.item, o.aliases) })).filter(o => o.score < 3)
+  ]
+    // Stable: the gateway's order holds within a tier.
+    .sort((a, b) => a.score - b.score)
+    .map(o => o.item)
+
+  return [...commands, ...kept.filter(i => i.kind === 'skill')]
 }
 
 /** Icons for hermes's common commands; others fall back by kind. */

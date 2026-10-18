@@ -245,7 +245,7 @@ function copyButton(text: string, id: string, role: string, title: string, cx: T
 }
 
 /** The answer: the turn's last text, the one its fold leaves in view (notes before it fold away). */
-function answerText(turn: TurnEntry): string {
+export function answerText(turn: TurnEntry): string {
   const last = turn.blocks.findLast(b => b.kind === 'text' && b.text.trim())
 
   return last?.kind === 'text' ? last.text.trim() : ''

@@ -56,6 +56,7 @@ import { PullRequests } from './github/store.js'
 import { Cron } from './processes/cron.js'
 import { Sidebar } from './sidebar.js'
 import type { SessionHost } from './sessionCommands.js'
+import { ambiguousNotice, CommandCatalog, resolveSlashName } from './slashResolve.js'
 import { isLoginNotice, Notices, statusEffect } from './status.js'
 import { isRunning as processRuns, Processes, processTone } from './processes/store.js'
 import { loadSettings, saveSettings, type ThemeMode } from './settings.js'
@@ -132,6 +133,8 @@ export class App implements OverlayHost {
   readonly #tern: Session
   readonly #gw: GatewayClient
   readonly #completion: Completion
+  /** `commands.catalog`, for resolving a typed alias or prefix (`/hea` → /heartbeat). */
+  readonly #catalog: CommandCatalog
   readonly #welcome: WelcomeContext
   #surface!: Surface
   #scheduled = false
@@ -178,6 +181,7 @@ export class App implements OverlayHost {
     this.#tern = tern
     this.#gw = gw
     this.#completion = new Completion(this, gw, () => this.sid)
+    this.#catalog = new CommandCatalog(gw)
     this.#welcome = {
       tip: randomTip(process.env.HERMES_PYTHON_SRC_ROOT ?? ''),
       version: version && version !== 'unknown' ? `v${version}` : ''
@@ -233,6 +237,9 @@ export class App implements OverlayHost {
       // The runtime session died with the process: prompts queue until the next gateway.ready reattaches.
       this.sid = null
       this.busy = null
+      // Nothing can answer the sheets now; the reattach re-opens the questions still pending.
+      this.#heldRequests = []
+      this.#dropPrompts(() => true)
       this.transcript.interrupt()
       this.changed()
     })
@@ -885,14 +892,20 @@ export class App implements OverlayHost {
     this.changed()
   }
 
-  async #slash(text: string) {
-    const [name = '', ...rest] = text.slice(1).split(/\s+/)
+  /** Runs `/name arg`; `resolve`: expand a typed alias or prefix through the catalog first. */
+  async #slash(text: string, resolve = true): Promise<void> {
+    const [typed = '', ...rest] = text.slice(1).split(/\s+/)
+    const name = typed.toLowerCase()
     const arg = rest.join(' ')
     const local = localCommand(name)
 
     if (local) {
       try {
         const handled = await local.run(this, arg)
+
+        if (local.name === 'reload-skills') {
+          this.#catalog.reset()
+        }
 
         if (handled !== false) {
           return this.changed()
@@ -904,29 +917,69 @@ export class App implements OverlayHost {
       }
     }
 
-    if (!this.sid) {
+    // The reply belongs to the session it was typed in: once the view left it, or a switch begun since
+    // is in flight, the reply is dropped (Ink's stale()), so a late skill or /plan never sends its prompt
+    // to the next session.
+    const sid = this.sid
+    const generation = this.#switches.generation
+    const stale = () => this.sid !== sid || (this.#switches.pending && this.#switches.generation !== generation)
+
+    if (resolve) {
+      // Sessionless (starting, or the backend is down), only this frontend's own commands resolve.
+      const to = resolveSlashName(name, sid ? await this.#catalog.get(sid) : undefined)
+
+      if (stale()) {
+        return
+      }
+
+      if (to && 'ambiguous' in to) {
+        this.transcript.notice(ambiguousNotice(name, to.ambiguous), 'warning')
+
+        return this.changed()
+      }
+
+      if (to) {
+        return this.#slash(`/${to.name}${arg ? ` ${arg}` : ''}`, false)
+      }
+    }
+
+    if (!sid) {
       return
     }
 
     const title = `/${name}${arg ? ` ${arg}` : ''}`
 
     try {
-      const r = await this.#gw.request<unknown>('slash.exec', { command: text.slice(1), session_id: this.sid })
+      const r = await this.#gw.request<unknown>('slash.exec', { command: text.slice(1), session_id: sid })
+
+      if (stale()) {
+        return
+      }
 
       await this.#dispatched(r, title, arg)
     } catch (error) {
+      if (stale()) {
+        return
+      }
+
       // Only "slash.exec does not own this command" (skills, bundles) falls through to command.dispatch;
       // re-dispatching any other refusal could run a mutating command twice.
       if (isUnsupportedCommand(error) || !shouldFallbackToDispatch(error)) {
         this.transcript.notice(describeSlashExecError(name, error), isUnsupportedCommand(error) ? 'warning' : 'error')
       } else {
         try {
-          await this.#dispatched(
-            await this.#gw.request<unknown>('command.dispatch', { arg, name, session_id: this.sid }),
-            title,
-            arg
-          )
+          const r = await this.#gw.request<unknown>('command.dispatch', { arg, name, session_id: sid })
+
+          if (stale()) {
+            return
+          }
+
+          await this.#dispatched(r, title, arg)
         } catch (dispatchError) {
+          if (stale()) {
+            return
+          }
+
           this.transcript.notice(describeSlashExecError(name, dispatchError), 'error')
         }
       }
@@ -1198,7 +1251,9 @@ export class App implements OverlayHost {
       this.transcript.push({ id: this.transcript.id('w'), kind: 'welcome' })
       this.#adopt(r)
       snapshot = r
-      // An approval or question already waiting on the session opens its sheet.
+      // An approval or question already waiting on the session opens its sheet. A sheet from before
+      // the reattach may have been answered or pruned meanwhile (its settled event is not replayed).
+      this.#dropPrompts(key => key.startsWith(`prompt:${sharedPromptId('')}`))
       this.#gw.hydrateSharedPrompts(r)
 
       return r
@@ -1748,7 +1803,7 @@ export class App implements OverlayHost {
 
       case 'clarify.request': {
         const req = sharedPromptRequest(ev, this.#gw, message => {
-          t.notice(message, 'error')
+          t.notice(message, 'warning')
           this.changed()
         })
 

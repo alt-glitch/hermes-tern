@@ -2,7 +2,8 @@
 // (`approval.request` / `clarify.request`, gateway/session_pending_controls.py) and takes the
 // answer through `approval.respond` / `clarify.respond`, never through a server→client request.
 // This turns such an event into the ServerRequest the prompt sheets already answer, so the same
-// sheet serves both wires.
+// sheet serves both wires. Its `respond` returns the RPC: the sheet closes once the answer lands
+// and stays open to retry when the gateway refuses it.
 import type { ServerRequest } from '@hermes/shared/json-rpc-channel'
 import type { GatewayClient } from '@tui/gatewayClient.js'
 
@@ -21,7 +22,7 @@ export const sharedPromptId = (promptId: unknown) => `shared:${String(promptId)}
 export function sharedPromptRequest(
   ev: { type: string; session_id?: string; payload?: unknown },
   gw: Pick<GatewayClient, 'request'>,
-  onError: (message: string) => void
+  onNotice: (message: string) => void
 ): ServerRequest | null {
   const kind = ev.type === 'approval.request' ? 'approval' : ev.type === 'clarify.request' ? 'clarify' : null
   const shared = (ev.payload ?? {}) as SharedPayload
@@ -42,15 +43,25 @@ export function sharedPromptRequest(
       ? [{ choices: shared.choices ?? [], multi_select: shared.multi_select === true, qid: shared.prompt_id, question: single }]
       : [])
 
-  let answered = false
+  /** The answer in flight or landed: a second one waits on it, never sends again. */
+  let answered: Promise<void> | undefined
 
   const send = (method: string, params: Record<string, unknown>) => {
-    if (answered) {
-      return
-    }
+    answered ??= gw.request<{ status?: string } | null>(method, { ...params, ...control }).then(
+      r => {
+        if (r?.status === 'already_resolved') {
+          onNotice('That question was already answered (by another window, or it timed out).')
+        }
+      },
+      (error: unknown) => {
+        // Refused or lost: the sheet shows why and may answer again.
+        answered = undefined
 
-    answered = true
-    gw.request(method, { ...params, ...control }).catch((error: Error) => onError(error.message))
+        throw error
+      }
+    )
+
+    return answered
   }
 
   return {

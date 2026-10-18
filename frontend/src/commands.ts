@@ -4,7 +4,9 @@
 // gateway's `slash.exec`.
 
 import type { App } from './app.js'
+import { copyToClipboard } from './clipboard.js'
 import { CONTROL_COMMANDS } from './controlCommands.js'
+import type { Entry } from './model.js'
 import { openAgents } from './overlays/agents.js'
 import { openBackground } from './overlays/background.js'
 import { openChanges } from './overlays/changes.js'
@@ -16,11 +18,17 @@ import { confirmOverlay } from './overlays/prompts.js'
 import { openSessionPicker } from './overlays/sessions.js'
 import { isThemeMode, openThemePicker } from './overlays/theme.js'
 import { SESSION_COMMANDS } from './sessionCommands.js'
+import { answerText } from './view/transcript.js'
 
 /** A client-side slash command. */
 export interface LocalCommand {
   name: string
   aliases?: readonly string[]
+  /**
+   * The completion row and the help sheet's line. Only commands the gateway's catalog does not
+   * list carry one: the rest mirror a gateway command that is already listed.
+   */
+  help?: string
   /**
    * Runs `/name arg`. Returning false hands the command to `slash.exec`
    * instead (a form this frontend leaves to the backend).
@@ -80,6 +88,7 @@ const COMMANDS: readonly LocalCommand[] = [
     }
   },
   {
+    help: 'Pick the colors: Tern, Nous or the Hermes skin [tern|nous|skin]',
     name: 'theme',
     run: (app, arg) => {
       if (!arg) {
@@ -104,11 +113,13 @@ const COMMANDS: readonly LocalCommand[] = [
   {
     // Hermes has no command by these names (its `/bg` runs a prompt in a side agent: controlCommands.ts).
     aliases: ['bashes', 'shells', 'processes'],
+    help: 'Background processes and cron jobs',
     name: 'ps',
     run: app => openBackground(app)
   },
   {
     // Hermes' own `/reasoning` stays the backend's (show/hide, levels, --global).
+    help: 'Pick the reasoning effort [level] [--global]',
     name: 'effort',
     run: (app, arg) => {
       const words = arg.trim().split(/\s+/).filter(Boolean)
@@ -152,18 +163,30 @@ const COMMANDS: readonly LocalCommand[] = [
   },
   {
     aliases: ['side'],
+    help: 'Show or hide the session sidebar: branch, PRs, changes',
     name: 'sidebar',
     run: app => app.toggleSidebar()
   },
   {
     aliases: ['diff'],
+    help: 'The working tree changes, file by file',
     name: 'changes',
     run: app => openChanges(app)
   },
   {
     aliases: ['pr', 'pulls'],
+    help: 'Pull requests Hermes linked',
     name: 'prs',
     run: app => openPullRequests(app)
+  },
+  {
+    // The gateway refuses its own /copy and /history (cli_only); Ink runs them on its transcript, as these do.
+    name: 'copy',
+    run: (app, arg) => copyAnswer(app, arg)
+  },
+  {
+    name: 'history',
+    run: (app, arg) => app.transcript.panel('/history', historyText(app.transcript.entries, arg))
   },
   {
     // `/help <command>` is the backend's detailed usage.
@@ -173,6 +196,53 @@ const COMMANDS: readonly LocalCommand[] = [
   ...CONTROL_COMMANDS.map(c => ({ ...c, run: (app: App, arg: string) => c.run(app.control(), arg) })),
   ...SESSION_COMMANDS.map(c => ({ ...c, run: (app: App, arg: string) => c.run(app.control(), arg) }))
 ]
+
+/**
+ * Commands the gateway lists (complete.slash's TUI extras, the catalog's TUI section) that only the
+ * Ink TUI runs: this frontend neither offers nor resolves them.
+ */
+export const INK_ONLY_COMMANDS: ReadonlySet<string> = new Set(['density', 'details', 'logs', 'mouse'])
+
+/** `/copy [n]`: the last (or `n`th) answer to the clipboard. */
+function copyAnswer(app: App, arg: string) {
+  const n = arg.trim() ? Number.parseInt(arg, 10) : undefined
+
+  if (n !== undefined && !(n >= 1)) {
+    return app.transcript.notice('Usage: /copy [n] (n counts answers from the first)', 'warning')
+  }
+
+  const answers = app.transcript.entries.flatMap(e => (e.kind === 'turn' && answerText(e) ? [answerText(e)] : []))
+  const at = n === undefined ? answers.length : Math.min(n, answers.length)
+  const text = answers[at - 1]
+
+  if (!text) {
+    return app.transcript.notice('No answer to copy yet.', 'warning')
+  }
+
+  copyToClipboard(text)
+  app.transcript.notice(`Copied ${n === undefined ? 'the last answer' : `answer ${at}`} (${text.length} characters).`)
+}
+
+/** `/history [chars]`: the conversation so far, each prompt and answer clipped to `chars` (Ink's preview). */
+export function historyText(entries: readonly Entry[], arg: string): string {
+  const preview = Math.max(80, Number.parseInt(arg, 10) || 400)
+  let n = 0
+
+  const lines = entries.flatMap(e => {
+    if (e.kind !== 'user' && e.kind !== 'turn') {
+      return []
+    }
+
+    const tools = e.kind === 'turn' ? e.blocks.filter(b => b.kind === 'tool').length : 0
+    const said = e.kind === 'user' ? e.text.trim() : answerText(e)
+    const body = said || (tools ? `(${tools} tool call${tools === 1 ? '' : 's'})` : '(empty)')
+    const clipped = body.length > preview ? `${body.slice(0, preview).trimEnd()}…` : body
+
+    return [`**${e.kind === 'user' ? 'You' : 'Hermes'} #${++n}**\n${clipped}`]
+  })
+
+  return lines.length ? lines.join('\n\n') : 'No conversation yet.'
+}
 
 /** `/agents` opens the hub; `pause|resume` gate new spawns gateway-wide (`delegation.pause`). */
 async function agents(app: App, arg: string) {
@@ -205,7 +275,12 @@ async function agents(app: App, arg: string) {
   app.transcript.notice('Usage: /agents [pause|resume|status]', 'warning')
 }
 
-/** The client-side command `name` (without the slash) answers to, if any. */
+/** The client-side command `name` (without the slash, any case) answers to, if any. */
 export function localCommand(name: string): LocalCommand | undefined {
-  return COMMANDS.find(c => c.name === name || c.aliases?.includes(name))
+  const lower = name.toLowerCase()
+
+  return COMMANDS.find(c => c.name === lower || c.aliases?.includes(lower))
 }
+
+/** Every client-side command; the ones with `help` are this frontend's own (completion, /help). */
+export const localCommands = (): readonly LocalCommand[] => COMMANDS
