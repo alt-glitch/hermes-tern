@@ -190,6 +190,26 @@ describe('session commands', () => {
     expect(h.panel).toHaveBeenCalledWith('Reload Skills', 'Added: x')
   })
 
+  it('/reload-mcp calls reload.mcp, confirmed, and names the servers that did not connect', async () => {
+    const { h, request } = host(
+      {},
+      { 'reload.mcp': { message: 'MCP servers reconciled (added: argus)', session: 'applied', status: 'reloaded', unavailable: ['linear'] } }
+    )
+
+    await run('reload_mcp', h)
+
+    expect(request).toHaveBeenCalledWith('reload.mcp', { confirm: true, session_id: 'sid-1' })
+    expect(h.panel).toHaveBeenCalledWith('Reload MCP', 'MCP servers reconciled (added: argus)')
+    expect(h.notice).toHaveBeenCalledWith('Did not connect: linear.', 'warning')
+  })
+
+  it('/reload-mcp on a private gateway is left to slash.exec', async () => {
+    const { h, request } = host({ canonical: false })
+
+    expect(await run('reload-mcp', h)).toBe(false)
+    expect(request).not.toHaveBeenCalled()
+  })
+
   it('/rollback lists, diffs and restores checkpoints', async () => {
     const { h, request } = host(
       {},
