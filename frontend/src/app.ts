@@ -26,10 +26,12 @@ import type { AnyGatewayEvent } from '@tui/gatewayTypes.js'
 import logo from '../assets/logo.png'
 
 import { agentName, Agents } from './agents/store.js'
+import { Automation } from './automation.js'
 import { copyToClipboard } from './clipboard.js'
 import { localCommand } from './commands.js'
 import { Composer } from './composer.js'
 import { interruptTurn, steerTurn } from './controlCommands.js'
+import { fastTier } from './fast.js'
 import { type Busy, busyFrom, ownsEvent, Switches } from './flow.js'
 import { protocolNote, slowStartNotes } from './backendNotes.js'
 import { hudKey, type Pill } from './hud.js'
@@ -42,10 +44,12 @@ import { hasInterpolation, interpolate, shellError, shellExec, shellLines } from
 import { mutateSession } from './hermes/mutate.js'
 import { sharedPromptId, sharedPromptRequest } from './hermes/sharedPrompts.js'
 import { openAgents } from './overlays/agents.js'
+import { openAutomation } from './overlays/automation.js'
 import { openBackground } from './overlays/background.js'
 import { Completion } from './overlays/completion.js'
 import { openModelPicker } from './overlays/models.js'
-import { openEffortPicker } from './overlays/effort.js'
+import { DEFAULT_EFFORT, nextEffort, openEffortPicker } from './overlays/effort.js'
+import { capsOf } from './modelCaps.js'
 import { promptOverlay, promptTimeoutNotice } from './overlays/prompts.js'
 import { openPullRequests, openUrl, prsPill } from './overlays/pullRequests.js'
 import { STYLES } from './view/styles.js'
@@ -61,6 +65,7 @@ import { isLoginNotice, Notices, statusEffect } from './status.js'
 import { isRunning as processRuns, Processes, processTone } from './processes/store.js'
 import { loadSettings, saveSettings, type ThemeMode } from './settings.js'
 import { Transcript } from './transcript.js'
+import type { Reconnecting } from './view/automation.js'
 import { dockNodes, todoProgress } from './view/dock.js'
 import { entryNode } from './view/transcript.js'
 import { busyLabel, preparingLabel } from './workLog.js'
@@ -73,9 +78,6 @@ export const INPUT_ID = 'dock.composer.line.input'
 const EXIT_ARM_MS = 1500
 /** How long a prompt's Copy button reads Copied. */
 const COPIED_MS = 1500
-/** What Shift+Tab / the effort chip cycle through (hermes's `none` turns reasoning off). */
-const EFFORTS = ['none', 'low', 'medium', 'high', 'xhigh']
-
 /** session.create's result, or session.resume's with the state of a turn it may be in. */
 interface CreateResult extends Partial<
   Pick<SessionResumeResult, 'inflight' | 'running' | 'status' | 'turn_started_at'>
@@ -111,6 +113,8 @@ export class App implements OverlayHost {
   readonly processes: Processes = new Processes(this)
   readonly cron: Cron = new Cron(this)
   readonly sidebar: Sidebar = new Sidebar(this)
+  /** The session's standing /goal and /loop (the dock line above the pills and its sheets). */
+  readonly automation: Automation = new Automation(this)
   /** The session's title, as Hermes names it (`session.title`). */
   title = ''
   /** The todo panel above the composer is open. */
@@ -176,6 +180,9 @@ export class App implements OverlayHost {
   #compacting = false
   /** The status warning shown last, so a repeated one stays one line. */
   #lastStatusNote: string | undefined
+  /** The gateway is being redialled (`gateway.reconnecting`) until the next gateway.ready. */
+  #reconnecting: Reconnecting | undefined
+  #reconnectTimer: NodeJS.Timeout | undefined
 
   constructor(tern: Session, gw: GatewayClient, version: string) {
     this.#tern = tern
@@ -465,7 +472,9 @@ export class App implements OverlayHost {
       ...(this.#todos() && !this.busy ? (['todos'] as const) : []),
       ...(this.agents.running().length ? (['agents'] as const) : []),
       ...(this.processes.recent(now).length ? (['shells'] as const) : []),
-      ...(this.prs.entries().length ? (['prs'] as const) : [])
+      ...(this.prs.entries().length ? (['prs'] as const) : []),
+      ...(this.automation.goal ? (['goal'] as const) : []),
+      ...(this.automation.loop(now) ? (['loop'] as const) : [])
     ]
   }
 
@@ -485,6 +494,8 @@ export class App implements OverlayHost {
       openBackground(this)
     } else if (out.open === 'prs') {
       openPullRequests(this)
+    } else if (out.open === 'goal' || out.open === 'loop') {
+      openAutomation(this, out.open)
     } else if (out.open === 'todos') {
       this.#todosOpen = !this.#todosOpen
       this.changed()
@@ -1301,6 +1312,7 @@ export class App implements OverlayHost {
     this.processes.poke()
     this.#watchConnections()
     this.prs.adopt()
+    this.automation.adopt(r.session_id)
 
     if (r.inflight) {
       this.transcript.inflight(r.inflight, this.busy?.startedAt)
@@ -1372,6 +1384,11 @@ export class App implements OverlayHost {
         void this.#detach(r.session_id, r.subscription_id)
       }
     }
+  }
+
+  /** Acts on a command's dispatch envelope from outside a typed command (a goal or loop sheet's button). */
+  runDispatch(raw: unknown, title: string): Promise<void> {
+    return this.#dispatched(raw, title, '')
   }
 
   /** Acts on a slash.exec / command.dispatch answer: output, a skill or message to send, an alias or a prefill. */
@@ -1459,6 +1476,7 @@ export class App implements OverlayHost {
     switch (ev.type) {
       case 'gateway.ready':
         this.#offline = false
+        this.#reconnected()
         this.#applySkin(ev.payload?.skin)
         // A reconnect's ready reattaches the shown session; only a sessionless app bootstraps.
         void (this.storedSid ? this.#reattach(this.storedSid) : this.#bootstrap())
@@ -1467,6 +1485,17 @@ export class App implements OverlayHost {
 
       case 'skin.changed':
         this.#applySkin(ev.payload)
+
+        break
+
+      // The goal and loop line: every set, pause, resume, stop, wakeup and judged turn.
+      case 'session.control.update':
+        this.automation.apply(ev.session_id ?? this.sid, ev.payload?.control)
+
+        return
+
+      case 'gateway.reconnecting':
+        this.#reconnect(ev.payload?.attempt ?? 1, ev.payload?.delay_ms ?? 0)
 
         break
 
@@ -1872,6 +1901,19 @@ export class App implements OverlayHost {
     }
   }
 
+  /** One line for the whole outage: each try replaces it, and re-renders when the wait ends. */
+  #reconnect(attempt: number, delayMs: number) {
+    clearTimeout(this.#reconnectTimer)
+    this.#reconnecting = { attempt, dueAt: Date.now() + delayMs }
+    this.#reconnectTimer = setTimeout(() => this.changed(), delayMs + 50)
+    this.#reconnectTimer.unref?.()
+  }
+
+  #reconnected() {
+    clearTimeout(this.#reconnectTimer)
+    this.#reconnecting = undefined
+  }
+
   #applySkin(skin: SkinPayload | null | undefined) {
     if (skin) {
       this.#skin = skin
@@ -1932,35 +1974,54 @@ export class App implements OverlayHost {
     })
   }
 
-  /** Steps the session's reasoning effort up hermes's ladder; session.info echoes it back. */
+  /** Steps the session's reasoning effort up the levels its model takes; session.info echoes it back. */
   #cycleEffort() {
-    const at = EFFORTS.indexOf(this.info?.reasoning_effort ?? '')
+    const next = nextEffort(this.info?.reasoning_effort ?? '', capsOf(this.info))
 
-    void this.setEffort(EFFORTS[at < 0 ? EFFORTS.indexOf('medium') : (at + 1) % EFFORTS.length]!, 'session')
+    if (!next) {
+      this.transcript.notice('This model has no reasoning effort to set.', 'warning')
+
+      return this.changed()
+    }
+
+    void this.setEffort(next, 'session')
   }
 
   /**
    * Sets the reasoning effort: `session` for this session only (the pill, ⇧⇥), `global` also as
    * config.yaml's `agent.reasoning_effort`, the default of every new session (Hermes' `/reasoning
-   * <level> --global`).
+   * <level> --global`). On the shared gateway the session level is its revision-fenced `reasoning`
+   * mutation, as Ink and desktop send it: stored with the session, and session.info to every viewer.
    */
   async setEffort(value: string, scope: 'global' | 'session') {
-    if (!this.sid) {
+    const sid = this.sid
+
+    if (!sid) {
       return
     }
 
-    // Shown at once (and a quick second press steps from it); session.info confirms.
-    this.info = this.info && { ...this.info, reasoning_effort: value }
+    const before = this.info && { reasoning_effort: this.info.reasoning_effort, reasoning_effort_wire: this.info.reasoning_effort_wire }
+    // Shown at once (and a quick second press steps from it); session.info confirms, with the wire level.
+    this.info = this.info && { ...this.info, reasoning_effort: value, reasoning_effort_wire: undefined }
     this.changed()
 
     try {
-      await this.#gw.request('config.set', { key: 'reasoning', scope, session_id: this.sid, value })
+      if (scope === 'session' && this.#gw.isCanonical) {
+        await mutateSession(this.#gw, sid, 'reasoning', { effort: value })
+      } else {
+        await this.#gw.request('config.set', { key: 'reasoning', scope, session_id: sid, value })
+      }
 
       if (scope === 'global') {
         this.transcript.notice(`Reasoning effort ${value === 'none' ? 'off' : value} is now the default for new sessions.`)
       }
     } catch (error) {
-      this.transcript.notice(error instanceof Error ? error.message : String(error), 'error')
+      // Back to what the session runs, unless something newer has replaced the guess since.
+      if (sid === this.sid && this.info && before && this.info.reasoning_effort === value) {
+        this.info = { ...this.info, ...before }
+      }
+
+      this.transcript.notice(`Could not set the reasoning effort: ${error instanceof Error ? error.message : String(error)}`, 'error')
     }
 
     this.changed()
@@ -2068,6 +2129,17 @@ export class App implements OverlayHost {
         cost: usage?.cost_usd ?? undefined,
         cwd: info?.cwd ? shortPath(info.cwd) : '',
         effort: info?.reasoning_effort ?? '',
+        effortWire: info?.reasoning_effort_wire || undefined,
+        fast: fastTier(info),
+        reasons: capsOf(info)?.reasoning,
+        automation: {
+          goal: this.automation.goal,
+          loop: this.automation.loop(now),
+          loopOwner: this.automation.loopSnapshot,
+          onGoal: () => openAutomation(this, 'goal'),
+          onLoop: () => openAutomation(this, 'loop')
+        },
+        reconnecting: this.#reconnecting,
         ghost: modal ? '' : this.#completion.ghost,
         inputId: INPUT_ID,
         model: info?.model ?? '',
@@ -2079,7 +2151,7 @@ export class App implements OverlayHost {
         onEffort: () => this.#cycleEffort(),
         onEffortMenu: {
           'choose-effort': () => openEffortPicker(this),
-          'save-effort-as-default': () => void this.setEffort(this.info?.reasoning_effort || 'medium', 'global')
+          'save-effort-as-default': () => void this.setEffort(this.info?.reasoning_effort || DEFAULT_EFFORT, 'global')
         },
         onInterrupt: () => this.#interrupt(),
         onModel: () => openModelPicker(this),

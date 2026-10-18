@@ -2,8 +2,9 @@
 // provider's models in one `picker` sheet like omp's (search, a provider
 // scope column, facts, a preview pane, the current model checked), switching
 // the session's model through `config.set` as the Ink TUI's picker does. The effort strip picks the
-// reasoning effort to go with it (Ctrl+E steps it); Save as default keeps both for new sessions
-// where the gateway can write the default (a private one: the shared gateway switches the session only).
+// reasoning effort to go with it (Ctrl+E steps it) and, for a model with a fast tier, Fast (Ctrl+F);
+// Save as default keeps the model and effort for new sessions where the gateway can write the
+// default (a private one: the shared gateway switches the session only).
 
 import type { ConfigSetResult, ModelOptionProvider, ModelOptionsResult } from '@hermes/shared/gateway-events'
 import { modelSearchText } from '@hermes/shared/model-search-text'
@@ -11,10 +12,12 @@ import type { JSX, Key, KvItem, PickerColumn, PickerGroup, PickerItem, PickerSco
 import { providerDisplayNames } from '@tui/domain/providers.js'
 
 import type { App } from '../app.js'
+import { setFast } from '../fast.js'
 import { modelPayload, mutateSession } from '../hermes/mutate.js'
+import { rememberCaps } from '../modelCaps.js'
 import type { Overlay } from '../overlay.js'
 
-import { LEVELS } from './effort.js'
+import { levelsFor } from './effort.js'
 
 import { editQuery, hitRuns, moveSelection, rank } from './search.js'
 
@@ -108,6 +111,9 @@ export function openModelPicker(app: App) {
   /** The session's effort when the picker opened, and the one picked on the strip. */
   const startEffort = app.info?.reasoning_effort || ''
   let effort = startEffort || 'medium'
+  /** Fast mode as the session has it, and whether the user flipped it here. */
+  let fast = Boolean(app.info?.fast)
+  let fastTouched = false
   let confirm: Confirm | null = null
   let busy = false
   /** The ids shown, in order, for ↑/↓. */
@@ -120,6 +126,7 @@ export function openModelPicker(app: App) {
     try {
       const r = await app.gw.request<ModelOptionsResult>('model.options', app.sid ? { session_id: app.sid } : {})
       const list = r.providers ?? []
+      rememberCaps(list)
       const names = providerDisplayNames(list)
       providers = list.map((provider, i) => ({ name: names[i] ?? provider.name, provider }))
       rows = providers.flatMap(({ provider, name }) =>
@@ -163,8 +170,13 @@ export function openModelPicker(app: App) {
         app.close(overlay)
 
         // The effort goes with the model: saved with it as the default, or set when it changed.
-        if ((canSave && global) || effort !== startEffort) {
+        if (levelsFor(caps(row)).some(l => l.id === effort) && ((canSave && global) || effort !== startEffort)) {
           await app.setEffort(effort, canSave && global ? 'global' : 'session')
+        }
+
+        // After the switch: the gateway checks the tier against the session's new route.
+        if (fastTouched && fastable(row)) {
+          await setFast(app, fast ? 'fast' : 'normal')
         }
       }
     } catch (error) {
@@ -237,11 +249,12 @@ export function openModelPicker(app: App) {
       ]
 
       const row = rows.find(r => r.id === selected)
-      const reasons = row?.provider.capabilities?.[row.model]?.reasoning !== false
+      const levels = levelsFor(row && caps(row))
 
       return (
         <picker
           actions={[
+            ...(row && fastable(row) ? [{ id: 'fast', keys: ['ctrl+f'], label: '⚡ Fast', on: fast }] : []),
             ...(canSave ? [{ id: 'global', keys: ['ctrl+g'], label: 'Save as default', on: global }] : []),
             { end: true, id: 'close', keys: ['esc'], label: 'Close' },
             { id: 'use', keys: ['enter'], label: 'Switch', primary: true }
@@ -268,6 +281,11 @@ export function openModelPicker(app: App) {
             },
             close: () => app.close(overlay),
             confirm: () => void choose(confirm?.row.id, true),
+            fast: () => {
+              fast = !fast
+              fastTouched = true
+              app.changed()
+            },
             global: () => {
               global = !global
               app.changed()
@@ -278,7 +296,7 @@ export function openModelPicker(app: App) {
               app.changed()
             },
             strip: ev => {
-              effort = LEVELS.find(l => l.id === ev.value)?.id ?? effort
+              effort = levels.find(l => l.id === ev.value)?.id ?? effort
               app.changed()
             },
             use: () => void choose(selected)
@@ -299,9 +317,9 @@ export function openModelPicker(app: App) {
           size="lg"
           state={state}
           strip={
-            reasons
+            levels.length
               ? {
-                  items: LEVELS.map(l => ({ id: l.id, label: l.label, on: l.id === effort })),
+                  items: levels.map(l => ({ id: l.id, label: l.label, on: l.id === effort })),
                   label: 'Effort  ⌃E',
                   selected: effort
                 }
@@ -344,8 +362,21 @@ export function openModelPicker(app: App) {
       }
 
       if (k.ctrl && k.name === 'e') {
-        const at = LEVELS.findIndex(l => l.id === effort)
-        effort = LEVELS[(at + (k.shift ? LEVELS.length - 1 : 1)) % LEVELS.length]!.id
+        const row = rows.find(r => r.id === selected)
+        const levels = levelsFor(row && caps(row))
+        const at = levels.findIndex(l => l.id === effort)
+        effort = levels.length ? levels[(at + (k.shift ? levels.length - 1 : 1)) % levels.length]!.id : effort
+
+        return true
+      }
+
+      if (k.ctrl && k.name === 'f') {
+        const row = rows.find(r => r.id === selected)
+
+        if (row && fastable(row)) {
+          fast = !fast
+          fastTouched = true
+        }
 
         return true
       }
@@ -378,6 +409,11 @@ export function openModelPicker(app: App) {
   app.open(overlay)
   void load()
 }
+
+const caps = (row: Row) => row.provider.capabilities?.[row.model]
+
+/** The model has a fast tier on its provider. */
+const fastable = (row: Row) => Boolean(caps(row)?.fast || caps(row)?.ultrafast)
 
 function itemOf(row: Row): PickerItem {
   const price = row.provider.pricing?.[row.model]

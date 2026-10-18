@@ -302,6 +302,77 @@ export const STYLES = css`
     font-size: 10px;
   }
 
+  /* The standing goal and loop, and the reconnect notice: quiet lines above the pills, as wide as
+     the composer. A goal or loop part is a soft capsule that opens its sheet. */
+  [data-role='hermes.automation'],
+  [data-role='hermes.reconnect'] {
+    width: min(736px, calc(100% - 8px));
+    margin: 0 auto 6px !important;
+    font: 400 12.5px/22px var(--sans) !important;
+    color: var(--t2);
+  }
+
+  [data-role='hermes.reconnect'] {
+    padding: 0 10px !important;
+  }
+
+  [data-role='hermes.reconnect'] .sf-elapsed,
+  [data-role='hermes.automation.count'] {
+    font-variant-numeric: tabular-nums;
+    color: var(--t2);
+  }
+
+  .sf-row[data-role='hermes.automation.item'] {
+    flex: 1 1 0;
+    min-width: 0;
+    padding: 1px 10px !important;
+    border-radius: 999px;
+    background: var(--l1);
+    cursor: pointer;
+    transition: background 0.15s ease;
+  }
+
+  .sf-row[data-role='hermes.automation.item']:hover {
+    background: var(--l2);
+  }
+
+  .sf-row[data-role='hermes.automation.item'][data-mark='pick'] {
+    box-shadow: inset 0 0 0 1px var(--accent) !important;
+  }
+
+  .sf-row[data-role='hermes.automation.item'][data-mark='pick']::after {
+    display: none;
+  }
+
+  [data-role='hermes.automation.label'] {
+    flex: none;
+    color: var(--t1);
+    font-weight: 500;
+  }
+
+  [data-role='hermes.automation.what'] {
+    min-width: 0;
+    color: var(--t2);
+  }
+
+  [data-role='hermes.automation.item'] .sf-meter {
+    flex: none;
+    width: 44px;
+  }
+
+  [data-role='hermes.automation.title'] {
+    font-size: 15px !important;
+  }
+
+  /* Fast mode: a bolt on the model chip. */
+  [data-role='hermes.composer.fast'] {
+    margin-left: -2px;
+  }
+
+  [data-role='hermes.composer.fast'] + [data-role='hermes.composer.fast'] {
+    margin-left: -7px;
+  }
+
   /* A background card's process line opens the Background sheet. */
   .sf-row[data-role='omp.tool.process'] {
     cursor: pointer;

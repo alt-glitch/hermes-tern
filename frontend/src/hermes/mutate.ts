@@ -6,7 +6,7 @@ import { randomUUID } from 'node:crypto'
 
 import type { GatewayClient } from '@tui/gatewayClient.js'
 
-export type SessionOperation = 'model' | 'delete' | 'rename' | 'rewind' | 'compress' | 'branch'
+export type SessionOperation = 'model' | 'reasoning' | 'delete' | 'rename' | 'rewind' | 'compress' | 'branch'
 
 export interface MutationResult extends Record<string, unknown> {
   status?: string
