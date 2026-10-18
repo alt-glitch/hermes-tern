@@ -1,7 +1,8 @@
 import type { ServerRequest } from '@hermes/shared/json-rpc-channel'
 import type { Key } from '@stencil-hq/tern'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
+import { sharedPromptRequest } from '../hermes/sharedPrompts.js'
 import type { Overlay, OverlayHost } from '../overlay.js'
 import { promptOverlay, promptTimeoutNotice } from '../overlays/prompts.js'
 
@@ -125,5 +126,104 @@ describe('promptTimeoutNotice', () => {
     expect(promptTimeoutNotice('sudo', 'interrupted')).toBeNull()
     expect(promptTimeoutNotice('clarify', 'timeout')).toBeNull()
     expect(promptTimeoutNotice(undefined, 'timeout')).toBeNull()
+  })
+})
+
+/** A shared-gateway prompt (`approval.request` / `clarify.request`) whose respond RPCs answer by hand. */
+function shared(type: 'approval.request' | 'clarify.request', payload: Record<string, unknown> = {}) {
+  const replies: PromiseWithResolvers<unknown>[] = []
+  const request = vi.fn((_method: string, _params: Record<string, unknown>) => {
+    const reply = Promise.withResolvers<unknown>()
+    replies.push(reply)
+
+    return reply.promise
+  })
+  const notices: string[] = []
+
+  const req = sharedPromptRequest(
+    { payload: { execution_generation: 3, prompt_id: 'p1', ...payload }, session_id: 's1', type },
+    { request } as never,
+    m => notices.push(m)
+  )!
+
+  const closed: Overlay[] = []
+  const host: OverlayHost = { changed: () => undefined, close: o => closed.push(o), open: () => undefined }
+  const overlay = promptOverlay(host, req)!
+
+  return { closed, notices, overlay, replies, req, request }
+}
+
+/** Every text span the sheet shows, joined. */
+function sheetText(overlay: Overlay): string {
+  const walk = (n: { p?: { text?: unknown; spans?: { t: string }[] }; c?: unknown[] }): string[] => [
+    ...(typeof n.p?.text === 'string' ? [n.p.text] : []),
+    ...(n.p?.spans ?? []).map(sp => sp.t),
+    ...((n.c ?? []) as (typeof n)[]).flatMap(walk)
+  ]
+
+  return walk(JSON.parse(JSON.stringify(overlay.node('layer.prompt:shared:p1')))).join(' ')
+}
+
+const settle = () => new Promise(resolve => setTimeout(resolve, 0))
+
+describe('a shared prompt sheet', () => {
+  it('closes only once approval.respond lands', async () => {
+    const { closed, overlay, replies, request } = shared('approval.request', { command: 'rm -rf build' })
+
+    overlay.onKey(key('y'))
+    expect(request).toHaveBeenCalledWith('approval.respond', { choice: 'once', execution_generation: 3, prompt_id: 'p1', session_id: 's1' })
+    expect(closed).toEqual([])
+    expect(sheetText(overlay)).toMatch(/Sending/)
+
+    // A second answer while the first is in flight sends nothing.
+    overlay.onKey(key('n'))
+    expect(request).toHaveBeenCalledTimes(1)
+
+    replies[0]!.resolve({ status: 'resolved' })
+    await settle()
+    expect(closed).toEqual([overlay])
+  })
+
+  it('stays open with the reason when the answer is refused, and answers again', async () => {
+    const { closed, overlay, replies, request } = shared('approval.request', { command: 'make' })
+
+    overlay.onKey(key('y'))
+    replies[0]!.reject(new Error('gateway unavailable'))
+    await settle()
+
+    expect(closed).toEqual([])
+    expect(sheetText(overlay)).toMatch(/Not answered: gateway unavailable/)
+
+    overlay.onKey(key('n'))
+    expect(request).toHaveBeenLastCalledWith('approval.respond', expect.objectContaining({ choice: 'deny' }))
+    replies[1]!.resolve({ status: 'resolved' })
+    await settle()
+    expect(closed).toEqual([overlay])
+  })
+
+  it('closes unanswered on Esc after a refusal (a retry may never land)', async () => {
+    const { closed, overlay, replies, request } = shared('clarify.request', { question: 'Which?' })
+
+    overlay.onKey(key('a', { text: 'a' }))
+    overlay.onKey(key('enter'))
+    expect(request).toHaveBeenCalledWith('clarify.respond', expect.objectContaining({ answer: 'a' }))
+    replies[0]!.reject(new Error('stale_generation'))
+    await settle()
+    expect(closed).toEqual([])
+
+    overlay.onKey(key('escape'))
+    expect(closed).toEqual([overlay])
+    expect(request).toHaveBeenCalledTimes(1)
+  })
+
+  it('says so when the question was already answered elsewhere', async () => {
+    const { closed, notices, overlay, replies } = shared('approval.request', { command: 'make' })
+
+    overlay.onKey(key('y'))
+    replies[0]!.resolve({ status: 'already_resolved' })
+    await settle()
+
+    expect(closed).toEqual([overlay])
+    expect(notices).toEqual(['That question was already answered (by another window, or it timed out).'])
   })
 })

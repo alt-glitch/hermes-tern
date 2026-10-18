@@ -1,11 +1,13 @@
-// `/help`: the keyboard shortcuts and every slash command, grouped by the
-// backend's `commands.catalog` categories, in omp's hotkeys sheet
-// (`omp.overlay.hotkeys`: sections of key/action tables, Close esc).
+// `/help`: the keyboard shortcuts, this frontend's own commands, and every
+// slash command grouped by the backend's `commands.catalog` categories, in
+// omp's hotkeys sheet (`omp.overlay.hotkeys`: sections of key/action tables,
+// Close esc).
 
 import type { CommandsCatalogResult } from '@hermes/shared/gateway-events'
 import type { Key, SpanData } from '@stencil-hq/tern'
 
 import type { App } from '../app.js'
+import { INK_ONLY_COMMANDS, localCommands } from '../commands.js'
 import type { Overlay } from '../overlay.js'
 
 const KEY = 'help'
@@ -60,9 +62,19 @@ export async function openHelp(app: App) {
     )
   }
 
-  const categories = catalog.categories?.length
-    ? catalog.categories
-    : [{ name: 'Commands', pairs: catalog.pairs ?? [] }]
+  const own = localCommands().flatMap(c =>
+    c.help ? [[[`/${c.name}`, ...(c.aliases ?? []).map(a => `/${a}`)].join(' · '), c.help]] : []
+  )
+
+  // The catalog's Ink-only rows (/mouse, /logs, …) do nothing here.
+  const runs = ([command = '']: string[]) => !INK_ONLY_COMMANDS.has(command.replace(/^\//, '').split(/\s/)[0] ?? '')
+
+  const categories = [
+    { name: 'Tern', pairs: own },
+    ...(catalog.categories?.length ? catalog.categories : [{ name: 'Commands', pairs: catalog.pairs ?? [] }])
+      .map(c => ({ ...c, pairs: (c.pairs ?? []).filter(runs) }))
+      .filter(c => c.pairs.length)
+  ]
 
   const overlay: Overlay = {
     key: KEY,
