@@ -12,6 +12,7 @@ import type { AnyGatewayEvent } from '@tui/gatewayTypes.js'
 import { parseLiveLog } from '../agents/liveLog.js'
 import { applyLog, isRunning } from '../agents/store.js'
 import { Composer } from '../composer.js'
+import { Media } from '../media.js'
 import type { Subagent } from '../model.js'
 import { paletteFor } from '../palette.js'
 import { loadSettings } from '../settings.js'
@@ -41,6 +42,7 @@ interface ListRow {
 export class WatchApp {
   readonly transcript = new Transcript()
   readonly composer = new Composer()
+  readonly #media = new Media({ blob: (bytes, mime) => (this.#tern.caps.features.includes('blobs') ? this.#tern.blob(bytes, mime) : undefined) })
   readonly #tern: Session
   readonly #gw: GatewayClient
   readonly #spec: WatchSpec
@@ -218,6 +220,10 @@ export class WatchApp {
 
       this.#lastMessage = last
       this.transcript.load(store.messages(this.#child))
+      this.#media.showAll(this.transcript.entries, call => {
+        this.transcript.touchCall(call)
+        this.changed()
+      })
 
       return true
     } catch {

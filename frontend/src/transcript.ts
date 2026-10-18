@@ -13,7 +13,8 @@ import type {
 } from '@hermes/shared/gateway-events'
 
 import { settleBridge, unwrap } from './bridge.js'
-import type { Block, Counters, Entry, NoticeEntry, Todo, ToolCall, TurnEntry } from './model.js'
+import type { Block, Counters, Entry, NoticeEntry, Todo, ToolCall, TurnEntry, UserAttachment } from './model.js'
+import { promptAttachments, splitPrompt } from './promptRefs.js'
 
 type ToolBlock = Extract<Block, { kind: 'tool' }>
 
@@ -104,8 +105,14 @@ export class Transcript {
     turn.rev++
   }
 
-  user(text: string, at = Date.now(), steered = false) {
-    this.push({ at, id: this.id('u'), kind: 'user', text, ...(steered ? { steered } : {}) })
+  user(text: string, at = Date.now(), steered = false, attachments: UserAttachment[] = []) {
+    this.push({ at, id: this.id('u'), kind: 'user', text, ...(steered ? { steered } : {}), ...(attachments.length ? { attachments } : {}) })
+  }
+
+  /** A stored prompt: its words, and as attachments the image refs and attached context Hermes stored with them. */
+  #storedUser(raw: string, at: number) {
+    const parts = splitPrompt(raw)
+    this.user(parts.text, at, false, promptAttachments(parts))
   }
 
   notice(text: string, tone: NoticeEntry['tone'] = 'info') {
@@ -461,7 +468,7 @@ export class Transcript {
         } else {
           // A notice whose reply Hermes hid has no turn: its reason must not fall on this prompt's.
           pendingContinued = undefined
-          this.entries.push({ at, id: this.id('u'), kind: 'user', text: steered ?? text })
+          this.#storedUser(steered ?? text, at)
         }
 
         continue
@@ -556,7 +563,7 @@ export class Transcript {
     if (notice) {
       this.#continued = notice
     } else if (user) {
-      this.user(user, at)
+      this.#storedUser(user, at)
     }
 
     if (turn.assistant || turn.streaming) {

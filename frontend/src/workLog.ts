@@ -8,6 +8,7 @@ import { homedir } from 'node:os'
 
 import { callApp } from './bridge.js'
 import { isConnectCall } from './connections.js'
+import { shownImage } from './media.js'
 import type { Block, ToolCall, TurnEntry } from './model.js'
 import { isBackgroundCall } from './transcript.js'
 import { commandDisplayText, commandProgramName } from './vendor/t3code/commandLabel.js'
@@ -21,9 +22,17 @@ export type Piece = { kind: 'block'; block: Block } | { kind: 'work'; items: Wor
 /** Calls with a view of their own: a delegation's Task card, the todo list, clarify's questions. */
 const SOLO = new Set(['clarify', 'delegate_task', 'todo', 'todo_list'])
 
-/** A call that keeps its card: a solo tool, or a background process with its live line. */
+/**
+ * A call that keeps its card: a solo tool, a background process with its live line, or one that
+ * shows an image (image_generate's card is the picture asked for, even before it lands).
+ */
 export function ownsCard(call: ToolCall): boolean {
-  return SOLO.has(call.name) || isBackgroundCall(call) || isConnectCall(call)
+  return SOLO.has(call.name) || isBackgroundCall(call) || isConnectCall(call) || call.name === 'image_generate' || showsImage(call)
+}
+
+/** A call with an image to show; its card stays out of the fold, so the picture is in view. */
+export function showsImage(call: ToolCall): boolean {
+  return shownImage(call) !== undefined
 }
 
 /** Splits blocks into text, steers and card-owning calls, and the work groups between them. */
@@ -85,10 +94,13 @@ export function foldOf(turn: TurnEntry): Fold | undefined {
     }
 
     // Cards that still want the user stay out of the fold: a background process, running agents,
-    // apps to authorize.
+    // apps to authorize, an image.
     if (
       b.kind === 'tool' &&
-      (isBackgroundCall(b.call) || isConnectCall(b.call) || b.call.subagents?.some(a => a.status === 'running' || a.status === 'queued'))
+      (isBackgroundCall(b.call) ||
+        isConnectCall(b.call) ||
+        showsImage(b.call) ||
+        b.call.subagents?.some(a => a.status === 'running' || a.status === 'queued'))
     ) {
       continue
     }

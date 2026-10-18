@@ -24,7 +24,7 @@ function key(name: string, mods: Partial<Key> = {}): Key {
 }
 
 /** The app on a fake Tern and gateway: keys go in, gateway requests come out. */
-function setup(replies: Record<string, Reply> = {}) {
+function setup(replies: Record<string, Reply> = {}, features: string[] = []) {
   const handlers = new Map<string, Handler>()
   const requests: { method: string; params: Record<string, unknown> }[] = []
   let uploads = 0
@@ -56,7 +56,7 @@ function setup(replies: Record<string, Reply> = {}) {
 
   const tern = {
     blob: () => 'blob',
-    caps: { cols: 100, features: [] as string[] },
+    caps: { cols: 100, features },
     close: async () => undefined,
     open: () => surface,
     [Symbol.asyncIterator]: () => ({
@@ -174,6 +174,30 @@ describe('App: images in the draft', () => {
     app.composer.set('')
     await press(key('d', { ctrl: true }))
     expect(quit).not.toHaveBeenCalled()
+  })
+})
+
+describe('App: an attached image shows', () => {
+  it('as a thumbnail in the composer and in the sent prompt, not as a 📎 count', async () => {
+    const { app, attach, press, type } = setup({}, ['blobs'])
+    await attach()
+    await type('what is this')
+    await press(key('enter'))
+
+    const user = app.transcript.entries.findLast(e => e.kind === 'user')
+    expect(user).toMatchObject({ attachments: [{ kind: 'image', name: 'shot.png', source: { blob: 'blob' } }], text: 'what is this' })
+    expect(JSON.stringify(user)).not.toContain('📎')
+  })
+
+  it('as its name alone where Tern takes no blobs and the gateway’s copy is not on this machine', async () => {
+    const { app, attach, press, type } = setup()
+    await attach()
+    await type('x')
+    await press(key('enter'))
+
+    const user = app.transcript.entries.findLast(e => e.kind === 'user')
+    expect(user).toMatchObject({ attachments: [{ kind: 'image', name: 'shot.png' }] })
+    expect(user).not.toHaveProperty('attachments.0.source')
   })
 })
 

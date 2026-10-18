@@ -254,17 +254,32 @@ export const STYLES = css`
     font: 400 13px/22px var(--sans) !important;
   }
 
-  /* An image the next prompt carries: a chip in the composer; a click drops it. */
-  [data-role='hermes.composer.image'] {
+  /* An image the next prompt carries: Tern's omp chip (thumbnail, name, size) with a ✕ after
+     them, in a third column of its grid. */
+  .sf-card[data-role='omp.composer.chip'] > .sf-card-body > [data-role='hermes.composer.remove'] {
+    grid-column: 3;
+    grid-row: 1 / 3;
+    align-self: center;
+    width: 20px;
+    height: 20px;
+    margin-right: -6px;
+    border-radius: 6px;
+    color: var(--t3);
+    cursor: pointer;
+  }
+
+  .sf-card[data-role='omp.composer.chip'] > .sf-card-body > [data-role='hermes.composer.remove']:hover {
+    background: var(--l2);
+    color: var(--t1);
+  }
+
+  /* A prompt's file, or an image whose file is gone: a quiet chip beside its thumbnails. */
+  [data-role='hermes.user.attachment'] {
+    max-width: 240px;
     padding: 1px 8px !important;
     border-radius: 999px;
     background: var(--l1);
     font: 500 12px/20px var(--sans) !important;
-    cursor: pointer;
-  }
-
-  [data-role='hermes.composer.image']:hover {
-    background: var(--l2);
   }
 
   /* omp's ask theme draws a radio at the start of each option without moving the text over. */

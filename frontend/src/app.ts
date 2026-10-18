@@ -4,7 +4,7 @@
 // schedules one render of the whole view; the SDK diffs it into frame ops.
 
 import { randomUUID } from 'node:crypto'
-import { appendFileSync } from 'node:fs'
+import { appendFileSync, existsSync } from 'node:fs'
 import { basename } from 'node:path'
 
 import type {
@@ -37,7 +37,9 @@ import { moaLabel, moaReferenceLabel } from './moa.js'
 import type { Overlay, OverlayHost } from './overlay.js'
 import { writeActiveSessionFile } from './hermes/activeSessionFile.js'
 import { imagePathOf, withClipboardImage } from './hermes/clipboardImage.js'
-import { type Attachment, uploadImage } from './hermes/images.js'
+import { type Attachment, imageSize, uploadImage } from './hermes/images.js'
+import { Media } from './media.js'
+import type { ImageSource, ToolCall } from './model.js'
 import { hasInterpolation, interpolate, shellError, shellExec, shellLines } from './hermes/shell.js'
 import { mutateSession } from './hermes/mutate.js'
 import { sharedPromptId, sharedPromptRequest } from './hermes/sharedPrompts.js'
@@ -87,8 +89,11 @@ interface CreateResult extends Partial<
   messages?: TranscriptMessage[]
 }
 
-/** An uploaded image a prompt carries (the shared gateway takes it on prompt.submit), with the name its chip shows. */
-type Image = Attachment & { name: string }
+/**
+ * An uploaded image a prompt carries (the shared gateway takes it on prompt.submit), with the name
+ * its chip shows, and the thumbnail and size the chip and the prompt's bubble show.
+ */
+type Image = Attachment & { name: string; preview?: ImageSource; caption?: string }
 
 /** How long quitting waits for the sessions to detach. */
 const QUIT_DETACH_MS = 1500
@@ -104,6 +109,8 @@ export interface Queued {
 /** Runs the Tern frontend until the user quits; resolves the exit code. */
 export class App implements OverlayHost {
   readonly transcript = new Transcript()
+  /** Images tool calls showed, a URL's bytes fetched once and sent as a blob. */
+  readonly media = new Media({ blob: (bytes, mime) => this.#blob(bytes, mime) })
   /** The session's subagents, followed while they run (Task cards, the pill, the hub). */
   readonly agents: Agents = new Agents(this)
   /** The session's background processes (the shells pill, the Background sheet, background cards). */
@@ -666,11 +673,50 @@ export class App implements OverlayHost {
     }
 
     try {
-      this.#attachments.push({ ...(await uploadImage(this.#gw, sid, path, process.env.HERMES_CWD || process.cwd())), name })
+      this.#attachments.push(this.#image(await uploadImage(this.#gw, sid, path, process.env.HERMES_CWD || process.cwd()), name))
     } catch (error) {
       this.transcript.notice(`Could not attach ${name}: ${error instanceof Error ? error.message : String(error)}`, 'error')
     }
 
+    this.changed()
+  }
+
+  /**
+   * An uploaded image with its thumbnail: its bytes as a blob, else the gateway's copy where that
+   * is on this machine. The bytes are not kept.
+   */
+  #image({ bytes, ...attachment }: Attachment & { bytes: Buffer }, name: string): Image {
+    const size = imageSize(bytes)
+    const kb = bytes.length / 1024
+    const blob = this.#blob(bytes, attachment.mime)
+    const preview = blob ? { blob } : existsSync(attachment.path) ? { path: attachment.path } : undefined
+    const caption = [size && `${size.w}×${size.h}`, kb >= 1024 ? `${(kb / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(kb))} KB`]
+
+    return { ...attachment, caption: caption.filter(Boolean).join(' · '), name, ...(preview ? { preview } : {}) }
+  }
+
+  /** `bytes` sent to Tern as a blob; undefined where it takes none, or for more than a blob holds. */
+  #blob(bytes: Uint8Array, mime: string): string | undefined {
+    if (!this.#tern.caps.features.includes('blobs')) {
+      return undefined
+    }
+
+    try {
+      return this.#tern.blob(bytes, mime)
+    } catch {
+      return undefined
+    }
+  }
+
+  /** Has `call`'s image (a URL's) fetched; its card shows it once it lands. */
+  #showImage(call: ToolCall | undefined) {
+    if (call) {
+      this.media.show(call, () => this.#imageLanded(call))
+    }
+  }
+
+  #imageLanded(call: ToolCall) {
+    this.transcript.touchCall(call)
     this.changed()
   }
 
@@ -817,7 +863,12 @@ export class App implements OverlayHost {
 
     const { images, text } = item
     const attachments = images.map(({ mime, path }) => ({ mime, path }))
-    this.transcript.user(`${display?.trim() || text}${images.length ? `\n\n📎 ${images.length} image${images.length === 1 ? '' : 's'}` : ''}`)
+    this.transcript.user(
+      display?.trim() || text,
+      undefined,
+      false,
+      images.map(i => ({ kind: 'image', name: i.name, ...(i.preview ? { source: i.preview } : {}) }))
+    )
     this.#startBusy('Working…')
     this.#gw
       // The shared gateway admits a prompt by its submission id (a retry with the same id is one turn).
@@ -1025,7 +1076,7 @@ export class App implements OverlayHost {
 
     try {
       if (this.#gw.isCanonical) {
-        const image = { ...(await uploadImage(this.#gw, sid, path, process.env.HERMES_CWD || process.cwd())), name: basename(path) }
+        const image = this.#image(await uploadImage(this.#gw, sid, path, process.env.HERMES_CWD || process.cwd()), basename(path))
         // The startup query waits at the queue's head for this image.
         const images = this.queue[0]?.images ?? this.#attachments
         images.push(image)
@@ -1222,6 +1273,7 @@ export class App implements OverlayHost {
     if (r.messages?.length) {
       this.transcript.load(r.messages)
       this.agents.scan()
+      this.media.showAll(this.transcript.entries, call => this.#imageLanded(call))
     }
 
     // The new session's processes and PRs (and none of the last one's), and its open connect cards.
@@ -1474,6 +1526,8 @@ export class App implements OverlayHost {
           // The call as its step reads (a bridged or connector call as its app), not its wire name.
           const call = t.call(ev.payload.tool_id)
           this.#label(call ? busyLabel(call) : `Running ${ev.payload.name}…`)
+          // vision_analyze names its image up front.
+          this.#showImage(call)
         }
 
         break
@@ -1481,6 +1535,7 @@ export class App implements OverlayHost {
       case 'tool.complete':
         if (ev.payload) {
           t.toolComplete(ev.payload)
+          this.#showImage(t.call(ev.payload.tool_id))
           // A dispatched delegation: its agents' rows start following the owner.
           this.agents.scan()
 
@@ -1972,6 +2027,8 @@ export class App implements OverlayHost {
         agents: { onOpen: () => openAgents(this), running: this.agents.running().length },
         prs: prsPill(this.prs.entries(), () => openPullRequests(this)),
         attachments: this.#attachments.map((a, i) => ({
+          caption: a.caption,
+          image: a.preview,
           label: a.name,
           onRemove: () => {
             this.#attachments.splice(i, 1)

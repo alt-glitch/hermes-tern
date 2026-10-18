@@ -6,7 +6,7 @@ import type { EditEvent, JSX, SendEvent, Tone } from '@stencil-hq/tern'
 
 import type { Composer } from '../composer.js'
 import type { Pill } from '../hud.js'
-import type { Todo } from '../model.js'
+import type { ImageSource, Todo } from '../model.js'
 
 import { age, compact } from './time.js'
 import { checklistNode } from './tools.js'
@@ -58,10 +58,20 @@ export interface DockContext {
   todos?: TodosPill
   /** The status strip under the composer. */
   status?: StatusLine
-  /** Images the next prompt carries, as chips in the composer; a click on one drops it. */
-  attachments?: { label: string; onRemove(): void }[]
+  /** Images the next prompt carries, as chips in the composer: a thumbnail (a click opens it large) and a remove button. */
+  attachments?: ComposerImage[]
   /** The pill holding the keyboard (Down from an empty prompt). */
   focused?: Pill
+}
+
+/** An image attached to the draft. */
+export interface ComposerImage {
+  label: string
+  /** Its size, under the name. */
+  caption?: string
+  /** The thumbnail; unset where Tern can be sent no blob and the file is not here. */
+  image?: ImageSource
+  onRemove(): void
 }
 
 /** The agent's todo list as a pill: a ring that fills as items are done, and the one under way. */
@@ -434,13 +444,7 @@ function composerNode(cx: DockContext): JSX.Element {
         />
       )}
       <row gap="sm" hidden={!cx.attachments?.length} key="chips" role="omp.composer.chips" wrap>
-        {(cx.attachments ?? []).map((a, i) => (
-          <row align="center" gap="xs" key={`a${i}`} onClick={a.onRemove} role="hermes.composer.image" title="Remove this image">
-            <icon key="i" name="image" />
-            <text key="t" text={a.label} wrap="none" />
-            <icon key="x" name="x" />
-          </row>
-        ))}
+        {(cx.attachments ?? []).map(imageChip)}
       </row>
       <row align="start" gap="sm" key="line" role="omp.composer.line">
         <editor
@@ -502,5 +506,20 @@ function composerNode(cx: DockContext): JSX.Element {
         )}
       </row>
     </col>
+  )
+}
+
+/**
+ * An attached image as omp's composer chip (a card Tern lays out as a 36px thumbnail beside the
+ * name and its size), as t3code's composer shows one: a click on the thumbnail opens it large in
+ * Tern's lightbox; the ✕ drops it.
+ */
+export function imageChip(a: ComposerImage, i: number): JSX.Element {
+  return (
+    <card head={[{ s: 'strong', t: a.label }]} key={`a${i}`} role="omp.composer.chip" title={a.label} tone="accent">
+      {a.image ? <image alt={a.label} key="thumb" {...a.image} /> : <icon key="thumb" name="image" />}
+      <text key="caption" spans={[{ s: 'dim', t: a.caption ?? 'image' }]} wrap="none" />
+      <icon key="remove" name="x" onClick={a.onRemove} role="hermes.composer.remove" title={`Remove ${a.label}`} />
+    </card>
   )
 }
