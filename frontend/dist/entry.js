@@ -39814,7 +39814,7 @@ var App = class {
       return;
     }
     if (r.ok) {
-      this.transcript.steer(item3.text);
+      this.transcript.steer(item3.display ?? item3.text);
     } else {
       if (r.error) {
         this.transcript.notice(`${mode === "steer" ? "Steer" : "Redirect"} failed: ${r.error}. Queued instead.`, "warning");
@@ -39843,7 +39843,7 @@ var App = class {
     if (!ready || sid !== this.sid) {
       return;
     }
-    const own = { display: userText(item3.text, item3.images), inputId: randomUUID3(), item: { item: item3, text: ready.text } };
+    const own = { display: userText(item3.display ?? item3.text, item3.images), inputId: randomUUID3(), item: { item: item3, text: ready.text } };
     const attachments = ready.images.map(({ mime, path }) => ({ mime, path }));
     this.#server.admit(own);
     this.changed();
@@ -39884,7 +39884,7 @@ var App = class {
    * with it). A typed prompt's `{!cmd}`s run first and their output takes their place; `display` is
    * what the transcript shows.
    */
-  #send(item3, { display, queued = false } = {}) {
+  #send(item3, { display = item3.display, queued = false } = {}) {
     const sid = this.sid;
     if (!sid || this.#switches.pending) {
       this.queue.unshift(item3);
@@ -39935,7 +39935,8 @@ var App = class {
     return images;
   }
   /** Puts a prompt that did not go back into the composer, before any text there, with its images. */
-  #restore({ images, text: text2 }) {
+  #restore({ display, images, text: sent }) {
+    const text2 = display ?? sent;
     this.composer.set(text2 && this.composer.text ? `${text2}
 ${this.composer.text}` : text2 || this.composer.text);
     this.#attachments = [...images, ...this.#attachments];
@@ -40335,6 +40336,13 @@ ${this.composer.text}` : text2 || this.composer.text);
     return this.#dispatched(raw, title, "");
   }
   /** Acts on a slash.exec / command.dispatch answer: output, a skill or message to send, an alias or a prefill. */
+  /** A prompt a slash command made (a skill, a `send`): while a turn runs it takes the busy path a typed one does. */
+  #prompt(item3) {
+    if (this.busy) {
+      return void this.#busyInput(item3, this.#busyMode);
+    }
+    this.#send(item3);
+  }
   async #dispatched(raw, title, arg) {
     const d = parseCommandDispatch(raw);
     const legacy = raw ?? {};
@@ -40357,12 +40365,12 @@ ${this.composer.text}` : text2 || this.composer.text);
       case "alias":
         return this.#slash(`/${d.target}${arg ? ` ${arg}` : ""}`);
       case "skill":
-        return d.message?.trim() ? this.#send({ images: this.#takeImages(), text: d.message }, { display: d.display || title }) : this.transcript.notice(`${title}: the skill sent no message`, "error");
+        return d.message?.trim() ? this.#prompt({ display: d.display || title, images: this.#takeImages(), text: d.message }) : this.transcript.notice(`${title}: the skill sent no message`, "error");
       case "send":
         if (d.notice?.trim()) {
           this.transcript.notice(d.notice);
         }
-        return d.message?.trim() ? this.#send({ images: this.#takeImages(), text: d.message }, { display: d.display }) : void 0;
+        return d.message?.trim() ? this.#prompt({ display: d.display, images: this.#takeImages(), text: d.message }) : void 0;
       case "prefill":
         if (d.notice?.trim()) {
           this.transcript.notice(d.notice);
@@ -40414,7 +40422,7 @@ ${this.composer.text}` : text2 || this.composer.text);
         this.usage = ev.payload?.usage ?? this.usage;
         for (const started of this.#server.update(pendingRows(ev.payload))) {
           const own = started.own?.item.item;
-          t2.started(own ? own.text : started.text, void 0, own ? userImages(own.images) : []);
+          t2.started(own ? own.display ?? own.text : started.text, void 0, own ? userImages(own.images) : []);
         }
         this.#setTitle(typeof ev.payload?.title === "string" ? ev.payload.title : void 0);
         if (this.info?.cwd && this.info.cwd !== cwd) {
@@ -40797,7 +40805,7 @@ ${this.composer.text}` : text2 || this.composer.text);
   #queuedRows() {
     const steer2 = Boolean(this.busy);
     return [
-      ...this.queue.map((q) => ({ edit: true, steer: steer2, text: userText(q.text, q.images) })),
+      ...this.queue.map((q) => ({ edit: true, steer: steer2, text: userText(q.display ?? q.text, q.images) })),
       ...this.#server.queued().map((q) => {
         if (!q.own) {
           return { note: q.row?.status === "unknown" ? "unknown" : "elsewhere", text: internalNotice(q.text) ?? q.text };
@@ -40909,7 +40917,7 @@ ${this.composer.text}` : text2 || this.composer.text);
       return;
     }
     if (r.ok) {
-      this.transcript.steer(item3.text);
+      this.transcript.steer(item3.display ?? item3.text);
     } else {
       this.transcript.notice(
         r.error ? `Steer failed: ${r.error}. Queued again, at the end.` : "The turn ended before the steer landed. Queued again.",
