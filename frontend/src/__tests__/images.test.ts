@@ -271,6 +271,13 @@ describe('the composer chip of an attached image', () => {
     expect(n.c?.[2]?.p).toMatchObject({ actions: { click: 'click' }, name: 'x', role: 'hermes.composer.remove' })
   })
 
+  it('says it is attaching while the image is read and uploaded, and can be removed meanwhile', () => {
+    const onRemove = vi.fn()
+    const n = tree(imageChip({ label: 'pasted image 1', onRemove, pending: true }, 0))
+    expect(n.c?.[1]?.p?.spans).toEqual([{ fx: 'shimmer', s: 'dim', t: 'Attaching…' }])
+    expect(n.c?.[2]?.p).toMatchObject({ actions: { click: 'click' }, role: 'hermes.composer.remove' })
+  })
+
   it('an icon in the thumbnail’s place when there is no image to show', () => {
     expect(tree(imageChip({ label: 'a.png', onRemove: () => undefined }, 0)).c?.[0]).toMatchObject({ k: 'icon', p: { name: 'image' } })
   })

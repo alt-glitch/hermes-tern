@@ -71,6 +71,8 @@ export interface ComposerImage {
   caption?: string
   /** The thumbnail; unset where Tern can be sent no blob and the file is not here. */
   image?: ImageSource
+  /** Still read or uploaded: the chip says so. */
+  pending?: boolean
   onRemove(): void
 }
 
@@ -518,7 +520,11 @@ export function imageChip(a: ComposerImage, i: number): JSX.Element {
   return (
     <card head={[{ s: 'strong', t: a.label }]} key={`a${i}`} role="omp.composer.chip" title={a.label} tone="accent">
       {a.image ? <image alt={a.label} key="thumb" {...a.image} /> : <icon key="thumb" name="image" />}
-      <text key="caption" spans={[{ s: 'dim', t: a.caption ?? 'image' }]} wrap="none" />
+      <text
+        key="caption"
+        spans={[a.pending ? { fx: 'shimmer', s: 'dim', t: 'Attaching…' } : { s: 'dim', t: a.caption ?? 'image' }]}
+        wrap="none"
+      />
       <icon key="remove" name="x" onClick={a.onRemove} role="hermes.composer.remove" title={`Remove ${a.label}`} />
     </card>
   )

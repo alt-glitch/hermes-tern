@@ -95,6 +95,12 @@ interface CreateResult extends Partial<
  */
 type Image = Attachment & { name: string; preview?: ImageSource; caption?: string }
 
+/**
+ * What a prompt of images alone asks, as Ink (ui-tui/src/app/submissionCore.ts) and the desktop
+ * (use-prompt-actions/submit.ts) send it: Hermes takes no empty prompt text.
+ */
+const IMAGE_ONLY_PROMPT = 'What do you see in this image?'
+
 /** How long quitting waits for the sessions to detach. */
 const QUIT_DETACH_MS = 1500
 
@@ -157,6 +163,8 @@ export class App implements OverlayHost {
   #startupImage = process.env.HERMES_TUI_IMAGE?.trim() ?? ''
   /** The images attached to the draft: the next prompt entered takes them. */
   #attachments: Image[] = []
+  /** Images being read or uploaded for the draft: an "attaching…" chip each until they land. */
+  #attaching: { name: string }[] = []
   /** The skin the gateway last reported; only the `skin` theme mode wears it. */
   #skin: SkinPayload | undefined
   #theme: ThemeMode = loadSettings().theme ?? 'tern'
@@ -633,19 +641,23 @@ export class App implements OverlayHost {
 
   /** Attaches the clipboard's image to the next prompt (`quiet`: an empty paste, which may hold none). */
   async attachClipboardImage(quiet: boolean) {
+    // The chip shows at once; reading the clipboard and uploading fill it in.
+    const slot = this.#startAttaching(`pasted image ${this.#attachments.length + this.#attaching.length + 1}`)
+
     try {
       const found = await withClipboardImage(async path => {
-        await this.#attachImage(path, `pasted image ${this.#attachments.length + 1}`)
+        await this.#attachImage(path, slot.name, slot)
 
         return true
       })
 
       if (!found && !quiet) {
         this.transcript.notice('No image on the clipboard.', 'warning')
-        this.changed()
       }
     } catch (error) {
       this.transcript.notice(`Could not read the clipboard image: ${error instanceof Error ? error.message : String(error)}`, 'error')
+    } finally {
+      this.#endAttaching(slot)
       this.changed()
     }
   }
@@ -663,22 +675,41 @@ export class App implements OverlayHost {
     await this.#attachImage(path, basename(path))
   }
 
-  async #attachImage(path: string, name: string) {
+  /** Uploads `path` for the next prompt; its chip says "attaching…" (in `slot`) until it lands or fails. */
+  async #attachImage(path: string, name: string, slot = this.#startAttaching(name)) {
     const sid = this.sid
 
-    if (!sid) {
-      this.transcript.notice('Wait for the session to start before attaching an image.', 'warning')
-
-      return this.changed()
-    }
-
     try {
-      this.#attachments.push(this.#image(await uploadImage(this.#gw, sid, path, process.env.HERMES_CWD || process.cwd()), name))
+      if (!sid) {
+        this.transcript.notice('Wait for the session to start before attaching an image.', 'warning')
+
+        return
+      }
+
+      const image = this.#image(await uploadImage(this.#gw, sid, path, process.env.HERMES_CWD || process.cwd()), name)
+
+      // Its chip was removed (✕, Ctrl+C) while it uploaded: the prompt does not take it.
+      if (this.#attaching.includes(slot)) {
+        this.#attachments.push(image)
+      }
     } catch (error) {
       this.transcript.notice(`Could not attach ${name}: ${error instanceof Error ? error.message : String(error)}`, 'error')
+    } finally {
+      this.#endAttaching(slot)
+      this.changed()
     }
+  }
 
+  #startAttaching(name: string): { name: string } {
+    const slot = { name }
+    this.#attaching.push(slot)
     this.changed()
+
+    return slot
+  }
+
+  #endAttaching(slot: { name: string }) {
+    this.#attaching = this.#attaching.filter(s => s !== slot)
   }
 
   /**
@@ -749,13 +780,14 @@ export class App implements OverlayHost {
 
   /** Text or images in the composer: Ctrl+C clears them before it interrupts, Ctrl+D never exits over them. */
   #hasDraft(): boolean {
-    return Boolean(this.composer.text || this.#attachments.length)
+    return Boolean(this.composer.text || this.#attachments.length || this.#attaching.length)
   }
 
   #ctrlC() {
     if (this.#hasDraft()) {
       this.composer.set('')
       this.#attachments = []
+      this.#attaching = []
 
       return
     }
@@ -797,7 +829,16 @@ export class App implements OverlayHost {
   #submit(raw: string, draft = true) {
     const text = raw.trim()
 
-    if (!text) {
+    // An image still uploading would miss the prompt: the words wait in the composer for it.
+    if (draft && this.#attaching.length && !text.startsWith('/')) {
+      this.composer.set(raw)
+      this.transcript.notice('An image is still attaching. Send again in a moment.', 'warning')
+
+      return
+    }
+
+    // Images alone are a prompt: the bubble shows just them (the gateway gets Ink's stand-in words).
+    if (!text && !(draft && this.#attachments.length)) {
       return
     }
 
@@ -861,10 +902,11 @@ export class App implements OverlayHost {
       return
     }
 
-    const { images, text } = item
+    const { images } = item
+    const text = item.text || (images.length ? IMAGE_ONLY_PROMPT : '')
     const attachments = images.map(({ mime, path }) => ({ mime, path }))
     this.transcript.user(
-      display?.trim() || text,
+      display?.trim() || item.text,
       undefined,
       false,
       images.map(i => ({ kind: 'image', name: i.name, ...(i.preview ? { source: i.preview } : {}) }))
@@ -899,7 +941,7 @@ export class App implements OverlayHost {
 
   /** Puts a prompt that did not go back into the composer, before any text there, with its images. */
   #restore({ images, text }: Queued) {
-    this.composer.set(this.composer.text ? `${text}\n${this.composer.text}` : text)
+    this.composer.set(text && this.composer.text ? `${text}\n${this.composer.text}` : text || this.composer.text)
     this.#attachments = [...images, ...this.#attachments]
   }
 
@@ -2026,15 +2068,25 @@ export class App implements OverlayHost {
         },
         agents: { onOpen: () => openAgents(this), running: this.agents.running().length },
         prs: prsPill(this.prs.entries(), () => openPullRequests(this)),
-        attachments: this.#attachments.map((a, i) => ({
-          caption: a.caption,
-          image: a.preview,
-          label: a.name,
-          onRemove: () => {
-            this.#attachments.splice(i, 1)
-            this.changed()
-          }
-        })),
+        attachments: [
+          ...this.#attachments.map((a, i) => ({
+            caption: a.caption,
+            image: a.preview,
+            label: a.name,
+            onRemove: () => {
+              this.#attachments.splice(i, 1)
+              this.changed()
+            }
+          })),
+          ...this.#attaching.map(slot => ({
+            label: slot.name,
+            onRemove: () => {
+              this.#endAttaching(slot)
+              this.changed()
+            },
+            pending: true
+          }))
+        ],
         status: {
           compressions: typeof usage?.compressions === 'number' ? usage.compressions : undefined,
           notice: this.#notices.current(now),
@@ -2068,7 +2120,7 @@ export class App implements OverlayHost {
           tps: typeof usage?.avg_tps === 'number' && usage.avg_tps > 0 ? usage.avg_tps : undefined
         },
         placeholder: 'Ask Hermes — / commands · @ files',
-        queued: this.queue.map(q => q.text),
+        queued: this.queue.map(q => q.text || `📎 ${q.images.length} image${q.images.length === 1 ? '' : 's'}`),
         ready: this.sid !== null
       }),
       layer: [

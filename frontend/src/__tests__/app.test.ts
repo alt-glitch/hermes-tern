@@ -37,7 +37,7 @@ function setup(replies: Record<string, Reply> = {}, features: string[] = []) {
     request: (method: string, params: Record<string, unknown>) => {
       requests.push({ method, params })
 
-      if (method === 'image.attach_bytes') {
+      if (method === 'image.attach_bytes' && !replies[method]) {
         return Promise.resolve({ path: `/uploads/${++uploads}.png` })
       }
 
@@ -198,6 +198,76 @@ describe('App: an attached image shows', () => {
     const user = app.transcript.entries.findLast(e => e.kind === 'user')
     expect(user).toMatchObject({ attachments: [{ kind: 'image', name: 'shot.png' }] })
     expect(user).not.toHaveProperty('attachments.0.source')
+  })
+})
+
+describe('App: a prompt of images alone', () => {
+  it('sends with an empty composer, as Ink does, and the bubble shows just the image', async () => {
+    const { app, attach, press, sent } = setup({}, ['blobs'])
+    await press(key('enter'))
+    expect(sent('prompt.submit')).toEqual([])
+
+    await attach()
+    await press(key('enter'))
+
+    expect(sent('prompt.submit')).toMatchObject([{ attachments: [{ path: '/uploads/1.png' }], text: 'What do you see in this image?' }])
+    expect(app.transcript.entries.findLast(e => e.kind === 'user')).toMatchObject({ attachments: [{ name: 'shot.png' }], text: '' })
+  })
+
+  it('queues behind a running turn and goes when it ends', async () => {
+    const { app, attach, emit, press, sent } = setup()
+    app.busy = { ...busy }
+    await attach()
+    await press(key('enter'))
+    expect(app.queue).toMatchObject([{ images: [{ path: '/uploads/1.png' }], text: '' }])
+
+    emit('event', { payload: { text: 'done' }, session_id: 's1', type: 'message.complete' })
+    await settle()
+    expect(sent('prompt.submit')).toMatchObject([{ attachments: [{ path: '/uploads/1.png' }], text: 'What do you see in this image?' }])
+  })
+})
+
+describe('App: an image while it attaches', () => {
+  function slowUpload() {
+    let finish: (v: unknown) => void = () => undefined
+    const upload = () => new Promise(resolve => (finish = resolve))
+
+    return { finish: (path: string) => finish({ path }), upload }
+  }
+
+  it('holds the prompt until it lands, then goes with it', async () => {
+    const u = slowUpload()
+    const { app, press, sent, type } = setup({ 'image.attach_bytes': u.upload })
+    await press(key('paste', { text: png }))
+    await type('look')
+    await press(key('enter'))
+
+    expect(sent('prompt.submit')).toEqual([])
+    expect(app.composer.text).toBe('look')
+    expect(app.transcript.entries.at(-1)).toMatchObject({ kind: 'notice', text: expect.stringContaining('still attaching') })
+
+    u.finish('/uploads/slow.png')
+    await settle()
+    app.composer.set('')
+    await type('look')
+    await press(key('enter'))
+    expect(sent('prompt.submit')).toMatchObject([{ attachments: [{ path: '/uploads/slow.png' }], text: 'look' }])
+  })
+
+  it('is dropped when Ctrl+C clears the draft before it lands', async () => {
+    const u = slowUpload()
+    const { app, press, sent, type } = setup({ 'image.attach_bytes': u.upload })
+    await press(key('paste', { text: png }))
+    const quit = vi.spyOn(app, 'quit')
+    await press(key('d', { ctrl: true }))
+    expect(quit).not.toHaveBeenCalled()
+
+    await press(key('c', { ctrl: true }))
+    u.finish('/uploads/late.png')
+    await settle()
+    await type('later')
+    await press(key('enter'))
+    expect(sent('prompt.submit')[0]).not.toHaveProperty('attachments')
   })
 })
 
