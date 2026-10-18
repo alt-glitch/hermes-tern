@@ -409,6 +409,33 @@ describe('App: Enter while a turn runs (busy_input_mode)', () => {
     expect(queuedRows()).toEqual([])
   })
 
+  it('a skill invoked while a turn runs is queued like a prompt: the queue and its bubble show the invocation, not the body', async () => {
+    const body = '[IMPORTANT: The user has invoked the "fanout" skill…]\n\n…the skill body…'
+    const { app, emit, press, queuedRows, sent, type } = setup({
+      'prompt.submit': () => ({ admission_id: 'a1', status: 'queued' }),
+      'slash.exec': () => ({ display: '/fanout if needed', message: body, name: 'fanout', type: 'skill' })
+    })
+    app.busy = { ...busy }
+    await type('/fanout if needed')
+    await press(key('enter'))
+    await settle()
+
+    const [submit] = sent('prompt.submit')
+    expect(submit).toMatchObject({ queued: true, text: body })
+    expect(users(app)).toEqual([])
+    expect(queuedRows()).toEqual([{ actions: ['steer', 'edit'], text: '/fanout if needed' }])
+
+    const row = { admission_id: 'a1', input_id: submit!.submission_id, status: 'queued', user: body }
+    emit('event', { payload: { pending_submissions: [row] }, session_id: 's1', type: 'session.info' })
+    emit('event', { payload: { text: 'first reply' }, session_id: 's1', type: 'message.complete' })
+    emit('event', { payload: {}, session_id: 's1', type: 'message.start' })
+    emit('event', { payload: { pending_submissions: [{ ...row, status: 'started' }] }, session_id: 's1', type: 'session.info' })
+    await settle()
+
+    expect(users(app)).toEqual(['/fanout if needed'])
+    expect(app.transcript.entries.map(e => e.kind).slice(-2)).toEqual(['user', 'turn'])
+  })
+
   it('a prompt sent while idle gets one bubble, even when the gateway reports it queued then started', async () => {
     const { app, emit, press, sent, type } = setup()
     await type('hello')

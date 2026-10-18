@@ -116,6 +116,8 @@ export interface Queued {
   images: Image[]
   /** Typed by the user: its `{!cmd}`s run when it is sent. */
   expand?: boolean
+  /** What the transcript, the queue and Edit show instead of `text` (a skill's invocation, not its body). */
+  display?: string
 }
 
 /** A prompt this pane admitted into the shared gateway's queue: as typed (for Edit), and as sent. */
@@ -1002,7 +1004,7 @@ export class App implements OverlayHost {
     }
 
     if (r.ok) {
-      this.transcript.steer(item.text)
+      this.transcript.steer(item.display ?? item.text)
     } else {
       if (r.error) {
         this.transcript.notice(`${mode === 'steer' ? 'Steer' : 'Redirect'} failed: ${r.error}. Queued instead.`, 'warning')
@@ -1040,7 +1042,7 @@ export class App implements OverlayHost {
       return
     }
 
-    const own: OwnAdmission<Admitted> = { display: userText(item.text, item.images), inputId: randomUUID(), item: { item, text: ready.text } }
+    const own: OwnAdmission<Admitted> = { display: userText(item.display ?? item.text, item.images), inputId: randomUUID(), item: { item, text: ready.text } }
     const attachments = ready.images.map(({ mime, path }) => ({ mime, path }))
     this.#server.admit(own)
     this.changed()
@@ -1089,7 +1091,7 @@ export class App implements OverlayHost {
    * with it). A typed prompt's `{!cmd}`s run first and their output takes their place; `display` is
    * what the transcript shows.
    */
-  #send(item: Queued, { display, queued = false }: { display?: string; queued?: boolean } = {}) {
+  #send(item: Queued, { display = item.display, queued = false }: { display?: string; queued?: boolean } = {}) {
     const sid = this.sid
 
     // A session switch in flight: the prompt belongs to the session it adopts.
@@ -1155,7 +1157,8 @@ export class App implements OverlayHost {
   }
 
   /** Puts a prompt that did not go back into the composer, before any text there, with its images. */
-  #restore({ images, text }: Queued) {
+  #restore({ display, images, text: sent }: Queued) {
+    const text = display ?? sent
     this.composer.set(text && this.composer.text ? `${text}\n${this.composer.text}` : text || this.composer.text)
     this.#attachments = [...images, ...this.#attachments]
   }
@@ -1679,6 +1682,15 @@ export class App implements OverlayHost {
   }
 
   /** Acts on a slash.exec / command.dispatch answer: output, a skill or message to send, an alias or a prefill. */
+  /** A prompt a slash command made (a skill, a `send`): while a turn runs it takes the busy path a typed one does. */
+  #prompt(item: Queued) {
+    if (this.busy) {
+      return void this.#busyInput(item, this.#busyMode)
+    }
+
+    this.#send(item)
+  }
+
   async #dispatched(raw: unknown, title: string, arg: string) {
     const d = parseCommandDispatch(raw)
     const legacy = (raw ?? {}) as { output?: string; warning?: string }
@@ -1711,7 +1723,7 @@ export class App implements OverlayHost {
       case 'skill':
         // `message` is the expanded skill body for the model; the transcript shows the invocation.
         return d.message?.trim()
-          ? this.#send({ images: this.#takeImages(), text: d.message }, { display: d.display || title })
+          ? this.#prompt({ display: d.display || title, images: this.#takeImages(), text: d.message })
           : this.transcript.notice(`${title}: the skill sent no message`, 'error')
 
       case 'send':
@@ -1719,7 +1731,7 @@ export class App implements OverlayHost {
           this.transcript.notice(d.notice)
         }
 
-        return d.message?.trim() ? this.#send({ images: this.#takeImages(), text: d.message }, { display: d.display }) : undefined
+        return d.message?.trim() ? this.#prompt({ display: d.display, images: this.#takeImages(), text: d.message }) : undefined
 
       case 'prefill':
         if (d.notice?.trim()) {
@@ -1795,7 +1807,7 @@ export class App implements OverlayHost {
         // A queued prompt the gateway started gets its bubble now, after the reply it waited for.
         for (const started of this.#server.update(pendingRows(ev.payload))) {
           const own = started.own?.item.item
-          t.started(own ? own.text : started.text, undefined, own ? userImages(own.images) : [])
+          t.started(own ? (own.display ?? own.text) : started.text, undefined, own ? userImages(own.images) : [])
         }
 
         this.#setTitle(typeof ev.payload?.title === 'string' ? ev.payload.title : undefined)
@@ -2339,7 +2351,7 @@ export class App implements OverlayHost {
     const steer = Boolean(this.busy)
 
     return [
-      ...this.queue.map(q => ({ edit: true, steer, text: userText(q.text, q.images) })),
+      ...this.queue.map(q => ({ edit: true, steer, text: userText(q.display ?? q.text, q.images) })),
       ...this.#server.queued().map((q): QueuedRow => {
         if (!q.own) {
           return { note: q.row?.status === 'unknown' ? 'unknown' : 'elsewhere', text: internalNotice(q.text) ?? q.text }
@@ -2492,7 +2504,7 @@ export class App implements OverlayHost {
     }
 
     if (r.ok) {
-      this.transcript.steer(item.text)
+      this.transcript.steer(item.display ?? item.text)
     } else {
       this.transcript.notice(
         r.error ? `Steer failed: ${r.error}. Queued again, at the end.` : 'The turn ended before the steer landed. Queued again.',
