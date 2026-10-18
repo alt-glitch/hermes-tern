@@ -144,8 +144,8 @@ describe('shownImage: the image a tool call showed', () => {
     expect(shownImage(call('image_generate', { prompt: 'a cat' }, { status: 'running' }))).toBeUndefined()
   })
 
-  it('vision_analyze: its image_url; a browser screenshot: the path in its result', () => {
-    expect(shownImage(call('vision_analyze', { image_url: '/h/a.png' }, { status: 'running' }))).toBe('/h/a.png')
+  it('vision_analyze shows none (it folds); a browser screenshot: the path in its result', () => {
+    expect(shownImage(call('vision_analyze', { image_url: '/h/a.png' }, { status: 'running' }))).toBeUndefined()
     expect(shownImage(call('browser_vision', {}, { result: { meta: { screenshot_path: '/h/s.png' } } }))).toBe('/h/s.png')
     expect(shownImage(call('browser_vision', {}, { result: { analysis: 'a page', screenshot_path: '/h/t.png', success: true } }))).toBe('/h/t.png')
     expect(shownImage(call('browser_vision', {}, { resultText: 'Looks fine. Screenshot path: /h/u.png' }))).toBe('/h/u.png')
@@ -196,7 +196,7 @@ describe('Media: URLs as blobs', () => {
 
   it('leaves a local file to Tern', () => {
     const fetcher = vi.fn(() => ok(PNG))
-    const c = call('vision_analyze', { image_url: '/h/a.png' })
+    const c = call('browser_vision', {}, { result: { meta: { screenshot_path: '/h/a.png' } } })
     new Media({ blob: () => 'b' }, fetcher).show(c, () => undefined)
     expect(fetcher).not.toHaveBeenCalled()
     expect(c.image).toBeUndefined()
@@ -231,9 +231,9 @@ describe('image cards', () => {
     expect(n.p?.note).toContain('Content policy')
   })
 
-  it('vision_analyze shows the image it looked at with its analysis', () => {
+  it('vision_analyze shows its analysis, not the image it looked at (the user already sees it)', () => {
     const n = tree(toolNode(call('vision_analyze', { image_url: shot, question: 'what?' }, { result: { analysis: 'A chart.', success: true } }), 0))
-    expect(images(n).map(i => i.p?.path)).toEqual([shot])
+    expect(images(n)).toEqual([])
     expect(JSON.stringify(n)).toContain('A chart.')
   })
 

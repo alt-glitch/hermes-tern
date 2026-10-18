@@ -168,6 +168,8 @@ describe('the connect card', () => {
     await flush()
 
     expect(told(gw, app)).toEqual(["I've authorized Google Drive. Check with manage_connections status and carry on."])
+    // As on the desktop, Continue settles the card: no Authorize, no Continue, the wait is over.
+    expect(app.transcript.call('call_b')!.connect).toMatchObject({ settled: 'continued', told: true })
 
     // The resume brings the call back without its result: the card is found by its call id.
     gw.handlers.set('session.resume', p => ({

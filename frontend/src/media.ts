@@ -1,6 +1,6 @@
 // Images tool calls showed, as the desktop draws them (apps/desktop/src/lib/generated-images.ts,
-// tool/fallback-model/index.ts): the picture image_generate made, the one vision_analyze looked
-// at, a browser screenshot. A local file goes to Tern by `path`; a data URL, or an http(s) URL's
+// tool/fallback-model/index.ts): the picture image_generate made, a browser screenshot. Not the
+// image vision_analyze looks at: that is mostly the user's own paste, so its card folds. A local file goes to Tern by `path`; a data URL, or an http(s) URL's
 // bytes fetched once, go as a blob, the way the welcome logo does. A click on an `image` node
 // opens it large in Tern's own lightbox.
 
@@ -36,10 +36,6 @@ export function shownImage(call: ToolCall): string | undefined {
   if (call.name === 'image_generate') {
     // host_image is the file on this side when the image was made inside a sandbox.
     return str(r?.host_image) ?? str(r?.image)
-  }
-
-  if (call.name === 'vision_analyze') {
-    return str(call.args.image_url)
   }
 
   if (call.name.startsWith('browser')) {
