@@ -80,11 +80,19 @@ export class WatchApp {
   async run(): Promise<number> {
     this.#surface = this.#tern.open({ id: 'hermes', mode: 'inline', role: 'omp.session', title: this.#spec.name })
     this.#surface.stylesheet('hermes-tern', STYLES)
-    this.#surface.palette(paletteFor(loadSettings().theme ?? 'tern', undefined))
+    const theme = loadSettings().theme ?? 'tern'
+    this.#surface.palette(paletteFor(theme, undefined))
     this.#gw.on('event', (ev: AnyGatewayEvent) => {
       if (ev.type === 'gateway.ready') {
         this.#ready = true
         void this.#tick()
+      }
+
+      // In `skin` mode the watcher wears the skin the session does, as the main pane does.
+      const skin = ev.type === 'gateway.ready' ? ev.payload?.skin : ev.type === 'skin.changed' ? ev.payload : undefined
+
+      if (skin) {
+        this.#surface.palette(paletteFor(theme, skin))
       }
     })
     this.#gw.drain()

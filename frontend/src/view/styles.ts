@@ -1,4 +1,6 @@
-// The plugin's own stylesheet over Tern's: only what roles alone cannot say.
+// The plugin's own stylesheet over Tern's: only what roles alone cannot say. Every color is one of
+// Tern's theme vars (--t*, --l*, --sf-c-*, the palette's --sf-p-*), never a literal, so it changes
+// with the user's theme and with /theme.
 
 import { css } from '@stencil-hq/tern'
 
@@ -19,7 +21,7 @@ export const STYLES = css`
   [data-role='hermes.turn.fold'] > .sf-section-head {
     padding-bottom: 8px !important;
     margin-bottom: 6px !important;
-    box-shadow: inset 0 -1px 0 rgba(128, 128, 128, 0.22) !important;
+    box-shadow: inset 0 -1px 0 var(--l3) !important;
   }
 
   /* An open fold or group lists its steps and notes where they were, not in an indented code
@@ -118,7 +120,7 @@ export const STYLES = css`
   [data-role='hermes.work.group'] > .sf-section-body {
     margin: 2px 0 6px 7px !important;
     padding-left: 17px !important;
-    border-left: 1px solid rgba(128, 128, 128, 0.28) !important;
+    border-left: 1px solid var(--l3) !important;
   }
 
   [data-role='hermes.work.group'] > .sf-section-body [data-role='hermes.work.row'] > .sf-section-head,
@@ -151,7 +153,7 @@ export const STYLES = css`
   }
 
   [data-role='hermes.statusline.brand'] {
-    color: var(--accent) !important;
+    color: var(--sf-p-accent, var(--sf-c-accent)) !important;
     font-weight: 600 !important;
   }
 
@@ -191,7 +193,7 @@ export const STYLES = css`
   [data-role='hermes.streak'] {
     height: 1px;
     margin: 0 18px -1px;
-    background-image: linear-gradient(to right, transparent, var(--accent), transparent);
+    background-image: linear-gradient(to right, transparent, var(--sf-p-accent, var(--accent)), transparent);
     background-size: 30% 100%;
     background-repeat: no-repeat;
     animation: hermes-streak 1.8s ease-in-out infinite alternate;
@@ -235,12 +237,12 @@ export const STYLES = css`
   }
 
   [data-role='hermes.connect.open'] {
-    color: var(--accent) !important;
+    color: var(--sf-p-accent, var(--sf-c-accent)) !important;
   }
 
   [data-role='hermes.connect.continue'] {
     background: var(--t1);
-    color: var(--l0, #fff) !important;
+    color: var(--card) !important;
     box-shadow: none;
   }
 
@@ -294,7 +296,7 @@ export const STYLES = css`
 
   /* A pill holding the keys (Down from an empty prompt): ringed in the accent, without the pick mark's side bar. */
   .sf-row[data-role='omp.hud.pill'][data-mark='pick'] {
-    box-shadow: inset 0 0 0 1px var(--accent) !important;
+    box-shadow: inset 0 0 0 1px var(--sf-p-accent, var(--accent)) !important;
     color: var(--t1) !important;
   }
 
@@ -355,7 +357,7 @@ export const STYLES = css`
   }
 
   .sf-row[data-role='hermes.automation.item'][data-mark='pick'] {
-    box-shadow: inset 0 0 0 1px var(--accent) !important;
+    box-shadow: inset 0 0 0 1px var(--sf-p-accent, var(--accent)) !important;
   }
 
   .sf-row[data-role='hermes.automation.item'][data-mark='pick']::after {
@@ -420,14 +422,14 @@ export const STYLES = css`
     margin: 6px 0 !important;
     padding: 6px 12px !important;
     border-radius: 10px;
-    background: rgba(128, 128, 128, 0.045);
-    box-shadow: inset 0 0 0 1px rgba(128, 128, 128, 0.13);
+    background: var(--sf-card-bg);
+    box-shadow: inset 0 0 0 1px var(--l2);
     cursor: pointer;
     transition: background 120ms ease;
   }
 
   .sf-agent[data-role='hermes.task.solo']:hover {
-    background: rgba(128, 128, 128, 0.09);
+    background: var(--l1);
   }
 
   /* A compaction: a quiet rule across the transcript, what happened in its middle. */
@@ -446,7 +448,7 @@ export const STYLES = css`
     content: '';
     flex: 1 1 24px;
     height: 1px;
-    background: rgba(128, 128, 128, 0.3);
+    background: var(--l3);
   }
 
   [data-role='hermes.compaction.line'] .sf-elapsed {
@@ -484,7 +486,7 @@ export const STYLES = css`
     margin: 10px 0 0 !important;
     padding: 2px 0 2px 14px !important;
     border: none !important;
-    box-shadow: inset 2px 0 0 rgba(128, 128, 128, 0.25) !important;
+    box-shadow: inset 2px 0 0 var(--l3) !important;
     background: none !important;
     font-family: var(--sans) !important;
     font-size: 14px !important;
