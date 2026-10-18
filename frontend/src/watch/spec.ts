@@ -1,4 +1,5 @@
-// Opening a subagent beside the chat: a Tern split running a second `hermes tern` in watch mode.
+// Opening a subagent beside the chat: a Tern split running a second `hermes tern` in watch mode
+// (and `hermes update` below the chat, for /update).
 // `tern split` starts its command in Tern's own environment, so what the watcher needs (the
 // profile's home, which agent) travels on its command line through `env`.
 
@@ -54,16 +55,41 @@ export function specOf(a: Subagent, name: string, sid: string, stored: string | 
 let sidebar: string | undefined
 
 /**
- * Opens `spec` in a split right of this pane, closing the sidebar opened before. False when
- * this isn't a Tern pane Tern's CLI can reach (over ssh, say): the caller falls back.
+ * This pane and `hermes <args>` as a split's command line, `vars` set first. Undefined when this
+ * isn't a Tern pane Tern's CLI can reach (over ssh, say) or the launcher named no interpreter.
  */
-export async function openSidebar(spec: WatchSpec, cwd: string, env: NodeJS.ProcessEnv = process.env): Promise<boolean> {
+function hermesSplit(env: NodeJS.ProcessEnv, vars: readonly string[], args: readonly string[]) {
   const pane = env.TERN_PANE
   const python = env.HERMES_PYTHON
   // The `hermes` wrapper puts its checkout on sys.path; the bare interpreter needs it said.
   const src = env.HERMES_PYTHON_SRC_ROOT
 
   if (!pane || !python || !src) {
+    return undefined
+  }
+
+  const command = [
+    'env',
+    `PYTHONPATH=${src}`,
+    ...(env.HERMES_HOME ? [`HERMES_HOME=${env.HERMES_HOME}`] : []),
+    ...vars,
+    python,
+    '-m',
+    'hermes_cli.main',
+    ...args
+  ]
+
+  return { command, pane }
+}
+
+/**
+ * Opens `spec` in a split right of this pane, closing the sidebar opened before. False when
+ * this isn't a Tern pane Tern's CLI can reach (over ssh, say): the caller falls back.
+ */
+export async function openSidebar(spec: WatchSpec, cwd: string, env: NodeJS.ProcessEnv = process.env): Promise<boolean> {
+  const split = hermesSplit(env, [`${WATCH_ENV}=${JSON.stringify(spec)}`], ['tern'])
+
+  if (!split) {
     return false
   }
 
@@ -72,20 +98,29 @@ export async function openSidebar(spec: WatchSpec, cwd: string, env: NodeJS.Proc
     sidebar = undefined
   }
 
-  const command = [
-    'env',
-    `PYTHONPATH=${src}`,
-    ...(env.HERMES_HOME ? [`HERMES_HOME=${env.HERMES_HOME}`] : []),
-    `${WATCH_ENV}=${JSON.stringify(spec)}`,
-    python,
-    '-m',
-    'hermes_cli.main',
-    'tern'
-  ]
+  try {
+    const { stdout } = await run('tern', ['split', split.pane, 'right', '--cwd', cwd, '--', ...split.command])
+    sidebar = stdout.trim().split(/\s+/).at(-1) || undefined
+
+    return true
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Runs `hermes <args>` in a split below this pane (`/update`), kept open after it ends so its
+ * last lines stay readable. False when Tern's CLI cannot reach this pane.
+ */
+export async function openHermesSplit(args: readonly string[], cwd: string, env: NodeJS.ProcessEnv = process.env): Promise<boolean> {
+  const split = hermesSplit(env, [], args)
+
+  if (!split) {
+    return false
+  }
 
   try {
-    const { stdout } = await run('tern', ['split', pane, 'right', '--cwd', cwd, '--', ...command])
-    sidebar = stdout.trim().split(/\s+/).at(-1) || undefined
+    await run('tern', ['split', split.pane, 'down', '--cwd', cwd, '--keep-open', '--', ...split.command])
 
     return true
   } catch {

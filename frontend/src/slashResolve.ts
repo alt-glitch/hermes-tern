@@ -7,21 +7,22 @@ import type { CommandsCatalogResult } from '@hermes/shared/gateway-events'
 import { scoreSlashMenuItem } from '@tui/app/slash/fuzzyScore.js'
 import type { GatewayClient } from '@tui/gatewayClient.js'
 
-import { INK_ONLY_COMMANDS, localCommands } from './commands.js'
+import { HIDDEN_COMMANDS, localCommands } from './commands.js'
 
 export type Resolution = { name: string } | { ambiguous: string[] } | null
 
-/** Lowercase `/alias` → `/canonical` for the catalog's commands and this frontend's own, minus the Ink-only ones. */
+/** Lowercase `/alias` → `/canonical` for the catalog's commands and this frontend's own, minus the hidden ones. */
 function canonOf(catalog: Pick<CommandsCatalogResult, 'canon'> | undefined): Map<string, string> {
   const canon = new Map<string, string>()
 
   for (const [alias, target] of Object.entries(catalog?.canon ?? {})) {
-    if (!INK_ONLY_COMMANDS.has(target.replace(/^\//, '').toLowerCase())) {
+    if (!HIDDEN_COMMANDS.has(target.replace(/^\//, '').toLowerCase())) {
       canon.set(alias.toLowerCase(), target)
     }
   }
 
-  for (const c of localCommands()) {
+  // A hidden command answers only its exact name or alias (a local command runs before any resolving).
+  for (const c of localCommands().filter(c => !HIDDEN_COMMANDS.has(c.name))) {
     for (const n of [c.name, ...(c.aliases ?? [])]) {
       if (!canon.has(`/${n}`)) {
         canon.set(`/${n}`, `/${c.name}`)

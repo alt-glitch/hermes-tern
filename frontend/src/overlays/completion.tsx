@@ -9,7 +9,7 @@ import { scoreSlashMenuItem } from '@tui/app/slash/fuzzyScore.js'
 import { applyCompletion, completionToApplyOnSubmit } from '@tui/domain/slash.js'
 import type { GatewayClient } from '@tui/gatewayClient.js'
 
-import { INK_ONLY_COMMANDS, localCommands } from '../commands.js'
+import { HIDDEN_COMMANDS, localCommands } from '../commands.js'
 import { completionRequestForInput } from '../hermes/completion.js'
 
 import type { Composer } from '../composer.js'
@@ -249,19 +249,19 @@ export class Completion {
 }
 
 /**
- * A command's completion rows for `typed` (the draft's `/…` text): the gateway's, minus the Ink-only
+ * A command's completion rows for `typed` (the draft's `/…` text): the gateway's, minus the hidden
  * commands this frontend cannot run, and this frontend's own commands (/ps, /prs, …) that match the
  * typed name, ranked among the gateway's commands by the same name tiers (skills stay last).
  */
 export function slashItems(items: readonly CompletionItem[], typed: string): CompletionItem[] {
   const word = (text: string) => text.replace(/^\//, '').split(/\s/)[0]?.toLowerCase() ?? ''
 
-  // An Ink-only command's own arguments (`/details hidden`) are no use either.
-  if (INK_ONLY_COMMANDS.has(word(typed))) {
+  // A hidden command's own arguments (`/details hidden`) are no use either.
+  if (HIDDEN_COMMANDS.has(word(typed))) {
     return []
   }
 
-  const kept = items.filter(i => !(i.kind === 'command' && INK_ONLY_COMMANDS.has(word(i.text))))
+  const kept = items.filter(i => !(i.kind === 'command' && HIDDEN_COMMANDS.has(word(i.text))))
 
   // Past the name (`/theme `) the rows are the command's arguments.
   if (/\s/.test(typed)) {
