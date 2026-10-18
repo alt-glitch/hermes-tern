@@ -415,6 +415,66 @@ export const STYLES = css`
     background: var(--l1);
   }
 
+  /* A compaction: a quiet rule across the transcript, what happened in its middle. */
+  [data-role='hermes.compaction'] {
+    margin: 20px 0 !important;
+  }
+
+  .sf-row[data-role='hermes.compaction.line'] {
+    font: 400 13px/22px var(--sans) !important;
+    justify-content: center;
+    min-width: 0;
+  }
+
+  .sf-row[data-role='hermes.compaction.line']::before,
+  .sf-row[data-role='hermes.compaction.line']::after {
+    content: '';
+    flex: 1 1 24px;
+    height: 1px;
+    background: rgba(128, 128, 128, 0.3);
+  }
+
+  [data-role='hermes.compaction.line'] .sf-elapsed {
+    margin-left: 4px;
+  }
+
+  .sf-row[data-role='hermes.compaction.line']::before {
+    margin-right: 6px;
+  }
+
+  .sf-row[data-role='hermes.compaction.line']::after {
+    margin-left: 6px;
+  }
+
+  /* With its summary known, the rule opens it: the whole line is the head, the chevron after it. */
+  [data-role='hermes.compaction'] > .sf-section-head {
+    cursor: pointer;
+    padding: 0 !important;
+    background: none !important;
+    border: none !important;
+  }
+
+  [data-role='hermes.compaction'] > .sf-section-head > .sf-head {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  [data-role='hermes.compaction'] > .sf-section-head > .sf-chev {
+    order: 2;
+    opacity: 0.6;
+    margin-left: 4px;
+  }
+
+  [data-role='hermes.compaction'] > .sf-section-body {
+    margin: 10px 0 0 !important;
+    padding: 2px 0 2px 14px !important;
+    border: none !important;
+    box-shadow: inset 2px 0 0 rgba(128, 128, 128, 0.25) !important;
+    background: none !important;
+    font-family: var(--sans) !important;
+    font-size: 14px !important;
+  }
+
   /* A turn Hermes started by itself: set apart from the answer above, like a new prompt is. */
   [data-role='omp.turn.continued'] {
     margin-top: 28px !important;

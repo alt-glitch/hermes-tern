@@ -93,8 +93,8 @@ export function foldOf(turn: TurnEntry): Fold | undefined {
   const hidden = new Set<string>()
 
   for (const [i, b] of turn.blocks.entries()) {
-    // The answer stays, and so do the user's own words: a steer is never folded away.
-    if (i === answer || b.kind === 'steer') {
+    // The answer stays, and so do the user's own words and the compactions: neither folds away.
+    if (i === answer || b.kind === 'steer' || b.kind === 'compaction') {
       continue
     }
 
@@ -132,9 +132,10 @@ const workedFor = (ms: number) => (ms > 0 ? `Worked for ${formatDuration(ms)}` :
 export type Part = { blocks: Block[]; key: string; kind: 'fold'; label: string } | { blocks: Block[]; kind: 'shown' }
 
 /**
- * A turn as it reads once finished. Its steers split it, as a new prompt splits t3code's runs:
- * each stretch folds behind how long it took (from the steer before it, or the turn's start, to
- * the steer after it, or the end), what stays in view follows its fold, then the steer itself.
+ * A turn as it reads once finished. Its steers and compactions split it, as a new prompt splits
+ * t3code's runs: each stretch folds behind how long it took (from the split before it, or the
+ * turn's start, to the one after it, or the end), what stays in view follows its fold, then the
+ * split itself.
  * A turn that does not fold is one shown part.
  */
 export function parts(turn: TurnEntry): Part[] {
@@ -170,10 +171,10 @@ export function parts(turn: TurnEntry): Part[] {
   }
 
   for (const b of turn.blocks) {
-    if (b.kind === 'steer') {
+    if (b.kind === 'steer' || b.kind === 'compaction') {
       flush(b.at)
       show(b)
-      from = b.at
+      from = b.kind === 'compaction' ? (b.compaction.endedAt ?? b.at) : b.at
     } else {
       stretch.push(b)
     }

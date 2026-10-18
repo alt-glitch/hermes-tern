@@ -11,16 +11,30 @@ describe('statusEffect', () => {
     expect(statusEffect({ kind: 'status', text: 'Thinking' })).toEqual({ label: 'Thinking' })
   })
 
-  it('shows compaction in the transcript and holds the label until the done edge', () => {
+  it('drives the compaction rule (no notice line) and holds the label until the done edge', () => {
     expect(statusEffect({ kind: 'compacting', text: '📦 Pre-API compression: compacting' })).toEqual({
       compacting: true,
-      label: COMPACTING_LABEL,
-      notice: { text: '📦 Pre-API compression: compacting', tone: 'info' }
+      label: COMPACTING_LABEL
     })
     expect(statusEffect({ kind: 'compacted', text: 'Compaction complete' })).toEqual({
       compacting: false,
       label: 'Compaction complete'
     })
+  })
+
+  it("reads the token counts of Hermes' compaction lines", () => {
+    const preflight = '📦 Preflight compression: ~182,000 tokens >= 160,000 threshold. This may take a moment.'
+    expect(statusEffect({ kind: 'compacting', text: preflight }).tokens).toEqual({ before: 182000 })
+    expect(statusEffect({ kind: 'compressing', text: '⠋ compressing 120 messages (~95,400 tok)…' }).tokens).toEqual({ before: 95400 })
+    expect(statusEffect({ kind: 'compacting', text: '🗜️ Compressed ~250,000 → ~120,000 tokens, retrying...' }).tokens).toEqual({
+      after: 120000,
+      before: 250000
+    })
+  })
+
+  it("ends /compress's compaction on its bare ready edge", () => {
+    expect(statusEffect({ kind: 'ready' })).toEqual({ compacting: false })
+    expect(statusEffect({ kind: 'lifecycle' })).toEqual({})
   })
 
   it('puts warnings in the transcript once', () => {

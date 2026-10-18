@@ -121,6 +121,16 @@ The parent can take it from here.
 """
 
 
+COMPACTION_SUMMARY = """## Goal
+Try the lab's chat surface: a greeting, the repo tour and one more thing.
+
+## Progress
+- Answered each prompt with the canned reply.
+
+## Next steps
+- Wait for the next prompt."""
+
+
 def _todos(*statuses: str) -> tuple[str, dict]:
     items = ["Read the failing test", "Run the test suite", "Fix the timing assumption", "Run the suite again"]
     todos = [{"id": str(i + 1), "content": c, "status": st} for i, (c, st) in enumerate(zip(items, statuses))]
@@ -224,7 +234,11 @@ class Model(BaseHTTPRequestHandler):
         if isinstance(prompt, list):
             prompt = " ".join(p.get("text", "") for p in prompt if isinstance(p, dict))
         system = next((m.get("content") for m in messages if m.get("role") == "system"), "") or ""
-        if isinstance(system, str) and SUBAGENT_MARKER in system:
+        if not names and "summar" in (prompt + str(system)).lower():
+            # Context compaction's summary call: a slow, short handoff, so the running rule shows.
+            content, delay = COMPACTION_SUMMARY, 2.5
+            calls = None
+        elif isinstance(system, str) and SUBAGENT_MARKER in system:
             calls = _subagent_calls(messages)
             content = None if calls else SUBAGENT_REPLY
             delay = 0.15
@@ -267,6 +281,7 @@ class Model(BaseHTTPRequestHandler):
         if request.get("stream"):
             self._stream(content, calls, delay)
         else:
+            time.sleep(delay)
             message = {"role": "assistant", "content": content, **({"tool_calls": calls} if calls else {})}
             self._json({"id": "fake", "object": "chat.completion", "created": 1, "model": "fake-model",
                         "choices": [{"index": 0, "message": message, "finish_reason": "tool_calls" if calls else "stop"}],
@@ -329,6 +344,8 @@ def write_home(home: Path, base_url: str) -> Path:
         "auxiliary": {"title_generation": {"enabled": False}},
         "plugins": {"enabled": ["hermes-tern"], "disabled": []},
         "telemetry": {"shared_metrics": {"enabled": False, "send": False, "offer_version": 2}},
+        # A short tail, so /compress has something to summarize after a few turns.
+        "compression": {"protect_last_n": 2, "protect_first_n": 0},
     }, indent=2))
     (home / ".env").write_text("OPENAI_API_KEY=loopback-only\n")
     target = home / "approve-target"
