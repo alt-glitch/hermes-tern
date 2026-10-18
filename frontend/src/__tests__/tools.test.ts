@@ -97,6 +97,13 @@ describe('tool cards', () => {
     expect([brief?.p?.head, brief?.p?.collapsed]).toEqual(['Shared brief', true])
   })
 
+  it("gives a Python cell's code and output the card's width", () => {
+    const n = tree(toolNode(call('execute_code', { code: 'print(1)' }, { result: { output: '1\n' } }), 0))
+    const cell = n.c?.[0]?.c ?? []
+    expect(cell.map(r => r.c?.[1]?.p?.grow)).toEqual([1, 1])
+    expect(cell[1]?.c?.[1]?.c?.[0]?.p?.text).toBe('1')
+  })
+
   it('draws the legacy `todo` tool as the checklist', () => {
     const todos = [{ content: 'Plan', id: '1', status: 'completed' as const }]
     const n = tree(toolNode(call('todo', { todos }, { todos }), 0))

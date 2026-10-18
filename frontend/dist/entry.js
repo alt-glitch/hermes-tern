@@ -24996,9 +24996,12 @@ var Transcript = class {
   usageTick(counters, tps) {
     this.#counters = counters;
     const turn = this.live ?? this.entries.findLast((e) => e.kind === "turn");
-    const start = turn?.kind === "turn" ? turn.countersAtStart : void 0;
+    let start = turn?.kind === "turn" ? turn.countersAtStart : void 0;
     if (turn?.kind !== "turn" || !start) {
       return;
+    }
+    if (counters.total < start.total) {
+      start = turn.countersAtStart = { prompt: 0, read: 0, total: 0 };
     }
     const prompt = counters.prompt - start.prompt;
     const hit = prompt > 0 ? Math.round((counters.read - start.read) / prompt * 100) : void 0;
@@ -25872,7 +25875,8 @@ function internalNotice(content) {
   }
   const done = /^\[IMPORTANT: Background process \S+ ([^(]+?) \(exit code ([^)\s]+)/.exec(text2);
   if (done) {
-    return `Background command ${done[1]}${done[2] === "0" ? "" : ` (exit ${done[2]})`}`;
+    const how = done[1] === "completed normally" ? "finished" : done[1];
+    return `Background command ${how}${done[2] === "0" ? "" : ` (exit ${done[2]})`}`;
   }
   return text2.includes(INTERNAL_FOOTER) ? "Hermes notice" : void 0;
 }
@@ -29936,12 +29940,12 @@ function evalCard(call, result) {
       /* @__PURE__ */ jsxs("col", { role: "omp.tool.eval.cell", children: [
         /* @__PURE__ */ jsxs("row", { align: "start", role: "omp.tool.eval.input", children: [
           /* @__PURE__ */ jsx("icon", { aria: "Input", name: "arrow-left", role: "omp.tool.eval.prompt" }, "0"),
-          /* @__PURE__ */ jsx("code", { lang: "python", numbers: false, text: code2 }, "code")
+          /* @__PURE__ */ jsx("col", { grow: 1, children: /* @__PURE__ */ jsx("code", { lang: "python", max: { h: "20lines" }, numbers: false, text: code2, wrap: true }, "code") }, "source")
         ] }, "input"),
         output || error ? /* @__PURE__ */ jsxs("row", { align: "start", role: "omp.tool.eval.result", children: [
           /* @__PURE__ */ jsx("icon", { aria: "Output", name: "arrow-right", role: "omp.tool.eval.prompt" }, "0"),
-          /* @__PURE__ */ jsxs("col", { role: "omp.tool.eval.outputs", children: [
-            output ? /* @__PURE__ */ jsx("ansi", { follow: false, role: "omp.tool.eval.output", text: output.replace(/\n$/, "") }, "out") : null,
+          /* @__PURE__ */ jsxs("col", { grow: 1, role: "omp.tool.eval.outputs", children: [
+            output ? /* @__PURE__ */ jsx("ansi", { follow: false, max: { h: "20lines" }, role: "omp.tool.eval.output", text: output.replace(/\n$/, "") }, "out") : null,
             error ? /* @__PURE__ */ jsx("text", { role: "omp.tool.error", spans: [{ s: "error", t: error }], wrap: "word" }, "err") : null
           ] }, "outputs")
         ] }, "result") : null

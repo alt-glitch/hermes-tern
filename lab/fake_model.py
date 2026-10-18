@@ -144,6 +144,15 @@ Try the lab's chat surface: a greeting, the repo tour and one more thing.
 - Wait for the next prompt."""
 
 
+EVAL_CODE = (
+    "import json\n"
+    "calls=[{'name': 'connectors__linear__RUN_QUERY_OR_MUTATION', 'arguments': {'query_or_mutation': "
+    "'mutation($input: IssueCreateInput!) { issueCreate(input: $input) { success issue { identifier url } } }', "
+    "'variables': {'input': {'teamId': 'c75abc07-3a64-46f8-83fc-9e0fe53b80ed', 'projectId': '3f9ddca6-6f21-4'}}}}]\n"
+    "print(json.dumps(calls)[:300])"
+)
+
+
 def _todos(*statuses: str) -> tuple[str, dict]:
     items = ["Read the failing test", "Run the test suite", "Fix the timing assumption", "Run the suite again"]
     todos = [{"id": str(i + 1), "content": c, "status": st} for i, (c, st) in enumerate(zip(items, statuses))]
@@ -209,6 +218,9 @@ def _calls(prompt: str, target: Path) -> list[dict] | None:
                 "action": "create", "name": "lab page watch", "schedule": "every 15m",
                 "prompt": "Say what changed on the page.", "monitor": "https://example.com"}}, "call-monitor"),
         ]
+    if words.lstrip().startswith("eval"):
+        # A Python cell whose output is one long line, as an agent peeking at a JSON file prints.
+        return [_call("execute_code", {"code": EVAL_CODE})]
     if words.lstrip().startswith("script"):
         return [_call("terminal", {"command": SCRIPT})]
     if "approve" in words:

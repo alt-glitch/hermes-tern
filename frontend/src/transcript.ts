@@ -55,10 +55,16 @@ export class Transcript {
   usageTick(counters: Counters, tps: number | undefined) {
     this.#counters = counters
     const turn = this.live ?? this.entries.findLast(e => e.kind === 'turn')
-    const start = turn?.kind === 'turn' ? turn.countersAtStart : undefined
+    let start = turn?.kind === 'turn' ? turn.countersAtStart : undefined
 
     if (turn?.kind !== 'turn' || !start) {
       return
+    }
+
+    // The counters went back: Hermes built a new agent for the session (they are its, not the
+    // session's), so the turn counts from zero rather than below it.
+    if (counters.total < start.total) {
+      start = turn.countersAtStart = { prompt: 0, read: 0, total: 0 }
     }
 
     const prompt = counters.prompt - start.prompt
@@ -1256,7 +1262,9 @@ export function internalNotice(content: string): string | undefined {
   const done = /^\[IMPORTANT: Background process \S+ ([^(]+?) \(exit code ([^)\s]+)/.exec(text)
 
   if (done) {
-    return `Background command ${done[1]}${done[2] === '0' ? '' : ` (exit ${done[2]})`}`
+    const how = done[1] === 'completed normally' ? 'finished' : done[1]
+
+    return `Background command ${how}${done[2] === '0' ? '' : ` (exit ${done[2]})`}`
   }
 
   return text.includes(INTERNAL_FOOTER) ? 'Hermes notice' : undefined

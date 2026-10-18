@@ -239,6 +239,14 @@ describe('Transcript', () => {
     expect(turns.map(e => e.kind === 'turn' && e.usage?.total)).toEqual([1380, 1380])
   })
 
+  it("counts a turn from zero when the counters go back (a new agent's), not below it", () => {
+    const t = new Transcript()
+    t.usageTick({ prompt: 20_000, read: 15_000, total: 21_560 }, undefined)
+    const turn = t.start(0)
+    t.usageTick({ prompt: 3_000, read: 2_250, total: 3_080 }, undefined)
+    expect([turn.tickTokens, turn.cacheHit]).toEqual([3_080, 75])
+  })
+
   it('shows todo_list args while running and the snapshot once done', () => {
     const t = new Transcript()
     t.start(0)
