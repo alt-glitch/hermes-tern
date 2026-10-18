@@ -1916,9 +1916,9 @@ var require_dispatcher_base = __commonJS({
       }
       close(callback) {
         if (callback === void 0) {
-          return new Promise((resolve5, reject) => {
+          return new Promise((resolve6, reject) => {
             this.close((err, data) => {
-              return err ? reject(err) : resolve5(data);
+              return err ? reject(err) : resolve6(data);
             });
           });
         }
@@ -1956,12 +1956,12 @@ var require_dispatcher_base = __commonJS({
           err = null;
         }
         if (callback === void 0) {
-          return new Promise((resolve5, reject) => {
+          return new Promise((resolve6, reject) => {
             this.destroy(err, (err2, data) => {
               return err2 ? (
                 /* istanbul ignore next: should never error */
                 reject(err2)
-              ) : resolve5(data);
+              ) : resolve6(data);
             });
           });
         }
@@ -4228,8 +4228,8 @@ var require_util2 = __commonJS({
     function createDeferredPromise() {
       let res;
       let rej;
-      const promise = new Promise((resolve5, reject) => {
-        res = resolve5;
+      const promise = new Promise((resolve6, reject) => {
+        res = resolve6;
         rej = reject;
       });
       return { promise, resolve: res, reject: rej };
@@ -6481,12 +6481,12 @@ upgrade: ${upgrade}\r
           cb();
         }
       }
-      const waitForDrain = () => new Promise((resolve5, reject) => {
+      const waitForDrain = () => new Promise((resolve6, reject) => {
         assert(callback === null);
         if (socket[kError]) {
           reject(socket[kError]);
         } else {
-          callback = resolve5;
+          callback = resolve6;
         }
       });
       socket.on("close", onDrain).on("drain", onDrain);
@@ -7158,12 +7158,12 @@ var require_client_h2 = __commonJS({
           cb();
         }
       }
-      const waitForDrain = () => new Promise((resolve5, reject) => {
+      const waitForDrain = () => new Promise((resolve6, reject) => {
         assert(callback === null);
         if (socket[kError]) {
           reject(socket[kError]);
         } else {
-          callback = resolve5;
+          callback = resolve6;
         }
       });
       h2stream.on("close", onDrain).on("drain", onDrain);
@@ -7641,16 +7641,16 @@ var require_client = __commonJS({
         return this[kNeedDrain] < 2;
       }
       async [kClose]() {
-        return new Promise((resolve5) => {
+        return new Promise((resolve6) => {
           if (this[kSize]) {
-            this[kClosedResolve] = resolve5;
+            this[kClosedResolve] = resolve6;
           } else {
-            resolve5(null);
+            resolve6(null);
           }
         });
       }
       async [kDestroy](err) {
-        return new Promise((resolve5) => {
+        return new Promise((resolve6) => {
           const requests = this[kQueue].splice(this[kPendingIdx]);
           for (let i = 0; i < requests.length; i++) {
             const request = requests[i];
@@ -7661,7 +7661,7 @@ var require_client = __commonJS({
               this[kClosedResolve]();
               this[kClosedResolve] = null;
             }
-            resolve5(null);
+            resolve6(null);
           };
           if (this[kHTTPContext]) {
             this[kHTTPContext].destroy(err, callback);
@@ -7712,7 +7712,7 @@ var require_client = __commonJS({
         });
       }
       try {
-        const socket = await new Promise((resolve5, reject) => {
+        const socket = await new Promise((resolve6, reject) => {
           client[kConnector]({
             host,
             hostname: hostname2,
@@ -7724,7 +7724,7 @@ var require_client = __commonJS({
             if (err) {
               reject(err);
             } else {
-              resolve5(socket2);
+              resolve6(socket2);
             }
           });
         });
@@ -8060,8 +8060,8 @@ var require_pool_base = __commonJS({
         if (this[kQueue].isEmpty()) {
           await Promise.all(this[kClients].map((c) => c.close()));
         } else {
-          await new Promise((resolve5) => {
-            this[kClosedResolve] = resolve5;
+          await new Promise((resolve6) => {
+            this[kClosedResolve] = resolve6;
           });
         }
       }
@@ -9327,7 +9327,7 @@ var require_readable = __commonJS({
         if (this._readableState.closeEmitted) {
           return null;
         }
-        return await new Promise((resolve5, reject) => {
+        return await new Promise((resolve6, reject) => {
           if (this[kContentLength] > limit) {
             this.destroy(new AbortError());
           }
@@ -9340,7 +9340,7 @@ var require_readable = __commonJS({
             if (signal?.aborted) {
               reject(signal.reason ?? new AbortError());
             } else {
-              resolve5(null);
+              resolve6(null);
             }
           }).on("error", noop).on("data", function(chunk) {
             limit -= chunk.length;
@@ -9359,7 +9359,7 @@ var require_readable = __commonJS({
     }
     async function consume(stream, type) {
       assert(!stream[kConsume]);
-      return new Promise((resolve5, reject) => {
+      return new Promise((resolve6, reject) => {
         if (isUnusable(stream)) {
           const rState = stream._readableState;
           if (rState.destroyed && rState.closeEmitted === false) {
@@ -9376,7 +9376,7 @@ var require_readable = __commonJS({
             stream[kConsume] = {
               type,
               stream,
-              resolve: resolve5,
+              resolve: resolve6,
               reject,
               length: 0,
               body: []
@@ -9446,18 +9446,18 @@ var require_readable = __commonJS({
       return buffer;
     }
     function consumeEnd(consume2) {
-      const { type, body, resolve: resolve5, stream, length } = consume2;
+      const { type, body, resolve: resolve6, stream, length } = consume2;
       try {
         if (type === "text") {
-          resolve5(chunksDecode(body, length));
+          resolve6(chunksDecode(body, length));
         } else if (type === "json") {
-          resolve5(JSON.parse(chunksDecode(body, length)));
+          resolve6(JSON.parse(chunksDecode(body, length)));
         } else if (type === "arrayBuffer") {
-          resolve5(chunksConcat(body, length).buffer);
+          resolve6(chunksConcat(body, length).buffer);
         } else if (type === "blob") {
-          resolve5(new Blob(body, { type: stream[kContentType] }));
+          resolve6(new Blob(body, { type: stream[kContentType] }));
         } else if (type === "bytes") {
-          resolve5(chunksConcat(body, length));
+          resolve6(chunksConcat(body, length));
         }
         consumeFinish(consume2);
       } catch (err) {
@@ -9714,9 +9714,9 @@ var require_api_request = __commonJS({
     };
     function request(opts, callback) {
       if (callback === void 0) {
-        return new Promise((resolve5, reject) => {
+        return new Promise((resolve6, reject) => {
           request.call(this, opts, (err, data) => {
-            return err ? reject(err) : resolve5(data);
+            return err ? reject(err) : resolve6(data);
           });
         });
       }
@@ -9939,9 +9939,9 @@ var require_api_stream = __commonJS({
     };
     function stream(opts, factory, callback) {
       if (callback === void 0) {
-        return new Promise((resolve5, reject) => {
+        return new Promise((resolve6, reject) => {
           stream.call(this, opts, factory, (err, data) => {
-            return err ? reject(err) : resolve5(data);
+            return err ? reject(err) : resolve6(data);
           });
         });
       }
@@ -10226,9 +10226,9 @@ var require_api_upgrade = __commonJS({
     };
     function upgrade(opts, callback) {
       if (callback === void 0) {
-        return new Promise((resolve5, reject) => {
+        return new Promise((resolve6, reject) => {
           upgrade.call(this, opts, (err, data) => {
-            return err ? reject(err) : resolve5(data);
+            return err ? reject(err) : resolve6(data);
           });
         });
       }
@@ -10320,9 +10320,9 @@ var require_api_connect = __commonJS({
     };
     function connect2(opts, callback) {
       if (callback === void 0) {
-        return new Promise((resolve5, reject) => {
+        return new Promise((resolve6, reject) => {
           connect2.call(this, opts, (err, data) => {
-            return err ? reject(err) : resolve5(data);
+            return err ? reject(err) : resolve6(data);
           });
         });
       }
@@ -14184,7 +14184,7 @@ var require_fetch = __commonJS({
       function dispatch({ body }) {
         const url = requestCurrentURL(request);
         const agent = fetchParams.controller.dispatcher;
-        return new Promise((resolve5, reject) => agent.dispatch(
+        return new Promise((resolve6, reject) => agent.dispatch(
           {
             path: url.pathname + url.search,
             origin: url.origin,
@@ -14260,7 +14260,7 @@ var require_fetch = __commonJS({
                 }
               }
               const onError = this.onError.bind(this);
-              resolve5({
+              resolve6({
                 status,
                 statusText,
                 headersList,
@@ -14306,7 +14306,7 @@ var require_fetch = __commonJS({
               for (let i = 0; i < rawHeaders.length; i += 2) {
                 headersList.append(bufferToLowerCasedHeaderName(rawHeaders[i]), rawHeaders[i + 1].toString("latin1"), true);
               }
-              resolve5({
+              resolve6({
                 status,
                 statusText: STATUS_CODES[status],
                 headersList,
@@ -18037,8 +18037,8 @@ var require_util8 = __commonJS({
       return true;
     }
     function delay(ms) {
-      return new Promise((resolve5) => {
-        setTimeout(resolve5, ms).unref();
+      return new Promise((resolve6) => {
+        setTimeout(resolve6, ms).unref();
       });
     }
     module.exports = {
@@ -20653,9 +20653,9 @@ var Session = class {
     ownedInputs.add(this.#input);
     this.#ownsInput = true;
     this.#wasRaw = this.#input.isRaw === true;
-    const { promise, resolve: resolve5 } = Promise.withResolvers();
-    const timer = setTimeout(() => resolve5(false), options.timeout ?? 1e3);
-    this.#handshake = resolve5;
+    const { promise, resolve: resolve6 } = Promise.withResolvers();
+    const timer = setTimeout(() => resolve6(false), options.timeout ?? 1e3);
+    this.#handshake = resolve6;
     let connected = false;
     try {
       if (options.exitHooks ?? (options.input === void 0 && options.output === void 0))
@@ -20747,8 +20747,8 @@ var Session = class {
   blobs(ids) {
     if (this.#closed)
       return Promise.resolve([]);
-    const { promise, resolve: resolve5 } = Promise.withResolvers();
-    this.#blobWaiters.push(resolve5);
+    const { promise, resolve: resolve6 } = Promise.withResolvers();
+    this.#blobWaiters.push(resolve6);
     this.#send({ verb: "q", body: { q: "blobs", ids } });
     return promise;
   }
@@ -20764,8 +20764,8 @@ var Session = class {
     }
     if (this.#closed || this.#closing)
       return Promise.resolve(null);
-    const { promise, resolve: resolve5, reject } = Promise.withResolvers();
-    this.#waiters.push({ resolve: resolve5, reject });
+    const { promise, resolve: resolve6, reject } = Promise.withResolvers();
+    this.#waiters.push({ resolve: resolve6, reject });
     return promise;
   }
   /** Keys and unhandled events until the session closes. */
@@ -21053,10 +21053,7 @@ async function connect(options = {}) {
 }
 
 // .hermes-src/ui-tui/src/gatewayClient.ts
-import { execFile } from "node:child_process";
 import { EventEmitter } from "node:events";
-import { resolve } from "node:path";
-import { promisify } from "node:util";
 
 // .hermes-src/node_modules/@hermes/shared/src/json-rpc-channel.ts
 var isServerRequestFrame = (frame) => typeof frame.id === "string" && typeof frame.method === "string" && frame.method !== "event";
@@ -21157,7 +21154,7 @@ var JsonRpcRequestChannel = class {
       return Promise.reject(new DOMException("Aborted", "AbortError"));
     }
     const id = this.options.createRequestId(++this.nextId);
-    return new Promise((resolve5, reject) => {
+    return new Promise((resolve6, reject) => {
       let onAbort;
       const detachAbort = () => {
         if (onAbort && signal) {
@@ -21167,7 +21164,7 @@ var JsonRpcRequestChannel = class {
       const pending = {
         resolve: (value) => {
           detachAbort();
-          resolve5(value);
+          resolve6(value);
         },
         reject: (error) => {
           detachAbort();
@@ -22607,7 +22604,8 @@ var pickersEn = {
       },
       errors: {
         couldNotLoadResumable: "could not load resumable sessions",
-        alreadyClosed: "session was already closed"
+        alreadyClosed: "session was already closed",
+        notAttached: "this view is not attached to that session \u2014 nothing was closed"
       },
       row: {
         new: "new",
@@ -23015,7 +23013,14 @@ var slashCmdOpsEn = {
       workspaceTarget: "workspace",
       restoredDetail: "restored",
       // {0}=target (file path or "workspace"), {1}=detail
-      restored: (target, detail) => `rollback restored ${target}: ${detail}`
+      restored: (target, detail) => `rollback restored ${target}: ${detail}`,
+      // {0}=summarized paths; main's CLI lines for what a safe whole-tree restore left alone
+      keptUserEdits: (files) => `\u21B7 Kept your hand-edits: ${files}
+Use /rollback <N> --all to restore those too.`,
+      keptOversize: (files) => `\u21B7 Kept (too large for checkpoints, no stored copy to revert to): ${files}`,
+      failedDeletes: (files) => `\u26A0\uFE0F Could not remove (left in place): ${files}`,
+      // {0}=count of paths not listed
+      morePaths: (count) => ` (+${count} more)`
     },
     agents: {
       paused: "delegation \xB7 paused",
@@ -23160,6 +23165,8 @@ var slashCmdSessionEn = {
       cancel: "Cancel",
       confirmStale: "Model not switched: the session changed before the confirmation landed; run /model again.",
       confirmTitle: (model) => `Confirm model switch to ${model}`,
+      // {0}=model picked during a turn, {1}=the owner's refusal reason
+      deferredRefused: (model, reason) => `model switch to ${model} failed (${reason}); keeping the current model`,
       expensiveDetail: "This model has unusually high known pricing.",
       expensiveTitle: "Expensive model selection",
       invalidResponse: "error: invalid response: model switch",
@@ -23671,6 +23678,9 @@ function canonicalRequest(method, original, contract) {
     if (!contract?.sources.includes("tui")) {
       throw new Error(t("canonical.launch.noTuiPolicy"));
     }
+    if (!contract.parameters.includes("client_env")) {
+      delete params.client_env;
+    }
     const unsupported = Object.keys(params).filter((key2) => !contract.parameters.includes(key2));
     if (unsupported.length) {
       throw new Error(t("canonical.launch.unsupportedOptions", unsupported.join(", ")));
@@ -23748,6 +23758,10 @@ function localCreationOptions(env = process.env) {
   if (skills.length) {
     options.skills = skills;
   }
+  const clientEnv = parseClientEnv(env.HERMES_TUI_CLIENT_ENV);
+  if (clientEnv) {
+    options.client_env = clientEnv;
+  }
   if (env.HERMES_TUI_MAX_TURNS) {
     const turns = Number(env.HERMES_TUI_MAX_TURNS);
     options.max_turns = Number.isInteger(turns) ? turns : env.HERMES_TUI_MAX_TURNS.trim();
@@ -23767,6 +23781,19 @@ function localCreationOptions(env = process.env) {
     }
   }
   return options;
+}
+function parseClientEnv(raw) {
+  if (!raw) {
+    return void 0;
+  }
+  try {
+    const value = JSON.parse(raw);
+    if (value && typeof value === "object" && !Array.isArray(value) && Object.values(value).every((item3) => typeof item3 === "string")) {
+      return value;
+    }
+  } catch {
+  }
+  return void 0;
 }
 var TOOL_PROGRESS_MODES = /* @__PURE__ */ new Set(["off", "new", "all", "verbose"]);
 function launchToolProgress(env = process.env) {
@@ -23848,6 +23875,38 @@ function recordParentLifecycle(line) {
   }
 }
 
+// .hermes-src/ui-tui/src/localGatewayBootstrap.ts
+import { execFile } from "node:child_process";
+import { resolve as resolve2 } from "node:path";
+import { promisify } from "node:util";
+
+// .hermes-src/ui-tui/src/lib/pythonHelpers.ts
+import { existsSync } from "node:fs";
+import { resolve } from "node:path";
+function pythonHelperPath(name, pythonRoot) {
+  const bundled = resolve(import.meta.dirname, "scripts", name);
+  return existsSync(bundled) ? bundled : resolve(pythonRoot, "ui-tui/scripts", name);
+}
+
+// .hermes-src/ui-tui/src/localGatewayBootstrap.ts
+var resolvePython = () => {
+  const configured = process.env.HERMES_PYTHON?.trim();
+  if (configured) {
+    return configured;
+  }
+  return process.platform === "win32" ? "python" : "python3";
+};
+var isTerminalBootstrapFailure = (message) => /^gateway unavailable: /m.test(message);
+var bootstrapLocalGateway = async (start, recover = false) => {
+  const root = process.env.HERMES_PYTHON_SRC_ROOT ?? resolve2(import.meta.dirname, "../../");
+  const { stdout } = await promisify(execFile)(
+    resolvePython(),
+    [pythonHelperPath("gateway_bootstrap.py", root), ...start ? ["--start"] : recover ? ["--recover"] : []],
+    { cwd: root, env: { ...process.env, PYTHONPATH: root, HERMES_PYTHON_SRC_ROOT: root }, timeout: 4e4, maxBuffer: 1024 * 1024 }
+  );
+  return JSON.parse(stdout);
+};
+
 // .hermes-src/ui-tui/src/gatewayClient.ts
 var MAX_GATEWAY_LOG_LINES = 200;
 var MAX_LOG_LINE_BYTES = 4096;
@@ -23871,13 +23930,6 @@ var resolveSidecarUrl = () => {
   const raw = process.env.HERMES_TUI_SIDECAR_URL?.trim();
   return raw ? raw : null;
 };
-var resolvePython = () => {
-  const configured = process.env.HERMES_PYTHON?.trim();
-  if (configured) {
-    return configured;
-  }
-  return process.platform === "win32" ? "python" : "python3";
-};
 var _USERINFO_FALLBACK_RE = /^([a-z][a-z0-9+.-]*:\/\/)[^/?#@]*@/i;
 var redactUrl = (raw) => {
   if (!raw) {
@@ -23896,15 +23948,6 @@ var redactUrl = (raw) => {
 };
 var OWNER_RECOVERY_LIMIT = 3;
 var OWNER_RECOVERY_WINDOW_MS = 6e4;
-var bootstrapLocalGateway = async (start, recover = false) => {
-  const root = process.env.HERMES_PYTHON_SRC_ROOT ?? resolve(import.meta.dirname, "../../");
-  const { stdout } = await promisify(execFile)(
-    resolvePython(),
-    [resolve(root, "ui-tui/scripts/gateway_bootstrap.py"), ...start ? ["--start"] : recover ? ["--recover"] : []],
-    { cwd: root, env: { ...process.env, PYTHONPATH: root }, timeout: 4e4, maxBuffer: 1024 * 1024 }
-  );
-  return JSON.parse(stdout);
-};
 var GatewayClient = class extends EventEmitter {
   constructor(bootstrap = bootstrapLocalGateway) {
     super();
@@ -24274,6 +24317,10 @@ var GatewayClient = class extends EventEmitter {
         stderr_tail: this.bootstrapError.message
       } });
       this.channel.detach(this.bootstrapError);
+      if (isTerminalBootstrapFailure(this.bootstrapError.message)) {
+        this.lifecycle(`[lifecycle] gateway bootstrap cannot start; not retrying: ${this.bootstrapError.message.match(/^gateway unavailable: .*$/m)?.[0]}`);
+        return;
+      }
       this.scheduleReconnect();
     });
   }
@@ -24302,7 +24349,7 @@ var GatewayClient = class extends EventEmitter {
       let settled = false;
       this.ws = ws;
       this.channel.attach({ send: (text2) => ws.send(text2) });
-      const connectPromise = new Promise((resolve5, reject) => {
+      const connectPromise = new Promise((resolve6, reject) => {
         ws.addEventListener(
           "open",
           () => {
@@ -24311,7 +24358,7 @@ var GatewayClient = class extends EventEmitter {
             }
             if (!settled) {
               settled = true;
-              resolve5();
+              resolve6();
             }
             this.connectSidecarMirror();
             if (this.isCanonical) {
@@ -24554,7 +24601,7 @@ var GatewayClient = class extends EventEmitter {
 
 // src/app.ts
 import { randomUUID as randomUUID3 } from "node:crypto";
-import { appendFileSync as appendFileSync4, existsSync as existsSync5 } from "node:fs";
+import { appendFileSync as appendFileSync4, existsSync as existsSync6 } from "node:fs";
 import { hostname } from "node:os";
 import { basename as basename4 } from "node:path";
 
@@ -24598,7 +24645,7 @@ var detailLine = (raw) => {
   }
   return t("userMessages.details", text2.length > DETAIL_LIMIT ? `${text2.slice(0, DETAIL_LIMIT - 1)}\u2026` : text2);
 };
-var STDERR_PROBLEM_RE = /Traceback|\b[A-Z][A-Za-z]*(?:Error|Exception)\b:|CRITICAL|\[gateway-turn\]|\[gateway-exit\]|^gateway (?:absent|conflict|draining|inaccessible|incompatible|starting): /;
+var STDERR_PROBLEM_RE = /Traceback|\b[A-Z][A-Za-z]*(?:Error|Exception)\b:|CRITICAL|\[gateway-turn\]|\[gateway-exit\]|^gateway (?:absent|conflict|draining|inaccessible|incompatible|starting|unavailable): /;
 var stderrLooksLikeProblem = (line) => STDERR_PROBLEM_RE.test(line);
 var VERSION_SKEW_RE = /Extra inputs are not permitted|^unknown method:/;
 var isVersionSkewError = (err) => {
@@ -24665,8 +24712,8 @@ var shouldFallbackToDispatch = (err) => {
   return !/slash worker|timed out|not connected|not running/.test(message ?? "");
 };
 
-// .hermes-src/ui-tui/src/domain/usage.ts
-var num2 = (value) => typeof value === "number" && Number.isFinite(value) ? value : void 0;
+// .hermes-src/node_modules/@hermes/shared/src/usage-tick.ts
+var num2 = (value) => value !== null && value !== void 0 && Number.isFinite(value) ? value : void 0;
 var round1 = (value) => Math.round(value * 10) / 10;
 var pct = (part, whole) => Math.max(0, Math.min(100, Math.round(part / whole * 100)));
 var COUNTERS = [
@@ -24681,11 +24728,12 @@ var COUNTERS = [
 function contextFields(p) {
   const used = num2(p.last_prompt_tokens) ?? 0;
   const max = num2(p.context_length) ?? 0;
-  const fields = p.context_length == null ? {} : { compressions: num2(p.compression_count) ?? 0 };
+  const compressions = num2(p.compression_count);
+  const fields = p.context_source == null || compressions === void 0 ? {} : { compressions };
   if (!used || !max) {
     return fields;
   }
-  const source = typeof p.context_source === "string" && p.context_source ? p.context_source : "provider_usage";
+  const source = p.context_source || "provider_usage";
   const clamped = Math.min(used, max);
   return {
     ...fields,
@@ -24702,6 +24750,7 @@ function rateFields(p) {
   const cacheRead = num2(p.cache_read_tokens) ?? 0;
   const latency = num2(p.avg_latency_s);
   const tps = num2(p.tokens_per_s);
+  const subagents = num2(p.active_subagents);
   if (promptTotal > 0 && cacheRead > 0) {
     fields.cache_hit_pct = pct(cacheRead, promptTotal);
   }
@@ -24711,29 +24760,31 @@ function rateFields(p) {
   if (tps !== void 0) {
     fields.avg_tps = round1(tps);
   }
-  if (num2(p.active_subagents) !== void 0) {
-    fields.active_subagents = num2(p.active_subagents);
+  if (subagents !== void 0) {
+    fields.active_subagents = subagents;
   }
   return fields;
 }
 function usageFromTick(payload) {
-  if (!payload || typeof payload !== "object") {
+  if (!payload) {
     return void 0;
   }
-  const p = payload;
-  if (p.usage && typeof p.usage === "object") {
-    return p.usage;
+  if ("usage" in payload && payload.usage) {
+    return payload.usage;
   }
-  if (num2(p.api_calls) === void 0 && num2(p.total_tokens) === void 0) {
+  const usage = {};
+  for (const [key2, sources] of COUNTERS) {
+    const values = sources.map((source) => num2(payload[source]));
+    const value = values.find(Boolean) ?? values.find((v) => v !== void 0);
+    if (value !== void 0) {
+      usage[key2] = value;
+    }
+  }
+  const derived = { ...usage, ...contextFields(payload), ...rateFields(payload) };
+  if (Object.keys(derived).length === 0) {
     return void 0;
   }
-  const usage = Object.fromEntries(
-    COUNTERS.map(([key2, sources]) => [key2, sources.map((source) => num2(p[source])).find(Boolean) ?? 0])
-  );
-  if (typeof p.model === "string" && p.model) {
-    usage.model = p.model;
-  }
-  return { ...usage, ...contextFields(p), ...rateFields(p) };
+  return payload.model ? { ...derived, model: payload.model } : derived;
 }
 
 // assets/logo.png
@@ -24858,7 +24909,7 @@ function callApp(call) {
 }
 
 // src/promptRefs.ts
-import { existsSync } from "node:fs";
+import { existsSync as existsSync2 } from "node:fs";
 import { basename as basename2 } from "node:path";
 var VALUE = "(`[^`\\n]+`|\"[^\"\\n]+\"|'[^'\\n]+'|\\S+)";
 var IMAGE_LINE = new RegExp(`^@image:${VALUE}[ \\t]*$`, "gm");
@@ -24906,7 +24957,7 @@ function splitPrompt(raw) {
   }
   return { files, images: [...refs, ...hinted], text: text2.replace(CONTEXT_WARNINGS, "").replace(/\n{3,}/g, "\n\n").trim() };
 }
-function promptAttachments(parts2, exists = existsSync) {
+function promptAttachments(parts2, exists = existsSync2) {
   const local = (p) => p.startsWith("/") && exists(p);
   return [
     ...parts2.images.map((p) => ({ kind: "image", name: basename2(p), ...local(p) ? { source: { path: p } } : {} })),
@@ -26857,7 +26908,7 @@ function compact(n) {
 }
 
 // src/connections.ts
-import { existsSync as existsSync2, mkdirSync as mkdirSync2, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync as existsSync3, mkdirSync as mkdirSync2, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { homedir as homedir3 } from "node:os";
 import { join as join3 } from "node:path";
 var CONNECT_TOOL = "manage_connections";
@@ -26895,7 +26946,7 @@ function readCard(key2, dir2 = dataDir(), now = Date.now()) {
     } else if (!alive(data.pid) || now - updated > STALE_MS) {
       settled = "stopped";
     }
-    return { error, key: key2, settled, targets: data.targets, told: existsSync2(join3(dir2, "connections", `${key2}.told`)) };
+    return { error, key: key2, settled, targets: data.targets, told: existsSync3(join3(dir2, "connections", `${key2}.told`)) };
   } catch {
     return void 0;
   }
@@ -26904,7 +26955,7 @@ function findCard(call, dir2 = dataDir()) {
   const op = record2(call.result)?.op_id;
   const prefix = `${safe(call.id)}.`;
   if (typeof op === "string" && op) {
-    return existsSync2(join3(dir2, "connections", `${cardStem(call.id, op)}.json`)) ? cardStem(call.id, op) : void 0;
+    return existsSync3(join3(dir2, "connections", `${cardStem(call.id, op)}.json`)) ? cardStem(call.id, op) : void 0;
   }
   let names;
   try {
@@ -27020,7 +27071,7 @@ import { fileURLToPath } from "node:url";
 // src/hermes/images.ts
 import { readFile as readFile2 } from "node:fs/promises";
 import { homedir as homedir4 } from "node:os";
-import { extname as extname2, resolve as resolve2 } from "node:path";
+import { extname as extname2, resolve as resolve3 } from "node:path";
 var MAX_IMAGE_BYTES = 20 * 1024 * 1024;
 function imageFormat(bytes) {
   if (bytes.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))) {
@@ -27075,7 +27126,7 @@ function imageSize(bytes) {
   return void 0;
 }
 async function uploadImage(gw2, sid, raw, cwd) {
-  const path = resolve2(cwd, raw.replace(/^~(?=$|\/)/, homedir4()));
+  const path = resolve3(cwd, raw.replace(/^~(?=$|\/)/, homedir4()));
   const bytes = await readFile2(path);
   if (bytes.length > MAX_IMAGE_BYTES) {
     throw new Error("the image is larger than 20 MB");
@@ -29277,6 +29328,10 @@ function commandLine(command, n = 96) {
 // src/view/tools.tsx
 var str6 = (v) => typeof v === "string" && v ? v : void 0;
 function toolNode(call, now, place = {}) {
+  const solo = call.name === "delegate_task" ? soloTask(call, now) : void 0;
+  if (solo) {
+    return solo;
+  }
   const card = cardOf(call, now);
   const status = card.status ?? call.status;
   const running = status === "running";
@@ -29716,7 +29771,7 @@ function taskCard(call, result, now) {
   const tasks = Array.isArray(call.args.tasks) ? call.args.tasks.map((t2) => record2(t2)).filter((t2) => t2 !== void 0) : [];
   const goals = tasks.length ? tasks.map((t2) => str6(t2.goal) ?? "") : str6(call.args.goal) ? [str6(call.args.goal) ?? ""] : [];
   const agents2 = call.subagents ?? [];
-  const rows = agents2.length ? agents2.map((a) => agentNode(a, now)) : call.status === "running" || result?.status === "dispatched" ? goals.map((g, i) => /* @__PURE__ */ jsx("agent", { agent: "task", name: `Agent ${i + 1}`, status: "pending", task: g }, `p${i}`)) : settledRows(goals, result);
+  const rows = agents2.length ? agents2.map((a) => agentNode(a, now)) : call.status === "running" || result?.status === "dispatched" ? goals.map((g, i) => /* @__PURE__ */ jsx("agent", { name: `Agent ${i + 1}`, status: "pending", task: g }, `p${i}`)) : settledRows(goals, result);
   const context = str6(call.args.context) ?? (tasks.length === 1 ? str6(tasks[0]?.context) : void 0);
   const working = agents2.some((a) => a.status === "running" || a.status === "queued") || !agents2.length && result?.status === "dispatched";
   const settled = agents2.filter((a) => a.status !== "running" && a.status !== "queued");
@@ -29740,10 +29795,8 @@ function taskCard(call, result, now) {
   }
   return {
     badges: result?.mode === "background" ? [{ text: "background" }] : void 0,
-    body: [
-      ...context ? [/* @__PURE__ */ jsx("text", { role: "omp.tool.context", spans: [{ s: "muted", t: `Context: ${context}` }], wrap: "word" }, "ctx")] : [],
-      ...rows
-    ],
+    // The agents first; the brief they share stays folded.
+    body: [...rows, ...context ? [briefNode("Shared brief", context)] : []],
     meta: meta ? [meta] : void 0,
     name: "task",
     status: working ? "running" : void 0,
@@ -29757,27 +29810,24 @@ function settledRows(goals, result) {
   const results = Array.isArray(result?.results) ? result.results.map((r) => record2(r)) : [];
   const titles = goals.length ? goals : results.map(() => "Delegated task");
   return titles.map((g, i) => {
-    const r = results[i];
-    const verdict = str6(r?.status) ?? "";
-    const status = !r ? "idle" : verdict === "" || verdict === "ok" || verdict === "completed" ? "done" : "failed";
-    const summary4 = str6(r?.summary) ?? str6(r?.error);
-    return /* @__PURE__ */ jsx("agent", { agent: "task", name: `Agent ${i + 1}`, status, task: g, children: summary4 ? /* @__PURE__ */ jsx("md", { children: summary4 }, "o") : null }, `s${i}`);
+    const { status, summary: summary4 } = outcome(results[i]);
+    return /* @__PURE__ */ jsx("agent", { name: `Agent ${i + 1}`, status, task: g, children: summary4 ? /* @__PURE__ */ jsx("md", { children: summary4 }, "o") : null }, `s${i}`);
   });
 }
-function agentNode(a, now) {
+function agentNode(a, now, solo) {
   const status = a.status === "done" ? "done" : a.status === "failed" ? "failed" : a.status === "cancelled" ? "aborted" : a.status === "queued" ? "pending" : "running";
   const running = a.status === "running";
   return /* @__PURE__ */ jsx(
     "agent",
     {
       actions: { click: `open-agent=${a.id}`, menu: [`open-agent=${a.id}`] },
-      agent: "task",
       badges: a.exitReason && (a.status !== "done" || a.exitReason === OUTCOME_UNKNOWN) ? [{ text: a.exitReason.replace(/_/g, " "), tone: "warning" }] : void 0,
       collapsed: a.summary ? true : void 0,
       collapsible: a.summary ? true : void 0,
       depth: a.depth || void 0,
       model: a.model,
-      name: agentName(a),
+      name: solo?.name ?? agentName(a),
+      role: solo ? "hermes.task.solo" : void 0,
       stats: {
         requests: a.calls || void 0,
         tokens: a.tokens || void 0,
@@ -29786,7 +29836,7 @@ function agentNode(a, now) {
       },
       status,
       task: a.goal,
-      title: `Open ${agentName(a)} beside the chat`,
+      title: `Open ${solo ? "the agent" : agentName(a)} beside the chat`,
       tool: running && a.tool ? {
         age: a.toolSince ? age(a.toolSince, a.toolSince.at, now) : void 0,
         intent: a.toolPreview,
@@ -29794,8 +29844,50 @@ function agentNode(a, now) {
       } : void 0,
       children: a.summary ? /* @__PURE__ */ jsx("md", { children: a.summary }, "o") : null
     },
-    a.key ?? a.id
+    solo?.key ?? a.key ?? a.id
   );
+}
+function outcome(r) {
+  const verdict = str6(r?.status) ?? "";
+  const status = !r ? "idle" : verdict === "" || verdict === "ok" || verdict === "completed" ? "done" : "failed";
+  return { status, summary: str6(r?.summary) ?? str6(r?.error) };
+}
+function soloTask(call, now) {
+  const tasks = Array.isArray(call.args.tasks) ? call.args.tasks.map((t2) => record2(t2)).filter((t2) => t2 !== void 0) : [];
+  const result = record2(call.result);
+  if (tasks.length > 1 || (call.subagents?.length ?? 0) > 1 || call.status === "error" || result?.error) {
+    return void 0;
+  }
+  const goal = str6(tasks[0]?.goal) ?? str6(call.args.goal) ?? call.subagents?.[0]?.goal ?? "Delegated task";
+  const name = result?.mode === "background" ? "Background agent" : "Agent";
+  const a = call.subagents?.[0];
+  if (a) {
+    return agentNode(a, now, { key: call.id, name });
+  }
+  const pending = call.status === "running" || result?.status === "dispatched";
+  const results = Array.isArray(result?.results) ? result.results.map((r) => record2(r)) : [];
+  const { status, summary: summary4 } = pending ? { status: "pending", summary: void 0 } : outcome(results[0]);
+  return /* @__PURE__ */ jsx(
+    "agent",
+    {
+      collapsed: summary4 ? true : void 0,
+      collapsible: summary4 ? true : void 0,
+      name,
+      role: "hermes.task.solo",
+      status,
+      task: goal,
+      children: summary4 ? /* @__PURE__ */ jsx("md", { children: summary4 }, "o") : null
+    },
+    call.id
+  );
+}
+function briefOf(call, index) {
+  const tasks = Array.isArray(call.args.tasks) ? call.args.tasks.map((t2) => record2(t2)) : [];
+  const context = str6(tasks[index]?.context) ?? str6(call.args.context);
+  return context;
+}
+function briefNode(head2, text2) {
+  return /* @__PURE__ */ jsx("section", { collapsed: true, collapsible: true, head: head2, role: "hermes.task.brief", children: /* @__PURE__ */ jsx("md", { children: text2 }, "md") }, "brief");
 }
 function askCard(call, result) {
   const qs = (Array.isArray(call.args.questions) ? call.args.questions : str6(call.args.question) ? [call.args] : []).map((q) => record2(q)).filter((q) => q !== void 0);
@@ -30434,7 +30526,7 @@ function openAgents(app2, focus) {
         title: "Agents",
         total: all.length,
         ...steerProps(a),
-        children: a ? hubPreview(a, now) : null
+        children: a ? hubPreview(a, now, briefFor(app2, a)) : null
       },
       KEY
     );
@@ -30470,7 +30562,7 @@ function openAgents(app2, focus) {
         title: agentName(a),
         total: entries.length,
         ...steerProps(a),
-        children: at >= 0 ? stepPreview(entries[at]) : [agentNode(a, now)]
+        children: at >= 0 ? stepPreview(entries[at], a, briefFor(app2, a)) : [agentNode(a, now)]
       },
       KEY
     );
@@ -30505,7 +30597,11 @@ function hubItem(a, now) {
     title: a.goal
   };
 }
-function hubPreview(a, now) {
+function briefFor(app2, a) {
+  const call = app2.transcript.delegations().find((c) => c.subagents?.includes(a));
+  return call ? briefOf(call, a.index) : void 0;
+}
+function hubPreview(a, now, brief) {
   const recent = (a.log?.entries ?? []).slice(-RECENT);
   return [
     // A new node each time the selection moves: its timers need their true ages.
@@ -30527,6 +30623,9 @@ function hubPreview(a, now) {
       "facts"
     ),
     /* @__PURE__ */ jsx("section", { head: "Task", children: /* @__PURE__ */ jsx("md", { text: a.goal }, "goal") }, "task"),
+    ...brief ? [
+      /* @__PURE__ */ jsx("section", { collapsed: true, collapsible: true, head: "Brief", children: /* @__PURE__ */ jsx("md", { text: brief }, "text") }, "brief")
+    ] : [],
     ...a.summary ? [
       /* @__PURE__ */ jsx("section", { head: "Result", children: /* @__PURE__ */ jsx("md", { text: a.summary }, "summary") }, "result")
     ] : [],
@@ -30560,13 +30659,18 @@ function stepItem(e, id, a) {
     tone: e.kind === "think" || e.kind === "note" ? "muted" : void 0
   };
 }
-function stepPreview(e) {
+function stepPreview(e, a, brief) {
   if (e.kind !== "tool") {
     const head2 = { assistant: "Answer", kickoff: "Task", note: "Note", think: "Thinking" }[e.kind];
+    const text2 = e.kind === "kickoff" && a.goal ? brief ? `${a.goal}
+
+---
+
+${brief}` : a.goal : e.text;
     return [
       /* @__PURE__ */ jsx("text", { role: "omp.hub.title", text: head2 }, "title"),
       /* @__PURE__ */ jsx("text", { spans: [{ s: "dim mono", t: e.at }] }, "at"),
-      /* @__PURE__ */ jsx("md", { text: e.text, tone: e.kind === "think" ? "muted" : void 0 }, "body")
+      /* @__PURE__ */ jsx("md", { text: text2, tone: e.kind === "think" ? "muted" : void 0 }, "body")
     ];
   }
   return [
@@ -33139,7 +33243,7 @@ function preview3(row, isCurrent) {
 }
 
 // .hermes-src/ui-tui/src/lib/history.ts
-import { appendFileSync as appendFileSync3, existsSync as existsSync3, mkdirSync as mkdirSync3, readFileSync as readFileSync3 } from "node:fs";
+import { appendFileSync as appendFileSync3, existsSync as existsSync4, mkdirSync as mkdirSync3, readFileSync as readFileSync3 } from "node:fs";
 import { homedir as homedir9 } from "node:os";
 import { join as join6 } from "node:path";
 var MAX2 = 1e3;
@@ -33151,7 +33255,7 @@ function load() {
     return cache;
   }
   try {
-    if (!existsSync3(file)) {
+    if (!existsSync4(file)) {
       cache = [];
       return cache;
     }
@@ -33188,7 +33292,7 @@ function append(line) {
     items.splice(0, items.length - MAX2);
   }
   try {
-    if (!existsSync3(dir)) {
+    if (!existsSync4(dir)) {
       mkdirSync3(dir, { recursive: true });
     }
     const ts = (/* @__PURE__ */ new Date()).toISOString().replace("T", " ").replace("Z", "");
@@ -36578,10 +36682,10 @@ var writeActiveSessionFile = (sessionId, file2 = process.env.HERMES_TUI_ACTIVE_S
 
 // src/hermes/clipboardImage.ts
 import { execFile as execFile6 } from "node:child_process";
-import { existsSync as existsSync4 } from "node:fs";
+import { existsSync as existsSync5 } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
 import { homedir as homedir10, tmpdir } from "node:os";
-import { join as join8, resolve as resolve3 } from "node:path";
+import { join as join8, resolve as resolve4 } from "node:path";
 import { promisify as promisify5 } from "node:util";
 var execFileP = promisify5(execFile6);
 var runFile = async (file2, args, options) => (await execFileP(file2, args, options)).stdout;
@@ -36613,10 +36717,10 @@ async function extractClipboardImage(dest, env, platform = process.platform, run
     }
     if (answer?.startsWith("file:")) {
       const file2 = answer.slice("file:".length);
-      return IMAGE.test(file2) && existsSync4(file2) ? file2 : void 0;
+      return IMAGE.test(file2) && existsSync5(file2) ? file2 : void 0;
     }
     if (answer !== void 0) {
-      return answer === "true" && existsSync4(dest) ? dest : void 0;
+      return answer === "true" && existsSync5(dest) ? dest : void 0;
     }
   }
   const root = env.HERMES_PYTHON_SRC_ROOT;
@@ -36629,7 +36733,7 @@ async function extractClipboardImage(dest, env, platform = process.platform, run
     env: { ...env, PYTHONPATH: root },
     timeout: 15e3
   });
-  return stdout.trim() === "true" && existsSync4(dest) ? dest : void 0;
+  return stdout.trim() === "true" && existsSync5(dest) ? dest : void 0;
 }
 async function withClipboardImage(use, env = process.env, extract = extractClipboardImage) {
   const dir2 = await mkdtemp(join8(tmpdir(), "hermes-tern-clipboard-"));
@@ -36657,8 +36761,8 @@ function imagePathOf(text2, cwd) {
   if (!IMAGE.test(raw)) {
     return void 0;
   }
-  const path = resolve3(cwd, raw);
-  return existsSync4(path) ? path : void 0;
+  const path = resolve4(cwd, raw);
+  return existsSync5(path) ? path : void 0;
 }
 
 // .hermes-src/ui-tui/src/protocol/interpolation.ts
@@ -37738,6 +37842,21 @@ var STYLES = css`
     background: var(--l1);
   }
 
+  /* A one-agent delegation: the agent's own row as one soft tile, a click opening the agent. */
+  .sf-agent[data-role='hermes.task.solo'] {
+    margin: 6px 0 !important;
+    padding: 6px 12px !important;
+    border-radius: 10px;
+    background: rgba(128, 128, 128, 0.045);
+    box-shadow: inset 0 0 0 1px rgba(128, 128, 128, 0.13);
+    cursor: pointer;
+    transition: background 120ms ease;
+  }
+
+  .sf-agent[data-role='hermes.task.solo']:hover {
+    background: rgba(128, 128, 128, 0.09);
+  }
+
   /* A compaction: a quiet rule across the transcript, what happened in its middle. */
   [data-role='hermes.compaction'] {
     margin: 20px 0 !important;
@@ -38400,14 +38519,14 @@ function paletteFor(mode, skin) {
   if (mode === "skin" && skin) {
     const name = skin.name || "default";
     return {
-      dark: semantic(resolve4(skin, "dark")),
-      light: semantic(resolve4(skin, "light")),
+      dark: semantic(resolve5(skin, "dark")),
+      light: semantic(resolve5(skin, "light")),
       name: { dark: name, light: name }
     };
   }
   return { dark: {}, light: {}, name: { dark: "tern", light: "tern" } };
 }
-function resolve4(skin, polarity) {
+function resolve5(skin, polarity) {
   const light = polarity === "light";
   const colors = { ...skin.colors, ...light ? skin.light_colors : skin.dark_colors };
   const saved = process.env.HERMES_TUI_LIGHT;
@@ -39914,7 +40033,7 @@ var App = class {
     const code2 = await this.#done.promise;
     await Promise.race([
       Promise.all([...this.#subscriptions.keys()].map((sid) => this.#leave(sid, "tui_shutdown"))),
-      new Promise((resolve5) => setTimeout(resolve5, QUIT_DETACH_MS))
+      new Promise((resolve6) => setTimeout(resolve6, QUIT_DETACH_MS))
     ]);
     await this.#tern.close();
     this.#gw.kill("exit");
@@ -40310,7 +40429,7 @@ var App = class {
     const size = imageSize(bytes);
     const kb = bytes.length / 1024;
     const blob = this.#blob(bytes, attachment.mime);
-    const preview5 = blob ? { blob } : existsSync5(attachment.path) ? { path: attachment.path } : void 0;
+    const preview5 = blob ? { blob } : existsSync6(attachment.path) ? { path: attachment.path } : void 0;
     const caption = [size && `${size.w}\xD7${size.h}`, kb >= 1024 ? `${(kb / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(kb))} KB`];
     return { ...attachment, caption: caption.filter(Boolean).join(" \xB7 "), name, ...preview5 ? { preview: preview5 } : {} };
   }
@@ -40605,7 +40724,7 @@ ${this.composer.text}` : text2 || this.composer.text);
     this.changed();
   }
   /** Runs `/name arg`; `resolve`: expand a typed alias or prefix through the catalog first. */
-  async #slash(text2, resolve5 = true) {
+  async #slash(text2, resolve6 = true) {
     const [typed = "", ...rest] = text2.slice(1).split(/\s+/);
     const name = typed.toLowerCase();
     const arg = rest.join(" ");
@@ -40627,7 +40746,7 @@ ${this.composer.text}` : text2 || this.composer.text);
     const sid = this.sid;
     const generation = this.#switches.generation;
     const stale = () => this.sid !== sid || this.#switches.pending && this.#switches.generation !== generation;
-    if (resolve5) {
+    if (resolve6) {
       const to = resolveSlashName(name, sid ? await this.#catalog.get(sid) : void 0);
       if (stale()) {
         return;

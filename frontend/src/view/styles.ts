@@ -415,6 +415,21 @@ export const STYLES = css`
     background: var(--l1);
   }
 
+  /* A one-agent delegation: the agent's own row as one soft tile, a click opening the agent. */
+  .sf-agent[data-role='hermes.task.solo'] {
+    margin: 6px 0 !important;
+    padding: 6px 12px !important;
+    border-radius: 10px;
+    background: rgba(128, 128, 128, 0.045);
+    box-shadow: inset 0 0 0 1px rgba(128, 128, 128, 0.13);
+    cursor: pointer;
+    transition: background 120ms ease;
+  }
+
+  .sf-agent[data-role='hermes.task.solo']:hover {
+    background: rgba(128, 128, 128, 0.09);
+  }
+
   /* A compaction: a quiet rule across the transcript, what happened in its middle. */
   [data-role='hermes.compaction'] {
     margin: 20px 0 !important;

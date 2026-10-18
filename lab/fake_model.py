@@ -14,6 +14,7 @@ the user's prompt, so one home covers every flow:
                    in rounds (commands, reads, a search, a slow command), then a long answer
     "script"    -> a heredoc script with sections and long output, run alone
     "slow"      -> one 8-second command, long enough to queue or steer a message
+    "solo…"     -> (at the start) one delegated agent with a long brief (context)
     "delegate…" -> (at the start) a delegate_task batch of three subagents, each running two slow
                    terminal calls before a slowly streamed answer
     "background…" -> (at the start) a 90 s ticking background process that notifies on exit
@@ -112,6 +113,18 @@ SUBAGENT_STEPS = [
     "sleep 4 && date && find . -maxdepth 2 -name '*.md' | wc -l",
 ]
 
+SOLO_GOAL = "Read-only on the repo (only write the one output file). Verify which cleanup candidates in the audit are still dead code."
+SOLO_CONTEXT = """Repo checkout (read-only) at origin/main. Do not fetch; work on this snapshot and note the commit.
+
+Candidates to check (find more in the audit reports if they qualify):
+- One-shot runtime: hermes_cli/oneshot.py run_oneshot
+- Legacy console script `hermes-agent`
+- RL/datagen root modules: batch_runner.py, mini_swe_runner.py
+
+For EACH candidate record: callers, tests that exist only for it, the old-updater surface, the plugin surface, whether it is user-facing, the last meaningful touch, a verdict with file:line evidence, and the line count removed.
+
+Work in small steps and append findings to the output file as you go. Conservative bar: if unsure, NEEDS DECISION, never DELETE."""
+
 SUBAGENT_REPLY = """Finished the delegated task.
 
 - ran two terminal steps
@@ -161,6 +174,9 @@ def _calls(prompt: str, target: Path) -> list[dict] | None:
     # would otherwise dispatch again, forever.
     if words.lstrip().startswith("delegate"):
         return [_call("delegate_task", {"tasks": [{"goal": g} for g in SUBAGENT_GOALS]})]
+    if words.lstrip().startswith("solo"):
+        # One delegated agent with a long brief, as a real audit hand-off reads.
+        return [_call("delegate_task", {"goal": SOLO_GOAL, "context": SOLO_CONTEXT})]
     if words.lstrip().startswith("slow"):
         return [_call("terminal", {"command": "sleep 8 && echo slept"})]
     if words.lstrip().startswith("background"):
