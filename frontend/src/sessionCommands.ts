@@ -181,6 +181,31 @@ async function reloadSkills(host: SessionHost) {
   host.panel('Reload Skills', r?.output?.trim() || 'Skills reloaded.')
 }
 
+interface ReloadMcp {
+  message?: string
+  /** The calling chat's tools: `applied`, `unchanged`, or `busy` (they apply after its turn). */
+  session?: string
+  unavailable?: string[]
+}
+
+/**
+ * `/reload-mcp`: the shared gateway refuses it in `slash.exec` but serves `reload.mcp`, desktop's
+ * add/toggle/repair call. Typing it is the confirmation the RPC asks for, as the desktop's button is.
+ */
+async function reloadMcp(host: SessionHost) {
+  if (!host.canonical) {
+    return false
+  }
+
+  const r = await host.gw.request<ReloadMcp | null>('reload.mcp', { confirm: true, ...(host.sid ? { session_id: host.sid } : {}) })
+
+  host.panel('Reload MCP', r?.message?.trim() || 'MCP servers reloaded.')
+
+  if (r?.unavailable?.length) {
+    host.notice(`Did not connect: ${r.unavailable.join(', ')}.`, 'warning')
+  }
+}
+
 interface RollbackList {
   enabled?: boolean
   checkpoints?: { hash: string; timestamp?: string; message?: string }[]
@@ -279,6 +304,7 @@ const COMMANDS: readonly SessionCommand[] = [
   { name: 'save', run: save },
   { name: 'reload', run: reloadEnv },
   { aliases: ['reload_skills'], name: 'reload-skills', run: reloadSkills },
+  { aliases: ['reload_mcp'], name: 'reload-mcp', run: reloadMcp },
   { name: 'rollback', run: rollback }
 ]
 

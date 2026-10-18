@@ -34896,6 +34896,16 @@ async function reloadSkills(host) {
   const r = await host.gw.request("skills.reload", host.sid ? { session_id: host.sid } : {});
   host.panel("Reload Skills", r?.output?.trim() || "Skills reloaded.");
 }
+async function reloadMcp(host) {
+  if (!host.canonical) {
+    return false;
+  }
+  const r = await host.gw.request("reload.mcp", { confirm: true, ...host.sid ? { session_id: host.sid } : {} });
+  host.panel("Reload MCP", r?.message?.trim() || "MCP servers reloaded.");
+  if (r?.unavailable?.length) {
+    host.notice(`Did not connect: ${r.unavailable.join(", ")}.`, "warning");
+  }
+}
 async function rollback(host, arg) {
   if (!host.sid) {
     return host.notice("No active session: nothing to roll back.", "warning");
@@ -34953,6 +34963,7 @@ var COMMANDS2 = [
   { name: "save", run: save },
   { name: "reload", run: reloadEnv },
   { aliases: ["reload_skills"], name: "reload-skills", run: reloadSkills },
+  { aliases: ["reload_mcp"], name: "reload-mcp", run: reloadMcp },
   { name: "rollback", run: rollback }
 ];
 var SESSION_COMMANDS = COMMANDS2.map((c) => ({ ...c, run: guarded(c.name, c.run) }));
