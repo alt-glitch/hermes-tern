@@ -69,6 +69,7 @@ import { isRunning as processRuns, Processes, processTone } from './processes/st
 import { loadSettings, saveSettings, type ThemeMode } from './settings.js'
 import { type BusyMode, busyModeOf, type OwnAdmission, type PendingRow, ServerQueue, type ServerQueued } from './serverQueue.js'
 import { internalNotice, Transcript } from './transcript.js'
+import { storedCompactions } from './compaction.js'
 import type { Reconnecting } from './view/automation.js'
 import { dockNodes, type QueuedRow, todoProgress } from './view/dock.js'
 import { entryNode } from './view/transcript.js'
@@ -1345,6 +1346,17 @@ export class App implements OverlayHost {
         this.transcript.panel(title, text)
         this.changed()
       },
+      compressing: state => {
+        if (state === 'start') {
+          this.transcript.compacting(this.usage?.context_used || undefined, Date.now(), true)
+        } else if (state === 'none') {
+          this.transcript.uncompact()
+        } else {
+          this.transcript.compacted(Date.now(), state)
+        }
+
+        this.changed()
+      },
       queued: this.#queuedCount(),
       reload: async () => {
         if (sid && this.sid === sid) {
@@ -1361,6 +1373,24 @@ export class App implements OverlayHost {
       // /queue: behind the turn whatever busy_input_mode says.
       submit: text => this.#submit(text, true, 'queue')
     }
+  }
+
+  /** Gives the compactions seen here their summaries from the store, `delay` ms from now. */
+  #summarize(delay = 0) {
+    const sid = this.sid
+
+    if (!this.transcript.unsummarized) {
+      return
+    }
+
+    setTimeout(() => {
+      const stored = this.info?.stored_session_id || this.storedSid
+
+      if (this.sid === sid && stored && this.transcript.unsummarized) {
+        this.transcript.summarize(storedCompactions(stored))
+        this.changed()
+      }
+    }, delay)
   }
 
   #startBusy(label: string) {
@@ -1579,6 +1609,7 @@ export class App implements OverlayHost {
     if (r.session_id !== this.sid) {
       // The last session's approvals and questions are not this one's (a resume hydrates its own after).
       this.#dropPrompts(() => true)
+      this.transcript.forgetCompactions()
       this.#busyMode = 'queue'
     }
 
@@ -1611,7 +1642,8 @@ export class App implements OverlayHost {
     this.transcript.usageBase(r.info?.usage ?? undefined)
 
     if (r.messages?.length) {
-      this.transcript.load(r.messages)
+      // The history leaves the compactions out; the store says where they were.
+      this.transcript.load(r.messages, storedCompactions(this.storedSid ?? r.session_id))
       this.agents.scan()
       this.media.showAll(this.transcript.entries, call => this.#imageLanded(call))
     }
@@ -1821,6 +1853,7 @@ export class App implements OverlayHost {
         // The shared owner's idle fanout carries only pending/revision/generation: merge, never replace.
         this.info = ev.payload ? { ...this.info, ...ev.payload } : this.info
         this.usage = ev.payload?.usage ?? this.usage
+        t.contextUsed(this.usage?.context_used ?? 0)
 
         // A queued prompt the gateway started gets its bubble now, after the reply it waited for.
         for (const started of this.#server.update(pendingRows(ev.payload))) {
@@ -1843,6 +1876,7 @@ export class App implements OverlayHost {
         // The shared owner sends its counters at the top level; older gateways nest them.
         const tick = usageFromTick(ev.payload)
         this.usage = tick ? { ...this.usage, ...tick } : this.usage
+        t.contextUsed(this.usage?.context_used ?? 0)
         const raw = ev.payload as Record<string, unknown> | undefined
         const counters = {
           prompt: Number(raw?.prompt_tokens ?? 0),
@@ -2031,6 +2065,9 @@ export class App implements OverlayHost {
         t.complete(ev.payload ?? {})
         this.busy = null
         this.#compacting = false
+        // A compaction Hermes aborted sends no done edge; one that committed has its summary stored now.
+        t.uncompact(true)
+        this.#summarize()
         this.#drainQueue()
         // The turn may have pushed a branch, opened a PR or changed files.
         this.prs.poke()
@@ -2045,6 +2082,14 @@ export class App implements OverlayHost {
 
         if (effect.compacting !== undefined) {
           this.#compacting = effect.compacting
+        }
+
+        if (effect.compacting) {
+          t.compacting(effect.tokens?.before ?? (this.usage?.context_used || undefined))
+        } else if (effect.compacting === false) {
+          t.compacted(Date.now(), effect.tokens)
+          // The store has the summary once the compaction commits (a moment after its done edge).
+          this.#summarize(1500)
         }
 
         if (effect.label) {

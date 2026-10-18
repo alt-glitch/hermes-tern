@@ -114,6 +114,28 @@ export type Block =
   | { kind: 'tool'; id: string; call: ToolCall }
   /** Guidance the user sent into this turn while it ran; it lands before the agent's next step. */
   | { kind: 'steer'; id: string; text: string; at: number }
+  /** The context compacted while the turn ran. */
+  | { kind: 'compaction'; id: string; at: number; compaction: Compaction }
+
+/**
+ * One compaction: Hermes summarized the earlier conversation to free context. The agent reads the
+ * summary from then on; the turns before it stay in the transcript for the user.
+ */
+export interface Compaction {
+  status: 'done' | 'running'
+  /** Epoch ms; a stored one knows only when its summary was written. */
+  startedAt: number
+  endedAt?: number
+  /** Context tokens before and after, as Hermes' lines and the next context reading say. */
+  before?: number
+  after?: number
+  /** How many messages it summarized. */
+  messages?: number
+  /** The summary the agent goes on from, without the handoff's instructions to the model. */
+  summary?: string
+  /** /compress ran it, not Hermes on its own. */
+  manual?: boolean
+}
 
 /** An image an `image` node shows: a file Tern reads, or bytes sent once as a blob. */
 export type ImageSource = { path: string } | { blob: string }
@@ -189,10 +211,19 @@ export interface PanelEntry {
   text: string
 }
 
+/** A compaction between turns (/compress, or one before the turn that needed it). */
+export interface CompactionEntry {
+  kind: 'compaction'
+  id: string
+  /** Bumped when it ends or learns its numbers or summary. */
+  rev: number
+  compaction: Compaction
+}
+
 /** The session's opening card. */
 export interface WelcomeEntry {
   kind: 'welcome'
   id: string
 }
 
-export type Entry = NoticeEntry | PanelEntry | TurnEntry | UserEntry | WelcomeEntry
+export type Entry = CompactionEntry | NoticeEntry | PanelEntry | TurnEntry | UserEntry | WelcomeEntry

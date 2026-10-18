@@ -3,6 +3,7 @@
 // Mirrors Hermes' ui-tui/src/app/createGatewayEventHandler.ts (status.update, notification.show/clear)
 // and turnController's keyed notice.
 
+import { lineTokens } from './compaction.js'
 import type { NoticeEntry } from './model.js'
 
 /** The working line while the context is compacted; the stream's own labels wait for the done edge. */
@@ -14,8 +15,10 @@ export interface StatusEffect {
   label?: string
   /** A line for the transcript. */
   notice?: { text: string; tone: NoticeEntry['tone'] }
-  /** Compaction started (true) or ended (false). */
+  /** Compaction started (true) or ended (false): the transcript's compaction rule shows it. */
   compacting?: boolean
+  /** The token counts the compaction line gave. */
+  tokens?: { before?: number; after?: number }
   /** The warning to pass back as `last` next time. */
   note?: string
 }
@@ -29,8 +32,9 @@ export function statusEffect(payload: { kind?: string; text?: string } | undefin
   const text = payload?.text?.trim()
   const kind = payload?.kind ?? ''
 
+  // /compress always ends with a bare `ready` (methods_session._compress_live's finally).
   if (!text) {
-    return {}
+    return kind === 'ready' ? { compacting: false } : {}
   }
 
   if (kind === 'goal') {
@@ -38,11 +42,11 @@ export function statusEffect(payload: { kind?: string; text?: string } | undefin
   }
 
   if (kind === 'compacting' || kind === 'compressing') {
-    return { compacting: true, label: COMPACTING_LABEL, notice: { text, tone: 'info' } }
+    return { compacting: true, label: COMPACTING_LABEL, ...counted(text) }
   }
 
   if (kind === 'compacted' || kind === 'ready') {
-    return { compacting: false, label: text }
+    return { compacting: false, label: text, ...counted(text) }
   }
 
   if (kind === 'warn' || kind === 'approval' || kind === 'error') {
@@ -50,6 +54,13 @@ export function statusEffect(payload: { kind?: string; text?: string } | undefin
   }
 
   return { label: text }
+}
+
+/** A compaction line's token counts, when it gives any. */
+function counted(text: string): Pick<StatusEffect, 'tokens'> {
+  const tokens = lineTokens(text)
+
+  return tokens.before || tokens.after ? { tokens } : {}
 }
 
 /** A `notification.show` payload. */

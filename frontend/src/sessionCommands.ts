@@ -4,6 +4,7 @@
 // verbs (gateway/session_tui_ops.py, session_tui_side.py,
 // session_ancillary.py). Mirrors Hermes' ui-tui/src/app/slash/commands/{core,session,ops}.ts and
 // canonicalSessionCommands.ts / canonicalSessionControls.ts.
+import { lineTokens } from './compaction.js'
 import type { ControlHost } from './controlCommands.js'
 import { type MutationResult, mutateSession } from './hermes/mutate.js'
 import { lastTurnRewind, retryText, retryTurnRewind } from './hermes/rewind.js'
@@ -17,6 +18,8 @@ export interface SessionHost extends ControlHost {
   panel(title: string, text: string): void
   /** Re-reads the session's transcript from the gateway (after a rewind, compression or restore). */
   reload(): Promise<void>
+  /** /compress started, changed nothing, or ended with the owner's token counts: the transcript's compaction rule. */
+  compressing(state: 'none' | 'start' | { before?: number; after?: number }): void
   /** Sends `text` as a prompt now. */
   send(text: string): void
   /** Shows session `id` in this view; false when the view did not move to it. */
@@ -72,9 +75,11 @@ async function rewind(host: SessionHost, intent: 'retry' | 'undo') {
 }
 
 interface CompressSummary {
+  aborted?: boolean
   headline?: string
   noop?: boolean
   note?: string
+  refused_would_grow?: boolean
   token_line?: string
 }
 
@@ -101,12 +106,24 @@ async function compress(host: SessionHost, arg: string) {
 
   const focus = arg.trim()
 
-  // The summary is an LLM call: say it started (a `--preview` only reads).
-  if (!/(^|\s)--preview(\s|$)/.test(focus)) {
-    host.notice('Compressing the conversation…')
+  // The summary is an LLM call: the compaction rule runs until it ends (a `--preview` only reads).
+  const preview = /(^|\s)--preview(\s|$)/.test(focus)
+
+  if (!preview) {
+    host.compressing('start')
   }
 
-  const result: MutationResult = await mutateSession(host.gw, host.sid, 'compress', focus ? { focus } : {})
+  let result: MutationResult
+
+  try {
+    result = await mutateSession(host.gw, host.sid, 'compress', focus ? { focus } : {})
+  } catch (e) {
+    if (!preview) {
+      host.compressing('none')
+    }
+
+    throw e
+  }
 
   if (host.stale()) {
     return
@@ -117,8 +134,20 @@ async function compress(host: SessionHost, arg: string) {
     return host.notice(Array.isArray(result.lines) ? result.lines.join('\n') : 'Nothing to preview.')
   }
 
+  const summary = result.summary as CompressSummary | undefined
+  const num = (v: unknown) => (typeof v === 'number' && v > 0 ? v : undefined)
+  const kept = result.status === 'noop' || result.status === 'aborted' || Boolean(summary?.noop || summary?.aborted || summary?.refused_would_grow)
+
+  // The rule says what it freed; the report stays for what it does not say (a note, a refusal). A
+  // `pending` one goes on in the background, and its `ready` edge ends the rule.
+  if (result.status !== 'pending') {
+    // The shared gateway's receipt gives the counts only in its token line ("~248 → ~831 tokens").
+    const line = lineTokens(summary?.token_line ?? '')
+    host.compressing(kept ? 'none' : { after: num(result.after_tokens) ?? line.after, before: num(result.before_tokens) ?? line.before })
+  }
+
   if (result.status !== 'noop') {
-    // The compressed transcript replaces the shown one.
+    // The compressed transcript replaces the shown one, its compaction rule with it.
     await host.reload()
 
     if (host.stale()) {
@@ -126,7 +155,9 @@ async function compress(host: SessionHost, arg: string) {
     }
   }
 
-  host.notice(compressReport(result.summary as CompressSummary | undefined))
+  if (kept || summary?.note || result.status === 'pending') {
+    host.notice(compressReport(summary))
+  }
 }
 
 /** `/branch [title]`: a copy of the session the view then moves to (the original keeps its history). */

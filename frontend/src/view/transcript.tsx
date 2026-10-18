@@ -5,11 +5,11 @@
 
 import { type JSX, node } from '@stencil-hq/tern'
 
-import type { Block, Entry, NoticeEntry, TurnEntry, UserAttachment, UserEntry } from '../model.js'
+import type { Block, Compaction, Entry, NoticeEntry, TurnEntry, UserAttachment, UserEntry } from '../model.js'
 import { steerState } from '../transcript.js'
 import { parts, pieces } from '../workLog.js'
 
-import { compact, duration } from './time.js'
+import { age, compact, duration } from './time.js'
 import { slashBody } from './slash.js'
 import { toolNode } from './tools.js'
 import { type WelcomeContext, welcomeNode } from './welcome.js'
@@ -33,8 +33,8 @@ interface Built {
 }
 
 /**
- * The node of one entry; `id` is its full node id (`main.<key>`). Turns rebuild only when
- * their `rev` moved and prompts, notices and panels never change, so a long transcript
+ * The node of one entry; `id` is its full node id (`main.<key>`). Turns and compactions rebuild
+ * only when their `rev` moved and prompts, notices and panels never change, so a long transcript
  * costs one turn's build per frame (timer ages are fixed at first build, see time.ts).
  */
 export function entryNode(e: Entry, id: string, cx: TranscriptContext): JSX.Element {
@@ -45,7 +45,7 @@ export function entryNode(e: Entry, id: string, cx: TranscriptContext): JSX.Elem
   // Entries are plain objects; the symbol slot rides on them (weak type: widen first).
   const holder: object = e
   const built: Built = holder
-  const rev = `${e.kind === 'turn' ? e.rev : 0}${cx.copied === e.id ? '+copied' : ''}`
+  const rev = `${e.kind === 'turn' || e.kind === 'compaction' ? e.rev : 0}${cx.copied === e.id ? '+copied' : ''}`
   const cached = built[kNode]
 
   if (cached?.rev === rev) {
@@ -68,6 +68,9 @@ function buildEntry(e: Exclude<Entry, { kind: 'welcome' }>, id: string, cx: Tran
 
     case 'notice':
       return noticeNode(e)
+
+    case 'compaction':
+      return compactionNode(e.compaction, e.id, id, cx.now)
 
     case 'panel':
       return (
@@ -157,7 +160,10 @@ function turnNode(turn: TurnEntry, id: string, cx: TranscriptContext): JSX.Eleme
   const last = pieces(turn.blocks).at(-1)
 
   // t3code: once the newest step failed, its group stops shining and "Thinking" carries the turn.
-  if (live && (!last || (last.kind === 'block' && last.block.kind !== 'text') || (last.kind === 'work' && latestFailed(last.items)))) {
+  // A running compaction is its own live line.
+  const compacting = last?.kind === 'block' && last.block.kind === 'compaction' && last.block.compaction.status === 'running'
+
+  if (live && !compacting && (!last || (last.kind === 'block' && last.block.kind !== 'text') || (last.kind === 'work' && latestFailed(last.items)))) {
     children.push(thinkingRow())
   }
 
@@ -227,6 +233,9 @@ function pieceNodes(turn: TurnEntry, blocks: readonly Block[], parent: string, c
 
       case 'steer':
         return steerNode(b, steerState(turn, turn.blocks.indexOf(b)))
+
+      case 'compaction':
+        return compactionNode(b.compaction, b.id, `${parent}.${b.id}`, cx.now)
 
       case 'thinking':
         return null
@@ -316,6 +325,56 @@ function usageNode(turn: TurnEntry, answer: string, cx: TranscriptContext): JSX.
       ])}
     </row>
   )
+}
+
+const COMPACTED_TITLE =
+  'Hermes summarized the conversation before this line to free context. From here on the agent works from that summary; the turns above stay here for you.'
+
+/**
+ * A compaction, as a rule across the transcript: "Compacting context" and its timer while it
+ * runs, then "Context compacted" and what it freed. With its summary known, a click on the rule
+ * opens the summary the agent goes on from.
+ */
+function compactionNode(c: Compaction, key: string, id: string, now: number): JSX.Element {
+  const running = c.status === 'running'
+  const tokens = c.before && c.after ? `${compact(c.before)} → ${compact(c.after)} tokens` : c.before ? `${compact(c.before)} tokens` : ''
+  const took = c.endedAt && c.endedAt - c.startedAt >= 1000 ? duration(c.endedAt - c.startedAt) : ''
+  const facts = running
+    ? [tokens]
+    : [tokens, c.messages ? `${c.messages.toLocaleString()} messages summarized` : '', took, c.manual ? '/compress' : '']
+  const detail = facts.filter(Boolean).join(' · ')
+
+  const line = (
+    <row align="center" gap="xs" key="head" role="hermes.compaction.line" title={running ? undefined : COMPACTED_TITLE}>
+      {running ? (
+        <shimmer
+          key="what"
+          mode="classic"
+          palette={{ high: 'accent', low: 'dim', mid: 'muted' }}
+          spans={[{ s: 'muted', t: 'Compacting context' }]}
+        />
+      ) : (
+        <icon key="icon" name="compaction" />
+      )}
+      {running ? null : <text key="what" spans={[{ s: 'muted', t: 'Context compacted' }]} wrap="none" />}
+      {running ? <elapsed age={age(c, c.startedAt, now)} format="short" key="age" /> : null}
+      {detail ? <text key="facts" spans={[{ s: 'dim', t: `· ${detail}` }]} truncate="end" wrap="none" /> : null}
+    </row>
+  )
+
+  if (running || !c.summary) {
+    return (
+      <col key={key} role="hermes.compaction">
+        {line}
+      </col>
+    )
+  }
+
+  return node('section', { collapsed: true, collapsible: true, head: `${id}.head`, key, role: 'hermes.compaction' }, [
+    line,
+    <text key="lead" role="hermes.compaction.lead" spans={[{ s: 'dim', t: 'The summary the agent goes on from:' }]} wrap="word" />,
+    <md key="summary">{c.summary}</md>
+  ])
 }
 
 function noticeNode(e: NoticeEntry): JSX.Element {

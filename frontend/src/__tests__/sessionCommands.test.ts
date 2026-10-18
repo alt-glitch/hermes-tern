@@ -35,6 +35,7 @@ function host(over: Partial<SessionHost> = {}, replies: Record<string, unknown> 
     notice: vi.fn(),
     open: vi.fn(async () => true),
     panel: vi.fn(),
+    compressing: vi.fn(),
     queued: 0,
     reload: vi.fn(async () => undefined),
     send: vi.fn(),
@@ -128,15 +129,40 @@ describe('session commands', () => {
     expect(request).not.toHaveBeenCalled()
   })
 
-  it('/compress sends the raw argument as focus, reloads, and prints the report', async () => {
+  it('/compress sends the raw argument as focus, runs the compaction rule, and reloads', async () => {
     const summary = { headline: 'Compressed 12 messages', token_line: '40k → 8k tokens' }
-    const { h, request } = host({}, { 'session.mutate': { status: 'applied', summary } })
+    const reply = { after_tokens: 8000, before_tokens: 40000, status: 'compressed', summary }
+    const { h, request } = host({}, { 'session.mutate': reply })
 
     await run('compress', h, 'here 3')
 
     expect(mutation(request)).toMatchObject({ operation: 'compress', payload: { focus: 'here 3' } })
+    expect(h.compressing).toHaveBeenNthCalledWith(1, 'start')
+    expect(h.compressing).toHaveBeenNthCalledWith(2, { after: 8000, before: 40000 })
     expect(h.reload).toHaveBeenCalled()
-    expect(h.notice).toHaveBeenCalledWith('✓ Compressed 12 messages\n  40k → 8k tokens')
+    // The rule says it; a report with a note still prints.
+    expect(h.notice).not.toHaveBeenCalled()
+
+    // The shared gateway's receipt gives the counts only in its token line.
+    const lined = host({}, { 'session.mutate': { status: 'applied', summary: { headline: 'Compressed: 6 → 4 messages', token_line: 'Approx request size: ~1,248 → ~831 tokens' } } })
+    await run('compress', lined.h)
+    expect(lined.h.compressing).toHaveBeenLastCalledWith({ after: 831, before: 1248 })
+
+    const noted = host({}, { 'session.mutate': { status: 'compressed', summary: { ...summary, note: 'Note: estimate rose' } } })
+    await run('compress', noted.h)
+    expect(noted.h.notice).toHaveBeenCalledWith('✓ Compressed 12 messages\n  40k → 8k tokens\n  Note: estimate rose')
+  })
+
+  it('/compress that changed nothing or failed takes its rule back', async () => {
+    const aborted = host({}, { 'session.mutate': { status: 'aborted', summary: { aborted: true, headline: 'Compression aborted' } } })
+    await run('compress', aborted.h)
+    expect(aborted.h.compressing).toHaveBeenLastCalledWith('none')
+    expect(aborted.h.notice).toHaveBeenCalledWith('✓ Compression aborted')
+
+    const failing = host({}, { 'session.mutate': new Error('boom') })
+    await run('compress', failing.h)
+    expect(failing.h.compressing).toHaveBeenLastCalledWith('none')
+    expect(failing.h.notice).toHaveBeenCalledWith('/compress failed: boom', 'error')
   })
 
   it('/compress --preview and a no-op compression leave the transcript alone', async () => {
@@ -144,12 +170,14 @@ describe('session commands', () => {
     await run('compress', preview.h, '--preview')
     expect(preview.h.notice).toHaveBeenCalledWith('would remove 4')
     expect(preview.h.reload).not.toHaveBeenCalled()
+    expect(preview.h.compressing).not.toHaveBeenCalled()
 
     const noop = host({}, { 'session.mutate': { status: 'noop', summary: { headline: 'No changes', noop: true } } })
     await run('compact', noop.h)
     expect(mutation(noop.request)).toMatchObject({ payload: {} })
     expect(noop.h.reload).not.toHaveBeenCalled()
     expect(noop.h.notice).toHaveBeenCalledWith('No changes')
+    expect(noop.h.compressing).toHaveBeenLastCalledWith('none')
     expect(compressReport(undefined)).toBe('✓ Transcript compressed.')
   })
 

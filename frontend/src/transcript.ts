@@ -13,7 +13,8 @@ import type {
 } from '@hermes/shared/gateway-events'
 
 import { settleBridge, unwrap } from './bridge.js'
-import type { Block, Counters, Entry, NoticeEntry, Todo, ToolCall, TurnEntry, UserAttachment } from './model.js'
+import type { StoredCompaction } from './compaction.js'
+import type { Block, Compaction, CompactionEntry, Counters, Entry, NoticeEntry, Todo, ToolCall, TurnEntry, UserAttachment } from './model.js'
 import { promptAttachments, splitPrompt } from './promptRefs.js'
 
 type ToolBlock = Extract<Block, { kind: 'tool' }>
@@ -38,6 +39,8 @@ export class Transcript {
   #live: TurnEntry | undefined
   /** The reason line for the next turn, when Hermes' own notice started it. */
   #continued: string | undefined
+  /** The compactions this view saw happen: what a reload's stored ones get their numbers from. */
+  #seen: Compaction[] = []
 
   /** Sets the running usage turns count from (a resumed session's totals). */
   usageBase(usage: Usage | undefined) {
@@ -155,6 +158,165 @@ export class Transcript {
     this.push({ id: this.id('p'), kind: 'panel', text, title })
   }
 
+  /**
+   * The context started compacting (`before`: its tokens, when known). Inside a running turn that
+   * already did something it is a step of that turn; else it goes between turns, before the turn
+   * it was compacted for. Hermes' later lines of the same compaction only fill in the count.
+   */
+  compacting(before: number | undefined, at = Date.now(), manual = false) {
+    const running = this.#seen.findLast(c => c.status === 'running')
+
+    if (running) {
+      running.before ??= before || undefined
+      running.manual ||= manual || undefined
+
+      return this.#touchCompaction(running)
+    }
+
+    const compaction: Compaction = { startedAt: at, status: 'running', ...(before ? { before } : {}), ...(manual ? { manual } : {}) }
+    this.#seen.push(compaction)
+    const live = this.live
+
+    if (live?.blocks.length) {
+      live.blocks.push({ at, compaction, id: this.id('z'), kind: 'compaction' })
+      this.#touch(live)
+
+      return
+    }
+
+    const entry: CompactionEntry = { compaction, id: this.id('z'), kind: 'compaction', rev: 0 }
+
+    if (live && this.entries.at(-1) === live) {
+      this.entries.splice(-1, 0, entry)
+      this.#touch()
+    } else {
+      this.push(entry)
+    }
+  }
+
+  /**
+   * The running compaction ended. `tokens` are the owner's own counts (/compress reports them
+   * after its `ready` edge, so they also reach the compaction that just ended).
+   */
+  compacted(at = Date.now(), tokens: { before?: number; after?: number } = {}) {
+    const running = this.#seen.findLast(c => c.status === 'running')
+    const c = running ?? (tokens.before || tokens.after ? this.#seen.at(-1) : undefined)
+
+    if (!c) {
+      return
+    }
+
+    if (running) {
+      running.status = 'done'
+      running.endedAt = at
+    }
+
+    c.before = tokens.before || c.before
+    c.after = tokens.after || c.after
+    this.#touchCompaction(c)
+  }
+
+  /**
+   * The last compaction did not happen after all: Hermes aborted it (no done edge came before the
+   * turn ended; `running` drops only a running one) or /compress changed nothing.
+   */
+  uncompact(running = false) {
+    const c = this.#seen.at(-1)
+
+    if (!c || (running && c.status !== 'running')) {
+      return
+    }
+
+    this.#seen.pop()
+    const at = this.entries.findIndex(e => e.kind === 'compaction' && e.compaction === c)
+
+    if (at >= 0) {
+      this.entries.splice(at, 1)
+
+      return this.#touch()
+    }
+
+    const turn = this.entries.findLast(
+      (e): e is TurnEntry => e.kind === 'turn' && e.blocks.some(b => b.kind === 'compaction' && b.compaction === c)
+    )
+
+    if (turn) {
+      turn.blocks = turn.blocks.filter(b => b.kind !== 'compaction' || b.compaction !== c)
+      this.#touch(turn)
+    }
+  }
+
+  /**
+   * A context reading (tokens in use): the first one under the last compaction's `before` is what
+   * it left. A reading from before it finished (a stale tick) is not lower, so it is skipped.
+   */
+  contextUsed(used: number) {
+    const c = this.#seen.at(-1)
+
+    if (c?.status !== 'done' || c.after !== undefined || !(used > 0) || (c.before && used >= c.before * 0.95)) {
+      return
+    }
+
+    c.after = used
+    this.#touchCompaction(c)
+  }
+
+  /** The compactions seen here that the store has no summary for yet. */
+  get unsummarized(): boolean {
+    return this.#seen.some(c => c.status === 'done' && c.summary === undefined)
+  }
+
+  /** Gives each seen compaction the stored summary written while it ran. */
+  summarize(stored: readonly StoredCompaction[]) {
+    for (const [mark, c] of this.#claims(stored)) {
+      if (c.summary === undefined) {
+        c.summary = mark.summary ?? ''
+        c.messages = mark.messages
+        this.#touchCompaction(c)
+      }
+    }
+  }
+
+  /** Which stored compaction each seen one is: the nearest summary written while it ran, each once. */
+  #claims(stored: readonly StoredCompaction[]): Map<StoredCompaction, Compaction> {
+    const out = new Map<StoredCompaction, Compaction>()
+
+    for (const c of this.#seen) {
+      const end = c.endedAt ?? c.startedAt
+      const mark = stored
+        .filter(s => c.status === 'done' && !out.has(s) && within(c, s.at))
+        .sort((a, b) => Math.abs(a.at - end) - Math.abs(b.at - end))[0]
+
+      if (mark) {
+        out.set(mark, c)
+      }
+    }
+
+    return out
+  }
+
+  /** Another session is shown: the compactions seen were the last one's. */
+  forgetCompactions() {
+    this.#seen = []
+  }
+
+  /** Marks the turn or entry showing `c` changed. */
+  #touchCompaction(c: Compaction) {
+    for (let i = this.entries.length - 1; i >= 0; i--) {
+      const e = this.entries[i]!
+
+      if (e.kind === 'compaction' && e.compaction === c) {
+        e.rev++
+
+        return this.#touch()
+      }
+
+      if (e.kind === 'turn' && e.blocks.some(b => b.kind === 'compaction' && b.compaction === c)) {
+        return this.#touch(e)
+      }
+    }
+  }
+
   /** Opens a live turn unless one is already streaming. */
   start(at = Date.now()): TurnEntry {
     const live = this.live
@@ -165,7 +327,7 @@ export class Transcript {
 
     const turn: TurnEntry = {
       blocks: [],
-      continued: this.#continued ?? continuation(this.entries.findLast(e => e.kind !== 'notice')),
+      continued: this.#continued ?? continuation(this.entries.findLast(passable)),
       // A session's first turn starts from zero; later ones from the last tick.
       countersAtStart: this.#counters ?? (this.entries.some(e => e.kind === 'turn') ? undefined : { prompt: 0, read: 0, total: 0 }),
       id: this.id('t'),
@@ -463,11 +625,32 @@ export class Transcript {
     }
   }
 
-  /** Rebuilds the entries of a resumed session from its stored messages. */
-  load(messages: TranscriptMessage[]) {
+  /**
+   * Rebuilds the entries of a resumed session from its stored messages, with its compactions
+   * (`stored`, which the gateway's history leaves out) where they happened: in the turn that went
+   * on after one, else between turns.
+   */
+  load(messages: TranscriptMessage[], stored: readonly StoredCompaction[] = []) {
     this.entries = this.entries.filter(e => e.kind === 'welcome')
     this.#live = undefined
     let turn: TurnEntry | undefined
+    const marks = [...stored].sort((a, b) => a.at - b.at)
+    const claims = this.#claims(marks)
+    let due: StoredCompaction[] = []
+
+    const place = (inTurn: boolean) => {
+      for (const mark of due) {
+        const compaction = this.#storedCompaction(mark, claims.get(mark))
+
+        if (inTurn && turn) {
+          turn.blocks.push({ at: mark.at, compaction, id: this.id('z'), kind: 'compaction' })
+        } else {
+          this.entries.push({ compaction, id: this.id('z'), kind: 'compaction', rev: 0 })
+        }
+      }
+
+      due = []
+    }
     let pendingContinued: string | undefined
     // When the row that opened the next turn (a prompt or a notice) was written.
     let promptAt = 0
@@ -482,6 +665,13 @@ export class Transcript {
       // A steer is stored as its own user row inside the turn it joined. The display projection
       // tags it `steer` and already unwraps Hermes' marker; a raw snapshot still carries the marker.
       const steered = m.role === 'user' ? (m.display_kind === 'steer' ? text.trim() : steerText(text)) : undefined
+
+      while (at > 0 && marks.length && marks[0]!.at <= at) {
+        due.push(marks.shift()!)
+      }
+
+      // The turn going on after it (its next step or a steer) holds it; a prompt or a notice starts afresh.
+      place(m.role === 'assistant' || m.role === 'tool' || (m.role === 'user' && steered !== undefined))
 
       if (steered !== undefined && turn) {
         turn.blocks.push({ at, id: this.id('s'), kind: 'steer', text: steered })
@@ -520,7 +710,7 @@ export class Transcript {
       }
 
       if (!turn) {
-        const continued = pendingContinued ?? continuation(this.entries.findLast(e => e.kind !== 'notice'))
+        const continued = pendingContinued ?? continuation(this.entries.findLast(passable))
         turn = { blocks: [], continued, id: this.id('t'), kind: 'turn', rev: 0, startedAt: promptAt || at, status: 'done' }
         pendingContinued = undefined
         promptAt = 0
@@ -626,7 +816,21 @@ export class Transcript {
       }
     }
 
+    due.push(...marks)
+    place(false)
     this.#touch()
+  }
+
+  /** A stored compaction, as the one this view saw happen (`seen`) when there is one: its numbers stay. */
+  #storedCompaction(mark: StoredCompaction, seen: Compaction | undefined): Compaction {
+    if (seen) {
+      seen.summary = mark.summary ?? ''
+      seen.messages = mark.messages
+
+      return seen
+    }
+
+    return { startedAt: mark.at, status: 'done', ...(mark.summary ? { summary: mark.summary } : {}), ...(mark.messages ? { messages: mark.messages } : {}) }
   }
 
   /** A resumed session's unfinished turn: its prompt, then a live turn holding what streamed so far. */
@@ -868,6 +1072,14 @@ function usageSince(now: Usage, before: Usage | undefined): Usage {
  * Hermes moved to the background (a long timeout, a message arriving mid-run), whose result
  * then names the process (`session_id`).
  */
+/** What a new turn looks past for the turn before it: notices and compactions. */
+const passable = (e: Entry) => e.kind !== 'notice' && e.kind !== 'compaction'
+
+/** A summary written at `at` belongs to compaction `c`: while it ran, give or take the clocks. */
+function within(c: Compaction, at: number): boolean {
+  return at >= c.startedAt - 5_000 && at <= (c.endedAt ?? Date.now()) + 15_000
+}
+
 export function isBackgroundCall(call: ToolCall): boolean {
   return call.name === 'terminal' && (call.args.background === true || typeof record(call.result)?.session_id === 'string')
 }
@@ -1095,7 +1307,7 @@ export function steerText(content: string): string | undefined {
  * next prompt).
  */
 export function steerState(turn: TurnEntry, index: number): 'landed' | 'pending' | 'next' {
-  if (turn.blocks.slice(index + 1).some(b => b.kind !== 'steer')) {
+  if (turn.blocks.slice(index + 1).some(b => b.kind !== 'steer' && b.kind !== 'compaction')) {
     return 'landed'
   }
 
