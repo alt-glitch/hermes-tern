@@ -25,7 +25,7 @@ interface Option {
   role?: string
 }
 
-interface Button {
+export interface Button {
   key: string
   label: string
   keys: string[]
@@ -59,7 +59,7 @@ export function promptTimeoutNotice(method: unknown, reason: unknown): string | 
   return reason === 'timeout' && typeof method === 'string' ? (TIMEOUT_NOTICES[method] ?? null) : null
 }
 
-function actionsRow(buttons: Button[]): JSX.Element {
+export function actionsRow(buttons: Button[]): JSX.Element {
   return (
     <row align="center" gap="sm" key="actions" role="omp.actions">
       <spacer grow={1} key="fill" />

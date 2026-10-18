@@ -5,6 +5,7 @@
 
 import type { App } from './app.js'
 import { CONTROL_COMMANDS } from './controlCommands.js'
+import { fastCommand } from './fast.js'
 import { openAgents } from './overlays/agents.js'
 import { openBackground } from './overlays/background.js'
 import { openChanges } from './overlays/changes.js'
@@ -108,7 +109,6 @@ const COMMANDS: readonly LocalCommand[] = [
     run: app => openBackground(app)
   },
   {
-    // Hermes' own `/reasoning` stays the backend's (show/hide, levels, --global).
     name: 'effort',
     run: (app, arg) => {
       const words = arg.trim().split(/\s+/).filter(Boolean)
@@ -121,6 +121,28 @@ const COMMANDS: readonly LocalCommand[] = [
 
       void app.setEffort(LEVELS.find(l => l.id === level || l.label === level)!.id, global ? 'global' : 'session')
     }
+  },
+  {
+    // `/reasoning <level> [--global]` sets the level as the pill does (on the shared gateway, the
+    // session mutation every viewer sees); its other forms (show, hide, status) stay the backend's.
+    name: 'reasoning',
+    run: (app, arg) => {
+      const words = arg.trim().toLowerCase().split(/\s+/).filter(Boolean)
+      const global = words.includes('--global')
+      const rest = words.filter(w => w !== '--global')
+      const level = rest.length === 1 ? LEVELS.find(l => l.id === rest[0] || l.label === rest[0]) : undefined
+
+      if (!level) {
+        return false
+      }
+
+      void app.setEffort(level.id, global ? 'global' : 'session')
+    }
+  },
+  {
+    // The shared gateway sends no session.info after a typed /fast, so the bolt would not move.
+    name: 'fast',
+    run: (app, arg) => fastCommand(app, arg)
   },
   {
     // The shared gateway refuses /skin in slash.exec; Ink sets the profile's skin through config.set,

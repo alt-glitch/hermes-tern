@@ -16,6 +16,13 @@ export function age(owner: object, startedAt: number, now: number): number {
   return (aged[kAge] ??= Math.max(0, now - startedAt))
 }
 
+/** The (negative) age for a timer counting down to `dueAt`, fixed at first use on `owner`. */
+export function countdownAge(owner: object, dueAt: number, now: number): number {
+  const aged: Aged = owner
+
+  return (aged[kAge] ??= Math.min(0, now - dueAt))
+}
+
 /** `12s`, `3m 05s`, `1h 02m`: a duration as omp's turn footers write it. */
 export function duration(ms: number): string {
   if (ms < 1000) {
