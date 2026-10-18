@@ -5,6 +5,7 @@
 
 import { randomUUID } from 'node:crypto'
 import { appendFileSync, existsSync } from 'node:fs'
+import { hostname } from 'node:os'
 import { basename } from 'node:path'
 
 import type {
@@ -191,6 +192,8 @@ export class App implements OverlayHost {
   #startupImage = process.env.HERMES_TUI_IMAGE?.trim() ?? ''
   /** The images attached to the draft: the next prompt entered takes them. */
   #attachments: Image[] = []
+  /** The folder last reported to Tern by OSC 7. */
+  #reportedCwd: string | undefined
   /** Images being read or uploaded for the draft: an "attaching…" chip each until they land. */
   #attaching: { name: string }[] = []
   /** The skin the gateway last reported; only the `skin` theme mode wears it. */
@@ -586,6 +589,19 @@ export class App implements OverlayHost {
       }
     } catch {
       // No session list: the title still arrives with session.info.
+    }
+  }
+
+  /**
+   * OSC 7: tells Tern the session's folder, so its file viewer, branch and new splits follow a
+   * worktree (`hermes -w tern`) or a moved workspace instead of the folder the pane was opened in.
+   */
+  #reportCwd() {
+    const cwd = this.info?.cwd
+
+    if (cwd && cwd !== this.#reportedCwd) {
+      this.#reportedCwd = cwd
+      process.stdout.write(`\x1b]7;file://${hostname()}${encodeURI(cwd)}\x07`)
     }
   }
 
@@ -1585,6 +1601,7 @@ export class App implements OverlayHost {
     this.title = ''
     this.#setTitle(typeof r.info?.title === 'string' ? r.info.title : undefined)
     this.#readTitle()
+    this.#reportCwd()
     // A resumed session may be mid-turn: Esc Esc stops it and new prompts go as busy_input_mode says.
     this.busy = busyFrom(r)
     // The last session's notices and status lines are not this one's.
@@ -1816,6 +1833,7 @@ export class App implements OverlayHost {
         // Another folder: another branch, maybe another PR.
         if (this.info?.cwd && this.info.cwd !== cwd) {
           this.prs.poke()
+          this.#reportCwd()
         }
 
         break
