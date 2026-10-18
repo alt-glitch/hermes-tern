@@ -61,6 +61,42 @@ describe('tool cards', () => {
     expect(JSON.stringify(settled[0])).toContain('did g1')
   })
 
+  it('draws a one-agent delegation as its agent row alone, with no pills and no brief', () => {
+    const args = { context: 'Long brief for the agent', goal: 'Audit the repo' }
+    const result = { delegation_id: 'd1', mode: 'background', status: 'dispatched' }
+    const live = tree(toolNode(call('delegate_task', args, { result, status: 'running' }), 0))
+    expect([live.k, live.p?.name, live.p?.task, live.p?.status, live.p?.agent, live.p?.badges]).toEqual([
+      'agent',
+      'Background agent',
+      'Audit the repo',
+      'pending',
+      undefined,
+      undefined
+    ])
+    expect(JSON.stringify(live)).not.toContain('Long brief')
+
+    const agent = { calls: 1, goal: 'Audit the repo', id: 'sa-1', index: 0, startedAt: 0, status: 'running' as const, tokens: 0, toolCount: 2 }
+    const running = tree(toolNode(call('delegate_task', args, { result, status: 'done', subagents: [agent] }), 5))
+    expect([running.k, running.p?.key, running.p?.name, running.p?.role]).toEqual(['agent', 'c1', 'Background agent', 'hermes.task.solo'])
+
+    // A resumed one: its result's report folds inside the row.
+    const done = tree(toolNode(call('delegate_task', { goal: 'Audit the repo' }, { result: { results: [{ status: 'ok', summary: 'all clear' }] } }), 0))
+    expect([done.p?.name, done.p?.status, done.p?.collapsed]).toEqual(['Agent', 'done', true])
+    expect(JSON.stringify(done)).toContain('all clear')
+
+    // A dispatch that failed keeps the Task card, which says why.
+    expect(tree(toolNode(call('delegate_task', args, { result: { error: 'no model' }, status: 'error' }), 0)).k).toBe('tool')
+  })
+
+  it("folds a several-agent delegation's shared brief, and its rows carry no type pill", () => {
+    const args = { context: 'Shared notes', tasks: [{ goal: 'g1' }, { goal: 'g2' }] }
+    const n = tree(toolNode(call('delegate_task', args), 0))
+    const rows = (n.c ?? []).filter(c => c.k === 'agent')
+    expect(rows.map(r => r.p?.agent)).toEqual([undefined, undefined])
+    const brief = (n.c ?? []).find(c => c.k === 'section')
+    expect([brief?.p?.head, brief?.p?.collapsed]).toEqual(['Shared brief', true])
+  })
+
   it('draws the legacy `todo` tool as the checklist', () => {
     const todos = [{ content: 'Plan', id: '1', status: 'completed' as const }]
     const n = tree(toolNode(call('todo', { todos }, { todos }), 0))

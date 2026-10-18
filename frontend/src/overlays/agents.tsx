@@ -15,7 +15,7 @@ import type { Overlay } from '../overlay.js'
 import type { LogEntry } from '../agents/liveLog.js'
 import { agentName, isRunning } from '../agents/store.js'
 import { duration } from '../view/time.js'
-import { agentNode } from '../view/tools.js'
+import { agentNode, briefOf } from '../view/tools.js'
 
 import { editQuery, moveSelection } from './search.js'
 
@@ -353,7 +353,7 @@ export function openAgents(app: App, focus?: { id: string; watch?: boolean }) {
         total={all.length}
         {...steerProps(a)}
       >
-        {a ? hubPreview(a, now) : null}
+        {a ? hubPreview(a, now, briefFor(app, a)) : null}
       </picker>
     )
   }
@@ -391,7 +391,7 @@ export function openAgents(app: App, focus?: { id: string; watch?: boolean }) {
         total={entries.length}
         {...steerProps(a)}
       >
-        {at >= 0 ? stepPreview(entries[at]!) : [agentNode(a, now)]}
+        {at >= 0 ? stepPreview(entries[at]!, a, briefFor(app, a)) : [agentNode(a, now)]}
       </picker>
     )
   }
@@ -432,7 +432,14 @@ function hubItem(a: Subagent, now: number): PickerItem {
   }
 }
 
-function hubPreview(a: Subagent, now: number): JSX.Element[] {
+/** The brief agent `a` was given with its goal, from the delegation that started it. */
+function briefFor(app: App, a: Subagent): string | undefined {
+  const call = app.transcript.delegations().find(c => c.subagents?.includes(a))
+
+  return call ? briefOf(call, a.index) : undefined
+}
+
+function hubPreview(a: Subagent, now: number, brief?: string): JSX.Element[] {
   const recent = (a.log?.entries ?? []).slice(-RECENT)
 
   return [
@@ -456,6 +463,13 @@ function hubPreview(a: Subagent, now: number): JSX.Element[] {
     <section head="Task" key="task">
       <md key="goal" text={a.goal} />
     </section>,
+    ...(brief
+      ? [
+          <section collapsed collapsible head="Brief" key="brief">
+            <md key="text" text={brief} />
+          </section>
+        ]
+      : []),
     ...(a.summary
       ? [
           <section head="Result" key="result">
@@ -502,14 +516,19 @@ function stepItem(e: LogEntry, id: string, a: Subagent): PickerItem {
   }
 }
 
-function stepPreview(e: LogEntry): JSX.Element[] {
+/**
+ * One step of `a`'s timeline. Its kickoff is the whole prompt the agent got, from the delegation
+ * (the goal, then its `brief`): the log keeps only a capped, flattened copy.
+ */
+function stepPreview(e: LogEntry, a: Subagent, brief?: string): JSX.Element[] {
   if (e.kind !== 'tool') {
     const head = { assistant: 'Answer', kickoff: 'Task', note: 'Note', think: 'Thinking' }[e.kind]
+    const text = e.kind === 'kickoff' && a.goal ? (brief ? `${a.goal}\n\n---\n\n${brief}` : a.goal) : e.text
 
     return [
       <text key="title" role="omp.hub.title" text={head} />,
       <text key="at" spans={[{ s: 'dim mono', t: e.at }]} />,
-      <md key="body" text={e.text} tone={e.kind === 'think' ? 'muted' : undefined} />
+      <md key="body" text={text} tone={e.kind === 'think' ? 'muted' : undefined} />
     ]
   }
 

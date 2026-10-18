@@ -48,6 +48,12 @@ export interface ToolPlace {
 
 /** The `tool` node of one call. */
 export function toolNode(call: ToolCall, now: number, place: ToolPlace = {}): JSX.Element {
+  const solo = call.name === 'delegate_task' ? soloTask(call, now) : undefined
+
+  if (solo) {
+    return solo
+  }
+
   const card = cardOf(call, now)
   const status = card.status ?? call.status
   const running = status === 'running'
@@ -639,7 +645,7 @@ function taskCard(call: ToolCall, result: Record<string, unknown> | undefined, n
   const rows = agents.length
     ? agents.map(a => agentNode(a, now))
     : call.status === 'running' || result?.status === 'dispatched'
-      ? goals.map((g, i) => <agent agent="task" key={`p${i}`} name={`Agent ${i + 1}`} status="pending" task={g} />)
+      ? goals.map((g, i) => <agent key={`p${i}`} name={`Agent ${i + 1}`} status="pending" task={g} />)
       : settledRows(goals, result)
 
   const context = str(call.args.context) ?? (tasks.length === 1 ? str(tasks[0]?.context) : undefined)
@@ -673,12 +679,8 @@ function taskCard(call: ToolCall, result: Record<string, unknown> | undefined, n
 
   return {
     badges: result?.mode === 'background' ? [{ text: 'background' }] : undefined,
-    body: [
-      ...(context
-        ? [<text key="ctx" role="omp.tool.context" spans={[{ s: 'muted', t: `Context: ${context}` }]} wrap="word" />]
-        : []),
-      ...rows
-    ],
+    // The agents first; the brief they share stays folded.
+    body: [...rows, ...(context ? [briefNode('Shared brief', context)] : [])],
     meta: meta ? [meta] : undefined,
     name: 'task',
     status: working ? 'running' : undefined,
@@ -699,14 +701,10 @@ function settledRows(goals: string[], result: Record<string, unknown> | undefine
   const titles = goals.length ? goals : results.map(() => 'Delegated task')
 
   return titles.map((g, i) => {
-    const r = results[i]
-    const verdict = str(r?.status) ?? ''
-    // As the desktop's settledRowStatus: anything but a success (a timeout, an error) failed.
-    const status = !r ? 'idle' : verdict === '' || verdict === 'ok' || verdict === 'completed' ? 'done' : 'failed'
-    const summary = str(r?.summary) ?? str(r?.error)
+    const { status, summary } = outcome(results[i])
 
     return (
-      <agent agent="task" key={`s${i}`} name={`Agent ${i + 1}`} status={status} task={g}>
+      <agent key={`s${i}`} name={`Agent ${i + 1}`} status={status} task={g}>
         {summary ? <md key="o">{summary}</md> : null}
       </agent>
     )
@@ -719,7 +717,7 @@ function settledRows(goals: string[], result: Record<string, unknown> | undefine
  * tool count, a status), so an age fixed at the first send would run late. The row is only
  * rebuilt when something about the agent changed, so this sends no extra frames.
  */
-export function agentNode(a: Subagent, now: number): JSX.Element {
+export function agentNode(a: Subagent, now: number, solo?: Solo): JSX.Element {
   const status =
     a.status === 'done'
       ? 'done'
@@ -737,7 +735,6 @@ export function agentNode(a: Subagent, now: number): JSX.Element {
     <agent
       // A click (or the context menu) opens the agent beside the chat; App handles the action.
       actions={{ click: `open-agent=${a.id}`, menu: [`open-agent=${a.id}`] }}
-      agent="task"
       // A done row whose outcome nothing reported says so, rather than reading as a success.
       badges={
         a.exitReason && (a.status !== 'done' || a.exitReason === OUTCOME_UNKNOWN)
@@ -747,9 +744,10 @@ export function agentNode(a: Subagent, now: number): JSX.Element {
       collapsed={a.summary ? true : undefined}
       collapsible={a.summary ? true : undefined}
       depth={a.depth || undefined}
-      key={a.key ?? a.id}
+      key={solo?.key ?? a.key ?? a.id}
       model={a.model}
-      name={agentName(a)}
+      name={solo?.name ?? agentName(a)}
+      role={solo ? 'hermes.task.solo' : undefined}
       stats={{
         requests: a.calls || undefined,
         tokens: a.tokens || undefined,
@@ -758,7 +756,7 @@ export function agentNode(a: Subagent, now: number): JSX.Element {
       }}
       status={status}
       task={a.goal}
-      title={`Open ${agentName(a)} beside the chat`}
+      title={`Open ${solo ? 'the agent' : agentName(a)} beside the chat`}
       tool={
         running && a.tool
           ? {
@@ -771,6 +769,79 @@ export function agentNode(a: Subagent, now: number): JSX.Element {
     >
       {a.summary ? <md key="o">{a.summary}</md> : null}
     </agent>
+  )
+}
+
+/** A settled agent's status and report from its `result.results` entry (none: idle). */
+function outcome(r: Record<string, unknown> | undefined): { status: string; summary?: string } {
+  const verdict = str(r?.status) ?? ''
+  // As the desktop's settledRowStatus: anything but a success (a timeout, an error) failed.
+  const status = !r ? 'idle' : verdict === '' || verdict === 'ok' || verdict === 'completed' ? 'done' : 'failed'
+
+  return { status, summary: str(r?.summary) ?? str(r?.error) }
+}
+
+/** A one-agent delegation's row in place of its Task card: its own key and name. */
+interface Solo {
+  key: string
+  name: string
+}
+
+/**
+ * A delegation of one agent, as one row: the agent's own (status, goal, model, its current tool
+ * and timer), named "Background agent" when it runs on its own. Its brief is in the agent's
+ * sheet (a click away), not here. A failed dispatch keeps the Task card, which says why.
+ */
+function soloTask(call: ToolCall, now: number): JSX.Element | undefined {
+  const tasks = Array.isArray(call.args.tasks) ? call.args.tasks.map(t => record(t)).filter(t => t !== undefined) : []
+  const result = record(call.result)
+
+  if (tasks.length > 1 || (call.subagents?.length ?? 0) > 1 || call.status === 'error' || result?.error) {
+    return undefined
+  }
+
+  const goal = str(tasks[0]?.goal) ?? str(call.args.goal) ?? call.subagents?.[0]?.goal ?? 'Delegated task'
+  const name = result?.mode === 'background' ? 'Background agent' : 'Agent'
+  const a = call.subagents?.[0]
+
+  if (a) {
+    return agentNode(a, now, { key: call.id, name })
+  }
+
+  // Before its first event the request stands in; a resumed one has only its result.
+  const pending = call.status === 'running' || result?.status === 'dispatched'
+  const results = Array.isArray(result?.results) ? result.results.map(r => record(r)) : []
+  const { status, summary } = pending ? { status: 'pending', summary: undefined } : outcome(results[0])
+
+  return (
+    <agent
+      collapsed={summary ? true : undefined}
+      collapsible={summary ? true : undefined}
+      key={call.id}
+      name={name}
+      role="hermes.task.solo"
+      status={status}
+      task={goal}
+    >
+      {summary ? <md key="o">{summary}</md> : null}
+    </agent>
+  )
+}
+
+/** The brief (`context`) delegation `call` gave its agent `index` beside the goal, if any. */
+export function briefOf(call: ToolCall, index: number): string | undefined {
+  const tasks = Array.isArray(call.args.tasks) ? call.args.tasks.map(t => record(t)) : []
+  const context = str(tasks[index]?.context) ?? str(call.args.context)
+
+  return context
+}
+
+/** A delegation's brief, folded: what the agents were told. */
+function briefNode(head: string, text: string): JSX.Element {
+  return (
+    <section collapsed collapsible head={head} key="brief" role="hermes.task.brief">
+      <md key="md">{text}</md>
+    </section>
   )
 }
 
