@@ -24198,12 +24198,12 @@ var GatewayClient = class extends EventEmitter {
   }
   /** End a hold: with the applied snapshot, replay only frames it does not contain; without one
    * (failed or superseded attach), deliver what was held. A replaced hold is a no-op. */
-  settleAttach(hold, snapshot2) {
+  settleAttach(hold, snapshot3) {
     if (!hold || this.attachHold !== hold) {
       return;
     }
     this.attachHold = null;
-    const fence = snapshot2;
+    const fence = snapshot3;
     for (const ev of hold.frames) {
       const { replay_epoch: epoch, seq } = ev;
       if (!fence || epoch === fence.replay_epoch && typeof seq === "number" && seq > Number(fence.last_sequence ?? -1)) {
@@ -24211,11 +24211,11 @@ var GatewayClient = class extends EventEmitter {
       }
     }
   }
-  hydrateSharedPrompts(snapshot2) {
+  hydrateSharedPrompts(snapshot3) {
     if (!this.isCanonical) {
       return;
     }
-    const result = snapshot2;
+    const result = snapshot3;
     for (const prompt of result.prompts ?? []) {
       this.publishLocalEvent({
         type: `${prompt.kind}.request`,
@@ -24777,11 +24777,11 @@ function appTitle(slug) {
   if (known2) {
     return known2;
   }
-  const words2 = slug.split(/[-_\s]+/).filter(Boolean);
-  if (words2.length > 1 && words2.at(-1).toLowerCase() === "mcp") {
-    words2.pop();
+  const words3 = slug.split(/[-_\s]+/).filter(Boolean);
+  if (words3.length > 1 && words3.at(-1).toLowerCase() === "mcp") {
+    words3.pop();
   }
-  return words2.map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
+  return words3.map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
 }
 function actionPhrase(tool, app2 = "") {
   const prefix = `${app2.replace(/-/g, "_").toUpperCase()}_`;
@@ -26438,26 +26438,26 @@ function copyToClipboard(text2, env = process.env) {
 // src/hermes/mutate.ts
 import { randomUUID as randomUUID2 } from "node:crypto";
 async function currentGeneration(gw2, sid) {
-  const snapshot2 = await gw2.request("session.resume", { session_id: sid });
-  if (!Number.isSafeInteger(snapshot2?.execution_generation)) {
+  const snapshot3 = await gw2.request("session.resume", { session_id: sid });
+  if (!Number.isSafeInteger(snapshot3?.execution_generation)) {
     throw new Error("The session did not report its execution generation; try again.");
   }
-  return snapshot2.execution_generation;
+  return snapshot3.execution_generation;
 }
 async function mutateSession(gw2, sid, operation, payload) {
-  const snapshot2 = await gw2.request("session.resume", { session_id: sid });
-  if (!Number.isSafeInteger(snapshot2?.revision) || !Number.isSafeInteger(snapshot2?.execution_generation)) {
+  const snapshot3 = await gw2.request("session.resume", { session_id: sid });
+  if (!Number.isSafeInteger(snapshot3?.revision) || !Number.isSafeInteger(snapshot3?.execution_generation)) {
     throw new Error("The session did not report its revision; try again.");
   }
-  const body = typeof payload === "function" ? payload(snapshot2) : payload;
+  const body = typeof payload === "function" ? payload(snapshot3) : payload;
   if (!body) {
     return null;
   }
   const result = await gw2.request("session.mutate", {
     session_id: sid,
     request_id: randomUUID2(),
-    expected_revision: snapshot2.revision,
-    ...operation === "rename" ? {} : { expected_generation: snapshot2.execution_generation },
+    expected_revision: snapshot3.revision,
+    ...operation === "rename" ? {} : { expected_generation: snapshot3.execution_generation },
     operation,
     payload: body
   });
@@ -28614,7 +28614,7 @@ function actionOf(call) {
   return call.name.startsWith("browser") ? "browser" : "other";
 }
 var plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
-var and2 = (words2) => words2.length < 3 ? words2.join(" and ") : `${words2.slice(0, -1).join(", ")}, and ${words2.at(-1)}`;
+var and2 = (words3) => words3.length < 3 ? words3.join(" and ") : `${words3.slice(0, -1).join(", ")}, and ${words3.at(-1)}`;
 function actionLabel(action, n, calls = []) {
   switch (action) {
     case "app": {
@@ -28671,8 +28671,8 @@ function summarize(items) {
   if (rest > 0) {
     labels.push(`Performed ${plural(rest, "other action", "other actions")}`);
   }
-  const words2 = labels.map((l, i) => i === 0 ? l : l.charAt(0).toLowerCase() + l.slice(1));
-  return words2.length < 3 ? words2.join(" and ") : `${words2.slice(0, -1).join(", ")}, and ${words2.at(-1)}`;
+  const words3 = labels.map((l, i) => i === 0 ? l : l.charAt(0).toLowerCase() + l.slice(1));
+  return words3.length < 3 ? words3.join(" and ") : `${words3.slice(0, -1).join(", ")}, and ${words3.at(-1)}`;
 }
 function editedFiles(calls) {
   const paths = /* @__PURE__ */ new Set();
@@ -29898,8 +29898,8 @@ function firstLine(text2) {
   return text2?.split("\n").find((l) => l.trim())?.trim();
 }
 function humanize(name) {
-  const words2 = name.replace(/[_-]+/g, " ").trim();
-  return words2.charAt(0).toUpperCase() + words2.slice(1);
+  const words3 = name.replace(/[_-]+/g, " ").trim();
+  return words3.charAt(0).toUpperCase() + words3.slice(1);
 }
 function pretty(v) {
   return typeof v === "string" ? v : JSON.stringify(v, null, 2);
@@ -29941,8 +29941,8 @@ function moveSelection(key2, ids, selected) {
   return void 0;
 }
 function rank(items, query, textOf, { scattered = true } = {}) {
-  const words2 = query.toLowerCase().split(/\s+/).filter(Boolean);
-  if (!words2.length) {
+  const words3 = query.toLowerCase().split(/\s+/).filter(Boolean);
+  if (!words3.length) {
     return items.map((item3) => ({ item: item3, positions: [] }));
   }
   const scored = [];
@@ -29950,7 +29950,7 @@ function rank(items, query, textOf, { scattered = true } = {}) {
     const text2 = textOf(item3).toLowerCase();
     const positions = /* @__PURE__ */ new Set();
     let score = 0;
-    for (const word of words2) {
+    for (const word of words3) {
       const at = text2.indexOf(word);
       if (at >= 0) {
         const boundary = at === 0 || /[\s/_.:-]/.test(text2[at - 1] ?? "");
@@ -30582,10 +30582,14 @@ var STATUS2 = {
   lost: "Lost",
   running: "Running"
 };
-function openBackground(app2, focus) {
+function openBackground(app2, at) {
   const procs = () => app2.processes.all();
+  const focus = typeof at === "string" ? at : void 0;
   const focused = focus ? app2.processes.get(focus) : void 0;
   let tab = focused ? isRunning2(focused) ? "running" : "all" : app2.processes.running().length ? "running" : "all";
+  if (typeof at === "object") {
+    tab = at.tab;
+  }
   let selected = focus ?? procs().find(isRunning2)?.id ?? procs()[0]?.id;
   let expanded = false;
   let confirm;
@@ -32386,14 +32390,14 @@ function checksPreview(pr) {
 var VERB = { comment: "commented", commit: "pushed", review: "reviewed", thread: "commented on" };
 function activityItem(a, id, now) {
   const verdict = a.kind === "review" && a.state ? REVIEW[a.state] : void 0;
-  const words2 = a.kind === "commit" ? a.body : a.body.replace(/\s+/g, " ").trim();
+  const words3 = a.kind === "commit" ? a.body : a.body.replace(/\s+/g, " ").trim();
   return {
     badges: [
       ...verdict && a.state !== "COMMENTED" ? [{ text: verdict[0].toLowerCase(), tone: verdict[1] }] : [],
       ...a.resolved ? [{ text: "resolved", tone: "success" }] : [],
       ...a.outdated ? [{ text: "outdated" }] : []
     ],
-    detail: a.kind === "thread" && a.path ? `${a.path}${a.line ? `:${a.line}` : ""}${words2 ? ` \xB7 ${words2}` : ""}` : words2,
+    detail: a.kind === "thread" && a.path ? `${a.path}${a.line ? `:${a.line}` : ""}${words3 ? ` \xB7 ${words3}` : ""}` : words3,
     facts: { when: relative(a.at, now) },
     id,
     label: [{ s: "strong", t: a.author }, { s: "muted", t: ` ${verdict && a.state !== "COMMENTED" ? "reviewed" : VERB[a.kind]}` }],
@@ -32510,7 +32514,7 @@ async function openHelp(app2) {
   const own = localCommands().flatMap(
     (c) => c.help ? [[[`/${c.name}`, ...(c.aliases ?? []).map((a) => `/${a}`)].join(" \xB7 "), c.help]] : []
   );
-  const runs2 = ([command = ""]) => !INK_ONLY_COMMANDS.has(command.replace(/^\//, "").split(/\s/)[0] ?? "");
+  const runs2 = ([command = ""]) => !HIDDEN_COMMANDS.has(command.replace(/^\//, "").split(/\s/)[0] ?? "");
   const categories = [
     { name: "Tern", pairs: own },
     ...(catalog.categories?.length ? catalog.categories : [{ name: "Commands", pairs: catalog.pairs ?? [] }]).map((c) => ({ ...c, pairs: (c.pairs ?? []).filter(runs2) })).filter((c) => c.pairs.length)
@@ -33918,8 +33922,8 @@ function questionsOf(raw) {
   });
 }
 function tabLabel(question) {
-  const words2 = question.replace(/[?.!:]+$/, "").split(/\s+/);
-  return words2.length > 4 ? `${words2.slice(0, 4).join(" ")}\u2026` : words2.join(" ");
+  const words3 = question.replace(/[?.!:]+$/, "").split(/\s+/);
+  return words3.length > 4 ? `${words3.slice(0, 4).join(" ")}\u2026` : words3.join(" ");
 }
 function clarifyOverlay(host, req) {
   const questions = questionsOf(req.params.questions);
@@ -34770,12 +34774,320 @@ function openThemePicker(app2) {
   app2.open(overlay);
 }
 
+// src/watch/spec.ts
+import { execFile as execFile5 } from "node:child_process";
+import { promisify as promisify4 } from "node:util";
+var run3 = promisify4(execFile5);
+var WATCH_ENV = "HERMES_TERN_WATCH";
+function readWatchSpec(env = process.env) {
+  try {
+    const raw = env[WATCH_ENV];
+    const spec = raw ? JSON.parse(raw) : void 0;
+    return spec && typeof spec.sid === "string" && typeof spec.subagent === "string" ? spec : void 0;
+  } catch {
+    return void 0;
+  }
+}
+function specOf(a, name, sid, stored) {
+  return {
+    goal: a.goal,
+    index: a.index,
+    log: a.logPath,
+    name,
+    sid,
+    startedAt: a.startedAt,
+    stored: stored && stored !== sid ? stored : void 0,
+    subagent: a.id
+  };
+}
+var sidebar;
+function hermesSplit(env, vars, args) {
+  const pane = env.TERN_PANE;
+  const python = env.HERMES_PYTHON;
+  const src = env.HERMES_PYTHON_SRC_ROOT;
+  if (!pane || !python || !src) {
+    return void 0;
+  }
+  const command = [
+    "env",
+    `PYTHONPATH=${src}`,
+    ...env.HERMES_HOME ? [`HERMES_HOME=${env.HERMES_HOME}`] : [],
+    ...vars,
+    python,
+    "-m",
+    "hermes_cli.main",
+    ...args
+  ];
+  return { command, pane };
+}
+async function openSidebar(spec, cwd, env = process.env) {
+  const split = hermesSplit(env, [`${WATCH_ENV}=${JSON.stringify(spec)}`], ["tern"]);
+  if (!split) {
+    return false;
+  }
+  if (sidebar) {
+    await run3("tern", ["close", sidebar]).catch(() => void 0);
+    sidebar = void 0;
+  }
+  try {
+    const { stdout } = await run3("tern", ["split", split.pane, "right", "--cwd", cwd, "--", ...split.command]);
+    sidebar = stdout.trim().split(/\s+/).at(-1) || void 0;
+    return true;
+  } catch {
+    return false;
+  }
+}
+async function openHermesSplit(args, cwd, env = process.env) {
+  const split = hermesSplit(env, [], args);
+  if (!split) {
+    return false;
+  }
+  try {
+    await run3("tern", ["split", split.pane, "down", "--cwd", cwd, "--keep-open", "--", ...split.command]);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// src/refusedCommands.ts
+var errorText2 = (e) => e instanceof Error ? e.message : String(e);
+var words2 = (arg) => arg.trim().split(/\s+/).filter(Boolean);
+async function cliPanel(app2, title, argv) {
+  const r = await app2.gw.request("cli.exec", { argv });
+  if (r?.blocked) {
+    return app2.transcript.notice(r.hint || `\`hermes ${argv.join(" ")}\` cannot run here.`, "warning");
+  }
+  app2.transcript.panel(title, r?.output?.trim() || "(no output)");
+  if (r?.code) {
+    app2.transcript.notice(`\`hermes ${argv.join(" ")}\` exited with code ${r.code}.`, "warning");
+  }
+}
+async function browser(app2, arg) {
+  const [first = "status", ...rest] = words2(arg);
+  const action = first.toLowerCase();
+  const note = (text2, tone) => app2.transcript.notice(text2, tone);
+  if (!["connect", "disconnect", "status", "use"].includes(action)) {
+    return note("Usage: /browser [status|use [on|off]|connect [url]|disconnect]", "warning");
+  }
+  const mode = action === "use" ? (rest[0] ?? "on").toLowerCase() : void 0;
+  if (mode && mode !== "on" && mode !== "off") {
+    return note("Usage: /browser use [on|off]", "warning");
+  }
+  const url = action === "connect" ? rest.join(" ").trim() || "http://127.0.0.1:9222" : void 0;
+  let r;
+  try {
+    r = await app2.gw.request("browser.manage", {
+      action,
+      session_id: app2.sid,
+      ...url ? { url } : {},
+      ...mode ? { enabled: mode === "on" } : {}
+    });
+  } catch (e) {
+    return note(errorText2(e), "warning");
+  }
+  if (action === "use") {
+    return note(
+      `${mode === "on" ? "Browser Use mode on: browser_exec runs through the Browser Use CLI." : "Browser Use mode off: the built-in browser tools are back."} New sessions get it; this one keeps its tools (/new starts one).`
+    );
+  }
+  if (action === "disconnect") {
+    return note("Browser disconnected.");
+  }
+  if (action === "connect") {
+    const said = r?.messages?.join("\n");
+    const done = r?.connected ? `Browser connected over CDP: ${r.url || url}. The next browser tool call uses it.` : `No browser answered at ${url}.`;
+    return note(said ? `${said}
+${done}` : done, r?.connected ? "info" : "warning");
+  }
+  note(
+    [
+      r?.connected ? `Browser connected: ${r.url || "(url unavailable)"}` : "Browser not connected (set browser.cdp_url in config.yaml to attach one).",
+      ...r?.browser_use ? ["Browser Use mode: browser_exec runs through the Browser Use CLI."] : []
+    ].join("\n")
+  );
+}
+function pluginLines(rows) {
+  const mark = (status = "") => status === "enabled" ? "\u2713" : status === "disabled" ? "\u2717" : "\xB7";
+  return rows.map((p) => {
+    const facts2 = [p.version, p.source, p.status === "enabled" || p.status === "disabled" ? "" : p.status].filter(Boolean).join(", ");
+    return `- ${mark(p.status)} **${p.name}**${facts2 ? ` (${facts2})` : ""}${p.description ? ` \u2014 ${p.description}` : ""}`;
+  });
+}
+async function plugins(app2, arg) {
+  const sub = (words2(arg)[0] ?? "list").toLowerCase();
+  if (sub !== "list" && sub !== "ls" && sub !== "all") {
+    return app2.transcript.notice(
+      `Usage: /plugins [list|all]. To ${sub} a plugin, run \`hermes plugins ${sub} \u2026\` in a terminal.`,
+      "warning"
+    );
+  }
+  const r = await app2.gw.request("plugins.manage", { action: "list" });
+  const rows = r?.plugins ?? [];
+  const user = rows.filter((p) => p.source !== "bundled");
+  const shown = sub === "all" || !user.length ? rows : user;
+  const hidden = rows.length - shown.length;
+  if (!rows.length) {
+    return app2.transcript.notice("No plugins installed.");
+  }
+  app2.transcript.panel(
+    "Plugins",
+    [
+      ...pluginLines(shown),
+      ...hidden ? ["", `${hidden} bundled plugin${hidden === 1 ? "" : "s"} not shown: /plugins all lists them.`] : []
+    ].join("\n")
+  );
+}
+function manageUrl(s) {
+  try {
+    const url = new URL("/manage-subscription", new URL(s.portal_url ?? "").origin);
+    if (s.org_id) {
+      url.searchParams.set("org_id", s.org_id);
+    }
+    return url.toString();
+  } catch {
+    return null;
+  }
+}
+function subscriptionText(s) {
+  const c = s.current;
+  const price = s.tiers?.find((t2) => t2.is_current)?.dollars_per_month_display;
+  const url = manageUrl(s);
+  const lines = [
+    `**Plan:** ${c?.tier_name || "none"}${price ? ` (${price} / month)` : ""}`,
+    ...c?.credits_remaining && c.monthly_credits ? [`**Credits:** ${c.credits_remaining} of ${c.monthly_credits} left this cycle`] : [],
+    ...s.usage?.renews_display ? [`**Renews:** ${s.usage.renews_display}`] : [],
+    ...s.org_name ? [`**Account:** ${s.org_name}${s.role ? ` (${s.role})` : ""}`] : [],
+    ...c?.pending_downgrade_tier_name ? [
+      `Changes to ${c.pending_downgrade_tier_name}${c.pending_downgrade_display ? ` ${c.pending_downgrade_display}` : ""}.`
+    ] : [],
+    ...c?.cancel_at_period_end ? [
+      `Cancels${c.cancellation_effective_display ? ` ${c.cancellation_effective_display}` : " at the end of the cycle"}.`
+    ] : []
+  ];
+  const change = s.can_change_plan === false ? "Only an admin of this account can change the plan." : url ? `[Change your plan](${url}) on the Nous Portal.` : "Change your plan on the Nous Portal.";
+  return [...lines, "", change].join("\n");
+}
+async function subscription(app2) {
+  const s = await app2.gw.request("subscription.state", {});
+  if (!s?.logged_in) {
+    return app2.transcript.notice(
+      s?.error ? `Could not load the subscription: ${s.error}` : "Not logged into Nous Portal: run /login, then /subscription.",
+      "warning"
+    );
+  }
+  app2.transcript.panel("Subscription", subscriptionText(s));
+}
+function config(app2, arg) {
+  const argv = words2(arg);
+  return cliPanel(app2, `/config${argv.length ? ` ${argv.join(" ")}` : ""}`, [
+    "config",
+    ...argv.length ? argv : ["show"]
+  ]);
+}
+function worktree(app2, arg) {
+  const [first = "list", ...rest] = words2(arg);
+  const sub = first.toLowerCase();
+  const cwd = app2.info?.cwd;
+  if (sub === "new") {
+    return app2.transcript.notice(
+      "/worktree new runs only in the classic CLI. Start a session in a new worktree with `hermes -w` in a terminal.",
+      "warning"
+    );
+  }
+  const head2 = sub === "status" || sub === "show" ? "list" : sub;
+  if (!["audit", "list", "ls", "prune"].includes(head2)) {
+    return app2.transcript.notice("Usage: /worktree [list|prune [--dry-run]]", "warning");
+  }
+  if (!cwd) {
+    return app2.transcript.notice("Wait for the session to start: /worktree needs its folder.", "warning");
+  }
+  return cliPanel(app2, `/worktree ${[head2, ...rest].join(" ")}`, ["worktree", head2, ...rest, "--repo", cwd]);
+}
+function snapshot2(app2, arg) {
+  const [first = "", ...rest] = words2(arg);
+  if (first.toLowerCase() !== "create") {
+    return app2.transcript.notice(
+      "/snapshot list, restore and prune run only in the classic CLI (hermes --cli). Here, /snapshot create [label] takes one.",
+      "warning"
+    );
+  }
+  const label = rest.join(" ");
+  return cliPanel(app2, "/snapshot create", ["backup", "--quick", ...label ? ["--label", label] : []]);
+}
+async function update(app2) {
+  if (await openHermesSplit(["update"], app2.info?.cwd || process.env.HOME || "/")) {
+    return app2.transcript.notice(
+      "Running `hermes update` in the split below. Hermes may restart the gateway when it finishes."
+    );
+  }
+  app2.transcript.notice("Run `hermes update` in a terminal to update Hermes.");
+}
+var guarded = (name, run6) => async (app2, arg) => {
+  try {
+    return await run6(app2, arg);
+  } catch (e) {
+    app2.transcript.notice(`/${name} failed: ${errorText2(e)}`, "error");
+  }
+};
+var ROUTED = [
+  { name: "cron", run: (app2) => openBackground(app2, { tab: "cron" }) },
+  { name: "browser", run: browser },
+  { name: "plugins", run: plugins },
+  { aliases: ["upgrade"], name: "subscription", run: subscription },
+  { name: "config", run: config },
+  { name: "worktree", run: worktree },
+  { aliases: ["snap"], name: "snapshot", run: snapshot2 },
+  { name: "update", run: update }
+];
+var ink = (feature) => (name) => `/${name} is an Ink TUI feature; ${feature}`;
+var messaging = (name) => `/${name} is for messaging platforms (Telegram, Discord\u2026).`;
+var classic = (instead) => (name) => `/${name} runs only in the classic CLI (hermes --cli). ${instead}`;
+var HIDDEN = [
+  // Ink TUI display and input features.
+  { name: "battery", why: ink("Tern has no battery gauge.") },
+  { name: "density", why: ink("Tern has no compact mode.") },
+  { aliases: ["detail"], name: "details", why: ink("Tern has no detail levels.") },
+  { name: "focus", why: ink("Tern has no focus view.") },
+  { name: "indicator", why: ink("Tern has its own busy indicator.") },
+  { aliases: ["learning", "memory-graph"], name: "journey", why: ink("Tern has no learning timeline.") },
+  { name: "logs", why: ink("Tern has no gateway log viewer.") },
+  { aliases: ["scroll"], name: "mouse", why: ink("Tern handles the mouse itself.") },
+  { name: "palette", why: ink("in Tern, type / to search every command.") },
+  { name: "pet", why: ink("Tern has no pet.") },
+  { aliases: ["generate-pet"], name: "hatch", why: ink("Tern has no pet.") },
+  { aliases: ["compose"], name: "prompt", why: ink("Tern's composer already edits Markdown.") },
+  { name: "redraw", why: ink("Tern repaints by itself.") },
+  { aliases: ["sb"], name: "statusbar", why: ink("Tern has no status bar to toggle.") },
+  { aliases: ["ts"], name: "timestamps", why: ink("Tern already shows the time of each prompt.") },
+  { name: "wake", why: ink("Tern has no wake word.") },
+  // The messaging gateway's own.
+  { name: "pause", why: messaging },
+  { name: "platform", why: messaging },
+  { name: "restart", why: messaging },
+  { aliases: ["set-home"], name: "sethome", why: messaging },
+  { name: "start", why: messaging },
+  { name: "topic", why: messaging },
+  { name: "handoff", why: classic("It hands the session to a messaging platform.") },
+  { name: "export", why: classic("In a terminal, `hermes profile export` does the same.") },
+  { name: "import", why: classic("In a terminal, `hermes profile import <archive>` does the same.") }
+];
+var HIDDEN_COMMANDS = new Set(HIDDEN.flatMap((h) => [h.name, ...h.aliases ?? []]));
+var REFUSED_COMMANDS = [
+  ...ROUTED.map((c) => ({ ...c, run: guarded(c.name, c.run) })),
+  ...HIDDEN.map((h) => ({
+    aliases: h.aliases,
+    name: h.name,
+    run: (app2) => app2.transcript.notice(h.why(h.name), "warning")
+  }))
+];
+
 // src/hermes/rewind.ts
 var COMPACTION_MARKERS = ["[CONTEXT COMPACTION", "[CONTEXT SUMMARY]:", "[END OF PRIOR CONTEXT"];
 var isUserTurn = (row) => row.role === "user" && (!row.display_kind || row.display_kind === "steer") && Number.isSafeInteger(row.row_id) && !(typeof row.content === "string" && COMPACTION_MARKERS.some((marker2) => row.content.includes(marker2)));
-var lastUserTurn = (snapshot2) => (snapshot2.stored_messages ?? snapshot2.messages ?? []).findLast(isUserTurn);
-function lastTurnRewind(snapshot2) {
-  const target = lastUserTurn(snapshot2);
+var lastUserTurn = (snapshot3) => (snapshot3.stored_messages ?? snapshot3.messages ?? []).findLast(isUserTurn);
+function lastTurnRewind(snapshot3) {
+  const target = lastUserTurn(snapshot3);
   return target ? { target_message_id: target.row_id } : null;
 }
 var TEXT_PARTS = /* @__PURE__ */ new Set(["input_text", "output_text", "text"]);
@@ -34792,8 +35104,8 @@ function retryText(content) {
   }
   return text2.trim() ? text2 : "";
 }
-function retryTurnRewind(snapshot2) {
-  const target = lastUserTurn(snapshot2);
+function retryTurnRewind(snapshot3) {
+  const target = lastUserTurn(snapshot3);
   const text2 = target ? retryText(target.content) : "";
   if (text2 === null) {
     throw new Error("/retry: retry does not support media or unknown content parts");
@@ -34803,7 +35115,7 @@ function retryTurnRewind(snapshot2) {
 
 // src/sessionCommands.ts
 var plural2 = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
-var errorText2 = (e) => e instanceof Error ? e.message : String(e);
+var errorText3 = (e) => e instanceof Error ? e.message : String(e);
 async function rewind(host, intent) {
   if (!host.canonical) {
     return false;
@@ -34948,11 +35260,11 @@ async function rollback(host, arg) {
   }
   host.notice(`Rollback restored ${file2 || "the workspace"}: ${r.reason || r.message || r.restored_to || "restored"}`);
 }
-var guarded = (name, run6) => async (host, arg) => {
+var guarded2 = (name, run6) => async (host, arg) => {
   try {
     return await run6(host, arg);
   } catch (e) {
-    host.notice(`/${name} failed: ${errorText2(e)}`, "error");
+    host.notice(`/${name} failed: ${errorText3(e)}`, "error");
   }
 };
 var COMMANDS2 = [
@@ -34966,7 +35278,7 @@ var COMMANDS2 = [
   { aliases: ["reload_mcp"], name: "reload-mcp", run: reloadMcp },
   { name: "rollback", run: rollback }
 ];
-var SESSION_COMMANDS = COMMANDS2.map((c) => ({ ...c, run: guarded(c.name, c.run) }));
+var SESSION_COMMANDS = COMMANDS2.map((c) => ({ ...c, run: guarded2(c.name, c.run) }));
 
 // src/preformatted.ts
 var BOX = /[─-╿]/;
@@ -35705,9 +36017,9 @@ var COMMANDS3 = [
     help: "Pick the reasoning effort [level] [--global]",
     name: "effort",
     run: (app2, arg) => {
-      const words2 = arg.trim().split(/\s+/).filter(Boolean);
-      const global2 = words2.includes("--global") || words2.includes("default");
-      const level = words2.find((w) => LEVELS.some((l) => l.id === w || l.label === w));
+      const words3 = arg.trim().split(/\s+/).filter(Boolean);
+      const global2 = words3.includes("--global") || words3.includes("default");
+      const level = words3.find((w) => LEVELS.some((l) => l.id === w || l.label === w));
       if (!level) {
         return openEffortPicker(app2, global2);
       }
@@ -35719,9 +36031,9 @@ var COMMANDS3 = [
     // session mutation every viewer sees); its other forms (show, hide, status) stay the backend's.
     name: "reasoning",
     run: (app2, arg) => {
-      const words2 = arg.trim().toLowerCase().split(/\s+/).filter(Boolean);
-      const global2 = words2.includes("--global");
-      const rest = words2.filter((w) => w !== "--global");
+      const words3 = arg.trim().toLowerCase().split(/\s+/).filter(Boolean);
+      const global2 = words3.includes("--global");
+      const rest = words3.filter((w) => w !== "--global");
       const level = rest.length === 1 ? LEVELS.find((l) => l.id === rest[0] || l.label === rest[0]) : void 0;
       if (!level) {
         return false;
@@ -35794,9 +36106,9 @@ var COMMANDS3 = [
     run: (app2, arg) => arg ? false : openHelp(app2)
   },
   ...CONTROL_COMMANDS.map((c) => ({ ...c, run: (app2, arg) => c.run(app2.control(), arg) })),
-  ...SESSION_COMMANDS.map((c) => ({ ...c, run: (app2, arg) => c.run(app2.control(), arg) }))
+  ...SESSION_COMMANDS.map((c) => ({ ...c, run: (app2, arg) => c.run(app2.control(), arg) })),
+  ...REFUSED_COMMANDS
 ];
-var INK_ONLY_COMMANDS = /* @__PURE__ */ new Set(["density", "details", "logs", "mouse"]);
 function copyAnswer(app2, arg) {
   const n = arg.trim() ? Number.parseInt(arg, 10) : void 0;
   if (n !== void 0 && !(n >= 1)) {
@@ -35986,13 +36298,13 @@ var writeActiveSessionFile = (sessionId, file2 = process.env.HERMES_TUI_ACTIVE_S
 };
 
 // src/hermes/clipboardImage.ts
-import { execFile as execFile5 } from "node:child_process";
+import { execFile as execFile6 } from "node:child_process";
 import { existsSync as existsSync4 } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
 import { homedir as homedir10, tmpdir } from "node:os";
 import { join as join8, resolve as resolve3 } from "node:path";
-import { promisify as promisify4 } from "node:util";
-var execFileP = promisify4(execFile5);
+import { promisify as promisify5 } from "node:util";
+var execFileP = promisify5(execFile6);
 var runFile = async (file2, args, options) => (await execFileP(file2, args, options)).stdout;
 var IMAGE = /\.(png|jpe?g|gif|webp)$/i;
 var MAC_SCRIPT = `ObjC.import('AppKit');
@@ -36658,10 +36970,10 @@ var Completion = class {
 };
 function slashItems(items, typed) {
   const word = (text2) => text2.replace(/^\//, "").split(/\s/)[0]?.toLowerCase() ?? "";
-  if (INK_ONLY_COMMANDS.has(word(typed))) {
+  if (HIDDEN_COMMANDS.has(word(typed))) {
     return [];
   }
-  const kept = items.filter((i) => !(i.kind === "command" && INK_ONLY_COMMANDS.has(word(i.text))));
+  const kept = items.filter((i) => !(i.kind === "command" && HIDDEN_COMMANDS.has(word(i.text))));
   if (/\s/.test(typed)) {
     return kept;
   }
@@ -37790,9 +38102,9 @@ function semantic(c) {
 }
 
 // src/github/branch.ts
-import { execFile as execFile6 } from "node:child_process";
-import { promisify as promisify5 } from "node:util";
-var run3 = promisify5(execFile6);
+import { execFile as execFile7 } from "node:child_process";
+import { promisify as promisify6 } from "node:util";
+var run4 = promisify6(execFile7);
 function parseRemote(url) {
   const m = url.match(/^[\w.-]+@([^:/]+):([^/]+\/[^/]+?)(?:\.git)?\/?$/) ?? url.match(/^(?:https?|ssh|git):\/\/(?:[^@/]+@)?([^/:]+)(?::\d+)?\/([^/]+\/[^/]+?)(?:\.git)?\/?$/);
   if (!m) {
@@ -37802,7 +38114,7 @@ function parseRemote(url) {
   return host === "github.com" || host.split(".").includes("github") ? { host, repository: m[2].toLowerCase() } : void 0;
 }
 async function git2(cwd, ...args) {
-  const { stdout } = await run3("git", ["-C", cwd, ...args], { timeout: 5e3 });
+  const { stdout } = await run4("git", ["-C", cwd, ...args], { timeout: 5e3 });
   return stdout.trim();
 }
 async function branchTarget(cwd) {
@@ -37872,9 +38184,9 @@ function parseStacks(host, repository, rows) {
 }
 
 // src/github/client.ts
-import { execFile as execFile7 } from "node:child_process";
-import { promisify as promisify6 } from "node:util";
-var run4 = promisify6(execFile7);
+import { execFile as execFile8 } from "node:child_process";
+import { promisify as promisify7 } from "node:util";
+var run5 = promisify7(execFile8);
 var GitHubError = class extends Error {
   constructor(message, status) {
     super(message);
@@ -37902,7 +38214,7 @@ async function read(host, env) {
     return own;
   }
   try {
-    const { stdout } = await run4("gh", ["auth", "token", "--hostname", host], { timeout: 1e4 });
+    const { stdout } = await run5("gh", ["auth", "token", "--hostname", host], { timeout: 1e4 });
     const token = stdout.trim();
     if (token) {
       return token;
@@ -38456,11 +38768,11 @@ var Sidebar = class {
 function canonOf(catalog) {
   const canon = /* @__PURE__ */ new Map();
   for (const [alias, target] of Object.entries(catalog?.canon ?? {})) {
-    if (!INK_ONLY_COMMANDS.has(target.replace(/^\//, "").toLowerCase())) {
+    if (!HIDDEN_COMMANDS.has(target.replace(/^\//, "").toLowerCase())) {
       canon.set(alias.toLowerCase(), target);
     }
   }
-  for (const c of localCommands()) {
+  for (const c of localCommands().filter((c2) => !HIDDEN_COMMANDS.has(c2.name))) {
     for (const n of [c.name, ...c.aliases ?? []]) {
       if (!canon.has(`/${n}`)) {
         canon.set(`/${n}`, `/${c.name}`);
@@ -39082,63 +39394,6 @@ function imageChip(a, i) {
     ),
     /* @__PURE__ */ jsx("icon", { name: "x", onClick: a.onRemove, role: "hermes.composer.remove", title: `Remove ${a.label}` }, "remove")
   ] }, `a${i}`);
-}
-
-// src/watch/spec.ts
-import { execFile as execFile8 } from "node:child_process";
-import { promisify as promisify7 } from "node:util";
-var run5 = promisify7(execFile8);
-var WATCH_ENV = "HERMES_TERN_WATCH";
-function readWatchSpec(env = process.env) {
-  try {
-    const raw = env[WATCH_ENV];
-    const spec = raw ? JSON.parse(raw) : void 0;
-    return spec && typeof spec.sid === "string" && typeof spec.subagent === "string" ? spec : void 0;
-  } catch {
-    return void 0;
-  }
-}
-function specOf(a, name, sid, stored) {
-  return {
-    goal: a.goal,
-    index: a.index,
-    log: a.logPath,
-    name,
-    sid,
-    startedAt: a.startedAt,
-    stored: stored && stored !== sid ? stored : void 0,
-    subagent: a.id
-  };
-}
-var sidebar;
-async function openSidebar(spec, cwd, env = process.env) {
-  const pane = env.TERN_PANE;
-  const python = env.HERMES_PYTHON;
-  const src = env.HERMES_PYTHON_SRC_ROOT;
-  if (!pane || !python || !src) {
-    return false;
-  }
-  if (sidebar) {
-    await run5("tern", ["close", sidebar]).catch(() => void 0);
-    sidebar = void 0;
-  }
-  const command = [
-    "env",
-    `PYTHONPATH=${src}`,
-    ...env.HERMES_HOME ? [`HERMES_HOME=${env.HERMES_HOME}`] : [],
-    `${WATCH_ENV}=${JSON.stringify(spec)}`,
-    python,
-    "-m",
-    "hermes_cli.main",
-    "tern"
-  ];
-  try {
-    const { stdout } = await run5("tern", ["split", pane, "right", "--cwd", cwd, "--", ...command]);
-    sidebar = stdout.trim().split(/\s+/).at(-1) || void 0;
-    return true;
-  } catch {
-    return false;
-  }
 }
 
 // src/app.ts
@@ -40225,7 +40480,7 @@ ${this.composer.text}` : text2 || this.composer.text);
   async #resume(id) {
     const token = this.#switches.begin();
     const hold = this.#gw.holdAttach(id);
-    let snapshot2;
+    let snapshot3;
     try {
       const detaching = this.#detaching.get(id);
       if (detaching) {
@@ -40242,12 +40497,12 @@ ${this.composer.text}` : text2 || this.composer.text);
       this.transcript.clear();
       this.transcript.push({ id: this.transcript.id("w"), kind: "welcome" });
       this.#adopt(r);
-      snapshot2 = r;
+      snapshot3 = r;
       this.#dropPrompts((key2) => key2.startsWith(`prompt:${sharedPromptId("")}`));
       this.#gw.hydrateSharedPrompts(r);
       return r;
     } finally {
-      this.#gw.settleAttach(hold, snapshot2);
+      this.#gw.settleAttach(hold, snapshot3);
       this.#settle(token);
     }
   }
@@ -40296,23 +40551,23 @@ ${this.composer.text}` : text2 || this.composer.text);
   }
   /** Stops showing session `sid`: a shared-gateway view detaches (the session keeps running for its other viewers); a private gateway closes it. */
   async #leave(sid, endReason) {
-    const subscription = this.#subscriptions.get(sid);
+    const subscription2 = this.#subscriptions.get(sid);
     if (!this.#gw.isCanonical) {
       await this.#gw.request("session.close", { session_id: sid }).catch(() => void 0);
       return;
     }
-    if (!subscription) {
+    if (!subscription2) {
       return;
     }
     this.#subscriptions.delete(sid);
-    await this.#detach(sid, subscription, endReason);
+    await this.#detach(sid, subscription2, endReason);
   }
   /** Sends `session.detach`, one at a time per session; `endReason` lets the owner end it once no viewer remains. */
-  #detach(sid, subscription, endReason) {
+  #detach(sid, subscription2, endReason) {
     const send = () => this.#gw.request("session.detach", {
       ...endReason ? { end_reason: endReason } : {},
       session_id: sid,
-      subscription_id: subscription
+      subscription_id: subscription2
     });
     const run6 = (this.#detaching.get(sid)?.then(send) ?? send()).catch(() => void 0);
     this.#detaching.set(sid, run6);
