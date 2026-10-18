@@ -2333,14 +2333,14 @@ var require_connect = __commonJS({
       const sessionCache = new SessionCache(maxCachedSessions == null ? 100 : maxCachedSessions);
       timeout = timeout == null ? 1e4 : timeout;
       allowH2 = allowH2 != null ? allowH2 : false;
-      return function connect2({ hostname, host, protocol, port, servername, localAddress, httpSocket }, callback) {
+      return function connect2({ hostname: hostname2, host, protocol, port, servername, localAddress, httpSocket }, callback) {
         let socket;
         if (protocol === "https:") {
           if (!tls) {
             tls = __require("node:tls");
           }
           servername = servername || options.servername || util.getServerName(host) || null;
-          const sessionKey = servername || hostname;
+          const sessionKey = servername || hostname2;
           assert(sessionKey);
           const session2 = customSession || sessionCache.get(sessionKey) || null;
           port = port || 443;
@@ -2356,7 +2356,7 @@ var require_connect = __commonJS({
             socket: httpSocket,
             // upgrade socket connection
             port,
-            host: hostname
+            host: hostname2
           });
           socket.on("session", function(session3) {
             sessionCache.set(sessionKey, session3);
@@ -2370,14 +2370,14 @@ var require_connect = __commonJS({
             ...options,
             localAddress,
             port,
-            host: hostname
+            host: hostname2
           });
         }
         if (options.keepAlive == null || options.keepAlive) {
           const keepAliveInitialDelay = options.keepAliveInitialDelay === void 0 ? 6e4 : options.keepAliveInitialDelay;
           socket.setKeepAlive(true, keepAliveInitialDelay);
         }
-        const clearConnectTimeout = setupConnectTimeout(new WeakRef(socket), { timeout, hostname, port });
+        const clearConnectTimeout = setupConnectTimeout(new WeakRef(socket), { timeout, hostname: hostname2, port });
         socket.setNoDelay(true).once(protocol === "https:" ? "secureConnect" : "connect", function() {
           queueMicrotask(clearConnectTimeout);
           if (callback) {
@@ -6848,8 +6848,8 @@ var require_client_h2 = __commonJS({
         }
       }
       let stream;
-      const { hostname, port } = client[kUrl];
-      headers[HTTP2_HEADER_AUTHORITY] = host || `${hostname}${port ? `:${port}` : ""}`;
+      const { hostname: hostname2, port } = client[kUrl];
+      headers[HTTP2_HEADER_AUTHORITY] = host || `${hostname2}${port ? `:${port}` : ""}`;
       headers[HTTP2_HEADER_METHOD] = method;
       const abort = (error) => {
         if (request.aborted) {
@@ -7688,20 +7688,20 @@ var require_client = __commonJS({
     async function connect2(client) {
       assert(!client[kConnecting]);
       assert(!client[kHTTPContext]);
-      let { host, hostname, protocol, port } = client[kUrl];
-      if (hostname[0] === "[") {
-        const idx = hostname.indexOf("]");
+      let { host, hostname: hostname2, protocol, port } = client[kUrl];
+      if (hostname2[0] === "[") {
+        const idx = hostname2.indexOf("]");
         assert(idx !== -1);
-        const ip = hostname.substring(1, idx);
+        const ip = hostname2.substring(1, idx);
         assert(net.isIP(ip));
-        hostname = ip;
+        hostname2 = ip;
       }
       client[kConnecting] = true;
       if (channels.beforeConnect.hasSubscribers) {
         channels.beforeConnect.publish({
           connectParams: {
             host,
-            hostname,
+            hostname: hostname2,
             protocol,
             port,
             version: client[kHTTPContext]?.version,
@@ -7715,7 +7715,7 @@ var require_client = __commonJS({
         const socket = await new Promise((resolve5, reject) => {
           client[kConnector]({
             host,
-            hostname,
+            hostname: hostname2,
             protocol,
             port,
             servername: client[kServerName],
@@ -7748,7 +7748,7 @@ var require_client = __commonJS({
           channels.connected.publish({
             connectParams: {
               host,
-              hostname,
+              hostname: hostname2,
               protocol,
               port,
               version: client[kHTTPContext]?.version,
@@ -7769,7 +7769,7 @@ var require_client = __commonJS({
           channels.connectError.publish({
             connectParams: {
               host,
-              hostname,
+              hostname: hostname2,
               protocol,
               port,
               version: client[kHTTPContext]?.version,
@@ -8741,10 +8741,10 @@ var require_env_http_proxy_agent = __commonJS({
         }
       }
       #getProxyAgentForUrl(url) {
-        let { protocol, host: hostname, port } = url;
-        hostname = hostname.replace(/:\d*$/, "").toLowerCase();
+        let { protocol, host: hostname2, port } = url;
+        hostname2 = hostname2.replace(/:\d*$/, "").toLowerCase();
         port = Number.parseInt(port, 10) || DEFAULT_PORTS[protocol] || 0;
-        if (!this.#shouldProxy(hostname, port)) {
+        if (!this.#shouldProxy(hostname2, port)) {
           return this[kNoProxyAgent];
         }
         if (protocol === "https:") {
@@ -8752,7 +8752,7 @@ var require_env_http_proxy_agent = __commonJS({
         }
         return this[kHttpProxyAgent];
       }
-      #shouldProxy(hostname, port) {
+      #shouldProxy(hostname2, port) {
         if (this.#noProxyChanged) {
           this.#parseNoProxy();
         }
@@ -8768,11 +8768,11 @@ var require_env_http_proxy_agent = __commonJS({
             continue;
           }
           if (!/^[.*]/.test(entry.hostname)) {
-            if (hostname === entry.hostname) {
+            if (hostname2 === entry.hostname) {
               return false;
             }
           } else {
-            if (hostname.endsWith(entry.hostname.replace(/^\*/, ""))) {
+            if (hostname2.endsWith(entry.hostname.replace(/^\*/, ""))) {
               return false;
             }
           }
@@ -24555,6 +24555,7 @@ var GatewayClient = class extends EventEmitter {
 // src/app.ts
 import { randomUUID as randomUUID3 } from "node:crypto";
 import { appendFileSync as appendFileSync4, existsSync as existsSync5 } from "node:fs";
+import { hostname } from "node:os";
 import { basename as basename4 } from "node:path";
 
 // node_modules/@hermes/shared/src/slash.ts
@@ -39467,6 +39468,8 @@ var App = class {
   #startupImage = process.env.HERMES_TUI_IMAGE?.trim() ?? "";
   /** The images attached to the draft: the next prompt entered takes them. */
   #attachments = [];
+  /** The folder last reported to Tern by OSC 7. */
+  #reportedCwd;
   /** Images being read or uploaded for the draft: an "attaching…" chip each until they land. */
   #attaching = [];
   /** The skin the gateway last reported; only the `skin` theme mode wears it. */
@@ -39768,6 +39771,17 @@ var App = class {
         this.changed();
       }
     } catch {
+    }
+  }
+  /**
+   * OSC 7: tells Tern the session's folder, so its file viewer, branch and new splits follow a
+   * worktree (`hermes -w tern`) or a moved workspace instead of the folder the pane was opened in.
+   */
+  #reportCwd() {
+    const cwd = this.info?.cwd;
+    if (cwd && cwd !== this.#reportedCwd) {
+      this.#reportedCwd = cwd;
+      process.stdout.write(`\x1B]7;file://${hostname()}${encodeURI(cwd)}\x07`);
     }
   }
   #setTitle(title) {
@@ -40525,6 +40539,7 @@ ${this.composer.text}` : text2 || this.composer.text);
     this.title = "";
     this.#setTitle(typeof r.info?.title === "string" ? r.info.title : void 0);
     this.#readTitle();
+    this.#reportCwd();
     this.busy = busyFrom(r);
     this.#notices.reset();
     this.#compacting = false;
@@ -40693,6 +40708,7 @@ ${this.composer.text}` : text2 || this.composer.text);
         this.#setTitle(typeof ev.payload?.title === "string" ? ev.payload.title : void 0);
         if (this.info?.cwd && this.info.cwd !== cwd) {
           this.prs.poke();
+          this.#reportCwd();
         }
         break;
       }

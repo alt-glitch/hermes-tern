@@ -621,3 +621,22 @@ describe('App: Option+← and Option+→ in a Mac terminal', () => {
     expect(app.overlays.map(o => o.key)).toContain('background')
   })
 })
+
+describe('App: the session folder reaches Tern', () => {
+  it('reports the session cwd by OSC 7 once, and again when it moves', async () => {
+    const write = vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
+    const { emit } = setup({
+      'session.create': () => ({ info: { cwd: '/repo/.worktrees/wt 1' }, session_id: 's1', subscription_id: 'sub1' })
+    })
+    await settle()
+    emit('event', { payload: { cwd: '/repo/.worktrees/wt 1' }, session_id: 's1', type: 'session.info' })
+    emit('event', { payload: { cwd: '/elsewhere' }, session_id: 's1', type: 'session.info' })
+    await settle()
+
+    const osc7 = write.mock.calls.map(c => String(c[0])).filter(s => s.startsWith('\x1b]7;'))
+    write.mockRestore()
+    expect(osc7).toHaveLength(2)
+    expect(osc7[0]).toMatch(/^\x1b\]7;file:\/\/[^/]*\/repo\/\.worktrees\/wt%201\x07$/)
+    expect(osc7[1]).toMatch(/\/elsewhere\x07$/)
+  })
+})

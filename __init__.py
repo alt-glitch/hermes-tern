@@ -69,6 +69,10 @@ def _run(args: argparse.Namespace) -> None:
         print(f"hermes tern: {bundle} is missing; reinstall the plugin", file=sys.stderr)
         sys.exit(1)
     flags = [a for a in args.tui_args if a != "--"]
+    # `hermes -w tern`: the top-level flag lands on `args`, not in tui_args; Hermes' TUI launcher is what
+    # makes the worktree and points the session, HERMES_CWD and TERMINAL_CWD at it.
+    if getattr(args, "worktree", False) and not {"-w", "--worktree"} & set(flags):
+        flags = ["--worktree", *flags]
     code = _chat(flags, str(FRONTEND))
     if code == NO_TSP_EXIT:
         print("hermes tern: this terminal does not speak the Tern Surface Protocol; "
