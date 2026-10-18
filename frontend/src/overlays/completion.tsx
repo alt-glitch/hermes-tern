@@ -230,7 +230,11 @@ export class Completion {
       return false
     }
 
-    composer.splice(0, composer.cursor, before)
+    // A finished `@` mention takes one space after it, like t3code: the list closes and typing goes on.
+    // Folders (`/`) and kinds (`@file:`) stay open to keep picking; a space already there is reused.
+    const finished = /(?:^|\s)@[^\s]*[^\s/:]$/.test(before)
+    const spaced = finished && composer.text[composer.cursor] === ' '
+    composer.splice(0, composer.cursor + (spaced ? 1 : 0), finished ? `${before} ` : before)
     this.dismiss()
     this.update(composer)
 

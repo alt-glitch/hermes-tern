@@ -4,7 +4,9 @@
 import { looksLikeSlashCommand } from '@hermes/shared/slash'
 import { inlineSlashTrigger } from '@tui/domain/slash.js'
 
-const TAB_PATH_RE = /((?:["']?(?:[A-Za-z]:[\\/]|\.{1,2}\/|~\/|\/|@|[^"'`\s]+\/))[^\s]*)$/
+// A path word starts its token: the Ink TUI's pattern lets `@` open mid-word, so `me@host` listed files.
+// t3code and Hermes desktop open `@` only at the start of the text or after whitespace.
+const TAB_PATH_RE = /(?<=^|\s)((?:["']?(?:[A-Za-z]:[\\/]|\.{1,2}\/|~\/|\/|@|[^"'`\s]+\/))[^\s]*)$/
 
 export interface CompletionScope {
   cwd?: string | null

@@ -4,6 +4,7 @@ import type { GatewayClient } from '@tui/gatewayClient.js'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { Composer } from '../composer.js'
+import { completionRequestForInput } from '../hermes/completion.js'
 import { Completion } from '../overlays/completion.js'
 
 const history: string[] = []
@@ -120,5 +121,54 @@ describe('Completion', () => {
     // Typed text is a draft again: the list owns the arrows.
     composer.insert('x')
     expect(completion.onKey(up)).toBe(true)
+  })
+})
+
+describe('Completion: accepting an @ mention', () => {
+  const tab = { ...escape, name: 'tab' }
+
+  async function pick(before: string, after: string, text: string) {
+    const { completion, composer } = setup()
+    composer.insert(after)
+    composer.cursor = 0
+    type(completion, composer, before)
+    pending[0]?.resolve({ items: [row(text)] })
+    await vi.runAllTimersAsync()
+    completion.onKey(tab)
+
+    return { cursor: composer.cursor, text: composer.text }
+  }
+
+  it('a file ends the mention with one space', async () => {
+    expect(await pick('see @app', '', '@file:src/app.ts')).toEqual({ cursor: 21, text: 'see @file:src/app.ts ' })
+  })
+
+  it('reuses a space already after the caret', async () => {
+    expect(await pick('@app', ' now', '@file:src/app.ts')).toEqual({ cursor: 17, text: '@file:src/app.ts now' })
+  })
+
+  it('a folder stays open to pick inside it', async () => {
+    expect(await pick('@sr', '', '@folder:src/')).toEqual({ cursor: 12, text: '@folder:src/' })
+  })
+})
+
+describe('completionRequestForInput', () => {
+  const word = (input: string) => {
+    const request = completionRequestForInput(input)
+
+    return request?.method === 'complete.path' ? request.params.word : null
+  }
+
+  it('opens `@` only at the start of a word', () => {
+    expect(word('daimon@daimon')).toBeNull()
+    expect(word('mail me@x.com')).toBeNull()
+    expect(word('@dai')).toBe('@dai')
+    expect(word('see @src/app')).toBe('@src/app')
+  })
+
+  it('still completes paths that start a word', () => {
+    expect(word('open ./src')).toBe('./src')
+    expect(word('~/notes')).toBe('~/notes')
+    expect(word('look at frontend/src')).toBe('frontend/src')
   })
 })
