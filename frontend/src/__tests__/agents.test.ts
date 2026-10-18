@@ -6,7 +6,7 @@ import type { GatewayClient } from '@tui/gatewayClient.js'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { parseLiveLog } from '../agents/liveLog.js'
-import { Agents } from '../agents/store.js'
+import { Agents, completionOutcomes, mergeTail, OUTCOME_UNKNOWN } from '../agents/store.js'
 import { Transcript } from '../transcript.js'
 
 // A finished child's log as tools/delegation_live_log.py writes it (lab run, 2026-10-17).
@@ -43,6 +43,48 @@ describe('parseLiveLog', () => {
 
     expect(log.entries).toEqual([{ args: 'a.md', at: '12:00:01', kind: 'tool', name: 'read_file', status: 'running' }])
     expect(log.status).toBeUndefined()
+  })
+})
+
+describe('mergeTail', () => {
+  const line = (n: number) => `12:00:${String(n).padStart(2, '0')} think    | step ${n}\n`
+  const log = (from: number, to: number) => Array.from({ length: to - from + 1 }, (_, i) => line(from + i)).join('')
+
+  it('appends what a later tail adds past the overlap', () => {
+    expect(mergeTail(log(1, 5), `ep 3\n${log(4, 8)}`)).toBe(log(1, 8))
+  })
+
+  it('keeps a gap when the log outgrew a tail, dropping the cut first line', () => {
+    expect(mergeTail(log(1, 2), `ep 6\n${log(7, 8)}`)).toBe(log(1, 2) + log(7, 8))
+  })
+})
+
+describe('completionOutcomes', () => {
+  it("reads each task's status from a batch completion", () => {
+    const text = [
+      '[ASYNC DELEGATION BATCH COMPLETE — deleg_1]',
+      'A background fan-out unit you dispatched earlier — 2 subagent(s) — has finished.',
+      '',
+      '--- ✓ TASK 1/2: goal 0  (status=completed, api_calls=3, 4.1s) ---',
+      'Did it.',
+      '',
+      '--- ✗ TASK 2/2: goal 1  (status=timeout, 600s) ---',
+      '(no summary — status=timeout)'
+    ].join('\n')
+
+    expect(completionOutcomes(text)).toEqual({ delegationId: 'deleg_1', outcomes: new Map([[0, 'completed'], [1, 'timeout']]) })
+  })
+
+  it("reads a lone task's status, and a fan-out's early failure notice", () => {
+    expect(completionOutcomes('[ASYNC DELEGATION COMPLETE — deleg_2]\nintro\n\nStatus: interrupted   API calls: 1')).toEqual({
+      delegationId: 'deleg_2',
+      outcomes: new Map([[0, 'interrupted']])
+    })
+    expect(completionOutcomes('[ASYNC DELEGATION TASK FAILED — deleg_3, task 2/3]\nwarn\nStatus: error   Duration: 3s')).toEqual({
+      delegationId: 'deleg_3',
+      outcomes: new Map([[1, 'error']])
+    })
+    expect(completionOutcomes('[IMPORTANT: Background process proc_1 finished (exit code 0)]')).toBeUndefined()
   })
 })
 
@@ -161,5 +203,92 @@ describe('Agents', () => {
     expect(await store.pause(false)).toBe(false)
     expect(store.paused).toBe(false)
     expect(changes).toBe(2)
+  })
+
+  describe('with no log this process can read (a remote gateway)', () => {
+    afterEach(() => vi.useRealTimers())
+
+    /** A dispatched call of `n` background tasks whose logs are not on this machine. */
+    function remote(n: number) {
+      const transcript = new Transcript()
+      transcript.start(0)
+      transcript.toolStart({ name: 'delegate_task', tool_id: 'c1' } as never, 0)
+      transcript.toolComplete(
+        {
+          name: 'delegate_task',
+          result: {
+            delegation_id: 'deleg_1',
+            goals: Array.from({ length: n }, (_, i) => `goal ${i}`),
+            mode: 'background',
+            status: 'dispatched',
+            subagent_ids: Array.from({ length: n }, (_, i) => `sa-${i}-abcd`)
+          },
+          tool_id: 'c1'
+        } as never,
+        0
+      )
+
+      return transcript
+    }
+
+    it('ends a child the list never showed after a grace, then takes its outcome from the completion', async () => {
+      vi.useFakeTimers()
+      const request = vi.fn(async () => ({ subagents: [] }))
+      const agentEnded = vi.fn()
+      store = new Agents({ agentEnded, changed: () => undefined, gw: { request } as unknown as GatewayClient, sid: 's1', transcript: remote(2) })
+
+      store.scan()
+      await vi.advanceTimersByTimeAsync(1000)
+      expect(store.running()).toHaveLength(2)
+
+      await vi.advanceTimersByTimeAsync(2000)
+      expect(store.running()).toEqual([])
+      expect(store.all().map(a => [a.status, a.exitReason])).toEqual([
+        ['done', OUTCOME_UNKNOWN],
+        ['done', OUTCOME_UNKNOWN]
+      ])
+
+      // Each end is told once (the pane re-reads the PRs a subagent linked).
+      expect(agentEnded).toHaveBeenCalledTimes(2)
+
+      // Nothing runs, so polling stopped.
+      const polls = request.mock.calls.length
+      await vi.advanceTimersByTimeAsync(5000)
+      expect(request.mock.calls.length).toBe(polls)
+
+      store.settle(
+        '[ASYNC DELEGATION BATCH COMPLETE — deleg_1]\n\n--- ✓ TASK 1/2: goal 0  (status=completed) ---\n\n--- ✗ TASK 2/2: goal 1  (status=failed) ---'
+      )
+      expect(store.all().map(a => [a.status, a.exitReason])).toEqual([
+        ['done', undefined],
+        ['failed', undefined]
+      ])
+      expect(agentEnded).toHaveBeenCalledTimes(2)
+    })
+
+    it('does not call a child that left the list Done, and merges its log tails', async () => {
+      vi.useFakeTimers()
+      let listed = true
+      const tails = ['12:00:01 tool     | -> read_file(a.md)\n', 'md)\n12:00:01 tool     | -> read_file(a.md)\n12:00:02 think    | next\n']
+      const request = vi.fn(async (method: string) =>
+        method === 'subagent.list'
+          ? { subagents: listed ? [{ delegation_id: 'deleg_1', depth: 0, status: 'running', subagent_id: 'sa-0-abcd' }] : [] }
+          : { available: true, text: tails.shift() ?? '', truncated: true }
+      )
+      store = new Agents({ changed: () => undefined, gw: { request } as unknown as GatewayClient, sid: 's1', transcript: remote(1) })
+
+      store.scan()
+      await vi.advanceTimersByTimeAsync(1000)
+      const [agent] = store.all()
+      expect(agent!.status).toBe('running')
+      expect(agent!.log?.entries.map(e => e.kind)).toEqual(['tool', 'think'])
+
+      listed = false
+      await vi.advanceTimersByTimeAsync(1000)
+      expect(agent).toMatchObject({ exitReason: OUTCOME_UNKNOWN, status: 'done' })
+
+      store.settle('[ASYNC DELEGATION COMPLETE — deleg_1]\nintro\n\nStatus: interrupted   API calls: 2')
+      expect(agent).toMatchObject({ exitReason: undefined, status: 'cancelled' })
+    })
   })
 })

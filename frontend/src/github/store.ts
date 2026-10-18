@@ -216,6 +216,26 @@ export class PullRequests {
     }
   }
 
+  /**
+   * Reads the stored links again. A subagent runs in a session of its own and links under this
+   * conversation (pull_requests.py), with no link result in this transcript.
+   */
+  relink() {
+    const sid = this.#host.sid()
+
+    if (!sid || sid !== this.#sid) {
+      return
+    }
+
+    const linked = this.#links(sid)
+
+    if (linked.map(prKey).join() !== this.#refs.map(prKey).join()) {
+      this.#refs = linked
+      this.#host.changed()
+      this.poke()
+    }
+  }
+
   /** Reads every linked PR now. */
   poke() {
     clearTimeout(this.#timer)

@@ -24,6 +24,8 @@ export interface AgentsHost {
   readonly sid: string | null
   readonly transcript: Transcript
   changed(): void
+  /** A subagent ended (the PRs it linked may be new). */
+  agentEnded?(): void
 }
 
 /** One row of `subagent.list` (gateway/session_ancillary.py `_SUBAGENT_FIELDS`). */
@@ -45,6 +47,10 @@ const POLL_MS = 1000
 /** Logs are compact (one capped line per event); a runaway one is read from its tail. */
 const MAX_LOG_BYTES = 2 * 1024 * 1024
 const ENDED = new Set(['cancelled', 'done', 'failed'])
+/** Polls a child with no log this process can read may go unlisted before it counts as ended (it can finish inside the first one). */
+const GRACE_POLLS = 3
+/** The note on a row that ended where nothing said how; the async-delegation completion replaces it. */
+export const OUTCOME_UNKNOWN = 'outcome unknown'
 
 export function isRunning(a: Subagent): boolean {
   return !ENDED.has(a.status)
@@ -66,6 +72,12 @@ export class Agents {
   readonly #unreadable = new Set<string>()
   /** Ids `subagent.list` reported: one that leaves the list has finished. */
   readonly #listed = new Set<string>()
+  /** Polls each unlisted row without a readable log has gone unseen. */
+  readonly #unseen = new WeakMap<Subagent, number>()
+  /** Rows whose end the host heard of. */
+  readonly #ended = new WeakSet<Subagent>()
+  /** The `subagent.tail` text read so far, by subagent id: each tail (the last 16 KB) is merged onto it. */
+  readonly #tails = new Map<string, string>()
   /**
    * New delegate_task spawns are blocked, as this pane last set it (`delegation.pause`); undefined
    * until then (the shared gateway serves no `delegation.status`). The gate is gateway-wide.
@@ -144,6 +156,48 @@ export class Agents {
     this.#host.changed()
 
     return this.paused
+  }
+
+  /**
+   * Applies an async-delegation completion (the model text of its `message.start`,
+   * tools/process_registry_notifications.py) to the rows whose log never told their outcome.
+   */
+  settle(text: string) {
+    const done = completionOutcomes(text)
+
+    if (!done) {
+      return
+    }
+
+    let changed = false
+
+    for (const a of this.all()) {
+      const status = a.depth ? undefined : done.outcomes.get(a.index)
+
+      if (a.delegationId !== done.delegationId || status === undefined || a.log?.status) {
+        continue
+      }
+
+      const ended = endedStatus(status)
+
+      if (!ended) {
+        continue
+      }
+
+      if (isRunning(a)) {
+        a.duration = Date.now() - a.startedAt
+      }
+
+      a.status = ended
+      a.tool = undefined
+      a.exitReason = status === 'unknown' ? OUTCOME_UNKNOWN : PLAIN_OUTCOMES.has(status) ? undefined : status
+      this.#touch(a)
+      changed = true
+    }
+
+    if (changed) {
+      this.#host.changed()
+    }
   }
 
   /** Reads `a`'s log now (the hub's timeline opening on it), whatever its state. */
@@ -265,6 +319,13 @@ export class Agents {
       }
 
       a.id = id
+      // Ended unseen, then listed after all (it waited for a slot): it runs.
+      if (a.status === 'done' && a.exitReason === OUTCOME_UNKNOWN) {
+        a.status = 'running'
+        a.exitReason = undefined
+        this.#ended.delete(a)
+      }
+
       a.model = row.model ?? a.model
       a.toolCount = Math.max(a.toolCount, row.tool_count ?? 0)
       a.steerable = row.accepting_steer ?? a.steerable
@@ -282,14 +343,28 @@ export class Agents {
       changed.add(a)
     }
 
-    // A child that left the registry has finished; its log, when there is one, says how.
+    // A child that left the registry has finished; its log, when there is one, says how. Without
+    // one (a remote gateway), so does a child never listed after a grace (it ended within a poll).
+    // Neither says how it ended: the row waits on the delegation's completion (settle).
     for (const a of owners.keys()) {
-      if (isRunning(a) && this.#listed.has(a.id) && !present.has(a.id) && !this.#readableLog(a)) {
-        a.status = 'done'
-        a.duration = Date.now() - a.startedAt
-        a.tool = undefined
-        changed.add(a)
+      if (!isRunning(a) || present.has(a.id) || this.#readableLog(a)) {
+        continue
       }
+
+      if (!this.#listed.has(a.id)) {
+        const unseen = (this.#unseen.get(a) ?? 0) + 1
+        this.#unseen.set(a, unseen)
+
+        if (unseen < GRACE_POLLS) {
+          continue
+        }
+      }
+
+      a.status = 'done'
+      a.exitReason = OUTCOME_UNKNOWN
+      a.duration = Date.now() - a.startedAt
+      a.tool = undefined
+      changed.add(a)
     }
   }
 
@@ -419,12 +494,15 @@ export class Agents {
 
     if (text === undefined && this.#listed.has(a.id) && this.#host.sid) {
       try {
-        const r = await this.#host.gw.request<{ available?: boolean; text?: string }>('subagent.tail', {
+        const r = await this.#host.gw.request<{ available?: boolean; text?: string; truncated?: boolean }>('subagent.tail', {
           session_id: this.#host.sid,
           subagent_id: a.id
         })
 
-        text = r?.available ? r.text : undefined
+        if (r?.available && typeof r.text === 'string') {
+          text = r.truncated ? mergeTail(this.#tails.get(a.id) ?? '', r.text) : r.text
+          this.#tails.set(a.id, text)
+        }
       } catch {
         text = undefined
       }
@@ -445,6 +523,11 @@ export class Agents {
     if (call) {
       this.#host.transcript.touchCall(call)
     }
+
+    if (!isRunning(a) && !this.#ended.has(a)) {
+      this.#ended.add(a)
+      this.#host.agentEnded?.()
+    }
   }
 
   /** Each agent with the delegate_task call whose card shows it. */
@@ -459,6 +542,76 @@ export class Agents {
 
     return owners
   }
+}
+
+/**
+ * Tail `tail` (a log's last bytes, maybe cut mid-line) appended to the log text read so far: the
+ * part past where the two overlap. With no overlap (the log grew past a tail between reads), the
+ * gap stays and the tail's cut first line is dropped.
+ */
+export function mergeTail(seen: string, tail: string): string {
+  const lines = seen.split(/(?<=\n)/)
+  let merged: string | undefined
+
+  // The overlap ends with the last lines read: the longest such run (up to 4 lines) the tail holds.
+  for (let n = Math.min(4, lines.length); n > 0 && merged === undefined; n--) {
+    const anchor = lines.slice(-n).join('')
+    const at = tail.indexOf(anchor)
+
+    if (at >= 0) {
+      merged = seen + tail.slice(at + anchor.length)
+    }
+  }
+
+  merged ??= seen + (seen && !seen.endsWith('\n') ? '\n' : '') + tail.slice(tail.indexOf('\n') + 1)
+
+  return merged.length > MAX_LOG_BYTES ? merged.slice(merged.indexOf('\n', merged.length - MAX_LOG_BYTES) + 1) : merged
+}
+
+/**
+ * Each task's status in an async-delegation completion's model text: the batch block's
+ * `--- ✓ TASK i/n … (status=…` headers, a lone task's `Status:` line, or a still-running fan-out's
+ * one failed task. Undefined for any other text.
+ */
+export function completionOutcomes(text: string): { delegationId: string; outcomes: Map<number, string> } | undefined {
+  const head = /^\[ASYNC DELEGATION (BATCH COMPLETE|COMPLETE|TASK FAILED) — ([^\],]+)(?:, task (\d+)\/\d+)?\]/.exec(text.trim())
+
+  if (!head) {
+    return undefined
+  }
+
+  const [, kind, delegationId, task] = head as unknown as [string, string, string, string | undefined]
+  const outcomes = new Map<number, string>()
+
+  if (kind === 'BATCH COMPLETE') {
+    for (const m of text.matchAll(/^--- \S+ TASK (\d+)\/\d+.*\(status=([^,)\s]+)/gm)) {
+      outcomes.set(Number(m[1]) - 1, m[2]!)
+    }
+  } else {
+    const status = /^Status: (\S+)/m.exec(text)?.[1]
+
+    if (status) {
+      outcomes.set(kind === 'TASK FAILED' ? Number(task) - 1 : 0, status)
+    }
+  }
+
+  return { delegationId: delegationId.trim(), outcomes }
+}
+
+/** Completion statuses the row's status already says; others (timeout, stalled, …) also show as its end reason. */
+const PLAIN_OUTCOMES = new Set(['cancelled', 'completed', 'error', 'failed', 'interrupted', 'success'])
+
+/** A completion's task status as a row status; undefined for one that says nothing (`?`). */
+function endedStatus(status: string): Subagent['status'] | undefined {
+  if (status === '?') {
+    return undefined
+  }
+
+  if (status === 'completed' || status === 'success' || status === 'unknown') {
+    return 'done'
+  }
+
+  return status === 'interrupted' || status === 'cancelled' ? 'cancelled' : 'failed'
 }
 
 /** The task index a top-level child's id names (`sa-<i>-…`, tools/delegate_tool.py). */
