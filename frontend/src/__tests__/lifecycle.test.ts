@@ -161,6 +161,27 @@ describe('session lifecycle', () => {
     expect(app.sid).toBe('s1')
   })
 
+  it("shows a resumed session's prompts still waiting in the gateway's queue", async () => {
+    const app = await started(gw)
+    gw.handlers.set('session.resume', p => ({
+      info: {
+        pending_submissions: [
+          { admission_id: 'a1', input_id: 'i1', status: 'started', user: 'running now' },
+          { admission_id: 'a2', input_id: 'i2', status: 'queued', user: 'after that' }
+        ],
+        stored_session_id: p.session_id
+      },
+      running: true,
+      session_id: p.session_id,
+      subscription_id: 'sub-old'
+    }))
+    app.busy = null
+
+    await app.resume('old')
+
+    expect(app.control().queued).toBe(1)
+  })
+
   it('shows an otherwise unhandled error in the chat', async () => {
     const app = await started(gw)
     app.fault(new Error('boom'))
@@ -187,6 +208,83 @@ describe('session lifecycle', () => {
     expect(gw.methods('session.detach').map(c => c.params)).toEqual([
       { end_reason: 'tui_close', session_id: 's1', subscription_id: 'sub1' }
     ])
+  })
+
+  it('a superseded resume of the session the view adopts keeps its shared subscription', async () => {
+    for (const staleFirst of [true, false]) {
+      gw = new FakeGateway()
+      gw.handlers.set('setup.status', () => ({ provider_configured: true }))
+      gw.handlers.set('session.create', () => ({ session_id: 's1', subscription_id: 'sub1' }))
+      const app = await started(gw)
+      const answers: (() => void)[] = []
+      // The gateway hands one actor the same subscription for every attach of a session.
+      gw.handlers.set('session.resume', p => new Promise(resolve => answers.push(() => resolve({ session_id: p.session_id, subscription_id: 'sub-x' }))))
+
+      const stale = app.resume('x')
+      const winner = app.resume('x')
+      await flush()
+      const [first, second] = answers
+
+      if (staleFirst) {
+        first!()
+        await flush()
+        second!()
+      } else {
+        second!()
+        await flush()
+        first!()
+      }
+
+      await Promise.all([stale, winner])
+      await flush()
+
+      expect(app.sid).toBe('x')
+      expect(gw.methods('session.detach').map(c => c.params)).toEqual([
+        { end_reason: 'tui_close', session_id: 's1', subscription_id: 'sub1' }
+      ])
+    }
+  })
+
+  it('a superseded resume of another session detaches it after the switch lands, with no end reason', async () => {
+    const app = await started(gw)
+    const answers = new Map<string, () => void>()
+    gw.handlers.set('session.resume', p => new Promise(resolve => {
+      answers.set(String(p.session_id), () => resolve({ session_id: p.session_id, subscription_id: `sub-${p.session_id}` }))
+    }))
+
+    const skipped = app.resume('a')
+    const chosen = app.resume('b')
+    await flush()
+    answers.get('a')!()
+    await skipped
+    expect(gw.methods('session.detach')).toHaveLength(0)
+
+    answers.get('b')!()
+    await chosen
+    await flush()
+
+    expect(app.sid).toBe('b')
+    expect(gw.methods('session.detach').map(c => c.params)).toEqual([
+      { session_id: 'a', subscription_id: 'sub-a' },
+      { end_reason: 'tui_close', session_id: 's1', subscription_id: 'sub1' }
+    ])
+  })
+
+  it('a resume of a session waits for its detach in flight', async () => {
+    const app = await started(gw)
+    let detached!: () => void
+    gw.handlers.set('session.detach', () => new Promise<void>(resolve => (detached = resolve)))
+
+    await app.resume('b')
+    const back = app.resume('s1')
+    await flush()
+    expect(gw.methods('session.resume').map(c => c.params.session_id)).toEqual(['b'])
+
+    detached()
+    await back
+
+    expect(gw.methods('session.resume').map(c => c.params.session_id)).toEqual(['b', 's1'])
+    expect(app.sid).toBe('s1')
   })
 
   it('/new waits while a turn runs, so its queue never lands in the new session', async () => {

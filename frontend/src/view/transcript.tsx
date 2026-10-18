@@ -5,7 +5,7 @@
 
 import { type JSX, node } from '@stencil-hq/tern'
 
-import type { Block, Entry, NoticeEntry, TurnEntry, UserEntry } from '../model.js'
+import type { Block, Entry, NoticeEntry, TurnEntry, UserAttachment, UserEntry } from '../model.js'
 import { steerState } from '../transcript.js'
 import { parts, pieces } from '../workLog.js'
 
@@ -92,8 +92,36 @@ function userNode(e: UserEntry, cx: TranscriptContext): JSX.Element {
         />
         {copyButton(e.text, e.id, 'omp.user.tool', 'Copy message', cx)}
       </row>
-      <md key="body">{e.text}</md>
+      {e.attachments?.length ? attachmentsRow(e.attachments) : null}
+      {e.text ? <md key="body">{e.text}</md> : null}
     </card>
+  )
+}
+
+/**
+ * A prompt's attachments over its words, as omp's bubble shows them: each image a thumbnail
+ * (a click opens Tern's lightbox, which steps through the others), a file or a gone image a chip.
+ */
+function attachmentsRow(list: readonly UserAttachment[]): JSX.Element {
+  return (
+    <row align="start" gap="sm" key="images" role="omp.user.images" wrap>
+      {list.map((a, i) =>
+        a.source ? (
+          <image alt={a.name} key={`a${i}`} title={a.name} {...a.source} />
+        ) : (
+          <row
+            align="center"
+            gap="xs"
+            key={`a${i}`}
+            role="hermes.user.attachment"
+            title={a.kind === 'image' ? `${a.name} (the file is gone)` : a.name}
+          >
+            <icon key="i" name={a.kind === 'image' ? 'image' : 'file'} />
+            <text key="t" text={a.name} truncate="middle" wrap="none" />
+          </row>
+        )
+      )}
+    </row>
   )
 }
 
@@ -140,13 +168,10 @@ function turnNode(turn: TurnEntry, id: string, cx: TranscriptContext): JSX.Eleme
           <text key="title" spans={[{ s: 'error strong', t: 'Request failed' }]} />
           {turn.errorCode ? <badge key="code" role="omp.error.code" text={turn.errorCode} tone="error" /> : null}
         </row>,
-        <text
-          key="message"
-          lines={8}
-          role="omp.error.message"
-          spans={[{ s: 'mono', t: turn.error ?? '' }]}
-          wrap="word"
-        />,
+        // A failed turn reloaded from an older store knows only Hermes' advice, not the error.
+        turn.error ? (
+          <text key="message" lines={8} role="omp.error.message" spans={[{ s: 'mono', t: turn.error }]} wrap="word" />
+        ) : null,
         turn.errorHint ? <md key="hint">{turn.errorHint}</md> : null
       ])
     )
@@ -179,7 +204,7 @@ function turnNode(turn: TurnEntry, id: string, cx: TranscriptContext): JSX.Eleme
  */
 function pieceNodes(turn: TurnEntry, blocks: readonly Block[], parent: string, cx: TranscriptContext): (JSX.Element | null)[] {
   const live = turn.status === 'live'
-  const ps = pieces(blocks)
+  const ps = pieces(blocks, turn.blocks)
   const lastText = blocks.findLast(b => b.kind === 'text')
 
   return ps.map((p, i) => {
@@ -248,7 +273,7 @@ function copyButton(text: string, id: string, role: string, title: string, cx: T
 }
 
 /** The answer: the turn's last text, the one its fold leaves in view (notes before it fold away). */
-function answerText(turn: TurnEntry): string {
+export function answerText(turn: TurnEntry): string {
   const last = turn.blocks.findLast(b => b.kind === 'text' && b.text.trim())
 
   return last?.kind === 'text' ? last.text.trim() : ''

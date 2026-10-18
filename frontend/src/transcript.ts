@@ -13,7 +13,8 @@ import type {
 } from '@hermes/shared/gateway-events'
 
 import { settleBridge, unwrap } from './bridge.js'
-import type { Block, Counters, Entry, NoticeEntry, Todo, ToolCall, TurnEntry } from './model.js'
+import type { Block, Counters, Entry, NoticeEntry, Todo, ToolCall, TurnEntry, UserAttachment } from './model.js'
+import { promptAttachments, splitPrompt } from './promptRefs.js'
 
 type ToolBlock = Extract<Block, { kind: 'tool' }>
 
@@ -104,8 +105,46 @@ export class Transcript {
     turn.rev++
   }
 
-  user(text: string, at = Date.now(), steered = false) {
-    this.push({ at, id: this.id('u'), kind: 'user', text, ...(steered ? { steered } : {}) })
+  user(text: string, at = Date.now(), steered = false, attachments: UserAttachment[] = []) {
+    this.push({ at, id: this.id('u'), kind: 'user', text, ...(steered ? { steered } : {}), ...(attachments.length ? { attachments } : {}) })
+  }
+
+  /** A stored prompt: its words, and as attachments the image refs and attached context Hermes stored with them. */
+  #storedUser(raw: string, at: number) {
+    const parts = splitPrompt(raw)
+    this.user(parts.text, at, false, promptAttachments(parts))
+  }
+
+  /**
+   * A queued prompt the shared gateway just started. Its message.start came first, so the bubble
+   * goes before the turn it opened while that turn is still empty; else at the end.
+   */
+  started(text: string, at = Date.now(), attachments: UserAttachment[] = []) {
+    const live = this.live
+    // A goal continuation or loop run Hermes queued itself: a reason line on its turn, not a bubble.
+    const notice = attachments.length ? undefined : internalNotice(text)
+
+    if (notice) {
+      if (live && !live.blocks.length) {
+        live.continued = notice
+        this.#touch(live)
+      } else {
+        this.#continued = notice
+      }
+
+      return
+    }
+
+    if (live && !live.blocks.length && this.entries.at(-1) === live) {
+      this.entries.splice(-1, 0, { at, id: this.id('u'), kind: 'user', text, ...(attachments.length ? { attachments } : {}) })
+      // It answers this prompt; it did not go on on its own.
+      live.continued = undefined
+      this.#touch(live)
+
+      return
+    }
+
+    this.user(text, at, false, attachments)
   }
 
   notice(text: string, tone: NoticeEntry['tone'] = 'info') {
@@ -238,10 +277,16 @@ export class Transcript {
       via: u.via
     }
 
+    const before = this.currentTodos()
+
+    if (isTodoName(call.name)) {
+      call.todosBefore = before
+    }
+
     // The call's own list shows while it runs (a merge patches the current one); tool.complete's
     // snapshot replaces it.
     if (Array.isArray(call.args.todos)) {
-      call.todos = todosOf(call.args, this.currentTodos())
+      call.todos = todosOf(call.args, before)
     }
 
     turn.blocks.push({ call, id: p.tool_id, kind: 'tool' })
@@ -401,10 +446,7 @@ export class Transcript {
     if (turn.status === 'error') {
       const surfaced = p.error_surface?.message
       const error = (typeof surfaced === 'string' && surfaced) || p.error || final || 'The request failed'
-      const http = /^HTTP (\d{3}):\s*/.exec(error)
-      const code = p.error_surface?.code
-      turn.error = http ? error.slice(http[0].length) : error
-      turn.errorCode = http?.[1] ?? (typeof code === 'string' && code ? code : undefined)
+      Object.assign(turn, failure(error, p.error_surface?.code))
       // The gateway's final text is advice ("wait and /retry, or /model …") followed by the raw error.
       turn.errorHint = final.split(/\n\s*\n/)[0]?.trim() || undefined
     }
@@ -461,7 +503,7 @@ export class Transcript {
         } else {
           // A notice whose reply Hermes hid has no turn: its reason must not fall on this prompt's.
           pendingContinued = undefined
-          this.entries.push({ at, id: this.id('u'), kind: 'user', text: steered ?? text })
+          this.#storedUser(steered ?? text, at)
         }
 
         continue
@@ -491,21 +533,55 @@ export class Transcript {
       }
 
       if (m.role === 'assistant') {
-        if (m.reasoning?.trim()) {
-          turn.blocks.push({ endedAt: at, id: this.id('k'), kind: 'thinking', startedAt: at, text: m.reasoning })
+        const meta = record(m.display_metadata)
+        const thought = storedThought(m)
+
+        if (thought.trim()) {
+          turn.blocks.push({ endedAt: at, id: this.id('k'), kind: 'thinking', startedAt: at, text: thought })
         }
 
-        if (text.trim()) {
-          turn.blocks.push({ id: this.id('x'), kind: 'text', text })
+        // Hermes' own row closing a failed turn: the turn's error card, not the agent's answer.
+        if (m.display_kind === 'failed_turn') {
+          const surface = record(meta?.error_surface)
+          const error = str(meta?.error) ?? str(surface?.message)
+          turn.status = 'error'
+          Object.assign(turn, error ? failure(error, surface?.code) : {})
+          turn.errorHint = text.trim() || undefined
+
+          continue
+        }
+
+        // The commentary projection: interim messages apart, and a reply with raw commentary cleaned.
+        const reply = typeof m.display_content === 'string' ? m.display_content : text
+        const notes = Array.isArray(m.display_commentary)
+          ? m.display_commentary.filter((n): n is string => typeof n === 'string' && Boolean(n.trim()))
+          : []
+        const flat = (s: string) => s.replace(/\s+/g, ' ').trim()
+
+        // Some providers store the joined commentary as the reply too: keep that copy once.
+        if (!reply.trim() || flat(notes.join('\n\n')) !== flat(reply)) {
+          turn.blocks.push(...notes.map(n => ({ id: this.id('x'), kind: 'text' as const, text: n })))
+        }
+
+        if (reply.trim()) {
+          turn.blocks.push({ id: this.id('x'), kind: 'text', text: reply })
+        }
+
+        // A reply the user stopped halfway is stored as far as it got.
+        if (meta?.interrupted === true) {
+          turn.status = 'interrupted'
         }
       } else if (m.role === 'tool') {
         const id = m.tool_call_id ?? this.id('c')
         // History keeps the result only for edit tools (`content`, JSON); the rest come back bare.
         const result = typeof m.content === 'string' && m.content ? m.content : undefined
+        // The edit preview the live call showed (tool.complete's inline_diff), kept on the row.
+        const diff = str(record(record(m.display_metadata)?.tool_result_metadata)?.inline_diff)
         const existing = calls.get(id)
 
         if (existing) {
           existing.result = result ?? existing.result
+          existing.diff = diff ?? existing.diff
 
           if (settleBridge(existing)) {
             existing.status = 'error'
@@ -523,6 +599,7 @@ export class Transcript {
           argsText: '',
           batch: u.batch,
           context: m.context ?? '',
+          diff,
           duration: 0,
           id,
           name: u.name,
@@ -533,6 +610,10 @@ export class Transcript {
         }
 
         call.status = (settleBridge(call) ?? Boolean(record(call.result)?.error)) ? 'error' : 'done'
+
+        if (isTodoName(call.name)) {
+          call.todosBefore = todos
+        }
 
         // History drops todo results: the list is the stored args, a merge patching the one before.
         if (Array.isArray(args.todos)) {
@@ -556,7 +637,7 @@ export class Transcript {
     if (notice) {
       this.#continued = notice
     } else if (user) {
-      this.user(user, at)
+      this.#storedUser(user, at)
     }
 
     if (turn.assistant || turn.streaming) {
@@ -685,6 +766,74 @@ function trailingText(turn: TurnEntry): string {
   }
 
   return out
+}
+
+/** A failed request's message and badge: an `HTTP 429: …` prefix becomes the code. */
+function failure(error: string, code: unknown): Pick<TurnEntry, 'error' | 'errorCode'> {
+  const http = /^HTTP (\d{3}):\s*/.exec(error)
+
+  return {
+    error: http ? error.slice(http[0].length) : error,
+    errorCode: http?.[1] ?? (typeof code === 'string' && code ? code : undefined)
+  }
+}
+
+const str = (v: unknown): string | undefined => (typeof v === 'string' && v.trim() ? v : undefined)
+
+/**
+ * A stored reply's thinking, as the desktop reads it (chat-messages/hydration.ts): the projection's
+ * `display_reasoning` (commentary taken out), else whichever field the provider kept it in.
+ */
+function storedThought(m: TranscriptMessage): string {
+  if (typeof m.display_reasoning === 'string') {
+    return detailsText(m.display_reasoning)
+  }
+
+  return str(m.reasoning) ?? str(m.reasoning_content) ?? detailsText(m.reasoning_details)
+}
+
+/**
+ * The readable text of stored `reasoning_details`: each provider block's summary, thinking or
+ * text. Encrypted blocks are opaque replay data; plain text (not JSON) is the thought itself.
+ */
+function detailsText(details: unknown): string {
+  let blocks = details
+
+  if (typeof blocks === 'string') {
+    const text = blocks.trim()
+
+    if (!text.startsWith('[') && !text.startsWith('{')) {
+      return text
+    }
+
+    try {
+      blocks = JSON.parse(text)
+    } catch {
+      return text
+    }
+  }
+
+  const out: string[] = []
+
+  for (const block of Array.isArray(blocks) ? blocks : [blocks]) {
+    const r = typeof block === 'string' ? { text: block } : record(block)
+
+    if (!r || r.type === 'reasoning.encrypted') {
+      continue
+    }
+
+    // OpenAI Responses keeps a summary as parts ({type: 'summary_text', text}).
+    const summary = Array.isArray(r.summary)
+      ? r.summary.map(s => (typeof s === 'string' ? s : (str(record(s)?.text) ?? ''))).join('\n\n')
+      : r.summary
+    const text = [summary, r.thinking, r.content, r.text].map(str).find(Boolean)?.trim()
+
+    if (text && !out.includes(text)) {
+      out.push(text)
+    }
+  }
+
+  return out.join('\n\n')
 }
 
 function isToolError(p: ToolCompletePayload): boolean {
@@ -860,6 +1009,26 @@ export function internalNotice(content: string): string | undefined {
 
   if (text.startsWith('[ASYNC DELEGATION BATCH COMPLETE')) {
     return 'Subagents finished'
+  }
+
+  if (text.startsWith('[ASYNC DELEGATION COMPLETE')) {
+    return 'Subagent finished'
+  }
+
+  // One child of a fan-out failed while its siblings still run.
+  if (text.startsWith('[ASYNC DELEGATION TASK FAILED')) {
+    return 'Subagent failed'
+  }
+
+  // The goal's and the loop's own prompts (hermes_cli/goals.py, hermes_cli/loops.py): the dock tracks both.
+  if (text.startsWith('[Continuing toward your standing goal]')) {
+    return 'Continuing toward the goal'
+  }
+
+  const wakeup = /^\[\/loop wakeup #(\d+)(?:, ([^\]]+))?\]/.exec(text)
+
+  if (wakeup) {
+    return `Loop run #${wakeup[1]}${wakeup[2] ? ` · ${wakeup[2]}` : ''}`
   }
 
   const watch = /^\[IMPORTANT: Background process \S+ matched watch pattern "([^"]*)"/.exec(text)

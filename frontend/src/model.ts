@@ -6,7 +6,7 @@ import type { SubagentEventPayload, Usage } from '@hermes/shared/gateway-events'
 
 import type { LiveLog } from './agents/liveLog.js'
 import type { BatchEntry } from './bridge.js'
-import type { ConnectTarget } from './connections.js'
+import type { ConnectCard } from './connections.js'
 
 /** One todo item as the `todo_list` tool reports it. */
 export interface Todo {
@@ -91,6 +91,8 @@ export interface ToolCall {
   /** A unified diff of the files the call changed. */
   diff?: string
   todos?: Todo[]
+  /** A todo call's list as the call found it: what its step line says it changed. */
+  todosBefore?: Todo[]
   subagents?: Subagent[]
   /** The background process a `terminal(background=true)` call started, while the store follows it. */
   process?: BackgroundProcess
@@ -98,10 +100,10 @@ export interface ToolCall {
   via?: 'tool_call'
   /** A bridge call of several tools (a connector batch): each with its own outcome. */
   batch?: BatchEntry[]
-  /** A no-card `manage_connections` call's apps, their states kept current by the app's poll. */
-  connect?: ConnectTarget[]
-  /** The user pressed Continue on its connect card. */
-  connectDone?: boolean
+  /** A no-card `manage_connections` call's card: its apps, their states kept current by the app's poll. */
+  connect?: ConnectCard
+  /** The image it showed (media.ts), once a URL's bytes arrived; null when they could not be fetched. */
+  image?: ImageSource | null
 }
 
 /** A part of an assistant turn, in the order it streamed. */
@@ -113,6 +115,16 @@ export type Block =
   /** Guidance the user sent into this turn while it ran; it lands before the agent's next step. */
   | { kind: 'steer'; id: string; text: string; at: number }
 
+/** An image an `image` node shows: a file Tern reads, or bytes sent once as a blob. */
+export type ImageSource = { path: string } | { blob: string }
+
+/** A file or image a prompt carried; `source` is unset when the image is gone (a resumed prompt's deleted file). */
+export interface UserAttachment {
+  kind: 'file' | 'image'
+  name: string
+  source?: ImageSource
+}
+
 /** A user prompt. */
 export interface UserEntry {
   kind: 'user'
@@ -121,6 +133,8 @@ export interface UserEntry {
   at: number
   /** Injected into a running turn rather than starting one. */
   steered?: boolean
+  /** Its images (thumbnails over the words) and files. */
+  attachments?: UserAttachment[]
 }
 
 /** One assistant turn: thinking, text and tool calls as they arrived. */

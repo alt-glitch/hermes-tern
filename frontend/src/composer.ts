@@ -2,8 +2,10 @@
 // and its selection; the text model, keys and undo history live here.
 // Offsets are UTF-16 code units, as TSP's `cursor` and `edit` events count.
 
-import type { Key } from '@stencil-hq/tern'
+import type { Decor, Key } from '@stencil-hq/tern'
 import { append as appendHistory, load as loadHistory } from '@tui/lib/history.js'
+
+import { listNewline, markdownDecor, type Splice, toggleMark } from './markdown.js'
 
 /** What a key asked the app to do beyond editing. */
 export type ComposerAction = 'submit' | null
@@ -22,6 +24,8 @@ const WORD = /[\p{L}\p{N}_]/u
 export class Composer {
   text = ''
   cursor = 0
+  /** The selection's other end, while text is selected (Shift+arrows, or Tern's native selection). */
+  anchor: number | undefined
   /** Bumped on every change, so the app knows to render. */
   rev = 0
   #undo: Snapshot[] = []
@@ -31,6 +35,23 @@ export class Composer {
   /** Index into history while browsing it; history.length means the draft. */
   #browse = -1
   #draft = ''
+  #decor: { text: string; decor: Decor[] } = { decor: [], text: '' }
+
+  /** The selected range, or the caret twice. */
+  get selection(): [number, number] {
+    const a = this.anchor ?? this.cursor
+
+    return a < this.cursor ? [a, this.cursor] : [this.cursor, a]
+  }
+
+  /** The draft's Markdown styling for the `editor` node, recomputed only when the text changed (not on caret moves). */
+  get decor(): Decor[] {
+    if (this.#decor.text !== this.text) {
+      this.#decor = { decor: markdownDecor(this.text), text: this.text }
+    }
+
+    return this.#decor.decor
+  }
 
   /** Up/Down are walking the prompt history (Down still has somewhere to go). */
   get browsing(): boolean {
@@ -53,15 +74,18 @@ export class Composer {
     this.#browse = -1
     this.text = ''
     this.cursor = 0
+    this.anchor = undefined
     this.#changed()
 
     return text
   }
 
+  /** Types `s` at the caret, over the selection if there is one. */
   insert(s: string) {
-    this.#record({ merge: true })
-    this.text = this.text.slice(0, this.cursor) + s + this.text.slice(this.cursor)
-    this.cursor += s.length
+    const [from, to] = this.selection
+    this.#record({ merge: from === to })
+    this.text = this.text.slice(0, from) + s + this.text.slice(to)
+    this.cursor = from + s.length
     this.#changed()
   }
 
@@ -77,17 +101,30 @@ export class Composer {
     this.#changed()
   }
 
-  /** A TSP `edit` event; ignored when the text changed since Tern saw it. */
-  edit(ev: { from: number; to: number; text: string; cursor: number; len: number }) {
+  /**
+   * A TSP `edit` event; ignored when the text changed since Tern saw it. A caret move may carry
+   * Tern's selection anchor in its raw frame; a new line typed in a list item continues the list.
+   */
+  edit(ev: { from: number; to: number; text: string; cursor: number; len: number; raw?: Record<string, unknown> }) {
     if (ev.len !== this.text.length) {
       return
     }
 
     if (ev.from === ev.to && !ev.text) {
       this.cursor = clamp(ev.cursor, this.text.length)
+      const anchor = ev.raw?.anchor
+      this.anchor = typeof anchor === 'number' && anchor !== this.cursor ? clamp(anchor, this.text.length) : undefined
       this.#changed()
 
       return
+    }
+
+    if (ev.from === ev.to && ev.text === '\n') {
+      const list = listNewline(this.text, ev.from)
+
+      if (list) {
+        return this.#apply(list)
+      }
     }
 
     // Native typing arrives one character per edit: those join the typing burst like keys do.
@@ -105,6 +142,7 @@ export class Composer {
     this.#redo.push({ cursor: this.cursor, text: this.text })
     this.text = prev.text
     this.cursor = prev.cursor
+    this.anchor = undefined
     this.#lastEdit = 0
     this.#browse = -1
     this.#changed()
@@ -120,6 +158,7 @@ export class Composer {
     this.#undo.push({ cursor: this.cursor, text: this.text })
     this.text = next.text
     this.cursor = next.cursor
+    this.anchor = undefined
     this.#lastEdit = 0
     this.#browse = -1
     this.#changed()
@@ -133,25 +172,39 @@ export class Composer {
     if (name === 'paste') {
       // One undo step of its own, never merged with the typing around it.
       const s = (key.text ?? '').replace(/\r\n?/g, '\n')
-      this.splice(this.cursor, this.cursor, s)
+      const [from, to] = this.selection
+      this.splice(from, to, s)
 
       return true
     }
 
     if (name === 'enter') {
       if (shift || alt) {
-        this.insert('\n')
-
-        return true
+        return this.#newline()
       }
 
+      // A trailing `\` is a new line: it goes, and a list item still continues.
       if (this.text.slice(0, this.cursor).endsWith('\\')) {
-        this.splice(this.cursor - 1, this.cursor, '\n')
+        const at = this.cursor - 1
+        const list = listNewline(this.text.slice(0, at) + this.text.slice(this.cursor), at)
+
+        if (list) {
+          return this.#apply({ ...list, to: list.to + 1 })
+        }
+
+        this.splice(at, this.cursor, '\n')
 
         return true
       }
 
       return 'submit'
+    }
+
+    // ⌘B / ⌘I: Markdown bold and italic on the selection, or at the caret.
+    if (meta && !ctrl && !alt && (name === 'b' || name === 'i')) {
+      const [from, to] = this.selection
+
+      return this.#apply(toggleMark(this.text, from, to, name === 'b' ? '**' : '_'))
     }
 
     if ((ctrl || meta) && name === 'z') {
@@ -231,7 +284,38 @@ export class Composer {
       }
     }
 
-    switch (name) {
+    // Shift+arrows select; the moves below then extend the selection instead of dropping it.
+    const selecting = shift && ['left', 'right', 'home', 'end'].includes(name)
+    const anchor = selecting ? (this.anchor ?? this.cursor) : undefined
+
+    if (!selecting && this.anchor !== undefined && (name === 'backspace' || name === 'delete')) {
+      const [from, to] = this.selection
+
+      return this.#cut(from, to)
+    }
+
+    const moved = this.#motion(key)
+
+    if (moved !== undefined) {
+      this.anchor = anchor !== undefined && anchor !== this.cursor ? anchor : undefined
+
+      return moved
+    }
+
+    if (key.text && !ctrl && !meta) {
+      this.insert(key.text)
+
+      return true
+    }
+
+    return false
+  }
+
+  /** The editing and motion keys without modifiers that change their meaning; undefined for others. */
+  #motion(key: Key): boolean | undefined {
+    const { alt, meta } = key
+
+    switch (key.name) {
       case 'backspace':
         if (meta) {
           return this.#cut(lineStart(this.text, this.cursor), this.cursor)
@@ -273,13 +357,28 @@ export class Composer {
         return meta ? this.#move(this.text.length) : this.#vertical(1)
     }
 
-    if (key.text && !ctrl && !meta) {
-      this.insert(key.text)
+    return undefined
+  }
 
-      return true
+  /** A new line at the caret; in a list item, the next item's marker comes with it. */
+  #newline(): true {
+    const list = this.anchor === undefined ? listNewline(this.text, this.cursor) : undefined
+
+    if (list) {
+      return this.#apply(list)
     }
 
-    return false
+    this.insert('\n')
+
+    return true
+  }
+
+  /** Applies a Markdown edit as one undo step, with the selection it leaves. */
+  #apply({ anchor, cursor, from, text, to }: Splice): true {
+    this.#replace({ cursor, from, merge: false, s: text, to })
+    this.anchor = anchor !== undefined && anchor !== this.cursor ? anchor : undefined
+
+    return true
   }
 
   #vertical(dir: -1 | 1): boolean {
@@ -330,14 +429,16 @@ export class Composer {
 
     this.text = text
     this.cursor = text.length
+    this.anchor = undefined
     this.#changed()
 
     return true
   }
 
   #move(to: number): true {
-    if (to !== this.cursor) {
+    if (to !== this.cursor || this.anchor !== undefined) {
       this.cursor = clamp(to, this.text.length)
+      this.anchor = undefined
       this.#lastEdit = 0
       this.#changed()
     }
@@ -375,6 +476,7 @@ export class Composer {
     const now = Date.now()
     // An edited history entry is the draft now: the next Up saves it and starts from the newest entry.
     this.#browse = -1
+    this.anchor = undefined
 
     if (!merge || now - this.#lastEdit > UNDO_MERGE_MS || !this.#undo.length) {
       this.#undo.push({ cursor: this.cursor, text: this.text })

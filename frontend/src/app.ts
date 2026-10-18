@@ -4,7 +4,7 @@
 // schedules one render of the whole view; the SDK diffs it into frame ops.
 
 import { randomUUID } from 'node:crypto'
-import { appendFileSync } from 'node:fs'
+import { appendFileSync, existsSync } from 'node:fs'
 import { basename } from 'node:path'
 
 import type {
@@ -26,10 +26,12 @@ import type { AnyGatewayEvent } from '@tui/gatewayTypes.js'
 import logo from '../assets/logo.png'
 
 import { agentName, Agents } from './agents/store.js'
+import { Automation } from './automation.js'
 import { copyToClipboard } from './clipboard.js'
 import { localCommand } from './commands.js'
 import { Composer } from './composer.js'
-import { interruptTurn, steerTurn } from './controlCommands.js'
+import { interruptTurn, redirectTurn, steerTurn } from './controlCommands.js'
+import { fastTier } from './fast.js'
 import { type Busy, busyFrom, ownsEvent, Switches } from './flow.js'
 import { protocolNote, slowStartNotes } from './backendNotes.js'
 import { hudKey, type Pill } from './hud.js'
@@ -37,30 +39,37 @@ import { moaLabel, moaReferenceLabel } from './moa.js'
 import type { Overlay, OverlayHost } from './overlay.js'
 import { writeActiveSessionFile } from './hermes/activeSessionFile.js'
 import { imagePathOf, withClipboardImage } from './hermes/clipboardImage.js'
-import { type Attachment, uploadImage } from './hermes/images.js'
+import { type Attachment, imageSize, uploadImage } from './hermes/images.js'
+import { Media } from './media.js'
+import type { ImageSource, ToolCall, UserAttachment } from './model.js'
 import { hasInterpolation, interpolate, shellError, shellExec, shellLines } from './hermes/shell.js'
 import { mutateSession } from './hermes/mutate.js'
 import { sharedPromptId, sharedPromptRequest } from './hermes/sharedPrompts.js'
 import { openAgents } from './overlays/agents.js'
+import { openAutomation } from './overlays/automation.js'
 import { openBackground } from './overlays/background.js'
 import { Completion } from './overlays/completion.js'
 import { openModelPicker } from './overlays/models.js'
-import { openEffortPicker } from './overlays/effort.js'
+import { DEFAULT_EFFORT, nextEffort, openEffortPicker } from './overlays/effort.js'
+import { capsOf } from './modelCaps.js'
 import { promptOverlay, promptTimeoutNotice } from './overlays/prompts.js'
 import { openPullRequests, openUrl, prsPill } from './overlays/pullRequests.js'
 import { STYLES } from './view/styles.js'
 import { paletteFor } from './palette.js'
-import { CONNECT_TOOL, connectedMessage, connectTargets, continueMessage, markViewer, POLL_FOR_MS, POLL_MS, readCard, waiting } from './connections.js'
+import { allConnected, claimTold, CONNECT_TOOL, connectedMessage, continueMessage, loadConnect, markViewer, POLL_MS, waiting } from './connections.js'
 import { LINK_TOOLS } from './github/links.js'
 import { PullRequests } from './github/store.js'
 import { Cron } from './processes/cron.js'
 import { Sidebar } from './sidebar.js'
 import type { SessionHost } from './sessionCommands.js'
+import { ambiguousNotice, CommandCatalog, resolveSlashName } from './slashResolve.js'
 import { isLoginNotice, Notices, statusEffect } from './status.js'
 import { isRunning as processRuns, Processes, processTone } from './processes/store.js'
 import { loadSettings, saveSettings, type ThemeMode } from './settings.js'
-import { Transcript } from './transcript.js'
-import { dockNodes, todoProgress } from './view/dock.js'
+import { type BusyMode, busyModeOf, type OwnAdmission, type PendingRow, ServerQueue, type ServerQueued } from './serverQueue.js'
+import { internalNotice, Transcript } from './transcript.js'
+import type { Reconnecting } from './view/automation.js'
+import { dockNodes, type QueuedRow, todoProgress } from './view/dock.js'
 import { entryNode } from './view/transcript.js'
 import { busyLabel, preparingLabel } from './workLog.js'
 import { openSidebar, specOf } from './watch/spec.js'
@@ -70,11 +79,10 @@ import { randomTip, type WelcomeContext } from './view/welcome.js'
 export const INPUT_ID = 'dock.composer.line.input'
 
 const EXIT_ARM_MS = 1500
+/** Two Esc presses within this window are a double Esc (Ink's DOUBLE_ESC_MS). */
+const DOUBLE_ESC_MS = 500
 /** How long a prompt's Copy button reads Copied. */
 const COPIED_MS = 1500
-/** What Shift+Tab / the effort chip cycle through (hermes's `none` turns reasoning off). */
-const EFFORTS = ['none', 'low', 'medium', 'high', 'xhigh']
-
 /** session.create's result, or session.resume's with the state of a turn it may be in. */
 interface CreateResult extends Partial<
   Pick<SessionResumeResult, 'inflight' | 'running' | 'status' | 'turn_started_at'>
@@ -87,8 +95,17 @@ interface CreateResult extends Partial<
   messages?: TranscriptMessage[]
 }
 
-/** An uploaded image a prompt carries (the shared gateway takes it on prompt.submit), with the name its chip shows. */
-type Image = Attachment & { name: string }
+/**
+ * An uploaded image a prompt carries (the shared gateway takes it on prompt.submit), with the name
+ * its chip shows, and the thumbnail and size the chip and the prompt's bubble show.
+ */
+type Image = Attachment & { name: string; preview?: ImageSource; caption?: string }
+
+/**
+ * What a prompt of images alone asks, as Ink (ui-tui/src/app/submissionCore.ts) and the desktop
+ * (use-prompt-actions/submit.ts) send it: Hermes takes no empty prompt text.
+ */
+const IMAGE_ONLY_PROMPT = 'What do you see in this image?'
 
 /** How long quitting waits for the sessions to detach. */
 const QUIT_DETACH_MS = 1500
@@ -101,15 +118,25 @@ export interface Queued {
   expand?: boolean
 }
 
+/** A prompt this pane admitted into the shared gateway's queue: as typed (for Edit), and as sent. */
+interface Admitted {
+  item: Queued
+  text: string
+}
+
 /** Runs the Tern frontend until the user quits; resolves the exit code. */
 export class App implements OverlayHost {
   readonly transcript = new Transcript()
+  /** Images tool calls showed, a URL's bytes fetched once and sent as a blob. */
+  readonly media = new Media({ blob: (bytes, mime) => this.#blob(bytes, mime) })
   /** The session's subagents, followed while they run (Task cards, the pill, the hub). */
   readonly agents: Agents = new Agents(this)
   /** The session's background processes (the shells pill, the Background sheet, background cards). */
   readonly processes: Processes = new Processes(this)
   readonly cron: Cron = new Cron(this)
   readonly sidebar: Sidebar = new Sidebar(this)
+  /** The session's standing /goal and /loop (the dock line above the pills and its sheets). */
+  readonly automation: Automation = new Automation(this)
   /** The session's title, as Hermes names it (`session.title`). */
   title = ''
   /** The todo panel above the composer is open. */
@@ -128,28 +155,42 @@ export class App implements OverlayHost {
   info: SessionLiveInfo | null = null
   usage: Usage | null = null
   busy: Busy | null = null
+  /** Prompts held here until they can be sent: no session yet, a switch in flight, or a private gateway's busy turn. */
   queue: Queued[] = []
+  /** The shared gateway's queue for this session: its FIFO, this pane's admissions, the bubbles they owe. */
+  readonly #server = new ServerQueue<Admitted>()
+  /** What Enter does while a turn runs (`display.busy_input_mode`); queue until the gateway says. */
+  #busyMode: BusyMode = 'queue'
   readonly #tern: Session
   readonly #gw: GatewayClient
   readonly #completion: Completion
+  /** `commands.catalog`, for resolving a typed alias or prefix (`/hea` → /heartbeat). */
+  readonly #catalog: CommandCatalog
   readonly #welcome: WelcomeContext
   #surface!: Surface
   #scheduled = false
   /** The field holding Tern's caret, as last sent. */
   #focus: string | null = INPUT_ID
   #exitArmed = 0
+  #lastEsc = 0
   #done = Promise.withResolvers<number>()
   readonly #switches = new Switches()
   /** Server requests for another session, kept while a switch is in flight. */
   #heldRequests: ServerRequest[] = []
   /** Shared-gateway subscriptions this view holds, by session id. */
   readonly #subscriptions = new Map<string, string>()
+  /** What superseded switches attached; disposed once no switch is in flight (see #disposeStale). */
+  #stale: CreateResult[] = []
+  /** The last `session.detach` in flight per session: a resume of that id waits for it (they share a subscription id). */
+  readonly #detaching = new Map<string, Promise<unknown>>()
   /** Open approval prompts' overlay keys → their approval-queue `request_id` (what approval.cancelled names). */
   readonly #approvalIds = new Map<string, string>()
   /** The launcher's startup image until it is attached to the first session (the queue waits for it). */
   #startupImage = process.env.HERMES_TUI_IMAGE?.trim() ?? ''
   /** The images attached to the draft: the next prompt entered takes them. */
   #attachments: Image[] = []
+  /** Images being read or uploaded for the draft: an "attaching…" chip each until they land. */
+  #attaching: { name: string }[] = []
   /** The skin the gateway last reported; only the `skin` theme mode wears it. */
   #skin: SkinPayload | undefined
   #theme: ThemeMode = loadSettings().theme ?? 'tern'
@@ -169,11 +210,15 @@ export class App implements OverlayHost {
   #compacting = false
   /** The status warning shown last, so a repeated one stays one line. */
   #lastStatusNote: string | undefined
+  /** The gateway is being redialled (`gateway.reconnecting`) until the next gateway.ready. */
+  #reconnecting: Reconnecting | undefined
+  #reconnectTimer: NodeJS.Timeout | undefined
 
   constructor(tern: Session, gw: GatewayClient, version: string) {
     this.#tern = tern
     this.#gw = gw
     this.#completion = new Completion(this, gw, () => this.sid)
+    this.#catalog = new CommandCatalog(gw)
     this.#welcome = {
       tip: randomTip(process.env.HERMES_PYTHON_SRC_ROOT ?? ''),
       version: version && version !== 'unknown' ? `v${version}` : ''
@@ -229,6 +274,9 @@ export class App implements OverlayHost {
       // The runtime session died with the process: prompts queue until the next gateway.ready reattaches.
       this.sid = null
       this.busy = null
+      // Nothing can answer the sheets now; the reattach re-opens the questions still pending.
+      this.#heldRequests = []
+      this.#dropPrompts(() => true)
       this.transcript.interrupt()
       this.changed()
     })
@@ -347,8 +395,16 @@ export class App implements OverlayHost {
       return
     }
 
+    // A single Esc never cancels work (Ink's resolveDoubleEscAction): a second one within
+    // DOUBLE_ESC_MS clears a draft into the prompt history, else stops the running turn.
     if (key.name === 'escape') {
-      if (this.busy) {
+      const now = Date.now()
+      const double = now - this.#lastEsc <= DOUBLE_ESC_MS
+      this.#lastEsc = double ? 0 : now
+
+      if (double && this.#hasDraft()) {
+        this.#clearDraft()
+      } else if (double && this.busy) {
         this.#interrupt()
       }
 
@@ -359,30 +415,29 @@ export class App implements OverlayHost {
       return this.#cycleEffort()
     }
 
-    if ((key.alt && key.name === 'a') || key.name === 'å') {
-      return openAgents(this)
+    // By the Alt modifier only: a typed å, ∫, ß or π (macOS Option without Meta, or a keyboard
+    // that has the letter) is text for the composer. Word-back stays on Alt+Left.
+    if (key.alt && !key.ctrl && !key.meta) {
+      switch (key.name) {
+        case 'a':
+          return openAgents(this)
+
+        case 'b':
+          return openBackground(this)
+
+        case 's':
+          return this.toggleSidebar()
+
+        case 'p':
+          return openPullRequests(this)
+      }
     }
 
-    // ⌥B (macOS Option without Meta types ∫). Word-back stays on Alt+Left.
-    if ((key.alt && key.name === 'b' && !key.ctrl && !key.meta) || key.name === '∫') {
-      return openBackground(this)
+    if (key.alt && key.name === 'up' && this.#queuedCount()) {
+      return this.#dequeue(0)
     }
 
-    // ⌥S (macOS Option without Meta types ß).
-    if ((key.alt && key.name === 's' && !key.ctrl && !key.meta) || key.name === 'ß') {
-      return this.toggleSidebar()
-    }
-
-    // ⌥P (macOS Option without Meta types π).
-    if ((key.alt && key.name === 'p' && !key.ctrl && !key.meta) || key.name === 'π') {
-      return openPullRequests(this)
-    }
-
-    if (key.alt && key.name === 'up' && this.queue.length) {
-      return this.#dequeue()
-    }
-
-    if (key.alt && key.name === 'enter' && this.busy && this.queue.length && !this.composer.text) {
+    if (key.alt && key.name === 'enter' && this.busy && this.#queuedCount() && !this.composer.text) {
       return this.#steerQueued(0)
     }
 
@@ -427,6 +482,13 @@ export class App implements OverlayHost {
       return this.#connectContinue(ev.value)
     }
 
+    // `<card>:<app>`: the card names the row, as call ids repeat.
+    if (ev.ev === 'action' && ev.act === 'connect-open' && ev.value) {
+      const at = ev.value.lastIndexOf(':')
+
+      return this.#connectOpen(ev.value.slice(0, at), ev.value.slice(at + 1))
+    }
+
     if (ev.ev === 'focus' && ev.id === INPUT_ID && !this.overlays.at(-1)?.modal) {
       this.#hud = undefined
       this.#focus = INPUT_ID
@@ -454,7 +516,9 @@ export class App implements OverlayHost {
       ...(this.#todos() && !this.busy ? (['todos'] as const) : []),
       ...(this.agents.running().length ? (['agents'] as const) : []),
       ...(this.processes.recent(now).length ? (['shells'] as const) : []),
-      ...(this.prs.entries().length ? (['prs'] as const) : [])
+      ...(this.prs.entries().length ? (['prs'] as const) : []),
+      ...(this.automation.goal ? (['goal'] as const) : []),
+      ...(this.automation.loop(now) ? (['loop'] as const) : [])
     ]
   }
 
@@ -474,6 +538,8 @@ export class App implements OverlayHost {
       openBackground(this)
     } else if (out.open === 'prs') {
       openPullRequests(this)
+    } else if (out.open === 'goal' || out.open === 'loop') {
+      openAutomation(this, out.open)
     } else if (out.open === 'todos') {
       this.#todosOpen = !this.#todosOpen
       this.changed()
@@ -535,32 +601,36 @@ export class App implements OverlayHost {
   }
 
   #connectTimer: NodeJS.Timeout | undefined
-  /** Connect cards this pane saw with an app still waiting. */
+  /** Connect cards (by file) this pane saw with an app still waiting. */
   readonly #connectSeen = new Set<string>()
-
-  /** The connect cards still waiting on the user. */
-  #connectCalls() {
-    const since = Date.now() - POLL_FOR_MS
-
-    return this.transcript.calls(CONNECT_TOOL).filter(c => !c.connectDone && c.startedAt > since)
-  }
+  /** Connect calls that drew no card (a status read, a call with nothing to authorize): never again. */
+  readonly #noCard = new WeakSet<object>()
 
   /**
    * Keeps each connect card current from the file the plugin's watcher writes (links and states),
    * and tells the agent once every app of a card is connected, as the desktop's card settles the call.
+   * A settled card never moves again, so the poll runs only while some card is watched.
    */
   #watchConnections() {
-    if (this.#connectTimer) {
-      return
-    }
+    // A new call or a reloaded transcript reads now, not at the next poll.
+    clearTimeout(this.#connectTimer)
 
     const tick = () => {
       this.#connectTimer = undefined
       let open = false
 
-      for (const call of this.#connectCalls()) {
-        const card = readCard(call.id)
-        const next = connectTargets(call, card)
+      for (const call of this.transcript.calls(CONNECT_TOOL)) {
+        // A running call has no card yet; by its call id alone it would take an earlier call's.
+        if (call.connect?.settled || call.status === 'running' || this.#noCard.has(call)) {
+          continue
+        }
+
+        const next = loadConnect(call)
+
+        if (!next) {
+          this.#noCard.add(call)
+          continue
+        }
 
         if (JSON.stringify(next) !== JSON.stringify(call.connect)) {
           call.connect = next
@@ -568,17 +638,20 @@ export class App implements OverlayHost {
           this.changed()
         }
 
-        if (next.some(waiting)) {
-          this.#connectSeen.add(call.id)
+        const seen = next.key ?? call.id
+
+        if (next.targets.some(waiting) && !next.settled) {
+          this.#connectSeen.add(seen)
         }
 
-        // Only a card this pane saw waiting: a resumed session's long-settled card stays quiet.
-        if (this.#connectSeen.has(call.id) && next.length && next.every(t => t.state === 'connected')) {
-          call.connectDone = true
+        // Only a card this pane saw waiting: a resumed session's long-settled card stays quiet. Only
+        // one pane tells: the claim is the card's.
+        if (!next.told && this.#connectSeen.has(seen) && allConnected(next) && (!next.key || claimTold(next.key))) {
+          next.told = true
           this.transcript.touchCall(call)
-          this.#submit(connectedMessage(next), false)
+          this.#submit(connectedMessage(next.targets), false)
           this.changed()
-        } else if (next.some(waiting) && (card?.watching ?? true)) {
+        } else if (next.key && !next.settled) {
           open = true
         }
       }
@@ -591,17 +664,43 @@ export class App implements OverlayHost {
     tick()
   }
 
-  /** A connect card's Continue: tell the agent which apps the user authorized, as the tool asks. */
-  #connectContinue(id: string) {
-    const call = this.transcript.calls(CONNECT_TOOL).find(c => c.id === id)
+  /** The connect card `ref` names (its file, or its call id when it has none). */
+  #connectCall(ref: string) {
+    return this.transcript.calls(CONNECT_TOOL).findLast(c => (c.connect?.key ?? c.id) === ref)
+  }
 
-    if (!call || call.connectDone) {
+  /** A connect card's Continue: tell the agent which apps the user authorized, as the tool asks. */
+  #connectContinue(ref: string) {
+    const call = this.#connectCall(ref)
+    const card = call?.connect
+
+    if (!call || !card || card.told || card.settled) {
       return
     }
 
-    call.connectDone = true
+    card.told = true
     this.transcript.touchCall(call)
-    this.#submit(continueMessage(call.connect ?? connectTargets(call, readCard(call.id))), false)
+
+    // Another pane's message already told the agent.
+    if (!card.key || claimTold(card.key)) {
+      this.#submit(continueMessage(card.targets), false)
+    }
+
+    this.changed()
+  }
+
+  /** A connect card's Authorize: the app's link in the browser, and its row waits on the browser now. */
+  #connectOpen(ref: string, name: string) {
+    const call = this.#connectCall(ref)
+    const target = call?.connect?.targets.find(t => t.name === name)
+
+    if (!call?.connect || !target?.url) {
+      return
+    }
+
+    openUrl(target.url)
+    call.connect.opened = [...new Set([...call.connect.opened, name])]
+    this.transcript.touchCall(call)
     this.changed()
   }
 
@@ -626,19 +725,23 @@ export class App implements OverlayHost {
 
   /** Attaches the clipboard's image to the next prompt (`quiet`: an empty paste, which may hold none). */
   async attachClipboardImage(quiet: boolean) {
+    // The chip shows at once; reading the clipboard and uploading fill it in.
+    const slot = this.#startAttaching(`pasted image ${this.#attachments.length + this.#attaching.length + 1}`)
+
     try {
       const found = await withClipboardImage(async path => {
-        await this.#attachImage(path, `pasted image ${this.#attachments.length + 1}`)
+        await this.#attachImage(path, slot.name, slot)
 
         return true
       })
 
       if (!found && !quiet) {
         this.transcript.notice('No image on the clipboard.', 'warning')
-        this.changed()
       }
     } catch (error) {
       this.transcript.notice(`Could not read the clipboard image: ${error instanceof Error ? error.message : String(error)}`, 'error')
+    } finally {
+      this.#endAttaching(slot)
       this.changed()
     }
   }
@@ -656,21 +759,79 @@ export class App implements OverlayHost {
     await this.#attachImage(path, basename(path))
   }
 
-  async #attachImage(path: string, name: string) {
+  /** Uploads `path` for the next prompt; its chip says "attaching…" (in `slot`) until it lands or fails. */
+  async #attachImage(path: string, name: string, slot = this.#startAttaching(name)) {
     const sid = this.sid
 
-    if (!sid) {
-      this.transcript.notice('Wait for the session to start before attaching an image.', 'warning')
+    try {
+      if (!sid) {
+        this.transcript.notice('Wait for the session to start before attaching an image.', 'warning')
 
-      return this.changed()
+        return
+      }
+
+      const image = this.#image(await uploadImage(this.#gw, sid, path, process.env.HERMES_CWD || process.cwd()), name)
+
+      // Its chip was removed (✕, Ctrl+C) while it uploaded: the prompt does not take it.
+      if (this.#attaching.includes(slot)) {
+        this.#attachments.push(image)
+      }
+    } catch (error) {
+      this.transcript.notice(`Could not attach ${name}: ${error instanceof Error ? error.message : String(error)}`, 'error')
+    } finally {
+      this.#endAttaching(slot)
+      this.changed()
+    }
+  }
+
+  #startAttaching(name: string): { name: string } {
+    const slot = { name }
+    this.#attaching.push(slot)
+    this.changed()
+
+    return slot
+  }
+
+  #endAttaching(slot: { name: string }) {
+    this.#attaching = this.#attaching.filter(s => s !== slot)
+  }
+
+  /**
+   * An uploaded image with its thumbnail: its bytes as a blob, else the gateway's copy where that
+   * is on this machine. The bytes are not kept.
+   */
+  #image({ bytes, ...attachment }: Attachment & { bytes: Buffer }, name: string): Image {
+    const size = imageSize(bytes)
+    const kb = bytes.length / 1024
+    const blob = this.#blob(bytes, attachment.mime)
+    const preview = blob ? { blob } : existsSync(attachment.path) ? { path: attachment.path } : undefined
+    const caption = [size && `${size.w}×${size.h}`, kb >= 1024 ? `${(kb / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(kb))} KB`]
+
+    return { ...attachment, caption: caption.filter(Boolean).join(' · '), name, ...(preview ? { preview } : {}) }
+  }
+
+  /** `bytes` sent to Tern as a blob; undefined where it takes none, or for more than a blob holds. */
+  #blob(bytes: Uint8Array, mime: string): string | undefined {
+    if (!this.#tern.caps.features.includes('blobs')) {
+      return undefined
     }
 
     try {
-      this.#attachments.push({ ...(await uploadImage(this.#gw, sid, path, process.env.HERMES_CWD || process.cwd())), name })
-    } catch (error) {
-      this.transcript.notice(`Could not attach ${name}: ${error instanceof Error ? error.message : String(error)}`, 'error')
+      return this.#tern.blob(bytes, mime)
+    } catch {
+      return undefined
     }
+  }
 
+  /** Has `call`'s image (a URL's) fetched; its card shows it once it lands. */
+  #showImage(call: ToolCall | undefined) {
+    if (call) {
+      this.media.show(call, () => this.#imageLanded(call))
+    }
+  }
+
+  #imageLanded(call: ToolCall) {
+    this.transcript.touchCall(call)
     this.changed()
   }
 
@@ -684,6 +845,11 @@ export class App implements OverlayHost {
     }
 
     this.sidebar.toggle()
+  }
+
+  /** A subagent ended: the PRs it linked are filed under this conversation (pull_requests.py). */
+  agentEnded() {
+    this.prs.relink()
   }
 
   /** Shows subagent `id` beside the chat in a Tern split; its timeline sheet where no split can open. */
@@ -703,13 +869,25 @@ export class App implements OverlayHost {
 
   /** Text or images in the composer: Ctrl+C clears them before it interrupts, Ctrl+D never exits over them. */
   #hasDraft(): boolean {
-    return Boolean(this.composer.text || this.#attachments.length)
+    return Boolean(this.composer.text || this.#attachments.length || this.#attaching.length)
+  }
+
+  /** Esc Esc: the draft's text goes to the prompt history (Up brings it back), its images go. */
+  #clearDraft() {
+    if (this.composer.text.trim()) {
+      this.composer.take()
+    } else {
+      this.composer.set('')
+    }
+
+    this.#attachments = []
   }
 
   #ctrlC() {
     if (this.#hasDraft()) {
       this.composer.set('')
       this.#attachments = []
+      this.#attaching = []
 
       return
     }
@@ -747,11 +925,24 @@ export class App implements OverlayHost {
 
   // ── Prompts and commands ───────────────────────────────────────────
 
-  /** Sends or queues a prompt, or runs a command; `draft`: the user entered it (it takes the draft's images). */
-  #submit(raw: string, draft = true) {
+  /**
+   * Sends or queues a prompt, or runs a command; `draft`: the user entered it (it takes the draft's
+   * images). While a turn runs the prompt goes as `busy` says: the session's busy_input_mode for
+   * a typed one; a message the app writes (a connect result) waits behind the turn.
+   */
+  #submit(raw: string, draft = true, busy: BusyMode = draft ? this.#busyMode : 'queue') {
     const text = raw.trim()
 
-    if (!text) {
+    // An image still uploading would miss the prompt: the words wait in the composer for it.
+    if (draft && this.#attaching.length && !text.startsWith('/')) {
+      this.composer.set(raw)
+      this.transcript.notice('An image is still attaching. Send again in a moment.', 'warning')
+
+      return
+    }
+
+    // Images alone are a prompt: the bubble shows just them (the gateway gets Ink's stand-in words).
+    if (!text && !(draft && this.#attachments.length)) {
       return
     }
 
@@ -771,13 +962,124 @@ export class App implements OverlayHost {
     // The draft's images go with this prompt, whenever it is sent; a message the app writes leaves them.
     const item: Queued = { expand: true, images: draft ? this.#takeImages() : [], text }
 
-    if (this.busy || !this.sid || this.#switches.pending) {
+    if (!this.sid || this.#switches.pending) {
       this.queue.push(item)
 
       return
     }
 
+    if (this.busy) {
+      return void this.#busyInput(item, busy)
+    }
+
     this.#send(item)
+  }
+
+  /**
+   * A prompt entered while a turn runs, as Ink's handleBusyInput: `steer` injects it into the turn,
+   * `interrupt` redirects the turn with it, `queue` puts it behind the turn. A steer or redirect
+   * carries no images, and one the gateway refuses is queued instead.
+   */
+  async #busyInput(item: Queued, mode: BusyMode) {
+    const sid = this.sid
+
+    if (!sid || mode === 'queue' || item.images.length) {
+      return this.#queueBehind(item)
+    }
+
+    const ready = await this.#expanded(sid, item)
+
+    if (!ready || sid !== this.sid) {
+      return
+    }
+
+    const r = await (mode === 'steer' ? steerTurn : redirectTurn)(this.#gw, sid, ready.text)
+
+    if (sid !== this.sid) {
+      return
+    }
+
+    if (r.ok) {
+      this.transcript.steer(item.text)
+    } else {
+      if (r.error) {
+        this.transcript.notice(`${mode === 'steer' ? 'Steer' : 'Redirect'} failed: ${r.error}. Queued instead.`, 'warning')
+      }
+
+      this.#queueBehind(item)
+    }
+
+    this.changed()
+  }
+
+  /** Puts `item` behind the running turn: into the shared gateway's queue at once, else held here. */
+  #queueBehind(item: Queued) {
+    const sid = this.sid
+
+    if (!this.#gw.isCanonical || !sid || this.#switches.pending) {
+      this.queue.push(item)
+      this.#drainQueue()
+
+      return this.changed()
+    }
+
+    void this.#admit(sid, item)
+  }
+
+  /**
+   * Admits `item` into session `sid`'s FIFO now (Ink's busy-time admission): crash-durable, and in
+   * every viewer's queue. Its bubble waits until the gateway starts it; a refusal puts it back in
+   * the composer. `text`: what to send instead of expanding the item again (a re-queued steer).
+   */
+  async #admit(sid: string, item: Queued, text?: string) {
+    const ready = text === undefined ? await this.#expanded(sid, item) : { images: item.images, text }
+
+    if (!ready || sid !== this.sid) {
+      return
+    }
+
+    const own: OwnAdmission<Admitted> = { display: userText(item.text, item.images), inputId: randomUUID(), item: { item, text: ready.text } }
+    const attachments = ready.images.map(({ mime, path }) => ({ mime, path }))
+    this.#server.admit(own)
+    this.changed()
+
+    try {
+      const r = await this.#gw.request<{ admission_id?: string } | null>('prompt.submit', {
+        queued: true,
+        session_id: sid,
+        submission_id: own.inputId,
+        text: ready.text || (attachments.length ? IMAGE_ONLY_PROMPT : ''),
+        ...(attachments.length ? { attachments } : {})
+      })
+
+      own.admissionId = r?.admission_id
+    } catch (error) {
+      this.#server.drop(own)
+
+      if (sid === this.sid) {
+        this.transcript.notice(`Not queued: ${error instanceof Error ? error.message : String(error)}. Your message is back in the composer.`, 'error')
+        this.#restore(item)
+      }
+    }
+
+    this.changed()
+  }
+
+  /** `item` with its `{!cmd}`s run (a typed prompt's); undefined when one failed (the prompt is back in the composer). */
+  async #expanded(sid: string, item: Queued): Promise<{ images: Image[]; text: string } | undefined> {
+    if (!item.expand || !hasInterpolation(item.text)) {
+      return item
+    }
+
+    try {
+      return { images: item.images, text: await interpolate(this.#gw, sid, item.text) }
+    } catch (error) {
+      this.transcript.notice(`Not sent: a {!…} command failed: ${shellError(error)}.`, 'error')
+      this.#restore(item)
+      this.changed()
+
+      return undefined
+    }
   }
 
   /**
@@ -815,15 +1117,19 @@ export class App implements OverlayHost {
       return
     }
 
-    const { images, text } = item
+    const { images } = item
+    const text = item.text || (images.length ? IMAGE_ONLY_PROMPT : '')
     const attachments = images.map(({ mime, path }) => ({ mime, path }))
-    this.transcript.user(`${display?.trim() || text}${images.length ? `\n\n📎 ${images.length} image${images.length === 1 ? '' : 's'}` : ''}`)
+    const submission = randomUUID()
+    this.transcript.user(display?.trim() || item.text, undefined, false, userImages(images))
+    // Its bubble is up: the gateway's queued → started for it owes none.
+    this.#server.shown(submission)
     this.#startBusy('Working…')
     this.#gw
       // The shared gateway admits a prompt by its submission id (a retry with the same id is one turn).
       .request('prompt.submit', {
         session_id: sid,
-        submission_id: randomUUID(),
+        submission_id: submission,
         text,
         ...(queued ? { queued } : {}),
         ...(attachments.length ? { attachments } : {})
@@ -848,7 +1154,7 @@ export class App implements OverlayHost {
 
   /** Puts a prompt that did not go back into the composer, before any text there, with its images. */
   #restore({ images, text }: Queued) {
-    this.composer.set(this.composer.text ? `${text}\n${this.composer.text}` : text)
+    this.composer.set(text && this.composer.text ? `${text}\n${this.composer.text}` : text || this.composer.text)
     this.#attachments = [...images, ...this.#attachments]
   }
 
@@ -876,14 +1182,20 @@ export class App implements OverlayHost {
     this.changed()
   }
 
-  async #slash(text: string) {
-    const [name = '', ...rest] = text.slice(1).split(/\s+/)
+  /** Runs `/name arg`; `resolve`: expand a typed alias or prefix through the catalog first. */
+  async #slash(text: string, resolve = true): Promise<void> {
+    const [typed = '', ...rest] = text.slice(1).split(/\s+/)
+    const name = typed.toLowerCase()
     const arg = rest.join(' ')
     const local = localCommand(name)
 
     if (local) {
       try {
         const handled = await local.run(this, arg)
+
+        if (local.name === 'reload-skills') {
+          this.#catalog.reset()
+        }
 
         if (handled !== false) {
           return this.changed()
@@ -895,29 +1207,69 @@ export class App implements OverlayHost {
       }
     }
 
-    if (!this.sid) {
+    // The reply belongs to the session it was typed in: once the view left it, or a switch begun since
+    // is in flight, the reply is dropped (Ink's stale()), so a late skill or /plan never sends its prompt
+    // to the next session.
+    const sid = this.sid
+    const generation = this.#switches.generation
+    const stale = () => this.sid !== sid || (this.#switches.pending && this.#switches.generation !== generation)
+
+    if (resolve) {
+      // Sessionless (starting, or the backend is down), only this frontend's own commands resolve.
+      const to = resolveSlashName(name, sid ? await this.#catalog.get(sid) : undefined)
+
+      if (stale()) {
+        return
+      }
+
+      if (to && 'ambiguous' in to) {
+        this.transcript.notice(ambiguousNotice(name, to.ambiguous), 'warning')
+
+        return this.changed()
+      }
+
+      if (to) {
+        return this.#slash(`/${to.name}${arg ? ` ${arg}` : ''}`, false)
+      }
+    }
+
+    if (!sid) {
       return
     }
 
     const title = `/${name}${arg ? ` ${arg}` : ''}`
 
     try {
-      const r = await this.#gw.request<unknown>('slash.exec', { command: text.slice(1), session_id: this.sid })
+      const r = await this.#gw.request<unknown>('slash.exec', { command: text.slice(1), session_id: sid })
+
+      if (stale()) {
+        return
+      }
 
       await this.#dispatched(r, title, arg)
     } catch (error) {
+      if (stale()) {
+        return
+      }
+
       // Only "slash.exec does not own this command" (skills, bundles) falls through to command.dispatch;
       // re-dispatching any other refusal could run a mutating command twice.
       if (isUnsupportedCommand(error) || !shouldFallbackToDispatch(error)) {
         this.transcript.notice(describeSlashExecError(name, error), isUnsupportedCommand(error) ? 'warning' : 'error')
       } else {
         try {
-          await this.#dispatched(
-            await this.#gw.request<unknown>('command.dispatch', { arg, name, session_id: this.sid }),
-            title,
-            arg
-          )
+          const r = await this.#gw.request<unknown>('command.dispatch', { arg, name, session_id: sid })
+
+          if (stale()) {
+            return
+          }
+
+          await this.#dispatched(r, title, arg)
         } catch (dispatchError) {
+          if (stale()) {
+            return
+          }
+
           this.transcript.notice(describeSlashExecError(name, dispatchError), 'error')
         }
       }
@@ -956,10 +1308,7 @@ export class App implements OverlayHost {
       busy: Boolean(this.busy),
       // A steer that fell back to the queue: steering carries no images.
       canonical: this.#gw.isCanonical,
-      enqueue: text => {
-        this.queue.push({ images: [], text })
-        this.changed()
-      },
+      enqueue: text => this.#queueBehind({ images: [], text }),
       gw: this.#gw,
       notice: (text, tone) => {
         this.transcript.notice(text, tone)
@@ -974,7 +1323,7 @@ export class App implements OverlayHost {
         this.transcript.panel(title, text)
         this.changed()
       },
-      queued: this.queue.length,
+      queued: this.#queuedCount(),
       reload: async () => {
         if (sid && this.sid === sid) {
           await this.#resume(sid)
@@ -987,7 +1336,8 @@ export class App implements OverlayHost {
         this.transcript.steer(text)
         this.changed()
       },
-      submit: text => this.#submit(text)
+      // /queue: behind the turn whatever busy_input_mode says.
+      submit: text => this.#submit(text, true, 'queue')
     }
   }
 
@@ -1025,7 +1375,7 @@ export class App implements OverlayHost {
 
     try {
       if (this.#gw.isCanonical) {
-        const image = { ...(await uploadImage(this.#gw, sid, path, process.env.HERMES_CWD || process.cwd())), name: basename(path) }
+        const image = this.#image(await uploadImage(this.#gw, sid, path, process.env.HERMES_CWD || process.cwd()), basename(path))
         // The startup query waits at the queue's head for this image.
         const images = this.queue[0]?.images ?? this.#attachments
         images.push(image)
@@ -1094,8 +1444,7 @@ export class App implements OverlayHost {
 
       if (!this.#switches.current(token)) {
         // A later switch won; nothing will ever show this session.
-        this.#subscribe(r)
-        void this.#leave(r.session_id, 'tui_close')
+        this.#stale.push(r)
 
         return
       }
@@ -1139,7 +1488,7 @@ export class App implements OverlayHost {
       return false
     }
 
-    this.transcript.notice('Wait for the current turn to finish (or press Esc) before switching sessions.', 'warning')
+    this.transcript.notice('Wait for the current turn to finish (or press Esc twice) before switching sessions.', 'warning')
     this.changed()
 
     return true
@@ -1167,11 +1516,21 @@ export class App implements OverlayHost {
     let snapshot: CreateResult | undefined
 
     try {
+      const detaching = this.#detaching.get(id)
+
+      if (detaching) {
+        // A detach that lands after this attach would drop the subscription the attach reuses.
+        await detaching
+
+        if (!this.#switches.current(token)) {
+          return undefined
+        }
+      }
+
       const r = await this.#gw.request<CreateResult>('session.resume', { cols: this.#tern.caps.cols, session_id: id })
 
       if (!this.#switches.current(token)) {
-        this.#subscribe(r)
-        void this.#leave(r.session_id, 'tui_close')
+        this.#stale.push(r)
 
         return undefined
       }
@@ -1180,7 +1539,9 @@ export class App implements OverlayHost {
       this.transcript.push({ id: this.transcript.id('w'), kind: 'welcome' })
       this.#adopt(r)
       snapshot = r
-      // An approval or question already waiting on the session opens its sheet.
+      // An approval or question already waiting on the session opens its sheet. A sheet from before
+      // the reattach may have been answered or pruned meanwhile (its settled event is not replayed).
+      this.#dropPrompts(key => key.startsWith(`prompt:${sharedPromptId('')}`))
       this.#gw.hydrateSharedPrompts(r)
 
       return r
@@ -1196,7 +1557,14 @@ export class App implements OverlayHost {
     if (r.session_id !== this.sid) {
       // The last session's approvals and questions are not this one's (a resume hydrates its own after).
       this.#dropPrompts(() => true)
+      this.#busyMode = 'queue'
     }
+
+    // Read on every adopt: a reconnect may land on a gateway whose config changed.
+    void this.#readBusyMode(r.session_id)
+
+    // The session's own queue, from the snapshot (a reattach's rows of this pane become read-only rows).
+    this.#server.reset(pendingRows(r.info))
 
     this.sid = r.session_id
     this.#showThoughts(r.session_id)
@@ -1211,7 +1579,7 @@ export class App implements OverlayHost {
     this.title = ''
     this.#setTitle(typeof r.info?.title === 'string' ? r.info.title : undefined)
     this.#readTitle()
-    // A resumed session may be mid-turn: Esc stops it and new prompts queue behind it.
+    // A resumed session may be mid-turn: Esc Esc stops it and new prompts go as busy_input_mode says.
     this.busy = busyFrom(r)
     // The last session's notices and status lines are not this one's.
     this.#notices.reset()
@@ -1222,12 +1590,14 @@ export class App implements OverlayHost {
     if (r.messages?.length) {
       this.transcript.load(r.messages)
       this.agents.scan()
+      this.media.showAll(this.transcript.entries, call => this.#imageLanded(call))
     }
 
     // The new session's processes and PRs (and none of the last one's), and its open connect cards.
     this.processes.poke()
     this.#watchConnections()
     this.prs.adopt()
+    this.automation.adopt(r.session_id)
 
     if (r.inflight) {
       this.transcript.inflight(r.inflight, this.busy?.startedAt)
@@ -1257,9 +1627,53 @@ export class App implements OverlayHost {
     }
 
     this.#subscriptions.delete(sid)
-    await this.#gw
-      .request('session.detach', { end_reason: endReason, session_id: sid, subscription_id: subscription })
-      .catch(() => undefined)
+    await this.#detach(sid, subscription, endReason)
+  }
+
+  /** Sends `session.detach`, one at a time per session; `endReason` lets the owner end it once no viewer remains. */
+  #detach(sid: string, subscription: string, endReason?: 'tui_close' | 'tui_shutdown') {
+    const send = () =>
+      this.#gw.request('session.detach', {
+        ...(endReason ? { end_reason: endReason } : {}),
+        session_id: sid,
+        subscription_id: subscription
+      })
+    const run = (this.#detaching.get(sid)?.then(send) ?? send()).catch(() => undefined)
+    this.#detaching.set(sid, run)
+    void run.then(() => {
+      if (this.#detaching.get(sid) === run) {
+        this.#detaching.delete(sid)
+      }
+    })
+
+    return run
+  }
+
+  /**
+   * Releases what superseded switches attached, once the adopted session is known. The gateway gives
+   * this view one subscription per session, so a stale result for the shown session is the live
+   * view's own and stays; others detach with no end reason (nobody chose to close them).
+   */
+  #disposeStale() {
+    const stale = this.#stale
+    this.#stale = []
+
+    for (const r of stale) {
+      if (r.session_id === this.sid || (r.subscription_id && this.#subscriptions.get(r.session_id) === r.subscription_id)) {
+        continue
+      }
+
+      if (!this.#gw.isCanonical) {
+        void this.#gw.request('session.close', { session_id: r.session_id }).catch(() => undefined)
+      } else if (r.subscription_id) {
+        void this.#detach(r.session_id, r.subscription_id)
+      }
+    }
+  }
+
+  /** Acts on a command's dispatch envelope from outside a typed command (a goal or loop sheet's button). */
+  runDispatch(raw: unknown, title: string): Promise<void> {
+    return this.#dispatched(raw, title, '')
   }
 
   /** Acts on a slash.exec / command.dispatch answer: output, a skill or message to send, an alias or a prefill. */
@@ -1322,6 +1736,7 @@ export class App implements OverlayHost {
       return
     }
 
+    this.#disposeStale()
     const held = this.#heldRequests
     this.#heldRequests = []
 
@@ -1346,6 +1761,7 @@ export class App implements OverlayHost {
     switch (ev.type) {
       case 'gateway.ready':
         this.#offline = false
+        this.#reconnected()
         this.#applySkin(ev.payload?.skin)
         // A reconnect's ready reattaches the shown session; only a sessionless app bootstraps.
         void (this.storedSid ? this.#reattach(this.storedSid) : this.#bootstrap())
@@ -1357,11 +1773,29 @@ export class App implements OverlayHost {
 
         break
 
+      // The goal and loop line: every set, pause, resume, stop, wakeup and judged turn.
+      case 'session.control.update':
+        this.automation.apply(ev.session_id ?? this.sid, ev.payload?.control)
+
+        return
+
+      case 'gateway.reconnecting':
+        this.#reconnect(ev.payload?.attempt ?? 1, ev.payload?.delay_ms ?? 0)
+
+        break
+
       case 'session.info': {
         const cwd = this.info?.cwd
         // The shared owner's idle fanout carries only pending/revision/generation: merge, never replace.
         this.info = ev.payload ? { ...this.info, ...ev.payload } : this.info
         this.usage = ev.payload?.usage ?? this.usage
+
+        // A queued prompt the gateway started gets its bubble now, after the reply it waited for.
+        for (const started of this.#server.update(pendingRows(ev.payload))) {
+          const own = started.own?.item.item
+          t.started(own ? own.text : started.text, undefined, own ? userImages(own.images) : [])
+        }
+
         this.#setTitle(typeof ev.payload?.title === 'string' ? ev.payload.title : undefined)
 
         // Another folder: another branch, maybe another PR.
@@ -1416,6 +1850,12 @@ export class App implements OverlayHost {
         }
 
         t.start()
+
+        // A delegation's completion turn carries its model text: each task's outcome, which a log
+        // this process cannot read (a remote gateway) never told.
+        if (ev.payload?.display_kind === 'async_delegation_complete' && ev.payload.text) {
+          this.agents.settle(ev.payload.text)
+        }
 
         break
 
@@ -1474,6 +1914,8 @@ export class App implements OverlayHost {
           // The call as its step reads (a bridged or connector call as its app), not its wire name.
           const call = t.call(ev.payload.tool_id)
           this.#label(call ? busyLabel(call) : `Running ${ev.payload.name}…`)
+          // vision_analyze names its image up front.
+          this.#showImage(call)
         }
 
         break
@@ -1481,8 +1923,14 @@ export class App implements OverlayHost {
       case 'tool.complete':
         if (ev.payload) {
           t.toolComplete(ev.payload)
+          this.#showImage(t.call(ev.payload.tool_id))
           // A dispatched delegation: its agents' rows start following the owner.
           this.agents.scan()
+
+          if (ev.payload.name === 'delegate_task') {
+            // Its subagents (a foreground call's have ended) may have linked PRs.
+            this.prs.relink()
+          }
 
           if (LINK_TOOLS.has(ev.payload.name)) {
             const call = this.transcript.calls(ev.payload.name).at(-1)
@@ -1535,9 +1983,18 @@ export class App implements OverlayHost {
           t.subagent(ev.type, ev.payload)
         }
 
+        if (ev.type === 'subagent.complete') {
+          this.agentEnded()
+        }
+
         break
 
       case 'message.complete':
+        // prompt.cancel settles a withdrawn queued row with a completion of its own.
+        if (this.#server.settlesQueuedRow(ev.payload)) {
+          return
+        }
+
         t.complete(ev.payload ?? {})
         this.busy = null
         this.#compacting = false
@@ -1675,7 +2132,7 @@ export class App implements OverlayHost {
 
       case 'clarify.request': {
         const req = sharedPromptRequest(ev, this.#gw, message => {
-          t.notice(message, 'error')
+          t.notice(message, 'warning')
           this.changed()
         })
 
@@ -1744,6 +2201,19 @@ export class App implements OverlayHost {
     }
   }
 
+  /** One line for the whole outage: each try replaces it, and re-renders when the wait ends. */
+  #reconnect(attempt: number, delayMs: number) {
+    clearTimeout(this.#reconnectTimer)
+    this.#reconnecting = { attempt, dueAt: Date.now() + delayMs }
+    this.#reconnectTimer = setTimeout(() => this.changed(), delayMs + 50)
+    this.#reconnectTimer.unref?.()
+  }
+
+  #reconnected() {
+    clearTimeout(this.#reconnectTimer)
+    this.#reconnecting = undefined
+  }
+
   #applySkin(skin: SkinPayload | null | undefined) {
     if (skin) {
       this.#skin = skin
@@ -1804,56 +2274,161 @@ export class App implements OverlayHost {
     })
   }
 
-  /** Steps the session's reasoning effort up hermes's ladder; session.info echoes it back. */
+  /** Steps the session's reasoning effort up the levels its model takes; session.info echoes it back. */
   #cycleEffort() {
-    const at = EFFORTS.indexOf(this.info?.reasoning_effort ?? '')
+    const next = nextEffort(this.info?.reasoning_effort ?? '', capsOf(this.info))
 
-    void this.setEffort(EFFORTS[at < 0 ? EFFORTS.indexOf('medium') : (at + 1) % EFFORTS.length]!, 'session')
+    if (!next) {
+      this.transcript.notice('This model has no reasoning effort to set.', 'warning')
+
+      return this.changed()
+    }
+
+    void this.setEffort(next, 'session')
   }
 
   /**
    * Sets the reasoning effort: `session` for this session only (the pill, ⇧⇥), `global` also as
    * config.yaml's `agent.reasoning_effort`, the default of every new session (Hermes' `/reasoning
-   * <level> --global`).
+   * <level> --global`). On the shared gateway the session level is its revision-fenced `reasoning`
+   * mutation, as Ink and desktop send it: stored with the session, and session.info to every viewer.
    */
   async setEffort(value: string, scope: 'global' | 'session') {
-    if (!this.sid) {
+    const sid = this.sid
+
+    if (!sid) {
       return
     }
 
-    // Shown at once (and a quick second press steps from it); session.info confirms.
-    this.info = this.info && { ...this.info, reasoning_effort: value }
+    const before = this.info && { reasoning_effort: this.info.reasoning_effort, reasoning_effort_wire: this.info.reasoning_effort_wire }
+    // Shown at once (and a quick second press steps from it); session.info confirms, with the wire level.
+    this.info = this.info && { ...this.info, reasoning_effort: value, reasoning_effort_wire: undefined }
     this.changed()
 
     try {
-      await this.#gw.request('config.set', { key: 'reasoning', scope, session_id: this.sid, value })
+      if (scope === 'session' && this.#gw.isCanonical) {
+        await mutateSession(this.#gw, sid, 'reasoning', { effort: value })
+      } else {
+        await this.#gw.request('config.set', { key: 'reasoning', scope, session_id: sid, value })
+      }
 
       if (scope === 'global') {
         this.transcript.notice(`Reasoning effort ${value === 'none' ? 'off' : value} is now the default for new sessions.`)
       }
     } catch (error) {
-      this.transcript.notice(error instanceof Error ? error.message : String(error), 'error')
+      // Back to what the session runs, unless something newer has replaced the guess since.
+      if (sid === this.sid && this.info && before && this.info.reasoning_effort === value) {
+        this.info = { ...this.info, ...before }
+      }
+
+      this.transcript.notice(`Could not set the reasoning effort: ${error instanceof Error ? error.message : String(error)}`, 'error')
     }
 
     this.changed()
   }
 
-  /** Alt+Up / the queue's Edit: the oldest queued prompt back into an empty composer. */
-  #dequeue() {
-    const next = this.queue.shift()
-
-    if (next !== undefined) {
-      this.#restore(next)
-      this.changed()
-    }
+  /** Prompts waiting behind the turn: this pane's own queue, then the shared gateway's. */
+  #queuedCount(): number {
+    return this.queue.length + this.#server.queued().length
   }
 
-  /** Alt+Enter / the queue's Steer: injects queued prompt `index` into the running turn instead of waiting for it to end. */
+  /** The dock's queued rows, in #queuedCount's order, with what each one's Edit and Steer can do. */
+  #queuedRows(): QueuedRow[] {
+    const steer = Boolean(this.busy)
+
+    return [
+      ...this.queue.map(q => ({ edit: true, steer, text: userText(q.text, q.images) })),
+      ...this.#server.queued().map((q): QueuedRow => {
+        if (!q.own) {
+          return { note: q.row?.status === 'unknown' ? 'unknown' : 'elsewhere', text: internalNotice(q.text) ?? q.text }
+        }
+
+        // Withdrawing it needs the gateway's id for it: until prompt.submit answers it is on its way.
+        return q.own.admissionId
+          ? { edit: true, steer: steer && !q.own.item.item.images.length, text: q.text }
+          : { pending: true, text: q.text }
+      })
+    ]
+  }
+
+  /** The shared gateway's queued row at dock index `index`, if this pane can act on it. */
+  #serverQueued(index: number): ServerQueued<Admitted> | undefined {
+    const q = this.#server.queued()[index - this.queue.length]
+
+    return q?.own?.admissionId ? q : undefined
+  }
+
+  /**
+   * Takes this pane's admission out of the gateway's queue (prompt.cancel); true once withdrawn,
+   * false when it started meanwhile (it runs as its own turn) or the gateway refused.
+   */
+  async #withdraw(sid: string, q: ServerQueued<Admitted>): Promise<boolean> {
+    const own = q.own!
+    // Its `cancelled` completion can come before the reply.
+    this.#server.withdrawn(own.admissionId!)
+
+    try {
+      const r = await this.#gw.request<{ status?: string } | null>('prompt.cancel', { admission_id: own.admissionId, session_id: sid })
+
+      if (r?.status !== 'terminal') {
+        return false
+      }
+    } catch (error) {
+      this.transcript.notice(`Could not take the prompt out of the queue: ${error instanceof Error ? error.message : String(error)}`, 'error')
+      this.changed()
+
+      return false
+    }
+
+    this.#server.drop(own)
+
+    return true
+  }
+
+  /** Alt+Up / a queued row's Edit: queued prompt `index` (the oldest by default) back into the composer. */
+  #dequeue(index = 0) {
+    if (index < this.queue.length) {
+      const [next] = this.queue.splice(index, 1)
+
+      if (next) {
+        this.#restore(next)
+        this.changed()
+      }
+
+      return
+    }
+
+    const sid = this.sid
+    const q = this.#serverQueued(index)
+
+    if (!sid || !q) {
+      return
+    }
+
+    void this.#withdraw(sid, q).then(out => {
+      if (out && sid === this.sid) {
+        this.#restore(q.own!.item.item)
+      }
+
+      this.changed()
+    })
+  }
+
+  /** Alt+Enter / a queued row's Steer: injects queued prompt `index` into the running turn instead of waiting for it to end. */
   #steerQueued(index: number) {
     const sid = this.sid
+
+    if (!this.busy || !sid) {
+      return
+    }
+
+    if (index >= this.queue.length) {
+      return void this.#steerServerQueued(sid, index)
+    }
+
     const item = this.queue[index]
 
-    if (!this.busy || !sid || !item) {
+    if (!item) {
       return
     }
 
@@ -1883,6 +2458,61 @@ export class App implements OverlayHost {
 
       this.changed()
     })
+  }
+
+  /**
+   * A Steer on a row in the gateway's queue: withdrawn from it, then steered into the turn; a steer
+   * that does not land goes back into the queue, at its end.
+   */
+  async #steerServerQueued(sid: string, index: number) {
+    const q = this.#serverQueued(index)
+
+    if (!q) {
+      return
+    }
+
+    const { item, text } = q.own!.item
+
+    if (item.images.length) {
+      this.transcript.notice('A queued prompt with images cannot steer the turn. It stays queued.', 'warning')
+
+      return this.changed()
+    }
+
+    if (!(await this.#withdraw(sid, q)) || sid !== this.sid) {
+      return
+    }
+
+    const r = await steerTurn(this.#gw, sid, text)
+
+    if (sid !== this.sid) {
+      return
+    }
+
+    if (r.ok) {
+      this.transcript.steer(item.text)
+    } else {
+      this.transcript.notice(
+        r.error ? `Steer failed: ${r.error}. Queued again, at the end.` : 'The turn ended before the steer landed. Queued again.',
+        'warning'
+      )
+      void this.#admit(sid, item, text)
+    }
+
+    this.changed()
+  }
+
+  /** Reads session `sid`'s busy_input_mode; an older gateway without it leaves Enter queueing (the TUI default). */
+  async #readBusyMode(sid: string) {
+    try {
+      const r = await this.#gw.request<{ value?: unknown } | null>('config.get', { key: 'busy', session_id: sid })
+
+      if (sid === this.sid) {
+        this.#busyMode = busyModeOf(r?.value)
+      }
+    } catch {
+      // Keeps `queue`.
+    }
   }
 
   /** Sends the oldest queued prompt once the session is adopted and idle (no turn, switch or startup image pending). */
@@ -1940,6 +2570,17 @@ export class App implements OverlayHost {
         cost: usage?.cost_usd ?? undefined,
         cwd: info?.cwd ? shortPath(info.cwd) : '',
         effort: info?.reasoning_effort ?? '',
+        effortWire: info?.reasoning_effort_wire || undefined,
+        fast: fastTier(info),
+        reasons: capsOf(info)?.reasoning,
+        automation: {
+          goal: this.automation.goal,
+          loop: this.automation.loop(now),
+          loopOwner: this.automation.loopSnapshot,
+          onGoal: () => openAutomation(this, 'goal'),
+          onLoop: () => openAutomation(this, 'loop')
+        },
+        reconnecting: this.#reconnecting,
         ghost: modal ? '' : this.#completion.ghost,
         inputId: INPUT_ID,
         model: info?.model ?? '',
@@ -1951,11 +2592,11 @@ export class App implements OverlayHost {
         onEffort: () => this.#cycleEffort(),
         onEffortMenu: {
           'choose-effort': () => openEffortPicker(this),
-          'save-effort-as-default': () => void this.setEffort(this.info?.reasoning_effort || 'medium', 'global')
+          'save-effort-as-default': () => void this.setEffort(this.info?.reasoning_effort || DEFAULT_EFFORT, 'global')
         },
         onInterrupt: () => this.#interrupt(),
         onModel: () => openModelPicker(this),
-        onQueueEdit: () => this.#dequeue(),
+        onQueueEdit: i => this.#dequeue(i),
         onQueueSteer: this.busy ? i => this.#steerQueued(i) : undefined,
         onSend: ev => {
           this.#submit(ev.text)
@@ -1971,13 +2612,25 @@ export class App implements OverlayHost {
         },
         agents: { onOpen: () => openAgents(this), running: this.agents.running().length },
         prs: prsPill(this.prs.entries(), () => openPullRequests(this)),
-        attachments: this.#attachments.map((a, i) => ({
-          label: a.name,
-          onRemove: () => {
-            this.#attachments.splice(i, 1)
-            this.changed()
-          }
-        })),
+        attachments: [
+          ...this.#attachments.map((a, i) => ({
+            caption: a.caption,
+            image: a.preview,
+            label: a.name,
+            onRemove: () => {
+              this.#attachments.splice(i, 1)
+              this.changed()
+            }
+          })),
+          ...this.#attaching.map(slot => ({
+            label: slot.name,
+            onRemove: () => {
+              this.#endAttaching(slot)
+              this.changed()
+            },
+            pending: true
+          }))
+        ],
         status: {
           compressions: typeof usage?.compressions === 'number' ? usage.compressions : undefined,
           notice: this.#notices.current(now),
@@ -2011,7 +2664,7 @@ export class App implements OverlayHost {
           tps: typeof usage?.avg_tps === 'number' && usage.avg_tps > 0 ? usage.avg_tps : undefined
         },
         placeholder: 'Ask Hermes — / commands · @ files',
-        queued: this.queue.map(q => q.text),
+        queued: this.#queuedRows(),
         ready: this.sid !== null
       }),
       layer: [
@@ -2031,6 +2684,26 @@ export class App implements OverlayHost {
       this.#surface.focus(focus)
     }
   }
+}
+
+/** A prompt's bubble: its text, and how many images went with it. */
+/** A queued prompt's dock line: its words and how many images it carries. */
+function userText(text: string, images: readonly unknown[]): string {
+  const count = images.length ? `📎 ${images.length} image${images.length === 1 ? '' : 's'}` : ''
+
+  return [text, count].filter(Boolean).join('\n\n')
+}
+
+/** A sent prompt's images, drawn as thumbnails in its bubble. */
+function userImages(images: readonly Image[]): UserAttachment[] {
+  return images.map(i => ({ kind: 'image', name: i.name, ...(i.preview ? { source: i.preview } : {}) }))
+}
+
+/** The shared gateway's FIFO on a session.info or snapshot `info` (the client maps `pending` to it). */
+function pendingRows(info: unknown): PendingRow[] | undefined {
+  const rows = (info as { pending_submissions?: unknown } | null | undefined)?.pending_submissions
+
+  return Array.isArray(rows) ? (rows as PendingRow[]) : undefined
 }
 
 /** `( •_•)>⌐■-■ cogitating...` → `Cogitating…`: hermes's kawaii status without the face. */

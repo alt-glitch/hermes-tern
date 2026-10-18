@@ -51,6 +51,28 @@ describe('storedSessions', () => {
     expect(lastReply('root', path)).toBe('newest answer')
   })
 
+  it('lists a local conversation reset in place once, by its newest segment', () => {
+    const path = db()
+    const conn = new DatabaseSync(path)
+    conn.exec('CREATE TABLE state_meta (key TEXT PRIMARY KEY, value TEXT)')
+    const add = conn.prepare(`INSERT INTO sessions (id, source, parent_session_id, model_config, end_reason, last_activity_at,
+      started_at, title, cwd, message_count) VALUES (?,?,?,?,?,?,?,?,?,?)`)
+    // Owner `own` was reset into `seg2`; `seg2` was compressed into `seg2b`, then reset into `seg3`.
+    add.run('own', 'tui', null, '{}', 'session_reset', 300, 300, 'Start', '/w/a', 2)
+    add.run('seg2', 'tui', 'own', '{"_reset_from":"own"}', 'compression', 400, 400, '', '/w/a', 3)
+    add.run('seg2b', 'tui', 'seg2', '{}', 'session_reset', 450, 420, '', '/w/a', 5)
+    add.run('seg3', 'tui', 'seg2b', '{"_reset_from":"seg2b"}', null, 1000, 600, 'Now', '/w/a', 1)
+    conn.prepare('INSERT INTO state_meta VALUES (?, ?)').run(
+      'gateway.local_policy.v1:own',
+      JSON.stringify({ lineage: ['own', 'seg2', 'seg2b', 'seg3'], session_id: 'own' })
+    )
+    // A receipt with no reset yet lists its one row as before.
+    conn.prepare('INSERT INTO state_meta VALUES (?, ?)').run('gateway.local_policy.v1:plain', JSON.stringify({ lineage: ['plain'], session_id: 'plain' }))
+    conn.close()
+
+    expect(storedSessions(50, path).map(r => r.id)).toEqual(['seg3', 'root', 'plain', 'keep'])
+  })
+
   it('is empty without a database', () => {
     expect(storedSessions(5, '/nonexistent/state.db')).toEqual([])
   })

@@ -223,6 +223,26 @@ describe('PullRequests', () => {
     store.dispose()
   })
 
+  it("re-reads the stored links for a subagent's link, which this transcript never sees", async () => {
+    const gh = { graphql: vi.fn(async () => ({})), rest: vi.fn() } as unknown as GitHub
+    const changed = vi.fn()
+    let stored = [ref(1)]
+    const links = vi.fn(() => stored)
+    const store = new PullRequests({ changed, cwd: () => null, sid: () => 's1' }, gh, links)
+
+    store.adopt()
+    store.relink()
+    expect(changed).toHaveBeenCalledTimes(1)
+
+    stored = [ref(1), ref(2)]
+    store.relink()
+
+    expect(links).toHaveBeenLastCalledWith('s1')
+    expect(store.entries().map(e => e.ref.number)).toEqual([1, 2])
+    expect(changed).toHaveBeenCalledTimes(2)
+    store.dispose()
+  })
+
   it('says once why nothing could be read', async () => {
     const gh = { graphql: vi.fn(async () => Promise.reject(new Error('Not logged in to github.com.'))), rest: vi.fn() } as unknown as GitHub
     const store = new PullRequests({ changed: vi.fn(), cwd: () => null, sid: () => 's1' }, gh, () => [ref(1), ref(2)])

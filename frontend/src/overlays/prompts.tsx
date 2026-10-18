@@ -25,7 +25,7 @@ interface Option {
   role?: string
 }
 
-interface Button {
+export interface Button {
   key: string
   label: string
   keys: string[]
@@ -59,7 +59,7 @@ export function promptTimeoutNotice(method: unknown, reason: unknown): string | 
   return reason === 'timeout' && typeof method === 'string' ? (TIMEOUT_NOTICES[method] ?? null) : null
 }
 
-function actionsRow(buttons: Button[]): JSX.Element {
+export function actionsRow(buttons: Button[]): JSX.Element {
   return (
     <row align="center" gap="sm" key="actions" role="omp.actions">
       <spacer grow={1} key="fill" />
@@ -126,6 +126,72 @@ function optionList(
   )
 }
 
+/** An answer's progress on its sheet: in flight (a second answer waits), or refused with why. */
+interface Sending {
+  busy: boolean
+  error: string
+}
+
+/**
+ * Answers `req`; the sheet closes once the answer lands. A shared prompt's `respond` returns its RPC
+ * (hermes/sharedPrompts.ts), as Ink's card waits on approval.respond: a refusal keeps the sheet open
+ * with the reason, to answer again. Another viewer's answer still closes it (`*.settled`).
+ */
+function answerWith(
+  host: OverlayHost,
+  overlay: Overlay,
+  req: ServerRequest,
+  state: Sending,
+  result: Record<string, unknown>
+) {
+  if (state.busy) {
+    return
+  }
+
+  const sent: unknown = req.respond(result)
+
+  if (!isThenable(sent)) {
+    return host.close(overlay)
+  }
+
+  state.busy = true
+  state.error = ''
+  host.changed()
+  sent.then(
+    () => host.close(overlay),
+    (error: unknown) => {
+      state.busy = false
+      state.error = error instanceof Error ? error.message : String(error)
+      host.changed()
+    }
+  )
+}
+
+const isThenable = (v: unknown): v is PromiseLike<unknown> =>
+  typeof v === 'object' && v !== null && typeof (v as { then?: unknown }).then === 'function'
+
+/** An answer no sheet waits on: a refusal has nowhere to show, and must not surface as an unhandled rejection. */
+function settleQuietly(sent: unknown) {
+  if (isThenable(sent)) {
+    sent.then(undefined, () => undefined)
+  }
+}
+
+/** The line under a sheet's question while its answer is in flight or after a refusal. */
+function sendingLine(state: Sending): JSX.Element | null {
+  if (state.error) {
+    return (
+      <text
+        key="sending"
+        spans={[{ s: 'error', t: `Not answered: ${state.error}. Answer again, or Esc to close without answering.` }]}
+        wrap="word"
+      />
+    )
+  }
+
+  return state.busy ? <text key="sending" spans={[{ s: 'dim', t: 'Sending…' }]} /> : null
+}
+
 /** ↑/↓ (⌃P/⌃N) through `count` rows, wrapping; undefined when `key` isn't a move. */
 function moved(key: Key, at: number, count: number): number | undefined {
   if (key.name === 'up' || (key.ctrl && key.name === 'p')) {
@@ -148,7 +214,7 @@ export function promptOverlay(host: OverlayHost, req: ServerRequest): Overlay | 
     case 'clarify':
       if (!questionsOf(req.params.questions).length) {
         // Nothing to ask: answer at once (the first answer wins, so the caller's decline is a no-op).
-        req.respond({})
+        settleQuietly(req.respond({}))
 
         return null
       }
@@ -204,17 +270,17 @@ function approvalOverlay(host: OverlayHost, req: ServerRequest): Overlay {
 
   const options = APPROVALS.filter(o => allowed.has(o.id))
   const key = `prompt:${req.id}`
+  const sending: Sending = { busy: false, error: '' }
   let selected = 0
 
-  const answer = (choice: string) => {
-    req.respond({ choice })
-    host.close(overlay)
-  }
+  const answer = (choice: string) => answerWith(host, overlay, req, sending, { choice })
+  // After a refused answer, Esc closes the sheet unanswered: a retry may never land (a stale turn).
+  const decline = () => (sending.error ? host.close(overlay) : answer('deny'))
 
   const overlay: Overlay = {
     key,
     modal: true,
-    cancel: () => answer('deny'),
+    cancel: decline,
     node: id => (
       <overlay anchor="bottom" key={key} modal role="omp.overlay.ask" size="md">
         <col gap="md" key="body">
@@ -240,6 +306,7 @@ function approvalOverlay(host: OverlayHost, req: ServerRequest): Overlay {
             },
             i => answer(options[i]?.id ?? 'deny')
           )}
+          {sendingLine(sending)}
           {actionsRow([
             { hint: 'n · escape', key: 'deny', keys: ['escape'], label: 'Deny', onClick: () => answer('deny') },
             {
@@ -258,15 +325,15 @@ function approvalOverlay(host: OverlayHost, req: ServerRequest): Overlay {
       const n = Number.parseInt(k.name, 10)
       const to = moved(k, selected, options.length)
 
-      if (isCtrlC(k)) {
-        answer('deny')
+      if (isCtrlC(k) || k.name === 'escape') {
+        decline()
       } else if (to !== undefined) {
         selected = to
       } else if (n >= 1 && n <= options.length) {
         answer(options[n - 1]?.id ?? 'deny')
       } else if (k.name === 'enter') {
         answer(options[selected]?.id ?? 'deny')
-      } else if (k.name === 'escape' || k.name === 'n') {
+      } else if (k.name === 'n') {
         answer('deny')
       } else if (k.name === 'y') {
         answer('once')
@@ -345,6 +412,10 @@ function clarifyOverlay(host: OverlayHost, req: ServerRequest): Overlay {
   }))
 
   const key = `prompt:${req.id}`
+  const sending: Sending = { busy: false, error: '' }
+  const respond = (result: Record<string, unknown>) => answerWith(host, overlay, req, sending, result)
+  // After a refused answer, Esc closes the sheet unanswered: a retry may never land (a stale turn).
+  const cancel = () => (sending.error ? host.close(overlay) : respond({}))
 
   let step = Math.max(
     0,
@@ -380,8 +451,7 @@ function clarifyOverlay(host: OverlayHost, req: ServerRequest): Overlay {
       return
     }
 
-    req.respond({ answers })
-    host.close(overlay)
+    respond({ answers })
   }
 
   /** The answer the current question would get from Enter / Submit. */
@@ -450,10 +520,7 @@ function clarifyOverlay(host: OverlayHost, req: ServerRequest): Overlay {
     key,
     modal: true,
     // Every question at once: an empty answer is the contract's cancel ('' skips on the shared wire).
-    cancel: () => {
-      req.respond({})
-      host.close(overlay)
-    },
+    cancel,
     focus: id => {
       const q = questions[step]
       const d = drafts[step]
@@ -528,6 +595,7 @@ function clarifyOverlay(host: OverlayHost, req: ServerRequest): Overlay {
                 text={d.other.text}
               />
             ) : null}
+            {sendingLine(sending)}
             {actionsRow([
               { hint: 'escape', key: 'skip', keys: ['escape'], label: 'Skip', onClick: () => commit(null) },
               {
@@ -554,10 +622,9 @@ function clarifyOverlay(host: OverlayHost, req: ServerRequest): Overlay {
       const typing = d.typing || !q.choices.length
       const count = q.choices.length + 1
 
-      if (isCtrlC(k)) {
+      if (isCtrlC(k) || (k.name === 'escape' && sending.error)) {
         // The whole card, not just this question: an empty answer is cancel-all ('' on the shared wire).
-        req.respond({})
-        host.close(overlay)
+        cancel()
       } else if (k.name === 'tab' && questions.length > 1) {
         go(step + (k.shift ? -1 : 1))
       } else if (k.name === 'escape' && typing && q.choices.length) {
@@ -648,17 +715,23 @@ function maskedOverlay(host: OverlayHost, req: ServerRequest): Overlay {
         ? [str(p.hint), 'typed into the page only · never shown to the model'].filter(Boolean).join(' · ')
         : ''
 
-  // `''` is the contract's "skipped / declined".
+  const sending: Sending = { busy: false, error: '' }
+
+  // `''` is the contract's "skipped / declined"; after a refused answer, cancel closes the sheet unanswered.
   const finish = (cancel: boolean) => {
     const [first, second] = fields
-    req.respond({
+
+    if (cancel && sending.error) {
+      return host.close(overlay)
+    }
+
+    answerWith(host, overlay, req, sending, {
       value: cancel
         ? ''
         : login
           ? JSON.stringify({ identifier: first?.value.text ?? '', password: second?.value.text ?? '' })
           : (first?.value.text ?? '')
     })
-    host.close(overlay)
   }
 
   const overlay: Overlay = {
@@ -698,6 +771,7 @@ function maskedOverlay(host: OverlayHost, req: ServerRequest): Overlay {
               text={f.masked ? maskOf(f.value.text) : f.value.text}
             />
           ))}
+          {sendingLine(sending)}
           {actionsRow([
             { hint: 'escape', key: 'cancel', keys: ['escape'], label: 'Cancel', onClick: () => finish(true) },
             {

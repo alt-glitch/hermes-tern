@@ -254,17 +254,32 @@ export const STYLES = css`
     font: 400 13px/22px var(--sans) !important;
   }
 
-  /* An image the next prompt carries: a chip in the composer; a click drops it. */
-  [data-role='hermes.composer.image'] {
+  /* An image the next prompt carries: Tern's omp chip (thumbnail, name, size) with a ✕ after
+     them, in a third column of its grid. */
+  .sf-card[data-role='omp.composer.chip'] > .sf-card-body > [data-role='hermes.composer.remove'] {
+    grid-column: 3;
+    grid-row: 1 / 3;
+    align-self: center;
+    width: 20px;
+    height: 20px;
+    margin-right: -6px;
+    border-radius: 6px;
+    color: var(--t3);
+    cursor: pointer;
+  }
+
+  .sf-card[data-role='omp.composer.chip'] > .sf-card-body > [data-role='hermes.composer.remove']:hover {
+    background: var(--l2);
+    color: var(--t1);
+  }
+
+  /* A prompt's file, or an image whose file is gone: a quiet chip beside its thumbnails. */
+  [data-role='hermes.user.attachment'] {
+    max-width: 240px;
     padding: 1px 8px !important;
     border-radius: 999px;
     background: var(--l1);
     font: 500 12px/20px var(--sans) !important;
-    cursor: pointer;
-  }
-
-  [data-role='hermes.composer.image']:hover {
-    background: var(--l2);
   }
 
   /* omp's ask theme draws a radio at the start of each option without moving the text over. */
@@ -300,6 +315,94 @@ export const STYLES = css`
     height: 15px;
     min-width: 18px;
     font-size: 10px;
+  }
+
+  /* The standing goal and loop, and the reconnect notice: quiet lines above the pills, as wide as
+     the composer. A goal or loop part is a soft capsule that opens its sheet. */
+  [data-role='hermes.automation'],
+  [data-role='hermes.reconnect'] {
+    width: min(736px, calc(100% - 8px));
+    margin: 0 auto 6px !important;
+    font: 400 12.5px/22px var(--sans) !important;
+    color: var(--t2);
+  }
+
+  [data-role='hermes.reconnect'] {
+    padding: 0 10px !important;
+  }
+
+  [data-role='hermes.reconnect'] .sf-elapsed,
+  [data-role='hermes.automation.count'] {
+    font-variant-numeric: tabular-nums;
+    color: var(--t2);
+  }
+
+  /* Each capsule takes its content's width and gives way by truncating its words, never its count. */
+  .sf-row[data-role='hermes.automation.item'] {
+    flex: 0 1 auto;
+    max-width: 100%;
+    min-width: 0;
+    overflow: hidden;
+    padding: 1px 10px !important;
+    border-radius: 999px;
+    background: var(--l1);
+    cursor: pointer;
+    transition: background 0.15s ease;
+  }
+
+  .sf-row[data-role='hermes.automation.item']:hover {
+    background: var(--l2);
+  }
+
+  .sf-row[data-role='hermes.automation.item'][data-mark='pick'] {
+    box-shadow: inset 0 0 0 1px var(--accent) !important;
+  }
+
+  .sf-row[data-role='hermes.automation.item'][data-mark='pick']::after {
+    display: none;
+  }
+
+  [data-role='hermes.automation.label'] {
+    flex: none;
+    color: var(--t1);
+    font-weight: 500;
+  }
+
+  [data-role='hermes.automation.what'] {
+    flex: 0 1 auto !important;
+    min-width: 0;
+    overflow: hidden;
+    color: var(--t2);
+  }
+
+  [data-role='hermes.automation.item'] > :not([data-role='hermes.automation.what']) {
+    flex: none;
+  }
+
+  [data-role='hermes.automation.when'] {
+    margin-left: 6px;
+  }
+
+  [data-role='hermes.automation.item'] .sf-meter {
+    margin-left: 6px;
+  }
+
+  [data-role='hermes.automation.item'] .sf-meter {
+    flex: none;
+    width: 44px;
+  }
+
+  [data-role='hermes.automation.title'] {
+    font-size: 15px !important;
+  }
+
+  /* Fast mode: a bolt on the model chip. */
+  [data-role='hermes.composer.fast'] {
+    margin-left: -2px;
+  }
+
+  [data-role='hermes.composer.fast'] + [data-role='hermes.composer.fast'] {
+    margin-left: -7px;
   }
 
   /* A background card's process line opens the Background sheet. */

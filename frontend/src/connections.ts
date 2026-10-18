@@ -4,11 +4,16 @@
 // with each app's `connect_url`, and nothing watches the authorizations. For a session this pane
 // shows, the plugin's Python half (connections.py, a `transform_tool_result` hook) keeps the links
 // out of the model's context, writes the apps and their links to
-// `plugin-data/hermes-tern/connections/<call id>.json` and watches the connector list, writing
-// each app's state there. The pane draws that file as the desktop's card: an Authorize button
-// per app, the states as they change, and the agent told as soon as every app is connected.
+// `plugin-data/hermes-tern/connections/<call id>.<op id>.json` and watches the user's accounts,
+// writing each app's state there. The pane draws that file as the desktop's card: an Authorize
+// button per app, the states as they change, and the agent told as soon as every app is connected.
+//
+// The desktop's rules (apps/desktop/src/store/connection-request.ts, connector-tool.tsx) carry over:
+// the card is named by its operation, not its call id, as models reuse call ids; the backend alone
+// moves a row; a newer call for the same account replaces the card; a settled card is a static
+// summary with no controls and no polling, its unresolved rows not connected.
 
-import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 
@@ -18,27 +23,137 @@ import { record } from './transcript.js'
 
 export const CONNECT_TOOL = 'manage_connections'
 
-/** How often the pane reads the card file while an app waits, and for how long at most. */
+/** How often the pane reads the card file while an app waits. */
 export const POLL_MS = 2000
-export const POLL_FOR_MS = 16 * 60_000
+/**
+ * A watching card whose file has not moved for this long has no watcher: its gateway restarted or
+ * hung. The watcher writes every few seconds; one slow connector read can hold it for a minute.
+ */
+export const STALE_MS = 2 * 60_000
 
 const dataDir = (env: NodeJS.ProcessEnv = process.env) => join(env.HERMES_HOME || join(homedir(), '.hermes'), 'plugin-data', 'hermes-tern')
 
-/** The card the plugin's watcher keeps for call `id`: the apps, their links and states. */
+/**
+ * Why nothing moves a card's rows any more (the desktop's settle reasons, and the plugin's own):
+ * every app resolved, the 15 minutes ran out, a newer call asked for its apps again, the watcher
+ * failed, or it stopped without a word (its gateway is gone).
+ */
+export type SettleReason = 'all_resolved' | 'deadline' | 'error' | 'stopped' | 'superseded'
+
+const REASONS = new Set<string>(['all_resolved', 'deadline', 'error', 'superseded'])
+
+/** The card the plugin's watcher keeps for one call: the apps, their links and states. */
 export interface CardFile {
+  /** Its name without `.json`: `<call id>.<op id>`, or `<call id>` from before cards had an op. */
+  key: string
   targets: unknown[]
-  /** The watcher still reads the connector list. */
-  watching: boolean
+  settled?: SettleReason
   error?: string
+  /** A pane already told the agent about it (its Continue, or every app connected). */
+  told: boolean
 }
 
-export function readCard(id: string, dir = dataDir()): CardFile | undefined {
-  try {
-    const data = JSON.parse(readFileSync(join(dir, 'connections', `${id}.json`), 'utf8')) as Partial<CardFile>
+/** connections.py `_safe`: the file name's parts. */
+const safe = (part: string) => part.replace(/[^A-Za-z0-9_-]/g, '_')
 
-    return Array.isArray(data.targets) ? { error: data.error, targets: data.targets, watching: data.watching === true } : undefined
+export const cardStem = (callId: string, opId?: string) => (opId ? `${safe(callId)}.${safe(opId)}` : safe(callId))
+
+const alive = (pid: unknown) => {
+  if (typeof pid !== 'number') {
+    return true
+  }
+
+  try {
+    process.kill(pid, 0)
+
+    return true
+  } catch (error) {
+    return (error as NodeJS.ErrnoException).code === 'EPERM'
+  }
+}
+
+export function readCard(key: string, dir = dataDir(), now = Date.now()): CardFile | undefined {
+  const file = join(dir, 'connections', `${key}.json`)
+
+  try {
+    const data = JSON.parse(readFileSync(file, 'utf8')) as Record<string, unknown>
+
+    if (!Array.isArray(data.targets)) {
+      return undefined
+    }
+
+    const error = typeof data.error === 'string' && data.error ? data.error : undefined
+    const updated = typeof data.updated_at === 'number' ? data.updated_at * 1000 : now
+    let settled: SettleReason | undefined
+
+    if (typeof data.settled_by === 'string' && REASONS.has(data.settled_by)) {
+      settled = data.settled_by as SettleReason
+    } else if (data.watching !== true) {
+      // A card from before `settled_by`: it stopped at the end, or on an error.
+      settled = error ? 'error' : data.targets.some(t => waiting({ state: String(record(t)?.state ?? '') })) ? 'deadline' : 'all_resolved'
+    } else if (!alive(data.pid) || now - updated > STALE_MS) {
+      settled = 'stopped'
+    }
+
+    return { error, key, settled, targets: data.targets, told: existsSync(join(dir, 'connections', `${key}.told`)) }
   } catch {
     return undefined
+  }
+}
+
+/**
+ * The card file of `call`. The live result names its operation (`op_id`); a stored call comes back
+ * without its result, so it goes by its call id: the one card of that id, or, as a model reuses call
+ * ids, the one written closest to when the call ran.
+ */
+export function findCard(call: Pick<ToolCall, 'id' | 'result' | 'startedAt'>, dir = dataDir()): string | undefined {
+  const op = record(call.result)?.op_id
+  const prefix = `${safe(call.id)}.`
+
+  // A call that names its operation draws that card and no other.
+  if (typeof op === 'string' && op) {
+    return existsSync(join(dir, 'connections', `${cardStem(call.id, op)}.json`)) ? cardStem(call.id, op) : undefined
+  }
+
+  let names: string[]
+
+  try {
+    names = readdirSync(join(dir, 'connections'))
+  } catch {
+    return undefined
+  }
+
+  const keys = names.flatMap(n => {
+    const key = n.endsWith('.json') ? n.slice(0, -5) : ''
+
+    return key === safe(call.id) || (key.startsWith(prefix) && !key.slice(prefix.length).includes('.')) ? [key] : []
+  })
+
+  if (keys.length < 2) {
+    return keys[0]
+  }
+
+  const createdAt = (key: string) => {
+    try {
+      const at = record(readFileSync(join(dir, 'connections', `${key}.json`), 'utf8'))?.created_at
+
+      return typeof at === 'number' ? at * 1000 : 0
+    } catch {
+      return 0
+    }
+  }
+
+  return keys.map(key => ({ gap: Math.abs(createdAt(key) - call.startedAt), key })).sort((a, b) => a.gap - b.gap)[0]?.key
+}
+
+/** Records that a pane told the agent about card `key`; false when one already had (two panes, one message). */
+export function claimTold(key: string, dir = dataDir()): boolean {
+  try {
+    writeFileSync(join(dir, 'connections', `${key}.told`), '', { flag: 'wx' })
+
+    return true
+  } catch {
+    return false
   }
 }
 
@@ -69,14 +184,28 @@ export interface ConnectTarget {
   /** `Google Drive`. */
   title: string
   alias?: string
-  /** pending, initiated, connected, skipped, failed, expired, not_connected. */
+  /** pending, initiated, connected, skipped, failed, expired, not_connected, superseded. */
   state: string
   url?: string
   detail?: string
 }
 
+/** A connect call's card as the pane last read it. */
+export interface ConnectCard {
+  /** Its file (`CardFile.key`); none when the call's own result carries the links. */
+  key?: string
+  targets: ConnectTarget[]
+  /** Nothing moves the rows any more; the card is a summary. */
+  settled?: SettleReason
+  error?: string
+  /** The agent was told (this pane's Continue or its message, or another pane's). */
+  told: boolean
+  /** The apps whose link the user opened from this card: only those wait on the browser. */
+  opened: string[]
+}
+
 /** The apps a no-card `manage_connections` result asks the user to authorize; none for other calls. */
-export function connectTargets(call: Pick<ToolCall, 'id' | 'name' | 'result'>, card?: CardFile): ConnectTarget[] {
+export function connectTargets(call: Pick<ToolCall, 'name' | 'result'>, card?: Pick<CardFile, 'targets'>): ConnectTarget[] {
   if (call.name !== CONNECT_TOOL) {
     return []
   }
@@ -85,6 +214,30 @@ export function connectTargets(call: Pick<ToolCall, 'id' | 'name' | 'result'>, c
   const targets = card?.targets ?? record(call.result)?.targets
 
   return parseTargets(Array.isArray(targets) ? targets : [])
+}
+
+/** `call`'s card: its file when the watcher keeps one, else its own result (links there, nothing watching). */
+export function loadConnect(call: ToolCall, dir = dataDir(), now = Date.now()): ConnectCard | undefined {
+  if (call.name !== CONNECT_TOOL) {
+    return undefined
+  }
+
+  const key = call.connect?.key ?? findCard(call, dir)
+  const file = key ? readCard(key, dir, now) : undefined
+  const targets = connectTargets(call, file)
+
+  if (!targets.length) {
+    return undefined
+  }
+
+  return {
+    error: file?.error,
+    key: file?.key,
+    opened: call.connect?.opened ?? [],
+    settled: file?.settled,
+    targets,
+    told: Boolean(file?.told || call.connect?.told)
+  }
 }
 
 function parseTargets(targets: unknown[]): ConnectTarget[] {
@@ -108,11 +261,23 @@ function parseTargets(targets: unknown[]): ConnectTarget[] {
 }
 
 /** A target still waiting on the user (a link to open, or a link already opened). */
-export const waiting = (t: ConnectTarget) => t.state === 'initiated' || t.state === 'pending'
+export const waiting = (t: Pick<ConnectTarget, 'state'>) => t.state === 'initiated' || t.state === 'pending'
 
-/** The call draws the connect card: it carries at least one link to authorize (here, or in its card file). */
-export function isConnectCall(call: Pick<ToolCall, 'connect' | 'id' | 'name' | 'result'>): boolean {
-  return (call.connect ?? connectTargets(call)).some(t => t.url)
+/** Every app the card still stands for is connected. */
+export const allConnected = (card: ConnectCard) => {
+  const own = card.targets.filter(t => t.state !== 'superseded')
+
+  return own.length > 0 && own.every(t => t.state === 'connected')
+}
+
+/**
+ * The call draws the connect card: it carries at least one link to authorize (here, or in its card
+ * file). A card a newer call replaced draws none, as on the desktop: its row is the plain tool call.
+ */
+export function isConnectCall(call: Pick<ToolCall, 'connect' | 'name' | 'result'>): boolean {
+  const card = call.connect
+
+  return card ? card.settled !== 'superseded' && card.targets.some(t => t.url) : connectTargets(call).some(t => t.url)
 }
 
 const and = (names: string[]) => (names.length < 3 ? names.join(' and ') : `${names.slice(0, -1).join(', ')} and ${names.at(-1)}`)
@@ -126,5 +291,7 @@ export function continueMessage(targets: readonly ConnectTarget[]): string {
 
 /** What the pane sends by itself once the watcher saw every app connect, as the desktop's card settles the call. */
 export function connectedMessage(targets: readonly ConnectTarget[]): string {
-  return `${and(targets.filter(t => t.state === 'connected').map(t => t.title))} ${targets.length === 1 ? 'is' : 'are'} connected now. Carry on.`
+  const names = targets.filter(t => t.state === 'connected').map(t => t.title)
+
+  return `${and(names)} ${names.length === 1 ? 'is' : 'are'} connected now. Carry on.`
 }

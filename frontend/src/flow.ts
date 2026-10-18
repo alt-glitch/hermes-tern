@@ -29,6 +29,11 @@ export class Switches {
     return this.#pending
   }
 
+  /** Bumped by every `begin`: read before an await, it tells whether a switch began since. */
+  get generation(): number {
+    return this.#generation
+  }
+
   /** Starts a switch and returns its token; earlier tokens go stale. */
   begin(): number {
     this.#pending = true

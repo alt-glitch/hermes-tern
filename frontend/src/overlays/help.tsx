@@ -1,11 +1,13 @@
-// `/help`: the keyboard shortcuts and every slash command, grouped by the
-// backend's `commands.catalog` categories, in omp's hotkeys sheet
-// (`omp.overlay.hotkeys`: sections of key/action tables, Close esc).
+// `/help`: the keyboard shortcuts, this frontend's own commands, and every
+// slash command grouped by the backend's `commands.catalog` categories, in
+// omp's hotkeys sheet (`omp.overlay.hotkeys`: sections of key/action tables,
+// Close esc).
 
 import type { CommandsCatalogResult } from '@hermes/shared/gateway-events'
 import type { Key, SpanData } from '@stencil-hq/tern'
 
 import type { App } from '../app.js'
+import { INK_ONLY_COMMANDS, localCommands } from '../commands.js'
 import type { Overlay } from '../overlay.js'
 
 const KEY = 'help'
@@ -26,15 +28,20 @@ const HOTKEYS: { group: string; rows: [string[], string][] }[] = [
       [['alt+d'], 'Delete word forward'],
       [['ctrl+k'], 'Delete to end of line (joins the next line at its end)'],
       [['ctrl+y'], 'Paste the last deleted text'],
-      [['ctrl+z', 'shift+ctrl+z'], 'Undo / redo']
+      [['ctrl+z', 'shift+ctrl+z'], 'Undo / redo'],
+      [['cmd+b', 'cmd+i'], 'Bold / italic (Markdown) on the selection or at the caret'],
+      [['shift+left', 'shift+right'], 'Select'],
+      [['shift+enter'], 'In a list item: the next item (an empty item ends the list)']
     ]
   },
   {
     group: 'Control',
     rows: [
-      [['escape'], 'Close the completion / interrupt the agent'],
+      [['escape'], 'Close the completion'],
+      [['escape escape'], 'Clear the draft into the history (Up brings it back) / stop the agent'],
       [['shift+tab'], 'Cycle the reasoning effort (/effort picks one; Ctrl+G there saves it as the default)'],
       [['alt+up'], 'Edit the oldest queued prompt'],
+      [['alt+enter'], 'Steer the running turn with the oldest queued prompt (empty prompt)'],
       [['alt+a'], 'Agents'],
       [['alt+b'], 'Background processes and cron jobs (/ps)'],
       [['alt+p'], 'Pull requests Hermes linked (/prs)'],
@@ -60,9 +67,19 @@ export async function openHelp(app: App) {
     )
   }
 
-  const categories = catalog.categories?.length
-    ? catalog.categories
-    : [{ name: 'Commands', pairs: catalog.pairs ?? [] }]
+  const own = localCommands().flatMap(c =>
+    c.help ? [[[`/${c.name}`, ...(c.aliases ?? []).map(a => `/${a}`)].join(' · '), c.help]] : []
+  )
+
+  // The catalog's Ink-only rows (/mouse, /logs, …) do nothing here.
+  const runs = ([command = '']: string[]) => !INK_ONLY_COMMANDS.has(command.replace(/^\//, '').split(/\s/)[0] ?? '')
+
+  const categories = [
+    { name: 'Tern', pairs: own },
+    ...(catalog.categories?.length ? catalog.categories : [{ name: 'Commands', pairs: catalog.pairs ?? [] }])
+      .map(c => ({ ...c, pairs: (c.pairs ?? []).filter(runs) }))
+      .filter(c => c.pairs.length)
+  ]
 
   const overlay: Overlay = {
     key: KEY,
