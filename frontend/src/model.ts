@@ -6,7 +6,7 @@ import type { SubagentEventPayload, Usage } from '@hermes/shared/gateway-events'
 
 import type { LiveLog } from './agents/liveLog.js'
 import type { BatchEntry } from './bridge.js'
-import type { ConnectTarget } from './connections.js'
+import type { ConnectCard } from './connections.js'
 
 /** One todo item as the `todo_list` tool reports it. */
 export interface Todo {
@@ -98,10 +98,8 @@ export interface ToolCall {
   via?: 'tool_call'
   /** A bridge call of several tools (a connector batch): each with its own outcome. */
   batch?: BatchEntry[]
-  /** A no-card `manage_connections` call's apps, their states kept current by the app's poll. */
-  connect?: ConnectTarget[]
-  /** The user pressed Continue on its connect card. */
-  connectDone?: boolean
+  /** A no-card `manage_connections` call's card: its apps, their states kept current by the app's poll. */
+  connect?: ConnectCard
 }
 
 /** A part of an assistant turn, in the order it streamed. */
