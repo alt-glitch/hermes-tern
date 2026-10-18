@@ -35,12 +35,12 @@ const dataDir = (env: NodeJS.ProcessEnv = process.env) => join(env.HERMES_HOME |
 
 /**
  * Why nothing moves a card's rows any more (the desktop's settle reasons, and the plugin's own):
- * every app resolved, the 15 minutes ran out, a newer call asked for its apps again, the watcher
- * failed, or it stopped without a word (its gateway is gone).
+ * every app resolved, the user pressed Continue, the 15 minutes ran out, a newer call asked for its
+ * apps again, the watcher failed, or it stopped without a word (its gateway is gone).
  */
-export type SettleReason = 'all_resolved' | 'deadline' | 'error' | 'stopped' | 'superseded'
+export type SettleReason = 'all_resolved' | 'continued' | 'deadline' | 'error' | 'stopped' | 'superseded'
 
-const REASONS = new Set<string>(['all_resolved', 'deadline', 'error', 'superseded'])
+const REASONS = new Set<string>(['all_resolved', 'continued', 'deadline', 'error', 'superseded'])
 
 /** The card the plugin's watcher keeps for one call: the apps, their links and states. */
 export interface CardFile {
@@ -234,7 +234,8 @@ export function loadConnect(call: ToolCall, dir = dataDir(), now = Date.now()): 
     error: file?.error,
     key: file?.key,
     opened: call.connect?.opened ?? [],
-    settled: file?.settled,
+    // Continue settles the card at once, as on the desktop; the watcher sees the claim on its next read.
+    settled: file?.settled ?? (file?.told || call.connect?.told ? 'continued' : undefined),
     targets,
     told: Boolean(file?.told || call.connect?.told)
   }

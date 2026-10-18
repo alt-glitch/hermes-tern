@@ -19,7 +19,7 @@ one, so the whole compression lineage counts), a ``transform_tool_result`` hook:
   state, until every app is resolved or 15 minutes pass. The pane tells the agent when all are.
 
 The card file is backend-owned, as the desktop's operation is: the watcher alone moves a row, and
-``settled_by`` says why it stopped (``all_resolved``, ``deadline``, ``superseded``, ``error``).
+``settled_by`` says why it stopped (``all_resolved``, ``continued``, ``deadline``, ``superseded``, ``error``).
 
 Every other surface keeps the tool's own result.
 """
@@ -252,6 +252,9 @@ def _watch(card: _Card) -> None:
                     return
                 if _status(rows, accounts, card.targets, last):
                     card.settle("all_resolved")
+                elif (_dir("connections") / f"{card.stem}.told").exists():
+                    # The user pressed Continue: the desktop settles the op there, and so does this card.
+                    card.settle("continued")
                 _write(card)
             if card.settled_by is not None:
                 return

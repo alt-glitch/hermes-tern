@@ -26700,7 +26700,7 @@ var CONNECT_TOOL = "manage_connections";
 var POLL_MS2 = 2e3;
 var STALE_MS = 2 * 6e4;
 var dataDir = (env = process.env) => join3(env.HERMES_HOME || join3(homedir3(), ".hermes"), "plugin-data", "hermes-tern");
-var REASONS = /* @__PURE__ */ new Set(["all_resolved", "deadline", "error", "superseded"]);
+var REASONS = /* @__PURE__ */ new Set(["all_resolved", "continued", "deadline", "error", "superseded"]);
 var safe = (part) => part.replace(/[^A-Za-z0-9_-]/g, "_");
 var cardStem = (callId, opId) => opId ? `${safe(callId)}.${safe(opId)}` : safe(callId);
 var alive = (pid) => {
@@ -26807,7 +26807,8 @@ function loadConnect(call, dir2 = dataDir(), now = Date.now()) {
     error: file2?.error,
     key: file2?.key,
     opened: call.connect?.opened ?? [],
-    settled: file2?.settled,
+    // Continue settles the card at once, as on the desktop; the watcher sees the claim on its next read.
+    settled: file2?.settled ?? (file2?.told || call.connect?.told ? "continued" : void 0),
     targets,
     told: Boolean(file2?.told || call.connect?.told)
   };
@@ -26944,9 +26945,6 @@ function shownImage(call) {
   }
   if (call.name === "image_generate") {
     return str4(r?.host_image) ?? str4(r?.image);
-  }
-  if (call.name === "vision_analyze") {
-    return str4(call.args.image_url);
   }
   if (call.name.startsWith("browser")) {
     const summary4 = call.resultText ?? str4(r?.text_summary) ?? "";
@@ -29712,6 +29710,7 @@ var CONNECT_STATE = {
 };
 var SETTLED_NOTE = {
   all_resolved: "All connected.",
+  continued: "Sent to Hermes.",
   deadline: "Stopped waiting after 15 minutes. Ask Hermes to connect again.",
   error: "Hermes stopped watching these links.",
   stopped: "Hermes stopped watching these links. Ask Hermes to connect again.",
@@ -39574,6 +39573,7 @@ var App = class {
       return;
     }
     card.told = true;
+    card.settled = "continued";
     this.transcript.touchCall(call);
     if (!card.key || claimTold(card.key)) {
       this.#submit(continueMessage(card.targets), false);

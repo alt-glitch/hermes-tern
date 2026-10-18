@@ -875,6 +875,7 @@ const CONNECT_STATE: Record<string, { icon: string; tone?: 'error' | 'muted' | '
 /** Why a settled card stopped short of connecting every app. */
 const SETTLED_NOTE: Record<SettleReason, string> = {
   all_resolved: 'All connected.',
+  continued: 'Sent to Hermes.',
   deadline: 'Stopped waiting after 15 minutes. Ask Hermes to connect again.',
   error: 'Hermes stopped watching these links.',
   stopped: 'Hermes stopped watching these links. Ask Hermes to connect again.',

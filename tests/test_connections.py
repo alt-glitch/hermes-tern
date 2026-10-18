@@ -253,3 +253,17 @@ def test_the_deadline_settles_what_still_waits(conn, monkeypatch):
     assert wait_for(lambda: card(conn, "c2", "op2")["settled_by"] == "deadline")
     assert states(conn, "c2", "op2") == ["not_connected"]
     assert not card(conn, "c2", "op2")["watching"]
+
+
+def test_continue_settles_the_card_at_once(conn):
+    view(conn, "s1")
+    conn.lists.extend([[{"connector": "googledrive", "connected": False}]] * 50)
+
+    hook(conn, one(), call="c3")
+    assert wait_for(lambda: card(conn, "c3", "op2")["watching"])
+
+    # A pane pressed Continue: it writes the claim beside the card.
+    (conn.root / "connections" / "c3.op2.told").write_text("")
+
+    assert wait_for(lambda: card(conn, "c3", "op2")["settled_by"] == "continued")
+    assert states(conn, "c3", "op2") == ["not_connected"]

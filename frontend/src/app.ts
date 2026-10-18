@@ -678,7 +678,9 @@ export class App implements OverlayHost {
       return
     }
 
+    // As on the desktop, Continue settles the card: an app still waiting did not connect.
     card.told = true
+    card.settled = 'continued'
     this.transcript.touchCall(call)
 
     // Another pane's message already told the agent.
