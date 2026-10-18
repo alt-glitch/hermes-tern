@@ -39167,7 +39167,7 @@ var CommandCatalog = class {
 };
 
 // src/status.ts
-var COMPACTING_LABEL = "Compressing context\u2026";
+var COMPACTING_LABEL = "Compacting context\u2026";
 function statusEffect(payload, last) {
   const text2 = payload?.text?.trim();
   const kind = payload?.kind ?? "";
@@ -39372,9 +39372,9 @@ function todoProgress(list) {
 }
 function dockNodes(cx) {
   const nodes2 = [];
-  if (cx.busy) {
+  if (cx.busy || cx.compacting) {
     nodes2.push(
-      /* @__PURE__ */ jsx("col", { role: "omp.hud.status", children: workingNode2(cx) }, "hud")
+      /* @__PURE__ */ jsx("col", { role: "omp.hud.status", children: cx.busy ? workingNode2(cx) : compactingNode(cx.compacting, cx.now) }, "hud")
     );
   }
   if (cx.queued.length) {
@@ -39627,6 +39627,23 @@ function workingNode2(cx) {
     ] }, "stop")
   ] }, "working");
 }
+function compactingNode(c, now) {
+  return /* @__PURE__ */ jsxs("row", { align: "center", gap: "sm", role: "omp.working", title: "Prompts sent now wait in the queue until the compaction ends", children: [
+    /* @__PURE__ */ jsx("spinner", { style: "starburst", tone: "accent" }, "spinner"),
+    /* @__PURE__ */ jsx(
+      "shimmer",
+      {
+        mode: "classic",
+        palette: { high: "accent", low: "dim", mid: "muted" },
+        role: "omp.working.label",
+        spans: [{ s: "muted", t: COMPACTING_LABEL }]
+      },
+      "label"
+    ),
+    /* @__PURE__ */ jsx("text", { role: "omp.working.sep", text: "\xB7" }, "sep"),
+    /* @__PURE__ */ jsx("elapsed", { age: age(c.since, c.startedAt, now), format: "short" }, "elapsed")
+  ] }, "working");
+}
 function effortChip(cx) {
   const text2 = effortText(cx.effort, cx.effortWire);
   const glyph = cx.effort === "none" ? "off" : cx.effortWire || cx.effort || DEFAULT_EFFORT;
@@ -39829,8 +39846,11 @@ var App = class {
   /** The gateway's keyed notices (credits, a slow start); the newest rides the status strip. */
   #notices = new Notices();
   #noticeTimer;
-  /** Auto-compaction runs: the working line says so until its done edge. */
-  #compacting = false;
+  /**
+   * A compaction runs (Hermes' own, or /compress): the working line says so until its done edge,
+   * and with no turn running the dock shows it and prompts queue behind it.
+   */
+  #compacting;
   /** The status warning shown last, so a repeated one stays one line. */
   #lastStatusNote;
   /** The gateway is being redialled (`gateway.reconnecting`) until the next gateway.ready. */
@@ -40415,6 +40435,9 @@ var App = class {
     if (this.busy) {
       return void this.#busyInput(item3, busy);
     }
+    if (this.#compacting) {
+      return void this.#queueBehind(item3);
+    }
     this.#send(item3);
   }
   /**
@@ -40696,6 +40719,7 @@ ${this.composer.text}` : text2 || this.composer.text);
         } else {
           this.transcript.compacted(Date.now(), state);
         }
+        this.#setCompacting(state === "start");
         this.changed();
       },
       queued: this.#queuedCount(),
@@ -40714,6 +40738,13 @@ ${this.composer.text}` : text2 || this.composer.text);
       // /queue: behind the turn whatever busy_input_mode says.
       submit: (text2) => this.#submit(text2, true, "queue")
     };
+  }
+  /** A compaction started or ended; prompts held behind one with no turn running go once it ends. */
+  #setCompacting(on) {
+    this.#compacting = on ? this.#compacting ?? { since: {}, startedAt: Date.now() } : void 0;
+    if (!on) {
+      this.#drainQueue();
+    }
   }
   /** Gives the compactions seen here their summaries from the store, `delay` ms from now. */
   #summarize(delay = 0) {
@@ -40909,7 +40940,7 @@ ${this.composer.text}` : text2 || this.composer.text);
     this.#reportCwd();
     this.busy = busyFrom(r);
     this.#notices.reset();
-    this.#compacting = false;
+    this.#compacting = void 0;
     this.#lastStatusNote = void 0;
     this.transcript.usageBase(r.info?.usage ?? void 0);
     if (r.messages?.length) {
@@ -40988,6 +41019,9 @@ ${this.composer.text}` : text2 || this.composer.text);
   #prompt(item3) {
     if (this.busy) {
       return void this.#busyInput(item3, this.#busyMode);
+    }
+    if (this.#compacting) {
+      return void this.#queueBehind(item3);
     }
     this.#send(item3);
   }
@@ -41209,7 +41243,7 @@ ${this.composer.text}` : text2 || this.composer.text);
         }
         t2.complete(ev.payload ?? {});
         this.busy = null;
-        this.#compacting = false;
+        this.#compacting = void 0;
         t2.uncompact(true);
         this.#summarize();
         this.#drainQueue();
@@ -41219,7 +41253,7 @@ ${this.composer.text}` : text2 || this.composer.text);
       case "status.update": {
         const effect = statusEffect(ev.payload, this.#lastStatusNote);
         if (effect.compacting !== void 0) {
-          this.#compacting = effect.compacting;
+          this.#setCompacting(effect.compacting);
         }
         if (effect.compacting) {
           t2.compacting(effect.tokens?.before ?? (this.usage?.context_used || void 0));
@@ -41598,7 +41632,7 @@ ${this.composer.text}` : text2 || this.composer.text);
   }
   /** Sends the oldest queued prompt once the session is adopted and idle (no turn, switch or startup image pending). */
   #drainQueue() {
-    if (this.busy || !this.sid || this.#switches.pending || this.#startupImage) {
+    if (this.busy || this.#compacting || !this.sid || this.#switches.pending || this.#startupImage) {
       return;
     }
     const next2 = this.queue.shift();
@@ -41635,6 +41669,7 @@ ${this.composer.text}` : text2 || this.composer.text);
       dock: dockNodes({
         branch: info?.branch ?? "",
         busy: this.busy ?? void 0,
+        compacting: this.busy ? void 0 : this.#compacting,
         composer: this.composer,
         context: max > 0 ? { max, used } : void 0,
         cost: usage?.cost_usd ?? void 0,

@@ -8,6 +8,7 @@ import type { Composer } from '../composer.js'
 import type { Pill } from '../hud.js'
 import type { ImageSource, Todo } from '../model.js'
 import { DEFAULT_EFFORT, effortText } from '../overlays/effort.js'
+import { COMPACTING_LABEL } from '../status.js'
 
 import { type AutomationLine, automationNode, type Reconnecting, reconnectNode } from './automation.js'
 import { age, compact } from './time.js'
@@ -22,6 +23,8 @@ export interface DockContext {
   /** The agent accepts prompts (for Tern's `send`). */
   ready: boolean
   busy?: { since: object; startedAt: number; label: string }
+  /** A compaction runs with no turn (/compress): the working row says so, with nothing to stop. */
+  compacting?: { since: object; startedAt: number }
   queued: readonly QueuedRow[]
   model: string
   /** The session runs on a priority tier: a bolt on the model chip. */
@@ -150,10 +153,10 @@ export interface ShellsPill {
 export function dockNodes(cx: DockContext): JSX.Element[] {
   const nodes: JSX.Element[] = []
 
-  if (cx.busy) {
+  if (cx.busy || cx.compacting) {
     nodes.push(
       <col key="hud" role="omp.hud.status">
-        {workingNode(cx)}
+        {cx.busy ? workingNode(cx) : compactingNode(cx.compacting!, cx.now)}
       </col>
     )
   }
@@ -460,6 +463,24 @@ function workingNode(cx: DockContext): JSX.Element {
         <kbd key="k2" keys={['esc']} />
         <text key="t" text="Stop" />
       </row>
+    </row>
+  )
+}
+
+/** The working row while /compress runs: what holds the session, and for how long. */
+function compactingNode(c: NonNullable<DockContext['compacting']>, now: number): JSX.Element {
+  return (
+    <row align="center" gap="sm" key="working" role="omp.working" title="Prompts sent now wait in the queue until the compaction ends">
+      <spinner key="spinner" style="starburst" tone="accent" />
+      <shimmer
+        key="label"
+        mode="classic"
+        palette={{ high: 'accent', low: 'dim', mid: 'muted' }}
+        role="omp.working.label"
+        spans={[{ s: 'muted', t: COMPACTING_LABEL }]}
+      />
+      <text key="sep" role="omp.working.sep" text="·" />
+      <elapsed age={age(c.since, c.startedAt, now)} format="short" key="elapsed" />
     </row>
   )
 }

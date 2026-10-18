@@ -212,8 +212,11 @@ export class App implements OverlayHost {
   /** The gateway's keyed notices (credits, a slow start); the newest rides the status strip. */
   readonly #notices = new Notices()
   #noticeTimer: NodeJS.Timeout | undefined
-  /** Auto-compaction runs: the working line says so until its done edge. */
-  #compacting = false
+  /**
+   * A compaction runs (Hermes' own, or /compress): the working line says so until its done edge,
+   * and with no turn running the dock shows it and prompts queue behind it.
+   */
+  #compacting: { since: object; startedAt: number } | undefined
   /** The status warning shown last, so a repeated one stays one line. */
   #lastStatusNote: string | undefined
   /** The gateway is being redialled (`gateway.reconnecting`) until the next gateway.ready. */
@@ -994,6 +997,11 @@ export class App implements OverlayHost {
       return void this.#busyInput(item, busy)
     }
 
+    // /compress holds the session: the prompt waits behind it (no turn runs, so none to steer).
+    if (this.#compacting) {
+      return void this.#queueBehind(item)
+    }
+
     this.#send(item)
   }
 
@@ -1355,6 +1363,8 @@ export class App implements OverlayHost {
           this.transcript.compacted(Date.now(), state)
         }
 
+        this.#setCompacting(state === 'start')
+
         this.changed()
       },
       queued: this.#queuedCount(),
@@ -1372,6 +1382,15 @@ export class App implements OverlayHost {
       },
       // /queue: behind the turn whatever busy_input_mode says.
       submit: text => this.#submit(text, true, 'queue')
+    }
+  }
+
+  /** A compaction started or ended; prompts held behind one with no turn running go once it ends. */
+  #setCompacting(on: boolean) {
+    this.#compacting = on ? (this.#compacting ?? { since: {}, startedAt: Date.now() }) : undefined
+
+    if (!on) {
+      this.#drainQueue()
     }
   }
 
@@ -1637,7 +1656,7 @@ export class App implements OverlayHost {
     this.busy = busyFrom(r)
     // The last session's notices and status lines are not this one's.
     this.#notices.reset()
-    this.#compacting = false
+    this.#compacting = undefined
     this.#lastStatusNote = undefined
     this.transcript.usageBase(r.info?.usage ?? undefined)
 
@@ -1736,6 +1755,10 @@ export class App implements OverlayHost {
   #prompt(item: Queued) {
     if (this.busy) {
       return void this.#busyInput(item, this.#busyMode)
+    }
+
+    if (this.#compacting) {
+      return void this.#queueBehind(item)
     }
 
     this.#send(item)
@@ -2064,7 +2087,7 @@ export class App implements OverlayHost {
 
         t.complete(ev.payload ?? {})
         this.busy = null
-        this.#compacting = false
+        this.#compacting = undefined
         // A compaction Hermes aborted sends no done edge; one that committed has its summary stored now.
         t.uncompact(true)
         this.#summarize()
@@ -2081,7 +2104,7 @@ export class App implements OverlayHost {
         const effect = statusEffect(ev.payload, this.#lastStatusNote)
 
         if (effect.compacting !== undefined) {
-          this.#compacting = effect.compacting
+          this.#setCompacting(effect.compacting)
         }
 
         if (effect.compacting) {
@@ -2595,7 +2618,7 @@ export class App implements OverlayHost {
 
   /** Sends the oldest queued prompt once the session is adopted and idle (no turn, switch or startup image pending). */
   #drainQueue() {
-    if (this.busy || !this.sid || this.#switches.pending || this.#startupImage) {
+    if (this.busy || this.#compacting || !this.sid || this.#switches.pending || this.#startupImage) {
       return
     }
 
@@ -2643,6 +2666,7 @@ export class App implements OverlayHost {
       dock: dockNodes({
         branch: info?.branch ?? '',
         busy: this.busy ?? undefined,
+        compacting: this.busy ? undefined : this.#compacting,
         composer: this.composer,
         context: max > 0 ? { max, used } : undefined,
         cost: usage?.cost_usd ?? undefined,
