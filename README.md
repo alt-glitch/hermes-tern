@@ -1,8 +1,16 @@
-# hermes-tern
+<h1 align="center">hermes-tern</h1>
 
-Hermes Agent in [Tern](https://stencil.so/tern)'s native UI. A Hermes plugin that adds
-`hermes tern`: the chat is described to Tern over its Surface Protocol (TSP), so the
-transcript, tool cards, approvals, questions and pickers are drawn by the terminal itself.
+<p align="center">
+  <b><a href="https://github.com/NousResearch/hermes-agent">Hermes Agent</a>, drawn natively by <a href="https://stencil.so/tern">Tern</a>.</b><br>
+  The transcript, tool cards, approvals, subagents and pull requests are real Tern UI, not text in a terminal.
+</p>
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/images/hero-dark.png">
+    <img alt="hermes tern: a chat beside a pull request docked at the pane's edge" src="docs/images/hero-light.png">
+  </picture>
+</p>
 
 ```sh
 hermes plugins install alt-glitch/hermes-tern
@@ -10,44 +18,82 @@ hermes tern                 # in a Tern pane
 hermes tern -c              # every `hermes chat` flag works: -m, -q, --image, --resume, --worktree, …
 ```
 
-Outside Tern (or inside tmux/screen/zellij) the frontend gets no TSP answer and `hermes tern`
-starts the regular TUI instead. To open Hermes in Tern's agent pane, set Tern's agent command
-(`agent_command` in Tern's settings) to `hermes tern`.
+`hermes tern` describes the chat to Tern over its Surface Protocol (TSP), so Tern draws it with its
+own components: Markdown, folds, diffs, sheets, asides and keys. Outside Tern (or inside
+tmux/screen/zellij) there is no TSP answer, and `hermes tern` starts the regular TUI instead. To
+open Hermes in Tern's agent pane, set Tern's agent command (`agent_command` in Tern's settings) to
+`hermes tern`.
+
+## The chat
+
+A turn shows what the agent does while it does it: its reasoning, short notes, and tool calls
+grouped into one line per run ("Ran 3 commands"). A todo list stays live in the transcript and in
+the status line. When the turn ends, the work folds into "Worked for 9.5s" and the answer stays.
+
+<table>
+  <tr>
+    <td width="50%"><img alt="A turn in progress with a live todo list" src="docs/images/transcript.png"></td>
+    <td width="50%"><img alt="An approval sheet for a flagged command" src="docs/images/approval.png"></td>
+  </tr>
+  <tr>
+    <td><b>Live work.</b> Tool runs fold to one line; the todo list ticks as it goes.</td>
+    <td><b>Approvals.</b> A flagged command asks first: once, for the session, always, or deny.</td>
+  </tr>
+  <tr>
+    <td><img alt="Three delegated subagents running in the background" src="docs/images/subagents.png"></td>
+    <td><img alt="The session sidebar docked at the pane's edge" src="docs/images/sidebar.png"></td>
+  </tr>
+  <tr>
+    <td><b>Subagents.</b> A delegated batch is one card, one row per agent, with its model and tool count.</td>
+    <td><b>Sidebar</b> (⌥S). The branch, the session's pull requests and the changed files.</td>
+  </tr>
+</table>
+
+Also: `/model` and `/effort` from the composer chips, `/sessions` to resume, `/ps` for background
+processes and cron jobs, `/agents` for subagents, `/changes` for the working tree's diff, and
+`/theme` to paint the chat in Tern's colors, Nous colors or the Hermes skin.
 
 ## Pull requests
 
-The plugin gives the agent three tools: `link_pull_request`, `unlink_pull_request` and
-`list_pull_requests`. A short system prompt section tells the agent to link every PR it opens or
-works on, as T3 Code does. Links are kept per conversation in
-`$HERMES_HOME/plugin-data/hermes-tern/pull-requests.json`, so they stay after compression and resume.
+The agent links every PR it opens or works on, as T3 Code does. The pill above the composer counts
+them; click it (or ⌥P) and a tray drops up with each PR's state and age.
 
-The sheet also shows two kinds of PR that the agent did not link:
+<p align="center"><img alt="The PR tray above the composer" src="docs/images/pr-tray.png" width="760"></p>
 
-- the PR of the session's branch, in its checkout or worktree;
-- the other layers of a GitHub stack that a listed PR is part of.
+Pick one and it docks at the chat's right edge, beside the conversation. The chat narrows and
+keeps the keys, so you can go on talking to the agent while the PR stays in view. `/prs 22` opens
+#22 directly.
 
-In `hermes tern`, the PR pill above the composer and `/prs` (⌥P) open the Pull requests sheet.
-The sheet reads each PR from GitHub with your own token (`GH_TOKEN`, else `gh auth token`). It shows:
+<table>
+  <tr>
+    <td width="42%"><img alt="The Files tab: Tern's own edit cards and diffs" src="docs/images/pr-files.png"></td>
+    <td>
 
-- **PRs**: state, checks, review and description.
-- **Checks**: each check run, with its log link.
-- **Activity**: comments, reviews, review threads and commits.
-- **Files**: each diff.
+**Drawn as GitHub draws it.** PR bodies and comments go through the same pipeline T3 Code's PR
+panel uses (`remark-gfm`, `rehype-raw`, GitHub's sanitize schema). `<details>` become folds, bot
+badges become links, HTML comments go away, and tables, task lists, alerts and mermaid draw
+natively. `#123` and `@login` link.
 
-Its actions are merge (asks first), close (asks first), ready for review, update branch, re-run
-failed jobs, open on GitHub and copy URL. The tools and the prompt section start in new sessions.
+**Three tabs, as on GitHub.**
 
-## Sidebar
+- **Conversation**: the description, then every comment, review, review thread and commit, in order.
+- **Checks**: failing and running checks open; passed and skipped ones folded.
+- **Files**: each file is Tern's own edit card with its diff, highlighted and folded around the hunks.
 
-⌥S (`/sidebar`) docks a session sidebar at the pane's right edge, using Tern's `aside`. The chat
-narrows beside it and keeps the keys. The sidebar shows:
+**Actions.** Merge and close (both ask first), ready for review, update branch, re-run failed
+jobs, copy `gh pr checkout N`, open on GitHub.
 
-- the branch, and how far it is ahead of or behind its upstream;
-- the session's pull requests;
-- the changed files, with added and removed lines.
+The aside is as wide as Tern's Settings sheet: drag that sheet's edge (⌘,) to resize it.
 
-A PR row opens the Pull requests sheet. A file row opens the Changes sheet (`/changes`), which
-shows each file's diff against HEAD.
+</td>
+  </tr>
+</table>
+
+The agent gets three tools: `link_pull_request`, `unlink_pull_request` and `list_pull_requests`.
+Links are kept per conversation in `$HERMES_HOME/plugin-data/hermes-tern/pull-requests.json`, so
+they survive compression and resume. The list also shows two kinds of PR the agent did not link:
+the PR of the session's branch, and the other layers of a GitHub stack that a listed PR is part
+of. PRs are read from GitHub with your own token (`GH_TOKEN`, else `gh auth token`).
 
 ## How it works
 
@@ -79,11 +125,12 @@ npm run check                                     # typecheck + tests
 npm run bundle                                    # rebuilds dist/entry.js
 ```
 
-`lab/fake_model.py --home DIR` writes a disposable `HERMES_HOME` pointed at a loopback model
-and serves it: prompts containing "approve", "clarify" or "tool" drive those flows (and ones starting "background" or
-"watch" start a ticking background process), anything
-else streams markdown. Pair it with a headless Tern (`tern serve --control PORT`, then
-`tern ctl --control PORT run|type|key|shot …`) to check the UI without credentials.
+`lab/fake_model.py --home DIR` writes a disposable `HERMES_HOME` pointed at a loopback model and
+serves it. The prompt picks the flow: "approve", "clarify", "tool", "work…", "delegate…",
+"errands…", "pr URL…" and more (the file's docstring lists them all); anything else streams
+Markdown. Pair it with a headless Tern (`tern serve --control PORT`, then
+`tern ctl --control PORT run|type|key|shot …`) to check the UI without credentials. The
+screenshots above come from that setup.
 
 ## License
 
