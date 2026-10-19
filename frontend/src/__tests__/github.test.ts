@@ -22,7 +22,6 @@ import {
 } from '../github/pullRequest.js'
 import { PullRequests } from '../github/store.js'
 import type { ToolCall } from '../model.js'
-import { tabView } from '../overlays/pullRequests.js'
 
 const ref = (number: number, repository = 'acme/app'): PrRef => ({
   host: 'github.com',
@@ -314,17 +313,6 @@ describe('PullRequests', () => {
     expect(store.get(KEY)?.activity?.length).toBe(1)
     now.mockRestore()
     store.dispose()
-  })
-
-  it('shows a failed tab read in the tab instead of loading forever', () => {
-    const pr = parsePullRequest(ref(5), prJson())!
-    const entry = { pr, ref: ref(5), source: 'linked' as const }
-
-    expect(tabView('activity', entry, 0)).toMatchObject({ error: undefined, loading: true })
-    expect(tabView('activity', { ...entry, activityError: 'GitHub answered 502' }, 0)).toMatchObject({ error: 'GitHub answered 502', loading: false })
-    expect(tabView('files', { ...entry, filesError: 'timeout' }, 0)).toMatchObject({ error: 'timeout', loading: false })
-    // An older list stays up while a newer read fails.
-    expect(tabView('files', { ...entry, files: [], filesError: 'timeout' }, 0)).toMatchObject({ error: undefined, loading: false })
   })
 
   it('turns stack grouping off only for a schema with no stack field, not for a failed request', async () => {

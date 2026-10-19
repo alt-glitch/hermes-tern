@@ -17,7 +17,7 @@ import type {
 } from '@hermes/shared/gateway-events'
 import type { ServerRequest } from '@hermes/shared/json-rpc-channel'
 import { parseCommandDispatch } from '@hermes/shared/slash'
-import type { Key, Session, Surface, TspEvent } from '@stencil-hq/tern'
+import type { Key, ScrollTo, Session, Surface, TspEvent } from '@stencil-hq/tern'
 import { describeSlashExecError, isUnsupportedCommand, shouldFallbackToDispatch } from '@tui/app/userMessages.js'
 import { localCreationOptions } from '@tui/canonicalGateway.js'
 import { usageFromTick } from '@tui/domain/usage.js'
@@ -54,13 +54,14 @@ import { openModelPicker } from './overlays/models.js'
 import { DEFAULT_EFFORT, nextEffort, openEffortPicker } from './overlays/effort.js'
 import { capsOf } from './modelCaps.js'
 import { promptOverlay, promptTimeoutNotice } from './overlays/prompts.js'
-import { openPullRequests, openUrl, prsPill } from './overlays/pullRequests.js'
+import { openPrMenu, openPrSheet, openUrl, prsPill } from './overlays/pullRequests.js'
 import { STYLES } from './view/styles.js'
 import { paletteFor } from './palette.js'
 import { allConnected, claimTold, CONNECT_TOOL, connectedMessage, continueMessage, loadConnect, markViewer, POLL_MS, waiting } from './connections.js'
 import { LINK_TOOLS } from './github/links.js'
 import { PullRequests } from './github/store.js'
 import { Cron } from './processes/cron.js'
+import { PrAside } from './prs/aside.js'
 import { Sidebar } from './sidebar.js'
 import type { SessionHost } from './sessionCommands.js'
 import { ambiguousNotice, CommandCatalog, resolveSlashName } from './slashResolve.js'
@@ -139,6 +140,8 @@ export class App implements OverlayHost {
   readonly processes: Processes = new Processes(this)
   readonly cron: Cron = new Cron(this)
   readonly sidebar: Sidebar = new Sidebar(this)
+  /** The pull request docked at the pane's right edge (the PR aside). */
+  readonly prAside: PrAside = new PrAside(this)
   /** The session's standing /goal and /loop (the dock line above the pills and its sheets). */
   readonly automation: Automation = new Automation(this)
   /** The session's title, as Hermes names it (`session.title`). */
@@ -439,7 +442,7 @@ export class App implements OverlayHost {
           return this.toggleSidebar()
 
         case 'p':
-          return openPullRequests(this)
+          return openPrMenu(this)
       }
     }
 
@@ -547,7 +550,7 @@ export class App implements OverlayHost {
     } else if (out.open === 'shells') {
       openBackground(this)
     } else if (out.open === 'prs') {
-      openPullRequests(this)
+      openPrMenu(this)
     } else if (out.open === 'goal' || out.open === 'loop') {
       openAutomation(this, out.open)
     } else if (out.open === 'todos') {
@@ -869,7 +872,35 @@ export class App implements OverlayHost {
       return
     }
 
+    // One sheet docks at the edge at a time: the session sidebar takes the PR aside's place.
+    if (!this.sidebar.open && this.prAside.open) {
+      this.prAside.close()
+    }
+
     this.sidebar.toggle()
+  }
+
+  /** Brings node `id` into view (a PR's file, say). */
+  reveal(id: string) {
+    this.#surface.reveal(id, 'start')
+  }
+
+  /** Scrolls the scroll container holding node `id`. */
+  scroll(id: string, to: ScrollTo) {
+    this.#surface.scroll(id, to)
+  }
+
+  /** Docks PR `key` at the pane's right edge, in place of the session sidebar. */
+  openPrAside(key: string | undefined) {
+    if (!this.#tern.caps.features.includes('aside')) {
+      return openPrSheet(this, key)
+    }
+
+    if (this.sidebar.open) {
+      this.sidebar.toggle()
+    }
+
+    this.prAside.show(key)
   }
 
   /** A subagent ended: the PRs it linked are filed under this conversation (pull_requests.py). */
@@ -2713,7 +2744,7 @@ export class App implements OverlayHost {
           this.changed()
         },
         agents: { onOpen: () => openAgents(this), running: this.agents.running().length },
-        prs: prsPill(this.prs.entries(), () => openPullRequests(this)),
+        prs: prsPill(this.prs.entries(), () => openPrMenu(this)),
         attachments: [
           ...this.#attachments.map((a, i) => ({
             caption: a.caption,
@@ -2770,7 +2801,9 @@ export class App implements OverlayHost {
         ready: this.sid !== null
       }),
       layer: [
-        ...(this.#tern.caps.features.includes('aside') ? [this.sidebar.node('layer.sidebar')].filter(n => n !== null) : []),
+        ...(this.#tern.caps.features.includes('aside')
+          ? [this.prAside.open ? this.prAside.node('layer.prs') : this.sidebar.node('layer.sidebar')].filter(n => n !== null)
+          : []),
         ...this.overlays.map(o => o.node(`layer.${o.key}`)),
         ...(modal ? [] : this.#completion.nodes(INPUT_ID))
       ],

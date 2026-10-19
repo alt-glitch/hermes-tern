@@ -1204,7 +1204,7 @@ const LANGS: Record<string, string> = {
   yml: 'yaml'
 }
 
-function langOf(path: string | undefined): string | undefined {
+export function langOf(path: string | undefined): string | undefined {
   const ext = path?.split('.').pop()?.toLowerCase()
 
   return ext ? LANGS[ext] : undefined
