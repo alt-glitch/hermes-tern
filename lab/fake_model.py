@@ -21,6 +21,7 @@ the user's prompt, so one home covers every flow:
     "watch…"    -> (at the start) a 2 min ticking background process watching for "tick 10"
     "errands…"  -> (at the start) a four-item todo list worked through over slow steps
     "connector…" -> (at the start) a tool search, a two-app connector batch and one connector call
+    "ternenv"   -> (at the start) prints the TERN_* variables from a command, a background command and a Python cell's command
     "pr [URL…]" -> (at the start) links the PR URLs given, else a real public PR (link_pull_request)
     "cron…"     -> (at the start) two cron jobs: a 30 min digest and a 15 min page monitor
     anything else -> a streamed markdown reply
@@ -219,6 +220,11 @@ def _calls(prompt: str, target: Path) -> list[dict] | None:
                 "action": "create", "name": "lab page watch", "schedule": "every 15m",
                 "prompt": "Say what changed on the page.", "monitor": "https://example.com"}}, "call-monitor"),
         ]
+    if words.lstrip().startswith("ternenv"):
+        # The Tern variables each kind of child process sees: a command, a background one, a Python cell's command.
+        return [_call("terminal", {"command": "env | grep ^TERN_ | sort"}, "call-env"),
+                _call("terminal", {"command": "echo bg $TERN_PANE", "background": True}, "call-env-bg"),
+                _call("execute_code", {"code": "from hermes_tools import terminal\nprint('code', terminal('echo $TERN_PANE')['output'])"}, "call-env-code")]
     if words.lstrip().startswith("eval"):
         # A Python cell whose output is one long line, as an agent peeking at a JSON file prints.
         return [_call("execute_code", {"code": EVAL_CODE})]

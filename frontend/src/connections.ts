@@ -157,7 +157,7 @@ export function claimTold(key: string, dir = dataDir()): boolean {
   }
 }
 
-/** The Tern variables that name this pane, its window and their sockets: `tern_open` runs Tern's CLI with them. */
+/** The Tern variables that name this pane, its window and their sockets: the agent's tools get them, so `tern` finds this pane. */
 export const TERN_PANE_VARS = ['TERN_PANE', 'TERN_PANE_SOCKET', 'TERN_WINDOW_KEY', 'TERN_WINDOW_SOCKET', 'TERN_DAEMON_SOCKET'] as const
 
 /** This pane's Tern variables (only the set ones), or undefined outside a Tern pane. */
@@ -169,7 +169,7 @@ export function ternPane(env: NodeJS.ProcessEnv = process.env): Record<string, s
 
 /**
  * Tells the plugin's Python half that this pane shows session `sid` (and stops claiming `previous`),
- * so its connect results come here as a card and `tern_open` opens its blocks beside this one. The
+ * so its connect results come here as a card and the agent's `tern` commands find this pane. The
  * marker names this process; a dead one counts for nothing.
  */
 export function markViewer(sid: string | null, previous: string | null, dir = dataDir(), env: NodeJS.ProcessEnv = process.env) {

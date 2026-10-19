@@ -49,12 +49,6 @@ the status line. When the turn ends, the work folds into "Worked for 9.5s" and t
   </tr>
 </table>
 
-The agent can open things beside the chat with its `tern_open` tool: a file in a Tern file block
-(code, Markdown, images, PDFs and 3D models such as `.glb`, `.stl` and `.fbx`), a web page, or a
-terminal, with a command run in it after the usual approval. Its own shell runs in Hermes' gateway,
-not in the chat's pane, so the tool finds the pane from the frontend and opens each block beside
-the chat that asked for it.
-
 Also: `/model` and `/effort` from the composer chips, `/sessions` to resume, `/ps` for background
 processes and cron jobs, `/agents` for subagents, `/changes` for the working tree's diff, and
 `/theme` to paint the chat in Tern's colors, Nous colors or the Hermes skin.
@@ -110,6 +104,11 @@ of. PRs are read from GitHub with your own token (`GH_TOKEN`, else `gh auth toke
 - `frontend/` is the TSP frontend, a TypeScript app on [`@stencil-hq/tern`](https://www.npmjs.com/package/@stencil-hq/tern).
   It talks to the profile's shared Hermes gateway (`hermes-gateway-v1`) through Hermes' own
   gateway client. `frontend/dist/entry.js` is committed, so installing needs no npm step.
+- The agent's tools run in that shared gateway, not in the chat's pane, so `tern_env.py` gives every
+  process the agent starts (commands, background processes, a Python cell's commands) the
+  `TERN_PANE` and window variables of the pane that shows its conversation, read from the pane's
+  marker when the process starts. Plain `tern open`, `tern split` and the rest of Tern's CLI act
+  beside the chat, as they do from `hermes chat` in a Tern pane.
 - The frontend began as [can1357](https://github.com/can1357)'s `ui-tsp`
   (`can1357/hermes-agent@tern-frontend`) and keeps omp's chat roles (`omp.session`, …), which
   Tern's chat styles, tool folding and Carly integration are written against.
