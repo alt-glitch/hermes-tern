@@ -519,6 +519,16 @@ export function stepLabel(call: ToolCall): string {
     case 'list_pull_requests':
       return 'Listed linked pull requests'
 
+    case 'tern_open': {
+      const where = a.place === 'tab' ? ' in a new tab' : a.place === 'down' ? ' below' : ' beside the chat'
+
+      if (a.terminal) {
+        return str(a.command) ? `Ran ${flat(str(a.command)!)} in a terminal${where}` : `Opened a terminal${where}`
+      }
+
+      return path ? `Opened ${shortPath(path)}${where}` : str(a.url) ? `Opened ${a.url}` : 'Opened a Tern block'
+    }
+
     case 'skill_view':
       return str(a.name) ? `Read skill ${a.name}` : 'Read a skill'
 

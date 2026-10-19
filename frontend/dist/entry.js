@@ -27087,7 +27087,12 @@ function claimTold(key2, dir2 = dataDir()) {
     return false;
   }
 }
-function markViewer(sid, previous3, dir2 = dataDir()) {
+var TERN_PANE_VARS = ["TERN_PANE", "TERN_PANE_SOCKET", "TERN_WINDOW_KEY", "TERN_WINDOW_SOCKET", "TERN_DAEMON_SOCKET"];
+function ternPane(env2 = process.env) {
+  const vars = Object.fromEntries(TERN_PANE_VARS.flatMap((k) => env2[k] ? [[k, env2[k]]] : []));
+  return vars.TERN_PANE ? vars : void 0;
+}
+function markViewer(sid, previous3, dir2 = dataDir(), env2 = process.env) {
   const viewers = join3(dir2, "viewers");
   try {
     if (previous3 && previous3 !== sid) {
@@ -27095,7 +27100,7 @@ function markViewer(sid, previous3, dir2 = dataDir()) {
     }
     if (sid) {
       mkdirSync2(viewers, { recursive: true });
-      writeFileSync(join3(viewers, `${sid}.json`), JSON.stringify({ pid: process.pid }));
+      writeFileSync(join3(viewers, `${sid}.json`), JSON.stringify({ pid: process.pid, tern: ternPane(env2) }));
     }
   } catch {
   }
@@ -29090,6 +29095,13 @@ function stepLabel(call) {
     }
     case "list_pull_requests":
       return "Listed linked pull requests";
+    case "tern_open": {
+      const where = a2.place === "tab" ? " in a new tab" : a2.place === "down" ? " below" : " beside the chat";
+      if (a2.terminal) {
+        return str5(a2.command) ? `Ran ${flat(str5(a2.command))} in a terminal${where}` : `Opened a terminal${where}`;
+      }
+      return path2 ? `Opened ${shortPath(path2)}${where}` : str5(a2.url) ? `Opened ${a2.url}` : "Opened a Tern block";
+    }
     case "skill_view":
       return str5(a2.name) ? `Read skill ${a2.name}` : "Read a skill";
     case "skills_list":

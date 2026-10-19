@@ -214,6 +214,9 @@ describe('labels', () => {
 
   it('names skills and tool lookups in words', () => {
     expect(stepLabel(call('skill_view', { name: 'composio' }))).toBe('Read skill composio')
+    expect(stepLabel(call('tern_open', { path: '/tmp/m/helmet.glb' }))).toBe('Opened /tmp/m/helmet.glb beside the chat')
+    expect(stepLabel(call('tern_open', { command: 'npm test', place: 'down', terminal: true }))).toBe('Ran npm test in a terminal below')
+    expect(stepLabel(call('tern_open', { place: 'tab', url: 'https://stencil.so' }))).toBe('Opened https://stencil.so')
     expect(stepLabel(call('tool_describe', { names: ['connectors__granola_mcp__LIST_MEETINGS', 'cronjob_manage'] }))).toBe(
       'Read how to call Granola · list meetings, cronjob manage'
     )

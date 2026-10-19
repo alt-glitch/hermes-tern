@@ -49,6 +49,12 @@ the status line. When the turn ends, the work folds into "Worked for 9.5s" and t
   </tr>
 </table>
 
+The agent can open things beside the chat with its `tern_open` tool: a file in a Tern file block
+(code, Markdown, images, PDFs and 3D models such as `.glb`, `.stl` and `.fbx`), a web page, or a
+terminal, with a command run in it after the usual approval. Its own shell runs in Hermes' gateway,
+not in the chat's pane, so the tool finds the pane from the frontend and opens each block beside
+the chat that asked for it.
+
 Also: `/model` and `/effort` from the composer chips, `/sessions` to resume, `/ps` for background
 processes and cron jobs, `/agents` for subagents, `/changes` for the working tree's diff, and
 `/theme` to paint the chat in Tern's colors, Nous colors or the Hermes skin.
