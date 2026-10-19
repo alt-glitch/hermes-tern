@@ -12,7 +12,7 @@ import { openAgents } from './overlays/agents.js'
 import { openBackground } from './overlays/background.js'
 import { openChanges } from './overlays/changes.js'
 import { LEVELS, openEffortPicker } from './overlays/effort.js'
-import { openPullRequests } from './overlays/pullRequests.js'
+import { prsCommand } from './overlays/pullRequests.js'
 import { openHelp } from './overlays/help.js'
 import { openModelPicker, switchModel } from './overlays/models.js'
 import { confirmOverlay } from './overlays/prompts.js'
@@ -198,9 +198,9 @@ const COMMANDS: readonly LocalCommand[] = [
   },
   {
     aliases: ['pr', 'pulls'],
-    help: 'Pull requests Hermes linked',
+    help: 'Pull requests Hermes linked, beside the chat (/prs 22 opens #22)',
     name: 'prs',
-    run: app => openPullRequests(app)
+    run: (app, arg) => prsCommand(app, arg)
   },
   {
     // The gateway refuses its own /copy and /history (cli_only); Ink runs them on its transcript, as these do.

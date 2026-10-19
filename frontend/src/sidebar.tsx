@@ -1,7 +1,7 @@
 // The session sidebar (⌥S, `/sidebar`): Tern's aside, a `prefs` sheet docked at the pane's right
 // edge that narrows the chat beside it. It shows where the session works: the branch and how far it
 // is from its upstream, the session's pull requests, and the changed files. It takes no keys; the
-// composer keeps them. A PR opens the Pull requests sheet; a file opens the Changes sheet on its diff.
+// composer keeps them. A PR opens in the PR aside (in its place); a file opens the Changes sheet on its diff.
 
 import type { JSX, PrefsRow } from '@stencil-hq/tern'
 

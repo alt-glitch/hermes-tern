@@ -498,4 +498,210 @@ export const STYLES = css`
     margin-bottom: 4px !important;
     font-family: var(--sans) !important;
   }
+
+  /* ── Pull requests (prs/view.tsx): one view in the PR aside and the sheet ── */
+  /* Prose in sans in the aside and the sheet (their text defaults to mono); code,
+     paths and diffs keep mono. */
+  :is([data-role='hermes.pr.frame'], [data-role='hermes.pr.asideview'])
+    :is(.sf-text, .sf-md, .md, .sf-card-head, .sf-section-head, .sf-tabs, .sf-badge) {
+    font-family: var(--sans) !important;
+  }
+
+  /* (Tern's \`:is()\` takes compound selectors only: \`.md code\` gets a rule of its own.) */
+  :is([data-role='hermes.pr.frame'], [data-role='hermes.pr.asideview']) :is(.sf-t-mono, .sf-diff, .sf-code) {
+    font-family: var(--mono) !important;
+  }
+
+  :is([data-role='hermes.pr.frame'], [data-role='hermes.pr.asideview']) .md code {
+    font-family: var(--mono) !important;
+  }
+
+  :is([data-role='hermes.pr.frame'], [data-role='hermes.pr.asideview']) .sf-md {
+    font-size: 14px;
+  }
+
+  /* GitHub ticks a done task; it does not strike it through. */
+  :is([data-role='hermes.pr.frame'], [data-role='hermes.pr.asideview']) li.task.done :is(*, .li-t) {
+    text-decoration: none !important;
+    color: inherit !important;
+  }
+
+  [data-role='hermes.pr.head'] {
+    padding: 2px 2px 0;
+  }
+
+  /* Each header row spans the view; its text takes the room its trailing parts leave. */
+  [data-role='hermes.pr.head'] > .sf-row,
+  [data-role='hermes.pr.tabs'] {
+    align-self: stretch;
+    width: 100%;
+  }
+
+  [data-role='hermes.pr.head'] > .sf-row > .sf-text {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  [data-role='hermes.pr.head'] > .sf-row > :is([data-role='hermes.pr.checkout'], [data-role='hermes.pr.size']) {
+    flex: none;
+    margin-left: auto;
+  }
+
+  [data-role='hermes.pr.head'] > .sf-row > :is(.sf-badge, .sf-icon) {
+    flex: none;
+  }
+
+  [data-role='hermes.pr.title'] {
+    font: 600 19px/1.3 var(--sans) !important;
+    letter-spacing: -0.01em;
+    color: var(--t1) !important;
+  }
+
+  [data-role='hermes.pr.meta'],
+  [data-role='hermes.pr.branch'] {
+    font-size: 12.5px;
+  }
+
+  [data-role='hermes.pr.checkout'] {
+    cursor: pointer;
+  }
+
+  [data-role='hermes.pr.tabs'] {
+    padding: 8px 0;
+    box-shadow: inset 0 1px 0 var(--l2), inset 0 -1px 0 var(--l2);
+  }
+
+  [data-role='hermes.pr.checkstate'] {
+    cursor: pointer;
+    font-size: 12.5px;
+  }
+
+  [data-role='hermes.pr.body'] {
+    padding: 4px 2px 8px;
+  }
+
+  [data-role='hermes.pr.comment'],
+  [data-role='hermes.pr.thread'] {
+    background: var(--sf-card-bg) !important;
+    box-shadow: inset 0 0 0 1px var(--l2) !important;
+    border-radius: 10px !important;
+  }
+
+  [data-role='hermes.pr.comment'] > .sf-card-head,
+  [data-role='hermes.pr.thread'] > .sf-card-head {
+    box-shadow: inset 0 -1px 0 var(--l2);
+    font-family: var(--sans) !important;
+  }
+
+  [data-role='hermes.pr.permalink'] {
+    font-size: 12px;
+  }
+
+  [data-role='hermes.pr.reply'] {
+    padding: 8px 0 0 12px;
+    box-shadow: inset 2px 0 0 var(--l2);
+  }
+
+  [data-role='hermes.pr.event'],
+  [data-role='hermes.pr.commits'] {
+    padding: 0 6px;
+    font-size: 13px;
+  }
+
+  [data-role='hermes.pr.commit'] {
+    padding-left: 22px;
+    font-size: 12.5px;
+  }
+
+  [data-role='hermes.pr.details'] > .sf-section-head {
+    font-weight: 600;
+  }
+
+  /* The file list beside the diffs where there is room, above them where there is not. */
+  [data-role='hermes.pr.files'] {
+    flex-wrap: wrap;
+  }
+
+  [data-role='hermes.pr.files'] > .sf-col:last-child {
+    flex: 1 1 520px;
+  }
+
+  [data-role='hermes.pr.filelist'] {
+    flex: 1 0 260px;
+    max-width: 320px;
+    position: sticky;
+    top: 0;
+    max-height: 100%;
+    overflow-y: auto;
+  }
+
+  [data-role='hermes.pr.fileitem'] {
+    padding: 3px 8px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 12.5px;
+  }
+
+  [data-role='hermes.pr.fileitem']:hover {
+    background: var(--l1);
+  }
+
+  [data-role='hermes.pr.check'] {
+    padding: 2px 4px;
+    font-size: 13px;
+  }
+
+  /* The sheet: the view fills the overlay; only the body scrolls. */
+  [data-role='hermes.pr.frame'] {
+    height: 100%;
+    min-height: 0;
+    gap: 12px !important;
+  }
+
+  [data-role='hermes.pr.frame'] > [data-role='hermes.pr.body'] {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+  }
+
+  /* The PR aside is Tern's settings sheet: its search, page title and empty state say nothing here. */
+  [data-role='hermes.pr.aside'] :is(.pf-search, .pf-head, .pf-eyebrow, .pf-none, .pf-groups) {
+    display: none !important;
+  }
+
+  [data-role='hermes.pr.aside'] .pf-extra {
+    margin-top: 0 !important;
+  }
+
+  [data-role='hermes.pr.asideview'] [data-role='hermes.pr.checkout'] {
+    display: none;
+  }
+
+  /* The PR pill's menu: a tray above the composer, as wide as it. */
+  .sf-overlay[data-role='hermes.pr.menu'] .sf-ov-card {
+    width: 720px;
+    max-width: 100%;
+    font-family: var(--sans);
+  }
+
+  [data-role='hermes.pr.menu.row'] {
+    padding: 7px 10px;
+    border-radius: 8px;
+    cursor: pointer;
+  }
+
+  [data-role='hermes.pr.menu.row']:hover,
+  [data-role='hermes.pr.menu.row'][data-mark='pick'] {
+    background: var(--l1);
+  }
+
+  [data-role='hermes.pr.menu.foot'] {
+    padding: 8px 10px 2px;
+    box-shadow: inset 0 1px 0 var(--l2);
+    font-size: 12px;
+  }
+
 `

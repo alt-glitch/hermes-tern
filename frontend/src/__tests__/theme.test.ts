@@ -31,7 +31,7 @@ describe('STYLES', () => {
   const TERN = /^(t[1-4]|l[1-4]|accent|accent-ink|accent-fill|ok|warn|bad|ink[2-4]?|card|raise|panel|page|code-bg|chip-bg|well|well-line|pop-bg|sf-card-bg|sf-shade|sf-c-[a-z]+|sf-p-[a-zA-Z]+|sans|mono)$/
 
   it("paints only with Tern's theme vars, so a theme change repaints the plugin too", () => {
-    expect(STYLES).not.toMatch(/#[0-9a-f]{3,8}\b|\b(rgba?|hsla?)\(|\b(white|black)\b/i)
+    expect(STYLES).not.toMatch(/#[0-9a-f]{3,8}\b|\b(rgba?|hsla?)\(|(?<![\w-])(white|black)(?![\w-])/i)
 
     for (const [, name] of STYLES.matchAll(/var\(--([\w-]+)/g)) {
       expect(name).toMatch(TERN)

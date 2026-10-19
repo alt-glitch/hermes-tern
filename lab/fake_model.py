@@ -21,13 +21,14 @@ the user's prompt, so one home covers every flow:
     "watch…"    -> (at the start) a 2 min ticking background process watching for "tick 10"
     "errands…"  -> (at the start) a four-item todo list worked through over slow steps
     "connector…" -> (at the start) a tool search, a two-app connector batch and one connector call
-    "pr…"       -> (at the start) links a real public PR (link_pull_request)
+    "pr [URL…]" -> (at the start) links the PR URLs given, else a real public PR (link_pull_request)
     "cron…"     -> (at the start) two cron jobs: a 30 min digest and a 15 min page monitor
     anything else -> a streamed markdown reply
 """
 
 import argparse
 import json
+import re
 import os
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -207,8 +208,8 @@ def _calls(prompt: str, target: Path) -> list[dict] | None:
     if words.lstrip().startswith("pr"):
         # A real public PR, linked the way an agent links one it opened (through the tool_call bridge
         # in case Tool Search defers the plugin's tools).
-        return [_call("tool_call", {"name": "link_pull_request", "arguments": {
-            "url": "https://github.com/alt-glitch/hermes-tern/pull/22"}}, "call-link")]
+        urls = re.findall(r"https://github\.com/[^\s/]+/[^\s/]+/pull/\d+", words) or ["https://github.com/alt-glitch/hermes-tern/pull/22"]
+        return [_call("tool_call", {"calls": [{"name": "link_pull_request", "arguments": {"url": u}} for u in urls]}, "call-link")]
     if words.lstrip().startswith("cron"):
         # cronjob_manage is a deferred tool: the model reaches it through the tool_call bridge.
         return [
