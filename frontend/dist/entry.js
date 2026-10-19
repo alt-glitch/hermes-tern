@@ -29095,13 +29095,6 @@ function stepLabel(call) {
     }
     case "list_pull_requests":
       return "Listed linked pull requests";
-    case "tern_open": {
-      const where = a2.place === "tab" ? " in a new tab" : a2.place === "down" ? " below" : " beside the chat";
-      if (a2.terminal) {
-        return str5(a2.command) ? `Ran ${flat(str5(a2.command))} in a terminal${where}` : `Opened a terminal${where}`;
-      }
-      return path2 ? `Opened ${shortPath(path2)}${where}` : str5(a2.url) ? `Opened ${a2.url}` : "Opened a Tern block";
-    }
     case "skill_view":
       return str5(a2.name) ? `Read skill ${a2.name}` : "Read a skill";
     case "skills_list":

@@ -174,7 +174,7 @@ describe('manage_connections without its card', () => {
     expect(existsSync(join(dir, 'viewers', 's2.json'))).toBe(true)
   })
 
-  it("records the pane's Tern variables, for tern_open", () => {
+  it("records the pane's Tern variables, for the agent's tools", () => {
     const dir = mkdtempSync(join(tmpdir(), 'tern-viewers-'))
 
     markViewer('s1', null, dir, { HOME: '/h', TERN_PANE: '42', TERN_PANE_SOCKET: '/s/pane', TERN_WINDOW_KEY: '' })
