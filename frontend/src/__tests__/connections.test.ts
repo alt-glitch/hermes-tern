@@ -16,7 +16,8 @@ import {
   loadConnect,
   markViewer,
   readCard,
-  STALE_MS
+  STALE_MS,
+  ternPane
 } from '../connections.js'
 import type { ToolCall, TurnEntry } from '../model.js'
 import { foldOf, ownsCard } from '../workLog.js'
@@ -166,11 +167,22 @@ describe('manage_connections without its card', () => {
   it('marks this pane as the viewer of one session at a time', () => {
     const dir = mkdtempSync(join(tmpdir(), 'tern-viewers-'))
 
-    markViewer('s1', null, dir)
+    markViewer('s1', null, dir, {})
     expect(JSON.parse(readFileSync(join(dir, 'viewers', 's1.json'), 'utf8'))).toEqual({ pid: process.pid })
     markViewer('s2', 's1', dir)
     expect(existsSync(join(dir, 'viewers', 's1.json'))).toBe(false)
     expect(existsSync(join(dir, 'viewers', 's2.json'))).toBe(true)
+  })
+
+  it("records the pane's Tern variables, for tern_open", () => {
+    const dir = mkdtempSync(join(tmpdir(), 'tern-viewers-'))
+
+    markViewer('s1', null, dir, { HOME: '/h', TERN_PANE: '42', TERN_PANE_SOCKET: '/s/pane', TERN_WINDOW_KEY: '' })
+    expect(JSON.parse(readFileSync(join(dir, 'viewers', 's1.json'), 'utf8'))).toEqual({
+      pid: process.pid,
+      tern: { TERN_PANE: '42', TERN_PANE_SOCKET: '/s/pane' }
+    })
+    expect(ternPane({ TERN_WINDOW_KEY: '3' })).toBeUndefined()
   })
 
   it('tells the agent which apps the user authorized, or that all are connected', () => {
