@@ -195,6 +195,22 @@ describe('Composer: the pastes a draft holds', () => {
     expect(c.cursor).toBe(9)
   })
 
+  it('keeps them in each undo step: undo and redo bring back the pastes the draft held then', () => {
+    const c = new Composer()
+    c.key(key('paste', { text: '!rm -rf x' }))
+    c.set('')
+
+    c.undo()
+    expect([c.text, c.pasted]).toEqual(['!rm -rf x', ['!rm -rf x']])
+    c.redo()
+    expect([c.text, c.pasted]).toEqual(['', []])
+    c.undo()
+    expect(c.pasted).toEqual(['!rm -rf x'])
+    // Undoing the paste itself leaves the draft from before it, which held none.
+    c.undo()
+    expect([c.text, c.pasted]).toEqual(['', []])
+  })
+
   it('places the caret where set() says', () => {
     const c = new Composer()
     c.set('hello', { cursor: 2 })
@@ -227,5 +243,31 @@ describe('Composer: the pastes a draft holds', () => {
 
     expect(gw.sent('shell.exec')).toEqual([{ command: 'echo hi', session_id: 's1' }])
     expect(gw.sent('prompt.submit')).toEqual([])
+  })
+
+  it('a pasted `!cmd` that Ctrl+C cleared and Ctrl+Z brought back still goes as written, not to the shell', async () => {
+    process.env['HERMES_HOME'] = mkdtempSync(join(tmpdir(), 'hermes-tern-composer-'))
+    const { App } = await import('../app/chat.js')
+    const gw = new FakeGateway({ replies: { 'shell.exec': () => ({ code: 0, stderr: '', stdout: 'hi' }) } })
+    const tern = fakeTern()
+    const app = new App(tern.session, gw.client, '')
+    void app.run()
+    given.session(app, 's1')
+    const press = async (k: Key) => {
+      await vi.waitFor(() => expect(tern.reading).toBe(true))
+      tern.press(k)
+      await settle(gw)
+    }
+
+    await press(key('paste', { text: '!echo hi' }))
+    await press(key('c', { ctrl: true }))
+    expect(app.composer.text).toBe('')
+    await press(key('z', { ctrl: true }))
+    expect(app.composer.text).toBe('!echo hi')
+
+    await press(key('enter'))
+
+    expect(gw.sent('shell.exec')).toEqual([])
+    expect(gw.sent('prompt.submit')).toEqual([expect.objectContaining({ session_id: 's1', text: '!echo hi' })])
   })
 })

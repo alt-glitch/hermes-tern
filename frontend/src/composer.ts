@@ -146,18 +146,24 @@ export class Composer {
   }
 
   undo() {
-    this.#restore(this.#steps.undo({ cursor: this.cursor, text: this.text }))
+    this.#restore(this.#steps.undo(this.#snapshot()))
   }
 
   redo() {
-    this.#restore(this.#steps.redo({ cursor: this.cursor, text: this.text }))
+    this.#restore(this.#steps.redo(this.#snapshot()))
   }
 
-  /** Puts back the draft an undo or redo step held, if there was one. */
+  /** The draft as an undo step holds it: its text, caret and pastes. */
+  #snapshot(): Snapshot {
+    return { cursor: this.cursor, pasted: [...this.#pasted], text: this.text }
+  }
+
+  /** Puts back the draft an undo or redo step held, if there was one, with the pastes it held. */
   #restore(step: Snapshot | undefined) {
     if (step) {
       this.#text = step.text
       this.#cursor = step.cursor
+      this.#pasted = [...step.pasted]
       this.#anchor = undefined
       this.#browse = -1
     }
@@ -173,11 +179,12 @@ export class Composer {
       const s = (key.text ?? '').replace(/\r\n?/g, '\n')
       const [from, to] = this.selection
 
+      this.splice(from, to, s)
+
+      // After the splice, so the step it saved holds the pastes from before this one.
       if (pastedCommand(s)) {
         this.#pasted.push(s)
       }
-
-      this.splice(from, to, s)
 
       return true
     }
@@ -476,7 +483,7 @@ export class Composer {
     // An edited history entry is the draft now: the next Up saves it and starts from the newest entry.
     this.#browse = -1
     this.#anchor = undefined
-    this.#steps.record({ cursor: this.cursor, text: this.text }, { merge })
+    this.#steps.record(this.#snapshot(), { merge })
   }
 }
 

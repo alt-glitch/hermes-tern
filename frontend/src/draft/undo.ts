@@ -1,10 +1,14 @@
 // The composer's undo history: the draft as it was before each edit, a typing burst joined into
 // one step, and the steps undone kept for redo until the next edit.
 
-/** The draft as one undo step holds it. */
+/**
+ * The draft as one undo step holds it, with the pastes it held: a paste undone and redone, or
+ * brought back after a clear, still counts as pasted (an `!` command in it never runs as typed).
+ */
 export interface Snapshot {
   readonly text: string
   readonly cursor: number
+  readonly pasted: readonly string[]
 }
 
 /** Typing within this window joins one undo step. */
