@@ -43,7 +43,6 @@ open Hermes in Tern's agent pane, set Tern's agent command (`agent_command` in T
 | `tool_request` middleware | the agent's shell commands run with the chat's `TERN_PANE`, so `tern open` works beside the chat |
 | `tern_charts` auxiliary task | writes the rules behind a background process's live chart (`auxiliary.tern_charts` picks its model) |
 | system prompt sections | tell the agent to link the PRs it opens, and (only in a session a Tern pane shows) what Tern draws in a reply |
-| `tern-rendering` skill | the full reference for figures in a reply: every mermaid kind Tern draws, svg rules, math, media |
 
 ## The chat
 

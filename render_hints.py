@@ -10,16 +10,13 @@ runs only once Tern answered its handshake); the platform cannot tell (a gateway
 
 from __future__ import annotations
 
-from pathlib import Path
 from typing import Any, Mapping
 
 from . import tern_env
 
-SKILL = Path(__file__).resolve().parent / "skills" / "tern-rendering" / "SKILL.md"
-
 PROMPT = """<tern_rendering>
 This conversation is shown in Tern, which draws your Markdown natively. Use a figure when it says more than prose; keep short answers plain, and never announce or restate a figure.
-- Flow, sequence, state, structure or dependencies: a ```mermaid diagram. Tern draws (merman, Mermaid 12): flowchart, sequenceDiagram, classDiagram, stateDiagram-v2, erDiagram, gantt, gitGraph, journey, timeline, mindmap, kanban, quadrantChart, xychart, sankey-beta, packet, radar-beta, block-beta, C4Context, requirementDiagram, treemap-beta, treeView-beta, ishikawa-beta, venn-beta, swimlane-beta, railroad-beta (also -ebnf-beta, -abnf-beta, -peg-beta), wardley-beta, cynefin-beta, agentflow-beta, eventmodeling, usecase-beta, zenuml, pie. Write each header exactly as listed. Never architecture-beta (Tern does not draw it): use flowchart subgraphs or C4Context. Quote labels with spaces or punctuation: A["Parse (step 1)"]. No HTML in labels except <br/>. The skill has a working example of each kind.
+- Flow, sequence, state, structure or dependencies: a ```mermaid diagram. Tern draws (merman, Mermaid 12): flowchart, sequenceDiagram, classDiagram, stateDiagram-v2, erDiagram, gantt, gitGraph, journey, timeline, mindmap, kanban, quadrantChart, xychart, sankey-beta, packet, radar-beta, block-beta, C4Context, requirementDiagram, treemap-beta, treeView-beta, ishikawa-beta, venn-beta, swimlane-beta, railroad-beta (also -ebnf-beta, -abnf-beta, -peg-beta), wardley-beta, cynefin-beta, agentflow-beta, eventmodeling, usecase-beta, zenuml, pie. Write each header exactly as listed. Never architecture-beta (Tern does not draw it): use flowchart subgraphs or C4Context. Quote labels with spaces or punctuation: A["Parse (step 1)"]. No HTML in labels except <br/>. In sequenceDiagram, a # cuts a label short (write PR 123, not PR #123), and a participant named like a keyword needs an alias: participant E as End User.
 - What mermaid cannot draw (a layout, mockup, geometry, custom chart, infographic): a ```svg block; it shows inline as a picture in the theme's colors. viewBox sets the size (1 unit is about 1px, at most 1000 wide; font-size 14 is body text). Color only with currentColor and var(--fg), var(--muted), var(--border), var(--surface), var(--accent), var(--success), var(--warning), var(--error), series var(--c1) to var(--c6). No background, no scripts, no animation, no <foreignObject>, no external href.
 - Math: $...$ inline, $$...$$ on its own lines for display (a ```math fence stays code). Write a literal dollar sign as \\$.
 - A 3D model as text: a ```stl, ```obj, ```ply or ```wrl block shows a model the user can turn.
@@ -28,7 +25,6 @@ This conversation is shown in Tern, which draws your Markdown natively. Use a fi
 - File references become links that open the file at the line: `src/app.ts:42`. Relative paths resolve against {cwd}; for a file outside it, write the absolute path or a ~/ path.
 - A full HTML page or site: write the file and run `tern open --split right /absolute/page.html`; it opens in a browser block beside the chat. HTML in a reply shows as text.
 - Figures are checked after your reply; if one does not render you get its error and resend only that figure.
-The skill hermes-tern:tern-rendering has the full reference and worked examples.
 </tern_rendering>"""
 
 
@@ -41,6 +37,3 @@ def section(info: Mapping[str, Any]) -> str:
 
 def register(ctx) -> None:
     ctx.register_system_prompt_section("hermes-tern.rendering", section)
-    ctx.register_skill("tern-rendering", SKILL,
-                       description="What Tern draws in a hermes tern reply: mermaid, svg, math, 3D, media and links, "
-                                   "with the rules each needs to render.")
