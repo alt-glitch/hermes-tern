@@ -189,7 +189,7 @@ export class AppActions {
       gw,
       host: chat,
       life,
-      prompt: item => cx.router.route(item, cx.state.busyMode, 'command'),
+      prompt: item => cx.router.route(item, cx.state.busyMode),
       transcript
     }
     this.host = {
@@ -276,7 +276,7 @@ export class AppActions {
     }
 
     // The draft's images go with this prompt, whenever it is sent; a message the app writes leaves them.
-    this.#cx.router.route({ images: draft ? attachments.take() : [], kind: 'typed', pasted, text }, busy, 'typed')
+    this.#cx.router.route({ images: draft ? attachments.take() : [], kind: 'typed', pasted, text }, busy)
   }
 
   /** What the router's gates read: the session, the switch in flight, the turn, the compaction and the startup image. */

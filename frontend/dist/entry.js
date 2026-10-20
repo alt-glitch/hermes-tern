@@ -69108,7 +69108,7 @@ var AppActions = class {
       gw: gw2,
       host: chat,
       life,
-      prompt: (item3) => cx.router.route(item3, cx.state.busyMode, "command"),
+      prompt: (item3) => cx.router.route(item3, cx.state.busyMode),
       transcript
     };
     this.host = {
@@ -69175,7 +69175,7 @@ var AppActions = class {
       void this.#shell(text15.slice(1).trim());
       return;
     }
-    this.#cx.router.route({ images: draft ? attachments.take() : [], kind: "typed", pasted, text: text15 }, busy, "typed");
+    this.#cx.router.route({ images: draft ? attachments.take() : [], kind: "typed", pasted, text: text15 }, busy);
   }
   /** What the router's gates read: the session, the switch in flight, the turn, the compaction and the startup image. */
   gates() {
@@ -72871,7 +72871,7 @@ var SessionLifecycle = class {
   }
   /** Closes the open session and starts a fresh one with an empty transcript, named `title` if given. */
   async newSession(title) {
-    if (this.#busySwitch()) {
+    if (this.#refuseSwitch()) {
       return;
     }
     const host = this.#host;
@@ -72910,7 +72910,7 @@ var SessionLifecycle = class {
   }
   /** Resumes stored session `id`: its history replaces the transcript, and the session it leaves is closed. */
   async resume(id) {
-    if (this.#busySwitch()) {
+    if (this.#refuseSwitch()) {
       return;
     }
     const previous3 = this.#host.state.ref.live;
@@ -72952,13 +72952,17 @@ var SessionLifecycle = class {
       this.#settle(token);
     }
   }
-  /** Refuses a session switch while a turn runs (its queue and prompts belong to this session); true when refused. */
-  #busySwitch() {
+  /**
+   * Refuses a session switch while a turn or a compaction runs (its queue and prompts belong to this
+   * session); true when refused.
+   */
+  #refuseSwitch() {
     const host = this.#host;
-    if (!host.busy()) {
+    const gate = host.canSwitch();
+    if (gate.kind === "switch") {
       return false;
     }
-    host.transcript.notice("Wait for the current turn to finish (or press Esc twice) before switching sessions.", "warning");
+    host.transcript.notice(gate.notice, "warning");
     host.changed();
     return true;
   }
@@ -74431,45 +74435,50 @@ async function expand2(host, sid, prompt) {
 }
 
 // src/turn/router.ts
-function gateTurn(s2) {
+function doing(s2) {
   if (s2.busy) {
-    return "busy";
+    return "turn";
   }
-  if (s2.compacting) {
-    return "behind";
-  }
-  return "send";
+  return s2.compacting ? "compaction" : "nothing";
 }
-function gateSubmit(s2) {
-  if (!s2.sid || s2.switching) {
-    return "hold";
-  }
-  return gateTurn(s2);
-}
-function gateBehind(s2) {
-  if (!s2.canonical || !s2.sid || s2.switching) {
-    return { kind: "hold" };
-  }
-  return { kind: "admit", sid: s2.sid };
-}
-function gateSend(s2) {
+function canSend(s2) {
   if (!s2.sid || s2.switching) {
     return { kind: "hold" };
   }
-  return { kind: "send", sid: s2.sid };
+  const { sid } = s2;
+  switch (doing(s2)) {
+    case "turn":
+      return { kind: "busy", sid };
+    case "compaction":
+      return { kind: "behind", sid };
+    case "nothing":
+      return { kind: "send", sid };
+  }
 }
-function gateDrain(s2) {
-  return !(s2.busy || s2.compacting || !s2.sid || s2.switching || s2.awaitingStartup);
+function canDrain(s2) {
+  return canSend(s2).kind === "send" && !s2.awaitingStartup;
+}
+function canSwitch(s2) {
+  switch (doing(s2)) {
+    case "turn":
+      return { kind: "wait", notice: "Wait for the current turn to finish (or press Esc twice) before switching sessions." };
+    case "compaction":
+      return { kind: "wait", notice: "Wait for the compaction to finish before switching sessions." };
+    case "nothing":
+      return { kind: "switch" };
+  }
 }
 var PromptRouter = class {
   #host;
   constructor(host) {
     this.#host = host;
   }
-  /** Sends, queues or holds `prompt` as its entry's gate says; while a turn runs, as `mode` says. */
-  route(prompt, mode, entry) {
-    const s2 = this.#host.gates();
-    switch (entry === "typed" ? gateSubmit(s2) : gateTurn(s2)) {
+  /**
+   * Sends, queues or holds `prompt` (a typed one, or a slash command's) as canSend says; while a
+   * turn runs, as `mode` says.
+   */
+  route(prompt, mode) {
+    switch (canSend(this.#host.gates()).kind) {
       case "hold":
         return this.#host.queue.hold(prompt);
       case "busy":
@@ -74513,8 +74522,9 @@ var PromptRouter = class {
   /** Puts `prompt` behind the running turn: into the shared gateway's queue at once, else held here. */
   behind(prompt) {
     const host = this.#host;
-    const gate = gateBehind(host.gates());
-    if (gate.kind === "hold") {
+    const s2 = host.gates();
+    const gate = canSend(s2);
+    if (gate.kind === "hold" || !s2.canonical) {
       host.queue.hold(prompt);
       host.queue.drain();
       return host.changed();
@@ -74532,7 +74542,7 @@ var PromptRouter = class {
    */
   send(prompt, { display = prompt.kind === "command" ? prompt.display : void 0, queued = false } = {}) {
     const host = this.#host;
-    const gate = gateSend(host.gates());
+    const gate = canSend(host.gates());
     if (gate.kind === "hold") {
       host.queue.holdFirst(prompt);
       return;
@@ -74643,7 +74653,7 @@ function chatStores(chat, { act, gw: gw2, launch: launch3, settings: settings2, 
   );
   const queue2 = new PromptQueue({
     busy: () => Boolean(activity.busy),
-    canDrain: () => gateDrain(act().gates()),
+    canDrain: () => canDrain(act().gates()),
     changed,
     expanded: (sid, prompt) => router.expanded(sid, prompt),
     gw: gw2,
@@ -74691,7 +74701,7 @@ function chatStores(chat, { act, gw: gw2, launch: launch3, settings: settings2, 
     {
       attachStartup: (sid) => act().attachStartupImage(sid),
       awaitingStartup: () => attachments.awaitingStartup,
-      busy: () => Boolean(activity.busy),
+      canSwitch: () => canSwitch(act().gates()),
       changed,
       cols: () => tern.caps.cols,
       drain: () => queue2.drain(),

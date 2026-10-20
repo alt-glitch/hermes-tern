@@ -44,7 +44,7 @@ import type { SurfaceHost } from '../surface/host.js'
 import { Transcript } from '../transcript.js'
 import { Activity } from '../turn/activity.js'
 import { PromptQueue } from '../turn/queue.js'
-import { gateDrain, PromptRouter } from '../turn/router.js'
+import { canDrain, canSwitch, PromptRouter } from '../turn/router.js'
 import { randomTip, type WelcomeContext } from '../view/welcome.js'
 
 import type { AppActions } from './actions.js'
@@ -169,7 +169,7 @@ export function chatStores(chat: StoresHost, { act, gw, launch, settings, surfac
   /** The prompts waiting behind the turn: held here, and the shared gateway's queue for this session. */
   const queue: PromptQueue = new PromptQueue({
     busy: () => Boolean(activity.busy),
-    canDrain: () => gateDrain(act().gates()),
+    canDrain: () => canDrain(act().gates()),
     changed,
     expanded: (sid, prompt) => router.expanded(sid, prompt),
     gw,
@@ -219,7 +219,7 @@ export function chatStores(chat: StoresHost, { act, gw, launch, settings, surfac
     {
       attachStartup: sid => act().attachStartupImage(sid),
       awaitingStartup: () => attachments.awaitingStartup,
-      busy: () => Boolean(activity.busy),
+      canSwitch: () => canSwitch(act().gates()),
       changed,
       cols: () => tern.caps.cols,
       drain: () => queue.drain(),

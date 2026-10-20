@@ -265,7 +265,7 @@ function lifecycle() {
     {
       attachStartup: () => Promise.resolve(),
       awaitingStartup: () => false,
-      busy: () => false,
+      canSwitch: () => ({ kind: 'switch' }),
       changed: () => void log.push('changed'),
       cols: () => 80,
       drain: () => void log.push('drain'),

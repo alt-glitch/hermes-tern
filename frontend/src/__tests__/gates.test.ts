@@ -1,6 +1,6 @@
-// The router's gates and the working line's busy state, pinned as they are before WP23 merges the
-// gates: which parts of the session's state each entry point reads, the labels' last-write-wins
-// order, and a send's {!cmd} expansion counting as a turn everywhere busy is read.
+// The router's gates and the working line's busy state: canSend, canDrain and canSwitch over
+// every combination of the state they read, the labels' last-write-wins order, and a send's
+// {!cmd} expansion counting as a turn everywhere busy is read.
 import { mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -9,7 +9,7 @@ import { describe, expect, it, vi } from 'vitest'
 
 import { liveSessionId } from '../core/ids.js'
 import { Activity } from '../turn/activity.js'
-import { gateBehind, gateDrain, gateSend, type GateState, gateSubmit, gateTurn } from '../turn/router.js'
+import { canDrain, canSend, canSwitch, type GateState } from '../turn/router.js'
 
 import { FakeGateway, fakeTern, given, key, type Reply, settle } from './fakes.js'
 
@@ -45,46 +45,34 @@ const name = (on: ReadonlySet<Flag>) => [...on].join('+') || 'nothing'
 
 /** Each gate, its answer as a comparable value, and the flags it reads (the others never change it). */
 const GATES: { name: string; answer: (s: GateState) => unknown; reads: readonly Flag[] }[] = [
-  { answer: s => gateBehind(s).kind, name: 'gateBehind', reads: ['sid', 'switching', 'canonical'] },
-  { answer: gateDrain, name: 'gateDrain', reads: ['sid', 'switching', 'busy', 'compacting', 'awaitingStartup'] },
-  { answer: s => gateSend(s).kind, name: 'gateSend', reads: ['sid', 'switching'] },
-  { answer: gateSubmit, name: 'gateSubmit', reads: ['sid', 'switching', 'busy', 'compacting'] },
-  { answer: gateTurn, name: 'gateTurn', reads: ['busy', 'compacting'] }
+  { answer: s => canSend(s).kind, name: 'canSend', reads: ['sid', 'switching', 'busy', 'compacting'] },
+  { answer: canDrain, name: 'canDrain', reads: ['sid', 'switching', 'busy', 'compacting', 'awaitingStartup'] },
+  { answer: s => canSwitch(s).kind, name: 'canSwitch', reads: ['busy', 'compacting'] }
 ]
 
 describe('the gates, for every combination of session, switch, turn, compaction, startup image and gateway', () => {
-  it('gateSubmit: no session or a switch holds; then a turn takes the busy path, a compaction queues behind, else send', () => {
+  it('canSend: no session or a switch holds; then a turn takes the busy path, a compaction queues behind, else send', () => {
     for (const on of COMBINATIONS) {
-      const want = !on.has('sid') || on.has('switching') ? 'hold' : on.has('busy') ? 'busy' : on.has('compacting') ? 'behind' : 'send'
-      expect(gateSubmit(state(on)), name(on)).toBe(want)
+      const want = !on.has('sid') || on.has('switching') ? { kind: 'hold' } : { kind: on.has('busy') ? 'busy' : on.has('compacting') ? 'behind' : 'send', sid: S1 }
+      expect(canSend(state(on)), name(on)).toEqual(want)
     }
   })
 
-  it('gateTurn (a slash command\'s prompt): a turn takes the busy path, a compaction queues behind, else send; no hold', () => {
-    for (const on of COMBINATIONS) {
-      const want = on.has('busy') ? 'busy' : on.has('compacting') ? 'behind' : 'send'
-      expect(gateTurn(state(on)), name(on)).toBe(want)
-    }
-  })
-
-  it('gateBehind: a private gateway, no session or a switch holds; the shared gateway admits into the session\'s queue', () => {
-    for (const on of COMBINATIONS) {
-      const admits = on.has('canonical') && on.has('sid') && !on.has('switching')
-      expect(gateBehind(state(on)), name(on)).toEqual(admits ? { kind: 'admit', sid: S1 } : { kind: 'hold' })
-    }
-  })
-
-  it('gateSend: no session or a switch holds (at the queue\'s head); a turn or a compaction does not', () => {
-    for (const on of COMBINATIONS) {
-      const sends = on.has('sid') && !on.has('switching')
-      expect(gateSend(state(on)), name(on)).toEqual(sends ? { kind: 'send', sid: S1 } : { kind: 'hold' })
-    }
-  })
-
-  it('gateDrain: only an adopted, idle session with no startup image waiting drains', () => {
+  it('canDrain: only an adopted, idle session with no startup image waiting drains', () => {
     for (const on of COMBINATIONS) {
       const drains = on.has('sid') && !on.has('switching') && !on.has('busy') && !on.has('compacting') && !on.has('awaitingStartup')
-      expect(gateDrain(state(on)), name(on)).toBe(drains)
+      expect(canDrain(state(on)), name(on)).toBe(drains)
+    }
+  })
+
+  it('canSwitch: a turn or a compaction makes the switch wait, each with its own notice', () => {
+    for (const on of COMBINATIONS) {
+      const want = on.has('busy')
+        ? { kind: 'wait', notice: 'Wait for the current turn to finish (or press Esc twice) before switching sessions.' }
+        : on.has('compacting')
+          ? { kind: 'wait', notice: 'Wait for the compaction to finish before switching sessions.' }
+          : { kind: 'switch' }
+      expect(canSwitch(state(on)), name(on)).toEqual(want)
     }
   })
 

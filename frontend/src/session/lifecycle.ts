@@ -14,6 +14,7 @@ import { type RequestRoute, Switches } from '../flow.js'
 import { createParams } from '../hermes/create.js'
 import type { PromptSheets } from '../prompts/sheets.js'
 import type { Transcript } from '../transcript.js'
+import type { SwitchGate } from '../turn/router.js'
 import { rpc } from '../wire/rpc.js'
 
 import { type Adoptable, adoptAll, type Snapshot } from './adopt.js'
@@ -30,8 +31,8 @@ export interface LifecycleHost {
   readonly launch: Pick<LaunchEnv, 'resume' | 'sessionCwd'>
   /** The pane's width, which a private gateway lays its output out for. */
   cols(): number
-  /** A turn runs: a switch waits for it. */
-  busy(): boolean
+  /** Whether the view may move to another session now (not while a turn or a compaction runs). */
+  canSwitch(): SwitchGate
   /** The launcher's --image still waits for the first session. */
   awaitingStartup(): boolean
   /** Attaches the launcher's image to session `sid`, then lets the startup query go. */
@@ -173,7 +174,7 @@ export class SessionLifecycle {
 
   /** Closes the open session and starts a fresh one with an empty transcript, named `title` if given. */
   async newSession(title?: string) {
-    if (this.#busySwitch()) {
+    if (this.#refuseSwitch()) {
       return
     }
 
@@ -227,7 +228,7 @@ export class SessionLifecycle {
 
   /** Resumes stored session `id`: its history replaces the transcript, and the session it leaves is closed. */
   async resume(id: StoredSessionId) {
-    if (this.#busySwitch()) {
+    if (this.#refuseSwitch()) {
       return
     }
 
@@ -285,15 +286,19 @@ export class SessionLifecycle {
     }
   }
 
-  /** Refuses a session switch while a turn runs (its queue and prompts belong to this session); true when refused. */
-  #busySwitch(): boolean {
+  /**
+   * Refuses a session switch while a turn or a compaction runs (its queue and prompts belong to this
+   * session); true when refused.
+   */
+  #refuseSwitch(): boolean {
     const host = this.#host
+    const gate = host.canSwitch()
 
-    if (!host.busy()) {
+    if (gate.kind === 'switch') {
       return false
     }
 
-    host.transcript.notice('Wait for the current turn to finish (or press Esc twice) before switching sessions.', 'warning')
+    host.transcript.notice(gate.notice, 'warning')
     host.changed()
 
     return true

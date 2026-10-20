@@ -1,8 +1,8 @@
 // Where a prompt goes: sent now, through the busy path (steer, redirect or queue, as
 // busy_input_mode says), behind a turn or a compaction, or held until a session is adopted. One
 // router for the composer's prompts, a slash command's, the queue's drain and the session
-// commands' sends. Each entry point keeps its own gate, named here: they read different parts of
-// the session's state, and each is pinned by a test (WP23 merges them).
+// commands' sends. Two gates read the session's state: canSend (where a prompt goes) and
+// canSwitch (whether the view may move to another session); each entry point reads one of them.
 
 import type { GatewayClient } from '@tui/gatewayClient.js'
 
@@ -34,66 +34,72 @@ export interface GateState {
   canonical: boolean
 }
 
-/** Where a turn-time prompt goes: the busy path, behind the compaction, or sent now. */
-export type TurnGate = 'busy' | 'behind' | 'send'
+/** What the session is doing: a turn (it wins over a compaction inside it), a compaction, or nothing. */
+type Doing = 'turn' | 'compaction' | 'nothing'
 
-/** Where a typed prompt goes: also held, before the first session or during a switch. */
-export type SubmitGate = 'hold' | TurnGate
-
-/** Where a prompt behind the turn goes: held here, or admitted into session `sid`'s queue. */
-export type BehindGate = { kind: 'hold' } | { kind: 'admit'; sid: LiveSessionId }
-
-/** Whether a prompt can be sent now in session `sid`, or waits at the queue's head. */
-export type SendGate = { kind: 'hold' } | { kind: 'send'; sid: LiveSessionId }
-
-/** A slash command's prompt (a skill, a `send`): while a turn runs it takes the busy path a typed one does. */
-export function gateTurn(s: GateState): TurnGate {
+function doing(s: GateState): Doing {
   if (s.busy) {
-    return 'busy'
+    return 'turn'
   }
 
-  // /compress holds the session: the prompt waits behind it (no turn runs, so none to steer).
-  if (s.compacting) {
-    return 'behind'
-  }
-
-  return 'send'
+  return s.compacting ? 'compaction' : 'nothing'
 }
 
-/** A prompt the composer (or the app through it) sends: held until a session is adopted, then as gateTurn. */
-export function gateSubmit(s: GateState): SubmitGate {
-  if (!s.sid || s.switching) {
-    return 'hold'
-  }
+/**
+ * Where a prompt can go now. `hold`: no session yet, or a switch in flight (it belongs to the
+ * session adopted next); `busy`: a turn runs (the busy path); `behind`: a compaction runs (no turn
+ * to steer, so it waits behind it); `send`: the session is idle.
+ */
+export type SendGate =
+  | { kind: 'hold' }
+  | { kind: 'busy'; sid: LiveSessionId }
+  | { kind: 'behind'; sid: LiveSessionId }
+  | { kind: 'send'; sid: LiveSessionId }
 
-  return gateTurn(s)
-}
-
-/** A prompt behind the turn: a private gateway, no session or a switch holds it here; the shared one admits it. */
-export function gateBehind(s: GateState): BehindGate {
-  if (!s.canonical || !s.sid || s.switching) {
-    return { kind: 'hold' }
-  }
-
-  return { kind: 'admit', sid: s.sid }
-}
-
-/** A send: with no session, or a switch in flight, the prompt waits at the queue's head. */
-export function gateSend(s: GateState): SendGate {
+/** Where a prompt can go now, read from the whole state once: every entry point asks here. */
+export function canSend(s: GateState): SendGate {
   if (!s.sid || s.switching) {
     return { kind: 'hold' }
   }
 
-  return { kind: 'send', sid: s.sid }
+  const { sid } = s
+
+  switch (doing(s)) {
+    case 'turn':
+      return { kind: 'busy', sid }
+
+    case 'compaction':
+      return { kind: 'behind', sid }
+
+    case 'nothing':
+      return { kind: 'send', sid }
+  }
 }
 
-/** Whether the oldest held prompt may go: the session is adopted and idle (no turn, compaction, switch or startup image). */
-export function gateDrain(s: GateState): boolean {
-  return !(s.busy || s.compacting || !s.sid || s.switching || s.awaitingStartup)
+/** Whether the oldest held prompt may go: the session can take a send, and no startup image waits. */
+export function canDrain(s: GateState): boolean {
+  return canSend(s).kind === 'send' && !s.awaitingStartup
 }
 
-/** Which gate a prompt passes: a typed prompt's (gateSubmit), or a slash command's (gateTurn). */
-export type Entry = 'typed' | 'command'
+/** Whether the view may move to another session: `wait` says why not. */
+export type SwitchGate = { kind: 'switch' } | { kind: 'wait'; notice: string }
+
+/**
+ * A switch waits while a turn or a compaction runs: the prompts queued behind it, and its result,
+ * are this session's. A switch in flight may be superseded by another.
+ */
+export function canSwitch(s: GateState): SwitchGate {
+  switch (doing(s)) {
+    case 'turn':
+      return { kind: 'wait', notice: 'Wait for the current turn to finish (or press Esc twice) before switching sessions.' }
+
+    case 'compaction':
+      return { kind: 'wait', notice: 'Wait for the compaction to finish before switching sessions.' }
+
+    case 'nothing':
+      return { kind: 'switch' }
+  }
+}
 
 /** What the router reaches of the app. */
 export interface RouterHost {
@@ -117,7 +123,7 @@ export interface SendOptions {
   queued?: boolean
 }
 
-/** Routes each prompt through its entry point's gate. */
+/** Routes each prompt through the gates. */
 export class PromptRouter {
   readonly #host: RouterHost
 
@@ -125,11 +131,12 @@ export class PromptRouter {
     this.#host = host
   }
 
-  /** Sends, queues or holds `prompt` as its entry's gate says; while a turn runs, as `mode` says. */
-  route(prompt: Prompt, mode: BusyMode, entry: Entry) {
-    const s = this.#host.gates()
-
-    switch (entry === 'typed' ? gateSubmit(s) : gateTurn(s)) {
+  /**
+   * Sends, queues or holds `prompt` (a typed one, or a slash command's) as canSend says; while a
+   * turn runs, as `mode` says.
+   */
+  route(prompt: Prompt, mode: BusyMode) {
+    switch (canSend(this.#host.gates()).kind) {
       case 'hold':
         return this.#host.queue.hold(prompt)
 
@@ -186,9 +193,11 @@ export class PromptRouter {
   /** Puts `prompt` behind the running turn: into the shared gateway's queue at once, else held here. */
   behind(prompt: Prompt) {
     const host = this.#host
-    const gate = gateBehind(host.gates())
+    const s = host.gates()
+    const gate = canSend(s)
 
-    if (gate.kind === 'hold') {
+    // A private gateway has no queue to admit into: the prompt waits here.
+    if (gate.kind === 'hold' || !s.canonical) {
       host.queue.hold(prompt)
       host.queue.drain()
 
@@ -210,9 +219,10 @@ export class PromptRouter {
    */
   send(prompt: Prompt, { display = prompt.kind === 'command' ? prompt.display : undefined, queued = false }: SendOptions = {}) {
     const host = this.#host
-    const gate = gateSend(host.gates())
+    const gate = canSend(host.gates())
 
-    // A session switch in flight: the prompt belongs to the session it adopts.
+    // No session, or a switch in flight: the prompt belongs to the session it adopts. A turn or a
+    // compaction does not stop it (a drained prompt, or one the busy path already chose to send).
     if (gate.kind === 'hold') {
       host.queue.holdFirst(prompt)
 
