@@ -1,34 +1,26 @@
 // The prompt editor's state machine. Tern draws the `editor` node, its caret
-// and its selection; the text model, keys and undo history live here.
-// Offsets are UTF-16 code units, as TSP's `cursor` and `edit` events count.
+// and its selection; the text model and keys live here, the undo history in
+// draft/undo.ts. Offsets are UTF-16 code units, as TSP's `cursor` and `edit`
+// events count.
 
 import type { Decor, Key } from '@stencil-hq/tern'
 import { append as appendHistory, load as loadHistory } from '@tui/lib/history.js'
 
+import { type Snapshot, UndoHistory } from './draft/undo.js'
 import { listNewline, markdownDecor, type Splice, toggleMark } from './markdown.js'
 
 /** What a key asked the app to do beyond editing. */
 export type ComposerAction = 'submit' | null
 
-interface Snapshot {
-  text: string
-  cursor: number
-}
-
 const graphemes = new Intl.Segmenter(undefined, { granularity: 'grapheme' })
-/** Typing within this window joins one undo step. */
-const UNDO_MERGE_MS = 800
 const WORD = /[\p{L}\p{N}_]/u
 
 /** The prompt editor: text, caret, undo/redo, prompt history and kill ring, driven by keys and native edits. */
 export class Composer {
-  text = ''
-  cursor = 0
-  /** The selection's other end, while text is selected (Shift+arrows, or Tern's native selection). */
-  anchor: number | undefined
-  #undo: Snapshot[] = []
-  #redo: Snapshot[] = []
-  #lastEdit = 0
+  #text = ''
+  #cursor = 0
+  #anchor: number | undefined
+  readonly #steps = new UndoHistory()
   #kill = ''
   /** Index into history while browsing it; history.length means the draft. */
   #browse = -1
@@ -36,6 +28,21 @@ export class Composer {
   #decor: { text: string; decor: Decor[] } = { decor: [], text: '' }
   /** Pasted text that holds `{!…}` or starts with `!`: what it says is not the user's command. */
   #pasted: string[] = []
+
+  /** The draft; only the composer's own edits change it. */
+  get text(): string {
+    return this.#text
+  }
+
+  /** The caret's offset in the draft. */
+  get cursor(): number {
+    return this.#cursor
+  }
+
+  /** The selection's other end, while text is selected (Shift+arrows, or Tern's native selection). */
+  get anchor(): number | undefined {
+    return this.#anchor
+  }
 
   /** The selected range, or the caret twice. */
   get selection(): [number, number] {
@@ -70,8 +77,8 @@ export class Composer {
 
   set(text: string, cursor = text.length) {
     this.#record({ merge: false })
-    this.text = text
-    this.cursor = clamp(cursor, text.length)
+    this.#text = text
+    this.#cursor = clamp(cursor, text.length)
   }
 
   /** Clears the draft after a submit, remembering it in the prompt history. */
@@ -79,12 +86,11 @@ export class Composer {
     const text = this.text
     appendHistory(text)
     this.#pasted = []
-    this.#undo = []
-    this.#redo = []
+    this.#steps.clear()
     this.#browse = -1
-    this.text = ''
-    this.cursor = 0
-    this.anchor = undefined
+    this.#text = ''
+    this.#cursor = 0
+    this.#anchor = undefined
 
     return text
   }
@@ -93,8 +99,8 @@ export class Composer {
   insert(s: string) {
     const [from, to] = this.selection
     this.#record({ merge: from === to })
-    this.text = this.text.slice(0, from) + s + this.text.slice(to)
-    this.cursor = from + s.length
+    this.#text = this.text.slice(0, from) + s + this.text.slice(to)
+    this.#cursor = from + s.length
   }
 
   /** Replaces `[from, to)`: native edits from Tern and completions. */
@@ -104,8 +110,8 @@ export class Composer {
 
   #replace({ cursor, from, merge, s, to }: { cursor: number; from: number; merge: boolean; s: string; to: number }) {
     this.#record({ merge })
-    this.text = this.text.slice(0, from) + s + this.text.slice(to)
-    this.cursor = clamp(cursor, this.text.length)
+    this.#text = this.text.slice(0, from) + s + this.text.slice(to)
+    this.#cursor = clamp(cursor, this.text.length)
   }
 
   /**
@@ -118,9 +124,9 @@ export class Composer {
     }
 
     if (ev.from === ev.to && !ev.text) {
-      this.cursor = clamp(ev.cursor, this.text.length)
+      this.#cursor = clamp(ev.cursor, this.text.length)
       const anchor = ev.raw?.anchor
-      this.anchor = typeof anchor === 'number' && anchor !== this.cursor ? clamp(anchor, this.text.length) : undefined
+      this.#anchor = typeof anchor === 'number' && anchor !== this.cursor ? clamp(anchor, this.text.length) : undefined
 
       return
     }
@@ -139,33 +145,21 @@ export class Composer {
   }
 
   undo() {
-    const prev = this.#undo.pop()
-
-    if (!prev) {
-      return
-    }
-
-    this.#redo.push({ cursor: this.cursor, text: this.text })
-    this.text = prev.text
-    this.cursor = prev.cursor
-    this.anchor = undefined
-    this.#lastEdit = 0
-    this.#browse = -1
+    this.#restore(this.#steps.undo({ cursor: this.cursor, text: this.text }))
   }
 
   redo() {
-    const next = this.#redo.pop()
+    this.#restore(this.#steps.redo({ cursor: this.cursor, text: this.text }))
+  }
 
-    if (!next) {
-      return
+  /** Puts back the draft an undo or redo step held, if there was one. */
+  #restore(step: Snapshot | undefined) {
+    if (step) {
+      this.#text = step.text
+      this.#cursor = step.cursor
+      this.#anchor = undefined
+      this.#browse = -1
     }
-
-    this.#undo.push({ cursor: this.cursor, text: this.text })
-    this.text = next.text
-    this.cursor = next.cursor
-    this.anchor = undefined
-    this.#lastEdit = 0
-    this.#browse = -1
   }
 
   /** Handles one editing key; false when the key isn't the composer's. */
@@ -306,7 +300,7 @@ export class Composer {
     const moved = this.#motion(key)
 
     if (moved !== undefined) {
-      this.anchor = anchor !== undefined && anchor !== this.cursor ? anchor : undefined
+      this.#anchor = anchor !== undefined && anchor !== this.cursor ? anchor : undefined
 
       return moved
     }
@@ -385,7 +379,7 @@ export class Composer {
   /** Applies a Markdown edit as one undo step, with the selection it leaves. */
   #apply({ anchor, cursor, from, text, to }: Splice): true {
     this.#replace({ cursor, from, merge: false, s: text, to })
-    this.anchor = anchor !== undefined && anchor !== this.cursor ? anchor : undefined
+    this.#anchor = anchor !== undefined && anchor !== this.cursor ? anchor : undefined
 
     return true
   }
@@ -436,18 +430,18 @@ export class Composer {
       this.#browse = -1
     }
 
-    this.text = text
-    this.cursor = text.length
-    this.anchor = undefined
+    this.#text = text
+    this.#cursor = text.length
+    this.#anchor = undefined
 
     return true
   }
 
   #move(to: number): true {
     if (to !== this.cursor || this.anchor !== undefined) {
-      this.cursor = clamp(to, this.text.length)
-      this.anchor = undefined
-      this.#lastEdit = 0
+      this.#cursor = clamp(to, this.text.length)
+      this.#anchor = undefined
+      this.#steps.breakBurst()
     }
 
     return true
@@ -459,8 +453,8 @@ export class Composer {
     }
 
     this.#record({ merge: true })
-    this.text = this.text.slice(0, from) + this.text.slice(to)
-    this.cursor = from
+    this.#text = this.text.slice(0, from) + this.text.slice(to)
+    this.#cursor = from
 
     return true
   }
@@ -469,8 +463,8 @@ export class Composer {
     if (from < to) {
       this.#kill = this.text.slice(from, to)
       this.#record({ merge: false })
-      this.text = this.text.slice(0, from) + this.text.slice(to)
-      this.cursor = from
+      this.#text = this.text.slice(0, from) + this.text.slice(to)
+      this.#cursor = from
     }
 
     return true
@@ -478,21 +472,10 @@ export class Composer {
 
   /** Saves an undo step; typing bursts merge into one. Every edit runs it, so it also ends a history walk. */
   #record({ merge }: { merge: boolean }) {
-    const now = Date.now()
     // An edited history entry is the draft now: the next Up saves it and starts from the newest entry.
     this.#browse = -1
-    this.anchor = undefined
-
-    if (!merge || now - this.#lastEdit > UNDO_MERGE_MS || !this.#undo.length) {
-      this.#undo.push({ cursor: this.cursor, text: this.text })
-
-      if (this.#undo.length > 200) {
-        this.#undo.shift()
-      }
-    }
-
-    this.#lastEdit = merge ? now : 0
-    this.#redo = []
+    this.#anchor = undefined
+    this.#steps.record({ cursor: this.cursor, text: this.text }, { merge })
   }
 }
 

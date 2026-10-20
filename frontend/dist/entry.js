@@ -62567,6 +62567,57 @@ ${encoded}
   }
 }
 
+// src/draft/undo.ts
+var UNDO_MERGE_MS = 800;
+var MAX_STEPS = 200;
+var UndoHistory = class {
+  #undo = [];
+  #redo = [];
+  #lastEdit = 0;
+  /**
+   * Saves `before`, the draft an edit is about to change, as a step; a typing burst (`merge`)
+   * joins the step it began. Every edit drops the redo steps.
+   */
+  record(before, { merge: merge2 }) {
+    const now = Date.now();
+    if (!merge2 || now - this.#lastEdit > UNDO_MERGE_MS || !this.#undo.length) {
+      this.#undo.push(before);
+      if (this.#undo.length > MAX_STEPS) {
+        this.#undo.shift();
+      }
+    }
+    this.#lastEdit = merge2 ? now : 0;
+    this.#redo = [];
+  }
+  /** The step before `current` (which redo gives back), or undefined when there is none. */
+  undo(current) {
+    return this.#step(this.#undo, this.#redo, current);
+  }
+  /** The step undo left (`current` goes back on the undo steps), or undefined when there is none. */
+  redo(current) {
+    return this.#step(this.#redo, this.#undo, current);
+  }
+  /** Ends the typing burst: the next keystroke starts a step of its own (the caret moved). */
+  breakBurst() {
+    this.#lastEdit = 0;
+  }
+  /** Forgets every step (the draft was sent). */
+  clear() {
+    this.#undo = [];
+    this.#redo = [];
+  }
+  /** Takes the newest step of `from`, and keeps `current` on `to`; a step ends the typing burst. */
+  #step(from, to, current) {
+    const step = from.pop();
+    if (!step) {
+      return void 0;
+    }
+    to.push(current);
+    this.#lastEdit = 0;
+    return step;
+  }
+};
+
 // src/markdown.ts
 var FENCE = /^\s*(```|~~~)/;
 var HEADING = /^(#{1,6})(\s+)/;
@@ -62765,16 +62816,12 @@ function markedRun(text15, at, marker2) {
 
 // src/composer.ts
 var graphemes = new Intl.Segmenter(void 0, { granularity: "grapheme" });
-var UNDO_MERGE_MS = 800;
 var WORD2 = /[\p{L}\p{N}_]/u;
 var Composer = class {
-  text = "";
-  cursor = 0;
-  /** The selection's other end, while text is selected (Shift+arrows, or Tern's native selection). */
-  anchor;
-  #undo = [];
-  #redo = [];
-  #lastEdit = 0;
+  #text = "";
+  #cursor = 0;
+  #anchor;
+  #steps = new UndoHistory();
   #kill = "";
   /** Index into history while browsing it; history.length means the draft. */
   #browse = -1;
@@ -62782,6 +62829,18 @@ var Composer = class {
   #decor = { decor: [], text: "" };
   /** Pasted text that holds `{!…}` or starts with `!`: what it says is not the user's command. */
   #pasted = [];
+  /** The draft; only the composer's own edits change it. */
+  get text() {
+    return this.#text;
+  }
+  /** The caret's offset in the draft. */
+  get cursor() {
+    return this.#cursor;
+  }
+  /** The selection's other end, while text is selected (Shift+arrows, or Tern's native selection). */
+  get anchor() {
+    return this.#anchor;
+  }
   /** The selected range, or the caret twice. */
   get selection() {
     const a2 = this.anchor ?? this.cursor;
@@ -62808,28 +62867,27 @@ var Composer = class {
   }
   set(text15, cursor = text15.length) {
     this.#record({ merge: false });
-    this.text = text15;
-    this.cursor = clamp(cursor, text15.length);
+    this.#text = text15;
+    this.#cursor = clamp(cursor, text15.length);
   }
   /** Clears the draft after a submit, remembering it in the prompt history. */
   take() {
     const text15 = this.text;
     append(text15);
     this.#pasted = [];
-    this.#undo = [];
-    this.#redo = [];
+    this.#steps.clear();
     this.#browse = -1;
-    this.text = "";
-    this.cursor = 0;
-    this.anchor = void 0;
+    this.#text = "";
+    this.#cursor = 0;
+    this.#anchor = void 0;
     return text15;
   }
   /** Types `s` at the caret, over the selection if there is one. */
   insert(s2) {
     const [from, to] = this.selection;
     this.#record({ merge: from === to });
-    this.text = this.text.slice(0, from) + s2 + this.text.slice(to);
-    this.cursor = from + s2.length;
+    this.#text = this.text.slice(0, from) + s2 + this.text.slice(to);
+    this.#cursor = from + s2.length;
   }
   /** Replaces `[from, to)`: native edits from Tern and completions. */
   splice(from, to, s2, cursor = from + s2.length) {
@@ -62837,8 +62895,8 @@ var Composer = class {
   }
   #replace({ cursor, from, merge: merge2, s: s2, to }) {
     this.#record({ merge: merge2 });
-    this.text = this.text.slice(0, from) + s2 + this.text.slice(to);
-    this.cursor = clamp(cursor, this.text.length);
+    this.#text = this.text.slice(0, from) + s2 + this.text.slice(to);
+    this.#cursor = clamp(cursor, this.text.length);
   }
   /**
    * A TSP `edit` event; ignored when the text changed since Tern saw it. A caret move may carry
@@ -62849,9 +62907,9 @@ var Composer = class {
       return;
     }
     if (ev.from === ev.to && !ev.text) {
-      this.cursor = clamp(ev.cursor, this.text.length);
+      this.#cursor = clamp(ev.cursor, this.text.length);
       const anchor = ev.raw?.anchor;
-      this.anchor = typeof anchor === "number" && anchor !== this.cursor ? clamp(anchor, this.text.length) : void 0;
+      this.#anchor = typeof anchor === "number" && anchor !== this.cursor ? clamp(anchor, this.text.length) : void 0;
       return;
     }
     if (ev.from === ev.to && ev.text === "\n") {
@@ -62864,28 +62922,19 @@ var Composer = class {
     this.#replace({ cursor: ev.cursor, from: ev.from, merge: typed, s: ev.text, to: ev.to });
   }
   undo() {
-    const prev = this.#undo.pop();
-    if (!prev) {
-      return;
-    }
-    this.#redo.push({ cursor: this.cursor, text: this.text });
-    this.text = prev.text;
-    this.cursor = prev.cursor;
-    this.anchor = void 0;
-    this.#lastEdit = 0;
-    this.#browse = -1;
+    this.#restore(this.#steps.undo({ cursor: this.cursor, text: this.text }));
   }
   redo() {
-    const next2 = this.#redo.pop();
-    if (!next2) {
-      return;
+    this.#restore(this.#steps.redo({ cursor: this.cursor, text: this.text }));
+  }
+  /** Puts back the draft an undo or redo step held, if there was one. */
+  #restore(step) {
+    if (step) {
+      this.#text = step.text;
+      this.#cursor = step.cursor;
+      this.#anchor = void 0;
+      this.#browse = -1;
     }
-    this.#undo.push({ cursor: this.cursor, text: this.text });
-    this.text = next2.text;
-    this.cursor = next2.cursor;
-    this.anchor = void 0;
-    this.#lastEdit = 0;
-    this.#browse = -1;
   }
   /** Handles one editing key; false when the key isn't the composer's. */
   key(key2) {
@@ -62980,7 +63029,7 @@ var Composer = class {
     }
     const moved2 = this.#motion(key2);
     if (moved2 !== void 0) {
-      this.anchor = anchor !== void 0 && anchor !== this.cursor ? anchor : void 0;
+      this.#anchor = anchor !== void 0 && anchor !== this.cursor ? anchor : void 0;
       return moved2;
     }
     if (key2.text && !ctrl && !meta3) {
@@ -63031,7 +63080,7 @@ var Composer = class {
   /** Applies a Markdown edit as one undo step, with the selection it leaves. */
   #apply({ anchor, cursor, from, text: text15, to }) {
     this.#replace({ cursor, from, merge: false, s: text15, to });
-    this.anchor = anchor !== void 0 && anchor !== this.cursor ? anchor : void 0;
+    this.#anchor = anchor !== void 0 && anchor !== this.cursor ? anchor : void 0;
     return true;
   }
   #vertical(dir2) {
@@ -63067,16 +63116,16 @@ var Composer = class {
     if (at === items.length) {
       this.#browse = -1;
     }
-    this.text = text15;
-    this.cursor = text15.length;
-    this.anchor = void 0;
+    this.#text = text15;
+    this.#cursor = text15.length;
+    this.#anchor = void 0;
     return true;
   }
   #move(to) {
     if (to !== this.cursor || this.anchor !== void 0) {
-      this.cursor = clamp(to, this.text.length);
-      this.anchor = void 0;
-      this.#lastEdit = 0;
+      this.#cursor = clamp(to, this.text.length);
+      this.#anchor = void 0;
+      this.#steps.breakBurst();
     }
     return true;
   }
@@ -63085,32 +63134,24 @@ var Composer = class {
       return true;
     }
     this.#record({ merge: true });
-    this.text = this.text.slice(0, from) + this.text.slice(to);
-    this.cursor = from;
+    this.#text = this.text.slice(0, from) + this.text.slice(to);
+    this.#cursor = from;
     return true;
   }
   #cut(from, to) {
     if (from < to) {
       this.#kill = this.text.slice(from, to);
       this.#record({ merge: false });
-      this.text = this.text.slice(0, from) + this.text.slice(to);
-      this.cursor = from;
+      this.#text = this.text.slice(0, from) + this.text.slice(to);
+      this.#cursor = from;
     }
     return true;
   }
   /** Saves an undo step; typing bursts merge into one. Every edit runs it, so it also ends a history walk. */
   #record({ merge: merge2 }) {
-    const now = Date.now();
     this.#browse = -1;
-    this.anchor = void 0;
-    if (!merge2 || now - this.#lastEdit > UNDO_MERGE_MS || !this.#undo.length) {
-      this.#undo.push({ cursor: this.cursor, text: this.text });
-      if (this.#undo.length > 200) {
-        this.#undo.shift();
-      }
-    }
-    this.#lastEdit = merge2 ? now : 0;
-    this.#redo = [];
+    this.#anchor = void 0;
+    this.#steps.record({ cursor: this.cursor, text: this.text }, { merge: merge2 });
   }
 };
 function clamp(n, max) {
