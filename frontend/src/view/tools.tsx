@@ -11,6 +11,7 @@ import { allConnected, CONNECT_TOOL, type ConnectTarget, connectTargets, isConne
 import { localSource, shownImage } from '../media.js'
 import type { Subagent, Todo, ToolCall } from '../model.js'
 import { isRunning as processRuns, processElapsed, processIdOf, processTone, processVerdict, watchersOf } from '../processes/store.js'
+import { primaryNode } from '../processes/widgets/view.js'
 import { isBackgroundCall, record } from '../transcript.js'
 import { appsOf } from '../workLog.js'
 
@@ -334,8 +335,9 @@ function backgroundCard(call: ToolCall, result: Record<string, unknown> | undefi
   const w = watchersOf(call)
   const id = processIdOf(call) ?? call.process?.id
   const line = id ? processLine(call, id, now) : undefined
+  const chart = call.process?.chart && primaryNode(call.process.chart)
   // The start result ("Background process started") says nothing the process line does not.
-  const card = bashCard(call, result, line)
+  const card = bashCard(call, result, line && chart ? <col gap="xs" key="process">{line}{chart}</col> : line)
 
   return {
     ...card,

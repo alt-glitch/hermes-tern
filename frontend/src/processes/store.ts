@@ -10,6 +10,8 @@ import type { GatewayClient } from '@tui/gatewayClient.js'
 import type { BackgroundProcess, ToolCall } from '../model.js'
 import { record, type Transcript } from '../transcript.js'
 
+import { Charts, type ChartsOptions } from './widgets/registry.js'
+
 /** What the store reaches of the app. */
 export interface ProcessesHost {
   readonly gw: Pick<GatewayClient, 'request'>
@@ -222,9 +224,13 @@ export class Processes {
   #disposed = false
   /** Ids a stop was sent for and that still run: the registry can take seconds to end one. */
   readonly #stopping = new Set<string>()
+  /** Each process's live chart, kept on `p.chart`. */
+  readonly #charts: Charts
 
-  constructor(host: ProcessesHost) {
+  constructor(host: ProcessesHost, charts: ChartsOptions = {}) {
     this.#host = host
+    // A spec arrived: every chart may have changed.
+    this.#charts = new Charts(() => this.#chart([...this.#byId.values()]) && this.#host.changed(), charts)
   }
 
   /** Everything the gateway still lists for the session, in roster order. */
@@ -283,6 +289,8 @@ export class Processes {
 
     p.output = (p.output + chunk).slice(-OUTPUT_MAX)
     p.lastLine = lastLine(p.output)
+    this.#charts.output(id, chunk)
+    this.#chart([p])
     this.#link(new Set([p]))
     this.#host.changed()
   }
@@ -322,6 +330,23 @@ export class Processes {
     this.#disposed = true
     clearTimeout(this.#timer)
     this.#timer = undefined
+    this.#charts.dispose()
+  }
+
+  /** Brings the charts of `procs` up to date and relinks the cards of those that changed; true when one did. */
+  #chart(procs: readonly BackgroundProcess[]): boolean {
+    const touched = new Set<BackgroundProcess>()
+
+    for (const p of procs) {
+      const chart = this.#charts.view(p)
+
+      if (chart !== p.chart) {
+        p.chart = chart
+        touched.add(p)
+      }
+    }
+
+    return this.#link(touched) || touched.size > 0
   }
 
   #schedule() {
@@ -419,6 +444,8 @@ export class Processes {
       }
     }
 
+    this.#charts.retain(new Set(this.#byId.keys()))
+    changed = this.#chart([...this.#byId.values()]) || changed
     changed = this.#link(touched) || touched.size > 0 || changed
     const shown = this.recent(now)
       .map(p => `${p.id}:${p.status}`)

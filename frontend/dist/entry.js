@@ -1754,11 +1754,11 @@ var require_request = __commonJS({
           } else if (typeof val[i] === "object") {
             throw new InvalidArgumentError(`invalid ${key2} header`);
           } else {
-            const str9 = `${val[i]}`;
-            if (!isValidHeaderValue(str9)) {
+            const str10 = `${val[i]}`;
+            if (!isValidHeaderValue(str10)) {
               throw new InvalidArgumentError(`invalid ${key2} header`);
             }
-            arr.push(str9);
+            arr.push(str10);
           }
         }
         val = arr;
@@ -3323,25 +3323,25 @@ var require_data_url = __commonJS({
     function isHTTPWhiteSpace(char) {
       return char === 13 || char === 10 || char === 9 || char === 32;
     }
-    function removeHTTPWhitespace(str9, leading = true, trailing = true) {
-      return removeChars(str9, leading, trailing, isHTTPWhiteSpace);
+    function removeHTTPWhitespace(str10, leading = true, trailing = true) {
+      return removeChars(str10, leading, trailing, isHTTPWhiteSpace);
     }
     function isASCIIWhitespace(char) {
       return char === 13 || char === 10 || char === 9 || char === 12 || char === 32;
     }
-    function removeASCIIWhitespace(str9, leading = true, trailing = true) {
-      return removeChars(str9, leading, trailing, isASCIIWhitespace);
+    function removeASCIIWhitespace(str10, leading = true, trailing = true) {
+      return removeChars(str10, leading, trailing, isASCIIWhitespace);
     }
-    function removeChars(str9, leading, trailing, predicate) {
+    function removeChars(str10, leading, trailing, predicate) {
       let lead = 0;
-      let trail2 = str9.length - 1;
+      let trail2 = str10.length - 1;
       if (leading) {
-        while (lead < str9.length && predicate(str9.charCodeAt(lead))) lead++;
+        while (lead < str10.length && predicate(str10.charCodeAt(lead))) lead++;
       }
       if (trailing) {
-        while (trail2 > 0 && predicate(str9.charCodeAt(trail2))) trail2--;
+        while (trail2 > 0 && predicate(str10.charCodeAt(trail2))) trail2--;
       }
-      return lead === 0 && trail2 === str9.length - 1 ? str9 : str9.slice(lead, trail2 + 1);
+      return lead === 0 && trail2 === str10.length - 1 ? str10 : str10.slice(lead, trail2 + 1);
     }
     function isomorphicDecode(input2) {
       const length = input2.length;
@@ -4418,17 +4418,17 @@ var require_util2 = __commonJS({
     }
     async function readAllBytes(reader) {
       const bytes = [];
-      let byteLength = 0;
+      let byteLength2 = 0;
       while (true) {
         const { done, value: chunk } = await reader.read();
         if (done) {
-          return Buffer.concat(bytes, byteLength);
+          return Buffer.concat(bytes, byteLength2);
         }
         if (!isUint8Array3(chunk)) {
           throw new TypeError("Received non-Uint8Array chunk");
         }
         bytes.push(chunk);
-        byteLength += chunk.length;
+        byteLength2 += chunk.length;
       }
     }
     function urlIsLocal(url) {
@@ -4615,8 +4615,8 @@ var require_util2 = __commonJS({
       }
       return values;
     }
-    function getDecodeSplit(name, list7) {
-      const value = list7.get(name, true);
+    function getDecodeSplit(name, list8) {
+      const value = list8.get(name, true);
       if (value === null) {
         return null;
       }
@@ -5260,7 +5260,7 @@ var require_body = __commonJS({
         const boundary = `----formdata-undici-0${`${random(1e11)}`.padStart(11, "0")}`;
         const prefix2 = `--${boundary}\r
 Content-Disposition: form-data`;
-        const escape = (str9) => str9.replace(/\n/g, "%0A").replace(/\r/g, "%0D").replace(/"/g, "%22");
+        const escape = (str10) => str10.replace(/\n/g, "%0A").replace(/\r/g, "%0D").replace(/"/g, "%22");
         const normalizeLinefeeds = (value) => value.replace(/\r?\n|\r/g, "\r\n");
         const blobParts = [];
         const rn = new Uint8Array([13, 10]);
@@ -12027,9 +12027,9 @@ var require_headers = __commonJS({
       // https://fetch.spec.whatwg.org/#dom-headers-getsetcookie
       getSetCookie() {
         webidl.brandCheck(this, _Headers);
-        const list7 = this.#headersList.cookies;
-        if (list7) {
-          return [...list7];
+        const list8 = this.#headersList.cookies;
+        if (list8) {
+          return [...list8];
         }
         return [];
       }
@@ -12069,8 +12069,8 @@ var require_headers = __commonJS({
       static getHeadersList(o) {
         return o.#headersList;
       }
-      static setHeadersList(o, list7) {
-        o.#headersList = list7;
+      static setHeadersList(o, list8) {
+        o.#headersList = list8;
       }
     };
     var { getHeadersGuard, setHeadersGuard, getHeadersList, setHeadersList } = Headers;
@@ -13038,13 +13038,13 @@ var require_request2 = __commonJS({
         if (this.signal.aborted) {
           ac.abort(this.signal.reason);
         } else {
-          let list7 = dependentControllerMap.get(this.signal);
-          if (list7 === void 0) {
-            list7 = /* @__PURE__ */ new Set();
-            dependentControllerMap.set(this.signal, list7);
+          let list8 = dependentControllerMap.get(this.signal);
+          if (list8 === void 0) {
+            list8 = /* @__PURE__ */ new Set();
+            dependentControllerMap.set(this.signal, list8);
           }
           const acRef = new WeakRef(ac);
-          list7.add(acRef);
+          list8.add(acRef);
           util.addAbortListener(
             ac.signal,
             buildAbort(acRef)
@@ -16244,9 +16244,9 @@ var require_cookies = __commonJS({
       webidl.argumentLengthCheck(arguments, 2, "setCookie");
       webidl.brandCheck(headers, Headers, { strict: false });
       cookie = webidl.converters.Cookie(cookie);
-      const str9 = stringify3(cookie);
-      if (str9) {
-        headers.append("Set-Cookie", str9);
+      const str10 = stringify3(cookie);
+      if (str10) {
+        headers.append("Set-Cookie", str10);
       }
     }
     webidl.converters.DeleteCookieAttributes = webidl.dictionaryConverter([
@@ -16806,8 +16806,8 @@ var require_util7 = __commonJS({
           return false;
         }
       }
-      const num4 = Number.parseInt(value, 10);
-      return num4 >= 8 && num4 <= 15;
+      const num5 = Number.parseInt(value, 10);
+      return num5 >= 8 && num5 <= 15;
     }
     var hasIntl = typeof process.versions.icu === "string";
     var fatalDecoder = hasIntl ? new TextDecoder("utf-8", { fatal: true }) : void 0;
@@ -19137,10 +19137,10 @@ function formValues(raw2) {
   return out;
 }
 function mods(raw2) {
-  const list7 = strings(raw2, "mods");
-  if (!list7)
+  const list8 = strings(raw2, "mods");
+  if (!list8)
     return void 0;
-  return list7.filter((m) => m === "shift" || m === "ctrl" || m === "alt" || m === "meta");
+  return list8.filter((m) => m === "shift" || m === "ctrl" || m === "alt" || m === "meta");
 }
 function defined(target, fields) {
   for (const key2 in fields) {
@@ -24945,8 +24945,8 @@ function appOf(name, args) {
   return mcp ? { action: actionPhrase(mcp[2]), app: appTitle(mcp[1]), kind: "mcp" } : void 0;
 }
 function entriesOf(args) {
-  const list7 = Array.isArray(args.calls) ? args.calls : [args];
-  return list7.flatMap((e) => {
+  const list8 = Array.isArray(args.calls) ? args.calls : [args];
+  return list8.flatMap((e) => {
     const r = record(e);
     const name = r?.name;
     return typeof name === "string" && name ? [{ args: record(r?.arguments) ?? {}, name }] : [];
@@ -25450,9 +25450,9 @@ var Transcript = class {
     if (!found) {
       return;
     }
-    const list7 = found.call.subagents ??= [];
+    const list8 = found.call.subagents ??= [];
     const key2 = p3.subagent_id ?? `task-${p3.task_index}`;
-    let agent = list7.find((a2) => a2.id === key2);
+    let agent = list8.find((a2) => a2.id === key2);
     if (!agent) {
       agent = {
         calls: 0,
@@ -25464,8 +25464,8 @@ var Transcript = class {
         tokens: 0,
         toolCount: 0
       };
-      list7.push(agent);
-      list7.sort((a2, b) => a2.index - b.index);
+      list8.push(agent);
+      list8.sort((a2, b) => a2.index - b.index);
     }
     agent.last = p3;
     agent.goal = p3.goal || agent.goal;
@@ -25821,8 +25821,8 @@ function detailsText(details) {
     if (!r || r.type === "reasoning.encrypted") {
       continue;
     }
-    const summary3 = Array.isArray(r.summary) ? r.summary.map((s2) => typeof s2 === "string" ? s2 : str3(record2(s2)?.text) ?? "").join("\n\n") : r.summary;
-    const text11 = [summary3, r.thinking, r.content, r.text].map(str3).find(Boolean)?.trim();
+    const summary4 = Array.isArray(r.summary) ? r.summary.map((s2) => typeof s2 === "string" ? s2 : str3(record2(s2)?.text) ?? "").join("\n\n") : r.summary;
+    const text11 = [summary4, r.thinking, r.content, r.text].map(str3).find(Boolean)?.trim();
     if (text11 && !out.includes(text11)) {
       out.push(text11);
     }
@@ -26061,9 +26061,9 @@ function final(log, at, body) {
   if (duration3) {
     log.duration = Number(duration3);
   }
-  const summary3 = /summary: (.*)$/.exec(body)?.[1];
-  if (summary3) {
-    log.summary = summary3;
+  const summary4 = /summary: (.*)$/.exec(body)?.[1];
+  if (summary4) {
+    log.summary = summary4;
   }
   const reason = /exit_reason=(\S+)/.exec(body)?.[1];
   if (reason) {
@@ -26073,7 +26073,7 @@ function final(log, at, body) {
   if (error) {
     log.error = error;
   }
-  if (!status && !duration3 && !summary3) {
+  if (!status && !duration3 && !summary4) {
     log.entries.push({ at, kind: "note", text: body });
   }
 }
@@ -26240,20 +26240,20 @@ var Agents = class {
     const goals = Array.isArray(r.goals) ? r.goals.map((g) => typeof g === "string" ? g : "") : [];
     const ids = Array.isArray(r.subagent_ids) ? r.subagent_ids : [];
     const paths = Array.isArray(r.live_transcripts) ? r.live_transcripts : [];
-    const list7 = call.subagents ??= [];
+    const list8 = call.subagents ??= [];
     goals.forEach((goal, i) => {
       const id = typeof ids[i] === "string" && ids[i] ? ids[i] : `task-${i}`;
-      let a2 = list7.find((x) => x.id === id);
+      let a2 = list8.find((x) => x.id === id);
       if (!a2) {
         a2 = { calls: 0, goal, id, index: i, startedAt: at, status: "queued", tokens: 0, toolCount: 0 };
-        list7.push(a2);
+        list8.push(a2);
       }
       a2.key ??= `p${i}`;
       a2.delegationId = r.delegation_id;
       a2.depth = 0;
       a2.logPath = typeof paths[i] === "string" ? paths[i] : void 0;
     });
-    list7.sort((a2, b) => a2.index - b.index || (a2.depth ?? 0) - (b.depth ?? 0));
+    list8.sort((a2, b) => a2.index - b.index || (a2.depth ?? 0) - (b.depth ?? 0));
     return true;
   }
   #wake() {
@@ -26364,8 +26364,8 @@ var Agents = class {
     if (!parent || !call?.subagents) {
       return void 0;
     }
-    const list7 = call.subagents;
-    const siblings = list7.filter((a2) => a2.parentId === parent.id).length;
+    const list8 = call.subagents;
+    const siblings = list8.filter((a2) => a2.parentId === parent.id).length;
     const child = {
       calls: 0,
       delegationId: row2.delegation_id,
@@ -26380,11 +26380,11 @@ var Agents = class {
       tokens: 0,
       toolCount: 0
     };
-    let at = list7.indexOf(parent) + 1;
-    while (at < list7.length && (list7[at].depth ?? 0) > (parent.depth ?? 0)) {
+    let at = list8.indexOf(parent) + 1;
+    while (at < list8.length && (list8[at].depth ?? 0) > (parent.depth ?? 0)) {
       at++;
     }
-    list7.splice(at, 0, child);
+    list8.splice(at, 0, child);
     owners.set(child, call);
     return child;
   }
@@ -26417,9 +26417,9 @@ var Agents = class {
       tokens: 0,
       toolCount: 0
     };
-    const list7 = call.subagents ??= [];
-    list7.push(a2);
-    list7.sort((x, y) => x.index - y.index || (x.depth ?? 0) - (y.depth ?? 0));
+    const list8 = call.subagents ??= [];
+    list8.push(a2);
+    list8.sort((x, y) => x.index - y.index || (x.depth ?? 0) - (y.depth ?? 0));
     owners.set(a2, call);
     return a2;
   }
@@ -27266,8 +27266,8 @@ function shownImage(call) {
     return str4(r?.host_image) ?? str4(r?.image);
   }
   if (call.name.startsWith("browser")) {
-    const summary3 = call.resultText ?? str4(r?.text_summary) ?? "";
-    return str4(record2(r?.meta)?.screenshot_path) ?? str4(r?.screenshot_path) ?? /Screenshot path: (\S+)/.exec(summary3)?.[1];
+    const summary4 = call.resultText ?? str4(r?.text_summary) ?? "";
+    return str4(record2(r?.meta)?.screenshot_path) ?? str4(r?.screenshot_path) ?? /Screenshot path: (\S+)/.exec(summary4)?.[1];
   }
   return void 0;
 }
@@ -27354,6 +27354,1488 @@ var Media = class {
   }
 };
 
+// src/processes/widgets/format.ts
+var COMPACT_STEPS = [
+  [1e12, "T"],
+  [1e9, "G"],
+  [1e6, "M"],
+  [1e3, "k"]
+];
+var COMPACT_FROM = 1e4;
+function formatNumber(value, unit, digits) {
+  if (!Number.isFinite(value)) {
+    return "\u2014";
+  }
+  const magnitude = Math.abs(value);
+  let text11;
+  if (magnitude >= COMPACT_FROM) {
+    for (const [step, suffix] of COMPACT_STEPS) {
+      if (magnitude < step) {
+        continue;
+      }
+      const scaled = value / step;
+      text11 = `${scaled.toFixed(digits ?? (Math.abs(scaled) >= 100 ? 0 : 1))}${suffix}`;
+      break;
+    }
+  }
+  text11 ??= Number.isInteger(value) && digits === void 0 ? String(value) : value.toFixed(digits ?? (magnitude >= 100 ? 0 : magnitude >= 10 ? 1 : 2));
+  if (!unit) {
+    return text11;
+  }
+  return unit === "%" ? `${text11}%` : `${text11} ${unit}`;
+}
+function formatTrend(first, last, better, unit) {
+  const delta = last - first;
+  if (delta === 0 || !Number.isFinite(delta)) {
+    return void 0;
+  }
+  const arrow = delta > 0 ? "\u25B2" : "\u25BC";
+  const tone = delta > 0 === (better === "higher") ? "success" : "error";
+  if (first === 0) {
+    return { text: `${arrow} ${formatNumber(Math.abs(delta), unit)}`, tone };
+  }
+  const percent = Math.abs(delta / first) * 100;
+  return { text: `${arrow} ${percent.toFixed(percent >= 10 ? 0 : 1)}%`, tone };
+}
+
+// src/processes/widgets/spec.ts
+import { setFlagsFromString } from "node:v8";
+var AGGS = ["last", "first", "min", "max", "mean", "sum", "count", "rate", "delta", "change"];
+var TONES = ["neutral", "accent", "info", "success", "warning", "error", "pending", "muted", "user"];
+var MAX_TITLE_CHARS = 48;
+var MAX_RULES = 12;
+var MAX_BLOCKS = 4;
+var MAX_STAT_ITEMS = 4;
+var MAX_PATTERN_CHARS = 400;
+var MAX_LABEL_CHARS = 48;
+var MAX_UNIT_CHARS = 12;
+var MAX_GRID_TONES = 12;
+var FIELD_NAME = /^[a-z][a-z0-9_]{0,23}$/;
+var GROUP_NAME = /^[A-Za-z_][A-Za-z0-9_]{0,31}$/;
+var SOURCE_ID = /^(?:\*|[A-Za-z0-9_:.-]{1,64}\*?)$/;
+var NAMED_GROUP = /\(\?P?<([A-Za-z_][A-Za-z0-9_]*)>/g;
+var STRING = { type: "string" };
+var NUMBER = { type: "number" };
+var BETTER = { enum: ["higher", "lower"] };
+var VALUE_REF_SCHEMA = {
+  properties: {
+    agg: { enum: AGGS },
+    better: BETTER,
+    digits: { type: "integer" },
+    field: STRING,
+    key: STRING,
+    label: STRING,
+    unit: STRING
+  },
+  required: ["field", "agg"],
+  type: "object"
+};
+var SPEC_SCHEMA = {
+  properties: {
+    blocks: {
+      items: {
+        properties: {
+          agg: { enum: AGGS },
+          better: BETTER,
+          field: STRING,
+          items: { items: VALUE_REF_SCHEMA, type: "array" },
+          key: STRING,
+          kind: { enum: ["spark", "bars", "meter", "stat", "grid", "text"] },
+          label: STRING,
+          max: NUMBER,
+          min: NUMBER,
+          target: NUMBER,
+          targetLabel: STRING,
+          tones: { additionalProperties: { enum: TONES }, type: "object" },
+          total: { anyOf: [NUMBER, VALUE_REF_SCHEMA] },
+          unit: STRING
+        },
+        required: ["kind"],
+        type: "object"
+      },
+      type: "array"
+    },
+    headline: VALUE_REF_SCHEMA,
+    rules: {
+      items: {
+        properties: { count: STRING, from: STRING, key: STRING, match: STRING, scale: NUMBER, text: STRING },
+        required: ["from", "match"],
+        type: "object"
+      },
+      type: "array"
+    },
+    skip: STRING,
+    stage: STRING,
+    title: STRING
+  },
+  type: "object"
+};
+var linear;
+function linearEngine() {
+  if (linear === void 0) {
+    try {
+      setFlagsFromString("--enable-experimental-regexp-engine");
+      linear = new RegExp("a", "l").flags.includes("l");
+    } catch {
+      linear = false;
+    }
+  }
+  return linear;
+}
+var LOOKAROUND = /\(\?<?[=!]|\\[1-9]|\\k</;
+function nestedQuantifier(pattern) {
+  const groups = [];
+  let inClass = false;
+  for (let i = 0; i < pattern.length; i++) {
+    const c = pattern[i];
+    if (c === "\\") {
+      i++;
+    } else if (inClass) {
+      inClass = c !== "]";
+    } else if (c === "[") {
+      inClass = true;
+    } else if (c === "(") {
+      groups.push(false);
+    } else if (c === ")") {
+      const inner = groups.pop() ?? false;
+      const next3 = pattern[i + 1];
+      if (inner && (next3 === "+" || next3 === "*" || next3 === "{")) {
+        return true;
+      }
+      if (inner && groups.length) {
+        groups[groups.length - 1] = true;
+      }
+    } else if ((c === "+" || c === "*" || c === "{" && /^\{\d*,\}/.test(pattern.slice(i))) && groups.length) {
+      groups[groups.length - 1] = true;
+    }
+  }
+  return false;
+}
+function compilePattern(pattern) {
+  const source = pattern.replace(/\(\?P</g, "(?<");
+  if (linearEngine()) {
+    try {
+      return new RegExp(source, "l");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      throw new Error(
+        /linear time/.test(message) ? `\`${pattern}\` uses lookaround or backreferences, which are not allowed` : message
+      );
+    }
+  }
+  if (LOOKAROUND.test(source)) {
+    throw new Error(`\`${pattern}\` uses lookaround or backreferences, which are not allowed`);
+  }
+  if (nestedQuantifier(source)) {
+    throw new Error(`\`${pattern}\` repeats a group that repeats (like (\\d+,?)+); quantify one level only`);
+  }
+  return new RegExp(source);
+}
+var LineMatcher = class {
+  #patterns;
+  #names;
+  constructor(patterns) {
+    this.#patterns = patterns.map(compilePattern);
+    this.#names = patterns.map((p3) => [...patternGroupNames(p3)]);
+  }
+  /** Each pattern's named groups, in pattern order. */
+  groupNames() {
+    return this.#names.map((names) => names.slice());
+  }
+  /** Every hit: the line's index, the pattern's index and its captures by group position. */
+  matchLines(lines) {
+    const hits = [];
+    lines.forEach((text11, line) => {
+      this.#patterns.forEach((re2, pattern) => {
+        const m = re2.exec(text11);
+        if (m) {
+          hits.push({ captures: this.#names[pattern].map((name) => m.groups?.[name]), line, pattern });
+        }
+      });
+    });
+    return hits;
+  }
+};
+var isRecord2 = (v) => typeof v === "object" && v !== null && !Array.isArray(v);
+var cut = (text11, max) => text11.length > max ? `${text11.slice(0, max - 1)}\u2026` : text11;
+function specSkip(value) {
+  return isRecord2(value) && typeof value.skip === "string" && value.skip.trim() ? value.skip.trim() : void 0;
+}
+function ruleReadsSource(from, id) {
+  if (from === "*") {
+    return true;
+  }
+  return from.endsWith("*") ? id.startsWith(from.slice(0, -1)) : from === id;
+}
+function patternGroupNames(pattern) {
+  return new Set([...pattern.matchAll(NAMED_GROUP)].map((m) => m[1]));
+}
+function ruleFields(rule) {
+  const fields = [];
+  for (const group of patternGroupNames(rule.match)) {
+    if (group !== rule.key) {
+      fields.push({ count: false, field: group, text: group === rule.text });
+    }
+  }
+  if (rule.count !== void 0) {
+    fields.push({ count: true, field: rule.count, text: false });
+  }
+  return fields;
+}
+function aggNeedsValue(agg) {
+  return agg !== "count" && agg !== "rate";
+}
+var NUMBER_PREFIX = /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?/;
+var SUFFIX_SCALE = { G: 1e9, K: 1e3, M: 1e6, k: 1e3 };
+function parseValue(text11) {
+  const first = text11.charCodeAt(0);
+  if (first >= 48 && first <= 57 && !/[xXbBoO]/.test(text11.charAt(1))) {
+    const plain3 = Number(text11);
+    if (Number.isFinite(plain3)) {
+      return plain3;
+    }
+  }
+  const compact2 = text11.trim().replace(/[,_]/g, "");
+  const match = NUMBER_PREFIX.exec(compact2);
+  if (!match) {
+    return Number.NaN;
+  }
+  return Number.parseFloat(match[0]) * (SUFFIX_SCALE[compact2.charAt(match[0].length)] ?? 1);
+}
+function validateSpec(value, samples, brief) {
+  const errors = [];
+  const spec = parseSpec(value, errors);
+  if (!spec) {
+    return { errors, ok: false };
+  }
+  const numeric = checkReferences(spec, errors);
+  let matcher;
+  try {
+    matcher = new LineMatcher(spec.rules.map((r) => r.match));
+  } catch (error) {
+    errors.push(`rules: ${error instanceof Error ? error.message : String(error)}`);
+  }
+  if (matcher && samples && !errors.length) {
+    dryRun(spec, matcher, samples, numeric, errors);
+    if (brief !== void 0) {
+      checkStatedNumbers(spec, samples, brief, errors);
+    }
+  }
+  return errors.length ? { errors, ok: false } : { ok: true, spec };
+}
+var WRITTEN_NUMBER = /\d[\d,_]*(?:\.\d+)?[kKMG]?/g;
+function checkStatedNumbers(spec, samples, brief, errors) {
+  const stated = /* @__PURE__ */ new Set();
+  const collect = (text11) => {
+    for (const m of text11.matchAll(WRITTEN_NUMBER)) {
+      stated.add(parseValue(m[0]));
+    }
+  };
+  collect(brief);
+  samples.forEach((s2) => s2.lines.forEach(collect));
+  spec.blocks.forEach((block, i) => {
+    const where = `blocks[${i}] (${block.kind})`;
+    if (block.kind === "meter" && typeof block.total === "number" && !stated.has(block.total)) {
+      errors.push(
+        `${where}.total: ${block.total} appears nowhere in the command or its output; read the total from a line (a value ref) or show the value as a stat`
+      );
+    } else if (block.kind === "spark" && block.target !== void 0 && !stated.has(block.target)) {
+      errors.push(`${where}.target: ${block.target} appears nowhere in the command or its output; set a target only when the job states one`);
+    }
+  });
+}
+function dryRun(spec, matcher, samples, numeric, errors) {
+  const groups = matcher.groupNames();
+  let seen = false;
+  let matches = 0;
+  const numbers = /* @__PURE__ */ new Set();
+  const words3 = /* @__PURE__ */ new Map();
+  for (const sample of samples) {
+    if (!sample.lines.some((l) => l.trim())) {
+      continue;
+    }
+    seen = true;
+    for (const hit of matcher.matchLines(sample.lines)) {
+      const rule = spec.rules[hit.pattern];
+      if (!ruleReadsSource(rule.from, sample.id)) {
+        continue;
+      }
+      matches++;
+      groups[hit.pattern].forEach((field, at) => {
+        const captured = hit.captures[at];
+        if (field === rule.key || field === rule.text || captured === void 0) {
+          return;
+        }
+        if (Number.isFinite(parseValue(captured))) {
+          numbers.add(field);
+        } else if (!words3.has(field)) {
+          words3.set(field, captured);
+        }
+      });
+    }
+  }
+  if (seen && !matches) {
+    errors.push("no rule matches any sample line; copy the exact text of lines that carry the numbers");
+  }
+  for (const [field, where] of numeric) {
+    const word = words3.get(field);
+    if (word !== void 0 && !numbers.has(field)) {
+      errors.push(`${where}: field "${field}" needs numbers, but its group captured "${cut(word, 40)}" in the samples; capture only the digits`);
+    }
+  }
+}
+function fieldFeeds(spec) {
+  const fields = /* @__PURE__ */ new Map();
+  for (const rule of spec.rules) {
+    for (const { count, field, text: text11 } of ruleFields(rule)) {
+      const feed = fields.get(field) ?? { keyGroups: /* @__PURE__ */ new Set(), text: false, value: false };
+      feed.value ||= !text11 && !count;
+      feed.text ||= text11;
+      if (rule.key !== void 0) {
+        feed.keyGroups.add(rule.key);
+      }
+      fields.set(field, feed);
+    }
+  }
+  return fields;
+}
+function checkReferences(spec, errors) {
+  const feeds = fieldFeeds(spec);
+  const numeric = /* @__PURE__ */ new Map();
+  const checkField = (where, field, agg, key2) => {
+    const feed = feeds.get(field);
+    if (!feed) {
+      return errors.push(`${where}: unknown field "${field}"; no rule has a group (?P<${field}>\u2026) or count "${field}"`);
+    }
+    if (key2 !== void 0 && feed.keyGroups.has(key2)) {
+      errors.push(`${where}.key: "${key2}" is the name of the key group; set one of its values (one model, one job) or omit \`key\``);
+    }
+    if (agg === void 0 || !aggNeedsValue(agg)) {
+      return;
+    }
+    if (!feed.value) {
+      errors.push(`${where}: agg "${agg}" needs numbers, but field "${field}" only counts matches or keeps text`);
+    } else if (!numeric.has(field)) {
+      numeric.set(field, where);
+    }
+  };
+  const checkRef = (where, ref) => checkField(where, ref.field, ref.agg, ref.key);
+  spec.rules.forEach((rule, i) => {
+    const where = `rules[${i}]`;
+    if (rule.text !== void 0 && rule.text === rule.key) {
+      errors.push(`${where}.text: the key group is not a field`);
+    }
+    for (const group of patternGroupNames(rule.match)) {
+      if (group !== rule.key && !FIELD_NAME.test(group)) {
+        errors.push(`${where}.match: group "${group}" names a field, so it must match ${FIELD_NAME.source}`);
+      }
+    }
+    if (!ruleFields(rule).length) {
+      errors.push(`${where}: feeds no field; name a group (?P<field>\u2026) besides the key, or set \`count\``);
+    }
+  });
+  if (spec.headline) {
+    checkRef("headline", spec.headline);
+  }
+  if (spec.stage) {
+    checkField("stage", spec.stage, void 0);
+  }
+  spec.blocks.forEach((block, i) => {
+    const where = `blocks[${i}] (${block.kind})`;
+    switch (block.kind) {
+      case "spark":
+        return checkField(where, block.field, "last", block.key);
+      case "bars":
+        checkField(where, block.field, block.agg);
+        return feeds.get(block.field)?.keyGroups.size === 0 ? errors.push(`${where}: bars need a rule with \`key\``) : void 0;
+      case "meter":
+        checkField(where, block.field, block.agg, block.key);
+        return typeof block.total === "number" ? void 0 : checkRef(`${where}.total`, block.total);
+      case "stat":
+        return block.items.forEach((item3, j) => checkRef(`${where}.items[${j}]`, item3));
+      case "grid":
+        checkField(where, block.field, void 0);
+        return feeds.get(block.field)?.keyGroups.size === 0 ? errors.push(`${where}: grid needs a rule with \`key\``) : void 0;
+      case "text":
+        return checkField(where, block.field, void 0);
+    }
+  });
+  return numeric;
+}
+function parseSpec(value, errors) {
+  if (!isRecord2(value)) {
+    errors.push("spec: expected an object");
+    return void 0;
+  }
+  const title = str5(value.title, "title", errors, { cut: MAX_TITLE_CHARS, required: true });
+  const rules = list(value.rules, "rules", errors, 1, MAX_RULES)?.map((r, i) => parseRule(r, `rules[${i}]`, errors));
+  const blocks2 = list(value.blocks, "blocks", errors, 1, MAX_BLOCKS)?.map((b, i) => parseBlock(b, `blocks[${i}]`, errors));
+  let headline;
+  if (value.headline !== void 0) {
+    const ref = parseValueRef(value.headline, "headline", errors);
+    const label = isRecord2(value.headline) ? str5(value.headline.label, "headline.label", errors, { cut: MAX_LABEL_CHARS }) : void 0;
+    if (ref) {
+      headline = label ? { ...ref, label } : ref;
+    }
+  }
+  const stage = value.stage === void 0 ? void 0 : fieldName(value.stage, "stage", errors);
+  if (errors.length || title === void 0 || !rules || !blocks2 || rules.some((r) => !r) || blocks2.some((b) => !b)) {
+    return void 0;
+  }
+  return {
+    blocks: blocks2,
+    rules,
+    title,
+    ...headline ? { headline } : {},
+    ...stage ? { stage } : {}
+  };
+}
+function parseRule(value, where, errors) {
+  if (!isRecord2(value)) {
+    errors.push(`${where}: expected an object`);
+    return void 0;
+  }
+  const from = str5(value.from, `${where}.from`, errors, { required: true });
+  if (from !== void 0 && !SOURCE_ID.test(from)) {
+    errors.push(`${where}.from: invalid source id "${from}"`);
+  }
+  const match = str5(value.match, `${where}.match`, errors, { max: MAX_PATTERN_CHARS, required: true });
+  const group = (name) => {
+    const raw2 = str5(value[name], `${where}.${name}`, errors);
+    if (raw2 !== void 0 && !GROUP_NAME.test(raw2)) {
+      errors.push(`${where}.${name}: invalid group name "${raw2}"`);
+    }
+    return raw2;
+  };
+  const key2 = group("key");
+  const text11 = group("text");
+  const count = value.count === void 0 ? void 0 : fieldName(value.count, `${where}.count`, errors);
+  const scale = num3(value.scale, `${where}.scale`, errors);
+  if (from === void 0 || match === void 0) {
+    return void 0;
+  }
+  const groups = patternGroupNames(match);
+  const wrap4 = text11 !== void 0 && FIELD_NAME.test(text11) && groups.size === 0;
+  const keyGroup = key2 !== void 0 && groups.has(key2) ? key2 : void 0;
+  const textGroup = text11 !== void 0 && (wrap4 || groups.has(text11)) ? text11 : void 0;
+  return {
+    from,
+    match: wrap4 ? `(?P<${text11}>${match})` : match,
+    ...keyGroup !== void 0 ? { key: keyGroup } : {},
+    ...textGroup !== void 0 ? { text: textGroup } : {},
+    ...count !== void 0 ? { count } : {},
+    ...scale !== void 0 ? { scale } : {}
+  };
+}
+function parseValueRef(value, where, errors) {
+  if (!isRecord2(value)) {
+    errors.push(`${where}: expected an object`);
+    return void 0;
+  }
+  const field = fieldName(value.field, `${where}.field`, errors);
+  const key2 = str5(value.key, `${where}.key`, errors, { max: 120 });
+  const agg = aggregation(value.agg, `${where}.agg`, errors);
+  const unit = str5(value.unit, `${where}.unit`, errors, { cut: MAX_UNIT_CHARS });
+  const digits = num3(value.digits, `${where}.digits`, errors);
+  if (digits !== void 0 && (!Number.isInteger(digits) || digits < 0 || digits > 4)) {
+    errors.push(`${where}.digits: expected an integer 0\u20134`);
+  }
+  const better = betterValue(value.better, `${where}.better`, errors);
+  if (field === void 0 || agg === void 0) {
+    return void 0;
+  }
+  return {
+    agg,
+    field,
+    ...key2 !== void 0 ? { key: key2 } : {},
+    ...unit !== void 0 ? { unit } : {},
+    ...digits !== void 0 ? { digits } : {},
+    ...better !== void 0 ? { better } : {}
+  };
+}
+function parseBlock(value, where, errors) {
+  if (!isRecord2(value)) {
+    errors.push(`${where}: expected an object`);
+    return void 0;
+  }
+  const before = errors.length;
+  const label = () => str5(value.label, `${where}.label`, errors, { cut: MAX_LABEL_CHARS, required: true }) ?? "";
+  const unit = () => str5(value.unit, `${where}.unit`, errors, { cut: MAX_UNIT_CHARS });
+  const field = () => fieldName(value.field, `${where}.field`, errors) ?? "";
+  const optional = (entry, name) => entry === void 0 ? {} : { [name]: entry };
+  let block;
+  switch (value.kind) {
+    case "spark":
+      block = {
+        field: field(),
+        kind: "spark",
+        label: label(),
+        ...optional(str5(value.key, `${where}.key`, errors, { max: 120 }), "key"),
+        ...optional(unit(), "unit"),
+        ...optional(betterValue(value.better, `${where}.better`, errors), "better"),
+        ...optional(num3(value.target, `${where}.target`, errors), "target"),
+        ...optional(str5(value.targetLabel, `${where}.targetLabel`, errors, { cut: MAX_LABEL_CHARS }), "targetLabel"),
+        ...optional(num3(value.min, `${where}.min`, errors), "min"),
+        ...optional(num3(value.max, `${where}.max`, errors), "max")
+      };
+      break;
+    case "bars":
+      block = {
+        agg: aggregation(value.agg, `${where}.agg`, errors) ?? "last",
+        field: field(),
+        kind: "bars",
+        label: label(),
+        ...optional(unit(), "unit"),
+        ...optional(num3(value.max, `${where}.max`, errors), "max"),
+        ...optional(betterValue(value.better, `${where}.better`, errors), "better")
+      };
+      break;
+    case "meter": {
+      const whole = typeof value.total === "string" ? Number(value.total) : value.total;
+      if (!isRecord2(whole) && (typeof whole !== "number" || Number.isNaN(whole))) {
+        const ref = parseValueRef(value, where, errors);
+        block = ref && { items: [{ ...ref, label: label() }], kind: "stat" };
+        break;
+      }
+      let total;
+      if (typeof whole === "number") {
+        if (!Number.isFinite(whole) || whole <= 0) {
+          errors.push(`${where}.total: expected a positive number`);
+        } else {
+          total = whole;
+        }
+      } else {
+        total = parseValueRef(value.total, `${where}.total`, errors);
+      }
+      block = {
+        agg: aggregation(value.agg, `${where}.agg`, errors) ?? "last",
+        field: field(),
+        kind: "meter",
+        label: label(),
+        total: total ?? 1,
+        ...optional(str5(value.key, `${where}.key`, errors, { max: 120 }), "key"),
+        ...optional(unit(), "unit")
+      };
+      break;
+    }
+    case "stat": {
+      const items = list(value.items, `${where}.items`, errors, 1, MAX_STAT_ITEMS)?.map((item3, i) => {
+        const at = `${where}.items[${i}]`;
+        const ref = parseValueRef(item3, at, errors);
+        const itemLabel = isRecord2(item3) ? str5(item3.label, `${at}.label`, errors, { cut: MAX_LABEL_CHARS, required: true }) : void 0;
+        return ref && itemLabel !== void 0 ? { ...ref, label: itemLabel } : void 0;
+      }) ?? [];
+      block = { items: items.filter((i) => i !== void 0), kind: "stat" };
+      break;
+    }
+    case "grid": {
+      const tones = {};
+      if (!isRecord2(value.tones)) {
+        errors.push(`${where}.tones: expected an object of status substring \u2192 tone`);
+      } else {
+        let n = 0;
+        for (const [status, tone] of Object.entries(value.tones)) {
+          if (++n > MAX_GRID_TONES) {
+            errors.push(`${where}.tones: at most ${MAX_GRID_TONES} entries`);
+            break;
+          }
+          if (typeof tone === "string" && TONES.includes(tone)) {
+            tones[status] = tone;
+          } else {
+            errors.push(`${where}.tones.${status}: expected one of ${TONES.join(", ")}`);
+          }
+        }
+      }
+      block = { field: field(), kind: "grid", label: label(), tones };
+      break;
+    }
+    case "text":
+      block = { field: field(), kind: "text" };
+      break;
+    default:
+      errors.push(`${where}.kind: expected spark, bars, meter, stat, grid or text`);
+      return void 0;
+  }
+  return errors.length === before ? block : void 0;
+}
+function list(value, where, errors, min, max) {
+  if (!Array.isArray(value)) {
+    errors.push(`${where}: expected an array`);
+    return void 0;
+  }
+  if (value.length < min || value.length > max) {
+    errors.push(`${where}: expected ${min}\u2013${max} entries, got ${value.length}`);
+    return void 0;
+  }
+  return value;
+}
+function str5(value, where, errors, o = {}) {
+  if (value === void 0 || value === null) {
+    if (o.required) {
+      errors.push(`${where}: required`);
+    }
+    return void 0;
+  }
+  if (typeof value !== "string") {
+    errors.push(`${where}: expected a string`);
+    return void 0;
+  }
+  const trimmed = value.trim();
+  if (!trimmed) {
+    if (o.required) {
+      errors.push(`${where}: must not be empty`);
+    }
+    return void 0;
+  }
+  if (o.max !== void 0 && trimmed.length > o.max) {
+    errors.push(`${where}: at most ${o.max} characters`);
+    return void 0;
+  }
+  return o.cut === void 0 ? trimmed : cut(trimmed, o.cut);
+}
+function num3(value, where, errors) {
+  if (value === void 0 || value === null) {
+    return void 0;
+  }
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    errors.push(`${where}: expected a finite number`);
+    return void 0;
+  }
+  return value;
+}
+function fieldName(value, where, errors) {
+  const name = str5(value, where, errors, { required: true });
+  if (name !== void 0 && !FIELD_NAME.test(name)) {
+    errors.push(`${where}: "${name}" must match ${FIELD_NAME.source}`);
+    return void 0;
+  }
+  return name;
+}
+function aggregation(value, where, errors) {
+  if (typeof value === "string" && AGGS.includes(value)) {
+    return value;
+  }
+  errors.push(`${where}: expected one of ${AGGS.join(", ")}`);
+  return void 0;
+}
+function betterValue(value, where, errors) {
+  if (value === void 0 || value === null) {
+    return void 0;
+  }
+  if (value === "higher" || value === "lower") {
+    return value;
+  }
+  errors.push(`${where}: expected "higher" or "lower"`);
+  return void 0;
+}
+
+// src/processes/widgets/runtime.ts
+var MAX_LINE_CHARS = 4096;
+var RING_POINTS = 240;
+var SPARK_POINTS = 48;
+var RATE_WINDOW_MS = 6e4;
+var SAMPLE_HEAD_LINES = 30;
+var SAMPLE_TAIL_LINES = 60;
+var MAX_STAGE_CHARS = 200;
+var MAX_TEXT_CHARS = 200;
+var MAX_BAR_ITEMS = 16;
+var MAX_GRID_ITEMS = 48;
+var cut2 = (text11, max) => text11.length > max ? `${text11.slice(0, max - 1)}\u2026` : text11;
+var ESCAPES = /\x1b\[[0-?]*[ -/]*[@-~]|\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)|\x1b[@-_]|[\x00-\x08\x0b-\x1f\x7f]/g;
+function clean2(line) {
+  return line.replace(/\t/g, " ").replace(ESCAPES, "");
+}
+var SourceLineReader = class {
+  constructor(source) {
+    this.source = source;
+  }
+  source;
+  #cursor = 0;
+  #partial = "";
+  #torn = false;
+  /** New complete lines; `flush` also ends the line in progress (the process exited). */
+  read(flush) {
+    const chunk = this.source.read(this.#cursor);
+    let text11 = chunk.text;
+    if (chunk.start > this.#cursor) {
+      this.#partial = "";
+      this.#torn = true;
+    }
+    this.#cursor = Math.max(this.#cursor, chunk.end);
+    if (this.#torn) {
+      const lineEnd2 = text11.search(/[\r\n]/);
+      if (lineEnd2 === -1) {
+        text11 = "";
+      } else {
+        text11 = text11.slice(lineEnd2 + 1);
+        this.#torn = false;
+      }
+    }
+    const raw2 = (this.#partial + text11).replace(/\r\n?/g, "\n").split("\n");
+    this.#partial = (raw2.pop() ?? "").slice(0, MAX_LINE_CHARS * 2);
+    if ((flush || !chunk.open) && this.#partial) {
+      raw2.push(this.#partial);
+      this.#partial = "";
+    }
+    return { end: chunk.end, lines: raw2.map((l) => clean2(l).slice(0, MAX_LINE_CHARS)), open: chunk.open };
+  }
+};
+function emptySeries() {
+  return { count: 0, first: 0, last: 0, max: -Infinity, min: Infinity, recent: [], ring: [], sum: 0, updatedAt: 0, values: 0 };
+}
+function pushMatch(s2, value, text11, line, t2) {
+  s2.count++;
+  const bucket = s2.recent.at(-1);
+  if (bucket?.t === t2) {
+    bucket.n++;
+  } else {
+    s2.recent.push({ n: 1, t: t2 });
+    const horizon = t2 - RATE_WINDOW_MS;
+    let stale = 0;
+    while (stale < s2.recent.length && s2.recent[stale].t < horizon) {
+      stale++;
+    }
+    s2.recent.splice(0, stale);
+  }
+  if (value !== void 0) {
+    if (!s2.values) {
+      s2.first = value;
+    }
+    s2.values++;
+    s2.last = value;
+    s2.min = Math.min(s2.min, value);
+    s2.max = Math.max(s2.max, value);
+    s2.sum += value;
+    s2.ring.push({ t: t2, v: value });
+    if (s2.ring.length >= RING_POINTS * 2) {
+      s2.ring.splice(0, s2.ring.length - RING_POINTS);
+    }
+  }
+  if (text11) {
+    s2.text = text11;
+  }
+  s2.line = line;
+  s2.updatedAt = t2;
+}
+function rateWindowMs(now, startTime) {
+  return Math.min(RATE_WINDOW_MS, Math.max(1e3, now - startTime));
+}
+function aggregate(s2, agg, now, startTime) {
+  if (agg === "count") {
+    return s2.count;
+  }
+  if (agg === "rate") {
+    const horizon = now - RATE_WINDOW_MS;
+    const inWindow = s2.recent.reduce((n, b) => b.t >= horizon ? n + b.n : n, 0);
+    return inWindow / (rateWindowMs(now, startTime) / 1e3);
+  }
+  if (!s2.values) {
+    return void 0;
+  }
+  switch (agg) {
+    case "last":
+      return s2.last;
+    case "first":
+      return s2.first;
+    case "min":
+      return s2.min;
+    case "max":
+      return s2.max;
+    case "sum":
+      return s2.sum;
+    case "mean":
+      return s2.sum / s2.values;
+    case "delta":
+      return s2.last - s2.first;
+    case "change":
+      if (s2.first === 0) {
+        return s2.last === 0 ? 0 : void 0;
+      }
+      return (s2.last - s2.first) / Math.abs(s2.first) * 100;
+  }
+}
+function downsample(ring, points) {
+  if (ring.length <= points) {
+    return ring.slice();
+  }
+  const out = [];
+  for (let b = 0; b < points; b++) {
+    const from = Math.floor(b * ring.length / points);
+    const to = Math.floor((b + 1) * ring.length / points);
+    let sum = 0;
+    for (let i = from; i < to; i++) {
+      sum += ring[i].v;
+    }
+    out.push({ t: ring[to - 1].t, v: sum / (to - from) });
+  }
+  return out;
+}
+function compileRule(rule, groups) {
+  return {
+    captures: groups.flatMap((field, index2) => field === rule.key ? [] : [{ field, index: index2, text: field === rule.text }]),
+    count: rule.count,
+    key: rule.key === void 0 ? -1 : groups.indexOf(rule.key),
+    scale: rule.scale ?? 1
+  };
+}
+var ChartRuntime = class {
+  constructor(spec, startTime, now = Date.now) {
+    this.spec = spec;
+    this.startTime = startTime;
+    this.now = now;
+    for (const rule of spec?.rules ?? []) {
+      if (rule.key !== void 0) {
+        ruleFields(rule).forEach((f) => this.#keyedFields.add(f.field));
+      }
+    }
+  }
+  spec;
+  startTime;
+  now;
+  #readers = /* @__PURE__ */ new Map();
+  #stats = /* @__PURE__ */ new Map();
+  #fields = /* @__PURE__ */ new Map();
+  #matchers = /* @__PURE__ */ new Map();
+  /** Fields some rule splits by key; every other field keeps a single series. */
+  #keyedFields = /* @__PURE__ */ new Set();
+  #lastMatchAt;
+  #lastLineAt;
+  /** Non-empty lines read since the last match. */
+  #unmatchedLines = 0;
+  /** Newest non-empty line no rule matched: a live chart's stage when the spec names none. */
+  #lastUnmatchedLine;
+  /** Lines seen since the last match. */
+  get unmatchedLines() {
+    return this.#unmatchedLines;
+  }
+  /** Time of the newest match. */
+  get lastMatchAt() {
+    return this.#lastMatchAt;
+  }
+  get totalLines() {
+    return [...this.#stats.values()].reduce((n, s2) => n + s2.lines, 0);
+  }
+  /** Reads every source's new text; `flush` ends lines in progress. True when anything arrived. */
+  ingest(sources, flush) {
+    const t2 = this.now();
+    let changed = false;
+    for (const source of sources) {
+      let reader = this.#readers.get(source.id);
+      if (!reader || reader.source !== source) {
+        reader = new SourceLineReader(source);
+        this.#readers.set(source.id, reader);
+      }
+      const { end, lines } = reader.read(flush);
+      let stats = this.#stats.get(source.id);
+      if (!stats) {
+        stats = { head: [], id: source.id, label: source.label, lastActiveAt: 0, lines: 0, recent: [], size: 0, tail: [] };
+        this.#stats.set(source.id, stats);
+      }
+      stats.size = end;
+      if (!lines.length) {
+        continue;
+      }
+      changed = true;
+      this.#recordLines(stats, lines, t2);
+      this.#matchLines(source.id, lines, t2);
+    }
+    return changed;
+  }
+  #recordLines(stats, lines, t2) {
+    let fresh = 0;
+    let tailFrom = 0;
+    lines.forEach((line, i) => {
+      if (!line.trim()) {
+        return;
+      }
+      fresh++;
+      if (stats.head.length < SAMPLE_HEAD_LINES) {
+        stats.head.push(line);
+        tailFrom = i + 1;
+      }
+    });
+    if (!fresh) {
+      return;
+    }
+    const newest = [];
+    for (let i = lines.length - 1; i >= tailFrom && newest.length < SAMPLE_TAIL_LINES; i--) {
+      if (lines[i].trim()) {
+        newest.push(lines[i]);
+      }
+    }
+    if (newest.length) {
+      stats.lastLine = newest[0];
+      newest.reverse();
+      stats.tail = [...stats.tail, ...newest].slice(-SAMPLE_TAIL_LINES);
+    } else {
+      stats.lastLine = stats.head.at(-1);
+    }
+    stats.lines += fresh;
+    stats.lastActiveAt = t2;
+    this.#lastLineAt = t2;
+    stats.recent.push({ n: fresh, t: t2 });
+    while (stats.recent.length && stats.recent[0].t < t2 - RATE_WINDOW_MS) {
+      stats.recent.shift();
+    }
+  }
+  /** The matcher of the rules reading source `id`, compiled on first use. */
+  #sourceMatcher(id) {
+    const known2 = this.#matchers.get(id);
+    if (known2 !== void 0) {
+      return known2 ?? void 0;
+    }
+    const byPattern = /* @__PURE__ */ new Map();
+    for (const rule of this.spec?.rules ?? []) {
+      if (ruleReadsSource(rule.from, id)) {
+        byPattern.set(rule.match, [...byPattern.get(rule.match) ?? [], rule]);
+      }
+    }
+    if (!byPattern.size) {
+      this.#matchers.set(id, null);
+      return void 0;
+    }
+    const patterns = [...byPattern.keys()];
+    const matcher = new LineMatcher(patterns);
+    const groups = matcher.groupNames();
+    const entry = {
+      matcher,
+      rules: patterns.map((p3, i) => byPattern.get(p3).map((r) => compileRule(r, groups[i])))
+    };
+    this.#matchers.set(id, entry);
+    return entry;
+  }
+  #matchLines(sourceId, lines, t2) {
+    const entry = this.#sourceMatcher(sourceId);
+    if (!entry) {
+      return;
+    }
+    const hits = entry.matcher.matchLines(lines);
+    const capture = (captures, at) => at < 0 ? void 0 : captures[at];
+    for (const hit of hits) {
+      const line = lines[hit.line];
+      for (const rule of entry.rules[hit.pattern]) {
+        const key2 = capture(hit.captures, rule.key)?.trim() ?? "";
+        for (const c of rule.captures) {
+          const captured = hit.captures[c.index];
+          if (captured === void 0) {
+            continue;
+          }
+          const value = c.text ? Number.NaN : parseValue(captured) * rule.scale;
+          if (Number.isFinite(value)) {
+            this.#push(c.field, key2, value, void 0, line, t2);
+          } else {
+            this.#push(c.field, key2, void 0, captured.trim(), line, t2);
+          }
+        }
+        if (rule.count !== void 0) {
+          this.#push(rule.count, key2, void 0, void 0, line, t2);
+        }
+      }
+    }
+    const matched = new Set(hits.map((h2) => h2.line));
+    if (matched.size) {
+      this.#lastMatchAt = t2;
+    }
+    const lastMatched = hits.length ? hits.at(-1).line : -1;
+    let unmatched = 0;
+    for (let i = lastMatched + 1; i < lines.length; i++) {
+      if (lines[i].trim()) {
+        unmatched++;
+      }
+    }
+    this.#unmatchedLines = lastMatched >= 0 ? unmatched : this.#unmatchedLines + unmatched;
+    for (let i = lines.length - 1; i >= 0; i--) {
+      const line = lines[i].trim();
+      if (line && !matched.has(i)) {
+        this.#lastUnmatchedLine = cut2(line, MAX_STAGE_CHARS);
+        break;
+      }
+    }
+  }
+  #push(name, key2, value, text11, line, t2) {
+    let field = this.#fields.get(name);
+    if (!field) {
+      const all8 = emptySeries();
+      field = { all: all8, keys: this.#keyedFields.has(name) ? /* @__PURE__ */ new Map() : /* @__PURE__ */ new Map([["", all8]]) };
+      this.#fields.set(name, field);
+    }
+    let series = field.keys.get(key2);
+    if (!series) {
+      series = emptySeries();
+      field.keys.set(key2, series);
+    }
+    pushMatch(series, value, text11, line, t2);
+    if (series !== field.all) {
+      pushMatch(field.all, value, text11, line, t2);
+    }
+  }
+  /** First and last lines per source, most active first, for the author and the dry run. */
+  samples() {
+    return [...this.#stats.values()].filter((s2) => s2.lines > 0).sort((a2, b) => b.lines - a2.lines).map((s2) => ({ head: s2.head.slice(), id: s2.id, label: s2.label, lines: s2.lines, size: s2.size, tail: s2.tail.slice() }));
+  }
+  /** The view now: the spec's blocks when a spec drives it, else the fallback. */
+  view(context) {
+    const now = this.now();
+    const updatedAt = this.#lastMatchAt ?? this.#lastLineAt ?? this.startTime;
+    const spec = this.spec;
+    if (!spec) {
+      const stage2 = this.#lastLine();
+      const state = context.authoring ? "authoring" : "fallback";
+      return {
+        blocks: this.#fallbackBlocks(now),
+        state,
+        title: cut2(context.label.replace(/\s+/g, " ").trim(), MAX_TITLE_CHARS),
+        updatedAt,
+        ...stage2 ? { stage: stage2 } : {}
+      };
+    }
+    const headline = spec.headline ? this.#headline(spec.headline, now) : void 0;
+    const stage = (spec.stage ? this.#specStage() : void 0) ?? this.#lastUnmatchedLine;
+    return {
+      // A block with nothing to draw yet is left out; the head row still shows.
+      blocks: spec.blocks.map((b) => this.#block(b, now)).filter(hasData),
+      state: "live",
+      title: spec.title,
+      updatedAt,
+      ...headline ? { headline } : {},
+      ...stage ? { stage } : {}
+    };
+  }
+  #fallbackBlocks(now) {
+    const total = this.totalLines;
+    if (!total) {
+      return [];
+    }
+    let recent = 0;
+    for (const stats of this.#stats.values()) {
+      for (const e of stats.recent) {
+        if (e.t >= now - RATE_WINDOW_MS) {
+          recent += e.n;
+        }
+      }
+    }
+    const perSecond = recent / (rateWindowMs(now, this.startTime) / 1e3);
+    return [
+      {
+        items: [
+          { label: "lines", text: formatNumber(total) },
+          { label: "lines/s", text: formatNumber(perSecond) }
+        ],
+        kind: "stat"
+      }
+    ];
+  }
+  #specStage() {
+    const field = this.spec?.stage ? this.#fields.get(this.spec.stage) : void 0;
+    const text11 = (field?.all.text ?? field?.all.line)?.trim();
+    return text11 ? cut2(text11, MAX_STAGE_CHARS) : void 0;
+  }
+  /** The last non-empty line of the most recently active source. */
+  #lastLine() {
+    let best;
+    for (const stats of this.#stats.values()) {
+      if (stats.lastLine && (!best || stats.lastActiveAt >= best.lastActiveAt)) {
+        best = stats;
+      }
+    }
+    return best?.lastLine ? cut2(best.lastLine.trim(), MAX_STAGE_CHARS) : void 0;
+  }
+  #series(field, key2) {
+    const state = this.#fields.get(field);
+    if (!state) {
+      return emptySeries();
+    }
+    return key2 === void 0 ? state.all : state.keys.get(key2) ?? emptySeries();
+  }
+  #value(ref, now) {
+    const series = this.#series(ref.field, ref.key);
+    const value = aggregate(series, ref.agg, now, this.startTime);
+    const unit = ref.agg === "change" ? "%" : ref.unit;
+    const text11 = value === void 0 ? "\u2014" : formatNumber(value, unit, ref.digits);
+    const trend = ref.better && TREND_AGGS.has(ref.agg) && series.values >= 2 ? formatTrend(series.first, series.last, ref.better, ref.unit) : void 0;
+    return { text: text11, value, ...trend ? { trend } : {} };
+  }
+  #headline(ref, now) {
+    const { text: text11, trend, value } = this.#value(ref, now);
+    return value === void 0 ? void 0 : { text: text11, ...ref.label ? { label: ref.label } : {}, ...trend ? { trend } : {} };
+  }
+  #block(block, now) {
+    switch (block.kind) {
+      case "spark":
+        return this.#spark(block);
+      case "bars": {
+        const state = this.#fields.get(block.field);
+        const entries = state ? [...state.keys.entries()].slice(-MAX_BAR_ITEMS) : [];
+        const unit = block.agg === "change" ? "%" : block.unit;
+        const values = entries.map(([, s2]) => aggregate(s2, block.agg, now, this.startTime) ?? 0);
+        const best = block.better && values.length > 1 ? block.better === "higher" ? Math.max(...values) : Math.min(...values) : void 0;
+        const labels = keyLabels(entries.map(([k]) => k));
+        const peak = Math.max(0, ...values);
+        return {
+          items: entries.map(([k], i) => ({
+            label: labels[i] || k || block.label,
+            text: formatNumber(values[i], unit),
+            value: values[i],
+            ...best !== void 0 && values[i] === best ? { tone: "success" } : {}
+          })),
+          kind: "bars",
+          label: block.label,
+          max: block.max ?? (peak > 0 ? peak : 1)
+        };
+      }
+      case "meter": {
+        const value = aggregate(this.#series(block.field, block.key), block.agg, now, this.startTime) ?? 0;
+        const total = typeof block.total === "number" ? block.total : this.#value(block.total, now).value ?? 0;
+        return {
+          kind: "meter",
+          label: block.label,
+          text: `${formatNumber(value)}/${formatNumber(total, block.unit)}`,
+          value: total > 0 ? Math.min(1, Math.max(0, value / total)) : 0,
+          ...total > 0 && value >= total ? { tone: "success" } : {}
+        };
+      }
+      case "stat":
+        return {
+          items: block.items.map((item3) => {
+            const { text: text11, trend } = this.#value(item3, now);
+            return { label: item3.label, text: text11, ...trend ? { trend } : {} };
+          }),
+          kind: "stat"
+        };
+      case "grid": {
+        const state = this.#fields.get(block.field);
+        const entries = state ? [...state.keys.entries()].slice(-MAX_GRID_ITEMS) : [];
+        const labels = keyLabels(entries.map(([k]) => k));
+        return {
+          items: entries.map(([k, s2], i) => {
+            const text11 = cut2(s2.text ?? (s2.values ? formatNumber(s2.last) : s2.line?.trim() ?? ""), MAX_TEXT_CHARS);
+            return { label: labels[i] || k || block.label, text: text11, tone: gridTone(block.tones, text11) };
+          }),
+          kind: "grid",
+          label: block.label
+        };
+      }
+      case "text": {
+        const s2 = this.#series(block.field, void 0);
+        return { kind: "text", text: cut2(s2.text ?? s2.line?.trim() ?? "", MAX_TEXT_CHARS) };
+      }
+    }
+  }
+  #spark(block) {
+    const series = this.#series(block.field, block.key);
+    const ring = series.ring.length > RING_POINTS ? series.ring.slice(-RING_POINTS) : series.ring;
+    const points = downsample(ring, SPARK_POINTS);
+    const values = points.map((p3) => p3.v);
+    const marks = block.target === void 0 ? void 0 : [{ label: block.targetLabel ?? `target ${formatNumber(block.target, block.unit)}`, tone: "muted", value: block.target }];
+    const { max, min } = sparkDomain([...values, ...(marks ?? []).map((m) => m.value)], block.min, block.max);
+    let tone;
+    if (block.better && block.target !== void 0 && series.values) {
+      const reached = block.better === "higher" ? series.last >= block.target : series.last <= block.target;
+      if (reached) {
+        tone = "success";
+      }
+    }
+    return {
+      kind: "spark",
+      label: block.label,
+      last: series.values ? formatNumber(series.last, block.unit) : "\u2014",
+      max,
+      min,
+      tips: points.map((p3) => `${new Date(p3.t).toTimeString().slice(0, 8)} \xB7 ${formatNumber(p3.v, block.unit)}`),
+      values,
+      ...marks ? { marks } : {},
+      ...tone ? { tone } : {}
+    };
+  }
+};
+function sparkDomain(bounds, specMin, specMax) {
+  let min = 0;
+  let max = 1;
+  if (bounds.length) {
+    const lo = Math.min(...bounds);
+    const hi = Math.max(...bounds);
+    const pad = hi > lo ? (hi - lo) * 0.1 : Math.max(1, Math.abs(hi) * 0.05);
+    min = lo >= 0 ? Math.max(0, lo - pad) : lo - pad;
+    max = hi + pad;
+  }
+  min = specMin ?? min;
+  max = specMax ?? max;
+  return { max: max <= min ? min + 1 : max, min };
+}
+var TREND_AGGS = /* @__PURE__ */ new Set(["last", "min", "max"]);
+function hasData(block) {
+  switch (block.kind) {
+    case "text":
+      return block.text.length > 0;
+    case "bars":
+    case "grid":
+      return block.items.length > 0;
+    case "spark":
+      return block.values.length > 0;
+    default:
+      return true;
+  }
+}
+function keyLabels(keys2) {
+  if (!keys2.length || !keys2.every((k) => k.includes("/"))) {
+    return keys2.slice();
+  }
+  const short = keys2.map((k) => k.slice(k.lastIndexOf("/") + 1));
+  return short.every(Boolean) && new Set(short).size === short.length ? short : keys2.slice();
+}
+function gridTone(tones, text11) {
+  const lower = text11.toLowerCase();
+  for (const [status, tone] of Object.entries(tones)) {
+    if (lower.includes(status.toLowerCase())) {
+      return tone;
+    }
+  }
+  return "neutral";
+}
+function sampleLines(samples) {
+  return samples.map((s2) => ({ id: s2.id, lines: [...s2.head, ...s2.tail] }));
+}
+
+// src/processes/widgets/registry.ts
+var TAP_CAPACITY = 256 * 1024;
+var HEAD_CHARS = 64;
+var OutputTap = class {
+  constructor(label) {
+    this.label = label;
+  }
+  label;
+  id = "out";
+  #text = "";
+  /** Offset of `#text[0]`. */
+  #start = 0;
+  #window = "";
+  #open = true;
+  /** Chunks arrive: polled windows add nothing they do not already have. */
+  #streamed = false;
+  /** A chunk the process printed. */
+  append(chunk) {
+    if (this.#open) {
+      this.#streamed = true;
+      this.#append(chunk);
+    }
+  }
+  /** The store's newest window of the output. */
+  update(window) {
+    const prev = this.#window;
+    if (!this.#open || this.#streamed || window === prev) {
+      return;
+    }
+    this.#window = window;
+    if (window.startsWith(prev)) {
+      return this.#append(window.slice(prev.length));
+    }
+    const head2 = window.slice(0, HEAD_CHARS);
+    for (let i = prev.indexOf(head2); i >= 0; i = prev.indexOf(head2, i + 1)) {
+      if (prev.length - i <= window.length && window.startsWith(prev.slice(i))) {
+        return this.#append(window.slice(prev.length - i));
+      }
+    }
+    if (this.#text.includes(window.slice(-HEAD_CHARS))) {
+      this.#window = prev;
+      return;
+    }
+    this.#start += this.#text.length + 1;
+    this.#text = "";
+    this.#append(window);
+  }
+  close() {
+    this.#open = false;
+  }
+  read(from) {
+    const end = this.#start + this.#text.length;
+    const start = Math.min(Math.max(from, this.#start), end);
+    return { end, open: this.#open, start, text: this.#text.slice(start - this.#start) };
+  }
+  #append(text11) {
+    this.#text += text11;
+    const excess = this.#text.length - TAP_CAPACITY;
+    if (excess > TAP_CAPACITY / 4) {
+      this.#text = this.#text.slice(excess);
+      this.#start += excess;
+    }
+  }
+};
+var DEFAULTS = { authorAfterMs: 15e3, driftLines: 200, driftStaleMs: 9e4, maxAttempts: 3, maxInFlight: 2 };
+var MIN_AUTHOR_LINES = 3;
+var Charts = class {
+  #entries = /* @__PURE__ */ new Map();
+  #author;
+  #enabled;
+  #now;
+  #changed;
+  #o;
+  #inFlight = 0;
+  #disposed = false;
+  /** `changed` runs when a spec arrives, so the surfaces showing the chart redraw. */
+  constructor(changed, options = {}) {
+    this.#changed = changed;
+    this.#author = options.author;
+    this.#enabled = options.enabled ?? (() => true);
+    this.#now = options.now ?? Date.now;
+    this.#o = { ...DEFAULTS, ...Object.fromEntries(Object.entries(options).filter(([k, v]) => k in DEFAULTS && v !== void 0)) };
+  }
+  /** The process's chart now, after reading the output that arrived since the last call; undefined when charts are off. */
+  view(p3) {
+    if (this.#disposed || !this.#enabled()) {
+      return void 0;
+    }
+    let entry = this.#entries.get(p3.id);
+    if (!entry) {
+      const tap = new OutputTap(p3.command);
+      const runtime = new ChartRuntime(void 0, p3.startedAt, this.#now);
+      entry = {
+        attempts: 0,
+        done: false,
+        frozen: false,
+        process: p3,
+        runtime,
+        tap,
+        view: runtime.view({ authoring: false, label: p3.command }),
+        viewKey: ""
+      };
+      this.#entries.set(p3.id, entry);
+    }
+    entry.process = p3;
+    this.#refresh(entry);
+    return entry.view;
+  }
+  /** A chunk process `id` printed, for its chart's exact stream. */
+  output(id, chunk) {
+    this.#entries.get(id)?.tap.append(chunk);
+  }
+  /** Drops the charts of processes no longer listed. */
+  retain(ids) {
+    for (const [id, entry] of this.#entries) {
+      if (!ids.has(id)) {
+        entry.request?.abort();
+        this.#entries.delete(id);
+      }
+    }
+  }
+  dispose() {
+    this.#disposed = true;
+    this.#entries.forEach((e) => e.request?.abort());
+    this.#entries.clear();
+  }
+  /** Reads the new output; an exited process gets one flushing read and freezes. */
+  #refresh(entry) {
+    if (entry.frozen) {
+      return;
+    }
+    const now = this.#now();
+    const settled = entry.process.status !== "running";
+    entry.tap.update(entry.process.output);
+    if (settled) {
+      entry.tap.close();
+    }
+    entry.runtime.ingest([entry.tap], settled);
+    if (settled) {
+      entry.frozen = true;
+      entry.request?.abort();
+      entry.request = void 0;
+    } else {
+      this.#maybeAuthor(entry, now);
+    }
+    this.#recompute(entry);
+  }
+  #recompute(entry) {
+    const view = entry.runtime.view({ authoring: entry.request !== void 0, label: entry.process.command });
+    const key2 = JSON.stringify(view);
+    if (key2 === entry.viewKey) {
+      return false;
+    }
+    entry.view = view;
+    entry.viewKey = key2;
+    return true;
+  }
+  /** Starts a spec request once the process is old and talkative enough, or re-authors a spec that stopped fitting. */
+  #maybeAuthor(entry, now) {
+    if (!this.#author || entry.request || entry.done || entry.attempts >= this.#o.maxAttempts || this.#inFlight >= this.#o.maxInFlight) {
+      return;
+    }
+    if (now - entry.process.startedAt < this.#o.authorAfterMs) {
+      return;
+    }
+    const runtime = entry.runtime;
+    let previous3;
+    if (runtime.spec) {
+      const reason = this.#reauthorReason(entry, now);
+      if (!reason) {
+        return;
+      }
+      previous3 = { reason, spec: runtime.spec };
+    } else if (!runtime.samples().some((s2) => s2.lines >= MIN_AUTHOR_LINES)) {
+      return;
+    }
+    void this.#writeSpec(entry, previous3);
+  }
+  #reauthorReason(entry, now) {
+    const runtime = entry.runtime;
+    if (runtime.unmatchedLines < this.#o.driftLines) {
+      return void 0;
+    }
+    const newest = runtime.lastMatchAt;
+    if (newest !== void 0 && now - newest <= this.#o.driftStaleMs) {
+      return void 0;
+    }
+    return `no rule matched the last ${runtime.unmatchedLines} lines`;
+  }
+  /** One spec request (plus one retry on a rejected answer); installs the spec when it validates. */
+  async #writeSpec(entry, previous3) {
+    const author = this.#author;
+    const controller = new AbortController();
+    entry.request = controller;
+    entry.attempts++;
+    this.#inFlight++;
+    if (this.#recompute(entry)) {
+      this.#changed();
+    }
+    const samples = entry.runtime.samples();
+    const request = { command: entry.process.command, id: entry.process.id, sources: samples, ...previous3 ? { previous: previous3 } : {} };
+    let spec;
+    try {
+      for (let round = 0; round < 2 && !spec; round++) {
+        const answer = await author(request, controller.signal);
+        if (controller.signal.aborted) {
+          return;
+        }
+        if (answer === void 0 || specSkip(answer) !== void 0) {
+          entry.done = true;
+          break;
+        }
+        const checked = validateSpec(answer, sampleLines(samples), entry.process.command);
+        if (checked.ok) {
+          spec = checked.spec;
+        } else {
+          request.rejected = { answer: JSON.stringify(answer), errors: checked.errors };
+        }
+      }
+    } catch {
+    } finally {
+      this.#inFlight--;
+      if (entry.request === controller) {
+        entry.request = void 0;
+      }
+    }
+    if (controller.signal.aborted || this.#entries.get(entry.process.id) !== entry) {
+      return;
+    }
+    if (spec) {
+      entry.runtime = new ChartRuntime(spec, entry.process.startedAt, this.#now);
+      entry.tap.update(entry.process.output);
+      entry.runtime.ingest([entry.tap], entry.process.status !== "running");
+    }
+    if (this.#recompute(entry)) {
+      this.#changed();
+    }
+  }
+};
+
 // src/processes/store.ts
 var OUTPUT_MAX = 32e3;
 var RETAIN_MS = 6e4;
@@ -27366,9 +28848,9 @@ function processStatus(entry) {
   }
   return REASON_STATUS[entry.completion_reason ?? ""] ?? (entry.exit_code ? "failed" : "done");
 }
-var ESCAPES = /\x1b\[[0-?]*[ -/]*[@-~]|\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)|\x1b[@-_]/g;
+var ESCAPES2 = /\x1b\[[0-?]*[ -/]*[@-~]|\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)|\x1b[@-_]/g;
 function lastLine(output) {
-  const lines = output.replace(ESCAPES, "").split("\n");
+  const lines = output.replace(ESCAPES2, "").split("\n");
   for (let i = lines.length - 1; i >= 0; i--) {
     const draws = lines[i].split("\r");
     const text11 = (draws.findLast((d) => d.trim()) ?? "").replace(/\s+/g, " ").trim();
@@ -27399,8 +28881,8 @@ function isRunning2(p3) {
 function isRecent(p3, now) {
   return isRunning2(p3) || p3.exitedAt !== void 0 && now - p3.exitedAt <= RETAIN_MS;
 }
-function sortProcesses(list7) {
-  return [...list7].sort(
+function sortProcesses(list8) {
+  return [...list8].sort(
     (a2, b) => isRunning2(a2) !== isRunning2(b) ? isRunning2(a2) ? -1 : 1 : isRunning2(a2) ? a2.startedAt - b.startedAt : (b.exitedAt ?? 0) - (a2.exitedAt ?? 0)
   );
 }
@@ -27470,8 +28952,11 @@ var Processes = class {
   #disposed = false;
   /** Ids a stop was sent for and that still run: the registry can take seconds to end one. */
   #stopping = /* @__PURE__ */ new Set();
-  constructor(host) {
+  /** Each process's live chart, kept on `p.chart`. */
+  #charts;
+  constructor(host, charts = {}) {
     this.#host = host;
+    this.#charts = new Charts(() => this.#chart([...this.#byId.values()]) && this.#host.changed(), charts);
   }
   /** Everything the gateway still lists for the session, in roster order. */
   all() {
@@ -27518,6 +29003,8 @@ var Processes = class {
     }
     p3.output = (p3.output + chunk).slice(-OUTPUT_MAX);
     p3.lastLine = lastLine(p3.output);
+    this.#charts.output(id, chunk);
+    this.#chart([p3]);
     this.#link(/* @__PURE__ */ new Set([p3]));
     this.#host.changed();
   }
@@ -27550,6 +29037,19 @@ var Processes = class {
     this.#disposed = true;
     clearTimeout(this.#timer);
     this.#timer = void 0;
+    this.#charts.dispose();
+  }
+  /** Brings the charts of `procs` up to date and relinks the cards of those that changed; true when one did. */
+  #chart(procs) {
+    const touched = /* @__PURE__ */ new Set();
+    for (const p3 of procs) {
+      const chart = this.#charts.view(p3);
+      if (chart !== p3.chart) {
+        p3.chart = chart;
+        touched.add(p3);
+      }
+    }
+    return this.#link(touched) || touched.size > 0;
   }
   #schedule() {
     if (this.#disposed) {
@@ -27624,6 +29124,8 @@ var Processes = class {
         changed = true;
       }
     }
+    this.#charts.retain(new Set(this.#byId.keys()));
+    changed = this.#chart([...this.#byId.values()]) || changed;
     changed = this.#link(touched) || touched.size > 0 || changed;
     const shown = this.recent(now).map((p3) => `${p3.id}:${p3.status}`).join();
     if (shown !== this.#shown) {
@@ -27677,6 +29179,281 @@ function linkCalls(calls, procs) {
 }
 function snapshot(p3) {
   return `${p3.status}|${p3.exitCode}|${p3.exitedAt}|${p3.startedAt}|${p3.output.slice(-120)}|${p3.lastLine}|${p3.command}`;
+}
+
+// src/processes/widgets/view.tsx
+var MINI_SPARK_POINTS = 16;
+var HOVERCARD_JOBS = 4;
+var TILE_BARS = 3;
+var DEFAULT_TONE = "accent";
+function toneStyle(tone) {
+  switch (tone) {
+    case "accent":
+    case "info":
+    case "user":
+      return "accent";
+    case "success":
+    case "error":
+    case "muted":
+      return tone;
+    case "warning":
+    case "pending":
+      return "warning";
+    default:
+      return void 0;
+  }
+}
+var sp = (t2, s2) => s2 ? { s: s2, t: t2 } : { t: t2 };
+var plain = (text11) => text11.replace(/\s+/g, " ").trim();
+var fraction = (value, max) => !(max > 0) || !Number.isFinite(value) ? 0 : Math.min(1, Math.max(0, value / max));
+var extra = (props) => props;
+function glance(view) {
+  const h2 = view.headline;
+  if (h2 && plain(h2.text)) {
+    return { text: plain(h2.text), ...h2.label ? { label: plain(h2.label) } : {}, ...h2.trend ? { trend: h2.trend } : {} };
+  }
+  for (const b of view.blocks) {
+    if (b.kind === "spark" && b.values.length && plain(b.last)) {
+      return { label: plain(b.label), text: plain(b.last) };
+    }
+    if (b.kind === "meter" && plain(b.text)) {
+      return { label: plain(b.label), text: plain(b.text) };
+    }
+  }
+  return void 0;
+}
+function latest(entries) {
+  return entries.filter((e) => e.view.state === "live").reduce((a2, e) => !a2 || e.view.updatedAt > a2.view.updatedAt ? e : a2, void 0);
+}
+function summary(view) {
+  const g = glance(view);
+  const title = plain(view.title);
+  if (!g || view.state !== "live") {
+    return title;
+  }
+  const figure = [g.label, g.text, g.trend?.text].filter(Boolean).join(" ");
+  return title ? `${title} \u2014 ${figure}` : figure;
+}
+function glanceSpans(g) {
+  return [...g.label ? [sp(`${g.label} `, "muted")] : [], sp(g.text, "num strong"), ...g.trend ? [sp(` ${g.trend.text}`, toneStyle(g.trend.tone))] : []];
+}
+function primarySpark(view, points = MINI_SPARK_POINTS) {
+  const spark = view.blocks.find((b) => b.kind === "spark");
+  if (!spark?.values.length) {
+    return void 0;
+  }
+  if (spark.values.length <= points) {
+    return spark;
+  }
+  const from = spark.values.length - points;
+  return { ...spark, values: spark.values.slice(from), ...spark.tips ? { tips: spark.tips.slice(from) } : {} };
+}
+function sparkProps(b) {
+  const marks = (b.marks ?? []).map((m) => ({ value: m.value, ...m.tone ? { tone: m.tone } : {}, ...m.label ? { title: plain(m.label) } : {} }));
+  return {
+    kind: "bars",
+    max: b.max,
+    min: b.min,
+    series: b.values.map((value, i) => b.tips?.[i] ? { title: b.tips[i], value } : { value }),
+    summary: `${plain(b.label)} ${plain(b.last)}`,
+    token: toneStyle(b.tone ?? DEFAULT_TONE) ?? "accent",
+    ...marks.length ? { marks } : {}
+  };
+}
+function miniSpark(view, key2 = "spark") {
+  const spark = view.state === "live" ? primarySpark(view) : void 0;
+  return spark ? node("chart", { ...sparkProps(spark), key: key2, role: "omp.hud.spark", size: "sm" }) : void 0;
+}
+function hovercard(entries) {
+  if (!entries.length) {
+    return void 0;
+  }
+  const shown = entries.slice(0, HOVERCARD_JOBS);
+  const rest = entries.length - shown.length;
+  const card = /* @__PURE__ */ jsxs("col", { gap: "md", role: "omp.jobs.hovercard", children: [
+    /* @__PURE__ */ jsx("row", { gap: "none", role: "omp.job.tiles", wrap: true, children: shown.map((e) => tile(e)) }, "tiles"),
+    rest > 0 ? /* @__PURE__ */ jsx("text", { role: "omp.jobs.hovercard.more", spans: [sp(`+${rest} more \xB7 /ps`, "dim")], wrap: "none" }, "more") : null
+  ] });
+  return card instanceof Node ? card.toJSON() : void 0;
+}
+var TILE_TONE = { done: "success", failed: "error", killed: "warning", lost: "warning", running: "accent" };
+var TILE_GLYPH = { done: "\u2713", failed: "\u2715", killed: "\u25A0", lost: "\u25A0", running: "\u25CF" };
+var FIGURE_NUMBER = /^([-+]?(?:\d[\d,]*(?:\.\d+)?|\.\d+)[kKMGT]?%?)(?:\s+|(?=\/)|$)(.*)$/;
+function figureSpans(g) {
+  const m = FIGURE_NUMBER.exec(g.text);
+  const value = m?.[1] ?? g.text;
+  const unit = (m?.[2] ?? "").replace(/^\/\s*/, "/ ");
+  const label = g.label && !unit.toLowerCase().includes(g.label.toLowerCase()) ? g.label : "";
+  return [
+    ...label ? [sp(`${label} `, "dim")] : [],
+    sp(value),
+    ...unit ? [sp(` ${unit}`, "dim")] : [],
+    ...g.trend ? [sp(` ${g.trend.text}`, toneStyle(g.trend.tone))] : []
+  ];
+}
+function tile({ process: p3, view }) {
+  const live = view.state === "live" ? view : void 0;
+  const g = live && glance(live);
+  const title = plain(live?.title ?? "") || plain(p3.command.split(/\r?\n/, 1)[0] ?? "") || p3.id;
+  const visual = tileVisual(live?.blocks[0]);
+  return /* @__PURE__ */ jsxs("col", { gap: "xs", role: "omp.job.tile", tone: TILE_TONE[p3.status], children: [
+    /* @__PURE__ */ jsxs("row", { align: "center", gap: "xs", role: "omp.job.tile.head", children: [
+      /* @__PURE__ */ jsx(
+        "text",
+        {
+          role: "omp.job.tile.dot",
+          spans: [{ s: toneStyle(TILE_TONE[p3.status]), t: TILE_GLYPH[p3.status], ...p3.status === "running" ? { fx: "pulse" } : {} }],
+          wrap: "none"
+        },
+        "dot"
+      ),
+      /* @__PURE__ */ jsx("text", { grow: 1, role: "omp.job.tile.title", spans: [sp(title)], truncate: "end", wrap: "none" }, "title"),
+      /* @__PURE__ */ jsx("text", { role: "omp.job.tile.id", spans: [sp(p3.id, "dim")], wrap: "none" }, "id")
+    ] }, "head"),
+    g ? /* @__PURE__ */ jsx("text", { role: "omp.job.tile.figure", spans: figureSpans(g), truncate: "end", wrap: "none" }, "figure") : null,
+    visual,
+    tileNotes(p3, view, live, !g && !visual)
+  ] }, p3.id);
+}
+function tileMeter(value, tone = DEFAULT_TONE, key2 = "meter") {
+  return /* @__PURE__ */ jsx("meter", { grow: 1, role: "omp.job.tile.meter", size: "sm", tone, value: fraction(value, 1) }, key2);
+}
+function tileVisual(b) {
+  switch (b?.kind) {
+    case "spark":
+      return b.values.length ? node("chart", { ...sparkProps(b), key: "visual", role: "omp.job.tile.chart", size: "sm" }) : void 0;
+    case "meter":
+      return tileMeter(b.value, b.tone, "visual");
+    case "bars": {
+      const rest = b.items.length - TILE_BARS;
+      return b.items.length ? /* @__PURE__ */ jsxs("col", { gap: "xs", role: "omp.job.tile.bars", children: [
+        b.items.slice(0, TILE_BARS).map((item3, i) => /* @__PURE__ */ jsxs("row", { align: "center", gap: "sm", role: "omp.job.tile.bar", children: [
+          /* @__PURE__ */ jsx("text", { role: "omp.job.tile.key", spans: [sp(plain(item3.label), "dim")], truncate: "end", wrap: "none" }, "key"),
+          tileMeter(fraction(item3.value, b.max), item3.tone),
+          /* @__PURE__ */ jsx("text", { role: "omp.job.tile.num", spans: [sp(plain(item3.text))], wrap: "none" }, "num")
+        ] }, `${i}`)),
+        rest > 0 ? /* @__PURE__ */ jsx("text", { role: "omp.job.tile.more", spans: [sp(`+${rest} more`, "dim")], wrap: "none" }, "more") : null
+      ] }, "visual") : void 0;
+    }
+    case "grid":
+      return b.items.length ? /* @__PURE__ */ jsx(
+        "text",
+        {
+          role: "omp.job.tile.grid",
+          spans: b.items.flatMap((item3, i) => [
+            ...i ? [sp("   ")] : [],
+            sp("\u25CF\xA0", toneStyle(item3.tone)),
+            sp(plain(item3.label).replaceAll(" ", "\xA0"), "dim")
+          ]),
+          wrap: "word"
+        },
+        "visual"
+      ) : void 0;
+    default:
+      return void 0;
+  }
+}
+function tileNotes(p3, view, live, lead) {
+  const stage = plain(view.stage ?? "");
+  const failed = p3.exitCode ? `exit ${p3.exitCode}` : "";
+  const notes = [];
+  for (const b of live?.blocks ?? []) {
+    if (b.kind === "stat" && b.items.length) {
+      notes.push(/* @__PURE__ */ jsx("text", { role: "omp.job.tile.stats", spans: statSpans(b), truncate: "end", wrap: "none" }, `note-${notes.length}`));
+    } else if (b.kind === "text" && plain(b.text) && plain(b.text) !== stage) {
+      notes.push(/* @__PURE__ */ jsx("text", { role: "omp.job.tile.note", spans: [sp(plain(b.text), "dim")], truncate: "end", wrap: "none" }, `note-${notes.length}`));
+    }
+  }
+  if (stage || failed) {
+    const spans = [...failed ? [sp(failed, "error")] : [], ...failed && stage ? [sp(" \xB7 ", "dim")] : [], ...stage ? [sp(stage, lead ? "mono" : "dim mono")] : []];
+    notes.push(
+      lead ? /* @__PURE__ */ jsx("text", { lines: 3, role: "omp.job.tile.lead", spans, truncate: "end", wrap: "word" }, "stage") : /* @__PURE__ */ jsx("text", { role: "omp.job.tile.stage", spans, truncate: "end", wrap: "none" }, "stage")
+    );
+  }
+  return notes;
+}
+function statSpans(b) {
+  return b.items.flatMap((item3, i) => [
+    ...i ? [sp(" \xB7 ", "dim")] : [],
+    sp(`${plain(item3.label)} `, "dim"),
+    sp(plain(item3.text), toneStyle(item3.tone)),
+    ...item3.trend ? [sp(` ${item3.trend.text}`, toneStyle(item3.trend.tone))] : []
+  ]);
+}
+function chartNode(view, key2 = "chart") {
+  const stage = view.stage ? plain(view.stage) : "";
+  const h2 = view.state === "live" ? glance({ ...view, blocks: [] }) : void 0;
+  return /* @__PURE__ */ jsxs("col", { gap: "xs", role: "omp.job.widget", children: [
+    /* @__PURE__ */ jsxs("row", { align: "baseline", gap: "sm", role: "omp.job.widget.head", children: [
+      /* @__PURE__ */ jsx("text", { role: "omp.job.widget.title", spans: [sp(plain(view.title), "strong")], truncate: "end", wrap: "none", ...extra(stage ? {} : { grow: 1 }) }, "title"),
+      stage ? /* @__PURE__ */ jsx("text", { grow: 1, role: "omp.job.widget.stage", spans: [sp(stage, "muted")], truncate: "end", wrap: "none" }, "stage") : null,
+      view.state === "authoring" ? /* @__PURE__ */ jsx("shimmer", { text: "charting\u2026" }, "authoring") : null,
+      h2 ? /* @__PURE__ */ jsx("text", { role: "omp.job.widget.headline", spans: glanceSpans(h2), wrap: "none" }, "headline") : null
+    ] }, "head"),
+    view.state === "live" ? view.blocks.map((b, i) => blockNode(b, `${i}-${b.kind}`)) : null
+  ] }, key2);
+}
+function primaryNode(view, key2 = "chart") {
+  const b = view.state === "live" ? view.blocks[0] : void 0;
+  return b ? /* @__PURE__ */ jsx("col", { role: "omp.job.widget", children: blockNode(b, "primary") }, key2) : void 0;
+}
+function blockNode(b, key2) {
+  switch (b.kind) {
+    case "spark":
+      return sparkNode(b, key2);
+    case "bars":
+      return /* @__PURE__ */ jsxs("col", { gap: "xs", role: "omp.job.widget.bars", children: [
+        /* @__PURE__ */ jsx("text", { role: "omp.job.widget.caption", spans: [sp(plain(b.label), "dim")], truncate: "end", wrap: "none" }, "caption"),
+        b.items.length ? b.items.map(
+          (item3, i) => labelled(
+            item3.label,
+            /* @__PURE__ */ jsx("meter", { grow: 1, label: plain(item3.text), size: "sm", value: fraction(item3.value, b.max), ...extra(item3.tone ? { tone: item3.tone } : {}) }, "meter"),
+            "omp.job.widget.bar",
+            `${i}`
+          )
+        ) : waiting2()
+      ] }, key2);
+    case "meter":
+      return labelled(
+        b.label,
+        /* @__PURE__ */ jsx("meter", { grow: 1, label: plain(b.text), size: "sm", value: fraction(b.value, 1), ...extra(b.tone ? { tone: b.tone } : {}) }, "meter"),
+        "omp.job.widget.meter",
+        key2
+      );
+    case "stat":
+      return /* @__PURE__ */ jsx("text", { role: "omp.job.widget.stat", spans: statSpans(b), truncate: "end", wrap: "none" }, key2);
+    case "grid":
+      return /* @__PURE__ */ jsxs("col", { gap: "xs", role: "omp.job.widget.grid", children: [
+        /* @__PURE__ */ jsx("text", { role: "omp.job.widget.caption", spans: [sp(plain(b.label), "dim")], truncate: "end", wrap: "none" }, "caption"),
+        b.items.length ? /* @__PURE__ */ jsx("row", { gap: "xs", role: "omp.job.widget.cells", wrap: true, children: b.items.map((item3, i) => /* @__PURE__ */ jsx("badge", { text: plain(item3.label), title: plain(item3.text), tone: item3.tone }, `${i}`)) }, "cells") : waiting2()
+      ] }, key2);
+    case "text":
+      return /* @__PURE__ */ jsx("text", { role: "omp.job.widget.text", spans: [sp(plain(b.text), "muted")], truncate: "end", wrap: "none" }, key2);
+  }
+}
+function sparkNode(b, key2) {
+  if (!b.values.length) {
+    return labelled(b.label, waiting2(), "omp.job.widget.spark", key2);
+  }
+  const label = plain(b.label);
+  const last = plain(b.last);
+  return /* @__PURE__ */ jsxs("row", { align: "center", gap: "sm", role: "omp.job.widget.spark", children: [
+    node("chart", { ...sparkProps(b), grow: 1, key: "chart", size: "md" }),
+    /* @__PURE__ */ jsxs("col", { gap: "none", role: "omp.job.widget.side", children: [
+      /* @__PURE__ */ jsx("text", { spans: [sp(last, "num strong")], wrap: "none" }, "last"),
+      label && !last.endsWith(label) ? /* @__PURE__ */ jsx("text", { spans: [sp(label, "muted")], truncate: "end", wrap: "none" }, "label") : null,
+      (b.marks ?? []).map((m, i) => /* @__PURE__ */ jsx("text", { spans: [sp("\u2504 ", toneStyle(m.tone ?? "muted")), sp(plain(m.label), "dim")], truncate: "end", wrap: "none" }, `mark-${i}`))
+    ] }, "side")
+  ] }, key2);
+}
+function labelled(label, content5, role, key2) {
+  return /* @__PURE__ */ jsxs("row", { align: "center", gap: "sm", role, children: [
+    /* @__PURE__ */ jsx("text", { max: { w: "12ch" }, min: { w: "12ch" }, spans: [sp(plain(label), "muted")], truncate: "end", wrap: "none" }, "label"),
+    content5
+  ] }, key2);
+}
+function waiting2() {
+  return /* @__PURE__ */ jsx("text", { spans: [sp("waiting for data", "dim")], wrap: "none" }, "waiting");
 }
 
 // src/workLog.ts
@@ -28978,10 +30755,10 @@ function summarize(items) {
     const a2 = actionOf(c);
     groups.set(a2, [...groups.get(a2) ?? [], c]);
   }
-  const all8 = [...groups].map(([action, list7], index2) => ({
-    count: list7.length,
+  const all8 = [...groups].map(([action, list8], index2) => ({
+    count: list8.length,
     index: index2,
-    label: actionLabel(action, action === "edit" ? editedFiles(list7) : list7.length, list7),
+    label: actionLabel(action, action === "edit" ? editedFiles(list8) : list8.length, list8),
     priority: priority(action)
   }));
   const picked = [...all8].sort((a2, b) => a2.priority - b.priority || a2.index - b.index).slice(0, 2).sort((a2, b) => a2.index - b.index);
@@ -28997,7 +30774,7 @@ function editedFiles(calls) {
   const paths = /* @__PURE__ */ new Set();
   let unnamed = 0;
   for (const c of calls) {
-    const path2 = str5(c.args.path);
+    const path2 = str6(c.args.path);
     if (path2) {
       paths.add(path2);
     } else {
@@ -29038,7 +30815,7 @@ function actionIcon(action) {
       return "wrench";
   }
 }
-var str5 = (v) => typeof v === "string" && v ? v : void 0;
+var str6 = (v) => typeof v === "string" && v ? v : void 0;
 function shortPath(path2, cwd = process.env.HERMES_CWD || process.cwd()) {
   const root7 = cwd.replace(/\/+$/, "");
   if (root7 && path2.startsWith(`${root7}/`)) {
@@ -29049,7 +30826,7 @@ function shortPath(path2, cwd = process.env.HERMES_CWD || process.cwd()) {
 }
 function stepLabel(call) {
   const a2 = call.args;
-  const path2 = str5(a2.path);
+  const path2 = str6(a2.path);
   const app2 = callApp(call);
   if (app2) {
     return `${app2.app} \xB7 ${app2.action}`;
@@ -29062,7 +30839,7 @@ function stepLabel(call) {
   }
   switch (call.name) {
     case "terminal": {
-      const command = str5(a2.command) ?? call.context;
+      const command = str6(a2.command) ?? call.context;
       return command ? flat(commandDisplayText(command)) : "Command";
     }
     case "read_file":
@@ -29072,15 +30849,15 @@ function stepLabel(call) {
     case "write_file":
       return path2 ? `Wrote ${shortPath(path2)}` : "Wrote a file";
     case "search_files": {
-      const pattern = str5(a2.pattern) ?? call.context;
+      const pattern = str6(a2.pattern) ?? call.context;
       const where = path2 && path2 !== "." ? ` in ${shortPath(path2)}` : "";
       return a2.target === "files" ? `Searched files ${pattern}${where}` : `Searched ${pattern}${where}`;
     }
     case "web_search":
-      return str5(a2.query) ? `Searched the web for ${a2.query}` : "Web search";
+      return str6(a2.query) ? `Searched the web for ${a2.query}` : "Web search";
     case "web_extract": {
       const urls = Array.isArray(a2.urls) ? a2.urls.filter((u) => typeof u === "string") : [];
-      const first = urls[0] ?? str5(a2.url);
+      const first = urls[0] ?? str6(a2.url);
       return first ? `Read ${first}${urls.length > 1 ? ` +${urls.length - 1} more` : ""}` : "Read a page";
     }
     case "execute_code":
@@ -29088,19 +30865,19 @@ function stepLabel(call) {
     case "link_pull_request":
     case "unlink_pull_request": {
       const verb = call.name === "link_pull_request" ? "Linked" : "Unlinked";
-      const pr = str5(a2.url)?.match(/github[^/]*\/([^/]+\/[^/]+)\/pull\/(\d+)/);
-      const repo = pr?.[1] ?? str5(a2.repository);
+      const pr = str6(a2.url)?.match(/github[^/]*\/([^/]+\/[^/]+)\/pull\/(\d+)/);
+      const repo = pr?.[1] ?? str6(a2.repository);
       const number2 = pr?.[2] ?? (typeof a2.number === "number" ? String(a2.number) : void 0);
       return repo && number2 ? `${verb} ${repo}#${number2}` : `${verb} a pull request`;
     }
     case "list_pull_requests":
       return "Listed linked pull requests";
     case "skill_view":
-      return str5(a2.name) ? `Read skill ${a2.name}` : "Read a skill";
+      return str6(a2.name) ? `Read skill ${a2.name}` : "Read a skill";
     case "skills_list":
       return "Listed skills";
     case "tool_search": {
-      const q2 = Array.isArray(a2.queries) ? a2.queries.filter((x) => typeof x === "string") : [str5(a2.queries) ?? str5(a2.query)].filter(Boolean);
+      const q2 = Array.isArray(a2.queries) ? a2.queries.filter((x) => typeof x === "string") : [str6(a2.queries) ?? str6(a2.query)].filter(Boolean);
       return q2.length ? `Searched tools for ${q2.join(", ")}` : "Searched tools";
     }
     case "tool_describe": {
@@ -29136,7 +30913,7 @@ function liveLabel(item3, active = false) {
   }
   const call = item3.call;
   const status = active && call.status === "done" ? "running" : call.status;
-  const command = call.name === "terminal" ? str5(call.args.command) ?? call.context : void 0;
+  const command = call.name === "terminal" ? str6(call.args.command) ?? call.context : void 0;
   if (!command) {
     return status === "running" ? presentTense(stepLabel(call)) : stepLabel(call);
   }
@@ -29430,7 +31207,7 @@ function commandLine(command, n = 96) {
 }
 
 // src/view/tools.tsx
-var str6 = (v) => typeof v === "string" && v ? v : void 0;
+var str7 = (v) => typeof v === "string" && v ? v : void 0;
 function toolNode(call, now, place = {}) {
   const solo = call.name === "delegate_task" ? soloTask(call, now) : void 0;
   if (solo) {
@@ -29484,7 +31261,7 @@ function toolNode(call, now, place = {}) {
 function toolDetail(call, now) {
   const card = cardOf(call, now);
   const body = [...card.body];
-  const command = call.name === "terminal" ? (str6(call.args.command) ?? call.context ?? "").trim() : "";
+  const command = call.name === "terminal" ? (str7(call.args.command) ?? call.context ?? "").trim() : "";
   if (command && command === commandLine(command)) {
     body.unshift(/* @__PURE__ */ jsx("code", { lang: "bash", max: { h: "12lines" }, role: "omp.tool.command", text: command }, "cmd"));
   }
@@ -29568,21 +31345,21 @@ function cardOf(call, now) {
       return {
         body: [],
         frame: "inline",
-        meta: str6(result?.usage) ? [`${result?.usage}`] : void 0,
+        meta: str7(result?.usage) ? [`${result?.usage}`] : void 0,
         name: "memory",
-        target: call.context || str6(call.args.action),
+        target: call.context || str7(call.args.action),
         targetKind: "text",
         title: "Memory"
       };
     case "skills_list": {
       const skills = Array.isArray(result?.skills) ? result.skills : [];
-      const names = skills.map((s2) => str6(record2(s2)?.name) ?? str6(s2)).filter((n) => n !== void 0);
+      const names = skills.map((s2) => str7(record2(s2)?.name) ?? str7(s2)).filter((n) => n !== void 0);
       return {
         body: names.length ? [/* @__PURE__ */ jsx("text", { spans: [{ s: "muted", t: names.join(" \xB7 ") }], wrap: "word" }, "names")] : [],
         folded: true,
         frame: "inline",
         meta: [
-          names.length ? `${names.length} skill${names.length === 1 ? "" : "s"}` : str6(result?.message) ?? "no skills"
+          names.length ? `${names.length} skill${names.length === 1 ? "" : "s"}` : str7(result?.message) ?? "no skills"
         ],
         name: "skill",
         title: "Skills"
@@ -29590,11 +31367,11 @@ function cardOf(call, now) {
     }
     case "skill_view":
       return {
-        body: str6(result?.content) ? [/* @__PURE__ */ jsx("md", { children: clip2(str6(result?.content) ?? "", 6e3) }, "body")] : [],
+        body: str7(result?.content) ? [/* @__PURE__ */ jsx("md", { children: clip2(str7(result?.content) ?? "", 6e3) }, "body")] : [],
         folded: true,
         frame: "inline",
         name: "skill",
-        target: str6(call.args.name) ?? call.context,
+        target: str7(call.args.name) ?? call.context,
         targetKind: "text",
         title: "Skill"
       };
@@ -29602,7 +31379,7 @@ function cardOf(call, now) {
   const look = call.name.startsWith("browser") ? { name: "browser", title: humanize(call.name.replace(/^browser_?/, "")) || "Browser" } : call.name === "session_search" ? { name: "search", title: "Session search" } : call.name === "vision_analyze" ? { name: "image", title: "Vision" } : call.name === "image_generate" ? { name: "image", title: "Image" } : { name: call.name, title: humanize(call.name) };
   const src = shownImage(call);
   if (src || call.name === "image_generate") {
-    const said = call.status === "running" ? void 0 : str6(result?.analysis) ?? str6(result?.text_summary);
+    const said = call.status === "running" ? void 0 : str7(result?.analysis) ?? str7(result?.text_summary);
     return {
       ...look,
       body: [
@@ -29610,7 +31387,7 @@ function cardOf(call, now) {
         ...said ? [/* @__PURE__ */ jsx("text", { lines: 6, spans: [{ s: "muted", t: clip2(said, 2e3) }], wrap: "word" }, "said")] : []
       ],
       folded: false,
-      target: str6(call.args.prompt) ?? str6(call.args.question) ?? (call.context || void 0),
+      target: str7(call.args.prompt) ?? str7(call.args.question) ?? (call.context || void 0),
       targetKind: "text"
     };
   }
@@ -29619,14 +31396,14 @@ function cardOf(call, now) {
     body: genericBody(call),
     folded: true,
     frame: "inline",
-    target: str6(call.args.query) ?? str6(call.args.url) ?? (call.context || void 0),
-    targetKind: str6(call.args.url) ? "path" : str6(call.args.query) ? "query" : "text"
+    target: str7(call.args.query) ?? str7(call.args.url) ?? (call.context || void 0),
+    targetKind: str7(call.args.url) ? "path" : str7(call.args.query) ? "query" : "text"
   };
 }
 function bashCard(call, result, instead) {
-  const output = (str6(result?.output) ?? call.resultText)?.replace(/\s*\[Command interrupted\]\s*$/, "");
-  const error = str6(result?.error);
-  const command = (str6(call.args.command) ?? call.context ?? "").trim();
+  const output = (str7(result?.output) ?? call.resultText)?.replace(/\s*\[Command interrupted\]\s*$/, "");
+  const error = str7(result?.error);
+  const command = (str7(call.args.command) ?? call.context ?? "").trim();
   const line = commandLine(command);
   const running = call.status === "running";
   return {
@@ -29649,7 +31426,11 @@ function backgroundCard(call, result, now) {
   const w = watchersOf(call);
   const id = processIdOf(call) ?? call.process?.id;
   const line = id ? processLine(call, id, now) : void 0;
-  const card = bashCard(call, result, line);
+  const chart = call.process?.chart && primaryNode(call.process.chart);
+  const card = bashCard(call, result, line && chart ? /* @__PURE__ */ jsxs("col", { gap: "xs", children: [
+    line,
+    chart
+  ] }, "process") : line);
   return {
     ...card,
     badges: [
@@ -29687,8 +31468,8 @@ function processLine(call, id, now) {
   );
 }
 function readCard2(call, result) {
-  const path2 = str6(call.args.path) ?? call.context;
-  const content5 = str6(result?.content);
+  const path2 = str7(call.args.path) ?? call.context;
+  const content5 = str7(result?.content);
   const total = typeof result?.total_lines === "number" ? result.total_lines : void 0;
   const numbered = content5 ? [...content5.matchAll(/^ *(\d+)\|/gm)] : [];
   const first = numbered.length ? Number(numbered[0]?.[1]) : void 0;
@@ -29707,10 +31488,10 @@ function readCard2(call, result) {
   };
 }
 function editCard(call, result) {
-  const path2 = str6(call.args.path) ?? call.context;
+  const path2 = str7(call.args.path) ?? call.context;
   const lang = langOf(path2);
-  const diff2 = hunks(str6(result?.diff)) ?? (call.diff ? plainDiff(call.diff) : void 0);
-  const content5 = str6(call.args.content);
+  const diff2 = hunks(str7(result?.diff)) ?? (call.diff ? plainDiff(call.diff) : void 0);
+  const content5 = str7(call.args.content);
   const write = call.name === "write_file";
   const head2 = {
     name: write ? "write" : "edit",
@@ -29737,19 +31518,19 @@ function editCard(call, result) {
   return { ...head2, body: [/* @__PURE__ */ jsx("diff", { lang, text: diff2 }, "diff")], meta: [`+${added} \u2212${removed}`] };
 }
 function searchCard(call, result) {
-  const pattern = str6(call.args.pattern) ?? call.context;
-  const where = str6(call.args.path);
+  const pattern = str7(call.args.pattern) ?? call.context;
+  const where = str7(call.args.path);
   const inPath = where && where !== "." ? ` \xB7 in ${where}` : "";
-  const files = Array.isArray(result?.files) ? result.files.map((f) => str6(f)).filter((f) => f !== void 0) : void 0;
+  const files = Array.isArray(result?.files) ? result.files.map((f) => str7(f)).filter((f) => f !== void 0) : void 0;
   if (files || call.args.target === "files") {
-    const list7 = (files ?? []).map((f) => f.replace(/^\.\//, ""));
-    const total2 = typeof result?.total_count === "number" ? result.total_count : list7.length;
+    const list8 = (files ?? []).map((f) => f.replace(/^\.\//, ""));
+    const total2 = typeof result?.total_count === "number" ? result.total_count : list8.length;
     return {
-      body: list7.slice(0, 200).map((f, i) => {
+      body: list8.slice(0, 200).map((f, i) => {
         const slash = f.lastIndexOf("/");
         return /* @__PURE__ */ jsx("row", { role: "omp.tool.file", title: slash > 0 ? f.slice(0, slash + 1) : void 0, children: /* @__PURE__ */ jsx("text", { spans: [{ s: "path", t: slash > 0 ? f.slice(slash + 1) : f }] }, "p") }, `f${i}`);
       }),
-      folded: list7.length > 20,
+      folded: list8.length > 20,
       frame: "inline",
       meta: files ? [`${total2} file${total2 === 1 ? "" : "s"}${inPath}`] : void 0,
       name: "glob",
@@ -29761,10 +31542,10 @@ function searchCard(call, result) {
   const matches = Array.isArray(result?.matches) ? result.matches.map((m) => record2(m)).filter((m) => m !== void 0) : void 0;
   const byFile = /* @__PURE__ */ new Map();
   for (const m of matches ?? []) {
-    const path2 = (str6(m.path) ?? "").replace(/^\.\//, "");
-    const list7 = byFile.get(path2) ?? [];
-    list7.push({ line: typeof m.line === "number" ? m.line : 0, text: typeof m.content === "string" ? m.content : "" });
-    byFile.set(path2, list7);
+    const path2 = (str7(m.path) ?? "").replace(/^\.\//, "");
+    const list8 = byFile.get(path2) ?? [];
+    list8.push({ line: typeof m.line === "number" ? m.line : 0, text: typeof m.content === "string" ? m.content : "" });
+    byFile.set(path2, list8);
   }
   const total = typeof result?.total_count === "number" ? result.total_count : matches?.length ?? 0;
   const body = [];
@@ -29825,35 +31606,35 @@ function webSearchCard(call, result) {
   const hits = (Array.isArray(data?.web) ? data.web : Array.isArray(result?.results) ? result.results : []).map((h2) => record2(h2)).filter((h2) => h2 !== void 0);
   return {
     body: hits.length ? [
-      /* @__PURE__ */ jsx("col", { role: "omp.tool.sources", children: hits.map((h2, i) => sourceRow(`s${i}`, str6(h2.title) ?? str6(h2.url) ?? "", str6(h2.url))) }, "s")
+      /* @__PURE__ */ jsx("col", { role: "omp.tool.sources", children: hits.map((h2, i) => sourceRow(`s${i}`, str7(h2.title) ?? str7(h2.url) ?? "", str7(h2.url))) }, "s")
     ] : [],
     frame: "inline",
     meta: hits.length ? [`${hits.length} source${hits.length === 1 ? "" : "s"}`] : void 0,
     name: "web_search",
-    target: str6(call.args.query) ?? call.context,
+    target: str7(call.args.query) ?? call.context,
     targetKind: "query",
     title: "Web search"
   };
 }
 function fetchCard(call, result) {
   const pages = (Array.isArray(result?.results) ? result.results : []).map((p3) => record2(p3)).filter((p3) => p3 !== void 0);
-  const urls = Array.isArray(call.args.urls) ? call.args.urls.map((u) => str6(u)).filter((u) => u !== void 0) : [];
+  const urls = Array.isArray(call.args.urls) ? call.args.urls.map((u) => str7(u)).filter((u) => u !== void 0) : [];
   const body = [];
   for (const [i, p3] of pages.entries()) {
-    body.push(sourceRow(`s${i}`, str6(p3.title) ?? str6(p3.url) ?? "", str6(p3.url)));
-    const content5 = str6(p3.content);
+    body.push(sourceRow(`s${i}`, str7(p3.title) ?? str7(p3.url) ?? "", str7(p3.url)));
+    const content5 = str7(p3.content);
     if (content5) {
       body.push(/* @__PURE__ */ jsx("md", { children: clip2(content5, 4e3) }, `b${i}`));
     }
   }
-  const chars = pages.reduce((n, p3) => n + (str6(p3.content)?.length ?? 0), 0);
+  const chars = pages.reduce((n, p3) => n + (str7(p3.content)?.length ?? 0), 0);
   return {
     body,
     folded: true,
     meta: pages.length ? [`${pages.length} page${pages.length === 1 ? "" : "s"} \xB7 ${compact(chars)} chars`] : void 0,
     name: "fetch",
     preview: { lines: 6 },
-    target: urls.length > 1 ? `${urls[0]} +${urls.length - 1}` : urls[0] ?? str6(call.args.url) ?? call.context,
+    target: urls.length > 1 ? `${urls[0]} +${urls.length - 1}` : urls[0] ?? str7(call.args.url) ?? call.context,
     targetKind: "path",
     title: "Fetch"
   };
@@ -29873,10 +31654,10 @@ function sourceRow(key2, title, url) {
 }
 function taskCard(call, result, now) {
   const tasks = Array.isArray(call.args.tasks) ? call.args.tasks.map((t2) => record2(t2)).filter((t2) => t2 !== void 0) : [];
-  const goals = tasks.length ? tasks.map((t2) => str6(t2.goal) ?? "") : str6(call.args.goal) ? [str6(call.args.goal) ?? ""] : [];
+  const goals = tasks.length ? tasks.map((t2) => str7(t2.goal) ?? "") : str7(call.args.goal) ? [str7(call.args.goal) ?? ""] : [];
   const agents2 = call.subagents ?? [];
   const rows = agents2.length ? agents2.map((a2) => agentNode(a2, now)) : call.status === "running" || result?.status === "dispatched" ? goals.map((g, i) => /* @__PURE__ */ jsx("agent", { name: `Agent ${i + 1}`, status: "pending", task: g }, `p${i}`)) : settledRows(goals, result);
-  const context = str6(call.args.context) ?? (tasks.length === 1 ? str6(tasks[0]?.context) : void 0);
+  const context = str7(call.args.context) ?? (tasks.length === 1 ? str7(tasks[0]?.context) : void 0);
   const working = agents2.some((a2) => a2.status === "running" || a2.status === "queued") || !agents2.length && result?.status === "dispatched";
   const settled = agents2.filter((a2) => a2.status !== "running" && a2.status !== "queued");
   const count = goals.length || agents2.length;
@@ -29914,8 +31695,8 @@ function settledRows(goals, result) {
   const results = Array.isArray(result?.results) ? result.results.map((r) => record2(r)) : [];
   const titles = goals.length ? goals : results.map(() => "Delegated task");
   return titles.map((g, i) => {
-    const { status, summary: summary3 } = outcome(results[i]);
-    return /* @__PURE__ */ jsx("agent", { name: `Agent ${i + 1}`, status, task: g, children: summary3 ? /* @__PURE__ */ jsx("md", { children: summary3 }, "o") : null }, `s${i}`);
+    const { status, summary: summary4 } = outcome(results[i]);
+    return /* @__PURE__ */ jsx("agent", { name: `Agent ${i + 1}`, status, task: g, children: summary4 ? /* @__PURE__ */ jsx("md", { children: summary4 }, "o") : null }, `s${i}`);
   });
 }
 function agentNode(a2, now, solo) {
@@ -29952,9 +31733,9 @@ function agentNode(a2, now, solo) {
   );
 }
 function outcome(r) {
-  const verdict = str6(r?.status) ?? "";
+  const verdict = str7(r?.status) ?? "";
   const status = !r ? "idle" : verdict === "" || verdict === "ok" || verdict === "completed" ? "done" : "failed";
-  return { status, summary: str6(r?.summary) ?? str6(r?.error) };
+  return { status, summary: str7(r?.summary) ?? str7(r?.error) };
 }
 function soloTask(call, now) {
   const tasks = Array.isArray(call.args.tasks) ? call.args.tasks.map((t2) => record2(t2)).filter((t2) => t2 !== void 0) : [];
@@ -29962,7 +31743,7 @@ function soloTask(call, now) {
   if (tasks.length > 1 || (call.subagents?.length ?? 0) > 1 || call.status === "error" || result?.error) {
     return void 0;
   }
-  const goal = str6(tasks[0]?.goal) ?? str6(call.args.goal) ?? call.subagents?.[0]?.goal ?? "Delegated task";
+  const goal = str7(tasks[0]?.goal) ?? str7(call.args.goal) ?? call.subagents?.[0]?.goal ?? "Delegated task";
   const name = result?.mode === "background" ? "Background agent" : "Agent";
   const a2 = call.subagents?.[0];
   if (a2) {
@@ -29970,39 +31751,39 @@ function soloTask(call, now) {
   }
   const pending = call.status === "running" || result?.status === "dispatched";
   const results = Array.isArray(result?.results) ? result.results.map((r) => record2(r)) : [];
-  const { status, summary: summary3 } = pending ? { status: "pending", summary: void 0 } : outcome(results[0]);
+  const { status, summary: summary4 } = pending ? { status: "pending", summary: void 0 } : outcome(results[0]);
   return /* @__PURE__ */ jsx(
     "agent",
     {
-      collapsed: summary3 ? true : void 0,
-      collapsible: summary3 ? true : void 0,
+      collapsed: summary4 ? true : void 0,
+      collapsible: summary4 ? true : void 0,
       name,
       role: "hermes.task.solo",
       status,
       task: goal,
-      children: summary3 ? /* @__PURE__ */ jsx("md", { children: summary3 }, "o") : null
+      children: summary4 ? /* @__PURE__ */ jsx("md", { children: summary4 }, "o") : null
     },
     call.id
   );
 }
 function briefOf(call, index2) {
   const tasks = Array.isArray(call.args.tasks) ? call.args.tasks.map((t2) => record2(t2)) : [];
-  const context = str6(tasks[index2]?.context) ?? str6(call.args.context);
+  const context = str7(tasks[index2]?.context) ?? str7(call.args.context);
   return context;
 }
 function briefNode(head2, text11) {
   return /* @__PURE__ */ jsx("section", { collapsed: true, collapsible: true, head: head2, role: "hermes.task.brief", children: /* @__PURE__ */ jsx("md", { children: text11 }, "md") }, "brief");
 }
 function askCard(call, result) {
-  const qs = (Array.isArray(call.args.questions) ? call.args.questions : str6(call.args.question) ? [call.args] : []).map((q2) => record2(q2)).filter((q2) => q2 !== void 0);
+  const qs = (Array.isArray(call.args.questions) ? call.args.questions : str7(call.args.question) ? [call.args] : []).map((q2) => record2(q2)).filter((q2) => q2 !== void 0);
   const responses = Array.isArray(result?.responses) ? result.responses.map((r) => record2(r)) : [];
   const body = [];
   for (const [i, q2] of qs.entries()) {
-    const choices = Array.isArray(q2.choices) ? q2.choices.map((c) => str6(c)).filter((c) => c !== void 0) : [];
+    const choices = Array.isArray(q2.choices) ? q2.choices.map((c) => str7(c)).filter((c) => c !== void 0) : [];
     const raw2 = responses[i]?.user_response;
-    const answers = (Array.isArray(raw2) ? raw2 : [raw2]).map((a2) => str6(a2)).filter((a2) => a2 !== void 0);
+    const answers = (Array.isArray(raw2) ? raw2 : [raw2]).map((a2) => str7(a2)).filter((a2) => a2 !== void 0);
     if (qs.length > 1) {
-      body.push(/* @__PURE__ */ jsx("md", { children: str6(q2.question) ?? "" }, `q${i}`));
+      body.push(/* @__PURE__ */ jsx("md", { children: str7(q2.question) ?? "" }, `q${i}`));
     }
     for (const [j, c] of choices.entries()) {
       body.push(answerRow(`q${i}.o${j}`, c, answers.includes(c)));
@@ -30019,7 +31800,7 @@ function askCard(call, result) {
     body,
     name: "ask",
     // Several questions each read in the body; the head counts them instead of repeating one.
-    target: qs.length > 1 ? `${qs.length} questions` : str6(qs[0]?.question) ?? call.context,
+    target: qs.length > 1 ? `${qs.length} questions` : str7(qs[0]?.question) ?? call.context,
     targetKind: "text",
     title: "Ask"
   };
@@ -30031,9 +31812,9 @@ function answerRow(key2, text11, picked) {
   ] }, key2);
 }
 function evalCard(call, result) {
-  const code7 = str6(call.args.code) ?? "";
-  const output = str6(result?.output) ?? str6(result?.stdout) ?? call.resultText;
-  const error = str6(result?.error) ?? str6(result?.stderr);
+  const code7 = str7(call.args.code) ?? "";
+  const output = str7(result?.output) ?? str7(result?.stdout) ?? call.resultText;
+  const error = str7(result?.error) ?? str7(result?.stderr);
   return {
     badges: [{ text: "python" }],
     body: [
@@ -30158,7 +31939,7 @@ function batchBody(call) {
 }
 function imageNode(call, src) {
   const source = localSource(src) ?? call.image;
-  const alt = str6(call.args.prompt) ?? "Image";
+  const alt = str7(call.args.prompt) ?? "Image";
   if (source) {
     return /* @__PURE__ */ jsx("image", { alt: clip2(alt, 200), role: "hermes.tool.image", ...source }, "image");
   }
@@ -30181,7 +31962,7 @@ function genericBody(call) {
 }
 function errorOf(call) {
   const result = record2(call.result);
-  return str6(result?.error) ?? str6(call.summary) ?? (typeof call.result === "string" && !result ? call.result : void 0);
+  return str7(result?.error) ?? str7(call.summary) ?? (typeof call.result === "string" && !result ? call.result : void 0);
 }
 function exitOf(call) {
   const code7 = record2(call.result)?.exit_code;
@@ -30586,12 +32367,12 @@ function openAgents(app2, focus) {
   };
   function hubNode(now) {
     const all8 = agents2();
-    const list7 = shown();
+    const list8 = shown();
     const running = all8.filter(isRunning).length;
-    if (!list7.some((a3) => a3.id === selected)) {
-      selected = list7[0]?.id;
+    if (!list8.some((a3) => a3.id === selected)) {
+      selected = list8[0]?.id;
     }
-    const a2 = list7.find((x) => x.id === selected);
+    const a2 = list8.find((x) => x.id === selected);
     const columns = [
       { format: "num", head: "Tools", id: "tools", priority: 3 },
       { format: "elapsed", head: "Time", id: "time", priority: 5 }
@@ -30614,12 +32395,12 @@ function openAgents(app2, focus) {
           stopping = false;
           app2.changed();
         },
-        order: list7.map((x) => x.id),
+        order: list8.map((x) => x.id),
         preview: "side",
         selected,
         size: "lg",
         subtitle: [
-          { s: "muted", t: summary(all8) },
+          { s: "muted", t: summary2(all8) },
           ...app2.agents.paused ? [{ s: "warning", t: " \xB7 spawns paused (gateway-wide)" }] : []
         ],
         tab: tab2,
@@ -30676,7 +32457,7 @@ function openAgents(app2, focus) {
     watch2(focus.id);
   }
 }
-function summary(all8) {
+function summary2(all8) {
   const count = (s2) => all8.filter((a2) => a2.status === s2).length;
   const parts3 = [
     [count("running") + count("queued"), "running"],
@@ -31210,12 +32991,12 @@ function openBackground(app2, at) {
   }
   function processNode(now) {
     const all8 = procs();
-    const list7 = shown();
+    const list8 = shown();
     const running = all8.filter(isRunning2).length;
-    if (!list7.some((p4) => p4.id === selected)) {
-      selected = list7[0]?.id;
+    if (!list8.some((p4) => p4.id === selected)) {
+      selected = list8[0]?.id;
     }
-    const p3 = list7.find((x) => x.id === selected);
+    const p3 = list8.find((x) => x.id === selected);
     const call = p3 && callOf(app2, p3.id);
     const columns = [
       { format: "dim", head: "Last output", id: "last", min: 16, priority: 1 },
@@ -31256,11 +33037,11 @@ function openBackground(app2, at) {
           confirm = void 0;
           app2.changed();
         },
-        order: list7.map((x) => x.id),
+        order: list8.map((x) => x.id),
         preview: "side",
         selected,
         size: "lg",
-        subtitle: [{ s: "muted", t: summary2(all8) }],
+        subtitle: [{ s: "muted", t: summary3(all8) }],
         tab: tab2,
         tabs: tabs(),
         title: "Background",
@@ -31341,7 +33122,7 @@ function jobPreview(j, now, own13) {
 function callOf(app2, id) {
   return app2.transcript.backgroundCalls().find((c) => (processIdOf(c) ?? c.process?.id) === id);
 }
-function summary2(all8) {
+function summary3(all8) {
   const count = (s2) => all8.filter((p3) => p3.status === s2).length;
   const parts3 = [
     [count("running"), "running"],
@@ -31387,6 +33168,8 @@ function preview2(p3, call, now) {
       },
       "facts"
     ),
+    // The chart once its rules are being written or drive it; a plain count of lines says nothing the output does not.
+    ...p3.chart && p3.chart.state !== "fallback" ? [/* @__PURE__ */ jsx("section", { head: "Chart", children: chartNode(p3.chart) }, "chart")] : [],
     /* @__PURE__ */ jsx("section", { head: "Output", children: outputNodes(p3) }, "output")
   ];
 }
@@ -31553,15 +33336,15 @@ function openChanges(app2, focus) {
     }
   };
   function sheetNode() {
-    const list7 = files();
-    if (!list7.some((f2) => f2.path === selected)) {
-      selected = list7[0]?.path;
+    const list8 = files();
+    if (!list8.some((f2) => f2.path === selected)) {
+      selected = list8[0]?.path;
     }
     const f = current();
     load2(f);
     const diff2 = f ? diffs.get(f.path) : void 0;
-    const added = list7.reduce((n, x) => n + x.additions, 0);
-    const removed = list7.reduce((n, x) => n + x.deletions, 0);
+    const added = list8.reduce((n, x) => n + x.additions, 0);
+    const removed = list8.reduce((n, x) => n + x.deletions, 0);
     return /* @__PURE__ */ jsx(
       "picker",
       {
@@ -31573,7 +33356,7 @@ function openChanges(app2, focus) {
         columns: [{ format: "dim", head: "Changes", id: "changes", priority: 2 }],
         empty: failed ? "This folder is not in a git repository." : state ? "Nothing changed since the last commit." : "Reading git\u2026",
         icon: "diff",
-        items: list7.map(item2),
+        items: list8.map(item2),
         noun: "files",
         onAction: {
           close: () => app2.close(overlay),
@@ -31584,7 +33367,7 @@ function openChanges(app2, focus) {
           selected = ev.item;
           app2.changed();
         },
-        order: list7.map((x) => x.path),
+        order: list8.map((x) => x.path),
         preview: "below",
         selected,
         size: "lg",
@@ -31596,7 +33379,7 @@ function openChanges(app2, focus) {
           { s: "error", t: `\u2212${removed}` }
         ],
         title: "Changes",
-        total: list7.length,
+        total: list8.length,
         children: f ? diffView(f, diff2) : null
       },
       KEY3
@@ -31976,11 +33759,11 @@ function batchQuery(refs) {
   return { query: `query(${decls.join(", ")}) { ${parts3.join("\n")} }`, variables };
 }
 var obj = (v) => v && typeof v === "object" && !Array.isArray(v) ? v : void 0;
-var str7 = (v) => typeof v === "string" ? v : "";
-var num3 = (v) => typeof v === "number" ? v : 0;
+var str8 = (v) => typeof v === "string" ? v : "";
+var num4 = (v) => typeof v === "number" ? v : 0;
 var nodes = (v) => {
-  const list7 = obj(v)?.nodes;
-  return Array.isArray(list7) ? list7.map(obj).filter((x) => Boolean(x)) : [];
+  const list8 = obj(v)?.nodes;
+  return Array.isArray(list8) ? list8.map(obj).filter((x) => Boolean(x)) : [];
 };
 function checkStatus(status, conclusion) {
   if (status && status !== "COMPLETED") {
@@ -32010,20 +33793,20 @@ function checkStatus(status, conclusion) {
 function parseCheck(n) {
   if (n.__typename === "StatusContext") {
     return {
-      description: str7(n.description) || void 0,
-      name: str7(n.context),
-      startedAt: str7(n.createdAt) || void 0,
-      status: checkStatus("COMPLETED", str7(n.state)),
-      url: str7(n.targetUrl) || void 0
+      description: str8(n.description) || void 0,
+      name: str8(n.context),
+      startedAt: str8(n.createdAt) || void 0,
+      status: checkStatus("COMPLETED", str8(n.state)),
+      url: str8(n.targetUrl) || void 0
     };
   }
-  const workflow = str7(obj(obj(obj(n.checkSuite)?.workflowRun)?.workflow)?.name);
+  const workflow = str8(obj(obj(obj(n.checkSuite)?.workflowRun)?.workflow)?.name);
   return {
-    completedAt: str7(n.completedAt) || void 0,
-    name: str7(n.name),
-    startedAt: str7(n.startedAt) || void 0,
-    status: checkStatus(str7(n.status), str7(n.conclusion)),
-    url: str7(n.detailsUrl) || void 0,
+    completedAt: str8(n.completedAt) || void 0,
+    name: str8(n.name),
+    startedAt: str8(n.startedAt) || void 0,
+    status: checkStatus(str8(n.status), str8(n.conclusion)),
+    url: str8(n.detailsUrl) || void 0,
     workflow: workflow || void 0
   };
 }
@@ -32037,12 +33820,12 @@ function dedupeChecks(checks2) {
       newest.set(key2, c);
     }
   }
-  const list7 = [...newest.values()];
+  const list8 = [...newest.values()];
   const workflows = /* @__PURE__ */ new Map();
-  for (const c of list7) {
+  for (const c of list8) {
     workflows.set(c.name, (workflows.get(c.name) ?? /* @__PURE__ */ new Set()).add(c.workflow ?? ""));
   }
-  return list7.map((c) => (workflows.get(c.name)?.size ?? 0) > 1 && c.workflow ? { ...c, name: `${c.workflow} / ${c.name}` } : c);
+  return list8.map((c) => (workflows.get(c.name)?.size ?? 0) > 1 && c.workflow ? { ...c, name: `${c.workflow} / ${c.name}` } : c);
 }
 function checksState(checks2) {
   if (!checks2.length) {
@@ -32082,15 +33865,15 @@ function parsePullRequest(ref, repo) {
   const reviews = /* @__PURE__ */ new Map();
   for (const n of nodes(p3.reviewRequests)) {
     const who = obj(n.requestedReviewer);
-    const login = str7(who?.login) || str7(who?.name);
+    const login = str8(who?.login) || str8(who?.name);
     if (login) {
       reviews.set(login, "PENDING");
     }
   }
   for (const n of nodes(p3.latestReviews)) {
-    const login = str7(obj(n.author)?.login);
+    const login = str8(obj(n.author)?.login);
     if (login && !reviews.has(login)) {
-      reviews.set(login, str7(n.state));
+      reviews.set(login, str8(n.state));
     }
   }
   const rollup = obj(obj(obj(nodes(p3.commits)[0]?.commit)?.statusCheckRollup)?.contexts);
@@ -32102,33 +33885,33 @@ function parsePullRequest(ref, repo) {
   const behind = obj(obj(p3.baseRef)?.compare)?.behindBy;
   return {
     ...ref,
-    additions: num3(p3.additions),
-    author: str7(obj(p3.author)?.login) || "ghost",
-    autoMerge: str7(obj(p3.autoMergeRequest)?.mergeMethod) || null,
-    base: str7(p3.baseRefName),
+    additions: num4(p3.additions),
+    author: str8(obj(p3.author)?.login) || "ghost",
+    autoMerge: str8(obj(p3.autoMergeRequest)?.mergeMethod) || null,
+    base: str8(p3.baseRefName),
     behindBy: typeof behind === "number" ? behind : null,
-    body: str7(p3.body),
+    body: str8(p3.body),
     canUpdate: p3.viewerCanUpdate === true,
-    changedFiles: num3(p3.changedFiles),
+    changedFiles: num4(p3.changedFiles),
     checks: dedupeChecks(nodes(rollup).map(parseCheck)),
-    closedAt: str7(p3.closedAt) || null,
-    createdAt: str7(p3.createdAt),
-    deletions: num3(p3.deletions),
+    closedAt: str8(p3.closedAt) || null,
+    createdAt: str8(p3.createdAt),
+    deletions: num4(p3.deletions),
     draft: p3.isDraft === true,
-    head: str7(p3.headRefName),
-    headOid: str7(p3.headRefOid),
-    id: str7(p3.id),
-    labels: nodes(p3.labels).map((n) => str7(n.name)),
+    head: str8(p3.headRefName),
+    headOid: str8(p3.headRefOid),
+    id: str8(p3.id),
+    labels: nodes(p3.labels).map((n) => str8(n.name)),
     mergeMethods: methods,
-    mergeState: str7(p3.mergeStateStatus),
-    mergeable: MERGEABLE[str7(p3.mergeable)] ?? "unknown",
-    mergedAt: str7(p3.mergedAt) || null,
-    reviewDecision: str7(p3.reviewDecision) || null,
+    mergeState: str8(p3.mergeStateStatus),
+    mergeable: MERGEABLE[str8(p3.mergeable)] ?? "unknown",
+    mergedAt: str8(p3.mergedAt) || null,
+    reviewDecision: str8(p3.reviewDecision) || null,
     reviewers: [...reviews].map(([login, state]) => ({ login, state })),
-    state: STATE[str7(p3.state)] ?? "open",
-    title: str7(p3.title),
-    updatedAt: str7(p3.updatedAt),
-    url: str7(p3.url) || ref.url
+    state: STATE[str8(p3.state)] ?? "open",
+    title: str8(p3.title),
+    updatedAt: str8(p3.updatedAt),
+    url: str8(p3.url) || ref.url
   };
 }
 var ACTIVITY_QUERY = `query($o: String!, $r: String!, $n: Int!) {
@@ -32144,24 +33927,24 @@ function parseActivity(data) {
   if (!p3) {
     return [];
   }
-  const who = (n) => str7(obj(n.author)?.login) || "ghost";
+  const who = (n) => str8(obj(n.author)?.login) || "ghost";
   const items = [
-    ...nodes(p3.comments).map((n) => ({ at: str7(n.createdAt), author: who(n), body: str7(n.body), kind: "comment", url: str7(n.url) })),
-    ...nodes(p3.reviews).filter((n) => str7(n.body).trim() || str7(n.state) !== "COMMENTED").map((n) => ({ at: str7(n.submittedAt), author: who(n), body: str7(n.body), kind: "review", state: str7(n.state), url: str7(n.url) })),
+    ...nodes(p3.comments).map((n) => ({ at: str8(n.createdAt), author: who(n), body: str8(n.body), kind: "comment", url: str8(n.url) })),
+    ...nodes(p3.reviews).filter((n) => str8(n.body).trim() || str8(n.state) !== "COMMENTED").map((n) => ({ at: str8(n.submittedAt), author: who(n), body: str8(n.body), kind: "review", state: str8(n.state), url: str8(n.url) })),
     ...nodes(p3.reviewThreads).flatMap((t2) => {
       const [first, ...rest] = nodes(t2.comments);
       return first ? [
         {
-          at: str7(first.createdAt),
+          at: str8(first.createdAt),
           author: who(first),
-          body: str7(first.body),
+          body: str8(first.body),
           kind: "thread",
           line: typeof t2.line === "number" ? t2.line : null,
           outdated: t2.isOutdated === true,
-          path: str7(t2.path),
-          replies: rest.map((n) => ({ at: str7(n.createdAt), author: who(n), body: str7(n.body) })),
+          path: str8(t2.path),
+          replies: rest.map((n) => ({ at: str8(n.createdAt), author: who(n), body: str8(n.body) })),
           resolved: t2.isResolved === true,
-          url: str7(first.url)
+          url: str8(first.url)
         }
       ] : [];
     }),
@@ -32169,11 +33952,11 @@ function parseActivity(data) {
       const c = obj(n.commit) ?? {};
       const a2 = obj(c.author);
       return {
-        at: str7(c.committedDate),
-        author: str7(obj(a2?.user)?.login) || str7(a2?.name) || "ghost",
-        body: str7(c.messageHeadline),
+        at: str8(c.committedDate),
+        author: str8(obj(a2?.user)?.login) || str8(a2?.name) || "ghost",
+        body: str8(c.messageHeadline),
         kind: "commit",
-        url: str7(c.url)
+        url: str8(c.url)
       };
     })
   ];
@@ -32181,12 +33964,12 @@ function parseActivity(data) {
 }
 function parseFiles(rows) {
   return (Array.isArray(rows) ? rows : []).map(obj).filter((r) => Boolean(r)).map((r) => ({
-    additions: num3(r.additions),
-    deletions: num3(r.deletions),
-    patch: str7(r.patch) || void 0,
-    path: str7(r.filename),
-    previous: str7(r.previous_filename) || void 0,
-    status: str7(r.status)
+    additions: num4(r.additions),
+    deletions: num4(r.deletions),
+    patch: str8(r.patch) || void 0,
+    path: str8(r.filename),
+    previous: str8(r.previous_filename) || void 0,
+    status: str8(r.status)
   }));
 }
 function failedRuns(checks2) {
@@ -33432,15 +35215,15 @@ function collectText(node3, info) {
     start = end + 1;
   }
   let index2 = -1;
-  let join11;
+  let join12;
   while (++index2 < lines.length) {
     if (lines[index2].charCodeAt(lines[index2].length - 1) === 8203 || index2 < lines.length - 1 && lines[index2 + 1].charCodeAt(0) === 8203) {
       result.push(lines[index2]);
-      join11 = void 0;
+      join12 = void 0;
     } else if (lines[index2]) {
-      if (typeof join11 === "number") result.push(join11);
+      if (typeof join12 === "number") result.push(join12);
       result.push(lines[index2]);
-      join11 = 0;
+      join12 = 0;
     } else if (index2 === 0 || index2 === lines.length - 1) {
       result.push(0);
     }
@@ -33594,23 +35377,23 @@ function listItemsSpread(children3) {
 
 // node_modules/hast-util-to-mdast/lib/handlers/dl.js
 function dl(state, node3) {
-  const clean2 = [];
+  const clean3 = [];
   const groups = [];
   let index2 = -1;
   while (++index2 < node3.children.length) {
     const child = node3.children[index2];
     if (child.type === "element" && child.tagName === "div") {
-      clean2.push(...child.children);
+      clean3.push(...child.children);
     } else {
-      clean2.push(child);
+      clean3.push(child);
     }
   }
   let group = { definitions: [], titles: [] };
   index2 = -1;
-  while (++index2 < clean2.length) {
-    const child = clean2[index2];
+  while (++index2 < clean3.length) {
+    const child = clean3[index2];
     if (child.type === "element" && child.tagName === "dt") {
-      const previous3 = clean2[index2 - 1];
+      const previous3 = clean3[index2 - 1];
       if (previous3 && previous3.type === "element" && previous3.tagName === "dd") {
         groups.push(group);
         group = { definitions: [], titles: [] };
@@ -33766,11 +35549,11 @@ function findSelectedOptions(node3, explicitProperties) {
       selectedOptions.push(option);
     }
   }
-  const list7 = selectedOptions.length > 0 ? selectedOptions : options;
-  const max = Math.min(list7.length, size);
+  const list8 = selectedOptions.length > 0 ? selectedOptions : options;
+  const max = Math.min(list8.length, size);
   index2 = -1;
   while (++index2 < max) {
-    const option = list7[index2];
+    const option = list8[index2];
     const properties3 = option.properties || {};
     const content5 = toText(option);
     const label = content5 || String(properties3.label || "");
@@ -33832,8 +35615,8 @@ function input(state, node3) {
     // `list` is not supported on these types:
     properties2.type !== "button" && properties2.type !== "file" && properties2.type !== "password" && properties2.type !== "reset" && properties2.type !== "submit" && properties2.list
   ) {
-    const list7 = String(properties2.list);
-    const datalist = state.elementById.get(list7);
+    const list8 = String(properties2.list);
+    const datalist = state.elementById.get(list8);
     if (datalist && datalist.tagName === "datalist") {
       values = findSelectedOptions(datalist, properties2);
     }
@@ -33882,7 +35665,7 @@ function hasProperty(node3, name) {
 }
 
 // node_modules/hast-util-is-body-ok-link/lib/index.js
-var list = /* @__PURE__ */ new Set(["pingback", "prefetch", "stylesheet"]);
+var list2 = /* @__PURE__ */ new Set(["pingback", "prefetch", "stylesheet"]);
 function isBodyOkLink(node3) {
   if (node3.type !== "element" || node3.tagName !== "link") {
     return false;
@@ -33896,7 +35679,7 @@ function isBodyOkLink(node3) {
     return false;
   }
   while (++index2 < value.length) {
-    if (!list.has(String(value[index2]))) {
+    if (!list2.has(String(value[index2]))) {
       return false;
     }
   }
@@ -34002,7 +35785,7 @@ function extractLeadingCheckbox(node3) {
 }
 
 // node_modules/hast-util-to-mdast/lib/handlers/list.js
-function list2(state, node3) {
+function list3(state, node3) {
   const ordered = node3.tagName === "ol";
   const children3 = state.toSpecificContent(state.all(node3), create2);
   let start = null;
@@ -34578,7 +36361,7 @@ var handlers = {
   blockquote,
   br,
   code: inlineCode,
-  dir: list2,
+  dir: list3,
   dl,
   dt: li,
   dd: li,
@@ -34600,7 +36383,7 @@ var handlers = {
   li,
   listing: code,
   mark: em,
-  ol: list2,
+  ol: list3,
   p: p2,
   plaintext: code,
   pre: code,
@@ -34618,7 +36401,7 @@ var handlers = {
   tr: tableRow,
   tt: inlineCode,
   u: em,
-  ul: list2,
+  ul: list3,
   var: inlineCode,
   video: media,
   wbr,
@@ -34812,10 +36595,10 @@ function escapeStringRegexp(string3) {
 }
 
 // node_modules/mdast-util-find-and-replace/lib/index.js
-function findAndReplace(tree, list7, options) {
+function findAndReplace(tree, list8, options) {
   const settings = options || {};
   const ignored = convert(settings.ignore || []);
-  const pairs = toPairs(list7);
+  const pairs = toPairs(list8);
   let pairIndex = -1;
   while (++pairIndex < pairs.length) {
     visitParents(tree, "text", visitor);
@@ -34904,10 +36687,10 @@ function toPairs(tupleOrList) {
     throw new TypeError("Expected find and replace tuple or list of tuples");
   }
   const result = [];
-  const list7 = !tupleOrList[0] || Array.isArray(tupleOrList[0]) ? tupleOrList : [tupleOrList];
+  const list8 = !tupleOrList[0] || Array.isArray(tupleOrList[0]) ? tupleOrList : [tupleOrList];
   let index2 = -1;
-  while (++index2 < list7.length) {
-    const tuple = list7[index2];
+  while (++index2 < list8.length) {
+    const tuple = list8[index2];
     result.push([toExpression(tuple[0]), toFunction(tuple[1])]);
   }
   return result;
@@ -35477,11 +37260,11 @@ function configure(base3, extension2) {
         }
         /* c8 ignore next 4 */
         case "unsafe": {
-          list3(base3[key2], extension2[key2]);
+          list4(base3[key2], extension2[key2]);
           break;
         }
         case "join": {
-          list3(base3[key2], extension2[key2]);
+          list4(base3[key2], extension2[key2]);
           break;
         }
         case "handlers": {
@@ -35496,7 +37279,7 @@ function configure(base3, extension2) {
   }
   return base3;
 }
-function list3(left, right) {
+function list4(left, right) {
   if (right) {
     left.push(...right);
   }
@@ -35528,16 +37311,16 @@ function map2(line, _, blank) {
 function patternInScope(stack, pattern) {
   return listInScope(stack, pattern.inConstruct, true) && !listInScope(stack, pattern.notInConstruct, false);
 }
-function listInScope(stack, list7, none) {
-  if (typeof list7 === "string") {
-    list7 = [list7];
+function listInScope(stack, list8, none) {
+  if (typeof list8 === "string") {
+    list8 = [list8];
   }
-  if (!list7 || list7.length === 0) {
+  if (!list8 || list8.length === 0) {
     return none;
   }
   let index2 = -1;
-  while (++index2 < list7.length) {
-    if (stack.includes(list7[index2])) {
+  while (++index2 < list8.length) {
+    if (stack.includes(list8[index2])) {
       return true;
     }
   }
@@ -36142,7 +37925,7 @@ function checkRule(state) {
 }
 
 // node_modules/mdast-util-to-markdown/lib/handle/list.js
-function list4(node3, parent, state, info) {
+function list5(node3, parent, state, info) {
   const exit3 = state.enter("list");
   const bulletCurrent = state.bulletCurrent;
   let bullet = node3.ordered ? checkBulletOrdered(state) : checkBullet(state);
@@ -36318,7 +38101,7 @@ var handle2 = {
   inlineCode: inlineCode2,
   link,
   linkReference,
-  list: list4,
+  list: list5,
   listItem,
   paragraph,
   root: root2,
@@ -38770,7 +40553,7 @@ function association(node3) {
 }
 
 // node_modules/mdast-util-to-markdown/lib/util/compile-pattern.js
-function compilePattern(pattern) {
+function compilePattern2(pattern) {
   if (!pattern._compiled) {
     const before = (pattern.atBreak ? "[\\r\\n][\\t ]*" : "") + (pattern.before ? "(?:" + pattern.before + ")" : "");
     pattern._compiled = new RegExp(
@@ -38981,8 +40764,8 @@ function pair(runs3, wrong) {
         } else {
           const involved = [.../* @__PURE__ */ new Set([...opening, ...closing])];
           for (const token of involved) {
-            const list7 = wrong.get(token);
-            if (list7) list7.push(...involved);
+            const list8 = wrong.get(token);
+            if (list8) list8.push(...involved);
           }
         }
         opener.end -= size;
@@ -39390,7 +41173,7 @@ function toMarkdown(tree, options) {
     containerPhrasing: containerPhrasingBound,
     containerFlow: containerFlowBound,
     createTracker: track,
-    compilePattern,
+    compilePattern: compilePattern2,
     enter,
     // @ts-expect-error: GFM / frontmatter are typed in `mdast` but not defined
     // here.
@@ -41061,11 +42844,11 @@ function isChild(value) {
     const value2 = record3[key2];
     if (value2 && typeof value2 === "object") {
       if (!Array.isArray(value2)) return true;
-      const list7 = (
+      const list8 = (
         /** @type {ReadonlyArray<unknown>} */
         value2
       );
-      for (const item3 of list7) {
+      for (const item3 of list8) {
         if (typeof item3 !== "number" && typeof item3 !== "string") {
           return true;
         }
@@ -49635,11 +51418,11 @@ function unknown2(node_, state) {
   if (state.options.passThrough && state.options.passThrough.includes(node3.type)) {
     stitch(node3, state);
   } else {
-    let extra = "";
+    let extra2 = "";
     if (knownMdxNames.has(node3.type)) {
-      extra = ". It looks like you are using MDX nodes with `hast-util-raw` (or `rehype-raw`). If you use this because you are using remark or rehype plugins that inject `'html'` nodes, then please raise an issue with that plugin, as its a bad and slow idea. If you use this because you are using markdown syntax, then you have to configure this utility (or plugin) to pass through these nodes (see `passThrough` in docs), but you can also migrate to use the MDX syntax";
+      extra2 = ". It looks like you are using MDX nodes with `hast-util-raw` (or `rehype-raw`). If you use this because you are using remark or rehype plugins that inject `'html'` nodes, then please raise an issue with that plugin, as its a bad and slow idea. If you use this because you are using markdown syntax, then you have to configure this utility (or plugin) to pass through these nodes (see `passThrough` in docs), but you can also migrate to use the MDX syntax";
     }
-    throw new Error("Cannot compile `" + node3.type + "` node" + extra);
+    throw new Error("Cannot compile `" + node3.type + "` node" + extra2);
   }
 }
 function resetTokenizer(state, point5) {
@@ -50256,8 +52039,8 @@ function rehypeSanitize(options) {
 }
 
 // node_modules/micromark-util-chunked/index.js
-function splice(list7, start, remove, items) {
-  const end = list7.length;
+function splice(list8, start, remove, items) {
+  const end = list8.length;
   let chunkStart = 0;
   let parameters;
   if (start < 0) {
@@ -50269,22 +52052,22 @@ function splice(list7, start, remove, items) {
   if (items.length < 1e4) {
     parameters = Array.from(items);
     parameters.unshift(start, remove);
-    list7.splice(...parameters);
+    list8.splice(...parameters);
   } else {
-    if (remove) list7.splice(start, remove);
+    if (remove) list8.splice(start, remove);
     while (chunkStart < items.length) {
       parameters = items.slice(chunkStart, chunkStart + 1e4);
       parameters.unshift(start, 0);
-      list7.splice(...parameters);
+      list8.splice(...parameters);
       chunkStart += 1e4;
       start += 1e4;
     }
   }
 }
-function push(list7, items) {
-  if (list7.length > 0) {
-    splice(list7, list7.length, 0, items);
-    return list7;
+function push(list8, items) {
+  if (list8.length > 0) {
+    splice(list8, list8.length, 0, items);
+    return list8;
   }
   return items;
 }
@@ -50319,12 +52102,12 @@ function syntaxExtension(all8, extension2) {
     }
   }
 }
-function constructs(existing, list7) {
+function constructs(existing, list8) {
   let index2 = -1;
   const before = [];
-  while (++index2 < list7.length) {
+  while (++index2 < list8.length) {
     ;
-    (list7[index2].add === "after" ? existing : before).push(list7[index2]);
+    (list8[index2].add === "after" ? existing : before).push(list8[index2]);
   }
   splice(existing, 0, 0, before);
 }
@@ -51696,13 +53479,13 @@ var SpliceBuffer = class {
     }
   }
 };
-function chunkedPush(list7, right) {
+function chunkedPush(list8, right) {
   let chunkStart = 0;
   if (right.length < 1e4) {
-    list7.push(...right);
+    list8.push(...right);
   } else {
     while (chunkStart < right.length) {
-      list7.push(...right.slice(chunkStart, chunkStart + 1e4));
+      list8.push(...right.slice(chunkStart, chunkStart + 1e4));
       chunkStart += 1e4;
     }
   }
@@ -53373,7 +55156,7 @@ function tokenizeThematicBreak(effects, ok3, nok) {
 }
 
 // node_modules/micromark-core-commonmark/lib/list.js
-var list5 = {
+var list6 = {
   continuation: {
     tokenize: tokenizeListContinuation
   },
@@ -53479,7 +55262,7 @@ function tokenizeListContinuation(effects, ok3, nok) {
   function notInCurrentItem(code7) {
     self2.containerState._closeFlow = true;
     self2.interrupt = void 0;
-    return factorySpace(effects, effects.attempt(list5, ok3, nok), "linePrefix", self2.parser.constructs.disable.null.includes("codeIndented") ? void 0 : 4)(code7);
+    return factorySpace(effects, effects.attempt(list6, ok3, nok), "linePrefix", self2.parser.constructs.disable.null.includes("codeIndented") ? void 0 : 4)(code7);
   }
 }
 function tokenizeIndent(effects, ok3, nok) {
@@ -54991,11 +56774,11 @@ function initializeFactory(field) {
       if (code7 === null) {
         return true;
       }
-      const list7 = constructs2[code7];
+      const list8 = constructs2[code7];
       let index2 = -1;
-      if (list7) {
-        while (++index2 < list7.length) {
-          const item3 = list7[index2];
+      if (list8) {
+        while (++index2 < list8.length) {
+          const item3 = list8[index2];
           if (!item3.previous || item3.previous.call(self2, self2.previous)) {
             return true;
           }
@@ -55107,19 +56890,19 @@ __export(constructs_exports, {
   text: () => text8
 });
 var document2 = {
-  [42]: list5,
-  [43]: list5,
-  [45]: list5,
-  [48]: list5,
-  [49]: list5,
-  [50]: list5,
-  [51]: list5,
-  [52]: list5,
-  [53]: list5,
-  [54]: list5,
-  [55]: list5,
-  [56]: list5,
-  [57]: list5,
+  [42]: list6,
+  [43]: list6,
+  [45]: list6,
+  [48]: list6,
+  [49]: list6,
+  [50]: list6,
+  [51]: list6,
+  [52]: list6,
+  [53]: list6,
+  [54]: list6,
+  [55]: list6,
+  [56]: list6,
+  [57]: list6,
   [62]: blockQuote
 };
 var contentInitial = {
@@ -55334,22 +57117,22 @@ function createTokenizer(parser, initialize, from) {
         function start(code7) {
           const left = code7 !== null && map4[code7];
           const all8 = code7 !== null && map4.null;
-          const list7 = [
+          const list8 = [
             // To do: add more extension tests.
             /* c8 ignore next 2 */
             ...Array.isArray(left) ? left : left ? [left] : [],
             ...Array.isArray(all8) ? all8 : all8 ? [all8] : []
           ];
-          return handleListOfConstructs(list7)(code7);
+          return handleListOfConstructs(list8)(code7);
         }
       }
-      function handleListOfConstructs(list7) {
-        listOfConstructs = list7;
+      function handleListOfConstructs(list8) {
+        listOfConstructs = list8;
         constructIndex = 0;
-        if (list7.length === 0) {
+        if (list8.length === 0) {
           return bogusState;
         }
-        return handleConstruct(list7[constructIndex]);
+        return handleConstruct(list8[constructIndex]);
       }
       function handleConstruct(construct) {
         return start;
@@ -55680,8 +57463,8 @@ function compiler(options) {
       link: opener(link3),
       listItem: opener(listItem3),
       listItemValue: onenterlistitemvalue,
-      listOrdered: opener(list7, onenterlistordered),
-      listUnordered: opener(list7),
+      listOrdered: opener(list8, onenterlistordered),
+      listUnordered: opener(list8),
       paragraph: opener(paragraph3),
       reference: onenterreference,
       referenceString: buffer,
@@ -56283,7 +58066,7 @@ function compiler(options) {
       position: void 0
     };
   }
-  function list7(token) {
+  function list8(token) {
     return {
       type: "list",
       ordered: token.type === "listOrdered",
@@ -56721,7 +58504,7 @@ function listItemLoose(node3) {
 }
 
 // node_modules/mdast-util-to-hast/lib/handlers/list.js
-function list6(state, node3) {
+function list7(state, node3) {
   const properties2 = {};
   const results = state.all(node3);
   let index2 = -1;
@@ -56935,7 +58718,7 @@ var handlers2 = {
   linkReference: linkReference2,
   link: link2,
   listItem: listItem2,
-  list: list6,
+  list: list7,
   paragraph: paragraph2,
   // @ts-expect-error: root is different, but hard to type.
   root: root6,
@@ -58672,12 +60455,12 @@ function parts2(nodes2, links) {
   for (const n of nodes2) {
     if (n.type === "element" && n.tagName === "details") {
       flush();
-      const summary3 = n.children.find((c) => c.type === "element" && c.tagName === "summary");
+      const summary4 = n.children.find((c) => c.type === "element" && c.tagName === "summary");
       out.push({
         kind: "details",
         open: n.properties.open !== void 0 && n.properties.open !== false,
-        parts: parts2(n.children.filter((c) => c !== summary3), links),
-        summary: (summary3 ? toText(summary3) : "").replace(/\s+/g, " ").trim() || "Details"
+        parts: parts2(n.children.filter((c) => c !== summary4), links),
+        summary: (summary4 ? toText(summary4) : "").replace(/\s+/g, " ").trim() || "Details"
       });
     } else if (n.type === "element" && holdsDetails(n)) {
       flush();
@@ -59110,7 +60893,7 @@ var PrView = class {
     if (density === "narrow") {
       return cards;
     }
-    const list7 = /* @__PURE__ */ jsxs("col", { gap: "none", role: "hermes.pr.filelist", children: [
+    const list8 = /* @__PURE__ */ jsxs("col", { gap: "none", role: "hermes.pr.filelist", children: [
       e.files.map((f, i) => {
         const slash = f.path.lastIndexOf("/");
         return /* @__PURE__ */ jsxs("row", { align: "center", gap: "sm", onClick: () => this.#host.reveal?.(`${id}.diffs.f${i}`), role: "hermes.pr.fileitem", title: f.path, children: [
@@ -59132,7 +60915,7 @@ var PrView = class {
     ] }, "list");
     return [
       /* @__PURE__ */ jsxs("row", { align: "start", gap: "md", role: "hermes.pr.files", children: [
-        list7,
+        list8,
         /* @__PURE__ */ jsx("col", { gap: "sm", grow: 1, min: { w: 0 }, children: cards }, "diffs")
       ] }, "files")
     ];
@@ -59706,10 +61489,10 @@ function openModelPicker(app2) {
     app2.changed();
     try {
       const r = await app2.gw.request("model.options", app2.sid ? { session_id: app2.sid } : {});
-      const list7 = r.providers ?? [];
-      rememberCaps(list7);
-      const names = providerDisplayNames(list7);
-      providers = list7.map((provider, i) => ({ name: names[i] ?? provider.name, provider }));
+      const list8 = r.providers ?? [];
+      rememberCaps(list8);
+      const names = providerDisplayNames(list8);
+      providers = list8.map((provider, i) => ({ name: names[i] ?? provider.name, provider }));
       rows = providers.flatMap(
         ({ provider, name }) => (provider.models ?? []).map((model) => ({
           id: `${provider.slug}	${model}`,
@@ -59718,7 +61501,7 @@ function openModelPicker(app2) {
           providerName: name
         }))
       );
-      const currentProvider = list7.find((p3) => p3.is_current)?.slug ?? r.provider ?? "";
+      const currentProvider = list8.find((p3) => p3.is_current)?.slug ?? r.provider ?? "";
       current = rows.find((row2) => row2.model === r.model && row2.provider.slug === currentProvider)?.id ?? rows.find((row2) => row2.model === r.model)?.id ?? "";
       selected = current || rows[0]?.id;
       state = "ready";
@@ -60115,15 +61898,15 @@ function blockMarks(line, at, mark2) {
     body = quote2[1].length;
     mark2(at + body, at + line.length, "muted");
   }
-  const list7 = LIST.exec(line.slice(body));
-  if (list7) {
-    const start = body + list7[1].length;
-    mark2(at + start, at + start + list7[2].length, "accent");
-    if (list7[4]) {
-      const box = body + list7[0].length - list7[4].length;
+  const list8 = LIST.exec(line.slice(body));
+  if (list8) {
+    const start = body + list8[1].length;
+    mark2(at + start, at + start + list8[2].length, "accent");
+    if (list8[4]) {
+      const box = body + list8[0].length - list8[4].length;
       mark2(at + box, at + box + 3, "accent");
     }
-    body += list7[0].length;
+    body += list8[0].length;
   }
   inlineMarks(line, body, at, mark2);
 }
@@ -60343,9 +62126,9 @@ var Composer = class {
       return;
     }
     if (ev.from === ev.to && ev.text === "\n") {
-      const list7 = listNewline(this.text, ev.from);
-      if (list7) {
-        return this.#apply(list7);
+      const list8 = listNewline(this.text, ev.from);
+      if (list8) {
+        return this.#apply(list8);
       }
     }
     const typed = ev.from === ev.to && [...ev.text].length === 1 && ev.text !== "\n";
@@ -60393,9 +62176,9 @@ var Composer = class {
       }
       if (this.text.slice(0, this.cursor).endsWith("\\")) {
         const at = this.cursor - 1;
-        const list7 = listNewline(this.text.slice(0, at) + this.text.slice(this.cursor), at);
-        if (list7) {
-          return this.#apply({ ...list7, to: list7.to + 1 });
+        const list8 = listNewline(this.text.slice(0, at) + this.text.slice(this.cursor), at);
+        if (list8) {
+          return this.#apply({ ...list8, to: list8.to + 1 });
         }
         this.splice(at, this.cursor, "\n");
         return true;
@@ -60508,9 +62291,9 @@ var Composer = class {
   }
   /** A new line at the caret; in a list item, the next item's marker comes with it. */
   #newline() {
-    const list7 = this.anchor === void 0 ? listNewline(this.text, this.cursor) : void 0;
-    if (list7) {
-      return this.#apply(list7);
+    const list8 = this.anchor === void 0 ? listNewline(this.text, this.cursor) : void 0;
+    if (list8) {
+      return this.#apply(list8);
     }
     this.insert("\n");
     return true;
@@ -60707,7 +62490,7 @@ function unmaskEdit(secret, ev) {
 
 // src/overlays/prompts.tsx
 var RECOMMENDED = /\s*\(recommended\)\s*$/i;
-var str8 = (v) => typeof v === "string" ? v : "";
+var str9 = (v) => typeof v === "string" ? v : "";
 var isCtrlC = (k) => k.ctrl && k.name === "c";
 var TIMEOUT_NOTICES = {
   approval: "Approval timed out: the command was not run. Ask Hermes to try again when you are ready to answer.",
@@ -60852,8 +62635,8 @@ var APPROVALS = [
 ];
 function approvalOverlay(host, req) {
   const p3 = req.params;
-  const command = str8(p3.command);
-  const description = str8(p3.description);
+  const command = str9(p3.command);
+  const description = str9(p3.description);
   const smartDenied = p3.smart_denied === true;
   const offered = Array.isArray(p3.choices) ? p3.choices.filter((c) => typeof c === "string") : [];
   const allowed = new Set(
@@ -60939,8 +62722,8 @@ function questionsOf(raw2) {
       return [];
     }
     const choices = "choices" in q2 && Array.isArray(q2.choices) ? q2.choices.filter((c) => typeof c === "string") : [];
-    const question = str8(q2.question).trim();
-    return question ? [{ choices, multi: "multi_select" in q2 && q2.multi_select === true, qid: str8(q2.qid), question }] : [];
+    const question = str9(q2.question).trim();
+    return question ? [{ choices, multi: "multi_select" in q2 && q2.multi_select === true, qid: str9(q2.qid), question }] : [];
   });
 }
 function tabLabel(question) {
@@ -61177,7 +62960,7 @@ function clarifyOverlay(host, req) {
 function maskedOverlay(host, req) {
   const p3 = req.params;
   const key2 = `prompt:${req.id}`;
-  const site = str8(p3.site) || str8(p3.origin);
+  const site = str9(p3.site) || str9(p3.origin);
   const login = req.method === "vault.save_login";
   const code7 = req.method === "vault.code";
   const fields = login ? [
@@ -61185,8 +62968,8 @@ function maskedOverlay(host, req) {
     { id: "password", label: "Password", masked: true, value: new Composer() }
   ] : [{ id: "value", label: code7 ? "Type the code" : "Hidden while you type", masked: !code7, value: new Composer() }];
   let at = 0;
-  const title = req.method === "sudo" ? "Password for sudo" : req.method === "secret" ? str8(p3.prompt) || `Value for ${str8(p3.env_var) || "a secret"}` : req.method === "vault.unlock_prompt" ? `Master password for ${str8(p3.display_name) || str8(p3.backend) || "the password manager"}` : login ? `Save a login for ${site || "this site"}` : `Code for ${site || "this site"}`;
-  const note = req.method === "secret" ? str8(p3.env_var) : code7 ? [str8(p3.hint), "typed into the page only \xB7 never shown to the model"].filter(Boolean).join(" \xB7 ") : "";
+  const title = req.method === "sudo" ? "Password for sudo" : req.method === "secret" ? str9(p3.prompt) || `Value for ${str9(p3.env_var) || "a secret"}` : req.method === "vault.unlock_prompt" ? `Master password for ${str9(p3.display_name) || str9(p3.backend) || "the password manager"}` : login ? `Save a login for ${site || "this site"}` : `Code for ${site || "this site"}`;
+  const note = req.method === "secret" ? str9(p3.env_var) : code7 ? [str9(p3.hint), "typed into the page only \xB7 never shown to the model"].filter(Boolean).join(" \xB7 ") : "";
   const sending = { busy: false, error: "" };
   const finish = (cancel) => {
     const [first, second] = fields;
@@ -61205,7 +62988,7 @@ function maskedOverlay(host, req) {
     node: () => /* @__PURE__ */ jsx("overlay", { anchor: "bottom", modal: true, role: "omp.overlay.ask", size: "md", children: /* @__PURE__ */ jsxs("col", { gap: "md", children: [
       /* @__PURE__ */ jsx("md", { role: "omp.ask.question", text: title }, "question"),
       note ? /* @__PURE__ */ jsx("text", { spans: [{ s: req.method === "secret" ? "mono dim" : "muted", t: note }], wrap: "word" }, "note") : null,
-      str8(p3.command) ? /* @__PURE__ */ jsx("code", { lang: "bash", text: str8(p3.command) }, "command") : null,
+      str9(p3.command) ? /* @__PURE__ */ jsx("code", { lang: "bash", text: str9(p3.command) }, "command") : null,
       fields.map((f, i) => /* @__PURE__ */ jsx(
         "input",
         {
@@ -61509,8 +63292,8 @@ function openSessionPicker(app2) {
   };
   const view = (now) => {
     const rank0 = (x) => x.pinned ? 0 : tab2 === "all" && here(x) ? 1 : 2;
-    const list7 = query ? rows() : [...rows()].sort((a2, b) => rank0(a2) - rank0(b));
-    const ranked = rank(list7, query, (s2) => `${sessionLabel(s2)}
+    const list8 = query ? rows() : [...rows()].sort((a2, b) => rank0(a2) - rank0(b));
+    const ranked = rank(list8, query, (s2) => `${sessionLabel(s2)}
 ${s2.preview} ${s2.cwd} ${s2.branch} ${s2.id}`, { scattered: false });
     const hits = {};
     const order2 = [];
@@ -61519,7 +63302,7 @@ ${s2.preview} ${s2.cwd} ${s2.branch} ${s2.id}`, { scattered: false });
     } else {
       const groups = /* @__PURE__ */ new Map();
       const add = (label, id) => groups.set(label, [...groups.get(label) ?? [], id]);
-      for (const s2 of list7) {
+      for (const s2 of list8) {
         add(s2.pinned ? "Pinned" : tab2 === "all" && here(s2) && workspace ? `In ${basename3(workspace)}` : dayOf(s2.lastActive, now), s2.id);
       }
       for (const [label, ids] of groups) {
@@ -62139,8 +63922,8 @@ function handoff(content5) {
   const count = /\bThe (\d+) compacted message/.exec(body);
   const start = body.indexOf("\n## ");
   const end = body.indexOf(END);
-  const summary3 = start < 0 ? "" : body.slice(start, end > start ? end : void 0).replace(RECOVERY, "").replace(FOR_MODEL, "").replace(/\n{3,}/g, "\n\n").trim();
-  return { ...summary3 ? { summary: summary3 } : {}, ...count ? { messages: Number(count[1]) } : {} };
+  const summary4 = start < 0 ? "" : body.slice(start, end > start ? end : void 0).replace(RECOVERY, "").replace(FOR_MODEL, "").replace(/\n{3,}/g, "\n\n").trim();
+  return { ...summary4 ? { summary: summary4 } : {}, ...count ? { messages: Number(count[1]) } : {} };
 }
 function textOf(content5) {
   if (typeof content5 !== "string") {
@@ -62157,13 +63940,13 @@ function textOf(content5) {
   }
 }
 function lineTokens(text11) {
-  const num4 = (s2) => Number(s2.replace(/,/g, ""));
+  const num5 = (s2) => Number(s2.replace(/,/g, ""));
   const pair3 = /~([\d,]+)\s*→\s*~([\d,]+)\s*tok/.exec(text11);
   if (pair3) {
-    return { after: num4(pair3[2]), before: num4(pair3[1]) };
+    return { after: num5(pair3[2]), before: num5(pair3[1]) };
   }
   const one5 = /~([\d,]+)\s*tok/.exec(text11);
-  return one5 ? { before: num4(one5[1]) } : {};
+  return one5 ? { before: num5(one5[1]) } : {};
 }
 
 // src/hermes/rewind.ts
@@ -62225,9 +64008,9 @@ async function rewind(host, intent) {
   const text11 = retryText(result.target_message?.content);
   return text11 ? host.send(text11) : host.notice("Nothing to retry.");
 }
-function compressReport(summary3) {
-  const head2 = summary3?.headline ? `${summary3.noop ? "" : "\u2713 "}${summary3.headline}` : "\u2713 Transcript compressed.";
-  return [head2, ...[summary3?.token_line, summary3?.note].filter(Boolean).map((line) => `  ${line}`)].join("\n");
+function compressReport(summary4) {
+  const head2 = summary4?.headline ? `${summary4.noop ? "" : "\u2713 "}${summary4.headline}` : "\u2713 Transcript compressed.";
+  return [head2, ...[summary4?.token_line, summary4?.note].filter(Boolean).map((line) => `  ${line}`)].join("\n");
 }
 async function compress(host, arg) {
   if (!host.canonical) {
@@ -62259,12 +64042,12 @@ async function compress(host, arg) {
   if (result.status === "preview") {
     return host.notice(Array.isArray(result.lines) ? result.lines.join("\n") : "Nothing to preview.");
   }
-  const summary3 = result.summary;
-  const num4 = (v) => typeof v === "number" && v > 0 ? v : void 0;
-  const kept = result.status === "noop" || result.status === "aborted" || Boolean(summary3?.noop || summary3?.aborted || summary3?.refused_would_grow);
+  const summary4 = result.summary;
+  const num5 = (v) => typeof v === "number" && v > 0 ? v : void 0;
+  const kept = result.status === "noop" || result.status === "aborted" || Boolean(summary4?.noop || summary4?.aborted || summary4?.refused_would_grow);
   if (result.status !== "pending") {
-    const line = lineTokens(summary3?.token_line ?? "");
-    host.compressing(kept ? "none" : { after: num4(result.after_tokens) ?? line.after, before: num4(result.before_tokens) ?? line.before });
+    const line = lineTokens(summary4?.token_line ?? "");
+    host.compressing(kept ? "none" : { after: num5(result.after_tokens) ?? line.after, before: num5(result.before_tokens) ?? line.before });
   }
   if (result.status !== "noop") {
     await host.reload();
@@ -62272,8 +64055,8 @@ async function compress(host, arg) {
       return;
     }
   }
-  if (kept || summary3?.note || result.status === "pending") {
-    host.notice(compressReport(summary3));
+  if (kept || summary4?.note || result.status === "pending") {
+    host.notice(compressReport(summary4));
   }
 }
 async function branch(host, arg) {
@@ -62780,10 +64563,10 @@ function workNode(items, parent, live, now) {
   }
   const calls = shown.flatMap((i) => i.kind === "tool" ? [i.call] : []);
   const failed = calls.at(-1)?.status === "error";
-  const latest = shown.findLast((i) => i.kind === "tool" && i.call.status === "running") ?? shown.at(-1);
+  const latest2 = shown.findLast((i) => i.kind === "tool" && i.call.status === "running") ?? shown.at(-1);
   const head2 = live ? /* @__PURE__ */ jsxs("row", { align: "center", gap: "sm", children: [
-    /* @__PURE__ */ jsx("icon", { name: itemIcon(latest) }, "icon"),
-    liveText(liveLabel(latest, true)),
+    /* @__PURE__ */ jsx("icon", { name: itemIcon(latest2) }, "icon"),
+    liveText(liveLabel(latest2, true)),
     /* @__PURE__ */ jsx("icon", { name: "chev", role: "hermes.work.chev" }, "chev")
   ] }, "head") : /* @__PURE__ */ jsxs("row", { align: "center", gap: "sm", children: [
     /* @__PURE__ */ jsx("icon", { name: groupIcon(shown), tone: failed ? "error" : void 0 }, "icon"),
@@ -62890,8 +64673,8 @@ function userNode(e, cx) {
     e.text ? /* @__PURE__ */ jsx("md", { children: e.text }, "body") : null
   ] }, e.id);
 }
-function attachmentsRow(list7) {
-  return /* @__PURE__ */ jsx("row", { align: "start", gap: "sm", role: "omp.user.images", wrap: true, children: list7.map(
+function attachmentsRow(list8) {
+  return /* @__PURE__ */ jsx("row", { align: "start", gap: "sm", role: "omp.user.images", wrap: true, children: list8.map(
     (a2, i) => a2.source ? /* @__PURE__ */ jsx("image", { alt: a2.name, title: a2.name, ...a2.source }, `a${i}`) : /* @__PURE__ */ jsxs(
       "row",
       {
@@ -63383,14 +65166,14 @@ var FaultBudget = class {
 };
 
 // src/hud.ts
-var plain = (k) => !k.ctrl && !k.alt && !k.meta && !k.shift;
+var plain2 = (k) => !k.ctrl && !k.alt && !k.meta && !k.shift;
 function hudKey(k, cx) {
   const { focused, pills } = cx;
   if (!focused || !pills.includes(focused)) {
-    return k.name === "down" && plain(k) && cx.idle && pills.length ? { consumed: true, focused: pills[0] } : { consumed: false };
+    return k.name === "down" && plain2(k) && cx.idle && pills.length ? { consumed: true, focused: pills[0] } : { consumed: false };
   }
   const at = pills.indexOf(focused);
-  switch (plain(k) ? k.name : "") {
+  switch (plain2(k) ? k.name : "") {
     case "left":
       return { consumed: true, focused: pills[Math.max(0, at - 1)] };
     case "right":
@@ -63694,7 +65477,7 @@ function reconnectNode(r, now) {
   if (!r) {
     return null;
   }
-  const waiting2 = r.dueAt > now;
+  const waiting3 = r.dueAt > now;
   return /* @__PURE__ */ jsxs(
     "row",
     {
@@ -63705,8 +65488,8 @@ function reconnectNode(r, now) {
       children: [
         /* @__PURE__ */ jsx("spinner", { style: "dots", tone: "warning" }, "spin"),
         /* @__PURE__ */ jsx("text", { text: "Reconnecting to Hermes", wrap: "none" }, "text"),
-        /* @__PURE__ */ jsx("text", { spans: [{ s: "muted", t: ` \xB7 attempt ${r.attempt} \xB7 ${waiting2 ? "next try in" : "trying now\u2026"}` }], wrap: "none" }, "attempt"),
-        waiting2 ? /* @__PURE__ */ jsx("elapsed", { age: countdownAge(r, r.dueAt, now), format: "short" }, "countdown") : null
+        /* @__PURE__ */ jsx("text", { spans: [{ s: "muted", t: ` \xB7 attempt ${r.attempt} \xB7 ${waiting3 ? "next try in" : "trying now\u2026"}` }], wrap: "none" }, "attempt"),
+        waiting3 ? /* @__PURE__ */ jsx("elapsed", { age: countdownAge(r, r.dueAt, now), format: "short" }, "countdown") : null
       ]
     },
     "reconnect"
@@ -65969,8 +67752,8 @@ var PullRequests = class {
         byHost.set(e.ref.host, [...byHost.get(e.ref.host) ?? [], e]);
       }
     }
-    for (const [host, list7] of byHost) {
-      const { query, variables } = stackQuery(list7.slice(0, BATCH2).map((e) => e.ref));
+    for (const [host, list8] of byHost) {
+      const { query, variables } = stackQuery(list8.slice(0, BATCH2).map((e) => e.ref));
       let data;
       try {
         data = await this.#gh.graphql(host, query, variables);
@@ -65981,7 +67764,7 @@ var PullRequests = class {
         continue;
       }
       const asked = /* @__PURE__ */ new Set();
-      for (const [i, e] of list7.slice(0, BATCH2).entries()) {
+      for (const [i, e] of list8.slice(0, BATCH2).entries()) {
         const n = data[`p${i}`]?.pullRequest?.stack?.number;
         const key2 = `${host}/${e.ref.repository}#stack:${n}`;
         if (typeof n !== "number" || asked.has(key2)) {
@@ -66011,9 +67794,9 @@ var PullRequests = class {
       byHost.set(e.ref.host, [...byHost.get(e.ref.host) ?? [], e]);
     }
     let failed;
-    for (const [host, list7] of byHost) {
-      for (let i = 0; i < list7.length; i += BATCH2) {
-        const chunk = list7.slice(i, i + BATCH2);
+    for (const [host, list8] of byHost) {
+      for (let i = 0; i < list8.length; i += BATCH2) {
+        const chunk = list8.slice(i, i + BATCH2);
         const { query, variables } = batchQuery(chunk.map((e) => e.ref));
         try {
           const data = await this.#gh.graphql(host, query, variables);
@@ -66342,7 +68125,7 @@ function counted(text11) {
   const tokens2 = lineTokens(text11);
   return tokens2.before || tokens2.after ? { tokens: tokens2 } : {};
 }
-var TONES = { error: "error", success: "success", warn: "warning", warning: "warning" };
+var TONES2 = { error: "error", success: "success", warn: "warning", warning: "warning" };
 var Notices = class {
   #list = [];
   #seq = 0;
@@ -66354,7 +68137,7 @@ var Notices = class {
     }
     const key2 = p3.key || p3.id || `n${++this.#seq}`;
     const ttl = p3.kind === "ttl" && typeof p3.ttl_ms === "number" && p3.ttl_ms > 0 ? p3.ttl_ms : void 0;
-    const notice = { key: key2, text: text11, tone: TONES[p3.level ?? ""] ?? "info", ...ttl ? { expires: now + ttl } : {} };
+    const notice = { key: key2, text: text11, tone: TONES2[p3.level ?? ""] ?? "info", ...ttl ? { expires: now + ttl } : {} };
     this.#list = [...this.#list.filter((n) => n.key !== key2), notice];
     return notice;
   }
@@ -66383,12 +68166,166 @@ function isLoginNotice(p3) {
   return Boolean(p3.key?.startsWith("login:"));
 }
 
+// src/processes/widgets/author.ts
+import { spawn as spawn2 } from "node:child_process";
+import { join as join10 } from "node:path";
+var MAX_BRIEF_CHARS = 1500;
+var MAX_SAMPLE_LINE_CHARS = 300;
+var MAX_SAMPLE_BYTES = 12 * 1024;
+var MAX_SHAPE_REPEATS = 3;
+var REQUEST_TIMEOUT_MS2 = 12e4;
+var SYSTEM_PROMPT = `You design the live status widget of a coding agent's background process (benchmark, eval, CI, tests, build, training, server). From the command and samples of its output you write a spec once; plain code then runs its regexes on every new line and redraws the widget until the process ends. Nobody can fix it later: its rules MUST match the real lines.
+
+A widget charts a quantity that shows how the process is going: throughput, latency, loss, tests or trials passed, progress toward a total the process states. When the output has none, call \`respond\` with only \`{"skip":"<why>"}\`; no widget beats a meaningless one. Never chart activity: lines or matches seen, words like \`error\` inside file contents.
+
+Otherwise call \`respond\` with:
+- \`title\` (\u2264 48 chars): what is watched.
+- \`rules\` (1\u201312) \`{from, match, key?, text?, count?, scale?}\`:
+  - \`from\`: the sample source id carrying the data (\`out\`), \`*\` for all.
+  - \`match\`: a JavaScript regex on one line; no lookaround or backreferences. Copy the literal text around the data from the samples; allow varying digits (\`[\\d.]+\`) and widths (\`\\s+\`).
+  - Each named group \`(?P<name>\u2026)\` feeds field \`name\` (\`[a-z][a-z0-9_]*\`) with its number (\`1,234\`, \`4.5k\` parse). One rule can capture several fields of a line.
+  - \`key\`: the rule's group naming a series (model, shard, CI job); the rule's fields keep one series per key. Not a field itself.
+  - \`text\`: the rule's group kept as text (status word, test name).
+  - \`count\`: a field counting matching lines.
+  - \`scale\`: multiplies the rule's numbers.
+- \`blocks\` (1\u20134, most important first), each on a \`field\`:
+  - \`spark\`: numbers over time. \`label\`, \`key?\` (one key value, e.g. \`gpt-5\`), \`unit?\`, \`better?\` (\`higher\`|\`lower\`), \`target?\` + \`targetLabel?\` (goal line the command or output states), \`min?\`, \`max?\`.
+  - \`bars\`: one bar per key, reduced by \`agg\`. \`label\`, \`unit?\`, \`max?\`, \`better?\`.
+  - \`meter\`: \`agg\` out of a \`total\` (a value ref, or a number the process or its output states; never a guess), \`label\`, \`unit?\`.
+  - \`stat\`: \`items\`, 1\u20134 value refs with \`label\`.
+  - \`grid\`: a cell per key, coloured by latest text. \`label\`, \`tones\`: lowercase status substring \u2192 \`success\`|\`error\`|\`warning\`|\`pending\`|\`info\`|\`muted\`|\`neutral\`.
+  - \`text\`: the field's latest text.
+- \`headline?\`: the value ref to glance at. \`stage?\`: field whose latest text is the current step.
+
+Value ref: \`{field, agg, label?, key?, unit?, digits?, better?}\`; \`key\` is one key value, \`better\` adds a trend arrow. \`agg\` over numbers: \`last\` \`first\` \`min\` \`max\` \`mean\` \`sum\` \`delta\` \`change\` (%); over matches: \`count\`, \`rate\` (/s, last minute).
+
+Chart what a watcher wants: throughput or latency against the goal, progress toward a known total, per-model results, failures. Few accurate blocks; never invent lines the samples lack. Omit optional properties you do not need.
+
+Examples:
+
+\`req 8 rps=56 p50=41ms\`, goal 60 req/s:
+{"title":"load test \xB7 rps","rules":[{"from":"out","match":"^req \\\\d+ rps=(?P<rps>[\\\\d.]+) p50=(?P<p50>[\\\\d.]+)ms"}],"blocks":[{"kind":"spark","field":"rps","label":"req/s","unit":"req/s","better":"higher","target":60,"targetLabel":"goal 60"},{"kind":"stat","items":[{"field":"p50","agg":"last","label":"p50","unit":"ms","better":"lower"}]}],"headline":{"field":"rps","agg":"last","unit":"req/s","better":"higher"}}
+
+\`finish bash openai/gpt-5 t2: reward=1 tests=27/36 turns=5\`, 9 trials:
+{"title":"eval \xB7 tests passed per model","rules":[{"from":"out","match":"^finish \\\\S+ (?P<model>\\\\S+) t\\\\d+: .*tests=(?P<passed>\\\\d+)/\\\\d+","key":"model","count":"trials"}],"blocks":[{"kind":"bars","field":"passed","agg":"mean","label":"tests passed","max":36,"better":"higher"},{"kind":"meter","field":"trials","agg":"count","total":9,"label":"trials"}]}
+
+\`\u2713 lint (1m02s)\` / \`\u2717 test-linux (4m11s)\` / \`* build-macos\`:
+{"title":"CI \xB7 6 jobs","rules":[{"from":"*","match":"^(?P<mark>[\u2713\u2717*-])\\\\s+(?P<name>\\\\S+)","key":"name","text":"mark"}],"blocks":[{"kind":"grid","field":"mark","label":"jobs","tones":{"\u2713":"success","\u2717":"error","*":"pending","-":"muted"}}]}
+
+pytest, \`tests/test_api.py::test_login PASSED [ 12%]\`:
+{"title":"pytest \xB7 tests/","rules":[{"from":"out","match":" PASSED ","count":"pass"},{"from":"out","match":" FAILED ","count":"fail"},{"from":"out","match":"^(?P<current>\\\\S+::\\\\S+) \\\\w+\\\\s+\\\\[\\\\s*(?P<pct>\\\\d+)%\\\\]","text":"current"}],"blocks":[{"kind":"meter","field":"pct","agg":"last","total":100,"label":"progress","unit":"%"},{"kind":"stat","items":[{"field":"pass","agg":"count","label":"passed"},{"field":"fail","agg":"count","label":"failed"}]}],"stage":"current"}`;
+var byteLength = (s2) => Buffer.byteLength(s2) + 1;
+var clip4 = (text11, max) => text11.length > max ? `${text11.slice(0, max - 1)}\u2026` : text11;
+function promptSources(sources) {
+  let budget = MAX_SAMPLE_BYTES;
+  return sources.map((source, index2) => {
+    const share = Math.floor(budget / (sources.length - index2));
+    const take = (lines, limit) => {
+      const out = [];
+      const shapes = /* @__PURE__ */ new Map();
+      let used = 0;
+      for (const line of lines) {
+        const trimmed = line.trimStart();
+        if (trimmed.startsWith("```") || trimmed.startsWith("~~~")) {
+          continue;
+        }
+        const shape = trimmed.replace(/\d+/g, "0").replace(/\s+/g, " ");
+        const repeats = shapes.get(shape) ?? 0;
+        if (repeats >= MAX_SHAPE_REPEATS) {
+          continue;
+        }
+        shapes.set(shape, repeats + 1);
+        const sample = clip4(line, MAX_SAMPLE_LINE_CHARS);
+        if (used + byteLength(sample) > limit) {
+          break;
+        }
+        used += byteLength(sample);
+        out.push(sample);
+      }
+      budget -= used;
+      return out;
+    };
+    const tail = take(source.tail.slice().reverse(), source.head.length ? Math.floor(share * 2 / 3) : share).reverse();
+    const head2 = take(source.head, share - tail.reduce((n, l) => n + byteLength(l), 0));
+    return {
+      head: head2,
+      id: source.id,
+      label: source.label,
+      lines: source.lines,
+      omitted: Math.max(0, source.lines - head2.length - tail.length),
+      size: source.size,
+      tail
+    };
+  });
+}
+function renderPrompt(request) {
+  const fence = (body) => `\`\`\`
+${body}
+\`\`\``;
+  const out = ["<job>", "Background process. Command:", fence(clip4(request.command.trim(), MAX_BRIEF_CHARS)), "</job>", "", "<sources>"];
+  for (const s2 of promptSources(request.sources)) {
+    const omitted = s2.omitted ? ` ${s2.omitted} not shown: the middle, and repeats of a line that differ only in numbers.` : "";
+    const tail = s2.tail.length ? [...s2.omitted ? ["[\u2026]"] : [], ...s2.tail] : [];
+    out.push(`## \`${s2.id}\` \u2014 ${s2.label}`, `${s2.lines} lines so far (${s2.size} characters).${omitted}`, fence([...s2.head, ...tail].join("\n")));
+  }
+  out.push("</sources>");
+  if (request.previous) {
+    out.push(
+      "",
+      `A spec is already in place, but ${request.previous.reason}. Write a replacement that matches the lines above:`,
+      fence(JSON.stringify(request.previous.spec))
+    );
+  }
+  if (request.rejected) {
+    out.push(
+      "",
+      "Your previous answer was rejected:",
+      fence(clip4(request.rejected.answer, 4e3)),
+      "Problems:",
+      ...request.rejected.errors.map((e) => `- ${e}`),
+      "Fix every problem and call `respond` again."
+    );
+  }
+  return out.join("\n");
+}
+function hermesAuthor(env2 = process.env) {
+  const python = env2.HERMES_PYTHON?.trim();
+  const root7 = env2.HERMES_PYTHON_SRC_ROOT;
+  const ui = env2.HERMES_TUI_DIR;
+  if (!python || !root7 || !ui) {
+    return void 0;
+  }
+  const script = join10(ui, "..", "widget_author.py");
+  return (request, signal) => new Promise((resolve7, reject) => {
+    const child = spawn2(python, [script], {
+      cwd: root7,
+      env: { ...env2, PYTHONPATH: root7 },
+      signal,
+      stdio: ["pipe", "pipe", "ignore"],
+      timeout: REQUEST_TIMEOUT_MS2
+    });
+    let stdout = "";
+    child.stdout.setEncoding("utf8").on("data", (chunk) => stdout += chunk);
+    child.on("error", reject);
+    child.stdin.on("error", () => void 0);
+    child.on("close", () => {
+      try {
+        const reply = JSON.parse(stdout.trim().split("\n").at(-1) ?? "");
+        return reply.unavailable ? resolve7(void 0) : reply.error ? reject(new Error(reply.error)) : resolve7(reply.answer);
+      } catch {
+        reject(new Error("widget_author.py gave no answer"));
+      }
+    });
+    child.stdin.end(JSON.stringify({ schema: SPEC_SCHEMA, system: SYSTEM_PROMPT, user: renderPrompt(request) }));
+  });
+}
+
 // src/settings.ts
 import { mkdirSync as mkdirSync4, readFileSync as readFileSync5, writeFileSync as writeFileSync3 } from "node:fs";
 import { homedir as homedir11 } from "node:os";
-import { dirname, join as join10 } from "node:path";
+import { dirname, join as join11 } from "node:path";
 function settingsFile(env2 = process.env) {
-  return join10(env2.HERMES_HOME || join10(homedir11(), ".hermes"), "hermes-tern", "settings.json");
+  return join11(env2.HERMES_HOME || join11(homedir11(), ".hermes"), "hermes-tern", "settings.json");
 }
 function loadSettings(file2 = settingsFile()) {
   try {
@@ -66514,8 +68451,8 @@ var ServerQueue = class {
 };
 
 // src/view/dock.tsx
-function todoProgress(list7) {
-  const live = list7.filter((t2) => t2.status !== "cancelled");
+function todoProgress(list8) {
+  const live = list8.filter((t2) => t2.status !== "cancelled");
   const done = live.filter((t2) => t2.status === "completed").length;
   const current = live.find((t2) => t2.status === "in_progress") ?? live.find((t2) => t2.status === "pending");
   return { current: current?.content ?? "", done, total: live.length };
@@ -66712,6 +68649,11 @@ function agentsPill(running, onOpen, focused) {
 function shellsPill(s2, focused) {
   const live = s2.running > 0;
   const n = live ? s2.running : s2.exited;
+  const charts = live ? s2.charts ?? [] : [];
+  const fresh = latest(charts)?.view;
+  const figure = fresh && glance(fresh);
+  const title = ["Background processes  \u2325J", ...charts.map((c) => `${c.process.id}  ${summary(c.view)}`)].join("\n");
+  const card = hovercard(charts);
   return /* @__PURE__ */ jsx(
     "row",
     {
@@ -66719,7 +68661,8 @@ function shellsPill(s2, focused) {
       mark: focused ? "pick" : void 0,
       onClick: s2.onOpen,
       role: "omp.hud.pill",
-      title: "Background processes  \u2325J",
+      title,
+      ...card ? { hovercard: card } : {},
       children: /* @__PURE__ */ jsxs("row", { align: "center", gap: "xs", role: "omp.hud.seg", children: [
         /* @__PURE__ */ jsx("icon", { name: "terminal" }, "icon"),
         live ? /* @__PURE__ */ jsx("spinner", { style: "dots", tone: "accent" }, "spin") : /* @__PURE__ */ jsx("icon", { name: s2.tone === "success" ? "done" : s2.tone === "error" ? "failed" : "aborted", tone: s2.tone }, "end"),
@@ -66730,7 +68673,9 @@ function shellsPill(s2, focused) {
             wrap: "none"
           },
           "text"
-        )
+        ),
+        figure ? /* @__PURE__ */ jsx("text", { role: "omp.hud.glance", spans: glanceSpans(figure), wrap: "none" }, "glance") : null,
+        fresh ? miniSpark(fresh) : null
       ] }, "seg")
     },
     "shells"
@@ -66920,7 +68865,7 @@ var App = class {
   /** The session's subagents, followed while they run (Task cards, the pill, the hub). */
   agents = new Agents(this);
   /** The session's background processes (the shells pill, the Background sheet, background cards). */
-  processes = new Processes(this);
+  processes = new Processes(this, { author: hermesAuthor(), enabled: () => this.#jobCharts });
   cron = new Cron(this);
   sidebar = new Sidebar(this);
   /** The pull request docked at the pane's right edge (the PR aside). */
@@ -66986,6 +68931,8 @@ var App = class {
   /** The skin the gateway last reported; only the `skin` theme mode wears it. */
   #skin;
   #theme = loadSettings().theme ?? "tern";
+  /** Background processes get live charts (settings.json `jobCharts`). */
+  #jobCharts = loadSettings().jobCharts !== false;
   /** The prompt whose Copy button reads Copied, until the timer clears it. */
   #copied;
   #copiedTimer;
@@ -67215,12 +69162,12 @@ var App = class {
   }
   /** The agent's todo list while it matters: a turn runs, or something on it is still open. */
   #todos() {
-    const list7 = this.transcript.currentTodos();
-    if (!list7?.length) {
+    const list8 = this.transcript.currentTodos();
+    if (!list8?.length) {
       return void 0;
     }
-    const { done, total } = todoProgress(list7);
-    return total && (this.busy || done < total) ? list7 : void 0;
+    const { done, total } = todoProgress(list8);
+    return total && (this.busy || done < total) ? list8 : void 0;
   }
   /** The pills above the composer, left to right. */
   #pills(now = Date.now()) {
@@ -68916,9 +70863,9 @@ ${this.composer.text}` : text11 || this.composer.text);
           tokens: typeof usage?.total === "number" ? usage.total : void 0
         },
         todos: (() => {
-          const list7 = this.#todos();
-          return list7 ? {
-            list: list7,
+          const list8 = this.#todos();
+          return list8 ? {
+            list: list8,
             onToggle: () => {
               this.#todosOpen = !this.#todosOpen;
               this.changed();
@@ -68928,6 +70875,7 @@ ${this.composer.text}` : text11 || this.composer.text);
         })(),
         focused: modal ? void 0 : this.#hud,
         shells: {
+          charts: recent.flatMap((p3) => p3.chart && isRunning2(p3) ? [{ process: p3, view: p3.chart }] : []),
           exited: exited.length,
           onOpen: () => openBackground(this),
           running: recent.length - exited.length,

@@ -8,6 +8,7 @@ import type { Composer } from '../composer.js'
 import type { Pill } from '../hud.js'
 import type { ImageSource, Todo } from '../model.js'
 import { DEFAULT_EFFORT, effortText } from '../overlays/effort.js'
+import { type ChartEntry, glance, glanceSpans, hovercard, latest, miniSpark, summary } from '../processes/widgets/view.js'
 import { COMPACTING_LABEL } from '../status.js'
 
 import { type AutomationLine, automationNode, type Reconnecting, reconnectNode } from './automation.js'
@@ -141,6 +142,8 @@ export interface PrsPill {
 
 /** The shells pill: how many run, else how the recently exited ones ended. */
 export interface ShellsPill {
+  /** The running processes' charts: the freshest one's glance on the pill, all of them in its hover card. */
+  charts?: ChartEntry[]
   running: number
   /** Exited within the retention window; shown only while none runs. */
   exited: number
@@ -384,10 +387,19 @@ function agentsPill(running: number, onOpen: () => void, focused: boolean): JSX.
   )
 }
 
-/** The shells pill, in the agents pill's style: `2 shells` with a live dot, then `1 shell exited` for a minute. */
+/**
+ * The shells pill, in the agents pill's style: `2 shells` with a live dot, then `1 shell exited`
+ * for a minute. While processes chart their output, the freshest chart's figure and mini chart
+ * follow the count, and the hover card shows every running process as a tile.
+ */
 function shellsPill(s: ShellsPill, focused: boolean): JSX.Element {
   const live = s.running > 0
   const n = live ? s.running : s.exited
+  const charts = live ? (s.charts ?? []) : []
+  const fresh = latest(charts)?.view
+  const figure = fresh && glance(fresh)
+  const title = ['Background processes  ⌥J', ...charts.map(c => `${c.process.id}  ${summary(c.view)}`)].join('\n')
+  const card = hovercard(charts)
 
   return (
     <row
@@ -396,7 +408,8 @@ function shellsPill(s: ShellsPill, focused: boolean): JSX.Element {
       mark={focused ? 'pick' : undefined}
       onClick={s.onOpen}
       role="omp.hud.pill"
-      title="Background processes  ⌥J"
+      title={title}
+      {...(card ? { hovercard: card } : {})}
     >
       <row align="center" gap="xs" key="seg" role="omp.hud.seg">
         <icon key="icon" name="terminal" />
@@ -410,6 +423,8 @@ function shellsPill(s: ShellsPill, focused: boolean): JSX.Element {
           spans={[{ s: live ? undefined : 'muted', t: `${n} shell${n === 1 ? '' : 's'}${live ? '' : ' exited'}` }]}
           wrap="none"
         />
+        {figure ? <text key="glance" role="omp.hud.glance" spans={glanceSpans(figure)} wrap="none" /> : null}
+        {fresh ? miniSpark(fresh) : null}
       </row>
     </row>
   )

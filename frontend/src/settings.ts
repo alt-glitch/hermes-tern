@@ -13,6 +13,8 @@ export interface Settings {
   theme?: ThemeMode
   /** Ask the gateway for each session's reasoning, shown as thought rows (default on). */
   thoughts?: boolean
+  /** Live charts of background processes, their rules written by Hermes' auxiliary model once per process (default on). */
+  jobCharts?: boolean
 }
 
 export function settingsFile(env: NodeJS.ProcessEnv = process.env): string {

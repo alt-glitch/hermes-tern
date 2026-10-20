@@ -19,6 +19,9 @@ the user's prompt, so one home covers every flow:
                    terminal calls before a slowly streamed answer
     "background…" -> (at the start) a 90 s ticking background process that notifies on exit
     "watch…"    -> (at the start) a 2 min ticking background process watching for "tick 10"
+    "jobchart…" -> (at the start) a 2 min background benchmark printing tok/s and loss against a
+                   stated goal; after 15 s the plugin asks this model for its chart spec, and the
+                   shells pill charts it (hover it for the tiles), as do its card and /ps
     "errands…"  -> (at the start) a four-item todo list worked through over slow steps
     "connector…" -> (at the start) a tool search, a two-app connector batch and one connector call
     "ternenv"   -> (at the start) prints the TERN_* variables from a command, a background command and a Python cell's command
@@ -192,6 +195,8 @@ def _calls(prompt: str, target: Path) -> list[dict] | None:
         return [_call("terminal", {"command": "sleep 8 && echo slept"})]
     if words.lstrip().startswith("background"):
         return [_call("terminal", {"command": TICKS.format(n=90), "background": True, "notify_on_complete": True})]
+    if words.lstrip().startswith("jobchart"):
+        return [_call("terminal", {"command": BENCH, "background": True})]
     if words.lstrip().startswith("watch"):
         # `notify` is the advertised flag (tools/terminal_tool.py): a list watches for those lines.
         return [_call("terminal", {"command": TICKS.format(n=120), "background": True, "notify": ["tick 10"]})]
@@ -244,6 +249,25 @@ def _call(name: str, arguments: dict, call_id: str = "") -> dict:
     return {"id": call_id or f"call-{name}", "type": "function", "function": {"name": name, "arguments": json.dumps(arguments)}}
 
 
+# A benchmark whose output a chart can read: a throughput wave around a goal the command states.
+BENCH = ("for i in $(seq 1 120); do echo \"step $i tok/s=$((150 + (i * 37) % 70)) loss=0.$((99 - i * 2 / 3))\"; "
+         "sleep 1; done  # decode bench, goal 200 tok/s")
+
+# The plugin's chart request (frontend/src/processes/widgets/author.ts) and the spec this model writes for BENCH.
+WIDGET_MARKER = "You design the live status widget"
+BENCH_SPEC = {
+    "title": "decode bench · tok/s",
+    "rules": [{"from": "out", "match": "^step (?P<step>\\d+) tok/s=(?P<tps>[\\d.]+) loss=(?P<loss>[\\d.]+)"}],
+    "blocks": [
+        {"kind": "spark", "field": "tps", "label": "tok/s", "unit": "tok/s", "better": "higher", "target": 200, "targetLabel": "goal 200"},
+        {"kind": "meter", "field": "step", "agg": "last", "total": 120, "label": "steps"},
+        {"kind": "stat", "items": [{"field": "loss", "agg": "last", "label": "loss", "digits": 2, "better": "lower"},
+                                   {"field": "tps", "agg": "max", "label": "best", "unit": "tok/s"}]},
+    ],
+    "headline": {"field": "tps", "agg": "last", "unit": "tok/s", "better": "higher"},
+}
+
+
 class Server(ThreadingHTTPServer):
     target: Path
 
@@ -269,7 +293,11 @@ class Model(BaseHTTPRequestHandler):
         if isinstance(prompt, list):
             prompt = " ".join(p.get("text", "") for p in prompt if isinstance(p, dict))
         system = next((m.get("content") for m in messages if m.get("role") == "system"), "") or ""
-        if not names and "summar" in (prompt + str(system)).lower():
+        if isinstance(system, str) and WIDGET_MARKER in system:
+            # The chart request: one `respond` call, a skip for anything but the bench.
+            spec = BENCH_SPEC if "tok/s=" in str(prompt) else {"skip": "nothing to chart"}
+            content, calls, delay = None, [_call("respond", spec, "call-respond")], 0.5
+        elif not names and "summar" in (prompt + str(system)).lower():
             # Context compaction's summary call: a slow, short handoff, so the running rule shows.
             content, delay = COMPACTION_SUMMARY, 2.5
             calls = None

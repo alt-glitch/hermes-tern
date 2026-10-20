@@ -67,6 +67,7 @@ import type { SessionHost } from './sessionCommands.js'
 import { ambiguousNotice, CommandCatalog, resolveSlashName } from './slashResolve.js'
 import { isLoginNotice, Notices, statusEffect } from './status.js'
 import { isRunning as processRuns, Processes, processTone } from './processes/store.js'
+import { hermesAuthor } from './processes/widgets/author.js'
 import { loadSettings, saveSettings, type ThemeMode } from './settings.js'
 import { type BusyMode, busyModeOf, type OwnAdmission, type PendingRow, ServerQueue, type ServerQueued } from './serverQueue.js'
 import { internalNotice, Transcript } from './transcript.js'
@@ -137,7 +138,7 @@ export class App implements OverlayHost {
   /** The session's subagents, followed while they run (Task cards, the pill, the hub). */
   readonly agents: Agents = new Agents(this)
   /** The session's background processes (the shells pill, the Background sheet, background cards). */
-  readonly processes: Processes = new Processes(this)
+  readonly processes: Processes = new Processes(this, { author: hermesAuthor(), enabled: () => this.#jobCharts })
   readonly cron: Cron = new Cron(this)
   readonly sidebar: Sidebar = new Sidebar(this)
   /** The pull request docked at the pane's right edge (the PR aside). */
@@ -203,6 +204,8 @@ export class App implements OverlayHost {
   /** The skin the gateway last reported; only the `skin` theme mode wears it. */
   #skin: SkinPayload | undefined
   #theme: ThemeMode = loadSettings().theme ?? 'tern'
+  /** Background processes get live charts (settings.json `jobCharts`). */
+  readonly #jobCharts = loadSettings().jobCharts !== false
   /** The prompt whose Copy button reads Copied, until the timer clears it. */
   #copied: string | undefined
   #copiedTimer: NodeJS.Timeout | undefined
@@ -2786,6 +2789,7 @@ export class App implements OverlayHost {
         })(),
         focused: modal ? undefined : this.#hud,
         shells: {
+          charts: recent.flatMap(p => (p.chart && processRuns(p) ? [{ process: p, view: p.chart }] : [])),
           exited: exited.length,
           onOpen: () => openBackground(this),
           running: recent.length - exited.length,
