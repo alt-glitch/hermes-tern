@@ -34111,6 +34111,25 @@ function failedRuns(checks2) {
   return [...ids];
 }
 
+// src/prs/look.ts
+function stateLabel(pr) {
+  return pr.state === "open" ? pr.draft ? "Draft" : "Open" : pr.state === "merged" ? "Merged" : "Closed";
+}
+function stateTone(pr) {
+  return pr.state === "merged" ? "accent" : pr.state === "closed" ? "error" : pr.draft ? "muted" : "success";
+}
+function checksTone(pr) {
+  const s2 = checksState(pr.checks);
+  return s2 === "failing" ? "error" : s2 === "pending" ? "warning" : s2 === "passing" ? "success" : "muted";
+}
+function prTone(e) {
+  return e.pr ? e.pr.state === "open" && e.pr.checks.length ? checksTone(e.pr) : stateTone(e.pr) : "muted";
+}
+function checksIcon(pr) {
+  const s2 = checksState(pr.checks);
+  return s2 === "failing" ? "failed" : s2 === "pending" ? "running" : s2 === "passing" ? "success" : "info";
+}
+
 // src/view/ui/button.tsx
 function button(b) {
   return /* @__PURE__ */ jsxs(
@@ -34135,6 +34154,52 @@ function actionsRow(buttons) {
     /* @__PURE__ */ jsx("spacer", { grow: 1 }, "fill"),
     buttons.map(button)
   ] }, "actions");
+}
+
+// src/prs/checks.tsx
+var CHECK = {
+  "action-required": { icon: "pending", tone: "warning", word: "waiting for approval" },
+  cancelled: { icon: "cancelled", tone: "muted", word: "cancelled" },
+  failure: { icon: "failed", tone: "error", word: "failed" },
+  neutral: { icon: "minus", tone: "muted", word: "neutral" },
+  pending: { icon: "running", tone: "warning", word: "running" },
+  skipped: { icon: "minus", tone: "muted", word: "skipped" },
+  success: { icon: "success", tone: "success", word: "passed" }
+};
+function took(c, now) {
+  return c.startedAt && c.completedAt ? durationWhole(Date.parse(c.completedAt) - Date.parse(c.startedAt)) : c.startedAt && c.status === "pending" ? `${durationWhole(now - Date.parse(c.startedAt))}\u2026` : "";
+}
+function checksTab(pr, now) {
+  if (!pr.checks.length) {
+    return [/* @__PURE__ */ jsx("text", { spans: [{ s: "muted", t: "No checks ran on the latest commit." }] }, "none")];
+  }
+  const sorted = [...pr.checks].sort((a2, b) => a2.name.localeCompare(b.name));
+  const groups = [
+    { checks: sorted.filter((c) => checkGroup(c) === "attention"), head: "Needs attention", id: "bad", open: true },
+    { checks: sorted.filter((c) => checkGroup(c) === "running"), head: "Running", id: "run", open: true },
+    { checks: sorted.filter((c) => c.status === "success"), head: "Passed", id: "ok", open: false },
+    { checks: sorted.filter((c) => c.status === "skipped" || c.status === "neutral"), head: "Skipped", id: "skip", open: false }
+  ];
+  const runs3 = failedRuns(pr.checks).length;
+  return [
+    /* @__PURE__ */ jsx(
+      "text",
+      {
+        spans: [
+          { s: checksTone(pr), t: checksSummary(pr.checks) },
+          { s: "dim", t: ` \xB7 on ${pr.headOid.slice(0, 7)}${runs3 ? ` \xB7 F re-runs ${plural(runs3, "failed workflow run")}` : ""}` }
+        ]
+      },
+      "sum"
+    ),
+    ...groups.filter((g) => g.checks.length).map((g) => /* @__PURE__ */ jsx("section", { collapsed: !g.open, collapsible: true, head: `${g.head} \xB7 ${g.checks.length}`, role: "hermes.pr.checkgroup", children: g.checks.map((c, i) => /* @__PURE__ */ jsxs("row", { align: "center", gap: "sm", role: "hermes.pr.check", title: c.description, children: [
+      /* @__PURE__ */ jsx("icon", { name: CHECK[c.status].icon, tone: CHECK[c.status].tone }, "i"),
+      /* @__PURE__ */ jsx("text", { grow: 1, spans: [{ href: c.url, t: c.name }], truncate: "end", wrap: "none" }, "n"),
+      c.workflow && !c.name.startsWith(`${c.workflow} /`) ? /* @__PURE__ */ jsx("text", { spans: [{ s: "dim", t: c.workflow }], truncate: "end", wrap: "none" }, "w") : null,
+      /* @__PURE__ */ jsx("text", { spans: [{ s: CHECK[c.status].tone === "muted" ? "dim" : CHECK[c.status].tone, t: CHECK[c.status].word }], wrap: "none" }, "s"),
+      /* @__PURE__ */ jsx("text", { spans: [{ s: "dim mono", t: took(c, now) }], wrap: "none" }, "t")
+    ] }, `k${i}`)) }, g.id))
+  ];
 }
 
 // node_modules/@ungap/structured-clone/esm/types.js
@@ -60639,40 +60704,187 @@ function partNodes(ps, key2) {
   );
 }
 
+// src/prs/conversation.tsx
+var COMMENTED = ["reviewed", "muted"];
+var REVIEW = {
+  APPROVED: ["approved these changes", "success"],
+  CHANGES_REQUESTED: ["requested changes", "error"],
+  COMMENTED,
+  DISMISSED: ["reviewed (dismissed)", "muted"],
+  PENDING: ["started a review", "muted"]
+};
+function conversation(e, pr, now) {
+  const links = { repo: pr.url.replace(/\/pull\/\d+.*$/, "") };
+  const out = [
+    comment5("desc", [{ s: "strong", t: pr.author }, { s: "muted", t: " opened this" }], pr.createdAt, now, pr.body, pr.url, links, "No description provided.")
+  ];
+  if (!e.activity) {
+    out.push(/* @__PURE__ */ jsx("text", { spans: [{ s: e.activityError ? "error" : "muted", t: e.activityError ?? "Reading the conversation\u2026" }] }, "load"));
+    return out;
+  }
+  let commits = [];
+  const flush = () => {
+    const last = commits.at(-1);
+    if (last) {
+      out.push(commitRun(commits, last, `c${out.length}`, now));
+      commits = [];
+    }
+  };
+  e.activity.forEach((a2, i) => {
+    if (a2.kind === "commit") {
+      commits.push(a2);
+      return;
+    }
+    flush();
+    if (a2.kind === "review") {
+      const [verb, tone] = REVIEW[a2.state ?? "COMMENTED"] ?? COMMENTED;
+      if (!a2.body.trim()) {
+        out.push(
+          /* @__PURE__ */ jsxs("row", { align: "center", gap: "sm", role: "hermes.pr.event", children: [
+            /* @__PURE__ */ jsx("icon", { name: a2.state === "APPROVED" ? "check" : a2.state === "CHANGES_REQUESTED" ? "warn" : "message", tone }, "i"),
+            /* @__PURE__ */ jsx("text", { spans: [{ s: "strong", t: a2.author }, { s: tone === "muted" ? "muted" : tone, t: ` ${verb}` }, { s: "dim", t: ` \xB7 ${relative(a2.at, now)}` }] }, "t")
+          ] }, `a${i}`)
+        );
+        return;
+      }
+      out.push(comment5(`a${i}`, [{ s: "strong", t: a2.author }, { s: tone === "muted" ? "muted" : tone, t: ` ${verb}` }], a2.at, now, a2.body, a2.url, links));
+    } else if (a2.kind === "thread") {
+      out.push(thread(a2, `a${i}`, now, links));
+    } else {
+      out.push(comment5(`a${i}`, [{ s: "strong", t: a2.author }, { s: "muted", t: " commented" }], a2.at, now, a2.body, a2.url, links));
+    }
+  });
+  flush();
+  return out;
+}
+function comment5(key2, who, at, now, body, url, links, empty3) {
+  return /* @__PURE__ */ jsxs("card", { head: [...who, { s: "dim", t: ` \xB7 ${relative(at, now)}` }], role: "hermes.pr.comment", children: [
+    bodyNodes(body, "b", empty3, links),
+    url ? /* @__PURE__ */ jsx("text", { role: "hermes.pr.permalink", spans: [{ href: url, s: "dim", t: "View on GitHub" }], wrap: "none" }, "link") : null
+  ] }, key2);
+}
+function thread(a2, key2, now, links) {
+  const where = `${a2.path ?? ""}${a2.line ? `:${a2.line}` : ""}`;
+  return /* @__PURE__ */ jsxs(
+    "card",
+    {
+      collapsed: Boolean(a2.resolved || a2.outdated),
+      collapsible: true,
+      head: [
+        { s: "strong", t: a2.author },
+        { s: "muted", t: " commented on " },
+        { s: "mono", t: where },
+        { s: "dim", t: ` \xB7 ${relative(a2.at, now)}` },
+        ...a2.resolved ? [{ s: "success", t: "  resolved" }] : [],
+        ...a2.outdated ? [{ s: "dim", t: "  outdated" }] : []
+      ],
+      role: "hermes.pr.thread",
+      children: [
+        bodyNodes(a2.body, "b", void 0, links),
+        (a2.replies ?? []).map((r, j) => /* @__PURE__ */ jsxs("col", { gap: "xs", role: "hermes.pr.reply", children: [
+          /* @__PURE__ */ jsx("text", { spans: [{ s: "strong", t: r.author }, { s: "dim", t: ` \xB7 ${relative(r.at, now)}` }] }, "h"),
+          bodyNodes(r.body, "b", void 0, links)
+        ] }, `r${j}`)),
+        a2.url ? /* @__PURE__ */ jsx("text", { role: "hermes.pr.permalink", spans: [{ href: a2.url, s: "dim", t: "View on GitHub" }], wrap: "none" }, "link") : null
+      ]
+    },
+    key2
+  );
+}
+function commitRun(commits, last, key2, now) {
+  const authors = [...new Set(commits.map((c) => c.author))];
+  return /* @__PURE__ */ jsxs("col", { gap: "xs", role: "hermes.pr.commits", children: [
+    /* @__PURE__ */ jsxs("row", { align: "center", gap: "sm", children: [
+      /* @__PURE__ */ jsx("icon", { name: "commit" }, "i"),
+      /* @__PURE__ */ jsx(
+        "text",
+        {
+          spans: [
+            { s: "strong", t: authors.join(", ") },
+            { s: "muted", t: ` added ${plural(commits.length, "commit")}` },
+            { s: "dim", t: ` \xB7 ${relative(last.at, now)}` }
+          ]
+        },
+        "t"
+      )
+    ] }, "h"),
+    commits.map((c, i) => {
+      const sha = c.url?.match(/\/commit\/([0-9a-f]{7})/)?.[1];
+      return /* @__PURE__ */ jsxs("row", { align: "center", gap: "sm", role: "hermes.pr.commit", children: [
+        /* @__PURE__ */ jsx("text", { grow: 1, spans: [{ t: c.body.split("\n")[0] ?? "" }], truncate: "end", wrap: "none" }, "m"),
+        sha ? /* @__PURE__ */ jsx("text", { spans: [{ href: c.url, s: "mono dim", t: sha }], wrap: "none" }, "s") : null
+      ] }, `c${i}`);
+    })
+  ] }, key2);
+}
+
+// src/prs/files.tsx
+var LONG_DIFF = 400;
+function filesTab(e, pr, id, density, reveal) {
+  if (!e.files) {
+    return [/* @__PURE__ */ jsx("text", { spans: [{ s: e.filesError ? "error" : "muted", t: e.filesError ?? "Reading the files\u2026" }] }, "load")];
+  }
+  if (!e.files.length) {
+    return [/* @__PURE__ */ jsx("text", { spans: [{ s: "muted", t: "No files changed." }] }, "none")];
+  }
+  const cards = e.files.map((f, i) => fileCard(f, `f${i}`));
+  if (density === "narrow") {
+    return cards;
+  }
+  const list9 = /* @__PURE__ */ jsxs("col", { gap: "none", role: "hermes.pr.filelist", children: [
+    e.files.map((f, i) => {
+      const slash = f.path.lastIndexOf("/");
+      return /* @__PURE__ */ jsxs("row", { align: "center", gap: "sm", onClick: () => reveal?.(`${id}.diffs.f${i}`), role: "hermes.pr.fileitem", title: f.path, children: [
+        /* @__PURE__ */ jsx("icon", { name: "file", tone: FILE_TONE[f.status] }, "i"),
+        /* @__PURE__ */ jsx(
+          "text",
+          {
+            grow: 1,
+            spans: [...slash > 0 ? [{ s: "dim", t: f.path.slice(0, slash + 1) }] : [], { t: f.path.slice(slash + 1) }],
+            truncate: "start",
+            wrap: "none"
+          },
+          "p"
+        ),
+        /* @__PURE__ */ jsx("text", { shrink: 0, spans: [{ s: "success", t: `+${f.additions}` }, { t: " " }, { s: "error", t: `\u2212${f.deletions}` }], wrap: "none" }, "n")
+      ] }, `l${i}`);
+    }),
+    e.files.length < pr.changedFiles ? /* @__PURE__ */ jsx("text", { spans: [{ s: "muted", t: `${pr.changedFiles - e.files.length} more on GitHub` }] }, "more") : null
+  ] }, "list");
+  return [
+    /* @__PURE__ */ jsxs("row", { align: "start", gap: "md", role: "hermes.pr.files", children: [
+      list9,
+      /* @__PURE__ */ jsx("col", { gap: "sm", grow: 1, min: { w: 0 }, children: cards }, "diffs")
+    ] }, "files")
+  ];
+}
+var FILE_TONE = { added: "success", removed: "error", renamed: "info" };
+var FILE_TITLE = { added: "Added", copied: "Copied", modified: "Changed", removed: "Deleted", renamed: "Renamed" };
+function fileCard(f, key2) {
+  const lines = f.patch ? f.patch.split("\n").length : 0;
+  return node(
+    "tool",
+    {
+      badges: f.previous ? [{ text: `from ${f.previous}` }] : void 0,
+      collapsed: f.status === "removed" || lines > LONG_DIFF,
+      collapsible: true,
+      key: key2,
+      meta: [`+${f.additions} \u2212${f.deletions}`],
+      name: f.status === "added" ? "write" : "edit",
+      role: "hermes.pr.file",
+      status: "done",
+      target: f.path,
+      targetKind: "path",
+      title: FILE_TITLE[f.status] ?? "Changed"
+    },
+    f.patch ? [/* @__PURE__ */ jsx("diff", { lang: langOf(f.path), path: f.path, text: f.patch }, "d")] : [/* @__PURE__ */ jsx("text", { spans: [{ s: "muted", t: "Binary, or too large to show here." }] }, "none")]
+  );
+}
+
 // src/prs/view.tsx
 var PR_TABS = ["conversation", "checks", "files"];
 var METHOD_LABEL = { merge: "Merge", rebase: "Rebase and merge", squash: "Squash and merge" };
 var COPIED_MS2 = 1500;
-var LONG_DIFF = 400;
-function stateLabel(pr) {
-  return pr.state === "open" ? pr.draft ? "Draft" : "Open" : pr.state === "merged" ? "Merged" : "Closed";
-}
-function stateTone(pr) {
-  return pr.state === "merged" ? "accent" : pr.state === "closed" ? "error" : pr.draft ? "muted" : "success";
-}
-function checksTone(pr) {
-  const s2 = checksState(pr.checks);
-  return s2 === "failing" ? "error" : s2 === "pending" ? "warning" : s2 === "passing" ? "success" : "muted";
-}
-function prTone(e) {
-  return e.pr ? e.pr.state === "open" && e.pr.checks.length ? checksTone(e.pr) : stateTone(e.pr) : "muted";
-}
-var CHECK = {
-  "action-required": { icon: "pending", tone: "warning", word: "waiting for approval" },
-  cancelled: { icon: "cancelled", tone: "muted", word: "cancelled" },
-  failure: { icon: "failed", tone: "error", word: "failed" },
-  neutral: { icon: "minus", tone: "muted", word: "neutral" },
-  pending: { icon: "running", tone: "warning", word: "running" },
-  skipped: { icon: "minus", tone: "muted", word: "skipped" },
-  success: { icon: "success", tone: "success", word: "passed" }
-};
-var REVIEW = {
-  APPROVED: ["approved these changes", "success"],
-  CHANGES_REQUESTED: ["requested changes", "error"],
-  COMMENTED: ["reviewed", "muted"],
-  DISMISSED: ["reviewed (dismissed)", "muted"],
-  PENDING: ["started a review", "muted"]
-};
 var DECISION = {
   APPROVED: ["Approved", "success"],
   CHANGES_REQUESTED: ["Changes requested", "error"],
@@ -60680,8 +60892,8 @@ var DECISION = {
 };
 var PrView = class {
   #host;
-  selected;
-  tab = "conversation";
+  #selected;
+  #tab = "conversation";
   #confirm;
   #copied;
   #copiedTimer;
@@ -60689,7 +60901,7 @@ var PrView = class {
   #bodyId = "";
   constructor(host, focus) {
     this.#host = host;
-    this.selected = focus;
+    this.#selected = focus;
   }
   dispose() {
     clearTimeout(this.#copiedTimer);
@@ -60698,21 +60910,28 @@ var PrView = class {
   keys() {
     return this.#host.prs.entries().map((e) => prKey(e.ref)).toReversed();
   }
-  current() {
+  /** The PR shown: the picked one while it is linked, else the newest. */
+  selection() {
     const keys2 = this.keys();
-    if (!this.selected || !keys2.includes(this.selected)) {
-      this.selected = keys2[0];
+    if (!this.#selected || !keys2.includes(this.#selected)) {
+      this.#selected = keys2[0];
     }
-    return this.selected ? this.#host.prs.get(this.selected) : void 0;
+    const key2 = this.#selected;
+    const entry = key2 ? this.#host.prs.get(key2) : void 0;
+    return key2 && entry ? { entry, key: key2, pr: entry.pr } : void 0;
+  }
+  /** The shown PR's entry. */
+  current() {
+    return this.selection()?.entry;
   }
   select(key2) {
-    this.selected = key2;
+    this.#selected = key2;
     this.#confirm = void 0;
     this.#load();
     this.#host.changed();
   }
   setTab(tab2) {
-    this.tab = tab2;
+    this.#tab = tab2;
     this.#confirm = void 0;
     this.#load();
     this.#host.changed();
@@ -60720,54 +60939,38 @@ var PrView = class {
   /** Step through the PRs (`[` and `]`). */
   step(by) {
     const keys2 = this.keys();
-    const at = this.selected ? keys2.indexOf(this.selected) : -1;
-    if (keys2.length) {
-      this.select(keys2[(at + by + keys2.length) % keys2.length]);
+    const at = this.#selected ? keys2.indexOf(this.#selected) : -1;
+    const next2 = keys2[(at + by + keys2.length) % keys2.length];
+    if (next2) {
+      this.select(next2);
     }
   }
   /** Reads what the tab shows, once per PR update; asked on every render. */
   #load() {
-    const e = this.current();
-    if (!e?.pr || !this.selected) {
+    const s2 = this.selection();
+    if (!s2?.pr) {
       return;
     }
-    if (this.tab === "conversation") {
-      this.#host.prs.activity(this.selected).catch(() => {
+    if (this.#tab === "conversation") {
+      this.#host.prs.activity(s2.key).catch(() => {
       });
-    } else if (this.tab === "files") {
-      this.#host.prs.files(this.selected).catch(() => {
+    } else if (this.#tab === "files") {
+      this.#host.prs.files(s2.key).catch(() => {
       });
     }
   }
   can(action) {
-    const pr = this.current()?.pr;
-    if (!pr || this.#host.prs.busy(this.selected)) {
-      return false;
-    }
-    switch (action) {
-      case "merge":
-        return pr.state === "open" && !pr.draft && pr.canUpdate && pr.mergeable !== "conflicting";
-      case "ready":
-        return pr.state === "open" && pr.draft && pr.canUpdate;
-      case "close":
-        return pr.state === "open" && pr.canUpdate;
-      case "reopen":
-        return pr.state === "closed" && pr.canUpdate;
-      case "update-branch":
-        return pr.state === "open" && (pr.behindBy ?? 0) > 0;
-      case "rerun":
-        return pr.state === "open" && failedRuns(pr.checks).length > 0;
-      default:
-        return false;
-    }
+    const s2 = this.selection();
+    return s2?.pr ? canAct(action, s2.pr, this.#host.prs.busy(s2.key)) : false;
   }
   async act(action) {
     this.#confirm = void 0;
-    if (!this.can(action)) {
+    const s2 = this.selection();
+    if (!s2?.pr || !canAct(action, s2.pr, this.#host.prs.busy(s2.key))) {
       return this.#host.changed();
     }
     try {
-      await this.#host.prs.act(action, this.selected);
+      await this.#host.prs.act(action, s2.key);
     } catch (error) {
       this.#host.notice(errorText(error), "error");
     }
@@ -60786,7 +60989,7 @@ var PrView = class {
       return;
     }
     copyToClipboard(e.pr?.url ?? e.ref.url);
-    this.#copied = this.selected;
+    this.#copied = this.#selected;
     clearTimeout(this.#copiedTimer);
     this.#copiedTimer = setTimeout(() => {
       this.#copied = void 0;
@@ -60814,7 +61017,7 @@ var PrView = class {
     const bare = !k.ctrl && !k.alt && !k.meta;
     const scroll = (to) => this.#host.scroll?.(this.#bodyId, to);
     if (k.name === "tab") {
-      this.setTab(PR_TABS[(PR_TABS.indexOf(this.tab) + (k.shift ? PR_TABS.length - 1 : 1)) % PR_TABS.length]);
+      this.setTab(PR_TABS[(PR_TABS.indexOf(this.#tab) + (k.shift ? PR_TABS.length - 1 : 1)) % PR_TABS.length] ?? this.#tab);
     } else if (bare && (k.name === "]" || k.name === "right")) {
       this.step(1);
     } else if (bare && (k.name === "[" || k.name === "left")) {
@@ -60868,7 +61071,7 @@ var PrView = class {
     return /* @__PURE__ */ jsx(
       "tabs",
       {
-        active: this.selected,
+        active: this.#selected,
         items: entries.map((e) => ({
           id: prKey(e.ref),
           label: [{ s: prTone(e), t: "\u25CF " }, { t: `#${e.ref.number}` }, ...e.pr && !compact2 ? [{ s: "muted", t: ` ${clip(e.pr.title, { max: 28 })}` }] : []]
@@ -60960,15 +61163,16 @@ var PrView = class {
       /* @__PURE__ */ jsx(
         "tabs",
         {
-          active: this.tab,
+          active: this.#tab,
           items: [
             { id: "conversation", label: comments ? `Conversation ${comments}` : "Conversation" },
             { id: "checks", label: pr?.checks.length ? `Checks ${pr.checks.length}` : "Checks" },
             { id: "files", label: pr ? `Files ${pr.changedFiles}` : "Files" }
           ],
           onSelect: (ev) => {
-            if (PR_TABS.includes(ev.item)) {
-              this.setTab(ev.item);
+            const tab2 = PR_TABS.find((t2) => t2 === ev.item);
+            if (tab2) {
+              this.setTab(tab2);
             }
           }
         },
@@ -60985,29 +61189,31 @@ var PrView = class {
   body(id, now, density = "wide") {
     this.#bodyId = id;
     this.#load();
-    const e = this.current();
-    if (!e) {
+    const s2 = this.selection();
+    if (!s2) {
       return [/* @__PURE__ */ jsx("text", { spans: [{ s: "muted", t: "No pull requests linked yet. Hermes links each PR it opens or works on." }] }, "none")];
     }
-    if (!e.pr) {
+    const { entry: e, pr } = s2;
+    if (!pr) {
       return [/* @__PURE__ */ jsx("text", { spans: [{ s: e.error ? "error" : "muted", t: e.error ?? "Reading GitHub\u2026" }] }, "none")];
     }
-    switch (this.tab) {
+    switch (this.#tab) {
       case "checks":
-        return checksTab(e.pr, now);
+        return checksTab(pr, now);
       case "files":
-        return this.#filesTab(e, id, density);
-      default:
-        return conversation(e, now);
+        return filesTab(e, pr, id, density, (node3) => this.#host.reveal?.(node3));
+      case "conversation":
+        return conversation(e, pr, now);
     }
   }
   /** The actions bar, or the question a merge or close asks first. */
   actions() {
     const pr = this.current()?.pr;
-    const busy = this.selected ? this.#host.prs.busy(this.selected) : false;
+    const busy = this.#selected ? this.#host.prs.busy(this.#selected) : false;
     const method = pr?.mergeMethods[0] ?? "merge";
-    if (this.#confirm && pr) {
-      const merge2 = this.#confirm === "merge";
+    const confirm = this.#confirm;
+    if (confirm && pr) {
+      const merge2 = confirm === "merge";
       return /* @__PURE__ */ jsxs("row", { align: "center", gap: "sm", role: "omp.actions", children: [
         /* @__PURE__ */ jsx(
           "text",
@@ -61031,7 +61237,7 @@ var PrView = class {
           key: "yes",
           kind: merge2 ? "primary" : "danger",
           label: merge2 ? METHOD_LABEL[method] : "Close PR",
-          onClick: () => void this.act(this.#confirm)
+          onClick: () => void this.act(confirm)
         })
       ] }, "actions");
     }
@@ -61045,218 +61251,35 @@ var PrView = class {
       prButton({
         hint: "c",
         key: "copy",
-        label: this.#copied && this.#copied === this.selected ? "Copied" : "Copy URL",
+        label: this.#copied && this.#copied === this.#selected ? "Copied" : "Copy URL",
         onClick: () => this.copy()
       }),
       prButton({ hint: "o", key: "open", label: "Open on GitHub", onClick: () => this.openOnGitHub() }),
       this.can("merge") ? prButton({ hint: "m", key: "merge", kind: "primary", label: busy ? "Working\u2026" : METHOD_LABEL[method], onClick: () => this.ask("merge") }) : null
     ] }, "actions");
   }
-  #filesTab(e, id, density) {
-    const pr = e.pr;
-    if (!e.files) {
-      return [/* @__PURE__ */ jsx("text", { spans: [{ s: e.filesError ? "error" : "muted", t: e.filesError ?? "Reading the files\u2026" }] }, "load")];
-    }
-    if (!e.files.length) {
-      return [/* @__PURE__ */ jsx("text", { spans: [{ s: "muted", t: "No files changed." }] }, "none")];
-    }
-    const cards = e.files.map((f, i) => fileCard(f, `f${i}`));
-    if (density === "narrow") {
-      return cards;
-    }
-    const list9 = /* @__PURE__ */ jsxs("col", { gap: "none", role: "hermes.pr.filelist", children: [
-      e.files.map((f, i) => {
-        const slash = f.path.lastIndexOf("/");
-        return /* @__PURE__ */ jsxs("row", { align: "center", gap: "sm", onClick: () => this.#host.reveal?.(`${id}.diffs.f${i}`), role: "hermes.pr.fileitem", title: f.path, children: [
-          /* @__PURE__ */ jsx("icon", { name: "file", tone: FILE_TONE[f.status] }, "i"),
-          /* @__PURE__ */ jsx(
-            "text",
-            {
-              grow: 1,
-              spans: [...slash > 0 ? [{ s: "dim", t: f.path.slice(0, slash + 1) }] : [], { t: f.path.slice(slash + 1) }],
-              truncate: "start",
-              wrap: "none"
-            },
-            "p"
-          ),
-          /* @__PURE__ */ jsx("text", { shrink: 0, spans: [{ s: "success", t: `+${f.additions}` }, { t: " " }, { s: "error", t: `\u2212${f.deletions}` }], wrap: "none" }, "n")
-        ] }, `l${i}`);
-      }),
-      e.files.length < pr.changedFiles ? /* @__PURE__ */ jsx("text", { spans: [{ s: "muted", t: `${pr.changedFiles - e.files.length} more on GitHub` }] }, "more") : null
-    ] }, "list");
-    return [
-      /* @__PURE__ */ jsxs("row", { align: "start", gap: "md", role: "hermes.pr.files", children: [
-        list9,
-        /* @__PURE__ */ jsx("col", { gap: "sm", grow: 1, min: { w: 0 }, children: cards }, "diffs")
-      ] }, "files")
-    ];
-  }
 };
-var FILE_TONE = { added: "success", removed: "error", renamed: "info" };
-var FILE_TITLE = { added: "Added", copied: "Copied", modified: "Changed", removed: "Deleted", renamed: "Renamed" };
-function fileCard(f, key2) {
-  const lines = f.patch ? f.patch.split("\n").length : 0;
-  return node(
-    "tool",
-    {
-      badges: f.previous ? [{ text: `from ${f.previous}` }] : void 0,
-      collapsed: f.status === "removed" || lines > LONG_DIFF,
-      collapsible: true,
-      key: key2,
-      meta: [`+${f.additions} \u2212${f.deletions}`],
-      name: f.status === "added" ? "write" : "edit",
-      role: "hermes.pr.file",
-      status: "done",
-      target: f.path,
-      targetKind: "path",
-      title: FILE_TITLE[f.status] ?? "Changed"
-    },
-    f.patch ? [/* @__PURE__ */ jsx("diff", { lang: langOf(f.path), path: f.path, text: f.patch }, "d")] : [/* @__PURE__ */ jsx("text", { spans: [{ s: "muted", t: "Binary, or too large to show here." }] }, "none")]
-  );
-}
-function checksIcon(pr) {
-  const s2 = checksState(pr.checks);
-  return s2 === "failing" ? "failed" : s2 === "pending" ? "running" : s2 === "passing" ? "success" : "info";
-}
 var prButton = (b) => button({ ...b, wrap: "none" });
-function conversation(e, now) {
-  const pr = e.pr;
-  const links = { repo: pr.url.replace(/\/pull\/\d+.*$/, "") };
-  const out = [
-    comment5("desc", [{ s: "strong", t: pr.author }, { s: "muted", t: " opened this" }], pr.createdAt, now, pr.body, pr.url, links, "No description provided.")
-  ];
-  if (!e.activity) {
-    out.push(/* @__PURE__ */ jsx("text", { spans: [{ s: e.activityError ? "error" : "muted", t: e.activityError ?? "Reading the conversation\u2026" }] }, "load"));
-    return out;
+function canAct(action, pr, busy) {
+  if (busy) {
+    return false;
   }
-  let commits = [];
-  const flush = () => {
-    if (commits.length) {
-      out.push(commitRun(commits, `c${out.length}`, now));
-      commits = [];
-    }
-  };
-  e.activity.forEach((a2, i) => {
-    if (a2.kind === "commit") {
-      commits.push(a2);
-      return;
-    }
-    flush();
-    if (a2.kind === "review") {
-      const [verb, tone] = REVIEW[a2.state ?? "COMMENTED"] ?? REVIEW.COMMENTED;
-      if (!a2.body.trim()) {
-        out.push(
-          /* @__PURE__ */ jsxs("row", { align: "center", gap: "sm", role: "hermes.pr.event", children: [
-            /* @__PURE__ */ jsx("icon", { name: a2.state === "APPROVED" ? "check" : a2.state === "CHANGES_REQUESTED" ? "warn" : "message", tone }, "i"),
-            /* @__PURE__ */ jsx("text", { spans: [{ s: "strong", t: a2.author }, { s: tone === "muted" ? "muted" : tone, t: ` ${verb}` }, { s: "dim", t: ` \xB7 ${relative(a2.at, now)}` }] }, "t")
-          ] }, `a${i}`)
-        );
-        return;
-      }
-      out.push(comment5(`a${i}`, [{ s: "strong", t: a2.author }, { s: tone === "muted" ? "muted" : tone, t: ` ${verb}` }], a2.at, now, a2.body, a2.url, links));
-    } else if (a2.kind === "thread") {
-      out.push(thread(a2, `a${i}`, now, links));
-    } else {
-      out.push(comment5(`a${i}`, [{ s: "strong", t: a2.author }, { s: "muted", t: " commented" }], a2.at, now, a2.body, a2.url, links));
-    }
-  });
-  flush();
-  return out;
-}
-function comment5(key2, who, at, now, body, url, links, empty3) {
-  return /* @__PURE__ */ jsxs("card", { head: [...who, { s: "dim", t: ` \xB7 ${relative(at, now)}` }], role: "hermes.pr.comment", children: [
-    bodyNodes(body, "b", empty3, links),
-    url ? /* @__PURE__ */ jsx("text", { role: "hermes.pr.permalink", spans: [{ href: url, s: "dim", t: "View on GitHub" }], wrap: "none" }, "link") : null
-  ] }, key2);
-}
-function thread(a2, key2, now, links) {
-  const where = `${a2.path ?? ""}${a2.line ? `:${a2.line}` : ""}`;
-  return /* @__PURE__ */ jsxs(
-    "card",
-    {
-      collapsed: Boolean(a2.resolved || a2.outdated),
-      collapsible: true,
-      head: [
-        { s: "strong", t: a2.author },
-        { s: "muted", t: " commented on " },
-        { s: "mono", t: where },
-        { s: "dim", t: ` \xB7 ${relative(a2.at, now)}` },
-        ...a2.resolved ? [{ s: "success", t: "  resolved" }] : [],
-        ...a2.outdated ? [{ s: "dim", t: "  outdated" }] : []
-      ],
-      role: "hermes.pr.thread",
-      children: [
-        bodyNodes(a2.body, "b", void 0, links),
-        (a2.replies ?? []).map((r, j) => /* @__PURE__ */ jsxs("col", { gap: "xs", role: "hermes.pr.reply", children: [
-          /* @__PURE__ */ jsx("text", { spans: [{ s: "strong", t: r.author }, { s: "dim", t: ` \xB7 ${relative(r.at, now)}` }] }, "h"),
-          bodyNodes(r.body, "b", void 0, links)
-        ] }, `r${j}`)),
-        a2.url ? /* @__PURE__ */ jsx("text", { role: "hermes.pr.permalink", spans: [{ href: a2.url, s: "dim", t: "View on GitHub" }], wrap: "none" }, "link") : null
-      ]
-    },
-    key2
-  );
-}
-function commitRun(commits, key2, now) {
-  const authors = [...new Set(commits.map((c) => c.author))];
-  return /* @__PURE__ */ jsxs("col", { gap: "xs", role: "hermes.pr.commits", children: [
-    /* @__PURE__ */ jsxs("row", { align: "center", gap: "sm", children: [
-      /* @__PURE__ */ jsx("icon", { name: "commit" }, "i"),
-      /* @__PURE__ */ jsx(
-        "text",
-        {
-          spans: [
-            { s: "strong", t: authors.join(", ") },
-            { s: "muted", t: ` added ${plural(commits.length, "commit")}` },
-            { s: "dim", t: ` \xB7 ${relative(commits.at(-1).at, now)}` }
-          ]
-        },
-        "t"
-      )
-    ] }, "h"),
-    commits.map((c, i) => {
-      const sha = c.url?.match(/\/commit\/([0-9a-f]{7})/)?.[1];
-      return /* @__PURE__ */ jsxs("row", { align: "center", gap: "sm", role: "hermes.pr.commit", children: [
-        /* @__PURE__ */ jsx("text", { grow: 1, spans: [{ t: c.body.split("\n")[0] ?? "" }], truncate: "end", wrap: "none" }, "m"),
-        sha ? /* @__PURE__ */ jsx("text", { spans: [{ href: c.url, s: "mono dim", t: sha }], wrap: "none" }, "s") : null
-      ] }, `c${i}`);
-    })
-  ] }, key2);
-}
-function took(c, now) {
-  return c.startedAt && c.completedAt ? durationWhole(Date.parse(c.completedAt) - Date.parse(c.startedAt)) : c.startedAt && c.status === "pending" ? `${durationWhole(now - Date.parse(c.startedAt))}\u2026` : "";
-}
-function checksTab(pr, now) {
-  if (!pr.checks.length) {
-    return [/* @__PURE__ */ jsx("text", { spans: [{ s: "muted", t: "No checks ran on the latest commit." }] }, "none")];
+  switch (action) {
+    case "merge":
+      return pr.state === "open" && !pr.draft && pr.canUpdate && pr.mergeable !== "conflicting";
+    case "ready":
+      return pr.state === "open" && pr.draft && pr.canUpdate;
+    case "close":
+      return pr.state === "open" && pr.canUpdate;
+    case "reopen":
+      return pr.state === "closed" && pr.canUpdate;
+    case "update-branch":
+      return pr.state === "open" && (pr.behindBy ?? 0) > 0;
+    case "rerun":
+      return pr.state === "open" && failedRuns(pr.checks).length > 0;
+    case "draft":
+      return false;
   }
-  const sorted = [...pr.checks].sort((a2, b) => a2.name.localeCompare(b.name));
-  const groups = [
-    { checks: sorted.filter((c) => checkGroup(c) === "attention"), head: "Needs attention", id: "bad", open: true },
-    { checks: sorted.filter((c) => checkGroup(c) === "running"), head: "Running", id: "run", open: true },
-    { checks: sorted.filter((c) => c.status === "success"), head: "Passed", id: "ok", open: false },
-    { checks: sorted.filter((c) => c.status === "skipped" || c.status === "neutral"), head: "Skipped", id: "skip", open: false }
-  ];
-  const runs3 = failedRuns(pr.checks).length;
-  return [
-    /* @__PURE__ */ jsx(
-      "text",
-      {
-        spans: [
-          { s: checksTone(pr), t: checksSummary(pr.checks) },
-          { s: "dim", t: ` \xB7 on ${pr.headOid.slice(0, 7)}${runs3 ? ` \xB7 F re-runs ${plural(runs3, "failed workflow run")}` : ""}` }
-        ]
-      },
-      "sum"
-    ),
-    ...groups.filter((g) => g.checks.length).map((g) => /* @__PURE__ */ jsx("section", { collapsed: !g.open, collapsible: true, head: `${g.head} \xB7 ${g.checks.length}`, role: "hermes.pr.checkgroup", children: g.checks.map((c, i) => /* @__PURE__ */ jsxs("row", { align: "center", gap: "sm", role: "hermes.pr.check", title: c.description, children: [
-      /* @__PURE__ */ jsx("icon", { name: CHECK[c.status].icon, tone: CHECK[c.status].tone }, "i"),
-      /* @__PURE__ */ jsx("text", { grow: 1, spans: [{ href: c.url, t: c.name }], truncate: "end", wrap: "none" }, "n"),
-      c.workflow && !c.name.startsWith(`${c.workflow} /`) ? /* @__PURE__ */ jsx("text", { spans: [{ s: "dim", t: c.workflow }], truncate: "end", wrap: "none" }, "w") : null,
-      /* @__PURE__ */ jsx("text", { spans: [{ s: CHECK[c.status].tone === "muted" ? "dim" : CHECK[c.status].tone, t: CHECK[c.status].word }], wrap: "none" }, "s"),
-      /* @__PURE__ */ jsx("text", { spans: [{ s: "dim mono", t: took(c, now) }], wrap: "none" }, "t")
-    ] }, `k${i}`)) }, g.id))
-  ];
 }
 
 // src/overlays/pullRequests.tsx

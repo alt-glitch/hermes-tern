@@ -120,8 +120,6 @@
   "src/prs/body.tsx @typescript-eslint/consistent-type-assertions": 4,
   "src/prs/body.tsx @typescript-eslint/no-non-null-assertion": 1,
   "src/prs/body.tsx @typescript-eslint/no-unnecessary-type-assertion": 2,
-  "src/prs/view.tsx @typescript-eslint/consistent-type-assertions": 2,
-  "src/prs/view.tsx @typescript-eslint/no-non-null-assertion": 9,
   "src/sessionCommands.ts @typescript-eslint/consistent-type-assertions": 2,
   "src/settings.ts @typescript-eslint/consistent-type-assertions": 1,
   "src/settings.ts @typescript-eslint/no-unnecessary-type-assertion": 1,
