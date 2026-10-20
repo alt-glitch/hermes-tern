@@ -18,7 +18,7 @@ import { checksSummary, failedRuns, type MergeMethod, type PullRequest } from '.
 import { shown } from '../github/remote.js'
 import type { Entry, PrAction, PullRequests } from '../github/store.js'
 import { relative } from '../view/format.js'
-import { button, type ButtonProps } from '../view/ui/button.js'
+import { button, type ButtonProps, pressable } from '../view/ui/button.js'
 
 import { checksTab } from './checks.js'
 import { conversation } from './conversation.js'
@@ -312,18 +312,18 @@ export class PrView {
               ]}
               wrap="none"
             />
-            <text
-              key="checkout"
-              shrink={0}
-              onClick={() => {
-                copyToClipboard(`gh pr checkout ${pr.number}`)
-                this.#host.notice(`Copied gh pr checkout ${pr.number}`, 'info')
-              }}
-              role="hermes.pr.checkout"
-              spans={[{ s: 'mono dim', t: `gh pr checkout ${pr.number}` }]}
-              title="Copy the checkout command"
-              wrap="none"
-            />
+            {pressable(
+              {
+                key: 'checkout',
+                name: `Copy gh pr checkout ${pr.number}`,
+                onClick: () => {
+                  copyToClipboard(`gh pr checkout ${pr.number}`)
+                  this.#host.notice(`Copied gh pr checkout ${pr.number}`, 'info')
+                },
+                role: 'hermes.pr.checkout'
+              },
+              <text key="face" spans={[{ s: 'mono dim', t: `gh pr checkout ${pr.number}` }]} title="Copy the checkout command" wrap="none" />
+            )}
           </row>
         ) : (
           <text key="err" spans={[{ s: e.error ? 'error' : 'muted', t: e.error ?? '' }]} />
@@ -374,12 +374,20 @@ export class PrView {
           }}
         />
         <spacer grow={1} key="fill" />
-        {pr ? (
-          <row align="center" gap="xs" key="checks" onClick={() => this.setTab('checks')} role="hermes.pr.checkstate" title="Checks">
-            <icon key="i" name={checksIcon(pr)} tone={checksTone(pr)} />
-            <text key="t" spans={[{ s: checksTone(pr), t: pr.checks.length ? checksSummary(pr.checks) : 'No checks reported' }]} wrap="none" />
-          </row>
-        ) : null}
+        {pr
+          ? pressable(
+              {
+                key: 'checks',
+                name: `Checks: ${pr.checks.length ? checksSummary(pr.checks) : 'none reported'}`,
+                onClick: () => this.setTab('checks'),
+                role: 'hermes.pr.checkstate'
+              },
+              <row align="center" gap="xs" key="face" title="Checks">
+                <icon key="i" name={checksIcon(pr)} tone={checksTone(pr)} />
+                <text key="t" spans={[{ s: checksTone(pr), t: pr.checks.length ? checksSummary(pr.checks) : 'No checks reported' }]} wrap="none" />
+              </row>
+            )
+          : null}
       </row>
     )
   }

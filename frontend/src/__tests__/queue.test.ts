@@ -10,7 +10,7 @@ import { dockNodes } from '../view/dock.js'
 import type { PendingRow, PendingStatus } from '../wire/schemas.js'
 
 import { dockActions, dockContext } from './dockFakes.js'
-import { FakeGateway, settle } from './fakes.js'
+import { faceJson, FakeGateway, settle } from './fakes.js'
 
 const S1 = liveSessionId('s1')
 const image: Image = { mime: 'image/png', name: 'shot.png', path: '/uploads/1.png' }
@@ -273,7 +273,7 @@ function drawn(queued: QueuedRow[], steer = true) {
   const prop = (n: NodeJson, name: string) => n.p?.[name]
 
   return rows.map(r => ({
-    actions: (r.c ?? []).flatMap(c => (prop(c, 'role') === 'omp.queue.steer' ? ['steer'] : prop(c, 'role') === 'omp.queue.edit' ? ['edit'] : [])),
+    actions: (r.c ?? []).map(faceJson).flatMap(c => (prop(c, 'role') === 'omp.queue.steer' ? ['steer'] : prop(c, 'role') === 'omp.queue.edit' ? ['edit'] : [])),
     badges: (r.c ?? []).filter(c => c.k === 'badge' && prop(c, 'key') === 'note').map(c => prop(c, 'text')),
     icon: r.c?.filter(c => c.k === 'icon').map(c => prop(c, 'name'))[0],
     title: prop(r, 'title')

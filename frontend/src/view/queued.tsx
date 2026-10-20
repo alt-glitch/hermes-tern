@@ -6,6 +6,8 @@ import type { JSX } from '@stencil-hq/tern'
 import { assertNever } from '../core/assert.js'
 import type { QueuedRow } from '../turn/queue.js'
 
+import { pressable } from './ui/button.js'
+
 /** What a queued row's buttons do, by its index: Edit pulls it into the composer; Steer (absent when no turn runs) sends it into the turn. */
 export interface QueuedActions {
   edit(index: number): void
@@ -22,33 +24,25 @@ export function queuedNode(queued: readonly QueuedRow[], on: QueuedActions): JSX
           <text grow={1} key="text" text={q.text.replace(/\s*\r?\n\s*/g, ' ↵ ')} truncate="end" wrap="none" />
           {i === 0 && queued.length > 1 ? <badge key="count" role="omp.queue.count" text={`${queued.length}`} /> : null}
           {q.kind === 'foreign' && q.note === 'unknown' ? <badge key="note" text="unknown" tone="warning" /> : null}
-          {on.steer && editable(q) && q.steer ? (
-            <row
-              align="center"
-              gap="xs"
-              key="steer"
-              onClick={() => on.steer?.(i)}
-              role="omp.queue.steer"
-              title={`Steer the running turn with this instead${i === 0 ? '  ⌥↵' : ''}`}
-            >
-              <icon key="i" name="corner-up-right" />
-              {i === 0 ? <kbd key="k" keys={['alt', 'enter']} /> : null}
-              <text key="t" text="Steer" />
-            </row>
-          ) : null}
-          {editable(q) ? (
-            <row
-              align="center"
-              gap="xs"
-              key="edit"
-              onClick={() => on.edit(i)}
-              role="omp.queue.edit"
-              title={`Edit in the composer${i === 0 ? '  ⌥↑' : ''}`}
-            >
-              {i === 0 ? <kbd key="k" keys={['alt', 'up']} /> : null}
-              <text key="t" text="Edit" />
-            </row>
-          ) : null}
+          {on.steer && editable(q) && q.steer
+            ? pressable(
+                { key: 'steer', name: 'Steer', onClick: () => on.steer?.(i) },
+                <row align="center" gap="xs" key="face" role="omp.queue.steer" title={`Steer the running turn with this instead${i === 0 ? '  ⌥↵' : ''}`}>
+                  <icon key="i" name="corner-up-right" />
+                  {i === 0 ? <kbd key="k" keys={['alt', 'enter']} /> : null}
+                  <text key="t" text="Steer" />
+                </row>
+              )
+            : null}
+          {editable(q)
+            ? pressable(
+                { key: 'edit', name: 'Edit', onClick: () => on.edit(i) },
+                <row align="center" gap="xs" key="face" role="omp.queue.edit" title={`Edit in the composer${i === 0 ? '  ⌥↑' : ''}`}>
+                  {i === 0 ? <kbd key="k" keys={['alt', 'up']} /> : null}
+                  <text key="t" text="Edit" />
+                </row>
+              )
+            : null}
         </row>
       ))}
     </col>
