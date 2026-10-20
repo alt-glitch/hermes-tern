@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 
 import { CONTROL_COMMANDS, type ControlHost, steerTurn } from '../controlCommands.js'
+import { liveSessionId } from '../core/ids.js'
 
 const run = (name: string, host: ControlHost, arg = '') => CONTROL_COMMANDS.find(c => c.name === name)!.run(host, arg)
 
@@ -21,7 +22,7 @@ function host(over: Partial<ControlHost> = {}, replies: Record<string, unknown> 
     gw: { request } as unknown as ControlHost['gw'],
     notice: vi.fn(),
     queued: 0,
-    sid: 'sid-1',
+    sid: liveSessionId('sid-1'),
     submit: vi.fn(),
     ...over
   }

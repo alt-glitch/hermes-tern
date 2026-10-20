@@ -7,7 +7,7 @@ import { execFile } from 'node:child_process'
 import type { JSX, Key } from '@stencil-hq/tern'
 
 import type { ChatPorts } from '../app/ports.js'
-import { prKey } from '../github/links.js'
+import { type PrKey, prKey } from '../core/ids.js'
 import { checksState } from '../github/pullRequest.js'
 import type { Entry } from '../github/store.js'
 import type { Overlay } from '../overlay.js'
@@ -49,14 +49,14 @@ export function prsCommand(host: PullRequestsSheetHost, arg: string) {
 }
 
 /** Docks PR `focus` (a key; else the newest) at the chat's right edge. */
-export function openPullRequests(host: PullRequestsSheetHost, focus?: string) {
+export function openPullRequests(host: PullRequestsSheetHost, focus?: PrKey) {
   const newest = host.prs.entries().at(-1)
 
   host.openPrAside(focus ?? (newest ? prKey(newest.ref) : undefined))
 }
 
 /** The PR sheet: the whole view over the chat, Escape closes it. */
-export function openPrSheet(host: PullRequestsSheetHost, focus?: string) {
+export function openPrSheet(host: PullRequestsSheetHost, focus?: PrKey) {
   const view = new PrView(
     {
       changed: () => host.changed(),
@@ -136,7 +136,7 @@ export function openPrMenu(host: PullRequestsSheetHost) {
 
   const close = () => host.close(overlay)
 
-  const pick = (key: string | undefined) => {
+  const pick = (key: PrKey | undefined) => {
     close()
 
     if (key) {
@@ -163,7 +163,7 @@ export function openPrMenu(host: PullRequestsSheetHost) {
     },
     onKey: (k: Key) => {
       const keys = entries().map(e => prKey(e.ref))
-      const at = keys.indexOf(selected ?? '')
+      const at = selected ? keys.indexOf(selected) : -1
 
       if (k.name === 'escape') {
         close()

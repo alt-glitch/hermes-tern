@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 
+import { liveSessionId } from '../core/ids.js'
 import { mutateSession } from '../hermes/mutate.js'
 import { lastTurnRewind, retryText, retryTurnRewind } from '../hermes/rewind.js'
 import { compressReport, SESSION_COMMANDS, type SessionHost } from '../sessionCommands.js'
@@ -39,7 +40,7 @@ function host(over: Partial<SessionHost> = {}, replies: Record<string, unknown> 
     queued: 0,
     reload: vi.fn(async () => undefined),
     send: vi.fn(),
-    sid: 'sid-1',
+    sid: liveSessionId('sid-1'),
     stale: () => false,
     submit: vi.fn(),
     ...over

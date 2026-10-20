@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { copyToClipboard } from '../clipboard.js'
 import { type CommandHost, historyText, localCommand } from '../commands.js'
 import { CONTROL_COMMANDS, type ControlHost } from '../controlCommands.js'
+import { entryId } from '../core/ids.js'
 import type { Entry } from '../model.js'
 
 vi.mock('../clipboard.js', () => ({ copyToClipboard: vi.fn() }))
@@ -130,17 +131,17 @@ describe('local commands', () => {
 
 const turn = (id: string, text: string, tools = 0): Entry => ({
   blocks: [
-    ...Array.from({ length: tools }, (_, i) => ({ call: {} as never, id: `${id}c${i}`, kind: 'tool' as const })),
-    ...(text ? [{ id: `${id}x`, kind: 'text' as const, text }] : [])
+    ...Array.from({ length: tools }, (_, i) => ({ call: {} as never, id: entryId(`${id}c${i}`), kind: 'tool' as const })),
+    ...(text ? [{ id: entryId(`${id}x`), kind: 'text' as const, text }] : [])
   ],
-  id,
+  id: entryId(id),
   kind: 'turn',
   rev: 0,
   startedAt: 0,
   status: 'done'
 })
 
-const user = (id: string, text: string): Entry => ({ at: 0, id, kind: 'user', text })
+const user = (id: string, text: string): Entry => ({ at: 0, id: entryId(id), kind: 'user', text })
 
 describe('/copy and /history', () => {
   const entries = [user('u1', 'hi'), turn('t1', 'first answer'), user('u2', 'more'), turn('t2', '', 2), turn('t3', 'last answer')]

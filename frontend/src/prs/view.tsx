@@ -10,7 +10,7 @@ import { node } from '@stencil-hq/tern'
 
 import { copyToClipboard } from '../clipboard.js'
 import { errorText } from '../core/errors.js'
-import { prKey } from '../github/links.js'
+import { type PrKey, prKey } from '../core/ids.js'
 import {
   type ActivityItem,
   type Check,
@@ -102,7 +102,7 @@ const DECISION: Record<string, [string, Tone]> = {
 
 export class PrView {
   readonly #host: PrViewHost
-  selected: string | undefined
+  selected: PrKey | undefined
   tab: PrTab = 'conversation'
   #confirm: 'close' | 'merge' | undefined
   #copied: string | undefined
@@ -110,7 +110,7 @@ export class PrView {
   /** The node id the body's nodes sit under, from the last render (for scroll and reveal). */
   #bodyId = ''
 
-  constructor(host: PrViewHost, focus?: string) {
+  constructor(host: PrViewHost, focus?: PrKey) {
     this.#host = host
     this.selected = focus
   }
@@ -120,11 +120,8 @@ export class PrView {
   }
 
   /** The PRs in the order the switcher lists them: newest link first. */
-  keys(): string[] {
-    return this.#host.prs
-      .entries()
-      .map(e => prKey(e.ref))
-      .toReversed()
+  keys(): PrKey[] {
+    return this.#host.prs.entries().map(e => prKey(e.ref)).toReversed()
   }
 
   current(): Entry | undefined {
@@ -137,7 +134,7 @@ export class PrView {
     return this.selected ? this.#host.prs.get(this.selected) : undefined
   }
 
-  select(key: string) {
+  select(key: PrKey) {
     this.selected = key
     this.#confirm = undefined
     this.#load()
@@ -154,7 +151,7 @@ export class PrView {
   /** Step through the PRs (`[` and `]`). */
   step(by: number) {
     const keys = this.keys()
-    const at = keys.indexOf(this.selected ?? '')
+    const at = this.selected ? keys.indexOf(this.selected) : -1
 
     if (keys.length) {
       this.select(keys[(at + by + keys.length) % keys.length]!)
@@ -338,8 +335,10 @@ export class PrView {
         }))}
         key="switch"
         onSelect={ev => {
-          if (ev.item) {
-            this.select(ev.item)
+          const key = ev.item ? this.#host.prs.keyOf(ev.item) : undefined
+
+          if (key) {
+            this.select(key)
           }
         }}
         role="hermes.pr.switch"

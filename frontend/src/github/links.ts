@@ -20,8 +20,6 @@ export function linksPath(env: NodeJS.ProcessEnv = process.env): string {
   return join(env.HERMES_HOME || join(homedir(), '.hermes'), 'plugin-data', 'hermes-tern', 'pull-requests.json')
 }
 
-export const prKey = (ref: Pick<PrRef, 'host' | 'number' | 'repository'>) => `${ref.host}/${ref.repository}#${ref.number}`
-
 function refOf(v: unknown): PrRef | undefined {
   const r = record(v)
   const host = typeof r?.host === 'string' ? r.host : ''

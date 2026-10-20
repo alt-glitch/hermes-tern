@@ -13,6 +13,7 @@ import type { JSX, Key, PickerGroup, PickerItem, Span } from '@stencil-hq/tern'
 import type { ChatPorts } from '../app/ports.js'
 import { launchEnv } from '../config/env.js'
 import { errorText } from '../core/errors.js'
+import { durable, storedSessionId } from '../core/ids.js'
 import { mutateSession } from '../hermes/mutate.js'
 import { inWorkspace, lastReply, sessionLabel, type StoredSession, storedSessions, workspaceOf } from '../hermes/sessionIndex.js'
 import type { Overlay } from '../overlay.js'
@@ -42,7 +43,7 @@ export function openSessionPicker(host: SessionsHost) {
   let deleting: string | null = null
   let shown: string[] = []
   const replies = new Map<string, string>()
-  const current = host.session.ref.stored ?? host.session.ref.live ?? ''
+  const current = durable(host.session.ref) ?? ''
 
   const load = async () => {
     state = 'loading'
@@ -79,7 +80,7 @@ export function openSessionPicker(host: SessionsHost) {
 
     if (s.id !== current) {
       // A refusal (deleted elsewhere, gateway down) is a notice; the view stays where it was.
-      host.resume(s.id).catch((error: unknown) => {
+      host.resume(storedSessionId(s.id)).catch((error: unknown) => {
         host.transcript.notice(`Could not resume: ${errorText(error)}`, 'error')
         host.changed()
       })

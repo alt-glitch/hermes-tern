@@ -6,6 +6,7 @@
 import type { ChatPorts } from './app/ports.js'
 import { copyToClipboard } from './clipboard.js'
 import { CONTROL_COMMANDS } from './controlCommands.js'
+import { storedSessionId } from './core/ids.js'
 import { fastCommand, type FastHost } from './fast.js'
 import type { Entry } from './model.js'
 import { type AgentsSheetHost, openAgents } from './overlays/agents.js'
@@ -118,7 +119,8 @@ const COMMANDS: readonly LocalCommand[] = [
         return openSessionPicker(host)
       }
 
-      return arg === 'new' ? host.newSession() : host.resume(arg)
+      // The argument names a stored session, as the picker's rows do.
+      return arg === 'new' ? host.newSession() : host.resume(storedSessionId(arg))
     }
   },
   {

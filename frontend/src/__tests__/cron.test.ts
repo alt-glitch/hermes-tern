@@ -1,6 +1,7 @@
 import type { GatewayClient } from '@tui/gatewayClient.js'
 import { describe, expect, it, vi } from 'vitest'
 
+import { toolCallId } from '../core/ids.js'
 import type { ToolCall } from '../model.js'
 import { Cron, type CronJob, isMonitor, isPaused, jobTone, ownJobs, relative } from '../processes/cron.js'
 
@@ -12,7 +13,7 @@ const call = (name: string, result: unknown): ToolCall => ({
   args: {},
   argsText: '',
   context: '',
-  id: 'c',
+  id: toolCallId('c'),
   name,
   result: JSON.stringify(result),
   startedAt: 0,

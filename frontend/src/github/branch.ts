@@ -5,6 +5,8 @@
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 
+import { type StackKey, stackKey } from '../core/ids.js'
+
 import type { GitHub } from './client.js'
 import type { PrRef } from './pullRequest.js'
 
@@ -92,8 +94,7 @@ export async function branchPullRequest(gh: GitHub, target: BranchTarget): Promi
 // ── Stacks (GitHub's stacked pull requests) ───────────────────────────────────────────────────
 
 export interface Stack {
-  /** `host/repo#stack:N`. */
-  key: string
+  key: StackKey
   host: string
   repository: string
   number: number
@@ -132,7 +133,7 @@ export function parseStacks(host: string, repository: string, rows: unknown): St
       {
         base: typeof s.base === 'string' ? s.base : (s.base?.ref ?? ''),
         host,
-        key: `${host}/${repository}#stack:${s.number}`,
+        key: stackKey(host, repository, s.number),
         layers: s.pull_requests
           .filter(p => typeof p.number === 'number')
           .map(p => ({ head: p.head?.ref ?? '', number: p.number!, state: p.merged_at ? 'merged' : (p.state ?? 'open') })),

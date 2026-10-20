@@ -3,6 +3,7 @@ import type { ModelOptionProvider, SessionLiveInfo } from '@hermes/shared/gatewa
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { SessionView } from '../app/ports.js'
+import { liveSessionId, storedSessionId } from '../core/ids.js'
 import { forgetCaps, rememberCaps } from '../modelCaps.js'
 import type { Overlay } from '../overlay.js'
 import { type EffortHost, openEffortPicker } from '../overlays/effort.js'
@@ -73,7 +74,7 @@ describe('the theme picker on its ports', () => {
 function effortHost(info: SessionLiveInfo | null, replies: ConstructorParameters<typeof FakeGateway>[0] = {}) {
   const gw = new FakeGateway(replies)
   const opened: Overlay[] = []
-  const session: SessionView = { info, ref: { live: 's1', stored: 'stored-1' } }
+  const session: SessionView = { info, ref: { live: liveSessionId('s1'), stored: storedSessionId('stored-1') } }
   const host = {
     changed: vi.fn<EffortHost['changed']>(),
     close: vi.fn<EffortHost['close']>(),

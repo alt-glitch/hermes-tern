@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
+import { entryId } from '../core/ids.js'
 import type { TurnEntry } from '../model.js'
 import { steerState, steerText, Transcript } from '../transcript.js'
 
@@ -22,7 +23,7 @@ describe('steers', () => {
   it('reads as landed once the turn goes on, and as the next prompt when the turn ended first', () => {
     const turn = { blocks: [{ at: 0, id: 's', kind: 'steer', text: 'x' }], status: 'live' } as unknown as TurnEntry
     expect(steerState(turn, 0)).toBe('pending')
-    turn.blocks.push({ id: 'x', kind: 'text', text: 'ok' })
+    turn.blocks.push({ id: entryId('x'), kind: 'text', text: 'ok' })
     expect(steerState(turn, 0)).toBe('landed')
     expect(steerState({ ...turn, blocks: turn.blocks.slice(0, 1), status: 'done' }, 0)).toBe('next')
   })

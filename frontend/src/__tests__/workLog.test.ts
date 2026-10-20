@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
+import { entryId, toolCallId } from '../core/ids.js'
 import type { Block, ToolCall, TurnEntry } from '../model.js'
 import type { Todo } from '../model.js'
 import { Transcript } from '../transcript.js'
@@ -9,21 +10,21 @@ const call = (name: string, args: Record<string, unknown> = {}, more: Partial<To
   args,
   argsText: '',
   context: '',
-  id: `${name}-${JSON.stringify(args)}`,
+  id: toolCallId(`${name}-${JSON.stringify(args)}`),
   name,
   startedAt: 0,
   status: 'done',
   ...more
 })
 
-const tool = (id: string, c: ToolCall): Extract<Block, { kind: 'tool' }> => ({ call: c, id, kind: 'tool' })
-const text = (id: string, t = 'x'): Block => ({ id, kind: 'text', text: t })
-const think = (id: string, t = 'hm'): Extract<Block, { kind: 'thinking' }> => ({ endedAt: 1, id, kind: 'thinking', startedAt: 0, text: t })
+const tool = (id: string, c: ToolCall): Extract<Block, { kind: 'tool' }> => ({ call: c, id: entryId(id), kind: 'tool' })
+const text = (id: string, t = 'x'): Block => ({ id: entryId(id), kind: 'text', text: t })
+const think = (id: string, t = 'hm'): Extract<Block, { kind: 'thinking' }> => ({ endedAt: 1, id: entryId(id), kind: 'thinking', startedAt: 0, text: t })
 
 const turn = (blocks: Block[], more: Partial<TurnEntry> = {}): TurnEntry => ({
   blocks,
   endedAt: 54_000,
-  id: 't',
+  id: entryId('t'),
   kind: 'turn',
   rev: 0,
   startedAt: 0,
@@ -168,7 +169,7 @@ describe('foldOf', () => {
 })
 
 describe('parts', () => {
-  const steer = (id: string, at: number): Block => ({ at, id, kind: 'steer', text: 'also check the tests' })
+  const steer = (id: string, at: number): Block => ({ at, id: entryId(id), kind: 'steer', text: 'also check the tests' })
 
   it('keeps a steer in view and folds each stretch around it by its own time', () => {
     const t = turn([tool('a', call('terminal')), steer('s', 20_000), tool('b', call('terminal')), text('answer')])

@@ -14,6 +14,16 @@ import type { GatewayClient } from '@tui/gatewayClient.js'
 import type { SessionInfo } from '@tui/types.js'
 import type { ZodMiniType } from 'zod/mini'
 
+import {
+  type AdmissionId,
+  admissionId,
+  liveSessionId,
+  type SessionRef,
+  storedSessionId,
+  subscriptionId,
+  type SubscriptionId
+} from '../core/ids.js'
+
 type Classic = RpcMethods
 type Canonical = CanonicalRpcMethods
 
@@ -78,4 +88,38 @@ export function rpc<M extends Method>(gw: Requester, method: M, params: Params<M
 /** Sends `method` and parses the answer with `schema`; a shape it refuses rejects, as a failed request does. */
 export async function rpcParsed<M extends Method, T>(gw: Requester, method: M, params: Params<M>, schema: ZodMiniType<T>): Promise<T> {
   return schema.parse(await gw.request<unknown>(method, params as Record<string, unknown>))
+}
+
+/** The fields of a session.create or session.resume result, from either gateway, that name ids. */
+export interface SnapshotIdFields {
+  session_id: string
+  stored_session_id?: string | null
+  subscription_id?: string | null
+  info?: { stored_session_id?: string | null } | null
+}
+
+/** What a session.create or session.resume result names: the session's ids, and this view's subscription to it. */
+export interface SnapshotIds {
+  ref: SessionRef
+  /** The shared gateway's subscription for this view; a private gateway has none. */
+  subscription: SubscriptionId | undefined
+}
+
+/**
+ * The ids `r` names. The stored id is the info's (the shared gateway's), else the result's own
+ * (a private gateway's); an empty one is none, and stays null so a reader that needs a stored id
+ * can tell.
+ */
+export function snapshotIds(r: SnapshotIdFields): SnapshotIds {
+  const stored = r.info?.stored_session_id || r.stored_session_id
+
+  return {
+    ref: { live: liveSessionId(r.session_id), stored: stored ? storedSessionId(stored) : null },
+    subscription: r.subscription_id ? subscriptionId(r.subscription_id) : undefined
+  }
+}
+
+/** The admission a prompt.submit receipt names; only the shared gateway admits into a queue. */
+export function admissionOf(r: ResultOf<'prompt.submit'> | null | undefined): AdmissionId | undefined {
+  return r && 'admission_id' in r ? admissionId(r.admission_id) : undefined
 }

@@ -9,7 +9,7 @@ import type { ChatPorts } from './app/ports.js'
 import { copyToClipboard } from './clipboard.js'
 import { launchEnv } from './config/env.js'
 import { type GitState, gitState } from './git/status.js'
-import { prKey } from './github/links.js'
+import { prKey } from './core/ids.js'
 import { checksState } from './github/pullRequest.js'
 import { type ChangesHost, openChanges } from './overlays/changes.js'
 import { openPullRequests, type PullRequestsSheetHost, stateLabel } from './overlays/pullRequests.js'
@@ -206,7 +206,7 @@ export class Sidebar {
         return
 
       case 'open-pr':
-        return openPullRequests(this.#host, row.replace(/^pr:/, ''))
+        return openPullRequests(this.#host, this.#host.prs.keyOf(row.replace(/^pr:/, '')))
 
       case 'diff':
         return openChanges(this.#host, row.replace(/^file:/, ''))

@@ -5,9 +5,10 @@ import { DatabaseSync } from 'node:sqlite'
 
 import { describe, expect, it, vi } from 'vitest'
 
+import { prKey, storedSessionId, toolCallId } from '../core/ids.js'
 import { parseRemote, parseStacks } from '../github/branch.js'
 import type { GitHub } from '../github/client.js'
-import { ancestry, linkedFromResult, prKey, storedLinks } from '../github/links.js'
+import { ancestry, linkedFromResult, storedLinks } from '../github/links.js'
 import {
   ACTIVITY_QUERY,
   batchQuery,
@@ -34,7 +35,7 @@ const linkCall = (linked: PrRef[], status: ToolCall['status'] = 'done'): ToolCal
   args: {},
   argsText: '',
   context: '',
-  id: 'l',
+  id: toolCallId('l'),
   name: 'link_pull_request',
   result: JSON.stringify({ already_linked: false, linked }),
   startedAt: 0,
@@ -210,14 +211,14 @@ describe('PullRequests', () => {
     const graphql = vi.fn(async () => ({ p0: prJson() }))
     const gh = { graphql, rest: vi.fn() } as unknown as GitHub
     const changed = vi.fn()
-    const store = new PullRequests({ changed, cwd: () => null, sid: () => 's1' }, gh, () => [])
+    const store = new PullRequests({ changed, cwd: () => null, sid: () => storedSessionId('s1') }, gh, () => [])
 
     store.adopt()
     store.onCall(linkCall([ref(5)]))
     await vi.waitFor(() => expect(store.entries()[0]?.pr?.title).toBe('Fix it'))
     expect(graphql).toHaveBeenCalledWith('github.com', expect.stringContaining('pullRequest(number: $n0)'), expect.objectContaining({ n0: 5 }))
 
-    await store.act('merge', 'github.com/acme/app#5')
+    await store.act('merge', prKey(ref(5)))
     expect(graphql).toHaveBeenCalledWith('github.com', expect.stringContaining('mergePullRequest'), { id: 'PR_1', m: 'SQUASH', oid: 'abc1234' })
     store.dispose()
   })
@@ -227,7 +228,7 @@ describe('PullRequests', () => {
     const changed = vi.fn()
     let stored = [ref(1)]
     const links = vi.fn(() => stored)
-    const store = new PullRequests({ changed, cwd: () => null, sid: () => 's1' }, gh, links)
+    const store = new PullRequests({ changed, cwd: () => null, sid: () => storedSessionId('s1') }, gh, links)
 
     store.adopt()
     store.relink()
@@ -244,7 +245,7 @@ describe('PullRequests', () => {
 
   it('says once why nothing could be read', async () => {
     const gh = { graphql: vi.fn(async () => Promise.reject(new Error('Not logged in to github.com.'))), rest: vi.fn() } as unknown as GitHub
-    const store = new PullRequests({ changed: vi.fn(), cwd: () => null, sid: () => 's1' }, gh, () => [ref(1), ref(2)])
+    const store = new PullRequests({ changed: vi.fn(), cwd: () => null, sid: () => storedSessionId('s1') }, gh, () => [ref(1), ref(2)])
 
     store.adopt()
     await vi.waitFor(() => expect(store.error).toBe('Not logged in to github.com.'))
@@ -266,12 +267,12 @@ describe('PullRequests', () => {
       return { repository: { pullRequest: { comments: { nodes: [{ author: { login: 'a' }, body: at.now, createdAt: '2026-01-02T00:00:00Z' }] } } } }
     })
     const rest = vi.fn(async () => [{ filename: `${at.now}.ts`, status: 'modified' }])
-    const store = new PullRequests({ changed: vi.fn(), cwd: () => null, sid: () => 's1' }, { graphql, rest } as unknown as GitHub, () => [ref(5)])
+    const store = new PullRequests({ changed: vi.fn(), cwd: () => null, sid: () => storedSessionId('s1') }, { graphql, rest } as unknown as GitHub, () => [ref(5)])
     const reads = () => graphql.mock.calls.filter(c => c[1] === ACTIVITY_QUERY).length
 
     return { at, reads, rest, store }
   }
-  const KEY = 'github.com/acme/app#5'
+  const KEY = prKey(ref(5))
 
   it('keeps the files and the activity fresh apart: one tab read does not vouch for the other', async () => {
     const { at, rest, store } = detailStore()
@@ -324,7 +325,7 @@ describe('PullRequests', () => {
 
       return { p0: prJson() }
     })
-    const store = new PullRequests({ changed: vi.fn(), cwd: () => null, sid: () => 's1' }, { graphql, rest: vi.fn() } as unknown as GitHub, () => [ref(5)])
+    const store = new PullRequests({ changed: vi.fn(), cwd: () => null, sid: () => storedSessionId('s1') }, { graphql, rest: vi.fn() } as unknown as GitHub, () => [ref(5)])
     const asked = () => graphql.mock.calls.filter(c => c[1].includes('stack { number }')).length
 
     const round = async () => {
@@ -383,7 +384,7 @@ describe('branch and stacks', () => {
     })
     const rest = vi.fn(async () => [{ base: 'main', number: 4, pull_requests: [{ head: { ref: 'x' }, number: 8 }, { head: { ref: 'y' }, number: 9 }] }])
     const store = new PullRequests(
-      { changed: vi.fn(), cwd: () => '/wt', sid: () => 's1' },
+      { changed: vi.fn(), cwd: () => '/wt', sid: () => storedSessionId('s1') },
       { graphql, rest } as unknown as GitHub,
       () => [ref(5)],
       async () => ({ head: 'y', host: 'github.com', repository: 'acme/app' })

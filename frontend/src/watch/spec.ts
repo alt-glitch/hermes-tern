@@ -6,6 +6,7 @@
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 
+import type { LiveSessionId, StoredSessionId } from '../core/ids.js'
 import type { Subagent } from '../model.js'
 
 const run = promisify(execFile)
@@ -16,9 +17,9 @@ export const WATCH_ENV = 'HERMES_TERN_WATCH'
 /** Which agent a watcher shows. */
 export interface WatchSpec {
   /** The delegating session's runtime id (for subagent.list / steer / interrupt). */
-  sid: string
+  sid: LiveSessionId
   /** Its stored id, when it differs (children name either as their parent). */
-  stored?: string
+  stored?: StoredSessionId
   subagent: string
   name: string
   goal: string
@@ -38,7 +39,10 @@ export function readWatchSpec(env: NodeJS.ProcessEnv = process.env): WatchSpec |
   }
 }
 
-export function specOf(a: Subagent, name: string, sid: string, stored: string | null): WatchSpec {
+export function specOf(a: Subagent, name: string, sid: LiveSessionId, stored: StoredSessionId | null): WatchSpec {
+  // The two kinds differ in general; the shared gateway names one id for both.
+  const live: string = sid
+
   return {
     goal: a.goal,
     index: a.index,
@@ -46,7 +50,7 @@ export function specOf(a: Subagent, name: string, sid: string, stored: string | 
     name,
     sid,
     startedAt: a.startedAt,
-    stored: stored && stored !== sid ? stored : undefined,
+    stored: stored && stored !== live ? stored : undefined,
     subagent: a.id
   }
 }

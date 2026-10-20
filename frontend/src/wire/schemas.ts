@@ -8,6 +8,7 @@ import type { SessionInfo } from '@tui/types.js'
 import * as z from 'zod/mini'
 
 import { oneOf } from '../core/assert.js'
+import { type AdmissionId, admissionId, type InputId, inputId } from '../core/ids.js'
 import type { Counters } from '../model.js'
 
 /** `schema`, or undefined when the field is missing or not that shape (the old code read it unchecked). */
@@ -60,12 +61,16 @@ export type PendingStatus = (typeof PENDING_STATUSES)[number] | 'other'
 type InfoRow = NonNullable<SessionInfo['pending_submissions']>[number]
 
 /** One row of the authority's FIFO (`info.pending_submissions`), as the queue reads it. */
-export type PendingRow = Pick<InfoRow, 'admission_id' | 'user'> & { input_id?: InfoRow['input_id']; status: PendingStatus }
+export interface PendingRow extends Pick<InfoRow, 'user'> {
+  admission_id: AdmissionId
+  input_id?: InputId | undefined
+  status: PendingStatus
+}
 
 const pendingRow: z.ZodMiniType<PendingRow> = z.object({
-  admission_id: z.string(),
+  admission_id: z.pipe(z.string(), z.transform(admissionId)),
   /** The submission id the submitter chose (this pane's `submission_id`). */
-  input_id: loose(z.string()),
+  input_id: loose(z.pipe(z.string(), z.transform(inputId))),
   status: z.pipe(z.optional(z.unknown()), z.transform((status): PendingStatus => (isPendingStatus(status) ? status : 'other'))),
   /** The prompt's text. */
   user: z.catch(z.string(), '')

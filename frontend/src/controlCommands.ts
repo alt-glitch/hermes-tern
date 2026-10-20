@@ -5,6 +5,7 @@
 import type { GatewayClient } from '@tui/gatewayClient.js'
 
 import { errorText } from './core/errors.js'
+import type { LiveSessionId } from './core/ids.js'
 import { currentGeneration } from './hermes/mutate.js'
 import type { NoticeEntry } from './model.js'
 import { rpc } from './wire/rpc.js'
@@ -12,7 +13,8 @@ import { rpc } from './wire/rpc.js'
 /** What a control command needs from the app; App.control() supplies it. */
 export interface ControlHost {
   gw: Pick<GatewayClient, 'request'>
-  sid: string | null
+  /** The open session's runtime id. */
+  sid: LiveSessionId | null
   busy: boolean
   /** How many prompts wait on the next-prompt queue. */
   queued: number

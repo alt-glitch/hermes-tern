@@ -7,6 +7,7 @@
 import { lineTokens } from './compaction.js'
 import type { ControlHost } from './controlCommands.js'
 import { errorText } from './core/errors.js'
+import { type StoredSessionId, storedSessionId } from './core/ids.js'
 import { type MutationResult, mutateSession } from './hermes/mutate.js'
 import { lastTurnRewind, retryText, retryTurnRewind } from './hermes/rewind.js'
 import { rpc } from './wire/rpc.js'
@@ -24,8 +25,8 @@ export interface SessionHost extends ControlHost {
   compressing(state: 'none' | 'start' | { before?: number; after?: number }): void
   /** Sends `text` as a prompt now. */
   send(text: string): void
-  /** Shows session `id` in this view; false when the view did not move to it. */
-  open(id: string): Promise<boolean>
+  /** Shows stored session `id` in this view; false when the view did not move to it. */
+  open(id: StoredSessionId): Promise<boolean>
 }
 
 export interface SessionCommand {
@@ -178,7 +179,7 @@ async function branch(host: SessionHost, arg: string) {
     throw new Error('the gateway did not name the branch')
   }
 
-  if (host.stale() || !(await host.open(child))) {
+  if (host.stale() || !(await host.open(storedSessionId(child)))) {
     return
   }
 

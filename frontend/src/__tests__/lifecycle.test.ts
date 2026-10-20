@@ -4,6 +4,8 @@ import { join } from 'node:path'
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { storedSessionId } from '../core/ids.js'
+
 import { FakeGateway, fakeTern } from './fakes.js'
 
 process.env.HERMES_HOME = mkdtempSync(join(tmpdir(), 'hermes-tern-lifecycle-'))
@@ -128,7 +130,7 @@ describe('session lifecycle', () => {
     }))
     app.busy = null
 
-    await app.resume('old')
+    await app.resume(storedSessionId('old'))
 
     expect(app.control().queued).toBe(1)
   })
@@ -171,8 +173,8 @@ describe('session lifecycle', () => {
       // The gateway hands one actor the same subscription for every attach of a session.
       gw.handlers.set('session.resume', p => new Promise(resolve => answers.push(() => resolve({ session_id: p.session_id, subscription_id: 'sub-x' }))))
 
-      const stale = app.resume('x')
-      const winner = app.resume('x')
+      const stale = app.resume(storedSessionId('x'))
+      const winner = app.resume(storedSessionId('x'))
       await flush()
       const [first, second] = answers
 
@@ -203,8 +205,8 @@ describe('session lifecycle', () => {
       answers.set(String(p.session_id), () => resolve({ session_id: p.session_id, subscription_id: `sub-${p.session_id}` }))
     }))
 
-    const skipped = app.resume('a')
-    const chosen = app.resume('b')
+    const skipped = app.resume(storedSessionId('a'))
+    const chosen = app.resume(storedSessionId('b'))
     await flush()
     answers.get('a')!()
     await skipped
@@ -226,8 +228,8 @@ describe('session lifecycle', () => {
     let detached!: () => void
     gw.handlers.set('session.detach', () => new Promise<void>(resolve => (detached = resolve)))
 
-    await app.resume('b')
-    const back = app.resume('s1')
+    await app.resume(storedSessionId('b'))
+    const back = app.resume(storedSessionId('s1'))
     await flush()
     expect(gw.methods('session.resume').map(c => c.params.session_id)).toEqual(['b'])
 

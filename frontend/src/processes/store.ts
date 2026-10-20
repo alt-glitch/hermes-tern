@@ -7,6 +7,7 @@
 
 import type { GatewayClient } from '@tui/gatewayClient.js'
 
+import type { LiveSessionId } from '../core/ids.js'
 import type { BackgroundProcess, ToolCall } from '../model.js'
 import { isWatchCall, type Transcript } from '../transcript.js'
 import { withoutTernEnv } from '../view/describe.js'
@@ -19,7 +20,8 @@ import { Charts, type ChartsOptions } from './widgets/registry.js'
 /** What the store reaches of the app. */
 export interface ProcessesHost {
   readonly gw: Pick<GatewayClient, 'request'>
-  readonly sid: string | null
+  /** The open session's runtime id. */
+  readonly sid: LiveSessionId | null
   readonly transcript: Transcript
   changed(): void
 }
@@ -198,7 +200,7 @@ export function processIdOf(call: ToolCall): string | undefined {
 export class Processes {
   readonly #host: ProcessesHost
   readonly #byId = new Map<string, BackgroundProcess>()
-  #sid: string | null = null
+  #sid: LiveSessionId | null = null
   #timer: NodeJS.Timeout | undefined
   #ticking = false
   #again = false

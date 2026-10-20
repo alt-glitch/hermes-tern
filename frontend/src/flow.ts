@@ -4,6 +4,8 @@
 
 import type { SessionResumeResult } from '@hermes/shared/gateway-events'
 
+import type { LiveSessionId } from './core/ids.js'
+
 /** The working row while a turn runs. */
 export interface Busy {
   startedAt: number
@@ -58,7 +60,7 @@ export class Switches {
    * session's request waits while a switch is in flight (it may be the one
    * being adopted) and is dropped otherwise.
    */
-  route(active: string | null, sessionId: string | undefined): RequestRoute {
+  route(active: LiveSessionId | null, sessionId: string | undefined): RequestRoute {
     if (!sessionId || !active || sessionId === active) {
       return 'show'
     }
@@ -71,7 +73,7 @@ export class Switches {
  * Whether a gateway event belongs on screen while `active` is shown:
  * session-less and `gateway.*` events are global, the rest must name it.
  */
-export function ownsEvent(active: string | null, ev: { type: string; session_id?: string }): boolean {
+export function ownsEvent(active: LiveSessionId | null, ev: { type: string; session_id?: string }): boolean {
   return !ev.session_id || !active || ev.session_id === active || ev.type.startsWith('gateway.')
 }
 

@@ -14,6 +14,7 @@ import type {
 
 import { settleBridge, unwrap } from './bridge.js'
 import type { StoredCompaction } from './compaction.js'
+import { type EntryId, entryId, type ToolCallId, toolCallId } from './core/ids.js'
 import type { Block, Compaction, CompactionEntry, Counters, Entry, NoticeEntry, Todo, ToolCall, TurnEntry, UserAttachment } from './model.js'
 import { promptAttachments, splitPrompt } from './promptRefs.js'
 import { withoutTernEnv } from './view/describe.js'
@@ -82,8 +83,8 @@ export class Transcript {
   }
 
   /** A fresh id for an entry or block, unique within this transcript. */
-  id(prefix: string): string {
-    return `${prefix}${(this.#next++).toString(36)}`
+  id(prefix: string): EntryId {
+    return entryId(`${prefix}${(this.#next++).toString(36)}`)
   }
 
   get live(): TurnEntry | undefined {
@@ -440,7 +441,7 @@ export class Transcript {
       argsText: p.args_text ?? '',
       batch: u.batch,
       context: withoutTernEnv(p.context ?? ''),
-      id: p.tool_id,
+      id: toolCallId(p.tool_id),
       name: u.name,
       startedAt: at,
       status: 'running',
@@ -459,7 +460,7 @@ export class Transcript {
       call.todos = todosOf(call.args, before)
     }
 
-    turn.blocks.push({ call, id: p.tool_id, kind: 'tool' })
+    turn.blocks.push({ call, id: call.id, kind: 'tool' })
     this.#touch(turn)
   }
 
@@ -662,7 +663,7 @@ export class Transcript {
     let pendingContinued: string | undefined
     // When the row that opened the next turn (a prompt or a notice) was written.
     let promptAt = 0
-    const calls = new Map<string, ToolCall>()
+    const calls = new Map<ToolCallId, ToolCall>()
     // The list as the calls so far left it: what the next merge patches.
     let todos: Todo[] | undefined
 
@@ -770,7 +771,8 @@ export class Transcript {
           turn.status = 'interrupted'
         }
       } else if (m.role === 'tool') {
-        const id = m.tool_call_id ?? this.id('c')
+        // A stored row with no call id gets an entry id in its place, unique in this transcript.
+        const id = toolCallId(m.tool_call_id ?? this.id('c'))
         // History keeps the result only for edit tools (`content`, JSON); the rest come back bare.
         const result = typeof m.content === 'string' && m.content ? m.content : undefined
         // The edit preview the live call showed (tool.complete's inline_diff), kept on the row.
@@ -892,11 +894,7 @@ export class Transcript {
 
   /** The delegate_task calls in the transcript, oldest first. */
   delegations(): ToolCall[] {
-    return this.entries.flatMap(e =>
-      e.kind === 'turn'
-        ? e.blocks.flatMap(b => (b.kind === 'tool' && b.call.name === 'delegate_task' ? [b.call] : []))
-        : []
-    )
+    return this.calls('delegate_task')
   }
 
   /** The calls of tool `name` in the transcript, oldest first. */
@@ -907,7 +905,7 @@ export class Transcript {
   }
 
   /** The call with tool id `id`, in any turn. */
-  call(id: string): ToolCall | undefined {
+  call(id: ToolCallId): ToolCall | undefined {
     return this.#tool(id)?.call
   }
 
@@ -920,6 +918,7 @@ export class Transcript {
     )
   }
 
+  /** The call the gateway's tool id `id` names (as an event sends it), in any turn. */
   #tool(id: string): Located | undefined {
     return this.#findTool(call => call.id === id)
   }

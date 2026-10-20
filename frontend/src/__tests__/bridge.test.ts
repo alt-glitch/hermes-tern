@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { appOf, callApp, unwrap } from '../bridge.js'
+import { toolCallId } from '../core/ids.js'
 import { Transcript } from '../transcript.js'
 import { stepLabel, summarize } from '../workLog.js'
 
@@ -71,7 +72,9 @@ describe('the tool_call bridge', () => {
     const item = (name: string, args: Record<string, unknown> = {}) => {
       const u = unwrap(name, args)
 
-      return { call: { args: u.args, argsText: '', batch: u.batch, context: '', id: name, name: u.name, startedAt: 0, status: 'done' as const }, id: name, kind: 'tool' as const }
+      const id = toolCallId(name)
+
+      return { call: { args: u.args, argsText: '', batch: u.batch, context: '', id, name: u.name, startedAt: 0, status: 'done' as const }, id, kind: 'tool' as const }
     }
     const batch = item('tool_call', { calls: [{ name: 'connectors__linear__LINEAR_CREATE_ISSUE' }, { name: 'connectors__slack__SLACK_SEND_MESSAGE' }] })
 

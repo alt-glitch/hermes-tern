@@ -1,6 +1,7 @@
 import { plain } from '@stencil-hq/tern'
 import { describe, expect, it, vi } from 'vitest'
 
+import { prKey } from '../core/ids.js'
 import type { PrRef } from '../github/pullRequest.js'
 import type { Entry, PullRequests } from '../github/store.js'
 import { parseBody } from '../prs/body.js'
@@ -108,7 +109,7 @@ describe('PrView', () => {
 
   const viewOf = (entry: Entry) => {
     const prs = { activity: vi.fn(async () => {}), busy: () => false, entries: () => [entry], files: vi.fn(async () => {}), get: () => entry, poke: vi.fn() }
-    const view = new PrView({ changed: vi.fn(), notice: vi.fn(), open: vi.fn(), prs: prs as unknown as PullRequests }, 'github.com/acme/app#5')
+    const view = new PrView({ changed: vi.fn(), notice: vi.fn(), open: vi.fn(), prs: prs as unknown as PullRequests }, prKey(ref))
 
     return { prs, view }
   }

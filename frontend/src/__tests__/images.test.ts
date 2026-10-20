@@ -5,6 +5,7 @@ import { join } from 'node:path'
 import type { JSX } from '@stencil-hq/tern'
 import { describe, expect, it, vi } from 'vitest'
 
+import { entryId, toolCallId } from '../core/ids.js'
 import { imageSize } from '../hermes/images.js'
 import { localSource, Media, shownImage } from '../media.js'
 import type { ToolCall, TurnEntry, UserEntry } from '../model.js'
@@ -34,11 +35,11 @@ const PNG = Buffer.concat([
 const shot = join(dir, 'clip_1.png')
 writeFileSync(shot, PNG)
 
-const call = (name: string, args: Record<string, unknown>, more: Partial<ToolCall> = {}): ToolCall => ({
+const call = (name: string, args: Record<string, unknown>, { id = 'c1', ...more }: Omit<Partial<ToolCall>, 'id'> & { id?: string } = {}): ToolCall => ({
   args,
   argsText: '',
   context: '',
-  id: 'c1',
+  id: toolCallId(id),
   name,
   startedAt: 0,
   status: 'done',
@@ -241,11 +242,11 @@ describe('image cards', () => {
     const img = call('image_generate', {}, { id: 'g', result: { image: '/h/a.png', success: true } })
     const sh = call('terminal', { command: 'ls' }, { id: 's' })
     const blocks = [
-      { call: sh, id: 'b1', kind: 'tool' as const },
-      { call: img, id: 'b2', kind: 'tool' as const },
-      { id: 'b3', kind: 'text' as const, text: 'Here it is.' }
+      { call: sh, id: entryId('b1'), kind: 'tool' as const },
+      { call: img, id: entryId('b2'), kind: 'tool' as const },
+      { id: entryId('b3'), kind: 'text' as const, text: 'Here it is.' }
     ]
-    const turn: TurnEntry = { blocks, endedAt: 9, id: 't', kind: 'turn', rev: 0, startedAt: 0, status: 'done' }
+    const turn: TurnEntry = { blocks, endedAt: 9, id: entryId('t'), kind: 'turn', rev: 0, startedAt: 0, status: 'done' }
 
     expect(ownsCard(img)).toBe(true)
     expect(pieces(blocks).map(p => p.kind)).toEqual(['work', 'block', 'block'])
@@ -253,7 +254,7 @@ describe('image cards', () => {
 
     // A failed one has no image to keep in view.
     const failed = { ...img, status: 'error' as const }
-    expect(foldOf({ ...turn, blocks: [{ call: failed, id: 'b2', kind: 'tool' }, blocks[2]!] })?.hidden.has('b2')).toBe(true)
+    expect(foldOf({ ...turn, blocks: [{ call: failed, id: entryId('b2'), kind: 'tool' }, blocks[2]!] })?.hidden.has('b2')).toBe(true)
   })
 })
 

@@ -3,7 +3,6 @@
 // transcript, keys go to the top overlay or the composer, and every change
 // schedules one render of the whole view; the SDK diffs it into frame ops.
 
-import { randomUUID } from 'node:crypto'
 import { appendFileSync, existsSync } from 'node:fs'
 import { basename } from 'node:path'
 
@@ -30,6 +29,21 @@ import { Composer } from './composer.js'
 import { interruptTurn, redirectTurn, steerTurn } from './controlCommands.js'
 import { Disposables } from './core/disposables.js'
 import { errorText } from './core/errors.js'
+import {
+  type DurableSessionId,
+  durable,
+  entryId,
+  isLive,
+  type LiveSessionId,
+  liveSessionId,
+  newInputId,
+  NO_SESSION,
+  type PrKey,
+  type SessionIds,
+  type StoredSessionId,
+  storedSessionId,
+  toolCallId
+} from './core/ids.js'
 import { RenderScheduler } from './core/scheduler.js'
 import { fastTier } from './fast.js'
 import { type Busy, busyFrom, ownsEvent, Switches } from './flow.js'
@@ -62,6 +76,7 @@ import { PullRequests } from './github/store.js'
 import { Cron } from './processes/cron.js'
 import { PrAside } from './prs/aside.js'
 import { applyEffort, cycleEffort, DEFAULT_EFFORT } from './session/effort.js'
+import { SessionViews } from './session/views.js'
 import { Sidebar } from './sidebar.js'
 import type { SessionHost } from './sessionCommands.js'
 import { ambiguousNotice, CommandCatalog, resolveSlashName } from './slashResolve.js'
@@ -79,7 +94,7 @@ import { storedCompactions } from './compaction.js'
 import type { Reconnecting } from './view/automation.js'
 import { dockNodes, type QueuedRow, todoProgress } from './view/dock.js'
 import { entryNode } from './view/transcript.js'
-import { type AdaptedSnapshot, rpc } from './wire/rpc.js'
+import { type AdaptedSnapshot, admissionOf, rpc } from './wire/rpc.js'
 import { pendingRows, usageCounters } from './wire/schemas.js'
 import { busyLabel, preparingLabel } from './workLog.js'
 import { openSidebar, specOf } from './watch/spec.js'
@@ -154,7 +169,7 @@ export class App implements ChatPorts {
   readonly prs: PullRequests = new PullRequests({
     changed: () => this.changed(),
     cwd: () => this.info?.cwd || null,
-    sid: () => this.storedSid ?? this.sid
+    sid: () => durable(this.#ids)
   })
   /** The pull request docked at the pane's right edge (the PR aside). */
   readonly prAside: PrAside = new PrAside({
@@ -167,12 +182,11 @@ export class App implements ChatPorts {
   })
   readonly composer = new Composer()
   readonly overlays: Overlay[] = []
-  sid: string | null = null
-  /** The stored (database) id of the open session: what `session.list` rows are keyed by. */
-  storedSid: string | null = null
+  /** The open session's ids: the runtime id requests name, and the stored id it is saved under. */
+  #ids: SessionIds = NO_SESSION
   info: SessionInfo | null = null
-  /** The session as the ports read it: `sid`, `storedSid` and `info`, live. */
-  readonly session: SessionView = sessionView(this)
+  /** The session as the ports read it: its ids and `info`, live. */
+  readonly session: SessionView = sessionView(this, () => this.#ids)
   usage: Usage | null = null
   busy: Busy | null = null
   /** Prompts held here until they can be sent: no session yet, a switch in flight, or a private gateway's busy turn. */
@@ -199,12 +213,8 @@ export class App implements ChatPorts {
   readonly #switches = new Switches()
   /** Server requests for another session, kept while a switch is in flight. */
   #heldRequests: ServerRequest[] = []
-  /** Shared-gateway subscriptions this view holds, by session id. */
-  readonly #subscriptions = new Map<string, string>()
-  /** What superseded switches attached; disposed once no switch is in flight (see #disposeStale). */
-  #stale: Snapshot[] = []
-  /** The last `session.detach` in flight per session: a resume of that id waits for it (they share a subscription id). */
-  readonly #detaching = new Map<string, Promise<unknown>>()
+  /** The sessions this pane views: its subscriptions, detaches in flight, and superseded switches' results. */
+  readonly #views: SessionViews
   /** Open approval prompts' overlay keys → their approval-queue `request_id` (what approval.cancelled names). */
   readonly #approvalIds = new Map<string, string>()
   /** The launcher's startup image until it is attached to the first session (the queue waits for it). */
@@ -247,6 +257,7 @@ export class App implements ChatPorts {
   constructor(tern: Session, gw: GatewayClient, version: string, { launch = readLaunchEnv(), settings = fileSettings() }: { launch?: LaunchEnv; settings?: SettingsSource } = {}) {
     this.#tern = tern
     this.#gw = gw
+    this.#views = new SessionViews(gw)
     this.#launch = launch
     this.#settings = settings
     this.#startupImage = launch.image
@@ -259,6 +270,26 @@ export class App implements ChatPorts {
       tip: randomTip(launch.pythonSrcRoot),
       version: version && version !== 'unknown' ? `v${version}` : ''
     }
+  }
+
+  /** The open session's runtime id: null before the first session and while the gateway is down. */
+  get sid(): LiveSessionId | null {
+    return this.#ids.live
+  }
+
+  /** Sets the runtime id, keeping the stored one (tests arrange a session this way). */
+  set sid(id: string | null) {
+    this.#ids = { live: id === null ? null : liveSessionId(id), stored: this.#ids.stored }
+  }
+
+  /** The stored (database) id of the open session: what `session.list` rows are keyed by. */
+  get storedSid(): StoredSessionId | null {
+    return this.#ids.stored
+  }
+
+  /** Sets the stored id, keeping the runtime one (tests arrange a session this way). */
+  set storedSid(id: string | null) {
+    this.#ids = { live: this.#ids.live, stored: id === null ? null : storedSessionId(id) }
   }
 
   /** The gateway, for overlays that issue their own RPCs. */
@@ -274,7 +305,7 @@ export class App implements ChatPorts {
       this.#welcome.logo = this.#tern.blob(logo, 'image/png')
     }
 
-    this.transcript.push({ id: 'welcome', kind: 'welcome' })
+    this.transcript.push({ id: entryId('welcome'), kind: 'welcome' })
 
     // `hermes -q …`: the launcher's query is the first prompt, sent literally once the first session is adopted.
     const query = this.#launch.query
@@ -314,7 +345,7 @@ export class App implements ChatPorts {
 
       this.#offline = true
       // The runtime session died with the process: prompts queue until the next gateway.ready reattaches.
-      this.sid = null
+      this.#ids = { live: null, stored: this.#ids.stored }
       this.busy = null
       // Nothing can answer the sheets now; the reattach re-opens the questions still pending.
       this.#heldRequests = []
@@ -337,7 +368,7 @@ export class App implements ChatPorts {
     const code = await this.#done.promise
     // Bounded, as Ink's deferExitForClose: a dead socket must not hold the terminal.
     await Promise.race([
-      Promise.all([...this.#subscriptions.keys()].map(sid => this.#leave(sid, 'tui_shutdown'))),
+      this.#views.leaveAll('tui_shutdown'),
       new Promise(resolve => this.#timers.timeout(() => resolve(undefined), QUIT_DETACH_MS))
     ])
     this.dispose()
@@ -612,7 +643,7 @@ export class App implements ChatPorts {
 
   async #fetchTitle() {
     const sid = this.sid
-    const ids = new Set([sid, this.storedSid].filter(Boolean))
+    const ids = new Set<string | null>([sid, this.storedSid].filter(Boolean))
 
     if (!sid) {
       return
@@ -918,7 +949,7 @@ export class App implements ChatPorts {
   }
 
   /** Docks PR `key` at the pane's right edge, in place of the session sidebar. */
-  openPrAside(key: string | undefined) {
+  openPrAside(key: PrKey | undefined) {
     if (!this.#tern.caps.features.includes('aside')) {
       return openPrSheet(this, key)
     }
@@ -1007,7 +1038,7 @@ export class App implements ChatPorts {
   }
 
   quit(code = 0) {
-    markViewer(null, this.storedSid ?? this.sid)
+    markViewer(null, durable(this.#ids))
     this.#done.resolve(code)
   }
 
@@ -1140,7 +1171,7 @@ export class App implements ChatPorts {
       return
     }
 
-    const own: OwnAdmission<Admitted> = { display: userText(item.display ?? item.text, item.images), inputId: randomUUID(), item: { item, text: ready.text } }
+    const own: OwnAdmission<Admitted> = { display: userText(item.display ?? item.text, item.images), inputId: newInputId(), item: { item, text: ready.text } }
     const attachments = ready.images.map(({ mime, path }) => ({ mime, path }))
     this.#server.admit(own)
     this.changed()
@@ -1155,7 +1186,7 @@ export class App implements ChatPorts {
       })
 
       // Only the shared gateway admits into a queue; its receipt names the admission.
-      own.admissionId = r && 'admission_id' in r ? r.admission_id : undefined
+      own.admissionId = admissionOf(r)
     } catch (error) {
       this.#server.drop(own)
 
@@ -1223,7 +1254,7 @@ export class App implements ChatPorts {
     const { images } = item
     const text = item.text || (images.length ? IMAGE_ONLY_PROMPT : '')
     const attachments = images.map(({ mime, path }) => ({ mime, path }))
-    const submission = randomUUID()
+    const submission = newInputId()
     this.transcript.user(display?.trim() || item.text, undefined, false, userImages(images))
     // Its bubble is up: the gateway's queued → started for it owes none.
     this.#server.shown(submission)
@@ -1417,10 +1448,11 @@ export class App implements ChatPorts {
         this.transcript.notice(text, tone)
         this.changed()
       },
+      // The shared gateway (the one /branch runs on) answers a resume with one id for both kinds.
       open: async id => {
         await this.resume(id)
 
-        return this.sid === id
+        return durable(this.#ids) === id
       },
       panel: (title, text) => {
         this.transcript.panel(title, text)
@@ -1496,7 +1528,7 @@ export class App implements ChatPorts {
     const resume = this.#launch.resume
 
     try {
-      await (resume ? this.resume(resume) : this.newSession())
+      await (resume ? this.resume(storedSessionId(resume)) : this.newSession())
     } catch (error) {
       this.transcript.notice(
         `Could not start a session: ${errorText(error)}`,
@@ -1537,8 +1569,8 @@ export class App implements ChatPorts {
     this.changed()
   }
 
-  /** After a reconnect (or a replay gap): resumes the shown session (its runtime id or subscription died). */
-  async #reattach(id: string, notice = 'Reconnected to the agent backend.') {
+  /** After a reconnect (or a replay gap): resumes the shown session under `id` (its runtime id or subscription died). */
+  async #reattach(id: DurableSessionId, notice = 'Reconnected to the agent backend.') {
     try {
       if (await this.#resume(id)) {
         this.transcript.notice(notice)
@@ -1588,7 +1620,7 @@ export class App implements ChatPorts {
 
       if (!this.#switches.current(token)) {
         // A later switch won; nothing will ever show this session.
-        this.#stale.push(r)
+        this.#views.superseded(r)
 
         return
       }
@@ -1599,7 +1631,7 @@ export class App implements ChatPorts {
 
       // Only now: a failed create leaves the view on the session it still receives.
       if (previous && previous !== r.session_id) {
-        void this.#leave(previous, 'tui_close')
+        void this.#views.leave(previous, 'tui_close')
       }
     } finally {
       this.#settle(token)
@@ -1639,7 +1671,7 @@ export class App implements ChatPorts {
   }
 
   /** Resumes stored session `id`: its history replaces the transcript, and the session it leaves is closed. */
-  async resume(id: string) {
+  async resume(id: StoredSessionId) {
     if (this.#busySwitch()) {
       return
     }
@@ -1648,19 +1680,22 @@ export class App implements ChatPorts {
     const r = await this.#resume(id)
 
     if (r && previous && previous !== r.session_id) {
-      void this.#leave(previous, 'tui_close')
+      void this.#views.leave(previous, 'tui_close')
     }
   }
 
-  /** Resumes and adopts stored session `id`; undefined when a later switch superseded this one. */
-  async #resume(id: string): Promise<Snapshot | undefined> {
+  /**
+   * Resumes and adopts session `id` (its stored id, or a runtime id when none is known); undefined
+   * when a later switch superseded this one.
+   */
+  async #resume(id: DurableSessionId): Promise<Snapshot | undefined> {
     const token = this.#switches.begin()
     // Frames for `id` that beat the snapshot wait, then replay only what the snapshot lacks.
     const hold = this.#gw.holdAttach(id)
     let snapshot: Snapshot | undefined
 
     try {
-      const detaching = this.#detaching.get(id)
+      const detaching = this.#views.detaching(id)
 
       if (detaching) {
         // A detach that lands after this attach would drop the subscription the attach reuses.
@@ -1674,7 +1709,7 @@ export class App implements ChatPorts {
       const r: Snapshot = await rpc(this.#gw, 'session.resume', { cols: this.#tern.caps.cols, session_id: id })
 
       if (!this.#switches.current(token)) {
-        this.#stale.push(r)
+        this.#views.superseded(r)
 
         return undefined
       }
@@ -1696,9 +1731,9 @@ export class App implements ChatPorts {
   }
 
   #adopt(r: Snapshot) {
-    this.#subscribe(r)
+    const ref = this.#views.adopt(r)
 
-    if (r.session_id !== this.sid) {
+    if (ref.live !== this.sid) {
       // The last session's approvals and questions are not this one's (a resume hydrates its own after).
       this.#dropPrompts(() => true)
       this.transcript.forgetCompactions()
@@ -1706,18 +1741,17 @@ export class App implements ChatPorts {
     }
 
     // Read on every adopt: a reconnect may land on a gateway whose config changed.
-    void this.#readBusyMode(r.session_id)
+    void this.#readBusyMode(ref.live)
 
     // The session's own queue, from the snapshot (a reattach's rows of this pane become read-only rows).
     this.#server.reset(pendingRows(r.info))
 
-    this.sid = r.session_id
-    this.#showThoughts(r.session_id)
-    const previousStored = this.storedSid
-    this.storedSid = r.info?.stored_session_id || r.stored_session_id || null
+    const previousStored = this.#ids.stored
+    this.#ids = ref
+    this.#showThoughts(ref.live)
     // This pane shows the session now: the plugin's Python half sends its connect results here as a card.
-    markViewer(this.storedSid ?? r.session_id, previousStored)
-    writeActiveSessionFile(this.storedSid ?? r.session_id)
+    markViewer(durable(ref), previousStored)
+    writeActiveSessionFile(durable(ref))
     this.info = r.info ?? this.info
     this.usage = r.info?.usage ?? null
     // Another session: its own name (or none yet) on the tab.
@@ -1735,7 +1769,7 @@ export class App implements ChatPorts {
 
     if (r.messages?.length) {
       // The history leaves the compactions out; the store says where they were.
-      this.transcript.load(r.messages, storedCompactions(this.storedSid ?? r.session_id))
+      this.transcript.load(r.messages, storedCompactions(durable(ref)))
       this.agents.scan()
       this.media.showAll(this.transcript.entries, call => this.#imageLanded(call))
     }
@@ -1744,78 +1778,13 @@ export class App implements ChatPorts {
     this.processes.poke()
     this.#watchConnections()
     this.prs.adopt()
-    this.automation.adopt(r.session_id)
+    this.automation.adopt(ref.live)
 
     if (r.inflight) {
       this.transcript.inflight(r.inflight, this.busy?.startedAt)
     }
 
     this.changed()
-  }
-
-  #subscribe(r: Snapshot) {
-    if (r.subscription_id) {
-      this.#subscriptions.set(r.session_id, r.subscription_id)
-    }
-  }
-
-  /** Stops showing session `sid`: a shared-gateway view detaches (the session keeps running for its other viewers); a private gateway closes it. */
-  async #leave(sid: string, endReason: 'tui_close' | 'tui_shutdown') {
-    const subscription = this.#subscriptions.get(sid)
-
-    if (!this.#gw.isCanonical) {
-      await rpc(this.#gw, 'session.close', { session_id: sid }).catch(() => undefined)
-
-      return
-    }
-
-    if (!subscription) {
-      return
-    }
-
-    this.#subscriptions.delete(sid)
-    await this.#detach(sid, subscription, endReason)
-  }
-
-  /** Sends `session.detach`, one at a time per session; `endReason` lets the owner end it once no viewer remains. */
-  #detach(sid: string, subscription: string, endReason?: 'tui_close' | 'tui_shutdown') {
-    const send = () =>
-      rpc(this.#gw, 'session.detach', {
-        ...(endReason ? { end_reason: endReason } : {}),
-        session_id: sid,
-        subscription_id: subscription
-      })
-    const run = (this.#detaching.get(sid)?.then(send) ?? send()).catch(() => undefined)
-    this.#detaching.set(sid, run)
-    void run.then(() => {
-      if (this.#detaching.get(sid) === run) {
-        this.#detaching.delete(sid)
-      }
-    })
-
-    return run
-  }
-
-  /**
-   * Releases what superseded switches attached, once the adopted session is known. The gateway gives
-   * this view one subscription per session, so a stale result for the shown session is the live
-   * view's own and stays; others detach with no end reason (nobody chose to close them).
-   */
-  #disposeStale() {
-    const stale = this.#stale
-    this.#stale = []
-
-    for (const r of stale) {
-      if (r.session_id === this.sid || (r.subscription_id && this.#subscriptions.get(r.session_id) === r.subscription_id)) {
-        continue
-      }
-
-      if (!this.#gw.isCanonical) {
-        void rpc(this.#gw, 'session.close', { session_id: r.session_id }).catch(() => undefined)
-      } else if (r.subscription_id) {
-        void this.#detach(r.session_id, r.subscription_id)
-      }
-    }
   }
 
   /** Acts on a command's dispatch envelope from outside a typed command (a goal or loop sheet's button). */
@@ -1896,7 +1865,7 @@ export class App implements ChatPorts {
       return
     }
 
-    this.#disposeStale()
+    this.#views.release(this.sid)
     const held = this.#heldRequests
     this.#heldRequests = []
 
@@ -1924,7 +1893,7 @@ export class App implements ChatPorts {
         this.#reconnected()
         this.#applySkin(ev.payload?.skin)
         // A reconnect's ready reattaches the shown session; only a sessionless app bootstraps.
-        void (this.storedSid ? this.#reattach(this.storedSid) : this.#bootstrap())
+        void (this.#ids.stored ? this.#reattach(this.#ids.stored) : this.#bootstrap())
 
         break
 
@@ -1996,8 +1965,8 @@ export class App implements ChatPorts {
       // The view fell behind and the owner retired its subscription (the socket is fine, so no
       // reconnect re-attaches it): a fresh resume brings the snapshot and a new subscription.
       case 'session.replay_gap':
-        if (this.sid && ev.session_id === this.sid) {
-          void this.#reattach(this.storedSid ?? this.sid, 'Reloaded the session: this view fell behind its events.')
+        if (isLive(this.#ids) && ev.session_id === this.#ids.live) {
+          void this.#reattach(durable(this.#ids), 'Reloaded the session: this view fell behind its events.')
         }
 
         return
@@ -2070,7 +2039,7 @@ export class App implements ChatPorts {
         if (ev.payload) {
           t.toolStart(ev.payload)
           // The call as its step reads (a bridged or connector call as its app), not its wire name.
-          const call = t.call(ev.payload.tool_id)
+          const call = t.call(toolCallId(ev.payload.tool_id))
           this.#label(call ? busyLabel(call) : `Running ${ev.payload.name}…`)
           // vision_analyze names its image up front.
           this.#showImage(call)
@@ -2081,7 +2050,7 @@ export class App implements ChatPorts {
       case 'tool.complete':
         if (ev.payload) {
           t.toolComplete(ev.payload)
-          this.#showImage(t.call(ev.payload.tool_id))
+          this.#showImage(t.call(toolCallId(ev.payload.tool_id)))
           // A dispatched delegation: its agents' rows start following the owner.
           this.agents.scan()
 

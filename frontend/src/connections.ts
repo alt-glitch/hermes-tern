@@ -18,6 +18,7 @@ import { homedir } from 'node:os'
 import { join } from 'node:path'
 
 import { appTitle } from './bridge.js'
+import type { DurableSessionId } from './core/ids.js'
 import type { ToolCall } from './model.js'
 import { record } from './wire/json.js'
 
@@ -172,7 +173,7 @@ export function ternPane(env: NodeJS.ProcessEnv = process.env): Record<string, s
  * so its connect results come here as a card and the agent's `tern` commands find this pane. The
  * marker names this process; a dead one counts for nothing.
  */
-export function markViewer(sid: string | null, previous: string | null, dir = dataDir(), env: NodeJS.ProcessEnv = process.env) {
+export function markViewer(sid: DurableSessionId | null, previous: DurableSessionId | null, dir = dataDir(), env: NodeJS.ProcessEnv = process.env) {
   const viewers = join(dir, 'viewers')
 
   try {

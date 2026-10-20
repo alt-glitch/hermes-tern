@@ -121,7 +121,7 @@ export function workNode(items: readonly WorkItem[], parent: string, live: boole
 }
 
 /** One step: a call (opens to its output) or a thought (opens to its text). */
-function itemNode(item: WorkItem, parent: string, now: number, key = item.id): JSX.Element {
+function itemNode(item: WorkItem, parent: string, now: number, key: string = item.id): JSX.Element {
   const id = `${parent}.${key}`
 
   if (item.kind === 'thinking') {

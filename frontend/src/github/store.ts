@@ -5,11 +5,12 @@
 // the sheet shows them.
 
 import { errorText } from '../core/errors.js'
+import { type DurableSessionId, type PrKey, prKey, type StackKey, stackKey } from '../core/ids.js'
 import type { ToolCall } from '../model.js'
 
 import { type BranchTarget, branchPullRequest, branchTarget, parseStacks, type Stack, stackQuery } from './branch.js'
 import { type GitHub, github } from './client.js'
-import { linkedFromResult, prKey, storedLinks } from './links.js'
+import { linkedFromResult, storedLinks } from './links.js'
 import {
   ACTIVITY_QUERY,
   type ActivityItem,
@@ -31,8 +32,8 @@ export const PENDING_MS = 30_000
 const BATCH = 20
 
 export interface PullRequestsHost {
-  /** The session the links belong to (the stored session id the link tools see). */
-  sid(): string | null
+  /** The session the links belong to (the stored session id the link tools see, else its runtime id). */
+  sid(): DurableSessionId | null
   /** The session's working directory, for its branch's PR. */
   cwd(): string | null
   changed(): void
@@ -93,13 +94,13 @@ const MUTATIONS: Partial<Record<PrAction, string>> = {
 export class PullRequests {
   readonly #host: PullRequestsHost
   readonly #gh: GitHub
-  readonly #links: (sid: string) => PrRef[]
-  #sid: string | null = null
+  readonly #links: (sid: DurableSessionId) => PrRef[]
+  #sid: DurableSessionId | null = null
   #refs: PrRef[] = []
-  readonly #entries = new Map<string, Entry>()
+  readonly #entries = new Map<PrKey, Entry>()
   #branch: { at: number; cwd: string; ref?: PrRef; target?: BranchTarget } | undefined
   /** Native stacks by key, from the PRs' stack membership. */
-  readonly #stacks = new Map<string, Stack>()
+  readonly #stacks = new Map<StackKey, Stack>()
   /** Hosts whose GraphQL has no stack fields (GHES): not asked again. */
   readonly #noStacks = new Set<string>()
   readonly #branchOf: (cwd: string) => Promise<BranchTarget | undefined>
@@ -109,7 +110,7 @@ export class PullRequests {
   #loading = false
   #again = false
   #disposed = false
-  readonly #busy = new Set<string>()
+  readonly #busy = new Set<PrKey>()
   /** The activity and files reads in flight (`key:activity`, `key:files`). */
   readonly #reading = new Set<string>()
   /** When each of those last failed. */
@@ -118,7 +119,7 @@ export class PullRequests {
   constructor(
     host: PullRequestsHost,
     gh: GitHub = github(),
-    links: (sid: string) => PrRef[] = sid => storedLinks(sid),
+    links: (sid: DurableSessionId) => PrRef[] = sid => storedLinks(sid),
     branchOf: (cwd: string) => Promise<BranchTarget | undefined> = branchTarget
   ) {
     this.#host = host
@@ -129,7 +130,7 @@ export class PullRequests {
 
   /** The linked PRs (oldest link first), then the branch's PR, then stack layers none of them are. */
   entries(): Entry[] {
-    const seen = new Set<string>()
+    const seen = new Set<PrKey>()
     const out: Entry[] = []
     const add = (ref: PrRef, source: Source) => {
       const key = prKey(ref)
@@ -168,7 +169,12 @@ export class PullRequests {
     return [...this.#stacks.values()]
   }
 
-  get(key: string): Entry | undefined {
+  /** The key of the listed PR whose key reads `raw` (a node id's), if one is listed. */
+  keyOf(raw: string): PrKey | undefined {
+    return this.entries().map(e => prKey(e.ref)).find(key => key === raw)
+  }
+
+  get(key: PrKey): Entry | undefined {
     return this.#entries.get(key)
   }
 
@@ -180,7 +186,7 @@ export class PullRequests {
     return this.#loading
   }
 
-  busy(key: string): boolean {
+  busy(key: PrKey): boolean {
     return this.#busy.has(key)
   }
 
@@ -250,7 +256,7 @@ export class PullRequests {
   }
 
   /** Comments, reviews and commits of `key`, read once per PR update. */
-  activity(key: string): Promise<void> {
+  activity(key: PrKey): Promise<void> {
     return this.#detail(key, 'activity', async e => {
       const [o, r] = e.ref.repository.split('/')
       e.activity = parseActivity(await this.#gh.graphql(e.ref.host, ACTIVITY_QUERY, { n: e.ref.number, o, r }))
@@ -258,7 +264,7 @@ export class PullRequests {
   }
 
   /** The changed files of `key` with their patches (the first 300). */
-  files(key: string): Promise<void> {
+  files(key: PrKey): Promise<void> {
     return this.#detail(key, 'files', async e => {
       const files: PrFile[] = []
 
@@ -279,7 +285,7 @@ export class PullRequests {
    * Reads one tab's data of `key` once per PR update, so the sheet may ask on every frame: one read
    * at a time, and a failed one (its error on the entry) again after `RETRY_MS`.
    */
-  async #detail(key: string, what: Detail, read: (e: Entry) => Promise<void>): Promise<void> {
+  async #detail(key: PrKey, what: Detail, read: (e: Entry) => Promise<void>): Promise<void> {
     const e = this.#entries.get(key)
     const id = `${key}:${what}`
     const failed = this.#failedAt.get(id)
@@ -307,7 +313,7 @@ export class PullRequests {
   }
 
   /** Changes PR `key` on GitHub; throws GitHub's error. `merge` uses `method`, the repository's first by default. */
-  async act(action: PrAction, key: string, method?: MergeMethod): Promise<void> {
+  async act(action: PrAction, key: PrKey, method?: MergeMethod): Promise<void> {
     const pr = this.#entries.get(key)?.pr
 
     if (!pr) {
@@ -443,13 +449,13 @@ export class PullRequests {
         continue
       }
 
-      const asked = new Set<string>()
+      const asked = new Set<StackKey>()
 
       for (const [i, e] of list.slice(0, BATCH).entries()) {
         const n = data[`p${i}`]?.pullRequest?.stack?.number
-        const key = `${host}/${e.ref.repository}#stack:${n}`
+        const key = typeof n === 'number' ? stackKey(host, e.ref.repository, n) : undefined
 
-        if (typeof n !== 'number' || asked.has(key)) {
+        if (!key || asked.has(key)) {
           continue
         }
 

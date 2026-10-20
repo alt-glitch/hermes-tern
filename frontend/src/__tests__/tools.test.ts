@@ -1,6 +1,7 @@
 import type { JSX } from '@stencil-hq/tern'
 import { describe, expect, it } from 'vitest'
 
+import { toolCallId } from '../core/ids.js'
 import type { ToolCall } from '../model.js'
 import { toolNode } from '../view/tools.js'
 
@@ -10,11 +11,11 @@ interface Node {
   c?: Node[]
 }
 
-const call = (name: string, args: Record<string, unknown>, more: Partial<ToolCall> = {}): ToolCall => ({
+const call = (name: string, args: Record<string, unknown>, { id = 'c1', ...more }: Omit<Partial<ToolCall>, 'id'> & { id?: string } = {}): ToolCall => ({
   args,
   argsText: '',
   context: '',
-  id: 'c1',
+  id: toolCallId(id),
   name,
   startedAt: 0,
   status: 'done',

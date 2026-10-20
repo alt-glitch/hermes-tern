@@ -1,6 +1,7 @@
 import type { GatewayClient } from '@tui/gatewayClient.js'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
+import { liveSessionId } from '../core/ids.js'
 import type { BackgroundProcess } from '../model.js'
 import {
   foldEntry,
@@ -134,7 +135,7 @@ describe('Processes', () => {
     ]
     const request = vi.fn(async (method: string) => (method === 'process.list' ? { processes: rows } : {}))
     const changed = vi.fn()
-    const store = new Processes({ changed, gw: { request } as unknown as Pick<GatewayClient, 'request'>, sid: 's1', transcript })
+    const store = new Processes({ changed, gw: { request } as unknown as Pick<GatewayClient, 'request'>, sid: liveSessionId('s1'), transcript })
 
     store.poke()
     await vi.advanceTimersByTimeAsync(0)
@@ -160,7 +161,7 @@ describe('Processes', () => {
     const transcript = new Transcript()
     const rows: ProcessRow[] = [{ command: 'sleep 90', output_tail: 'tick 1\n', session_id: 'proc_a', status: 'running' }]
     const request = vi.fn(async () => ({ processes: rows }))
-    const store = new Processes({ changed: vi.fn(), gw: { request } as unknown as Pick<GatewayClient, 'request'>, sid: 's1', transcript })
+    const store = new Processes({ changed: vi.fn(), gw: { request } as unknown as Pick<GatewayClient, 'request'>, sid: liveSessionId('s1'), transcript })
 
     store.poke()
     await vi.advanceTimersByTimeAsync(0)

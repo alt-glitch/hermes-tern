@@ -4,6 +4,8 @@ import { join } from 'node:path'
 
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { storedSessionId } from '../core/ids.js'
+
 import { FakeGateway, fakeTern } from './fakes.js'
 
 process.env.HERMES_HOME = mkdtempSync(join(tmpdir(), 'hermes-tern-slash-'))
@@ -117,7 +119,7 @@ describe('a slash reply after a session switch', () => {
     await submit('/heartbeat check the build')
     expect(gw.methods('slash.exec')).toHaveLength(1)
 
-    await app.resume('other')
+    await app.resume(storedSessionId('other'))
     expect(app.sid).toBe('other')
     reply.resolve({ message: 'check the build', type: 'send' })
     await flush()

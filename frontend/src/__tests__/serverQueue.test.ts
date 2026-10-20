@@ -1,9 +1,15 @@
 import { describe, expect, it } from 'vitest'
 
+import { admissionId, inputId } from '../core/ids.js'
 import { busyModeOf, ServerQueue } from '../serverQueue.js'
 import type { PendingRow, PendingStatus } from '../wire/schemas.js'
 
-const row = (id: string, status: PendingStatus, user = id, input = `in-${id}`): PendingRow => ({ admission_id: id, input_id: input, status, user })
+const row = (id: string, status: PendingStatus, user = id, input = `in-${id}`): PendingRow => ({
+  admission_id: admissionId(id),
+  input_id: inputId(input),
+  status,
+  user
+})
 
 describe('ServerQueue', () => {
   it("shows a resumed session's queued rows, but owes no bubble for a row the snapshot already started", () => {
@@ -17,7 +23,7 @@ describe('ServerQueue', () => {
 
   it("lists an own admission before the FIFO does, then by the FIFO's row, and forgets it once it left without starting", () => {
     const q = new ServerQueue<string>()
-    const own = { display: 'mine (typed)', inputId: 'in-x', item: 'x' }
+    const own = { display: 'mine (typed)', inputId: inputId('in-x'), item: 'x' }
     q.admit(own)
     expect(q.queued()).toEqual([{ own, text: 'mine (typed)' }])
 

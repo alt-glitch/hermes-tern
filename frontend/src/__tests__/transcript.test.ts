@@ -1,6 +1,7 @@
 import type { TranscriptMessage } from '@hermes/shared/gateway-events'
 import { describe, expect, it } from 'vitest'
 
+import { toolCallId } from '../core/ids.js'
 import type { Block, Entry, ToolCall, TurnEntry } from '../model.js'
 import { Transcript } from '../transcript.js'
 
@@ -392,7 +393,7 @@ describe('Transcript', () => {
     const t = new Transcript()
     t.start(0)
     t.toolStart({ args: { path: 'a.ts' }, name: 'read_file', tool_id: 'c1' }, 1)
-    expect(t.call('c1')?.name).toBe('read_file')
-    expect(t.call('nope')).toBeUndefined()
+    expect(t.call(toolCallId('c1'))?.name).toBe('read_file')
+    expect(t.call(toolCallId('nope'))).toBeUndefined()
   })
 })

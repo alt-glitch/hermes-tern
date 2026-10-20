@@ -4,6 +4,7 @@ import { join } from 'node:path'
 
 import { describe, expect, it } from 'vitest'
 
+import { toolCallId } from '../core/ids.js'
 import type { BackgroundProcess, ToolCall } from '../model.js'
 import { linkCalls } from '../processes/store.js'
 import { isWatchCall } from '../transcript.js'
@@ -352,7 +353,7 @@ describe('process calls show their process', () => {
     args,
     argsText: '',
     context: '',
-    id: `${name}-${JSON.stringify(args)}`,
+    id: toolCallId(`${name}-${JSON.stringify(args)}`),
     name,
     result,
     startedAt: 0,

@@ -24695,7 +24695,6 @@ var GatewayClient = class extends EventEmitter {
 };
 
 // src/app.ts
-import { randomUUID as randomUUID3 } from "node:crypto";
 import { appendFileSync as appendFileSync4, existsSync as existsSync6 } from "node:fs";
 import { basename as basename4 } from "node:path";
 
@@ -24901,12 +24900,40 @@ function record(v) {
   return v && typeof v === "object" && !Array.isArray(v) ? v : void 0;
 }
 
+// src/core/ids.ts
+import { randomUUID as randomUUID2 } from "node:crypto";
+var liveSessionId = (raw2) => raw2;
+var storedSessionId = (raw2) => raw2;
+var subscriptionId = (raw2) => raw2;
+var admissionId = (raw2) => raw2;
+var inputId = (raw2) => raw2;
+var newInputId = () => inputId(randomUUID2());
+var toolCallId = (raw2) => raw2;
+var entryId = (raw2) => raw2;
+var prKey = (ref) => `${ref.host}/${ref.repository}#${ref.number}`;
+var stackKey = (host, repository, number4) => `${host}/${repository}#stack:${number4}`;
+var isLive = (ids) => ids.live !== null;
+var NO_SESSION = { live: null, stored: null };
+function durable(ids) {
+  return ids.stored ?? ids.live;
+}
+
 // src/wire/rpc.ts
 function rpc(gw2, method, params) {
   return gw2.request(method, params);
 }
 async function rpcParsed(gw2, method, params, schema2) {
   return schema2.parse(await gw2.request(method, params));
+}
+function snapshotIds(r) {
+  const stored = r.info?.stored_session_id || r.stored_session_id;
+  return {
+    ref: { live: liveSessionId(r.session_id), stored: stored ? storedSessionId(stored) : null },
+    subscription: r.subscription_id ? subscriptionId(r.subscription_id) : void 0
+  };
+}
+function admissionOf(r) {
+  return r && "admission_id" in r ? admissionId(r.admission_id) : void 0;
 }
 
 // src/agents/liveLog.ts
@@ -25085,10 +25112,7 @@ var Agents = class {
   }
   /** Blocks (or unblocks) new subagent spawns on the gateway; running children keep going. */
   async pause(paused) {
-    const r = await rpc(this.#host.gw, "delegation.pause", {
-      paused,
-      ...this.#host.sid ? { session_id: this.#host.sid } : {}
-    });
+    const r = await rpc(this.#host.gw, "delegation.pause", { paused, ...this.#host.sid ? { session_id: this.#host.sid } : {} });
     this.paused = typeof r?.paused === "boolean" ? r.paused : paused;
     this.#host.changed();
     return this.paused;
@@ -25498,7 +25522,7 @@ function applyLog(a2, log) {
 }
 
 // src/app/ports.ts
-function sessionView(fields) {
+function sessionView(fields, ids) {
   return {
     get info() {
       return fields.info;
@@ -25507,7 +25531,7 @@ function sessionView(fields) {
       fields.info = info;
     },
     get ref() {
-      return { live: fields.sid, stored: fields.storedSid };
+      return ids();
     }
   };
 }
@@ -25690,7 +25714,7 @@ function launchEnv() {
 }
 
 // src/hermes/mutate.ts
-import { randomUUID as randomUUID2 } from "node:crypto";
+import { randomUUID as randomUUID3 } from "node:crypto";
 var isSafeInteger = (value) => Number.isSafeInteger(value);
 async function currentGeneration(gw2, sid) {
   const snapshot3 = await rpc(gw2, "session.resume", { session_id: sid });
@@ -25711,7 +25735,7 @@ async function mutateSession(gw2, sid, operation, payload) {
   }
   const result = await rpc(gw2, "session.mutate", {
     session_id: sid,
-    request_id: randomUUID2(),
+    request_id: randomUUID3(),
     expected_revision: snapshot3.revision,
     ...operation === "rename" ? {} : { expected_generation: snapshot3.execution_generation },
     operation,
@@ -26763,7 +26787,7 @@ var Transcript = class {
   }
   /** A fresh id for an entry or block, unique within this transcript. */
   id(prefix2) {
-    return `${prefix2}${(this.#next++).toString(36)}`;
+    return entryId(`${prefix2}${(this.#next++).toString(36)}`);
   }
   get live() {
     return this.#live;
@@ -27043,7 +27067,7 @@ var Transcript = class {
       argsText: p3.args_text ?? "",
       batch: u.batch,
       context: withoutTernEnv(p3.context ?? ""),
-      id: p3.tool_id,
+      id: toolCallId(p3.tool_id),
       name: u.name,
       startedAt: at,
       status: "running",
@@ -27056,7 +27080,7 @@ var Transcript = class {
     if (Array.isArray(call.args.todos)) {
       call.todos = todosOf(call.args, before);
     }
-    turn.blocks.push({ call, id: p3.tool_id, kind: "tool" });
+    turn.blocks.push({ call, id: call.id, kind: "tool" });
     this.#touch(turn);
   }
   toolComplete(p3, at = Date.now()) {
@@ -27282,7 +27306,7 @@ var Transcript = class {
           turn.status = "interrupted";
         }
       } else if (m.role === "tool") {
-        const id = m.tool_call_id ?? this.id("c");
+        const id = toolCallId(m.tool_call_id ?? this.id("c"));
         const result = typeof m.content === "string" && m.content ? m.content : void 0;
         const diff2 = str4(record(record(m.display_metadata)?.tool_result_metadata)?.inline_diff);
         const existing = calls.get(id);
@@ -27376,9 +27400,7 @@ var Transcript = class {
   }
   /** The delegate_task calls in the transcript, oldest first. */
   delegations() {
-    return this.entries.flatMap(
-      (e) => e.kind === "turn" ? e.blocks.flatMap((b) => b.kind === "tool" && b.call.name === "delegate_task" ? [b.call] : []) : []
-    );
+    return this.calls("delegate_task");
   }
   /** The calls of tool `name` in the transcript, oldest first. */
   calls(name) {
@@ -27396,6 +27418,7 @@ var Transcript = class {
       (e) => e.kind === "turn" ? e.blocks.flatMap((b) => b.kind === "tool" && (isBackgroundCall(b.call) || isWatchCall(b.call)) ? [b.call] : []) : []
     );
   }
+  /** The call the gateway's tool id `id` names (as an event sends it), in any turn. */
   #tool(id) {
     return this.#findTool((call) => call.id === id);
   }
@@ -28632,9 +28655,9 @@ var processList = pipe(
 var PENDING_STATUSES = ["queued", "started", "unknown", "terminal"];
 var isPendingStatus = oneOf(PENDING_STATUSES);
 var pendingRow = object({
-  admission_id: string2(),
+  admission_id: pipe(string2(), transform(admissionId)),
   /** The submission id the submitter chose (this pane's `submission_id`). */
-  input_id: loose(string2()),
+  input_id: loose(pipe(string2(), transform(inputId))),
   status: pipe(optional(unknown()), transform((status) => isPendingStatus(status) ? status : "other")),
   /** The prompt's text. */
   user: _catch(string2(), "")
@@ -34837,79 +34860,6 @@ function openEffortPicker(host, global2 = false) {
 // src/overlays/pullRequests.tsx
 import { execFile as execFile3 } from "node:child_process";
 
-// src/github/links.ts
-import { readFileSync as readFileSync2 } from "node:fs";
-import { homedir as homedir9 } from "node:os";
-import { join as join6 } from "node:path";
-import { DatabaseSync } from "node:sqlite";
-
-// src/hermes/paths.ts
-import { homedir as homedir8 } from "node:os";
-import { join as join5 } from "node:path";
-function stateDbPath(env2 = process.env) {
-  return join5(env2.HERMES_HOME || join5(homedir8(), ".hermes"), "state.db");
-}
-
-// src/github/links.ts
-var LINK_TOOLS = /* @__PURE__ */ new Set(["link_pull_request", "list_pull_requests", "unlink_pull_request"]);
-function linksPath(env2 = process.env) {
-  return join6(env2.HERMES_HOME || join6(homedir9(), ".hermes"), "plugin-data", "hermes-tern", "pull-requests.json");
-}
-var prKey = (ref) => `${ref.host}/${ref.repository}#${ref.number}`;
-function refOf(v) {
-  const r = record(v);
-  const host = typeof r?.host === "string" ? r.host : "";
-  const repository = typeof r?.repository === "string" ? r.repository : "";
-  const number4 = typeof r?.number === "number" ? r.number : 0;
-  return host && repository && number4 > 0 ? { host, number: number4, repository, url: typeof r?.url === "string" ? r.url : `https://${host}/${repository}/pull/${number4}` } : void 0;
-}
-function linkedFromResult(call) {
-  if (!LINK_TOOLS.has(call.name) || call.status !== "done") {
-    return void 0;
-  }
-  const linked = record(call.result)?.linked;
-  return Array.isArray(linked) ? linked.map(refOf).filter((r) => Boolean(r)) : void 0;
-}
-var marker = (k) => `COALESCE(json_extract(CASE WHEN json_valid(c.model_config) THEN c.model_config ELSE '{}' END, '$.${k}'), '') != p.id`;
-var CONTINUES = `SELECT p.id AS p FROM sessions c JOIN sessions p ON p.id = c.parent_session_id
-  WHERE c.id = ? AND p.end_reason = 'compression' AND COALESCE(c.source, '') != 'tool'
-    AND ${["_branched_from", "_delegate_from", "_reset_from"].map(marker).join(" AND ")}`;
-function ancestry(sid, db = stateDbPath()) {
-  const chain = [sid];
-  try {
-    const conn = new DatabaseSync(db, { readOnly: true });
-    try {
-      const parent = conn.prepare(CONTINUES);
-      for (let i = 0; i < 100; i++) {
-        const row2 = parent.get(chain.at(-1));
-        if (!row2?.p || chain.includes(row2.p)) {
-          break;
-        }
-        chain.push(row2.p);
-      }
-    } finally {
-      conn.close();
-    }
-  } catch {
-  }
-  return chain;
-}
-function storedLinks(sid, file2 = linksPath(), lineage = ancestry) {
-  let data;
-  try {
-    data = JSON.parse(readFileSync2(file2, "utf8"));
-  } catch {
-    return [];
-  }
-  const aliases = data.aliases ?? {};
-  const root7 = lineage(sid).find((id) => aliases[id] || data.conversations?.[id]);
-  if (!root7) {
-    return [];
-  }
-  const links = data.conversations?.[aliases[root7] ?? root7];
-  return Array.isArray(links) ? links.map(refOf).filter((r) => Boolean(r)) : [];
-}
-
 // src/github/pullRequest.ts
 var CHECK_FIELDS = `
   __typename
@@ -39389,7 +39339,7 @@ function htmlKind(value) {
 }
 
 // node_modules/mdast-util-to-markdown/lib/join.js
-var join7 = [joinDefaults];
+var join5 = [joinDefaults];
 function joinDefaults(left, right, parent, state) {
   if (right.type === "code" && formatCodeAsIndented(right, state) && (left.type === "list" || left.type === right.type && formatCodeAsIndented(left, state))) {
     return false;
@@ -42366,7 +42316,7 @@ function toMarkdown(tree, options) {
     handle: void 0,
     indentLines,
     indexStack: [],
-    join: [...join7],
+    join: [...join5],
     options: {},
     safe: safeBound,
     stack: [],
@@ -61750,7 +61700,7 @@ var PrView = class {
   /** Step through the PRs (`[` and `]`). */
   step(by) {
     const keys2 = this.keys();
-    const at = keys2.indexOf(this.selected ?? "");
+    const at = this.selected ? keys2.indexOf(this.selected) : -1;
     if (keys2.length) {
       this.select(keys2[(at + by + keys2.length) % keys2.length]);
     }
@@ -61904,8 +61854,9 @@ var PrView = class {
           label: [{ s: prTone(e), t: "\u25CF " }, { t: `#${e.ref.number}` }, ...e.pr && !compact2 ? [{ s: "muted", t: ` ${clip3(e.pr.title, 28)}` }] : []]
         })),
         onSelect: (ev) => {
-          if (ev.item) {
-            this.select(ev.item);
+          const key2 = ev.item ? this.#host.prs.keyOf(ev.item) : void 0;
+          if (key2) {
+            this.select(key2);
           }
         },
         role: "hermes.pr.switch"
@@ -62391,7 +62342,7 @@ function openPrMenu(host) {
     },
     onKey: (k) => {
       const keys2 = entries().map((e) => prKey(e.ref));
-      const at = keys2.indexOf(selected ?? "");
+      const at = selected ? keys2.indexOf(selected) : -1;
       if (k.name === "escape") {
         close();
       } else if (k.name === "enter") {
@@ -62835,12 +62786,12 @@ function preview3(row2, isCurrent) {
 }
 
 // .hermes-src/ui-tui/src/lib/history.ts
-import { appendFileSync as appendFileSync3, existsSync as existsSync4, mkdirSync as mkdirSync3, readFileSync as readFileSync3 } from "node:fs";
-import { homedir as homedir10 } from "node:os";
-import { join as join8 } from "node:path";
+import { appendFileSync as appendFileSync3, existsSync as existsSync4, mkdirSync as mkdirSync3, readFileSync as readFileSync2 } from "node:fs";
+import { homedir as homedir8 } from "node:os";
+import { join as join6 } from "node:path";
 var MAX2 = 1e3;
-var dir = process.env.HERMES_HOME ?? join8(homedir10(), ".hermes");
-var file = join8(dir, ".hermes_history");
+var dir = process.env.HERMES_HOME ?? join6(homedir8(), ".hermes");
+var file = join6(dir, ".hermes_history");
 var cache = null;
 function load() {
   if (cache) {
@@ -62853,7 +62804,7 @@ function load() {
     }
     const entries = [];
     let current = [];
-    for (const line of readFileSync3(file, "utf8").split("\n")) {
+    for (const line of readFileSync2(file, "utf8").split("\n")) {
       if (line.startsWith("+")) {
         current.push(line.slice(1));
       } else if (current.length) {
@@ -64157,8 +64108,17 @@ import { basename as basename3 } from "node:path";
 
 // src/hermes/sessionIndex.ts
 import { execFile as execFile4 } from "node:child_process";
-import { DatabaseSync as DatabaseSync2 } from "node:sqlite";
+import { DatabaseSync } from "node:sqlite";
 import { promisify as promisify3 } from "node:util";
+
+// src/hermes/paths.ts
+import { homedir as homedir9 } from "node:os";
+import { join as join7 } from "node:path";
+function stateDbPath(env2 = process.env) {
+  return join7(env2.HERMES_HOME || join7(homedir9(), ".hermes"), "state.db");
+}
+
+// src/hermes/sessionIndex.ts
 var run2 = promisify3(execFile4);
 var SOURCES = ["acp", "cli", "desktop", "gui", "local", "tui"];
 var LISTABLE = `(s.parent_session_id IS NULL
@@ -64226,7 +64186,7 @@ function flat2(text11) {
 function storedSessions(limit = 400, db = stateDbPath()) {
   let conn;
   try {
-    conn = new DatabaseSync2(db, { readOnly: true });
+    conn = new DatabaseSync(db, { readOnly: true });
     const rows = conn.prepare(QUERY).all(...SOURCES, JSON.stringify(supersededSegments(conn)), limit);
     return rows.map((r) => ({
       branch: r.branch ?? "",
@@ -64251,7 +64211,7 @@ function storedSessions(limit = 400, db = stateDbPath()) {
 function lastReply(id, db = stateDbPath()) {
   let conn;
   try {
-    conn = new DatabaseSync2(db, { readOnly: true });
+    conn = new DatabaseSync(db, { readOnly: true });
     const row2 = conn.prepare(
       `WITH RECURSIVE chain(cur) AS (SELECT ? UNION ALL SELECT child.id FROM chain c
            JOIN sessions parent ON parent.id = c.cur JOIN sessions child ON child.parent_session_id = c.cur
@@ -64306,7 +64266,7 @@ function openSessionPicker(host) {
   let deleting = null;
   let shown = [];
   const replies = /* @__PURE__ */ new Map();
-  const current = host.session.ref.stored ?? host.session.ref.live ?? "";
+  const current = durable(host.session.ref) ?? "";
   const load2 = async () => {
     state = "loading";
     host.changed();
@@ -64332,7 +64292,7 @@ function openSessionPicker(host) {
     }
     host.close(overlay);
     if (s2.id !== current) {
-      host.resume(s2.id).catch((error) => {
+      host.resume(storedSessionId(s2.id)).catch((error) => {
         host.transcript.notice(`Could not resume: ${errorText(error)}`, "error");
         host.changed();
       });
@@ -64666,6 +64626,7 @@ function readWatchSpec(env2 = process.env) {
   }
 }
 function specOf(a2, name, sid, stored) {
+  const live = sid;
   return {
     goal: a2.goal,
     index: a2.index,
@@ -64673,7 +64634,7 @@ function specOf(a2, name, sid, stored) {
     name,
     sid,
     startedAt: a2.startedAt,
-    stored: stored && stored !== sid ? stored : void 0,
+    stored: stored && stored !== live ? stored : void 0,
     subagent: a2.id
   };
 }
@@ -64961,6 +64922,71 @@ var REFUSED_COMMANDS = [
 
 // src/compaction.ts
 import { DatabaseSync as DatabaseSync3 } from "node:sqlite";
+
+// src/github/links.ts
+import { readFileSync as readFileSync3 } from "node:fs";
+import { homedir as homedir10 } from "node:os";
+import { join as join8 } from "node:path";
+import { DatabaseSync as DatabaseSync2 } from "node:sqlite";
+var LINK_TOOLS = /* @__PURE__ */ new Set(["link_pull_request", "list_pull_requests", "unlink_pull_request"]);
+function linksPath(env2 = process.env) {
+  return join8(env2.HERMES_HOME || join8(homedir10(), ".hermes"), "plugin-data", "hermes-tern", "pull-requests.json");
+}
+function refOf(v) {
+  const r = record(v);
+  const host = typeof r?.host === "string" ? r.host : "";
+  const repository = typeof r?.repository === "string" ? r.repository : "";
+  const number4 = typeof r?.number === "number" ? r.number : 0;
+  return host && repository && number4 > 0 ? { host, number: number4, repository, url: typeof r?.url === "string" ? r.url : `https://${host}/${repository}/pull/${number4}` } : void 0;
+}
+function linkedFromResult(call) {
+  if (!LINK_TOOLS.has(call.name) || call.status !== "done") {
+    return void 0;
+  }
+  const linked = record(call.result)?.linked;
+  return Array.isArray(linked) ? linked.map(refOf).filter((r) => Boolean(r)) : void 0;
+}
+var marker = (k) => `COALESCE(json_extract(CASE WHEN json_valid(c.model_config) THEN c.model_config ELSE '{}' END, '$.${k}'), '') != p.id`;
+var CONTINUES = `SELECT p.id AS p FROM sessions c JOIN sessions p ON p.id = c.parent_session_id
+  WHERE c.id = ? AND p.end_reason = 'compression' AND COALESCE(c.source, '') != 'tool'
+    AND ${["_branched_from", "_delegate_from", "_reset_from"].map(marker).join(" AND ")}`;
+function ancestry(sid, db = stateDbPath()) {
+  const chain = [sid];
+  try {
+    const conn = new DatabaseSync2(db, { readOnly: true });
+    try {
+      const parent = conn.prepare(CONTINUES);
+      for (let i = 0; i < 100; i++) {
+        const row2 = parent.get(chain.at(-1));
+        if (!row2?.p || chain.includes(row2.p)) {
+          break;
+        }
+        chain.push(row2.p);
+      }
+    } finally {
+      conn.close();
+    }
+  } catch {
+  }
+  return chain;
+}
+function storedLinks(sid, file2 = linksPath(), lineage = ancestry) {
+  let data;
+  try {
+    data = JSON.parse(readFileSync3(file2, "utf8"));
+  } catch {
+    return [];
+  }
+  const aliases = data.aliases ?? {};
+  const root7 = lineage(sid).find((id) => aliases[id] || data.conversations?.[id]);
+  if (!root7) {
+    return [];
+  }
+  const links = data.conversations?.[aliases[root7] ?? root7];
+  return Array.isArray(links) ? links.map(refOf).filter((r) => Boolean(r)) : [];
+}
+
+// src/compaction.ts
 var MARKER2 = "[CONTEXT COMPACTION";
 var END = "--- END OF CONTEXT SUMMARY";
 var RECOVERY = /\n## Context Recovery\b[\s\S]*?(?=\n## |$)/;
@@ -65143,7 +65169,7 @@ async function branch(host, arg) {
   if (typeof child !== "string" || !child) {
     throw new Error("the gateway did not name the branch");
   }
-  if (host.stale() || !await host.open(child)) {
+  if (host.stale() || !await host.open(storedSessionId(child))) {
     return;
   }
   const info = await rpc(host.gw, "session.info", { session_id: child }).catch(() => null);
@@ -65974,7 +66000,7 @@ var COMMANDS3 = [
       if (!arg) {
         return openSessionPicker(host);
       }
-      return arg === "new" ? host.newSession() : host.resume(arg);
+      return arg === "new" ? host.newSession() : host.resume(storedSessionId(arg));
     }
   },
   {
@@ -66988,13 +67014,13 @@ var Completion = class {
     return false;
   }
   /** The overlay nodes for the `layer` region (none while closed). */
-  nodes(inputId) {
+  nodes(inputId2) {
     if (!this.open) {
       return [];
     }
     const listId = "layer.complete.select.list";
     return [
-      /* @__PURE__ */ jsx("overlay", { anchor: { caret: inputId }, role: "omp.autocomplete", children: /* @__PURE__ */ jsx("col", { role: "omp.select", children: /* @__PURE__ */ jsx(
+      /* @__PURE__ */ jsx("overlay", { anchor: { caret: inputId2 }, role: "omp.autocomplete", children: /* @__PURE__ */ jsx("col", { role: "omp.select", children: /* @__PURE__ */ jsx(
         "list",
         {
           empty: this.#for.includes("@") ? "No files" : "No items",
@@ -67955,7 +67981,7 @@ function parseStacks(host, repository, rows) {
       {
         base: typeof s2.base === "string" ? s2.base : s2.base?.ref ?? "",
         host,
-        key: `${host}/${repository}#stack:${s2.number}`,
+        key: stackKey(host, repository, s2.number),
         layers: s2.pull_requests.filter((p3) => typeof p3.number === "number").map((p3) => ({ head: p3.head?.ref ?? "", number: p3.number, state: p3.merged_at ? "merged" : p3.state ?? "open" })),
         number: s2.number,
         repository
@@ -68101,6 +68127,10 @@ var PullRequests = class {
   /** The native stacks the list's PRs sit in. */
   stacks() {
     return [...this.#stacks.values()];
+  }
+  /** The key of the listed PR whose key reads `raw` (a node id's), if one is listed. */
+  keyOf(raw2) {
+    return this.entries().map((e) => prKey(e.ref)).find((key2) => key2 === raw2);
   }
   get(key2) {
     return this.#entries.get(key2);
@@ -68323,8 +68353,8 @@ var PullRequests = class {
       const asked = /* @__PURE__ */ new Set();
       for (const [i, e] of list8.slice(0, BATCH2).entries()) {
         const n = data[`p${i}`]?.pullRequest?.stack?.number;
-        const key2 = `${host}/${e.ref.repository}#stack:${n}`;
-        if (typeof n !== "number" || asked.has(key2)) {
+        const key2 = typeof n === "number" ? stackKey(host, e.ref.repository, n) : void 0;
+        if (!key2 || asked.has(key2)) {
           continue;
         }
         asked.add(key2);
@@ -68430,6 +68460,93 @@ var PrAside = class {
       },
       "prs"
     );
+  }
+};
+
+// src/session/views.ts
+var SessionViews = class {
+  #gw;
+  /** Shared-gateway subscriptions this view holds, by session id. */
+  #subscriptions = /* @__PURE__ */ new Map();
+  /** What superseded switches attached; released once no switch is in flight (see `release`). */
+  #stale = [];
+  /**
+   * The last `session.detach` in flight per session: a resume of that id waits for it (they share a
+   * subscription id). Set under the runtime id detached and read under the id a resume names: the
+   * shared gateway, the one that detaches, answers with one id for both.
+   */
+  #detaching = /* @__PURE__ */ new Map();
+  constructor(gw2) {
+    this.#gw = gw2;
+  }
+  /** Takes the ids of an adopted snapshot `r`, keeping its subscription (the shared gateway's). */
+  adopt(r) {
+    const { ref, subscription: subscription2 } = snapshotIds(r);
+    if (subscription2) {
+      this.#subscriptions.set(ref.live, subscription2);
+    }
+    return ref;
+  }
+  /** The detach of session `id` still in flight, if any. */
+  detaching(id) {
+    return this.#detaching.get(id);
+  }
+  /** A switch's result that a later switch superseded: nothing will show it. */
+  superseded(r) {
+    this.#stale.push(r);
+  }
+  /** Leaves every session this pane holds a subscription to. */
+  leaveAll(endReason) {
+    return Promise.all([...this.#subscriptions.keys()].map((sid) => this.leave(sid, endReason)));
+  }
+  /** Stops showing session `sid`: a shared-gateway view detaches (the session keeps running for its other viewers); a private gateway closes it. */
+  async leave(sid, endReason) {
+    const subscription2 = this.#subscriptions.get(sid);
+    if (!this.#gw.isCanonical) {
+      await rpc(this.#gw, "session.close", { session_id: sid }).catch(() => void 0);
+      return;
+    }
+    if (!subscription2) {
+      return;
+    }
+    this.#subscriptions.delete(sid);
+    await this.#detach(sid, subscription2, endReason);
+  }
+  /**
+   * Releases what superseded switches attached, once the adopted session (`shown`) is known. The
+   * gateway gives this view one subscription per session, so a stale result for the shown session
+   * is the live view's own and stays; others detach with no end reason (nobody chose to close them).
+   */
+  release(shown) {
+    const stale = this.#stale;
+    this.#stale = [];
+    for (const r of stale) {
+      const { ref, subscription: subscription2 } = snapshotIds(r);
+      if (ref.live === shown || subscription2 && this.#subscriptions.get(ref.live) === subscription2) {
+        continue;
+      }
+      if (!this.#gw.isCanonical) {
+        void rpc(this.#gw, "session.close", { session_id: ref.live }).catch(() => void 0);
+      } else if (subscription2) {
+        void this.#detach(ref.live, subscription2);
+      }
+    }
+  }
+  /** Sends `session.detach`, one at a time per session; `endReason` lets the owner end it once no viewer remains. */
+  #detach(sid, subscription2, endReason) {
+    const send = () => rpc(this.#gw, "session.detach", {
+      ...endReason ? { end_reason: endReason } : {},
+      session_id: sid,
+      subscription_id: subscription2
+    });
+    const run5 = (this.#detaching.get(sid)?.then(send) ?? send()).catch(() => void 0);
+    this.#detaching.set(sid, run5);
+    void run5.then(() => {
+      if (this.#detaching.get(sid) === run5) {
+        this.#detaching.delete(sid);
+      }
+    });
+    return run5;
   }
 };
 
@@ -68574,7 +68691,7 @@ var Sidebar = class {
         }
         return;
       case "open-pr":
-        return openPullRequests(this.#host, row2.replace(/^pr:/, ""));
+        return openPullRequests(this.#host, this.#host.prs.keyOf(row2.replace(/^pr:/, "")));
       case "diff":
         return openChanges(this.#host, row2.replace(/^file:/, ""));
       case "all-files":
@@ -68973,8 +69090,8 @@ var ServerQueue = class {
     }
   }
   /** A prompt whose bubble this pane painted when it sent it. */
-  shown(inputId) {
-    this.#shown.add(inputId);
+  shown(inputId2) {
+    this.#shown.add(inputId2);
   }
   /**
    * Takes the FIFO from a session.info (or a reconnect's resume) and returns the bubbles owed,
@@ -69021,13 +69138,13 @@ var ServerQueue = class {
     return owed;
   }
   /** Withdrawn by this pane: its row's `cancelled` completion must not end the running turn. */
-  withdrawn(admissionId) {
-    this.#queuedOnly.add(admissionId);
+  withdrawn(admissionId2) {
+    this.#queuedOnly.add(admissionId2);
   }
   /** A message.complete that only settles a queued row nobody started (prompt.cancel's), not the running turn. */
   settlesQueuedRow(payload) {
     const p3 = payload ?? {};
-    return p3.outcome === "cancelled" && typeof p3.admission_id === "string" && this.#queuedOnly.has(p3.admission_id);
+    return p3.outcome === "cancelled" && typeof p3.admission_id === "string" && this.#queuedOnly.has(admissionId(p3.admission_id));
   }
   /** The rows that still wait, oldest first: the FIFO's, then admissions it does not list yet. */
   queued() {
@@ -70238,7 +70355,7 @@ var App = class {
   prs = new PullRequests({
     changed: () => this.changed(),
     cwd: () => this.info?.cwd || null,
-    sid: () => this.storedSid ?? this.sid
+    sid: () => durable(this.#ids)
   });
   /** The pull request docked at the pane's right edge (the PR aside). */
   prAside = new PrAside({
@@ -70251,12 +70368,11 @@ var App = class {
   });
   composer = new Composer();
   overlays = [];
-  sid = null;
-  /** The stored (database) id of the open session: what `session.list` rows are keyed by. */
-  storedSid = null;
+  /** The open session's ids: the runtime id requests name, and the stored id it is saved under. */
+  #ids = NO_SESSION;
   info = null;
-  /** The session as the ports read it: `sid`, `storedSid` and `info`, live. */
-  session = sessionView(this);
+  /** The session as the ports read it: its ids and `info`, live. */
+  session = sessionView(this, () => this.#ids);
   usage = null;
   busy = null;
   /** Prompts held here until they can be sent: no session yet, a switch in flight, or a private gateway's busy turn. */
@@ -70283,12 +70399,8 @@ var App = class {
   #switches = new Switches();
   /** Server requests for another session, kept while a switch is in flight. */
   #heldRequests = [];
-  /** Shared-gateway subscriptions this view holds, by session id. */
-  #subscriptions = /* @__PURE__ */ new Map();
-  /** What superseded switches attached; disposed once no switch is in flight (see #disposeStale). */
-  #stale = [];
-  /** The last `session.detach` in flight per session: a resume of that id waits for it (they share a subscription id). */
-  #detaching = /* @__PURE__ */ new Map();
+  /** The sessions this pane views: its subscriptions, detaches in flight, and superseded switches' results. */
+  #views;
   /** Open approval prompts' overlay keys → their approval-queue `request_id` (what approval.cancelled names). */
   #approvalIds = /* @__PURE__ */ new Map();
   /** The launcher's startup image until it is attached to the first session (the queue waits for it). */
@@ -70330,6 +70442,7 @@ var App = class {
   constructor(tern, gw2, version2, { launch: launch3 = readLaunchEnv(), settings: settings2 = fileSettings() } = {}) {
     this.#tern = tern;
     this.#gw = gw2;
+    this.#views = new SessionViews(gw2);
     this.#launch = launch3;
     this.#settings = settings2;
     this.#startupImage = launch3.image;
@@ -70343,6 +70456,22 @@ var App = class {
       version: version2 && version2 !== "unknown" ? `v${version2}` : ""
     };
   }
+  /** The open session's runtime id: null before the first session and while the gateway is down. */
+  get sid() {
+    return this.#ids.live;
+  }
+  /** Sets the runtime id, keeping the stored one (tests arrange a session this way). */
+  set sid(id) {
+    this.#ids = { live: id === null ? null : liveSessionId(id), stored: this.#ids.stored };
+  }
+  /** The stored (database) id of the open session: what `session.list` rows are keyed by. */
+  get storedSid() {
+    return this.#ids.stored;
+  }
+  /** Sets the stored id, keeping the runtime one (tests arrange a session this way). */
+  set storedSid(id) {
+    this.#ids = { live: this.#ids.live, stored: id === null ? null : storedSessionId(id) };
+  }
   /** The gateway, for overlays that issue their own RPCs. */
   get gw() {
     return this.#gw;
@@ -70353,7 +70482,7 @@ var App = class {
     if (this.#tern.caps.features.includes("blobs")) {
       this.#welcome.logo = this.#tern.blob(logo_default, "image/png");
     }
-    this.transcript.push({ id: "welcome", kind: "welcome" });
+    this.transcript.push({ id: entryId("welcome"), kind: "welcome" });
     const query = this.#launch.query;
     if (query || this.#startupImage) {
       this.queue.push({ images: [], text: query || "What do you see in this image?" });
@@ -70381,7 +70510,7 @@ var App = class {
         );
       }
       this.#offline = true;
-      this.sid = null;
+      this.#ids = { live: null, stored: this.#ids.stored };
       this.busy = null;
       this.#heldRequests = [];
       this.#dropPrompts(() => true);
@@ -70400,7 +70529,7 @@ var App = class {
     }).then(() => this.quit());
     const code7 = await this.#done.promise;
     await Promise.race([
-      Promise.all([...this.#subscriptions.keys()].map((sid) => this.#leave(sid, "tui_shutdown"))),
+      this.#views.leaveAll("tui_shutdown"),
       new Promise((resolve7) => this.#timers.timeout(() => resolve7(void 0), QUIT_DETACH_MS))
     ]);
     this.dispose();
@@ -70905,7 +71034,7 @@ var App = class {
     }, COPIED_MS3);
   }
   quit(code7 = 0) {
-    markViewer(null, this.storedSid ?? this.sid);
+    markViewer(null, durable(this.#ids));
     this.#done.resolve(code7);
   }
   // ── Prompts and commands ───────────────────────────────────────────
@@ -71000,7 +71129,7 @@ var App = class {
     if (!ready || sid !== this.sid) {
       return;
     }
-    const own13 = { display: userText(item3.display ?? item3.text, item3.images), inputId: randomUUID3(), item: { item: item3, text: ready.text } };
+    const own13 = { display: userText(item3.display ?? item3.text, item3.images), inputId: newInputId(), item: { item: item3, text: ready.text } };
     const attachments = ready.images.map(({ mime, path: path2 }) => ({ mime, path: path2 }));
     this.#server.admit(own13);
     this.changed();
@@ -71012,7 +71141,7 @@ var App = class {
         text: ready.text || (attachments.length ? IMAGE_ONLY_PROMPT : ""),
         ...attachments.length ? { attachments } : {}
       });
-      own13.admissionId = r && "admission_id" in r ? r.admission_id : void 0;
+      own13.admissionId = admissionOf(r);
     } catch (error) {
       this.#server.drop(own13);
       if (sid === this.sid) {
@@ -71067,7 +71196,7 @@ var App = class {
     const { images } = item3;
     const text11 = item3.text || (images.length ? IMAGE_ONLY_PROMPT : "");
     const attachments = images.map(({ mime, path: path2 }) => ({ mime, path: path2 }));
-    const submission = randomUUID3();
+    const submission = newInputId();
     this.transcript.user(display?.trim() || item3.text, void 0, false, userImages(images));
     this.#server.shown(submission);
     this.#startBusy("Working\u2026");
@@ -71216,9 +71345,10 @@ ${this.composer.text}` : text11 || this.composer.text);
         this.transcript.notice(text11, tone);
         this.changed();
       },
+      // The shared gateway (the one /branch runs on) answers a resume with one id for both kinds.
       open: async (id) => {
         await this.resume(id);
-        return this.sid === id;
+        return durable(this.#ids) === id;
       },
       panel: (title, text11) => {
         this.transcript.panel(title, text11);
@@ -71282,7 +71412,7 @@ ${this.composer.text}` : text11 || this.composer.text);
   async #bootstrap() {
     const resume = this.#launch.resume;
     try {
-      await (resume ? this.resume(resume) : this.newSession());
+      await (resume ? this.resume(storedSessionId(resume)) : this.newSession());
     } catch (error) {
       this.transcript.notice(
         `Could not start a session: ${errorText(error)}`,
@@ -71316,7 +71446,7 @@ ${this.composer.text}` : text11 || this.composer.text);
     this.#drainQueue();
     this.changed();
   }
-  /** After a reconnect (or a replay gap): resumes the shown session (its runtime id or subscription died). */
+  /** After a reconnect (or a replay gap): resumes the shown session under `id` (its runtime id or subscription died). */
   async #reattach(id, notice = "Reconnected to the agent backend.") {
     try {
       if (await this.#resume(id)) {
@@ -71353,14 +71483,14 @@ ${this.composer.text}` : text11 || this.composer.text);
         this.#gw.isCanonical ? { ...localCreationOptions(), ...cwd ? { cwd } : {} } : { cols: this.#tern.caps.cols, ...cwd ? { cwd } : {} }
       );
       if (!this.#switches.current(token)) {
-        this.#stale.push(r);
+        this.#views.superseded(r);
         return;
       }
       this.transcript.clear();
       this.transcript.push({ id: this.transcript.id("w"), kind: "welcome" });
       this.#adopt(r);
       if (previous3 && previous3 !== r.session_id) {
-        void this.#leave(previous3, "tui_close");
+        void this.#views.leave(previous3, "tui_close");
       }
     } finally {
       this.#settle(token);
@@ -71398,16 +71528,19 @@ ${this.composer.text}` : text11 || this.composer.text);
     const previous3 = this.sid;
     const r = await this.#resume(id);
     if (r && previous3 && previous3 !== r.session_id) {
-      void this.#leave(previous3, "tui_close");
+      void this.#views.leave(previous3, "tui_close");
     }
   }
-  /** Resumes and adopts stored session `id`; undefined when a later switch superseded this one. */
+  /**
+   * Resumes and adopts session `id` (its stored id, or a runtime id when none is known); undefined
+   * when a later switch superseded this one.
+   */
   async #resume(id) {
     const token = this.#switches.begin();
     const hold = this.#gw.holdAttach(id);
     let snapshot3;
     try {
-      const detaching = this.#detaching.get(id);
+      const detaching = this.#views.detaching(id);
       if (detaching) {
         await detaching;
         if (!this.#switches.current(token)) {
@@ -71416,7 +71549,7 @@ ${this.composer.text}` : text11 || this.composer.text);
       }
       const r = await rpc(this.#gw, "session.resume", { cols: this.#tern.caps.cols, session_id: id });
       if (!this.#switches.current(token)) {
-        this.#stale.push(r);
+        this.#views.superseded(r);
         return void 0;
       }
       this.transcript.clear();
@@ -71432,20 +71565,19 @@ ${this.composer.text}` : text11 || this.composer.text);
     }
   }
   #adopt(r) {
-    this.#subscribe(r);
-    if (r.session_id !== this.sid) {
+    const ref = this.#views.adopt(r);
+    if (ref.live !== this.sid) {
       this.#dropPrompts(() => true);
       this.transcript.forgetCompactions();
       this.#busyMode = "queue";
     }
-    void this.#readBusyMode(r.session_id);
+    void this.#readBusyMode(ref.live);
     this.#server.reset(pendingRows(r.info));
-    this.sid = r.session_id;
-    this.#showThoughts(r.session_id);
-    const previousStored = this.storedSid;
-    this.storedSid = r.info?.stored_session_id || r.stored_session_id || null;
-    markViewer(this.storedSid ?? r.session_id, previousStored);
-    writeActiveSessionFile(this.storedSid ?? r.session_id);
+    const previousStored = this.#ids.stored;
+    this.#ids = ref;
+    this.#showThoughts(ref.live);
+    markViewer(durable(ref), previousStored);
+    writeActiveSessionFile(durable(ref));
     this.info = r.info ?? this.info;
     this.usage = r.info?.usage ?? null;
     this.title = "";
@@ -71458,71 +71590,18 @@ ${this.composer.text}` : text11 || this.composer.text);
     this.#lastStatusNote = void 0;
     this.transcript.usageBase(r.info?.usage ?? void 0);
     if (r.messages?.length) {
-      this.transcript.load(r.messages, storedCompactions(this.storedSid ?? r.session_id));
+      this.transcript.load(r.messages, storedCompactions(durable(ref)));
       this.agents.scan();
       this.media.showAll(this.transcript.entries, (call) => this.#imageLanded(call));
     }
     this.processes.poke();
     this.#watchConnections();
     this.prs.adopt();
-    this.automation.adopt(r.session_id);
+    this.automation.adopt(ref.live);
     if (r.inflight) {
       this.transcript.inflight(r.inflight, this.busy?.startedAt);
     }
     this.changed();
-  }
-  #subscribe(r) {
-    if (r.subscription_id) {
-      this.#subscriptions.set(r.session_id, r.subscription_id);
-    }
-  }
-  /** Stops showing session `sid`: a shared-gateway view detaches (the session keeps running for its other viewers); a private gateway closes it. */
-  async #leave(sid, endReason) {
-    const subscription2 = this.#subscriptions.get(sid);
-    if (!this.#gw.isCanonical) {
-      await rpc(this.#gw, "session.close", { session_id: sid }).catch(() => void 0);
-      return;
-    }
-    if (!subscription2) {
-      return;
-    }
-    this.#subscriptions.delete(sid);
-    await this.#detach(sid, subscription2, endReason);
-  }
-  /** Sends `session.detach`, one at a time per session; `endReason` lets the owner end it once no viewer remains. */
-  #detach(sid, subscription2, endReason) {
-    const send = () => rpc(this.#gw, "session.detach", {
-      ...endReason ? { end_reason: endReason } : {},
-      session_id: sid,
-      subscription_id: subscription2
-    });
-    const run5 = (this.#detaching.get(sid)?.then(send) ?? send()).catch(() => void 0);
-    this.#detaching.set(sid, run5);
-    void run5.then(() => {
-      if (this.#detaching.get(sid) === run5) {
-        this.#detaching.delete(sid);
-      }
-    });
-    return run5;
-  }
-  /**
-   * Releases what superseded switches attached, once the adopted session is known. The gateway gives
-   * this view one subscription per session, so a stale result for the shown session is the live
-   * view's own and stays; others detach with no end reason (nobody chose to close them).
-   */
-  #disposeStale() {
-    const stale = this.#stale;
-    this.#stale = [];
-    for (const r of stale) {
-      if (r.session_id === this.sid || r.subscription_id && this.#subscriptions.get(r.session_id) === r.subscription_id) {
-        continue;
-      }
-      if (!this.#gw.isCanonical) {
-        void rpc(this.#gw, "session.close", { session_id: r.session_id }).catch(() => void 0);
-      } else if (r.subscription_id) {
-        void this.#detach(r.session_id, r.subscription_id);
-      }
-    }
   }
   /** Acts on a command's dispatch envelope from outside a typed command (a goal or loop sheet's button). */
   runDispatch(raw2, title) {
@@ -71580,7 +71659,7 @@ ${this.composer.text}` : text11 || this.composer.text);
     if (this.#switches.pending) {
       return;
     }
-    this.#disposeStale();
+    this.#views.release(this.sid);
     const held = this.#heldRequests;
     this.#heldRequests = [];
     for (const req of held) {
@@ -71600,7 +71679,7 @@ ${this.composer.text}` : text11 || this.composer.text);
         this.#offline = false;
         this.#reconnected();
         this.#applySkin(ev.payload?.skin);
-        void (this.storedSid ? this.#reattach(this.storedSid) : this.#bootstrap());
+        void (this.#ids.stored ? this.#reattach(this.#ids.stored) : this.#bootstrap());
         break;
       case "skin.changed":
         this.#applySkin(ev.payload);
@@ -71648,8 +71727,8 @@ ${this.composer.text}` : text11 || this.composer.text);
       // The view fell behind and the owner retired its subscription (the socket is fine, so no
       // reconnect re-attaches it): a fresh resume brings the snapshot and a new subscription.
       case "session.replay_gap":
-        if (this.sid && ev.session_id === this.sid) {
-          void this.#reattach(this.storedSid ?? this.sid, "Reloaded the session: this view fell behind its events.");
+        if (isLive(this.#ids) && ev.session_id === this.#ids.live) {
+          void this.#reattach(durable(this.#ids), "Reloaded the session: this view fell behind its events.");
         }
         return;
       case "message.start":
@@ -71695,7 +71774,7 @@ ${this.composer.text}` : text11 || this.composer.text);
       case "tool.start":
         if (ev.payload) {
           t2.toolStart(ev.payload);
-          const call = t2.call(ev.payload.tool_id);
+          const call = t2.call(toolCallId(ev.payload.tool_id));
           this.#label(call ? busyLabel(call) : `Running ${ev.payload.name}\u2026`);
           this.#showImage(call);
         }
@@ -71703,7 +71782,7 @@ ${this.composer.text}` : text11 || this.composer.text);
       case "tool.complete":
         if (ev.payload) {
           t2.toolComplete(ev.payload);
-          this.#showImage(t2.call(ev.payload.tool_id));
+          this.#showImage(t2.call(toolCallId(ev.payload.tool_id)));
           this.agents.scan();
           if (ev.payload.name === "delegate_task") {
             this.prs.relink();
@@ -71991,10 +72070,10 @@ ${this.composer.text}` : text11 || this.composer.text);
    */
   async #withdraw(sid, q2) {
     const own13 = q2.own;
-    const admissionId = own13.admissionId;
-    this.#server.withdrawn(admissionId);
+    const admissionId2 = own13.admissionId;
+    this.#server.withdrawn(admissionId2);
     try {
-      const r = await rpc(this.#gw, "prompt.cancel", { admission_id: admissionId, session_id: sid });
+      const r = await rpc(this.#gw, "prompt.cancel", { admission_id: admissionId2, session_id: sid });
       if (r?.status !== "terminal") {
         return false;
       }

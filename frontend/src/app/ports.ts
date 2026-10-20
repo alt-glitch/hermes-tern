@@ -9,6 +9,7 @@ import type { SessionInfo } from '@tui/types.js'
 
 import type { Agents } from '../agents/store.js'
 import type { Automation } from '../automation.js'
+import type { PrKey, SessionIds, StoredSessionId } from '../core/ids.js'
 import type { Busy } from '../flow.js'
 import type { GitState } from '../git/status.js'
 import type { PullRequests } from '../github/store.js'
@@ -20,18 +21,9 @@ import type { SessionHost } from '../sessionCommands.js'
 import type { ThemeMode } from '../settings.js'
 import type { Transcript } from '../transcript.js'
 
-/**
- * The session's two ids. `live` is the gateway's runtime id: null before the first session and
- * while the gateway is down. `stored` is the id its history is saved under: null until a snapshot
- * names it, and kept while the gateway is down.
- */
-export interface SessionIds {
-  readonly live: string | null
-  readonly stored: string | null
-}
-
 /** The session as the ports read it, live: each read sees the current ids and info. */
 export interface SessionView {
+  /** The open session's ids: `live` for the gateway's requests, `durable(ref)` to file or resume it. */
   readonly ref: SessionIds
   /**
    * The gateway's session.info, merged. Writable: a picker that switched the model or the fast
@@ -40,15 +32,13 @@ export interface SessionView {
   info: SessionInfo | null
 }
 
-/** Where a SessionView reads: the app's session fields, as they are until a session store holds them. */
+/** Where a SessionView reads: the app's session info, as it is until a session store holds it. */
 export interface SessionFields {
-  readonly sid: string | null
-  readonly storedSid: string | null
   info: SessionInfo | null
 }
 
-/** The live view of `fields`: each read sees the current ids and info, and `info` writes through. */
-export function sessionView(fields: SessionFields): SessionView {
+/** The live view of `fields` and `ids()`: each read sees the current ids and info, and `info` writes through. */
+export function sessionView(fields: SessionFields, ids: () => SessionIds): SessionView {
   return {
     get info() {
       return fields.info
@@ -57,7 +47,7 @@ export function sessionView(fields: SessionFields): SessionView {
       fields.info = info
     },
     get ref() {
-      return { live: fields.sid, stored: fields.storedSid }
+      return ids()
     }
   }
 }
@@ -95,13 +85,13 @@ export interface ChatPorts extends OverlayHost {
   /** Opens the help sheet. */
   openHelp(): Promise<void>
   /** Docks PR `key` at the pane's right edge, in place of the session sidebar. */
-  openPrAside(key: string | undefined): void
+  openPrAside(key: PrKey | undefined): void
   /** Shows or hides the session sidebar. */
   toggleSidebar(): void
   /** Starts a new session, named `title` when given. */
   newSession(title?: string): Promise<void>
-  /** Switches this pane to session `id`. */
-  resume(id: string): Promise<void>
+  /** Switches this pane to stored session `id`. */
+  resume(id: StoredSessionId): Promise<void>
   /** Ends the app with exit code `code`. */
   quit(code?: number): void
   /** Attaches the clipboard's image to the next prompt; `quiet`: no notice when it holds none. */

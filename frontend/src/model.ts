@@ -7,6 +7,7 @@ import type { SubagentEventPayload, Usage } from '@hermes/shared/gateway-events'
 import type { LiveLog } from './agents/liveLog.js'
 import type { BatchEntry } from './bridge.js'
 import type { ConnectCard } from './connections.js'
+import type { BlockKey, EntryId, ToolCallId } from './core/ids.js'
 import type { ChartView } from './processes/widgets/types.js'
 
 /** One todo item as the `todo_list` tool reports it. */
@@ -78,7 +79,7 @@ export interface BackgroundProcess {
 
 /** One tool call, from `tool.start` to `tool.complete`. */
 export interface ToolCall {
-  id: string
+  id: ToolCallId
   name: string
   args: Record<string, unknown>
   argsText: string
@@ -111,14 +112,15 @@ export interface ToolCall {
 
 /** A part of an assistant turn, in the order it streamed. */
 export type Block =
-  | { kind: 'text'; id: string; text: string }
+  | { kind: 'text'; id: EntryId; text: string }
   /** A thought; `label` names one that is not the agent's own (a Mixture-of-Agents reference answer). */
-  | { kind: 'thinking'; id: string; text: string; startedAt: number; endedAt?: number; label?: string }
-  | { kind: 'tool'; id: string; call: ToolCall }
+  | { kind: 'thinking'; id: EntryId; text: string; startedAt: number; endedAt?: number; label?: string }
+  /** Keyed by its call's id when it streamed, by an entry id when it came from the stored history. */
+  | { kind: 'tool'; id: BlockKey; call: ToolCall }
   /** Guidance the user sent into this turn while it ran; it lands before the agent's next step. */
-  | { kind: 'steer'; id: string; text: string; at: number }
+  | { kind: 'steer'; id: EntryId; text: string; at: number }
   /** The context compacted while the turn ran. */
-  | { kind: 'compaction'; id: string; at: number; compaction: Compaction }
+  | { kind: 'compaction'; id: EntryId; at: number; compaction: Compaction }
 
 /**
  * One compaction: Hermes summarized the earlier conversation to free context. The agent reads the
@@ -153,7 +155,7 @@ export interface UserAttachment {
 /** A user prompt. */
 export interface UserEntry {
   kind: 'user'
-  id: string
+  id: EntryId
   text: string
   at: number
   /** Injected into a running turn rather than starting one. */
@@ -165,7 +167,7 @@ export interface UserEntry {
 /** One assistant turn: thinking, text and tool calls as they arrived. */
 export interface TurnEntry {
   kind: 'turn'
-  id: string
+  id: EntryId
   /** Why a turn with no prompt of its own started ("Subagents finished"): Hermes went on by itself. */
   continued?: string
   /** Bumped on every change to the turn, so views rebuild only the turns that changed. */
@@ -201,7 +203,7 @@ export interface Counters {
 /** A line from the app or the gateway: a notice, a warning, an error. */
 export interface NoticeEntry {
   kind: 'notice'
-  id: string
+  id: EntryId
   text: string
   tone: 'error' | 'info' | 'success' | 'warning'
 }
@@ -209,7 +211,7 @@ export interface NoticeEntry {
 /** Output of a slash command, shown as Markdown. */
 export interface PanelEntry {
   kind: 'panel'
-  id: string
+  id: EntryId
   title: string
   text: string
 }
@@ -217,7 +219,7 @@ export interface PanelEntry {
 /** A compaction between turns (/compress, or one before the turn that needed it). */
 export interface CompactionEntry {
   kind: 'compaction'
-  id: string
+  id: EntryId
   /** Bumped when it ends or learns its numbers or summary. */
   rev: number
   compaction: Compaction
@@ -226,7 +228,7 @@ export interface CompactionEntry {
 /** The session's opening card. */
 export interface WelcomeEntry {
   kind: 'welcome'
-  id: string
+  id: EntryId
 }
 
 export type Entry = CompactionEntry | NoticeEntry | PanelEntry | TurnEntry | UserEntry | WelcomeEntry

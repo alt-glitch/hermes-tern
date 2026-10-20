@@ -5,6 +5,8 @@
 
 import type { JSX } from '@stencil-hq/tern'
 
+import type { PrKey } from '../core/ids.js'
+
 import { PrView, type PrViewHost } from './view.js'
 
 export class PrAside {
@@ -20,7 +22,7 @@ export class PrAside {
     return this.#view !== undefined
   }
 
-  show(focus?: string) {
+  show(focus?: PrKey) {
     if (!this.#view) {
       this.#view = new PrView(this.#host)
     }

@@ -14,6 +14,7 @@ import { join } from 'node:path'
 import type { SubagentSnapshot } from '@hermes/shared/gateway-events'
 import type { GatewayClient } from '@tui/gatewayClient.js'
 
+import type { LiveSessionId } from '../core/ids.js'
 import type { Subagent, ToolCall } from '../model.js'
 import type { Transcript } from '../transcript.js'
 import { record } from '../wire/json.js'
@@ -24,7 +25,8 @@ import { clockToMs, parseLiveLog, runningTool, type LiveLog } from './liveLog.js
 /** What the store reaches of the app. */
 export interface AgentsHost {
   readonly gw: Pick<GatewayClient, 'request'>
-  readonly sid: string | null
+  /** The open session's runtime id. */
+  readonly sid: LiveSessionId | null
   readonly transcript: Transcript
   changed(): void
   /** A subagent ended (the PRs it linked may be new). */
@@ -143,10 +145,7 @@ export class Agents {
 
   /** Blocks (or unblocks) new subagent spawns on the gateway; running children keep going. */
   async pause(paused: boolean): Promise<boolean> {
-    const r = await rpc(this.#host.gw, 'delegation.pause', {
-      paused,
-      ...(this.#host.sid ? { session_id: this.#host.sid } : {})
-    })
+    const r = await rpc(this.#host.gw, 'delegation.pause', { paused, ...(this.#host.sid ? { session_id: this.#host.sid } : {}) })
 
     this.paused = typeof r?.paused === 'boolean' ? r.paused : paused
     this.#host.changed()

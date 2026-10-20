@@ -58,6 +58,22 @@ handle every member, so a new member fails to compile where it needs a case. A `
 handling the rest; when the switch should cover every member, end it with
 `default: assertNever(x)` from `core/assert.ts` so the compiler still checks.
 
+## Branded ids
+
+`src/core/ids.ts` brands the ids that share the type `string` but not a meaning: a session's
+runtime id (`LiveSessionId`) and its stored id (`StoredSessionId`), a tool call's id
+(`ToolCallId`) and a transcript entry's (`EntryId`), a prompt's input and admission ids, a PR's
+and a stack's key. A brand exists only for the compiler; the value stays the string it was. A
+branded id reads as a string anywhere, but only its constructor in `core/ids.ts` makes one, so
+code that puts one kind where another belongs fails to compile unless it says so.
+
+- Call a constructor where the value comes in: `wire/` for a gateway answer (`snapshotIds`,
+  `admissionOf`, the FIFO schema), the event or file reader for the rest.
+- A session is filed and resumed under `durable(ids)`: its stored id, else its runtime id. Requests
+  about the running session name its runtime id (`session.ref.live`).
+- Comparing two kinds is a compile error. Where it is meant (the shared gateway names one id for
+  both), widen one side to `string` and say why.
+
 ## Restricted imports
 
 `@typescript-eslint/no-restricted-imports`:

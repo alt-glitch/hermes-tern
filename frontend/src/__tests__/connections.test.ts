@@ -19,6 +19,7 @@ import {
   STALE_MS,
   ternPane
 } from '../connections.js'
+import { entryId, liveSessionId, storedSessionId, toolCallId } from '../core/ids.js'
 import type { ToolCall, TurnEntry } from '../model.js'
 import { foldOf, ownsCard } from '../workLog.js'
 
@@ -32,11 +33,14 @@ const result = {
   ]
 }
 
-const call = (over: Partial<ToolCall> = {}): ToolCall => ({
+/** A call's fields to set; its id as plain text. */
+type CallOver = Omit<Partial<ToolCall>, 'id'> & { id?: string }
+
+const call = ({ id = 'c1', ...over }: CallOver = {}): ToolCall => ({
   args: { action: 'connect', connectors: ['googledrive', 'gmail', 'slack'] },
   argsText: '',
   context: '',
-  id: 'c1',
+  id: toolCallId(id),
   name: 'manage_connections',
   result: JSON.stringify(result),
   startedAt: 0,
@@ -63,7 +67,7 @@ const watched = (state: string, over: Record<string, unknown> = {}) => ({
   ...over
 })
 
-const stripped = (over: Partial<ToolCall> = {}) =>
+const stripped = (over: CallOver = {}) =>
   call({ result: JSON.stringify({ op_id: 'op1', status: 'initiated', targets: [{ name: 'googledrive', state: 'initiated' }] }), ...over })
 
 describe('manage_connections without its card', () => {
@@ -167,9 +171,9 @@ describe('manage_connections without its card', () => {
   it('marks this pane as the viewer of one session at a time', () => {
     const dir = mkdtempSync(join(tmpdir(), 'tern-viewers-'))
 
-    markViewer('s1', null, dir, {})
+    markViewer(storedSessionId('s1'), null, dir, {})
     expect(JSON.parse(readFileSync(join(dir, 'viewers', 's1.json'), 'utf8'))).toEqual({ pid: process.pid })
-    markViewer('s2', 's1', dir)
+    markViewer(storedSessionId('s2'), storedSessionId('s1'), dir)
     expect(existsSync(join(dir, 'viewers', 's1.json'))).toBe(false)
     expect(existsSync(join(dir, 'viewers', 's2.json'))).toBe(true)
   })
@@ -177,7 +181,7 @@ describe('manage_connections without its card', () => {
   it("records the pane's Tern variables, for the agent's tools", () => {
     const dir = mkdtempSync(join(tmpdir(), 'tern-viewers-'))
 
-    markViewer('s1', null, dir, { HOME: '/h', TERN_PANE: '42', TERN_PANE_SOCKET: '/s/pane', TERN_WINDOW_KEY: '' })
+    markViewer(liveSessionId('s1'), null, dir, { HOME: '/h', TERN_PANE: '42', TERN_PANE_SOCKET: '/s/pane', TERN_WINDOW_KEY: '' })
     expect(JSON.parse(readFileSync(join(dir, 'viewers', 's1.json'), 'utf8'))).toEqual({
       pid: process.pid,
       tern: { TERN_PANE: '42', TERN_PANE_SOCKET: '/s/pane' }
@@ -206,11 +210,11 @@ describe('manage_connections without its card', () => {
     const c = call()
     const turn: TurnEntry = {
       blocks: [
-        { call: c, id: 'b1', kind: 'tool' },
-        { id: 'b2', kind: 'text', text: 'While you authorize those, I will start.' }
+        { call: c, id: entryId('b1'), kind: 'tool' },
+        { id: entryId('b2'), kind: 'text', text: 'While you authorize those, I will start.' }
       ],
       endedAt: 1000,
-      id: 't',
+      id: entryId('t'),
       kind: 'turn',
       rev: 0,
       startedAt: 0,

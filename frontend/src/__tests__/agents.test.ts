@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { parseLiveLog } from '../agents/liveLog.js'
 import { Agents, completionOutcomes, mergeTail, OUTCOME_UNKNOWN } from '../agents/store.js'
+import { liveSessionId } from '../core/ids.js'
 import { Transcript } from '../transcript.js'
 
 // A finished child's log as tools/delegation_live_log.py writes it (lab run, 2026-10-17).
@@ -124,7 +125,7 @@ describe('Agents', () => {
     const transcript = dispatched([path])
     const gw = { request: async () => ({ subagents: [] }) } as unknown as GatewayClient
     let changes = 0
-    store = new Agents({ changed: () => changes++, gw, sid: 's1', transcript })
+    store = new Agents({ changed: () => changes++, gw, sid: liveSessionId('s1'), transcript })
 
     store.scan()
     const [agent] = store.all()
@@ -162,7 +163,7 @@ describe('Agents', () => {
     const row = { delegation_id: 'deleg_9', depth: 0, goal: 'Survey the layout', status: 'running', subagent_id: 'sa-1-beef', tool_count: 2 }
     const request = vi.fn(async (method: string) => (method === 'subagent.list' ? { subagents: [row] } : {}))
     let changes = 0
-    store = new Agents({ changed: () => changes++, gw: { request } as unknown as GatewayClient, sid: 's1', transcript })
+    store = new Agents({ changed: () => changes++, gw: { request } as unknown as GatewayClient, sid: liveSessionId('s1'), transcript })
 
     try {
       store.scan()
@@ -184,7 +185,7 @@ describe('Agents', () => {
     const request = vi.fn(async () => ({ subagents: [] }))
     const transcript = new Transcript()
     transcript.load([{ role: 'user', text: 'hi' }] as never)
-    store = new Agents({ changed: () => undefined, gw: { request } as unknown as GatewayClient, sid: 's1', transcript })
+    store = new Agents({ changed: () => undefined, gw: { request } as unknown as GatewayClient, sid: liveSessionId('s1'), transcript })
 
     store.scan()
 
@@ -194,7 +195,7 @@ describe('Agents', () => {
   it('pauses and resumes new spawns through delegation.pause, keeping the flag', async () => {
     const request = vi.fn(async (_method: string, params: { paused: boolean }) => ({ paused: params.paused }))
     let changes = 0
-    store = new Agents({ changed: () => changes++, gw: { request } as unknown as GatewayClient, sid: 's1', transcript: new Transcript() })
+    store = new Agents({ changed: () => changes++, gw: { request } as unknown as GatewayClient, sid: liveSessionId('s1'), transcript: new Transcript() })
 
     expect(store.paused).toBeUndefined()
     expect(await store.pause(true)).toBe(true)
@@ -235,7 +236,7 @@ describe('Agents', () => {
       vi.useFakeTimers()
       const request = vi.fn(async () => ({ subagents: [] }))
       const agentEnded = vi.fn()
-      store = new Agents({ agentEnded, changed: () => undefined, gw: { request } as unknown as GatewayClient, sid: 's1', transcript: remote(2) })
+      store = new Agents({ agentEnded, changed: () => undefined, gw: { request } as unknown as GatewayClient, sid: liveSessionId('s1'), transcript: remote(2) })
 
       store.scan()
       await vi.advanceTimersByTimeAsync(1000)
@@ -275,7 +276,7 @@ describe('Agents', () => {
           ? { subagents: listed ? [{ delegation_id: 'deleg_1', depth: 0, status: 'running', subagent_id: 'sa-0-abcd' }] : [] }
           : { available: true, text: tails.shift() ?? '', truncated: true }
       )
-      store = new Agents({ changed: () => undefined, gw: { request } as unknown as GatewayClient, sid: 's1', transcript: remote(1) })
+      store = new Agents({ changed: () => undefined, gw: { request } as unknown as GatewayClient, sid: liveSessionId('s1'), transcript: remote(1) })
 
       store.scan()
       await vi.advanceTimersByTimeAsync(1000)
