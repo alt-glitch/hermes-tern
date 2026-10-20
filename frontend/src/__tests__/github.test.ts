@@ -442,10 +442,11 @@ describe('branch and stacks', () => {
 
     store.adopt()
     expect(store.entries().map(e => `${e.ref.number}:${e.source}`)).toEqual(['5:linked'])
-    // Listing made no entry: the read does.
-    expect(store.get(key)).toBeUndefined()
+    // Listing made no entry (the read does): get() answers a blank, not a stored one.
+    expect(store.get(key)).not.toBe(store.get(key))
 
     await vi.waitFor(() => expect(store.entries()[0]?.pr?.title).toBe('Fix it'))
+    expect(store.get(key)).toBe(store.get(key))
     expect(store.get(key)).not.toHaveProperty('source')
     expect(store.entries()[0]).not.toBe(store.entries()[0])
     store.dispose()

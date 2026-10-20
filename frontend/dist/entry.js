@@ -71692,8 +71692,17 @@ var PullRequests = class {
   keyOf(raw2) {
     return this.#list().map((l) => prKey(l.ref)).find((key2) => key2 === raw2);
   }
+  /**
+   * What the store knows of `key`: its stored entry, else a blank one while it is listed but not
+   * read yet (a fresh link, an adopt), so the sheet says 'Reading GitHub…' as the list does. Writes nothing.
+   */
   get(key2) {
-    return this.#entries.get(key2);
+    const stored = this.#entries.get(key2);
+    if (stored) {
+      return stored;
+    }
+    const listed = this.#list().find((l) => prKey(l.ref) === key2);
+    return listed && blank(listed.ref);
   }
   get error() {
     return this.#error;

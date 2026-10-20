@@ -1,9 +1,10 @@
 import { plain } from '@stencil-hq/tern'
 import { describe, expect, it, vi } from 'vitest'
 
-import { prKey } from '../core/ids.js'
+import { prKey, storedSessionId } from '../core/ids.js'
+import type { BranchTarget } from '../github/branch.js'
 import type { PrRef } from '../github/pullRequest.js'
-import type { Entry, PullRequests } from '../github/store.js'
+import { type Entry, PullRequests } from '../github/store.js'
 import { parseBody } from '../prs/body.js'
 import { PrView } from '../prs/view.js'
 
@@ -158,5 +159,22 @@ describe('PrView', () => {
     expect(out).toContain('sid added 2 commits')
     expect(out).toContain('1111111')
     expect(out).toContain('ana approved these changes')
+  })
+
+  it("shows a linked PR as 'Reading GitHub…' with its repository and number before the first read settles", () => {
+    // The round waits on the branch lookup, so nothing has been read or stored yet.
+    const branchOf = () => new Promise<BranchTarget | undefined>(() => {})
+    const graphql = vi.fn(async () => ({}))
+    const prs = new PullRequests({ changed: vi.fn(), cwd: () => '/repo', sid: () => storedSessionId('s1') }, { graphql, rest: vi.fn() }, () => [ref], branchOf)
+    const view = new PrView({ changed: vi.fn(), notice: vi.fn(), open: vi.fn(), prs }, prKey(ref))
+
+    prs.adopt()
+    expect(prs.get(prKey(ref))).toMatchObject({ ref })
+    expect(prs.get(prKey(ref))?.pr).toBeUndefined()
+    expect(view.selection()?.key).toBe(prKey(ref))
+    expect(text(view.body('b', 0))).toContain('Reading GitHub…')
+    expect(text([view.header(0)])).toContain('acme/app #5')
+    expect(graphql).not.toHaveBeenCalled()
+    prs.dispose()
   })
 })
