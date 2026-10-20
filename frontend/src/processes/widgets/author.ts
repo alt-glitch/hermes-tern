@@ -40,7 +40,7 @@ A widget charts a quantity that shows how the process is going: throughput, late
 Otherwise call \`respond\` with:
 - \`title\` (≤ 48 chars): what is watched.
 - \`rules\` (1–12) \`{from, match, key?, text?, count?, scale?}\`:
-  - \`from\`: the sample source id carrying the data (\`out\`), \`*\` for all.
+  - \`from\`: the sample source id carrying the data (\`out\` for the process's output, \`file:1\` for a log file the command writes to), \`*\` for all.
   - \`match\`: a JavaScript regex on one line; no lookaround or backreferences. Copy the literal text around the data from the samples; allow varying digits (\`[\\d.]+\`) and widths (\`\\s+\`).
   - Each named group \`(?P<name>…)\` feeds field \`name\` (\`[a-z][a-z0-9_]*\`) with its number (\`1,234\`, \`4.5k\` parse). One rule can capture several fields of a line.
   - \`key\`: the rule's group naming a series (model, shard, CI job); the rule's fields keep one series per key. Not a field itself.

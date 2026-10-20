@@ -7,6 +7,7 @@
 import type { BackgroundProcess } from '../../model.js'
 
 import type { Author, AuthorRequest } from './author.js'
+import { FileTap, outputFiles } from './files.js'
 import type { ChartMemory } from './memory.js'
 import { ChartRuntime, sampleLines, type TextChunk, type TextSource } from './runtime.js'
 import { type Spec, specSkip, validateSpec } from './spec.js'
@@ -127,10 +128,14 @@ const DEFAULTS = { authorAfterMs: 15_000, driftLines: 200, driftStaleMs: 90_000,
 
 /** Lines the output needs before it is worth a spec. */
 const MIN_AUTHOR_LINES = 3
+/** New lines, besides doubling, before a declined process is asked again (a short log's results come late). */
+const REASK_LINES = 5
 
 interface Entry {
   process: BackgroundProcess
   tap: OutputTap
+  /** The log files the command writes its output to (`file:1`, …). */
+  files: FileTap[]
   runtime: ChartRuntime
   view: ChartView
   /** `JSON.stringify(view)`, to keep the view's identity while it does not change. */
@@ -138,8 +143,10 @@ interface Entry {
   /** Exited and flushed: the view never changes again. */
   frozen: boolean
   attempts: number
-  /** No model can write specs, or it declined: stop asking. */
+  /** No model can write specs: stop asking. */
   done: boolean
+  /** The model declined when the output had this many lines; it is asked again once the output doubled. */
+  declined?: number
   request?: AbortController
 }
 
@@ -176,11 +183,14 @@ export class Charts {
       const tap = new OutputTap(p.command)
       // Rules another pane (or this one, before) already got for the process.
       const known = this.#memory?.load(p.id)
-      const runtime = new ChartRuntime(known === 'skip' ? undefined : known, p.startedAt, this.#now)
+      const declined = known && 'skip' in known ? known.skip : undefined
+      const runtime = new ChartRuntime(known && !('skip' in known) ? known : undefined, p.startedAt, this.#now)
 
       entry = {
         attempts: 0,
-        done: known === 'skip',
+        declined,
+        done: false,
+        files: outputFiles(p.command).map((path, i) => new FileTap(`file:${i + 1}`, path)),
         frozen: false,
         process: p,
         runtime,
@@ -228,12 +238,14 @@ export class Charts {
     const now = this.#now()
     const settled = entry.process.status !== 'running'
     entry.tap.update(entry.process.output)
+    entry.files.forEach(f => f.update())
 
     if (settled) {
       entry.tap.close()
+      entry.files.forEach(f => f.close())
     }
 
-    entry.runtime.ingest([entry.tap], settled)
+    entry.runtime.ingest([entry.tap, ...entry.files], settled)
 
     if (settled) {
       entry.frozen = true
@@ -284,6 +296,9 @@ export class Charts {
       previous = { reason, spec: runtime.spec }
     } else if (!runtime.samples().some(s => s.lines >= MIN_AUTHOR_LINES)) {
       return
+    } else if (entry.declined !== undefined && runtime.totalLines < Math.max(2 * entry.declined, entry.declined + REASK_LINES)) {
+      // Declined on fewer lines (shell start-up noise, a banner): asked again once the output has grown.
+      return
     }
 
     void this.#writeSpec(entry, previous)
@@ -329,13 +344,17 @@ export class Charts {
           return
         }
 
-        if (answer === undefined || specSkip(answer) !== undefined) {
-          // No model can write specs, or nothing in the output is worth charting.
+        if (answer === undefined) {
+          // No model can write specs.
           entry.done = true
 
-          if (answer !== undefined) {
-            this.#memory?.save(entry.process.id, 'skip')
-          }
+          break
+        }
+
+        if (specSkip(answer) !== undefined) {
+          // Nothing in the output so far is worth charting.
+          entry.declined = entry.runtime.totalLines
+          this.#memory?.save(entry.process.id, { skip: entry.declined })
 
           break
         }
@@ -367,7 +386,7 @@ export class Charts {
       // A new spec rereads the output from its oldest retained text.
       entry.runtime = new ChartRuntime(spec, entry.process.startedAt, this.#now)
       entry.tap.update(entry.process.output)
-      entry.runtime.ingest([entry.tap], entry.process.status !== 'running')
+      entry.runtime.ingest([entry.tap, ...entry.files], entry.process.status !== 'running')
     }
 
     if (this.#recompute(entry)) {

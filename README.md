@@ -59,7 +59,10 @@ A command the agent runs in the background (`terminal(background=true)`) gets a 
 omp. After 15 s of output, Hermes' auxiliary model reads the command and samples of its output
 once and writes rules that pull numbers out of each line (throughput, latency, loss, tests passed,
 progress toward a total the command states), or declines when nothing is worth charting. From then
-on the plugin applies the rules to every new line itself, with no further model calls.
+on the plugin applies the rules to every new line itself, with no further model calls. A command
+that sends its output to a log file (`> /tmp/run.log 2>&1`, `| tee run.log`) is charted from that
+file. A decline is asked again once the output has doubled, since a job often starts with setup
+lines and prints its numbers later.
 
 <p align="center"><img alt="The shells pill with a job's figure and mini chart, its hover card above a column chart with a dashed goal line" src="docs/images/job-chart.png" width="600"></p>
 
@@ -157,7 +160,8 @@ npm run bundle                                    # rebuilds dist/entry.js
 `lab/fake_model.py --home DIR` writes a disposable `HERMES_HOME` pointed at a loopback model and
 serves it. The prompt picks the flow: "approve", "clarify", "tool", "work…", "delegate…",
 "errands…", "jobchart…", "pr URL…" and more (the file's docstring lists them all); anything else streams
-Markdown. Pair it with a headless Tern (`tern serve --control PORT`, then
+Markdown. `lab/chartbench.ts` replays real background jobs (their recorded output and log files) through the
+chart registry and the auxiliary model, and reports which ones chart. Pair the fake model with a headless Tern (`tern serve --control PORT`, then
 `tern ctl --control PORT run|type|key|shot …`) to check the UI without credentials. The
 screenshots above come from that setup.
 

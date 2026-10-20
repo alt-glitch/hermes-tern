@@ -14715,7 +14715,7 @@ var require_util4 = __commonJS({
     var { getEncoding } = require_encoding();
     var { serializeAMimeType, parseMIMEType } = require_data_url();
     var { types } = __require("node:util");
-    var { StringDecoder } = __require("string_decoder");
+    var { StringDecoder: StringDecoder2 } = __require("string_decoder");
     var { btoa } = __require("node:buffer");
     var staticPropertyDescriptors = {
       enumerable: true,
@@ -14806,7 +14806,7 @@ var require_util4 = __commonJS({
             dataURL += serializeAMimeType(parsed);
           }
           dataURL += ";base64,";
-          const decoder4 = new StringDecoder("latin1");
+          const decoder4 = new StringDecoder2("latin1");
           for (const chunk of bytes) {
             dataURL += btoa(decoder4.write(chunk));
           }
@@ -14835,7 +14835,7 @@ var require_util4 = __commonJS({
         }
         case "BinaryString": {
           let binaryString = "";
-          const decoder4 = new StringDecoder("latin1");
+          const decoder4 = new StringDecoder2("latin1");
           for (const chunk of bytes) {
             binaryString += decoder4.write(chunk);
           }
@@ -23957,8 +23957,8 @@ function recordParentLifecycle(line) {
     return;
   }
   try {
-    const oneLine = line.replace(/[\r\n]+/g, " \u21B5 ");
-    const capped = oneLine.length > MAX_BREADCRUMB ? `${oneLine.slice(0, MAX_BREADCRUMB)}\u2026 [truncated ${oneLine.length} chars]` : oneLine;
+    const oneLine2 = line.replace(/[\r\n]+/g, " \u21B5 ");
+    const capped = oneLine2.length > MAX_BREADCRUMB ? `${oneLine2.slice(0, MAX_BREADCRUMB)}\u2026 [truncated ${oneLine2.length} chars]` : oneLine2;
     mkdirSync(logDir, { recursive: true });
     appendFileSync2(CRASH_LOG, `[tui-parent] ${(/* @__PURE__ */ new Date()).toISOString()} ${capped}
 `);
@@ -27360,6 +27360,105 @@ var Media = class {
   }
 };
 
+// src/processes/widgets/files.ts
+import { closeSync, fstatSync, openSync, readSync } from "node:fs";
+import { homedir as homedir6 } from "node:os";
+import { isAbsolute as isAbsolute2, join as join4, normalize } from "node:path";
+import { StringDecoder } from "node:string_decoder";
+var TARGET = /(?:^|[\s;&|(])(?:1|&)?>>?\s*([^\s;&|)<>]+)|\btee\s+(?:-a\s+)?([^\s;&|)<>-][^\s;&|)<>]*)/g;
+var CD = /^\s*cd\s+([^\s;&|]+)\s*(?:&&|;)/;
+var SKIP = /^\/dev\/|^&/;
+var unquote2 = (s2) => s2.replace(/^(['"])(.*)\1$/, "$2");
+function expand(path2, env2) {
+  const out = unquote2(path2).replace(/^~(?=\/|$)/, env2.HOME || homedir6()).replace(/\$\{?(HOME|TMPDIR|USER)\}?/g, (_, name) => env2[name]?.replace(/\/$/, "") ?? `$${name}`);
+  return out.includes("$") ? void 0 : out;
+}
+function outputFiles(command, env2 = process.env) {
+  const cd = CD.exec(command)?.[1];
+  const base3 = cd ? expand(cd, env2) : void 0;
+  const files = [];
+  for (const m of command.matchAll(TARGET)) {
+    const raw2 = m[1] ?? m[2];
+    if (!raw2 || SKIP.test(raw2)) {
+      continue;
+    }
+    const path2 = expand(raw2, env2);
+    const full = path2 && (isAbsolute2(path2) ? path2 : base3 && isAbsolute2(base3) ? join4(base3, path2) : void 0);
+    if (full && !files.includes(normalize(full))) {
+      files.push(normalize(full));
+    }
+  }
+  return files;
+}
+var CAPACITY = 256 * 1024;
+var FileTap = class {
+  constructor(id, path2) {
+    this.id = id;
+    this.path = path2;
+  }
+  id;
+  path;
+  #text = "";
+  #start = 0;
+  /** Bytes of the file read so far. */
+  #offset = 0;
+  #open = true;
+  /** Keeps a character split between two reads whole. */
+  #decoder = new StringDecoder("utf8");
+  get label() {
+    return `the file ${this.path}`;
+  }
+  /** Reads what the file gained since the last call. */
+  update() {
+    if (!this.#open) {
+      return;
+    }
+    let fd;
+    try {
+      fd = openSync(this.path, "r");
+      const size = fstatSync(fd).size;
+      if (size < this.#offset) {
+        this.#start += this.#text.length + 1;
+        this.#text = "";
+        this.#offset = 0;
+        this.#decoder = new StringDecoder("utf8");
+      }
+      if (this.#offset === 0 && size > CAPACITY) {
+        this.#start += this.#text.length + 1;
+        this.#offset = size - CAPACITY;
+      }
+      const length = Math.min(size - this.#offset, 4 * CAPACITY);
+      if (length > 0) {
+        const buf = Buffer.alloc(length);
+        const read2 = readSync(fd, buf, 0, length, this.#offset);
+        this.#offset += read2;
+        this.#append(this.#decoder.write(buf.subarray(0, read2)));
+      }
+    } catch {
+    } finally {
+      if (fd !== void 0) {
+        closeSync(fd);
+      }
+    }
+  }
+  close() {
+    this.#open = false;
+  }
+  read(from) {
+    const end = this.#start + this.#text.length;
+    const start = Math.min(Math.max(from, this.#start), end);
+    return { end, open: this.#open, start, text: this.#text.slice(start - this.#start) };
+  }
+  #append(text11) {
+    this.#text += text11;
+    const excess = this.#text.length - CAPACITY;
+    if (excess > CAPACITY / 4) {
+      this.#text = this.#text.slice(excess);
+      this.#start += excess;
+    }
+  }
+};
+
 // src/processes/widgets/format.ts
 var COMPACT_STEPS = [
   [1e12, "T"],
@@ -27997,7 +28096,11 @@ function str5(value, where, errors, o = {}) {
     errors.push(`${where}: at most ${o.max} characters`);
     return void 0;
   }
-  return o.cut === void 0 ? trimmed : cut(trimmed, o.cut);
+  return o.cut === void 0 ? trimmed : cut(unescape(trimmed), o.cut);
+}
+var ENTITIES = { "&#39;": "'", "&amp;": "&", "&gt;": ">", "&lt;": "<", "&quot;": '"' };
+function unescape(text11) {
+  return text11.replace(/&(?:amp|lt|gt|quot|#39);/g, (e) => ENTITIES[e] ?? e);
 }
 function num3(value, where, errors) {
   if (value === void 0 || value === null) {
@@ -28668,6 +28771,7 @@ var OutputTap = class {
 };
 var DEFAULTS = { authorAfterMs: 15e3, driftLines: 200, driftStaleMs: 9e4, maxAttempts: 3, maxInFlight: 2 };
 var MIN_AUTHOR_LINES = 3;
+var REASK_LINES = 5;
 var Charts = class {
   #entries = /* @__PURE__ */ new Map();
   #author;
@@ -28696,10 +28800,13 @@ var Charts = class {
     if (!entry) {
       const tap = new OutputTap(p3.command);
       const known2 = this.#memory?.load(p3.id);
-      const runtime = new ChartRuntime(known2 === "skip" ? void 0 : known2, p3.startedAt, this.#now);
+      const declined = known2 && "skip" in known2 ? known2.skip : void 0;
+      const runtime = new ChartRuntime(known2 && !("skip" in known2) ? known2 : void 0, p3.startedAt, this.#now);
       entry = {
         attempts: 0,
-        done: known2 === "skip",
+        declined,
+        done: false,
+        files: outputFiles(p3.command).map((path2, i) => new FileTap(`file:${i + 1}`, path2)),
         frozen: false,
         process: p3,
         runtime,
@@ -28739,10 +28846,12 @@ var Charts = class {
     const now = this.#now();
     const settled = entry.process.status !== "running";
     entry.tap.update(entry.process.output);
+    entry.files.forEach((f) => f.update());
     if (settled) {
       entry.tap.close();
+      entry.files.forEach((f) => f.close());
     }
-    entry.runtime.ingest([entry.tap], settled);
+    entry.runtime.ingest([entry.tap, ...entry.files], settled);
     if (settled) {
       entry.frozen = true;
       entry.request?.abort();
@@ -28780,6 +28889,8 @@ var Charts = class {
       previous3 = { reason, spec: runtime.spec };
     } else if (!runtime.samples().some((s2) => s2.lines >= MIN_AUTHOR_LINES)) {
       return;
+    } else if (entry.declined !== void 0 && runtime.totalLines < Math.max(2 * entry.declined, entry.declined + REASK_LINES)) {
+      return;
     }
     void this.#writeSpec(entry, previous3);
   }
@@ -28813,11 +28924,13 @@ var Charts = class {
         if (controller.signal.aborted) {
           return;
         }
-        if (answer === void 0 || specSkip(answer) !== void 0) {
+        if (answer === void 0) {
           entry.done = true;
-          if (answer !== void 0) {
-            this.#memory?.save(entry.process.id, "skip");
-          }
+          break;
+        }
+        if (specSkip(answer) !== void 0) {
+          entry.declined = entry.runtime.totalLines;
+          this.#memory?.save(entry.process.id, { skip: entry.declined });
           break;
         }
         const checked = validateSpec(answer, sampleLines(samples), entry.process.command);
@@ -28841,7 +28954,7 @@ var Charts = class {
       this.#memory?.save(entry.process.id, spec);
       entry.runtime = new ChartRuntime(spec, entry.process.startedAt, this.#now);
       entry.tap.update(entry.process.output);
-      entry.runtime.ingest([entry.tap], entry.process.status !== "running");
+      entry.runtime.ingest([entry.tap, ...entry.files], entry.process.status !== "running");
     }
     if (this.#recompute(entry)) {
       this.#changed();
@@ -29480,7 +29593,7 @@ function waiting2() {
 }
 
 // src/workLog.ts
-import { homedir as homedir6 } from "node:os";
+import { homedir as homedir7 } from "node:os";
 
 // src/vendor/t3code/commandLabel.ts
 var MAX_COMMAND_SEGMENTS = 64;
@@ -30848,7 +30961,7 @@ function shortPath(path2, cwd = process.env.HERMES_CWD || process.cwd()) {
   if (root7 && path2.startsWith(`${root7}/`)) {
     return path2.slice(root7.length + 1);
   }
-  const home = homedir6();
+  const home = homedir7();
   return home && path2.startsWith(`${home}/`) ? `~${path2.slice(home.length)}` : path2.replace(/^\.\//, "");
 }
 function stepLabel(call) {
@@ -31231,6 +31344,9 @@ function describeCommand(command) {
 function commandLine(command, n = 96) {
   const flat3 = command.replace(/<<-?\s*['"]?(\w+)['"]?[\s\S]*?\n\s*\1\s*(?=\n|$)/g, "<<'$1' \u2026").replace(/\s+/g, " ").trim();
   return clip(flat3, n);
+}
+function oneLine(text11) {
+  return text11.replace(/\s+/g, " ").trim();
 }
 
 // src/view/tools.tsx
@@ -33108,7 +33224,7 @@ function jobItem(j, now, own13, busy) {
   const error = jobError(j);
   return {
     badges: [...isMonitor(j) ? [{ text: "monitor" }] : [], ...own13 ? [{ text: "this session", tone: "accent" }] : []],
-    detail: j.prompt_preview || j.monitor_url || j.monitor_script || void 0,
+    detail: oneLine(j.prompt_preview || j.monitor_url || j.monitor_script || "") || void 0,
     dot: jobTone(j),
     facts: {
       last: busy ? "working\u2026" : error ? "failed" : j.last_run_at ? `${j.last_status ?? "ran"} ${relative(j.last_run_at, now)}` : "never ran",
@@ -33601,16 +33717,16 @@ import { execFile as execFile3 } from "node:child_process";
 
 // src/github/links.ts
 import { readFileSync as readFileSync2 } from "node:fs";
-import { homedir as homedir8 } from "node:os";
-import { join as join5 } from "node:path";
+import { homedir as homedir9 } from "node:os";
+import { join as join6 } from "node:path";
 import { DatabaseSync as DatabaseSync2 } from "node:sqlite";
 
 // src/watch/child.ts
-import { homedir as homedir7 } from "node:os";
-import { join as join4 } from "node:path";
+import { homedir as homedir8 } from "node:os";
+import { join as join5 } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 function stateDbPath(env2 = process.env) {
-  return join4(env2.HERMES_HOME || join4(homedir7(), ".hermes"), "state.db");
+  return join5(env2.HERMES_HOME || join5(homedir8(), ".hermes"), "state.db");
 }
 var ChildStore = class {
   #db;
@@ -33707,7 +33823,7 @@ function parseArgs(raw2) {
 // src/github/links.ts
 var LINK_TOOLS = /* @__PURE__ */ new Set(["link_pull_request", "list_pull_requests", "unlink_pull_request"]);
 function linksPath(env2 = process.env) {
-  return join5(env2.HERMES_HOME || join5(homedir8(), ".hermes"), "plugin-data", "hermes-tern", "pull-requests.json");
+  return join6(env2.HERMES_HOME || join6(homedir9(), ".hermes"), "plugin-data", "hermes-tern", "pull-requests.json");
 }
 var prKey = (ref) => `${ref.host}/${ref.repository}#${ref.number}`;
 function refOf(v) {
@@ -34826,7 +34942,7 @@ function color(d) {
 var empty2 = [];
 var CONTINUE = true;
 var EXIT = false;
-var SKIP = "skip";
+var SKIP2 = "skip";
 function visitParents(tree, test, visitor, reverse) {
   let check2;
   if (typeof test === "function" && typeof visitor !== "function") {
@@ -34872,7 +34988,7 @@ function visitParents(tree, test, visitor, reverse) {
           /** @type {UnistParent} */
           node3
         );
-        if (nodeAsParent.children && result[0] !== SKIP) {
+        if (nodeAsParent.children && result[0] !== SKIP2) {
           offset = (reverse ? nodeAsParent.children.length : -1) + step;
           grandparents = parents.concat(nodeAsParent);
           while (offset > -1 && offset < nodeAsParent.children.length) {
@@ -35253,15 +35369,15 @@ function collectText(node3, info) {
     start = end + 1;
   }
   let index2 = -1;
-  let join13;
+  let join14;
   while (++index2 < lines.length) {
     if (lines[index2].charCodeAt(lines[index2].length - 1) === 8203 || index2 < lines.length - 1 && lines[index2 + 1].charCodeAt(0) === 8203) {
       result.push(lines[index2]);
-      join13 = void 0;
+      join14 = void 0;
     } else if (lines[index2]) {
-      if (typeof join13 === "number") result.push(join13);
+      if (typeof join14 === "number") result.push(join14);
       result.push(lines[index2]);
-      join13 = 0;
+      join14 = 0;
     } else if (index2 === 0 || index2 === lines.length - 1) {
       result.push(0);
     }
@@ -36234,7 +36350,7 @@ function inspect(node3) {
   visit(node3, function(child) {
     if (child.type === "element") {
       if (child.tagName === "table" && node3 !== child) {
-        return SKIP;
+        return SKIP2;
       }
       if ((child.tagName === "th" || child.tagName === "td") && child.properties) {
         if (!info.align[cellIndex]) {
@@ -38243,7 +38359,7 @@ function htmlKind(value) {
 }
 
 // node_modules/mdast-util-to-markdown/lib/join.js
-var join6 = [joinDefaults];
+var join7 = [joinDefaults];
 function joinDefaults(left, right, parent, state) {
   if (right.type === "code" && formatCodeAsIndented(right, state) && (left.type === "list" || left.type === right.type && formatCodeAsIndented(left, state))) {
     return false;
@@ -41220,7 +41336,7 @@ function toMarkdown(tree, options) {
     handle: void 0,
     indentLines,
     indexStack: [],
-    join: [...join6],
+    join: [...join7],
     options: {},
     safe: safeBound,
     stack: [],
@@ -41562,7 +41678,7 @@ function merge(definitions, space2) {
 }
 
 // node_modules/property-information/lib/normalize.js
-function normalize(value) {
+function normalize2(value) {
   return value.toLowerCase();
 }
 
@@ -41670,8 +41786,8 @@ function create4(definition3) {
       info.mustUseProperty = true;
     }
     properties2[property] = info;
-    normals[normalize(property)] = property;
-    normals[normalize(info.attribute)] = property;
+    normals[normalize2(property)] = property;
+    normals[normalize2(info.attribute)] = property;
   }
   return new Schema(properties2, normals, definition3.space);
 }
@@ -42721,7 +42837,7 @@ var cap = /[A-Z]/g;
 var dash = /-[a-z]/g;
 var valid = /^data[-\w.:]+$/i;
 function find(schema2, value) {
-  const normal = normalize(value);
+  const normal = normalize2(value);
   let property = value;
   let Type = Info;
   if (normal in schema2.normal) {
@@ -42963,7 +43079,7 @@ function parsePrimitive(info, name, value) {
     if (info.number && value && !Number.isNaN(Number(value))) {
       return Number(value);
     }
-    if ((info.boolean || info.overloadedBoolean) && (value === "" || normalize(value) === normalize(name))) {
+    if ((info.boolean || info.overloadedBoolean) && (value === "" || normalize2(value) === normalize2(name))) {
       return true;
     }
   }
@@ -60474,9 +60590,9 @@ function markdown(nodes2, links) {
     });
     if (badge && parent && i !== void 0) {
       parent.children.splice(i + 1, 0, { type: "text", value: " \xB7 " });
-      return [SKIP, i + 2];
+      return [SKIP2, i + 2];
     }
-    return SKIP;
+    return SKIP2;
   });
   return toMarkdown(mdast, { extensions: [gfmToMarkdown()] }).replace(/\n{3,}/g, "\n\n").replace(/^> \\\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\][ \t]*/gim, "> [!$1]\n> ").trim();
 }
@@ -61819,11 +61935,11 @@ function preview3(row2, isCurrent) {
 
 // .hermes-src/ui-tui/src/lib/history.ts
 import { appendFileSync as appendFileSync3, existsSync as existsSync4, mkdirSync as mkdirSync3, readFileSync as readFileSync3 } from "node:fs";
-import { homedir as homedir9 } from "node:os";
-import { join as join7 } from "node:path";
+import { homedir as homedir10 } from "node:os";
+import { join as join8 } from "node:path";
 var MAX2 = 1e3;
-var dir = process.env.HERMES_HOME ?? join7(homedir9(), ".hermes");
-var file = join7(dir, ".hermes_history");
+var dir = process.env.HERMES_HOME ?? join8(homedir10(), ".hermes");
+var file = join8(dir, ".hermes_history");
 var cache = null;
 function load() {
   if (cache) {
@@ -63503,7 +63619,7 @@ function itemOf2(s2, now, running, elsewhere) {
       ...s2.branch ? [{ text: s2.branch, title: `Branch ${s2.branch}` }] : [],
       ...elsewhere && s2.cwd ? [{ text: basename3(s2.cwd), title: s2.cwd }] : []
     ],
-    detail: s2.title && s2.preview ? s2.preview : void 0,
+    detail: s2.title && s2.preview ? oneLine(s2.preview) : void 0,
     facts: { size: `${s2.messages} msg${s2.messages === 1 ? "" : "s"}`, when: ageOf(s2.lastActive, now) },
     id: s2.id,
     label,
@@ -64537,7 +64653,7 @@ function breakdownBody(items) {
 
 // src/view/welcome.tsx
 import { readFileSync as readFileSync4 } from "node:fs";
-import { join as join8 } from "node:path";
+import { join as join9 } from "node:path";
 function welcomeNode(key2, cx) {
   return /* @__PURE__ */ jsxs("card", { role: "omp.welcome", children: [
     /* @__PURE__ */ jsxs("row", { align: "center", gap: "md", role: "omp.welcome.lockup", children: [
@@ -64557,7 +64673,7 @@ var TIP_LINE = /^\s+t\d+:\s+"((?:[^"\\]|\\.)*)"\s*$/;
 function randomTip(root7) {
   let text11;
   try {
-    text11 = readFileSync4(join8(root7, "locales", "en.yaml"), "utf8");
+    text11 = readFileSync4(join9(root7, "locales", "en.yaml"), "utf8");
   } catch {
     return "";
   }
@@ -65276,8 +65392,8 @@ var writeActiveSessionFile = (sessionId, file2 = process.env.HERMES_TUI_ACTIVE_S
 import { execFile as execFile6 } from "node:child_process";
 import { existsSync as existsSync5 } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
-import { homedir as homedir10, tmpdir } from "node:os";
-import { join as join9, resolve as resolve5 } from "node:path";
+import { homedir as homedir11, tmpdir } from "node:os";
+import { join as join10, resolve as resolve5 } from "node:path";
 import { promisify as promisify5 } from "node:util";
 var execFileP = promisify5(execFile6);
 var runFile = async (file2, args, options) => (await execFileP(file2, args, options)).stdout;
@@ -65320,7 +65436,7 @@ async function extractClipboardImage(dest, env2, platform = process.platform, ru
   if (!root7) {
     return void 0;
   }
-  const stdout = await run6(python, [join9(root7, "ui-tui/scripts/clipboard_image.py"), dest], {
+  const stdout = await run6(python, [join10(root7, "ui-tui/scripts/clipboard_image.py"), dest], {
     cwd: root7,
     env: { ...env2, PYTHONPATH: root7 },
     timeout: 15e3
@@ -65328,9 +65444,9 @@ async function extractClipboardImage(dest, env2, platform = process.platform, ru
   return stdout.trim() === "true" && existsSync5(dest) ? dest : void 0;
 }
 async function withClipboardImage(use, env2 = process.env, extract = extractClipboardImage) {
-  const dir2 = await mkdtemp(join9(tmpdir(), "hermes-tern-clipboard-"));
+  const dir2 = await mkdtemp(join10(tmpdir(), "hermes-tern-clipboard-"));
   try {
-    const path2 = await extract(join9(dir2, "clipboard.png"), env2);
+    const path2 = await extract(join10(dir2, "clipboard.png"), env2);
     return path2 ? await use(path2) : void 0;
   } finally {
     await rm(dir2, { force: true, recursive: true });
@@ -65349,7 +65465,7 @@ function imagePathOf(text11, cwd) {
       return void 0;
     }
   }
-  raw2 = raw2.replace(/\\(.)/g, "$1").replace(/^~(?=$|\/)/, homedir10());
+  raw2 = raw2.replace(/\\(.)/g, "$1").replace(/^~(?=$|\/)/, homedir11());
   if (!IMAGE.test(raw2)) {
     return void 0;
   }
@@ -65910,7 +66026,7 @@ var Completion = class {
           children: this.items.map((item3, i) => /* @__PURE__ */ jsx(
             "item",
             {
-              detail: item3.meta && item3.meta !== "dir" ? item3.meta : void 0,
+              detail: item3.meta && item3.meta !== "dir" ? oneLine(item3.meta) : void 0,
               icon: iconOf(item3),
               label: labelOf(item3, this.#for, this.#replaceFrom)
             },
@@ -68225,7 +68341,7 @@ function isLoginNotice(p3) {
 
 // src/processes/widgets/author.ts
 import { spawn as spawn2 } from "node:child_process";
-import { join as join10 } from "node:path";
+import { join as join11 } from "node:path";
 var MAX_BRIEF_CHARS = 1500;
 var MAX_SAMPLE_LINE_CHARS = 300;
 var MAX_SAMPLE_BYTES = 12 * 1024;
@@ -68238,7 +68354,7 @@ A widget charts a quantity that shows how the process is going: throughput, late
 Otherwise call \`respond\` with:
 - \`title\` (\u2264 48 chars): what is watched.
 - \`rules\` (1\u201312) \`{from, match, key?, text?, count?, scale?}\`:
-  - \`from\`: the sample source id carrying the data (\`out\`), \`*\` for all.
+  - \`from\`: the sample source id carrying the data (\`out\` for the process's output, \`file:1\` for a log file the command writes to), \`*\` for all.
   - \`match\`: a JavaScript regex on one line; no lookaround or backreferences. Copy the literal text around the data from the samples; allow varying digits (\`[\\d.]+\`) and widths (\`\\s+\`).
   - Each named group \`(?P<name>\u2026)\` feeds field \`name\` (\`[a-z][a-z0-9_]*\`) with its number (\`1,234\`, \`4.5k\` parse). One rule can capture several fields of a line.
   - \`key\`: the rule's group naming a series (model, shard, CI job); the rule's fields keep one series per key. Not a field itself.
@@ -68352,7 +68468,7 @@ function hermesAuthor(env2 = process.env) {
   if (!python || !root7 || !ui) {
     return void 0;
   }
-  const script = join10(ui, "..", "widget_author.py");
+  const script = join11(ui, "..", "widget_author.py");
   return (request, signal) => new Promise((resolve7, reject) => {
     const child = spawn2(python, [script], {
       cwd: root7,
@@ -68379,19 +68495,19 @@ function hermesAuthor(env2 = process.env) {
 
 // src/processes/widgets/memory.ts
 import { mkdirSync as mkdirSync4, readdirSync as readdirSync2, readFileSync as readFileSync5, rmSync as rmSync2, statSync, writeFileSync as writeFileSync3 } from "node:fs";
-import { join as join11 } from "node:path";
+import { join as join12 } from "node:path";
 var KEEP_MS = 7 * 24 * 36e5;
 var safe3 = (id) => /^[\w.-]{1,128}$/.test(id);
-function chartMemory(dir2 = join11(dataDir(), "charts"), now = Date.now) {
+function chartMemory(dir2 = join12(dataDir(), "charts"), now = Date.now) {
   return {
     load(id) {
       if (!safe3(id)) {
         return void 0;
       }
       try {
-        const value = JSON.parse(readFileSync5(join11(dir2, `${id}.json`), "utf8"));
-        if (value === "skip") {
-          return "skip";
+        const value = JSON.parse(readFileSync5(join12(dir2, `${id}.json`), "utf8"));
+        if (value && typeof value === "object" && typeof value.skip === "number") {
+          return { skip: value.skip };
         }
         const checked = validateSpec(value);
         return checked.ok ? checked.spec : void 0;
@@ -68405,9 +68521,9 @@ function chartMemory(dir2 = join11(dataDir(), "charts"), now = Date.now) {
       }
       try {
         mkdirSync4(dir2, { recursive: true });
-        writeFileSync3(join11(dir2, `${id}.json`), JSON.stringify(value));
+        writeFileSync3(join12(dir2, `${id}.json`), JSON.stringify(value));
         for (const name of readdirSync2(dir2)) {
-          const file2 = join11(dir2, name);
+          const file2 = join12(dir2, name);
           if (now() - statSync(file2).mtimeMs > KEEP_MS) {
             rmSync2(file2, { force: true });
           }
@@ -68420,10 +68536,10 @@ function chartMemory(dir2 = join11(dataDir(), "charts"), now = Date.now) {
 
 // src/settings.ts
 import { mkdirSync as mkdirSync5, readFileSync as readFileSync6, writeFileSync as writeFileSync4 } from "node:fs";
-import { homedir as homedir11 } from "node:os";
-import { dirname, join as join12 } from "node:path";
+import { homedir as homedir12 } from "node:os";
+import { dirname, join as join13 } from "node:path";
 function settingsFile(env2 = process.env) {
-  return join12(env2.HERMES_HOME || join12(homedir11(), ".hermes"), "hermes-tern", "settings.json");
+  return join13(env2.HERMES_HOME || join13(homedir12(), ".hermes"), "hermes-tern", "settings.json");
 }
 function loadSettings(file2 = settingsFile()) {
   try {

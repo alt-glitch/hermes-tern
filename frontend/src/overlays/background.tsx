@@ -24,7 +24,7 @@ import {
 } from '../processes/store.js'
 import { chartNode } from '../processes/widgets/view.js'
 import { isBackgroundCall } from '../transcript.js'
-import { commandLine, describeCommand } from '../view/describe.js'
+import { commandLine, describeCommand, oneLine } from '../view/describe.js'
 import { duration } from '../view/time.js'
 
 import { moveSelection } from './search.js'
@@ -448,7 +448,7 @@ function jobItem(j: CronJob, now: number, own: boolean, busy: boolean): PickerIt
 
   return {
     badges: [...(isMonitor(j) ? [{ text: 'monitor' }] : []), ...(own ? [{ text: 'this session', tone: 'accent' as const }] : [])],
-    detail: j.prompt_preview || j.monitor_url || j.monitor_script || undefined,
+    detail: oneLine(j.prompt_preview || j.monitor_url || j.monitor_script || '') || undefined,
     dot: jobTone(j),
     facts: {
       last: busy ? 'working…' : error ? 'failed' : j.last_run_at ? `${j.last_status ?? 'ran'} ${relative(j.last_run_at, now)}` : 'never ran',

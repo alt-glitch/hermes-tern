@@ -934,8 +934,15 @@ function str(value: unknown, where: string, errors: string[], o: { max?: number;
     return undefined
   }
 
-  // Display text (titles, labels, units) is cut to fit rather than sent back for a retry.
-  return o.cut === undefined ? trimmed : cut(trimmed, o.cut)
+  // Display text (titles, labels, units) is cut to fit rather than sent back for a retry, and
+  // models sometimes write it HTML-escaped (`ACL &amp; update`).
+  return o.cut === undefined ? trimmed : cut(unescape(trimmed), o.cut)
+}
+
+const ENTITIES: Record<string, string> = { '&#39;': "'", '&amp;': '&', '&gt;': '>', '&lt;': '<', '&quot;': '"' }
+
+function unescape(text: string): string {
+  return text.replace(/&(?:amp|lt|gt|quot|#39);/g, e => ENTITIES[e] ?? e)
 }
 
 function num(value: unknown, where: string, errors: string[]): number | undefined {

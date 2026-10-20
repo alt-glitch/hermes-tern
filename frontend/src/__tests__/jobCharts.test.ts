@@ -1,4 +1,4 @@
-import { mkdtempSync } from 'node:fs'
+import { appendFileSync, mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -9,6 +9,7 @@ import { linkCalls } from '../processes/store.js'
 import { isWatchCall } from '../transcript.js'
 import { promptSources, renderPrompt, SYSTEM_PROMPT } from '../processes/widgets/author.js'
 import { formatNumber, formatTrend } from '../processes/widgets/format.js'
+import { FileTap, outputFiles } from '../processes/widgets/files.js'
 import { chartMemory } from '../processes/widgets/memory.js'
 import { Charts, OutputTap } from '../processes/widgets/registry.js'
 import { ChartRuntime, sparkDomain } from '../processes/widgets/runtime.js'
@@ -80,6 +81,12 @@ describe('job chart specs', () => {
 
     const unknown = validateSpec({ ...LOAD, headline: { agg: 'last', field: 'tps' } })
     expect(!unknown.ok && unknown.errors.join('\n')).toMatch(/unknown field "tps"/)
+  })
+
+  it('reads model text written HTML-escaped', () => {
+    const r = validateSpec({ ...LOAD, title: 'ACL &amp; update tests' })
+
+    expect(r.ok && r.spec.title).toBe('ACL & update tests')
   })
 
   it('turns a meter without a known total into a stat', () => {
@@ -374,10 +381,84 @@ describe('chart memory', () => {
   it('remembers a decline, and ignores a file that is not a spec', () => {
     const dir = join(mkdtempSync(join(tmpdir(), 'charts-')), 'charts')
     const memory = chartMemory(dir)
-    memory.save('proc_1', 'skip')
-    expect(memory.load('proc_1')).toBe('skip')
+    memory.save('proc_1', { skip: 3 })
+    expect(memory.load('proc_1')).toEqual({ skip: 3 })
     memory.save('proc_2', { title: 'x' } as unknown as Spec)
     expect(memory.load('proc_2')).toBeUndefined()
     expect(memory.load('../etc/passwd')).toBeUndefined()
+  })
+})
+
+describe('log files', () => {
+  const env = { HOME: '/home/u', TMPDIR: '/var/tmp/' }
+
+  it('finds where a command sends its output', () => {
+    expect(outputFiles('pytest -x > /tmp/t.log 2>&1', env)).toEqual(['/tmp/t.log'])
+    expect(outputFiles('make 2>&1 | tee -a ~/build.log', env)).toEqual(['/home/u/build.log'])
+    expect(outputFiles('cd /repo && npm test &> out/run.txt', env)).toEqual(['/repo/out/run.txt'])
+    expect(outputFiles('bench >> "$TMPDIR/b.log"', env)).toEqual(['/var/tmp/b.log'])
+    // Errors alone, /dev/null, unknown variables and relative paths without a `cd` are not output files.
+    expect(outputFiles('a 2> /tmp/err.log; b > /dev/null; c > $OUT/x.log; d > rel.log', env)).toEqual([])
+  })
+
+  it('reads a log as it grows, and again after it is rewritten', () => {
+    const file = join(mkdtempSync(join(tmpdir(), 'log-')), 'run.log')
+    const tap = new FileTap('file:1', file)
+    tap.update()
+    expect(tap.read(0).text).toBe('')
+
+    writeFileSync(file, 'step 1\n')
+    tap.update()
+    appendFileSync(file, 'step 2\n')
+    tap.update()
+    expect(tap.read(0)).toMatchObject({ start: 0, text: 'step 1\nstep 2\n' })
+
+    writeFileSync(file, 'new\n')
+    tap.update()
+    const after = tap.read(14)
+    expect(after.start).toBeGreaterThan(14)
+    expect(after.text).toBe('new\n')
+  })
+
+  it('charts a process from the log its command writes to', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'log-'))
+    const file = join(dir, 'bench.log')
+    writeFileSync(file, lines(6))
+    const seen: string[] = []
+    const charts = new Charts(() => undefined, {
+      author: async request => (seen.push(...request.sources.map(s => s.id)), { ...LOAD, rules: [{ ...LOAD.rules[0]!, from: 'file:1' }] }),
+      now: () => 20_000
+    })
+    const p = proc({ command: `bench --goal 60 > ${file} 2>&1` })
+
+    charts.view(p)
+    await new Promise(r => setTimeout(r, 0))
+    expect(seen).toEqual(['file:1'])
+    appendFileSync(file, lines(2, 7))
+    expect((charts.view(p)?.blocks[0] as SparkBlock).values).toHaveLength(8)
+  })
+})
+
+describe('a declined chart', () => {
+  it('is asked again once the output has doubled and grown by 5 lines', async () => {
+    let asked = 0
+    const charts = new Charts(() => undefined, { author: async () => (asked++ ? LOAD : { skip: 'only shell noise' }), now: () => 20_000 })
+    const noise = "(anon):setopt:5: can't change option: monitor\n[ERROR]: gitstatus failed to initialize.\n"
+    const p = proc({ output: `${noise}req 1 rps=51 p50=40ms\n` })
+
+    charts.view(p)
+    await new Promise(r => setTimeout(r, 0))
+    expect(asked).toBe(1)
+
+    p.output += lines(2, 2)
+    charts.view(p)
+    await new Promise(r => setTimeout(r, 0))
+    expect(asked).toBe(1)
+
+    p.output += lines(5, 4)
+    charts.view(p)
+    await new Promise(r => setTimeout(r, 0))
+    expect(asked).toBe(2)
+    expect(charts.view(p)?.state).toBe('live')
   })
 })
