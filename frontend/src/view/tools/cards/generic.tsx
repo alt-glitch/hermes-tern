@@ -6,10 +6,10 @@
 
 import type { JSX } from '@stencil-hq/tern'
 
-import { appOf } from '../../../bridge.js'
 import { shownImage } from '../../../media.js'
 import type { ToolCall } from '../../../model.js'
 import { tilesNode } from '../../../processes/widgets/view.js'
+import { appOf } from '../../../tools/bridge.js'
 import { resultOf } from '../../../tools/detail.js'
 import type { GenericFields, PullRequestDetail } from '../../../tools/misc.js'
 import { isWatchCall } from '../../../transcript/calls.js'

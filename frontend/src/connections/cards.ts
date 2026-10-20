@@ -17,13 +17,13 @@ import { existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from 'node:
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 
-import { appTitle } from './bridge.js'
-import { errorCode } from './core/errors.js'
-import type { DurableSessionId } from './core/ids.js'
-import { attempt } from './core/result.js'
-import type { ToolCall } from './model.js'
-import { cardCreatedAt, readCardFile } from './wire/files.js'
-import { record } from './wire/json.js'
+import { errorCode } from '../core/errors.js'
+import type { DurableSessionId } from '../core/ids.js'
+import { attempt } from '../core/result.js'
+import type { ToolCall } from '../model.js'
+import { appTitle } from '../tools/bridge.js'
+import { cardCreatedAt, readCardFile } from '../wire/files.js'
+import { record } from '../wire/json.js'
 
 export const CONNECT_TOOL = 'manage_connections'
 

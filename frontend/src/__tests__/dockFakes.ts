@@ -2,7 +2,7 @@
 // from, and the stores dockModel() reads, each as a small typed stand-in that a test overrides.
 import { vi } from 'vitest'
 
-import { Composer } from '../composer.js'
+import { Composer } from '../draft/composer.js'
 import type { DockActions, DockContext } from '../view/dock.js'
 import type { DockSources } from '../view/dockModel.js'
 

@@ -4,8 +4,9 @@
 import type { SkinPayload } from '@hermes/shared/gateway-events'
 import type { Palette } from '@stencil-hq/tern'
 
-import { paletteFor } from '../palette.js'
 import type { SettingsSource, ThemeMode } from '../settings.js'
+
+import { paletteFor } from './palette.js'
 
 /** What the theme reaches of the app. */
 export interface ThemeHost {

@@ -4,11 +4,11 @@
 // and read 2 files"), each step one line; a finished turn folds everything but its answer
 // behind "Worked for 54s". The views in view/workLog.tsx draw what this derives.
 
-import { appOf, appsOf, batchOf } from './bridge.js'
-import { isConnectCall } from './connections.js'
+import { isConnectCall } from './connections/cards.js'
 import { isNonEmpty } from './core/assert.js'
 import { shownImage } from './media.js'
 import type { Block, ToolCall, TurnEntry } from './model.js'
+import { appOf, appsOf, batchOf } from './tools/bridge.js'
 import { detailOf } from './tools/detail.js'
 import { isBackgroundCall, isTodoName, isWatchCall } from './transcript/calls.js'
 import { compactionEndedAt } from './transcript/compactions.js'

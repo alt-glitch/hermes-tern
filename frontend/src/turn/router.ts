@@ -6,13 +6,13 @@
 
 import type { GatewayClient } from '@tui/gatewayClient.js'
 
-import { redirectTurn, steerTurn } from '../controlCommands.js'
 import { type LiveSessionId, newInputId } from '../core/ids.js'
 import type { SessionState, SessionTicket } from '../session/state.js'
-import type { Transcript } from '../transcript.js'
+import type { Transcript } from '../transcript/store.js'
 import { rpc } from '../wire/rpc.js'
 
 import type { Activity } from './activity.js'
+import { redirectTurn, steerTurn } from './control.js'
 import { EXPANDING_LABEL, expand, type Expanded, hasCommands } from './expand.js'
 import { IMAGE_ONLY_PROMPT, type Prompt, shownText, userImages } from './prompt.js'
 import type { HeldTarget, PromptQueue } from './queue.js'

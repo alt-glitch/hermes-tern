@@ -1,13 +1,13 @@
 import type { CompletionItem } from '@hermes/shared/gateway-events'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { type CommandHost, HIDDEN_COMMANDS, localCommand } from '../commands.js'
-import type { Overlay } from '../overlay.js'
+import { type CommandHost, HIDDEN_COMMANDS, localCommand } from '../commands/local.js'
+import { subscriptionText } from '../commands/refused.js'
+import { resolveSlashName } from '../commands/resolve.js'
 import { openBackground } from '../overlays/background.js'
 import { slashItems } from '../overlays/completion.js'
 import { openHelp } from '../overlays/help.js'
-import { subscriptionText } from '../refusedCommands.js'
-import { resolveSlashName } from '../slashResolve.js'
+import type { Overlay } from '../overlays/overlay.js'
 import { openHermesSplit } from '../watch/spec.js'
 
 import { must, stub } from './fakes.js'

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { type CommandHost, localCommand } from '../commands.js'
+import { type CommandHost, localCommand } from '../commands/local.js'
 import { modelPayload } from '../hermes/mutate.js'
 import { pickerValue } from '../overlays/models.js'
 

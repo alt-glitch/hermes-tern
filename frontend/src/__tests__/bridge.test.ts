@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
 
-import { appOf, batchOf, callApp, unwrap } from '../bridge.js'
 import { toolCallId } from '../core/ids.js'
 import type { ToolCall } from '../model.js'
-import { Transcript } from '../transcript.js'
+import { appOf, batchOf, callApp, unwrap } from '../tools/bridge.js'
+import { Transcript } from '../transcript/store.js'
 import { stepLabel, summarize } from '../workLog.js'
 
 import { must, stub } from './fakes.js'

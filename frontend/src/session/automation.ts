@@ -8,10 +8,10 @@
 import type { GoalSnapshot, LoopSnapshot, SessionControlSnapshot } from '@hermes/shared/gateway-events'
 import type { GatewayClient } from '@tui/gatewayClient.js'
 
-import { Epoch } from './core/epoch.js'
-import { errorText } from './core/errors.js'
-import type { NoticeEntry } from './model.js'
-import { rpc } from './wire/rpc.js'
+import { Epoch } from '../core/epoch.js'
+import { errorText } from '../core/errors.js'
+import type { NoticeEntry } from '../model.js'
+import { rpc } from '../wire/rpc.js'
 
 /** What the store reaches of the app. */
 export interface AutomationHost {

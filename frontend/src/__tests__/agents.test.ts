@@ -10,7 +10,7 @@ import { applyListRow, completionOutcomes, dispatchRows, endedStatus, mergeTail,
 import { Agents, readLogFile } from '../agents/store.js'
 import { liveSessionId } from '../core/ids.js'
 import type { Subagent } from '../model.js'
-import { Transcript } from '../transcript.js'
+import { Transcript } from '../transcript/store.js'
 
 import { FakeGateway, must, stub } from './fakes.js'
 

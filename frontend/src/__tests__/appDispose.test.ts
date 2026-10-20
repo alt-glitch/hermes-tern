@@ -8,7 +8,7 @@ import { Node, node } from '@stencil-hq/tern'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { readLaunchEnv } from '../config/env.js'
-import type { Overlay } from '../overlay.js'
+import type { Overlay } from '../overlays/overlay.js'
 import type { Settings, SettingsSource } from '../settings.js'
 
 import { FakeGateway, fakeTern } from './fakes.js'

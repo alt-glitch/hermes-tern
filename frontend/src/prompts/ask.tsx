@@ -8,7 +8,7 @@ import type { JSX, Key } from '@stencil-hq/tern'
 
 import { optional } from '../core/assert.js'
 import { errorText } from '../core/errors.js'
-import type { Overlay, OverlayHost } from '../overlay.js'
+import type { Overlay, OverlayHost } from '../overlays/overlay.js'
 
 /** One row of a sheet's option list. */
 export interface Option {

@@ -7,7 +7,7 @@
 import { connect } from '@stencil-hq/tern'
 
 import { App } from './app/chat.js'
-import { FaultBudget, isDeadStream } from './backendNotes.js'
+import { FaultBudget, isDeadStream } from './chrome/backendNotes.js'
 import { launchEnv } from './config/env.js'
 import { GatewayClient } from './hermes/gatewayClient.js'
 import { fileSettings } from './settings.js'

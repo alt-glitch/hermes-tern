@@ -2,7 +2,8 @@
 
 import type { ChatPorts } from '../app/ports.js'
 import { errorText } from '../core/errors.js'
-import type { OverlayHost } from '../overlay.js'
+
+import type { OverlayHost } from './overlay.js'
 
 /**
  * Re-renders every `ms` while a sheet is open, so its clocks and live rows move. The returned

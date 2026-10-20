@@ -21,13 +21,13 @@ const spy = vi.hoisted(() => ({
   markViewer: vi.fn()
 }))
 
-vi.mock('../connections.js', async importOriginal => ({
-  ...(await importOriginal<typeof import('../connections.js')>()),
+vi.mock('../connections/cards.js', async importOriginal => ({
+  ...(await importOriginal<typeof import('../connections/cards.js')>()),
   markViewer: spy.markViewer
 }))
 vi.mock('../hermes/activeSessionFile.js', () => ({ writeActiveSessionFile: spy.active }))
-vi.mock('../compaction.js', async importOriginal => ({
-  ...(await importOriginal<typeof import('../compaction.js')>()),
+vi.mock('../hermes/compactions.js', async importOriginal => ({
+  ...(await importOriginal<typeof import('../hermes/compactions.js')>()),
   storedCompactions: spy.compactions
 }))
 vi.mock('../github/links.js', async importOriginal => ({

@@ -6,9 +6,9 @@
 
 import type { JSX, Span } from '@stencil-hq/tern'
 
-import { appOf, batchOf } from '../bridge.js'
 import { isDefined, isNonEmpty, optional } from '../core/assert.js'
 import type { ToolCall, TurnEntry } from '../model.js'
+import { appOf, batchOf } from '../tools/bridge.js'
 import {
   actionIcon,
   actionOf,

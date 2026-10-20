@@ -5,7 +5,7 @@ import { join } from 'node:path'
 import type { Key } from '@stencil-hq/tern'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { Composer } from '../composer.js'
+import { Composer } from '../draft/composer.js'
 
 import { FakeGateway, fakeTern, given, key, settle } from './fakes.js'
 

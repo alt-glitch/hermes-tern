@@ -1,8 +1,8 @@
-import { describe, expect, it } from 'vitest'
-
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+
+import { describe, expect, it } from 'vitest'
 
 import {
   allConnected,
@@ -18,7 +18,7 @@ import {
   readCard,
   STALE_MS,
   ternPane
-} from '../connections.js'
+} from '../connections/cards.js'
 import { entryId, liveSessionId, storedSessionId, toolCallId } from '../core/ids.js'
 import type { ToolCall, TurnEntry } from '../model.js'
 import { decodeJson } from '../wire/json.js'

@@ -3,7 +3,7 @@
 
 import type { ApprovalChoice, ApprovalResult } from '@hermes/shared/gateway-events'
 
-import type { Overlay, OverlayHost } from '../overlay.js'
+import type { Overlay, OverlayHost } from '../overlays/overlay.js'
 import { withoutTernEnv } from '../view/describe.js'
 import { actionsRow } from '../view/ui/button.js'
 

@@ -6,8 +6,8 @@
 // or args its parser did not expect) gives way to the generic one through withView, and the pane
 // hears of it once per tool name (faults.ts).
 
-import { appsOf, batchOf, type BatchEntry, callApp } from '../../bridge.js'
 import type { ToolCall } from '../../model.js'
+import { appsOf, batchOf, type BatchEntry, callApp } from '../../tools/bridge.js'
 import { type DetailOf, detailOf, type ToolKey, toolKeyOf } from '../../tools/detail.js'
 
 import { appCard, batchCard } from './cards/app.js'

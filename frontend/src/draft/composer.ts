@@ -5,9 +5,10 @@
 
 import type { Decor, Key } from '@stencil-hq/tern'
 
-import { type Snapshot, UndoHistory } from './draft/undo.js'
-import { append as appendHistory, load as loadHistory } from './hermes/history.js'
+import { append as appendHistory, load as loadHistory } from '../hermes/history.js'
+
 import { listNewline, markdownDecor, type Splice, toggleMark } from './markdown.js'
+import { type Snapshot, UndoHistory } from './undo.js'
 
 /** What a key asked the app to do beyond editing. */
 export type ComposerAction = 'submit' | null

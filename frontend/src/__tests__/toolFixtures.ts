@@ -1,9 +1,9 @@
 // Tool calls of every tool the views know, with the arg and result shapes each reads (and some
 // they must read past): the registry test checks each call's step line, action and icon.
 
-import type { BatchEntry } from '../bridge.js'
 import { toolCallId } from '../core/ids.js'
 import type { ToolCall } from '../model.js'
+import type { BatchEntry } from '../tools/bridge.js'
 
 let n = 0
 

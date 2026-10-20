@@ -6,9 +6,10 @@
 import type { CommandsCatalogResult } from '@hermes/shared/gateway-events'
 import type { GatewayClient } from '@tui/gatewayClient.js'
 
-import { HIDDEN_COMMANDS, localCommands } from './commands.js'
-import { scoreSlashMenuItem } from './hermes/completion.js'
-import { rpc } from './wire/rpc.js'
+import { scoreSlashMenuItem } from '../hermes/completion.js'
+import { rpc } from '../wire/rpc.js'
+
+import { HIDDEN_COMMANDS, localCommands } from './local.js'
 
 export type Resolution = { name: string } | { ambiguous: string[] } | null
 

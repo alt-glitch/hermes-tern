@@ -5,7 +5,7 @@
 
 import type { JSX, Tone } from '@stencil-hq/tern'
 
-import type { GoalState, GoalView, LoopView } from '../automation.js'
+import type { GoalState, GoalView, LoopView } from '../session/automation.js'
 
 import { countdownAge } from './time.js'
 import { pill } from './ui/pill.js'

@@ -1,20 +1,21 @@
-// A typed `/name arg`: run here when this frontend owns the command (commands.ts), else resolved
+// A typed `/name arg`: run here when this frontend owns the command (local.ts), else resolved
 // through the gateway's catalog and sent to `slash.exec` (or `command.dispatch`, for a command
 // slash.exec does not own). The answer's envelope then shows output, sends a skill or message,
 // follows an alias or fills the composer.
 
 import { type CommandDispatchResponse, parseCommandDispatch } from '@hermes/shared/slash'
 
-import { type CommandHost, localCommand } from '../commands.js'
-import type { Composer } from '../composer.js'
 import { errorText } from '../core/errors.js'
 import type { Attachments } from '../draft/attachments.js'
+import type { Composer } from '../draft/composer.js'
 import { dispatchError, execRefusal } from '../hermes/slashErrors.js'
 import type { SessionLifecycle } from '../session/lifecycle.js'
-import { ambiguousNotice, type CommandCatalog, resolveSlashName } from '../slashResolve.js'
-import type { Transcript } from '../transcript.js'
+import type { Transcript } from '../transcript/store.js'
 import type { Prompt } from '../turn/prompt.js'
 import { type Requester, rpc } from '../wire/rpc.js'
+
+import { type CommandHost, localCommand } from './local.js'
+import { ambiguousNotice, type CommandCatalog, resolveSlashName } from './resolve.js'
 
 /** What running a slash command reaches of the app. */
 export interface SlashCx {

@@ -8,11 +8,6 @@
 
 import type { JSX, Key, PickerColumn, PickerItem } from '@stencil-hq/tern'
 
-import type { ChatPorts } from '../app/ports.js'
-import { optional } from '../core/assert.js'
-import type { Subagent } from '../model.js'
-import type { Overlay } from '../overlay.js'
-
 import { agentNode } from '../agents/agentRow.js'
 import {
   currentAgent,
@@ -29,11 +24,15 @@ import {
 import type { LogEntry } from '../agents/liveLog.js'
 import { SUBAGENT_LOOK } from '../agents/look.js'
 import { agentName, isRunning } from '../agents/rows.js'
+import type { ChatPorts } from '../app/ports.js'
+import { optional } from '../core/assert.js'
+import type { Subagent } from '../model.js'
 import { duration } from '../view/format.js'
 import { briefOf } from '../view/tools/cards/task.js'
 import { hubIconOf } from '../view/tools/registry.js'
 import { facts } from '../view/ui/facts.js'
 
+import type { Overlay } from './overlay.js'
 import { countSummary, reportError, tickWhileOpen } from './sheet.js'
 
 /** What the agents hub reaches of the app. */

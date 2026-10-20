@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
-import { Composer } from '../composer.js'
-import { maskedOffset, maskOf, unmaskEdit } from '../mask.js'
+import { Composer } from '../draft/composer.js'
+import { maskedOffset, maskOf, unmaskEdit } from '../prompts/mask.js'
 
 import { must } from './fakes.js'
 

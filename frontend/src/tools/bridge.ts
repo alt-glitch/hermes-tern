@@ -5,9 +5,9 @@
 // call shows as the tool it ran; a batch keeps its entries. Names and titles follow Hermes'
 // tools/tool_labels.py and tools/connectors/gateway/names.py.
 
-import { isNonEmpty, type NonEmpty } from './core/assert.js'
-import type { ToolCall, Via } from './model.js'
-import { record } from './wire/json.js'
+import { isNonEmpty, type NonEmpty } from '../core/assert.js'
+import type { ToolCall, Via } from '../model.js'
+import { record } from '../wire/json.js'
 
 export const BRIDGE = 'tool_call'
 /** Hermes' planner name for a connector batch (CONNECTOR_BATCH_SENTINEL). */

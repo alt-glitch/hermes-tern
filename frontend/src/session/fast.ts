@@ -6,10 +6,10 @@
 import type { SessionLiveInfo } from '@hermes/shared/gateway-events'
 import type { GatewayClient } from '@tui/gatewayClient.js'
 
-import type { SessionView } from './app/ports.js'
-import { errorText } from './core/errors.js'
-import type { NoticeEntry } from './model.js'
-import { rpc } from './wire/rpc.js'
+import type { SessionView } from '../app/ports.js'
+import { errorText } from '../core/errors.js'
+import type { NoticeEntry } from '../model.js'
+import { rpc } from '../wire/rpc.js'
 
 export type FastWord = 'fast' | 'normal' | 'ultrafast'
 

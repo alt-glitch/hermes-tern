@@ -4,8 +4,8 @@
 
 import type { ClarifyResult } from '@hermes/shared/gateway-events'
 
-import { Composer } from '../composer.js'
-import type { Overlay, OverlayHost } from '../overlay.js'
+import { Composer } from '../draft/composer.js'
+import type { Overlay, OverlayHost } from '../overlays/overlay.js'
 import { actionsRow } from '../view/ui/button.js'
 
 import { answerWith, isCtrlC, moved, type Option, optionList, type Sending, sendingLine } from './ask.js'

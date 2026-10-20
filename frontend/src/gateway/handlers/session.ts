@@ -3,15 +3,15 @@
 
 import { usageFromTick } from '@hermes/shared/usage-tick'
 
-import type { Automation } from '../../automation.js'
 import type { Reconnect } from '../../chrome/reconnect.js'
 import type { Theme } from '../../chrome/theme.js'
 import type { LiveSessionId } from '../../core/ids.js'
 import type { PullRequests } from '../../github/store.js'
+import type { Automation } from '../../session/automation.js'
 import type { SessionLifecycle } from '../../session/lifecycle.js'
 import type { SessionState } from '../../session/state.js'
 import type { SessionTitle } from '../../session/title.js'
-import type { Transcript } from '../../transcript.js'
+import type { Transcript } from '../../transcript/store.js'
 import { shownText, userImages } from '../../turn/prompt.js'
 import type { PromptQueue } from '../../turn/queue.js'
 import { pendingRows, usageCounters } from '../../wire/schemas.js'

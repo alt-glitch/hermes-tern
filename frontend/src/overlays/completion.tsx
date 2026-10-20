@@ -7,14 +7,14 @@ import type { CompleteSlashResult, CompletionItem } from '@hermes/shared/gateway
 import type { JSX, Key } from '@stencil-hq/tern'
 import type { GatewayClient } from '@tui/gatewayClient.js'
 
-import { HIDDEN_COMMANDS, localCommands } from '../commands.js'
+import { HIDDEN_COMMANDS, localCommands } from '../commands/local.js'
 import { optional } from '../core/assert.js'
+import type { Composer } from '../draft/composer.js'
 import { applyCompletion, completionRequestForInput, completionToApplyOnSubmit, scoreSlashMenuItem } from '../hermes/completion.js'
 import { oneLine } from '../view/describe.js'
-
-import type { Composer } from '../composer.js'
-import type { OverlayHost } from '../overlay.js'
 import { rpc } from '../wire/rpc.js'
+
+import type { OverlayHost } from './overlay.js'
 
 const DEBOUNCE_MS = 60
 

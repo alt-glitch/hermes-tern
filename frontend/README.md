@@ -25,22 +25,22 @@ code 75, and the launcher runs the Ink TUI in its place (`hermes_cli/main_tui_la
 | --- | --- |
 | `src/entry.ts` | Handshake (`@stencil-hq/tern`), gateway start, `App` |
 | `src/app/` | The composition root: `chat.ts` (`App`: one inline surface, gateway events → transcript, keys → overlay → completion → composer; its ports, run and quit), `stores.ts` (every store, made in dependency order and wired together), `actions.ts` (what the user starts, bound once), `frame.ts` (one coalesced render per change), `ports.ts` (what App lends the modules it drives) |
-| `src/chrome/` | The pane's chrome around the chat: the pills above the composer and their keys, the status strip's notices, the connection's lost and redial lines, and the theme |
-| `src/session/` | The open session: its state (ids, info, usage, busy-input mode, and the tickets awaited work checks), its lifecycle (the first session, new, resume, reattach, switches and the requests held across one), the ordered steps of an adopt, the views this pane holds on the gateway, and its settings and name: reasoning effort, title, thoughts |
-| `src/model.ts`, `src/transcript.ts` | The structured transcript (prompts, turns of thinking/text/tool blocks, notices, panels) folded from gateway events |
-| `src/transcript/` | The transcript's parts: compactions, a reload from history, finding calls, todos, subagent rows, and what a message says (Hermes' notices, steers) |
-| `src/composer.ts` | The prompt editor's model: text, caret, undo, history, kill ring |
-| `src/turn/` | Prompts on their way to the agent: the `Prompt` kinds (typed, the app's, a command's), the router that sends, steers, queues or holds each one through its entry point's gate, `{!cmd}` expansion, the working line's busy state and compaction phase (`Activity`), and the queue behind the turn (held here, and the shared gateway's FIFO with this pane's admissions) with its Edit, Steer and drain |
-| `src/draft/` | What the draft carries beside its text: the attached images (clipboard, pasted paths, `/image`, the launcher's `--image`) and those still uploading |
+| `src/chrome/` | The pane's chrome around the chat: the pills above the composer and their keys, the status strip's notices, the backend's own failures, the connection's lost and redial lines, and the theme with its Tern program palette (`t`) |
+| `src/session/` | The open session: its state (ids, info, usage, busy-input mode, and the tickets awaited work checks), its lifecycle (the first session, new, resume, reattach, switches and the requests held across one), the ordered steps of an adopt, the views this pane holds on the gateway, which gateway traffic belongs to it (`flow.ts`), its standing /goal and /loop, and its settings and name: reasoning effort, fast mode, title, thoughts |
+| `src/model.ts` | The structured transcript's types (prompts, turns of thinking/text/tool blocks, notices, panels) |
+| `src/transcript/` | The transcript folded from gateway events (`store.ts`) and its parts: compactions, a reload from history, finding calls, todos, subagent rows, what a stored prompt carried, and what a message says (Hermes' notices, steers) |
+| `src/turn/` | Prompts on their way to the agent: the `Prompt` kinds (typed, the app's, a command's), the router that sends, steers, queues or holds each one through its entry point's gate, `{!cmd}` expansion, the turn's controls (interrupt, steer, redirect), the working line's busy state and compaction phase (`Activity`), and the queue behind the turn (held here, and the shared gateway's FIFO with this pane's admissions) with its Edit, Steer and drain |
+| `src/draft/` | The draft: the prompt editor's model (`composer.ts`: text, caret, undo, history, kill ring), its live Markdown, its keys, and what it carries beside its text: the attached images (clipboard, pasted paths, `/image`, the launcher's `--image`) and those still uploading |
+| `src/commands/` | Slash commands: those this frontend runs itself (`local.ts`), the turn controls and session commands the shared gateway serves through their own RPCs (`control.ts`, `session.ts`), those its `slash.exec` refuses (`refused.ts`), a typed name's resolution (`resolve.ts`) and the `slash.exec` path (`slash.ts`) |
 | `src/view/` | Node builders (TSX on the Tern SDK's runtime) for the transcript, tool cards, dock and welcome card; `format.ts` holds how they write text, durations, times and paths |
-| `src/tools/` | Tool details: each call's args and result read once (lenient: a field of the wrong type reads as absent) into a variant keyed by its tool, `detail.ts` holding the union and the parse memo |
+| `src/tools/` | Tool details: each call's args and result read once (lenient: a field of the wrong type reads as absent) into a variant keyed by its tool, `detail.ts` holding the union and the parse memo; Tool Search's `tool_call` bridge unpacked (`bridge.ts`) |
 | `src/view/tools/` | Tool calls as `tool` nodes: `registry.ts` holds one view per tool (its card, step line, action and hub icon), `shell.tsx` wraps a call's card, `cards/` holds one module per card family (terminal, read, edit, search, web, task, ask, eval, connect, apps, images, the small inline ones, the generic fallback) with its tools' views |
 | `src/code/` | Code helpers the views share: a file's highlighting language, unified diff hunks and counts |
 | `src/view/ui/` | The parts the views share: pills, buttons and the action row, the shimmer and working row, sections headed by a child, facts lists |
-| `src/overlay.ts`, `src/overlays/` | Floating sheets: approvals, clarify, masked prompts, completions, pickers |
+| `src/overlays/` | Floating sheets (`overlay.ts` is their contract): approvals, clarify, masked prompts, completions, pickers |
 | `src/prompts/` | The prompt sheets on the overlay stack: their keys, and closing them when the gateway withdraws their questions |
-| `src/connections.ts`, `src/connections/` | Connect cards: the card files the plugin writes, and the watcher that keeps each card current and tells the agent |
-| `src/palette.ts` | The skin as a Tern program palette (`t`) |
+| `src/connections/` | Connect cards: the card files the plugin writes (`cards.ts`), and the watcher that keeps each card current and tells the agent |
+| `src/hermes/` | Hermes' own runtime and files: the gateway client, its `state.db` (the session index, the compaction boundaries), paths, shell, history |
 
 The views speak omp's chat vocabulary (`omp.session`, `omp.user`, `omp.assistant`,
 `omp.thinking`, `omp.editor`, `tool` names like `bash`/`read`/`edit`): Tern's chat styles

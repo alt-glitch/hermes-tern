@@ -5,14 +5,14 @@
 import type { JSX, Key, KvItem } from '@stencil-hq/tern'
 
 import type { ChatPorts } from '../app/ports.js'
-import type { AutomationAction, GoalView, LoopView } from '../automation.js'
 import type { NonEmpty } from '../core/assert.js'
 import { optional } from '../core/assert.js'
-import type { Overlay } from '../overlay.js'
-import { countdownAge } from '../view/time.js'
+import type { AutomationAction, GoalView, LoopView } from '../session/automation.js'
 import { loopWhen, turnsText } from '../view/automation.js'
+import { countdownAge } from '../view/time.js'
 import { actionsRow, type ButtonProps } from '../view/ui/button.js'
 
+import type { Overlay } from './overlay.js'
 import { confirmOverlay } from './prompts.js'
 
 /** What the /goal and /loop sheets reach of the app. */

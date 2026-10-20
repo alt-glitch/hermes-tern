@@ -4,13 +4,14 @@
 // clarify.tsx, masked.tsx), keyed by its request id (prompts/sheets.ts). The yes/no sheet for a
 // choice the frontend itself confirms lives here too.
 
-import type { Overlay, OverlayHost } from '../overlay.js'
 import { approvalOverlay } from '../prompts/approval.js'
 import { settleQuietly } from '../prompts/ask.js'
 import { clarifyOverlay } from '../prompts/clarify.js'
 import { maskedOverlay } from '../prompts/masked.js'
 import type { PromptRequest } from '../prompts/parse.js'
 import { actionsRow } from '../view/ui/button.js'
+
+import type { Overlay, OverlayHost } from './overlay.js'
 
 /** What the TUI says when an unanswered password, secret or vault card times out (and desktop, for a legacy approval). */
 const TIMEOUT_NOTICES: Record<string, string> = {

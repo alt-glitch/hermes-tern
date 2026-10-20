@@ -1,7 +1,8 @@
 import { describe, expect, it, vi } from 'vitest'
 
-import { CONTROL_COMMANDS, type ControlHost, steerTurn } from '../controlCommands.js'
+import { CONTROL_COMMANDS, type ControlHost } from '../commands/control.js'
 import { liveSessionId } from '../core/ids.js'
+import { steerTurn } from '../turn/control.js'
 
 import { must, stub } from './fakes.js'
 

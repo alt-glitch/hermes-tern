@@ -7,19 +7,20 @@ import type { CommandsCatalogResult } from '@hermes/shared/gateway-events'
 import type { Key, SpanData } from '@stencil-hq/tern'
 
 import type { ChatPorts } from '../app/ports.js'
-import { HIDDEN_COMMANDS, localCommands } from '../commands.js'
+import { HIDDEN_COMMANDS, localCommands } from '../commands/local.js'
 import { errorText } from '../core/errors.js'
 import { KEYS } from '../draft/keys.js'
-import type { Overlay } from '../overlay.js'
 import { actionsRow } from '../view/ui/button.js'
 import { rpc } from '../wire/rpc.js'
+
+import type { Overlay } from './overlay.js'
 
 /** What the help sheet reaches of the app. */
 export type HelpHost = Pick<ChatPorts, 'close' | 'gw' | 'open' | 'session' | 'transcript'>
 
 const KEY = 'help'
 
-/** The shortcuts this frontend handles, by group: the composer's (composer.ts), then the app's (KEYS). */
+/** The shortcuts this frontend handles, by group: the composer's (draft/composer.ts), then the app's (KEYS). */
 export const HOTKEYS: readonly { group: string; rows: [string[], string][] }[] = [
   {
     group: 'Editing',

@@ -4,15 +4,15 @@
 import type { Agents } from '../../agents/store.js'
 import { toolCallId } from '../../core/ids.js'
 import type { PullRequests } from '../../github/store.js'
-import { moaLabel, moaReferenceLabel } from '../../moa.js'
 import type { SessionState } from '../../session/state.js'
 import { statusEffect } from '../../status.js'
-import type { Transcript } from '../../transcript.js'
+import type { Transcript } from '../../transcript/store.js'
 import type { Activity } from '../../turn/activity.js'
 import { afterMessageComplete, afterToolComplete, type MessageFanout, type ToolFanout } from '../../turn/fanout.js'
 import type { PromptQueue } from '../../turn/queue.js'
 import { busyLabel, preparingLabel } from '../../workLog.js'
 import type { EventOf, Handlers, Outcome } from '../dispatch.js'
+import { moaLabel, moaReferenceLabel } from '../moa.js'
 
 import type { Warned } from './chrome.js'
 

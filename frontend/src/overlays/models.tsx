@@ -13,14 +13,14 @@ import type { JSX, Key, KvItem, PickerColumn, PickerGroup, PickerItem, PickerSco
 import type { ChatPorts } from '../app/ports.js'
 import { optional } from '../core/assert.js'
 import { errorText } from '../core/errors.js'
-import { setFast } from '../fast.js'
 import { modelPayload, mutateSession } from '../hermes/mutate.js'
 import { providerDisplayNames } from '../hermes/providers.js'
 import { rememberCaps } from '../modelCaps.js'
-import type { Overlay } from '../overlay.js'
 import { levelsFor } from '../session/effort.js'
+import { setFast } from '../session/fast.js'
 import { rpc } from '../wire/rpc.js'
 
+import type { Overlay } from './overlay.js'
 import { editQuery, hitRuns, moveSelection, rank } from './search.js'
 
 /** What the model picker reaches of the app. */

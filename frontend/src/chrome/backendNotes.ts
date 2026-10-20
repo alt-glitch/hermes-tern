@@ -1,8 +1,8 @@
 // What the backend's own failures put on screen: a slow start's diagnosis, protocol noise, and the
 // stray faults the pane survives (Ink's setupGracefulExit).
 
-import { stderrLooksLikeProblem } from './hermes/stderr.js'
-import type { NoticeEntry } from './model.js'
+import { stderrLooksLikeProblem } from '../hermes/stderr.js'
+import type { NoticeEntry } from '../model.js'
 
 interface Note {
   text: string

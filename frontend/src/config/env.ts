@@ -3,7 +3,7 @@
 // them while the pane runs. Read once, they are plain fields.
 //
 // Not here: modules that take an `env` parameter (HERMES_HOME's paths, GitHub tokens, the Python
-// launcher) keep it, so tests hand them their own; and palette.ts pins HERMES_TUI_LIGHT around a
+// launcher) keep it, so tests hand them their own; and chrome/palette.ts pins HERMES_TUI_LIGHT around a
 // Hermes call that reads it, which is a write, not a launch setting.
 
 /** What the launcher said at startup. Every string is '' when its variable is unset. */

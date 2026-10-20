@@ -20,9 +20,9 @@ vi.mock('../hermes/sessionIndex.js', async importOriginal => ({
 }))
 
 const { App } = await import('../app/chat.js')
-const { POLL_MS } = await import('../connections.js')
+const { POLL_MS } = await import('../connections/cards.js')
 const { ConnectWatcher, NO_CARD_MS } = await import('../connections/watcher.js')
-const { Transcript } = await import('../transcript.js')
+const { Transcript } = await import('../transcript/store.js')
 const { toolNode } = await import('../view/tools/shell.js')
 
 const cards = join(home, 'plugin-data', 'hermes-tern', 'connections')

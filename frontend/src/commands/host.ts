@@ -1,6 +1,6 @@
 // The gateway-backed commands' host (/steer, /queue, /stop, /tools, /undo, /compress, …): what
-// controlCommands.ts and sessionCommands.ts reach of the pane, made from its stores each time one
-// of them runs. `sid` is the session it was made for (stale() says when the view left it); the
+// control.ts and session.ts reach of the pane, made from its stores each time one of them runs.
+// `sid` is the session it was made for (stale() says when the view left it); the
 // rest, `busy` and `queued` among them, reads the stores live, so a command that awaited sees now.
 
 import type { GatewayClient } from '@tui/gatewayClient.js'
@@ -9,11 +9,12 @@ import { durable, type StoredSessionId } from '../core/ids.js'
 import type { Compaction } from '../model.js'
 import type { SessionLifecycle } from '../session/lifecycle.js'
 import type { SessionState } from '../session/state.js'
-import type { SessionHost } from '../sessionCommands.js'
-import type { Transcript } from '../transcript.js'
+import type { Transcript } from '../transcript/store.js'
 import type { Activity } from '../turn/activity.js'
 import type { PromptQueue } from '../turn/queue.js'
 import type { PromptRouter } from '../turn/router.js'
+
+import type { SessionHost } from './session.js'
 
 /** What the session host is made from. */
 export interface SessionHostCx {

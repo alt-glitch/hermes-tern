@@ -3,26 +3,27 @@
 // gateway serves only through their own RPCs. Everything else goes to the
 // gateway's `slash.exec`.
 
-import type { ChatPorts } from './app/ports.js'
-import { copyToClipboard } from './clipboard.js'
-import { CONTROL_COMMANDS } from './controlCommands.js'
-import { storedSessionId } from './core/ids.js'
-import { fastCommand, type FastHost } from './fast.js'
-import type { Entry } from './model.js'
-import { type AgentsSheetHost, openAgents } from './overlays/agents.js'
-import { type BackgroundHost, openBackground } from './overlays/background.js'
-import { type ChangesHost, openChanges } from './overlays/changes.js'
-import { type EffortHost, openEffortPicker } from './overlays/effort.js'
-import { prsCommand, type PullRequestsSheetHost } from './overlays/pullRequests.js'
-import { type ModelsHost, openModelPicker, switchModel } from './overlays/models.js'
-import { confirmOverlay } from './overlays/prompts.js'
-import { openSessionPicker, type SessionsHost } from './overlays/sessions.js'
-import { isThemeMode, openThemePicker, type ThemeHost } from './overlays/theme.js'
-import { REFUSED_COMMANDS, type RefusedHost } from './refusedCommands.js'
-import { LEVELS } from './session/effort.js'
-import { SESSION_COMMANDS } from './sessionCommands.js'
-import { answerText } from './view/transcript.js'
-import { rpc } from './wire/rpc.js'
+import type { ChatPorts } from '../app/ports.js'
+import { copyToClipboard } from '../clipboard.js'
+import { storedSessionId } from '../core/ids.js'
+import type { Entry } from '../model.js'
+import { type AgentsSheetHost, openAgents } from '../overlays/agents.js'
+import { type BackgroundHost, openBackground } from '../overlays/background.js'
+import { type ChangesHost, openChanges } from '../overlays/changes.js'
+import { type EffortHost, openEffortPicker } from '../overlays/effort.js'
+import { type ModelsHost, openModelPicker, switchModel } from '../overlays/models.js'
+import { confirmOverlay } from '../overlays/prompts.js'
+import { prsCommand, type PullRequestsSheetHost } from '../overlays/pullRequests.js'
+import { openSessionPicker, type SessionsHost } from '../overlays/sessions.js'
+import { isThemeMode, openThemePicker, type ThemeHost } from '../overlays/theme.js'
+import { LEVELS } from '../session/effort.js'
+import { fastCommand, type FastHost } from '../session/fast.js'
+import { answerText } from '../view/transcript.js'
+import { rpc } from '../wire/rpc.js'
+
+import { CONTROL_COMMANDS } from './control.js'
+import { REFUSED_COMMANDS, type RefusedHost } from './refused.js'
+import { SESSION_COMMANDS } from './session.js'
 
 /** What the commands reach of the app. */
 export type CommandHost = Pick<
@@ -147,7 +148,7 @@ const COMMANDS: readonly LocalCommand[] = [
     run: (host, arg) => agents(host, arg)
   },
   {
-    // Hermes has no command by these names (its `/bg` runs a prompt in a side agent: controlCommands.ts).
+    // Hermes has no command by these names (its `/bg` runs a prompt in a side agent: control.ts).
     aliases: ['bashes', 'shells', 'processes'],
     help: 'Background processes and cron jobs',
     name: 'ps',
@@ -256,10 +257,10 @@ const COMMANDS: readonly LocalCommand[] = [
 ]
 
 /**
- * Commands the gateway lists that only the Ink TUI or a messaging platform runs (refusedCommands.ts):
+ * Commands the gateway lists that only the Ink TUI or a messaging platform runs (refused.ts):
  * this frontend neither offers nor resolves them, and answers one typed whole with why.
  */
-export { HIDDEN_COMMANDS } from './refusedCommands.js'
+export { HIDDEN_COMMANDS } from './refused.js'
 
 /** `/copy [n]`: the last (or `n`th) answer to the clipboard. */
 function copyAnswer(host: CommandHost, arg: string) {

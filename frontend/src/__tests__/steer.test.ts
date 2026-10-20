@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest'
 
 import { entryId } from '../core/ids.js'
 import type { TurnEntry } from '../model.js'
-import { Transcript } from '../transcript.js'
 import { steerState, steerText } from '../transcript/messages.js'
+import { Transcript } from '../transcript/store.js'
 import { turnEndedAt } from '../transcript/turns.js'
 
 import { must } from './fakes.js'

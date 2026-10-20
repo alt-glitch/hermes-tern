@@ -4,15 +4,16 @@
 
 import type { TranscriptMessage } from '@hermes/shared/gateway-events'
 
-import { settleBridge, unwrap } from '../bridge.js'
 import { type EntryId, type ToolCallId, toolCallId } from '../core/ids.js'
 import type { Entry, Todo, ToolCall, TurnEnd, TurnEntry, UserEntry } from '../model.js'
-import { promptAttachments, splitPrompt } from '../promptRefs.js'
+import { settleBridge, unwrap } from '../tools/bridge.js'
 import { detailOf } from '../tools/detail.js'
 import { parseJson, record } from '../wire/json.js'
+
 import { isTodoName } from './calls.js'
 import type { RestoredCompaction } from './compactions.js'
 import { continuation, displayNotice, failure, internalNotice, passable, steerText, userEntry } from './messages.js'
+import { promptAttachments, splitPrompt } from './promptRefs.js'
 import { todosOf } from './todos.js'
 import { turnEndedAt } from './turns.js'
 

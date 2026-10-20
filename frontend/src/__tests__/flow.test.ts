@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { liveSessionId } from '../core/ids.js'
-import { busyFrom, routeEvent, Switches } from '../flow.js'
+import { busyFrom, routeEvent, Switches } from '../session/flow.js'
 
 /** The shown session. */
 const a = liveSessionId('a')

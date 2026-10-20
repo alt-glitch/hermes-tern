@@ -4,9 +4,9 @@
 import type { Key, PickerItem } from '@stencil-hq/tern'
 
 import type { ChatPorts } from '../app/ports.js'
-import type { Overlay } from '../overlay.js'
 import type { ThemeMode } from '../settings.js'
 
+import type { Overlay } from './overlay.js'
 import { moveSelection } from './search.js'
 
 /** What the theme picker reaches of the app. */

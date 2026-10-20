@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from 'vitest'
 
+import { compressReport, SESSION_COMMANDS, type SessionHost } from '../commands/session.js'
 import { liveSessionId } from '../core/ids.js'
 import { mutateSession } from '../hermes/mutate.js'
 import { lastTurnRewind, retryText, retryTurnRewind } from '../hermes/rewind.js'
-import { compressReport, SESSION_COMMANDS, type SessionHost } from '../sessionCommands.js'
 
 import { must, stub } from './fakes.js'
 

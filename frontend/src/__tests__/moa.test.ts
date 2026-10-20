@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { moaLabel, moaReferenceLabel } from '../moa.js'
+import { moaLabel, moaReferenceLabel } from '../gateway/moa.js'
 
 describe('Mixture-of-Agents', () => {
   it('labels the reference phase and the aggregator', () => {

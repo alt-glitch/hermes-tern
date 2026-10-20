@@ -11,7 +11,7 @@ import { DatabaseSync } from 'node:sqlite'
 import { describe, expect, it } from 'vitest'
 import * as z from 'zod/mini'
 
-import { readCard } from '../connections.js'
+import { readCard } from '../connections/cards.js'
 import { liveSessionId, storedSessionId } from '../core/ids.js'
 import { parseStacks } from '../github/branch.js'
 import { storedLinks } from '../github/links.js'

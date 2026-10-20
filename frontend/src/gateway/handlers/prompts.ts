@@ -7,7 +7,7 @@ import { sharedPromptId, sharedPromptRequest } from '../../hermes/sharedPrompts.
 import { promptTimeoutNotice } from '../../overlays/prompts.js'
 import type { PromptSheets } from '../../prompts/sheets.js'
 import type { SessionLifecycle } from '../../session/lifecycle.js'
-import type { Transcript } from '../../transcript.js'
+import type { Transcript } from '../../transcript/store.js'
 import type { Requester } from '../../wire/rpc.js'
 import type { EventOf, Handlers, Outcome } from '../dispatch.js'
 

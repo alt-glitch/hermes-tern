@@ -1,15 +1,15 @@
 // The transcript as ui-tsp keeps it: structured entries built from gateway
-// events (see transcript.ts), never pre-rendered text. Views (view/*.tsx)
+// events (see transcript/store.ts), never pre-rendered text. Views (view/*.tsx)
 // derive TSP nodes from these.
 
 import type { SubagentEventPayload, Usage } from '@hermes/shared/gateway-events'
 
 import type { LiveLog } from './agents/liveLog.js'
-import type { BatchEntry } from './bridge.js'
-import type { ConnectCard } from './connections.js'
+import type { ConnectCard } from './connections/cards.js'
 import type { NonEmpty } from './core/assert.js'
 import type { BlockKey, EntryId, SubagentKey, ToolCallId } from './core/ids.js'
 import type { ChartView } from './processes/widgets/types.js'
+import type { BatchEntry } from './tools/bridge.js'
 
 /** One todo item as the `todo_list` tool reports it. */
 export interface Todo {

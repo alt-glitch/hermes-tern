@@ -2,7 +2,7 @@
 // warnings, compaction, goal verdicts). Mirrors Hermes' ui-tui/src/app/createGatewayEventHandler.ts
 // (status.update). The keyed `notification.show` notices are chrome/notices.ts.
 
-import { lineTokens } from './compaction.js'
+import { lineTokens } from './hermes/compactions.js'
 import type { NoticeEntry } from './model.js'
 
 /** The working line while the context is compacted; the stream's own labels wait for the done edge. */

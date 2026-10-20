@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from 'vitest'
 
 import { copyToClipboard } from '../clipboard.js'
-import { type CommandHost, historyText, localCommand } from '../commands.js'
-import { CONTROL_COMMANDS, type ControlHost } from '../controlCommands.js'
+import { CONTROL_COMMANDS, type ControlHost } from '../commands/control.js'
+import { type CommandHost, historyText, localCommand } from '../commands/local.js'
 import { entryId } from '../core/ids.js'
 import type { Entry, ToolCall } from '../model.js'
 

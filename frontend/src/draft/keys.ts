@@ -5,13 +5,13 @@
 
 import type { Key, KeyName } from '@stencil-hq/tern'
 
-import type { Composer } from '../composer.js'
-import type { Overlay } from '../overlay.js'
 import type { Completion } from '../overlays/completion.js'
-import type { Transcript } from '../transcript.js'
+import type { Overlay } from '../overlays/overlay.js'
+import type { Transcript } from '../transcript/store.js'
 import type { PromptQueue } from '../turn/queue.js'
 
 import type { Attachments } from './attachments.js'
+import type { Composer } from './composer.js'
 
 /** A second Ctrl+C within this window quits. */
 export const EXIT_ARM_MS = 1500

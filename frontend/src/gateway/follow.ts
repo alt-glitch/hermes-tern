@@ -10,7 +10,7 @@ import type { AnyGatewayEvent } from '@tui/gatewayTypes.js'
 import type { Reconnect } from '../chrome/reconnect.js'
 import type { PromptSheets } from '../prompts/sheets.js'
 import type { SessionLifecycle } from '../session/lifecycle.js'
-import type { Transcript } from '../transcript.js'
+import type { Transcript } from '../transcript/store.js'
 import type { Activity } from '../turn/activity.js'
 
 import { dispatcher, type EventCx } from './dispatch.js'

@@ -1,10 +1,10 @@
 import type { CompletionItem } from '@hermes/shared/gateway-events'
 import { describe, expect, it, vi } from 'vitest'
 
-import type { Overlay } from '../overlay.js'
+import { CommandCatalog, resolveSlashName } from '../commands/resolve.js'
 import { slashItems } from '../overlays/completion.js'
 import { openHelp } from '../overlays/help.js'
-import { CommandCatalog, resolveSlashName } from '../slashResolve.js'
+import type { Overlay } from '../overlays/overlay.js'
 
 import { must, stub } from './fakes.js'
 

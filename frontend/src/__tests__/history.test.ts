@@ -2,8 +2,8 @@ import type { NodeJson } from '@stencil-hq/tern'
 import { describe, expect, it } from 'vitest'
 
 import type { Block, Entry, TurnEntry } from '../model.js'
-import { Transcript } from '../transcript.js'
 import { internalNotice } from '../transcript/messages.js'
+import { Transcript } from '../transcript/store.js'
 import { toolNode } from '../view/tools/shell.js'
 import { entryNode, type TranscriptContext } from '../view/transcript.js'
 

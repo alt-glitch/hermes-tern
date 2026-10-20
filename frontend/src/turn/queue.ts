@@ -8,7 +8,6 @@
 // switch was in flight), or the session it was held in (behind its turn or its compaction). When
 // another session is adopted, the second kind goes back to the composer, never to that session.
 
-import { steerTurn } from '../controlCommands.js'
 import { type LiveSessionId, newInputId, type SessionRef } from '../core/ids.js'
 import { errorText } from '../core/errors.js'
 import type { Image } from '../draft/attachments.js'
@@ -18,6 +17,7 @@ import type { SessionTicket } from '../session/state.js'
 import type { QueuedRow } from '../view/queued.js'
 import { admissionOf, type Requester, rpc } from '../wire/rpc.js'
 
+import { steerTurn } from './control.js'
 import { IMAGE_ONLY_PROMPT, type Prompt, shownText, userText } from './prompt.js'
 import { type OwnAdmission, ServerQueue, type ServerQueued } from './serverQueue.js'
 

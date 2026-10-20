@@ -12,7 +12,6 @@ import type { ChatPorts } from '../app/ports.js'
 import { copyToClipboard } from '../clipboard.js'
 import { optional } from '../core/assert.js'
 import type { BackgroundProcess, ToolCall } from '../model.js'
-import type { Overlay } from '../overlay.js'
 import { type CronAction, type CronJob, isMonitor, isPaused, jobError, jobTone, ownJobs, relative } from '../processes/cron.js'
 import { PROCESS_LOOK } from '../processes/look.js'
 import {
@@ -42,6 +41,7 @@ import { commandLine, describeCommand, oneLine } from '../view/describe.js'
 import { clockSeconds, duration, plural } from '../view/format.js'
 import { type Fact, facts } from '../view/ui/facts.js'
 
+import type { Overlay } from './overlay.js'
 import { countSummary, reportError, tickWhileOpen } from './sheet.js'
 
 /** What the Background sheet reaches of the app. */

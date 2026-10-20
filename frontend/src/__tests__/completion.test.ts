@@ -3,7 +3,7 @@ import type { Key } from '@stencil-hq/tern'
 import type { GatewayClient } from '@tui/gatewayClient.js'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { Composer } from '../composer.js'
+import { Composer } from '../draft/composer.js'
 import { completionRequestForInput } from '../hermes/completion.js'
 import { Completion } from '../overlays/completion.js'
 

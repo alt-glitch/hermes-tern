@@ -2,8 +2,8 @@
 // step of the running turn, or an entry between turns. The store's summaries reach them later,
 // and a reload takes their numbers for the stored compactions they turn out to be.
 
-import type { StoredCompaction } from '../compaction.js'
 import type { EntryId } from '../core/ids.js'
+import type { StoredCompaction } from '../hermes/compactions.js'
 import type { Compaction, CompactionEntry, CompactionState, Entry, TurnEntry } from '../model.js'
 
 /** What Compactions reads and changes of the transcript that holds it. */

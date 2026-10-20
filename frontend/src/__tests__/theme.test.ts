@@ -6,8 +6,8 @@ import type { SkinPayload } from '@hermes/shared/gateway-events'
 import type { Palette } from '@stencil-hq/tern'
 import { describe, expect, it } from 'vitest'
 
+import { paletteFor } from '../chrome/palette.js'
 import { Theme } from '../chrome/theme.js'
-import { paletteFor } from '../palette.js'
 import { loadSettings, saveSettings } from '../settings.js'
 import { STYLES } from '../view/styles.js'
 

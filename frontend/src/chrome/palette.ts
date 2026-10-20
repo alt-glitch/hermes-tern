@@ -11,8 +11,8 @@
 import type { HermesSkin } from '@hermes/shared/skin'
 import type { Palette } from '@stencil-hq/tern'
 
-import { fromSkin, type ThemeColors } from './hermes/theme.js'
-import type { ThemeMode } from './settings.js'
+import { fromSkin, type ThemeColors } from '../hermes/theme.js'
+import type { ThemeMode } from '../settings.js'
 
 type Tokens = Record<string, string>
 

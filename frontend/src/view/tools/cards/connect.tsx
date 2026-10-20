@@ -1,6 +1,6 @@
 // The manage_connections tool's connect card: the apps to authorize, their states, and Continue.
 
-import { allConnected, type ConnectTarget, connectTargets, isConnectCall, type SettleReason, waiting } from '../../../connections.js'
+import { allConnected, type ConnectTarget, connectTargets, isConnectCall, type SettleReason, waiting } from '../../../connections/cards.js'
 import { optional } from '../../../core/assert.js'
 import type { ToolCall } from '../../../model.js'
 import { namedStep } from '../steps.js'

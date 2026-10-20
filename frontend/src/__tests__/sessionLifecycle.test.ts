@@ -4,8 +4,8 @@ import { mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import type { ServerRequest } from '@hermes/shared/json-rpc-channel'
 import type { Usage } from '@hermes/shared/gateway-events'
+import type { ServerRequest } from '@hermes/shared/json-rpc-channel'
 import type { SessionInfo } from '@tui/types.js'
 import { describe, expect, it } from 'vitest'
 
@@ -14,7 +14,7 @@ import { liveSessionId, NO_SESSION, type SessionIds, storedSessionId } from '../
 import { adoptAll, type AdoptHost, adoptSteps, type Snapshot } from '../session/adopt.js'
 import { SessionLifecycle } from '../session/lifecycle.js'
 import { SessionState } from '../session/state.js'
-import { Transcript } from '../transcript.js'
+import { Transcript } from '../transcript/store.js'
 import type { BusyMode } from '../turn/serverQueue.js'
 
 import { FakeGateway, settle } from './fakes.js'

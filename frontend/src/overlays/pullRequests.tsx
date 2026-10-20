@@ -11,13 +11,13 @@ import { optional } from '../core/assert.js'
 import { type PrKey, prKey } from '../core/ids.js'
 import { checksState } from '../github/pullRequest.js'
 import type { Entry } from '../github/store.js'
-import type { Overlay } from '../overlay.js'
 import { relative } from '../processes/cron.js'
 import { prTone, stateLabel } from '../prs/look.js'
 import { PrView } from '../prs/view.js'
 import type { PrsPill } from '../view/dock.js'
 import { button } from '../view/ui/button.js'
 
+import type { Overlay } from './overlay.js'
 import { tickWhileOpen } from './sheet.js'
 
 /** What the pull request sheets reach of the app. */

@@ -3,13 +3,13 @@
 
 import type { ValueResult } from '@hermes/shared/gateway-events'
 
-import { Composer } from '../composer.js'
-import { maskedOffset, maskOf, unmaskEdit } from '../mask.js'
-import type { Overlay, OverlayHost } from '../overlay.js'
+import { Composer } from '../draft/composer.js'
+import type { Overlay, OverlayHost } from '../overlays/overlay.js'
 import { withoutTernEnv } from '../view/describe.js'
 import { actionsRow } from '../view/ui/button.js'
 
 import { answerWith, isCtrlC, type Sending, sendingLine } from './ask.js'
+import { maskedOffset, maskOf, unmaskEdit } from './mask.js'
 import type { MaskedPrompt } from './parse.js'
 import { promptKey } from './sheets.js'
 

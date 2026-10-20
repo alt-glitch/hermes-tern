@@ -8,7 +8,7 @@
 import { existsSync } from 'node:fs'
 import { basename } from 'node:path'
 
-import type { UserAttachment } from './model.js'
+import type { UserAttachment } from '../model.js'
 
 /** A reference's value: bare, or quoted with backticks, double or single quotes. */
 const VALUE = '(`[^`\\n]+`|"[^"\\n]+"|\'[^\'\\n]+\'|\\S+)'

@@ -10,8 +10,8 @@ import { readFileSync } from 'node:fs'
 
 import * as z from 'zod/mini'
 
+import type { SettleReason } from '../connections/cards.js'
 import { liveSessionId, storedSessionId } from '../core/ids.js'
-import type { SettleReason } from '../connections.js'
 import type { Settings } from '../settings.js'
 import type { WatchSpec } from '../watch/spec.js'
 
@@ -89,7 +89,7 @@ const SETTLED_BY = ['all_resolved', 'continued', 'deadline', 'error', 'supersede
 
 /** A card file as connections.py `_Card.data` writes it, the fields the pane reads. */
 const cardFile = z.object({
-  /** Each app's row: kept as written, read by connections.ts as a tool result's rows are. */
+  /** Each app's row: kept as written, read by connections/cards.ts as a tool result's rows are. */
   targets: z.array(z.unknown()),
   error: loose(z.string()),
   /** Epoch seconds of the watcher's last write. */

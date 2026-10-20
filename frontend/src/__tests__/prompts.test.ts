@@ -3,7 +3,7 @@ import type { NodeJson } from '@stencil-hq/tern'
 import { describe, expect, it, vi } from 'vitest'
 
 import { sharedPromptRequest } from '../hermes/sharedPrompts.js'
-import type { Overlay, OverlayHost } from '../overlay.js'
+import type { Overlay, OverlayHost } from '../overlays/overlay.js'
 import { promptOverlay, promptTimeoutNotice } from '../overlays/prompts.js'
 import { parsePrompt, type PromptRequest } from '../prompts/parse.js'
 import { promptKey, PromptSheets } from '../prompts/sheets.js'

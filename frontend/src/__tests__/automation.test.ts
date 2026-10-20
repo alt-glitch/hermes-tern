@@ -2,8 +2,8 @@ import type { GoalSnapshot, LoopSnapshot, SessionControlSnapshot } from '@hermes
 import { plain } from '@stencil-hq/tern'
 import { describe, expect, it, vi } from 'vitest'
 
-import { Automation, type AutomationHost, cadence, countdown, goalView, loopView } from '../automation.js'
 import { automationButtons } from '../overlays/automation.js'
+import { Automation, type AutomationHost, cadence, countdown, goalView, loopView } from '../session/automation.js'
 import { automationNode, reconnectNode } from '../view/automation.js'
 
 import { stub } from './fakes.js'

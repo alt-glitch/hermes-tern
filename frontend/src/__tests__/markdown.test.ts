@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { Composer } from '../composer.js'
-import { listNewline, markdownDecor, toggleMark } from '../markdown.js'
+import { Composer } from '../draft/composer.js'
+import { listNewline, markdownDecor, toggleMark } from '../draft/markdown.js'
 
 import { key, must } from './fakes.js'
 

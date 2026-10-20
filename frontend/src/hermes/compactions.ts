@@ -7,10 +7,11 @@ import { DatabaseSync } from 'node:sqlite'
 
 import * as z from 'zod/mini'
 
-import { ancestry } from './github/links.js'
-import { stateDbPath } from './hermes/paths.js'
-import { parseJson } from './wire/json.js'
-import { rows } from './wire/sqlite.js'
+import { ancestry } from '../github/links.js'
+import { parseJson } from '../wire/json.js'
+import { rows } from '../wire/sqlite.js'
+
+import { stateDbPath } from './paths.js'
 
 /** A compaction the store knows of: when its summary was written (epoch ms), and the summary. */
 export interface StoredCompaction {

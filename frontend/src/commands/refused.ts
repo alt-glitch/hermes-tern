@@ -14,18 +14,18 @@ import type {
   UsageModel
 } from '@hermes/shared/gateway-events'
 
-import type { ChatPorts } from './app/ports.js'
-import { oneOf, optional } from './core/assert.js'
-import { errorText } from './core/errors.js'
-import type { NoticeEntry } from './model.js'
-import { type BackgroundHost, openBackground } from './overlays/background.js'
-import { openHermesSplit } from './watch/spec.js'
-import { type ResultOf, rpc } from './wire/rpc.js'
+import type { ChatPorts } from '../app/ports.js'
+import { oneOf, optional } from '../core/assert.js'
+import { errorText } from '../core/errors.js'
+import type { NoticeEntry } from '../model.js'
+import { type BackgroundHost, openBackground } from '../overlays/background.js'
+import { openHermesSplit } from '../watch/spec.js'
+import { type ResultOf, rpc } from '../wire/rpc.js'
 
 /** What these commands reach of the app. */
 export type RefusedHost = Pick<ChatPorts, 'gw' | 'session' | 'transcript'> & BackgroundHost
 
-/** A command this module answers: commands.ts's LocalCommand, on the ports these commands reach. */
+/** A command this module answers: local.ts's LocalCommand, on the ports these commands reach. */
 export interface RefusedCommand {
   name: string
   aliases?: readonly string[]

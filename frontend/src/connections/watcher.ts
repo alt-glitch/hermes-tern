@@ -2,11 +2,12 @@
 // the file the plugin's watcher writes (links and states), and the agent is told once every app
 // of a card is connected, as the desktop's card settles the call. The card's own buttons land
 // here too: Continue tells the agent which apps the user authorized, and Authorize opens an
-// app's link. The card files are connections.ts's; this module only reads and claims them.
+// app's link. The card files are cards.ts's; this module only reads and claims them.
 
-import { allConnected, CONNECT_TOOL, connectedMessage, continueMessage, loadConnect, mayTell, POLL_MS, waiting } from '../connections.js'
 import { Poller } from '../core/poller.js'
-import type { Transcript } from '../transcript.js'
+import type { Transcript } from '../transcript/store.js'
+
+import { allConnected, CONNECT_TOOL, connectedMessage, continueMessage, loadConnect, mayTell, POLL_MS, waiting } from './cards.js'
 
 /**
  * How long a connect call that drew no card (a status read, a call with nothing to authorize) is

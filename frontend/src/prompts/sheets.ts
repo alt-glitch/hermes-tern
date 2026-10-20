@@ -6,7 +6,7 @@
 
 import { type OverlayKey, overlayKey } from '../core/ids.js'
 import { sharedPromptId } from '../hermes/sharedPrompts.js'
-import type { Overlay, OverlayHost } from '../overlay.js'
+import type { Overlay, OverlayHost } from '../overlays/overlay.js'
 
 import type { PromptRequest } from './parse.js'
 

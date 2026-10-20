@@ -17,12 +17,12 @@ import { errorText } from '../core/errors.js'
 import { durable, storedSessionId } from '../core/ids.js'
 import { mutateSession } from '../hermes/mutate.js'
 import { inWorkspace, lastReply, sessionLabel, type StoredSession, storedSessions, workspaceOf } from '../hermes/sessionIndex.js'
-import type { Overlay } from '../overlay.js'
 import { oneLine } from '../view/describe.js'
 import { homeTilde, plural } from '../view/format.js'
 import { facts } from '../view/ui/facts.js'
 import { rpc } from '../wire/rpc.js'
 
+import type { Overlay } from './overlay.js'
 import { editQuery, hitRuns, moveSelection, rank } from './search.js'
 
 /** What the session picker reaches of the app. */

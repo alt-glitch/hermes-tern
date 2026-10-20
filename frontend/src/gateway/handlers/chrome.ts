@@ -1,10 +1,10 @@
 // What the gateway says around the turn: its skin, keyed notices, plain notices and errors, a slow
 // start, stray backend output, the self-improvement review, and /bg and /btw answers.
 
-import { protocolNote, slowStartNotes } from '../../backendNotes.js'
+import { protocolNote, slowStartNotes } from '../../chrome/backendNotes.js'
 import { isLoginNotice, type NoticeStrip } from '../../chrome/notices.js'
 import type { Theme } from '../../chrome/theme.js'
-import type { Transcript } from '../../transcript.js'
+import type { Transcript } from '../../transcript/store.js'
 import type { EventOf, Handlers, Outcome } from '../dispatch.js'
 
 /** The backend warnings shown already, so each stays one line; the app keeps it, and an adopt forgets `status`. */

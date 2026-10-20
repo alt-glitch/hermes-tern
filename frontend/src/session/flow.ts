@@ -5,9 +5,9 @@
 
 import type { SessionResumeResult } from '@hermes/shared/gateway-events'
 
-import { Epoch, type Ticket } from './core/epoch.js'
-import type { LiveSessionId } from './core/ids.js'
-import type { Busy } from './turn/activity.js'
+import { Epoch, type Ticket } from '../core/epoch.js'
+import type { LiveSessionId } from '../core/ids.js'
+import type { Busy } from '../turn/activity.js'
 
 /** What to do with a server request or an event: show it, keep it until the switch in flight lands, or drop it. */
 export type RequestRoute = 'show' | 'hold' | 'drop'

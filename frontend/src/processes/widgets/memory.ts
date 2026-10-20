@@ -5,7 +5,7 @@
 import { mkdirSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 
-import { dataDir } from '../../connections.js'
+import { dataDir } from '../../connections/cards.js'
 import { chartSkip, readJsonFile } from '../../wire/files.js'
 
 import { type Spec, validateSpec } from './spec.js'

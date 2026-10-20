@@ -3,8 +3,8 @@ import { describe, expect, it } from 'vitest'
 
 import { entryId, toolCallId } from '../core/ids.js'
 import type { Block, Entry, ToolCall, TurnEntry } from '../model.js'
-import { Transcript } from '../transcript.js'
 import { findCall } from '../transcript/calls.js'
+import { Transcript } from '../transcript/store.js'
 
 function turnOf(entries: readonly Entry[]): TurnEntry {
   const turn = entries.findLast(e => e.kind === 'turn')

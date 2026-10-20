@@ -6,13 +6,14 @@
 // canonicalSessionCommands.ts / canonicalSessionControls.ts.
 import type { CompressionSummary } from '@hermes/shared/gateway-events'
 
-import { lineTokens } from './compaction.js'
-import type { ControlHost } from './controlCommands.js'
-import { errorText } from './core/errors.js'
-import { type StoredSessionId, storedSessionId } from './core/ids.js'
-import { type MutationResult, mutateSession } from './hermes/mutate.js'
-import { lastTurnRewind, retryText, retryTurnRewind } from './hermes/rewind.js'
-import { rpc } from './wire/rpc.js'
+import { errorText } from '../core/errors.js'
+import { type StoredSessionId, storedSessionId } from '../core/ids.js'
+import { lineTokens } from '../hermes/compactions.js'
+import { type MutationResult, mutateSession } from '../hermes/mutate.js'
+import { lastTurnRewind, retryText, retryTurnRewind } from '../hermes/rewind.js'
+import { rpc } from '../wire/rpc.js'
+
+import type { ControlHost } from './control.js'
 
 /** What a session command needs beyond a control command's host; commands/host.ts's sessionHost() supplies it. */
 export interface SessionHost extends ControlHost {

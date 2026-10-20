@@ -6,9 +6,9 @@ import type { Key, PickerItem } from '@stencil-hq/tern'
 
 import type { ChatPorts } from '../app/ports.js'
 import { capsOf, loadCaps } from '../modelCaps.js'
-import type { Overlay } from '../overlay.js'
 import { DEFAULT_EFFORT, levelsFor } from '../session/effort.js'
 
+import type { Overlay } from './overlay.js'
 import { moveSelection } from './search.js'
 
 const KEY = 'effort'

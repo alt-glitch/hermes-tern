@@ -6,9 +6,9 @@ import { DatabaseSync } from 'node:sqlite'
 import type { TranscriptMessage } from '@hermes/shared/gateway-events'
 import { describe, expect, it } from 'vitest'
 
-import { handoff, lineTokens, storedCompactions } from '../compaction.js'
+import { handoff, lineTokens, storedCompactions } from '../hermes/compactions.js'
 import type { Compaction, Entry, TurnEntry } from '../model.js'
-import { Transcript } from '../transcript.js'
+import { Transcript } from '../transcript/store.js'
 import { parts } from '../workLog.js'
 
 import { must } from './fakes.js'

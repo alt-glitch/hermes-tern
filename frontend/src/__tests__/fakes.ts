@@ -10,7 +10,7 @@ import type { SessionInfo } from '@tui/types.js'
 
 import type { SessionView } from '../app/ports.js'
 import { liveSessionId } from '../core/ids.js'
-import type { Overlay } from '../overlay.js'
+import type { Overlay } from '../overlays/overlay.js'
 import type { SessionState } from '../session/state.js'
 import type { Activity, Busy } from '../turn/activity.js'
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { Transcript } from '../transcript.js'
+import { Transcript } from '../transcript/store.js'
 import { toTranscript } from '../watch/child.js'
 
 describe('toTranscript', () => {

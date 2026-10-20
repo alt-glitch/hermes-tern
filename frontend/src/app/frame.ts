@@ -3,13 +3,13 @@
 // dock from dockModel(), the layers, the transcript), and then the caret moves where it belongs,
 // sent only when that changed. Every step but those three only reads.
 
-import type { Overlay } from '../overlay.js'
-import type { Completion } from '../overlays/completion.js'
 import type { Hud } from '../chrome/hud.js'
+import type { Completion } from '../overlays/completion.js'
+import type { Overlay } from '../overlays/overlay.js'
 import type { PrAside } from '../prs/aside.js'
 import type { Sidebar } from '../sidebar.js'
 import { INPUT_ID, type SurfaceHost } from '../surface/host.js'
-import type { Transcript } from '../transcript.js'
+import type { Transcript } from '../transcript/store.js'
 import { type DockActions, dockNodes } from '../view/dock.js'
 import { type DockSources, dockModel, isModal, shownPills } from '../view/dockModel.js'
 import { entryNode, type TranscriptContext } from '../view/transcript.js'

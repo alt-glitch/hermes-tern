@@ -16,7 +16,7 @@ import {
   sortProcesses,
   watchersOf
 } from '../processes/store.js'
-import { Transcript } from '../transcript.js'
+import { Transcript } from '../transcript/store.js'
 import type { ProcessRow } from '../wire/schemas.js'
 
 import { FakeGateway, must, stub } from './fakes.js'

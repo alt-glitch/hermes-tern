@@ -13,19 +13,20 @@ import type {
   Usage
 } from '@hermes/shared/gateway-events'
 
-import { nextVia, settleBridge, unwrap } from './bridge.js'
-import type { StoredCompaction } from './compaction.js'
-import { type EntryId, entryId, type ToolCallId, toolCallId } from './core/ids.js'
-import type { Compaction, Counters, Entry, NoticeEntry, Todo, ToolCall, TurnEntry, UserAttachment } from './model.js'
-import { detailOf } from './tools/detail.js'
-import { callIn, callsWhere, findCall, isBackgroundCall, isTodoName, isToolError, isWatchCall, type Located } from './transcript/calls.js'
-import { type CompactionStart, Compactions } from './transcript/compactions.js'
-import { history, storedUser } from './transcript/history.js'
-import { continuation, displayNotice, failure, internalNotice, passable, type UserPrompt, userEntry } from './transcript/messages.js'
-import { currentTodos, todosOf, toTodos } from './transcript/todos.js'
-import { endThinking, shownArgs, trailingText, usageSince } from './transcript/turns.js'
-import { withoutTernEnv } from './view/describe.js'
-import { record } from './wire/json.js'
+import { type EntryId, entryId, type ToolCallId, toolCallId } from '../core/ids.js'
+import type { StoredCompaction } from '../hermes/compactions.js'
+import type { Compaction, Counters, Entry, NoticeEntry, Todo, ToolCall, TurnEntry, UserAttachment } from '../model.js'
+import { nextVia, settleBridge, unwrap } from '../tools/bridge.js'
+import { detailOf } from '../tools/detail.js'
+import { withoutTernEnv } from '../view/describe.js'
+import { record } from '../wire/json.js'
+
+import { callIn, callsWhere, findCall, isBackgroundCall, isTodoName, isToolError, isWatchCall, type Located } from './calls.js'
+import { type CompactionStart, Compactions } from './compactions.js'
+import { history, storedUser } from './history.js'
+import { continuation, displayNotice, failure, internalNotice, passable, type UserPrompt, userEntry } from './messages.js'
+import { currentTodos, todosOf, toTodos } from './todos.js'
+import { endThinking, shownArgs, trailingText, usageSince } from './turns.js'
 
 /** The ordered entries of one session, plus the event reducer that grows them. */
 export class Transcript {

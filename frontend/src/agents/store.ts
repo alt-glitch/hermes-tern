@@ -21,7 +21,7 @@ import { errorCode } from '../core/errors.js'
 import type { LiveSessionId } from '../core/ids.js'
 import { Poller } from '../core/poller.js'
 import type { Subagent, ToolCall } from '../model.js'
-import type { Transcript } from '../transcript.js'
+import type { Transcript } from '../transcript/store.js'
 import { record } from '../wire/json.js'
 import { rpc } from '../wire/rpc.js'
 

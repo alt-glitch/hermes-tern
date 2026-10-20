@@ -15,8 +15,8 @@ vi.mock('@tui/lib/history.js', () => ({ append: () => undefined, load: () => [] 
 process.env['HERMES_HOME'] = mkdtempSync(join(tmpdir(), 'hermes-tern-status-'))
 
 const { App } = await import('../app/chat.js')
-const { localCommand } = await import('../commands.js')
-const { fastValue, fastTier } = await import('../fast.js')
+const { localCommand } = await import('../commands/local.js')
+const { fastValue, fastTier } = await import('../session/fast.js')
 const { forgetCaps, rememberCaps } = await import('../modelCaps.js')
 const { effortText, levelsFor, nextEffort } = await import('../session/effort.js')
 const { openModelPicker } = await import('../overlays/models.js')
