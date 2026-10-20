@@ -1,7 +1,7 @@
 import type { GatewayClient } from '@tui/gatewayClient.js'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { liveSessionId } from '../core/ids.js'
+import { type LiveSessionId, liveSessionId } from '../core/ids.js'
 import type { BackgroundProcess } from '../model.js'
 import {
   FAST_MS,
@@ -231,6 +231,50 @@ describe('Processes', () => {
     await vi.advanceTimersByTimeAsync(IDLE_MS)
     expect(store.get('proc_a')).toBe(first)
     expect(first.state.status).toBe('running')
+    store.dispose()
+  })
+
+  it("keeps its processes as 'unknown' when the gateway exits, and clears them only for another session", async () => {
+    vi.useFakeTimers({ now: NOW })
+    const rows: ProcessRow[] = [{ command: 'sleep 90', session_id: 'proc_a', started_epoch: NOW / 1000, status: 'running' }]
+    const gw = new FakeGateway({ replies: { 'process.list': () => ({ processes: rows }) } })
+    let sid: LiveSessionId | null = liveSessionId('s1')
+    const changed = vi.fn()
+    const store = new Processes({
+      changed,
+      gw: gw.client,
+      get sid() {
+        return sid
+      },
+      transcript: new Transcript()
+    })
+
+    store.poke()
+    await vi.advanceTimersByTimeAsync(0)
+    const first = must(store.get('proc_a'))
+
+    // The gateway exits: the session's runtime id goes with it, and nothing says the process runs.
+    sid = null
+    changed.mockClear()
+    await vi.advanceTimersByTimeAsync(FAST_MS)
+    expect(store.get('proc_a')).toBe(first)
+    expect(first.state.status).toBe('unknown')
+    expect(store.recent()).toEqual([first])
+    expect(changed).toHaveBeenCalled()
+
+    // The same session is back: the gateway's answer takes the process back.
+    sid = liveSessionId('s1')
+    await vi.advanceTimersByTimeAsync(IDLE_MS)
+    expect(store.get('proc_a')).toBe(first)
+    expect(first.state.status).toBe('running')
+
+    // Another session is adopted: the last one's processes are not its own.
+    sid = null
+    await vi.advanceTimersByTimeAsync(FAST_MS)
+    rows.length = 0
+    sid = liveSessionId('s2')
+    await vi.advanceTimersByTimeAsync(IDLE_MS)
+    expect(store.all()).toEqual([])
     store.dispose()
   })
 })

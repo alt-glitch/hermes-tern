@@ -3,8 +3,9 @@
 // printed (`agent.terminal.output`); status and exits come from polling `process.list`
 // (session-scoped): every second while the sheet is open or a process runs, else every five. Exited processes stay on the pill for
 // Hermes' 60 s (ui-tui/src/app/processRoster.ts); the sheet's All tab keeps whatever the
-// gateway still lists. When `process.list` keeps failing (the gateway went away), the running
-// processes show as unknown and the poll slows to the idle cadence until it answers again.
+// gateway still lists. When `process.list` keeps failing, or the gateway exits and takes the
+// session's runtime id with it, the running processes show as unknown and the poll slows to the
+// idle cadence until it answers again; only another session's adoption clears them.
 
 import type { GatewayClient } from '@tui/gatewayClient.js'
 
@@ -229,6 +230,7 @@ export function processIdOf(call: ToolCall): string | undefined {
 export class Processes {
   readonly #host: ProcessesHost
   readonly #byId = new Map<string, BackgroundProcess>()
+  /** The session whose processes #byId holds: the last one adopted, kept while the gateway is away. */
   #sid: LiveSessionId | null = null
   /** The poll: fast while a sheet watches or a process runs, idle otherwise or while it fails. */
   readonly #poller: Poller = new Poller({
@@ -356,6 +358,13 @@ export class Processes {
 
   async #poll() {
     const sid = this.#host.sid
+
+    // No runtime id: the gateway went away (or no session is adopted yet). The session's processes
+    // stay, the running ones as unknown, until a session is adopted.
+    if (!sid) {
+      return this.#unknown() ? this.#host.changed() : undefined
+    }
+
     let changed = false
 
     if (sid !== this.#sid) {
@@ -364,10 +373,6 @@ export class Processes {
       this.#byId.clear()
       this.#failures = 0
       this.#sid = sid
-    }
-
-    if (!sid) {
-      return changed ? this.#host.changed() : undefined
     }
 
     let rows: ProcessRow[]
@@ -446,10 +451,11 @@ export class Processes {
   #failed(): boolean {
     this.#failures++
 
-    if (this.#failures < FAILED_POLLS) {
-      return false
-    }
+    return this.#failures >= FAILED_POLLS && this.#unknown()
+  }
 
+  /** The running processes show as unknown; true when one changed. */
+  #unknown(): boolean {
     const touched = new Set([...this.#byId.values()].filter(isRunning))
     touched.forEach(p => (p.state = { status: 'unknown' }))
 
