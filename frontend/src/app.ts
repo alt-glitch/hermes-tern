@@ -43,7 +43,7 @@ import { imagePathOf, withClipboardImage } from './hermes/clipboardImage.js'
 import { type Attachment, imageSize, uploadImage } from './hermes/images.js'
 import { Media } from './media.js'
 import type { ImageSource, ToolCall, UserAttachment } from './model.js'
-import { hasInterpolation, interpolate, shellError, shellExec, shellLines } from './hermes/shell.js'
+import { interpolate, shellError, shellExec, shellLines, typedCommands } from './hermes/shell.js'
 import { mutateSession } from './hermes/mutate.js'
 import { sharedPromptId, sharedPromptRequest } from './hermes/sharedPrompts.js'
 import { openAgents } from './overlays/agents.js'
@@ -120,6 +120,8 @@ export interface Queued {
   images: Image[]
   /** Typed by the user: its `{!cmd}`s run when it is sent. */
   expand?: boolean
+  /** Text pasted into it: a `{!cmd}` from a paste stays as written. */
+  pasted?: readonly string[]
   /** What the transcript, the queue and Edit show instead of `text` (a skill's invocation, not its body). */
   display?: string
 }
@@ -474,7 +476,7 @@ export class App implements OverlayHost {
     const action = this.composer.key(key)
 
     if (action === 'submit') {
-      this.#submit(this.composer.take())
+      this.#submitDraft()
     }
   }
 
@@ -984,17 +986,26 @@ export class App implements OverlayHost {
 
   // ── Prompts and commands ───────────────────────────────────────────
 
+  /** Sends the composer's draft, with the pastes it holds. */
+  #submitDraft() {
+    const pasted = [...this.composer.pasted]
+
+    this.#submit(this.composer.take(), true, this.#busyMode, pasted)
+  }
+
   /**
    * Sends or queues a prompt, or runs a command; `draft`: the user entered it (it takes the draft's
    * images). While a turn runs the prompt goes as `busy` says: the session's busy_input_mode for
-   * a typed one; a message the app writes (a connect result) waits behind the turn.
+   * a typed one; a message the app writes (a connect result) waits behind the turn. `pasted`:
+   * the draft's pastes, whose `{!cmd}`s and leading `!` stay as written.
    */
-  #submit(raw: string, draft = true, busy: BusyMode = draft ? this.#busyMode : 'queue') {
+  #submit(raw: string, draft = true, busy: BusyMode = draft ? this.#busyMode : 'queue', pasted: readonly string[] = []) {
     const text = raw.trim()
 
     // An image still uploading would miss the prompt: the words wait in the composer for it.
     if (draft && this.#attaching.length && !text.startsWith('/')) {
       this.composer.set(raw)
+      this.composer.repasted(pasted)
       this.transcript.notice('An image is still attaching. Send again in a moment.', 'warning')
 
       return
@@ -1011,15 +1022,15 @@ export class App implements OverlayHost {
       return
     }
 
-    // `!cmd` runs a shell command now, beside any turn (Ink's shellExec).
-    if (text.startsWith('!') && text.slice(1).trim()) {
+    // `!cmd` runs a shell command now, beside any turn (Ink's shellExec); a pasted one is a prompt.
+    if (text.startsWith('!') && text.slice(1).trim() && !pasted.some(p => text.startsWith(p.trim().split('\n')[0]!))) {
       void this.#shell(text.slice(1).trim())
 
       return
     }
 
     // The draft's images go with this prompt, whenever it is sent; a message the app writes leaves them.
-    const item: Queued = { expand: true, images: draft ? this.#takeImages() : [], text }
+    const item: Queued = { expand: true, images: draft ? this.#takeImages() : [], pasted, text }
 
     if (!this.sid || this.#switches.pending) {
       this.queue.push(item)
@@ -1131,12 +1142,12 @@ export class App implements OverlayHost {
 
   /** `item` with its `{!cmd}`s run (a typed prompt's); undefined when one failed (the prompt is back in the composer). */
   async #expanded(sid: string, item: Queued): Promise<{ images: Image[]; text: string } | undefined> {
-    if (!item.expand || !hasInterpolation(item.text)) {
+    if (!item.expand || !typedCommands(item.text, item.pasted).length) {
       return item
     }
 
     try {
-      return { images: item.images, text: await interpolate(this.#gw, sid, item.text) }
+      return { images: item.images, text: await interpolate(this.#gw, sid, item.text, item.pasted) }
     } catch (error) {
       this.transcript.notice(`Not sent: a {!…} command failed: ${shellError(error)}.`, 'error')
       this.#restore(item)
@@ -1161,9 +1172,9 @@ export class App implements OverlayHost {
       return
     }
 
-    if (item.expand && hasInterpolation(item.text)) {
+    if (item.expand && typedCommands(item.text, item.pasted).length) {
       this.#startBusy('Running {!…}')
-      void interpolate(this.#gw, sid, item.text).then(
+      void interpolate(this.#gw, sid, item.text, item.pasted).then(
         text => {
           this.busy = null
           this.#send({ images: item.images, text }, { display: item.text, queued })
@@ -1217,9 +1228,10 @@ export class App implements OverlayHost {
   }
 
   /** Puts a prompt that did not go back into the composer, before any text there, with its images. */
-  #restore({ display, images, text: sent }: Queued) {
+  #restore({ display, images, pasted = [], text: sent }: Queued) {
     const text = display ?? sent
     this.composer.set(text && this.composer.text ? `${text}\n${this.composer.text}` : text || this.composer.text)
+    this.composer.repasted(pasted)
     this.#attachments = [...images, ...this.#attachments]
   }
 
@@ -2739,7 +2751,7 @@ export class App implements OverlayHost {
           this.changed()
         },
         onSubmit: () => {
-          this.#submit(this.composer.take())
+          this.#submitDraft()
           this.changed()
         },
         onUndo: () => {

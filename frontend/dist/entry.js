@@ -62057,6 +62057,8 @@ var Composer = class {
   #browse = -1;
   #draft = "";
   #decor = { decor: [], text: "" };
+  /** Pasted text that holds `{!…}` or starts with `!`: what it says is not the user's command. */
+  #pasted = [];
   /** The selected range, or the caret twice. */
   get selection() {
     const a2 = this.anchor ?? this.cursor;
@@ -62068,6 +62070,14 @@ var Composer = class {
       this.#decor = { decor: markdownDecor(this.text), text: this.text };
     }
     return this.#decor.decor;
+  }
+  /** The draft's pastes that hold `{!…}` or start with `!`; `take()` forgets them. */
+  get pasted() {
+    return this.#pasted;
+  }
+  /** Marks `texts` as pasted again (a refused prompt back in the composer). */
+  repasted(texts) {
+    this.#pasted.push(...texts);
   }
   /** Up/Down are walking the prompt history (Down still has somewhere to go). */
   get browsing() {
@@ -62083,6 +62093,7 @@ var Composer = class {
   take() {
     const text11 = this.text;
     append(text11);
+    this.#pasted = [];
     this.#undo = [];
     this.#redo = [];
     this.#browse = -1;
@@ -62167,6 +62178,9 @@ var Composer = class {
     if (name === "paste") {
       const s2 = (key2.text ?? "").replace(/\r\n?/g, "\n");
       const [from, to] = this.selection;
+      if (pastedCommand(s2)) {
+        this.#pasted.push(s2);
+      }
       this.splice(from, to, s2);
       return true;
     }
@@ -62450,6 +62464,9 @@ function nextWord(text11, at) {
     i++;
   }
   return i;
+}
+function pastedCommand(text11) {
+  return text11.includes("{!") || text11.trimStart().startsWith("!");
 }
 
 // src/mask.ts
@@ -65304,7 +65321,6 @@ function imagePathOf(text11, cwd) {
 
 // .hermes-src/ui-tui/src/protocol/interpolation.ts
 var INTERPOLATION_RE = /\{!(.+?)\}/g;
-var hasInterpolation = (s2) => /\{!.+?\}/.test(s2);
 
 // src/hermes/shell.ts
 var REFUSALS = [
@@ -65333,8 +65349,11 @@ function shellLines(r) {
     ...r.code !== 0 || !out ? [{ failed: r.code !== 0, text: `exit ${r.code}` }] : []
   ];
 }
-async function interpolate(gw2, sid, text11) {
-  const matches = [...text11.matchAll(new RegExp(INTERPOLATION_RE.source, "g"))];
+function typedCommands(text11, pasted = []) {
+  return [...text11.matchAll(new RegExp(INTERPOLATION_RE.source, "g"))].filter((m) => !pasted.some((p3) => p3.includes(m[0])));
+}
+async function interpolate(gw2, sid, text11, pasted = []) {
+  const matches = typedCommands(text11, pasted);
   const results = await Promise.all(
     matches.map(async (m) => {
       const r = await shellExec(gw2, sid, m[1] ?? "");
@@ -69133,7 +69152,7 @@ var App = class {
     }
     const action = this.composer.key(key2);
     if (action === "submit") {
-      this.#submit(this.composer.take());
+      this.#submitDraft();
     }
   }
   #onTernEvent(ev) {
@@ -69524,15 +69543,22 @@ var App = class {
     this.#done.resolve(code7);
   }
   // ── Prompts and commands ───────────────────────────────────────────
+  /** Sends the composer's draft, with the pastes it holds. */
+  #submitDraft() {
+    const pasted = [...this.composer.pasted];
+    this.#submit(this.composer.take(), true, this.#busyMode, pasted);
+  }
   /**
    * Sends or queues a prompt, or runs a command; `draft`: the user entered it (it takes the draft's
    * images). While a turn runs the prompt goes as `busy` says: the session's busy_input_mode for
-   * a typed one; a message the app writes (a connect result) waits behind the turn.
+   * a typed one; a message the app writes (a connect result) waits behind the turn. `pasted`:
+   * the draft's pastes, whose `{!cmd}`s and leading `!` stay as written.
    */
-  #submit(raw2, draft = true, busy = draft ? this.#busyMode : "queue") {
+  #submit(raw2, draft = true, busy = draft ? this.#busyMode : "queue", pasted = []) {
     const text11 = raw2.trim();
     if (draft && this.#attaching.length && !text11.startsWith("/")) {
       this.composer.set(raw2);
+      this.composer.repasted(pasted);
       this.transcript.notice("An image is still attaching. Send again in a moment.", "warning");
       return;
     }
@@ -69543,11 +69569,11 @@ var App = class {
       void this.#slash(text11);
       return;
     }
-    if (text11.startsWith("!") && text11.slice(1).trim()) {
+    if (text11.startsWith("!") && text11.slice(1).trim() && !pasted.some((p3) => text11.startsWith(p3.trim().split("\n")[0]))) {
       void this.#shell(text11.slice(1).trim());
       return;
     }
-    const item3 = { expand: true, images: draft ? this.#takeImages() : [], text: text11 };
+    const item3 = { expand: true, images: draft ? this.#takeImages() : [], pasted, text: text11 };
     if (!this.sid || this.#switches.pending) {
       this.queue.push(item3);
       return;
@@ -69632,11 +69658,11 @@ var App = class {
   }
   /** `item` with its `{!cmd}`s run (a typed prompt's); undefined when one failed (the prompt is back in the composer). */
   async #expanded(sid, item3) {
-    if (!item3.expand || !hasInterpolation(item3.text)) {
+    if (!item3.expand || !typedCommands(item3.text, item3.pasted).length) {
       return item3;
     }
     try {
-      return { images: item3.images, text: await interpolate(this.#gw, sid, item3.text) };
+      return { images: item3.images, text: await interpolate(this.#gw, sid, item3.text, item3.pasted) };
     } catch (error) {
       this.transcript.notice(`Not sent: a {!\u2026} command failed: ${shellError(error)}.`, "error");
       this.#restore(item3);
@@ -69655,9 +69681,9 @@ var App = class {
       this.queue.unshift(item3);
       return;
     }
-    if (item3.expand && hasInterpolation(item3.text)) {
+    if (item3.expand && typedCommands(item3.text, item3.pasted).length) {
       this.#startBusy("Running {!\u2026}");
-      void interpolate(this.#gw, sid, item3.text).then(
+      void interpolate(this.#gw, sid, item3.text, item3.pasted).then(
         (text12) => {
           this.busy = null;
           this.#send({ images: item3.images, text: text12 }, { display: item3.text, queued });
@@ -69700,10 +69726,11 @@ var App = class {
     return images;
   }
   /** Puts a prompt that did not go back into the composer, before any text there, with its images. */
-  #restore({ display, images, text: sent }) {
+  #restore({ display, images, pasted = [], text: sent }) {
     const text11 = display ?? sent;
     this.composer.set(text11 && this.composer.text ? `${text11}
 ${this.composer.text}` : text11 || this.composer.text);
+    this.composer.repasted(pasted);
     this.#attachments = [...images, ...this.#attachments];
   }
   /** `!cmd`: runs `command` in the session's folder and shows its output; nothing reaches the model. */
@@ -70828,7 +70855,7 @@ ${this.composer.text}` : text11 || this.composer.text);
           this.changed();
         },
         onSubmit: () => {
-          this.#submit(this.composer.take());
+          this.#submitDraft();
           this.changed();
         },
         onUndo: () => {
