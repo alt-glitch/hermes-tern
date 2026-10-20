@@ -171,10 +171,9 @@ function recordingHost() {
       get entries() {
         return transcript.entries
       },
-      forgetCompactions: rec('transcript.forgetCompactions'),
       inflight: rec('transcript.inflight'),
       load: rec('transcript.load'),
-      usageBase: rec('transcript.usageBase')
+      reset: ({ session }) => void log.push(`transcript.reset ${session}`)
     },
     writeActiveSession: id => void log.push(`writeActiveSession ${id}`)
   }
@@ -200,9 +199,9 @@ describe('adoptSteps', () => {
 
     expect(log).toEqual([
       'ref b',
-      // Another session: the last one's sheets, compactions and busy-input mode go.
+      // Another session: the transcript starts over at once, and the last one's sheets and busy-input mode go.
+      'transcript.reset other',
       'sheets.dropAll',
-      'transcript.forgetCompactions',
       'busyMode queue',
       'readBusyMode',
       'queue.reset',
@@ -217,7 +216,6 @@ describe('adoptSteps', () => {
       'notices.reset',
       'activity.endCompaction',
       'forgetStatusNote',
-      'transcript.usageBase',
       'agents.adopt b',
       // The history.
       'transcript.load',
@@ -245,7 +243,7 @@ describe('adoptSteps', () => {
     expect(log).not.toContain('busyMode queue')
     expect(log).not.toContain('transcript.load')
     expect(log).not.toContain('transcript.inflight')
-    expect(log.slice(0, 3)).toEqual(['ref a', 'readBusyMode', 'queue.reset'])
+    expect(log.slice(0, 4)).toEqual(['ref a', 'transcript.reset same', 'readBusyMode', 'queue.reset'])
     expect(log.at(-1)).toBe('changed')
   })
 })

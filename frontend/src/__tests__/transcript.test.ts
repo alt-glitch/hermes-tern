@@ -56,11 +56,12 @@ describe('Transcript', () => {
     expect(texts(turnOf(t.entries))).toEqual(['Half way there.'])
   })
 
-  it('forgets the live turn on clear and load', () => {
+  it('forgets the live turn on reset and load', () => {
     const t = new Transcript()
     t.start(0)
-    t.clear()
+    t.reset({ session: 'other', usage: undefined })
     expect(t.live).toBeUndefined()
+    expect(t.entries.map(e => e.kind)).toEqual(['welcome'])
 
     t.start(1)
     t.load([{ role: 'user', text: 'hi' }])
@@ -231,7 +232,7 @@ describe('Transcript', () => {
 
   it('reports each turn its share of the session usage', () => {
     const t = new Transcript()
-    t.usageBase({ input: 100, output: 10, total: 110 })
+    t.reset({ session: 'other', usage: { input: 100, output: 10, total: 110 } })
     t.start(0)
     t.complete({ status: 'complete', text: 'a', usage: { input: 1300, output: 190, total: 1490 } }, 1)
     t.start(2)

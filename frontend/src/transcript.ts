@@ -35,7 +35,7 @@ export class Transcript {
   #sessionUsage: Usage | undefined
   /** The session's cumulative counters at the last `session.usage` tick. */
   #counters: Counters | undefined
-  /** The streaming turn: set by start, cleared by complete, clear and load (notices may land after it). */
+  /** The streaming turn: set by start, cleared by complete, reset and load (notices may land after it). */
   #live: TurnEntry | undefined
   /** The reason line for the next turn, when Hermes' own notice started it. */
   #continued: string | undefined
@@ -46,9 +46,22 @@ export class Transcript {
     return this.#entries
   }
 
-  /** Sets the running usage turns count from (a resumed session's totals). */
-  usageBase(usage: Usage | undefined) {
+  /**
+   * Starts over for an adopted session, in one step: only a welcome, no live turn, no reason line
+   * waiting, and `usage` (a resumed session's totals) as what turns count from. Another `session`
+   * also takes the last one's counters and compactions; a reattach of the same session keeps them
+   * (a reload's stored compactions get their numbers from the ones seen).
+   */
+  reset({ session, usage }: { session: 'other' | 'same'; usage: Usage | undefined }) {
+    this.#entries = [{ id: this.id('w'), kind: 'welcome' }]
+    this.#live = undefined
+    this.#continued = undefined
     this.#sessionUsage = usage
+
+    if (session === 'other') {
+      this.#counters = undefined
+      this.#compactions.forget()
+    }
   }
 
   /**
@@ -90,11 +103,6 @@ export class Transcript {
 
   get live(): TurnEntry | undefined {
     return this.#live
-  }
-
-  clear() {
-    this.#entries = []
-    this.#live = undefined
   }
 
   push(entry: Entry) {
@@ -193,11 +201,6 @@ export class Transcript {
   /** Gives each seen compaction the stored summary written while it ran. */
   summarize(stored: readonly StoredCompaction[]) {
     this.#compactions.summarize(stored)
-  }
-
-  /** Another session is shown: the compactions seen were the last one's. */
-  forgetCompactions() {
-    this.#compactions.forget()
   }
 
   /** Opens a live turn unless one is already streaming. */

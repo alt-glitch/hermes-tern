@@ -25,7 +25,7 @@ import { type EndReason, SessionViews } from './views.js'
 export interface LifecycleHost {
   readonly gw: Pick<GatewayClient, 'holdAttach' | 'hydrateSharedPrompts' | 'isCanonical' | 'request' | 'settleAttach'>
   readonly state: SessionState
-  readonly transcript: Pick<Transcript, 'clear' | 'id' | 'notice' | 'push'>
+  readonly transcript: Pick<Transcript, 'notice'>
   readonly sheets: Pick<PromptSheets, 'dropShared'>
   /** The launcher's session to resume, and the folder a new session starts in. */
   readonly launch: Pick<LaunchEnv, 'resume' | 'sessionCwd'>
@@ -208,7 +208,6 @@ export class SessionLifecycle {
         return
       }
 
-      this.#fresh()
       this.#adopt(r)
 
       // Only now: a failed create leaves the view on the session it still receives.
@@ -271,7 +270,6 @@ export class SessionLifecycle {
         return undefined
       }
 
-      this.#fresh()
       this.#adopt(r)
       snapshot = r
       // An approval or question already waiting on the session opens its sheet. A sheet from before
@@ -304,14 +302,10 @@ export class SessionLifecycle {
     return true
   }
 
-  /** An empty transcript with its welcome, for the session about to be adopted. */
-  #fresh() {
-    const { transcript } = this.#host
-    transcript.clear()
-    transcript.push({ id: transcript.id('w'), kind: 'welcome' })
-  }
-
-  /** Takes on snapshot `r`: its ids (and the shared gateway's subscription), then each adopt step in order. */
+  /**
+   * Takes on snapshot `r`: its ids (and the shared gateway's subscription), then each adopt step in
+   * order (one resets the transcript).
+   */
   #adopt(r: Snapshot) {
     const ref = this.#views.adopt(r)
 

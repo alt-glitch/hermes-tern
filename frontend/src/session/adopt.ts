@@ -1,7 +1,7 @@
 // Adopting a session: what the pane takes on when a new, resumed or reattached session becomes the
 // shown one. One ordered list of steps, run in this order on every adopt, so the order lives in one
-// place: the ids first (everything after reads the adopted session), the per-session state, the
-// history, then the stores that follow the session.
+// place: the ids first (everything after reads the adopted session), the transcript's reset (the
+// only one), the per-session state, the history, then the stores that follow the session.
 
 import type { SessionResumeResult } from '@hermes/shared/gateway-events'
 import type { SessionInfo } from '@tui/types.js'
@@ -63,7 +63,7 @@ export interface AdoptHost {
   readonly queue: Pick<PromptQueue, 'adopt'> & { readonly server: Pick<PromptQueue['server'], 'reset'> }
   readonly sheets: Pick<PromptSheets, 'dropAll'>
   readonly title: Pick<SessionTitle, 'adopt'>
-  readonly transcript: Pick<Transcript, 'entries' | 'forgetCompactions' | 'inflight' | 'load' | 'usageBase'>
+  readonly transcript: Pick<Transcript, 'entries' | 'inflight' | 'load' | 'reset'>
   /** Reads the adopted session's busy_input_mode into the state. */
   readBusyMode(): void
   /** Asks the gateway to stream session `sid`'s reasoning. */
@@ -94,11 +94,15 @@ export function adoptSteps(host: AdoptHost): readonly Adoptable[] {
       }
     },
     {
-      adopt: ({ previous, ref }) => {
-        if (ref.live !== previous.live) {
+      adopt: ({ previous, r, ref }) => {
+        const other = ref.live !== previous.live
+        // One step, so nothing of the last session's transcript outlives it: its entries, live
+        // turn, reason line, and (another session's) counters and compactions.
+        transcript.reset({ session: other ? 'other' : 'same', usage: r.info?.usage ?? undefined })
+
+        if (other) {
           // The last session's approvals and questions are not this one's (a resume hydrates its own after).
           host.sheets.dropAll()
-          transcript.forgetCompactions()
           state.busyMode = 'queue'
         }
       }
@@ -117,7 +121,8 @@ export function adoptSteps(host: AdoptHost): readonly Adoptable[] {
     },
     {
       adopt: ({ r }) => {
-        state.info = r.info ?? state.info
+        // A snapshot without info leaves none: the last session's folder, model and branch are not this one's.
+        state.info = r.info ?? null
         state.usage = r.info?.usage ?? null
       }
     },
@@ -132,7 +137,6 @@ export function adoptSteps(host: AdoptHost): readonly Adoptable[] {
         host.notices.reset()
         host.activity.endCompaction()
         host.forgetStatusNote()
-        transcript.usageBase(r.info?.usage ?? undefined)
       }
     },
     // The last session's children are not this one's: a poll in flight for them drops its answer.

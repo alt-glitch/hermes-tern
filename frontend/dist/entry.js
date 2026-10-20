@@ -72636,10 +72636,11 @@ function adoptSteps(host) {
       }
     },
     {
-      adopt: ({ previous: previous3, ref }) => {
-        if (ref.live !== previous3.live) {
+      adopt: ({ previous: previous3, r, ref }) => {
+        const other = ref.live !== previous3.live;
+        transcript.reset({ session: other ? "other" : "same", usage: r.info?.usage ?? void 0 });
+        if (other) {
           host.sheets.dropAll();
-          transcript.forgetCompactions();
           state.busyMode = "queue";
         }
       }
@@ -72657,7 +72658,7 @@ function adoptSteps(host) {
     },
     {
       adopt: ({ r }) => {
-        state.info = r.info ?? state.info;
+        state.info = r.info ?? null;
         state.usage = r.info?.usage ?? null;
       }
     },
@@ -72670,7 +72671,6 @@ function adoptSteps(host) {
         host.notices.reset();
         host.activity.endCompaction();
         host.forgetStatusNote();
-        transcript.usageBase(r.info?.usage ?? void 0);
       }
     },
     // The last session's children are not this one's: a poll in flight for them drops its answer.
@@ -72929,7 +72929,6 @@ var SessionLifecycle = class {
         this.#views.superseded(r);
         return;
       }
-      this.#fresh();
       this.#adopt(r);
       if (previous3 && previous3 !== r.session_id) {
         void this.#views.leave(previous3, "tui_close");
@@ -72975,7 +72974,6 @@ var SessionLifecycle = class {
         this.#views.superseded(r);
         return void 0;
       }
-      this.#fresh();
       this.#adopt(r);
       snapshot3 = r;
       host.sheets.dropShared();
@@ -73000,13 +72998,10 @@ var SessionLifecycle = class {
     host.changed();
     return true;
   }
-  /** An empty transcript with its welcome, for the session about to be adopted. */
-  #fresh() {
-    const { transcript } = this.#host;
-    transcript.clear();
-    transcript.push({ id: transcript.id("w"), kind: "welcome" });
-  }
-  /** Takes on snapshot `r`: its ids (and the shared gateway's subscription), then each adopt step in order. */
+  /**
+   * Takes on snapshot `r`: its ids (and the shared gateway's subscription), then each adopt step in
+   * order (one resets the transcript).
+   */
   #adopt(r) {
     const ref = this.#views.adopt(r);
     adoptAll(this.#steps, { previous: this.#host.state.ref, r, ref });
@@ -73756,7 +73751,7 @@ var Transcript = class {
   #sessionUsage;
   /** The session's cumulative counters at the last `session.usage` tick. */
   #counters;
-  /** The streaming turn: set by start, cleared by complete, clear and load (notices may land after it). */
+  /** The streaming turn: set by start, cleared by complete, reset and load (notices may land after it). */
   #live;
   /** The reason line for the next turn, when Hermes' own notice started it. */
   #continued;
@@ -73765,9 +73760,21 @@ var Transcript = class {
   get entries() {
     return this.#entries;
   }
-  /** Sets the running usage turns count from (a resumed session's totals). */
-  usageBase(usage) {
+  /**
+   * Starts over for an adopted session, in one step: only a welcome, no live turn, no reason line
+   * waiting, and `usage` (a resumed session's totals) as what turns count from. Another `session`
+   * also takes the last one's counters and compactions; a reattach of the same session keeps them
+   * (a reload's stored compactions get their numbers from the ones seen).
+   */
+  reset({ session: session2, usage }) {
+    this.#entries = [{ id: this.id("w"), kind: "welcome" }];
+    this.#live = void 0;
+    this.#continued = void 0;
     this.#sessionUsage = usage;
+    if (session2 === "other") {
+      this.#counters = void 0;
+      this.#compactions.forget();
+    }
   }
   /**
    * Takes a `session.usage` tick's cumulative counters and rate. The turn running (or, as the
@@ -73800,10 +73807,6 @@ var Transcript = class {
   }
   get live() {
     return this.#live;
-  }
-  clear() {
-    this.#entries = [];
-    this.#live = void 0;
   }
   push(entry) {
     this.#entries.push(entry);
@@ -73881,10 +73884,6 @@ var Transcript = class {
   /** Gives each seen compaction the stored summary written while it ran. */
   summarize(stored) {
     this.#compactions.summarize(stored);
-  }
-  /** Another session is shown: the compactions seen were the last one's. */
-  forgetCompactions() {
-    this.#compactions.forget();
   }
   /** Opens a live turn unless one is already streaming. */
   start(at = Date.now()) {
