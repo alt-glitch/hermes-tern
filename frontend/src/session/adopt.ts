@@ -60,7 +60,7 @@ export interface AdoptHost {
   readonly notices: Pick<NoticeStrip, 'reset'>
   readonly processes: Pick<Processes, 'poke'>
   readonly prs: Pick<PullRequests, 'adopt'>
-  readonly queue: { readonly server: Pick<PromptQueue['server'], 'reset'> }
+  readonly queue: Pick<PromptQueue, 'adopt'> & { readonly server: Pick<PromptQueue['server'], 'reset'> }
   readonly sheets: Pick<PromptSheets, 'dropAll'>
   readonly title: Pick<SessionTitle, 'adopt'>
   readonly transcript: Pick<Transcript, 'entries' | 'forgetCompactions' | 'inflight' | 'load' | 'usageBase'>
@@ -107,6 +107,8 @@ export function adoptSteps(host: AdoptHost): readonly Adoptable[] {
     { adopt: () => host.readBusyMode() },
     // The session's own queue, from the snapshot (a reattach's rows of this pane become read-only rows).
     { adopt: ({ r }) => host.queue.server.reset(pendingRows(r.info)) },
+    // Prompts held for another session go back to the composer, not to this one.
+    { adopt: ({ ref }) => host.queue.adopt(ref) },
     { adopt: ({ ref }) => host.showThoughts(ref.live) },
     {
       adopt: ({ previous, ref }) => {

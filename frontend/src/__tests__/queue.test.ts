@@ -1,7 +1,7 @@
 import { Node, type NodeJson } from '@stencil-hq/tern'
 import { describe, expect, it } from 'vitest'
 
-import { admissionId, inputId, type LiveSessionId, liveSessionId } from '../core/ids.js'
+import { admissionId, inputId, type LiveSessionId, liveSessionId, storedSessionId } from '../core/ids.js'
 import type { Image } from '../draft/attachments.js'
 import { sessionTicket } from '../session/state.js'
 import type { Prompt } from '../turn/prompt.js'
@@ -109,6 +109,25 @@ describe('PromptQueue', () => {
 
     expect(t.queue.rows().map(r => r.text)).toEqual(['first'])
     expect(t.log).toEqual(['error: Not queued: queue_full. Your message is back in the composer.', 'restore second'])
+  })
+
+  it('on adopt, returns the prompts held for another session to the composer, oldest on top, and keeps the rest', () => {
+    const t = setup()
+    const s1 = { live: S1, stored: null }
+    t.queue.hold(typed('a'))
+    t.queue.hold(typed('b'), { kind: 'session', ref: s1 })
+    t.queue.hold(typed('c'), { kind: 'session', ref: s1 })
+    t.queue.hold(typed('d'), { kind: 'session', ref: { live: S1, stored: storedSessionId('st1') } })
+
+    // The same session again (its runtime id): nothing moves.
+    t.queue.adopt({ live: S1, stored: null })
+    expect(t.queue.held.map(p => p.text)).toEqual(['a', 'b', 'c', 'd'])
+    expect(t.log).toEqual([])
+
+    // Another runtime id with d's stored id (a reattach of d's session): b and c go back.
+    t.queue.adopt({ live: liveSessionId('s2'), stored: storedSessionId('st1') })
+    expect(t.queue.held.map(p => p.text)).toEqual(['a', 'd'])
+    expect(t.log).toEqual(['restore c', 'restore b', 'warning: 2 prompts queued for the last session are back in the composer.'])
   })
 
   it('dequeues a held prompt into the composer, and withdraws an admission before restoring it', async () => {

@@ -155,3 +155,39 @@ describe('the working row is ended only by the work that owns it', () => {
     expect(notices()).not.toContain('Could not stop the turn: boom')
   })
 })
+
+describe('held prompts keep the session they were held for', () => {
+  const resumed = (session_id: string, stored: string) => () => ({ info: { stored_session_id: stored }, messages: [], session_id })
+
+  it("on a private gateway, a prompt held behind session A's turn goes back to the composer when B is adopted; one for the next session goes to B", async () => {
+    const { app, enter, gw, notices } = setup({ 'session.resume': resumed('b', 'sb') }, { canonical: false })
+    given.busy(app, { label: 'Working…', since: {}, startedAt: 0 })
+    await enter('for A')
+    expect(app.queue.held).toMatchObject([{ text: 'for A' }])
+
+    // The gateway goes away (the turn with it); a prompt typed now waits for whichever session comes.
+    gw.emit('exit', null)
+    await enter('for whoever')
+    await app.resume(storedSessionId('sb'))
+    await settle(gw)
+
+    expect(app.session.ref.live).toBe('b')
+    expect(gw.sent('prompt.submit')).toMatchObject([{ session_id: 'b', text: 'for whoever' }])
+    expect(app.composer.text).toBe('for A')
+    expect(notices()).toContain('A prompt queued for the last session is back in the composer.')
+  })
+
+  it('a reattach of the same stored session keeps the prompts held for it', async () => {
+    const { app, enter, gw } = setup({ 'session.resume': resumed('s1b', 'st1') }, { canonical: false })
+    app.session.ref = { live: app.session.ref.live, stored: storedSessionId('st1') }
+    given.busy(app, { label: 'Working…', since: {}, startedAt: 0 })
+    await enter('for A')
+
+    gw.emit('exit', null)
+    gw.event({ payload: {}, type: 'gateway.ready' })
+    await settle(gw)
+
+    expect(app.session.ref.live).toBe('s1b')
+    expect(gw.sent('prompt.submit')).toMatchObject([{ session_id: 's1b', text: 'for A' }])
+  })
+})

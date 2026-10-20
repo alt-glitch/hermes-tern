@@ -8,7 +8,7 @@ import type { GatewayClient } from '@tui/gatewayClient.js'
 
 import { redirectTurn, steerTurn } from '../controlCommands.js'
 import { type LiveSessionId, newInputId } from '../core/ids.js'
-import type { SessionTicket } from '../session/state.js'
+import type { SessionState, SessionTicket } from '../session/state.js'
 import type { Transcript } from '../transcript.js'
 import { rpc } from '../wire/rpc.js'
 
@@ -106,6 +106,7 @@ export interface RouterHost {
   readonly gw: Pick<GatewayClient, 'request'>
   readonly activity: Activity
   readonly queue: PromptQueue
+  readonly session: Pick<SessionState, 'ref'>
   readonly transcript: Pick<Transcript, 'notice' | 'steer' | 'user'>
   /** The session's state, for the gates. */
   gates(): GateState
@@ -196,9 +197,10 @@ export class PromptRouter {
     const s = host.gates()
     const gate = canSend(s)
 
-    // A private gateway has no queue to admit into: the prompt waits here.
+    // A private gateway has no queue to admit into: the prompt waits here, for this session (or,
+    // with none adopted, for the next).
     if (gate.kind === 'hold' || !s.canonical) {
-      host.queue.hold(prompt)
+      host.queue.hold(prompt, gate.kind === 'hold' ? { kind: 'next' } : { kind: 'session', ref: { live: gate.sid, stored: host.session.ref.stored } })
       host.queue.drain()
 
       return host.changed()

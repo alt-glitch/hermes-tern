@@ -3,9 +3,13 @@
 // the shared gateway's queue, with the other viewers' rows of it. The dock's queued rows, Alt+Up
 // and Edit (back into the composer), Alt+Enter and Steer (into the running turn) and the drain
 // once the session is idle all act here. App decides when a prompt is held or admitted.
+//
+// A held prompt knows whom it waits for: whichever session is adopted next (none was shown, or a
+// switch was in flight), or the session it was held in (behind its turn or its compaction). When
+// another session is adopted, the second kind goes back to the composer, never to that session.
 
 import { steerTurn } from '../controlCommands.js'
-import { type LiveSessionId, newInputId } from '../core/ids.js'
+import { type LiveSessionId, newInputId, type SessionRef } from '../core/ids.js'
 import { errorText } from '../core/errors.js'
 import type { Image } from '../draft/attachments.js'
 import type { NoticeEntry } from '../model.js'
@@ -25,6 +29,29 @@ export interface Admitted {
 
 /** One of this pane's rows in the shared gateway's queue that the gateway named: it can be withdrawn. */
 type Mine = Extract<ServerQueued<Admitted>, { kind: 'mine' }>
+
+/** Whom a held prompt waits for: the session adopted next, or session `ref`, where it was held. */
+export type HeldTarget = { kind: 'next' } | { kind: 'session'; ref: SessionRef }
+
+/** The session adopted next. */
+const NEXT: HeldTarget = { kind: 'next' }
+
+/** A prompt held here, and whom it waits for. Each is made once, so it is its own id. */
+interface Held {
+  readonly prompt: Prompt
+  readonly target: HeldTarget
+}
+
+/** Whether `target` waits for adopted session `ref`: the next one, or the same session (its runtime id, or its stored id across a reattach). */
+function waitsFor(target: HeldTarget, ref: SessionRef): boolean {
+  switch (target.kind) {
+    case 'next':
+      return true
+
+    case 'session':
+      return target.ref.live === ref.live || (target.ref.stored !== null && target.ref.stored === ref.stored)
+  }
+}
 
 /** What the prompt queue reaches of the app. */
 export interface QueueHost {
@@ -52,7 +79,7 @@ export interface QueueHost {
 /** The prompts waiting behind the turn: held here, then the shared gateway's queue. */
 export class PromptQueue {
   /** Prompts held here until they can be sent: no session yet, a switch in flight, or a private gateway's busy turn. */
-  held: Prompt[] = []
+  #held: Held[] = []
   /** The shared gateway's queue for this session: its FIFO, this pane's admissions, the bubbles they owe. */
   readonly server = new ServerQueue<Admitted>()
   readonly #host: QueueHost
@@ -61,14 +88,45 @@ export class PromptQueue {
     this.#host = host
   }
 
-  /** Holds `prompt` behind the others. */
-  hold(prompt: Prompt) {
-    this.held.push(prompt)
+  /** The held prompts, oldest first. */
+  get held(): readonly Prompt[] {
+    return this.#held.map(h => h.prompt)
   }
 
-  /** Holds `prompt` ahead of the others (a send that found a switch in flight). */
+  /** Holds `prompt` behind the others, for `target` (the session adopted next by default). */
+  hold(prompt: Prompt, target: HeldTarget = NEXT) {
+    this.#held.push({ prompt, target })
+  }
+
+  /** Holds `prompt` ahead of the others, for the session adopted next (a send that found a switch in flight). */
   holdFirst(prompt: Prompt) {
-    this.held.unshift(prompt)
+    this.#held.unshift({ prompt, target: NEXT })
+  }
+
+  /**
+   * Session `ref` is adopted: the prompts held for another session go back to the composer, oldest
+   * first, and a notice says so; those for the next session wait for the drain.
+   */
+  adopt(ref: SessionRef) {
+    const gone = this.#held.filter(h => !waitsFor(h.target, ref))
+
+    if (!gone.length) {
+      return
+    }
+
+    this.#held = this.#held.filter(h => waitsFor(h.target, ref))
+
+    // Each restore goes before the composer's text: the newest first leaves the oldest on top.
+    for (const h of gone.toReversed()) {
+      this.#host.restore(h.prompt)
+    }
+
+    const n = gone.length
+    this.#host.transcript.notice(
+      `${n === 1 ? 'A prompt' : `${n} prompts`} queued for the last session ${n === 1 ? 'is' : 'are'} back in the composer.`,
+      'warning'
+    )
+    this.#host.changed()
   }
 
   /**
@@ -76,7 +134,7 @@ export class PromptQueue {
    * false when nothing is held.
    */
   attachToHead(image: Image): boolean {
-    const head = this.held[0]
+    const head = this.#held[0]?.prompt
     head?.images.push(image)
 
     return Boolean(head)
@@ -84,7 +142,7 @@ export class PromptQueue {
 
   /** Prompts waiting behind the turn: this pane's own queue, then the shared gateway's. */
   count(): number {
-    return this.held.length + this.server.queued().length
+    return this.#held.length + this.server.queued().length
   }
 
   /** The dock's queued rows, in count()'s order, with what each one's Edit and Steer can do. */
@@ -92,7 +150,7 @@ export class PromptQueue {
     const steer = this.#host.busy()
 
     return [
-      ...this.held.map((p): QueuedRow => ({ kind: 'local', steer, text: userText(shownText(p), p.images) })),
+      ...this.#held.map(({ prompt: p }): QueuedRow => ({ kind: 'local', steer, text: userText(shownText(p), p.images) })),
       ...this.server.queued().map((q): QueuedRow => {
         switch (q.kind) {
           case 'theirs':
@@ -164,11 +222,11 @@ export class PromptQueue {
   dequeue(index = 0) {
     const host = this.#host
 
-    if (index < this.held.length) {
-      const [next] = this.held.splice(index, 1)
+    if (index < this.#held.length) {
+      const [next] = this.#held.splice(index, 1)
 
       if (next) {
-        host.restore(next)
+        host.restore(next.prompt)
         host.changed()
       }
 
@@ -202,15 +260,17 @@ export class PromptQueue {
       return
     }
 
-    if (index >= this.held.length) {
+    if (index >= this.#held.length) {
       return void this.#steerServerQueued(ticket, sid, index)
     }
 
-    const prompt = this.held[index]
+    const item = this.#held[index]
 
-    if (!prompt) {
+    if (!item) {
       return
     }
+
+    const { prompt } = item
 
     // A steer is text only: a prompt with images waits for its own turn.
     if (prompt.images.length) {
@@ -220,14 +280,14 @@ export class PromptQueue {
     }
 
     const { text } = prompt
-    this.held.splice(index, 1)
+    this.#held.splice(index, 1)
     host.changed()
     void steerTurn(host.gw, sid, text).then(r => {
       if (r.ok) {
         host.transcript.steer(text)
       } else {
         // Back where it was, by index (WP23 re-inserts it by id).
-        this.held.splice(index, 0, prompt)
+        this.#held.splice(index, 0, item)
         host.transcript.notice(
           r.error
             ? `Steer failed: ${r.error}. It stays queued.`
@@ -247,16 +307,16 @@ export class PromptQueue {
       return
     }
 
-    const next = this.held.shift()
+    const next = this.#held.shift()
 
     if (next) {
-      this.#host.send(next)
+      this.#host.send(next.prompt)
     }
   }
 
   /** The shared gateway's queued row at dock index `index`, if this pane can act on it. */
   #mine(index: number): Mine | undefined {
-    const q = this.server.queued()[index - this.held.length]
+    const q = this.server.queued()[index - this.#held.length]
 
     return q?.kind === 'mine' ? q : undefined
   }

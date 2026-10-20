@@ -186,6 +186,7 @@ export function chatStores(chat: StoresHost, { act, gw, launch, settings, surfac
     gw,
     queue,
     restore: prompt => act().restore(prompt),
+    session,
     ticket: () => session.ticket(),
     transcript
   })

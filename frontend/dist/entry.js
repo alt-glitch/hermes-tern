@@ -72618,6 +72618,8 @@ function adoptSteps(host) {
     { adopt: () => host.readBusyMode() },
     // The session's own queue, from the snapshot (a reattach's rows of this pane become read-only rows).
     { adopt: ({ r }) => host.queue.server.reset(pendingRows(r.info)) },
+    // Prompts held for another session go back to the composer, not to this one.
+    { adopt: ({ ref }) => host.queue.adopt(ref) },
     { adopt: ({ ref }) => host.showThoughts(ref.live) },
     {
       adopt: ({ previous: previous3, ref }) => {
@@ -74217,41 +74219,74 @@ var Activity = class {
 };
 
 // src/turn/queue.ts
+var NEXT = { kind: "next" };
+function waitsFor(target, ref) {
+  switch (target.kind) {
+    case "next":
+      return true;
+    case "session":
+      return target.ref.live === ref.live || target.ref.stored !== null && target.ref.stored === ref.stored;
+  }
+}
 var PromptQueue = class {
   /** Prompts held here until they can be sent: no session yet, a switch in flight, or a private gateway's busy turn. */
-  held = [];
+  #held = [];
   /** The shared gateway's queue for this session: its FIFO, this pane's admissions, the bubbles they owe. */
   server = new ServerQueue();
   #host;
   constructor(host) {
     this.#host = host;
   }
-  /** Holds `prompt` behind the others. */
-  hold(prompt) {
-    this.held.push(prompt);
+  /** The held prompts, oldest first. */
+  get held() {
+    return this.#held.map((h2) => h2.prompt);
   }
-  /** Holds `prompt` ahead of the others (a send that found a switch in flight). */
+  /** Holds `prompt` behind the others, for `target` (the session adopted next by default). */
+  hold(prompt, target = NEXT) {
+    this.#held.push({ prompt, target });
+  }
+  /** Holds `prompt` ahead of the others, for the session adopted next (a send that found a switch in flight). */
   holdFirst(prompt) {
-    this.held.unshift(prompt);
+    this.#held.unshift({ prompt, target: NEXT });
+  }
+  /**
+   * Session `ref` is adopted: the prompts held for another session go back to the composer, oldest
+   * first, and a notice says so; those for the next session wait for the drain.
+   */
+  adopt(ref) {
+    const gone = this.#held.filter((h2) => !waitsFor(h2.target, ref));
+    if (!gone.length) {
+      return;
+    }
+    this.#held = this.#held.filter((h2) => waitsFor(h2.target, ref));
+    for (const h2 of gone.toReversed()) {
+      this.#host.restore(h2.prompt);
+    }
+    const n = gone.length;
+    this.#host.transcript.notice(
+      `${n === 1 ? "A prompt" : `${n} prompts`} queued for the last session ${n === 1 ? "is" : "are"} back in the composer.`,
+      "warning"
+    );
+    this.#host.changed();
   }
   /**
    * The startup image goes to the startup query at the queue's head, into its images in place;
    * false when nothing is held.
    */
   attachToHead(image3) {
-    const head2 = this.held[0];
+    const head2 = this.#held[0]?.prompt;
     head2?.images.push(image3);
     return Boolean(head2);
   }
   /** Prompts waiting behind the turn: this pane's own queue, then the shared gateway's. */
   count() {
-    return this.held.length + this.server.queued().length;
+    return this.#held.length + this.server.queued().length;
   }
   /** The dock's queued rows, in count()'s order, with what each one's Edit and Steer can do. */
   rows() {
     const steer3 = this.#host.busy();
     return [
-      ...this.held.map((p3) => ({ kind: "local", steer: steer3, text: userText(shownText(p3), p3.images) })),
+      ...this.#held.map(({ prompt: p3 }) => ({ kind: "local", steer: steer3, text: userText(shownText(p3), p3.images) })),
       ...this.server.queued().map((q2) => {
         switch (q2.kind) {
           case "theirs":
@@ -74310,10 +74345,10 @@ var PromptQueue = class {
   /** Alt+Up / a queued row's Edit: queued prompt `index` (the oldest by default) back into the composer. */
   dequeue(index2 = 0) {
     const host = this.#host;
-    if (index2 < this.held.length) {
-      const [next2] = this.held.splice(index2, 1);
+    if (index2 < this.#held.length) {
+      const [next2] = this.#held.splice(index2, 1);
       if (next2) {
-        host.restore(next2);
+        host.restore(next2.prompt);
         host.changed();
       }
       return;
@@ -74339,25 +74374,26 @@ var PromptQueue = class {
     if (!host.busy() || !sid) {
       return;
     }
-    if (index2 >= this.held.length) {
+    if (index2 >= this.#held.length) {
       return void this.#steerServerQueued(ticket, sid, index2);
     }
-    const prompt = this.held[index2];
-    if (!prompt) {
+    const item3 = this.#held[index2];
+    if (!item3) {
       return;
     }
+    const { prompt } = item3;
     if (prompt.images.length) {
       host.transcript.notice("A queued prompt with images cannot steer the turn. It stays queued.", "warning");
       return host.changed();
     }
     const { text: text15 } = prompt;
-    this.held.splice(index2, 1);
+    this.#held.splice(index2, 1);
     host.changed();
     void steerTurn(host.gw, sid, text15).then((r) => {
       if (r.ok) {
         host.transcript.steer(text15);
       } else {
-        this.held.splice(index2, 0, prompt);
+        this.#held.splice(index2, 0, item3);
         host.transcript.notice(
           r.error ? `Steer failed: ${r.error}. It stays queued.` : "The turn ended before the steer landed. It will send as the next prompt.",
           "warning"
@@ -74372,14 +74408,14 @@ var PromptQueue = class {
     if (!this.#host.canDrain()) {
       return;
     }
-    const next2 = this.held.shift();
+    const next2 = this.#held.shift();
     if (next2) {
-      this.#host.send(next2);
+      this.#host.send(next2.prompt);
     }
   }
   /** The shared gateway's queued row at dock index `index`, if this pane can act on it. */
   #mine(index2) {
-    const q2 = this.server.queued()[index2 - this.held.length];
+    const q2 = this.server.queued()[index2 - this.#held.length];
     return q2?.kind === "mine" ? q2 : void 0;
   }
   /**
@@ -74546,7 +74582,7 @@ var PromptRouter = class {
     const s2 = host.gates();
     const gate = canSend(s2);
     if (gate.kind === "hold" || !s2.canonical) {
-      host.queue.hold(prompt);
+      host.queue.hold(prompt, gate.kind === "hold" ? { kind: "next" } : { kind: "session", ref: { live: gate.sid, stored: host.session.ref.stored } });
       host.queue.drain();
       return host.changed();
     }
@@ -74690,6 +74726,7 @@ function chatStores(chat, { act, gw: gw2, launch: launch3, settings: settings2, 
     gw: gw2,
     queue: queue2,
     restore: (prompt) => act().restore(prompt),
+    session: session2,
     ticket: () => session2.ticket(),
     transcript
   });
