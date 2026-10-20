@@ -27467,9 +27467,38 @@ var COMPACT_STEPS = [
   [1e3, "k"]
 ];
 var COMPACT_FROM = 1e4;
+var SCALES = {
+  B: [
+    [1e12, "TB"],
+    [1e9, "GB"],
+    [1e6, "MB"],
+    [1e3, "kB"]
+  ],
+  ms: [
+    [36e5, "h"],
+    [6e4, "min"],
+    [1e3, "s"]
+  ],
+  s: [
+    [3600, "h"],
+    [60, "min"]
+  ]
+};
+var ALIASES = { byte: "B", bytes: "B", msec: "ms", sec: "s", secs: "s", second: "s", seconds: "s" };
+function unitStep(value, unit) {
+  const base3 = unit ? ALIASES[unit.toLowerCase()] ?? unit : "";
+  const steps = SCALES[base3];
+  const hit = steps?.find(([step]) => Math.abs(value) >= step);
+  return hit ? { step: hit[0], unit: hit[1] } : void 0;
+}
 function formatNumber(value, unit, digits) {
   if (!Number.isFinite(value)) {
     return "\u2014";
+  }
+  const scaled = unitStep(value, unit);
+  if (scaled) {
+    const text12 = formatNumber(value / scaled.step, scaled.unit, digits ?? (Math.abs(value / scaled.step) >= 100 ? 0 : 1));
+    return digits === void 0 ? text12.replace(/\.0(?= )/, "") : text12;
   }
   const magnitude = Math.abs(value);
   let text11;
@@ -27478,8 +27507,8 @@ function formatNumber(value, unit, digits) {
       if (magnitude < step) {
         continue;
       }
-      const scaled = value / step;
-      text11 = `${scaled.toFixed(digits ?? (Math.abs(scaled) >= 100 ? 0 : 1))}${suffix}`;
+      const scaled2 = value / step;
+      text11 = `${scaled2.toFixed(digits ?? (Math.abs(scaled2) >= 100 ? 0 : 1))}${suffix}`;
       break;
     }
   }
@@ -27500,7 +27529,17 @@ function formatTrend(first, last, better, unit) {
     return { text: `${arrow} ${formatNumber(Math.abs(delta), unit)}`, tone };
   }
   const percent = Math.abs(delta / first) * 100;
+  if (percent >= 1e3) {
+    return { text: `${arrow} ${formatNumber(Math.abs(last / first))}\xD7`, tone };
+  }
   return { text: `${arrow} ${percent.toFixed(percent >= 10 ? 0 : 1)}%`, tone };
+}
+function formatRatio(value, total, unit) {
+  const scaled = unitStep(total, unit);
+  if (scaled) {
+    return `${formatNumber(value / scaled.step, void 0, 1)}/${formatNumber(total / scaled.step, scaled.unit, 1)}`;
+  }
+  return `${formatNumber(value)}/${formatNumber(total, unit)}`;
 }
 
 // src/processes/widgets/spec.ts
@@ -28598,7 +28637,7 @@ var ChartRuntime = class {
         return {
           kind: "meter",
           label: block.label,
-          text: `${formatNumber(value)}/${formatNumber(total, block.unit)}`,
+          text: formatRatio(value, total, block.unit),
           value: total > 0 ? Math.min(1, Math.max(0, value / total)) : 0,
           ...total > 0 && value >= total ? { tone: "success" } : {}
         };
@@ -28671,7 +28710,7 @@ function sparkDomain(bounds, specMin, specMax) {
   max = specMax ?? max;
   return { max: max <= min ? min + 1 : max, min };
 }
-var TREND_AGGS = /* @__PURE__ */ new Set(["last", "min", "max"]);
+var TREND_AGGS = /* @__PURE__ */ new Set(["last"]);
 function hasData(block) {
   switch (block.kind) {
     case "text":

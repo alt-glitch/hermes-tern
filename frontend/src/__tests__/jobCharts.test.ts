@@ -8,7 +8,7 @@ import type { BackgroundProcess, ToolCall } from '../model.js'
 import { linkCalls } from '../processes/store.js'
 import { isWatchCall } from '../transcript.js'
 import { promptSources, renderPrompt, SYSTEM_PROMPT } from '../processes/widgets/author.js'
-import { formatNumber, formatTrend } from '../processes/widgets/format.js'
+import { formatNumber, formatRatio, formatTrend } from '../processes/widgets/format.js'
 import { FileTap, outputFiles } from '../processes/widgets/files.js'
 import { chartMemory } from '../processes/widgets/memory.js'
 import { Charts, OutputTap } from '../processes/widgets/registry.js'
@@ -48,6 +48,20 @@ describe('job chart formatting', () => {
     expect(formatNumber(12_345, 'req')).toBe('12.3k req')
     expect(formatNumber(41.25, 'ms')).toBe('41.3 ms')
     expect(formatNumber(68, '%')).toBe('68%')
+  })
+
+  it('scales bytes and times to a readable unit', () => {
+    expect(formatNumber(1.8e9, 'B')).toBe('1.8 GB')
+    expect(formatNumber(43_200_000, 'bytes')).toBe('43.2 MB')
+    expect(formatNumber(959_000, 'ms')).toBe('16 min')
+    expect(formatNumber(348, 'ms')).toBe('348 ms')
+    expect(formatNumber(7200, 's')).toBe('2 h')
+    expect(formatRatio(1.2e9, 1.8e9, 'B')).toBe('1.2/1.8 GB')
+    expect(formatRatio(7, 9, 'trials')).toBe('7/9 trials')
+  })
+
+  it('reads a large move as a factor', () => {
+    expect(formatTrend(5000, 959_000, 'lower')).toEqual({ text: '▲ 192×', tone: 'error' })
   })
 
   it('tones a trend toward or away from better', () => {
