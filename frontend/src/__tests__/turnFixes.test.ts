@@ -8,8 +8,11 @@ import { join } from 'node:path'
 
 import { describe, expect, it, vi } from 'vitest'
 
-import { storedSessionId } from '../core/ids.js'
+import { type LiveSessionId, liveSessionId, storedSessionId } from '../core/ids.js'
+import { sessionTicket } from '../session/state.js'
 import { Activity } from '../turn/activity.js'
+import type { Prompt } from '../turn/prompt.js'
+import { PromptQueue, type QueueHost } from '../turn/queue.js'
 
 import { FakeGateway, fakeTern, given, key, type Reply, settle } from './fakes.js'
 
@@ -189,5 +192,71 @@ describe('held prompts keep the session they were held for', () => {
 
     expect(app.session.ref.live).toBe('s1b')
     expect(gw.sent('prompt.submit')).toMatchObject([{ session_id: 's1b', text: 'for A' }])
+  })
+})
+
+/** A PromptQueue over a fake gateway whose steers answer when the test says, and a log of what it did. */
+function queueSetup() {
+  const steer = held()
+  const gw = new FakeGateway({ replies: { 'session.resume': () => ({ execution_generation: 1 }), 'session.steer': steer.reply } })
+  const log: string[] = []
+  const state: { canDrain: boolean; sid: LiveSessionId | null } = { canDrain: false, sid: liveSessionId('s1') }
+  const host: QueueHost = {
+    busy: () => true,
+    canDrain: () => state.canDrain,
+    changed: () => undefined,
+    expanded: (_sid, prompt) => Promise.resolve(prompt),
+    gw: gw.client,
+    restore: prompt => log.push(`restore ${prompt.text}`),
+    send: prompt => log.push(`send ${prompt.text}`),
+    ticket: () => sessionTicket(() => state.sid, new AbortController().signal),
+    transcript: {
+      notice: (text, tone) => log.push(`${tone ?? 'info'}: ${text}`),
+      steer: text => log.push(`steer ${text}`)
+    }
+  }
+  const queue = new PromptQueue(host)
+  const typed = (text: string): Prompt => ({ images: [], kind: 'typed', pasted: [], text })
+
+  for (const text of ['a', 'b', 'c']) {
+    queue.hold(typed(text))
+  }
+
+  return { gw, log, queue, state, steer }
+}
+
+describe('a held prompt whose steer fails goes back where it was', () => {
+  it('after the prompts that were ahead of it, though the drain took one meanwhile', async () => {
+    const t = queueSetup()
+    t.queue.steer(1)
+    expect(t.queue.held.map(p => p.text)).toEqual(['a', 'c'])
+
+    // The turn ends: the drain sends the oldest while the steer is out.
+    t.state.canDrain = true
+    t.queue.drain()
+    t.state.canDrain = false
+    t.steer.reject(new Error('boom'))
+    await settle(t.gw)
+
+    expect(t.log).toEqual(['send a', 'warning: Steer failed: boom. It stays queued.'])
+    expect(t.queue.held.map(p => p.text)).toEqual(['b', 'c'])
+  })
+
+  it('to the composer once the view left the session, and nothing is written to the next one', async () => {
+    const t = queueSetup()
+    t.queue.steer(0)
+    t.state.sid = liveSessionId('s2')
+    t.steer.reject(new Error('gone'))
+    await settle(t.gw)
+
+    expect(t.queue.held.map(p => p.text)).toEqual(['b', 'c'])
+    expect(t.log).toEqual(['restore a', 'warning: The steer did not land before the session changed. It is back in the composer.'])
+
+    const u = queueSetup()
+    u.queue.steer(0)
+    u.state.sid = null
+    u.steer.resolve({ status: 'queued' })
+    await settle(u.gw)
+    expect(u.log).toEqual([])
   })
 })

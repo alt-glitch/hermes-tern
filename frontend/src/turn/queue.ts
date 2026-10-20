@@ -280,14 +280,28 @@ export class PromptQueue {
     }
 
     const { text } = prompt
+    // The prompts ahead of it: a steer that fails puts it back behind those still held.
+    const ahead = this.#held.slice(0, index)
     this.#held.splice(index, 1)
     host.changed()
     void steerTurn(host.gw, sid, text).then(r => {
+      if (!ticket.isCurrent()) {
+        // The view left the session: the transcript is another's, and so would the drain be.
+        if (!r.ok) {
+          host.restore(prompt)
+          host.transcript.notice('The steer did not land before the session changed. It is back in the composer.', 'warning')
+        }
+
+        return host.changed()
+      }
+
       if (r.ok) {
         host.transcript.steer(text)
       } else {
-        // Back where it was, by index (WP23 re-inserts it by id).
-        this.#held.splice(index, 0, item)
+        // Back where it was: after the last prompt that was ahead of it and is still held (the
+        // drain or an Edit may have taken some meanwhile), else at the head.
+        const at = Math.max(0, ...ahead.map(h => this.#held.indexOf(h) + 1))
+        this.#held.splice(at, 0, item)
         host.transcript.notice(
           r.error
             ? `Steer failed: ${r.error}. It stays queued.`

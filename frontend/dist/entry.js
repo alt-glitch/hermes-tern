@@ -74387,13 +74387,22 @@ var PromptQueue = class {
       return host.changed();
     }
     const { text: text15 } = prompt;
+    const ahead = this.#held.slice(0, index2);
     this.#held.splice(index2, 1);
     host.changed();
     void steerTurn(host.gw, sid, text15).then((r) => {
+      if (!ticket.isCurrent()) {
+        if (!r.ok) {
+          host.restore(prompt);
+          host.transcript.notice("The steer did not land before the session changed. It is back in the composer.", "warning");
+        }
+        return host.changed();
+      }
       if (r.ok) {
         host.transcript.steer(text15);
       } else {
-        this.#held.splice(index2, 0, item3);
+        const at = Math.max(0, ...ahead.map((h2) => this.#held.indexOf(h2) + 1));
+        this.#held.splice(at, 0, item3);
         host.transcript.notice(
           r.error ? `Steer failed: ${r.error}. It stays queued.` : "The turn ended before the steer landed. It will send as the next prompt.",
           "warning"
