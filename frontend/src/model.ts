@@ -7,6 +7,7 @@ import type { SubagentEventPayload, Usage } from '@hermes/shared/gateway-events'
 import type { LiveLog } from './agents/liveLog.js'
 import type { BatchEntry } from './bridge.js'
 import type { ConnectCard } from './connections.js'
+import type { ChartView } from './processes/widgets/types.js'
 
 /** One todo item as the `todo_list` tool reports it. */
 export interface Todo {
@@ -71,6 +72,8 @@ export interface BackgroundProcess {
   output: string
   /** The last non-empty output line, plain text. */
   lastLine: string
+  /** Its live chart (processes/widgets): kept by the store, the same object while it does not change. */
+  chart?: ChartView
 }
 
 /** One tool call, from `tool.start` to `tool.complete`. */

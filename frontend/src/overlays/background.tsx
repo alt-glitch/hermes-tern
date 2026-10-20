@@ -22,6 +22,7 @@ import {
   watchersOf,
   type Watchers
 } from '../processes/store.js'
+import { chartNode } from '../processes/widgets/view.js'
 import { commandLine, describeCommand } from '../view/describe.js'
 import { duration } from '../view/time.js'
 
@@ -555,6 +556,8 @@ function preview(p: BackgroundProcess, call: ToolCall | undefined, now: number):
       key="facts"
       role="omp.hub.kv"
     />,
+    // The chart once its rules are being written or drive it; a plain count of lines says nothing the output does not.
+    ...(p.chart && p.chart.state !== 'fallback' ? [<section head="Chart" key="chart">{chartNode(p.chart)}</section>] : []),
     <section head="Output" key="output">
       {outputNodes(p)}
     </section>

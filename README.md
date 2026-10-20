@@ -53,6 +53,23 @@ Also: `/model` and `/effort` from the composer chips, `/sessions` to resume, `/p
 processes and cron jobs, `/agents` for subagents, `/changes` for the working tree's diff, and
 `/theme` to paint the chat in Tern's colors, Nous colors or the Hermes skin.
 
+## Background processes
+
+A command the agent runs in the background (`terminal(background=true)`) gets a live chart, as in
+omp. After 15 s of output, Hermes' auxiliary model reads the command and samples of its output
+once and writes rules that pull numbers out of each line (throughput, latency, loss, tests passed,
+progress toward a total the command states), or declines when nothing is worth charting. From then
+on the plugin applies the rules to every new line itself, with no further model calls.
+
+<p align="center"><img alt="The shells pill with a job's figure and mini chart, its hover card above a column chart with a dashed goal line" src="docs/images/job-chart.png" width="600"></p>
+
+The shells pill shows the freshest figure and a mini chart; hover it for a tile per running
+process. The background terminal card draws the primary chart under its live line, and the
+Background sheet (`/ps`, ⌥J) the whole chart above the output. Goals the command states draw as
+dashed lines. The request goes to the `job_widget` auxiliary task, so `auxiliary.job_widget` in
+`config.yaml` picks a cheap model for it, and Hermes redacts secrets in the samples before they
+leave. Turn charts off with `"jobCharts": false` in `$HERMES_HOME/hermes-tern/settings.json`.
+
 ## Pull requests
 
 The agent links every PR it opens or works on, as T3 Code does. The pill above the composer counts
@@ -101,6 +118,10 @@ of. PRs are read from GitHub with your own token (`GH_TOKEN`, else `gh auth toke
   `HERMES_TUI_DIR` pointing at `frontend/`, so Hermes' own launcher still does profile, cwd,
   resume, worktree, the gateway attach and the exit summary. Exit code 75 (no TSP) reruns
   `hermes chat --tui` without it.
+- `widget_author.py` runs in Hermes' interpreter when the frontend asks for a background
+  process's chart rules: it calls the auxiliary model (task `job_widget`) and prints the answer.
+  The frontend validates the rules and runs them (`frontend/src/processes/widgets/`, ported from
+  omp's job widgets), using Node's linear-time regex engine so no rule can stall the chat.
 - `frontend/` is the TSP frontend, a TypeScript app on [`@stencil-hq/tern`](https://www.npmjs.com/package/@stencil-hq/tern).
   It talks to the profile's shared Hermes gateway (`hermes-gateway-v1`) through Hermes' own
   gateway client. `frontend/dist/entry.js` is committed, so installing needs no npm step.
@@ -132,7 +153,7 @@ npm run bundle                                    # rebuilds dist/entry.js
 
 `lab/fake_model.py --home DIR` writes a disposable `HERMES_HOME` pointed at a loopback model and
 serves it. The prompt picks the flow: "approve", "clarify", "tool", "work…", "delegate…",
-"errands…", "pr URL…" and more (the file's docstring lists them all); anything else streams
+"errands…", "jobchart…", "pr URL…" and more (the file's docstring lists them all); anything else streams
 Markdown. Pair it with a headless Tern (`tern serve --control PORT`, then
 `tern ctl --control PORT run|type|key|shot …`) to check the UI without credentials. The
 screenshots above come from that setup.
