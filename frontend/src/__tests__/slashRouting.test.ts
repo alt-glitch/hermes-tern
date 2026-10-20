@@ -1,12 +1,14 @@
-import { EventEmitter } from 'node:events'
 import { mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import type { Key } from '@stencil-hq/tern'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-process.env.HERMES_HOME = mkdtempSync(join(tmpdir(), 'hermes-tern-slash-'))
+import { storedSessionId } from '../core/ids.js'
+
+import { FakeGateway, fakeTern, stubOverlay } from './fakes.js'
+
+process.env['HERMES_HOME'] = mkdtempSync(join(tmpdir(), 'hermes-tern-slash-'))
 
 vi.mock('../hermes/sessionIndex.js', async importOriginal => ({
   ...(await importOriginal<typeof import('../hermes/sessionIndex.js')>()),
@@ -14,73 +16,7 @@ vi.mock('../hermes/sessionIndex.js', async importOriginal => ({
   storedSessions: () => []
 }))
 
-const { App } = await import('../app.js')
-
-type Handler = (params: Record<string, unknown>) => unknown
-
-/** A shared-gateway stand-in: `request` answers from `handlers` (else `{}`), `event` feeds the app. */
-class FakeGateway extends EventEmitter {
-  isCanonical = true
-  attached = true
-  readonly calls: { method: string; params: Record<string, unknown> }[] = []
-  readonly handlers = new Map<string, Handler>()
-
-  request(method: string, params: Record<string, unknown> = {}) {
-    this.calls.push({ method, params })
-    const handler = this.handlers.get(method)
-
-    try {
-      return Promise.resolve(handler ? handler(params) : {})
-    } catch (error) {
-      return Promise.reject(error)
-    }
-  }
-
-  methods(name: string) {
-    return this.calls.filter(c => c.method === name)
-  }
-
-  event(ev: Record<string, unknown>) {
-    this.emit('event', ev)
-  }
-
-  drain() {}
-  kill() {}
-  holdAttach() {
-    return undefined
-  }
-  settleAttach() {}
-  hydrateSharedPrompts() {}
-}
-
-/** A Tern session whose surface draws nothing; `type` feeds its input loop. */
-function fakeTern() {
-  const surface: object = new Proxy({}, { get: (_, key) => (key === 'closed' ? true : () => surface) })
-  const inputs: { type: 'key'; key: Key }[] = []
-  let wake: (() => void) | undefined
-
-  const tern = {
-    [Symbol.asyncIterator]: () => ({
-      next: async () => {
-        while (!inputs.length) {
-          await new Promise<void>(resolve => (wake = resolve))
-        }
-
-        return { done: false, value: inputs.shift()! }
-      }
-    }),
-    blob: () => 'blob',
-    caps: { cols: 80, features: [] },
-    close: async () => undefined,
-    open: () => surface,
-    press(name: string) {
-      inputs.push({ key: { alt: false, ctrl: false, meta: false, name, shift: false }, type: 'key' })
-      wake?.()
-    }
-  }
-
-  return tern
-}
+const { App } = await import('../app/chat.js')
 
 const flush = async () => {
   for (let i = 0; i < 4; i++) {
@@ -93,14 +29,14 @@ let created = 0
 
 async function started() {
   const tern = fakeTern()
-  const app = new App(tern as never, gw as never, '')
+  const app = new App(tern.session, gw.client, '')
   void app.run()
   gw.event({ type: 'gateway.ready', payload: {} })
   await flush()
 
   /** Types `text` into the composer and presses Enter. */
   const submit = async (text: string) => {
-    app.composer.set(text)
+    app.stores.composer.set(text)
     tern.press('enter')
     await flush()
   }
@@ -111,7 +47,7 @@ async function started() {
 const notices = (app: InstanceType<typeof App>) =>
   app.transcript.entries.flatMap(e => (e.kind === 'notice' ? [e.text] : []))
 
-const prompt = (key: string) => ({ key, modal: true, node: () => null as never, onKey: () => true })
+const prompt = (key: string) => stubOverlay(key, { modal: true })
 
 beforeEach(() => {
   created = 0
@@ -123,10 +59,10 @@ beforeEach(() => {
     return { info: { stored_session_id: `s${created}` }, session_id: `s${created}`, subscription_id: `sub${created}` }
   })
   gw.handlers.set('session.resume', p => ({
-    info: { stored_session_id: p.session_id },
+    info: { stored_session_id: p['session_id'] },
     running: false,
-    session_id: p.session_id,
-    subscription_id: `sub-${p.session_id}`
+    session_id: p['session_id'],
+    subscription_id: `sub-${p['session_id']}`
   }))
   gw.handlers.set('commands.catalog', () => ({
     canon: { '/heartbeat': '/heartbeat', '/save': '/save', '/sessions': '/sessions', '/status': '/status', '/statusbar': '/statusbar', '/bundles': '/bundles', '/busy': '/busy', '/mouse': '/mouse' },
@@ -140,7 +76,7 @@ describe('slash name resolution', () => {
 
     await submit('/hea every 5m')
 
-    expect(gw.methods('slash.exec').map(c => c.params.command)).toEqual(['heartbeat every 5m'])
+    expect(gw.methods('slash.exec').map(c => c.params['command'])).toEqual(['heartbeat every 5m'])
   })
 
   it('says which commands an ambiguous prefix could mean, and runs none', async () => {
@@ -158,7 +94,7 @@ describe('slash name resolution', () => {
     await submit('/Clear')
 
     expect(gw.methods('session.create')).toHaveLength(2)
-    expect(app.sid).toBe('s2')
+    expect(app.session.ref.live).toBe('s2')
   })
 
   it('loads the catalog once per session, and again after /reload-skills', async () => {
@@ -183,8 +119,8 @@ describe('a slash reply after a session switch', () => {
     await submit('/heartbeat check the build')
     expect(gw.methods('slash.exec')).toHaveLength(1)
 
-    await app.resume('other')
-    expect(app.sid).toBe('other')
+    await app.resume(storedSessionId('other'))
+    expect(app.session.ref.live).toBe('other')
     reply.resolve({ message: 'check the build', type: 'send' })
     await flush()
 
@@ -198,7 +134,7 @@ describe('a slash reply after a session switch', () => {
 
     await submit('/heartbeat check the build')
 
-    expect(gw.methods('prompt.submit').map(c => c.params.session_id)).toEqual(['s1'])
+    expect(gw.methods('prompt.submit').map(c => c.params['session_id'])).toEqual(['s1'])
   })
 })
 
@@ -214,11 +150,33 @@ describe('stale prompt sheets', () => {
     expect(app.overlays.map(o => o.key)).toEqual(['prompt:r1'])
   })
 
+  it('approval.cancelled closes the approvals it names, and not a sheet that took a closed one\'s key', async () => {
+    const { app } = await started()
+    const sid = app.session.ref.live ?? ''
+    const ask = (id: string, method: string, params: Record<string, unknown>) =>
+      gw.emit('request', { fail: () => undefined, id, method, params: { session_id: sid, ...params }, respond: () => undefined })
+
+    ask('r1', 'approval', { command: 'ls', request_id: 'q1' })
+    ask('r2', 'approval', { command: 'make', request_id: 'q2' })
+    const answered = app.overlays.find(o => o.key === 'prompt:r1')
+    expect(answered).toBeDefined()
+
+    if (answered) {
+      app.close(answered)
+    }
+
+    ask('r1', 'sudo', {})
+
+    gw.event({ payload: { request_ids: ['q1', 'q2'] }, session_id: sid, type: 'approval.cancelled' })
+
+    expect(app.overlays.map(o => o.key)).toEqual(['prompt:r1'])
+  })
+
   it('the backend exiting closes every prompt sheet', async () => {
     const { app } = await started()
     app.open(prompt('prompt:shared:p1'))
     app.open(prompt('prompt:r1'))
-    app.open({ key: 'help', node: () => null as never, onKey: () => true })
+    app.open(stubOverlay('help'))
 
     gw.emit('exit', 1)
 

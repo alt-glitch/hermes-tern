@@ -7,6 +7,8 @@ import { describe, expect, it } from 'vitest'
 
 import { applyNumstat, fileDiff, gitState, parseStatus } from '../git/status.js'
 
+import { must } from './fakes.js'
+
 describe('git status', () => {
   it('reads the branch, its distance from upstream and every kind of change', () => {
     const s = parseStatus(
@@ -73,6 +75,6 @@ describe('git status', () => {
     expect(byPath.get('d/f.txt')).toMatchObject({ additions: 1, deletions: 0, from: 'd/sub/f.txt', status: 'renamed' })
     expect(byPath.get('ü.txt')).toMatchObject({ additions: 1, deletions: 0, status: 'modified' })
     expect(byPath.get('ñew.txt')).toMatchObject({ additions: 2, status: 'untracked' })
-    expect(await fileDiff(state!.root, byPath.get('ü.txt')!)).toContain('+b')
+    expect(await fileDiff(must(state).root, must(byPath.get('ü.txt')))).toContain('+b')
   })
 })

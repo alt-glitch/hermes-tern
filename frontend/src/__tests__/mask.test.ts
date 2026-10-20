@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
 
-import { Composer } from '../composer.js'
-import { maskedOffset, maskOf, unmaskEdit } from '../mask.js'
+import { Composer } from '../draft/composer.js'
+import { maskedOffset, maskOf, unmaskEdit } from '../prompts/mask.js'
+
+import { must } from './fakes.js'
 
 // 'a', a family emoji (one grapheme, 11 UTF-16 units), '🔑' (2 units), 'b'.
 const FAMILY = '👨‍👩‍👧'
@@ -27,7 +29,7 @@ describe('masked fields', () => {
     // Tern deletes the third bullet (🔑): masked [2, 3), caret 2, over a 4-bullet text.
     const edit = unmaskEdit(c.text, { cursor: 2, from: 2, len: 4, text: '', to: 3 })
     expect(edit).not.toBeNull()
-    c.edit(edit!)
+    c.edit(must(edit))
     expect(c.text).toBe(`a${FAMILY}b`)
     expect(c.cursor).toBe(1 + FAMILY.length)
   })
@@ -36,7 +38,7 @@ describe('masked fields', () => {
     const c = new Composer()
     c.set(SECRET)
     // Typed "xy" after the second bullet: Tern's text is `••xy••`, caret 4.
-    c.edit(unmaskEdit(c.text, { cursor: 4, from: 2, len: 4, text: 'xy', to: 2 })!)
+    c.edit(must(unmaskEdit(c.text, { cursor: 4, from: 2, len: 4, text: 'xy', to: 2 })))
     expect(c.text).toBe(`a${FAMILY}xy🔑b`)
     expect(c.cursor).toBe(1 + FAMILY.length + 2)
     expect(maskedOffset(c.text, c.cursor)).toBe(4)

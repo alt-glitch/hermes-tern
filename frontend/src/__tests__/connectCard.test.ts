@@ -1,14 +1,17 @@
 // The connect card in the app: the poll that follows the watcher's file, the message that tells the
 // agent, Continue, and a resume that draws each card as it ended.
-import { EventEmitter } from 'node:events'
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
+import { chmodSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { toolCallId } from '../core/ids.js'
+
+import { FakeGateway, fakeTern, must } from './fakes.js'
+
 const home = mkdtempSync(join(tmpdir(), 'hermes-tern-connect-'))
-process.env.HERMES_HOME = home
+process.env['HERMES_HOME'] = home
 
 vi.mock('../hermes/sessionIndex.js', async importOriginal => ({
   ...(await importOriginal<typeof import('../hermes/sessionIndex.js')>()),
@@ -16,58 +19,13 @@ vi.mock('../hermes/sessionIndex.js', async importOriginal => ({
   storedSessions: () => []
 }))
 
-const { App } = await import('../app.js')
-const { POLL_MS } = await import('../connections.js')
-const { toolNode } = await import('../view/tools.js')
+const { App } = await import('../app/chat.js')
+const { POLL_MS } = await import('../connections/cards.js')
+const { ConnectWatcher, NO_CARD_MS } = await import('../connections/watcher.js')
+const { Transcript } = await import('../transcript/store.js')
+const { toolNode } = await import('../view/tools/shell.js')
 
 const cards = join(home, 'plugin-data', 'hermes-tern', 'connections')
-
-type Handler = (params: Record<string, unknown>) => unknown
-
-class FakeGateway extends EventEmitter {
-  isCanonical = true
-  attached = true
-  readonly calls: { method: string; params: Record<string, unknown> }[] = []
-  readonly handlers = new Map<string, Handler>()
-
-  request(method: string, params: Record<string, unknown> = {}) {
-    this.calls.push({ method, params })
-    const handler = this.handlers.get(method)
-
-    return Promise.resolve(handler ? handler(params) : {})
-  }
-
-  methods(name: string) {
-    return this.calls.filter(c => c.method === name)
-  }
-
-  event(ev: Record<string, unknown>) {
-    this.emit('event', ev)
-  }
-
-  drain() {}
-  kill() {}
-  holdAttach() {
-    return undefined
-  }
-  settleAttach() {}
-  hydrateSharedPrompts() {}
-}
-
-/** A Tern session whose surface draws nothing; `send` delivers one input event. */
-function fakeTern() {
-  const surface: object = new Proxy({}, { get: (_, key) => (key === 'closed' ? true : () => surface) })
-  const waiting: ((v: IteratorResult<unknown>) => void)[] = []
-
-  return {
-    [Symbol.asyncIterator]: () => ({ next: () => new Promise<IteratorResult<unknown>>(resolve => waiting.push(resolve)) }),
-    blob: () => 'blob',
-    caps: { cols: 80, features: [] },
-    close: async () => undefined,
-    open: () => surface,
-    send: (event: Record<string, unknown>) => waiting.shift()?.({ done: false, value: { event, type: 'event' } })
-  }
-}
 
 const flush = () => new Promise(resolve => setImmediate(resolve))
 
@@ -95,8 +53,8 @@ const complete = (id: string, op: string) => ({
 
 /** What the app sent the agent: prompts it submitted, and those queued behind a turn. */
 const told = (gw: FakeGateway, app: InstanceType<typeof App>) => [
-  ...gw.methods('prompt.submit').map(c => String(c.params.text)),
-  ...app.queue.map(q => q.text)
+  ...gw.methods('prompt.submit').map(c => String(c.params['text'])),
+  ...app.stores.queue.held.map(q => q.text)
 ]
 
 let gw: FakeGateway
@@ -104,7 +62,7 @@ let tern: ReturnType<typeof fakeTern>
 
 async function started() {
   tern = fakeTern()
-  const app = new App(tern as never, gw as never, '')
+  const app = new App(tern.session, gw.client, '')
   void app.run()
   gw.event({ type: 'gateway.ready', payload: {} })
   await flush()
@@ -131,9 +89,11 @@ describe('the connect card', () => {
     writeCard('call_a.op1', drive('initiated'))
 
     gw.event(complete('call_a', 'op1'))
-    const call = app.transcript.call('call_a')!
+    const call = must(app.transcript.call(toolCallId('call_a')))
     expect(call.connect).toMatchObject({ key: 'call_a.op1', settled: undefined, told: false })
 
+    // The next read is set once the first round settles.
+    await flush()
     writeCard('call_a.op1', drive('connected', { settled_by: 'all_resolved', watching: false }))
     vi.advanceTimersByTime(POLL_MS)
     await flush()
@@ -153,14 +113,14 @@ describe('the connect card', () => {
 
     gw.event(complete('call_0', 'op2'))
 
-    expect(app.transcript.call('call_0')?.connect).toMatchObject({ key: 'call_0.op2', settled: undefined })
+    expect(app.transcript.call(toolCallId('call_0'))?.connect).toMatchObject({ key: 'call_0.op2', settled: undefined })
   })
 
   it('Continue tells the agent once and the card stays told after a resume', async () => {
     const app = await started()
     writeCard('call_b.op3', drive('initiated'))
     gw.event(complete('call_b', 'op3'))
-    const ref = app.transcript.call('call_b')!.connect!.key!
+    const ref = must(must(app.transcript.call(toolCallId('call_b'))).connect?.key)
 
     tern.send({ act: 'connect-continue', ev: 'action', value: ref })
     await flush()
@@ -169,23 +129,23 @@ describe('the connect card', () => {
 
     expect(told(gw, app)).toEqual(["I've authorized Google Drive. Check with manage_connections status and carry on."])
     // As on the desktop, Continue settles the card: no Authorize, no Continue, the wait is over.
-    expect(app.transcript.call('call_b')!.connect).toMatchObject({ settled: 'continued', told: true })
+    expect(must(app.transcript.call(toolCallId('call_b'))).connect).toMatchObject({ settled: 'continued', told: true })
 
     // The resume brings the call back without its result: the card is found by its call id.
     gw.handlers.set('session.resume', p => ({
-      info: { stored_session_id: p.session_id },
+      info: { stored_session_id: p['session_id'] },
       messages: [
         { role: 'user', text: 'connect drive', timestamp: Date.now() / 1000 },
         { args: { action: 'connect', connectors: ['googledrive'] }, name: 'manage_connections', role: 'tool', timestamp: Date.now() / 1000, tool_call_id: 'call_b' }
       ],
-      session_id: p.session_id,
+      session_id: p['session_id'],
       subscription_id: 'sub-again'
     }))
     gw.event({ payload: {}, type: 'gateway.ready' })
     await flush()
     await flush()
 
-    const again = app.transcript.call('call_b')!
+    const again = must(app.transcript.call(toolCallId('call_b')))
     expect(again).not.toBe(undefined)
     expect(again.connect).toMatchObject({ key: 'call_b.op3', told: true })
   })
@@ -196,13 +156,13 @@ describe('the connect card', () => {
     writeCard('call_c.op4', drive('initiated', { created_at: now, pid: 2 ** 22 + 4321 }))
     writeCard('call_d.op5', drive('superseded', { created_at: now, settled_by: 'superseded', watching: false }))
     gw.handlers.set('session.resume', p => ({
-      info: { stored_session_id: p.session_id },
+      info: { stored_session_id: p['session_id'] },
       messages: [
         { role: 'user', text: 'connect drive', timestamp: now },
         { args: { action: 'connect' }, name: 'manage_connections', role: 'tool', timestamp: now, tool_call_id: 'call_d' },
         { args: { action: 'connect' }, name: 'manage_connections', role: 'tool', timestamp: now, tool_call_id: 'call_c' }
       ],
-      session_id: p.session_id,
+      session_id: p['session_id'],
       subscription_id: 'sub-again'
     }))
 
@@ -211,14 +171,166 @@ describe('the connect card', () => {
     await flush()
 
     // Its gateway is gone: the card is a summary, its app not connected, with no controls.
-    const stopped = app.transcript.call('call_c')!
+    const stopped = must(app.transcript.call(toolCallId('call_c')))
     expect(stopped.connect).toMatchObject({ settled: 'stopped' })
     const view = JSON.stringify(toolNode(stopped, Date.now()))
     expect(view).toContain('not connected')
     expect(view).not.toContain('connect-open')
     expect(view).not.toContain('connect-continue')
     // A card a later request replaced is the plain tool call.
-    expect(JSON.stringify(toolNode(app.transcript.call('call_d')!, Date.now()))).not.toContain('hermes.connect.row')
+    expect(JSON.stringify(toolNode(must(app.transcript.call(toolCallId('call_d'))), Date.now()))).not.toContain('hermes.connect.row')
     expect(told(gw, app)).toEqual([])
+  })
+})
+
+describe('ConnectWatcher on a fake host', () => {
+  /** Its own data folder, so the claims of the App tests above are not its. */
+  const dir = mkdtempSync(join(tmpdir(), 'hermes-tern-watcher-'))
+
+  function card(stem: string, data: Record<string, unknown>) {
+    mkdirSync(join(dir, 'connections'), { recursive: true })
+    writeFileSync(join(dir, 'connections', `${stem}.json`), JSON.stringify({ pid: process.pid, updated_at: Date.now() / 1000, ...data }))
+  }
+
+  function watcher(folder = dir) {
+    const transcript = new Transcript()
+    const mutate = vi.spyOn(transcript, 'mutateCall')
+    const told: string[] = []
+    const opened: string[] = []
+    const changed = vi.fn()
+    const w = new ConnectWatcher({ changed, openUrl: url => void opened.push(url), tell: text => void told.push(text), transcript }, { dir: folder })
+
+    /** A finished manage_connections call for operation `op`. */
+    const call = (id: string, op: string) => {
+      transcript.toolComplete(complete(id, op).payload)
+      const c = transcript.call(toolCallId(id))
+
+      if (!c) {
+        throw new Error(`no call ${id}`)
+      }
+
+      return c
+    }
+
+    return { call, changed, mutate, opened, told, transcript, w }
+  }
+
+  it('polls an open card, writes through mutateCall, tells once, and stops once it settles', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    const { call, mutate, told, w } = watcher()
+    card('call_w.op1', drive('initiated'))
+    const c = call('call_w', 'op1')
+
+    w.watch()
+    expect(c.connect).toMatchObject({ key: 'call_w.op1', settled: undefined, told: false })
+    expect(mutate).toHaveBeenCalledTimes(1)
+    // The next read is set once the round settles.
+    await flush()
+    expect(vi.getTimerCount()).toBe(1)
+
+    card('call_w.op1', drive('connected', { settled_by: 'all_resolved', watching: false }))
+    vi.advanceTimersByTime(POLL_MS)
+
+    expect(c.connect).toMatchObject({ settled: 'all_resolved', told: true })
+    expect(told).toEqual(['Google Drive is connected now. Carry on.'])
+    // The card's new state, then its told mark.
+    expect(mutate).toHaveBeenCalledTimes(3)
+    expect(vi.getTimerCount()).toBe(0)
+  })
+
+  it('a card first seen settled stays quiet: nobody saw it wait', () => {
+    const { call, told, w } = watcher()
+    card('call_s.op1', drive('connected', { settled_by: 'all_resolved', watching: false }))
+    const c = call('call_s', 'op1')
+
+    w.watch()
+
+    expect(c.connect).toMatchObject({ settled: 'all_resolved', told: false })
+    expect(told).toEqual([])
+  })
+
+  it('Continue settles the card and tells the agent once; Authorize opens the link and marks the row', () => {
+    const { call, opened, told, w } = watcher()
+    card('call_k.op1', drive('initiated'))
+    const c = call('call_k', 'op1')
+    w.watch()
+    w.dispose()
+
+    w.open('call_k.op1', 'googledrive')
+    expect(opened).toEqual(['https://portal/x'])
+    expect(c.connect?.opened).toEqual(['googledrive'])
+
+    w.continue('call_k.op1')
+    w.continue('call_k.op1')
+
+    expect(told).toEqual(["I've authorized Google Drive. Check with manage_connections status and carry on."])
+    expect(c.connect).toMatchObject({ settled: 'continued', told: true })
+  })
+
+  it('dispose stops the poll', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    const { call, w } = watcher()
+    card('call_d.op1', drive('initiated'))
+    call('call_d', 'op1')
+
+    w.watch()
+    await flush()
+    expect(vi.getTimerCount()).toBe(1)
+
+    w.dispose()
+    expect(vi.getTimerCount()).toBe(0)
+  })
+
+  it('tells the agent when the claim cannot be written: only a claim another pane holds means it was told', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    const own = mkdtempSync(join(tmpdir(), 'hermes-tern-watcher-'))
+    const cards = join(own, 'connections')
+    mkdirSync(cards)
+    const { call, told, w } = watcher(own)
+    const write = (data: Record<string, unknown>) => writeFileSync(join(cards, 'call_r.op1.json'), JSON.stringify({ pid: process.pid, updated_at: Date.now() / 1000, ...data }))
+    write(drive('initiated'))
+    call('call_r', 'op1')
+
+    w.watch()
+    await flush()
+    write(drive('connected', { settled_by: 'all_resolved', watching: false }))
+    // The pane may read the cards but not write beside them (EACCES).
+    chmodSync(cards, 0o555)
+
+    try {
+      vi.advanceTimersByTime(POLL_MS)
+      await flush()
+    } finally {
+      chmodSync(cards, 0o755)
+    }
+
+    // Root writes anyway, and so claims as before.
+    expect(told).toEqual(['Google Drive is connected now. Carry on.'])
+    w.dispose()
+  })
+
+  it('reads a call that drew no card again once a while has passed: the card may land late', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] })
+    const own = mkdtempSync(join(tmpdir(), 'hermes-tern-watcher-'))
+    const { transcript, w } = watcher(own)
+    transcript.toolComplete({ name: 'manage_connections', result: JSON.stringify({ status: 'ok' }), tool_id: 'call_l' })
+    const c = must(transcript.call(toolCallId('call_l')))
+
+    w.watch()
+    await flush()
+    expect(c.connect).toBeUndefined()
+
+    mkdirSync(join(own, 'connections'))
+    writeFileSync(join(own, 'connections', 'call_l.op1.json'), JSON.stringify({ pid: process.pid, updated_at: Date.now() / 1000, ...drive('initiated') }))
+
+    // Within the limit the miss stands.
+    w.watch()
+    await flush()
+    expect(c.connect).toBeUndefined()
+
+    vi.setSystemTime(Date.now() + NO_CARD_MS)
+    w.watch()
+    expect(c.connect).toMatchObject({ key: 'call_l.op1', settled: undefined })
+    w.dispose()
   })
 })

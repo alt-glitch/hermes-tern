@@ -8,89 +8,51 @@ import { join } from 'node:path'
 import { type Key, plain } from '@stencil-hq/tern'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
+import { FakeGateway, fakeTern, given, key, must, type Reply } from './fakes.js'
+
 vi.mock('@tui/lib/history.js', () => ({ append: () => undefined, load: () => [] }))
 
-process.env.HERMES_HOME = mkdtempSync(join(tmpdir(), 'hermes-tern-status-'))
+process.env['HERMES_HOME'] = mkdtempSync(join(tmpdir(), 'hermes-tern-status-'))
 
-const { App } = await import('../app.js')
-const { localCommand } = await import('../commands.js')
-const { fastValue, fastTier } = await import('../fast.js')
+const { App } = await import('../app/chat.js')
+const { localCommand } = await import('../commands/local.js')
+const { fastValue, fastTier } = await import('../session/fast.js')
 const { forgetCaps, rememberCaps } = await import('../modelCaps.js')
-const { effortText, levelsFor, nextEffort } = await import('../overlays/effort.js')
+const { effortText, levelsFor, nextEffort } = await import('../session/effort.js')
 const { openModelPicker } = await import('../overlays/models.js')
-
-type Reply = (params: Record<string, unknown>) => unknown
-
-const key = (name: string, mods: Partial<Key> = {}): Key =>
-  ({ alt: false, ctrl: false, meta: false, name, shift: false, ...mods }) as Key
 
 const settle = () => new Promise(resolve => setTimeout(resolve, 5))
 
 function setup(replies: Record<string, Reply> = {}, canonical = true) {
-  const handlers = new Map<string, (arg: unknown) => void>()
-  const requests: { method: string; params: Record<string, unknown> }[] = []
-  let view: { dock?: unknown[] } = {}
+  const gw = new FakeGateway({ canonical, replies })
+  const tern = fakeTern({ cols: 100, draws: true })
+  /** The last frame's dock. */
+  const shown = () => tern.region('dock') ?? []
 
-  const gw = {
-    drain: () => undefined,
-    isCanonical: canonical,
-    kill: () => undefined,
-    on: (name: string, fn: (arg: unknown) => void) => void handlers.set(name, fn),
-    request: (method: string, params: Record<string, unknown>) => {
-      requests.push({ method, params })
-
-      try {
-        return Promise.resolve(replies[method] ? replies[method](params) : {})
-      } catch (error) {
-        return Promise.reject(error)
-      }
-    }
-  }
-
-  const waiting: ((r: IteratorResult<{ type: 'key'; key: Key }>) => void)[] = []
-  const surface = {
-    closed: false,
-    focus: () => undefined,
-    palette: () => undefined,
-    render: (v: typeof view) => void (view = v),
-    stylesheet: () => undefined
-  }
-
-  const tern = {
-    blob: () => 'blob',
-    caps: { cols: 100, features: [] as string[] },
-    close: async () => undefined,
-    open: () => surface,
-    [Symbol.asyncIterator]: () => ({
-      next: () => new Promise<IteratorResult<{ type: 'key'; key: Key }>>(resolve => waiting.push(resolve)),
-      return: async () => ({ done: true as const, value: undefined })
-    })
-  }
-
-  const app = new App(tern as never, gw as never, '1.0.0')
+  const app = new App(tern.session, gw.client, '1.0.0')
   void app.run()
-  app.sid = 's1'
+  given.session(app, 's1')
 
   const press = async (k: Key) => {
-    await vi.waitFor(() => expect(waiting.length).toBeGreaterThan(0))
-    waiting.shift()?.({ done: false, value: { key: k, type: 'key' } })
+    await vi.waitFor(() => expect(tern.reading).toBe(true))
+    tern.press(k)
     await settle()
   }
 
-  const emit = (name: string, arg: unknown) => handlers.get(name)?.(arg)
-  const sent = (method: string) => requests.filter(r => r.method === method).map(r => r.params)
+  const emit = (name: string, arg: unknown) => gw.emit(name, arg)
+  const sent = (method: string) => gw.sent(method)
   /** The dock as the pane would read it, after the pending render. */
   const dock = async () => {
     await settle()
 
-    return plain({ dock: view.dock ?? [] } as never, 200)
+    return plain({ dock: shown() }, 200)
   }
 
   /** The dock's nodes as JSON, for what plain text leaves out (icons). */
   const raw = async () => {
     await settle()
 
-    return JSON.stringify(view.dock ?? [])
+    return JSON.stringify(shown())
   }
 
   return { app, dock, emit, press, raw, sent }
@@ -150,6 +112,21 @@ describe('App: the goal and loop line', () => {
     expect(sent('session.control')).toEqual([{ action: 'goal.pause', session_id: 's1' }])
     expect(app.automation.goal?.state).toBe('paused')
   })
+
+  it('closes the sheet once the goal no longer stands (cleared here or by another viewer)', async () => {
+    const { app, emit, press } = setup()
+
+    app.automation.adopt('s1')
+    emit('event', { payload: { control: control({ goal }) }, session_id: 's1', type: 'session.control.update' })
+    await settle()
+    await press(key('down'))
+    await press(key('enter'))
+    expect(app.overlays.at(-1)?.key).toBe('automation:goal')
+
+    emit('event', { payload: { control: control({}) }, session_id: 's1', type: 'session.control.update' })
+    await settle()
+    expect(app.overlays.map(o => o.key)).not.toContain('automation:goal')
+  })
 })
 
 describe('App: reconnecting', () => {
@@ -177,26 +154,26 @@ describe('App: fast mode', () => {
     expect(fastTier({ fast: false, service_tier: 'priority' })).toBeUndefined()
 
     const { app, raw } = setup()
-    app.info = { model: 'gpt-5' }
+    given.info(app, { model: 'gpt-5' })
     app.changed()
     expect(await raw()).not.toContain('"bolt"')
 
-    app.info = { fast: true, model: 'gpt-5', service_tier: 'priority' }
+    given.info(app, { fast: true, model: 'gpt-5', service_tier: 'priority' })
     app.changed()
     expect(await raw()).toContain('"bolt"')
   })
 
   it('/fast toggles through config.set and patches the info from the reply', async () => {
-    const { app, sent } = setup({ 'config.set': p => ({ key: 'fast', value: p.value === 'toggle' ? 'fast' : 'normal' }) })
-    app.info = { model: 'gpt-5' }
+    const { app, sent } = setup({ 'config.set': p => ({ key: 'fast', value: p['value'] === 'toggle' ? 'fast' : 'normal' }) })
+    given.info(app, { model: 'gpt-5' })
 
-    await localCommand('fast')!.run(app, '')
+    await must(localCommand('fast')).run(app, '')
     expect(sent('config.set')).toEqual([{ key: 'fast', session_id: 's1', value: 'toggle' }])
-    expect(app.info).toMatchObject({ fast: true, service_tier: 'priority' })
+    expect(app.session.info).toMatchObject({ fast: true, service_tier: 'priority' })
 
-    await localCommand('fast')!.run(app, 'off')
+    await must(localCommand('fast')).run(app, 'off')
     expect(sent('config.set').at(-1)).toEqual({ key: 'fast', session_id: 's1', value: 'normal' })
-    expect(app.info).toMatchObject({ fast: false, service_tier: '' })
+    expect(app.session.info).toMatchObject({ fast: false, service_tier: '' })
   })
 
   it('says when the route has no fast mode, and takes only its words', async () => {
@@ -206,7 +183,7 @@ describe('App: fast mode', () => {
       }
     })
 
-    await localCommand('fast')!.run(app, 'on')
+    await must(localCommand('fast')).run(app, 'on')
     expect(app.transcript.entries.at(-1)).toMatchObject({ text: 'This model has no fast mode on its current route.' })
     expect(fastValue('ultrafast')).toBe('ultrafast')
     expect(fastValue('warp')).toBeNull()
@@ -223,7 +200,7 @@ describe('App: fast mode', () => {
       'session.mutate': () => ({ model: 'b', status: 'applied' }),
       'session.resume': () => ({ execution_generation: 1, revision: 1 })
     })
-    app.info = { model: 'a', reasoning_effort: 'medium' }
+    given.info(app, { model: 'a', reasoning_effort: 'medium' })
 
     openModelPicker(app)
     await settle()
@@ -260,11 +237,11 @@ describe('the effort chip and its levels', () => {
 
   it('is hidden for a model without reasoning, muted at the default', async () => {
     const { app, dock } = setup()
-    app.info = { model: 'plain-model', provider: 'p', reasoning_effort: '' }
+    given.info(app, { model: 'plain-model', provider: 'p', reasoning_effort: '' })
     app.changed()
     expect(await dock()).toContain('medium')
 
-    rememberCaps([{ capabilities: { 'plain-model': { fast: false, reasoning: false } }, models: ['plain-model'], name: 'P', slug: 'p' } as never])
+    rememberCaps([{ capabilities: { 'plain-model': { fast: false, reasoning: false } }, models: ['plain-model'], name: 'P', slug: 'p' }])
     app.changed()
     expect(await dock()).not.toContain('medium')
   })
@@ -284,14 +261,14 @@ describe('App: setting the effort', () => {
 
   it('sends the session level as the reasoning mutation on the shared gateway', async () => {
     const { app, sent } = setup(mutation())
-    app.info = { model: 'm', reasoning_effort: 'low' }
+    given.info(app, { model: 'm', reasoning_effort: 'low' })
 
     await app.setEffort('high', 'session')
     expect(sent('session.mutate')).toEqual([
       expect.objectContaining({ expected_generation: 2, expected_revision: 7, operation: 'reasoning', payload: { effort: 'high' }, session_id: 's1' })
     ])
     expect(sent('config.set')).toEqual([])
-    expect(app.info?.reasoning_effort).toBe('high')
+    expect(app.session.info?.reasoning_effort).toBe('high')
   })
 
   it('keeps config.set scope=global for Save as default, and config.set on a private gateway', async () => {
@@ -307,20 +284,20 @@ describe('App: setting the effort', () => {
 
   it('rolls the chip back when the change is refused', async () => {
     const { app } = setup(mutation(true))
-    app.info = { model: 'm', reasoning_effort: 'low', reasoning_effort_wire: 'low' }
+    given.info(app, { model: 'm', reasoning_effort: 'low', reasoning_effort_wire: 'low' })
 
     await app.setEffort('high', 'session')
-    expect(app.info).toMatchObject({ reasoning_effort: 'low', reasoning_effort_wire: 'low' })
+    expect(app.session.info).toMatchObject({ reasoning_effort: 'low', reasoning_effort_wire: 'low' })
     expect(app.transcript.entries.at(-1)).toMatchObject({ text: expect.stringContaining('stale_revision'), tone: 'error' })
   })
 
   it('/reasoning <level> sets it the same way; its other forms stay the backend\'s', async () => {
     const { app, sent } = setup(mutation())
-    app.info = { model: 'm' }
+    given.info(app, { model: 'm' })
 
-    await localCommand('reasoning')!.run(app, 'ultra')
+    await must(localCommand('reasoning')).run(app, 'ultra')
     await settle()
     expect(sent('session.mutate')[0]).toMatchObject({ operation: 'reasoning', payload: { effort: 'ultra' } })
-    expect(localCommand('reasoning')!.run(app, 'show')).toBe(false)
+    expect(must(localCommand('reasoning')).run(app, 'show')).toBe(false)
   })
 })

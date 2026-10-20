@@ -1,12 +1,16 @@
 import { plain } from '@stencil-hq/tern'
 import { describe, expect, it, vi } from 'vitest'
 
-import type { PrRef } from '../github/pullRequest.js'
-import type { Entry, PullRequests } from '../github/store.js'
+import { prKey, storedSessionId } from '../core/ids.js'
+import type { BranchTarget } from '../github/branch.js'
+import type { PrRef, PullRequest } from '../github/pullRequest.js'
+import { type Entry, type Listed, PullRequests } from '../github/store.js'
 import { parseBody } from '../prs/body.js'
 import { PrView } from '../prs/view.js'
 
-const text = (nodes: unknown[]) => plain({ main: nodes } as never, 200)
+import { ofKind, stub } from './fakes.js'
+
+const text = (nodes: unknown[]) => plain(stub({ main: nodes }), 200)
 
 describe('parseBody', () => {
   it('drops HTML comments and turns HTML into the Markdown it means', () => {
@@ -48,7 +52,7 @@ describe('parseBody', () => {
 
     expect(part).toMatchObject({ kind: 'md' })
 
-    const md = (part as { text: string }).text
+    const md = ofKind(part, 'md').text
 
     expect(md).toContain('Use `<b>`:')
     expect(md).toContain('```html\n<details>x</details>\n```')
@@ -73,7 +77,7 @@ describe('parseBody', () => {
 
 describe('PrView', () => {
   const ref: PrRef = { host: 'github.com', number: 5, repository: 'acme/app', url: 'https://github.com/acme/app/pull/5' }
-  const pr = {
+  const pr: PullRequest = {
     additions: 3,
     author: 'sid',
     autoMerge: null,
@@ -108,47 +112,71 @@ describe('PrView', () => {
 
   const viewOf = (entry: Entry) => {
     const prs = { activity: vi.fn(async () => {}), busy: () => false, entries: () => [entry], files: vi.fn(async () => {}), get: () => entry, poke: vi.fn() }
-    const view = new PrView({ changed: vi.fn(), notice: vi.fn(), open: vi.fn(), prs: prs as unknown as PullRequests }, 'github.com/acme/app#5')
+    const view = new PrView({ changed: vi.fn(), notice: vi.fn(), open: vi.fn(), prs: stub<PullRequests>(prs) }, prKey(ref))
 
     return { prs, view }
   }
 
   it('shows the description, then says the conversation is loading, or why it failed', () => {
-    const entry = { pr, ref, source: 'linked' } as Entry
+    const entry: Listed = { activity: { kind: 'idle' }, files: { kind: 'idle' }, pr, ref, source: 'linked' }
     const { prs, view } = viewOf(entry)
 
     expect(text(view.body('b', 0))).toContain('Fixes it.')
     expect(text(view.body('b', 0))).toContain('Reading the conversation…')
     expect(prs.activity).toHaveBeenCalled()
-    expect(text(viewOf({ ...entry, activityError: 'GitHub answered 502' }).view.body('b', 0))).toContain('GitHub answered 502')
+    expect(text(viewOf({ ...entry, activity: { error: 'GitHub answered 502', failedAt: 0, kind: 'failed' } }).view.body('b', 0))).toContain('GitHub answered 502')
   })
 
   it('reads the files only on the Files tab, and says why they failed', () => {
-    const entry = { filesError: 'timeout', pr, ref, source: 'linked' } as Entry
+    const entry: Listed = { activity: { kind: 'idle' }, files: { error: 'timeout', failedAt: 0, kind: 'failed' }, pr, ref, source: 'linked' }
     const { prs, view } = viewOf(entry)
 
     view.setTab('files')
     expect(prs.files).toHaveBeenCalled()
     expect(text(view.body('b', 0))).toContain('timeout')
     // An older list stays up while a newer read fails.
-    expect(text(viewOf({ ...entry, files: [{ additions: 1, deletions: 0, patch: '@@ -1 +1 @@\n-a\n+b', path: 'a.ts', status: 'modified' }] }).view.body('b', 0))).not.toContain('timeout')
+    const files = [{ additions: 1, deletions: 0, patch: '@@ -1 +1 @@\n-a\n+b', path: 'a.ts', status: 'modified' }]
+    const last = { at: pr.updatedAt, value: files }
+    expect(text(viewOf({ ...entry, files: { error: 'timeout', failedAt: 0, kind: 'failed', last } }).view.body('b', 0))).not.toContain('timeout')
   })
 
   it('folds a run of commits into one line and draws a review verdict without words as a line', () => {
-    const entry = {
-      activity: [
-        { at: '2026-10-19T10:01:00Z', author: 'sid', body: 'one', kind: 'commit', url: 'https://github.com/acme/app/commit/1111111aaa' },
-        { at: '2026-10-19T10:02:00Z', author: 'sid', body: 'two', kind: 'commit', url: 'https://github.com/acme/app/commit/2222222bbb' },
-        { at: '2026-10-19T10:03:00Z', author: 'ana', body: '', kind: 'review', state: 'APPROVED' }
-      ],
+    const entry: Listed = {
+      activity: {
+        at: pr.updatedAt,
+        kind: 'ready',
+        value: [
+          { at: '2026-10-19T10:01:00Z', author: 'sid', body: 'one', kind: 'commit', url: 'https://github.com/acme/app/commit/1111111aaa' },
+          { at: '2026-10-19T10:02:00Z', author: 'sid', body: 'two', kind: 'commit', url: 'https://github.com/acme/app/commit/2222222bbb' },
+          { at: '2026-10-19T10:03:00Z', author: 'ana', body: '', kind: 'review', state: 'APPROVED' }
+        ]
+      },
+      files: { kind: 'idle' },
       pr,
       ref,
       source: 'linked'
-    } as Entry
+    }
     const out = text(viewOf(entry).view.body('b', Date.parse('2026-10-19T10:05:00Z')))
 
     expect(out).toContain('sid added 2 commits')
     expect(out).toContain('1111111')
     expect(out).toContain('ana approved these changes')
+  })
+
+  it("shows a linked PR as 'Reading GitHub…' with its repository and number before the first read settles", () => {
+    // The round waits on the branch lookup, so nothing has been read or stored yet.
+    const branchOf = () => new Promise<BranchTarget | undefined>(() => {})
+    const graphql = vi.fn(async () => ({}))
+    const prs = new PullRequests({ changed: vi.fn(), cwd: () => '/repo', sid: () => storedSessionId('s1') }, { graphql, rest: vi.fn() }, () => [ref], branchOf)
+    const view = new PrView({ changed: vi.fn(), notice: vi.fn(), open: vi.fn(), prs }, prKey(ref))
+
+    prs.adopt()
+    expect(prs.get(prKey(ref))).toMatchObject({ ref })
+    expect(prs.get(prKey(ref))?.pr).toBeUndefined()
+    expect(view.selection()?.key).toBe(prKey(ref))
+    expect(text(view.body('b', 0))).toContain('Reading GitHub…')
+    expect(text([view.header(0)])).toContain('acme/app #5')
+    expect(graphql).not.toHaveBeenCalled()
+    prs.dispose()
   })
 })

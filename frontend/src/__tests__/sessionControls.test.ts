@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest'
 
-import type { App } from '../app.js'
-import { localCommand } from '../commands.js'
-import { modelPayload, mutateSession } from '../hermes/mutate.js'
+import { type CommandHost, localCommand } from '../commands/local.js'
+import { modelPayload } from '../hermes/mutate.js'
 import { pickerValue } from '../overlays/models.js'
+
+import { must } from './fakes.js'
 
 /** A gateway that answers each method from `answers` and records the calls. */
 function fakeGateway(answers: Record<string, unknown>) {
@@ -11,10 +12,10 @@ function fakeGateway(answers: Record<string, unknown>) {
 
   return {
     calls,
-    request: async (method: string, params: Record<string, unknown> = {}) => {
+    request: async (method: string, params: Record<string, unknown> = {}): Promise<unknown> => {
       calls.push([method, params])
 
-      return answers[method] as never
+      return answers[method]
     }
   }
 }
@@ -23,7 +24,8 @@ describe('/skin', () => {
   const host = (theme: string, answers: Record<string, unknown>) => {
     const gw = fakeGateway(answers)
     const notices: string[] = []
-    const app = { gw, theme, transcript: { notice: (text: string) => notices.push(text) } } as unknown as App
+    // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- a stub host: /skin reaches only gw, theme and transcript.notice
+    const app = { gw, theme, transcript: { notice: (text: string) => notices.push(text) } } as unknown as CommandHost
 
     return { app, gw, notices }
   }
@@ -31,7 +33,7 @@ describe('/skin', () => {
   it('reads the skin with config.get', async () => {
     const { app, gw, notices } = host('skin', { 'config.get': { value: 'ares' } })
 
-    await localCommand('skin')!.run(app, '')
+    await must(localCommand('skin')).run(app, '')
     expect(gw.calls).toEqual([['config.get', { key: 'skin' }]])
     expect(notices).toEqual(['skin: ares'])
   })
@@ -39,7 +41,7 @@ describe('/skin', () => {
   it('sets the skin with config.set, and points at /theme skin outside the skin theme', async () => {
     const { app, gw, notices } = host('tern', { 'config.set': { key: 'skin', value: 'mono' } })
 
-    await localCommand('skin')!.run(app, 'mono')
+    await must(localCommand('skin')).run(app, 'mono')
     expect(gw.calls).toEqual([['config.set', { key: 'skin', value: 'mono' }]])
     expect(notices).toEqual(['skin → mono', 'Hermes wears the skin in the skin theme: /theme skin'])
   })

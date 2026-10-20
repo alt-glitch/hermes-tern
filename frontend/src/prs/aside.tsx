@@ -5,52 +5,40 @@
 
 import type { JSX } from '@stencil-hq/tern'
 
-import type { App } from '../app.js'
-import { openUrl } from '../overlays/pullRequests.js'
+import type { PrKey } from '../core/ids.js'
 
-import { PrView } from './view.js'
+import { PrView, type PrViewHost } from './view.js'
 
 export class PrAside {
-  readonly #app: App
+  readonly #host: PrViewHost
   #view: PrView | undefined
 
-  constructor(app: App) {
-    this.#app = app
+  /** `host` is what the PR view reaches; the aside lends it the same one. */
+  constructor(host: PrViewHost) {
+    this.#host = host
   }
 
   get open(): boolean {
     return this.#view !== undefined
   }
 
-  show(focus?: string) {
+  show(focus?: PrKey) {
     if (!this.#view) {
-      const app = this.#app
-
-      this.#view = new PrView({
-        changed: () => app.changed(),
-        notice: (text, tone) => {
-          app.transcript.notice(text, tone)
-          app.changed()
-        },
-        open: openUrl,
-        prs: app.prs,
-        reveal: id => app.reveal(id),
-        scroll: (id, to) => app.scroll(id, to)
-      })
+      this.#view = new PrView(this.#host)
     }
 
     if (focus) {
       this.#view.select(focus)
     }
 
-    this.#app.prs.poke()
-    this.#app.changed()
+    this.#host.prs.poke()
+    this.#host.changed()
   }
 
   close() {
     this.#view?.dispose()
     this.#view = undefined
-    this.#app.changed()
+    this.#host.changed()
   }
 
   node(id: string): JSX.Element | null {

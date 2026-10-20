@@ -1,0 +1,11 @@
+{"payload":{},"type":"gateway.ready"}
+{"payload":{},"session_id":"s1","type":"message.start"}
+{"payload":{"text":"Formatting the files"},"session_id":"s1","type":"message.delta"}
+{"payload":{"pending_submissions":[{"admission_id":"a1","input_id":"00000000-0000-4000-8000-000000000002","status":"queued","user":"use tabs"}]},"session_id":"s1","type":"session.info"}
+{"payload":{"admission_id":"a1","content":"","outcome":"cancelled","text":""},"session_id":"s1","type":"message.complete"}
+{"payload":{"pending_submissions":[]},"session_id":"s1","type":"session.info"}
+{"payload":{"pending_submissions":[{"admission_id":"a2","input_id":"00000000-0000-4000-8000-000000000003","status":"queued","user":"then the docs"}]},"session_id":"s1","type":"session.info"}
+{"payload":{"text":"Formatting the files with tabs."},"session_id":"s1","type":"message.complete"}
+{"payload":{},"session_id":"s1","type":"message.start"}
+{"payload":{"pending_submissions":[{"admission_id":"a2","input_id":"00000000-0000-4000-8000-000000000003","status":"started","user":"then the docs"}]},"session_id":"s1","type":"session.info"}
+{"payload":{"text":"Docs updated."},"session_id":"s1","type":"message.complete"}

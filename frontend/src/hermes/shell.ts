@@ -1,15 +1,13 @@
 // `!cmd` and `{!cmd}` in the composer, as Hermes' Ink TUI runs them (ui-tui/src/app/useSubmission.ts):
 // one captured command through the shared gateway's `shell.exec` (gateway/session_shell.py), which runs
 // it for a local session in its launch cwd and refuses sandboxed backends and dangerous commands.
+import type { ShellExecResult } from '@hermes/shared/gateway-events'
 import type { GatewayClient } from '@tui/gatewayClient.js'
 import { describeRpcError } from '@tui/app/userMessages.js'
 import { INTERPOLATION_RE } from '@tui/protocol/interpolation.js'
 
-export interface ShellResult {
-  stdout: string
-  stderr: string
-  code: number
-}
+import { errorText } from '../core/errors.js'
+import { rpc } from '../wire/rpc.js'
 
 /** The owner's refusals (its reason codes), in words. */
 const REFUSALS: [string, string][] = [
@@ -23,14 +21,14 @@ const REFUSALS: [string, string][] = [
 
 /** Why a `shell.exec` failed, for the user. */
 export function shellError(error: unknown): string {
-  const text = error instanceof Error ? error.message : String(error)
+  const text = errorText(error)
 
   return REFUSALS.find(([code]) => text.includes(code))?.[1] ?? describeRpcError(error)
 }
 
 /** Runs `command` for session `sid`. */
-export async function shellExec(gw: Pick<GatewayClient, 'request'>, sid: string, command: string): Promise<ShellResult> {
-  const r = await gw.request<Partial<ShellResult> | null>('shell.exec', { command, session_id: sid })
+export async function shellExec(gw: Pick<GatewayClient, 'request'>, sid: string, command: string): Promise<ShellExecResult> {
+  const r = await rpc(gw, 'shell.exec', { command, session_id: sid })
 
   if (!r || typeof r !== 'object') {
     throw new Error('invalid response: shell.exec')
@@ -40,7 +38,7 @@ export async function shellExec(gw: Pick<GatewayClient, 'request'>, sid: string,
 }
 
 /** What a run prints: its output, then `exit N` when it failed or printed nothing (as Ink shows it). */
-export function shellLines(r: ShellResult): { text: string; failed: boolean }[] {
+export function shellLines(r: ShellExecResult): { text: string; failed: boolean }[] {
   const out = [r.stdout, r.stderr].filter(Boolean).join('\n').trim()
 
   return [

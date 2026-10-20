@@ -3,45 +3,17 @@
 // session created is marked as its own. The list polls every five seconds while the tab shows;
 // pause, resume and remove go through the same method.
 
+import type { CronJobRow } from '@hermes/shared/gateway-events'
 import type { GatewayClient } from '@tui/gatewayClient.js'
 
+import { errorText } from '../core/errors.js'
+import { Poller } from '../core/poller.js'
 import type { ToolCall } from '../model.js'
-import { record } from '../transcript.js'
+import { record } from '../wire/json.js'
+import { rpc } from '../wire/rpc.js'
 
 /** One row of `cron.manage` `list` (tools/cronjob_job_args.py `_format_job`). */
-export interface CronJob {
-  job_id: string
-  name?: string
-  schedule?: string
-  repeat?: number | string | null
-  deliver?: string | null
-  prompt_preview?: string
-  skills?: string[]
-  model?: string | null
-  next_run_at?: string | null
-  last_run_at?: string | null
-  last_status?: string | null
-  last_error?: string | null
-  last_delivery_error?: string | null
-  last_fire_error?: string | null
-  enabled?: boolean
-  state?: string | null
-  paused_at?: string | null
-  paused_reason?: string | null
-  workdir?: string | null
-  script?: string | null
-  monitor_script?: string | null
-  monitor_url?: string | null
-  monitor_state?: unknown
-  no_agent?: boolean | null
-}
-
-interface CronResult {
-  success?: boolean
-  error?: string | null
-  jobs?: CronJob[] | null
-  warning?: string | null
-}
+export type CronJob = CronJobRow
 
 export const CRON_POLL_MS = 5000
 
@@ -77,8 +49,8 @@ export function ownJobs(calls: readonly ToolCall[]): Set<string> {
 
   for (const c of calls) {
     const r = record(c.result)
-    const job = record(r?.job)
-    const id = r?.job_id ?? job?.job_id ?? job?.id
+    const job = record(r?.['job'])
+    const id = r?.['job_id'] ?? job?.['job_id'] ?? job?.['id']
 
     if (c.name === 'cronjob_manage' && typeof id === 'string' && id) {
       ids.add(id)
@@ -94,8 +66,12 @@ export class Cron {
   #error: string | undefined
   #warning: string | undefined
   #loaded = false
-  #watchers = 0
-  #timer: NodeJS.Timeout | undefined
+  /** The list's poll: every CRON_POLL_MS while the Cron tab shows, else none. */
+  readonly #poller: Poller = new Poller({
+    cadence: () => (this.#poller.watched ? CRON_POLL_MS : 'off'),
+    // A round scheduled before the tab closed reads nothing.
+    run: async () => (this.#poller.watched ? this.refresh() : undefined)
+  })
   #busy = new Set<string>()
 
   constructor(host: CronHost) {
@@ -127,24 +103,12 @@ export class Cron {
 
   /** Polls while the returned release has not run (the Cron tab shows). */
   watch(): () => void {
-    this.#watchers++
+    return this.#poller.watch()
+  }
 
-    if (this.#watchers === 1) {
-      void this.#tick()
-    }
-
-    let released = false
-
-    return () => {
-      if (!released) {
-        released = true
-
-        if (--this.#watchers === 0) {
-          clearTimeout(this.#timer)
-          this.#timer = undefined
-        }
-      }
-    }
+  /** Stops polling for good (the pane quits). */
+  dispose() {
+    this.#poller.dispose()
   }
 
   /** Pauses, resumes or removes job `id`; throws the gateway's error. */
@@ -153,7 +117,7 @@ export class Cron {
     this.#host.changed()
 
     try {
-      const r = await this.#host.gw.request<CronResult>('cron.manage', { action, name: id })
+      const r = await rpc(this.#host.gw, 'cron.manage', { action, name: id })
 
       if (r?.success === false || r?.error) {
         throw new Error(r.error || `Could not ${action} the job`)
@@ -166,7 +130,7 @@ export class Cron {
 
   async refresh() {
     try {
-      const r = await this.#host.gw.request<CronResult>('cron.manage', { action: 'list', include_disabled: true })
+      const r = await rpc(this.#host.gw, 'cron.manage', { action: 'list', include_disabled: true })
 
       if (r?.success === false && r.error) {
         throw new Error(r.error)
@@ -176,34 +140,10 @@ export class Cron {
       this.#warning = r?.warning ?? undefined
       this.#error = undefined
     } catch (error) {
-      this.#error = error instanceof Error ? error.message : String(error)
+      this.#error = errorText(error)
     }
 
     this.#loaded = true
     this.#host.changed()
   }
-
-  async #tick() {
-    await this.refresh()
-
-    if (this.#watchers > 0) {
-      clearTimeout(this.#timer)
-      this.#timer = setTimeout(() => void this.#tick(), CRON_POLL_MS)
-    }
-  }
-}
-
-/** `in 12m`, `3h ago`, `now`: how far `iso` is from `now`, in its largest whole unit. */
-export function relative(iso: string | null | undefined, now: number): string {
-  const at = iso ? Date.parse(iso) : NaN
-
-  if (Number.isNaN(at)) {
-    return ''
-  }
-
-  const d = at - now
-  const s = Math.abs(d) / 1000
-  const [n, unit] = s < 45 ? [0, ''] : s < 3600 ? [Math.round(s / 60), 'm'] : s < 86_400 ? [Math.round(s / 3600), 'h'] : [Math.round(s / 86_400), 'd']
-
-  return n === 0 ? 'now' : d > 0 ? `in ${n}${unit}` : `${n}${unit} ago`
 }

@@ -1,0 +1,7 @@
+{"payload":{},"type":"gateway.ready"}
+{"payload":{},"session_id":"s1","type":"message.start"}
+{"payload":{"kind":"compacting","text":"🗜️ Compacting context — summarizing earlier conversation so I can continue..."},"session_id":"s1","type":"status.update"}
+{"payload":{"kind":"compacted","text":"🗜️ Compacted ~182,000 → ~31,000 tokens"},"session_id":"s1","type":"status.update"}
+{"payload":{"text":"Still going after the compaction."},"session_id":"s1","type":"message.delta"}
+{"payload":{"text":"Still going after the compaction."},"session_id":"s1","type":"message.complete"}
+{"payload":{"title":"Old chat"},"session_id":"old","type":"session.info"}

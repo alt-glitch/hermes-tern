@@ -4,9 +4,10 @@ import { join } from 'node:path'
 
 import { describe, expect, it } from 'vitest'
 
+import { toolCallId } from '../core/ids.js'
 import type { BackgroundProcess, ToolCall } from '../model.js'
 import { linkCalls } from '../processes/store.js'
-import { isWatchCall } from '../transcript.js'
+import { isWatchCall } from '../transcript/calls.js'
 import { promptSources, renderPrompt, SYSTEM_PROMPT } from '../processes/widgets/author.js'
 import { formatNumber, formatRatio, formatTrend } from '../processes/widgets/format.js'
 import { FileTap, outputFiles } from '../processes/widgets/files.js'
@@ -14,8 +15,9 @@ import { chartMemory } from '../processes/widgets/memory.js'
 import { Charts, OutputTap } from '../processes/widgets/registry.js'
 import { ChartRuntime, sparkDomain } from '../processes/widgets/runtime.js'
 import { compilePattern, parseValue, type Spec, validateSpec } from '../processes/widgets/spec.js'
-import type { SparkBlock, StatBlock } from '../processes/widgets/types.js'
 import { glance, hovercard, miniSpark, summary } from '../processes/widgets/view.js'
+
+import { must, ofKind, stub, tree } from './fakes.js'
 
 const LOAD: Spec = {
   blocks: [
@@ -38,7 +40,7 @@ const proc = (over: Partial<BackgroundProcess> = {}): BackgroundProcess => ({
   lastLine: '',
   output: '',
   startedAt: 0,
-  status: 'running',
+  state: { status: 'running' },
   ...over
 })
 
@@ -106,7 +108,7 @@ describe('job chart specs', () => {
   it('turns a meter without a known total into a stat', () => {
     const r = validateSpec({ blocks: [{ agg: 'last', field: 'rps', kind: 'meter', label: 'rps', total: '?' }], rules: LOAD.rules, title: 't' })
 
-    expect(r.ok && r.spec.blocks[0]!.kind).toBe('stat')
+    expect(r.ok && must(r.spec.blocks[0]).kind).toBe('stat')
   })
 
   it('compiles patterns to run in linear time, refusing lookaround and backreferences', () => {
@@ -127,12 +129,12 @@ describe('job chart runtime', () => {
 
     expect(view.state).toBe('live')
     expect(view.headline).toEqual({ text: '54 req/s', trend: { text: '▲ 5.9%', tone: 'success' } })
-    const spark = view.blocks[0] as SparkBlock
+    const spark = ofKind(view.blocks[0], 'spark')
     expect(spark.values).toEqual([51, 52, 53, 54])
     expect(spark.marks).toEqual([{ label: 'goal 60', tone: 'muted', value: 60 }])
     expect(spark.min).toBeLessThan(51)
     expect(spark.max).toBeGreaterThan(60)
-    expect((view.blocks[1] as StatBlock).items[0]).toEqual({ label: 'p50', text: '37 ms', trend: { text: '▼ 7.5%', tone: 'success' } })
+    expect(ofKind(view.blocks[1], 'stat').items[0]).toEqual({ label: 'p50', text: '37 ms', trend: { text: '▼ 7.5%', tone: 'success' } })
   })
 
   it('falls back to line counts and the last line without a spec', () => {
@@ -227,9 +229,9 @@ describe('Charts', () => {
     expect(changed).toBe(2)
 
     now += 1000
-    const view = charts.view(p)!
+    const view = must(charts.view(p))
     expect(view.state).toBe('live')
-    expect((view.blocks[0] as SparkBlock).values).toHaveLength(5)
+    expect(ofKind(view.blocks[0], 'spark').values).toHaveLength(5)
     // Unchanged data keeps the view's identity, so the store does not relink cards.
     now += 1000
     expect(charts.view(p)).toBe(view)
@@ -264,7 +266,7 @@ describe('Charts', () => {
     const p = proc({ output: lines(5) })
 
     expect(charts.view(p)?.state).toBe('authoring')
-    p.status = 'done'
+    p.state = { status: 'done' }
     now += 1000
     expect(charts.view(p)?.state).toBe('fallback')
     release(LOAD)
@@ -277,7 +279,7 @@ describe('Charts', () => {
     expect(charts.view(proc())).toBeUndefined()
 
     const on = new Charts(() => undefined)
-    const p = proc({ output: 'one\n', status: 'done' })
+    const p = proc({ output: 'one\n', state: { status: 'done' } })
     const view = on.view(p)
     p.output = 'one\ntwo\n'
     expect(on.view(p)).toBe(view)
@@ -298,10 +300,10 @@ describe('job chart views', () => {
   })
 
   it('draws the mini chart with the target line, Tern 0.9.5 chart props', () => {
-    const spark = miniSpark(live())!
+    const spark = must(miniSpark(live()))
 
     expect(spark).toMatchObject({ kind: 'chart' })
-    expect((spark as { props: Record<string, unknown> }).props).toMatchObject({
+    expect(tree(spark).p).toMatchObject({
       kind: 'bars',
       marks: [{ title: 'goal 60', tone: 'muted', value: 60 }],
       role: 'omp.hud.spark',
@@ -311,17 +313,17 @@ describe('job chart views', () => {
   })
 
   it('builds the hover card as a plain node tree, one tile per process', () => {
-    const card = hovercard([
+    const card = must(hovercard([
       { process: proc(), view: live() },
       { process: proc({ command: 'sleep 99', id: 'proc_2' }), view: { blocks: [], stage: 'waiting', state: 'fallback', title: 'sleep 99', updatedAt: 0 } }
-    ])!
+    ]))
 
     expect(card.k).toBe('col')
-    const tiles = card.c![0]!
+    const tiles = must(must(card.c)[0])
     expect(tiles.p).toMatchObject({ role: 'omp.job.tiles' })
-    expect(tiles.c!.map(t => t.p?.role)).toEqual(['omp.job.tile', 'omp.job.tile'])
-    expect(JSON.stringify(tiles.c![0])).toContain('omp.job.tile.chart')
-    expect(JSON.stringify(tiles.c![1])).toContain('omp.job.tile.lead')
+    expect(must(tiles.c).map(t => t.p?.['role'])).toEqual(['omp.job.tile', 'omp.job.tile'])
+    expect(JSON.stringify(must(tiles.c)[0])).toContain('omp.job.tile.chart')
+    expect(JSON.stringify(must(tiles.c)[1])).toContain('omp.job.tile.lead')
   })
 })
 
@@ -331,8 +333,8 @@ describe('the author prompt', () => {
     const [s] = promptSources([{ head: ['starting', '```'], id: 'out', label: 'train', lines: 12, size: 200, tail }])
 
     // Three lines of one shape at most; fences left out.
-    expect(s!.head).toEqual(['starting'])
-    expect(s!.tail).toEqual(['step 7 loss=7', 'step 8 loss=8', 'step 9 loss=9'])
+    expect(must(s).head).toEqual(['starting'])
+    expect(must(s).tail).toEqual(['step 7 loss=7', 'step 8 loss=8', 'step 9 loss=9'])
 
     const prompt = renderPrompt({
       command: 'python train.py',
@@ -352,11 +354,12 @@ describe('process calls show their process', () => {
     args,
     argsText: '',
     context: '',
-    id: `${name}-${JSON.stringify(args)}`,
+    id: toolCallId(`${name}-${JSON.stringify(args)}`),
     name,
     result,
     startedAt: 0,
-    status: 'done'
+    outcome: { duration: 0, kind: 'done' },
+    via: { kind: 'direct' }
   })
 
   it('links a wait, poll or log by its id prefix, as omp tiles the jobs a wait watches', () => {
@@ -397,7 +400,7 @@ describe('chart memory', () => {
     const memory = chartMemory(dir)
     memory.save('proc_1', { skip: 3 })
     expect(memory.load('proc_1')).toEqual({ skip: 3 })
-    memory.save('proc_2', { title: 'x' } as unknown as Spec)
+    memory.save('proc_2', stub<Spec>({ title: 'x' }))
     expect(memory.load('proc_2')).toBeUndefined()
     expect(memory.load('../etc/passwd')).toBeUndefined()
   })
@@ -440,7 +443,7 @@ describe('log files', () => {
     writeFileSync(file, lines(6))
     const seen: string[] = []
     const charts = new Charts(() => undefined, {
-      author: async request => (seen.push(...request.sources.map(s => s.id)), { ...LOAD, rules: [{ ...LOAD.rules[0]!, from: 'file:1' }] }),
+      author: async request => (seen.push(...request.sources.map(s => s.id)), { ...LOAD, rules: [{ ...must(LOAD.rules[0]), from: 'file:1' }] }),
       now: () => 20_000
     })
     const p = proc({ command: `bench --goal 60 > ${file} 2>&1` })
@@ -449,7 +452,7 @@ describe('log files', () => {
     await new Promise(r => setTimeout(r, 0))
     expect(seen).toEqual(['file:1'])
     appendFileSync(file, lines(2, 7))
-    expect((charts.view(p)?.blocks[0] as SparkBlock).values).toHaveLength(8)
+    expect(ofKind(charts.view(p)?.blocks[0], 'spark').values).toHaveLength(8)
   })
 })
 
@@ -474,5 +477,45 @@ describe('a declined chart', () => {
     await new Promise(r => setTimeout(r, 0))
     expect(asked).toBe(2)
     expect(charts.view(p)?.state).toBe('live')
+  })
+
+  it('counts a decline and a rejected request as attempts, and stops asking at the limit', async () => {
+    let asked = 0
+    const bad = { ...LOAD, rules: [{ from: 'out', match: '^nope (?P<rps>\\d+)' }] }
+    const charts = new Charts(() => undefined, { author: async () => (asked++ ? bad : { skip: 'only shell noise' }), maxAttempts: 2, now: () => 20_000 })
+    const p = proc({ output: lines(3) })
+
+    charts.view(p)
+    await new Promise(r => setTimeout(r, 0))
+    expect(asked).toBe(1)
+
+    // Grown past the decline: asked again (one request and its retry), both answers rejected.
+    p.output += lines(6, 4)
+    charts.view(p)
+    await new Promise(r => setTimeout(r, 0))
+    expect(asked).toBe(3)
+
+    p.output += lines(20, 10)
+    charts.view(p)
+    await new Promise(r => setTimeout(r, 0))
+    expect(asked).toBe(3)
+    expect(charts.view(p)?.state).toBe('fallback')
+  })
+})
+
+describe('a chart with no model to write specs', () => {
+  it('asks once, and never again', async () => {
+    let asked = 0
+    const charts = new Charts(() => undefined, { author: async () => void asked++, now: () => 20_000 })
+    const p = proc({ output: lines(3) })
+
+    charts.view(p)
+    await new Promise(r => setTimeout(r, 0))
+    p.output += lines(20, 4)
+    charts.view(p)
+    await new Promise(r => setTimeout(r, 0))
+
+    expect(asked).toBe(1)
+    expect(charts.view(p)?.state).toBe('fallback')
   })
 })

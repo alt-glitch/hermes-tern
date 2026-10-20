@@ -3,9 +3,11 @@ import type { Key } from '@stencil-hq/tern'
 import type { GatewayClient } from '@tui/gatewayClient.js'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { Composer } from '../composer.js'
+import { Composer } from '../draft/composer.js'
 import { completionRequestForInput } from '../hermes/completion.js'
 import { Completion } from '../overlays/completion.js'
+
+import { stub } from './fakes.js'
 
 const history: string[] = []
 
@@ -29,7 +31,7 @@ function setup() {
   }
 
   const host = { changed: vi.fn(), close: vi.fn(), open: vi.fn() }
-  const completion = new Completion(host, gw as unknown as GatewayClient, () => 'sid')
+  const completion = new Completion(host, stub<GatewayClient>(gw), () => 'sid')
   const composer = new Composer()
 
   return { completion, composer }
@@ -130,8 +132,7 @@ describe('Completion: accepting an @ mention', () => {
 
   async function pick(before: string, after: string, text: string) {
     const { completion, composer } = setup()
-    composer.insert(after)
-    composer.cursor = 0
+    composer.set(after, { cursor: 0 })
     type(completion, composer, before)
     pending[0]?.resolve({ items: [row(text)] })
     await vi.runAllTimersAsync()

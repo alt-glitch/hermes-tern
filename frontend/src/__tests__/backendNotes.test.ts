@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { FaultBudget, isDeadStream, protocolNote, slowStartNotes } from '../backendNotes.js'
+import { FaultBudget, isDeadStream, protocolNote, slowStartNotes } from '../chrome/backendNotes.js'
 
 describe('slowStartNotes', () => {
   it('says the backend is still starting, then up to four failure lines, capped', () => {

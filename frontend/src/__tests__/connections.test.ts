@@ -1,8 +1,8 @@
-import { describe, expect, it } from 'vitest'
-
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+
+import { describe, expect, it } from 'vitest'
 
 import {
   allConnected,
@@ -18,9 +18,11 @@ import {
   readCard,
   STALE_MS,
   ternPane
-} from '../connections.js'
+} from '../connections/cards.js'
+import { entryId, liveSessionId, storedSessionId, toolCallId } from '../core/ids.js'
 import type { ToolCall, TurnEntry } from '../model.js'
-import { foldOf, ownsCard } from '../workLog.js'
+import { foldOf, ownsCard } from '../view/workLogModel.js'
+import { decodeJson } from '../wire/json.js'
 
 const result = {
   note: 'Show each connect_url to the user; they open it in a browser to authorize.',
@@ -32,15 +34,19 @@ const result = {
   ]
 }
 
-const call = (over: Partial<ToolCall> = {}): ToolCall => ({
+/** A call's fields to set; its id as plain text. */
+type CallOver = Omit<Partial<ToolCall>, 'id'> & { id?: string }
+
+const call = ({ id = 'c1', ...over }: CallOver = {}): ToolCall => ({
   args: { action: 'connect', connectors: ['googledrive', 'gmail', 'slack'] },
   argsText: '',
   context: '',
-  id: 'c1',
+  id: toolCallId(id),
   name: 'manage_connections',
   result: JSON.stringify(result),
   startedAt: 0,
-  status: 'done',
+  outcome: { duration: 0, kind: 'done' },
+  via: { kind: 'direct' },
   ...over
 })
 
@@ -63,7 +69,7 @@ const watched = (state: string, over: Record<string, unknown> = {}) => ({
   ...over
 })
 
-const stripped = (over: Partial<ToolCall> = {}) =>
+const stripped = (over: CallOver = {}) =>
   call({ result: JSON.stringify({ op_id: 'op1', status: 'initiated', targets: [{ name: 'googledrive', state: 'initiated' }] }), ...over })
 
 describe('manage_connections without its card', () => {
@@ -158,18 +164,35 @@ describe('manage_connections without its card', () => {
   it('one pane tells the agent about a card, once', () => {
     const dir = dataDir({ 'c1.op1': watched('connected') })
 
-    expect(claimTold('c1.op1', dir)).toBe(true)
-    expect(claimTold('c1.op1', dir)).toBe(false)
+    expect(claimTold('c1.op1', dir)).toEqual({ kind: 'claimed' })
+    expect(claimTold('c1.op1', dir)).toEqual({ kind: 'taken' })
     expect(readCard('c1.op1', dir)?.told).toBe(true)
     expect(loadConnect(stripped(), dir)?.told).toBe(true)
+  })
+
+  it('a claim that cannot be written failed: it is not one another pane holds', () => {
+    // No connections folder (ENOENT).
+    expect(claimTold('c1.op1', mkdtempSync(join(tmpdir(), 'tern-claims-')))).toMatchObject({ error: expect.objectContaining({ code: 'ENOENT' }), kind: 'failed' })
+
+    // A folder this pane may not write (EACCES); root writes anyway.
+    const dir = dataDir({ 'c2.op1': watched('connected') })
+    chmodSync(join(dir, 'connections'), 0o555)
+
+    try {
+      if (process.getuid?.() !== 0) {
+        expect(claimTold('c2.op1', dir)).toMatchObject({ error: expect.objectContaining({ code: 'EACCES' }), kind: 'failed' })
+      }
+    } finally {
+      chmodSync(join(dir, 'connections'), 0o755)
+    }
   })
 
   it('marks this pane as the viewer of one session at a time', () => {
     const dir = mkdtempSync(join(tmpdir(), 'tern-viewers-'))
 
-    markViewer('s1', null, dir, {})
-    expect(JSON.parse(readFileSync(join(dir, 'viewers', 's1.json'), 'utf8'))).toEqual({ pid: process.pid })
-    markViewer('s2', 's1', dir)
+    markViewer(storedSessionId('s1'), null, dir, {})
+    expect(decodeJson(readFileSync(join(dir, 'viewers', 's1.json'), 'utf8'))).toEqual({ pid: process.pid })
+    markViewer(storedSessionId('s2'), storedSessionId('s1'), dir)
     expect(existsSync(join(dir, 'viewers', 's1.json'))).toBe(false)
     expect(existsSync(join(dir, 'viewers', 's2.json'))).toBe(true)
   })
@@ -177,8 +200,8 @@ describe('manage_connections without its card', () => {
   it("records the pane's Tern variables, for the agent's tools", () => {
     const dir = mkdtempSync(join(tmpdir(), 'tern-viewers-'))
 
-    markViewer('s1', null, dir, { HOME: '/h', TERN_PANE: '42', TERN_PANE_SOCKET: '/s/pane', TERN_WINDOW_KEY: '' })
-    expect(JSON.parse(readFileSync(join(dir, 'viewers', 's1.json'), 'utf8'))).toEqual({
+    markViewer(liveSessionId('s1'), null, dir, { HOME: '/h', TERN_PANE: '42', TERN_PANE_SOCKET: '/s/pane', TERN_WINDOW_KEY: '' })
+    expect(decodeJson(readFileSync(join(dir, 'viewers', 's1.json'), 'utf8'))).toEqual({
       pid: process.pid,
       tern: { TERN_PANE: '42', TERN_PANE_SOCKET: '/s/pane' }
     })
@@ -206,15 +229,14 @@ describe('manage_connections without its card', () => {
     const c = call()
     const turn: TurnEntry = {
       blocks: [
-        { call: c, id: 'b1', kind: 'tool' },
-        { id: 'b2', kind: 'text', text: 'While you authorize those, I will start.' }
+        { call: c, id: entryId('b1'), kind: 'tool' },
+        { id: entryId('b2'), kind: 'text', text: 'While you authorize those, I will start.' }
       ],
-      endedAt: 1000,
-      id: 't',
+      end: { endedAt: 1000, status: 'done' },
+      id: entryId('t'),
       kind: 'turn',
       rev: 0,
-      startedAt: 0,
-      status: 'done'
+      startedAt: 0
     }
 
     expect(ownsCard(c)).toBe(true)

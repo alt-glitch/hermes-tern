@@ -7,9 +7,14 @@
   "scripts": {
     "setup": "node scripts/hermes-src.mjs && bun install",
     "bundle": "node scripts/hermes-src.mjs && node scripts/build.mjs",
+    "bundle:report": "node scripts/bundle-report.mjs",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run",
-    "check": "bun run typecheck && bun run test"
+    "check:size": "node scripts/check-size.mjs",
+    "check:strict": "node scripts/check-strict.mjs",
+    "check:suppressions": "node scripts/check-suppressions.mjs",
+    "lint": "node scripts/lint.mjs",
+    "check": "node scripts/check-hermes-src.mjs && bun run typecheck && bun run test && bun run lint && bun run check:size && bun run check:strict && bun run check:suppressions"
   },
   "dependencies": {
     "@hermes/shared": "file:.hermes-src/apps/shared",
@@ -27,12 +32,15 @@
     "remark-rehype": "11.1.2",
     "undici": "6.29.0",
     "unified": "11.0.5",
-    "unist-util-visit": "5.1.0"
+    "unist-util-visit": "5.1.0",
+    "zod": "4.4.3"
   },
   "devDependencies": {
     "@types/node": "22.20.1",
     "esbuild": "0.28.1",
+    "eslint": "10.13.0",
     "typescript": "6.0.3",
+    "typescript-eslint": "8.72.0",
     "vitest": "4.1.10"
   }
 }

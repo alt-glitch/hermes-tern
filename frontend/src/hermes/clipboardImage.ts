@@ -82,8 +82,8 @@ export async function extractClipboardImage(
     }
   }
 
-  const root = env.HERMES_PYTHON_SRC_ROOT
-  const python = env.HERMES_PYTHON?.trim() || 'python3'
+  const root = env['HERMES_PYTHON_SRC_ROOT']
+  const python = env['HERMES_PYTHON']?.trim() || 'python3'
 
   if (!root) {
     return undefined

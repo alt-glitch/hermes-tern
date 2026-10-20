@@ -1,16 +1,27 @@
 import type { ServerRequest } from '@hermes/shared/json-rpc-channel'
-import type { Key } from '@stencil-hq/tern'
+import type { NodeJson } from '@stencil-hq/tern'
 import { describe, expect, it, vi } from 'vitest'
 
 import { sharedPromptRequest } from '../hermes/sharedPrompts.js'
-import type { Overlay, OverlayHost } from '../overlay.js'
+import type { Overlay, OverlayHost } from '../overlays/overlay.js'
 import { promptOverlay, promptTimeoutNotice } from '../overlays/prompts.js'
+import { parsePrompt, type PromptRequest } from '../prompts/parse.js'
+import { promptKey, PromptSheets } from '../prompts/sheets.js'
 
-function key(name: string, mods: Partial<Key> = {}): Key {
-  return { alt: false, ctrl: false, meta: false, name, shift: false, ...mods } as Key
-}
+import { key, must, spanTexts, stub, tree } from './fakes.js'
 
 const ctrlC = key('c', { ctrl: true })
+
+/** `req` read as the sheets read it. */
+function parsed(req: ServerRequest): PromptRequest {
+  const prompt = parsePrompt(req)
+
+  if (!prompt) {
+    throw new Error(`no prompt for ${req.method}`)
+  }
+
+  return prompt
+}
 
 function open(method: string, params: Record<string, unknown>) {
   const answers: Record<string, unknown>[] = []
@@ -25,7 +36,7 @@ function open(method: string, params: Record<string, unknown>) {
     respond: result => answers.push(result)
   }
 
-  const overlay = promptOverlay(host, req)
+  const overlay = promptOverlay(host, parsed(req))
 
   if (!overlay) {
     throw new Error(`no sheet for ${method}`)
@@ -34,17 +45,11 @@ function open(method: string, params: Record<string, unknown>) {
   return { answers, closed, overlay }
 }
 
-interface Node {
-  k: string
-  p?: { text?: unknown }
-  c?: Node[]
-}
-
 /** The `text` the sheet's input shows (masked or not), found in its node tree. */
 function inputText(overlay: Overlay): unknown {
-  const walk = (n: Node): unknown => (n.k === 'input' ? n.p?.text : (n.c ?? []).map(walk).find(t => t !== undefined))
+  const walk = (n: NodeJson): unknown => (n.k === 'input' ? n.p?.['text'] : (n.c ?? []).map(walk).find(t => t !== undefined))
 
-  return walk(JSON.parse(JSON.stringify(overlay.node('layer.prompt:r1'))) as Node)
+  return walk(tree(overlay.node('layer.prompt:r1')))
 }
 
 describe('Ctrl+C on a question sheet', () => {
@@ -93,12 +98,12 @@ describe('Ctrl+C on a question sheet', () => {
 describe('the approval sheet', () => {
   /** The action row's buttons: their labels, keys and whether each is the primary one. */
   function buttons(overlay: Overlay) {
-    const walk = (n: Node & { p?: { role?: unknown; tone?: unknown; keys?: unknown } }): unknown[] =>
-      n.p?.role === 'omp.btn'
-        ? [{ keys: (n.c ?? []).map(c => (c as typeof n).p?.keys).find(Boolean), label: (n.c ?? [])[0]?.p?.text, primary: n.p.tone === 'accent' }]
+    const walk = (n: NodeJson): unknown[] =>
+      n.p?.['role'] === 'omp.btn'
+        ? [{ keys: (n.c ?? []).map(c => c.p?.['keys']).find(Boolean), label: n.c?.[0]?.p?.['text'], primary: n.p['tone'] === 'accent' }]
         : (n.c ?? []).flatMap(walk)
 
-    return walk(JSON.parse(JSON.stringify(overlay.node('layer.prompt:r1'))) as Node)
+    return walk(tree(overlay.node('layer.prompt:r1')))
   }
 
   it('offers each answer as a button, Allow once on Enter', () => {
@@ -198,28 +203,28 @@ function shared(type: 'approval.request' | 'clarify.request', payload: Record<st
   })
   const notices: string[] = []
 
-  const req = sharedPromptRequest(
+  const req = must(sharedPromptRequest(
     { payload: { execution_generation: 3, prompt_id: 'p1', ...payload }, session_id: 's1', type },
-    { request } as never,
+    stub({ request }),
     m => notices.push(m)
-  )!
+  ))
 
   const closed: Overlay[] = []
   const host: OverlayHost = { changed: () => undefined, close: o => closed.push(o), open: () => undefined }
-  const overlay = promptOverlay(host, req)!
+  const overlay = must(promptOverlay(host, parsed(req)))
 
   return { closed, notices, overlay, replies, req, request }
 }
 
 /** Every text span the sheet shows, joined. */
 function sheetText(overlay: Overlay): string {
-  const walk = (n: { p?: { text?: unknown; spans?: { t: string }[] }; c?: unknown[] }): string[] => [
-    ...(typeof n.p?.text === 'string' ? [n.p.text] : []),
-    ...(n.p?.spans ?? []).map(sp => sp.t),
-    ...((n.c ?? []) as (typeof n)[]).flatMap(walk)
+  const walk = (n: NodeJson): string[] => [
+    ...(typeof n.p?.['text'] === 'string' ? [n.p['text']] : []),
+    ...spanTexts(n.p?.['spans']),
+    ...(n.c ?? []).flatMap(walk)
   ]
 
-  return walk(JSON.parse(JSON.stringify(overlay.node('layer.prompt:shared:p1')))).join(' ')
+  return walk(tree(overlay.node('layer.prompt:shared:p1'))).join(' ')
 }
 
 const settle = () => new Promise(resolve => setTimeout(resolve, 0))
@@ -237,7 +242,7 @@ describe('a shared prompt sheet', () => {
     overlay.onKey(key('n'))
     expect(request).toHaveBeenCalledTimes(1)
 
-    replies[0]!.resolve({ status: 'resolved' })
+    must(replies[0]).resolve({ status: 'resolved' })
     await settle()
     expect(closed).toEqual([overlay])
   })
@@ -246,7 +251,7 @@ describe('a shared prompt sheet', () => {
     const { closed, overlay, replies, request } = shared('approval.request', { command: 'make' })
 
     overlay.onKey(key('y'))
-    replies[0]!.reject(new Error('gateway unavailable'))
+    must(replies[0]).reject(new Error('gateway unavailable'))
     await settle()
 
     expect(closed).toEqual([])
@@ -254,7 +259,7 @@ describe('a shared prompt sheet', () => {
 
     overlay.onKey(key('n'))
     expect(request).toHaveBeenLastCalledWith('approval.respond', expect.objectContaining({ choice: 'deny' }))
-    replies[1]!.resolve({ status: 'resolved' })
+    must(replies[1]).resolve({ status: 'resolved' })
     await settle()
     expect(closed).toEqual([overlay])
   })
@@ -265,7 +270,7 @@ describe('a shared prompt sheet', () => {
     overlay.onKey(key('a', { text: 'a' }))
     overlay.onKey(key('enter'))
     expect(request).toHaveBeenCalledWith('clarify.respond', expect.objectContaining({ answer: 'a' }))
-    replies[0]!.reject(new Error('stale_generation'))
+    must(replies[0]).reject(new Error('stale_generation'))
     await settle()
     expect(closed).toEqual([])
 
@@ -278,10 +283,104 @@ describe('a shared prompt sheet', () => {
     const { closed, notices, overlay, replies } = shared('approval.request', { command: 'make' })
 
     overlay.onKey(key('y'))
-    replies[0]!.resolve({ status: 'already_resolved' })
+    must(replies[0]).resolve({ status: 'already_resolved' })
     await settle()
 
     expect(closed).toEqual([overlay])
     expect(notices).toEqual(['That question was already answered (by another window, or it timed out).'])
+  })
+})
+
+describe('PromptSheets', () => {
+  /** A stack the way App keeps it: open replaces a same-key overlay, close tells the sheets. */
+  function stack() {
+    const overlays: Overlay[] = []
+    const closed: string[] = []
+
+    const sheets: PromptSheets = new PromptSheets({
+      close: o => {
+        const at = overlays.indexOf(o)
+
+        if (at >= 0) {
+          overlays.splice(at, 1)
+          sheets.closed(o)
+          closed.push(o.key)
+        }
+      },
+      open: o => void overlays.push(o),
+      overlays
+    })
+
+    const sheet = (key: string): Overlay => ({ ...open('sudo', {}).overlay, key })
+    const request = (id: string, method = 'clarify', params: Record<string, unknown> = {}): ServerRequest => ({ fail: () => undefined, id, method, params, respond: () => undefined })
+    const show = (id: string, method?: string, params?: Record<string, unknown>) => sheets.open(sheet(promptKey(id)), parsed(request(id, method, params)))
+    const keys = () => overlays.map(o => o.key)
+
+    return { closed, keys, overlays, sheet, sheets, show }
+  }
+
+  it('keys a sheet by its request id, as each prompt overlay does', () => {
+    expect(promptKey('r1')).toBe('prompt:r1')
+    expect(open('approval', { command: 'ls' }).overlay.key).toBe(promptKey('r1'))
+    expect(open('sudo', {}).overlay.key).toBe(promptKey('r1'))
+  })
+
+  it('drop closes the sheet for one request id, and shows says whether it is open', () => {
+    const { keys, sheets, show } = stack()
+    show('r1')
+    show('r2')
+
+    expect(sheets.shows('r1')).toBe(true)
+    sheets.drop('r1')
+
+    expect(keys()).toEqual(['prompt:r2'])
+    expect(sheets.shows('r1')).toBe(false)
+  })
+
+  it('dropShared closes every shared prompt\'s sheet and keeps a legacy request\'s', () => {
+    const { keys, sheets, show } = stack()
+    show('shared:p1')
+    show('r1')
+    show('shared:p2')
+
+    sheets.dropShared()
+
+    expect(keys()).toEqual(['prompt:r1'])
+  })
+
+  it('dropAll closes every prompt sheet and leaves the other overlays', () => {
+    const { keys, overlays, sheet, sheets, show } = stack()
+    show('r1')
+    overlays.push(sheet('help'))
+    show('shared:p1')
+
+    sheets.dropAll()
+
+    expect(keys()).toEqual(['help'])
+  })
+
+  it('dropByApproval closes the approvals whose queue ids it names', () => {
+    const { keys, sheets, show } = stack()
+    show('r1', 'approval', { request_id: 'q1' })
+    show('r2', 'approval', { request_id: 'q2' })
+    show('r3')
+
+    sheets.dropByApproval(['q2', 'q9'])
+    expect(keys()).toEqual(['prompt:r1', 'prompt:r3'])
+
+    sheets.dropByApproval(undefined)
+    expect(keys()).toEqual(['prompt:r1', 'prompt:r3'])
+  })
+
+  it('a closed approval forgets its queue id: a sheet that takes its key after it is not that approval', () => {
+    const { closed, keys, sheets, show } = stack()
+    show('r1', 'approval', { request_id: 'q1' })
+    sheets.drop('r1')
+    show('r1', 'sudo')
+
+    sheets.dropByApproval(['q1'])
+
+    expect(keys()).toEqual(['prompt:r1'])
+    expect(closed).toEqual(['prompt:r1'])
   })
 })

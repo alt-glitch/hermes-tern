@@ -6,9 +6,11 @@
 
 import { type JSX, Node, node, type NodeJson, type SpanData, type Tone } from '@stencil-hq/tern'
 
+import { optional } from '../../core/assert.js'
 import type { BackgroundProcess } from '../../model.js'
+import { PROCESS_LOOK } from '../look.js'
 
-import type { Block, ChartView, SparkBlock, StatBlock, Trend } from './types.js'
+import type { ChartBlock, ChartView, SparkBlock, StatBlock, Trend } from './types.js'
 
 /** Points the pill's mini chart keeps from the primary spark. */
 const MINI_SPARK_POINTS = 16
@@ -63,9 +65,6 @@ const sp = (t: string, s?: string): SpanData => (s ? { s, t } : { t })
 const plain = (text: string) => text.replace(/\s+/g, ' ').trim()
 
 const fraction = (value: number, max: number) => (!(max > 0) || !Number.isFinite(value) ? 0 : Math.min(1, Math.max(0, value / max)))
-
-/** Props the SDK's JSX types do not know yet, spread onto an element. */
-const extra = (props: Record<string, unknown>) => props as object
 
 export function glance(view: ChartView): Glance | undefined {
   const h = view.headline
@@ -178,9 +177,6 @@ export function tilesNode(entries: readonly ChartEntry[], key = 'tiles'): JSX.El
   )
 }
 
-const TILE_TONE: Record<BackgroundProcess['status'], Tone> = { done: 'success', failed: 'error', killed: 'warning', lost: 'warning', running: 'accent' }
-const TILE_GLYPH: Record<BackgroundProcess['status'], string> = { done: '✓', failed: '✕', killed: '■', lost: '■', running: '●' }
-
 /** A figure's leading number and the unit after it: `1.10k req/s`, `7/9 trials`, `68%`. */
 const FIGURE_NUMBER = /^([-+]?(?:\d[\d,]*(?:\.\d+)?|\.\d+)[kKMGT]?%?)(?:\s+|(?=\/)|$)(.*)$/
 
@@ -209,14 +205,15 @@ export function tile({ process: p, view }: ChartEntry): JSX.Element {
   const g = live && glance(live)
   const title = plain(live?.title ?? '') || plain(p.command.split(/\r?\n/, 1)[0] ?? '') || p.id
   const visual = tileVisual(live?.blocks[0])
+  const look = PROCESS_LOOK[p.state.status]
 
   return (
-    <col gap="xs" key={p.id} role="omp.job.tile" tone={TILE_TONE[p.status]}>
+    <col gap="xs" key={p.id} role="omp.job.tile" tone={look.tone}>
       <row align="center" gap="xs" key="head" role="omp.job.tile.head">
         <text
           key="dot"
           role="omp.job.tile.dot"
-          spans={[{ s: toneStyle(TILE_TONE[p.status]), t: TILE_GLYPH[p.status], ...(p.status === 'running' ? { fx: 'pulse' } : {}) }]}
+          spans={[{ ...optional('s', toneStyle(look.tone)), t: look.glyph, ...(p.state.status === 'running' ? { fx: 'pulse' } : {}) }]}
           wrap="none"
         />
         <text grow={1} key="title" role="omp.job.tile.title" spans={[sp(title)]} truncate="end" wrap="none" />
@@ -234,7 +231,7 @@ function tileMeter(value: number, tone: Tone = DEFAULT_TONE, key = 'meter'): JSX
 }
 
 /** A tile's picture of its primary block; stats and text read as notes instead. */
-function tileVisual(b: Block | undefined): JSX.Element | undefined {
+function tileVisual(b: ChartBlock | undefined): JSX.Element | undefined {
   switch (b?.kind) {
     case 'spark':
       return b.values.length ? node('chart', { ...sparkProps(b), key: 'visual', role: 'omp.job.tile.chart', size: 'sm' }) : undefined
@@ -283,7 +280,8 @@ function tileVisual(b: Block | undefined): JSX.Element | undefined {
 function tileNotes(p: BackgroundProcess, view: ChartView, live: ChartView | undefined, lead: boolean): JSX.Element[] {
   // A live chart's stage is a line no rule read; the matched lines are what its figures show.
   const stage = plain(view.stage ?? '')
-  const failed = p.exitCode ? `exit ${p.exitCode}` : ''
+  const code = 'exitCode' in p.state ? p.state.exitCode : undefined
+  const failed = code ? `exit ${code}` : ''
   const notes: JSX.Element[] = []
 
   for (const b of live?.blocks ?? []) {
@@ -326,7 +324,7 @@ export function chartNode(view: ChartView, key = 'chart'): JSX.Element {
   return (
     <col gap="xs" key={key} role="omp.job.widget">
       <row align="baseline" gap="sm" key="head" role="omp.job.widget.head">
-        <text key="title" role="omp.job.widget.title" spans={[sp(plain(view.title), 'strong')]} truncate="end" wrap="none" {...extra(stage ? {} : { grow: 1 })} />
+        <text key="title" role="omp.job.widget.title" spans={[sp(plain(view.title), 'strong')]} truncate="end" wrap="none" {...(stage ? {} : { grow: 1 })} />
         {stage ? <text grow={1} key="stage" role="omp.job.widget.stage" spans={[sp(stage, 'muted')]} truncate="end" wrap="none" /> : null}
         {view.state === 'authoring' ? <shimmer key="authoring" text="charting…" /> : null}
         {h ? <text key="headline" role="omp.job.widget.headline" spans={glanceSpans(h)} wrap="none" /> : null}
@@ -343,7 +341,7 @@ export function primaryNode(view: ChartView, key = 'chart'): JSX.Element | undef
   return b ? <col key={key} role="omp.job.widget">{blockNode(b, 'primary')}</col> : undefined
 }
 
-function blockNode(b: Block, key: string): JSX.Element {
+function blockNode(b: ChartBlock, key: string): JSX.Element {
   switch (b.kind) {
     case 'spark':
       return sparkNode(b, key)
@@ -356,7 +354,7 @@ function blockNode(b: Block, key: string): JSX.Element {
             ? b.items.map((item, i) =>
                 labelled(
                   item.label,
-                  <meter grow={1} key="meter" label={plain(item.text)} size="sm" value={fraction(item.value, b.max)} {...extra(item.tone ? { tone: item.tone } : {})} />,
+                  <meter grow={1} key="meter" label={plain(item.text)} size="sm" value={fraction(item.value, b.max)} {...(item.tone ? { tone: item.tone } : {})} />,
                   'omp.job.widget.bar',
                   `${i}`
                 )
@@ -368,7 +366,7 @@ function blockNode(b: Block, key: string): JSX.Element {
     case 'meter':
       return labelled(
         b.label,
-        <meter grow={1} key="meter" label={plain(b.text)} size="sm" value={fraction(b.value, 1)} {...extra(b.tone ? { tone: b.tone } : {})} />,
+        <meter grow={1} key="meter" label={plain(b.text)} size="sm" value={fraction(b.value, 1)} {...(b.tone ? { tone: b.tone } : {})} />,
         'omp.job.widget.meter',
         key
       )

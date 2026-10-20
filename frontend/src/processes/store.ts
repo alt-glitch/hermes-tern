@@ -3,41 +3,33 @@
 // printed (`agent.terminal.output`); status and exits come from polling `process.list`
 // (session-scoped): every second while the sheet is open or a process runs, else every five. Exited processes stay on the pill for
 // Hermes' 60 s (ui-tui/src/app/processRoster.ts); the sheet's All tab keeps whatever the
-// gateway still lists.
+// gateway still lists. When `process.list` keeps failing, or the gateway exits and takes the
+// session's runtime id with it, the running processes show as unknown and the poll slows to the
+// idle cadence until it answers again; only another session's adoption clears them.
 
 import type { GatewayClient } from '@tui/gatewayClient.js'
 
-import type { BackgroundProcess, ToolCall } from '../model.js'
-import { isWatchCall, record, type Transcript } from '../transcript.js'
-import { withoutTernEnv } from '../view/describe.js'
+import type { LiveSessionId } from '../core/ids.js'
+import { Poller } from '../core/poller.js'
+import { withoutEscapes } from '../core/text.js'
+import type { BackgroundProcess, ProcessEnd, ProcessState, ToolCall } from '../model.js'
+import { withoutTernEnv } from '../tools/terminal.js'
+import { isWatchCall } from '../transcript/calls.js'
+import type { Transcript } from '../transcript/store.js'
+import { record } from '../wire/json.js'
+import { rpc, rpcParsed } from '../wire/rpc.js'
+import { processList, type ProcessRow } from '../wire/schemas.js'
 
+import { PROCESS_LOOK, type ProcessLook } from './look.js'
 import { Charts, type ChartsOptions } from './widgets/registry.js'
 
 /** What the store reaches of the app. */
 export interface ProcessesHost {
   readonly gw: Pick<GatewayClient, 'request'>
-  readonly sid: string | null
+  /** The open session's runtime id. */
+  readonly sid: LiveSessionId | null
   readonly transcript: Transcript
   changed(): void
-}
-
-/**
- * One row of `process.list`. The shared gateway (gateway/session_ancillary.py `process_snapshot`)
- * sends `started_epoch` and a 32k `output_tail`; the per-session gateway
- * (tools/process_registry.py `list_sessions`) sends `uptime_seconds` and `output_preview`.
- * Neither says how a process notifies: that is only in the terminal call's arguments.
- */
-export interface ProcessEntry {
-  session_id: string
-  command?: string
-  status?: string
-  exit_code?: number | null
-  started_epoch?: number | null
-  uptime_seconds?: number | null
-  exited_at?: number | null
-  completion_reason?: string | null
-  output_tail?: string
-  output_preview?: string
 }
 
 /** How much output a process keeps between polls: the shared gateway's `output_tail` is 32k. */
@@ -47,11 +39,13 @@ export const OUTPUT_MAX = 32_000
 export const RETAIN_MS = 60_000
 export const FAST_MS = 1000
 export const IDLE_MS = 5000
+/** Failed `process.list` polls in a row after which a running process shows as unknown. */
+export const FAILED_POLLS = 3
 
-const REASON_STATUS: Record<string, BackgroundProcess['status']> = { failed_start: 'failed', killed: 'killed', lost: 'lost' }
+const REASON_STATUS: Record<string, ProcessEnd['status']> = { failed_start: 'failed', killed: 'killed', lost: 'lost' }
 
 /** Hermes' mapping: running until exited, then the completion reason, else the exit code. */
-export function processStatus(entry: Pick<ProcessEntry, 'completion_reason' | 'exit_code' | 'status'>): BackgroundProcess['status'] {
+export function processStatus(entry: Pick<ProcessRow, 'completion_reason' | 'exit_code' | 'status'>): 'running' | ProcessEnd['status'] {
   if (entry.status !== 'exited') {
     return 'running'
   }
@@ -59,15 +53,12 @@ export function processStatus(entry: Pick<ProcessEntry, 'completion_reason' | 'e
   return REASON_STATUS[entry.completion_reason ?? ''] ?? (entry.exit_code ? 'failed' : 'done')
 }
 
-// eslint-disable-next-line no-control-regex -- terminal escapes are what this strips
-const ESCAPES = /\x1b\[[0-?]*[ -/]*[@-~]|\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)|\x1b[@-_]/g
-
 /** The last non-empty line of `output`, without escapes; a `\r`-redrawn line reads as its newest draw. */
 export function lastLine(output: string): string {
-  const lines = output.replace(ESCAPES, '').split('\n')
+  const lines = withoutEscapes(output).split('\n')
 
-  for (let i = lines.length - 1; i >= 0; i--) {
-    const draws = lines[i]!.split('\r')
+  for (const line of lines.toReversed()) {
+    const draws = line.split('\r')
     const text = (draws.findLast(d => d.trim()) ?? '').replace(/\s+/g, ' ').trim()
 
     if (text) {
@@ -79,35 +70,62 @@ export function lastLine(output: string): string {
 }
 
 /** `entry` folded into `prev` (kept as the same object, so Tern timers keyed on it stay put). */
-export function foldEntry(prev: BackgroundProcess | undefined, entry: ProcessEntry, now: number): BackgroundProcess {
-  const status = processStatus(entry)
+export function foldEntry(prev: BackgroundProcess | undefined, entry: ProcessRow, now: number): BackgroundProcess {
+  const state = stateOf(entry, prev && endOf(prev))
   const output = entry.output_tail ?? entry.output_preview ?? prev?.output ?? ''
   const startedAt =
     typeof entry.started_epoch === 'number'
       ? entry.started_epoch * 1000
       : (prev?.startedAt ?? now - Math.max(0, entry.uptime_seconds ?? 0) * 1000)
 
-  const p: BackgroundProcess = prev ?? { command: '', id: entry.session_id, lastLine: '', output: '', startedAt, status }
+  const p: BackgroundProcess = prev ?? { command: '', id: entry.session_id, lastLine: '', output: '', startedAt, state }
 
   p.command = withoutTernEnv((entry.command ?? '').trim()) || p.command || 'background process'
-  p.status = status
+  p.state = state
   p.startedAt = startedAt
   p.output = output
   p.lastLine = lastLine(output)
-  p.exitCode = typeof entry.exit_code === 'number' && status !== 'running' ? entry.exit_code : undefined
-  p.reason = status !== 'running' ? (entry.completion_reason ?? undefined) : undefined
-  p.exitedAt = status === 'running' ? undefined : typeof entry.exited_at === 'number' && entry.exited_at ? entry.exited_at * 1000 : p.exitedAt
 
   return p
 }
 
-export function isRunning(p: BackgroundProcess): boolean {
-  return p.status === 'running'
+/** What `entry` says of its process; an exit time it does not give stays the one `was` had. */
+function stateOf(entry: ProcessRow, was: ProcessEnd | undefined): ProcessState {
+  const status = processStatus(entry)
+
+  if (status === 'running') {
+    return { status }
+  }
+
+  const exitedAt = typeof entry.exited_at === 'number' && entry.exited_at ? entry.exited_at * 1000 : was?.exitedAt
+
+  return {
+    status,
+    ...(exitedAt === undefined ? {} : { exitedAt }),
+    ...(typeof entry.exit_code === 'number' ? { exitCode: entry.exit_code } : {}),
+    ...(typeof entry.completion_reason === 'string' ? { reason: entry.completion_reason } : {})
+  }
 }
 
-/** Still on the pill: running, or exited within the retention window (an exit with no time is not). */
+/** How `p` ended; undefined while it is not seen to end. */
+export function endOf(p: BackgroundProcess): ProcessEnd | undefined {
+  return p.state.status === 'running' || p.state.status === 'unknown' ? undefined : p.state
+}
+
+export function isRunning(p: BackgroundProcess): boolean {
+  return p.state.status === 'running'
+}
+
+/** Not seen to end: running, or unknown (it ran when `process.list` last answered). */
+export function isUnended(p: BackgroundProcess): boolean {
+  return !endOf(p)
+}
+
+/** Still on the pill: not seen to end, or exited within the retention window (an exit with no time is not). */
 export function isRecent(p: BackgroundProcess, now: number): boolean {
-  return isRunning(p) || (p.exitedAt !== undefined && now - p.exitedAt <= RETAIN_MS)
+  const exitedAt = endOf(p)?.exitedAt
+
+  return isUnended(p) || (exitedAt !== undefined && now - exitedAt <= RETAIN_MS)
 }
 
 /** Running first, longest-running first; then exited ones, newest exit first. */
@@ -119,41 +137,37 @@ export function sortProcesses(list: readonly BackgroundProcess[]): BackgroundPro
         : 1
       : isRunning(a)
         ? a.startedAt - b.startedAt
-        : (b.exitedAt ?? 0) - (a.exitedAt ?? 0)
+        : (endOf(b)?.exitedAt ?? 0) - (endOf(a)?.exitedAt ?? 0)
   )
 }
 
-/** How long it ran (so far, while running). */
+/** How long it ran (so far, while not seen to end). */
 export function processElapsed(p: BackgroundProcess, now: number): number {
-  return Math.max(0, (p.exitedAt ?? (isRunning(p) ? now : p.startedAt)) - p.startedAt)
-}
-
-const TONE: Record<BackgroundProcess['status'], 'accent' | 'error' | 'success' | 'warning'> = {
-  done: 'success',
-  failed: 'error',
-  killed: 'warning',
-  lost: 'warning',
-  running: 'accent'
+  return Math.max(0, (endOf(p)?.exitedAt ?? (isUnended(p) ? now : p.startedAt)) - p.startedAt)
 }
 
 /** The status's palette tone: accent while running, then success, error or warning. */
-export function processTone(status: BackgroundProcess['status']): 'accent' | 'error' | 'success' | 'warning' {
-  return TONE[status]
+export function processTone(status: ProcessState['status']): ProcessLook['tone'] {
+  return PROCESS_LOOK[status].tone
 }
 
-/** `running`, `exit 0`, `exit 2`, `killed`, `lost`, `failed to start`. */
+/** `running`, `exit 0`, `exit 2`, `killed`, `lost`, `unknown`, `failed to start`. */
 export function processVerdict(p: BackgroundProcess): string {
-  switch (p.status) {
+  const { state } = p
+
+  switch (state.status) {
     case 'running':
       return 'running'
 
     case 'killed':
 
     case 'lost':
-      return p.status
+
+    case 'unknown':
+      return state.status
 
     default:
-      return p.reason === 'failed_start' ? 'failed to start' : `exit ${p.exitCode ?? '?'}`
+      return state.reason === 'failed_start' ? 'failed to start' : `exit ${state.exitCode ?? '?'}`
   }
 }
 
@@ -177,26 +191,26 @@ const strings = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is
 export function watchersOf(call: Pick<ToolCall, 'args' | 'result'>): Watchers {
   const r = record(call.result)
 
-  if (typeof r?.session_id === 'string') {
+  if (typeof r?.['session_id'] === 'string') {
     return {
-      heartbeat: typeof r.heartbeat_seconds === 'number' ? r.heartbeat_seconds : 0,
-      notify: r.notify_on_complete === true,
-      patterns: strings(r.watch_patterns)
+      heartbeat: typeof r['heartbeat_seconds'] === 'number' ? r['heartbeat_seconds'] : 0,
+      notify: r['notify_on_complete'] === true,
+      patterns: strings(r['watch_patterns'])
     }
   }
 
   const a = call.args
-  const beat = typeof a.heartbeat === 'number' && a.heartbeat > 0 ? Math.max(60, Math.floor(a.heartbeat)) : 0
-  let notify = a.notify_on_complete === true
-  let patterns = strings(a.watch_patterns)
+  const beat = typeof a['heartbeat'] === 'number' && a['heartbeat'] > 0 ? Math.max(60, Math.floor(a['heartbeat'])) : 0
+  let notify = a['notify_on_complete'] === true
+  let patterns = strings(a['watch_patterns'])
 
   // `notify` is the advertised flag and wins over the legacy pair.
-  if (typeof a.notify === 'boolean') {
-    notify = a.notify
+  if (typeof a['notify'] === 'boolean') {
+    notify = a['notify']
     patterns = []
-  } else if (Array.isArray(a.notify)) {
+  } else if (Array.isArray(a['notify'])) {
     notify = false
-    patterns = strings(a.notify)
+    patterns = strings(a['notify'])
   }
 
   notify ||= beat > 0
@@ -206,7 +220,7 @@ export function watchersOf(call: Pick<ToolCall, 'args' | 'result'>): Watchers {
 
 /** The process id a background terminal call's result names. */
 export function processIdOf(call: ToolCall): string | undefined {
-  const id = record(call.result)?.session_id
+  const id = record(call.result)?.['session_id']
 
   return typeof id === 'string' && id ? id : undefined
 }
@@ -214,15 +228,17 @@ export function processIdOf(call: ToolCall): string | undefined {
 export class Processes {
   readonly #host: ProcessesHost
   readonly #byId = new Map<string, BackgroundProcess>()
-  #sid: string | null = null
-  #timer: NodeJS.Timeout | undefined
-  #ticking = false
-  #again = false
-  /** Open sheets wanting the fast cadence. */
-  #watchers = 0
+  /** The session whose processes #byId holds: the last one adopted, kept while the gateway is away. */
+  #sid: LiveSessionId | null = null
+  /** The poll: fast while a sheet watches or a process runs, idle otherwise or while it fails. */
+  readonly #poller: Poller = new Poller({
+    cadence: () => (this.#failures < FAILED_POLLS && (this.#poller.watched || [...this.#byId.values()].some(isRunning)) ? FAST_MS : IDLE_MS),
+    run: () => this.#poll()
+  })
+  /** `process.list` polls that failed in a row. */
+  #failures = 0
   /** The pill's rows at the last tick, to re-render when one ages out. */
   #shown = ''
-  #disposed = false
   /** Ids a stop was sent for and that still run: the registry can take seconds to end one. */
   readonly #stopping = new Set<string>()
   /** Each process's live chart, kept on `p.chart`. */
@@ -261,23 +277,12 @@ export class Processes {
 
   /** Polls now (a background command just started, the sheet opened, a stop landed). */
   poke() {
-    clearTimeout(this.#timer)
-    this.#timer = undefined
-    void this.#tick()
+    this.#poller.poke()
   }
 
   /** The fast cadence while the returned release has not run (an open sheet). */
   watch(): () => void {
-    this.#watchers++
-    this.poke()
-    let released = false
-
-    return () => {
-      if (!released) {
-        released = true
-        this.#watchers--
-      }
-    }
+    return this.#poller.watch()
   }
 
   /** A chunk `id` printed (`agent.terminal.output`); a process the store does not know yet polls. */
@@ -302,7 +307,8 @@ export class Processes {
     this.#host.changed()
 
     try {
-      const r = await this.#host.gw.request<{ status?: string }>('process.kill', { process_id: id, session_id: this.#host.sid })
+      const sid = this.#host.sid
+      const r = sid ? await rpc(this.#host.gw, 'process.kill', { process_id: id, session_id: sid }) : undefined
 
       return r?.status
     } finally {
@@ -318,7 +324,7 @@ export class Processes {
     this.#host.changed()
 
     try {
-      const r = await this.#host.gw.request<{ killed?: number }>('process.stop', { session_id: this.#host.sid })
+      const r = await rpc(this.#host.gw, 'process.stop', { session_id: this.#host.sid })
 
       return typeof r?.killed === 'number' ? r.killed : 0
     } finally {
@@ -328,9 +334,7 @@ export class Processes {
   }
 
   dispose() {
-    this.#disposed = true
-    clearTimeout(this.#timer)
-    this.#timer = undefined
+    this.#poller.dispose()
     this.#charts.dispose()
   }
 
@@ -350,71 +354,48 @@ export class Processes {
     return this.#link(touched) || touched.size > 0
   }
 
-  #schedule() {
-    if (this.#disposed) {
-      return
-    }
-
-    clearTimeout(this.#timer)
-    const fast = this.#watchers > 0 || [...this.#byId.values()].some(isRunning)
-    this.#timer = setTimeout(() => void this.#tick(), fast ? FAST_MS : IDLE_MS)
-  }
-
-  async #tick() {
-    if (this.#ticking) {
-      // A poke during a poll: poll once more right after it.
-      this.#again = true
-
-      return
-    }
-
-    this.#ticking = true
-
-    try {
-      do {
-        this.#again = false
-        await this.#poll()
-      } while (this.#again)
-    } finally {
-      this.#ticking = false
-      this.#schedule()
-    }
-  }
-
   async #poll() {
     const sid = this.#host.sid
+
+    // No runtime id: the gateway went away (or no session is adopted yet). The session's processes
+    // stay, the running ones as unknown, until a session is adopted.
+    if (!sid) {
+      return this.#unknown() ? this.#host.changed() : undefined
+    }
+
     let changed = false
 
     if (sid !== this.#sid) {
       // Another session: its processes are not this one's.
       changed = this.#byId.size > 0
       this.#byId.clear()
+      this.#failures = 0
       this.#sid = sid
     }
 
-    if (!sid) {
-      return changed ? this.#host.changed() : undefined
-    }
-
-    let rows: ProcessEntry[]
+    let rows: ProcessRow[]
 
     try {
-      rows = (await this.#host.gw.request<{ processes?: ProcessEntry[] }>('process.list', { session_id: sid }))?.processes ?? []
+      rows = await rpcParsed(this.#host.gw, 'process.list', { session_id: sid }, processList)
     } catch {
-      // A gateway without process.list, or a session it no longer holds live.
-      return changed ? this.#host.changed() : undefined
+      // A gateway without process.list, or a session it no longer holds live, or no gateway at all.
+      const unknown = sid === this.#host.sid && this.#failed()
+
+      return unknown || changed ? this.#host.changed() : undefined
     }
 
+    // Another session was shown meanwhile: these rows are the last one's.
     if (sid !== this.#host.sid) {
       return
     }
 
+    this.#failures = 0
     const now = Date.now()
     const touched = new Set<BackgroundProcess>()
     const listed = new Set<string>()
 
     for (const row of rows) {
-      if (typeof row?.session_id !== 'string' || !row.session_id) {
+      if (!row.session_id) {
         continue
       }
 
@@ -434,10 +415,9 @@ export class Processes {
         continue
       }
 
-      if (isRunning(p)) {
+      if (isUnended(p)) {
         // Gone from the registry while running (a restarted gateway): Hermes calls that lost.
-        p.status = 'lost'
-        p.exitedAt = now
+        p.state = { exitedAt: now, status: 'lost' }
         touched.add(p)
       } else if (!isRecent(p, now)) {
         this.#byId.delete(p.id)
@@ -449,7 +429,7 @@ export class Processes {
     changed = this.#chart([...this.#byId.values()]) || changed
     changed = this.#link(touched) || touched.size > 0 || changed
     const shown = this.recent(now)
-      .map(p => `${p.id}:${p.status}`)
+      .map(p => `${p.id}:${p.state.status}`)
       .join()
 
     if (shown !== this.#shown) {
@@ -462,6 +442,24 @@ export class Processes {
     }
   }
 
+  /**
+   * Counts a failed poll; at FAILED_POLLS in a row, the running processes show as unknown (nothing
+   * says they still run). True when one changed.
+   */
+  #failed(): boolean {
+    this.#failures++
+
+    return this.#failures >= FAILED_POLLS && this.#unknown()
+  }
+
+  /** The running processes show as unknown; true when one changed. */
+  #unknown(): boolean {
+    const touched = new Set([...this.#byId.values()].filter(isRunning))
+    touched.forEach(p => (p.state = { status: 'unknown' }))
+
+    return this.#link(touched) || touched.size > 0
+  }
+
   /** Points each background terminal card at its process; true when a card changed. */
   #link(touched: Set<BackgroundProcess>): boolean {
     const calls = this.#host.transcript.backgroundCalls()
@@ -472,8 +470,7 @@ export class Processes {
       const p = owners.get(call)
 
       if (p && (call.process !== p || touched.has(p))) {
-        call.process = p
-        this.#host.transcript.touchCall(call)
+        this.#host.transcript.mutateCall(call, c => (c.process = p))
         changed = true
       }
     }
@@ -503,18 +500,20 @@ export function linkCalls(calls: readonly ToolCall[], procs: readonly Background
 
   // A process tool call names its process by id or a unique prefix of it; many calls may watch one.
   for (const call of calls) {
-    const ref = isWatchCall(call) ? String(call.args.session_id).trim() : ''
+    const ref = isWatchCall(call) ? String(call.args['session_id']).trim() : ''
     const matches = ref ? procs.filter(p => p.id.startsWith(ref)) : []
 
-    if (matches.length === 1) {
-      owners.set(call, matches[0]!)
+    const [only] = matches
+
+    if (only && matches.length === 1) {
+      owners.set(call, only)
     }
   }
 
   const free = [...procs].sort((a, b) => a.startedAt - b.startedAt)
 
   for (const call of calls) {
-    const command = typeof call.args.command === 'string' ? call.args.command.trim() : ''
+    const command = typeof call.args['command'] === 'string' ? call.args['command'].trim() : ''
 
     if (owners.has(call) || processIdOf(call) || !command || call.name !== 'terminal') {
       continue
@@ -532,5 +531,7 @@ export function linkCalls(calls: readonly ToolCall[], procs: readonly Background
 }
 
 function snapshot(p: BackgroundProcess): string {
-  return `${p.status}|${p.exitCode}|${p.exitedAt}|${p.startedAt}|${p.output.slice(-120)}|${p.lastLine}|${p.command}`
+  const end = endOf(p)
+
+  return `${p.state.status}|${end?.exitCode}|${end?.exitedAt}|${p.startedAt}|${p.output.slice(-120)}|${p.lastLine}|${p.command}`
 }

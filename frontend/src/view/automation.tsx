@@ -5,9 +5,11 @@
 
 import type { JSX, Tone } from '@stencil-hq/tern'
 
-import type { GoalState, GoalView, LoopView } from '../automation.js'
+import type { Reconnecting } from '../chrome/reconnect.js'
+import type { GoalState, GoalView, LoopView } from '../session/automation.js'
 
 import { countdownAge } from './time.js'
+import { pill } from './ui/pill.js'
 
 /** The goal and loop line's model. */
 export interface AutomationLine {
@@ -19,12 +21,8 @@ export interface AutomationLine {
   onLoop(): void
 }
 
-/** The gateway is being redialled: which try, and when the next one starts. */
-export interface Reconnecting {
-  attempt: number
-  /** When the next try starts (ms since the epoch). */
-  dueAt: number
-}
+/** A part of the line: a pill the keyboard can hold, with no inner part. */
+const ITEM = 'hermes.automation.item'
 
 const GOAL_LOOK: Record<GoalState, { icon: string; label: string; tone: Tone }> = {
   active: { icon: 'goal', label: 'Goal', tone: 'accent' },
@@ -76,55 +74,51 @@ function goalPart(g: GoalView, onOpen: () => void, focused: boolean): JSX.Elemen
   const look = GOAL_LOOK[g.state]
   const judged = g.verdict ? `\nLast check: ${g.verdict}${g.reason ? ` · ${g.reason}` : ''}` : ''
 
-  return (
-    <row
-      align="center"
-      gap="xs"
-      key="goal"
-      mark={focused ? 'pick' : undefined}
-      onClick={onOpen}
-      role="hermes.automation.item"
-      title={`${look.label}: ${g.title}\n${turnsText(g)}${g.detail ? ` · ${g.detail}` : ''}${judged}\nClick for details and controls`}
-    >
-      <icon key="icon" name={look.icon} tone={look.tone} />
-      <text key="label" role="hermes.automation.label" text={look.label} wrap="none" />
-      {/* The judge's reason can run long: the tooltip and the sheet carry it, the line stays one line. */}
-      <text grow={1} key="what" role="hermes.automation.what" text={g.title} truncate="end" wrap="none" />
-      {g.maxTurns > 0 ? (
+  return pill({
+    children: [
+      <icon key="icon" name={look.icon} tone={look.tone} />,
+      <text key="label" role="hermes.automation.label" text={look.label} wrap="none" />,
+      // The judge's reason can run long: the tooltip and the sheet carry it, the line stays one line.
+      <text grow={1} key="what" role="hermes.automation.what" text={g.title} truncate="end" wrap="none" />,
+      g.maxTurns > 0 ? (
         <meter key="turns" size="sm" style="bar" thresholds={{ bad: 0.9, warn: 0.75 }} value={Math.min(1, g.turns / g.maxTurns)} />
-      ) : null}
+      ) : null,
       <text key="count" role="hermes.automation.count" spans={[{ s: 'muted', t: g.maxTurns > 0 ? `${g.turns}/${g.maxTurns}` : turnsText(g) }]} wrap="none" />
-    </row>
-  )
+    ],
+    focused,
+    key: 'goal',
+    onClick: onOpen,
+    role: ITEM,
+    seg: false,
+    title: `${look.label}: ${g.title}\n${turnsText(g)}${g.detail ? ` · ${g.detail}` : ''}${judged}\nClick for details and controls`
+  })
 }
 
 function loopPart(l: LoopView, owner: object, onOpen: () => void, now: number, focused: boolean): JSX.Element {
   const paused = l.state === 'paused'
   const when = loopWhen(l)
 
-  return (
-    <row
-      align="center"
-      gap="xs"
-      key="loop"
-      mark={focused ? 'pick' : undefined}
-      onClick={onOpen}
-      role="hermes.automation.item"
-      title={`${paused ? 'Loop paused' : 'Loop'}: ${l.prompt}\n${l.cadence} · ${l.runs}${l.until ? ` · until ${l.until}` : ''}\nClick for details and controls`}
-    >
-      {l.state === 'running' ? (
+  return pill({
+    children: [
+      l.state === 'running' ? (
         <spinner key="icon" style="dots" tone="accent" />
       ) : (
         <icon key="icon" name={paused ? 'pause' : 'loop'} tone={paused ? 'warning' : l.state === 'deferred' ? 'muted' : 'accent'} />
-      )}
-      <text key="label" role="hermes.automation.label" text={paused ? 'Loop paused' : 'Loop'} wrap="none" />
-      <text grow={1} key="what" role="hermes.automation.what" text={l.prompt} truncate="end" wrap="none" />
-      <text key="cadence" role="hermes.automation.when" spans={[{ s: 'muted', t: `${l.cadence} · ${when}` }]} wrap="none" />
-      {l.dueAt !== undefined ? (
+      ),
+      <text key="label" role="hermes.automation.label" text={paused ? 'Loop paused' : 'Loop'} wrap="none" />,
+      <text grow={1} key="what" role="hermes.automation.what" text={l.prompt} truncate="end" wrap="none" />,
+      <text key="cadence" role="hermes.automation.when" spans={[{ s: 'muted', t: `${l.cadence} · ${when}` }]} wrap="none" />,
+      l.dueAt !== undefined ? (
         <elapsed age={countdownAge(owner, l.dueAt, now)} format="short" key="countdown" role="hermes.automation.count" />
-      ) : null}
-    </row>
-  )
+      ) : null
+    ],
+    focused,
+    key: 'loop',
+    onClick: onOpen,
+    role: ITEM,
+    seg: false,
+    title: `${paused ? 'Loop paused' : 'Loop'}: ${l.prompt}\n${l.cadence} · ${l.runs}${l.until ? ` · until ${l.until}` : ''}\nClick for details and controls`
+  })
 }
 
 /** One replaceable line while the gateway is redialled: the try, and a countdown to the next. */

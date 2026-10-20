@@ -1,0 +1,1 @@
+{"op_id": "op_1", "call_id": "call_1", "session": "sess_1", "pid": 1, "created_at": 1792500000.25, "updated_at": 1792500020.5, "targets": [{"name": "gmail", "alias": "work", "state": "not_connected", "connect_url": "https://connect.example/gmail"}, {"name": "google_drive", "state": "connected"}], "watching": false, "settled_by": "error", "error": "connector read failed"}

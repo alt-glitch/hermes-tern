@@ -1,10 +1,11 @@
 import type { GatewayClient } from '@tui/gatewayClient.js'
 import { describe, expect, it, vi } from 'vitest'
 
+import { toolCallId } from '../core/ids.js'
 import type { ToolCall } from '../model.js'
-import { Cron, type CronJob, isMonitor, isPaused, jobTone, ownJobs, relative } from '../processes/cron.js'
+import { Cron, CRON_POLL_MS, type CronJob, isMonitor, isPaused, jobTone, ownJobs } from '../processes/cron.js'
 
-const NOW = Date.parse('2026-10-17T12:00:00Z')
+import { stub } from './fakes.js'
 
 const job = (over: Partial<CronJob> = {}): CronJob => ({ enabled: true, job_id: 'j1', name: 'digest', schedule: 'every 30m', ...over })
 
@@ -12,11 +13,12 @@ const call = (name: string, result: unknown): ToolCall => ({
   args: {},
   argsText: '',
   context: '',
-  id: 'c',
+  id: toolCallId('c'),
   name,
   result: JSON.stringify(result),
   startedAt: 0,
-  status: 'done'
+  outcome: { duration: 0, kind: 'done' },
+  via: { kind: 'direct' }
 })
 
 describe('cron jobs', () => {
@@ -40,25 +42,15 @@ describe('cron jobs', () => {
 
     expect([...ownJobs(calls)]).toEqual(['a', 'b'])
   })
-
-  it('says how far a time is in its largest whole unit', () => {
-    const at = (ms: number) => new Date(NOW + ms).toISOString()
-
-    expect(relative(at(10_000), NOW)).toBe('now')
-    expect(relative(at(29 * 60_000), NOW)).toBe('in 29m')
-    expect(relative(at(-3 * 3_600_000), NOW)).toBe('3h ago')
-    expect(relative(at(2 * 86_400_000), NOW)).toBe('in 2d')
-    expect(relative(null, NOW)).toBe('')
-  })
 })
 
 describe('Cron', () => {
   it('lists paused jobs too, acts by id and keeps the error when the gateway refuses', async () => {
     const request = vi.fn(
       async (_method: string, params: Record<string, unknown>): Promise<{ error?: string; jobs?: CronJob[]; success: boolean }> =>
-        params.action === 'list' ? { jobs: [job()], success: true } : { success: true }
+        params['action'] === 'list' ? { jobs: [job()], success: true } : { success: true }
     )
-    const cron = new Cron({ changed: vi.fn(), gw: { request } as unknown as Pick<GatewayClient, 'request'> })
+    const cron = new Cron({ changed: vi.fn(), gw: stub<Pick<GatewayClient, 'request'>>({ request }) })
 
     await cron.refresh()
     expect(request).toHaveBeenCalledWith('cron.manage', { action: 'list', include_disabled: true })
@@ -73,5 +65,26 @@ describe('Cron', () => {
     request.mockRejectedValueOnce(new Error('method not found'))
     await cron.refresh()
     expect(cron.error).toBe('method not found')
+  })
+
+  it('polls the list while the Cron tab shows, and stops once it closes', async () => {
+    vi.useFakeTimers()
+
+    try {
+      const request = vi.fn(async () => ({ jobs: [job()], success: true }))
+      const cron = new Cron({ changed: vi.fn(), gw: stub<Pick<GatewayClient, 'request'>>({ request }) })
+      const release = cron.watch()
+      await vi.advanceTimersByTimeAsync(0)
+      expect(request).toHaveBeenCalledTimes(1)
+      await vi.advanceTimersByTimeAsync(CRON_POLL_MS)
+      expect(request).toHaveBeenCalledTimes(2)
+
+      release()
+      await vi.advanceTimersByTimeAsync(4 * CRON_POLL_MS)
+      expect(request).toHaveBeenCalledTimes(2)
+      cron.dispose()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })

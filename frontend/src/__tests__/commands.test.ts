@@ -1,14 +1,16 @@
 import { describe, expect, it, vi } from 'vitest'
 
-import type { App } from '../app.js'
 import { copyToClipboard } from '../clipboard.js'
-import { historyText, localCommand } from '../commands.js'
-import { CONTROL_COMMANDS, type ControlHost } from '../controlCommands.js'
-import type { Entry } from '../model.js'
+import { CONTROL_COMMANDS, type ControlHost } from '../commands/control.js'
+import { type CommandHost, historyText, localCommand } from '../commands/local.js'
+import { entryId } from '../core/ids.js'
+import type { Entry, ToolCall } from '../model.js'
+
+import { must, stub } from './fakes.js'
 
 vi.mock('../clipboard.js', () => ({ copyToClipboard: vi.fn() }))
 
-/** The slice of App `/agents <sub>` reaches. */
+/** The slice of the command host `/agents <sub>` reaches. */
 function app(paused?: boolean) {
   const agents = {
     pause: vi.fn(async (p: boolean) => {
@@ -22,7 +24,7 @@ function app(paused?: boolean) {
   return { agents, transcript: { notice: vi.fn() } }
 }
 
-const agents = (a: ReturnType<typeof app>, arg: string) => localCommand('agents')!.run(a as unknown as App, arg)
+const agents = (a: ReturnType<typeof app>, arg: string) => must(localCommand('agents')).run(stub<CommandHost>(a), arg)
 
 describe('/agents', () => {
   it('pauses and resumes spawns itself instead of sending them to slash.exec', async () => {
@@ -60,7 +62,7 @@ describe('/agents', () => {
 function local(over: Record<string, unknown> = {}) {
   const request = vi.fn(async (_method: string, _params?: unknown) => ({ paused: false }))
 
-  return {
+  return stub<CommandHost & { request: typeof request }>({
     attachClipboardImage: vi.fn(),
     attachImagePath: vi.fn(),
     busy: null,
@@ -70,7 +72,7 @@ function local(over: Record<string, unknown> = {}) {
     request,
     transcript: { notice: vi.fn() },
     ...over
-  } as unknown as App & { request: typeof request }
+  })
 }
 
 describe('local commands', () => {
@@ -83,17 +85,17 @@ describe('local commands', () => {
     const a = local()
 
     expect(localCommand('clear')?.name).toBe('new')
-    await localCommand('clear')!.run(a, '')
+    await must(localCommand('clear')).run(a, '')
     expect(a.newSession).toHaveBeenCalledWith(undefined)
 
-    await localCommand('new')!.run(a, ' Bug hunt ')
+    await must(localCommand('new')).run(a, ' Bug hunt ')
     expect(a.newSession).toHaveBeenLastCalledWith('Bug hunt')
   })
 
   it('/new waits for a running turn instead of switching away from it', async () => {
     const a = local({ busy: { label: 'Working…' } })
 
-    await localCommand('reset')!.run(a, '')
+    await must(localCommand('reset')).run(a, '')
 
     expect(a.newSession).not.toHaveBeenCalled()
     expect(a.transcript.notice).toHaveBeenCalledWith(expect.stringContaining('Wait for the current turn'), 'warning')
@@ -102,14 +104,14 @@ describe('local commands', () => {
   it('/image <path> attaches that file; /paste takes no argument', async () => {
     const a = local()
 
-    await localCommand('image')!.run(a, './shot.png')
+    await must(localCommand('image')).run(a, './shot.png')
     expect(a.attachImagePath).toHaveBeenCalledWith('./shot.png')
     expect(a.attachClipboardImage).not.toHaveBeenCalled()
 
-    await localCommand('image')!.run(a, '')
+    await must(localCommand('image')).run(a, '')
     expect(a.transcript.notice).toHaveBeenCalledWith('Usage: /image <path>', 'warning')
 
-    expect(await localCommand('paste')!.run(a, 'x')).not.toBe(false)
+    expect(await must(localCommand('paste')).run(a, 'x')).not.toBe(false)
     expect(a.transcript.notice).toHaveBeenCalledWith('Usage: /paste', 'warning')
   })
 
@@ -123,7 +125,7 @@ describe('local commands', () => {
   it('a bare /queue reports how many prompts wait', () => {
     const notice = vi.fn()
 
-    CONTROL_COMMANDS.find(c => c.name === 'queue')!.run({ notice, queued: 2 } as unknown as ControlHost, '')
+    must(CONTROL_COMMANDS.find(c => c.name === 'queue')).run(stub<ControlHost>({ notice, queued: 2 }), '')
 
     expect(notice).toHaveBeenCalledWith('2 queued messages')
   })
@@ -131,17 +133,17 @@ describe('local commands', () => {
 
 const turn = (id: string, text: string, tools = 0): Entry => ({
   blocks: [
-    ...Array.from({ length: tools }, (_, i) => ({ call: {} as never, id: `${id}c${i}`, kind: 'tool' as const })),
-    ...(text ? [{ id: `${id}x`, kind: 'text' as const, text }] : [])
+    ...Array.from({ length: tools }, (_, i) => ({ call: stub<ToolCall>({}), id: entryId(`${id}c${i}`), kind: 'tool' as const })),
+    ...(text ? [{ id: entryId(`${id}x`), kind: 'text' as const, text }] : [])
   ],
-  id,
+  end: { status: 'done' },
+  id: entryId(id),
   kind: 'turn',
   rev: 0,
-  startedAt: 0,
-  status: 'done'
+  startedAt: 0
 })
 
-const user = (id: string, text: string): Entry => ({ at: 0, id, kind: 'user', text })
+const user = (id: string, text: string): Entry => ({ at: 0, id: entryId(id), kind: 'user', text })
 
 describe('/copy and /history', () => {
   const entries = [user('u1', 'hi'), turn('t1', 'first answer'), user('u2', 'more'), turn('t2', '', 2), turn('t3', 'last answer')]
@@ -154,17 +156,17 @@ describe('/copy and /history', () => {
   it('/copy takes the last answer, /copy n the nth, clamped to the last', async () => {
     const a = withTranscript()
 
-    await localCommand('copy')!.run(a, '')
+    await must(localCommand('copy')).run(a, '')
     expect(copyToClipboard).toHaveBeenLastCalledWith('last answer')
 
-    await localCommand('copy')!.run(a, '1')
+    await must(localCommand('copy')).run(a, '1')
     expect(copyToClipboard).toHaveBeenLastCalledWith('first answer')
     expect(a.transcript.notice).toHaveBeenLastCalledWith('Copied answer 1 (12 characters).')
 
-    await localCommand('copy')!.run(a, '9')
+    await must(localCommand('copy')).run(a, '9')
     expect(copyToClipboard).toHaveBeenLastCalledWith('last answer')
 
-    await localCommand('copy')!.run(a, 'x')
+    await must(localCommand('copy')).run(a, 'x')
     expect(a.transcript.notice).toHaveBeenLastCalledWith('Usage: /copy [n] (n counts answers from the first)', 'warning')
   })
 
@@ -179,7 +181,7 @@ describe('/copy and /history', () => {
   it('/history is a panel in the transcript', async () => {
     const a = withTranscript()
 
-    await localCommand('history')!.run(a, '')
+    await must(localCommand('history')).run(a, '')
     expect(a.transcript.panel).toHaveBeenCalledWith('/history', expect.stringContaining('last answer'))
   })
 })

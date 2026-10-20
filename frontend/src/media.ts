@@ -10,7 +10,7 @@ import { fileURLToPath } from 'node:url'
 
 import { imageFormat } from './hermes/images.js'
 import type { Entry, ImageSource, ToolCall } from './model.js'
-import { record } from './transcript.js'
+import { record } from './wire/json.js'
 
 const str = (v: unknown): string | undefined => (typeof v === 'string' && v.trim() ? v.trim() : undefined)
 
@@ -23,26 +23,26 @@ const FETCH_MS = 20_000
  * call that showed none, failed, or (image_generate) has not answered yet.
  */
 export function shownImage(call: ToolCall): string | undefined {
-  if (call.status === 'error' || call.status === 'cancelled') {
+  if (call.outcome.kind === 'error' || call.outcome.kind === 'cancelled') {
     return undefined
   }
 
   const r = record(call.result)
 
-  if (r?.success === false) {
+  if (r?.['success'] === false) {
     return undefined
   }
 
   if (call.name === 'image_generate') {
     // host_image is the file on this side when the image was made inside a sandbox.
-    return str(r?.host_image) ?? str(r?.image)
+    return str(r?.['host_image']) ?? str(r?.['image'])
   }
 
   if (call.name.startsWith('browser')) {
     // browser_vision: its native-vision envelope keeps the file in `meta`; the aux-model answer at the top.
-    const summary = call.resultText ?? str(r?.text_summary) ?? ''
+    const summary = call.resultText ?? str(r?.['text_summary']) ?? ''
 
-    return str(record(r?.meta)?.screenshot_path) ?? str(r?.screenshot_path) ?? /Screenshot path: (\S+)/.exec(summary)?.[1]
+    return str(record(r?.['meta'])?.['screenshot_path']) ?? str(r?.['screenshot_path']) ?? /Screenshot path: (\S+)/.exec(summary)?.[1]
   }
 
   return undefined

@@ -23,27 +23,6 @@ export function countdownAge(owner: object, dueAt: number, now: number): number 
   return (aged[kAge] ??= Math.min(0, now - dueAt))
 }
 
-/** `12s`, `3m 05s`, `1h 02m`: a duration as omp's turn footers write it. */
-export function duration(ms: number): string {
-  if (ms < 1000) {
-    return `${Math.max(0, Math.round(ms))}ms`
-  }
-
-  const s = Math.round(ms / 100) / 10
-
-  if (s < 60) {
-    return `${s < 10 ? s.toFixed(1) : Math.round(s)}s`
-  }
-
-  const m = Math.floor(s / 60)
-
-  if (m < 60) {
-    return `${m}m ${String(Math.round(s % 60)).padStart(2, '0')}s`
-  }
-
-  return `${Math.floor(m / 60)}h ${String(m % 60).padStart(2, '0')}m`
-}
-
 /** `1.2K`, `34K`, `1.1M`. */
 export function compact(n: number): string {
   if (n < 1000) {

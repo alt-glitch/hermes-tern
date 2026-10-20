@@ -2,8 +2,10 @@
 // carries no capabilities, so the effort chip, the Shift+Tab cycle and the effort picker read them
 // from here: filled whenever a picker loads the options, and once lazily by the effort picker.
 
-import type { ModelCapabilities, ModelOptionProvider, ModelOptionsResult } from '@hermes/shared/gateway-events'
+import type { ModelCapabilities, ModelOptionProvider } from '@hermes/shared/gateway-events'
 import type { GatewayClient } from '@tui/gatewayClient.js'
+
+import { rpc } from './wire/rpc.js'
 
 const known = new Map<string, ModelCapabilities>()
 
@@ -38,7 +40,7 @@ export function capsOf(info: { model?: string; provider?: string } | null | unde
 /** Loads the options for session `sid` and keeps their capabilities; never throws. */
 export async function loadCaps(gw: Pick<GatewayClient, 'request'>, sid: string | null): Promise<void> {
   try {
-    const r = await gw.request<ModelOptionsResult>('model.options', sid ? { session_id: sid } : {})
+    const r = await rpc(gw, 'model.options', sid ? { session_id: sid } : {})
     rememberCaps(r?.providers ?? [])
   } catch {
     // Unknown capabilities: every level stays on offer.

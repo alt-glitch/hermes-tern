@@ -4,6 +4,8 @@ import { describe, expect, it, vi } from 'vitest'
 
 import { openHermesSplit } from '../watch/spec.js'
 
+import { must } from './fakes.js'
+
 vi.mock('node:child_process', () => ({
   execFile: vi.fn((_file: string, _args: string[], done: (e: Error | null, out: { stdout: string }) => void) =>
     done(null, { stdout: 'split b7' })
@@ -15,7 +17,7 @@ const env = { HERMES_HOME: '/h', HERMES_PYTHON: '/venv/python', HERMES_PYTHON_SR
 describe('openHermesSplit', () => {
   it('runs `hermes <args>` in a kept-open split below this pane', async () => {
     expect(await openHermesSplit(['update'], '/repo', env)).toBe(true)
-    expect(vi.mocked(execFile).mock.lastCall!.slice(0, 2)).toEqual([
+    expect(must(vi.mocked(execFile).mock.lastCall).slice(0, 2)).toEqual([
       'tern',
       [
         'split',

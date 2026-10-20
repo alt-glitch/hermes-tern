@@ -1,122 +1,13 @@
-import { mkdtempSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
-
-import type { Key } from '@stencil-hq/tern'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+
+import { busy, settle, setup } from './appSetup.js'
+import { given, key, stubOverlay } from './fakes.js'
 
 vi.mock('@tui/lib/history.js', () => ({ append: () => undefined, load: () => [] }))
 
-const home = mkdtempSync(join(tmpdir(), 'hermes-tern-app-'))
-process.env.HERMES_HOME = home
-
-const { App } = await import('../app.js')
-
-type Handler = (arg: unknown) => void
-type Reply = (params: Record<string, unknown>) => unknown
-
-/** A PNG on disk, for a pasted image path. */
-const png = join(home, 'shot.png')
-writeFileSync(png, Buffer.from([137, 80, 78, 71, 13, 10, 26, 10, 0, 0]))
-
-function key(name: string, mods: Partial<Key> = {}): Key {
-  return { alt: false, ctrl: false, meta: false, name, shift: false, ...mods } as Key
-}
-
-/** The app on a fake Tern and gateway: keys go in, gateway requests come out (`canonical`: the shared gateway). */
-function setup(replies: Record<string, Reply> = {}, { canonical = true, features = [] as string[] } = {}) {
-  const handlers = new Map<string, Handler>()
-  const requests: { method: string; params: Record<string, unknown> }[] = []
-  let uploads = 0
-
-  const gw = {
-    drain: () => undefined,
-    isCanonical: canonical,
-    kill: () => undefined,
-    on: (name: string, fn: Handler) => void handlers.set(name, fn),
-    request: (method: string, params: Record<string, unknown>) => {
-      requests.push({ method, params })
-
-      if (method === 'image.attach_bytes' && !replies[method]) {
-        return Promise.resolve({ path: `/uploads/${++uploads}.png` })
-      }
-
-      const reply = replies[method]
-
-      try {
-        return Promise.resolve(reply ? reply(params) : {})
-      } catch (error) {
-        return Promise.reject(error)
-      }
-    }
-  }
-
-  const waiting: ((r: IteratorResult<{ type: 'key'; key: Key }>) => void)[] = []
-  let rendered: unknown
-  const surface = {
-    closed: false,
-    focus: () => undefined,
-    palette: () => undefined,
-    render: (tree: unknown) => void (rendered = tree),
-    stylesheet: () => undefined
-  }
-
-  const tern = {
-    blob: () => 'blob',
-    caps: { cols: 100, features },
-    close: async () => undefined,
-    open: () => surface,
-    [Symbol.asyncIterator]: () => ({
-      next: () => new Promise<IteratorResult<{ type: 'key'; key: Key }>>(resolve => waiting.push(resolve)),
-      return: async () => ({ done: true as const, value: undefined })
-    })
-  }
-
-  const app = new App(tern as never, gw as never, '1.0.0')
-  void app.run()
-  app.sid = 's1'
-
-  const press = async (k: Key) => {
-    await vi.waitFor(() => expect(waiting.length).toBeGreaterThan(0))
-    waiting.shift()?.({ done: false, value: { key: k, type: 'key' } })
-    await settle()
-  }
-
-  const type = async (text: string) => {
-    for (const ch of text) {
-      await press(key(ch, { text: ch }))
-    }
-  }
-
-  const attach = async () => {
-    await press(key('paste', { text: png }))
-    await vi.waitFor(() => expect(requests.some(r => r.method === 'image.attach_bytes')).toBe(true))
-    await settle()
-  }
-
-  const emit = (name: string, arg: unknown) => handlers.get(name)?.(arg)
-  const sent = (method: string) => requests.filter(r => r.method === method).map(r => r.params)
-
-  /** The dock's queued rows as last rendered: their text and which actions they offer. */
-  const queuedRows = () => {
-    const dock = JSON.parse(JSON.stringify((rendered as { dock: unknown[] }).dock)) as { k: string; p?: { key?: string; role?: string; text?: string }; c?: never[] }[]
-    const rows = dock.find(n => n.p?.role === 'omp.queue')?.c ?? []
-
-    return rows.map((r: { c: { p?: { role?: string; text?: string } }[] }) => ({
-      actions: r.c.flatMap(c => (c.p?.role === 'omp.queue.steer' ? ['steer'] : c.p?.role === 'omp.queue.edit' ? ['edit'] : [])),
-      text: r.c.find(c => c.p?.text !== undefined)?.p?.text
-    }))
-  }
-
-  return { app, attach, emit, press, queuedRows, requests, sent, type }
-}
-
-const settle = () => new Promise(resolve => setTimeout(resolve, 5))
-const busy = { label: 'Working…', since: {}, startedAt: 0 }
-
 beforeEach(() => {
-  delete process.env.HERMES_TUI_QUERY
-  delete process.env.HERMES_TUI_IMAGE
+  delete process.env['HERMES_TUI_QUERY']
+  delete process.env['HERMES_TUI_IMAGE']
 })
 
 afterEach(() => {
@@ -136,8 +27,8 @@ describe('App: a refused prompt', () => {
     await settle()
 
     expect(sent('prompt.submit')).toHaveLength(1)
-    expect(app.busy).toBeNull()
-    expect(app.composer.text).toBe('ship it')
+    expect(app.stores.activity.busy).toBeNull()
+    expect(app.stores.composer.text).toBe('ship it')
     expect(app.transcript.entries.at(-1)).toMatchObject({ kind: 'notice', text: expect.stringContaining('Not sent: session_busy') })
   })
 })
@@ -145,11 +36,11 @@ describe('App: a refused prompt', () => {
 describe('App: images in the draft', () => {
   it('a prompt queued behind the turn (private gateway) takes the images attached with it', async () => {
     const { app, attach, emit, press, sent, type } = setup({}, { canonical: false })
-    app.busy = { ...busy }
+    given.busy(app.stores, { ...busy })
     await attach()
     await type('first')
     await press(key('enter'))
-    expect(app.queue).toMatchObject([{ images: [{ path: '/uploads/1.png' }], text: 'first' }])
+    expect(app.stores.queue.held).toMatchObject([{ images: [{ path: '/uploads/1.png' }], text: 'first' }])
 
     // Typed while the first waits: no images of its own.
     await type('second')
@@ -159,7 +50,7 @@ describe('App: images in the draft', () => {
 
     const [submit] = sent('prompt.submit')
     expect(submit).toMatchObject({ attachments: [{ path: '/uploads/1.png' }], text: 'first' })
-    expect(app.queue).toMatchObject([{ images: [], text: 'second' }])
+    expect(app.stores.queue.held).toMatchObject([{ images: [], text: 'second' }])
   })
 
   it('Ctrl+C clears the images with the text, and Ctrl+D does not exit over an image', async () => {
@@ -179,17 +70,17 @@ describe('App: images in the draft', () => {
 
   it('Alt+Up brings a queued prompt (private gateway) back with its images', async () => {
     const { app, attach, press, type } = setup({}, { canonical: false })
-    app.busy = { ...busy }
+    given.busy(app.stores, { ...busy })
     await attach()
     await type('edit me')
     await press(key('enter'))
     await press(key('up', { alt: true }))
 
-    expect(app.composer.text).toBe('edit me')
-    expect(app.queue).toEqual([])
+    expect(app.stores.composer.text).toBe('edit me')
+    expect(app.stores.queue.held).toEqual([])
     // Back in the draft: Ctrl+D still sees it.
     const quit = vi.spyOn(app, 'quit')
-    app.composer.set('')
+    app.stores.composer.set('')
     await press(key('d', { ctrl: true }))
     expect(quit).not.toHaveBeenCalled()
   })
@@ -234,10 +125,10 @@ describe('App: a prompt of images alone', () => {
 
   it('a private gateway queues it behind a running turn; it goes when the turn ends', async () => {
     const { app, attach, emit, press, sent } = setup({}, { canonical: false })
-    app.busy = { ...busy }
+    given.busy(app.stores, { ...busy })
     await attach()
     await press(key('enter'))
-    expect(app.queue).toMatchObject([{ images: [{ path: '/uploads/1.png' }], text: '' }])
+    expect(app.stores.queue.held).toMatchObject([{ images: [{ path: '/uploads/1.png' }], text: '' }])
 
     emit('event', { payload: { text: 'done' }, session_id: 's1', type: 'message.complete' })
     await settle()
@@ -246,7 +137,7 @@ describe('App: a prompt of images alone', () => {
 
   it('the shared gateway admits it to its queue at once', async () => {
     const { app, attach, press, sent } = setup()
-    app.busy = { ...busy }
+    given.busy(app.stores, { ...busy })
     await attach()
     await press(key('enter'))
     await settle()
@@ -266,18 +157,18 @@ describe('App: an image while it attaches', () => {
 
   it('holds the prompt until it lands, then goes with it', async () => {
     const u = slowUpload()
-    const { app, press, sent, type } = setup({ 'image.attach_bytes': u.upload })
-    await press(key('paste', { text: png }))
+    const { app, attach, press, sent, type } = setup({ 'image.attach_bytes': u.upload })
+    await attach()
     await type('look')
     await press(key('enter'))
 
     expect(sent('prompt.submit')).toEqual([])
-    expect(app.composer.text).toBe('look')
+    expect(app.stores.composer.text).toBe('look')
     expect(app.transcript.entries.at(-1)).toMatchObject({ kind: 'notice', text: expect.stringContaining('still attaching') })
 
     u.finish('/uploads/slow.png')
     await settle()
-    app.composer.set('')
+    app.stores.composer.set('')
     await type('look')
     await press(key('enter'))
     expect(sent('prompt.submit')).toMatchObject([{ attachments: [{ path: '/uploads/slow.png' }], text: 'look' }])
@@ -285,8 +176,8 @@ describe('App: an image while it attaches', () => {
 
   it('is dropped when Ctrl+C clears the draft before it lands', async () => {
     const u = slowUpload()
-    const { app, press, sent, type } = setup({ 'image.attach_bytes': u.upload })
-    await press(key('paste', { text: png }))
+    const { app, attach, press, sent, type } = setup({ 'image.attach_bytes': u.upload })
+    await attach()
     const quit = vi.spyOn(app, 'quit')
     await press(key('d', { ctrl: true }))
     expect(quit).not.toHaveBeenCalled()
@@ -304,7 +195,7 @@ describe('App: Ctrl+C with a sheet open', () => {
   it('denies an approval instead of clearing the hidden draft or interrupting the turn', async () => {
     const { app, emit, press, sent, type } = setup()
     await type('half typed')
-    app.busy = { ...busy }
+    given.busy(app.stores, { ...busy })
     const respond = vi.fn()
     emit('request', { fail: vi.fn(), id: 'r1', method: 'approval', params: { command: 'rm -rf x', session_id: 's1' }, respond })
     await settle()
@@ -313,9 +204,9 @@ describe('App: Ctrl+C with a sheet open', () => {
     await press(key('c', { ctrl: true }))
     expect(respond).toHaveBeenCalledWith({ choice: 'deny' })
     expect(app.overlays).toHaveLength(0)
-    expect(app.composer.text).toBe('half typed')
+    expect(app.stores.composer.text).toBe('half typed')
     expect(sent('session.interrupt')).toEqual([])
-    expect(app.busy).not.toBeNull()
+    expect(app.stores.activity.busy).not.toBeNull()
   })
 
   it('cancels a secret prompt with the empty value, and closes a picker', async () => {
@@ -327,7 +218,7 @@ describe('App: Ctrl+C with a sheet open', () => {
     await press(key('c', { ctrl: true }))
     expect(respond).toHaveBeenCalledWith({ value: '' })
 
-    app.open({ key: 'picker', modal: true, node: () => null as never, onKey: () => true })
+    app.open(stubOverlay('picker', { modal: true }))
     await press(key('c', { ctrl: true }))
     expect(app.overlays).toHaveLength(0)
   })
@@ -346,7 +237,7 @@ describe('App: shell commands', () => {
   })
 
   it('splices {!cmd} output into the prompt and shows what was typed', async () => {
-    const { app, press, sent, type } = setup({ 'shell.exec': p => ({ code: 0, stderr: '', stdout: `<${String(p.command)}>\n` }) })
+    const { app, press, sent, type } = setup({ 'shell.exec': p => ({ code: 0, stderr: '', stdout: `<${String(p['command'])}>\n` }) })
     await type('today is {!date} ok')
     await press(key('enter'))
     await vi.waitFor(() => expect(sent('prompt.submit')).toHaveLength(1))
@@ -356,7 +247,7 @@ describe('App: shell commands', () => {
   })
 
   it('never runs a {!cmd} or a leading ! that came in a paste', async () => {
-    const { press, sent, type } = setup({ 'shell.exec': p => ({ code: 0, stderr: '', stdout: `<${String(p.command)}>` }) })
+    const { press, sent, type } = setup({ 'shell.exec': p => ({ code: 0, stderr: '', stdout: `<${String(p['command'])}>` }) })
     await type('log: ')
     await press(key('paste', { text: 'expect(x).toBe("{!rm -rf /}")\n' }))
     await type(' at {!date}')
@@ -382,252 +273,19 @@ describe('App: shell commands', () => {
     })
     await type('x {!rm -rf /}')
     await press(key('enter'))
-    await vi.waitFor(() => expect(app.busy).toBeNull())
+    await vi.waitFor(() => expect(app.stores.activity.busy).toBeNull())
 
     expect(sent('prompt.submit')).toEqual([])
-    expect(app.composer.text).toBe('x {!rm -rf /}')
+    expect(app.stores.composer.text).toBe('x {!rm -rf /}')
     expect(app.transcript.entries.at(-1)).toMatchObject({ kind: 'notice', tone: 'error' })
   })
 })
 
 /** The session as the shared gateway starts it, with `mode` as its busy_input_mode. */
-const session = (mode: string): Record<string, Reply> => ({
-  'config.get': p => (p.key === 'busy' ? { key: 'busy', value: mode } : {}),
-  'session.create': () => ({ info: {}, session_id: 's1', subscription_id: 'sub1' }),
-  'session.resume': () => ({ execution_generation: 7 }),
-  'setup.status': () => ({ provider_configured: true })
-})
-
-const users = (app: InstanceType<typeof App>) => app.transcript.entries.flatMap(e => (e.kind === 'user' ? [e.text] : []))
-
-describe('App: compaction', () => {
-  const status = (kind: string, text = '') => ({ payload: { kind, text }, session_id: 's1', type: 'status.update' })
-
-  it('a prompt sent while /compress runs (no turn) waits in the queue, with no Steer, and shows in the dock', async () => {
-    const { app, emit, press, queuedRows, sent, type } = setup({ 'prompt.submit': () => ({ admission_id: 'a1', status: 'queued' }) })
-    emit('event', status('compressing', '⠋ compressing 12 messages (~40,000 tok)…'))
-    await type('after it')
-    await press(key('enter'))
-
-    expect(sent('prompt.submit')).toMatchObject([{ queued: true, text: 'after it' }])
-    expect(users(app)).toEqual([])
-    expect(queuedRows()).toEqual([{ actions: ['edit'], text: 'after it' }])
-    expect(JSON.stringify(app.transcript.entries)).toContain('"status":"running"')
-  })
-
-  it('on a private gateway the held prompt goes when the compaction ends', async () => {
-    const { app, emit, press, sent, type } = setup({}, { canonical: false })
-    emit('event', status('compressing', 'compressing'))
-    await type('after it')
-    await press(key('enter'))
-    expect(sent('prompt.submit')).toEqual([])
-    expect(app.queue).toMatchObject([{ text: 'after it' }])
-
-    emit('event', status('ready'))
-    await settle()
-    expect(sent('prompt.submit')).toMatchObject([{ text: 'after it' }])
-  })
-
-  it('a compaction inside a turn still offers Steer on a queued prompt (Hermes holds it until the compaction ends)', async () => {
-    const { app, emit, press, queuedRows, type } = setup({ 'prompt.submit': () => ({ admission_id: 'a1', status: 'queued' }) })
-    app.busy = { ...busy }
-    emit('event', { payload: {}, session_id: 's1', type: 'message.start' })
-    emit('event', status('compacting', '🗜️ Compacting context — summarizing earlier conversation so I can continue...'))
-    await settle()
-    expect(app.busy?.label).toBe('Compacting context…')
-
-    await type('look at the tests too')
-    await press(key('enter'))
-    expect(queuedRows()).toEqual([{ actions: ['steer', 'edit'], text: 'look at the tests too' }])
-  })
-})
-
-describe('App: Enter while a turn runs (busy_input_mode)', () => {
-  it('queue: admits the prompt to the gateway at once, shows it queued, and paints its bubble when it starts', async () => {
-    const { app, attach, emit, press, queuedRows, sent, type } = setup({ 'prompt.submit': () => ({ admission_id: 'a1', status: 'queued' }) })
-    app.busy = { ...busy }
-    await attach()
-    await type('next one')
-    await press(key('enter'))
-
-    const [submit] = sent('prompt.submit')
-    expect(submit).toMatchObject({ attachments: [{ path: '/uploads/1.png' }], queued: true, session_id: 's1', text: 'next one' })
-    expect(app.queue).toEqual([])
-    expect(users(app)).toEqual([])
-    expect(queuedRows()).toEqual([{ actions: ['edit'], text: 'next one ↵ 📎 1 image' }])
-
-    const row = { admission_id: 'a1', input_id: submit!.submission_id, status: 'queued', user: 'next one' }
-    emit('event', { payload: { pending_submissions: [row] }, session_id: 's1', type: 'session.info' })
-    emit('event', { payload: { text: 'first reply' }, session_id: 's1', type: 'message.complete' })
-    emit('event', { payload: {}, session_id: 's1', type: 'message.start' })
-    emit('event', { payload: { pending_submissions: [{ ...row, status: 'started' }] }, session_id: 's1', type: 'session.info' })
-    await settle()
-
-    // After the reply it waited for, before the turn it opened; and only once.
-    expect(users(app)).toEqual(['next one'])
-    expect(app.transcript.entries.findLast(e => e.kind === 'user')).toMatchObject({ attachments: [{ kind: 'image' }] })
-    expect(app.transcript.entries.map(e => e.kind).slice(-2)).toEqual(['user', 'turn'])
-    expect(queuedRows()).toEqual([])
-  })
-
-  it('a skill invoked while a turn runs is queued like a prompt: the queue and its bubble show the invocation, not the body', async () => {
-    const body = '[IMPORTANT: The user has invoked the "fanout" skill…]\n\n…the skill body…'
-    const { app, emit, press, queuedRows, sent, type } = setup({
-      'prompt.submit': () => ({ admission_id: 'a1', status: 'queued' }),
-      'slash.exec': () => ({ display: '/fanout if needed', message: body, name: 'fanout', type: 'skill' })
-    })
-    app.busy = { ...busy }
-    await type('/fanout if needed')
-    await press(key('enter'))
-    await settle()
-
-    const [submit] = sent('prompt.submit')
-    expect(submit).toMatchObject({ queued: true, text: body })
-    expect(users(app)).toEqual([])
-    expect(queuedRows()).toEqual([{ actions: ['steer', 'edit'], text: '/fanout if needed' }])
-
-    const row = { admission_id: 'a1', input_id: submit!.submission_id, status: 'queued', user: body }
-    emit('event', { payload: { pending_submissions: [row] }, session_id: 's1', type: 'session.info' })
-    emit('event', { payload: { text: 'first reply' }, session_id: 's1', type: 'message.complete' })
-    emit('event', { payload: {}, session_id: 's1', type: 'message.start' })
-    emit('event', { payload: { pending_submissions: [{ ...row, status: 'started' }] }, session_id: 's1', type: 'session.info' })
-    await settle()
-
-    expect(users(app)).toEqual(['/fanout if needed'])
-    expect(app.transcript.entries.map(e => e.kind).slice(-2)).toEqual(['user', 'turn'])
-  })
-
-  it('a prompt sent while idle gets one bubble, even when the gateway reports it queued then started', async () => {
-    const { app, emit, press, sent, type } = setup()
-    await type('hello')
-    await press(key('enter'))
-    const row = { admission_id: 'a1', input_id: sent('prompt.submit')[0]!.submission_id, status: 'queued', user: 'hello' }
-
-    emit('event', { payload: { pending_submissions: [row] }, session_id: 's1', type: 'session.info' })
-    emit('event', { payload: { pending_submissions: [{ ...row, status: 'started' }] }, session_id: 's1', type: 'session.info' })
-    await settle()
-
-    expect(users(app)).toEqual(['hello'])
-  })
-
-  it("shows another window's queued prompt read-only, and its bubble when it starts", async () => {
-    const { app, emit, queuedRows } = setup()
-    app.busy = { ...busy }
-    const row = { admission_id: 'b1', input_id: 'theirs', status: 'queued', user: 'from desktop' }
-
-    emit('event', { payload: { pending_submissions: [row] }, session_id: 's1', type: 'session.info' })
-    await settle()
-    expect(queuedRows()).toEqual([{ actions: [], text: 'from desktop' }])
-
-    emit('event', { payload: { pending_submissions: [{ ...row, status: 'started' }] }, session_id: 's1', type: 'session.info' })
-    await settle()
-    expect(users(app)).toEqual(['from desktop'])
-  })
-
-  it("a queued row's Steer withdraws it from the gateway's queue and steers the turn; its cancelled completion does not end the turn", async () => {
-    const { app, emit, press, queuedRows, sent, type } = setup({
-      'prompt.cancel': () => ({ admission_id: 'a1', outcome: 'cancelled', status: 'terminal' }),
-      'prompt.submit': () => ({ admission_id: 'a1', status: 'queued' }),
-      'session.resume': () => ({ execution_generation: 7 }),
-      'session.steer': () => ({ status: 'queued' })
-    })
-    app.busy = { ...busy }
-    app.transcript.start()
-    await type('use tabs')
-    await press(key('enter'))
-    const row = { admission_id: 'a1', input_id: sent('prompt.submit')[0]!.submission_id, status: 'queued', user: 'use tabs' }
-    emit('event', { payload: { pending_submissions: [row] }, session_id: 's1', type: 'session.info' })
-    await settle()
-    expect(queuedRows()).toEqual([{ actions: ['steer', 'edit'], text: 'use tabs' }])
-
-    await press(key('enter', { alt: true }))
-    await vi.waitFor(() => expect(sent('session.steer')).toHaveLength(1))
-    emit('event', { payload: { admission_id: 'a1', content: '', outcome: 'cancelled', text: '' }, session_id: 's1', type: 'message.complete' })
-    emit('event', { payload: { pending_submissions: [] }, session_id: 's1', type: 'session.info' })
-    await settle()
-
-    expect(sent('prompt.cancel')).toEqual([{ admission_id: 'a1', session_id: 's1' }])
-    expect(sent('session.steer')[0]).toMatchObject({ execution_generation: 7, session_id: 's1', text: 'use tabs' })
-    expect(app.transcript.live?.blocks.map(b => b.kind)).toEqual(['steer'])
-    expect(app.busy).not.toBeNull()
-    expect(queuedRows()).toEqual([])
-  })
-
-  it("a queued row's Edit takes it out of the gateway's queue and back into the composer", async () => {
-    const { app, emit, press, sent, type } = setup({
-      'prompt.cancel': () => ({ status: 'terminal' }),
-      'prompt.submit': () => ({ admission_id: 'a1', status: 'queued' })
-    })
-    app.busy = { ...busy }
-    await type('fix me')
-    await press(key('enter'))
-    const row = { admission_id: 'a1', input_id: sent('prompt.submit')[0]!.submission_id, status: 'queued', user: 'fix me' }
-    emit('event', { payload: { pending_submissions: [row] }, session_id: 's1', type: 'session.info' })
-
-    await press(key('up', { alt: true }))
-    await vi.waitFor(() => expect(app.composer.text).toBe('fix me'))
-    expect(sent('prompt.cancel')).toHaveLength(1)
-  })
-
-  it('steer: injects the prompt into the turn; a refused steer is queued instead', async () => {
-    let steer = { status: 'queued' }
-    const { app, emit, press, sent, type } = setup({
-      ...session('steer'),
-      'prompt.submit': () => ({ admission_id: 'a1', status: 'queued' }),
-      'session.steer': () => steer
-    })
-    emit('event', { payload: {}, type: 'gateway.ready' })
-    await vi.waitFor(() => expect(sent('config.get')).toContainEqual({ key: 'busy', session_id: 's1' }))
-    await settle()
-    app.busy = { ...busy }
-    app.transcript.start()
-
-    await type('look at the tests too')
-    await press(key('enter'))
-    await vi.waitFor(() => expect(sent('session.steer')).toHaveLength(1))
-    expect(sent('session.steer')[0]).toMatchObject({ execution_generation: 7, text: 'look at the tests too' })
-    expect(app.transcript.live?.blocks.at(-1)).toMatchObject({ kind: 'steer', text: 'look at the tests too' })
-    expect(sent('prompt.submit')).toEqual([])
-
-    steer = { status: 'rejected' }
-    await type('then this')
-    await press(key('enter'))
-    await vi.waitFor(() => expect(sent('prompt.submit')).toHaveLength(1))
-    expect(sent('prompt.submit')[0]).toMatchObject({ queued: true, text: 'then this' })
-  })
-
-  it('interrupt: redirects the turn with the prompt (session.redirect)', async () => {
-    const { app, emit, press, sent, type } = setup({ ...session('interrupt'), 'session.redirect': () => ({ status: 'redirected' }) })
-    emit('event', { payload: {}, type: 'gateway.ready' })
-    await vi.waitFor(() => expect(sent('config.get')).toContainEqual({ key: 'busy', session_id: 's1' }))
-    await settle()
-    app.busy = { ...busy }
-
-    await type('no, use rust')
-    await press(key('enter'))
-    await vi.waitFor(() => expect(sent('session.redirect')).toHaveLength(1))
-    expect(sent('session.redirect')[0]).toEqual({ execution_generation: 7, session_id: 's1', text: 'no, use rust' })
-    expect(sent('prompt.submit')).toEqual([])
-  })
-
-  it('/queue queues behind the turn whatever the mode says', async () => {
-    const { app, emit, press, sent, type } = setup({ ...session('steer'), 'prompt.submit': () => ({ admission_id: 'a1' }) })
-    emit('event', { payload: {}, type: 'gateway.ready' })
-    await vi.waitFor(() => expect(sent('config.get')).toContainEqual({ key: 'busy', session_id: 's1' }))
-    await settle()
-    app.busy = { ...busy }
-
-    await type('/queue later please')
-    await press(key('enter'))
-    await vi.waitFor(() => expect(sent('prompt.submit')).toHaveLength(1))
-    expect(sent('session.steer')).toEqual([])
-  })
-})
-
 describe('App: Esc', () => {
   it('one Esc never stops the turn; two quick ones do', async () => {
     const { app, press, sent } = setup({ 'session.resume': () => ({ execution_generation: 2 }) })
-    app.busy = { ...busy }
+    given.busy(app.stores, { ...busy })
 
     await press(key('escape'))
     expect(sent('session.interrupt')).toEqual([])
@@ -638,16 +296,16 @@ describe('App: Esc', () => {
 
   it('two Esc with a draft clear it into the history instead of stopping the turn', async () => {
     const { app, press, sent, type } = setup()
-    app.busy = { ...busy }
+    given.busy(app.stores, { ...busy })
     await type('half a thought')
 
     await press(key('escape'))
-    expect(app.composer.text).toBe('half a thought')
+    expect(app.stores.composer.text).toBe('half a thought')
     await press(key('escape'))
 
-    expect(app.composer.text).toBe('')
+    expect(app.stores.composer.text).toBe('')
     expect(sent('session.interrupt')).toEqual([])
-    expect(app.busy).not.toBeNull()
+    expect(app.stores.activity.busy).not.toBeNull()
   })
 })
 
@@ -655,7 +313,7 @@ describe('App: Option characters', () => {
   it('a typed å, ∫, ß or π is text; Alt+letter still opens its panel', async () => {
     const { app, press, type } = setup()
     await type('åßπ∫')
-    expect(app.composer.text).toBe('åßπ∫')
+    expect(app.stores.composer.text).toBe('åßπ∫')
     expect(app.overlays).toEqual([])
 
     await press(key('a', { alt: true }))
@@ -668,11 +326,11 @@ describe('App: Option+← and Option+→ in a Mac terminal', () => {
     const { app, press, type } = setup()
     await type('hello brave world')
     await press(key('b', { alt: true }))
-    expect(app.composer.cursor).toBe('hello brave '.length)
+    expect(app.stores.composer.cursor).toBe('hello brave '.length)
     await press(key('b', { alt: true }))
-    expect(app.composer.cursor).toBe('hello '.length)
+    expect(app.stores.composer.cursor).toBe('hello '.length)
     await press(key('f', { alt: true }))
-    expect(app.composer.cursor).toBe('hello brave'.length)
+    expect(app.stores.composer.cursor).toBe('hello brave'.length)
     expect(app.overlays).toEqual([])
   })
 
@@ -697,7 +355,7 @@ describe('App: the session folder reaches Tern', () => {
     const osc7 = write.mock.calls.map(c => String(c[0])).filter(s => s.startsWith('\x1b]7;'))
     write.mockRestore()
     expect(osc7).toHaveLength(2)
-    expect(osc7[0]).toMatch(/^\x1b\]7;file:\/\/[^/]*\/repo\/\.worktrees\/wt%201\x07$/)
-    expect(osc7[1]).toMatch(/\/elsewhere\x07$/)
+    expect(osc7[0]).toMatch(/^\x1b\]7;file:\/\/[^/]*\/repo\/\.worktrees\/wt%201\x07$/) // eslint-disable-line no-control-regex -- the OSC 7 escape is what this checks
+    expect(osc7[1]).toMatch(/\/elsewhere\x07$/) // eslint-disable-line no-control-regex -- the OSC's BEL terminator is what this checks
   })
 })

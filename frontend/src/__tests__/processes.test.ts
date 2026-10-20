@@ -1,12 +1,14 @@
 import type { GatewayClient } from '@tui/gatewayClient.js'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
+import { type LiveSessionId, liveSessionId } from '../core/ids.js'
 import type { BackgroundProcess } from '../model.js'
 import {
+  FAST_MS,
   foldEntry,
+  IDLE_MS,
   isRecent,
   lastLine,
-  type ProcessEntry,
   Processes,
   processStatus,
   processVerdict,
@@ -14,7 +16,10 @@ import {
   sortProcesses,
   watchersOf
 } from '../processes/store.js'
-import { Transcript } from '../transcript.js'
+import { Transcript } from '../transcript/store.js'
+import type { ProcessRow } from '../wire/schemas.js'
+
+import { FakeGateway, must, stub } from './fakes.js'
 
 const NOW = 1_800_000_000_000
 
@@ -24,7 +29,7 @@ const proc = (id: string, over: Partial<BackgroundProcess> = {}): BackgroundProc
   lastLine: '',
   output: '',
   startedAt: NOW - 10_000,
-  status: 'running',
+  state: { status: 'running' },
   ...over
 })
 
@@ -50,7 +55,7 @@ describe('lastLine', () => {
 
 describe('foldEntry', () => {
   it('reads the shared gateway projection and keeps the same object across polls', () => {
-    const entry: ProcessEntry = {
+    const entry: ProcessRow = {
       command: 'for i in 1 2; do echo $i; done',
       output_tail: 'tick 1\ntick 2\n',
       session_id: 'proc_a',
@@ -59,12 +64,12 @@ describe('foldEntry', () => {
     }
     const p = foldEntry(undefined, entry, NOW)
 
-    expect(p).toMatchObject({ id: 'proc_a', lastLine: 'tick 2', startedAt: NOW - 5000, status: 'running' })
+    expect(p).toMatchObject({ id: 'proc_a', lastLine: 'tick 2', startedAt: NOW - 5000, state: { status: 'running' } })
 
     const q = foldEntry(p, { ...entry, completion_reason: 'killed', exit_code: -15, exited_at: NOW / 1000, status: 'exited' }, NOW)
 
     expect(q).toBe(p)
-    expect(q).toMatchObject({ exitCode: -15, exitedAt: NOW, reason: 'killed', status: 'killed' })
+    expect(q).toMatchObject({ state: { exitCode: -15, exitedAt: NOW, reason: 'killed', status: 'killed' } })
     expect(processVerdict(q)).toBe('killed')
   })
 
@@ -79,16 +84,16 @@ describe('foldEntry', () => {
 describe('retention and order', () => {
   it('keeps exits for 60 s; one with no exit time leaves at once', () => {
     expect(isRecent(proc('a'), NOW)).toBe(true)
-    expect(isRecent(proc('b', { exitedAt: NOW - RETAIN_MS, status: 'done' }), NOW)).toBe(true)
-    expect(isRecent(proc('c', { exitedAt: NOW - RETAIN_MS - 1, status: 'done' }), NOW)).toBe(false)
-    expect(isRecent(proc('d', { status: 'failed' }), NOW)).toBe(false)
+    expect(isRecent(proc('b', { state: { exitedAt: NOW - RETAIN_MS, status: 'done' } }), NOW)).toBe(true)
+    expect(isRecent(proc('c', { state: { exitedAt: NOW - RETAIN_MS - 1, status: 'done' } }), NOW)).toBe(false)
+    expect(isRecent(proc('d', { state: { status: 'failed' } }), NOW)).toBe(false)
   })
 
   it('lists running first (longest running first), then exits newest first', () => {
     const list = [
-      proc('exited-old', { exitedAt: NOW - 30_000, status: 'done' }),
+      proc('exited-old', { state: { exitedAt: NOW - 30_000, status: 'done' } }),
       proc('young', { startedAt: NOW - 1000 }),
-      proc('exited-new', { exitedAt: NOW - 1000, status: 'failed' }),
+      proc('exited-new', { state: { exitedAt: NOW - 1000, status: 'failed' } }),
       proc('old', { startedAt: NOW - 60_000 })
     ]
 
@@ -121,7 +126,7 @@ describe('Processes', () => {
   it('follows process.list and links the background card that started each process', async () => {
     vi.useFakeTimers({ now: NOW })
     const transcript = new Transcript()
-    transcript.start()
+    transcript.messageStart()
     transcript.toolStart({ args: { background: true, command: 'sleep 90' }, name: 'terminal', tool_id: 't1' })
     transcript.toolComplete({
       name: 'terminal',
@@ -129,12 +134,12 @@ describe('Processes', () => {
       tool_id: 't1'
     })
 
-    let rows: ProcessEntry[] = [
+    let rows: ProcessRow[] = [
       { command: 'sleep 90', output_tail: 'tick 1\n', session_id: 'proc_a', started_epoch: NOW / 1000, status: 'running' }
     ]
     const request = vi.fn(async (method: string) => (method === 'process.list' ? { processes: rows } : {}))
     const changed = vi.fn()
-    const store = new Processes({ changed, gw: { request } as unknown as Pick<GatewayClient, 'request'>, sid: 's1', transcript })
+    const store = new Processes({ changed, gw: stub<Pick<GatewayClient, 'request'>>({ request }), sid: liveSessionId('s1'), transcript })
 
     store.poke()
     await vi.advanceTimersByTimeAsync(0)
@@ -145,10 +150,10 @@ describe('Processes', () => {
     expect(changed).toHaveBeenCalled()
 
     // It exits; the pill keeps it for the retention window, then drops it.
-    rows = [{ ...rows[0]!, exit_code: 0, exited_at: (NOW + 1000) / 1000, status: 'exited' }]
+    rows = [{ ...must(rows[0]), exit_code: 0, exited_at: (NOW + 1000) / 1000, status: 'exited' }]
     await vi.advanceTimersByTimeAsync(1000)
 
-    expect(store.recent().map(p => p.status)).toEqual(['done'])
+    expect(store.recent().map(p => p.state.status)).toEqual(['done'])
     await vi.advanceTimersByTimeAsync(RETAIN_MS + 5000)
     expect(store.recent()).toEqual([])
     expect(store.all().map(p => p.id)).toEqual(['proc_a'])
@@ -158,9 +163,9 @@ describe('Processes', () => {
   it('adds printed output to its process as it arrives, and polls for a process it does not know', async () => {
     vi.useFakeTimers({ now: NOW })
     const transcript = new Transcript()
-    const rows: ProcessEntry[] = [{ command: 'sleep 90', output_tail: 'tick 1\n', session_id: 'proc_a', status: 'running' }]
+    const rows: ProcessRow[] = [{ command: 'sleep 90', output_tail: 'tick 1\n', session_id: 'proc_a', status: 'running' }]
     const request = vi.fn(async () => ({ processes: rows }))
-    const store = new Processes({ changed: vi.fn(), gw: { request } as unknown as Pick<GatewayClient, 'request'>, sid: 's1', transcript })
+    const store = new Processes({ changed: vi.fn(), gw: stub<Pick<GatewayClient, 'request'>>({ request }), sid: liveSessionId('s1'), transcript })
 
     store.poke()
     await vi.advanceTimersByTimeAsync(0)
@@ -173,6 +178,103 @@ describe('Processes', () => {
     store.output('proc_new', 'hello\n')
     await vi.advanceTimersByTimeAsync(0)
     expect(request).toHaveBeenCalledWith('process.list', { session_id: 's1' })
+    store.dispose()
+  })
+
+  it("shows its processes as 'unknown' after three failed polls in a row, polls slower, and takes the answer back", async () => {
+    vi.useFakeTimers({ now: NOW })
+    let down = false
+    const rows: ProcessRow[] = [{ command: 'sleep 90', session_id: 'proc_a', started_epoch: NOW / 1000, status: 'running' }]
+    const gw = new FakeGateway({
+      replies: {
+        'process.list': () => {
+          if (down) {
+            throw new Error('gateway gone')
+          }
+
+          return { processes: rows }
+        }
+      }
+    })
+    const polls = () => gw.methods('process.list').length
+    const changed = vi.fn()
+    const store = new Processes({ changed, gw: gw.client, sid: liveSessionId('s1'), transcript: new Transcript() })
+
+    store.poke()
+    await vi.advanceTimersByTimeAsync(0)
+    const first = must(store.get('proc_a'))
+    expect(first.state.status).toBe('running')
+
+    // Two failures could be a blip: it still runs, polled every second.
+    down = true
+    await vi.advanceTimersByTimeAsync(2 * FAST_MS)
+    expect(store.get('proc_a')?.state.status).toBe('running')
+
+    changed.mockClear()
+    await vi.advanceTimersByTimeAsync(FAST_MS)
+    const p = must(store.get('proc_a'))
+    // The same object: Tern timers keyed on it stay put.
+    expect(p).toBe(first)
+    expect(p.state.status).toBe('unknown')
+    expect(processVerdict(p)).toBe('unknown')
+    expect(store.recent()).toEqual([p])
+    expect(changed).toHaveBeenCalled()
+
+    // Polled at the idle cadence while no answer comes.
+    const before = polls()
+    await vi.advanceTimersByTimeAsync(IDLE_MS - 1)
+    expect(polls()).toBe(before)
+    await vi.advanceTimersByTimeAsync(1)
+    expect(polls()).toBe(before + 1)
+
+    down = false
+    await vi.advanceTimersByTimeAsync(IDLE_MS)
+    expect(store.get('proc_a')).toBe(first)
+    expect(first.state.status).toBe('running')
+    store.dispose()
+  })
+
+  it("keeps its processes as 'unknown' when the gateway exits, and clears them only for another session", async () => {
+    vi.useFakeTimers({ now: NOW })
+    const rows: ProcessRow[] = [{ command: 'sleep 90', session_id: 'proc_a', started_epoch: NOW / 1000, status: 'running' }]
+    const gw = new FakeGateway({ replies: { 'process.list': () => ({ processes: rows }) } })
+    let sid: LiveSessionId | null = liveSessionId('s1')
+    const changed = vi.fn()
+    const store = new Processes({
+      changed,
+      gw: gw.client,
+      get sid() {
+        return sid
+      },
+      transcript: new Transcript()
+    })
+
+    store.poke()
+    await vi.advanceTimersByTimeAsync(0)
+    const first = must(store.get('proc_a'))
+
+    // The gateway exits: the session's runtime id goes with it, and nothing says the process runs.
+    sid = null
+    changed.mockClear()
+    await vi.advanceTimersByTimeAsync(FAST_MS)
+    expect(store.get('proc_a')).toBe(first)
+    expect(first.state.status).toBe('unknown')
+    expect(store.recent()).toEqual([first])
+    expect(changed).toHaveBeenCalled()
+
+    // The same session is back: the gateway's answer takes the process back.
+    sid = liveSessionId('s1')
+    await vi.advanceTimersByTimeAsync(IDLE_MS)
+    expect(store.get('proc_a')).toBe(first)
+    expect(first.state.status).toBe('running')
+
+    // Another session is adopted: the last one's processes are not its own.
+    sid = null
+    await vi.advanceTimersByTimeAsync(FAST_MS)
+    rows.length = 0
+    sid = liveSessionId('s2')
+    await vi.advanceTimersByTimeAsync(IDLE_MS)
+    expect(store.all()).toEqual([])
     store.dispose()
   })
 })

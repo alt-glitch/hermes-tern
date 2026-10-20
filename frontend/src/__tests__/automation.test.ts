@@ -2,9 +2,11 @@ import type { GoalSnapshot, LoopSnapshot, SessionControlSnapshot } from '@hermes
 import { plain } from '@stencil-hq/tern'
 import { describe, expect, it, vi } from 'vitest'
 
-import { Automation, cadence, countdown, goalView, loopView } from '../automation.js'
 import { automationButtons } from '../overlays/automation.js'
+import { Automation, type AutomationHost, cadence, countdown, goalView, loopView } from '../session/automation.js'
 import { automationNode, reconnectNode } from '../view/automation.js'
+
+import { stub } from './fakes.js'
 
 const goal = (over: Partial<GoalSnapshot> = {}): GoalSnapshot => ({
   contract: {},
@@ -46,7 +48,7 @@ const snapshot = (over: Partial<SessionControlSnapshot> = {}): SessionControlSna
   ...over
 })
 
-const text = (node: unknown) => plain({ main: [node] } as never, 200)
+const text = (node: unknown) => plain(stub({ main: [node] }), 200)
 
 describe('goalView', () => {
   it('shows a standing goal, held or judged blocked, and nothing once it is done', () => {
@@ -141,17 +143,16 @@ describe('Automation', () => {
     const calls: [string, Record<string, unknown>][] = []
     const notices: string[] = []
     const dispatched: unknown[] = []
-    const h = {
-      changed: vi.fn(),
-      gw: {
-        request: async (method: string, params: Record<string, unknown> = {}) => {
-          calls.push([method, params])
+    const request = async (method: string, params: Record<string, unknown> = {}): Promise<unknown> => {
+      calls.push([method, params])
 
-          return answers[method]?.(params) as never
-        }
-      },
+      return answers[method]?.(params)
+    }
+    const h: AutomationHost = {
+      changed: vi.fn(),
+      gw: stub({ request }),
       runDispatch: async (raw: unknown) => void dispatched.push(raw),
-      sid: 's1' as string | null,
+      sid: 's1',
       transcript: { notice: (t: string) => void notices.push(t) }
     }
 

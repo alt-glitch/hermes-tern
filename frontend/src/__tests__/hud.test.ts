@@ -1,10 +1,9 @@
-import type { Key } from '@stencil-hq/tern'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
-import { hudKey } from '../hud.js'
+import { Hud, hudKey, pills, type PillSources, todos } from '../chrome/hud.js'
+import type { Todo } from '../model.js'
 
-const key = (name: string, mods: Partial<Key> = {}): Key =>
-  ({ alt: false, ctrl: false, meta: false, name, shift: false, ...mods }) as Key
+import { key } from './fakes.js'
 
 const both = ['agents', 'shells'] as const
 
@@ -36,5 +35,90 @@ describe('hudKey', () => {
     expect(hudKey(key('a', { text: 'a' }), at)).toEqual({ consumed: false })
     expect(hudKey(key('enter', { shift: true }), at)).toEqual({ consumed: false })
     expect(hudKey(key('enter'), { ...at, pills: ['agents'] })).toEqual({ consumed: false })
+  })
+})
+
+const todo = (status: Todo['status']): Todo => ({ content: status, id: status, status })
+
+describe('todos', () => {
+  it('keeps the list while a turn runs or something on it is open', () => {
+    const open = [todo('completed'), todo('pending')]
+    const done = [todo('completed'), todo('cancelled')]
+
+    expect(todos(undefined, false)).toBeUndefined()
+    expect(todos([], true)).toBeUndefined()
+    expect(todos(open, false)).toBe(open)
+    expect(todos(done, false)).toBeUndefined()
+    expect(todos(done, true)).toBe(done)
+    // Cancelled ones drop out: none left is no list.
+    expect(todos([todo('cancelled')], true)).toBeUndefined()
+  })
+})
+
+describe('pills', () => {
+  const none: PillSources = { agents: 0, busy: false, goal: false, loop: false, prs: 0, shells: 0, todos: undefined }
+
+  it('lists the pills on show, left to right', () => {
+    expect(pills(none)).toEqual([])
+    expect(pills({ agents: 2, busy: false, goal: true, loop: true, prs: 1, shells: 1, todos: [todo('pending')] })).toEqual([
+      'todos',
+      'agents',
+      'shells',
+      'prs',
+      'goal',
+      'loop'
+    ])
+  })
+
+  it('leaves the todo pill to the working line while a turn runs', () => {
+    expect(pills({ ...none, busy: true, todos: [todo('pending')] })).toEqual([])
+    expect(pills({ ...none, busy: true, shells: 1, todos: [todo('pending')] })).toEqual(['shells'])
+  })
+})
+
+describe('Hud', () => {
+  const host = () => ({ changed: vi.fn(), open: vi.fn() })
+
+  it('focuses, moves, and opens a pill\'s sheet through the host', () => {
+    const h = host()
+    const hud = new Hud(h)
+
+    expect(hud.key(key('down'), { idle: true, pills: both })).toBe(true)
+    expect(hud.focused).toBe('agents')
+    hud.key(key('right'), { idle: true, pills: both })
+    expect(hud.focused).toBe('shells')
+    expect(hud.key(key('enter'), { idle: true, pills: both })).toBe(true)
+    expect(h.open).toHaveBeenCalledWith('shells')
+    // Opening hands the keys back, as Enter does.
+    expect(hud.focused).toBeUndefined()
+  })
+
+  it('folds the todo panel in place instead of opening a sheet', () => {
+    const h = host()
+    const hud = new Hud(h)
+
+    hud.key(key('down'), { idle: true, pills: ['todos'] })
+    hud.key(key('enter'), { idle: true, pills: ['todos'] })
+    expect(h.open).not.toHaveBeenCalled()
+    expect(hud.todosOpen).toBe(true)
+    expect(h.changed).toHaveBeenCalledTimes(1)
+
+    hud.toggleTodos()
+    expect(hud.todosOpen).toBe(false)
+    expect(h.changed).toHaveBeenCalledTimes(2)
+  })
+
+  it('prune() lets go of a pill that left, each frame; release() hands the keys back', () => {
+    const hud = new Hud(host())
+
+    hud.key(key('down'), { idle: true, pills: both })
+    hud.prune(both)
+    expect(hud.focused).toBe('agents')
+    hud.prune(['shells'])
+    expect(hud.focused).toBeUndefined()
+
+    hud.key(key('down'), { idle: true, pills: both })
+    hud.release()
+    expect(hud.focused).toBeUndefined()
   })
 })

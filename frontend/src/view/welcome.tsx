@@ -7,6 +7,8 @@ import { join } from 'node:path'
 
 import type { JSX } from '@stencil-hq/tern'
 
+import { decodeJson } from '../wire/json.js'
+
 /** What the welcome card shows. */
 export interface WelcomeContext {
   /** Blob id of the uploaded logo, when the terminal took it. */
@@ -65,8 +67,11 @@ export function randomTip(root: string): string {
 
     const quoted = TIP_LINE.exec(line)?.[1]
 
-    if (quoted) {
-      tips.push(JSON.parse(`"${quoted}"`))
+    // The tip is a Python string literal's body; as a JSON string it decodes its escapes.
+    const tip = quoted ? decodeJson(`"${quoted}"`) : undefined
+
+    if (typeof tip === 'string') {
+      tips.push(tip)
     }
   }
 

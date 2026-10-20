@@ -1,0 +1,4447 @@
+[
+ {
+  "detail": [
+   {
+    "k": "code",
+    "p": {
+     "lang": "bash",
+     "max": {
+      "h": "12lines"
+     },
+     "role": "omp.tool.command",
+     "text": "ls -la",
+     "key": "cmd"
+    }
+   },
+   {
+    "k": "ansi",
+    "p": {
+     "follow": true,
+     "max": {
+      "h": "20lines"
+     },
+     "text": "a\nb\n",
+     "key": "out"
+    }
+   }
+  ],
+  "name": "terminal",
+  "node": {
+   "k": "tool",
+   "p": {
+    "collapsed": true,
+    "collapsible": true,
+    "exit": 0,
+    "lang": "bash",
+    "name": "bash",
+    "preview": {
+     "tail": 3
+    },
+    "status": "done",
+    "target": "ls -la",
+    "targetKind": "command",
+    "title": "List files",
+    "took": 1200,
+    "key": "f1"
+   },
+   "c": [
+    {
+     "k": "ansi",
+     "p": {
+      "follow": true,
+      "max": {
+       "h": "20lines"
+      },
+      "text": "a\nb\n",
+      "key": "out"
+     }
+    }
+   ]
+  }
+ },
+ {
+  "detail": [
+   {
+    "k": "code",
+    "p": {
+     "lang": "bash",
+     "max": {
+      "h": "12lines"
+     },
+     "role": "omp.tool.command",
+     "text": "npm test",
+     "key": "cmd"
+    }
+   }
+  ],
+  "name": "terminal",
+  "node": {
+   "k": "tool",
+   "p": {
+    "lang": "bash",
+    "name": "bash",
+    "preview": {
+     "tail": 3
+    },
+    "status": "done",
+    "target": "npm test",
+    "targetKind": "command",
+    "title": "Run tests",
+    "took": 1200,
+    "key": "f2"
+   }
+  }
+ },
+ {
+  "detail": [],
+  "name": "terminal",
+  "node": {
+   "k": "tool",
+   "p": {
+    "lang": "bash",
+    "name": "bash",
+    "preview": {
+     "tail": 3
+    },
+    "status": "done",
+    "title": "Run a command",
+    "took": 1200,
+    "key": "f3"
+   }
+  }
+ },
+ {
+  "detail": [
+   {
+    "k": "code",
+    "p": {
+     "lang": "bash",
+     "max": {
+      "h": "12lines"
+     },
+     "role": "omp.tool.command",
+     "text": "sh -c 'cat a\n  | head'",
+     "key": "cmd"
+    }
+   },
+   {
+    "k": "ansi",
+    "p": {
+     "follow": true,
+     "max": {
+      "h": "20lines"
+     },
+     "text": "oops",
+     "key": "out"
+    }
+   },
+   {
+    "k": "text",
+    "p": {
+     "spans": [
+      {
+       "s": "error",
+       "t": "exit 2"
+      }
+     ],
+     "key": "exit"
+    }
+   }
+  ],
+  "name": "terminal",
+  "node": {
+   "k": "tool",
+   "p": {
+    "collapsed": false,
+    "collapsible": true,
+    "exit": 2,
+    "lang": "bash",
+    "name": "bash",
+    "preview": {
+     "tail": 3
+    },
+    "status": "error",
+    "title": "Run a shell snippet",
+    "took": 1200,
+    "key": "f4"
+   },
+   "c": [
+    {
+     "k": "code",
+     "p": {
+      "lang": "bash",
+      "max": {
+       "h": "12lines"
+      },
+      "role": "omp.tool.command",
+      "text": "sh -c 'cat a\n  | head'",
+      "key": "cmd"
+     }
+    },
+    {
+     "k": "ansi",
+     "p": {
+      "follow": true,
+      "max": {
+       "h": "20lines"
+      },
+      "text": "oops",
+      "key": "out"
+     }
+    }
+   ]
+  }
+ },
+ {
+  "detail": [
+   {
+    "k": "code",
+    "p": {
+     "lang": "bash",
+     "max": {
+      "h": "12lines"
+     },
+     "role": "omp.tool.command",
+     "text": "for f in *; do\n  echo \"$f\"\ndone",
+     "key": "cmd"
+    }
+   },
+   {
+    "k": "text",
+    "p": {
+     "role": "omp.tool.error",
+     "spans": [
+      {
+       "s": "error",
+       "t": "no such file"
+      }
+     ],
+     "wrap": "word",
+     "key": "err"
+    }
+   },
+   {
+    "k": "text",
+    "p": {
+     "spans": [
+      {
+       "s": "error",
+       "t": "exit 1"
+      }
+     ],
+     "key": "exit"
+    }
+   }
+  ],
+  "name": "terminal",
+  "node": {
+   "k": "tool",
+   "p": {
+    "collapsed": true,
+    "collapsible": true,
+    "exit": 1,
+    "lang": "bash",
+    "name": "bash",
+    "preview": {
+     "tail": 3
+    },
+    "status": "done",
+    "title": "Run a loop",
+    "took": 1200,
+    "key": "f5"
+   },
+   "c": [
+    {
+     "k": "code",
+     "p": {
+      "lang": "bash",
+      "max": {
+       "h": "12lines"
+      },
+      "role": "omp.tool.command",
+      "text": "for f in *; do\n  echo \"$f\"\ndone",
+      "key": "cmd"
+     }
+    },
+    {
+     "k": "text",
+     "p": {
+      "role": "omp.tool.error",
+      "spans": [
+       {
+        "s": "error",
+        "t": "no such file"
+       }
+      ],
+      "wrap": "word",
+      "key": "err"
+     }
+    }
+   ]
+  }
+ },
+ {
+  "detail": [
+   {
+    "k": "code",
+    "p": {
+     "lang": "bash",
+     "max": {
+      "h": "12lines"
+     },
+     "role": "omp.tool.command",
+     "text": "npm run dev",
+     "key": "cmd"
+    }
+   },
+   {
+    "k": "row",
+    "p": {
+     "actions": {
+      "click": "open-process=proc_1",
+      "menu": [
+       "open-process=proc_1"
+      ]
+     },
+     "align": "center",
+     "gap": "xs",
+     "role": "omp.tool.process",
+     "title": "Open in the Background sheet  ⌥J",
+     "key": "process"
+    },
+    "c": [
+     {
+      "k": "icon",
+      "p": {
+       "name": "pending",
+       "tone": "muted",
+       "key": "state-icon"
+      }
+     },
+     {
+      "k": "text",
+      "p": {
+       "spans": [
+        {
+         "s": "muted",
+         "t": "starting"
+        }
+       ],
+       "wrap": "none",
+       "key": "state"
+      }
+     }
+    ]
+   }
+  ],
+  "name": "terminal",
+  "node": {
+   "k": "tool",
+   "p": {
+    "badges": [
+     {
+      "text": "background"
+     }
+    ],
+    "collapsed": false,
+    "collapsible": true,
+    "lang": "bash",
+    "name": "bash",
+    "preview": {
+     "tail": 3
+    },
+    "status": "done",
+    "target": "npm run dev",
+    "targetKind": "command",
+    "title": "Run dev",
+    "took": 1200,
+    "key": "f6"
+   },
+   "c": [
+    {
+     "k": "row",
+     "p": {
+      "actions": {
+       "click": "open-process=proc_1",
+       "menu": [
+        "open-process=proc_1"
+       ]
+      },
+      "align": "center",
+      "gap": "xs",
+      "role": "omp.tool.process",
+      "title": "Open in the Background sheet  ⌥J",
+      "key": "process"
+     },
+     "c": [
+      {
+       "k": "icon",
+       "p": {
+        "name": "pending",
+        "tone": "muted",
+        "key": "state-icon"
+       }
+      },
+      {
+       "k": "text",
+       "p": {
+        "spans": [
+         {
+          "s": "muted",
+          "t": "starting"
+         }
+        ],
+        "wrap": "none",
+        "key": "state"
+       }
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "detail": [
+   {
+    "k": "code",
+    "p": {
+     "lang": "bash",
+     "max": {
+      "h": "12lines"
+     },
+     "role": "omp.tool.command",
+     "text": "sleep 99",
+     "key": "cmd"
+    }
+   },
+   {
+    "k": "row",
+    "p": {
+     "actions": {
+      "click": "open-process=proc_2",
+      "menu": [
+       "open-process=proc_2"
+      ]
+     },
+     "align": "center",
+     "gap": "xs",
+     "role": "omp.tool.process",
+     "title": "Open in the Background sheet  ⌥J",
+     "key": "process"
+    },
+    "c": [
+     {
+      "k": "icon",
+      "p": {
+       "name": "pending",
+       "tone": "muted",
+       "key": "state-icon"
+      }
+     },
+     {
+      "k": "text",
+      "p": {
+       "spans": [
+        {
+         "s": "muted",
+         "t": "starting"
+        }
+       ],
+       "wrap": "none",
+       "key": "state"
+      }
+     }
+    ]
+   }
+  ],
+  "name": "terminal",
+  "node": {
+   "k": "tool",
+   "p": {
+    "age": 4000,
+    "badges": [
+     {
+      "text": "background"
+     }
+    ],
+    "collapsed": false,
+    "collapsible": true,
+    "lang": "bash",
+    "name": "bash",
+    "preview": {
+     "tail": 4
+    },
+    "status": "running",
+    "target": "sleep 99",
+    "targetKind": "command",
+    "title": "Wait 99s",
+    "key": "f7"
+   },
+   "c": [
+    {
+     "k": "row",
+     "p": {
+      "actions": {
+       "click": "open-process=proc_2",
+       "menu": [
+        "open-process=proc_2"
+       ]
+      },
+      "align": "center",
+      "gap": "xs",
+      "role": "omp.tool.process",
+      "title": "Open in the Background sheet  ⌥J",
+      "key": "process"
+     },
+     "c": [
+      {
+       "k": "icon",
+       "p": {
+        "name": "pending",
+        "tone": "muted",
+        "key": "state-icon"
+       }
+      },
+      {
+       "k": "text",
+       "p": {
+        "spans": [
+         {
+          "s": "muted",
+          "t": "starting"
+         }
+        ],
+        "wrap": "none",
+        "key": "state"
+       }
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "detail": [
+   {
+    "k": "code",
+    "p": {
+     "lang": "bash",
+     "max": {
+      "h": "12lines"
+     },
+     "role": "omp.tool.command",
+     "text": "make",
+     "key": "cmd"
+    }
+   },
+   {
+    "k": "text",
+    "p": {
+     "spans": [
+      {
+       "s": "muted",
+       "t": "Interrupted by user after 1.2s"
+      }
+     ],
+     "key": "cancelled"
+    }
+   }
+  ],
+  "name": "terminal",
+  "node": {
+   "k": "tool",
+   "p": {
+    "collapsed": true,
+    "collapsible": true,
+    "lang": "bash",
+    "name": "bash",
+    "note": "cancelled",
+    "preview": {
+     "tail": 3
+    },
+    "status": "cancelled",
+    "target": "make",
+    "targetKind": "command",
+    "title": "Make",
+    "took": 1200,
+    "key": "f8"
+   },
+   "c": [
+    {
+     "k": "text",
+     "p": {
+      "role": "omp.tool.notice",
+      "spans": [
+       {
+        "s": "muted",
+        "t": "Interrupted by user after 1.2s"
+       }
+      ],
+      "key": "cancelled"
+     }
+    }
+   ]
+  }
+ },
+ {
+  "detail": [
+   {
+    "k": "code",
+    "p": {
+     "lang": "typescript",
+     "numbers": true,
+     "start": 1,
+     "text": "const a = 1\nexport {}",
+     "key": "code"
+    }
+   }
+  ],
+  "name": "read_file",
+  "node": {
+   "k": "tool",
+   "p": {
+    "collapsed": true,
+    "collapsible": true,
+    "frame": "inline",
+    "meta": [
+     "2 lines"
+    ],
+    "name": "read",
+    "status": "done",
+    "target": "src/a.ts",
+    "targetKind": "path",
+    "title": "Read",
+    "took": 1200,
+    "key": "f9"
+   },
+   "c": [
+    {
+     "k": "code",
+     "p": {
+      "lang": "typescript",
+      "numbers": true,
+      "start": 1,
+      "text": "const a = 1\nexport {}",
+      "key": "code"
+     }
+    }
+   ]
+  }
+ },
+ {
+  "detail": [
+   {
+    "k": "code",
+    "p": {
+     "lang": "typescript",
+     "numbers": true,
+     "start": 10,
+     "text": "x\ny",
+     "key": "code"
+    }
+   }
+  ],
+  "name": "read_file",
+  "node": {
+   "k": "tool",
+   "p": {
+    "collapsed": true,
+    "collapsible": true,
+    "frame": "inline",
+    "meta": [
+     ":10-11"
+    ],
+    "name": "read",
+    "status": "done",
+    "target": "src/b.ts",
+    "targetKind": "path",
+    "title": "Read",
+    "took": 1200,
+    "key": "f10"
+   },
+   "c": [
+    {
+     "k": "code",
+     "p": {
+      "lang": "typescript",
+      "numbers": true,
+      "start": 10,
+      "text": "x\ny",
+      "key": "code"
+     }
+    }
+   ]
+  }
+ },
+ {
+  "detail": [],
+  "name": "read_file",
+  "node": {
+   "k": "tool",
+   "p": {
+    "frame": "inline",
+    "name": "read",
+    "status": "done",
+    "target": "notes.md",
+    "targetKind": "path",
+    "title": "Read",
+    "took": 1200,
+    "key": "f11"
+   }
+  }
+ },
+ {
+  "detail": [
+   {
+    "k": "text",
+    "p": {
+     "role": "omp.tool.error",
+     "spans": [
+      {
+       "s": "error",
+       "t": "denied"
+      }
+     ],
+     "wrap": "word",
+     "key": "err"
+    }
+   }
+  ],
+  "name": "read_file",
+  "node": {
+   "k": "tool",
+   "p": {
+    "frame": "inline",
+    "name": "read",
+    "note": "denied",
+    "status": "error",
+    "target": "",
+    "title": "Read",
+    "took": 1200,
+    "key": "f12"
+   }
+  }
+ },
+ {
+  "detail": [
+   {
+    "k": "diff",
+    "p": {
+     "lang": "typescript",
+     "text": "@@ -1 +1 @@\n-a\n+b",
+     "key": "diff"
+    }
+   }
+  ],
+  "name": "patch",
+  "node": {
+   "k": "tool",
+   "p": {
+    "collapsible": true,
+    "meta": [
+     "+1 −1"
+    ],
+    "name": "edit",
+    "status": "done",
+    "target": "src/a.ts",
+    "targetKind": "path",
+    "title": "Edit",
+    "took": 1200,
+    "key": "f13"
+   },
+   "c": [
+    {
+     "k": "diff",
+     "p": {
+      "lang": "typescript",
+      "text": "@@ -1 +1 @@\n-a\n+b",
+      "key": "diff"
+     }
+    }
+   ]
+  }
+ },
+ {
+  "detail": [],
+  "name": "patch",
+  "node": {
+   "k": "tool",
+   "p": {
+    "name": "edit",
+    "status": "done",
+    "target": "",
+    "title": "Edit",
+    "took": 1200,
+    "key": "f14"
+   }
+  }
+ },
+ {
+  "detail": [
+   {
+    "k": "code",
+    "p": {
+     "lang": "markdown",
+     "numbers": true,
+     "text": "hello\nworld",
+     "key": "code"
+    }
+   }
+  ],
+  "name": "write_file",
+  "node": {
+   "k": "tool",
+   "p": {
+    "badges": [
+     {
+      "text": "new file",
+      "tone": "success"
+     }
+    ],
+    "collapsed": true,
+    "collapsible": true,
+    "meta": [
+     "2 lines"
+    ],
+    "name": "write",
+    "preview": {
+     "lines": 8
+    },
+    "status": "done",
+    "target": "docs/new.md",
+    "targetKind": "path",
+    "title": "Write",
+    "took": 1200,
+    "key": "f15"
+   },
+   "c": [
+    {
+     "k": "code",
+     "p": {
+      "lang": "markdown",
+      "numbers": true,
+      "text": "hello\nworld",
+      "key": "code"
+     }
+    }
+   ]
+  }
+ },
+ {
+  "detail": [
+   {
+    "k": "code",
+    "p": {
+     "lang": "text",
+     "numbers": true,
+     "text": "x",
+     "key": "code"
+    }
+   }
+  ],
+  "name": "write_file",
+  "node": {
+   "k": "tool",
+   "p": {
+    "collapsed": true,
+    "collapsible": true,
+    "meta": [
+     "1 line"
+    ],
+    "name": "write",
+    "preview": {
+     "lines": 8
+    },
+    "status": "done",
+    "target": "",
+    "title": "Write",
+    "took": 1200,
+    "key": "f16"
+   },
+   "c": [
+    {
+     "k": "code",
+     "p": {
+      "lang": "text",
+      "numbers": true,
+      "text": "x",
+      "key": "code"
+     }
+    }
+   ]
+  }
+ },
+ {
+  "detail": [
+   {
+    "k": "row",
+    "p": {
+     "role": "omp.tool.file",
+     "key": "f0"
+    },
+    "c": [
+     {
+      "k": "text",
+      "p": {
+       "spans": [
+        {
+         "s": "path",
+         "t": "lab/x.py"
+        }
+       ],
+       "key": "p"
+      }
+     },
+     {
+      "k": "text",
+      "p": {
+       "role": "omp.tool.chip",
+       "spans": [
+        {
+         "t": "2"
+        }
+       ],
+       "key": "n"
+      }
+     }
+    ]
+   },
+   {
+    "k": "code",
+    "p": {
+     "lang": "python",
+     "marks": [
+      {
+       "line": 3,
+       "tone": "accent"
+      },
+      {
+       "line": 4,
+       "tone": "accent"
+      }
+     ],
+     "numbers": true,
+     "start": 3,
+     "text": "def a\ndef b",
+     "key": "f0.c0"
+    }
+   }
+  ],
+  "name": "search_files",
+  "node": {
+   "k": "tool",
+   "p": {
+    "collapsed": false,
+    "collapsible": true,
+    "frame": "inline",
+    "meta": [
+     "2 matches · 1 file · in lab"
+    ],
+    "name": "grep",
+    "status": "done",
+    "target": "def ",
+    "targetKind": "pattern",
+    "title": "Grep",
+    "took": 1200,
+    "key": "f17"
+   },
+   "c": [
+    {
+     "k": "row",
+     "p": {
+      "role": "omp.tool.file",
+      "key": "f0"
+     },
+     "c": [
+      {
+       "k": "text",
+       "p": {
+        "spans": [
+         {
+          "s": "path",
+          "t": "lab/x.py"
+         }
+        ],
+        "key": "p"
+       }
+      },
+      {
+       "k": "text",
+       "p": {
+        "role": "omp.tool.chip",
+        "spans": [
+         {
+          "t": "2"
+         }
+        ],
+        "key": "n"
+       }
+      }
+     ]
+    },
+    {
+     "k": "code",
+     "p": {
+      "lang": "python",
+      "marks": [
+       {
+        "line": 3,
+        "tone": "accent"
+       },
+       {
+        "line": 4,
+        "tone": "accent"
+       }
+      ],
+      "numbers": true,
+      "start": 3,
+      "text": "def a\ndef b",
+      "key": "f0.c0"
+     }
+    }
+   ]
+  }
+ },
+ {
+  "detail": [
+   {
+    "k": "row",
+    "p": {
+     "role": "omp.tool.file",
+     "key": "f0"
+    },
+    "c": [
+     {
+      "k": "text",
+      "p": {
+       "spans": [
+        {
+         "s": "path",
+         "t": "README.md"
+        }
+       ],
+       "key": "p"
+      }
+     }
+    ]
+   },
+   {
+    "k": "row",
+    "p": {
+     "role": "omp.tool.file",
+     "title": "docs/",
+     "key": "f1"
+    },
+    "c": [
+     {
+      "k": "text",
+      "p": {
+       "spans": [
+        {
+         "s": "path",
+         "t": "a.md"
+        }
+       ],
+       "key": "p"
+      }
+     }
+    ]
+   }
+  ],
+  "name": "search_files",
+  "node": {
+   "k": "tool",
+   "p": {
+    "collapsed": false,
+    "collapsible": true,
+    "frame": "inline",
+    "meta": [
+     "9 files"
+    ],
+    "name": "glob",
+    "status": "done",
+    "target": "*.md",
+    "targetKind": "pattern",
+    "title": "Glob",
+    "took": 1200,
+    "key": "f18"
+   },
+   "c": [
+    {
+     "k": "row",
+     "p": {
+      "role": "omp.tool.file",
+      "key": "f0"
+     },
+     "c": [
+      {
+       "k": "text",
+       "p": {
+        "spans": [
+         {
+          "s": "path",
+          "t": "README.md"
+         }
+        ],
+        "key": "p"
+       }
+      }
+     ]
+    },
+    {
+     "k": "row",
+     "p": {
+      "role": "omp.tool.file",
+      "title": "docs/",
+      "key": "f1"
+     },
+     "c": [
+      {
+       "k": "text",
+       "p": {
+        "spans": [
+         {
+          "s": "path",
+          "t": "a.md"
+         }
+        ],
+        "key": "p"
+       }
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "detail": [],
+  "name": "search_files",
+  "node": {
+   "k": "tool",
+   "p": {
+    "frame": "inline",
+    "name": "grep",
+    "status": "done",
+    "target": "TODO",
+    "targetKind": "pattern",
+    "title": "Grep",
+    "took": 1200,
+    "key": "f19"
+   }
+  }
+ },
+ {
+  "detail": [
+   {
+    "k": "col",
+    "p": {
+     "role": "omp.tool.sources",
+     "key": "s"
+    },
+    "c": [
+     {
+      "k": "row",
+      "p": {
+       "role": "omp.tool.source",
+       "key": "s0"
+      },
+      "c": [
+       {
+        "k": "text",
+        "p": {
+         "role": "omp.tool.chip",
+         "spans": [
+          {
+           "t": "T"
+          }
+         ],
+         "key": "d"
+        }
+       },
+       {
+        "k": "text",
+        "p": {
+         "spans": [
+          {
+           "href": "https://www.tern.dev/x",
+           "t": "Tern"
+          }
+         ],
+         "key": "t"
+        }
+       },
+       {
+        "k": "text",
+        "p": {
+         "spans": [
+          {
+           "s": "muted",
+           "t": "tern.dev"
+          }
+         ],
+         "key": "m"
+        }
+       }
+      ]
+     },
+     {
+      "k": "row",
+      "p": {
+       "role": "omp.tool.source",
+       "key": "s1"
+      },
+      "c": [
+       {
+        "k": "text",
+        "p": {
+         "role": "omp.tool.chip",
+         "spans": [
+          {
+           "t": "B"
+          }
+         ],
+         "key": "d"
+        }
+       },
+       {
+        "k": "text",
+        "p": {
+         "spans": [
+          {
+           "href": "https://b.io",
+           "t": "https://b.io"
+          }
+         ],
+         "key": "t"
+        }
+       },
+       {
+        "k": "text",
+        "p": {
+         "spans": [
+          {
+           "s": "muted",
+           "t": "b.io"
+          }
+         ],
+         "key": "m"
+        }
+       }
+      ]
+     }
+    ]
+   }
+  ],
+  "name": "web_search",
+  "node": {
+   "k": "tool",
+   "p": {
+    "collapsible": true,
+    "meta": [
+     "2 sources"
+    ],
+    "name": "web_search",
+    "status": "done",
+    "target": "tern terminal",
+    "targetKind": "query",
+    "title": "Web search",
+    "took": 1200,
+    "key": "f20"
+   },
+   "c": [
+    {
+     "k": "col",
+     "p": {
+      "role": "omp.tool.sources",
+      "key": "s"
+     },
+     "c": [
+      {
+       "k": "row",
+       "p": {
+        "role": "omp.tool.source",
+        "key": "s0"
+       },
+       "c": [
+        {
+         "k": "text",
+         "p": {
+          "role": "omp.tool.chip",
+          "spans": [
+           {
+            "t": "T"
+           }
+          ],
+          "key": "d"
+         }
+        },
+        {
+         "k": "text",
+         "p": {
+          "spans": [
+           {
+            "href": "https://www.tern.dev/x",
+            "t": "Tern"
+           }
+          ],
+          "key": "t"
+         }
+        },
+        {
+         "k": "text",
+         "p": {
+          "spans": [
+           {
+            "s": "muted",
+            "t": "tern.dev"
+           }
+          ],
+          "key": "m"
+         }
+        }
+       ]
+      },
+      {
+       "k": "row",
+       "p": {
+        "role": "omp.tool.source",
+        "key": "s1"
+       },
+       "c": [
+        {
+         "k": "text",
+         "p": {
+          "role": "omp.tool.chip",
+          "spans": [
+           {
+            "t": "B"
+           }
+          ],
+          "key": "d"
+         }
+        },
+        {
+         "k": "text",
+         "p": {
+          "spans": [
+           {
+            "href": "https://b.io",
+            "t": "https://b.io"
+           }
+          ],
+          "key": "t"
+         }
+        },
+        {
+         "k": "text",
+         "p": {
+          "spans": [
+           {
+            "s": "muted",
+            "t": "b.io"
+           }
+          ],
+          "key": "m"
+         }
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "detail": [
+   {
+    "k": "col",
+    "p": {
+     "role": "omp.tool.sources",
+     "key": "s"
+    },
+    "c": [
+     {
+      "k": "row",
+      "p": {
+       "role": "omp.tool.source",
+       "key": "s0"
+      },
+      "c": [
+       {
+        "k": "text",
+        "p": {
+         "role": "omp.tool.chip",
+         "spans": [
+          {
+           "t": "·"
+          }
+         ],
+         "key": "d"
+        }
+       },
+       {
+        "k": "text",
+        "p": {
+         "spans": [
+          {
+           "href": "notaurl",
+           "t": "Old"
+          }
+         ],
+         "key": "t"
+        }
+       }
+      ]
+     }
+    ]
+   }
+  ],
+  "name": "web_search",
+  "node": {
+   "k": "tool",
+   "p": {
+    "collapsible": true,
+    "meta": [
+     "1 source"
+    ],
+    "name": "web_search",
+    "status": "done",
+    "target": "old shape",
+    "targetKind": "query",
+    "title": "Web search",
+    "took": 1200,
+    "key": "f21"
+   },
+   "c": [
+    {
+     "k": "col",
+     "p": {
+      "role": "omp.tool.sources",
+      "key": "s"
+     },
+     "c": [
+      {
+       "k": "row",
+       "p": {
+        "role": "omp.tool.source",
+        "key": "s0"
+       },
+       "c": [
+        {
+         "k": "text",
+         "p": {
+          "role": "omp.tool.chip",
+          "spans": [
+           {
+            "t": "·"
+           }
+          ],
+          "key": "d"
+         }
+        },
+        {
+         "k": "text",
+         "p": {
+          "spans": [
+           {
+            "href": "notaurl",
+            "t": "Old"
+           }
+          ],
+          "key": "t"
+         }
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "detail": [],
+  "name": "web_search",
+  "node": {
+   "k": "tool",
+   "p": {
+    "frame": "inline",
+    "name": "web_search",
+    "status": "done",
+    "target": "",
+    "title": "Web search",
+    "took": 1200,
+    "key": "f22"
+   }
+  }
+ },
+ {
+  "detail": [
+   {
+    "k": "row",
+    "p": {
+     "role": "omp.tool.source",
+     "key": "s0"
+    },
+    "c": [
+     {
+      "k": "text",
+      "p": {
+       "role": "omp.tool.chip",
+       "spans": [
+        {
+         "t": "A"
+        }
+       ],
+       "key": "d"
+      }
+     },
+     {
+      "k": "text",
+      "p": {
+       "spans": [
+        {
+         "href": "https://a.io",
+         "t": "A"
+        }
+       ],
+       "key": "t"
+      }
+     },
+     {
+      "k": "text",
+      "p": {
+       "spans": [
+        {
+         "s": "muted",
+         "t": "a.io"
+        }
+       ],
+       "key": "m"
+      }
+     }
+    ]
+   },
+   {
+    "k": "md",
+    "p": {
+     "key": "b0",
+     "text": "page a"
+    }
+   },
+   {
+    "k": "row",
+    "p": {
+     "role": "omp.tool.source",
+     "key": "s1"
+    },
+    "c": [
+     {
+      "k": "text",
+      "p": {
+       "role": "omp.tool.chip",
+       "spans": [
+        {
+         "t": "B"
+        }
+       ],
+       "key": "d"
+      }
+     },
+     {
+      "k": "text",
+      "p": {
+       "spans": [
+        {
+         "href": "https://b.io",
+         "t": "https://b.io"
+        }
+       ],
+       "key": "t"
+      }
+     },
+     {
+      "k": "text",
+      "p": {
+       "spans": [
+        {
+         "s": "muted",
+         "t": "b.io"
+        }
+       ],
+       "key": "m"
+      }
+     }
+    ]
+   }
+  ],
+  "name": "web_extract",
+  "node": {
+   "k": "tool",
+   "p": {
+    "collapsed": true,
+    "collapsible": true,
+    "meta": [
+     "2 pages · 6 chars"
+    ],
+    "name": "fetch",
+    "preview": {
+     "lines": 6
+    },
+    "status": "done",
+    "target": "https://a.io +1",
+    "targetKind": "path",
+    "title": "Fetch",
+    "took": 1200,
+    "key": "f23"
+   },
+   "c": [
+    {
+     "k": "row",
+     "p": {
+      "role": "omp.tool.source",
+      "key": "s0"
+     },
+     "c": [
+      {
+       "k": "text",
+       "p": {
+        "role": "omp.tool.chip",
+        "spans": [
+         {
+          "t": "A"
+         }
+        ],
+        "key": "d"
+       }
+      },
+      {
+       "k": "text",
+       "p": {
+        "spans": [
+         {
+          "href": "https://a.io",
+          "t": "A"
+         }
+        ],
+        "key": "t"
+       }
+      },
+      {
+       "k": "text",
+       "p": {
+        "spans": [
+         {
+          "s": "muted",
+          "t": "a.io"
+         }
+        ],
+        "key": "m"
+       }
+      }
+     ]
+    },
+    {
+     "k": "md",
+     "p": {
+      "key": "b0",
+      "text": "page a"
+     }
+    },
+    {
+     "k": "row",
+     "p": {
+      "role": "omp.tool.source",
+      "key": "s1"
+     },
+     "c": [
+      {
+       "k": "text",
+       "p": {
+        "role": "omp.tool.chip",
+        "spans": [
+         {
+          "t": "B"
+         }
+        ],
+        "key": "d"
+       }
+      },
+      {
+       "k": "text",
+       "p": {
+        "spans": [
+         {
+          "href": "https://b.io",
+          "t": "https://b.io"
+         }
+        ],
+        "key": "t"
+       }
+      },
+      {
+       "k": "text",
+       "p": {
+        "spans": [
+         {
+          "s": "muted",
+          "t": "b.io"
+         }
+        ],
+        "key": "m"
+       }
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "detail": [],
+  "name": "web_extract",
+  "node": {
+   "k": "tool",
+   "p": {
+    "name": "fetch",
+    "preview": {
+     "lines": 6
+    },
+    "status": "done",
+    "target": "https://c.io",
+    "targetKind": "path",
+    "title": "Fetch",
+    "took": 1200,
+    "key": "f24"
+   }
+  }
+ },
+ {
+  "detail": [],
+  "name": "web_extract",
+  "node": {
+   "k": "tool",
+   "p": {
+    "name": "fetch",
+    "preview": {
+     "lines": 6
+    },
+    "status": "done",
+    "target": "https://d.io",
+    "targetKind": "path",
+    "title": "Fetch",
+    "took": 1200,
+    "key": "f25"
+   }
+  }
+ },
+ {
+  "detail": [],
+  "name": "web_extract",
+  "node": {
+   "k": "tool",
+   "p": {
+    "name": "fetch",
+    "preview": {
+     "lines": 6
+    },
+    "status": "done",
+    "target": "",
+    "title": "Fetch",
+    "took": 1200,
+    "key": "f26"
+   }
+  }
+ },
+ {
+  "detail": [
+   {
+    "k": "col",
+    "p": {
+     "role": "omp.tool.eval.cell",
+     "key": "cell-0"
+    },
+    "c": [
+     {
+      "k": "row",
+      "p": {
+       "align": "start",
+       "role": "omp.tool.eval.input",
+       "key": "input"
+      },
+      "c": [
+       {
+        "k": "icon",
+        "p": {
+         "aria": "Input",
+         "name": "arrow-left",
+         "role": "omp.tool.eval.prompt",
+         "key": "0"
+        }
+       },
+       {
+        "k": "col",
+        "p": {
+         "grow": 1,
+         "key": "source"
+        },
+        "c": [
+         {
+          "k": "code",
+          "p": {
+           "lang": "python",
+           "max": {
+            "h": "20lines"
+           },
+           "numbers": false,
+           "text": "# Sum\nprint(1)",
+           "wrap": true,
+           "key": "code"
+          }
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "k": "row",
+      "p": {
+       "align": "start",
+       "role": "omp.tool.eval.result",
+       "key": "result"
+      },
+      "c": [
+       {
+        "k": "icon",
+        "p": {
+         "aria": "Output",
+         "name": "arrow-right",
+         "role": "omp.tool.eval.prompt",
+         "key": "0"
+        }
+       },
+       {
+        "k": "col",
+        "p": {
+         "grow": 1,
+         "role": "omp.tool.eval.outputs",
+         "key": "outputs"
+        },
+        "c": [
+         {
+          "k": "ansi",
+          "p": {
+           "follow": false,
+           "max": {
+            "h": "20lines"
+           },
+           "role": "omp.tool.eval.output",
+           "text": "1",
+           "key": "out"
+          }
+         }
+        ]
+       }
+      ]
+     }
+    ]
+   }
+  ],
+  "name": "execute_code",
+  "node": {
+   "k": "tool",
+   "p": {
+    "badges": [
+     {
+      "text": "python"
+     }
+    ],
+    "collapsed": false,
+    "collapsible": true,
+    "name": "eval",
+    "role": "omp.tool.eval",
+    "status": "done",
+    "title": "Sum",
+    "took": 1200,
+    "key": "f27"
+   },
+   "c": [
+    {
+     "k": "col",
+     "p": {
+      "role": "omp.tool.eval.cell",
+      "key": "cell-0"
+     },
+     "c": [
+      {
+       "k": "row",
+       "p": {
+        "align": "start",
+        "role": "omp.tool.eval.input",
+        "key": "input"
+       },
+       "c": [
+        {
+         "k": "icon",
+         "p": {
+          "aria": "Input",
+          "name": "arrow-left",
+          "role": "omp.tool.eval.prompt",
+          "key": "0"
+         }
+        },
+        {
+         "k": "col",
+         "p": {
+          "grow": 1,
+          "key": "source"
+         },
+         "c": [
+          {
+           "k": "code",
+           "p": {
+            "lang": "python",
+            "max": {
+             "h": "20lines"
+            },
+            "numbers": false,
+            "text": "# Sum\nprint(1)",
+            "wrap": true,
+            "key": "code"
+           }
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "k": "row",
+       "p": {
+        "align": "start",
+        "role": "omp.tool.eval.result",
+        "key": "result"
+       },
+       "c": [
+        {
+         "k": "icon",
+         "p": {
+          "aria": "Output",
+          "name": "arrow-right",
+          "role": "omp.tool.eval.prompt",
+          "key": "0"
+         }
+        },
+        {
+         "k": "col",
+         "p": {
+          "grow": 1,
+          "role": "omp.tool.eval.outputs",
+          "key": "outputs"
+         },
+         "c": [
+          {
+           "k": "ansi",
+           "p": {
+            "follow": false,
+            "max": {
+             "h": "20lines"
+            },
+            "role": "omp.tool.eval.output",
+            "text": "1",
+            "key": "out"
+           }
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "detail": [
+   {
+    "k": "col",
+    "p": {
+     "role": "omp.tool.eval.cell",
+     "key": "cell-0"
+    },
+    "c": [
+     {
+      "k": "row",
+      "p": {
+       "align": "start",
+       "role": "omp.tool.eval.input",
+       "key": "input"
+      },
+      "c": [
+       {
+        "k": "icon",
+        "p": {
+         "aria": "Input",
+         "name": "arrow-left",
+         "role": "omp.tool.eval.prompt",
+         "key": "0"
+        }
+       },
+       {
+        "k": "col",
+        "p": {
+         "grow": 1,
+         "key": "source"
+        },
+        "c": [
+         {
+          "k": "code",
+          "p": {
+           "lang": "python",
+           "max": {
+            "h": "20lines"
+           },
+           "numbers": false,
+           "text": "x",
+           "wrap": true,
+           "key": "code"
+          }
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "k": "row",
+      "p": {
+       "align": "start",
+       "role": "omp.tool.eval.result",
+       "key": "result"
+      },
+      "c": [
+       {
+        "k": "icon",
+        "p": {
+         "aria": "Output",
+         "name": "arrow-right",
+         "role": "omp.tool.eval.prompt",
+         "key": "0"
+        }
+       },
+       {
+        "k": "col",
+        "p": {
+         "grow": 1,
+         "role": "omp.tool.eval.outputs",
+         "key": "outputs"
+        },
+        "c": [
+         {
+          "k": "text",
+          "p": {
+           "role": "omp.tool.error",
+           "spans": [
+            {
+             "s": "error",
+             "t": "boom"
+            }
+           ],
+           "wrap": "word",
+           "key": "err"
+          }
+         }
+        ]
+       }
+      ]
+     }
+    ]
+   }
+  ],
+  "name": "execute_code",
+  "node": {
+   "k": "tool",
+   "p": {
+    "badges": [
+     {
+      "text": "python"
+     }
+    ],
+    "collapsed": false,
+    "collapsible": true,
+    "name": "eval",
+    "role": "omp.tool.eval",
+    "status": "error",
+    "title": "Eval",
+    "took": 1200,
+    "key": "f28"
+   },
+   "c": [
+    {
+     "k": "col",
+     "p": {
+      "role": "omp.tool.eval.cell",
+      "key": "cell-0"
+     },
+     "c": [
+      {
+       "k": "row",
+       "p": {
+        "align": "start",
+        "role": "omp.tool.eval.input",
+        "key": "input"
+       },
+       "c": [
+        {
+         "k": "icon",
+         "p": {
+          "aria": "Input",
+          "name": "arrow-left",
+          "role": "omp.tool.eval.prompt",
+          "key": "0"
+         }
+        },
+        {
+         "k": "col",
+         "p": {
+          "grow": 1,
+          "key": "source"
+         },
+         "c": [
+          {
+           "k": "code",
+           "p": {
+            "lang": "python",
+            "max": {
+             "h": "20lines"
+            },
+            "numbers": false,
+            "text": "x",
+            "wrap": true,
+            "key": "code"
+           }
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "k": "row",
+       "p": {
+        "align": "start",
+        "role": "omp.tool.eval.result",
+        "key": "result"
+       },
+       "c": [
+        {
+         "k": "icon",
+         "p": {
+          "aria": "Output",
+          "name": "arrow-right",
+          "role": "omp.tool.eval.prompt",
+          "key": "0"
+         }
+        },
+        {
+         "k": "col",
+         "p": {
+          "grow": 1,
+          "role": "omp.tool.eval.outputs",
+          "key": "outputs"
+         },
+         "c": [
+          {
+           "k": "text",
+           "p": {
+            "role": "omp.tool.error",
+            "spans": [
+             {
+              "s": "error",
+              "t": "boom"
+             }
+            ],
+            "wrap": "word",
+            "key": "err"
+           }
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "detail": [],
+  "name": "link_pull_request",
+  "node": {
+   "k": "tool",
+   "p": {
+    "frame": "inline",
+    "name": "link_pull_request",
+    "status": "done",
+    "target": "https://github.com/o/r/pull/12",
+    "targetKind": "path",
+    "title": "Link pull request",
+    "took": 1200,
+    "key": "f29"
+   }
+  }
+ },
+ {
+  "detail": [],
+  "name": "link_pull_request",
+  "node": {
+   "k": "tool",
+   "p": {
+    "frame": "inline",
+    "name": "link_pull_request",
+    "status": "done",
+    "title": "Link pull request",
+    "took": 1200,
+    "key": "f30"
+   }
+  }
+ },
+ {
+  "detail": [],
+  "name": "unlink_pull_request",
+  "node": {
+   "k": "tool",
+   "p": {
+    "frame": "inline",
+    "name": "unlink_pull_request",
+    "status": "done",
+    "title": "Unlink pull request",
+    "took": 1200,
+    "key": "f31"
+   }
+  }
+ },
+ {
+  "detail": [],
+  "name": "list_pull_requests",
+  "node": {
+   "k": "tool",
+   "p": {
+    "frame": "inline",
+    "name": "list_pull_requests",
+    "status": "done",
+    "title": "List pull requests",
+    "took": 1200,
+    "key": "f32"
+   }
+  }
+ },
+ {
+  "detail": [
+   {
+    "k": "md",
+    "p": {
+     "key": "body",
+     "text": "# Composio"
+    }
+   }
+  ],
+  "name": "skill_view",
+  "node": {
+   "k": "tool",
+   "p": {
+    "collapsed": true,
+    "collapsible": true,
+    "frame": "inline",
+    "name": "skill",
+    "status": "done",
+    "target": "composio",
+    "targetKind": "text",
+    "title": "Skill",
+    "took": 1200,
+    "key": "f33"
+   },
+   "c": [
+    {
+     "k": "md",
+     "p": {
+      "key": "body",
+      "text": "# Composio"
+     }
+    }
+   ]
+  }
+ },
+ {
+  "detail": [],
+  "name": "skill_view",
+  "node": {
+   "k": "tool",
+   "p": {
+    "frame": "inline",
+    "name": "skill",
+    "status": "done",
+    "target": "",
+    "title": "Skill",
+    "took": 1200,
+    "key": "f34"
+   }
+  }
+ },
+ {
+  "detail": [
+   {
+    "k": "text",
+    "p": {
+     "spans": [
+      {
+       "s": "muted",
+       "t": "a · b"
+      }
+     ],
+     "wrap": "word",
+     "key": "names"
+    }
+   }
+  ],
+  "name": "skills_list",
+  "node": {
+   "k": "tool",
+   "p": {
+    "collapsed": true,
+    "collapsible": true,
+    "frame": "inline",
+    "meta": [
+     "2 skills"
+    ],
+    "name": "skill",
+    "status": "done",
+    "title": "Skills",
+    "took": 1200,
+    "key": "f35"
+   },
+   "c": [
+    {
+     "k": "text",
+     "p": {
+      "spans": [
+       {
+        "s": "muted",
+        "t": "a · b"
+       }
+      ],
+      "wrap": "word",
+      "key": "names"
+     }
+    }
+   ]
+  }
+ },
+ {
+  "detail": [],
+  "name": "skills_list",
+  "node": {
+   "k": "tool",
+   "p": {
+    "frame": "inline",
+    "meta": [
+     "none here"
+    ],
+    "name": "skill",
+    "status": "done",
+    "title": "Skills",
+    "took": 1200,
+    "key": "f36"
+   }
+  }
+ },
+ {
+  "detail": [],
+  "name": "tool_search",
+  "node": {
+   "k": "tool",
+   "p": {
+    "frame": "inline",
+    "name": "tool_search",
+    "status": "done",
+    "title": "Tool search",
+    "took": 1200,
+    "key": "f37"
+   }
+  }
+ },
+ {
+  "detail": [],
+  "name": "tool_search",
+  "node": {
+   "k": "tool",
+   "p": {
+    "frame": "inline",
+    "name": "tool_search",
+    "status": "done",
+    "target": "slack",
+    "targetKind": "query",
+    "title": "Tool search",
+    "took": 1200,
+    "key": "f38"
+   }
+  }
+ },
+ {
+  "detail": [],
+  "name": "tool_search",
+  "node": {
+   "k": "tool",
+   "p": {
+    "frame": "inline",
+    "name": "tool_search",
+    "status": "done",
+    "title": "Tool search",
+    "took": 1200,
+    "key": "f39"
+   }
+  }
+ },
+ {
+  "detail": [],
+  "name": "tool_describe",
+  "node": {
+   "k": "tool",
+   "p": {
+    "frame": "inline",
+    "name": "tool_describe",
+    "status": "done",
+    "title": "Tool describe",
+    "took": 1200,
+    "key": "f40"
+   }
+  }
+ },
+ {
+  "detail": [],
+  "name": "tool_describe",
+  "node": {
+   "k": "tool",
+   "p": {
+    "frame": "inline",
+    "name": "tool_describe",
+    "status": "done",
+    "title": "Tool describe",
+    "took": 1200,
+    "key": "f41"
+   }
+  }
+ },
+ {
+  "detail": [],
+  "name": "tool_describe",
+  "node": {
+   "k": "tool",
+   "p": {
+    "frame": "inline",
+    "name": "tool_describe",
+    "status": "done",
+    "title": "Tool describe",
+    "took": 1200,
+    "key": "f42"
+   }
+  }
+ },
+ {
+  "detail": [
+   {
+    "k": "checklist",
+    "p": {
+     "mode": "full",
+     "phases": [
+      {
+       "id": "all",
+       "items": [
+        {
+         "id": "1",
+         "status": "done",
+         "text": "Write tests"
+        },
+        {
+         "id": "2",
+         "status": "active",
+         "text": "Run the suite"
+        }
+       ]
+      }
+     ],
+     "key": "list"
+    }
+   }
+  ],
+  "name": "todo",
+  "node": {
+   "k": "tool",
+   "p": {
+    "collapsible": true,
+    "name": "todo",
+    "status": "done",
+    "target": "1/2",
+    "targetKind": "text",
+    "title": "Todo",
+    "took": 1200,
+    "key": "f43"
+   },
+   "c": [
+    {
+     "k": "checklist",
+     "p": {
+      "mode": "full",
+      "phases": [
+       {
+        "id": "all",
+        "items": [
+         {
+          "id": "1",
+          "status": "done",
+          "text": "Write tests"
+         },
+         {
+          "id": "2",
+          "status": "active",
+          "text": "Run the suite"
+         }
+        ]
+       }
+      ],
+      "key": "list"
+     }
+    }
+   ]
+  }
+ },
+ {
+  "detail": [
+   {
+    "k": "checklist",
+    "p": {
+     "mode": "full",
+     "phases": [
+      {
+       "id": "all",
+       "items": [
+        {
+         "id": "1",
+         "status": "done",
+         "text": "Write tests"
+        },
+        {
+         "id": "2",
+         "status": "active",
+         "text": "Run the suite"
+        }
+       ]
+      }
+     ],
+     "key": "list"
+    }
+   }
+  ],
+  "name": "todo_list",
+  "node": {
+   "k": "tool",
+   "p": {
+    "collapsible": true,
+    "name": "todo",
+    "status": "done",
+    "target": "1/2",
+    "targetKind": "text",
+    "title": "Todo",
+    "took": 1200,
+    "key": "f44"
+   },
+   "c": [
+    {
+     "k": "checklist",
+     "p": {
+      "mode": "full",
+      "phases": [
+       {
+        "id": "all",
+        "items": [
+         {
+          "id": "1",
+          "status": "done",
+          "text": "Write tests"
+         },
+         {
+          "id": "2",
+          "status": "active",
+          "text": "Run the suite"
+         }
+        ]
+       }
+      ],
+      "key": "list"
+     }
+    }
+   ]
+  }
+ },
+ {
+  "detail": [
+   {
+    "k": "agent",
+    "p": {
+     "name": "Agent 1",
+     "status": "done",
+     "task": "Audit the repo",
+     "key": "s0"
+    },
+    "c": [
+     {
+      "k": "md",
+      "p": {
+       "key": "o",
+       "text": "all clear"
+      }
+     }
+    ]
+   }
+  ],
+  "name": "delegate_task",
+  "node": {
+   "k": "agent",
+   "p": {
+    "collapsed": true,
+    "collapsible": true,
+    "name": "Agent",
+    "role": "hermes.task.solo",
+    "status": "done",
+    "task": "Audit the repo",
+    "key": "f45"
+   },
+   "c": [
+    {
+     "k": "md",
+     "p": {
+      "key": "o",
+      "text": "all clear"
+     }
+    }
+   ]
+  }
+ },
+ {
+  "detail": [
+   {
+    "k": "agent",
+    "p": {
+     "name": "Agent 1",
+     "status": "pending",
+     "task": "g1",
+     "key": "p0"
+    }
+   },
+   {
+    "k": "agent",
+    "p": {
+     "name": "Agent 2",
+     "status": "pending",
+     "task": "g2",
+     "key": "p1"
+    }
+   },
+   {
+    "k": "section",
+    "p": {
+     "collapsed": true,
+     "collapsible": true,
+     "head": "Shared brief",
+     "role": "hermes.task.brief",
+     "key": "brief"
+    },
+    "c": [
+     {
+      "k": "md",
+      "p": {
+       "key": "md",
+       "text": "shared"
+      }
+     }
+    ]
+   }
+  ],
+  "name": "delegate_task",
+  "node": {
+   "k": "tool",
+   "p": {
+    "age": 4000,
+    "badges": [
+     {
+      "text": "background"
+     }
+    ],
+    "collapsible": true,
+    "name": "task",
+    "status": "running",
+    "target": "2 agents",
+    "targetKind": "text",
+    "title": "Task",
+    "key": "f46"
+   },
+   "c": [
+    {
+     "k": "agent",
+     "p": {
+      "name": "Agent 1",
+      "status": "pending",
+      "task": "g1",
+      "key": "p0"
+     }
+    },
+    {
+     "k": "agent",
+     "p": {
+      "name": "Agent 2",
+      "status": "pending",
+      "task": "g2",
+      "key": "p1"
+     }
+    },
+    {
+     "k": "section",
+     "p": {
+      "collapsed": true,
+      "collapsible": true,
+      "head": "Shared brief",
+      "role": "hermes.task.brief",
+      "key": "brief"
+     },
+     "c": [
+      {
+       "k": "md",
+       "p": {
+        "key": "md",
+        "text": "shared"
+       }
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "detail": [
+   {
+    "k": "agent",
+    "p": {
+     "name": "Agent 1",
+     "status": "idle",
+     "task": "g1",
+     "key": "s0"
+    }
+   }
+  ],
+  "name": "delegate_task",
+  "node": {
+   "k": "tool",
+   "p": {
+    "collapsed": false,
+    "collapsible": true,
+    "name": "task",
+    "status": "error",
+    "target": "1 agent",
+    "targetKind": "text",
+    "title": "Task",
+    "took": 1200,
+    "key": "f47"
+   },
+   "c": [
+    {
+     "k": "agent",
+     "p": {
+      "name": "Agent 1",
+      "status": "idle",
+      "task": "g1",
+      "key": "s0"
+     }
+    }
+   ]
+  }
+ },
+ {
+  "detail": [
+   {
+    "k": "row",
+    "p": {
+     "role": "omp.tool.answer.off",
+     "key": "q0.o0"
+    },
+    "c": [
+     {
+      "k": "text",
+      "p": {
+       "spans": [
+        {
+         "s": "dim",
+         "t": "·"
+        }
+       ],
+       "key": "c"
+      }
+     },
+     {
+      "k": "text",
+      "p": {
+       "spans": [
+        {
+         "t": "a"
+        }
+       ],
+       "key": "t"
+      }
+     }
+    ]
+   },
+   {
+    "k": "row",
+    "p": {
+     "role": "omp.tool.answer",
+     "key": "q0.o1"
+    },
+    "c": [
+     {
+      "k": "text",
+      "p": {
+       "spans": [
+        {
+         "s": "success",
+         "t": "✓"
+        }
+       ],
+       "key": "c"
+      }
+     },
+     {
+      "k": "text",
+      "p": {
+       "spans": [
+        {
+         "t": "b"
+        }
+       ],
+       "key": "t"
+      }
+     }
+    ]
+   }
+  ],
+  "name": "clarify",
+  "node": {
+   "k": "tool",
+   "p": {
+    "collapsible": true,
+    "name": "ask",
+    "status": "done",
+    "target": "Pick?",
+    "targetKind": "text",
+    "title": "Ask",
+    "took": 1200,
+    "key": "f48"
+   },
+   "c": [
+    {
+     "k": "row",
+     "p": {
+      "role": "omp.tool.answer.off",
+      "key": "q0.o0"
+     },
+     "c": [
+      {
+       "k": "text",
+       "p": {
+        "spans": [
+         {
+          "s": "dim",
+          "t": "·"
+         }
+        ],
+        "key": "c"
+       }
+      },
+      {
+       "k": "text",
+       "p": {
+        "spans": [
+         {
+          "t": "a"
+         }
+        ],
+        "key": "t"
+       }
+      }
+     ]
+    },
+    {
+     "k": "row",
+     "p": {
+      "role": "omp.tool.answer",
+      "key": "q0.o1"
+     },
+     "c": [
+      {
+       "k": "text",
+       "p": {
+        "spans": [
+         {
+          "s": "success",
+          "t": "✓"
+         }
+        ],
+        "key": "c"
+       }
+      },
+      {
+       "k": "text",
+       "p": {
+        "spans": [
+         {
+          "t": "b"
+         }
+        ],
+        "key": "t"
+       }
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "detail": [
+   {
+    "k": "md",
+    "p": {
+     "key": "q0",
+     "text": "One?"
+    }
+   },
+   {
+    "k": "text",
+    "p": {
+     "role": "omp.tool.notice",
+     "spans": [
+      {
+       "s": "muted",
+       "t": "No answer"
+      }
+     ],
+     "key": "q0.none"
+    }
+   },
+   {
+    "k": "md",
+    "p": {
+     "key": "q1",
+     "text": "Two?"
+    }
+   },
+   {
+    "k": "row",
+    "p": {
+     "role": "omp.tool.answer.off",
+     "key": "q1.o0"
+    },
+    "c": [
+     {
+      "k": "text",
+      "p": {
+       "spans": [
+        {
+         "s": "dim",
+         "t": "·"
+        }
+       ],
+       "key": "c"
+      }
+     },
+     {
+      "k": "text",
+      "p": {
+       "spans": [
+        {
+         "t": "x"
+        }
+       ],
+       "key": "t"
+      }
+     }
+    ]
+   },
+   {
+    "k": "text",
+    "p": {
+     "role": "omp.tool.notice",
+     "spans": [
+      {
+       "s": "muted",
+       "t": "Skipped"
+      }
+     ],
+     "key": "q1.none"
+    }
+   }
+  ],
+  "name": "clarify",
+  "node": {
+   "k": "tool",
+   "p": {
+    "collapsible": true,
+    "name": "ask",
+    "status": "done",
+    "target": "2 questions",
+    "targetKind": "text",
+    "title": "Ask",
+    "took": 1200,
+    "key": "f49"
+   },
+   "c": [
+    {
+     "k": "md",
+     "p": {
+      "key": "q0",
+      "text": "One?"
+     }
+    },
+    {
+     "k": "text",
+     "p": {
+      "role": "omp.tool.notice",
+      "spans": [
+       {
+        "s": "muted",
+        "t": "No answer"
+       }
+      ],
+      "key": "q0.none"
+     }
+    },
+    {
+     "k": "md",
+     "p": {
+      "key": "q1",
+      "text": "Two?"
+     }
+    },
+    {
+     "k": "row",
+     "p": {
+      "role": "omp.tool.answer.off",
+      "key": "q1.o0"
+     },
+     "c": [
+      {
+       "k": "text",
+       "p": {
+        "spans": [
+         {
+          "s": "dim",
+          "t": "·"
+         }
+        ],
+        "key": "c"
+       }
+      },
+      {
+       "k": "text",
+       "p": {
+        "spans": [
+         {
+          "t": "x"
+         }
+        ],
+        "key": "t"
+       }
+      }
+     ]
+    },
+    {
+     "k": "text",
+     "p": {
+      "role": "omp.tool.notice",
+      "spans": [
+       {
+        "s": "muted",
+        "t": "Skipped"
+       }
+      ],
+      "key": "q1.none"
+     }
+    }
+   ]
+  }
+ },
+ {
+  "detail": [],
+  "name": "memory",
+  "node": {
+   "k": "tool",
+   "p": {
+    "frame": "inline",
+    "meta": [
+     "12% full"
+    ],
+    "name": "memory",
+    "status": "done",
+    "target": "add: likes tabs",
+    "targetKind": "text",
+    "title": "Memory",
+    "took": 1200,
+    "key": "f50"
+   }
+  }
+ },
+ {
+  "detail": [],
+  "name": "process",
+  "node": {
+   "k": "tool",
+   "p": {
+    "frame": "inline",
+    "name": "terminal",
+    "status": "done",
+    "title": "Wait for process",
+    "took": 1200,
+    "key": "f51"
+   }
+  }
+ },
+ {
+  "detail": [],
+  "name": "process_manage",
+  "node": {
+   "k": "tool",
+   "p": {
+    "frame": "inline",
+    "name": "terminal",
+    "status": "done",
+    "title": "Stop process",
+    "took": 1200,
+    "key": "f52"
+   }
+  }
+ },
+ {
+  "detail": [],
+  "name": "process_manage",
+  "node": {
+   "k": "tool",
+   "p": {
+    "frame": "inline",
+    "name": "terminal",
+    "status": "done",
+    "title": "Process",
+    "took": 1200,
+    "key": "f53"
+   }
+  }
+ },
+ {
+  "detail": [],
+  "name": "browser_navigate",
+  "node": {
+   "k": "tool",
+   "p": {
+    "frame": "inline",
+    "name": "browser",
+    "status": "done",
+    "target": "https://tern.dev",
+    "targetKind": "path",
+    "title": "Navigate",
+    "took": 1200,
+    "key": "f54"
+   }
+  }
+ },
+ {
+  "detail": [
+   {
+    "k": "image",
+    "p": {
+     "alt": "Image",
+     "role": "hermes.tool.image",
+     "path": "/tmp/shot.png",
+     "key": "image"
+    }
+   },
+   {
+    "k": "text",
+    "p": {
+     "lines": 6,
+     "spans": [
+      {
+       "s": "muted",
+       "t": "A page"
+      }
+     ],
+     "wrap": "word",
+     "key": "said"
+    }
+   }
+  ],
+  "name": "browser_vision",
+  "node": {
+   "k": "tool",
+   "p": {
+    "collapsed": false,
+    "collapsible": true,
+    "name": "browser",
+    "status": "done",
+    "target": "what?",
+    "targetKind": "text",
+    "title": "Vision",
+    "took": 1200,
+    "key": "f55"
+   },
+   "c": [
+    {
+     "k": "image",
+     "p": {
+      "alt": "Image",
+      "role": "hermes.tool.image",
+      "path": "/tmp/shot.png",
+      "key": "image"
+     }
+    },
+    {
+     "k": "text",
+     "p": {
+      "lines": 6,
+      "spans": [
+       {
+        "s": "muted",
+        "t": "A page"
+       }
+      ],
+      "wrap": "word",
+      "key": "said"
+     }
+    }
+   ]
+  }
+ },
+ {
+  "detail": [],
+  "name": "browser",
+  "node": {
+   "k": "tool",
+   "p": {
+    "frame": "inline",
+    "name": "browser",
+    "status": "done",
+    "target": "open",
+    "targetKind": "text",
+    "title": "Browser",
+    "took": 1200,
+    "key": "f56"
+   }
+  }
+ },
+ {
+  "detail": [],
+  "name": "session_search",
+  "node": {
+   "k": "tool",
+   "p": {
+    "frame": "inline",
+    "name": "search",
+    "status": "done",
+    "target": "last week",
+    "targetKind": "query",
+    "title": "Session search",
+    "took": 1200,
+    "key": "f57"
+   }
+  }
+ },
+ {
+  "detail": [
+   {
+    "k": "code",
+    "p": {
+     "lang": "json",
+     "text": "{\n  \"analysis\": \"A chart.\",\n  \"success\": true\n}",
+     "key": "out"
+    }
+   }
+  ],
+  "name": "vision_analyze",
+  "node": {
+   "k": "tool",
+   "p": {
+    "collapsed": true,
+    "collapsible": true,
+    "frame": "inline",
+    "name": "image",
+    "status": "done",
+    "title": "Vision",
+    "took": 1200,
+    "key": "f58"
+   },
+   "c": [
+    {
+     "k": "code",
+     "p": {
+      "lang": "json",
+      "text": "{\n  \"analysis\": \"A chart.\",\n  \"success\": true\n}",
+      "key": "out"
+     }
+    }
+   ]
+  }
+ },
+ {
+  "detail": [
+   {
+    "k": "image",
+    "p": {
+     "alt": "a red fox",
+     "role": "hermes.tool.image",
+     "path": "/h/fox.png",
+     "key": "image"
+    }
+   }
+  ],
+  "name": "image_generate",
+  "node": {
+   "k": "tool",
+   "p": {
+    "collapsed": false,
+    "collapsible": true,
+    "name": "image",
+    "status": "done",
+    "target": "a red fox",
+    "targetKind": "text",
+    "title": "Image",
+    "took": 1200,
+    "key": "f59"
+   },
+   "c": [
+    {
+     "k": "image",
+     "p": {
+      "alt": "a red fox",
+      "role": "hermes.tool.image",
+      "path": "/h/fox.png",
+      "key": "image"
+     }
+    }
+   ]
+  }
+ },
+ {
+  "detail": [],
+  "name": "image_generate",
+  "node": {
+   "k": "tool",
+   "p": {
+    "age": 4000,
+    "name": "image",
+    "status": "running",
+    "target": "pending",
+    "targetKind": "text",
+    "title": "Image",
+    "key": "f60"
+   }
+  }
+ },
+ {
+  "detail": [
+   {
+    "k": "row",
+    "p": {
+     "align": "center",
+     "gap": "sm",
+     "role": "hermes.connect.row",
+     "key": "t0"
+    },
+    "c": [
+     {
+      "k": "icon",
+      "p": {
+       "name": "clock",
+       "tone": "muted",
+       "key": "i"
+      }
+     },
+     {
+      "k": "text",
+      "p": {
+       "grow": 1,
+       "spans": [
+        {
+         "s": "strong",
+         "t": "Linear"
+        },
+        {
+         "s": "muted",
+         "t": "  needs authorizing"
+        }
+       ],
+       "truncate": "end",
+       "wrap": "none",
+       "key": "n"
+      }
+     },
+     {
+      "k": "row",
+      "p": {
+       "actions": {
+        "click": "connect-open=f61:linear"
+       },
+       "align": "center",
+       "gap": "xs",
+       "role": "hermes.connect.open",
+       "title": "https://auth/l",
+       "key": "go"
+      },
+      "c": [
+       {
+        "k": "text",
+        "p": {
+         "text": "Authorize ↗",
+         "key": "t"
+        }
+       }
+      ]
+     }
+    ]
+   },
+   {
+    "k": "row",
+    "p": {
+     "align": "center",
+     "gap": "sm",
+     "key": "foot"
+    },
+    "c": [
+     {
+      "k": "text",
+      "p": {
+       "grow": 1,
+       "spans": [
+        {
+         "s": "muted",
+         "t": "Authorize in the browser. Hermes hears when every app is connected."
+        }
+       ],
+       "wrap": "word",
+       "key": "hint"
+      }
+     },
+     {
+      "k": "row",
+      "p": {
+       "actions": {
+        "click": "connect-continue=f61"
+       },
+       "align": "center",
+       "role": "hermes.connect.continue",
+       "key": "go"
+      },
+      "c": [
+       {
+        "k": "text",
+        "p": {
+         "text": "Done, continue",
+         "key": "t"
+        }
+       }
+      ]
+     }
+    ]
+   }
+  ],
+  "name": "manage_connections",
+  "node": {
+   "k": "tool",
+   "p": {
+    "collapsible": true,
+    "name": "plug",
+    "status": "done",
+    "target": "0 of 1 connected",
+    "targetKind": "text",
+    "title": "Connect apps",
+    "took": 1200,
+    "key": "f61"
+   },
+   "c": [
+    {
+     "k": "row",
+     "p": {
+      "align": "center",
+      "gap": "sm",
+      "role": "hermes.connect.row",
+      "key": "t0"
+     },
+     "c": [
+      {
+       "k": "icon",
+       "p": {
+        "name": "clock",
+        "tone": "muted",
+        "key": "i"
+       }
+      },
+      {
+       "k": "text",
+       "p": {
+        "grow": 1,
+        "spans": [
+         {
+          "s": "strong",
+          "t": "Linear"
+         },
+         {
+          "s": "muted",
+          "t": "  needs authorizing"
+         }
+        ],
+        "truncate": "end",
+        "wrap": "none",
+        "key": "n"
+       }
+      },
+      {
+       "k": "row",
+       "p": {
+        "actions": {
+         "click": "connect-open=f61:linear"
+        },
+        "align": "center",
+        "gap": "xs",
+        "role": "hermes.connect.open",
+        "title": "https://auth/l",
+        "key": "go"
+       },
+       "c": [
+        {
+         "k": "text",
+         "p": {
+          "text": "Authorize ↗",
+          "key": "t"
+         }
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "k": "row",
+     "p": {
+      "align": "center",
+      "gap": "sm",
+      "key": "foot"
+     },
+     "c": [
+      {
+       "k": "text",
+       "p": {
+        "grow": 1,
+        "spans": [
+         {
+          "s": "muted",
+          "t": "Authorize in the browser. Hermes hears when every app is connected."
+         }
+        ],
+        "wrap": "word",
+        "key": "hint"
+       }
+      },
+      {
+       "k": "row",
+       "p": {
+        "actions": {
+         "click": "connect-continue=f61"
+        },
+        "align": "center",
+        "role": "hermes.connect.continue",
+        "key": "go"
+       },
+       "c": [
+        {
+         "k": "text",
+         "p": {
+          "text": "Done, continue",
+          "key": "t"
+         }
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "detail": [
+   {
+    "k": "code",
+    "p": {
+     "lang": "json",
+     "text": "{\n  \"targets\": [\n    {\n      \"name\": \"linear\",\n      \"state\": \"connected\"\n    }\n  ]\n}",
+     "key": "out"
+    }
+   }
+  ],
+  "name": "manage_connections",
+  "node": {
+   "k": "tool",
+   "p": {
+    "collapsed": true,
+    "collapsible": true,
+    "frame": "inline",
+    "name": "manage_connections",
+    "status": "done",
+    "title": "Manage connections",
+    "took": 1200,
+    "key": "f62"
+   },
+   "c": [
+    {
+     "k": "code",
+     "p": {
+      "lang": "json",
+      "text": "{\n  \"targets\": [\n    {\n      \"name\": \"linear\",\n      \"state\": \"connected\"\n    }\n  ]\n}",
+      "key": "out"
+     }
+    }
+   ]
+  }
+ },
+ {
+  "detail": [],
+  "name": "unknown_tool",
+  "node": {
+   "k": "tool",
+   "p": {
+    "frame": "inline",
+    "name": "unknown_tool",
+    "status": "done",
+    "target": "https://x.io",
+    "targetKind": "path",
+    "title": "Unknown tool",
+    "took": 1200,
+    "key": "f63"
+   }
+  }
+ },
+ {
+  "detail": [
+   {
+    "k": "code",
+    "p": {
+     "lang": "text",
+     "text": "plain text result",
+     "key": "out"
+    }
+   }
+  ],
+  "name": "weird-name",
+  "node": {
+   "k": "tool",
+   "p": {
+    "collapsed": true,
+    "collapsible": true,
+    "frame": "inline",
+    "name": "weird-name",
+    "status": "done",
+    "target": "q",
+    "targetKind": "query",
+    "title": "Weird name",
+    "took": 1200,
+    "key": "f64"
+   },
+   "c": [
+    {
+     "k": "code",
+     "p": {
+      "lang": "text",
+      "text": "plain text result",
+      "key": "out"
+     }
+    }
+   ]
+  }
+ },
+ {
+  "detail": [],
+  "name": "other",
+  "node": {
+   "k": "tool",
+   "p": {
+    "frame": "inline",
+    "name": "other",
+    "status": "done",
+    "title": "Other",
+    "took": 1200,
+    "key": "f65"
+   }
+  }
+ },
+ {
+  "detail": [
+   {
+    "k": "kv",
+    "p": {
+     "items": [
+      {
+       "k": [
+        {
+         "t": "title"
+        }
+       ],
+       "v": "Bug"
+      }
+     ],
+     "key": "args"
+    }
+   },
+   {
+    "k": "code",
+    "p": {
+     "lang": "json",
+     "text": "{\n  \"id\": 1\n}",
+     "key": "out"
+    }
+   }
+  ],
+  "name": "connectors__linear__LINEAR_CREATE_ISSUE",
+  "node": {
+   "k": "tool",
+   "p": {
+    "badges": [
+     {
+      "text": "connector"
+     }
+    ],
+    "collapsed": true,
+    "collapsible": true,
+    "frame": "inline",
+    "name": "plug",
+    "status": "done",
+    "target": "create issue (work)",
+    "targetKind": "text",
+    "title": "Linear",
+    "took": 1200,
+    "key": "f66"
+   },
+   "c": [
+    {
+     "k": "kv",
+     "p": {
+      "items": [
+       {
+        "k": [
+         {
+          "t": "title"
+         }
+        ],
+        "v": "Bug"
+       }
+      ],
+      "key": "args"
+     }
+    },
+    {
+     "k": "code",
+     "p": {
+      "lang": "json",
+      "text": "{\n  \"id\": 1\n}",
+      "key": "out"
+     }
+    }
+   ]
+  }
+ },
+ {
+  "detail": [
+   {
+    "k": "kv",
+    "p": {
+     "items": [
+      {
+       "k": [
+        {
+         "t": "text"
+        }
+       ],
+       "v": "hi"
+      }
+     ],
+     "key": "args"
+    }
+   },
+   {
+    "k": "text",
+    "p": {
+     "spans": [
+      {
+       "s": "error",
+       "t": "nope"
+      }
+     ],
+     "wrap": "word",
+     "key": "error"
+    }
+   }
+  ],
+  "name": "mcp__slack__send_message",
+  "node": {
+   "k": "tool",
+   "p": {
+    "badges": [
+     {
+      "text": "MCP"
+     }
+    ],
+    "collapsed": false,
+    "collapsible": true,
+    "frame": "inline",
+    "name": "plug",
+    "status": "error",
+    "target": "send message",
+    "targetKind": "text",
+    "title": "Slack",
+    "took": 1200,
+    "key": "f67"
+   },
+   "c": [
+    {
+     "k": "kv",
+     "p": {
+      "items": [
+       {
+        "k": [
+         {
+          "t": "text"
+         }
+        ],
+        "v": "hi"
+       }
+      ],
+      "key": "args"
+     }
+    },
+    {
+     "k": "text",
+     "p": {
+      "spans": [
+       {
+        "s": "error",
+        "t": "nope"
+       }
+      ],
+      "wrap": "word",
+      "key": "error"
+     }
+    }
+   ]
+  }
+ },
+ {
+  "detail": [
+   {
+    "k": "row",
+    "p": {
+     "align": "center",
+     "gap": "sm",
+     "key": "e0"
+    },
+    "c": [
+     {
+      "k": "icon",
+      "p": {
+       "name": "check",
+       "tone": "success",
+       "key": "i"
+      }
+     },
+     {
+      "k": "text",
+      "p": {
+       "grow": 1,
+       "spans": [
+        {
+         "t": "Linear · create issue"
+        }
+       ],
+       "truncate": "end",
+       "wrap": "none",
+       "key": "t"
+      }
+     }
+    ]
+   },
+   {
+    "k": "code",
+    "p": {
+     "lang": "json",
+     "max": {
+      "h": "8lines"
+     },
+     "text": "{\n  \"ok\": 0\n}",
+     "wrap": true,
+     "key": "r0"
+    }
+   },
+   {
+    "k": "row",
+    "p": {
+     "align": "center",
+     "gap": "sm",
+     "key": "e1"
+    },
+    "c": [
+     {
+      "k": "icon",
+      "p": {
+       "name": "check",
+       "tone": "success",
+       "key": "i"
+      }
+     },
+     {
+      "k": "text",
+      "p": {
+       "grow": 1,
+       "spans": [
+        {
+         "t": "Slack · send message"
+        }
+       ],
+       "truncate": "end",
+       "wrap": "none",
+       "key": "t"
+      }
+     }
+    ]
+   },
+   {
+    "k": "code",
+    "p": {
+     "lang": "json",
+     "max": {
+      "h": "8lines"
+     },
+     "text": "{\n  \"ok\": 1\n}",
+     "wrap": true,
+     "key": "r1"
+    }
+   }
+  ],
+  "name": "tool_call",
+  "node": {
+   "k": "tool",
+   "p": {
+    "badges": [
+     {
+      "text": "connectors"
+     }
+    ],
+    "collapsed": true,
+    "collapsible": true,
+    "frame": "inline",
+    "name": "plug",
+    "status": "done",
+    "target": "2 calls",
+    "targetKind": "text",
+    "title": "Linear, Slack",
+    "took": 1200,
+    "key": "f68"
+   },
+   "c": [
+    {
+     "k": "row",
+     "p": {
+      "align": "center",
+      "gap": "sm",
+      "key": "e0"
+     },
+     "c": [
+      {
+       "k": "icon",
+       "p": {
+        "name": "check",
+        "tone": "success",
+        "key": "i"
+       }
+      },
+      {
+       "k": "text",
+       "p": {
+        "grow": 1,
+        "spans": [
+         {
+          "t": "Linear · create issue"
+         }
+        ],
+        "truncate": "end",
+        "wrap": "none",
+        "key": "t"
+       }
+      }
+     ]
+    },
+    {
+     "k": "code",
+     "p": {
+      "lang": "json",
+      "max": {
+       "h": "8lines"
+      },
+      "text": "{\n  \"ok\": 0\n}",
+      "wrap": true,
+      "key": "r0"
+     }
+    },
+    {
+     "k": "row",
+     "p": {
+      "align": "center",
+      "gap": "sm",
+      "key": "e1"
+     },
+     "c": [
+      {
+       "k": "icon",
+       "p": {
+        "name": "check",
+        "tone": "success",
+        "key": "i"
+       }
+      },
+      {
+       "k": "text",
+       "p": {
+        "grow": 1,
+        "spans": [
+         {
+          "t": "Slack · send message"
+         }
+        ],
+        "truncate": "end",
+        "wrap": "none",
+        "key": "t"
+       }
+      }
+     ]
+    },
+    {
+     "k": "code",
+     "p": {
+      "lang": "json",
+      "max": {
+       "h": "8lines"
+      },
+      "text": "{\n  \"ok\": 1\n}",
+      "wrap": true,
+      "key": "r1"
+     }
+    }
+   ]
+  }
+ },
+ {
+  "detail": [
+   {
+    "k": "row",
+    "p": {
+     "align": "center",
+     "gap": "sm",
+     "key": "e0"
+    },
+    "c": [
+     {
+      "k": "icon",
+      "p": {
+       "name": "check",
+       "tone": "success",
+       "key": "i"
+      }
+     },
+     {
+      "k": "text",
+      "p": {
+       "grow": 1,
+       "spans": [
+        {
+         "t": "Linear · create issue"
+        }
+       ],
+       "truncate": "end",
+       "wrap": "none",
+       "key": "t"
+      }
+     }
+    ]
+   },
+   {
+    "k": "code",
+    "p": {
+     "lang": "json",
+     "max": {
+      "h": "8lines"
+     },
+     "text": "{\n  \"ok\": 0\n}",
+     "wrap": true,
+     "key": "r0"
+    }
+   },
+   {
+    "k": "row",
+    "p": {
+     "align": "center",
+     "gap": "sm",
+     "key": "e1"
+    },
+    "c": [
+     {
+      "k": "icon",
+      "p": {
+       "name": "check",
+       "tone": "success",
+       "key": "i"
+      }
+     },
+     {
+      "k": "text",
+      "p": {
+       "grow": 1,
+       "spans": [
+        {
+         "t": "Read file"
+        }
+       ],
+       "truncate": "end",
+       "wrap": "none",
+       "key": "t"
+      }
+     }
+    ]
+   },
+   {
+    "k": "code",
+    "p": {
+     "lang": "json",
+     "max": {
+      "h": "8lines"
+     },
+     "text": "{\n  \"ok\": 1\n}",
+     "wrap": true,
+     "key": "r1"
+    }
+   }
+  ],
+  "name": "tool_call",
+  "node": {
+   "k": "tool",
+   "p": {
+    "collapsed": true,
+    "collapsible": true,
+    "frame": "inline",
+    "name": "plug",
+    "status": "done",
+    "target": "2 calls",
+    "targetKind": "text",
+    "title": "Tool calls",
+    "took": 1200,
+    "key": "f69"
+   },
+   "c": [
+    {
+     "k": "row",
+     "p": {
+      "align": "center",
+      "gap": "sm",
+      "key": "e0"
+     },
+     "c": [
+      {
+       "k": "icon",
+       "p": {
+        "name": "check",
+        "tone": "success",
+        "key": "i"
+       }
+      },
+      {
+       "k": "text",
+       "p": {
+        "grow": 1,
+        "spans": [
+         {
+          "t": "Linear · create issue"
+         }
+        ],
+        "truncate": "end",
+        "wrap": "none",
+        "key": "t"
+       }
+      }
+     ]
+    },
+    {
+     "k": "code",
+     "p": {
+      "lang": "json",
+      "max": {
+       "h": "8lines"
+      },
+      "text": "{\n  \"ok\": 0\n}",
+      "wrap": true,
+      "key": "r0"
+     }
+    },
+    {
+     "k": "row",
+     "p": {
+      "align": "center",
+      "gap": "sm",
+      "key": "e1"
+     },
+     "c": [
+      {
+       "k": "icon",
+       "p": {
+        "name": "check",
+        "tone": "success",
+        "key": "i"
+       }
+      },
+      {
+       "k": "text",
+       "p": {
+        "grow": 1,
+        "spans": [
+         {
+          "t": "Read file"
+         }
+        ],
+        "truncate": "end",
+        "wrap": "none",
+        "key": "t"
+       }
+      }
+     ]
+    },
+    {
+     "k": "code",
+     "p": {
+      "lang": "json",
+      "max": {
+       "h": "8lines"
+      },
+      "text": "{\n  \"ok\": 1\n}",
+      "wrap": true,
+      "key": "r1"
+     }
+    }
+   ]
+  }
+ },
+ {
+  "detail": [
+   {
+    "k": "row",
+    "p": {
+     "align": "center",
+     "gap": "sm",
+     "key": "e0"
+    },
+    "c": [
+     {
+      "k": "icon",
+      "p": {
+       "name": "check",
+       "tone": "success",
+       "key": "i"
+      }
+     },
+     {
+      "k": "text",
+      "p": {
+       "grow": 1,
+       "spans": [
+        {
+         "t": "Linear · create issue"
+        }
+       ],
+       "truncate": "end",
+       "wrap": "none",
+       "key": "t"
+      }
+     }
+    ]
+   },
+   {
+    "k": "code",
+    "p": {
+     "lang": "json",
+     "max": {
+      "h": "8lines"
+     },
+     "text": "{\n  \"ok\": 0\n}",
+     "wrap": true,
+     "key": "r0"
+    }
+   },
+   {
+    "k": "row",
+    "p": {
+     "align": "center",
+     "gap": "sm",
+     "key": "e1"
+    },
+    "c": [
+     {
+      "k": "icon",
+      "p": {
+       "name": "check",
+       "tone": "success",
+       "key": "i"
+      }
+     },
+     {
+      "k": "text",
+      "p": {
+       "grow": 1,
+       "spans": [
+        {
+         "t": "Linear · get issue"
+        }
+       ],
+       "truncate": "end",
+       "wrap": "none",
+       "key": "t"
+      }
+     }
+    ]
+   },
+   {
+    "k": "code",
+    "p": {
+     "lang": "json",
+     "max": {
+      "h": "8lines"
+     },
+     "text": "{\n  \"ok\": 1\n}",
+     "wrap": true,
+     "key": "r1"
+    }
+   }
+  ],
+  "name": "tool_call",
+  "node": {
+   "k": "tool",
+   "p": {
+    "badges": [
+     {
+      "text": "connector"
+     }
+    ],
+    "collapsed": true,
+    "collapsible": true,
+    "frame": "inline",
+    "name": "plug",
+    "status": "done",
+    "target": "2 calls",
+    "targetKind": "text",
+    "title": "Linear",
+    "took": 1200,
+    "key": "f70"
+   },
+   "c": [
+    {
+     "k": "row",
+     "p": {
+      "align": "center",
+      "gap": "sm",
+      "key": "e0"
+     },
+     "c": [
+      {
+       "k": "icon",
+       "p": {
+        "name": "check",
+        "tone": "success",
+        "key": "i"
+       }
+      },
+      {
+       "k": "text",
+       "p": {
+        "grow": 1,
+        "spans": [
+         {
+          "t": "Linear · create issue"
+         }
+        ],
+        "truncate": "end",
+        "wrap": "none",
+        "key": "t"
+       }
+      }
+     ]
+    },
+    {
+     "k": "code",
+     "p": {
+      "lang": "json",
+      "max": {
+       "h": "8lines"
+      },
+      "text": "{\n  \"ok\": 0\n}",
+      "wrap": true,
+      "key": "r0"
+     }
+    },
+    {
+     "k": "row",
+     "p": {
+      "align": "center",
+      "gap": "sm",
+      "key": "e1"
+     },
+     "c": [
+      {
+       "k": "icon",
+       "p": {
+        "name": "check",
+        "tone": "success",
+        "key": "i"
+       }
+      },
+      {
+       "k": "text",
+       "p": {
+        "grow": 1,
+        "spans": [
+         {
+          "t": "Linear · get issue"
+         }
+        ],
+        "truncate": "end",
+        "wrap": "none",
+        "key": "t"
+       }
+      }
+     ]
+    },
+    {
+     "k": "code",
+     "p": {
+      "lang": "json",
+      "max": {
+       "h": "8lines"
+      },
+      "text": "{\n  \"ok\": 1\n}",
+      "wrap": true,
+      "key": "r1"
+     }
+    }
+   ]
+  }
+ }
+]

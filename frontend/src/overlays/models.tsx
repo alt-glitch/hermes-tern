@@ -6,20 +6,25 @@
 // Save as default keeps the model and effort for new sessions where the gateway can write the
 // default (a private one: the shared gateway switches the session only).
 
-import type { ConfigSetResult, ModelOptionProvider, ModelOptionsResult } from '@hermes/shared/gateway-events'
+import type { ConfigSetResult, ModelOptionProvider } from '@hermes/shared/gateway-events'
 import { modelSearchText } from '@hermes/shared/model-search-text'
 import type { JSX, Key, KvItem, PickerColumn, PickerGroup, PickerItem, PickerScope } from '@stencil-hq/tern'
-import { providerDisplayNames } from '@tui/domain/providers.js'
 
-import type { App } from '../app.js'
-import { setFast } from '../fast.js'
+import type { ChatPorts } from '../app/ports.js'
+import { optional } from '../core/assert.js'
+import { errorText } from '../core/errors.js'
 import { modelPayload, mutateSession } from '../hermes/mutate.js'
+import { providerDisplayNames } from '../hermes/providers.js'
 import { rememberCaps } from '../modelCaps.js'
-import type { Overlay } from '../overlay.js'
+import { levelsFor } from '../session/effort.js'
+import { setFast } from '../session/fast.js'
+import { rpc } from '../wire/rpc.js'
 
-import { levelsFor } from './effort.js'
-
+import type { Overlay } from './overlay.js'
 import { editQuery, hitRuns, moveSelection, rank } from './search.js'
+
+/** What the model picker reaches of the app. */
+export type ModelsHost = Pick<ChatPorts, 'changed' | 'close' | 'gw' | 'open' | 'session' | 'setEffort' | 'transcript'>
 
 const KEY = 'models'
 const ALL = 'all'
@@ -40,33 +45,38 @@ interface Confirm {
 const confirmTokens = new Map<string, string>()
 
 /** A model switch on the shared gateway: a revision-fenced `session.mutate operation=model`, shaped like `config.set`'s reply. */
-async function mutateModel(app: App, value: string, confirmed: boolean): Promise<ConfigSetResult> {
-  const key = `${app.sid} ${value}`
+async function mutateModel(host: ModelsHost, value: string, confirmed: boolean): Promise<ConfigSetResult> {
+  const sid = host.session.ref.live
+  const key = `${sid} ${value}`
   const confirm = confirmed ? confirmTokens.get(key) : undefined
   confirmTokens.delete(key)
-  const result = await mutateSession(app.gw, app.sid ?? '', 'model', { ...modelPayload(value), ...(confirm ? { confirm } : {}) })
+  const result = await mutateSession(host.gw, sid ?? '', 'model', { ...modelPayload(value), ...(confirm ? { confirm } : {}) })
 
   if (result.status === 'confirmation_required' && typeof result.confirm === 'string' && !confirmed) {
     confirmTokens.set(key, result.confirm)
 
-    return { confirm_message: result.confirm_message, confirm_required: true } as ConfigSetResult
+    return {
+      confirm_required: true,
+      key: 'model',
+      ...(result.confirm_message === undefined ? {} : { confirm_message: result.confirm_message })
+    } satisfies ConfigSetResult
   }
 
   if (result.status === 'confirmation_required') {
     throw new Error(result.confirm_message || 'The model switch needs confirming again; try once more.')
   }
 
-  return { value: result.model ?? '' } as ConfigSetResult
+  return { key: 'model', value: result.model ?? '' } satisfies ConfigSetResult
 }
 
 /** Switches the session's model to `value` (`<model> [--provider <slug>] [--session|--global]`); reports the switch in the transcript unless it needs a confirmation. */
-export async function switchModel(app: App, value: string, confirmed = false): Promise<ConfigSetResult> {
-  const r = app.gw.isCanonical
-    ? await mutateModel(app, value, confirmed)
-    : await app.gw.request<ConfigSetResult>('config.set', {
+export async function switchModel(host: ModelsHost, value: string, confirmed = false): Promise<ConfigSetResult> {
+  const r = host.gw.isCanonical
+    ? await mutateModel(host, value, confirmed)
+    : await rpc(host.gw, 'config.set', {
         confirm_expensive_model: confirmed,
         key: 'model',
-        session_id: app.sid,
+        session_id: host.session.ref.live,
         value
       })
 
@@ -77,15 +87,15 @@ export async function switchModel(app: App, value: string, confirmed = false): P
   const model = typeof r.value === 'string' ? r.value : ''
 
   if (model) {
-    app.info = { ...app.info, model }
-    app.transcript.notice(r.deferred ? `Model switches to ${model} from the next turn.` : `Switched to ${model}.`)
+    host.session.info = { ...host.session.info, model }
+    host.transcript.notice(r.deferred ? `Model switches to ${model} from the next turn.` : `Switched to ${model}.`)
   }
 
   if (r.warning) {
-    app.transcript.notice(r.warning, 'warning')
+    host.transcript.notice(r.warning, 'warning')
   }
 
-  app.changed()
+  host.changed()
 
   return r
 }
@@ -96,7 +106,7 @@ export function pickerValue(model: string, provider: string, global: boolean): s
 }
 
 /** Opens the model picker over the session. */
-export function openModelPicker(app: App) {
+export function openModelPicker(host: ModelsHost) {
   let state: 'loading' | 'ready' | 'error' = 'loading'
   let message = ''
   let rows: Row[] = []
@@ -107,12 +117,12 @@ export function openModelPicker(app: App) {
   let selected: string | undefined
   let global = false
   // The shared gateway's model mutation switches this session only (as Desktop's and Ink's pickers there).
-  const canSave = !app.gw.isCanonical
+  const canSave = !host.gw.isCanonical
   /** The session's effort when the picker opened, and the one picked on the strip. */
-  const startEffort = app.info?.reasoning_effort || ''
+  const startEffort = host.session.info?.reasoning_effort || ''
   let effort = startEffort || 'medium'
   /** Fast mode as the session has it, and whether the user flipped it here. */
-  let fast = Boolean(app.info?.fast)
+  let fast = Boolean(host.session.info?.fast)
   let fastTouched = false
   let confirm: Confirm | null = null
   let busy = false
@@ -121,10 +131,11 @@ export function openModelPicker(app: App) {
 
   const load = async () => {
     state = 'loading'
-    app.changed()
+    host.changed()
 
     try {
-      const r = await app.gw.request<ModelOptionsResult>('model.options', app.sid ? { session_id: app.sid } : {})
+      const sid = host.session.ref.live
+      const r = await rpc(host.gw, 'model.options', sid ? { session_id: sid } : {})
       const list = r.providers ?? []
       rememberCaps(list)
       const names = providerDisplayNames(list)
@@ -146,10 +157,10 @@ export function openModelPicker(app: App) {
       state = 'ready'
     } catch (error) {
       state = 'error'
-      message = error instanceof Error ? error.message : String(error)
+      message = errorText(error)
     }
 
-    app.changed()
+    host.changed()
   }
 
   const choose = async (id: string | undefined, confirmed = false) => {
@@ -162,30 +173,30 @@ export function openModelPicker(app: App) {
     busy = true
 
     try {
-      const r = await switchModel(app, pickerValue(row.model, row.provider.slug, canSave && global), confirmed)
+      const r = await switchModel(host, pickerValue(row.model, row.provider.slug, canSave && global), confirmed)
 
       if (r.confirm_required) {
         confirm = { row, text: r.confirm_message || r.warning || `${row.model} is expensive. Switch anyway?` }
       } else {
-        app.close(overlay)
+        host.close(overlay)
 
         // The effort goes with the model: saved with it as the default, or set when it changed.
         if (levelsFor(caps(row)).some(l => l.id === effort) && ((canSave && global) || effort !== startEffort)) {
-          await app.setEffort(effort, canSave && global ? 'global' : 'session')
+          await host.setEffort(effort, canSave && global ? 'global' : 'session')
         }
 
         // After the switch: the gateway checks the tier against the session's new route.
         if (fastTouched && fastable(row)) {
-          await setFast(app, fast ? 'fast' : 'normal')
+          await setFast(host, fast ? 'fast' : 'normal')
         }
       }
     } catch (error) {
-      app.transcript.notice(error instanceof Error ? error.message : String(error), 'error')
-      app.close(overlay)
+      host.transcript.notice(errorText(error), 'error')
+      host.close(overlay)
     }
 
     busy = false
-    app.changed()
+    host.changed()
   }
 
   const view = () => {
@@ -240,7 +251,7 @@ export function openModelPicker(app: App) {
         { count: rows.length, icon: 'list', id: ALL, label: 'All models' },
         ...providers.map(({ provider, name }) => ({
           count: provider.models?.length ?? 0,
-          dot: provider.warning ? ('warning' as const) : undefined,
+          ...optional('dot', provider.warning ? ('warning' as const) : undefined),
           group: 'Providers',
           id: `provider:${provider.slug}`,
           label: name,
@@ -260,44 +271,44 @@ export function openModelPicker(app: App) {
             { id: 'use', keys: ['enter'], label: 'Switch', primary: true }
           ]}
           columns={columns}
-          confirm={confirm ? { act: 'confirm', label: 'Switch anyway', text: confirm.text } : undefined}
+          key={KEY}
+          {...optional('confirm', confirm ? { act: 'confirm', label: 'Switch anyway', text: confirm.text } : undefined)}
           current={current ? [current] : []}
-          empty={query ? undefined : 'No models in this scope'}
+          {...optional('empty', query ? undefined : 'No models in this scope')}
           hits={hits}
           icon="cpu"
           items={rows.map(itemOf)}
-          key={KEY}
           layout="rows"
-          message={state === 'error' ? message : undefined}
+          {...optional('message', state === 'error' ? message : undefined)}
           noun="models"
           onAction={{
             cancel: () => {
               confirm = null
-              app.changed()
+              host.changed()
             },
             clear: () => {
               query = ''
-              app.changed()
+              host.changed()
             },
-            close: () => app.close(overlay),
+            close: () => host.close(overlay),
             confirm: () => void choose(confirm?.row.id, true),
             fast: () => {
               fast = !fast
               fastTouched = true
-              app.changed()
+              host.changed()
             },
             global: () => {
               global = !global
-              app.changed()
+              host.changed()
             },
             retry: () => void load(),
             scope: ev => {
               scope = ev.value ?? ALL
-              app.changed()
+              host.changed()
             },
             strip: ev => {
               effort = levels.find(l => l.id === ev.value)?.id ?? effort
-              app.changed()
+              host.changed()
             },
             use: () => void choose(selected)
           }}
@@ -305,7 +316,7 @@ export function openModelPicker(app: App) {
           onSelect={ev => {
             selected = ev.item
             confirm = null
-            app.changed()
+            host.changed()
           }}
           order={order}
           placeholder="Search models…"
@@ -313,18 +324,18 @@ export function openModelPicker(app: App) {
           query={query}
           scope={scope}
           scopes={scopes}
-          selected={selected}
+          {...optional('selected', selected)}
           size="lg"
           state={state}
-          strip={
-            levels.length
-              ? {
+          {...(levels.length
+            ? {
+                strip: {
                   items: levels.map(l => ({ id: l.id, label: l.label, on: l.id === effort })),
                   label: 'Effort  ⌃E',
                   selected: effort
                 }
-              : undefined
-          }
+              }
+            : {})}
           title="Models"
           total={rows.length}
         >
@@ -344,7 +355,7 @@ export function openModelPicker(app: App) {
       }
 
       if (k.name === 'escape') {
-        app.close(overlay)
+        host.close(overlay)
 
         return true
       }
@@ -365,7 +376,7 @@ export function openModelPicker(app: App) {
         const row = rows.find(r => r.id === selected)
         const levels = levelsFor(row && caps(row))
         const at = levels.findIndex(l => l.id === effort)
-        effort = levels.length ? levels[(at + (k.shift ? levels.length - 1 : 1)) % levels.length]!.id : effort
+        effort = levels[(at + (k.shift ? levels.length - 1 : 1)) % levels.length]?.id ?? effort
 
         return true
       }
@@ -406,7 +417,7 @@ export function openModelPicker(app: App) {
     }
   }
 
-  app.open(overlay)
+  host.open(overlay)
   void load()
 }
 
@@ -430,13 +441,15 @@ function itemOf(row: Row): PickerItem {
           ? [{ text: 'fast', tone: 'info' as const }]
           : [])
     ],
-    disabled: unavailable ? `${row.providerName} doesn't offer ${row.model} on this plan` : undefined,
-    facts:
+    ...optional('disabled', unavailable ? `${row.providerName} doesn't offer ${row.model} on this plan` : undefined),
+    ...optional(
+      'facts',
       price && !free && price.input
         ? { price: `${price.input}·${price.output}` }
         : free
           ? { price: 'free' }
-          : undefined,
+          : undefined
+    ),
     id: row.id,
     label: row.model,
     mono: true,

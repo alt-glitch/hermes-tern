@@ -4,11 +4,18 @@
 // `session.resume`, as there.
 import { randomUUID } from 'node:crypto'
 
+import type { CompressionSummary, SessionMutateResult } from '@hermes/shared/gateway-events'
 import type { GatewayClient } from '@tui/gatewayClient.js'
+
+import { type AdaptedSnapshot, rpc } from '../wire/rpc.js'
 
 export type SessionOperation = 'model' | 'reasoning' | 'delete' | 'rename' | 'rewind' | 'compress' | 'branch'
 
-export interface MutationResult extends Record<string, unknown> {
+/**
+ * What `session.mutate` answers: the contract's fields, and those of the operations this frontend
+ * sends, which the contract leaves open (a model switch's `confirm`, a branch's child, a rename's title).
+ */
+export type MutationResult = SessionMutateResult & {
   status?: string
   model?: string
   confirm?: string
@@ -19,28 +26,26 @@ export interface MutationResult extends Record<string, unknown> {
   branched_session_id?: string
   /** A `rename`'s stored title. */
   title?: string
-}
-
-/** The `session.resume` snapshot a mutation's CAS tuple is read from; a payload may name its target from it. */
-export interface Snapshot {
-  revision?: number
-  execution_generation?: number
-  messages?: Record<string, unknown>[]
-  /** The stored rows (content + row_id) behind a display-projected `messages`. */
-  stored_messages?: Record<string, unknown>[]
+  /** A `compress`'s report, as the classic `session.compress` result carries it. */
+  summary?: CompressionSummary | null
 }
 
 type Payload = Record<string, unknown>
 
+/** Number.isSafeInteger as a guard. */
+const isSafeInteger = (value: unknown): value is number => Number.isSafeInteger(value)
+
 /** Session `sid`'s current execution generation (the fence for steer/interrupt). */
 export async function currentGeneration(gw: Pick<GatewayClient, 'request'>, sid: string): Promise<number> {
-  const snapshot = await gw.request<Snapshot>('session.resume', { session_id: sid })
+  const snapshot = await rpc(gw, 'session.resume', { session_id: sid })
+  // Only the shared gateway's snapshot carries one; a private gateway's has no fence.
+  const generation = snapshot && 'execution_generation' in snapshot ? snapshot.execution_generation : undefined
 
-  if (!Number.isSafeInteger(snapshot?.execution_generation)) {
+  if (!isSafeInteger(generation)) {
     throw new Error('The session did not report its execution generation; try again.')
   }
 
-  return snapshot.execution_generation!
+  return generation
 }
 
 /**
@@ -59,17 +64,17 @@ export async function mutateSession(
   gw: Pick<GatewayClient, 'request'>,
   sid: string,
   operation: SessionOperation,
-  payload: Payload | ((snapshot: Snapshot) => Payload | null)
+  payload: Payload | ((snapshot: AdaptedSnapshot) => Payload | null)
 ): Promise<MutationResult | null>
 export async function mutateSession(
   gw: Pick<GatewayClient, 'request'>,
   sid: string,
   operation: SessionOperation,
-  payload: Payload | ((snapshot: Snapshot) => Payload | null)
+  payload: Payload | ((snapshot: AdaptedSnapshot) => Payload | null)
 ): Promise<MutationResult | null> {
-  const snapshot = await gw.request<Snapshot>('session.resume', { session_id: sid })
+  const snapshot = await rpc(gw, 'session.resume', { session_id: sid })
 
-  if (!Number.isSafeInteger(snapshot?.revision) || !Number.isSafeInteger(snapshot?.execution_generation)) {
+  if (!snapshot || !('revision' in snapshot) || !isSafeInteger(snapshot.revision) || !isSafeInteger(snapshot.execution_generation)) {
     throw new Error('The session did not report its revision; try again.')
   }
 
@@ -79,7 +84,7 @@ export async function mutateSession(
     return null
   }
 
-  const result = await gw.request<MutationResult | null>('session.mutate', {
+  const result = await rpc(gw, 'session.mutate', {
     session_id: sid,
     request_id: randomUUID(),
     expected_revision: snapshot.revision,
@@ -106,15 +111,16 @@ export function modelPayload(arg: string): Record<string, string> {
 
   const payload: Record<string, string> = { model }
 
-  while (parts.length) {
-    const flag = parts.shift()!
-
+  for (let flag = parts.shift(); flag !== undefined; flag = parts.shift()) {
     if (flag === '--session' || flag === '--tui-session') {
       continue
     }
 
-    if (flag === '--provider' && parts[0] && !parts[0].startsWith('--')) {
-      payload.provider = parts.shift()!
+    const value = parts[0]
+
+    if (flag === '--provider' && value && !value.startsWith('--')) {
+      payload['provider'] = value
+      parts.shift()
 
       continue
     }

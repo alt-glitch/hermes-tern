@@ -1,8 +1,12 @@
 import { describe, expect, it } from 'vitest'
 
-import { appOf, callApp, unwrap } from '../bridge.js'
-import { Transcript } from '../transcript.js'
-import { stepLabel, summarize } from '../workLog.js'
+import { toolCallId } from '../core/ids.js'
+import type { ToolCall } from '../model.js'
+import { appOf, batchOf, callApp, unwrap } from '../tools/bridge.js'
+import { Transcript } from '../transcript/store.js'
+import { stepLabel, summarize } from '../view/workLogModel.js'
+
+import { must, stub } from './fakes.js'
 
 const results = (...entries: Record<string, unknown>[]) => JSON.stringify({ results: entries.map((e, index) => ({ index, ...e })) })
 
@@ -20,19 +24,20 @@ describe('the tool_call bridge', () => {
     expect(unwrap('tool_call', { arguments: { action: 'list' }, name: 'cronjob_manage' })).toEqual({
       args: { action: 'list' },
       name: 'cronjob_manage',
-      via: 'tool_call'
+      via: { kind: 'bridged' }
     })
     expect(unwrap('tool_call', { calls: [{ arguments: { a: 1 }, name: 'connectors__linear__X' }] }).name).toBe('connectors__linear__X')
-    expect(unwrap('tool_call', { calls: [{ name: 'connectors__linear__X' }, { name: 'connectors__slack__Y' }] }).batch?.map(e => e.name)).toEqual([
+    expect(unwrap('tool_call', { calls: [{ name: 'connectors__linear__X' }, { name: 'connectors__slack__Y' }] }).via).toMatchObject({ entries: [{ name: 'connectors__linear__X' }, { name: 'connectors__slack__Y' }], kind: 'batch' })
+    expect(batchOf(unwrap('tool_call', { calls: [{ name: 'connectors__linear__X' }, { name: 'connectors__slack__Y' }] }))?.map(e => e.name)).toEqual([
       'connectors__linear__X',
       'connectors__slack__Y'
     ])
-    expect(unwrap('terminal', { command: 'ls' })).toEqual({ args: { command: 'ls' }, name: 'terminal' })
+    expect(unwrap('terminal', { command: 'ls' })).toEqual({ args: { command: 'ls' }, name: 'terminal', via: { kind: 'direct' } })
   })
 
   it('settles a live connector call and a batch from the results list', () => {
     const t = new Transcript()
-    t.start()
+    t.messageStart()
     t.toolStart({ args: { arguments: { limit: 3 }, name: 'connectors__linear__LINEAR_LIST_ISSUES' }, name: 'tool_call', tool_id: 'one' })
     t.toolComplete({ name: 'tool_call', result: results({ response: { issues: [] } }), tool_id: 'one' })
     t.toolStart({ args: { calls: [{ name: 'connectors__linear__A' }, { name: 'connectors__slack__B' }] }, name: 'tool_call', tool_id: 'two' })
@@ -40,18 +45,18 @@ describe('the tool_call bridge', () => {
 
     const [one, two] = t.calls('connectors__linear__LINEAR_LIST_ISSUES').concat(t.calls('tool_call'))
 
-    expect([one?.name, one?.status, one?.result]).toEqual(['connectors__linear__LINEAR_LIST_ISSUES', 'done', { issues: [] }])
-    expect(two?.status).toBe('done')
-    expect(two?.batch?.map(e => [e.status, e.error ?? e.result])).toEqual([
-      ['done', 'ok'],
-      ['error', 'no slack']
+    expect([one?.name, one?.outcome.kind, one?.result]).toEqual(['connectors__linear__LINEAR_LIST_ISSUES', 'done', { issues: [] }])
+    expect(two?.outcome.kind).toBe('done')
+    expect(two && batchOf(two)?.map(e => e.outcome)).toEqual([
+      { kind: 'done', result: 'ok' },
+      { error: 'no slack', kind: 'error' }
     ])
-    expect(callApp(one!)).toMatchObject({ action: 'list issues', app: 'Linear' })
+    expect(callApp(must(one))).toMatchObject({ action: 'list issues', app: 'Linear' })
   })
 
   it('unwraps stored bridge calls on resume', () => {
     const t = new Transcript()
-    t.load([
+    t.load(stub([
       { role: 'user', text: 'go' },
       {
         args: { calls: [{ arguments: {}, name: 'connectors__slack__SLACK_SEND_MESSAGE' }] },
@@ -60,18 +65,22 @@ describe('the tool_call bridge', () => {
         role: 'tool',
         tool_call_id: 'c1'
       }
-    ] as never)
+    ]))
 
     const [call] = t.calls('connectors__slack__SLACK_SEND_MESSAGE')
 
-    expect([call?.status, call?.via]).toEqual(['error', 'tool_call'])
+    expect([call?.outcome.kind, call?.via]).toEqual(['error', { kind: 'bridged' }])
   })
 
   it('summarizes connector work by app, and tool lookups apart', () => {
     const item = (name: string, args: Record<string, unknown> = {}) => {
       const u = unwrap(name, args)
 
-      return { call: { args: u.args, argsText: '', batch: u.batch, context: '', id: name, name: u.name, startedAt: 0, status: 'done' as const }, id: name, kind: 'tool' as const }
+      const id = toolCallId(name)
+
+      const call: ToolCall = { args: u.args, argsText: '', context: '', id, name: u.name, outcome: { duration: 0, kind: 'done' }, startedAt: 0, via: u.via }
+
+      return { call, id, kind: 'tool' as const }
     }
     const batch = item('tool_call', { calls: [{ name: 'connectors__linear__LINEAR_CREATE_ISSUE' }, { name: 'connectors__slack__SLACK_SEND_MESSAGE' }] })
 

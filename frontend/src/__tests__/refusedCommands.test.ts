@@ -1,35 +1,35 @@
 import type { CompletionItem } from '@hermes/shared/gateway-events'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import type { App } from '../app.js'
-import { HIDDEN_COMMANDS, localCommand } from '../commands.js'
-import type { Overlay } from '../overlay.js'
+import { type CommandHost, HIDDEN_COMMANDS, localCommand } from '../commands/local.js'
+import { subscriptionText } from '../commands/refused.js'
+import { resolveSlashName } from '../commands/resolve.js'
 import { openBackground } from '../overlays/background.js'
 import { slashItems } from '../overlays/completion.js'
 import { openHelp } from '../overlays/help.js'
-import { subscriptionText } from '../refusedCommands.js'
-import { resolveSlashName } from '../slashResolve.js'
+import type { Overlay } from '../overlays/overlay.js'
 import { openHermesSplit } from '../watch/spec.js'
+
+import { must, stub } from './fakes.js'
 
 vi.mock('../overlays/background.js', () => ({ openBackground: vi.fn() }))
 vi.mock('../watch/spec.js', () => ({ openHermesSplit: vi.fn(async () => true) }))
 
-/** The slice of App these commands reach; `reply` answers every request. */
+/** The slice of the command host these commands reach; `reply` answers every request. */
 function app(reply: (method: string, params: unknown) => unknown = () => null, cwd: string | null = '/repo') {
   const request = vi.fn(async (method: string, params?: unknown) => reply(method, params))
 
   return {
     gw: { request },
-    info: cwd ? { cwd } : null,
     request,
-    sid: 'sid-1',
+    session: { info: cwd ? { cwd } : null, ref: { live: 'sid-1', stored: null } },
     transcript: { notice: vi.fn(), panel: vi.fn() }
   }
 }
 
 type Fake = ReturnType<typeof app>
 
-const run = (a: Fake, name: string, arg = '') => localCommand(name)!.run(a as unknown as App, arg)
+const run = (a: Fake, name: string, arg = '') => must(localCommand(name)).run(stub<CommandHost>(a), arg)
 
 beforeEach(() => vi.clearAllMocks())
 
@@ -58,7 +58,7 @@ describe('commands the shared gateway refuses, routed here', () => {
 
     await run(a, 'browser', 'use off')
     expect(a.request).toHaveBeenCalledWith('browser.manage', { action: 'use', enabled: false, session_id: 'sid-1' })
-    expect(a.transcript.notice.mock.calls[0]![0]).toMatch(/^Browser Use mode off.*New sessions get it/)
+    expect(must(a.transcript.notice.mock.calls[0])[0]).toMatch(/^Browser Use mode off.*New sessions get it/)
   })
 
   it("/browser connect shows the shared gateway's refusal, with the default CDP url sent", async () => {
@@ -105,7 +105,7 @@ describe('commands the shared gateway refuses, routed here', () => {
     )
 
     await run(a, 'plugins', 'all')
-    expect(a.transcript.panel.mock.lastCall![1]).toContain('- · **memory-honcho** (bundled, not enabled)')
+    expect(must(a.transcript.panel.mock.lastCall)[1]).toContain('- · **memory-honcho** (bundled, not enabled)')
   })
 
   it('/plugins enable is a usage notice: Ink sends it to slash.exec, which the shared gateway refuses', async () => {
@@ -226,7 +226,7 @@ describe('commands the shared gateway refuses, routed here', () => {
     const a = app()
 
     await run(a, 'worktree', 'new feature')
-    expect(a.transcript.notice.mock.lastCall![0]).toMatch(/^\/worktree new runs only in the classic CLI/)
+    expect(must(a.transcript.notice.mock.lastCall)[0]).toMatch(/^\/worktree new runs only in the classic CLI/)
 
     const early = app(() => null, null)
 
@@ -247,7 +247,7 @@ describe('commands the shared gateway refuses, routed here', () => {
 
     await run(a, 'snapshot', 'restore 1')
     expect(a.request).toHaveBeenCalledTimes(1)
-    expect(a.transcript.notice.mock.lastCall![0]).toMatch(
+    expect(must(a.transcript.notice.mock.lastCall)[0]).toMatch(
       /^\/snapshot list, restore and prune run only in the classic CLI/
     )
   })
@@ -257,7 +257,7 @@ describe('commands the shared gateway refuses, routed here', () => {
 
     await run(a, 'update')
     expect(openHermesSplit).toHaveBeenCalledWith(['update'], '/repo')
-    expect(a.transcript.notice.mock.lastCall![0]).toMatch(/^Running `hermes update` in the split below/)
+    expect(must(a.transcript.notice.mock.lastCall)[0]).toMatch(/^Running `hermes update` in the split below/)
 
     vi.mocked(openHermesSplit).mockResolvedValueOnce(false)
     await run(a, 'update')
@@ -373,12 +373,12 @@ describe('hidden commands', () => {
     const help = {
       gw: { request: async () => ({ categories }) },
       open: (o: Overlay) => (sheet = o),
-      sid: 's1',
+      session: { info: null, ref: { live: 's1', stored: null } },
       transcript: { notice: vi.fn() }
     }
 
-    await openHelp(help as never)
-    const text = JSON.stringify(sheet!.node('layer.help'))
+    await openHelp(stub(help))
+    const text = JSON.stringify(must(sheet).node('layer.help'))
 
     expect(text).toContain('/cron')
     expect(text).not.toContain('/sethome')

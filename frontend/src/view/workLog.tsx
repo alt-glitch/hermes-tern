@@ -4,14 +4,20 @@
 // and a thought to its text. The group still running is a single shining line ("Running
 // ls"). Tern keeps each section's open state, so a click needs no round trip.
 
-import { type JSX, node, type Span } from '@stencil-hq/tern'
+import type { JSX, Span } from '@stencil-hq/tern'
 
-import { callApp } from '../bridge.js'
+import { isDefined, isNonEmpty, optional } from '../core/assert.js'
 import type { ToolCall, TurnEntry } from '../model.js'
+import { appOf, batchOf } from '../tools/bridge.js'
+
+import { clockShort } from './format.js'
+import { age } from './time.js'
+import { toolDetail } from './tools/shell.js'
+import { foldSection } from './ui/fold.js'
+import { shimmerText } from './ui/live.js'
 import {
   actionIcon,
   actionOf,
-  clock,
   groupIcon,
   liveLabel,
   type Part,
@@ -20,10 +26,7 @@ import {
   thoughtTitle,
   visibleItems,
   type WorkItem
-} from '../workLog.js'
-
-import { age } from './time.js'
-import { toolDetail } from './tools.js'
+} from './workLogModel.js'
 
 /** "Working for 12s" over a running turn, ruled off from its steps. */
 export function workingNode(turn: TurnEntry, now: number): JSX.Element {
@@ -46,14 +49,14 @@ const LIVE_MAX = 120
 function liveText(label: string): JSX.Element {
   const text = label.length > LIVE_MAX ? `${label.slice(0, LIVE_MAX - 1)}…` : label
 
-  return <shimmer key="label" mode="classic" palette={{ high: 'accent', low: 'dim', mid: 'muted' }} role="hermes.work.live" spans={[{ s: 'muted', t: text }]} />
+  return shimmerText({ key: 'label', role: 'hermes.work.live', text })
 }
 
 /** The newest step of `items` failed: the group no longer stands for live work. */
 export function latestFailed(items: readonly WorkItem[]): boolean {
   const last = items.findLast(i => i.kind === 'tool')
 
-  return last?.kind === 'tool' && last.call.status === 'error'
+  return last?.kind === 'tool' && last.call.outcome.kind === 'error'
 }
 
 export function thinkingRow(): JSX.Element {
@@ -67,12 +70,17 @@ export function thinkingRow(): JSX.Element {
 
 /** "Worked for 54s": a finished stretch of the turn's steps and notes, folded until a click; `id` is its node id. */
 export function foldNode(part: Extract<Part, { kind: 'fold' }>, id: string, children: (JSX.Element | null)[]): JSX.Element {
-  return node('section', { collapsed: true, collapsible: true, head: `${id}.head`, key: part.key, role: 'hermes.turn.fold' }, [
-    <row align="center" gap="xs" key="head">
-      <text key="label" spans={[{ s: 'muted', t: part.label }]} wrap="none" />
-    </row>,
-    ...children
-  ])
+  return foldSection({
+    body: children,
+    head: (
+      <row align="center" gap="xs" key="head">
+        <text key="label" spans={[{ s: 'muted', t: part.label }]} wrap="none" />
+      </row>
+    ),
+    id,
+    key: part.key,
+    role: 'hermes.turn.fold'
+  })
 }
 
 /**
@@ -83,20 +91,20 @@ export function foldNode(part: Extract<Part, { kind: 'fold' }>, id: string, chil
 export function workNode(items: readonly WorkItem[], parent: string, live: boolean, now: number): JSX.Element | null {
   const shown = visibleItems(items)
 
-  if (!shown.length) {
+  if (!isNonEmpty(shown)) {
     return null
   }
 
-  const key = `w${items[0]!.id}`
+  const key = `w${(items[0] ?? shown[0]).id}`
   const id = `${parent}.${key}`
 
   if (!live && shown.length === 1) {
-    return itemNode(shown[0]!, parent, now, key)
+    return itemNode(shown[0], parent, now, key)
   }
 
   const calls = shown.flatMap(i => (i.kind === 'tool' ? [i.call] : []))
-  const failed = calls.at(-1)?.status === 'error'
-  const latest = shown.findLast(i => i.kind === 'tool' && i.call.status === 'running') ?? shown.at(-1)!
+  const failed = calls.at(-1)?.outcome.kind === 'error'
+  const latest = shown.findLast(i => i.kind === 'tool' && i.call.outcome.kind === 'running') ?? shown.at(-1) ?? shown[0]
 
   const head = live ? (
     <row align="center" gap="sm" key="head">
@@ -106,45 +114,49 @@ export function workNode(items: readonly WorkItem[], parent: string, live: boole
     </row>
   ) : (
     <row align="center" gap="sm" key="head">
-      <icon key="icon" name={groupIcon(shown)} tone={failed ? 'error' : undefined} />
+      <icon key="icon" name={groupIcon(shown)} {...optional('tone', failed ? 'error' : undefined)} />
       <text key="label" spans={[{ s: 'muted', t: summarize(shown) }]} truncate="end" wrap="none" />
       <icon key="chev" name="chev" role="hermes.work.chev" />
       <spacer grow={1} key="gap" />
-      <text key="time" role="hermes.work.time" spans={[{ s: 'dim', t: clock(startOf(shown[0]!)) }]} wrap="none" />
+      <text key="time" role="hermes.work.time" spans={[{ s: 'dim', t: clockShort(startOf(shown[0])) }]} wrap="none" />
     </row>
   )
 
-  return node('section', { collapsed: true, collapsible: true, head: `${id}.head`, key, role: 'hermes.work.group' }, [
-    head,
-    ...shown.map(i => itemNode(i, id, now))
-  ])
+  return foldSection({ body: shown.map(i => itemNode(i, id, now)), head, id, key, role: 'hermes.work.group' })
 }
 
 /** One step: a call (opens to its output) or a thought (opens to its text). */
-function itemNode(item: WorkItem, parent: string, now: number, key = item.id): JSX.Element {
+function itemNode(item: WorkItem, parent: string, now: number, key: string = item.id): JSX.Element {
   const id = `${parent}.${key}`
 
   if (item.kind === 'thinking') {
-    return node('section', { collapsed: true, collapsible: true, head: `${id}.head`, key, role: 'hermes.work.row' }, [
-      <row align="center" gap="sm" key="head">
-        <icon key="icon" name="brain" />
-        <text grow={1} key="label" spans={[{ s: 'muted', t: thoughtTitle(item) }]} truncate="end" wrap="none" />
-      </row>,
-      <md key="body" role="hermes.work.thought" stream={item.endedAt === undefined || undefined}>
-        {item.text}
-      </md>
-    ])
+    return foldSection({
+      body: (
+        <md key="body" role="hermes.work.thought" {...optional('stream', item.endedAt === undefined || undefined)}>
+          {item.text}
+        </md>
+      ),
+      head: (
+        <row align="center" gap="sm" key="head">
+          <icon key="icon" name="brain" />
+          <text grow={1} key="label" spans={[{ s: 'muted', t: thoughtTitle(item) }]} truncate="end" wrap="none" />
+        </row>
+      ),
+      id,
+      key,
+      role: 'hermes.work.row'
+    })
   }
 
   const call = item.call
   const detail = toolDetail(call, now)
-  const running = call.status === 'running'
+  const running = call.outcome.kind === 'running'
 
   const head = (
-    <row align="center" gap="sm" key="head" title={call.context || undefined}>
-      <icon key="icon" name={itemIcon(item)} tone={call.status === 'error' ? 'error' : undefined} />
+    <row align="center" gap="sm" key="head" {...optional('title', call.context || undefined)}>
+      <icon key="icon" name={itemIcon(item)} {...optional('tone', call.outcome.kind === 'error' ? 'error' : undefined)} />
       {running ? liveText(stepLabel(call)) : <text grow={1} key="label" spans={labelSpans(call)} truncate="end" wrap="none" />}
-      {call.status === 'error' ? <icon key="failed" name="x" tone="error" /> : null}
+      {call.outcome.kind === 'error' ? <icon key="failed" name="x" tone="error" /> : null}
     </row>
   )
 
@@ -156,26 +168,32 @@ function itemNode(item: WorkItem, parent: string, now: number, key = item.id): J
     )
   }
 
-  return node('section', { collapsed: true, collapsible: true, head: `${id}.head`, key, role: 'hermes.work.row' }, [
+  return foldSection({
+    body: (
+      <col gap="xs" key="detail" role="hermes.work.detail">
+        {detail}
+      </col>
+    ),
     head,
-    <col gap="xs" key="detail" role="hermes.work.detail">
-      {detail}
-    </col>
-  ])
+    id,
+    key,
+    role: 'hermes.work.row'
+  })
 }
 
 /** A step's words; a connector's app stands out from what it did there ("Linear · create issue"). */
 function labelSpans(call: ToolCall): Span[] {
-  const entries = (call.batch ?? [call]).map(e => callApp({ args: e.args, name: e.name }))
+  const entries = (batchOf(call) ?? [call]).map(e => appOf(e.name, e.args))
+  const apps = entries.filter(isDefined)
 
-  if (!entries.every(Boolean)) {
+  if (apps.length < entries.length) {
     return [{ s: 'muted', t: stepLabel(call) }]
   }
 
-  return entries.flatMap((app, i) => [
+  return apps.flatMap((app, i) => [
     ...(i ? [{ s: 'muted', t: ', ' }] : []),
-    { t: app!.app },
-    { s: 'muted', t: ` · ${app!.action}` }
+    { t: app.app },
+    { s: 'muted', t: ` · ${app.action}` }
   ])
 }
 

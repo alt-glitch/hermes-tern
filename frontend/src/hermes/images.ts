@@ -7,6 +7,8 @@ import { extname, resolve } from 'node:path'
 
 import type { GatewayClient } from '@tui/gatewayClient.js'
 
+import { rpc } from '../wire/rpc.js'
+
 export interface Attachment {
   path: string
   mime: string
@@ -71,7 +73,7 @@ export function imageSize(bytes: Buffer): { w: number; h: number } | undefined {
           return undefined
         }
 
-        const marker = bytes[i + 1]!
+        const marker = bytes.readUInt8(i + 1)
 
         if (marker >= 0xc0 && marker <= 0xcf && marker !== 0xc4 && marker !== 0xc8 && marker !== 0xcc) {
           return size(bytes.readUInt16BE(i + 7), bytes.readUInt16BE(i + 5))
@@ -110,7 +112,7 @@ export async function uploadImage(
     throw new Error(`${extname(path) || 'this file'} is not a PNG, JPEG, GIF or WebP image`)
   }
 
-  const r = await gw.request<{ path?: string }>('image.attach_bytes', {
+  const r = await rpc(gw, 'image.attach_bytes', {
     session_id: sid,
     filename: `image${format.ext}`,
     content_base64: bytes.toString('base64')

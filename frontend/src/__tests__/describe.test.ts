@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest'
 
-import { commandLine, describeCommand, withoutTernEnv } from '../view/describe.js'
+import { withoutTernEnv } from '../tools/terminal.js'
+import { commandLine, describeCommand } from '../view/describe.js'
 
 describe('describeCommand', () => {
   it('names a heredoc script shipped to a host by the script, the host and its sections', () => {
-    const cmd = `cat > /Users/sid/.hermes/cache/scratch/vq7.ps1 <<'EOF'
+    const cmd = `cat > /home/u/.hermes/cache/scratch/vq7.ps1 <<'EOF'
 "== steam userdata 3669870 =="
 Get-ChildItem 'C:\\Program Files (x86)\\Steam\\userdata' -Directory
 "== explorer/dwm running in session 1? =="
@@ -12,7 +13,7 @@ Get-Process explorer,dwm
 "== commit peak since boot =="
 (Get-Counter '\\Memory\\Committed Bytes')
 EOF
-scp -q /Users/sid/.hermes/cache/scratch/vq7.ps1 sidbin@vespyr:vq7.ps1 && ssh sidbin@vespyr 'powershell -NoProfile -ExecutionPolicy Bypass -File C:\\Users\\sidbin\\vq7.ps1' 2>&1 | cut -c1-220`
+scp -q /home/u/.hermes/cache/scratch/vq7.ps1 sidbin@vespyr:vq7.ps1 && ssh sidbin@vespyr 'powershell -NoProfile -ExecutionPolicy Bypass -File C:\\Users\\sidbin\\vq7.ps1' 2>&1 | cut -c1-220`
 
     expect(describeCommand(cmd)).toBe('Run vq7.ps1 on vespyr: steam userdata 3669870 +2')
   })

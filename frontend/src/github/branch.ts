@@ -5,6 +5,11 @@
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 
+import * as z from 'zod/mini'
+
+import { type StackKey, stackKey } from '../core/ids.js'
+import { rowsOf } from '../wire/schemas.js'
+
 import type { GitHub } from './client.js'
 import type { PrRef } from './pullRequest.js'
 
@@ -20,17 +25,18 @@ export interface BranchTarget {
 
 /** `git@github.com:Owner/Repo.git`, `https://github.com/owner/repo`, `ssh://git@host/o/r.git` → host and repo. */
 export function parseRemote(url: string): { host: string; repository: string } | undefined {
-  const m =
-    url.match(/^[\w.-]+@([^:/]+):([^/]+\/[^/]+?)(?:\.git)?\/?$/) ??
-    url.match(/^(?:https?|ssh|git):\/\/(?:[^@/]+@)?([^/:]+)(?::\d+)?\/([^/]+\/[^/]+?)(?:\.git)?\/?$/)
+  const m = (
+    /^[\w.-]+@(?<host>[^:/]+):(?<repo>[^/]+\/[^/]+?)(?:\.git)?\/?$/.exec(url) ??
+    /^(?:https?|ssh|git):\/\/(?:[^@/]+@)?(?<host>[^/:]+)(?::\d+)?\/(?<repo>[^/]+\/[^/]+?)(?:\.git)?\/?$/.exec(url)
+  )?.groups
 
   if (!m) {
     return undefined
   }
 
-  const host = m[1]!.toLowerCase()
+  const host = (m['host'] ?? '').toLowerCase()
 
-  return host === 'github.com' || host.split('.').includes('github') ? { host, repository: m[2]!.toLowerCase() } : undefined
+  return host === 'github.com' || host.split('.').includes('github') ? { host, repository: (m['repo'] ?? '').toLowerCase() } : undefined
 }
 
 async function git(cwd: string, ...args: string[]): Promise<string> {
@@ -74,16 +80,25 @@ const BY_HEAD = `query($o: String!, $r: String!, $h: String!) {
   }
 }`
 
-interface ByHead {
-  repository?: { pullRequests?: { nodes?: { number: number; url: string; state: string; headRepositoryOwner?: { login?: string } | null }[] } } | null
-}
+/** One PR of the branch's name; its owner's login is '' when GitHub names none. */
+const headNode = z.object({
+  number: z.number(),
+  url: z.string(),
+  state: z.catch(z.string(), ''),
+  headRepositoryOwner: z.catch(z.object({ login: z.catch(z.string(), '') }), { login: '' })
+})
+
+/** BY_HEAD's answer. A repository or list GitHub did not send reads as no PRs; a node it cannot read throws, as it did before the schema. */
+const byHead = z.object({
+  repository: z.nullish(z.object({ pullRequests: z.nullish(z.object({ nodes: z.nullish(z.array(headNode)) })) }))
+})
 
 /** The branch's PR: the newest open one, else the newest of any state (T3 Code's findLatestPrForHeadContext). */
 export async function branchPullRequest(gh: GitHub, target: BranchTarget): Promise<PrRef | undefined> {
   const [o, r] = target.repository.split('/')
-  const data = await gh.graphql<ByHead>(target.host, BY_HEAD, { h: target.head, o, r })
+  const data = byHead.parse(await gh.graphql(target.host, BY_HEAD, { h: target.head, o, r }))
   // A fork's branch of the same name is not this one.
-  const prs = (data.repository?.pullRequests?.nodes ?? []).filter(p => (p.headRepositoryOwner?.login ?? '').toLowerCase() === o)
+  const prs = (data.repository?.pullRequests?.nodes ?? []).filter(p => p.headRepositoryOwner.login.toLowerCase() === o)
   const pr = prs.find(p => p.state === 'OPEN') ?? prs[0]
 
   return pr ? { host: target.host, number: pr.number, repository: target.repository, url: pr.url } : undefined
@@ -92,8 +107,7 @@ export async function branchPullRequest(gh: GitHub, target: BranchTarget): Promi
 // ── Stacks (GitHub's stacked pull requests) ───────────────────────────────────────────────────
 
 export interface Stack {
-  /** `host/repo#stack:N`. */
-  key: string
+  key: StackKey
   host: string
   repository: string
   number: number
@@ -119,26 +133,52 @@ export function stackQuery(refs: readonly PrRef[]): { query: string; variables: 
   return { query: `query(${decls.join(', ')}) { ${parts.join('\n')} }`, variables }
 }
 
+/** One alias of the stack query: its PR, in the stack it sits in. */
+const member = z.object({ pullRequest: z.object({ stack: z.object({ number: z.number() }) }) })
+
+/** The number of the stack one alias's PR sits in; undefined for none (or an answer that says nothing). */
+export function stackNumber(alias: unknown): number | undefined {
+  return member.safeParse(alias).data?.pullRequest.stack.number
+}
+
+/** One stack of the answer; one with no number or no list of PRs is skipped. */
+const stackRow = z.object({
+  number: z.number(),
+  /** The branch the stack sits on: a name, or a ref object. */
+  base: z.catch(z.union([z.string(), z.pipe(z.object({ ref: z.catch(z.string(), '') }), z.transform(b => b.ref))]), ''),
+  pull_requests: z.array(z.unknown())
+})
+
+/** One layer of a stack, bottom first; one with no number is skipped. */
+const layerRow = z.object({
+  number: z.number(),
+  head: z.catch(z.object({ ref: z.catch(z.string(), '') }), { ref: '' }),
+  state: z.catch(z.string(), 'open'),
+  merged_at: z.optional(z.unknown())
+})
+
+/**
+ * A stack's layer; undefined for one with no number. A null layer throws, as reading its number
+ * did before the schema: the caller then keeps the stack it had.
+ */
+function layerOf(raw: unknown): Stack['layers'][number] | undefined {
+  if (raw === null) {
+    throw new TypeError('A stack layer is null')
+  }
+
+  const p = layerRow.safeParse(raw).data
+
+  return p && { head: p.head.ref, number: p.number, state: p.merged_at ? 'merged' : p.state }
+}
+
 /** `GET /repos/{repo}/stacks?pull_request=N`, decoded as T3 Code's decodePullRequestStacksJson does. */
 export function parseStacks(host: string, repository: string, rows: unknown): Stack[] {
-  return (Array.isArray(rows) ? rows : []).flatMap(row => {
-    const s = row as { number?: number; base?: string | { ref?: string }; pull_requests?: { number?: number; head?: { ref?: string }; state?: string; merged_at?: string | null }[] }
-
-    if (typeof s?.number !== 'number' || !Array.isArray(s.pull_requests)) {
-      return []
-    }
-
-    return [
-      {
-        base: typeof s.base === 'string' ? s.base : (s.base?.ref ?? ''),
-        host,
-        key: `${host}/${repository}#stack:${s.number}`,
-        layers: s.pull_requests
-          .filter(p => typeof p.number === 'number')
-          .map(p => ({ head: p.head?.ref ?? '', number: p.number!, state: p.merged_at ? 'merged' : (p.state ?? 'open') })),
-        number: s.number,
-        repository
-      }
-    ]
-  })
+  return rowsOf(stackRow, Array.isArray(rows) ? rows : []).map(s => ({
+    base: s.base,
+    host,
+    key: stackKey(host, repository, s.number),
+    layers: s.pull_requests.flatMap(p => layerOf(p) ?? []),
+    number: s.number,
+    repository
+  }))
 }

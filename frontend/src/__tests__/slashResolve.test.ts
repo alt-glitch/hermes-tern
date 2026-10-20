@@ -1,10 +1,12 @@
 import type { CompletionItem } from '@hermes/shared/gateway-events'
 import { describe, expect, it, vi } from 'vitest'
 
-import type { Overlay } from '../overlay.js'
+import { CommandCatalog, resolveSlashName } from '../commands/resolve.js'
 import { slashItems } from '../overlays/completion.js'
 import { openHelp } from '../overlays/help.js'
-import { CommandCatalog, resolveSlashName } from '../slashResolve.js'
+import type { Overlay } from '../overlays/overlay.js'
+
+import { must, stub } from './fakes.js'
 
 const catalog = {
   canon: {
@@ -62,7 +64,7 @@ describe('CommandCatalog', () => {
 
       return catalog
     })
-    const cache = new CommandCatalog({ request } as never)
+    const cache = new CommandCatalog(stub({ request }))
 
     expect(await cache.get('s1')).toBeUndefined()
     fail = false
@@ -115,12 +117,12 @@ describe('/help', () => {
     const app = {
       gw: { request: async () => ({ categories }) },
       open: (o: Overlay) => (sheet = o),
-      sid: 's1',
+      session: { info: null, ref: { live: 's1', stored: null } },
       transcript: { notice: vi.fn() }
     }
 
-    await openHelp(app as never)
-    const text = JSON.stringify(sheet!.node('layer.help'))
+    await openHelp(stub(app))
+    const text = JSON.stringify(must(sheet).node('layer.help'))
 
     expect(text).toContain('"head":"Tern"')
     expect(text).toContain('/ps · /bashes · /shells · /processes')

@@ -2,10 +2,11 @@
 // outlives the pane that charted it, so a pane opened later, or a second pane on the session,
 // reads the rules instead of asking the model again. A decline is kept too.
 
-import { mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { mkdirSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 
-import { dataDir } from '../../connections.js'
+import { dataDir } from '../../connections/cards.js'
+import { chartSkip, readJsonFile } from '../../wire/files.js'
 
 import { type Spec, validateSpec } from './spec.js'
 
@@ -29,13 +30,14 @@ export function chartMemory(dir = join(dataDir(), 'charts'), now = Date.now): Ch
         return undefined
       }
 
+      const value = readJsonFile(join(dir, `${id}.json`))
+      const skip = chartSkip(value)
+
+      if (value === undefined || skip) {
+        return skip
+      }
+
       try {
-        const value: unknown = JSON.parse(readFileSync(join(dir, `${id}.json`), 'utf8'))
-
-        if (value && typeof value === 'object' && typeof (value as { skip?: unknown }).skip === 'number') {
-          return { skip: (value as { skip: number }).skip }
-        }
-
         // Checked again: the file is outside the frontend's hands.
         const checked = validateSpec(value)
 

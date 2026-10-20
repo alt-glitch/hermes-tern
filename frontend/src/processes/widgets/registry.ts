@@ -4,6 +4,7 @@
 // (packages/coding-agent/src/job-widgets/registry.ts); the process store asks for a view when
 // output arrives and on each poll, so no timer of its own runs.
 
+import { assertNever } from '../../core/assert.js'
 import type { BackgroundProcess } from '../../model.js'
 
 import type { Author, AuthorRequest } from './author.js'
@@ -106,7 +107,7 @@ export class OutputTap implements TextSource {
 
 export interface ChartsOptions {
   /** Writes specs; absent = fallback views only. */
-  author?: Author
+  author?: Author | undefined
   /** Where each process's rules (or the model's decline) are kept between panes. */
   memory?: ChartMemory
   /** Whether charts are on; read on every call. */
@@ -131,6 +132,22 @@ const MIN_AUTHOR_LINES = 3
 /** New lines, besides doubling, before a declined process is asked again (a short log's results come late). */
 const REASK_LINES = 5
 
+/** Where a chart's spec request stands. */
+type Authoring =
+  /** None in flight; `attempts` requests were made. */
+  | { kind: 'idle'; attempts: number }
+  /** The model declined when the output had `atLines` lines; it is asked again once the output doubled. */
+  | { kind: 'declined'; attempts: number; atLines: number }
+  /** A request is in flight; `was` (its attempt counted) is where it goes back to unless the answer changes that. */
+  | { kind: 'requesting'; controller: AbortController; was: Waiting }
+  /** No model can write specs: none is asked for again. */
+  | { kind: 'unavailable' }
+  /** Exited and flushed: the view never changes again. */
+  | { kind: 'frozen' }
+
+/** No request in flight, and one may be made. */
+type Waiting = Extract<Authoring, { kind: 'declined' | 'idle' }>
+
 interface Entry {
   process: BackgroundProcess
   tap: OutputTap
@@ -140,14 +157,34 @@ interface Entry {
   view: ChartView
   /** `JSON.stringify(view)`, to keep the view's identity while it does not change. */
   viewKey: string
-  /** Exited and flushed: the view never changes again. */
-  frozen: boolean
-  attempts: number
-  /** No model can write specs: stop asking. */
-  done: boolean
-  /** The model declined when the output had this many lines; it is asked again once the output doubled. */
-  declined?: number
-  request?: AbortController
+  authoring: Authoring
+}
+
+/** `a` while a request may be made; undefined while one is in flight or none will be. */
+function waiting(a: Authoring): Waiting | undefined {
+  switch (a.kind) {
+    case 'idle':
+
+    case 'declined':
+      return a
+
+    case 'requesting':
+
+    case 'unavailable':
+
+    case 'frozen':
+      return undefined
+
+    default:
+      return assertNever(a)
+  }
+}
+
+/** Aborts `entry`'s request in flight, if one is. */
+function abortRequest(entry: Entry) {
+  if (entry.authoring.kind === 'requesting') {
+    entry.authoring.controller.abort()
+  }
 }
 
 export class Charts {
@@ -183,15 +220,11 @@ export class Charts {
       const tap = new OutputTap(p.command)
       // Rules another pane (or this one, before) already got for the process.
       const known = this.#memory?.load(p.id)
-      const declined = known && 'skip' in known ? known.skip : undefined
       const runtime = new ChartRuntime(known && !('skip' in known) ? known : undefined, p.startedAt, this.#now)
 
       entry = {
-        attempts: 0,
-        declined,
-        done: false,
+        authoring: known && 'skip' in known ? { atLines: known.skip, attempts: 0, kind: 'declined' } : { attempts: 0, kind: 'idle' },
         files: outputFiles(p.command).map((path, i) => new FileTap(`file:${i + 1}`, path)),
-        frozen: false,
         process: p,
         runtime,
         tap,
@@ -217,7 +250,7 @@ export class Charts {
   retain(ids: ReadonlySet<string>) {
     for (const [id, entry] of this.#entries) {
       if (!ids.has(id)) {
-        entry.request?.abort()
+        abortRequest(entry)
         this.#entries.delete(id)
       }
     }
@@ -225,18 +258,18 @@ export class Charts {
 
   dispose() {
     this.#disposed = true
-    this.#entries.forEach(e => e.request?.abort())
+    this.#entries.forEach(abortRequest)
     this.#entries.clear()
   }
 
   /** Reads the new output; an exited process gets one flushing read and freezes. */
   #refresh(entry: Entry) {
-    if (entry.frozen) {
+    if (entry.authoring.kind === 'frozen') {
       return
     }
 
     const now = this.#now()
-    const settled = entry.process.status !== 'running'
+    const settled = entry.process.state.status !== 'running'
     entry.tap.update(entry.process.output)
     entry.files.forEach(f => f.update())
 
@@ -248,10 +281,9 @@ export class Charts {
     entry.runtime.ingest([entry.tap, ...entry.files], settled)
 
     if (settled) {
-      entry.frozen = true
       // Cleared here, not in the request's `finally`: the view recomputed below is its last.
-      entry.request?.abort()
-      entry.request = undefined
+      abortRequest(entry)
+      entry.authoring = { kind: 'frozen' }
     } else {
       this.#maybeAuthor(entry, now)
     }
@@ -260,7 +292,7 @@ export class Charts {
   }
 
   #recompute(entry: Entry): boolean {
-    const view = entry.runtime.view({ authoring: entry.request !== undefined, label: entry.process.command })
+    const view = entry.runtime.view({ authoring: entry.authoring.kind === 'requesting', label: entry.process.command })
     const key = JSON.stringify(view)
 
     if (key === entry.viewKey) {
@@ -275,7 +307,10 @@ export class Charts {
 
   /** Starts a spec request once the process is old and talkative enough, or re-authors a spec that stopped fitting. */
   #maybeAuthor(entry: Entry, now: number) {
-    if (!this.#author || entry.request || entry.done || entry.attempts >= this.#o.maxAttempts || this.#inFlight >= this.#o.maxInFlight) {
+    const author = this.#author
+    const state = waiting(entry.authoring)
+
+    if (!author || !state || state.attempts >= this.#o.maxAttempts || this.#inFlight >= this.#o.maxInFlight) {
       return
     }
 
@@ -296,12 +331,12 @@ export class Charts {
       previous = { reason, spec: runtime.spec }
     } else if (!runtime.samples().some(s => s.lines >= MIN_AUTHOR_LINES)) {
       return
-    } else if (entry.declined !== undefined && runtime.totalLines < Math.max(2 * entry.declined, entry.declined + REASK_LINES)) {
+    } else if (state.kind === 'declined' && runtime.totalLines < Math.max(2 * state.atLines, state.atLines + REASK_LINES)) {
       // Declined on fewer lines (shell start-up noise, a banner): asked again once the output has grown.
       return
     }
 
-    void this.#writeSpec(entry, previous)
+    void this.#writeSpec(entry, { author, previous, was: state })
   }
 
   #reauthorReason(entry: Entry, now: number): string | undefined {
@@ -320,12 +355,17 @@ export class Charts {
     return `no rule matched the last ${runtime.unmatchedLines} lines`
   }
 
-  /** One spec request (plus one retry on a rejected answer); installs the spec when it validates. */
-  async #writeSpec(entry: Entry, previous: AuthorRequest['previous']) {
-    const author = this.#author!
+  /**
+   * One spec request by `author` (plus one retry on a rejected answer); installs the spec when it
+   * validates. `was` is where the request started from, `previous` the spec it replaces.
+   */
+  async #writeSpec(entry: Entry, { author, previous, was }: { author: Author; previous: AuthorRequest['previous']; was: Waiting }) {
     const controller = new AbortController()
-    entry.request = controller
-    entry.attempts++
+    // A failed request counts as an attempt too.
+    const counted: Waiting = { ...was, attempts: was.attempts + 1 }
+    entry.authoring = { controller, kind: 'requesting', was: counted }
+    // Where the request leaves the entry: back where it was, unless the answer says otherwise.
+    let next: Authoring = counted
     this.#inFlight++
 
     if (this.#recompute(entry)) {
@@ -346,15 +386,15 @@ export class Charts {
 
         if (answer === undefined) {
           // No model can write specs.
-          entry.done = true
+          next = { kind: 'unavailable' }
 
           break
         }
 
         if (specSkip(answer) !== undefined) {
           // Nothing in the output so far is worth charting.
-          entry.declined = entry.runtime.totalLines
-          this.#memory?.save(entry.process.id, { skip: entry.declined })
+          next = { atLines: entry.runtime.totalLines, attempts: counted.attempts, kind: 'declined' }
+          this.#memory?.save(entry.process.id, { skip: next.atLines })
 
           break
         }
@@ -372,8 +412,8 @@ export class Charts {
     } finally {
       this.#inFlight--
 
-      if (entry.request === controller) {
-        entry.request = undefined
+      if (entry.authoring.kind === 'requesting' && entry.authoring.controller === controller) {
+        entry.authoring = next
       }
     }
 
@@ -386,7 +426,7 @@ export class Charts {
       // A new spec rereads the output from its oldest retained text.
       entry.runtime = new ChartRuntime(spec, entry.process.startedAt, this.#now)
       entry.tap.update(entry.process.output)
-      entry.runtime.ingest([entry.tap, ...entry.files], entry.process.status !== 'running')
+      entry.runtime.ingest([entry.tap, ...entry.files], entry.process.state.status !== 'running')
     }
 
     if (this.#recompute(entry)) {

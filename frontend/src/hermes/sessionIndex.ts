@@ -8,10 +8,16 @@
 // (hermes_state_sessions.workspace_key): the same repo root, or the folder or one under it.
 
 import { execFile } from 'node:child_process'
-import { DatabaseSync } from 'node:sqlite'
+import { DatabaseSync, type StatementSync } from 'node:sqlite'
 import { promisify } from 'node:util'
 
-import { stateDbPath } from '../watch/child.js'
+import * as z from 'zod/mini'
+
+import { attempt } from '../core/result.js'
+import { decodeJson } from '../wire/json.js'
+import { first, real, rows, text } from '../wire/sqlite.js'
+
+import { stateDbPath } from './paths.js'
 
 const run = promisify(execFile)
 
@@ -44,21 +50,27 @@ const LISTABLE = `(s.parent_session_id IS NULL
 /** The shared gateway's local creation receipts (hermes_state_local.POLICY_PREFIX). */
 const POLICY_PREFIX = 'gateway.local_policy.v1:'
 
+const receiptRow = z.object({ value: z.string() })
+
+/** A local policy receipt (hermes_state_local): the session it names, and every segment of its lineage. */
+const lineageReceipt = z.object({ session_id: z.string(), lineage: z.array(z.string()) })
+
+const segmentRow = z.object({ id: z.string(), end_reason: text })
+
 /**
  * The listable roots of earlier reset segments, which core leaves out of its listing
  * (hermes_state_local.local_lineage_index): a local session reset in place keeps one receipt whose
  * lineage holds every segment, and a segment starts after one that ended `session_reset`. Only the
  * newest such start stands for the conversation.
  */
-function supersededSegments(conn: DatabaseSync): string[] {
+export function supersededSegments(conn: { prepare(sql: string): Pick<StatementSync, 'all'> }): string[] {
   let receipts: { value: string }[]
 
   try {
-    receipts = conn
-      .prepare(
-        `SELECT value FROM state_meta WHERE key GLOB ? AND json_valid(value) AND json_array_length(value, '$.lineage') > 1`
-      )
-      .all(`${POLICY_PREFIX}*`) as unknown as { value: string }[]
+    const stmt = conn.prepare(
+      `SELECT value FROM state_meta WHERE key GLOB ? AND json_valid(value) AND json_array_length(value, '$.lineage') > 1`
+    )
+    receipts = rows(stmt, receiptRow, `${POLICY_PREFIX}*`)
   } catch {
     // No state_meta (an older database): no local lineages.
     return []
@@ -67,19 +79,18 @@ function supersededSegments(conn: DatabaseSync): string[] {
   const superseded: string[] = []
 
   for (const { value } of receipts) {
-    const receipt = JSON.parse(value) as { lineage?: unknown[]; session_id?: unknown }
-    const lineage = receipt.lineage ?? []
+    // The query keeps SQLite's valid JSON only; a receipt JavaScript cannot read is skipped, not the listing.
+    const text = attempt(() => decodeJson(value))
+    const receipt = text.kind === 'ok' ? lineageReceipt.safeParse(text.value) : undefined
 
-    if (typeof receipt.session_id !== 'string' || !lineage.every(id => typeof id === 'string')) {
+    if (!receipt?.success) {
       continue
     }
 
-    const ids = lineage as string[]
-    const rows = conn
-      .prepare(`SELECT id, end_reason FROM sessions WHERE id IN (${ids.map(() => '?').join(',')})`)
-      .all(...ids) as unknown as { id: string; end_reason: string | null }[]
-    const ended = new Map(rows.map(r => [r.id, r.end_reason]))
-    const starts = ids.filter((_, i) => i === 0 || ended.get(ids[i - 1]!) === 'session_reset')
+    const ids = receipt.data.lineage
+    const stmt = conn.prepare(`SELECT id, end_reason FROM sessions WHERE id IN (${ids.map(() => '?').join(',')})`)
+    const ended = new Map(rows(stmt, segmentRow, ...ids).map(r => [r.id, r.end_reason]))
+    const starts = ids.filter((_, i) => i === 0 || ended.get(ids[i - 1] ?? '') === 'session_reset')
 
     superseded.push(...starts.slice(0, -1))
   }
@@ -120,20 +131,21 @@ FROM spans sp JOIN sessions r ON r.id = sp.root LEFT JOIN sessions tip ON tip.id
 ORDER BY sp.last_active DESC
 LIMIT ?`
 
-interface Row {
-  id: string
-  title: string | null
-  source: string | null
-  cwd: string
-  repo_root: string
-  branch: string
-  model: string
-  started_at: number | null
-  last_active: number | null
-  messages: number
-  pinned: number
-  preview: string | null
-}
+/** One listed chain as QUERY selects it. */
+const sessionRow = z.object({
+  id: z.string(),
+  title: text,
+  source: text,
+  cwd: text,
+  repo_root: text,
+  branch: text,
+  model: text,
+  started_at: real,
+  last_active: real,
+  messages: z.optional(z.unknown()),
+  pinned: z.optional(z.unknown()),
+  preview: text
+})
 
 /** Hermes wraps steers and notices in markers; the picker wants the words. */
 function flat(text: string | null | undefined): string {
@@ -149,9 +161,9 @@ export function storedSessions(limit = 400, db = stateDbPath()): StoredSession[]
 
   try {
     conn = new DatabaseSync(db, { readOnly: true })
-    const rows = conn.prepare(QUERY).all(...SOURCES, JSON.stringify(supersededSegments(conn)), limit) as unknown as Row[]
+    const listed = rows(conn.prepare(QUERY), sessionRow, ...SOURCES, JSON.stringify(supersededSegments(conn)), limit)
 
-    return rows.map(r => ({
+    return listed.map(r => ({
       branch: r.branch ?? '',
       cwd: r.cwd ?? '',
       id: r.id,
@@ -172,24 +184,24 @@ export function storedSessions(limit = 400, db = stateDbPath()): StoredSession[]
   }
 }
 
+const replyRow = z.object({ content: text })
+
 /** A conversation's last reply (from its newest segment), for the picker's preview. */
 export function lastReply(id: string, db = stateDbPath()): string {
   let conn: DatabaseSync | undefined
 
   try {
     conn = new DatabaseSync(db, { readOnly: true })
-    const row = conn
-      .prepare(
-        `WITH RECURSIVE chain(cur) AS (SELECT ? UNION ALL SELECT child.id FROM chain c
-           JOIN sessions parent ON parent.id = c.cur JOIN sessions child ON child.parent_session_id = c.cur
-           WHERE parent.end_reason = 'compression')
-         SELECT m.content FROM messages m WHERE m.session_id IN (SELECT cur FROM chain)
-           AND m.role = 'assistant' AND m.content IS NOT NULL AND m.content != ''
-         ORDER BY m.timestamp DESC, m.id DESC LIMIT 1`
-      )
-      .get(id) as { content?: string } | undefined
+    const stmt = conn.prepare(
+      `WITH RECURSIVE chain(cur) AS (SELECT ? UNION ALL SELECT child.id FROM chain c
+         JOIN sessions parent ON parent.id = c.cur JOIN sessions child ON child.parent_session_id = c.cur
+         WHERE parent.end_reason = 'compression')
+       SELECT m.content FROM messages m WHERE m.session_id IN (SELECT cur FROM chain)
+         AND m.role = 'assistant' AND m.content IS NOT NULL AND m.content != ''
+       ORDER BY m.timestamp DESC, m.id DESC LIMIT 1`
+    )
 
-    return (row?.content ?? '').trim()
+    return (first(stmt, replyRow, id)?.content ?? '').trim()
   } catch {
     return ''
   } finally {

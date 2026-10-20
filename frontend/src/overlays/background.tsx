@@ -8,12 +8,27 @@
 
 import type { JSX, Key, PickerColumn, PickerItem } from '@stencil-hq/tern'
 
-import type { App } from '../app.js'
+import type { ChatPorts } from '../app/ports.js'
 import { copyToClipboard } from '../clipboard.js'
+import { optional } from '../core/assert.js'
+import { Flash } from '../core/flash.js'
+import { plural } from '../core/text.js'
 import type { BackgroundProcess, ToolCall } from '../model.js'
-import type { Overlay } from '../overlay.js'
-import { type CronJob, isMonitor, isPaused, jobError, jobTone, ownJobs, relative } from '../processes/cron.js'
+import { type CronAction, type CronJob, isMonitor, isPaused, jobError, jobTone, ownJobs } from '../processes/cron.js'
+import { PROCESS_LOOK } from '../processes/look.js'
 import {
+  initialSheet,
+  reduceSheet,
+  SHEET_CLICKS,
+  type SheetAction,
+  type SheetEffect,
+  type SheetFacts,
+  sheetKey,
+  type SheetState,
+  shownProcesses
+} from '../processes/sheet.js'
+import {
+  endOf,
   isRunning,
   processElapsed,
   processIdOf,
@@ -23,282 +38,151 @@ import {
   type Watchers
 } from '../processes/store.js'
 import { chartNode } from '../processes/widgets/view.js'
-import { isBackgroundCall } from '../transcript.js'
+import { isBackgroundCall } from '../transcript/calls.js'
 import { commandLine, describeCommand, oneLine } from '../view/describe.js'
-import { duration } from '../view/time.js'
+import { clockSeconds, duration, relative } from '../view/format.js'
+import { type Fact, facts } from '../view/ui/facts.js'
 
-import { moveSelection } from './search.js'
+import type { Overlay } from './overlay.js'
+import { countSummary, reportError, tickWhileOpen } from './sheet.js'
+
+/** What the Background sheet reaches of the app. */
+export type BackgroundHost = Pick<ChatPorts, 'changed' | 'close' | 'cron' | 'open' | 'processes' | 'transcript'>
 
 const KEY = 'background'
 /** Run times follow the clock while the sheet is open. */
 const TICK_MS = 1000
-const COPIED_MS = 1500
-
-type Tab = 'all' | 'cron' | 'running'
-
-const TABS: Tab[] = ['running', 'all', 'cron']
-
-const STATUS: Record<BackgroundProcess['status'], string> = {
-  done: 'Exited',
-  failed: 'Failed',
-  killed: 'Stopped',
-  lost: 'Lost',
-  running: 'Running'
-}
 
 /** Opens the sheet, on process `focus` when given, or on the Cron tab (`/cron`). */
-export function openBackground(app: App, at?: string | { tab: 'cron' }) {
-  const procs = () => app.processes.all()
-  const focus = typeof at === 'string' ? at : undefined
-  const focused = focus ? app.processes.get(focus) : undefined
-  let tab: Tab = focused ? (isRunning(focused) ? 'running' : 'all') : app.processes.running().length ? 'running' : 'all'
+export function openBackground(host: BackgroundHost, at?: string | { tab: 'cron' }) {
+  const procs = () => host.processes.all()
+  let state: SheetState = initialSheet(procs(), at)
+  /** The process whose command was just copied, while its button says so. */
+  const copied = new Flash<string>(() => host.changed())
+  const release = host.processes.watch()
+  const releaseCron = host.cron.watch()
 
-  if (typeof at === 'object') {
-    tab = at.tab
-  }
+  const stopTicking = tickWhileOpen(host, TICK_MS)
+  const close = () => host.close(overlay)
 
-  let selected = focus ?? procs().find(isRunning)?.id ?? procs()[0]?.id
-  /** Enter: the output takes the whole sheet. */
-  let expanded = false
-  let confirm: 'all' | 'job' | 'one' | undefined
-  let job: string | undefined
-  let copied: string | undefined
-  let copiedTimer: NodeJS.Timeout | undefined
-  const release = app.processes.watch()
-  const releaseCron = app.cron.watch()
+  const sheetFacts = (): SheetFacts => ({
+    busy: id => host.cron.busy(id),
+    jobs: host.cron.jobs(),
+    processes: procs(),
+    stopping: id => host.processes.stopping(id)
+  })
 
-  // Ends with the sheet, however it closed (Esc, a session switch replacing the overlays).
-  const timer = setInterval(() => (app.overlays.includes(overlay) ? app.changed() : end()), TICK_MS)
-
-  function end() {
-    clearInterval(timer)
-    clearTimeout(copiedTimer)
-    release()
-    releaseCron()
-  }
-
-  const close = () => {
-    end()
-    app.close(overlay)
-  }
-
-  const shown = (): BackgroundProcess[] => (tab === 'running' ? procs().filter(isRunning) : procs())
-  const current = () => procs().find(p => p.id === selected)
-
-  const stopOne = async () => {
-    const p = current()
-    confirm = undefined
-
-    if (!p || !isRunning(p)) {
-      return app.changed()
-    }
-
-    try {
-      const status = await app.processes.kill(p.id)
+  const stopOne = async (p: BackgroundProcess) => {
+    await reportError(host.transcript, async () => {
+      const status = await host.processes.kill(p.id)
 
       if (status && status !== 'killed') {
-        app.transcript.notice(`${describeCommand(p.command)}: ${status.replace(/_/g, ' ')}.`, 'warning')
+        host.transcript.notice(`${describeCommand(p.command)}: ${status.replace(/_/g, ' ')}.`, 'warning')
       }
-    } catch (error) {
-      app.transcript.notice(error instanceof Error ? error.message : String(error), 'error')
-    }
+    })
 
-    app.changed()
+    host.changed()
   }
 
   const stopAll = async () => {
-    confirm = undefined
+    await reportError(host.transcript, async () => {
+      const n = await host.processes.stopAll()
+      host.transcript.notice(`Stopped ${plural(n, 'background process', 'background processes')}.`)
+    })
 
-    try {
-      const n = await app.processes.stopAll()
-      app.transcript.notice(`Stopped ${n} background process${n === 1 ? '' : 'es'}.`)
-    } catch (error) {
-      app.transcript.notice(error instanceof Error ? error.message : String(error), 'error')
-    }
-
-    app.changed()
+    host.changed()
   }
 
-  const copy = () => {
-    const p = current()
+  const actJob = async (action: CronAction, j: CronJob) => {
+    await reportError(host.transcript, () => host.cron.act(action, j.job_id))
 
-    if (!p) {
+    host.changed()
+  }
+
+  const copy = (command: string, id: string) => {
+    copyToClipboard(command)
+    copied.set(id)
+  }
+
+  const run = (effect: SheetEffect) => {
+    switch (effect.kind) {
+      case 'close':
+        return close()
+
+      case 'stopOne':
+        return void stopOne(effect.process)
+
+      case 'stopAll':
+        return void stopAll()
+
+      case 'job':
+        return void actJob(effect.action, effect.job)
+
+      case 'copy':
+        return copy(effect.command, effect.id)
+    }
+  }
+
+  /** Applies `action` and runs its effect; a click also re-renders (a key's render follows the key). */
+  const act = (action: SheetAction | undefined) => {
+    if (!action) {
       return
     }
 
-    copyToClipboard(p.command)
-    copied = p.id
-    clearTimeout(copiedTimer)
-    copiedTimer = setTimeout(() => {
-      copied = undefined
-      app.changed()
-    }, COPIED_MS)
-    app.changed()
-  }
+    const step = reduceSheet(state, action, sheetFacts())
+    state = step.state
 
-  const ask = (what: 'all' | 'one') => {
-    const p = current()
-
-    if (what === 'one' ? p && isRunning(p) && !app.processes.stopping(p.id) : app.processes.running().length) {
-      confirm = what
+    if (step.effect) {
+      run(step.effect)
     }
   }
 
-  const currentJob = () => app.cron.jobs().find(j => j.job_id === job)
-
-  const actJob = async (action: 'pause' | 'remove' | 'resume') => {
-    const j = currentJob()
-    confirm = undefined
-
-    if (!j || app.cron.busy(j.job_id)) {
-      return app.changed()
-    }
-
-    try {
-      await app.cron.act(action, j.job_id)
-    } catch (error) {
-      app.transcript.notice(error instanceof Error ? error.message : String(error), 'error')
-    }
-
-    app.changed()
+  const click = (action: SheetAction) => {
+    act(action)
+    host.changed()
   }
 
-  const toggleJob = () => {
-    const j = currentJob()
-
-    if (j) {
-      void actJob(isPaused(j) ? 'resume' : 'pause')
-    }
-  }
-
-  const askRemove = () => {
-    if (currentJob()) {
-      confirm = 'job'
-    }
-  }
-
-  const settle = () => void (confirm === 'all' ? stopAll() : confirm === 'job' ? actJob('remove') : stopOne())
+  const handlers = Object.fromEntries(
+    Object.entries(SHEET_CLICKS).map(([id, action]) => [id, (ev: { value?: string }) => click(action(ev))])
+  )
 
   const overlay: Overlay = {
     key: KEY,
     modal: true,
     cancel: close,
+    // Ends with the sheet, however it closed (Esc, a session switch replacing the overlays).
+    onClose: () => {
+      stopTicking()
+      copied.dispose()
+      release()
+      releaseCron()
+    },
     node: () => sheetNode(Date.now()),
     onKey: (k: Key) => {
-      if (confirm) {
-        if (k.name === 'enter' || k.name === 'y') {
-          settle()
-        } else if (k.name === 'escape' || k.name === 'n') {
-          confirm = undefined
-        }
-
-        return true
-      }
-
-      const bare = !k.ctrl && !k.alt && !k.meta
-
-      if (k.name === 'escape') {
-        if (expanded) {
-          expanded = false
-        } else {
-          close()
-        }
-      } else if (tab === 'cron') {
-        if (k.name === 'tab') {
-          tab = next(tab, k.shift)
-        } else if (k.name === 'p' && bare && !k.shift) {
-          toggleJob()
-        } else if (k.name === 'd' && bare && !k.shift) {
-          askRemove()
-        } else {
-          job =
-            moveSelection(
-              k,
-              app.cron.jobs().map(j => j.job_id),
-              job
-            ) ?? job
-        }
-      } else if (k.name === 'enter') {
-        expanded = Boolean(current()) && !expanded
-      } else if (k.name === 'k' && bare) {
-        ask(k.shift ? 'all' : 'one')
-      } else if (k.name === 'c' && bare && !k.shift) {
-        copy()
-      } else if (k.name === 'tab' && !expanded) {
-        tab = next(tab, k.shift)
-      } else {
-        selected =
-          moveSelection(
-            k,
-            shown().map(p => p.id),
-            selected
-          ) ?? selected
-      }
+      act(sheetKey(state, k, sheetFacts()))
 
       return true
     }
   }
 
-  const handlers = {
-    all: () => {
-      ask('all')
-      app.changed()
-    },
-    cancel: () => {
-      confirm = undefined
-      app.changed()
-    },
-    close: () => {
-      if (expanded) {
-        expanded = false
-        app.changed()
-      } else {
-        close()
-      }
-    },
-    confirm: settle,
-    copy,
-    expand: () => {
-      expanded = Boolean(current()) && !expanded
-      app.changed()
-    },
-    remove: () => {
-      askRemove()
-      app.changed()
-    },
-    stop: () => {
-      ask('one')
-      app.changed()
-    },
-    tab: (ev: { value?: string }) => {
-      tab = TABS.find(t => t === ev.value) ?? 'all'
-      expanded = false
-      confirm = undefined
-      app.changed()
-    },
-    toggle: toggleJob
-  }
-
   function sheetNode(now: number): JSX.Element {
-    return tab === 'cron' ? cronNode(now) : processNode(now)
+    return state.tab === 'cron' ? cronNode(now) : processNode(now)
   }
 
   const tabs = () => [
-    { count: app.processes.running().length, id: 'running', label: 'Running' },
+    { count: host.processes.running().length, id: 'running', label: 'Running' },
     { count: procs().length, id: 'all', label: 'All' },
-    { count: app.cron.loaded ? app.cron.jobs().length : undefined, id: 'cron', label: 'Cron' }
+    { ...optional('count', host.cron.loaded ? host.cron.jobs().length : undefined), id: 'cron', label: 'Cron' }
   ]
 
   function cronNode(now: number): JSX.Element {
-    const jobs = app.cron.jobs()
-    const own = ownJobs(app.transcript.calls('cronjob_manage'))
+    const jobs = host.cron.jobs()
+    const own = ownJobs(host.transcript.calls('cronjob_manage'))
 
-    if (!jobs.some(j => j.job_id === job)) {
-      job = jobs[0]?.job_id
-    }
+    act({ ids: jobs.map(x => x.job_id), type: 'jobsListed' })
 
-    const j = jobs.find(x => x.job_id === job)
-    const busy = j ? app.cron.busy(j.job_id) : false
+    const j = jobs.find(x => x.job_id === state.job)
+    const busy = j ? host.cron.busy(j.job_id) : false
     const columns: PickerColumn[] = [
       { format: 'dim', head: 'Schedule', id: 'schedule', min: 10, priority: 1 },
       { format: 'dim', head: 'Next', id: 'next', priority: 3 },
@@ -309,40 +193,36 @@ export function openBackground(app: App, at?: string | { tab: 'cron' }) {
       <picker
         actions={[
           {
-            disabled: j ? (busy ? 'Working' : undefined) : 'No job',
+            ...optional('disabled', j ? (busy ? 'Working' : undefined) : 'No job'),
             id: 'toggle',
             keys: ['p'],
             label: j && isPaused(j) ? 'Resume' : 'Pause',
             primary: true
           },
-          { danger: true, disabled: j ? (busy ? 'Working' : undefined) : 'No job', id: 'remove', keys: ['d'], label: 'Remove' },
+          { danger: true, ...optional('disabled', j ? (busy ? 'Working' : undefined) : 'No job'), id: 'remove', keys: ['d'], label: 'Remove' },
           { end: true, id: 'close', keys: ['esc'], label: 'Close' }
         ]}
         columns={columns}
-        confirm={confirm === 'job' && j ? { act: 'confirm', label: 'Remove', text: `Remove ${j.name || j.job_id}? It will not run again.` } : undefined}
+        key={KEY}
+        {...optional('confirm', state.confirm === 'job' && j ? { act: 'confirm', label: 'Remove', text: `Remove ${j.name || j.job_id}? It will not run again.` } : undefined)}
         empty={
-          app.cron.error
-            ? `Could not list cron jobs: ${app.cron.error}`
-            : app.cron.loaded
+          host.cron.error
+            ? `Could not list cron jobs: ${host.cron.error}`
+            : host.cron.loaded
               ? 'No cron jobs. Ask Hermes to schedule one or to watch something.'
               : 'Loading cron jobs…'
         }
         icon="clock"
-        items={jobs.map(x => jobItem(x, now, own.has(x.job_id), app.cron.busy(x.job_id)))}
-        key={KEY}
+        items={jobs.map(x => jobItem(x, now, own.has(x.job_id), host.cron.busy(x.job_id)))}
         noun="jobs"
         onAction={handlers}
-        onSelect={ev => {
-          job = ev.item
-          confirm = undefined
-          app.changed()
-        }}
+        onSelect={ev => click({ id: ev.item, type: 'selectJob' })}
         order={jobs.map(x => x.job_id)}
         preview="side"
-        selected={job}
+        {...optional('selected', state.job)}
         size="lg"
-        subtitle={[{ s: 'muted', t: app.cron.warning ?? cronSummary(jobs) }]}
-        tab={tab}
+        subtitle={[{ s: 'muted', t: host.cron.warning ?? cronSummary(jobs) }]}
+        tab={state.tab}
         tabs={tabs()}
         title="Background"
         total={jobs.length}
@@ -354,15 +234,14 @@ export function openBackground(app: App, at?: string | { tab: 'cron' }) {
 
   function processNode(now: number): JSX.Element {
     const all = procs()
-    const list = shown()
+    const list = shownProcesses(state, all)
     const running = all.filter(isRunning).length
 
-    if (!list.some(p => p.id === selected)) {
-      selected = list[0]?.id
-    }
+    act({ ids: list.map(x => x.id), type: 'listed' })
 
-    const p = list.find(x => x.id === selected)
-    const call = p && callOf(app, p.id)
+    const { confirm, expanded } = state
+    const p = list.find(x => x.id === state.selected)
+    const call = p && callOf(host, p.id)
     const columns: PickerColumn[] = [
       { format: 'dim', head: 'Last output', id: 'last', min: 16, priority: 1 },
       { format: 'dim', head: 'Status', id: 'status', priority: 3 },
@@ -373,48 +252,41 @@ export function openBackground(app: App, at?: string | { tab: 'cron' }) {
       <picker
         actions={[
           { id: 'expand', keys: ['enter'], label: expanded ? 'List' : 'Output', primary: true },
-          { id: 'copy', keys: ['c'], label: copied && copied === p?.id ? 'Copied' : 'Copy command' },
+          { id: 'copy', keys: ['c'], label: copied.value && copied.value === p?.id ? 'Copied' : 'Copy command' },
           {
             danger: true,
-            disabled: p && isRunning(p) ? (app.processes.stopping(p.id) ? 'Stopping' : undefined) : 'Not running',
+            ...optional('disabled', p && isRunning(p) ? (host.processes.stopping(p.id) ? 'Stopping' : undefined) : 'Not running'),
             id: 'stop',
             keys: ['k'],
-            label: p && app.processes.stopping(p.id) ? 'Stopping…' : 'Stop'
+            label: p && host.processes.stopping(p.id) ? 'Stopping…' : 'Stop'
           },
-          { danger: true, disabled: running ? undefined : 'None running', id: 'all', keys: ['shift+k'], label: 'Stop all' },
+          { danger: true, ...optional('disabled', running ? undefined : 'None running'), id: 'all', keys: ['shift+k'], label: 'Stop all' },
           { end: true, id: 'close', keys: ['esc'], label: expanded ? 'Back' : 'Close' }
         ]}
         columns={columns}
-        confirm={
+        key={KEY}
+        {...optional(
+          'confirm',
           confirm === 'all'
-            ? { act: 'confirm', label: 'Stop all', text: `Stop ${running} background process${running === 1 ? '' : 'es'}?` }
+            ? { act: 'confirm', label: 'Stop all', text: `Stop ${plural(running, 'background process', 'background processes')}?` }
             : confirm === 'one' && p
               ? { act: 'confirm', label: 'Stop', text: `Stop ${describeCommand(p.command)}?` }
               : undefined
-        }
-        empty={tab === 'running' ? 'No background processes running. Tab shows the finished ones.' : 'No background processes in this session'}
-        focus={expanded ? 'preview' : undefined}
+        )}
+        empty={state.tab === 'running' ? 'No background processes running. Tab shows the finished ones.' : 'No background processes in this session'}
+        {...optional('focus', expanded ? 'preview' : undefined)}
         icon="terminal"
-        items={all.map(x => item(x, now, app.processes.stopping(x.id)))}
-        key={KEY}
+        items={all.map(x => item(x, now, host.processes.stopping(x.id)))}
         noun="processes"
         onAction={handlers}
-        onActivate={ev => {
-          selected = ev.item
-          expanded = true
-          app.changed()
-        }}
-        onSelect={ev => {
-          selected = ev.item
-          confirm = undefined
-          app.changed()
-        }}
+        onActivate={ev => click({ id: ev.item, type: 'activate' })}
+        onSelect={ev => click({ id: ev.item, type: 'select' })}
         order={list.map(x => x.id)}
         preview="side"
-        selected={selected}
+        {...optional('selected', state.selected)}
         size="lg"
         subtitle={[{ s: 'muted', t: summary(all) }]}
-        tab={tab}
+        tab={state.tab}
         tabs={tabs()}
         title="Background"
         total={all.length}
@@ -424,23 +296,15 @@ export function openBackground(app: App, at?: string | { tab: 'cron' }) {
     )
   }
 
-  app.open(overlay)
-}
-
-function next(tab: Tab, back: boolean): Tab {
-  return TABS[(TABS.indexOf(tab) + (back ? TABS.length - 1 : 1)) % TABS.length]!
+  host.open(overlay)
 }
 
 function cronSummary(jobs: CronJob[]): string {
-  const paused = jobs.filter(isPaused).length
-  const monitors = jobs.filter(isMonitor).length
-  const parts = [
-    [jobs.length - paused, 'active'],
-    [paused, 'paused'],
-    [monitors, monitors === 1 ? 'monitor' : 'monitors']
-  ] as const
-
-  return parts.filter(([n]) => n).map(([n, label]) => `${n} ${label}`).join(' · ') || 'none yet'
+  return countSummary(jobs, [
+    [j => !isPaused(j), 'active'],
+    [isPaused, 'paused'],
+    [isMonitor, ['monitor', 'monitors']]
+  ])
 }
 
 function jobItem(j: CronJob, now: number, own: boolean, busy: boolean): PickerItem {
@@ -448,7 +312,7 @@ function jobItem(j: CronJob, now: number, own: boolean, busy: boolean): PickerIt
 
   return {
     badges: [...(isMonitor(j) ? [{ text: 'monitor' }] : []), ...(own ? [{ text: 'this session', tone: 'accent' as const }] : [])],
-    detail: oneLine(j.prompt_preview || j.monitor_url || j.monitor_script || '') || undefined,
+    ...optional('detail', oneLine(j.prompt_preview || j.monitor_url || j.monitor_script || '') || undefined),
     dot: jobTone(j),
     facts: {
       last: busy ? 'working…' : error ? 'failed' : j.last_run_at ? `${j.last_status ?? 'ran'} ${relative(j.last_run_at, now)}` : 'never ran',
@@ -457,33 +321,32 @@ function jobItem(j: CronJob, now: number, own: boolean, busy: boolean): PickerIt
     },
     id: j.job_id,
     label: j.name || j.job_id,
-    tone: isPaused(j) ? 'muted' : undefined
+    ...optional('tone', isPaused(j) ? 'muted' : undefined)
   }
 }
 
 function jobPreview(j: CronJob, now: number, own: boolean): JSX.Element[] {
-  const at = (iso: string | null | undefined) => (iso ? `${clock(Date.parse(iso))} · ${relative(iso, now)}` : '—')
+  const at = (iso: string | null | undefined) => (iso ? `${clockSeconds(Date.parse(iso))} · ${relative(iso, now)}` : '—')
   const error = jobError(j)
-  const fact = (k: string, v: string | null | undefined) => (v ? [{ k: [{ t: k }], v }] : [])
 
   return [
     <text key="title" role="omp.hub.title" text={j.name || j.job_id} />,
     <kv
-      items={[
-        { k: [{ t: 'State' }], v: [{ s: jobTone(j), t: isPaused(j) ? `Paused${j.paused_reason ? ` · ${j.paused_reason}` : ''}` : 'Active' }] },
-        ...fact('Schedule', j.schedule),
-        ...(isPaused(j) ? [] : fact('Next run', at(j.next_run_at))),
-        { k: [{ t: 'Last run' }], v: j.last_run_at ? `${at(j.last_run_at)}${j.last_status ? ` · ${j.last_status}` : ''}` : 'never' },
-        ...fact('Repeat', j.repeat === null || j.repeat === undefined ? undefined : String(j.repeat)),
-        ...fact('Delivers to', j.deliver),
-        ...fact('Watches', j.monitor_url ?? j.monitor_script),
-        ...fact('Script', j.script),
-        ...fact('Folder', j.workdir),
-        ...fact('Model', j.model),
-        ...fact('Skills', j.skills?.join(' · ')),
-        ...(own ? [{ k: [{ t: 'Made by' }], v: 'this session' }] : []),
-        { k: [{ t: 'Job' }], v: [{ s: 'mono dim', t: j.job_id }] }
-      ]}
+      items={facts([
+        ['State', [{ s: jobTone(j), t: isPaused(j) ? `Paused${j.paused_reason ? ` · ${j.paused_reason}` : ''}` : 'Active' }]],
+        ['Schedule', j.schedule],
+        ['Next run', !isPaused(j) && at(j.next_run_at)],
+        ['Last run', j.last_run_at ? `${at(j.last_run_at)}${j.last_status ? ` · ${j.last_status}` : ''}` : 'never'],
+        ['Repeat', j.repeat === null || j.repeat === undefined ? undefined : String(j.repeat)],
+        ['Delivers to', j.deliver],
+        ['Watches', j.monitor_url ?? j.monitor_script],
+        ['Script', j.script],
+        ['Folder', j.workdir],
+        ['Model', j.model],
+        ['Skills', j.skills?.join(' · ')],
+        ['Made by', own && 'this session'],
+        ['Job', [{ s: 'mono dim', t: j.job_id }]]
+      ])}
       key="facts"
       role="omp.hub.kv"
     />,
@@ -506,26 +369,24 @@ function jobPreview(j: CronJob, now: number, own: boolean): JSX.Element[] {
 }
 
 /** The terminal call that started process `id`, for its watchers. */
-function callOf(app: App, id: string): ToolCall | undefined {
-  return app.transcript.backgroundCalls().find(c => isBackgroundCall(c) && (processIdOf(c) ?? c.process?.id) === id)
+function callOf(host: BackgroundHost, id: string): ToolCall | undefined {
+  return host.transcript.backgroundCalls().find(c => isBackgroundCall(c) && (processIdOf(c) ?? c.process?.id) === id)
 }
 
 function summary(all: BackgroundProcess[]): string {
-  const count = (s: BackgroundProcess['status']) => all.filter(p => p.status === s).length
-  const parts = [
-    [count('running'), 'running'],
-    [count('done'), 'exited'],
-    [count('failed'), 'failed'],
-    [count('killed') + count('lost'), 'stopped']
-  ] as const
-
-  return parts.filter(([n]) => n).map(([n, label]) => `${n} ${label}`).join(' · ') || 'none yet'
+  return countSummary(all, [
+    [p => p.state.status === 'running', 'running'],
+    [p => p.state.status === 'done', 'exited'],
+    [p => p.state.status === 'failed', 'failed'],
+    [p => p.state.status === 'killed' || p.state.status === 'lost', 'stopped'],
+    [p => p.state.status === 'unknown', 'unknown']
+  ])
 }
 
 function item(p: BackgroundProcess, now: number, stopping: boolean): PickerItem {
   return {
     detail: commandLine(p.command, 120),
-    dot: processTone(p.status),
+    dot: processTone(p.state.status),
     facts: {
       last: p.lastLine || (isRunning(p) ? 'starting…' : ''),
       status: stopping ? 'stopping…' : isRunning(p) ? 'running' : processVerdict(p),
@@ -534,26 +395,27 @@ function item(p: BackgroundProcess, now: number, stopping: boolean): PickerItem 
     id: p.id,
     label: describeCommand(p.command),
     title: p.command,
-    tone: isRunning(p) ? undefined : 'muted'
+    ...optional('tone', isRunning(p) ? undefined : 'muted')
   }
 }
 
 function preview(p: BackgroundProcess, call: ToolCall | undefined, now: number): JSX.Element[] {
   const w = call ? watchersOf(call) : undefined
+  const end = endOf(p)
 
   return [
     <text key="title" role="omp.hub.title" text={describeCommand(p.command)} />,
     <code key="cmd" lang="bash" max={{ h: '6lines' }} role="omp.tool.command" text={p.command} wrap />,
     <kv
-      items={[
-        { k: [{ t: 'Status' }], v: [{ s: processTone(p.status), t: isRunning(p) ? STATUS.running : `${STATUS[p.status]} · ${processVerdict(p)}` }] },
-        { k: [{ t: 'Started' }], v: clock(p.startedAt) },
-        { k: [{ t: isRunning(p) ? 'Running for' : 'Ran for' }], v: duration(processElapsed(p, now)) },
-        ...(p.exitedAt ? [{ k: [{ t: 'Exited' }], v: `${clock(p.exitedAt)} · ${duration(now - p.exitedAt)} ago` }] : []),
-        ...(p.reason && p.status !== 'running' ? [{ k: [{ t: 'Reason' }], v: p.reason.replace(/_/g, ' ') }] : []),
+      items={facts([
+        ['Status', [{ s: processTone(p.state.status), t: isRunning(p) ? PROCESS_LOOK.running.word : `${PROCESS_LOOK[p.state.status].word} · ${processVerdict(p)}` }]],
+        ['Started', clockSeconds(p.startedAt)],
+        [isRunning(p) ? 'Running for' : 'Ran for', duration(processElapsed(p, now))],
+        ['Exited', end?.exitedAt ? `${clockSeconds(end.exitedAt)} · ${duration(now - end.exitedAt)} ago` : undefined],
+        ['Reason', end?.reason?.replace(/_/g, ' ')],
         ...(w ? watcherFacts(w) : []),
-        { k: [{ t: 'Process' }], v: [{ s: 'mono dim', t: p.id }] }
-      ]}
+        ['Process', [{ s: 'mono dim', t: p.id }]]
+      ])}
       key="facts"
       role="omp.hub.kv"
     />,
@@ -579,7 +441,7 @@ function outputView(p: BackgroundProcess, now: number): JSX.Element[] {
     <text
       key="state"
       spans={[
-        { s: processTone(p.status), t: isRunning(p) ? 'running' : processVerdict(p) },
+        { s: processTone(p.state.status), t: isRunning(p) ? 'running' : processVerdict(p) },
         { s: 'muted', t: ` · ${duration(processElapsed(p, now))}` }
       ]}
     />,
@@ -587,15 +449,10 @@ function outputView(p: BackgroundProcess, now: number): JSX.Element[] {
   ]
 }
 
-function watcherFacts(w: Watchers): { k: { t: string }[]; v: string }[] {
+function watcherFacts(w: Watchers): Fact[] {
   return [
-    { k: [{ t: 'Notify' }], v: w.notify ? 'when it exits' : w.patterns.length ? 'on a matching line' : 'off' },
-    ...(w.patterns.length ? [{ k: [{ t: 'Watch' }], v: w.patterns.join(' · ') }] : []),
-    ...(w.heartbeat ? [{ k: [{ t: 'Heartbeat' }], v: `every ${w.heartbeat}s` }] : [])
+    ['Notify', w.notify ? 'when it exits' : w.patterns.length ? 'on a matching line' : 'off'],
+    ['Watch', w.patterns.join(' · ')],
+    ['Heartbeat', w.heartbeat ? `every ${w.heartbeat}s` : undefined]
   ]
-}
-
-/** `14:02:07`: a wall-clock time today. */
-function clock(ms: number): string {
-  return new Date(ms).toLocaleTimeString([], { hour: '2-digit', hour12: false, minute: '2-digit', second: '2-digit' })
 }

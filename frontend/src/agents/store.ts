@@ -3,73 +3,116 @@
 // owner's live registry: status, model, tool count, steerability) and each child's live
 // transcript log (tools/delegation_live_log.py), whose path the dispatch result names. The log
 // outlives the child, so a finished agent keeps its timeline and final status. Where a gateway
-// does send `subagent.*` events, Transcript.subagent folds them into the same rows. A resumed
+// does send `subagent.*` events, apply() folds them into the same rows: this store is the only
+// writer of the rows. A resumed
 // session's history drops the dispatch result, so its still-running children are found by one
-// `subagent.list` probe and attached to the delegate_task call that asked for their goals.
+// `subagent.list` probe and attached to the delegate_task call that asked for their goals. The
+// rows and how each source folds into them are rows.ts's; this reads and polls.
 
 import { readFile, stat } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 
+import type { SubagentEventPayload } from '@hermes/shared/gateway-events'
 import type { GatewayClient } from '@tui/gatewayClient.js'
 
+import type { Ticket } from '../core/epoch.js'
+import { errorCode } from '../core/errors.js'
+import type { LiveSessionId } from '../core/ids.js'
+import { Poller } from '../core/poller.js'
 import type { Subagent, ToolCall } from '../model.js'
-import { record, type Transcript } from '../transcript.js'
+import type { Transcript } from '../transcript/store.js'
+import { record } from '../wire/json.js'
+import { rpc } from '../wire/rpc.js'
 
-import { clockToMs, parseLiveLog, runningTool, type LiveLog } from './liveLog.js'
+import { parseLiveLog } from './liveLog.js'
+import {
+  applyListRow,
+  applyLog,
+  applyOutcome,
+  askingCall,
+  attachRow,
+  completionOutcomes,
+  dispatchOf,
+  dispatchRows,
+  endUnseen,
+  findRow,
+  foldEvent,
+  isRunning,
+  type ListRow,
+  MAX_LOG_BYTES,
+  mergeTail,
+  nestedChild,
+  type Owners,
+  ownersOf,
+  type SubagentEventType
+} from './rows.js'
 
 /** What the store reaches of the app. */
 export interface AgentsHost {
   readonly gw: Pick<GatewayClient, 'request'>
-  readonly sid: string | null
+  /** The open session's runtime id. */
+  readonly sid: LiveSessionId | null
   readonly transcript: Transcript
   changed(): void
   /** A subagent ended (the PRs it linked may be new). */
   agentEnded?(): void
 }
 
-/** One row of `subagent.list` (gateway/session_ancillary.py `_SUBAGENT_FIELDS`). */
-interface ListRow {
-  subagent_id?: string
-  parent_id?: string | null
-  depth?: number
-  goal?: string
-  delegation_id?: string
-  model?: string | null
-  started_at?: number
-  status?: string
-  tool_count?: number
-  last_tool?: string | null
-  accepting_steer?: boolean
-}
-
 const POLL_MS = 1000
-/** Logs are compact (one capped line per event); a runaway one is read from its tail. */
-const MAX_LOG_BYTES = 2 * 1024 * 1024
-const ENDED = new Set(['cancelled', 'done', 'failed'])
 /** Polls a child with no log this process can read may go unlisted before it counts as ended (it can finish inside the first one). */
 const GRACE_POLLS = 3
-/** The note on a row that ended where nothing said how; the async-delegation completion replaces it. */
-export const OUTCOME_UNKNOWN = 'outcome unknown'
+/**
+ * Reads that found no log file while the child runs before the store stops looking for it: a
+ * child may not have written it yet, but a gateway on another machine writes it where this
+ * process never sees it. A queued child (behind the concurrency limit) writes none yet.
+ */
+const MISSING_READS = 3
 
-export function isRunning(a: Subagent): boolean {
-  return !ENDED.has(a.status)
-}
+/** What one read of a child's log file gave. */
+export type LogRead =
+  /** The log's text (its last `MAX_LOG_BYTES`) and its size. */
+  | { kind: 'ok'; text: string; size: number }
+  /** It has the size it had at the last read: nothing new. */
+  | { kind: 'same' }
+  /** No such file (ENOENT): the child has not written it yet, or it is on another machine. */
+  | { kind: 'notYet' }
+  /** It is there and this process may not read it (EACCES, EPERM), or the read failed otherwise. */
+  | { kind: 'unreadable'; error: unknown }
 
-/** `Agent 2`, or `Agent 2.1` for the first child that agent spawned. */
-export function agentName(a: Subagent): string {
-  return a.name ?? `Agent ${a.index + 1}`
+/** Reads the log at `path`, unless it still has size `last` (undefined: read it whatever its size). */
+export async function readLogFile(path: string, last: number | undefined): Promise<LogRead> {
+  try {
+    const { size } = await stat(path)
+
+    if (last === size) {
+      return { kind: 'same' }
+    }
+
+    const bytes = await readFile(path)
+
+    return { kind: 'ok', size, text: bytes.subarray(Math.max(0, bytes.length - MAX_LOG_BYTES)).toString('utf8') }
+  } catch (error) {
+    return errorCode(error) === 'ENOENT' ? { kind: 'notYet' } : { error, kind: 'unreadable' }
+  }
 }
 
 export class Agents {
   readonly #host: AgentsHost
-  #timer: NodeJS.Timeout | undefined
-  #ticking = false
+  /** The poll: every second while an agent runs, and a probe for a resumed session's children. */
+  readonly #poller = new Poller({
+    cadence: () => (this.running().length ? POLL_MS : 'off'),
+    run: ticket => this.#round(ticket)
+  })
+  /** The next round polls even with nothing running (a resumed session's probe). */
+  #probe = false
   readonly #tracked = new WeakSet<ToolCall>()
   /** Log sizes at the last read, by path; a log that did not grow is not read again. */
   readonly #sizes = new Map<string, number>()
   /** Logs this process cannot read (a gateway on another machine): `subagent.tail` instead. */
   readonly #unreadable = new Set<string>()
+  /** Reads in a row that found no log file, by path (see MISSING_READS). */
+  readonly #missing = new Map<string, number>()
   /** Ids `subagent.list` reported: one that leaves the list has finished. */
   readonly #listed = new Set<string>()
   /** Polls each unlisted row without a readable log has gone unseen. */
@@ -98,6 +141,22 @@ export class Agents {
   }
 
   /**
+   * Another session is shown (`sid`): what the store learned of the last one's children (listed
+   * ids, log sizes, tails, unreadable logs) goes, and a poll in flight for it drops its answer.
+   */
+  adopt(sid: LiveSessionId | null) {
+    if (!this.#poller.adopt(sid)) {
+      return
+    }
+
+    this.#listed.clear()
+    this.#sizes.clear()
+    this.#tails.clear()
+    this.#unreadable.clear()
+    this.#missing.clear()
+  }
+
+  /**
    * Takes over each dispatched delegate_task call not tracked yet, and polls while any agent runs.
    * A call history brought back without its result (a resumed session) gets one `subagent.list`
    * probe: its children still running are attached to it and followed from then on.
@@ -112,45 +171,67 @@ export class Agents {
 
       if (this.#track(call, at)) {
         this.#tracked.add(call)
-      } else if (call.result === undefined && call.status !== 'running' && !call.subagents?.length) {
+      } else if (call.result === undefined && call.outcome.kind !== 'running' && !call.subagents?.length) {
         bare = true
       }
     }
 
     if (this.running().length) {
-      this.#wake()
+      this.#poller.poke()
     } else if (bare) {
-      void this.#tick(true)
+      // A probe during a round in flight runs right after it.
+      this.#probe = true
+      this.#poller.poke()
+    }
+  }
+
+  /**
+   * A `subagent.*` event, where the gateway sends them, folded into the rows of the delegate_task
+   * call that dispatched it. A background delegation reports after its turn ended (maybe after
+   * newer turns started), so its call is found by its delegation id first; else it is the newest
+   * delegate_task call of the live (else the last) turn.
+   */
+  apply(type: SubagentEventType, event: SubagentEventPayload, at = Date.now()) {
+    const transcript = this.#host.transcript
+    const id = event.delegation_id
+    const call =
+      (id ? transcript.delegations().findLast(c => record(c.result)?.['delegation_id'] === id) : undefined) ??
+      transcript.lastCall(c => c.name === 'delegate_task')
+
+    if (call) {
+      transcript.mutateCall(call, c => foldEvent(c, { at, event, type }))
     }
   }
 
   /** Queues steering text into a running agent; the owner answers `queued` or `rejected`. */
   async steer(a: Subagent, text: string): Promise<boolean> {
-    const r = await this.#host.gw.request<{ status?: string }>('subagent.steer', {
-      session_id: this.#host.sid,
-      subagent_id: a.id,
-      text
-    })
+    const sid = this.#host.sid
+
+    if (!sid) {
+      return false
+    }
+
+    const r = await rpc(this.#host.gw, 'subagent.steer', { session_id: sid, subagent_id: a.id, text })
 
     return r?.status === 'queued'
   }
 
   /** Interrupts a running agent; its partial result still returns to the parent. */
   async stop(a: Subagent): Promise<boolean> {
-    const r = await this.#host.gw.request<{ found?: boolean }>('subagent.interrupt', {
-      session_id: this.#host.sid,
-      subagent_id: a.id
-    })
+    const sid = this.#host.sid
+
+    if (!sid) {
+      return false
+    }
+
+    const r = await rpc(this.#host.gw, 'subagent.interrupt', { session_id: sid, subagent_id: a.id })
 
     return Boolean(r?.found)
   }
 
   /** Blocks (or unblocks) new subagent spawns on the gateway; running children keep going. */
   async pause(paused: boolean): Promise<boolean> {
-    const r = await this.#host.gw.request<{ paused?: boolean }>('delegation.pause', {
-      paused,
-      ...(this.#host.sid ? { session_id: this.#host.sid } : {})
-    })
+    const r = await rpc(this.#host.gw, 'delegation.pause', { paused, ...(this.#host.sid ? { session_id: this.#host.sid } : {}) })
 
     this.paused = typeof r?.paused === 'boolean' ? r.paused : paused
     this.#host.changed()
@@ -178,19 +259,10 @@ export class Agents {
         continue
       }
 
-      const ended = endedStatus(status)
-
-      if (!ended) {
+      if (!applyOutcome(a, status)) {
         continue
       }
 
-      if (isRunning(a)) {
-        a.duration = Date.now() - a.startedAt
-      }
-
-      a.status = ended
-      a.tool = undefined
-      a.exitReason = status === 'unknown' ? OUTCOME_UNKNOWN : PLAIN_OUTCOMES.has(status) ? undefined : status
       this.#touch(a)
       changed = true
     }
@@ -202,89 +274,62 @@ export class Agents {
 
   /** Reads `a`'s log now (the hub's timeline opening on it), whatever its state. */
   async refresh(a: Subagent) {
-    if (await this.#readLog(a, true)) {
+    if (await this.#readLog(a, this.#poller.ticket(), true)) {
       this.#touch(a)
       this.#host.changed()
     }
   }
 
+  /** Stops the poll for good (the pane quits). */
   dispose() {
-    clearInterval(this.#timer)
-    this.#timer = undefined
+    this.#poller.dispose()
   }
 
   #track(call: ToolCall, at: number): boolean {
-    const r = record(call.result)
+    const dispatch = dispatchOf(call.result)
 
-    if (r?.status !== 'dispatched' || typeof r.delegation_id !== 'string') {
+    if (!dispatch) {
       return false
     }
 
-    const goals = Array.isArray(r.goals) ? r.goals.map(g => (typeof g === 'string' ? g : '')) : []
-    const ids = Array.isArray(r.subagent_ids) ? r.subagent_ids : []
-    const paths = Array.isArray(r.live_transcripts) ? r.live_transcripts : []
-    const list = (call.subagents ??= [])
-
-    goals.forEach((goal, i) => {
-      const id = typeof ids[i] === 'string' && ids[i] ? (ids[i] as string) : `task-${i}`
-      let a = list.find(x => x.id === id)
-
-      if (!a) {
-        a = { calls: 0, goal, id, index: i, startedAt: at, status: 'queued', tokens: 0, toolCount: 0 }
-        list.push(a)
-      }
-
-      // The node key stays put when the first poll renames a `task-<i>` placeholder, so Tern keeps its timer.
-      a.key ??= `p${i}`
-      a.delegationId = r.delegation_id as string
-      a.depth = 0
-      a.logPath = typeof paths[i] === 'string' ? (paths[i] as string) : undefined
-    })
-
-    list.sort((a, b) => a.index - b.index || (a.depth ?? 0) - (b.depth ?? 0))
+    this.#host.transcript.mutateCall(call, c => dispatchRows((c.subagents ??= []), dispatch, at))
 
     return true
   }
 
-  #wake() {
-    this.#timer ??= setInterval(() => void this.#tick(), POLL_MS)
-    void this.#tick()
-  }
+  /** One poll and log read; a probe polls even with nothing running yet (a resumed session). */
+  async #round(ticket: Ticket) {
+    const probe = this.#probe
+    this.#probe = false
 
-  /** One poll and log read; `probe` polls even with nothing running yet (a resumed session). */
-  async #tick(probe = false) {
-    if (this.#ticking) {
+    if (!probe && !this.running().length) {
       return
     }
 
-    this.#ticking = true
+    const changed = new Set<Subagent>()
+    await this.#poll(changed, ticket)
 
-    try {
-      if (!probe && !this.running().length) {
-        return this.dispose()
-      }
+    if (!ticket.isCurrent()) {
+      return
+    }
 
-      const changed = new Set<Subagent>()
-      await this.#poll(changed)
-      const reads = await Promise.all(this.running().map(async a => ((await this.#readLog(a)) ? a : undefined)))
-      reads.forEach(a => a && changed.add(a))
+    const reads = await Promise.all(this.running().map(async a => ((await this.#readLog(a, ticket)) ? a : undefined)))
 
-      if (changed.size) {
-        changed.forEach(a => this.#touch(a))
-        this.#host.changed()
-      }
+    // Another session was adopted meanwhile: these rows are not its rows.
+    if (!ticket.isCurrent()) {
+      return
+    }
 
-      // A probe that found live children keeps following them.
-      if (probe && this.running().length) {
-        this.#timer ??= setInterval(() => void this.#tick(), POLL_MS)
-      }
-    } finally {
-      this.#ticking = false
+    reads.forEach(a => a && changed.add(a))
+
+    if (changed.size) {
+      changed.forEach(a => this.#touch(a))
+      this.#host.changed()
     }
   }
 
   /** Folds `subagent.list` into the rows: new nested children, status, model, counts. */
-  async #poll(changed: Set<Subagent>) {
+  async #poll(changed: Set<Subagent>, ticket: Ticket) {
     const sid = this.#host.sid
 
     if (!sid) {
@@ -294,9 +339,13 @@ export class Agents {
     let rows: ListRow[]
 
     try {
-      rows = (await this.#host.gw.request<{ subagents?: ListRow[] }>('subagent.list', { session_id: sid }))?.subagents ?? []
+      rows = (await rpc(this.#host.gw, 'subagent.list', { session_id: sid }))?.subagents ?? []
     } catch {
       // A session the owner no longer holds live (or a worker it cannot project): the logs still tell.
+      return
+    }
+
+    if (!ticket.isCurrent()) {
       return
     }
 
@@ -312,32 +361,18 @@ export class Agents {
 
       present.add(id)
       this.#listed.add(id)
-      const a = this.#find(owners, row) ?? this.#adopt(owners, row) ?? (await this.#attach(owners, row))
+      const a = findRow(owners, row) ?? nestedChild(owners, row) ?? (await this.#attach(owners, row, ticket))
+
+      if (!ticket.isCurrent()) {
+        return
+      }
 
       if (!a) {
         continue
       }
 
-      a.id = id
-      // Ended unseen, then listed after all (it waited for a slot): it runs.
-      if (a.status === 'done' && a.exitReason === OUTCOME_UNKNOWN) {
-        a.status = 'running'
-        a.exitReason = undefined
+      if (applyListRow(a, row)) {
         this.#ended.delete(a)
-      }
-
-      a.model = row.model ?? a.model
-      a.toolCount = Math.max(a.toolCount, row.tool_count ?? 0)
-      a.steerable = row.accepting_steer ?? a.steerable
-      a.startedAt = typeof row.started_at === 'number' ? row.started_at * 1000 : a.startedAt
-
-      if (a.status === 'queued' || a.status === 'running') {
-        a.status = 'running'
-
-        if (!a.log && row.last_tool && a.tool !== row.last_tool) {
-          a.tool = row.last_tool
-          a.toolSince = { at: Date.now() }
-        }
       }
 
       changed.add(a)
@@ -347,7 +382,7 @@ export class Agents {
     // one (a remote gateway), so does a child never listed after a grace (it ended within a poll).
     // Neither says how it ended: the row waits on the delegation's completion (settle).
     for (const a of owners.keys()) {
-      if (!isRunning(a) || present.has(a.id) || this.#readableLog(a)) {
+      if (!isRunning(a) || present.has(a.id) || this.#logPath(a)) {
         continue
       }
 
@@ -360,144 +395,86 @@ export class Agents {
         }
       }
 
-      a.status = 'done'
-      a.exitReason = OUTCOME_UNKNOWN
-      a.duration = Date.now() - a.startedAt
-      a.tool = undefined
+      endUnseen(a)
       changed.add(a)
     }
   }
 
-  /** The row `row` describes: by id, else a dispatch placeholder (`task-<i>`) of its delegation. */
-  #find(owners: Map<Subagent, ToolCall>, row: ListRow): Subagent | undefined {
-    const agents = [...owners.keys()]
-    const byId = agents.find(a => a.id === row.subagent_id)
-
-    if (byId) {
-      return byId
-    }
-
-    const index = taskIndex(row)
-
-    return (row.depth ?? 0) === 0 && index !== undefined
-      ? agents.find(a => a.delegationId === row.delegation_id && a.id === `task-${index}`)
-      : undefined
-  }
-
-  /** A nested child (an orchestrator's worker): a row under its parent, in the parent's card. */
-  #adopt(owners: Map<Subagent, ToolCall>, row: ListRow): Subagent | undefined {
-    const parent = [...owners.keys()].find(a => a.id === row.parent_id)
-    const call = parent && owners.get(parent)
-
-    if (!parent || !call?.subagents) {
-      return undefined
-    }
-
-    const list = call.subagents
-    const siblings = list.filter(a => a.parentId === parent.id).length
-    const child: Subagent = {
-      calls: 0,
-      delegationId: row.delegation_id,
-      depth: (parent.depth ?? 0) + 1,
-      goal: row.goal ?? '',
-      id: row.subagent_id!,
-      index: parent.index,
-      name: `${agentName(parent)}.${siblings + 1}`,
-      parentId: parent.id,
-      startedAt: Date.now(),
-      status: 'running',
-      tokens: 0,
-      toolCount: 0
-    }
-
-    // After the parent's last descendant, so the card reads as a tree.
-    let at = list.indexOf(parent) + 1
-
-    while (at < list.length && (list[at]!.depth ?? 0) > (parent.depth ?? 0)) {
-      at++
-    }
-
-    list.splice(at, 0, child)
-    owners.set(child, call)
-
-    return child
-  }
-
   /**
    * A top-level child whose dispatch result the history dropped (a resumed session): a row on the
-   * newest result-less delegate_task call whose task `sa-<i>-` asked for its goal, its log found
-   * through the delegation's manifest (else read with `subagent.tail`).
+   * call that asked for its goal, its log found through the delegation's manifest (else read with
+   * `subagent.tail`).
    */
-  async #attach(owners: Map<Subagent, ToolCall>, row: ListRow): Promise<Subagent | undefined> {
-    const index = taskIndex(row)
-    const goal = row.goal?.trim()
+  async #attach(owners: Owners, row: ListRow, ticket: Ticket): Promise<Subagent | undefined> {
+    const asked = askingCall(this.#host.transcript.delegations(), row)
 
-    if ((row.depth ?? 0) !== 0 || index === undefined || !goal) {
+    if (!asked) {
       return undefined
     }
 
-    const call = this.#host.transcript
-      .delegations()
-      .findLast(c => c.result === undefined && taskGoals(c)[index] === goal && !c.subagents?.some(a => !a.depth && a.index === index))
+    const logPath = row.delegation_id ? await manifestLog(row.delegation_id, asked.index) : undefined
 
-    if (!call) {
-      return undefined
-    }
-
-    const a: Subagent = {
-      calls: 0,
-      delegationId: row.delegation_id,
-      depth: 0,
-      goal: row.goal!,
-      id: row.subagent_id!,
-      index,
-      key: `p${index}`,
-      logPath: row.delegation_id ? await manifestLog(row.delegation_id, index) : undefined,
-      startedAt: Date.now(),
-      status: 'running',
-      tokens: 0,
-      toolCount: 0
-    }
-    const list = (call.subagents ??= [])
-
-    list.push(a)
-    list.sort((x, y) => x.index - y.index || (x.depth ?? 0) - (y.depth ?? 0))
-    owners.set(a, call)
-
-    return a
+    return ticket.isCurrent() ? attachRow(owners, asked.call, asked.index, row, logPath) : undefined
   }
 
-  #readableLog(a: Subagent): boolean {
-    return Boolean(a.logPath && !this.#unreadable.has(a.logPath))
+  /** `a`'s log path while this process may read it. */
+  #logPath(a: Subagent): string | undefined {
+    return a.logPath && !this.#unreadable.has(a.logPath) ? a.logPath : undefined
   }
 
   /** Reads `a`'s log from disk (else its tail over the gateway); true when it changed. */
-  async #readLog(a: Subagent, force = false): Promise<boolean> {
+  async #readLog(a: Subagent, ticket: Ticket, force = false): Promise<boolean> {
     let text: string | undefined
+    const path = this.#logPath(a)
 
-    if (this.#readableLog(a)) {
-      try {
-        const path = a.logPath!
-        const { size } = await stat(path)
+    if (path) {
+      const read = await readLogFile(path, force ? undefined : this.#sizes.get(path))
 
-        if (!force && this.#sizes.get(path) === size) {
+      if (!ticket.isCurrent()) {
+        return false
+      }
+
+      switch (read.kind) {
+        case 'ok':
+          this.#sizes.set(path, read.size)
+          this.#missing.delete(path)
+          text = read.text
+          break
+
+        case 'same':
           return false
+
+        case 'notYet': {
+          // Not written yet, or written on another machine: after a few reads while it runs, the
+          // tail it is. A queued child has not started writing.
+          if (a.status !== 'running') {
+            break
+          }
+
+          const misses = (this.#missing.get(path) ?? 0) + 1
+          this.#missing.set(path, misses)
+
+          if (misses >= MISSING_READS) {
+            this.#unreadable.add(path)
+          }
+
+          break
         }
 
-        this.#sizes.set(path, size)
-        const bytes = await readFile(path)
-        text = bytes.subarray(Math.max(0, bytes.length - MAX_LOG_BYTES)).toString('utf8')
-      } catch {
-        this.#unreadable.add(a.logPath!)
+        case 'unreadable':
+          this.#unreadable.add(path)
       }
     }
 
-    if (text === undefined && this.#listed.has(a.id) && this.#host.sid) {
+    const sid = this.#host.sid
+
+    if (text === undefined && this.#listed.has(a.id) && sid) {
       try {
-        const r = await this.#host.gw.request<{ available?: boolean; text?: string; truncated?: boolean }>('subagent.tail', {
-          session_id: this.#host.sid,
-          subagent_id: a.id
-        })
+        const r = await rpc(this.#host.gw, 'subagent.tail', { session_id: sid, subagent_id: a.id })
+
+        if (!ticket.isCurrent()) {
+          return false
+        }
 
         if (r?.available && typeof r.text === 'string') {
           text = r.truncated ? mergeTail(this.#tails.get(a.id) ?? '', r.text) : r.text
@@ -517,12 +494,9 @@ export class Agents {
     return true
   }
 
+  /** Marks the card showing `a` changed (#poll and #readLog changed its row), and tells when it ended. */
   #touch(a: Subagent) {
-    const call = this.#owners().get(a)
-
-    if (call) {
-      this.#host.transcript.touchCall(call)
-    }
+    this.#host.transcript.touchCall(this.#owners().get(a))
 
     if (!isRunning(a) && !this.#ended.has(a)) {
       this.#ended.add(a)
@@ -531,117 +505,9 @@ export class Agents {
   }
 
   /** Each agent with the delegate_task call whose card shows it. */
-  #owners(): Map<Subagent, ToolCall> {
-    const owners = new Map<Subagent, ToolCall>()
-
-    for (const call of this.#host.transcript.delegations()) {
-      for (const a of call.subagents ?? []) {
-        owners.set(a, call)
-      }
-    }
-
-    return owners
+  #owners(): Owners {
+    return ownersOf(this.#host.transcript.delegations())
   }
-}
-
-/**
- * Tail `tail` (a log's last bytes, maybe cut mid-line) appended to the log text read so far: the
- * part past where the two overlap. With no overlap (the log grew past a tail between reads), the
- * gap stays and the tail's cut first line is dropped.
- */
-export function mergeTail(seen: string, tail: string): string {
-  const lines = seen.split(/(?<=\n)/)
-  let merged: string | undefined
-
-  // The overlap ends with the last lines read: the longest such run (up to 4 lines) the tail holds.
-  for (let n = Math.min(4, lines.length); n > 0 && merged === undefined; n--) {
-    const anchor = lines.slice(-n).join('')
-    const at = tail.indexOf(anchor)
-
-    if (at >= 0) {
-      merged = seen + tail.slice(at + anchor.length)
-    }
-  }
-
-  merged ??= seen + (seen && !seen.endsWith('\n') ? '\n' : '') + tail.slice(tail.indexOf('\n') + 1)
-
-  return merged.length > MAX_LOG_BYTES ? merged.slice(merged.indexOf('\n', merged.length - MAX_LOG_BYTES) + 1) : merged
-}
-
-/**
- * Each task's status in an async-delegation completion's model text: the batch block's
- * `--- ✓ TASK i/n … (status=…` headers, a lone task's `Status:` line, or a still-running fan-out's
- * one failed task. Undefined for any other text.
- */
-export function completionOutcomes(text: string): { delegationId: string; outcomes: Map<number, string> } | undefined {
-  const head = /^\[ASYNC DELEGATION (BATCH COMPLETE|COMPLETE|TASK FAILED) — ([^\],]+)(?:, task (\d+)\/\d+)?\]/.exec(text.trim())
-
-  if (!head) {
-    return undefined
-  }
-
-  const [, kind, delegationId, task] = head as unknown as [string, string, string, string | undefined]
-  const outcomes = new Map<number, string>()
-
-  if (kind === 'BATCH COMPLETE') {
-    for (const m of text.matchAll(/^--- \S+ TASK (\d+)\/\d+.*\(status=([^,)\s]+)/gm)) {
-      outcomes.set(Number(m[1]) - 1, m[2]!)
-    }
-  } else {
-    const status = /^Status: (\S+)/m.exec(text)?.[1]
-
-    if (status) {
-      outcomes.set(kind === 'TASK FAILED' ? Number(task) - 1 : 0, status)
-    }
-  }
-
-  return { delegationId: delegationId.trim(), outcomes }
-}
-
-/** Completion statuses the row's status already says; others (timeout, stalled, …) also show as its end reason. */
-const PLAIN_OUTCOMES = new Set(['cancelled', 'completed', 'error', 'failed', 'interrupted', 'success'])
-
-/** A completion's task status as a row status; undefined for one that says nothing (`?`). */
-function endedStatus(status: string): Subagent['status'] | undefined {
-  if (status === '?') {
-    return undefined
-  }
-
-  if (status === 'completed' || status === 'success' || status === 'unknown') {
-    return 'done'
-  }
-
-  return status === 'interrupted' || status === 'cancelled' ? 'cancelled' : 'failed'
-}
-
-/** The task index a top-level child's id names (`sa-<i>-…`, tools/delegate_tool.py). */
-function taskIndex(row: ListRow): number | undefined {
-  const index = Number(/^sa-(\d+)-/.exec(row.subagent_id ?? '')?.[1])
-
-  return Number.isInteger(index) ? index : undefined
-}
-
-/** The goals a delegate_task call asked for, by task index: its `tasks`, else its one `goal`. */
-function taskGoals(call: ToolCall): string[] {
-  let tasks = call.args.tasks
-
-  if (typeof tasks === 'string') {
-    try {
-      tasks = JSON.parse(tasks)
-    } catch {
-      tasks = undefined
-    }
-  }
-
-  if (Array.isArray(tasks) && tasks.length) {
-    return tasks.map(t => {
-      const goal = record(t)?.goal
-
-      return typeof goal === 'string' ? goal.trim() : ''
-    })
-  }
-
-  return typeof call.args.goal === 'string' ? [call.args.goal.trim()] : []
 }
 
 /**
@@ -653,13 +519,13 @@ async function manifestLog(delegationId: string, index: number, env = process.en
     return undefined
   }
 
-  const home = env.HERMES_HOME || join(homedir(), '.hermes')
+  const home = env['HERMES_HOME'] || join(homedir(), '.hermes')
 
   for (const root of [join(home, 'delegation_cache', 'live'), join(home, 'cache', 'delegation', 'live')]) {
     try {
       const text = await readFile(join(root, delegationId, 'manifest.json'), 'utf8')
-      const tasks = record(text.replace(/^\uFEFF/, ''))?.tasks
-      const log = Array.isArray(tasks) ? record(tasks.find(t => record(t)?.index === index))?.log : undefined
+      const tasks = record(text.replace(/^\uFEFF/, ''))?.['tasks']
+      const log = Array.isArray(tasks) ? record(tasks.find(t => record(t)?.['index'] === index))?.['log'] : undefined
 
       if (typeof log === 'string' && log) {
         return log
@@ -670,41 +536,4 @@ async function manifestLog(delegationId: string, index: number, env = process.en
   }
 
   return undefined
-}
-
-/** Folds a parsed log into its row: timeline, current tool, counts and, once it ended, the outcome. */
-export function applyLog(a: Subagent, log: LiveLog) {
-  a.log = log
-  const tools = log.entries.filter(e => e.kind === 'tool').length
-  a.toolCount = Math.max(a.toolCount, tools)
-
-  if (log.status) {
-    a.status = log.status === 'completed' ? 'done' : log.status === 'interrupted' ? 'cancelled' : 'failed'
-    a.summary = log.summary ?? a.summary
-    a.duration = log.duration !== undefined ? Math.round(log.duration * 1000) : a.duration
-    a.exitReason = log.exitReason ?? log.error ?? a.exitReason
-    a.tool = undefined
-
-    return
-  }
-
-  if (log.entries.length && a.status === 'queued') {
-    a.status = 'running'
-  }
-
-  const now = runningTool(log)
-
-  if (!now) {
-    a.tool = undefined
-
-    return
-  }
-
-  const since = clockToMs(now.at)
-
-  if (a.tool !== now.name || a.toolSince?.at !== since) {
-    a.tool = now.name
-    a.toolPreview = now.args || undefined
-    a.toolSince = { at: since }
-  }
 }

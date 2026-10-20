@@ -1,0 +1,316 @@
+// Session commands the shared gateway serves only through dedicated RPCs: its `slash.exec`
+// refuses them by name. /undo, /retry, /compress and /branch are `session.mutate` operations
+// (gateway/session_mutations.py); /save, /reload, /reload-skills and /rollback are their own
+// verbs (gateway/session_tui_ops.py, session_tui_side.py,
+// session_ancillary.py). Mirrors Hermes' ui-tui/src/app/slash/commands/{core,session,ops}.ts and
+// canonicalSessionCommands.ts / canonicalSessionControls.ts.
+import type { CompressionSummary } from '@hermes/shared/gateway-events'
+
+import { errorText } from '../core/errors.js'
+import { type StoredSessionId, storedSessionId } from '../core/ids.js'
+import { plural } from '../core/text.js'
+import { lineTokens } from '../hermes/compactions.js'
+import { type MutationResult, mutateSession } from '../hermes/mutate.js'
+import { lastTurnRewind, retryText, retryTurnRewind } from '../hermes/rewind.js'
+import { rpc } from '../wire/rpc.js'
+
+import type { ControlHost } from './control.js'
+
+/** What a session command needs beyond a control command's host; commands/host.ts's sessionHost() supplies it. */
+export interface SessionHost extends ControlHost {
+  /** The gateway is Hermes' shared one (only it serves `session.mutate`). */
+  canonical: boolean
+  /** The view has moved off the session this host was made for. */
+  stale(): boolean
+  panel(title: string, text: string): void
+  /** Re-reads the session's transcript from the gateway (after a rewind, compression or restore). */
+  reload(): Promise<void>
+  /** /compress started, changed nothing, or ended with the owner's token counts: the transcript's compaction rule. */
+  compressing(state: 'none' | 'start' | { before?: number | undefined; after?: number | undefined }): void
+  /** Sends `text` as a prompt now. */
+  send(text: string): void
+  /** Shows stored session `id` in this view; false when the view did not move to it. */
+  open(id: StoredSessionId): Promise<boolean>
+}
+
+export interface SessionCommand {
+  name: string
+  aliases?: readonly string[]
+  /** Returning false hands the command to `slash.exec` (a private gateway, which still serves it). */
+  run(host: SessionHost, arg: string): Promise<boolean | void> | boolean | void
+}
+
+/** `/undo` and `/retry`: rewind to before the newest user turn; `/retry` then resends that turn's text. */
+async function rewind(host: SessionHost, intent: 'retry' | 'undo') {
+  if (!host.canonical) {
+    return false
+  }
+
+  if (!host.sid) {
+    return host.notice(`Nothing to ${intent}.`)
+  }
+
+  const result = await mutateSession(host.gw, host.sid, 'rewind', intent === 'retry' ? retryTurnRewind : lastTurnRewind)
+  const removed = Number(result?.['rewound_count'] ?? 0)
+
+  if (host.stale()) {
+    return
+  }
+
+  if (!result || removed <= 0) {
+    return host.notice(`Nothing to ${intent}.`)
+  }
+
+  await host.reload()
+
+  if (host.stale()) {
+    return
+  }
+
+  if (intent === 'undo') {
+    return host.notice(`Undid ${plural(removed, 'message')}.`)
+  }
+
+  // The rewound turn's own text, not whatever this view typed last.
+  const target = result['target_message']
+  const text = retryText(typeof target === 'object' && target !== null && 'content' in target ? target.content : undefined)
+
+  return text ? host.send(text) : host.notice('Nothing to retry.')
+}
+
+/** The owner's report (headline, token line, note), as the native /compress prints it. */
+export function compressReport(summary: CompressionSummary | null | undefined): string {
+  const head = summary?.headline ? `${summary.noop ? '' : '✓ '}${summary.headline}` : '✓ Transcript compressed.'
+
+  return [head, ...[summary?.token_line, summary?.note].filter(Boolean).map(line => `  ${line}`)].join('\n')
+}
+
+/** `/compress [here [N] | focus | --preview]`: the raw argument is the payload's `focus`, parsed by the owner. */
+async function compress(host: SessionHost, arg: string) {
+  if (!host.canonical) {
+    return false
+  }
+
+  if (!host.sid) {
+    return host.notice('No active session.', 'warning')
+  }
+
+  if (host.busy) {
+    return host.notice('Wait for the current turn to finish (or press Esc twice) before compressing.', 'warning')
+  }
+
+  const focus = arg.trim()
+
+  // The summary is an LLM call: the compaction rule runs until it ends (a `--preview` only reads).
+  const preview = /(^|\s)--preview(\s|$)/.test(focus)
+
+  if (!preview) {
+    host.compressing('start')
+  }
+
+  let result: MutationResult
+
+  try {
+    result = await mutateSession(host.gw, host.sid, 'compress', focus ? { focus } : {})
+  } catch (e) {
+    // The view left the session: the shown transcript (and its compaction) is another's.
+    if (host.stale()) {
+      return
+    }
+
+    if (!preview) {
+      host.compressing('none')
+    }
+
+    throw e
+  }
+
+  if (host.stale()) {
+    return
+  }
+
+  if (result.status === 'preview') {
+    // `--preview` is a read-only report.
+    return host.notice(Array.isArray(result['lines']) ? result['lines'].join('\n') : 'Nothing to preview.')
+  }
+
+  const summary = result.summary
+  const num = (v: unknown) => (typeof v === 'number' && v > 0 ? v : undefined)
+  const kept = result.status === 'noop' || result.status === 'aborted' || Boolean(summary?.noop || summary?.aborted || summary?.refused_would_grow)
+
+  // The rule says what it freed; the report stays for what it does not say (a note, a refusal). A
+  // `pending` one goes on in the background, and its `ready` edge ends the rule.
+  if (result.status !== 'pending') {
+    // The shared gateway's receipt gives the counts only in its token line ("~248 → ~831 tokens").
+    const line = lineTokens(summary?.token_line ?? '')
+    host.compressing(kept ? 'none' : { after: num(result['after_tokens']) ?? line.after, before: num(result['before_tokens']) ?? line.before })
+  }
+
+  if (result.status !== 'noop') {
+    // The compressed transcript replaces the shown one, its compaction rule with it.
+    await host.reload()
+
+    if (host.stale()) {
+      return
+    }
+  }
+
+  if (kept || summary?.note || result.status === 'pending') {
+    host.notice(compressReport(summary))
+  }
+}
+
+/** `/branch [title]`: a copy of the session the view then moves to (the original keeps its history). */
+async function branch(host: SessionHost, arg: string) {
+  if (!host.canonical) {
+    return false
+  }
+
+  if (!host.sid) {
+    return host.notice('No active session.', 'warning')
+  }
+
+  const title = arg.trim()
+  const result = await mutateSession(host.gw, host.sid, 'branch', title ? { title } : {})
+  const child = result.branched_session_id
+
+  if (typeof child !== 'string' || !child) {
+    throw new Error('the gateway did not name the branch')
+  }
+
+  if (host.stale() || !(await host.open(storedSessionId(child)))) {
+    return
+  }
+
+  // Hermes names an untitled branch after its parent ("Bug hunt #2").
+  const info = await rpc(host.gw, 'session.info', { session_id: child }).catch(() => null)
+
+  host.notice(`Branched → ${info?.title?.trim() || title || child}`)
+}
+
+async function save(host: SessionHost) {
+  if (!host.sid) {
+    return host.notice('No active session: nothing to save.', 'warning')
+  }
+
+  const r = await rpc(host.gw, 'session.save', { session_id: host.sid })
+
+  host.notice(r?.file ? `Conversation saved to: ${r.file}` : 'Could not save the conversation.', r?.file ? 'info' : 'error')
+}
+
+async function reloadEnv(host: SessionHost) {
+  // The shared gateway reloads `.env` only for a session this view controls.
+  const r = await rpc(host.gw, 'reload.env', host.sid ? { session_id: host.sid } : {})
+
+  host.notice(`Reloaded .env (${plural(Number(r?.updated ?? 0), 'var')} updated).`)
+}
+
+async function reloadSkills(host: SessionHost) {
+  // Bound to the session, so the rescan sees its repo's project-local skills.
+  const r = await rpc(host.gw, 'skills.reload', host.sid ? { session_id: host.sid } : {})
+
+  host.panel('Reload Skills', r?.output?.trim() || 'Skills reloaded.')
+}
+
+/**
+ * `/reload-mcp`: the shared gateway refuses it in `slash.exec` but serves `reload.mcp`, desktop's
+ * add/toggle/repair call. Typing it is the confirmation the RPC asks for, as the desktop's button is.
+ */
+async function reloadMcp(host: SessionHost): Promise<boolean | void> {
+  if (!host.canonical) {
+    return false
+  }
+
+  const r = await rpc(host.gw, 'reload.mcp', { confirm: true, ...(host.sid ? { session_id: host.sid } : {}) })
+
+  host.panel('Reload MCP', r?.message?.trim() || 'MCP servers reloaded.')
+
+  if (r?.unavailable?.length) {
+    host.notice(`Did not connect: ${r.unavailable.join(', ')}.`, 'warning')
+  }
+}
+
+/** `/rollback [list] | diff <checkpoint> | <checkpoint> [file]`: the session's filesystem checkpoints. */
+async function rollback(host: SessionHost, arg: string) {
+  if (!host.sid) {
+    return host.notice('No active session: nothing to roll back.', 'warning')
+  }
+
+  const [first = '', ...rest] = arg.trim().split(/\s+/).filter(Boolean)
+  const sub = first.toLowerCase()
+
+  if (!sub || sub === 'list' || sub === 'ls') {
+    const r = await rpc(host.gw, 'rollback.list', { session_id: host.sid })
+    const checkpoints = r?.checkpoints ?? []
+
+    if (!r?.enabled) {
+      return host.notice('Checkpoints are not enabled.')
+    }
+
+    if (!checkpoints.length) {
+      return host.notice('No checkpoints found.')
+    }
+
+    return host.panel(
+      'Rollback checkpoints',
+      checkpoints
+        .map((c, i) => `${i + 1}. ${(c.hash ?? '').slice(0, 10)}  ${[c.timestamp, c.message].filter(Boolean).join(' · ') || '(no metadata)'}`)
+        .join('\n')
+    )
+  }
+
+  if (sub === 'diff') {
+    if (!rest[0]) {
+      return host.notice('Usage: /rollback diff <checkpoint>', 'warning')
+    }
+
+    // The plain diff: `rendered` is painted for a terminal.
+    const r = await rpc(host.gw, 'rollback.diff', { hash: rest[0], session_id: host.sid })
+    const text = [r?.stat?.trim(), r?.diff?.trim()].filter(Boolean).join('\n\n')
+
+    return text ? host.panel('Rollback diff', text) : host.notice('No changes since this checkpoint.')
+  }
+
+  const file = rest.join(' ').trim()
+  const r = await rpc(host.gw, 'rollback.restore', {
+    ...(file ? { file_path: file } : {}),
+    hash: first,
+    session_id: host.sid
+  })
+
+  if (!r?.success) {
+    return host.notice(`Rollback failed: ${r?.error || r?.['message'] || 'unknown error'}`, 'error')
+  }
+
+  // A whole-tree restore also rewinds the transcript to before the newest user turn.
+  if ((r.history_removed ?? 0) > 0) {
+    await host.reload()
+  }
+
+  host.notice(`Rollback restored ${file || 'the workspace'}: ${r.reason || r['message'] || r.restored_to || 'restored'}`)
+}
+
+/** Runs a command, reporting a gateway refusal as `/<name> failed: …`. */
+const guarded =
+  (name: string, run: SessionCommand['run']): SessionCommand['run'] =>
+  async (host, arg) => {
+    try {
+      return await run(host, arg)
+    } catch (e) {
+      host.notice(`/${name} failed: ${errorText(e)}`, 'error')
+    }
+  }
+
+const COMMANDS: readonly SessionCommand[] = [
+  { name: 'undo', run: host => rewind(host, 'undo') },
+  { name: 'retry', run: host => rewind(host, 'retry') },
+  { aliases: ['compact'], name: 'compress', run: compress },
+  { aliases: ['fork'], name: 'branch', run: branch },
+  { name: 'save', run: save },
+  { name: 'reload', run: reloadEnv },
+  { aliases: ['reload_skills'], name: 'reload-skills', run: reloadSkills },
+  { aliases: ['reload_mcp'], name: 'reload-mcp', run: reloadMcp },
+  { name: 'rollback', run: rollback }
+]
+
+export const SESSION_COMMANDS: readonly SessionCommand[] = COMMANDS.map(c => ({ ...c, run: guarded(c.name, c.run) }))

@@ -6,6 +6,8 @@ import { describe, expect, it } from 'vitest'
 
 import { extractClipboardImage, imagePathOf, type Runner, withClipboardImage } from '../hermes/clipboardImage.js'
 
+import { must } from './fakes.js'
+
 describe('imagePathOf', () => {
   const dir = mkdtempSync(join(tmpdir(), 'tern paste-'))
   const shot = join(dir, 'Screen Shot 1.png')
@@ -78,14 +80,14 @@ describe('extractClipboardImage', () => {
         }
 
         if (mac === 'true') {
-          writeFileSync(args.at(-1)!, 'png')
+          writeFileSync(must(args.at(-1)), 'png')
         }
 
         return `${mac}\n`
       }
 
       if (py === 'true') {
-        writeFileSync(args.at(-1)!, 'png')
+        writeFileSync(must(args.at(-1)), 'png')
       }
 
       return py

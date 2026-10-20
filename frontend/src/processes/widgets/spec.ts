@@ -9,6 +9,10 @@ import { setFlagsFromString } from 'node:v8'
 
 import type { Tone } from '@stencil-hq/tern'
 
+import { isDefined } from '../../core/assert.js'
+import { errorText } from '../../core/errors.js'
+
+import { betterValue, choice, cut, FIELD_NAME, fieldName, list, num, str } from './check.js'
 import type { Better } from './types.js'
 
 /** How a field's values reduce to one number. */
@@ -126,7 +130,6 @@ const MAX_PATTERN_CHARS = 400
 const MAX_LABEL_CHARS = 48
 const MAX_UNIT_CHARS = 12
 const MAX_GRID_TONES = 12
-const FIELD_NAME = /^[a-z][a-z0-9_]{0,23}$/
 const GROUP_NAME = /^[A-Za-z_][A-Za-z0-9_]{0,31}$/
 const SOURCE_ID = /^(?:\*|[A-Za-z0-9_:.-]{1,64}\*?)$/
 /** Named groups in both spellings: `(?P<name>…)` (Python, Rust) and `(?<name>…)`. */
@@ -266,7 +269,7 @@ export function compilePattern(pattern: string): RegExp {
     try {
       return new RegExp(source, 'l')
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error)
+      const message = errorText(error)
 
       throw new Error(
         /linear time/.test(message) ? `\`${pattern}\` uses lookaround or backreferences, which are not allowed` : message
@@ -312,7 +315,7 @@ export class LineMatcher {
         const m = re.exec(text)
 
         if (m) {
-          hits.push({ captures: this.#names[pattern]!.map(name => m.groups?.[name]), line, pattern })
+          hits.push({ captures: (this.#names[pattern] ?? []).map(name => m.groups?.[name]), line, pattern })
         }
       })
     })
@@ -333,11 +336,9 @@ export type Validation = { ok: true; spec: Spec } | { ok: false; errors: string[
 
 const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v)
 
-const cut = (text: string, max: number) => (text.length > max ? `${text.slice(0, max - 1)}…` : text)
-
 /** Why an answer declines to chart (its `skip`), or undefined for an answer offering a spec. */
 export function specSkip(value: unknown): string | undefined {
-  return isRecord(value) && typeof value.skip === 'string' && value.skip.trim() ? value.skip.trim() : undefined
+  return isRecord(value) && typeof value['skip'] === 'string' && value['skip'].trim() ? value['skip'].trim() : undefined
 }
 
 /** Whether a rule's `from` names the source `id`. */
@@ -351,7 +352,7 @@ export function ruleReadsSource(from: string, id: string): boolean {
 
 /** Named groups a pattern declares, in pattern order. */
 export function patternGroupNames(pattern: string): Set<string> {
-  return new Set([...pattern.matchAll(NAMED_GROUP)].map(m => m[1]!))
+  return new Set([...pattern.matchAll(NAMED_GROUP)].flatMap(m => m[1] ?? []))
 }
 
 /** The fields a rule feeds: one per named group but `key`, then its `count`. */
@@ -421,7 +422,7 @@ export function validateSpec(value: unknown, samples?: readonly SampleLines[], b
   try {
     matcher = new LineMatcher(spec.rules.map(r => r.match))
   } catch (error) {
-    errors.push(`rules: ${error instanceof Error ? error.message : String(error)}`)
+    errors.push(`rules: ${errorText(error)}`)
   }
 
   if (matcher && samples && !errors.length) {
@@ -477,14 +478,14 @@ function dryRun(spec: Spec, matcher: LineMatcher, samples: readonly SampleLines[
     seen = true
 
     for (const hit of matcher.matchLines(sample.lines)) {
-      const rule = spec.rules[hit.pattern]!
+      const rule = spec.rules[hit.pattern]
 
-      if (!ruleReadsSource(rule.from, sample.id)) {
+      if (!rule || !ruleReadsSource(rule.from, sample.id)) {
         continue
       }
 
       matches++
-      groups[hit.pattern]!.forEach((field, at) => {
+      groups[hit.pattern]?.forEach((field, at) => {
         const captured = hit.captures[at]
 
         if (field === rule.key || field === rule.text || captured === undefined) {
@@ -548,7 +549,7 @@ function checkReferences(spec: Spec, errors: string[]): Map<string, string> {
     const feed = feeds.get(field)
 
     if (!feed) {
-      return errors.push(`${where}: unknown field "${field}"; no rule has a group (?P<${field}>…) or count "${field}"`)
+      return void errors.push(`${where}: unknown field "${field}"; no rule has a group (?P<${field}>…) or count "${field}"`)
     }
 
     if (key !== undefined && feed.keyGroups.has(key)) {
@@ -636,33 +637,27 @@ function parseSpec(value: unknown, errors: string[]): Spec | undefined {
     return undefined
   }
 
-  const title = str(value.title, 'title', errors, { cut: MAX_TITLE_CHARS, required: true })
-  const rules = list(value.rules, 'rules', errors, 1, MAX_RULES)?.map((r, i) => parseRule(r, `rules[${i}]`, errors))
-  const blocks = list(value.blocks, 'blocks', errors, 1, MAX_BLOCKS)?.map((b, i) => parseBlock(b, `blocks[${i}]`, errors))
+  const title = str(value['title'], 'title', errors, { cut: MAX_TITLE_CHARS, required: true })
+  const rules = list(value['rules'], 'rules', errors, 1, MAX_RULES)?.map((r, i) => parseRule(r, `rules[${i}]`, errors))
+  const blocks = list(value['blocks'], 'blocks', errors, 1, MAX_BLOCKS)?.map((b, i) => parseBlock(b, `blocks[${i}]`, errors))
   let headline: Spec['headline']
 
-  if (value.headline !== undefined) {
-    const ref = parseValueRef(value.headline, 'headline', errors)
-    const label = isRecord(value.headline) ? str(value.headline.label, 'headline.label', errors, { cut: MAX_LABEL_CHARS }) : undefined
+  if (value['headline'] !== undefined) {
+    const ref = parseValueRef(value['headline'], 'headline', errors)
+    const label = isRecord(value['headline']) ? str(value['headline']['label'], 'headline.label', errors, { cut: MAX_LABEL_CHARS }) : undefined
 
     if (ref) {
       headline = label ? { ...ref, label } : ref
     }
   }
 
-  const stage = value.stage === undefined ? undefined : fieldName(value.stage, 'stage', errors)
+  const stage = value['stage'] === undefined ? undefined : fieldName(value['stage'], 'stage', errors)
 
-  if (errors.length || title === undefined || !rules || !blocks || rules.some(r => !r) || blocks.some(b => !b)) {
+  if (errors.length || title === undefined || !rules?.every(isDefined) || !blocks?.every(isDefined)) {
     return undefined
   }
 
-  return {
-    blocks: blocks as BlockSpec[],
-    rules: rules as Rule[],
-    title,
-    ...(headline ? { headline } : {}),
-    ...(stage ? { stage } : {})
-  }
+  return { blocks, rules, title, ...(headline ? { headline } : {}), ...(stage ? { stage } : {}) }
 }
 
 function parseRule(value: unknown, where: string, errors: string[]): Rule | undefined {
@@ -672,13 +667,13 @@ function parseRule(value: unknown, where: string, errors: string[]): Rule | unde
     return undefined
   }
 
-  const from = str(value.from, `${where}.from`, errors, { required: true })
+  const from = str(value['from'], `${where}.from`, errors, { required: true })
 
   if (from !== undefined && !SOURCE_ID.test(from)) {
     errors.push(`${where}.from: invalid source id "${from}"`)
   }
 
-  const match = str(value.match, `${where}.match`, errors, { max: MAX_PATTERN_CHARS, required: true })
+  const match = str(value['match'], `${where}.match`, errors, { max: MAX_PATTERN_CHARS, required: true })
 
   const group = (name: 'key' | 'text') => {
     const raw = str(value[name], `${where}.${name}`, errors)
@@ -692,8 +687,8 @@ function parseRule(value: unknown, where: string, errors: string[]): Rule | unde
 
   const key = group('key')
   const text = group('text')
-  const count = value.count === undefined ? undefined : fieldName(value.count, `${where}.count`, errors)
-  const scale = num(value.scale, `${where}.scale`, errors)
+  const count = value['count'] === undefined ? undefined : fieldName(value['count'], `${where}.count`, errors)
+  const scale = num(value['scale'], `${where}.scale`, errors)
 
   if (from === undefined || match === undefined) {
     return undefined
@@ -724,17 +719,17 @@ function parseValueRef(value: unknown, where: string, errors: string[]): ValueRe
     return undefined
   }
 
-  const field = fieldName(value.field, `${where}.field`, errors)
-  const key = str(value.key, `${where}.key`, errors, { max: 120 })
-  const agg = aggregation(value.agg, `${where}.agg`, errors)
-  const unit = str(value.unit, `${where}.unit`, errors, { cut: MAX_UNIT_CHARS })
-  const digits = num(value.digits, `${where}.digits`, errors)
+  const field = fieldName(value['field'], `${where}.field`, errors)
+  const key = str(value['key'], `${where}.key`, errors, { max: 120 })
+  const agg = choice(value['agg'], AGGS, `${where}.agg`, errors)
+  const unit = str(value['unit'], `${where}.unit`, errors, { cut: MAX_UNIT_CHARS })
+  const digits = num(value['digits'], `${where}.digits`, errors)
 
   if (digits !== undefined && (!Number.isInteger(digits) || digits < 0 || digits > 4)) {
     errors.push(`${where}.digits: expected an integer 0–4`)
   }
 
-  const better = betterValue(value.better, `${where}.better`, errors)
+  const better = betterValue(value['better'], `${where}.better`, errors)
 
   if (field === undefined || agg === undefined) {
     return undefined
@@ -758,44 +753,44 @@ function parseBlock(value: unknown, where: string, errors: string[]): BlockSpec 
   }
 
   const before = errors.length
-  const label = () => str(value.label, `${where}.label`, errors, { cut: MAX_LABEL_CHARS, required: true }) ?? ''
-  const unit = () => str(value.unit, `${where}.unit`, errors, { cut: MAX_UNIT_CHARS })
-  const field = () => fieldName(value.field, `${where}.field`, errors) ?? ''
+  const label = () => str(value['label'], `${where}.label`, errors, { cut: MAX_LABEL_CHARS, required: true }) ?? ''
+  const unit = () => str(value['unit'], `${where}.unit`, errors, { cut: MAX_UNIT_CHARS })
+  const field = () => fieldName(value['field'], `${where}.field`, errors) ?? ''
   const optional = <T>(entry: T | undefined, name: string): Record<string, T> => (entry === undefined ? {} : { [name]: entry })
   let block: BlockSpec | undefined
 
-  switch (value.kind) {
+  switch (value['kind']) {
     case 'spark':
       block = {
         field: field(),
         kind: 'spark',
         label: label(),
-        ...optional(str(value.key, `${where}.key`, errors, { max: 120 }), 'key'),
+        ...optional(str(value['key'], `${where}.key`, errors, { max: 120 }), 'key'),
         ...optional(unit(), 'unit'),
-        ...optional(betterValue(value.better, `${where}.better`, errors), 'better'),
-        ...optional(num(value.target, `${where}.target`, errors), 'target'),
-        ...optional(str(value.targetLabel, `${where}.targetLabel`, errors, { cut: MAX_LABEL_CHARS }), 'targetLabel'),
-        ...optional(num(value.min, `${where}.min`, errors), 'min'),
-        ...optional(num(value.max, `${where}.max`, errors), 'max')
+        ...optional(betterValue(value['better'], `${where}.better`, errors), 'better'),
+        ...optional(num(value['target'], `${where}.target`, errors), 'target'),
+        ...optional(str(value['targetLabel'], `${where}.targetLabel`, errors, { cut: MAX_LABEL_CHARS }), 'targetLabel'),
+        ...optional(num(value['min'], `${where}.min`, errors), 'min'),
+        ...optional(num(value['max'], `${where}.max`, errors), 'max')
       }
 
       break
 
     case 'bars':
       block = {
-        agg: aggregation(value.agg, `${where}.agg`, errors) ?? 'last',
+        agg: choice(value['agg'], AGGS, `${where}.agg`, errors) ?? 'last',
         field: field(),
         kind: 'bars',
         label: label(),
         ...optional(unit(), 'unit'),
-        ...optional(num(value.max, `${where}.max`, errors), 'max'),
-        ...optional(betterValue(value.better, `${where}.better`, errors), 'better')
+        ...optional(num(value['max'], `${where}.max`, errors), 'max'),
+        ...optional(betterValue(value['better'], `${where}.better`, errors), 'better')
       }
 
       break
 
     case 'meter': {
-      const whole = typeof value.total === 'string' ? Number(value.total) : value.total
+      const whole = typeof value['total'] === 'string' ? Number(value['total']) : value['total']
 
       // A meter whose whole is unknown (absent, `"?"`, null) is a plain number: drawn as a stat.
       if (!isRecord(whole) && (typeof whole !== 'number' || Number.isNaN(whole))) {
@@ -814,16 +809,16 @@ function parseBlock(value: unknown, where: string, errors: string[]): BlockSpec 
           total = whole
         }
       } else {
-        total = parseValueRef(value.total, `${where}.total`, errors)
+        total = parseValueRef(value['total'], `${where}.total`, errors)
       }
 
       block = {
-        agg: aggregation(value.agg, `${where}.agg`, errors) ?? 'last',
+        agg: choice(value['agg'], AGGS, `${where}.agg`, errors) ?? 'last',
         field: field(),
         kind: 'meter',
         label: label(),
         total: total ?? 1,
-        ...optional(str(value.key, `${where}.key`, errors, { max: 120 }), 'key'),
+        ...optional(str(value['key'], `${where}.key`, errors, { max: 120 }), 'key'),
         ...optional(unit(), 'unit')
       }
 
@@ -832,10 +827,10 @@ function parseBlock(value: unknown, where: string, errors: string[]): BlockSpec 
 
     case 'stat': {
       const items =
-        list(value.items, `${where}.items`, errors, 1, MAX_STAT_ITEMS)?.map((item, i) => {
+        list(value['items'], `${where}.items`, errors, 1, MAX_STAT_ITEMS)?.map((item, i) => {
           const at = `${where}.items[${i}]`
           const ref = parseValueRef(item, at, errors)
-          const itemLabel = isRecord(item) ? str(item.label, `${at}.label`, errors, { cut: MAX_LABEL_CHARS, required: true }) : undefined
+          const itemLabel = isRecord(item) ? str(item['label'], `${at}.label`, errors, { cut: MAX_LABEL_CHARS, required: true }) : undefined
 
           return ref && itemLabel !== undefined ? { ...ref, label: itemLabel } : undefined
         }) ?? []
@@ -848,12 +843,12 @@ function parseBlock(value: unknown, where: string, errors: string[]): BlockSpec 
     case 'grid': {
       const tones: Record<string, Tone> = {}
 
-      if (!isRecord(value.tones)) {
+      if (!isRecord(value['tones'])) {
         errors.push(`${where}.tones: expected an object of status substring → tone`)
       } else {
         let n = 0
 
-        for (const [status, tone] of Object.entries(value.tones)) {
+        for (const [status, tone] of Object.entries(value['tones'])) {
           if (++n > MAX_GRID_TONES) {
             errors.push(`${where}.tones: at most ${MAX_GRID_TONES} entries`)
 
@@ -885,112 +880,4 @@ function parseBlock(value: unknown, where: string, errors: string[]): BlockSpec 
   }
 
   return errors.length === before ? block : undefined
-}
-
-function list(value: unknown, where: string, errors: string[], min: number, max: number): unknown[] | undefined {
-  if (!Array.isArray(value)) {
-    errors.push(`${where}: expected an array`)
-
-    return undefined
-  }
-
-  if (value.length < min || value.length > max) {
-    errors.push(`${where}: expected ${min}–${max} entries, got ${value.length}`)
-
-    return undefined
-  }
-
-  return value
-}
-
-function str(value: unknown, where: string, errors: string[], o: { max?: number; cut?: number; required?: boolean } = {}): string | undefined {
-  if (value === undefined || value === null) {
-    if (o.required) {
-      errors.push(`${where}: required`)
-    }
-
-    return undefined
-  }
-
-  if (typeof value !== 'string') {
-    errors.push(`${where}: expected a string`)
-
-    return undefined
-  }
-
-  const trimmed = value.trim()
-
-  if (!trimmed) {
-    if (o.required) {
-      errors.push(`${where}: must not be empty`)
-    }
-
-    return undefined
-  }
-
-  if (o.max !== undefined && trimmed.length > o.max) {
-    errors.push(`${where}: at most ${o.max} characters`)
-
-    return undefined
-  }
-
-  // Display text (titles, labels, units) is cut to fit rather than sent back for a retry, and
-  // models sometimes write it HTML-escaped (`ACL &amp; update`).
-  return o.cut === undefined ? trimmed : cut(unescape(trimmed), o.cut)
-}
-
-const ENTITIES: Record<string, string> = { '&#39;': "'", '&amp;': '&', '&gt;': '>', '&lt;': '<', '&quot;': '"' }
-
-function unescape(text: string): string {
-  return text.replace(/&(?:amp|lt|gt|quot|#39);/g, e => ENTITIES[e] ?? e)
-}
-
-function num(value: unknown, where: string, errors: string[]): number | undefined {
-  if (value === undefined || value === null) {
-    return undefined
-  }
-
-  if (typeof value !== 'number' || !Number.isFinite(value)) {
-    errors.push(`${where}: expected a finite number`)
-
-    return undefined
-  }
-
-  return value
-}
-
-function fieldName(value: unknown, where: string, errors: string[]): string | undefined {
-  const name = str(value, where, errors, { required: true })
-
-  if (name !== undefined && !FIELD_NAME.test(name)) {
-    errors.push(`${where}: "${name}" must match ${FIELD_NAME.source}`)
-
-    return undefined
-  }
-
-  return name
-}
-
-function aggregation(value: unknown, where: string, errors: string[]): Agg | undefined {
-  if (typeof value === 'string' && (AGGS as readonly string[]).includes(value)) {
-    return value as Agg
-  }
-
-  errors.push(`${where}: expected one of ${AGGS.join(', ')}`)
-
-  return undefined
-}
-
-function betterValue(value: unknown, where: string, errors: string[]): Better | undefined {
-  if (value === undefined || value === null) {
-    return undefined
-  }
-
-  if (value === 'higher' || value === 'lower') {
-    return value
-  }
-
-  errors.push(`${where}: expected "higher" or "lower"`)
-
-  return undefined
 }

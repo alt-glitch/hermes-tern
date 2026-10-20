@@ -7,6 +7,9 @@
 import { spawn } from 'node:child_process'
 import { join } from 'node:path'
 
+import { clip } from '../../core/text.js'
+import { readAuthorReply } from '../../wire/files.js'
+
 import type { SourceSample } from './runtime.js'
 import { SPEC_SCHEMA, type Spec } from './spec.js'
 
@@ -76,8 +79,6 @@ pytest, \`tests/test_api.py::test_login PASSED [ 12%]\`:
 
 const byteLength = (s: string) => Buffer.byteLength(s) + 1
 
-const clip = (text: string, max: number) => (text.length > max ? `${text.slice(0, max - 1)}…` : text)
-
 interface PromptSource {
   id: string
   label: string
@@ -120,7 +121,7 @@ export function promptSources(sources: readonly SourceSample[]): PromptSource[] 
         }
 
         shapes.set(shape, repeats + 1)
-        const sample = clip(line, MAX_SAMPLE_LINE_CHARS)
+        const sample = clip(line, { max: MAX_SAMPLE_LINE_CHARS })
 
         if (used + byteLength(sample) > limit) {
           break
@@ -154,7 +155,7 @@ export function promptSources(sources: readonly SourceSample[]): PromptSource[] 
 /** The user message of a request. */
 export function renderPrompt(request: AuthorRequest): string {
   const fence = (body: string) => `\`\`\`\n${body}\n\`\`\``
-  const out = ['<job>', 'Background process. Command:', fence(clip(request.command.trim(), MAX_BRIEF_CHARS)), '</job>', '', '<sources>']
+  const out = ['<job>', 'Background process. Command:', fence(clip(request.command.trim(), { max: MAX_BRIEF_CHARS })), '</job>', '', '<sources>']
 
   for (const s of promptSources(request.sources)) {
     const omitted = s.omitted ? ` ${s.omitted} not shown: the middle, and repeats of a line that differ only in numbers.` : ''
@@ -176,7 +177,7 @@ export function renderPrompt(request: AuthorRequest): string {
     out.push(
       '',
       'Your previous answer was rejected:',
-      fence(clip(request.rejected.answer, 4000)),
+      fence(clip(request.rejected.answer, { max: 4000 })),
       'Problems:',
       ...request.rejected.errors.map(e => `- ${e}`),
       'Fix every problem and call `respond` again.'
@@ -192,9 +193,9 @@ export function renderPrompt(request: AuthorRequest): string {
  * when the launcher named no interpreter or checkout to run it with.
  */
 export function hermesAuthor(env: NodeJS.ProcessEnv = process.env): Author | undefined {
-  const python = env.HERMES_PYTHON?.trim()
-  const root = env.HERMES_PYTHON_SRC_ROOT
-  const ui = env.HERMES_TUI_DIR
+  const python = env['HERMES_PYTHON']?.trim()
+  const root = env['HERMES_PYTHON_SRC_ROOT']
+  const ui = env['HERMES_TUI_DIR']
 
   if (!python || !root || !ui) {
     return undefined
@@ -218,12 +219,14 @@ export function hermesAuthor(env: NodeJS.ProcessEnv = process.env): Author | und
       // A script that dies before reading its request closes the pipe; `close` says how it ended.
       child.stdin.on('error', () => undefined)
       child.on('close', () => {
-        try {
-          const reply = JSON.parse(stdout.trim().split('\n').at(-1) ?? '') as { answer?: unknown; error?: string; unavailable?: boolean }
+        const reply = readAuthorReply(stdout)
 
-          return reply.unavailable ? resolve(undefined) : reply.error ? reject(new Error(reply.error)) : resolve(reply.answer)
-        } catch {
+        if (!reply) {
           reject(new Error('widget_author.py gave no answer'))
+        } else if (reply.kind === 'error') {
+          reject(new Error(reply.message))
+        } else {
+          resolve(reply.kind === 'answer' ? reply.answer : undefined)
         }
       })
       child.stdin.end(JSON.stringify({ schema: SPEC_SCHEMA, system: SYSTEM_PROMPT, user: renderPrompt(request) }))

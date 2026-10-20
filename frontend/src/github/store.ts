@@ -2,16 +2,21 @@
 // session's branch (its checkout or worktree), and the other layers of a GitHub stack any of them
 // sits in, each read from GitHub. Polling only, as T3 Code does: every minute while one is open, every 30 s while its
 // checks run, and at once when the sheet opens or a PR is linked. Comments and files are read when
-// the sheet shows them.
+// the sheet shows them. A read that awaited across an adopt (another session) drops its answer.
 
+import type { Ticket } from '../core/epoch.js'
+import { errorText } from '../core/errors.js'
+import { type DurableSessionId, type PrKey, prKey, type StackKey, stackKey } from '../core/ids.js'
+import { Poller } from '../core/poller.js'
 import type { ToolCall } from '../model.js'
 
-import { type BranchTarget, branchPullRequest, branchTarget, parseStacks, type Stack, stackQuery } from './branch.js'
+import { type BranchTarget, branchPullRequest, branchTarget, parseStacks, type Stack, stackNumber, stackQuery } from './branch.js'
 import { type GitHub, github } from './client.js'
-import { linkedFromResult, prKey, storedLinks } from './links.js'
+import { linkedFromResult, storedLinks } from './links.js'
 import {
   ACTIVITY_QUERY,
   type ActivityItem,
+  batchAnswers,
   batchQuery,
   checksState,
   failedRuns,
@@ -23,6 +28,7 @@ import {
   type PrRef,
   type PullRequest
 } from './pullRequest.js'
+import { lastRead, type Remote, type Settled } from './remote.js'
 
 export const OPEN_MS = 60_000
 export const PENDING_MS = 30_000
@@ -30,8 +36,8 @@ export const PENDING_MS = 30_000
 const BATCH = 20
 
 export interface PullRequestsHost {
-  /** The session the links belong to (the stored session id the link tools see). */
-  sid(): string | null
+  /** The session the links belong to (the stored session id the link tools see, else its runtime id). */
+  sid(): DurableSessionId | null
   /** The session's working directory, for its branch's PR. */
   cwd(): string | null
   changed(): void
@@ -47,38 +53,62 @@ const BRANCH_MISS_MS = 300_000
 /** GraphQL's answer when the schema has no `stack` field (GHES, an older API). */
 const NO_STACK_FIELD = /Field '?stack'? doesn't exist/i
 
-/** What the sheet knows of one linked PR. */
+/** What the store knows of one PR, whichever session lists it. */
 export interface Entry {
   ref: PrRef
-  source: Source
-  /** The native stack it is a layer of. */
-  stack?: Stack
-  pr?: PullRequest
+  pr?: PullRequest | undefined
   /** GitHub's answer when it could not read this PR. */
-  error?: string
-  activity?: ActivityItem[]
-  files?: PrFile[]
-  /** The `updatedAt` the activity was read at; a newer PR reads it again. */
-  activityAt?: string
-  /** The `updatedAt` the files were read at, kept apart: one tab's read says nothing of the other. */
-  filesAt?: string
-  /** GitHub's answer when the last activity read failed. */
-  activityError?: string
-  /** GitHub's answer when the last files read failed. */
-  filesError?: string
+  error?: string | undefined
+  /** The Conversation tab's comments, reviews and commits. */
+  activity: Remote<ActivityItem[]>
+  /** The Files tab's files, kept apart: one tab's read says nothing of the other. */
+  files: Remote<PrFile[]>
 }
 
-/** The data a tab reads on demand. */
-type Detail = 'activity' | 'files'
+/** One PR on the session's list: a copy of its entry, and why and where it is listed. */
+export interface Listed extends Entry {
+  readonly source: Source
+  /** The native stack it is a layer of. */
+  readonly stack?: Stack | undefined
+}
 
-const STAMP = { activity: 'activityAt', files: 'filesAt' } as const
-const FAILURE = { activity: 'activityError', files: 'filesError' } as const
+/** A PR on the list before anything was read of it. */
+const blank = (ref: PrRef): Entry => ({ activity: { kind: 'idle' }, files: { kind: 'idle' }, ref })
+
+/** One tab's data on an entry, and how it is read. */
+interface Tab<T> {
+  get(e: Entry): Remote<T>
+  set(e: Entry, remote: Remote<T>): void
+  read(e: Entry): Promise<T>
+}
+
 /** How soon a failed activity or files read is tried again. */
 const RETRY_MS = 30_000
 
+/**
+ * Whether a tab's settled data wants a read for the PR at `updatedAt`: not once read for that
+ * update, and after a failed read only once `RETRY_MS` has passed.
+ */
+function due<T>(remote: Settled<T>, updatedAt: string, now: number): boolean {
+  switch (remote.kind) {
+    case 'idle':
+      return true
+
+    case 'ready':
+      return remote.at !== updatedAt
+
+    case 'failed':
+      return remote.last?.at !== updatedAt && now - remote.failedAt >= RETRY_MS
+  }
+}
+
+/** How many rows a page of the files answer holds; a page that is not a list ends the reading. */
+const pageLength = (rows: unknown) => (Array.isArray(rows) ? rows.length : 0)
+
 export type PrAction = 'close' | 'draft' | 'merge' | 'ready' | 'reopen' | 'rerun' | 'update-branch'
 
-const MUTATIONS: Partial<Record<PrAction, string>> = {
+/** The GraphQL mutation of each action but `rerun` (a REST call per failed run). */
+const MUTATIONS: Record<Exclude<PrAction, 'rerun'>, string> = {
   close: 'mutation($id: ID!) { closePullRequest(input: {pullRequestId: $id}) { clientMutationId } }',
   draft: 'mutation($id: ID!) { convertPullRequestToDraft(input: {pullRequestId: $id}) { clientMutationId } }',
   merge:
@@ -92,32 +122,30 @@ const MUTATIONS: Partial<Record<PrAction, string>> = {
 export class PullRequests {
   readonly #host: PullRequestsHost
   readonly #gh: GitHub
-  readonly #links: (sid: string) => PrRef[]
-  #sid: string | null = null
+  readonly #links: (sid: DurableSessionId) => PrRef[]
+  #sid: DurableSessionId | null = null
   #refs: PrRef[] = []
-  readonly #entries = new Map<string, Entry>()
-  #branch: { at: number; cwd: string; ref?: PrRef; target?: BranchTarget } | undefined
+  readonly #entries = new Map<PrKey, Entry>()
+  #branch: { at: number; cwd: string; ref?: PrRef | undefined; target?: BranchTarget | undefined } | undefined
   /** Native stacks by key, from the PRs' stack membership. */
-  readonly #stacks = new Map<string, Stack>()
+  readonly #stacks = new Map<StackKey, Stack>()
   /** Hosts whose GraphQL has no stack fields (GHES): not asked again. */
   readonly #noStacks = new Set<string>()
   readonly #branchOf: (cwd: string) => Promise<BranchTarget | undefined>
   /** Why nothing could be read at all (no token). */
   #error: string | undefined
-  #timer: NodeJS.Timeout | undefined
-  #loading = false
-  #again = false
-  #disposed = false
-  readonly #busy = new Set<string>()
-  /** The activity and files reads in flight (`key:activity`, `key:files`). */
-  readonly #reading = new Set<string>()
-  /** When each of those last failed. */
-  readonly #failedAt = new Map<string, number>()
+  /** The poll: every minute while a listed PR is open, every 30 s while its checks run. */
+  readonly #poller: Poller = new Poller({
+    cadence: () => this.#cadence(),
+    run: ticket => this.#read(ticket),
+    settled: () => this.#host.changed()
+  })
+  readonly #busy = new Set<PrKey>()
 
   constructor(
     host: PullRequestsHost,
     gh: GitHub = github(),
-    links: (sid: string) => PrRef[] = sid => storedLinks(sid),
+    links: (sid: DurableSessionId) => PrRef[] = sid => storedLinks(sid),
     branchOf: (cwd: string) => Promise<BranchTarget | undefined> = branchTarget
   ) {
     this.#host = host
@@ -126,40 +154,12 @@ export class PullRequests {
     this.#branchOf = branchOf
   }
 
-  /** The linked PRs (oldest link first), then the branch's PR, then stack layers none of them are. */
-  entries(): Entry[] {
-    const seen = new Set<string>()
-    const out: Entry[] = []
-    const add = (ref: PrRef, source: Source) => {
-      const key = prKey(ref)
-
-      if (!seen.has(key)) {
-        seen.add(key)
-        const e = this.#entry(ref)
-        e.source = source
-        out.push(e)
-      }
-    }
-
-    this.#refs.forEach(r => add(r, 'linked'))
-
-    if (this.#branch?.ref) {
-      add(this.#branch.ref, 'branch')
-    }
-
-    const inStack = (s: Stack, ref: PrRef) => ref.host === s.host && ref.repository === s.repository && s.layers.some(l => l.number === ref.number)
-
-    for (const s of this.#stacks.values()) {
-      if (out.some(e => inStack(s, e.ref))) {
-        s.layers.forEach(l => add({ host: s.host, number: l.number, repository: s.repository, url: `https://${s.host}/${s.repository}/pull/${l.number}` }, 'stack'))
-      }
-    }
-
-    for (const e of out) {
-      e.stack = [...this.#stacks.values()].find(s => inStack(s, e.ref))
-    }
-
-    return out
+  /**
+   * The linked PRs (oldest link first), then the branch's PR, then stack layers none of them are:
+   * each a copy of its entry with its source and stack. Writes nothing.
+   */
+  entries(): Listed[] {
+    return this.#list().map(({ ref, source, stack }) => ({ ...(this.#entries.get(prKey(ref)) ?? blank(ref)), source, stack }))
   }
 
   /** The native stacks the list's PRs sit in. */
@@ -167,8 +167,27 @@ export class PullRequests {
     return [...this.#stacks.values()]
   }
 
-  get(key: string): Entry | undefined {
-    return this.#entries.get(key)
+  /** The key of the listed PR whose key reads `raw` (a node id's), if one is listed. */
+  keyOf(raw: string): PrKey | undefined {
+    return this.#list()
+      .map(l => prKey(l.ref))
+      .find(key => key === raw)
+  }
+
+  /**
+   * What the store knows of `key`: its stored entry, else a blank one while it is listed but not
+   * read yet (a fresh link, an adopt), so the sheet says 'Reading GitHub…' as the list does. Writes nothing.
+   */
+  get(key: PrKey): Entry | undefined {
+    const stored = this.#entries.get(key)
+
+    if (stored) {
+      return stored
+    }
+
+    const listed = this.#list().find(l => prKey(l.ref) === key)
+
+    return listed && blank(listed.ref)
   }
 
   get error(): string | undefined {
@@ -176,14 +195,14 @@ export class PullRequests {
   }
 
   get loading(): boolean {
-    return this.#loading
+    return this.#poller.running
   }
 
-  busy(key: string): boolean {
+  busy(key: PrKey): boolean {
     return this.#busy.has(key)
   }
 
-  /** A session was adopted (a resume, a switch): its stored links replace the old ones. */
+  /** A session was adopted (a resume, a switch): its stored links replace the old ones, and a read in flight drops its answer. */
   adopt() {
     const sid = this.#host.sid()
 
@@ -191,6 +210,7 @@ export class PullRequests {
       return
     }
 
+    this.#poller.adopt(sid)
     this.#sid = sid
     this.#refs = sid ? this.#links(sid) : []
     this.#branch = undefined
@@ -238,39 +258,45 @@ export class PullRequests {
 
   /** Reads every linked PR now. */
   poke() {
-    clearTimeout(this.#timer)
-    this.#timer = undefined
-    void this.#tick()
+    this.#poller.poke()
   }
 
   dispose() {
-    this.#disposed = true
-    clearTimeout(this.#timer)
+    this.#poller.dispose()
   }
 
   /** Comments, reviews and commits of `key`, read once per PR update. */
-  activity(key: string): Promise<void> {
-    return this.#detail(key, 'activity', async e => {
-      const [o, r] = e.ref.repository.split('/')
-      e.activity = parseActivity(await this.#gh.graphql(e.ref.host, ACTIVITY_QUERY, { n: e.ref.number, o, r }))
+  activity(key: PrKey): Promise<void> {
+    return this.#detail(key, {
+      get: e => e.activity,
+      read: async e => {
+        const [o, r] = e.ref.repository.split('/')
+
+        return parseActivity(await this.#gh.graphql(e.ref.host, ACTIVITY_QUERY, { n: e.ref.number, o, r }))
+      },
+      set: (e, remote) => (e.activity = remote)
     })
   }
 
   /** The changed files of `key` with their patches (the first 300). */
-  files(key: string): Promise<void> {
-    return this.#detail(key, 'files', async e => {
-      const files: PrFile[] = []
+  files(key: PrKey): Promise<void> {
+    return this.#detail(key, {
+      get: e => e.files,
+      read: async e => {
+        const files: PrFile[] = []
 
-      for (let page = 1; page <= 3; page++) {
-        const rows = await this.#gh.rest<unknown[]>(e.ref.host, 'GET', `/repos/${e.ref.repository}/pulls/${e.ref.number}/files?per_page=100&page=${page}`)
-        files.push(...parseFiles(rows))
+        for (let page = 1; page <= 3; page++) {
+          const rows = await this.#gh.rest(e.ref.host, 'GET', `/repos/${e.ref.repository}/pulls/${e.ref.number}/files?per_page=100&page=${page}`)
+          files.push(...parseFiles(rows))
 
-        if (rows.length < 100) {
-          break
+          if (pageLength(rows) < 100) {
+            break
+          }
         }
-      }
 
-      e.files = files
+        return files
+      },
+      set: (e, remote) => (e.files = remote)
     })
   }
 
@@ -278,35 +304,29 @@ export class PullRequests {
    * Reads one tab's data of `key` once per PR update, so the sheet may ask on every frame: one read
    * at a time, and a failed one (its error on the entry) again after `RETRY_MS`.
    */
-  async #detail(key: string, what: Detail, read: (e: Entry) => Promise<void>): Promise<void> {
+  async #detail<T>(key: PrKey, tab: Tab<T>): Promise<void> {
     const e = this.#entries.get(key)
-    const id = `${key}:${what}`
-    const failed = this.#failedAt.get(id)
+    const was = e && tab.get(e)
 
-    if (!e?.pr || this.#reading.has(id) || (e[what] && e[STAMP[what]] === e.pr.updatedAt) || (failed && Date.now() - failed < RETRY_MS)) {
+    if (!e?.pr || !was || was.kind === 'loading' || !due(was, e.pr.updatedAt, Date.now())) {
       return
     }
 
     const at = e.pr.updatedAt
-    this.#reading.add(id)
+    tab.set(e, { kind: 'loading', was })
 
     try {
-      await read(e)
-      e[STAMP[what]] = at
-      e[FAILURE[what]] = undefined
-      this.#failedAt.delete(id)
+      tab.set(e, { at, kind: 'ready', value: await tab.read(e) })
     } catch (error) {
-      e[FAILURE[what]] = error instanceof Error ? error.message : String(error)
-      this.#failedAt.set(id, Date.now())
+      tab.set(e, { error: errorText(error), failedAt: Date.now(), kind: 'failed', last: lastRead(was) })
       throw error
     } finally {
-      this.#reading.delete(id)
       this.#host.changed()
     }
   }
 
   /** Changes PR `key` on GitHub; throws GitHub's error. `merge` uses `method`, the repository's first by default. */
-  async act(action: PrAction, key: string, method?: MergeMethod): Promise<void> {
+  async act(action: PrAction, key: PrKey, method?: MergeMethod): Promise<void> {
     const pr = this.#entries.get(key)?.pr
 
     if (!pr) {
@@ -328,7 +348,7 @@ export class PullRequests {
           await this.#gh.rest(pr.host, 'POST', `/repos/${pr.repository}/actions/runs/${id}/rerun-failed-jobs`)
         }
       } else {
-        await this.#gh.graphql(pr.host, MUTATIONS[action]!, {
+        await this.#gh.graphql(pr.host, MUTATIONS[action], {
           id: pr.id,
           ...(action === 'merge' ? { m: (method ?? pr.mergeMethods[0] ?? 'merge').toUpperCase(), oid: pr.headOid } : {}),
           ...(action === 'update-branch' ? { oid: pr.headOid } : {})
@@ -340,53 +360,64 @@ export class PullRequests {
     }
   }
 
-  #entry(ref: PrRef): Entry {
-    const key = prKey(ref)
-    let e = this.#entries.get(key)
+  /** The list, as entries() gives it, without the entries: each PR's ref, source and stack. */
+  #list(): { ref: PrRef; source: Source; stack: Stack | undefined }[] {
+    const seen = new Set<PrKey>()
+    const out: { ref: PrRef; source: Source }[] = []
+    const add = (ref: PrRef, source: Source) => {
+      const key = prKey(ref)
 
-    if (!e) {
-      e = { ref, source: 'linked' }
-      this.#entries.set(key, e)
+      if (!seen.has(key)) {
+        seen.add(key)
+        out.push({ ref, source })
+      }
     }
 
-    return e
+    this.#refs.forEach(r => add(r, 'linked'))
+
+    if (this.#branch?.ref) {
+      add(this.#branch.ref, 'branch')
+    }
+
+    const inStack = (s: Stack, ref: PrRef) => ref.host === s.host && ref.repository === s.repository && s.layers.some(l => l.number === ref.number)
+
+    for (const s of this.#stacks.values()) {
+      if (out.some(e => inStack(s, e.ref))) {
+        s.layers.forEach(l => add({ host: s.host, number: l.number, repository: s.repository, url: `https://${s.host}/${s.repository}/pull/${l.number}` }, 'stack'))
+      }
+    }
+
+    return out.map(e => ({ ...e, stack: [...this.#stacks.values()].find(s => inStack(s, e.ref)) }))
   }
 
-  #schedule() {
-    clearTimeout(this.#timer)
+  /** The stored entry of each listed PR, made for those not read yet: what a read writes into. */
+  #listedEntries(): Entry[] {
+    return this.#list().map(({ ref }) => {
+      const key = prKey(ref)
+      let e = this.#entries.get(key)
+
+      if (!e) {
+        e = blank(ref)
+        this.#entries.set(key, e)
+      }
+
+      return e
+    })
+  }
+
+  /** How long until the next read: none while no listed PR is open. */
+  #cadence(): number | 'off' {
     const open = this.entries().filter(e => !e.pr || e.pr.state === 'open')
 
-    if (this.#disposed || !open.length) {
-      return
+    if (!open.length) {
+      return 'off'
     }
 
-    const pending = open.some(e => e.pr && checksState(e.pr.checks) === 'pending')
-    this.#timer = setTimeout(() => void this.#tick(), pending ? PENDING_MS : OPEN_MS)
-  }
-
-  async #tick() {
-    if (this.#loading) {
-      this.#again = true
-
-      return
-    }
-
-    this.#loading = true
-
-    try {
-      do {
-        this.#again = false
-        await this.#read()
-      } while (this.#again)
-    } finally {
-      this.#loading = false
-      this.#schedule()
-      this.#host.changed()
-    }
+    return open.some(e => e.pr && checksState(e.pr.checks) === 'pending') ? PENDING_MS : OPEN_MS
   }
 
   /** The branch's PR, looked up again once its last answer is old or the session moved. */
-  async #readBranch() {
+  async #readBranch(ticket: Ticket) {
     const cwd = this.#host.cwd()
     const now = Date.now()
     const b = this.#branch
@@ -398,6 +429,11 @@ export class PullRequests {
     }
 
     const target = await this.#branchOf(cwd)
+
+    if (!ticket.isCurrent()) {
+      return
+    }
+
     const same = b && b.cwd === cwd && b.target?.head === target?.head && b.target?.repository === target?.repository
 
     if (same && now - b.at < (b.ref ? BRANCH_HIT_MS : BRANCH_MISS_MS)) {
@@ -413,11 +449,13 @@ export class PullRequests {
       ref = same ? b.ref : undefined
     }
 
-    this.#branch = { at: now, cwd, ref, target }
+    if (ticket.isCurrent()) {
+      this.#branch = { at: now, cwd, ref, target }
+    }
   }
 
   /** Which PRs sit in a GitHub stack, and that stack's layers; new layers are read next round. */
-  async #readStacks(entries: Entry[]): Promise<boolean> {
+  async #readStacks(entries: Entry[], ticket: Ticket): Promise<boolean> {
     const before = [...this.#stacks.keys()].join()
     const byHost = new Map<string, Entry[]>()
 
@@ -429,26 +467,26 @@ export class PullRequests {
 
     for (const [host, list] of byHost) {
       const { query, variables } = stackQuery(list.slice(0, BATCH).map(e => e.ref))
-      let data: Record<string, { pullRequest?: { stack?: { number?: number } | null } | null } | null>
+      let answers: Record<string, unknown>
 
       try {
-        data = await this.#gh.graphql(host, query, variables)
+        answers = batchAnswers.parse(await this.#gh.graphql(host, query, variables))
       } catch (error) {
         // Only a schema without the field turns stacks off; a timeout, a 5xx or a rate limit tries again next round.
-        if (NO_STACK_FIELD.test(error instanceof Error ? error.message : String(error))) {
+        if (NO_STACK_FIELD.test(errorText(error))) {
           this.#noStacks.add(host)
         }
 
         continue
       }
 
-      const asked = new Set<string>()
+      const asked = new Set<StackKey>()
 
       for (const [i, e] of list.slice(0, BATCH).entries()) {
-        const n = data[`p${i}`]?.pullRequest?.stack?.number
-        const key = `${host}/${e.ref.repository}#stack:${n}`
+        const n = stackNumber(answers[`p${i}`])
+        const key = n === undefined ? undefined : stackKey(host, e.ref.repository, n)
 
-        if (typeof n !== 'number' || asked.has(key)) {
+        if (!key || asked.has(key)) {
           continue
         }
 
@@ -456,6 +494,12 @@ export class PullRequests {
 
         try {
           const rows = await this.#gh.rest(host, 'GET', `/repos/${e.ref.repository}/stacks?pull_request=${e.ref.number}`)
+
+          // The last session's stacks are not the new one's.
+          if (!ticket.isCurrent()) {
+            return false
+          }
+
           parseStacks(host, e.ref.repository, rows).forEach(s => this.#stacks.set(s.key, s))
         } catch {
           // A stack we cannot read stays a single PR.
@@ -466,18 +510,24 @@ export class PullRequests {
     return [...this.#stacks.keys()].join() !== before
   }
 
-  async #read() {
-    await this.#readBranch()
-    await this.#readPrs()
+  /** One round: the branch's PR, every listed PR, and the stacks they sit in; it stops once another session is adopted. */
+  async #read(ticket: Ticket) {
+    await this.#readBranch(ticket)
+
+    if (!ticket.isCurrent()) {
+      return
+    }
+
+    await this.#readPrs(ticket)
 
     // Stack layers not read yet: read them now, once.
-    if (await this.#readStacks(this.entries())) {
-      await this.#readPrs()
+    if (ticket.isCurrent() && (await this.#readStacks(this.#listedEntries(), ticket)) && ticket.isCurrent()) {
+      await this.#readPrs(ticket)
     }
   }
 
-  async #readPrs() {
-    const entries = this.entries()
+  async #readPrs(ticket: Ticket) {
+    const entries = this.#listedEntries()
     const byHost = new Map<string, Entry[]>()
 
     for (const e of entries) {
@@ -492,15 +542,23 @@ export class PullRequests {
         const { query, variables } = batchQuery(chunk.map(e => e.ref))
 
         try {
-          const data = await this.#gh.graphql<Record<string, unknown>>(host, query, variables)
+          const answers = batchAnswers.parse(await this.#gh.graphql(host, query, variables))
+
+          if (!ticket.isCurrent()) {
+            return
+          }
 
           chunk.forEach((e, j) => {
-            const pr = parsePullRequest(e.ref, data[`p${j}`])
+            const pr = parsePullRequest(e.ref, answers[`p${j}`])
             e.pr = pr ?? e.pr
             e.error = pr ? undefined : 'GitHub has no such pull request, or this token cannot see it.'
           })
         } catch (error) {
-          failed = error instanceof Error ? error.message : String(error)
+          if (!ticket.isCurrent()) {
+            return
+          }
+
+          failed = errorText(error)
           chunk.forEach(e => (e.error = failed))
         }
       }

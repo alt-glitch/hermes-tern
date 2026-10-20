@@ -3,18 +3,18 @@
 // changes and shown as a caret-anchored list (`omp.autocomplete`).
 // Tab accepts; Enter accepts a row that changes the token, else submits.
 
-import type { CompletionItem } from '@hermes/shared/gateway-events'
+import type { CompleteSlashResult, CompletionItem } from '@hermes/shared/gateway-events'
 import type { JSX, Key } from '@stencil-hq/tern'
-import { scoreSlashMenuItem } from '@tui/app/slash/fuzzyScore.js'
-import { applyCompletion, completionToApplyOnSubmit } from '@tui/domain/slash.js'
 import type { GatewayClient } from '@tui/gatewayClient.js'
 
-import { HIDDEN_COMMANDS, localCommands } from '../commands.js'
-import { completionRequestForInput } from '../hermes/completion.js'
+import { HIDDEN_COMMANDS, localCommands } from '../commands/local.js'
+import { optional } from '../core/assert.js'
+import type { Composer } from '../draft/composer.js'
+import { applyCompletion, completionRequestForInput, completionToApplyOnSubmit, scoreSlashMenuItem } from '../hermes/completion.js'
 import { oneLine } from '../view/describe.js'
+import { rpc } from '../wire/rpc.js'
 
-import type { Composer } from '../composer.js'
-import type { OverlayHost } from '../overlay.js'
+import type { OverlayHost } from './overlay.js'
 
 const DEBOUNCE_MS = 60
 
@@ -88,9 +88,9 @@ export class Completion {
       const params =
         request.method === 'complete.slash' && sid ? { ...request.params, session_id: sid } : request.params
 
-      this.#gw
-        .request<{ items?: CompletionItem[]; replace_from?: number | null }>(request.method, params)
-        .then(r => {
+      rpc(this.#gw, request.method, params)
+        // Either method's answer: only complete.slash's says where its replacement starts.
+        .then((r: CompleteSlashResult) => {
           if (gen !== this.#gen || composer.text.slice(0, composer.cursor) !== before) {
             return
           }
@@ -177,9 +177,10 @@ export class Completion {
 
         return this.#accept(next)
       }
-    }
 
-    return false
+      default:
+        return false
+    }
   }
 
   /** The overlay nodes for the `layer` region (none while closed). */
@@ -203,9 +204,9 @@ export class Completion {
           >
             {this.items.map((item, i) => (
               <item
-                detail={item.meta && item.meta !== 'dir' ? oneLine(item.meta) : undefined}
-                icon={iconOf(item)}
                 key={String(i)}
+                {...optional('detail', item.meta && item.meta !== 'dir' ? oneLine(item.meta) : undefined)}
+                icon={iconOf(item)}
                 label={labelOf(item, this.#for, this.#replaceFrom)}
               />
             ))}
@@ -347,13 +348,13 @@ function labelOf(item: CompletionItem, typed: string, replaceFrom: number) {
   const at = query ? label.toLowerCase().indexOf(query.toLowerCase()) : -1
 
   if (at < 0) {
-    return [{ s: base, t: label }]
+    return [{ ...optional('s', base), t: label }]
   }
 
   return [
-    { s: base, t: label.slice(0, at) },
+    { ...optional('s', base), t: label.slice(0, at) },
     { s: base ? `${base} mark` : 'mark', t: label.slice(at, at + query.length) },
-    { s: base, t: label.slice(at + query.length) }
+    { ...optional('s', base), t: label.slice(at + query.length) }
   ].filter(s => s.t)
 }
 

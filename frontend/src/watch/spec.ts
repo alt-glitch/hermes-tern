@@ -6,7 +6,9 @@
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 
+import type { LiveSessionId, StoredSessionId } from '../core/ids.js'
 import type { Subagent } from '../model.js'
+import { readWatchSpecText } from '../wire/files.js'
 
 const run = promisify(execFile)
 
@@ -16,29 +18,26 @@ export const WATCH_ENV = 'HERMES_TERN_WATCH'
 /** Which agent a watcher shows. */
 export interface WatchSpec {
   /** The delegating session's runtime id (for subagent.list / steer / interrupt). */
-  sid: string
+  sid: LiveSessionId
   /** Its stored id, when it differs (children name either as their parent). */
-  stored?: string
+  stored?: StoredSessionId | undefined
   subagent: string
   name: string
   goal: string
   index: number
-  log?: string
+  log?: string | undefined
   startedAt: number
 }
 
+/** The spec this process was launched to watch; undefined for a chat pane (or a spec it cannot read). */
 export function readWatchSpec(env: NodeJS.ProcessEnv = process.env): WatchSpec | undefined {
-  try {
-    const raw = env[WATCH_ENV]
-    const spec = raw ? (JSON.parse(raw) as WatchSpec) : undefined
-
-    return spec && typeof spec.sid === 'string' && typeof spec.subagent === 'string' ? spec : undefined
-  } catch {
-    return undefined
-  }
+  return readWatchSpecText(env[WATCH_ENV])
 }
 
-export function specOf(a: Subagent, name: string, sid: string, stored: string | null): WatchSpec {
+export function specOf(a: Subagent, name: string, sid: LiveSessionId, stored: StoredSessionId | null): WatchSpec {
+  // The two kinds differ in general; the shared gateway names one id for both.
+  const live: string = sid
+
   return {
     goal: a.goal,
     index: a.index,
@@ -46,7 +45,7 @@ export function specOf(a: Subagent, name: string, sid: string, stored: string | 
     name,
     sid,
     startedAt: a.startedAt,
-    stored: stored && stored !== sid ? stored : undefined,
+    stored: stored && stored !== live ? stored : undefined,
     subagent: a.id
   }
 }
@@ -59,10 +58,10 @@ let sidebar: string | undefined
  * isn't a Tern pane Tern's CLI can reach (over ssh, say) or the launcher named no interpreter.
  */
 function hermesSplit(env: NodeJS.ProcessEnv, vars: readonly string[], args: readonly string[]) {
-  const pane = env.TERN_PANE
-  const python = env.HERMES_PYTHON
+  const pane = env['TERN_PANE']
+  const python = env['HERMES_PYTHON']
   // The `hermes` wrapper puts its checkout on sys.path; the bare interpreter needs it said.
-  const src = env.HERMES_PYTHON_SRC_ROOT
+  const src = env['HERMES_PYTHON_SRC_ROOT']
 
   if (!pane || !python || !src) {
     return undefined
@@ -71,7 +70,7 @@ function hermesSplit(env: NodeJS.ProcessEnv, vars: readonly string[], args: read
   const command = [
     'env',
     `PYTHONPATH=${src}`,
-    ...(env.HERMES_HOME ? [`HERMES_HOME=${env.HERMES_HOME}`] : []),
+    ...(env['HERMES_HOME'] ? [`HERMES_HOME=${env['HERMES_HOME']}`] : []),
     ...vars,
     python,
     '-m',

@@ -5,39 +5,39 @@
 
 import { readFile } from 'node:fs/promises'
 
-import type { Key, Session, Surface, TspEvent } from '@stencil-hq/tern'
+import type { Key, Session, TspEvent } from '@stencil-hq/tern'
 import type { GatewayClient } from '@tui/gatewayClient.js'
 import type { AnyGatewayEvent } from '@tui/gatewayTypes.js'
 
+import { agentNode } from '../agents/agentRow.js'
 import { parseLiveLog } from '../agents/liveLog.js'
-import { applyLog, isRunning } from '../agents/store.js'
-import { Composer } from '../composer.js'
+import { applyLog, isRunning } from '../agents/rows.js'
+import { paletteFor } from '../chrome/palette.js'
+import { errorText } from '../core/errors.js'
+import { subagentKey } from '../core/ids.js'
+import { Poller } from '../core/poller.js'
+import { RenderScheduler } from '../core/scheduler.js'
+import { Composer } from '../draft/composer.js'
 import { Media } from '../media.js'
 import type { Subagent } from '../model.js'
-import { paletteFor } from '../palette.js'
-import { loadSettings } from '../settings.js'
-import { Transcript } from '../transcript.js'
-import { dockNodes } from '../view/dock.js'
+import { fileSettings, type SettingsSource } from '../settings.js'
+import { INPUT_ID, SurfaceHost } from '../surface/host.js'
+import { runInput } from '../surface/input.js'
+import { Transcript } from '../transcript/store.js'
+import { type DockActions, dockNodes } from '../view/dock.js'
 import { STYLES } from '../view/styles.js'
-import { agentNode } from '../view/tools.js'
+import { noticeSink, onCardFault } from '../view/tools/faults.js'
 import { entryNode } from '../view/transcript.js'
+import { rpc } from '../wire/rpc.js'
 
 import { ChildStore } from './child.js'
 import type { WatchSpec } from './spec.js'
 
-const INPUT_ID = 'dock.composer.line.input'
 const POLL_MS = 1000
 const EXIT_ARM_MS = 1500
 
-interface ListRow {
-  subagent_id?: string
-  model?: string | null
-  status?: string
-  tool_count?: number
-  last_tool?: string | null
-  accepting_steer?: boolean
-  started_at?: number
-}
+/** A dock button this pane does not show. */
+const none = () => undefined
 
 export class WatchApp {
   readonly transcript = new Transcript()
@@ -47,27 +47,65 @@ export class WatchApp {
   readonly #gw: GatewayClient
   readonly #spec: WatchSpec
   readonly #agent: Subagent
+  readonly #settings: SettingsSource
   #store: ChildStore | undefined
   #child: string | undefined
   #lastMessage = 0
   #logSize = -1
   #listed = false
   #ready = false
-  #surface!: Surface
-  #timer: NodeJS.Timeout | undefined
-  #scheduled = false
+  #surface!: SurfaceHost
+  /** The poll: every second until the agent ended and its stored transcript caught up. */
+  readonly #poller: Poller = new Poller({
+    cadence: () => (!isRunning(this.#agent) && this.#child ? 'off' : POLL_MS),
+    run: () => this.#tick()
+  })
+  readonly #renders = new RenderScheduler(() => this.#render())
   #exitArmed = 0
   #done = Promise.withResolvers<number>()
+  /** The dock's buttons: the composer steers the agent and Stop stops it; this pane has no pills, queue, chips or chips' sheets. */
+  readonly #dock: DockActions = {
+    onAgents: none,
+    onEdit: ev => {
+      this.composer.edit(ev)
+      this.changed()
+    },
+    onEffort: none,
+    onGoal: none,
+    onInterrupt: () => void this.#stop(),
+    onLoop: none,
+    onModel: none,
+    onPrs: none,
+    onQueueEdit: none,
+    onQueueSteer: none,
+    onRemoveAttachment: none,
+    onSend: ev => {
+      void this.#submit(ev.text)
+      this.changed()
+    },
+    onShells: none,
+    onSubmit: () => {
+      void this.#submit(this.composer.take())
+      this.changed()
+    },
+    onTodos: none,
+    onUndo: () => {
+      this.composer.undo()
+      this.changed()
+    }
+  }
 
-  constructor(tern: Session, gw: GatewayClient, spec: WatchSpec) {
+  constructor(tern: Session, gw: GatewayClient, spec: WatchSpec, settings: SettingsSource = fileSettings()) {
     this.#tern = tern
     this.#gw = gw
     this.#spec = spec
+    this.#settings = settings
     this.#agent = {
       calls: 0,
       goal: spec.goal,
       id: spec.subagent,
       index: spec.index,
+      key: subagentKey(spec.subagent),
       logPath: spec.log,
       name: spec.name,
       startedAt: spec.startedAt,
@@ -78,14 +116,13 @@ export class WatchApp {
   }
 
   async run(): Promise<number> {
-    this.#surface = this.#tern.open({ id: 'hermes', mode: 'inline', role: 'omp.session', title: this.#spec.name })
-    this.#surface.stylesheet('hermes-tern', STYLES)
-    const theme = loadSettings().theme ?? 'tern'
+    this.#surface = new SurfaceHost(this.#tern, this.#spec.name, STYLES)
+    const theme = this.#settings.load().theme ?? 'tern'
     this.#surface.palette(paletteFor(theme, undefined))
     this.#gw.on('event', (ev: AnyGatewayEvent) => {
       if (ev.type === 'gateway.ready') {
         this.#ready = true
-        void this.#tick()
+        this.#poller.poke()
       }
 
       // In `skin` mode the watcher wears the skin the session does, as the main pane does.
@@ -103,14 +140,20 @@ export class WatchApp {
       this.transcript.notice(`The session database is not readable here: ${String(error)}`, 'warning')
     }
 
-    this.#timer = setInterval(() => void this.#tick(), POLL_MS)
-    void this.#tick()
+    // A card that throws draws as the generic one, and the pane says so once per tool name.
+    onCardFault(
+      noticeSink(text => {
+        this.transcript.notice(text, 'warning')
+        this.changed()
+      })
+    )
+    this.#poller.poke()
     this.#render()
     this.#surface.focus(INPUT_ID)
     void this.#readInput()
 
     const code = await this.#done.promise
-    clearInterval(this.#timer)
+    this.#poller.dispose()
     this.#store?.close()
     await this.#tern.close()
     this.#gw.kill('exit')
@@ -119,15 +162,7 @@ export class WatchApp {
   }
 
   changed() {
-    if (this.#scheduled) {
-      return
-    }
-
-    this.#scheduled = true
-    setImmediate(() => {
-      this.#scheduled = false
-      this.#render()
-    })
+    this.#renders.request()
   }
 
   async #tick() {
@@ -144,19 +179,13 @@ export class WatchApp {
     if (changed) {
       this.changed()
     }
-
-    // Once it ended and the stored transcript caught up, nothing else will change.
-    if (!isRunning(a) && this.#child && this.#timer) {
-      clearInterval(this.#timer)
-      this.#timer = undefined
-    }
   }
 
   async #poll(): Promise<boolean> {
     const a = this.#agent
 
     try {
-      const r = await this.#gw.request<{ subagents?: ListRow[] }>('subagent.list', { session_id: this.#spec.sid })
+      const r = await rpc(this.#gw, 'subagent.list', { session_id: this.#spec.sid })
       const row = r?.subagents?.find(x => x.subagent_id === a.id)
 
       if (!row) {
@@ -240,20 +269,8 @@ export class WatchApp {
   }
 
   async #readInput() {
-    try {
-      for await (const input of this.#tern) {
-        if (input.type === 'key') {
-          this.#onKey(input.key)
-        } else {
-          this.#onEvent(input.event)
-        }
-
-        this.changed()
-      }
-    } catch {
-      // The pane went away.
-    }
-
+    // A failure means the pane went away: it ends the loop quietly.
+    await runInput(this.#tern, { after: () => this.changed(), onEvent: event => this.#onEvent(event), onKey: key => this.#onKey(key) })
     this.#done.resolve(0)
   }
 
@@ -311,7 +328,7 @@ export class WatchApp {
     }
 
     try {
-      const r = await this.#gw.request<{ status?: string }>('subagent.steer', {
+      const r = await rpc(this.#gw, 'subagent.steer', {
         session_id: this.#spec.sid,
         subagent_id: a.id,
         text
@@ -321,7 +338,7 @@ export class WatchApp {
         r?.status === 'queued' ? 'info' : 'warning'
       )
     } catch (error) {
-      this.transcript.notice(error instanceof Error ? error.message : String(error), 'error')
+      this.transcript.notice(errorText(error), 'error')
     }
 
     this.changed()
@@ -335,13 +352,13 @@ export class WatchApp {
     }
 
     try {
-      const r = await this.#gw.request<{ found?: boolean }>('subagent.interrupt', {
+      const r = await rpc(this.#gw, 'subagent.interrupt', {
         session_id: this.#spec.sid,
         subagent_id: a.id
       })
       this.transcript.notice(r?.found ? `Stopping ${a.name}…` : `${a.name} already finished.`, 'info')
     } catch (error) {
-      this.transcript.notice(error instanceof Error ? error.message : String(error), 'error')
+      this.transcript.notice(errorText(error), 'error')
     }
 
     this.changed()
@@ -354,41 +371,23 @@ export class WatchApp {
     const cx = { copy: () => undefined, now, welcome: { tip: '', version: '' } }
 
     this.#surface.render({
-      dock: dockNodes({
-        branch: '',
-        busy: running
-          ? { label: a.tool ? `Running ${a.tool}…` : 'Working…', since: a, startedAt: a.startedAt }
-          : undefined,
-        composer: this.composer,
-        cwd: '',
-        effort: '',
-        inputId: INPUT_ID,
-        model: a.model ?? '',
-        now,
-        onEdit: ev => {
-          this.composer.edit(ev)
-          this.changed()
+      dock: dockNodes(
+        {
+          activity: running ? { kind: 'turn', label: a.tool ? `Running ${a.tool}…` : 'Working…', since: a, startedAt: a.startedAt } : { kind: 'idle' },
+          composer: {
+            attachments: [],
+            draft: this.composer,
+            placeholder: running ? `Steer ${a.name} — /stop ends it` : `${a.name} has finished`,
+            ready: running
+          },
+          now,
+          pills: {},
+          queue: { canSteer: false, rows: [] },
+          route: { effort: '', model: a.model ?? '' },
+          status: { branch: '' }
         },
-        onEffort: () => undefined,
-        onInterrupt: () => void this.#stop(),
-        onModel: () => undefined,
-        onQueueEdit: () => undefined,
-        onSend: ev => {
-          void this.#submit(ev.text)
-          this.changed()
-        },
-        onSubmit: () => {
-          void this.#submit(this.composer.take())
-          this.changed()
-        },
-        onUndo: () => {
-          this.composer.undo()
-          this.changed()
-        },
-        placeholder: running ? `Steer ${a.name} — /stop ends it` : `${a.name} has finished`,
-        queued: [],
-        ready: running
-      }),
+        this.#dock
+      ),
       main: [
         // The agent row heads the pane: status, model, tools, timer, the step it runs.
         agentNode({ ...a, summary: undefined }, now),

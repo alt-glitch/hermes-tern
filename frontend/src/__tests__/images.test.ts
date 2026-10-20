@@ -2,28 +2,26 @@ import { mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import type { JSX } from '@stencil-hq/tern'
+import type { NodeJson } from '@stencil-hq/tern'
 import { describe, expect, it, vi } from 'vitest'
 
+import { entryId, toolCallId } from '../core/ids.js'
+import { Attachments, type AttachmentsHost, type ClipboardReader, type Image } from '../draft/attachments.js'
+import { extractClipboardImage, type Runner, withClipboardImage } from '../hermes/clipboardImage.js'
 import { imageSize } from '../hermes/images.js'
 import { localSource, Media, shownImage } from '../media.js'
 import type { ToolCall, TurnEntry, UserEntry } from '../model.js'
-import { promptAttachments, splitPrompt } from '../promptRefs.js'
-import { Transcript } from '../transcript.js'
+import { promptAttachments, splitPrompt } from '../transcript/promptRefs.js'
+import { Transcript } from '../transcript/store.js'
 import { imageChip } from '../view/dock.js'
-import { toolNode } from '../view/tools.js'
+import { toolNode } from '../view/tools/shell.js'
 import { entryNode, type TranscriptContext } from '../view/transcript.js'
-import { foldOf, ownsCard, pieces } from '../workLog.js'
+import { foldOf, ownsCard, pieces } from '../view/workLogModel.js'
 
-interface Node {
-  k: string
-  p?: Record<string, unknown>
-  c?: Node[]
-}
+import { FakeGateway, must, tree } from './fakes.js'
 
-const tree = (n: JSX.Element): Node => JSON.parse(JSON.stringify(n)) as Node
-const all = (n: Node): Node[] => [n, ...(n.c ?? []).flatMap(all)]
-const images = (n: Node) => all(n).filter(x => x.k === 'image')
+const all = (n: NodeJson): NodeJson[] => [n, ...(n.c ?? []).flatMap(all)]
+const images = (n: NodeJson) => all(n).filter(x => x.k === 'image')
 
 const dir = mkdtempSync(join(tmpdir(), 'hermes-tern-images-'))
 const PNG = Buffer.concat([
@@ -34,14 +32,15 @@ const PNG = Buffer.concat([
 const shot = join(dir, 'clip_1.png')
 writeFileSync(shot, PNG)
 
-const call = (name: string, args: Record<string, unknown>, more: Partial<ToolCall> = {}): ToolCall => ({
+const call = (name: string, args: Record<string, unknown>, { id = 'c1', ...more }: Omit<Partial<ToolCall>, 'id'> & { id?: string } = {}): ToolCall => ({
   args,
   argsText: '',
   context: '',
-  id: 'c1',
+  id: toolCallId(id),
   name,
   startedAt: 0,
-  status: 'done',
+  outcome: { duration: 0, kind: 'done' },
+  via: { kind: 'direct' },
   ...more
 })
 
@@ -114,7 +113,7 @@ describe('a resumed prompt with images', () => {
   it('shows its words without the refs, and its images as thumbnails over them', () => {
     const t = new Transcript()
     t.load([{ role: 'user', text: `ion see any new host.\n@image:${shot}\n@image:/nowhere/clip_2.png\n[screenshot]\n[screenshot]` }])
-    const user = t.entries.find(e => e.kind === 'user') as UserEntry
+    const user = must(t.entries.find((e): e is UserEntry => e.kind === 'user'))
 
     expect(user.text).toBe('ion see any new host.')
     expect(user.attachments).toEqual([
@@ -125,13 +124,13 @@ describe('a resumed prompt with images', () => {
     const n = tree(entryNode(user, `main.${user.id}`, cx))
     expect(images(n).map(i => i.p)).toEqual([expect.objectContaining({ path: shot })])
     // The gone image is a chip with its name; no raw ref reaches the bubble.
-    expect(all(n).some(x => x.p?.role === 'hermes.user.attachment' && JSON.stringify(x).includes('clip_2.png'))).toBe(true)
+    expect(all(n).some(x => x.p?.['role'] === 'hermes.user.attachment' && JSON.stringify(x).includes('clip_2.png'))).toBe(true)
     expect(JSON.stringify(n)).not.toMatch(/@image:|\[screenshot\]/)
   })
 
   it('a resumed in-flight prompt is split the same way', () => {
     const t = new Transcript()
-    t.inflight({ user: `hi\n@image:${shot}` } as never)
+    t.inflight({ user: `hi\n@image:${shot}` })
     expect(t.entries.at(-1)).toMatchObject({ attachments: [{ source: { path: shot } }], kind: 'user', text: 'hi' })
   })
 })
@@ -140,12 +139,12 @@ describe('shownImage: the image a tool call showed', () => {
   it('image_generate: the host file before the agent-side one, nothing on failure or while it runs', () => {
     expect(shownImage(call('image_generate', {}, { result: { host_image: '/h/i.png', image: '/sandbox/i.png', success: true } }))).toBe('/h/i.png')
     expect(shownImage(call('image_generate', {}, { result: JSON.stringify({ image: 'https://x/i.png', success: true }) }))).toBe('https://x/i.png')
-    expect(shownImage(call('image_generate', {}, { result: { error: 'quota', image: null, success: false }, status: 'error' }))).toBeUndefined()
-    expect(shownImage(call('image_generate', { prompt: 'a cat' }, { status: 'running' }))).toBeUndefined()
+    expect(shownImage(call('image_generate', {}, { result: { error: 'quota', image: null, success: false }, outcome: { duration: 0, kind: 'error' } }))).toBeUndefined()
+    expect(shownImage(call('image_generate', { prompt: 'a cat' }, { outcome: { kind: 'running' } }))).toBeUndefined()
   })
 
   it('vision_analyze shows none (it folds); a browser screenshot: the path in its result', () => {
-    expect(shownImage(call('vision_analyze', { image_url: '/h/a.png' }, { status: 'running' }))).toBeUndefined()
+    expect(shownImage(call('vision_analyze', { image_url: '/h/a.png' }, { outcome: { kind: 'running' } }))).toBeUndefined()
     expect(shownImage(call('browser_vision', {}, { result: { meta: { screenshot_path: '/h/s.png' } } }))).toBe('/h/s.png')
     expect(shownImage(call('browser_vision', {}, { result: { analysis: 'a page', screenshot_path: '/h/t.png', success: true } }))).toBe('/h/t.png')
     expect(shownImage(call('browser_vision', {}, { resultText: 'Looks fine. Screenshot path: /h/u.png' }))).toBe('/h/u.png')
@@ -208,7 +207,7 @@ describe('image cards', () => {
     const n = tree(toolNode(call('image_generate', { prompt: 'a red fox' }, { result: { image: '/h/fox.png', success: true } }), 0))
     expect(images(n).map(i => i.p)).toEqual([expect.objectContaining({ alt: 'a red fox', path: '/h/fox.png' })])
     expect(n.p).toMatchObject({ name: 'image', target: 'a red fox', title: 'Image' })
-    expect(n.p?.collapsed).toBe(false)
+    expect(n.p?.['collapsed']).toBe(false)
     expect(all(n).some(x => x.k === 'code')).toBe(false)
   })
 
@@ -217,7 +216,7 @@ describe('image cards', () => {
     const loading = call('image_generate', {}, { result: { image: url, success: true } })
     expect(JSON.stringify(tree(toolNode(loading, 0)))).toContain('Loading the image')
 
-    expect(images(tree(toolNode({ ...loading, image: { blob: 'b9' } }, 0))).map(i => i.p?.blob)).toEqual(['b9'])
+    expect(images(tree(toolNode({ ...loading, image: { blob: 'b9' } }, 0))).map(i => i.p?.['blob'])).toEqual(['b9'])
 
     const failed = JSON.stringify(tree(toolNode({ ...loading, image: null }, 0)))
     expect(failed).toContain('Could not load the image')
@@ -225,10 +224,10 @@ describe('image cards', () => {
   })
 
   it('a failed image_generate keeps its error note and shows no image', () => {
-    const c = call('image_generate', { prompt: 'x' }, { result: { error: 'Content policy', image: null, success: false }, status: 'error' })
+    const c = call('image_generate', { prompt: 'x' }, { result: { error: 'Content policy', image: null, success: false }, outcome: { duration: 0, kind: 'error' } })
     const n = tree(toolNode(c, 0))
     expect(images(n)).toEqual([])
-    expect(n.p?.note).toContain('Content policy')
+    expect(n.p?.['note']).toContain('Content policy')
   })
 
   it('vision_analyze shows its analysis, not the image it looked at (the user already sees it)', () => {
@@ -241,45 +240,45 @@ describe('image cards', () => {
     const img = call('image_generate', {}, { id: 'g', result: { image: '/h/a.png', success: true } })
     const sh = call('terminal', { command: 'ls' }, { id: 's' })
     const blocks = [
-      { call: sh, id: 'b1', kind: 'tool' as const },
-      { call: img, id: 'b2', kind: 'tool' as const },
-      { id: 'b3', kind: 'text' as const, text: 'Here it is.' }
+      { call: sh, id: entryId('b1'), kind: 'tool' as const },
+      { call: img, id: entryId('b2'), kind: 'tool' as const },
+      { id: entryId('b3'), kind: 'text' as const, text: 'Here it is.' }
     ]
-    const turn: TurnEntry = { blocks, endedAt: 9, id: 't', kind: 'turn', rev: 0, startedAt: 0, status: 'done' }
+    const turn: TurnEntry = { blocks, end: { endedAt: 9, status: 'done' }, id: entryId('t'), kind: 'turn', rev: 0, startedAt: 0 }
 
     expect(ownsCard(img)).toBe(true)
     expect(pieces(blocks).map(p => p.kind)).toEqual(['work', 'block', 'block'])
     expect([...(foldOf(turn)?.hidden ?? [])]).toEqual(['b1'])
 
     // A failed one has no image to keep in view.
-    const failed = { ...img, status: 'error' as const }
-    expect(foldOf({ ...turn, blocks: [{ call: failed, id: 'b2', kind: 'tool' }, blocks[2]!] })?.hidden.has('b2')).toBe(true)
+    const failed: ToolCall = { ...img, outcome: { duration: 0, kind: 'error' } }
+    expect(foldOf({ ...turn, blocks: [{ call: failed, id: entryId('b2'), kind: 'tool' }, must(blocks[2])] })?.hidden.has('b2')).toBe(true)
   })
 })
 
 describe('the composer chip of an attached image', () => {
   it('shows the thumbnail, name and size, and drops the image only from its ✕', () => {
     const onRemove = vi.fn()
-    const n = tree(imageChip({ caption: '1280×720 · 12 KB', image: { blob: 'b1' }, label: 'pasted image 1', onRemove }, 0))
+    const n = tree(imageChip({ caption: '1280×720 · 12 KB', image: { blob: 'b1' }, label: 'pasted image 1' }, 0, onRemove))
 
     expect(n).toMatchObject({ k: 'card', p: { head: [{ t: 'pasted image 1' }], role: 'omp.composer.chip' } })
-    expect(n.p?.actions).toBeUndefined()
+    expect(n.p?.['actions']).toBeUndefined()
     expect(n.c?.map(c => c.k)).toEqual(['image', 'text', 'icon'])
     // No click of its own on the thumbnail: Tern opens it in its lightbox.
     expect(n.c?.[0]?.p).toMatchObject({ blob: 'b1' })
-    expect(n.c?.[0]?.p?.actions).toBeUndefined()
+    expect(n.c?.[0]?.p?.['actions']).toBeUndefined()
     expect(n.c?.[2]?.p).toMatchObject({ actions: { click: 'click' }, name: 'x', role: 'hermes.composer.remove' })
   })
 
   it('says it is attaching while the image is read and uploaded, and can be removed meanwhile', () => {
     const onRemove = vi.fn()
-    const n = tree(imageChip({ label: 'pasted image 1', onRemove, pending: true }, 0))
-    expect(n.c?.[1]?.p?.spans).toEqual([{ fx: 'shimmer', s: 'dim', t: 'Attaching…' }])
+    const n = tree(imageChip({ label: 'pasted image 1', pending: true }, 0, onRemove))
+    expect(n.c?.[1]?.p?.['spans']).toEqual([{ fx: 'shimmer', s: 'dim', t: 'Attaching…' }])
     expect(n.c?.[2]?.p).toMatchObject({ actions: { click: 'click' }, role: 'hermes.composer.remove' })
   })
 
   it('an icon in the thumbnail’s place when there is no image to show', () => {
-    expect(tree(imageChip({ label: 'a.png', onRemove: () => undefined }, 0)).c?.[0]).toMatchObject({ k: 'icon', p: { name: 'image' } })
+    expect(tree(imageChip({ label: 'a.png' }, 0, () => undefined)).c?.[0]).toMatchObject({ k: 'icon', p: { name: 'image' } })
   })
 })
 
@@ -304,5 +303,207 @@ describe('imageSize', () => {
     webp.writeUIntLE(99, 24, 3)
     webp.writeUIntLE(49, 27, 3)
     expect(imageSize(webp)).toEqual({ h: 50, w: 100 })
+  })
+})
+
+/** A clipboard read through Hermes' extractor (as off macOS), with `runner` in the extractor's place. */
+const clipboardOf = (runner: Runner): ClipboardReader => use =>
+  withClipboardImage(use, { HERMES_PYTHON_SRC_ROOT: dir }, (dest, env) => extractClipboardImage(dest, env, 'linux', runner))
+
+/** An extractor that writes the PNG to its destination, as one finding an image does. */
+const holding: Runner = async (_file, args) => {
+  writeFileSync(args[1] ?? '', PNG)
+
+  return 'true'
+}
+
+/** An extractor that finds no image. */
+const empty: Runner = async () => 'false'
+
+/** The attachments on a fake host: the uploads go to a fake gateway, notices and renders are counted. */
+function attachments({ blob, canonical = true, clipboard = clipboardOf(holding), head, sid = 's1', startup }: { blob?: string; canonical?: boolean; clipboard?: ClipboardReader; head?: Image[]; sid?: string | null; startup?: string } = {}) {
+  const gw = new FakeGateway({ canonical })
+  let uploads = 0
+  gw.handlers.set('image.attach_bytes', () => ({ path: `/uploads/${++uploads}.png` }))
+  const notes: { text: string; tone: string | undefined }[] = []
+  const changed = vi.fn()
+
+  const host: AttachmentsHost = {
+    attachToHead: image => {
+      head?.push(image)
+
+      return Boolean(head)
+    },
+    blob: () => blob,
+    changed,
+    cwd: () => dir,
+    gw: gw.client,
+    launchCwd: dir,
+    note: (text, tone) => void notes.push({ text, tone }),
+    sid: () => sid
+  }
+
+  return { a: new Attachments(host, { clipboard, ...(startup ? { startup } : {}) }), changed, gw, notes }
+}
+
+describe('Attachments: the draft\'s images', () => {
+  it('an empty paste reads the clipboard\'s image and uploads it, with its size and thumbnail', async () => {
+    const { a, gw } = attachments({ blob: 'b1' })
+
+    expect(a.paste('')).toBe(true)
+    await vi.waitFor(() => expect(a.uploading).toBe(false))
+
+    expect(gw.sent('image.attach_bytes')).toEqual([expect.objectContaining({ filename: 'image.png', session_id: 's1' })])
+    expect(a.items).toEqual([{ caption: '1280×720 · 1 KB', mime: 'image/png', name: 'pasted image 1', path: '/uploads/1.png', preview: { blob: 'b1' } }])
+  })
+
+  it('a pasted image path attaches that file; text is no image', async () => {
+    const { a } = attachments()
+
+    expect(a.paste('hello')).toBe(false)
+    expect(a.paste(`'${shot}'`)).toBe(true)
+    expect(a.uploading).toBe(true)
+    await vi.waitFor(() => expect(a.uploading).toBe(false))
+
+    // No blob and no upload on this machine: no thumbnail.
+    expect(a.items).toEqual([{ caption: '1280×720 · 1 KB', mime: 'image/png', name: 'clip_1.png', path: '/uploads/1.png' }])
+  })
+
+  it('Ctrl+V says the clipboard holds no image; an empty paste stays quiet', async () => {
+    const { a, notes } = attachments({ clipboard: clipboardOf(empty) })
+
+    await a.fromClipboard(true)
+    expect(notes).toEqual([])
+
+    await a.fromClipboard(false)
+    expect(notes).toEqual([{ text: 'No image on the clipboard.', tone: 'warning' }])
+    expect(a.any).toBe(false)
+  })
+
+  it('a clipboard that cannot be read says why', async () => {
+    const { a, notes } = attachments({ clipboard: clipboardOf(() => Promise.reject(new Error('no display'))) })
+
+    await a.fromClipboard(false)
+
+    expect(notes).toEqual([{ text: 'Could not read the clipboard image: no display', tone: 'error' }])
+    expect(a.any).toBe(false)
+  })
+
+  it('/image takes an image file, and refuses anything else', async () => {
+    const { a, notes } = attachments()
+
+    await a.fromPath('notes.txt')
+    expect(notes).toEqual([{ text: 'Not an image file: notes.txt (PNG, JPEG, GIF or WebP)', tone: 'warning' }])
+
+    await a.fromPath(shot)
+    expect(a.items.map(i => i.name)).toEqual(['clip_1.png'])
+  })
+
+  it('waits for a session before it uploads', async () => {
+    const { a, gw, notes } = attachments({ sid: null })
+
+    await a.fromPath(shot)
+
+    expect(gw.sent('image.attach_bytes')).toEqual([])
+    expect(notes).toEqual([{ text: 'Wait for the session to start before attaching an image.', tone: 'warning' }])
+  })
+
+  it('shows a pending chip while it uploads; Ctrl+C drops it, and the upload lands nowhere', async () => {
+    const { a, gw } = attachments()
+    let land: (v: unknown) => void = () => undefined
+    gw.handlers.set('image.attach_bytes', () => new Promise(resolve => (land = resolve)))
+
+    const attaching = a.fromPath(shot)
+    await vi.waitFor(() => expect(gw.sent('image.attach_bytes')).toHaveLength(1))
+
+    expect(a.uploading).toBe(true)
+    expect(a.chips()).toEqual([{ label: 'clip_1.png', pending: true }])
+
+    a.clearAll()
+    land({ path: '/uploads/late.png' })
+    await attaching
+
+    expect(a.any).toBe(false)
+  })
+
+  it('Esc Esc clears the landed images, and one still uploading lands after', async () => {
+    const { a, gw } = attachments()
+    await a.fromPath(shot)
+    let land: (v: unknown) => void = () => undefined
+    gw.handlers.set('image.attach_bytes', () => new Promise(resolve => (land = resolve)))
+
+    const attaching = a.fromPath(shot)
+    await vi.waitFor(() => expect(gw.sent('image.attach_bytes')).toHaveLength(2))
+    a.clear()
+    expect(a.items).toEqual([])
+
+    land({ path: '/uploads/late.png' })
+    await attaching
+
+    expect(a.items.map(i => i.path)).toEqual(['/uploads/late.png'])
+  })
+
+  it('take empties the draft; a prompt that did not go puts its images back before the draft\'s', async () => {
+    const { a } = attachments()
+    await a.fromPath(shot)
+    const taken = a.take()
+
+    expect(a.items).toEqual([])
+    await a.fromPath(shot)
+    a.restore(taken)
+
+    expect(a.items.map(i => i.path)).toEqual(['/uploads/1.png', '/uploads/2.png'])
+  })
+
+  it('a chip\'s ✕ drops only its image', async () => {
+    const { a, changed } = attachments()
+    await a.fromPath(shot)
+    await a.fromPath(shot)
+    changed.mockClear()
+
+    a.remove(0)
+
+    expect(a.items.map(i => i.path)).toEqual(['/uploads/2.png'])
+    expect(changed).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('Attachments: the launcher\'s startup image', () => {
+  it('goes into the startup query at the queue\'s head, in place', async () => {
+    const head: Image[] = []
+    const { a } = attachments({ head, startup: shot })
+    expect(a.awaitingStartup).toBe(true)
+
+    await a.attachStartup('s1')
+
+    expect(head.map(i => [i.name, i.path])).toEqual([['clip_1.png', '/uploads/1.png']])
+    expect(a.items).toEqual([])
+    expect(a.awaitingStartup).toBe(false)
+  })
+
+  it('goes to the draft when no prompt waits', async () => {
+    const { a } = attachments({ startup: shot })
+
+    await a.attachStartup('s1')
+
+    expect(a.items.map(i => i.name)).toEqual(['clip_1.png'])
+  })
+
+  it('a private gateway takes it by path', async () => {
+    const { a, gw } = attachments({ canonical: false, startup: shot })
+
+    await a.attachStartup('s1')
+
+    expect(gw.sent('image.attach')).toEqual([{ path: shot, session_id: 's1' }])
+    expect(gw.sent('image.attach_bytes')).toEqual([])
+  })
+
+  it('one that cannot be read is a warning, and the queue goes on', async () => {
+    const { a, notes } = attachments({ startup: join(dir, 'gone.png') })
+
+    await a.attachStartup('s1')
+
+    expect(notes).toEqual([{ text: expect.stringMatching(/^Could not attach .*gone\.png: ENOENT/), tone: 'warning' }])
+    expect(a.awaitingStartup).toBe(false)
   })
 })

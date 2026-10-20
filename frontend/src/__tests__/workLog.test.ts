@@ -1,33 +1,38 @@
 import { describe, expect, it } from 'vitest'
 
+import { entryId, subagentKey, toolCallId } from '../core/ids.js'
 import type { Block, ToolCall, TurnEntry } from '../model.js'
 import type { Todo } from '../model.js'
-import { Transcript } from '../transcript.js'
-import { busyLabel, foldOf, formatDuration, liveLabel, parts, pieces, planStep, preparingLabel, presentTense, stepLabel, summarize, thoughtLine, thoughtTitle, type WorkItem } from '../workLog.js'
+import { Transcript } from '../transcript/store.js'
+import { durationCompact } from '../view/format.js'
+import { planStep } from '../view/tools/cards/inline.js'
+import { busyLabel, foldOf, liveLabel, parts, pieces, preparingLabel, presentTense, stepLabel, summarize, thoughtLine, thoughtTitle, type WorkItem } from '../view/workLogModel.js'
+
+import { must } from './fakes.js'
 
 const call = (name: string, args: Record<string, unknown> = {}, more: Partial<ToolCall> = {}): ToolCall => ({
   args,
   argsText: '',
   context: '',
-  id: `${name}-${JSON.stringify(args)}`,
+  id: toolCallId(`${name}-${JSON.stringify(args)}`),
   name,
   startedAt: 0,
-  status: 'done',
+  outcome: { duration: 0, kind: 'done' },
+  via: { kind: 'direct' },
   ...more
 })
 
-const tool = (id: string, c: ToolCall): Extract<Block, { kind: 'tool' }> => ({ call: c, id, kind: 'tool' })
-const text = (id: string, t = 'x'): Block => ({ id, kind: 'text', text: t })
-const think = (id: string, t = 'hm'): Extract<Block, { kind: 'thinking' }> => ({ endedAt: 1, id, kind: 'thinking', startedAt: 0, text: t })
+const tool = (id: string, c: ToolCall): Extract<Block, { kind: 'tool' }> => ({ call: c, id: entryId(id), kind: 'tool' })
+const text = (id: string, t = 'x'): Block => ({ id: entryId(id), kind: 'text', text: t })
+const think = (id: string, t = 'hm'): Extract<Block, { kind: 'thinking' }> => ({ endedAt: 1, id: entryId(id), kind: 'thinking', startedAt: 0, text: t })
 
 const turn = (blocks: Block[], more: Partial<TurnEntry> = {}): TurnEntry => ({
   blocks,
-  endedAt: 54_000,
-  id: 't',
+  end: { endedAt: 54_000, status: 'done' },
+  id: entryId('t'),
   kind: 'turn',
   rev: 0,
   startedAt: 0,
-  status: 'done',
   ...more
 })
 
@@ -96,22 +101,23 @@ describe('todo lists in a turn', () => {
 
   it('draws only the newest list as its card; older ones are steps saying what changed', () => {
     const t = new Transcript()
-    t.start(0)
+    t.messageStart(0)
     t.toolStart({ args: { todos: [{ content: 'Plan', id: '1', status: 'in_progress' }, { content: 'Build', id: '2', status: 'pending' }] }, name: 'todo_list', tool_id: 'c1' }, 1)
     t.toolStart({ args: { command: 'ls' }, name: 'terminal', tool_id: 'c2' }, 2)
     t.toolStart({ args: { merge: true, todos: [{ id: '1', status: 'completed' }, { id: '2', status: 'in_progress' }] }, name: 'todo_list', tool_id: 'c3' }, 3)
     t.toolStart({ args: { command: 'pwd' }, name: 'terminal', tool_id: 'c4' }, 4)
     t.toolStart({ args: { merge: true, todos: [{ id: '2', status: 'completed' }, { content: 'Ship', id: '3', status: 'pending' }] }, name: 'todo_list', tool_id: 'c5' }, 5)
 
-    const turn = t.entries.find(e => e.kind === 'turn') as TurnEntry
+    const turn = must(t.entries.find((e): e is TurnEntry => e.kind === 'turn'))
     const ps = pieces(turn.blocks)
 
     // The two older lists join the commands' work group; the newest keeps its checklist card.
     expect(ps.map(p => (p.kind === 'work' ? p.items.map(i => i.id) : p.block.id))).toEqual([['c1', 'c2', 'c3', 'c4'], 'c5'])
 
-    const steps = ps[0]!.kind === 'work' ? ps[0]!.items.flatMap(i => (i.kind === 'tool' && i.call.name === 'todo_list' ? [stepLabel(i.call)] : [])) : []
+    const first = must(ps[0])
+    const steps = first.kind === 'work' ? first.items.flatMap(i => (i.kind === 'tool' && i.call.name === 'todo_list' ? [stepLabel(i.call)] : [])) : []
     expect(steps).toEqual(['Planned 2 steps', 'Plan updated: ✓ Plan, → Build'])
-    expect(summarize(ps[0]!.kind === 'work' ? ps[0]!.items : [])).toBe('Updated the plan 2 times and ran 2 commands')
+    expect(summarize(first.kind === 'work' ? first.items : [])).toBe('Updated the plan 2 times and ran 2 commands')
 
     // A part of the turn (a fold) still knows which list is the turn's newest.
     expect(pieces(turn.blocks.slice(0, 3), turn.blocks).map(p => p.kind)).toEqual(['work'])
@@ -135,7 +141,7 @@ describe('todo lists in a turn', () => {
       { args: { merge: true, todos: [{ id: '1', status: 'completed' }] }, name: 'todo_list', role: 'tool', tool_call_id: 'c2' }
     ])
 
-    const turn = t.entries.find(e => e.kind === 'turn') as TurnEntry
+    const turn = must(t.entries.find((e): e is TurnEntry => e.kind === 'turn'))
     const calls = turn.blocks.flatMap(b => (b.kind === 'tool' ? [b.call] : []))
     expect(calls.map(stepLabel)).toEqual(['Planned 1 step', 'Plan updated: ✓ Plan'])
     expect(pieces(turn.blocks).map(p => p.kind)).toEqual(['work', 'block'])
@@ -153,22 +159,22 @@ describe('foldOf', () => {
   it('does not fold a running, failed or interrupted turn, or one with nothing to hide', () => {
     const blocks = [tool('a', call('terminal')), text('answer')]
 
-    expect(foldOf(turn(blocks, { status: 'live' }))).toBeUndefined()
-    expect(foldOf(turn(blocks, { status: 'error' }))).toBeUndefined()
-    expect(foldOf(turn(blocks, { status: 'interrupted' }))).toBeUndefined()
+    expect(foldOf(turn(blocks, { end: { status: 'live' } }))).toBeUndefined()
+    expect(foldOf(turn(blocks, { end: { endedAt: 54_000, status: 'error' } }))).toBeUndefined()
+    expect(foldOf(turn(blocks, { end: { endedAt: 54_000, status: 'interrupted' } }))).toBeUndefined()
     expect(foldOf(turn([text('answer')]))).toBeUndefined()
   })
 
   it('keeps a background process and a delegation with running agents in view', () => {
     const bg = tool('bg', call('terminal', { background: true, command: 'sleep 9' }))
-    const agents = tool('d', call('delegate_task', {}, { subagents: [{ calls: 0, goal: 'g', id: 'x', index: 0, startedAt: 0, status: 'running', tokens: 0, toolCount: 0 }] }))
+    const agents = tool('d', call('delegate_task', {}, { subagents: [{ calls: 0, goal: 'g', id: 'x', index: 0, key: subagentKey('x'), startedAt: 0, status: 'running', tokens: 0, toolCount: 0 }] }))
 
     expect([...(foldOf(turn([bg, agents, tool('a', call('terminal')), text('answer')]))?.hidden ?? [])]).toEqual(['a'])
   })
 })
 
 describe('parts', () => {
-  const steer = (id: string, at: number): Block => ({ at, id, kind: 'steer', text: 'also check the tests' })
+  const steer = (id: string, at: number): Block => ({ at, id: entryId(id), kind: 'steer', text: 'also check the tests' })
 
   it('keeps a steer in view and folds each stretch around it by its own time', () => {
     const t = turn([tool('a', call('terminal')), steer('s', 20_000), tool('b', call('terminal')), text('answer')])
@@ -195,11 +201,11 @@ describe('parts', () => {
 
 describe('labels', () => {
   it('names the running program, without a shell wrapper', () => {
-    const running = (command: string) => tool('a', call('terminal', { command }, { status: 'running' }))
+    const running = (command: string) => tool('a', call('terminal', { command }, { outcome: { kind: 'running' } }))
 
     expect(liveLabel(running('ls -la && git log'))).toBe('Running ls')
     expect(liveLabel(running("bash -lc 'npm test'"))).toBe('Running npm')
-    expect(liveLabel(tool('a', call('terminal', { command: 'ls' }, { status: 'error' })))).toBe('Failed ls')
+    expect(liveLabel(tool('a', call('terminal', { command: 'ls' }, { outcome: { duration: 0, kind: 'error' } })))).toBe('Failed ls')
   })
 
   it('keeps the live step in the present tense while the turn works on, as t3code does', () => {
@@ -208,7 +214,7 @@ describe('labels', () => {
     expect(liveLabel(done(call('terminal', { command: 'sed -n 1p a' })), true)).toBe('Running sed')
     expect(liveLabel(done(call('terminal', { command: 'sed -n 1p a' })))).toBe('Ran sed')
     expect(liveLabel(done(call('read_file', { path: 'a.ts' })), true)).toBe('Reading a.ts')
-    expect(liveLabel(done(call('terminal', { command: 'x' }, { status: 'error' })), true)).toBe('Failed x')
+    expect(liveLabel(done(call('terminal', { command: 'x' }, { outcome: { duration: 0, kind: 'error' } })), true)).toBe('Failed x')
     expect(presentTense('Searched tools for x')).toBe('Searching tools for x')
   })
 
@@ -239,13 +245,13 @@ describe('labels', () => {
   })
 
   it('formats durations as t3code does', () => {
-    expect([820, 4_300, 42_000, 62_000, 3_725_000].map(formatDuration)).toEqual(['820ms', '4.3s', '42s', '1m 2s', '1h 2m 5s'])
+    expect([820, 4_300, 42_000, 62_000, 3_725_000].map(durationCompact)).toEqual(['820ms', '4.3s', '42s', '1m 2s', '1h 2m 5s'])
   })
 })
 
 describe('busy labels', () => {
   it('names the running call as its step reads, not by its wire name', () => {
-    const running = { status: 'running' as const }
+    const running: Partial<ToolCall> = { outcome: { kind: 'running' } }
     expect(busyLabel(call('read_file', { path: '/x/a.ts' }, running))).toBe('Reading /x/a.ts…')
     expect(busyLabel(call('terminal', { command: 'ls -la' }, running))).toBe('Running ls…')
     expect(busyLabel(call('connectors__linear__LINEAR_CREATE_ISSUE', {}, running))).toMatch(/^Linear · .*issue.*…$/i)

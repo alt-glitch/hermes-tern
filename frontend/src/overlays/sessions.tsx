@@ -10,13 +10,24 @@ import { basename } from 'node:path'
 
 import type { JSX, Key, PickerGroup, PickerItem, Span } from '@stencil-hq/tern'
 
-import type { App } from '../app.js'
+import type { ChatPorts } from '../app/ports.js'
+import { launchEnv } from '../config/env.js'
+import { optional } from '../core/assert.js'
+import { errorText } from '../core/errors.js'
+import { durable, storedSessionId } from '../core/ids.js'
+import { plural } from '../core/text.js'
 import { mutateSession } from '../hermes/mutate.js'
 import { inWorkspace, lastReply, sessionLabel, type StoredSession, storedSessions, workspaceOf } from '../hermes/sessionIndex.js'
-import type { Overlay } from '../overlay.js'
 import { oneLine } from '../view/describe.js'
+import { ageShort, homeTilde } from '../view/format.js'
+import { facts } from '../view/ui/facts.js'
+import { rpc } from '../wire/rpc.js'
 
+import type { Overlay } from './overlay.js'
 import { editQuery, hitRuns, moveSelection, rank } from './search.js'
+
+/** What the session picker reaches of the app. */
+export type SessionsHost = Pick<ChatPorts, 'changed' | 'close' | 'gw' | 'open' | 'resume' | 'session' | 'transcript'>
 
 const KEY = 'sessions'
 const LIMIT = 400
@@ -25,7 +36,7 @@ const DAY = 86_400_000
 type Tab = 'all' | 'here'
 
 /** Opens the session picker; picking a row resumes that session. */
-export function openSessionPicker(app: App) {
+export function openSessionPicker(host: SessionsHost) {
   let state: 'loading' | 'ready' | 'error' = 'loading'
   let sessions: StoredSession[] = []
   let running = new Set<string>()
@@ -36,26 +47,27 @@ export function openSessionPicker(app: App) {
   let deleting: string | null = null
   let shown: string[] = []
   const replies = new Map<string, string>()
-  const current = app.storedSid ?? app.sid ?? ''
+  const current = durable(host.session.ref) ?? ''
 
   const load = async () => {
     state = 'loading'
-    app.changed()
+    host.changed()
 
-    const cwd = app.info?.cwd || process.env.HERMES_CWD || process.cwd()
+    const cwd = host.session.info?.cwd || launchEnv().cwd
     // The open session may have no messages yet; every other empty one is litter.
     const [key, live] = await Promise.all([
       workspaceOf(cwd),
-      app.gw.request<{ sessions?: { id?: string; running?: boolean }[] }>('session.list', { limit: 200 }).catch(() => ({ sessions: [] }))
+      rpc(host.gw, 'session.list', { limit: 200 }).catch(() => ({ sessions: [] }))
     ])
 
     workspace = key
-    running = new Set((live.sessions ?? []).filter(s => s.running && s.id).map(s => s.id!))
+    // Only the shared gateway's rows say whether the session runs.
+    running = new Set((live.sessions ?? []).filter(s => 'running' in s && s.running && s.id).map(s => s.id))
     sessions = storedSessions(LIMIT).filter(s => s.messages > 0 || s.id === current)
     tab = sessions.some(s => inWorkspace(s, workspace)) ? 'here' : 'all'
     selected = rows().find(s => s.id !== current)?.id ?? rows()[0]?.id
     state = 'ready'
-    app.changed()
+    host.changed()
   }
 
   const here = (s: StoredSession) => inWorkspace(s, workspace)
@@ -68,13 +80,13 @@ export function openSessionPicker(app: App) {
       return
     }
 
-    app.close(overlay)
+    host.close(overlay)
 
     if (s.id !== current) {
       // A refusal (deleted elsewhere, gateway down) is a notice; the view stays where it was.
-      app.resume(s.id).catch((error: unknown) => {
-        app.transcript.notice(`Could not resume: ${error instanceof Error ? error.message : String(error)}`, 'error')
-        app.changed()
+      host.resume(storedSessionId(s.id)).catch((error: unknown) => {
+        host.transcript.notice(`Could not resume: ${errorText(error)}`, 'error')
+        host.changed()
       })
     }
   }
@@ -84,13 +96,13 @@ export function openSessionPicker(app: App) {
 
     try {
       // The shared gateway deletes through a revision-fenced mutation (the whole lineage).
-      await (app.gw.isCanonical ? mutateSession(app.gw, id, 'delete', {}) : app.gw.request('session.delete', { session_id: id }))
+      await (host.gw.isCanonical ? mutateSession(host.gw, id, 'delete', {}) : rpc(host.gw, 'session.delete', { session_id: id }))
       sessions = sessions.filter(s => s.id !== id)
     } catch (error) {
-      app.transcript.notice(error instanceof Error ? error.message : String(error), 'error')
+      host.transcript.notice(errorText(error), 'error')
     }
 
-    app.changed()
+    host.changed()
   }
 
   const askDelete = () => {
@@ -99,7 +111,7 @@ export function openSessionPicker(app: App) {
     }
 
     if (selected === current) {
-      app.transcript.notice('The open session cannot be deleted; start a new one first.', 'warning')
+      host.transcript.notice('The open session cannot be deleted; start a new one first.', 'warning')
     } else {
       deleting = selected
     }
@@ -168,31 +180,31 @@ export function openSessionPicker(app: App) {
           actions={[
             { id: 'delete', keys: ['backspace'], label: 'Delete' },
             { end: true, id: 'close', keys: ['esc'], label: 'Close' },
-            { disabled: s ? undefined : 'No session', id: 'resume', keys: ['enter'], label: s?.id === current ? 'Back to it' : 'Resume', primary: true }
+            { ...optional('disabled', s ? undefined : 'No session'), id: 'resume', keys: ['enter'], label: s?.id === current ? 'Back to it' : 'Resume', primary: true }
           ]}
           columns={[
             { format: 'dim', id: 'size', priority: 1 },
             { format: 'time', id: 'when', priority: 2 }
           ]}
-          confirm={deleting ? { act: 'confirm', label: 'Delete', text: `Delete “${sessionLabel(sessions.find(x => x.id === deleting) ?? { preview: '', title: '' })}”?` } : undefined}
+          key={KEY}
+          {...optional('confirm', deleting ? { act: 'confirm', label: 'Delete', text: `Delete “${sessionLabel(sessions.find(x => x.id === deleting) ?? { preview: '', title: '' })}”?` } : undefined)}
           current={current ? [current] : []}
           empty={tab === 'here' ? `No sessions in ${project} yet. Tab shows every folder.` : 'No saved sessions yet'}
           hits={hits}
           icon="history"
           items={rows().map(x => itemOf(x, now, running.has(x.id), tab === 'all' && !here(x)))}
-          key={KEY}
           layout="cards"
           noun="sessions"
           onAction={{
             cancel: () => {
               deleting = null
-              app.changed()
+              host.changed()
             },
             clear: () => {
               query = ''
-              app.changed()
+              host.changed()
             },
-            close: () => app.close(overlay),
+            close: () => host.close(overlay),
             confirm: () => {
               if (deleting) {
                 void remove(deleting)
@@ -200,26 +212,26 @@ export function openSessionPicker(app: App) {
             },
             delete: () => {
               askDelete()
-              app.changed()
+              host.changed()
             },
             resume: () => resume(selected),
             retry: () => void load(),
             tab: ev => {
               setTab(ev.value === 'here' ? 'here' : 'all')
-              app.changed()
+              host.changed()
             }
           }}
           onActivate={ev => resume(ev.item)}
           onSelect={ev => {
             selected = ev.item
             deleting = null
-            app.changed()
+            host.changed()
           }}
           order={order}
           placeholder="Search titles, prompts, folders, branches…"
           preview="side"
           query={query}
-          selected={selected}
+          {...optional('selected', selected)}
           size="lg"
           state={state}
           subtitle={[{ s: 'muted', t: workspace ? shortPath(workspace) : '' }]}
@@ -250,7 +262,7 @@ export function openSessionPicker(app: App) {
         if (query) {
           query = ''
         } else {
-          app.close(overlay)
+          host.close(overlay)
         }
       } else if (k.name === 'enter') {
         resume(selected)
@@ -273,7 +285,7 @@ export function openSessionPicker(app: App) {
     }
   }
 
-  app.open(overlay)
+  host.open(overlay)
   // After the sheet is up: the read is synchronous.
   setTimeout(() => void load(), 0)
 }
@@ -287,11 +299,11 @@ function itemOf(s: StoredSession, now: number, running: boolean, elsewhere: bool
       ...(s.branch ? [{ text: s.branch, title: `Branch ${s.branch}` }] : []),
       ...(elsewhere && s.cwd ? [{ text: basename(s.cwd), title: s.cwd }] : [])
     ],
-    detail: s.title && s.preview ? oneLine(s.preview) : undefined,
-    facts: { size: `${s.messages} msg${s.messages === 1 ? '' : 's'}`, when: ageOf(s.lastActive, now) },
+    ...optional('detail', s.title && s.preview ? oneLine(s.preview) : undefined),
+    facts: { size: plural(s.messages, 'msg'), when: ageShort(now - s.lastActive) },
     id: s.id,
     label,
-    title: s.cwd || undefined
+    ...optional('title', s.cwd || undefined)
   }
 }
 
@@ -305,16 +317,16 @@ function preview(s: StoredSession, now: number, isCurrent: boolean, running: boo
   return [
     <text key="title" role="omp.picker.title" text={sessionLabel(s)} />,
     <kv
-      items={[
-        ...(status ? [{ k: [{ t: 'Status' }], v: status }] : []),
-        ...(s.cwd ? [{ k: [{ t: 'Folder' }], v: [{ s: 'mono', t: shortPath(s.cwd) }] as Span[] }] : []),
-        ...(s.branch ? [{ k: [{ t: 'Branch' }], v: [{ s: 'mono', t: s.branch }] as Span[] }] : []),
-        { k: [{ t: 'Last active' }], v: `${dateOf(s.lastActive)} · ${ageOf(s.lastActive, now)} ago` },
-        { k: [{ t: 'Started' }], v: dateOf(s.startedAt) },
-        { k: [{ t: 'Messages' }], v: String(s.messages) },
-        ...(s.model ? [{ k: [{ t: 'Model' }], v: [{ s: 'mono', t: s.model }] as Span[] }] : []),
-        { k: [{ t: 'Session' }], v: [{ s: 'mono dim', t: `${s.source} · ${s.id.replace(/^(local-)?(.{12}).*$/, '$1$2…')}` }] }
-      ]}
+      items={facts([
+        ['Status', status],
+        ['Folder', s.cwd && [{ s: 'mono', t: shortPath(s.cwd) }]],
+        ['Branch', s.branch && [{ s: 'mono', t: s.branch }]],
+        ['Last active', `${dateOf(s.lastActive)} · ${ageShort(now - s.lastActive)} ago`],
+        ['Started', dateOf(s.startedAt)],
+        ['Messages', String(s.messages)],
+        ['Model', s.model && [{ s: 'mono', t: s.model }]],
+        ['Session', [{ s: 'mono dim', t: `${s.source} · ${s.id.replace(/^(local-)?(.{12}).*$/, '$1$2…')}` }]]
+      ])}
       key="facts"
     />,
     ...(s.preview
@@ -334,30 +346,7 @@ function preview(s: StoredSession, now: number, isCurrent: boolean, running: boo
   ]
 }
 
-function shortPath(path: string): string {
-  const home = process.env.HOME
-
-  return home && path.startsWith(home) ? `~${path.slice(home.length)}` : path
-}
-
-/** `25m`, `2h`, `3d`, `1w`, `2mo`, `1y`: how long ago, as omp's session list writes it. */
-function ageOf(at: number, now: number): string {
-  const m = Math.max(0, Math.round((now - at) / 60_000))
-
-  if (m < 60) {
-    return `${Math.max(1, m)}m`
-  }
-
-  const h = Math.round(m / 60)
-
-  if (h < 24) {
-    return `${h}h`
-  }
-
-  const d = Math.round(h / 24)
-
-  return d < 7 ? `${d}d` : d < 30 ? `${Math.round(d / 7)}w` : d < 365 ? `${Math.round(d / 30)}mo` : `${Math.round(d / 365)}y`
-}
+const shortPath = (path: string) => homeTilde(path, launchEnv().home)
 
 /** Today / Yesterday / This week / This month / Earlier, by local calendar day. */
 function dayOf(at: number, now: number): string {

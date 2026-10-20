@@ -6,14 +6,22 @@
 import type { CommandsCatalogResult } from '@hermes/shared/gateway-events'
 import type { Key, SpanData } from '@stencil-hq/tern'
 
-import type { App } from '../app.js'
-import { HIDDEN_COMMANDS, localCommands } from '../commands.js'
-import type { Overlay } from '../overlay.js'
+import type { ChatPorts } from '../app/ports.js'
+import { HIDDEN_COMMANDS, localCommands } from '../commands/local.js'
+import { errorText } from '../core/errors.js'
+import { KEYS } from '../draft/keys.js'
+import { actionsRow } from '../view/ui/button.js'
+import { rpc } from '../wire/rpc.js'
+
+import type { Overlay } from './overlay.js'
+
+/** What the help sheet reaches of the app. */
+export type HelpHost = Pick<ChatPorts, 'close' | 'gw' | 'open' | 'session' | 'transcript'>
 
 const KEY = 'help'
 
-/** The shortcuts this frontend handles (composer.ts, app.ts), by group. */
-const HOTKEYS: { group: string; rows: [string[], string][] }[] = [
+/** The shortcuts this frontend handles, by group: the composer's (draft/composer.ts), then the app's (KEYS). */
+export const HOTKEYS: readonly { group: string; rows: [string[], string][] }[] = [
   {
     group: 'Editing',
     rows: [
@@ -38,31 +46,32 @@ const HOTKEYS: { group: string; rows: [string[], string][] }[] = [
     group: 'Control',
     rows: [
       [['escape'], 'Close the completion'],
-      [['escape escape'], 'Clear the draft into the history (Up brings it back) / stop the agent'],
-      [['shift+tab'], 'Cycle the reasoning effort (/effort picks one; Ctrl+G there saves it as the default)'],
-      [['alt+up'], 'Edit the oldest queued prompt'],
-      [['alt+enter'], 'Steer the running turn with the oldest queued prompt (empty prompt)'],
-      [['alt+a'], 'Agents'],
-      [['alt+j'], 'Background processes and cron jobs (/ps)'],
-      [['alt+p'], 'Pull requests Hermes linked (/prs)'],
-      [['alt+s'], 'Session sidebar: branch, PRs, changes (/sidebar)'],
-      [['ctrl+v'], 'Attach the clipboard image (also ⌘V of an image, a dropped image file, /paste)'],
+      [[KEYS.clearOrStop.label], 'Clear the draft into the history (Up brings it back) / stop the agent'],
+      [[KEYS.effort.label], 'Cycle the reasoning effort (/effort picks one; Ctrl+G there saves it as the default)'],
+      [[KEYS.dequeue.label], 'Edit the oldest queued prompt'],
+      [[KEYS.steer.label], 'Steer the running turn with the oldest queued prompt (empty prompt)'],
+      [[KEYS.agents.label], 'Agents'],
+      [[KEYS.background.label], 'Background processes and cron jobs (/ps)'],
+      [[KEYS.prs.label], 'Pull requests Hermes linked (/prs)'],
+      [[KEYS.sidebar.label], 'Session sidebar: branch, PRs, changes (/sidebar)'],
+      [[KEYS.clipboardImage.label], 'Attach the clipboard image (also ⌘V of an image, a dropped image file, /paste)'],
       [['down'], 'Focus the agents / shells / PR pills (empty prompt); ← → switch, Enter opens, Esc returns'],
-      [['ctrl+c'], 'Answer no to the open sheet / clear the draft and images / interrupt / exit (twice)'],
-      [['ctrl+d'], 'Delete forward / exit (empty prompt)']
+      [[KEYS.cancel.label], 'Answer no to the open sheet / clear the draft and images / interrupt / exit (twice)'],
+      [[KEYS.quit.label], 'Delete forward / exit (empty prompt)']
     ]
   }
 ]
 
 /** Opens the help sheet; the command list comes from the gateway's catalog. */
-export async function openHelp(app: App) {
+export async function openHelp(host: HelpHost) {
   let catalog: CommandsCatalogResult = {}
+  const sid = host.session.ref.live
 
   try {
-    catalog = await app.gw.request<CommandsCatalogResult>('commands.catalog', app.sid ? { session_id: app.sid } : {})
+    catalog = await rpc(host.gw, 'commands.catalog', sid ? { session_id: sid } : {})
   } catch (error) {
-    app.transcript.notice(
-      `Could not load the command list: ${error instanceof Error ? error.message : String(error)}`,
+    host.transcript.notice(
+      `Could not load the command list: ${errorText(error)}`,
       'warning'
     )
   }
@@ -126,31 +135,18 @@ export async function openHelp(app: App) {
               />
             </section>
           ))}
-          <row align="center" gap="sm" key="actions" role="omp.actions">
-            <spacer grow={1} key="fill" />
-            <row
-              align="center"
-              gap="xs"
-              key="close"
-              onClick={() => app.close(overlay)}
-              role="omp.btn"
-              title="Close  escape"
-            >
-              <text key="label" text="Close" />
-              <kbd key="keys" keys={['escape']} />
-            </row>
-          </row>
+          {actionsRow([{ hint: 'escape', key: 'close', keys: ['escape'], label: 'Close', onClick: () => host.close(overlay) }])}
         </col>
       </overlay>
     ),
     onKey: (k: Key) => {
       if (k.name === 'escape' || k.name === 'enter' || k.name === 'q') {
-        app.close(overlay)
+        host.close(overlay)
       }
 
       return true
     }
   }
 
-  app.open(overlay)
+  host.open(overlay)
 }

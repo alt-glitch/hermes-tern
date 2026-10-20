@@ -3,12 +3,16 @@
 
 import type { JSX, Key, PickerItem } from '@stencil-hq/tern'
 
-import type { App } from '../app.js'
+import type { ChatPorts } from '../app/ports.js'
 import { copyToClipboard } from '../clipboard.js'
+import { optional } from '../core/assert.js'
 import { type ChangedFile, fileDiff, type GitState, gitState } from '../git/status.js'
-import type { Overlay } from '../overlay.js'
 
+import type { Overlay } from './overlay.js'
 import { moveSelection } from './search.js'
+
+/** What the Changes sheet reaches of the app. */
+export type ChangesHost = Pick<ChatPorts, 'changed' | 'close' | 'open' | 'session' | 'sidebar'>
 
 const KEY = 'changes'
 
@@ -21,20 +25,20 @@ const TONE: Record<string, 'error' | 'info' | 'success' | 'warning'> = {
 }
 
 /** Opens the sheet, on file `focus` when given. */
-export function openChanges(app: App, focus?: string) {
-  let state: GitState | undefined = app.sidebar.state
+export function openChanges(host: ChangesHost, focus?: string) {
+  let state: GitState | undefined = host.sidebar.state
   let selected = focus
   let failed = false
   /** Each file's diff; null while it is read. */
   const diffs = new Map<string, string | null>()
 
   const read = async () => {
-    const cwd = app.info?.cwd
+    const cwd = host.session.info?.cwd
 
     state = cwd ? await gitState(cwd) : undefined
     failed = !state
     diffs.clear()
-    app.changed()
+    host.changed()
   }
 
   const load = (f: ChangedFile | undefined) => {
@@ -45,7 +49,7 @@ export function openChanges(app: App, focus?: string) {
     diffs.set(f.path, null)
     void fileDiff(state.root, f).then(text => {
       diffs.set(f.path, text)
-      app.changed()
+      host.changed()
     })
   }
 
@@ -59,10 +63,12 @@ export function openChanges(app: App, focus?: string) {
     modal: true,
     node: () => sheetNode(),
     onKey: (k: Key) => {
+      const file = current()
+
       if (k.name === 'escape') {
-        app.close(overlay)
-      } else if (k.name === 'c' && !k.ctrl && !k.alt && !k.meta && current()) {
-        copyToClipboard(current()!.path)
+        host.close(overlay)
+      } else if (k.name === 'c' && !k.ctrl && !k.alt && !k.meta && file) {
+        copyToClipboard(file.path)
       } else if (k.name === 'r' && k.shift) {
         void read()
       } else {
@@ -94,7 +100,7 @@ export function openChanges(app: App, focus?: string) {
     return (
       <picker
         actions={[
-          { disabled: f ? undefined : 'No file', id: 'copy', keys: ['c'], label: 'Copy path' },
+          { ...optional('disabled', f ? undefined : 'No file'), id: 'copy', keys: ['c'], label: 'Copy path' },
           { id: 'refresh', keys: ['shift+r'], label: 'Refresh' },
           { end: true, id: 'close', keys: ['esc'], label: 'Close', primary: true }
         ]}
@@ -105,17 +111,17 @@ export function openChanges(app: App, focus?: string) {
         key={KEY}
         noun="files"
         onAction={{
-          close: () => app.close(overlay),
+          close: () => host.close(overlay),
           copy: () => f && copyToClipboard(f.path),
           refresh: () => void read()
         }}
         onSelect={ev => {
           selected = ev.item
-          app.changed()
+          host.changed()
         }}
         order={list.map(x => x.path)}
         preview="below"
-        selected={selected}
+        {...optional('selected', selected)}
         size="lg"
         state={state || failed ? 'ready' : 'loading'}
         subtitle={[
@@ -132,16 +138,16 @@ export function openChanges(app: App, focus?: string) {
     )
   }
 
-  app.open(overlay)
+  host.open(overlay)
 }
 
 function item(f: ChangedFile): PickerItem {
   return {
     badges: [
-      ...(f.status !== 'modified' ? [{ text: f.status, tone: TONE[f.status] }] : []),
+      ...(f.status !== 'modified' ? [{ text: f.status, ...optional('tone', TONE[f.status]) }] : []),
       ...(f.staged ? [{ text: 'staged' }] : [])
     ],
-    detail: f.from ? `from ${f.from}` : undefined,
+    ...optional('detail', f.from ? `from ${f.from}` : undefined),
     facts: { changes: [{ s: 'success', t: `+${f.additions}` }, { t: ' ' }, { s: 'error', t: `−${f.deletions}` }] },
     id: f.path,
     label: f.path,

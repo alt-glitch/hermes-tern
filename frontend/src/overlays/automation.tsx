@@ -4,19 +4,36 @@
 
 import type { JSX, Key, KvItem } from '@stencil-hq/tern'
 
-import type { App } from '../app.js'
-import type { AutomationAction, GoalView, LoopView } from '../automation.js'
-import type { Overlay } from '../overlay.js'
-import { countdownAge } from '../view/time.js'
+import type { ChatPorts } from '../app/ports.js'
+import type { NonEmpty } from '../core/assert.js'
+import { optional } from '../core/assert.js'
+import type { AutomationAction, GoalView, LoopView } from '../session/automation.js'
 import { loopWhen, turnsText } from '../view/automation.js'
+import { countdownAge } from '../view/time.js'
+import { actionsRow, type ButtonProps } from '../view/ui/button.js'
 
-import { actionsRow, type Button, confirmOverlay } from './prompts.js'
+import type { Overlay } from './overlay.js'
+import { confirmOverlay } from './prompts.js'
+
+/** What the /goal and /loop sheets reach of the app. */
+export type AutomationSheetHost = Pick<ChatPorts, 'automation' | 'changed' | 'close' | 'open'>
+
+/** One of the sheet's buttons: the verb it sends, its keys, and the question it asks first, if any. */
+export interface AutomationButton {
+  action: AutomationAction
+  label: string
+  keys: string[]
+  confirm?: string
+}
+
+/** What the sheet shows: the standing goal, or the standing loop. */
+export type AutomationSheet = { which: 'goal'; view: GoalView } | { which: 'loop'; view: LoopView }
 
 /** The sheet's buttons for the goal or the loop as it stands; the first is the plain key's. */
 export function automationButtons(
-  which: 'goal' | 'loop',
+  which: AutomationSheet['which'],
   view: Pick<GoalView, 'state'> | Pick<LoopView, 'state'>
-): { action: AutomationAction; label: string; keys: string[]; confirm?: string }[] {
+): NonEmpty<AutomationButton> {
   if (which === 'goal') {
     return [
       view.state === 'paused'
@@ -35,7 +52,7 @@ export function automationButtons(
   ]
 }
 
-const kv = (k: string, v: string, s?: string): KvItem => ({ k: [{ t: k }], v: [{ s, t: v }] })
+const kv = (k: string, v: string, s?: string): KvItem => ({ k: [{ t: k }], v: [{ ...optional('s', s), t: v }] })
 
 function goalBody(g: GoalView): JSX.Element[] {
   const facts: KvItem[] = [
@@ -100,20 +117,20 @@ function loopBody(l: LoopView, owner: object, now: number): JSX.Element[] {
 }
 
 /** Opens the goal's or the loop's sheet; it closes itself once that is no longer standing. */
-export function openAutomation(app: App, which: 'goal' | 'loop') {
+export function openAutomation(host: AutomationSheetHost, which: AutomationSheet['which']) {
   const key = `automation:${which}`
 
-  const run = (b: ReturnType<typeof automationButtons>[number]) => {
-    if (app.automation.pending) {
+  const run = (b: AutomationButton) => {
+    if (host.automation.pending) {
       return
     }
 
     if (b.confirm) {
-      app.open(
-        confirmOverlay(app, {
+      host.open(
+        confirmOverlay(host, {
           confirm: b.label,
           detail: which === 'goal' ? 'Hermes stops working toward it. /goal sets a new one.' : 'No more runs. /loop starts a new one.',
-          onConfirm: () => void app.automation.act(b.action),
+          onConfirm: () => void host.automation.act(b.action),
           title: b.confirm
         })
       )
@@ -121,51 +138,66 @@ export function openAutomation(app: App, which: 'goal' | 'loop') {
       return
     }
 
-    void app.automation.act(b.action)
+    void host.automation.act(b.action)
   }
 
-  const current = () => (which === 'goal' ? app.automation.goal : app.automation.loop())
+  const current = (): AutomationSheet | undefined => {
+    if (which === 'goal') {
+      const view = host.automation.goal
+
+      return view ? { view, which } : undefined
+    }
+
+    const view = host.automation.loop()
+
+    return view ? { view, which } : undefined
+  }
+
+  /** Done, cleared or stopped meanwhile (here or by another viewer): nothing left to show, so the sheet goes (after the change's own work). */
+  const closeIfGone = () => {
+    if (!current()) {
+      queueMicrotask(() => host.close(overlay))
+    }
+  }
+
+  const unwatch = host.automation.watch(closeIfGone)
 
   const overlay: Overlay = {
     key,
     modal: true,
+    onClose: unwatch,
     node: () => {
       const now = Date.now()
-      const view = current()
+      const sheet = current()
 
-      if (!view) {
-        // Done, cleared or stopped meanwhile (here or by another viewer): nothing left to show.
-        queueMicrotask(() => app.close(overlay))
-
+      if (!sheet) {
         return <overlay anchor="bottom" key={key} modal size="md" />
       }
 
-      const pending = app.automation.pending
-      const buttons: Button[] = [
-        { hint: 'escape', key: 'close', keys: ['escape'], label: 'Close', onClick: () => app.close(overlay) },
-        ...automationButtons(which, view).map((b, i) => ({
+      const pending = host.automation.pending
+      const buttons: ButtonProps[] = [
+        { hint: 'escape', key: 'close', keys: ['escape'], label: 'Close', onClick: () => host.close(overlay) },
+        ...automationButtons(sheet.which, sheet.view).map((b, i): ButtonProps => ({
           hint: i === 0 ? `enter · ${b.keys.join(' · ')}` : b.keys.join(' · '),
           key: b.action,
           keys: b.keys,
+          ...(i === 0 ? { kind: 'primary' } : {}),
           label: pending === b.action ? `${b.label}…` : b.label,
-          onClick: () => run(b),
-          primary: i === 0
+          onClick: () => run(b)
         }))
       ]
 
       return (
         <overlay
           anchor="bottom"
-          head={[{ t: which === 'goal' ? 'Goal' : 'Loop' }]}
+          head={[{ t: sheet.which === 'goal' ? 'Goal' : 'Loop' }]}
           key={key}
           modal
           role="hermes.automation.sheet"
           size="md"
         >
           <col gap="md" key="body">
-            {which === 'goal'
-              ? goalBody(view as GoalView)
-              : loopBody(view as LoopView, app.automation.loopSnapshot ?? view, now)}
+            {sheet.which === 'goal' ? goalBody(sheet.view) : loopBody(sheet.view, host.automation.loopSnapshot ?? sheet.view, now)}
             {actionsRow(buttons)}
           </col>
         </overlay>
@@ -173,23 +205,26 @@ export function openAutomation(app: App, which: 'goal' | 'loop') {
     },
     onKey: (k: Key) => {
       if (k.name === 'escape') {
-        app.close(overlay)
+        host.close(overlay)
 
         return true
       }
 
-      const view = current()
-      const b = view ? automationButtons(which, view).find(b => b.keys.includes(k.name) && !k.ctrl && !k.meta) : undefined
+      const sheet = current()
+      const offered = sheet ? automationButtons(sheet.which, sheet.view) : undefined
+      const b = offered?.find(b => b.keys.includes(k.name) && !k.ctrl && !k.meta)
 
       if (b) {
         run(b)
-      } else if (k.name === 'enter' && view) {
-        run(automationButtons(which, view)[0]!)
+      } else if (k.name === 'enter' && offered) {
+        run(offered[0])
       }
 
       return true
     }
   }
 
-  app.open(overlay)
+  host.open(overlay)
+  // Opened on nothing (it went in the same turn): the sheet goes at once.
+  closeIfGone()
 }

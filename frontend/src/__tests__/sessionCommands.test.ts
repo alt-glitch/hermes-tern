@@ -1,8 +1,11 @@
 import { describe, expect, it, vi } from 'vitest'
 
+import { compressReport, SESSION_COMMANDS, type SessionHost } from '../commands/session.js'
+import { liveSessionId } from '../core/ids.js'
 import { mutateSession } from '../hermes/mutate.js'
 import { lastTurnRewind, retryText, retryTurnRewind } from '../hermes/rewind.js'
-import { compressReport, SESSION_COMMANDS, type SessionHost } from '../sessionCommands.js'
+
+import { must, stub } from './fakes.js'
 
 const MESSAGES = [
   { content: 'first', role: 'user', row_id: 1 },
@@ -14,7 +17,7 @@ const MESSAGES = [
 ]
 
 const run = (name: string, host: SessionHost, arg = '') =>
-  SESSION_COMMANDS.find(c => c.name === name || c.aliases?.includes(name))!.run(host, arg)
+  must(SESSION_COMMANDS.find(c => c.name === name || c.aliases?.includes(name))).run(host, arg)
 
 function host(over: Partial<SessionHost> = {}, replies: Record<string, unknown> = {}) {
   const request = vi.fn(async (method: string, _params?: Record<string, unknown>) => {
@@ -24,14 +27,14 @@ function host(over: Partial<SessionHost> = {}, replies: Record<string, unknown> 
       throw r
     }
 
-    return method === 'session.resume' ? { execution_generation: 7, messages: MESSAGES, revision: 3, ...(r as object) } : r
+    return method === 'session.resume' ? { execution_generation: 7, messages: MESSAGES, revision: 3, ...(typeof r === 'object' ? r : {}) } : r
   })
 
   const h = {
     busy: false,
     canonical: true,
     enqueue: vi.fn(),
-    gw: { request } as unknown as SessionHost['gw'],
+    gw: stub<SessionHost['gw']>({ request }),
     notice: vi.fn(),
     open: vi.fn(async () => true),
     panel: vi.fn(),
@@ -39,7 +42,7 @@ function host(over: Partial<SessionHost> = {}, replies: Record<string, unknown> 
     queued: 0,
     reload: vi.fn(async () => undefined),
     send: vi.fn(),
-    sid: 'sid-1',
+    sid: liveSessionId('sid-1'),
     stale: () => false,
     submit: vi.fn(),
     ...over
@@ -49,7 +52,7 @@ function host(over: Partial<SessionHost> = {}, replies: Record<string, unknown> 
 }
 
 const mutation = (request: ReturnType<typeof host>['request']) =>
-  request.mock.calls.find(([method]) => method === 'session.mutate')?.[1] as Record<string, unknown> | undefined
+  request.mock.calls.find(([method]) => method === 'session.mutate')?.[1]
 
 describe('rewind targets', () => {
   it('names the newest human user turn, skipping compaction carriers and display rows', () => {
@@ -74,12 +77,12 @@ describe('session.mutate', () => {
   it('fences a rename by revision only, and a payload function sees the snapshot', async () => {
     const { request } = host({}, { 'session.mutate': { title: 'Bug hunt' } })
 
-    await mutateSession({ request } as never, 'sid-1', 'rename', { title: 'Bug hunt' })
+    await mutateSession(stub({ request }), 'sid-1', 'rename', { title: 'Bug hunt' })
     expect(mutation(request)).toMatchObject({ expected_revision: 3, operation: 'rename', payload: { title: 'Bug hunt' } })
     expect(mutation(request)).not.toHaveProperty('expected_generation')
 
     const seen = vi.fn(() => null)
-    expect(await mutateSession({ request } as never, 'sid-1', 'rewind', seen)).toBeNull()
+    expect(await mutateSession(stub({ request }), 'sid-1', 'rewind', seen)).toBeNull()
     expect(seen).toHaveBeenCalledWith(expect.objectContaining({ revision: 3 }))
   })
 })
