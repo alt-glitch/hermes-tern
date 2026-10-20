@@ -69227,7 +69227,13 @@ var App = class {
       }
       this.#onGatewayEvent(ev);
     });
-    this.#gw.on("request", (req) => this.#onRequest(req));
+    this.#gw.on("request", (req) => {
+      if (log) {
+        appendFileSync4(log, `${JSON.stringify({ request: { id: req.id, method: req.method, params: req.params } })}
+`);
+      }
+      this.#onRequest(req);
+    });
     this.#gw.on("exit", (code8) => {
       if (!this.#offline) {
         this.transcript.notice(

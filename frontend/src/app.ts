@@ -268,15 +268,22 @@ export class App implements OverlayHost {
 
     const log = process.env.HERMES_TERN_EVENT_LOG
 
+    // Development (the lab, and the golden replays' fixtures): one JSON line per gateway event, as
+    // the event itself, and per server request, as `{"request": {id, method, params}}`.
     this.#gw.on('event', (ev: AnyGatewayEvent) => {
-      // Development: every gateway event, one JSON line each, for the lab.
       if (log) {
         appendFileSync(log, `${JSON.stringify(ev)}\n`)
       }
 
       this.#onGatewayEvent(ev)
     })
-    this.#gw.on('request', (req: ServerRequest) => this.#onRequest(req))
+    this.#gw.on('request', (req: ServerRequest) => {
+      if (log) {
+        appendFileSync(log, `${JSON.stringify({ request: { id: req.id, method: req.method, params: req.params } })}\n`)
+      }
+
+      this.#onRequest(req)
+    })
     this.#gw.on('exit', (code: null | number) => {
       // Once per outage: each failed redial emits another exit. An attached gateway (and its turn) lives on.
       if (!this.#offline) {
