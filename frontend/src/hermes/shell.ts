@@ -3,9 +3,7 @@
 // it for a local session in its launch cwd and refuses sandboxed backends and dangerous commands.
 import type { GatewayClient } from '@tui/gatewayClient.js'
 import { describeRpcError } from '@tui/app/userMessages.js'
-import { hasInterpolation, INTERPOLATION_RE } from '@tui/protocol/interpolation.js'
-
-export { hasInterpolation }
+import { INTERPOLATION_RE } from '@tui/protocol/interpolation.js'
 
 export interface ShellResult {
   stdout: string
@@ -51,9 +49,17 @@ export function shellLines(r: ShellResult): { text: string; failed: boolean }[] 
   ]
 }
 
-/** `text` with every `{!cmd}` replaced by that command's output; throws when one could not run. */
-export async function interpolate(gw: Pick<GatewayClient, 'request'>, sid: string, text: string): Promise<string> {
-  const matches = [...text.matchAll(new RegExp(INTERPOLATION_RE.source, 'g'))]
+/**
+ * The `{!cmd}`s of `text` the user typed: one that also appears in `pasted` (text pasted into the
+ * draft) stays as written, so pasting a log or a document never runs what it quotes.
+ */
+export function typedCommands(text: string, pasted: readonly string[] = []): RegExpExecArray[] {
+  return [...text.matchAll(new RegExp(INTERPOLATION_RE.source, 'g'))].filter(m => !pasted.some(p => p.includes(m[0])))
+}
+
+/** `text` with every typed `{!cmd}` replaced by that command's output; throws when one could not run. */
+export async function interpolate(gw: Pick<GatewayClient, 'request'>, sid: string, text: string, pasted: readonly string[] = []): Promise<string> {
+  const matches = typedCommands(text, pasted)
 
   const results = await Promise.all(
     matches.map(async m => {

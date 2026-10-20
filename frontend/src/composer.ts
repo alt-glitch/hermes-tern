@@ -36,6 +36,8 @@ export class Composer {
   #browse = -1
   #draft = ''
   #decor: { text: string; decor: Decor[] } = { decor: [], text: '' }
+  /** Pasted text that holds `{!…}` or starts with `!`: what it says is not the user's command. */
+  #pasted: string[] = []
 
   /** The selected range, or the caret twice. */
   get selection(): [number, number] {
@@ -51,6 +53,16 @@ export class Composer {
     }
 
     return this.#decor.decor
+  }
+
+  /** The draft's pastes that hold `{!…}` or start with `!`; `take()` forgets them. */
+  get pasted(): readonly string[] {
+    return this.#pasted
+  }
+
+  /** Marks `texts` as pasted again (a refused prompt back in the composer). */
+  repasted(texts: readonly string[]) {
+    this.#pasted.push(...texts)
   }
 
   /** Up/Down are walking the prompt history (Down still has somewhere to go). */
@@ -69,6 +81,7 @@ export class Composer {
   take(): string {
     const text = this.text
     appendHistory(text)
+    this.#pasted = []
     this.#undo = []
     this.#redo = []
     this.#browse = -1
@@ -173,6 +186,11 @@ export class Composer {
       // One undo step of its own, never merged with the typing around it.
       const s = (key.text ?? '').replace(/\r\n?/g, '\n')
       const [from, to] = this.selection
+
+      if (pastedCommand(s)) {
+        this.#pasted.push(s)
+      }
+
       this.splice(from, to, s)
 
       return true
@@ -579,4 +597,9 @@ function nextWord(text: string, at: number): number {
   }
 
   return i
+}
+
+/** Text that would run a command if typed: a `{!cmd}`, or a leading `!`. */
+export function pastedCommand(text: string): boolean {
+  return text.includes('{!') || text.trimStart().startsWith('!')
 }
