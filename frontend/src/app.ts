@@ -33,6 +33,7 @@ import { localCommand } from './commands.js'
 import { Composer } from './composer.js'
 import { interruptTurn, redirectTurn, steerTurn } from './controlCommands.js'
 import { fastTier } from './fast.js'
+import { claimFigures, figures, fixPrompt, hermesFigureCheck } from './figures.js'
 import { type Busy, busyFrom, ownsEvent, Switches } from './flow.js'
 import { protocolNote, slowStartNotes } from './backendNotes.js'
 import { hudKey, type Pill } from './hud.js'
@@ -143,6 +144,8 @@ export class App implements OverlayHost {
   /** The session's background processes (the shells pill, the Background sheet, background cards). */
   readonly processes: Processes = new Processes(this, { author: hermesAuthor(), enabled: () => this.#jobCharts, memory: chartMemory() })
   readonly cron: Cron = new Cron(this)
+  /** Checks a finished reply's mermaid and svg figures; undefined without Hermes' interpreter. */
+  readonly figureCheck = hermesFigureCheck()
   readonly sidebar: Sidebar = new Sidebar(this)
   /** The pull request docked at the pane's right edge (the PR aside). */
   readonly prAside: PrAside = new PrAside(this)
@@ -172,6 +175,8 @@ export class App implements OverlayHost {
   readonly #server = new ServerQueue<Admitted>()
   /** What Enter does while a turn runs (`display.busy_input_mode`); queue until the gateway says. */
   #busyMode: BusyMode = 'queue'
+  /** The agent was asked to resend figures since the user's last prompt: it is asked once. */
+  #figuresAsked = false
   readonly #tern: Session
   readonly #gw: GatewayClient
   readonly #completion: Completion
@@ -988,8 +993,30 @@ export class App implements OverlayHost {
   // ── Prompts and commands ───────────────────────────────────────────
 
   /** Sends the composer's draft, with the pastes it holds. */
+  /** A finished reply's figures that would not render: the agent is asked once to send them again. */
+  #checkFigures(payload: { status?: string | null; text?: unknown } | undefined) {
+    const text = payload?.status === 'complete' && typeof payload.text === 'string' ? payload.text : undefined
+    const sid = this.sid
+    const figs = text && !this.#figuresAsked ? figures(text) : []
+
+    if (!text || !sid || !figs.length || !this.figureCheck) {
+      return
+    }
+
+    void this.figureCheck(figs).then(failed => {
+      if (!failed?.length || this.sid !== sid || this.#figuresAsked || !claimFigures(sid, text)) {
+        return
+      }
+
+      this.#figuresAsked = true
+      this.#submit(fixPrompt(failed), false)
+    })
+  }
+
   #submitDraft() {
     const pasted = [...this.composer.pasted]
+
+    this.#figuresAsked = false
 
     this.#submit(this.composer.take(), true, this.#busyMode, pasted)
   }
@@ -2134,6 +2161,7 @@ export class App implements OverlayHost {
 
         t.complete(ev.payload ?? {})
         this.busy = null
+        this.#checkFigures(ev.payload)
         this.#compacting = undefined
         // A compaction Hermes aborted sends no done edge; one that committed has its summary stored now.
         t.uncompact(true)

@@ -18411,7 +18411,7 @@ var require_eventsource = __commonJS({
     var experimentalWarned = false;
     var defaultReconnectionTime = 3e3;
     var CONNECTING = 0;
-    var OPEN = 1;
+    var OPEN2 = 1;
     var CLOSED = 2;
     var ANONYMOUS = "anonymous";
     var USE_CREDENTIALS = "use-credentials";
@@ -18543,7 +18543,7 @@ var require_eventsource = __commonJS({
             this.dispatchEvent(new Event("error"));
             return;
           }
-          this.#readyState = OPEN;
+          this.#readyState = OPEN2;
           this.dispatchEvent(new Event("open"));
           this.#state.origin = response.urlList[response.urlList.length - 1].origin;
           const eventSourceStream = new EventSourceStream({
@@ -18649,7 +18649,7 @@ var require_eventsource = __commonJS({
         __proto__: null,
         configurable: false,
         enumerable: true,
-        value: OPEN,
+        value: OPEN2,
         writable: false
       },
       CLOSED: {
@@ -35416,15 +35416,15 @@ function collectText(node3, info) {
     start = end + 1;
   }
   let index2 = -1;
-  let join14;
+  let join15;
   while (++index2 < lines.length) {
     if (lines[index2].charCodeAt(lines[index2].length - 1) === 8203 || index2 < lines.length - 1 && lines[index2 + 1].charCodeAt(0) === 8203) {
       result.push(lines[index2]);
-      join14 = void 0;
+      join15 = void 0;
     } else if (lines[index2]) {
-      if (typeof join14 === "number") result.push(join14);
+      if (typeof join15 === "number") result.push(join15);
       result.push(lines[index2]);
-      join14 = 0;
+      join15 = 0;
     } else if (index2 === 0 || index2 === lines.length - 1) {
       result.push(0);
     }
@@ -64383,6 +64383,62 @@ var COMMANDS2 = [
 ];
 var SESSION_COMMANDS = COMMANDS2.map((c) => ({ ...c, run: guarded2(c.name, c.run) }));
 
+// src/view/transcript.tsx
+import { homedir as homedir11 } from "node:os";
+
+// src/replyParts.ts
+var MEDIA_LINE = /^\s*MEDIA:\s*(\S(?:.*\S)?)\s*$/;
+var IMAGE_LINE2 = /^\s*!\[[^\]\n]*\]\(\s*<?([^)\s>]+)>?(?:\s+"[^"]*")?\s*\)\s*$/;
+var FENCE2 = /^ {0,3}(`{3,}|~{3,})/;
+var VIEWABLE = /\.(png|jpe?g|gif|webp|bmp|avif|svg|pdf|mp4|mov|webm|m4v|mp3|wav|flac|ogg|m4a|aac|obj|ply|wrl|x3dv?|stl|gltf|glb|fbx|usdz?|usda|usdc|3ds)$/i;
+function localImage(target) {
+  if (/^[a-z][\w+.-]*:/i.test(target) && !/^file:\/\//i.test(target)) {
+    return void 0;
+  }
+  const path2 = /^file:\/\//i.test(target) ? decodeURIComponent(target.replace(/^file:\/\//i, "")) : target;
+  return VIEWABLE.test(path2) ? path2 : void 0;
+}
+function replyParts(text11, streaming = false) {
+  if (!text11.includes("MEDIA:") && !text11.includes("![")) {
+    return [{ kind: "md", text: text11 }];
+  }
+  const lines = text11.split("\n");
+  const parts3 = [];
+  let run5 = [];
+  let fence;
+  const flush = () => {
+    if (run5.some((l) => l.trim())) {
+      parts3.push({ kind: "md", text: run5.join("\n") });
+    }
+    run5 = [];
+  };
+  lines.forEach((line, i) => {
+    const mark2 = FENCE2.exec(line)?.[1];
+    if (fence) {
+      if (mark2 && mark2[0] === fence[0] && mark2.length >= fence.length && !line.trim().slice(mark2.length)) {
+        fence = void 0;
+      }
+      run5.push(line);
+      return;
+    }
+    if (mark2) {
+      fence = mark2;
+      run5.push(line);
+      return;
+    }
+    const done = !streaming || i < lines.length - 1;
+    const media2 = done ? MEDIA_LINE.exec(line)?.[1] ?? localImage(IMAGE_LINE2.exec(line)?.[1] ?? "") : void 0;
+    if (media2) {
+      flush();
+      parts3.push({ kind: "media", path: media2.replace(/^`|`$/g, "") });
+    } else {
+      run5.push(line);
+    }
+  });
+  flush();
+  return parts3.length ? parts3 : [{ kind: "md", text: text11 }];
+}
+
 // src/preformatted.ts
 var BOX = /[─-╿]/;
 var RULE2 = /^\s*\+[-=+]{3,}\+?\s*$/;
@@ -64970,7 +65026,7 @@ function pieceNodes(turn, blocks2, parent, cx) {
     const b = p3.block;
     switch (b.kind) {
       case "text":
-        return /* @__PURE__ */ jsx("md", { stream: live && b === lastText || void 0, children: b.text }, b.id);
+        return textNodes(b.id, b.text, live && b === lastText);
       case "tool":
         return toolNode(b.call, cx.now);
       case "steer":
@@ -64981,6 +65037,15 @@ function pieceNodes(turn, blocks2, parent, cx) {
         return null;
     }
   });
+}
+function textNodes(id, text11, streaming) {
+  const parts3 = replyParts(text11, streaming);
+  if (parts3.length === 1 && parts3[0]?.kind === "md") {
+    return /* @__PURE__ */ jsx("md", { stream: streaming || void 0, children: text11 }, id);
+  }
+  return /* @__PURE__ */ jsx("col", { gap: "sm", role: "hermes.reply.parts", children: parts3.map(
+    (p3, i) => p3.kind === "md" ? /* @__PURE__ */ jsx("md", { stream: streaming && i === parts3.length - 1 || void 0, children: p3.text }, `md${i}`) : node("media", { key: `media${i}`, path: p3.path.replace(/^~(?=\/)/, homedir11()) })
+  ) }, id);
 }
 function continuedIcon(why) {
   return /^(\d+ )?subagent/i.test(why) ? "users" : why.startsWith("Watcher") ? "eye" : why.startsWith("Background") ? "terminal" : "loop";
@@ -65302,6 +65367,94 @@ function localCommand(name) {
 }
 var localCommands = () => COMMANDS3;
 
+// src/figures.ts
+import { spawn as spawn2 } from "node:child_process";
+import { createHash as createHash2 } from "node:crypto";
+import { mkdirSync as mkdirSync4, writeFileSync as writeFileSync2 } from "node:fs";
+import { join as join10 } from "node:path";
+var OPEN = /^ {0,3}(`{3,}|~{3,})\s*([^\s`]*)/;
+var CHECK_TIMEOUT_MS = 15e4;
+function figures(text11) {
+  const out = [];
+  const counts = { mermaid: 0, svg: 0 };
+  let open;
+  for (const line of text11.split("\n")) {
+    if (open) {
+      const close = line.trim();
+      if (close.length >= open.mark.length && close === open.mark.charAt(0).repeat(close.length)) {
+        if (open.lang === "mermaid" || open.lang === "svg") {
+          out.push({ lang: open.lang, n: ++counts[open.lang], source: open.lines.join("\n") });
+        }
+        open = void 0;
+      } else {
+        open.lines.push(line);
+      }
+      continue;
+    }
+    const m = OPEN.exec(line);
+    if (m?.[1]) {
+      open = { lang: (m[2] ?? "").toLowerCase(), lines: [], mark: m[1] };
+    }
+  }
+  return out;
+}
+var NAME = { mermaid: "Mermaid diagram", svg: "SVG figure" };
+function fixPrompt(failed) {
+  const lines = failed.map((f) => `- ${NAME[f.lang]} ${f.n}${f.line ? `, line ${f.line}` : ""}: ${f.error}`);
+  const one5 = failed.length === 1;
+  return [
+    `${one5 ? "A figure" : "Some figures"} in your last reply ${one5 ? "does" : "do"} not render in Tern:`,
+    "",
+    ...lines,
+    "",
+    `Send ${one5 ? "it" : "them"} again, fixed, each in its fence, with no other text.`
+  ].join("\n");
+}
+function claimFigures(sid, text11, dir2 = dataDir()) {
+  const key2 = createHash2("sha256").update(`${sid}\0${text11}`).digest("hex").slice(0, 32);
+  try {
+    mkdirSync4(join10(dir2, "figures"), { recursive: true });
+    writeFileSync2(join10(dir2, "figures", `${key2}.asked`), "", { flag: "wx" });
+    return true;
+  } catch {
+    return false;
+  }
+}
+function hermesFigureCheck(env2 = process.env) {
+  const python = env2.HERMES_PYTHON?.trim();
+  const root7 = env2.HERMES_PYTHON_SRC_ROOT;
+  const ui = env2.HERMES_TUI_DIR;
+  if (!python || !root7 || !ui) {
+    return void 0;
+  }
+  const script = join10(ui, "..", "figure_check.py");
+  return (figs, signal) => new Promise((resolve7) => {
+    const child = spawn2(python, ["-I", script], { cwd: root7, env: env2, signal, stdio: ["pipe", "pipe", "ignore"], timeout: CHECK_TIMEOUT_MS });
+    let stdout = "";
+    child.stdout.setEncoding("utf8").on("data", (chunk) => stdout += chunk);
+    child.on("error", () => resolve7(void 0));
+    child.stdin.on("error", () => void 0);
+    child.on("close", () => {
+      try {
+        const reply = JSON.parse(stdout.trim().split("\n").at(-1) ?? "");
+        const results = reply.results;
+        if (!Array.isArray(results) || results.length !== figs.length) {
+          return resolve7(void 0);
+        }
+        resolve7(
+          figs.flatMap((f, i) => {
+            const r = results[i];
+            return r?.ok === false ? [{ ...f, error: r.error || "it does not parse", line: r.line }] : [];
+          })
+        );
+      } catch {
+        resolve7(void 0);
+      }
+    });
+    child.stdin.end(JSON.stringify({ figures: figs.map((f) => ({ lang: f.lang, source: f.source })) }));
+  });
+}
+
 // src/flow.ts
 var Switches = class {
   #generation = 0;
@@ -65424,13 +65577,13 @@ function moaReferenceLabel(label, index2, count) {
 }
 
 // src/hermes/activeSessionFile.ts
-import { writeFileSync as writeFileSync2 } from "node:fs";
+import { writeFileSync as writeFileSync3 } from "node:fs";
 var writeActiveSessionFile = (sessionId, file2 = process.env.HERMES_TUI_ACTIVE_SESSION_FILE) => {
   if (!file2 || !sessionId) {
     return;
   }
   try {
-    writeFileSync2(file2, JSON.stringify({ session_id: sessionId }), { mode: 384 });
+    writeFileSync3(file2, JSON.stringify({ session_id: sessionId }), { mode: 384 });
   } catch {
   }
 };
@@ -65439,8 +65592,8 @@ var writeActiveSessionFile = (sessionId, file2 = process.env.HERMES_TUI_ACTIVE_S
 import { execFile as execFile6 } from "node:child_process";
 import { existsSync as existsSync5 } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
-import { homedir as homedir11, tmpdir } from "node:os";
-import { join as join10, resolve as resolve5 } from "node:path";
+import { homedir as homedir12, tmpdir } from "node:os";
+import { join as join11, resolve as resolve5 } from "node:path";
 import { promisify as promisify5 } from "node:util";
 var execFileP = promisify5(execFile6);
 var runFile = async (file2, args, options) => (await execFileP(file2, args, options)).stdout;
@@ -65483,7 +65636,7 @@ async function extractClipboardImage(dest, env2, platform = process.platform, ru
   if (!root7) {
     return void 0;
   }
-  const stdout = await run5(python, [join10(root7, "ui-tui/scripts/clipboard_image.py"), dest], {
+  const stdout = await run5(python, [join11(root7, "ui-tui/scripts/clipboard_image.py"), dest], {
     cwd: root7,
     env: { ...env2, PYTHONPATH: root7 },
     timeout: 15e3
@@ -65491,9 +65644,9 @@ async function extractClipboardImage(dest, env2, platform = process.platform, ru
   return stdout.trim() === "true" && existsSync5(dest) ? dest : void 0;
 }
 async function withClipboardImage(use, env2 = process.env, extract = extractClipboardImage) {
-  const dir2 = await mkdtemp(join10(tmpdir(), "hermes-tern-clipboard-"));
+  const dir2 = await mkdtemp(join11(tmpdir(), "hermes-tern-clipboard-"));
   try {
-    const path2 = await extract(join10(dir2, "clipboard.png"), env2);
+    const path2 = await extract(join11(dir2, "clipboard.png"), env2);
     return path2 ? await use(path2) : void 0;
   } finally {
     await rm(dir2, { force: true, recursive: true });
@@ -65512,7 +65665,7 @@ function imagePathOf(text11, cwd) {
       return void 0;
     }
   }
-  raw2 = raw2.replace(/\\(.)/g, "$1").replace(/^~(?=$|\/)/, homedir11());
+  raw2 = raw2.replace(/\\(.)/g, "$1").replace(/^~(?=$|\/)/, homedir12());
   if (!IMAGE.test(raw2)) {
     return void 0;
   }
@@ -68364,8 +68517,8 @@ function isLoginNotice(p3) {
 }
 
 // src/processes/widgets/author.ts
-import { spawn as spawn2 } from "node:child_process";
-import { join as join11 } from "node:path";
+import { spawn as spawn3 } from "node:child_process";
+import { join as join12 } from "node:path";
 var MAX_BRIEF_CHARS = 1500;
 var MAX_SAMPLE_LINE_CHARS = 300;
 var MAX_SAMPLE_BYTES = 12 * 1024;
@@ -68492,9 +68645,9 @@ function hermesAuthor(env2 = process.env) {
   if (!python || !root7 || !ui) {
     return void 0;
   }
-  const script = join11(ui, "..", "widget_author.py");
+  const script = join12(ui, "..", "widget_author.py");
   return (request, signal) => new Promise((resolve7, reject) => {
-    const child = spawn2(python, [script], {
+    const child = spawn3(python, [script], {
       cwd: root7,
       env: { ...env2, PYTHONPATH: root7 },
       signal,
@@ -68518,18 +68671,18 @@ function hermesAuthor(env2 = process.env) {
 }
 
 // src/processes/widgets/memory.ts
-import { mkdirSync as mkdirSync4, readdirSync as readdirSync2, readFileSync as readFileSync5, rmSync as rmSync2, statSync, writeFileSync as writeFileSync3 } from "node:fs";
-import { join as join12 } from "node:path";
+import { mkdirSync as mkdirSync5, readdirSync as readdirSync2, readFileSync as readFileSync5, rmSync as rmSync2, statSync, writeFileSync as writeFileSync4 } from "node:fs";
+import { join as join13 } from "node:path";
 var KEEP_MS = 7 * 24 * 36e5;
 var safe3 = (id) => /^[\w.-]{1,128}$/.test(id);
-function chartMemory(dir2 = join12(dataDir(), "charts"), now = Date.now) {
+function chartMemory(dir2 = join13(dataDir(), "charts"), now = Date.now) {
   return {
     load(id) {
       if (!safe3(id)) {
         return void 0;
       }
       try {
-        const value = JSON.parse(readFileSync5(join12(dir2, `${id}.json`), "utf8"));
+        const value = JSON.parse(readFileSync5(join13(dir2, `${id}.json`), "utf8"));
         if (value && typeof value === "object" && typeof value.skip === "number") {
           return { skip: value.skip };
         }
@@ -68544,10 +68697,10 @@ function chartMemory(dir2 = join12(dataDir(), "charts"), now = Date.now) {
         return;
       }
       try {
-        mkdirSync4(dir2, { recursive: true });
-        writeFileSync3(join12(dir2, `${id}.json`), JSON.stringify(value));
+        mkdirSync5(dir2, { recursive: true });
+        writeFileSync4(join13(dir2, `${id}.json`), JSON.stringify(value));
         for (const name of readdirSync2(dir2)) {
-          const file2 = join12(dir2, name);
+          const file2 = join13(dir2, name);
           if (now() - statSync(file2).mtimeMs > KEEP_MS) {
             rmSync2(file2, { force: true });
           }
@@ -68559,11 +68712,11 @@ function chartMemory(dir2 = join12(dataDir(), "charts"), now = Date.now) {
 }
 
 // src/settings.ts
-import { mkdirSync as mkdirSync5, readFileSync as readFileSync6, writeFileSync as writeFileSync4 } from "node:fs";
-import { homedir as homedir12 } from "node:os";
-import { dirname, join as join13 } from "node:path";
+import { mkdirSync as mkdirSync6, readFileSync as readFileSync6, writeFileSync as writeFileSync5 } from "node:fs";
+import { homedir as homedir13 } from "node:os";
+import { dirname, join as join14 } from "node:path";
 function settingsFile(env2 = process.env) {
-  return join13(env2.HERMES_HOME || join13(homedir12(), ".hermes"), "hermes-tern", "settings.json");
+  return join14(env2.HERMES_HOME || join14(homedir13(), ".hermes"), "hermes-tern", "settings.json");
 }
 function loadSettings(file2 = settingsFile()) {
   try {
@@ -68575,8 +68728,8 @@ function loadSettings(file2 = settingsFile()) {
 }
 function saveSettings(patch6, file2 = settingsFile()) {
   const next3 = { ...loadSettings(file2), ...patch6 };
-  mkdirSync5(dirname(file2), { recursive: true });
-  writeFileSync4(file2, `${JSON.stringify(next3, null, 2)}
+  mkdirSync6(dirname(file2), { recursive: true });
+  writeFileSync5(file2, `${JSON.stringify(next3, null, 2)}
 `);
   return next3;
 }
@@ -69105,6 +69258,8 @@ var App = class {
   /** The session's background processes (the shells pill, the Background sheet, background cards). */
   processes = new Processes(this, { author: hermesAuthor(), enabled: () => this.#jobCharts, memory: chartMemory() });
   cron = new Cron(this);
+  /** Checks a finished reply's mermaid and svg figures; undefined without Hermes' interpreter. */
+  figureCheck = hermesFigureCheck();
   sidebar = new Sidebar(this);
   /** The pull request docked at the pane's right edge (the PR aside). */
   prAside = new PrAside(this);
@@ -69134,6 +69289,8 @@ var App = class {
   #server = new ServerQueue();
   /** What Enter does while a turn runs (`display.busy_input_mode`); queue until the gateway says. */
   #busyMode = "queue";
+  /** The agent was asked to resend figures since the user's last prompt: it is asked once. */
+  #figuresAsked = false;
   #tern;
   #gw;
   #completion;
@@ -69763,8 +69920,25 @@ var App = class {
   }
   // ── Prompts and commands ───────────────────────────────────────────
   /** Sends the composer's draft, with the pastes it holds. */
+  /** A finished reply's figures that would not render: the agent is asked once to send them again. */
+  #checkFigures(payload) {
+    const text11 = payload?.status === "complete" && typeof payload.text === "string" ? payload.text : void 0;
+    const sid = this.sid;
+    const figs = text11 && !this.#figuresAsked ? figures(text11) : [];
+    if (!text11 || !sid || !figs.length || !this.figureCheck) {
+      return;
+    }
+    void this.figureCheck(figs).then((failed) => {
+      if (!failed?.length || this.sid !== sid || this.#figuresAsked || !claimFigures(sid, text11)) {
+        return;
+      }
+      this.#figuresAsked = true;
+      this.#submit(fixPrompt(failed), false);
+    });
+  }
   #submitDraft() {
     const pasted = [...this.composer.pasted];
+    this.#figuresAsked = false;
     this.#submit(this.composer.take(), true, this.#busyMode, pasted);
   }
   /**
@@ -70609,6 +70783,7 @@ ${this.composer.text}` : text11 || this.composer.text);
         }
         t2.complete(ev.payload ?? {});
         this.busy = null;
+        this.#checkFigures(ev.payload);
         this.#compacting = void 0;
         t2.uncompact(true);
         this.#summarize();

@@ -31,6 +31,9 @@ the user's prompt, so one home covers every flow:
     "ternenv"   -> (at the start) prints the TERN_* variables from a command, a background command and a Python cell's command
     "pr [URL…]" -> (at the start) links the PR URLs given, else a real public PR (link_pull_request)
     "cron…"     -> (at the start) two cron jobs: a 30 min digest and a 15 min page monitor
+    "figures…"  -> (at the start) a reply with a broken mermaid diagram, an svg figure, math and a MEDIA
+                   line, saying whether the Tern rendering section reached the system prompt; the
+                   frontend's figure check then asks for the diagram again and gets it fixed
     anything else -> a streamed markdown reply
 """
 
@@ -160,6 +163,37 @@ EVAL_CODE = (
     "'variables': {'input': {'teamId': 'c75abc07-3a64-46f8-83fc-9e0fe53b80ed', 'projectId': '3f9ddca6-6f21-4'}}}}]\n"
     "print(json.dumps(calls)[:300])"
 )
+
+
+FIGURES = """Rendering section in my system prompt: {hinted}.
+
+```mermaid
+flowchart LR
+  P[Prompt --> A{Agent}
+  A --> T[Tools]
+```
+
+An inline formula $e^{i\\pi} + 1 = 0$, a price of \\$5, and a display one:
+
+$$
+\\int_0^1 x^2\\,dx = \\tfrac{1}{3}
+$$
+
+```svg
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 60" font-size="14" font-family="sans-serif">
+  <rect x="2" y="2" width="236" height="56" rx="8" fill="none" stroke="var(--accent)"/>
+  <text x="120" y="35" text-anchor="middle" fill="currentColor">An svg figure</text>
+</svg>
+```
+
+MEDIA:{picture}
+"""
+
+FIGURES_FIX = """```mermaid
+flowchart LR
+  P["Prompt"] --> A{"Agent"}
+  A --> T["Tools"]
+```"""
 
 
 def _todos(*statuses: str) -> tuple[str, dict]:
@@ -344,6 +378,14 @@ class Model(BaseHTTPRequestHandler):
                 return
             content = note
             delay = 0.0
+        elif prompt.lower().lstrip().startswith("figures") or "does not render in tern" in prompt.lower():
+            # The figure check: one broken diagram, then only the fixed one when the frontend asks.
+            if "does not render in tern" in prompt.lower():
+                content = FIGURES_FIX
+            else:
+                hinted = "yes" if "<tern_rendering>" in json.dumps(system) else "no"
+                content = FIGURES.replace("{hinted}", hinted).replace("{picture}", str(PLUGIN / "frontend" / "assets" / "logo.png"))
+            calls, delay = None, 0.05
         elif "steps" in prompt.lower():
             # One call per request until the steps run out; the tool results so far count them.
             last_user = max(i for i, m in enumerate(messages) if m.get("role") == "user")

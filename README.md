@@ -42,7 +42,8 @@ open Hermes in Tern's agent pane, set Tern's agent command (`agent_command` in T
 | `transform_tool_result` hook | a connector's connect result becomes a card in the chat that started it |
 | `tool_request` middleware | the agent's shell commands run with the chat's `TERN_PANE`, so `tern open` works beside the chat |
 | `tern_charts` auxiliary task | writes the rules behind a background process's live chart (`auxiliary.tern_charts` picks its model) |
-| system prompt section | tells the agent to link the PRs it opens |
+| system prompt sections | tell the agent to link the PRs it opens, and (only in a session a Tern pane shows) what Tern draws in a reply |
+| `tern-rendering` skill | the full reference for figures in a reply: every mermaid kind Tern draws, svg rules, math, media |
 
 ## The chat
 
@@ -72,6 +73,20 @@ the status line. When the turn ends, the work folds into "Worked for 9.5s" and t
 Also: `/model` and `/effort` from the composer chips, `/sessions` to resume, `/ps` for background
 processes and cron jobs, `/agents` for subagents, `/changes` for the working tree's diff, and
 `/theme` to paint the chat in Tern's colors, Nous colors or the Hermes skin.
+
+### Figures
+
+Tern draws more than Markdown in a reply: ```` ```mermaid ```` diagrams (through merman, the Rust
+port of Mermaid, so 35 kinds from flowcharts to Wardley maps), ```` ```svg ```` figures in the
+theme's colors, TeX math, 3D fences (` ```stl `, ` ```obj `), callouts and links to files at a line.
+The plugin tells the agent so in sessions a Tern pane shows, and a line `MEDIA:/path` in a reply
+shows that file (an image, PDF, video, audio or 3D model) in Tern's viewer.
+
+After a turn, the plugin checks the reply's diagrams with merman and its svg figures against Tern's
+rules (`figure_check.py`, which fetches merman through Hermes' `uv` on first use). When one would
+not render, it asks the agent once to send it again, with the error and the line.
+
+<img alt="A reply with a broken diagram, math, an svg figure and an image, then the fixed diagram" src="docs/images/figures.png" width="600">
 
 ## Background processes
 
