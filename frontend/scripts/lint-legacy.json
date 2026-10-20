@@ -83,7 +83,6 @@
   "src/overlays/pullRequests.tsx @typescript-eslint/no-non-null-assertion": 1,
   "src/palette.ts @typescript-eslint/no-restricted-imports": 1,
   "src/processes/store.ts @typescript-eslint/no-non-null-assertion": 2,
-  "src/processes/widgets/registry.ts @typescript-eslint/no-non-null-assertion": 1,
   "src/processes/widgets/runtime.ts @typescript-eslint/consistent-type-assertions": 1,
   "src/processes/widgets/runtime.ts @typescript-eslint/no-non-null-assertion": 15,
   "src/processes/widgets/spec.ts @typescript-eslint/consistent-type-assertions": 2,

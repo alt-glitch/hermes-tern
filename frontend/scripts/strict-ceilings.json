@@ -44,7 +44,6 @@
   "src/processes/store.ts": 19,
   "src/processes/widgets/author.ts": 3,
   "src/processes/widgets/files.ts": 1,
-  "src/processes/widgets/registry.ts": 7,
   "src/processes/widgets/runtime.ts": 2,
   "src/processes/widgets/spec.ts": 47,
   "src/processes/widgets/view.tsx": 1,

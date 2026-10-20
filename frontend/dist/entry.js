@@ -31017,6 +31017,24 @@ var OutputTap = class {
 var DEFAULTS = { authorAfterMs: 15e3, driftLines: 200, driftStaleMs: 9e4, maxAttempts: 3, maxInFlight: 2 };
 var MIN_AUTHOR_LINES = 3;
 var REASK_LINES = 5;
+function waiting3(a2) {
+  switch (a2.kind) {
+    case "idle":
+    case "declined":
+      return a2;
+    case "requesting":
+    case "unavailable":
+    case "frozen":
+      return void 0;
+    default:
+      return assertNever(a2);
+  }
+}
+function abortRequest(entry) {
+  if (entry.authoring.kind === "requesting") {
+    entry.authoring.controller.abort();
+  }
+}
 var Charts = class {
   #entries = /* @__PURE__ */ new Map();
   #author;
@@ -31045,14 +31063,10 @@ var Charts = class {
     if (!entry) {
       const tap = new OutputTap(p3.command);
       const known2 = this.#memory?.load(p3.id);
-      const declined = known2 && "skip" in known2 ? known2.skip : void 0;
       const runtime = new ChartRuntime(known2 && !("skip" in known2) ? known2 : void 0, p3.startedAt, this.#now);
       entry = {
-        attempts: 0,
-        declined,
-        done: false,
+        authoring: known2 && "skip" in known2 ? { atLines: known2.skip, attempts: 0, kind: "declined" } : { attempts: 0, kind: "idle" },
         files: outputFiles(p3.command).map((path2, i) => new FileTap(`file:${i + 1}`, path2)),
-        frozen: false,
         process: p3,
         runtime,
         tap,
@@ -31073,19 +31087,19 @@ var Charts = class {
   retain(ids) {
     for (const [id, entry] of this.#entries) {
       if (!ids.has(id)) {
-        entry.request?.abort();
+        abortRequest(entry);
         this.#entries.delete(id);
       }
     }
   }
   dispose() {
     this.#disposed = true;
-    this.#entries.forEach((e) => e.request?.abort());
+    this.#entries.forEach(abortRequest);
     this.#entries.clear();
   }
   /** Reads the new output; an exited process gets one flushing read and freezes. */
   #refresh(entry) {
-    if (entry.frozen) {
+    if (entry.authoring.kind === "frozen") {
       return;
     }
     const now = this.#now();
@@ -31098,16 +31112,15 @@ var Charts = class {
     }
     entry.runtime.ingest([entry.tap, ...entry.files], settled2);
     if (settled2) {
-      entry.frozen = true;
-      entry.request?.abort();
-      entry.request = void 0;
+      abortRequest(entry);
+      entry.authoring = { kind: "frozen" };
     } else {
       this.#maybeAuthor(entry, now);
     }
     this.#recompute(entry);
   }
   #recompute(entry) {
-    const view = entry.runtime.view({ authoring: entry.request !== void 0, label: entry.process.command });
+    const view = entry.runtime.view({ authoring: entry.authoring.kind === "requesting", label: entry.process.command });
     const key2 = JSON.stringify(view);
     if (key2 === entry.viewKey) {
       return false;
@@ -31118,7 +31131,9 @@ var Charts = class {
   }
   /** Starts a spec request once the process is old and talkative enough, or re-authors a spec that stopped fitting. */
   #maybeAuthor(entry, now) {
-    if (!this.#author || entry.request || entry.done || entry.attempts >= this.#o.maxAttempts || this.#inFlight >= this.#o.maxInFlight) {
+    const author = this.#author;
+    const state = waiting3(entry.authoring);
+    if (!author || !state || state.attempts >= this.#o.maxAttempts || this.#inFlight >= this.#o.maxInFlight) {
       return;
     }
     if (now - entry.process.startedAt < this.#o.authorAfterMs) {
@@ -31134,10 +31149,10 @@ var Charts = class {
       previous3 = { reason, spec: runtime.spec };
     } else if (!runtime.samples().some((s2) => s2.lines >= MIN_AUTHOR_LINES)) {
       return;
-    } else if (entry.declined !== void 0 && runtime.totalLines < Math.max(2 * entry.declined, entry.declined + REASK_LINES)) {
+    } else if (state.kind === "declined" && runtime.totalLines < Math.max(2 * state.atLines, state.atLines + REASK_LINES)) {
       return;
     }
-    void this.#writeSpec(entry, previous3);
+    void this.#writeSpec(entry, { author, previous: previous3, was: state });
   }
   #reauthorReason(entry, now) {
     const runtime = entry.runtime;
@@ -31150,12 +31165,15 @@ var Charts = class {
     }
     return `no rule matched the last ${runtime.unmatchedLines} lines`;
   }
-  /** One spec request (plus one retry on a rejected answer); installs the spec when it validates. */
-  async #writeSpec(entry, previous3) {
-    const author = this.#author;
+  /**
+   * One spec request by `author` (plus one retry on a rejected answer); installs the spec when it
+   * validates. `was` is where the request started from, `previous` the spec it replaces.
+   */
+  async #writeSpec(entry, { author, previous: previous3, was }) {
     const controller = new AbortController();
-    entry.request = controller;
-    entry.attempts++;
+    const counted2 = { ...was, attempts: was.attempts + 1 };
+    entry.authoring = { controller, kind: "requesting", was: counted2 };
+    let next2 = counted2;
     this.#inFlight++;
     if (this.#recompute(entry)) {
       this.#changed();
@@ -31170,12 +31188,12 @@ var Charts = class {
           return;
         }
         if (answer === void 0) {
-          entry.done = true;
+          next2 = { kind: "unavailable" };
           break;
         }
         if (specSkip(answer) !== void 0) {
-          entry.declined = entry.runtime.totalLines;
-          this.#memory?.save(entry.process.id, { skip: entry.declined });
+          next2 = { atLines: entry.runtime.totalLines, attempts: counted2.attempts, kind: "declined" };
+          this.#memory?.save(entry.process.id, { skip: next2.atLines });
           break;
         }
         const checked = validateSpec(answer, sampleLines(samples), entry.process.command);
@@ -31188,8 +31206,8 @@ var Charts = class {
     } catch {
     } finally {
       this.#inFlight--;
-      if (entry.request === controller) {
-        entry.request = void 0;
+      if (entry.authoring.kind === "requesting" && entry.authoring.controller === controller) {
+        entry.authoring = next2;
       }
     }
     if (controller.signal.aborted || this.#entries.get(entry.process.id) !== entry) {
@@ -65250,9 +65268,9 @@ function within(c, at) {
 // src/workLog.ts
 var SOLO = /* @__PURE__ */ new Set(["clarify", "delegate_task", "todo", "todo_list"]);
 function ownsCard(call) {
-  return SOLO.has(call.name) || isBackgroundCall(call) || waiting3(call) || isConnectCall(call) || call.name === "image_generate" || showsImage(call);
+  return SOLO.has(call.name) || isBackgroundCall(call) || waiting4(call) || isConnectCall(call) || call.name === "image_generate" || showsImage(call);
 }
-function waiting3(call) {
+function waiting4(call) {
   return isWatchCall(call) && call.outcome.kind === "running";
 }
 function showsImage(call) {
@@ -65291,7 +65309,7 @@ function foldOf(turn) {
     if (i === answer || b.kind === "steer" || b.kind === "compaction") {
       continue;
     }
-    if (b.kind === "tool" && (isBackgroundCall(b.call) || waiting3(b.call) || isConnectCall(b.call) || showsImage(b.call) || b.call.subagents?.some((a2) => a2.status === "running" || a2.status === "queued"))) {
+    if (b.kind === "tool" && (isBackgroundCall(b.call) || waiting4(b.call) || isConnectCall(b.call) || showsImage(b.call) || b.call.subagents?.some((a2) => a2.status === "running" || a2.status === "queued"))) {
       continue;
     }
     if (answer >= 0 && i > answer && b.kind === "tool" && b.call.outcome.kind !== "done") {
@@ -68742,7 +68760,7 @@ function reconnectNode(r, now) {
   if (!r) {
     return null;
   }
-  const waiting4 = r.dueAt > now;
+  const waiting5 = r.dueAt > now;
   return /* @__PURE__ */ jsxs(
     "row",
     {
@@ -68753,8 +68771,8 @@ function reconnectNode(r, now) {
       children: [
         /* @__PURE__ */ jsx("spinner", { style: "dots", tone: "warning" }, "spin"),
         /* @__PURE__ */ jsx("text", { text: "Reconnecting to Hermes", wrap: "none" }, "text"),
-        /* @__PURE__ */ jsx("text", { spans: [{ s: "muted", t: ` \xB7 attempt ${r.attempt} \xB7 ${waiting4 ? "next try in" : "trying now\u2026"}` }], wrap: "none" }, "attempt"),
-        waiting4 ? /* @__PURE__ */ jsx("elapsed", { age: countdownAge(r, r.dueAt, now), format: "short" }, "countdown") : null
+        /* @__PURE__ */ jsx("text", { spans: [{ s: "muted", t: ` \xB7 attempt ${r.attempt} \xB7 ${waiting5 ? "next try in" : "trying now\u2026"}` }], wrap: "none" }, "attempt"),
+        waiting5 ? /* @__PURE__ */ jsx("elapsed", { age: countdownAge(r, r.dueAt, now), format: "short" }, "countdown") : null
       ]
     },
     "reconnect"

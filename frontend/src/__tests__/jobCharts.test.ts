@@ -477,4 +477,44 @@ describe('a declined chart', () => {
     expect(asked).toBe(2)
     expect(charts.view(p)?.state).toBe('live')
   })
+
+  it('counts a decline and a rejected request as attempts, and stops asking at the limit', async () => {
+    let asked = 0
+    const bad = { ...LOAD, rules: [{ from: 'out', match: '^nope (?P<rps>\\d+)' }] }
+    const charts = new Charts(() => undefined, { author: async () => (asked++ ? bad : { skip: 'only shell noise' }), maxAttempts: 2, now: () => 20_000 })
+    const p = proc({ output: lines(3) })
+
+    charts.view(p)
+    await new Promise(r => setTimeout(r, 0))
+    expect(asked).toBe(1)
+
+    // Grown past the decline: asked again (one request and its retry), both answers rejected.
+    p.output += lines(6, 4)
+    charts.view(p)
+    await new Promise(r => setTimeout(r, 0))
+    expect(asked).toBe(3)
+
+    p.output += lines(20, 10)
+    charts.view(p)
+    await new Promise(r => setTimeout(r, 0))
+    expect(asked).toBe(3)
+    expect(charts.view(p)?.state).toBe('fallback')
+  })
+})
+
+describe('a chart with no model to write specs', () => {
+  it('asks once, and never again', async () => {
+    let asked = 0
+    const charts = new Charts(() => undefined, { author: async () => void asked++, now: () => 20_000 })
+    const p = proc({ output: lines(3) })
+
+    charts.view(p)
+    await new Promise(r => setTimeout(r, 0))
+    p.output += lines(20, 4)
+    charts.view(p)
+    await new Promise(r => setTimeout(r, 0))
+
+    expect(asked).toBe(1)
+    expect(charts.view(p)?.state).toBe('fallback')
+  })
 })
