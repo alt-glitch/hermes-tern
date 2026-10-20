@@ -1,8 +1,9 @@
-import type { Key } from '@stencil-hq/tern'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { Composer } from '../composer.js'
 import { listNewline, markdownDecor, toggleMark } from '../markdown.js'
+
+import { key, must } from './fakes.js'
 
 const history: string[] = []
 
@@ -10,10 +11,6 @@ vi.mock('@tui/lib/history.js', () => ({
   append: (text: string) => void history.push(text),
   load: () => history
 }))
-
-function key(name: string, mods: Partial<Key> = {}): Key {
-  return { alt: false, ctrl: false, meta: false, name, shift: false, ...mods } as Key
-}
 
 /** Each decor run as `text:tokens`. */
 const styled = (text: string) => markdownDecor(text).map(d => `${text.slice(d.from, d.to)}:${d.s}`)
@@ -42,7 +39,7 @@ describe('markdownDecor', () => {
     expect(styled('**bold _both_**')).toEqual(['**:dim', 'bold :strong', '_:strong dim', 'both:strong em', '_:strong dim', '**:dim'])
 
     for (let i = 1; i < decor.length; i++) {
-      expect(decor[i]!.from).toBeGreaterThanOrEqual(decor[i - 1]!.to)
+      expect(must(decor[i]).from).toBeGreaterThanOrEqual(must(decor[i - 1]).to)
     }
   })
 

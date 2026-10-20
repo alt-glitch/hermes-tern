@@ -16,6 +16,8 @@ new errors; `scripts/lint.mjs` runs every rule everywhere and checks the counts:
 - The list may not gain an entry or raise a count against HEAD, so new code adds no debt. Code that
   moves to a new file is cleaned on the way.
 
+The list is empty now: every file passes every rule. The ratchet stays, so it stays empty.
+
 ## No type assertions
 
 `@typescript-eslint/consistent-type-assertions` (`assertionStyle: 'never'`): no `x as T` and no
@@ -26,6 +28,9 @@ fine.
 
 Casts belong where data crosses in, after it is checked: `src/wire/**` (decoders),
 `src/core/ids.ts` (brands) and `src/gateway/dispatch.ts` (the event table) may use them.
+In the tests, a double that has only what the code under test reaches (a host's few ports, a
+payload's few fields) goes through `stub()` in `src/__tests__/fakes.ts`, the one cast they share;
+`must()` stands in for `!`, and `ofKind()` narrows a union to the variant a test expects.
 
 ## No non-null assertions
 

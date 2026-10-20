@@ -6,6 +6,8 @@ import { slashItems } from '../overlays/completion.js'
 import { openHelp } from '../overlays/help.js'
 import { CommandCatalog, resolveSlashName } from '../slashResolve.js'
 
+import { must, stub } from './fakes.js'
+
 const catalog = {
   canon: {
     '/bundles': '/bundles',
@@ -62,7 +64,7 @@ describe('CommandCatalog', () => {
 
       return catalog
     })
-    const cache = new CommandCatalog({ request } as never)
+    const cache = new CommandCatalog(stub({ request }))
 
     expect(await cache.get('s1')).toBeUndefined()
     fail = false
@@ -119,8 +121,8 @@ describe('/help', () => {
       transcript: { notice: vi.fn() }
     }
 
-    await openHelp(app as never)
-    const text = JSON.stringify(sheet!.node('layer.help'))
+    await openHelp(stub(app))
+    const text = JSON.stringify(must(sheet).node('layer.help'))
 
     expect(text).toContain('"head":"Tern"')
     expect(text).toContain('/ps · /bashes · /shells · /processes')

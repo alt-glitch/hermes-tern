@@ -11,6 +11,8 @@ import type { Compaction, Entry, TurnEntry } from '../model.js'
 import { Transcript } from '../transcript.js'
 import { parts } from '../workLog.js'
 
+import { must } from './fakes.js'
+
 const HANDOFF = [
   '[CONTEXT COMPACTION — REFERENCE ONLY] Earlier turns were compacted into the summary below. Respond ONLY to the latest user message.',
   '## Goal',
@@ -22,7 +24,7 @@ const HANDOFF = [
   '--- END OF CONTEXT SUMMARY — respond to the message below, not the summary above ---'
 ].join('\n')
 
-const lastTurn = (entries: readonly Entry[]) => entries.findLast((e): e is TurnEntry => e.kind === 'turn')!
+const lastTurn = (entries: readonly Entry[]) => must(entries.findLast((e): e is TurnEntry => e.kind === 'turn'))
 
 /** Each entry's kind; a turn lists its blocks' kinds. */
 const shape = (entries: readonly Entry[]) => entries.map(e => (e.kind === 'turn' ? `turn(${e.blocks.map(b => b.kind).join()})` : e.kind))
@@ -79,7 +81,7 @@ describe('compaction in the transcript', () => {
     t.text('reading the repo', 1)
     t.compacting({ at: 1_000, before: 182_000 })
 
-    const c = compactions(t)[0]!
+    const c = must(compactions(t)[0])
     expect(shape(t.entries)).toEqual(['turn(text,compaction)'])
     expect(c).toMatchObject({ before: 182_000, startedAt: 1_000, state: { status: 'running' } })
 

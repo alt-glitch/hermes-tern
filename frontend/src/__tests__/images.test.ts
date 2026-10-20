@@ -2,7 +2,7 @@ import { mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import type { JSX } from '@stencil-hq/tern'
+import type { NodeJson } from '@stencil-hq/tern'
 import { describe, expect, it, vi } from 'vitest'
 
 import { entryId, toolCallId } from '../core/ids.js'
@@ -18,17 +18,10 @@ import { toolNode } from '../view/tools/shell.js'
 import { entryNode, type TranscriptContext } from '../view/transcript.js'
 import { foldOf, ownsCard, pieces } from '../workLog.js'
 
-import { FakeGateway } from './fakes.js'
+import { FakeGateway, must, tree } from './fakes.js'
 
-interface Node {
-  k: string
-  p?: Record<string, unknown>
-  c?: Node[]
-}
-
-const tree = (n: JSX.Element): Node => JSON.parse(JSON.stringify(n)) as Node
-const all = (n: Node): Node[] => [n, ...(n.c ?? []).flatMap(all)]
-const images = (n: Node) => all(n).filter(x => x.k === 'image')
+const all = (n: NodeJson): NodeJson[] => [n, ...(n.c ?? []).flatMap(all)]
+const images = (n: NodeJson) => all(n).filter(x => x.k === 'image')
 
 const dir = mkdtempSync(join(tmpdir(), 'hermes-tern-images-'))
 const PNG = Buffer.concat([
@@ -120,7 +113,7 @@ describe('a resumed prompt with images', () => {
   it('shows its words without the refs, and its images as thumbnails over them', () => {
     const t = new Transcript()
     t.load([{ role: 'user', text: `ion see any new host.\n@image:${shot}\n@image:/nowhere/clip_2.png\n[screenshot]\n[screenshot]` }])
-    const user = t.entries.find(e => e.kind === 'user') as UserEntry
+    const user = must(t.entries.find((e): e is UserEntry => e.kind === 'user'))
 
     expect(user.text).toBe('ion see any new host.')
     expect(user.attachments).toEqual([
@@ -137,7 +130,7 @@ describe('a resumed prompt with images', () => {
 
   it('a resumed in-flight prompt is split the same way', () => {
     const t = new Transcript()
-    t.inflight({ user: `hi\n@image:${shot}` } as never)
+    t.inflight({ user: `hi\n@image:${shot}` })
     expect(t.entries.at(-1)).toMatchObject({ attachments: [{ source: { path: shot } }], kind: 'user', text: 'hi' })
   })
 })
@@ -259,7 +252,7 @@ describe('image cards', () => {
 
     // A failed one has no image to keep in view.
     const failed: ToolCall = { ...img, outcome: { duration: 0, kind: 'error' } }
-    expect(foldOf({ ...turn, blocks: [{ call: failed, id: entryId('b2'), kind: 'tool' }, blocks[2]!] })?.hidden.has('b2')).toBe(true)
+    expect(foldOf({ ...turn, blocks: [{ call: failed, id: entryId('b2'), kind: 'tool' }, must(blocks[2])] })?.hidden.has('b2')).toBe(true)
   })
 })
 

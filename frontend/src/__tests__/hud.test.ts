@@ -1,11 +1,9 @@
-import type { Key } from '@stencil-hq/tern'
 import { describe, expect, it, vi } from 'vitest'
 
 import { Hud, hudKey, pills, type PillSources, todos } from '../chrome/hud.js'
 import type { Todo } from '../model.js'
 
-const key = (name: string, mods: Partial<Key> = {}): Key =>
-  ({ alt: false, ctrl: false, meta: false, name, shift: false, ...mods }) as Key
+import { key } from './fakes.js'
 
 const both = ['agents', 'shells'] as const
 

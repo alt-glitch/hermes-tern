@@ -6,6 +6,8 @@ import type { ToolCall } from '../model.js'
 import { Transcript } from '../transcript.js'
 import { stepLabel, summarize } from '../workLog.js'
 
+import { must, stub } from './fakes.js'
+
 const results = (...entries: Record<string, unknown>[]) => JSON.stringify({ results: entries.map((e, index) => ({ index, ...e })) })
 
 describe('the tool_call bridge', () => {
@@ -49,12 +51,12 @@ describe('the tool_call bridge', () => {
       { kind: 'done', result: 'ok' },
       { error: 'no slack', kind: 'error' }
     ])
-    expect(callApp(one!)).toMatchObject({ action: 'list issues', app: 'Linear' })
+    expect(callApp(must(one))).toMatchObject({ action: 'list issues', app: 'Linear' })
   })
 
   it('unwraps stored bridge calls on resume', () => {
     const t = new Transcript()
-    t.load([
+    t.load(stub([
       { role: 'user', text: 'go' },
       {
         args: { calls: [{ arguments: {}, name: 'connectors__slack__SLACK_SEND_MESSAGE' }] },
@@ -63,7 +65,7 @@ describe('the tool_call bridge', () => {
         role: 'tool',
         tool_call_id: 'c1'
       }
-    ] as never)
+    ]))
 
     const [call] = t.calls('connectors__slack__SLACK_SEND_MESSAGE')
 

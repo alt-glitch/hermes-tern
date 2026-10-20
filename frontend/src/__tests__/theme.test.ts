@@ -11,13 +11,15 @@ import { paletteFor } from '../palette.js'
 import { loadSettings, saveSettings } from '../settings.js'
 import { STYLES } from '../view/styles.js'
 
+import { stub } from './fakes.js'
+
 describe('paletteFor', () => {
   it("sends nothing in Tern mode, so Tern's theme colors the surface", () => {
-    expect(paletteFor('tern', { name: 'default' } as never)).toMatchObject({ dark: {}, light: {} })
+    expect(paletteFor('tern', stub({ name: 'default' }))).toMatchObject({ dark: {}, light: {} })
   })
 
   it('keeps a skin to its semantic colors: no muted, dim or path text', () => {
-    const { dark } = paletteFor('skin', { colors: { accent: '#3366ff' }, name: 'ocean' } as never)
+    const { dark } = paletteFor('skin', stub({ colors: { accent: '#3366ff' }, name: 'ocean' }))
 
     expect(Object.keys(dark ?? {}).sort()).toEqual(
       expect.arrayContaining(['accent', 'error', 'success', 'warning'])

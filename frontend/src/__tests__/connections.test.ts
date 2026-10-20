@@ -21,6 +21,7 @@ import {
 } from '../connections.js'
 import { entryId, liveSessionId, storedSessionId, toolCallId } from '../core/ids.js'
 import type { ToolCall, TurnEntry } from '../model.js'
+import { decodeJson } from '../wire/json.js'
 import { foldOf, ownsCard } from '../workLog.js'
 
 const result = {
@@ -190,7 +191,7 @@ describe('manage_connections without its card', () => {
     const dir = mkdtempSync(join(tmpdir(), 'tern-viewers-'))
 
     markViewer(storedSessionId('s1'), null, dir, {})
-    expect(JSON.parse(readFileSync(join(dir, 'viewers', 's1.json'), 'utf8'))).toEqual({ pid: process.pid })
+    expect(decodeJson(readFileSync(join(dir, 'viewers', 's1.json'), 'utf8'))).toEqual({ pid: process.pid })
     markViewer(storedSessionId('s2'), storedSessionId('s1'), dir)
     expect(existsSync(join(dir, 'viewers', 's1.json'))).toBe(false)
     expect(existsSync(join(dir, 'viewers', 's2.json'))).toBe(true)
@@ -200,7 +201,7 @@ describe('manage_connections without its card', () => {
     const dir = mkdtempSync(join(tmpdir(), 'tern-viewers-'))
 
     markViewer(liveSessionId('s1'), null, dir, { HOME: '/h', TERN_PANE: '42', TERN_PANE_SOCKET: '/s/pane', TERN_WINDOW_KEY: '' })
-    expect(JSON.parse(readFileSync(join(dir, 'viewers', 's1.json'), 'utf8'))).toEqual({
+    expect(decodeJson(readFileSync(join(dir, 'viewers', 's1.json'), 'utf8'))).toEqual({
       pid: process.pid,
       tern: { TERN_PANE: '42', TERN_PANE_SOCKET: '/s/pane' }
     })

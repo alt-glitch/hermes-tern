@@ -3,6 +3,8 @@ import { describe, expect, it } from 'vitest'
 import { hardBreaks, isPreformatted } from '../preformatted.js'
 import { compactCount, parseCount, parseUsage } from '../usage.js'
 
+import { must, ofKind } from './fakes.js'
+
 const FIXTURE = `⏱️ **Rate Limits:** RPM: 794/800 | RPH: 33.6K/33.6K (resets 37m 26s) | TPM: 8.0M/8.0M | TPH: 336.0M/336.0M (resets 37m 21s)
 
 📊 **Session Token Usage**
@@ -48,7 +50,7 @@ describe('parseCount', () => {
 
 describe('parseUsage', () => {
   it('parses every section of a full answer', () => {
-    const sections = parseUsage(FIXTURE)!
+    const sections = must(parseUsage(FIXTURE))
 
     expect(sections.map(s => s.kind)).toEqual(['limits', 'session', 'breakdown', 'credits'])
 
@@ -63,7 +65,7 @@ describe('parseUsage', () => {
       ]
     })
     expect(session).toMatchObject({ context: { max: 800000, used: 132196 } })
-    expect((session as { rows: unknown[] }).rows).toEqual([
+    expect(ofKind(session, 'session').rows).toEqual([
       { key: 'Model', value: 'anthropic/claude-opus-5.5' },
       { key: 'Input tokens', value: '2,947' },
       { key: 'Output tokens', value: '3,604' },
@@ -71,13 +73,13 @@ describe('parseUsage', () => {
       { key: 'API calls', value: '10' }
     ])
     expect(breakdown).toMatchObject({ note: 'estimated' })
-    expect((breakdown as { items: unknown[] }).items).toHaveLength(6)
-    expect((breakdown as { items: { label: string; tokens: number; pct: number }[] }).items[1]).toEqual({
+    expect(ofKind(breakdown, 'breakdown').items).toHaveLength(6)
+    expect(ofKind(breakdown, 'breakdown').items[1]).toEqual({
       label: 'Tool definitions',
       pct: 24,
       tokens: 19161
     })
-    expect((credits as { rows: { key: string; value: string }[] }).rows.at(-1)).toEqual({
+    expect(ofKind(credits, 'credits').rows.at(-1)).toEqual({
       key: 'Top up',
       value: 'https://portal.nousresearch.com/orgs/nousresearch-155/billing?topup=open'
     })
@@ -86,14 +88,14 @@ describe('parseUsage', () => {
 
   it('tolerates missing and reordered sections', () => {
     const partial = `📈 **Nous credits**\nTotal usable: $1.00\n\n📊 **Session Token Usage**\nInput tokens: 5\n`
-    const sections = parseUsage(partial)!
+    const sections = must(parseUsage(partial))
 
     expect(sections.map(s => s.kind)).toEqual(['credits', 'session'])
     expect(sections[1]).toMatchObject({ rows: [{ key: 'Input tokens', value: '5' }] })
   })
 
   it('keeps unknown sections and a preamble as text', () => {
-    const sections = parseUsage('Hello\n\n**Rate Limits:** RPM: 1/10\n\n**Mystery**\nsome words')!
+    const sections = must(parseUsage('Hello\n\n**Rate Limits:** RPM: 1/10\n\n**Mystery**\nsome words'))
 
     expect(sections.map(s => s.kind)).toEqual(['text', 'limits', 'text'])
     expect(sections[2]).toMatchObject({ text: 'some words', title: 'Mystery' })

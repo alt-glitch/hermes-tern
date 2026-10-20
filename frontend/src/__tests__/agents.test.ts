@@ -12,7 +12,7 @@ import { liveSessionId } from '../core/ids.js'
 import type { Subagent } from '../model.js'
 import { Transcript } from '../transcript.js'
 
-import { FakeGateway, must } from './fakes.js'
+import { FakeGateway, must, stub } from './fakes.js'
 
 // A finished child's log as tools/delegation_live_log.py writes it (lab run, 2026-10-17).
 const DONE = `=== Hermes subagent live transcript ===
@@ -129,9 +129,9 @@ describe('Agents', () => {
   function dispatched(paths: string[]) {
     const transcript = new Transcript()
     transcript.messageStart(0)
-    transcript.toolStart({ name: 'delegate_task', tool_id: 'c1' } as never, 0)
+    transcript.toolStart(stub({ name: 'delegate_task', tool_id: 'c1' }), 0)
     transcript.toolComplete(
-      {
+      stub({
         name: 'delegate_task',
         result: {
           delegation_id: 'deleg_1',
@@ -142,7 +142,7 @@ describe('Agents', () => {
           subagent_ids: paths.map((_, i) => `sa-${i}-abcd`)
         },
         tool_id: 'c1'
-      } as never,
+      }),
       0
     )
 
@@ -154,7 +154,7 @@ describe('Agents', () => {
     const path = join(dir, 'task-0.log')
     await writeFile(path, DONE)
     const transcript = dispatched([path])
-    const gw = { request: async () => ({ subagents: [] }) } as unknown as GatewayClient
+    const gw = stub<GatewayClient>({ request: async () => ({ subagents: [] }) })
     let changes = 0
     store = new Agents({ changed: () => changes++, gw, sid: liveSessionId('s1'), transcript })
 
@@ -163,7 +163,7 @@ describe('Agents', () => {
 
     expect(agent).toMatchObject({ delegationId: 'deleg_1', id: 'sa-0-abcd', logPath: path, status: 'queued' })
 
-    await store.refresh(agent!)
+    await store.refresh(must(agent))
 
     expect(agent).toMatchObject({ duration: 8870, status: 'done', summary: 'Finished the delegated task.', toolCount: 2 })
     expect(store.running()).toEqual([])
@@ -182,7 +182,7 @@ describe('Agents', () => {
 
     // The display projection: a delegate_task row with its args and no result.
     const transcript = new Transcript()
-    transcript.load([
+    transcript.load(stub([
       { role: 'user', text: 'survey it' },
       {
         args: { tasks: [{ goal: 'Read the docs' }, { goal: 'Survey the layout' }] },
@@ -190,15 +190,15 @@ describe('Agents', () => {
         role: 'tool',
         tool_call_id: 'c1'
       }
-    ] as never)
+    ]))
     const row = { delegation_id: 'deleg_9', depth: 0, goal: 'Survey the layout', status: 'running', subagent_id: 'sa-1-beef', tool_count: 2 }
     const request = vi.fn(async (method: string) => (method === 'subagent.list' ? { subagents: [row] } : {}))
     let changes = 0
-    store = new Agents({ changed: () => changes++, gw: { request } as unknown as GatewayClient, sid: liveSessionId('s1'), transcript })
+    store = new Agents({ changed: () => changes++, gw: stub<GatewayClient>({ request }), sid: liveSessionId('s1'), transcript })
 
     try {
       store.scan()
-      await vi.waitFor(() => expect(store!.running()).toHaveLength(1))
+      await vi.waitFor(() => expect(must(store).running()).toHaveLength(1))
     } finally {
       process.env['HERMES_HOME'] = before
     }
@@ -207,8 +207,8 @@ describe('Agents', () => {
 
     expect(request).toHaveBeenCalledWith('subagent.list', { session_id: 's1' })
     expect(agent).toMatchObject({ delegationId: 'deleg_9', depth: 0, id: 'sa-1-beef', index: 1, logPath: path, status: 'running' })
-    expect(transcript.delegations()[0]!.subagents).toEqual([agent])
-    await vi.waitFor(() => expect(agent!.tool).toBe('read_file'))
+    expect(must(transcript.delegations()[0]).subagents).toEqual([agent])
+    await vi.waitFor(() => expect(must(agent).tool).toBe('read_file'))
     expect(changes).toBeGreaterThan(0)
   })
 
@@ -270,8 +270,8 @@ describe('Agents', () => {
   it('does not probe a session with no delegate_task call', () => {
     const request = vi.fn(async () => ({ subagents: [] }))
     const transcript = new Transcript()
-    transcript.load([{ role: 'user', text: 'hi' }] as never)
-    store = new Agents({ changed: () => undefined, gw: { request } as unknown as GatewayClient, sid: liveSessionId('s1'), transcript })
+    transcript.load(stub([{ role: 'user', text: 'hi' }]))
+    store = new Agents({ changed: () => undefined, gw: stub<GatewayClient>({ request }), sid: liveSessionId('s1'), transcript })
 
     store.scan()
 
@@ -281,7 +281,7 @@ describe('Agents', () => {
   it('pauses and resumes new spawns through delegation.pause, keeping the flag', async () => {
     const request = vi.fn(async (_method: string, params: { paused: boolean }) => ({ paused: params.paused }))
     let changes = 0
-    store = new Agents({ changed: () => changes++, gw: { request } as unknown as GatewayClient, sid: liveSessionId('s1'), transcript: new Transcript() })
+    store = new Agents({ changed: () => changes++, gw: stub<GatewayClient>({ request }), sid: liveSessionId('s1'), transcript: new Transcript() })
 
     expect(store.paused).toBeUndefined()
     expect(await store.pause(true)).toBe(true)
@@ -414,9 +414,9 @@ describe('Agents', () => {
     function remote(n: number) {
       const transcript = new Transcript()
       transcript.messageStart(0)
-      transcript.toolStart({ name: 'delegate_task', tool_id: 'c1' } as never, 0)
+      transcript.toolStart(stub({ name: 'delegate_task', tool_id: 'c1' }), 0)
       transcript.toolComplete(
-        {
+        stub({
           name: 'delegate_task',
           result: {
             delegation_id: 'deleg_1',
@@ -426,7 +426,7 @@ describe('Agents', () => {
             subagent_ids: Array.from({ length: n }, (_, i) => `sa-${i}-abcd`)
           },
           tool_id: 'c1'
-        } as never,
+        }),
         0
       )
 
@@ -437,7 +437,7 @@ describe('Agents', () => {
       vi.useFakeTimers()
       const request = vi.fn(async () => ({ subagents: [] }))
       const agentEnded = vi.fn()
-      store = new Agents({ agentEnded, changed: () => undefined, gw: { request } as unknown as GatewayClient, sid: liveSessionId('s1'), transcript: remote(2) })
+      store = new Agents({ agentEnded, changed: () => undefined, gw: stub<GatewayClient>({ request }), sid: liveSessionId('s1'), transcript: remote(2) })
 
       store.scan()
       await vi.advanceTimersByTimeAsync(1000)
@@ -477,13 +477,13 @@ describe('Agents', () => {
           ? { subagents: listed ? [{ delegation_id: 'deleg_1', depth: 0, status: 'running', subagent_id: 'sa-0-abcd' }] : [] }
           : { available: true, text: tails.shift() ?? '', truncated: true }
       )
-      store = new Agents({ changed: () => undefined, gw: { request } as unknown as GatewayClient, sid: liveSessionId('s1'), transcript: remote(1) })
+      store = new Agents({ changed: () => undefined, gw: stub<GatewayClient>({ request }), sid: liveSessionId('s1'), transcript: remote(1) })
 
       store.scan()
       await vi.advanceTimersByTimeAsync(1000)
       const [agent] = store.all()
-      expect(agent!.status).toBe('running')
-      expect(agent!.log?.entries.map(e => e.kind)).toEqual(['tool', 'think'])
+      expect(must(agent).status).toBe('running')
+      expect(must(agent).log?.entries.map(e => e.kind)).toEqual(['tool', 'think'])
 
       listed = false
       await vi.advanceTimersByTimeAsync(1000)

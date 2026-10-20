@@ -161,7 +161,7 @@ describe('pull request data', () => {
   })
 
   it('reads a PR: reviewers from requests and reviews, checks, merge methods', () => {
-    const pr = parsePullRequest(ref(5), prJson())!
+    const pr = must(parsePullRequest(ref(5), prJson()))
 
     expect(pr.title).toBe('Fix it')
     expect(pr.reviewers).toEqual([

@@ -19,7 +19,7 @@ import {
 import { Transcript } from '../transcript.js'
 import type { ProcessRow } from '../wire/schemas.js'
 
-import { FakeGateway, must } from './fakes.js'
+import { FakeGateway, must, stub } from './fakes.js'
 
 const NOW = 1_800_000_000_000
 
@@ -139,7 +139,7 @@ describe('Processes', () => {
     ]
     const request = vi.fn(async (method: string) => (method === 'process.list' ? { processes: rows } : {}))
     const changed = vi.fn()
-    const store = new Processes({ changed, gw: { request } as unknown as Pick<GatewayClient, 'request'>, sid: liveSessionId('s1'), transcript })
+    const store = new Processes({ changed, gw: stub<Pick<GatewayClient, 'request'>>({ request }), sid: liveSessionId('s1'), transcript })
 
     store.poke()
     await vi.advanceTimersByTimeAsync(0)
@@ -150,7 +150,7 @@ describe('Processes', () => {
     expect(changed).toHaveBeenCalled()
 
     // It exits; the pill keeps it for the retention window, then drops it.
-    rows = [{ ...rows[0]!, exit_code: 0, exited_at: (NOW + 1000) / 1000, status: 'exited' }]
+    rows = [{ ...must(rows[0]), exit_code: 0, exited_at: (NOW + 1000) / 1000, status: 'exited' }]
     await vi.advanceTimersByTimeAsync(1000)
 
     expect(store.recent().map(p => p.state.status)).toEqual(['done'])
@@ -165,7 +165,7 @@ describe('Processes', () => {
     const transcript = new Transcript()
     const rows: ProcessRow[] = [{ command: 'sleep 90', output_tail: 'tick 1\n', session_id: 'proc_a', status: 'running' }]
     const request = vi.fn(async () => ({ processes: rows }))
-    const store = new Processes({ changed: vi.fn(), gw: { request } as unknown as Pick<GatewayClient, 'request'>, sid: liveSessionId('s1'), transcript })
+    const store = new Processes({ changed: vi.fn(), gw: stub<Pick<GatewayClient, 'request'>>({ request }), sid: liveSessionId('s1'), transcript })
 
     store.poke()
     await vi.advanceTimersByTimeAsync(0)

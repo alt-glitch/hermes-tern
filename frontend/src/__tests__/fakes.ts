@@ -4,7 +4,7 @@
 // arranges what a test starts from through the stores' own APIs.
 import { EventEmitter } from 'node:events'
 
-import { type Key, node, Node, type Region, type RegionName, type Renderable, type Session, Span, type ViewInput } from '@stencil-hq/tern'
+import { type JSX, type Key, node, Node, type NodeJson, type Region, type RegionName, type Renderable, type Session, Span, type ViewInput } from '@stencil-hq/tern'
 import type { GatewayClient } from '@tui/gatewayClient.js'
 import type { SessionInfo } from '@tui/types.js'
 
@@ -216,6 +216,46 @@ export function must<T>(value: T, what = 'a value'): NonNullable<T> {
   }
 
   return value
+}
+
+/**
+ * `value` standing in for a T: a test double with only what the code under test reaches (a
+ * host's few ports, a payload's few fields, a gateway's `request`). T comes from where the value
+ * goes, or is named: `stub<GatewayClient>({ request })`.
+ */
+export function stub<T>(value: unknown): T {
+  // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- boundary: a test double stands in for the whole type
+  return value as T
+}
+
+/** Whether `value` is the `k` variant of its union. */
+function isKind<T extends { kind: string }, K extends T['kind']>(value: T, k: K): value is Extract<T, { kind: K }> {
+  return value.kind === k
+}
+
+/** `value` as its `k` variant, failing the test where it is missing or another kind. */
+export function ofKind<T extends { kind: string }, K extends T['kind']>(value: T | undefined, k: K): Extract<T, { kind: K }> {
+  if (value === undefined || !isKind(value, k)) {
+    throw new Error(`expected ${k}, got ${value?.kind ?? 'nothing'}`)
+  }
+
+  return value
+}
+
+/** `n` as it goes on the wire, `{k, p?, c?}`. */
+export function tree(n: JSX.Element): NodeJson {
+  if (!(n instanceof Node)) {
+    throw new Error('expected a node, got a span')
+  }
+
+  return n.toJSON()
+}
+
+/** The text of each span in a node's `spans` prop, read from its JSON. */
+export function spanTexts(spans: unknown): string[] {
+  const list: readonly unknown[] = Array.isArray(spans) ? spans : []
+
+  return list.flatMap(s => (typeof s === 'object' && s !== null && 't' in s && typeof s.t === 'string' ? [s.t] : []))
 }
 
 /** An overlay with nothing to show that takes every key, for a test to open (`modal`: a question sheet). */

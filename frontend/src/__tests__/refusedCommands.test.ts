@@ -10,6 +10,8 @@ import { subscriptionText } from '../refusedCommands.js'
 import { resolveSlashName } from '../slashResolve.js'
 import { openHermesSplit } from '../watch/spec.js'
 
+import { must, stub } from './fakes.js'
+
 vi.mock('../overlays/background.js', () => ({ openBackground: vi.fn() }))
 vi.mock('../watch/spec.js', () => ({ openHermesSplit: vi.fn(async () => true) }))
 
@@ -27,7 +29,7 @@ function app(reply: (method: string, params: unknown) => unknown = () => null, c
 
 type Fake = ReturnType<typeof app>
 
-const run = (a: Fake, name: string, arg = '') => localCommand(name)!.run(a as unknown as CommandHost, arg)
+const run = (a: Fake, name: string, arg = '') => must(localCommand(name)).run(stub<CommandHost>(a), arg)
 
 beforeEach(() => vi.clearAllMocks())
 
@@ -56,7 +58,7 @@ describe('commands the shared gateway refuses, routed here', () => {
 
     await run(a, 'browser', 'use off')
     expect(a.request).toHaveBeenCalledWith('browser.manage', { action: 'use', enabled: false, session_id: 'sid-1' })
-    expect(a.transcript.notice.mock.calls[0]![0]).toMatch(/^Browser Use mode off.*New sessions get it/)
+    expect(must(a.transcript.notice.mock.calls[0])[0]).toMatch(/^Browser Use mode off.*New sessions get it/)
   })
 
   it("/browser connect shows the shared gateway's refusal, with the default CDP url sent", async () => {
@@ -103,7 +105,7 @@ describe('commands the shared gateway refuses, routed here', () => {
     )
 
     await run(a, 'plugins', 'all')
-    expect(a.transcript.panel.mock.lastCall![1]).toContain('- · **memory-honcho** (bundled, not enabled)')
+    expect(must(a.transcript.panel.mock.lastCall)[1]).toContain('- · **memory-honcho** (bundled, not enabled)')
   })
 
   it('/plugins enable is a usage notice: Ink sends it to slash.exec, which the shared gateway refuses', async () => {
@@ -224,7 +226,7 @@ describe('commands the shared gateway refuses, routed here', () => {
     const a = app()
 
     await run(a, 'worktree', 'new feature')
-    expect(a.transcript.notice.mock.lastCall![0]).toMatch(/^\/worktree new runs only in the classic CLI/)
+    expect(must(a.transcript.notice.mock.lastCall)[0]).toMatch(/^\/worktree new runs only in the classic CLI/)
 
     const early = app(() => null, null)
 
@@ -245,7 +247,7 @@ describe('commands the shared gateway refuses, routed here', () => {
 
     await run(a, 'snapshot', 'restore 1')
     expect(a.request).toHaveBeenCalledTimes(1)
-    expect(a.transcript.notice.mock.lastCall![0]).toMatch(
+    expect(must(a.transcript.notice.mock.lastCall)[0]).toMatch(
       /^\/snapshot list, restore and prune run only in the classic CLI/
     )
   })
@@ -255,7 +257,7 @@ describe('commands the shared gateway refuses, routed here', () => {
 
     await run(a, 'update')
     expect(openHermesSplit).toHaveBeenCalledWith(['update'], '/repo')
-    expect(a.transcript.notice.mock.lastCall![0]).toMatch(/^Running `hermes update` in the split below/)
+    expect(must(a.transcript.notice.mock.lastCall)[0]).toMatch(/^Running `hermes update` in the split below/)
 
     vi.mocked(openHermesSplit).mockResolvedValueOnce(false)
     await run(a, 'update')
@@ -375,8 +377,8 @@ describe('hidden commands', () => {
       transcript: { notice: vi.fn() }
     }
 
-    await openHelp(help as never)
-    const text = JSON.stringify(sheet!.node('layer.help'))
+    await openHelp(stub(help))
+    const text = JSON.stringify(must(sheet).node('layer.help'))
 
     expect(text).toContain('/cron')
     expect(text).not.toContain('/sethome')

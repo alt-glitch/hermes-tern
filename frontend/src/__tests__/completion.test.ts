@@ -7,6 +7,8 @@ import { Composer } from '../composer.js'
 import { completionRequestForInput } from '../hermes/completion.js'
 import { Completion } from '../overlays/completion.js'
 
+import { stub } from './fakes.js'
+
 const history: string[] = []
 
 vi.mock('@tui/lib/history.js', () => ({ append: () => undefined, load: () => history }))
@@ -29,7 +31,7 @@ function setup() {
   }
 
   const host = { changed: vi.fn(), close: vi.fn(), open: vi.fn() }
-  const completion = new Completion(host, gw as unknown as GatewayClient, () => 'sid')
+  const completion = new Completion(host, stub<GatewayClient>(gw), () => 'sid')
   const composer = new Composer()
 
   return { completion, composer }

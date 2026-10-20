@@ -4,6 +4,8 @@ import { assertNever, isDefined, isNonEmpty, type NonEmpty, oneOf } from '../cor
 import { errorText } from '../core/errors.js'
 import { record } from '../wire/json.js'
 
+import { stub } from './fakes.js'
+
 describe('errorText', () => {
   it('reads an Error by its message, and anything else thrown as text', () => {
     expect(errorText(new Error('no route'))).toBe('no route')
@@ -34,9 +36,9 @@ describe('assertNever', () => {
   })
 
   it('throws, naming the value, when data newer than the code gets through', () => {
-    const newer = { kind: 'arc' } as unknown as Shape
+    const newer = stub<Shape>({ kind: 'arc' })
     expect(() => size(newer)).toThrow('Unexpected shape: {"kind":"arc"}')
-    expect(() => assertNever('wat' as never)).toThrow('Unexpected variant: wat')
+    expect(() => assertNever(stub('wat'))).toThrow('Unexpected variant: wat')
   })
 })
 

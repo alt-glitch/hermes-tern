@@ -7,7 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { Composer } from '../composer.js'
 
-import { FakeGateway, fakeTern, given, settle } from './fakes.js'
+import { FakeGateway, fakeTern, given, key, settle } from './fakes.js'
 
 const history: string[] = []
 
@@ -15,10 +15,6 @@ vi.mock('@tui/lib/history.js', () => ({
   append: (text: string) => void history.push(text),
   load: () => history
 }))
-
-function key(name: string, mods: Partial<Key> = {}): Key {
-  return { alt: false, ctrl: false, meta: false, name, shift: false, ...mods } as Key
-}
 
 function typed(c: Composer, text: string) {
   for (const ch of text) {

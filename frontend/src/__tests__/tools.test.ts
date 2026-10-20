@@ -1,4 +1,4 @@
-import type { JSX } from '@stencil-hq/tern'
+import type { NodeJson } from '@stencil-hq/tern'
 import { describe, expect, it } from 'vitest'
 
 import { entryId, subagentKey, toolCallId } from '../core/ids.js'
@@ -7,11 +7,7 @@ import { toolDetail, toolNode } from '../view/tools/shell.js'
 import { entryNode, type TranscriptContext } from '../view/transcript.js'
 import { actionOf, stepLabel } from '../workLog.js'
 
-interface Node {
-  k: string
-  p?: Record<string, unknown>
-  c?: Node[]
-}
+import { spanTexts, tree } from './fakes.js'
 
 const call = (name: string, args: Record<string, unknown>, { id = 'c1', ...more }: Omit<Partial<ToolCall>, 'id'> & { id?: string } = {}): ToolCall => ({
   args,
@@ -25,14 +21,9 @@ const call = (name: string, args: Record<string, unknown>, { id = 'c1', ...more 
   ...more
 })
 
-/** The node as it goes on the wire, `{k, p?, c?}`. */
-const tree = (n: JSX.Element): Node => JSON.parse(JSON.stringify(n)) as Node
-
 /** Every span's text under `n`, in order. */
-function words(n: Node): string[] {
-  const spans = Array.isArray(n.p?.['spans']) ? (n.p['spans'] as { t: string }[]).map(s => s.t) : []
-
-  return [...spans, ...(n.c ?? []).flatMap(words)]
+function words(n: NodeJson): string[] {
+  return [...spanTexts(n.p?.['spans']), ...(n.c ?? []).flatMap(words)]
 }
 
 describe('tool cards', () => {

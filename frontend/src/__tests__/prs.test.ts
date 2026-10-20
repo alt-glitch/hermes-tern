@@ -3,12 +3,14 @@ import { describe, expect, it, vi } from 'vitest'
 
 import { prKey, storedSessionId } from '../core/ids.js'
 import type { BranchTarget } from '../github/branch.js'
-import type { PrRef } from '../github/pullRequest.js'
-import { type Entry, PullRequests } from '../github/store.js'
+import type { PrRef, PullRequest } from '../github/pullRequest.js'
+import { type Entry, type Listed, PullRequests } from '../github/store.js'
 import { parseBody } from '../prs/body.js'
 import { PrView } from '../prs/view.js'
 
-const text = (nodes: unknown[]) => plain({ main: nodes } as never, 200)
+import { ofKind, stub } from './fakes.js'
+
+const text = (nodes: unknown[]) => plain(stub({ main: nodes }), 200)
 
 describe('parseBody', () => {
   it('drops HTML comments and turns HTML into the Markdown it means', () => {
@@ -50,7 +52,7 @@ describe('parseBody', () => {
 
     expect(part).toMatchObject({ kind: 'md' })
 
-    const md = (part as { text: string }).text
+    const md = ofKind(part, 'md').text
 
     expect(md).toContain('Use `<b>`:')
     expect(md).toContain('```html\n<details>x</details>\n```')
@@ -75,7 +77,7 @@ describe('parseBody', () => {
 
 describe('PrView', () => {
   const ref: PrRef = { host: 'github.com', number: 5, repository: 'acme/app', url: 'https://github.com/acme/app/pull/5' }
-  const pr = {
+  const pr: PullRequest = {
     additions: 3,
     author: 'sid',
     autoMerge: null,
@@ -110,13 +112,13 @@ describe('PrView', () => {
 
   const viewOf = (entry: Entry) => {
     const prs = { activity: vi.fn(async () => {}), busy: () => false, entries: () => [entry], files: vi.fn(async () => {}), get: () => entry, poke: vi.fn() }
-    const view = new PrView({ changed: vi.fn(), notice: vi.fn(), open: vi.fn(), prs: prs as unknown as PullRequests }, prKey(ref))
+    const view = new PrView({ changed: vi.fn(), notice: vi.fn(), open: vi.fn(), prs: stub<PullRequests>(prs) }, prKey(ref))
 
     return { prs, view }
   }
 
   it('shows the description, then says the conversation is loading, or why it failed', () => {
-    const entry = { activity: { kind: 'idle' }, files: { kind: 'idle' }, pr, ref, source: 'linked' } as Entry
+    const entry: Listed = { activity: { kind: 'idle' }, files: { kind: 'idle' }, pr, ref, source: 'linked' }
     const { prs, view } = viewOf(entry)
 
     expect(text(view.body('b', 0))).toContain('Fixes it.')
@@ -126,7 +128,7 @@ describe('PrView', () => {
   })
 
   it('reads the files only on the Files tab, and says why they failed', () => {
-    const entry = { activity: { kind: 'idle' }, files: { error: 'timeout', failedAt: 0, kind: 'failed' }, pr, ref, source: 'linked' } as Entry
+    const entry: Listed = { activity: { kind: 'idle' }, files: { error: 'timeout', failedAt: 0, kind: 'failed' }, pr, ref, source: 'linked' }
     const { prs, view } = viewOf(entry)
 
     view.setTab('files')
@@ -139,7 +141,7 @@ describe('PrView', () => {
   })
 
   it('folds a run of commits into one line and draws a review verdict without words as a line', () => {
-    const entry = {
+    const entry: Listed = {
       activity: {
         at: pr.updatedAt,
         kind: 'ready',
@@ -153,7 +155,7 @@ describe('PrView', () => {
       pr,
       ref,
       source: 'linked'
-    } as Entry
+    }
     const out = text(viewOf(entry).view.body('b', Date.parse('2026-10-19T10:05:00Z')))
 
     expect(out).toContain('sid added 2 commits')

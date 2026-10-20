@@ -3,7 +3,9 @@ import { describe, expect, it, vi } from 'vitest'
 import { CONTROL_COMMANDS, type ControlHost, steerTurn } from '../controlCommands.js'
 import { liveSessionId } from '../core/ids.js'
 
-const run = (name: string, host: ControlHost, arg = '') => CONTROL_COMMANDS.find(c => c.name === name)!.run(host, arg)
+import { must, stub } from './fakes.js'
+
+const run = (name: string, host: ControlHost, arg = '') => must(CONTROL_COMMANDS.find(c => c.name === name)).run(host, arg)
 
 function host(over: Partial<ControlHost> = {}, replies: Record<string, unknown> = {}) {
   const request = vi.fn(async (method: string) => {
@@ -19,7 +21,7 @@ function host(over: Partial<ControlHost> = {}, replies: Record<string, unknown> 
   const h = {
     busy: true,
     enqueue: vi.fn(),
-    gw: { request } as unknown as ControlHost['gw'],
+    gw: stub<ControlHost['gw']>({ request }),
     notice: vi.fn(),
     queued: 0,
     sid: liveSessionId('sid-1'),
@@ -131,7 +133,7 @@ describe('control commands', () => {
 
 describe('steerTurn', () => {
   const gw = (steer: unknown) =>
-    ({
+    stub<ControlHost['gw']>({
       request: vi.fn(async (m: string) => {
         if (m === 'session.resume') {
           return { execution_generation: 4 }
@@ -143,7 +145,7 @@ describe('steerTurn', () => {
 
         return steer
       })
-    }) as unknown as ControlHost['gw']
+    })
 
   it('lands at the current generation when the gateway queues it', async () => {
     const g = gw({ status: 'queued' })

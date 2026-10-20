@@ -8,6 +8,8 @@ import { durationCompact } from '../view/format.js'
 import { planStep } from '../view/tools/cards/inline.js'
 import { busyLabel, foldOf, liveLabel, parts, pieces, preparingLabel, presentTense, stepLabel, summarize, thoughtLine, thoughtTitle, type WorkItem } from '../workLog.js'
 
+import { must } from './fakes.js'
+
 const call = (name: string, args: Record<string, unknown> = {}, more: Partial<ToolCall> = {}): ToolCall => ({
   args,
   argsText: '',
@@ -106,15 +108,16 @@ describe('todo lists in a turn', () => {
     t.toolStart({ args: { command: 'pwd' }, name: 'terminal', tool_id: 'c4' }, 4)
     t.toolStart({ args: { merge: true, todos: [{ id: '2', status: 'completed' }, { content: 'Ship', id: '3', status: 'pending' }] }, name: 'todo_list', tool_id: 'c5' }, 5)
 
-    const turn = t.entries.find(e => e.kind === 'turn') as TurnEntry
+    const turn = must(t.entries.find((e): e is TurnEntry => e.kind === 'turn'))
     const ps = pieces(turn.blocks)
 
     // The two older lists join the commands' work group; the newest keeps its checklist card.
     expect(ps.map(p => (p.kind === 'work' ? p.items.map(i => i.id) : p.block.id))).toEqual([['c1', 'c2', 'c3', 'c4'], 'c5'])
 
-    const steps = ps[0]!.kind === 'work' ? ps[0]!.items.flatMap(i => (i.kind === 'tool' && i.call.name === 'todo_list' ? [stepLabel(i.call)] : [])) : []
+    const first = must(ps[0])
+    const steps = first.kind === 'work' ? first.items.flatMap(i => (i.kind === 'tool' && i.call.name === 'todo_list' ? [stepLabel(i.call)] : [])) : []
     expect(steps).toEqual(['Planned 2 steps', 'Plan updated: ✓ Plan, → Build'])
-    expect(summarize(ps[0]!.kind === 'work' ? ps[0]!.items : [])).toBe('Updated the plan 2 times and ran 2 commands')
+    expect(summarize(first.kind === 'work' ? first.items : [])).toBe('Updated the plan 2 times and ran 2 commands')
 
     // A part of the turn (a fold) still knows which list is the turn's newest.
     expect(pieces(turn.blocks.slice(0, 3), turn.blocks).map(p => p.kind)).toEqual(['work'])
@@ -138,7 +141,7 @@ describe('todo lists in a turn', () => {
       { args: { merge: true, todos: [{ id: '1', status: 'completed' }] }, name: 'todo_list', role: 'tool', tool_call_id: 'c2' }
     ])
 
-    const turn = t.entries.find(e => e.kind === 'turn') as TurnEntry
+    const turn = must(t.entries.find((e): e is TurnEntry => e.kind === 'turn'))
     const calls = turn.blocks.flatMap(b => (b.kind === 'tool' ? [b.call] : []))
     expect(calls.map(stepLabel)).toEqual(['Planned 1 step', 'Plan updated: ✓ Plan'])
     expect(pieces(turn.blocks).map(p => p.kind)).toEqual(['work', 'block'])

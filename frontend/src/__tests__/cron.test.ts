@@ -5,6 +5,8 @@ import { toolCallId } from '../core/ids.js'
 import type { ToolCall } from '../model.js'
 import { Cron, type CronJob, isMonitor, isPaused, jobTone, ownJobs, relative } from '../processes/cron.js'
 
+import { stub } from './fakes.js'
+
 const NOW = Date.parse('2026-10-17T12:00:00Z')
 
 const job = (over: Partial<CronJob> = {}): CronJob => ({ enabled: true, job_id: 'j1', name: 'digest', schedule: 'every 30m', ...over })
@@ -60,7 +62,7 @@ describe('Cron', () => {
       async (_method: string, params: Record<string, unknown>): Promise<{ error?: string; jobs?: CronJob[]; success: boolean }> =>
         params['action'] === 'list' ? { jobs: [job()], success: true } : { success: true }
     )
-    const cron = new Cron({ changed: vi.fn(), gw: { request } as unknown as Pick<GatewayClient, 'request'> })
+    const cron = new Cron({ changed: vi.fn(), gw: stub<Pick<GatewayClient, 'request'>>({ request }) })
 
     await cron.refresh()
     expect(request).toHaveBeenCalledWith('cron.manage', { action: 'list', include_disabled: true })

@@ -1,35 +1,27 @@
-import type { JSX } from '@stencil-hq/tern'
+import type { NodeJson } from '@stencil-hq/tern'
 import { describe, expect, it } from 'vitest'
 
-import type { Block, Entry, ToolCall, TurnEntry } from '../model.js'
+import type { Block, Entry, TurnEntry } from '../model.js'
 import { Transcript } from '../transcript.js'
 import { internalNotice } from '../transcript/messages.js'
 import { toolNode } from '../view/tools/shell.js'
 import { entryNode, type TranscriptContext } from '../view/transcript.js'
 
-interface Node {
-  k: string
-  p?: Record<string, unknown>
-  c?: Node[]
+import { must, spanTexts, stub, tree } from './fakes.js'
+
+function words(n: NodeJson): string[] {
+  return [...spanTexts(n.p?.['spans']), ...(typeof n.p?.['text'] === 'string' && n.k === 'md' ? [n.p['text']] : []), ...(n.c ?? []).flatMap(words)]
 }
 
-const tree = (n: JSX.Element): Node => JSON.parse(JSON.stringify(n)) as Node
-
-function words(n: Node): string[] {
-  const spans = Array.isArray(n.p?.['spans']) ? (n.p['spans'] as { t: string }[]).map(s => s.t) : []
-
-  return [...spans, ...(typeof n.p?.['text'] === 'string' && n.k === 'md' ? [n.p['text']] : []), ...(n.c ?? []).flatMap(words)]
-}
-
-function roles(n: Node): string[] {
+function roles(n: NodeJson): string[] {
   return [...(typeof n.p?.['role'] === 'string' ? [n.p['role']] : []), ...(n.c ?? []).flatMap(roles)]
 }
 
-const cx: TranscriptContext = { copy: () => {}, now: 0, welcome: {} as never }
+const cx: TranscriptContext = { copy: () => {}, now: 0, welcome: stub({}) }
 
 function load(messages: object[]): Transcript {
   const t = new Transcript()
-  t.load(messages as never)
+  t.load(stub(messages))
 
   return t
 }
@@ -58,7 +50,7 @@ describe('resumed failed and interrupted turns', () => {
     ])
 
     const [turn] = turns(t.entries)
-    expect(texts(turn!)).toEqual([])
+    expect(texts(must(turn))).toEqual([])
     expect(turn?.end).toMatchObject({ code: '400', error: 'This request is not valid.', hint: NOTICE, status: 'error' })
   })
 
@@ -72,7 +64,7 @@ describe('resumed failed and interrupted turns', () => {
     expect(turn?.end).toMatchObject({ hint: NOTICE, status: 'error' })
     expect(turn?.end.status === 'error' && turn.end.error).toBeUndefined()
 
-    const n = tree(entryNode(turn!, `main.${turn!.id}`, cx))
+    const n = tree(entryNode(must(turn), `main.${must(turn).id}`, cx))
     expect(roles(n)).toContain('omp.error')
     expect(roles(n)).not.toContain('omp.error.message')
     expect(words(n).filter(w => w === NOTICE)).toHaveLength(1)
@@ -85,8 +77,8 @@ describe('resumed failed and interrupted turns', () => {
     ])
 
     const [turn] = turns(t.entries)
-    expect(turn!.end.status).toBe('interrupted')
-    expect(texts(turn!)).toEqual(['Here is the start'])
+    expect(must(turn).end.status).toBe('interrupted')
+    expect(texts(must(turn))).toEqual(['Here is the start'])
   })
 })
 
@@ -140,7 +132,7 @@ describe('resumed commentary (Codex providers)', () => {
     ])
 
     const [turn] = turns(t.entries)
-    expect(texts(turn!)).toEqual(['Checking the repo.', 'Done.'])
+    expect(texts(must(turn))).toEqual(['Checking the repo.', 'Done.'])
   })
 
   it('keeps commentary stored as the reply too only once', () => {
@@ -149,7 +141,7 @@ describe('resumed commentary (Codex providers)', () => {
       { display_commentary: ['First.', 'Second.'], role: 'assistant', text: 'First.\n\nSecond.', timestamp: 2 }
     ])
 
-    expect(texts(turns(t.entries)[0]!)).toEqual(['First.\n\nSecond.'])
+    expect(texts(must(turns(t.entries)[0]))).toEqual(['First.\n\nSecond.'])
   })
 })
 
@@ -167,7 +159,7 @@ describe('resumed edit previews', () => {
       }
     ])
 
-    const call = toolsOf(turns(t.entries)[0]!)[0] as ToolCall
+    const call = must(toolsOf(must(turns(t.entries)[0]))[0])
     expect(call.diff).toBe(inline)
 
     const n = tree(toolNode(call, 0))

@@ -1,5 +1,5 @@
 import type { ServerRequest } from '@hermes/shared/json-rpc-channel'
-import type { Key } from '@stencil-hq/tern'
+import type { NodeJson } from '@stencil-hq/tern'
 import { describe, expect, it, vi } from 'vitest'
 
 import { sharedPromptRequest } from '../hermes/sharedPrompts.js'
@@ -8,9 +8,7 @@ import { promptOverlay, promptTimeoutNotice } from '../overlays/prompts.js'
 import { parsePrompt, type PromptRequest } from '../prompts/parse.js'
 import { promptKey, PromptSheets } from '../prompts/sheets.js'
 
-function key(name: string, mods: Partial<Key> = {}): Key {
-  return { alt: false, ctrl: false, meta: false, name, shift: false, ...mods } as Key
-}
+import { key, must, spanTexts, stub, tree } from './fakes.js'
 
 const ctrlC = key('c', { ctrl: true })
 
@@ -47,17 +45,11 @@ function open(method: string, params: Record<string, unknown>) {
   return { answers, closed, overlay }
 }
 
-interface Node {
-  k: string
-  p?: { text?: unknown }
-  c?: Node[]
-}
-
 /** The `text` the sheet's input shows (masked or not), found in its node tree. */
 function inputText(overlay: Overlay): unknown {
-  const walk = (n: Node): unknown => (n.k === 'input' ? n.p?.text : (n.c ?? []).map(walk).find(t => t !== undefined))
+  const walk = (n: NodeJson): unknown => (n.k === 'input' ? n.p?.['text'] : (n.c ?? []).map(walk).find(t => t !== undefined))
 
-  return walk(JSON.parse(JSON.stringify(overlay.node('layer.prompt:r1'))) as Node)
+  return walk(tree(overlay.node('layer.prompt:r1')))
 }
 
 describe('Ctrl+C on a question sheet', () => {
@@ -153,28 +145,28 @@ function shared(type: 'approval.request' | 'clarify.request', payload: Record<st
   })
   const notices: string[] = []
 
-  const req = sharedPromptRequest(
+  const req = must(sharedPromptRequest(
     { payload: { execution_generation: 3, prompt_id: 'p1', ...payload }, session_id: 's1', type },
-    { request } as never,
+    stub({ request }),
     m => notices.push(m)
-  )!
+  ))
 
   const closed: Overlay[] = []
   const host: OverlayHost = { changed: () => undefined, close: o => closed.push(o), open: () => undefined }
-  const overlay = promptOverlay(host, parsed(req))!
+  const overlay = must(promptOverlay(host, parsed(req)))
 
   return { closed, notices, overlay, replies, req, request }
 }
 
 /** Every text span the sheet shows, joined. */
 function sheetText(overlay: Overlay): string {
-  const walk = (n: { p?: { text?: unknown; spans?: { t: string }[] }; c?: unknown[] }): string[] => [
-    ...(typeof n.p?.text === 'string' ? [n.p.text] : []),
-    ...(n.p?.spans ?? []).map(sp => sp.t),
-    ...((n.c ?? []) as (typeof n)[]).flatMap(walk)
+  const walk = (n: NodeJson): string[] => [
+    ...(typeof n.p?.['text'] === 'string' ? [n.p['text']] : []),
+    ...spanTexts(n.p?.['spans']),
+    ...(n.c ?? []).flatMap(walk)
   ]
 
-  return walk(JSON.parse(JSON.stringify(overlay.node('layer.prompt:shared:p1')))).join(' ')
+  return walk(tree(overlay.node('layer.prompt:shared:p1'))).join(' ')
 }
 
 const settle = () => new Promise(resolve => setTimeout(resolve, 0))
@@ -192,7 +184,7 @@ describe('a shared prompt sheet', () => {
     overlay.onKey(key('n'))
     expect(request).toHaveBeenCalledTimes(1)
 
-    replies[0]!.resolve({ status: 'resolved' })
+    must(replies[0]).resolve({ status: 'resolved' })
     await settle()
     expect(closed).toEqual([overlay])
   })
@@ -201,7 +193,7 @@ describe('a shared prompt sheet', () => {
     const { closed, overlay, replies, request } = shared('approval.request', { command: 'make' })
 
     overlay.onKey(key('y'))
-    replies[0]!.reject(new Error('gateway unavailable'))
+    must(replies[0]).reject(new Error('gateway unavailable'))
     await settle()
 
     expect(closed).toEqual([])
@@ -209,7 +201,7 @@ describe('a shared prompt sheet', () => {
 
     overlay.onKey(key('n'))
     expect(request).toHaveBeenLastCalledWith('approval.respond', expect.objectContaining({ choice: 'deny' }))
-    replies[1]!.resolve({ status: 'resolved' })
+    must(replies[1]).resolve({ status: 'resolved' })
     await settle()
     expect(closed).toEqual([overlay])
   })
@@ -220,7 +212,7 @@ describe('a shared prompt sheet', () => {
     overlay.onKey(key('a', { text: 'a' }))
     overlay.onKey(key('enter'))
     expect(request).toHaveBeenCalledWith('clarify.respond', expect.objectContaining({ answer: 'a' }))
-    replies[0]!.reject(new Error('stale_generation'))
+    must(replies[0]).reject(new Error('stale_generation'))
     await settle()
     expect(closed).toEqual([])
 
@@ -233,7 +225,7 @@ describe('a shared prompt sheet', () => {
     const { closed, notices, overlay, replies } = shared('approval.request', { command: 'make' })
 
     overlay.onKey(key('y'))
-    replies[0]!.resolve({ status: 'already_resolved' })
+    must(replies[0]).resolve({ status: 'already_resolved' })
     await settle()
 
     expect(closed).toEqual([overlay])
