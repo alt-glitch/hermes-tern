@@ -377,7 +377,8 @@ function summary(all: BackgroundProcess[]): string {
     [p => p.status === 'running', 'running'],
     [p => p.status === 'done', 'exited'],
     [p => p.status === 'failed', 'failed'],
-    [p => p.status === 'killed' || p.status === 'lost', 'stopped']
+    [p => p.status === 'killed' || p.status === 'lost', 'stopped'],
+    [p => p.status === 'unknown', 'unknown']
   ])
 }
 

@@ -3,11 +3,13 @@
 // printed (`agent.terminal.output`); status and exits come from polling `process.list`
 // (session-scoped): every second while the sheet is open or a process runs, else every five. Exited processes stay on the pill for
 // Hermes' 60 s (ui-tui/src/app/processRoster.ts); the sheet's All tab keeps whatever the
-// gateway still lists.
+// gateway still lists. When `process.list` keeps failing (the gateway went away), the running
+// processes show as unknown and the poll slows to the idle cadence until it answers again.
 
 import type { GatewayClient } from '@tui/gatewayClient.js'
 
 import type { LiveSessionId } from '../core/ids.js'
+import { Poller } from '../core/poller.js'
 import type { BackgroundProcess, ToolCall } from '../model.js'
 import type { Transcript } from '../transcript.js'
 import { isWatchCall } from '../transcript/calls.js'
@@ -35,6 +37,8 @@ export const OUTPUT_MAX = 32_000
 export const RETAIN_MS = 60_000
 export const FAST_MS = 1000
 export const IDLE_MS = 5000
+/** Failed `process.list` polls in a row after which a running process shows as unknown. */
+export const FAILED_POLLS = 3
 
 const REASON_STATUS: Record<string, BackgroundProcess['status']> = { failed_start: 'failed', killed: 'killed', lost: 'lost' }
 
@@ -93,9 +97,14 @@ export function isRunning(p: BackgroundProcess): boolean {
   return p.status === 'running'
 }
 
-/** Still on the pill: running, or exited within the retention window (an exit with no time is not). */
+/** Not seen to end: running, or unknown (it ran when `process.list` last answered). */
+export function isUnended(p: BackgroundProcess): boolean {
+  return p.status === 'running' || p.status === 'unknown'
+}
+
+/** Still on the pill: not seen to end, or exited within the retention window (an exit with no time is not). */
 export function isRecent(p: BackgroundProcess, now: number): boolean {
-  return isRunning(p) || (p.exitedAt !== undefined && now - p.exitedAt <= RETAIN_MS)
+  return isUnended(p) || (p.exitedAt !== undefined && now - p.exitedAt <= RETAIN_MS)
 }
 
 /** Running first, longest-running first; then exited ones, newest exit first. */
@@ -111,9 +120,9 @@ export function sortProcesses(list: readonly BackgroundProcess[]): BackgroundPro
   )
 }
 
-/** How long it ran (so far, while running). */
+/** How long it ran (so far, while not seen to end). */
 export function processElapsed(p: BackgroundProcess, now: number): number {
-  return Math.max(0, (p.exitedAt ?? (isRunning(p) ? now : p.startedAt)) - p.startedAt)
+  return Math.max(0, (p.exitedAt ?? (isUnended(p) ? now : p.startedAt)) - p.startedAt)
 }
 
 /** The status's palette tone: accent while running, then success, error or warning. */
@@ -121,7 +130,7 @@ export function processTone(status: BackgroundProcess['status']): ProcessLook['t
   return PROCESS_LOOK[status].tone
 }
 
-/** `running`, `exit 0`, `exit 2`, `killed`, `lost`, `failed to start`. */
+/** `running`, `exit 0`, `exit 2`, `killed`, `lost`, `unknown`, `failed to start`. */
 export function processVerdict(p: BackgroundProcess): string {
   switch (p.status) {
     case 'running':
@@ -130,6 +139,8 @@ export function processVerdict(p: BackgroundProcess): string {
     case 'killed':
 
     case 'lost':
+
+    case 'unknown':
       return p.status
 
     default:
@@ -195,14 +206,15 @@ export class Processes {
   readonly #host: ProcessesHost
   readonly #byId = new Map<string, BackgroundProcess>()
   #sid: LiveSessionId | null = null
-  #timer: NodeJS.Timeout | undefined
-  #ticking = false
-  #again = false
-  /** Open sheets wanting the fast cadence. */
-  #watchers = 0
+  /** The poll: fast while a sheet watches or a process runs, idle otherwise or while it fails. */
+  readonly #poller: Poller = new Poller({
+    cadence: () => (this.#failures < FAILED_POLLS && (this.#poller.watched || [...this.#byId.values()].some(isRunning)) ? FAST_MS : IDLE_MS),
+    run: () => this.#poll()
+  })
+  /** `process.list` polls that failed in a row. */
+  #failures = 0
   /** The pill's rows at the last tick, to re-render when one ages out. */
   #shown = ''
-  #disposed = false
   /** Ids a stop was sent for and that still run: the registry can take seconds to end one. */
   readonly #stopping = new Set<string>()
   /** Each process's live chart, kept on `p.chart`. */
@@ -241,23 +253,12 @@ export class Processes {
 
   /** Polls now (a background command just started, the sheet opened, a stop landed). */
   poke() {
-    clearTimeout(this.#timer)
-    this.#timer = undefined
-    void this.#tick()
+    this.#poller.poke()
   }
 
   /** The fast cadence while the returned release has not run (an open sheet). */
   watch(): () => void {
-    this.#watchers++
-    this.poke()
-    let released = false
-
-    return () => {
-      if (!released) {
-        released = true
-        this.#watchers--
-      }
-    }
+    return this.#poller.watch()
   }
 
   /** A chunk `id` printed (`agent.terminal.output`); a process the store does not know yet polls. */
@@ -309,9 +310,7 @@ export class Processes {
   }
 
   dispose() {
-    this.#disposed = true
-    clearTimeout(this.#timer)
-    this.#timer = undefined
+    this.#poller.dispose()
     this.#charts.dispose()
   }
 
@@ -331,37 +330,6 @@ export class Processes {
     return this.#link(touched) || touched.size > 0
   }
 
-  #schedule() {
-    if (this.#disposed) {
-      return
-    }
-
-    clearTimeout(this.#timer)
-    const fast = this.#watchers > 0 || [...this.#byId.values()].some(isRunning)
-    this.#timer = setTimeout(() => void this.#tick(), fast ? FAST_MS : IDLE_MS)
-  }
-
-  async #tick() {
-    if (this.#ticking) {
-      // A poke during a poll: poll once more right after it.
-      this.#again = true
-
-      return
-    }
-
-    this.#ticking = true
-
-    try {
-      do {
-        this.#again = false
-        await this.#poll()
-      } while (this.#again)
-    } finally {
-      this.#ticking = false
-      this.#schedule()
-    }
-  }
-
   async #poll() {
     const sid = this.#host.sid
     let changed = false
@@ -370,6 +338,7 @@ export class Processes {
       // Another session: its processes are not this one's.
       changed = this.#byId.size > 0
       this.#byId.clear()
+      this.#failures = 0
       this.#sid = sid
     }
 
@@ -382,14 +351,18 @@ export class Processes {
     try {
       rows = await rpcParsed(this.#host.gw, 'process.list', { session_id: sid }, processList)
     } catch {
-      // A gateway without process.list, or a session it no longer holds live.
-      return changed ? this.#host.changed() : undefined
+      // A gateway without process.list, or a session it no longer holds live, or no gateway at all.
+      const unknown = sid === this.#host.sid && this.#failed()
+
+      return unknown || changed ? this.#host.changed() : undefined
     }
 
+    // Another session was shown meanwhile: these rows are the last one's.
     if (sid !== this.#host.sid) {
       return
     }
 
+    this.#failures = 0
     const now = Date.now()
     const touched = new Set<BackgroundProcess>()
     const listed = new Set<string>()
@@ -415,7 +388,7 @@ export class Processes {
         continue
       }
 
-      if (isRunning(p)) {
+      if (isUnended(p)) {
         // Gone from the registry while running (a restarted gateway): Hermes calls that lost.
         p.status = 'lost'
         p.exitedAt = now
@@ -441,6 +414,23 @@ export class Processes {
     if (changed) {
       this.#host.changed()
     }
+  }
+
+  /**
+   * Counts a failed poll; at FAILED_POLLS in a row, the running processes show as unknown (nothing
+   * says they still run). True when one changed.
+   */
+  #failed(): boolean {
+    this.#failures++
+
+    if (this.#failures < FAILED_POLLS) {
+      return false
+    }
+
+    const touched = new Set([...this.#byId.values()].filter(isRunning))
+    touched.forEach(p => (p.status = 'unknown'))
+
+    return this.#link(touched) || touched.size > 0
   }
 
   /** Points each background terminal card at its process; true when a card changed. */

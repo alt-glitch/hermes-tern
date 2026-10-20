@@ -4,7 +4,9 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { liveSessionId } from '../core/ids.js'
 import type { BackgroundProcess } from '../model.js'
 import {
+  FAST_MS,
   foldEntry,
+  IDLE_MS,
   isRecent,
   lastLine,
   Processes,
@@ -16,6 +18,8 @@ import {
 } from '../processes/store.js'
 import { Transcript } from '../transcript.js'
 import type { ProcessRow } from '../wire/schemas.js'
+
+import { FakeGateway, must } from './fakes.js'
 
 const NOW = 1_800_000_000_000
 
@@ -174,6 +178,55 @@ describe('Processes', () => {
     store.output('proc_new', 'hello\n')
     await vi.advanceTimersByTimeAsync(0)
     expect(request).toHaveBeenCalledWith('process.list', { session_id: 's1' })
+    store.dispose()
+  })
+
+  it("shows its processes as 'unknown' after three failed polls in a row, polls slower, and takes the answer back", async () => {
+    vi.useFakeTimers({ now: NOW })
+    let down = false
+    const rows: ProcessRow[] = [{ command: 'sleep 90', session_id: 'proc_a', started_epoch: NOW / 1000, status: 'running' }]
+    const gw = new FakeGateway({
+      replies: {
+        'process.list': () => {
+          if (down) {
+            throw new Error('gateway gone')
+          }
+
+          return { processes: rows }
+        }
+      }
+    })
+    const polls = () => gw.methods('process.list').length
+    const changed = vi.fn()
+    const store = new Processes({ changed, gw: gw.client, sid: liveSessionId('s1'), transcript: new Transcript() })
+
+    store.poke()
+    await vi.advanceTimersByTimeAsync(0)
+    expect(store.get('proc_a')?.status).toBe('running')
+
+    // Two failures could be a blip: it still runs, polled every second.
+    down = true
+    await vi.advanceTimersByTimeAsync(2 * FAST_MS)
+    expect(store.get('proc_a')?.status).toBe('running')
+
+    changed.mockClear()
+    await vi.advanceTimersByTimeAsync(FAST_MS)
+    const p = must(store.get('proc_a'))
+    expect(p.status).toBe('unknown')
+    expect(processVerdict(p)).toBe('unknown')
+    expect(store.recent()).toEqual([p])
+    expect(changed).toHaveBeenCalled()
+
+    // Polled at the idle cadence while no answer comes.
+    const before = polls()
+    await vi.advanceTimersByTimeAsync(IDLE_MS - 1)
+    expect(polls()).toBe(before)
+    await vi.advanceTimersByTimeAsync(1)
+    expect(polls()).toBe(before + 1)
+
+    down = false
+    await vi.advanceTimersByTimeAsync(IDLE_MS)
+    expect(store.get('proc_a')?.status).toBe('running')
     store.dispose()
   })
 })

@@ -6,7 +6,7 @@ import { DatabaseSync } from 'node:sqlite'
 import { describe, expect, it, vi } from 'vitest'
 
 import { prKey, storedSessionId, toolCallId } from '../core/ids.js'
-import { parseRemote, parseStacks } from '../github/branch.js'
+import { type BranchTarget, parseRemote, parseStacks } from '../github/branch.js'
 import { ancestry, linkedFromResult, storedLinks } from '../github/links.js'
 import {
   ACTIVITY_QUERY,
@@ -23,6 +23,8 @@ import {
 import { shown } from '../github/remote.js'
 import { PullRequests } from '../github/store.js'
 import type { ToolCall } from '../model.js'
+
+import { must } from './fakes.js'
 
 const ref = (number: number, repository = 'acme/app'): PrRef => ({
   host: 'github.com',
@@ -395,6 +397,57 @@ describe('branch and stacks', () => {
     await vi.waitFor(() => expect(store.entries().map(e => `${e.ref.number}:${e.source}`)).toEqual(['5:linked', '9:branch', '8:stack']))
     await vi.waitFor(() => expect(store.entries().every(e => e.pr)).toBe(true))
     expect(store.entries().find(e => e.ref.number === 8)?.stack?.layers.map(l => l.number)).toEqual([8, 9])
+    store.dispose()
+  })
+
+  it("drops a read for the last session that answers after an adopt, so its branch PR never shows on the new one", async () => {
+    const graphql = vi.fn(async (_host: string, query: string, variables: Record<string, unknown>) => {
+      if (query.includes('pullRequests(headRefName')) {
+        const number = variables['h'] === 'old' ? 7 : 9
+
+        return { repository: { pullRequests: { nodes: [{ headRepositoryOwner: { login: 'acme' }, number, state: 'OPEN', url: `https://github.com/acme/app/pull/${number}` }] } } }
+      }
+
+      return Object.fromEntries(
+        Object.keys(variables)
+          .filter(k => k.startsWith('n'))
+          .map(k => [`p${k.slice(1)}`, prJson({ number: variables[k] })])
+      )
+    })
+    const lookups: ((target: BranchTarget) => void)[] = []
+    const branchOf = () => new Promise<BranchTarget | undefined>(resolve => lookups.push(resolve))
+    let shown = { cwd: '/a', sid: storedSessionId('s1') }
+    const store = new PullRequests({ changed: vi.fn(), cwd: () => shown.cwd, sid: () => shown.sid }, { graphql, rest: vi.fn() }, () => [], branchOf)
+
+    store.adopt()
+    await vi.waitFor(() => expect(lookups).toHaveLength(1))
+
+    shown = { cwd: '/b', sid: storedSessionId('s2') }
+    store.adopt()
+    must(lookups[0])({ head: 'old', host: 'github.com', repository: 'acme/app' })
+
+    // The new session's own lookup runs next; the old answer left nothing behind.
+    await vi.waitFor(() => expect(lookups).toHaveLength(2))
+    expect(store.entries()).toEqual([])
+
+    must(lookups[1])({ head: 'new', host: 'github.com', repository: 'acme/app' })
+    await vi.waitFor(() => expect(store.entries().map(e => `${e.ref.number}:${e.source}`)).toEqual(['9:branch']))
+    store.dispose()
+  })
+
+  it('lists without writing: entries() projects the store, and the stored entries carry no list fields', async () => {
+    const graphql = vi.fn(async () => ({ p0: prJson() }))
+    const store = new PullRequests({ changed: vi.fn(), cwd: () => null, sid: () => storedSessionId('s1') }, { graphql, rest: vi.fn() }, () => [ref(5)])
+    const key = prKey(ref(5))
+
+    store.adopt()
+    expect(store.entries().map(e => `${e.ref.number}:${e.source}`)).toEqual(['5:linked'])
+    // Listing made no entry: the read does.
+    expect(store.get(key)).toBeUndefined()
+
+    await vi.waitFor(() => expect(store.entries()[0]?.pr?.title).toBe('Fix it'))
+    expect(store.get(key)).not.toHaveProperty('source')
+    expect(store.entries()[0]).not.toBe(store.entries()[0])
     store.dispose()
   })
 })

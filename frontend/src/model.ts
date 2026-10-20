@@ -61,7 +61,8 @@ export interface BackgroundProcess {
   /** The registry's process id (`proc_…`): `process.list`'s `session_id`, the terminal result's `session_id`. */
   id: string
   command: string
-  status: 'done' | 'failed' | 'killed' | 'lost' | 'running'
+  /** `unknown`: it ran, and `process.list` has failed since (see Processes), so nothing says whether it still does. */
+  status: 'done' | 'failed' | 'killed' | 'lost' | 'running' | 'unknown'
   /** Epoch milliseconds. */
   startedAt: number
   /** Epoch milliseconds, once it exited and the gateway says when. */

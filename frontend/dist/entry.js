@@ -26420,7 +26420,8 @@ var PROCESS_LOOK = {
   failed: { glyph: "\u2715", icon: "failed", tone: "error", word: "Failed" },
   killed: { glyph: "\u25A0", icon: "aborted", tone: "warning", word: "Stopped" },
   lost: { glyph: "\u25A0", icon: "aborted", tone: "warning", word: "Lost" },
-  running: { glyph: "\u25CF", icon: "running", tone: "accent", word: "Running" }
+  running: { glyph: "\u25CF", icon: "running", tone: "accent", word: "Running" },
+  unknown: { glyph: "?", icon: "pending", tone: "warning", word: "Unknown" }
 };
 
 // src/processes/widgets/view.tsx
@@ -29353,6 +29354,131 @@ function searchCard(call, d) {
   };
 }
 
+// src/core/epoch.ts
+var Epoch = class {
+  #generation = 0;
+  #controller = new AbortController();
+  /** The present generation: 0 until the first `next()`. */
+  get generation() {
+    return this.#generation;
+  }
+  /** A ticket for the present generation: current until the next `next()`. */
+  current() {
+    const generation = this.#generation;
+    return { isCurrent: () => generation === this.#generation, signal: this.#controller.signal };
+  }
+  /** Ends the present generation (its tickets go stale, their signal aborts) and returns a ticket for the new one. */
+  next() {
+    const ended = this.#controller;
+    this.#controller = new AbortController();
+    this.#generation++;
+    ended.abort();
+    return this.current();
+  }
+};
+
+// src/core/poller.ts
+var Poller = class {
+  #options;
+  #epoch = new Epoch();
+  #timer;
+  #running = false;
+  #again = false;
+  #watchers = 0;
+  #key;
+  #disposed = false;
+  constructor(options) {
+    this.#options = options;
+  }
+  /** A round is in flight. */
+  get running() {
+    return this.#running;
+  }
+  /** A `watch()` has not been released (an open sheet wants the fast cadence). */
+  get watched() {
+    return this.#watchers > 0;
+  }
+  /** A ticket for the present session: for reads outside a round (a sheet opening on one row). */
+  ticket() {
+    return this.#epoch.current();
+  }
+  /** Runs a round now, or one more right after the round in flight. */
+  poke() {
+    if (this.#disposed) {
+      return;
+    }
+    clearTimeout(this.#timer);
+    this.#timer = void 0;
+    if (this.#running) {
+      this.#again = true;
+      return;
+    }
+    void this.#loop();
+  }
+  /** Counts as watched (see `watched`) until the returned release runs; pokes now. */
+  watch() {
+    this.#watchers++;
+    this.poke();
+    let released = false;
+    return () => {
+      if (!released) {
+        released = true;
+        this.#watchers--;
+      }
+    };
+  }
+  /**
+   * Another session (`key`): the round in flight goes stale and its signal aborts; the next round
+   * reads for the new one. False, with nothing changed, when `key` is the one adopted last.
+   */
+  adopt(key2) {
+    if (Object.is(key2, this.#key)) {
+      return false;
+    }
+    this.#key = key2;
+    this.#epoch.next();
+    return true;
+  }
+  /** Stops polling for good: no round runs again, and the one in flight goes stale. */
+  dispose() {
+    this.#disposed = true;
+    clearTimeout(this.#timer);
+    this.#timer = void 0;
+    this.#epoch.next();
+  }
+  async #loop() {
+    this.#running = true;
+    try {
+      do {
+        this.#again = false;
+        await this.#round();
+      } while (this.#again && !this.#disposed);
+    } finally {
+      this.#running = false;
+      this.#schedule();
+      this.#options.settled?.();
+    }
+  }
+  async #round() {
+    try {
+      await this.#options.run(this.#epoch.current());
+    } catch (error) {
+      if (!this.#options.onError) {
+        throw error;
+      }
+      this.#options.onError(error);
+    }
+  }
+  #schedule() {
+    clearTimeout(this.#timer);
+    this.#timer = void 0;
+    const ms = this.#disposed ? "off" : this.#options.cadence();
+    if (ms !== "off") {
+      this.#timer = setTimeout(() => this.poke(), ms);
+    }
+  }
+};
+
 // src/processes/widgets/files.ts
 import { closeSync, fstatSync, openSync, readSync } from "node:fs";
 import { homedir as homedir6 } from "node:os";
@@ -31003,6 +31129,7 @@ var OUTPUT_MAX = 32e3;
 var RETAIN_MS = 6e4;
 var FAST_MS = 1e3;
 var IDLE_MS = 5e3;
+var FAILED_POLLS = 3;
 var REASON_STATUS = { failed_start: "failed", killed: "killed", lost: "lost" };
 function processStatus(entry) {
   if (entry.status !== "exited") {
@@ -31040,8 +31167,11 @@ function foldEntry(prev, entry, now) {
 function isRunning2(p3) {
   return p3.status === "running";
 }
+function isUnended(p3) {
+  return p3.status === "running" || p3.status === "unknown";
+}
 function isRecent(p3, now) {
-  return isRunning2(p3) || p3.exitedAt !== void 0 && now - p3.exitedAt <= RETAIN_MS;
+  return isUnended(p3) || p3.exitedAt !== void 0 && now - p3.exitedAt <= RETAIN_MS;
 }
 function sortProcesses(list9) {
   return [...list9].sort(
@@ -31049,7 +31179,7 @@ function sortProcesses(list9) {
   );
 }
 function processElapsed(p3, now) {
-  return Math.max(0, (p3.exitedAt ?? (isRunning2(p3) ? now : p3.startedAt)) - p3.startedAt);
+  return Math.max(0, (p3.exitedAt ?? (isUnended(p3) ? now : p3.startedAt)) - p3.startedAt);
 }
 function processTone(status) {
   return PROCESS_LOOK[status].tone;
@@ -31060,6 +31190,7 @@ function processVerdict(p3) {
       return "running";
     case "killed":
     case "lost":
+    case "unknown":
       return p3.status;
     default:
       return p3.reason === "failed_start" ? "failed to start" : `exit ${p3.exitCode ?? "?"}`;
@@ -31097,14 +31228,15 @@ var Processes = class {
   #host;
   #byId = /* @__PURE__ */ new Map();
   #sid = null;
-  #timer;
-  #ticking = false;
-  #again = false;
-  /** Open sheets wanting the fast cadence. */
-  #watchers = 0;
+  /** The poll: fast while a sheet watches or a process runs, idle otherwise or while it fails. */
+  #poller = new Poller({
+    cadence: () => this.#failures < FAILED_POLLS && (this.#poller.watched || [...this.#byId.values()].some(isRunning2)) ? FAST_MS : IDLE_MS,
+    run: () => this.#poll()
+  });
+  /** `process.list` polls that failed in a row. */
+  #failures = 0;
   /** The pill's rows at the last tick, to re-render when one ages out. */
   #shown = "";
-  #disposed = false;
   /** Ids a stop was sent for and that still run: the registry can take seconds to end one. */
   #stopping = /* @__PURE__ */ new Set();
   /** Each process's live chart, kept on `p.chart`. */
@@ -31134,21 +31266,11 @@ var Processes = class {
   }
   /** Polls now (a background command just started, the sheet opened, a stop landed). */
   poke() {
-    clearTimeout(this.#timer);
-    this.#timer = void 0;
-    void this.#tick();
+    this.#poller.poke();
   }
   /** The fast cadence while the returned release has not run (an open sheet). */
   watch() {
-    this.#watchers++;
-    this.poke();
-    let released = false;
-    return () => {
-      if (!released) {
-        released = true;
-        this.#watchers--;
-      }
-    };
+    return this.#poller.watch();
   }
   /** A chunk `id` printed (`agent.terminal.output`); a process the store does not know yet polls. */
   output(id, chunk) {
@@ -31190,9 +31312,7 @@ var Processes = class {
     }
   }
   dispose() {
-    this.#disposed = true;
-    clearTimeout(this.#timer);
-    this.#timer = void 0;
+    this.#poller.dispose();
     this.#charts.dispose();
   }
   /** Brings the charts of `procs` up to date and relinks the cards of those that changed; true when one did. */
@@ -31207,36 +31327,13 @@ var Processes = class {
     }
     return this.#link(touched) || touched.size > 0;
   }
-  #schedule() {
-    if (this.#disposed) {
-      return;
-    }
-    clearTimeout(this.#timer);
-    const fast = this.#watchers > 0 || [...this.#byId.values()].some(isRunning2);
-    this.#timer = setTimeout(() => void this.#tick(), fast ? FAST_MS : IDLE_MS);
-  }
-  async #tick() {
-    if (this.#ticking) {
-      this.#again = true;
-      return;
-    }
-    this.#ticking = true;
-    try {
-      do {
-        this.#again = false;
-        await this.#poll();
-      } while (this.#again);
-    } finally {
-      this.#ticking = false;
-      this.#schedule();
-    }
-  }
   async #poll() {
     const sid = this.#host.sid;
     let changed = false;
     if (sid !== this.#sid) {
       changed = this.#byId.size > 0;
       this.#byId.clear();
+      this.#failures = 0;
       this.#sid = sid;
     }
     if (!sid) {
@@ -31246,11 +31343,13 @@ var Processes = class {
     try {
       rows2 = await rpcParsed(this.#host.gw, "process.list", { session_id: sid }, processList);
     } catch {
-      return changed ? this.#host.changed() : void 0;
+      const unknown4 = sid === this.#host.sid && this.#failed();
+      return unknown4 || changed ? this.#host.changed() : void 0;
     }
     if (sid !== this.#host.sid) {
       return;
     }
+    this.#failures = 0;
     const now = Date.now();
     const touched = /* @__PURE__ */ new Set();
     const listed = /* @__PURE__ */ new Set();
@@ -31271,7 +31370,7 @@ var Processes = class {
       if (listed.has(p3.id)) {
         continue;
       }
-      if (isRunning2(p3)) {
+      if (isUnended(p3)) {
         p3.status = "lost";
         p3.exitedAt = now;
         touched.add(p3);
@@ -31291,6 +31390,19 @@ var Processes = class {
     if (changed) {
       this.#host.changed();
     }
+  }
+  /**
+   * Counts a failed poll; at FAILED_POLLS in a row, the running processes show as unknown (nothing
+   * says they still run). True when one changed.
+   */
+  #failed() {
+    this.#failures++;
+    if (this.#failures < FAILED_POLLS) {
+      return false;
+    }
+    const touched = new Set([...this.#byId.values()].filter(isRunning2));
+    touched.forEach((p3) => p3.status = "unknown");
+    return this.#link(touched) || touched.size > 0;
   }
   /** Points each background terminal card at its process; true when a card changed. */
   #link(touched) {
@@ -33587,7 +33699,8 @@ function summary3(all8) {
     [(p3) => p3.status === "running", "running"],
     [(p3) => p3.status === "done", "exited"],
     [(p3) => p3.status === "failed", "failed"],
-    [(p3) => p3.status === "killed" || p3.status === "lost", "stopped"]
+    [(p3) => p3.status === "killed" || p3.status === "lost", "stopped"],
+    [(p3) => p3.status === "unknown", "unknown"]
   ]);
 }
 function item(p3, now, stopping) {
@@ -37517,11 +37630,11 @@ function gfmFootnoteToMarkdown(options) {
     return value;
   }
 }
-function mapExceptFirst(line, index2, blank) {
-  return index2 === 0 ? line : mapAll(line, index2, blank);
+function mapExceptFirst(line, index2, blank2) {
+  return index2 === 0 ? line : mapAll(line, index2, blank2);
 }
-function mapAll(line, index2, blank) {
-  return (blank ? "" : "    ") + line;
+function mapAll(line, index2, blank2) {
+  return (blank2 ? "" : "    ") + line;
 }
 
 // node_modules/mdast-util-gfm-strikethrough/lib/index.js
@@ -37804,8 +37917,8 @@ function blockquote2(node3, _, state, info) {
   exit3();
   return value;
 }
-function map2(line, _, blank) {
-  return ">" + (blank ? "" : " ") + line;
+function map2(line, _, blank2) {
+  return ">" + (blank2 ? "" : " ") + line;
 }
 
 // node_modules/mdast-util-to-markdown/lib/util/pattern-in-scope.js
@@ -37933,8 +38046,8 @@ function code2(node3, _, state, info) {
   exit3();
   return value;
 }
-function map3(line, _, blank) {
-  return (blank ? "" : "    ") + line;
+function map3(line, _, blank2) {
+  return (blank2 ? "" : "    ") + line;
 }
 
 // node_modules/mdast-util-to-markdown/lib/util/check-quote.js
@@ -38497,11 +38610,11 @@ function listItem(node3, parent, state, info) {
   );
   exit3();
   return value;
-  function map4(line, index2, blank) {
+  function map4(line, index2, blank2) {
     if (index2) {
-      return (blank ? "" : " ".repeat(size)) + line;
+      return (blank2 ? "" : " ".repeat(size)) + line;
     }
-    return (blank ? bullet : bullet + " ".repeat(size - bullet.length)) + line;
+    return (blank2 ? bullet : bullet + " ".repeat(size - bullet.length)) + line;
   }
 }
 
@@ -66479,29 +66592,6 @@ function onKey(key2, cx, top) {
   KEY_RULES.some((rule) => rule(key2, cx, top));
 }
 
-// src/core/epoch.ts
-var Epoch = class {
-  #generation = 0;
-  #controller = new AbortController();
-  /** The present generation: 0 until the first `next()`. */
-  get generation() {
-    return this.#generation;
-  }
-  /** A ticket for the present generation: current until the next `next()`. */
-  current() {
-    const generation = this.#generation;
-    return { isCurrent: () => generation === this.#generation, signal: this.#controller.signal };
-  }
-  /** Ends the present generation (its tickets go stale, their signal aborts) and returns a ticket for the new one. */
-  next() {
-    const ended = this.#controller;
-    this.#controller = new AbortController();
-    this.#generation++;
-    ended.abort();
-    return this.current();
-  }
-};
-
 // src/flow.ts
 var Switches = class {
   /** One generation per switch: a switch's token is the generation its `begin` started. */
@@ -69733,110 +69823,6 @@ function focusOf(cx) {
 import { readFile as readFile2, stat } from "node:fs/promises";
 import { homedir as homedir11 } from "node:os";
 import { join as join10 } from "node:path";
-
-// src/core/poller.ts
-var Poller = class {
-  #options;
-  #epoch = new Epoch();
-  #timer;
-  #running = false;
-  #again = false;
-  #watchers = 0;
-  #key;
-  #disposed = false;
-  constructor(options) {
-    this.#options = options;
-  }
-  /** A round is in flight. */
-  get running() {
-    return this.#running;
-  }
-  /** A `watch()` has not been released (an open sheet wants the fast cadence). */
-  get watched() {
-    return this.#watchers > 0;
-  }
-  /** A ticket for the present session: for reads outside a round (a sheet opening on one row). */
-  ticket() {
-    return this.#epoch.current();
-  }
-  /** Runs a round now, or one more right after the round in flight. */
-  poke() {
-    if (this.#disposed) {
-      return;
-    }
-    clearTimeout(this.#timer);
-    this.#timer = void 0;
-    if (this.#running) {
-      this.#again = true;
-      return;
-    }
-    void this.#loop();
-  }
-  /** Counts as watched (see `watched`) until the returned release runs; pokes now. */
-  watch() {
-    this.#watchers++;
-    this.poke();
-    let released = false;
-    return () => {
-      if (!released) {
-        released = true;
-        this.#watchers--;
-      }
-    };
-  }
-  /**
-   * Another session (`key`): the round in flight goes stale and its signal aborts; the next round
-   * reads for the new one. False, with nothing changed, when `key` is the one adopted last.
-   */
-  adopt(key2) {
-    if (Object.is(key2, this.#key)) {
-      return false;
-    }
-    this.#key = key2;
-    this.#epoch.next();
-    return true;
-  }
-  /** Stops polling for good: no round runs again, and the one in flight goes stale. */
-  dispose() {
-    this.#disposed = true;
-    clearTimeout(this.#timer);
-    this.#timer = void 0;
-    this.#epoch.next();
-  }
-  async #loop() {
-    this.#running = true;
-    try {
-      do {
-        this.#again = false;
-        await this.#round();
-      } while (this.#again && !this.#disposed);
-    } finally {
-      this.#running = false;
-      this.#schedule();
-      this.#options.settled?.();
-    }
-  }
-  async #round() {
-    try {
-      await this.#options.run(this.#epoch.current());
-    } catch (error) {
-      if (!this.#options.onError) {
-        throw error;
-      }
-      this.#options.onError(error);
-    }
-  }
-  #schedule() {
-    clearTimeout(this.#timer);
-    this.#timer = void 0;
-    const ms = this.#disposed ? "off" : this.#options.cadence();
-    if (ms !== "off") {
-      this.#timer = setTimeout(() => this.poke(), ms);
-    }
-  }
-};
-
-// src/agents/store.ts
 var POLL_MS2 = 1e3;
 var GRACE_POLLS = 3;
 var MISSING_READS = 3;
@@ -71626,6 +71612,7 @@ var BATCH2 = 20;
 var BRANCH_HIT_MS = 6e4;
 var BRANCH_MISS_MS = 3e5;
 var NO_STACK_FIELD = /Field '?stack'? doesn't exist/i;
+var blank = (ref) => ({ activity: { kind: "idle" }, files: { kind: "idle" }, ref });
 var RETRY_MS = 3e4;
 function due(remote, updatedAt, now) {
   switch (remote.kind) {
@@ -71661,10 +71648,12 @@ var PullRequests = class {
   #branchOf;
   /** Why nothing could be read at all (no token). */
   #error;
-  #timer;
-  #loading = false;
-  #again = false;
-  #disposed = false;
+  /** The poll: every minute while a listed PR is open, every 30 s while its checks run. */
+  #poller = new Poller({
+    cadence: () => this.#cadence(),
+    run: (ticket) => this.#read(ticket),
+    settled: () => this.#host.changed()
+  });
   #busy = /* @__PURE__ */ new Set();
   constructor(host, gh = github(), links = (sid) => storedLinks(sid), branchOf = branchTarget) {
     this.#host = host;
@@ -71672,33 +71661,12 @@ var PullRequests = class {
     this.#links = links;
     this.#branchOf = branchOf;
   }
-  /** The linked PRs (oldest link first), then the branch's PR, then stack layers none of them are. */
+  /**
+   * The linked PRs (oldest link first), then the branch's PR, then stack layers none of them are:
+   * each a copy of its entry with its source and stack. Writes nothing.
+   */
   entries() {
-    const seen = /* @__PURE__ */ new Set();
-    const out = [];
-    const add = (ref, source2) => {
-      const key2 = prKey(ref);
-      if (!seen.has(key2)) {
-        seen.add(key2);
-        const e = this.#entry(ref);
-        e.source = source2;
-        out.push(e);
-      }
-    };
-    this.#refs.forEach((r) => add(r, "linked"));
-    if (this.#branch?.ref) {
-      add(this.#branch.ref, "branch");
-    }
-    const inStack = (s2, ref) => ref.host === s2.host && ref.repository === s2.repository && s2.layers.some((l) => l.number === ref.number);
-    for (const s2 of this.#stacks.values()) {
-      if (out.some((e) => inStack(s2, e.ref))) {
-        s2.layers.forEach((l) => add({ host: s2.host, number: l.number, repository: s2.repository, url: `https://${s2.host}/${s2.repository}/pull/${l.number}` }, "stack"));
-      }
-    }
-    for (const e of out) {
-      e.stack = [...this.#stacks.values()].find((s2) => inStack(s2, e.ref));
-    }
-    return out;
+    return this.#list().map(({ ref, source: source2, stack }) => ({ ...this.#entries.get(prKey(ref)) ?? blank(ref), source: source2, stack }));
   }
   /** The native stacks the list's PRs sit in. */
   stacks() {
@@ -71706,7 +71674,7 @@ var PullRequests = class {
   }
   /** The key of the listed PR whose key reads `raw` (a node id's), if one is listed. */
   keyOf(raw2) {
-    return this.entries().map((e) => prKey(e.ref)).find((key2) => key2 === raw2);
+    return this.#list().map((l) => prKey(l.ref)).find((key2) => key2 === raw2);
   }
   get(key2) {
     return this.#entries.get(key2);
@@ -71715,17 +71683,18 @@ var PullRequests = class {
     return this.#error;
   }
   get loading() {
-    return this.#loading;
+    return this.#poller.running;
   }
   busy(key2) {
     return this.#busy.has(key2);
   }
-  /** A session was adopted (a resume, a switch): its stored links replace the old ones. */
+  /** A session was adopted (a resume, a switch): its stored links replace the old ones, and a read in flight drops its answer. */
   adopt() {
     const sid = this.#host.sid();
     if (sid === this.#sid) {
       return;
     }
+    this.#poller.adopt(sid);
     this.#sid = sid;
     this.#refs = sid ? this.#links(sid) : [];
     this.#branch = void 0;
@@ -71764,13 +71733,10 @@ var PullRequests = class {
   }
   /** Reads every linked PR now. */
   poke() {
-    clearTimeout(this.#timer);
-    this.#timer = void 0;
-    void this.#tick();
+    this.#poller.poke();
   }
   dispose() {
-    this.#disposed = true;
-    clearTimeout(this.#timer);
+    this.#poller.dispose();
   }
   /** Comments, reviews and commits of `key`, read once per PR update. */
   activity(key2) {
@@ -71851,43 +71817,51 @@ var PullRequests = class {
       this.poke();
     }
   }
-  #entry(ref) {
-    const key2 = prKey(ref);
-    let e = this.#entries.get(key2);
-    if (!e) {
-      e = { activity: { kind: "idle" }, files: { kind: "idle" }, ref, source: "linked" };
-      this.#entries.set(key2, e);
+  /** The list, as entries() gives it, without the entries: each PR's ref, source and stack. */
+  #list() {
+    const seen = /* @__PURE__ */ new Set();
+    const out = [];
+    const add = (ref, source2) => {
+      const key2 = prKey(ref);
+      if (!seen.has(key2)) {
+        seen.add(key2);
+        out.push({ ref, source: source2 });
+      }
+    };
+    this.#refs.forEach((r) => add(r, "linked"));
+    if (this.#branch?.ref) {
+      add(this.#branch.ref, "branch");
     }
-    return e;
+    const inStack = (s2, ref) => ref.host === s2.host && ref.repository === s2.repository && s2.layers.some((l) => l.number === ref.number);
+    for (const s2 of this.#stacks.values()) {
+      if (out.some((e) => inStack(s2, e.ref))) {
+        s2.layers.forEach((l) => add({ host: s2.host, number: l.number, repository: s2.repository, url: `https://${s2.host}/${s2.repository}/pull/${l.number}` }, "stack"));
+      }
+    }
+    return out.map((e) => ({ ...e, stack: [...this.#stacks.values()].find((s2) => inStack(s2, e.ref)) }));
   }
-  #schedule() {
-    clearTimeout(this.#timer);
+  /** The stored entry of each listed PR, made for those not read yet: what a read writes into. */
+  #listedEntries() {
+    return this.#list().map(({ ref }) => {
+      const key2 = prKey(ref);
+      let e = this.#entries.get(key2);
+      if (!e) {
+        e = blank(ref);
+        this.#entries.set(key2, e);
+      }
+      return e;
+    });
+  }
+  /** How long until the next read: none while no listed PR is open. */
+  #cadence() {
     const open = this.entries().filter((e) => !e.pr || e.pr.state === "open");
-    if (this.#disposed || !open.length) {
-      return;
+    if (!open.length) {
+      return "off";
     }
-    const pending = open.some((e) => e.pr && checksState(e.pr.checks) === "pending");
-    this.#timer = setTimeout(() => void this.#tick(), pending ? PENDING_MS : OPEN_MS);
-  }
-  async #tick() {
-    if (this.#loading) {
-      this.#again = true;
-      return;
-    }
-    this.#loading = true;
-    try {
-      do {
-        this.#again = false;
-        await this.#read();
-      } while (this.#again);
-    } finally {
-      this.#loading = false;
-      this.#schedule();
-      this.#host.changed();
-    }
+    return open.some((e) => e.pr && checksState(e.pr.checks) === "pending") ? PENDING_MS : OPEN_MS;
   }
   /** The branch's PR, looked up again once its last answer is old or the session moved. */
-  async #readBranch() {
+  async #readBranch(ticket) {
     const cwd = this.#host.cwd();
     const now = Date.now();
     const b = this.#branch;
@@ -71896,6 +71870,9 @@ var PullRequests = class {
       return;
     }
     const target = await this.#branchOf(cwd);
+    if (!ticket.isCurrent()) {
+      return;
+    }
     const same = b && b.cwd === cwd && b.target?.head === target?.head && b.target?.repository === target?.repository;
     if (same && now - b.at < (b.ref ? BRANCH_HIT_MS : BRANCH_MISS_MS)) {
       return;
@@ -71906,10 +71883,12 @@ var PullRequests = class {
     } catch {
       ref = same ? b.ref : void 0;
     }
-    this.#branch = { at: now, cwd, ref, target };
+    if (ticket.isCurrent()) {
+      this.#branch = { at: now, cwd, ref, target };
+    }
   }
   /** Which PRs sit in a GitHub stack, and that stack's layers; new layers are read next round. */
-  async #readStacks(entries) {
+  async #readStacks(entries, ticket) {
     const before = [...this.#stacks.keys()].join();
     const byHost = /* @__PURE__ */ new Map();
     for (const e of entries) {
@@ -71938,6 +71917,9 @@ var PullRequests = class {
         asked2.add(key2);
         try {
           const rows2 = await this.#gh.rest(host, "GET", `/repos/${e.ref.repository}/stacks?pull_request=${e.ref.number}`);
+          if (!ticket.isCurrent()) {
+            return false;
+          }
           parseStacks(host, e.ref.repository, rows2).forEach((s2) => this.#stacks.set(s2.key, s2));
         } catch {
         }
@@ -71945,15 +71927,19 @@ var PullRequests = class {
     }
     return [...this.#stacks.keys()].join() !== before;
   }
-  async #read() {
-    await this.#readBranch();
-    await this.#readPrs();
-    if (await this.#readStacks(this.entries())) {
-      await this.#readPrs();
+  /** One round: the branch's PR, every listed PR, and the stacks they sit in; it stops once another session is adopted. */
+  async #read(ticket) {
+    await this.#readBranch(ticket);
+    if (!ticket.isCurrent()) {
+      return;
+    }
+    await this.#readPrs(ticket);
+    if (ticket.isCurrent() && await this.#readStacks(this.#listedEntries(), ticket) && ticket.isCurrent()) {
+      await this.#readPrs(ticket);
     }
   }
-  async #readPrs() {
-    const entries = this.entries();
+  async #readPrs(ticket) {
+    const entries = this.#listedEntries();
     const byHost = /* @__PURE__ */ new Map();
     for (const e of entries) {
       byHost.set(e.ref.host, [...byHost.get(e.ref.host) ?? [], e]);
@@ -71965,12 +71951,18 @@ var PullRequests = class {
         const { query, variables } = batchQuery(chunk.map((e) => e.ref));
         try {
           const answers = batchAnswers.parse(await this.#gh.graphql(host, query, variables));
+          if (!ticket.isCurrent()) {
+            return;
+          }
           chunk.forEach((e, j) => {
             const pr = parsePullRequest(e.ref, answers[`p${j}`]);
             e.pr = pr ?? e.pr;
             e.error = pr ? void 0 : "GitHub has no such pull request, or this token cannot see it.";
           });
         } catch (error) {
+          if (!ticket.isCurrent()) {
+            return;
+          }
           failed = errorText(error);
           chunk.forEach((e) => e.error = failed);
         }

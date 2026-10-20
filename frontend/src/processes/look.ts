@@ -21,5 +21,6 @@ export const PROCESS_LOOK = {
   failed: { glyph: '✕', icon: 'failed', tone: 'error', word: 'Failed' },
   killed: { glyph: '■', icon: 'aborted', tone: 'warning', word: 'Stopped' },
   lost: { glyph: '■', icon: 'aborted', tone: 'warning', word: 'Lost' },
-  running: { glyph: '●', icon: 'running', tone: 'accent', word: 'Running' }
+  running: { glyph: '●', icon: 'running', tone: 'accent', word: 'Running' },
+  unknown: { glyph: '?', icon: 'pending', tone: 'warning', word: 'Unknown' }
 } as const satisfies Record<BackgroundProcess['status'], ProcessLook>
