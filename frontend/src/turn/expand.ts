@@ -2,6 +2,7 @@
 // text. A command that cannot run refuses the whole prompt, which goes back to the composer to
 // edit. The busy path (a steer, a redirect, an admission) and a send both expand through here.
 
+import type { LiveSessionId } from '../core/ids.js'
 import type { Image } from '../draft/attachments.js'
 import { interpolate, shellError, typedCommands } from '../hermes/shell.js'
 import type { NoticeEntry } from '../model.js'
@@ -40,7 +41,7 @@ export function hasCommands(prompt: TypedPrompt): boolean {
  * `prompt` with its `{!cmd}`s run in session `sid` (the prompt itself when it has none); undefined
  * when one failed, after the notice says so and the prompt is back in the composer.
  */
-export async function expand(host: ExpandHost, sid: string, prompt: Prompt): Promise<Expanded | undefined> {
+export async function expand(host: ExpandHost, sid: LiveSessionId, prompt: Prompt): Promise<Expanded | undefined> {
   if (prompt.kind !== 'typed' || !hasCommands(prompt)) {
     return prompt
   }

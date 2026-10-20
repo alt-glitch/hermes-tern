@@ -2,10 +2,13 @@
 // for each kind, and the types the send path sees (a typed prompt with no {!cmd} is still typed).
 import { describe, expect, expectTypeOf, it } from 'vitest'
 
+import { liveSessionId } from '../core/ids.js'
 import { type ExpandHost, expand, hasCommands } from '../turn/expand.js'
 import type { Prompt, TypedPrompt } from '../turn/prompt.js'
 
 import { FakeGateway, type Reply } from './fakes.js'
+
+const S1 = liveSessionId('s1')
 
 /** A typed prompt of `text`, with `pasted` as the text pasted into its draft. */
 function typed(text: string, pasted: readonly string[] = []): TypedPrompt {
@@ -73,7 +76,7 @@ describe('expand', () => {
     ]
 
     for (const prompt of prompts) {
-      expect(await expand(h, 's1', prompt)).toBe(prompt)
+      expect(await expand(h, S1, prompt)).toBe(prompt)
     }
 
     expect(gw.methods('shell.exec')).toEqual([])
@@ -84,7 +87,7 @@ describe('expand', () => {
     const image = { mime: 'image/png', name: 'a.png', path: '/tmp/a.png' }
     const prompt: TypedPrompt = { images: [image], kind: 'typed', pasted: [], text: 'today is {!date}' }
 
-    expect(await expand(h, 's1', prompt)).toEqual({ images: [image], text: 'today is <date>' })
+    expect(await expand(h, S1, prompt)).toEqual({ images: [image], text: 'today is <date>' })
     expect(gw.methods('shell.exec').map(c => c.params)).toEqual([{ command: 'date', session_id: 's1' }])
   })
 
@@ -96,7 +99,7 @@ describe('expand', () => {
     })
     const prompt = typed('today is {!date}')
 
-    expect(await expand(h, 's1', prompt)).toBeUndefined()
+    expect(await expand(h, S1, prompt)).toBeUndefined()
     expect(notices).toHaveLength(1)
     expect(notices[0]?.text).toMatch(/^Not sent: a \{!…\} command failed: /)
     expect(notices[0]?.tone).toBe('error')

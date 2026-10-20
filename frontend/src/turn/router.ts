@@ -220,7 +220,7 @@ export class PromptRouter {
   }
 
   /** `prompt` with its `{!cmd}`s run (a typed prompt's); undefined when one failed (the prompt is back in the composer). */
-  expanded(sid: string, prompt: Prompt): Promise<Expanded | undefined> {
+  expanded(sid: LiveSessionId, prompt: Prompt): Promise<Expanded | undefined> {
     return expand(this.#host, sid, prompt)
   }
 
