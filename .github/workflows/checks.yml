@@ -1,5 +1,6 @@
-# The checks main's ruleset requires: the plugin's Python tests, and the frontend's typecheck, tests
-# and bundle build against hermes-agent's main (the frontend inlines ui-tui and apps/shared from it).
+# The checks main's ruleset requires (`python`, `frontend`), and the frontend's other gates in jobs
+# of their own so a failure names what broke. The frontend jobs build against the hermes-agent
+# commit in frontend/hermes-src.lock: the bundle inlines ui-tui and apps/shared from it.
 name: checks
 
 on:
@@ -16,6 +17,7 @@ concurrency:
 
 jobs:
   python:
+    name: python
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -26,6 +28,7 @@ jobs:
       - run: uv run --no-project --python 3.11 --with pytest python -m pytest -q
 
   frontend:
+    name: frontend
     runs-on: ubuntu-latest
     timeout-minutes: 15
     defaults:
@@ -35,15 +38,94 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - id: lock
+        # The lock comes from the PR: accept only a full commit SHA as checkout's ref.
+        run: |
+          sha=$(tr -d '[:space:]' < hermes-src.lock)
+          [[ $sha =~ ^[0-9a-f]{40}$ ]] || { echo "::error file=frontend/hermes-src.lock::not a commit SHA"; exit 1; }
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: NousResearch/hermes-agent
+          ref: ${{ steps.lock.outputs.sha }}
           path: .hermes-agent
           persist-credentials: false
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
       - run: node scripts/hermes-src.mjs && bun install --frozen-lockfile
         env:
           HERMES_SRC: ${{ github.workspace }}/.hermes-agent
-      - run: bun run typecheck
-      - run: bun run test
-      - run: node scripts/build.mjs
+      - name: typecheck
+        run: bun run typecheck
+      - name: tests (unit, app and golden replays)
+        run: bun run test
+
+  lint:
+    name: lint and ratchets
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - id: lock
+        # The lock comes from the PR: accept only a full commit SHA as checkout's ref.
+        run: |
+          sha=$(tr -d '[:space:]' < hermes-src.lock)
+          [[ $sha =~ ^[0-9a-f]{40}$ ]] || { echo "::error file=frontend/hermes-src.lock::not a commit SHA"; exit 1; }
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: NousResearch/hermes-agent
+          ref: ${{ steps.lock.outputs.sha }}
+          path: .hermes-agent
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+      - run: node scripts/hermes-src.mjs && bun install --frozen-lockfile
+        env:
+          HERMES_SRC: ${{ github.workspace }}/.hermes-agent
+      - name: lint
+        run: bun run lint
+      - name: file sizes
+        run: bun run check:size
+      - name: strictness
+        run: bun run check:strict
+      - name: suppressions
+        run: bun run check:suppressions
+
+  bundle:
+    name: bundle is current
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - id: lock
+        # The lock comes from the PR: accept only a full commit SHA as checkout's ref.
+        run: |
+          sha=$(tr -d '[:space:]' < hermes-src.lock)
+          [[ $sha =~ ^[0-9a-f]{40}$ ]] || { echo "::error file=frontend/hermes-src.lock::not a commit SHA"; exit 1; }
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: NousResearch/hermes-agent
+          ref: ${{ steps.lock.outputs.sha }}
+          path: .hermes-agent
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+      - run: node scripts/hermes-src.mjs && bun install --frozen-lockfile
+        env:
+          HERMES_SRC: ${{ github.workspace }}/.hermes-agent
+      - name: rebuild and compare with dist/entry.js
+        run: |
+          TSP_OUT="$RUNNER_TEMP/entry.js" node scripts/build.mjs
+          cmp "$RUNNER_TEMP/entry.js" dist/entry.js || {
+            echo "::error file=frontend/dist/entry.js::dist/entry.js is stale: run 'bun run bundle' and commit it"
+            exit 1
+          }
