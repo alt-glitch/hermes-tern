@@ -15,7 +15,7 @@ import { rpc } from '../wire/rpc.js'
 import type { Activity } from './activity.js'
 import { EXPANDING_LABEL, expand, type Expanded, hasCommands } from './expand.js'
 import { IMAGE_ONLY_PROMPT, type Prompt, shownText, userImages } from './prompt.js'
-import type { PromptQueue } from './queue.js'
+import type { HeldTarget, PromptQueue } from './queue.js'
 import type { BusyMode } from './serverQueue.js'
 
 /** What the gates read: the shown session's state when a prompt arrives. */
@@ -191,8 +191,11 @@ export class PromptRouter {
     host.changed()
   }
 
-  /** Puts `prompt` behind the running turn: into the shared gateway's queue at once, else held here. */
-  behind(prompt: Prompt) {
+  /**
+   * Puts `prompt` behind the running turn: into the shared gateway's queue at once, else held here;
+   * `first` holds it ahead of the prompts held already (it was sent before any of them).
+   */
+  behind(prompt: Prompt, { first = false }: { first?: boolean } = {}) {
     const host = this.#host
     const s = host.gates()
     const gate = canSend(s)
@@ -200,7 +203,14 @@ export class PromptRouter {
     // A private gateway has no queue to admit into: the prompt waits here, for this session (or,
     // with none adopted, for the next).
     if (gate.kind === 'hold' || !s.canonical) {
-      host.queue.hold(prompt, gate.kind === 'hold' ? { kind: 'next' } : { kind: 'session', ref: { live: gate.sid, stored: host.session.ref.stored } })
+      const target: HeldTarget = gate.kind === 'hold' ? { kind: 'next' } : { kind: 'session', ref: { live: gate.sid, stored: host.session.ref.stored } }
+
+      if (first) {
+        host.queue.holdFirst(prompt, target)
+      } else {
+        host.queue.hold(prompt, target)
+      }
+
       host.queue.drain()
 
       return host.changed()
@@ -235,13 +245,18 @@ export class PromptRouter {
 
     if (prompt.kind === 'typed' && hasCommands(prompt)) {
       // The expansion counts as busy: the working line says so, and nothing else is sent meanwhile.
-      // A turn that starts meanwhile takes the row, and the expansion's end leaves it.
+      // A turn that starts meanwhile takes the row, and the expansion's end leaves it; the expanded
+      // prompt then goes behind that turn, not into it, ahead of those held while it expanded (the
+      // shared gateway's queue only appends).
       const row = host.activity.startBusy(EXPANDING_LABEL)
       host.changed()
       void this.expanded(sid, prompt).then(ready => {
+        const overtaken = !row.isCurrent()
         host.activity.endBusy(row)
 
-        if (ready) {
+        if (ready && overtaken) {
+          this.behind({ images: ready.images, kind: 'app', text: ready.text }, { first: true })
+        } else if (ready) {
           this.send({ images: ready.images, kind: 'app', text: ready.text }, { display: prompt.text, queued })
         } else {
           // A command that could not run refuses the whole prompt: it is back in the composer to edit.

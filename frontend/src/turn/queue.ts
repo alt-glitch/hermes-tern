@@ -98,9 +98,12 @@ export class PromptQueue {
     this.#held.push({ prompt, target })
   }
 
-  /** Holds `prompt` ahead of the others, for the session adopted next (a send that found a switch in flight). */
-  holdFirst(prompt: Prompt) {
-    this.#held.unshift({ prompt, target: NEXT })
+  /**
+   * Holds `prompt` ahead of the others, for `target` (the session adopted next by default): a send
+   * that found a switch in flight, or one a turn overtook while its `{!cmd}`s ran.
+   */
+  holdFirst(prompt: Prompt, target: HeldTarget = NEXT) {
+    this.#held.unshift({ prompt, target })
   }
 
   /**

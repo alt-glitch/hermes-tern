@@ -253,12 +253,11 @@ describe("App: a send's {!cmd} expansion counts as a turn", () => {
     await emit('message.delta', { text: 'hi' })
     expect(app.activity.busy).toMatchObject({ label: 'Writing…', since })
 
-    // Expanded: the prompt goes with a working row of its own, and the held one still waits.
+    // Expanded after the turn started: the prompt waits behind the turn, ahead of the one held
+    // meanwhile, and the turn keeps its row.
     shell.resolve({ code: 0, stderr: '', stdout: 'Monday\n' })
-    await vi.waitFor(() => expect(gw.sent('prompt.submit')).toHaveLength(1))
-    expect(gw.sent('prompt.submit')[0]).toMatchObject({ text: 'today is Monday' })
-    expect(app.activity.busy?.label).toBe('Working…')
-    expect(app.activity.busy?.since).not.toBe(since)
-    expect(app.queue.held).toMatchObject([{ text: 'next' }])
+    await vi.waitFor(() => expect(app.queue.held).toMatchObject([{ text: 'today is Monday' }, { text: 'next' }]))
+    expect(gw.sent('prompt.submit')).toEqual([])
+    expect(app.activity.busy).toMatchObject({ label: 'Writing…', since })
   })
 })

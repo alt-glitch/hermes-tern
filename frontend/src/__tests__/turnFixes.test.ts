@@ -129,6 +129,26 @@ describe('the working row is ended only by the work that owns it', () => {
     expect(gw.sent('prompt.submit')).toEqual([])
     expect(app.queue.held).toMatchObject([{ text: 'next' }])
   })
+
+  it('a {!cmd} that resolves after the turn started goes behind the turn, not into it', async () => {
+    const shell = held()
+    const { app, emit, enter, gw } = setup({ 'shell.exec': shell.reply }, { canonical: false })
+    await enter('today is {!date}')
+
+    await emit('message.start')
+    const row = app.activity.busy
+    shell.resolve({ code: 0, stderr: '', stdout: 'Tuesday' })
+    await vi.waitFor(() => expect(app.queue.held).toMatchObject([{ kind: 'app', text: 'today is Tuesday' }]))
+
+    expect(app.activity.busy).toBe(row)
+    expect(gw.sent('prompt.submit')).toEqual([])
+    expect(app.transcript.entries.filter(e => e.kind === 'user')).toEqual([])
+
+    // The turn ends: the expanded prompt goes as the next one, its command not run again.
+    await emit('message.complete')
+    expect(gw.sent('prompt.submit')).toMatchObject([{ queued: true, text: 'today is Tuesday' }])
+    expect(gw.sent('shell.exec')).toHaveLength(1)
+  })
   it('a prompt.submit that fails after its turn started leaves the turn running', async () => {
     const submit = held()
     const { app, emit, enter, notices } = setup({ 'prompt.submit': submit.reply })
