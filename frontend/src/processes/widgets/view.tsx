@@ -161,14 +161,21 @@ export function hovercard(entries: readonly ChartEntry[]): NodeJson | undefined 
 
   const card = (
     <col gap="md" role="omp.jobs.hovercard">
-      <row gap="none" key="tiles" role="omp.job.tiles" wrap>
-        {shown.map(e => tile(e))}
-      </row>
+      {tilesNode(shown)}
       {rest > 0 ? <text key="more" role="omp.jobs.hovercard.more" spans={[sp(`+${rest} more · /ps`, 'dim')]} wrap="none" /> : null}
     </col>
   )
 
   return card instanceof Node ? card.toJSON() : undefined
+}
+
+/** Processes as one frame of tiles (role `omp.job.tiles`), as omp's `wait` card draws its jobs. */
+export function tilesNode(entries: readonly ChartEntry[], key = 'tiles'): JSX.Element {
+  return (
+    <row gap="none" key={key} role="omp.job.tiles" wrap>
+      {entries.map(e => tile(e))}
+    </row>
+  )
 }
 
 const TILE_TONE: Record<BackgroundProcess['status'], Tone> = { done: 'success', failed: 'error', killed: 'warning', lost: 'warning', running: 'accent' }

@@ -19014,12 +19014,12 @@ function chunkEnd(body, start, limit) {
   const target = start + Math.max(1, limit);
   if (target >= body.length)
     return body.length;
-  const safe3 = (at) => ((body[at] ?? 0) & 192) !== 128 && !leadsWithParameter(body, at);
+  const safe4 = (at) => ((body[at] ?? 0) & 192) !== 128 && !leadsWithParameter(body, at);
   for (let at = target; at > start; at--)
-    if (safe3(at))
+    if (safe4(at))
       return at;
   for (let at = target + 1; at < body.length; at++)
-    if (safe3(at))
+    if (safe4(at))
       return at;
   return body.length;
 }
@@ -25737,10 +25737,10 @@ var Transcript = class {
   call(id) {
     return this.#tool(id)?.call;
   }
-  /** The terminal calls that run on as background processes, oldest first. */
+  /** The calls that show a background process: terminal calls that start one, `process` calls that watch one; oldest first. */
   backgroundCalls() {
     return this.entries.flatMap(
-      (e) => e.kind === "turn" ? e.blocks.flatMap((b) => b.kind === "tool" && isBackgroundCall(b.call) ? [b.call] : []) : []
+      (e) => e.kind === "turn" ? e.blocks.flatMap((b) => b.kind === "tool" && (isBackgroundCall(b.call) || isWatchCall(b.call)) ? [b.call] : []) : []
     );
   }
   #tool(id) {
@@ -25850,6 +25850,12 @@ function usageSince(now, before) {
 var passable = (e) => e.kind !== "notice" && e.kind !== "compaction";
 function within(c, at) {
   return at >= c.startedAt - 5e3 && at <= (c.endedAt ?? Date.now()) + 15e3;
+}
+function isProcessTool(name) {
+  return name === "process_manage" || name === "process";
+}
+function isWatchCall(call) {
+  return isProcessTool(call.name) && ["log", "poll", "wait"].includes(String(call.args.action)) && typeof call.args.session_id === "string";
 }
 function isBackgroundCall(call) {
   return call.name === "terminal" && (call.args.background === true || typeof record2(call.result)?.session_id === "string");
@@ -28665,6 +28671,7 @@ var MIN_AUTHOR_LINES = 3;
 var Charts = class {
   #entries = /* @__PURE__ */ new Map();
   #author;
+  #memory;
   #enabled;
   #now;
   #changed;
@@ -28675,6 +28682,7 @@ var Charts = class {
   constructor(changed, options = {}) {
     this.#changed = changed;
     this.#author = options.author;
+    this.#memory = options.memory;
     this.#enabled = options.enabled ?? (() => true);
     this.#now = options.now ?? Date.now;
     this.#o = { ...DEFAULTS, ...Object.fromEntries(Object.entries(options).filter(([k, v]) => k in DEFAULTS && v !== void 0)) };
@@ -28687,10 +28695,11 @@ var Charts = class {
     let entry = this.#entries.get(p3.id);
     if (!entry) {
       const tap = new OutputTap(p3.command);
-      const runtime = new ChartRuntime(void 0, p3.startedAt, this.#now);
+      const known2 = this.#memory?.load(p3.id);
+      const runtime = new ChartRuntime(known2 === "skip" ? void 0 : known2, p3.startedAt, this.#now);
       entry = {
         attempts: 0,
-        done: false,
+        done: known2 === "skip",
         frozen: false,
         process: p3,
         runtime,
@@ -28806,6 +28815,9 @@ var Charts = class {
         }
         if (answer === void 0 || specSkip(answer) !== void 0) {
           entry.done = true;
+          if (answer !== void 0) {
+            this.#memory?.save(entry.process.id, "skip");
+          }
           break;
         }
         const checked = validateSpec(answer, sampleLines(samples), entry.process.command);
@@ -28826,6 +28838,7 @@ var Charts = class {
       return;
     }
     if (spec) {
+      this.#memory?.save(entry.process.id, spec);
       entry.runtime = new ChartRuntime(spec, entry.process.startedAt, this.#now);
       entry.tap.update(entry.process.output);
       entry.runtime.ingest([entry.tap], entry.process.status !== "running");
@@ -29157,16 +29170,23 @@ function linkCalls(calls, procs) {
   const owners = /* @__PURE__ */ new Map();
   const claimed = /* @__PURE__ */ new Set();
   for (const call of calls) {
-    const p3 = byId.get(processIdOf(call) ?? "");
+    const p3 = call.name === "terminal" ? byId.get(processIdOf(call) ?? "") : void 0;
     if (p3) {
       owners.set(call, p3);
       claimed.add(p3.id);
     }
   }
+  for (const call of calls) {
+    const ref = isWatchCall(call) ? String(call.args.session_id).trim() : "";
+    const matches = ref ? procs.filter((p3) => p3.id.startsWith(ref)) : [];
+    if (matches.length === 1) {
+      owners.set(call, matches[0]);
+    }
+  }
   const free = [...procs].sort((a2, b) => a2.startedAt - b.startedAt);
   for (const call of calls) {
     const command = typeof call.args.command === "string" ? call.args.command.trim() : "";
-    if (owners.has(call) || processIdOf(call) || !command) {
+    if (owners.has(call) || processIdOf(call) || !command || call.name !== "terminal") {
       continue;
     }
     const p3 = free.find((x) => !claimed.has(x.id) && x.command && command.startsWith(x.command));
@@ -29271,10 +29291,13 @@ function hovercard(entries) {
   const shown = entries.slice(0, HOVERCARD_JOBS);
   const rest = entries.length - shown.length;
   const card = /* @__PURE__ */ jsxs("col", { gap: "md", role: "omp.jobs.hovercard", children: [
-    /* @__PURE__ */ jsx("row", { gap: "none", role: "omp.job.tiles", wrap: true, children: shown.map((e) => tile(e)) }, "tiles"),
+    tilesNode(shown),
     rest > 0 ? /* @__PURE__ */ jsx("text", { role: "omp.jobs.hovercard.more", spans: [sp(`+${rest} more \xB7 /ps`, "dim")], wrap: "none" }, "more") : null
   ] });
   return card instanceof Node ? card.toJSON() : void 0;
+}
+function tilesNode(entries, key2 = "tiles") {
+  return /* @__PURE__ */ jsx("row", { gap: "none", role: "omp.job.tiles", wrap: true, children: entries.map((e) => tile(e)) }, key2);
 }
 var TILE_TONE = { done: "success", failed: "error", killed: "warning", lost: "warning", running: "accent" };
 var TILE_GLYPH = { done: "\u2713", failed: "\u2715", killed: "\u25A0", lost: "\u25A0", running: "\u25CF" };
@@ -30571,7 +30594,10 @@ var POWERSHELL_VERBS = new Set(
 // src/workLog.ts
 var SOLO = /* @__PURE__ */ new Set(["clarify", "delegate_task", "todo", "todo_list"]);
 function ownsCard(call) {
-  return SOLO.has(call.name) || isBackgroundCall(call) || isConnectCall(call) || call.name === "image_generate" || showsImage(call);
+  return SOLO.has(call.name) || isBackgroundCall(call) || waiting3(call) || isConnectCall(call) || call.name === "image_generate" || showsImage(call);
+}
+function waiting3(call) {
+  return isWatchCall(call) && call.status === "running";
 }
 function showsImage(call) {
   return shownImage(call) !== void 0;
@@ -30609,7 +30635,7 @@ function foldOf(turn) {
     if (i === answer || b.kind === "steer" || b.kind === "compaction") {
       continue;
     }
-    if (b.kind === "tool" && (isBackgroundCall(b.call) || isConnectCall(b.call) || showsImage(b.call) || b.call.subagents?.some((a2) => a2.status === "running" || a2.status === "queued"))) {
+    if (b.kind === "tool" && (isBackgroundCall(b.call) || waiting3(b.call) || isConnectCall(b.call) || showsImage(b.call) || b.call.subagents?.some((a2) => a2.status === "running" || a2.status === "queued"))) {
       continue;
     }
     if (answer >= 0 && i > answer && b.kind === "tool" && b.call.status !== "done") {
@@ -30694,6 +30720,7 @@ function actionOf(call) {
     case "terminal":
     case "execute_code":
     case "process":
+    case "process_manage":
       return "command";
     case "read_file":
       return "read";
@@ -31376,7 +31403,7 @@ function cardOf(call, now) {
         title: "Skill"
       };
   }
-  const look = call.name.startsWith("browser") ? { name: "browser", title: humanize(call.name.replace(/^browser_?/, "")) || "Browser" } : call.name === "session_search" ? { name: "search", title: "Session search" } : call.name === "vision_analyze" ? { name: "image", title: "Vision" } : call.name === "image_generate" ? { name: "image", title: "Image" } : { name: call.name, title: humanize(call.name) };
+  const look = isProcessTool(call.name) ? { name: "terminal", title: PROCESS_ACTIONS[String(call.args.action)] ?? "Process" } : call.name.startsWith("browser") ? { name: "browser", title: humanize(call.name.replace(/^browser_?/, "")) || "Browser" } : call.name === "session_search" ? { name: "search", title: "Session search" } : call.name === "vision_analyze" ? { name: "image", title: "Vision" } : call.name === "image_generate" ? { name: "image", title: "Image" } : { name: call.name, title: humanize(call.name) };
   const src = shownImage(call);
   if (src || call.name === "image_generate") {
     const said = call.status === "running" ? void 0 : str7(result?.analysis) ?? str7(result?.text_summary);
@@ -31391,15 +31418,26 @@ function cardOf(call, now) {
       targetKind: "text"
     };
   }
+  const chart = isWatchCall(call) && call.process?.chart ? tilesNode([{ process: call.process, view: call.process.chart }]) : void 0;
   return {
     ...look,
-    body: genericBody(call),
-    folded: true,
+    body: [...chart ? [chart] : [], ...genericBody(call)],
+    folded: !chart,
     frame: "inline",
-    target: str7(call.args.query) ?? str7(call.args.url) ?? (call.context || void 0),
+    target: (isProcessTool(call.name) && call.process ? commandLine(call.process.command) : void 0) ?? str7(call.args.query) ?? str7(call.args.url) ?? (call.context || void 0),
     targetKind: str7(call.args.url) ? "path" : str7(call.args.query) ? "query" : "text"
   };
 }
+var PROCESS_ACTIONS = {
+  close: "Close process input",
+  kill: "Stop process",
+  list: "List processes",
+  log: "Read process output",
+  poll: "Check process",
+  submit: "Send to process",
+  wait: "Wait for process",
+  write: "Write to process"
+};
 function bashCard(call, result, instead) {
   const output = (str7(result?.output) ?? call.resultText)?.replace(/\s*\[Command interrupted\]\s*$/, "");
   const error = str7(result?.error);
@@ -33120,7 +33158,7 @@ function jobPreview(j, now, own13) {
   ];
 }
 function callOf(app2, id) {
-  return app2.transcript.backgroundCalls().find((c) => (processIdOf(c) ?? c.process?.id) === id);
+  return app2.transcript.backgroundCalls().find((c) => isBackgroundCall(c) && (processIdOf(c) ?? c.process?.id) === id);
 }
 function summary3(all8) {
   const count = (s2) => all8.filter((p3) => p3.status === s2).length;
@@ -35215,15 +35253,15 @@ function collectText(node3, info) {
     start = end + 1;
   }
   let index2 = -1;
-  let join12;
+  let join13;
   while (++index2 < lines.length) {
     if (lines[index2].charCodeAt(lines[index2].length - 1) === 8203 || index2 < lines.length - 1 && lines[index2 + 1].charCodeAt(0) === 8203) {
       result.push(lines[index2]);
-      join12 = void 0;
+      join13 = void 0;
     } else if (lines[index2]) {
-      if (typeof join12 === "number") result.push(join12);
+      if (typeof join13 === "number") result.push(join13);
       result.push(lines[index2]);
-      join12 = 0;
+      join13 = 0;
     } else if (index2 === 0 || index2 === lines.length - 1) {
       result.push(0);
     }
@@ -51912,17 +51950,17 @@ function properties(state, properties2) {
   for (key2 in properties_) {
     if (own9.call(properties_, key2)) {
       const unsafe2 = properties_[key2];
-      let safe3 = propertyValue(
+      let safe4 = propertyValue(
         state,
         findDefinition(specific, key2),
         key2,
         unsafe2
       );
-      if (safe3 === null || safe3 === void 0) {
-        safe3 = propertyValue(state, findDefinition(defaults, key2), key2, unsafe2);
+      if (safe4 === null || safe4 === void 0) {
+        safe4 = propertyValue(state, findDefinition(defaults, key2), key2, unsafe2);
       }
-      if (safe3 !== null && safe3 !== void 0) {
-        result[key2] = safe3;
+      if (safe4 !== null && safe4 !== void 0) {
+        result[key2] = safe4;
       }
     }
   }
@@ -65496,7 +65534,7 @@ function reconnectNode(r, now) {
   if (!r) {
     return null;
   }
-  const waiting3 = r.dueAt > now;
+  const waiting4 = r.dueAt > now;
   return /* @__PURE__ */ jsxs(
     "row",
     {
@@ -65507,8 +65545,8 @@ function reconnectNode(r, now) {
       children: [
         /* @__PURE__ */ jsx("spinner", { style: "dots", tone: "warning" }, "spin"),
         /* @__PURE__ */ jsx("text", { text: "Reconnecting to Hermes", wrap: "none" }, "text"),
-        /* @__PURE__ */ jsx("text", { spans: [{ s: "muted", t: ` \xB7 attempt ${r.attempt} \xB7 ${waiting3 ? "next try in" : "trying now\u2026"}` }], wrap: "none" }, "attempt"),
-        waiting3 ? /* @__PURE__ */ jsx("elapsed", { age: countdownAge(r, r.dueAt, now), format: "short" }, "countdown") : null
+        /* @__PURE__ */ jsx("text", { spans: [{ s: "muted", t: ` \xB7 attempt ${r.attempt} \xB7 ${waiting4 ? "next try in" : "trying now\u2026"}` }], wrap: "none" }, "attempt"),
+        waiting4 ? /* @__PURE__ */ jsx("elapsed", { age: countdownAge(r, r.dueAt, now), format: "short" }, "countdown") : null
       ]
     },
     "reconnect"
@@ -68339,16 +68377,57 @@ function hermesAuthor(env2 = process.env) {
   });
 }
 
+// src/processes/widgets/memory.ts
+import { mkdirSync as mkdirSync4, readdirSync as readdirSync2, readFileSync as readFileSync5, rmSync as rmSync2, statSync, writeFileSync as writeFileSync3 } from "node:fs";
+import { join as join11 } from "node:path";
+var KEEP_MS = 7 * 24 * 36e5;
+var safe3 = (id) => /^[\w.-]{1,128}$/.test(id);
+function chartMemory(dir2 = join11(dataDir(), "charts"), now = Date.now) {
+  return {
+    load(id) {
+      if (!safe3(id)) {
+        return void 0;
+      }
+      try {
+        const value = JSON.parse(readFileSync5(join11(dir2, `${id}.json`), "utf8"));
+        if (value === "skip") {
+          return "skip";
+        }
+        const checked = validateSpec(value);
+        return checked.ok ? checked.spec : void 0;
+      } catch {
+        return void 0;
+      }
+    },
+    save(id, value) {
+      if (!safe3(id)) {
+        return;
+      }
+      try {
+        mkdirSync4(dir2, { recursive: true });
+        writeFileSync3(join11(dir2, `${id}.json`), JSON.stringify(value));
+        for (const name of readdirSync2(dir2)) {
+          const file2 = join11(dir2, name);
+          if (now() - statSync(file2).mtimeMs > KEEP_MS) {
+            rmSync2(file2, { force: true });
+          }
+        }
+      } catch {
+      }
+    }
+  };
+}
+
 // src/settings.ts
-import { mkdirSync as mkdirSync4, readFileSync as readFileSync5, writeFileSync as writeFileSync3 } from "node:fs";
+import { mkdirSync as mkdirSync5, readFileSync as readFileSync6, writeFileSync as writeFileSync4 } from "node:fs";
 import { homedir as homedir11 } from "node:os";
-import { dirname, join as join11 } from "node:path";
+import { dirname, join as join12 } from "node:path";
 function settingsFile(env2 = process.env) {
-  return join11(env2.HERMES_HOME || join11(homedir11(), ".hermes"), "hermes-tern", "settings.json");
+  return join12(env2.HERMES_HOME || join12(homedir11(), ".hermes"), "hermes-tern", "settings.json");
 }
 function loadSettings(file2 = settingsFile()) {
   try {
-    const parsed = JSON.parse(readFileSync5(file2, "utf8"));
+    const parsed = JSON.parse(readFileSync6(file2, "utf8"));
     return parsed && typeof parsed === "object" ? parsed : {};
   } catch {
     return {};
@@ -68356,8 +68435,8 @@ function loadSettings(file2 = settingsFile()) {
 }
 function saveSettings(patch6, file2 = settingsFile()) {
   const next3 = { ...loadSettings(file2), ...patch6 };
-  mkdirSync4(dirname(file2), { recursive: true });
-  writeFileSync3(file2, `${JSON.stringify(next3, null, 2)}
+  mkdirSync5(dirname(file2), { recursive: true });
+  writeFileSync4(file2, `${JSON.stringify(next3, null, 2)}
 `);
   return next3;
 }
@@ -68884,7 +68963,7 @@ var App = class {
   /** The session's subagents, followed while they run (Task cards, the pill, the hub). */
   agents = new Agents(this);
   /** The session's background processes (the shells pill, the Background sheet, background cards). */
-  processes = new Processes(this, { author: hermesAuthor(), enabled: () => this.#jobCharts });
+  processes = new Processes(this, { author: hermesAuthor(), enabled: () => this.#jobCharts, memory: chartMemory() });
   cron = new Cron(this);
   sidebar = new Sidebar(this);
   /** The pull request docked at the pane's right edge (the PR aside). */

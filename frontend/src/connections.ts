@@ -31,7 +31,7 @@ export const POLL_MS = 2000
  */
 export const STALE_MS = 2 * 60_000
 
-const dataDir = (env: NodeJS.ProcessEnv = process.env) => join(env.HERMES_HOME || join(homedir(), '.hermes'), 'plugin-data', 'hermes-tern')
+export const dataDir = (env: NodeJS.ProcessEnv = process.env) => join(env.HERMES_HOME || join(homedir(), '.hermes'), 'plugin-data', 'hermes-tern')
 
 /**
  * Why nothing moves a card's rows any more (the desktop's settle reasons, and the plugin's own):

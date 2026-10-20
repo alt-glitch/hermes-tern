@@ -20,8 +20,9 @@ the user's prompt, so one home covers every flow:
     "background…" -> (at the start) a 90 s ticking background process that notifies on exit
     "watch…"    -> (at the start) a 2 min ticking background process watching for "tick 10"
     "jobchart…" -> (at the start) a 2 min background benchmark printing tok/s and loss against a
-                   stated goal; after 15 s the plugin asks this model for its chart spec, and the
-                   shells pill charts it (hover it for the tiles), as do its card and /ps
+                   stated goal, then a 40 s `process_manage` wait on it; after 15 s the plugin asks this model
+                   for its chart spec, and the shells pill charts it (hover it for the tiles), as
+                   do its card, the wait card and /ps
     "errands…"  -> (at the start) a four-item todo list worked through over slow steps
     "connector…" -> (at the start) a tool search, a two-app connector batch and one connector call
     "ternenv"   -> (at the start) prints the TERN_* variables from a command, a background command and a Python cell's command
@@ -339,6 +340,13 @@ class Model(BaseHTTPRequestHandler):
         else:
             answered = bool(messages) and messages[-1].get("role") == "tool"
             calls = None if answered else _calls(prompt, self.server.target)
+            # jobchart: once the bench started, wait on it for a while, as an agent watching it would.
+            started = re.search(r"proc_[0-9a-f]+", str(messages[-1].get("content"))) if answered else None
+            if started and prompt.lower().lstrip().startswith("jobchart") and not any(
+                    "process" in json.dumps(m.get("tool_calls") or "") for m in messages):
+                # `process_manage` is deferred behind Tool Search: the bridge reaches it.
+                wait = {"name": "process_manage", "arguments": {"action": "wait", "session_id": started.group(0), "timeout": 40}}
+                calls, answered = [_call("tool_call", wait, "call-wait")], False
             content = "Done: the tool returned." if answered else (None if calls else REPLY)
             delay = 0.0
         if request.get("stream"):

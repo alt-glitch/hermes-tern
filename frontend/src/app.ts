@@ -68,6 +68,7 @@ import { ambiguousNotice, CommandCatalog, resolveSlashName } from './slashResolv
 import { isLoginNotice, Notices, statusEffect } from './status.js'
 import { isRunning as processRuns, Processes, processTone } from './processes/store.js'
 import { hermesAuthor } from './processes/widgets/author.js'
+import { chartMemory } from './processes/widgets/memory.js'
 import { loadSettings, saveSettings, type ThemeMode } from './settings.js'
 import { type BusyMode, busyModeOf, type OwnAdmission, type PendingRow, ServerQueue, type ServerQueued } from './serverQueue.js'
 import { internalNotice, Transcript } from './transcript.js'
@@ -140,7 +141,7 @@ export class App implements OverlayHost {
   /** The session's subagents, followed while they run (Task cards, the pill, the hub). */
   readonly agents: Agents = new Agents(this)
   /** The session's background processes (the shells pill, the Background sheet, background cards). */
-  readonly processes: Processes = new Processes(this, { author: hermesAuthor(), enabled: () => this.#jobCharts })
+  readonly processes: Processes = new Processes(this, { author: hermesAuthor(), enabled: () => this.#jobCharts, memory: chartMemory() })
   readonly cron: Cron = new Cron(this)
   readonly sidebar: Sidebar = new Sidebar(this)
   /** The pull request docked at the pane's right edge (the PR aside). */

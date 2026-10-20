@@ -97,7 +97,7 @@ export interface ToolCall {
   /** A todo call's list as the call found it: what its step line says it changed. */
   todosBefore?: Todo[]
   subagents?: Subagent[]
-  /** The background process a `terminal(background=true)` call started, while the store follows it. */
+  /** The background process a `terminal(background=true)` call started (or a `process` call watches), while the store follows it. */
   process?: BackgroundProcess
   /** It ran through Tool Search's `tool_call` bridge; `name` and `args` are the tool it ran. */
   via?: 'tool_call'

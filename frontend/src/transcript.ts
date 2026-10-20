@@ -909,10 +909,12 @@ export class Transcript {
     return this.#tool(id)?.call
   }
 
-  /** The terminal calls that run on as background processes, oldest first. */
+  /** The calls that show a background process: terminal calls that start one, `process` calls that watch one; oldest first. */
   backgroundCalls(): ToolCall[] {
     return this.entries.flatMap(e =>
-      e.kind === 'turn' ? e.blocks.flatMap(b => (b.kind === 'tool' && isBackgroundCall(b.call) ? [b.call] : [])) : []
+      e.kind === 'turn'
+        ? e.blocks.flatMap(b => (b.kind === 'tool' && (isBackgroundCall(b.call) || isWatchCall(b.call)) ? [b.call] : []))
+        : []
     )
   }
 
@@ -1084,6 +1086,16 @@ const passable = (e: Entry) => e.kind !== 'notice' && e.kind !== 'compaction'
 /** A summary written at `at` belongs to compaction `c`: while it ran, give or take the clocks. */
 function within(c: Compaction, at: number): boolean {
   return at >= c.startedAt - 5_000 && at <= (c.endedAt ?? Date.now()) + 15_000
+}
+
+/** The tool that manages background processes: `process_manage`, `process` before Hermes renamed it. */
+export function isProcessTool(name: string): boolean {
+  return name === 'process_manage' || name === 'process'
+}
+
+/** A process tool call that waits on, polls or reads one background process (omp's `wait`). */
+export function isWatchCall(call: ToolCall): boolean {
+  return isProcessTool(call.name) && ['log', 'poll', 'wait'].includes(String(call.args.action)) && typeof call.args.session_id === 'string'
 }
 
 export function isBackgroundCall(call: ToolCall): boolean {

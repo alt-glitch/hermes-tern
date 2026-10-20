@@ -23,6 +23,7 @@ import {
   type Watchers
 } from '../processes/store.js'
 import { chartNode } from '../processes/widgets/view.js'
+import { isBackgroundCall } from '../transcript.js'
 import { commandLine, describeCommand } from '../view/describe.js'
 import { duration } from '../view/time.js'
 
@@ -506,7 +507,7 @@ function jobPreview(j: CronJob, now: number, own: boolean): JSX.Element[] {
 
 /** The terminal call that started process `id`, for its watchers. */
 function callOf(app: App, id: string): ToolCall | undefined {
-  return app.transcript.backgroundCalls().find(c => (processIdOf(c) ?? c.process?.id) === id)
+  return app.transcript.backgroundCalls().find(c => isBackgroundCall(c) && (processIdOf(c) ?? c.process?.id) === id)
 }
 
 function summary(all: BackgroundProcess[]): string {

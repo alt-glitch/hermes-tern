@@ -10,7 +10,7 @@ import { callApp } from './bridge.js'
 import { isConnectCall } from './connections.js'
 import { shownImage } from './media.js'
 import type { Block, Todo, ToolCall, TurnEntry } from './model.js'
-import { isBackgroundCall, isTodoName } from './transcript.js'
+import { isBackgroundCall, isTodoName, isWatchCall } from './transcript.js'
 import { commandDisplayText, commandProgramName } from './vendor/t3code/commandLabel.js'
 
 /** A step of a work group: a tool call or a thought. */
@@ -23,11 +23,24 @@ export type Piece = { kind: 'block'; block: Block } | { kind: 'work'; items: Wor
 const SOLO = new Set(['clarify', 'delegate_task', 'todo', 'todo_list'])
 
 /**
- * A call that keeps its card: a solo tool, a background process with its live line, or one that
- * shows an image (image_generate's card is the picture asked for, even before it lands).
+ * A call that keeps its card: a solo tool, a background process with its live line, a wait on one
+ * while it lasts (its chart, as omp's `wait` card), or one that shows an image (image_generate's
+ * card is the picture asked for, even before it lands).
  */
 export function ownsCard(call: ToolCall): boolean {
-  return SOLO.has(call.name) || isBackgroundCall(call) || isConnectCall(call) || call.name === 'image_generate' || showsImage(call)
+  return (
+    SOLO.has(call.name) ||
+    isBackgroundCall(call) ||
+    waiting(call) ||
+    isConnectCall(call) ||
+    call.name === 'image_generate' ||
+    showsImage(call)
+  )
+}
+
+/** A process wait, poll or log still running. */
+function waiting(call: ToolCall): boolean {
+  return isWatchCall(call) && call.status === 'running'
 }
 
 /** A call with an image to show; its card stays out of the fold, so the picture is in view. */
@@ -98,11 +111,12 @@ export function foldOf(turn: TurnEntry): Fold | undefined {
       continue
     }
 
-    // Cards that still want the user stay out of the fold: a background process, running agents,
-    // apps to authorize, an image.
+    // Cards that still want the user stay out of the fold: a background process, a wait on one,
+    // running agents, apps to authorize, an image.
     if (
       b.kind === 'tool' &&
       (isBackgroundCall(b.call) ||
+        waiting(b.call) ||
         isConnectCall(b.call) ||
         showsImage(b.call) ||
         b.call.subagents?.some(a => a.status === 'running' || a.status === 'queued'))
@@ -248,6 +262,8 @@ export function actionOf(call: ToolCall): Action {
     case 'execute_code':
 
     case 'process':
+
+    case 'process_manage':
       return 'command'
 
     case 'read_file':
