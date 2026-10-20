@@ -26,7 +26,7 @@ export interface ApprovalPrompt {
   description: string
   /** The safety check advised against it. */
   smartDenied: boolean
-  /** The answers offered, in the sheet's order. */
+  /** The answers offered; the sheet (approval.tsx) sets the order it shows them in. */
   choices: ApprovalChoice[]
 }
 
@@ -77,8 +77,10 @@ const text = (v: unknown): string => (typeof v === 'string' ? v : '')
 
 const strings = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x: unknown): x is string => typeof x === 'string') : [])
 
-/** The order the sheet offers the approval answers in. */
-const APPROVAL_ORDER: readonly ApprovalChoice[] = ['once', 'session', 'always', 'deny']
+/** The approval answers this frontend knows: an offered choice outside them is dropped. */
+const APPROVAL_CHOICES: ReadonlySet<string> = new Set<ApprovalChoice>(['once', 'session', 'always', 'deny'])
+
+const isApprovalChoice = (c: string): c is ApprovalChoice => APPROVAL_CHOICES.has(c)
 
 /** The prompt `req` asks, or undefined for a method this frontend does not answer. */
 export function parsePrompt(req: ServerRequest): PromptRequest | undefined {
@@ -116,9 +118,9 @@ function approvalOf(req: ServerRequest, { params: p }: RequestOf<'approval'>): A
   const offered = strings(p.choices)
 
   // The TUI's rules: explicit choices win; a smart-guard deny leaves once/deny; no permanent scope drops "always".
-  const allowed = new Set<string>(
+  const allowed = new Set<ApprovalChoice>(
     offered.length
-      ? offered
+      ? offered.filter(isApprovalChoice)
       : smartDenied
         ? ['once', 'deny']
         : p.allow_permanent === false
@@ -131,7 +133,7 @@ function approvalOf(req: ServerRequest, { params: p }: RequestOf<'approval'>): A
   }
 
   return {
-    choices: APPROVAL_ORDER.filter(c => allowed.has(c)),
+    choices: [...allowed],
     command: text(p.command),
     description: text(p.description),
     kind: 'approval',

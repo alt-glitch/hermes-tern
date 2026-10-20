@@ -10,7 +10,7 @@ function request(method: string, params: Record<string, unknown>): ServerRequest
 const approval = (params: Record<string, unknown>) => parsePrompt(request('approval', params))
 
 describe('parsePrompt: approval', () => {
-  it('offers every answer by default, in the sheet\'s order', () => {
+  it('offers every answer by default', () => {
     expect(approval({ command: 'rm -rf build' })).toMatchObject({
       choices: ['once', 'session', 'always', 'deny'],
       command: 'rm -rf build',
@@ -21,8 +21,8 @@ describe('parsePrompt: approval', () => {
     })
   })
 
-  it('takes explicit choices first, keeps only known strings, and orders them', () => {
-    expect(approval({ choices: ['deny', 7, 'nope', 'once'] })).toMatchObject({ choices: ['once', 'deny'] })
+  it('takes explicit choices first, and keeps only known strings', () => {
+    expect(approval({ choices: ['deny', 7, 'nope', 'once', 'deny'] })).toMatchObject({ choices: ['deny', 'once'] })
   })
 
   it('leaves once and deny after a smart-guard deny, and drops always with no permanent scope', () => {
