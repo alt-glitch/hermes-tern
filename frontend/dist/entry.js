@@ -32750,6 +32750,24 @@ function sourceRow(key2, title, url) {
   ] }, key2);
 }
 
+// src/view/tools/faults.ts
+var sink = () => void 0;
+var told = /* @__PURE__ */ new Set();
+function onCardFault(next2) {
+  sink = next2;
+  told = /* @__PURE__ */ new Set();
+}
+function cardFault(name, error) {
+  if (told.has(name)) {
+    return;
+  }
+  told.add(name);
+  sink(name, error);
+}
+function noticeSink(notice) {
+  return (name, error) => queueMicrotask(() => notice(`The ${name} card failed to draw (${errorText(error)}); it shows as a plain card.`));
+}
+
 // src/view/tools/registry.ts
 var VIEWS = {
   browser: browserView,
@@ -32794,6 +32812,14 @@ var ACTION_ICON = {
 };
 function viewOf(call) {
   return matched(call) ?? named(call);
+}
+function withView(call, use) {
+  try {
+    return use(viewOf(call), errorOf);
+  } catch (error) {
+    cardFault(call.name, error);
+    return use(fallbackView(call), plainErrorOf);
+  }
 }
 function hubIconOf(name) {
   const icon = VIEWS[toolKeyOf(name)].hubIcon;
@@ -62939,16 +62965,21 @@ var Composer = class {
     this.#replace({ cursor: ev.cursor, from: ev.from, merge: typed, s: ev.text, to: ev.to });
   }
   undo() {
-    this.#restore(this.#steps.undo({ cursor: this.cursor, text: this.text }));
+    this.#restore(this.#steps.undo(this.#snapshot()));
   }
   redo() {
-    this.#restore(this.#steps.redo({ cursor: this.cursor, text: this.text }));
+    this.#restore(this.#steps.redo(this.#snapshot()));
   }
-  /** Puts back the draft an undo or redo step held, if there was one. */
+  /** The draft as an undo step holds it: its text, caret and pastes. */
+  #snapshot() {
+    return { cursor: this.cursor, pasted: [...this.#pasted], text: this.text };
+  }
+  /** Puts back the draft an undo or redo step held, if there was one, with the pastes it held. */
   #restore(step) {
     if (step) {
       this.#text = step.text;
       this.#cursor = step.cursor;
+      this.#pasted = [...step.pasted];
       this.#anchor = void 0;
       this.#browse = -1;
     }
@@ -62960,10 +62991,10 @@ var Composer = class {
     if (name === "paste") {
       const s2 = (key2.text ?? "").replace(/\r\n?/g, "\n");
       const [from, to] = this.selection;
+      this.splice(from, to, s2);
       if (pastedCommand(s2)) {
         this.#pasted.push(s2);
       }
-      this.splice(from, to, s2);
       return true;
     }
     if (name === "enter") {
@@ -63168,7 +63199,7 @@ var Composer = class {
   #record({ merge: merge2 }) {
     this.#browse = -1;
     this.#anchor = void 0;
-    this.#steps.record({ cursor: this.cursor, text: this.text }, { merge: merge2 });
+    this.#steps.record(this.#snapshot(), { merge: merge2 });
   }
 };
 function clamp(n, max) {
@@ -65051,7 +65082,7 @@ function parts2(turn) {
   return out;
 }
 function actionOf(call) {
-  return viewOf(call).action();
+  return withView(call, (view) => view.action());
 }
 var and2 = (words3) => words3.length < 3 ? words3.join(" and ") : `${words3.slice(0, -1).join(", ")}, and ${words3.at(-1)}`;
 function actionLabel(action, n, calls = []) {
@@ -65133,7 +65164,7 @@ function actionIcon(action) {
   return ACTION_ICON[action];
 }
 function stepLabel(call) {
-  return viewOf(call).step();
+  return withView(call, (view) => view.step());
 }
 function liveLabel(item3, active = false) {
   if (item3.kind === "thinking") {
@@ -65495,40 +65526,12 @@ function breakdownBody(items) {
   ];
 }
 
-// src/view/tools/faults.ts
-var sink = () => void 0;
-var told = /* @__PURE__ */ new Set();
-function onCardFault(next2) {
-  sink = next2;
-  told = /* @__PURE__ */ new Set();
-}
-function cardFault(name, error) {
-  if (told.has(name)) {
-    return;
-  }
-  told.add(name);
-  sink(name, error);
-}
-function noticeSink(notice) {
-  return (name, error) => queueMicrotask(() => notice(`The ${name} card failed to draw (${errorText(error)}); it shows as a plain card.`));
-}
-
 // src/view/tools/shell.tsx
 function toolNode(call, now) {
-  try {
-    return drawTool(call, viewOf(call), errorOf, now);
-  } catch (error) {
-    cardFault(call.name, error);
-    return drawTool(call, fallbackView(call), plainErrorOf, now);
-  }
+  return withView(call, (view, whyFailed) => drawTool(call, view, whyFailed, now));
 }
 function toolDetail(call, now) {
-  try {
-    return drawDetail(call, viewOf(call), errorOf, now);
-  } catch (error) {
-    cardFault(call.name, error);
-    return drawDetail(call, fallbackView(call), plainErrorOf, now);
-  }
+  return withView(call, (view, whyFailed) => drawDetail(call, view, whyFailed, now));
 }
 function drawTool(call, view, whyFailed, now) {
   const solo = view.replaces(now);

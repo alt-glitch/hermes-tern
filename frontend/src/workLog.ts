@@ -11,7 +11,7 @@ import type { Block, ToolCall, TurnEntry } from './model.js'
 import { isBackgroundCall, isTodoName, isWatchCall } from './transcript/calls.js'
 import { commandProgramName } from './vendor/t3code/commandLabel.js'
 import { durationCompact, flat, nonEmpty, plural } from './view/format.js'
-import { ACTION_ICON, viewOf } from './view/tools/registry.js'
+import { ACTION_ICON, withView } from './view/tools/registry.js'
 import type { Action } from './view/tools/types.js'
 
 /** A step of a work group: a tool call or a thought. */
@@ -200,9 +200,9 @@ export function parts(turn: TurnEntry): Part[] {
   return out
 }
 
-/** What a call counts as in a summary: its view's action (an app's while it acted in apps only). */
+/** What a call counts as in a summary: its view's action (an app's while it acted in apps only); `other` when its view throws. */
 export function actionOf(call: ToolCall): Action {
-  return viewOf(call).action()
+  return withView(call, view => view.action())
 }
 
 const and = (words: readonly string[]) => (words.length < 3 ? words.join(' and ') : `${words.slice(0, -1).join(', ')}, and ${words.at(-1)}`)
@@ -331,10 +331,10 @@ export function actionIcon(action: Action): string {
 /**
  * One step on one line, after t3code's `workEntryDisplayLabel`, in its view's words: a command
  * as its text (without an `sh -c` wrapper), a read as "Read path", a search as "Searched pattern
- * in folder".
+ * in folder"; the tool's name in words when its view throws.
  */
 export function stepLabel(call: ToolCall): string {
-  return viewOf(call).step()
+  return withView(call, view => view.step())
 }
 
 /** The live line of a running group, after t3code's `liveWorkEntryLabel`: "Running ls". */

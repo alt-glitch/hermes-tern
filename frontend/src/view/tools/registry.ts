@@ -2,7 +2,9 @@
 // (tools/detail.ts). Two tests run ahead of the name: a call that acts in an app (a connector
 // or MCP tool) takes the app card, and a bridge batch the batch card. Everything that once
 // switched on a tool's name asks here: the shell for the card and its hooks, the work log for
-// the step line and the action, the agents hub for the icon.
+// the step line and the action, the agents hub for the icon. A view that throws (a renderer bug,
+// or args its parser did not expect) gives way to the generic one through withView, and the pane
+// hears of it once per tool name (faults.ts).
 
 import { appsOf, type BatchEntry, callApp } from '../../bridge.js'
 import type { ToolCall } from '../../model.js'
@@ -15,10 +17,13 @@ import { patchView, writeView } from './cards/edit.js'
 import { evalView } from './cards/eval.js'
 import {
   browserView,
+  errorOf,
+  fallbackView,
   imageGenerateView,
   linkView,
   listPullRequestsView,
   otherView,
+  plainErrorOf,
   processView,
   sessionSearchView,
   toolDescribeView,
@@ -32,7 +37,11 @@ import { searchView } from './cards/search.js'
 import { taskView } from './cards/task.js'
 import { terminalView } from './cards/terminal.js'
 import { fetchView, webSearchView } from './cards/web.js'
+import { cardFault } from './faults.js'
 import type { Action, CallView, ToolView } from './types.js'
+
+/** Why a failed call failed, as the view drawing it may read it. */
+export type ErrorReader = (call: ToolCall) => string | undefined
 
 /**
  * Every tool's view. Typed as the mapped type (not only checked with `satisfies`) so a read by a
@@ -85,6 +94,23 @@ export const ACTION_ICON = {
 /** `call`'s view: its app's or its batch's when a test takes it, else its tool's, with its detail. */
 export function viewOf(call: ToolCall): CallView {
   return matched(call) ?? named(call)
+}
+
+/**
+ * What `use` makes of `call`'s view, with the reader of why it failed that goes with that view.
+ * When the view or `use` throws, `use` runs again on the generic view (fallbackView), which reads
+ * nothing the tool's parser reads, and the fault is told once per tool name. Everything that draws
+ * a call (its card, its detail, its step line and action in a work group) goes through here, so one
+ * broken view costs its own call, not the frame.
+ */
+export function withView<T>(call: ToolCall, use: (view: CallView, whyFailed: ErrorReader) => T): T {
+  try {
+    return use(viewOf(call), errorOf)
+  } catch (error) {
+    cardFault(call.name, error)
+
+    return use(fallbackView(call), plainErrorOf)
+  }
 }
 
 /** The icon the agents hub shows for a step of tool `name` (it has no args to read). */

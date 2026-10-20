@@ -4,8 +4,8 @@
 // tool it resembles, with the same props and body shapes omp sends. The shell
 // asks the registry (registry.ts) for a call's view and wraps its card in the
 // `tool` node; what only one tool knows, it asks through the view's hooks. A
-// view that throws gives the generic card, and the pane hears of it once per
-// tool name (faults.ts).
+// view that throws gives the generic card (registry.ts withView), and the pane
+// hears of it once per tool name (faults.ts).
 
 import type { JSX } from '@stencil-hq/tern'
 
@@ -13,23 +13,12 @@ import type { ToolCall } from '../../model.js'
 import { duration } from '../format.js'
 import { age } from '../time.js'
 
-import { errorOf, fallbackView, plainErrorOf } from './cards/generic.js'
-import { cardFault } from './faults.js'
-import { viewOf } from './registry.js'
+import { type ErrorReader, withView } from './registry.js'
 import type { CallView } from './types.js'
-
-/** Why a failed call failed, as the view drawing it may read it. */
-type ErrorReader = (call: ToolCall) => string | undefined
 
 /** The `tool` node of one call; the generic card when its view throws. */
 export function toolNode(call: ToolCall, now: number): JSX.Element {
-  try {
-    return drawTool(call, viewOf(call), errorOf, now)
-  } catch (error) {
-    cardFault(call.name, error)
-
-    return drawTool(call, fallbackView(call), plainErrorOf, now)
-  }
+  return withView(call, (view, whyFailed) => drawTool(call, view, whyFailed, now))
 }
 
 /**
@@ -38,13 +27,7 @@ export function toolNode(call: ToolCall, now: number): JSX.Element {
  * its view throws.
  */
 export function toolDetail(call: ToolCall, now: number): JSX.Element[] {
-  try {
-    return drawDetail(call, viewOf(call), errorOf, now)
-  } catch (error) {
-    cardFault(call.name, error)
-
-    return drawDetail(call, fallbackView(call), plainErrorOf, now)
-  }
+  return withView(call, (view, whyFailed) => drawDetail(call, view, whyFailed, now))
 }
 
 /** The `tool` node of `call` as `view` draws it. */

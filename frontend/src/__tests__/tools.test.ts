@@ -1,9 +1,11 @@
 import type { JSX } from '@stencil-hq/tern'
 import { describe, expect, it } from 'vitest'
 
-import { toolCallId } from '../core/ids.js'
-import type { ToolCall } from '../model.js'
+import { entryId, toolCallId } from '../core/ids.js'
+import type { ToolCall, TurnEntry } from '../model.js'
 import { toolDetail, toolNode } from '../view/tools/shell.js'
+import { entryNode, type TranscriptContext } from '../view/transcript.js'
+import { actionOf, stepLabel } from '../workLog.js'
 
 interface Node {
   k: string
@@ -155,5 +157,25 @@ describe('a card that throws', () => {
     await Promise.resolve()
 
     expect(notices).toEqual(['The terminal card failed to draw (bad args); it shows as a plain card.'])
+  })
+
+  it("costs only its own step in a done turn's work group: the step line and icon are the generic ones", async () => {
+    const { onCardFault } = await import('../view/tools/faults.js')
+    const told: string[] = []
+    onCardFault(name => void told.push(name))
+    const blocks = [
+      { call: broken('c4'), id: entryId('b1'), kind: 'tool' as const },
+      { call: broken('c5'), id: entryId('b2'), kind: 'tool' as const },
+      { id: entryId('b3'), kind: 'text' as const, text: 'Done.' }
+    ]
+    const turn: TurnEntry = { blocks, endedAt: 9, id: entryId('t'), kind: 'turn', rev: 0, startedAt: 0, status: 'done' }
+    const cx: TranscriptContext = { copy: () => undefined, now: 9, welcome: { tip: '', version: '' } }
+
+    const n = tree(entryNode(turn, 'main.t', cx))
+
+    expect(JSON.stringify(n)).toContain('Done.')
+    expect(stepLabel(broken('c6'))).toBe('Terminal')
+    expect(actionOf(broken('c7'))).toBe('other')
+    expect(told).toEqual(['terminal'])
   })
 })
