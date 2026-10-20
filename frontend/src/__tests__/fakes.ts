@@ -87,13 +87,15 @@ export interface FakeTernOptions {
 export function fakeTern({ cols = 80, draws = false, features = [] }: FakeTernOptions = {}) {
   const inputs: TernInput[] = []
   const waiting: ((r: IteratorResult<TernInput>) => void)[] = []
+  const opened: unknown[] = []
+  const focused: (string | null)[] = []
   let frame: unknown
 
   const blank: object = new Proxy({}, { get: (_, name) => (name === 'closed' ? true : () => blank) })
   const surface = draws
     ? {
         closed: false,
-        focus: () => undefined,
+        focus: (id: string | null) => void focused.push(id),
         palette: () => undefined,
         render: (tree: unknown) => void (frame = tree),
         stylesheet: () => undefined
@@ -122,7 +124,11 @@ export function fakeTern({ cols = 80, draws = false, features = [] }: FakeTernOp
     blob: () => 'blob',
     caps: { cols, features },
     close: async () => undefined,
-    open: () => surface
+    open: (options: unknown) => {
+      opened.push(options)
+
+      return surface
+    }
   }
 
   return {
@@ -132,6 +138,10 @@ export function fakeTern({ cols = 80, draws = false, features = [] }: FakeTernOp
     get frame(): unknown {
       return frame
     },
+    /** The options of each surface opened. */
+    opened,
+    /** Each caret move a drawing surface was sent, in order. */
+    focused,
     /** Whether the app's input loop waits for its next input. */
     get reading(): boolean {
       return waiting.length > 0

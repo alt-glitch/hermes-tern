@@ -5,7 +5,7 @@
 
 import { readFile } from 'node:fs/promises'
 
-import type { Key, Session, Surface, TspEvent } from '@stencil-hq/tern'
+import type { Key, Session, TspEvent } from '@stencil-hq/tern'
 import type { GatewayClient } from '@tui/gatewayClient.js'
 import type { AnyGatewayEvent } from '@tui/gatewayTypes.js'
 
@@ -13,20 +13,21 @@ import { parseLiveLog } from '../agents/liveLog.js'
 import { applyLog, isRunning } from '../agents/store.js'
 import { Composer } from '../composer.js'
 import { errorText } from '../core/errors.js'
+import { RenderScheduler } from '../core/scheduler.js'
 import { Media } from '../media.js'
 import type { Subagent } from '../model.js'
 import { paletteFor } from '../palette.js'
-import { loadSettings } from '../settings.js'
+import { fileSettings, type SettingsSource } from '../settings.js'
+import { INPUT_ID, SurfaceHost } from '../surface/host.js'
+import { runInput } from '../surface/input.js'
 import { Transcript } from '../transcript.js'
 import { dockNodes } from '../view/dock.js'
-import { STYLES } from '../view/styles.js'
 import { agentNode } from '../view/tools.js'
 import { entryNode } from '../view/transcript.js'
 
 import { ChildStore } from './child.js'
 import type { WatchSpec } from './spec.js'
 
-const INPUT_ID = 'dock.composer.line.input'
 const POLL_MS = 1000
 const EXIT_ARM_MS = 1500
 
@@ -48,22 +49,24 @@ export class WatchApp {
   readonly #gw: GatewayClient
   readonly #spec: WatchSpec
   readonly #agent: Subagent
+  readonly #settings: SettingsSource
   #store: ChildStore | undefined
   #child: string | undefined
   #lastMessage = 0
   #logSize = -1
   #listed = false
   #ready = false
-  #surface!: Surface
+  #surface!: SurfaceHost
   #timer: NodeJS.Timeout | undefined
-  #scheduled = false
+  readonly #renders = new RenderScheduler(() => this.#render())
   #exitArmed = 0
   #done = Promise.withResolvers<number>()
 
-  constructor(tern: Session, gw: GatewayClient, spec: WatchSpec) {
+  constructor(tern: Session, gw: GatewayClient, spec: WatchSpec, settings: SettingsSource = fileSettings()) {
     this.#tern = tern
     this.#gw = gw
     this.#spec = spec
+    this.#settings = settings
     this.#agent = {
       calls: 0,
       goal: spec.goal,
@@ -79,9 +82,8 @@ export class WatchApp {
   }
 
   async run(): Promise<number> {
-    this.#surface = this.#tern.open({ id: 'hermes', mode: 'inline', role: 'omp.session', title: this.#spec.name })
-    this.#surface.stylesheet('hermes-tern', STYLES)
-    const theme = loadSettings().theme ?? 'tern'
+    this.#surface = new SurfaceHost(this.#tern, this.#spec.name)
+    const theme = this.#settings.load().theme ?? 'tern'
     this.#surface.palette(paletteFor(theme, undefined))
     this.#gw.on('event', (ev: AnyGatewayEvent) => {
       if (ev.type === 'gateway.ready') {
@@ -120,15 +122,7 @@ export class WatchApp {
   }
 
   changed() {
-    if (this.#scheduled) {
-      return
-    }
-
-    this.#scheduled = true
-    setImmediate(() => {
-      this.#scheduled = false
-      this.#render()
-    })
+    this.#renders.request()
   }
 
   async #tick() {
@@ -241,20 +235,8 @@ export class WatchApp {
   }
 
   async #readInput() {
-    try {
-      for await (const input of this.#tern) {
-        if (input.type === 'key') {
-          this.#onKey(input.key)
-        } else {
-          this.#onEvent(input.event)
-        }
-
-        this.changed()
-      }
-    } catch {
-      // The pane went away.
-    }
-
+    // A failure means the pane went away: it ends the loop quietly.
+    await runInput(this.#tern, { after: () => this.changed(), onEvent: event => this.#onEvent(event), onKey: key => this.#onKey(key) })
     this.#done.resolve(0)
   }
 

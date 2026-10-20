@@ -15,10 +15,12 @@ import { relative } from '../processes/cron.js'
 import { PrView, prTone, stateLabel } from '../prs/view.js'
 import type { PrsPill } from '../view/dock.js'
 
+import { tickWhileOpen } from './sheet.js'
+
 /** What the pull request sheets reach of the app. */
 export type PullRequestsSheetHost = Pick<
   ChatPorts,
-  'changed' | 'close' | 'notice' | 'open' | 'openPrAside' | 'overlays' | 'prs' | 'reveal' | 'scroll' | 'transcript'
+  'changed' | 'close' | 'notice' | 'open' | 'openPrAside' | 'prs' | 'reveal' | 'scroll' | 'transcript'
 >
 
 export { stateLabel }
@@ -69,20 +71,16 @@ export function openPrSheet(host: PullRequestsSheetHost, focus?: string) {
 
   host.prs.poke()
 
-  const timer = setInterval(() => (host.overlays.includes(overlay) ? host.changed() : end()), TICK_MS)
-
-  function end() {
-    clearInterval(timer)
-    view.dispose()
-  }
-
-  const close = () => {
-    end()
-    host.close(overlay)
-  }
+  const stopTicking = tickWhileOpen(host, TICK_MS)
+  const close = () => host.close(overlay)
 
   const overlay: Overlay = {
     cancel: close,
+    // Ends with the sheet, however it closed (Esc, a session switch replacing the overlays).
+    onClose: () => {
+      stopTicking()
+      view.dispose()
+    },
     key: SHEET,
     modal: true,
     node: id => {

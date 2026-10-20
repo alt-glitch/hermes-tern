@@ -1,6 +1,7 @@
 // The contract every floating panel (approval, clarify, pickers, completion
 // list) implements. The app keeps a stack: the top overlay sees keys first,
-// every overlay draws into the `layer` region, and `close()` removes it.
+// every overlay draws into the `layer` region, and `close()` removes it (and tells it, through
+// `onClose`, so its timers and watches end with it).
 
 import type { JSX, Key } from '@stencil-hq/tern'
 
@@ -24,13 +25,18 @@ export interface Overlay {
    * Unset: the app closes the overlay.
    */
   cancel?(): void
+  /**
+   * The overlay left the stack: closed, or replaced by one with the same key. Ends what it runs
+   * while open (a tick, a watch). Called once, after it is off the stack.
+   */
+  onClose?(): void
 }
 
 /** What overlays reach of the app. */
 export interface OverlayHost {
   /** Pushes `overlay` on top, replacing an open overlay with the same key. */
   open(overlay: Overlay): void
-  /** Removes this exact instance; a no-op once it was closed or replaced. */
+  /** Removes this exact instance and calls its onClose; a no-op once it was closed or replaced. */
   close(overlay: Overlay): void
   /** Re-render after a state change made outside a key or event handler. */
   changed(): void

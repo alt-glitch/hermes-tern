@@ -7,6 +7,7 @@
 import { homedir } from 'node:os'
 
 import { callApp } from './bridge.js'
+import { launchEnv } from './config/env.js'
 import { isConnectCall } from './connections.js'
 import { shownImage } from './media.js'
 import type { Block, Todo, ToolCall, TurnEntry } from './model.js'
@@ -452,7 +453,7 @@ export function actionIcon(action: Action): string {
 const str = (v: unknown): string | undefined => (typeof v === 'string' && v ? v : undefined)
 
 /** A path as the user reads it: under the working folder relative, under home with `~`. */
-export function shortPath(path: string, cwd = process.env.HERMES_CWD || process.cwd()): string {
+export function shortPath(path: string, cwd = launchEnv().cwd): string {
   const root = cwd.replace(/\/+$/, '')
 
   if (root && path.startsWith(`${root}/`)) {
@@ -534,7 +535,6 @@ export function stepLabel(call: ToolCall): string {
 
     case 'list_pull_requests':
       return 'Listed linked pull requests'
-
 
     case 'skill_view':
       return str(a.name) ? `Read skill ${a.name}` : 'Read a skill'

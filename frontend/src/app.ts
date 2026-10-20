@@ -5,7 +5,6 @@
 
 import { randomUUID } from 'node:crypto'
 import { appendFileSync, existsSync } from 'node:fs'
-import { hostname } from 'node:os'
 import { basename } from 'node:path'
 
 import type {
@@ -17,7 +16,7 @@ import type {
 } from '@hermes/shared/gateway-events'
 import type { ServerRequest } from '@hermes/shared/json-rpc-channel'
 import { parseCommandDispatch } from '@hermes/shared/slash'
-import type { Key, ScrollTo, Session, Surface, TspEvent } from '@stencil-hq/tern'
+import type { Key, ScrollTo, Session, TspEvent } from '@stencil-hq/tern'
 import { describeSlashExecError, isUnsupportedCommand, shouldFallbackToDispatch } from '@tui/app/userMessages.js'
 import { localCreationOptions } from '@tui/canonicalGateway.js'
 import { usageFromTick } from '@tui/domain/usage.js'
@@ -30,10 +29,13 @@ import { agentName, Agents } from './agents/store.js'
 import { type ChatPorts, type SessionView, sessionView } from './app/ports.js'
 import { Automation } from './automation.js'
 import { copyToClipboard } from './clipboard.js'
+import { type LaunchEnv, readLaunchEnv } from './config/env.js'
 import { localCommand } from './commands.js'
 import { Composer } from './composer.js'
 import { interruptTurn, redirectTurn, steerTurn } from './controlCommands.js'
+import { Disposables } from './core/disposables.js'
 import { errorText } from './core/errors.js'
+import { RenderScheduler } from './core/scheduler.js'
 import { fastTier } from './fast.js'
 import { type Busy, busyFrom, ownsEvent, Switches } from './flow.js'
 import { protocolNote, slowStartNotes } from './backendNotes.js'
@@ -58,7 +60,6 @@ import { openHelp } from './overlays/help.js'
 import { capsOf } from './modelCaps.js'
 import { promptOverlay, promptTimeoutNotice } from './overlays/prompts.js'
 import { openPrMenu, openPrSheet, openUrl, prsPill } from './overlays/pullRequests.js'
-import { STYLES } from './view/styles.js'
 import { paletteFor } from './palette.js'
 import { allConnected, claimTold, CONNECT_TOOL, connectedMessage, continueMessage, loadConnect, markViewer, POLL_MS, waiting } from './connections.js'
 import { LINK_TOOLS } from './github/links.js'
@@ -73,8 +74,11 @@ import { isLoginNotice, Notices, statusEffect } from './status.js'
 import { isRunning as processRuns, Processes, processTone } from './processes/store.js'
 import { hermesAuthor } from './processes/widgets/author.js'
 import { chartMemory } from './processes/widgets/memory.js'
-import { loadSettings, saveSettings, type ThemeMode } from './settings.js'
+import { fileSettings, type SettingsSource, type ThemeMode } from './settings.js'
 import { type BusyMode, busyModeOf, type OwnAdmission, type PendingRow, ServerQueue, type ServerQueued } from './serverQueue.js'
+import { INPUT_ID, SurfaceHost } from './surface/host.js'
+import { runInput } from './surface/input.js'
+import { reportCwd, setTabTitle } from './surface/osc.js'
 import { internalNotice, Transcript } from './transcript.js'
 import { storedCompactions } from './compaction.js'
 import type { Reconnecting } from './view/automation.js'
@@ -83,9 +87,6 @@ import { entryNode } from './view/transcript.js'
 import { busyLabel, preparingLabel } from './workLog.js'
 import { openSidebar, specOf } from './watch/spec.js'
 import { randomTip, type WelcomeContext } from './view/welcome.js'
-
-/** The composer's `editor` node id (dock → composer → line → input). */
-export const INPUT_ID = 'dock.composer.line.input'
 
 const EXIT_ARM_MS = 1500
 /** Two Esc presses within this window are a double Esc (Ink's DOUBLE_ESC_MS). */
@@ -191,10 +192,12 @@ export class App implements ChatPorts {
   /** `commands.catalog`, for resolving a typed alias or prefix (`/hea` → /heartbeat). */
   readonly #catalog: CommandCatalog
   readonly #welcome: WelcomeContext
-  #surface!: Surface
-  #scheduled = false
-  /** The field holding Tern's caret, as last sent. */
-  #focus: string | null = INPUT_ID
+  readonly #launch: LaunchEnv
+  readonly #settings: SettingsSource
+  #surface!: SurfaceHost
+  readonly #renders = new RenderScheduler(() => this.#render())
+  /** Timers with no field of their own (a compaction's summary read, the quit's detach wait). */
+  readonly #timers = new Disposables()
   #exitArmed = 0
   #lastEsc = 0
   #done = Promise.withResolvers<number>()
@@ -210,7 +213,7 @@ export class App implements ChatPorts {
   /** Open approval prompts' overlay keys → their approval-queue `request_id` (what approval.cancelled names). */
   readonly #approvalIds = new Map<string, string>()
   /** The launcher's startup image until it is attached to the first session (the queue waits for it). */
-  #startupImage = process.env.HERMES_TUI_IMAGE?.trim() ?? ''
+  #startupImage: string
   /** The images attached to the draft: the next prompt entered takes them. */
   #attachments: Image[] = []
   /** The folder last reported to Tern by OSC 7. */
@@ -219,9 +222,9 @@ export class App implements ChatPorts {
   #attaching: { name: string }[] = []
   /** The skin the gateway last reported; only the `skin` theme mode wears it. */
   #skin: SkinPayload | undefined
-  #theme: ThemeMode = loadSettings().theme ?? 'tern'
+  #theme: ThemeMode
   /** Background processes get live charts (settings.json `jobCharts`). */
-  readonly #jobCharts = loadSettings().jobCharts !== false
+  readonly #jobCharts: boolean
   /** The prompt whose Copy button reads Copied, until the timer clears it. */
   #copied: string | undefined
   #copiedTimer: NodeJS.Timeout | undefined
@@ -245,13 +248,20 @@ export class App implements ChatPorts {
   #reconnecting: Reconnecting | undefined
   #reconnectTimer: NodeJS.Timeout | undefined
 
-  constructor(tern: Session, gw: GatewayClient, version: string) {
+  /** `launch` and `settings` are what entry.ts read once at startup; unset, each reads its default. */
+  constructor(tern: Session, gw: GatewayClient, version: string, { launch = readLaunchEnv(), settings = fileSettings() }: { launch?: LaunchEnv; settings?: SettingsSource } = {}) {
     this.#tern = tern
     this.#gw = gw
+    this.#launch = launch
+    this.#settings = settings
+    this.#startupImage = launch.image
+    const saved = settings.load()
+    this.#theme = saved.theme ?? 'tern'
+    this.#jobCharts = saved.jobCharts !== false
     this.#completion = new Completion(this, gw, () => this.sid)
     this.#catalog = new CommandCatalog(gw)
     this.#welcome = {
-      tip: randomTip(process.env.HERMES_PYTHON_SRC_ROOT ?? ''),
+      tip: randomTip(launch.pythonSrcRoot),
       version: version && version !== 'unknown' ? `v${version}` : ''
     }
   }
@@ -262,8 +272,7 @@ export class App implements ChatPorts {
   }
 
   async run(): Promise<number> {
-    this.#surface = this.#tern.open({ id: 'hermes', mode: 'inline', role: 'omp.session', title: 'hermes' })
-    this.#surface.stylesheet('hermes-tern', STYLES)
+    this.#surface = new SurfaceHost(this.#tern, 'hermes')
     this.#applyTheme()
 
     if (this.#tern.caps.features.includes('blobs')) {
@@ -273,13 +282,13 @@ export class App implements ChatPorts {
     this.transcript.push({ id: 'welcome', kind: 'welcome' })
 
     // `hermes -q …`: the launcher's query is the first prompt, sent literally once the first session is adopted.
-    const query = process.env.HERMES_TUI_QUERY?.trim()
+    const query = this.#launch.query
 
     if (query || this.#startupImage) {
       this.queue.push({ images: [], text: query || 'What do you see in this image?' })
     }
 
-    const log = process.env.HERMES_TERN_EVENT_LOG
+    const log = this.#launch.eventLog
 
     // Development (the lab, and the golden replays' fixtures): one JSON line per gateway event, as
     // the event itself, and per server request, as `{"request": {id, method, params}}`.
@@ -322,18 +331,41 @@ export class App implements ChatPorts {
     this.processes.poke()
     this.#render()
     this.#surface.focus(INPUT_ID)
-    void this.#readInput()
+    // Keys and Tern events until the pane closes, each followed by a render; then the app quits.
+    void runInput(this.#tern, {
+      after: () => this.changed(),
+      onError: error => this.transcript.notice(`Input failed: ${errorText(error)}`, 'error'),
+      onEvent: event => this.#onTernEvent(event),
+      onKey: key => this.#onKey(key)
+    }).then(() => this.quit())
 
     const code = await this.#done.promise
     // Bounded, as Ink's deferExitForClose: a dead socket must not hold the terminal.
     await Promise.race([
       Promise.all([...this.#subscriptions.keys()].map(sid => this.#leave(sid, 'tui_shutdown'))),
-      new Promise(resolve => setTimeout(resolve, QUIT_DETACH_MS))
+      new Promise(resolve => this.#timers.timeout(() => resolve(undefined), QUIT_DETACH_MS))
     ])
+    this.dispose()
     await this.#tern.close()
     this.#gw.kill('exit')
 
     return code
+  }
+
+  /**
+   * Stops what the pane runs on its own: every timer, the stores' polls and the sidebar's reads.
+   * Quitting calls it once the sessions detached (or the wait gave up), before Tern closes.
+   */
+  dispose() {
+    for (const timer of [this.#copiedTimer, this.#noticeTimer, this.#reconnectTimer, this.#titleTimer, this.#connectTimer]) {
+      clearTimeout(timer)
+    }
+
+    this.#timers.dispose()
+    this.agents.dispose()
+    this.processes.dispose()
+    this.prs.dispose()
+    this.sidebar.dispose()
   }
 
   // ── OverlayHost ────────────────────────────────────────────────────
@@ -362,20 +394,13 @@ export class App implements ChatPorts {
     if (at >= 0) {
       this.overlays.splice(at, 1)
       this.#approvalIds.delete(overlay.key)
+      overlay.onClose?.()
       this.changed()
     }
   }
 
   changed() {
-    if (this.#scheduled) {
-      return
-    }
-
-    this.#scheduled = true
-    setImmediate(() => {
-      this.#scheduled = false
-      this.#render()
-    })
+    this.#renders.request()
   }
 
   /** A notice in the transcript, rendered now. */
@@ -391,24 +416,6 @@ export class App implements ChatPorts {
   }
 
   // ── Input ──────────────────────────────────────────────────────────
-
-  async #readInput() {
-    try {
-      for await (const input of this.#tern) {
-        if (input.type === 'key') {
-          this.#onKey(input.key)
-        } else {
-          this.#onTernEvent(input.event)
-        }
-
-        this.changed()
-      }
-    } catch (error) {
-      this.transcript.notice(`Input failed: ${errorText(error)}`, 'error')
-    }
-
-    this.quit()
-  }
 
   #onKey(key: Key) {
     const top = this.overlays.at(-1)
@@ -536,7 +543,6 @@ export class App implements ChatPorts {
 
     if (ev.ev === 'focus' && ev.id === INPUT_ID && !this.overlays.at(-1)?.modal) {
       this.#hud = undefined
-      this.#focus = INPUT_ID
       this.#surface.focus(INPUT_ID)
     }
   }
@@ -631,16 +637,13 @@ export class App implements ChatPorts {
     }
   }
 
-  /**
-   * OSC 7: tells Tern the session's folder, so its file viewer, branch and new splits follow a
-   * worktree (`hermes -w tern`) or a moved workspace instead of the folder the pane was opened in.
-   */
+  /** Tells Tern the session's folder when it moved (`hermes -w tern`, a moved workspace): OSC 7. */
   #reportCwd() {
     const cwd = this.info?.cwd
 
     if (cwd && cwd !== this.#reportedCwd) {
       this.#reportedCwd = cwd
-      process.stdout.write(`\x1b]7;file://${hostname()}${encodeURI(cwd)}\x07`)
+      reportCwd(cwd)
     }
   }
 
@@ -652,8 +655,7 @@ export class App implements ChatPorts {
     }
 
     this.title = next
-    // eslint-disable-next-line no-control-regex -- a title must not end the OSC early
-    process.stdout.write(`\x1b]2;${next.replace(/[\x00-\x1f]/g, ' ')}\x07`)
+    setTabTitle(next)
 
     return true
   }
@@ -772,7 +774,7 @@ export class App implements ChatPorts {
       return true
     }
 
-    const path = imagePathOf(text, this.info?.cwd || process.env.HERMES_CWD || process.cwd())
+    const path = imagePathOf(text, this.info?.cwd || this.#launch.cwd)
 
     if (path) {
       void this.#attachImage(path, basename(path))
@@ -808,7 +810,7 @@ export class App implements ChatPorts {
 
   /** `/image <path>`: attaches that image file (resolved against the session's folder) to the next prompt. */
   async attachImagePath(raw: string) {
-    const path = imagePathOf(raw, this.info?.cwd || process.env.HERMES_CWD || process.cwd())
+    const path = imagePathOf(raw, this.info?.cwd || this.#launch.cwd)
 
     if (!path) {
       this.transcript.notice(`Not an image file: ${raw.trim()} (PNG, JPEG, GIF or WebP)`, 'warning')
@@ -830,7 +832,7 @@ export class App implements ChatPorts {
         return
       }
 
-      const image = this.#image(await uploadImage(this.#gw, sid, path, process.env.HERMES_CWD || process.cwd()), name)
+      const image = this.#image(await uploadImage(this.#gw, sid, path, this.#launch.cwd), name)
 
       // Its chip was removed (✕, Ctrl+C) while it uploaded: the prompt does not take it.
       if (this.#attaching.includes(slot)) {
@@ -948,7 +950,7 @@ export class App implements ChatPorts {
       return
     }
 
-    const cwd = this.info?.cwd || process.env.HOME || '/'
+    const cwd = this.info?.cwd || this.#launch.home || '/'
 
     if (!(await openSidebar(specOf(a, agentName(a), this.sid, this.storedSid), cwd))) {
       openAgents(this, { id, watch: true })
@@ -1480,7 +1482,7 @@ export class App implements ChatPorts {
       return
     }
 
-    setTimeout(() => {
+    this.#timers.timeout(() => {
       const stored = this.info?.stored_session_id || this.storedSid
 
       if (this.sid === sid && stored && this.transcript.unsummarized) {
@@ -1499,7 +1501,7 @@ export class App implements ChatPorts {
 
   /** The first session: HERMES_TUI_RESUME's, else a new one; then the launcher's startup image, if any. */
   async #bootstrap() {
-    const resume = process.env.HERMES_TUI_RESUME?.trim()
+    const resume = this.#launch.resume
 
     try {
       await (resume ? this.resume(resume) : this.newSession())
@@ -1524,7 +1526,7 @@ export class App implements ChatPorts {
 
     try {
       if (this.#gw.isCanonical) {
-        const image = this.#image(await uploadImage(this.#gw, sid, path, process.env.HERMES_CWD || process.cwd()), basename(path))
+        const image = this.#image(await uploadImage(this.#gw, sid, path, this.#launch.cwd), basename(path))
         // The startup query waits at the queue's head for this image.
         const images = this.queue[0]?.images ?? this.#attachments
         images.push(image)
@@ -1581,7 +1583,7 @@ export class App implements ChatPorts {
         return
       }
 
-      const cwd = process.env.HERMES_TUI_CWD?.trim()
+      const cwd = this.#launch.sessionCwd
 
       // The shared gateway takes the launch flags (`hermes tern -m … --yolo -s …`) as the session's creation policy.
       const r = await this.#gw.request<CreateResult>(
@@ -2412,7 +2414,7 @@ export class App implements ChatPorts {
   /** Switches the theme mode now and keeps it for the next launch. */
   setTheme(mode: ThemeMode) {
     this.#theme = mode
-    saveSettings({ theme: mode })
+    this.#settings.save({ theme: mode })
     this.#applyTheme()
     this.changed()
   }
@@ -2443,7 +2445,7 @@ export class App implements ChatPorts {
    * not a settings write); the work log shows it as thought rows.
    */
   #showThoughts(sid: string) {
-    if (loadSettings().thoughts === false) {
+    if (this.#settings.load().thoughts === false) {
       return
     }
 
@@ -2700,7 +2702,7 @@ export class App implements ChatPorts {
         composer: this.composer,
         context: max > 0 ? { max, used } : undefined,
         cost: usage?.cost_usd ?? undefined,
-        cwd: info?.cwd ? shortPath(info.cwd) : '',
+        cwd: info?.cwd ? shortPath(info.cwd, this.#launch.home) : '',
         effort: info?.reasoning_effort ?? '',
         effortWire: info?.reasoning_effort_wire || undefined,
         fast: fastTier(info),
@@ -2814,10 +2816,7 @@ export class App implements ChatPorts {
     const top = this.overlays.at(-1)
     const focus = top?.focus ? top.focus(`layer.${top.key}`) : top?.modal || this.#hud ? null : INPUT_ID
 
-    if (focus !== this.#focus) {
-      this.#focus = focus
-      this.#surface.focus(focus)
-    }
+    this.#surface.follow(focus)
   }
 }
 
@@ -2848,9 +2847,8 @@ function kaomojiLabel(text: string): string {
   return word ? `${word.charAt(0).toUpperCase()}${word.slice(1)}…` : ''
 }
 
-function shortPath(path: string): string {
-  const home = process.env.HOME
-
+/** `path` with `home` (HOME) as `~`. */
+function shortPath(path: string, home: string | undefined): string {
   return home && path.startsWith(home) ? `~${path.slice(home.length)}` : path
 }
 

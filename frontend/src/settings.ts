@@ -39,3 +39,22 @@ export function saveSettings(patch: Settings, file = settingsFile()): Settings {
 
   return next
 }
+
+/**
+ * Where the panes keep their settings. The panes of one profile share the file, so a read sees
+ * what another pane saved: read again where the moment matters (a session's thoughts flag).
+ */
+export interface SettingsSource {
+  /** The settings now; the defaults when there are none. */
+  load(): Settings
+  /** Merges `patch` into the stored settings; returns the merged settings. */
+  save(patch: Settings): Settings
+}
+
+/** The settings file: `file` when given, else the profile's, resolved at each read and write. */
+export function fileSettings(file?: string): SettingsSource {
+  return {
+    load: () => loadSettings(file ?? settingsFile()),
+    save: patch => saveSettings(patch, file ?? settingsFile())
+  }
+}

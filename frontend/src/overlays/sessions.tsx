@@ -11,6 +11,7 @@ import { basename } from 'node:path'
 import type { JSX, Key, PickerGroup, PickerItem, Span } from '@stencil-hq/tern'
 
 import type { ChatPorts } from '../app/ports.js'
+import { launchEnv } from '../config/env.js'
 import { errorText } from '../core/errors.js'
 import { mutateSession } from '../hermes/mutate.js'
 import { inWorkspace, lastReply, sessionLabel, type StoredSession, storedSessions, workspaceOf } from '../hermes/sessionIndex.js'
@@ -46,7 +47,7 @@ export function openSessionPicker(host: SessionsHost) {
     state = 'loading'
     host.changed()
 
-    const cwd = host.session.info?.cwd || process.env.HERMES_CWD || process.cwd()
+    const cwd = host.session.info?.cwd || launchEnv().cwd
     // The open session may have no messages yet; every other empty one is litter.
     const [key, live] = await Promise.all([
       workspaceOf(cwd),
@@ -339,7 +340,7 @@ function preview(s: StoredSession, now: number, isCurrent: boolean, running: boo
 }
 
 function shortPath(path: string): string {
-  const home = process.env.HOME
+  const home = launchEnv().home
 
   return home && path.startsWith(home) ? `~${path.slice(home.length)}` : path
 }

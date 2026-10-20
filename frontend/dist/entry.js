@@ -1265,36 +1265,36 @@ var require_diagnostics = __commonJS({
       const debuglog = fetchDebuglog.enabled ? fetchDebuglog : undiciDebugLog;
       diagnosticsChannel.channel("undici:client:beforeConnect").subscribe((evt) => {
         const {
-          connectParams: { version: version2, protocol, port, host }
+          connectParams: { version, protocol, port, host }
         } = evt;
         debuglog(
           "connecting to %s using %s%s",
           `${host}${port ? `:${port}` : ""}`,
           protocol,
-          version2
+          version
         );
       });
       diagnosticsChannel.channel("undici:client:connected").subscribe((evt) => {
         const {
-          connectParams: { version: version2, protocol, port, host }
+          connectParams: { version, protocol, port, host }
         } = evt;
         debuglog(
           "connected to %s using %s%s",
           `${host}${port ? `:${port}` : ""}`,
           protocol,
-          version2
+          version
         );
       });
       diagnosticsChannel.channel("undici:client:connectError").subscribe((evt) => {
         const {
-          connectParams: { version: version2, protocol, port, host },
+          connectParams: { version, protocol, port, host },
           error
         } = evt;
         debuglog(
           "connection to %s using %s%s errored - %s",
           `${host}${port ? `:${port}` : ""}`,
           protocol,
-          version2,
+          version,
           error.message
         );
       });
@@ -1343,31 +1343,31 @@ var require_diagnostics = __commonJS({
         const debuglog = undiciDebugLog.enabled ? undiciDebugLog : websocketDebuglog;
         diagnosticsChannel.channel("undici:client:beforeConnect").subscribe((evt) => {
           const {
-            connectParams: { version: version2, protocol, port, host }
+            connectParams: { version, protocol, port, host }
           } = evt;
           debuglog(
             "connecting to %s%s using %s%s",
             host,
             port ? `:${port}` : "",
             protocol,
-            version2
+            version
           );
         });
         diagnosticsChannel.channel("undici:client:connected").subscribe((evt) => {
           const {
-            connectParams: { version: version2, protocol, port, host }
+            connectParams: { version, protocol, port, host }
           } = evt;
           debuglog(
             "connected to %s%s using %s%s",
             host,
             port ? `:${port}` : "",
             protocol,
-            version2
+            version
           );
         });
         diagnosticsChannel.channel("undici:client:connectError").subscribe((evt) => {
           const {
-            connectParams: { version: version2, protocol, port, host },
+            connectParams: { version, protocol, port, host },
             error
           } = evt;
           debuglog(
@@ -1375,7 +1375,7 @@ var require_diagnostics = __commonJS({
             host,
             port ? `:${port}` : "",
             protocol,
-            version2,
+            version,
             error.message
           );
         });
@@ -18455,10 +18455,10 @@ var require_eventsource = __commonJS({
           lastEventId: "",
           reconnectionTime: defaultReconnectionTime
         };
-        const settings = environmentSettingsObject;
+        const settings2 = environmentSettingsObject;
         let urlRecord;
         try {
-          urlRecord = new URL(url, settings.settingsObject.baseUrl);
+          urlRecord = new URL(url, settings2.settingsObject.baseUrl);
           this.#state.origin = urlRecord.origin;
         } catch (e) {
           throw new DOMException(e, "SyntaxError");
@@ -24697,7 +24697,6 @@ var GatewayClient = class extends EventEmitter {
 // src/app.ts
 import { randomUUID as randomUUID3 } from "node:crypto";
 import { appendFileSync as appendFileSync4, existsSync as existsSync6 } from "node:fs";
-import { hostname } from "node:os";
 import { basename as basename4 } from "node:path";
 
 // node_modules/@hermes/shared/src/slash.ts
@@ -25663,6 +25662,25 @@ function copyToClipboard(text11, env2 = process.env) {
     });
     child.stdin.end(text11);
   }
+}
+
+// src/config/env.ts
+function readLaunchEnv(env2 = process.env, cwd = process.cwd()) {
+  return Object.freeze({
+    cwd: env2["HERMES_CWD"] || cwd,
+    eventLog: env2["HERMES_TERN_EVENT_LOG"] ?? "",
+    home: env2["HOME"],
+    image: env2["HERMES_TUI_IMAGE"]?.trim() ?? "",
+    pythonSrcRoot: env2["HERMES_PYTHON_SRC_ROOT"] ?? "",
+    query: env2["HERMES_TUI_QUERY"]?.trim() ?? "",
+    resume: env2["HERMES_TUI_RESUME"]?.trim() ?? "",
+    sessionCwd: env2["HERMES_TUI_CWD"]?.trim() ?? "",
+    version: env2["HERMES_VERSION"] ?? ""
+  });
+}
+var launch;
+function launchEnv() {
+  return launch ??= readLaunchEnv();
 }
 
 // src/hermes/mutate.ts
@@ -31277,7 +31295,7 @@ function actionIcon(action) {
   }
 }
 var str6 = (v) => typeof v === "string" && v ? v : void 0;
-function shortPath(path2, cwd = process.env.HERMES_CWD || process.cwd()) {
+function shortPath(path2, cwd = launchEnv().cwd) {
   const root7 = cwd.replace(/\/+$/, "");
   if (root7 && path2.startsWith(`${root7}/`)) {
     return path2.slice(root7.length + 1);
@@ -32356,6 +32374,12 @@ function hitRuns(positions, limit) {
   return runs3;
 }
 
+// src/overlays/sheet.ts
+function tickWhileOpen(host, ms) {
+  const timer = setInterval(() => host.changed(), ms);
+  return () => clearInterval(timer);
+}
+
 // src/overlays/agents.tsx
 var KEY = "agents";
 var TICK_MS = 1e3;
@@ -32393,11 +32417,8 @@ function openAgents(host, focus) {
   let step;
   let steer2;
   let stopping = false;
-  const timer = setInterval(() => host.overlays.includes(overlay) ? host.changed() : clearInterval(timer), TICK_MS);
-  const close = () => {
-    clearInterval(timer);
-    host.close(overlay);
-  };
+  const stopTicking = tickWhileOpen(host, TICK_MS);
+  const close = () => host.close(overlay);
   const current = () => agents2().find((a2) => a2.id === (watching ?? selected));
   const watch2 = (id) => {
     const a2 = agents2().find((x) => x.id === id);
@@ -32462,6 +32483,8 @@ function openAgents(host, focus) {
     key: KEY,
     modal: true,
     cancel: close,
+    // Ends with the sheet, however it closed (Esc, a session switch replacing the overlays).
+    onClose: stopTicking,
     node: () => {
       const now = Date.now();
       const watched = watching ? agents2().find((a2) => a2.id === watching) : void 0;
@@ -32966,17 +32989,8 @@ function openBackground(host, at) {
   let copiedTimer;
   const release = host.processes.watch();
   const releaseCron = host.cron.watch();
-  const timer = setInterval(() => host.overlays.includes(overlay) ? host.changed() : end(), TICK_MS2);
-  function end() {
-    clearInterval(timer);
-    clearTimeout(copiedTimer);
-    release();
-    releaseCron();
-  }
-  const close = () => {
-    end();
-    host.close(overlay);
-  };
+  const stopTicking = tickWhileOpen(host, TICK_MS2);
+  const close = () => host.close(overlay);
   const shown = () => tab2 === "running" ? procs().filter(isRunning2) : procs();
   const current = () => procs().find((p3) => p3.id === selected);
   const stopOne = async () => {
@@ -33055,6 +33069,13 @@ function openBackground(host, at) {
     key: KEY2,
     modal: true,
     cancel: close,
+    // Ends with the sheet, however it closed (Esc, a session switch replacing the overlays).
+    onClose: () => {
+      stopTicking();
+      clearTimeout(copiedTimer);
+      release();
+      releaseCron();
+    },
     node: () => sheetNode(Date.now()),
     onKey: (k) => {
       if (confirm) {
@@ -34771,23 +34792,23 @@ var skippable = [
 var emptyOptions = {};
 var ignorableNode = convert(["comment", "doctype"]);
 function minifyWhitespace(tree, options) {
-  const settings = options || emptyOptions;
+  const settings2 = options || emptyOptions;
   minify(tree, {
     collapse: collapseFactory(
-      settings.newlines ? replaceNewlines : replaceWhitespace
+      settings2.newlines ? replaceNewlines : replaceWhitespace
     ),
     whitespace: "normal"
   });
 }
 function minify(node3, state) {
   if ("children" in node3) {
-    const settings = { ...state };
+    const settings2 = { ...state };
     if (node3.type === "root" || blocklike(node3)) {
-      settings.before = true;
-      settings.after = true;
+      settings2.before = true;
+      settings2.after = true;
     }
-    settings.whitespace = inferWhiteSpace(node3, state);
-    return all(node3, settings);
+    settings2.whitespace = inferWhiteSpace(node3, state);
+    return all(node3, settings2);
   }
   if (node3.type === "text") {
     if (state.whitespace === "normal") {
@@ -35968,9 +35989,9 @@ function create2() {
 // node_modules/mdast-util-to-string/lib/index.js
 var emptyOptions2 = {};
 function toString2(value, options) {
-  const settings = options || emptyOptions2;
-  const includeImageAlt = typeof settings.includeImageAlt === "boolean" ? settings.includeImageAlt : true;
-  const includeHtml = typeof settings.includeHtml === "boolean" ? settings.includeHtml : true;
+  const settings2 = options || emptyOptions2;
+  const includeImageAlt = typeof settings2.includeImageAlt === "boolean" ? settings2.includeImageAlt : true;
+  const includeHtml = typeof settings2.includeHtml === "boolean" ? settings2.includeHtml : true;
   return one(value, includeImageAlt, includeHtml);
 }
 function one(value, includeImageAlt, includeHtml) {
@@ -36689,11 +36710,11 @@ function toSpecificContent(nodes2, build2) {
 var emptyOptions3 = {};
 function toMdast(tree, options) {
   const cleanTree = esm_default(tree);
-  const settings = options || emptyOptions3;
+  const settings2 = options || emptyOptions3;
   const transformWhitespace = rehypeMinifyWhitespace({
-    newlines: settings.newlines === true
+    newlines: settings2.newlines === true
   });
-  const state = createState(settings);
+  const state = createState(settings2);
   let mdast;
   transformWhitespace(cleanTree);
   visit(cleanTree, function(node3) {
@@ -36755,8 +36776,8 @@ function escapeStringRegexp(string3) {
 
 // node_modules/mdast-util-find-and-replace/lib/index.js
 function findAndReplace(tree, list8, options) {
-  const settings = options || {};
-  const ignored = convert(settings.ignore || []);
+  const settings2 = options || {};
+  const ignored = convert(settings2.ignore || []);
   const pairs = toPairs(list8);
   let pairIndex = -1;
   while (++pairIndex < pairs.length) {
@@ -37244,9 +37265,9 @@ function defaultStringLength(value) {
   return value.length;
 }
 function markdownTable(table3, options) {
-  const settings = options || {};
-  const align = (settings.align || []).concat();
-  const stringLength = settings.stringLength || defaultStringLength;
+  const settings2 = options || {};
+  const align = (settings2.align || []).concat();
+  const stringLength = settings2.stringLength || defaultStringLength;
   const alignments = [];
   const cellMatrix = [];
   const sizeMatrix = [];
@@ -37262,7 +37283,7 @@ function markdownTable(table3, options) {
     }
     while (++columnIndex2 < table3[rowIndex].length) {
       const cell3 = serialize2(table3[rowIndex][columnIndex2]);
-      if (settings.alignDelimiters !== false) {
+      if (settings2.alignDelimiters !== false) {
         const size = stringLength(cell3);
         sizes2[columnIndex2] = size;
         if (longestCellByColumn[columnIndex2] === void 0 || size > longestCellByColumn[columnIndex2]) {
@@ -37300,12 +37321,12 @@ function markdownTable(table3, options) {
     } else if (code7 === 114) {
       after = ":";
     }
-    let size = settings.alignDelimiters === false ? 1 : Math.max(
+    let size = settings2.alignDelimiters === false ? 1 : Math.max(
       1,
       longestCellByColumn[columnIndex] - before.length - after.length
     );
     const cell3 = before + "-".repeat(size) + after;
-    if (settings.alignDelimiters !== false) {
+    if (settings2.alignDelimiters !== false) {
       size = before.length + size + after.length;
       if (size > longestCellByColumn[columnIndex]) {
         longestCellByColumn[columnIndex] = size;
@@ -37327,7 +37348,7 @@ function markdownTable(table3, options) {
       const cell3 = row3[columnIndex] || "";
       let before = "";
       let after = "";
-      if (settings.alignDelimiters !== false) {
+      if (settings2.alignDelimiters !== false) {
         const size = longestCellByColumn[columnIndex] - (sizes2[columnIndex] || 0);
         const code7 = alignments[columnIndex];
         if (code7 === 114) {
@@ -37344,30 +37365,30 @@ function markdownTable(table3, options) {
           after = " ".repeat(size);
         }
       }
-      if (settings.delimiterStart !== false && !columnIndex) {
+      if (settings2.delimiterStart !== false && !columnIndex) {
         line.push("|");
       }
-      if (settings.padding !== false && // Don’t add the opening space if we’re not aligning and the cell is
+      if (settings2.padding !== false && // Don’t add the opening space if we’re not aligning and the cell is
       // empty: there will be a closing space.
-      !(settings.alignDelimiters === false && cell3 === "") && (settings.delimiterStart !== false || columnIndex)) {
+      !(settings2.alignDelimiters === false && cell3 === "") && (settings2.delimiterStart !== false || columnIndex)) {
         line.push(" ");
       }
-      if (settings.alignDelimiters !== false) {
+      if (settings2.alignDelimiters !== false) {
         line.push(before);
       }
       line.push(cell3);
-      if (settings.alignDelimiters !== false) {
+      if (settings2.alignDelimiters !== false) {
         line.push(after);
       }
-      if (settings.padding !== false) {
+      if (settings2.padding !== false) {
         line.push(" ");
       }
-      if (settings.delimiterEnd !== false || columnIndex !== mostCellsPerRow - 1) {
+      if (settings2.delimiterEnd !== false || columnIndex !== mostCellsPerRow - 1) {
         line.push("|");
       }
     }
     lines.push(
-      settings.delimiterEnd === false ? line.join("").replace(/ +$/, "") : line.join("")
+      settings2.delimiterEnd === false ? line.join("").replace(/ +$/, "") : line.join("")
     );
   }
   return lines.join("\n");
@@ -37383,7 +37404,7 @@ function toAlignment(value) {
 // node_modules/zwitch/index.js
 var own3 = {}.hasOwnProperty;
 function zwitch(key2, options) {
-  const settings = options || {};
+  const settings2 = options || {};
   function one5(value, ...parameters) {
     let fn = one5.invalid;
     const handlers3 = one5.handlers;
@@ -37395,9 +37416,9 @@ function zwitch(key2, options) {
       return fn.call(this, value, ...parameters);
     }
   }
-  one5.handlers = settings.handlers || {};
-  one5.invalid = settings.invalid;
-  one5.unknown = settings.unknown;
+  one5.handlers = settings2.handlers || {};
+  one5.invalid = settings2.invalid;
+  one5.unknown = settings2.unknown;
   return one5;
 }
 
@@ -41324,7 +41345,7 @@ function track(config2) {
 
 // node_modules/mdast-util-to-markdown/lib/index.js
 function toMarkdown(tree, options) {
-  const settings = options || {};
+  const settings2 = options || {};
   const state = {
     associationId: association,
     bulletCurrent: void 0,
@@ -41347,7 +41368,7 @@ function toMarkdown(tree, options) {
     stack: [],
     unsafe: [...unsafe]
   };
-  configure(state, settings);
+  configure(state, settings2);
   if (state.options.tightDefinitions) {
     state.join.push(joinDefinition);
   }
@@ -41459,10 +41480,10 @@ function replace($0, $1) {
   return $1 === "|" ? $1 : $0;
 }
 function gfmTableToMarkdown(options) {
-  const settings = options || {};
-  const padding = settings.tableCellPadding;
-  const alignDelimiters = settings.tablePipeAlign;
-  const stringLength = settings.stringLength;
+  const settings2 = options || {};
+  const padding = settings2.tableCellPadding;
+  const alignDelimiters = settings2.tablePipeAlign;
+  const stringLength = settings2.stringLength;
   const around = padding ? " " : "|";
   return {
     unsafe: [
@@ -42899,10 +42920,10 @@ function parse(value) {
   return tokens2;
 }
 function stringify(values, options) {
-  const settings = options || {};
+  const settings2 = options || {};
   const input2 = values[values.length - 1] === "" ? [...values, ""] : values;
   return input2.join(
-    (settings.padRight ? " " : "") + "," + (settings.padLeft === false ? "" : " ")
+    (settings2.padRight ? " " : "") + "," + (settings2.padLeft === false ? "" : " ")
   ).trim();
 }
 
@@ -43214,13 +43235,13 @@ var webNamespaces = {
 var own7 = {}.hasOwnProperty;
 var proto = Object.prototype;
 function fromParse5(tree, options) {
-  const settings = options || {};
+  const settings2 = options || {};
   return one3(
     {
-      file: settings.file || void 0,
+      file: settings2.file || void 0,
       location: false,
-      schema: settings.space === "svg" ? svg2 : html3,
-      verbose: settings.verbose || false
+      schema: settings2.space === "svg" ? svg2 : html3,
+      verbose: settings2.verbose || false
     },
     tree
   );
@@ -43397,8 +43418,8 @@ var emptyOptions4 = {};
 var own8 = {}.hasOwnProperty;
 var one4 = zwitch("type", { handlers: { root: root3, element: element3, text: text3, comment: comment2, doctype } });
 function toParse5(tree, options) {
-  const settings = options || emptyOptions4;
-  const space2 = settings.space;
+  const settings2 = options || emptyOptions4;
+  const space2 = settings2.space;
   return one4(tree, space2 === "svg" ? svg2 : html3);
 }
 function root3(node3, schema2) {
@@ -56601,14 +56622,14 @@ function remarkGfm(options) {
     /** @type {Processor<Root>} */
     this
   );
-  const settings = options || emptyOptions5;
+  const settings2 = options || emptyOptions5;
   const data = self2.data();
   const micromarkExtensions = data.micromarkExtensions || (data.micromarkExtensions = []);
   const fromMarkdownExtensions = data.fromMarkdownExtensions || (data.fromMarkdownExtensions = []);
   const toMarkdownExtensions = data.toMarkdownExtensions || (data.toMarkdownExtensions = []);
-  micromarkExtensions.push(gfm(settings));
+  micromarkExtensions.push(gfm(settings2));
   fromMarkdownExtensions.push(gfmFromMarkdown());
-  toMarkdownExtensions.push(gfmToMarkdown(settings));
+  toMarkdownExtensions.push(gfmToMarkdown(settings2));
 }
 
 // node_modules/micromark/lib/initialize/content.js
@@ -57438,10 +57459,10 @@ function serializeChunks(chunks2, expandTabs) {
 
 // node_modules/micromark/lib/parse.js
 function parse3(options) {
-  const settings = options || {};
+  const settings2 = options || {};
   const constructs2 = (
     /** @type {FullNormalizedExtension} */
-    combineExtensions([constructs_exports, ...settings.extensions || []])
+    combineExtensions([constructs_exports, ...settings2.extensions || []])
   );
   const parser = {
     constructs: constructs2,
@@ -59010,11 +59031,11 @@ function footer(state) {
 var own11 = {}.hasOwnProperty;
 var emptyOptions6 = {};
 function createState2(tree, options) {
-  const settings = options || emptyOptions6;
+  const settings2 = options || emptyOptions6;
   const definitionById = /* @__PURE__ */ new Map();
   const footnoteById = /* @__PURE__ */ new Map();
   const footnoteCounts = /* @__PURE__ */ new Map();
-  const handlers3 = { ...handlers2, ...settings.handlers };
+  const handlers3 = { ...handlers2, ...settings2.handlers };
   const state = {
     all: all8,
     applyData,
@@ -59024,7 +59045,7 @@ function createState2(tree, options) {
     footnoteOrder: [],
     handlers: handlers3,
     one: one5,
-    options: settings,
+    options: settings2,
     patch: patch5,
     wrap: wrap2
   };
@@ -61302,17 +61323,15 @@ function openPrSheet(host, focus) {
     focus
   );
   host.prs.poke();
-  const timer = setInterval(() => host.overlays.includes(overlay) ? host.changed() : end(), TICK_MS3);
-  function end() {
-    clearInterval(timer);
-    view.dispose();
-  }
-  const close = () => {
-    end();
-    host.close(overlay);
-  };
+  const stopTicking = tickWhileOpen(host, TICK_MS3);
+  const close = () => host.close(overlay);
   const overlay = {
     cancel: close,
+    // Ends with the sheet, however it closed (Esc, a session switch replacing the overlays).
+    onClose: () => {
+      stopTicking();
+      view.dispose();
+    },
     key: SHEET,
     modal: true,
     node: (id) => {
@@ -63283,7 +63302,7 @@ function openSessionPicker(host) {
   const load2 = async () => {
     state = "loading";
     host.changed();
-    const cwd = host.session.info?.cwd || process.env.HERMES_CWD || process.cwd();
+    const cwd = host.session.info?.cwd || launchEnv().cwd;
     const [key2, live] = await Promise.all([
       workspaceOf(cwd),
       host.gw.request("session.list", { limit: 200 }).catch(() => ({ sessions: [] }))
@@ -63529,7 +63548,7 @@ function preview4(s2, now, isCurrent, running, reply) {
   ];
 }
 function shortPath2(path2) {
-  const home = process.env.HOME;
+  const home = launchEnv().home;
   return home && path2.startsWith(home) ? `~${path2.slice(home.length)}` : path2;
 }
 function ageOf(at, now) {
@@ -65127,6 +65146,81 @@ function localCommand(name) {
 }
 var localCommands = () => COMMANDS3;
 
+// src/core/disposables.ts
+var Disposables = class {
+  #teardowns = /* @__PURE__ */ new Set();
+  #disposed = false;
+  /** Whether dispose() ran. */
+  get disposed() {
+    return this.#disposed;
+  }
+  /**
+   * Runs `teardown` at dispose (at once when that already ran). The returned function drops it
+   * unrun: the thing ended on its own.
+   */
+  add(teardown) {
+    if (this.#disposed) {
+      teardown();
+      return () => void 0;
+    }
+    const entry = () => teardown();
+    this.#teardowns.add(entry);
+    return () => void this.#teardowns.delete(entry);
+  }
+  /** setTimeout, cleared at dispose unless it fired first. */
+  timeout(fn, ms) {
+    const timer = setTimeout(() => {
+      drop();
+      fn();
+    }, ms);
+    const drop = this.add(() => clearTimeout(timer));
+    return timer;
+  }
+  /**
+   * Runs every teardown once, the newest first. One that throws does not stop the rest; the first
+   * error is thrown after all of them ran.
+   */
+  dispose() {
+    if (this.#disposed) {
+      return;
+    }
+    this.#disposed = true;
+    const teardowns = [...this.#teardowns].reverse();
+    this.#teardowns.clear();
+    const errors = [];
+    for (const teardown of teardowns) {
+      try {
+        teardown();
+      } catch (error) {
+        errors.push(error);
+      }
+    }
+    if (errors.length) {
+      throw errors[0];
+    }
+  }
+};
+
+// src/core/scheduler.ts
+var RenderScheduler = class {
+  #render;
+  #scheduled = false;
+  constructor(render3) {
+    this.#render = render3;
+  }
+  /** Renders on the next turn of the event loop (setImmediate), once however often it is asked. */
+  request() {
+    if (this.#scheduled) {
+      return;
+    }
+    this.#scheduled = true;
+    setImmediate(() => {
+      this.#scheduled = false;
+      this.#render();
+    });
+  }
+};
+
 // src/flow.ts
 var Switches = class {
   #generation = 0;
@@ -66140,709 +66234,6 @@ async function openHelp(host) {
   };
   host.open(overlay);
 }
-
-// src/view/styles.ts
-var STYLES = css`
-  /* The work log, as t3code draws it: quiet 14px rows in the UI face, a 24px line each. */
-  [data-role='hermes.turn.working'],
-  [data-role='hermes.turn.fold'] > .sf-section-head,
-  [data-role='hermes.work.group'] > .sf-section-head,
-  [data-role='hermes.work.row'] > .sf-section-head,
-  .sf-col[data-role='hermes.work.row'],
-  .sf-row[data-role='hermes.work.row'] {
-    font: 400 14px/24px var(--sans) !important;
-    min-height: 24px;
-  }
-
-  /* "Working for 12s" and "Worked for 54s" head the turn, ruled off from what follows. */
-  [data-role='hermes.turn.working'],
-  [data-role='hermes.turn.fold'] > .sf-section-head {
-    padding-bottom: 8px !important;
-    margin-bottom: 6px !important;
-    box-shadow: inset 0 -1px 0 var(--l3) !important;
-  }
-
-  /* An open fold or group lists its steps and notes where they were, not in an indented code
-     column: no guide line, no indent, the UI face at the answer's size. */
-  :is([data-role='hermes.turn.fold'], [data-role='hermes.work.group'], [data-role='hermes.work.row']),
-  :is([data-role='hermes.turn.fold'], [data-role='hermes.work.group'], [data-role='hermes.work.row']) > .sf-section-body {
-    margin-left: 0 !important;
-    padding-left: 0 !important;
-    border: none !important;
-    box-shadow: none !important;
-    background: none !important;
-  }
-
-  :is([data-role='hermes.turn.fold'], [data-role='hermes.work.group'], [data-role='hermes.work.row'])::before,
-  :is([data-role='hermes.turn.fold'], [data-role='hermes.work.group'], [data-role='hermes.work.row'])::after,
-  :is([data-role='hermes.turn.fold'], [data-role='hermes.work.group'], [data-role='hermes.work.row']) > .sf-section-body::before,
-  :is([data-role='hermes.turn.fold'], [data-role='hermes.work.group'], [data-role='hermes.work.row']) > .sf-section-body::after {
-    display: none !important;
-  }
-
-  :is([data-role='hermes.turn.fold'], [data-role='hermes.work.group'], [data-role='hermes.work.row']) > .sf-section-body {
-    font-family: var(--sans) !important;
-    font-size: 14px !important;
-  }
-
-  [data-role='hermes.turn.fold'] > .sf-section-body > .sf-md {
-    margin: 4px 0 10px !important;
-  }
-
-  [data-role='hermes.turn.working'] .sf-elapsed {
-    margin-left: 4px;
-  }
-
-  /* The chevron follows the label: right after "Worked for", at the row's end on a step. */
-  [data-role='hermes.turn.fold'] > .sf-section-head > .sf-chev,
-  [data-role='hermes.work.row'] > .sf-section-head > .sf-chev {
-    order: 2;
-    opacity: 0.7;
-  }
-
-  [data-role='hermes.work.row'] > .sf-section-head > .sf-head {
-    flex: 1 1 auto;
-    min-width: 0;
-  }
-
-  /* A group's summary has no chevron; when it started shows on hover. */
-  [data-role='hermes.work.group'] > .sf-section-head > .sf-chev {
-    display: none;
-  }
-
-  [data-role='hermes.work.group'] > .sf-section-head > .sf-head {
-    flex: 1 1 auto;
-    min-width: 0;
-  }
-
-  [data-role='hermes.work.time'] {
-    opacity: 0;
-    font-size: 12px !important;
-    font-variant-numeric: tabular-nums;
-  }
-
-  [data-role='hermes.work.group'] > .sf-section-head:hover [data-role='hermes.work.time'] {
-    opacity: 1;
-  }
-
-  /* What a step or thought opens to sits under its label, past the icon column: a call's
-     command and output in the code face, a thought as prose. */
-  [data-role='hermes.work.detail'],
-  [data-role='hermes.work.thought'] {
-    margin: 2px 0 8px 28px !important;
-  }
-
-  [data-role='hermes.work.detail'] {
-    font-family: var(--mono) !important;
-    font-size: 13px !important;
-  }
-
-  /* The session sidebar is a prefs sheet for its dock, not for settings: no search, no one-page
-     strip, no page heading over the folder line. */
-  .sf-prefs[data-id='layer.sidebar'] .pf-mark,
-  .sf-prefs[data-id='layer.sidebar'] .pf-search,
-  .sf-prefs[data-id='layer.sidebar'] .pf-groups,
-  .sf-prefs[data-id='layer.sidebar'] .pf-eyebrow,
-  .sf-prefs[data-id='layer.sidebar'] .pf-title {
-    display: none !important;
-  }
-
-  .sf-prefs[data-id='layer.sidebar'] .pf-lead {
-    font-family: var(--mono) !important;
-    font-size: 12px !important;
-    margin-top: 0 !important;
-  }
-
-  /* An open group's steps hang from its summary: a guide line down from its icon, the rows a size
-     smaller, so the summary reads as the parent and not as one more step. */
-  [data-role='hermes.work.group'] > .sf-section-body {
-    margin: 2px 0 6px 7px !important;
-    padding-left: 17px !important;
-    border-left: 1px solid var(--l3) !important;
-  }
-
-  [data-role='hermes.work.group'] > .sf-section-body [data-role='hermes.work.row'] > .sf-section-head,
-  [data-role='hermes.work.group'] > .sf-section-body .sf-col[data-role='hermes.work.row'] {
-    font-size: 13px !important;
-    line-height: 22px !important;
-    min-height: 22px;
-  }
-
-  /* The group's own chevron sits right after its summary and turns as it opens (Tern's is hidden). */
-  [data-role='hermes.work.chev'] {
-    opacity: 0.45;
-    transition: transform 0.15s ease, opacity 0.15s ease;
-  }
-
-  .sf-section.collapsed > .sf-section-head [data-role='hermes.work.chev'] {
-    transform: rotate(-90deg);
-  }
-
-  [data-role='hermes.work.group'] > .sf-section-head:hover [data-role='hermes.work.chev'] {
-    opacity: 0.85;
-  }
-
-  /* The status strip under everything (hermes-for-tern's console bar): one quiet mono line, the
-     brand in the accent, the send or stop key the strongest thing on it. */
-  [data-role='hermes.statusline'] {
-    margin-top: 6px !important;
-    font: 400 11.5px/20px var(--mono) !important;
-    color: var(--t3) !important;
-  }
-
-  [data-role='hermes.statusline.brand'] {
-    color: var(--sf-p-accent, var(--sf-c-accent)) !important;
-    font-weight: 600 !important;
-  }
-
-  [data-role='hermes.statusline.send'],
-  [data-role='hermes.statusline.stop'] {
-    color: var(--t1) !important;
-    cursor: pointer;
-  }
-
-  [data-role='hermes.statusline.stop'] {
-    color: var(--sf-c-error, var(--t1)) !important;
-  }
-
-  [data-role='hermes.statusline.warn'] {
-    color: var(--sf-c-warning, var(--t2)) !important;
-  }
-
-  [data-role='hermes.statusline.bad'] {
-    color: var(--sf-c-error, var(--t2)) !important;
-  }
-
-  [data-role='hermes.statusline.good'] {
-    color: var(--sf-c-success, var(--t2)) !important;
-  }
-
-  /* While a turn runs, an accent streak sweeps the composer's top edge. */
-  @keyframes hermes-streak {
-    from {
-      background-position: 0% 0;
-    }
-
-    to {
-      background-position: 100% 0;
-    }
-  }
-
-  [data-role='hermes.streak'] {
-    height: 1px;
-    margin: 0 18px -1px;
-    background-image: linear-gradient(to right, transparent, var(--sf-p-accent, var(--accent)), transparent);
-    background-size: 30% 100%;
-    background-repeat: no-repeat;
-    animation: hermes-streak 1.8s ease-in-out infinite alternate;
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    [data-role='hermes.streak'] {
-      animation: none;
-      background-position: 50% 0;
-    }
-  }
-
-  /* The todo list, opened from its pill: a panel above the composer. */
-  [data-role='hermes.todos'] {
-    width: min(736px, calc(100% - 8px));
-    margin: 0 auto 8px !important;
-    padding: 8px 12px !important;
-    border-radius: 10px;
-    background: var(--l1);
-    max-height: 260px;
-    overflow: auto;
-  }
-
-  [data-role='hermes.todos.pill'] .sf-meter {
-    flex: none;
-  }
-
-  [data-role='hermes.todos.now'] {
-    max-width: 360px;
-  }
-
-  /* The connect card's buttons: Authorize per app, Continue at the foot. */
-  [data-role='hermes.connect.open'],
-  [data-role='hermes.connect.continue'] {
-    flex: none;
-    padding: 2px 10px !important;
-    border-radius: 999px;
-    box-shadow: inset 0 0 0 1px var(--l3);
-    font: 500 12px/20px var(--sans) !important;
-    cursor: pointer;
-  }
-
-  [data-role='hermes.connect.open'] {
-    color: var(--sf-p-accent, var(--sf-c-accent)) !important;
-  }
-
-  [data-role='hermes.connect.continue'] {
-    background: var(--t1);
-    color: var(--card) !important;
-    box-shadow: none;
-  }
-
-  [data-role='hermes.connect.open']:hover,
-  [data-role='hermes.connect.continue']:hover {
-    opacity: 0.85;
-  }
-
-  [data-role='hermes.connect.row'] {
-    min-height: 28px;
-    font: 400 13px/22px var(--sans) !important;
-  }
-
-  /* An image the next prompt carries: Tern's omp chip (thumbnail, name, size) with a ✕ after
-     them, in a third column of its grid. */
-  .sf-card[data-role='omp.composer.chip'] > .sf-card-body > [data-role='hermes.composer.remove'] {
-    grid-column: 3;
-    grid-row: 1 / 3;
-    align-self: center;
-    width: 20px;
-    height: 20px;
-    margin-right: -6px;
-    border-radius: 6px;
-    color: var(--t3);
-    cursor: pointer;
-  }
-
-  .sf-card[data-role='omp.composer.chip'] > .sf-card-body > [data-role='hermes.composer.remove']:hover {
-    background: var(--l2);
-    color: var(--t1);
-  }
-
-  /* A prompt's file, or an image whose file is gone: a quiet chip beside its thumbnails. */
-  [data-role='hermes.user.attachment'] {
-    max-width: 240px;
-    padding: 1px 8px !important;
-    border-radius: 999px;
-    background: var(--l1);
-    font: 500 12px/20px var(--sans) !important;
-  }
-
-  /* omp's ask theme draws a radio at the start of each option without moving the text over. */
-  [data-role='omp.ask.option'] {
-    padding-left: 34px !important;
-  }
-
-  /* A steer's status under its words is a note, not code. */
-  [data-role='omp.user.steered'] {
-    font-family: var(--sans) !important;
-  }
-
-  /* A pill holding the keys (Down from an empty prompt): ringed in the accent, without the pick mark's side bar. */
-  .sf-row[data-role='omp.hud.pill'][data-mark='pick'] {
-    box-shadow: inset 0 0 0 1px var(--sf-p-accent, var(--accent)) !important;
-    color: var(--t1) !important;
-  }
-
-  .sf-row[data-role='omp.hud.pill'][data-mark='pick']::after {
-    display: none;
-  }
-
-  /* What the keys do while a pill holds them, beside the pills. */
-  .sf-row[data-role='omp.hud.hint'] {
-    flex: none;
-    gap: 4px;
-    margin-right: 6px;
-    font: 500 11px/1 var(--sans);
-    color: var(--t3);
-  }
-
-  [data-role='omp.hud.hint'] .kbd {
-    height: 15px;
-    min-width: 18px;
-    font-size: 10px;
-  }
-
-  /* The standing goal and loop, and the reconnect notice: quiet lines above the pills, as wide as
-     the composer. A goal or loop part is a soft capsule that opens its sheet. */
-  [data-role='hermes.automation'],
-  [data-role='hermes.reconnect'] {
-    width: min(736px, calc(100% - 8px));
-    margin: 0 auto 6px !important;
-    font: 400 12.5px/22px var(--sans) !important;
-    color: var(--t2);
-  }
-
-  [data-role='hermes.reconnect'] {
-    padding: 0 10px !important;
-  }
-
-  [data-role='hermes.reconnect'] .sf-elapsed,
-  [data-role='hermes.automation.count'] {
-    font-variant-numeric: tabular-nums;
-    color: var(--t2);
-  }
-
-  /* Each capsule takes its content's width and gives way by truncating its words, never its count. */
-  .sf-row[data-role='hermes.automation.item'] {
-    flex: 0 1 auto;
-    max-width: 100%;
-    min-width: 0;
-    overflow: hidden;
-    padding: 1px 10px !important;
-    border-radius: 999px;
-    background: var(--l1);
-    cursor: pointer;
-    transition: background 0.15s ease;
-  }
-
-  .sf-row[data-role='hermes.automation.item']:hover {
-    background: var(--l2);
-  }
-
-  .sf-row[data-role='hermes.automation.item'][data-mark='pick'] {
-    box-shadow: inset 0 0 0 1px var(--sf-p-accent, var(--accent)) !important;
-  }
-
-  .sf-row[data-role='hermes.automation.item'][data-mark='pick']::after {
-    display: none;
-  }
-
-  [data-role='hermes.automation.label'] {
-    flex: none;
-    color: var(--t1);
-    font-weight: 500;
-  }
-
-  [data-role='hermes.automation.what'] {
-    flex: 0 1 auto !important;
-    min-width: 0;
-    overflow: hidden;
-    color: var(--t2);
-  }
-
-  [data-role='hermes.automation.item'] > :not([data-role='hermes.automation.what']) {
-    flex: none;
-  }
-
-  [data-role='hermes.automation.when'] {
-    margin-left: 6px;
-  }
-
-  [data-role='hermes.automation.item'] .sf-meter {
-    margin-left: 6px;
-  }
-
-  [data-role='hermes.automation.item'] .sf-meter {
-    flex: none;
-    width: 44px;
-  }
-
-  [data-role='hermes.automation.title'] {
-    font-size: 15px !important;
-  }
-
-  /* Fast mode: a bolt on the model chip. */
-  [data-role='hermes.composer.fast'] {
-    margin-left: -2px;
-  }
-
-  [data-role='hermes.composer.fast'] + [data-role='hermes.composer.fast'] {
-    margin-left: -7px;
-  }
-
-  /* A background card's process line opens the Background sheet. */
-  .sf-row[data-role='omp.tool.process'] {
-    cursor: pointer;
-    border-radius: 4px;
-  }
-
-  .sf-row[data-role='omp.tool.process']:hover {
-    background: var(--l1);
-  }
-
-  /* A one-agent delegation: the agent's own row as one soft tile, a click opening the agent. */
-  .sf-agent[data-role='hermes.task.solo'] {
-    margin: 6px 0 !important;
-    padding: 6px 12px !important;
-    border-radius: 10px;
-    background: var(--sf-card-bg);
-    box-shadow: inset 0 0 0 1px var(--l2);
-    cursor: pointer;
-    transition: background 120ms ease;
-  }
-
-  .sf-agent[data-role='hermes.task.solo']:hover {
-    background: var(--l1);
-  }
-
-  /* A compaction: a quiet rule across the transcript, what happened in its middle. */
-  [data-role='hermes.compaction'] {
-    margin: 20px 0 !important;
-  }
-
-  .sf-row[data-role='hermes.compaction.line'] {
-    font: 400 13px/22px var(--sans) !important;
-    justify-content: center;
-    min-width: 0;
-  }
-
-  .sf-row[data-role='hermes.compaction.line']::before,
-  .sf-row[data-role='hermes.compaction.line']::after {
-    content: '';
-    flex: 1 1 24px;
-    height: 1px;
-    background: var(--l3);
-  }
-
-  [data-role='hermes.compaction.line'] .sf-elapsed {
-    margin-left: 4px;
-  }
-
-  .sf-row[data-role='hermes.compaction.line']::before {
-    margin-right: 6px;
-  }
-
-  .sf-row[data-role='hermes.compaction.line']::after {
-    margin-left: 6px;
-  }
-
-  /* With its summary known, the rule opens it: the whole line is the head, the chevron after it. */
-  [data-role='hermes.compaction'] > .sf-section-head {
-    cursor: pointer;
-    padding: 0 !important;
-    background: none !important;
-    border: none !important;
-  }
-
-  [data-role='hermes.compaction'] > .sf-section-head > .sf-head {
-    flex: 1 1 auto;
-    min-width: 0;
-  }
-
-  [data-role='hermes.compaction'] > .sf-section-head > .sf-chev {
-    order: 2;
-    opacity: 0.6;
-    margin-left: 4px;
-  }
-
-  [data-role='hermes.compaction'] > .sf-section-body {
-    margin: 10px 0 0 !important;
-    padding: 2px 0 2px 14px !important;
-    border: none !important;
-    box-shadow: inset 2px 0 0 var(--l3) !important;
-    background: none !important;
-    font-family: var(--sans) !important;
-    font-size: 14px !important;
-  }
-
-  /* A turn Hermes started by itself: set apart from the answer above, like a new prompt is. */
-  [data-role='omp.turn.continued'] {
-    margin-top: 28px !important;
-    margin-bottom: 4px !important;
-    font-family: var(--sans) !important;
-  }
-
-  /* ── Pull requests (prs/view.tsx): one view in the PR aside and the sheet ── */
-  /* Prose in sans in the aside and the sheet (their text defaults to mono); code,
-     paths and diffs keep mono. */
-  :is([data-role='hermes.pr.frame'], [data-role='hermes.pr.asideview'])
-    :is(.sf-text, .sf-md, .md, .sf-card-head, .sf-section-head, .sf-tabs, .sf-badge) {
-    font-family: var(--sans) !important;
-  }
-
-  /* (Tern's \`:is()\` takes compound selectors only: \`.md code\` gets a rule of its own.) */
-  :is([data-role='hermes.pr.frame'], [data-role='hermes.pr.asideview']) :is(.sf-t-mono, .sf-diff, .sf-code) {
-    font-family: var(--mono) !important;
-  }
-
-  :is([data-role='hermes.pr.frame'], [data-role='hermes.pr.asideview']) .md code {
-    font-family: var(--mono) !important;
-  }
-
-  :is([data-role='hermes.pr.frame'], [data-role='hermes.pr.asideview']) .sf-md {
-    font-size: 14px;
-  }
-
-  /* GitHub ticks a done task; it does not strike it through. */
-  :is([data-role='hermes.pr.frame'], [data-role='hermes.pr.asideview']) li.task.done :is(*, .li-t) {
-    text-decoration: none !important;
-    color: inherit !important;
-  }
-
-  [data-role='hermes.pr.head'] {
-    padding: 2px 2px 0;
-  }
-
-  /* Each header row spans the view; its text takes the room its trailing parts leave. */
-  [data-role='hermes.pr.head'] > .sf-row,
-  [data-role='hermes.pr.tabs'] {
-    align-self: stretch;
-    width: 100%;
-  }
-
-  [data-role='hermes.pr.head'] > .sf-row > .sf-text {
-    flex: 1 1 auto;
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  [data-role='hermes.pr.head'] > .sf-row > :is([data-role='hermes.pr.checkout'], [data-role='hermes.pr.size']) {
-    flex: none;
-    margin-left: auto;
-  }
-
-  [data-role='hermes.pr.head'] > .sf-row > :is(.sf-badge, .sf-icon) {
-    flex: none;
-  }
-
-  [data-role='hermes.pr.title'] {
-    font: 600 19px/1.3 var(--sans) !important;
-    letter-spacing: -0.01em;
-    color: var(--t1) !important;
-  }
-
-  [data-role='hermes.pr.meta'],
-  [data-role='hermes.pr.branch'] {
-    font-size: 12.5px;
-  }
-
-  [data-role='hermes.pr.checkout'] {
-    cursor: pointer;
-  }
-
-  [data-role='hermes.pr.tabs'] {
-    padding: 8px 0;
-    box-shadow: inset 0 1px 0 var(--l2), inset 0 -1px 0 var(--l2);
-  }
-
-  [data-role='hermes.pr.checkstate'] {
-    cursor: pointer;
-    font-size: 12.5px;
-  }
-
-  [data-role='hermes.pr.body'] {
-    padding: 4px 2px 8px;
-  }
-
-  [data-role='hermes.pr.comment'],
-  [data-role='hermes.pr.thread'] {
-    background: var(--sf-card-bg) !important;
-    box-shadow: inset 0 0 0 1px var(--l2) !important;
-    border-radius: 10px !important;
-  }
-
-  [data-role='hermes.pr.comment'] > .sf-card-head,
-  [data-role='hermes.pr.thread'] > .sf-card-head {
-    box-shadow: inset 0 -1px 0 var(--l2);
-    font-family: var(--sans) !important;
-  }
-
-  [data-role='hermes.pr.permalink'] {
-    font-size: 12px;
-  }
-
-  [data-role='hermes.pr.reply'] {
-    padding: 8px 0 0 12px;
-    box-shadow: inset 2px 0 0 var(--l2);
-  }
-
-  [data-role='hermes.pr.event'],
-  [data-role='hermes.pr.commits'] {
-    padding: 0 6px;
-    font-size: 13px;
-  }
-
-  [data-role='hermes.pr.commit'] {
-    padding-left: 22px;
-    font-size: 12.5px;
-  }
-
-  [data-role='hermes.pr.details'] > .sf-section-head {
-    font-weight: 600;
-  }
-
-  /* The file list beside the diffs where there is room, above them where there is not. */
-  [data-role='hermes.pr.files'] {
-    flex-wrap: wrap;
-  }
-
-  [data-role='hermes.pr.files'] > .sf-col:last-child {
-    flex: 1 1 520px;
-  }
-
-  [data-role='hermes.pr.filelist'] {
-    flex: 1 0 260px;
-    max-width: 320px;
-    position: sticky;
-    top: 0;
-    max-height: 100%;
-    overflow-y: auto;
-  }
-
-  [data-role='hermes.pr.fileitem'] {
-    padding: 3px 8px;
-    border-radius: 6px;
-    cursor: pointer;
-    font-size: 12.5px;
-  }
-
-  [data-role='hermes.pr.fileitem']:hover {
-    background: var(--l1);
-  }
-
-  [data-role='hermes.pr.check'] {
-    padding: 2px 4px;
-    font-size: 13px;
-  }
-
-  /* The sheet: the view fills the overlay; only the body scrolls. */
-  [data-role='hermes.pr.frame'] {
-    height: 100%;
-    min-height: 0;
-    gap: 12px !important;
-  }
-
-  [data-role='hermes.pr.frame'] > [data-role='hermes.pr.body'] {
-    flex: 1 1 auto;
-    min-height: 0;
-    overflow-y: auto;
-  }
-
-  /* The PR aside is Tern's settings sheet: its search, page title and empty state say nothing here. */
-  [data-role='hermes.pr.aside'] :is(.pf-search, .pf-head, .pf-eyebrow, .pf-none, .pf-groups) {
-    display: none !important;
-  }
-
-  [data-role='hermes.pr.aside'] .pf-extra {
-    margin-top: 0 !important;
-  }
-
-  [data-role='hermes.pr.asideview'] [data-role='hermes.pr.checkout'] {
-    display: none;
-  }
-
-  /* The PR pill's menu: a tray above the composer, as wide as it. */
-  .sf-overlay[data-role='hermes.pr.menu'] .sf-ov-card {
-    width: 720px;
-    max-width: 100%;
-    font-family: var(--sans);
-  }
-
-  [data-role='hermes.pr.menu.row'] {
-    padding: 7px 10px;
-    border-radius: 8px;
-    cursor: pointer;
-  }
-
-  [data-role='hermes.pr.menu.row']:hover,
-  [data-role='hermes.pr.menu.row'][data-mark='pick'] {
-    background: var(--l1);
-  }
-
-  [data-role='hermes.pr.menu.foot'] {
-    padding: 8px 10px 2px;
-    box-shadow: inset 0 1px 0 var(--l2);
-    font-size: 12px;
-  }
-
-`;
 
 // .hermes-src/node_modules/@hermes/shared/src/color.ts
 var HEX6_RE = /^#?([0-9a-f]{6})$/i;
@@ -68126,7 +67517,7 @@ var Sidebar = class {
     return /* @__PURE__ */ jsx(
       "prefs",
       {
-        lead: git3 ? git3.root.replace(process.env.HOME ?? "\0", "~") : host.session.info?.cwd ?? "",
+        lead: git3 ? git3.root.replace(launchEnv().home ?? "\0", "~") : host.session.info?.cwd ?? "",
         onAction: Object.fromEntries(ACTS.map((act) => [act, (ev) => this.#action(act, ev.value)])),
         page: "session",
         pages: [{ icon: "branch", id: "session", label: "Session" }],
@@ -68526,6 +67917,12 @@ function saveSettings(patch6, file2 = settingsFile()) {
 `);
   return next3;
 }
+function fileSettings(file2) {
+  return {
+    load: () => loadSettings(file2 ?? settingsFile()),
+    save: (patch6) => saveSettings(patch6, file2 ?? settingsFile())
+  };
+}
 
 // src/serverQueue.ts
 function busyModeOf(raw2) {
@@ -68633,6 +68030,773 @@ var ServerQueue = class {
     ];
   }
 };
+
+// src/view/styles.ts
+var STYLES = css`
+  /* The work log, as t3code draws it: quiet 14px rows in the UI face, a 24px line each. */
+  [data-role='hermes.turn.working'],
+  [data-role='hermes.turn.fold'] > .sf-section-head,
+  [data-role='hermes.work.group'] > .sf-section-head,
+  [data-role='hermes.work.row'] > .sf-section-head,
+  .sf-col[data-role='hermes.work.row'],
+  .sf-row[data-role='hermes.work.row'] {
+    font: 400 14px/24px var(--sans) !important;
+    min-height: 24px;
+  }
+
+  /* "Working for 12s" and "Worked for 54s" head the turn, ruled off from what follows. */
+  [data-role='hermes.turn.working'],
+  [data-role='hermes.turn.fold'] > .sf-section-head {
+    padding-bottom: 8px !important;
+    margin-bottom: 6px !important;
+    box-shadow: inset 0 -1px 0 var(--l3) !important;
+  }
+
+  /* An open fold or group lists its steps and notes where they were, not in an indented code
+     column: no guide line, no indent, the UI face at the answer's size. */
+  :is([data-role='hermes.turn.fold'], [data-role='hermes.work.group'], [data-role='hermes.work.row']),
+  :is([data-role='hermes.turn.fold'], [data-role='hermes.work.group'], [data-role='hermes.work.row']) > .sf-section-body {
+    margin-left: 0 !important;
+    padding-left: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+    background: none !important;
+  }
+
+  :is([data-role='hermes.turn.fold'], [data-role='hermes.work.group'], [data-role='hermes.work.row'])::before,
+  :is([data-role='hermes.turn.fold'], [data-role='hermes.work.group'], [data-role='hermes.work.row'])::after,
+  :is([data-role='hermes.turn.fold'], [data-role='hermes.work.group'], [data-role='hermes.work.row']) > .sf-section-body::before,
+  :is([data-role='hermes.turn.fold'], [data-role='hermes.work.group'], [data-role='hermes.work.row']) > .sf-section-body::after {
+    display: none !important;
+  }
+
+  :is([data-role='hermes.turn.fold'], [data-role='hermes.work.group'], [data-role='hermes.work.row']) > .sf-section-body {
+    font-family: var(--sans) !important;
+    font-size: 14px !important;
+  }
+
+  [data-role='hermes.turn.fold'] > .sf-section-body > .sf-md {
+    margin: 4px 0 10px !important;
+  }
+
+  [data-role='hermes.turn.working'] .sf-elapsed {
+    margin-left: 4px;
+  }
+
+  /* The chevron follows the label: right after "Worked for", at the row's end on a step. */
+  [data-role='hermes.turn.fold'] > .sf-section-head > .sf-chev,
+  [data-role='hermes.work.row'] > .sf-section-head > .sf-chev {
+    order: 2;
+    opacity: 0.7;
+  }
+
+  [data-role='hermes.work.row'] > .sf-section-head > .sf-head {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  /* A group's summary has no chevron; when it started shows on hover. */
+  [data-role='hermes.work.group'] > .sf-section-head > .sf-chev {
+    display: none;
+  }
+
+  [data-role='hermes.work.group'] > .sf-section-head > .sf-head {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  [data-role='hermes.work.time'] {
+    opacity: 0;
+    font-size: 12px !important;
+    font-variant-numeric: tabular-nums;
+  }
+
+  [data-role='hermes.work.group'] > .sf-section-head:hover [data-role='hermes.work.time'] {
+    opacity: 1;
+  }
+
+  /* What a step or thought opens to sits under its label, past the icon column: a call's
+     command and output in the code face, a thought as prose. */
+  [data-role='hermes.work.detail'],
+  [data-role='hermes.work.thought'] {
+    margin: 2px 0 8px 28px !important;
+  }
+
+  [data-role='hermes.work.detail'] {
+    font-family: var(--mono) !important;
+    font-size: 13px !important;
+  }
+
+  /* The session sidebar is a prefs sheet for its dock, not for settings: no search, no one-page
+     strip, no page heading over the folder line. */
+  .sf-prefs[data-id='layer.sidebar'] .pf-mark,
+  .sf-prefs[data-id='layer.sidebar'] .pf-search,
+  .sf-prefs[data-id='layer.sidebar'] .pf-groups,
+  .sf-prefs[data-id='layer.sidebar'] .pf-eyebrow,
+  .sf-prefs[data-id='layer.sidebar'] .pf-title {
+    display: none !important;
+  }
+
+  .sf-prefs[data-id='layer.sidebar'] .pf-lead {
+    font-family: var(--mono) !important;
+    font-size: 12px !important;
+    margin-top: 0 !important;
+  }
+
+  /* An open group's steps hang from its summary: a guide line down from its icon, the rows a size
+     smaller, so the summary reads as the parent and not as one more step. */
+  [data-role='hermes.work.group'] > .sf-section-body {
+    margin: 2px 0 6px 7px !important;
+    padding-left: 17px !important;
+    border-left: 1px solid var(--l3) !important;
+  }
+
+  [data-role='hermes.work.group'] > .sf-section-body [data-role='hermes.work.row'] > .sf-section-head,
+  [data-role='hermes.work.group'] > .sf-section-body .sf-col[data-role='hermes.work.row'] {
+    font-size: 13px !important;
+    line-height: 22px !important;
+    min-height: 22px;
+  }
+
+  /* The group's own chevron sits right after its summary and turns as it opens (Tern's is hidden). */
+  [data-role='hermes.work.chev'] {
+    opacity: 0.45;
+    transition: transform 0.15s ease, opacity 0.15s ease;
+  }
+
+  .sf-section.collapsed > .sf-section-head [data-role='hermes.work.chev'] {
+    transform: rotate(-90deg);
+  }
+
+  [data-role='hermes.work.group'] > .sf-section-head:hover [data-role='hermes.work.chev'] {
+    opacity: 0.85;
+  }
+
+  /* The status strip under everything (hermes-for-tern's console bar): one quiet mono line, the
+     brand in the accent, the send or stop key the strongest thing on it. */
+  [data-role='hermes.statusline'] {
+    margin-top: 6px !important;
+    font: 400 11.5px/20px var(--mono) !important;
+    color: var(--t3) !important;
+  }
+
+  [data-role='hermes.statusline.brand'] {
+    color: var(--sf-p-accent, var(--sf-c-accent)) !important;
+    font-weight: 600 !important;
+  }
+
+  [data-role='hermes.statusline.send'],
+  [data-role='hermes.statusline.stop'] {
+    color: var(--t1) !important;
+    cursor: pointer;
+  }
+
+  [data-role='hermes.statusline.stop'] {
+    color: var(--sf-c-error, var(--t1)) !important;
+  }
+
+  [data-role='hermes.statusline.warn'] {
+    color: var(--sf-c-warning, var(--t2)) !important;
+  }
+
+  [data-role='hermes.statusline.bad'] {
+    color: var(--sf-c-error, var(--t2)) !important;
+  }
+
+  [data-role='hermes.statusline.good'] {
+    color: var(--sf-c-success, var(--t2)) !important;
+  }
+
+  /* While a turn runs, an accent streak sweeps the composer's top edge. */
+  @keyframes hermes-streak {
+    from {
+      background-position: 0% 0;
+    }
+
+    to {
+      background-position: 100% 0;
+    }
+  }
+
+  [data-role='hermes.streak'] {
+    height: 1px;
+    margin: 0 18px -1px;
+    background-image: linear-gradient(to right, transparent, var(--sf-p-accent, var(--accent)), transparent);
+    background-size: 30% 100%;
+    background-repeat: no-repeat;
+    animation: hermes-streak 1.8s ease-in-out infinite alternate;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    [data-role='hermes.streak'] {
+      animation: none;
+      background-position: 50% 0;
+    }
+  }
+
+  /* The todo list, opened from its pill: a panel above the composer. */
+  [data-role='hermes.todos'] {
+    width: min(736px, calc(100% - 8px));
+    margin: 0 auto 8px !important;
+    padding: 8px 12px !important;
+    border-radius: 10px;
+    background: var(--l1);
+    max-height: 260px;
+    overflow: auto;
+  }
+
+  [data-role='hermes.todos.pill'] .sf-meter {
+    flex: none;
+  }
+
+  [data-role='hermes.todos.now'] {
+    max-width: 360px;
+  }
+
+  /* The connect card's buttons: Authorize per app, Continue at the foot. */
+  [data-role='hermes.connect.open'],
+  [data-role='hermes.connect.continue'] {
+    flex: none;
+    padding: 2px 10px !important;
+    border-radius: 999px;
+    box-shadow: inset 0 0 0 1px var(--l3);
+    font: 500 12px/20px var(--sans) !important;
+    cursor: pointer;
+  }
+
+  [data-role='hermes.connect.open'] {
+    color: var(--sf-p-accent, var(--sf-c-accent)) !important;
+  }
+
+  [data-role='hermes.connect.continue'] {
+    background: var(--t1);
+    color: var(--card) !important;
+    box-shadow: none;
+  }
+
+  [data-role='hermes.connect.open']:hover,
+  [data-role='hermes.connect.continue']:hover {
+    opacity: 0.85;
+  }
+
+  [data-role='hermes.connect.row'] {
+    min-height: 28px;
+    font: 400 13px/22px var(--sans) !important;
+  }
+
+  /* An image the next prompt carries: Tern's omp chip (thumbnail, name, size) with a ✕ after
+     them, in a third column of its grid. */
+  .sf-card[data-role='omp.composer.chip'] > .sf-card-body > [data-role='hermes.composer.remove'] {
+    grid-column: 3;
+    grid-row: 1 / 3;
+    align-self: center;
+    width: 20px;
+    height: 20px;
+    margin-right: -6px;
+    border-radius: 6px;
+    color: var(--t3);
+    cursor: pointer;
+  }
+
+  .sf-card[data-role='omp.composer.chip'] > .sf-card-body > [data-role='hermes.composer.remove']:hover {
+    background: var(--l2);
+    color: var(--t1);
+  }
+
+  /* A prompt's file, or an image whose file is gone: a quiet chip beside its thumbnails. */
+  [data-role='hermes.user.attachment'] {
+    max-width: 240px;
+    padding: 1px 8px !important;
+    border-radius: 999px;
+    background: var(--l1);
+    font: 500 12px/20px var(--sans) !important;
+  }
+
+  /* omp's ask theme draws a radio at the start of each option without moving the text over. */
+  [data-role='omp.ask.option'] {
+    padding-left: 34px !important;
+  }
+
+  /* A steer's status under its words is a note, not code. */
+  [data-role='omp.user.steered'] {
+    font-family: var(--sans) !important;
+  }
+
+  /* A pill holding the keys (Down from an empty prompt): ringed in the accent, without the pick mark's side bar. */
+  .sf-row[data-role='omp.hud.pill'][data-mark='pick'] {
+    box-shadow: inset 0 0 0 1px var(--sf-p-accent, var(--accent)) !important;
+    color: var(--t1) !important;
+  }
+
+  .sf-row[data-role='omp.hud.pill'][data-mark='pick']::after {
+    display: none;
+  }
+
+  /* What the keys do while a pill holds them, beside the pills. */
+  .sf-row[data-role='omp.hud.hint'] {
+    flex: none;
+    gap: 4px;
+    margin-right: 6px;
+    font: 500 11px/1 var(--sans);
+    color: var(--t3);
+  }
+
+  [data-role='omp.hud.hint'] .kbd {
+    height: 15px;
+    min-width: 18px;
+    font-size: 10px;
+  }
+
+  /* The standing goal and loop, and the reconnect notice: quiet lines above the pills, as wide as
+     the composer. A goal or loop part is a soft capsule that opens its sheet. */
+  [data-role='hermes.automation'],
+  [data-role='hermes.reconnect'] {
+    width: min(736px, calc(100% - 8px));
+    margin: 0 auto 6px !important;
+    font: 400 12.5px/22px var(--sans) !important;
+    color: var(--t2);
+  }
+
+  [data-role='hermes.reconnect'] {
+    padding: 0 10px !important;
+  }
+
+  [data-role='hermes.reconnect'] .sf-elapsed,
+  [data-role='hermes.automation.count'] {
+    font-variant-numeric: tabular-nums;
+    color: var(--t2);
+  }
+
+  /* Each capsule takes its content's width and gives way by truncating its words, never its count. */
+  .sf-row[data-role='hermes.automation.item'] {
+    flex: 0 1 auto;
+    max-width: 100%;
+    min-width: 0;
+    overflow: hidden;
+    padding: 1px 10px !important;
+    border-radius: 999px;
+    background: var(--l1);
+    cursor: pointer;
+    transition: background 0.15s ease;
+  }
+
+  .sf-row[data-role='hermes.automation.item']:hover {
+    background: var(--l2);
+  }
+
+  .sf-row[data-role='hermes.automation.item'][data-mark='pick'] {
+    box-shadow: inset 0 0 0 1px var(--sf-p-accent, var(--accent)) !important;
+  }
+
+  .sf-row[data-role='hermes.automation.item'][data-mark='pick']::after {
+    display: none;
+  }
+
+  [data-role='hermes.automation.label'] {
+    flex: none;
+    color: var(--t1);
+    font-weight: 500;
+  }
+
+  [data-role='hermes.automation.what'] {
+    flex: 0 1 auto !important;
+    min-width: 0;
+    overflow: hidden;
+    color: var(--t2);
+  }
+
+  [data-role='hermes.automation.item'] > :not([data-role='hermes.automation.what']) {
+    flex: none;
+  }
+
+  [data-role='hermes.automation.when'] {
+    margin-left: 6px;
+  }
+
+  [data-role='hermes.automation.item'] .sf-meter {
+    margin-left: 6px;
+  }
+
+  [data-role='hermes.automation.item'] .sf-meter {
+    flex: none;
+    width: 44px;
+  }
+
+  [data-role='hermes.automation.title'] {
+    font-size: 15px !important;
+  }
+
+  /* Fast mode: a bolt on the model chip. */
+  [data-role='hermes.composer.fast'] {
+    margin-left: -2px;
+  }
+
+  [data-role='hermes.composer.fast'] + [data-role='hermes.composer.fast'] {
+    margin-left: -7px;
+  }
+
+  /* A background card's process line opens the Background sheet. */
+  .sf-row[data-role='omp.tool.process'] {
+    cursor: pointer;
+    border-radius: 4px;
+  }
+
+  .sf-row[data-role='omp.tool.process']:hover {
+    background: var(--l1);
+  }
+
+  /* A one-agent delegation: the agent's own row as one soft tile, a click opening the agent. */
+  .sf-agent[data-role='hermes.task.solo'] {
+    margin: 6px 0 !important;
+    padding: 6px 12px !important;
+    border-radius: 10px;
+    background: var(--sf-card-bg);
+    box-shadow: inset 0 0 0 1px var(--l2);
+    cursor: pointer;
+    transition: background 120ms ease;
+  }
+
+  .sf-agent[data-role='hermes.task.solo']:hover {
+    background: var(--l1);
+  }
+
+  /* A compaction: a quiet rule across the transcript, what happened in its middle. */
+  [data-role='hermes.compaction'] {
+    margin: 20px 0 !important;
+  }
+
+  .sf-row[data-role='hermes.compaction.line'] {
+    font: 400 13px/22px var(--sans) !important;
+    justify-content: center;
+    min-width: 0;
+  }
+
+  .sf-row[data-role='hermes.compaction.line']::before,
+  .sf-row[data-role='hermes.compaction.line']::after {
+    content: '';
+    flex: 1 1 24px;
+    height: 1px;
+    background: var(--l3);
+  }
+
+  [data-role='hermes.compaction.line'] .sf-elapsed {
+    margin-left: 4px;
+  }
+
+  .sf-row[data-role='hermes.compaction.line']::before {
+    margin-right: 6px;
+  }
+
+  .sf-row[data-role='hermes.compaction.line']::after {
+    margin-left: 6px;
+  }
+
+  /* With its summary known, the rule opens it: the whole line is the head, the chevron after it. */
+  [data-role='hermes.compaction'] > .sf-section-head {
+    cursor: pointer;
+    padding: 0 !important;
+    background: none !important;
+    border: none !important;
+  }
+
+  [data-role='hermes.compaction'] > .sf-section-head > .sf-head {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  [data-role='hermes.compaction'] > .sf-section-head > .sf-chev {
+    order: 2;
+    opacity: 0.6;
+    margin-left: 4px;
+  }
+
+  [data-role='hermes.compaction'] > .sf-section-body {
+    margin: 10px 0 0 !important;
+    padding: 2px 0 2px 14px !important;
+    border: none !important;
+    box-shadow: inset 2px 0 0 var(--l3) !important;
+    background: none !important;
+    font-family: var(--sans) !important;
+    font-size: 14px !important;
+  }
+
+  /* A turn Hermes started by itself: set apart from the answer above, like a new prompt is. */
+  [data-role='omp.turn.continued'] {
+    margin-top: 28px !important;
+    margin-bottom: 4px !important;
+    font-family: var(--sans) !important;
+  }
+
+  /* ── Pull requests (prs/view.tsx): one view in the PR aside and the sheet ── */
+  /* Prose in sans in the aside and the sheet (their text defaults to mono); code,
+     paths and diffs keep mono. */
+  :is([data-role='hermes.pr.frame'], [data-role='hermes.pr.asideview'])
+    :is(.sf-text, .sf-md, .md, .sf-card-head, .sf-section-head, .sf-tabs, .sf-badge) {
+    font-family: var(--sans) !important;
+  }
+
+  /* (Tern's \`:is()\` takes compound selectors only: \`.md code\` gets a rule of its own.) */
+  :is([data-role='hermes.pr.frame'], [data-role='hermes.pr.asideview']) :is(.sf-t-mono, .sf-diff, .sf-code) {
+    font-family: var(--mono) !important;
+  }
+
+  :is([data-role='hermes.pr.frame'], [data-role='hermes.pr.asideview']) .md code {
+    font-family: var(--mono) !important;
+  }
+
+  :is([data-role='hermes.pr.frame'], [data-role='hermes.pr.asideview']) .sf-md {
+    font-size: 14px;
+  }
+
+  /* GitHub ticks a done task; it does not strike it through. */
+  :is([data-role='hermes.pr.frame'], [data-role='hermes.pr.asideview']) li.task.done :is(*, .li-t) {
+    text-decoration: none !important;
+    color: inherit !important;
+  }
+
+  [data-role='hermes.pr.head'] {
+    padding: 2px 2px 0;
+  }
+
+  /* Each header row spans the view; its text takes the room its trailing parts leave. */
+  [data-role='hermes.pr.head'] > .sf-row,
+  [data-role='hermes.pr.tabs'] {
+    align-self: stretch;
+    width: 100%;
+  }
+
+  [data-role='hermes.pr.head'] > .sf-row > .sf-text {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  [data-role='hermes.pr.head'] > .sf-row > :is([data-role='hermes.pr.checkout'], [data-role='hermes.pr.size']) {
+    flex: none;
+    margin-left: auto;
+  }
+
+  [data-role='hermes.pr.head'] > .sf-row > :is(.sf-badge, .sf-icon) {
+    flex: none;
+  }
+
+  [data-role='hermes.pr.title'] {
+    font: 600 19px/1.3 var(--sans) !important;
+    letter-spacing: -0.01em;
+    color: var(--t1) !important;
+  }
+
+  [data-role='hermes.pr.meta'],
+  [data-role='hermes.pr.branch'] {
+    font-size: 12.5px;
+  }
+
+  [data-role='hermes.pr.checkout'] {
+    cursor: pointer;
+  }
+
+  [data-role='hermes.pr.tabs'] {
+    padding: 8px 0;
+    box-shadow: inset 0 1px 0 var(--l2), inset 0 -1px 0 var(--l2);
+  }
+
+  [data-role='hermes.pr.checkstate'] {
+    cursor: pointer;
+    font-size: 12.5px;
+  }
+
+  [data-role='hermes.pr.body'] {
+    padding: 4px 2px 8px;
+  }
+
+  [data-role='hermes.pr.comment'],
+  [data-role='hermes.pr.thread'] {
+    background: var(--sf-card-bg) !important;
+    box-shadow: inset 0 0 0 1px var(--l2) !important;
+    border-radius: 10px !important;
+  }
+
+  [data-role='hermes.pr.comment'] > .sf-card-head,
+  [data-role='hermes.pr.thread'] > .sf-card-head {
+    box-shadow: inset 0 -1px 0 var(--l2);
+    font-family: var(--sans) !important;
+  }
+
+  [data-role='hermes.pr.permalink'] {
+    font-size: 12px;
+  }
+
+  [data-role='hermes.pr.reply'] {
+    padding: 8px 0 0 12px;
+    box-shadow: inset 2px 0 0 var(--l2);
+  }
+
+  [data-role='hermes.pr.event'],
+  [data-role='hermes.pr.commits'] {
+    padding: 0 6px;
+    font-size: 13px;
+  }
+
+  [data-role='hermes.pr.commit'] {
+    padding-left: 22px;
+    font-size: 12.5px;
+  }
+
+  [data-role='hermes.pr.details'] > .sf-section-head {
+    font-weight: 600;
+  }
+
+  /* The file list beside the diffs where there is room, above them where there is not. */
+  [data-role='hermes.pr.files'] {
+    flex-wrap: wrap;
+  }
+
+  [data-role='hermes.pr.files'] > .sf-col:last-child {
+    flex: 1 1 520px;
+  }
+
+  [data-role='hermes.pr.filelist'] {
+    flex: 1 0 260px;
+    max-width: 320px;
+    position: sticky;
+    top: 0;
+    max-height: 100%;
+    overflow-y: auto;
+  }
+
+  [data-role='hermes.pr.fileitem'] {
+    padding: 3px 8px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 12.5px;
+  }
+
+  [data-role='hermes.pr.fileitem']:hover {
+    background: var(--l1);
+  }
+
+  [data-role='hermes.pr.check'] {
+    padding: 2px 4px;
+    font-size: 13px;
+  }
+
+  /* The sheet: the view fills the overlay; only the body scrolls. */
+  [data-role='hermes.pr.frame'] {
+    height: 100%;
+    min-height: 0;
+    gap: 12px !important;
+  }
+
+  [data-role='hermes.pr.frame'] > [data-role='hermes.pr.body'] {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+  }
+
+  /* The PR aside is Tern's settings sheet: its search, page title and empty state say nothing here. */
+  [data-role='hermes.pr.aside'] :is(.pf-search, .pf-head, .pf-eyebrow, .pf-none, .pf-groups) {
+    display: none !important;
+  }
+
+  [data-role='hermes.pr.aside'] .pf-extra {
+    margin-top: 0 !important;
+  }
+
+  [data-role='hermes.pr.asideview'] [data-role='hermes.pr.checkout'] {
+    display: none;
+  }
+
+  /* The PR pill's menu: a tray above the composer, as wide as it. */
+  .sf-overlay[data-role='hermes.pr.menu'] .sf-ov-card {
+    width: 720px;
+    max-width: 100%;
+    font-family: var(--sans);
+  }
+
+  [data-role='hermes.pr.menu.row'] {
+    padding: 7px 10px;
+    border-radius: 8px;
+    cursor: pointer;
+  }
+
+  [data-role='hermes.pr.menu.row']:hover,
+  [data-role='hermes.pr.menu.row'][data-mark='pick'] {
+    background: var(--l1);
+  }
+
+  [data-role='hermes.pr.menu.foot'] {
+    padding: 8px 10px 2px;
+    box-shadow: inset 0 1px 0 var(--l2);
+    font-size: 12px;
+  }
+
+`;
+
+// src/surface/host.ts
+var INPUT_ID = "dock.composer.line.input";
+var SurfaceHost = class {
+  #surface;
+  #focus = INPUT_ID;
+  /** Opens the surface on `tern`, titled `title` (the tab's name until a program sets one). */
+  constructor(tern, title) {
+    this.#surface = tern.open({ id: "hermes", mode: "inline", role: "omp.session", title });
+    this.#surface.stylesheet("hermes-tern", STYLES);
+  }
+  /** Whether Tern dropped the surface or it was closed: it draws nothing more. */
+  get closed() {
+    return this.#surface.closed;
+  }
+  render(view) {
+    this.#surface.render(view);
+  }
+  palette(palette) {
+    this.#surface.palette(palette);
+  }
+  /** Gives the caret to `id` (or to none) now, sent even when it is already there. */
+  focus(id) {
+    this.#focus = id;
+    this.#surface.focus(id);
+  }
+  /** Gives the caret to `id` when it is somewhere else: what each render does. */
+  follow(id) {
+    if (id !== this.#focus) {
+      this.focus(id);
+    }
+  }
+  reveal(id, at) {
+    this.#surface.reveal(id, at);
+  }
+  scroll(id, to) {
+    this.#surface.scroll(id, to);
+  }
+};
+
+// src/surface/input.ts
+async function runInput(input2, { after, onError, onEvent, onKey }) {
+  try {
+    for await (const item3 of input2) {
+      if (item3.type === "key") {
+        onKey(item3.key);
+      } else {
+        onEvent(item3.event);
+      }
+      after();
+    }
+  } catch (error) {
+    onError?.(error);
+  }
+}
+
+// src/surface/osc.ts
+import { hostname } from "node:os";
+function setTabTitle(title, out = process.stdout) {
+  out.write(`\x1B]2;${title.replace(/[\x00-\x1f]/g, " ")}\x07`);
+}
+function reportCwd(cwd, out = process.stdout) {
+  out.write(`\x1B]7;file://${hostname()}${encodeURI(cwd)}\x07`);
+}
 
 // src/view/dock.tsx
 function todoProgress(list8) {
@@ -69036,7 +69200,6 @@ function imageChip(a2, i) {
 }
 
 // src/app.ts
-var INPUT_ID = "dock.composer.line.input";
 var EXIT_ARM_MS = 1500;
 var DOUBLE_ESC_MS = 500;
 var COPIED_MS3 = 1500;
@@ -69095,10 +69258,12 @@ var App = class {
   /** `commands.catalog`, for resolving a typed alias or prefix (`/hea` → /heartbeat). */
   #catalog;
   #welcome;
+  #launch;
+  #settings;
   #surface;
-  #scheduled = false;
-  /** The field holding Tern's caret, as last sent. */
-  #focus = INPUT_ID;
+  #renders = new RenderScheduler(() => this.#render());
+  /** Timers with no field of their own (a compaction's summary read, the quit's detach wait). */
+  #timers = new Disposables();
   #exitArmed = 0;
   #lastEsc = 0;
   #done = Promise.withResolvers();
@@ -69114,7 +69279,7 @@ var App = class {
   /** Open approval prompts' overlay keys → their approval-queue `request_id` (what approval.cancelled names). */
   #approvalIds = /* @__PURE__ */ new Map();
   /** The launcher's startup image until it is attached to the first session (the queue waits for it). */
-  #startupImage = process.env.HERMES_TUI_IMAGE?.trim() ?? "";
+  #startupImage;
   /** The images attached to the draft: the next prompt entered takes them. */
   #attachments = [];
   /** The folder last reported to Tern by OSC 7. */
@@ -69123,9 +69288,9 @@ var App = class {
   #attaching = [];
   /** The skin the gateway last reported; only the `skin` theme mode wears it. */
   #skin;
-  #theme = loadSettings().theme ?? "tern";
+  #theme;
   /** Background processes get live charts (settings.json `jobCharts`). */
-  #jobCharts = loadSettings().jobCharts !== false;
+  #jobCharts;
   /** The prompt whose Copy button reads Copied, until the timer clears it. */
   #copied;
   #copiedTimer;
@@ -69148,14 +69313,21 @@ var App = class {
   /** The gateway is being redialled (`gateway.reconnecting`) until the next gateway.ready. */
   #reconnecting;
   #reconnectTimer;
-  constructor(tern, gw2, version2) {
+  /** `launch` and `settings` are what entry.ts read once at startup; unset, each reads its default. */
+  constructor(tern, gw2, version, { launch: launch3 = readLaunchEnv(), settings: settings2 = fileSettings() } = {}) {
     this.#tern = tern;
     this.#gw = gw2;
+    this.#launch = launch3;
+    this.#settings = settings2;
+    this.#startupImage = launch3.image;
+    const saved = settings2.load();
+    this.#theme = saved.theme ?? "tern";
+    this.#jobCharts = saved.jobCharts !== false;
     this.#completion = new Completion(this, gw2, () => this.sid);
     this.#catalog = new CommandCatalog(gw2);
     this.#welcome = {
-      tip: randomTip(process.env.HERMES_PYTHON_SRC_ROOT ?? ""),
-      version: version2 && version2 !== "unknown" ? `v${version2}` : ""
+      tip: randomTip(launch3.pythonSrcRoot),
+      version: version && version !== "unknown" ? `v${version}` : ""
     };
   }
   /** The gateway, for overlays that issue their own RPCs. */
@@ -69163,18 +69335,17 @@ var App = class {
     return this.#gw;
   }
   async run() {
-    this.#surface = this.#tern.open({ id: "hermes", mode: "inline", role: "omp.session", title: "hermes" });
-    this.#surface.stylesheet("hermes-tern", STYLES);
+    this.#surface = new SurfaceHost(this.#tern, "hermes");
     this.#applyTheme();
     if (this.#tern.caps.features.includes("blobs")) {
       this.#welcome.logo = this.#tern.blob(logo_default, "image/png");
     }
     this.transcript.push({ id: "welcome", kind: "welcome" });
-    const query = process.env.HERMES_TUI_QUERY?.trim();
+    const query = this.#launch.query;
     if (query || this.#startupImage) {
       this.queue.push({ images: [], text: query || "What do you see in this image?" });
     }
-    const log = process.env.HERMES_TERN_EVENT_LOG;
+    const log = this.#launch.eventLog;
     this.#gw.on("event", (ev) => {
       if (log) {
         appendFileSync4(log, `${JSON.stringify(ev)}
@@ -69208,15 +69379,35 @@ var App = class {
     this.processes.poke();
     this.#render();
     this.#surface.focus(INPUT_ID);
-    void this.#readInput();
+    void runInput(this.#tern, {
+      after: () => this.changed(),
+      onError: (error) => this.transcript.notice(`Input failed: ${errorText(error)}`, "error"),
+      onEvent: (event) => this.#onTernEvent(event),
+      onKey: (key2) => this.#onKey(key2)
+    }).then(() => this.quit());
     const code7 = await this.#done.promise;
     await Promise.race([
       Promise.all([...this.#subscriptions.keys()].map((sid) => this.#leave(sid, "tui_shutdown"))),
-      new Promise((resolve7) => setTimeout(resolve7, QUIT_DETACH_MS))
+      new Promise((resolve7) => this.#timers.timeout(() => resolve7(void 0), QUIT_DETACH_MS))
     ]);
+    this.dispose();
     await this.#tern.close();
     this.#gw.kill("exit");
     return code7;
+  }
+  /**
+   * Stops what the pane runs on its own: every timer, the stores' polls and the sidebar's reads.
+   * Quitting calls it once the sessions detached (or the wait gave up), before Tern closes.
+   */
+  dispose() {
+    for (const timer of [this.#copiedTimer, this.#noticeTimer, this.#reconnectTimer, this.#titleTimer, this.#connectTimer]) {
+      clearTimeout(timer);
+    }
+    this.#timers.dispose();
+    this.agents.dispose();
+    this.processes.dispose();
+    this.prs.dispose();
+    this.sidebar.dispose();
   }
   // ── OverlayHost ────────────────────────────────────────────────────
   open(overlay) {
@@ -69235,18 +69426,12 @@ var App = class {
     if (at >= 0) {
       this.overlays.splice(at, 1);
       this.#approvalIds.delete(overlay.key);
+      overlay.onClose?.();
       this.changed();
     }
   }
   changed() {
-    if (this.#scheduled) {
-      return;
-    }
-    this.#scheduled = true;
-    setImmediate(() => {
-      this.#scheduled = false;
-      this.#render();
-    });
+    this.#renders.request();
   }
   /** A notice in the transcript, rendered now. */
   notice(text11, tone) {
@@ -69259,21 +69444,6 @@ var App = class {
     this.changed();
   }
   // ── Input ──────────────────────────────────────────────────────────
-  async #readInput() {
-    try {
-      for await (const input2 of this.#tern) {
-        if (input2.type === "key") {
-          this.#onKey(input2.key);
-        } else {
-          this.#onTernEvent(input2.event);
-        }
-        this.changed();
-      }
-    } catch (error) {
-      this.transcript.notice(`Input failed: ${errorText(error)}`, "error");
-    }
-    this.quit();
-  }
   #onKey(key2) {
     const top = this.overlays.at(-1);
     if (key2.ctrl && key2.name === "c") {
@@ -69360,7 +69530,6 @@ var App = class {
     }
     if (ev.ev === "focus" && ev.id === INPUT_ID && !this.overlays.at(-1)?.modal) {
       this.#hud = void 0;
-      this.#focus = INPUT_ID;
       this.#surface.focus(INPUT_ID);
     }
   }
@@ -69438,15 +69607,12 @@ var App = class {
     } catch {
     }
   }
-  /**
-   * OSC 7: tells Tern the session's folder, so its file viewer, branch and new splits follow a
-   * worktree (`hermes -w tern`) or a moved workspace instead of the folder the pane was opened in.
-   */
+  /** Tells Tern the session's folder when it moved (`hermes -w tern`, a moved workspace): OSC 7. */
   #reportCwd() {
     const cwd = this.info?.cwd;
     if (cwd && cwd !== this.#reportedCwd) {
       this.#reportedCwd = cwd;
-      process.stdout.write(`\x1B]7;file://${hostname()}${encodeURI(cwd)}\x07`);
+      reportCwd(cwd);
     }
   }
   #setTitle(title) {
@@ -69455,7 +69621,7 @@ var App = class {
       return false;
     }
     this.title = next3;
-    process.stdout.write(`\x1B]2;${next3.replace(/[\x00-\x1f]/g, " ")}\x07`);
+    setTabTitle(next3);
     return true;
   }
   #connectTimer;
@@ -69543,7 +69709,7 @@ var App = class {
       void this.attachClipboardImage(true);
       return true;
     }
-    const path2 = imagePathOf(text11, this.info?.cwd || process.env.HERMES_CWD || process.cwd());
+    const path2 = imagePathOf(text11, this.info?.cwd || this.#launch.cwd);
     if (path2) {
       void this.#attachImage(path2, basename4(path2));
       return true;
@@ -69570,7 +69736,7 @@ var App = class {
   }
   /** `/image <path>`: attaches that image file (resolved against the session's folder) to the next prompt. */
   async attachImagePath(raw2) {
-    const path2 = imagePathOf(raw2, this.info?.cwd || process.env.HERMES_CWD || process.cwd());
+    const path2 = imagePathOf(raw2, this.info?.cwd || this.#launch.cwd);
     if (!path2) {
       this.transcript.notice(`Not an image file: ${raw2.trim()} (PNG, JPEG, GIF or WebP)`, "warning");
       return this.changed();
@@ -69585,7 +69751,7 @@ var App = class {
         this.transcript.notice("Wait for the session to start before attaching an image.", "warning");
         return;
       }
-      const image3 = this.#image(await uploadImage(this.#gw, sid, path2, process.env.HERMES_CWD || process.cwd()), name);
+      const image3 = this.#image(await uploadImage(this.#gw, sid, path2, this.#launch.cwd), name);
       if (this.#attaching.includes(slot)) {
         this.#attachments.push(image3);
       }
@@ -69678,7 +69844,7 @@ var App = class {
     if (!a2 || !this.sid) {
       return;
     }
-    const cwd = this.info?.cwd || process.env.HOME || "/";
+    const cwd = this.info?.cwd || this.#launch.home || "/";
     if (!await openSidebar(specOf(a2, agentName(a2), this.sid, this.storedSid), cwd)) {
       openAgents(this, { id, watch: true });
     }
@@ -70088,7 +70254,7 @@ ${this.composer.text}` : text11 || this.composer.text);
     if (!this.transcript.unsummarized) {
       return;
     }
-    setTimeout(() => {
+    this.#timers.timeout(() => {
       const stored = this.info?.stored_session_id || this.storedSid;
       if (this.sid === sid && stored && this.transcript.unsummarized) {
         this.transcript.summarize(storedCompactions(stored));
@@ -70103,7 +70269,7 @@ ${this.composer.text}` : text11 || this.composer.text);
   // ── Sessions ───────────────────────────────────────────────────────
   /** The first session: HERMES_TUI_RESUME's, else a new one; then the launcher's startup image, if any. */
   async #bootstrap() {
-    const resume = process.env.HERMES_TUI_RESUME?.trim();
+    const resume = this.#launch.resume;
     try {
       await (resume ? this.resume(resume) : this.newSession());
     } catch (error) {
@@ -70123,7 +70289,7 @@ ${this.composer.text}` : text11 || this.composer.text);
     const path2 = this.#startupImage;
     try {
       if (this.#gw.isCanonical) {
-        const image3 = this.#image(await uploadImage(this.#gw, sid, path2, process.env.HERMES_CWD || process.cwd()), basename4(path2));
+        const image3 = this.#image(await uploadImage(this.#gw, sid, path2, this.#launch.cwd), basename4(path2));
         const images = this.queue[0]?.images ?? this.#attachments;
         images.push(image3);
       } else {
@@ -70169,7 +70335,7 @@ ${this.composer.text}` : text11 || this.composer.text);
         this.transcript.notice("No model provider is configured. Run `hermes setup`, then start again.", "warning");
         return;
       }
-      const cwd = process.env.HERMES_TUI_CWD?.trim();
+      const cwd = this.#launch.sessionCwd;
       const r = await this.#gw.request(
         "session.create",
         this.#gw.isCanonical ? { ...localCreationOptions(), ...cwd ? { cwd } : {} } : { cols: this.#tern.caps.cols, ...cwd ? { cwd } : {} }
@@ -70751,7 +70917,7 @@ ${this.composer.text}` : text11 || this.composer.text);
   /** Switches the theme mode now and keeps it for the next launch. */
   setTheme(mode) {
     this.#theme = mode;
-    saveSettings({ theme: mode });
+    this.#settings.save({ theme: mode });
     this.#applyTheme();
     this.changed();
   }
@@ -70778,7 +70944,7 @@ ${this.composer.text}` : text11 || this.composer.text);
    * not a settings write); the work log shows it as thought rows.
    */
   #showThoughts(sid) {
-    if (loadSettings().thoughts === false) {
+    if (this.#settings.load().thoughts === false) {
       return;
     }
     this.#gw.request("config.set", { key: "show_reasoning", session_id: sid, value: "on" }).catch((error) => {
@@ -70973,7 +71139,7 @@ ${this.composer.text}` : text11 || this.composer.text);
         composer: this.composer,
         context: max > 0 ? { max, used } : void 0,
         cost: usage?.cost_usd ?? void 0,
-        cwd: info?.cwd ? shortPath3(info.cwd) : "",
+        cwd: info?.cwd ? shortPath3(info.cwd, this.#launch.home) : "",
         effort: info?.reasoning_effort ?? "",
         effortWire: info?.reasoning_effort_wire || void 0,
         fast: fastTier(info),
@@ -71079,10 +71245,7 @@ ${this.composer.text}` : text11 || this.composer.text);
     });
     const top = this.overlays.at(-1);
     const focus = top?.focus ? top.focus(`layer.${top.key}`) : top?.modal || this.#hud ? null : INPUT_ID;
-    if (focus !== this.#focus) {
-      this.#focus = focus;
-      this.#surface.focus(focus);
-    }
+    this.#surface.follow(focus);
   }
 };
 function userText(text11, images) {
@@ -71100,8 +71263,7 @@ function kaomojiLabel(text11) {
   const word = text11.match(/([A-Za-z][A-Za-z ]*[A-Za-z])\.{2,}\s*$/)?.[1];
   return word ? `${word.charAt(0).toUpperCase()}${word.slice(1)}\u2026` : "";
 }
-function shortPath3(path2) {
-  const home = process.env.HOME;
+function shortPath3(path2, home) {
   return home && path2.startsWith(home) ? `~${path2.slice(home.length)}` : path2;
 }
 
@@ -71203,7 +71365,6 @@ function parseArgs(raw2) {
 }
 
 // src/watch/watchApp.ts
-var INPUT_ID2 = "dock.composer.line.input";
 var POLL_MS4 = 1e3;
 var EXIT_ARM_MS2 = 1500;
 var WatchApp = class {
@@ -71214,6 +71375,7 @@ var WatchApp = class {
   #gw;
   #spec;
   #agent;
+  #settings;
   #store;
   #child;
   #lastMessage = 0;
@@ -71222,13 +71384,14 @@ var WatchApp = class {
   #ready = false;
   #surface;
   #timer;
-  #scheduled = false;
+  #renders = new RenderScheduler(() => this.#render());
   #exitArmed = 0;
   #done = Promise.withResolvers();
-  constructor(tern, gw2, spec) {
+  constructor(tern, gw2, spec, settings2 = fileSettings()) {
     this.#tern = tern;
     this.#gw = gw2;
     this.#spec = spec;
+    this.#settings = settings2;
     this.#agent = {
       calls: 0,
       goal: spec.goal,
@@ -71243,9 +71406,8 @@ var WatchApp = class {
     };
   }
   async run() {
-    this.#surface = this.#tern.open({ id: "hermes", mode: "inline", role: "omp.session", title: this.#spec.name });
-    this.#surface.stylesheet("hermes-tern", STYLES);
-    const theme = loadSettings().theme ?? "tern";
+    this.#surface = new SurfaceHost(this.#tern, this.#spec.name);
+    const theme = this.#settings.load().theme ?? "tern";
     this.#surface.palette(paletteFor(theme, void 0));
     this.#gw.on("event", (ev) => {
       if (ev.type === "gateway.ready") {
@@ -71266,7 +71428,7 @@ var WatchApp = class {
     this.#timer = setInterval(() => void this.#tick(), POLL_MS4);
     void this.#tick();
     this.#render();
-    this.#surface.focus(INPUT_ID2);
+    this.#surface.focus(INPUT_ID);
     void this.#readInput();
     const code7 = await this.#done.promise;
     clearInterval(this.#timer);
@@ -71276,14 +71438,7 @@ var WatchApp = class {
     return code7;
   }
   changed() {
-    if (this.#scheduled) {
-      return;
-    }
-    this.#scheduled = true;
-    setImmediate(() => {
-      this.#scheduled = false;
-      this.#render();
-    });
+    this.#renders.request();
   }
   async #tick() {
     const a2 = this.#agent;
@@ -71367,22 +71522,12 @@ var WatchApp = class {
     }
   }
   async #readInput() {
-    try {
-      for await (const input2 of this.#tern) {
-        if (input2.type === "key") {
-          this.#onKey(input2.key);
-        } else {
-          this.#onEvent(input2.event);
-        }
-        this.changed();
-      }
-    } catch {
-    }
+    await runInput(this.#tern, { after: () => this.changed(), onEvent: (event) => this.#onEvent(event), onKey: (key2) => this.#onKey(key2) });
     this.#done.resolve(0);
   }
   #onEvent(ev) {
-    if (ev.ev === "focus" && ev.id === INPUT_ID2) {
-      this.#surface.focus(INPUT_ID2);
+    if (ev.ev === "focus" && ev.id === INPUT_ID) {
+      this.#surface.focus(INPUT_ID);
     }
   }
   #onKey(key2) {
@@ -71462,7 +71607,7 @@ var WatchApp = class {
         composer: this.composer,
         cwd: "",
         effort: "",
-        inputId: INPUT_ID2,
+        inputId: INPUT_ID,
         model: a2.model ?? "",
         now,
         onEdit: (ev) => {
@@ -71500,15 +71645,16 @@ var WatchApp = class {
 
 // src/entry.ts
 var NO_TSP = 75;
-var version = process.env.HERMES_VERSION ?? "";
-var session = await connect({ app: "hermes", features: ["edit", "undo", "send"], version });
+var launch2 = launchEnv();
+var settings = fileSettings();
+var session = await connect({ app: "hermes", features: ["edit", "undo", "send"], version: launch2.version });
 if (!session) {
   process.exit(NO_TSP);
 }
 var gw = new GatewayClient();
 gw.start();
 var watch = readWatchSpec();
-var app = watch ? new WatchApp(session, gw, watch) : new App(session, gw, version);
+var app = watch ? new WatchApp(session, gw, watch, settings) : new App(session, gw, launch2.version, { launch: launch2, settings });
 var faults = new FaultBudget();
 var fault = (err) => {
   if (!(app instanceof App) || isDeadStream(err) || !faults.take()) {

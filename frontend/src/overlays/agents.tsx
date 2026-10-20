@@ -19,9 +19,10 @@ import { duration } from '../view/time.js'
 import { agentNode, briefOf } from '../view/tools.js'
 
 import { editQuery, moveSelection } from './search.js'
+import { tickWhileOpen } from './sheet.js'
 
 /** What the agents hub reaches of the app. */
-export type AgentsSheetHost = Pick<ChatPorts, 'agents' | 'changed' | 'close' | 'open' | 'openAgent' | 'overlays' | 'transcript'>
+export type AgentsSheetHost = Pick<ChatPorts, 'agents' | 'changed' | 'close' | 'open' | 'openAgent' | 'transcript'>
 
 const KEY = 'agents'
 /** Timers and the timeline follow the clock while the sheet is open. */
@@ -72,13 +73,8 @@ export function openAgents(host: AgentsSheetHost, focus?: { id: string; watch?: 
   let steer: string | undefined
   let stopping = false
 
-  // Ends with the sheet, however it closed (Esc, a session switch replacing the overlays).
-  const timer = setInterval(() => (host.overlays.includes(overlay) ? host.changed() : clearInterval(timer)), TICK_MS)
-
-  const close = () => {
-    clearInterval(timer)
-    host.close(overlay)
-  }
+  const stopTicking = tickWhileOpen(host, TICK_MS)
+  const close = () => host.close(overlay)
 
   const current = () => agents().find(a => a.id === (watching ?? selected))
 
@@ -163,6 +159,8 @@ export function openAgents(host: AgentsSheetHost, focus?: { id: string; watch?: 
     key: KEY,
     modal: true,
     cancel: close,
+    // Ends with the sheet, however it closed (Esc, a session switch replacing the overlays).
+    onClose: stopTicking,
     node: () => {
       const now = Date.now()
       const watched = watching ? agents().find(a => a.id === watching) : undefined

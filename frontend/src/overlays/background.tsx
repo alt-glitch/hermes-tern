@@ -29,9 +29,10 @@ import { commandLine, describeCommand, oneLine } from '../view/describe.js'
 import { duration } from '../view/time.js'
 
 import { moveSelection } from './search.js'
+import { tickWhileOpen } from './sheet.js'
 
 /** What the Background sheet reaches of the app. */
-export type BackgroundHost = Pick<ChatPorts, 'changed' | 'close' | 'cron' | 'open' | 'overlays' | 'processes' | 'transcript'>
+export type BackgroundHost = Pick<ChatPorts, 'changed' | 'close' | 'cron' | 'open' | 'processes' | 'transcript'>
 
 const KEY = 'background'
 /** Run times follow the clock while the sheet is open. */
@@ -65,20 +66,8 @@ export function openBackground(host: BackgroundHost, at?: string | { tab: 'cron'
   const release = host.processes.watch()
   const releaseCron = host.cron.watch()
 
-  // Ends with the sheet, however it closed (Esc, a session switch replacing the overlays).
-  const timer = setInterval(() => (host.overlays.includes(overlay) ? host.changed() : end()), TICK_MS)
-
-  function end() {
-    clearInterval(timer)
-    clearTimeout(copiedTimer)
-    release()
-    releaseCron()
-  }
-
-  const close = () => {
-    end()
-    host.close(overlay)
-  }
+  const stopTicking = tickWhileOpen(host, TICK_MS)
+  const close = () => host.close(overlay)
 
   const shown = (): BackgroundProcess[] => (tab === 'running' ? procs().filter(isRunning) : procs())
   const current = () => procs().find(p => p.id === selected)
@@ -181,6 +170,13 @@ export function openBackground(host: BackgroundHost, at?: string | { tab: 'cron'
     key: KEY,
     modal: true,
     cancel: close,
+    // Ends with the sheet, however it closed (Esc, a session switch replacing the overlays).
+    onClose: () => {
+      stopTicking()
+      clearTimeout(copiedTimer)
+      release()
+      releaseCron()
+    },
     node: () => sheetNode(Date.now()),
     onKey: (k: Key) => {
       if (confirm) {

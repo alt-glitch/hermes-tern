@@ -60,6 +60,9 @@ export function paletteFor(mode: ThemeMode, skin: HermesSkin | undefined): Palet
  * The skin's colors for one polarity. `fromSkin` decides polarity from the
  * environment (`HERMES_TUI_LIGHT`), so pin it for the call; the overlay a
  * skin authors for that polarity wins over its base colors.
+ *
+ * Boundary: this writes the environment for a Hermes call that reads it. It
+ * is not a launch setting, so it stays out of LaunchEnv (config/env.ts).
  */
 function resolve(skin: HermesSkin, polarity: 'dark' | 'light'): ThemeColors {
   const light = polarity === 'light'

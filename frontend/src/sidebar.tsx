@@ -7,6 +7,7 @@ import type { JSX, PrefsRow } from '@stencil-hq/tern'
 
 import type { ChatPorts } from './app/ports.js'
 import { copyToClipboard } from './clipboard.js'
+import { launchEnv } from './config/env.js'
 import { type GitState, gitState } from './git/status.js'
 import { prKey } from './github/links.js'
 import { checksState } from './github/pullRequest.js'
@@ -151,7 +152,7 @@ export class Sidebar {
     return (
       <prefs
         key="sidebar"
-        lead={git ? git.root.replace(process.env.HOME ?? '\u0000', '~') : (host.session.info?.cwd ?? '')}
+        lead={git ? git.root.replace(launchEnv().home ?? '\u0000', '~') : (host.session.info?.cwd ?? '')}
         onAction={Object.fromEntries(ACTS.map(act => [act, (ev: { value?: unknown }) => this.#action(act, ev.value)]))}
         page="session"
         pages={[{ icon: 'branch', id: 'session', label: 'Session' }]}
