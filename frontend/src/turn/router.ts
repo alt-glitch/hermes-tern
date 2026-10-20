@@ -258,7 +258,7 @@ export class PromptRouter {
     host.transcript.user({ attachments: userImages(images), text: display?.trim() || prompt.text })
     // Its bubble is up: the gateway's queued → started for it owes none.
     host.queue.server.shown(submission)
-    host.activity.startBusy('Working…')
+    const row = host.activity.startBusy('Working…')
     host.changed()
     // The shared gateway admits a prompt by its submission id (a retry with the same id is one turn).
     rpc(host.gw, 'prompt.submit', {
@@ -268,9 +268,10 @@ export class PromptRouter {
       ...(queued ? { queued } : {}),
       ...(attachments.length ? { attachments } : {})
     }).catch((error: Error) => {
-      // Back to the composer, not re-sent: a timeout may come after the gateway admitted it.
+      // Back to the composer, not re-sent: a timeout may come after the gateway admitted it. Once
+      // its turn started (message.start took the row), the row is the turn's and stays.
       host.transcript.notice(`Not sent: ${error.message}. Your message is back in the composer.`, 'error')
-      host.activity.endBusy()
+      host.activity.endBusy(row)
       host.restore(prompt)
       host.queue.drain()
       host.changed()

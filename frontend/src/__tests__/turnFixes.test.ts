@@ -123,4 +123,17 @@ describe('the working row is ended only by the work that owns it', () => {
     expect(gw.sent('prompt.submit')).toEqual([])
     expect(app.queue.held).toMatchObject([{ text: 'next' }])
   })
+  it('a prompt.submit that fails after its turn started leaves the turn running', async () => {
+    const submit = held()
+    const { app, emit, enter, notices } = setup({ 'prompt.submit': submit.reply })
+    await enter('hello')
+    await emit('message.start')
+    const row = app.activity.busy
+
+    submit.reject(new Error('timed out'))
+    await vi.waitFor(() => expect(notices().at(-1)).toBe('Not sent: timed out. Your message is back in the composer.'))
+
+    expect(app.activity.busy).toBe(row)
+    expect(app.composer.text).toBe('hello')
+  })
 })

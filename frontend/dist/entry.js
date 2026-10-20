@@ -74566,10 +74566,10 @@ var PromptRouter = class {
     }
     const { sid } = gate;
     if (prompt.kind === "typed" && hasCommands(prompt)) {
-      const row2 = host.activity.startBusy(EXPANDING_LABEL);
+      const row3 = host.activity.startBusy(EXPANDING_LABEL);
       host.changed();
       void this.expanded(sid, prompt).then((ready) => {
-        host.activity.endBusy(row2);
+        host.activity.endBusy(row3);
         if (ready) {
           this.send({ images: ready.images, kind: "app", text: ready.text }, { display: prompt.text, queued });
         } else {
@@ -74585,7 +74585,7 @@ var PromptRouter = class {
     const submission = newInputId();
     host.transcript.user({ attachments: userImages(images), text: display?.trim() || prompt.text });
     host.queue.server.shown(submission);
-    host.activity.startBusy("Working\u2026");
+    const row2 = host.activity.startBusy("Working\u2026");
     host.changed();
     rpc(host.gw, "prompt.submit", {
       session_id: sid,
@@ -74595,7 +74595,7 @@ var PromptRouter = class {
       ...attachments.length ? { attachments } : {}
     }).catch((error) => {
       host.transcript.notice(`Not sent: ${error.message}. Your message is back in the composer.`, "error");
-      host.activity.endBusy();
+      host.activity.endBusy(row2);
       host.restore(prompt);
       host.queue.drain();
       host.changed();
