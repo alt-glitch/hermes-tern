@@ -27118,8 +27118,23 @@ function genericBody(call) {
   }
   return [/* @__PURE__ */ jsx("code", { lang: /^\s*[[{]/.test(text15) ? "json" : "text", text: clip(text15, { mark: "line", max: 4e3 }) }, "out")];
 }
+function fallbackView(call) {
+  return {
+    action: () => "other",
+    card: () => ({ body: genericBody(call), folded: true, frame: "inline", name: call.name, title: humanize(call.name) }),
+    detailPrefix: () => void 0,
+    exit: () => void 0,
+    replaces: () => void 0,
+    step: () => humanize(call.name)
+  };
+}
 function errorOf(call) {
-  const result = resultOf(call);
+  return errorIn(call, resultOf(call));
+}
+function plainErrorOf(call) {
+  return errorIn(call, record(call.result));
+}
+function errorIn(call, result) {
   return nonEmpty(result?.["error"]) ?? nonEmpty(call.summary) ?? (typeof call.result === "string" && !result ? call.result : void 0);
 }
 function humanize(name) {
@@ -65480,9 +65495,42 @@ function breakdownBody(items) {
   ];
 }
 
+// src/view/tools/faults.ts
+var sink = () => void 0;
+var told = /* @__PURE__ */ new Set();
+function onCardFault(next2) {
+  sink = next2;
+  told = /* @__PURE__ */ new Set();
+}
+function cardFault(name, error) {
+  if (told.has(name)) {
+    return;
+  }
+  told.add(name);
+  sink(name, error);
+}
+function noticeSink(notice) {
+  return (name, error) => queueMicrotask(() => notice(`The ${name} card failed to draw (${errorText(error)}); it shows as a plain card.`));
+}
+
 // src/view/tools/shell.tsx
 function toolNode(call, now) {
-  const view = viewOf(call);
+  try {
+    return drawTool(call, viewOf(call), errorOf, now);
+  } catch (error) {
+    cardFault(call.name, error);
+    return drawTool(call, fallbackView(call), plainErrorOf, now);
+  }
+}
+function toolDetail(call, now) {
+  try {
+    return drawDetail(call, viewOf(call), errorOf, now);
+  } catch (error) {
+    cardFault(call.name, error);
+    return drawDetail(call, fallbackView(call), plainErrorOf, now);
+  }
+}
+function drawTool(call, view, whyFailed, now) {
   const solo = view.replaces(now);
   if (solo) {
     return solo;
@@ -65491,7 +65539,7 @@ function toolNode(call, now) {
   const status = card.status ?? call.status;
   const running2 = status === "running";
   const body = [...card.body];
-  const error = call.status === "error" ? errorOf(call) : void 0;
+  const error = call.status === "error" ? whyFailed(call) : void 0;
   if (call.status === "cancelled") {
     body.push(
       /* @__PURE__ */ jsx(
@@ -65531,8 +65579,7 @@ function toolNode(call, now) {
     call.id
   );
 }
-function toolDetail(call, now) {
-  const view = viewOf(call);
+function drawDetail(call, view, whyFailed, now) {
   const card = view.card(now);
   const body = [...card.body];
   const prefix2 = view.detailPrefix();
@@ -65543,7 +65590,7 @@ function toolDetail(call, now) {
   if (exit3) {
     body.push(/* @__PURE__ */ jsx("text", { spans: [{ s: "error", t: `exit ${exit3}` }] }, "exit"));
   }
-  const error = call.status === "error" && !card.body.length ? errorOf(call) : void 0;
+  const error = call.status === "error" && !card.body.length ? whyFailed(call) : void 0;
   if (error) {
     body.push(/* @__PURE__ */ jsx("text", { role: "omp.tool.error", spans: [{ s: "error", t: error }], wrap: "word" }, "err"));
   }
@@ -67299,7 +67346,7 @@ function run4(ev, cx) {
   return TABLE[ev.type]?.(ev, cx);
 }
 function dispatcher(cx, unknown4 = () => void 0) {
-  const told = /* @__PURE__ */ new Set();
+  const told2 = /* @__PURE__ */ new Set();
   return (ev) => {
     if (cx.life.routeEvent(ev) !== "show") {
       return "quiet";
@@ -67307,8 +67354,8 @@ function dispatcher(cx, unknown4 = () => void 0) {
     if (Object.hasOwn(TABLE, ev.type)) {
       return run4(ev, cx) ?? "quiet";
     }
-    if (!IGNORED_TYPES.has(ev.type) && !told.has(ev.type)) {
-      told.add(ev.type);
+    if (!IGNORED_TYPES.has(ev.type) && !told2.has(ev.type)) {
+      told2.add(ev.type);
       unknown4(ev.type);
     }
     return "quiet";
@@ -75028,6 +75075,7 @@ var App = class {
       surface: this.#surface
     };
     s2.theme.apply();
+    onCardFault(noticeSink((text15) => this.notice(text15, "warning")));
     if (this.#tern.caps.features.includes("blobs")) {
       s2.welcome.logo = this.#tern.blob(logo_default, "image/png");
     }
@@ -75340,6 +75388,12 @@ var WatchApp = class {
     } catch (error) {
       this.transcript.notice(`The session database is not readable here: ${String(error)}`, "warning");
     }
+    onCardFault(
+      noticeSink((text15) => {
+        this.transcript.notice(text15, "warning");
+        this.changed();
+      })
+    );
     this.#poller.poke();
     this.#render();
     this.#surface.focus(INPUT_ID);

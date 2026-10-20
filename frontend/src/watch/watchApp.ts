@@ -24,6 +24,7 @@ import { INPUT_ID, SurfaceHost } from '../surface/host.js'
 import { runInput } from '../surface/input.js'
 import { Transcript } from '../transcript.js'
 import { type DockActions, dockNodes } from '../view/dock.js'
+import { noticeSink, onCardFault } from '../view/tools/faults.js'
 import { entryNode } from '../view/transcript.js'
 import { rpc } from '../wire/rpc.js'
 
@@ -136,6 +137,13 @@ export class WatchApp {
       this.transcript.notice(`The session database is not readable here: ${String(error)}`, 'warning')
     }
 
+    // A card that throws draws as the generic one, and the pane says so once per tool name.
+    onCardFault(
+      noticeSink(text => {
+        this.transcript.notice(text, 'warning')
+        this.changed()
+      })
+    )
     this.#poller.poke()
     this.#render()
     this.#surface.focus(INPUT_ID)

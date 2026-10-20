@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 
 import { toolCallId } from '../core/ids.js'
 import type { ToolCall } from '../model.js'
-import { toolNode } from '../view/tools/shell.js'
+import { toolDetail, toolNode } from '../view/tools/shell.js'
 
 interface Node {
   k: string
@@ -109,5 +109,51 @@ describe('tool cards', () => {
     const todos = [{ content: 'Plan', id: '1', status: 'completed' as const }]
     const n = tree(toolNode(call('todo', { todos }, { todos }), 0))
     expect([n.p?.name, n.p?.title, n.p?.target]).toEqual(['todo', 'Todo', '1/1'])
+  })
+})
+
+// WP24: a card that throws while it draws costs its own card, not the frame.
+describe('a card that throws', () => {
+  /** A terminal call whose args throw when the card reads them (a renderer bug's stand-in); `more` replaces its output. */
+  const broken = (id: string, more: Partial<ToolCall> = { result: { output: 'still here' }, resultText: 'still here' }) =>
+    call(
+      'terminal',
+      Object.defineProperty({}, 'command', {
+        enumerable: true,
+        get: () => {
+          throw new Error('bad args')
+        }
+      }),
+      { id, ...more }
+    )
+
+  it('draws the generic card instead, and is told once per tool name', async () => {
+    const { onCardFault } = await import('../view/tools/faults.js')
+    const told: [string, string][] = []
+    onCardFault((name, error) => void told.push([name, error instanceof Error ? error.message : String(error)]))
+
+    const first = tree(toolNode(broken('c1'), 0))
+    const again = tree(toolNode(broken('c2'), 0))
+
+    expect(first).toMatchObject({ k: 'tool', p: { name: 'terminal', title: 'Terminal' } })
+    expect(JSON.stringify(first)).toContain('still here')
+    expect(again.k).toBe('tool')
+    expect(told).toEqual([['terminal', 'bad args']])
+  })
+
+  it("says why a failed one failed without the tool's parse, in its card and in a work group's step", async () => {
+    const { noticeSink, onCardFault } = await import('../view/tools/faults.js')
+    const notices: string[] = []
+    onCardFault(noticeSink(text => void notices.push(text)))
+    // No output: the reason goes in the head (and the step), read from the summary.
+    const failed = broken('c3', { status: 'error', summary: 'boom' })
+
+    expect(tree(toolNode(failed, 0))).toMatchObject({ k: 'tool', p: { note: 'boom', status: 'error' } })
+    expect(toolDetail(failed, 0).flatMap(n => words(tree(n)))).toEqual(['boom'])
+    // The notice waits for the frame to finish.
+    expect(notices).toEqual([])
+    await Promise.resolve()
+
+    expect(notices).toEqual(['The terminal card failed to draw (bad args); it shows as a plain card.'])
   })
 })

@@ -43,6 +43,7 @@ import type { Transcript } from '../transcript.js'
 import type { Activity, Busy } from '../turn/activity.js'
 import { IMAGE_ONLY_PROMPT } from '../turn/prompt.js'
 import type { PromptQueue } from '../turn/queue.js'
+import { noticeSink, onCardFault } from '../view/tools/faults.js'
 
 import { AppActions } from './actions.js'
 import { drawFrame, type FrameCx } from './frame.js'
@@ -134,6 +135,8 @@ export class App implements ChatPorts {
       surface: this.#surface
     }
     s.theme.apply()
+    // A card that throws draws as the generic one, and the pane says so once per tool name.
+    onCardFault(noticeSink(text => this.notice(text, 'warning')))
 
     if (this.#tern.caps.features.includes('blobs')) {
       s.welcome.logo = this.#tern.blob(logo, 'image/png')

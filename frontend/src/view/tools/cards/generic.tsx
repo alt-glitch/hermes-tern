@@ -1,7 +1,8 @@
 // Every other tool: the views of the tools no card family takes (the process, browser, vision,
 // image and session search tools, Tool Search's lookups, the pull request tools and any unknown
 // name), the generic card they draw (named for the omp tool each resembles, its result as code),
-// and the readings of a call (its error, a readable name, its result as text) the cards share.
+// the view the shell falls back on when a call's own view throws, and the readings of a call (its
+// error, a readable name, its result as text) the cards share.
 
 import type { JSX } from '@stencil-hq/tern'
 
@@ -12,10 +13,11 @@ import { tilesNode } from '../../../processes/widgets/view.js'
 import { resultOf } from '../../../tools/detail.js'
 import type { GenericFields, PullRequestDetail } from '../../../tools/misc.js'
 import { isWatchCall } from '../../../transcript/calls.js'
+import { record } from '../../../wire/json.js'
 import { commandLine } from '../../describe.js'
 import { clip, nonEmpty } from '../../format.js'
 import { namedStep } from '../steps.js'
-import type { Card, ToolView } from '../types.js'
+import type { CallView, Card, ToolView } from '../types.js'
 
 import { imageCard } from './image.js'
 
@@ -153,10 +155,33 @@ export function genericBody(call: ToolCall): JSX.Element[] {
   return [<code key="out" lang={/^\s*[[{]/.test(text) ? 'json' : 'text'} text={clip(text, { mark: 'line', max: 4000 })} />]
 }
 
+/**
+ * The view of a call whose own view threw: the generic card by the call's own name, its result as
+ * code. It reads nothing the tool's parser reads, so it draws whatever the call holds.
+ */
+export function fallbackView(call: ToolCall): CallView {
+  return {
+    action: () => 'other',
+    card: () => ({ body: genericBody(call), folded: true, frame: 'inline', name: call.name, title: humanize(call.name) }),
+    detailPrefix: () => undefined,
+    exit: () => undefined,
+    replaces: () => undefined,
+    step: () => humanize(call.name)
+  }
+}
+
 /** Why a failed call failed: its result's error, its summary, or a bare string result. */
 export function errorOf(call: ToolCall): string | undefined {
-  const result = resultOf(call)
+  return errorIn(call, resultOf(call))
+}
 
+/** errorOf without the tool's parser, for the fallback card (the parse may be what threw). */
+export function plainErrorOf(call: ToolCall): string | undefined {
+  return errorIn(call, record(call.result))
+}
+
+/** Why `call` failed, with `result` its result as an object. */
+function errorIn(call: ToolCall, result: Record<string, unknown> | undefined): string | undefined {
   return (
     nonEmpty(result?.['error']) ?? nonEmpty(call.summary) ?? (typeof call.result === 'string' && !result ? call.result : undefined)
   )

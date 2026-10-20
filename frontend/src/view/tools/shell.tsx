@@ -3,7 +3,9 @@
 // eval pick the icon and the layout), so each hermes tool maps onto the omp
 // tool it resembles, with the same props and body shapes omp sends. The shell
 // asks the registry (registry.ts) for a call's view and wraps its card in the
-// `tool` node; what only one tool knows, it asks through the view's hooks.
+// `tool` node; what only one tool knows, it asks through the view's hooks. A
+// view that throws gives the generic card, and the pane hears of it once per
+// tool name (faults.ts).
 
 import type { JSX } from '@stencil-hq/tern'
 
@@ -11,12 +13,42 @@ import type { ToolCall } from '../../model.js'
 import { duration } from '../format.js'
 import { age } from '../time.js'
 
-import { errorOf } from './cards/generic.js'
+import { errorOf, fallbackView, plainErrorOf } from './cards/generic.js'
+import { cardFault } from './faults.js'
 import { viewOf } from './registry.js'
+import type { CallView } from './types.js'
 
-/** The `tool` node of one call. */
+/** Why a failed call failed, as the view drawing it may read it. */
+type ErrorReader = (call: ToolCall) => string | undefined
+
+/** The `tool` node of one call; the generic card when its view throws. */
 export function toolNode(call: ToolCall, now: number): JSX.Element {
-  const view = viewOf(call)
+  try {
+    return drawTool(call, viewOf(call), errorOf, now)
+  } catch (error) {
+    cardFault(call.name, error)
+
+    return drawTool(call, fallbackView(call), plainErrorOf, now)
+  }
+}
+
+/**
+ * What a step's line opens to in a work group: its card's body without the card (a command
+ * and its output, a diff, a file), and why it failed or stopped; the generic card's body when
+ * its view throws.
+ */
+export function toolDetail(call: ToolCall, now: number): JSX.Element[] {
+  try {
+    return drawDetail(call, viewOf(call), errorOf, now)
+  } catch (error) {
+    cardFault(call.name, error)
+
+    return drawDetail(call, fallbackView(call), plainErrorOf, now)
+  }
+}
+
+/** The `tool` node of `call` as `view` draws it. */
+function drawTool(call: ToolCall, view: CallView, whyFailed: ErrorReader, now: number): JSX.Element {
   const solo = view.replaces(now)
 
   if (solo) {
@@ -27,7 +59,7 @@ export function toolNode(call: ToolCall, now: number): JSX.Element {
   const status = card.status ?? call.status
   const running = status === 'running'
   const body = [...card.body]
-  const error = call.status === 'error' ? errorOf(call) : undefined
+  const error = call.status === 'error' ? whyFailed(call) : undefined
 
   if (call.status === 'cancelled') {
     body.push(
@@ -72,12 +104,8 @@ export function toolNode(call: ToolCall, now: number): JSX.Element {
   )
 }
 
-/**
- * What a step's line opens to in a work group: its card's body without the card (a command
- * and its output, a diff, a file), and why it failed or stopped.
- */
-export function toolDetail(call: ToolCall, now: number): JSX.Element[] {
-  const view = viewOf(call)
+/** What `call`'s step opens to, as `view` draws it. */
+function drawDetail(call: ToolCall, view: CallView, whyFailed: ErrorReader, now: number): JSX.Element[] {
   const card = view.card(now)
   const body = [...card.body]
   // What the card's head held and its body lacks (a short command).
@@ -93,7 +121,7 @@ export function toolDetail(call: ToolCall, now: number): JSX.Element[] {
     body.push(<text key="exit" spans={[{ s: 'error', t: `exit ${exit}` }]} />)
   }
 
-  const error = call.status === 'error' && !card.body.length ? errorOf(call) : undefined
+  const error = call.status === 'error' && !card.body.length ? whyFailed(call) : undefined
 
   if (error) {
     body.push(<text key="err" role="omp.tool.error" spans={[{ s: 'error', t: error }]} wrap="word" />)
