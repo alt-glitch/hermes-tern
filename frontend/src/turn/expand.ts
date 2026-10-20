@@ -7,7 +7,7 @@ import { interpolate, shellError, typedCommands } from '../hermes/shell.js'
 import type { NoticeEntry } from '../model.js'
 import type { Requester } from '../wire/rpc.js'
 
-import type { Prompt } from './prompt.js'
+import type { Prompt, TypedPrompt } from './prompt.js'
 
 /** The working row's label while a send's `{!cmd}`s run (busy counts it as a turn). */
 export const EXPANDING_LABEL = 'Running {!…}'
@@ -28,9 +28,12 @@ export interface ExpandHost {
   changed(): void
 }
 
-/** Whether `prompt` has `{!cmd}`s to run: only a typed one's, and none of those it pasted. */
-export function needsExpansion(prompt: Prompt): prompt is Extract<Prompt, { kind: 'typed' }> {
-  return prompt.kind === 'typed' && typedCommands(prompt.text, prompt.pasted).length > 0
+/**
+ * Whether typed `prompt` has `{!cmd}`s to run, none of those it pasted counted. A plain check, not
+ * a type guard: a typed prompt without one is still typed, so callers narrow on `kind` first.
+ */
+export function hasCommands(prompt: TypedPrompt): boolean {
+  return typedCommands(prompt.text, prompt.pasted).length > 0
 }
 
 /**
@@ -38,7 +41,7 @@ export function needsExpansion(prompt: Prompt): prompt is Extract<Prompt, { kind
  * when one failed, after the notice says so and the prompt is back in the composer.
  */
 export async function expand(host: ExpandHost, sid: string, prompt: Prompt): Promise<Expanded | undefined> {
-  if (!needsExpansion(prompt)) {
+  if (prompt.kind !== 'typed' || !hasCommands(prompt)) {
     return prompt
   }
 

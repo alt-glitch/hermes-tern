@@ -24,6 +24,9 @@ export type Prompt =
   /** A slash command's (a skill's body, a `send`): `display` is what the transcript, the queue and Edit show instead of `text`. */
   | { kind: 'command'; text: string; images: Image[]; display: string | undefined }
 
+/** A prompt the user typed: the one kind whose `{!cmd}`s run. */
+export type TypedPrompt = Extract<Prompt, { kind: 'typed' }>
+
 /** What the transcript, the queue and Edit show of `prompt`. */
 export function shownText(prompt: Prompt): string {
   return (prompt.kind === 'command' ? prompt.display : undefined) ?? prompt.text

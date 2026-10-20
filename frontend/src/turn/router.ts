@@ -12,7 +12,7 @@ import type { Transcript } from '../transcript.js'
 import { rpc } from '../wire/rpc.js'
 
 import type { Activity } from './activity.js'
-import { EXPANDING_LABEL, expand, type Expanded, needsExpansion } from './expand.js'
+import { EXPANDING_LABEL, expand, type Expanded, hasCommands } from './expand.js'
 import { IMAGE_ONLY_PROMPT, type Prompt, shownText, userImages } from './prompt.js'
 import type { PromptQueue } from './queue.js'
 import type { BusyMode } from './serverQueue.js'
@@ -217,7 +217,7 @@ export class PromptRouter {
 
     const { sid } = gate
 
-    if (needsExpansion(prompt)) {
+    if (prompt.kind === 'typed' && hasCommands(prompt)) {
       // The expansion counts as busy: the working line says so, and nothing else is sent meanwhile.
       host.activity.startBusy(EXPANDING_LABEL)
       host.changed()

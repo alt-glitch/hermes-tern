@@ -69641,11 +69641,11 @@ var PromptQueue = class {
 
 // src/turn/expand.ts
 var EXPANDING_LABEL = "Running {!\u2026}";
-function needsExpansion(prompt) {
-  return prompt.kind === "typed" && typedCommands(prompt.text, prompt.pasted).length > 0;
+function hasCommands(prompt) {
+  return typedCommands(prompt.text, prompt.pasted).length > 0;
 }
 async function expand2(host, sid, prompt) {
-  if (!needsExpansion(prompt)) {
+  if (prompt.kind !== "typed" || !hasCommands(prompt)) {
     return prompt;
   }
   try {
@@ -69765,7 +69765,7 @@ var PromptRouter = class {
       return;
     }
     const { sid } = gate;
-    if (needsExpansion(prompt)) {
+    if (prompt.kind === "typed" && hasCommands(prompt)) {
       host.activity.startBusy(EXPANDING_LABEL);
       host.changed();
       void this.expanded(sid, prompt).then((ready) => {
