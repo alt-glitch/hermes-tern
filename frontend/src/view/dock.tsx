@@ -5,11 +5,12 @@
 import type { EditEvent, JSX, SendEvent, Tone } from '@stencil-hq/tern'
 
 import type { Composer } from '../composer.js'
-import type { Pill } from '../hud.js'
+import type { Pill } from '../chrome/hud.js'
 import type { ImageSource, Todo } from '../model.js'
 import { DEFAULT_EFFORT, effortText } from '../session/effort.js'
 import { type ChartEntry, glance, glanceSpans, hovercard, latest, miniSpark, summary } from '../processes/widgets/view.js'
 import { COMPACTING_LABEL } from '../status.js'
+import { todoProgress } from '../transcript/todos.js'
 
 import { type AutomationLine, automationNode, type Reconnecting, reconnectNode } from './automation.js'
 import { plural } from './format.js'
@@ -125,15 +126,6 @@ export interface StatusLine {
   compressions?: number
   /** The gateway's newest out-of-band notice (credits, a slow start), in its tone. */
   notice?: { text: string; tone: 'error' | 'info' | 'success' | 'warning' }
-}
-
-/** Done and total (cancelled ones drop out), and the item under way (else the next one). */
-export function todoProgress(list: readonly Todo[]): { done: number; total: number; current: string } {
-  const live = list.filter(t => t.status !== 'cancelled')
-  const done = live.filter(t => t.status === 'completed').length
-  const current = live.find(t => t.status === 'in_progress') ?? live.find(t => t.status === 'pending')
-
-  return { current: current?.content ?? '', done, total: live.length }
 }
 
 /** The PR pill: the newest linked PR, or how many there are, toned by their checks. */

@@ -25689,6 +25689,983 @@ var Automation = class {
   }
 };
 
+// src/transcript/todos.ts
+var TODO_LOOK = {
+  cancelled: { item: "dropped" },
+  completed: { item: "done" },
+  in_progress: { item: "active" },
+  pending: { item: "pending" }
+};
+function todoProgress(list9) {
+  const live = list9.filter((t2) => t2.status !== "cancelled");
+  const done = live.filter((t2) => t2.status === "completed").length;
+  const current = live.find((t2) => t2.status === "in_progress") ?? live.find((t2) => t2.status === "pending");
+  return { current: current?.content ?? "", done, total: live.length };
+}
+function currentTodos(entries) {
+  for (let i = entries.length - 1; i >= 0; i--) {
+    const e = entries[i];
+    if (e?.kind !== "turn") {
+      continue;
+    }
+    const hit = e.blocks.findLast((b) => b.kind === "tool" && b.call.todos?.length);
+    if (hit?.kind === "tool") {
+      return hit.call.todos;
+    }
+  }
+  return void 0;
+}
+function todosOf(args, current) {
+  const raw2 = Array.isArray(args.todos) ? args.todos : [];
+  return args.merge === true ? mergeTodos(current ?? [], raw2) : toTodos(raw2);
+}
+function mergeTodos(current, patch6) {
+  const out = current.map((t2) => ({ ...t2 }));
+  for (const item3 of patch6) {
+    const r = record(item3);
+    const id = String(r?.id ?? "").trim();
+    if (!r || !id) {
+      continue;
+    }
+    const cur = out.find((t2) => t2.id === id);
+    if (!cur) {
+      if (String(r.content ?? "").trim()) {
+        out.push(...toTodos([{ ...r, id }]));
+      }
+      continue;
+    }
+    const content5 = String(r.content ?? "").trim();
+    const status = String(r.status ?? "").trim().toLowerCase();
+    if (content5) {
+      cur.content = content5;
+    }
+    if (status === "pending" || status === "in_progress" || status === "completed" || status === "cancelled") {
+      cur.status = status;
+    }
+    if ("parent" in r) {
+      const parent = String(r.parent ?? "").trim();
+      if (parent && parent !== id) {
+        cur.parent = parent;
+      } else {
+        delete cur.parent;
+      }
+    }
+  }
+  return out;
+}
+function toTodos(raw2) {
+  const out = [];
+  for (const item3 of raw2) {
+    if (!item3 || typeof item3 !== "object") {
+      continue;
+    }
+    const id = "id" in item3 ? String(item3.id) : String(out.length);
+    const content5 = "content" in item3 ? String(item3.content) : "";
+    const status = "status" in item3 ? String(item3.status) : "pending";
+    const parent = "parent" in item3 && item3.parent ? String(item3.parent) : void 0;
+    out.push({
+      content: content5,
+      id,
+      ...parent && { parent },
+      status: status === "completed" || status === "in_progress" || status === "cancelled" ? status : "pending"
+    });
+  }
+  return out;
+}
+
+// src/chrome/hud.ts
+var plain = (k) => !k.ctrl && !k.alt && !k.meta && !k.shift;
+function hudKey(k, cx) {
+  const { focused, pills: pills2 } = cx;
+  if (!focused || !pills2.includes(focused)) {
+    return k.name === "down" && plain(k) && cx.idle && pills2.length ? { consumed: true, focused: pills2[0] } : { consumed: false };
+  }
+  const at = pills2.indexOf(focused);
+  switch (plain(k) ? k.name : "") {
+    case "left":
+      return { consumed: true, focused: pills2[Math.max(0, at - 1)] };
+    case "right":
+      return { consumed: true, focused: pills2[Math.min(pills2.length - 1, at + 1)] };
+    case "enter":
+    case "space":
+      return { consumed: true, open: focused };
+    case "escape":
+    case "up":
+      return { consumed: true };
+    case "down":
+      return { consumed: true, focused };
+    default:
+      return { consumed: false };
+  }
+}
+function todos(list9, busy) {
+  if (!list9?.length) {
+    return void 0;
+  }
+  const { done, total } = todoProgress(list9);
+  return total && (busy || done < total) ? list9 : void 0;
+}
+function pills(s2) {
+  return [
+    // While a turn runs the todo pill rides the working line, where the keys don't reach it.
+    ...s2.todos && !s2.busy ? ["todos"] : [],
+    ...s2.agents ? ["agents"] : [],
+    ...s2.shells ? ["shells"] : [],
+    ...s2.prs ? ["prs"] : [],
+    ...s2.goal ? ["goal"] : [],
+    ...s2.loop ? ["loop"] : []
+  ];
+}
+var Hud = class {
+  #host;
+  #focused;
+  #todosOpen = false;
+  constructor(host) {
+    this.#host = host;
+  }
+  /** The pill holding the keys (Down from an empty prompt), if any. */
+  get focused() {
+    return this.#focused;
+  }
+  /** The todo panel above the composer is open. */
+  get todosOpen() {
+    return this.#todosOpen;
+  }
+  /** Down from an empty prompt focuses the pills; ←/→, Enter and Esc/↑ while one holds the keys. True when the key ends here. */
+  key(k, cx) {
+    const out = hudKey(k, { ...cx, ...this.#focused ? { focused: this.#focused } : {} });
+    this.#focused = out.focused;
+    if (out.open) {
+      this.#open(out.open);
+    }
+    return out.consumed;
+  }
+  /** Folds the todo panel open or shut. */
+  toggleTodos() {
+    this.#todosOpen = !this.#todosOpen;
+    this.#host.changed();
+  }
+  /** Each frame: a pill that left (its last process aged out) hands the keys back. */
+  prune(shown) {
+    this.#focused = this.#focused && shown.includes(this.#focused) ? this.#focused : void 0;
+  }
+  /** The composer took the focus back (a click in it). */
+  release() {
+    this.#focused = void 0;
+  }
+  #open(pill2) {
+    switch (pill2) {
+      case "todos":
+        this.toggleTodos();
+        break;
+      case "agents":
+      case "goal":
+      case "loop":
+      case "prs":
+      case "shells":
+        this.#host.open(pill2);
+        break;
+    }
+  }
+};
+
+// src/chrome/notices.ts
+var TONES = { error: "error", success: "success", warn: "warning", warning: "warning" };
+var Notices = class {
+  #list = [];
+  #seq = 0;
+  /** Adds or replaces the notice; returns it (undefined for an empty one). */
+  show(p3, now = Date.now()) {
+    const text12 = p3.text?.trim();
+    if (!text12) {
+      return void 0;
+    }
+    const key2 = p3.key || p3.id || `n${++this.#seq}`;
+    const ttl = p3.kind === "ttl" && typeof p3.ttl_ms === "number" && p3.ttl_ms > 0 ? p3.ttl_ms : void 0;
+    const notice = { key: key2, text: text12, tone: TONES[p3.level ?? ""] ?? "info", ...ttl ? { expires: now + ttl } : {} };
+    this.#list = [...this.#list.filter((n) => n.key !== key2), notice];
+    return notice;
+  }
+  /** Drops the notice with `key`; true when one went. */
+  clear(key2) {
+    const before = this.#list.length;
+    this.#list = this.#list.filter((n) => n.key !== key2);
+    return this.#list.length !== before;
+  }
+  /** The newest notice still live at `now`. */
+  current(now = Date.now()) {
+    this.#list = this.#list.filter((n) => !n.expires || n.expires > now);
+    return this.#list.at(-1);
+  }
+  /** When the next `ttl` notice expires, if one is live. */
+  nextExpiry() {
+    const at = this.#list.flatMap((n) => n.expires ? [n.expires] : []);
+    return at.length ? Math.min(...at) : void 0;
+  }
+  /** Forgets every notice (another session is shown). */
+  reset() {
+    this.#list = [];
+  }
+};
+function isLoginNotice(p3) {
+  return Boolean(p3.key?.startsWith("login:"));
+}
+var NoticeStrip = class {
+  #host;
+  #notices = new Notices();
+  #timer;
+  constructor(host) {
+    this.#host = host;
+  }
+  /** Adds or replaces the notice, and re-arms the expiry render. */
+  show(p3) {
+    this.#notices.show(p3);
+    this.#arm();
+  }
+  /** Drops the notice with `key`. */
+  clear(key2) {
+    this.#notices.clear(key2);
+  }
+  /** The notice the strip shows at `now`. */
+  current(now = Date.now()) {
+    return this.#notices.current(now);
+  }
+  /** Forgets every notice (another session is shown). */
+  reset() {
+    this.#notices.reset();
+  }
+  /** Stops the expiry render. */
+  dispose() {
+    clearTimeout(this.#timer);
+  }
+  /** Re-renders when the next `ttl` notice expires, so the strip drops it on time. */
+  #arm() {
+    clearTimeout(this.#timer);
+    const at = this.#notices.nextExpiry();
+    if (at !== void 0) {
+      this.#timer = setTimeout(() => {
+        this.#notices.current();
+        this.#arm();
+        this.#host.changed();
+      }, Math.max(0, at - Date.now()) + 10);
+    }
+  }
+};
+
+// src/chrome/reconnect.ts
+var Reconnect = class {
+  #host;
+  /** The connection is down until the next gateway.ready (its one line is shown). */
+  #offline = false;
+  /** The gateway is being redialled until the next gateway.ready. */
+  #redial;
+  #timer;
+  constructor(host) {
+    this.#host = host;
+  }
+  /** The redial the dock shows: which try, and when the next one starts. */
+  get redial() {
+    return this.#redial;
+  }
+  /**
+   * The gateway exited: the line to show, once per outage (each failed redial exits again). An
+   * attached gateway (and its turn) lives on, so its line says the pane reconnects.
+   */
+  lost(attached, code7) {
+    const first = !this.#offline;
+    this.#offline = true;
+    if (!first) {
+      return void 0;
+    }
+    return attached ? { text: "Lost the connection to Hermes; reconnecting\u2026", tone: "warning" } : { text: `The agent backend exited${code7 === null ? "" : ` (${code7})`}.`, tone: "error" };
+  }
+  /** One line for the whole outage: each try replaces it, and re-renders when the wait ends. */
+  redialing(attempt, delayMs) {
+    clearTimeout(this.#timer);
+    this.#redial = { attempt, dueAt: Date.now() + delayMs };
+    this.#timer = setTimeout(() => this.#host.changed(), delayMs + 50);
+    this.#timer.unref?.();
+  }
+  /** gateway.ready: the connection is up, and the redial line goes. */
+  ready() {
+    this.#offline = false;
+    clearTimeout(this.#timer);
+    this.#redial = void 0;
+  }
+  /** Stops the redial line's re-render. */
+  dispose() {
+    clearTimeout(this.#timer);
+  }
+};
+
+// .hermes-src/node_modules/@hermes/shared/src/color.ts
+var HEX6_RE = /^#?([0-9a-f]{6})$/i;
+var HEX3_RE = /^#?([0-9a-f]{3})$/i;
+var RGB_FN_RE = /^rgba?\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})/i;
+var clampChannel = (v) => Math.max(0, Math.min(255, Math.round(v)));
+function parseColor(input2) {
+  const value = input2.trim();
+  let m = HEX6_RE.exec(value);
+  if (m) {
+    const n = parseInt(m[1], 16);
+    return [n >> 16 & 255, n >> 8 & 255, n & 255];
+  }
+  m = HEX3_RE.exec(value);
+  if (m) {
+    const [r, g, b] = m[1];
+    return [parseInt(r + r, 16), parseInt(g + g, 16), parseInt(b + b, 16)];
+  }
+  m = RGB_FN_RE.exec(value);
+  if (m) {
+    return [clampChannel(Number(m[1])), clampChannel(Number(m[2])), clampChannel(Number(m[3]))];
+  }
+  return null;
+}
+var toHex = (rgb) => "#" + rgb.map((c) => clampChannel(c).toString(16).padStart(2, "0")).join("");
+function mix(a2, b, t2) {
+  const pa = parseColor(a2);
+  const pb = parseColor(b);
+  if (!pa || !pb) {
+    return a2;
+  }
+  return toHex([pa[0] + (pb[0] - pa[0]) * t2, pa[1] + (pb[1] - pa[1]) * t2, pa[2] + (pb[2] - pa[2]) * t2]);
+}
+function channelLuminance(value) {
+  const normalized = value / 255;
+  return normalized <= 0.03928 ? normalized / 12.92 : ((normalized + 0.055) / 1.055) ** 2.4;
+}
+function relativeLuminance(color2) {
+  const rgb = parseColor(color2);
+  return rgb ? 0.2126 * channelLuminance(rgb[0]) + 0.7152 * channelLuminance(rgb[1]) + 0.0722 * channelLuminance(rgb[2]) : null;
+}
+function contrastRatio(a2, b) {
+  const la = relativeLuminance(a2);
+  const lb = relativeLuminance(b);
+  if (la === null || lb === null) {
+    return null;
+  }
+  const [hi, lo] = la >= lb ? [la, lb] : [lb, la];
+  return (hi + 0.05) / (lo + 0.05);
+}
+
+// .hermes-src/ui-tui/src/lib/color.ts
+var clampChannel2 = (v) => Math.max(0, Math.min(255, Math.round(v)));
+function liftForContrast(color2, bg, ratio) {
+  const fg = parseColor(color2);
+  const bgLum = relativeLuminance(bg);
+  if (!fg || bgLum === null) {
+    return color2;
+  }
+  if ((contrastRatio(color2, bg) ?? 21) >= ratio) {
+    return color2;
+  }
+  let [r, g, b] = fg;
+  if (bgLum > 0.5) {
+    let cr = contrastRatio(toHex([r, g, b]), bg) ?? 21;
+    while (cr < ratio && (r > 0 || g > 0 || b > 0)) {
+      r -= Math.ceil(r * 0.1);
+      g -= Math.ceil(g * 0.1);
+      b -= Math.ceil(b * 0.1);
+      cr = contrastRatio(toHex([r, g, b]), bg) ?? 21;
+    }
+  } else {
+    let cr = contrastRatio(toHex([r, g, b]), bg) ?? 21;
+    while (cr < ratio && (r < 255 || g < 255 || b < 255)) {
+      r = Math.min(255, r + Math.ceil((255 - r) * 0.1));
+      g = Math.min(255, g + Math.ceil((255 - g) * 0.1));
+      b = Math.min(255, b + Math.ceil((255 - b) * 0.1));
+      cr = contrastRatio(toHex([r, g, b]), bg) ?? 21;
+    }
+  }
+  return toHex([r, g, b]);
+}
+function grayOf(color2) {
+  const rgb = parseColor(color2);
+  if (!rgb) {
+    return color2;
+  }
+  const gray = clampChannel2(0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2]);
+  return toHex([gray, gray, gray]);
+}
+var desaturate = (color2, s2) => mix(color2, grayOf(color2), s2);
+
+// .hermes-src/ui-tui/src/theme.ts
+var XTERM_6_LEVELS = [0, 95, 135, 175, 215, 255];
+var ANSI_LIGHT_MAX_LUMINANCE = 0.72;
+var ANSI_LIGHT_TARGET_LUMINANCE = 0.34;
+var ANSI_LIGHT_MIN_SATURATION = 0.22;
+var ANSI_MUTED_BUCKET = 245;
+var ANSI_NORMALIZED_FOREGROUNDS = [
+  "text",
+  "label",
+  "ok",
+  "error",
+  "warn",
+  "prompt",
+  "statusFg",
+  "statusGood",
+  "statusWarn",
+  "statusBad",
+  "statusCritical",
+  "shellDollar",
+  "tool"
+];
+var ANSI_MUTED_FOREGROUNDS = ["muted", "sessionLabel", "sessionBorder", "thinking"];
+function xtermEightBitRgb(colorNumber) {
+  if (colorNumber >= 232) {
+    const value = 8 + (colorNumber - 232) * 10;
+    return [value, value, value];
+  }
+  if (colorNumber >= 16) {
+    const offset = colorNumber - 16;
+    return [
+      XTERM_6_LEVELS[Math.floor(offset / 36) % 6],
+      XTERM_6_LEVELS[Math.floor(offset / 6) % 6],
+      XTERM_6_LEVELS[offset % 6]
+    ];
+  }
+  return [0, 0, 0];
+}
+var rgbLuminance = (red, green, blue) => relativeLuminance(toHex([red, green, blue])) ?? 0;
+function rgbToHsl(red, green, blue) {
+  const rn = red / 255;
+  const gn = green / 255;
+  const bn = blue / 255;
+  const max = Math.max(rn, gn, bn);
+  const min = Math.min(rn, gn, bn);
+  const lightness = (max + min) / 2;
+  if (max === min) {
+    return [0, 0, lightness];
+  }
+  const delta = max - min;
+  const saturation = lightness > 0.5 ? delta / (2 - max - min) : delta / (max + min);
+  const hue = max === rn ? (gn - bn) / delta + (gn < bn ? 6 : 0) : max === gn ? (bn - rn) / delta + 2 : (rn - gn) / delta + 4;
+  return [hue / 6, saturation, lightness];
+}
+function circularDistance(a2, b) {
+  const distance = Math.abs(a2 - b);
+  return Math.min(distance, 1 - distance);
+}
+function richEightBitColorNumber(red, green, blue) {
+  const [, saturation, lightness] = rgbToHsl(red, green, blue);
+  if (saturation < 0.15) {
+    const gray = Math.round(lightness * 25);
+    return gray === 0 ? 16 : gray === 25 ? 231 : 231 + gray;
+  }
+  const sixRed = red < 95 ? red / 95 : 1 + (red - 95) / 40;
+  const sixGreen = green < 95 ? green / 95 : 1 + (green - 95) / 40;
+  const sixBlue = blue < 95 ? blue / 95 : 1 + (blue - 95) / 40;
+  return 16 + 36 * Math.round(sixRed) + 6 * Math.round(sixGreen) + Math.round(sixBlue);
+}
+function bestReadableAnsiColor(red, green, blue) {
+  const [hue, saturation, lightness] = rgbToHsl(red, green, blue);
+  let bestColor = richEightBitColorNumber(red, green, blue);
+  let bestScore = Number.POSITIVE_INFINITY;
+  for (let colorNumber = 16; colorNumber <= 255; colorNumber += 1) {
+    const [candidateRed, candidateGreen, candidateBlue] = xtermEightBitRgb(colorNumber);
+    const candidateLuminance = rgbLuminance(candidateRed, candidateGreen, candidateBlue);
+    if (candidateLuminance > ANSI_LIGHT_MAX_LUMINANCE) {
+      continue;
+    }
+    const [candidateHue, candidateSaturation, candidateLightness] = rgbToHsl(
+      candidateRed,
+      candidateGreen,
+      candidateBlue
+    );
+    const saturationFloorPenalty = candidateSaturation < ANSI_LIGHT_MIN_SATURATION ? (ANSI_LIGHT_MIN_SATURATION - candidateSaturation) * 3 : 0;
+    const score = circularDistance(candidateHue, hue) * 4 + Math.abs(candidateSaturation - Math.max(ANSI_LIGHT_MIN_SATURATION, saturation)) * 0.8 + Math.abs(candidateLightness - Math.min(lightness, ANSI_LIGHT_TARGET_LUMINANCE)) * 2 + saturationFloorPenalty;
+    if (score < bestScore) {
+      bestColor = colorNumber;
+      bestScore = score;
+    }
+  }
+  return bestColor;
+}
+function normalizeAnsiForeground(color2) {
+  const rgb = parseColor(color2);
+  if (!rgb) {
+    return color2;
+  }
+  const richAnsi = richEightBitColorNumber(rgb[0], rgb[1], rgb[2]);
+  const richRgb = xtermEightBitRgb(richAnsi);
+  const ansi = rgbLuminance(richRgb[0], richRgb[1], richRgb[2]) > ANSI_LIGHT_MAX_LUMINANCE ? bestReadableAnsiColor(rgb[0], rgb[1], rgb[2]) : richAnsi;
+  return `ansi256(${ansi})`;
+}
+var BRAND = {
+  name: "Hermes Agent",
+  icon: "\u2624",
+  prompt: "\u276F",
+  welcome: "Type your message or /help for commands.",
+  goodbye: "Goodbye! \u2624",
+  tool: "\u250A",
+  helpHeader: "(^_^)? Commands"
+};
+var cleanPromptSymbol = (s2, fallback) => {
+  const cleaned = String(s2 ?? "").replace(/\s+/g, " ").trim();
+  return cleaned || fallback;
+};
+var DIFF_DARK = {
+  diffAdded: "rgb(220,255,220)",
+  diffRemoved: "rgb(255,220,220)",
+  diffAddedWord: "rgb(36,138,61)",
+  diffRemovedWord: "rgb(207,34,46)"
+};
+var DIFF_LIGHT = {
+  diffAdded: "rgb(200,240,200)",
+  diffRemoved: "rgb(240,200,200)",
+  diffAddedWord: "rgb(27,94,32)",
+  diffRemovedWord: "rgb(183,28,28)"
+};
+function buildPalette(seeds, isLight) {
+  const tones = deriveTones(seeds);
+  const surface = seeds.surface ?? tones.surface;
+  const activeRow = seeds.activeRow ?? (seeds.surface ? mix(surface, seeds.accent, 0.22) : tones.activeRow);
+  const muted = seeds.muted ?? tones.muted;
+  return {
+    primary: seeds.primary,
+    accent: seeds.accent,
+    border: seeds.border ?? tones.border,
+    text: seeds.text,
+    muted,
+    completionBg: surface,
+    completionCurrentBg: activeRow,
+    completionMetaBg: surface,
+    completionMetaCurrentBg: activeRow,
+    label: tones.label,
+    ok: seeds.ok,
+    error: seeds.error,
+    warn: seeds.warn,
+    // Element tokens: independently settable, but default to their semantic
+    // parents (tool marker → accent, reasoning body → muted).
+    tool: seeds.accent,
+    thinking: muted,
+    // Code-syntax tokens default to brand tokens (unchanged highlighting)
+    // but are independently skinnable.
+    syntaxString: seeds.accent,
+    syntaxNumber: seeds.text,
+    syntaxKeyword: seeds.border ?? tones.border,
+    syntaxComment: muted,
+    prompt: seeds.prompt ?? seeds.text,
+    // sessionLabel/sessionBorder track the muted tone — "same role, same
+    // colour" by design (#11300).
+    sessionLabel: muted,
+    sessionBorder: muted,
+    statusBg: surface,
+    statusFg: tones.statusFg,
+    statusGood: seeds.statusGood,
+    statusWarn: seeds.statusWarn,
+    statusBad: seeds.statusBad,
+    statusCritical: seeds.statusCritical,
+    selectionBg: seeds.selection ?? tones.selection,
+    ...isLight ? DIFF_LIGHT : DIFF_DARK,
+    shellDollar: seeds.shellDollar
+  };
+}
+var DARK_SEEDS = {
+  accent: "#FFBF00",
+  // The classic Hermes navy surfaces are IDENTITY, not derivation drift —
+  // keep them as explicit fill seeds (the ladder derives them for skins
+  // that don't care).
+  activeRow: "#333355",
+  bg: "#101014",
+  border: "#CD7F32",
+  error: "#ef5350",
+  ok: "#4caf50",
+  primary: "#FFD700",
+  prompt: "#FFF8DC",
+  selection: "#3a3a55",
+  shellDollar: "#4dabf7",
+  statusBad: "#FF8C00",
+  statusCritical: "#FF6B6B",
+  statusGood: "#8FBC8F",
+  statusWarn: "#FFD700",
+  surface: "#1a1a2e",
+  text: "#FFF8DC",
+  warn: "#ffa726"
+};
+var LIGHT_SEEDS = {
+  accent: "#956E00",
+  bg: "#ffffff",
+  border: "#A56628",
+  error: "#C14240",
+  ok: "#367E39",
+  primary: "#867000",
+  prompt: "#2B2014",
+  shellDollar: "#377BB3",
+  statusBad: "#A65A00",
+  statusCritical: "#B94D4D",
+  statusGood: "#5C7A5C",
+  statusWarn: "#867000",
+  text: "#3D2F13",
+  warn: "#956115"
+};
+var DARK_THEME = {
+  color: buildPalette(DARK_SEEDS, false),
+  brand: BRAND,
+  bannerLogo: "",
+  bannerHero: ""
+};
+var LIGHT_THEME = {
+  color: buildPalette(LIGHT_SEEDS, true),
+  brand: BRAND,
+  bannerLogo: "",
+  bannerHero: ""
+};
+var DISPLAY_MIN_CONTRAST = 1.45;
+var SEMANTIC_MIN_CONTRAST = 2.2;
+var LIGHT_DISPLAY_MIN_CONTRAST = 1.18;
+var LIGHT_SEMANTIC_MIN_CONTRAST = 1.6;
+var DISPLAY_FOREGROUNDS = [
+  "primary",
+  "accent",
+  "text",
+  "label",
+  "prompt",
+  "statusFg",
+  "border",
+  "muted",
+  "sessionLabel",
+  "sessionBorder",
+  "shellDollar"
+];
+var SEMANTIC_FOREGROUNDS = [
+  "ok",
+  "error",
+  "warn",
+  "statusGood",
+  "statusWarn",
+  "statusBad",
+  "statusCritical"
+];
+var ADAPTIVE_BACKGROUNDS = [
+  "completionBg",
+  "completionCurrentBg",
+  "completionMetaBg",
+  "completionMetaCurrentBg",
+  "statusBg",
+  "selectionBg"
+];
+var LIGHT_BG_MIN_LUMINANCE = 0.4;
+var DARK_BG_MAX_LUMINANCE = 0.35;
+function adaptColorsToBackground(colors, isLight, base3, bg) {
+  const out = { ...colors };
+  const displayFloor = isLight ? LIGHT_DISPLAY_MIN_CONTRAST : DISPLAY_MIN_CONTRAST;
+  const semanticFloor = isLight ? LIGHT_SEMANTIC_MIN_CONTRAST : SEMANTIC_MIN_CONTRAST;
+  for (const key2 of DISPLAY_FOREGROUNDS) {
+    out[key2] = liftForContrast(out[key2], bg, displayFloor);
+  }
+  for (const key2 of SEMANTIC_FOREGROUNDS) {
+    out[key2] = liftForContrast(out[key2], bg, semanticFloor);
+  }
+  for (const key2 of ADAPTIVE_BACKGROUNDS) {
+    const luminance = relativeLuminance(out[key2]);
+    if (luminance === null) {
+      continue;
+    }
+    if (isLight ? luminance < LIGHT_BG_MIN_LUMINANCE : luminance > DARK_BG_MAX_LUMINANCE) {
+      out[key2] = base3[key2];
+    }
+  }
+  return out;
+}
+function referenceBackground(isLight, env2 = process.env) {
+  const cached2 = (env2.HERMES_TUI_BACKGROUND ?? "").trim();
+  if (cached2 && backgroundLuminance(cached2) !== null) {
+    return cached2.startsWith("#") ? cached2 : `#${cached2}`;
+  }
+  return isLight ? "#ffffff" : "#101014";
+}
+function deriveTones(seeds) {
+  const { accent, bg, text: text12 } = seeds;
+  const isLight = (relativeLuminance(bg) ?? 0) > 0.5;
+  const surface = mix(bg, desaturate(accent, 0.15), isLight ? 0.045 : 0.09);
+  return {
+    // Light knobs are fitted to the lift canon (xterm minimumContrastRatio
+    // 4.5 of the classic dark golds against white — see LIGHT_SEEDS), not
+    // to ink blends: muted #946C08 ≈ desat(accent .05), label #8E6B13 ≈
+    // desat(mix(accent, text, .03), .15), statusFg #6F6F6F ≈ gray 30% lift.
+    muted: isLight ? desaturate(accent, 0.05) : desaturate(mix(accent, bg, 0.19), 0.16),
+    label: isLight ? desaturate(mix(accent, text12, 0.03), 0.15) : desaturate(mix(accent, bg, 0.13), 0.16),
+    statusFg: grayOf(mix(text12, bg, isLight ? 0.3 : 0.24)),
+    surface,
+    activeRow: mix(surface, accent, 0.25),
+    selection: isLight && seeds.shellDollar ? mix(bg, seeds.shellDollar, 0.2) : mix(surface, accent, 0.28),
+    border: mix(accent, bg, 0.25)
+  };
+}
+var TRUE_RE = /^(?:1|true|yes|on)$/;
+var FALSE_RE = /^(?:0|false|no|off)$/;
+var LIGHT_DEFAULT_TERM_PROGRAMS = /* @__PURE__ */ new Set(["Apple_Terminal"]);
+var LUMA_LIGHT_THRESHOLD = 0.6;
+var HEX_3_RE = /^[0-9a-f]{3}$/;
+var HEX_6_RE = /^[0-9a-f]{6}$/;
+function backgroundLuminance(raw2) {
+  const v = raw2.trim().toLowerCase();
+  if (!v) {
+    return null;
+  }
+  const hex = v.startsWith("#") ? v.slice(1) : v;
+  const rgb = HEX_6_RE.test(hex) ? [parseInt(hex.slice(0, 2), 16), parseInt(hex.slice(2, 4), 16), parseInt(hex.slice(4, 6), 16)] : HEX_3_RE.test(hex) ? [parseInt(hex[0] + hex[0], 16), parseInt(hex[1] + hex[1], 16), parseInt(hex[2] + hex[2], 16)] : null;
+  if (!rgb) {
+    return null;
+  }
+  return (0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2]) / 255;
+}
+function detectLightMode(env2 = process.env, lightDefaultTermPrograms = LIGHT_DEFAULT_TERM_PROGRAMS) {
+  const lightFlag = (env2.HERMES_TUI_LIGHT ?? "").trim().toLowerCase();
+  if (TRUE_RE.test(lightFlag)) {
+    return true;
+  }
+  if (FALSE_RE.test(lightFlag)) {
+    return false;
+  }
+  const themeFlag = (env2.HERMES_TUI_THEME ?? "").trim().toLowerCase();
+  if (themeFlag === "light") {
+    return true;
+  }
+  if (themeFlag === "dark") {
+    return false;
+  }
+  const bgHint = backgroundLuminance(env2.HERMES_TUI_BACKGROUND ?? "");
+  if (bgHint !== null) {
+    return bgHint >= LUMA_LIGHT_THRESHOLD;
+  }
+  const colorfgbg = (env2.COLORFGBG ?? "").trim();
+  if (colorfgbg) {
+    const lastField = colorfgbg.split(";").at(-1) ?? "";
+    if (/^\d+$/.test(lastField)) {
+      const bg = Number(lastField);
+      if (bg === 7 || bg === 15) {
+        return true;
+      }
+      if (bg >= 0 && bg < 16) {
+        return false;
+      }
+    }
+  }
+  const termProgram = (env2.TERM_PROGRAM ?? "").trim();
+  return lightDefaultTermPrograms.has(termProgram);
+}
+function shouldNormalizeAnsiLightTheme(env2 = process.env, isLight = detectLightMode(env2)) {
+  const colorTerm = (env2.COLORTERM ?? "").trim().toLowerCase();
+  const termProgram = (env2.TERM_PROGRAM ?? "").trim();
+  return termProgram === "Apple_Terminal" && colorTerm !== "truecolor" && colorTerm !== "24bit" && isLight;
+}
+function normalizeThemeForAnsiLightTerminal(theme, env2 = process.env, isLight = detectLightMode(env2)) {
+  if (!shouldNormalizeAnsiLightTheme(env2, isLight)) {
+    return theme;
+  }
+  const color2 = { ...theme.color };
+  for (const key2 of ANSI_NORMALIZED_FOREGROUNDS) {
+    color2[key2] = normalizeAnsiForeground(color2[key2]);
+  }
+  for (const key2 of ANSI_MUTED_FOREGROUNDS) {
+    color2[key2] = `ansi256(${ANSI_MUTED_BUCKET})`;
+  }
+  return { ...theme, color: color2 };
+}
+var DEFAULT_LIGHT_MODE = detectLightMode();
+var DEFAULT_THEME = normalizeThemeForAnsiLightTerminal(
+  DEFAULT_LIGHT_MODE ? LIGHT_THEME : DARK_THEME,
+  process.env,
+  DEFAULT_LIGHT_MODE
+);
+var authoredBackground = (raw2) => {
+  const v = (raw2 ?? "").trim();
+  return backgroundLuminance(v) === null ? null : v.startsWith("#") ? v : `#${v}`;
+};
+function skinIsLight(colors, env2 = process.env) {
+  const authored = backgroundLuminance(colors["background"] ?? "");
+  return authored === null ? detectLightMode(env2) : authored >= LUMA_LIGHT_THRESHOLD;
+}
+function fromSkin(colors, branding, bannerLogo = "", bannerHero = "", toolPrefix = "", helpHeader = "") {
+  const skinBg = authoredBackground(colors["background"]);
+  const isLight = skinIsLight(colors);
+  const bg = skinBg ?? referenceBackground(isLight);
+  const base3 = isLight ? LIGHT_SEEDS : DARK_SEEDS;
+  const d = isLight ? LIGHT_THEME : DARK_THEME;
+  const c = (k) => colors[k];
+  const hasSkinColors = Object.keys(colors).length > 0;
+  const identityFills = hasSkinColors ? {} : { activeRow: base3.activeRow, muted: base3.muted, selection: base3.selection, surface: base3.surface };
+  const seeds = {
+    ...identityFills,
+    accent: c("ui_accent") ?? c("banner_accent") ?? base3.accent,
+    bg,
+    border: c("ui_border") ?? c("banner_border") ?? base3.border,
+    error: c("ui_error") ?? base3.error,
+    ok: c("ui_ok") ?? base3.ok,
+    primary: c("ui_primary") ?? c("banner_title") ?? base3.primary,
+    prompt: c("prompt") ?? c("banner_text") ?? base3.prompt,
+    shellDollar: c("shell_dollar") ?? base3.shellDollar,
+    statusBad: c("status_bar_bad") ?? base3.statusBad,
+    statusCritical: c("status_bar_critical") ?? c("ui_error") ?? base3.statusCritical,
+    statusGood: c("status_bar_good") ?? c("ui_ok") ?? base3.statusGood,
+    statusWarn: c("status_bar_warn") ?? c("ui_warn") ?? base3.statusWarn,
+    text: c("ui_text") ?? c("banner_text") ?? base3.text,
+    warn: c("ui_warn") ?? base3.warn
+  };
+  const derived = buildPalette(seeds, isLight);
+  const surface = c("completion_menu_bg") ?? c("background") ?? derived.completionBg;
+  const activeRow = c("completion_menu_current_bg") ?? (c("completion_menu_bg") ? mix(surface, seeds.accent, 0.22) : derived.completionCurrentBg);
+  const assembled = {
+    ...derived,
+    muted: c("banner_dim") ?? derived.muted,
+    label: c("ui_label") ?? derived.label,
+    completionBg: surface,
+    completionCurrentBg: activeRow,
+    completionMetaBg: c("completion_menu_meta_bg") ?? surface,
+    completionMetaCurrentBg: c("completion_menu_meta_current_bg") ?? activeRow,
+    sessionLabel: c("session_label") ?? c("banner_dim") ?? derived.sessionLabel,
+    sessionBorder: c("session_border") ?? c("banner_dim") ?? derived.sessionBorder,
+    statusBg: c("status_bar_bg") ?? surface,
+    statusFg: c("status_bar_text") ?? c("ui_text") ?? c("banner_text") ?? derived.statusFg,
+    selectionBg: c("selection_bg") ?? c("completion_menu_current_bg") ?? derived.selectionBg,
+    // Element tokens + skinnable diffs (theme-sdk): overridable, else the
+    // derived defaults (tool→accent, thinking→muted, diff_* → DIFF_* ladder).
+    // thinking tracks the EFFECTIVE muted (banner_dim override included), not
+    // just derived.muted, so recoloring muted carries the reasoning body with it.
+    tool: c("ui_tool") ?? derived.tool,
+    thinking: c("ui_thinking") ?? c("banner_dim") ?? derived.thinking,
+    diffAdded: c("diff_added") ?? derived.diffAdded,
+    diffRemoved: c("diff_removed") ?? derived.diffRemoved,
+    diffAddedWord: c("diff_added_word") ?? derived.diffAddedWord,
+    diffRemovedWord: c("diff_removed_word") ?? derived.diffRemovedWord,
+    // Code-syntax tokens: overridable, else the derived brand-token defaults.
+    syntaxString: c("syntax_string") ?? derived.syntaxString,
+    syntaxNumber: c("syntax_number") ?? derived.syntaxNumber,
+    syntaxKeyword: c("syntax_keyword") ?? derived.syntaxKeyword,
+    syntaxComment: c("syntax_comment") ?? c("banner_dim") ?? derived.syntaxComment
+  };
+  const adapted = shouldNormalizeAnsiLightTheme(process.env, isLight) ? assembled : adaptColorsToBackground(assembled, isLight, derived, bg);
+  return normalizeThemeForAnsiLightTerminal(
+    {
+      // The element tokens theme-sdk introduced (ui_primary, ui_text,
+      // ui_border, ui_ok/warn/error, ui_tool, ui_thinking, shell_dollar,
+      // status_bar_*, diff_*) are read into `seeds`/`assembled` above and
+      // flow through buildPalette → adaptColorsToBackground, so `adapted`
+      // already honors them AND applies #20379's contrast/polarity machinery.
+      // Emitting a hand-mapped color block here would bypass that adaptation
+      // and regress theme quality.
+      color: adapted,
+      brand: {
+        name: branding.agent_name ?? d.brand.name,
+        icon: d.brand.icon,
+        prompt: cleanPromptSymbol(branding.prompt_symbol, d.brand.prompt),
+        welcome: branding.welcome ?? d.brand.welcome,
+        goodbye: branding.goodbye ?? d.brand.goodbye,
+        tool: toolPrefix || d.brand.tool,
+        helpHeader: branding.help_header ?? (helpHeader || d.brand.helpHeader)
+      },
+      bannerLogo,
+      bannerHero
+    },
+    process.env,
+    isLight
+  );
+}
+
+// src/palette.ts
+var NOUS = {
+  dark: {
+    accent: "#F5B820",
+    dim: "#77746D",
+    error: "#E5484D",
+    mdLink: "#7A9CFF",
+    muted: "#9A968C",
+    selectedBg: "#26262A",
+    statusLinePath: "#9A968C",
+    text: "#EDE8DC"
+  },
+  light: {
+    accent: "#956E00",
+    dim: "#8A867C",
+    error: "#C93C42",
+    mdLink: "#2F5BD8",
+    muted: "#6B675E",
+    statusLinePath: "#6B675E"
+  }
+};
+function paletteFor(mode, skin) {
+  if (mode === "nous") {
+    return { dark: NOUS.dark, light: NOUS.light, name: { dark: "nous", light: "nous" } };
+  }
+  if (mode === "skin" && skin) {
+    const name = skin.name || "default";
+    return {
+      dark: semantic(resolve3(skin, "dark")),
+      light: semantic(resolve3(skin, "light")),
+      name: { dark: name, light: name }
+    };
+  }
+  return { dark: {}, light: {}, name: { dark: "tern", light: "tern" } };
+}
+function resolve3(skin, polarity) {
+  const light = polarity === "light";
+  const colors = { ...skin.colors, ...light ? skin.light_colors : skin.dark_colors };
+  const saved = process.env.HERMES_TUI_LIGHT;
+  process.env.HERMES_TUI_LIGHT = light ? "1" : "0";
+  try {
+    return fromSkin(colors, skin.branding ?? {}).color;
+  } finally {
+    if (saved === void 0) {
+      delete process.env.HERMES_TUI_LIGHT;
+    } else {
+      process.env.HERMES_TUI_LIGHT = saved;
+    }
+  }
+}
+function semantic(c) {
+  const out = {
+    accent: c.accent,
+    borderAccent: c.accent,
+    error: c.error,
+    mdListBullet: c.accent,
+    statusLineModel: c.accent,
+    success: c.ok,
+    warning: c.warn
+  };
+  for (const key2 in out) {
+    if (!/^#[0-9a-f]{3,8}$/i.test(out[key2] ?? "")) {
+      delete out[key2];
+    }
+  }
+  return out;
+}
+
+// src/chrome/theme.ts
+var Theme = class {
+  #host;
+  #mode;
+  /** The skin the gateway last reported; only the `skin` theme mode wears it. */
+  #skin;
+  /** `mode` is the one settings.json kept. */
+  constructor(host, mode) {
+    this.#host = host;
+    this.#mode = mode;
+  }
+  /** Whose colors the surface wears. */
+  get mode() {
+    return this.#mode;
+  }
+  /** Sends the palette of the mode and skin now. */
+  apply() {
+    this.#host.palette(paletteFor(this.#mode, this.#skin));
+  }
+  /** The gateway's skin (gateway.ready, skin.changed); none keeps the last one. */
+  skin(skin) {
+    if (skin) {
+      this.#skin = skin;
+      this.apply();
+    }
+  }
+  /** Switches the mode now and keeps it for the next launch. */
+  set(mode) {
+    this.#mode = mode;
+    this.#host.settings.save({ theme: mode });
+    this.apply();
+  }
+};
+
 // src/clipboard.ts
 import { spawn } from "node:child_process";
 function copyToClipboard(text12, env2 = process.env) {
@@ -26527,7 +27504,7 @@ import { fileURLToPath } from "node:url";
 // src/hermes/images.ts
 import { readFile as readFile2 } from "node:fs/promises";
 import { homedir as homedir4 } from "node:os";
-import { extname as extname2, resolve as resolve3 } from "node:path";
+import { extname as extname2, resolve as resolve4 } from "node:path";
 var MAX_IMAGE_BYTES = 20 * 1024 * 1024;
 function imageFormat(bytes) {
   if (bytes.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))) {
@@ -26582,7 +27559,7 @@ function imageSize(bytes) {
   return void 0;
 }
 async function uploadImage(gw2, sid, raw2, cwd) {
-  const path2 = resolve3(cwd, raw2.replace(/^~(?=$|\/)/, homedir4()));
+  const path2 = resolve4(cwd, raw2.replace(/^~(?=$|\/)/, homedir4()));
   const bytes = await readFile2(path2);
   if (bytes.length > MAX_IMAGE_BYTES) {
     throw new Error("the image is larger than 20 MB");
@@ -26738,20 +27715,20 @@ function toneStyle(tone) {
   }
 }
 var sp = (t2, s2) => s2 ? { s: s2, t: t2 } : { t: t2 };
-var plain = (text12) => text12.replace(/\s+/g, " ").trim();
+var plain2 = (text12) => text12.replace(/\s+/g, " ").trim();
 var fraction = (value, max) => !(max > 0) || !Number.isFinite(value) ? 0 : Math.min(1, Math.max(0, value / max));
 var extra = (props) => props;
 function glance(view) {
   const h2 = view.headline;
-  if (h2 && plain(h2.text)) {
-    return { text: plain(h2.text), ...h2.label ? { label: plain(h2.label) } : {}, ...h2.trend ? { trend: h2.trend } : {} };
+  if (h2 && plain2(h2.text)) {
+    return { text: plain2(h2.text), ...h2.label ? { label: plain2(h2.label) } : {}, ...h2.trend ? { trend: h2.trend } : {} };
   }
   for (const b of view.blocks) {
-    if (b.kind === "spark" && b.values.length && plain(b.last)) {
-      return { label: plain(b.label), text: plain(b.last) };
+    if (b.kind === "spark" && b.values.length && plain2(b.last)) {
+      return { label: plain2(b.label), text: plain2(b.last) };
     }
-    if (b.kind === "meter" && plain(b.text)) {
-      return { label: plain(b.label), text: plain(b.text) };
+    if (b.kind === "meter" && plain2(b.text)) {
+      return { label: plain2(b.label), text: plain2(b.text) };
     }
   }
   return void 0;
@@ -26761,7 +27738,7 @@ function latest(entries) {
 }
 function summary(view) {
   const g = glance(view);
-  const title = plain(view.title);
+  const title = plain2(view.title);
   if (!g || view.state !== "live") {
     return title;
   }
@@ -26783,13 +27760,13 @@ function primarySpark(view, points = MINI_SPARK_POINTS) {
   return { ...spark, values: spark.values.slice(from), ...spark.tips ? { tips: spark.tips.slice(from) } : {} };
 }
 function sparkProps(b) {
-  const marks = (b.marks ?? []).map((m) => ({ value: m.value, ...m.tone ? { tone: m.tone } : {}, ...m.label ? { title: plain(m.label) } : {} }));
+  const marks = (b.marks ?? []).map((m) => ({ value: m.value, ...m.tone ? { tone: m.tone } : {}, ...m.label ? { title: plain2(m.label) } : {} }));
   return {
     kind: "bars",
     max: b.max,
     min: b.min,
     series: b.values.map((value, i) => b.tips?.[i] ? { title: b.tips[i], value } : { value }),
-    summary: `${plain(b.label)} ${plain(b.last)}`,
+    summary: `${plain2(b.label)} ${plain2(b.last)}`,
     token: toneStyle(b.tone ?? DEFAULT_TONE) ?? "accent",
     ...marks.length ? { marks } : {}
   };
@@ -26829,7 +27806,7 @@ function figureSpans(g) {
 function tile({ process: p3, view }) {
   const live = view.state === "live" ? view : void 0;
   const g = live && glance(live);
-  const title = plain(live?.title ?? "") || plain(p3.command.split(/\r?\n/, 1)[0] ?? "") || p3.id;
+  const title = plain2(live?.title ?? "") || plain2(p3.command.split(/\r?\n/, 1)[0] ?? "") || p3.id;
   const visual = tileVisual(live?.blocks[0]);
   const look = PROCESS_LOOK[p3.status];
   return /* @__PURE__ */ jsxs("col", { gap: "xs", role: "omp.job.tile", tone: look.tone, children: [
@@ -26864,9 +27841,9 @@ function tileVisual(b) {
       const rest = b.items.length - TILE_BARS;
       return b.items.length ? /* @__PURE__ */ jsxs("col", { gap: "xs", role: "omp.job.tile.bars", children: [
         b.items.slice(0, TILE_BARS).map((item3, i) => /* @__PURE__ */ jsxs("row", { align: "center", gap: "sm", role: "omp.job.tile.bar", children: [
-          /* @__PURE__ */ jsx("text", { role: "omp.job.tile.key", spans: [sp(plain(item3.label), "dim")], truncate: "end", wrap: "none" }, "key"),
+          /* @__PURE__ */ jsx("text", { role: "omp.job.tile.key", spans: [sp(plain2(item3.label), "dim")], truncate: "end", wrap: "none" }, "key"),
           tileMeter(fraction(item3.value, b.max), item3.tone),
-          /* @__PURE__ */ jsx("text", { role: "omp.job.tile.num", spans: [sp(plain(item3.text))], wrap: "none" }, "num")
+          /* @__PURE__ */ jsx("text", { role: "omp.job.tile.num", spans: [sp(plain2(item3.text))], wrap: "none" }, "num")
         ] }, `${i}`)),
         rest > 0 ? /* @__PURE__ */ jsx("text", { role: "omp.job.tile.more", spans: [sp(`+${rest} more`, "dim")], wrap: "none" }, "more") : null
       ] }, "visual") : void 0;
@@ -26879,7 +27856,7 @@ function tileVisual(b) {
           spans: b.items.flatMap((item3, i) => [
             ...i ? [sp("   ")] : [],
             sp("\u25CF\xA0", toneStyle(item3.tone)),
-            sp(plain(item3.label).replaceAll(" ", "\xA0"), "dim")
+            sp(plain2(item3.label).replaceAll(" ", "\xA0"), "dim")
           ]),
           wrap: "word"
         },
@@ -26890,14 +27867,14 @@ function tileVisual(b) {
   }
 }
 function tileNotes(p3, view, live, lead) {
-  const stage = plain(view.stage ?? "");
+  const stage = plain2(view.stage ?? "");
   const failed = p3.exitCode ? `exit ${p3.exitCode}` : "";
   const notes = [];
   for (const b of live?.blocks ?? []) {
     if (b.kind === "stat" && b.items.length) {
       notes.push(/* @__PURE__ */ jsx("text", { role: "omp.job.tile.stats", spans: statSpans(b), truncate: "end", wrap: "none" }, `note-${notes.length}`));
-    } else if (b.kind === "text" && plain(b.text) && plain(b.text) !== stage) {
-      notes.push(/* @__PURE__ */ jsx("text", { role: "omp.job.tile.note", spans: [sp(plain(b.text), "dim")], truncate: "end", wrap: "none" }, `note-${notes.length}`));
+    } else if (b.kind === "text" && plain2(b.text) && plain2(b.text) !== stage) {
+      notes.push(/* @__PURE__ */ jsx("text", { role: "omp.job.tile.note", spans: [sp(plain2(b.text), "dim")], truncate: "end", wrap: "none" }, `note-${notes.length}`));
     }
   }
   if (stage || failed) {
@@ -26911,17 +27888,17 @@ function tileNotes(p3, view, live, lead) {
 function statSpans(b) {
   return b.items.flatMap((item3, i) => [
     ...i ? [sp(" \xB7 ", "dim")] : [],
-    sp(`${plain(item3.label)} `, "dim"),
-    sp(plain(item3.text), toneStyle(item3.tone)),
+    sp(`${plain2(item3.label)} `, "dim"),
+    sp(plain2(item3.text), toneStyle(item3.tone)),
     ...item3.trend ? [sp(` ${item3.trend.text}`, toneStyle(item3.trend.tone))] : []
   ]);
 }
 function chartNode(view, key2 = "chart") {
-  const stage = view.stage ? plain(view.stage) : "";
+  const stage = view.stage ? plain2(view.stage) : "";
   const h2 = view.state === "live" ? glance({ ...view, blocks: [] }) : void 0;
   return /* @__PURE__ */ jsxs("col", { gap: "xs", role: "omp.job.widget", children: [
     /* @__PURE__ */ jsxs("row", { align: "baseline", gap: "sm", role: "omp.job.widget.head", children: [
-      /* @__PURE__ */ jsx("text", { role: "omp.job.widget.title", spans: [sp(plain(view.title), "strong")], truncate: "end", wrap: "none", ...extra(stage ? {} : { grow: 1 }) }, "title"),
+      /* @__PURE__ */ jsx("text", { role: "omp.job.widget.title", spans: [sp(plain2(view.title), "strong")], truncate: "end", wrap: "none", ...extra(stage ? {} : { grow: 1 }) }, "title"),
       stage ? /* @__PURE__ */ jsx("text", { grow: 1, role: "omp.job.widget.stage", spans: [sp(stage, "muted")], truncate: "end", wrap: "none" }, "stage") : null,
       view.state === "authoring" ? /* @__PURE__ */ jsx("shimmer", { text: "charting\u2026" }, "authoring") : null,
       h2 ? /* @__PURE__ */ jsx("text", { role: "omp.job.widget.headline", spans: glanceSpans(h2), wrap: "none" }, "headline") : null
@@ -26939,11 +27916,11 @@ function blockNode(b, key2) {
       return sparkNode(b, key2);
     case "bars":
       return /* @__PURE__ */ jsxs("col", { gap: "xs", role: "omp.job.widget.bars", children: [
-        /* @__PURE__ */ jsx("text", { role: "omp.job.widget.caption", spans: [sp(plain(b.label), "dim")], truncate: "end", wrap: "none" }, "caption"),
+        /* @__PURE__ */ jsx("text", { role: "omp.job.widget.caption", spans: [sp(plain2(b.label), "dim")], truncate: "end", wrap: "none" }, "caption"),
         b.items.length ? b.items.map(
           (item3, i) => labelled(
             item3.label,
-            /* @__PURE__ */ jsx("meter", { grow: 1, label: plain(item3.text), size: "sm", value: fraction(item3.value, b.max), ...extra(item3.tone ? { tone: item3.tone } : {}) }, "meter"),
+            /* @__PURE__ */ jsx("meter", { grow: 1, label: plain2(item3.text), size: "sm", value: fraction(item3.value, b.max), ...extra(item3.tone ? { tone: item3.tone } : {}) }, "meter"),
             "omp.job.widget.bar",
             `${i}`
           )
@@ -26952,7 +27929,7 @@ function blockNode(b, key2) {
     case "meter":
       return labelled(
         b.label,
-        /* @__PURE__ */ jsx("meter", { grow: 1, label: plain(b.text), size: "sm", value: fraction(b.value, 1), ...extra(b.tone ? { tone: b.tone } : {}) }, "meter"),
+        /* @__PURE__ */ jsx("meter", { grow: 1, label: plain2(b.text), size: "sm", value: fraction(b.value, 1), ...extra(b.tone ? { tone: b.tone } : {}) }, "meter"),
         "omp.job.widget.meter",
         key2
       );
@@ -26960,31 +27937,31 @@ function blockNode(b, key2) {
       return /* @__PURE__ */ jsx("text", { role: "omp.job.widget.stat", spans: statSpans(b), truncate: "end", wrap: "none" }, key2);
     case "grid":
       return /* @__PURE__ */ jsxs("col", { gap: "xs", role: "omp.job.widget.grid", children: [
-        /* @__PURE__ */ jsx("text", { role: "omp.job.widget.caption", spans: [sp(plain(b.label), "dim")], truncate: "end", wrap: "none" }, "caption"),
-        b.items.length ? /* @__PURE__ */ jsx("row", { gap: "xs", role: "omp.job.widget.cells", wrap: true, children: b.items.map((item3, i) => /* @__PURE__ */ jsx("badge", { text: plain(item3.label), title: plain(item3.text), tone: item3.tone }, `${i}`)) }, "cells") : waiting()
+        /* @__PURE__ */ jsx("text", { role: "omp.job.widget.caption", spans: [sp(plain2(b.label), "dim")], truncate: "end", wrap: "none" }, "caption"),
+        b.items.length ? /* @__PURE__ */ jsx("row", { gap: "xs", role: "omp.job.widget.cells", wrap: true, children: b.items.map((item3, i) => /* @__PURE__ */ jsx("badge", { text: plain2(item3.label), title: plain2(item3.text), tone: item3.tone }, `${i}`)) }, "cells") : waiting()
       ] }, key2);
     case "text":
-      return /* @__PURE__ */ jsx("text", { role: "omp.job.widget.text", spans: [sp(plain(b.text), "muted")], truncate: "end", wrap: "none" }, key2);
+      return /* @__PURE__ */ jsx("text", { role: "omp.job.widget.text", spans: [sp(plain2(b.text), "muted")], truncate: "end", wrap: "none" }, key2);
   }
 }
 function sparkNode(b, key2) {
   if (!b.values.length) {
     return labelled(b.label, waiting(), "omp.job.widget.spark", key2);
   }
-  const label = plain(b.label);
-  const last = plain(b.last);
+  const label = plain2(b.label);
+  const last = plain2(b.last);
   return /* @__PURE__ */ jsxs("row", { align: "center", gap: "sm", role: "omp.job.widget.spark", children: [
     node("chart", { ...sparkProps(b), grow: 1, key: "chart", size: "md" }),
     /* @__PURE__ */ jsxs("col", { gap: "none", role: "omp.job.widget.side", children: [
       /* @__PURE__ */ jsx("text", { spans: [sp(last, "num strong")], wrap: "none" }, "last"),
       label && !last.endsWith(label) ? /* @__PURE__ */ jsx("text", { spans: [sp(label, "muted")], truncate: "end", wrap: "none" }, "label") : null,
-      (b.marks ?? []).map((m, i) => /* @__PURE__ */ jsx("text", { spans: [sp("\u2504 ", toneStyle(m.tone ?? "muted")), sp(plain(m.label), "dim")], truncate: "end", wrap: "none" }, `mark-${i}`))
+      (b.marks ?? []).map((m, i) => /* @__PURE__ */ jsx("text", { spans: [sp("\u2504 ", toneStyle(m.tone ?? "muted")), sp(plain2(m.label), "dim")], truncate: "end", wrap: "none" }, `mark-${i}`))
     ] }, "side")
   ] }, key2);
 }
 function labelled(label, content5, role, key2) {
   return /* @__PURE__ */ jsxs("row", { align: "center", gap: "sm", role, children: [
-    /* @__PURE__ */ jsx("text", { max: { w: "12ch" }, min: { w: "12ch" }, spans: [sp(plain(label), "muted")], truncate: "end", wrap: "none" }, "label"),
+    /* @__PURE__ */ jsx("text", { max: { w: "12ch" }, min: { w: "12ch" }, spans: [sp(plain2(label), "muted")], truncate: "end", wrap: "none" }, "label"),
     content5
   ] }, key2);
 }
@@ -27326,17 +28303,17 @@ function imageNode(call, d, src) {
 
 // src/view/tools/cards/generic.tsx
 var own = (call) => ({ name: call.name, title: humanize(call.name) });
-var plain2 = (look, action = "other") => ({ action, card: (call, d) => genericCard(call, d, look(call)), step: namedStep });
-var otherView = plain2(own);
-var sessionSearchView = plain2(() => ({ name: "search", title: "Session search" }));
-var visionView = plain2(() => ({ name: "image", title: "Vision" }));
+var plain3 = (look, action = "other") => ({ action, card: (call, d) => genericCard(call, d, look(call)), step: namedStep });
+var otherView = plain3(own);
+var sessionSearchView = plain3(() => ({ name: "search", title: "Session search" }));
+var visionView = plain3(() => ({ name: "image", title: "Vision" }));
 var imageGenerateView = {
   action: "other",
   card: (call, d) => imageCard(call, d, { name: "image", title: "Image" }, shownImage(call)),
   step: namedStep
 };
 var browserView = {
-  ...plain2((call) => ({ name: "browser", title: humanize(call.name.replace(/^browser_?/, "")) || "Browser" }), "browser"),
+  ...plain3((call) => ({ name: "browser", title: humanize(call.name.replace(/^browser_?/, "")) || "Browser" }), "browser"),
   hubIcon: (name) => name === "browser_navigate" ? "web" : "wrench"
 };
 var PROCESS_ACTIONS = {
@@ -27358,11 +28335,11 @@ var processView = {
   step: namedStep
 };
 var toolSearchView = {
-  ...plain2(own, "lookup"),
+  ...plain3(own, "lookup"),
   step: (_call, d) => d.queries.length ? `Searched tools for ${d.queries.join(", ")}` : "Searched tools"
 };
 var toolDescribeView = {
-  ...plain2(own, "lookup"),
+  ...plain3(own, "lookup"),
   step: (_call, d) => {
     const named2 = d.names.map((n) => {
       const app2 = callApp({ args: {}, name: n });
@@ -27377,9 +28354,9 @@ function pullRequestStep(verb, d) {
   const number4 = pr?.["number"] ?? (d.number === void 0 ? void 0 : String(d.number));
   return repo && number4 ? `${verb} ${repo}#${number4}` : `${verb} a pull request`;
 }
-var linkView = { ...plain2(own), step: (_call, d) => pullRequestStep("Linked", d) };
-var unlinkView = { ...plain2(own), step: (_call, d) => pullRequestStep("Unlinked", d) };
-var listPullRequestsView = { ...plain2(own), step: () => "Listed linked pull requests" };
+var linkView = { ...plain3(own), step: (_call, d) => pullRequestStep("Linked", d) };
+var unlinkView = { ...plain3(own), step: (_call, d) => pullRequestStep("Unlinked", d) };
+var listPullRequestsView = { ...plain3(own), step: () => "Listed linked pull requests" };
 function genericCard(call, d, look) {
   const src = shownImage(call);
   if (src) {
@@ -27877,91 +28854,13 @@ function firstLine(text12) {
   return text12?.split("\n").find((l) => l.trim())?.trim();
 }
 
-// src/transcript/todos.ts
-var TODO_LOOK = {
-  cancelled: { item: "dropped" },
-  completed: { item: "done" },
-  in_progress: { item: "active" },
-  pending: { item: "pending" }
-};
-function currentTodos(entries) {
-  for (let i = entries.length - 1; i >= 0; i--) {
-    const e = entries[i];
-    if (e?.kind !== "turn") {
-      continue;
-    }
-    const hit = e.blocks.findLast((b) => b.kind === "tool" && b.call.todos?.length);
-    if (hit?.kind === "tool") {
-      return hit.call.todos;
-    }
-  }
-  return void 0;
-}
-function todosOf(args, current) {
-  const raw2 = Array.isArray(args.todos) ? args.todos : [];
-  return args.merge === true ? mergeTodos(current ?? [], raw2) : toTodos(raw2);
-}
-function mergeTodos(current, patch6) {
-  const out = current.map((t2) => ({ ...t2 }));
-  for (const item3 of patch6) {
-    const r = record(item3);
-    const id = String(r?.id ?? "").trim();
-    if (!r || !id) {
-      continue;
-    }
-    const cur = out.find((t2) => t2.id === id);
-    if (!cur) {
-      if (String(r.content ?? "").trim()) {
-        out.push(...toTodos([{ ...r, id }]));
-      }
-      continue;
-    }
-    const content5 = String(r.content ?? "").trim();
-    const status = String(r.status ?? "").trim().toLowerCase();
-    if (content5) {
-      cur.content = content5;
-    }
-    if (status === "pending" || status === "in_progress" || status === "completed" || status === "cancelled") {
-      cur.status = status;
-    }
-    if ("parent" in r) {
-      const parent = String(r.parent ?? "").trim();
-      if (parent && parent !== id) {
-        cur.parent = parent;
-      } else {
-        delete cur.parent;
-      }
-    }
-  }
-  return out;
-}
-function toTodos(raw2) {
-  const out = [];
-  for (const item3 of raw2) {
-    if (!item3 || typeof item3 !== "object") {
-      continue;
-    }
-    const id = "id" in item3 ? String(item3.id) : String(out.length);
-    const content5 = "content" in item3 ? String(item3.content) : "";
-    const status = "status" in item3 ? String(item3.status) : "pending";
-    const parent = "parent" in item3 && item3.parent ? String(item3.parent) : void 0;
-    out.push({
-      content: content5,
-      id,
-      ...parent && { parent },
-      status: status === "completed" || status === "in_progress" || status === "cancelled" ? status : "pending"
-    });
-  }
-  return out;
-}
-
 // src/view/todos.tsx
-function checklistNode(todos) {
+function checklistNode(todos2) {
   const item3 = (t2) => ({ id: t2.id, status: TODO_LOOK[t2.status].item, text: t2.content });
-  const roots = todos.filter((t2) => !t2.parent);
-  const nested = todos.some((t2) => t2.parent);
+  const roots = todos2.filter((t2) => !t2.parent);
+  const nested = todos2.some((t2) => t2.parent);
   const phases = nested ? roots.map((r) => {
-    const kids = todos.filter((t2) => t2.parent === r.id);
+    const kids = todos2.filter((t2) => t2.parent === r.id);
     return {
       collapsed: kids.length > 0 && kids.every((k) => k.status === "completed"),
       id: r.id,
@@ -28029,11 +28928,11 @@ function skillCard(call, d) {
     title: "Skill"
   };
 }
-function todoCount(todos) {
-  if (!todos?.length) {
+function todoCount(todos2) {
+  if (!todos2?.length) {
     return void 0;
   }
-  return `${todos.filter((t2) => t2.status === "completed").length}/${todos.length}`;
+  return `${todos2.filter((t2) => t2.status === "completed").length}/${todos2.length}`;
 }
 var MARK = { cancelled: "\u2717", completed: "\u2713", in_progress: "\u2192", pending: "\u25CB" };
 function planStep(before, after) {
@@ -29440,7 +30339,7 @@ function betterValue(value, where, errors) {
 
 // src/processes/widgets/spec.ts
 var AGGS = ["last", "first", "min", "max", "mean", "sum", "count", "rate", "delta", "change"];
-var TONES = ["neutral", "accent", "info", "success", "warning", "error", "pending", "muted", "user"];
+var TONES2 = ["neutral", "accent", "info", "success", "warning", "error", "pending", "muted", "user"];
 var MAX_TITLE_CHARS = 48;
 var MAX_RULES = 12;
 var MAX_BLOCKS = 4;
@@ -29484,7 +30383,7 @@ var SPEC_SCHEMA = {
           min: NUMBER,
           target: NUMBER,
           targetLabel: STRING,
-          tones: { additionalProperties: { enum: TONES }, type: "object" },
+          tones: { additionalProperties: { enum: TONES2 }, type: "object" },
           total: { anyOf: [NUMBER, VALUE_REF_SCHEMA] },
           unit: STRING
         },
@@ -29976,10 +30875,10 @@ function parseBlock(value, where, errors) {
             errors.push(`${where}.tones: at most ${MAX_GRID_TONES} entries`);
             break;
           }
-          if (typeof tone === "string" && TONES.includes(tone)) {
+          if (typeof tone === "string" && TONES2.includes(tone)) {
             tones[status] = tone;
           } else {
-            errors.push(`${where}.tones.${status}: expected one of ${TONES.join(", ")}`);
+            errors.push(`${where}.tones.${status}: expected one of ${TONES2.join(", ")}`);
           }
         }
       }
@@ -36756,7 +37655,7 @@ function createState(options) {
     options,
     patch,
     qNesting: 0,
-    resolve: resolve4,
+    resolve: resolve5,
     toFlow,
     toSpecificContent
   };
@@ -36802,7 +37701,7 @@ function one2(node3, parent) {
 function patch(origin, node3) {
   if (origin.position) node3.position = position(origin);
 }
-function resolve4(url) {
+function resolve5(url) {
   const base3 = this.frozenBaseUrl;
   if (url === null || url === void 0) {
     return "";
@@ -65904,32 +66803,6 @@ var FaultBudget = class {
   }
 };
 
-// src/hud.ts
-var plain3 = (k) => !k.ctrl && !k.alt && !k.meta && !k.shift;
-function hudKey(k, cx) {
-  const { focused, pills } = cx;
-  if (!focused || !pills.includes(focused)) {
-    return k.name === "down" && plain3(k) && cx.idle && pills.length ? { consumed: true, focused: pills[0] } : { consumed: false };
-  }
-  const at = pills.indexOf(focused);
-  switch (plain3(k) ? k.name : "") {
-    case "left":
-      return { consumed: true, focused: pills[Math.max(0, at - 1)] };
-    case "right":
-      return { consumed: true, focused: pills[Math.min(pills.length - 1, at + 1)] };
-    case "enter":
-    case "space":
-      return { consumed: true, open: focused };
-    case "escape":
-    case "up":
-      return { consumed: true };
-    case "down":
-      return { consumed: true, focused };
-    default:
-      return { consumed: false };
-  }
-}
-
 // src/moa.ts
 function moaLabel(ev) {
   switch (ev.type) {
@@ -65962,7 +66835,7 @@ import { execFile as execFile6 } from "node:child_process";
 import { existsSync as existsSync4 } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
 import { homedir as homedir11, tmpdir } from "node:os";
-import { join as join10, resolve as resolve5 } from "node:path";
+import { join as join10, resolve as resolve6 } from "node:path";
 import { promisify as promisify5 } from "node:util";
 var execFileP = promisify5(execFile6);
 var runFile = async (file2, args, options) => (await execFileP(file2, args, options)).stdout;
@@ -66038,7 +66911,7 @@ function imagePathOf(text12, cwd) {
   if (!IMAGE.test(raw2)) {
     return void 0;
   }
-  const path2 = resolve5(cwd, raw2);
+  const path2 = resolve6(cwd, raw2);
   return existsSync4(path2) ? path2 : void 0;
 }
 
@@ -66837,640 +67710,6 @@ async function openHelp(host) {
   host.open(overlay);
 }
 
-// .hermes-src/node_modules/@hermes/shared/src/color.ts
-var HEX6_RE = /^#?([0-9a-f]{6})$/i;
-var HEX3_RE = /^#?([0-9a-f]{3})$/i;
-var RGB_FN_RE = /^rgba?\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})/i;
-var clampChannel = (v) => Math.max(0, Math.min(255, Math.round(v)));
-function parseColor(input2) {
-  const value = input2.trim();
-  let m = HEX6_RE.exec(value);
-  if (m) {
-    const n = parseInt(m[1], 16);
-    return [n >> 16 & 255, n >> 8 & 255, n & 255];
-  }
-  m = HEX3_RE.exec(value);
-  if (m) {
-    const [r, g, b] = m[1];
-    return [parseInt(r + r, 16), parseInt(g + g, 16), parseInt(b + b, 16)];
-  }
-  m = RGB_FN_RE.exec(value);
-  if (m) {
-    return [clampChannel(Number(m[1])), clampChannel(Number(m[2])), clampChannel(Number(m[3]))];
-  }
-  return null;
-}
-var toHex = (rgb) => "#" + rgb.map((c) => clampChannel(c).toString(16).padStart(2, "0")).join("");
-function mix(a2, b, t2) {
-  const pa = parseColor(a2);
-  const pb = parseColor(b);
-  if (!pa || !pb) {
-    return a2;
-  }
-  return toHex([pa[0] + (pb[0] - pa[0]) * t2, pa[1] + (pb[1] - pa[1]) * t2, pa[2] + (pb[2] - pa[2]) * t2]);
-}
-function channelLuminance(value) {
-  const normalized = value / 255;
-  return normalized <= 0.03928 ? normalized / 12.92 : ((normalized + 0.055) / 1.055) ** 2.4;
-}
-function relativeLuminance(color2) {
-  const rgb = parseColor(color2);
-  return rgb ? 0.2126 * channelLuminance(rgb[0]) + 0.7152 * channelLuminance(rgb[1]) + 0.0722 * channelLuminance(rgb[2]) : null;
-}
-function contrastRatio(a2, b) {
-  const la = relativeLuminance(a2);
-  const lb = relativeLuminance(b);
-  if (la === null || lb === null) {
-    return null;
-  }
-  const [hi, lo] = la >= lb ? [la, lb] : [lb, la];
-  return (hi + 0.05) / (lo + 0.05);
-}
-
-// .hermes-src/ui-tui/src/lib/color.ts
-var clampChannel2 = (v) => Math.max(0, Math.min(255, Math.round(v)));
-function liftForContrast(color2, bg, ratio) {
-  const fg = parseColor(color2);
-  const bgLum = relativeLuminance(bg);
-  if (!fg || bgLum === null) {
-    return color2;
-  }
-  if ((contrastRatio(color2, bg) ?? 21) >= ratio) {
-    return color2;
-  }
-  let [r, g, b] = fg;
-  if (bgLum > 0.5) {
-    let cr = contrastRatio(toHex([r, g, b]), bg) ?? 21;
-    while (cr < ratio && (r > 0 || g > 0 || b > 0)) {
-      r -= Math.ceil(r * 0.1);
-      g -= Math.ceil(g * 0.1);
-      b -= Math.ceil(b * 0.1);
-      cr = contrastRatio(toHex([r, g, b]), bg) ?? 21;
-    }
-  } else {
-    let cr = contrastRatio(toHex([r, g, b]), bg) ?? 21;
-    while (cr < ratio && (r < 255 || g < 255 || b < 255)) {
-      r = Math.min(255, r + Math.ceil((255 - r) * 0.1));
-      g = Math.min(255, g + Math.ceil((255 - g) * 0.1));
-      b = Math.min(255, b + Math.ceil((255 - b) * 0.1));
-      cr = contrastRatio(toHex([r, g, b]), bg) ?? 21;
-    }
-  }
-  return toHex([r, g, b]);
-}
-function grayOf(color2) {
-  const rgb = parseColor(color2);
-  if (!rgb) {
-    return color2;
-  }
-  const gray = clampChannel2(0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2]);
-  return toHex([gray, gray, gray]);
-}
-var desaturate = (color2, s2) => mix(color2, grayOf(color2), s2);
-
-// .hermes-src/ui-tui/src/theme.ts
-var XTERM_6_LEVELS = [0, 95, 135, 175, 215, 255];
-var ANSI_LIGHT_MAX_LUMINANCE = 0.72;
-var ANSI_LIGHT_TARGET_LUMINANCE = 0.34;
-var ANSI_LIGHT_MIN_SATURATION = 0.22;
-var ANSI_MUTED_BUCKET = 245;
-var ANSI_NORMALIZED_FOREGROUNDS = [
-  "text",
-  "label",
-  "ok",
-  "error",
-  "warn",
-  "prompt",
-  "statusFg",
-  "statusGood",
-  "statusWarn",
-  "statusBad",
-  "statusCritical",
-  "shellDollar",
-  "tool"
-];
-var ANSI_MUTED_FOREGROUNDS = ["muted", "sessionLabel", "sessionBorder", "thinking"];
-function xtermEightBitRgb(colorNumber) {
-  if (colorNumber >= 232) {
-    const value = 8 + (colorNumber - 232) * 10;
-    return [value, value, value];
-  }
-  if (colorNumber >= 16) {
-    const offset = colorNumber - 16;
-    return [
-      XTERM_6_LEVELS[Math.floor(offset / 36) % 6],
-      XTERM_6_LEVELS[Math.floor(offset / 6) % 6],
-      XTERM_6_LEVELS[offset % 6]
-    ];
-  }
-  return [0, 0, 0];
-}
-var rgbLuminance = (red, green, blue) => relativeLuminance(toHex([red, green, blue])) ?? 0;
-function rgbToHsl(red, green, blue) {
-  const rn = red / 255;
-  const gn = green / 255;
-  const bn = blue / 255;
-  const max = Math.max(rn, gn, bn);
-  const min = Math.min(rn, gn, bn);
-  const lightness = (max + min) / 2;
-  if (max === min) {
-    return [0, 0, lightness];
-  }
-  const delta = max - min;
-  const saturation = lightness > 0.5 ? delta / (2 - max - min) : delta / (max + min);
-  const hue = max === rn ? (gn - bn) / delta + (gn < bn ? 6 : 0) : max === gn ? (bn - rn) / delta + 2 : (rn - gn) / delta + 4;
-  return [hue / 6, saturation, lightness];
-}
-function circularDistance(a2, b) {
-  const distance = Math.abs(a2 - b);
-  return Math.min(distance, 1 - distance);
-}
-function richEightBitColorNumber(red, green, blue) {
-  const [, saturation, lightness] = rgbToHsl(red, green, blue);
-  if (saturation < 0.15) {
-    const gray = Math.round(lightness * 25);
-    return gray === 0 ? 16 : gray === 25 ? 231 : 231 + gray;
-  }
-  const sixRed = red < 95 ? red / 95 : 1 + (red - 95) / 40;
-  const sixGreen = green < 95 ? green / 95 : 1 + (green - 95) / 40;
-  const sixBlue = blue < 95 ? blue / 95 : 1 + (blue - 95) / 40;
-  return 16 + 36 * Math.round(sixRed) + 6 * Math.round(sixGreen) + Math.round(sixBlue);
-}
-function bestReadableAnsiColor(red, green, blue) {
-  const [hue, saturation, lightness] = rgbToHsl(red, green, blue);
-  let bestColor = richEightBitColorNumber(red, green, blue);
-  let bestScore = Number.POSITIVE_INFINITY;
-  for (let colorNumber = 16; colorNumber <= 255; colorNumber += 1) {
-    const [candidateRed, candidateGreen, candidateBlue] = xtermEightBitRgb(colorNumber);
-    const candidateLuminance = rgbLuminance(candidateRed, candidateGreen, candidateBlue);
-    if (candidateLuminance > ANSI_LIGHT_MAX_LUMINANCE) {
-      continue;
-    }
-    const [candidateHue, candidateSaturation, candidateLightness] = rgbToHsl(
-      candidateRed,
-      candidateGreen,
-      candidateBlue
-    );
-    const saturationFloorPenalty = candidateSaturation < ANSI_LIGHT_MIN_SATURATION ? (ANSI_LIGHT_MIN_SATURATION - candidateSaturation) * 3 : 0;
-    const score = circularDistance(candidateHue, hue) * 4 + Math.abs(candidateSaturation - Math.max(ANSI_LIGHT_MIN_SATURATION, saturation)) * 0.8 + Math.abs(candidateLightness - Math.min(lightness, ANSI_LIGHT_TARGET_LUMINANCE)) * 2 + saturationFloorPenalty;
-    if (score < bestScore) {
-      bestColor = colorNumber;
-      bestScore = score;
-    }
-  }
-  return bestColor;
-}
-function normalizeAnsiForeground(color2) {
-  const rgb = parseColor(color2);
-  if (!rgb) {
-    return color2;
-  }
-  const richAnsi = richEightBitColorNumber(rgb[0], rgb[1], rgb[2]);
-  const richRgb = xtermEightBitRgb(richAnsi);
-  const ansi = rgbLuminance(richRgb[0], richRgb[1], richRgb[2]) > ANSI_LIGHT_MAX_LUMINANCE ? bestReadableAnsiColor(rgb[0], rgb[1], rgb[2]) : richAnsi;
-  return `ansi256(${ansi})`;
-}
-var BRAND = {
-  name: "Hermes Agent",
-  icon: "\u2624",
-  prompt: "\u276F",
-  welcome: "Type your message or /help for commands.",
-  goodbye: "Goodbye! \u2624",
-  tool: "\u250A",
-  helpHeader: "(^_^)? Commands"
-};
-var cleanPromptSymbol = (s2, fallback) => {
-  const cleaned = String(s2 ?? "").replace(/\s+/g, " ").trim();
-  return cleaned || fallback;
-};
-var DIFF_DARK = {
-  diffAdded: "rgb(220,255,220)",
-  diffRemoved: "rgb(255,220,220)",
-  diffAddedWord: "rgb(36,138,61)",
-  diffRemovedWord: "rgb(207,34,46)"
-};
-var DIFF_LIGHT = {
-  diffAdded: "rgb(200,240,200)",
-  diffRemoved: "rgb(240,200,200)",
-  diffAddedWord: "rgb(27,94,32)",
-  diffRemovedWord: "rgb(183,28,28)"
-};
-function buildPalette(seeds, isLight) {
-  const tones = deriveTones(seeds);
-  const surface = seeds.surface ?? tones.surface;
-  const activeRow = seeds.activeRow ?? (seeds.surface ? mix(surface, seeds.accent, 0.22) : tones.activeRow);
-  const muted = seeds.muted ?? tones.muted;
-  return {
-    primary: seeds.primary,
-    accent: seeds.accent,
-    border: seeds.border ?? tones.border,
-    text: seeds.text,
-    muted,
-    completionBg: surface,
-    completionCurrentBg: activeRow,
-    completionMetaBg: surface,
-    completionMetaCurrentBg: activeRow,
-    label: tones.label,
-    ok: seeds.ok,
-    error: seeds.error,
-    warn: seeds.warn,
-    // Element tokens: independently settable, but default to their semantic
-    // parents (tool marker → accent, reasoning body → muted).
-    tool: seeds.accent,
-    thinking: muted,
-    // Code-syntax tokens default to brand tokens (unchanged highlighting)
-    // but are independently skinnable.
-    syntaxString: seeds.accent,
-    syntaxNumber: seeds.text,
-    syntaxKeyword: seeds.border ?? tones.border,
-    syntaxComment: muted,
-    prompt: seeds.prompt ?? seeds.text,
-    // sessionLabel/sessionBorder track the muted tone — "same role, same
-    // colour" by design (#11300).
-    sessionLabel: muted,
-    sessionBorder: muted,
-    statusBg: surface,
-    statusFg: tones.statusFg,
-    statusGood: seeds.statusGood,
-    statusWarn: seeds.statusWarn,
-    statusBad: seeds.statusBad,
-    statusCritical: seeds.statusCritical,
-    selectionBg: seeds.selection ?? tones.selection,
-    ...isLight ? DIFF_LIGHT : DIFF_DARK,
-    shellDollar: seeds.shellDollar
-  };
-}
-var DARK_SEEDS = {
-  accent: "#FFBF00",
-  // The classic Hermes navy surfaces are IDENTITY, not derivation drift —
-  // keep them as explicit fill seeds (the ladder derives them for skins
-  // that don't care).
-  activeRow: "#333355",
-  bg: "#101014",
-  border: "#CD7F32",
-  error: "#ef5350",
-  ok: "#4caf50",
-  primary: "#FFD700",
-  prompt: "#FFF8DC",
-  selection: "#3a3a55",
-  shellDollar: "#4dabf7",
-  statusBad: "#FF8C00",
-  statusCritical: "#FF6B6B",
-  statusGood: "#8FBC8F",
-  statusWarn: "#FFD700",
-  surface: "#1a1a2e",
-  text: "#FFF8DC",
-  warn: "#ffa726"
-};
-var LIGHT_SEEDS = {
-  accent: "#956E00",
-  bg: "#ffffff",
-  border: "#A56628",
-  error: "#C14240",
-  ok: "#367E39",
-  primary: "#867000",
-  prompt: "#2B2014",
-  shellDollar: "#377BB3",
-  statusBad: "#A65A00",
-  statusCritical: "#B94D4D",
-  statusGood: "#5C7A5C",
-  statusWarn: "#867000",
-  text: "#3D2F13",
-  warn: "#956115"
-};
-var DARK_THEME = {
-  color: buildPalette(DARK_SEEDS, false),
-  brand: BRAND,
-  bannerLogo: "",
-  bannerHero: ""
-};
-var LIGHT_THEME = {
-  color: buildPalette(LIGHT_SEEDS, true),
-  brand: BRAND,
-  bannerLogo: "",
-  bannerHero: ""
-};
-var DISPLAY_MIN_CONTRAST = 1.45;
-var SEMANTIC_MIN_CONTRAST = 2.2;
-var LIGHT_DISPLAY_MIN_CONTRAST = 1.18;
-var LIGHT_SEMANTIC_MIN_CONTRAST = 1.6;
-var DISPLAY_FOREGROUNDS = [
-  "primary",
-  "accent",
-  "text",
-  "label",
-  "prompt",
-  "statusFg",
-  "border",
-  "muted",
-  "sessionLabel",
-  "sessionBorder",
-  "shellDollar"
-];
-var SEMANTIC_FOREGROUNDS = [
-  "ok",
-  "error",
-  "warn",
-  "statusGood",
-  "statusWarn",
-  "statusBad",
-  "statusCritical"
-];
-var ADAPTIVE_BACKGROUNDS = [
-  "completionBg",
-  "completionCurrentBg",
-  "completionMetaBg",
-  "completionMetaCurrentBg",
-  "statusBg",
-  "selectionBg"
-];
-var LIGHT_BG_MIN_LUMINANCE = 0.4;
-var DARK_BG_MAX_LUMINANCE = 0.35;
-function adaptColorsToBackground(colors, isLight, base3, bg) {
-  const out = { ...colors };
-  const displayFloor = isLight ? LIGHT_DISPLAY_MIN_CONTRAST : DISPLAY_MIN_CONTRAST;
-  const semanticFloor = isLight ? LIGHT_SEMANTIC_MIN_CONTRAST : SEMANTIC_MIN_CONTRAST;
-  for (const key2 of DISPLAY_FOREGROUNDS) {
-    out[key2] = liftForContrast(out[key2], bg, displayFloor);
-  }
-  for (const key2 of SEMANTIC_FOREGROUNDS) {
-    out[key2] = liftForContrast(out[key2], bg, semanticFloor);
-  }
-  for (const key2 of ADAPTIVE_BACKGROUNDS) {
-    const luminance = relativeLuminance(out[key2]);
-    if (luminance === null) {
-      continue;
-    }
-    if (isLight ? luminance < LIGHT_BG_MIN_LUMINANCE : luminance > DARK_BG_MAX_LUMINANCE) {
-      out[key2] = base3[key2];
-    }
-  }
-  return out;
-}
-function referenceBackground(isLight, env2 = process.env) {
-  const cached2 = (env2.HERMES_TUI_BACKGROUND ?? "").trim();
-  if (cached2 && backgroundLuminance(cached2) !== null) {
-    return cached2.startsWith("#") ? cached2 : `#${cached2}`;
-  }
-  return isLight ? "#ffffff" : "#101014";
-}
-function deriveTones(seeds) {
-  const { accent, bg, text: text12 } = seeds;
-  const isLight = (relativeLuminance(bg) ?? 0) > 0.5;
-  const surface = mix(bg, desaturate(accent, 0.15), isLight ? 0.045 : 0.09);
-  return {
-    // Light knobs are fitted to the lift canon (xterm minimumContrastRatio
-    // 4.5 of the classic dark golds against white — see LIGHT_SEEDS), not
-    // to ink blends: muted #946C08 ≈ desat(accent .05), label #8E6B13 ≈
-    // desat(mix(accent, text, .03), .15), statusFg #6F6F6F ≈ gray 30% lift.
-    muted: isLight ? desaturate(accent, 0.05) : desaturate(mix(accent, bg, 0.19), 0.16),
-    label: isLight ? desaturate(mix(accent, text12, 0.03), 0.15) : desaturate(mix(accent, bg, 0.13), 0.16),
-    statusFg: grayOf(mix(text12, bg, isLight ? 0.3 : 0.24)),
-    surface,
-    activeRow: mix(surface, accent, 0.25),
-    selection: isLight && seeds.shellDollar ? mix(bg, seeds.shellDollar, 0.2) : mix(surface, accent, 0.28),
-    border: mix(accent, bg, 0.25)
-  };
-}
-var TRUE_RE = /^(?:1|true|yes|on)$/;
-var FALSE_RE = /^(?:0|false|no|off)$/;
-var LIGHT_DEFAULT_TERM_PROGRAMS = /* @__PURE__ */ new Set(["Apple_Terminal"]);
-var LUMA_LIGHT_THRESHOLD = 0.6;
-var HEX_3_RE = /^[0-9a-f]{3}$/;
-var HEX_6_RE = /^[0-9a-f]{6}$/;
-function backgroundLuminance(raw2) {
-  const v = raw2.trim().toLowerCase();
-  if (!v) {
-    return null;
-  }
-  const hex = v.startsWith("#") ? v.slice(1) : v;
-  const rgb = HEX_6_RE.test(hex) ? [parseInt(hex.slice(0, 2), 16), parseInt(hex.slice(2, 4), 16), parseInt(hex.slice(4, 6), 16)] : HEX_3_RE.test(hex) ? [parseInt(hex[0] + hex[0], 16), parseInt(hex[1] + hex[1], 16), parseInt(hex[2] + hex[2], 16)] : null;
-  if (!rgb) {
-    return null;
-  }
-  return (0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2]) / 255;
-}
-function detectLightMode(env2 = process.env, lightDefaultTermPrograms = LIGHT_DEFAULT_TERM_PROGRAMS) {
-  const lightFlag = (env2.HERMES_TUI_LIGHT ?? "").trim().toLowerCase();
-  if (TRUE_RE.test(lightFlag)) {
-    return true;
-  }
-  if (FALSE_RE.test(lightFlag)) {
-    return false;
-  }
-  const themeFlag = (env2.HERMES_TUI_THEME ?? "").trim().toLowerCase();
-  if (themeFlag === "light") {
-    return true;
-  }
-  if (themeFlag === "dark") {
-    return false;
-  }
-  const bgHint = backgroundLuminance(env2.HERMES_TUI_BACKGROUND ?? "");
-  if (bgHint !== null) {
-    return bgHint >= LUMA_LIGHT_THRESHOLD;
-  }
-  const colorfgbg = (env2.COLORFGBG ?? "").trim();
-  if (colorfgbg) {
-    const lastField = colorfgbg.split(";").at(-1) ?? "";
-    if (/^\d+$/.test(lastField)) {
-      const bg = Number(lastField);
-      if (bg === 7 || bg === 15) {
-        return true;
-      }
-      if (bg >= 0 && bg < 16) {
-        return false;
-      }
-    }
-  }
-  const termProgram = (env2.TERM_PROGRAM ?? "").trim();
-  return lightDefaultTermPrograms.has(termProgram);
-}
-function shouldNormalizeAnsiLightTheme(env2 = process.env, isLight = detectLightMode(env2)) {
-  const colorTerm = (env2.COLORTERM ?? "").trim().toLowerCase();
-  const termProgram = (env2.TERM_PROGRAM ?? "").trim();
-  return termProgram === "Apple_Terminal" && colorTerm !== "truecolor" && colorTerm !== "24bit" && isLight;
-}
-function normalizeThemeForAnsiLightTerminal(theme, env2 = process.env, isLight = detectLightMode(env2)) {
-  if (!shouldNormalizeAnsiLightTheme(env2, isLight)) {
-    return theme;
-  }
-  const color2 = { ...theme.color };
-  for (const key2 of ANSI_NORMALIZED_FOREGROUNDS) {
-    color2[key2] = normalizeAnsiForeground(color2[key2]);
-  }
-  for (const key2 of ANSI_MUTED_FOREGROUNDS) {
-    color2[key2] = `ansi256(${ANSI_MUTED_BUCKET})`;
-  }
-  return { ...theme, color: color2 };
-}
-var DEFAULT_LIGHT_MODE = detectLightMode();
-var DEFAULT_THEME = normalizeThemeForAnsiLightTerminal(
-  DEFAULT_LIGHT_MODE ? LIGHT_THEME : DARK_THEME,
-  process.env,
-  DEFAULT_LIGHT_MODE
-);
-var authoredBackground = (raw2) => {
-  const v = (raw2 ?? "").trim();
-  return backgroundLuminance(v) === null ? null : v.startsWith("#") ? v : `#${v}`;
-};
-function skinIsLight(colors, env2 = process.env) {
-  const authored = backgroundLuminance(colors["background"] ?? "");
-  return authored === null ? detectLightMode(env2) : authored >= LUMA_LIGHT_THRESHOLD;
-}
-function fromSkin(colors, branding, bannerLogo = "", bannerHero = "", toolPrefix = "", helpHeader = "") {
-  const skinBg = authoredBackground(colors["background"]);
-  const isLight = skinIsLight(colors);
-  const bg = skinBg ?? referenceBackground(isLight);
-  const base3 = isLight ? LIGHT_SEEDS : DARK_SEEDS;
-  const d = isLight ? LIGHT_THEME : DARK_THEME;
-  const c = (k) => colors[k];
-  const hasSkinColors = Object.keys(colors).length > 0;
-  const identityFills = hasSkinColors ? {} : { activeRow: base3.activeRow, muted: base3.muted, selection: base3.selection, surface: base3.surface };
-  const seeds = {
-    ...identityFills,
-    accent: c("ui_accent") ?? c("banner_accent") ?? base3.accent,
-    bg,
-    border: c("ui_border") ?? c("banner_border") ?? base3.border,
-    error: c("ui_error") ?? base3.error,
-    ok: c("ui_ok") ?? base3.ok,
-    primary: c("ui_primary") ?? c("banner_title") ?? base3.primary,
-    prompt: c("prompt") ?? c("banner_text") ?? base3.prompt,
-    shellDollar: c("shell_dollar") ?? base3.shellDollar,
-    statusBad: c("status_bar_bad") ?? base3.statusBad,
-    statusCritical: c("status_bar_critical") ?? c("ui_error") ?? base3.statusCritical,
-    statusGood: c("status_bar_good") ?? c("ui_ok") ?? base3.statusGood,
-    statusWarn: c("status_bar_warn") ?? c("ui_warn") ?? base3.statusWarn,
-    text: c("ui_text") ?? c("banner_text") ?? base3.text,
-    warn: c("ui_warn") ?? base3.warn
-  };
-  const derived = buildPalette(seeds, isLight);
-  const surface = c("completion_menu_bg") ?? c("background") ?? derived.completionBg;
-  const activeRow = c("completion_menu_current_bg") ?? (c("completion_menu_bg") ? mix(surface, seeds.accent, 0.22) : derived.completionCurrentBg);
-  const assembled = {
-    ...derived,
-    muted: c("banner_dim") ?? derived.muted,
-    label: c("ui_label") ?? derived.label,
-    completionBg: surface,
-    completionCurrentBg: activeRow,
-    completionMetaBg: c("completion_menu_meta_bg") ?? surface,
-    completionMetaCurrentBg: c("completion_menu_meta_current_bg") ?? activeRow,
-    sessionLabel: c("session_label") ?? c("banner_dim") ?? derived.sessionLabel,
-    sessionBorder: c("session_border") ?? c("banner_dim") ?? derived.sessionBorder,
-    statusBg: c("status_bar_bg") ?? surface,
-    statusFg: c("status_bar_text") ?? c("ui_text") ?? c("banner_text") ?? derived.statusFg,
-    selectionBg: c("selection_bg") ?? c("completion_menu_current_bg") ?? derived.selectionBg,
-    // Element tokens + skinnable diffs (theme-sdk): overridable, else the
-    // derived defaults (tool→accent, thinking→muted, diff_* → DIFF_* ladder).
-    // thinking tracks the EFFECTIVE muted (banner_dim override included), not
-    // just derived.muted, so recoloring muted carries the reasoning body with it.
-    tool: c("ui_tool") ?? derived.tool,
-    thinking: c("ui_thinking") ?? c("banner_dim") ?? derived.thinking,
-    diffAdded: c("diff_added") ?? derived.diffAdded,
-    diffRemoved: c("diff_removed") ?? derived.diffRemoved,
-    diffAddedWord: c("diff_added_word") ?? derived.diffAddedWord,
-    diffRemovedWord: c("diff_removed_word") ?? derived.diffRemovedWord,
-    // Code-syntax tokens: overridable, else the derived brand-token defaults.
-    syntaxString: c("syntax_string") ?? derived.syntaxString,
-    syntaxNumber: c("syntax_number") ?? derived.syntaxNumber,
-    syntaxKeyword: c("syntax_keyword") ?? derived.syntaxKeyword,
-    syntaxComment: c("syntax_comment") ?? c("banner_dim") ?? derived.syntaxComment
-  };
-  const adapted = shouldNormalizeAnsiLightTheme(process.env, isLight) ? assembled : adaptColorsToBackground(assembled, isLight, derived, bg);
-  return normalizeThemeForAnsiLightTerminal(
-    {
-      // The element tokens theme-sdk introduced (ui_primary, ui_text,
-      // ui_border, ui_ok/warn/error, ui_tool, ui_thinking, shell_dollar,
-      // status_bar_*, diff_*) are read into `seeds`/`assembled` above and
-      // flow through buildPalette → adaptColorsToBackground, so `adapted`
-      // already honors them AND applies #20379's contrast/polarity machinery.
-      // Emitting a hand-mapped color block here would bypass that adaptation
-      // and regress theme quality.
-      color: adapted,
-      brand: {
-        name: branding.agent_name ?? d.brand.name,
-        icon: d.brand.icon,
-        prompt: cleanPromptSymbol(branding.prompt_symbol, d.brand.prompt),
-        welcome: branding.welcome ?? d.brand.welcome,
-        goodbye: branding.goodbye ?? d.brand.goodbye,
-        tool: toolPrefix || d.brand.tool,
-        helpHeader: branding.help_header ?? (helpHeader || d.brand.helpHeader)
-      },
-      bannerLogo,
-      bannerHero
-    },
-    process.env,
-    isLight
-  );
-}
-
-// src/palette.ts
-var NOUS = {
-  dark: {
-    accent: "#F5B820",
-    dim: "#77746D",
-    error: "#E5484D",
-    mdLink: "#7A9CFF",
-    muted: "#9A968C",
-    selectedBg: "#26262A",
-    statusLinePath: "#9A968C",
-    text: "#EDE8DC"
-  },
-  light: {
-    accent: "#956E00",
-    dim: "#8A867C",
-    error: "#C93C42",
-    mdLink: "#2F5BD8",
-    muted: "#6B675E",
-    statusLinePath: "#6B675E"
-  }
-};
-function paletteFor(mode, skin) {
-  if (mode === "nous") {
-    return { dark: NOUS.dark, light: NOUS.light, name: { dark: "nous", light: "nous" } };
-  }
-  if (mode === "skin" && skin) {
-    const name = skin.name || "default";
-    return {
-      dark: semantic(resolve6(skin, "dark")),
-      light: semantic(resolve6(skin, "light")),
-      name: { dark: name, light: name }
-    };
-  }
-  return { dark: {}, light: {}, name: { dark: "tern", light: "tern" } };
-}
-function resolve6(skin, polarity) {
-  const light = polarity === "light";
-  const colors = { ...skin.colors, ...light ? skin.light_colors : skin.dark_colors };
-  const saved = process.env.HERMES_TUI_LIGHT;
-  process.env.HERMES_TUI_LIGHT = light ? "1" : "0";
-  try {
-    return fromSkin(colors, skin.branding ?? {}).color;
-  } finally {
-    if (saved === void 0) {
-      delete process.env.HERMES_TUI_LIGHT;
-    } else {
-      process.env.HERMES_TUI_LIGHT = saved;
-    }
-  }
-}
-function semantic(c) {
-  const out = {
-    accent: c.accent,
-    borderAccent: c.accent,
-    error: c.error,
-    mdListBullet: c.accent,
-    statusLineModel: c.accent,
-    success: c.ok,
-    warning: c.warn
-  };
-  for (const key2 in out) {
-    if (!/^#[0-9a-f]{3,8}$/i.test(out[key2] ?? "")) {
-      delete out[key2];
-    }
-  }
-  return out;
-}
-
 // src/github/branch.ts
 import { execFile as execFile7 } from "node:child_process";
 import { promisify as promisify6 } from "node:util";
@@ -68026,6 +68265,96 @@ var PrAside = class {
   }
 };
 
+// src/session/thoughts.ts
+function showThoughts(host, sid) {
+  if (host.settings.load().thoughts === false) {
+    return;
+  }
+  rpc(host.gw, "config.set", { key: "show_reasoning", session_id: sid, value: "on" }).catch((error) => {
+    host.notice(`Could not turn on thoughts: ${error.message}`, "warning");
+  });
+}
+
+// src/surface/osc.ts
+import { hostname } from "node:os";
+function setTabTitle(title, out = process.stdout) {
+  out.write(`\x1B]2;${title.replace(/[\x00-\x1f]/g, " ")}\x07`);
+}
+function reportCwd(cwd, out = process.stdout) {
+  out.write(`\x1B]7;file://${hostname()}${encodeURI(cwd)}\x07`);
+}
+
+// src/session/title.ts
+var READ_MS = 400;
+var SessionTitle = class {
+  #host;
+  #text = "";
+  #timer;
+  constructor(host) {
+    this.#host = host;
+  }
+  /** The title; '' while the session has none. */
+  get text() {
+    return this.#text;
+  }
+  /** Names the session `title` (trimmed) on the strip and the tab; true when it changed. */
+  set(title) {
+    const next3 = title?.trim();
+    if (!next3 || next3 === this.#text) {
+      return false;
+    }
+    this.#text = next3;
+    setTabTitle(next3);
+    return true;
+  }
+  /** Another session is shown: its own name (or none yet) on the tab, and a read of the list. */
+  adopt(title) {
+    this.#text = "";
+    this.set(title);
+    this.read();
+  }
+  /**
+   * Reads the session's title from the session list, a moment after the list changed: the shared
+   * gateway tells viewers only that (`sessions.changed`) when /title or the auto-titler names it,
+   * and serves no `session.title`. The session is among the newest rows; its stored id finds it.
+   */
+  read() {
+    clearTimeout(this.#timer);
+    this.#timer = setTimeout(() => void this.#fetch(), READ_MS);
+  }
+  /** Names session `sid` (`/new <title>`): the shared gateway's rename mutation, a private one's `session.title`. */
+  async rename(sid, title) {
+    const host = this.#host;
+    try {
+      const r = host.gw.isCanonical ? await mutateSession(host.gw, sid, "rename", { title }) : await rpc(host.gw, "session.title", { session_id: sid, title });
+      if (sid === host.session.ref.live && this.set(String(r?.title ?? title))) {
+        host.changed();
+      }
+    } catch (error) {
+      host.notice(`Could not name the session: ${errorText(error)}`, "warning");
+    }
+  }
+  /** Stops a pending list read. */
+  dispose() {
+    clearTimeout(this.#timer);
+  }
+  async #fetch() {
+    const { live: sid, stored } = this.#host.session.ref;
+    const ids = new Set([sid, stored].filter(Boolean));
+    if (!sid) {
+      return;
+    }
+    try {
+      const r = await rpc(this.#host.gw, "session.list", { limit: 20 });
+      const row2 = r?.sessions?.find((x) => ids.has(x.id ?? "") || ids.has(x.resolved_id ?? ""));
+      if (sid === this.#host.session.ref.live && this.set(row2?.title)) {
+        this.#host.changed();
+      }
+    } catch {
+    }
+  }
+};
+
 // src/session/views.ts
 var SessionViews = class {
   #gw;
@@ -68351,46 +68680,6 @@ function statusEffect(payload, last) {
 function counted(text12) {
   const tokens2 = lineTokens(text12);
   return tokens2.before || tokens2.after ? { tokens: tokens2 } : {};
-}
-var TONES2 = { error: "error", success: "success", warn: "warning", warning: "warning" };
-var Notices = class {
-  #list = [];
-  #seq = 0;
-  /** Adds or replaces the notice; returns it (undefined for an empty one). */
-  show(p3, now = Date.now()) {
-    const text12 = p3.text?.trim();
-    if (!text12) {
-      return void 0;
-    }
-    const key2 = p3.key || p3.id || `n${++this.#seq}`;
-    const ttl = p3.kind === "ttl" && typeof p3.ttl_ms === "number" && p3.ttl_ms > 0 ? p3.ttl_ms : void 0;
-    const notice = { key: key2, text: text12, tone: TONES2[p3.level ?? ""] ?? "info", ...ttl ? { expires: now + ttl } : {} };
-    this.#list = [...this.#list.filter((n) => n.key !== key2), notice];
-    return notice;
-  }
-  /** Drops the notice with `key`; true when one went. */
-  clear(key2) {
-    const before = this.#list.length;
-    this.#list = this.#list.filter((n) => n.key !== key2);
-    return this.#list.length !== before;
-  }
-  /** The newest notice still live at `now`. */
-  current(now = Date.now()) {
-    this.#list = this.#list.filter((n) => !n.expires || n.expires > now);
-    return this.#list.at(-1);
-  }
-  /** When the next `ttl` notice expires, if one is live. */
-  nextExpiry() {
-    const at = this.#list.flatMap((n) => n.expires ? [n.expires] : []);
-    return at.length ? Math.min(...at) : void 0;
-  }
-  /** Forgets every notice (another session is shown). */
-  reset() {
-    this.#list = [];
-  }
-};
-function isLoginNotice(p3) {
-  return Boolean(p3.key?.startsWith("login:"));
 }
 
 // src/processes/widgets/author.ts
@@ -69482,15 +69771,6 @@ async function runInput(input2, { after, onError, onEvent, onKey }) {
   }
 }
 
-// src/surface/osc.ts
-import { hostname } from "node:os";
-function setTabTitle(title, out = process.stdout) {
-  out.write(`\x1B]2;${title.replace(/[\x00-\x1f]/g, " ")}\x07`);
-}
-function reportCwd(cwd, out = process.stdout) {
-  out.write(`\x1B]7;file://${hostname()}${encodeURI(cwd)}\x07`);
-}
-
 // src/transcript/compactions.ts
 var Compactions = class {
   #host;
@@ -69718,7 +69998,7 @@ function history({ kept, messages: messages2, compactions, id }) {
   let pendingContinued;
   let promptAt = 0;
   const calls = /* @__PURE__ */ new Map();
-  let todos;
+  let todos2;
   for (const m of messages2) {
     const at = typeof m.timestamp === "number" ? m.timestamp * 1e3 : 0;
     const text12 = typeof m.text === "string" ? m.text : typeof m.content === "string" ? m.content : "";
@@ -69818,11 +70098,11 @@ function history({ kept, messages: messages2, compactions, id }) {
       };
       call.status = settleBridge(call) ?? Boolean(record(call.result)?.error) ? "error" : "done";
       if (isTodoName(call.name)) {
-        call.todosBefore = todos;
+        call.todosBefore = todos2;
       }
       if (Array.isArray(args.todos)) {
-        call.todos = todosOf(args, todos);
-        todos = call.todos;
+        call.todos = todosOf(args, todos2);
+        todos2 = call.todos;
       }
       calls.set(callId, call);
       turn.blocks.push({ call, id: id("c"), kind: "tool" });
@@ -70191,10 +70471,10 @@ var Transcript = class {
     turn.rev++;
   }
   /** The newest todo snapshot lands on the newest todo tool call. */
-  todos(todos) {
+  todos(todos2) {
     const found = this.#lastTool((c) => isTodoName(c.name));
     if (found) {
-      found.call.todos = toTodos(todos);
+      found.call.todos = toTodos(todos2);
       found.turn.rev++;
     }
   }
@@ -70350,12 +70630,6 @@ function shownArgs(args) {
 }
 
 // src/view/dock.tsx
-function todoProgress(list9) {
-  const live = list9.filter((t2) => t2.status !== "cancelled");
-  const done = live.filter((t2) => t2.status === "completed").length;
-  const current = live.find((t2) => t2.status === "in_progress") ?? live.find((t2) => t2.status === "pending");
-  return { current: current?.content ?? "", done, total: live.length };
-}
 function dockNodes(cx) {
   const nodes2 = [];
   if (cx.busy || cx.compacting) {
@@ -70417,18 +70691,18 @@ function dockNodes(cx) {
   if (automation) {
     nodes2.push(automation);
   }
-  const pills = [
+  const pills2 = [
     // While a turn runs the todo pill rides the working line instead.
     cx.todos && !cx.busy ? todosPillNode(cx.todos, cx.focused === "todos") : null,
     cx.agents?.running ? agentsPill(cx.agents.running, cx.agents.onOpen, cx.focused === "agents") : null,
     cx.shells && (cx.shells.running || cx.shells.exited) ? shellsPill(cx.shells, cx.focused === "shells") : null,
     cx.prs ? prsPillNode(cx.prs, cx.focused === "prs") : null
   ].filter((p3) => p3 !== null);
-  if (pills.length) {
+  if (pills2.length) {
     nodes2.push(
       /* @__PURE__ */ jsxs("row", { role: "omp.hud", children: [
         cx.focused ? hudHint() : null,
-        pills
+        pills2
       ] }, "agents")
     );
   }
@@ -70746,10 +71020,10 @@ var App = class {
   sidebar = new Sidebar(this);
   /** The session's standing /goal and /loop (the dock line above the pills and its sheets). */
   automation = new Automation(this);
-  /** The session's title, as Hermes names it (`session.title`). */
-  title = "";
-  /** The todo panel above the composer is open. */
-  #todosOpen = false;
+  /** The session's title, on the status strip and the tab. */
+  #title = new SessionTitle(this);
+  /** The pills above the composer: the one holding the keys, and the todo panel's fold. */
+  #hud = new Hud({ changed: () => this.changed(), open: (pill2) => this.#openPill(pill2) });
   /** The conversation's PRs; links are stored under the stored session id the tools see. */
   prs = new PullRequests({
     changed: () => this.changed(),
@@ -70810,23 +71084,19 @@ var App = class {
   #reportedCwd;
   /** Images being read or uploaded for the draft: an "attaching…" chip each until they land. */
   #attaching = [];
-  /** The skin the gateway last reported; only the `skin` theme mode wears it. */
-  #skin;
+  /** Whose colors the surface wears, and the gateway's skin. */
   #theme;
   /** Background processes get live charts (settings.json `jobCharts`). */
   #jobCharts;
   /** The prompt whose Copy button reads Copied, until the timer clears it. */
   #copied;
   #copiedTimer;
-  /** The pill above the composer holding the keys (Down from an empty prompt), if any. */
-  #hud;
-  /** The gateway connection is down until the next gateway.ready (its one notice is shown). */
-  #offline = false;
+  /** The gateway connection: down until the next gateway.ready, and its redial line. */
+  #reconnect = new Reconnect(this);
   /** Stray backend output was reported once already. */
   #protocolWarned = false;
   /** The gateway's keyed notices (credits, a slow start); the newest rides the status strip. */
-  #notices = new Notices();
-  #noticeTimer;
+  #notices = new NoticeStrip(this);
   /**
    * A compaction runs (Hermes' own, or /compress): the working line says so until its done edge,
    * and with no turn running the dock shows it and prompts queue behind it.
@@ -70834,9 +71104,6 @@ var App = class {
   #compacting;
   /** The status warning shown last, so a repeated one stays one line. */
   #lastStatusNote;
-  /** The gateway is being redialled (`gateway.reconnecting`) until the next gateway.ready. */
-  #reconnecting;
-  #reconnectTimer;
   /** `launch` and `settings` are what entry.ts read once at startup; unset, each reads its default. */
   constructor(tern, gw2, version2, { launch: launch3 = readLaunchEnv(), settings: settings2 = fileSettings() } = {}) {
     this.#tern = tern;
@@ -70846,7 +71113,7 @@ var App = class {
     this.#settings = settings2;
     this.#startupImage = launch3.image;
     const saved = settings2.load();
-    this.#theme = saved.theme ?? "tern";
+    this.#theme = new Theme({ palette: (palette) => this.#surface.palette(palette), settings: settings2 }, saved.theme ?? "tern");
     this.#jobCharts = saved.jobCharts !== false;
     this.#completion = new Completion(this, gw2, () => this.sid);
     this.#catalog = new CommandCatalog(gw2);
@@ -70871,13 +71138,17 @@ var App = class {
   set storedSid(id) {
     this.#ids = { live: this.#ids.live, stored: id === null ? null : storedSessionId(id) };
   }
+  /** The session's title, as Hermes names it (`session.title`); '' while it has none. */
+  get title() {
+    return this.#title.text;
+  }
   /** The gateway, for overlays that issue their own RPCs. */
   get gw() {
     return this.#gw;
   }
   async run() {
     this.#surface = new SurfaceHost(this.#tern, "hermes");
-    this.#applyTheme();
+    this.#theme.apply();
     if (this.#tern.caps.features.includes("blobs")) {
       this.#welcome.logo = this.#tern.blob(logo_default, "image/png");
     }
@@ -70902,13 +71173,10 @@ var App = class {
       this.#onRequest(req);
     });
     this.#gw.on("exit", (code8) => {
-      if (!this.#offline) {
-        this.transcript.notice(
-          this.#gw.attached ? "Lost the connection to Hermes; reconnecting\u2026" : `The agent backend exited${code8 === null ? "" : ` (${code8})`}.`,
-          this.#gw.attached ? "warning" : "error"
-        );
+      const lost = this.#reconnect.lost(this.#gw.attached, code8);
+      if (lost) {
+        this.transcript.notice(lost.text, lost.tone);
       }
-      this.#offline = true;
       this.#ids = { live: null, stored: this.#ids.stored };
       this.busy = null;
       this.#heldRequests = [];
@@ -70941,10 +71209,13 @@ var App = class {
    * Quitting calls it once the sessions detached (or the wait gave up), before Tern closes.
    */
   dispose() {
-    for (const timer of [this.#copiedTimer, this.#noticeTimer, this.#reconnectTimer, this.#titleTimer, this.#connectTimer]) {
+    for (const timer of [this.#copiedTimer, this.#connectTimer]) {
       clearTimeout(timer);
     }
     this.#timers.dispose();
+    this.#notices.dispose();
+    this.#reconnect.dispose();
+    this.#title.dispose();
     this.agents.dispose();
     this.processes.dispose();
     this.prs.dispose();
@@ -71070,80 +71341,49 @@ var App = class {
       return this.#connectOpen(ev.value.slice(0, at), ev.value.slice(at + 1));
     }
     if (ev.ev === "focus" && ev.id === INPUT_ID && !this.overlays.at(-1)?.modal) {
-      this.#hud = void 0;
+      this.#hud.release();
       this.#surface.focus(INPUT_ID);
     }
   }
   /** The agent's todo list while it matters: a turn runs, or something on it is still open. */
   #todos() {
-    const list9 = this.transcript.currentTodos();
-    if (!list9?.length) {
-      return void 0;
-    }
-    const { done, total } = todoProgress(list9);
-    return total && (this.busy || done < total) ? list9 : void 0;
+    return todos(this.transcript.currentTodos(), Boolean(this.busy));
   }
   /** The pills above the composer, left to right. */
   #pills(now = Date.now()) {
-    return [
-      // While a turn runs the todo pill rides the working line, where the keys don't reach it.
-      ...this.#todos() && !this.busy ? ["todos"] : [],
-      ...this.agents.running().length ? ["agents"] : [],
-      ...this.processes.recent(now).length ? ["shells"] : [],
-      ...this.prs.entries().length ? ["prs"] : [],
-      ...this.automation.goal ? ["goal"] : [],
-      ...this.automation.loop(now) ? ["loop"] : []
-    ];
+    return pills({
+      agents: this.agents.running().length,
+      busy: Boolean(this.busy),
+      goal: Boolean(this.automation.goal),
+      loop: Boolean(this.automation.loop(now)),
+      prs: this.prs.entries().length,
+      shells: this.processes.recent(now).length,
+      todos: this.#todos()
+    });
   }
   /** Down from an empty prompt focuses the pills; ←/→, Enter and Esc/↑ while one holds the keys. */
   #hudKey(key2) {
-    const out = hudKey(key2, {
-      focused: this.#hud,
+    return this.#hud.key(key2, {
       idle: !this.composer.text && !this.composer.browsing && !this.#completion.open,
       pills: this.#pills()
     });
-    this.#hud = out.focused;
-    if (out.open === "agents") {
-      openAgents(this);
-    } else if (out.open === "shells") {
-      openBackground(this);
-    } else if (out.open === "prs") {
-      openPrMenu(this);
-    } else if (out.open === "goal" || out.open === "loop") {
-      openAutomation(this, out.open);
-    } else if (out.open === "todos") {
-      this.#todosOpen = !this.#todosOpen;
-      this.changed();
-    }
-    return out.consumed;
   }
-  /**
-   * The session's name, on the status strip and on Tern's tab: OSC 2 names the pane, and the tab
-   * follows it (the surface's own `hermes` title stands only until a program sets one).
-   */
-  #titleTimer;
-  /**
-   * Reads the session's title from the session list, a moment after the list changed: the shared
-   * gateway tells viewers only that (`sessions.changed`) when /title or the auto-titler names it,
-   * and serves no `session.title`. The session is among the newest rows; its stored id finds it.
-   */
-  #readTitle() {
-    clearTimeout(this.#titleTimer);
-    this.#titleTimer = setTimeout(() => void this.#fetchTitle(), 400);
-  }
-  async #fetchTitle() {
-    const sid = this.sid;
-    const ids = new Set([sid, this.storedSid].filter(Boolean));
-    if (!sid) {
-      return;
-    }
-    try {
-      const r = await rpc(this.#gw, "session.list", { limit: 20 });
-      const row2 = r?.sessions?.find((x) => ids.has(x.id ?? "") || ids.has(x.resolved_id ?? ""));
-      if (sid === this.sid && this.#setTitle(row2?.title)) {
-        this.changed();
-      }
-    } catch {
+  /** Opens the sheet behind a pill. */
+  #openPill(pill2) {
+    switch (pill2) {
+      case "agents":
+        openAgents(this);
+        break;
+      case "shells":
+        openBackground(this);
+        break;
+      case "prs":
+        openPrMenu(this);
+        break;
+      case "goal":
+      case "loop":
+        openAutomation(this, pill2);
+        break;
     }
   }
   /** Tells Tern the session's folder when it moved (`hermes -w tern`, a moved workspace): OSC 7. */
@@ -71153,15 +71393,6 @@ var App = class {
       this.#reportedCwd = cwd;
       reportCwd(cwd);
     }
-  }
-  #setTitle(title) {
-    const next3 = title?.trim();
-    if (!next3 || next3 === this.title) {
-      return false;
-    }
-    this.title = next3;
-    setTabTitle(next3);
-    return true;
   }
   #connectTimer;
   /** Connect cards (by file) this pane saw with an app still waiting. */
@@ -71894,19 +72125,7 @@ ${this.composer.text}` : text12 || this.composer.text);
       this.#settle(token);
     }
     if (title && this.sid) {
-      await this.#rename(this.sid, title);
-    }
-  }
-  /** Names session `sid` (`/new <title>`): the shared gateway's rename mutation, a private one's `session.title`. */
-  async #rename(sid, title) {
-    try {
-      const r = this.#gw.isCanonical ? await mutateSession(this.#gw, sid, "rename", { title }) : await rpc(this.#gw, "session.title", { session_id: sid, title });
-      if (sid === this.sid && this.#setTitle(String(r?.title ?? title))) {
-        this.changed();
-      }
-    } catch (error) {
-      this.transcript.notice(`Could not name the session: ${errorText(error)}`, "warning");
-      this.changed();
+      await this.#title.rename(this.sid, title);
     }
   }
   /** Refuses a session switch while a turn runs (its queue and prompts belong to this session); true when refused. */
@@ -71973,14 +72192,12 @@ ${this.composer.text}` : text12 || this.composer.text);
     this.#server.reset(pendingRows(r.info));
     const previousStored = this.#ids.stored;
     this.#ids = ref;
-    this.#showThoughts(ref.live);
+    showThoughts({ gw: this.#gw, notice: (text12, tone) => this.notice(text12, tone), settings: this.#settings }, ref.live);
     markViewer(durable(ref), previousStored);
     writeActiveSessionFile(durable(ref));
     this.info = r.info ?? this.info;
     this.usage = r.info?.usage ?? null;
-    this.title = "";
-    this.#setTitle(typeof r.info?.title === "string" ? r.info.title : void 0);
-    this.#readTitle();
+    this.#title.adopt(typeof r.info?.title === "string" ? r.info.title : void 0);
     this.#reportCwd();
     this.busy = busyFrom(r);
     this.#notices.reset();
@@ -72074,20 +72291,19 @@ ${this.composer.text}` : text12 || this.composer.text);
     const t2 = this.transcript;
     switch (ev.type) {
       case "gateway.ready":
-        this.#offline = false;
-        this.#reconnected();
-        this.#applySkin(ev.payload?.skin);
+        this.#reconnect.ready();
+        this.#theme.skin(ev.payload?.skin);
         void (this.#ids.stored ? this.#reattach(this.#ids.stored) : this.#bootstrap());
         break;
       case "skin.changed":
-        this.#applySkin(ev.payload);
+        this.#theme.skin(ev.payload);
         break;
       // The goal and loop line: every set, pause, resume, stop, wakeup and judged turn.
       case "session.control.update":
         this.automation.apply(ev.session_id ?? this.sid, ev.payload?.control);
         return;
       case "gateway.reconnecting":
-        this.#reconnect(ev.payload?.attempt ?? 1, ev.payload?.delay_ms ?? 0);
+        this.#reconnect.redialing(ev.payload?.attempt ?? 1, ev.payload?.delay_ms ?? 0);
         break;
       case "session.info": {
         const cwd = this.info?.cwd;
@@ -72098,7 +72314,7 @@ ${this.composer.text}` : text12 || this.composer.text);
           const own14 = started.own?.item.item;
           t2.started(own14 ? own14.display ?? own14.text : started.text, void 0, own14 ? userImages(own14.images) : []);
         }
-        this.#setTitle(typeof ev.payload?.title === "string" ? ev.payload.title : void 0);
+        this.#title.set(typeof ev.payload?.title === "string" ? ev.payload.title : void 0);
         if (this.info?.cwd && this.info.cwd !== cwd) {
           this.prs.poke();
           this.#reportCwd();
@@ -72116,11 +72332,11 @@ ${this.composer.text}` : text12 || this.composer.text);
         break;
       }
       case "session.title":
-        this.#setTitle(ev.payload?.title);
+        this.#title.set(ev.payload?.title);
         break;
       // A title set by /title or Hermes' auto-titler reaches viewers only as a changed session list.
       case "sessions.changed":
-        this.#readTitle();
+        this.#title.read();
         return;
       // The view fell behind and the owner retired its subscription (the socket is fine, so no
       // reconnect re-attaches it): a fresh resume brings the snapshot and a new subscription.
@@ -72266,7 +72482,6 @@ ${this.composer.text}` : text12 || this.composer.text);
         }
         if (p3) {
           this.#notices.show(p3);
-          this.#armNotices();
         }
         break;
       }
@@ -72374,67 +72589,20 @@ ${this.composer.text}` : text12 || this.composer.text);
       }
     }
   }
-  /** One line for the whole outage: each try replaces it, and re-renders when the wait ends. */
-  #reconnect(attempt, delayMs) {
-    clearTimeout(this.#reconnectTimer);
-    this.#reconnecting = { attempt, dueAt: Date.now() + delayMs };
-    this.#reconnectTimer = setTimeout(() => this.changed(), delayMs + 50);
-    this.#reconnectTimer.unref?.();
-  }
-  #reconnected() {
-    clearTimeout(this.#reconnectTimer);
-    this.#reconnecting = void 0;
-  }
-  #applySkin(skin) {
-    if (skin) {
-      this.#skin = skin;
-      this.#applyTheme();
-    }
-  }
-  #applyTheme() {
-    this.#surface.palette(paletteFor(this.#theme, this.#skin));
-  }
   /** Whose colors the surface wears (`/theme`). */
   get theme() {
-    return this.#theme;
+    return this.#theme.mode;
   }
   /** Switches the theme mode now and keeps it for the next launch. */
   setTheme(mode) {
-    this.#theme = mode;
-    this.#settings.save({ theme: mode });
-    this.#applyTheme();
+    this.#theme.set(mode);
     this.changed();
-  }
-  /** Re-renders when the next `ttl` notice expires, so the strip drops it on time. */
-  #armNotices() {
-    clearTimeout(this.#noticeTimer);
-    const at = this.#notices.nextExpiry();
-    if (at !== void 0) {
-      this.#noticeTimer = setTimeout(() => {
-        this.#notices.current();
-        this.#armNotices();
-        this.changed();
-      }, Math.max(0, at - Date.now()) + 10);
-    }
   }
   /** Relabels the working line; the stream's labels wait while the context is compacted (`status`: a status line's own). */
   #label(label, status = false) {
     if (this.busy && label && (status || !this.#compacting)) {
       this.busy.label = label;
     }
-  }
-  /**
-   * The shared gateway streams a session's reasoning only to a viewer that asks (a session flag,
-   * not a settings write); the work log shows it as thought rows.
-   */
-  #showThoughts(sid) {
-    if (this.#settings.load().thoughts === false) {
-      return;
-    }
-    rpc(this.#gw, "config.set", { key: "show_reasoning", session_id: sid, value: "on" }).catch((error) => {
-      this.transcript.notice(`Could not turn on thoughts: ${error.message}`, "warning");
-      this.changed();
-    });
   }
   /** Sets the reasoning effort for this session, or also as the default of every new one (session/effort.ts). */
   setEffort(value, scope) {
@@ -72606,8 +72774,7 @@ ${this.composer.text}` : text12 || this.composer.text);
       now,
       welcome: { ...this.#welcome, version: this.#welcome.version || backend }
     };
-    const pills = this.#pills(now);
-    this.#hud = this.#hud && pills.includes(this.#hud) ? this.#hud : void 0;
+    this.#hud.prune(this.#pills(now));
     const recent = this.processes.recent(now);
     const exited = recent.filter((p3) => !isRunning2(p3));
     const used = usage?.context_used ?? 0;
@@ -72636,7 +72803,7 @@ ${this.composer.text}` : text12 || this.composer.text);
           onGoal: () => openAutomation(this, "goal"),
           onLoop: () => openAutomation(this, "loop")
         },
-        reconnecting: this.#reconnecting,
+        reconnecting: this.#reconnect.redial,
         ghost: modal ? "" : this.#completion.ghost,
         inputId: INPUT_ID,
         model: info?.model ?? "",
@@ -72690,21 +72857,18 @@ ${this.composer.text}` : text12 || this.composer.text);
         status: {
           compressions: typeof usage?.compressions === "number" ? usage.compressions : void 0,
           notice: this.#notices.current(now),
-          title: this.title || void 0,
+          title: this.#title.text || void 0,
           tokens: typeof usage?.total === "number" ? usage.total : void 0
         },
         todos: (() => {
           const list9 = this.#todos();
           return list9 ? {
             list: list9,
-            onToggle: () => {
-              this.#todosOpen = !this.#todosOpen;
-              this.changed();
-            },
-            open: this.#todosOpen
+            onToggle: () => this.#hud.toggleTodos(),
+            open: this.#hud.todosOpen
           } : void 0;
         })(),
-        focused: modal ? void 0 : this.#hud,
+        focused: modal ? void 0 : this.#hud.focused,
         shells: {
           charts: recent.flatMap((p3) => p3.chart && isRunning2(p3) ? [{ process: p3, view: p3.chart }] : []),
           exited: exited.length,
@@ -72729,7 +72893,7 @@ ${this.composer.text}` : text12 || this.composer.text);
       main: this.transcript.entries.map((e) => entryNode(e, `main.${e.id}`, cx))
     });
     const top = this.overlays.at(-1);
-    const focus = top?.focus ? top.focus(`layer.${top.key}`) : top?.modal || this.#hud ? null : INPUT_ID;
+    const focus = top?.focus ? top.focus(`layer.${top.key}`) : top?.modal || this.#hud.focused ? null : INPUT_ID;
     this.#surface.follow(focus);
   }
 };

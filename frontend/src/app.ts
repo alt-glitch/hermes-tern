@@ -6,7 +6,7 @@
 import { appendFileSync, existsSync } from 'node:fs'
 import { basename } from 'node:path'
 
-import type { SessionResumeResult, SkinPayload, Usage } from '@hermes/shared/gateway-events'
+import type { SessionResumeResult, Usage } from '@hermes/shared/gateway-events'
 import type { ServerRequest } from '@hermes/shared/json-rpc-channel'
 import { parseCommandDispatch } from '@hermes/shared/slash'
 import type { Key, ScrollTo, Session, TspEvent } from '@stencil-hq/tern'
@@ -22,6 +22,10 @@ import logo from '../assets/logo.png'
 import { agentName, Agents } from './agents/store.js'
 import { type ChatPorts, type SessionView, sessionView } from './app/ports.js'
 import { Automation } from './automation.js'
+import { Hud, pills, type Pill, type SheetPill, todos } from './chrome/hud.js'
+import { isLoginNotice, NoticeStrip } from './chrome/notices.js'
+import { Reconnect } from './chrome/reconnect.js'
+import { Theme } from './chrome/theme.js'
 import { copyToClipboard } from './clipboard.js'
 import { type LaunchEnv, readLaunchEnv } from './config/env.js'
 import { localCommand } from './commands.js'
@@ -48,7 +52,6 @@ import { RenderScheduler } from './core/scheduler.js'
 import { fastTier } from './fast.js'
 import { type Busy, busyFrom, ownsEvent, Switches } from './flow.js'
 import { protocolNote, slowStartNotes } from './backendNotes.js'
-import { hudKey, type Pill } from './hud.js'
 import { moaLabel, moaReferenceLabel } from './moa.js'
 import type { Overlay } from './overlay.js'
 import { writeActiveSessionFile } from './hermes/activeSessionFile.js'
@@ -57,7 +60,6 @@ import { type Attachment, imageSize, uploadImage } from './hermes/images.js'
 import { Media } from './media.js'
 import type { ImageSource, NoticeEntry, ToolCall, UserAttachment } from './model.js'
 import { interpolate, shellError, shellExec, shellLines, typedCommands } from './hermes/shell.js'
-import { mutateSession } from './hermes/mutate.js'
 import { sharedPromptId, sharedPromptRequest } from './hermes/sharedPrompts.js'
 import { openAgents } from './overlays/agents.js'
 import { openAutomation } from './overlays/automation.js'
@@ -69,18 +71,19 @@ import { openHelp } from './overlays/help.js'
 import { capsOf } from './modelCaps.js'
 import { promptOverlay, promptTimeoutNotice } from './overlays/prompts.js'
 import { openPrMenu, openPrSheet, openUrl, prsPill } from './overlays/pullRequests.js'
-import { paletteFor } from './palette.js'
 import { allConnected, claimTold, CONNECT_TOOL, connectedMessage, continueMessage, loadConnect, markViewer, POLL_MS, waiting } from './connections.js'
 import { LINK_TOOLS } from './github/links.js'
 import { PullRequests } from './github/store.js'
 import { Cron } from './processes/cron.js'
 import { PrAside } from './prs/aside.js'
 import { applyEffort, cycleEffort, DEFAULT_EFFORT } from './session/effort.js'
+import { showThoughts } from './session/thoughts.js'
+import { SessionTitle } from './session/title.js'
 import { SessionViews } from './session/views.js'
 import { Sidebar } from './sidebar.js'
 import type { SessionHost } from './sessionCommands.js'
 import { ambiguousNotice, CommandCatalog, resolveSlashName } from './slashResolve.js'
-import { isLoginNotice, Notices, statusEffect } from './status.js'
+import { statusEffect } from './status.js'
 import { isRunning as processRuns, Processes, processTone } from './processes/store.js'
 import { hermesAuthor } from './processes/widgets/author.js'
 import { chartMemory } from './processes/widgets/memory.js'
@@ -88,12 +91,11 @@ import { fileSettings, type SettingsSource, type ThemeMode } from './settings.js
 import { type BusyMode, busyModeOf, type OwnAdmission, ServerQueue, type ServerQueued } from './serverQueue.js'
 import { INPUT_ID, SurfaceHost } from './surface/host.js'
 import { runInput } from './surface/input.js'
-import { reportCwd, setTabTitle } from './surface/osc.js'
+import { reportCwd } from './surface/osc.js'
 import { Transcript } from './transcript.js'
 import { internalNotice } from './transcript/messages.js'
 import { storedCompactions } from './compaction.js'
-import type { Reconnecting } from './view/automation.js'
-import { dockNodes, type QueuedRow, todoProgress } from './view/dock.js'
+import { dockNodes, type QueuedRow } from './view/dock.js'
 import { homeTilde } from './view/format.js'
 import { entryNode } from './view/transcript.js'
 import { type AdaptedSnapshot, admissionOf, rpc } from './wire/rpc.js'
@@ -163,10 +165,10 @@ export class App implements ChatPorts {
   readonly sidebar: Sidebar = new Sidebar(this)
   /** The session's standing /goal and /loop (the dock line above the pills and its sheets). */
   readonly automation: Automation = new Automation(this)
-  /** The session's title, as Hermes names it (`session.title`). */
-  title = ''
-  /** The todo panel above the composer is open. */
-  #todosOpen = false
+  /** The session's title, on the status strip and the tab. */
+  readonly #title: SessionTitle = new SessionTitle(this)
+  /** The pills above the composer: the one holding the keys, and the todo panel's fold. */
+  readonly #hud = new Hud({ changed: () => this.changed(), open: pill => this.#openPill(pill) })
   /** The conversation's PRs; links are stored under the stored session id the tools see. */
   readonly prs: PullRequests = new PullRequests({
     changed: () => this.changed(),
@@ -227,23 +229,19 @@ export class App implements ChatPorts {
   #reportedCwd: string | undefined
   /** Images being read or uploaded for the draft: an "attaching…" chip each until they land. */
   #attaching: { name: string }[] = []
-  /** The skin the gateway last reported; only the `skin` theme mode wears it. */
-  #skin: SkinPayload | undefined
-  #theme: ThemeMode
+  /** Whose colors the surface wears, and the gateway's skin. */
+  readonly #theme: Theme
   /** Background processes get live charts (settings.json `jobCharts`). */
   readonly #jobCharts: boolean
   /** The prompt whose Copy button reads Copied, until the timer clears it. */
   #copied: string | undefined
   #copiedTimer: NodeJS.Timeout | undefined
-  /** The pill above the composer holding the keys (Down from an empty prompt), if any. */
-  #hud: Pill | undefined
-  /** The gateway connection is down until the next gateway.ready (its one notice is shown). */
-  #offline = false
+  /** The gateway connection: down until the next gateway.ready, and its redial line. */
+  readonly #reconnect = new Reconnect(this)
   /** Stray backend output was reported once already. */
   #protocolWarned = false
   /** The gateway's keyed notices (credits, a slow start); the newest rides the status strip. */
-  readonly #notices = new Notices()
-  #noticeTimer: NodeJS.Timeout | undefined
+  readonly #notices = new NoticeStrip(this)
   /**
    * A compaction runs (Hermes' own, or /compress): the working line says so until its done edge,
    * and with no turn running the dock shows it and prompts queue behind it.
@@ -251,9 +249,6 @@ export class App implements ChatPorts {
   #compacting: { since: object; startedAt: number } | undefined
   /** The status warning shown last, so a repeated one stays one line. */
   #lastStatusNote: string | undefined
-  /** The gateway is being redialled (`gateway.reconnecting`) until the next gateway.ready. */
-  #reconnecting: Reconnecting | undefined
-  #reconnectTimer: NodeJS.Timeout | undefined
 
   /** `launch` and `settings` are what entry.ts read once at startup; unset, each reads its default. */
   constructor(tern: Session, gw: GatewayClient, version: string, { launch = readLaunchEnv(), settings = fileSettings() }: { launch?: LaunchEnv; settings?: SettingsSource } = {}) {
@@ -264,7 +259,7 @@ export class App implements ChatPorts {
     this.#settings = settings
     this.#startupImage = launch.image
     const saved = settings.load()
-    this.#theme = saved.theme ?? 'tern'
+    this.#theme = new Theme({ palette: palette => this.#surface.palette(palette), settings }, saved.theme ?? 'tern')
     this.#jobCharts = saved.jobCharts !== false
     this.#completion = new Completion(this, gw, () => this.sid)
     this.#catalog = new CommandCatalog(gw)
@@ -294,6 +289,11 @@ export class App implements ChatPorts {
     this.#ids = { live: this.#ids.live, stored: id === null ? null : storedSessionId(id) }
   }
 
+  /** The session's title, as Hermes names it (`session.title`); '' while it has none. */
+  get title(): string {
+    return this.#title.text
+  }
+
   /** The gateway, for overlays that issue their own RPCs. */
   get gw(): GatewayClient {
     return this.#gw
@@ -301,7 +301,7 @@ export class App implements ChatPorts {
 
   async run(): Promise<number> {
     this.#surface = new SurfaceHost(this.#tern, 'hermes')
-    this.#applyTheme()
+    this.#theme.apply()
 
     if (this.#tern.caps.features.includes('blobs')) {
       this.#welcome.logo = this.#tern.blob(logo, 'image/png')
@@ -336,16 +336,12 @@ export class App implements ChatPorts {
     })
     this.#gw.on('exit', (code: null | number) => {
       // Once per outage: each failed redial emits another exit. An attached gateway (and its turn) lives on.
-      if (!this.#offline) {
-        this.transcript.notice(
-          this.#gw.attached
-            ? 'Lost the connection to Hermes; reconnecting…'
-            : `The agent backend exited${code === null ? '' : ` (${code})`}.`,
-          this.#gw.attached ? 'warning' : 'error'
-        )
+      const lost = this.#reconnect.lost(this.#gw.attached, code)
+
+      if (lost) {
+        this.transcript.notice(lost.text, lost.tone)
       }
 
-      this.#offline = true
       // The runtime session died with the process: prompts queue until the next gateway.ready reattaches.
       this.#ids = { live: null, stored: this.#ids.stored }
       this.busy = null
@@ -385,11 +381,14 @@ export class App implements ChatPorts {
    * Quitting calls it once the sessions detached (or the wait gave up), before Tern closes.
    */
   dispose() {
-    for (const timer of [this.#copiedTimer, this.#noticeTimer, this.#reconnectTimer, this.#titleTimer, this.#connectTimer]) {
+    for (const timer of [this.#copiedTimer, this.#connectTimer]) {
       clearTimeout(timer)
     }
 
     this.#timers.dispose()
+    this.#notices.dispose()
+    this.#reconnect.dispose()
+    this.#title.dispose()
     this.agents.dispose()
     this.processes.dispose()
     this.prs.dispose()
@@ -570,96 +569,61 @@ export class App implements ChatPorts {
     }
 
     if (ev.ev === 'focus' && ev.id === INPUT_ID && !this.overlays.at(-1)?.modal) {
-      this.#hud = undefined
+      this.#hud.release()
       this.#surface.focus(INPUT_ID)
     }
   }
 
   /** The agent's todo list while it matters: a turn runs, or something on it is still open. */
   #todos() {
-    const list = this.transcript.currentTodos()
-
-    if (!list?.length) {
-      return undefined
-    }
-
-    const { done, total } = todoProgress(list)
-
-    return total && (this.busy || done < total) ? list : undefined
+    return todos(this.transcript.currentTodos(), Boolean(this.busy))
   }
 
   /** The pills above the composer, left to right. */
   #pills(now = Date.now()): Pill[] {
-    return [
-      // While a turn runs the todo pill rides the working line, where the keys don't reach it.
-      ...(this.#todos() && !this.busy ? (['todos'] as const) : []),
-      ...(this.agents.running().length ? (['agents'] as const) : []),
-      ...(this.processes.recent(now).length ? (['shells'] as const) : []),
-      ...(this.prs.entries().length ? (['prs'] as const) : []),
-      ...(this.automation.goal ? (['goal'] as const) : []),
-      ...(this.automation.loop(now) ? (['loop'] as const) : [])
-    ]
+    return pills({
+      agents: this.agents.running().length,
+      busy: Boolean(this.busy),
+      goal: Boolean(this.automation.goal),
+      loop: Boolean(this.automation.loop(now)),
+      prs: this.prs.entries().length,
+      shells: this.processes.recent(now).length,
+      todos: this.#todos()
+    })
   }
 
   /** Down from an empty prompt focuses the pills; ←/→, Enter and Esc/↑ while one holds the keys. */
   #hudKey(key: Key): boolean {
-    const out = hudKey(key, {
-      focused: this.#hud,
+    return this.#hud.key(key, {
       idle: !this.composer.text && !this.composer.browsing && !this.#completion.open,
       pills: this.#pills()
     })
-
-    this.#hud = out.focused
-
-    if (out.open === 'agents') {
-      openAgents(this)
-    } else if (out.open === 'shells') {
-      openBackground(this)
-    } else if (out.open === 'prs') {
-      openPrMenu(this)
-    } else if (out.open === 'goal' || out.open === 'loop') {
-      openAutomation(this, out.open)
-    } else if (out.open === 'todos') {
-      this.#todosOpen = !this.#todosOpen
-      this.changed()
-    }
-
-    return out.consumed
   }
 
-  /**
-   * The session's name, on the status strip and on Tern's tab: OSC 2 names the pane, and the tab
-   * follows it (the surface's own `hermes` title stands only until a program sets one).
-   */
-  #titleTimer: NodeJS.Timeout | undefined
+  /** Opens the sheet behind a pill. */
+  #openPill(pill: SheetPill) {
+    switch (pill) {
+      case 'agents':
+        openAgents(this)
 
-  /**
-   * Reads the session's title from the session list, a moment after the list changed: the shared
-   * gateway tells viewers only that (`sessions.changed`) when /title or the auto-titler names it,
-   * and serves no `session.title`. The session is among the newest rows; its stored id finds it.
-   */
-  #readTitle() {
-    clearTimeout(this.#titleTimer)
-    this.#titleTimer = setTimeout(() => void this.#fetchTitle(), 400)
-  }
+        break
 
-  async #fetchTitle() {
-    const sid = this.sid
-    const ids = new Set<string | null>([sid, this.storedSid].filter(Boolean))
+      case 'shells':
+        openBackground(this)
 
-    if (!sid) {
-      return
-    }
+        break
 
-    try {
-      const r = await rpc(this.#gw, 'session.list', { limit: 20 })
-      const row = r?.sessions?.find(x => ids.has(x.id ?? '') || ids.has(x.resolved_id ?? ''))
+      case 'prs':
+        openPrMenu(this)
 
-      if (sid === this.sid && this.#setTitle(row?.title)) {
-        this.changed()
-      }
-    } catch {
-      // No session list: the title still arrives with session.info.
+        break
+
+      case 'goal':
+
+      case 'loop':
+        openAutomation(this, pill)
+
+        break
     }
   }
 
@@ -671,19 +635,6 @@ export class App implements ChatPorts {
       this.#reportedCwd = cwd
       reportCwd(cwd)
     }
-  }
-
-  #setTitle(title: string | undefined): boolean {
-    const next = title?.trim()
-
-    if (!next || next === this.title) {
-      return false
-    }
-
-    this.title = next
-    setTabTitle(next)
-
-    return true
   }
 
   #connectTimer: NodeJS.Timeout | undefined
@@ -1639,23 +1590,7 @@ export class App implements ChatPorts {
     }
 
     if (title && this.sid) {
-      await this.#rename(this.sid, title)
-    }
-  }
-
-  /** Names session `sid` (`/new <title>`): the shared gateway's rename mutation, a private one's `session.title`. */
-  async #rename(sid: string, title: string) {
-    try {
-      const r = this.#gw.isCanonical
-        ? await mutateSession(this.#gw, sid, 'rename', { title })
-        : await rpc(this.#gw, 'session.title', { session_id: sid, title })
-
-      if (sid === this.sid && this.#setTitle(String(r?.title ?? title))) {
-        this.changed()
-      }
-    } catch (error) {
-      this.transcript.notice(`Could not name the session: ${errorText(error)}`, 'warning')
-      this.changed()
+      await this.#title.rename(this.sid, title)
     }
   }
 
@@ -1749,16 +1684,14 @@ export class App implements ChatPorts {
 
     const previousStored = this.#ids.stored
     this.#ids = ref
-    this.#showThoughts(ref.live)
+    showThoughts({ gw: this.#gw, notice: (text, tone) => this.notice(text, tone), settings: this.#settings }, ref.live)
     // This pane shows the session now: the plugin's Python half sends its connect results here as a card.
     markViewer(durable(ref), previousStored)
     writeActiveSessionFile(durable(ref))
     this.info = r.info ?? this.info
     this.usage = r.info?.usage ?? null
     // Another session: its own name (or none yet) on the tab.
-    this.title = ''
-    this.#setTitle(typeof r.info?.title === 'string' ? r.info.title : undefined)
-    this.#readTitle()
+    this.#title.adopt(typeof r.info?.title === 'string' ? r.info.title : undefined)
     this.#reportCwd()
     // A resumed session may be mid-turn: Esc Esc stops it and new prompts go as busy_input_mode says.
     this.busy = busyFrom(r)
@@ -1890,16 +1823,15 @@ export class App implements ChatPorts {
 
     switch (ev.type) {
       case 'gateway.ready':
-        this.#offline = false
-        this.#reconnected()
-        this.#applySkin(ev.payload?.skin)
+        this.#reconnect.ready()
+        this.#theme.skin(ev.payload?.skin)
         // A reconnect's ready reattaches the shown session; only a sessionless app bootstraps.
         void (this.#ids.stored ? this.#reattach(this.#ids.stored) : this.#bootstrap())
 
         break
 
       case 'skin.changed':
-        this.#applySkin(ev.payload)
+        this.#theme.skin(ev.payload)
 
         break
 
@@ -1910,7 +1842,7 @@ export class App implements ChatPorts {
         return
 
       case 'gateway.reconnecting':
-        this.#reconnect(ev.payload?.attempt ?? 1, ev.payload?.delay_ms ?? 0)
+        this.#reconnect.redialing(ev.payload?.attempt ?? 1, ev.payload?.delay_ms ?? 0)
 
         break
 
@@ -1927,7 +1859,7 @@ export class App implements ChatPorts {
           t.started(own ? (own.display ?? own.text) : started.text, undefined, own ? userImages(own.images) : [])
         }
 
-        this.#setTitle(typeof ev.payload?.title === 'string' ? ev.payload.title : undefined)
+        this.#title.set(typeof ev.payload?.title === 'string' ? ev.payload.title : undefined)
 
         // Another folder: another branch, maybe another PR.
         if (this.info?.cwd && this.info.cwd !== cwd) {
@@ -1953,13 +1885,13 @@ export class App implements ChatPorts {
       }
 
       case 'session.title':
-        this.#setTitle(ev.payload?.title)
+        this.#title.set(ev.payload?.title)
 
         break
 
       // A title set by /title or Hermes' auto-titler reaches viewers only as a changed session list.
       case 'sessions.changed':
-        this.#readTitle()
+        this.#title.read()
 
         return
 
@@ -2179,7 +2111,6 @@ export class App implements ChatPorts {
 
         if (p) {
           this.#notices.show(p)
-          this.#armNotices()
         }
 
         break
@@ -2340,55 +2271,15 @@ export class App implements ChatPorts {
     }
   }
 
-  /** One line for the whole outage: each try replaces it, and re-renders when the wait ends. */
-  #reconnect(attempt: number, delayMs: number) {
-    clearTimeout(this.#reconnectTimer)
-    this.#reconnecting = { attempt, dueAt: Date.now() + delayMs }
-    this.#reconnectTimer = setTimeout(() => this.changed(), delayMs + 50)
-    this.#reconnectTimer.unref?.()
-  }
-
-  #reconnected() {
-    clearTimeout(this.#reconnectTimer)
-    this.#reconnecting = undefined
-  }
-
-  #applySkin(skin: SkinPayload | null | undefined) {
-    if (skin) {
-      this.#skin = skin
-      this.#applyTheme()
-    }
-  }
-
-  #applyTheme() {
-    this.#surface.palette(paletteFor(this.#theme, this.#skin))
-  }
-
   /** Whose colors the surface wears (`/theme`). */
   get theme(): ThemeMode {
-    return this.#theme
+    return this.#theme.mode
   }
 
   /** Switches the theme mode now and keeps it for the next launch. */
   setTheme(mode: ThemeMode) {
-    this.#theme = mode
-    this.#settings.save({ theme: mode })
-    this.#applyTheme()
+    this.#theme.set(mode)
     this.changed()
-  }
-
-  /** Re-renders when the next `ttl` notice expires, so the strip drops it on time. */
-  #armNotices() {
-    clearTimeout(this.#noticeTimer)
-    const at = this.#notices.nextExpiry()
-
-    if (at !== undefined) {
-      this.#noticeTimer = setTimeout(() => {
-        this.#notices.current()
-        this.#armNotices()
-        this.changed()
-      }, Math.max(0, at - Date.now()) + 10)
-    }
   }
 
   /** Relabels the working line; the stream's labels wait while the context is compacted (`status`: a status line's own). */
@@ -2396,21 +2287,6 @@ export class App implements ChatPorts {
     if (this.busy && label && (status || !this.#compacting)) {
       this.busy.label = label
     }
-  }
-
-  /**
-   * The shared gateway streams a session's reasoning only to a viewer that asks (a session flag,
-   * not a settings write); the work log shows it as thought rows.
-   */
-  #showThoughts(sid: string) {
-    if (this.#settings.load().thoughts === false) {
-      return
-    }
-
-    rpc(this.#gw, 'config.set', { key: 'show_reasoning', session_id: sid, value: 'on' }).catch((error: Error) => {
-      this.transcript.notice(`Could not turn on thoughts: ${error.message}`, 'warning')
-      this.changed()
-    })
   }
 
   /** Sets the reasoning effort for this session, or also as the default of every new one (session/effort.ts). */
@@ -2639,9 +2515,8 @@ export class App implements ChatPorts {
       welcome: { ...this.#welcome, version: this.#welcome.version || backend }
     }
 
-    const pills = this.#pills(now)
     // A pill that left (its last process aged out) hands the keys back.
-    this.#hud = this.#hud && pills.includes(this.#hud) ? this.#hud : undefined
+    this.#hud.prune(this.#pills(now))
     const recent = this.processes.recent(now)
     const exited = recent.filter(p => !processRuns(p))
     const used = usage?.context_used ?? 0
@@ -2673,7 +2548,7 @@ export class App implements ChatPorts {
           onGoal: () => openAutomation(this, 'goal'),
           onLoop: () => openAutomation(this, 'loop')
         },
-        reconnecting: this.#reconnecting,
+        reconnecting: this.#reconnect.redial,
         ghost: modal ? '' : this.#completion.ghost,
         inputId: INPUT_ID,
         model: info?.model ?? '',
@@ -2727,7 +2602,7 @@ export class App implements ChatPorts {
         status: {
           compressions: typeof usage?.compressions === 'number' ? usage.compressions : undefined,
           notice: this.#notices.current(now),
-          title: this.title || undefined,
+          title: this.#title.text || undefined,
           tokens: typeof usage?.total === 'number' ? usage.total : undefined
         },
         todos: (() => {
@@ -2736,15 +2611,12 @@ export class App implements ChatPorts {
           return list
             ? {
                 list,
-                onToggle: () => {
-                  this.#todosOpen = !this.#todosOpen
-                  this.changed()
-                },
-                open: this.#todosOpen
+                onToggle: () => this.#hud.toggleTodos(),
+                open: this.#hud.todosOpen
               }
             : undefined
         })(),
-        focused: modal ? undefined : this.#hud,
+        focused: modal ? undefined : this.#hud.focused,
         shells: {
           charts: recent.flatMap(p => (p.chart && processRuns(p) ? [{ process: p, view: p.chart }] : [])),
           exited: exited.length,
@@ -2773,7 +2645,7 @@ export class App implements ChatPorts {
 
     // The top overlay's field holds the caret; a modal sheet without one takes it from the composer.
     const top = this.overlays.at(-1)
-    const focus = top?.focus ? top.focus(`layer.${top.key}`) : top?.modal || this.#hud ? null : INPUT_ID
+    const focus = top?.focus ? top.focus(`layer.${top.key}`) : top?.modal || this.#hud.focused ? null : INPUT_ID
 
     this.#surface.follow(focus)
   }

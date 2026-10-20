@@ -19,6 +19,15 @@ export const TODO_LOOK = {
   pending: { item: 'pending' }
 } as const satisfies Record<Todo['status'], TodoLook>
 
+/** Done and total (cancelled ones drop out), and the item under way (else the next one). */
+export function todoProgress(list: readonly Todo[]): { done: number; total: number; current: string } {
+  const live = list.filter(t => t.status !== 'cancelled')
+  const done = live.filter(t => t.status === 'completed').length
+  const current = live.find(t => t.status === 'in_progress') ?? live.find(t => t.status === 'pending')
+
+  return { current: current?.content ?? '', done, total: live.length }
+}
+
 /** The agent's todo list as its newest snapshot in `entries` left it (any turn), if it ever made one. */
 export function currentTodos(entries: readonly Entry[]): Todo[] | undefined {
   for (let i = entries.length - 1; i >= 0; i--) {
