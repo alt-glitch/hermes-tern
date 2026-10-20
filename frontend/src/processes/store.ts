@@ -8,7 +8,7 @@
 import type { GatewayClient } from '@tui/gatewayClient.js'
 
 import type { BackgroundProcess, ToolCall } from '../model.js'
-import { record, type Transcript } from '../transcript.js'
+import { isWatchCall, record, type Transcript } from '../transcript.js'
 
 import { Charts, type ChartsOptions } from './widgets/registry.js'
 
@@ -492,11 +492,21 @@ export function linkCalls(calls: readonly ToolCall[], procs: readonly Background
   const claimed = new Set<string>()
 
   for (const call of calls) {
-    const p = byId.get(processIdOf(call) ?? '')
+    const p = call.name === 'terminal' ? byId.get(processIdOf(call) ?? '') : undefined
 
     if (p) {
       owners.set(call, p)
       claimed.add(p.id)
+    }
+  }
+
+  // A process tool call names its process by id or a unique prefix of it; many calls may watch one.
+  for (const call of calls) {
+    const ref = isWatchCall(call) ? String(call.args.session_id).trim() : ''
+    const matches = ref ? procs.filter(p => p.id.startsWith(ref)) : []
+
+    if (matches.length === 1) {
+      owners.set(call, matches[0]!)
     }
   }
 
@@ -505,7 +515,7 @@ export function linkCalls(calls: readonly ToolCall[], procs: readonly Background
   for (const call of calls) {
     const command = typeof call.args.command === 'string' ? call.args.command.trim() : ''
 
-    if (owners.has(call) || processIdOf(call) || !command) {
+    if (owners.has(call) || processIdOf(call) || !command || call.name !== 'terminal') {
       continue
     }
 

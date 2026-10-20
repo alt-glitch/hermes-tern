@@ -1,8 +1,15 @@
+import { mkdtempSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+
 import { describe, expect, it } from 'vitest'
 
-import type { BackgroundProcess } from '../model.js'
+import type { BackgroundProcess, ToolCall } from '../model.js'
+import { linkCalls } from '../processes/store.js'
+import { isWatchCall } from '../transcript.js'
 import { promptSources, renderPrompt, SYSTEM_PROMPT } from '../processes/widgets/author.js'
 import { formatNumber, formatTrend } from '../processes/widgets/format.js'
+import { chartMemory } from '../processes/widgets/memory.js'
 import { Charts, OutputTap } from '../processes/widgets/registry.js'
 import { ChartRuntime, sparkDomain } from '../processes/widgets/runtime.js'
 import { compilePattern, parseValue, type Spec, validateSpec } from '../processes/widgets/spec.js'
@@ -316,5 +323,61 @@ describe('the author prompt', () => {
     expect(prompt).toContain('python train.py')
     expect(prompt).toContain('- title: required')
     expect(SYSTEM_PROMPT).toContain('"match":"^req \\\\d+ rps=(?P<rps>[\\\\d.]+)')
+  })
+})
+
+describe('process calls show their process', () => {
+  const call = (name: string, args: Record<string, unknown>, result?: unknown): ToolCall => ({
+    args,
+    argsText: '',
+    context: '',
+    id: `${name}-${JSON.stringify(args)}`,
+    name,
+    result,
+    startedAt: 0,
+    status: 'done'
+  })
+
+  it('links a wait, poll or log by its id prefix, as omp tiles the jobs a wait watches', () => {
+    const procs = [proc({ id: 'proc_4dae56ca81f6' }), proc({ id: 'proc_9b00aa', command: 'sleep 9' })]
+    const start = call('terminal', { background: true, command: 'bench --goal 60' }, { session_id: 'proc_4dae56ca81f6' })
+    const wait = call('process', { action: 'wait', session_id: 'proc_4dae' })
+    const poll = call('process', { action: 'poll', session_id: 'proc_4dae56ca81f6' })
+    const vague = call('process', { action: 'wait', session_id: 'proc_' })
+
+    expect([wait, poll, vague, call('process', { action: 'kill', session_id: 'proc_4dae' })].map(isWatchCall)).toEqual([true, true, true, false])
+    const owners = linkCalls([start, wait, poll, vague], procs)
+    expect(owners.get(start)?.id).toBe('proc_4dae56ca81f6')
+    expect(owners.get(wait)?.id).toBe('proc_4dae56ca81f6')
+    expect(owners.get(poll)?.id).toBe('proc_4dae56ca81f6')
+    // A prefix two processes share names neither.
+    expect(owners.has(vague)).toBe(false)
+  })
+})
+
+describe('chart memory', () => {
+  it('lets a later pane chart a process without asking the model again', async () => {
+    const memory = chartMemory(join(mkdtempSync(join(tmpdir(), 'charts-')), 'charts'))
+    let asked = 0
+    const author = async () => (asked++, LOAD)
+    const p = proc({ output: lines(5) })
+
+    new Charts(() => undefined, { author, memory, now: () => 20_000 }).view(p)
+    await new Promise(r => setTimeout(r, 0))
+    expect(asked).toBe(1)
+
+    const later = new Charts(() => undefined, { author, memory, now: () => 30_000 }).view(p)
+    expect(later?.state).toBe('live')
+    expect(asked).toBe(1)
+  })
+
+  it('remembers a decline, and ignores a file that is not a spec', () => {
+    const dir = join(mkdtempSync(join(tmpdir(), 'charts-')), 'charts')
+    const memory = chartMemory(dir)
+    memory.save('proc_1', 'skip')
+    expect(memory.load('proc_1')).toBe('skip')
+    memory.save('proc_2', { title: 'x' } as unknown as Spec)
+    expect(memory.load('proc_2')).toBeUndefined()
+    expect(memory.load('../etc/passwd')).toBeUndefined()
   })
 })

@@ -11,8 +11,8 @@ import { allConnected, CONNECT_TOOL, type ConnectTarget, connectTargets, isConne
 import { localSource, shownImage } from '../media.js'
 import type { Subagent, Todo, ToolCall } from '../model.js'
 import { isRunning as processRuns, processElapsed, processIdOf, processTone, processVerdict, watchersOf } from '../processes/store.js'
-import { primaryNode } from '../processes/widgets/view.js'
-import { isBackgroundCall, record } from '../transcript.js'
+import { primaryNode, tilesNode } from '../processes/widgets/view.js'
+import { isBackgroundCall, isProcessTool, isWatchCall, record } from '../transcript.js'
 import { appsOf } from '../workLog.js'
 
 import { commandLine, describeCommand } from './describe.js'
@@ -257,7 +257,9 @@ function cardOf(call: ToolCall, now: number): Card {
       }
   }
 
-  const look = call.name.startsWith('browser')
+  const look = isProcessTool(call.name)
+    ? { name: 'terminal', title: PROCESS_ACTIONS[String(call.args.action)] ?? 'Process' }
+    : call.name.startsWith('browser')
     ? { name: 'browser', title: humanize(call.name.replace(/^browser_?/, '')) || 'Browser' }
     : call.name === 'session_search'
       ? { name: 'search', title: 'Session search' }
@@ -285,14 +287,29 @@ function cardOf(call: ToolCall, now: number): Card {
     }
   }
 
+  // A process wait, poll or log shows its process's chart, as omp's `wait` card tiles its jobs.
+  const chart = isWatchCall(call) && call.process?.chart ? tilesNode([{ process: call.process, view: call.process.chart }]) : undefined
+
   return {
     ...look,
-    body: genericBody(call),
-    folded: true,
+    body: [...(chart ? [chart] : []), ...genericBody(call)],
+    folded: !chart,
     frame: 'inline',
-    target: str(call.args.query) ?? str(call.args.url) ?? (call.context || undefined),
+    target: (isProcessTool(call.name) && call.process ? commandLine(call.process.command) : undefined) ?? str(call.args.query) ?? str(call.args.url) ?? (call.context || undefined),
     targetKind: str(call.args.url) ? 'path' : str(call.args.query) ? 'query' : 'text'
   }
+}
+
+/** The process tool's actions as a card's title. */
+const PROCESS_ACTIONS: Record<string, string> = {
+  close: 'Close process input',
+  kill: 'Stop process',
+  list: 'List processes',
+  log: 'Read process output',
+  poll: 'Check process',
+  submit: 'Send to process',
+  wait: 'Wait for process',
+  write: 'Write to process'
 }
 
 /** `instead`, when given, takes the output's place (a background call's process line). */

@@ -64,8 +64,11 @@ on the plugin applies the rules to every new line itself, with no further model 
 <p align="center"><img alt="The shells pill with a job's figure and mini chart, its hover card above a column chart with a dashed goal line" src="docs/images/job-chart.png" width="600"></p>
 
 The shells pill shows the freshest figure and a mini chart; hover it for a tile per running
-process. The background terminal card draws the primary chart under its live line, and the
-Background sheet (`/ps`, ⌥J) the whole chart above the output. Goals the command states draw as
+process. The background terminal card draws the primary chart under its live line, a
+`process_manage` wait or poll on the process draws its tile (in view while the agent waits, as
+omp's `wait` card), and the Background sheet (`/ps`, ⌥J) the whole chart above the output. Each
+process's rules are kept in `$HERMES_HOME/plugin-data/hermes-tern/charts/`, so another pane on the
+session, or a resumed one, charts it without asking the model again. Goals the command states draw as
 dashed lines. The request goes to the `job_widget` auxiliary task, so `auxiliary.job_widget` in
 `config.yaml` picks a cheap model for it, and Hermes redacts secrets in the samples before they
 leave. Turn charts off with `"jobCharts": false` in `$HERMES_HOME/hermes-tern/settings.json`.

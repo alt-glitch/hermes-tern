@@ -7,6 +7,7 @@
 import type { BackgroundProcess } from '../../model.js'
 
 import type { Author, AuthorRequest } from './author.js'
+import type { ChartMemory } from './memory.js'
 import { ChartRuntime, sampleLines, type TextChunk, type TextSource } from './runtime.js'
 import { type Spec, specSkip, validateSpec } from './spec.js'
 import type { ChartView } from './types.js'
@@ -105,6 +106,8 @@ export class OutputTap implements TextSource {
 export interface ChartsOptions {
   /** Writes specs; absent = fallback views only. */
   author?: Author
+  /** Where each process's rules (or the model's decline) are kept between panes. */
+  memory?: ChartMemory
   /** Whether charts are on; read on every call. */
   enabled?: () => boolean
   now?: () => number
@@ -143,6 +146,7 @@ interface Entry {
 export class Charts {
   readonly #entries = new Map<string, Entry>()
   readonly #author: Author | undefined
+  readonly #memory: ChartMemory | undefined
   readonly #enabled: () => boolean
   readonly #now: () => number
   readonly #changed: () => void
@@ -154,6 +158,7 @@ export class Charts {
   constructor(changed: () => void, options: ChartsOptions = {}) {
     this.#changed = changed
     this.#author = options.author
+    this.#memory = options.memory
     this.#enabled = options.enabled ?? (() => true)
     this.#now = options.now ?? Date.now
     this.#o = { ...DEFAULTS, ...Object.fromEntries(Object.entries(options).filter(([k, v]) => k in DEFAULTS && v !== undefined)) }
@@ -169,11 +174,13 @@ export class Charts {
 
     if (!entry) {
       const tap = new OutputTap(p.command)
-      const runtime = new ChartRuntime(undefined, p.startedAt, this.#now)
+      // Rules another pane (or this one, before) already got for the process.
+      const known = this.#memory?.load(p.id)
+      const runtime = new ChartRuntime(known === 'skip' ? undefined : known, p.startedAt, this.#now)
 
       entry = {
         attempts: 0,
-        done: false,
+        done: known === 'skip',
         frozen: false,
         process: p,
         runtime,
@@ -326,6 +333,10 @@ export class Charts {
           // No model can write specs, or nothing in the output is worth charting.
           entry.done = true
 
+          if (answer !== undefined) {
+            this.#memory?.save(entry.process.id, 'skip')
+          }
+
           break
         }
 
@@ -352,6 +363,7 @@ export class Charts {
     }
 
     if (spec) {
+      this.#memory?.save(entry.process.id, spec)
       // A new spec rereads the output from its oldest retained text.
       entry.runtime = new ChartRuntime(spec, entry.process.startedAt, this.#now)
       entry.tap.update(entry.process.output)
