@@ -263,11 +263,12 @@ describe('the composer chip of an attached image', () => {
 
     expect(n).toMatchObject({ k: 'card', p: { head: [{ t: 'pasted image 1' }], role: 'omp.composer.chip' } })
     expect(n.p?.['actions']).toBeUndefined()
-    expect(n.c?.map(c => c.k)).toEqual(['image', 'text', 'icon'])
+    expect(n.c?.map(c => c.k)).toEqual(['image', 'text', 'el'])
     // No click of its own on the thumbnail: Tern opens it in its lightbox.
     expect(n.c?.[0]?.p).toMatchObject({ blob: 'b1' })
     expect(n.c?.[0]?.p?.['actions']).toBeUndefined()
-    expect(n.c?.[2]?.p).toMatchObject({ actions: { click: 'click' }, name: 'x', role: 'hermes.composer.remove' })
+    expect(n.c?.[2]).toMatchObject({ k: 'el', p: { actions: { click: 'click' }, aria: 'Remove pasted image 1', role: 'hermes.composer.remove', tag: 'button' } })
+    expect(n.c?.[2]?.c?.[0]?.p).toMatchObject({ name: 'x' })
   })
 
   it('says it is attaching while the image is read and uploaded, and can be removed meanwhile', () => {

@@ -3,6 +3,7 @@
 import { allConnected, type ConnectTarget, connectTargets, isConnectCall, type SettleReason, waiting } from '../../../connections/cards.js'
 import { optional } from '../../../core/assert.js'
 import type { ToolCall } from '../../../model.js'
+import { pressable } from '../../ui/button.js'
 import { namedStep } from '../steps.js'
 import type { Card, ToolView } from '../types.js'
 
@@ -80,11 +81,14 @@ function connectCard(call: ToolCall): Card {
           truncate="end"
           wrap="none"
         />
-        {t.url && !settled && waiting(t) ? (
-          <row actions={{ click: `connect-open=${ref}:${t.name}` }} align="center" gap="xs" key="go" role="hermes.connect.open" title={t.url}>
-            <text key="t" text="Authorize ↗" />
-          </row>
-        ) : null}
+        {t.url && !settled && waiting(t)
+          ? pressable(
+              { action: `connect-open=${ref}:${t.name}`, key: 'go', name: `Authorize ${t.title}`, role: 'hermes.connect.open' },
+              <row align="center" gap="xs" key="face" title={t.url}>
+                <text key="t" text="Authorize ↗" />
+              </row>
+            )
+          : null}
       </row>
     )
   })
@@ -115,11 +119,14 @@ function connectCard(call: ToolCall): Card {
                 ]}
                 wrap="word"
               />
-              {open.length ? (
-                <row actions={{ click: `connect-continue=${ref}` }} align="center" key="go" role="hermes.connect.continue">
-                  <text key="t" text="Done, continue" />
-                </row>
-              ) : null}
+              {open.length
+                ? pressable(
+                    { action: `connect-continue=${ref}`, key: 'go', name: 'Done, continue', role: 'hermes.connect.continue' },
+                    <row align="center" key="face">
+                      <text key="t" text="Done, continue" />
+                    </row>
+                  )
+                : null}
             </row>
           ])
     ],

@@ -242,6 +242,19 @@ export function ofKind<T extends { kind: string }, K extends T['kind']>(value: T
   return value
 }
 
+/**
+ * The control a node draws: for the native button `pressable` puts around one (view/ui/button.tsx),
+ * the control inside, which keeps omp's role; any other node is its own.
+ */
+export function face(n: Node): Node {
+  return n.kind === 'el' && n.props['tag'] === 'button' && n.props['role'] === undefined ? (n.children[0] ?? n) : n
+}
+
+/** `face()` on the wire form. */
+export function faceJson(n: NodeJson): NodeJson {
+  return n.k === 'el' && n.p?.['tag'] === 'button' && n.p['role'] === undefined ? (n.c?.[0] ?? n) : n
+}
+
 /** `n` as it goes on the wire, `{k, p?, c?}`. */
 export function tree(n: JSX.Element): NodeJson {
   if (!(n instanceof Node)) {

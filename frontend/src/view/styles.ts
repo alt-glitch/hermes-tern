@@ -259,6 +259,8 @@ export const STYLES = css`
   /* An image the next prompt carries: Tern's omp chip (thumbnail, name, size) with a ✕ after
      them, in a third column of its grid. */
   .sf-card[data-role='omp.composer.chip'] > .sf-card-body > [data-role='hermes.composer.remove'] {
+    align-items: center;
+    justify-content: center;
     grid-column: 3;
     grid-row: 1 / 3;
     align-self: center;
@@ -704,4 +706,22 @@ export const STYLES = css`
     font-size: 12px;
   }
 
+  /* The native button a control sits in (pressable, view/ui/button.tsx) draws nothing itself: as
+     wide as the control in a row, as wide as the line in a column. One that carries a role of
+     omp's (Send, Stop) keeps the display omp's sheets give it; one of ours lays out its content
+     as the control did. A goal or loop capsule may still give way. */
+  button.sf-el.hermes-press {
+    flex: none;
+    min-width: 0;
+  }
+
+  button.sf-el.hermes-press:is(:not([data-role]), [data-role^='hermes.']) {
+    display: flex;
+    flex-direction: column;
+  }
+
+  [data-role='hermes.automation'] > button.sf-el.hermes-press {
+    flex: 0 1 auto;
+    max-width: 100%;
+  }
 `

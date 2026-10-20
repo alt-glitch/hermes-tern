@@ -15,7 +15,7 @@ import { prTone, stateLabel } from '../prs/look.js'
 import { PrView } from '../prs/view.js'
 import type { PrsPill } from '../view/dock.js'
 import { relative } from '../view/format.js'
-import { button } from '../view/ui/button.js'
+import { button, pressable } from '../view/ui/button.js'
 
 import type { Overlay } from './overlay.js'
 import { tickWhileOpen } from './sheet.js'
@@ -189,8 +189,9 @@ function menuRow(e: Entry, now: number, on: boolean, onClick: () => void): JSX.E
   const pr = e.pr
   const what = !pr ? (e.error ? 'unreadable' : 'reading…') : pr.state !== 'open' ? stateLabel(pr).toLowerCase() : pr.checks.length ? `checks ${checksState(pr.checks)}` : stateLabel(pr).toLowerCase()
 
-  return (
-    <row align="center" gap="sm" key={prKey(e.ref)} {...optional('mark', on ? 'pick' : undefined)} onClick={onClick} role="hermes.pr.menu.row" title={pr?.url ?? e.ref.url}>
+  return pressable(
+    { key: prKey(e.ref), name: `${pr?.title ?? `#${e.ref.number}`}, ${e.ref.repository} #${e.ref.number}, ${what}`, onClick },
+    <row align="center" gap="sm" key="face" {...optional('mark', on ? 'pick' : undefined)} role="hermes.pr.menu.row" title={pr?.url ?? e.ref.url}>
       <icon key="i" name="merge" tone={prTone(e)} />
       <col gap="none" grow={1} key="t" min={{ w: 0 }}>
         <text key="title" spans={[{ s: 'strong', t: pr?.title ?? `#${e.ref.number}` }]} truncate="end" wrap="none" />
