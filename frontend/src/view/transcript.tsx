@@ -14,6 +14,7 @@ import { duration } from './format.js'
 import { slashBody } from './slash.js'
 import { age, compact } from './time.js'
 import { toolNode } from './tools/shell.js'
+import { pressable } from './ui/button.js'
 import { foldSection, headedCard } from './ui/fold.js'
 import { shimmerText } from './ui/live.js'
 import { type WelcomeContext, welcomeNode } from './welcome.js'
@@ -285,14 +286,9 @@ function steerNode(b: Extract<Block, { kind: 'steer' }>, state: keyof typeof STE
 function copyButton(text: string, id: string, role: string, title: string, cx: TranscriptContext): JSX.Element {
   const copied = cx.copied === id
 
-  return (
-    <icon
-      key="copy"
-      name={copied ? 'check' : 'copy'}
-      onClick={() => cx.copy(text, id)}
-      role={role}
-      title={copied ? 'Copied' : title}
-    />
+  return pressable(
+    { key: 'copy', name: copied ? 'Copied' : title, onClick: () => cx.copy(text, id) },
+    <icon key="face" name={copied ? 'check' : 'copy'} role={role} title={copied ? 'Copied' : title} />
   )
 }
 

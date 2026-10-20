@@ -9,6 +9,7 @@ import { optional } from '../core/assert.js'
 import type { PrFile, PullRequest } from '../github/pullRequest.js'
 import { shown } from '../github/remote.js'
 import type { Entry } from '../github/store.js'
+import { pressable } from '../view/ui/button.js'
 
 /** How much room the view has: `wide` draws the files beside their list. */
 export type PrDensity = 'narrow' | 'wide'
@@ -42,8 +43,9 @@ export function filesTab(e: Entry, pr: PullRequest, id: string, density: PrDensi
       {files.map((f, i) => {
         const slash = f.path.lastIndexOf('/')
 
-        return (
-          <row align="center" gap="sm" key={`l${i}`} onClick={() => reveal?.(`${id}.diffs.f${i}`)} role="hermes.pr.fileitem" title={f.path}>
+        return pressable(
+          { key: `l${i}`, name: f.path, onClick: () => reveal?.(`${id}.diffs.f${i}`), role: 'hermes.pr.fileitem' },
+          <row align="center" gap="sm" key="face" title={f.path}>
             <icon key="i" name="file" {...optional('tone', FILE_TONE[f.status])} />
             <text
               grow={1}

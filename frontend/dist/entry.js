@@ -20161,6 +20161,113 @@ function withKey(target, key2) {
   return new Node(target.kind, { ...target.props, key: key2 }, target.children, target.handlers);
 }
 
+// node_modules/@stencil-hq/tern/dist/ui.js
+function isProps(value) {
+  return typeof value === "object" && value !== null && !Array.isArray(value) && !(value instanceof Node) && !(value instanceof Span);
+}
+function build(kind, extra, args) {
+  const [first2, ...rest] = args;
+  if (first2 === null || isProps(first2)) {
+    return createNode(kind, first2 === null ? extra : { ...extra, ...first2 }, rest);
+  }
+  return createNode(kind, extra, args);
+}
+function builder(kind) {
+  return (...args) => build(kind, null, args);
+}
+var ui = {
+  col: builder("col"),
+  row: builder("row"),
+  card: builder("card"),
+  section: builder("section"),
+  rule: builder("rule"),
+  spacer: builder("spacer"),
+  text: builder("text"),
+  md: builder("md"),
+  code: builder("code"),
+  diff: builder("diff"),
+  ansi: builder("ansi"),
+  rows: builder("rows"),
+  math: builder("math"),
+  image: builder("image"),
+  kv: builder("kv"),
+  table: builder("table"),
+  tree: builder("tree"),
+  badge: builder("badge"),
+  kbd: builder("kbd"),
+  icon: builder("icon"),
+  list: builder("list"),
+  item: builder("item"),
+  tabs: builder("tabs"),
+  picker: builder("picker"),
+  spinner: builder("spinner"),
+  shimmer: builder("shimmer"),
+  elapsed: builder("elapsed"),
+  rate: builder("rate"),
+  progress: builder("progress"),
+  meter: builder("meter"),
+  chart: builder("chart"),
+  effort: builder("effort"),
+  editor: builder("editor"),
+  input: builder("input"),
+  status: builder("status"),
+  seg: builder("seg"),
+  toast: builder("toast"),
+  overlay: builder("overlay"),
+  tool: builder("tool"),
+  agent: builder("agent"),
+  checklist: builder("checklist"),
+  prefs: builder("prefs"),
+  el: builder("el")
+};
+function tag(name) {
+  return (...args) => build("el", { tag: name }, args);
+}
+var html = {
+  div: tag("div"),
+  span: tag("span"),
+  p: tag("p"),
+  section: tag("section"),
+  header: tag("header"),
+  footer: tag("footer"),
+  nav: tag("nav"),
+  aside: tag("aside"),
+  main: tag("main"),
+  article: tag("article"),
+  figure: tag("figure"),
+  blockquote: tag("blockquote"),
+  ul: tag("ul"),
+  ol: tag("ol"),
+  li: tag("li"),
+  dl: tag("dl"),
+  dt: tag("dt"),
+  dd: tag("dd"),
+  h1: tag("h1"),
+  h2: tag("h2"),
+  h3: tag("h3"),
+  h4: tag("h4"),
+  pre: tag("pre"),
+  code: tag("code"),
+  kbd: tag("kbd"),
+  strong: tag("strong"),
+  b: tag("b"),
+  em: tag("em"),
+  i: tag("i"),
+  del: tag("del"),
+  mark: tag("mark"),
+  hr: tag("hr"),
+  table: tag("table"),
+  thead: tag("thead"),
+  tbody: tag("tbody"),
+  tr: tag("tr"),
+  th: tag("th"),
+  td: tag("td"),
+  label: tag("label"),
+  button: tag("button"),
+  form: tag("form"),
+  input: tag("input")
+};
+
 // node_modules/@stencil-hq/tern/dist/jsx-runtime.js
 function spanOf(props) {
   let t2 = "";
@@ -25896,22 +26003,40 @@ function withoutTernEnv(command) {
 }
 
 // src/view/ui/button.tsx
-function button(b) {
-  return /* @__PURE__ */ jsxs(
-    "row",
+var PRESS_CLASS = "hermes-press";
+function pressable(p3, content5) {
+  return /* @__PURE__ */ jsx(
+    html.button,
     {
-      align: "center",
-      gap: "xs",
-      onClick: b.onClick,
-      role: "omp.btn",
-      title: b.hint ? `${b.label}  ${b.hint}` : b.label,
-      ...b.kind ? { tone: b.kind === "primary" ? "accent" : "error" } : {},
-      children: [
-        /* @__PURE__ */ jsx("text", { text: b.label, ...b.wrap ? { wrap: b.wrap } : {} }, "label"),
-        b.keys ? /* @__PURE__ */ jsx("kbd", { keys: b.keys }, "keys") : null
-      ]
+      aria: p3.name,
+      class: PRESS_CLASS,
+      ...optional("actions", p3.action ? { click: p3.action, ...optional("menu", p3.menu) } : void 0),
+      ...optional("onClick", p3.onClick),
+      ...optional("onMenu", p3.onMenu),
+      ...optional("role", p3.role),
+      children: content5
     },
-    b.key
+    p3.key
+  );
+}
+function button(b) {
+  return pressable(
+    { key: b.key, name: b.label, onClick: b.onClick },
+    /* @__PURE__ */ jsxs(
+      "row",
+      {
+        align: "center",
+        gap: "xs",
+        role: "omp.btn",
+        title: b.hint ? `${b.label}  ${b.hint}` : b.label,
+        ...b.kind ? { tone: b.kind === "primary" ? "accent" : "error" } : {},
+        children: [
+          /* @__PURE__ */ jsx("text", { text: b.label, ...b.wrap ? { wrap: b.wrap } : {} }, "label"),
+          b.keys ? /* @__PURE__ */ jsx("kbd", { keys: b.keys }, "keys") : null
+        ]
+      },
+      "face"
+    )
   );
 }
 function actionsRow(buttons) {
@@ -30011,7 +30136,10 @@ function connectCard(call) {
         },
         "n"
       ),
-      t2.url && !settled2 && waiting(t2) ? /* @__PURE__ */ jsx("row", { actions: { click: `connect-open=${ref}:${t2.name}` }, align: "center", gap: "xs", role: "hermes.connect.open", title: t2.url, children: /* @__PURE__ */ jsx("text", { text: "Authorize \u2197" }, "t") }, "go") : null
+      t2.url && !settled2 && waiting(t2) ? pressable(
+        { action: `connect-open=${ref}:${t2.name}`, key: "go", name: `Authorize ${t2.title}`, role: "hermes.connect.open" },
+        /* @__PURE__ */ jsx("row", { align: "center", gap: "xs", title: t2.url, children: /* @__PURE__ */ jsx("text", { text: "Authorize \u2197" }, "t") }, "face")
+      ) : null
     ] }, `t${i}`);
   });
   const note = card.told ? open.length || settled2 && settled2 !== "all_resolved" ? "Sent to Hermes." : "All connected. Hermes carries on." : settled2 ? `${SETTLED_NOTE[settled2]}${settled2 === "error" && card.error ? ` ${card.error}` : ""}` : void 0;
@@ -30034,7 +30162,10 @@ function connectCard(call) {
             },
             "hint"
           ),
-          open.length ? /* @__PURE__ */ jsx("row", { actions: { click: `connect-continue=${ref}` }, align: "center", role: "hermes.connect.continue", children: /* @__PURE__ */ jsx("text", { text: "Done, continue" }, "t") }, "go") : null
+          open.length ? pressable(
+            { action: `connect-continue=${ref}`, key: "go", name: "Done, continue", role: "hermes.connect.continue" },
+            /* @__PURE__ */ jsx("row", { align: "center", children: /* @__PURE__ */ jsx("text", { text: "Done, continue" }, "t") }, "face")
+          ) : null
         ] }, "foot")
       ]
     ],
@@ -33767,25 +33898,17 @@ function processLine(call, id, now) {
   const p3 = call.process;
   const live = !p3 || isRunning2(p3);
   const tone = p3 ? processTone(p3.state.status) : "muted";
-  return /* @__PURE__ */ jsxs(
-    "row",
-    {
-      actions: { click: `open-process=${id}`, menu: [`open-process=${id}`] },
-      align: "center",
-      gap: "xs",
-      role: "omp.tool.process",
-      title: "Open in the Background sheet  \u2325J",
-      children: [
-        p3 && live ? /* @__PURE__ */ jsx("spinner", { style: "dots", tone: "accent" }, "state-icon") : /* @__PURE__ */ jsx("icon", { name: p3 ? PROCESS_LOOK[p3.state.status].icon : "pending", tone }, "state-icon"),
-        /* @__PURE__ */ jsx("text", { spans: [{ s: tone, t: p3 ? processVerdict(p3) : "starting" }], wrap: "none" }, "state"),
-        p3 ? /* @__PURE__ */ jsx("text", { spans: [{ s: "dim", t: "\xB7" }], wrap: "none" }, "sep1") : null,
-        p3 && live ? /* @__PURE__ */ jsx("elapsed", { age: age(p3, p3.startedAt, now), format: "short" }, "time") : null,
-        p3 && !live ? /* @__PURE__ */ jsx("text", { spans: [{ s: "muted", t: duration2(processElapsed(p3, now)) }], wrap: "none" }, "took") : null,
-        p3?.lastLine ? /* @__PURE__ */ jsx("text", { spans: [{ s: "dim", t: "\xB7" }], wrap: "none" }, "sep2") : null,
-        p3?.lastLine ? /* @__PURE__ */ jsx("text", { grow: 1, spans: [{ s: "muted mono", t: p3.lastLine }], truncate: "end", wrap: "none" }, "last") : null
-      ]
-    },
-    "process"
+  return pressable(
+    { action: `open-process=${id}`, key: "process", menu: [`open-process=${id}`], name: `Process ${p3 ? processVerdict(p3) : "starting"}: open in the Background sheet` },
+    /* @__PURE__ */ jsxs("row", { align: "center", gap: "xs", role: "omp.tool.process", title: "Open in the Background sheet  \u2325J", children: [
+      p3 && live ? /* @__PURE__ */ jsx("spinner", { style: "dots", tone: "accent" }, "state-icon") : /* @__PURE__ */ jsx("icon", { name: p3 ? PROCESS_LOOK[p3.state.status].icon : "pending", tone }, "state-icon"),
+      /* @__PURE__ */ jsx("text", { spans: [{ s: tone, t: p3 ? processVerdict(p3) : "starting" }], wrap: "none" }, "state"),
+      p3 ? /* @__PURE__ */ jsx("text", { spans: [{ s: "dim", t: "\xB7" }], wrap: "none" }, "sep1") : null,
+      p3 && live ? /* @__PURE__ */ jsx("elapsed", { age: age(p3, p3.startedAt, now), format: "short" }, "time") : null,
+      p3 && !live ? /* @__PURE__ */ jsx("text", { spans: [{ s: "muted", t: duration2(processElapsed(p3, now)) }], wrap: "none" }, "took") : null,
+      p3?.lastLine ? /* @__PURE__ */ jsx("text", { spans: [{ s: "dim", t: "\xB7" }], wrap: "none" }, "sep2") : null,
+      p3?.lastLine ? /* @__PURE__ */ jsx("text", { grow: 1, spans: [{ s: "muted mono", t: p3.lastLine }], truncate: "end", wrap: "none" }, "last") : null
+    ] }, "face")
   );
 }
 
@@ -38764,8 +38887,8 @@ function resolve2(url) {
 function toFlow(nodes) {
   return wrap(nodes);
 }
-function toSpecificContent(nodes, build2) {
-  const reference = build2();
+function toSpecificContent(nodes, build3) {
+  const reference = build3();
   const results = [];
   let queue2 = [];
   let index2 = -1;
@@ -38788,7 +38911,7 @@ function toSpecificContent(nodes, build2) {
   if (queue2.length > 0) {
     let node3 = results[results.length - 1];
     if (!node3) {
-      node3 = build2();
+      node3 = build3();
       results.push(node3);
     }
     node3.children.push(...queue2);
@@ -39872,8 +39995,8 @@ function heading2(node3, _, state, info) {
 }
 
 // node_modules/mdast-util-to-markdown/lib/handle/html.js
-html.peek = htmlPeek;
-function html(node3) {
+html2.peek = htmlPeek;
+function html2(node3) {
   return node3.value || "";
 }
 function htmlPeek() {
@@ -40369,7 +40492,7 @@ var handle2 = {
   emphasis,
   hardBreak,
   heading: heading2,
-  html,
+  html: html2,
   image,
   imageReference,
   inlineCode: inlineCode2,
@@ -43981,7 +44104,7 @@ function caseInsensitiveTransform(attributes, property) {
 }
 
 // node_modules/property-information/lib/html.js
-var html2 = create4({
+var html3 = create4({
   attributes: {
     acceptcharset: "accept-charset",
     classname: "class",
@@ -44989,7 +45112,7 @@ function camelcase($0) {
 }
 
 // node_modules/property-information/index.js
-var html3 = merge([aria, html2, xlink, xmlns, xml], "html");
+var html4 = merge([aria, html3, xlink, xmlns, xml], "html");
 var svg2 = merge([aria, svg, xlink, xmlns, xml], "svg");
 
 // node_modules/comma-separated-tokens/index.js
@@ -45264,7 +45387,7 @@ var svgCaseSensitiveTagNames = [
 ];
 
 // node_modules/hastscript/lib/index.js
-var h = createH(html3, "div");
+var h = createH(html4, "div");
 var s = createH(svg2, "g", svgCaseSensitiveTagNames);
 
 // node_modules/vfile-location/lib/index.js
@@ -45334,7 +45457,7 @@ function fromParse5(tree, options) {
     {
       file: settings2.file || void 0,
       location: false,
-      schema: settings2.space === "svg" ? svg2 : html3,
+      schema: settings2.space === "svg" ? svg2 : html4,
       verbose: settings2.verbose || false
     },
     tree
@@ -45418,7 +45541,7 @@ function all5(state, nodes) {
 }
 function element2(state, node3) {
   const schema2 = state.schema;
-  state.schema = node3.namespaceURI === webNamespaces.svg ? svg2 : html3;
+  state.schema = node3.namespaceURI === webNamespaces.svg ? svg2 : html4;
   let index2 = -1;
   const properties2 = {};
   while (++index2 < node3.attrs.length) {
@@ -45514,7 +45637,7 @@ var one4 = zwitch("type", { handlers: { root: root3, element: element3, text: te
 function toParse5(tree, options) {
   const settings2 = options || emptyOptions4;
   const space2 = settings2.space;
-  return one4(tree, space2 === "svg" ? svg2 : html3);
+  return one4(tree, space2 === "svg" ? svg2 : html4);
 }
 function root3(node3, schema2) {
   const result = {
@@ -50570,9 +50693,9 @@ var Parser = class {
     this.openElements = new OpenElementStack(this.document, this.treeAdapter, this);
   }
   // API
-  static parse(html5, options) {
+  static parse(html6, options) {
     const parser = new this(options);
-    parser.tokenizer.write(html5, true);
+    parser.tokenizer.write(html6, true);
     return parser.document;
   }
   static getFragmentParser(fragmentContext, options) {
@@ -53750,7 +53873,7 @@ function startTag(node3, state) {
     { ...node3, children: [] },
     { space: ns === webNamespaces.svg ? "svg" : "html" }
   );
-  const tag = {
+  const tag2 = {
     type: token_exports.TokenType.START_TAG,
     tagName,
     tagID: html_exports.getTagID(tagName),
@@ -53762,7 +53885,7 @@ function startTag(node3, state) {
     attrs: "attrs" in result ? result.attrs : [],
     location: createParse5Location(node3)
   };
-  state.parser.currentToken = tag;
+  state.parser.currentToken = tag2;
   state.parser._processToken(state.parser.currentToken);
   state.parser.tokenizer.lastStartTagName = tagName;
 }
@@ -53773,7 +53896,7 @@ function endTag(node3, state) {
   }
   if (state.parser.tokenizer.state === TokenizerMode.PLAINTEXT) return;
   resetTokenizer(state, pointEnd(node3));
-  const tag = {
+  const tag2 = {
     type: token_exports.TokenType.END_TAG,
     tagName,
     tagID: html_exports.getTagID(tagName),
@@ -53782,7 +53905,7 @@ function endTag(node3, state) {
     attrs: [],
     location: createParse5Location(node3)
   };
-  state.parser.currentToken = tag;
+  state.parser.currentToken = tag2;
   state.parser._processToken(state.parser.currentToken);
   if (
     // Current element is closed.
@@ -59728,9 +59851,9 @@ function compiler(options) {
       emphasis: opener(emphasis3),
       hardBreakEscape: opener(hardBreak3),
       hardBreakTrailing: opener(hardBreak3),
-      htmlFlow: opener(html5, buffer),
+      htmlFlow: opener(html6, buffer),
       htmlFlowData: onenterdata,
-      htmlText: opener(html5, buffer),
+      htmlText: opener(html6, buffer),
       htmlTextData: onenterdata,
       image: opener(image3),
       label: buffer,
@@ -60315,7 +60438,7 @@ function compiler(options) {
       position: void 0
     };
   }
-  function html5() {
+  function html6() {
     return {
       type: "html",
       value: "",
@@ -60596,7 +60719,7 @@ function heading3(state, node3) {
 }
 
 // node_modules/mdast-util-to-hast/lib/handlers/html.js
-function html4(state, node3) {
+function html5(state, node3) {
   if (state.options.allowDangerousHtml) {
     const result = { type: "raw", value: node3.value };
     state.patch(node3, result);
@@ -60985,7 +61108,7 @@ var handlers2 = {
   emphasis: emphasis2,
   footnoteReference: footnoteReference2,
   heading: heading3,
-  html: html4,
+  html: html5,
   imageReference: imageReference2,
   image: image2,
   inlineCode: inlineCode3,
@@ -62892,20 +63015,23 @@ function filesTab(e, pr, id, density, reveal) {
   const list9 = /* @__PURE__ */ jsxs("col", { gap: "none", role: "hermes.pr.filelist", children: [
     files.map((f, i) => {
       const slash = f.path.lastIndexOf("/");
-      return /* @__PURE__ */ jsxs("row", { align: "center", gap: "sm", onClick: () => reveal?.(`${id}.diffs.f${i}`), role: "hermes.pr.fileitem", title: f.path, children: [
-        /* @__PURE__ */ jsx("icon", { name: "file", ...optional("tone", FILE_TONE[f.status]) }, "i"),
-        /* @__PURE__ */ jsx(
-          "text",
-          {
-            grow: 1,
-            spans: [...slash > 0 ? [{ s: "dim", t: f.path.slice(0, slash + 1) }] : [], { t: f.path.slice(slash + 1) }],
-            truncate: "start",
-            wrap: "none"
-          },
-          "p"
-        ),
-        /* @__PURE__ */ jsx("text", { shrink: 0, spans: [{ s: "success", t: `+${f.additions}` }, { t: " " }, { s: "error", t: `\u2212${f.deletions}` }], wrap: "none" }, "n")
-      ] }, `l${i}`);
+      return pressable(
+        { key: `l${i}`, name: f.path, onClick: () => reveal?.(`${id}.diffs.f${i}`), role: "hermes.pr.fileitem" },
+        /* @__PURE__ */ jsxs("row", { align: "center", gap: "sm", title: f.path, children: [
+          /* @__PURE__ */ jsx("icon", { name: "file", ...optional("tone", FILE_TONE[f.status]) }, "i"),
+          /* @__PURE__ */ jsx(
+            "text",
+            {
+              grow: 1,
+              spans: [...slash > 0 ? [{ s: "dim", t: f.path.slice(0, slash + 1) }] : [], { t: f.path.slice(slash + 1) }],
+              truncate: "start",
+              wrap: "none"
+            },
+            "p"
+          ),
+          /* @__PURE__ */ jsx("text", { shrink: 0, spans: [{ s: "success", t: `+${f.additions}` }, { t: " " }, { s: "error", t: `\u2212${f.deletions}` }], wrap: "none" }, "n")
+        ] }, "face")
+      );
     }),
     files.length < pr.changedFiles ? /* @__PURE__ */ jsx("text", { spans: [{ s: "muted", t: `${pr.changedFiles - files.length} more on GitHub` }] }, "more") : null
   ] }, "list");
@@ -63169,20 +63295,17 @@ var PrView = class {
           },
           "who"
         ),
-        /* @__PURE__ */ jsx(
-          "text",
+        pressable(
           {
-            shrink: 0,
+            key: "checkout",
+            name: `Copy gh pr checkout ${pr.number}`,
             onClick: () => {
               copyToClipboard(`gh pr checkout ${pr.number}`);
               this.#host.notice(`Copied gh pr checkout ${pr.number}`, "info");
             },
-            role: "hermes.pr.checkout",
-            spans: [{ s: "mono dim", t: `gh pr checkout ${pr.number}` }],
-            title: "Copy the checkout command",
-            wrap: "none"
+            role: "hermes.pr.checkout"
           },
-          "checkout"
+          /* @__PURE__ */ jsx("text", { spans: [{ s: "mono dim", t: `gh pr checkout ${pr.number}` }], title: "Copy the checkout command", wrap: "none" }, "face")
         )
       ] }, "meta") : /* @__PURE__ */ jsx("text", { spans: [{ s: e.error ? "error" : "muted", t: e.error ?? "" }] }, "err"),
       pr ? /* @__PURE__ */ jsxs("row", { align: "center", gap: "sm", role: "hermes.pr.branch", children: [
@@ -63230,10 +63353,18 @@ var PrView = class {
         "t"
       ),
       /* @__PURE__ */ jsx("spacer", { grow: 1 }, "fill"),
-      pr ? /* @__PURE__ */ jsxs("row", { align: "center", gap: "xs", onClick: () => this.setTab("checks"), role: "hermes.pr.checkstate", title: "Checks", children: [
-        /* @__PURE__ */ jsx("icon", { name: checksIcon(pr), tone: checksTone(pr) }, "i"),
-        /* @__PURE__ */ jsx("text", { spans: [{ s: checksTone(pr), t: pr.checks.length ? checksSummary(pr.checks) : "No checks reported" }], wrap: "none" }, "t")
-      ] }, "checks") : null
+      pr ? pressable(
+        {
+          key: "checks",
+          name: `Checks: ${pr.checks.length ? checksSummary(pr.checks) : "none reported"}`,
+          onClick: () => this.setTab("checks"),
+          role: "hermes.pr.checkstate"
+        },
+        /* @__PURE__ */ jsxs("row", { align: "center", gap: "xs", title: "Checks", children: [
+          /* @__PURE__ */ jsx("icon", { name: checksIcon(pr), tone: checksTone(pr) }, "i"),
+          /* @__PURE__ */ jsx("text", { spans: [{ s: checksTone(pr), t: pr.checks.length ? checksSummary(pr.checks) : "No checks reported" }], wrap: "none" }, "t")
+        ] }, "face")
+      ) : null
     ] }, "tabs");
   }
   /** The tab's content; `id` is the node id these nodes sit under. */
@@ -63449,17 +63580,20 @@ function openPrMenu(host) {
 function menuRow(e, now, on, onClick) {
   const pr = e.pr;
   const what = !pr ? e.error ? "unreadable" : "reading\u2026" : pr.state !== "open" ? stateLabel(pr).toLowerCase() : pr.checks.length ? `checks ${checksState(pr.checks)}` : stateLabel(pr).toLowerCase();
-  return /* @__PURE__ */ jsxs("row", { align: "center", gap: "sm", ...optional("mark", on ? "pick" : void 0), onClick, role: "hermes.pr.menu.row", title: pr?.url ?? e.ref.url, children: [
-    /* @__PURE__ */ jsx("icon", { name: "merge", tone: prTone(e) }, "i"),
-    /* @__PURE__ */ jsxs("col", { gap: "none", grow: 1, min: { w: 0 }, children: [
-      /* @__PURE__ */ jsx("text", { spans: [{ s: "strong", t: pr?.title ?? `#${e.ref.number}` }], truncate: "end", wrap: "none" }, "title"),
-      /* @__PURE__ */ jsx("text", { spans: [{ s: "dim", t: `${e.ref.repository} #${e.ref.number}` }], truncate: "end", wrap: "none" }, "sub")
-    ] }, "t"),
-    /* @__PURE__ */ jsxs("col", { align: "end", gap: "none", children: [
-      /* @__PURE__ */ jsx("text", { spans: [{ s: prTone(e), t: what }], wrap: "none" }, "state"),
-      /* @__PURE__ */ jsx("text", { spans: [{ s: "dim", t: pr ? relative(pr.updatedAt, now) : "" }], wrap: "none" }, "at")
-    ] }, "r")
-  ] }, prKey(e.ref));
+  return pressable(
+    { key: prKey(e.ref), name: `${pr?.title ?? `#${e.ref.number}`}, ${e.ref.repository} #${e.ref.number}, ${what}`, onClick },
+    /* @__PURE__ */ jsxs("row", { align: "center", gap: "sm", ...optional("mark", on ? "pick" : void 0), role: "hermes.pr.menu.row", title: pr?.url ?? e.ref.url, children: [
+      /* @__PURE__ */ jsx("icon", { name: "merge", tone: prTone(e) }, "i"),
+      /* @__PURE__ */ jsxs("col", { gap: "none", grow: 1, min: { w: 0 }, children: [
+        /* @__PURE__ */ jsx("text", { spans: [{ s: "strong", t: pr?.title ?? `#${e.ref.number}` }], truncate: "end", wrap: "none" }, "title"),
+        /* @__PURE__ */ jsx("text", { spans: [{ s: "dim", t: `${e.ref.repository} #${e.ref.number}` }], truncate: "end", wrap: "none" }, "sub")
+      ] }, "t"),
+      /* @__PURE__ */ jsxs("col", { align: "end", gap: "none", children: [
+        /* @__PURE__ */ jsx("text", { spans: [{ s: prTone(e), t: what }], wrap: "none" }, "state"),
+        /* @__PURE__ */ jsx("text", { spans: [{ s: "dim", t: pr ? relative(pr.updatedAt, now) : "" }], wrap: "none" }, "at")
+      ] }, "r")
+    ] }, "face")
+  );
 }
 function prsPill(entries) {
   const newest = entries.at(-1);
@@ -65371,6 +65505,8 @@ var STYLES = css`
   /* An image the next prompt carries: Tern's omp chip (thumbnail, name, size) with a ✕ after
      them, in a third column of its grid. */
   .sf-card[data-role='omp.composer.chip'] > .sf-card-body > [data-role='hermes.composer.remove'] {
+    align-items: center;
+    justify-content: center;
     grid-column: 3;
     grid-row: 1 / 3;
     align-self: center;
@@ -65816,6 +65952,24 @@ var STYLES = css`
     font-size: 12px;
   }
 
+  /* The native button a control sits in (pressable, view/ui/button.tsx) draws nothing itself: as
+     wide as the control in a row, as wide as the line in a column. One that carries a role of
+     omp's (Send, Stop) keeps the display omp's sheets give it; one of ours lays out its content
+     as the control did. A goal or loop capsule may still give way. */
+  button.sf-el.hermes-press {
+    flex: none;
+    min-width: 0;
+  }
+
+  button.sf-el.hermes-press:is(:not([data-role]), [data-role^='hermes.']) {
+    display: flex;
+    flex-direction: column;
+  }
+
+  [data-role='hermes.automation'] > button.sf-el.hermes-press {
+    flex: 0 1 auto;
+    max-width: 100%;
+  }
 `;
 
 // src/transcript/compactions.ts
@@ -66551,19 +66705,21 @@ async function interpolate(gw2, sid, text15, pasted = []) {
 // src/view/ui/pill.tsx
 function pill(p3) {
   const seg = p3.seg ?? "omp.hud.seg";
-  return /* @__PURE__ */ jsx(
-    "row",
-    {
-      align: "center",
-      ...seg === false ? { gap: "xs" } : {},
-      ...p3.focused ? { mark: "pick" } : {},
-      onClick: p3.onClick,
-      role: p3.role ?? "omp.hud.pill",
-      title: p3.title,
-      ...p3.hovercard ? { hovercard: p3.hovercard } : {},
-      children: seg === false ? p3.children : /* @__PURE__ */ jsx("row", { align: "center", gap: "xs", role: seg, children: p3.children }, "seg")
-    },
-    p3.key
+  return pressable(
+    { key: p3.key, name: p3.name, onClick: p3.onClick },
+    /* @__PURE__ */ jsx(
+      "row",
+      {
+        align: "center",
+        ...seg === false ? { gap: "xs" } : {},
+        ...p3.focused ? { mark: "pick" } : {},
+        role: p3.role ?? "omp.hud.pill",
+        title: p3.title,
+        ...p3.hovercard ? { hovercard: p3.hovercard } : {},
+        children: seg === false ? p3.children : /* @__PURE__ */ jsx("row", { align: "center", gap: "xs", role: seg, children: p3.children }, "seg")
+      },
+      "face"
+    )
   );
 }
 
@@ -66614,6 +66770,7 @@ Last check: ${g.verdict}${g.reason ? ` \xB7 ${g.reason}` : ""}` : "";
     ],
     focused,
     key: "goal",
+    name: `${look.label}: ${g.title}`,
     onClick: onOpen,
     role: ITEM,
     seg: false,
@@ -66635,6 +66792,7 @@ function loopPart(l, owner, onOpen, now, focused) {
     ],
     focused,
     key: "loop",
+    name: `${paused ? "Loop paused" : "Loop"}: ${l.prompt}`,
     onClick: onOpen,
     role: ITEM,
     seg: false,
@@ -67635,36 +67793,20 @@ function queuedNode(queued, on) {
     /* @__PURE__ */ jsx("text", { grow: 1, text: q2.text.replace(/\s*\r?\n\s*/g, " \u21B5 "), truncate: "end", wrap: "none" }, "text"),
     i === 0 && queued.length > 1 ? /* @__PURE__ */ jsx("badge", { role: "omp.queue.count", text: `${queued.length}` }, "count") : null,
     q2.kind === "foreign" && q2.note === "unknown" ? /* @__PURE__ */ jsx("badge", { text: "unknown", tone: "warning" }, "note") : null,
-    on.steer && editable(q2) && q2.steer ? /* @__PURE__ */ jsxs(
-      "row",
-      {
-        align: "center",
-        gap: "xs",
-        onClick: () => on.steer?.(i),
-        role: "omp.queue.steer",
-        title: `Steer the running turn with this instead${i === 0 ? "  \u2325\u21B5" : ""}`,
-        children: [
-          /* @__PURE__ */ jsx("icon", { name: "corner-up-right" }, "i"),
-          i === 0 ? /* @__PURE__ */ jsx("kbd", { keys: ["alt", "enter"] }, "k") : null,
-          /* @__PURE__ */ jsx("text", { text: "Steer" }, "t")
-        ]
-      },
-      "steer"
+    on.steer && editable(q2) && q2.steer ? pressable(
+      { key: "steer", name: "Steer", onClick: () => on.steer?.(i) },
+      /* @__PURE__ */ jsxs("row", { align: "center", gap: "xs", role: "omp.queue.steer", title: `Steer the running turn with this instead${i === 0 ? "  \u2325\u21B5" : ""}`, children: [
+        /* @__PURE__ */ jsx("icon", { name: "corner-up-right" }, "i"),
+        i === 0 ? /* @__PURE__ */ jsx("kbd", { keys: ["alt", "enter"] }, "k") : null,
+        /* @__PURE__ */ jsx("text", { text: "Steer" }, "t")
+      ] }, "face")
     ) : null,
-    editable(q2) ? /* @__PURE__ */ jsxs(
-      "row",
-      {
-        align: "center",
-        gap: "xs",
-        onClick: () => on.edit(i),
-        role: "omp.queue.edit",
-        title: `Edit in the composer${i === 0 ? "  \u2325\u2191" : ""}`,
-        children: [
-          i === 0 ? /* @__PURE__ */ jsx("kbd", { keys: ["alt", "up"] }, "k") : null,
-          /* @__PURE__ */ jsx("text", { text: "Edit" }, "t")
-        ]
-      },
-      "edit"
+    editable(q2) ? pressable(
+      { key: "edit", name: "Edit", onClick: () => on.edit(i) },
+      /* @__PURE__ */ jsxs("row", { align: "center", gap: "xs", role: "omp.queue.edit", title: `Edit in the composer${i === 0 ? "  \u2325\u2191" : ""}`, children: [
+        i === 0 ? /* @__PURE__ */ jsx("kbd", { keys: ["alt", "up"] }, "k") : null,
+        /* @__PURE__ */ jsx("text", { text: "Edit" }, "t")
+      ] }, "face")
     ) : null
   ] }, `q${i}`)) }, "queue");
 }
@@ -67778,6 +67920,7 @@ function todosPillNode(t2, onToggle, focused) {
     ],
     focused,
     key: "todos",
+    name: `Todos, ${done} of ${total} done`,
     onClick: onToggle,
     seg: "hermes.todos.pill",
     title: t2.open ? "Hide the todo list" : "Show the todo list"
@@ -67847,7 +67990,7 @@ function statusLine(cx, on) {
     ) : null,
     s2.cost ? /* @__PURE__ */ jsx("seg", { priority: 3, side: "right", spans: [{ t: `$${s2.cost.toFixed(2)}` }], title: "Session cost" }, "cost") : null,
     /* @__PURE__ */ jsx("seg", { priority: 1, side: "right", spans: [{ s: "muted", t: "\u21E7\u23CE newline" }] }, "newline"),
-    cx.activity.kind === "turn" ? /* @__PURE__ */ jsx("seg", { onClick: on.onInterrupt, priority: 10, role: "hermes.statusline.stop", side: "right", spans: [{ t: "esc esc stop" }] }, "action") : /* @__PURE__ */ jsx("seg", { onClick: on.onSubmit, priority: 10, role: "hermes.statusline.send", side: "right", spans: [{ t: "\u23CE send" }] }, "action")
+    cx.activity.kind === "turn" ? /* @__PURE__ */ jsx("seg", { aria: "Stop", onClick: on.onInterrupt, priority: 10, role: "hermes.statusline.stop", side: "right", spans: [{ t: "esc esc stop" }] }, "action") : /* @__PURE__ */ jsx("seg", { aria: "Send", onClick: on.onSubmit, priority: 10, role: "hermes.statusline.send", side: "right", spans: [{ t: "\u23CE send" }] }, "action")
   ] }, "statusline");
 }
 function agentsPill(running2, onOpen, focused) {
@@ -67859,6 +68002,7 @@ function agentsPill(running2, onOpen, focused) {
     ],
     focused,
     key: "pill",
+    name: `${plural(running2, "agent")} running`,
     onClick: onOpen,
     title: "Agents  \u2325A"
   });
@@ -67882,6 +68026,7 @@ function shellsPill(s2, onOpen, focused) {
     focused,
     hovercard: card,
     key: "shells",
+    name: `${plural(n, "shell")}${live ? " running" : " exited"}`,
     onClick: onOpen,
     title
   });
@@ -67891,6 +68036,7 @@ function prsPillNode(p3, onOpen, focused) {
     children: [/* @__PURE__ */ jsx("icon", { name: "merge", ...optional("tone", p3.tone === "muted" ? void 0 : p3.tone) }, "icon"), /* @__PURE__ */ jsx("text", { text: p3.text, wrap: "none" }, "text")],
     focused,
     key: "prs",
+    name: `Pull requests: ${p3.text}`,
     onClick: onOpen,
     title: "Pull requests  \u2325P"
   });
@@ -67914,11 +68060,16 @@ function workingNode(busy, cx, on) {
     trailing: [
       /* @__PURE__ */ jsx("row", { grow: 1 }, "fill"),
       cx.pills.todos ? todosPillNode(cx.pills.todos, on.onTodos, false) : null,
-      /* @__PURE__ */ jsxs("row", { align: "center", gap: "xs", onClick: on.onInterrupt, role: "omp.working.stop", title: "Stop  esc esc", children: [
-        /* @__PURE__ */ jsx("kbd", { keys: ["esc"] }, "k"),
-        /* @__PURE__ */ jsx("kbd", { keys: ["esc"] }, "k2"),
-        /* @__PURE__ */ jsx("text", { text: "Stop" }, "t")
-      ] }, "stop")
+      // The role on the button: Tern hides omp's working-row Stop (the composer has one), and a
+      // hidden button must not keep a place in the focus order.
+      pressable(
+        { key: "stop", name: "Stop", onClick: on.onInterrupt, role: "omp.working.stop" },
+        /* @__PURE__ */ jsxs("row", { align: "center", gap: "xs", title: "Stop  esc esc", children: [
+          /* @__PURE__ */ jsx("kbd", { keys: ["esc"] }, "k"),
+          /* @__PURE__ */ jsx("kbd", { keys: ["esc"] }, "k2"),
+          /* @__PURE__ */ jsx("text", { text: "Stop" }, "t")
+        ] }, "face")
+      )
     ]
   });
 }
@@ -67998,17 +68149,7 @@ function composerNode(cx, on) {
       ) : null,
       route.reasons !== false ? effortChip(route, on) : null,
       /* @__PURE__ */ jsx("status", { grow: 1, role: "omp.composer.extras", transparent: true }, "extras"),
-      busy ? /* @__PURE__ */ jsx(
-        "text",
-        {
-          onClick: on.onInterrupt,
-          role: "omp.composer.stop",
-          text: "Stop",
-          title: "Stop  esc esc",
-          tone: "error"
-        },
-        "stop"
-      ) : /* @__PURE__ */ jsx("kbd", { keys: ["enter"], onClick: on.onSubmit, role: "omp.composer.send", title: "Send  \u23CE" }, "send")
+      busy ? pressable({ key: "stop", name: "Stop", onClick: on.onInterrupt, role: "omp.composer.stop" }, /* @__PURE__ */ jsx("text", { text: "Stop", title: "Stop  esc esc", tone: "error" }, "face")) : pressable({ key: "send", name: "Send", onClick: on.onSubmit, role: "omp.composer.send" }, /* @__PURE__ */ jsx("kbd", { keys: ["enter"], title: "Send  \u23CE" }, "face"))
     ] }, "bar")
   ] }, "composer");
 }
@@ -68039,7 +68180,10 @@ function imageChip(a2, i, onRemove) {
       },
       "caption"
     ),
-    /* @__PURE__ */ jsx("icon", { name: "x", onClick: () => onRemove(i), role: "hermes.composer.remove", title: `Remove ${a2.label}` }, "remove")
+    pressable(
+      { key: "remove", name: `Remove ${a2.label}`, onClick: () => onRemove(i), role: "hermes.composer.remove" },
+      /* @__PURE__ */ jsx("icon", { name: "x", title: `Remove ${a2.label}` }, "face")
+    )
   ] }, `a${i}`);
 }
 
@@ -68205,7 +68349,7 @@ function crumb(line) {
   const tokens2 = m ? parseCount(m["tokens"] ?? "") : NaN;
   return m && Number.isFinite(tokens2) ? { label: m["label"] ?? "", pct: m["pct"] ? Number(m["pct"]) : void 0, tokens: tokens2 } : void 0;
 }
-function build(title, inline, body) {
+function build2(title, inline, body) {
   const name = title.replace(/:$/, "").trim();
   const lower = name.toLowerCase();
   const lines = body.filter((l) => l.trim());
@@ -68257,7 +68401,7 @@ function parseUsage(raw2) {
   const preamble = [];
   const flush = () => {
     if (head2) {
-      sections2.push(build(head2.title, head2.inline, head2.body));
+      sections2.push(build2(head2.title, head2.inline, head2.body));
     }
   };
   for (const line of raw2.replace(/\r/g, "").split("\n")) {
@@ -68850,15 +68994,9 @@ function steerNode(b, state) {
 }
 function copyButton(text15, id, role, title, cx) {
   const copied = cx.copied === id;
-  return /* @__PURE__ */ jsx(
-    "icon",
-    {
-      name: copied ? "check" : "copy",
-      onClick: () => cx.copy(text15, id),
-      role,
-      title: copied ? "Copied" : title
-    },
-    "copy"
+  return pressable(
+    { key: "copy", name: copied ? "Copied" : title, onClick: () => cx.copy(text15, id) },
+    /* @__PURE__ */ jsx("icon", { name: copied ? "check" : "copy", role, title: copied ? "Copied" : title }, "face")
   );
 }
 function usageNode(turn, answer, cx) {
@@ -71556,11 +71694,11 @@ ${body}
 function hermesAuthor(env2 = process.env) {
   const python = env2["HERMES_PYTHON"]?.trim();
   const root7 = env2["HERMES_PYTHON_SRC_ROOT"];
-  const ui = env2["HERMES_TUI_DIR"];
-  if (!python || !root7 || !ui) {
+  const ui2 = env2["HERMES_TUI_DIR"];
+  if (!python || !root7 || !ui2) {
     return void 0;
   }
-  const script = join11(ui, "..", "widget_author.py");
+  const script = join11(ui2, "..", "widget_author.py");
   return (request, signal) => new Promise((resolve7, reject) => {
     const child = spawn2(python, [script], {
       cwd: root7,

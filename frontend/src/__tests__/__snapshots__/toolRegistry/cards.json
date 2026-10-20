@@ -295,41 +295,52 @@
     }
    },
    {
-    "k": "row",
+    "k": "el",
     "p": {
+     "tag": "button",
+     "aria": "Process starting: open in the Background sheet",
+     "class": "hermes-press",
      "actions": {
       "click": "open-process=proc_1",
       "menu": [
        "open-process=proc_1"
       ]
      },
-     "align": "center",
-     "gap": "xs",
-     "role": "omp.tool.process",
-     "title": "Open in the Background sheet  ⌥J",
      "key": "process"
     },
     "c": [
      {
-      "k": "icon",
+      "k": "row",
       "p": {
-       "name": "pending",
-       "tone": "muted",
-       "key": "state-icon"
-      }
-     },
-     {
-      "k": "text",
-      "p": {
-       "spans": [
-        {
-         "s": "muted",
-         "t": "starting"
+       "align": "center",
+       "gap": "xs",
+       "role": "omp.tool.process",
+       "title": "Open in the Background sheet  ⌥J",
+       "key": "face"
+      },
+      "c": [
+       {
+        "k": "icon",
+        "p": {
+         "name": "pending",
+         "tone": "muted",
+         "key": "state-icon"
         }
-       ],
-       "wrap": "none",
-       "key": "state"
-      }
+       },
+       {
+        "k": "text",
+        "p": {
+         "spans": [
+          {
+           "s": "muted",
+           "t": "starting"
+          }
+         ],
+         "wrap": "none",
+         "key": "state"
+        }
+       }
+      ]
      }
     ]
    }
@@ -359,41 +370,52 @@
    },
    "c": [
     {
-     "k": "row",
+     "k": "el",
      "p": {
+      "tag": "button",
+      "aria": "Process starting: open in the Background sheet",
+      "class": "hermes-press",
       "actions": {
        "click": "open-process=proc_1",
        "menu": [
         "open-process=proc_1"
        ]
       },
-      "align": "center",
-      "gap": "xs",
-      "role": "omp.tool.process",
-      "title": "Open in the Background sheet  ⌥J",
       "key": "process"
      },
      "c": [
       {
-       "k": "icon",
+       "k": "row",
        "p": {
-        "name": "pending",
-        "tone": "muted",
-        "key": "state-icon"
-       }
-      },
-      {
-       "k": "text",
-       "p": {
-        "spans": [
-         {
-          "s": "muted",
-          "t": "starting"
+        "align": "center",
+        "gap": "xs",
+        "role": "omp.tool.process",
+        "title": "Open in the Background sheet  ⌥J",
+        "key": "face"
+       },
+       "c": [
+        {
+         "k": "icon",
+         "p": {
+          "name": "pending",
+          "tone": "muted",
+          "key": "state-icon"
          }
-        ],
-        "wrap": "none",
-        "key": "state"
-       }
+        },
+        {
+         "k": "text",
+         "p": {
+          "spans": [
+           {
+            "s": "muted",
+            "t": "starting"
+           }
+          ],
+          "wrap": "none",
+          "key": "state"
+         }
+        }
+       ]
       }
      ]
     }
@@ -415,41 +437,52 @@
     }
    },
    {
-    "k": "row",
+    "k": "el",
     "p": {
+     "tag": "button",
+     "aria": "Process starting: open in the Background sheet",
+     "class": "hermes-press",
      "actions": {
       "click": "open-process=proc_2",
       "menu": [
        "open-process=proc_2"
       ]
      },
-     "align": "center",
-     "gap": "xs",
-     "role": "omp.tool.process",
-     "title": "Open in the Background sheet  ⌥J",
      "key": "process"
     },
     "c": [
      {
-      "k": "icon",
+      "k": "row",
       "p": {
-       "name": "pending",
-       "tone": "muted",
-       "key": "state-icon"
-      }
-     },
-     {
-      "k": "text",
-      "p": {
-       "spans": [
-        {
-         "s": "muted",
-         "t": "starting"
+       "align": "center",
+       "gap": "xs",
+       "role": "omp.tool.process",
+       "title": "Open in the Background sheet  ⌥J",
+       "key": "face"
+      },
+      "c": [
+       {
+        "k": "icon",
+        "p": {
+         "name": "pending",
+         "tone": "muted",
+         "key": "state-icon"
         }
-       ],
-       "wrap": "none",
-       "key": "state"
-      }
+       },
+       {
+        "k": "text",
+        "p": {
+         "spans": [
+          {
+           "s": "muted",
+           "t": "starting"
+          }
+         ],
+         "wrap": "none",
+         "key": "state"
+        }
+       }
+      ]
      }
     ]
    }
@@ -479,41 +512,52 @@
    },
    "c": [
     {
-     "k": "row",
+     "k": "el",
      "p": {
+      "tag": "button",
+      "aria": "Process starting: open in the Background sheet",
+      "class": "hermes-press",
       "actions": {
        "click": "open-process=proc_2",
        "menu": [
         "open-process=proc_2"
        ]
       },
-      "align": "center",
-      "gap": "xs",
-      "role": "omp.tool.process",
-      "title": "Open in the Background sheet  ⌥J",
       "key": "process"
      },
      "c": [
       {
-       "k": "icon",
+       "k": "row",
        "p": {
-        "name": "pending",
-        "tone": "muted",
-        "key": "state-icon"
-       }
-      },
-      {
-       "k": "text",
-       "p": {
-        "spans": [
-         {
-          "s": "muted",
-          "t": "starting"
+        "align": "center",
+        "gap": "xs",
+        "role": "omp.tool.process",
+        "title": "Open in the Background sheet  ⌥J",
+        "key": "face"
+       },
+       "c": [
+        {
+         "k": "icon",
+         "p": {
+          "name": "pending",
+          "tone": "muted",
+          "key": "state-icon"
          }
-        ],
-        "wrap": "none",
-        "key": "state"
-       }
+        },
+        {
+         "k": "text",
+         "p": {
+          "spans": [
+           {
+            "s": "muted",
+            "t": "starting"
+           }
+          ],
+          "wrap": "none",
+          "key": "state"
+         }
+        }
+       ]
       }
      ]
     }
@@ -3385,24 +3429,35 @@
       }
      },
      {
-      "k": "row",
+      "k": "el",
       "p": {
+       "tag": "button",
+       "aria": "Authorize Linear",
+       "class": "hermes-press",
        "actions": {
         "click": "connect-open=f61:linear"
        },
-       "align": "center",
-       "gap": "xs",
        "role": "hermes.connect.open",
-       "title": "https://auth/l",
        "key": "go"
       },
       "c": [
        {
-        "k": "text",
+        "k": "row",
         "p": {
-         "text": "Authorize ↗",
-         "key": "t"
-        }
+         "align": "center",
+         "gap": "xs",
+         "title": "https://auth/l",
+         "key": "face"
+        },
+        "c": [
+         {
+          "k": "text",
+          "p": {
+           "text": "Authorize ↗",
+           "key": "t"
+          }
+         }
+        ]
        }
       ]
      }
@@ -3431,22 +3486,33 @@
       }
      },
      {
-      "k": "row",
+      "k": "el",
       "p": {
+       "tag": "button",
+       "aria": "Done, continue",
+       "class": "hermes-press",
        "actions": {
         "click": "connect-continue=f61"
        },
-       "align": "center",
        "role": "hermes.connect.continue",
        "key": "go"
       },
       "c": [
        {
-        "k": "text",
+        "k": "row",
         "p": {
-         "text": "Done, continue",
-         "key": "t"
-        }
+         "align": "center",
+         "key": "face"
+        },
+        "c": [
+         {
+          "k": "text",
+          "p": {
+           "text": "Done, continue",
+           "key": "t"
+          }
+         }
+        ]
        }
       ]
      }
@@ -3504,24 +3570,35 @@
        }
       },
       {
-       "k": "row",
+       "k": "el",
        "p": {
+        "tag": "button",
+        "aria": "Authorize Linear",
+        "class": "hermes-press",
         "actions": {
          "click": "connect-open=f61:linear"
         },
-        "align": "center",
-        "gap": "xs",
         "role": "hermes.connect.open",
-        "title": "https://auth/l",
         "key": "go"
        },
        "c": [
         {
-         "k": "text",
+         "k": "row",
          "p": {
-          "text": "Authorize ↗",
-          "key": "t"
-         }
+          "align": "center",
+          "gap": "xs",
+          "title": "https://auth/l",
+          "key": "face"
+         },
+         "c": [
+          {
+           "k": "text",
+           "p": {
+            "text": "Authorize ↗",
+            "key": "t"
+           }
+          }
+         ]
         }
        ]
       }
@@ -3550,22 +3627,33 @@
        }
       },
       {
-       "k": "row",
+       "k": "el",
        "p": {
+        "tag": "button",
+        "aria": "Done, continue",
+        "class": "hermes-press",
         "actions": {
          "click": "connect-continue=f61"
         },
-        "align": "center",
         "role": "hermes.connect.continue",
         "key": "go"
        },
        "c": [
         {
-         "k": "text",
+         "k": "row",
          "p": {
-          "text": "Done, continue",
-          "key": "t"
-         }
+          "align": "center",
+          "key": "face"
+         },
+         "c": [
+          {
+           "k": "text",
+           "p": {
+            "text": "Done, continue",
+            "key": "t"
+           }
+          }
+         ]
         }
        ]
       }

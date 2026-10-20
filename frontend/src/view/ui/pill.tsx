@@ -3,12 +3,16 @@
 
 import type { Children, JSX, NodeJson } from '@stencil-hq/tern'
 
+import { pressable } from './button.js'
+
 /** One pill. */
 export interface PillProps {
   key: string
   /** The pill holds the keyboard: Tern marks it as picked. */
   focused: boolean
   onClick(): void
+  /** What a screen reader calls it (`2 agents running`); the title adds the keys. */
+  name: string
   title: string
   /** A card Tern shows while the pointer rests on the pill. */
   hovercard?: NodeJson | undefined
@@ -22,17 +26,17 @@ export interface PillProps {
   children: Children
 }
 
-/** A pill and its content. */
+/** A pill and its content, in a button. */
 export function pill(p: PillProps): JSX.Element {
   const seg = p.seg ?? 'omp.hud.seg'
 
-  return (
+  return pressable(
+    { key: p.key, name: p.name, onClick: p.onClick },
     <row
       align="center"
-      key={p.key}
+      key="face"
       {...(seg === false ? { gap: 'xs' } : {})}
       {...(p.focused ? { mark: 'pick' } : {})}
-      onClick={p.onClick}
       role={p.role ?? 'omp.hud.pill'}
       title={p.title}
       {...(p.hovercard ? { hovercard: p.hovercard } : {})}
