@@ -6,18 +6,7 @@
 // tools/tool_labels.py and tools/connectors/gateway/names.py.
 
 import type { ToolCall } from './model.js'
-
-const record = (v: unknown): Record<string, unknown> | undefined => {
-  if (typeof v === 'string') {
-    try {
-      return record(JSON.parse(v))
-    } catch {
-      return undefined
-    }
-  }
-
-  return v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : undefined
-}
+import { record } from './wire/json.js'
 
 export const BRIDGE = 'tool_call'
 /** Hermes' planner name for a connector batch (CONNECTOR_BATCH_SENTINEL). */

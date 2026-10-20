@@ -11553,16 +11553,16 @@ var require_dns = __commonJS({
       setRecords(origin, addresses) {
         const timestamp = Date.now();
         const records = { records: { 4: null, 6: null } };
-        for (const record3 of addresses) {
-          record3.timestamp = timestamp;
-          if (typeof record3.ttl === "number") {
-            record3.ttl = Math.min(record3.ttl, this.#maxTTL);
+        for (const record2 of addresses) {
+          record2.timestamp = timestamp;
+          if (typeof record2.ttl === "number") {
+            record2.ttl = Math.min(record2.ttl, this.#maxTTL);
           } else {
-            record3.ttl = this.#maxTTL;
+            record2.ttl = this.#maxTTL;
           }
-          const familyRecords = records.records[record3.family] ?? { ips: [] };
-          familyRecords.ips.push(record3);
-          records.records[record3.family] = familyRecords;
+          const familyRecords = records.records[record2.family] ?? { ips: [] };
+          familyRecords.ips.push(record2);
+          records.records[record2.family] = familyRecords;
         }
         this.#records.set(origin.hostname, records);
       }
@@ -20709,8 +20709,8 @@ var Session = class {
     this.#input = input2;
     this.#output = output;
     this.#options = options;
-    const record3 = options.record ?? (options.env ?? process.env)["TERN_TSP_RECORD"];
-    this.#record = record3 === "" ? void 0 : record3;
+    const record2 = options.record ?? (options.env ?? process.env)["TERN_TSP_RECORD"];
+    this.#record = record2 === "" ? void 0 : record2;
     this.#caps = {
       term: "",
       ver: "",
@@ -22832,7 +22832,7 @@ var sessionEn = {
     },
     approval: {
       denied: "denied",
-      approved: (choice) => `approved (${choice})`
+      approved: (choice2) => `approved (${choice2})`
     },
     input: {
       dashboardNewSession: "starting a fresh dashboard chat...",
@@ -24890,8 +24890,8 @@ import { readFile, stat } from "node:fs/promises";
 import { homedir as homedir2 } from "node:os";
 import { join as join2 } from "node:path";
 
-// src/bridge.ts
-var record = (v) => {
+// src/wire/json.ts
+function record(v) {
   if (typeof v === "string") {
     try {
       return record(JSON.parse(v));
@@ -24900,7 +24900,1013 @@ var record = (v) => {
     }
   }
   return v && typeof v === "object" && !Array.isArray(v) ? v : void 0;
+}
+
+// src/agents/liveLog.ts
+var LINE = /^(\d{2}:\d{2}:\d{2}) (\S+)\s*\| (.*)$/;
+var TOOL = /^-> ([^(]+)\((.*)\)$/;
+var RESULT = /^(\S+) (ok|ERROR)(?: ([\d.]+)s)?: ?(.*)$/;
+function parseLiveLog(text11) {
+  const log = { entries: [] };
+  for (const raw2 of text11.split("\n")) {
+    const m = LINE.exec(raw2);
+    if (!m) {
+      continue;
+    }
+    const [, at, role, body] = m;
+    switch (role) {
+      case "user":
+        log.entries.push({ at, kind: "kickoff", text: body.replace(/^kickoff: /, "") });
+        break;
+      case "tool": {
+        const t2 = TOOL.exec(body);
+        log.entries.push({ args: t2?.[2] ?? "", at, kind: "tool", name: t2?.[1]?.trim() || body, status: "running" });
+        break;
+      }
+      case "result": {
+        const r = RESULT.exec(body);
+        const call = r && findLast(log.entries, (e) => e.kind === "tool" && e.status === "running" && e.name === r[1]);
+        if (call && call.kind === "tool" && r) {
+          call.status = r[2] === "ok" ? "ok" : "error";
+          call.result = r[4];
+          call.took = r[3] ? Math.round(Number(r[3]) * 1e3) : void 0;
+        }
+        break;
+      }
+      case "think":
+      case "assistant":
+        log.entries.push({ at, kind: role, text: body });
+        break;
+      case "start":
+        break;
+      case "final":
+        final(log, at, body);
+        break;
+      default:
+        log.entries.push({ at, kind: "note", text: body });
+    }
+  }
+  return log;
+}
+function final(log, at, body) {
+  const status = /(?:^|\s)status=(\S+)/.exec(body)?.[1];
+  if (status) {
+    log.status = status;
+  }
+  const duration3 = /(?:^|\s)duration=([\d.]+)s/.exec(body)?.[1];
+  if (duration3) {
+    log.duration = Number(duration3);
+  }
+  const summary4 = /summary: (.*)$/.exec(body)?.[1];
+  if (summary4) {
+    log.summary = summary4;
+  }
+  const reason = /exit_reason=(\S+)/.exec(body)?.[1];
+  if (reason) {
+    log.exitReason = reason;
+  }
+  const error = /error: (.*)$/.exec(body)?.[1];
+  if (error) {
+    log.error = error;
+  }
+  if (!status && !duration3 && !summary4) {
+    log.entries.push({ at, kind: "note", text: body });
+  }
+}
+function findLast(items, match) {
+  for (let i = items.length - 1; i >= 0; i--) {
+    if (match(items[i])) {
+      return items[i];
+    }
+  }
+  return void 0;
+}
+function runningTool(log) {
+  const last = findLast(log.entries, (e) => e.kind === "tool");
+  return last?.kind === "tool" && last.status === "running" ? last : void 0;
+}
+function clockToMs(clock4, now = Date.now()) {
+  const [h2 = 0, m = 0, s2 = 0] = clock4.split(":").map(Number);
+  const at = new Date(now).setHours(h2, m, s2, 0);
+  return at > now + 6e4 ? at - 864e5 : at;
+}
+
+// src/agents/store.ts
+var POLL_MS = 1e3;
+var MAX_LOG_BYTES = 2 * 1024 * 1024;
+var ENDED = /* @__PURE__ */ new Set(["cancelled", "done", "failed"]);
+var GRACE_POLLS = 3;
+var OUTCOME_UNKNOWN = "outcome unknown";
+function isRunning(a2) {
+  return !ENDED.has(a2.status);
+}
+function agentName(a2) {
+  return a2.name ?? `Agent ${a2.index + 1}`;
+}
+var Agents = class {
+  #host;
+  #timer;
+  #ticking = false;
+  #tracked = /* @__PURE__ */ new WeakSet();
+  /** Log sizes at the last read, by path; a log that did not grow is not read again. */
+  #sizes = /* @__PURE__ */ new Map();
+  /** Logs this process cannot read (a gateway on another machine): `subagent.tail` instead. */
+  #unreadable = /* @__PURE__ */ new Set();
+  /** Ids `subagent.list` reported: one that leaves the list has finished. */
+  #listed = /* @__PURE__ */ new Set();
+  /** Polls each unlisted row without a readable log has gone unseen. */
+  #unseen = /* @__PURE__ */ new WeakMap();
+  /** Rows whose end the host heard of. */
+  #ended = /* @__PURE__ */ new WeakSet();
+  /** The `subagent.tail` text read so far, by subagent id: each tail (the last 16 KB) is merged onto it. */
+  #tails = /* @__PURE__ */ new Map();
+  /**
+   * New delegate_task spawns are blocked, as this pane last set it (`delegation.pause`); undefined
+   * until then (the shared gateway serves no `delegation.status`). The gate is gateway-wide.
+   */
+  paused;
+  constructor(host) {
+    this.#host = host;
+  }
+  /** Every agent of the session's delegations, each delegation's rows in order. */
+  all() {
+    return [...this.#owners().keys()];
+  }
+  running() {
+    return this.all().filter(isRunning);
+  }
+  /**
+   * Takes over each dispatched delegate_task call not tracked yet, and polls while any agent runs.
+   * A call history brought back without its result (a resumed session) gets one `subagent.list`
+   * probe: its children still running are attached to it and followed from then on.
+   */
+  scan(at = Date.now()) {
+    let bare = false;
+    for (const call of this.#host.transcript.delegations()) {
+      if (this.#tracked.has(call)) {
+        continue;
+      }
+      if (this.#track(call, at)) {
+        this.#tracked.add(call);
+      } else if (call.result === void 0 && call.status !== "running" && !call.subagents?.length) {
+        bare = true;
+      }
+    }
+    if (this.running().length) {
+      this.#wake();
+    } else if (bare) {
+      void this.#tick(true);
+    }
+  }
+  /** Queues steering text into a running agent; the owner answers `queued` or `rejected`. */
+  async steer(a2, text11) {
+    const r = await this.#host.gw.request("subagent.steer", {
+      session_id: this.#host.sid,
+      subagent_id: a2.id,
+      text: text11
+    });
+    return r?.status === "queued";
+  }
+  /** Interrupts a running agent; its partial result still returns to the parent. */
+  async stop(a2) {
+    const r = await this.#host.gw.request("subagent.interrupt", {
+      session_id: this.#host.sid,
+      subagent_id: a2.id
+    });
+    return Boolean(r?.found);
+  }
+  /** Blocks (or unblocks) new subagent spawns on the gateway; running children keep going. */
+  async pause(paused) {
+    const r = await this.#host.gw.request("delegation.pause", {
+      paused,
+      ...this.#host.sid ? { session_id: this.#host.sid } : {}
+    });
+    this.paused = typeof r?.paused === "boolean" ? r.paused : paused;
+    this.#host.changed();
+    return this.paused;
+  }
+  /**
+   * Applies an async-delegation completion (the model text of its `message.start`,
+   * tools/process_registry_notifications.py) to the rows whose log never told their outcome.
+   */
+  settle(text11) {
+    const done = completionOutcomes(text11);
+    if (!done) {
+      return;
+    }
+    let changed = false;
+    for (const a2 of this.all()) {
+      const status = a2.depth ? void 0 : done.outcomes.get(a2.index);
+      if (a2.delegationId !== done.delegationId || status === void 0 || a2.log?.status) {
+        continue;
+      }
+      const ended = endedStatus(status);
+      if (!ended) {
+        continue;
+      }
+      if (isRunning(a2)) {
+        a2.duration = Date.now() - a2.startedAt;
+      }
+      a2.status = ended;
+      a2.tool = void 0;
+      a2.exitReason = status === "unknown" ? OUTCOME_UNKNOWN : PLAIN_OUTCOMES.has(status) ? void 0 : status;
+      this.#touch(a2);
+      changed = true;
+    }
+    if (changed) {
+      this.#host.changed();
+    }
+  }
+  /** Reads `a`'s log now (the hub's timeline opening on it), whatever its state. */
+  async refresh(a2) {
+    if (await this.#readLog(a2, true)) {
+      this.#touch(a2);
+      this.#host.changed();
+    }
+  }
+  dispose() {
+    clearInterval(this.#timer);
+    this.#timer = void 0;
+  }
+  #track(call, at) {
+    const r = record(call.result);
+    if (r?.status !== "dispatched" || typeof r.delegation_id !== "string") {
+      return false;
+    }
+    const goals = Array.isArray(r.goals) ? r.goals.map((g) => typeof g === "string" ? g : "") : [];
+    const ids = Array.isArray(r.subagent_ids) ? r.subagent_ids : [];
+    const paths = Array.isArray(r.live_transcripts) ? r.live_transcripts : [];
+    const list8 = call.subagents ??= [];
+    goals.forEach((goal, i) => {
+      const id = typeof ids[i] === "string" && ids[i] ? ids[i] : `task-${i}`;
+      let a2 = list8.find((x) => x.id === id);
+      if (!a2) {
+        a2 = { calls: 0, goal, id, index: i, startedAt: at, status: "queued", tokens: 0, toolCount: 0 };
+        list8.push(a2);
+      }
+      a2.key ??= `p${i}`;
+      a2.delegationId = r.delegation_id;
+      a2.depth = 0;
+      a2.logPath = typeof paths[i] === "string" ? paths[i] : void 0;
+    });
+    list8.sort((a2, b) => a2.index - b.index || (a2.depth ?? 0) - (b.depth ?? 0));
+    return true;
+  }
+  #wake() {
+    this.#timer ??= setInterval(() => void this.#tick(), POLL_MS);
+    void this.#tick();
+  }
+  /** One poll and log read; `probe` polls even with nothing running yet (a resumed session). */
+  async #tick(probe = false) {
+    if (this.#ticking) {
+      return;
+    }
+    this.#ticking = true;
+    try {
+      if (!probe && !this.running().length) {
+        return this.dispose();
+      }
+      const changed = /* @__PURE__ */ new Set();
+      await this.#poll(changed);
+      const reads = await Promise.all(this.running().map(async (a2) => await this.#readLog(a2) ? a2 : void 0));
+      reads.forEach((a2) => a2 && changed.add(a2));
+      if (changed.size) {
+        changed.forEach((a2) => this.#touch(a2));
+        this.#host.changed();
+      }
+      if (probe && this.running().length) {
+        this.#timer ??= setInterval(() => void this.#tick(), POLL_MS);
+      }
+    } finally {
+      this.#ticking = false;
+    }
+  }
+  /** Folds `subagent.list` into the rows: new nested children, status, model, counts. */
+  async #poll(changed) {
+    const sid = this.#host.sid;
+    if (!sid) {
+      return;
+    }
+    let rows;
+    try {
+      rows = (await this.#host.gw.request("subagent.list", { session_id: sid }))?.subagents ?? [];
+    } catch {
+      return;
+    }
+    const owners = this.#owners();
+    const present = /* @__PURE__ */ new Set();
+    for (const row2 of rows) {
+      const id = row2.subagent_id;
+      if (!id) {
+        continue;
+      }
+      present.add(id);
+      this.#listed.add(id);
+      const a2 = this.#find(owners, row2) ?? this.#adopt(owners, row2) ?? await this.#attach(owners, row2);
+      if (!a2) {
+        continue;
+      }
+      a2.id = id;
+      if (a2.status === "done" && a2.exitReason === OUTCOME_UNKNOWN) {
+        a2.status = "running";
+        a2.exitReason = void 0;
+        this.#ended.delete(a2);
+      }
+      a2.model = row2.model ?? a2.model;
+      a2.toolCount = Math.max(a2.toolCount, row2.tool_count ?? 0);
+      a2.steerable = row2.accepting_steer ?? a2.steerable;
+      a2.startedAt = typeof row2.started_at === "number" ? row2.started_at * 1e3 : a2.startedAt;
+      if (a2.status === "queued" || a2.status === "running") {
+        a2.status = "running";
+        if (!a2.log && row2.last_tool && a2.tool !== row2.last_tool) {
+          a2.tool = row2.last_tool;
+          a2.toolSince = { at: Date.now() };
+        }
+      }
+      changed.add(a2);
+    }
+    for (const a2 of owners.keys()) {
+      if (!isRunning(a2) || present.has(a2.id) || this.#readableLog(a2)) {
+        continue;
+      }
+      if (!this.#listed.has(a2.id)) {
+        const unseen = (this.#unseen.get(a2) ?? 0) + 1;
+        this.#unseen.set(a2, unseen);
+        if (unseen < GRACE_POLLS) {
+          continue;
+        }
+      }
+      a2.status = "done";
+      a2.exitReason = OUTCOME_UNKNOWN;
+      a2.duration = Date.now() - a2.startedAt;
+      a2.tool = void 0;
+      changed.add(a2);
+    }
+  }
+  /** The row `row` describes: by id, else a dispatch placeholder (`task-<i>`) of its delegation. */
+  #find(owners, row2) {
+    const agents2 = [...owners.keys()];
+    const byId = agents2.find((a2) => a2.id === row2.subagent_id);
+    if (byId) {
+      return byId;
+    }
+    const index2 = taskIndex(row2);
+    return (row2.depth ?? 0) === 0 && index2 !== void 0 ? agents2.find((a2) => a2.delegationId === row2.delegation_id && a2.id === `task-${index2}`) : void 0;
+  }
+  /** A nested child (an orchestrator's worker): a row under its parent, in the parent's card. */
+  #adopt(owners, row2) {
+    const parent = [...owners.keys()].find((a2) => a2.id === row2.parent_id);
+    const call = parent && owners.get(parent);
+    if (!parent || !call?.subagents) {
+      return void 0;
+    }
+    const list8 = call.subagents;
+    const siblings = list8.filter((a2) => a2.parentId === parent.id).length;
+    const child = {
+      calls: 0,
+      delegationId: row2.delegation_id,
+      depth: (parent.depth ?? 0) + 1,
+      goal: row2.goal ?? "",
+      id: row2.subagent_id,
+      index: parent.index,
+      name: `${agentName(parent)}.${siblings + 1}`,
+      parentId: parent.id,
+      startedAt: Date.now(),
+      status: "running",
+      tokens: 0,
+      toolCount: 0
+    };
+    let at = list8.indexOf(parent) + 1;
+    while (at < list8.length && (list8[at].depth ?? 0) > (parent.depth ?? 0)) {
+      at++;
+    }
+    list8.splice(at, 0, child);
+    owners.set(child, call);
+    return child;
+  }
+  /**
+   * A top-level child whose dispatch result the history dropped (a resumed session): a row on the
+   * newest result-less delegate_task call whose task `sa-<i>-` asked for its goal, its log found
+   * through the delegation's manifest (else read with `subagent.tail`).
+   */
+  async #attach(owners, row2) {
+    const index2 = taskIndex(row2);
+    const goal = row2.goal?.trim();
+    if ((row2.depth ?? 0) !== 0 || index2 === void 0 || !goal) {
+      return void 0;
+    }
+    const call = this.#host.transcript.delegations().findLast((c) => c.result === void 0 && taskGoals(c)[index2] === goal && !c.subagents?.some((a3) => !a3.depth && a3.index === index2));
+    if (!call) {
+      return void 0;
+    }
+    const a2 = {
+      calls: 0,
+      delegationId: row2.delegation_id,
+      depth: 0,
+      goal: row2.goal,
+      id: row2.subagent_id,
+      index: index2,
+      key: `p${index2}`,
+      logPath: row2.delegation_id ? await manifestLog(row2.delegation_id, index2) : void 0,
+      startedAt: Date.now(),
+      status: "running",
+      tokens: 0,
+      toolCount: 0
+    };
+    const list8 = call.subagents ??= [];
+    list8.push(a2);
+    list8.sort((x, y) => x.index - y.index || (x.depth ?? 0) - (y.depth ?? 0));
+    owners.set(a2, call);
+    return a2;
+  }
+  #readableLog(a2) {
+    return Boolean(a2.logPath && !this.#unreadable.has(a2.logPath));
+  }
+  /** Reads `a`'s log from disk (else its tail over the gateway); true when it changed. */
+  async #readLog(a2, force = false) {
+    let text11;
+    if (this.#readableLog(a2)) {
+      try {
+        const path2 = a2.logPath;
+        const { size } = await stat(path2);
+        if (!force && this.#sizes.get(path2) === size) {
+          return false;
+        }
+        this.#sizes.set(path2, size);
+        const bytes = await readFile(path2);
+        text11 = bytes.subarray(Math.max(0, bytes.length - MAX_LOG_BYTES)).toString("utf8");
+      } catch {
+        this.#unreadable.add(a2.logPath);
+      }
+    }
+    if (text11 === void 0 && this.#listed.has(a2.id) && this.#host.sid) {
+      try {
+        const r = await this.#host.gw.request("subagent.tail", {
+          session_id: this.#host.sid,
+          subagent_id: a2.id
+        });
+        if (r?.available && typeof r.text === "string") {
+          text11 = r.truncated ? mergeTail(this.#tails.get(a2.id) ?? "", r.text) : r.text;
+          this.#tails.set(a2.id, text11);
+        }
+      } catch {
+        text11 = void 0;
+      }
+    }
+    if (text11 === void 0) {
+      return false;
+    }
+    applyLog(a2, parseLiveLog(text11));
+    return true;
+  }
+  #touch(a2) {
+    const call = this.#owners().get(a2);
+    if (call) {
+      this.#host.transcript.touchCall(call);
+    }
+    if (!isRunning(a2) && !this.#ended.has(a2)) {
+      this.#ended.add(a2);
+      this.#host.agentEnded?.();
+    }
+  }
+  /** Each agent with the delegate_task call whose card shows it. */
+  #owners() {
+    const owners = /* @__PURE__ */ new Map();
+    for (const call of this.#host.transcript.delegations()) {
+      for (const a2 of call.subagents ?? []) {
+        owners.set(a2, call);
+      }
+    }
+    return owners;
+  }
 };
+function mergeTail(seen, tail) {
+  const lines = seen.split(/(?<=\n)/);
+  let merged;
+  for (let n = Math.min(4, lines.length); n > 0 && merged === void 0; n--) {
+    const anchor = lines.slice(-n).join("");
+    const at = tail.indexOf(anchor);
+    if (at >= 0) {
+      merged = seen + tail.slice(at + anchor.length);
+    }
+  }
+  merged ??= seen + (seen && !seen.endsWith("\n") ? "\n" : "") + tail.slice(tail.indexOf("\n") + 1);
+  return merged.length > MAX_LOG_BYTES ? merged.slice(merged.indexOf("\n", merged.length - MAX_LOG_BYTES) + 1) : merged;
+}
+function completionOutcomes(text11) {
+  const head2 = /^\[ASYNC DELEGATION (BATCH COMPLETE|COMPLETE|TASK FAILED) — ([^\],]+)(?:, task (\d+)\/\d+)?\]/.exec(text11.trim());
+  if (!head2) {
+    return void 0;
+  }
+  const [, kind, delegationId, task] = head2;
+  const outcomes = /* @__PURE__ */ new Map();
+  if (kind === "BATCH COMPLETE") {
+    for (const m of text11.matchAll(/^--- \S+ TASK (\d+)\/\d+.*\(status=([^,)\s]+)/gm)) {
+      outcomes.set(Number(m[1]) - 1, m[2]);
+    }
+  } else {
+    const status = /^Status: (\S+)/m.exec(text11)?.[1];
+    if (status) {
+      outcomes.set(kind === "TASK FAILED" ? Number(task) - 1 : 0, status);
+    }
+  }
+  return { delegationId: delegationId.trim(), outcomes };
+}
+var PLAIN_OUTCOMES = /* @__PURE__ */ new Set(["cancelled", "completed", "error", "failed", "interrupted", "success"]);
+function endedStatus(status) {
+  if (status === "?") {
+    return void 0;
+  }
+  if (status === "completed" || status === "success" || status === "unknown") {
+    return "done";
+  }
+  return status === "interrupted" || status === "cancelled" ? "cancelled" : "failed";
+}
+function taskIndex(row2) {
+  const index2 = Number(/^sa-(\d+)-/.exec(row2.subagent_id ?? "")?.[1]);
+  return Number.isInteger(index2) ? index2 : void 0;
+}
+function taskGoals(call) {
+  let tasks = call.args.tasks;
+  if (typeof tasks === "string") {
+    try {
+      tasks = JSON.parse(tasks);
+    } catch {
+      tasks = void 0;
+    }
+  }
+  if (Array.isArray(tasks) && tasks.length) {
+    return tasks.map((t2) => {
+      const goal = record(t2)?.goal;
+      return typeof goal === "string" ? goal.trim() : "";
+    });
+  }
+  return typeof call.args.goal === "string" ? [call.args.goal.trim()] : [];
+}
+async function manifestLog(delegationId, index2, env2 = process.env) {
+  if (!/^[\w-]+$/.test(delegationId)) {
+    return void 0;
+  }
+  const home = env2.HERMES_HOME || join2(homedir2(), ".hermes");
+  for (const root7 of [join2(home, "delegation_cache", "live"), join2(home, "cache", "delegation", "live")]) {
+    try {
+      const text11 = await readFile(join2(root7, delegationId, "manifest.json"), "utf8");
+      const tasks = record(text11.replace(/^\uFEFF/, ""))?.tasks;
+      const log = Array.isArray(tasks) ? record(tasks.find((t2) => record(t2)?.index === index2))?.log : void 0;
+      if (typeof log === "string" && log) {
+        return log;
+      }
+    } catch {
+    }
+  }
+  return void 0;
+}
+function applyLog(a2, log) {
+  a2.log = log;
+  const tools2 = log.entries.filter((e) => e.kind === "tool").length;
+  a2.toolCount = Math.max(a2.toolCount, tools2);
+  if (log.status) {
+    a2.status = log.status === "completed" ? "done" : log.status === "interrupted" ? "cancelled" : "failed";
+    a2.summary = log.summary ?? a2.summary;
+    a2.duration = log.duration !== void 0 ? Math.round(log.duration * 1e3) : a2.duration;
+    a2.exitReason = log.exitReason ?? log.error ?? a2.exitReason;
+    a2.tool = void 0;
+    return;
+  }
+  if (log.entries.length && a2.status === "queued") {
+    a2.status = "running";
+  }
+  const now = runningTool(log);
+  if (!now) {
+    a2.tool = void 0;
+    return;
+  }
+  const since = clockToMs(now.at);
+  if (a2.tool !== now.name || a2.toolSince?.at !== since) {
+    a2.tool = now.name;
+    a2.toolPreview = now.args || void 0;
+    a2.toolSince = { at: since };
+  }
+}
+
+// src/core/errors.ts
+function errorText(error) {
+  return error instanceof Error ? error.message : String(error);
+}
+
+// src/automation.ts
+function cadence(loop) {
+  if (loop.mode === "self_paced") {
+    return "self-paced";
+  }
+  const s2 = loop.interval_seconds;
+  return `every ${s2 % 3600 === 0 ? `${s2 / 3600}h` : s2 % 60 === 0 ? `${s2 / 60}m` : `${s2}s`}`;
+}
+var clock = (epochSeconds) => new Date(epochSeconds * 1e3).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+function goalView(goal) {
+  if (!goal || goal.status !== "active" && goal.status !== "paused") {
+    return null;
+  }
+  const barrier = goal.status === "active" ? goal.wait_barrier : null;
+  const wait = barrier ? [barrier.type === "until" ? `until ${clock(barrier.until_at)}` : `on ${barrier.type} ${barrier.target}`, barrier.reason].filter(Boolean).join(" \xB7 ") : "";
+  return {
+    criteria: goal.subgoals ?? [],
+    detail: barrier ? wait : goal.status === "paused" ? goal.paused_reason ?? "" : "",
+    maxTurns: goal.max_turns,
+    reason: goal.last_reason ?? void 0,
+    state: goal.status === "paused" ? "paused" : barrier ? "waiting" : goal.last_verdict === "blocked" ? "blocked" : "active",
+    title: goal.title,
+    turns: goal.turns_used,
+    verdict: goal.last_verdict ?? void 0
+  };
+}
+function loopView(loop, now = Date.now()) {
+  if (!loop || loop.status !== "active" && loop.status !== "paused") {
+    return null;
+  }
+  const dueAt = loop.next_due_at > 0 ? loop.next_due_at * 1e3 : void 0;
+  const state = loop.status === "paused" ? "paused" : loop.awaiting_response ? "running" : loop.deferred_by_goal ? "deferred" : dueAt !== void 0 && dueAt > now ? "active" : "due";
+  return {
+    cadence: cadence(loop),
+    detail: loop.status === "paused" ? loop.paused_reason ?? "" : "",
+    dueAt: state === "active" ? dueAt : void 0,
+    fired: loop.ticks_fired,
+    prompt: loop.prompt,
+    runs: loop.times ? `${loop.ticks_fired}/${loop.times} runs` : `${loop.ticks_fired} run${loop.ticks_fired === 1 ? "" : "s"}`,
+    state,
+    times: loop.times,
+    until: loop.until ?? ""
+  };
+}
+var ACTION_LABELS = {
+  "goal.clear": "clear the goal",
+  "goal.pause": "pause the goal",
+  "goal.resume": "resume the goal",
+  "goal.unwait": "stop the goal waiting",
+  "loop.pause": "pause the loop",
+  "loop.resume": "resume the loop",
+  "loop.stop": "stop the loop"
+};
+var Automation = class {
+  #host;
+  #sid = null;
+  #snapshot = null;
+  /** Bumped by every update, so a read that started before one never overwrites it. */
+  #seq = 0;
+  #timer;
+  /** The verb in flight, if any (the sheet's buttons wait for it). */
+  pending;
+  constructor(host) {
+    this.#host = host;
+  }
+  get goal() {
+    return goalView(this.#snapshot?.goal);
+  }
+  loop(now = Date.now()) {
+    return loopView(this.#snapshot?.loop, now);
+  }
+  /** The loop's raw snapshot: a new object per update, so its countdown re-anchors only then. */
+  get loopSnapshot() {
+    return this.#snapshot?.loop ?? null;
+  }
+  /** Another session is shown: forget the last one's state and read this one's. */
+  adopt(sid) {
+    this.#sid = sid;
+    this.#set(null);
+    void this.#read(sid);
+  }
+  /** A `session.control.update` (or a verb's reply) for session `sid`. */
+  apply(sid, control) {
+    if (sid && sid !== this.#sid) {
+      return;
+    }
+    this.#seq++;
+    this.#set(control ?? null);
+  }
+  async #read(sid) {
+    const seq = this.#seq;
+    try {
+      const r = await this.#host.gw.request("session.control.read", { session_id: sid });
+      if (sid === this.#sid && seq === this.#seq) {
+        this.#set(r?.control ?? null);
+      }
+    } catch {
+    }
+  }
+  /** Runs `action` on the open session; the reply's snapshot repaints, its dispatch runs as a typed command's. */
+  async act(action) {
+    const sid = this.#sid;
+    if (!sid || this.pending) {
+      return;
+    }
+    this.pending = action;
+    this.#host.changed();
+    try {
+      const r = await this.#host.gw.request(
+        "session.control",
+        { action, session_id: sid }
+      );
+      this.apply(sid, r?.control);
+      if (r?.dispatch?.type && sid === this.#host.sid) {
+        await this.#host.runDispatch(r.dispatch, `/${action.replace(".", " ")}`);
+      }
+    } catch (error) {
+      this.#host.transcript.notice(
+        `Could not ${ACTION_LABELS[action]}: ${errorText(error)}`,
+        "error"
+      );
+    } finally {
+      this.pending = void 0;
+      this.#host.changed();
+    }
+  }
+  #set(control) {
+    if (JSON.stringify(control) !== JSON.stringify(this.#snapshot)) {
+      this.#snapshot = control;
+      this.#host.changed();
+    }
+    this.#arm();
+  }
+  /** Re-renders when the loop falls due, so its countdown turns into "due". Tern ticks the countdown itself. */
+  #arm() {
+    clearTimeout(this.#timer);
+    const due = this.loop()?.dueAt;
+    if (due !== void 0) {
+      this.#timer = setTimeout(() => this.#host.changed(), Math.max(0, due - Date.now()) + 50);
+      this.#timer.unref?.();
+    }
+  }
+};
+
+// src/clipboard.ts
+import { spawn } from "node:child_process";
+function copyToClipboard(text11, env2 = process.env) {
+  process.stdout.write(`\x1B]52;c;${Buffer.from(text11).toString("base64")}\x07`);
+  if (process.platform === "darwin" && !env2.SSH_CONNECTION && !env2.SSH_TTY) {
+    const child = spawn("pbcopy", [], { stdio: ["pipe", "ignore", "ignore"] });
+    child.on("error", () => {
+    });
+    child.stdin.end(text11);
+  }
+}
+
+// src/hermes/mutate.ts
+import { randomUUID as randomUUID2 } from "node:crypto";
+async function currentGeneration(gw2, sid) {
+  const snapshot3 = await gw2.request("session.resume", { session_id: sid });
+  if (!Number.isSafeInteger(snapshot3?.execution_generation)) {
+    throw new Error("The session did not report its execution generation; try again.");
+  }
+  return snapshot3.execution_generation;
+}
+async function mutateSession(gw2, sid, operation, payload) {
+  const snapshot3 = await gw2.request("session.resume", { session_id: sid });
+  if (!Number.isSafeInteger(snapshot3?.revision) || !Number.isSafeInteger(snapshot3?.execution_generation)) {
+    throw new Error("The session did not report its revision; try again.");
+  }
+  const body = typeof payload === "function" ? payload(snapshot3) : payload;
+  if (!body) {
+    return null;
+  }
+  const result = await gw2.request("session.mutate", {
+    session_id: sid,
+    request_id: randomUUID2(),
+    expected_revision: snapshot3.revision,
+    ...operation === "rename" ? {} : { expected_generation: snapshot3.execution_generation },
+    operation,
+    payload: body
+  });
+  if (!result) {
+    throw new Error("session.mutate returned nothing");
+  }
+  return result;
+}
+function modelPayload(arg) {
+  const parts3 = arg.trim().split(/\s+/);
+  const model = parts3.shift() ?? "";
+  if (!model || model.startsWith("--")) {
+    throw new Error("Usage: /model <name> [--provider <slug>]");
+  }
+  const payload = { model };
+  while (parts3.length) {
+    const flag = parts3.shift();
+    if (flag === "--session" || flag === "--tui-session") {
+      continue;
+    }
+    if (flag === "--provider" && parts3[0] && !parts3[0].startsWith("--")) {
+      payload.provider = parts3.shift();
+      continue;
+    }
+    throw new Error(
+      flag === "--global" ? "/model: --global is not supported here: the switch applies to this session only (`hermes model` sets the default)" : `/model: ${flag} is not supported here (the switch applies to this session)`
+    );
+  }
+  return payload;
+}
+
+// src/controlCommands.ts
+var preview = (text11) => text11.length > 60 ? `${text11.slice(0, 57)}\u2026` : text11;
+async function interruptTurn(gw2, sid) {
+  const execution_generation = await currentGeneration(gw2, sid);
+  await gw2.request("session.interrupt", { session_id: sid, execution_generation });
+}
+async function steerTurn(gw2, sid, text11) {
+  try {
+    const execution_generation = await currentGeneration(gw2, sid);
+    const r = await gw2.request("session.steer", { session_id: sid, execution_generation, text: text11 });
+    return r?.status === "queued" ? { ok: true } : { ok: false };
+  } catch (e) {
+    return errorText(e).includes("stale_generation") ? { ok: false } : { error: errorText(e), ok: false };
+  }
+}
+async function redirectTurn(gw2, sid, text11) {
+  try {
+    const execution_generation = await currentGeneration(gw2, sid);
+    const r = await gw2.request("session.redirect", { session_id: sid, execution_generation, text: text11 });
+    return r?.status === "redirected" || r?.status === "queued" ? { ok: true } : { ok: false };
+  } catch (e) {
+    return errorText(e).includes("stale_generation") ? { ok: false } : { error: errorText(e), ok: false };
+  }
+}
+async function steer(host, text11) {
+  if (!text11) {
+    return host.notice("Usage: /steer <guidance for the active turn>", "warning");
+  }
+  if (!host.busy || !host.sid) {
+    host.enqueue(text11);
+    return host.notice(`No active turn \u2014 queued as next prompt: ${preview(text11)}`);
+  }
+  const r = await steerTurn(host.gw, host.sid, text11);
+  if (r.ok) {
+    return host.steered ? host.steered(text11) : host.notice(`Steer queued for the active turn: ${preview(text11)}`);
+  }
+  if (r.error) {
+    return host.notice(`/steer failed: ${r.error}`, "error");
+  }
+  host.enqueue(text11);
+  host.notice("Turn ended before the steer landed \u2014 queued as next prompt", "warning");
+}
+function queue(host, text11) {
+  if (!text11) {
+    return host.notice(`${host.queued} queued message${host.queued === 1 ? "" : "s"}`);
+  }
+  host.submit(text11);
+}
+async function stop(host) {
+  if (!host.sid) {
+    return host.notice("No active session.", "warning");
+  }
+  const notes = [];
+  if (host.busy) {
+    try {
+      await interruptTurn(host.gw, host.sid);
+      notes.push("Interrupted the active turn.");
+    } catch (e) {
+      if (!errorText(e).includes("stale_generation")) {
+        host.notice(`Interrupt failed: ${errorText(e)}`, "error");
+      }
+    }
+  }
+  try {
+    const r = await host.gw.request("process.stop", { session_id: host.sid });
+    if (typeof r?.killed === "number") {
+      notes.push(`Stopped ${r.killed} background process${r.killed === 1 ? "" : "es"}.`);
+    }
+  } catch {
+  }
+  host.notice(notes.join(" ") || "Nothing to stop.");
+}
+async function tools(host, arg) {
+  const sub = arg.split(/\s+/)[0] ?? "";
+  if (sub && sub !== "list") {
+    return host.notice(`/tools ${sub} is not available on the shared gateway yet (toolsets are fixed at session launch)`, "warning");
+  }
+  if (!host.sid) {
+    return host.notice("No active session.", "warning");
+  }
+  try {
+    const r = await host.gw.request("tools.show", { session_id: host.sid });
+    const sections2 = (r?.sections ?? []).filter((s2) => s2.tools?.length);
+    const lines = sections2.map((s2) => `[${s2.name}] ${s2.tools.map((t2) => t2.name).join(", ")}`);
+    host.notice(lines.length ? [...lines, `Total: ${r?.total ?? 0} tools`].join("\n") : "No tools available.");
+  } catch (e) {
+    host.notice(`/tools failed: ${errorText(e)}`, "error");
+  }
+}
+async function side(host, text11, kind) {
+  if (!text11) {
+    return host.notice(kind === "bg" ? "Usage: /bg <prompt>" : "Usage: /btw <question>", "warning");
+  }
+  if (!host.sid) {
+    return host.notice("No active session.", "warning");
+  }
+  try {
+    const r = await host.gw.request(kind === "bg" ? "prompt.background" : "prompt.btw", {
+      session_id: host.sid,
+      text: text11
+    });
+    if (r?.task_id) {
+      host.notice(
+        kind === "bg" ? `Background task ${r.task_id} started: ${preview(text11)}` : `btw ${r.task_id}: answering from a snapshot of this conversation`
+      );
+    }
+  } catch (e) {
+    host.notice(`/${kind} failed: ${errorText(e)}`, "error");
+  }
+}
+var CONTROL_COMMANDS = [
+  { aliases: ["s"], name: "steer", run: steer },
+  { aliases: ["q"], name: "queue", run: queue },
+  { name: "stop", run: stop },
+  { name: "tools", run: tools },
+  { aliases: ["background"], name: "bg", run: (host, arg) => side(host, arg, "bg") },
+  { name: "btw", run: (host, arg) => side(host, arg, "btw") }
+];
+
+// src/fast.ts
+var TIERS = { fast: "priority", normal: "", ultrafast: "ultrafast" };
+var fastWord = (value) => value === "fast" || value === "ultrafast" ? value : "normal";
+function fastTier(info) {
+  return info?.fast ? info.service_tier === "ultrafast" ? "ultrafast" : "fast" : void 0;
+}
+function fastValue(arg) {
+  const word = arg.trim().toLowerCase();
+  return { "": "toggle", fast: "fast", normal: "normal", off: "normal", on: "fast", toggle: "toggle", ultrafast: "ultrafast" }[word] ?? null;
+}
+var describe2 = (word) => word === "normal" ? "Fast mode off." : `${word === "fast" ? "Fast" : "Ultrafast"} mode on: priority processing, billed higher.`;
+async function setFast(host, value) {
+  const sid = host.sid;
+  if (!sid) {
+    return false;
+  }
+  try {
+    const r = await host.gw.request("config.set", { key: "fast", session_id: sid, value });
+    const word = fastWord(r?.value);
+    if (sid === host.sid) {
+      host.info = { ...host.info, fast: word !== "normal", service_tier: TIERS[word] };
+    }
+    host.transcript.notice(describe2(word));
+    return true;
+  } catch (error) {
+    const why = errorText(error);
+    host.transcript.notice(
+      why.includes("fast_unavailable") ? "This model has no fast mode on its current route." : `Could not set fast mode: ${why}`,
+      "warning"
+    );
+    return false;
+  } finally {
+    host.changed();
+  }
+}
+async function fastCommand(host, arg) {
+  if (arg.trim().toLowerCase() === "status") {
+    const r = await host.gw.request("config.get", { key: "fast", session_id: host.sid });
+    return host.transcript.notice(`Fast mode: ${fastWord(r?.value)}.`);
+  }
+  const value = fastValue(arg);
+  if (!value) {
+    return host.transcript.notice("Usage: /fast [on|off|ultrafast|status]", "warning");
+  }
+  await setFast(host, value);
+}
+
+// src/view/time.ts
+var kAge = /* @__PURE__ */ Symbol("tsp.age");
+function age(owner, startedAt, now) {
+  const aged = owner;
+  return aged[kAge] ??= Math.max(0, now - startedAt);
+}
+function countdownAge(owner, dueAt, now) {
+  const aged = owner;
+  return aged[kAge] ??= Math.min(0, now - dueAt);
+}
+function duration(ms) {
+  if (ms < 1e3) {
+    return `${Math.max(0, Math.round(ms))}ms`;
+  }
+  const s2 = Math.round(ms / 100) / 10;
+  if (s2 < 60) {
+    return `${s2 < 10 ? s2.toFixed(1) : Math.round(s2)}s`;
+  }
+  const m = Math.floor(s2 / 60);
+  if (m < 60) {
+    return `${m}m ${String(Math.round(s2 % 60)).padStart(2, "0")}s`;
+  }
+  return `${Math.floor(m / 60)}h ${String(m % 60).padStart(2, "0")}m`;
+}
+function compact(n) {
+  if (n < 1e3) {
+    return String(n);
+  }
+  if (n < 1e6) {
+    const k = n / 1e3;
+    return `${k < 10 ? k.toFixed(1).replace(/\.0$/, "") : Math.round(k)}K`;
+  }
+  const m = n / 1e6;
+  return `${m < 10 ? m.toFixed(1).replace(/\.0$/, "") : Math.round(m)}M`;
+}
+
+// src/bridge.ts
 var BRIDGE = "tool_call";
 var BATCH = "connectors__execute";
 var TITLES = {
@@ -25003,8 +26009,356 @@ function callApp(call) {
   return appOf(call.name, call.args);
 }
 
+// src/connections.ts
+import { existsSync as existsSync2, mkdirSync as mkdirSync2, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { homedir as homedir3 } from "node:os";
+import { join as join3 } from "node:path";
+var CONNECT_TOOL = "manage_connections";
+var POLL_MS2 = 2e3;
+var STALE_MS = 2 * 6e4;
+var dataDir = (env2 = process.env) => join3(env2.HERMES_HOME || join3(homedir3(), ".hermes"), "plugin-data", "hermes-tern");
+var REASONS = /* @__PURE__ */ new Set(["all_resolved", "continued", "deadline", "error", "superseded"]);
+var safe = (part) => part.replace(/[^A-Za-z0-9_-]/g, "_");
+var cardStem = (callId, opId) => opId ? `${safe(callId)}.${safe(opId)}` : safe(callId);
+var alive = (pid) => {
+  if (typeof pid !== "number") {
+    return true;
+  }
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    return error.code === "EPERM";
+  }
+};
+function readCard(key2, dir2 = dataDir(), now = Date.now()) {
+  const file2 = join3(dir2, "connections", `${key2}.json`);
+  try {
+    const data = JSON.parse(readFileSync(file2, "utf8"));
+    if (!Array.isArray(data.targets)) {
+      return void 0;
+    }
+    const error = typeof data.error === "string" && data.error ? data.error : void 0;
+    const updated = typeof data.updated_at === "number" ? data.updated_at * 1e3 : now;
+    let settled;
+    if (typeof data.settled_by === "string" && REASONS.has(data.settled_by)) {
+      settled = data.settled_by;
+    } else if (data.watching !== true) {
+      settled = error ? "error" : data.targets.some((t2) => waiting({ state: String(record(t2)?.state ?? "") })) ? "deadline" : "all_resolved";
+    } else if (!alive(data.pid) || now - updated > STALE_MS) {
+      settled = "stopped";
+    }
+    return { error, key: key2, settled, targets: data.targets, told: existsSync2(join3(dir2, "connections", `${key2}.told`)) };
+  } catch {
+    return void 0;
+  }
+}
+function findCard(call, dir2 = dataDir()) {
+  const op = record(call.result)?.op_id;
+  const prefix2 = `${safe(call.id)}.`;
+  if (typeof op === "string" && op) {
+    return existsSync2(join3(dir2, "connections", `${cardStem(call.id, op)}.json`)) ? cardStem(call.id, op) : void 0;
+  }
+  let names;
+  try {
+    names = readdirSync(join3(dir2, "connections"));
+  } catch {
+    return void 0;
+  }
+  const keys2 = names.flatMap((n) => {
+    const key2 = n.endsWith(".json") ? n.slice(0, -5) : "";
+    return key2 === safe(call.id) || key2.startsWith(prefix2) && !key2.slice(prefix2.length).includes(".") ? [key2] : [];
+  });
+  if (keys2.length < 2) {
+    return keys2[0];
+  }
+  const createdAt = (key2) => {
+    try {
+      const at = record(readFileSync(join3(dir2, "connections", `${key2}.json`), "utf8"))?.created_at;
+      return typeof at === "number" ? at * 1e3 : 0;
+    } catch {
+      return 0;
+    }
+  };
+  return keys2.map((key2) => ({ gap: Math.abs(createdAt(key2) - call.startedAt), key: key2 })).sort((a2, b) => a2.gap - b.gap)[0]?.key;
+}
+function claimTold(key2, dir2 = dataDir()) {
+  try {
+    writeFileSync(join3(dir2, "connections", `${key2}.told`), "", { flag: "wx" });
+    return true;
+  } catch {
+    return false;
+  }
+}
+var TERN_PANE_VARS = ["TERN_PANE", "TERN_PANE_SOCKET", "TERN_WINDOW_KEY", "TERN_WINDOW_SOCKET", "TERN_DAEMON_SOCKET"];
+function ternPane(env2 = process.env) {
+  const vars = Object.fromEntries(TERN_PANE_VARS.flatMap((k) => env2[k] ? [[k, env2[k]]] : []));
+  return vars.TERN_PANE ? vars : void 0;
+}
+function markViewer(sid, previous3, dir2 = dataDir(), env2 = process.env) {
+  const viewers = join3(dir2, "viewers");
+  try {
+    if (previous3 && previous3 !== sid) {
+      rmSync(join3(viewers, `${previous3}.json`), { force: true });
+    }
+    if (sid) {
+      mkdirSync2(viewers, { recursive: true });
+      writeFileSync(join3(viewers, `${sid}.json`), JSON.stringify({ pid: process.pid, tern: ternPane(env2) }));
+    }
+  } catch {
+  }
+}
+function connectTargets(call, card) {
+  if (call.name !== CONNECT_TOOL) {
+    return [];
+  }
+  const targets = card?.targets ?? record(call.result)?.targets;
+  return parseTargets(Array.isArray(targets) ? targets : []);
+}
+function loadConnect(call, dir2 = dataDir(), now = Date.now()) {
+  if (call.name !== CONNECT_TOOL) {
+    return void 0;
+  }
+  const key2 = call.connect?.key ?? findCard(call, dir2);
+  const file2 = key2 ? readCard(key2, dir2, now) : void 0;
+  const targets = connectTargets(call, file2);
+  if (!targets.length) {
+    return void 0;
+  }
+  return {
+    error: file2?.error,
+    key: file2?.key,
+    opened: call.connect?.opened ?? [],
+    // Continue settles the card at once, as on the desktop; the watcher sees the claim on its next read.
+    settled: file2?.settled ?? (file2?.told || call.connect?.told ? "continued" : void 0),
+    targets,
+    told: Boolean(file2?.told || call.connect?.told)
+  };
+}
+function parseTargets(targets) {
+  return targets.flatMap((t2) => {
+    const r = record(t2);
+    const name = typeof r?.name === "string" ? r.name : "";
+    return name ? [
+      {
+        alias: typeof r?.alias === "string" && r.alias ? r.alias : void 0,
+        detail: typeof r?.detail === "string" && r.detail ? r.detail : void 0,
+        name,
+        state: typeof r?.state === "string" ? r.state : "pending",
+        title: appTitle(name),
+        url: typeof r?.connect_url === "string" && r.connect_url ? r.connect_url : void 0
+      }
+    ] : [];
+  });
+}
+var waiting = (t2) => t2.state === "initiated" || t2.state === "pending";
+var allConnected = (card) => {
+  const own13 = card.targets.filter((t2) => t2.state !== "superseded");
+  return own13.length > 0 && own13.every((t2) => t2.state === "connected");
+};
+function isConnectCall(call) {
+  const card = call.connect;
+  return card ? card.settled !== "superseded" && card.targets.some((t2) => t2.url) : connectTargets(call).some((t2) => t2.url);
+}
+var and = (names) => names.length < 3 ? names.join(" and ") : `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`;
+function continueMessage(targets) {
+  const names = targets.filter((t2) => t2.state === "connected" || waiting(t2)).map((t2) => t2.title);
+  return `I've authorized ${and(names) || "the apps"}. Check with manage_connections status and carry on.`;
+}
+function connectedMessage(targets) {
+  const names = targets.filter((t2) => t2.state === "connected").map((t2) => t2.title);
+  return `${and(names)} ${names.length === 1 ? "is" : "are"} connected now. Carry on.`;
+}
+
+// src/media.ts
+import { homedir as homedir5 } from "node:os";
+import { isAbsolute } from "node:path";
+import { fileURLToPath } from "node:url";
+
+// src/hermes/images.ts
+import { readFile as readFile2 } from "node:fs/promises";
+import { homedir as homedir4 } from "node:os";
+import { extname as extname2, resolve as resolve3 } from "node:path";
+var MAX_IMAGE_BYTES = 20 * 1024 * 1024;
+function imageFormat(bytes) {
+  if (bytes.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))) {
+    return { mime: "image/png", ext: ".png" };
+  }
+  if (bytes[0] === 255 && bytes[1] === 216 && bytes[2] === 255) {
+    return { mime: "image/jpeg", ext: ".jpg" };
+  }
+  if (/^GIF8[79]a$/.test(bytes.subarray(0, 6).toString("ascii"))) {
+    return { mime: "image/gif", ext: ".gif" };
+  }
+  if (bytes.subarray(0, 4).toString("ascii") === "RIFF" && bytes.subarray(8, 12).toString("ascii") === "WEBP") {
+    return { mime: "image/webp", ext: ".webp" };
+  }
+  return null;
+}
+function imageSize(bytes) {
+  const format = imageFormat(bytes)?.mime;
+  const size = (w, h2) => w > 0 && h2 > 0 ? { h: h2, w } : void 0;
+  try {
+    if (format === "image/png") {
+      return size(bytes.readUInt32BE(16), bytes.readUInt32BE(20));
+    }
+    if (format === "image/gif") {
+      return size(bytes.readUInt16LE(6), bytes.readUInt16LE(8));
+    }
+    if (format === "image/webp") {
+      const chunk = bytes.subarray(12, 16).toString("ascii");
+      if (chunk === "VP8X") {
+        return size(bytes.readUIntLE(24, 3) + 1, bytes.readUIntLE(27, 3) + 1);
+      }
+      if (chunk === "VP8L") {
+        const b = bytes.readUInt32LE(21);
+        return size((b & 16383) + 1, (b >> 14 & 16383) + 1);
+      }
+      return size(bytes.readUInt16LE(26) & 16383, bytes.readUInt16LE(28) & 16383);
+    }
+    if (format === "image/jpeg") {
+      for (let i = 2; i + 9 < bytes.length; ) {
+        if (bytes[i] !== 255) {
+          return void 0;
+        }
+        const marker2 = bytes[i + 1];
+        if (marker2 >= 192 && marker2 <= 207 && marker2 !== 196 && marker2 !== 200 && marker2 !== 204) {
+          return size(bytes.readUInt16BE(i + 7), bytes.readUInt16BE(i + 5));
+        }
+        i += 2 + bytes.readUInt16BE(i + 2);
+      }
+    }
+  } catch {
+  }
+  return void 0;
+}
+async function uploadImage(gw2, sid, raw2, cwd) {
+  const path2 = resolve3(cwd, raw2.replace(/^~(?=$|\/)/, homedir4()));
+  const bytes = await readFile2(path2);
+  if (bytes.length > MAX_IMAGE_BYTES) {
+    throw new Error("the image is larger than 20 MB");
+  }
+  const format = imageFormat(bytes);
+  if (!format) {
+    throw new Error(`${extname2(path2) || "this file"} is not a PNG, JPEG, GIF or WebP image`);
+  }
+  const r = await gw2.request("image.attach_bytes", {
+    session_id: sid,
+    filename: `image${format.ext}`,
+    content_base64: bytes.toString("base64")
+  });
+  if (!r?.path) {
+    throw new Error("the gateway did not store the image");
+  }
+  return { bytes, mime: format.mime, path: r.path };
+}
+
+// src/media.ts
+var str3 = (v) => typeof v === "string" && v.trim() ? v.trim() : void 0;
+var MAX_BYTES = 16 * 1024 * 1024;
+var FETCH_MS = 2e4;
+function shownImage(call) {
+  if (call.status === "error" || call.status === "cancelled") {
+    return void 0;
+  }
+  const r = record(call.result);
+  if (r?.success === false) {
+    return void 0;
+  }
+  if (call.name === "image_generate") {
+    return str3(r?.host_image) ?? str3(r?.image);
+  }
+  if (call.name.startsWith("browser")) {
+    const summary4 = call.resultText ?? str3(r?.text_summary) ?? "";
+    return str3(record(r?.meta)?.screenshot_path) ?? str3(r?.screenshot_path) ?? /Screenshot path: (\S+)/.exec(summary4)?.[1];
+  }
+  return void 0;
+}
+function localSource(src) {
+  if (/^file:\/\//i.test(src)) {
+    try {
+      return { path: fileURLToPath(src) };
+    } catch {
+      return void 0;
+    }
+  }
+  const path2 = src.replace(/^~(?=\/)/, homedir5());
+  return isAbsolute(path2) ? { path: path2 } : void 0;
+}
+var Media = class {
+  #host;
+  #fetch;
+  #loads = /* @__PURE__ */ new Map();
+  /** What each settled load gave, so a call rebuilt from history gets it before the next frame. */
+  #loaded = /* @__PURE__ */ new Map();
+  constructor(host, fetcher = (url, init) => fetch(url, init)) {
+    this.#host = host;
+    this.#fetch = fetcher;
+  }
+  /**
+   * Gets the image `call` shows ready: a URL's bytes land on `call.image` (null when they could
+   * not be had) and `done` runs. A local file needs nothing; Tern reads it.
+   */
+  show(call, done) {
+    const src = shownImage(call);
+    if (!src || localSource(src) || call.image !== void 0) {
+      return;
+    }
+    if (this.#loaded.has(src)) {
+      call.image = this.#loaded.get(src);
+      return;
+    }
+    void this.load(src).then((image3) => {
+      call.image = image3;
+      done();
+    });
+  }
+  /** `show` for every call of `entries` (a transcript loaded from history). */
+  showAll(entries, done) {
+    for (const e of entries) {
+      for (const b of e.kind === "turn" ? e.blocks : []) {
+        if (b.kind === "tool") {
+          this.show(b.call, () => done(b.call));
+        }
+      }
+    }
+  }
+  /** `src` (a data or http(s) URL) as a blob; null when it is no image or cannot be fetched. */
+  load(src) {
+    let load2 = this.#loads.get(src);
+    if (!load2) {
+      load2 = this.#bytes(src).then(
+        (bytes) => this.#blob(bytes),
+        () => null
+      ).then((image3) => {
+        this.#loaded.set(src, image3);
+        return image3;
+      });
+      this.#loads.set(src, load2);
+    }
+    return load2;
+  }
+  async #bytes(src) {
+    const data = /^data:image\/[\w.+-]+;base64,(.*)$/s.exec(src);
+    if (data) {
+      return Buffer.from(data[1] ?? "", "base64");
+    }
+    if (!/^https?:\/\//i.test(src)) {
+      return void 0;
+    }
+    const r = await this.#fetch(src, { signal: AbortSignal.timeout(FETCH_MS) });
+    const size = Number(r.headers.get("content-length") ?? 0);
+    return r.ok && size <= MAX_BYTES ? Buffer.from(await r.arrayBuffer()) : void 0;
+  }
+  #blob(bytes) {
+    const format = bytes && bytes.length <= MAX_BYTES ? imageFormat(bytes) : null;
+    const blob = format && bytes ? this.#host.blob(bytes, format.mime) : void 0;
+    return blob ? { blob } : null;
+  }
+};
+
 // src/promptRefs.ts
-import { existsSync as existsSync2 } from "node:fs";
+import { existsSync as existsSync3 } from "node:fs";
 import { basename as basename2 } from "node:path";
 var VALUE = "(`[^`\\n]+`|\"[^\"\\n]+\"|'[^'\\n]+'|\\S+)";
 var IMAGE_LINE = new RegExp(`^@image:${VALUE}[ \\t]*$`, "gm");
@@ -25052,7 +26406,7 @@ function splitPrompt(raw2) {
   }
   return { files, images: [...refs, ...hinted], text: text11.replace(CONTEXT_WARNINGS, "").replace(/\n{3,}/g, "\n\n").trim() };
 }
-function promptAttachments(parts3, exists = existsSync2) {
+function promptAttachments(parts3, exists = existsSync3) {
   const local = (p3) => p3.startsWith("/") && exists(p3);
   return [
     ...parts3.images.map((p3) => ({ kind: "image", name: basename2(p3), ...local(p3) ? { source: { path: p3 } } : {} })),
@@ -25674,7 +27028,7 @@ var Transcript = class {
       return;
     }
     const { call, turn } = found;
-    const output = record2(p3.result)?.output;
+    const output = record(p3.result)?.output;
     const interrupted = p3.name === "terminal" && typeof output === "string" && /\[Command interrupted\]\s*$/.test(output);
     call.duration = typeof p3.duration_s === "number" ? Math.round(p3.duration_s * 1e3) : at - call.startedAt;
     call.summary = p3.summary ?? void 0;
@@ -25704,7 +27058,7 @@ var Transcript = class {
     }
   }
   subagent(type, p3, at = Date.now()) {
-    const found = (p3.delegation_id ? this.#findTool((c) => c.name === "delegate_task" && record2(c.result)?.delegation_id === p3.delegation_id) : void 0) ?? this.#lastTool((c) => c.name === "delegate_task");
+    const found = (p3.delegation_id ? this.#findTool((c) => c.name === "delegate_task" && record(c.result)?.delegation_id === p3.delegation_id) : void 0) ?? this.#lastTool((c) => c.name === "delegate_task");
     if (!found) {
       return;
     }
@@ -25861,14 +27215,14 @@ var Transcript = class {
         turn.endedAt = Math.max(turn.endedAt ?? at, at);
       }
       if (m.role === "assistant") {
-        const meta2 = record2(m.display_metadata);
+        const meta2 = record(m.display_metadata);
         const thought = storedThought(m);
         if (thought.trim()) {
           turn.blocks.push({ endedAt: at, id: this.id("k"), kind: "thinking", startedAt: at, text: thought });
         }
         if (m.display_kind === "failed_turn") {
-          const surface = record2(meta2?.error_surface);
-          const error = str3(meta2?.error) ?? str3(surface?.message);
+          const surface = record(meta2?.error_surface);
+          const error = str4(meta2?.error) ?? str4(surface?.message);
           turn.status = "error";
           Object.assign(turn, error ? failure(error, surface?.code) : {});
           turn.errorHint = text11.trim() || void 0;
@@ -25889,7 +27243,7 @@ var Transcript = class {
       } else if (m.role === "tool") {
         const id = m.tool_call_id ?? this.id("c");
         const result = typeof m.content === "string" && m.content ? m.content : void 0;
-        const diff2 = str3(record2(record2(m.display_metadata)?.tool_result_metadata)?.inline_diff);
+        const diff2 = str4(record(record(m.display_metadata)?.tool_result_metadata)?.inline_diff);
         const existing = calls.get(id);
         if (existing) {
           existing.result = result ?? existing.result;
@@ -25915,7 +27269,7 @@ var Transcript = class {
           status: "done",
           via: u.via
         };
-        call.status = settleBridge(call) ?? Boolean(record2(call.result)?.error) ? "error" : "done";
+        call.status = settleBridge(call) ?? Boolean(record(call.result)?.error) ? "error" : "done";
         if (isTodoName(call.name)) {
           call.todosBefore = todos;
         }
@@ -26053,12 +27407,12 @@ function failure(error, code7) {
     errorCode: http?.[1] ?? (typeof code7 === "string" && code7 ? code7 : void 0)
   };
 }
-var str3 = (v) => typeof v === "string" && v.trim() ? v : void 0;
+var str4 = (v) => typeof v === "string" && v.trim() ? v : void 0;
 function storedThought(m) {
   if (typeof m.display_reasoning === "string") {
     return detailsText(m.display_reasoning);
   }
-  return str3(m.reasoning) ?? str3(m.reasoning_content) ?? detailsText(m.reasoning_details);
+  return str4(m.reasoning) ?? str4(m.reasoning_content) ?? detailsText(m.reasoning_details);
 }
 function detailsText(details) {
   let blocks2 = details;
@@ -26075,12 +27429,12 @@ function detailsText(details) {
   }
   const out = [];
   for (const block of Array.isArray(blocks2) ? blocks2 : [blocks2]) {
-    const r = typeof block === "string" ? { text: block } : record2(block);
+    const r = typeof block === "string" ? { text: block } : record(block);
     if (!r || r.type === "reasoning.encrypted") {
       continue;
     }
-    const summary4 = Array.isArray(r.summary) ? r.summary.map((s2) => typeof s2 === "string" ? s2 : str3(record2(s2)?.text) ?? "").join("\n\n") : r.summary;
-    const text11 = [summary4, r.thinking, r.content, r.text].map(str3).find(Boolean)?.trim();
+    const summary4 = Array.isArray(r.summary) ? r.summary.map((s2) => typeof s2 === "string" ? s2 : str4(record(s2)?.text) ?? "").join("\n\n") : r.summary;
+    const text11 = [summary4, r.thinking, r.content, r.text].map(str4).find(Boolean)?.trim();
     if (text11 && !out.includes(text11)) {
       out.push(text11);
     }
@@ -26088,7 +27442,7 @@ function detailsText(details) {
   return out.join("\n\n");
 }
 function isToolError(p3) {
-  const r = record2(p3.result);
+  const r = record(p3.result);
   if (r?.error) {
     return true;
   }
@@ -26119,17 +27473,7 @@ function shownArgs(args) {
   return typeof args.command === "string" ? { ...args, command: withoutTernEnv(args.command) } : args;
 }
 function isBackgroundCall(call) {
-  return call.name === "terminal" && (call.args.background === true || typeof record2(call.result)?.session_id === "string");
-}
-function record2(v) {
-  if (typeof v === "string") {
-    try {
-      return record2(JSON.parse(v));
-    } catch {
-      return void 0;
-    }
-  }
-  return v && typeof v === "object" && !Array.isArray(v) ? v : void 0;
+  return call.name === "terminal" && (call.args.background === true || typeof record(call.result)?.session_id === "string");
 }
 function isTodoName(name) {
   return name === "todo_list" || name === "todo";
@@ -26141,7 +27485,7 @@ function todosOf(args, current) {
 function mergeTodos(current, patch6) {
   const out = current.map((t2) => ({ ...t2 }));
   for (const item3 of patch6) {
-    const r = record2(item3);
+    const r = record(item3);
     const id = String(r?.id ?? "").trim();
     if (!r || !id) {
       continue;
@@ -26198,7 +27542,7 @@ function displayNotice(kind, metadata) {
   if (kind !== "async_delegation_complete" && kind !== "process_complete") {
     return void 0;
   }
-  const meta2 = record2(metadata);
+  const meta2 = record(metadata);
   const shown = typeof meta2?.display_text === "string" ? meta2.display_text.trim() : "";
   if (shown) {
     return shown;
@@ -26247,7 +27591,7 @@ function continuation(prev) {
     return void 0;
   }
   const background = prev.blocks.some(
-    (b) => b.kind === "tool" && b.call.name === "delegate_task" && record2(b.call.result)?.mode === "background"
+    (b) => b.kind === "tool" && b.call.name === "delegate_task" && record(b.call.result)?.mode === "background"
   );
   if (background) {
     return "Subagents finished";
@@ -26272,1354 +27616,6 @@ function steerState(turn, index2) {
   }
   return turn.status === "live" ? "pending" : "next";
 }
-
-// src/agents/liveLog.ts
-var LINE = /^(\d{2}:\d{2}:\d{2}) (\S+)\s*\| (.*)$/;
-var TOOL = /^-> ([^(]+)\((.*)\)$/;
-var RESULT = /^(\S+) (ok|ERROR)(?: ([\d.]+)s)?: ?(.*)$/;
-function parseLiveLog(text11) {
-  const log = { entries: [] };
-  for (const raw2 of text11.split("\n")) {
-    const m = LINE.exec(raw2);
-    if (!m) {
-      continue;
-    }
-    const [, at, role, body] = m;
-    switch (role) {
-      case "user":
-        log.entries.push({ at, kind: "kickoff", text: body.replace(/^kickoff: /, "") });
-        break;
-      case "tool": {
-        const t2 = TOOL.exec(body);
-        log.entries.push({ args: t2?.[2] ?? "", at, kind: "tool", name: t2?.[1]?.trim() || body, status: "running" });
-        break;
-      }
-      case "result": {
-        const r = RESULT.exec(body);
-        const call = r && findLast(log.entries, (e) => e.kind === "tool" && e.status === "running" && e.name === r[1]);
-        if (call && call.kind === "tool" && r) {
-          call.status = r[2] === "ok" ? "ok" : "error";
-          call.result = r[4];
-          call.took = r[3] ? Math.round(Number(r[3]) * 1e3) : void 0;
-        }
-        break;
-      }
-      case "think":
-      case "assistant":
-        log.entries.push({ at, kind: role, text: body });
-        break;
-      case "start":
-        break;
-      case "final":
-        final(log, at, body);
-        break;
-      default:
-        log.entries.push({ at, kind: "note", text: body });
-    }
-  }
-  return log;
-}
-function final(log, at, body) {
-  const status = /(?:^|\s)status=(\S+)/.exec(body)?.[1];
-  if (status) {
-    log.status = status;
-  }
-  const duration3 = /(?:^|\s)duration=([\d.]+)s/.exec(body)?.[1];
-  if (duration3) {
-    log.duration = Number(duration3);
-  }
-  const summary4 = /summary: (.*)$/.exec(body)?.[1];
-  if (summary4) {
-    log.summary = summary4;
-  }
-  const reason = /exit_reason=(\S+)/.exec(body)?.[1];
-  if (reason) {
-    log.exitReason = reason;
-  }
-  const error = /error: (.*)$/.exec(body)?.[1];
-  if (error) {
-    log.error = error;
-  }
-  if (!status && !duration3 && !summary4) {
-    log.entries.push({ at, kind: "note", text: body });
-  }
-}
-function findLast(items, match) {
-  for (let i = items.length - 1; i >= 0; i--) {
-    if (match(items[i])) {
-      return items[i];
-    }
-  }
-  return void 0;
-}
-function runningTool(log) {
-  const last = findLast(log.entries, (e) => e.kind === "tool");
-  return last?.kind === "tool" && last.status === "running" ? last : void 0;
-}
-function clockToMs(clock4, now = Date.now()) {
-  const [h2 = 0, m = 0, s2 = 0] = clock4.split(":").map(Number);
-  const at = new Date(now).setHours(h2, m, s2, 0);
-  return at > now + 6e4 ? at - 864e5 : at;
-}
-
-// src/agents/store.ts
-var POLL_MS = 1e3;
-var MAX_LOG_BYTES = 2 * 1024 * 1024;
-var ENDED = /* @__PURE__ */ new Set(["cancelled", "done", "failed"]);
-var GRACE_POLLS = 3;
-var OUTCOME_UNKNOWN = "outcome unknown";
-function isRunning(a2) {
-  return !ENDED.has(a2.status);
-}
-function agentName(a2) {
-  return a2.name ?? `Agent ${a2.index + 1}`;
-}
-var Agents = class {
-  #host;
-  #timer;
-  #ticking = false;
-  #tracked = /* @__PURE__ */ new WeakSet();
-  /** Log sizes at the last read, by path; a log that did not grow is not read again. */
-  #sizes = /* @__PURE__ */ new Map();
-  /** Logs this process cannot read (a gateway on another machine): `subagent.tail` instead. */
-  #unreadable = /* @__PURE__ */ new Set();
-  /** Ids `subagent.list` reported: one that leaves the list has finished. */
-  #listed = /* @__PURE__ */ new Set();
-  /** Polls each unlisted row without a readable log has gone unseen. */
-  #unseen = /* @__PURE__ */ new WeakMap();
-  /** Rows whose end the host heard of. */
-  #ended = /* @__PURE__ */ new WeakSet();
-  /** The `subagent.tail` text read so far, by subagent id: each tail (the last 16 KB) is merged onto it. */
-  #tails = /* @__PURE__ */ new Map();
-  /**
-   * New delegate_task spawns are blocked, as this pane last set it (`delegation.pause`); undefined
-   * until then (the shared gateway serves no `delegation.status`). The gate is gateway-wide.
-   */
-  paused;
-  constructor(host) {
-    this.#host = host;
-  }
-  /** Every agent of the session's delegations, each delegation's rows in order. */
-  all() {
-    return [...this.#owners().keys()];
-  }
-  running() {
-    return this.all().filter(isRunning);
-  }
-  /**
-   * Takes over each dispatched delegate_task call not tracked yet, and polls while any agent runs.
-   * A call history brought back without its result (a resumed session) gets one `subagent.list`
-   * probe: its children still running are attached to it and followed from then on.
-   */
-  scan(at = Date.now()) {
-    let bare = false;
-    for (const call of this.#host.transcript.delegations()) {
-      if (this.#tracked.has(call)) {
-        continue;
-      }
-      if (this.#track(call, at)) {
-        this.#tracked.add(call);
-      } else if (call.result === void 0 && call.status !== "running" && !call.subagents?.length) {
-        bare = true;
-      }
-    }
-    if (this.running().length) {
-      this.#wake();
-    } else if (bare) {
-      void this.#tick(true);
-    }
-  }
-  /** Queues steering text into a running agent; the owner answers `queued` or `rejected`. */
-  async steer(a2, text11) {
-    const r = await this.#host.gw.request("subagent.steer", {
-      session_id: this.#host.sid,
-      subagent_id: a2.id,
-      text: text11
-    });
-    return r?.status === "queued";
-  }
-  /** Interrupts a running agent; its partial result still returns to the parent. */
-  async stop(a2) {
-    const r = await this.#host.gw.request("subagent.interrupt", {
-      session_id: this.#host.sid,
-      subagent_id: a2.id
-    });
-    return Boolean(r?.found);
-  }
-  /** Blocks (or unblocks) new subagent spawns on the gateway; running children keep going. */
-  async pause(paused) {
-    const r = await this.#host.gw.request("delegation.pause", {
-      paused,
-      ...this.#host.sid ? { session_id: this.#host.sid } : {}
-    });
-    this.paused = typeof r?.paused === "boolean" ? r.paused : paused;
-    this.#host.changed();
-    return this.paused;
-  }
-  /**
-   * Applies an async-delegation completion (the model text of its `message.start`,
-   * tools/process_registry_notifications.py) to the rows whose log never told their outcome.
-   */
-  settle(text11) {
-    const done = completionOutcomes(text11);
-    if (!done) {
-      return;
-    }
-    let changed = false;
-    for (const a2 of this.all()) {
-      const status = a2.depth ? void 0 : done.outcomes.get(a2.index);
-      if (a2.delegationId !== done.delegationId || status === void 0 || a2.log?.status) {
-        continue;
-      }
-      const ended = endedStatus(status);
-      if (!ended) {
-        continue;
-      }
-      if (isRunning(a2)) {
-        a2.duration = Date.now() - a2.startedAt;
-      }
-      a2.status = ended;
-      a2.tool = void 0;
-      a2.exitReason = status === "unknown" ? OUTCOME_UNKNOWN : PLAIN_OUTCOMES.has(status) ? void 0 : status;
-      this.#touch(a2);
-      changed = true;
-    }
-    if (changed) {
-      this.#host.changed();
-    }
-  }
-  /** Reads `a`'s log now (the hub's timeline opening on it), whatever its state. */
-  async refresh(a2) {
-    if (await this.#readLog(a2, true)) {
-      this.#touch(a2);
-      this.#host.changed();
-    }
-  }
-  dispose() {
-    clearInterval(this.#timer);
-    this.#timer = void 0;
-  }
-  #track(call, at) {
-    const r = record2(call.result);
-    if (r?.status !== "dispatched" || typeof r.delegation_id !== "string") {
-      return false;
-    }
-    const goals = Array.isArray(r.goals) ? r.goals.map((g) => typeof g === "string" ? g : "") : [];
-    const ids = Array.isArray(r.subagent_ids) ? r.subagent_ids : [];
-    const paths = Array.isArray(r.live_transcripts) ? r.live_transcripts : [];
-    const list8 = call.subagents ??= [];
-    goals.forEach((goal, i) => {
-      const id = typeof ids[i] === "string" && ids[i] ? ids[i] : `task-${i}`;
-      let a2 = list8.find((x) => x.id === id);
-      if (!a2) {
-        a2 = { calls: 0, goal, id, index: i, startedAt: at, status: "queued", tokens: 0, toolCount: 0 };
-        list8.push(a2);
-      }
-      a2.key ??= `p${i}`;
-      a2.delegationId = r.delegation_id;
-      a2.depth = 0;
-      a2.logPath = typeof paths[i] === "string" ? paths[i] : void 0;
-    });
-    list8.sort((a2, b) => a2.index - b.index || (a2.depth ?? 0) - (b.depth ?? 0));
-    return true;
-  }
-  #wake() {
-    this.#timer ??= setInterval(() => void this.#tick(), POLL_MS);
-    void this.#tick();
-  }
-  /** One poll and log read; `probe` polls even with nothing running yet (a resumed session). */
-  async #tick(probe = false) {
-    if (this.#ticking) {
-      return;
-    }
-    this.#ticking = true;
-    try {
-      if (!probe && !this.running().length) {
-        return this.dispose();
-      }
-      const changed = /* @__PURE__ */ new Set();
-      await this.#poll(changed);
-      const reads = await Promise.all(this.running().map(async (a2) => await this.#readLog(a2) ? a2 : void 0));
-      reads.forEach((a2) => a2 && changed.add(a2));
-      if (changed.size) {
-        changed.forEach((a2) => this.#touch(a2));
-        this.#host.changed();
-      }
-      if (probe && this.running().length) {
-        this.#timer ??= setInterval(() => void this.#tick(), POLL_MS);
-      }
-    } finally {
-      this.#ticking = false;
-    }
-  }
-  /** Folds `subagent.list` into the rows: new nested children, status, model, counts. */
-  async #poll(changed) {
-    const sid = this.#host.sid;
-    if (!sid) {
-      return;
-    }
-    let rows;
-    try {
-      rows = (await this.#host.gw.request("subagent.list", { session_id: sid }))?.subagents ?? [];
-    } catch {
-      return;
-    }
-    const owners = this.#owners();
-    const present = /* @__PURE__ */ new Set();
-    for (const row2 of rows) {
-      const id = row2.subagent_id;
-      if (!id) {
-        continue;
-      }
-      present.add(id);
-      this.#listed.add(id);
-      const a2 = this.#find(owners, row2) ?? this.#adopt(owners, row2) ?? await this.#attach(owners, row2);
-      if (!a2) {
-        continue;
-      }
-      a2.id = id;
-      if (a2.status === "done" && a2.exitReason === OUTCOME_UNKNOWN) {
-        a2.status = "running";
-        a2.exitReason = void 0;
-        this.#ended.delete(a2);
-      }
-      a2.model = row2.model ?? a2.model;
-      a2.toolCount = Math.max(a2.toolCount, row2.tool_count ?? 0);
-      a2.steerable = row2.accepting_steer ?? a2.steerable;
-      a2.startedAt = typeof row2.started_at === "number" ? row2.started_at * 1e3 : a2.startedAt;
-      if (a2.status === "queued" || a2.status === "running") {
-        a2.status = "running";
-        if (!a2.log && row2.last_tool && a2.tool !== row2.last_tool) {
-          a2.tool = row2.last_tool;
-          a2.toolSince = { at: Date.now() };
-        }
-      }
-      changed.add(a2);
-    }
-    for (const a2 of owners.keys()) {
-      if (!isRunning(a2) || present.has(a2.id) || this.#readableLog(a2)) {
-        continue;
-      }
-      if (!this.#listed.has(a2.id)) {
-        const unseen = (this.#unseen.get(a2) ?? 0) + 1;
-        this.#unseen.set(a2, unseen);
-        if (unseen < GRACE_POLLS) {
-          continue;
-        }
-      }
-      a2.status = "done";
-      a2.exitReason = OUTCOME_UNKNOWN;
-      a2.duration = Date.now() - a2.startedAt;
-      a2.tool = void 0;
-      changed.add(a2);
-    }
-  }
-  /** The row `row` describes: by id, else a dispatch placeholder (`task-<i>`) of its delegation. */
-  #find(owners, row2) {
-    const agents2 = [...owners.keys()];
-    const byId = agents2.find((a2) => a2.id === row2.subagent_id);
-    if (byId) {
-      return byId;
-    }
-    const index2 = taskIndex(row2);
-    return (row2.depth ?? 0) === 0 && index2 !== void 0 ? agents2.find((a2) => a2.delegationId === row2.delegation_id && a2.id === `task-${index2}`) : void 0;
-  }
-  /** A nested child (an orchestrator's worker): a row under its parent, in the parent's card. */
-  #adopt(owners, row2) {
-    const parent = [...owners.keys()].find((a2) => a2.id === row2.parent_id);
-    const call = parent && owners.get(parent);
-    if (!parent || !call?.subagents) {
-      return void 0;
-    }
-    const list8 = call.subagents;
-    const siblings = list8.filter((a2) => a2.parentId === parent.id).length;
-    const child = {
-      calls: 0,
-      delegationId: row2.delegation_id,
-      depth: (parent.depth ?? 0) + 1,
-      goal: row2.goal ?? "",
-      id: row2.subagent_id,
-      index: parent.index,
-      name: `${agentName(parent)}.${siblings + 1}`,
-      parentId: parent.id,
-      startedAt: Date.now(),
-      status: "running",
-      tokens: 0,
-      toolCount: 0
-    };
-    let at = list8.indexOf(parent) + 1;
-    while (at < list8.length && (list8[at].depth ?? 0) > (parent.depth ?? 0)) {
-      at++;
-    }
-    list8.splice(at, 0, child);
-    owners.set(child, call);
-    return child;
-  }
-  /**
-   * A top-level child whose dispatch result the history dropped (a resumed session): a row on the
-   * newest result-less delegate_task call whose task `sa-<i>-` asked for its goal, its log found
-   * through the delegation's manifest (else read with `subagent.tail`).
-   */
-  async #attach(owners, row2) {
-    const index2 = taskIndex(row2);
-    const goal = row2.goal?.trim();
-    if ((row2.depth ?? 0) !== 0 || index2 === void 0 || !goal) {
-      return void 0;
-    }
-    const call = this.#host.transcript.delegations().findLast((c) => c.result === void 0 && taskGoals(c)[index2] === goal && !c.subagents?.some((a3) => !a3.depth && a3.index === index2));
-    if (!call) {
-      return void 0;
-    }
-    const a2 = {
-      calls: 0,
-      delegationId: row2.delegation_id,
-      depth: 0,
-      goal: row2.goal,
-      id: row2.subagent_id,
-      index: index2,
-      key: `p${index2}`,
-      logPath: row2.delegation_id ? await manifestLog(row2.delegation_id, index2) : void 0,
-      startedAt: Date.now(),
-      status: "running",
-      tokens: 0,
-      toolCount: 0
-    };
-    const list8 = call.subagents ??= [];
-    list8.push(a2);
-    list8.sort((x, y) => x.index - y.index || (x.depth ?? 0) - (y.depth ?? 0));
-    owners.set(a2, call);
-    return a2;
-  }
-  #readableLog(a2) {
-    return Boolean(a2.logPath && !this.#unreadable.has(a2.logPath));
-  }
-  /** Reads `a`'s log from disk (else its tail over the gateway); true when it changed. */
-  async #readLog(a2, force = false) {
-    let text11;
-    if (this.#readableLog(a2)) {
-      try {
-        const path2 = a2.logPath;
-        const { size } = await stat(path2);
-        if (!force && this.#sizes.get(path2) === size) {
-          return false;
-        }
-        this.#sizes.set(path2, size);
-        const bytes = await readFile(path2);
-        text11 = bytes.subarray(Math.max(0, bytes.length - MAX_LOG_BYTES)).toString("utf8");
-      } catch {
-        this.#unreadable.add(a2.logPath);
-      }
-    }
-    if (text11 === void 0 && this.#listed.has(a2.id) && this.#host.sid) {
-      try {
-        const r = await this.#host.gw.request("subagent.tail", {
-          session_id: this.#host.sid,
-          subagent_id: a2.id
-        });
-        if (r?.available && typeof r.text === "string") {
-          text11 = r.truncated ? mergeTail(this.#tails.get(a2.id) ?? "", r.text) : r.text;
-          this.#tails.set(a2.id, text11);
-        }
-      } catch {
-        text11 = void 0;
-      }
-    }
-    if (text11 === void 0) {
-      return false;
-    }
-    applyLog(a2, parseLiveLog(text11));
-    return true;
-  }
-  #touch(a2) {
-    const call = this.#owners().get(a2);
-    if (call) {
-      this.#host.transcript.touchCall(call);
-    }
-    if (!isRunning(a2) && !this.#ended.has(a2)) {
-      this.#ended.add(a2);
-      this.#host.agentEnded?.();
-    }
-  }
-  /** Each agent with the delegate_task call whose card shows it. */
-  #owners() {
-    const owners = /* @__PURE__ */ new Map();
-    for (const call of this.#host.transcript.delegations()) {
-      for (const a2 of call.subagents ?? []) {
-        owners.set(a2, call);
-      }
-    }
-    return owners;
-  }
-};
-function mergeTail(seen, tail) {
-  const lines = seen.split(/(?<=\n)/);
-  let merged;
-  for (let n = Math.min(4, lines.length); n > 0 && merged === void 0; n--) {
-    const anchor = lines.slice(-n).join("");
-    const at = tail.indexOf(anchor);
-    if (at >= 0) {
-      merged = seen + tail.slice(at + anchor.length);
-    }
-  }
-  merged ??= seen + (seen && !seen.endsWith("\n") ? "\n" : "") + tail.slice(tail.indexOf("\n") + 1);
-  return merged.length > MAX_LOG_BYTES ? merged.slice(merged.indexOf("\n", merged.length - MAX_LOG_BYTES) + 1) : merged;
-}
-function completionOutcomes(text11) {
-  const head2 = /^\[ASYNC DELEGATION (BATCH COMPLETE|COMPLETE|TASK FAILED) — ([^\],]+)(?:, task (\d+)\/\d+)?\]/.exec(text11.trim());
-  if (!head2) {
-    return void 0;
-  }
-  const [, kind, delegationId, task] = head2;
-  const outcomes = /* @__PURE__ */ new Map();
-  if (kind === "BATCH COMPLETE") {
-    for (const m of text11.matchAll(/^--- \S+ TASK (\d+)\/\d+.*\(status=([^,)\s]+)/gm)) {
-      outcomes.set(Number(m[1]) - 1, m[2]);
-    }
-  } else {
-    const status = /^Status: (\S+)/m.exec(text11)?.[1];
-    if (status) {
-      outcomes.set(kind === "TASK FAILED" ? Number(task) - 1 : 0, status);
-    }
-  }
-  return { delegationId: delegationId.trim(), outcomes };
-}
-var PLAIN_OUTCOMES = /* @__PURE__ */ new Set(["cancelled", "completed", "error", "failed", "interrupted", "success"]);
-function endedStatus(status) {
-  if (status === "?") {
-    return void 0;
-  }
-  if (status === "completed" || status === "success" || status === "unknown") {
-    return "done";
-  }
-  return status === "interrupted" || status === "cancelled" ? "cancelled" : "failed";
-}
-function taskIndex(row2) {
-  const index2 = Number(/^sa-(\d+)-/.exec(row2.subagent_id ?? "")?.[1]);
-  return Number.isInteger(index2) ? index2 : void 0;
-}
-function taskGoals(call) {
-  let tasks = call.args.tasks;
-  if (typeof tasks === "string") {
-    try {
-      tasks = JSON.parse(tasks);
-    } catch {
-      tasks = void 0;
-    }
-  }
-  if (Array.isArray(tasks) && tasks.length) {
-    return tasks.map((t2) => {
-      const goal = record2(t2)?.goal;
-      return typeof goal === "string" ? goal.trim() : "";
-    });
-  }
-  return typeof call.args.goal === "string" ? [call.args.goal.trim()] : [];
-}
-async function manifestLog(delegationId, index2, env2 = process.env) {
-  if (!/^[\w-]+$/.test(delegationId)) {
-    return void 0;
-  }
-  const home = env2.HERMES_HOME || join2(homedir2(), ".hermes");
-  for (const root7 of [join2(home, "delegation_cache", "live"), join2(home, "cache", "delegation", "live")]) {
-    try {
-      const text11 = await readFile(join2(root7, delegationId, "manifest.json"), "utf8");
-      const tasks = record2(text11.replace(/^\uFEFF/, ""))?.tasks;
-      const log = Array.isArray(tasks) ? record2(tasks.find((t2) => record2(t2)?.index === index2))?.log : void 0;
-      if (typeof log === "string" && log) {
-        return log;
-      }
-    } catch {
-    }
-  }
-  return void 0;
-}
-function applyLog(a2, log) {
-  a2.log = log;
-  const tools2 = log.entries.filter((e) => e.kind === "tool").length;
-  a2.toolCount = Math.max(a2.toolCount, tools2);
-  if (log.status) {
-    a2.status = log.status === "completed" ? "done" : log.status === "interrupted" ? "cancelled" : "failed";
-    a2.summary = log.summary ?? a2.summary;
-    a2.duration = log.duration !== void 0 ? Math.round(log.duration * 1e3) : a2.duration;
-    a2.exitReason = log.exitReason ?? log.error ?? a2.exitReason;
-    a2.tool = void 0;
-    return;
-  }
-  if (log.entries.length && a2.status === "queued") {
-    a2.status = "running";
-  }
-  const now = runningTool(log);
-  if (!now) {
-    a2.tool = void 0;
-    return;
-  }
-  const since = clockToMs(now.at);
-  if (a2.tool !== now.name || a2.toolSince?.at !== since) {
-    a2.tool = now.name;
-    a2.toolPreview = now.args || void 0;
-    a2.toolSince = { at: since };
-  }
-}
-
-// src/automation.ts
-function cadence(loop) {
-  if (loop.mode === "self_paced") {
-    return "self-paced";
-  }
-  const s2 = loop.interval_seconds;
-  return `every ${s2 % 3600 === 0 ? `${s2 / 3600}h` : s2 % 60 === 0 ? `${s2 / 60}m` : `${s2}s`}`;
-}
-var clock = (epochSeconds) => new Date(epochSeconds * 1e3).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-function goalView(goal) {
-  if (!goal || goal.status !== "active" && goal.status !== "paused") {
-    return null;
-  }
-  const barrier = goal.status === "active" ? goal.wait_barrier : null;
-  const wait = barrier ? [barrier.type === "until" ? `until ${clock(barrier.until_at)}` : `on ${barrier.type} ${barrier.target}`, barrier.reason].filter(Boolean).join(" \xB7 ") : "";
-  return {
-    criteria: goal.subgoals ?? [],
-    detail: barrier ? wait : goal.status === "paused" ? goal.paused_reason ?? "" : "",
-    maxTurns: goal.max_turns,
-    reason: goal.last_reason ?? void 0,
-    state: goal.status === "paused" ? "paused" : barrier ? "waiting" : goal.last_verdict === "blocked" ? "blocked" : "active",
-    title: goal.title,
-    turns: goal.turns_used,
-    verdict: goal.last_verdict ?? void 0
-  };
-}
-function loopView(loop, now = Date.now()) {
-  if (!loop || loop.status !== "active" && loop.status !== "paused") {
-    return null;
-  }
-  const dueAt = loop.next_due_at > 0 ? loop.next_due_at * 1e3 : void 0;
-  const state = loop.status === "paused" ? "paused" : loop.awaiting_response ? "running" : loop.deferred_by_goal ? "deferred" : dueAt !== void 0 && dueAt > now ? "active" : "due";
-  return {
-    cadence: cadence(loop),
-    detail: loop.status === "paused" ? loop.paused_reason ?? "" : "",
-    dueAt: state === "active" ? dueAt : void 0,
-    fired: loop.ticks_fired,
-    prompt: loop.prompt,
-    runs: loop.times ? `${loop.ticks_fired}/${loop.times} runs` : `${loop.ticks_fired} run${loop.ticks_fired === 1 ? "" : "s"}`,
-    state,
-    times: loop.times,
-    until: loop.until ?? ""
-  };
-}
-var ACTION_LABELS = {
-  "goal.clear": "clear the goal",
-  "goal.pause": "pause the goal",
-  "goal.resume": "resume the goal",
-  "goal.unwait": "stop the goal waiting",
-  "loop.pause": "pause the loop",
-  "loop.resume": "resume the loop",
-  "loop.stop": "stop the loop"
-};
-var Automation = class {
-  #host;
-  #sid = null;
-  #snapshot = null;
-  /** Bumped by every update, so a read that started before one never overwrites it. */
-  #seq = 0;
-  #timer;
-  /** The verb in flight, if any (the sheet's buttons wait for it). */
-  pending;
-  constructor(host) {
-    this.#host = host;
-  }
-  get goal() {
-    return goalView(this.#snapshot?.goal);
-  }
-  loop(now = Date.now()) {
-    return loopView(this.#snapshot?.loop, now);
-  }
-  /** The loop's raw snapshot: a new object per update, so its countdown re-anchors only then. */
-  get loopSnapshot() {
-    return this.#snapshot?.loop ?? null;
-  }
-  /** Another session is shown: forget the last one's state and read this one's. */
-  adopt(sid) {
-    this.#sid = sid;
-    this.#set(null);
-    void this.#read(sid);
-  }
-  /** A `session.control.update` (or a verb's reply) for session `sid`. */
-  apply(sid, control) {
-    if (sid && sid !== this.#sid) {
-      return;
-    }
-    this.#seq++;
-    this.#set(control ?? null);
-  }
-  async #read(sid) {
-    const seq = this.#seq;
-    try {
-      const r = await this.#host.gw.request("session.control.read", { session_id: sid });
-      if (sid === this.#sid && seq === this.#seq) {
-        this.#set(r?.control ?? null);
-      }
-    } catch {
-    }
-  }
-  /** Runs `action` on the open session; the reply's snapshot repaints, its dispatch runs as a typed command's. */
-  async act(action) {
-    const sid = this.#sid;
-    if (!sid || this.pending) {
-      return;
-    }
-    this.pending = action;
-    this.#host.changed();
-    try {
-      const r = await this.#host.gw.request(
-        "session.control",
-        { action, session_id: sid }
-      );
-      this.apply(sid, r?.control);
-      if (r?.dispatch?.type && sid === this.#host.sid) {
-        await this.#host.runDispatch(r.dispatch, `/${action.replace(".", " ")}`);
-      }
-    } catch (error) {
-      this.#host.transcript.notice(
-        `Could not ${ACTION_LABELS[action]}: ${error instanceof Error ? error.message : String(error)}`,
-        "error"
-      );
-    } finally {
-      this.pending = void 0;
-      this.#host.changed();
-    }
-  }
-  #set(control) {
-    if (JSON.stringify(control) !== JSON.stringify(this.#snapshot)) {
-      this.#snapshot = control;
-      this.#host.changed();
-    }
-    this.#arm();
-  }
-  /** Re-renders when the loop falls due, so its countdown turns into "due". Tern ticks the countdown itself. */
-  #arm() {
-    clearTimeout(this.#timer);
-    const due = this.loop()?.dueAt;
-    if (due !== void 0) {
-      this.#timer = setTimeout(() => this.#host.changed(), Math.max(0, due - Date.now()) + 50);
-      this.#timer.unref?.();
-    }
-  }
-};
-
-// src/clipboard.ts
-import { spawn } from "node:child_process";
-function copyToClipboard(text11, env2 = process.env) {
-  process.stdout.write(`\x1B]52;c;${Buffer.from(text11).toString("base64")}\x07`);
-  if (process.platform === "darwin" && !env2.SSH_CONNECTION && !env2.SSH_TTY) {
-    const child = spawn("pbcopy", [], { stdio: ["pipe", "ignore", "ignore"] });
-    child.on("error", () => {
-    });
-    child.stdin.end(text11);
-  }
-}
-
-// src/hermes/mutate.ts
-import { randomUUID as randomUUID2 } from "node:crypto";
-async function currentGeneration(gw2, sid) {
-  const snapshot3 = await gw2.request("session.resume", { session_id: sid });
-  if (!Number.isSafeInteger(snapshot3?.execution_generation)) {
-    throw new Error("The session did not report its execution generation; try again.");
-  }
-  return snapshot3.execution_generation;
-}
-async function mutateSession(gw2, sid, operation, payload) {
-  const snapshot3 = await gw2.request("session.resume", { session_id: sid });
-  if (!Number.isSafeInteger(snapshot3?.revision) || !Number.isSafeInteger(snapshot3?.execution_generation)) {
-    throw new Error("The session did not report its revision; try again.");
-  }
-  const body = typeof payload === "function" ? payload(snapshot3) : payload;
-  if (!body) {
-    return null;
-  }
-  const result = await gw2.request("session.mutate", {
-    session_id: sid,
-    request_id: randomUUID2(),
-    expected_revision: snapshot3.revision,
-    ...operation === "rename" ? {} : { expected_generation: snapshot3.execution_generation },
-    operation,
-    payload: body
-  });
-  if (!result) {
-    throw new Error("session.mutate returned nothing");
-  }
-  return result;
-}
-function modelPayload(arg) {
-  const parts3 = arg.trim().split(/\s+/);
-  const model = parts3.shift() ?? "";
-  if (!model || model.startsWith("--")) {
-    throw new Error("Usage: /model <name> [--provider <slug>]");
-  }
-  const payload = { model };
-  while (parts3.length) {
-    const flag = parts3.shift();
-    if (flag === "--session" || flag === "--tui-session") {
-      continue;
-    }
-    if (flag === "--provider" && parts3[0] && !parts3[0].startsWith("--")) {
-      payload.provider = parts3.shift();
-      continue;
-    }
-    throw new Error(
-      flag === "--global" ? "/model: --global is not supported here: the switch applies to this session only (`hermes model` sets the default)" : `/model: ${flag} is not supported here (the switch applies to this session)`
-    );
-  }
-  return payload;
-}
-
-// src/controlCommands.ts
-var preview = (text11) => text11.length > 60 ? `${text11.slice(0, 57)}\u2026` : text11;
-var errorText = (e) => e instanceof Error ? e.message : String(e);
-async function interruptTurn(gw2, sid) {
-  const execution_generation = await currentGeneration(gw2, sid);
-  await gw2.request("session.interrupt", { session_id: sid, execution_generation });
-}
-async function steerTurn(gw2, sid, text11) {
-  try {
-    const execution_generation = await currentGeneration(gw2, sid);
-    const r = await gw2.request("session.steer", { session_id: sid, execution_generation, text: text11 });
-    return r?.status === "queued" ? { ok: true } : { ok: false };
-  } catch (e) {
-    return errorText(e).includes("stale_generation") ? { ok: false } : { error: errorText(e), ok: false };
-  }
-}
-async function redirectTurn(gw2, sid, text11) {
-  try {
-    const execution_generation = await currentGeneration(gw2, sid);
-    const r = await gw2.request("session.redirect", { session_id: sid, execution_generation, text: text11 });
-    return r?.status === "redirected" || r?.status === "queued" ? { ok: true } : { ok: false };
-  } catch (e) {
-    return errorText(e).includes("stale_generation") ? { ok: false } : { error: errorText(e), ok: false };
-  }
-}
-async function steer(host, text11) {
-  if (!text11) {
-    return host.notice("Usage: /steer <guidance for the active turn>", "warning");
-  }
-  if (!host.busy || !host.sid) {
-    host.enqueue(text11);
-    return host.notice(`No active turn \u2014 queued as next prompt: ${preview(text11)}`);
-  }
-  const r = await steerTurn(host.gw, host.sid, text11);
-  if (r.ok) {
-    return host.steered ? host.steered(text11) : host.notice(`Steer queued for the active turn: ${preview(text11)}`);
-  }
-  if (r.error) {
-    return host.notice(`/steer failed: ${r.error}`, "error");
-  }
-  host.enqueue(text11);
-  host.notice("Turn ended before the steer landed \u2014 queued as next prompt", "warning");
-}
-function queue(host, text11) {
-  if (!text11) {
-    return host.notice(`${host.queued} queued message${host.queued === 1 ? "" : "s"}`);
-  }
-  host.submit(text11);
-}
-async function stop(host) {
-  if (!host.sid) {
-    return host.notice("No active session.", "warning");
-  }
-  const notes = [];
-  if (host.busy) {
-    try {
-      await interruptTurn(host.gw, host.sid);
-      notes.push("Interrupted the active turn.");
-    } catch (e) {
-      if (!errorText(e).includes("stale_generation")) {
-        host.notice(`Interrupt failed: ${errorText(e)}`, "error");
-      }
-    }
-  }
-  try {
-    const r = await host.gw.request("process.stop", { session_id: host.sid });
-    if (typeof r?.killed === "number") {
-      notes.push(`Stopped ${r.killed} background process${r.killed === 1 ? "" : "es"}.`);
-    }
-  } catch {
-  }
-  host.notice(notes.join(" ") || "Nothing to stop.");
-}
-async function tools(host, arg) {
-  const sub = arg.split(/\s+/)[0] ?? "";
-  if (sub && sub !== "list") {
-    return host.notice(`/tools ${sub} is not available on the shared gateway yet (toolsets are fixed at session launch)`, "warning");
-  }
-  if (!host.sid) {
-    return host.notice("No active session.", "warning");
-  }
-  try {
-    const r = await host.gw.request("tools.show", { session_id: host.sid });
-    const sections2 = (r?.sections ?? []).filter((s2) => s2.tools?.length);
-    const lines = sections2.map((s2) => `[${s2.name}] ${s2.tools.map((t2) => t2.name).join(", ")}`);
-    host.notice(lines.length ? [...lines, `Total: ${r?.total ?? 0} tools`].join("\n") : "No tools available.");
-  } catch (e) {
-    host.notice(`/tools failed: ${errorText(e)}`, "error");
-  }
-}
-async function side(host, text11, kind) {
-  if (!text11) {
-    return host.notice(kind === "bg" ? "Usage: /bg <prompt>" : "Usage: /btw <question>", "warning");
-  }
-  if (!host.sid) {
-    return host.notice("No active session.", "warning");
-  }
-  try {
-    const r = await host.gw.request(kind === "bg" ? "prompt.background" : "prompt.btw", {
-      session_id: host.sid,
-      text: text11
-    });
-    if (r?.task_id) {
-      host.notice(
-        kind === "bg" ? `Background task ${r.task_id} started: ${preview(text11)}` : `btw ${r.task_id}: answering from a snapshot of this conversation`
-      );
-    }
-  } catch (e) {
-    host.notice(`/${kind} failed: ${errorText(e)}`, "error");
-  }
-}
-var CONTROL_COMMANDS = [
-  { aliases: ["s"], name: "steer", run: steer },
-  { aliases: ["q"], name: "queue", run: queue },
-  { name: "stop", run: stop },
-  { name: "tools", run: tools },
-  { aliases: ["background"], name: "bg", run: (host, arg) => side(host, arg, "bg") },
-  { name: "btw", run: (host, arg) => side(host, arg, "btw") }
-];
-
-// src/fast.ts
-var TIERS = { fast: "priority", normal: "", ultrafast: "ultrafast" };
-var fastWord = (value) => value === "fast" || value === "ultrafast" ? value : "normal";
-function fastTier(info) {
-  return info?.fast ? info.service_tier === "ultrafast" ? "ultrafast" : "fast" : void 0;
-}
-function fastValue(arg) {
-  const word = arg.trim().toLowerCase();
-  return { "": "toggle", fast: "fast", normal: "normal", off: "normal", on: "fast", toggle: "toggle", ultrafast: "ultrafast" }[word] ?? null;
-}
-var describe2 = (word) => word === "normal" ? "Fast mode off." : `${word === "fast" ? "Fast" : "Ultrafast"} mode on: priority processing, billed higher.`;
-async function setFast(host, value) {
-  const sid = host.sid;
-  if (!sid) {
-    return false;
-  }
-  try {
-    const r = await host.gw.request("config.set", { key: "fast", session_id: sid, value });
-    const word = fastWord(r?.value);
-    if (sid === host.sid) {
-      host.info = { ...host.info, fast: word !== "normal", service_tier: TIERS[word] };
-    }
-    host.transcript.notice(describe2(word));
-    return true;
-  } catch (error) {
-    const why = error instanceof Error ? error.message : String(error);
-    host.transcript.notice(
-      why.includes("fast_unavailable") ? "This model has no fast mode on its current route." : `Could not set fast mode: ${why}`,
-      "warning"
-    );
-    return false;
-  } finally {
-    host.changed();
-  }
-}
-async function fastCommand(host, arg) {
-  if (arg.trim().toLowerCase() === "status") {
-    const r = await host.gw.request("config.get", { key: "fast", session_id: host.sid });
-    return host.transcript.notice(`Fast mode: ${fastWord(r?.value)}.`);
-  }
-  const value = fastValue(arg);
-  if (!value) {
-    return host.transcript.notice("Usage: /fast [on|off|ultrafast|status]", "warning");
-  }
-  await setFast(host, value);
-}
-
-// src/view/time.ts
-var kAge = /* @__PURE__ */ Symbol("tsp.age");
-function age(owner, startedAt, now) {
-  const aged = owner;
-  return aged[kAge] ??= Math.max(0, now - startedAt);
-}
-function countdownAge(owner, dueAt, now) {
-  const aged = owner;
-  return aged[kAge] ??= Math.min(0, now - dueAt);
-}
-function duration(ms) {
-  if (ms < 1e3) {
-    return `${Math.max(0, Math.round(ms))}ms`;
-  }
-  const s2 = Math.round(ms / 100) / 10;
-  if (s2 < 60) {
-    return `${s2 < 10 ? s2.toFixed(1) : Math.round(s2)}s`;
-  }
-  const m = Math.floor(s2 / 60);
-  if (m < 60) {
-    return `${m}m ${String(Math.round(s2 % 60)).padStart(2, "0")}s`;
-  }
-  return `${Math.floor(m / 60)}h ${String(m % 60).padStart(2, "0")}m`;
-}
-function compact(n) {
-  if (n < 1e3) {
-    return String(n);
-  }
-  if (n < 1e6) {
-    const k = n / 1e3;
-    return `${k < 10 ? k.toFixed(1).replace(/\.0$/, "") : Math.round(k)}K`;
-  }
-  const m = n / 1e6;
-  return `${m < 10 ? m.toFixed(1).replace(/\.0$/, "") : Math.round(m)}M`;
-}
-
-// src/connections.ts
-import { existsSync as existsSync3, mkdirSync as mkdirSync2, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { homedir as homedir3 } from "node:os";
-import { join as join3 } from "node:path";
-var CONNECT_TOOL = "manage_connections";
-var POLL_MS2 = 2e3;
-var STALE_MS = 2 * 6e4;
-var dataDir = (env2 = process.env) => join3(env2.HERMES_HOME || join3(homedir3(), ".hermes"), "plugin-data", "hermes-tern");
-var REASONS = /* @__PURE__ */ new Set(["all_resolved", "continued", "deadline", "error", "superseded"]);
-var safe = (part) => part.replace(/[^A-Za-z0-9_-]/g, "_");
-var cardStem = (callId, opId) => opId ? `${safe(callId)}.${safe(opId)}` : safe(callId);
-var alive = (pid) => {
-  if (typeof pid !== "number") {
-    return true;
-  }
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch (error) {
-    return error.code === "EPERM";
-  }
-};
-function readCard(key2, dir2 = dataDir(), now = Date.now()) {
-  const file2 = join3(dir2, "connections", `${key2}.json`);
-  try {
-    const data = JSON.parse(readFileSync(file2, "utf8"));
-    if (!Array.isArray(data.targets)) {
-      return void 0;
-    }
-    const error = typeof data.error === "string" && data.error ? data.error : void 0;
-    const updated = typeof data.updated_at === "number" ? data.updated_at * 1e3 : now;
-    let settled;
-    if (typeof data.settled_by === "string" && REASONS.has(data.settled_by)) {
-      settled = data.settled_by;
-    } else if (data.watching !== true) {
-      settled = error ? "error" : data.targets.some((t2) => waiting({ state: String(record2(t2)?.state ?? "") })) ? "deadline" : "all_resolved";
-    } else if (!alive(data.pid) || now - updated > STALE_MS) {
-      settled = "stopped";
-    }
-    return { error, key: key2, settled, targets: data.targets, told: existsSync3(join3(dir2, "connections", `${key2}.told`)) };
-  } catch {
-    return void 0;
-  }
-}
-function findCard(call, dir2 = dataDir()) {
-  const op = record2(call.result)?.op_id;
-  const prefix2 = `${safe(call.id)}.`;
-  if (typeof op === "string" && op) {
-    return existsSync3(join3(dir2, "connections", `${cardStem(call.id, op)}.json`)) ? cardStem(call.id, op) : void 0;
-  }
-  let names;
-  try {
-    names = readdirSync(join3(dir2, "connections"));
-  } catch {
-    return void 0;
-  }
-  const keys2 = names.flatMap((n) => {
-    const key2 = n.endsWith(".json") ? n.slice(0, -5) : "";
-    return key2 === safe(call.id) || key2.startsWith(prefix2) && !key2.slice(prefix2.length).includes(".") ? [key2] : [];
-  });
-  if (keys2.length < 2) {
-    return keys2[0];
-  }
-  const createdAt = (key2) => {
-    try {
-      const at = record2(readFileSync(join3(dir2, "connections", `${key2}.json`), "utf8"))?.created_at;
-      return typeof at === "number" ? at * 1e3 : 0;
-    } catch {
-      return 0;
-    }
-  };
-  return keys2.map((key2) => ({ gap: Math.abs(createdAt(key2) - call.startedAt), key: key2 })).sort((a2, b) => a2.gap - b.gap)[0]?.key;
-}
-function claimTold(key2, dir2 = dataDir()) {
-  try {
-    writeFileSync(join3(dir2, "connections", `${key2}.told`), "", { flag: "wx" });
-    return true;
-  } catch {
-    return false;
-  }
-}
-var TERN_PANE_VARS = ["TERN_PANE", "TERN_PANE_SOCKET", "TERN_WINDOW_KEY", "TERN_WINDOW_SOCKET", "TERN_DAEMON_SOCKET"];
-function ternPane(env2 = process.env) {
-  const vars = Object.fromEntries(TERN_PANE_VARS.flatMap((k) => env2[k] ? [[k, env2[k]]] : []));
-  return vars.TERN_PANE ? vars : void 0;
-}
-function markViewer(sid, previous3, dir2 = dataDir(), env2 = process.env) {
-  const viewers = join3(dir2, "viewers");
-  try {
-    if (previous3 && previous3 !== sid) {
-      rmSync(join3(viewers, `${previous3}.json`), { force: true });
-    }
-    if (sid) {
-      mkdirSync2(viewers, { recursive: true });
-      writeFileSync(join3(viewers, `${sid}.json`), JSON.stringify({ pid: process.pid, tern: ternPane(env2) }));
-    }
-  } catch {
-  }
-}
-function connectTargets(call, card) {
-  if (call.name !== CONNECT_TOOL) {
-    return [];
-  }
-  const targets = card?.targets ?? record2(call.result)?.targets;
-  return parseTargets(Array.isArray(targets) ? targets : []);
-}
-function loadConnect(call, dir2 = dataDir(), now = Date.now()) {
-  if (call.name !== CONNECT_TOOL) {
-    return void 0;
-  }
-  const key2 = call.connect?.key ?? findCard(call, dir2);
-  const file2 = key2 ? readCard(key2, dir2, now) : void 0;
-  const targets = connectTargets(call, file2);
-  if (!targets.length) {
-    return void 0;
-  }
-  return {
-    error: file2?.error,
-    key: file2?.key,
-    opened: call.connect?.opened ?? [],
-    // Continue settles the card at once, as on the desktop; the watcher sees the claim on its next read.
-    settled: file2?.settled ?? (file2?.told || call.connect?.told ? "continued" : void 0),
-    targets,
-    told: Boolean(file2?.told || call.connect?.told)
-  };
-}
-function parseTargets(targets) {
-  return targets.flatMap((t2) => {
-    const r = record2(t2);
-    const name = typeof r?.name === "string" ? r.name : "";
-    return name ? [
-      {
-        alias: typeof r?.alias === "string" && r.alias ? r.alias : void 0,
-        detail: typeof r?.detail === "string" && r.detail ? r.detail : void 0,
-        name,
-        state: typeof r?.state === "string" ? r.state : "pending",
-        title: appTitle(name),
-        url: typeof r?.connect_url === "string" && r.connect_url ? r.connect_url : void 0
-      }
-    ] : [];
-  });
-}
-var waiting = (t2) => t2.state === "initiated" || t2.state === "pending";
-var allConnected = (card) => {
-  const own13 = card.targets.filter((t2) => t2.state !== "superseded");
-  return own13.length > 0 && own13.every((t2) => t2.state === "connected");
-};
-function isConnectCall(call) {
-  const card = call.connect;
-  return card ? card.settled !== "superseded" && card.targets.some((t2) => t2.url) : connectTargets(call).some((t2) => t2.url);
-}
-var and = (names) => names.length < 3 ? names.join(" and ") : `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`;
-function continueMessage(targets) {
-  const names = targets.filter((t2) => t2.state === "connected" || waiting(t2)).map((t2) => t2.title);
-  return `I've authorized ${and(names) || "the apps"}. Check with manage_connections status and carry on.`;
-}
-function connectedMessage(targets) {
-  const names = targets.filter((t2) => t2.state === "connected").map((t2) => t2.title);
-  return `${and(names)} ${names.length === 1 ? "is" : "are"} connected now. Carry on.`;
-}
-
-// src/media.ts
-import { homedir as homedir5 } from "node:os";
-import { isAbsolute } from "node:path";
-import { fileURLToPath } from "node:url";
-
-// src/hermes/images.ts
-import { readFile as readFile2 } from "node:fs/promises";
-import { homedir as homedir4 } from "node:os";
-import { extname as extname2, resolve as resolve3 } from "node:path";
-var MAX_IMAGE_BYTES = 20 * 1024 * 1024;
-function imageFormat(bytes) {
-  if (bytes.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))) {
-    return { mime: "image/png", ext: ".png" };
-  }
-  if (bytes[0] === 255 && bytes[1] === 216 && bytes[2] === 255) {
-    return { mime: "image/jpeg", ext: ".jpg" };
-  }
-  if (/^GIF8[79]a$/.test(bytes.subarray(0, 6).toString("ascii"))) {
-    return { mime: "image/gif", ext: ".gif" };
-  }
-  if (bytes.subarray(0, 4).toString("ascii") === "RIFF" && bytes.subarray(8, 12).toString("ascii") === "WEBP") {
-    return { mime: "image/webp", ext: ".webp" };
-  }
-  return null;
-}
-function imageSize(bytes) {
-  const format = imageFormat(bytes)?.mime;
-  const size = (w, h2) => w > 0 && h2 > 0 ? { h: h2, w } : void 0;
-  try {
-    if (format === "image/png") {
-      return size(bytes.readUInt32BE(16), bytes.readUInt32BE(20));
-    }
-    if (format === "image/gif") {
-      return size(bytes.readUInt16LE(6), bytes.readUInt16LE(8));
-    }
-    if (format === "image/webp") {
-      const chunk = bytes.subarray(12, 16).toString("ascii");
-      if (chunk === "VP8X") {
-        return size(bytes.readUIntLE(24, 3) + 1, bytes.readUIntLE(27, 3) + 1);
-      }
-      if (chunk === "VP8L") {
-        const b = bytes.readUInt32LE(21);
-        return size((b & 16383) + 1, (b >> 14 & 16383) + 1);
-      }
-      return size(bytes.readUInt16LE(26) & 16383, bytes.readUInt16LE(28) & 16383);
-    }
-    if (format === "image/jpeg") {
-      for (let i = 2; i + 9 < bytes.length; ) {
-        if (bytes[i] !== 255) {
-          return void 0;
-        }
-        const marker2 = bytes[i + 1];
-        if (marker2 >= 192 && marker2 <= 207 && marker2 !== 196 && marker2 !== 200 && marker2 !== 204) {
-          return size(bytes.readUInt16BE(i + 7), bytes.readUInt16BE(i + 5));
-        }
-        i += 2 + bytes.readUInt16BE(i + 2);
-      }
-    }
-  } catch {
-  }
-  return void 0;
-}
-async function uploadImage(gw2, sid, raw2, cwd) {
-  const path2 = resolve3(cwd, raw2.replace(/^~(?=$|\/)/, homedir4()));
-  const bytes = await readFile2(path2);
-  if (bytes.length > MAX_IMAGE_BYTES) {
-    throw new Error("the image is larger than 20 MB");
-  }
-  const format = imageFormat(bytes);
-  if (!format) {
-    throw new Error(`${extname2(path2) || "this file"} is not a PNG, JPEG, GIF or WebP image`);
-  }
-  const r = await gw2.request("image.attach_bytes", {
-    session_id: sid,
-    filename: `image${format.ext}`,
-    content_base64: bytes.toString("base64")
-  });
-  if (!r?.path) {
-    throw new Error("the gateway did not store the image");
-  }
-  return { bytes, mime: format.mime, path: r.path };
-}
-
-// src/media.ts
-var str4 = (v) => typeof v === "string" && v.trim() ? v.trim() : void 0;
-var MAX_BYTES = 16 * 1024 * 1024;
-var FETCH_MS = 2e4;
-function shownImage(call) {
-  if (call.status === "error" || call.status === "cancelled") {
-    return void 0;
-  }
-  const r = record2(call.result);
-  if (r?.success === false) {
-    return void 0;
-  }
-  if (call.name === "image_generate") {
-    return str4(r?.host_image) ?? str4(r?.image);
-  }
-  if (call.name.startsWith("browser")) {
-    const summary4 = call.resultText ?? str4(r?.text_summary) ?? "";
-    return str4(record2(r?.meta)?.screenshot_path) ?? str4(r?.screenshot_path) ?? /Screenshot path: (\S+)/.exec(summary4)?.[1];
-  }
-  return void 0;
-}
-function localSource(src) {
-  if (/^file:\/\//i.test(src)) {
-    try {
-      return { path: fileURLToPath(src) };
-    } catch {
-      return void 0;
-    }
-  }
-  const path2 = src.replace(/^~(?=\/)/, homedir5());
-  return isAbsolute(path2) ? { path: path2 } : void 0;
-}
-var Media = class {
-  #host;
-  #fetch;
-  #loads = /* @__PURE__ */ new Map();
-  /** What each settled load gave, so a call rebuilt from history gets it before the next frame. */
-  #loaded = /* @__PURE__ */ new Map();
-  constructor(host, fetcher = (url, init) => fetch(url, init)) {
-    this.#host = host;
-    this.#fetch = fetcher;
-  }
-  /**
-   * Gets the image `call` shows ready: a URL's bytes land on `call.image` (null when they could
-   * not be had) and `done` runs. A local file needs nothing; Tern reads it.
-   */
-  show(call, done) {
-    const src = shownImage(call);
-    if (!src || localSource(src) || call.image !== void 0) {
-      return;
-    }
-    if (this.#loaded.has(src)) {
-      call.image = this.#loaded.get(src);
-      return;
-    }
-    void this.load(src).then((image3) => {
-      call.image = image3;
-      done();
-    });
-  }
-  /** `show` for every call of `entries` (a transcript loaded from history). */
-  showAll(entries, done) {
-    for (const e of entries) {
-      for (const b of e.kind === "turn" ? e.blocks : []) {
-        if (b.kind === "tool") {
-          this.show(b.call, () => done(b.call));
-        }
-      }
-    }
-  }
-  /** `src` (a data or http(s) URL) as a blob; null when it is no image or cannot be fetched. */
-  load(src) {
-    let load2 = this.#loads.get(src);
-    if (!load2) {
-      load2 = this.#bytes(src).then(
-        (bytes) => this.#blob(bytes),
-        () => null
-      ).then((image3) => {
-        this.#loaded.set(src, image3);
-        return image3;
-      });
-      this.#loads.set(src, load2);
-    }
-    return load2;
-  }
-  async #bytes(src) {
-    const data = /^data:image\/[\w.+-]+;base64,(.*)$/s.exec(src);
-    if (data) {
-      return Buffer.from(data[1] ?? "", "base64");
-    }
-    if (!/^https?:\/\//i.test(src)) {
-      return void 0;
-    }
-    const r = await this.#fetch(src, { signal: AbortSignal.timeout(FETCH_MS) });
-    const size = Number(r.headers.get("content-length") ?? 0);
-    return r.ok && size <= MAX_BYTES ? Buffer.from(await r.arrayBuffer()) : void 0;
-  }
-  #blob(bytes) {
-    const format = bytes && bytes.length <= MAX_BYTES ? imageFormat(bytes) : null;
-    const blob = format && bytes ? this.#host.blob(bytes, format.mime) : void 0;
-    return blob ? { blob } : null;
-  }
-};
 
 // src/processes/widgets/files.ts
 import { closeSync, fstatSync, openSync, readSync } from "node:fs";
@@ -27805,6 +27801,92 @@ function formatRatio(value, total, unit) {
 
 // src/processes/widgets/spec.ts
 import { setFlagsFromString } from "node:v8";
+
+// src/core/assert.ts
+function oneOf(values) {
+  const known2 = new Set(values);
+  return (value) => known2.has(value);
+}
+
+// src/processes/widgets/check.ts
+var FIELD_NAME = /^[a-z][a-z0-9_]{0,23}$/;
+var cut = (text11, max) => text11.length > max ? `${text11.slice(0, max - 1)}\u2026` : text11;
+function list(value, where, errors, min, max) {
+  if (!Array.isArray(value)) {
+    errors.push(`${where}: expected an array`);
+    return void 0;
+  }
+  if (value.length < min || value.length > max) {
+    errors.push(`${where}: expected ${min}\u2013${max} entries, got ${value.length}`);
+    return void 0;
+  }
+  return value;
+}
+function str5(value, where, errors, o = {}) {
+  if (value === void 0 || value === null) {
+    if (o.required) {
+      errors.push(`${where}: required`);
+    }
+    return void 0;
+  }
+  if (typeof value !== "string") {
+    errors.push(`${where}: expected a string`);
+    return void 0;
+  }
+  const trimmed = value.trim();
+  if (!trimmed) {
+    if (o.required) {
+      errors.push(`${where}: must not be empty`);
+    }
+    return void 0;
+  }
+  if (o.max !== void 0 && trimmed.length > o.max) {
+    errors.push(`${where}: at most ${o.max} characters`);
+    return void 0;
+  }
+  return o.cut === void 0 ? trimmed : cut(unescape(trimmed), o.cut);
+}
+var ENTITIES = { "&#39;": "'", "&amp;": "&", "&gt;": ">", "&lt;": "<", "&quot;": '"' };
+function unescape(text11) {
+  return text11.replace(/&(?:amp|lt|gt|quot|#39);/g, (e) => ENTITIES[e] ?? e);
+}
+function num3(value, where, errors) {
+  if (value === void 0 || value === null) {
+    return void 0;
+  }
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    errors.push(`${where}: expected a finite number`);
+    return void 0;
+  }
+  return value;
+}
+function fieldName(value, where, errors) {
+  const name = str5(value, where, errors, { required: true });
+  if (name !== void 0 && !FIELD_NAME.test(name)) {
+    errors.push(`${where}: "${name}" must match ${FIELD_NAME.source}`);
+    return void 0;
+  }
+  return name;
+}
+function choice(value, values, where, errors) {
+  if (oneOf(values)(value)) {
+    return value;
+  }
+  errors.push(`${where}: expected one of ${values.join(", ")}`);
+  return void 0;
+}
+function betterValue(value, where, errors) {
+  if (value === void 0 || value === null) {
+    return void 0;
+  }
+  if (value === "higher" || value === "lower") {
+    return value;
+  }
+  errors.push(`${where}: expected "higher" or "lower"`);
+  return void 0;
+}
+
+// src/processes/widgets/spec.ts
 var AGGS = ["last", "first", "min", "max", "mean", "sum", "count", "rate", "delta", "change"];
 var TONES = ["neutral", "accent", "info", "success", "warning", "error", "pending", "muted", "user"];
 var MAX_TITLE_CHARS = 48;
@@ -27815,7 +27897,6 @@ var MAX_PATTERN_CHARS = 400;
 var MAX_LABEL_CHARS = 48;
 var MAX_UNIT_CHARS = 12;
 var MAX_GRID_TONES = 12;
-var FIELD_NAME = /^[a-z][a-z0-9_]{0,23}$/;
 var GROUP_NAME = /^[A-Za-z_][A-Za-z0-9_]{0,31}$/;
 var SOURCE_ID = /^(?:\*|[A-Za-z0-9_:.-]{1,64}\*?)$/;
 var NAMED_GROUP = /\(\?P?<([A-Za-z_][A-Za-z0-9_]*)>/g;
@@ -27922,7 +28003,7 @@ function compilePattern(pattern) {
     try {
       return new RegExp(source, "l");
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
+      const message = errorText(error);
       throw new Error(
         /linear time/.test(message) ? `\`${pattern}\` uses lookaround or backreferences, which are not allowed` : message
       );
@@ -27962,7 +28043,6 @@ var LineMatcher = class {
   }
 };
 var isRecord2 = (v) => typeof v === "object" && v !== null && !Array.isArray(v);
-var cut = (text11, max) => text11.length > max ? `${text11.slice(0, max - 1)}\u2026` : text11;
 function specSkip(value) {
   return isRecord2(value) && typeof value.skip === "string" && value.skip.trim() ? value.skip.trim() : void 0;
 }
@@ -28018,7 +28098,7 @@ function validateSpec(value, samples, brief) {
   try {
     matcher = new LineMatcher(spec.rules.map((r) => r.match));
   } catch (error) {
-    errors.push(`rules: ${error instanceof Error ? error.message : String(error)}`);
+    errors.push(`rules: ${errorText(error)}`);
   }
   if (matcher && samples && !errors.length) {
     dryRun(spec, matcher, samples, numeric, errors);
@@ -28110,7 +28190,7 @@ function checkReferences(spec, errors) {
   const checkField = (where, field, agg, key2) => {
     const feed = feeds.get(field);
     if (!feed) {
-      return errors.push(`${where}: unknown field "${field}"; no rule has a group (?P<${field}>\u2026) or count "${field}"`);
+      return void errors.push(`${where}: unknown field "${field}"; no rule has a group (?P<${field}>\u2026) or count "${field}"`);
     }
     if (key2 !== void 0 && feed.keyGroups.has(key2)) {
       errors.push(`${where}.key: "${key2}" is the name of the key group; set one of its values (one model, one job) or omit \`key\``);
@@ -28239,7 +28319,7 @@ function parseValueRef(value, where, errors) {
   }
   const field = fieldName(value.field, `${where}.field`, errors);
   const key2 = str5(value.key, `${where}.key`, errors, { max: 120 });
-  const agg = aggregation(value.agg, `${where}.agg`, errors);
+  const agg = choice(value.agg, AGGS, `${where}.agg`, errors);
   const unit = str5(value.unit, `${where}.unit`, errors, { cut: MAX_UNIT_CHARS });
   const digits = num3(value.digits, `${where}.digits`, errors);
   if (digits !== void 0 && (!Number.isInteger(digits) || digits < 0 || digits > 4)) {
@@ -28286,7 +28366,7 @@ function parseBlock(value, where, errors) {
       break;
     case "bars":
       block = {
-        agg: aggregation(value.agg, `${where}.agg`, errors) ?? "last",
+        agg: choice(value.agg, AGGS, `${where}.agg`, errors) ?? "last",
         field: field(),
         kind: "bars",
         label: label(),
@@ -28313,7 +28393,7 @@ function parseBlock(value, where, errors) {
         total = parseValueRef(value.total, `${where}.total`, errors);
       }
       block = {
-        agg: aggregation(value.agg, `${where}.agg`, errors) ?? "last",
+        agg: choice(value.agg, AGGS, `${where}.agg`, errors) ?? "last",
         field: field(),
         kind: "meter",
         label: label(),
@@ -28362,80 +28442,6 @@ function parseBlock(value, where, errors) {
       return void 0;
   }
   return errors.length === before ? block : void 0;
-}
-function list(value, where, errors, min, max) {
-  if (!Array.isArray(value)) {
-    errors.push(`${where}: expected an array`);
-    return void 0;
-  }
-  if (value.length < min || value.length > max) {
-    errors.push(`${where}: expected ${min}\u2013${max} entries, got ${value.length}`);
-    return void 0;
-  }
-  return value;
-}
-function str5(value, where, errors, o = {}) {
-  if (value === void 0 || value === null) {
-    if (o.required) {
-      errors.push(`${where}: required`);
-    }
-    return void 0;
-  }
-  if (typeof value !== "string") {
-    errors.push(`${where}: expected a string`);
-    return void 0;
-  }
-  const trimmed = value.trim();
-  if (!trimmed) {
-    if (o.required) {
-      errors.push(`${where}: must not be empty`);
-    }
-    return void 0;
-  }
-  if (o.max !== void 0 && trimmed.length > o.max) {
-    errors.push(`${where}: at most ${o.max} characters`);
-    return void 0;
-  }
-  return o.cut === void 0 ? trimmed : cut(unescape(trimmed), o.cut);
-}
-var ENTITIES = { "&#39;": "'", "&amp;": "&", "&gt;": ">", "&lt;": "<", "&quot;": '"' };
-function unescape(text11) {
-  return text11.replace(/&(?:amp|lt|gt|quot|#39);/g, (e) => ENTITIES[e] ?? e);
-}
-function num3(value, where, errors) {
-  if (value === void 0 || value === null) {
-    return void 0;
-  }
-  if (typeof value !== "number" || !Number.isFinite(value)) {
-    errors.push(`${where}: expected a finite number`);
-    return void 0;
-  }
-  return value;
-}
-function fieldName(value, where, errors) {
-  const name = str5(value, where, errors, { required: true });
-  if (name !== void 0 && !FIELD_NAME.test(name)) {
-    errors.push(`${where}: "${name}" must match ${FIELD_NAME.source}`);
-    return void 0;
-  }
-  return name;
-}
-function aggregation(value, where, errors) {
-  if (typeof value === "string" && AGGS.includes(value)) {
-    return value;
-  }
-  errors.push(`${where}: expected one of ${AGGS.join(", ")}`);
-  return void 0;
-}
-function betterValue(value, where, errors) {
-  if (value === void 0 || value === null) {
-    return void 0;
-  }
-  if (value === "higher" || value === "lower") {
-    return value;
-  }
-  errors.push(`${where}: expected "higher" or "lower"`);
-  return void 0;
 }
 
 // src/processes/widgets/runtime.ts
@@ -29338,7 +29344,7 @@ function processVerdict(p3) {
 }
 var strings2 = (v) => Array.isArray(v) ? v.filter((x) => typeof x === "string" && x !== "") : [];
 function watchersOf(call) {
-  const r = record2(call.result);
+  const r = record(call.result);
   if (typeof r?.session_id === "string") {
     return {
       heartbeat: typeof r.heartbeat_seconds === "number" ? r.heartbeat_seconds : 0,
@@ -29361,7 +29367,7 @@ function watchersOf(call) {
   return { heartbeat: beat, notify, patterns: notify ? [] : patterns };
 }
 function processIdOf(call) {
-  const id = record2(call.result)?.session_id;
+  const id = record(call.result)?.session_id;
   return typeof id === "string" && id ? id : void 0;
 }
 var Processes = class {
@@ -31398,7 +31404,7 @@ function clock2(at) {
 
 // src/view/tools.tsx
 var str7 = (v) => typeof v === "string" && v ? v : void 0;
-function toolNode(call, now, place = {}) {
+function toolNode(call, now) {
   const solo = call.name === "delegate_task" ? soloTask(call, now) : void 0;
   if (solo) {
     return solo;
@@ -31436,8 +31442,7 @@ function toolNode(call, now, place = {}) {
       meta: card.meta?.length ? card.meta : void 0,
       name: card.name,
       note: call.status === "cancelled" ? "cancelled" : error && !card.body.length ? error : void 0,
-      // A run's steps are one line each; the run's head says what is running.
-      preview: place.inRun ? void 0 : card.preview,
+      preview: card.preview,
       role: card.role,
       status,
       target: card.target,
@@ -31469,7 +31474,7 @@ function toolDetail(call, now) {
   return body;
 }
 function cardOf(call, now) {
-  const result = record2(call.result);
+  const result = record(call.result);
   const app2 = callApp(call);
   if (app2) {
     return {
@@ -31543,7 +31548,7 @@ function cardOf(call, now) {
       };
     case "skills_list": {
       const skills = Array.isArray(result?.skills) ? result.skills : [];
-      const names = skills.map((s2) => str7(record2(s2)?.name) ?? str7(s2)).filter((n) => n !== void 0);
+      const names = skills.map((s2) => str7(record(s2)?.name) ?? str7(s2)).filter((n) => n !== void 0);
       return {
         body: names.length ? [/* @__PURE__ */ jsx("text", { spans: [{ s: "muted", t: names.join(" \xB7 ") }], wrap: "word" }, "names")] : [],
         folded: true,
@@ -31740,7 +31745,7 @@ function searchCard(call, result) {
       title: "Glob"
     };
   }
-  const matches = Array.isArray(result?.matches) ? result.matches.map((m) => record2(m)).filter((m) => m !== void 0) : void 0;
+  const matches = Array.isArray(result?.matches) ? result.matches.map((m) => record(m)).filter((m) => m !== void 0) : void 0;
   const byFile = /* @__PURE__ */ new Map();
   for (const m of matches ?? []) {
     const path2 = (str7(m.path) ?? "").replace(/^\.\//, "");
@@ -31803,8 +31808,8 @@ function searchCard(call, result) {
   };
 }
 function webSearchCard(call, result) {
-  const data = record2(result?.data);
-  const hits = (Array.isArray(data?.web) ? data.web : Array.isArray(result?.results) ? result.results : []).map((h2) => record2(h2)).filter((h2) => h2 !== void 0);
+  const data = record(result?.data);
+  const hits = (Array.isArray(data?.web) ? data.web : Array.isArray(result?.results) ? result.results : []).map((h2) => record(h2)).filter((h2) => h2 !== void 0);
   return {
     body: hits.length ? [
       /* @__PURE__ */ jsx("col", { role: "omp.tool.sources", children: hits.map((h2, i) => sourceRow(`s${i}`, str7(h2.title) ?? str7(h2.url) ?? "", str7(h2.url))) }, "s")
@@ -31818,7 +31823,7 @@ function webSearchCard(call, result) {
   };
 }
 function fetchCard(call, result) {
-  const pages = (Array.isArray(result?.results) ? result.results : []).map((p3) => record2(p3)).filter((p3) => p3 !== void 0);
+  const pages = (Array.isArray(result?.results) ? result.results : []).map((p3) => record(p3)).filter((p3) => p3 !== void 0);
   const urls = Array.isArray(call.args.urls) ? call.args.urls.map((u) => str7(u)).filter((u) => u !== void 0) : [];
   const body = [];
   for (const [i, p3] of pages.entries()) {
@@ -31854,7 +31859,7 @@ function sourceRow(key2, title, url) {
   ] }, key2);
 }
 function taskCard(call, result, now) {
-  const tasks = Array.isArray(call.args.tasks) ? call.args.tasks.map((t2) => record2(t2)).filter((t2) => t2 !== void 0) : [];
+  const tasks = Array.isArray(call.args.tasks) ? call.args.tasks.map((t2) => record(t2)).filter((t2) => t2 !== void 0) : [];
   const goals = tasks.length ? tasks.map((t2) => str7(t2.goal) ?? "") : str7(call.args.goal) ? [str7(call.args.goal) ?? ""] : [];
   const agents2 = call.subagents ?? [];
   const rows = agents2.length ? agents2.map((a2) => agentNode(a2, now)) : call.status === "running" || result?.status === "dispatched" ? goals.map((g, i) => /* @__PURE__ */ jsx("agent", { name: `Agent ${i + 1}`, status: "pending", task: g }, `p${i}`)) : settledRows(goals, result);
@@ -31893,7 +31898,7 @@ function taskCard(call, result, now) {
   };
 }
 function settledRows(goals, result) {
-  const results = Array.isArray(result?.results) ? result.results.map((r) => record2(r)) : [];
+  const results = Array.isArray(result?.results) ? result.results.map((r) => record(r)) : [];
   const titles = goals.length ? goals : results.map(() => "Delegated task");
   return titles.map((g, i) => {
     const { status, summary: summary4 } = outcome(results[i]);
@@ -31939,8 +31944,8 @@ function outcome(r) {
   return { status, summary: str7(r?.summary) ?? str7(r?.error) };
 }
 function soloTask(call, now) {
-  const tasks = Array.isArray(call.args.tasks) ? call.args.tasks.map((t2) => record2(t2)).filter((t2) => t2 !== void 0) : [];
-  const result = record2(call.result);
+  const tasks = Array.isArray(call.args.tasks) ? call.args.tasks.map((t2) => record(t2)).filter((t2) => t2 !== void 0) : [];
+  const result = record(call.result);
   if (tasks.length > 1 || (call.subagents?.length ?? 0) > 1 || call.status === "error" || result?.error) {
     return void 0;
   }
@@ -31951,7 +31956,7 @@ function soloTask(call, now) {
     return agentNode(a2, now, { key: call.id, name });
   }
   const pending = call.status === "running" || result?.status === "dispatched";
-  const results = Array.isArray(result?.results) ? result.results.map((r) => record2(r)) : [];
+  const results = Array.isArray(result?.results) ? result.results.map((r) => record(r)) : [];
   const { status, summary: summary4 } = pending ? { status: "pending", summary: void 0 } : outcome(results[0]);
   return /* @__PURE__ */ jsx(
     "agent",
@@ -31968,7 +31973,7 @@ function soloTask(call, now) {
   );
 }
 function briefOf(call, index2) {
-  const tasks = Array.isArray(call.args.tasks) ? call.args.tasks.map((t2) => record2(t2)) : [];
+  const tasks = Array.isArray(call.args.tasks) ? call.args.tasks.map((t2) => record(t2)) : [];
   const context = str7(tasks[index2]?.context) ?? str7(call.args.context);
   return context;
 }
@@ -31976,8 +31981,8 @@ function briefNode(head2, text11) {
   return /* @__PURE__ */ jsx("section", { collapsed: true, collapsible: true, head: head2, role: "hermes.task.brief", children: /* @__PURE__ */ jsx("md", { children: text11 }, "md") }, "brief");
 }
 function askCard(call, result) {
-  const qs = (Array.isArray(call.args.questions) ? call.args.questions : str7(call.args.question) ? [call.args] : []).map((q2) => record2(q2)).filter((q2) => q2 !== void 0);
-  const responses = Array.isArray(result?.responses) ? result.responses.map((r) => record2(r)) : [];
+  const qs = (Array.isArray(call.args.questions) ? call.args.questions : str7(call.args.question) ? [call.args] : []).map((q2) => record(q2)).filter((q2) => q2 !== void 0);
+  const responses = Array.isArray(result?.responses) ? result.responses.map((r) => record(r)) : [];
   const body = [];
   for (const [i, q2] of qs.entries()) {
     const choices = Array.isArray(q2.choices) ? q2.choices.map((c) => str7(c)).filter((c) => c !== void 0) : [];
@@ -32162,11 +32167,11 @@ function genericBody(call) {
   return [/* @__PURE__ */ jsx("code", { lang: /^\s*[[{]/.test(text11) ? "json" : "text", text: clip2(text11, 4e3) }, "out")];
 }
 function errorOf(call) {
-  const result = record2(call.result);
+  const result = record(call.result);
   return str7(result?.error) ?? str7(call.summary) ?? (typeof call.result === "string" && !result ? call.result : void 0);
 }
 function exitOf(call) {
-  const code7 = record2(call.result)?.exit_code;
+  const code7 = record(call.result)?.exit_code;
   return typeof code7 === "number" ? code7 : void 0;
 }
 function checklistNode(todos) {
@@ -32408,7 +32413,7 @@ function openAgents(app2, focus) {
         queued ? "info" : "warning"
       );
     } catch (error) {
-      app2.transcript.notice(error instanceof Error ? error.message : String(error), "error");
+      app2.transcript.notice(errorText(error), "error");
     }
     app2.changed();
   };
@@ -32423,7 +32428,7 @@ function openAgents(app2, focus) {
         app2.transcript.notice(`${agentName(a2)} already finished.`, "warning");
       }
     } catch (error) {
-      app2.transcript.notice(error instanceof Error ? error.message : String(error), "error");
+      app2.transcript.notice(errorText(error), "error");
     }
     app2.changed();
   };
@@ -32432,7 +32437,7 @@ function openAgents(app2, focus) {
       const paused = await app2.agents.pause(!app2.agents.paused);
       app2.transcript.notice(paused ? "Subagent spawning paused for every chat on this gateway." : "Subagent spawning resumed.");
     } catch (error) {
-      app2.transcript.notice(error instanceof Error ? error.message : String(error), "error");
+      app2.transcript.notice(errorText(error), "error");
     }
     app2.changed();
   };
@@ -32820,8 +32825,8 @@ function jobTone(job) {
 function ownJobs(calls) {
   const ids = /* @__PURE__ */ new Set();
   for (const c of calls) {
-    const r = record2(c.result);
-    const job = record2(r?.job);
+    const r = record(c.result);
+    const job = record(r?.job);
     const id = r?.job_id ?? job?.job_id ?? job?.id;
     if (c.name === "cronjob_manage" && typeof id === "string" && id) {
       ids.add(id);
@@ -32900,7 +32905,7 @@ var Cron = class {
       this.#warning = r?.warning ?? void 0;
       this.#error = void 0;
     } catch (error) {
-      this.#error = error instanceof Error ? error.message : String(error);
+      this.#error = errorText(error);
     }
     this.#loaded = true;
     this.#host.changed();
@@ -32977,7 +32982,7 @@ function openBackground(app2, at) {
         app2.transcript.notice(`${describeCommand(p3.command)}: ${status.replace(/_/g, " ")}.`, "warning");
       }
     } catch (error) {
-      app2.transcript.notice(error instanceof Error ? error.message : String(error), "error");
+      app2.transcript.notice(errorText(error), "error");
     }
     app2.changed();
   };
@@ -32987,7 +32992,7 @@ function openBackground(app2, at) {
       const n = await app2.processes.stopAll();
       app2.transcript.notice(`Stopped ${n} background process${n === 1 ? "" : "es"}.`);
     } catch (error) {
-      app2.transcript.notice(error instanceof Error ? error.message : String(error), "error");
+      app2.transcript.notice(errorText(error), "error");
     }
     app2.changed();
   };
@@ -33021,7 +33026,7 @@ function openBackground(app2, at) {
     try {
       await app2.cron.act(action, j.job_id);
     } catch (error) {
-      app2.transcript.notice(error instanceof Error ? error.message : String(error), "error");
+      app2.transcript.notice(errorText(error), "error");
     }
     app2.changed();
   };
@@ -33766,105 +33771,13 @@ import { execFile as execFile3 } from "node:child_process";
 import { readFileSync as readFileSync2 } from "node:fs";
 import { homedir as homedir9 } from "node:os";
 import { join as join6 } from "node:path";
-import { DatabaseSync as DatabaseSync2 } from "node:sqlite";
+import { DatabaseSync } from "node:sqlite";
 
-// src/watch/child.ts
+// src/hermes/paths.ts
 import { homedir as homedir8 } from "node:os";
 import { join as join5 } from "node:path";
-import { DatabaseSync } from "node:sqlite";
 function stateDbPath(env2 = process.env) {
   return join5(env2.HERMES_HOME || join5(homedir8(), ".hermes"), "state.db");
-}
-var ChildStore = class {
-  #db;
-  constructor(path2 = stateDbPath()) {
-    this.#db = new DatabaseSync(path2, { readOnly: true });
-  }
-  /**
-   * The child session of `parents` whose first prompt is `goal`: a child's first user turn is
-   * its goal. The newest wins, as a goal can repeat across delegations; `since` (epoch ms)
-   * skips older ones.
-   */
-  find(parents, goal, since = 0) {
-    const ids = parents.filter(Boolean);
-    if (!ids.length) {
-      return void 0;
-    }
-    const row2 = this.#db.prepare(
-      `SELECT s.id AS id FROM sessions s
-         WHERE s.parent_session_id IN (${ids.map(() => "?").join(",")}) AND s.source = 'subagent'
-           AND s.started_at >= ?
-           AND (SELECT m.content FROM messages m WHERE m.session_id = s.id AND m.role = 'user'
-                ORDER BY m.id LIMIT 1) = ?
-         ORDER BY s.started_at DESC LIMIT 1`
-    ).get(...ids, Math.max(0, since / 1e3 - 5), goal);
-    return row2?.id;
-  }
-  /** The child's active messages as the gateway's transcript messages, oldest first. */
-  messages(session2) {
-    const rows = this.#db.prepare(
-      `SELECT id, role, content, tool_call_id, tool_calls, tool_name, timestamp, reasoning
-         FROM messages WHERE session_id = ? AND active = 1 ORDER BY id`
-    ).all(session2);
-    return toTranscript(rows);
-  }
-  /** The newest message id of `session`, to tell whether anything changed. */
-  last(session2) {
-    const row2 = this.#db.prepare("SELECT MAX(id) AS id FROM messages WHERE session_id = ?").get(session2);
-    return row2?.id ?? 0;
-  }
-  close() {
-    this.#db.close();
-  }
-};
-function toTranscript(rows) {
-  const out = [];
-  for (const r of rows) {
-    const timestamp = r.timestamp;
-    if (r.role === "user" || r.role === "system") {
-      out.push({ content: r.content ?? "", role: r.role, timestamp });
-      continue;
-    }
-    if (r.role === "assistant") {
-      out.push({ content: r.content ?? "", reasoning: r.reasoning ?? void 0, role: "assistant", timestamp });
-      for (const call of parseCalls(r.tool_calls)) {
-        out.push({
-          args: parseArgs(call.function?.arguments),
-          name: call.function?.name ?? "tool",
-          role: "tool",
-          timestamp,
-          tool_call_id: call.id ?? call.call_id
-        });
-      }
-      continue;
-    }
-    if (r.role === "tool") {
-      out.push({
-        content: r.content ?? "",
-        name: r.tool_name ?? void 0,
-        role: "tool",
-        timestamp,
-        tool_call_id: r.tool_call_id ?? void 0
-      });
-    }
-  }
-  return out;
-}
-function parseCalls(raw2) {
-  try {
-    const parsed = raw2 ? JSON.parse(raw2) : [];
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
-}
-function parseArgs(raw2) {
-  try {
-    const parsed = raw2 ? JSON.parse(raw2) : {};
-    return parsed && typeof parsed === "object" ? parsed : {};
-  } catch {
-    return {};
-  }
 }
 
 // src/github/links.ts
@@ -33874,7 +33787,7 @@ function linksPath(env2 = process.env) {
 }
 var prKey = (ref) => `${ref.host}/${ref.repository}#${ref.number}`;
 function refOf(v) {
-  const r = record2(v);
+  const r = record(v);
   const host = typeof r?.host === "string" ? r.host : "";
   const repository = typeof r?.repository === "string" ? r.repository : "";
   const number2 = typeof r?.number === "number" ? r.number : 0;
@@ -33884,7 +33797,7 @@ function linkedFromResult(call) {
   if (!LINK_TOOLS.has(call.name) || call.status !== "done") {
     return void 0;
   }
-  const linked = record2(call.result)?.linked;
+  const linked = record(call.result)?.linked;
   return Array.isArray(linked) ? linked.map(refOf).filter((r) => Boolean(r)) : void 0;
 }
 var marker = (k) => `COALESCE(json_extract(CASE WHEN json_valid(c.model_config) THEN c.model_config ELSE '{}' END, '$.${k}'), '') != p.id`;
@@ -33894,7 +33807,7 @@ var CONTINUES = `SELECT p.id AS p FROM sessions c JOIN sessions p ON p.id = c.pa
 function ancestry(sid, db = stateDbPath()) {
   const chain = [sid];
   try {
-    const conn = new DatabaseSync2(db, { readOnly: true });
+    const conn = new DatabaseSync(db, { readOnly: true });
     try {
       const parent = conn.prepare(CONTINUES);
       for (let i = 0; i < 100; i++) {
@@ -43036,13 +42949,13 @@ function isChild(value) {
     return true;
   }
   if (typeof value.type !== "string") return false;
-  const record3 = (
+  const record2 = (
     /** @type {Record<string, unknown>} */
     value
   );
   const keys2 = Object.keys(value);
   for (const key2 of keys2) {
-    const value2 = record3[key2];
+    const value2 = record2[key2];
     if (value2 && typeof value2 === "object") {
       if (!Array.isArray(value2)) return true;
       const list8 = (
@@ -60816,7 +60729,7 @@ var PrView = class {
     try {
       await this.#host.prs.act(action, this.selected);
     } catch (error) {
-      this.#host.notice(error instanceof Error ? error.message : String(error), "error");
+      this.#host.notice(errorText(error), "error");
     }
     this.#host.changed();
   }
@@ -61513,7 +61426,7 @@ async function openHelp(app2) {
     catalog = await app2.gw.request("commands.catalog", app2.sid ? { session_id: app2.sid } : {});
   } catch (error) {
     app2.transcript.notice(
-      `Could not load the command list: ${error instanceof Error ? error.message : String(error)}`,
+      `Could not load the command list: ${errorText(error)}`,
       "warning"
     );
   }
@@ -61708,7 +61621,7 @@ function openModelPicker(app2) {
       state = "ready";
     } catch (error) {
       state = "error";
-      message = error instanceof Error ? error.message : String(error);
+      message = errorText(error);
     }
     app2.changed();
   };
@@ -61732,7 +61645,7 @@ function openModelPicker(app2) {
         }
       }
     } catch (error) {
-      app2.transcript.notice(error instanceof Error ? error.message : String(error), "error");
+      app2.transcript.notice(errorText(error), "error");
       app2.close(overlay);
     }
     busy = false;
@@ -62340,7 +62253,7 @@ var Composer = class {
     if (ev.from === ev.to && ev.text === "\n") {
       const list8 = listNewline(this.text, ev.from);
       if (list8) {
-        return this.#apply(list8);
+        return void this.#apply(list8);
       }
     }
     const typed = ev.from === ev.to && [...ev.text].length === 1 && ev.text !== "\n";
@@ -62792,7 +62705,7 @@ function answerWith(host, overlay, req, state, result) {
     () => host.close(overlay),
     (error) => {
       state.busy = false;
-      state.error = error instanceof Error ? error.message : String(error);
+      state.error = errorText(error);
       host.changed();
     }
   );
@@ -62867,7 +62780,7 @@ function approvalOverlay(host, req) {
   const key2 = `prompt:${req.id}`;
   const sending = { busy: false, error: "" };
   let selected = 0;
-  const answer = (choice) => answerWith(host, overlay, req, sending, { choice });
+  const answer = (choice2) => answerWith(host, overlay, req, sending, { choice: choice2 });
   const decline = () => sending.error ? host.close(overlay) : answer("deny");
   const overlay = {
     key: key2,
@@ -63303,7 +63216,7 @@ import { basename as basename3 } from "node:path";
 
 // src/hermes/sessionIndex.ts
 import { execFile as execFile4 } from "node:child_process";
-import { DatabaseSync as DatabaseSync3 } from "node:sqlite";
+import { DatabaseSync as DatabaseSync2 } from "node:sqlite";
 import { promisify as promisify3 } from "node:util";
 var run2 = promisify3(execFile4);
 var SOURCES = ["acp", "cli", "desktop", "gui", "local", "tui"];
@@ -63372,7 +63285,7 @@ function flat2(text11) {
 function storedSessions(limit = 400, db = stateDbPath()) {
   let conn;
   try {
-    conn = new DatabaseSync3(db, { readOnly: true });
+    conn = new DatabaseSync2(db, { readOnly: true });
     const rows = conn.prepare(QUERY).all(...SOURCES, JSON.stringify(supersededSegments(conn)), limit);
     return rows.map((r) => ({
       branch: r.branch ?? "",
@@ -63397,7 +63310,7 @@ function storedSessions(limit = 400, db = stateDbPath()) {
 function lastReply(id, db = stateDbPath()) {
   let conn;
   try {
-    conn = new DatabaseSync3(db, { readOnly: true });
+    conn = new DatabaseSync2(db, { readOnly: true });
     const row2 = conn.prepare(
       `WITH RECURSIVE chain(cur) AS (SELECT ? UNION ALL SELECT child.id FROM chain c
            JOIN sessions parent ON parent.id = c.cur JOIN sessions child ON child.parent_session_id = c.cur
@@ -63479,7 +63392,7 @@ function openSessionPicker(app2) {
     app2.close(overlay);
     if (s2.id !== current) {
       app2.resume(s2.id).catch((error) => {
-        app2.transcript.notice(`Could not resume: ${error instanceof Error ? error.message : String(error)}`, "error");
+        app2.transcript.notice(`Could not resume: ${errorText(error)}`, "error");
         app2.changed();
       });
     }
@@ -63490,7 +63403,7 @@ function openSessionPicker(app2) {
       await (app2.gw.isCanonical ? mutateSession(app2.gw, id, "delete", {}) : app2.gw.request("session.delete", { session_id: id }));
       sessions = sessions.filter((s2) => s2.id !== id);
     } catch (error) {
-      app2.transcript.notice(error instanceof Error ? error.message : String(error), "error");
+      app2.transcript.notice(errorText(error), "error");
     }
     app2.changed();
   };
@@ -63874,7 +63787,6 @@ async function openHermesSplit(args, cwd, env2 = process.env) {
 }
 
 // src/refusedCommands.ts
-var errorText2 = (e) => e instanceof Error ? e.message : String(e);
 var words2 = (arg) => arg.trim().split(/\s+/).filter(Boolean);
 async function cliPanel(app2, title, argv) {
   const r = await app2.gw.request("cli.exec", { argv });
@@ -63907,7 +63819,7 @@ async function browser(app2, arg) {
       ...mode ? { enabled: mode === "on" } : {}
     });
   } catch (e) {
-    return note(errorText2(e), "warning");
+    return note(errorText(e), "warning");
   }
   if (action === "use") {
     return note(
@@ -64050,7 +63962,7 @@ var guarded = (name, run5) => async (app2, arg) => {
   try {
     return await run5(app2, arg);
   } catch (e) {
-    app2.transcript.notice(`/${name} failed: ${errorText2(e)}`, "error");
+    app2.transcript.notice(`/${name} failed: ${errorText(e)}`, "error");
   }
 };
 var ROUTED = [
@@ -64106,7 +64018,7 @@ var REFUSED_COMMANDS = [
 ];
 
 // src/compaction.ts
-import { DatabaseSync as DatabaseSync4 } from "node:sqlite";
+import { DatabaseSync as DatabaseSync3 } from "node:sqlite";
 var MARKER2 = "[CONTEXT COMPACTION";
 var END = "--- END OF CONTEXT SUMMARY";
 var RECOVERY = /\n## Context Recovery\b[\s\S]*?(?=\n## |$)/;
@@ -64118,7 +64030,7 @@ var QUERY2 = (n) => `SELECT timestamp, content FROM messages
 function storedCompactions(sid, db = stateDbPath(), lineage = ancestry) {
   const ids = lineage(sid);
   try {
-    const conn = new DatabaseSync4(db, { readOnly: true });
+    const conn = new DatabaseSync3(db, { readOnly: true });
     try {
       const rows = conn.prepare(QUERY2(ids.length)).all(...ids);
       const out = rows.flatMap((r) => typeof r.timestamp === "number" ? [{ at: r.timestamp * 1e3, ...handoff(r.content) }] : []);
@@ -64200,7 +64112,6 @@ function retryTurnRewind(snapshot3) {
 
 // src/sessionCommands.ts
 var plural2 = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
-var errorText3 = (e) => e instanceof Error ? e.message : String(e);
 async function rewind(host, intent) {
   if (!host.canonical) {
     return false;
@@ -64367,7 +64278,7 @@ var guarded2 = (name, run5) => async (host, arg) => {
   try {
     return await run5(host, arg);
   } catch (e) {
-    host.notice(`/${name} failed: ${errorText3(e)}`, "error");
+    host.notice(`/${name} failed: ${errorText(e)}`, "error");
   }
 };
 var COMMANDS2 = [
@@ -65176,7 +65087,7 @@ var COMMANDS3 = [
       if (!level) {
         return false;
       }
-      void app2.setEffort(level.id, global2 ? "global" : "session");
+      return void app2.setEffort(level.id, global2 ? "global" : "session");
     }
   },
   {
@@ -65533,7 +65444,7 @@ var REFUSALS = [
   ["command_failed", "the command could not start"]
 ];
 function shellError(error) {
-  const text11 = error instanceof Error ? error.message : String(error);
+  const text11 = errorText(error);
   return REFUSALS.find(([code7]) => text11.includes(code7))?.[1] ?? describeRpcError(error);
 }
 async function shellExec(gw2, sid, command) {
@@ -67846,7 +67757,7 @@ var PullRequests = class {
       e[FAILURE[what]] = void 0;
       this.#failedAt.delete(id);
     } catch (error) {
-      e[FAILURE[what]] = error instanceof Error ? error.message : String(error);
+      e[FAILURE[what]] = errorText(error);
       this.#failedAt.set(id, Date.now());
       throw error;
     } finally {
@@ -67955,7 +67866,7 @@ var PullRequests = class {
       try {
         data = await this.#gh.graphql(host, query, variables);
       } catch (error) {
-        if (NO_STACK_FIELD.test(error instanceof Error ? error.message : String(error))) {
+        if (NO_STACK_FIELD.test(errorText(error))) {
           this.#noStacks.add(host);
         }
         continue;
@@ -68003,7 +67914,7 @@ var PullRequests = class {
             e.error = pr ? void 0 : "GitHub has no such pull request, or this token cannot see it.";
           });
         } catch (error) {
-          failed = error instanceof Error ? error.message : String(error);
+          failed = errorText(error);
           chunk.forEach((e) => e.error = failed);
         }
       }
@@ -69295,7 +69206,7 @@ var App = class {
   }
   /** An error nothing caught (a rejected promise no caller awaited): shown, so the pane lives on. */
   fault(reason) {
-    this.transcript.notice(`Unexpected error: ${reason instanceof Error ? reason.message : String(reason)}`, "error");
+    this.transcript.notice(`Unexpected error: ${errorText(reason)}`, "error");
     this.changed();
   }
   // ── Input ──────────────────────────────────────────────────────────
@@ -69310,7 +69221,7 @@ var App = class {
         this.changed();
       }
     } catch (error) {
-      this.transcript.notice(`Input failed: ${error instanceof Error ? error.message : String(error)}`, "error");
+      this.transcript.notice(`Input failed: ${errorText(error)}`, "error");
     }
     this.quit();
   }
@@ -69602,7 +69513,7 @@ var App = class {
         this.transcript.notice("No image on the clipboard.", "warning");
       }
     } catch (error) {
-      this.transcript.notice(`Could not read the clipboard image: ${error instanceof Error ? error.message : String(error)}`, "error");
+      this.transcript.notice(`Could not read the clipboard image: ${errorText(error)}`, "error");
     } finally {
       this.#endAttaching(slot);
       this.changed();
@@ -69630,7 +69541,7 @@ var App = class {
         this.#attachments.push(image3);
       }
     } catch (error) {
-      this.transcript.notice(`Could not attach ${name}: ${error instanceof Error ? error.message : String(error)}`, "error");
+      this.transcript.notice(`Could not attach ${name}: ${errorText(error)}`, "error");
     } finally {
       this.#endAttaching(slot);
       this.changed();
@@ -69875,7 +69786,7 @@ var App = class {
     } catch (error) {
       this.#server.drop(own13);
       if (sid === this.sid) {
-        this.transcript.notice(`Not queued: ${error instanceof Error ? error.message : String(error)}. Your message is back in the composer.`, "error");
+        this.transcript.notice(`Not queued: ${errorText(error)}. Your message is back in the composer.`, "error");
         this.#restore(item3);
       }
     }
@@ -69992,7 +69903,7 @@ ${this.composer.text}` : text11 || this.composer.text);
           return this.changed();
         }
       } catch (error) {
-        this.transcript.notice(error instanceof Error ? error.message : String(error), "error");
+        this.transcript.notice(errorText(error), "error");
         return this.changed();
       }
     }
@@ -70053,7 +69964,7 @@ ${this.composer.text}` : text11 || this.composer.text);
       this.busy.label = "Stopping\u2026";
     }
     interruptTurn(this.#gw, this.sid).catch((error) => {
-      const why = error instanceof Error ? error.message : String(error);
+      const why = errorText(error);
       if (this.busy && !why.includes("stale_generation")) {
         this.busy.label = "Working\u2026";
         this.transcript.notice(`Could not stop the turn: ${why}`, "error");
@@ -70144,7 +70055,7 @@ ${this.composer.text}` : text11 || this.composer.text);
       await (resume ? this.resume(resume) : this.newSession());
     } catch (error) {
       this.transcript.notice(
-        `Could not start a session: ${error instanceof Error ? error.message : String(error)}`,
+        `Could not start a session: ${errorText(error)}`,
         "error"
       );
       this.changed();
@@ -70167,7 +70078,7 @@ ${this.composer.text}` : text11 || this.composer.text);
       }
     } catch (error) {
       this.transcript.notice(
-        `Could not attach ${path2}: ${error instanceof Error ? error.message : String(error)}`,
+        `Could not attach ${path2}: ${errorText(error)}`,
         "warning"
       );
     }
@@ -70183,7 +70094,7 @@ ${this.composer.text}` : text11 || this.composer.text);
       }
     } catch (error) {
       this.transcript.notice(
-        `Could not reattach the session: ${error instanceof Error ? error.message : String(error)}`,
+        `Could not reattach the session: ${errorText(error)}`,
         "error"
       );
     }
@@ -70235,7 +70146,7 @@ ${this.composer.text}` : text11 || this.composer.text);
         this.changed();
       }
     } catch (error) {
-      this.transcript.notice(`Could not name the session: ${error instanceof Error ? error.message : String(error)}`, "warning");
+      this.transcript.notice(`Could not name the session: ${errorText(error)}`, "warning");
       this.changed();
     }
   }
@@ -70858,7 +70769,7 @@ ${this.composer.text}` : text11 || this.composer.text);
       if (sid === this.sid && this.info && before && this.info.reasoning_effort === value) {
         this.info = { ...this.info, ...before };
       }
-      this.transcript.notice(`Could not set the reasoning effort: ${error instanceof Error ? error.message : String(error)}`, "error");
+      this.transcript.notice(`Could not set the reasoning effort: ${errorText(error)}`, "error");
     }
     this.changed();
   }
@@ -70897,7 +70808,7 @@ ${this.composer.text}` : text11 || this.composer.text);
         return false;
       }
     } catch (error) {
-      this.transcript.notice(`Could not take the prompt out of the queue: ${error instanceof Error ? error.message : String(error)}`, "error");
+      this.transcript.notice(`Could not take the prompt out of the queue: ${errorText(error)}`, "error");
       this.changed();
       return false;
     }
@@ -71179,6 +71090,102 @@ function shortPath3(path2) {
 
 // src/watch/watchApp.ts
 import { readFile as readFile3 } from "node:fs/promises";
+
+// src/watch/child.ts
+import { DatabaseSync as DatabaseSync4 } from "node:sqlite";
+var ChildStore = class {
+  #db;
+  constructor(path2 = stateDbPath()) {
+    this.#db = new DatabaseSync4(path2, { readOnly: true });
+  }
+  /**
+   * The child session of `parents` whose first prompt is `goal`: a child's first user turn is
+   * its goal. The newest wins, as a goal can repeat across delegations; `since` (epoch ms)
+   * skips older ones.
+   */
+  find(parents, goal, since = 0) {
+    const ids = parents.filter(Boolean);
+    if (!ids.length) {
+      return void 0;
+    }
+    const row2 = this.#db.prepare(
+      `SELECT s.id AS id FROM sessions s
+         WHERE s.parent_session_id IN (${ids.map(() => "?").join(",")}) AND s.source = 'subagent'
+           AND s.started_at >= ?
+           AND (SELECT m.content FROM messages m WHERE m.session_id = s.id AND m.role = 'user'
+                ORDER BY m.id LIMIT 1) = ?
+         ORDER BY s.started_at DESC LIMIT 1`
+    ).get(...ids, Math.max(0, since / 1e3 - 5), goal);
+    return row2?.id;
+  }
+  /** The child's active messages as the gateway's transcript messages, oldest first. */
+  messages(session2) {
+    const rows = this.#db.prepare(
+      `SELECT id, role, content, tool_call_id, tool_calls, tool_name, timestamp, reasoning
+         FROM messages WHERE session_id = ? AND active = 1 ORDER BY id`
+    ).all(session2);
+    return toTranscript(rows);
+  }
+  /** The newest message id of `session`, to tell whether anything changed. */
+  last(session2) {
+    const row2 = this.#db.prepare("SELECT MAX(id) AS id FROM messages WHERE session_id = ?").get(session2);
+    return row2?.id ?? 0;
+  }
+  close() {
+    this.#db.close();
+  }
+};
+function toTranscript(rows) {
+  const out = [];
+  for (const r of rows) {
+    const timestamp = r.timestamp;
+    if (r.role === "user" || r.role === "system") {
+      out.push({ content: r.content ?? "", role: r.role, timestamp });
+      continue;
+    }
+    if (r.role === "assistant") {
+      out.push({ content: r.content ?? "", reasoning: r.reasoning ?? void 0, role: "assistant", timestamp });
+      for (const call of parseCalls(r.tool_calls)) {
+        out.push({
+          args: parseArgs(call.function?.arguments),
+          name: call.function?.name ?? "tool",
+          role: "tool",
+          timestamp,
+          tool_call_id: call.id ?? call.call_id
+        });
+      }
+      continue;
+    }
+    if (r.role === "tool") {
+      out.push({
+        content: r.content ?? "",
+        name: r.tool_name ?? void 0,
+        role: "tool",
+        timestamp,
+        tool_call_id: r.tool_call_id ?? void 0
+      });
+    }
+  }
+  return out;
+}
+function parseCalls(raw2) {
+  try {
+    const parsed = raw2 ? JSON.parse(raw2) : [];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+function parseArgs(raw2) {
+  try {
+    const parsed = raw2 ? JSON.parse(raw2) : {};
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+// src/watch/watchApp.ts
 var INPUT_ID2 = "dock.composer.line.input";
 var POLL_MS4 = 1e3;
 var EXIT_ARM_MS2 = 1500;
@@ -71406,7 +71413,7 @@ var WatchApp = class {
         r?.status === "queued" ? "info" : "warning"
       );
     } catch (error) {
-      this.transcript.notice(error instanceof Error ? error.message : String(error), "error");
+      this.transcript.notice(errorText(error), "error");
     }
     this.changed();
   }
@@ -71422,7 +71429,7 @@ var WatchApp = class {
       });
       this.transcript.notice(r?.found ? `Stopping ${a2.name}\u2026` : `${a2.name} already finished.`, "info");
     } catch (error) {
-      this.transcript.notice(error instanceof Error ? error.message : String(error), "error");
+      this.transcript.notice(errorText(error), "error");
     }
     this.changed();
   }

@@ -9,6 +9,7 @@
 import type { JSX, Key, PickerColumn, PickerItem, Tone } from '@stencil-hq/tern'
 
 import type { App } from '../app.js'
+import { errorText } from '../core/errors.js'
 import type { Subagent } from '../model.js'
 import type { Overlay } from '../overlay.js'
 
@@ -114,7 +115,7 @@ export function openAgents(app: App, focus?: { id: string; watch?: boolean }) {
         queued ? 'info' : 'warning'
       )
     } catch (error) {
-      app.transcript.notice(error instanceof Error ? error.message : String(error), 'error')
+      app.transcript.notice(errorText(error), 'error')
     }
 
     app.changed()
@@ -133,7 +134,7 @@ export function openAgents(app: App, focus?: { id: string; watch?: boolean }) {
         app.transcript.notice(`${agentName(a)} already finished.`, 'warning')
       }
     } catch (error) {
-      app.transcript.notice(error instanceof Error ? error.message : String(error), 'error')
+      app.transcript.notice(errorText(error), 'error')
     }
 
     app.changed()
@@ -145,7 +146,7 @@ export function openAgents(app: App, focus?: { id: string; watch?: boolean }) {
       const paused = await app.agents.pause(!app.agents.paused)
       app.transcript.notice(paused ? 'Subagent spawning paused for every chat on this gateway.' : 'Subagent spawning resumed.')
     } catch (error) {
-      app.transcript.notice(error instanceof Error ? error.message : String(error), 'error')
+      app.transcript.notice(errorText(error), 'error')
     }
 
     app.changed()

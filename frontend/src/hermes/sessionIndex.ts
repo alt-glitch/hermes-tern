@@ -11,7 +11,7 @@ import { execFile } from 'node:child_process'
 import { DatabaseSync } from 'node:sqlite'
 import { promisify } from 'node:util'
 
-import { stateDbPath } from '../watch/child.js'
+import { stateDbPath } from './paths.js'
 
 const run = promisify(execFile)
 

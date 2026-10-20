@@ -8,6 +8,7 @@ import type { Key, SpanData } from '@stencil-hq/tern'
 
 import type { App } from '../app.js'
 import { HIDDEN_COMMANDS, localCommands } from '../commands.js'
+import { errorText } from '../core/errors.js'
 import type { Overlay } from '../overlay.js'
 
 const KEY = 'help'
@@ -62,7 +63,7 @@ export async function openHelp(app: App) {
     catalog = await app.gw.request<CommandsCatalogResult>('commands.catalog', app.sid ? { session_id: app.sid } : {})
   } catch (error) {
     app.transcript.notice(
-      `Could not load the command list: ${error instanceof Error ? error.message : String(error)}`,
+      `Could not load the command list: ${errorText(error)}`,
       'warning'
     )
   }

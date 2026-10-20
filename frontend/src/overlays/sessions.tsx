@@ -11,6 +11,7 @@ import { basename } from 'node:path'
 import type { JSX, Key, PickerGroup, PickerItem, Span } from '@stencil-hq/tern'
 
 import type { App } from '../app.js'
+import { errorText } from '../core/errors.js'
 import { mutateSession } from '../hermes/mutate.js'
 import { inWorkspace, lastReply, sessionLabel, type StoredSession, storedSessions, workspaceOf } from '../hermes/sessionIndex.js'
 import type { Overlay } from '../overlay.js'
@@ -73,7 +74,7 @@ export function openSessionPicker(app: App) {
     if (s.id !== current) {
       // A refusal (deleted elsewhere, gateway down) is a notice; the view stays where it was.
       app.resume(s.id).catch((error: unknown) => {
-        app.transcript.notice(`Could not resume: ${error instanceof Error ? error.message : String(error)}`, 'error')
+        app.transcript.notice(`Could not resume: ${errorText(error)}`, 'error')
         app.changed()
       })
     }
@@ -87,7 +88,7 @@ export function openSessionPicker(app: App) {
       await (app.gw.isCanonical ? mutateSession(app.gw, id, 'delete', {}) : app.gw.request('session.delete', { session_id: id }))
       sessions = sessions.filter(s => s.id !== id)
     } catch (error) {
-      app.transcript.notice(error instanceof Error ? error.message : String(error), 'error')
+      app.transcript.notice(errorText(error), 'error')
     }
 
     app.changed()

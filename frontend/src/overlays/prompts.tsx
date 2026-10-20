@@ -9,6 +9,7 @@ import type { ServerRequest } from '@hermes/shared/json-rpc-channel'
 import type { JSX, Key } from '@stencil-hq/tern'
 
 import { Composer } from '../composer.js'
+import { errorText } from '../core/errors.js'
 import { maskedOffset, maskOf, unmaskEdit } from '../mask.js'
 import type { Overlay, OverlayHost } from '../overlay.js'
 import { withoutTernEnv } from '../view/describe.js'
@@ -162,7 +163,7 @@ function answerWith(
     () => host.close(overlay),
     (error: unknown) => {
       state.busy = false
-      state.error = error instanceof Error ? error.message : String(error)
+      state.error = errorText(error)
       host.changed()
     }
   )

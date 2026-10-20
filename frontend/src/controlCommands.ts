@@ -4,6 +4,7 @@
 // /tools) and session.ts (/bg, /btw).
 import type { GatewayClient } from '@tui/gatewayClient.js'
 
+import { errorText } from './core/errors.js'
 import { currentGeneration } from './hermes/mutate.js'
 import type { NoticeEntry } from './model.js'
 
@@ -30,8 +31,6 @@ export interface ControlCommand {
 }
 
 const preview = (text: string) => (text.length > 60 ? `${text.slice(0, 57)}…` : text)
-
-const errorText = (e: unknown) => (e instanceof Error ? e.message : String(e))
 
 /** Interrupts session `sid`'s active turn, fenced by its execution generation. */
 export async function interruptTurn(gw: ControlHost['gw'], sid: string) {

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import type { App } from '../app.js'
 import { localCommand } from '../commands.js'
-import { modelPayload, mutateSession } from '../hermes/mutate.js'
+import { modelPayload } from '../hermes/mutate.js'
 import { pickerValue } from '../overlays/models.js'
 
 /** A gateway that answers each method from `answers` and records the calls. */

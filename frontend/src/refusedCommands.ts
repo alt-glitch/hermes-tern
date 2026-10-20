@@ -8,11 +8,10 @@
 
 import type { App } from './app.js'
 import type { LocalCommand } from './commands.js'
+import { errorText } from './core/errors.js'
 import type { NoticeEntry } from './model.js'
 import { openBackground } from './overlays/background.js'
 import { openHermesSplit } from './watch/spec.js'
-
-const errorText = (e: unknown) => (e instanceof Error ? e.message : String(e))
 
 const words = (arg: string) => arg.trim().split(/\s+/).filter(Boolean)
 

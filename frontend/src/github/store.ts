@@ -4,6 +4,7 @@
 // checks run, and at once when the sheet opens or a PR is linked. Comments and files are read when
 // the sheet shows them.
 
+import { errorText } from '../core/errors.js'
 import type { ToolCall } from '../model.js'
 
 import { type BranchTarget, branchPullRequest, branchTarget, parseStacks, type Stack, stackQuery } from './branch.js'
@@ -296,7 +297,7 @@ export class PullRequests {
       e[FAILURE[what]] = undefined
       this.#failedAt.delete(id)
     } catch (error) {
-      e[FAILURE[what]] = error instanceof Error ? error.message : String(error)
+      e[FAILURE[what]] = errorText(error)
       this.#failedAt.set(id, Date.now())
       throw error
     } finally {
@@ -435,7 +436,7 @@ export class PullRequests {
         data = await this.#gh.graphql(host, query, variables)
       } catch (error) {
         // Only a schema without the field turns stacks off; a timeout, a 5xx or a rate limit tries again next round.
-        if (NO_STACK_FIELD.test(error instanceof Error ? error.message : String(error))) {
+        if (NO_STACK_FIELD.test(errorText(error))) {
           this.#noStacks.add(host)
         }
 
@@ -500,7 +501,7 @@ export class PullRequests {
             e.error = pr ? undefined : 'GitHub has no such pull request, or this token cannot see it.'
           })
         } catch (error) {
-          failed = error instanceof Error ? error.message : String(error)
+          failed = errorText(error)
           chunk.forEach(e => (e.error = failed))
         }
       }

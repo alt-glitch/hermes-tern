@@ -19,7 +19,7 @@ import { join } from 'node:path'
 
 import { appTitle } from './bridge.js'
 import type { ToolCall } from './model.js'
-import { record } from './transcript.js'
+import { record } from './wire/json.js'
 
 export const CONNECT_TOOL = 'manage_connections'
 

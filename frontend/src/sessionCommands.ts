@@ -6,6 +6,7 @@
 // canonicalSessionCommands.ts / canonicalSessionControls.ts.
 import { lineTokens } from './compaction.js'
 import type { ControlHost } from './controlCommands.js'
+import { errorText } from './core/errors.js'
 import { type MutationResult, mutateSession } from './hermes/mutate.js'
 import { lastTurnRewind, retryText, retryTurnRewind } from './hermes/rewind.js'
 
@@ -34,8 +35,6 @@ export interface SessionCommand {
 }
 
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`
-
-const errorText = (e: unknown) => (e instanceof Error ? e.message : String(e))
 
 /** `/undo` and `/retry`: rewind to before the newest user turn; `/retry` then resends that turn's text. */
 async function rewind(host: SessionHost, intent: 'retry' | 'undo') {
@@ -223,7 +222,7 @@ interface ReloadMcp {
  * `/reload-mcp`: the shared gateway refuses it in `slash.exec` but serves `reload.mcp`, desktop's
  * add/toggle/repair call. Typing it is the confirmation the RPC asks for, as the desktop's button is.
  */
-async function reloadMcp(host: SessionHost) {
+async function reloadMcp(host: SessionHost): Promise<boolean | void> {
   if (!host.canonical) {
     return false
   }

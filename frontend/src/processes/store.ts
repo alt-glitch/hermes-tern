@@ -8,8 +8,9 @@
 import type { GatewayClient } from '@tui/gatewayClient.js'
 
 import type { BackgroundProcess, ToolCall } from '../model.js'
-import { isWatchCall, record, type Transcript } from '../transcript.js'
+import { isWatchCall, type Transcript } from '../transcript.js'
 import { withoutTernEnv } from '../view/describe.js'
+import { record } from '../wire/json.js'
 
 import { Charts, type ChartsOptions } from './widgets/registry.js'
 

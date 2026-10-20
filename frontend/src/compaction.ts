@@ -6,7 +6,7 @@
 import { DatabaseSync } from 'node:sqlite'
 
 import { ancestry } from './github/links.js'
-import { stateDbPath } from './watch/child.js'
+import { stateDbPath } from './hermes/paths.js'
 
 /** A compaction the store knows of: when its summary was written (epoch ms), and the summary. */
 export interface StoredCompaction {

@@ -10,7 +10,7 @@ import { fileURLToPath } from 'node:url'
 
 import { imageFormat } from './hermes/images.js'
 import type { Entry, ImageSource, ToolCall } from './model.js'
-import { record } from './transcript.js'
+import { record } from './wire/json.js'
 
 const str = (v: unknown): string | undefined => (typeof v === 'string' && v.trim() ? v.trim() : undefined)
 

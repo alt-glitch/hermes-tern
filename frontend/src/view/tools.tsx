@@ -12,7 +12,8 @@ import { localSource, shownImage } from '../media.js'
 import type { Subagent, Todo, ToolCall } from '../model.js'
 import { isRunning as processRuns, processElapsed, processIdOf, processTone, processVerdict, watchersOf } from '../processes/store.js'
 import { primaryNode, tilesNode } from '../processes/widgets/view.js'
-import { isBackgroundCall, isProcessTool, isWatchCall, record } from '../transcript.js'
+import { isBackgroundCall, isProcessTool, isWatchCall } from '../transcript.js'
+import { record } from '../wire/json.js'
 import { appsOf } from '../workLog.js'
 
 import { commandLine, describeCommand } from './describe.js'
@@ -42,13 +43,8 @@ interface Card {
 
 const str = (v: unknown): string | undefined => (typeof v === 'string' && v ? v : undefined)
 
-/** Where a card shows: alone, or as one step of a folded run (one line until opened). */
-export interface ToolPlace {
-  inRun?: boolean
-}
-
 /** The `tool` node of one call. */
-export function toolNode(call: ToolCall, now: number, place: ToolPlace = {}): JSX.Element {
+export function toolNode(call: ToolCall, now: number): JSX.Element {
   const solo = call.name === 'delegate_task' ? soloTask(call, now) : undefined
 
   if (solo) {
@@ -91,8 +87,7 @@ export function toolNode(call: ToolCall, now: number, place: ToolPlace = {}): JS
       meta: card.meta?.length ? card.meta : undefined,
       name: card.name,
       note: call.status === 'cancelled' ? 'cancelled' : error && !card.body.length ? error : undefined,
-      // A run's steps are one line each; the run's head says what is running.
-      preview: place.inRun ? undefined : card.preview,
+      preview: card.preview,
       role: card.role,
       status,
       target: card.target,
@@ -395,18 +390,6 @@ function processLine(call: ToolCall, id: string, now: number): JSX.Element {
       {p?.lastLine ? <text grow={1} key="last" spans={[{ s: 'muted mono', t: p.lastLine }]} truncate="end" wrap="none" /> : null}
     </row>
   )
-}
-
-/** One call in a few words, for a run's head: "Check git status", "Read README.md". */
-export function stepTitle(call: ToolCall): string {
-  if (call.name === 'terminal') {
-    return describeCommand(str(call.args.command) ?? call.context ?? '')
-  }
-
-  const card = cardOf(call, Date.now())
-  const target = card.target ? (card.targetKind === 'path' ? card.target.split('/').at(-1) : card.target) : undefined
-
-  return target ? `${card.title} ${target}` : card.title
 }
 
 function readCard(call: ToolCall, result: Record<string, unknown> | undefined): Card {

@@ -5,8 +5,9 @@
 
 import type { GatewayClient } from '@tui/gatewayClient.js'
 
+import { errorText } from '../core/errors.js'
 import type { ToolCall } from '../model.js'
-import { record } from '../transcript.js'
+import { record } from '../wire/json.js'
 
 /** One row of `cron.manage` `list` (tools/cronjob_job_args.py `_format_job`). */
 export interface CronJob {
@@ -176,7 +177,7 @@ export class Cron {
       this.#warning = r?.warning ?? undefined
       this.#error = undefined
     } catch (error) {
-      this.#error = error instanceof Error ? error.message : String(error)
+      this.#error = errorText(error)
     }
 
     this.#loaded = true

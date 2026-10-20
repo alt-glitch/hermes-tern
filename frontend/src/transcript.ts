@@ -17,6 +17,7 @@ import type { StoredCompaction } from './compaction.js'
 import type { Block, Compaction, CompactionEntry, Counters, Entry, NoticeEntry, Todo, ToolCall, TurnEntry, UserAttachment } from './model.js'
 import { promptAttachments, splitPrompt } from './promptRefs.js'
 import { withoutTernEnv } from './view/describe.js'
+import { record } from './wire/json.js'
 
 type ToolBlock = Extract<Block, { kind: 'tool' }>
 
@@ -1075,12 +1076,6 @@ function usageSince(now: Usage, before: Usage | undefined): Usage {
   return { ...now, cost_usd: less('cost_usd'), input: less('input'), output: less('output'), total: less('total') }
 }
 
-/** A JSON object, parsing JSON text (stored tool results are strings). */
-/**
- * A terminal call that started a background process: `background: true`, or a foreground call
- * Hermes moved to the background (a long timeout, a message arriving mid-run), whose result
- * then names the process (`session_id`).
- */
 /** What a new turn looks past for the turn before it: notices and compactions. */
 const passable = (e: Entry) => e.kind !== 'notice' && e.kind !== 'compaction'
 
@@ -1104,20 +1099,13 @@ function shownArgs(args: Record<string, unknown>): Record<string, unknown> {
   return typeof args.command === 'string' ? { ...args, command: withoutTernEnv(args.command) } : args
 }
 
+/**
+ * A terminal call that started a background process: `background: true`, or a foreground call
+ * Hermes moved to the background (a long timeout, a message arriving mid-run), whose result
+ * then names the process (`session_id`).
+ */
 export function isBackgroundCall(call: ToolCall): boolean {
   return call.name === 'terminal' && (call.args.background === true || typeof record(call.result)?.session_id === 'string')
-}
-
-export function record(v: unknown): Record<string, unknown> | undefined {
-  if (typeof v === 'string') {
-    try {
-      return record(JSON.parse(v))
-    } catch {
-      return undefined
-    }
-  }
-
-  return v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : undefined
 }
 
 /** The task tool's names: `todo_list`, and `todo`, the legacy alias in stored transcripts. */

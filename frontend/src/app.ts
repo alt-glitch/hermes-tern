@@ -32,6 +32,7 @@ import { copyToClipboard } from './clipboard.js'
 import { localCommand } from './commands.js'
 import { Composer } from './composer.js'
 import { interruptTurn, redirectTurn, steerTurn } from './controlCommands.js'
+import { errorText } from './core/errors.js'
 import { fastTier } from './fast.js'
 import { type Busy, busyFrom, ownsEvent, Switches } from './flow.js'
 import { protocolNote, slowStartNotes } from './backendNotes.js'
@@ -367,7 +368,7 @@ export class App implements OverlayHost {
 
   /** An error nothing caught (a rejected promise no caller awaited): shown, so the pane lives on. */
   fault(reason: unknown) {
-    this.transcript.notice(`Unexpected error: ${reason instanceof Error ? reason.message : String(reason)}`, 'error')
+    this.transcript.notice(`Unexpected error: ${errorText(reason)}`, 'error')
     this.changed()
   }
 
@@ -385,7 +386,7 @@ export class App implements OverlayHost {
         this.changed()
       }
     } catch (error) {
-      this.transcript.notice(`Input failed: ${error instanceof Error ? error.message : String(error)}`, 'error')
+      this.transcript.notice(`Input failed: ${errorText(error)}`, 'error')
     }
 
     this.quit()
@@ -780,7 +781,7 @@ export class App implements OverlayHost {
         this.transcript.notice('No image on the clipboard.', 'warning')
       }
     } catch (error) {
-      this.transcript.notice(`Could not read the clipboard image: ${error instanceof Error ? error.message : String(error)}`, 'error')
+      this.transcript.notice(`Could not read the clipboard image: ${errorText(error)}`, 'error')
     } finally {
       this.#endAttaching(slot)
       this.changed()
@@ -818,7 +819,7 @@ export class App implements OverlayHost {
         this.#attachments.push(image)
       }
     } catch (error) {
-      this.transcript.notice(`Could not attach ${name}: ${error instanceof Error ? error.message : String(error)}`, 'error')
+      this.transcript.notice(`Could not attach ${name}: ${errorText(error)}`, 'error')
     } finally {
       this.#endAttaching(slot)
       this.changed()
@@ -1140,7 +1141,7 @@ export class App implements OverlayHost {
       this.#server.drop(own)
 
       if (sid === this.sid) {
-        this.transcript.notice(`Not queued: ${error instanceof Error ? error.message : String(error)}. Your message is back in the composer.`, 'error')
+        this.transcript.notice(`Not queued: ${errorText(error)}. Your message is back in the composer.`, 'error')
         this.#restore(item)
       }
     }
@@ -1286,7 +1287,7 @@ export class App implements OverlayHost {
           return this.changed()
         }
       } catch (error) {
-        this.transcript.notice(error instanceof Error ? error.message : String(error), 'error')
+        this.transcript.notice(errorText(error), 'error')
 
         return this.changed()
       }
@@ -1373,7 +1374,7 @@ export class App implements OverlayHost {
     }
 
     interruptTurn(this.#gw, this.sid).catch((error: unknown) => {
-      const why = error instanceof Error ? error.message : String(error)
+      const why = errorText(error)
 
       // A stale generation means the turn already ended: nothing to say.
       if (this.busy && !why.includes('stale_generation')) {
@@ -1481,7 +1482,7 @@ export class App implements OverlayHost {
       await (resume ? this.resume(resume) : this.newSession())
     } catch (error) {
       this.transcript.notice(
-        `Could not start a session: ${error instanceof Error ? error.message : String(error)}`,
+        `Could not start a session: ${errorText(error)}`,
         'error'
       )
       this.changed()
@@ -1509,7 +1510,7 @@ export class App implements OverlayHost {
       }
     } catch (error) {
       this.transcript.notice(
-        `Could not attach ${path}: ${error instanceof Error ? error.message : String(error)}`,
+        `Could not attach ${path}: ${errorText(error)}`,
         'warning'
       )
     }
@@ -1527,7 +1528,7 @@ export class App implements OverlayHost {
       }
     } catch (error) {
       this.transcript.notice(
-        `Could not reattach the session: ${error instanceof Error ? error.message : String(error)}`,
+        `Could not reattach the session: ${errorText(error)}`,
         'error'
       )
     }
@@ -1602,7 +1603,7 @@ export class App implements OverlayHost {
         this.changed()
       }
     } catch (error) {
-      this.transcript.notice(`Could not name the session: ${error instanceof Error ? error.message : String(error)}`, 'warning')
+      this.transcript.notice(`Could not name the session: ${errorText(error)}`, 'warning')
       this.changed()
     }
   }
@@ -2476,7 +2477,7 @@ export class App implements OverlayHost {
         this.info = { ...this.info, ...before }
       }
 
-      this.transcript.notice(`Could not set the reasoning effort: ${error instanceof Error ? error.message : String(error)}`, 'error')
+      this.transcript.notice(`Could not set the reasoning effort: ${errorText(error)}`, 'error')
     }
 
     this.changed()
@@ -2529,7 +2530,7 @@ export class App implements OverlayHost {
         return false
       }
     } catch (error) {
-      this.transcript.notice(`Could not take the prompt out of the queue: ${error instanceof Error ? error.message : String(error)}`, 'error')
+      this.transcript.notice(`Could not take the prompt out of the queue: ${errorText(error)}`, 'error')
       this.changed()
 
       return false

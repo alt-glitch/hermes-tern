@@ -6,6 +6,7 @@
 import type { SessionLiveInfo } from '@hermes/shared/gateway-events'
 import type { GatewayClient } from '@tui/gatewayClient.js'
 
+import { errorText } from './core/errors.js'
 import type { NoticeEntry } from './model.js'
 
 export type FastWord = 'fast' | 'normal' | 'ultrafast'
@@ -60,7 +61,7 @@ export async function setFast(host: FastHost, value: string): Promise<boolean> {
 
     return true
   } catch (error) {
-    const why = error instanceof Error ? error.message : String(error)
+    const why = errorText(error)
 
     host.transcript.notice(
       why.includes('fast_unavailable') ? 'This model has no fast mode on its current route.' : `Could not set fast mode: ${why}`,

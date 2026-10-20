@@ -9,6 +9,7 @@ import type { JSX, Key, ScrollTo, SpanData, Tone } from '@stencil-hq/tern'
 import { node } from '@stencil-hq/tern'
 
 import { copyToClipboard } from '../clipboard.js'
+import { errorText } from '../core/errors.js'
 import { prKey } from '../github/links.js'
 import {
   type ActivityItem,
@@ -216,7 +217,7 @@ export class PrView {
     try {
       await this.#host.prs.act(action, this.selected!)
     } catch (error) {
-      this.#host.notice(error instanceof Error ? error.message : String(error), 'error')
+      this.#host.notice(errorText(error), 'error')
     }
 
     this.#host.changed()

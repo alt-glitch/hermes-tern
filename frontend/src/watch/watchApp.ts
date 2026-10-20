@@ -12,6 +12,7 @@ import type { AnyGatewayEvent } from '@tui/gatewayTypes.js'
 import { parseLiveLog } from '../agents/liveLog.js'
 import { applyLog, isRunning } from '../agents/store.js'
 import { Composer } from '../composer.js'
+import { errorText } from '../core/errors.js'
 import { Media } from '../media.js'
 import type { Subagent } from '../model.js'
 import { paletteFor } from '../palette.js'
@@ -321,7 +322,7 @@ export class WatchApp {
         r?.status === 'queued' ? 'info' : 'warning'
       )
     } catch (error) {
-      this.transcript.notice(error instanceof Error ? error.message : String(error), 'error')
+      this.transcript.notice(errorText(error), 'error')
     }
 
     this.changed()
@@ -341,7 +342,7 @@ export class WatchApp {
       })
       this.transcript.notice(r?.found ? `Stopping ${a.name}…` : `${a.name} already finished.`, 'info')
     } catch (error) {
-      this.transcript.notice(error instanceof Error ? error.message : String(error), 'error')
+      this.transcript.notice(errorText(error), 'error')
     }
 
     this.changed()

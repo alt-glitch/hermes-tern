@@ -500,20 +500,6 @@ function compactingNode(c: NonNullable<DockContext['compacting']>, now: number):
   )
 }
 
-/** A path dim up to its last component, like omp's path segment. */
-function pathSpans(path: string): { s: string; t: string }[] {
-  const slash = path.lastIndexOf('/', path.length - 2)
-
-  if (slash < 0 || slash + 1 >= path.length) {
-    return [{ s: 'statusLinePath strong', t: path }]
-  }
-
-  return [
-    { s: 'statusLinePath dim', t: path.slice(0, slash + 1) },
-    { s: 'statusLinePath strong', t: path.slice(slash + 1) }
-  ]
-}
-
 /** The effort chip: the level (the default one muted), and `ultra→max` where the route clamps it. */
 function effortChip(cx: DockContext): JSX.Element {
   const text = effortText(cx.effort, cx.effortWire)

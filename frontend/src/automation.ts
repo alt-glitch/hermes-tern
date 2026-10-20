@@ -8,6 +8,7 @@
 import type { GoalSnapshot, LoopSnapshot, SessionControlSnapshot } from '@hermes/shared/gateway-events'
 import type { GatewayClient } from '@tui/gatewayClient.js'
 
+import { errorText } from './core/errors.js'
 import type { NoticeEntry } from './model.js'
 
 /** What the store reaches of the app. */
@@ -239,7 +240,7 @@ export class Automation {
       }
     } catch (error) {
       this.#host.transcript.notice(
-        `Could not ${ACTION_LABELS[action]}: ${error instanceof Error ? error.message : String(error)}`,
+        `Could not ${ACTION_LABELS[action]}: ${errorText(error)}`,
         'error'
       )
     } finally {

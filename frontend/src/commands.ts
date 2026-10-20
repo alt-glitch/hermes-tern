@@ -148,7 +148,7 @@ const COMMANDS: readonly LocalCommand[] = [
         return false
       }
 
-      void app.setEffort(level.id, global ? 'global' : 'session')
+      return void app.setEffort(level.id, global ? 'global' : 'session')
     }
   },
   {

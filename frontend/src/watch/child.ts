@@ -3,11 +3,11 @@
 // by message while they run. The shared gateway serves neither the link nor the messages
 // (`session.resume` on a child answers not_found), so this reads the database read-only.
 
-import { homedir } from 'node:os'
-import { join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 
 import type { TranscriptMessage } from '@hermes/shared/gateway-events'
+
+import { stateDbPath } from '../hermes/paths.js'
 
 /** One `messages` row, as this reads it. */
 interface Row {
@@ -19,10 +19,6 @@ interface Row {
   tool_name: string | null
   timestamp: number
   reasoning: string | null
-}
-
-export function stateDbPath(env: NodeJS.ProcessEnv = process.env): string {
-  return join(env.HERMES_HOME || join(homedir(), '.hermes'), 'state.db')
 }
 
 export class ChildStore {

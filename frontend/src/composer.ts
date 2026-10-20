@@ -136,7 +136,7 @@ export class Composer {
       const list = listNewline(this.text, ev.from)
 
       if (list) {
-        return this.#apply(list)
+        return void this.#apply(list)
       }
     }
 

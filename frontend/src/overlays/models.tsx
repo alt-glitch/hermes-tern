@@ -12,6 +12,7 @@ import type { JSX, Key, KvItem, PickerColumn, PickerGroup, PickerItem, PickerSco
 import { providerDisplayNames } from '@tui/domain/providers.js'
 
 import type { App } from '../app.js'
+import { errorText } from '../core/errors.js'
 import { setFast } from '../fast.js'
 import { modelPayload, mutateSession } from '../hermes/mutate.js'
 import { rememberCaps } from '../modelCaps.js'
@@ -146,7 +147,7 @@ export function openModelPicker(app: App) {
       state = 'ready'
     } catch (error) {
       state = 'error'
-      message = error instanceof Error ? error.message : String(error)
+      message = errorText(error)
     }
 
     app.changed()
@@ -180,7 +181,7 @@ export function openModelPicker(app: App) {
         }
       }
     } catch (error) {
-      app.transcript.notice(error instanceof Error ? error.message : String(error), 'error')
+      app.transcript.notice(errorText(error), 'error')
       app.close(overlay)
     }
 

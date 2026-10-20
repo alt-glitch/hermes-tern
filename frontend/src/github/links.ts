@@ -8,9 +8,9 @@ import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 
+import { stateDbPath } from '../hermes/paths.js'
 import type { ToolCall } from '../model.js'
-import { record } from '../transcript.js'
-import { stateDbPath } from '../watch/child.js'
+import { record } from '../wire/json.js'
 
 import type { PrRef } from './pullRequest.js'
 

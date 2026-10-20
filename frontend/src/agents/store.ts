@@ -14,7 +14,8 @@ import { join } from 'node:path'
 import type { GatewayClient } from '@tui/gatewayClient.js'
 
 import type { Subagent, ToolCall } from '../model.js'
-import { record, type Transcript } from '../transcript.js'
+import type { Transcript } from '../transcript.js'
+import { record } from '../wire/json.js'
 
 import { clockToMs, parseLiveLog, runningTool, type LiveLog } from './liveLog.js'
 

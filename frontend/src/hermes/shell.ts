@@ -5,6 +5,8 @@ import type { GatewayClient } from '@tui/gatewayClient.js'
 import { describeRpcError } from '@tui/app/userMessages.js'
 import { INTERPOLATION_RE } from '@tui/protocol/interpolation.js'
 
+import { errorText } from '../core/errors.js'
+
 export interface ShellResult {
   stdout: string
   stderr: string
@@ -23,7 +25,7 @@ const REFUSALS: [string, string][] = [
 
 /** Why a `shell.exec` failed, for the user. */
 export function shellError(error: unknown): string {
-  const text = error instanceof Error ? error.message : String(error)
+  const text = errorText(error)
 
   return REFUSALS.find(([code]) => text.includes(code))?.[1] ?? describeRpcError(error)
 }

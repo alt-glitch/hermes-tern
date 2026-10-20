@@ -10,6 +10,7 @@ import type { JSX, Key, PickerColumn, PickerItem } from '@stencil-hq/tern'
 
 import type { App } from '../app.js'
 import { copyToClipboard } from '../clipboard.js'
+import { errorText } from '../core/errors.js'
 import type { BackgroundProcess, ToolCall } from '../model.js'
 import type { Overlay } from '../overlay.js'
 import { type CronJob, isMonitor, isPaused, jobError, jobTone, ownJobs, relative } from '../processes/cron.js'
@@ -100,7 +101,7 @@ export function openBackground(app: App, at?: string | { tab: 'cron' }) {
         app.transcript.notice(`${describeCommand(p.command)}: ${status.replace(/_/g, ' ')}.`, 'warning')
       }
     } catch (error) {
-      app.transcript.notice(error instanceof Error ? error.message : String(error), 'error')
+      app.transcript.notice(errorText(error), 'error')
     }
 
     app.changed()
@@ -113,7 +114,7 @@ export function openBackground(app: App, at?: string | { tab: 'cron' }) {
       const n = await app.processes.stopAll()
       app.transcript.notice(`Stopped ${n} background process${n === 1 ? '' : 'es'}.`)
     } catch (error) {
-      app.transcript.notice(error instanceof Error ? error.message : String(error), 'error')
+      app.transcript.notice(errorText(error), 'error')
     }
 
     app.changed()
@@ -157,7 +158,7 @@ export function openBackground(app: App, at?: string | { tab: 'cron' }) {
     try {
       await app.cron.act(action, j.job_id)
     } catch (error) {
-      app.transcript.notice(error instanceof Error ? error.message : String(error), 'error')
+      app.transcript.notice(errorText(error), 'error')
     }
 
     app.changed()
