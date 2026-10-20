@@ -33,6 +33,7 @@ function host(over: Partial<SessionHost> = {}, replies: Record<string, unknown> 
   const h = {
     busy: false,
     canonical: true,
+    draft: vi.fn(),
     enqueue: vi.fn(),
     gw: stub<SessionHost['gw']>({ request }),
     notice: vi.fn(),
