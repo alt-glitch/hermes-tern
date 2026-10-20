@@ -2,15 +2,18 @@
 // reattach after a reconnect or a replay gap, and the gateway going away. Each switch takes a
 // token; a slow result whose switch a later one superseded is released, never shown. Server
 // requests for another session wait while a switch is in flight (it may be the one being
-// adopted), and once none is, the held ones open or drop and the queue drains.
+// adopted), and so do events that name a session while none is shown; once no switch is in
+// flight, the held events reach the pane or drop, the held requests open or drop, and the queue
+// drains.
 
 import type { ServerRequest } from '@hermes/shared/json-rpc-channel'
 import type { GatewayClient } from '@tui/gatewayClient.js'
+import type { AnyGatewayEvent } from '@tui/gatewayTypes.js'
 
 import type { LaunchEnv } from '../config/env.js'
 import { errorText } from '../core/errors.js'
 import { durable, type DurableSessionId, isLive, type LiveSessionId, type StoredSessionId, storedSessionId } from '../core/ids.js'
-import { type RequestRoute, Switches } from '../flow.js'
+import { type RequestRoute, routeEvent, Switches } from '../flow.js'
 import { createParams } from '../hermes/create.js'
 import type { PromptSheets } from '../prompts/sheets.js'
 import type { Transcript } from '../transcript.js'
@@ -57,6 +60,10 @@ export class SessionLifecycle {
   readonly #views: SessionViews
   /** Server requests for another session, kept while a switch is in flight. */
   #heldRequests: ServerRequest[] = []
+  /** Events that named a session while none was shown, kept while a switch is in flight. */
+  #heldEvents: AnyGatewayEvent[] = []
+  /** Where a held event goes once the switch settled: the dispatcher, set by follow(). */
+  #deliver: (ev: AnyGatewayEvent) => void = () => undefined
 
   constructor(host: LifecycleHost, steps: readonly Adoptable[]) {
     this.#host = host
@@ -84,6 +91,11 @@ export class SessionLifecycle {
     }
   }
 
+  /** Names where the events held across a switch go once it settled: the dispatcher, which routes them again. */
+  follow(deliver: (ev: AnyGatewayEvent) => void) {
+    this.#deliver = deliver
+  }
+
   /** gateway.ready: a reconnect's reattaches the shown session; only a sessionless app bootstraps. */
   ready() {
     const { stored } = this.#host.state.ref
@@ -97,6 +109,7 @@ export class SessionLifecycle {
     // Prompts queue until the next gateway.ready reattaches.
     state.ref = { live: null, stored: state.ref.stored }
     this.#heldRequests = []
+    this.#heldEvents = []
   }
 
   /**
@@ -118,6 +131,20 @@ export class SessionLifecycle {
 
     if (route === 'hold') {
       this.#heldRequests.push(req)
+    }
+
+    return route
+  }
+
+  /**
+   * Routes a gateway event: one that names a session while none is shown waits while a switch is
+   * in flight (held here), and drops otherwise, as another session's does (flow.ts).
+   */
+  routeEvent(ev: AnyGatewayEvent): RequestRoute {
+    const route = routeEvent(this.#host.state.ref.live, this.#switches.pending, ev)
+
+    if (route === 'hold') {
+      this.#heldEvents.push(ev)
     }
 
     return route
@@ -314,7 +341,8 @@ export class SessionLifecycle {
 
   /**
    * Ends switch `token`. Once none is in flight, in this order: what superseded switches attached is
-   * released, the held requests open (or drop), the queue drains, and the pane renders.
+   * released, the held events reach the pane (or drop), the held requests open (or drop), the queue
+   * drains, and the pane renders.
    */
   #settle(token: number) {
     const host = this.#host
@@ -325,6 +353,13 @@ export class SessionLifecycle {
     }
 
     this.#views.release(host.state.ref.live)
+    const events = this.#heldEvents
+    this.#heldEvents = []
+
+    for (const ev of events) {
+      this.#deliver(ev)
+    }
+
     const held = this.#heldRequests
     this.#heldRequests = []
 

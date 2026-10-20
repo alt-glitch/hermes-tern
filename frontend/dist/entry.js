@@ -66614,61 +66614,6 @@ function onKey(key2, cx, top) {
   KEY_RULES.some((rule) => rule(key2, cx, top));
 }
 
-// src/flow.ts
-var Switches = class {
-  /** One generation per switch: a switch's token is the generation its `begin` started. */
-  #epoch = new Epoch();
-  #pending = false;
-  /** Whether a switch is in flight. */
-  get pending() {
-    return this.#pending;
-  }
-  /** Bumped by every `begin`: read before an await, it tells whether a switch began since. */
-  get generation() {
-    return this.#epoch.generation;
-  }
-  /** Starts a switch and returns its token; earlier tokens go stale. */
-  begin() {
-    this.#pending = true;
-    this.#epoch.next();
-    return this.#epoch.generation;
-  }
-  /** Whether switch `token` is still the latest one (its result may apply). */
-  current(token) {
-    return token === this.#epoch.generation;
-  }
-  /** A ticket that goes stale once another switch begins (its signal aborts then). */
-  since() {
-    return this.#epoch.current();
-  }
-  /** Ends switch `token` (adopted or failed); a superseded token leaves the newer switch pending. */
-  end(token) {
-    if (this.current(token)) {
-      this.#pending = false;
-    }
-  }
-  /**
-   * Routes a server request for `sessionId` while `active` is shown: another
-   * session's request waits while a switch is in flight (it may be the one
-   * being adopted) and is dropped otherwise.
-   */
-  route(active, sessionId) {
-    if (!sessionId || !active || sessionId === active) {
-      return "show";
-    }
-    return this.#pending ? "hold" : "drop";
-  }
-};
-function ownsEvent(active, ev) {
-  return !ev.session_id || !active || ev.session_id === active || ev.type.startsWith("gateway.");
-}
-function busyFrom(r, now = Date.now()) {
-  if (!r.running && r.status !== "working" && r.status !== "waiting") {
-    return null;
-  }
-  return { label: "Working\u2026", since: {}, startedAt: r.turn_started_at ? r.turn_started_at * 1e3 : now };
-}
-
 // src/gateway/coverage.ts
 var IGNORED = [
   "agent.print",
@@ -67313,7 +67258,7 @@ function run4(ev, cx) {
 function dispatcher(cx, unknown4 = () => void 0) {
   const told = /* @__PURE__ */ new Set();
   return (ev) => {
-    if (!ownsEvent(cx.sid(), ev)) {
+    if (cx.life.routeEvent(ev) !== "show") {
       return "quiet";
     }
     if (Object.hasOwn(TABLE, ev.type)) {
@@ -67347,11 +67292,15 @@ function eventLog(path2) {
 function followGateway(gw2, cx) {
   const log = eventLog(cx.eventLog);
   const dispatch = dispatcher(cx, (type) => log.unknown(type));
-  gw2.on("event", (ev) => {
-    log.event(ev);
+  const deliver = (ev) => {
     if (dispatch(ev) === "render") {
       cx.changed();
     }
+  };
+  cx.life.follow(deliver);
+  gw2.on("event", (ev) => {
+    log.event(ev);
+    deliver(ev);
   });
   gw2.on("request", (req) => {
     log.request(req);
@@ -72625,6 +72574,64 @@ var PrAside = class {
   }
 };
 
+// src/flow.ts
+var Switches = class {
+  /** One generation per switch: a switch's token is the generation its `begin` started. */
+  #epoch = new Epoch();
+  #pending = false;
+  /** Whether a switch is in flight. */
+  get pending() {
+    return this.#pending;
+  }
+  /** Bumped by every `begin`: read before an await, it tells whether a switch began since. */
+  get generation() {
+    return this.#epoch.generation;
+  }
+  /** Starts a switch and returns its token; earlier tokens go stale. */
+  begin() {
+    this.#pending = true;
+    this.#epoch.next();
+    return this.#epoch.generation;
+  }
+  /** Whether switch `token` is still the latest one (its result may apply). */
+  current(token) {
+    return token === this.#epoch.generation;
+  }
+  /** A ticket that goes stale once another switch begins (its signal aborts then). */
+  since() {
+    return this.#epoch.current();
+  }
+  /** Ends switch `token` (adopted or failed); a superseded token leaves the newer switch pending. */
+  end(token) {
+    if (this.current(token)) {
+      this.#pending = false;
+    }
+  }
+  /**
+   * Routes a server request for `sessionId` while `active` is shown (null: none yet, or the
+   * gateway is down): another session's request waits while a switch is in flight (it may be the
+   * one being adopted) and is dropped otherwise.
+   */
+  route(active, sessionId) {
+    if (!sessionId || sessionId === active) {
+      return "show";
+    }
+    return this.#pending ? "hold" : "drop";
+  }
+};
+function routeEvent(active, switching, ev) {
+  if (!ev.session_id || ev.session_id === active || ev.type.startsWith("gateway.")) {
+    return "show";
+  }
+  return !active && switching ? "hold" : "drop";
+}
+function busyFrom(r, now = Date.now()) {
+  if (!r.running && r.status !== "working" && r.status !== "waiting") {
+    return null;
+  }
+  return { label: "Working\u2026", since: {}, startedAt: r.turn_started_at ? r.turn_started_at * 1e3 : now };
+}
+
 // src/session/adopt.ts
 function adoptSteps(host) {
   const { state, transcript } = host;
@@ -72813,6 +72820,10 @@ var SessionLifecycle = class {
   #views;
   /** Server requests for another session, kept while a switch is in flight. */
   #heldRequests = [];
+  /** Events that named a session while none was shown, kept while a switch is in flight. */
+  #heldEvents = [];
+  /** Where a held event goes once the switch settled: the dispatcher, set by follow(). */
+  #deliver = () => void 0;
   constructor(host, steps) {
     this.#host = host;
     this.#steps = steps;
@@ -72835,6 +72846,10 @@ var SessionLifecycle = class {
       sid: session2.sid
     };
   }
+  /** Names where the events held across a switch go once it settled: the dispatcher, which routes them again. */
+  follow(deliver) {
+    this.#deliver = deliver;
+  }
   /** gateway.ready: a reconnect's reattaches the shown session; only a sessionless app bootstraps. */
   ready() {
     const { stored } = this.#host.state.ref;
@@ -72845,6 +72860,7 @@ var SessionLifecycle = class {
     const { state } = this.#host;
     state.ref = { live: null, stored: state.ref.stored };
     this.#heldRequests = [];
+    this.#heldEvents = [];
   }
   /**
    * session.replay_gap for `sessionId`: the view fell behind and the owner retired its subscription
@@ -72862,6 +72878,17 @@ var SessionLifecycle = class {
     const route = this.#switches.route(this.#host.state.ref.live, req.params.session_id);
     if (route === "hold") {
       this.#heldRequests.push(req);
+    }
+    return route;
+  }
+  /**
+   * Routes a gateway event: one that names a session while none is shown waits while a switch is
+   * in flight (held here), and drops otherwise, as another session's does (flow.ts).
+   */
+  routeEvent(ev) {
+    const route = routeEvent(this.#host.state.ref.live, this.#switches.pending, ev);
+    if (route === "hold") {
+      this.#heldEvents.push(ev);
     }
     return route;
   }
@@ -73008,7 +73035,8 @@ var SessionLifecycle = class {
   }
   /**
    * Ends switch `token`. Once none is in flight, in this order: what superseded switches attached is
-   * released, the held requests open (or drop), the queue drains, and the pane renders.
+   * released, the held events reach the pane (or drop), the held requests open (or drop), the queue
+   * drains, and the pane renders.
    */
   #settle(token) {
     const host = this.#host;
@@ -73017,6 +73045,11 @@ var SessionLifecycle = class {
       return;
     }
     this.#views.release(host.state.ref.live);
+    const events = this.#heldEvents;
+    this.#heldEvents = [];
+    for (const ev of events) {
+      this.#deliver(ev);
+    }
     const held = this.#heldRequests;
     this.#heldRequests = [];
     for (const req of held) {

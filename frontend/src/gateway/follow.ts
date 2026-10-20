@@ -20,7 +20,7 @@ import { eventLog } from './eventLog.js'
 export type FollowCx = EventCx & {
   readonly activity: Pick<Activity, 'endBusy'>
   readonly reconnect: Pick<Reconnect, 'lost'>
-  readonly life: Pick<SessionLifecycle, 'lost'>
+  readonly life: Pick<SessionLifecycle, 'follow' | 'lost'>
   readonly sheets: Pick<PromptSheets, 'dropAll'>
   readonly transcript: Pick<Transcript, 'interrupt'>
   /** The development tap's file (HERMES_TERN_EVENT_LOG); empty for none. */
@@ -32,12 +32,17 @@ export function followGateway(gw: Pick<GatewayClient, 'attached' | 'drain' | 'on
   const log = eventLog(cx.eventLog)
   const dispatch = dispatcher(cx, type => log.unknown(type))
 
-  gw.on('event', (ev: AnyGatewayEvent) => {
-    log.event(ev)
-
+  const deliver = (ev: AnyGatewayEvent) => {
     if (dispatch(ev) === 'render') {
       cx.changed()
     }
+  }
+
+  // An event held across a switch comes back through the dispatcher (the tap logged it once).
+  cx.life.follow(deliver)
+  gw.on('event', (ev: AnyGatewayEvent) => {
+    log.event(ev)
+    deliver(ev)
   })
   gw.on('request', (req: ServerRequest) => {
     log.request(req)

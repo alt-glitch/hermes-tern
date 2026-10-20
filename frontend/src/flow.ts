@@ -1,6 +1,7 @@
 // Session switching rules: which gateway traffic belongs to the shown session,
 // which new/resume result is still wanted, and the busy state a resumed
-// session starts in (it may be mid-turn).
+// session starts in (it may be mid-turn). Traffic that names a session goes by
+// the phase the pane is in: a session shown, one being switched to, or none.
 
 import type { SessionResumeResult } from '@hermes/shared/gateway-events'
 
@@ -8,7 +9,7 @@ import { Epoch, type Ticket } from './core/epoch.js'
 import type { LiveSessionId } from './core/ids.js'
 import type { Busy } from './turn/activity.js'
 
-/** What to do with a server request: show it, keep it until the switch in flight lands, or drop it. */
+/** What to do with a server request or an event: show it, keep it until the switch in flight lands, or drop it. */
 export type RequestRoute = 'show' | 'hold' | 'drop'
 
 /**
@@ -57,12 +58,12 @@ export class Switches {
   }
 
   /**
-   * Routes a server request for `sessionId` while `active` is shown: another
-   * session's request waits while a switch is in flight (it may be the one
-   * being adopted) and is dropped otherwise.
+   * Routes a server request for `sessionId` while `active` is shown (null: none yet, or the
+   * gateway is down): another session's request waits while a switch is in flight (it may be the
+   * one being adopted) and is dropped otherwise.
    */
   route(active: LiveSessionId | null, sessionId: string | undefined): RequestRoute {
-    if (!sessionId || !active || sessionId === active) {
+    if (!sessionId || sessionId === active) {
       return 'show'
     }
 
@@ -71,11 +72,17 @@ export class Switches {
 }
 
 /**
- * Whether a gateway event belongs on screen while `active` is shown:
- * session-less and `gateway.*` events are global, the rest must name it.
+ * Routes a gateway event while `active` is shown: session-less and `gateway.*` events are global,
+ * the rest must name it. With no session shown, one that names a session waits while a switch is
+ * in flight (it may be the adopted session's, racing its snapshot) and drops otherwise; while a
+ * session is shown, another session's drops (a resume's own frames wait in the client's hold).
  */
-export function ownsEvent(active: LiveSessionId | null, ev: { type: string; session_id?: string }): boolean {
-  return !ev.session_id || !active || ev.session_id === active || ev.type.startsWith('gateway.')
+export function routeEvent(active: LiveSessionId | null, switching: boolean, ev: { type: string; session_id?: string }): RequestRoute {
+  if (!ev.session_id || ev.session_id === active || ev.type.startsWith('gateway.')) {
+    return 'show'
+  }
+
+  return !active && switching ? 'hold' : 'drop'
 }
 
 /** The busy state a resumed session starts in: running (or waiting on the user) means a turn is live. */

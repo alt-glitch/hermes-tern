@@ -1,13 +1,11 @@
 // The gateway's events in. Each event type has one handler, in the feature file it belongs to
 // (gateway/handlers/*), and each handler says what the event did to the pane: 'render' when what
 // it shows changed, 'quiet' when nothing did (or the store it fed renders on its own). Another
-// session's traffic is dropped first; an event type the contract does not declare (a newer
-// gateway's) is told once and dropped. coverage.ts checks that every declared type is handled or
-// named as ignored.
+// session's traffic is held or dropped first (the session lifecycle routes it); an event type the
+// contract does not declare (a newer gateway's) is told once and dropped. coverage.ts checks that
+// every declared type is handled or named as ignored.
 
 import type { AnyGatewayEvent, AnyGatewayEventName } from '@tui/gatewayTypes.js'
-
-import { ownsEvent } from '../flow.js'
 
 import { IGNORED } from './coverage.js'
 import { agentHandlers, type AgentsCx } from './handlers/agents.js'
@@ -61,8 +59,9 @@ export function dispatcher(cx: EventCx, unknown: (type: string) => void = () => 
   const told = new Set<string>()
 
   return ev => {
-    // Another session's traffic (one being closed, or left by a switch) never reaches this pane.
-    if (!ownsEvent(cx.sid(), ev)) {
+    // Another session's traffic (one being closed, or left by a switch) never reaches this pane;
+    // with none shown, it waits for the switch in flight, which hands it back here once it settled.
+    if (cx.life.routeEvent(ev) !== 'show') {
       return 'quiet'
     }
 

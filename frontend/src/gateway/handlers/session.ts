@@ -22,7 +22,7 @@ export interface SessionCx {
   /** The shown session's runtime id: null before the first session and while the gateway is down. */
   sid(): LiveSessionId | null
   readonly session: Pick<SessionState, 'info' | 'usage'>
-  readonly life: Pick<SessionLifecycle, 'fellBehind' | 'ready'>
+  readonly life: Pick<SessionLifecycle, 'fellBehind' | 'ready' | 'routeEvent'>
   readonly reconnect: Pick<Reconnect, 'ready' | 'redialing'>
   readonly theme: Pick<Theme, 'skin'>
   readonly automation: Pick<Automation, 'apply'>
