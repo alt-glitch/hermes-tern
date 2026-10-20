@@ -5,7 +5,7 @@
 
 import type { Tone } from '@stencil-hq/tern'
 
-import { formatNumber, formatTrend } from './format.js'
+import { formatNumber, formatRatio, formatTrend } from './format.js'
 import {
   type Agg,
   type BlockSpec,
@@ -736,7 +736,7 @@ export class ChartRuntime {
         return {
           kind: 'meter',
           label: block.label,
-          text: `${formatNumber(value)}/${formatNumber(total, block.unit)}`,
+          text: formatRatio(value, total, block.unit),
           value: total > 0 ? Math.min(1, Math.max(0, value / total)) : 0,
           ...(total > 0 && value >= total ? { tone: 'success' } : {})
         }
@@ -835,8 +835,11 @@ export function sparkDomain(bounds: readonly number[], specMin?: number, specMax
   return { max: max <= min ? min + 1 : max, min }
 }
 
-/** Aggregations whose value a trend arrow can describe. */
-const TREND_AGGS = new Set<Agg>(['last', 'min', 'max'])
+/**
+ * Aggregations whose value a trend arrow can describe: the latest one. A trend is the series'
+ * first value to its last, which says nothing about a minimum or a maximum ("fastest 2.5 s ▲ 1647%").
+ */
+const TREND_AGGS = new Set<Agg>(['last'])
 
 function hasData(block: Block): boolean {
   switch (block.kind) {
