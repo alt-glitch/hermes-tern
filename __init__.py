@@ -86,6 +86,11 @@ def register(ctx) -> None:
         name="tern", help="Chat in Tern's native UI (falls back to the regular TUI elsewhere)",
         setup_fn=_setup, handler_fn=_run,
         description="Runs `hermes chat --tui` with the Tern frontend; every `hermes chat` flag works.")
+    # The chart rules of background processes (frontend/src/processes/widgets, widget_author.py):
+    # its own `auxiliary.tern_charts` config block and model picker entry.
+    ctx.register_auxiliary_task(
+        "tern_charts", display_name="Tern job charts",
+        description="Writes the rules behind a background process's live chart in `hermes tern`, once per process.")
     pull_requests.register(ctx)
     connections.register(ctx)
     tern_env.register(ctx)

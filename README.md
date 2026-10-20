@@ -12,9 +12,18 @@
   </picture>
 </p>
 
+## Install
+
 ```sh
-hermes plugins install alt-glitch/hermes-tern
-hermes tern                 # in a Tern pane
+hermes plugins install hermes-tern            # from the plugin catalog, once listed
+hermes plugins install alt-glitch/hermes-tern # or from GitHub
+```
+
+Needs Hermes Agent 0.22.2 or later and [Tern](https://stencil.so/tern) (built and tested on 0.9.5).
+Then, in a Tern pane:
+
+```sh
+hermes tern                 # the chat, drawn by Tern
 hermes tern -c              # every `hermes chat` flag works: -m, -q, --image, --resume, --worktree, …
 ```
 
@@ -23,6 +32,17 @@ own components: Markdown, folds, diffs, sheets, asides and keys. Outside Tern (o
 tmux/screen/zellij) there is no TSP answer, and `hermes tern` starts the regular TUI instead. To
 open Hermes in Tern's agent pane, set Tern's agent command (`agent_command` in Tern's settings) to
 `hermes tern`.
+
+## What it adds
+
+| | |
+| --- | --- |
+| `hermes tern` | `hermes chat --tui` with this plugin's Tern frontend; the Ink TUI outside Tern |
+| `link_pull_request`, `unlink_pull_request`, `list_pull_requests` | tools: the PRs a conversation works on, shown above the composer |
+| `transform_tool_result` hook | a connector's connect result becomes a card in the chat that started it |
+| `tool_request` middleware | the agent's shell commands run with the chat's `TERN_PANE`, so `tern open` works beside the chat |
+| `tern_charts` auxiliary task | writes the rules behind a background process's live chart (`auxiliary.tern_charts` picks its model) |
+| system prompt section | tells the agent to link the PRs it opens |
 
 ## The chat
 
@@ -72,8 +92,8 @@ process. The background terminal card draws the primary chart under its live lin
 omp's `wait` card), and the Background sheet (`/ps`, ⌥J) the whole chart above the output. Each
 process's rules are kept in `$HERMES_HOME/plugin-data/hermes-tern/charts/`, so another pane on the
 session, or a resumed one, charts it without asking the model again. Goals the command states draw as
-dashed lines. The request goes to the `job_widget` auxiliary task, so `auxiliary.job_widget` in
-`config.yaml` picks a cheap model for it, and Hermes redacts secrets in the samples before they
+dashed lines. The request goes to the plugin's `tern_charts` auxiliary task, so `auxiliary.tern_charts`
+in `config.yaml` (or Hermes' model picker) chooses a cheap model for it, and Hermes redacts secrets in the samples before they
 leave. Turn charts off with `"jobCharts": false` in `$HERMES_HOME/hermes-tern/settings.json`.
 
 ## Pull requests
@@ -125,16 +145,17 @@ of. PRs are read from GitHub with your own token (`GH_TOKEN`, else `gh auth toke
   resume, worktree, the gateway attach and the exit summary. Exit code 75 (no TSP) reruns
   `hermes chat --tui` without it.
 - `widget_author.py` runs in Hermes' interpreter when the frontend asks for a background
-  process's chart rules: it calls the auxiliary model (task `job_widget`) and prints the answer.
+  process's chart rules: it calls the auxiliary model (task `tern_charts`) and prints the answer.
   The frontend validates the rules and runs them (`frontend/src/processes/widgets/`, ported from
   omp's job widgets), using Node's linear-time regex engine so no rule can stall the chat.
 - `frontend/` is the TSP frontend, a TypeScript app on [`@stencil-hq/tern`](https://www.npmjs.com/package/@stencil-hq/tern).
   It talks to the profile's shared Hermes gateway (`hermes-gateway-v1`) through Hermes' own
   gateway client. `frontend/dist/entry.js` is committed, so installing needs no npm step.
-- The agent's tools run in that shared gateway, not in the chat's pane, so `tern_env.py` gives every
-  process the agent starts (commands, background processes, a Python cell's commands) the
-  `TERN_PANE` and window variables of the pane that shows its conversation, read from the pane's
-  marker when the process starts. Plain `tern open`, `tern split` and the rest of Tern's CLI act
+- The agent's tools run in that shared gateway, not in the chat's pane, so `tern_env.py` (a
+  `tool_request` middleware) puts an `export` of the `TERN_PANE` and window variables of the pane
+  that shows the conversation before each shell command the agent runs (in the foreground, in the
+  background, and from a Python cell), read from the pane's marker at the call. The model's history
+  keeps the command as it wrote it, and the frontend leaves the prefix out of what it shows. Plain `tern open`, `tern split` and the rest of Tern's CLI act
   beside the chat, as they do from `hermes chat` in a Tern pane. [`docs/tern-blocks.md`](docs/tern-blocks.md) is
   the short guide to scripting blocks that way: split, run, capture, wait, close.
 - The frontend began as [can1357](https://github.com/can1357)'s `ui-tsp`
@@ -149,13 +170,16 @@ runs that client against the installed Hermes, which starts the gateway through
 `ui-tui/scripts/gateway_bootstrap.py`. That script and the gateway wire are Hermes internals:
 rebuild against a newer Hermes when they change.
 
-## Developing
+## Development
 
 ```sh
+hermes plugins validate .                         # the catalog's admission checks
+uv run --with pytest pytest -q                    # the Python side (no Hermes checkout needed)
+
 cd frontend
 HERMES_SRC=~/path/to/hermes-agent bun run setup   # links .hermes-src, installs (bun)
 bun run check                                     # typecheck + tests
-bun run bundle                                    # rebuilds dist/entry.js
+bun run bundle                                    # rebuilds dist/entry.js: commit it with the change
 ```
 
 `lab/fake_model.py --home DIR` writes a disposable `HERMES_HOME` pointed at a loopback model and

@@ -1,5 +1,5 @@
-// The cheap-model side of job charts: one request to Hermes' auxiliary model (task `job_widget`,
-// so `auxiliary.job_widget` in config.yaml picks its model) with a `respond` tool carrying the
+// The cheap-model side of job charts: one request to Hermes' auxiliary model (task `tern_charts`,
+// so `auxiliary.tern_charts` in config.yaml picks its model) with a `respond` tool carrying the
 // spec schema, fed the command and samples of its output. The request runs in Hermes' own
 // Python (`widget_author.py` at the plugin's root), which redacts secrets before anything leaves.
 // Ported from omp (packages/coding-agent/src/job-widgets/author.ts and its two prompts).

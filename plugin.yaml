@@ -1,11 +1,14 @@
 name: hermes-tern
+label: Tern
 version: 0.1.0
 manifest_version: 2
-api_version: 1
+kind: standalone
 description: "Hermes for Tern: the chat UI drawn natively by the Tern terminal over its Surface Protocol. Adds `hermes tern`."
 author: alt-glitch
 license: MIT
 homepage: https://github.com/alt-glitch/hermes-tern
 tags: [tern, tui, frontend]
+requires_hermes: ">=0.22.2"
 provides_tools: [link_pull_request, unlink_pull_request, list_pull_requests]
 provides_hooks: [transform_tool_result]
+provides_middleware: [tool_request]

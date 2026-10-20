@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { commandLine, describeCommand } from '../view/describe.js'
+import { commandLine, describeCommand, withoutTernEnv } from '../view/describe.js'
 
 describe('describeCommand', () => {
   it('names a heredoc script shipped to a host by the script, the host and its sections', () => {
@@ -62,5 +62,16 @@ describe('commandLine', () => {
   it('flattens a command to one line and folds heredoc bodies', () => {
     expect(commandLine("cat > a.ps1 <<'EOF'\nline one\nline two\nEOF\nscp a.ps1 h:a.ps1")).toBe("cat > a.ps1 <<'EOF' … scp a.ps1 h:a.ps1")
     expect(commandLine('x'.repeat(200), 20)).toHaveLength(20)
+  })
+})
+
+describe('withoutTernEnv', () => {
+  it("drops the plugin's pane prefix and nothing else", () => {
+    // As tern_env.py writes it: shlex-quoted values, set names first, then the unset ones.
+    expect(withoutTernEnv("export TERN_PANE=1 TERN_WINDOW_KEY='w 3'; unset TERN_PANE_SOCKET TERN_WINDOW_SOCKET TERN_DAEMON_SOCKET; ls -la")).toBe('ls -la')
+    expect(withoutTernEnv('export TERN_PANE=p1 TERN_PANE_SOCKET=/tmp/t.sock TERN_WINDOW_KEY=k TERN_WINDOW_SOCKET=/w TERN_DAEMON_SOCKET=/d; tern open x')).toBe('tern open x')
+    expect(withoutTernEnv('unset TERN_PANE TERN_PANE_SOCKET; make')).toBe('make')
+    expect(withoutTernEnv('export FOO=1; make')).toBe('export FOO=1; make')
+    expect(withoutTernEnv('echo export TERN_PANE=1;')).toBe('echo export TERN_PANE=1;')
   })
 })

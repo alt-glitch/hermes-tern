@@ -17,7 +17,6 @@ rest from the GitHub API.
 from __future__ import annotations
 
 import contextlib
-import fcntl
 import json
 import os
 import re
@@ -163,13 +162,27 @@ def _delegator(session_id: str) -> str:
 
 @contextlib.contextmanager
 def _locked(path: Path):
+    """An exclusive lock on ``path``'s ``.lock`` file across processes (several panes and the gateway)."""
     lock = path.with_suffix(".lock")
-    with open(lock, "a") as handle:
-        fcntl.flock(handle, fcntl.LOCK_EX)
-        try:
-            yield
-        finally:
-            fcntl.flock(handle, fcntl.LOCK_UN)
+    with open(lock, "a+") as handle:
+        if os.name == "nt":
+            import msvcrt
+
+            handle.seek(0)
+            msvcrt.locking(handle.fileno(), msvcrt.LK_LOCK, 1)
+            try:
+                yield
+            finally:
+                handle.seek(0)
+                msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)
+        else:
+            import fcntl
+
+            fcntl.flock(handle, fcntl.LOCK_EX)
+            try:
+                yield
+            finally:
+                fcntl.flock(handle, fcntl.LOCK_UN)
 
 
 def _read(path: Path) -> dict[str, Any]:
@@ -225,13 +238,8 @@ def _public(links: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 
 def _session(session_id: str | None) -> str:
-    sid = str(session_id or "")
-    if not sid:
-        with contextlib.suppress(Exception):
-            from gateway.session_context import get_session_env
-
-            sid = str(get_session_env("HERMES_SESSION_ID", "") or "")
-    return sid
+    # The dispatcher passes the calling session's id to plugin tool handlers.
+    return str(session_id or "")
 
 
 def link_pull_request(args: dict[str, Any], session_id: str | None = None) -> str:

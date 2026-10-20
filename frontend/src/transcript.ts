@@ -16,6 +16,7 @@ import { settleBridge, unwrap } from './bridge.js'
 import type { StoredCompaction } from './compaction.js'
 import type { Block, Compaction, CompactionEntry, Counters, Entry, NoticeEntry, Todo, ToolCall, TurnEntry, UserAttachment } from './model.js'
 import { promptAttachments, splitPrompt } from './promptRefs.js'
+import { withoutTernEnv } from './view/describe.js'
 
 type ToolBlock = Extract<Block, { kind: 'tool' }>
 
@@ -434,10 +435,10 @@ export class Transcript {
     // A bridge call shows as the tool it runs (a connector batch as its entries).
     const u = unwrap(p.name, p.args ?? {})
     const call: ToolCall = {
-      args: u.args,
+      args: shownArgs(u.args),
       argsText: p.args_text ?? '',
       batch: u.batch,
-      context: p.context ?? '',
+      context: withoutTernEnv(p.context ?? ''),
       id: p.tool_id,
       name: u.name,
       startedAt: at,
@@ -489,7 +490,7 @@ export class Transcript {
 
     if (p.args) {
       const u = unwrap(p.name, p.args)
-      call.args = u.args
+      call.args = shownArgs(u.args)
       call.name = u.name
       call.via = u.via ?? call.via
       call.batch = u.batch
@@ -1096,6 +1097,11 @@ export function isProcessTool(name: string): boolean {
 /** A process tool call that waits on, polls or reads one background process (omp's `wait`). */
 export function isWatchCall(call: ToolCall): boolean {
   return isProcessTool(call.name) && ['log', 'poll', 'wait'].includes(String(call.args.action)) && typeof call.args.session_id === 'string'
+}
+
+/** A call's args as views show them: a shell command as the agent wrote it, without the pane prefix the plugin's middleware adds (completion events carry the args that ran). */
+function shownArgs(args: Record<string, unknown>): Record<string, unknown> {
+  return typeof args.command === 'string' ? { ...args, command: withoutTernEnv(args.command) } : args
 }
 
 export function isBackgroundCall(call: ToolCall): boolean {

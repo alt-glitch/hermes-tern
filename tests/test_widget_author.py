@@ -51,7 +51,7 @@ def run(monkeypatch, capsys):
 def test_answers_with_the_respond_call_and_redacts_the_samples(run):
     reply, kwargs = run(_message(calls=[("respond", json.dumps({"title": "load", "rules": [], "blocks": []}))]))
     assert reply == {"answer": {"title": "load", "rules": [], "blocks": []}}
-    assert kwargs["task"] == "job_widget"
+    assert kwargs["task"] == "tern_charts"
     assert kwargs["tools"][0]["function"]["name"] == "respond"
     assert kwargs["tools"][0]["function"]["parameters"] == {"type": "object"}
     assert kwargs["messages"][1]["content"] == "token [redacted]"

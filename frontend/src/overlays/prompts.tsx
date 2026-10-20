@@ -11,6 +11,7 @@ import type { JSX, Key } from '@stencil-hq/tern'
 import { Composer } from '../composer.js'
 import { maskedOffset, maskOf, unmaskEdit } from '../mask.js'
 import type { Overlay, OverlayHost } from '../overlay.js'
+import { withoutTernEnv } from '../view/describe.js'
 
 /** Strips the backend's `(Recommended)` suffix from clarify's first choice. */
 const RECOMMENDED = /\s*\(recommended\)\s*$/i
@@ -248,7 +249,7 @@ const APPROVALS: Option[] = [
 
 function approvalOverlay(host: OverlayHost, req: ServerRequest): Overlay {
   const p = req.params
-  const command = str(p.command)
+  const command = str(p.command) && withoutTernEnv(str(p.command)!)
   const description = str(p.description)
   const smartDenied = p.smart_denied === true
   const offered = Array.isArray(p.choices) ? p.choices.filter(c => typeof c === 'string') : []
@@ -746,7 +747,7 @@ function maskedOverlay(host: OverlayHost, req: ServerRequest): Overlay {
           {note ? (
             <text key="note" spans={[{ s: req.method === 'secret' ? 'mono dim' : 'muted', t: note }]} wrap="word" />
           ) : null}
-          {str(p.command) ? <code key="command" lang="bash" text={str(p.command)} /> : null}
+          {str(p.command) ? <code key="command" lang="bash" text={withoutTernEnv(str(p.command)!)} /> : null}
           {fields.map((f, i) => (
             <input
               cursor={f.masked ? maskedOffset(f.value.text, f.value.cursor) : f.value.cursor}

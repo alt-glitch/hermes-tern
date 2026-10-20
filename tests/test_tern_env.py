@@ -1,10 +1,10 @@
-"""tern_env.py without Hermes: the session context, the terminal base class and the plugin's
-connections/pull_requests helpers are stubbed; markers go to a temp dir."""
+"""tern_env.py without Hermes: the plugin's connections/pull_requests helpers are stubbed and
+markers go to a temp dir. The middleware is called as Hermes calls ``tool_request`` middleware."""
 
-import contextvars
 import importlib.util
 import json
 import os
+import subprocess
 import sys
 import types
 from pathlib import Path
@@ -16,23 +16,6 @@ ROOT = Path(__file__).resolve().parents[1]
 
 @pytest.fixture()
 def tern(tmp_path, monkeypatch):
-    unset = object()
-    session_id = contextvars.ContextVar("HERMES_SESSION_ID", default=unset)
-    context = types.ModuleType("gateway.session_context")
-    context._UNSET, context._VAR_MAP = unset, {"HERMES_SESSION_ID": session_id}
-    monkeypatch.setitem(sys.modules, "gateway", types.ModuleType("gateway"))
-    monkeypatch.setitem(sys.modules, "gateway.session_context", context)
-
-    class BaseEnvironment:
-        def _snapshot_excluded_passthrough_names(self):
-            return ("GH_TOKEN",)
-
-    base = types.ModuleType("tools.environments.base")
-    base.BaseEnvironment = BaseEnvironment
-    for name in ("tools", "tools.environments"):
-        monkeypatch.setitem(sys.modules, name, types.ModuleType(name))
-    monkeypatch.setitem(sys.modules, "tools.environments.base", base)
-
     viewers = tmp_path / "viewers"
     viewers.mkdir()
     pkg = types.ModuleType("tern_pkg")
@@ -45,62 +28,69 @@ def tern(tmp_path, monkeypatch):
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     monkeypatch.setattr(module, "FRESH_S", 0)
+    for name in module.TERN_VARS:
+        monkeypatch.delenv(name, raising=False)
 
     def marker(sid, pid=os.getpid(), **tern):
         (viewers / f"{sid}.json").write_text(json.dumps({"pid": pid, "tern": tern}))
 
-    module.marker, module.session, module.unset = marker, session_id, unset
-    module.var_map, module.Base = context._VAR_MAP, BaseEnvironment
-    assert module.install()
+    module.marker = marker
     return module
 
 
-def child_env(tern):
-    """What Hermes' ``_inject_session_context_env`` reads for the Tern names."""
-    return {name: tern.var_map[name].get() for name in tern.TERN_VARS}
+def run(tern, session, command="echo $TERN_PANE", tool="terminal", **args):
+    """The command as Hermes would run it after the middleware."""
+    out = tern.tool_request(tool_name=tool, args={"command": command, **args}, original_args={}, session_id=session)
+    return out["args"]["command"] if out else command
 
 
-def test_a_child_gets_the_pane_of_the_session_it_runs_for(tern, monkeypatch):
-    monkeypatch.setenv("TERN_PANE", "gateway-pane")
-    tern.marker("a", TERN_PANE="1", TERN_WINDOW_KEY="3", HOME="/x")
+def shell(command):
+    return subprocess.run(["bash", "-c", command], capture_output=True, text=True, env={"PATH": os.environ["PATH"]}).stdout
+
+
+def test_a_command_runs_with_the_pane_of_its_session(tern):
+    tern.marker("a", TERN_PANE="1", TERN_WINDOW_KEY="w 3", HOME="/x")
     tern.marker("b", TERN_PANE="2", TERN_PANE_SOCKET="/s")
 
-    tern.session.set("a")
-    assert child_env(tern) == {"TERN_PANE": "1", "TERN_PANE_SOCKET": "", "TERN_WINDOW_KEY": "3",
-                               "TERN_WINDOW_SOCKET": "", "TERN_DAEMON_SOCKET": ""}
-    tern.session.set("b")
-    assert child_env(tern)["TERN_PANE"] == "2" and child_env(tern)["TERN_PANE_SOCKET"] == "/s"
+    a = run(tern, "a", "env | grep ^TERN_ | sort")
+    assert a.startswith(tern.MARK)
+    assert shell(a) == "TERN_PANE=1\nTERN_WINDOW_KEY=w 3\n"
+    assert shell(run(tern, "b", 'echo "$TERN_PANE $TERN_PANE_SOCKET"')) == "2 /s\n"
+
+
+def test_background_commands_and_their_other_args_go_through(tern):
+    tern.marker("a", TERN_PANE="1")
+    out = tern.tool_request(tool_name="terminal", args={"command": "sleep 9", "background": True}, session_id="a")
+    assert out["args"]["background"] is True and out["args"]["command"].endswith("; sleep 9")
 
 
 def test_a_compressed_conversation_and_its_subagents_keep_the_pane(tern):
     tern.marker("root", TERN_PANE="5")
     for sid in ("tip", "child"):
-        tern.session.set(sid)
-        assert tern.var_map["TERN_PANE"].get() == "5"
+        assert shell(run(tern, sid)) == "5\n"
 
 
-def test_no_live_pane_keeps_the_gateway_own_values(tern, monkeypatch):
-    monkeypatch.setenv("TERN_PANE", "gateway-pane")
-    monkeypatch.delenv("TERN_WINDOW_KEY", raising=False)
-    tern.marker("gone", pid=2 ** 22 + 1, TERN_PANE="9")
-    for sid in ("gone", "telegram"):
-        tern.session.set(sid)
-        assert tern.var_map["TERN_PANE"].get() == "gateway-pane"
-        assert tern.var_map["TERN_WINDOW_KEY"].get() is tern.unset
-    tern.session.set(tern.unset)
-    assert tern.var_map["TERN_PANE"].get() == "gateway-pane"
-
-
-def test_the_names_stay_out_of_the_shared_shell_snapshot(tern):
-    names = tern.Base()._snapshot_excluded_passthrough_names()
-    assert "GH_TOKEN" in names and set(tern.TERN_VARS) <= set(names)
-    tern.install()
-    assert tern.Base()._snapshot_excluded_passthrough_names() == names
-
-
-def test_resetting_the_session_vars_is_harmless(tern):
-    for var in tern.var_map.values():
-        var.set(tern.unset)
+def test_no_pane_leaves_the_command_alone_and_a_lost_pane_is_taken_back(tern, monkeypatch):
+    assert run(tern, "a") == "echo $TERN_PANE"
     tern.marker("a", TERN_PANE="1")
-    tern.session.set("a")
-    assert tern.var_map["TERN_PANE"].get() == "1"
+    assert shell(run(tern, "a")) == "1\n"
+
+    # The pane closed: the next command gets the gateway's own values back (here: none) once.
+    tern.marker("a", pid=-1, TERN_PANE="1")
+    monkeypatch.setenv("TERN_WINDOW_KEY", "gw")
+    taken = run(tern, "a", 'echo "[$TERN_PANE] $TERN_WINDOW_KEY"')
+    assert shell(f"export TERN_PANE=1; {taken}") == "[] gw\n"
+    assert run(tern, "a") == "echo $TERN_PANE"
+
+
+def test_other_tools_and_odd_args_are_left_alone(tern):
+    tern.marker("a", TERN_PANE="1")
+    assert tern.tool_request(tool_name="read_file", args={"path": "x"}, session_id="a") is None
+    assert tern.tool_request(tool_name="terminal", args={"command": "  "}, session_id="a") is None
+    assert tern.tool_request(tool_name="terminal", args=None, session_id="a") is None
+
+
+def test_register_uses_the_public_middleware_api(tern):
+    calls = []
+    tern.register(types.SimpleNamespace(register_middleware=lambda kind, fn: calls.append((kind, fn))))
+    assert calls == [("tool_request", tern.tool_request)]

@@ -9,7 +9,7 @@ The request is ``{"system", "user", "schema"}``. The user message (the command a
 output) is redacted before it is sent. One JSON line answers: ``{"answer": <object>}``,
 ``{"unavailable": true}`` when no auxiliary model is configured, or ``{"error": "..."}``.
 
-The task is ``job_widget``, so ``auxiliary.job_widget`` in config.yaml picks its model; without
+The task is ``tern_charts``, so ``auxiliary.tern_charts`` in config.yaml picks its model; without
 it, Hermes' auxiliary chain does (the main model first).
 """
 
@@ -65,7 +65,7 @@ def main() -> dict:
                 {"role": "user", "content": redact_sensitive_text(request["user"], force=True)}]
     try:
         # Spec writing is formatting work: no reasoning, the provider's default temperature.
-        response = call_llm(task="job_widget", messages=messages, tools=tools, max_tokens=MAX_TOKENS,
+        response = call_llm(task="tern_charts", messages=messages, tools=tools, max_tokens=MAX_TOKENS,
                             temperature=None, timeout=TIMEOUT_S, reasoning_config={"enabled": False})
     except AuxiliaryClientUnavailable:
         return {"unavailable": True}

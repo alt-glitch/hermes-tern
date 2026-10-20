@@ -9,6 +9,7 @@ import type { GatewayClient } from '@tui/gatewayClient.js'
 
 import type { BackgroundProcess, ToolCall } from '../model.js'
 import { isWatchCall, record, type Transcript } from '../transcript.js'
+import { withoutTernEnv } from '../view/describe.js'
 
 import { Charts, type ChartsOptions } from './widgets/registry.js'
 
@@ -88,7 +89,7 @@ export function foldEntry(prev: BackgroundProcess | undefined, entry: ProcessEnt
 
   const p: BackgroundProcess = prev ?? { command: '', id: entry.session_id, lastLine: '', output: '', startedAt, status }
 
-  p.command = (entry.command ?? '').trim() || p.command || 'background process'
+  p.command = withoutTernEnv((entry.command ?? '').trim()) || p.command || 'background process'
   p.status = status
   p.startedAt = startedAt
   p.output = output

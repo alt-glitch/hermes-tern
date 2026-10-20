@@ -25063,6 +25063,264 @@ function promptAttachments(parts3, exists = existsSync2) {
   ];
 }
 
+// src/view/describe.ts
+var MAX = 72;
+function words(segment) {
+  const out = [];
+  const re2 = /'([^']*)'|"((?:\\.|[^"\\])*)"|(\S+)/g;
+  for (const m of segment.matchAll(re2)) {
+    out.push(m[1] ?? m[2] ?? m[3] ?? "");
+  }
+  return out;
+}
+var base = (path2) => path2.replace(/\/+$/, "").split(/[/\\]/).at(-1) || path2;
+var quote = (s2) => `'${clip(s2, 32)}'`;
+var clip = (s2, n) => s2.length > n ? `${s2.slice(0, n - 1)}\u2026` : s2;
+function operand(args, valued = /* @__PURE__ */ new Set()) {
+  for (let i = 0; i < args.length; i++) {
+    const a2 = args[i];
+    if (valued.has(a2)) {
+      i++;
+    } else if (!a2.startsWith("-") || a2 === "-") {
+      return a2;
+    }
+  }
+  return void 0;
+}
+var operands = (args) => args.filter((a2) => !a2.startsWith("-"));
+var GIT = {
+  add: "Stage changes",
+  blame: "Blame",
+  branch: "List branches",
+  checkout: "Switch branch",
+  "cherry-pick": "Cherry-pick",
+  clone: "Clone repository",
+  commit: "Commit",
+  diff: "Diff changes",
+  fetch: "Fetch",
+  log: "Read git history",
+  merge: "Merge",
+  pull: "Pull",
+  push: "Push",
+  rebase: "Rebase",
+  remote: "List remotes",
+  reset: "Reset",
+  restore: "Restore files",
+  "rev-parse": "Resolve revision",
+  show: "Show commit",
+  stash: "Stash changes",
+  status: "Check git status",
+  switch: "Switch branch",
+  worktree: "Manage worktrees"
+};
+var COMMANDS = {
+  cat: (a2) => operand(a2) ? `Read ${base(operand(a2))}` : "Read input",
+  cd: (a2) => `Go to ${base(operand(a2) ?? "~")}`,
+  chmod: (a2) => `Change mode of ${base(operands(a2).at(-1) ?? "files")}`,
+  cp: (a2) => `Copy ${base(operands(a2)[0] ?? "files")}`,
+  curl: (a2) => {
+    const url = a2.find((x) => /^https?:\/\//.test(x));
+    return url ? `Fetch ${new URL(url).host}` : "Fetch a URL";
+  },
+  docker: (a2) => `Docker ${operand(a2) ?? ""}`.trim(),
+  echo: () => "Print text",
+  fd: (a2) => operand(a2) ? `Find ${quote(operand(a2))}` : "Find files",
+  find: (a2) => {
+    const name = a2[a2.indexOf("-name") + 1];
+    return a2.includes("-name") && name ? `Find ${quote(name)}` : `Find files in ${base(operand(a2) ?? ".")}`;
+  },
+  // A shell loop names no purpose of its own; its body's steps are past a `;`.
+  for: () => "Run a loop",
+  gh: (a2) => `GitHub ${operands(a2).slice(0, 2).join(" ")}`.trim(),
+  git: (a2) => {
+    const sub = operand(a2, /* @__PURE__ */ new Set(["-C", "-c"]));
+    return sub ? GIT[sub] ?? `Git ${sub}` : "Git";
+  },
+  grep: (a2) => searchTitle(a2),
+  head: (a2) => operand(a2, /* @__PURE__ */ new Set(["-n", "-c"])) ? `Read the start of ${base(operand(a2, /* @__PURE__ */ new Set(["-n", "-c"])))}` : "Read the start",
+  kill: () => "Stop a process",
+  less: (a2) => `Read ${base(operand(a2) ?? "output")}`,
+  ls: (a2) => `List ${base(operand(a2) ?? "files")}`,
+  make: (a2) => `Make ${operand(a2) ?? ""}`.trim(),
+  mkdir: (a2) => `Create ${base(operands(a2).at(-1) ?? "a folder")}`,
+  mv: (a2) => `Move ${base(operands(a2)[0] ?? "files")}`,
+  node: (a2) => operand(a2) ? `Run ${base(operand(a2))}` : "Run Node",
+  npm: (a2) => npmTitle(a2),
+  npx: (a2) => `Run ${operand(a2) ?? "a package"}`,
+  pkill: (a2) => `Stop ${operand(a2) ?? "processes"}`,
+  pnpm: (a2) => npmTitle(a2),
+  powershell: (a2) => powershellTitle(a2),
+  ps: () => "List processes",
+  pwsh: (a2) => powershellTitle(a2),
+  python: (a2) => pythonTitle(a2),
+  python3: (a2) => pythonTitle(a2),
+  rg: (a2) => searchTitle(a2),
+  rm: (a2) => `Delete ${base(operands(a2).at(-1) ?? "files")}`,
+  scp: (a2) => `Copy ${base(operands(a2)[0] ?? "files")} to ${hostOf(operands(a2).at(-1) ?? "") ?? "a host"}`,
+  bash: (a2) => shellTitle(a2),
+  sed: (a2) => a2.includes("-i") ? `Edit ${base(operands(a2).at(-1) ?? "a file")}` : `Read ${base(operands(a2).at(-1) ?? "a file")}`,
+  sh: (a2) => shellTitle(a2),
+  sleep: (a2) => `Wait ${operand(a2) ?? ""}s`.replace(" s", ""),
+  sort: () => "Sort output",
+  tail: (a2) => a2.includes("-f") ? `Follow ${base(operands(a2).at(-1) ?? "a log")}` : `Read the end of ${base(operands(a2).at(-1) ?? "output")}`,
+  tern: (a2) => `Tern ${operands(a2).slice(0, 2).join(" ")}`.trim(),
+  touch: (a2) => `Create ${base(operands(a2).at(-1) ?? "a file")}`,
+  until: () => "Run a loop",
+  uv: (a2) => a2[0] === "run" ? pythonTitle(a2.slice(1).filter((x) => x !== "python")) ?? "Run with uv" : `uv ${operand(a2) ?? ""}`.trim(),
+  vitest: () => "Run tests",
+  wc: (a2) => `Count lines in ${base(operands(a2).at(-1) ?? "files")}`,
+  while: () => "Run a loop",
+  zsh: (a2) => shellTitle(a2),
+  which: (a2) => `Locate ${operand(a2) ?? "a command"}`
+};
+function shellTitle(a2) {
+  const script = operand(a2, /* @__PURE__ */ new Set(["-c", "-o"]));
+  return a2.includes("-c") ? "Run a shell snippet" : script ? `Run ${base(script)}` : "Run a shell";
+}
+function searchTitle(a2) {
+  const pattern = operand(a2, /* @__PURE__ */ new Set(["-e", "-g", "--glob", "-t", "--type", "-A", "-B", "-C", "-m"]));
+  const where = operands(a2).at(-1);
+  const target = where && where !== pattern ? ` in ${base(where)}` : "";
+  return pattern ? `Search for ${quote(pattern)}${target}` : "Search";
+}
+function npmTitle(a2) {
+  const [sub, script] = operands(a2);
+  if (sub === "run" && script) {
+    return /test/.test(script) ? "Run tests" : `Run ${script}`;
+  }
+  return sub === "test" ? "Run tests" : sub === "install" || sub === "i" || sub === "ci" ? "Install packages" : `npm ${sub ?? ""}`.trim();
+}
+function pythonTitle(a2) {
+  const m = a2.indexOf("-m");
+  if (m >= 0 && a2[m + 1]) {
+    return a2[m + 1] === "pytest" ? "Run tests" : `Run ${a2[m + 1]}`;
+  }
+  if (a2.includes("-c") || a2.includes("-")) {
+    return "Run Python";
+  }
+  const script = operand(a2);
+  return script ? `Run ${base(script)}` : "Run Python";
+}
+function powershellTitle(a2) {
+  const file2 = a2[a2.findIndex((x) => /^-file$/i.test(x)) + 1];
+  return a2.some((x) => /^-file$/i.test(x)) && file2 ? `Run ${base(file2)}` : "Run PowerShell";
+}
+var CMDLETS = {
+  "get-childitem": "list files",
+  "get-content": "read files",
+  "get-counter": "read counters",
+  "get-itemproperty": "read the registry",
+  "get-process": "list processes",
+  "get-service": "list services",
+  "get-winevent": "read the event log",
+  "remove-item": "delete files",
+  "set-content": "write files",
+  "start-process": "start a process",
+  "stop-process": "stop a process"
+};
+function powershellScript(text11) {
+  const used = [...new Set([...text11.matchAll(/\b([A-Z][a-z]+-[A-Z][A-Za-z]+)\b/g)].map((m) => m[1].toLowerCase()))];
+  const said = [...new Set(used.map((c) => CMDLETS[c] ?? (c.startsWith("get-") ? `read ${c.slice(4)}` : void 0)).filter(Boolean))];
+  return said.length ? said.slice(0, 2).join(" and ") : void 0;
+}
+function hostOf(target) {
+  const m = /^(?:[^@\s]+@)?([A-Za-z0-9][\w.-]*):/.exec(target) ?? /^[^@\s]+@([\w.-]+)$/.exec(target);
+  return m?.[1];
+}
+function sections(script) {
+  const out = [];
+  for (const line of script.split("\n")) {
+    const m = /^\s*(?:echo\s+|Write-Host\s+)?["']?\s*(?:={2,}|-{3,}|#{2,})\s*(.+?)\s*(?:={2,}|-{3,}|#{2,})\s*["']?\s*$/.exec(line) ?? /^\s*#\s+([A-Z][^#]{3,60})$/.exec(line);
+    if (m?.[1] && !/^!/.test(m[1])) {
+      out.push(m[1].replace(/\s+/g, " "));
+    }
+  }
+  return out;
+}
+function head(segment) {
+  const w = words(segment);
+  while (w.length && (/^[A-Za-z_]\w*=/.test(w[0]) || w[0] === "sudo" || w[0] === "env" || w[0] === "time" || w[0] === "exec")) {
+    w.shift();
+  }
+  const cmd = w.shift();
+  return cmd ? { args: w, cmd: base(cmd), raw: cmd } : void 0;
+}
+function segments(line) {
+  const out = [];
+  let cur = "";
+  let q2;
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i];
+    if (q2) {
+      cur += c;
+      if (c === q2 && line[i - 1] !== "\\") {
+        q2 = void 0;
+      }
+    } else if (c === "'" || c === '"') {
+      q2 = c;
+      cur += c;
+    } else if (c === "\n" || c === ";" || c === "|" || c === "&" && line[i + 1] === "&") {
+      out.push(cur);
+      cur = "";
+      if (line[i + 1] === c) {
+        i++;
+      }
+    } else {
+      cur += c;
+    }
+  }
+  out.push(cur);
+  return out.map((s2) => s2.trim()).filter(Boolean);
+}
+var SETUP = /* @__PURE__ */ new Set(["cd", "export", "set", "source", ".", "true", "clear", "pushd", "popd"]);
+var FILTERS = /* @__PURE__ */ new Set(["head", "tail", "grep", "sort", "uniq", "wc", "cut", "tr", "awk", "jq", "tee", "column", "less", "cat", "xargs", "sed"]);
+function describeCommand(command) {
+  const text11 = command.trim();
+  if (!text11) {
+    return "Run a command";
+  }
+  const docs = [];
+  const line = text11.replace(/<<-?\s*['"]?(\w+)['"]?([^\n]*)\n([\s\S]*?)\n\s*\1\s*(?=\n|$)/g, (_m, _tag, rest, body) => {
+    docs.push(body);
+    return rest;
+  });
+  const labels = docs.flatMap(sections);
+  const steps = segments(line).flatMap((s2) => head(s2) ?? []);
+  const real = steps.filter((s2) => !SETUP.has(s2.cmd));
+  const remote = real.find((s2) => s2.cmd === "ssh");
+  let title;
+  if (remote) {
+    const host = operand(remote.args, /* @__PURE__ */ new Set(["-p", "-i", "-o", "-l", "-J", "-F"]))?.replace(/^[^@]+@/, "");
+    const after = remote.args.slice(remote.args.findIndex((a2) => a2.replace(/^[^@]+@/, "") === host) + 1).join(" ");
+    const inner = after ? describeCommand(after) : "Open a shell";
+    title = host ? `${inner} on ${host}` : inner;
+  } else {
+    const main = real.find((s2) => !FILTERS.has(s2.cmd)) ?? real[0];
+    const ps = main && !COMMANDS[main.cmd] && /^\$|^[A-Z][a-z]+-[A-Z]/.test(main.raw) ? powershellScript(line) : void 0;
+    title = ps ? ps : main ? COMMANDS[main.cmd]?.(main.args) ?? `Run ${main.cmd}` : steps[0] ? `Run ${steps[0].cmd}` : void 0;
+  }
+  title ??= "Run a command";
+  if (labels.length) {
+    const two = `${title}: ${labels.slice(0, 2).join(", ")}${labels.length > 2 ? ` +${labels.length - 2}` : ""}`;
+    title = two.length <= MAX ? two : `${title}: ${clip(labels[0], 32)}${labels.length > 1 ? ` +${labels.length - 1}` : ""}`;
+  } else if (docs.length && /^Read input|^Read /.test(title) && real[0]?.cmd === "cat") {
+    title = `Write ${base(operands(real[0].args).at(-1) ?? "a file")}`;
+  }
+  return clip(title.charAt(0).toUpperCase() + title.slice(1), MAX);
+}
+function commandLine(command, n = 96) {
+  const flat3 = command.replace(/<<-?\s*['"]?(\w+)['"]?[\s\S]*?\n\s*\1\s*(?=\n|$)/g, "<<'$1' \u2026").replace(/\s+/g, " ").trim();
+  return clip(flat3, n);
+}
+function oneLine(text11) {
+  return text11.replace(/\s+/g, " ").trim();
+}
+var TERN_ENV = /^\s*(?:export (?:TERN_[A-Z_]+=(?:'[^']*'|"[^"]*"|[^\s;]+) ?)+; ?)?(?:unset (?:TERN_[A-Z_]+ ?)+; ?)?/;
+function withoutTernEnv(command) {
+  const m = TERN_ENV.exec(command);
+  return m?.[0] ? command.slice(m[0].length) : command;
+}
+
 // src/transcript.ts
 var Transcript = class {
   entries = [];
@@ -25386,10 +25644,10 @@ var Transcript = class {
     }
     const u = unwrap(p3.name, p3.args ?? {});
     const call = {
-      args: u.args,
+      args: shownArgs(u.args),
       argsText: p3.args_text ?? "",
       batch: u.batch,
-      context: p3.context ?? "",
+      context: withoutTernEnv(p3.context ?? ""),
       id: p3.tool_id,
       name: u.name,
       startedAt: at,
@@ -25425,7 +25683,7 @@ var Transcript = class {
     call.diff = p3.inline_diff ?? void 0;
     if (p3.args) {
       const u = unwrap(p3.name, p3.args);
-      call.args = u.args;
+      call.args = shownArgs(u.args);
       call.name = u.name;
       call.via = u.via ?? call.via;
       call.batch = u.batch;
@@ -25856,6 +26114,9 @@ function isProcessTool(name) {
 }
 function isWatchCall(call) {
   return isProcessTool(call.name) && ["log", "poll", "wait"].includes(String(call.args.action)) && typeof call.args.session_id === "string";
+}
+function shownArgs(args) {
+  return typeof args.command === "string" ? { ...args, command: withoutTernEnv(args.command) } : args;
 }
 function isBackgroundCall(call) {
   return call.name === "terminal" && (call.args.background === true || typeof record2(call.result)?.session_id === "string");
@@ -29030,7 +29291,7 @@ function foldEntry(prev, entry, now) {
   const output = entry.output_tail ?? entry.output_preview ?? prev?.output ?? "";
   const startedAt = typeof entry.started_epoch === "number" ? entry.started_epoch * 1e3 : prev?.startedAt ?? now - Math.max(0, entry.uptime_seconds ?? 0) * 1e3;
   const p3 = prev ?? { command: "", id: entry.session_id, lastLine: "", output: "", startedAt, status };
-  p3.command = (entry.command ?? "").trim() || p3.command || "background process";
+  p3.command = withoutTernEnv((entry.command ?? "").trim()) || p3.command || "background process";
   p3.status = status;
   p3.startedAt = startedAt;
   p3.output = output;
@@ -31133,259 +31394,6 @@ function thoughtTitle(item3) {
 var flat = (text11) => text11.replace(/\s+/g, " ").trim();
 function clock2(at) {
   return new Date(at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }).toLowerCase();
-}
-
-// src/view/describe.ts
-var MAX = 72;
-function words(segment) {
-  const out = [];
-  const re2 = /'([^']*)'|"((?:\\.|[^"\\])*)"|(\S+)/g;
-  for (const m of segment.matchAll(re2)) {
-    out.push(m[1] ?? m[2] ?? m[3] ?? "");
-  }
-  return out;
-}
-var base = (path2) => path2.replace(/\/+$/, "").split(/[/\\]/).at(-1) || path2;
-var quote = (s2) => `'${clip(s2, 32)}'`;
-var clip = (s2, n) => s2.length > n ? `${s2.slice(0, n - 1)}\u2026` : s2;
-function operand(args, valued = /* @__PURE__ */ new Set()) {
-  for (let i = 0; i < args.length; i++) {
-    const a2 = args[i];
-    if (valued.has(a2)) {
-      i++;
-    } else if (!a2.startsWith("-") || a2 === "-") {
-      return a2;
-    }
-  }
-  return void 0;
-}
-var operands = (args) => args.filter((a2) => !a2.startsWith("-"));
-var GIT = {
-  add: "Stage changes",
-  blame: "Blame",
-  branch: "List branches",
-  checkout: "Switch branch",
-  "cherry-pick": "Cherry-pick",
-  clone: "Clone repository",
-  commit: "Commit",
-  diff: "Diff changes",
-  fetch: "Fetch",
-  log: "Read git history",
-  merge: "Merge",
-  pull: "Pull",
-  push: "Push",
-  rebase: "Rebase",
-  remote: "List remotes",
-  reset: "Reset",
-  restore: "Restore files",
-  "rev-parse": "Resolve revision",
-  show: "Show commit",
-  stash: "Stash changes",
-  status: "Check git status",
-  switch: "Switch branch",
-  worktree: "Manage worktrees"
-};
-var COMMANDS = {
-  cat: (a2) => operand(a2) ? `Read ${base(operand(a2))}` : "Read input",
-  cd: (a2) => `Go to ${base(operand(a2) ?? "~")}`,
-  chmod: (a2) => `Change mode of ${base(operands(a2).at(-1) ?? "files")}`,
-  cp: (a2) => `Copy ${base(operands(a2)[0] ?? "files")}`,
-  curl: (a2) => {
-    const url = a2.find((x) => /^https?:\/\//.test(x));
-    return url ? `Fetch ${new URL(url).host}` : "Fetch a URL";
-  },
-  docker: (a2) => `Docker ${operand(a2) ?? ""}`.trim(),
-  echo: () => "Print text",
-  fd: (a2) => operand(a2) ? `Find ${quote(operand(a2))}` : "Find files",
-  find: (a2) => {
-    const name = a2[a2.indexOf("-name") + 1];
-    return a2.includes("-name") && name ? `Find ${quote(name)}` : `Find files in ${base(operand(a2) ?? ".")}`;
-  },
-  // A shell loop names no purpose of its own; its body's steps are past a `;`.
-  for: () => "Run a loop",
-  gh: (a2) => `GitHub ${operands(a2).slice(0, 2).join(" ")}`.trim(),
-  git: (a2) => {
-    const sub = operand(a2, /* @__PURE__ */ new Set(["-C", "-c"]));
-    return sub ? GIT[sub] ?? `Git ${sub}` : "Git";
-  },
-  grep: (a2) => searchTitle(a2),
-  head: (a2) => operand(a2, /* @__PURE__ */ new Set(["-n", "-c"])) ? `Read the start of ${base(operand(a2, /* @__PURE__ */ new Set(["-n", "-c"])))}` : "Read the start",
-  kill: () => "Stop a process",
-  less: (a2) => `Read ${base(operand(a2) ?? "output")}`,
-  ls: (a2) => `List ${base(operand(a2) ?? "files")}`,
-  make: (a2) => `Make ${operand(a2) ?? ""}`.trim(),
-  mkdir: (a2) => `Create ${base(operands(a2).at(-1) ?? "a folder")}`,
-  mv: (a2) => `Move ${base(operands(a2)[0] ?? "files")}`,
-  node: (a2) => operand(a2) ? `Run ${base(operand(a2))}` : "Run Node",
-  npm: (a2) => npmTitle(a2),
-  npx: (a2) => `Run ${operand(a2) ?? "a package"}`,
-  pkill: (a2) => `Stop ${operand(a2) ?? "processes"}`,
-  pnpm: (a2) => npmTitle(a2),
-  powershell: (a2) => powershellTitle(a2),
-  ps: () => "List processes",
-  pwsh: (a2) => powershellTitle(a2),
-  python: (a2) => pythonTitle(a2),
-  python3: (a2) => pythonTitle(a2),
-  rg: (a2) => searchTitle(a2),
-  rm: (a2) => `Delete ${base(operands(a2).at(-1) ?? "files")}`,
-  scp: (a2) => `Copy ${base(operands(a2)[0] ?? "files")} to ${hostOf(operands(a2).at(-1) ?? "") ?? "a host"}`,
-  bash: (a2) => shellTitle(a2),
-  sed: (a2) => a2.includes("-i") ? `Edit ${base(operands(a2).at(-1) ?? "a file")}` : `Read ${base(operands(a2).at(-1) ?? "a file")}`,
-  sh: (a2) => shellTitle(a2),
-  sleep: (a2) => `Wait ${operand(a2) ?? ""}s`.replace(" s", ""),
-  sort: () => "Sort output",
-  tail: (a2) => a2.includes("-f") ? `Follow ${base(operands(a2).at(-1) ?? "a log")}` : `Read the end of ${base(operands(a2).at(-1) ?? "output")}`,
-  tern: (a2) => `Tern ${operands(a2).slice(0, 2).join(" ")}`.trim(),
-  touch: (a2) => `Create ${base(operands(a2).at(-1) ?? "a file")}`,
-  until: () => "Run a loop",
-  uv: (a2) => a2[0] === "run" ? pythonTitle(a2.slice(1).filter((x) => x !== "python")) ?? "Run with uv" : `uv ${operand(a2) ?? ""}`.trim(),
-  vitest: () => "Run tests",
-  wc: (a2) => `Count lines in ${base(operands(a2).at(-1) ?? "files")}`,
-  while: () => "Run a loop",
-  zsh: (a2) => shellTitle(a2),
-  which: (a2) => `Locate ${operand(a2) ?? "a command"}`
-};
-function shellTitle(a2) {
-  const script = operand(a2, /* @__PURE__ */ new Set(["-c", "-o"]));
-  return a2.includes("-c") ? "Run a shell snippet" : script ? `Run ${base(script)}` : "Run a shell";
-}
-function searchTitle(a2) {
-  const pattern = operand(a2, /* @__PURE__ */ new Set(["-e", "-g", "--glob", "-t", "--type", "-A", "-B", "-C", "-m"]));
-  const where = operands(a2).at(-1);
-  const target = where && where !== pattern ? ` in ${base(where)}` : "";
-  return pattern ? `Search for ${quote(pattern)}${target}` : "Search";
-}
-function npmTitle(a2) {
-  const [sub, script] = operands(a2);
-  if (sub === "run" && script) {
-    return /test/.test(script) ? "Run tests" : `Run ${script}`;
-  }
-  return sub === "test" ? "Run tests" : sub === "install" || sub === "i" || sub === "ci" ? "Install packages" : `npm ${sub ?? ""}`.trim();
-}
-function pythonTitle(a2) {
-  const m = a2.indexOf("-m");
-  if (m >= 0 && a2[m + 1]) {
-    return a2[m + 1] === "pytest" ? "Run tests" : `Run ${a2[m + 1]}`;
-  }
-  if (a2.includes("-c") || a2.includes("-")) {
-    return "Run Python";
-  }
-  const script = operand(a2);
-  return script ? `Run ${base(script)}` : "Run Python";
-}
-function powershellTitle(a2) {
-  const file2 = a2[a2.findIndex((x) => /^-file$/i.test(x)) + 1];
-  return a2.some((x) => /^-file$/i.test(x)) && file2 ? `Run ${base(file2)}` : "Run PowerShell";
-}
-var CMDLETS = {
-  "get-childitem": "list files",
-  "get-content": "read files",
-  "get-counter": "read counters",
-  "get-itemproperty": "read the registry",
-  "get-process": "list processes",
-  "get-service": "list services",
-  "get-winevent": "read the event log",
-  "remove-item": "delete files",
-  "set-content": "write files",
-  "start-process": "start a process",
-  "stop-process": "stop a process"
-};
-function powershellScript(text11) {
-  const used = [...new Set([...text11.matchAll(/\b([A-Z][a-z]+-[A-Z][A-Za-z]+)\b/g)].map((m) => m[1].toLowerCase()))];
-  const said = [...new Set(used.map((c) => CMDLETS[c] ?? (c.startsWith("get-") ? `read ${c.slice(4)}` : void 0)).filter(Boolean))];
-  return said.length ? said.slice(0, 2).join(" and ") : void 0;
-}
-function hostOf(target) {
-  const m = /^(?:[^@\s]+@)?([A-Za-z0-9][\w.-]*):/.exec(target) ?? /^[^@\s]+@([\w.-]+)$/.exec(target);
-  return m?.[1];
-}
-function sections(script) {
-  const out = [];
-  for (const line of script.split("\n")) {
-    const m = /^\s*(?:echo\s+|Write-Host\s+)?["']?\s*(?:={2,}|-{3,}|#{2,})\s*(.+?)\s*(?:={2,}|-{3,}|#{2,})\s*["']?\s*$/.exec(line) ?? /^\s*#\s+([A-Z][^#]{3,60})$/.exec(line);
-    if (m?.[1] && !/^!/.test(m[1])) {
-      out.push(m[1].replace(/\s+/g, " "));
-    }
-  }
-  return out;
-}
-function head(segment) {
-  const w = words(segment);
-  while (w.length && (/^[A-Za-z_]\w*=/.test(w[0]) || w[0] === "sudo" || w[0] === "env" || w[0] === "time" || w[0] === "exec")) {
-    w.shift();
-  }
-  const cmd = w.shift();
-  return cmd ? { args: w, cmd: base(cmd), raw: cmd } : void 0;
-}
-function segments(line) {
-  const out = [];
-  let cur = "";
-  let q2;
-  for (let i = 0; i < line.length; i++) {
-    const c = line[i];
-    if (q2) {
-      cur += c;
-      if (c === q2 && line[i - 1] !== "\\") {
-        q2 = void 0;
-      }
-    } else if (c === "'" || c === '"') {
-      q2 = c;
-      cur += c;
-    } else if (c === "\n" || c === ";" || c === "|" || c === "&" && line[i + 1] === "&") {
-      out.push(cur);
-      cur = "";
-      if (line[i + 1] === c) {
-        i++;
-      }
-    } else {
-      cur += c;
-    }
-  }
-  out.push(cur);
-  return out.map((s2) => s2.trim()).filter(Boolean);
-}
-var SETUP = /* @__PURE__ */ new Set(["cd", "export", "set", "source", ".", "true", "clear", "pushd", "popd"]);
-var FILTERS = /* @__PURE__ */ new Set(["head", "tail", "grep", "sort", "uniq", "wc", "cut", "tr", "awk", "jq", "tee", "column", "less", "cat", "xargs", "sed"]);
-function describeCommand(command) {
-  const text11 = command.trim();
-  if (!text11) {
-    return "Run a command";
-  }
-  const docs = [];
-  const line = text11.replace(/<<-?\s*['"]?(\w+)['"]?([^\n]*)\n([\s\S]*?)\n\s*\1\s*(?=\n|$)/g, (_m, _tag, rest, body) => {
-    docs.push(body);
-    return rest;
-  });
-  const labels = docs.flatMap(sections);
-  const steps = segments(line).flatMap((s2) => head(s2) ?? []);
-  const real = steps.filter((s2) => !SETUP.has(s2.cmd));
-  const remote = real.find((s2) => s2.cmd === "ssh");
-  let title;
-  if (remote) {
-    const host = operand(remote.args, /* @__PURE__ */ new Set(["-p", "-i", "-o", "-l", "-J", "-F"]))?.replace(/^[^@]+@/, "");
-    const after = remote.args.slice(remote.args.findIndex((a2) => a2.replace(/^[^@]+@/, "") === host) + 1).join(" ");
-    const inner = after ? describeCommand(after) : "Open a shell";
-    title = host ? `${inner} on ${host}` : inner;
-  } else {
-    const main = real.find((s2) => !FILTERS.has(s2.cmd)) ?? real[0];
-    const ps = main && !COMMANDS[main.cmd] && /^\$|^[A-Z][a-z]+-[A-Z]/.test(main.raw) ? powershellScript(line) : void 0;
-    title = ps ? ps : main ? COMMANDS[main.cmd]?.(main.args) ?? `Run ${main.cmd}` : steps[0] ? `Run ${steps[0].cmd}` : void 0;
-  }
-  title ??= "Run a command";
-  if (labels.length) {
-    const two = `${title}: ${labels.slice(0, 2).join(", ")}${labels.length > 2 ? ` +${labels.length - 2}` : ""}`;
-    title = two.length <= MAX ? two : `${title}: ${clip(labels[0], 32)}${labels.length > 1 ? ` +${labels.length - 1}` : ""}`;
-  } else if (docs.length && /^Read input|^Read /.test(title) && real[0]?.cmd === "cat") {
-    title = `Write ${base(operands(real[0].args).at(-1) ?? "a file")}`;
-  }
-  return clip(title.charAt(0).toUpperCase() + title.slice(1), MAX);
-}
-function commandLine(command, n = 96) {
-  const flat3 = command.replace(/<<-?\s*['"]?(\w+)['"]?[\s\S]*?\n\s*\1\s*(?=\n|$)/g, "<<'$1' \u2026").replace(/\s+/g, " ").trim();
-  return clip(flat3, n);
-}
-function oneLine(text11) {
-  return text11.replace(/\s+/g, " ").trim();
 }
 
 // src/view/tools.tsx
@@ -62845,7 +62853,7 @@ var APPROVALS = [
 ];
 function approvalOverlay(host, req) {
   const p3 = req.params;
-  const command = str9(p3.command);
+  const command = str9(p3.command) && withoutTernEnv(str9(p3.command));
   const description = str9(p3.description);
   const smartDenied = p3.smart_denied === true;
   const offered = Array.isArray(p3.choices) ? p3.choices.filter((c) => typeof c === "string") : [];
@@ -63198,7 +63206,7 @@ function maskedOverlay(host, req) {
     node: () => /* @__PURE__ */ jsx("overlay", { anchor: "bottom", modal: true, role: "omp.overlay.ask", size: "md", children: /* @__PURE__ */ jsxs("col", { gap: "md", children: [
       /* @__PURE__ */ jsx("md", { role: "omp.ask.question", text: title }, "question"),
       note ? /* @__PURE__ */ jsx("text", { spans: [{ s: req.method === "secret" ? "mono dim" : "muted", t: note }], wrap: "word" }, "note") : null,
-      str9(p3.command) ? /* @__PURE__ */ jsx("code", { lang: "bash", text: str9(p3.command) }, "command") : null,
+      str9(p3.command) ? /* @__PURE__ */ jsx("code", { lang: "bash", text: withoutTernEnv(str9(p3.command)) }, "command") : null,
       fields.map((f, i) => /* @__PURE__ */ jsx(
         "input",
         {
