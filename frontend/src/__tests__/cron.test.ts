@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 
 import { toolCallId } from '../core/ids.js'
 import type { ToolCall } from '../model.js'
-import { Cron, type CronJob, isMonitor, isPaused, jobTone, ownJobs, relative } from '../processes/cron.js'
+import { Cron, CRON_POLL_MS, type CronJob, isMonitor, isPaused, jobTone, ownJobs, relative } from '../processes/cron.js'
 
 import { stub } from './fakes.js'
 
@@ -77,5 +77,26 @@ describe('Cron', () => {
     request.mockRejectedValueOnce(new Error('method not found'))
     await cron.refresh()
     expect(cron.error).toBe('method not found')
+  })
+
+  it('polls the list while the Cron tab shows, and stops once it closes', async () => {
+    vi.useFakeTimers()
+
+    try {
+      const request = vi.fn(async () => ({ jobs: [job()], success: true }))
+      const cron = new Cron({ changed: vi.fn(), gw: stub<Pick<GatewayClient, 'request'>>({ request }) })
+      const release = cron.watch()
+      await vi.advanceTimersByTimeAsync(0)
+      expect(request).toHaveBeenCalledTimes(1)
+      await vi.advanceTimersByTimeAsync(CRON_POLL_MS)
+      expect(request).toHaveBeenCalledTimes(2)
+
+      release()
+      await vi.advanceTimersByTimeAsync(4 * CRON_POLL_MS)
+      expect(request).toHaveBeenCalledTimes(2)
+      cron.dispose()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })

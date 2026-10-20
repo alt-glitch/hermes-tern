@@ -18,6 +18,7 @@ import type { Media } from '../media.js'
 import type { ToolCall } from '../model.js'
 import type { PromptSheets } from '../prompts/sheets.js'
 import type { Processes } from '../processes/store.js'
+import type { Sidebar } from '../sidebar.js'
 import type { Transcript } from '../transcript.js'
 import type { Activity } from '../turn/activity.js'
 import type { PromptQueue } from '../turn/queue.js'
@@ -62,6 +63,7 @@ export interface AdoptHost {
   readonly prs: Pick<PullRequests, 'adopt'>
   readonly queue: Pick<PromptQueue, 'adopt'> & { readonly server: Pick<PromptQueue['server'], 'reset'> }
   readonly sheets: Pick<PromptSheets, 'dropAll'>
+  readonly sidebar: Pick<Sidebar, 'adopt'>
   readonly title: Pick<SessionTitle, 'adopt'>
   readonly transcript: Pick<Transcript, 'entries' | 'inflight' | 'load' | 'reset'>
   /** Reads the adopted session's busy_input_mode into the state. */
@@ -156,10 +158,11 @@ export function adoptSteps(host: AdoptHost): readonly Adoptable[] {
     { adopt: ({ ref }) => host.queue.adopt(ref) },
     {
       adopt: ({ ref }) => {
-        // The new session's processes and PRs (and none of the last one's), and its open connect cards.
+        // The new session's processes, PRs and git state (and none of the last one's), and its open connect cards.
         host.processes.poke()
         host.connect.watch()
         host.prs.adopt()
+        host.sidebar.adopt(ref.live)
         host.automation.adopt(ref.live)
       }
     },

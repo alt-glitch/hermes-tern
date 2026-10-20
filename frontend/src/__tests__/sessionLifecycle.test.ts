@@ -164,6 +164,7 @@ function recordingHost() {
     readBusyMode: rec('readBusyMode'),
     reportCwd: rec('reportCwd'),
     sheets: { dropAll: rec('sheets.dropAll') },
+    sidebar: { adopt: sid => void log.push(`sidebar.adopt ${sid}`) },
     showThoughts: sid => void log.push(`showThoughts ${sid}`),
     state: new RecordingState(log),
     title: { adopt: title => void log.push(`title.adopt ${title}`) },
@@ -226,6 +227,7 @@ describe('adoptSteps', () => {
       'processes.poke',
       'connect.watch',
       'prs.adopt',
+      'sidebar.adopt b',
       'automation.adopt b',
       'transcript.inflight',
       'changed'

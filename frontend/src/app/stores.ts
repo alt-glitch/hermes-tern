@@ -264,4 +264,5 @@ export function disposeStores(s: ChatStores) {
   s.processes.dispose()
   s.prs.dispose()
   s.sidebar.dispose()
+  s.cron.dispose()
 }

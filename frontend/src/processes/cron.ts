@@ -7,6 +7,7 @@ import type { CronJobRow } from '@hermes/shared/gateway-events'
 import type { GatewayClient } from '@tui/gatewayClient.js'
 
 import { errorText } from '../core/errors.js'
+import { Poller } from '../core/poller.js'
 import type { ToolCall } from '../model.js'
 import { record } from '../wire/json.js'
 import { rpc } from '../wire/rpc.js'
@@ -65,8 +66,12 @@ export class Cron {
   #error: string | undefined
   #warning: string | undefined
   #loaded = false
-  #watchers = 0
-  #timer: NodeJS.Timeout | undefined
+  /** The list's poll: every CRON_POLL_MS while the Cron tab shows, else none. */
+  readonly #poller: Poller = new Poller({
+    cadence: () => (this.#poller.watched ? CRON_POLL_MS : 'off'),
+    // A round scheduled before the tab closed reads nothing.
+    run: async () => (this.#poller.watched ? this.refresh() : undefined)
+  })
   #busy = new Set<string>()
 
   constructor(host: CronHost) {
@@ -98,24 +103,12 @@ export class Cron {
 
   /** Polls while the returned release has not run (the Cron tab shows). */
   watch(): () => void {
-    this.#watchers++
+    return this.#poller.watch()
+  }
 
-    if (this.#watchers === 1) {
-      void this.#tick()
-    }
-
-    let released = false
-
-    return () => {
-      if (!released) {
-        released = true
-
-        if (--this.#watchers === 0) {
-          clearTimeout(this.#timer)
-          this.#timer = undefined
-        }
-      }
-    }
+  /** Stops polling for good (the pane quits). */
+  dispose() {
+    this.#poller.dispose()
   }
 
   /** Pauses, resumes or removes job `id`; throws the gateway's error. */
@@ -152,15 +145,6 @@ export class Cron {
 
     this.#loaded = true
     this.#host.changed()
-  }
-
-  async #tick() {
-    await this.refresh()
-
-    if (this.#watchers > 0) {
-      clearTimeout(this.#timer)
-      this.#timer = setTimeout(() => void this.#tick(), CRON_POLL_MS)
-    }
   }
 }
 

@@ -9,8 +9,10 @@ import type { ChatPorts } from './app/ports.js'
 import { copyToClipboard } from './clipboard.js'
 import { launchEnv } from './config/env.js'
 import { optional } from './core/assert.js'
+import type { Ticket } from './core/epoch.js'
+import { type LiveSessionId, prKey } from './core/ids.js'
+import { Poller } from './core/poller.js'
 import { type GitState, gitState } from './git/status.js'
-import { prKey } from './core/ids.js'
 import { checksState } from './github/pullRequest.js'
 import { type ChangesHost, openChanges } from './overlays/changes.js'
 import { openPullRequests, type PullRequestsSheetHost, stateLabel } from './overlays/pullRequests.js'
@@ -26,16 +28,23 @@ const MAX_FILES = 40
 
 export class Sidebar {
   readonly #host: SidebarHost
+  readonly #read: (cwd: string) => Promise<GitState | undefined>
   #open = false
   #state: GitState | undefined
   #cwd: string | null = null
-  #timer: NodeJS.Timeout | undefined
-  #reading = false
+  /** The git read: every five seconds while the sidebar is open; another session's adopt drops a read in flight. */
+  readonly #poller: Poller = new Poller({
+    cadence: () => (this.#open ? POLL_MS : 'off'),
+    run: ticket => this.#refresh(ticket),
+    settled: () => this.#host.changed()
+  })
   #copied = false
   #copiedTimer: NodeJS.Timeout | undefined
 
-  constructor(host: SidebarHost) {
+  /** `read`: how a folder's git state is read (tests hold it). */
+  constructor(host: SidebarHost, read: (cwd: string) => Promise<GitState | undefined> = gitState) {
     this.#host = host
+    this.#read = read
   }
 
   get open(): boolean {
@@ -48,48 +57,46 @@ export class Sidebar {
 
   toggle() {
     this.#open = !this.#open
-    clearTimeout(this.#timer)
-
-    if (this.#open) {
-      void this.refresh()
-    }
-
+    this.poke()
     this.#host.changed()
   }
 
-  /** Reads git again now (a tool changed files, the turn ended). */
+  /** Reads git again now (a tool changed files, the turn ended); after the read in flight, if one is. */
   poke() {
     if (this.#open) {
-      void this.refresh()
+      this.#poller.poke()
     }
+  }
+
+  /** Session `sid` is shown now: the last one's git state goes, and a read in flight for it drops its answer. */
+  adopt(sid: LiveSessionId | null) {
+    if (!this.#poller.adopt(sid)) {
+      return
+    }
+
+    this.#state = undefined
+    this.#cwd = null
+    this.poke()
   }
 
   dispose() {
     this.#open = false
-    clearTimeout(this.#timer)
+    this.#poller.dispose()
+    clearTimeout(this.#copiedTimer)
   }
 
-  async refresh() {
-    const cwd = this.#host.session.info?.cwd || null
-
-    if (this.#reading) {
+  async #refresh(ticket: Ticket) {
+    // Closed since the round was scheduled: nothing reads until it opens again.
+    if (!this.#open) {
       return
     }
 
-    this.#reading = true
-    clearTimeout(this.#timer)
+    const cwd = this.#host.session.info?.cwd || null
+    const state = cwd ? await this.#read(cwd) : undefined
 
-    try {
-      this.#state = cwd ? await gitState(cwd) : undefined
+    if (ticket.isCurrent()) {
+      this.#state = state
       this.#cwd = cwd
-    } finally {
-      this.#reading = false
-
-      if (this.#open) {
-        this.#timer = setTimeout(() => void this.refresh(), POLL_MS)
-      }
-
-      this.#host.changed()
     }
   }
 
