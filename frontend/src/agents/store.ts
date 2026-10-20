@@ -218,25 +218,28 @@ export class Agents {
     const goals = Array.isArray(r.goals) ? r.goals.map(g => (typeof g === 'string' ? g : '')) : []
     const ids = Array.isArray(r.subagent_ids) ? r.subagent_ids : []
     const paths = Array.isArray(r.live_transcripts) ? r.live_transcripts : []
-    const list = (call.subagents ??= [])
 
-    goals.forEach((goal, i) => {
-      const id = typeof ids[i] === 'string' && ids[i] ? (ids[i] as string) : `task-${i}`
-      let a = list.find(x => x.id === id)
+    this.#host.transcript.mutateCall(call, c => {
+      const list = (c.subagents ??= [])
 
-      if (!a) {
-        a = { calls: 0, goal, id, index: i, startedAt: at, status: 'queued', tokens: 0, toolCount: 0 }
-        list.push(a)
-      }
+      goals.forEach((goal, i) => {
+        const id = typeof ids[i] === 'string' && ids[i] ? (ids[i] as string) : `task-${i}`
+        let a = list.find(x => x.id === id)
 
-      // The node key stays put when the first poll renames a `task-<i>` placeholder, so Tern keeps its timer.
-      a.key ??= `p${i}`
-      a.delegationId = r.delegation_id as string
-      a.depth = 0
-      a.logPath = typeof paths[i] === 'string' ? (paths[i] as string) : undefined
+        if (!a) {
+          a = { calls: 0, goal, id, index: i, startedAt: at, status: 'queued', tokens: 0, toolCount: 0 }
+          list.push(a)
+        }
+
+        // The node key stays put when the first poll renames a `task-<i>` placeholder, so Tern keeps its timer.
+        a.key ??= `p${i}`
+        a.delegationId = r.delegation_id as string
+        a.depth = 0
+        a.logPath = typeof paths[i] === 'string' ? (paths[i] as string) : undefined
+      })
+
+      list.sort((a, b) => a.index - b.index || (a.depth ?? 0) - (b.depth ?? 0))
     })
-
-    list.sort((a, b) => a.index - b.index || (a.depth ?? 0) - (b.depth ?? 0))
 
     return true
   }
@@ -512,12 +515,9 @@ export class Agents {
     return true
   }
 
+  /** Marks the card showing `a` changed (#poll and #readLog changed its row), and tells when it ended. */
   #touch(a: Subagent) {
-    const call = this.#owners().get(a)
-
-    if (call) {
-      this.#host.transcript.touchCall(call)
-    }
+    this.#host.transcript.touchCall(this.#owners().get(a))
 
     if (!isRunning(a) && !this.#ended.has(a)) {
       this.#ended.add(a)

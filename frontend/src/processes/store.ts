@@ -9,7 +9,8 @@ import type { GatewayClient } from '@tui/gatewayClient.js'
 
 import type { LiveSessionId } from '../core/ids.js'
 import type { BackgroundProcess, ToolCall } from '../model.js'
-import { isWatchCall, type Transcript } from '../transcript.js'
+import type { Transcript } from '../transcript.js'
+import { isWatchCall } from '../transcript/calls.js'
 import { withoutTernEnv } from '../view/describe.js'
 import { record } from '../wire/json.js'
 import { rpc, rpcParsed } from '../wire/rpc.js'
@@ -459,8 +460,7 @@ export class Processes {
       const p = owners.get(call)
 
       if (p && (call.process !== p || touched.has(p))) {
-        call.process = p
-        this.#host.transcript.touchCall(call)
+        this.#host.transcript.mutateCall(call, c => (c.process = p))
         changed = true
       }
     }

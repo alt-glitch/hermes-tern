@@ -24,7 +24,7 @@ import {
   type Watchers
 } from '../processes/store.js'
 import { chartNode } from '../processes/widgets/view.js'
-import { isBackgroundCall } from '../transcript.js'
+import { isBackgroundCall } from '../transcript/calls.js'
 import { commandLine, describeCommand, oneLine } from '../view/describe.js'
 import { duration } from '../view/time.js'
 

@@ -162,8 +162,6 @@
   "src/settings.ts no-restricted-syntax": 1,
   "src/slashResolve.ts @typescript-eslint/no-non-null-assertion": 2,
   "src/slashResolve.ts @typescript-eslint/no-restricted-imports": 1,
-  "src/transcript.ts @typescript-eslint/no-non-null-assertion": 3,
-  "src/transcript.ts no-restricted-syntax": 1,
   "src/usage.ts @typescript-eslint/no-non-null-assertion": 13,
   "src/view/describe.ts @typescript-eslint/no-non-null-assertion": 9,
   "src/view/dock.tsx @typescript-eslint/no-non-null-assertion": 4,

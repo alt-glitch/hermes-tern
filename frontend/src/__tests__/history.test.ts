@@ -2,7 +2,8 @@ import type { JSX } from '@stencil-hq/tern'
 import { describe, expect, it } from 'vitest'
 
 import type { Block, Entry, ToolCall, TurnEntry } from '../model.js'
-import { internalNotice, Transcript } from '../transcript.js'
+import { Transcript } from '../transcript.js'
+import { internalNotice } from '../transcript/messages.js'
 import { toolNode } from '../view/tools.js'
 import { entryNode, type TranscriptContext } from '../view/transcript.js'
 
@@ -33,7 +34,7 @@ function load(messages: object[]): Transcript {
   return t
 }
 
-const turns = (entries: Entry[]) => entries.filter((e): e is TurnEntry => e.kind === 'turn')
+const turns = (entries: readonly Entry[]) => entries.filter((e): e is TurnEntry => e.kind === 'turn')
 const texts = (turn: TurnEntry) => turn.blocks.flatMap(b => (b.kind === 'text' ? [b.text] : []))
 const thoughts = (turn: TurnEntry) => turn.blocks.flatMap(b => (b.kind === 'thinking' ? [b.text] : []))
 const toolsOf = (turn: TurnEntry) => turn.blocks.flatMap((b: Block) => (b.kind === 'tool' ? [b.call] : []))

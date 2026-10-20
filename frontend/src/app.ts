@@ -89,7 +89,8 @@ import { type BusyMode, busyModeOf, type OwnAdmission, ServerQueue, type ServerQ
 import { INPUT_ID, SurfaceHost } from './surface/host.js'
 import { runInput } from './surface/input.js'
 import { reportCwd, setTabTitle } from './surface/osc.js'
-import { internalNotice, Transcript } from './transcript.js'
+import { Transcript } from './transcript.js'
+import { internalNotice } from './transcript/messages.js'
 import { storedCompactions } from './compaction.js'
 import type { Reconnecting } from './view/automation.js'
 import { dockNodes, type QueuedRow, todoProgress } from './view/dock.js'
@@ -717,8 +718,7 @@ export class App implements ChatPorts {
         }
 
         if (JSON.stringify(next) !== JSON.stringify(call.connect)) {
-          call.connect = next
-          this.transcript.touchCall(call)
+          this.transcript.mutateCall(call, c => (c.connect = next))
           this.changed()
         }
 
@@ -731,8 +731,7 @@ export class App implements ChatPorts {
         // Only a card this pane saw waiting: a resumed session's long-settled card stays quiet. Only
         // one pane tells: the claim is the card's.
         if (!next.told && this.#connectSeen.has(seen) && allConnected(next) && (!next.key || claimTold(next.key))) {
-          next.told = true
-          this.transcript.touchCall(call)
+          this.transcript.mutateCall(call, () => (next.told = true))
           this.#submit(connectedMessage(next.targets), false)
           this.changed()
         } else if (next.key && !next.settled) {
@@ -763,9 +762,10 @@ export class App implements ChatPorts {
     }
 
     // As on the desktop, Continue settles the card: an app still waiting did not connect.
-    card.told = true
-    card.settled = 'continued'
-    this.transcript.touchCall(call)
+    this.transcript.mutateCall(call, () => {
+      card.told = true
+      card.settled = 'continued'
+    })
 
     // Another pane's message already told the agent.
     if (!card.key || claimTold(card.key)) {
@@ -778,15 +778,15 @@ export class App implements ChatPorts {
   /** A connect card's Authorize: the app's link in the browser, and its row waits on the browser now. */
   #connectOpen(ref: string, name: string) {
     const call = this.#connectCall(ref)
-    const target = call?.connect?.targets.find(t => t.name === name)
+    const card = call?.connect
+    const target = card?.targets.find(t => t.name === name)
 
-    if (!call?.connect || !target?.url) {
+    if (!call || !card || !target?.url) {
       return
     }
 
     openUrl(target.url)
-    call.connect.opened = [...new Set([...call.connect.opened, name])]
-    this.transcript.touchCall(call)
+    this.transcript.mutateCall(call, () => (card.opened = [...new Set([...card.opened, name])]))
     this.changed()
   }
 
@@ -1255,7 +1255,7 @@ export class App implements ChatPorts {
     const text = item.text || (images.length ? IMAGE_ONLY_PROMPT : '')
     const attachments = images.map(({ mime, path }) => ({ mime, path }))
     const submission = newInputId()
-    this.transcript.user(display?.trim() || item.text, undefined, false, userImages(images))
+    this.transcript.user({ attachments: userImages(images), text: display?.trim() || item.text })
     // Its bubble is up: the gateway's queued → started for it owes none.
     this.#server.shown(submission)
     this.#startBusy('Working…')
@@ -1302,7 +1302,7 @@ export class App implements ChatPorts {
       return this.changed()
     }
 
-    this.transcript.user(`!${command}`)
+    this.transcript.user({ text: `!${command}` })
     this.changed()
 
     try {
@@ -1460,7 +1460,7 @@ export class App implements ChatPorts {
       },
       compressing: state => {
         if (state === 'start') {
-          this.transcript.compacting(this.usage?.context_used || undefined, Date.now(), true)
+          this.transcript.compacting({ before: this.usage?.context_used || undefined, manual: true })
         } else if (state === 'none') {
           this.transcript.uncompact()
         } else {
@@ -2145,7 +2145,7 @@ export class App implements ChatPorts {
         }
 
         if (effect.compacting) {
-          t.compacting(effect.tokens?.before ?? (this.usage?.context_used || undefined))
+          t.compacting({ before: effect.tokens?.before ?? (this.usage?.context_used || undefined) })
         } else if (effect.compacting === false) {
           t.compacted(Date.now(), effect.tokens)
           // The store has the summary once the compaction commits (a moment after its done edge).

@@ -11,7 +11,7 @@ import { launchEnv } from './config/env.js'
 import { isConnectCall } from './connections.js'
 import { shownImage } from './media.js'
 import type { Block, Todo, ToolCall, TurnEntry } from './model.js'
-import { isBackgroundCall, isTodoName, isWatchCall } from './transcript.js'
+import { isBackgroundCall, isTodoName, isWatchCall } from './transcript/calls.js'
 import { commandDisplayText, commandProgramName } from './vendor/t3code/commandLabel.js'
 
 /** A step of a work group: a tool call or a thought. */

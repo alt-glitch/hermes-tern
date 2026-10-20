@@ -1,6 +1,8 @@
 // Folds gateway events into the structured transcript (model.ts). One live
 // turn at a time: message.start opens it, message.complete closes it, and
 // reasoning, text and tool events land in its blocks in arrival order.
+// Compactions (transcript/compactions.ts) and a reload from history
+// (transcript/history.ts) are parts of their own.
 
 import type {
   InflightTurn,
@@ -15,24 +17,19 @@ import type {
 import { settleBridge, unwrap } from './bridge.js'
 import type { StoredCompaction } from './compaction.js'
 import { type EntryId, entryId, type ToolCallId, toolCallId } from './core/ids.js'
-import type { Block, Compaction, CompactionEntry, Counters, Entry, NoticeEntry, Todo, ToolCall, TurnEntry, UserAttachment } from './model.js'
-import { promptAttachments, splitPrompt } from './promptRefs.js'
+import type { Counters, Entry, NoticeEntry, Todo, ToolCall, TurnEntry, UserAttachment } from './model.js'
+import { callIn, callsWhere, findCall, isBackgroundCall, isTodoName, isToolError, isWatchCall, type Located } from './transcript/calls.js'
+import { type CompactionStart, Compactions } from './transcript/compactions.js'
+import { history, storedUser } from './transcript/history.js'
+import { continuation, displayNotice, failure, internalNotice, passable, type UserPrompt, userEntry } from './transcript/messages.js'
+import { foldSubagent } from './transcript/subagents.js'
+import { currentTodos, todosOf, toTodos } from './transcript/todos.js'
 import { withoutTernEnv } from './view/describe.js'
 import { record } from './wire/json.js'
 
-type ToolBlock = Extract<Block, { kind: 'tool' }>
-
-/** A tool call and the turn holding it (whose revision a change to the call bumps). */
-interface Located {
-  call: ToolCall
-  turn: TurnEntry
-}
-
 /** The ordered entries of one session, plus the event reducer that grows them. */
 export class Transcript {
-  entries: Entry[] = []
-  /** Bumped on every change; views and the render loop compare it. */
-  rev = 0
+  #entries: Entry[] = []
   #next = 0
   /** The session's running usage at the last completed turn (message.complete reports session totals). */
   #sessionUsage: Usage | undefined
@@ -42,8 +39,12 @@ export class Transcript {
   #live: TurnEntry | undefined
   /** The reason line for the next turn, when Hermes' own notice started it. */
   #continued: string | undefined
-  /** The compactions this view saw happen: what a reload's stored ones get their numbers from. */
-  #seen: Compaction[] = []
+  readonly #compactions = new Compactions({ entries: () => this.#entries, id: prefix => this.id(prefix), live: () => this.#live })
+
+  /** The entries, oldest first; only the transcript's own methods change the list. */
+  get entries(): readonly Entry[] {
+    return this.#entries
+  }
 
   /** Sets the running usage turns count from (a resumed session's totals). */
   usageBase(usage: Usage | undefined) {
@@ -57,10 +58,10 @@ export class Transcript {
    */
   usageTick(counters: Counters, tps: number | undefined) {
     this.#counters = counters
-    const turn = this.live ?? this.entries.findLast(e => e.kind === 'turn')
-    let start = turn?.kind === 'turn' ? turn.countersAtStart : undefined
+    const turn = this.#current()
+    let start = turn?.countersAtStart
 
-    if (turn?.kind !== 'turn' || !start) {
+    if (!turn || !start) {
       return
     }
 
@@ -78,7 +79,7 @@ export class Transcript {
       turn.cacheHit = hit
       turn.tickTokens = tokens
       turn.tps = tps
-      this.#touch(turn)
+      turn.rev++
     }
   }
 
@@ -92,14 +93,12 @@ export class Transcript {
   }
 
   clear() {
-    this.entries = []
+    this.#entries = []
     this.#live = undefined
-    this.#touch()
   }
 
   push(entry: Entry) {
-    this.entries.push(entry)
-    this.#touch()
+    this.#entries.push(entry)
   }
 
   /**
@@ -110,21 +109,16 @@ export class Transcript {
     const turn = this.live
 
     if (!turn) {
-      return this.user(text, at)
+      return this.user({ at, text })
     }
 
     turn.blocks.push({ at, id: this.id('s'), kind: 'steer', text })
     turn.rev++
   }
 
-  user(text: string, at = Date.now(), steered = false, attachments: UserAttachment[] = []) {
-    this.push({ at, id: this.id('u'), kind: 'user', text, ...(steered ? { steered } : {}), ...(attachments.length ? { attachments } : {}) })
-  }
-
-  /** A stored prompt: its words, and as attachments the image refs and attached context Hermes stored with them. */
-  #storedUser(raw: string, at: number) {
-    const parts = splitPrompt(raw)
-    this.user(parts.text, at, false, promptAttachments(parts))
+  /** A prompt bubble at the end. */
+  user(prompt: UserPrompt) {
+    this.push(userEntry(this.id('u'), prompt))
   }
 
   /**
@@ -139,7 +133,7 @@ export class Transcript {
     if (notice) {
       if (live && !live.blocks.length) {
         live.continued = notice
-        this.#touch(live)
+        live.rev++
       } else {
         this.#continued = notice
       }
@@ -147,16 +141,16 @@ export class Transcript {
       return
     }
 
-    if (live && !live.blocks.length && this.entries.at(-1) === live) {
-      this.entries.splice(-1, 0, { at, id: this.id('u'), kind: 'user', text, ...(attachments.length ? { attachments } : {}) })
+    if (live && !live.blocks.length && this.#entries.at(-1) === live) {
+      this.#entries.splice(-1, 0, userEntry(this.id('u'), { at, attachments, text }))
       // It answers this prompt; it did not go on on its own.
       live.continued = undefined
-      this.#touch(live)
+      live.rev++
 
       return
     }
 
-    this.user(text, at, false, attachments)
+    this.user({ at, attachments, text })
   }
 
   notice(text: string, tone: NoticeEntry['tone'] = 'info') {
@@ -172,158 +166,38 @@ export class Transcript {
    * already did something it is a step of that turn; else it goes between turns, before the turn
    * it was compacted for. Hermes' later lines of the same compaction only fill in the count.
    */
-  compacting(before: number | undefined, at = Date.now(), manual = false) {
-    const running = this.#seen.findLast(c => c.status === 'running')
-
-    if (running) {
-      running.before ??= before || undefined
-      running.manual ||= manual || undefined
-
-      return this.#touchCompaction(running)
-    }
-
-    const compaction: Compaction = { startedAt: at, status: 'running', ...(before ? { before } : {}), ...(manual ? { manual } : {}) }
-    this.#seen.push(compaction)
-    const live = this.live
-
-    if (live?.blocks.length) {
-      live.blocks.push({ at, compaction, id: this.id('z'), kind: 'compaction' })
-      this.#touch(live)
-
-      return
-    }
-
-    const entry: CompactionEntry = { compaction, id: this.id('z'), kind: 'compaction', rev: 0 }
-
-    if (live && this.entries.at(-1) === live) {
-      this.entries.splice(-1, 0, entry)
-      this.#touch()
-    } else {
-      this.push(entry)
-    }
+  compacting(start: CompactionStart = {}) {
+    this.#compactions.compacting(start)
   }
 
-  /**
-   * The running compaction ended. `tokens` are the owner's own counts (/compress reports them
-   * after its `ready` edge, so they also reach the compaction that just ended).
-   */
+  /** The running compaction ended (`tokens`: the owner's own counts, when it reports them). */
   compacted(at = Date.now(), tokens: { before?: number; after?: number } = {}) {
-    const running = this.#seen.findLast(c => c.status === 'running')
-    const c = running ?? (tokens.before || tokens.after ? this.#seen.at(-1) : undefined)
-
-    if (!c) {
-      return
-    }
-
-    if (running) {
-      running.status = 'done'
-      running.endedAt = at
-    }
-
-    c.before = tokens.before || c.before
-    c.after = tokens.after || c.after
-    this.#touchCompaction(c)
+    this.#compactions.compacted(at, tokens)
   }
 
-  /**
-   * The last compaction did not happen after all: Hermes aborted it (no done edge came before the
-   * turn ended; `running` drops only a running one) or /compress changed nothing.
-   */
+  /** The last compaction did not happen after all (`running`: drop it only while it runs). */
   uncompact(running = false) {
-    const c = this.#seen.at(-1)
-
-    if (!c || (running && c.status !== 'running')) {
-      return
-    }
-
-    this.#seen.pop()
-    const at = this.entries.findIndex(e => e.kind === 'compaction' && e.compaction === c)
-
-    if (at >= 0) {
-      this.entries.splice(at, 1)
-
-      return this.#touch()
-    }
-
-    const turn = this.entries.findLast(
-      (e): e is TurnEntry => e.kind === 'turn' && e.blocks.some(b => b.kind === 'compaction' && b.compaction === c)
-    )
-
-    if (turn) {
-      turn.blocks = turn.blocks.filter(b => b.kind !== 'compaction' || b.compaction !== c)
-      this.#touch(turn)
-    }
+    this.#compactions.uncompact(running)
   }
 
-  /**
-   * A context reading (tokens in use): the first one under the last compaction's `before` is what
-   * it left. A reading from before it finished (a stale tick) is not lower, so it is skipped.
-   */
+  /** A context reading (tokens in use): the first one under the last compaction's `before` is what it left. */
   contextUsed(used: number) {
-    const c = this.#seen.at(-1)
-
-    if (c?.status !== 'done' || c.after !== undefined || !(used > 0) || (c.before && used >= c.before * 0.95)) {
-      return
-    }
-
-    c.after = used
-    this.#touchCompaction(c)
+    this.#compactions.contextUsed(used)
   }
 
   /** The compactions seen here that the store has no summary for yet. */
   get unsummarized(): boolean {
-    return this.#seen.some(c => c.status === 'done' && c.summary === undefined)
+    return this.#compactions.unsummarized
   }
 
   /** Gives each seen compaction the stored summary written while it ran. */
   summarize(stored: readonly StoredCompaction[]) {
-    for (const [mark, c] of this.#claims(stored)) {
-      if (c.summary === undefined) {
-        c.summary = mark.summary ?? ''
-        c.messages = mark.messages
-        this.#touchCompaction(c)
-      }
-    }
-  }
-
-  /** Which stored compaction each seen one is: the nearest summary written while it ran, each once. */
-  #claims(stored: readonly StoredCompaction[]): Map<StoredCompaction, Compaction> {
-    const out = new Map<StoredCompaction, Compaction>()
-
-    for (const c of this.#seen) {
-      const end = c.endedAt ?? c.startedAt
-      const mark = stored
-        .filter(s => c.status === 'done' && !out.has(s) && within(c, s.at))
-        .sort((a, b) => Math.abs(a.at - end) - Math.abs(b.at - end))[0]
-
-      if (mark) {
-        out.set(mark, c)
-      }
-    }
-
-    return out
+    this.#compactions.summarize(stored)
   }
 
   /** Another session is shown: the compactions seen were the last one's. */
   forgetCompactions() {
-    this.#seen = []
-  }
-
-  /** Marks the turn or entry showing `c` changed. */
-  #touchCompaction(c: Compaction) {
-    for (let i = this.entries.length - 1; i >= 0; i--) {
-      const e = this.entries[i]!
-
-      if (e.kind === 'compaction' && e.compaction === c) {
-        e.rev++
-
-        return this.#touch()
-      }
-
-      if (e.kind === 'turn' && e.blocks.some(b => b.kind === 'compaction' && b.compaction === c)) {
-        return this.#touch(e)
-      }
-    }
+    this.#compactions.forget()
   }
 
   /** Opens a live turn unless one is already streaming. */
@@ -336,9 +210,9 @@ export class Transcript {
 
     const turn: TurnEntry = {
       blocks: [],
-      continued: this.#continued ?? continuation(this.entries.findLast(passable)),
+      continued: this.#continued ?? continuation(this.#entries.findLast(passable)),
       // A session's first turn starts from zero; later ones from the last tick.
-      countersAtStart: this.#counters ?? (this.entries.some(e => e.kind === 'turn') ? undefined : { prompt: 0, read: 0, total: 0 }),
+      countersAtStart: this.#counters ?? (this.#entries.some(e => e.kind === 'turn') ? undefined : { prompt: 0, read: 0, total: 0 }),
       id: this.id('t'),
       kind: 'turn',
       rev: 0,
@@ -366,7 +240,7 @@ export class Transcript {
       turn.blocks.push({ id: this.id('k'), kind: 'thinking', startedAt: at, text })
     }
 
-    this.#touch(turn)
+    turn.rev++
   }
 
   /**
@@ -383,15 +257,15 @@ export class Transcript {
     }
 
     turn.blocks.push({ endedAt: at, id: this.id('k'), kind: 'thinking', startedAt: at, text })
-    this.#touch(turn)
+    turn.rev++
   }
 
   /** A Mixture-of-Agents reference model's answer: a sealed thought block of its own, under `label`. */
   reference(label: string, text: string, at = Date.now()) {
     const turn = this.start(at)
-    this.#endThinking(turn, at)
+    endThinking(turn, at)
     turn.blocks.push({ endedAt: at, id: this.id('k'), kind: 'thinking', label, startedAt: at, text: text.trim() })
-    this.#touch(turn)
+    turn.rev++
   }
 
   text(text: string, at = Date.now()) {
@@ -400,7 +274,7 @@ export class Transcript {
     }
 
     const turn = this.start(at)
-    this.#endThinking(turn, at)
+    endThinking(turn, at)
     const last = turn.blocks.at(-1)
 
     if (last?.kind === 'text') {
@@ -409,13 +283,13 @@ export class Transcript {
       turn.blocks.push({ id: this.id('x'), kind: 'text', text })
     }
 
-    this.#touch(turn)
+    turn.rev++
   }
 
   /** Interim commentary: seals the streamed text so the next delta starts a new block. */
   interim(text: string, { alreadyStreamed }: { alreadyStreamed: boolean }, at = Date.now()) {
     const turn = this.start(at)
-    this.#endThinking(turn, at)
+    endThinking(turn, at)
 
     if (!alreadyStreamed && text.trim()) {
       turn.blocks.push({ id: this.id('x'), kind: 'text', text })
@@ -423,12 +297,12 @@ export class Transcript {
 
     // An empty text block marks the seal; `text()` appends to a new one after it.
     turn.blocks.push({ id: this.id('x'), kind: 'text', text: '' })
-    this.#touch(turn)
+    turn.rev++
   }
 
   toolStart(p: ToolStartPayload, at = Date.now()) {
     const turn = this.start(at)
-    this.#endThinking(turn, at)
+    endThinking(turn, at)
 
     if (this.#tool(p.tool_id)) {
       return
@@ -461,7 +335,7 @@ export class Transcript {
     }
 
     turn.blocks.push({ call, id: call.id, kind: 'tool' })
-    this.#touch(turn)
+    turn.rev++
   }
 
   toolComplete(p: ToolCompletePayload, at = Date.now()) {
@@ -506,7 +380,7 @@ export class Transcript {
       call.todos = toTodos(p.todos)
     }
 
-    this.#touch(turn)
+    turn.rev++
   }
 
   /** The newest todo snapshot lands on the newest todo tool call. */
@@ -515,7 +389,7 @@ export class Transcript {
 
     if (found) {
       found.call.todos = toTodos(todos)
-      this.#touch(found.turn)
+      found.turn.rev++
     }
   }
 
@@ -524,63 +398,20 @@ export class Transcript {
     // started): find the call that dispatched them by its delegation id first.
     const found =
       (p.delegation_id
-        ? this.#findTool(c => c.name === 'delegate_task' && record(c.result)?.delegation_id === p.delegation_id)
+        ? findCall(this.#entries, c => c.name === 'delegate_task' && record(c.result)?.delegation_id === p.delegation_id)
         : undefined) ?? this.#lastTool(c => c.name === 'delegate_task')
 
     if (!found) {
       return
     }
 
-    const list = (found.call.subagents ??= [])
-    const key = p.subagent_id ?? `task-${p.task_index}`
-    let agent = list.find(a => a.id === key)
-
-    if (!agent) {
-      agent = {
-        calls: 0,
-        goal: p.goal,
-        id: key,
-        index: p.task_index,
-        startedAt: at,
-        status: 'queued',
-        tokens: 0,
-        toolCount: 0
-      }
-      list.push(agent)
-      list.sort((a, b) => a.index - b.index)
-    }
-
-    agent.last = p
-    agent.goal = p.goal || agent.goal
-    agent.model = p.model ?? agent.model
-    agent.toolCount = p.tool_count ?? agent.toolCount
-    agent.calls = p.api_calls ?? agent.calls
-    agent.tokens = (p.input_tokens ?? 0) + (p.output_tokens ?? 0) || agent.tokens
-
-    if (type === 'subagent.start') {
-      agent.status = 'running'
-      agent.startedAt = at
-    } else if (type === 'subagent.tool') {
-      agent.status = 'running'
-      agent.tool = p.tool_name ?? agent.tool
-      agent.toolPreview = p.tool_preview ?? p.text ?? undefined
-      agent.toolSince = { at }
-    } else if (type === 'subagent.complete') {
-      agent.status = p.status === 'completed' ? 'done' : p.status === 'interrupted' ? 'cancelled' : 'failed'
-      agent.summary = p.summary ?? undefined
-      agent.duration =
-        typeof p.duration_seconds === 'number' ? Math.round(p.duration_seconds * 1000) : at - agent.startedAt
-      agent.tool = undefined
-    } else if (p.status === 'running') {
-      agent.status = 'running'
-    }
-
-    this.#touch(found.turn)
+    foldSubagent(found.call, { at, event: p, type })
+    found.turn.rev++
   }
 
   complete(p: MessageCompletePayload, at = Date.now()) {
     const turn = this.live ?? this.start(at)
-    this.#endThinking(turn, at)
+    endThinking(turn, at)
     const final = typeof p.text === 'string' ? p.text : ''
     const tail = trailingText(turn)
 
@@ -622,7 +453,7 @@ export class Transcript {
       turn.errorHint = final.split(/\n\s*\n/)[0]?.trim() || undefined
     }
 
-    this.#touch(turn)
+    turn.rev++
   }
 
   /** Seals a live turn the user interrupted before the agent confirmed it. */
@@ -640,207 +471,9 @@ export class Transcript {
    * on after one, else between turns.
    */
   load(messages: TranscriptMessage[], stored: readonly StoredCompaction[] = []) {
-    this.entries = this.entries.filter(e => e.kind === 'welcome')
+    const kept = this.#entries.filter(e => e.kind === 'welcome')
     this.#live = undefined
-    let turn: TurnEntry | undefined
-    const marks = [...stored].sort((a, b) => a.at - b.at)
-    const claims = this.#claims(marks)
-    let due: StoredCompaction[] = []
-
-    const place = (inTurn: boolean) => {
-      for (const mark of due) {
-        const compaction = this.#storedCompaction(mark, claims.get(mark))
-
-        if (inTurn && turn) {
-          turn.blocks.push({ at: mark.at, compaction, id: this.id('z'), kind: 'compaction' })
-        } else {
-          this.entries.push({ compaction, id: this.id('z'), kind: 'compaction', rev: 0 })
-        }
-      }
-
-      due = []
-    }
-    let pendingContinued: string | undefined
-    // When the row that opened the next turn (a prompt or a notice) was written.
-    let promptAt = 0
-    const calls = new Map<ToolCallId, ToolCall>()
-    // The list as the calls so far left it: what the next merge patches.
-    let todos: Todo[] | undefined
-
-    for (const m of messages) {
-      const at = typeof m.timestamp === 'number' ? m.timestamp * 1000 : 0
-      const text = typeof m.text === 'string' ? m.text : typeof m.content === 'string' ? m.content : ''
-
-      // A steer is stored as its own user row inside the turn it joined. The display projection
-      // tags it `steer` and already unwraps Hermes' marker; a raw snapshot still carries the marker.
-      const steered = m.role === 'user' ? (m.display_kind === 'steer' ? text.trim() : steerText(text)) : undefined
-
-      while (at > 0 && marks.length && marks[0]!.at <= at) {
-        due.push(marks.shift()!)
-      }
-
-      // The turn going on after it (its next step or a steer) holds it; a prompt or a notice starts afresh.
-      place(m.role === 'assistant' || m.role === 'tool' || (m.role === 'user' && steered !== undefined))
-
-      if (steered !== undefined && turn) {
-        turn.blocks.push({ at, id: this.id('s'), kind: 'steer', text: steered })
-
-        continue
-      }
-
-      if (m.role === 'user') {
-        turn = undefined
-        promptAt = at
-
-        // Notices Hermes sends itself (subagents or a background command finished, a watcher
-        // fired, a crashed turn resumed) are not the user's words: they become the next turn's
-        // reason line. Typed rows say so in display_kind; older untyped rows are sniffed.
-        const notice = displayNotice(m.display_kind, m.display_metadata) ?? internalNotice(text)
-
-        if (notice) {
-          pendingContinued = notice
-        } else {
-          // A notice whose reply Hermes hid has no turn: its reason must not fall on this prompt's.
-          pendingContinued = undefined
-          this.#storedUser(steered ?? text, at)
-        }
-
-        continue
-      }
-
-      if (m.role === 'system') {
-        turn = undefined
-
-        if (text.trim()) {
-          this.entries.push({ id: this.id('n'), kind: 'notice', text, tone: 'info' })
-        }
-
-        continue
-      }
-
-      if (!turn) {
-        const continued = pendingContinued ?? continuation(this.entries.findLast(passable))
-        turn = { blocks: [], continued, id: this.id('t'), kind: 'turn', rev: 0, startedAt: promptAt || at, status: 'done' }
-        pendingContinued = undefined
-        promptAt = 0
-        this.entries.push(turn)
-      }
-
-      // The turn ended with its last stored row (the footer and the fold's duration read it).
-      if (at > 0) {
-        turn.endedAt = Math.max(turn.endedAt ?? at, at)
-      }
-
-      if (m.role === 'assistant') {
-        const meta = record(m.display_metadata)
-        const thought = storedThought(m)
-
-        if (thought.trim()) {
-          turn.blocks.push({ endedAt: at, id: this.id('k'), kind: 'thinking', startedAt: at, text: thought })
-        }
-
-        // Hermes' own row closing a failed turn: the turn's error card, not the agent's answer.
-        if (m.display_kind === 'failed_turn') {
-          const surface = record(meta?.error_surface)
-          const error = str(meta?.error) ?? str(surface?.message)
-          turn.status = 'error'
-          Object.assign(turn, error ? failure(error, surface?.code) : {})
-          turn.errorHint = text.trim() || undefined
-
-          continue
-        }
-
-        // The commentary projection: interim messages apart, and a reply with raw commentary cleaned.
-        const reply = typeof m.display_content === 'string' ? m.display_content : text
-        const notes = Array.isArray(m.display_commentary)
-          ? m.display_commentary.filter((n): n is string => typeof n === 'string' && Boolean(n.trim()))
-          : []
-        const flat = (s: string) => s.replace(/\s+/g, ' ').trim()
-
-        // Some providers store the joined commentary as the reply too: keep that copy once.
-        if (!reply.trim() || flat(notes.join('\n\n')) !== flat(reply)) {
-          turn.blocks.push(...notes.map(n => ({ id: this.id('x'), kind: 'text' as const, text: n })))
-        }
-
-        if (reply.trim()) {
-          turn.blocks.push({ id: this.id('x'), kind: 'text', text: reply })
-        }
-
-        // A reply the user stopped halfway is stored as far as it got.
-        if (meta?.interrupted === true) {
-          turn.status = 'interrupted'
-        }
-      } else if (m.role === 'tool') {
-        // A stored row with no call id gets an entry id in its place, unique in this transcript.
-        const id = toolCallId(m.tool_call_id ?? this.id('c'))
-        // History keeps the result only for edit tools (`content`, JSON); the rest come back bare.
-        const result = typeof m.content === 'string' && m.content ? m.content : undefined
-        // The edit preview the live call showed (tool.complete's inline_diff), kept on the row.
-        const diff = str(record(record(m.display_metadata)?.tool_result_metadata)?.inline_diff)
-        const existing = calls.get(id)
-
-        if (existing) {
-          existing.result = result ?? existing.result
-          existing.diff = diff ?? existing.diff
-
-          if (settleBridge(existing)) {
-            existing.status = 'error'
-          }
-
-          continue
-        }
-
-        // Deferred tools (todo_list, connectors, …) are stored as the `tool_call` bridge that ran them.
-        const u = unwrap(m.name ?? 'tool', m.args ?? {})
-        const args = u.args
-
-        const call: ToolCall = {
-          args,
-          argsText: '',
-          batch: u.batch,
-          context: m.context ?? '',
-          diff,
-          duration: 0,
-          id,
-          name: u.name,
-          result,
-          startedAt: at,
-          status: 'done',
-          via: u.via
-        }
-
-        call.status = (settleBridge(call) ?? Boolean(record(call.result)?.error)) ? 'error' : 'done'
-
-        if (isTodoName(call.name)) {
-          call.todosBefore = todos
-        }
-
-        // History drops todo results: the list is the stored args, a merge patching the one before.
-        if (Array.isArray(args.todos)) {
-          call.todos = todosOf(args, todos)
-          todos = call.todos
-        }
-
-        calls.set(id, call)
-        turn.blocks.push({ call, id: this.id('c'), kind: 'tool' })
-      }
-    }
-
-    due.push(...marks)
-    place(false)
-    this.#touch()
-  }
-
-  /** A stored compaction, as the one this view saw happen (`seen`) when there is one: its numbers stay. */
-  #storedCompaction(mark: StoredCompaction, seen: Compaction | undefined): Compaction {
-    if (seen) {
-      seen.summary = mark.summary ?? ''
-      seen.messages = mark.messages
-
-      return seen
-    }
-
-    return { startedAt: mark.at, status: 'done', ...(mark.summary ? { summary: mark.summary } : {}), ...(mark.messages ? { messages: mark.messages } : {}) }
+    this.#entries = history({ compactions: this.#compactions.restore(stored), id: prefix => this.id(prefix), kept, messages })
   }
 
   /** A resumed session's unfinished turn: its prompt, then a live turn holding what streamed so far. */
@@ -851,7 +484,7 @@ export class Transcript {
     if (notice) {
       this.#continued = notice
     } else if (user) {
-      this.#storedUser(user, at)
+      this.push(storedUser(this.id('u'), user, at))
     }
 
     if (turn.assistant || turn.streaming) {
@@ -860,36 +493,24 @@ export class Transcript {
     }
   }
 
-  #endThinking(turn: TurnEntry, at: number) {
-    for (const b of turn.blocks) {
-      if (b.kind === 'thinking' && b.endedAt === undefined) {
-        b.endedAt = at
-      }
+  /** Marks the turn holding `call` (if any) changed, after something outside the reducer updated it. */
+  touchCall(call: ToolCall | undefined) {
+    const found = call && findCall(this.#entries, c => c === call)
+
+    if (found) {
+      found.turn.rev++
     }
   }
 
-  /** Marks the turn holding `call` changed, after something outside the reducer updated it. */
-  touchCall(call: ToolCall) {
-    this.#touch(this.#findTool(c => c === call)?.turn)
+  /** Changes `call` from outside the reducer (`change` writes it), and marks the turn holding it changed. */
+  mutateCall(call: ToolCall, change: (call: ToolCall) => void) {
+    change(call)
+    this.touchCall(call)
   }
 
   /** The agent's todo list as its newest snapshot left it (any turn), if it ever made one. */
   currentTodos(): Todo[] | undefined {
-    for (let i = this.entries.length - 1; i >= 0; i--) {
-      const e = this.entries[i]
-
-      if (e?.kind !== 'turn') {
-        continue
-      }
-
-      const hit = e.blocks.findLast(b => b.kind === 'tool' && b.call.todos?.length)
-
-      if (hit?.kind === 'tool') {
-        return hit.call.todos
-      }
-    }
-
-    return undefined
+    return currentTodos(this.#entries)
   }
 
   /** The delegate_task calls in the transcript, oldest first. */
@@ -899,9 +520,7 @@ export class Transcript {
 
   /** The calls of tool `name` in the transcript, oldest first. */
   calls(name: string): ToolCall[] {
-    return this.entries.flatMap(e =>
-      e.kind === 'turn' ? e.blocks.flatMap(b => (b.kind === 'tool' && b.call.name === name ? [b.call] : [])) : []
-    )
+    return callsWhere(this.#entries, call => call.name === name)
   }
 
   /** The call with tool id `id`, in any turn. */
@@ -911,56 +530,32 @@ export class Transcript {
 
   /** The calls that show a background process: terminal calls that start one, `process` calls that watch one; oldest first. */
   backgroundCalls(): ToolCall[] {
-    return this.entries.flatMap(e =>
-      e.kind === 'turn'
-        ? e.blocks.flatMap(b => (b.kind === 'tool' && (isBackgroundCall(b.call) || isWatchCall(b.call)) ? [b.call] : []))
-        : []
-    )
+    return callsWhere(this.#entries, call => isBackgroundCall(call) || isWatchCall(call))
   }
 
-  /** The call the gateway's tool id `id` names (as an event sends it), in any turn. */
+  /** The call the gateway's tool id `id` names (as an event sends it), in any turn; the newest when ids repeat. */
   #tool(id: string): Located | undefined {
-    return this.#findTool(call => call.id === id)
-  }
-
-  /** The newest call matching `match` in any turn, newest turn first. */
-  #findTool(match: (call: ToolCall) => boolean): Located | undefined {
-    for (let i = this.entries.length - 1; i >= 0; i--) {
-      const turn = this.entries[i]
-
-      if (turn?.kind !== 'turn') {
-        continue
-      }
-
-      const hit = turn.blocks.findLast((b): b is ToolBlock => b.kind === 'tool' && match(b.call))
-
-      if (hit) {
-        return { call: hit.call, turn }
-      }
-    }
-
-    return undefined
+    return findCall(this.#entries, call => call.id === id)
   }
 
   /** The newest call matching `match` in the live (else the last) turn only. */
   #lastTool(match: (call: ToolCall) => boolean): Located | undefined {
-    const turn = this.live ?? this.entries.findLast(e => e.kind === 'turn')
+    const turn = this.#current()
 
-    if (turn?.kind !== 'turn') {
-      return undefined
-    }
-
-    const hit = turn.blocks.findLast((b): b is ToolBlock => b.kind === 'tool' && match(b.call))
-
-    return hit && { call: hit.call, turn }
+    return turn && callIn(turn, match)
   }
 
-  /** Marks a change: the transcript's, and the turn's when one changed. */
-  #touch(turn?: TurnEntry) {
-    this.rev++
+  /** The live turn, else the last one. */
+  #current(): TurnEntry | undefined {
+    return this.live ?? this.#entries.findLast((e): e is TurnEntry => e.kind === 'turn')
+  }
+}
 
-    if (turn) {
-      turn.rev++
+/** Ends the thoughts of `turn` still streaming. */
+function endThinking(turn: TurnEntry, at: number) {
+  for (const b of turn.blocks) {
+    if (b.kind === 'thinking' && b.endedAt === undefined) {
+      b.endedAt = at
     }
   }
 }
@@ -981,88 +576,6 @@ function trailingText(turn: TurnEntry): string {
   return out
 }
 
-/** A failed request's message and badge: an `HTTP 429: …` prefix becomes the code. */
-function failure(error: string, code: unknown): Pick<TurnEntry, 'error' | 'errorCode'> {
-  const http = /^HTTP (\d{3}):\s*/.exec(error)
-
-  return {
-    error: http ? error.slice(http[0].length) : error,
-    errorCode: http?.[1] ?? (typeof code === 'string' && code ? code : undefined)
-  }
-}
-
-const str = (v: unknown): string | undefined => (typeof v === 'string' && v.trim() ? v : undefined)
-
-/**
- * A stored reply's thinking, as the desktop reads it (chat-messages/hydration.ts): the projection's
- * `display_reasoning` (commentary taken out), else whichever field the provider kept it in.
- */
-function storedThought(m: TranscriptMessage): string {
-  if (typeof m.display_reasoning === 'string') {
-    return detailsText(m.display_reasoning)
-  }
-
-  return str(m.reasoning) ?? str(m.reasoning_content) ?? detailsText(m.reasoning_details)
-}
-
-/**
- * The readable text of stored `reasoning_details`: each provider block's summary, thinking or
- * text. Encrypted blocks are opaque replay data; plain text (not JSON) is the thought itself.
- */
-function detailsText(details: unknown): string {
-  let blocks = details
-
-  if (typeof blocks === 'string') {
-    const text = blocks.trim()
-
-    if (!text.startsWith('[') && !text.startsWith('{')) {
-      return text
-    }
-
-    try {
-      blocks = JSON.parse(text)
-    } catch {
-      return text
-    }
-  }
-
-  const out: string[] = []
-
-  for (const block of Array.isArray(blocks) ? blocks : [blocks]) {
-    const r = typeof block === 'string' ? { text: block } : record(block)
-
-    if (!r || r.type === 'reasoning.encrypted') {
-      continue
-    }
-
-    // OpenAI Responses keeps a summary as parts ({type: 'summary_text', text}).
-    const summary = Array.isArray(r.summary)
-      ? r.summary.map(s => (typeof s === 'string' ? s : (str(record(s)?.text) ?? ''))).join('\n\n')
-      : r.summary
-    const text = [summary, r.thinking, r.content, r.text].map(str).find(Boolean)?.trim()
-
-    if (text && !out.includes(text)) {
-      out.push(text)
-    }
-  }
-
-  return out.join('\n\n')
-}
-
-function isToolError(p: ToolCompletePayload): boolean {
-  const r = record(p.result)
-
-  if (r?.error) {
-    return true
-  }
-
-  if (p.name === 'terminal' && typeof r?.exit_code === 'number' && r.exit_code !== 0) {
-    return true
-  }
-
-  return typeof p.summary === 'string' && /^(error|failed)\b/i.test(p.summary)
-}
-
 /** One turn's share of the session totals: `now` minus `before`, field by field. */
 function usageSince(now: Usage, before: Usage | undefined): Usage {
   const less = (key: 'cost_usd' | 'input' | 'output' | 'total') => {
@@ -1075,254 +588,7 @@ function usageSince(now: Usage, before: Usage | undefined): Usage {
   return { ...now, cost_usd: less('cost_usd'), input: less('input'), output: less('output'), total: less('total') }
 }
 
-/** What a new turn looks past for the turn before it: notices and compactions. */
-const passable = (e: Entry) => e.kind !== 'notice' && e.kind !== 'compaction'
-
-/** A summary written at `at` belongs to compaction `c`: while it ran, give or take the clocks. */
-function within(c: Compaction, at: number): boolean {
-  return at >= c.startedAt - 5_000 && at <= (c.endedAt ?? Date.now()) + 15_000
-}
-
-/** The tool that manages background processes: `process_manage`, `process` before Hermes renamed it. */
-export function isProcessTool(name: string): boolean {
-  return name === 'process_manage' || name === 'process'
-}
-
-/** A process tool call that waits on, polls or reads one background process (omp's `wait`). */
-export function isWatchCall(call: ToolCall): boolean {
-  return isProcessTool(call.name) && ['log', 'poll', 'wait'].includes(String(call.args.action)) && typeof call.args.session_id === 'string'
-}
-
 /** A call's args as views show them: a shell command as the agent wrote it, without the pane prefix the plugin's middleware adds (completion events carry the args that ran). */
 function shownArgs(args: Record<string, unknown>): Record<string, unknown> {
   return typeof args.command === 'string' ? { ...args, command: withoutTernEnv(args.command) } : args
-}
-
-/**
- * A terminal call that started a background process: `background: true`, or a foreground call
- * Hermes moved to the background (a long timeout, a message arriving mid-run), whose result
- * then names the process (`session_id`).
- */
-export function isBackgroundCall(call: ToolCall): boolean {
-  return call.name === 'terminal' && (call.args.background === true || typeof record(call.result)?.session_id === 'string')
-}
-
-/** The task tool's names: `todo_list`, and `todo`, the legacy alias in stored transcripts. */
-export function isTodoName(name: string): boolean {
-  return name === 'todo_list' || name === 'todo'
-}
-
-/** A todo call's list from its args: the whole list, or with `merge: true` a patch on `current`. */
-function todosOf(args: Record<string, unknown>, current: Todo[] | undefined): Todo[] {
-  const raw = Array.isArray(args.todos) ? args.todos : []
-
-  return args.merge === true ? mergeTodos(current ?? [], raw) : toTodos(raw)
-}
-
-/** As TodoStore.write(merge=True): items update by id in the fields given, new ids append. */
-function mergeTodos(current: Todo[], patch: unknown[]): Todo[] {
-  const out = current.map(t => ({ ...t }))
-
-  for (const item of patch) {
-    const r = record(item)
-    const id = String(r?.id ?? '').trim()
-
-    if (!r || !id) {
-      continue
-    }
-
-    const cur = out.find(t => t.id === id)
-
-    if (!cur) {
-      // Hermes rejects a new item with no text, so it never joins the list.
-      if (String(r.content ?? '').trim()) {
-        out.push(...toTodos([{ ...r, id }]))
-      }
-
-      continue
-    }
-
-    const content = String(r.content ?? '').trim()
-    const status = String(r.status ?? '').trim().toLowerCase()
-
-    if (content) {
-      cur.content = content
-    }
-
-    if (status === 'pending' || status === 'in_progress' || status === 'completed' || status === 'cancelled') {
-      cur.status = status
-    }
-
-    if ('parent' in r) {
-      const parent = String(r.parent ?? '').trim()
-
-      if (parent && parent !== id) {
-        cur.parent = parent
-      } else {
-        delete cur.parent
-      }
-    }
-  }
-
-  return out
-}
-
-function toTodos(raw: unknown[]): Todo[] {
-  const out: Todo[] = []
-
-  for (const item of raw) {
-    if (!item || typeof item !== 'object') {
-      continue
-    }
-
-    const id = 'id' in item ? String(item.id) : String(out.length)
-    const content = 'content' in item ? String(item.content) : ''
-    const status = 'status' in item ? String(item.status) : 'pending'
-    const parent = 'parent' in item && item.parent ? String(item.parent) : undefined
-
-    out.push({
-      content,
-      id,
-      ...(parent && { parent }),
-      status: status === 'completed' || status === 'in_progress' || status === 'cancelled' ? status : 'pending'
-    })
-  }
-
-  return out
-}
-
-/**
- * The reason line for a row Hermes typed as its own notice (tui_gateway/session_history.py), as
- * Ink's and the desktop's timeline events word it; undefined for any other display_kind.
- */
-export function displayNotice(kind: string | null | undefined, metadata: unknown): string | undefined {
-  if (kind === 'auto_continue') {
-    return 'Resumed interrupted turn'
-  }
-
-  if (kind !== 'async_delegation_complete' && kind !== 'process_complete') {
-    return undefined
-  }
-
-  const meta = record(metadata)
-  const shown = typeof meta?.display_text === 'string' ? meta.display_text.trim() : ''
-
-  if (shown) {
-    return shown
-  }
-
-  if (kind === 'process_complete') {
-    return 'Background command finished'
-  }
-
-  const count = typeof meta?.task_count === 'number' ? meta.task_count : undefined
-
-  return count === 1 ? 'Subagent finished' : count === undefined ? 'Subagents finished' : `${count} subagents finished`
-}
-
-/** The footer Hermes' gateway appends to every notice it sends the agent as a user row. */
-const INTERNAL_FOOTER = '[INTERNAL NOTIFICATION — generated by the Hermes gateway'
-
-/**
- * A short reason line for a user row Hermes wrote itself (tools/process_registry_notifications.py,
- * gateway/run_notifications.py); undefined for the user's own words.
- */
-export function internalNotice(content: string): string | undefined {
-  const text = content.trim()
-
-  if (text.startsWith('[ASYNC DELEGATION BATCH COMPLETE')) {
-    return 'Subagents finished'
-  }
-
-  if (text.startsWith('[ASYNC DELEGATION COMPLETE')) {
-    return 'Subagent finished'
-  }
-
-  // One child of a fan-out failed while its siblings still run.
-  if (text.startsWith('[ASYNC DELEGATION TASK FAILED')) {
-    return 'Subagent failed'
-  }
-
-  // The goal's and the loop's own prompts (hermes_cli/goals.py, hermes_cli/loops.py): the dock tracks both.
-  if (text.startsWith('[Continuing toward your standing goal]')) {
-    return 'Continuing toward the goal'
-  }
-
-  const wakeup = /^\[\/loop wakeup #(\d+)(?:, ([^\]]+))?\]/.exec(text)
-
-  if (wakeup) {
-    return `Loop run #${wakeup[1]}${wakeup[2] ? ` · ${wakeup[2]}` : ''}`
-  }
-
-  const watch = /^\[IMPORTANT: Background process \S+ matched watch pattern "([^"]*)"/.exec(text)
-
-  if (watch) {
-    return `Watcher matched "${watch[1]}"`
-  }
-
-  if (/^\[Background process \S+ heartbeat/.test(text)) {
-    return 'Background command still running'
-  }
-
-  const done = /^\[IMPORTANT: Background process \S+ ([^(]+?) \(exit code ([^)\s]+)/.exec(text)
-
-  if (done) {
-    const how = done[1] === 'completed normally' ? 'finished' : done[1]
-
-    return `Background command ${how}${done[2] === '0' ? '' : ` (exit ${done[2]})`}`
-  }
-
-  return text.includes(INTERNAL_FOOTER) ? 'Hermes notice' : undefined
-}
-
-/**
- * Why a turn that follows `prev` started with no prompt: undefined after a prompt, "Subagents
- * finished" after a turn that sent subagents off in the background, else "Continued on its own".
- */
-export function continuation(prev: Entry | undefined): string | undefined {
-  if (prev?.kind !== 'turn') {
-    return undefined
-  }
-
-  const background = prev.blocks.some(
-    b => b.kind === 'tool' && b.call.name === 'delegate_task' && record(b.call.result)?.mode === 'background'
-  )
-
-  if (background) {
-    return 'Subagents finished'
-  }
-
-  const shell = prev.blocks.some(b => b.kind === 'tool' && b.call.name === 'terminal' && b.call.args.background === true)
-
-  return shell ? 'Background command finished' : 'Continued on its own'
-}
-
-const STEER_OPEN = '[OUT-OF-BAND USER MESSAGE'
-const STEER_CLOSE = '[/OUT-OF-BAND USER MESSAGE]'
-
-/** The user's words inside Hermes' steer marker; undefined for any other row. */
-export function steerText(content: string): string | undefined {
-  const text = content.trim()
-
-  if (!text.startsWith(STEER_OPEN)) {
-    return undefined
-  }
-
-  const body = text.slice(text.indexOf(']') + 1)
-  const end = body.lastIndexOf(STEER_CLOSE)
-
-  return (end >= 0 ? body.slice(0, end) : body).trim()
-}
-
-/**
- * Where a steer stands: `landed` once the turn went on after it, `pending` while the running
- * turn has not taken its next step, `next` when the turn ended first (Hermes then sends it as the
- * next prompt).
- */
-export function steerState(turn: TurnEntry, index: number): 'landed' | 'pending' | 'next' {
-  if (turn.blocks.slice(index + 1).some(b => b.kind !== 'steer' && b.kind !== 'compaction')) {
-    return 'landed'
-  }
-
-  return turn.status === 'live' ? 'pending' : 'next'
 }

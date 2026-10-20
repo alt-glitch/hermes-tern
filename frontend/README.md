@@ -26,6 +26,7 @@ code 75, and the launcher runs the Ink TUI in its place (`hermes_cli/main_tui_la
 | `src/entry.ts` | Handshake (`@stencil-hq/tern`), gateway start, `App` |
 | `src/app.ts` | The controller: one inline surface, gateway events → transcript, keys → overlay → completion → composer, one coalesced render per change |
 | `src/model.ts`, `src/transcript.ts` | The structured transcript (prompts, turns of thinking/text/tool blocks, notices, panels) folded from gateway events |
+| `src/transcript/` | The transcript's parts: compactions, a reload from history, finding calls, todos, subagent rows, and what a message says (Hermes' notices, steers) |
 | `src/composer.ts` | The prompt editor's model: text, caret, undo, history, kill ring |
 | `src/view/` | Node builders (TSX on the Tern SDK's runtime) for the transcript, tool cards, dock and welcome card |
 | `src/overlay.ts`, `src/overlays/` | Floating sheets: approvals, clarify, masked prompts, completions, pickers |

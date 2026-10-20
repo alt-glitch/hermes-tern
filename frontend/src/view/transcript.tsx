@@ -6,7 +6,7 @@
 import { type JSX, node } from '@stencil-hq/tern'
 
 import type { Block, Compaction, Entry, NoticeEntry, TurnEntry, UserAttachment, UserEntry } from '../model.js'
-import { steerState } from '../transcript.js'
+import { steerState } from '../transcript/messages.js'
 import { parts, pieces } from '../workLog.js'
 
 import { age, compact, duration } from './time.js'

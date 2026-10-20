@@ -22346,7 +22346,7 @@ var hubsEn = {
         listNavReplay: "Enter/\u2192 detail",
         listNavLive: "Enter tail \xB7 d/\u2192 detail",
         // {0} listNavReplay/listNavLive, {1} controls hint, {2} sort label, {3} filter label, {4} history hint
-        list: (nav, controls, sort, filter, history) => `\u2191\u2193/jk move \xB7 g/G top/bottom \xB7 ${nav}${controls} \xB7 s sort:${sort} \xB7 f filter:${filter}${history} \xB7 q close`,
+        list: (nav, controls, sort, filter, history2) => `\u2191\u2193/jk move \xB7 g/G top/bottom \xB7 ${nav}${controls} \xB7 s sort:${sort} \xB7 f filter:${filter}${history2} \xB7 q close`,
         // {0} replay index, {1} history length
         history: (index2, total) => ` \xB7 [ / ] history ${index2}/${total}`,
         detail: (controls) => `\u2191\u2193/jk scroll \xB7 PgUp/PgDn page \xB7 g/G top/bottom \xB7 Esc/\u2190 back to list${controls} \xB7 q close`
@@ -24899,6 +24899,13 @@ function record(v) {
   }
   return v && typeof v === "object" && !Array.isArray(v) ? v : void 0;
 }
+function parseJson(text11) {
+  try {
+    return JSON.parse(text11);
+  } catch {
+    return void 0;
+  }
+}
 
 // src/core/ids.ts
 import { randomUUID as randomUUID2 } from "node:crypto";
@@ -25168,20 +25175,22 @@ var Agents = class {
     const goals = Array.isArray(r.goals) ? r.goals.map((g) => typeof g === "string" ? g : "") : [];
     const ids = Array.isArray(r.subagent_ids) ? r.subagent_ids : [];
     const paths = Array.isArray(r.live_transcripts) ? r.live_transcripts : [];
-    const list8 = call.subagents ??= [];
-    goals.forEach((goal, i) => {
-      const id = typeof ids[i] === "string" && ids[i] ? ids[i] : `task-${i}`;
-      let a2 = list8.find((x) => x.id === id);
-      if (!a2) {
-        a2 = { calls: 0, goal, id, index: i, startedAt: at, status: "queued", tokens: 0, toolCount: 0 };
-        list8.push(a2);
-      }
-      a2.key ??= `p${i}`;
-      a2.delegationId = r.delegation_id;
-      a2.depth = 0;
-      a2.logPath = typeof paths[i] === "string" ? paths[i] : void 0;
+    this.#host.transcript.mutateCall(call, (c) => {
+      const list8 = c.subagents ??= [];
+      goals.forEach((goal, i) => {
+        const id = typeof ids[i] === "string" && ids[i] ? ids[i] : `task-${i}`;
+        let a2 = list8.find((x) => x.id === id);
+        if (!a2) {
+          a2 = { calls: 0, goal, id, index: i, startedAt: at, status: "queued", tokens: 0, toolCount: 0 };
+          list8.push(a2);
+        }
+        a2.key ??= `p${i}`;
+        a2.delegationId = r.delegation_id;
+        a2.depth = 0;
+        a2.logPath = typeof paths[i] === "string" ? paths[i] : void 0;
+      });
+      list8.sort((a2, b) => a2.index - b.index || (a2.depth ?? 0) - (b.depth ?? 0));
     });
-    list8.sort((a2, b) => a2.index - b.index || (a2.depth ?? 0) - (b.depth ?? 0));
     return true;
   }
   #wake() {
@@ -25391,11 +25400,9 @@ var Agents = class {
     applyLog(a2, parseLiveLog(text11));
     return true;
   }
+  /** Marks the card showing `a` changed (#poll and #readLog changed its row), and tells when it ended. */
   #touch(a2) {
-    const call = this.#owners().get(a2);
-    if (call) {
-      this.#host.transcript.touchCall(call);
-    }
+    this.#host.transcript.touchCall(this.#owners().get(a2));
     if (!isRunning(a2) && !this.#ended.has(a2)) {
       this.#ended.add(a2);
       this.#host.agentEnded?.();
@@ -26422,64 +26429,48 @@ var Media = class {
   }
 };
 
-// src/promptRefs.ts
-import { existsSync as existsSync3 } from "node:fs";
-import { basename as basename2 } from "node:path";
-var VALUE = "(`[^`\\n]+`|\"[^\"\\n]+\"|'[^'\\n]+'|\\S+)";
-var IMAGE_LINE = new RegExp(`^@image:${VALUE}[ \\t]*$`, "gm");
-var SCREENSHOT_LINE = /^\[screenshot\][ \t]*(?:\n|$)/gm;
-var HINTS = /\n\n((?:\[Image attached(?: at)?: [^\n]+\]\n?)+)((?:\[screenshot\](?:\n|$))*)$/;
-var ATTACHED_CONTEXT = /(?:^|\n)--- Attached Context ---\s*\n/;
-var CONTEXT_WARNINGS = /(?:^|\n)--- Context Warnings ---[\s\S]*$/;
-var CONTEXT_REF = new RegExp(`^(?:\\S+ )?@(file|folder|url|image):${VALUE}`, "gm");
-var IMAGE_FILE = /\.(png|jpe?g|gif|webp)$/i;
-var unquote = (v) => /^([`"']).*\1$/.test(v) ? v.slice(1, -1) : v;
-function splitPrompt(raw2) {
-  let text11 = raw2;
-  let hinted = [];
-  const hints = HINTS.exec(text11);
-  if (hints) {
-    const paths = [...(hints[1] ?? "").matchAll(/^\[Image attached(?: at)?: (.+)\]$/gm)].map((m) => m[1]);
-    const placeholders = (hints[2] ?? "").split("[screenshot]").length - 1;
-    if (placeholders === 0 || placeholders === paths.length) {
-      text11 = text11.slice(0, hints.index);
-      hinted = paths;
+// src/transcript/calls.ts
+function findCall(entries, match) {
+  for (let i = entries.length - 1; i >= 0; i--) {
+    const turn = entries[i];
+    if (turn?.kind !== "turn") {
+      continue;
+    }
+    const located = callIn(turn, match);
+    if (located) {
+      return located;
     }
   }
-  const refs = [];
-  text11 = text11.replace(IMAGE_LINE, (_line, value) => {
-    refs.push(unquote(value));
-    return "";
-  });
-  if (refs.length) {
-    text11 = text11.replace(SCREENSHOT_LINE, "");
-  }
-  const files = [];
-  const marker2 = ATTACHED_CONTEXT.exec(text11);
-  if (marker2) {
-    const context = text11.slice(marker2.index + marker2[0].length);
-    text11 = text11.slice(0, marker2.index);
-    for (const m of context.matchAll(CONTEXT_REF)) {
-      const ref = `@${m[1]}:${m[2]}`;
-      const end = context.indexOf("\n", m.index);
-      const line = context.slice(m.index, end < 0 ? void 0 : end);
-      const disk = /available on disk at `([^`]+)`/.exec(line)?.[1];
-      if (!text11.includes(ref) && !files.some((f) => f.ref === ref)) {
-        files.push({ ref, ...disk ? { path: disk } : {} });
-      }
-    }
-  }
-  return { files, images: [...refs, ...hinted], text: text11.replace(CONTEXT_WARNINGS, "").replace(/\n{3,}/g, "\n\n").trim() };
+  return void 0;
 }
-function promptAttachments(parts3, exists = existsSync3) {
-  const local = (p3) => p3.startsWith("/") && exists(p3);
-  return [
-    ...parts3.images.map((p3) => ({ kind: "image", name: basename2(p3), ...local(p3) ? { source: { path: p3 } } : {} })),
-    ...parts3.files.map(({ path: path2, ref }) => {
-      const name = basename2(unquote(ref.replace(/^@\w+:/, "")));
-      return path2 && IMAGE_FILE.test(path2) && local(path2) ? { kind: "image", name, source: { path: path2 } } : { kind: "file", name };
-    })
-  ];
+function callIn(turn, match) {
+  const hit = turn.blocks.findLast((b) => b.kind === "tool" && match(b.call));
+  return hit && { call: hit.call, turn };
+}
+function callsWhere(entries, match) {
+  return entries.flatMap((e) => e.kind === "turn" ? e.blocks.flatMap((b) => b.kind === "tool" && match(b.call) ? [b.call] : []) : []);
+}
+function isTodoName(name) {
+  return name === "todo_list" || name === "todo";
+}
+function isProcessTool(name) {
+  return name === "process_manage" || name === "process";
+}
+function isWatchCall(call) {
+  return isProcessTool(call.name) && ["log", "poll", "wait"].includes(String(call.args.action)) && typeof call.args.session_id === "string";
+}
+function isBackgroundCall(call) {
+  return call.name === "terminal" && (call.args.background === true || typeof record(call.result)?.session_id === "string");
+}
+function isToolError(p3) {
+  const r = record(p3.result);
+  if (r?.error) {
+    return true;
+  }
+  if (p3.name === "terminal" && typeof r?.exit_code === "number" && r.exit_code !== 0) {
+    return true;
+  }
+  return typeof p3.summary === "string" && /^(error|failed)\b/i.test(p3.summary);
 }
 
 // src/view/describe.ts
@@ -26738,947 +26729,6 @@ var TERN_ENV = /^\s*(?:export (?:TERN_[A-Z_]+=(?:'[^']*'|"[^"]*"|[^\s;]+) ?)+; ?
 function withoutTernEnv(command) {
   const m = TERN_ENV.exec(command);
   return m?.[0] ? command.slice(m[0].length) : command;
-}
-
-// src/transcript.ts
-var Transcript = class {
-  entries = [];
-  /** Bumped on every change; views and the render loop compare it. */
-  rev = 0;
-  #next = 0;
-  /** The session's running usage at the last completed turn (message.complete reports session totals). */
-  #sessionUsage;
-  /** The session's cumulative counters at the last `session.usage` tick. */
-  #counters;
-  /** The streaming turn: set by start, cleared by complete, clear and load (notices may land after it). */
-  #live;
-  /** The reason line for the next turn, when Hermes' own notice started it. */
-  #continued;
-  /** The compactions this view saw happen: what a reload's stored ones get their numbers from. */
-  #seen = [];
-  /** Sets the running usage turns count from (a resumed session's totals). */
-  usageBase(usage) {
-    this.#sessionUsage = usage;
-  }
-  /**
-   * Takes a `session.usage` tick's cumulative counters and rate. The turn running (or, as the
-   * last tick can trail message.complete, the one that just ended) gets its share: tokens and
-   * the part of its prompt read from the cache.
-   */
-  usageTick(counters, tps) {
-    this.#counters = counters;
-    const turn = this.live ?? this.entries.findLast((e) => e.kind === "turn");
-    let start = turn?.kind === "turn" ? turn.countersAtStart : void 0;
-    if (turn?.kind !== "turn" || !start) {
-      return;
-    }
-    if (counters.total < start.total) {
-      start = turn.countersAtStart = { prompt: 0, read: 0, total: 0 };
-    }
-    const prompt = counters.prompt - start.prompt;
-    const hit = prompt > 0 ? Math.round((counters.read - start.read) / prompt * 100) : void 0;
-    const tokens2 = counters.total - start.total || void 0;
-    if (hit !== turn.cacheHit || tokens2 !== turn.tickTokens || tps !== turn.tps) {
-      turn.cacheHit = hit;
-      turn.tickTokens = tokens2;
-      turn.tps = tps;
-      this.#touch(turn);
-    }
-  }
-  /** A fresh id for an entry or block, unique within this transcript. */
-  id(prefix2) {
-    return entryId(`${prefix2}${(this.#next++).toString(36)}`);
-  }
-  get live() {
-    return this.#live;
-  }
-  clear() {
-    this.entries = [];
-    this.#live = void 0;
-    this.#touch();
-  }
-  push(entry) {
-    this.entries.push(entry);
-    this.#touch();
-  }
-  /**
-   * A steer the gateway took for the running turn: it shows inside that turn, where it was sent,
-   * since the agent reads it before its next step. With no turn running it is a plain prompt.
-   */
-  steer(text11, at = Date.now()) {
-    const turn = this.live;
-    if (!turn) {
-      return this.user(text11, at);
-    }
-    turn.blocks.push({ at, id: this.id("s"), kind: "steer", text: text11 });
-    turn.rev++;
-  }
-  user(text11, at = Date.now(), steered = false, attachments = []) {
-    this.push({ at, id: this.id("u"), kind: "user", text: text11, ...steered ? { steered } : {}, ...attachments.length ? { attachments } : {} });
-  }
-  /** A stored prompt: its words, and as attachments the image refs and attached context Hermes stored with them. */
-  #storedUser(raw2, at) {
-    const parts3 = splitPrompt(raw2);
-    this.user(parts3.text, at, false, promptAttachments(parts3));
-  }
-  /**
-   * A queued prompt the shared gateway just started. Its message.start came first, so the bubble
-   * goes before the turn it opened while that turn is still empty; else at the end.
-   */
-  started(text11, at = Date.now(), attachments = []) {
-    const live = this.live;
-    const notice = attachments.length ? void 0 : internalNotice(text11);
-    if (notice) {
-      if (live && !live.blocks.length) {
-        live.continued = notice;
-        this.#touch(live);
-      } else {
-        this.#continued = notice;
-      }
-      return;
-    }
-    if (live && !live.blocks.length && this.entries.at(-1) === live) {
-      this.entries.splice(-1, 0, { at, id: this.id("u"), kind: "user", text: text11, ...attachments.length ? { attachments } : {} });
-      live.continued = void 0;
-      this.#touch(live);
-      return;
-    }
-    this.user(text11, at, false, attachments);
-  }
-  notice(text11, tone = "info") {
-    this.push({ id: this.id("n"), kind: "notice", text: text11, tone });
-  }
-  panel(title, text11) {
-    this.push({ id: this.id("p"), kind: "panel", text: text11, title });
-  }
-  /**
-   * The context started compacting (`before`: its tokens, when known). Inside a running turn that
-   * already did something it is a step of that turn; else it goes between turns, before the turn
-   * it was compacted for. Hermes' later lines of the same compaction only fill in the count.
-   */
-  compacting(before, at = Date.now(), manual = false) {
-    const running = this.#seen.findLast((c) => c.status === "running");
-    if (running) {
-      running.before ??= before || void 0;
-      running.manual ||= manual || void 0;
-      return this.#touchCompaction(running);
-    }
-    const compaction = { startedAt: at, status: "running", ...before ? { before } : {}, ...manual ? { manual } : {} };
-    this.#seen.push(compaction);
-    const live = this.live;
-    if (live?.blocks.length) {
-      live.blocks.push({ at, compaction, id: this.id("z"), kind: "compaction" });
-      this.#touch(live);
-      return;
-    }
-    const entry = { compaction, id: this.id("z"), kind: "compaction", rev: 0 };
-    if (live && this.entries.at(-1) === live) {
-      this.entries.splice(-1, 0, entry);
-      this.#touch();
-    } else {
-      this.push(entry);
-    }
-  }
-  /**
-   * The running compaction ended. `tokens` are the owner's own counts (/compress reports them
-   * after its `ready` edge, so they also reach the compaction that just ended).
-   */
-  compacted(at = Date.now(), tokens2 = {}) {
-    const running = this.#seen.findLast((c2) => c2.status === "running");
-    const c = running ?? (tokens2.before || tokens2.after ? this.#seen.at(-1) : void 0);
-    if (!c) {
-      return;
-    }
-    if (running) {
-      running.status = "done";
-      running.endedAt = at;
-    }
-    c.before = tokens2.before || c.before;
-    c.after = tokens2.after || c.after;
-    this.#touchCompaction(c);
-  }
-  /**
-   * The last compaction did not happen after all: Hermes aborted it (no done edge came before the
-   * turn ended; `running` drops only a running one) or /compress changed nothing.
-   */
-  uncompact(running = false) {
-    const c = this.#seen.at(-1);
-    if (!c || running && c.status !== "running") {
-      return;
-    }
-    this.#seen.pop();
-    const at = this.entries.findIndex((e) => e.kind === "compaction" && e.compaction === c);
-    if (at >= 0) {
-      this.entries.splice(at, 1);
-      return this.#touch();
-    }
-    const turn = this.entries.findLast(
-      (e) => e.kind === "turn" && e.blocks.some((b) => b.kind === "compaction" && b.compaction === c)
-    );
-    if (turn) {
-      turn.blocks = turn.blocks.filter((b) => b.kind !== "compaction" || b.compaction !== c);
-      this.#touch(turn);
-    }
-  }
-  /**
-   * A context reading (tokens in use): the first one under the last compaction's `before` is what
-   * it left. A reading from before it finished (a stale tick) is not lower, so it is skipped.
-   */
-  contextUsed(used) {
-    const c = this.#seen.at(-1);
-    if (c?.status !== "done" || c.after !== void 0 || !(used > 0) || c.before && used >= c.before * 0.95) {
-      return;
-    }
-    c.after = used;
-    this.#touchCompaction(c);
-  }
-  /** The compactions seen here that the store has no summary for yet. */
-  get unsummarized() {
-    return this.#seen.some((c) => c.status === "done" && c.summary === void 0);
-  }
-  /** Gives each seen compaction the stored summary written while it ran. */
-  summarize(stored) {
-    for (const [mark2, c] of this.#claims(stored)) {
-      if (c.summary === void 0) {
-        c.summary = mark2.summary ?? "";
-        c.messages = mark2.messages;
-        this.#touchCompaction(c);
-      }
-    }
-  }
-  /** Which stored compaction each seen one is: the nearest summary written while it ran, each once. */
-  #claims(stored) {
-    const out = /* @__PURE__ */ new Map();
-    for (const c of this.#seen) {
-      const end = c.endedAt ?? c.startedAt;
-      const mark2 = stored.filter((s2) => c.status === "done" && !out.has(s2) && within(c, s2.at)).sort((a2, b) => Math.abs(a2.at - end) - Math.abs(b.at - end))[0];
-      if (mark2) {
-        out.set(mark2, c);
-      }
-    }
-    return out;
-  }
-  /** Another session is shown: the compactions seen were the last one's. */
-  forgetCompactions() {
-    this.#seen = [];
-  }
-  /** Marks the turn or entry showing `c` changed. */
-  #touchCompaction(c) {
-    for (let i = this.entries.length - 1; i >= 0; i--) {
-      const e = this.entries[i];
-      if (e.kind === "compaction" && e.compaction === c) {
-        e.rev++;
-        return this.#touch();
-      }
-      if (e.kind === "turn" && e.blocks.some((b) => b.kind === "compaction" && b.compaction === c)) {
-        return this.#touch(e);
-      }
-    }
-  }
-  /** Opens a live turn unless one is already streaming. */
-  start(at = Date.now()) {
-    const live = this.live;
-    if (live) {
-      return live;
-    }
-    const turn = {
-      blocks: [],
-      continued: this.#continued ?? continuation(this.entries.findLast(passable)),
-      // A session's first turn starts from zero; later ones from the last tick.
-      countersAtStart: this.#counters ?? (this.entries.some((e) => e.kind === "turn") ? void 0 : { prompt: 0, read: 0, total: 0 }),
-      id: this.id("t"),
-      kind: "turn",
-      rev: 0,
-      startedAt: at,
-      status: "live"
-    };
-    this.push(turn);
-    this.#live = turn;
-    this.#continued = void 0;
-    return turn;
-  }
-  reasoning(text11, at = Date.now()) {
-    if (!text11) {
-      return;
-    }
-    const turn = this.start(at);
-    const last = turn.blocks.at(-1);
-    if (last?.kind === "thinking" && last.endedAt === void 0) {
-      last.text += text11;
-    } else {
-      turn.blocks.push({ id: this.id("k"), kind: "thinking", startedAt: at, text: text11 });
-    }
-    this.#touch(turn);
-  }
-  /**
-   * A whole reasoning block from a provider that doesn't stream it; ignored once reasoning streamed.
-   * Hermes also relays each response's visible text through `reasoning.available`, so text the
-   * turn already shows is not a thought either.
-   */
-  reasoningBlock(text11, at = Date.now()) {
-    const turn = this.start(at);
-    const incoming = text11.trim();
-    if (!incoming || turn.blocks.some((b) => b.kind === "thinking" && !b.label || b.kind === "text" && b.text.includes(incoming))) {
-      return;
-    }
-    turn.blocks.push({ endedAt: at, id: this.id("k"), kind: "thinking", startedAt: at, text: text11 });
-    this.#touch(turn);
-  }
-  /** A Mixture-of-Agents reference model's answer: a sealed thought block of its own, under `label`. */
-  reference(label, text11, at = Date.now()) {
-    const turn = this.start(at);
-    this.#endThinking(turn, at);
-    turn.blocks.push({ endedAt: at, id: this.id("k"), kind: "thinking", label, startedAt: at, text: text11.trim() });
-    this.#touch(turn);
-  }
-  text(text11, at = Date.now()) {
-    if (!text11) {
-      return;
-    }
-    const turn = this.start(at);
-    this.#endThinking(turn, at);
-    const last = turn.blocks.at(-1);
-    if (last?.kind === "text") {
-      last.text += text11;
-    } else {
-      turn.blocks.push({ id: this.id("x"), kind: "text", text: text11 });
-    }
-    this.#touch(turn);
-  }
-  /** Interim commentary: seals the streamed text so the next delta starts a new block. */
-  interim(text11, { alreadyStreamed }, at = Date.now()) {
-    const turn = this.start(at);
-    this.#endThinking(turn, at);
-    if (!alreadyStreamed && text11.trim()) {
-      turn.blocks.push({ id: this.id("x"), kind: "text", text: text11 });
-    }
-    turn.blocks.push({ id: this.id("x"), kind: "text", text: "" });
-    this.#touch(turn);
-  }
-  toolStart(p3, at = Date.now()) {
-    const turn = this.start(at);
-    this.#endThinking(turn, at);
-    if (this.#tool(p3.tool_id)) {
-      return;
-    }
-    const u = unwrap(p3.name, p3.args ?? {});
-    const call = {
-      args: shownArgs(u.args),
-      argsText: p3.args_text ?? "",
-      batch: u.batch,
-      context: withoutTernEnv(p3.context ?? ""),
-      id: toolCallId(p3.tool_id),
-      name: u.name,
-      startedAt: at,
-      status: "running",
-      via: u.via
-    };
-    const before = this.currentTodos();
-    if (isTodoName(call.name)) {
-      call.todosBefore = before;
-    }
-    if (Array.isArray(call.args.todos)) {
-      call.todos = todosOf(call.args, before);
-    }
-    turn.blocks.push({ call, id: call.id, kind: "tool" });
-    this.#touch(turn);
-  }
-  toolComplete(p3, at = Date.now()) {
-    let found = this.#tool(p3.tool_id);
-    if (!found) {
-      this.toolStart({ args: p3.args ?? {}, name: p3.name, tool_id: p3.tool_id }, at);
-      found = this.#tool(p3.tool_id);
-    }
-    if (!found) {
-      return;
-    }
-    const { call, turn } = found;
-    const output = record(p3.result)?.output;
-    const interrupted = p3.name === "terminal" && typeof output === "string" && /\[Command interrupted\]\s*$/.test(output);
-    call.duration = typeof p3.duration_s === "number" ? Math.round(p3.duration_s * 1e3) : at - call.startedAt;
-    call.summary = p3.summary ?? void 0;
-    call.resultText = p3.result_text ?? void 0;
-    call.result = p3.result;
-    call.diff = p3.inline_diff ?? void 0;
-    if (p3.args) {
-      const u = unwrap(p3.name, p3.args);
-      call.args = shownArgs(u.args);
-      call.name = u.name;
-      call.via = u.via ?? call.via;
-      call.batch = u.batch;
-    }
-    const bridged = settleBridge(call);
-    call.status = interrupted ? "cancelled" : bridged ?? isToolError(p3) ? "error" : "done";
-    if (Array.isArray(p3.todos)) {
-      call.todos = toTodos(p3.todos);
-    }
-    this.#touch(turn);
-  }
-  /** The newest todo snapshot lands on the newest todo tool call. */
-  todos(todos) {
-    const found = this.#lastTool((c) => isTodoName(c.name));
-    if (found) {
-      found.call.todos = toTodos(todos);
-      this.#touch(found.turn);
-    }
-  }
-  subagent(type, p3, at = Date.now()) {
-    const found = (p3.delegation_id ? this.#findTool((c) => c.name === "delegate_task" && record(c.result)?.delegation_id === p3.delegation_id) : void 0) ?? this.#lastTool((c) => c.name === "delegate_task");
-    if (!found) {
-      return;
-    }
-    const list8 = found.call.subagents ??= [];
-    const key2 = p3.subagent_id ?? `task-${p3.task_index}`;
-    let agent = list8.find((a2) => a2.id === key2);
-    if (!agent) {
-      agent = {
-        calls: 0,
-        goal: p3.goal,
-        id: key2,
-        index: p3.task_index,
-        startedAt: at,
-        status: "queued",
-        tokens: 0,
-        toolCount: 0
-      };
-      list8.push(agent);
-      list8.sort((a2, b) => a2.index - b.index);
-    }
-    agent.last = p3;
-    agent.goal = p3.goal || agent.goal;
-    agent.model = p3.model ?? agent.model;
-    agent.toolCount = p3.tool_count ?? agent.toolCount;
-    agent.calls = p3.api_calls ?? agent.calls;
-    agent.tokens = (p3.input_tokens ?? 0) + (p3.output_tokens ?? 0) || agent.tokens;
-    if (type === "subagent.start") {
-      agent.status = "running";
-      agent.startedAt = at;
-    } else if (type === "subagent.tool") {
-      agent.status = "running";
-      agent.tool = p3.tool_name ?? agent.tool;
-      agent.toolPreview = p3.tool_preview ?? p3.text ?? void 0;
-      agent.toolSince = { at };
-    } else if (type === "subagent.complete") {
-      agent.status = p3.status === "completed" ? "done" : p3.status === "interrupted" ? "cancelled" : "failed";
-      agent.summary = p3.summary ?? void 0;
-      agent.duration = typeof p3.duration_seconds === "number" ? Math.round(p3.duration_seconds * 1e3) : at - agent.startedAt;
-      agent.tool = void 0;
-    } else if (p3.status === "running") {
-      agent.status = "running";
-    }
-    this.#touch(found.turn);
-  }
-  complete(p3, at = Date.now()) {
-    const turn = this.live ?? this.start(at);
-    this.#endThinking(turn, at);
-    const final2 = typeof p3.text === "string" ? p3.text : "";
-    const tail = trailingText(turn);
-    if (final2.trim() && tail.trim() !== final2.trim() && !(p3.status === "error" && !p3.partial)) {
-      const last = turn.blocks.at(-1);
-      if (last?.kind === "text") {
-        last.text = final2;
-      } else {
-        turn.blocks.push({ id: this.id("x"), kind: "text", text: final2 });
-      }
-    }
-    turn.blocks = turn.blocks.filter((b) => b.kind !== "text" || b.text.trim());
-    for (const b of turn.blocks) {
-      if (b.kind === "tool" && b.call.status === "running") {
-        b.call.status = p3.status === "error" ? "error" : p3.status === "interrupted" ? "cancelled" : "done";
-        b.call.duration ??= at - b.call.startedAt;
-      }
-    }
-    turn.endedAt = at;
-    this.#live = void 0;
-    if (p3.usage) {
-      turn.usage = usageSince(p3.usage, this.#sessionUsage);
-      this.#sessionUsage = p3.usage;
-    }
-    turn.warning = p3.warning ?? void 0;
-    turn.status = p3.status === "error" ? "error" : p3.status === "interrupted" ? "interrupted" : "done";
-    if (turn.status === "error") {
-      const surfaced = p3.error_surface?.message;
-      const error = typeof surfaced === "string" && surfaced || p3.error || final2 || "The request failed";
-      Object.assign(turn, failure(error, p3.error_surface?.code));
-      turn.errorHint = final2.split(/\n\s*\n/)[0]?.trim() || void 0;
-    }
-    this.#touch(turn);
-  }
-  /** Seals a live turn the user interrupted before the agent confirmed it. */
-  interrupt(at = Date.now()) {
-    const turn = this.live;
-    if (turn) {
-      this.complete({ status: "interrupted" }, at);
-    }
-  }
-  /**
-   * Rebuilds the entries of a resumed session from its stored messages, with its compactions
-   * (`stored`, which the gateway's history leaves out) where they happened: in the turn that went
-   * on after one, else between turns.
-   */
-  load(messages2, stored = []) {
-    this.entries = this.entries.filter((e) => e.kind === "welcome");
-    this.#live = void 0;
-    let turn;
-    const marks = [...stored].sort((a2, b) => a2.at - b.at);
-    const claims = this.#claims(marks);
-    let due = [];
-    const place = (inTurn) => {
-      for (const mark2 of due) {
-        const compaction = this.#storedCompaction(mark2, claims.get(mark2));
-        if (inTurn && turn) {
-          turn.blocks.push({ at: mark2.at, compaction, id: this.id("z"), kind: "compaction" });
-        } else {
-          this.entries.push({ compaction, id: this.id("z"), kind: "compaction", rev: 0 });
-        }
-      }
-      due = [];
-    };
-    let pendingContinued;
-    let promptAt = 0;
-    const calls = /* @__PURE__ */ new Map();
-    let todos;
-    for (const m of messages2) {
-      const at = typeof m.timestamp === "number" ? m.timestamp * 1e3 : 0;
-      const text11 = typeof m.text === "string" ? m.text : typeof m.content === "string" ? m.content : "";
-      const steered = m.role === "user" ? m.display_kind === "steer" ? text11.trim() : steerText(text11) : void 0;
-      while (at > 0 && marks.length && marks[0].at <= at) {
-        due.push(marks.shift());
-      }
-      place(m.role === "assistant" || m.role === "tool" || m.role === "user" && steered !== void 0);
-      if (steered !== void 0 && turn) {
-        turn.blocks.push({ at, id: this.id("s"), kind: "steer", text: steered });
-        continue;
-      }
-      if (m.role === "user") {
-        turn = void 0;
-        promptAt = at;
-        const notice = displayNotice(m.display_kind, m.display_metadata) ?? internalNotice(text11);
-        if (notice) {
-          pendingContinued = notice;
-        } else {
-          pendingContinued = void 0;
-          this.#storedUser(steered ?? text11, at);
-        }
-        continue;
-      }
-      if (m.role === "system") {
-        turn = void 0;
-        if (text11.trim()) {
-          this.entries.push({ id: this.id("n"), kind: "notice", text: text11, tone: "info" });
-        }
-        continue;
-      }
-      if (!turn) {
-        const continued = pendingContinued ?? continuation(this.entries.findLast(passable));
-        turn = { blocks: [], continued, id: this.id("t"), kind: "turn", rev: 0, startedAt: promptAt || at, status: "done" };
-        pendingContinued = void 0;
-        promptAt = 0;
-        this.entries.push(turn);
-      }
-      if (at > 0) {
-        turn.endedAt = Math.max(turn.endedAt ?? at, at);
-      }
-      if (m.role === "assistant") {
-        const meta3 = record(m.display_metadata);
-        const thought = storedThought(m);
-        if (thought.trim()) {
-          turn.blocks.push({ endedAt: at, id: this.id("k"), kind: "thinking", startedAt: at, text: thought });
-        }
-        if (m.display_kind === "failed_turn") {
-          const surface = record(meta3?.error_surface);
-          const error = str4(meta3?.error) ?? str4(surface?.message);
-          turn.status = "error";
-          Object.assign(turn, error ? failure(error, surface?.code) : {});
-          turn.errorHint = text11.trim() || void 0;
-          continue;
-        }
-        const reply = typeof m.display_content === "string" ? m.display_content : text11;
-        const notes = Array.isArray(m.display_commentary) ? m.display_commentary.filter((n) => typeof n === "string" && Boolean(n.trim())) : [];
-        const flat3 = (s2) => s2.replace(/\s+/g, " ").trim();
-        if (!reply.trim() || flat3(notes.join("\n\n")) !== flat3(reply)) {
-          turn.blocks.push(...notes.map((n) => ({ id: this.id("x"), kind: "text", text: n })));
-        }
-        if (reply.trim()) {
-          turn.blocks.push({ id: this.id("x"), kind: "text", text: reply });
-        }
-        if (meta3?.interrupted === true) {
-          turn.status = "interrupted";
-        }
-      } else if (m.role === "tool") {
-        const id = toolCallId(m.tool_call_id ?? this.id("c"));
-        const result = typeof m.content === "string" && m.content ? m.content : void 0;
-        const diff2 = str4(record(record(m.display_metadata)?.tool_result_metadata)?.inline_diff);
-        const existing = calls.get(id);
-        if (existing) {
-          existing.result = result ?? existing.result;
-          existing.diff = diff2 ?? existing.diff;
-          if (settleBridge(existing)) {
-            existing.status = "error";
-          }
-          continue;
-        }
-        const u = unwrap(m.name ?? "tool", m.args ?? {});
-        const args = u.args;
-        const call = {
-          args,
-          argsText: "",
-          batch: u.batch,
-          context: m.context ?? "",
-          diff: diff2,
-          duration: 0,
-          id,
-          name: u.name,
-          result,
-          startedAt: at,
-          status: "done",
-          via: u.via
-        };
-        call.status = settleBridge(call) ?? Boolean(record(call.result)?.error) ? "error" : "done";
-        if (isTodoName(call.name)) {
-          call.todosBefore = todos;
-        }
-        if (Array.isArray(args.todos)) {
-          call.todos = todosOf(args, todos);
-          todos = call.todos;
-        }
-        calls.set(id, call);
-        turn.blocks.push({ call, id: this.id("c"), kind: "tool" });
-      }
-    }
-    due.push(...marks);
-    place(false);
-    this.#touch();
-  }
-  /** A stored compaction, as the one this view saw happen (`seen`) when there is one: its numbers stay. */
-  #storedCompaction(mark2, seen) {
-    if (seen) {
-      seen.summary = mark2.summary ?? "";
-      seen.messages = mark2.messages;
-      return seen;
-    }
-    return { startedAt: mark2.at, status: "done", ...mark2.summary ? { summary: mark2.summary } : {}, ...mark2.messages ? { messages: mark2.messages } : {} };
-  }
-  /** A resumed session's unfinished turn: its prompt, then a live turn holding what streamed so far. */
-  inflight(turn, at = Date.now()) {
-    const user = turn.user?.trim();
-    const notice = user ? displayNotice(turn.display_kind, turn.display_metadata) ?? internalNotice(user) : void 0;
-    if (notice) {
-      this.#continued = notice;
-    } else if (user) {
-      this.#storedUser(user, at);
-    }
-    if (turn.assistant || turn.streaming) {
-      this.start(at);
-      this.text(turn.assistant ?? "", at);
-    }
-  }
-  #endThinking(turn, at) {
-    for (const b of turn.blocks) {
-      if (b.kind === "thinking" && b.endedAt === void 0) {
-        b.endedAt = at;
-      }
-    }
-  }
-  /** Marks the turn holding `call` changed, after something outside the reducer updated it. */
-  touchCall(call) {
-    this.#touch(this.#findTool((c) => c === call)?.turn);
-  }
-  /** The agent's todo list as its newest snapshot left it (any turn), if it ever made one. */
-  currentTodos() {
-    for (let i = this.entries.length - 1; i >= 0; i--) {
-      const e = this.entries[i];
-      if (e?.kind !== "turn") {
-        continue;
-      }
-      const hit = e.blocks.findLast((b) => b.kind === "tool" && b.call.todos?.length);
-      if (hit?.kind === "tool") {
-        return hit.call.todos;
-      }
-    }
-    return void 0;
-  }
-  /** The delegate_task calls in the transcript, oldest first. */
-  delegations() {
-    return this.calls("delegate_task");
-  }
-  /** The calls of tool `name` in the transcript, oldest first. */
-  calls(name) {
-    return this.entries.flatMap(
-      (e) => e.kind === "turn" ? e.blocks.flatMap((b) => b.kind === "tool" && b.call.name === name ? [b.call] : []) : []
-    );
-  }
-  /** The call with tool id `id`, in any turn. */
-  call(id) {
-    return this.#tool(id)?.call;
-  }
-  /** The calls that show a background process: terminal calls that start one, `process` calls that watch one; oldest first. */
-  backgroundCalls() {
-    return this.entries.flatMap(
-      (e) => e.kind === "turn" ? e.blocks.flatMap((b) => b.kind === "tool" && (isBackgroundCall(b.call) || isWatchCall(b.call)) ? [b.call] : []) : []
-    );
-  }
-  /** The call the gateway's tool id `id` names (as an event sends it), in any turn. */
-  #tool(id) {
-    return this.#findTool((call) => call.id === id);
-  }
-  /** The newest call matching `match` in any turn, newest turn first. */
-  #findTool(match) {
-    for (let i = this.entries.length - 1; i >= 0; i--) {
-      const turn = this.entries[i];
-      if (turn?.kind !== "turn") {
-        continue;
-      }
-      const hit = turn.blocks.findLast((b) => b.kind === "tool" && match(b.call));
-      if (hit) {
-        return { call: hit.call, turn };
-      }
-    }
-    return void 0;
-  }
-  /** The newest call matching `match` in the live (else the last) turn only. */
-  #lastTool(match) {
-    const turn = this.live ?? this.entries.findLast((e) => e.kind === "turn");
-    if (turn?.kind !== "turn") {
-      return void 0;
-    }
-    const hit = turn.blocks.findLast((b) => b.kind === "tool" && match(b.call));
-    return hit && { call: hit.call, turn };
-  }
-  /** Marks a change: the transcript's, and the turn's when one changed. */
-  #touch(turn) {
-    this.rev++;
-    if (turn) {
-      turn.rev++;
-    }
-  }
-};
-function trailingText(turn) {
-  let out = "";
-  for (const b of turn.blocks) {
-    if (b.kind === "tool" || b.kind === "text" && !b.text) {
-      out = "";
-    } else if (b.kind === "text") {
-      out += b.text;
-    }
-  }
-  return out;
-}
-function failure(error, code7) {
-  const http = /^HTTP (\d{3}):\s*/.exec(error);
-  return {
-    error: http ? error.slice(http[0].length) : error,
-    errorCode: http?.[1] ?? (typeof code7 === "string" && code7 ? code7 : void 0)
-  };
-}
-var str4 = (v) => typeof v === "string" && v.trim() ? v : void 0;
-function storedThought(m) {
-  if (typeof m.display_reasoning === "string") {
-    return detailsText(m.display_reasoning);
-  }
-  return str4(m.reasoning) ?? str4(m.reasoning_content) ?? detailsText(m.reasoning_details);
-}
-function detailsText(details) {
-  let blocks2 = details;
-  if (typeof blocks2 === "string") {
-    const text11 = blocks2.trim();
-    if (!text11.startsWith("[") && !text11.startsWith("{")) {
-      return text11;
-    }
-    try {
-      blocks2 = JSON.parse(text11);
-    } catch {
-      return text11;
-    }
-  }
-  const out = [];
-  for (const block of Array.isArray(blocks2) ? blocks2 : [blocks2]) {
-    const r = typeof block === "string" ? { text: block } : record(block);
-    if (!r || r.type === "reasoning.encrypted") {
-      continue;
-    }
-    const summary4 = Array.isArray(r.summary) ? r.summary.map((s2) => typeof s2 === "string" ? s2 : str4(record(s2)?.text) ?? "").join("\n\n") : r.summary;
-    const text11 = [summary4, r.thinking, r.content, r.text].map(str4).find(Boolean)?.trim();
-    if (text11 && !out.includes(text11)) {
-      out.push(text11);
-    }
-  }
-  return out.join("\n\n");
-}
-function isToolError(p3) {
-  const r = record(p3.result);
-  if (r?.error) {
-    return true;
-  }
-  if (p3.name === "terminal" && typeof r?.exit_code === "number" && r.exit_code !== 0) {
-    return true;
-  }
-  return typeof p3.summary === "string" && /^(error|failed)\b/i.test(p3.summary);
-}
-function usageSince(now, before) {
-  const less = (key2) => {
-    const a2 = now[key2];
-    const b = before?.[key2];
-    return typeof a2 === "number" ? Math.max(0, a2 - (typeof b === "number" ? b : 0)) : void 0;
-  };
-  return { ...now, cost_usd: less("cost_usd"), input: less("input"), output: less("output"), total: less("total") };
-}
-var passable = (e) => e.kind !== "notice" && e.kind !== "compaction";
-function within(c, at) {
-  return at >= c.startedAt - 5e3 && at <= (c.endedAt ?? Date.now()) + 15e3;
-}
-function isProcessTool(name) {
-  return name === "process_manage" || name === "process";
-}
-function isWatchCall(call) {
-  return isProcessTool(call.name) && ["log", "poll", "wait"].includes(String(call.args.action)) && typeof call.args.session_id === "string";
-}
-function shownArgs(args) {
-  return typeof args.command === "string" ? { ...args, command: withoutTernEnv(args.command) } : args;
-}
-function isBackgroundCall(call) {
-  return call.name === "terminal" && (call.args.background === true || typeof record(call.result)?.session_id === "string");
-}
-function isTodoName(name) {
-  return name === "todo_list" || name === "todo";
-}
-function todosOf(args, current) {
-  const raw2 = Array.isArray(args.todos) ? args.todos : [];
-  return args.merge === true ? mergeTodos(current ?? [], raw2) : toTodos(raw2);
-}
-function mergeTodos(current, patch6) {
-  const out = current.map((t2) => ({ ...t2 }));
-  for (const item3 of patch6) {
-    const r = record(item3);
-    const id = String(r?.id ?? "").trim();
-    if (!r || !id) {
-      continue;
-    }
-    const cur = out.find((t2) => t2.id === id);
-    if (!cur) {
-      if (String(r.content ?? "").trim()) {
-        out.push(...toTodos([{ ...r, id }]));
-      }
-      continue;
-    }
-    const content5 = String(r.content ?? "").trim();
-    const status = String(r.status ?? "").trim().toLowerCase();
-    if (content5) {
-      cur.content = content5;
-    }
-    if (status === "pending" || status === "in_progress" || status === "completed" || status === "cancelled") {
-      cur.status = status;
-    }
-    if ("parent" in r) {
-      const parent = String(r.parent ?? "").trim();
-      if (parent && parent !== id) {
-        cur.parent = parent;
-      } else {
-        delete cur.parent;
-      }
-    }
-  }
-  return out;
-}
-function toTodos(raw2) {
-  const out = [];
-  for (const item3 of raw2) {
-    if (!item3 || typeof item3 !== "object") {
-      continue;
-    }
-    const id = "id" in item3 ? String(item3.id) : String(out.length);
-    const content5 = "content" in item3 ? String(item3.content) : "";
-    const status = "status" in item3 ? String(item3.status) : "pending";
-    const parent = "parent" in item3 && item3.parent ? String(item3.parent) : void 0;
-    out.push({
-      content: content5,
-      id,
-      ...parent && { parent },
-      status: status === "completed" || status === "in_progress" || status === "cancelled" ? status : "pending"
-    });
-  }
-  return out;
-}
-function displayNotice(kind, metadata) {
-  if (kind === "auto_continue") {
-    return "Resumed interrupted turn";
-  }
-  if (kind !== "async_delegation_complete" && kind !== "process_complete") {
-    return void 0;
-  }
-  const meta3 = record(metadata);
-  const shown = typeof meta3?.display_text === "string" ? meta3.display_text.trim() : "";
-  if (shown) {
-    return shown;
-  }
-  if (kind === "process_complete") {
-    return "Background command finished";
-  }
-  const count = typeof meta3?.task_count === "number" ? meta3.task_count : void 0;
-  return count === 1 ? "Subagent finished" : count === void 0 ? "Subagents finished" : `${count} subagents finished`;
-}
-var INTERNAL_FOOTER = "[INTERNAL NOTIFICATION \u2014 generated by the Hermes gateway";
-function internalNotice(content5) {
-  const text11 = content5.trim();
-  if (text11.startsWith("[ASYNC DELEGATION BATCH COMPLETE")) {
-    return "Subagents finished";
-  }
-  if (text11.startsWith("[ASYNC DELEGATION COMPLETE")) {
-    return "Subagent finished";
-  }
-  if (text11.startsWith("[ASYNC DELEGATION TASK FAILED")) {
-    return "Subagent failed";
-  }
-  if (text11.startsWith("[Continuing toward your standing goal]")) {
-    return "Continuing toward the goal";
-  }
-  const wakeup = /^\[\/loop wakeup #(\d+)(?:, ([^\]]+))?\]/.exec(text11);
-  if (wakeup) {
-    return `Loop run #${wakeup[1]}${wakeup[2] ? ` \xB7 ${wakeup[2]}` : ""}`;
-  }
-  const watch2 = /^\[IMPORTANT: Background process \S+ matched watch pattern "([^"]*)"/.exec(text11);
-  if (watch2) {
-    return `Watcher matched "${watch2[1]}"`;
-  }
-  if (/^\[Background process \S+ heartbeat/.test(text11)) {
-    return "Background command still running";
-  }
-  const done = /^\[IMPORTANT: Background process \S+ ([^(]+?) \(exit code ([^)\s]+)/.exec(text11);
-  if (done) {
-    const how = done[1] === "completed normally" ? "finished" : done[1];
-    return `Background command ${how}${done[2] === "0" ? "" : ` (exit ${done[2]})`}`;
-  }
-  return text11.includes(INTERNAL_FOOTER) ? "Hermes notice" : void 0;
-}
-function continuation(prev) {
-  if (prev?.kind !== "turn") {
-    return void 0;
-  }
-  const background = prev.blocks.some(
-    (b) => b.kind === "tool" && b.call.name === "delegate_task" && record(b.call.result)?.mode === "background"
-  );
-  if (background) {
-    return "Subagents finished";
-  }
-  const shell = prev.blocks.some((b) => b.kind === "tool" && b.call.name === "terminal" && b.call.args.background === true);
-  return shell ? "Background command finished" : "Continued on its own";
-}
-var STEER_OPEN = "[OUT-OF-BAND USER MESSAGE";
-var STEER_CLOSE = "[/OUT-OF-BAND USER MESSAGE]";
-function steerText(content5) {
-  const text11 = content5.trim();
-  if (!text11.startsWith(STEER_OPEN)) {
-    return void 0;
-  }
-  const body = text11.slice(text11.indexOf("]") + 1);
-  const end = body.lastIndexOf(STEER_CLOSE);
-  return (end >= 0 ? body.slice(0, end) : body).trim();
-}
-function steerState(turn, index2) {
-  if (turn.blocks.slice(index2 + 1).some((b) => b.kind !== "steer" && b.kind !== "compaction")) {
-    return "landed";
-  }
-  return turn.status === "live" ? "pending" : "next";
 }
 
 // node_modules/zod/v4/core/core.js
@@ -28690,9 +27740,9 @@ import { StringDecoder } from "node:string_decoder";
 var TARGET = /(?:^|[\s;&|(])(?:1|&)?>>?\s*([^\s;&|)<>]+)|\btee\s+(?:-a\s+)?([^\s;&|)<>-][^\s;&|)<>]*)/g;
 var CD = /^\s*cd\s+([^\s;&|]+)\s*(?:&&|;)/;
 var SKIP = /^\/dev\/|^&/;
-var unquote2 = (s2) => s2.replace(/^(['"])(.*)\1$/, "$2");
+var unquote = (s2) => s2.replace(/^(['"])(.*)\1$/, "$2");
 function expand(path2, env2) {
-  const out = unquote2(path2).replace(/^~(?=\/|$)/, env2.HOME || homedir6()).replace(/\$\{?(HOME|TMPDIR|USER)\}?/g, (_, name) => env2[name]?.replace(/\/$/, "") ?? `$${name}`);
+  const out = unquote(path2).replace(/^~(?=\/|$)/, env2.HOME || homedir6()).replace(/\$\{?(HOME|TMPDIR|USER)\}?/g, (_, name) => env2[name]?.replace(/\/$/, "") ?? `$${name}`);
   return out.includes("$") ? void 0 : out;
 }
 function outputFiles(command, env2 = process.env) {
@@ -28881,7 +27931,7 @@ function list(value, where, errors, min, max) {
   }
   return value;
 }
-function str5(value, where, errors, o = {}) {
+function str4(value, where, errors, o = {}) {
   if (value === void 0 || value === null) {
     if (o.required) {
       errors.push(`${where}: required`);
@@ -28920,7 +27970,7 @@ function num3(value, where, errors) {
   return value;
 }
 function fieldName(value, where, errors) {
-  const name = str5(value, where, errors, { required: true });
+  const name = str4(value, where, errors, { required: true });
   if (name !== void 0 && !FIELD_NAME.test(name)) {
     errors.push(`${where}: "${name}" must match ${FIELD_NAME.source}`);
     return void 0;
@@ -29311,13 +28361,13 @@ function parseSpec(value, errors) {
     errors.push("spec: expected an object");
     return void 0;
   }
-  const title = str5(value.title, "title", errors, { cut: MAX_TITLE_CHARS, required: true });
+  const title = str4(value.title, "title", errors, { cut: MAX_TITLE_CHARS, required: true });
   const rules = list(value.rules, "rules", errors, 1, MAX_RULES)?.map((r, i) => parseRule(r, `rules[${i}]`, errors));
   const blocks2 = list(value.blocks, "blocks", errors, 1, MAX_BLOCKS)?.map((b, i) => parseBlock(b, `blocks[${i}]`, errors));
   let headline;
   if (value.headline !== void 0) {
     const ref = parseValueRef(value.headline, "headline", errors);
-    const label = isRecord2(value.headline) ? str5(value.headline.label, "headline.label", errors, { cut: MAX_LABEL_CHARS }) : void 0;
+    const label = isRecord2(value.headline) ? str4(value.headline.label, "headline.label", errors, { cut: MAX_LABEL_CHARS }) : void 0;
     if (ref) {
       headline = label ? { ...ref, label } : ref;
     }
@@ -29339,13 +28389,13 @@ function parseRule(value, where, errors) {
     errors.push(`${where}: expected an object`);
     return void 0;
   }
-  const from = str5(value.from, `${where}.from`, errors, { required: true });
+  const from = str4(value.from, `${where}.from`, errors, { required: true });
   if (from !== void 0 && !SOURCE_ID.test(from)) {
     errors.push(`${where}.from: invalid source id "${from}"`);
   }
-  const match = str5(value.match, `${where}.match`, errors, { max: MAX_PATTERN_CHARS, required: true });
+  const match = str4(value.match, `${where}.match`, errors, { max: MAX_PATTERN_CHARS, required: true });
   const group = (name) => {
-    const raw2 = str5(value[name], `${where}.${name}`, errors);
+    const raw2 = str4(value[name], `${where}.${name}`, errors);
     if (raw2 !== void 0 && !GROUP_NAME.test(raw2)) {
       errors.push(`${where}.${name}: invalid group name "${raw2}"`);
     }
@@ -29377,9 +28427,9 @@ function parseValueRef(value, where, errors) {
     return void 0;
   }
   const field = fieldName(value.field, `${where}.field`, errors);
-  const key2 = str5(value.key, `${where}.key`, errors, { max: 120 });
+  const key2 = str4(value.key, `${where}.key`, errors, { max: 120 });
   const agg = choice(value.agg, AGGS, `${where}.agg`, errors);
-  const unit = str5(value.unit, `${where}.unit`, errors, { cut: MAX_UNIT_CHARS });
+  const unit = str4(value.unit, `${where}.unit`, errors, { cut: MAX_UNIT_CHARS });
   const digits = num3(value.digits, `${where}.digits`, errors);
   if (digits !== void 0 && (!Number.isInteger(digits) || digits < 0 || digits > 4)) {
     errors.push(`${where}.digits: expected an integer 0\u20134`);
@@ -29403,8 +28453,8 @@ function parseBlock(value, where, errors) {
     return void 0;
   }
   const before = errors.length;
-  const label = () => str5(value.label, `${where}.label`, errors, { cut: MAX_LABEL_CHARS, required: true }) ?? "";
-  const unit = () => str5(value.unit, `${where}.unit`, errors, { cut: MAX_UNIT_CHARS });
+  const label = () => str4(value.label, `${where}.label`, errors, { cut: MAX_LABEL_CHARS, required: true }) ?? "";
+  const unit = () => str4(value.unit, `${where}.unit`, errors, { cut: MAX_UNIT_CHARS });
   const field = () => fieldName(value.field, `${where}.field`, errors) ?? "";
   const optional2 = (entry, name) => entry === void 0 ? {} : { [name]: entry };
   let block;
@@ -29414,11 +28464,11 @@ function parseBlock(value, where, errors) {
         field: field(),
         kind: "spark",
         label: label(),
-        ...optional2(str5(value.key, `${where}.key`, errors, { max: 120 }), "key"),
+        ...optional2(str4(value.key, `${where}.key`, errors, { max: 120 }), "key"),
         ...optional2(unit(), "unit"),
         ...optional2(betterValue(value.better, `${where}.better`, errors), "better"),
         ...optional2(num3(value.target, `${where}.target`, errors), "target"),
-        ...optional2(str5(value.targetLabel, `${where}.targetLabel`, errors, { cut: MAX_LABEL_CHARS }), "targetLabel"),
+        ...optional2(str4(value.targetLabel, `${where}.targetLabel`, errors, { cut: MAX_LABEL_CHARS }), "targetLabel"),
         ...optional2(num3(value.min, `${where}.min`, errors), "min"),
         ...optional2(num3(value.max, `${where}.max`, errors), "max")
       };
@@ -29457,7 +28507,7 @@ function parseBlock(value, where, errors) {
         kind: "meter",
         label: label(),
         total: total ?? 1,
-        ...optional2(str5(value.key, `${where}.key`, errors, { max: 120 }), "key"),
+        ...optional2(str4(value.key, `${where}.key`, errors, { max: 120 }), "key"),
         ...optional2(unit(), "unit")
       };
       break;
@@ -29466,7 +28516,7 @@ function parseBlock(value, where, errors) {
       const items = list(value.items, `${where}.items`, errors, 1, MAX_STAT_ITEMS)?.map((item3, i) => {
         const at = `${where}.items[${i}]`;
         const ref = parseValueRef(item3, at, errors);
-        const itemLabel = isRecord2(item3) ? str5(item3.label, `${at}.label`, errors, { cut: MAX_LABEL_CHARS, required: true }) : void 0;
+        const itemLabel = isRecord2(item3) ? str4(item3.label, `${at}.label`, errors, { cut: MAX_LABEL_CHARS, required: true }) : void 0;
         return ref && itemLabel !== void 0 ? { ...ref, label: itemLabel } : void 0;
       }) ?? [];
       block = { items: items.filter((i) => i !== void 0), kind: "stat" };
@@ -30636,8 +29686,7 @@ var Processes = class {
     for (const call of calls) {
       const p3 = owners.get(call);
       if (p3 && (call.process !== p3 || touched.has(p3))) {
-        call.process = p3;
-        this.#host.transcript.touchCall(call);
+        this.#host.transcript.mutateCall(call, (c) => c.process = p3);
         changed = true;
       }
     }
@@ -32280,7 +31329,7 @@ function editedFiles(calls) {
   const paths = /* @__PURE__ */ new Set();
   let unnamed = 0;
   for (const c of calls) {
-    const path2 = str6(c.args.path);
+    const path2 = str5(c.args.path);
     if (path2) {
       paths.add(path2);
     } else {
@@ -32321,7 +31370,7 @@ function actionIcon(action) {
       return "wrench";
   }
 }
-var str6 = (v) => typeof v === "string" && v ? v : void 0;
+var str5 = (v) => typeof v === "string" && v ? v : void 0;
 function shortPath(path2, cwd = launchEnv().cwd) {
   const root7 = cwd.replace(/\/+$/, "");
   if (root7 && path2.startsWith(`${root7}/`)) {
@@ -32332,7 +31381,7 @@ function shortPath(path2, cwd = launchEnv().cwd) {
 }
 function stepLabel(call) {
   const a2 = call.args;
-  const path2 = str6(a2.path);
+  const path2 = str5(a2.path);
   const app2 = callApp(call);
   if (app2) {
     return `${app2.app} \xB7 ${app2.action}`;
@@ -32345,7 +31394,7 @@ function stepLabel(call) {
   }
   switch (call.name) {
     case "terminal": {
-      const command = str6(a2.command) ?? call.context;
+      const command = str5(a2.command) ?? call.context;
       return command ? flat(commandDisplayText(command)) : "Command";
     }
     case "read_file":
@@ -32355,15 +31404,15 @@ function stepLabel(call) {
     case "write_file":
       return path2 ? `Wrote ${shortPath(path2)}` : "Wrote a file";
     case "search_files": {
-      const pattern = str6(a2.pattern) ?? call.context;
+      const pattern = str5(a2.pattern) ?? call.context;
       const where = path2 && path2 !== "." ? ` in ${shortPath(path2)}` : "";
       return a2.target === "files" ? `Searched files ${pattern}${where}` : `Searched ${pattern}${where}`;
     }
     case "web_search":
-      return str6(a2.query) ? `Searched the web for ${a2.query}` : "Web search";
+      return str5(a2.query) ? `Searched the web for ${a2.query}` : "Web search";
     case "web_extract": {
       const urls = Array.isArray(a2.urls) ? a2.urls.filter((u) => typeof u === "string") : [];
-      const first = urls[0] ?? str6(a2.url);
+      const first = urls[0] ?? str5(a2.url);
       return first ? `Read ${first}${urls.length > 1 ? ` +${urls.length - 1} more` : ""}` : "Read a page";
     }
     case "execute_code":
@@ -32371,19 +31420,19 @@ function stepLabel(call) {
     case "link_pull_request":
     case "unlink_pull_request": {
       const verb = call.name === "link_pull_request" ? "Linked" : "Unlinked";
-      const pr = str6(a2.url)?.match(/github[^/]*\/([^/]+\/[^/]+)\/pull\/(\d+)/);
-      const repo = pr?.[1] ?? str6(a2.repository);
+      const pr = str5(a2.url)?.match(/github[^/]*\/([^/]+\/[^/]+)\/pull\/(\d+)/);
+      const repo = pr?.[1] ?? str5(a2.repository);
       const number4 = pr?.[2] ?? (typeof a2.number === "number" ? String(a2.number) : void 0);
       return repo && number4 ? `${verb} ${repo}#${number4}` : `${verb} a pull request`;
     }
     case "list_pull_requests":
       return "Listed linked pull requests";
     case "skill_view":
-      return str6(a2.name) ? `Read skill ${a2.name}` : "Read a skill";
+      return str5(a2.name) ? `Read skill ${a2.name}` : "Read a skill";
     case "skills_list":
       return "Listed skills";
     case "tool_search": {
-      const q2 = Array.isArray(a2.queries) ? a2.queries.filter((x) => typeof x === "string") : [str6(a2.queries) ?? str6(a2.query)].filter(Boolean);
+      const q2 = Array.isArray(a2.queries) ? a2.queries.filter((x) => typeof x === "string") : [str5(a2.queries) ?? str5(a2.query)].filter(Boolean);
       return q2.length ? `Searched tools for ${q2.join(", ")}` : "Searched tools";
     }
     case "tool_describe": {
@@ -32419,7 +31468,7 @@ function liveLabel(item3, active = false) {
   }
   const call = item3.call;
   const status = active && call.status === "done" ? "running" : call.status;
-  const command = call.name === "terminal" ? str6(call.args.command) ?? call.context : void 0;
+  const command = call.name === "terminal" ? str5(call.args.command) ?? call.context : void 0;
   if (!command) {
     return status === "running" ? presentTense(stepLabel(call)) : stepLabel(call);
   }
@@ -32463,7 +31512,7 @@ function clock2(at) {
 }
 
 // src/view/tools.tsx
-var str7 = (v) => typeof v === "string" && v ? v : void 0;
+var str6 = (v) => typeof v === "string" && v ? v : void 0;
 function toolNode(call, now) {
   const solo = call.name === "delegate_task" ? soloTask(call, now) : void 0;
   if (solo) {
@@ -32516,7 +31565,7 @@ function toolNode(call, now) {
 function toolDetail(call, now) {
   const card = cardOf(call, now);
   const body = [...card.body];
-  const command = call.name === "terminal" ? (str7(call.args.command) ?? call.context ?? "").trim() : "";
+  const command = call.name === "terminal" ? (str6(call.args.command) ?? call.context ?? "").trim() : "";
   if (command && command === commandLine(command)) {
     body.unshift(/* @__PURE__ */ jsx("code", { lang: "bash", max: { h: "12lines" }, role: "omp.tool.command", text: command }, "cmd"));
   }
@@ -32600,21 +31649,21 @@ function cardOf(call, now) {
       return {
         body: [],
         frame: "inline",
-        meta: str7(result?.usage) ? [`${result?.usage}`] : void 0,
+        meta: str6(result?.usage) ? [`${result?.usage}`] : void 0,
         name: "memory",
-        target: call.context || str7(call.args.action),
+        target: call.context || str6(call.args.action),
         targetKind: "text",
         title: "Memory"
       };
     case "skills_list": {
       const skills = Array.isArray(result?.skills) ? result.skills : [];
-      const names = skills.map((s2) => str7(record(s2)?.name) ?? str7(s2)).filter((n) => n !== void 0);
+      const names = skills.map((s2) => str6(record(s2)?.name) ?? str6(s2)).filter((n) => n !== void 0);
       return {
         body: names.length ? [/* @__PURE__ */ jsx("text", { spans: [{ s: "muted", t: names.join(" \xB7 ") }], wrap: "word" }, "names")] : [],
         folded: true,
         frame: "inline",
         meta: [
-          names.length ? `${names.length} skill${names.length === 1 ? "" : "s"}` : str7(result?.message) ?? "no skills"
+          names.length ? `${names.length} skill${names.length === 1 ? "" : "s"}` : str6(result?.message) ?? "no skills"
         ],
         name: "skill",
         title: "Skills"
@@ -32622,11 +31671,11 @@ function cardOf(call, now) {
     }
     case "skill_view":
       return {
-        body: str7(result?.content) ? [/* @__PURE__ */ jsx("md", { children: clip2(str7(result?.content) ?? "", 6e3) }, "body")] : [],
+        body: str6(result?.content) ? [/* @__PURE__ */ jsx("md", { children: clip2(str6(result?.content) ?? "", 6e3) }, "body")] : [],
         folded: true,
         frame: "inline",
         name: "skill",
-        target: str7(call.args.name) ?? call.context,
+        target: str6(call.args.name) ?? call.context,
         targetKind: "text",
         title: "Skill"
       };
@@ -32634,7 +31683,7 @@ function cardOf(call, now) {
   const look = isProcessTool(call.name) ? { name: "terminal", title: PROCESS_ACTIONS[String(call.args.action)] ?? "Process" } : call.name.startsWith("browser") ? { name: "browser", title: humanize(call.name.replace(/^browser_?/, "")) || "Browser" } : call.name === "session_search" ? { name: "search", title: "Session search" } : call.name === "vision_analyze" ? { name: "image", title: "Vision" } : call.name === "image_generate" ? { name: "image", title: "Image" } : { name: call.name, title: humanize(call.name) };
   const src = shownImage(call);
   if (src || call.name === "image_generate") {
-    const said = call.status === "running" ? void 0 : str7(result?.analysis) ?? str7(result?.text_summary);
+    const said = call.status === "running" ? void 0 : str6(result?.analysis) ?? str6(result?.text_summary);
     return {
       ...look,
       body: [
@@ -32642,7 +31691,7 @@ function cardOf(call, now) {
         ...said ? [/* @__PURE__ */ jsx("text", { lines: 6, spans: [{ s: "muted", t: clip2(said, 2e3) }], wrap: "word" }, "said")] : []
       ],
       folded: false,
-      target: str7(call.args.prompt) ?? str7(call.args.question) ?? (call.context || void 0),
+      target: str6(call.args.prompt) ?? str6(call.args.question) ?? (call.context || void 0),
       targetKind: "text"
     };
   }
@@ -32652,8 +31701,8 @@ function cardOf(call, now) {
     body: [...chart ? [chart] : [], ...genericBody(call)],
     folded: !chart,
     frame: "inline",
-    target: (isProcessTool(call.name) && call.process ? commandLine(call.process.command) : void 0) ?? str7(call.args.query) ?? str7(call.args.url) ?? (call.context || void 0),
-    targetKind: str7(call.args.url) ? "path" : str7(call.args.query) ? "query" : "text"
+    target: (isProcessTool(call.name) && call.process ? commandLine(call.process.command) : void 0) ?? str6(call.args.query) ?? str6(call.args.url) ?? (call.context || void 0),
+    targetKind: str6(call.args.url) ? "path" : str6(call.args.query) ? "query" : "text"
   };
 }
 var PROCESS_ACTIONS = {
@@ -32667,9 +31716,9 @@ var PROCESS_ACTIONS = {
   write: "Write to process"
 };
 function bashCard(call, result, instead) {
-  const output = (str7(result?.output) ?? call.resultText)?.replace(/\s*\[Command interrupted\]\s*$/, "");
-  const error = str7(result?.error);
-  const command = (str7(call.args.command) ?? call.context ?? "").trim();
+  const output = (str6(result?.output) ?? call.resultText)?.replace(/\s*\[Command interrupted\]\s*$/, "");
+  const error = str6(result?.error);
+  const command = (str6(call.args.command) ?? call.context ?? "").trim();
   const line = commandLine(command);
   const running = call.status === "running";
   return {
@@ -32734,8 +31783,8 @@ function processLine(call, id, now) {
   );
 }
 function readCard2(call, result) {
-  const path2 = str7(call.args.path) ?? call.context;
-  const content5 = str7(result?.content);
+  const path2 = str6(call.args.path) ?? call.context;
+  const content5 = str6(result?.content);
   const total = typeof result?.total_lines === "number" ? result.total_lines : void 0;
   const numbered = content5 ? [...content5.matchAll(/^ *(\d+)\|/gm)] : [];
   const first = numbered.length ? Number(numbered[0]?.[1]) : void 0;
@@ -32754,10 +31803,10 @@ function readCard2(call, result) {
   };
 }
 function editCard(call, result) {
-  const path2 = str7(call.args.path) ?? call.context;
+  const path2 = str6(call.args.path) ?? call.context;
   const lang = langOf(path2);
-  const diff2 = hunks(str7(result?.diff)) ?? (call.diff ? plainDiff(call.diff) : void 0);
-  const content5 = str7(call.args.content);
+  const diff2 = hunks(str6(result?.diff)) ?? (call.diff ? plainDiff(call.diff) : void 0);
+  const content5 = str6(call.args.content);
   const write = call.name === "write_file";
   const head2 = {
     name: write ? "write" : "edit",
@@ -32784,10 +31833,10 @@ function editCard(call, result) {
   return { ...head2, body: [/* @__PURE__ */ jsx("diff", { lang, text: diff2 }, "diff")], meta: [`+${added} \u2212${removed}`] };
 }
 function searchCard(call, result) {
-  const pattern = str7(call.args.pattern) ?? call.context;
-  const where = str7(call.args.path);
+  const pattern = str6(call.args.pattern) ?? call.context;
+  const where = str6(call.args.path);
   const inPath = where && where !== "." ? ` \xB7 in ${where}` : "";
-  const files = Array.isArray(result?.files) ? result.files.map((f) => str7(f)).filter((f) => f !== void 0) : void 0;
+  const files = Array.isArray(result?.files) ? result.files.map((f) => str6(f)).filter((f) => f !== void 0) : void 0;
   if (files || call.args.target === "files") {
     const list8 = (files ?? []).map((f) => f.replace(/^\.\//, ""));
     const total2 = typeof result?.total_count === "number" ? result.total_count : list8.length;
@@ -32808,7 +31857,7 @@ function searchCard(call, result) {
   const matches = Array.isArray(result?.matches) ? result.matches.map((m) => record(m)).filter((m) => m !== void 0) : void 0;
   const byFile = /* @__PURE__ */ new Map();
   for (const m of matches ?? []) {
-    const path2 = (str7(m.path) ?? "").replace(/^\.\//, "");
+    const path2 = (str6(m.path) ?? "").replace(/^\.\//, "");
     const list8 = byFile.get(path2) ?? [];
     list8.push({ line: typeof m.line === "number" ? m.line : 0, text: typeof m.content === "string" ? m.content : "" });
     byFile.set(path2, list8);
@@ -32872,35 +31921,35 @@ function webSearchCard(call, result) {
   const hits = (Array.isArray(data?.web) ? data.web : Array.isArray(result?.results) ? result.results : []).map((h2) => record(h2)).filter((h2) => h2 !== void 0);
   return {
     body: hits.length ? [
-      /* @__PURE__ */ jsx("col", { role: "omp.tool.sources", children: hits.map((h2, i) => sourceRow(`s${i}`, str7(h2.title) ?? str7(h2.url) ?? "", str7(h2.url))) }, "s")
+      /* @__PURE__ */ jsx("col", { role: "omp.tool.sources", children: hits.map((h2, i) => sourceRow(`s${i}`, str6(h2.title) ?? str6(h2.url) ?? "", str6(h2.url))) }, "s")
     ] : [],
     frame: "inline",
     meta: hits.length ? [`${hits.length} source${hits.length === 1 ? "" : "s"}`] : void 0,
     name: "web_search",
-    target: str7(call.args.query) ?? call.context,
+    target: str6(call.args.query) ?? call.context,
     targetKind: "query",
     title: "Web search"
   };
 }
 function fetchCard(call, result) {
   const pages = (Array.isArray(result?.results) ? result.results : []).map((p3) => record(p3)).filter((p3) => p3 !== void 0);
-  const urls = Array.isArray(call.args.urls) ? call.args.urls.map((u) => str7(u)).filter((u) => u !== void 0) : [];
+  const urls = Array.isArray(call.args.urls) ? call.args.urls.map((u) => str6(u)).filter((u) => u !== void 0) : [];
   const body = [];
   for (const [i, p3] of pages.entries()) {
-    body.push(sourceRow(`s${i}`, str7(p3.title) ?? str7(p3.url) ?? "", str7(p3.url)));
-    const content5 = str7(p3.content);
+    body.push(sourceRow(`s${i}`, str6(p3.title) ?? str6(p3.url) ?? "", str6(p3.url)));
+    const content5 = str6(p3.content);
     if (content5) {
       body.push(/* @__PURE__ */ jsx("md", { children: clip2(content5, 4e3) }, `b${i}`));
     }
   }
-  const chars = pages.reduce((n, p3) => n + (str7(p3.content)?.length ?? 0), 0);
+  const chars = pages.reduce((n, p3) => n + (str6(p3.content)?.length ?? 0), 0);
   return {
     body,
     folded: true,
     meta: pages.length ? [`${pages.length} page${pages.length === 1 ? "" : "s"} \xB7 ${compact(chars)} chars`] : void 0,
     name: "fetch",
     preview: { lines: 6 },
-    target: urls.length > 1 ? `${urls[0]} +${urls.length - 1}` : urls[0] ?? str7(call.args.url) ?? call.context,
+    target: urls.length > 1 ? `${urls[0]} +${urls.length - 1}` : urls[0] ?? str6(call.args.url) ?? call.context,
     targetKind: "path",
     title: "Fetch"
   };
@@ -32920,10 +31969,10 @@ function sourceRow(key2, title, url) {
 }
 function taskCard(call, result, now) {
   const tasks = Array.isArray(call.args.tasks) ? call.args.tasks.map((t2) => record(t2)).filter((t2) => t2 !== void 0) : [];
-  const goals = tasks.length ? tasks.map((t2) => str7(t2.goal) ?? "") : str7(call.args.goal) ? [str7(call.args.goal) ?? ""] : [];
+  const goals = tasks.length ? tasks.map((t2) => str6(t2.goal) ?? "") : str6(call.args.goal) ? [str6(call.args.goal) ?? ""] : [];
   const agents2 = call.subagents ?? [];
   const rows = agents2.length ? agents2.map((a2) => agentNode(a2, now)) : call.status === "running" || result?.status === "dispatched" ? goals.map((g, i) => /* @__PURE__ */ jsx("agent", { name: `Agent ${i + 1}`, status: "pending", task: g }, `p${i}`)) : settledRows(goals, result);
-  const context = str7(call.args.context) ?? (tasks.length === 1 ? str7(tasks[0]?.context) : void 0);
+  const context = str6(call.args.context) ?? (tasks.length === 1 ? str6(tasks[0]?.context) : void 0);
   const working = agents2.some((a2) => a2.status === "running" || a2.status === "queued") || !agents2.length && result?.status === "dispatched";
   const settled = agents2.filter((a2) => a2.status !== "running" && a2.status !== "queued");
   const count = goals.length || agents2.length;
@@ -32999,9 +32048,9 @@ function agentNode(a2, now, solo) {
   );
 }
 function outcome(r) {
-  const verdict = str7(r?.status) ?? "";
+  const verdict = str6(r?.status) ?? "";
   const status = !r ? "idle" : verdict === "" || verdict === "ok" || verdict === "completed" ? "done" : "failed";
-  return { status, summary: str7(r?.summary) ?? str7(r?.error) };
+  return { status, summary: str6(r?.summary) ?? str6(r?.error) };
 }
 function soloTask(call, now) {
   const tasks = Array.isArray(call.args.tasks) ? call.args.tasks.map((t2) => record(t2)).filter((t2) => t2 !== void 0) : [];
@@ -33009,7 +32058,7 @@ function soloTask(call, now) {
   if (tasks.length > 1 || (call.subagents?.length ?? 0) > 1 || call.status === "error" || result?.error) {
     return void 0;
   }
-  const goal = str7(tasks[0]?.goal) ?? str7(call.args.goal) ?? call.subagents?.[0]?.goal ?? "Delegated task";
+  const goal = str6(tasks[0]?.goal) ?? str6(call.args.goal) ?? call.subagents?.[0]?.goal ?? "Delegated task";
   const name = result?.mode === "background" ? "Background agent" : "Agent";
   const a2 = call.subagents?.[0];
   if (a2) {
@@ -33034,22 +32083,22 @@ function soloTask(call, now) {
 }
 function briefOf(call, index2) {
   const tasks = Array.isArray(call.args.tasks) ? call.args.tasks.map((t2) => record(t2)) : [];
-  const context = str7(tasks[index2]?.context) ?? str7(call.args.context);
+  const context = str6(tasks[index2]?.context) ?? str6(call.args.context);
   return context;
 }
 function briefNode(head2, text11) {
   return /* @__PURE__ */ jsx("section", { collapsed: true, collapsible: true, head: head2, role: "hermes.task.brief", children: /* @__PURE__ */ jsx("md", { children: text11 }, "md") }, "brief");
 }
 function askCard(call, result) {
-  const qs = (Array.isArray(call.args.questions) ? call.args.questions : str7(call.args.question) ? [call.args] : []).map((q2) => record(q2)).filter((q2) => q2 !== void 0);
+  const qs = (Array.isArray(call.args.questions) ? call.args.questions : str6(call.args.question) ? [call.args] : []).map((q2) => record(q2)).filter((q2) => q2 !== void 0);
   const responses = Array.isArray(result?.responses) ? result.responses.map((r) => record(r)) : [];
   const body = [];
   for (const [i, q2] of qs.entries()) {
-    const choices = Array.isArray(q2.choices) ? q2.choices.map((c) => str7(c)).filter((c) => c !== void 0) : [];
+    const choices = Array.isArray(q2.choices) ? q2.choices.map((c) => str6(c)).filter((c) => c !== void 0) : [];
     const raw2 = responses[i]?.user_response;
-    const answers = (Array.isArray(raw2) ? raw2 : [raw2]).map((a2) => str7(a2)).filter((a2) => a2 !== void 0);
+    const answers = (Array.isArray(raw2) ? raw2 : [raw2]).map((a2) => str6(a2)).filter((a2) => a2 !== void 0);
     if (qs.length > 1) {
-      body.push(/* @__PURE__ */ jsx("md", { children: str7(q2.question) ?? "" }, `q${i}`));
+      body.push(/* @__PURE__ */ jsx("md", { children: str6(q2.question) ?? "" }, `q${i}`));
     }
     for (const [j, c] of choices.entries()) {
       body.push(answerRow(`q${i}.o${j}`, c, answers.includes(c)));
@@ -33066,7 +32115,7 @@ function askCard(call, result) {
     body,
     name: "ask",
     // Several questions each read in the body; the head counts them instead of repeating one.
-    target: qs.length > 1 ? `${qs.length} questions` : str7(qs[0]?.question) ?? call.context,
+    target: qs.length > 1 ? `${qs.length} questions` : str6(qs[0]?.question) ?? call.context,
     targetKind: "text",
     title: "Ask"
   };
@@ -33078,9 +32127,9 @@ function answerRow(key2, text11, picked) {
   ] }, key2);
 }
 function evalCard(call, result) {
-  const code7 = str7(call.args.code) ?? "";
-  const output = str7(result?.output) ?? str7(result?.stdout) ?? call.resultText;
-  const error = str7(result?.error) ?? str7(result?.stderr);
+  const code7 = str6(call.args.code) ?? "";
+  const output = str6(result?.output) ?? str6(result?.stdout) ?? call.resultText;
+  const error = str6(result?.error) ?? str6(result?.stderr);
   return {
     badges: [{ text: "python" }],
     body: [
@@ -33205,7 +32254,7 @@ function batchBody(call) {
 }
 function imageNode(call, src) {
   const source = localSource(src) ?? call.image;
-  const alt = str7(call.args.prompt) ?? "Image";
+  const alt = str6(call.args.prompt) ?? "Image";
   if (source) {
     return /* @__PURE__ */ jsx("image", { alt: clip2(alt, 200), role: "hermes.tool.image", ...source }, "image");
   }
@@ -33228,7 +32277,7 @@ function genericBody(call) {
 }
 function errorOf(call) {
   const result = record(call.result);
-  return str7(result?.error) ?? str7(call.summary) ?? (typeof call.result === "string" && !result ? call.result : void 0);
+  return str6(result?.error) ?? str6(call.summary) ?? (typeof call.result === "string" && !result ? call.result : void 0);
 }
 function exitOf(call) {
   const code7 = record(call.result)?.exit_code;
@@ -34893,7 +33942,7 @@ function batchQuery(refs) {
   return { query: `query(${decls.join(", ")}) { ${parts3.join("\n")} }`, variables };
 }
 var obj = (v) => v && typeof v === "object" && !Array.isArray(v) ? v : void 0;
-var str8 = (v) => typeof v === "string" ? v : "";
+var str7 = (v) => typeof v === "string" ? v : "";
 var num4 = (v) => typeof v === "number" ? v : 0;
 var nodes = (v) => {
   const list8 = obj(v)?.nodes;
@@ -34927,20 +33976,20 @@ function checkStatus(status, conclusion) {
 function parseCheck(n) {
   if (n.__typename === "StatusContext") {
     return {
-      description: str8(n.description) || void 0,
-      name: str8(n.context),
-      startedAt: str8(n.createdAt) || void 0,
-      status: checkStatus("COMPLETED", str8(n.state)),
-      url: str8(n.targetUrl) || void 0
+      description: str7(n.description) || void 0,
+      name: str7(n.context),
+      startedAt: str7(n.createdAt) || void 0,
+      status: checkStatus("COMPLETED", str7(n.state)),
+      url: str7(n.targetUrl) || void 0
     };
   }
-  const workflow = str8(obj(obj(obj(n.checkSuite)?.workflowRun)?.workflow)?.name);
+  const workflow = str7(obj(obj(obj(n.checkSuite)?.workflowRun)?.workflow)?.name);
   return {
-    completedAt: str8(n.completedAt) || void 0,
-    name: str8(n.name),
-    startedAt: str8(n.startedAt) || void 0,
-    status: checkStatus(str8(n.status), str8(n.conclusion)),
-    url: str8(n.detailsUrl) || void 0,
+    completedAt: str7(n.completedAt) || void 0,
+    name: str7(n.name),
+    startedAt: str7(n.startedAt) || void 0,
+    status: checkStatus(str7(n.status), str7(n.conclusion)),
+    url: str7(n.detailsUrl) || void 0,
     workflow: workflow || void 0
   };
 }
@@ -34999,15 +34048,15 @@ function parsePullRequest(ref, repo) {
   const reviews = /* @__PURE__ */ new Map();
   for (const n of nodes(p3.reviewRequests)) {
     const who = obj(n.requestedReviewer);
-    const login = str8(who?.login) || str8(who?.name);
+    const login = str7(who?.login) || str7(who?.name);
     if (login) {
       reviews.set(login, "PENDING");
     }
   }
   for (const n of nodes(p3.latestReviews)) {
-    const login = str8(obj(n.author)?.login);
+    const login = str7(obj(n.author)?.login);
     if (login && !reviews.has(login)) {
-      reviews.set(login, str8(n.state));
+      reviews.set(login, str7(n.state));
     }
   }
   const rollup = obj(obj(obj(nodes(p3.commits)[0]?.commit)?.statusCheckRollup)?.contexts);
@@ -35020,32 +34069,32 @@ function parsePullRequest(ref, repo) {
   return {
     ...ref,
     additions: num4(p3.additions),
-    author: str8(obj(p3.author)?.login) || "ghost",
-    autoMerge: str8(obj(p3.autoMergeRequest)?.mergeMethod) || null,
-    base: str8(p3.baseRefName),
+    author: str7(obj(p3.author)?.login) || "ghost",
+    autoMerge: str7(obj(p3.autoMergeRequest)?.mergeMethod) || null,
+    base: str7(p3.baseRefName),
     behindBy: typeof behind === "number" ? behind : null,
-    body: str8(p3.body),
+    body: str7(p3.body),
     canUpdate: p3.viewerCanUpdate === true,
     changedFiles: num4(p3.changedFiles),
     checks: dedupeChecks(nodes(rollup).map(parseCheck)),
-    closedAt: str8(p3.closedAt) || null,
-    createdAt: str8(p3.createdAt),
+    closedAt: str7(p3.closedAt) || null,
+    createdAt: str7(p3.createdAt),
     deletions: num4(p3.deletions),
     draft: p3.isDraft === true,
-    head: str8(p3.headRefName),
-    headOid: str8(p3.headRefOid),
-    id: str8(p3.id),
-    labels: nodes(p3.labels).map((n) => str8(n.name)),
+    head: str7(p3.headRefName),
+    headOid: str7(p3.headRefOid),
+    id: str7(p3.id),
+    labels: nodes(p3.labels).map((n) => str7(n.name)),
     mergeMethods: methods,
-    mergeState: str8(p3.mergeStateStatus),
-    mergeable: MERGEABLE[str8(p3.mergeable)] ?? "unknown",
-    mergedAt: str8(p3.mergedAt) || null,
-    reviewDecision: str8(p3.reviewDecision) || null,
+    mergeState: str7(p3.mergeStateStatus),
+    mergeable: MERGEABLE[str7(p3.mergeable)] ?? "unknown",
+    mergedAt: str7(p3.mergedAt) || null,
+    reviewDecision: str7(p3.reviewDecision) || null,
     reviewers: [...reviews].map(([login, state]) => ({ login, state })),
-    state: STATE[str8(p3.state)] ?? "open",
-    title: str8(p3.title),
-    updatedAt: str8(p3.updatedAt),
-    url: str8(p3.url) || ref.url
+    state: STATE[str7(p3.state)] ?? "open",
+    title: str7(p3.title),
+    updatedAt: str7(p3.updatedAt),
+    url: str7(p3.url) || ref.url
   };
 }
 var ACTIVITY_QUERY = `query($o: String!, $r: String!, $n: Int!) {
@@ -35061,24 +34110,24 @@ function parseActivity(data) {
   if (!p3) {
     return [];
   }
-  const who = (n) => str8(obj(n.author)?.login) || "ghost";
+  const who = (n) => str7(obj(n.author)?.login) || "ghost";
   const items = [
-    ...nodes(p3.comments).map((n) => ({ at: str8(n.createdAt), author: who(n), body: str8(n.body), kind: "comment", url: str8(n.url) })),
-    ...nodes(p3.reviews).filter((n) => str8(n.body).trim() || str8(n.state) !== "COMMENTED").map((n) => ({ at: str8(n.submittedAt), author: who(n), body: str8(n.body), kind: "review", state: str8(n.state), url: str8(n.url) })),
+    ...nodes(p3.comments).map((n) => ({ at: str7(n.createdAt), author: who(n), body: str7(n.body), kind: "comment", url: str7(n.url) })),
+    ...nodes(p3.reviews).filter((n) => str7(n.body).trim() || str7(n.state) !== "COMMENTED").map((n) => ({ at: str7(n.submittedAt), author: who(n), body: str7(n.body), kind: "review", state: str7(n.state), url: str7(n.url) })),
     ...nodes(p3.reviewThreads).flatMap((t2) => {
       const [first, ...rest] = nodes(t2.comments);
       return first ? [
         {
-          at: str8(first.createdAt),
+          at: str7(first.createdAt),
           author: who(first),
-          body: str8(first.body),
+          body: str7(first.body),
           kind: "thread",
           line: typeof t2.line === "number" ? t2.line : null,
           outdated: t2.isOutdated === true,
-          path: str8(t2.path),
-          replies: rest.map((n) => ({ at: str8(n.createdAt), author: who(n), body: str8(n.body) })),
+          path: str7(t2.path),
+          replies: rest.map((n) => ({ at: str7(n.createdAt), author: who(n), body: str7(n.body) })),
           resolved: t2.isResolved === true,
-          url: str8(first.url)
+          url: str7(first.url)
         }
       ] : [];
     }),
@@ -35086,11 +34135,11 @@ function parseActivity(data) {
       const c = obj(n.commit) ?? {};
       const a2 = obj(c.author);
       return {
-        at: str8(c.committedDate),
-        author: str8(obj(a2?.user)?.login) || str8(a2?.name) || "ghost",
-        body: str8(c.messageHeadline),
+        at: str7(c.committedDate),
+        author: str7(obj(a2?.user)?.login) || str7(a2?.name) || "ghost",
+        body: str7(c.messageHeadline),
         kind: "commit",
-        url: str8(c.url)
+        url: str7(c.url)
       };
     })
   ];
@@ -35100,10 +34149,10 @@ function parseFiles(rows) {
   return (Array.isArray(rows) ? rows : []).map(obj).filter((r) => Boolean(r)).map((r) => ({
     additions: num4(r.additions),
     deletions: num4(r.deletions),
-    patch: str8(r.patch) || void 0,
-    path: str8(r.filename),
-    previous: str8(r.previous_filename) || void 0,
-    status: str8(r.status)
+    patch: str7(r.patch) || void 0,
+    path: str7(r.filename),
+    previous: str7(r.previous_filename) || void 0,
+    status: str7(r.status)
   }));
 }
 function failedRuns(checks2) {
@@ -62786,7 +61835,7 @@ function preview3(row2, isCurrent) {
 }
 
 // .hermes-src/ui-tui/src/lib/history.ts
-import { appendFileSync as appendFileSync3, existsSync as existsSync4, mkdirSync as mkdirSync3, readFileSync as readFileSync2 } from "node:fs";
+import { appendFileSync as appendFileSync3, existsSync as existsSync3, mkdirSync as mkdirSync3, readFileSync as readFileSync2 } from "node:fs";
 import { homedir as homedir8 } from "node:os";
 import { join as join6 } from "node:path";
 var MAX2 = 1e3;
@@ -62798,7 +61847,7 @@ function load() {
     return cache;
   }
   try {
-    if (!existsSync4(file)) {
+    if (!existsSync3(file)) {
       cache = [];
       return cache;
     }
@@ -62835,7 +61884,7 @@ function append(line) {
     items.splice(0, items.length - MAX2);
   }
   try {
-    if (!existsSync4(dir)) {
+    if (!existsSync3(dir)) {
       mkdirSync3(dir, { recursive: true });
     }
     const ts = (/* @__PURE__ */ new Date()).toISOString().replace("T", " ").replace("Z", "");
@@ -63053,8 +62102,6 @@ var Composer = class {
   cursor = 0;
   /** The selection's other end, while text is selected (Shift+arrows, or Tern's native selection). */
   anchor;
-  /** Bumped on every change, so the app knows to render. */
-  rev = 0;
   #undo = [];
   #redo = [];
   #lastEdit = 0;
@@ -63093,7 +62140,6 @@ var Composer = class {
     this.#record({ merge: false });
     this.text = text11;
     this.cursor = clamp(cursor, text11.length);
-    this.#changed();
   }
   /** Clears the draft after a submit, remembering it in the prompt history. */
   take() {
@@ -63106,7 +62152,6 @@ var Composer = class {
     this.text = "";
     this.cursor = 0;
     this.anchor = void 0;
-    this.#changed();
     return text11;
   }
   /** Types `s` at the caret, over the selection if there is one. */
@@ -63115,7 +62160,6 @@ var Composer = class {
     this.#record({ merge: from === to });
     this.text = this.text.slice(0, from) + s2 + this.text.slice(to);
     this.cursor = from + s2.length;
-    this.#changed();
   }
   /** Replaces `[from, to)`: native edits from Tern and completions. */
   splice(from, to, s2, cursor = from + s2.length) {
@@ -63125,7 +62169,6 @@ var Composer = class {
     this.#record({ merge: merge2 });
     this.text = this.text.slice(0, from) + s2 + this.text.slice(to);
     this.cursor = clamp(cursor, this.text.length);
-    this.#changed();
   }
   /**
    * A TSP `edit` event; ignored when the text changed since Tern saw it. A caret move may carry
@@ -63139,7 +62182,6 @@ var Composer = class {
       this.cursor = clamp(ev.cursor, this.text.length);
       const anchor = ev.raw?.anchor;
       this.anchor = typeof anchor === "number" && anchor !== this.cursor ? clamp(anchor, this.text.length) : void 0;
-      this.#changed();
       return;
     }
     if (ev.from === ev.to && ev.text === "\n") {
@@ -63162,7 +62204,6 @@ var Composer = class {
     this.anchor = void 0;
     this.#lastEdit = 0;
     this.#browse = -1;
-    this.#changed();
   }
   redo() {
     const next3 = this.#redo.pop();
@@ -63175,7 +62216,6 @@ var Composer = class {
     this.anchor = void 0;
     this.#lastEdit = 0;
     this.#browse = -1;
-    this.#changed();
   }
   /** Handles one editing key; false when the key isn't the composer's. */
   key(key2) {
@@ -63360,7 +62400,6 @@ var Composer = class {
     this.text = text11;
     this.cursor = text11.length;
     this.anchor = void 0;
-    this.#changed();
     return true;
   }
   #move(to) {
@@ -63368,7 +62407,6 @@ var Composer = class {
       this.cursor = clamp(to, this.text.length);
       this.anchor = void 0;
       this.#lastEdit = 0;
-      this.#changed();
     }
     return true;
   }
@@ -63379,7 +62417,6 @@ var Composer = class {
     this.#record({ merge: true });
     this.text = this.text.slice(0, from) + this.text.slice(to);
     this.cursor = from;
-    this.#changed();
     return true;
   }
   #cut(from, to) {
@@ -63388,7 +62425,6 @@ var Composer = class {
       this.#record({ merge: false });
       this.text = this.text.slice(0, from) + this.text.slice(to);
       this.cursor = from;
-      this.#changed();
     }
     return true;
   }
@@ -63405,9 +62441,6 @@ var Composer = class {
     }
     this.#lastEdit = merge2 ? now : 0;
     this.#redo = [];
-  }
-  #changed() {
-    this.rev++;
   }
 };
 function clamp(n, max) {
@@ -63513,7 +62546,7 @@ function unmaskEdit(secret, ev) {
 
 // src/overlays/prompts.tsx
 var RECOMMENDED = /\s*\(recommended\)\s*$/i;
-var str9 = (v) => typeof v === "string" ? v : "";
+var str8 = (v) => typeof v === "string" ? v : "";
 var isCtrlC = (k) => k.ctrl && k.name === "c";
 var TIMEOUT_NOTICES = {
   approval: "Approval timed out: the command was not run. Ask Hermes to try again when you are ready to answer.",
@@ -63658,8 +62691,8 @@ var APPROVALS = [
 ];
 function approvalOverlay(host, req) {
   const p3 = req.params;
-  const command = str9(p3.command) && withoutTernEnv(str9(p3.command));
-  const description = str9(p3.description);
+  const command = str8(p3.command) && withoutTernEnv(str8(p3.command));
+  const description = str8(p3.description);
   const smartDenied = p3.smart_denied === true;
   const offered = Array.isArray(p3.choices) ? p3.choices.filter((c) => typeof c === "string") : [];
   const allowed = new Set(
@@ -63745,8 +62778,8 @@ function questionsOf(raw2) {
       return [];
     }
     const choices = "choices" in q2 && Array.isArray(q2.choices) ? q2.choices.filter((c) => typeof c === "string") : [];
-    const question = str9(q2.question).trim();
-    return question ? [{ choices, multi: "multi_select" in q2 && q2.multi_select === true, qid: str9(q2.qid), question }] : [];
+    const question = str8(q2.question).trim();
+    return question ? [{ choices, multi: "multi_select" in q2 && q2.multi_select === true, qid: str8(q2.qid), question }] : [];
   });
 }
 function tabLabel(question) {
@@ -63983,7 +63016,7 @@ function clarifyOverlay(host, req) {
 function maskedOverlay(host, req) {
   const p3 = req.params;
   const key2 = `prompt:${req.id}`;
-  const site = str9(p3.site) || str9(p3.origin);
+  const site = str8(p3.site) || str8(p3.origin);
   const login = req.method === "vault.save_login";
   const code7 = req.method === "vault.code";
   const fields = login ? [
@@ -63991,8 +63024,8 @@ function maskedOverlay(host, req) {
     { id: "password", label: "Password", masked: true, value: new Composer() }
   ] : [{ id: "value", label: code7 ? "Type the code" : "Hidden while you type", masked: !code7, value: new Composer() }];
   let at = 0;
-  const title = req.method === "sudo" ? "Password for sudo" : req.method === "secret" ? str9(p3.prompt) || `Value for ${str9(p3.env_var) || "a secret"}` : req.method === "vault.unlock_prompt" ? `Master password for ${str9(p3.display_name) || str9(p3.backend) || "the password manager"}` : login ? `Save a login for ${site || "this site"}` : `Code for ${site || "this site"}`;
-  const note = req.method === "secret" ? str9(p3.env_var) : code7 ? [str9(p3.hint), "typed into the page only \xB7 never shown to the model"].filter(Boolean).join(" \xB7 ") : "";
+  const title = req.method === "sudo" ? "Password for sudo" : req.method === "secret" ? str8(p3.prompt) || `Value for ${str8(p3.env_var) || "a secret"}` : req.method === "vault.unlock_prompt" ? `Master password for ${str8(p3.display_name) || str8(p3.backend) || "the password manager"}` : login ? `Save a login for ${site || "this site"}` : `Code for ${site || "this site"}`;
+  const note = req.method === "secret" ? str8(p3.env_var) : code7 ? [str8(p3.hint), "typed into the page only \xB7 never shown to the model"].filter(Boolean).join(" \xB7 ") : "";
   const sending = { busy: false, error: "" };
   const finish = (cancel) => {
     const [first, second] = fields;
@@ -64011,7 +63044,7 @@ function maskedOverlay(host, req) {
     node: () => /* @__PURE__ */ jsx("overlay", { anchor: "bottom", modal: true, role: "omp.overlay.ask", size: "md", children: /* @__PURE__ */ jsxs("col", { gap: "md", children: [
       /* @__PURE__ */ jsx("md", { role: "omp.ask.question", text: title }, "question"),
       note ? /* @__PURE__ */ jsx("text", { spans: [{ s: req.method === "secret" ? "mono dim" : "muted", t: note }], wrap: "word" }, "note") : null,
-      str9(p3.command) ? /* @__PURE__ */ jsx("code", { lang: "bash", text: withoutTernEnv(str9(p3.command)) }, "command") : null,
+      str8(p3.command) ? /* @__PURE__ */ jsx("code", { lang: "bash", text: withoutTernEnv(str8(p3.command)) }, "command") : null,
       fields.map((f, i) => /* @__PURE__ */ jsx(
         "input",
         {
@@ -64104,7 +63137,7 @@ function confirmOverlay(host, ask) {
 }
 
 // src/overlays/sessions.tsx
-import { basename as basename3 } from "node:path";
+import { basename as basename2 } from "node:path";
 
 // src/hermes/sessionIndex.ts
 import { execFile as execFile4 } from "node:child_process";
@@ -64335,7 +63368,7 @@ ${s2.preview} ${s2.cwd} ${s2.branch} ${s2.id}`, { scattered: false });
       const groups = /* @__PURE__ */ new Map();
       const add = (label, id) => groups.set(label, [...groups.get(label) ?? [], id]);
       for (const s2 of list8) {
-        add(s2.pinned ? "Pinned" : tab2 === "all" && here(s2) && workspace ? `In ${basename3(workspace)}` : dayOf(s2.lastActive, now), s2.id);
+        add(s2.pinned ? "Pinned" : tab2 === "all" && here(s2) && workspace ? `In ${basename2(workspace)}` : dayOf(s2.lastActive, now), s2.id);
       }
       for (const [label, ids] of groups) {
         order2.push({ count: ids.length, group: label, label }, ...ids);
@@ -64360,7 +63393,7 @@ ${s2.preview} ${s2.cwd} ${s2.branch} ${s2.id}`, { scattered: false });
       const { hits, order: order2 } = view(now);
       const s2 = sessions.find((x) => x.id === selected);
       const hereCount = sessions.filter(here).length;
-      const project = workspace ? basename3(workspace) : "This folder";
+      const project = workspace ? basename2(workspace) : "This folder";
       if (s2 && !replies.has(s2.id)) {
         replies.set(s2.id, lastReply(s2.id));
       }
@@ -64478,7 +63511,7 @@ function itemOf2(s2, now, running, elsewhere) {
     badges: [
       ...running ? [{ text: "running", tone: "accent" }] : [],
       ...s2.branch ? [{ text: s2.branch, title: `Branch ${s2.branch}` }] : [],
-      ...elsewhere && s2.cwd ? [{ text: basename3(s2.cwd), title: s2.cwd }] : []
+      ...elsewhere && s2.cwd ? [{ text: basename2(s2.cwd), title: s2.cwd }] : []
     ],
     detail: s2.title && s2.preview ? oneLine(s2.preview) : void 0,
     facts: { size: `${s2.messages} msg${s2.messages === 1 ? "" : "s"}`, when: ageOf(s2.lastActive, now) },
@@ -65261,6 +64294,100 @@ var COMMANDS2 = [
   { name: "rollback", run: rollback }
 ];
 var SESSION_COMMANDS = COMMANDS2.map((c) => ({ ...c, run: guarded2(c.name, c.run) }));
+
+// src/transcript/messages.ts
+function userEntry(id, { text: text11, at = Date.now(), steered = false, attachments = [] }) {
+  return { at, id, kind: "user", text: text11, ...steered ? { steered } : {}, ...attachments.length ? { attachments } : {} };
+}
+function failure(error, code7) {
+  const http = /^HTTP (\d{3}):\s*/.exec(error);
+  return {
+    error: http ? error.slice(http[0].length) : error,
+    errorCode: http?.[1] ?? (typeof code7 === "string" && code7 ? code7 : void 0)
+  };
+}
+var passable = (e) => e.kind !== "notice" && e.kind !== "compaction";
+function displayNotice(kind, metadata) {
+  if (kind === "auto_continue") {
+    return "Resumed interrupted turn";
+  }
+  if (kind !== "async_delegation_complete" && kind !== "process_complete") {
+    return void 0;
+  }
+  const meta3 = record(metadata);
+  const shown = typeof meta3?.display_text === "string" ? meta3.display_text.trim() : "";
+  if (shown) {
+    return shown;
+  }
+  if (kind === "process_complete") {
+    return "Background command finished";
+  }
+  const count = typeof meta3?.task_count === "number" ? meta3.task_count : void 0;
+  return count === 1 ? "Subagent finished" : count === void 0 ? "Subagents finished" : `${count} subagents finished`;
+}
+var INTERNAL_FOOTER = "[INTERNAL NOTIFICATION \u2014 generated by the Hermes gateway";
+function internalNotice(content5) {
+  const text11 = content5.trim();
+  if (text11.startsWith("[ASYNC DELEGATION BATCH COMPLETE")) {
+    return "Subagents finished";
+  }
+  if (text11.startsWith("[ASYNC DELEGATION COMPLETE")) {
+    return "Subagent finished";
+  }
+  if (text11.startsWith("[ASYNC DELEGATION TASK FAILED")) {
+    return "Subagent failed";
+  }
+  if (text11.startsWith("[Continuing toward your standing goal]")) {
+    return "Continuing toward the goal";
+  }
+  const wakeup = /^\[\/loop wakeup #(\d+)(?:, ([^\]]+))?\]/.exec(text11);
+  if (wakeup) {
+    return `Loop run #${wakeup[1]}${wakeup[2] ? ` \xB7 ${wakeup[2]}` : ""}`;
+  }
+  const watch2 = /^\[IMPORTANT: Background process \S+ matched watch pattern "([^"]*)"/.exec(text11);
+  if (watch2) {
+    return `Watcher matched "${watch2[1]}"`;
+  }
+  if (/^\[Background process \S+ heartbeat/.test(text11)) {
+    return "Background command still running";
+  }
+  const done = /^\[IMPORTANT: Background process \S+ ([^(]+?) \(exit code ([^)\s]+)/.exec(text11);
+  if (done) {
+    const how = done[1] === "completed normally" ? "finished" : done[1];
+    return `Background command ${how}${done[2] === "0" ? "" : ` (exit ${done[2]})`}`;
+  }
+  return text11.includes(INTERNAL_FOOTER) ? "Hermes notice" : void 0;
+}
+function continuation(prev) {
+  if (prev?.kind !== "turn") {
+    return void 0;
+  }
+  const background = prev.blocks.some(
+    (b) => b.kind === "tool" && b.call.name === "delegate_task" && record(b.call.result)?.mode === "background"
+  );
+  if (background) {
+    return "Subagents finished";
+  }
+  const shell = prev.blocks.some((b) => b.kind === "tool" && b.call.name === "terminal" && b.call.args.background === true);
+  return shell ? "Background command finished" : "Continued on its own";
+}
+var STEER_OPEN = "[OUT-OF-BAND USER MESSAGE";
+var STEER_CLOSE = "[/OUT-OF-BAND USER MESSAGE]";
+function steerText(content5) {
+  const text11 = content5.trim();
+  if (!text11.startsWith(STEER_OPEN)) {
+    return void 0;
+  }
+  const body = text11.slice(text11.indexOf("]") + 1);
+  const end = body.lastIndexOf(STEER_CLOSE);
+  return (end >= 0 ? body.slice(0, end) : body).trim();
+}
+function steerState(turn, index2) {
+  if (turn.blocks.slice(index2 + 1).some((b) => b.kind !== "steer" && b.kind !== "compaction")) {
+    return "landed";
+  }
+  return turn.status === "live" ? "pending" : "next";
+}
 
 // src/preformatted.ts
 var BOX = /[─-╿]/;
@@ -66392,7 +65519,7 @@ var writeActiveSessionFile = (sessionId, file2 = process.env.HERMES_TUI_ACTIVE_S
 
 // src/hermes/clipboardImage.ts
 import { execFile as execFile6 } from "node:child_process";
-import { existsSync as existsSync5 } from "node:fs";
+import { existsSync as existsSync4 } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
 import { homedir as homedir11, tmpdir } from "node:os";
 import { join as join10, resolve as resolve5 } from "node:path";
@@ -66427,10 +65554,10 @@ async function extractClipboardImage(dest, env2, platform = process.platform, ru
     }
     if (answer?.startsWith("file:")) {
       const file2 = answer.slice("file:".length);
-      return IMAGE.test(file2) && existsSync5(file2) ? file2 : void 0;
+      return IMAGE.test(file2) && existsSync4(file2) ? file2 : void 0;
     }
     if (answer !== void 0) {
-      return answer === "true" && existsSync5(dest) ? dest : void 0;
+      return answer === "true" && existsSync4(dest) ? dest : void 0;
     }
   }
   const root7 = env2.HERMES_PYTHON_SRC_ROOT;
@@ -66443,7 +65570,7 @@ async function extractClipboardImage(dest, env2, platform = process.platform, ru
     env: { ...env2, PYTHONPATH: root7 },
     timeout: 15e3
   });
-  return stdout.trim() === "true" && existsSync5(dest) ? dest : void 0;
+  return stdout.trim() === "true" && existsSync4(dest) ? dest : void 0;
 }
 async function withClipboardImage(use, env2 = process.env, extract = extractClipboardImage) {
   const dir2 = await mkdtemp(join10(tmpdir(), "hermes-tern-clipboard-"));
@@ -66472,7 +65599,7 @@ function imagePathOf(text11, cwd) {
     return void 0;
   }
   const path2 = resolve5(cwd, raw2);
-  return existsSync5(path2) ? path2 : void 0;
+  return existsSync4(path2) ? path2 : void 0;
 }
 
 // .hermes-src/ui-tui/src/protocol/interpolation.ts
@@ -69928,6 +69055,936 @@ function reportCwd(cwd, out = process.stdout) {
   out.write(`\x1B]7;file://${hostname()}${encodeURI(cwd)}\x07`);
 }
 
+// src/transcript/compactions.ts
+var Compactions = class {
+  #host;
+  #seen = [];
+  constructor(host) {
+    this.#host = host;
+  }
+  /**
+   * The context started compacting. Inside a running turn that already did something it is a
+   * step of that turn; else it goes between turns, before the turn it was compacted for. Hermes'
+   * later lines of the same compaction only fill in the count.
+   */
+  compacting({ before, at = Date.now(), manual = false }) {
+    const running = this.#seen.findLast((c) => c.status === "running");
+    if (running) {
+      running.before ??= before || void 0;
+      running.manual ||= manual || void 0;
+      return this.#touch(running);
+    }
+    const compaction = { startedAt: at, status: "running", ...before ? { before } : {}, ...manual ? { manual } : {} };
+    this.#seen.push(compaction);
+    const live = this.#host.live();
+    if (live?.blocks.length) {
+      live.blocks.push({ at, compaction, id: this.#host.id("z"), kind: "compaction" });
+      live.rev++;
+      return;
+    }
+    const entry = { compaction, id: this.#host.id("z"), kind: "compaction", rev: 0 };
+    const entries = this.#host.entries();
+    if (live && entries.at(-1) === live) {
+      entries.splice(-1, 0, entry);
+    } else {
+      entries.push(entry);
+    }
+  }
+  /**
+   * The running compaction ended. `tokens` are the owner's own counts (/compress reports them
+   * after its `ready` edge, so they also reach the compaction that just ended).
+   */
+  compacted(at = Date.now(), tokens2 = {}) {
+    const running = this.#seen.findLast((c2) => c2.status === "running");
+    const c = running ?? (tokens2.before || tokens2.after ? this.#seen.at(-1) : void 0);
+    if (!c) {
+      return;
+    }
+    if (running) {
+      running.status = "done";
+      running.endedAt = at;
+    }
+    c.before = tokens2.before || c.before;
+    c.after = tokens2.after || c.after;
+    this.#touch(c);
+  }
+  /**
+   * The last compaction did not happen after all: Hermes aborted it (no done edge came before the
+   * turn ended; `running` drops only a running one) or /compress changed nothing.
+   */
+  uncompact(running = false) {
+    const c = this.#seen.at(-1);
+    if (!c || running && c.status !== "running") {
+      return;
+    }
+    this.#seen.pop();
+    const entries = this.#host.entries();
+    const at = entries.findIndex((e) => e.kind === "compaction" && e.compaction === c);
+    if (at >= 0) {
+      entries.splice(at, 1);
+      return;
+    }
+    const turn = entries.findLast(
+      (e) => e.kind === "turn" && e.blocks.some((b) => b.kind === "compaction" && b.compaction === c)
+    );
+    if (turn) {
+      turn.blocks = turn.blocks.filter((b) => b.kind !== "compaction" || b.compaction !== c);
+      turn.rev++;
+    }
+  }
+  /**
+   * A context reading (tokens in use): the first one under the last compaction's `before` is what
+   * it left. A reading from before it finished (a stale tick) is not lower, so it is skipped.
+   */
+  contextUsed(used) {
+    const c = this.#seen.at(-1);
+    if (c?.status !== "done" || c.after !== void 0 || !(used > 0) || c.before && used >= c.before * 0.95) {
+      return;
+    }
+    c.after = used;
+    this.#touch(c);
+  }
+  /** The compactions seen here that the store has no summary for yet. */
+  get unsummarized() {
+    return this.#seen.some((c) => c.status === "done" && c.summary === void 0);
+  }
+  /** Gives each seen compaction the stored summary written while it ran. */
+  summarize(stored) {
+    for (const [mark2, c] of this.#claims(stored)) {
+      if (c.summary === void 0) {
+        c.summary = mark2.summary ?? "";
+        c.messages = mark2.messages;
+        this.#touch(c);
+      }
+    }
+  }
+  /**
+   * The compactions a reload shows for `stored`, oldest first: the one this view saw happen when
+   * there is one (its numbers stay, the store's summary fills in), else one from the store alone.
+   */
+  restore(stored) {
+    const marks = [...stored].sort((a2, b) => a2.at - b.at);
+    const claims = this.#claims(marks);
+    return marks.map((mark2) => ({ at: mark2.at, compaction: restored(mark2, claims.get(mark2)) }));
+  }
+  /** Another session is shown: the compactions seen were the last one's. */
+  forget() {
+    this.#seen = [];
+  }
+  /** Which stored compaction each seen one is: the nearest summary written while it ran, each once. */
+  #claims(stored) {
+    const out = /* @__PURE__ */ new Map();
+    for (const c of this.#seen) {
+      const end = c.endedAt ?? c.startedAt;
+      const mark2 = stored.filter((s2) => c.status === "done" && !out.has(s2) && within(c, s2.at)).sort((a2, b) => Math.abs(a2.at - end) - Math.abs(b.at - end))[0];
+      if (mark2) {
+        out.set(mark2, c);
+      }
+    }
+    return out;
+  }
+  /** Marks the turn or entry showing `c` changed. */
+  #touch(c) {
+    const shown = this.#host.entries().findLast((e) => e.kind === "compaction" && e.compaction === c || e.kind === "turn" && e.blocks.some((b) => b.kind === "compaction" && b.compaction === c));
+    if (shown?.kind === "compaction" || shown?.kind === "turn") {
+      shown.rev++;
+    }
+  }
+};
+function restored(mark2, seen) {
+  if (seen) {
+    seen.summary = mark2.summary ?? "";
+    seen.messages = mark2.messages;
+    return seen;
+  }
+  return { startedAt: mark2.at, status: "done", ...mark2.summary ? { summary: mark2.summary } : {}, ...mark2.messages ? { messages: mark2.messages } : {} };
+}
+function within(c, at) {
+  return at >= c.startedAt - 5e3 && at <= (c.endedAt ?? Date.now()) + 15e3;
+}
+
+// src/promptRefs.ts
+import { existsSync as existsSync5 } from "node:fs";
+import { basename as basename3 } from "node:path";
+var VALUE = "(`[^`\\n]+`|\"[^\"\\n]+\"|'[^'\\n]+'|\\S+)";
+var IMAGE_LINE = new RegExp(`^@image:${VALUE}[ \\t]*$`, "gm");
+var SCREENSHOT_LINE = /^\[screenshot\][ \t]*(?:\n|$)/gm;
+var HINTS = /\n\n((?:\[Image attached(?: at)?: [^\n]+\]\n?)+)((?:\[screenshot\](?:\n|$))*)$/;
+var ATTACHED_CONTEXT = /(?:^|\n)--- Attached Context ---\s*\n/;
+var CONTEXT_WARNINGS = /(?:^|\n)--- Context Warnings ---[\s\S]*$/;
+var CONTEXT_REF = new RegExp(`^(?:\\S+ )?@(file|folder|url|image):${VALUE}`, "gm");
+var IMAGE_FILE = /\.(png|jpe?g|gif|webp)$/i;
+var unquote2 = (v) => /^([`"']).*\1$/.test(v) ? v.slice(1, -1) : v;
+function splitPrompt(raw2) {
+  let text11 = raw2;
+  let hinted = [];
+  const hints = HINTS.exec(text11);
+  if (hints) {
+    const paths = [...(hints[1] ?? "").matchAll(/^\[Image attached(?: at)?: (.+)\]$/gm)].map((m) => m[1]);
+    const placeholders = (hints[2] ?? "").split("[screenshot]").length - 1;
+    if (placeholders === 0 || placeholders === paths.length) {
+      text11 = text11.slice(0, hints.index);
+      hinted = paths;
+    }
+  }
+  const refs = [];
+  text11 = text11.replace(IMAGE_LINE, (_line, value) => {
+    refs.push(unquote2(value));
+    return "";
+  });
+  if (refs.length) {
+    text11 = text11.replace(SCREENSHOT_LINE, "");
+  }
+  const files = [];
+  const marker2 = ATTACHED_CONTEXT.exec(text11);
+  if (marker2) {
+    const context = text11.slice(marker2.index + marker2[0].length);
+    text11 = text11.slice(0, marker2.index);
+    for (const m of context.matchAll(CONTEXT_REF)) {
+      const ref = `@${m[1]}:${m[2]}`;
+      const end = context.indexOf("\n", m.index);
+      const line = context.slice(m.index, end < 0 ? void 0 : end);
+      const disk = /available on disk at `([^`]+)`/.exec(line)?.[1];
+      if (!text11.includes(ref) && !files.some((f) => f.ref === ref)) {
+        files.push({ ref, ...disk ? { path: disk } : {} });
+      }
+    }
+  }
+  return { files, images: [...refs, ...hinted], text: text11.replace(CONTEXT_WARNINGS, "").replace(/\n{3,}/g, "\n\n").trim() };
+}
+function promptAttachments(parts3, exists = existsSync5) {
+  const local = (p3) => p3.startsWith("/") && exists(p3);
+  return [
+    ...parts3.images.map((p3) => ({ kind: "image", name: basename3(p3), ...local(p3) ? { source: { path: p3 } } : {} })),
+    ...parts3.files.map(({ path: path2, ref }) => {
+      const name = basename3(unquote2(ref.replace(/^@\w+:/, "")));
+      return path2 && IMAGE_FILE.test(path2) && local(path2) ? { kind: "image", name, source: { path: path2 } } : { kind: "file", name };
+    })
+  ];
+}
+
+// src/transcript/todos.ts
+function currentTodos(entries) {
+  for (let i = entries.length - 1; i >= 0; i--) {
+    const e = entries[i];
+    if (e?.kind !== "turn") {
+      continue;
+    }
+    const hit = e.blocks.findLast((b) => b.kind === "tool" && b.call.todos?.length);
+    if (hit?.kind === "tool") {
+      return hit.call.todos;
+    }
+  }
+  return void 0;
+}
+function todosOf(args, current) {
+  const raw2 = Array.isArray(args.todos) ? args.todos : [];
+  return args.merge === true ? mergeTodos(current ?? [], raw2) : toTodos(raw2);
+}
+function mergeTodos(current, patch6) {
+  const out = current.map((t2) => ({ ...t2 }));
+  for (const item3 of patch6) {
+    const r = record(item3);
+    const id = String(r?.id ?? "").trim();
+    if (!r || !id) {
+      continue;
+    }
+    const cur = out.find((t2) => t2.id === id);
+    if (!cur) {
+      if (String(r.content ?? "").trim()) {
+        out.push(...toTodos([{ ...r, id }]));
+      }
+      continue;
+    }
+    const content5 = String(r.content ?? "").trim();
+    const status = String(r.status ?? "").trim().toLowerCase();
+    if (content5) {
+      cur.content = content5;
+    }
+    if (status === "pending" || status === "in_progress" || status === "completed" || status === "cancelled") {
+      cur.status = status;
+    }
+    if ("parent" in r) {
+      const parent = String(r.parent ?? "").trim();
+      if (parent && parent !== id) {
+        cur.parent = parent;
+      } else {
+        delete cur.parent;
+      }
+    }
+  }
+  return out;
+}
+function toTodos(raw2) {
+  const out = [];
+  for (const item3 of raw2) {
+    if (!item3 || typeof item3 !== "object") {
+      continue;
+    }
+    const id = "id" in item3 ? String(item3.id) : String(out.length);
+    const content5 = "content" in item3 ? String(item3.content) : "";
+    const status = "status" in item3 ? String(item3.status) : "pending";
+    const parent = "parent" in item3 && item3.parent ? String(item3.parent) : void 0;
+    out.push({
+      content: content5,
+      id,
+      ...parent && { parent },
+      status: status === "completed" || status === "in_progress" || status === "cancelled" ? status : "pending"
+    });
+  }
+  return out;
+}
+
+// src/transcript/history.ts
+function history({ kept, messages: messages2, compactions, id }) {
+  const entries = [...kept];
+  let turn;
+  const marks = [...compactions];
+  let due = [];
+  const place = (inTurn) => {
+    for (const { at, compaction } of due) {
+      if (inTurn && turn) {
+        turn.blocks.push({ at, compaction, id: id("z"), kind: "compaction" });
+      } else {
+        entries.push({ compaction, id: id("z"), kind: "compaction", rev: 0 });
+      }
+    }
+    due = [];
+  };
+  let pendingContinued;
+  let promptAt = 0;
+  const calls = /* @__PURE__ */ new Map();
+  let todos;
+  for (const m of messages2) {
+    const at = typeof m.timestamp === "number" ? m.timestamp * 1e3 : 0;
+    const text11 = typeof m.text === "string" ? m.text : typeof m.content === "string" ? m.content : "";
+    const steered = m.role === "user" ? m.display_kind === "steer" ? text11.trim() : steerText(text11) : void 0;
+    while (at > 0 && marks[0] && marks[0].at <= at) {
+      due.push(marks[0]);
+      marks.shift();
+    }
+    place(m.role === "assistant" || m.role === "tool" || m.role === "user" && steered !== void 0);
+    if (steered !== void 0 && turn) {
+      turn.blocks.push({ at, id: id("s"), kind: "steer", text: steered });
+      continue;
+    }
+    if (m.role === "user") {
+      turn = void 0;
+      promptAt = at;
+      const notice = displayNotice(m.display_kind, m.display_metadata) ?? internalNotice(text11);
+      if (notice) {
+        pendingContinued = notice;
+      } else {
+        pendingContinued = void 0;
+        entries.push(storedUser(id("u"), steered ?? text11, at));
+      }
+      continue;
+    }
+    if (m.role === "system") {
+      turn = void 0;
+      if (text11.trim()) {
+        entries.push({ id: id("n"), kind: "notice", text: text11, tone: "info" });
+      }
+      continue;
+    }
+    if (!turn) {
+      const continued = pendingContinued ?? continuation(entries.findLast(passable));
+      turn = { blocks: [], continued, id: id("t"), kind: "turn", rev: 0, startedAt: promptAt || at, status: "done" };
+      pendingContinued = void 0;
+      promptAt = 0;
+      entries.push(turn);
+    }
+    if (at > 0) {
+      turn.endedAt = Math.max(turn.endedAt ?? at, at);
+    }
+    if (m.role === "assistant") {
+      const meta3 = record(m.display_metadata);
+      const thought = storedThought(m);
+      if (thought.trim()) {
+        turn.blocks.push({ endedAt: at, id: id("k"), kind: "thinking", startedAt: at, text: thought });
+      }
+      if (m.display_kind === "failed_turn") {
+        const surface = record(meta3?.error_surface);
+        const error = str9(meta3?.error) ?? str9(surface?.message);
+        turn.status = "error";
+        Object.assign(turn, error ? failure(error, surface?.code) : {});
+        turn.errorHint = text11.trim() || void 0;
+        continue;
+      }
+      const reply = typeof m.display_content === "string" ? m.display_content : text11;
+      const notes = Array.isArray(m.display_commentary) ? m.display_commentary.filter((n) => typeof n === "string" && Boolean(n.trim())) : [];
+      const flat3 = (s2) => s2.replace(/\s+/g, " ").trim();
+      if (!reply.trim() || flat3(notes.join("\n\n")) !== flat3(reply)) {
+        turn.blocks.push(...notes.map((n) => ({ id: id("x"), kind: "text", text: n })));
+      }
+      if (reply.trim()) {
+        turn.blocks.push({ id: id("x"), kind: "text", text: reply });
+      }
+      if (meta3?.interrupted === true) {
+        turn.status = "interrupted";
+      }
+    } else if (m.role === "tool") {
+      const callId = toolCallId(m.tool_call_id ?? id("c"));
+      const result = typeof m.content === "string" && m.content ? m.content : void 0;
+      const diff2 = str9(record(record(m.display_metadata)?.tool_result_metadata)?.inline_diff);
+      const existing = calls.get(callId);
+      if (existing) {
+        existing.result = result ?? existing.result;
+        existing.diff = diff2 ?? existing.diff;
+        if (settleBridge(existing)) {
+          existing.status = "error";
+        }
+        continue;
+      }
+      const u = unwrap(m.name ?? "tool", m.args ?? {});
+      const args = u.args;
+      const call = {
+        args,
+        argsText: "",
+        batch: u.batch,
+        context: m.context ?? "",
+        diff: diff2,
+        duration: 0,
+        id: callId,
+        name: u.name,
+        result,
+        startedAt: at,
+        status: "done",
+        via: u.via
+      };
+      call.status = settleBridge(call) ?? Boolean(record(call.result)?.error) ? "error" : "done";
+      if (isTodoName(call.name)) {
+        call.todosBefore = todos;
+      }
+      if (Array.isArray(args.todos)) {
+        call.todos = todosOf(args, todos);
+        todos = call.todos;
+      }
+      calls.set(callId, call);
+      turn.blocks.push({ call, id: id("c"), kind: "tool" });
+    }
+  }
+  due.push(...marks);
+  place(false);
+  return entries;
+}
+function storedUser(id, raw2, at) {
+  const parts3 = splitPrompt(raw2);
+  return userEntry(id, { at, attachments: promptAttachments(parts3), text: parts3.text });
+}
+var str9 = (v) => typeof v === "string" && v.trim() ? v : void 0;
+function storedThought(m) {
+  if (typeof m.display_reasoning === "string") {
+    return detailsText(m.display_reasoning);
+  }
+  return str9(m.reasoning) ?? str9(m.reasoning_content) ?? detailsText(m.reasoning_details);
+}
+function detailsText(details) {
+  let blocks2 = details;
+  if (typeof blocks2 === "string") {
+    const text11 = blocks2.trim();
+    if (!text11.startsWith("[") && !text11.startsWith("{")) {
+      return text11;
+    }
+    blocks2 = parseJson(text11);
+    if (blocks2 === void 0) {
+      return text11;
+    }
+  }
+  const out = [];
+  for (const block of Array.isArray(blocks2) ? blocks2 : [blocks2]) {
+    const r = typeof block === "string" ? { text: block } : record(block);
+    if (!r || r.type === "reasoning.encrypted") {
+      continue;
+    }
+    const summary4 = Array.isArray(r.summary) ? r.summary.map((s2) => typeof s2 === "string" ? s2 : str9(record(s2)?.text) ?? "").join("\n\n") : r.summary;
+    const text11 = [summary4, r.thinking, r.content, r.text].map(str9).find(Boolean)?.trim();
+    if (text11 && !out.includes(text11)) {
+      out.push(text11);
+    }
+  }
+  return out.join("\n\n");
+}
+
+// src/transcript/subagents.ts
+function foldSubagent(call, { type, event, at }) {
+  const list8 = call.subagents ??= [];
+  const key2 = event.subagent_id ?? `task-${event.task_index}`;
+  let agent = list8.find((a2) => a2.id === key2);
+  if (!agent) {
+    agent = {
+      calls: 0,
+      goal: event.goal,
+      id: key2,
+      index: event.task_index,
+      startedAt: at,
+      status: "queued",
+      tokens: 0,
+      toolCount: 0
+    };
+    list8.push(agent);
+    list8.sort((a2, b) => a2.index - b.index);
+  }
+  agent.last = event;
+  agent.goal = event.goal || agent.goal;
+  agent.model = event.model ?? agent.model;
+  agent.toolCount = event.tool_count ?? agent.toolCount;
+  agent.calls = event.api_calls ?? agent.calls;
+  agent.tokens = (event.input_tokens ?? 0) + (event.output_tokens ?? 0) || agent.tokens;
+  if (type === "subagent.start") {
+    agent.status = "running";
+    agent.startedAt = at;
+  } else if (type === "subagent.tool") {
+    agent.status = "running";
+    agent.tool = event.tool_name ?? agent.tool;
+    agent.toolPreview = event.tool_preview ?? event.text ?? void 0;
+    agent.toolSince = { at };
+  } else if (type === "subagent.complete") {
+    agent.status = event.status === "completed" ? "done" : event.status === "interrupted" ? "cancelled" : "failed";
+    agent.summary = event.summary ?? void 0;
+    agent.duration = typeof event.duration_seconds === "number" ? Math.round(event.duration_seconds * 1e3) : at - agent.startedAt;
+    agent.tool = void 0;
+  } else if (event.status === "running") {
+    agent.status = "running";
+  }
+}
+
+// src/transcript.ts
+var Transcript = class {
+  #entries = [];
+  #next = 0;
+  /** The session's running usage at the last completed turn (message.complete reports session totals). */
+  #sessionUsage;
+  /** The session's cumulative counters at the last `session.usage` tick. */
+  #counters;
+  /** The streaming turn: set by start, cleared by complete, clear and load (notices may land after it). */
+  #live;
+  /** The reason line for the next turn, when Hermes' own notice started it. */
+  #continued;
+  #compactions = new Compactions({ entries: () => this.#entries, id: (prefix2) => this.id(prefix2), live: () => this.#live });
+  /** The entries, oldest first; only the transcript's own methods change the list. */
+  get entries() {
+    return this.#entries;
+  }
+  /** Sets the running usage turns count from (a resumed session's totals). */
+  usageBase(usage) {
+    this.#sessionUsage = usage;
+  }
+  /**
+   * Takes a `session.usage` tick's cumulative counters and rate. The turn running (or, as the
+   * last tick can trail message.complete, the one that just ended) gets its share: tokens and
+   * the part of its prompt read from the cache.
+   */
+  usageTick(counters, tps) {
+    this.#counters = counters;
+    const turn = this.#current();
+    let start = turn?.countersAtStart;
+    if (!turn || !start) {
+      return;
+    }
+    if (counters.total < start.total) {
+      start = turn.countersAtStart = { prompt: 0, read: 0, total: 0 };
+    }
+    const prompt = counters.prompt - start.prompt;
+    const hit = prompt > 0 ? Math.round((counters.read - start.read) / prompt * 100) : void 0;
+    const tokens2 = counters.total - start.total || void 0;
+    if (hit !== turn.cacheHit || tokens2 !== turn.tickTokens || tps !== turn.tps) {
+      turn.cacheHit = hit;
+      turn.tickTokens = tokens2;
+      turn.tps = tps;
+      turn.rev++;
+    }
+  }
+  /** A fresh id for an entry or block, unique within this transcript. */
+  id(prefix2) {
+    return entryId(`${prefix2}${(this.#next++).toString(36)}`);
+  }
+  get live() {
+    return this.#live;
+  }
+  clear() {
+    this.#entries = [];
+    this.#live = void 0;
+  }
+  push(entry) {
+    this.#entries.push(entry);
+  }
+  /**
+   * A steer the gateway took for the running turn: it shows inside that turn, where it was sent,
+   * since the agent reads it before its next step. With no turn running it is a plain prompt.
+   */
+  steer(text11, at = Date.now()) {
+    const turn = this.live;
+    if (!turn) {
+      return this.user({ at, text: text11 });
+    }
+    turn.blocks.push({ at, id: this.id("s"), kind: "steer", text: text11 });
+    turn.rev++;
+  }
+  /** A prompt bubble at the end. */
+  user(prompt) {
+    this.push(userEntry(this.id("u"), prompt));
+  }
+  /**
+   * A queued prompt the shared gateway just started. Its message.start came first, so the bubble
+   * goes before the turn it opened while that turn is still empty; else at the end.
+   */
+  started(text11, at = Date.now(), attachments = []) {
+    const live = this.live;
+    const notice = attachments.length ? void 0 : internalNotice(text11);
+    if (notice) {
+      if (live && !live.blocks.length) {
+        live.continued = notice;
+        live.rev++;
+      } else {
+        this.#continued = notice;
+      }
+      return;
+    }
+    if (live && !live.blocks.length && this.#entries.at(-1) === live) {
+      this.#entries.splice(-1, 0, userEntry(this.id("u"), { at, attachments, text: text11 }));
+      live.continued = void 0;
+      live.rev++;
+      return;
+    }
+    this.user({ at, attachments, text: text11 });
+  }
+  notice(text11, tone = "info") {
+    this.push({ id: this.id("n"), kind: "notice", text: text11, tone });
+  }
+  panel(title, text11) {
+    this.push({ id: this.id("p"), kind: "panel", text: text11, title });
+  }
+  /**
+   * The context started compacting (`before`: its tokens, when known). Inside a running turn that
+   * already did something it is a step of that turn; else it goes between turns, before the turn
+   * it was compacted for. Hermes' later lines of the same compaction only fill in the count.
+   */
+  compacting(start = {}) {
+    this.#compactions.compacting(start);
+  }
+  /** The running compaction ended (`tokens`: the owner's own counts, when it reports them). */
+  compacted(at = Date.now(), tokens2 = {}) {
+    this.#compactions.compacted(at, tokens2);
+  }
+  /** The last compaction did not happen after all (`running`: drop it only while it runs). */
+  uncompact(running = false) {
+    this.#compactions.uncompact(running);
+  }
+  /** A context reading (tokens in use): the first one under the last compaction's `before` is what it left. */
+  contextUsed(used) {
+    this.#compactions.contextUsed(used);
+  }
+  /** The compactions seen here that the store has no summary for yet. */
+  get unsummarized() {
+    return this.#compactions.unsummarized;
+  }
+  /** Gives each seen compaction the stored summary written while it ran. */
+  summarize(stored) {
+    this.#compactions.summarize(stored);
+  }
+  /** Another session is shown: the compactions seen were the last one's. */
+  forgetCompactions() {
+    this.#compactions.forget();
+  }
+  /** Opens a live turn unless one is already streaming. */
+  start(at = Date.now()) {
+    const live = this.live;
+    if (live) {
+      return live;
+    }
+    const turn = {
+      blocks: [],
+      continued: this.#continued ?? continuation(this.#entries.findLast(passable)),
+      // A session's first turn starts from zero; later ones from the last tick.
+      countersAtStart: this.#counters ?? (this.#entries.some((e) => e.kind === "turn") ? void 0 : { prompt: 0, read: 0, total: 0 }),
+      id: this.id("t"),
+      kind: "turn",
+      rev: 0,
+      startedAt: at,
+      status: "live"
+    };
+    this.push(turn);
+    this.#live = turn;
+    this.#continued = void 0;
+    return turn;
+  }
+  reasoning(text11, at = Date.now()) {
+    if (!text11) {
+      return;
+    }
+    const turn = this.start(at);
+    const last = turn.blocks.at(-1);
+    if (last?.kind === "thinking" && last.endedAt === void 0) {
+      last.text += text11;
+    } else {
+      turn.blocks.push({ id: this.id("k"), kind: "thinking", startedAt: at, text: text11 });
+    }
+    turn.rev++;
+  }
+  /**
+   * A whole reasoning block from a provider that doesn't stream it; ignored once reasoning streamed.
+   * Hermes also relays each response's visible text through `reasoning.available`, so text the
+   * turn already shows is not a thought either.
+   */
+  reasoningBlock(text11, at = Date.now()) {
+    const turn = this.start(at);
+    const incoming = text11.trim();
+    if (!incoming || turn.blocks.some((b) => b.kind === "thinking" && !b.label || b.kind === "text" && b.text.includes(incoming))) {
+      return;
+    }
+    turn.blocks.push({ endedAt: at, id: this.id("k"), kind: "thinking", startedAt: at, text: text11 });
+    turn.rev++;
+  }
+  /** A Mixture-of-Agents reference model's answer: a sealed thought block of its own, under `label`. */
+  reference(label, text11, at = Date.now()) {
+    const turn = this.start(at);
+    endThinking(turn, at);
+    turn.blocks.push({ endedAt: at, id: this.id("k"), kind: "thinking", label, startedAt: at, text: text11.trim() });
+    turn.rev++;
+  }
+  text(text11, at = Date.now()) {
+    if (!text11) {
+      return;
+    }
+    const turn = this.start(at);
+    endThinking(turn, at);
+    const last = turn.blocks.at(-1);
+    if (last?.kind === "text") {
+      last.text += text11;
+    } else {
+      turn.blocks.push({ id: this.id("x"), kind: "text", text: text11 });
+    }
+    turn.rev++;
+  }
+  /** Interim commentary: seals the streamed text so the next delta starts a new block. */
+  interim(text11, { alreadyStreamed }, at = Date.now()) {
+    const turn = this.start(at);
+    endThinking(turn, at);
+    if (!alreadyStreamed && text11.trim()) {
+      turn.blocks.push({ id: this.id("x"), kind: "text", text: text11 });
+    }
+    turn.blocks.push({ id: this.id("x"), kind: "text", text: "" });
+    turn.rev++;
+  }
+  toolStart(p3, at = Date.now()) {
+    const turn = this.start(at);
+    endThinking(turn, at);
+    if (this.#tool(p3.tool_id)) {
+      return;
+    }
+    const u = unwrap(p3.name, p3.args ?? {});
+    const call = {
+      args: shownArgs(u.args),
+      argsText: p3.args_text ?? "",
+      batch: u.batch,
+      context: withoutTernEnv(p3.context ?? ""),
+      id: toolCallId(p3.tool_id),
+      name: u.name,
+      startedAt: at,
+      status: "running",
+      via: u.via
+    };
+    const before = this.currentTodos();
+    if (isTodoName(call.name)) {
+      call.todosBefore = before;
+    }
+    if (Array.isArray(call.args.todos)) {
+      call.todos = todosOf(call.args, before);
+    }
+    turn.blocks.push({ call, id: call.id, kind: "tool" });
+    turn.rev++;
+  }
+  toolComplete(p3, at = Date.now()) {
+    let found = this.#tool(p3.tool_id);
+    if (!found) {
+      this.toolStart({ args: p3.args ?? {}, name: p3.name, tool_id: p3.tool_id }, at);
+      found = this.#tool(p3.tool_id);
+    }
+    if (!found) {
+      return;
+    }
+    const { call, turn } = found;
+    const output = record(p3.result)?.output;
+    const interrupted = p3.name === "terminal" && typeof output === "string" && /\[Command interrupted\]\s*$/.test(output);
+    call.duration = typeof p3.duration_s === "number" ? Math.round(p3.duration_s * 1e3) : at - call.startedAt;
+    call.summary = p3.summary ?? void 0;
+    call.resultText = p3.result_text ?? void 0;
+    call.result = p3.result;
+    call.diff = p3.inline_diff ?? void 0;
+    if (p3.args) {
+      const u = unwrap(p3.name, p3.args);
+      call.args = shownArgs(u.args);
+      call.name = u.name;
+      call.via = u.via ?? call.via;
+      call.batch = u.batch;
+    }
+    const bridged = settleBridge(call);
+    call.status = interrupted ? "cancelled" : bridged ?? isToolError(p3) ? "error" : "done";
+    if (Array.isArray(p3.todos)) {
+      call.todos = toTodos(p3.todos);
+    }
+    turn.rev++;
+  }
+  /** The newest todo snapshot lands on the newest todo tool call. */
+  todos(todos) {
+    const found = this.#lastTool((c) => isTodoName(c.name));
+    if (found) {
+      found.call.todos = toTodos(todos);
+      found.turn.rev++;
+    }
+  }
+  subagent(type, p3, at = Date.now()) {
+    const found = (p3.delegation_id ? findCall(this.#entries, (c) => c.name === "delegate_task" && record(c.result)?.delegation_id === p3.delegation_id) : void 0) ?? this.#lastTool((c) => c.name === "delegate_task");
+    if (!found) {
+      return;
+    }
+    foldSubagent(found.call, { at, event: p3, type });
+    found.turn.rev++;
+  }
+  complete(p3, at = Date.now()) {
+    const turn = this.live ?? this.start(at);
+    endThinking(turn, at);
+    const final2 = typeof p3.text === "string" ? p3.text : "";
+    const tail = trailingText(turn);
+    if (final2.trim() && tail.trim() !== final2.trim() && !(p3.status === "error" && !p3.partial)) {
+      const last = turn.blocks.at(-1);
+      if (last?.kind === "text") {
+        last.text = final2;
+      } else {
+        turn.blocks.push({ id: this.id("x"), kind: "text", text: final2 });
+      }
+    }
+    turn.blocks = turn.blocks.filter((b) => b.kind !== "text" || b.text.trim());
+    for (const b of turn.blocks) {
+      if (b.kind === "tool" && b.call.status === "running") {
+        b.call.status = p3.status === "error" ? "error" : p3.status === "interrupted" ? "cancelled" : "done";
+        b.call.duration ??= at - b.call.startedAt;
+      }
+    }
+    turn.endedAt = at;
+    this.#live = void 0;
+    if (p3.usage) {
+      turn.usage = usageSince(p3.usage, this.#sessionUsage);
+      this.#sessionUsage = p3.usage;
+    }
+    turn.warning = p3.warning ?? void 0;
+    turn.status = p3.status === "error" ? "error" : p3.status === "interrupted" ? "interrupted" : "done";
+    if (turn.status === "error") {
+      const surfaced = p3.error_surface?.message;
+      const error = typeof surfaced === "string" && surfaced || p3.error || final2 || "The request failed";
+      Object.assign(turn, failure(error, p3.error_surface?.code));
+      turn.errorHint = final2.split(/\n\s*\n/)[0]?.trim() || void 0;
+    }
+    turn.rev++;
+  }
+  /** Seals a live turn the user interrupted before the agent confirmed it. */
+  interrupt(at = Date.now()) {
+    const turn = this.live;
+    if (turn) {
+      this.complete({ status: "interrupted" }, at);
+    }
+  }
+  /**
+   * Rebuilds the entries of a resumed session from its stored messages, with its compactions
+   * (`stored`, which the gateway's history leaves out) where they happened: in the turn that went
+   * on after one, else between turns.
+   */
+  load(messages2, stored = []) {
+    const kept = this.#entries.filter((e) => e.kind === "welcome");
+    this.#live = void 0;
+    this.#entries = history({ compactions: this.#compactions.restore(stored), id: (prefix2) => this.id(prefix2), kept, messages: messages2 });
+  }
+  /** A resumed session's unfinished turn: its prompt, then a live turn holding what streamed so far. */
+  inflight(turn, at = Date.now()) {
+    const user = turn.user?.trim();
+    const notice = user ? displayNotice(turn.display_kind, turn.display_metadata) ?? internalNotice(user) : void 0;
+    if (notice) {
+      this.#continued = notice;
+    } else if (user) {
+      this.push(storedUser(this.id("u"), user, at));
+    }
+    if (turn.assistant || turn.streaming) {
+      this.start(at);
+      this.text(turn.assistant ?? "", at);
+    }
+  }
+  /** Marks the turn holding `call` (if any) changed, after something outside the reducer updated it. */
+  touchCall(call) {
+    const found = call && findCall(this.#entries, (c) => c === call);
+    if (found) {
+      found.turn.rev++;
+    }
+  }
+  /** Changes `call` from outside the reducer (`change` writes it), and marks the turn holding it changed. */
+  mutateCall(call, change) {
+    change(call);
+    this.touchCall(call);
+  }
+  /** The agent's todo list as its newest snapshot left it (any turn), if it ever made one. */
+  currentTodos() {
+    return currentTodos(this.#entries);
+  }
+  /** The delegate_task calls in the transcript, oldest first. */
+  delegations() {
+    return this.calls("delegate_task");
+  }
+  /** The calls of tool `name` in the transcript, oldest first. */
+  calls(name) {
+    return callsWhere(this.#entries, (call) => call.name === name);
+  }
+  /** The call with tool id `id`, in any turn. */
+  call(id) {
+    return this.#tool(id)?.call;
+  }
+  /** The calls that show a background process: terminal calls that start one, `process` calls that watch one; oldest first. */
+  backgroundCalls() {
+    return callsWhere(this.#entries, (call) => isBackgroundCall(call) || isWatchCall(call));
+  }
+  /** The call the gateway's tool id `id` names (as an event sends it), in any turn; the newest when ids repeat. */
+  #tool(id) {
+    return findCall(this.#entries, (call) => call.id === id);
+  }
+  /** The newest call matching `match` in the live (else the last) turn only. */
+  #lastTool(match) {
+    const turn = this.#current();
+    return turn && callIn(turn, match);
+  }
+  /** The live turn, else the last one. */
+  #current() {
+    return this.live ?? this.#entries.findLast((e) => e.kind === "turn");
+  }
+};
+function endThinking(turn, at) {
+  for (const b of turn.blocks) {
+    if (b.kind === "thinking" && b.endedAt === void 0) {
+      b.endedAt = at;
+    }
+  }
+}
+function trailingText(turn) {
+  let out = "";
+  for (const b of turn.blocks) {
+    if (b.kind === "tool" || b.kind === "text" && !b.text) {
+      out = "";
+    } else if (b.kind === "text") {
+      out += b.text;
+    }
+  }
+  return out;
+}
+function usageSince(now, before) {
+  const less = (key2) => {
+    const a2 = now[key2];
+    const b = before?.[key2];
+    return typeof a2 === "number" ? Math.max(0, a2 - (typeof b === "number" ? b : 0)) : void 0;
+  };
+  return { ...now, cost_usd: less("cost_usd"), input: less("input"), output: less("output"), total: less("total") };
+}
+function shownArgs(args) {
+  return typeof args.command === "string" ? { ...args, command: withoutTernEnv(args.command) } : args;
+}
+
 // src/view/dock.tsx
 function todoProgress(list8) {
   const live = list8.filter((t2) => t2.status !== "cancelled");
@@ -70789,8 +70846,7 @@ var App = class {
           continue;
         }
         if (JSON.stringify(next3) !== JSON.stringify(call.connect)) {
-          call.connect = next3;
-          this.transcript.touchCall(call);
+          this.transcript.mutateCall(call, (c) => c.connect = next3);
           this.changed();
         }
         const seen = next3.key ?? call.id;
@@ -70798,8 +70854,7 @@ var App = class {
           this.#connectSeen.add(seen);
         }
         if (!next3.told && this.#connectSeen.has(seen) && allConnected(next3) && (!next3.key || claimTold(next3.key))) {
-          next3.told = true;
-          this.transcript.touchCall(call);
+          this.transcript.mutateCall(call, () => next3.told = true);
           this.#submit(connectedMessage(next3.targets), false);
           this.changed();
         } else if (next3.key && !next3.settled) {
@@ -70823,9 +70878,10 @@ var App = class {
     if (!call || !card || card.told || card.settled) {
       return;
     }
-    card.told = true;
-    card.settled = "continued";
-    this.transcript.touchCall(call);
+    this.transcript.mutateCall(call, () => {
+      card.told = true;
+      card.settled = "continued";
+    });
     if (!card.key || claimTold(card.key)) {
       this.#submit(continueMessage(card.targets), false);
     }
@@ -70834,13 +70890,13 @@ var App = class {
   /** A connect card's Authorize: the app's link in the browser, and its row waits on the browser now. */
   #connectOpen(ref, name) {
     const call = this.#connectCall(ref);
-    const target = call?.connect?.targets.find((t2) => t2.name === name);
-    if (!call?.connect || !target?.url) {
+    const card = call?.connect;
+    const target = card?.targets.find((t2) => t2.name === name);
+    if (!call || !card || !target?.url) {
       return;
     }
     openUrl(target.url);
-    call.connect.opened = [.../* @__PURE__ */ new Set([...call.connect.opened, name])];
-    this.transcript.touchCall(call);
+    this.transcript.mutateCall(call, () => card.opened = [.../* @__PURE__ */ new Set([...card.opened, name])]);
     this.changed();
   }
   /** A paste that is an image (no text: the clipboard's; one image path: that file); false for text. */
@@ -71197,7 +71253,7 @@ var App = class {
     const text11 = item3.text || (images.length ? IMAGE_ONLY_PROMPT : "");
     const attachments = images.map(({ mime, path: path2 }) => ({ mime, path: path2 }));
     const submission = newInputId();
-    this.transcript.user(display?.trim() || item3.text, void 0, false, userImages(images));
+    this.transcript.user({ attachments: userImages(images), text: display?.trim() || item3.text });
     this.#server.shown(submission);
     this.#startBusy("Working\u2026");
     rpc(this.#gw, "prompt.submit", {
@@ -71235,7 +71291,7 @@ ${this.composer.text}` : text11 || this.composer.text);
       this.transcript.notice("Wait for the session to start before running a shell command.", "warning");
       return this.changed();
     }
-    this.transcript.user(`!${command}`);
+    this.transcript.user({ text: `!${command}` });
     this.changed();
     try {
       for (const line of shellLines(await shellExec(this.#gw, sid, command))) {
@@ -71356,7 +71412,7 @@ ${this.composer.text}` : text11 || this.composer.text);
       },
       compressing: (state) => {
         if (state === "start") {
-          this.transcript.compacting(this.usage?.context_used || void 0, Date.now(), true);
+          this.transcript.compacting({ before: this.usage?.context_used || void 0, manual: true });
         } else if (state === "none") {
           this.transcript.uncompact();
         } else {
@@ -71844,7 +71900,7 @@ ${this.composer.text}` : text11 || this.composer.text);
           this.#setCompacting(effect.compacting);
         }
         if (effect.compacting) {
-          t2.compacting(effect.tokens?.before ?? (this.usage?.context_used || void 0));
+          t2.compacting({ before: effect.tokens?.before ?? (this.usage?.context_used || void 0) });
         } else if (effect.compacting === false) {
           t2.compacted(Date.now(), effect.tokens);
           this.#summarize(1500);

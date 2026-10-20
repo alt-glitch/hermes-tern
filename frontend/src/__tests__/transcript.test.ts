@@ -1,11 +1,12 @@
 import type { TranscriptMessage } from '@hermes/shared/gateway-events'
 import { describe, expect, it } from 'vitest'
 
-import { toolCallId } from '../core/ids.js'
+import { entryId, toolCallId } from '../core/ids.js'
 import type { Block, Entry, ToolCall, TurnEntry } from '../model.js'
 import { Transcript } from '../transcript.js'
+import { findCall } from '../transcript/calls.js'
 
-function turnOf(entries: Entry[]): TurnEntry {
+function turnOf(entries: readonly Entry[]): TurnEntry {
   const turn = entries.findLast(e => e.kind === 'turn')
 
   if (turn?.kind !== 'turn') {
@@ -280,7 +281,7 @@ describe('Transcript', () => {
       2
     )
     t.complete({ status: 'complete', text: 'Dispatched.' }, 3)
-    t.user('next', 4)
+    t.user({ at: 4, text: 'next' })
     t.start(5)
 
     const base = { delegation_id: 'deleg_1', task_count: 2 }
@@ -395,5 +396,48 @@ describe('Transcript', () => {
     t.toolStart({ args: { path: 'a.ts' }, name: 'read_file', tool_id: 'c1' }, 1)
     expect(t.call(toolCallId('c1'))?.name).toBe('read_file')
     expect(t.call(toolCallId('nope'))).toBeUndefined()
+  })
+
+  it('finds the newest call when a tool id repeats: the newest turn, its last block', () => {
+    const call = (path: string): ToolCall => ({ args: { path }, argsText: path, context: '', id: toolCallId('c1'), name: 'read_file', startedAt: 0, status: 'done' })
+    const turn = (...paths: string[]): TurnEntry => ({
+      blocks: paths.map(path => ({ call: call(path), id: toolCallId('c1'), kind: 'tool' as const })),
+      id: entryId('t'),
+      kind: 'turn',
+      rev: 0,
+      startedAt: 0,
+      status: 'done'
+    })
+    const entries = [turn('a.ts', 'b.ts'), turn('c.ts', 'd.ts'), { id: entryId('n'), kind: 'notice' as const, text: '', tone: 'info' as const }]
+
+    expect(findCall(entries, c => c.id === 'c1')?.call.argsText).toBe('d.ts')
+    expect(findCall(entries, c => c.argsText === 'a.ts')?.turn).toBe(entries[0])
+  })
+
+  it('bumps the turn holding a call that changes outside the reducer', () => {
+    const t = new Transcript()
+    t.start(0)
+    t.toolStart({ args: { command: 'sleep 9', background: true }, name: 'terminal', tool_id: 'c1' }, 1)
+    t.complete({ status: 'complete' }, 2)
+    t.start(3)
+    const revs = () => t.entries.flatMap(e => (e.kind === 'turn' ? [e.rev] : []))
+    const call = tools(turnOf(t.entries.slice(0, 1)))[0]
+    const [first = 0, second] = revs()
+
+    if (!call) {
+      throw new Error('no call')
+    }
+
+    t.mutateCall(call, c => {
+      c.image = null
+    })
+
+    expect(call.image).toBeNull()
+    // Only the turn holding the call.
+    expect(revs()).toEqual([first + 1, second])
+
+    // A call no turn holds changes nothing else.
+    t.mutateCall({ ...call }, () => {})
+    expect(revs()).toEqual([first + 1, second])
   })
 })

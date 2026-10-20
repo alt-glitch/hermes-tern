@@ -26,8 +26,6 @@ export class Composer {
   cursor = 0
   /** The selection's other end, while text is selected (Shift+arrows, or Tern's native selection). */
   anchor: number | undefined
-  /** Bumped on every change, so the app knows to render. */
-  rev = 0
   #undo: Snapshot[] = []
   #redo: Snapshot[] = []
   #lastEdit = 0
@@ -74,7 +72,6 @@ export class Composer {
     this.#record({ merge: false })
     this.text = text
     this.cursor = clamp(cursor, text.length)
-    this.#changed()
   }
 
   /** Clears the draft after a submit, remembering it in the prompt history. */
@@ -88,7 +85,6 @@ export class Composer {
     this.text = ''
     this.cursor = 0
     this.anchor = undefined
-    this.#changed()
 
     return text
   }
@@ -99,7 +95,6 @@ export class Composer {
     this.#record({ merge: from === to })
     this.text = this.text.slice(0, from) + s + this.text.slice(to)
     this.cursor = from + s.length
-    this.#changed()
   }
 
   /** Replaces `[from, to)`: native edits from Tern and completions. */
@@ -111,7 +106,6 @@ export class Composer {
     this.#record({ merge })
     this.text = this.text.slice(0, from) + s + this.text.slice(to)
     this.cursor = clamp(cursor, this.text.length)
-    this.#changed()
   }
 
   /**
@@ -127,7 +121,6 @@ export class Composer {
       this.cursor = clamp(ev.cursor, this.text.length)
       const anchor = ev.raw?.anchor
       this.anchor = typeof anchor === 'number' && anchor !== this.cursor ? clamp(anchor, this.text.length) : undefined
-      this.#changed()
 
       return
     }
@@ -158,7 +151,6 @@ export class Composer {
     this.anchor = undefined
     this.#lastEdit = 0
     this.#browse = -1
-    this.#changed()
   }
 
   redo() {
@@ -174,7 +166,6 @@ export class Composer {
     this.anchor = undefined
     this.#lastEdit = 0
     this.#browse = -1
-    this.#changed()
   }
 
   /** Handles one editing key; false when the key isn't the composer's. */
@@ -448,7 +439,6 @@ export class Composer {
     this.text = text
     this.cursor = text.length
     this.anchor = undefined
-    this.#changed()
 
     return true
   }
@@ -458,7 +448,6 @@ export class Composer {
       this.cursor = clamp(to, this.text.length)
       this.anchor = undefined
       this.#lastEdit = 0
-      this.#changed()
     }
 
     return true
@@ -472,7 +461,6 @@ export class Composer {
     this.#record({ merge: true })
     this.text = this.text.slice(0, from) + this.text.slice(to)
     this.cursor = from
-    this.#changed()
 
     return true
   }
@@ -483,7 +471,6 @@ export class Composer {
       this.#record({ merge: false })
       this.text = this.text.slice(0, from) + this.text.slice(to)
       this.cursor = from
-      this.#changed()
     }
 
     return true
@@ -506,10 +493,6 @@ export class Composer {
 
     this.#lastEdit = merge ? now : 0
     this.#redo = []
-  }
-
-  #changed() {
-    this.rev++
   }
 }
 

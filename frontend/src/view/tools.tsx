@@ -12,7 +12,7 @@ import { localSource, shownImage } from '../media.js'
 import type { Subagent, Todo, ToolCall } from '../model.js'
 import { isRunning as processRuns, processElapsed, processIdOf, processTone, processVerdict, watchersOf } from '../processes/store.js'
 import { primaryNode, tilesNode } from '../processes/widgets/view.js'
-import { isBackgroundCall, isProcessTool, isWatchCall } from '../transcript.js'
+import { isBackgroundCall, isProcessTool, isWatchCall } from '../transcript/calls.js'
 import { record } from '../wire/json.js'
 import { appsOf } from '../workLog.js'
 
