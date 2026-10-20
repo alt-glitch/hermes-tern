@@ -2,9 +2,8 @@
 
 import type { JSX } from '@stencil-hq/tern'
 
-import { type AppTool, callApp } from '../../../bridge.js'
+import { type AppTool, appsOf, callApp } from '../../../bridge.js'
 import type { ToolCall } from '../../../model.js'
-import { appsOf } from '../../../workLog.js'
 import { clip } from '../../format.js'
 import type { Card } from '../types.js'
 

@@ -173,6 +173,5 @@
   "src/watch/child.ts no-restricted-syntax": 2,
   "src/watch/spec.ts @typescript-eslint/consistent-type-assertions": 1,
   "src/watch/spec.ts no-restricted-syntax": 1,
-  "src/workLog.ts @typescript-eslint/consistent-type-assertions": 1,
   "src/workLog.ts @typescript-eslint/no-non-null-assertion": 2
 }

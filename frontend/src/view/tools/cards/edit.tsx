@@ -3,23 +3,41 @@
 import { diffStats, hunks, plainDiff } from '../../../code/diff.js'
 import { langOf } from '../../../code/lang.js'
 import type { ToolCall } from '../../../model.js'
-import { nonEmpty, plural } from '../../format.js'
-import type { Card } from '../types.js'
+import type { EditDetail } from '../../../tools/files.js'
+import { plural } from '../../format.js'
+import { shortPath } from '../steps.js'
+import type { Card, ToolView } from '../types.js'
+
+/** The patch tool's view. */
+export const patchView: ToolView<'patch'> = {
+  action: 'edit',
+  card: editCard,
+  hubIcon: 'edit',
+  step: (_call, d) => (d.path ? `Edited ${shortPath(d.path)}` : 'Edited a file')
+}
+
+/** The write_file tool's view. */
+export const writeView: ToolView<'write_file'> = {
+  action: 'edit',
+  card: editCard,
+  hubIcon: 'write',
+  step: (_call, d) => (d.path ? `Wrote ${shortPath(d.path)}` : 'Wrote a file')
+}
 
 /** An edit's diff with its +/− counts; a new file as the file itself, numbered. */
-export function editCard(call: ToolCall, result: Record<string, unknown> | undefined): Card {
-  const path = nonEmpty(call.args.path) ?? call.context
+function editCard(call: ToolCall, d: EditDetail): Card {
+  const path = d.path ?? call.context
   const lang = langOf(path)
-  const diff = hunks(nonEmpty(result?.diff)) ?? (call.diff ? plainDiff(call.diff) : undefined)
-  const content = nonEmpty(call.args.content)
-  const write = call.name === 'write_file'
+  const diff = hunks(d.diff) ?? (call.diff ? plainDiff(call.diff) : undefined)
+  const content = d.content
+  const write = d.tool === 'write_file'
 
   const head = {
     name: write ? 'write' : 'edit',
     target: path,
-    targetKind: 'path' as const,
+    targetKind: 'path',
     title: write ? 'Write' : 'Edit'
-  }
+  } satisfies Partial<Card>
 
   // A new file is all additions: omp shows it as the file, numbered, with a badge.
   if (write && content && (!diff || diff.startsWith('@@ -0,0 '))) {

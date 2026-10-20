@@ -4,34 +4,30 @@ import type { JSX } from '@stencil-hq/tern'
 
 import { localSource } from '../../../media.js'
 import type { ToolCall } from '../../../model.js'
-import { clip, nonEmpty } from '../../format.js'
+import type { GenericFields } from '../../../tools/misc.js'
+import { clip } from '../../format.js'
 import type { Card } from '../types.js'
 
 /** The image itself, open; what the tool said of it under it (not the JSON it came in). */
-export function imageCard(
-  call: ToolCall,
-  result: Record<string, unknown> | undefined,
-  look: { name: string; title: string },
-  src: string | undefined
-): Card {
-  const said = call.status === 'running' ? undefined : (nonEmpty(result?.analysis) ?? nonEmpty(result?.text_summary))
+export function imageCard(call: ToolCall, d: GenericFields, look: { name: string; title: string }, src: string | undefined): Card {
+  const said = call.status === 'running' ? undefined : d.said
 
   return {
     ...look,
     body: [
-      ...(src ? [imageNode(call, src)] : []),
+      ...(src ? [imageNode(call, d, src)] : []),
       ...(said ? [<text key="said" lines={6} spans={[{ s: 'muted', t: clip(said, { mark: 'line', max: 2000 }) }]} wrap="word" />] : [])
     ],
     folded: false,
-    target: nonEmpty(call.args.prompt) ?? nonEmpty(call.args.question) ?? (call.context || undefined),
+    target: d.prompt ?? d.question ?? (call.context || undefined),
     targetKind: 'text'
   }
 }
 
 /** The image a call showed; a click opens it large in Tern's lightbox. A URL shows once its bytes came. */
-function imageNode(call: ToolCall, src: string): JSX.Element {
+function imageNode(call: ToolCall, d: GenericFields, src: string): JSX.Element {
   const source = localSource(src) ?? call.image
-  const alt = nonEmpty(call.args.prompt) ?? 'Image'
+  const alt = d.prompt ?? 'Image'
 
   if (source) {
     return <image alt={clip(alt, { mark: 'line', max: 200 })} key="image" role="hermes.tool.image" {...source} />

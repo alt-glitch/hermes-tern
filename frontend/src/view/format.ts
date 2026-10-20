@@ -20,6 +20,11 @@ export function clip(text: string, o: { max: number; mark?: 'end' | 'line' }): s
   return o.mark === 'line' ? `${text.slice(0, o.max)}\n…` : `${text.slice(0, o.max - 1)}…`
 }
 
+/** `text` on one line: each run of whitespace (newlines too) one space, the ends trimmed. */
+export function flat(text: string): string {
+  return text.replace(/\s+/g, ' ').trim()
+}
+
 /** `1 file`, `3 files`: a count and its noun; `many` defaults to `one` with an `s`. */
 export function plural(n: number, one: string, many = `${one}s`): string {
   return `${n} ${n === 1 ? one : many}`

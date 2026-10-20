@@ -4,20 +4,34 @@ import type { JSX } from '@stencil-hq/tern'
 
 import { langOf } from '../../../code/lang.js'
 import type { ToolCall } from '../../../model.js'
-import { record } from '../../../wire/json.js'
-import { nonEmpty, plural } from '../../format.js'
-import type { Card } from '../types.js'
+import type { SearchDetail } from '../../../tools/search.js'
+import { plural } from '../../format.js'
+import { shortPath } from '../steps.js'
+import type { Card, ToolView } from '../types.js'
+
+/** The search_files tool's view: "Searched pattern in folder". */
+export const searchView: ToolView<'search_files'> = {
+  action: 'code-search',
+  card: searchCard,
+  hubIcon: 'search',
+  step: (call, d) => {
+    const pattern = d.pattern ?? call.context
+    const where = d.path && d.path !== '.' ? ` in ${shortPath(d.path)}` : ''
+
+    return d.filesOnly ? `Searched files ${pattern}${where}` : `Searched ${pattern}${where}`
+  }
+}
 
 /** A file search as the files it found; a content search as its matches, grouped by file. */
-export function searchCard(call: ToolCall, result: Record<string, unknown> | undefined): Card {
-  const pattern = nonEmpty(call.args.pattern) ?? call.context
-  const where = nonEmpty(call.args.path)
+function searchCard(call: ToolCall, d: SearchDetail): Card {
+  const pattern = d.pattern ?? call.context
+  const where = d.path
   const inPath = where && where !== '.' ? ` · in ${where}` : ''
-  const files = Array.isArray(result?.files) ? result.files.map(f => nonEmpty(f)).filter(f => f !== undefined) : undefined
+  const files = d.files
 
-  if (files || call.args.target === 'files') {
+  if (files || d.filesOnly) {
     const list = (files ?? []).map(f => f.replace(/^\.\//, ''))
-    const total = typeof result?.total_count === 'number' ? result.total_count : list.length
+    const total = d.total ?? list.length
 
     return {
       body: list.slice(0, 200).map((f, i) => {
@@ -39,20 +53,17 @@ export function searchCard(call: ToolCall, result: Record<string, unknown> | und
     }
   }
 
-  const matches = Array.isArray(result?.matches)
-    ? result.matches.map(m => record(m)).filter(m => m !== undefined)
-    : undefined
-
+  const matches = d.matches
   const byFile = new Map<string, { line: number; text: string }[]>()
 
   for (const m of matches ?? []) {
-    const path = (nonEmpty(m.path) ?? '').replace(/^\.\//, '')
+    const path = m.path.replace(/^\.\//, '')
     const list = byFile.get(path) ?? []
-    list.push({ line: typeof m.line === 'number' ? m.line : 0, text: typeof m.content === 'string' ? m.content : '' })
+    list.push({ line: m.line, text: m.text })
     byFile.set(path, list)
   }
 
-  const total = typeof result?.total_count === 'number' ? result.total_count : (matches?.length ?? 0)
+  const total = d.total ?? matches?.length ?? 0
   const body: JSX.Element[] = []
   let fileIndex = 0
 

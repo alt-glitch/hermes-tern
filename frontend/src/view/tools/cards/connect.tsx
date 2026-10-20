@@ -1,8 +1,18 @@
 // The manage_connections tool's connect card: the apps to authorize, their states, and Continue.
 
-import { allConnected, type ConnectTarget, connectTargets, type SettleReason, waiting } from '../../../connections.js'
+import { allConnected, type ConnectTarget, connectTargets, isConnectCall, type SettleReason, waiting } from '../../../connections.js'
 import type { ToolCall } from '../../../model.js'
-import type { Card } from '../types.js'
+import { namedStep } from '../steps.js'
+import type { Card, ToolView } from '../types.js'
+
+import { genericCard, humanize } from './generic.js'
+
+/** The manage_connections tool's view: the connect card while it has apps to authorize, else the generic card. */
+export const connectView: ToolView<'manage_connections'> = {
+  action: 'other',
+  card: (call, d) => (isConnectCall(call) ? connectCard(call) : genericCard(call, d, { name: call.name, title: humanize(call.name) })),
+  step: namedStep
+}
 
 interface ConnectLook {
   icon: string
@@ -40,7 +50,7 @@ const SETTLED_NOTE: Record<SettleReason, string> = {
  * agent the user is done (the tool's own note asks it to wait for that, then check status). Settled,
  * it is the desktop's static summary: the rows as they ended, no controls.
  */
-export function connectCard(call: ToolCall): Card {
+function connectCard(call: ToolCall): Card {
   const card = call.connect ?? { opened: [], targets: connectTargets(call), told: false }
   const { settled, targets } = card
   const ref = card.key ?? call.id

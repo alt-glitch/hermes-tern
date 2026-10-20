@@ -18,6 +18,7 @@ import { SUBAGENT_LOOK } from '../agents/look.js'
 import { agentName, isRunning } from '../agents/store.js'
 import { duration } from '../view/format.js'
 import { briefOf } from '../view/tools/cards/task.js'
+import { hubIconOf } from '../view/tools/registry.js'
 import { facts } from '../view/ui/facts.js'
 
 import { editQuery, moveSelection } from './search.js'
@@ -32,19 +33,6 @@ const TICK_MS = 1000
 const RECENT = 6
 
 type Tab = 'running' | 'all'
-
-/** Icons for the tools hermes children run most; the rest get a wrench. */
-const TOOL_ICON: Record<string, string> = {
-  browser_navigate: 'web',
-  execute_code: 'python',
-  patch: 'edit',
-  read_file: 'read',
-  search_files: 'search',
-  terminal: 'bash',
-  web_extract: 'web',
-  web_search: 'web',
-  write_file: 'write'
-}
 
 /** Opens the hub, on agent `focus` when given (its timeline when `watch`). */
 export function openAgents(host: AgentsSheetHost, focus?: { id: string; watch?: boolean }) {
@@ -476,7 +464,7 @@ function stepItem(e: LogEntry, id: string, a: Subagent): PickerItem {
       detail: e.args,
       dot: e.status === 'error' ? 'error' : e.status === 'running' && isRunning(a) ? 'accent' : undefined,
       facts: { at: e.at, took: e.took !== undefined ? duration(e.took) : '' },
-      icon: TOOL_ICON[e.name] ?? 'wrench',
+      icon: hubIconOf(e.name),
       id,
       label: e.name,
       mono: true,

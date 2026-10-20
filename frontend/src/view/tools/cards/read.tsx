@@ -2,14 +2,23 @@
 
 import { langOf } from '../../../code/lang.js'
 import type { ToolCall } from '../../../model.js'
-import { nonEmpty } from '../../format.js'
-import type { Card } from '../types.js'
+import type { ReadDetail } from '../../../tools/files.js'
+import { shortPath } from '../steps.js'
+import type { Card, ToolView } from '../types.js'
+
+/** The read_file tool's view. */
+export const readView: ToolView<'read_file'> = {
+  action: 'read',
+  card: readCard,
+  hubIcon: 'read',
+  step: (_call, d) => (d.path ? `Read ${shortPath(d.path)}` : 'Read file')
+}
 
 /** The file's lines as read, numbered from where the read began; the range (or the whole count) as meta. */
-export function readCard(call: ToolCall, result: Record<string, unknown> | undefined): Card {
-  const path = nonEmpty(call.args.path) ?? call.context
-  const content = nonEmpty(result?.content)
-  const total = typeof result?.total_lines === 'number' ? result.total_lines : undefined
+function readCard(call: ToolCall, d: ReadDetail): Card {
+  const path = d.path ?? call.context
+  const content = d.content
+  const total = d.totalLines
   const numbered = content ? [...content.matchAll(/^ *(\d+)\|/gm)] : []
   const first = numbered.length ? Number(numbered[0]?.[1]) : undefined
   const last = numbered.length ? Number(numbered.at(-1)?.[1]) : undefined

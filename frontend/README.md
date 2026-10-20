@@ -29,7 +29,8 @@ code 75, and the launcher runs the Ink TUI in its place (`hermes_cli/main_tui_la
 | `src/transcript/` | The transcript's parts: compactions, a reload from history, finding calls, todos, subagent rows, and what a message says (Hermes' notices, steers) |
 | `src/composer.ts` | The prompt editor's model: text, caret, undo, history, kill ring |
 | `src/view/` | Node builders (TSX on the Tern SDK's runtime) for the transcript, tool cards, dock and welcome card; `format.ts` holds how they write text, durations, times and paths |
-| `src/view/tools/` | Tool calls as `tool` nodes: `shell.tsx` picks a call's card and wraps it, `cards/` holds one module per card family (terminal, read, edit, search, web, task, ask, eval, connect, apps, images, the small inline ones, the generic fallback) |
+| `src/tools/` | Tool details: each call's args and result read once (lenient: a field of the wrong type reads as absent) into a variant keyed by its tool, `detail.ts` holding the union and the parse memo |
+| `src/view/tools/` | Tool calls as `tool` nodes: `registry.ts` holds one view per tool (its card, step line, action and hub icon), `shell.tsx` wraps a call's card, `cards/` holds one module per card family (terminal, read, edit, search, web, task, ask, eval, connect, apps, images, the small inline ones, the generic fallback) with its tools' views |
 | `src/code/` | Code helpers the views share: a file's highlighting language, unified diff hunks and counts |
 | `src/view/ui/` | The parts the views share: pills, buttons and the action row, the shimmer and working row, sections headed by a child, facts lists |
 | `src/overlay.ts`, `src/overlays/` | Floating sheets: approvals, clarify, masked prompts, completions, pickers |

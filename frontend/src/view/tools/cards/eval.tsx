@@ -1,14 +1,23 @@
 // The execute_code tool: omp's eval card, one cell of input and its output.
 
 import type { ToolCall } from '../../../model.js'
-import { nonEmpty } from '../../format.js'
-import type { Card } from '../types.js'
+import type { EvalDetail } from '../../../tools/misc.js'
+import { flat } from '../../format.js'
+import type { Card, ToolView } from '../types.js'
+
+/** The execute_code tool's view: its step is the gateway's line for the script. */
+export const evalView: ToolView<'execute_code'> = {
+  action: 'command',
+  card: evalCard,
+  hubIcon: 'python',
+  step: call => (call.context ? flat(call.context) : 'Ran a script')
+}
 
 /** The code run and what it printed; a leading `#` comment line titles the card. */
-export function evalCard(call: ToolCall, result: Record<string, unknown> | undefined): Card {
-  const code = nonEmpty(call.args.code) ?? ''
-  const output = nonEmpty(result?.output) ?? nonEmpty(result?.stdout) ?? call.resultText
-  const error = nonEmpty(result?.error) ?? nonEmpty(result?.stderr)
+function evalCard(call: ToolCall, d: EvalDetail): Card {
+  const code = d.code ?? ''
+  const output = d.output ?? call.resultText
+  const error = d.error
 
   return {
     badges: [{ text: 'python' }],

@@ -167,6 +167,14 @@ export function settleBridge(call: ToolCall): boolean | undefined {
   return Boolean(o?.error)
 }
 
+/** The apps a call acted in: a connector's, or each of a batch's (none when any entry is local). */
+export function appsOf(call: Pick<ToolCall, 'args' | 'batch' | 'name'>): string[] {
+  const apps = (call.batch ?? [call]).map(e => callApp({ args: e.args, name: e.name })?.app)
+  const named = apps.filter((a): a is string => Boolean(a))
+
+  return named.length === apps.length ? [...new Set(named)] : []
+}
+
 /** The app a call acts in, for a batch the app all its entries share. */
 export function callApp(call: Pick<ToolCall, 'args' | 'batch' | 'name'>): AppTool | undefined {
   if (call.batch) {

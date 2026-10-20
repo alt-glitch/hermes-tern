@@ -5,6 +5,5 @@
   "src/overlays/prompts.tsx": 833,
   "src/processes/widgets/runtime.ts": 889,
   "src/processes/widgets/spec.ts": 888,
-  "src/prs/view.tsx": 813,
-  "src/workLog.ts": 629
+  "src/prs/view.tsx": 813
 }

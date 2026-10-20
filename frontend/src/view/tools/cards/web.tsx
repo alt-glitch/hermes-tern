@@ -3,52 +3,69 @@
 import type { JSX } from '@stencil-hq/tern'
 
 import type { ToolCall } from '../../../model.js'
-import { record } from '../../../wire/json.js'
-import { clip, nonEmpty, plural } from '../../format.js'
+import type { FetchDetail, WebSearchDetail } from '../../../tools/web.js'
+import { clip, plural } from '../../format.js'
 import { compact } from '../../time.js'
-import type { Card } from '../types.js'
+import type { Card, ToolView } from '../types.js'
 
-/** A web search as the sources it found, each linked. */
-export function webSearchCard(call: ToolCall, result: Record<string, unknown> | undefined): Card {
-  const data = record(result?.data)
+/** The web_search tool's view. */
+export const webSearchView: ToolView<'web_search'> = {
+  action: 'search',
+  card: webSearchCard,
+  hubIcon: 'web',
+  step: (_call, d) => (d.query ? `Searched the web for ${d.query}` : 'Web search')
+}
 
-  const hits = (Array.isArray(data?.web) ? data.web : Array.isArray(result?.results) ? result.results : [])
-    .map(h => record(h))
-    .filter(h => h !== undefined)
+/** The web_extract tool's view: its step names the first page and counts the rest. */
+export const fetchView: ToolView<'web_extract'> = {
+  action: 'fetch',
+  card: fetchCard,
+  hubIcon: 'web',
+  step: (_call, d) => {
+    const first = d.urls[0] ?? d.url
+
+    return first ? `Read ${first}${d.urls.length > 1 ? ` +${d.urls.length - 1} more` : ''}` : 'Read a page'
+  }
+}
+
+/** A web search as the sources it found, each linked; framed once they are in. */
+function webSearchCard(call: ToolCall, d: WebSearchDetail): Card {
+  const hits = d.hits
 
   return {
     body: hits.length
       ? [
           <col key="s" role="omp.tool.sources">
-            {hits.map((h, i) => sourceRow(`s${i}`, nonEmpty(h.title) ?? nonEmpty(h.url) ?? '', nonEmpty(h.url)))}
+            {hits.map((h, i) => sourceRow(`s${i}`, h.title ?? h.url ?? '', h.url))}
           </col>
         ]
       : [],
     frame: 'inline',
+    framedWithBody: true,
     meta: hits.length ? [plural(hits.length, 'source')] : undefined,
     name: 'web_search',
-    target: nonEmpty(call.args.query) ?? call.context,
+    target: d.query ?? call.context,
     targetKind: 'query',
     title: 'Web search'
   }
 }
 
 /** A page fetch: each page as its linked source and its content. */
-export function fetchCard(call: ToolCall, result: Record<string, unknown> | undefined): Card {
-  const pages = (Array.isArray(result?.results) ? result.results : []).map(p => record(p)).filter(p => p !== undefined)
-  const urls = Array.isArray(call.args.urls) ? call.args.urls.map(u => nonEmpty(u)).filter(u => u !== undefined) : []
+function fetchCard(call: ToolCall, d: FetchDetail): Card {
+  const pages = d.pages
+  const urls = d.urls.filter(u => u !== '')
   const body: JSX.Element[] = []
 
   for (const [i, p] of pages.entries()) {
-    body.push(sourceRow(`s${i}`, nonEmpty(p.title) ?? nonEmpty(p.url) ?? '', nonEmpty(p.url)))
-    const content = nonEmpty(p.content)
+    body.push(sourceRow(`s${i}`, p.title ?? p.url ?? '', p.url))
+    const content = p.content
 
     if (content) {
       body.push(<md key={`b${i}`}>{clip(content, { mark: 'line', max: 4000 })}</md>)
     }
   }
 
-  const chars = pages.reduce((n, p) => n + (nonEmpty(p.content)?.length ?? 0), 0)
+  const chars = pages.reduce((n, p) => n + (p.content?.length ?? 0), 0)
 
   return {
     body,
@@ -56,7 +73,7 @@ export function fetchCard(call: ToolCall, result: Record<string, unknown> | unde
     meta: pages.length ? [`${plural(pages.length, 'page')} · ${compact(chars)} chars`] : undefined,
     name: 'fetch',
     preview: { lines: 6 },
-    target: urls.length > 1 ? `${urls[0]} +${urls.length - 1}` : (urls[0] ?? nonEmpty(call.args.url) ?? call.context),
+    target: urls.length > 1 ? `${urls[0]} +${urls.length - 1}` : (urls[0] ?? d.url ?? call.context),
     targetKind: 'path',
     title: 'Fetch'
   }

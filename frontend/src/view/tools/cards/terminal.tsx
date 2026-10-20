@@ -6,17 +6,45 @@ import type { ToolCall } from '../../../model.js'
 import { PROCESS_LOOK } from '../../../processes/look.js'
 import { isRunning as processRuns, processElapsed, processIdOf, processTone, processVerdict, watchersOf } from '../../../processes/store.js'
 import { primaryNode } from '../../../processes/widgets/view.js'
+import type { TerminalDetail } from '../../../tools/terminal.js'
+import { commandDisplayText } from '../../../vendor/t3code/commandLabel.js'
 import { commandLine, describeCommand } from '../../describe.js'
-import { clip, duration, nonEmpty } from '../../format.js'
+import { clip, duration, flat } from '../../format.js'
 import { age } from '../../time.js'
-import type { Card } from '../types.js'
+import type { Card, ToolView } from '../types.js'
+
+/**
+ * The terminal tool's view. A background start reports no exit (its process line tells how it
+ * ended), and a short command that sat in the card's head opens a work group step.
+ */
+export const terminalView: ToolView<'terminal'> = {
+  action: 'command',
+  card: (call, d, now) => (d.background ? backgroundCard(call, d, now) : bashCard(call, d)),
+  detailPrefix: (call, d) => {
+    const command = commandOf(call, d)
+
+    return command && command === commandLine(command)
+      ? <code key="cmd" lang="bash" max={{ h: '12lines' }} role="omp.tool.command" text={command} />
+      : undefined
+  },
+  exit: d => (d.background ? undefined : d.exit),
+  hubIcon: 'bash',
+  // The command as its text, without an `sh -c` wrapper.
+  step: (call, d) => {
+    const command = d.command ?? call.context
+
+    return command ? flat(commandDisplayText(command)) : 'Command'
+  }
+}
+
+const commandOf = (call: ToolCall, d: TerminalDetail) => (d.command ?? call.context ?? '').trim()
 
 /** A command and its output. `instead`, when given, takes the output's place (a background call's process line). */
-export function bashCard(call: ToolCall, result: Record<string, unknown> | undefined, instead?: JSX.Element): Card {
+function bashCard(call: ToolCall, d: TerminalDetail, instead?: JSX.Element): Card {
   // The cancelled card's notice already says the command was interrupted.
-  const output = (nonEmpty(result?.output) ?? call.resultText)?.replace(/\s*\[Command interrupted\]\s*$/, '')
-  const error = nonEmpty(result?.error)
-  const command = (nonEmpty(call.args.command) ?? call.context ?? '').trim()
+  const output = (d.output ?? call.resultText)?.replace(/\s*\[Command interrupted\]\s*$/, '')
+  const error = d.error
+  const command = commandOf(call, d)
   const line = commandLine(command)
   const running = call.status === 'running'
 
@@ -47,13 +75,13 @@ export function bashCard(call: ToolCall, result: Record<string, unknown> | undef
  * (running · run time · last output line, then how it ended). A click on that line opens the
  * Background sheet on the process.
  */
-export function backgroundCard(call: ToolCall, result: Record<string, unknown> | undefined, now: number): Card {
+function backgroundCard(call: ToolCall, d: TerminalDetail, now: number): Card {
   const w = watchersOf(call)
   const id = processIdOf(call) ?? call.process?.id
   const line = id ? processLine(call, id, now) : undefined
   const chart = call.process?.chart && primaryNode(call.process.chart)
   // The start result ("Background process started") says nothing the process line does not.
-  const card = bashCard(call, result, line && chart ? <col gap="xs" key="process">{line}{chart}</col> : line)
+  const card = bashCard(call, d, line && chart ? <col gap="xs" key="process">{line}{chart}</col> : line)
 
   return {
     ...card,

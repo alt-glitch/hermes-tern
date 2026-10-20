@@ -5,7 +5,8 @@ import type { Block, ToolCall, TurnEntry } from '../model.js'
 import type { Todo } from '../model.js'
 import { Transcript } from '../transcript.js'
 import { durationCompact } from '../view/format.js'
-import { busyLabel, foldOf, liveLabel, parts, pieces, planStep, preparingLabel, presentTense, stepLabel, summarize, thoughtLine, thoughtTitle, type WorkItem } from '../workLog.js'
+import { planStep } from '../view/tools/cards/inline.js'
+import { busyLabel, foldOf, liveLabel, parts, pieces, preparingLabel, presentTense, stepLabel, summarize, thoughtLine, thoughtTitle, type WorkItem } from '../workLog.js'
 
 const call = (name: string, args: Record<string, unknown> = {}, more: Partial<ToolCall> = {}): ToolCall => ({
   args,

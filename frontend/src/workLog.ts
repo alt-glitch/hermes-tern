@@ -4,16 +4,15 @@
 // and read 2 files"), each step one line; a finished turn folds everything but its answer
 // behind "Worked for 54s". The views in view/workLog.tsx draw what this derives.
 
-import { homedir } from 'node:os'
-
-import { callApp } from './bridge.js'
-import { launchEnv } from './config/env.js'
+import { appsOf, callApp } from './bridge.js'
 import { isConnectCall } from './connections.js'
 import { shownImage } from './media.js'
-import type { Block, Todo, ToolCall, TurnEntry } from './model.js'
+import type { Block, ToolCall, TurnEntry } from './model.js'
 import { isBackgroundCall, isTodoName, isWatchCall } from './transcript/calls.js'
-import { durationCompact, nonEmpty, plural, relativePath } from './view/format.js'
-import { commandDisplayText, commandProgramName } from './vendor/t3code/commandLabel.js'
+import { commandProgramName } from './vendor/t3code/commandLabel.js'
+import { durationCompact, flat, nonEmpty, plural } from './view/format.js'
+import { ACTION_ICON, viewOf } from './view/tools/registry.js'
+import type { Action } from './view/tools/types.js'
 
 /** A step of a work group: a tool call or a thought. */
 export type WorkItem = Extract<Block, { kind: 'thinking' | 'tool' }>
@@ -201,64 +200,9 @@ export function parts(turn: TurnEntry): Part[] {
   return out
 }
 
-/** What a call counts as in a summary, after t3code's `toolGroupAction`. */
-export type Action =
-  | 'app'
-  | 'browser'
-  | 'code-search'
-  | 'command'
-  | 'edit'
-  | 'fetch'
-  | 'lookup'
-  | 'other'
-  | 'plan'
-  | 'read'
-  | 'search'
-
+/** What a call counts as in a summary: its view's action (an app's while it acted in apps only). */
 export function actionOf(call: ToolCall): Action {
-  // A connector or MCP tool acts in an app, whatever its name says; so does a batch of them.
-  if (appsOf(call).length) {
-    return 'app'
-  }
-
-  if (isTodoName(call.name)) {
-    return 'plan'
-  }
-
-  switch (call.name) {
-    case 'tool_search':
-
-    case 'tool_describe':
-      return 'lookup'
-
-    case 'terminal':
-
-    case 'execute_code':
-
-    case 'process':
-
-    case 'process_manage':
-      return 'command'
-
-    case 'read_file':
-      return 'read'
-
-    case 'patch':
-
-    case 'write_file':
-      return 'edit'
-
-    case 'search_files':
-      return 'code-search'
-
-    case 'web_search':
-      return 'search'
-
-    case 'web_extract':
-      return 'fetch'
-  }
-
-  return call.name.startsWith('browser') ? 'browser' : 'other'
+  return viewOf(call).action()
 }
 
 const and = (words: readonly string[]) => (words.length < 3 ? words.join(' and ') : `${words.slice(0, -1).join(', ')}, and ${words.at(-1)}`)
@@ -303,13 +247,6 @@ function actionLabel(action: Action, n: number, calls: readonly ToolCall[] = [])
     case 'other':
       return `Used ${plural(n, 'tool')}`
   }
-}
-
-/** The apps a call acted in: a connector's, or each of a batch's (none when any entry is local). */
-export function appsOf(call: ToolCall): string[] {
-  const apps = (call.batch ?? [call]).map(e => callApp({ args: e.args, name: e.name })?.app)
-
-  return apps.every(Boolean) ? [...new Set(apps as string[])] : []
 }
 
 /** Changes and work in other apps outrank looking around, which outranks everything else. */
@@ -363,7 +300,7 @@ function editedFiles(calls: readonly ToolCall[]): number {
   let unnamed = 0
 
   for (const c of calls) {
-    const path = nonEmpty(c.args.path)
+    const path = nonEmpty(c.args['path'])
 
     if (path) {
       paths.add(path)
@@ -386,171 +323,18 @@ export function groupIcon(items: readonly WorkItem[]): string {
   return actions.size === 1 ? actionIcon([...actions][0]!) : 'hammer'
 }
 
+/** A step's icon: its action's. */
 export function actionIcon(action: Action): string {
-  switch (action) {
-    case 'app':
-      return 'plug'
-
-    case 'lookup':
-      return 'search'
-
-    case 'plan':
-      return 'list-checks'
-
-    case 'command':
-      return 'terminal'
-
-    case 'read':
-      return 'eye'
-
-    case 'edit':
-      return 'pencil'
-
-    case 'code-search':
-      return 'search'
-
-    case 'search':
-
-    case 'fetch':
-      return 'globe'
-
-    case 'browser':
-      return 'compass'
-
-    case 'other':
-      return 'wrench'
-  }
+  return ACTION_ICON[action]
 }
 
-/** A path as the user reads it: under the working folder relative, under home with `~`. */
-const shortPath = (path: string) => relativePath(path, { cwd: launchEnv().cwd, home: homedir() })
-
 /**
- * One step on one line, after t3code's `workEntryDisplayLabel`: a command as its text (without
- * an `sh -c` wrapper), a read as "Read path", a search as "Searched pattern in folder".
+ * One step on one line, after t3code's `workEntryDisplayLabel`, in its view's words: a command
+ * as its text (without an `sh -c` wrapper), a read as "Read path", a search as "Searched pattern
+ * in folder".
  */
 export function stepLabel(call: ToolCall): string {
-  const a = call.args
-  const path = nonEmpty(a.path)
-  const app = callApp(call)
-
-  if (app) {
-    return `${app.app} · ${app.action}`
-  }
-
-  if (call.batch) {
-    return call.batch.map(e => stepLabel({ ...call, args: e.args, batch: undefined, name: e.name })).join(', ')
-  }
-
-  if (isTodoName(call.name)) {
-    return planStep(call.todosBefore, call.todos)
-  }
-
-  switch (call.name) {
-    case 'terminal': {
-      const command = nonEmpty(a.command) ?? call.context
-
-      return command ? flat(commandDisplayText(command)) : 'Command'
-    }
-
-    case 'read_file':
-      return path ? `Read ${shortPath(path)}` : 'Read file'
-
-    case 'patch':
-      return path ? `Edited ${shortPath(path)}` : 'Edited a file'
-
-    case 'write_file':
-      return path ? `Wrote ${shortPath(path)}` : 'Wrote a file'
-
-    case 'search_files': {
-      const pattern = nonEmpty(a.pattern) ?? call.context
-      const where = path && path !== '.' ? ` in ${shortPath(path)}` : ''
-
-      return a.target === 'files' ? `Searched files ${pattern}${where}` : `Searched ${pattern}${where}`
-    }
-
-    case 'web_search':
-      return nonEmpty(a.query) ? `Searched the web for ${a.query}` : 'Web search'
-
-    case 'web_extract': {
-      const urls = Array.isArray(a.urls) ? a.urls.filter(u => typeof u === 'string') : []
-      const first = urls[0] ?? nonEmpty(a.url)
-
-      return first ? `Read ${first}${urls.length > 1 ? ` +${urls.length - 1} more` : ''}` : 'Read a page'
-    }
-
-    case 'execute_code':
-      return call.context ? flat(call.context) : 'Ran a script'
-
-    case 'link_pull_request':
-
-    case 'unlink_pull_request': {
-      const verb = call.name === 'link_pull_request' ? 'Linked' : 'Unlinked'
-      const pr = nonEmpty(a.url)?.match(/github[^/]*\/([^/]+\/[^/]+)\/pull\/(\d+)/)
-      const repo = pr?.[1] ?? nonEmpty(a.repository)
-      const number = pr?.[2] ?? (typeof a.number === 'number' ? String(a.number) : undefined)
-
-      return repo && number ? `${verb} ${repo}#${number}` : `${verb} a pull request`
-    }
-
-    case 'list_pull_requests':
-      return 'Listed linked pull requests'
-
-    case 'skill_view':
-      return nonEmpty(a.name) ? `Read skill ${a.name}` : 'Read a skill'
-
-    case 'skills_list':
-      return 'Listed skills'
-
-    case 'tool_search': {
-      const q = Array.isArray(a.queries) ? a.queries.filter(x => typeof x === 'string') : [nonEmpty(a.queries) ?? nonEmpty(a.query)].filter(Boolean)
-
-      return q.length ? `Searched tools for ${q.join(', ')}` : 'Searched tools'
-    }
-
-    case 'tool_describe': {
-      const names = (Array.isArray(a.names) ? a.names : [a.names]).filter((x): x is string => typeof x === 'string' && x !== '')
-
-      // Connector names read as their app and action, as the calls themselves do.
-      const named = names.map(n => {
-        const app = callApp({ args: {}, name: n })
-
-        return app ? `${app.app} · ${app.action}` : n.replace(/_/g, ' ')
-      })
-
-      return named.length ? `Read how to call ${named.join(', ')}` : 'Read tool details'
-    }
-  }
-
-  const name = call.name.replace(/_/g, ' ')
-  const label = name.charAt(0).toUpperCase() + name.slice(1)
-
-  return call.context ? `${label}: ${flat(call.context)}` : label
-}
-
-const MARK: Record<Todo['status'], string> = { cancelled: '✗', completed: '✓', in_progress: '→', pending: '○' }
-
-/**
- * A todo call as one step, in t3code's words for a plan change ("Plan updated"): what it changed
- * in the list before it, each item marked with its new state ("✓ Write tests, → Run the suite");
- * an item it added reads "+ …". The first list reads "Planned 4 steps".
- */
-export function planStep(before: readonly Todo[] | undefined, after: readonly Todo[] | undefined): string {
-  if (!after?.length) {
-    return 'Plan updated'
-  }
-
-  if (!before?.length) {
-    return `Planned ${plural(after.length, 'step')}`
-  }
-
-  const changes = after.flatMap(t => {
-    const was = before.find(b => b.id === t.id)
-
-    return !was ? [`+ ${t.content}`] : was.status !== t.status ? [`${MARK[t.status]} ${t.content}`] : []
-  })
-
-  return changes.length ? `Plan updated: ${changes.join(', ')}` : 'Plan updated'
+  return viewOf(call).step()
 }
 
 /** The live line of a running group, after t3code's `liveWorkEntryLabel`: "Running ls". */
@@ -566,7 +350,7 @@ export function liveLabel(item: WorkItem, active = false): string {
 
   const call = item.call
   const status = active && call.status === 'done' ? 'running' : call.status
-  const command = call.name === 'terminal' ? (nonEmpty(call.args.command) ?? call.context) : undefined
+  const command = call.name === 'terminal' ? (nonEmpty(call.args['command']) ?? call.context) : undefined
 
   if (!command) {
     return status === 'running' ? presentTense(stepLabel(call)) : stepLabel(call)
@@ -625,5 +409,3 @@ export function thoughtTitle(item: { label?: string; text: string }): string {
 
   return item.label ? (line ? `${item.label}: ${line}` : item.label) : line
 }
-
-const flat = (text: string) => text.replace(/\s+/g, ' ').trim()

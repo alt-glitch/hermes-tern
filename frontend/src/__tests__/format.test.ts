@@ -7,6 +7,7 @@ import {
   duration,
   durationCompact,
   durationWhole,
+  flat,
   homeTilde,
   nonEmpty,
   plural,
@@ -39,6 +40,10 @@ describe('format', () => {
     expect(clip('abcdef', { mark: 'line', max: 4 })).toBe('abcd\n…')
     expect(clip('abcd', { max: 4 })).toBe('abcd')
     expect(clip('abcd', { mark: 'line', max: 4 })).toBe('abcd')
+  })
+
+  it('puts a text on one line', () => {
+    expect(flat('  cat a\n  | head\t-n 2 ')).toBe('cat a | head -n 2')
   })
 
   it('counts a noun', () => {
