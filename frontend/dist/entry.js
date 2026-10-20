@@ -24741,7 +24741,9 @@ function sessionHost(cx) {
   const { sid } = ticket;
   let started;
   return {
-    busy: Boolean(cx.activity.busy),
+    get busy() {
+      return cx.activity.busy !== null;
+    },
     // A steer that fell back to the queue: steering carries no images.
     canonical: cx.gw.isCanonical,
     enqueue: (text15) => cx.router.behind({ images: [], kind: "app", text: text15 }),
@@ -24772,7 +24774,9 @@ function sessionHost(cx) {
       cx.setCompacting(state === "start", { manual: true });
       cx.changed();
     },
-    queued: cx.queue.count(),
+    get queued() {
+      return cx.queue.count();
+    },
     reload: async () => {
       if (sid && ticket.isCurrent()) {
         await cx.life.reload(sid);

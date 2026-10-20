@@ -461,7 +461,7 @@ describe('commandEnvelope', () => {
 })
 
 describe('sessionHost', () => {
-  it('reads busy and queued when it is made, and the session live', async () => {
+  it('reads busy and queued live, the sid it was made for, and the session live', async () => {
     const gw = new FakeGateway()
     let busy: Busy | null = { label: 'Working…', since: {}, startedAt: 0 }
     let queued = 2
@@ -499,10 +499,14 @@ describe('sessionHost', () => {
 
     const host = sessionHost(cx)
 
-    busy = null
-    queued = 0
     expect(host.busy).toBe(true)
     expect(host.queued).toBe(2)
+
+    // A command that awaited reads them as they are now.
+    busy = null
+    queued = 0
+    expect(host.busy).toBe(false)
+    expect(host.queued).toBe(0)
     expect(host.sid).toBe('s1')
     await expect(host.open(storedSessionId('stored-2'))).resolves.toBe(true)
     expect(resumed).toEqual(['stored-2'])

@@ -1,6 +1,7 @@
 // The gateway-backed commands' host (/steer, /queue, /stop, /tools, /undo, /compress, …): what
 // controlCommands.ts and sessionCommands.ts reach of the pane, made from its stores each time one
-// of them runs. `busy` and `queued` are read then, once; the rest reads the stores live.
+// of them runs. `sid` is the session it was made for (stale() says when the view left it); the
+// rest, `busy` and `queued` among them, reads the stores live, so a command that awaited sees now.
 
 import type { GatewayClient } from '@tui/gatewayClient.js'
 
@@ -38,7 +39,9 @@ export function sessionHost(cx: SessionHostCx): SessionHost {
   let started: Compaction | undefined
 
   return {
-    busy: Boolean(cx.activity.busy),
+    get busy() {
+      return cx.activity.busy !== null
+    },
     // A steer that fell back to the queue: steering carries no images.
     canonical: cx.gw.isCanonical,
     enqueue: text => cx.router.behind({ images: [], kind: 'app', text }),
@@ -72,7 +75,9 @@ export function sessionHost(cx: SessionHostCx): SessionHost {
 
       cx.changed()
     },
-    queued: cx.queue.count(),
+    get queued() {
+      return cx.queue.count()
+    },
     reload: async () => {
       if (sid && ticket.isCurrent()) {
         await cx.life.reload(sid)
