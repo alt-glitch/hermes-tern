@@ -12,7 +12,7 @@ import type { ToolCall, TurnEntry, UserEntry } from '../model.js'
 import { promptAttachments, splitPrompt } from '../promptRefs.js'
 import { Transcript } from '../transcript.js'
 import { imageChip } from '../view/dock.js'
-import { toolNode } from '../view/tools.js'
+import { toolNode } from '../view/tools/shell.js'
 import { entryNode, type TranscriptContext } from '../view/transcript.js'
 import { foldOf, ownsCard, pieces } from '../workLog.js'
 

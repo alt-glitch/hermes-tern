@@ -29,6 +29,8 @@ code 75, and the launcher runs the Ink TUI in its place (`hermes_cli/main_tui_la
 | `src/transcript/` | The transcript's parts: compactions, a reload from history, finding calls, todos, subagent rows, and what a message says (Hermes' notices, steers) |
 | `src/composer.ts` | The prompt editor's model: text, caret, undo, history, kill ring |
 | `src/view/` | Node builders (TSX on the Tern SDK's runtime) for the transcript, tool cards, dock and welcome card; `format.ts` holds how they write text, durations, times and paths |
+| `src/view/tools/` | Tool calls as `tool` nodes: `shell.tsx` picks a call's card and wraps it, `cards/` holds one module per card family (terminal, read, edit, search, web, task, ask, eval, connect, apps, images, the small inline ones, the generic fallback) |
+| `src/code/` | Code helpers the views share: a file's highlighting language, unified diff hunks and counts |
 | `src/view/ui/` | The parts the views share: pills, buttons and the action row, the shimmer and working row, sections headed by a child, facts lists |
 | `src/overlay.ts`, `src/overlays/` | Floating sheets: approvals, clarify, masked prompts, completions, pickers |
 | `src/palette.ts` | The skin as a Tern program palette (`t`) |

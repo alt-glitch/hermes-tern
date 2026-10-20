@@ -23,7 +23,7 @@ import {
 
 import { clockShort } from './format.js'
 import { age } from './time.js'
-import { toolDetail } from './tools.js'
+import { toolDetail } from './tools/shell.js'
 import { foldSection } from './ui/fold.js'
 import { shimmerText } from './ui/live.js'
 

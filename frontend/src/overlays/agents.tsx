@@ -12,11 +12,12 @@ import type { ChatPorts } from '../app/ports.js'
 import type { Subagent } from '../model.js'
 import type { Overlay } from '../overlay.js'
 
+import { agentNode } from '../agents/agentRow.js'
 import type { LogEntry } from '../agents/liveLog.js'
 import { SUBAGENT_LOOK } from '../agents/look.js'
 import { agentName, isRunning } from '../agents/store.js'
 import { duration } from '../view/format.js'
-import { agentNode, briefOf } from '../view/tools.js'
+import { briefOf } from '../view/tools/cards/task.js'
 import { facts } from '../view/ui/facts.js'
 
 import { editQuery, moveSelection } from './search.js'

@@ -9,6 +9,7 @@ import type { JSX, Key, ScrollTo, SpanData, Tone } from '@stencil-hq/tern'
 import { node } from '@stencil-hq/tern'
 
 import { copyToClipboard } from '../clipboard.js'
+import { langOf } from '../code/lang.js'
 import { errorText } from '../core/errors.js'
 import { type PrKey, prKey } from '../core/ids.js'
 import {
@@ -25,7 +26,6 @@ import {
 import type { Entry, PrAction, PullRequests } from '../github/store.js'
 import { relative } from '../processes/cron.js'
 import { clip, durationWhole, plural } from '../view/format.js'
-import { langOf } from '../view/tools.js'
 import { button, type ButtonProps } from '../view/ui/button.js'
 
 import { type BodyLinks, bodyNodes } from './body.js'

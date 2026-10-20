@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest'
 import type { Block, Entry, ToolCall, TurnEntry } from '../model.js'
 import { Transcript } from '../transcript.js'
 import { internalNotice } from '../transcript/messages.js'
-import { toolNode } from '../view/tools.js'
+import { toolNode } from '../view/tools/shell.js'
 import { entryNode, type TranscriptContext } from '../view/transcript.js'
 
 interface Node {

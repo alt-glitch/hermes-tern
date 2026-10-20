@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 
 import { toolCallId } from '../core/ids.js'
 import type { ToolCall } from '../model.js'
-import { toolNode } from '../view/tools.js'
+import { toolNode } from '../view/tools/shell.js'
 
 interface Node {
   k: string

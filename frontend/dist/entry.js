@@ -2049,7 +2049,7 @@ var require_timers = __commonJS({
     var fastTimers = [];
     var NOT_IN_LIST = -2;
     var TO_BE_CLEARED = -1;
-    var PENDING = 0;
+    var PENDING2 = 0;
     var ACTIVE = 1;
     function onTick() {
       fastNow += TICK_MS4;
@@ -2057,7 +2057,7 @@ var require_timers = __commonJS({
       let len = fastTimers.length;
       while (idx < len) {
         const timer = fastTimers[idx];
-        if (timer._state === PENDING) {
+        if (timer._state === PENDING2) {
           timer._idleStart = fastNow - TICK_MS4;
           timer._state = ACTIVE;
         } else if (timer._state === ACTIVE && fastNow >= timer._idleStart + timer._idleTimeout) {
@@ -2162,7 +2162,7 @@ var require_timers = __commonJS({
         if (!fastNowTimeout || fastTimers.length === 1) {
           refreshTimeout();
         }
-        this._state = PENDING;
+        this._state = PENDING2;
       }
       /**
        * The `clear` method cancels the timer, preventing it from executing.
@@ -25942,6 +25942,28 @@ async function fastCommand(host, arg) {
   await setFast(host, value);
 }
 
+// src/view/time.ts
+var kAge = /* @__PURE__ */ Symbol("tsp.age");
+function age(owner, startedAt, now) {
+  const aged = owner;
+  return aged[kAge] ??= Math.max(0, now - startedAt);
+}
+function countdownAge(owner, dueAt, now) {
+  const aged = owner;
+  return aged[kAge] ??= Math.min(0, now - dueAt);
+}
+function compact(n) {
+  if (n < 1e3) {
+    return String(n);
+  }
+  if (n < 1e6) {
+    const k = n / 1e3;
+    return `${k < 10 ? k.toFixed(1).replace(/\.0$/, "") : Math.round(k)}K`;
+  }
+  const m = n / 1e6;
+  return `${m < 10 ? m.toFixed(1).replace(/\.0$/, "") : Math.round(m)}M`;
+}
+
 // src/agents/look.ts
 var SUBAGENT_LOOK = {
   cancelled: { row: "aborted", tone: "warning", word: "Stopped" },
@@ -25950,6 +25972,41 @@ var SUBAGENT_LOOK = {
   queued: { row: "pending", tone: "muted", word: "Queued" },
   running: { row: "running", tone: "accent", word: "Running" }
 };
+
+// src/agents/agentRow.tsx
+function agentNode(a2, now, solo) {
+  const status = SUBAGENT_LOOK[a2.status].row;
+  const running = a2.status === "running";
+  return /* @__PURE__ */ jsx(
+    "agent",
+    {
+      actions: { click: `open-agent=${a2.id}`, menu: [`open-agent=${a2.id}`] },
+      badges: a2.exitReason && (a2.status !== "done" || a2.exitReason === OUTCOME_UNKNOWN) ? [{ text: a2.exitReason.replace(/_/g, " "), tone: "warning" }] : void 0,
+      collapsed: a2.summary ? true : void 0,
+      collapsible: a2.summary ? true : void 0,
+      depth: a2.depth || void 0,
+      model: a2.model,
+      name: solo?.name ?? agentName(a2),
+      role: solo ? "hermes.task.solo" : void 0,
+      stats: {
+        requests: a2.calls || void 0,
+        tokens: a2.tokens || void 0,
+        tools: a2.toolCount || void 0,
+        ...running ? { age: Math.max(0, now - a2.startedAt) } : { took: a2.duration }
+      },
+      status,
+      task: a2.goal,
+      title: `Open ${solo ? "the agent" : agentName(a2)} beside the chat`,
+      tool: running && a2.tool ? {
+        age: a2.toolSince ? age(a2.toolSince, a2.toolSince.at, now) : void 0,
+        intent: a2.toolPreview,
+        name: a2.tool
+      } : void 0,
+      children: a2.summary ? /* @__PURE__ */ jsx("md", { children: a2.summary }, "o") : null
+    },
+    solo?.key ?? a2.key ?? a2.id
+  );
+}
 
 // src/view/format.ts
 function nonEmpty(v) {
@@ -26020,456 +26077,765 @@ function relativePath(path2, o) {
   return o.home && path2.startsWith(`${o.home}/`) ? `~${path2.slice(o.home.length)}` : path2.replace(/^\.\//, "");
 }
 
-// src/bridge.ts
-var BRIDGE = "tool_call";
-var BATCH = "connectors__execute";
-var TITLES = {
-  discord: "Discord",
-  figma: "Figma",
-  github: "GitHub",
-  gmail: "Gmail",
-  googlecalendar: "Google Calendar",
-  googledocs: "Google Docs",
-  googledrive: "Google Drive",
-  jira: "Jira",
-  linear: "Linear",
-  notion: "Notion",
-  outlook: "Outlook",
-  slack: "Slack",
-  stripe_mcp: "Stripe",
-  todoist: "Todoist"
-};
-function appTitle(slug) {
-  const known2 = TITLES[slug.trim().toLowerCase()];
-  if (known2) {
-    return known2;
-  }
-  const words3 = slug.split(/[-_\s]+/).filter(Boolean);
-  if (words3.length > 1 && words3.at(-1).toLowerCase() === "mcp") {
-    words3.pop();
-  }
-  return words3.map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
-}
-function actionPhrase(tool, app2 = "") {
-  const prefix2 = `${app2.replace(/-/g, "_").toUpperCase()}_`;
-  const text11 = app2 && tool.toUpperCase().startsWith(prefix2) ? tool.slice(prefix2.length) : tool;
-  return text11.split(/[-_\s]+/).filter(Boolean).join(" ").toLowerCase();
-}
-function appOf(name, args) {
-  const [prefix2, connector, ...tool] = name.split("__");
-  if (prefix2 === "connectors" && connector && tool.length && name !== BATCH) {
-    const alias = typeof args?.connector_alias === "string" && args.connector_alias.trim() ? ` (${args.connector_alias.trim()})` : "";
-    return { action: actionPhrase(tool.join("__"), connector) + alias, app: appTitle(connector), kind: "connector" };
-  }
-  const mcp = name.match(/^mcp__(.+?)__(.+)$/);
-  return mcp ? { action: actionPhrase(mcp[2]), app: appTitle(mcp[1]), kind: "mcp" } : void 0;
-}
-function entriesOf(args) {
-  const list8 = Array.isArray(args.calls) ? args.calls : [args];
-  return list8.flatMap((e) => {
-    const r = record(e);
-    const name = r?.name;
-    return typeof name === "string" && name ? [{ args: record(r?.arguments) ?? {}, name }] : [];
-  });
-}
-function unwrap(name, args) {
-  if (name !== BRIDGE && name !== BATCH) {
-    return { args, name };
-  }
-  const entries = entriesOf(args);
-  if (entries.length === 1) {
-    return { ...entries[0], via: "tool_call" };
-  }
-  return entries.length ? { args, batch: entries.map((e) => ({ ...e, status: "running" })), name, via: "tool_call" } : { args, name };
-}
-function batchResults(result) {
-  const results = record(result)?.results;
-  if (!Array.isArray(results)) {
-    return void 0;
-  }
-  return results.map((e) => {
-    const r = record(e) ?? {};
-    const err = r.error;
-    return err === void 0 || err === null ? { result: r.response } : { error: typeof err === "string" ? err : String(record(err)?.message ?? "") || JSON.stringify(err) };
-  });
-}
-function settleBridge(call) {
-  if (call.via !== "tool_call") {
-    return void 0;
-  }
-  const outcomes = batchResults(call.result);
-  if (!outcomes) {
-    return void 0;
-  }
-  if (call.batch) {
-    call.batch.forEach((e, i) => {
-      const o2 = outcomes[i];
-      e.status = o2?.error ? "error" : "done";
-      e.result = o2?.result;
-      e.error = o2?.error;
-    });
-    return call.batch.every((e) => e.status === "error");
-  }
-  const o = outcomes[0];
-  call.result = o?.error ? { error: o.error } : o?.result;
-  return Boolean(o?.error);
-}
-function callApp(call) {
-  if (call.batch) {
-    const apps = call.batch.map((e) => appOf(e.name, e.args));
-    const first = apps[0];
-    return first && apps.every((a2) => a2?.app === first.app) ? { ...first, action: `${call.batch.length} calls` } : void 0;
-  }
-  return appOf(call.name, call.args);
-}
-
-// src/connections.ts
-import { existsSync as existsSync2, mkdirSync as mkdirSync2, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { homedir as homedir3 } from "node:os";
-import { join as join3 } from "node:path";
-var CONNECT_TOOL = "manage_connections";
-var POLL_MS2 = 2e3;
-var STALE_MS = 2 * 6e4;
-var dataDir = (env2 = process.env) => join3(env2.HERMES_HOME || join3(homedir3(), ".hermes"), "plugin-data", "hermes-tern");
-var REASONS = /* @__PURE__ */ new Set(["all_resolved", "continued", "deadline", "error", "superseded"]);
-var safe = (part) => part.replace(/[^A-Za-z0-9_-]/g, "_");
-var cardStem = (callId, opId) => opId ? `${safe(callId)}.${safe(opId)}` : safe(callId);
-var alive = (pid) => {
-  if (typeof pid !== "number") {
-    return true;
-  }
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch (error) {
-    return error.code === "EPERM";
-  }
-};
-function readCard(key2, dir2 = dataDir(), now = Date.now()) {
-  const file2 = join3(dir2, "connections", `${key2}.json`);
-  try {
-    const data = JSON.parse(readFileSync(file2, "utf8"));
-    if (!Array.isArray(data.targets)) {
-      return void 0;
-    }
-    const error = typeof data.error === "string" && data.error ? data.error : void 0;
-    const updated = typeof data.updated_at === "number" ? data.updated_at * 1e3 : now;
-    let settled;
-    if (typeof data.settled_by === "string" && REASONS.has(data.settled_by)) {
-      settled = data.settled_by;
-    } else if (data.watching !== true) {
-      settled = error ? "error" : data.targets.some((t2) => waiting({ state: String(record(t2)?.state ?? "") })) ? "deadline" : "all_resolved";
-    } else if (!alive(data.pid) || now - updated > STALE_MS) {
-      settled = "stopped";
-    }
-    return { error, key: key2, settled, targets: data.targets, told: existsSync2(join3(dir2, "connections", `${key2}.told`)) };
-  } catch {
-    return void 0;
-  }
-}
-function findCard(call, dir2 = dataDir()) {
-  const op = record(call.result)?.op_id;
-  const prefix2 = `${safe(call.id)}.`;
-  if (typeof op === "string" && op) {
-    return existsSync2(join3(dir2, "connections", `${cardStem(call.id, op)}.json`)) ? cardStem(call.id, op) : void 0;
-  }
-  let names;
-  try {
-    names = readdirSync(join3(dir2, "connections"));
-  } catch {
-    return void 0;
-  }
-  const keys2 = names.flatMap((n) => {
-    const key2 = n.endsWith(".json") ? n.slice(0, -5) : "";
-    return key2 === safe(call.id) || key2.startsWith(prefix2) && !key2.slice(prefix2.length).includes(".") ? [key2] : [];
-  });
-  if (keys2.length < 2) {
-    return keys2[0];
-  }
-  const createdAt = (key2) => {
-    try {
-      const at = record(readFileSync(join3(dir2, "connections", `${key2}.json`), "utf8"))?.created_at;
-      return typeof at === "number" ? at * 1e3 : 0;
-    } catch {
-      return 0;
-    }
-  };
-  return keys2.map((key2) => ({ gap: Math.abs(createdAt(key2) - call.startedAt), key: key2 })).sort((a2, b) => a2.gap - b.gap)[0]?.key;
-}
-function claimTold(key2, dir2 = dataDir()) {
-  try {
-    writeFileSync(join3(dir2, "connections", `${key2}.told`), "", { flag: "wx" });
-    return true;
-  } catch {
-    return false;
-  }
-}
-var TERN_PANE_VARS = ["TERN_PANE", "TERN_PANE_SOCKET", "TERN_WINDOW_KEY", "TERN_WINDOW_SOCKET", "TERN_DAEMON_SOCKET"];
-function ternPane(env2 = process.env) {
-  const vars = Object.fromEntries(TERN_PANE_VARS.flatMap((k) => env2[k] ? [[k, env2[k]]] : []));
-  return vars.TERN_PANE ? vars : void 0;
-}
-function markViewer(sid, previous3, dir2 = dataDir(), env2 = process.env) {
-  const viewers = join3(dir2, "viewers");
-  try {
-    if (previous3 && previous3 !== sid) {
-      rmSync(join3(viewers, `${previous3}.json`), { force: true });
-    }
-    if (sid) {
-      mkdirSync2(viewers, { recursive: true });
-      writeFileSync(join3(viewers, `${sid}.json`), JSON.stringify({ pid: process.pid, tern: ternPane(env2) }));
-    }
-  } catch {
-  }
-}
-function connectTargets(call, card) {
-  if (call.name !== CONNECT_TOOL) {
-    return [];
-  }
-  const targets = card?.targets ?? record(call.result)?.targets;
-  return parseTargets(Array.isArray(targets) ? targets : []);
-}
-function loadConnect(call, dir2 = dataDir(), now = Date.now()) {
-  if (call.name !== CONNECT_TOOL) {
-    return void 0;
-  }
-  const key2 = call.connect?.key ?? findCard(call, dir2);
-  const file2 = key2 ? readCard(key2, dir2, now) : void 0;
-  const targets = connectTargets(call, file2);
-  if (!targets.length) {
-    return void 0;
+// src/view/tools/cards/task.tsx
+function taskCard(call, result, now) {
+  const tasks = Array.isArray(call.args.tasks) ? call.args.tasks.map((t2) => record(t2)).filter((t2) => t2 !== void 0) : [];
+  const goals = tasks.length ? tasks.map((t2) => nonEmpty(t2.goal) ?? "") : nonEmpty(call.args.goal) ? [nonEmpty(call.args.goal) ?? ""] : [];
+  const agents2 = call.subagents ?? [];
+  const rows = agents2.length ? agents2.map((a2) => agentNode(a2, now)) : call.status === "running" || result?.status === "dispatched" ? goals.map((g, i) => /* @__PURE__ */ jsx("agent", { name: `Agent ${i + 1}`, status: "pending", task: g }, `p${i}`)) : settledRows(goals, result);
+  const context = nonEmpty(call.args.context) ?? (tasks.length === 1 ? nonEmpty(tasks[0]?.context) : void 0);
+  const working = agents2.some((a2) => a2.status === "running" || a2.status === "queued") || !agents2.length && result?.status === "dispatched";
+  const settled = agents2.filter((a2) => a2.status !== "running" && a2.status !== "queued");
+  const count = goals.length || agents2.length;
+  let meta3;
+  let took2;
+  if (agents2.length && !working) {
+    const ok3 = agents2.filter((a2) => a2.status === "done").length;
+    const stopped = agents2.filter((a2) => a2.status === "cancelled").length;
+    const failed = agents2.length - ok3 - stopped;
+    const requests = agents2.reduce((n, a2) => n + a2.calls, 0);
+    meta3 = [
+      `${ok3} succeeded`,
+      failed ? `${failed} failed` : "",
+      stopped ? `${stopped} stopped` : "",
+      requests ? `${requests} req` : ""
+    ].filter(Boolean).join(" \xB7 ");
+    took2 = Math.max(...agents2.map((a2) => a2.startedAt + (a2.duration ?? 0))) - call.startedAt;
+  } else if (settled.length) {
+    meta3 = `${settled.length} of ${count} done`;
   }
   return {
-    error: file2?.error,
-    key: file2?.key,
-    opened: call.connect?.opened ?? [],
-    // Continue settles the card at once, as on the desktop; the watcher sees the claim on its next read.
-    settled: file2?.settled ?? (file2?.told || call.connect?.told ? "continued" : void 0),
-    targets,
-    told: Boolean(file2?.told || call.connect?.told)
+    badges: result?.mode === "background" ? [{ text: "background" }] : void 0,
+    // The agents first; the brief they share stays folded.
+    body: [...rows, ...context ? [briefNode("Shared brief", context)] : []],
+    meta: meta3 ? [meta3] : void 0,
+    name: "task",
+    status: working ? "running" : void 0,
+    target: count ? plural(count, "agent") : void 0,
+    targetKind: "text",
+    title: "Task",
+    took: took2
   };
 }
-function parseTargets(targets) {
-  return targets.flatMap((t2) => {
-    const r = record(t2);
-    const name = typeof r?.name === "string" ? r.name : "";
-    return name ? [
-      {
-        alias: typeof r?.alias === "string" && r.alias ? r.alias : void 0,
-        detail: typeof r?.detail === "string" && r.detail ? r.detail : void 0,
-        name,
-        state: typeof r?.state === "string" ? r.state : "pending",
-        title: appTitle(name),
-        url: typeof r?.connect_url === "string" && r.connect_url ? r.connect_url : void 0
-      }
-    ] : [];
+function settledRows(goals, result) {
+  const results = Array.isArray(result?.results) ? result.results.map((r) => record(r)) : [];
+  const titles = goals.length ? goals : results.map(() => "Delegated task");
+  return titles.map((g, i) => {
+    const { status, summary: summary4 } = outcome(results[i]);
+    return /* @__PURE__ */ jsx("agent", { name: `Agent ${i + 1}`, status, task: g, children: summary4 ? /* @__PURE__ */ jsx("md", { children: summary4 }, "o") : null }, `s${i}`);
   });
 }
-var waiting = (t2) => t2.state === "initiated" || t2.state === "pending";
-var allConnected = (card) => {
-  const own13 = card.targets.filter((t2) => t2.state !== "superseded");
-  return own13.length > 0 && own13.every((t2) => t2.state === "connected");
-};
-function isConnectCall(call) {
-  const card = call.connect;
-  return card ? card.settled !== "superseded" && card.targets.some((t2) => t2.url) : connectTargets(call).some((t2) => t2.url);
+function outcome(r) {
+  const verdict = nonEmpty(r?.status) ?? "";
+  const status = !r ? "idle" : verdict === "" || verdict === "ok" || verdict === "completed" ? "done" : "failed";
+  return { status, summary: nonEmpty(r?.summary) ?? nonEmpty(r?.error) };
 }
-var and = (names) => names.length < 3 ? names.join(" and ") : `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`;
-function continueMessage(targets) {
-  const names = targets.filter((t2) => t2.state === "connected" || waiting(t2)).map((t2) => t2.title);
-  return `I've authorized ${and(names) || "the apps"}. Check with manage_connections status and carry on.`;
+function soloTask(call, now) {
+  const tasks = Array.isArray(call.args.tasks) ? call.args.tasks.map((t2) => record(t2)).filter((t2) => t2 !== void 0) : [];
+  const result = record(call.result);
+  if (tasks.length > 1 || (call.subagents?.length ?? 0) > 1 || call.status === "error" || result?.error) {
+    return void 0;
+  }
+  const goal = nonEmpty(tasks[0]?.goal) ?? nonEmpty(call.args.goal) ?? call.subagents?.[0]?.goal ?? "Delegated task";
+  const name = result?.mode === "background" ? "Background agent" : "Agent";
+  const a2 = call.subagents?.[0];
+  if (a2) {
+    return agentNode(a2, now, { key: call.id, name });
+  }
+  const pending = call.status === "running" || result?.status === "dispatched";
+  const results = Array.isArray(result?.results) ? result.results.map((r) => record(r)) : [];
+  const { status, summary: summary4 } = pending ? { status: "pending", summary: void 0 } : outcome(results[0]);
+  return /* @__PURE__ */ jsx(
+    "agent",
+    {
+      collapsed: summary4 ? true : void 0,
+      collapsible: summary4 ? true : void 0,
+      name,
+      role: "hermes.task.solo",
+      status,
+      task: goal,
+      children: summary4 ? /* @__PURE__ */ jsx("md", { children: summary4 }, "o") : null
+    },
+    call.id
+  );
 }
-function connectedMessage(targets) {
-  const names = targets.filter((t2) => t2.state === "connected").map((t2) => t2.title);
-  return `${and(names)} ${names.length === 1 ? "is" : "are"} connected now. Carry on.`;
+function briefOf(call, index2) {
+  const tasks = Array.isArray(call.args.tasks) ? call.args.tasks.map((t2) => record(t2)) : [];
+  const context = nonEmpty(tasks[index2]?.context) ?? nonEmpty(call.args.context);
+  return context;
+}
+function briefNode(head2, text11) {
+  return /* @__PURE__ */ jsx("section", { collapsed: true, collapsible: true, head: head2, role: "hermes.task.brief", children: /* @__PURE__ */ jsx("md", { children: text11 }, "md") }, "brief");
 }
 
-// src/media.ts
-import { homedir as homedir5 } from "node:os";
-import { isAbsolute } from "node:path";
-import { fileURLToPath } from "node:url";
-
-// src/hermes/images.ts
-import { readFile as readFile2 } from "node:fs/promises";
-import { homedir as homedir4 } from "node:os";
-import { extname as extname2, resolve as resolve3 } from "node:path";
-var MAX_IMAGE_BYTES = 20 * 1024 * 1024;
-function imageFormat(bytes) {
-  if (bytes.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))) {
-    return { mime: "image/png", ext: ".png" };
-  }
-  if (bytes[0] === 255 && bytes[1] === 216 && bytes[2] === 255) {
-    return { mime: "image/jpeg", ext: ".jpg" };
-  }
-  if (/^GIF8[79]a$/.test(bytes.subarray(0, 6).toString("ascii"))) {
-    return { mime: "image/gif", ext: ".gif" };
-  }
-  if (bytes.subarray(0, 4).toString("ascii") === "RIFF" && bytes.subarray(8, 12).toString("ascii") === "WEBP") {
-    return { mime: "image/webp", ext: ".webp" };
-  }
-  return null;
+// src/view/ui/facts.ts
+function facts(list8) {
+  return list8.flatMap(([name, value]) => value ? [{ k: [{ t: name }], v: value }] : []);
 }
-function imageSize(bytes) {
-  const format = imageFormat(bytes)?.mime;
-  const size = (w, h2) => w > 0 && h2 > 0 ? { h: h2, w } : void 0;
+
+// src/overlays/search.ts
+var PAGE = 10;
+function editQuery(key2, query) {
+  if (key2.name === "backspace") {
+    return key2.alt || key2.ctrl ? query.replace(/\S*\s*$/, "") : query.slice(0, -1);
+  }
+  if (key2.ctrl && key2.name === "u") {
+    return "";
+  }
+  if (key2.name === "paste" || key2.text && !key2.ctrl && !key2.meta) {
+    return query + (key2.text ?? "").replace(/\s+/g, " ");
+  }
+  return void 0;
+}
+function moveSelection(key2, ids, selected) {
+  if (!ids.length) {
+    return void 0;
+  }
+  const at = selected === void 0 ? -1 : ids.indexOf(selected);
+  const step = key2.name === "up" || key2.ctrl && key2.name === "p" ? -1 : key2.name === "down" || key2.ctrl && key2.name === "n" ? 1 : key2.name === "page_up" ? -PAGE : key2.name === "page_down" ? PAGE : 0;
+  if (step) {
+    return ids[Math.max(0, Math.min(ids.length - 1, at + step))];
+  }
+  if (key2.name === "home") {
+    return ids[0];
+  }
+  if (key2.name === "end") {
+    return ids.at(-1);
+  }
+  return void 0;
+}
+function rank(items, query, textOf2, { scattered = true } = {}) {
+  const words3 = query.toLowerCase().split(/\s+/).filter(Boolean);
+  if (!words3.length) {
+    return items.map((item3) => ({ item: item3, positions: [] }));
+  }
+  const scored = [];
+  items.forEach((item3, index2) => {
+    const text11 = textOf2(item3).toLowerCase();
+    const positions = /* @__PURE__ */ new Set();
+    let score = 0;
+    for (const word of words3) {
+      const at = text11.indexOf(word);
+      if (at >= 0) {
+        const boundary = at === 0 || /[\s/_.:-]/.test(text11[at - 1] ?? "");
+        score += 100 - Math.min(at, 50) + (boundary ? 25 : 0);
+        for (let i = at; i < at + word.length; i++) {
+          positions.add(i);
+        }
+        continue;
+      }
+      if (!scattered) {
+        return;
+      }
+      let from = 0;
+      for (const ch of word) {
+        const i = text11.indexOf(ch, from);
+        if (i < 0) {
+          return;
+        }
+        positions.add(i);
+        from = i + 1;
+      }
+      score += 10;
+    }
+    scored.push({ index: index2, item: item3, positions: [...positions].sort((a2, b) => a2 - b), score });
+  });
+  return scored.sort((a2, b) => b.score - a2.score || a2.index - b.index).map(({ item: item3, positions }) => ({ item: item3, positions }));
+}
+function hitRuns(positions, limit) {
+  const runs3 = [];
+  for (const p3 of positions) {
+    if (p3 >= limit) {
+      break;
+    }
+    const last = runs3.at(-1);
+    if (last && last[1] === p3) {
+      last[1] = p3 + 1;
+    } else {
+      runs3.push([p3, p3 + 1]);
+    }
+  }
+  return runs3;
+}
+
+// src/overlays/sheet.ts
+function tickWhileOpen(host, ms) {
+  const timer = setInterval(() => host.changed(), ms);
+  return () => clearInterval(timer);
+}
+async function reportError(transcript, work) {
   try {
-    if (format === "image/png") {
-      return size(bytes.readUInt32BE(16), bytes.readUInt32BE(20));
-    }
-    if (format === "image/gif") {
-      return size(bytes.readUInt16LE(6), bytes.readUInt16LE(8));
-    }
-    if (format === "image/webp") {
-      const chunk = bytes.subarray(12, 16).toString("ascii");
-      if (chunk === "VP8X") {
-        return size(bytes.readUIntLE(24, 3) + 1, bytes.readUIntLE(27, 3) + 1);
-      }
-      if (chunk === "VP8L") {
-        const b = bytes.readUInt32LE(21);
-        return size((b & 16383) + 1, (b >> 14 & 16383) + 1);
-      }
-      return size(bytes.readUInt16LE(26) & 16383, bytes.readUInt16LE(28) & 16383);
-    }
-    if (format === "image/jpeg") {
-      for (let i = 2; i + 9 < bytes.length; ) {
-        if (bytes[i] !== 255) {
-          return void 0;
-        }
-        const marker2 = bytes[i + 1];
-        if (marker2 >= 192 && marker2 <= 207 && marker2 !== 196 && marker2 !== 200 && marker2 !== 204) {
-          return size(bytes.readUInt16BE(i + 7), bytes.readUInt16BE(i + 5));
-        }
-        i += 2 + bytes.readUInt16BE(i + 2);
-      }
-    }
-  } catch {
+    await work();
+  } catch (error) {
+    transcript.notice(errorText(error), "error");
   }
-  return void 0;
 }
-async function uploadImage(gw2, sid, raw2, cwd) {
-  const path2 = resolve3(cwd, raw2.replace(/^~(?=$|\/)/, homedir4()));
-  const bytes = await readFile2(path2);
-  if (bytes.length > MAX_IMAGE_BYTES) {
-    throw new Error("the image is larger than 20 MB");
-  }
-  const format = imageFormat(bytes);
-  if (!format) {
-    throw new Error(`${extname2(path2) || "this file"} is not a PNG, JPEG, GIF or WebP image`);
-  }
-  const r = await rpc(gw2, "image.attach_bytes", {
-    session_id: sid,
-    filename: `image${format.ext}`,
-    content_base64: bytes.toString("base64")
-  });
-  if (!r?.path) {
-    throw new Error("the gateway did not store the image");
-  }
-  return { bytes, mime: format.mime, path: r.path };
+function countSummary(items, tallies) {
+  return tallies.map(([counts, label]) => {
+    const n = items.filter(counts).length;
+    return n ? `${n} ${typeof label === "string" ? label : label[n === 1 ? 0 : 1]}` : "";
+  }).filter(Boolean).join(" \xB7 ") || "none yet";
 }
 
-// src/media.ts
-var str3 = (v) => typeof v === "string" && v.trim() ? v.trim() : void 0;
-var MAX_BYTES = 16 * 1024 * 1024;
-var FETCH_MS = 2e4;
-function shownImage(call) {
-  if (call.status === "error" || call.status === "cancelled") {
-    return void 0;
-  }
-  const r = record(call.result);
-  if (r?.success === false) {
-    return void 0;
-  }
-  if (call.name === "image_generate") {
-    return str3(r?.host_image) ?? str3(r?.image);
-  }
-  if (call.name.startsWith("browser")) {
-    const summary4 = call.resultText ?? str3(r?.text_summary) ?? "";
-    return str3(record(r?.meta)?.screenshot_path) ?? str3(r?.screenshot_path) ?? /Screenshot path: (\S+)/.exec(summary4)?.[1];
-  }
-  return void 0;
-}
-function localSource(src) {
-  if (/^file:\/\//i.test(src)) {
-    try {
-      return { path: fileURLToPath(src) };
-    } catch {
-      return void 0;
-    }
-  }
-  const path2 = src.replace(/^~(?=\/)/, homedir5());
-  return isAbsolute(path2) ? { path: path2 } : void 0;
-}
-var Media = class {
-  #host;
-  #fetch;
-  #loads = /* @__PURE__ */ new Map();
-  /** What each settled load gave, so a call rebuilt from history gets it before the next frame. */
-  #loaded = /* @__PURE__ */ new Map();
-  constructor(host, fetcher = (url, init) => fetch(url, init)) {
-    this.#host = host;
-    this.#fetch = fetcher;
-  }
-  /**
-   * Gets the image `call` shows ready: a URL's bytes land on `call.image` (null when they could
-   * not be had) and `done` runs. A local file needs nothing; Tern reads it.
-   */
-  show(call, done) {
-    const src = shownImage(call);
-    if (!src || localSource(src) || call.image !== void 0) {
+// src/overlays/agents.tsx
+var KEY = "agents";
+var TICK_MS = 1e3;
+var RECENT = 6;
+var TOOL_ICON = {
+  browser_navigate: "web",
+  execute_code: "python",
+  patch: "edit",
+  read_file: "read",
+  search_files: "search",
+  terminal: "bash",
+  web_extract: "web",
+  web_search: "web",
+  write_file: "write"
+};
+function openAgents(host, focus) {
+  const agents2 = () => host.agents.all();
+  let tab2 = host.agents.running().length ? "running" : "all";
+  let selected = focus?.id ?? agents2().find(isRunning)?.id ?? agents2()[0]?.id;
+  let watching;
+  let step;
+  let steer2;
+  let stopping = false;
+  const stopTicking = tickWhileOpen(host, TICK_MS);
+  const close = () => host.close(overlay);
+  const current = () => agents2().find((a2) => a2.id === (watching ?? selected));
+  const watch2 = (id) => {
+    const a2 = agents2().find((x) => x.id === id);
+    if (!a2) {
       return;
     }
-    if (this.#loaded.has(src)) {
-      call.image = this.#loaded.get(src);
-      return;
+    watching = a2.id;
+    step = void 0;
+    void host.agents.refresh(a2);
+  };
+  const beside = (id) => {
+    if (id) {
+      close();
+      void host.openAgent(id);
     }
-    void this.load(src).then((image3) => {
-      call.image = image3;
-      done();
+  };
+  const sendSteer = async () => {
+    const a2 = current();
+    const text11 = steer2?.trim();
+    steer2 = void 0;
+    if (!a2 || !text11) {
+      return host.changed();
+    }
+    await reportError(host.transcript, async () => {
+      const queued = await host.agents.steer(a2, text11);
+      host.transcript.notice(
+        queued ? `Steering queued for ${agentName(a2)}.` : `${agentName(a2)} is not taking steering now.`,
+        queued ? "info" : "warning"
+      );
     });
+    host.changed();
+  };
+  const stop2 = async () => {
+    const a2 = current();
+    stopping = false;
+    if (!a2 || !isRunning(a2)) {
+      return host.changed();
+    }
+    await reportError(host.transcript, async () => {
+      if (!await host.agents.stop(a2)) {
+        host.transcript.notice(`${agentName(a2)} already finished.`, "warning");
+      }
+    });
+    host.changed();
+  };
+  const togglePause = async () => {
+    await reportError(host.transcript, async () => {
+      const paused = await host.agents.pause(!host.agents.paused);
+      host.transcript.notice(paused ? "Subagent spawning paused for every chat on this gateway." : "Subagent spawning resumed.");
+    });
+    host.changed();
+  };
+  const shown = () => tab2 === "running" ? agents2().filter(isRunning) : agents2();
+  const steps = (a2) => a2.log?.entries ?? [];
+  const overlay = {
+    key: KEY,
+    modal: true,
+    cancel: close,
+    // Ends with the sheet, however it closed (Esc, a session switch replacing the overlays).
+    onClose: stopTicking,
+    node: () => {
+      const now = Date.now();
+      const watched = watching ? agents2().find((a2) => a2.id === watching) : void 0;
+      return watched ? timelineNode(watched, now) : hubNode(now);
+    },
+    onKey: (k) => {
+      const a2 = current();
+      if (steer2 !== void 0) {
+        if (k.name === "escape") {
+          steer2 = void 0;
+        } else if (k.name === "enter") {
+          void sendSteer();
+        } else {
+          steer2 = editQuery(k, steer2) ?? steer2;
+        }
+        return true;
+      }
+      if (stopping) {
+        if (k.name === "enter" || k.name === "y") {
+          void stop2();
+        } else if (k.name === "escape" || k.name === "n") {
+          stopping = false;
+        }
+        return true;
+      }
+      if (k.name === "escape") {
+        if (watching) {
+          selected = watching;
+          watching = void 0;
+        } else {
+          close();
+        }
+      } else if (k.name === "s" && !k.ctrl && !k.alt && a2 && isRunning(a2)) {
+        steer2 = "";
+      } else if (k.name === "x" && !k.ctrl && !k.alt && a2 && isRunning(a2)) {
+        stopping = true;
+      } else if (watching && a2) {
+        const ids = steps(a2).map((_, i) => `e${i}`);
+        const moved2 = moveSelection(k, ids, step ?? ids.at(-1));
+        if (moved2 !== void 0) {
+          step = moved2 === ids.at(-1) ? void 0 : moved2;
+        }
+      } else if (k.name === "enter") {
+        beside(selected);
+      } else if (k.name === "t" && !k.ctrl && !k.alt) {
+        watch2(selected);
+      } else if (k.name === "p" && !k.ctrl && !k.alt) {
+        void togglePause();
+      } else if (k.name === "tab") {
+        tab2 = tab2 === "running" ? "all" : "running";
+      } else {
+        selected = moveSelection(
+          k,
+          shown().map((x) => x.id),
+          selected
+        ) ?? selected;
+      }
+      return true;
+    }
+  };
+  const steerProps = (a2) => steer2 !== void 0 && a2 ? { placeholder: `Steer ${agentName(a2)}: type, then Enter (Esc cancels)`, query: steer2 } : {};
+  const actions = (a2, inTimeline) => {
+    const running = Boolean(a2 && isRunning(a2));
+    if (steer2 !== void 0) {
+      return [
+        { end: true, id: "steer-cancel", keys: ["esc"], label: "Cancel" },
+        { id: "steer-send", keys: ["enter"], label: "Send", primary: true }
+      ];
+    }
+    return [
+      ...inTimeline ? [] : [
+        { id: "watch", keys: ["t"], label: "Timeline" },
+        { id: "beside", keys: ["enter"], label: "Open beside", primary: true },
+        { id: "pause", keys: ["p"], label: host.agents.paused ? "Resume spawns" : "Pause spawns" }
+      ],
+      {
+        disabled: running ? a2?.steerable === false ? "Not taking steering now" : void 0 : "Finished",
+        id: "steer",
+        keys: ["s"],
+        label: "Steer"
+      },
+      { danger: true, disabled: running ? void 0 : "Finished", id: "stop", keys: ["x"], label: "Stop" },
+      { end: true, id: "close", keys: ["esc"], label: inTimeline ? "Back" : "Close" }
+    ];
+  };
+  const handlers3 = {
+    cancel: () => {
+      stopping = false;
+      host.changed();
+    },
+    close: () => {
+      if (watching) {
+        selected = watching;
+        watching = void 0;
+        host.changed();
+      } else {
+        close();
+      }
+    },
+    confirm: () => void stop2(),
+    pause: () => void togglePause(),
+    steer: () => {
+      steer2 = "";
+      host.changed();
+    },
+    "steer-cancel": () => {
+      steer2 = void 0;
+      host.changed();
+    },
+    "steer-send": () => void sendSteer(),
+    stop: () => {
+      stopping = true;
+      host.changed();
+    },
+    tab: (ev) => {
+      tab2 = ev.value === "running" ? "running" : "all";
+      host.changed();
+    },
+    beside: () => beside(selected),
+    watch: () => {
+      watch2(selected);
+      host.changed();
+    }
+  };
+  function hubNode(now) {
+    const all8 = agents2();
+    const list8 = shown();
+    const running = all8.filter(isRunning).length;
+    if (!list8.some((a3) => a3.id === selected)) {
+      selected = list8[0]?.id;
+    }
+    const a2 = list8.find((x) => x.id === selected);
+    const columns = [
+      { format: "num", head: "Tools", id: "tools", priority: 3 },
+      { format: "elapsed", head: "Time", id: "time", priority: 5 }
+    ];
+    return /* @__PURE__ */ jsx(
+      "picker",
+      {
+        actions: actions(a2, false),
+        columns,
+        confirm: stopping && a2 ? { act: "confirm", label: "Stop", text: `Stop ${agentName(a2)}? Its partial work returns to Hermes.` } : void 0,
+        empty: tab2 === "running" ? "No agents running. Tab shows finished ones." : "No subagents in this session yet",
+        icon: "agents",
+        items: all8.map((x) => hubItem(x, now)),
+        layout: all8.some((x) => x.depth) ? "tree" : "rows",
+        noun: "agents",
+        onAction: handlers3,
+        onActivate: (ev) => beside(ev.item),
+        onSelect: (ev) => {
+          selected = ev.item;
+          stopping = false;
+          host.changed();
+        },
+        order: list8.map((x) => x.id),
+        preview: "side",
+        selected,
+        size: "lg",
+        subtitle: [
+          { s: "muted", t: summary(all8) },
+          ...host.agents.paused ? [{ s: "warning", t: " \xB7 spawns paused (gateway-wide)" }] : []
+        ],
+        tab: tab2,
+        tabs: [
+          { count: running, id: "running", label: "Running" },
+          { count: all8.length, id: "all", label: "All" }
+        ],
+        title: "Agents",
+        total: all8.length,
+        ...steerProps(a2),
+        children: a2 ? hubPreview(a2, now, briefFor(host, a2)) : null
+      },
+      KEY
+    );
   }
-  /** `show` for every call of `entries` (a transcript loaded from history). */
-  showAll(entries, done) {
-    for (const e of entries) {
-      for (const b of e.kind === "turn" ? e.blocks : []) {
-        if (b.kind === "tool") {
-          this.show(b.call, () => done(b.call));
+  function timelineNode(a2, now) {
+    const entries = steps(a2);
+    const ids = entries.map((_, i) => `e${i}`);
+    const sel = step && ids.includes(step) ? step : ids.at(-1);
+    const at = sel ? ids.indexOf(sel) : -1;
+    return /* @__PURE__ */ jsx(
+      "picker",
+      {
+        actions: actions(a2, true),
+        columns: [
+          { format: "dim", head: "At", id: "at", min: 8, priority: 2 },
+          { format: "elapsed", head: "Took", id: "took", priority: 4 }
+        ],
+        confirm: stopping ? { act: "confirm", label: "Stop", text: `Stop ${agentName(a2)}? Its partial work returns to Hermes.` } : void 0,
+        empty: a2.logPath || a2.log ? "Nothing logged yet" : "This agent has no live transcript",
+        icon: "agent",
+        items: entries.map((e, i) => stepItem(e, `e${i}`, a2)),
+        layout: "timeline",
+        noun: "steps",
+        onAction: handlers3,
+        onSelect: (ev) => {
+          step = ev.item === ids.at(-1) ? void 0 : ev.item;
+          host.changed();
+        },
+        preview: "side",
+        selected: sel,
+        size: "lg",
+        subtitle: [{ s: "muted", t: `${SUBAGENT_LOOK[a2.status].word} \xB7 ${a2.goal}` }],
+        title: agentName(a2),
+        total: entries.length,
+        ...steerProps(a2),
+        children: at >= 0 ? stepPreview(entries[at], a2, briefFor(host, a2)) : [agentNode(a2, now)]
+      },
+      KEY
+    );
+  }
+  host.open(overlay);
+  if (focus?.watch) {
+    watch2(focus.id);
+  }
+}
+function summary(all8) {
+  return countSummary(all8, [
+    [(a2) => a2.status === "running" || a2.status === "queued", "running"],
+    [(a2) => a2.status === "done", "done"],
+    [(a2) => a2.status === "failed", "failed"],
+    [(a2) => a2.status === "cancelled", "stopped"]
+  ]);
+}
+function elapsed(a2, now) {
+  return duration(isRunning(a2) ? now - a2.startedAt : a2.duration ?? 0);
+}
+function hubItem(a2, now) {
+  return {
+    chips: a2.model ? [{ text: a2.model.split("/").at(-1) ?? a2.model }] : void 0,
+    depth: a2.depth ?? 0,
+    detail: a2.goal,
+    dot: SUBAGENT_LOOK[a2.status].tone,
+    facts: { time: elapsed(a2, now), tools: a2.toolCount },
+    id: a2.id,
+    label: agentName(a2),
+    title: a2.goal
+  };
+}
+function briefFor(host, a2) {
+  const call = host.transcript.delegations().find((c) => c.subagents?.includes(a2));
+  return call ? briefOf(call, a2.index) : void 0;
+}
+function hubPreview(a2, now, brief) {
+  const recent = (a2.log?.entries ?? []).slice(-RECENT);
+  const look = SUBAGENT_LOOK[a2.status];
+  return [
+    // A new node each time the selection moves: its timers need their true ages.
+    agentNode(a2, now),
+    /* @__PURE__ */ jsx(
+      "kv",
+      {
+        items: facts([
+          ["Status", [{ s: look.tone, t: look.word }]],
+          ["Model", a2.model],
+          ["Time", elapsed(a2, now)],
+          ["Tools", String(a2.toolCount)],
+          ["Ended", a2.exitReason?.replace(/_/g, " ")],
+          ["Steering", isRunning(a2) && a2.steerable !== void 0 ? a2.steerable ? "open" : "closed" : void 0],
+          ["ID", [{ s: "mono dim", t: a2.id }]]
+        ]),
+        role: "omp.hub.kv"
+      },
+      "facts"
+    ),
+    /* @__PURE__ */ jsx("section", { head: "Task", children: /* @__PURE__ */ jsx("md", { text: a2.goal }, "goal") }, "task"),
+    ...brief ? [
+      /* @__PURE__ */ jsx("section", { collapsed: true, collapsible: true, head: "Brief", children: /* @__PURE__ */ jsx("md", { text: brief }, "text") }, "brief")
+    ] : [],
+    ...a2.summary ? [
+      /* @__PURE__ */ jsx("section", { head: "Result", children: /* @__PURE__ */ jsx("md", { text: a2.summary }, "summary") }, "result")
+    ] : [],
+    ...recent.length ? [
+      /* @__PURE__ */ jsx("section", { head: "Recent activity", role: "omp.hub.activity", children: recent.map((e, i) => /* @__PURE__ */ jsxs("row", { gap: "sm", role: "omp.hub.activity.row", children: [
+        /* @__PURE__ */ jsx("text", { spans: [{ s: "dim mono", t: e.at }], wrap: "none" }, "at"),
+        /* @__PURE__ */ jsx("text", { grow: 1, spans: stepSpans(e), truncate: "end", wrap: "none" }, "what")
+      ] }, `r${i}`)) }, "recent")
+    ] : []
+  ];
+}
+function stepItem(e, id, a2) {
+  if (e.kind === "tool") {
+    return {
+      detail: e.args,
+      dot: e.status === "error" ? "error" : e.status === "running" && isRunning(a2) ? "accent" : void 0,
+      facts: { at: e.at, took: e.took !== void 0 ? duration(e.took) : "" },
+      icon: TOOL_ICON[e.name] ?? "wrench",
+      id,
+      label: e.name,
+      mono: true,
+      node: "tool",
+      tone: e.status === "error" ? "error" : void 0
+    };
+  }
+  return {
+    facts: { at: e.at },
+    id,
+    label: e.kind === "kickoff" ? `Task: ${e.text}` : e.kind === "think" ? `Thinking: ${e.text}` : e.text,
+    node: e.kind === "kickoff" ? "user" : "assistant",
+    tone: e.kind === "think" || e.kind === "note" ? "muted" : void 0
+  };
+}
+function stepPreview(e, a2, brief) {
+  if (e.kind !== "tool") {
+    const head2 = { assistant: "Answer", kickoff: "Task", note: "Note", think: "Thinking" }[e.kind];
+    const text11 = e.kind === "kickoff" && a2.goal ? brief ? `${a2.goal}
+
+---
+
+${brief}` : a2.goal : e.text;
+    return [
+      /* @__PURE__ */ jsx("text", { role: "omp.hub.title", text: head2 }, "title"),
+      /* @__PURE__ */ jsx("text", { spans: [{ s: "dim mono", t: e.at }] }, "at"),
+      /* @__PURE__ */ jsx("md", { text: text11, tone: e.kind === "think" ? "muted" : void 0 }, "body")
+    ];
+  }
+  return [
+    /* @__PURE__ */ jsx("text", { role: "omp.hub.title", spans: [{ s: "mono strong", t: e.name }] }, "title"),
+    /* @__PURE__ */ jsx(
+      "kv",
+      {
+        items: facts([
+          ["Status", [{ s: e.status === "error" ? "error" : e.status === "ok" ? "success" : "accent", t: e.status === "ok" ? "ok" : e.status }]],
+          ["Started", e.at],
+          ["Took", e.took !== void 0 ? duration(e.took) : void 0]
+        ]),
+        role: "omp.hub.kv"
+      },
+      "facts"
+    ),
+    ...e.args ? [
+      /* @__PURE__ */ jsx("section", { head: "Arguments", children: /* @__PURE__ */ jsx("code", { text: e.args, wrap: true }, "code") }, "args")
+    ] : [],
+    ...e.result ? [
+      /* @__PURE__ */ jsx("section", { head: "Result", children: /* @__PURE__ */ jsx("code", { text: e.result, wrap: true }, "code") }, "result")
+    ] : []
+  ];
+}
+function stepSpans(e) {
+  switch (e.kind) {
+    case "tool":
+      return [
+        { s: e.status === "error" ? "error mono" : "mono", t: e.name },
+        { s: "muted", t: ` ${e.args}` }
+      ];
+    case "think":
+      return [{ s: "muted", t: e.text }];
+    case "kickoff":
+      return [{ s: "dim", t: "Task: " }, { t: e.text }];
+    default:
+      return [{ t: e.text }];
+  }
+}
+
+// src/processes/cron.ts
+var CRON_POLL_MS = 5e3;
+function isMonitor(job) {
+  return Boolean(job.monitor_script || job.monitor_url);
+}
+function isPaused(job) {
+  return job.enabled === false || job.state === "paused";
+}
+function jobError(job) {
+  return job.last_error || job.last_fire_error || job.last_delivery_error || void 0;
+}
+function jobTone(job) {
+  return isPaused(job) ? "muted" : jobError(job) || job.last_status === "error" ? "error" : "accent";
+}
+function ownJobs(calls) {
+  const ids = /* @__PURE__ */ new Set();
+  for (const c of calls) {
+    const r = record(c.result);
+    const job = record(r?.job);
+    const id = r?.job_id ?? job?.job_id ?? job?.id;
+    if (c.name === "cronjob_manage" && typeof id === "string" && id) {
+      ids.add(id);
+    }
+  }
+  return ids;
+}
+var Cron = class {
+  #host;
+  #jobs = [];
+  #error;
+  #warning;
+  #loaded = false;
+  #watchers = 0;
+  #timer;
+  #busy = /* @__PURE__ */ new Set();
+  constructor(host) {
+    this.#host = host;
+  }
+  jobs() {
+    return this.#jobs;
+  }
+  /** Why the list could not load (an old gateway, a refused scope). */
+  get error() {
+    return this.#error;
+  }
+  /** The gateway's note that no scheduler runs (the jobs are saved but do not fire). */
+  get warning() {
+    return this.#warning;
+  }
+  get loaded() {
+    return this.#loaded;
+  }
+  /** An action is in flight for `id`. */
+  busy(id) {
+    return this.#busy.has(id);
+  }
+  /** Polls while the returned release has not run (the Cron tab shows). */
+  watch() {
+    this.#watchers++;
+    if (this.#watchers === 1) {
+      void this.#tick();
+    }
+    let released = false;
+    return () => {
+      if (!released) {
+        released = true;
+        if (--this.#watchers === 0) {
+          clearTimeout(this.#timer);
+          this.#timer = void 0;
         }
       }
+    };
+  }
+  /** Pauses, resumes or removes job `id`; throws the gateway's error. */
+  async act(action, id) {
+    this.#busy.add(id);
+    this.#host.changed();
+    try {
+      const r = await rpc(this.#host.gw, "cron.manage", { action, name: id });
+      if (r?.success === false || r?.error) {
+        throw new Error(r.error || `Could not ${action} the job`);
+      }
+    } finally {
+      this.#busy.delete(id);
+      await this.refresh();
     }
   }
-  /** `src` (a data or http(s) URL) as a blob; null when it is no image or cannot be fetched. */
-  load(src) {
-    let load2 = this.#loads.get(src);
-    if (!load2) {
-      load2 = this.#bytes(src).then(
-        (bytes) => this.#blob(bytes),
-        () => null
-      ).then((image3) => {
-        this.#loaded.set(src, image3);
-        return image3;
-      });
-      this.#loads.set(src, load2);
+  async refresh() {
+    try {
+      const r = await rpc(this.#host.gw, "cron.manage", { action: "list", include_disabled: true });
+      if (r?.success === false && r.error) {
+        throw new Error(r.error);
+      }
+      this.#jobs = (r?.jobs ?? []).filter((j) => typeof j?.job_id === "string");
+      this.#warning = r?.warning ?? void 0;
+      this.#error = void 0;
+    } catch (error) {
+      this.#error = errorText(error);
     }
-    return load2;
+    this.#loaded = true;
+    this.#host.changed();
   }
-  async #bytes(src) {
-    const data = /^data:image\/[\w.+-]+;base64,(.*)$/s.exec(src);
-    if (data) {
-      return Buffer.from(data[1] ?? "", "base64");
+  async #tick() {
+    await this.refresh();
+    if (this.#watchers > 0) {
+      clearTimeout(this.#timer);
+      this.#timer = setTimeout(() => void this.#tick(), CRON_POLL_MS);
     }
-    if (!/^https?:\/\//i.test(src)) {
-      return void 0;
-    }
-    const r = await this.#fetch(src, { signal: AbortSignal.timeout(FETCH_MS) });
-    const size = Number(r.headers.get("content-length") ?? 0);
-    return r.ok && size <= MAX_BYTES ? Buffer.from(await r.arrayBuffer()) : void 0;
-  }
-  #blob(bytes) {
-    const format = bytes && bytes.length <= MAX_BYTES ? imageFormat(bytes) : null;
-    const blob = format && bytes ? this.#host.blob(bytes, format.mime) : void 0;
-    return blob ? { blob } : null;
   }
 };
+function relative(iso, now) {
+  const at = iso ? Date.parse(iso) : NaN;
+  if (Number.isNaN(at)) {
+    return "";
+  }
+  const d = at - now;
+  const s2 = Math.abs(d) / 1e3;
+  const [n, unit] = s2 < 45 ? [0, ""] : s2 < 3600 ? [Math.round(s2 / 60), "m"] : s2 < 86400 ? [Math.round(s2 / 3600), "h"] : [Math.round(s2 / 86400), "d"];
+  return n === 0 ? "now" : d > 0 ? `in ${n}${unit}` : `${n}${unit} ago`;
+}
 
 // src/processes/look.ts
 var PROCESS_LOOK = {
@@ -27784,15 +28150,15 @@ function usageCounters(payload) {
 
 // src/processes/widgets/files.ts
 import { closeSync, fstatSync, openSync, readSync } from "node:fs";
-import { homedir as homedir6 } from "node:os";
-import { isAbsolute as isAbsolute2, join as join4, normalize } from "node:path";
+import { homedir as homedir3 } from "node:os";
+import { isAbsolute, join as join3, normalize } from "node:path";
 import { StringDecoder } from "node:string_decoder";
 var TARGET = /(?:^|[\s;&|(])(?:1|&)?>>?\s*([^\s;&|)<>]+)|\btee\s+(?:-a\s+)?([^\s;&|)<>-][^\s;&|)<>]*)/g;
 var CD = /^\s*cd\s+([^\s;&|]+)\s*(?:&&|;)/;
 var SKIP = /^\/dev\/|^&/;
 var unquote = (s2) => s2.replace(/^(['"])(.*)\1$/, "$2");
 function expand(path2, env2) {
-  const out = unquote(path2).replace(/^~(?=\/|$)/, env2.HOME || homedir6()).replace(/\$\{?(HOME|TMPDIR|USER)\}?/g, (_, name) => env2[name]?.replace(/\/$/, "") ?? `$${name}`);
+  const out = unquote(path2).replace(/^~(?=\/|$)/, env2.HOME || homedir3()).replace(/\$\{?(HOME|TMPDIR|USER)\}?/g, (_, name) => env2[name]?.replace(/\/$/, "") ?? `$${name}`);
   return out.includes("$") ? void 0 : out;
 }
 function outputFiles(command, env2 = process.env) {
@@ -27805,7 +28171,7 @@ function outputFiles(command, env2 = process.env) {
       continue;
     }
     const path2 = expand(raw2, env2);
-    const full = path2 && (isAbsolute2(path2) ? path2 : base3 && isAbsolute2(base3) ? join4(base3, path2) : void 0);
+    const full = path2 && (isAbsolute(path2) ? path2 : base3 && isAbsolute(base3) ? join3(base3, path2) : void 0);
     if (full && !files.includes(normalize(full))) {
       files.push(normalize(full));
     }
@@ -27981,7 +28347,7 @@ function list(value, where, errors, min, max) {
   }
   return value;
 }
-function str4(value, where, errors, o = {}) {
+function str3(value, where, errors, o = {}) {
   if (value === void 0 || value === null) {
     if (o.required) {
       errors.push(`${where}: required`);
@@ -28020,7 +28386,7 @@ function num3(value, where, errors) {
   return value;
 }
 function fieldName(value, where, errors) {
-  const name = str4(value, where, errors, { required: true });
+  const name = str3(value, where, errors, { required: true });
   if (name !== void 0 && !FIELD_NAME.test(name)) {
     errors.push(`${where}: "${name}" must match ${FIELD_NAME.source}`);
     return void 0;
@@ -28411,13 +28777,13 @@ function parseSpec(value, errors) {
     errors.push("spec: expected an object");
     return void 0;
   }
-  const title = str4(value.title, "title", errors, { cut: MAX_TITLE_CHARS, required: true });
+  const title = str3(value.title, "title", errors, { cut: MAX_TITLE_CHARS, required: true });
   const rules = list(value.rules, "rules", errors, 1, MAX_RULES)?.map((r, i) => parseRule(r, `rules[${i}]`, errors));
   const blocks2 = list(value.blocks, "blocks", errors, 1, MAX_BLOCKS)?.map((b, i) => parseBlock(b, `blocks[${i}]`, errors));
   let headline;
   if (value.headline !== void 0) {
     const ref = parseValueRef(value.headline, "headline", errors);
-    const label = isRecord2(value.headline) ? str4(value.headline.label, "headline.label", errors, { cut: MAX_LABEL_CHARS }) : void 0;
+    const label = isRecord2(value.headline) ? str3(value.headline.label, "headline.label", errors, { cut: MAX_LABEL_CHARS }) : void 0;
     if (ref) {
       headline = label ? { ...ref, label } : ref;
     }
@@ -28439,13 +28805,13 @@ function parseRule(value, where, errors) {
     errors.push(`${where}: expected an object`);
     return void 0;
   }
-  const from = str4(value.from, `${where}.from`, errors, { required: true });
+  const from = str3(value.from, `${where}.from`, errors, { required: true });
   if (from !== void 0 && !SOURCE_ID.test(from)) {
     errors.push(`${where}.from: invalid source id "${from}"`);
   }
-  const match = str4(value.match, `${where}.match`, errors, { max: MAX_PATTERN_CHARS, required: true });
+  const match = str3(value.match, `${where}.match`, errors, { max: MAX_PATTERN_CHARS, required: true });
   const group = (name) => {
-    const raw2 = str4(value[name], `${where}.${name}`, errors);
+    const raw2 = str3(value[name], `${where}.${name}`, errors);
     if (raw2 !== void 0 && !GROUP_NAME.test(raw2)) {
       errors.push(`${where}.${name}: invalid group name "${raw2}"`);
     }
@@ -28477,9 +28843,9 @@ function parseValueRef(value, where, errors) {
     return void 0;
   }
   const field = fieldName(value.field, `${where}.field`, errors);
-  const key2 = str4(value.key, `${where}.key`, errors, { max: 120 });
+  const key2 = str3(value.key, `${where}.key`, errors, { max: 120 });
   const agg = choice(value.agg, AGGS, `${where}.agg`, errors);
-  const unit = str4(value.unit, `${where}.unit`, errors, { cut: MAX_UNIT_CHARS });
+  const unit = str3(value.unit, `${where}.unit`, errors, { cut: MAX_UNIT_CHARS });
   const digits = num3(value.digits, `${where}.digits`, errors);
   if (digits !== void 0 && (!Number.isInteger(digits) || digits < 0 || digits > 4)) {
     errors.push(`${where}.digits: expected an integer 0\u20134`);
@@ -28503,8 +28869,8 @@ function parseBlock(value, where, errors) {
     return void 0;
   }
   const before = errors.length;
-  const label = () => str4(value.label, `${where}.label`, errors, { cut: MAX_LABEL_CHARS, required: true }) ?? "";
-  const unit = () => str4(value.unit, `${where}.unit`, errors, { cut: MAX_UNIT_CHARS });
+  const label = () => str3(value.label, `${where}.label`, errors, { cut: MAX_LABEL_CHARS, required: true }) ?? "";
+  const unit = () => str3(value.unit, `${where}.unit`, errors, { cut: MAX_UNIT_CHARS });
   const field = () => fieldName(value.field, `${where}.field`, errors) ?? "";
   const optional2 = (entry, name) => entry === void 0 ? {} : { [name]: entry };
   let block;
@@ -28514,11 +28880,11 @@ function parseBlock(value, where, errors) {
         field: field(),
         kind: "spark",
         label: label(),
-        ...optional2(str4(value.key, `${where}.key`, errors, { max: 120 }), "key"),
+        ...optional2(str3(value.key, `${where}.key`, errors, { max: 120 }), "key"),
         ...optional2(unit(), "unit"),
         ...optional2(betterValue(value.better, `${where}.better`, errors), "better"),
         ...optional2(num3(value.target, `${where}.target`, errors), "target"),
-        ...optional2(str4(value.targetLabel, `${where}.targetLabel`, errors, { cut: MAX_LABEL_CHARS }), "targetLabel"),
+        ...optional2(str3(value.targetLabel, `${where}.targetLabel`, errors, { cut: MAX_LABEL_CHARS }), "targetLabel"),
         ...optional2(num3(value.min, `${where}.min`, errors), "min"),
         ...optional2(num3(value.max, `${where}.max`, errors), "max")
       };
@@ -28557,7 +28923,7 @@ function parseBlock(value, where, errors) {
         kind: "meter",
         label: label(),
         total: total ?? 1,
-        ...optional2(str4(value.key, `${where}.key`, errors, { max: 120 }), "key"),
+        ...optional2(str3(value.key, `${where}.key`, errors, { max: 120 }), "key"),
         ...optional2(unit(), "unit")
       };
       break;
@@ -28566,7 +28932,7 @@ function parseBlock(value, where, errors) {
       const items = list(value.items, `${where}.items`, errors, 1, MAX_STAT_ITEMS)?.map((item3, i) => {
         const at = `${where}.items[${i}]`;
         const ref = parseValueRef(item3, at, errors);
-        const itemLabel = isRecord2(item3) ? str4(item3.label, `${at}.label`, errors, { cut: MAX_LABEL_CHARS, required: true }) : void 0;
+        const itemLabel = isRecord2(item3) ? str3(item3.label, `${at}.label`, errors, { cut: MAX_LABEL_CHARS, required: true }) : void 0;
         return ref && itemLabel !== void 0 ? { ...ref, label: itemLabel } : void 0;
       }) ?? [];
       block = { items: items.filter((i) => i !== void 0), kind: "stat" };
@@ -29816,7 +30182,7 @@ function glance(view) {
 function latest(entries) {
   return entries.filter((e) => e.view.state === "live").reduce((a2, e) => !a2 || e.view.updatedAt > a2.view.updatedAt ? e : a2, void 0);
 }
-function summary(view) {
+function summary2(view) {
   const g = glance(view);
   const title = plain(view.title);
   if (!g || view.state !== "live") {
@@ -30004,7 +30370,7 @@ function blockNode(b, key2) {
             "omp.job.widget.bar",
             `${i}`
           )
-        ) : waiting2()
+        ) : waiting()
       ] }, key2);
     case "meter":
       return labelled(
@@ -30018,7 +30384,7 @@ function blockNode(b, key2) {
     case "grid":
       return /* @__PURE__ */ jsxs("col", { gap: "xs", role: "omp.job.widget.grid", children: [
         /* @__PURE__ */ jsx("text", { role: "omp.job.widget.caption", spans: [sp(plain(b.label), "dim")], truncate: "end", wrap: "none" }, "caption"),
-        b.items.length ? /* @__PURE__ */ jsx("row", { gap: "xs", role: "omp.job.widget.cells", wrap: true, children: b.items.map((item3, i) => /* @__PURE__ */ jsx("badge", { text: plain(item3.label), title: plain(item3.text), tone: item3.tone }, `${i}`)) }, "cells") : waiting2()
+        b.items.length ? /* @__PURE__ */ jsx("row", { gap: "xs", role: "omp.job.widget.cells", wrap: true, children: b.items.map((item3, i) => /* @__PURE__ */ jsx("badge", { text: plain(item3.label), title: plain(item3.text), tone: item3.tone }, `${i}`)) }, "cells") : waiting()
       ] }, key2);
     case "text":
       return /* @__PURE__ */ jsx("text", { role: "omp.job.widget.text", spans: [sp(plain(b.text), "muted")], truncate: "end", wrap: "none" }, key2);
@@ -30026,7 +30392,7 @@ function blockNode(b, key2) {
 }
 function sparkNode(b, key2) {
   if (!b.values.length) {
-    return labelled(b.label, waiting2(), "omp.job.widget.spark", key2);
+    return labelled(b.label, waiting(), "omp.job.widget.spark", key2);
   }
   const label = plain(b.label);
   const last = plain(b.last);
@@ -30045,3097 +30411,8 @@ function labelled(label, content5, role, key2) {
     content5
   ] }, key2);
 }
-function waiting2() {
+function waiting() {
   return /* @__PURE__ */ jsx("text", { spans: [sp("waiting for data", "dim")], wrap: "none" }, "waiting");
-}
-
-// src/transcript/todos.ts
-var TODO_LOOK = {
-  cancelled: { item: "dropped" },
-  completed: { item: "done" },
-  in_progress: { item: "active" },
-  pending: { item: "pending" }
-};
-function currentTodos(entries) {
-  for (let i = entries.length - 1; i >= 0; i--) {
-    const e = entries[i];
-    if (e?.kind !== "turn") {
-      continue;
-    }
-    const hit = e.blocks.findLast((b) => b.kind === "tool" && b.call.todos?.length);
-    if (hit?.kind === "tool") {
-      return hit.call.todos;
-    }
-  }
-  return void 0;
-}
-function todosOf(args, current) {
-  const raw2 = Array.isArray(args.todos) ? args.todos : [];
-  return args.merge === true ? mergeTodos(current ?? [], raw2) : toTodos(raw2);
-}
-function mergeTodos(current, patch6) {
-  const out = current.map((t2) => ({ ...t2 }));
-  for (const item3 of patch6) {
-    const r = record(item3);
-    const id = String(r?.id ?? "").trim();
-    if (!r || !id) {
-      continue;
-    }
-    const cur = out.find((t2) => t2.id === id);
-    if (!cur) {
-      if (String(r.content ?? "").trim()) {
-        out.push(...toTodos([{ ...r, id }]));
-      }
-      continue;
-    }
-    const content5 = String(r.content ?? "").trim();
-    const status = String(r.status ?? "").trim().toLowerCase();
-    if (content5) {
-      cur.content = content5;
-    }
-    if (status === "pending" || status === "in_progress" || status === "completed" || status === "cancelled") {
-      cur.status = status;
-    }
-    if ("parent" in r) {
-      const parent = String(r.parent ?? "").trim();
-      if (parent && parent !== id) {
-        cur.parent = parent;
-      } else {
-        delete cur.parent;
-      }
-    }
-  }
-  return out;
-}
-function toTodos(raw2) {
-  const out = [];
-  for (const item3 of raw2) {
-    if (!item3 || typeof item3 !== "object") {
-      continue;
-    }
-    const id = "id" in item3 ? String(item3.id) : String(out.length);
-    const content5 = "content" in item3 ? String(item3.content) : "";
-    const status = "status" in item3 ? String(item3.status) : "pending";
-    const parent = "parent" in item3 && item3.parent ? String(item3.parent) : void 0;
-    out.push({
-      content: content5,
-      id,
-      ...parent && { parent },
-      status: status === "completed" || status === "in_progress" || status === "cancelled" ? status : "pending"
-    });
-  }
-  return out;
-}
-
-// src/workLog.ts
-import { homedir as homedir7 } from "node:os";
-
-// src/vendor/t3code/commandLabel.ts
-var MAX_COMMAND_SEGMENTS = 64;
-var SHELL_PROGRAMS = /* @__PURE__ */ new Set(["sh", "bash", "zsh", "dash", "ash", "ksh", "fish"]);
-var WINDOWS_SHELL_PROGRAMS = /* @__PURE__ */ new Set([
-  "cmd",
-  "cmd.exe",
-  "powershell",
-  "powershell.exe",
-  "pwsh",
-  "pwsh.exe"
-]);
-var SHELL_OPTIONS_WITH_VALUE = /* @__PURE__ */ new Set(["-o", "-O", "--rcfile", "--init-file"]);
-var SHELL_COMMAND_WRAPPERS = /* @__PURE__ */ new Set(["builtin", "command", "exec"]);
-var SHELL_PRECOMMAND_MODIFIERS = /* @__PURE__ */ new Set(["nocorrect", "noglob", "time"]);
-var POWERSHELL_SETUP_PROGRAMS = /* @__PURE__ */ new Set(["pop-location", "push-location", "set-location"]);
-var POWERSHELL_FLAGS = /* @__PURE__ */ new Set(["-mta", "-nologo", "-noninteractive", "-noprofile", "-sta"]);
-var POWERSHELL_OPTIONS_WITH_VALUE = /* @__PURE__ */ new Set([
-  "-configurationname",
-  "-executionpolicy",
-  "-inputformat",
-  "-outputformat",
-  "-version",
-  "-windowstyle",
-  "-workingdirectory"
-]);
-var START_PROCESS_FLAGS = /* @__PURE__ */ new Set([
-  "-confirm",
-  "-debug",
-  "-loaduserprofile",
-  "-nonewwindow",
-  "-passthru",
-  "-usenewenvironment",
-  "-verbose",
-  "-wait",
-  "-whatif"
-]);
-var START_PROCESS_OPTIONS_WITH_VALUE = /* @__PURE__ */ new Set([
-  "-argumentlist",
-  "-credential",
-  "-environment",
-  "-erroraction",
-  "-errorvariable",
-  "-informationaction",
-  "-informationvariable",
-  "-outbuffer",
-  "-outvariable",
-  "-pipelinevariable",
-  "-progressaction",
-  "-redirectstandarderror",
-  "-redirectstandardinput",
-  "-redirectstandardoutput",
-  "-verb",
-  "-warningaction",
-  "-warningvariable",
-  "-windowstyle",
-  "-workingdirectory"
-]);
-var SKIPPABLE_SUDO_PROBES = /* @__PURE__ */ new Set(["[", "[[", "test", "true"]);
-var NON_PROGRAM_PREFIX_CHARACTERS = "<>(){}[];|&$`#!%@:";
-var NON_PROGRAM_SUFFIX_CHARACTERS = "){]}`";
-var NON_DESCRIPTIVE_SHELL_PROGRAMS = /* @__PURE__ */ new Set([
-  "!",
-  "#",
-  ".",
-  ":",
-  "[",
-  "[[",
-  "alias",
-  "and",
-  "autoload",
-  "begin",
-  "bg",
-  "bind",
-  "bindkey",
-  "break",
-  "builtin",
-  "caller",
-  "case",
-  "catch",
-  "cd",
-  "command",
-  "compgen",
-  "complete",
-  "compopt",
-  "continue",
-  "coproc",
-  "declare",
-  "dirs",
-  "disown",
-  "do",
-  "done",
-  "elif",
-  "else",
-  "enable",
-  "end",
-  "esac",
-  "eval",
-  "exec",
-  "exit",
-  "export",
-  "false",
-  "fc",
-  "fg",
-  "fi",
-  "finally",
-  "for",
-  "foreach",
-  "function",
-  "getopts",
-  "history",
-  "if",
-  "in",
-  "jobs",
-  "let",
-  "local",
-  "logout",
-  "mapfile",
-  "nocorrect",
-  "noglob",
-  "not",
-  "or",
-  "popd",
-  "pushd",
-  "read",
-  "readarray",
-  "readonly",
-  "repeat",
-  "return",
-  "select",
-  "set",
-  "setopt",
-  "shift",
-  "shopt",
-  "source",
-  "switch",
-  "suspend",
-  "test",
-  "then",
-  "time",
-  "times",
-  "trap",
-  "try",
-  "true",
-  "type",
-  "typeset",
-  "ulimit",
-  "umask",
-  "unalias",
-  "until",
-  "unset",
-  "unsetopt",
-  "wait",
-  "while"
-]);
-var TERMINAL_SHELL_PROGRAMS = /* @__PURE__ */ new Set([
-  "and",
-  "begin",
-  "break",
-  "case",
-  "catch",
-  "continue",
-  "coproc",
-  "do",
-  "done",
-  "elif",
-  "else",
-  "end",
-  "esac",
-  "eval",
-  "exec",
-  "exit",
-  "false",
-  "fi",
-  "finally",
-  "for",
-  "foreach",
-  "function",
-  "if",
-  "in",
-  "not",
-  "or",
-  "repeat",
-  "return",
-  "select",
-  "switch",
-  "then",
-  "try",
-  "until",
-  "while"
-]);
-function shellCommandArgumentIndex(tokens2, start) {
-  for (let index2 = start; index2 < tokens2.length; index2 += 1) {
-    const option = tokens2[index2];
-    if (option === "--" || !option.startsWith("-")) return null;
-    if (SHELL_OPTIONS_WITH_VALUE.has(option)) {
-      index2 += 1;
-      continue;
-    }
-    if (option === "--command" || /^-[a-zA-Z]*c[a-zA-Z]*$/.test(option)) return index2 + 1;
-  }
-  return null;
-}
-var COMMAND_WRAPPER_OPTIONS_WITH_VALUE = {
-  env: /* @__PURE__ */ new Set(["-C", "--chdir", "-S", "--split-string", "-u", "--unset"]),
-  sudo: /* @__PURE__ */ new Set(["-C", "--close-from", "-D", "--chdir", "-g", "--group", "-u", "--user"])
-};
-var COMMAND_WRAPPER_FLAGS = {
-  env: /* @__PURE__ */ new Set(["-0", "--null", "-i", "--ignore-environment", "--debug", "-v"]),
-  sudo: /* @__PURE__ */ new Set(["-A", "--askpass", "-b", "--background", "-E", "-H", "-i", "-n", "-S"])
-};
-function tokenizeShellCommand(command) {
-  const input2 = command.trim();
-  const tokens2 = [];
-  let current = "";
-  let quote2 = null;
-  let escaping = false;
-  let inBackticks = false;
-  let substitutionDepth = 0;
-  let parameterExpansionDepth = 0;
-  let tokenStarted = false;
-  for (let index2 = 0; index2 < input2.length; index2 += 1) {
-    const character = input2[index2];
-    if (escaping) {
-      current += character;
-      escaping = false;
-      tokenStarted = true;
-      continue;
-    }
-    if (character === "\\" && quote2 !== "'") {
-      const nextCharacter = input2[index2 + 1];
-      const isWindowsPath = quote2 === null && /^(?:[A-Za-z]:|\.{1,2})(?:\\[^\s]*)?$/u.test(current);
-      if ((quote2 === '"' || isWindowsPath) && nextCharacter !== void 0 && nextCharacter !== '"' && nextCharacter !== "\\" && nextCharacter !== "$" && nextCharacter !== "`" && nextCharacter !== "\n") {
-        current += character;
-        tokenStarted = true;
-        continue;
-      }
-      escaping = true;
-      tokenStarted = true;
-      continue;
-    }
-    if (inBackticks) {
-      current += character;
-      if (character === "`") inBackticks = false;
-      tokenStarted = true;
-      continue;
-    }
-    if (quote2 !== null) {
-      if (character === quote2) {
-        quote2 = null;
-      } else {
-        current += character;
-      }
-      tokenStarted = true;
-      continue;
-    }
-    if (character === "`") {
-      current += character;
-      inBackticks = true;
-      tokenStarted = true;
-      continue;
-    }
-    if (character === "$" && input2[index2 + 1] === "{") {
-      current += "${";
-      parameterExpansionDepth += 1;
-      tokenStarted = true;
-      index2 += 1;
-      continue;
-    }
-    if (character === "{" && parameterExpansionDepth > 0) {
-      current += character;
-      parameterExpansionDepth += 1;
-      tokenStarted = true;
-      continue;
-    }
-    if (character === "}" && parameterExpansionDepth > 0) {
-      current += character;
-      parameterExpansionDepth -= 1;
-      tokenStarted = true;
-      continue;
-    }
-    if (character === "$" && input2[index2 + 1] === "(") {
-      current += "$(";
-      substitutionDepth += 1;
-      tokenStarted = true;
-      index2 += 1;
-      continue;
-    }
-    if (character === "(") {
-      current += character;
-      substitutionDepth += 1;
-      tokenStarted = true;
-      continue;
-    }
-    if (character === ")" && substitutionDepth > 0) {
-      current += character;
-      substitutionDepth -= 1;
-      tokenStarted = true;
-      continue;
-    }
-    if (character === '"' || character === "'") {
-      quote2 = character;
-      tokenStarted = true;
-      continue;
-    }
-    if (/\s/u.test(character)) {
-      if (substitutionDepth > 0 || parameterExpansionDepth > 0) {
-        current += character;
-        tokenStarted = true;
-        continue;
-      }
-      if (tokenStarted) {
-        tokens2.push(current);
-        current = "";
-        tokenStarted = false;
-      }
-      continue;
-    }
-    current += character;
-    tokenStarted = true;
-  }
-  if (quote2 !== null || escaping || inBackticks || substitutionDepth > 0 || parameterExpansionDepth > 0) {
-    return null;
-  }
-  if (tokenStarted) tokens2.push(current);
-  return tokens2;
-}
-function commandWithoutShellComments(command, end, comments) {
-  let result = "";
-  let cursor = 0;
-  for (const comment6 of comments) {
-    if (comment6.start >= end) break;
-    result += command.slice(cursor, comment6.start);
-    cursor = Math.min(comment6.end, end);
-  }
-  return result + command.slice(cursor, end);
-}
-function readHeredocDelimiter(command, start, stripTabs) {
-  let index2 = start;
-  while (command[index2] === " " || command[index2] === "	") index2 += 1;
-  let delimiter = "";
-  let quote2 = null;
-  let escaping = false;
-  for (; index2 < command.length; index2 += 1) {
-    const character = command[index2];
-    if (escaping) {
-      delimiter += character;
-      escaping = false;
-      continue;
-    }
-    if (character === "\\" && quote2 !== "'") {
-      escaping = true;
-      continue;
-    }
-    if (quote2 !== null) {
-      if (character === quote2) quote2 = null;
-      else delimiter += character;
-      continue;
-    }
-    if (character === '"' || character === "'") {
-      quote2 = character;
-      continue;
-    }
-    if (/\s/u.test(character) || ";&|<>()".includes(character)) break;
-    delimiter += character;
-  }
-  if (!delimiter || quote2 !== null || escaping) return null;
-  return { heredoc: { delimiter, stripTabs }, end: index2 };
-}
-function commandAfterHeredocs(command, start, heredocs) {
-  let cursor = start;
-  for (const heredoc of heredocs) {
-    let foundDelimiter = false;
-    while (cursor <= command.length) {
-      const newlineIndex = command.indexOf("\n", cursor);
-      const lineEnd2 = newlineIndex === -1 ? command.length : newlineIndex;
-      const line = command.slice(cursor, lineEnd2).replace(/\r$/u, "");
-      const comparableLine = heredoc.stripTabs ? line.replace(/^\t+/u, "") : line;
-      cursor = newlineIndex === -1 ? command.length : newlineIndex + 1;
-      if (comparableLine === heredoc.delimiter) {
-        foundDelimiter = true;
-        break;
-      }
-      if (newlineIndex === -1) break;
-    }
-    if (!foundDelimiter) return null;
-  }
-  return command.slice(cursor).trim() || null;
-}
-function splitFirstShellCommand(command) {
-  let quote2 = null;
-  let powerShellHereStringQuote = null;
-  let escaping = false;
-  let inBackticks = false;
-  let inComment = false;
-  let substitutionDepth = 0;
-  let parameterExpansionDepth = 0;
-  const heredocs = [];
-  const comments = [];
-  let commentStart = 0;
-  let separatorBeforeHeredocs = null;
-  for (let index2 = 0; index2 < command.length; index2 += 1) {
-    const character = command[index2];
-    if (powerShellHereStringQuote !== null) {
-      if (character === powerShellHereStringQuote && command[index2 + 1] === "@" && (index2 === 0 || command[index2 - 1] === "\n")) {
-        powerShellHereStringQuote = null;
-        index2 += 1;
-      }
-      continue;
-    }
-    if (inComment) {
-      if (character !== "\n") continue;
-      inComment = false;
-      comments.push({ start: commentStart, end: index2 });
-    }
-    if (escaping) {
-      escaping = false;
-      continue;
-    }
-    if (character === "\\" && quote2 !== "'") {
-      escaping = true;
-      continue;
-    }
-    if (inBackticks) {
-      if (character === "`") inBackticks = false;
-      continue;
-    }
-    if (quote2 !== null) {
-      if (character === quote2) quote2 = null;
-      continue;
-    }
-    if (character === "@" && (command[index2 + 1] === '"' || command[index2 + 1] === "'") && (command[index2 + 2] === "\n" || command[index2 + 2] === "\r" && command[index2 + 3] === "\n")) {
-      powerShellHereStringQuote = command[index2 + 1];
-      index2 += 1;
-      continue;
-    }
-    if (character === '"' || character === "'") {
-      quote2 = character;
-      continue;
-    }
-    if (character === "`") {
-      inBackticks = true;
-      continue;
-    }
-    if (character === "#" && (index2 === 0 || /\s/u.test(command[index2 - 1]) || ";&|(".includes(command[index2 - 1]))) {
-      inComment = true;
-      commentStart = index2;
-      continue;
-    }
-    if (character === "$" && command[index2 + 1] === "{") {
-      parameterExpansionDepth += 1;
-      index2 += 1;
-      continue;
-    }
-    if (character === "{" && parameterExpansionDepth > 0) {
-      parameterExpansionDepth += 1;
-      continue;
-    }
-    if (character === "}" && parameterExpansionDepth > 0) {
-      parameterExpansionDepth -= 1;
-      continue;
-    }
-    if (character === "(") {
-      substitutionDepth += 1;
-      continue;
-    }
-    if (character === ")" && substitutionDepth > 0) {
-      substitutionDepth -= 1;
-      continue;
-    }
-    if (substitutionDepth > 0 || parameterExpansionDepth > 0) continue;
-    if (character === "<" && command[index2 + 1] === "<" && command[index2 + 2] !== "<") {
-      const stripTabs = command[index2 + 2] === "-";
-      const delimiter = readHeredocDelimiter(command, index2 + (stripTabs ? 3 : 2), stripTabs);
-      if (delimiter === null) {
-        return { firstCommand: command.trim(), remainingCommand: null, separator: null };
-      }
-      heredocs.push(delimiter.heredoc);
-      index2 = delimiter.end - 1;
-      continue;
-    }
-    const isDoubleOperator = character === "&" && command[index2 + 1] === "&" || character === "|" && (command[index2 + 1] === "|" || command[index2 + 1] === "&");
-    const isRedirectionAmpersand = character === "&" && (command[index2 - 1] === ">" || command[index2 - 1] === "<" || command[index2 + 1] === ">");
-    if (!isDoubleOperator && !";&|\n".includes(character) || isRedirectionAmpersand) continue;
-    if (character === "\n" && heredocs.length > 0) {
-      const separator = separatorBeforeHeredocs;
-      const firstCommand2 = commandWithoutShellComments(
-        command,
-        separator?.index ?? index2,
-        comments
-      ).trimStart();
-      const commandBeforeHeredocs = separator ? command.slice(separator.index + separator.length, index2).trim() : "";
-      const commandFollowingHeredocs = commandAfterHeredocs(command, index2 + 1, heredocs);
-      const remainingCommand = [commandBeforeHeredocs, commandFollowingHeredocs].filter((part) => Boolean(part)).join("\n");
-      return {
-        firstCommand: firstCommand2,
-        remainingCommand: remainingCommand || null,
-        separator: separator ? command.slice(separator.index, separator.index + separator.length) : "\n"
-      };
-    }
-    if (heredocs.length > 0) {
-      separatorBeforeHeredocs ??= {
-        index: index2,
-        length: isDoubleOperator ? 2 : 1
-      };
-      if (isDoubleOperator) index2 += 1;
-      continue;
-    }
-    const firstCommand = commandWithoutShellComments(command, index2, comments).trimStart();
-    let nextCommandIndex = index2 + (isDoubleOperator ? 2 : 1);
-    while (/\s/u.test(command[nextCommandIndex] ?? "")) nextCommandIndex += 1;
-    const nextCommand = command.slice(nextCommandIndex).trim();
-    return {
-      firstCommand,
-      remainingCommand: nextCommand || null,
-      separator: isDoubleOperator ? command.slice(index2, index2 + 2) : character
-    };
-  }
-  if (inComment) comments.push({ start: commentStart, end: command.length });
-  return {
-    firstCommand: commandWithoutShellComments(command, command.length, comments).trim(),
-    remainingCommand: null,
-    separator: null
-  };
-}
-function commandWithoutLeadingShellComments(command) {
-  let remainingCommand = command.trimStart();
-  while (remainingCommand.startsWith("#")) {
-    const newlineIndex = remainingCommand.indexOf("\n");
-    if (newlineIndex === -1) return null;
-    remainingCommand = remainingCommand.slice(newlineIndex + 1).trimStart();
-  }
-  return remainingCommand || null;
-}
-function withoutShellLineContinuations(command) {
-  let normalizedCommand = "";
-  let quote2 = null;
-  let escaping = false;
-  for (let index2 = 0; index2 < command.length; index2 += 1) {
-    const character = command[index2];
-    if (escaping) {
-      normalizedCommand += character;
-      escaping = false;
-      continue;
-    }
-    if (character === "\\" && quote2 !== "'") {
-      if (command[index2 + 1] === "\n") {
-        index2 += 1;
-        continue;
-      }
-      if (command[index2 + 1] === "\r" && command[index2 + 2] === "\n") {
-        index2 += 2;
-        continue;
-      }
-      normalizedCommand += character;
-      escaping = true;
-      continue;
-    }
-    if (quote2 !== null) {
-      if (character === quote2) quote2 = null;
-    } else if (character === '"' || character === "'") {
-      quote2 = character;
-    }
-    normalizedCommand += character;
-  }
-  return normalizedCommand;
-}
-function indexAfterShellRedirection(tokens2, index2) {
-  const token = tokens2[index2];
-  if (!token || /^[<>]\(/u.test(token)) return null;
-  const match = token.match(
-    /^(?:(?:(?:\d+|\*|\{[A-Za-z_][A-Za-z0-9_]*\})?(?:<<<|<<-|<<|<>|>>|>\||<&|>&|<|>))|&>>|&>)(.*)$/u
-  );
-  if (!match) return null;
-  if (match[1]) return index2 + 1;
-  return tokens2[index2 + 1] === void 0 ? tokens2.length + 1 : index2 + 2;
-}
-function serializeShellTokens(tokens2) {
-  return tokens2.map((token) => `'${token.replaceAll("'", "'\\''")}'`).join(" ");
-}
-function transparentWrapperCommandIndex(wrapper, tokens2, index2) {
-  if (wrapper === "bundle") {
-    return tokens2[index2 + 1] === "exec" && tokens2[index2 + 2] !== void 0 ? index2 + 2 : null;
-  }
-  if (wrapper === "nohup") {
-    let targetIndex = index2 + 1;
-    if (tokens2[targetIndex] === "--") targetIndex += 1;
-    const target = tokens2[targetIndex];
-    return target && !target.startsWith("-") ? targetIndex : null;
-  }
-  if (wrapper === "script") {
-    return /^-[adkpqr]+$/u.test(tokens2[index2 + 1] ?? "") && tokens2[index2 + 3] !== void 0 ? index2 + 3 : null;
-  }
-  if (wrapper === "arch") {
-    if (/^-(?:arm64|arm64e|i386|x86_64)$/u.test(tokens2[index2 + 1] ?? "")) {
-      return tokens2[index2 + 2] !== void 0 ? index2 + 2 : null;
-    }
-    return tokens2[index2 + 1] === "-arch" && tokens2[index2 + 3] !== void 0 ? index2 + 3 : null;
-  }
-  if (wrapper === "timeout" || wrapper === "gtimeout") {
-    return /^(?:\d+(?:\.\d*)?|\.\d+)[smhd]?$/u.test(tokens2[index2 + 1] ?? "") && tokens2[index2 + 2] !== void 0 ? index2 + 2 : null;
-  }
-  return null;
-}
-function staticProgramName(value) {
-  const trimmedValue = value.trim();
-  if (!trimmedValue || /^[A-Za-z][A-Za-z0-9+.-]*:(?![\\/])/u.test(trimmedValue)) return null;
-  const program = trimmedValue.split(/[\\/]/u).at(-1);
-  if (!program || /\s/u.test(program) && !/[\\/]/u.test(trimmedValue) || NON_PROGRAM_PREFIX_CHARACTERS.includes(program[0] ?? "") || NON_PROGRAM_SUFFIX_CHARACTERS.includes(program.at(-1) ?? "")) {
-    return null;
-  }
-  return program;
-}
-function leadingPowerShellLiteral(command) {
-  const input2 = command.trimStart();
-  const quote2 = input2[0];
-  if (quote2 !== '"' && quote2 !== "'") return staticProgramName(input2.match(/^\S+/u)?.[0] ?? "");
-  let value = "";
-  for (let index2 = 1; index2 < input2.length; index2 += 1) {
-    const character = input2[index2];
-    if (character === "`" && input2[index2 + 1] !== void 0) {
-      value += input2[index2 + 1];
-      index2 += 1;
-      continue;
-    }
-    if (character === quote2) {
-      if (quote2 === "'" && input2[index2 + 1] === "'") {
-        value += "'";
-        index2 += 1;
-        continue;
-      }
-      return staticProgramName(value);
-    }
-    value += character;
-  }
-  return null;
-}
-function powerShellCallOperatorProgramName(command) {
-  const match = command.match(/^\s*&\s+([\s\S]*)$/u);
-  return match ? leadingPowerShellLiteral(match[1]) : void 0;
-}
-function powerShellAssignmentProgramName(command, depth, remainingCommand, segmentsRemaining) {
-  const assignment = command.match(
-    /^\s*\$(?:(env|global|local|script):)?[A-Za-z_][A-Za-z0-9_]*\s*=\s*([\s\S]*)$/iu
-  );
-  if (!assignment) return { matched: false, program: null };
-  if (assignment[1]?.toLowerCase() === "env") {
-    return {
-      matched: true,
-      program: remainingCommand ? commandProgramNameInternal(remainingCommand, depth, "shell", segmentsRemaining - 1) : null
-    };
-  }
-  const value = assignment[2].trim();
-  if (/^(?:\[ordered\]\s*)?@\s*[{(]/iu.test(value)) {
-    return { matched: true, program: null };
-  }
-  const calledProgram = powerShellCallOperatorProgramName(value);
-  if (calledProgram !== void 0) return { matched: true, program: calledProgram };
-  const directCommand = value.match(/^(?:@?\(\s*)?([A-Za-z][A-Za-z0-9_.-]*)\b/u)?.[1];
-  if (directCommand && !NON_DESCRIPTIVE_SHELL_PROGRAMS.has(directCommand.toLowerCase())) {
-    const parsedCommand = commandProgramNameInternal(value, depth + 1, "shell", segmentsRemaining);
-    return { matched: true, program: parsedCommand ?? directCommand };
-  }
-  return {
-    matched: true,
-    program: remainingCommand ? commandProgramNameInternal(remainingCommand, depth, "shell", segmentsRemaining - 1) : null
-  };
-}
-function windowsShellPayloadProgramName(shell, tokens2, start, depth, remainingCommand, separator, segmentsRemaining) {
-  const parsePayload = (payload) => {
-    if (!payload) return null;
-    const command = remainingCommand && separator ? `${payload} ${separator} ${remainingCommand}` : payload;
-    return commandProgramNameInternal(command, depth + 1, "shell", segmentsRemaining);
-  };
-  if (shell === "cmd" || shell === "cmd.exe") {
-    for (let index2 = start; index2 < tokens2.length; index2 += 1) {
-      const option = tokens2[index2].toLowerCase();
-      if (option !== "/c" && option !== "/k") continue;
-      const payload = tokens2[index2 + 1];
-      return {
-        matched: true,
-        program: parsePayload(payload)
-      };
-    }
-    return { matched: false, program: null };
-  }
-  for (let index2 = start; index2 < tokens2.length; index2 += 1) {
-    const option = tokens2[index2].toLowerCase();
-    if (option === "-command" || option === "-c") {
-      const payload = tokens2[index2 + 1];
-      return {
-        matched: true,
-        program: parsePayload(payload)
-      };
-    }
-    if (option === "-file" || option === "-f") {
-      return { matched: true, program: staticProgramName(tokens2[index2 + 1] ?? "") };
-    }
-    if (option === "-encodedcommand" || option === "-enc" || option === "-e") {
-      return { matched: true, program: null };
-    }
-    if (POWERSHELL_OPTIONS_WITH_VALUE.has(option)) {
-      index2 += 1;
-      continue;
-    }
-    if (POWERSHELL_FLAGS.has(option)) continue;
-    if (!option.startsWith("-")) {
-      return { matched: true, program: staticProgramName(tokens2[index2]) };
-    }
-  }
-  return { matched: false, program: null };
-}
-function startProcessProgramName(tokens2, start) {
-  for (let index2 = start; index2 < tokens2.length; index2 += 1) {
-    const token = tokens2[index2];
-    const option = token.toLowerCase();
-    if (option === "-filepath") return staticProgramName(tokens2[index2 + 1] ?? "");
-    if (START_PROCESS_FLAGS.has(option)) continue;
-    if (START_PROCESS_OPTIONS_WITH_VALUE.has(option)) {
-      if (tokens2[index2 + 1] === void 0) return null;
-      index2 += 1;
-      continue;
-    }
-    if (token.startsWith("-")) return null;
-    return staticProgramName(token);
-  }
-  return null;
-}
-function literalAssignmentProgram(token) {
-  const assignment = token.match(/^([A-Za-z_][A-Za-z0-9_]*)=(.*)$/su);
-  if (!assignment) return null;
-  const name = assignment[1];
-  let value = assignment[2].trim();
-  if (!value || /[$`]/u.test(value)) return { name, program: null };
-  if (value.startsWith("(") && value.endsWith(")")) {
-    const arrayTokens = tokenizeShellCommand(value.slice(1, -1));
-    value = arrayTokens?.[0] ?? "";
-  } else if (/\s/u.test(value) && !/[\\/]/u.test(value)) {
-    return { name, program: null };
-  }
-  return { name, program: staticProgramName(value) };
-}
-function referencedCommandAlias(token) {
-  const reference = token.match(
-    /^\$(?:([A-Za-z_][A-Za-z0-9_]*)|\{([A-Za-z_][A-Za-z0-9_]*)(?:\[@\])?\})$/u
-  );
-  return reference?.[1] ?? reference?.[2] ?? null;
-}
-function literalCommandAliasProgramName(command) {
-  const aliases = /* @__PURE__ */ new Map();
-  let remainingCommand = command;
-  let controlFlowDepth = 0;
-  for (let segmentCount = 0; remainingCommand && segmentCount < 64; segmentCount += 1) {
-    const commandWithoutComments = commandWithoutLeadingShellComments(remainingCommand);
-    if (commandWithoutComments === null) return null;
-    const commandSplit = splitFirstShellCommand(commandWithoutComments);
-    const tokens2 = tokenizeShellCommand(withoutShellLineContinuations(commandSplit.firstCommand));
-    if (tokens2 === null) return null;
-    let commandIndex = tokens2[0] === "do" || tokens2[0] === "then" ? 1 : 0;
-    while (commandIndex < tokens2.length) {
-      const indexAfterRedirection = indexAfterShellRedirection(tokens2, commandIndex);
-      if (indexAfterRedirection !== null && indexAfterRedirection <= tokens2.length) {
-        commandIndex = indexAfterRedirection;
-        continue;
-      }
-      if (/^[A-Za-z_][A-Za-z0-9_]*\+?=/u.test(tokens2[commandIndex] ?? "")) {
-        commandIndex += 1;
-        continue;
-      }
-      break;
-    }
-    const aliasName = referencedCommandAlias(tokens2[commandIndex] ?? "");
-    const aliasedProgram = aliasName ? aliases.get(aliasName) : void 0;
-    if (aliasedProgram) return aliasedProgram;
-    const leadingToken = tokens2[0];
-    if (leadingToken === "fi" || leadingToken === "done" || leadingToken === "esac") {
-      controlFlowDepth = Math.max(0, controlFlowDepth - 1);
-    }
-    if (leadingToken === "if" || leadingToken === "for" || leadingToken === "while" || leadingToken === "until" || leadingToken === "select" || leadingToken === "case") {
-      controlFlowDepth += 1;
-    }
-    if (controlFlowDepth === 0 && leadingToken === "unset") {
-      for (const name of tokens2.slice(1)) aliases.delete(name);
-    }
-    const assignmentStart = tokens2[0] === "export" ? 1 : 0;
-    const assignments = tokens2.slice(assignmentStart).map(literalAssignmentProgram);
-    if (controlFlowDepth === 0 && assignments.length > 0 && assignments.every((assignment) => assignment !== null)) {
-      for (const assignment of assignments) {
-        if (assignment.program) aliases.set(assignment.name, assignment.program);
-        else aliases.delete(assignment.name);
-      }
-    }
-    remainingCommand = commandSplit.remainingCommand;
-  }
-  return null;
-}
-function wrappedShellCommandProgramName(wrapper, tokens2, start, depth, remainingCommand, segmentsRemaining) {
-  let index2 = start;
-  if (wrapper === "command") {
-    while (index2 < tokens2.length) {
-      const option = tokens2[index2];
-      if (option === "--") {
-        index2 += 1;
-        break;
-      }
-      if (!option.startsWith("-") || option === "-") break;
-      if (option !== "-p") return null;
-      index2 += 1;
-    }
-  } else if (wrapper === "builtin") {
-    if (tokens2[index2] === "--") index2 += 1;
-    else if (tokens2[index2]?.startsWith("-")) return null;
-  } else if (wrapper === "exec") {
-    while (index2 < tokens2.length) {
-      const option = tokens2[index2];
-      if (option === "--") {
-        index2 += 1;
-        break;
-      }
-      if (option === "-a") {
-        if (tokens2[index2 + 1] === void 0) return null;
-        index2 += 2;
-        continue;
-      }
-      if (/^-a.+/u.test(option) || /^-[cl]+$/u.test(option)) {
-        index2 += 1;
-        continue;
-      }
-      if (option.startsWith("-") && option !== "-") return null;
-      break;
-    }
-  }
-  const wrappedTokens = tokens2.slice(index2);
-  if (wrappedTokens.length === 0) return null;
-  let targetIndex = 0;
-  while (targetIndex < wrappedTokens.length) {
-    const indexAfterRedirection = indexAfterShellRedirection(wrappedTokens, targetIndex);
-    if (indexAfterRedirection === null || indexAfterRedirection > wrappedTokens.length) break;
-    targetIndex = indexAfterRedirection;
-  }
-  const target = wrappedTokens[targetIndex];
-  if (target && /^[A-Za-z_][A-Za-z0-9_]*\+?=/u.test(target)) return null;
-  const wrappedProgram = commandProgramNameInternal(
-    serializeShellTokens(wrappedTokens),
-    depth + 1,
-    wrapper === "exec" ? "exec" : "shell",
-    segmentsRemaining
-  );
-  if (wrappedProgram !== null) return wrappedProgram;
-  if (wrapper !== "exec" && target && target === target.toLowerCase() && NON_DESCRIPTIVE_SHELL_PROGRAMS.has(target) && !TERMINAL_SHELL_PROGRAMS.has(target) && remainingCommand) {
-    return commandProgramNameInternal(remainingCommand, depth, "shell", segmentsRemaining - 1);
-  }
-  return null;
-}
-function parseCommandProgramName(command, depth, context, segmentsRemaining) {
-  if (depth >= 8 || segmentsRemaining <= 0) return null;
-  const commandWithoutComments = commandWithoutLeadingShellComments(command);
-  if (commandWithoutComments === null) return null;
-  if (/^(?:catch|finally|for|foreach|function|if|param|switch|try|while)\s*[{(]/iu.test(
-    commandWithoutComments
-  )) {
-    return null;
-  }
-  if (/^[A-Za-z_][A-Za-z0-9_]*\s*\(\s*\)\s*\{/u.test(commandWithoutComments)) return null;
-  if (commandWithoutComments.startsWith("[[")) return null;
-  const commandSplit = splitFirstShellCommand(commandWithoutComments);
-  if (/^@["'](?:\r?\n)/u.test(commandSplit.firstCommand.trimStart())) {
-    return commandSplit.remainingCommand ? commandProgramNameInternal(
-      commandSplit.remainingCommand,
-      depth,
-      "shell",
-      segmentsRemaining - 1
-    ) : null;
-  }
-  const powerShellAssignment = powerShellAssignmentProgramName(
-    commandSplit.firstCommand,
-    depth,
-    commandSplit.remainingCommand,
-    segmentsRemaining
-  );
-  if (powerShellAssignment.matched) return powerShellAssignment.program;
-  const windowsPath = commandSplit.firstCommand.match(
-    /^\s*((?:\.{1,2}|%[A-Za-z_][A-Za-z0-9_]*%|\$env:[A-Za-z_][A-Za-z0-9_]*)\\\S+)/iu
-  )?.[1];
-  if (windowsPath) return staticProgramName(windowsPath);
-  const tokens2 = tokenizeShellCommand(withoutShellLineContinuations(commandSplit.firstCommand));
-  if (tokens2 === null) return null;
-  const firstCharacter2 = commandSplit.firstCommand.trimStart()[0];
-  if (tokens2.length === 1 && (firstCharacter2 === '"' || firstCharacter2 === "'") && /[\s()=]/u.test(tokens2[0] ?? "") && !/[\\/]/u.test(tokens2[0] ?? "")) {
-    return commandSplit.remainingCommand ? commandProgramNameInternal(
-      commandSplit.remainingCommand,
-      depth,
-      context,
-      segmentsRemaining - 1
-    ) : null;
-  }
-  let index2 = 0;
-  let wrapper = null;
-  let executionContext = context;
-  let sawAssignment = false;
-  let sawRedirection = false;
-  while (index2 < tokens2.length) {
-    const token = tokens2[index2];
-    if (!token) return null;
-    const indexAfterRedirection = indexAfterShellRedirection(tokens2, index2);
-    if (indexAfterRedirection !== null) {
-      if (indexAfterRedirection > tokens2.length) return null;
-      sawRedirection = true;
-      index2 = indexAfterRedirection;
-      continue;
-    }
-    if (/^[A-Za-z_][A-Za-z0-9_]*\+?=/.test(token)) {
-      sawAssignment = true;
-      index2 += 1;
-      continue;
-    }
-    if (executionContext === "shell" && token === ":") {
-      return commandSplit.remainingCommand ? commandProgramNameInternal(
-        commandSplit.remainingCommand,
-        depth,
-        executionContext,
-        segmentsRemaining - 1
-      ) : null;
-    }
-    if (NON_PROGRAM_PREFIX_CHARACTERS.includes(token[0] ?? "") && !(token.startsWith("$") && token.includes("/"))) {
-      return executionContext === "shell" && token.startsWith("[") && commandSplit.remainingCommand ? commandProgramNameInternal(
-        commandSplit.remainingCommand,
-        depth,
-        executionContext,
-        segmentsRemaining - 1
-      ) : null;
-    }
-    const tokenProgram = token.split(/[\\/]/).at(-1);
-    const isUnqualifiedToken = token === tokenProgram;
-    if (tokenProgram === "env" || tokenProgram === "sudo") {
-      wrapper = tokenProgram;
-      executionContext = "exec";
-      index2 += 1;
-      continue;
-    }
-    if (wrapper !== null && token === "--") {
-      wrapper = null;
-      index2 += 1;
-      continue;
-    }
-    if (wrapper !== null && token.startsWith("-")) {
-      if (wrapper === "env" && (token === "-S" || token === "--split-string")) {
-        const splitCommand = tokens2[index2 + 1];
-        return splitCommand ? commandProgramNameInternal(splitCommand, depth + 1, executionContext, segmentsRemaining) : null;
-      }
-      if (wrapper === "env" && token.startsWith("--split-string=")) {
-        return commandProgramNameInternal(
-          token.slice("--split-string=".length),
-          depth + 1,
-          executionContext,
-          segmentsRemaining
-        );
-      }
-      if (COMMAND_WRAPPER_OPTIONS_WITH_VALUE[wrapper].has(token)) {
-        if (tokens2[index2 + 1] === void 0) return null;
-        index2 += 2;
-        continue;
-      }
-      if (COMMAND_WRAPPER_FLAGS[wrapper].has(token)) {
-        index2 += 1;
-        continue;
-      }
-      const equalsIndex = token.indexOf("=");
-      if (token.startsWith("--") && equalsIndex > 2) {
-        if (!COMMAND_WRAPPER_OPTIONS_WITH_VALUE[wrapper].has(token.slice(0, equalsIndex))) {
-          return null;
-        }
-        index2 += 1;
-        continue;
-      }
-      if (/^-[A-Za-z].+/.test(token) && !token.startsWith("--")) {
-        let consumesNextToken = false;
-        for (const [optionIndex, option] of token.slice(1).split("").entries()) {
-          const shortOption = `-${option}`;
-          if (COMMAND_WRAPPER_OPTIONS_WITH_VALUE[wrapper].has(shortOption)) {
-            consumesNextToken = optionIndex === token.length - 2;
-            break;
-          }
-          if (!COMMAND_WRAPPER_FLAGS[wrapper].has(shortOption)) return null;
-        }
-        if (consumesNextToken && tokens2[index2 + 1] === void 0) return null;
-        index2 += consumesNextToken ? 2 : 1;
-        continue;
-      }
-      return null;
-    }
-    if (tokenProgram && SHELL_PROGRAMS.has(tokenProgram.replace(/\.exe$/i, "").toLowerCase())) {
-      const scriptIndex = shellCommandArgumentIndex(tokens2, index2 + 1);
-      if (scriptIndex !== null) {
-        const script = tokens2[scriptIndex];
-        return script ? commandProgramNameInternal(script, depth + 1, "shell", segmentsRemaining) : null;
-      }
-    }
-    const lowerTokenProgram = tokenProgram?.toLowerCase();
-    if (lowerTokenProgram && WINDOWS_SHELL_PROGRAMS.has(lowerTokenProgram)) {
-      const payload = windowsShellPayloadProgramName(
-        lowerTokenProgram,
-        tokens2,
-        index2 + 1,
-        depth,
-        commandSplit.remainingCommand,
-        commandSplit.separator,
-        segmentsRemaining
-      );
-      if (payload.matched) return payload.program;
-    }
-    if (lowerTokenProgram === "start-process") {
-      const startedProgram = startProcessProgramName(tokens2, index2 + 1);
-      if (startedProgram !== null) return startedProgram;
-    }
-    if (executionContext === "shell" && isUnqualifiedToken && tokenProgram && SHELL_PRECOMMAND_MODIFIERS.has(tokenProgram)) {
-      index2 += 1;
-      if (tokenProgram === "time" && tokens2[index2] === "-p") index2 += 1;
-      if (tokens2[index2]?.startsWith("-")) return null;
-      continue;
-    }
-    if (isUnqualifiedToken && tokenProgram) {
-      const targetIndex = transparentWrapperCommandIndex(tokenProgram, tokens2, index2);
-      if (targetIndex !== null) {
-        const wrappedProgram = commandProgramNameInternal(
-          serializeShellTokens(tokens2.slice(targetIndex)),
-          depth + 1,
-          "exec",
-          segmentsRemaining
-        );
-        if (wrappedProgram !== null) return wrappedProgram;
-      }
-    }
-    if (isUnqualifiedToken && tokenProgram && SHELL_COMMAND_WRAPPERS.has(tokenProgram)) {
-      return wrappedShellCommandProgramName(
-        tokenProgram,
-        tokens2,
-        index2 + 1,
-        depth,
-        commandSplit.remainingCommand,
-        segmentsRemaining
-      );
-    }
-    if ((executionContext === "shell" || wrapper === "sudo" && tokenProgram && SKIPPABLE_SUDO_PROBES.has(tokenProgram)) && isUnqualifiedToken && tokenProgram && NON_DESCRIPTIVE_SHELL_PROGRAMS.has(tokenProgram) && (!TERMINAL_SHELL_PROGRAMS.has(tokenProgram) || tokenProgram === "false" && commandSplit.separator !== "&&") && commandSplit.remainingCommand) {
-      return commandProgramNameInternal(
-        commandSplit.remainingCommand,
-        depth,
-        "shell",
-        segmentsRemaining - 1
-      );
-    }
-    if (executionContext === "shell" && isUnqualifiedToken && lowerTokenProgram && POWERSHELL_SETUP_PROGRAMS.has(lowerTokenProgram) && commandSplit.remainingCommand) {
-      return commandProgramNameInternal(
-        commandSplit.remainingCommand,
-        depth,
-        "shell",
-        segmentsRemaining - 1
-      );
-    }
-    if (!tokenProgram || isUnqualifiedToken && NON_DESCRIPTIVE_SHELL_PROGRAMS.has(tokenProgram) || NON_PROGRAM_PREFIX_CHARACTERS.includes(tokenProgram[0] ?? "") || NON_PROGRAM_SUFFIX_CHARACTERS.includes(tokenProgram.at(-1) ?? "") || tokenProgram.endsWith("()") || /^[A-Za-z_][A-Za-z0-9_]*\(\)\{$/u.test(tokenProgram)) {
-      return null;
-    }
-    return tokenProgram || null;
-  }
-  if ((sawAssignment || sawRedirection) && wrapper === null && commandSplit.remainingCommand) {
-    return commandProgramNameInternal(
-      commandSplit.remainingCommand,
-      depth,
-      executionContext,
-      segmentsRemaining - 1
-    );
-  }
-  return null;
-}
-function commandProgramNameInternal(command, depth, context, segmentsRemaining = MAX_COMMAND_SEGMENTS) {
-  if (segmentsRemaining <= 0) return null;
-  const calledProgram = powerShellCallOperatorProgramName(command);
-  if (calledProgram !== void 0) return calledProgram;
-  return parseCommandProgramName(command, depth, context, segmentsRemaining) ?? (context === "shell" ? literalCommandAliasProgramName(command) : null);
-}
-function commandProgramName(command, depth = 0) {
-  return commandProgramNameInternal(command, depth, "shell", MAX_COMMAND_SEGMENTS);
-}
-var CONTROL_CHARACTERS = /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/gu;
-function commandDisplayText(command) {
-  return withVisibleControlCharacters(withoutShellWrapper(command));
-}
-function withVisibleControlCharacters(text11) {
-  return text11.replace(
-    CONTROL_CHARACTERS,
-    (character) => character === "\x7F" ? "\u2421" : String.fromCharCode(9216 + character.charCodeAt(0))
-  );
-}
-function withoutShellWrapper(command) {
-  const trimmed = command.trim();
-  const split2 = splitFirstShellCommand(trimmed);
-  if (split2.remainingCommand !== null) return trimmed;
-  const tokens2 = tokenizeShellCommand(trimmed);
-  const program = tokens2?.[0]?.split(/[\\/]/u).at(-1)?.replace(/\.exe$/iu, "");
-  if (!tokens2 || !program || !SHELL_PROGRAMS.has(program)) return trimmed;
-  const scriptIndex = shellCommandArgumentIndex(tokens2, 1);
-  if (scriptIndex === null || scriptIndex !== tokens2.length - 1) return trimmed;
-  return tokens2[scriptIndex]?.trim() || trimmed;
-}
-var POWERSHELL_VERBS = new Set(
-  `Add Approve Assert Backup Block Build Checkpoint Clear Close Compare Complete Compress Confirm Connect Convert ConvertFrom ConvertTo Copy Debug Deny Deploy Disable Disconnect Dismount Edit Enable Enter Exit Expand Export Find ForEach Format Get Grant Group Hide Import Initialize Install Invoke Join Limit Lock Measure Merge Mount Move New Open Optimize Out Ping Pop Protect Publish Push Read Receive Redo Register Remove Rename Repair Request Reset Resize Resolve Restart Restore Resume Revoke Save Search Select Send Set Show Skip Sort Split Start Step Stop Submit Suspend Switch Sync Tee Test Trace Unblock Undo Uninstall Unlock Unprotect Unpublish Unregister Update Use Wait Watch Where Write`.split(
-    " "
-  )
-);
-
-// src/workLog.ts
-var SOLO = /* @__PURE__ */ new Set(["clarify", "delegate_task", "todo", "todo_list"]);
-function ownsCard(call) {
-  return SOLO.has(call.name) || isBackgroundCall(call) || waiting3(call) || isConnectCall(call) || call.name === "image_generate" || showsImage(call);
-}
-function waiting3(call) {
-  return isWatchCall(call) && call.status === "running";
-}
-function showsImage(call) {
-  return shownImage(call) !== void 0;
-}
-function pieces(blocks2, turn = blocks2) {
-  const out = [];
-  let items = [];
-  const plan = turn.findLast((b) => b.kind === "tool" && isTodoName(b.call.name) && b.call.todos?.length);
-  for (const b of blocks2) {
-    if (b.kind === "thinking" || b.kind === "tool" && (!ownsCard(b.call) || isTodoName(b.call.name) && b !== plan)) {
-      items.push(b);
-      continue;
-    }
-    if (items.length) {
-      out.push({ items, kind: "work" });
-      items = [];
-    }
-    out.push({ block: b, kind: "block" });
-  }
-  if (items.length) {
-    out.push({ items, kind: "work" });
-  }
-  return out;
-}
-function visibleItems(items) {
-  return items.filter((i) => i.kind === "tool" || i.text.trim());
-}
-function foldOf(turn) {
-  if (turn.status !== "done") {
-    return void 0;
-  }
-  const answer = turn.blocks.findLastIndex((b) => b.kind === "text" && b.text.trim());
-  const hidden2 = /* @__PURE__ */ new Set();
-  for (const [i, b] of turn.blocks.entries()) {
-    if (i === answer || b.kind === "steer" || b.kind === "compaction") {
-      continue;
-    }
-    if (b.kind === "tool" && (isBackgroundCall(b.call) || waiting3(b.call) || isConnectCall(b.call) || showsImage(b.call) || b.call.subagents?.some((a2) => a2.status === "running" || a2.status === "queued"))) {
-      continue;
-    }
-    if (answer >= 0 && i > answer && b.kind === "tool" && b.call.status !== "done") {
-      continue;
-    }
-    hidden2.add(b.id);
-  }
-  if (hidden2.size === 0) {
-    return void 0;
-  }
-  const ms = (turn.endedAt ?? turn.startedAt) - turn.startedAt;
-  return { hidden: hidden2, label: workedFor(ms) };
-}
-var workedFor = (ms) => ms > 0 ? `Worked for ${durationCompact(ms)}` : "Worked";
-function parts(turn) {
-  const fold = foldOf(turn);
-  if (!fold) {
-    return [{ blocks: [...turn.blocks], kind: "shown" }];
-  }
-  const out = [];
-  const show = (b) => {
-    const last = out.at(-1);
-    if (last?.kind === "shown") {
-      last.blocks.push(b);
-    } else {
-      out.push({ blocks: [b], kind: "shown" });
-    }
-  };
-  let stretch = [];
-  let from = turn.startedAt;
-  const flush = (to) => {
-    const hidden2 = stretch.filter((b) => fold.hidden.has(b.id));
-    if (hidden2.length) {
-      out.push({ blocks: hidden2, key: `fold${hidden2[0].id}`, kind: "fold", label: workedFor(to - from) });
-    }
-    stretch.filter((b) => !fold.hidden.has(b.id)).forEach(show);
-    stretch = [];
-  };
-  for (const b of turn.blocks) {
-    if (b.kind === "steer" || b.kind === "compaction") {
-      flush(b.at);
-      show(b);
-      from = b.kind === "compaction" ? b.compaction.endedAt ?? b.at : b.at;
-    } else {
-      stretch.push(b);
-    }
-  }
-  flush(turn.endedAt ?? from);
-  return out;
-}
-function actionOf(call) {
-  if (appsOf(call).length) {
-    return "app";
-  }
-  if (isTodoName(call.name)) {
-    return "plan";
-  }
-  switch (call.name) {
-    case "tool_search":
-    case "tool_describe":
-      return "lookup";
-    case "terminal":
-    case "execute_code":
-    case "process":
-    case "process_manage":
-      return "command";
-    case "read_file":
-      return "read";
-    case "patch":
-    case "write_file":
-      return "edit";
-    case "search_files":
-      return "code-search";
-    case "web_search":
-      return "search";
-    case "web_extract":
-      return "fetch";
-  }
-  return call.name.startsWith("browser") ? "browser" : "other";
-}
-var and2 = (words3) => words3.length < 3 ? words3.join(" and ") : `${words3.slice(0, -1).join(", ")}, and ${words3.at(-1)}`;
-function actionLabel(action, n, calls = []) {
-  switch (action) {
-    case "app": {
-      const apps = [...new Set(calls.flatMap(appsOf))];
-      const uses = calls.reduce((k, c) => k + (c.batch?.length ?? 1), 0);
-      return apps.length === 1 ? `Used ${apps[0]}${uses > 1 ? ` ${uses} times` : ""}` : `Used ${and2(apps)}`;
-    }
-    case "command":
-      return `Ran ${plural(n, "command")}`;
-    case "read":
-      return `Read ${plural(n, "file")}`;
-    case "edit":
-      return `Changed ${plural(n, "file")}`;
-    case "code-search":
-      return `Searched code ${plural(n, "time")}`;
-    case "search":
-      return `Searched the web ${plural(n, "time")}`;
-    case "fetch":
-      return `Read ${plural(n, "page")}`;
-    case "browser":
-      return `Used browser ${plural(n, "time")}`;
-    case "lookup":
-      return `Looked up tools${n > 1 ? ` ${n} times` : ""}`;
-    case "plan":
-      return `Updated the plan${n > 1 ? ` ${n} times` : ""}`;
-    case "other":
-      return `Used ${plural(n, "tool")}`;
-  }
-}
-function appsOf(call) {
-  const apps = (call.batch ?? [call]).map((e) => callApp({ args: e.args, name: e.name })?.app);
-  return apps.every(Boolean) ? [...new Set(apps)] : [];
-}
-var priority = (a2) => a2 === "command" || a2 === "edit" || a2 === "app" ? 0 : a2 === "other" || a2 === "lookup" ? 2 : 1;
-function summarize(items) {
-  const calls = items.flatMap((i) => i.kind === "tool" ? [i.call] : []);
-  if (!calls.length) {
-    return items.length === 1 ? "Thought" : `Thought (\xD7${items.length})`;
-  }
-  const groups = /* @__PURE__ */ new Map();
-  for (const c of calls) {
-    const a2 = actionOf(c);
-    groups.set(a2, [...groups.get(a2) ?? [], c]);
-  }
-  const all8 = [...groups].map(([action, list8], index2) => ({
-    count: list8.length,
-    index: index2,
-    label: actionLabel(action, action === "edit" ? editedFiles(list8) : list8.length, list8),
-    priority: priority(action)
-  }));
-  const picked = [...all8].sort((a2, b) => a2.priority - b.priority || a2.index - b.index).slice(0, 2).sort((a2, b) => a2.index - b.index);
-  const labels = picked.map((p3) => p3.label);
-  const rest = calls.length - picked.reduce((n, p3) => n + p3.count, 0);
-  if (rest > 0) {
-    labels.push(`Performed ${plural(rest, "other action")}`);
-  }
-  const words3 = labels.map((l, i) => i === 0 ? l : l.charAt(0).toLowerCase() + l.slice(1));
-  return words3.length < 3 ? words3.join(" and ") : `${words3.slice(0, -1).join(", ")}, and ${words3.at(-1)}`;
-}
-function editedFiles(calls) {
-  const paths = /* @__PURE__ */ new Set();
-  let unnamed = 0;
-  for (const c of calls) {
-    const path2 = nonEmpty(c.args.path);
-    if (path2) {
-      paths.add(path2);
-    } else {
-      unnamed++;
-    }
-  }
-  return paths.size + unnamed;
-}
-function groupIcon(items) {
-  const actions = new Set(items.flatMap((i) => i.kind === "tool" ? [actionOf(i.call)] : []));
-  if (!actions.size) {
-    return "brain";
-  }
-  return actions.size === 1 ? actionIcon([...actions][0]) : "hammer";
-}
-function actionIcon(action) {
-  switch (action) {
-    case "app":
-      return "plug";
-    case "lookup":
-      return "search";
-    case "plan":
-      return "list-checks";
-    case "command":
-      return "terminal";
-    case "read":
-      return "eye";
-    case "edit":
-      return "pencil";
-    case "code-search":
-      return "search";
-    case "search":
-    case "fetch":
-      return "globe";
-    case "browser":
-      return "compass";
-    case "other":
-      return "wrench";
-  }
-}
-var shortPath = (path2) => relativePath(path2, { cwd: launchEnv().cwd, home: homedir7() });
-function stepLabel(call) {
-  const a2 = call.args;
-  const path2 = nonEmpty(a2.path);
-  const app2 = callApp(call);
-  if (app2) {
-    return `${app2.app} \xB7 ${app2.action}`;
-  }
-  if (call.batch) {
-    return call.batch.map((e) => stepLabel({ ...call, args: e.args, batch: void 0, name: e.name })).join(", ");
-  }
-  if (isTodoName(call.name)) {
-    return planStep(call.todosBefore, call.todos);
-  }
-  switch (call.name) {
-    case "terminal": {
-      const command = nonEmpty(a2.command) ?? call.context;
-      return command ? flat(commandDisplayText(command)) : "Command";
-    }
-    case "read_file":
-      return path2 ? `Read ${shortPath(path2)}` : "Read file";
-    case "patch":
-      return path2 ? `Edited ${shortPath(path2)}` : "Edited a file";
-    case "write_file":
-      return path2 ? `Wrote ${shortPath(path2)}` : "Wrote a file";
-    case "search_files": {
-      const pattern = nonEmpty(a2.pattern) ?? call.context;
-      const where = path2 && path2 !== "." ? ` in ${shortPath(path2)}` : "";
-      return a2.target === "files" ? `Searched files ${pattern}${where}` : `Searched ${pattern}${where}`;
-    }
-    case "web_search":
-      return nonEmpty(a2.query) ? `Searched the web for ${a2.query}` : "Web search";
-    case "web_extract": {
-      const urls = Array.isArray(a2.urls) ? a2.urls.filter((u) => typeof u === "string") : [];
-      const first = urls[0] ?? nonEmpty(a2.url);
-      return first ? `Read ${first}${urls.length > 1 ? ` +${urls.length - 1} more` : ""}` : "Read a page";
-    }
-    case "execute_code":
-      return call.context ? flat(call.context) : "Ran a script";
-    case "link_pull_request":
-    case "unlink_pull_request": {
-      const verb = call.name === "link_pull_request" ? "Linked" : "Unlinked";
-      const pr = nonEmpty(a2.url)?.match(/github[^/]*\/([^/]+\/[^/]+)\/pull\/(\d+)/);
-      const repo = pr?.[1] ?? nonEmpty(a2.repository);
-      const number4 = pr?.[2] ?? (typeof a2.number === "number" ? String(a2.number) : void 0);
-      return repo && number4 ? `${verb} ${repo}#${number4}` : `${verb} a pull request`;
-    }
-    case "list_pull_requests":
-      return "Listed linked pull requests";
-    case "skill_view":
-      return nonEmpty(a2.name) ? `Read skill ${a2.name}` : "Read a skill";
-    case "skills_list":
-      return "Listed skills";
-    case "tool_search": {
-      const q2 = Array.isArray(a2.queries) ? a2.queries.filter((x) => typeof x === "string") : [nonEmpty(a2.queries) ?? nonEmpty(a2.query)].filter(Boolean);
-      return q2.length ? `Searched tools for ${q2.join(", ")}` : "Searched tools";
-    }
-    case "tool_describe": {
-      const names = (Array.isArray(a2.names) ? a2.names : [a2.names]).filter((x) => typeof x === "string" && x !== "");
-      const named = names.map((n) => {
-        const app3 = callApp({ args: {}, name: n });
-        return app3 ? `${app3.app} \xB7 ${app3.action}` : n.replace(/_/g, " ");
-      });
-      return named.length ? `Read how to call ${named.join(", ")}` : "Read tool details";
-    }
-  }
-  const name = call.name.replace(/_/g, " ");
-  const label = name.charAt(0).toUpperCase() + name.slice(1);
-  return call.context ? `${label}: ${flat(call.context)}` : label;
-}
-var MARK = { cancelled: "\u2717", completed: "\u2713", in_progress: "\u2192", pending: "\u25CB" };
-function planStep(before, after) {
-  if (!after?.length) {
-    return "Plan updated";
-  }
-  if (!before?.length) {
-    return `Planned ${plural(after.length, "step")}`;
-  }
-  const changes = after.flatMap((t2) => {
-    const was = before.find((b) => b.id === t2.id);
-    return !was ? [`+ ${t2.content}`] : was.status !== t2.status ? [`${MARK[t2.status]} ${t2.content}`] : [];
-  });
-  return changes.length ? `Plan updated: ${changes.join(", ")}` : "Plan updated";
-}
-function liveLabel(item3, active = false) {
-  if (item3.kind === "thinking") {
-    return thoughtTitle(item3) || (item3.endedAt === void 0 || active ? "Thinking" : "Thought");
-  }
-  const call = item3.call;
-  const status = active && call.status === "done" ? "running" : call.status;
-  const command = call.name === "terminal" ? nonEmpty(call.args.command) ?? call.context : void 0;
-  if (!command) {
-    return status === "running" ? presentTense(stepLabel(call)) : stepLabel(call);
-  }
-  const verb = { cancelled: "Stopped", done: "Ran", error: "Failed", running: "Running" }[status];
-  return `${verb} ${commandProgramName(command) ?? "command"}`;
-}
-function busyLabel(call) {
-  return `${liveLabel({ call, id: call.id, kind: "tool" }, true)}\u2026`;
-}
-function preparingLabel(name) {
-  const app2 = callApp({ args: {}, name });
-  return `Preparing ${app2 ? `${app2.app} \xB7 ${app2.action}` : name.replace(/_/g, " ")}\u2026`;
-}
-var PRESENT = {
-  Edited: "Editing",
-  Linked: "Linking",
-  Listed: "Listing",
-  Looked: "Looking",
-  Read: "Reading",
-  Searched: "Searching",
-  Unlinked: "Unlinking",
-  Used: "Using",
-  Wrote: "Writing"
-};
-function presentTense(label) {
-  const [verb = "", ...rest] = label.split(" ");
-  return PRESENT[verb] ? [PRESENT[verb], ...rest].join(" ") : label;
-}
-function thoughtLine(markdown2) {
-  return flat(
-    markdown2.replace(/!?\[([^\]]*)\]\([^)]*\)/g, "$1").replace(/^[ \t]*(?:#{1,6}|[-*+]|\d+\.)[ \t]+/gm, "").replace(/`+|\*\*|~~/g, "").replace(/(^|[^\w*])[*_]([^*_\n]+)[*_](?![\w*])/g, "$1$2")
-  );
-}
-function thoughtTitle(item3) {
-  const line = thoughtLine(item3.text);
-  return item3.label ? line ? `${item3.label}: ${line}` : item3.label : line;
-}
-var flat = (text11) => text11.replace(/\s+/g, " ").trim();
-
-// src/view/time.ts
-var kAge = /* @__PURE__ */ Symbol("tsp.age");
-function age(owner, startedAt, now) {
-  const aged = owner;
-  return aged[kAge] ??= Math.max(0, now - startedAt);
-}
-function countdownAge(owner, dueAt, now) {
-  const aged = owner;
-  return aged[kAge] ??= Math.min(0, now - dueAt);
-}
-function compact(n) {
-  if (n < 1e3) {
-    return String(n);
-  }
-  if (n < 1e6) {
-    const k = n / 1e3;
-    return `${k < 10 ? k.toFixed(1).replace(/\.0$/, "") : Math.round(k)}K`;
-  }
-  const m = n / 1e6;
-  return `${m < 10 ? m.toFixed(1).replace(/\.0$/, "") : Math.round(m)}M`;
-}
-
-// src/view/tools.tsx
-function toolNode(call, now) {
-  const solo = call.name === "delegate_task" ? soloTask(call, now) : void 0;
-  if (solo) {
-    return solo;
-  }
-  const card = cardOf(call, now);
-  const status = card.status ?? call.status;
-  const running = status === "running";
-  const body = [...card.body];
-  const error = call.status === "error" ? errorOf(call) : void 0;
-  if (call.status === "cancelled") {
-    body.push(
-      /* @__PURE__ */ jsx(
-        "text",
-        {
-          role: "omp.tool.notice",
-          spans: [{ s: "muted", t: `Interrupted by user after ${duration(call.duration ?? 0)}` }]
-        },
-        "cancelled"
-      )
-    );
-  }
-  const collapsed = call.status === "error" ? false : card.folded;
-  return node(
-    "tool",
-    {
-      age: running ? age(call, call.startedAt, now) : void 0,
-      badges: card.badges,
-      collapsed: body.length > 0 ? collapsed : void 0,
-      collapsible: body.length > 0 ? true : void 0,
-      // A background start's exit 0 only says it started; its process line tells how it ended.
-      exit: call.name === "terminal" && !running && call.status !== "cancelled" && !isBackgroundCall(call) ? exitOf(call) : void 0,
-      frame: card.frame === "inline" && (running || !body.length || card.name !== "web_search") ? "inline" : void 0,
-      key: call.id,
-      lang: card.lang,
-      meta: card.meta?.length ? card.meta : void 0,
-      name: card.name,
-      note: call.status === "cancelled" ? "cancelled" : error && !card.body.length ? error : void 0,
-      preview: card.preview,
-      role: card.role,
-      status,
-      target: card.target,
-      targetKind: card.target ? card.targetKind : void 0,
-      title: card.title,
-      took: running ? void 0 : card.took ?? call.duration
-    },
-    body
-  );
-}
-function toolDetail(call, now) {
-  const card = cardOf(call, now);
-  const body = [...card.body];
-  const command = call.name === "terminal" ? (nonEmpty(call.args.command) ?? call.context ?? "").trim() : "";
-  if (command && command === commandLine(command)) {
-    body.unshift(/* @__PURE__ */ jsx("code", { lang: "bash", max: { h: "12lines" }, role: "omp.tool.command", text: command }, "cmd"));
-  }
-  const exit3 = call.name === "terminal" && call.status !== "running" && !isBackgroundCall(call) ? exitOf(call) : void 0;
-  if (exit3) {
-    body.push(/* @__PURE__ */ jsx("text", { spans: [{ s: "error", t: `exit ${exit3}` }] }, "exit"));
-  }
-  const error = call.status === "error" && !card.body.length ? errorOf(call) : void 0;
-  if (error) {
-    body.push(/* @__PURE__ */ jsx("text", { role: "omp.tool.error", spans: [{ s: "error", t: error }], wrap: "word" }, "err"));
-  }
-  if (call.status === "cancelled") {
-    body.push(/* @__PURE__ */ jsx("text", { spans: [{ s: "muted", t: `Interrupted by user after ${duration(call.duration ?? 0)}` }] }, "cancelled"));
-  }
-  return body;
-}
-function cardOf(call, now) {
-  const result = record(call.result);
-  const app2 = callApp(call);
-  if (app2) {
-    return {
-      badges: [{ text: app2.kind === "mcp" ? "MCP" : "connector" }],
-      body: call.batch ? batchBody(call) : appBody(call),
-      folded: true,
-      frame: "inline",
-      name: "plug",
-      target: app2.action,
-      targetKind: "text",
-      title: app2.app
-    };
-  }
-  if (call.batch) {
-    const apps = appsOf(call);
-    return {
-      badges: apps.length ? [{ text: "connectors" }] : void 0,
-      body: batchBody(call),
-      folded: true,
-      frame: "inline",
-      name: "plug",
-      target: `${call.batch.length} calls`,
-      targetKind: "text",
-      title: apps.length ? apps.join(", ") : "Tool calls"
-    };
-  }
-  switch (call.name) {
-    case "terminal":
-      return isBackgroundCall(call) ? backgroundCard(call, result, now) : bashCard(call, result);
-    case "read_file":
-      return readCard2(call, result);
-    case "patch":
-    case "write_file":
-      return editCard(call, result);
-    case "search_files":
-      return searchCard(call, result);
-    case "web_search":
-      return webSearchCard(call, result);
-    case "web_extract":
-      return fetchCard(call, result);
-    case CONNECT_TOOL:
-      if (isConnectCall(call)) {
-        return connectCard(call);
-      }
-      break;
-    // `todo` is the legacy name stored transcripts and older backends keep.
-    case "todo":
-    case "todo_list":
-      return {
-        body: call.todos?.length ? [checklistNode(call.todos)] : [],
-        name: "todo",
-        target: todoCount(call.todos),
-        targetKind: "text",
-        title: "Todo"
-      };
-    case "delegate_task":
-      return taskCard(call, result, now);
-    case "clarify":
-      return askCard(call, result);
-    case "execute_code":
-      return evalCard(call, result);
-    case "memory":
-      return {
-        body: [],
-        frame: "inline",
-        meta: nonEmpty(result?.usage) ? [`${result?.usage}`] : void 0,
-        name: "memory",
-        target: call.context || nonEmpty(call.args.action),
-        targetKind: "text",
-        title: "Memory"
-      };
-    case "skills_list": {
-      const skills = Array.isArray(result?.skills) ? result.skills : [];
-      const names = skills.map((s2) => nonEmpty(record(s2)?.name) ?? nonEmpty(s2)).filter((n) => n !== void 0);
-      return {
-        body: names.length ? [/* @__PURE__ */ jsx("text", { spans: [{ s: "muted", t: names.join(" \xB7 ") }], wrap: "word" }, "names")] : [],
-        folded: true,
-        frame: "inline",
-        meta: [
-          names.length ? plural(names.length, "skill") : nonEmpty(result?.message) ?? "no skills"
-        ],
-        name: "skill",
-        title: "Skills"
-      };
-    }
-    case "skill_view":
-      return {
-        body: nonEmpty(result?.content) ? [/* @__PURE__ */ jsx("md", { children: clip(nonEmpty(result?.content) ?? "", { mark: "line", max: 6e3 }) }, "body")] : [],
-        folded: true,
-        frame: "inline",
-        name: "skill",
-        target: nonEmpty(call.args.name) ?? call.context,
-        targetKind: "text",
-        title: "Skill"
-      };
-  }
-  const look = isProcessTool(call.name) ? { name: "terminal", title: PROCESS_ACTIONS[String(call.args.action)] ?? "Process" } : call.name.startsWith("browser") ? { name: "browser", title: humanize(call.name.replace(/^browser_?/, "")) || "Browser" } : call.name === "session_search" ? { name: "search", title: "Session search" } : call.name === "vision_analyze" ? { name: "image", title: "Vision" } : call.name === "image_generate" ? { name: "image", title: "Image" } : { name: call.name, title: humanize(call.name) };
-  const src = shownImage(call);
-  if (src || call.name === "image_generate") {
-    const said = call.status === "running" ? void 0 : nonEmpty(result?.analysis) ?? nonEmpty(result?.text_summary);
-    return {
-      ...look,
-      body: [
-        ...src ? [imageNode(call, src)] : [],
-        ...said ? [/* @__PURE__ */ jsx("text", { lines: 6, spans: [{ s: "muted", t: clip(said, { mark: "line", max: 2e3 }) }], wrap: "word" }, "said")] : []
-      ],
-      folded: false,
-      target: nonEmpty(call.args.prompt) ?? nonEmpty(call.args.question) ?? (call.context || void 0),
-      targetKind: "text"
-    };
-  }
-  const chart = isWatchCall(call) && call.process?.chart ? tilesNode([{ process: call.process, view: call.process.chart }]) : void 0;
-  return {
-    ...look,
-    body: [...chart ? [chart] : [], ...genericBody(call)],
-    folded: !chart,
-    frame: "inline",
-    target: (isProcessTool(call.name) && call.process ? commandLine(call.process.command) : void 0) ?? nonEmpty(call.args.query) ?? nonEmpty(call.args.url) ?? (call.context || void 0),
-    targetKind: nonEmpty(call.args.url) ? "path" : nonEmpty(call.args.query) ? "query" : "text"
-  };
-}
-var PROCESS_ACTIONS = {
-  close: "Close process input",
-  kill: "Stop process",
-  list: "List processes",
-  log: "Read process output",
-  poll: "Check process",
-  submit: "Send to process",
-  wait: "Wait for process",
-  write: "Write to process"
-};
-function bashCard(call, result, instead) {
-  const output = (nonEmpty(result?.output) ?? call.resultText)?.replace(/\s*\[Command interrupted\]\s*$/, "");
-  const error = nonEmpty(result?.error);
-  const command = (nonEmpty(call.args.command) ?? call.context ?? "").trim();
-  const line = commandLine(command);
-  const running = call.status === "running";
-  return {
-    body: [
-      ...command && command !== line ? [/* @__PURE__ */ jsx("code", { lang: "bash", max: { h: "12lines" }, role: "omp.tool.command", text: command }, "cmd")] : [],
-      ...instead ? [instead] : output ? [/* @__PURE__ */ jsx("ansi", { follow: true, max: { h: "20lines" }, text: output }, "out")] : [],
-      ...error ? [/* @__PURE__ */ jsx("text", { role: "omp.tool.error", spans: [{ s: "error", t: error }], wrap: "word" }, "err")] : []
-    ],
-    folded: true,
-    lang: "bash",
-    name: "bash",
-    preview: { tail: running ? 4 : 3 },
-    // A short command is the head's target; a longer one shows whole in the body instead.
-    target: command === line ? line || void 0 : void 0,
-    targetKind: "command",
-    title: describeCommand(command)
-  };
-}
-function backgroundCard(call, result, now) {
-  const w = watchersOf(call);
-  const id = processIdOf(call) ?? call.process?.id;
-  const line = id ? processLine(call, id, now) : void 0;
-  const chart = call.process?.chart && primaryNode(call.process.chart);
-  const card = bashCard(call, result, line && chart ? /* @__PURE__ */ jsxs("col", { gap: "xs", children: [
-    line,
-    chart
-  ] }, "process") : line);
-  return {
-    ...card,
-    badges: [
-      { text: "background" },
-      ...w.notify ? [{ text: "notify on exit" }] : [],
-      ...w.patterns.map((p3) => ({ text: `watch: ${clip(p3, { mark: "line", max: 32 })}` })),
-      ...w.heartbeat ? [{ text: `every ${w.heartbeat}s` }] : []
-    ],
-    folded: line ? false : card.folded
-  };
-}
-function processLine(call, id, now) {
-  const p3 = call.process;
-  const live = !p3 || isRunning2(p3);
-  const tone = p3 ? processTone(p3.status) : "muted";
-  return /* @__PURE__ */ jsxs(
-    "row",
-    {
-      actions: { click: `open-process=${id}`, menu: [`open-process=${id}`] },
-      align: "center",
-      gap: "xs",
-      role: "omp.tool.process",
-      title: "Open in the Background sheet  \u2325J",
-      children: [
-        p3 && live ? /* @__PURE__ */ jsx("spinner", { style: "dots", tone: "accent" }, "state-icon") : /* @__PURE__ */ jsx("icon", { name: p3 ? PROCESS_LOOK[p3.status].icon : "pending", tone }, "state-icon"),
-        /* @__PURE__ */ jsx("text", { spans: [{ s: tone, t: p3 ? processVerdict(p3) : "starting" }], wrap: "none" }, "state"),
-        p3 ? /* @__PURE__ */ jsx("text", { spans: [{ s: "dim", t: "\xB7" }], wrap: "none" }, "sep1") : null,
-        p3 && live ? /* @__PURE__ */ jsx("elapsed", { age: age(p3, p3.startedAt, now), format: "short" }, "time") : null,
-        p3 && !live ? /* @__PURE__ */ jsx("text", { spans: [{ s: "muted", t: duration(processElapsed(p3, now)) }], wrap: "none" }, "took") : null,
-        p3?.lastLine ? /* @__PURE__ */ jsx("text", { spans: [{ s: "dim", t: "\xB7" }], wrap: "none" }, "sep2") : null,
-        p3?.lastLine ? /* @__PURE__ */ jsx("text", { grow: 1, spans: [{ s: "muted mono", t: p3.lastLine }], truncate: "end", wrap: "none" }, "last") : null
-      ]
-    },
-    "process"
-  );
-}
-function readCard2(call, result) {
-  const path2 = nonEmpty(call.args.path) ?? call.context;
-  const content5 = nonEmpty(result?.content);
-  const total = typeof result?.total_lines === "number" ? result.total_lines : void 0;
-  const numbered = content5 ? [...content5.matchAll(/^ *(\d+)\|/gm)] : [];
-  const first = numbered.length ? Number(numbered[0]?.[1]) : void 0;
-  const last = numbered.length ? Number(numbered.at(-1)?.[1]) : void 0;
-  const whole = first === 1 && last !== void 0 && last === total;
-  const meta3 = first !== void 0 && last !== void 0 ? [whole ? `${total} lines` : `:${first}-${last}`] : [];
-  return {
-    body: content5 ? [/* @__PURE__ */ jsx("code", { lang: langOf(path2), numbers: true, start: first, text: content5.replace(/^ *\d+\|/gm, "") }, "code")] : [],
-    folded: true,
-    frame: "inline",
-    meta: meta3,
-    name: "read",
-    target: path2,
-    targetKind: "path",
-    title: "Read"
-  };
-}
-function editCard(call, result) {
-  const path2 = nonEmpty(call.args.path) ?? call.context;
-  const lang = langOf(path2);
-  const diff2 = hunks(nonEmpty(result?.diff)) ?? (call.diff ? plainDiff(call.diff) : void 0);
-  const content5 = nonEmpty(call.args.content);
-  const write = call.name === "write_file";
-  const head2 = {
-    name: write ? "write" : "edit",
-    target: path2,
-    targetKind: "path",
-    title: write ? "Write" : "Edit"
-  };
-  if (write && content5 && (!diff2 || diff2.startsWith("@@ -0,0 "))) {
-    const text11 = content5.replace(/\n$/, "");
-    const lines = text11.split("\n").length;
-    return {
-      ...head2,
-      badges: diff2 ? [{ text: "new file", tone: "success" }] : void 0,
-      body: [/* @__PURE__ */ jsx("code", { lang: lang ?? "text", numbers: true, text: text11 }, "code")],
-      folded: true,
-      meta: [plural(lines, "line")],
-      preview: { lines: 8 }
-    };
-  }
-  if (!diff2) {
-    return { ...head2, body: [] };
-  }
-  const { added, removed } = diffStats(diff2);
-  return { ...head2, body: [/* @__PURE__ */ jsx("diff", { lang, text: diff2 }, "diff")], meta: [`+${added} \u2212${removed}`] };
-}
-function searchCard(call, result) {
-  const pattern = nonEmpty(call.args.pattern) ?? call.context;
-  const where = nonEmpty(call.args.path);
-  const inPath = where && where !== "." ? ` \xB7 in ${where}` : "";
-  const files = Array.isArray(result?.files) ? result.files.map((f) => nonEmpty(f)).filter((f) => f !== void 0) : void 0;
-  if (files || call.args.target === "files") {
-    const list8 = (files ?? []).map((f) => f.replace(/^\.\//, ""));
-    const total2 = typeof result?.total_count === "number" ? result.total_count : list8.length;
-    return {
-      body: list8.slice(0, 200).map((f, i) => {
-        const slash = f.lastIndexOf("/");
-        return /* @__PURE__ */ jsx("row", { role: "omp.tool.file", title: slash > 0 ? f.slice(0, slash + 1) : void 0, children: /* @__PURE__ */ jsx("text", { spans: [{ s: "path", t: slash > 0 ? f.slice(slash + 1) : f }] }, "p") }, `f${i}`);
-      }),
-      folded: list8.length > 20,
-      frame: "inline",
-      meta: files ? [`${plural(total2, "file")}${inPath}`] : void 0,
-      name: "glob",
-      target: pattern,
-      targetKind: "pattern",
-      title: "Glob"
-    };
-  }
-  const matches = Array.isArray(result?.matches) ? result.matches.map((m) => record(m)).filter((m) => m !== void 0) : void 0;
-  const byFile = /* @__PURE__ */ new Map();
-  for (const m of matches ?? []) {
-    const path2 = (nonEmpty(m.path) ?? "").replace(/^\.\//, "");
-    const list8 = byFile.get(path2) ?? [];
-    list8.push({ line: typeof m.line === "number" ? m.line : 0, text: typeof m.content === "string" ? m.content : "" });
-    byFile.set(path2, list8);
-  }
-  const total = typeof result?.total_count === "number" ? result.total_count : matches?.length ?? 0;
-  const body = [];
-  let fileIndex = 0;
-  for (const [path2, hits] of byFile) {
-    const f = `f${fileIndex++}`;
-    body.push(
-      /* @__PURE__ */ jsxs("row", { role: "omp.tool.file", children: [
-        /* @__PURE__ */ jsx("text", { spans: [{ s: "path", t: path2 }] }, "p"),
-        /* @__PURE__ */ jsx("text", { role: "omp.tool.chip", spans: [{ t: String(hits.length) }] }, "n")
-      ] }, f)
-    );
-    let run5 = [];
-    let runIndex = 0;
-    const flush = () => {
-      const start = run5[0]?.line ?? 1;
-      if (runIndex > 0) {
-        body.push(/* @__PURE__ */ jsx("text", { role: "omp.tool.context", spans: [{ s: "muted", t: "\u2026" }] }, `${f}.g${runIndex}`));
-      }
-      body.push(
-        /* @__PURE__ */ jsx(
-          "code",
-          {
-            lang: langOf(path2),
-            marks: run5.map((h2) => ({ line: h2.line, tone: "accent" })),
-            numbers: true,
-            start,
-            text: run5.map((h2) => h2.text).join("\n")
-          },
-          `${f}.c${runIndex++}`
-        )
-      );
-      run5 = [];
-    };
-    for (const hit of hits) {
-      if (run5.length && hit.line !== (run5.at(-1)?.line ?? 0) + 1) {
-        flush();
-      }
-      run5.push(hit);
-    }
-    if (run5.length) {
-      flush();
-    }
-  }
-  return {
-    body,
-    folded: total > 40,
-    frame: "inline",
-    meta: matches ? [`${plural(total, "match", "matches")} \xB7 ${plural(byFile.size, "file")}${inPath}`] : void 0,
-    name: "grep",
-    target: pattern,
-    targetKind: "pattern",
-    title: "Grep"
-  };
-}
-function webSearchCard(call, result) {
-  const data = record(result?.data);
-  const hits = (Array.isArray(data?.web) ? data.web : Array.isArray(result?.results) ? result.results : []).map((h2) => record(h2)).filter((h2) => h2 !== void 0);
-  return {
-    body: hits.length ? [
-      /* @__PURE__ */ jsx("col", { role: "omp.tool.sources", children: hits.map((h2, i) => sourceRow(`s${i}`, nonEmpty(h2.title) ?? nonEmpty(h2.url) ?? "", nonEmpty(h2.url))) }, "s")
-    ] : [],
-    frame: "inline",
-    meta: hits.length ? [plural(hits.length, "source")] : void 0,
-    name: "web_search",
-    target: nonEmpty(call.args.query) ?? call.context,
-    targetKind: "query",
-    title: "Web search"
-  };
-}
-function fetchCard(call, result) {
-  const pages = (Array.isArray(result?.results) ? result.results : []).map((p3) => record(p3)).filter((p3) => p3 !== void 0);
-  const urls = Array.isArray(call.args.urls) ? call.args.urls.map((u) => nonEmpty(u)).filter((u) => u !== void 0) : [];
-  const body = [];
-  for (const [i, p3] of pages.entries()) {
-    body.push(sourceRow(`s${i}`, nonEmpty(p3.title) ?? nonEmpty(p3.url) ?? "", nonEmpty(p3.url)));
-    const content5 = nonEmpty(p3.content);
-    if (content5) {
-      body.push(/* @__PURE__ */ jsx("md", { children: clip(content5, { mark: "line", max: 4e3 }) }, `b${i}`));
-    }
-  }
-  const chars = pages.reduce((n, p3) => n + (nonEmpty(p3.content)?.length ?? 0), 0);
-  return {
-    body,
-    folded: true,
-    meta: pages.length ? [`${plural(pages.length, "page")} \xB7 ${compact(chars)} chars`] : void 0,
-    name: "fetch",
-    preview: { lines: 6 },
-    target: urls.length > 1 ? `${urls[0]} +${urls.length - 1}` : urls[0] ?? nonEmpty(call.args.url) ?? call.context,
-    targetKind: "path",
-    title: "Fetch"
-  };
-}
-function sourceRow(key2, title, url) {
-  let host = "";
-  try {
-    host = url ? new URL(url).hostname.replace(/^www\./, "") : "";
-  } catch {
-    host = "";
-  }
-  return /* @__PURE__ */ jsxs("row", { role: "omp.tool.source", children: [
-    /* @__PURE__ */ jsx("text", { role: "omp.tool.chip", spans: [{ t: (host.charAt(0) || "\xB7").toUpperCase() }] }, "d"),
-    /* @__PURE__ */ jsx("text", { spans: [url ? { href: url, t: title } : { t: title }] }, "t"),
-    host ? /* @__PURE__ */ jsx("text", { spans: [{ s: "muted", t: host }] }, "m") : null
-  ] }, key2);
-}
-function taskCard(call, result, now) {
-  const tasks = Array.isArray(call.args.tasks) ? call.args.tasks.map((t2) => record(t2)).filter((t2) => t2 !== void 0) : [];
-  const goals = tasks.length ? tasks.map((t2) => nonEmpty(t2.goal) ?? "") : nonEmpty(call.args.goal) ? [nonEmpty(call.args.goal) ?? ""] : [];
-  const agents2 = call.subagents ?? [];
-  const rows = agents2.length ? agents2.map((a2) => agentNode(a2, now)) : call.status === "running" || result?.status === "dispatched" ? goals.map((g, i) => /* @__PURE__ */ jsx("agent", { name: `Agent ${i + 1}`, status: "pending", task: g }, `p${i}`)) : settledRows(goals, result);
-  const context = nonEmpty(call.args.context) ?? (tasks.length === 1 ? nonEmpty(tasks[0]?.context) : void 0);
-  const working = agents2.some((a2) => a2.status === "running" || a2.status === "queued") || !agents2.length && result?.status === "dispatched";
-  const settled = agents2.filter((a2) => a2.status !== "running" && a2.status !== "queued");
-  const count = goals.length || agents2.length;
-  let meta3;
-  let took2;
-  if (agents2.length && !working) {
-    const ok3 = agents2.filter((a2) => a2.status === "done").length;
-    const stopped = agents2.filter((a2) => a2.status === "cancelled").length;
-    const failed = agents2.length - ok3 - stopped;
-    const requests = agents2.reduce((n, a2) => n + a2.calls, 0);
-    meta3 = [
-      `${ok3} succeeded`,
-      failed ? `${failed} failed` : "",
-      stopped ? `${stopped} stopped` : "",
-      requests ? `${requests} req` : ""
-    ].filter(Boolean).join(" \xB7 ");
-    took2 = Math.max(...agents2.map((a2) => a2.startedAt + (a2.duration ?? 0))) - call.startedAt;
-  } else if (settled.length) {
-    meta3 = `${settled.length} of ${count} done`;
-  }
-  return {
-    badges: result?.mode === "background" ? [{ text: "background" }] : void 0,
-    // The agents first; the brief they share stays folded.
-    body: [...rows, ...context ? [briefNode("Shared brief", context)] : []],
-    meta: meta3 ? [meta3] : void 0,
-    name: "task",
-    status: working ? "running" : void 0,
-    target: count ? plural(count, "agent") : void 0,
-    targetKind: "text",
-    title: "Task",
-    took: took2
-  };
-}
-function settledRows(goals, result) {
-  const results = Array.isArray(result?.results) ? result.results.map((r) => record(r)) : [];
-  const titles = goals.length ? goals : results.map(() => "Delegated task");
-  return titles.map((g, i) => {
-    const { status, summary: summary4 } = outcome(results[i]);
-    return /* @__PURE__ */ jsx("agent", { name: `Agent ${i + 1}`, status, task: g, children: summary4 ? /* @__PURE__ */ jsx("md", { children: summary4 }, "o") : null }, `s${i}`);
-  });
-}
-function agentNode(a2, now, solo) {
-  const status = SUBAGENT_LOOK[a2.status].row;
-  const running = a2.status === "running";
-  return /* @__PURE__ */ jsx(
-    "agent",
-    {
-      actions: { click: `open-agent=${a2.id}`, menu: [`open-agent=${a2.id}`] },
-      badges: a2.exitReason && (a2.status !== "done" || a2.exitReason === OUTCOME_UNKNOWN) ? [{ text: a2.exitReason.replace(/_/g, " "), tone: "warning" }] : void 0,
-      collapsed: a2.summary ? true : void 0,
-      collapsible: a2.summary ? true : void 0,
-      depth: a2.depth || void 0,
-      model: a2.model,
-      name: solo?.name ?? agentName(a2),
-      role: solo ? "hermes.task.solo" : void 0,
-      stats: {
-        requests: a2.calls || void 0,
-        tokens: a2.tokens || void 0,
-        tools: a2.toolCount || void 0,
-        ...running ? { age: Math.max(0, now - a2.startedAt) } : { took: a2.duration }
-      },
-      status,
-      task: a2.goal,
-      title: `Open ${solo ? "the agent" : agentName(a2)} beside the chat`,
-      tool: running && a2.tool ? {
-        age: a2.toolSince ? age(a2.toolSince, a2.toolSince.at, now) : void 0,
-        intent: a2.toolPreview,
-        name: a2.tool
-      } : void 0,
-      children: a2.summary ? /* @__PURE__ */ jsx("md", { children: a2.summary }, "o") : null
-    },
-    solo?.key ?? a2.key ?? a2.id
-  );
-}
-function outcome(r) {
-  const verdict = nonEmpty(r?.status) ?? "";
-  const status = !r ? "idle" : verdict === "" || verdict === "ok" || verdict === "completed" ? "done" : "failed";
-  return { status, summary: nonEmpty(r?.summary) ?? nonEmpty(r?.error) };
-}
-function soloTask(call, now) {
-  const tasks = Array.isArray(call.args.tasks) ? call.args.tasks.map((t2) => record(t2)).filter((t2) => t2 !== void 0) : [];
-  const result = record(call.result);
-  if (tasks.length > 1 || (call.subagents?.length ?? 0) > 1 || call.status === "error" || result?.error) {
-    return void 0;
-  }
-  const goal = nonEmpty(tasks[0]?.goal) ?? nonEmpty(call.args.goal) ?? call.subagents?.[0]?.goal ?? "Delegated task";
-  const name = result?.mode === "background" ? "Background agent" : "Agent";
-  const a2 = call.subagents?.[0];
-  if (a2) {
-    return agentNode(a2, now, { key: call.id, name });
-  }
-  const pending = call.status === "running" || result?.status === "dispatched";
-  const results = Array.isArray(result?.results) ? result.results.map((r) => record(r)) : [];
-  const { status, summary: summary4 } = pending ? { status: "pending", summary: void 0 } : outcome(results[0]);
-  return /* @__PURE__ */ jsx(
-    "agent",
-    {
-      collapsed: summary4 ? true : void 0,
-      collapsible: summary4 ? true : void 0,
-      name,
-      role: "hermes.task.solo",
-      status,
-      task: goal,
-      children: summary4 ? /* @__PURE__ */ jsx("md", { children: summary4 }, "o") : null
-    },
-    call.id
-  );
-}
-function briefOf(call, index2) {
-  const tasks = Array.isArray(call.args.tasks) ? call.args.tasks.map((t2) => record(t2)) : [];
-  const context = nonEmpty(tasks[index2]?.context) ?? nonEmpty(call.args.context);
-  return context;
-}
-function briefNode(head2, text11) {
-  return /* @__PURE__ */ jsx("section", { collapsed: true, collapsible: true, head: head2, role: "hermes.task.brief", children: /* @__PURE__ */ jsx("md", { children: text11 }, "md") }, "brief");
-}
-function askCard(call, result) {
-  const qs = (Array.isArray(call.args.questions) ? call.args.questions : nonEmpty(call.args.question) ? [call.args] : []).map((q2) => record(q2)).filter((q2) => q2 !== void 0);
-  const responses = Array.isArray(result?.responses) ? result.responses.map((r) => record(r)) : [];
-  const body = [];
-  for (const [i, q2] of qs.entries()) {
-    const choices = Array.isArray(q2.choices) ? q2.choices.map((c) => nonEmpty(c)).filter((c) => c !== void 0) : [];
-    const raw2 = responses[i]?.user_response;
-    const answers = (Array.isArray(raw2) ? raw2 : [raw2]).map((a2) => nonEmpty(a2)).filter((a2) => a2 !== void 0);
-    if (qs.length > 1) {
-      body.push(/* @__PURE__ */ jsx("md", { children: nonEmpty(q2.question) ?? "" }, `q${i}`));
-    }
-    for (const [j, c] of choices.entries()) {
-      body.push(answerRow(`q${i}.o${j}`, c, answers.includes(c)));
-    }
-    for (const [j, typed] of answers.filter((a2) => !choices.includes(a2)).entries()) {
-      body.push(answerRow(`q${i}.a${j}`, typed, true));
-    }
-    if (!answers.length && call.status !== "running" && result !== void 0) {
-      const skipped = responses[i]?.status === "skipped";
-      body.push(/* @__PURE__ */ jsx("text", { role: "omp.tool.notice", spans: [{ s: "muted", t: skipped ? "Skipped" : "No answer" }] }, `q${i}.none`));
-    }
-  }
-  return {
-    body,
-    name: "ask",
-    // Several questions each read in the body; the head counts them instead of repeating one.
-    target: qs.length > 1 ? `${qs.length} questions` : nonEmpty(qs[0]?.question) ?? call.context,
-    targetKind: "text",
-    title: "Ask"
-  };
-}
-function answerRow(key2, text11, picked) {
-  return /* @__PURE__ */ jsxs("row", { role: picked ? "omp.tool.answer" : "omp.tool.answer.off", children: [
-    /* @__PURE__ */ jsx("text", { spans: [picked ? { s: "success", t: "\u2713" } : { s: "dim", t: "\xB7" }] }, "c"),
-    /* @__PURE__ */ jsx("text", { spans: [{ t: text11 }] }, "t")
-  ] }, key2);
-}
-function evalCard(call, result) {
-  const code7 = nonEmpty(call.args.code) ?? "";
-  const output = nonEmpty(result?.output) ?? nonEmpty(result?.stdout) ?? call.resultText;
-  const error = nonEmpty(result?.error) ?? nonEmpty(result?.stderr);
-  return {
-    badges: [{ text: "python" }],
-    body: [
-      /* @__PURE__ */ jsxs("col", { role: "omp.tool.eval.cell", children: [
-        /* @__PURE__ */ jsxs("row", { align: "start", role: "omp.tool.eval.input", children: [
-          /* @__PURE__ */ jsx("icon", { aria: "Input", name: "arrow-left", role: "omp.tool.eval.prompt" }, "0"),
-          /* @__PURE__ */ jsx("col", { grow: 1, children: /* @__PURE__ */ jsx("code", { lang: "python", max: { h: "20lines" }, numbers: false, text: code7, wrap: true }, "code") }, "source")
-        ] }, "input"),
-        output || error ? /* @__PURE__ */ jsxs("row", { align: "start", role: "omp.tool.eval.result", children: [
-          /* @__PURE__ */ jsx("icon", { aria: "Output", name: "arrow-right", role: "omp.tool.eval.prompt" }, "0"),
-          /* @__PURE__ */ jsxs("col", { grow: 1, role: "omp.tool.eval.outputs", children: [
-            output ? /* @__PURE__ */ jsx("ansi", { follow: false, max: { h: "20lines" }, role: "omp.tool.eval.output", text: output.replace(/\n$/, "") }, "out") : null,
-            error ? /* @__PURE__ */ jsx("text", { role: "omp.tool.error", spans: [{ s: "error", t: error }], wrap: "word" }, "err") : null
-          ] }, "outputs")
-        ] }, "result") : null
-      ] }, "cell-0")
-    ],
-    folded: false,
-    name: "eval",
-    role: "omp.tool.eval",
-    title: firstLine(code7)?.startsWith("#") ? firstLine(code7)?.replace(/^#+\s*/, "") ?? "Eval" : "Eval"
-  };
-}
-var CONNECT_STATE = {
-  connected: { icon: "check", tone: "success", word: "connected" },
-  expired: { icon: "clock", tone: "error", word: "link expired" },
-  failed: { icon: "x", tone: "error", word: "failed" },
-  initiated: { icon: "clock", tone: "pending", word: "waiting for your browser" },
-  not_connected: { icon: "minus", tone: "muted", word: "not connected" },
-  // Minted, not opened yet: the desktop's waiting cue belongs to a row the user opened.
-  pending: { icon: "clock", tone: "muted", word: "needs authorizing" },
-  skipped: { icon: "minus", tone: "muted", word: "skipped" },
-  superseded: { icon: "minus", tone: "muted", word: "asked again below" }
-};
-var SETTLED_NOTE = {
-  all_resolved: "All connected.",
-  continued: "Sent to Hermes.",
-  deadline: "Stopped waiting after 15 minutes. Ask Hermes to connect again.",
-  error: "Hermes stopped watching these links.",
-  stopped: "Hermes stopped watching these links. Ask Hermes to connect again.",
-  superseded: "A later request replaced this one."
-};
-function connectCard(call) {
-  const card = call.connect ?? { opened: [], targets: connectTargets(call), told: false };
-  const { settled, targets } = card;
-  const ref = card.key ?? call.id;
-  const stateOf = (t2) => settled && waiting(t2) ? "not_connected" : t2.state === "initiated" && !card.opened.includes(t2.name) ? "pending" : t2.state;
-  const open = settled ? [] : targets.filter(waiting);
-  const rows = targets.map((t2, i) => {
-    const look = CONNECT_STATE[stateOf(t2)] ?? CONNECT_STATE.pending;
-    return /* @__PURE__ */ jsxs("row", { align: "center", gap: "sm", role: "hermes.connect.row", children: [
-      /* @__PURE__ */ jsx("icon", { name: look.icon, tone: look.tone }, "i"),
-      /* @__PURE__ */ jsx(
-        "text",
-        {
-          grow: 1,
-          spans: [
-            { s: "strong", t: t2.title },
-            ...t2.alias ? [{ s: "muted", t: ` (${t2.alias})` }] : [],
-            { s: look.tone ?? "muted", t: `  ${look.word}` },
-            ...t2.detail && look.tone === "error" ? [{ s: "muted", t: ` \xB7 ${t2.detail}` }] : []
-          ],
-          truncate: "end",
-          wrap: "none"
-        },
-        "n"
-      ),
-      t2.url && !settled && waiting(t2) ? /* @__PURE__ */ jsx("row", { actions: { click: `connect-open=${ref}:${t2.name}` }, align: "center", gap: "xs", role: "hermes.connect.open", title: t2.url, children: /* @__PURE__ */ jsx("text", { text: "Authorize \u2197" }, "t") }, "go") : null
-    ] }, `t${i}`);
-  });
-  const note = card.told ? open.length || settled && settled !== "all_resolved" ? "Sent to Hermes." : "All connected. Hermes carries on." : settled ? `${SETTLED_NOTE[settled]}${settled === "error" && card.error ? ` ${card.error}` : ""}` : void 0;
-  return {
-    body: [
-      ...rows,
-      ...note ? [/* @__PURE__ */ jsx("text", { spans: [{ s: "muted", t: note }], wrap: "word" }, "done")] : [
-        /* @__PURE__ */ jsxs("row", { align: "center", gap: "sm", children: [
-          /* @__PURE__ */ jsx(
-            "text",
-            {
-              grow: 1,
-              spans: [
-                {
-                  s: "muted",
-                  t: open.length ? "Authorize in the browser. Hermes hears when every app is connected." : "All set."
-                }
-              ],
-              wrap: "word"
-            },
-            "hint"
-          ),
-          open.length ? /* @__PURE__ */ jsx("row", { actions: { click: `connect-continue=${ref}` }, align: "center", role: "hermes.connect.continue", children: /* @__PURE__ */ jsx("text", { text: "Done, continue" }, "t") }, "go") : null
-        ] }, "foot")
-      ]
-    ],
-    name: "plug",
-    target: `${targets.filter((t2) => t2.state === "connected").length} of ${targets.filter((t2) => t2.state !== "superseded").length} connected`,
-    targetKind: "text",
-    title: allConnected(card) ? "Apps connected" : "Connect apps"
-  };
-}
-function appBody(call) {
-  const facts2 = Object.entries(call.args).filter(([k, v]) => k !== "connector_alias" && v !== void 0 && v !== null && v !== "").slice(0, 12).map(([k, v]) => ({ k: [{ t: k.replace(/_/g, " ") }], v: clip(typeof v === "string" ? v : JSON.stringify(v), { mark: "line", max: 300 }) }));
-  const error = call.status === "error" ? errorOf(call) : void 0;
-  return [
-    ...facts2.length ? [/* @__PURE__ */ jsx("kv", { items: facts2 }, "args")] : [],
-    ...error ? [/* @__PURE__ */ jsx("text", { spans: [{ s: "error", t: clip(error, { mark: "line", max: 1200 }) }], wrap: "word" }, "error")] : genericBody(call)
-  ];
-}
-function batchBody(call) {
-  return (call.batch ?? []).flatMap((e, i) => {
-    const app2 = callApp({ args: e.args, name: e.name });
-    const tone = e.status === "error" ? "error" : e.status === "running" ? "pending" : "success";
-    const answer = e.error ?? (e.result === void 0 ? void 0 : pretty(e.result));
-    return [
-      /* @__PURE__ */ jsxs("row", { align: "center", gap: "sm", children: [
-        /* @__PURE__ */ jsx("icon", { name: e.status === "error" ? "x" : e.status === "running" ? "clock" : "check", tone }, "i"),
-        /* @__PURE__ */ jsx("text", { grow: 1, spans: [{ t: app2 ? `${app2.app} \xB7 ${app2.action}` : humanize(e.name) }], truncate: "end", wrap: "none" }, "t")
-      ] }, `e${i}`),
-      ...e.error ? [/* @__PURE__ */ jsx("text", { spans: [{ s: "error", t: clip(e.error, { mark: "line", max: 600 }) }], wrap: "word" }, `r${i}`)] : answer && call.status !== "running" ? [/* @__PURE__ */ jsx("code", { lang: /^\s*[[{]/.test(answer) ? "json" : "text", max: { h: "8lines" }, text: clip(answer, { mark: "line", max: 2e3 }), wrap: true }, `r${i}`)] : []
-    ];
-  });
-}
-function imageNode(call, src) {
-  const source = localSource(src) ?? call.image;
-  const alt = nonEmpty(call.args.prompt) ?? "Image";
-  if (source) {
-    return /* @__PURE__ */ jsx("image", { alt: clip(alt, { mark: "line", max: 200 }), role: "hermes.tool.image", ...source }, "image");
-  }
-  const link3 = /^https?:\/\//i.test(src) ? [{ href: src, t: clip(src, { mark: "line", max: 120 }) }] : [];
-  return /* @__PURE__ */ jsx(
-    "text",
-    {
-      spans: [{ s: "muted", t: call.image === null ? `Could not load the image${link3.length ? ": " : "."}` : "Loading the image\u2026" }, ...call.image === null ? link3 : []],
-      wrap: "word"
-    },
-    "image"
-  );
-}
-function genericBody(call) {
-  const text11 = call.resultText ?? (call.result === void 0 ? void 0 : pretty(call.result));
-  if (!text11 || call.status === "running") {
-    return [];
-  }
-  return [/* @__PURE__ */ jsx("code", { lang: /^\s*[[{]/.test(text11) ? "json" : "text", text: clip(text11, { mark: "line", max: 4e3 }) }, "out")];
-}
-function errorOf(call) {
-  const result = record(call.result);
-  return nonEmpty(result?.error) ?? nonEmpty(call.summary) ?? (typeof call.result === "string" && !result ? call.result : void 0);
-}
-function exitOf(call) {
-  const code7 = record(call.result)?.exit_code;
-  return typeof code7 === "number" ? code7 : void 0;
-}
-function checklistNode(todos) {
-  const item3 = (t2) => ({ id: t2.id, status: TODO_LOOK[t2.status].item, text: t2.content });
-  const roots = todos.filter((t2) => !t2.parent);
-  const nested = todos.some((t2) => t2.parent);
-  const phases = nested ? roots.map((r) => {
-    const kids = todos.filter((t2) => t2.parent === r.id);
-    return {
-      collapsed: kids.length > 0 && kids.every((k) => k.status === "completed"),
-      id: r.id,
-      items: kids.length ? kids.map(item3) : [item3(r)],
-      title: r.content
-    };
-  }) : [{ id: "all", items: roots.map(item3) }];
-  return /* @__PURE__ */ jsx("checklist", { mode: "full", phases }, "list");
-}
-function plainDiff(raw2) {
-  return hunks(raw2.replace(/\x1b\[[0-9;]*m/g, ""));
-}
-function hunks(diff2) {
-  const lines = diff2?.split("\n") ?? [];
-  const start = lines.findIndex((l) => l.startsWith("@@"));
-  return start < 0 ? void 0 : lines.slice(start).join("\n").trimEnd();
-}
-function diffStats(diff2) {
-  let added = 0;
-  let removed = 0;
-  for (const line of diff2.split("\n")) {
-    if (line.startsWith("+") && !line.startsWith("+++")) {
-      added++;
-    } else if (line.startsWith("-") && !line.startsWith("---")) {
-      removed++;
-    }
-  }
-  return { added, removed };
-}
-var LANGS = {
-  c: "c",
-  cpp: "cpp",
-  css: "css",
-  go: "go",
-  html: "html",
-  java: "java",
-  js: "javascript",
-  json: "json",
-  jsx: "jsx",
-  md: "markdown",
-  py: "python",
-  rb: "ruby",
-  rs: "rust",
-  sh: "bash",
-  toml: "toml",
-  ts: "typescript",
-  tsx: "tsx",
-  yaml: "yaml",
-  yml: "yaml"
-};
-function langOf(path2) {
-  const ext = path2?.split(".").pop()?.toLowerCase();
-  return ext ? LANGS[ext] : void 0;
-}
-function todoCount(todos) {
-  if (!todos?.length) {
-    return void 0;
-  }
-  return `${todos.filter((t2) => t2.status === "completed").length}/${todos.length}`;
-}
-function firstLine(text11) {
-  return text11?.split("\n").find((l) => l.trim())?.trim();
-}
-function humanize(name) {
-  const words3 = name.replace(/[_-]+/g, " ").trim();
-  return words3.charAt(0).toUpperCase() + words3.slice(1);
-}
-function pretty(v) {
-  return typeof v === "string" ? v : JSON.stringify(v, null, 2);
-}
-
-// src/view/ui/facts.ts
-function facts(list8) {
-  return list8.flatMap(([name, value]) => value ? [{ k: [{ t: name }], v: value }] : []);
-}
-
-// src/overlays/search.ts
-var PAGE = 10;
-function editQuery(key2, query) {
-  if (key2.name === "backspace") {
-    return key2.alt || key2.ctrl ? query.replace(/\S*\s*$/, "") : query.slice(0, -1);
-  }
-  if (key2.ctrl && key2.name === "u") {
-    return "";
-  }
-  if (key2.name === "paste" || key2.text && !key2.ctrl && !key2.meta) {
-    return query + (key2.text ?? "").replace(/\s+/g, " ");
-  }
-  return void 0;
-}
-function moveSelection(key2, ids, selected) {
-  if (!ids.length) {
-    return void 0;
-  }
-  const at = selected === void 0 ? -1 : ids.indexOf(selected);
-  const step = key2.name === "up" || key2.ctrl && key2.name === "p" ? -1 : key2.name === "down" || key2.ctrl && key2.name === "n" ? 1 : key2.name === "page_up" ? -PAGE : key2.name === "page_down" ? PAGE : 0;
-  if (step) {
-    return ids[Math.max(0, Math.min(ids.length - 1, at + step))];
-  }
-  if (key2.name === "home") {
-    return ids[0];
-  }
-  if (key2.name === "end") {
-    return ids.at(-1);
-  }
-  return void 0;
-}
-function rank(items, query, textOf2, { scattered = true } = {}) {
-  const words3 = query.toLowerCase().split(/\s+/).filter(Boolean);
-  if (!words3.length) {
-    return items.map((item3) => ({ item: item3, positions: [] }));
-  }
-  const scored = [];
-  items.forEach((item3, index2) => {
-    const text11 = textOf2(item3).toLowerCase();
-    const positions = /* @__PURE__ */ new Set();
-    let score = 0;
-    for (const word of words3) {
-      const at = text11.indexOf(word);
-      if (at >= 0) {
-        const boundary = at === 0 || /[\s/_.:-]/.test(text11[at - 1] ?? "");
-        score += 100 - Math.min(at, 50) + (boundary ? 25 : 0);
-        for (let i = at; i < at + word.length; i++) {
-          positions.add(i);
-        }
-        continue;
-      }
-      if (!scattered) {
-        return;
-      }
-      let from = 0;
-      for (const ch of word) {
-        const i = text11.indexOf(ch, from);
-        if (i < 0) {
-          return;
-        }
-        positions.add(i);
-        from = i + 1;
-      }
-      score += 10;
-    }
-    scored.push({ index: index2, item: item3, positions: [...positions].sort((a2, b) => a2 - b), score });
-  });
-  return scored.sort((a2, b) => b.score - a2.score || a2.index - b.index).map(({ item: item3, positions }) => ({ item: item3, positions }));
-}
-function hitRuns(positions, limit) {
-  const runs3 = [];
-  for (const p3 of positions) {
-    if (p3 >= limit) {
-      break;
-    }
-    const last = runs3.at(-1);
-    if (last && last[1] === p3) {
-      last[1] = p3 + 1;
-    } else {
-      runs3.push([p3, p3 + 1]);
-    }
-  }
-  return runs3;
-}
-
-// src/overlays/sheet.ts
-function tickWhileOpen(host, ms) {
-  const timer = setInterval(() => host.changed(), ms);
-  return () => clearInterval(timer);
-}
-async function reportError(transcript, work) {
-  try {
-    await work();
-  } catch (error) {
-    transcript.notice(errorText(error), "error");
-  }
-}
-function countSummary(items, tallies) {
-  return tallies.map(([counts, label]) => {
-    const n = items.filter(counts).length;
-    return n ? `${n} ${typeof label === "string" ? label : label[n === 1 ? 0 : 1]}` : "";
-  }).filter(Boolean).join(" \xB7 ") || "none yet";
-}
-
-// src/overlays/agents.tsx
-var KEY = "agents";
-var TICK_MS = 1e3;
-var RECENT = 6;
-var TOOL_ICON = {
-  browser_navigate: "web",
-  execute_code: "python",
-  patch: "edit",
-  read_file: "read",
-  search_files: "search",
-  terminal: "bash",
-  web_extract: "web",
-  web_search: "web",
-  write_file: "write"
-};
-function openAgents(host, focus) {
-  const agents2 = () => host.agents.all();
-  let tab2 = host.agents.running().length ? "running" : "all";
-  let selected = focus?.id ?? agents2().find(isRunning)?.id ?? agents2()[0]?.id;
-  let watching;
-  let step;
-  let steer2;
-  let stopping = false;
-  const stopTicking = tickWhileOpen(host, TICK_MS);
-  const close = () => host.close(overlay);
-  const current = () => agents2().find((a2) => a2.id === (watching ?? selected));
-  const watch2 = (id) => {
-    const a2 = agents2().find((x) => x.id === id);
-    if (!a2) {
-      return;
-    }
-    watching = a2.id;
-    step = void 0;
-    void host.agents.refresh(a2);
-  };
-  const beside = (id) => {
-    if (id) {
-      close();
-      void host.openAgent(id);
-    }
-  };
-  const sendSteer = async () => {
-    const a2 = current();
-    const text11 = steer2?.trim();
-    steer2 = void 0;
-    if (!a2 || !text11) {
-      return host.changed();
-    }
-    await reportError(host.transcript, async () => {
-      const queued = await host.agents.steer(a2, text11);
-      host.transcript.notice(
-        queued ? `Steering queued for ${agentName(a2)}.` : `${agentName(a2)} is not taking steering now.`,
-        queued ? "info" : "warning"
-      );
-    });
-    host.changed();
-  };
-  const stop2 = async () => {
-    const a2 = current();
-    stopping = false;
-    if (!a2 || !isRunning(a2)) {
-      return host.changed();
-    }
-    await reportError(host.transcript, async () => {
-      if (!await host.agents.stop(a2)) {
-        host.transcript.notice(`${agentName(a2)} already finished.`, "warning");
-      }
-    });
-    host.changed();
-  };
-  const togglePause = async () => {
-    await reportError(host.transcript, async () => {
-      const paused = await host.agents.pause(!host.agents.paused);
-      host.transcript.notice(paused ? "Subagent spawning paused for every chat on this gateway." : "Subagent spawning resumed.");
-    });
-    host.changed();
-  };
-  const shown = () => tab2 === "running" ? agents2().filter(isRunning) : agents2();
-  const steps = (a2) => a2.log?.entries ?? [];
-  const overlay = {
-    key: KEY,
-    modal: true,
-    cancel: close,
-    // Ends with the sheet, however it closed (Esc, a session switch replacing the overlays).
-    onClose: stopTicking,
-    node: () => {
-      const now = Date.now();
-      const watched = watching ? agents2().find((a2) => a2.id === watching) : void 0;
-      return watched ? timelineNode(watched, now) : hubNode(now);
-    },
-    onKey: (k) => {
-      const a2 = current();
-      if (steer2 !== void 0) {
-        if (k.name === "escape") {
-          steer2 = void 0;
-        } else if (k.name === "enter") {
-          void sendSteer();
-        } else {
-          steer2 = editQuery(k, steer2) ?? steer2;
-        }
-        return true;
-      }
-      if (stopping) {
-        if (k.name === "enter" || k.name === "y") {
-          void stop2();
-        } else if (k.name === "escape" || k.name === "n") {
-          stopping = false;
-        }
-        return true;
-      }
-      if (k.name === "escape") {
-        if (watching) {
-          selected = watching;
-          watching = void 0;
-        } else {
-          close();
-        }
-      } else if (k.name === "s" && !k.ctrl && !k.alt && a2 && isRunning(a2)) {
-        steer2 = "";
-      } else if (k.name === "x" && !k.ctrl && !k.alt && a2 && isRunning(a2)) {
-        stopping = true;
-      } else if (watching && a2) {
-        const ids = steps(a2).map((_, i) => `e${i}`);
-        const moved2 = moveSelection(k, ids, step ?? ids.at(-1));
-        if (moved2 !== void 0) {
-          step = moved2 === ids.at(-1) ? void 0 : moved2;
-        }
-      } else if (k.name === "enter") {
-        beside(selected);
-      } else if (k.name === "t" && !k.ctrl && !k.alt) {
-        watch2(selected);
-      } else if (k.name === "p" && !k.ctrl && !k.alt) {
-        void togglePause();
-      } else if (k.name === "tab") {
-        tab2 = tab2 === "running" ? "all" : "running";
-      } else {
-        selected = moveSelection(
-          k,
-          shown().map((x) => x.id),
-          selected
-        ) ?? selected;
-      }
-      return true;
-    }
-  };
-  const steerProps = (a2) => steer2 !== void 0 && a2 ? { placeholder: `Steer ${agentName(a2)}: type, then Enter (Esc cancels)`, query: steer2 } : {};
-  const actions = (a2, inTimeline) => {
-    const running = Boolean(a2 && isRunning(a2));
-    if (steer2 !== void 0) {
-      return [
-        { end: true, id: "steer-cancel", keys: ["esc"], label: "Cancel" },
-        { id: "steer-send", keys: ["enter"], label: "Send", primary: true }
-      ];
-    }
-    return [
-      ...inTimeline ? [] : [
-        { id: "watch", keys: ["t"], label: "Timeline" },
-        { id: "beside", keys: ["enter"], label: "Open beside", primary: true },
-        { id: "pause", keys: ["p"], label: host.agents.paused ? "Resume spawns" : "Pause spawns" }
-      ],
-      {
-        disabled: running ? a2?.steerable === false ? "Not taking steering now" : void 0 : "Finished",
-        id: "steer",
-        keys: ["s"],
-        label: "Steer"
-      },
-      { danger: true, disabled: running ? void 0 : "Finished", id: "stop", keys: ["x"], label: "Stop" },
-      { end: true, id: "close", keys: ["esc"], label: inTimeline ? "Back" : "Close" }
-    ];
-  };
-  const handlers3 = {
-    cancel: () => {
-      stopping = false;
-      host.changed();
-    },
-    close: () => {
-      if (watching) {
-        selected = watching;
-        watching = void 0;
-        host.changed();
-      } else {
-        close();
-      }
-    },
-    confirm: () => void stop2(),
-    pause: () => void togglePause(),
-    steer: () => {
-      steer2 = "";
-      host.changed();
-    },
-    "steer-cancel": () => {
-      steer2 = void 0;
-      host.changed();
-    },
-    "steer-send": () => void sendSteer(),
-    stop: () => {
-      stopping = true;
-      host.changed();
-    },
-    tab: (ev) => {
-      tab2 = ev.value === "running" ? "running" : "all";
-      host.changed();
-    },
-    beside: () => beside(selected),
-    watch: () => {
-      watch2(selected);
-      host.changed();
-    }
-  };
-  function hubNode(now) {
-    const all8 = agents2();
-    const list8 = shown();
-    const running = all8.filter(isRunning).length;
-    if (!list8.some((a3) => a3.id === selected)) {
-      selected = list8[0]?.id;
-    }
-    const a2 = list8.find((x) => x.id === selected);
-    const columns = [
-      { format: "num", head: "Tools", id: "tools", priority: 3 },
-      { format: "elapsed", head: "Time", id: "time", priority: 5 }
-    ];
-    return /* @__PURE__ */ jsx(
-      "picker",
-      {
-        actions: actions(a2, false),
-        columns,
-        confirm: stopping && a2 ? { act: "confirm", label: "Stop", text: `Stop ${agentName(a2)}? Its partial work returns to Hermes.` } : void 0,
-        empty: tab2 === "running" ? "No agents running. Tab shows finished ones." : "No subagents in this session yet",
-        icon: "agents",
-        items: all8.map((x) => hubItem(x, now)),
-        layout: all8.some((x) => x.depth) ? "tree" : "rows",
-        noun: "agents",
-        onAction: handlers3,
-        onActivate: (ev) => beside(ev.item),
-        onSelect: (ev) => {
-          selected = ev.item;
-          stopping = false;
-          host.changed();
-        },
-        order: list8.map((x) => x.id),
-        preview: "side",
-        selected,
-        size: "lg",
-        subtitle: [
-          { s: "muted", t: summary2(all8) },
-          ...host.agents.paused ? [{ s: "warning", t: " \xB7 spawns paused (gateway-wide)" }] : []
-        ],
-        tab: tab2,
-        tabs: [
-          { count: running, id: "running", label: "Running" },
-          { count: all8.length, id: "all", label: "All" }
-        ],
-        title: "Agents",
-        total: all8.length,
-        ...steerProps(a2),
-        children: a2 ? hubPreview(a2, now, briefFor(host, a2)) : null
-      },
-      KEY
-    );
-  }
-  function timelineNode(a2, now) {
-    const entries = steps(a2);
-    const ids = entries.map((_, i) => `e${i}`);
-    const sel = step && ids.includes(step) ? step : ids.at(-1);
-    const at = sel ? ids.indexOf(sel) : -1;
-    return /* @__PURE__ */ jsx(
-      "picker",
-      {
-        actions: actions(a2, true),
-        columns: [
-          { format: "dim", head: "At", id: "at", min: 8, priority: 2 },
-          { format: "elapsed", head: "Took", id: "took", priority: 4 }
-        ],
-        confirm: stopping ? { act: "confirm", label: "Stop", text: `Stop ${agentName(a2)}? Its partial work returns to Hermes.` } : void 0,
-        empty: a2.logPath || a2.log ? "Nothing logged yet" : "This agent has no live transcript",
-        icon: "agent",
-        items: entries.map((e, i) => stepItem(e, `e${i}`, a2)),
-        layout: "timeline",
-        noun: "steps",
-        onAction: handlers3,
-        onSelect: (ev) => {
-          step = ev.item === ids.at(-1) ? void 0 : ev.item;
-          host.changed();
-        },
-        preview: "side",
-        selected: sel,
-        size: "lg",
-        subtitle: [{ s: "muted", t: `${SUBAGENT_LOOK[a2.status].word} \xB7 ${a2.goal}` }],
-        title: agentName(a2),
-        total: entries.length,
-        ...steerProps(a2),
-        children: at >= 0 ? stepPreview(entries[at], a2, briefFor(host, a2)) : [agentNode(a2, now)]
-      },
-      KEY
-    );
-  }
-  host.open(overlay);
-  if (focus?.watch) {
-    watch2(focus.id);
-  }
-}
-function summary2(all8) {
-  return countSummary(all8, [
-    [(a2) => a2.status === "running" || a2.status === "queued", "running"],
-    [(a2) => a2.status === "done", "done"],
-    [(a2) => a2.status === "failed", "failed"],
-    [(a2) => a2.status === "cancelled", "stopped"]
-  ]);
-}
-function elapsed(a2, now) {
-  return duration(isRunning(a2) ? now - a2.startedAt : a2.duration ?? 0);
-}
-function hubItem(a2, now) {
-  return {
-    chips: a2.model ? [{ text: a2.model.split("/").at(-1) ?? a2.model }] : void 0,
-    depth: a2.depth ?? 0,
-    detail: a2.goal,
-    dot: SUBAGENT_LOOK[a2.status].tone,
-    facts: { time: elapsed(a2, now), tools: a2.toolCount },
-    id: a2.id,
-    label: agentName(a2),
-    title: a2.goal
-  };
-}
-function briefFor(host, a2) {
-  const call = host.transcript.delegations().find((c) => c.subagents?.includes(a2));
-  return call ? briefOf(call, a2.index) : void 0;
-}
-function hubPreview(a2, now, brief) {
-  const recent = (a2.log?.entries ?? []).slice(-RECENT);
-  const look = SUBAGENT_LOOK[a2.status];
-  return [
-    // A new node each time the selection moves: its timers need their true ages.
-    agentNode(a2, now),
-    /* @__PURE__ */ jsx(
-      "kv",
-      {
-        items: facts([
-          ["Status", [{ s: look.tone, t: look.word }]],
-          ["Model", a2.model],
-          ["Time", elapsed(a2, now)],
-          ["Tools", String(a2.toolCount)],
-          ["Ended", a2.exitReason?.replace(/_/g, " ")],
-          ["Steering", isRunning(a2) && a2.steerable !== void 0 ? a2.steerable ? "open" : "closed" : void 0],
-          ["ID", [{ s: "mono dim", t: a2.id }]]
-        ]),
-        role: "omp.hub.kv"
-      },
-      "facts"
-    ),
-    /* @__PURE__ */ jsx("section", { head: "Task", children: /* @__PURE__ */ jsx("md", { text: a2.goal }, "goal") }, "task"),
-    ...brief ? [
-      /* @__PURE__ */ jsx("section", { collapsed: true, collapsible: true, head: "Brief", children: /* @__PURE__ */ jsx("md", { text: brief }, "text") }, "brief")
-    ] : [],
-    ...a2.summary ? [
-      /* @__PURE__ */ jsx("section", { head: "Result", children: /* @__PURE__ */ jsx("md", { text: a2.summary }, "summary") }, "result")
-    ] : [],
-    ...recent.length ? [
-      /* @__PURE__ */ jsx("section", { head: "Recent activity", role: "omp.hub.activity", children: recent.map((e, i) => /* @__PURE__ */ jsxs("row", { gap: "sm", role: "omp.hub.activity.row", children: [
-        /* @__PURE__ */ jsx("text", { spans: [{ s: "dim mono", t: e.at }], wrap: "none" }, "at"),
-        /* @__PURE__ */ jsx("text", { grow: 1, spans: stepSpans(e), truncate: "end", wrap: "none" }, "what")
-      ] }, `r${i}`)) }, "recent")
-    ] : []
-  ];
-}
-function stepItem(e, id, a2) {
-  if (e.kind === "tool") {
-    return {
-      detail: e.args,
-      dot: e.status === "error" ? "error" : e.status === "running" && isRunning(a2) ? "accent" : void 0,
-      facts: { at: e.at, took: e.took !== void 0 ? duration(e.took) : "" },
-      icon: TOOL_ICON[e.name] ?? "wrench",
-      id,
-      label: e.name,
-      mono: true,
-      node: "tool",
-      tone: e.status === "error" ? "error" : void 0
-    };
-  }
-  return {
-    facts: { at: e.at },
-    id,
-    label: e.kind === "kickoff" ? `Task: ${e.text}` : e.kind === "think" ? `Thinking: ${e.text}` : e.text,
-    node: e.kind === "kickoff" ? "user" : "assistant",
-    tone: e.kind === "think" || e.kind === "note" ? "muted" : void 0
-  };
-}
-function stepPreview(e, a2, brief) {
-  if (e.kind !== "tool") {
-    const head2 = { assistant: "Answer", kickoff: "Task", note: "Note", think: "Thinking" }[e.kind];
-    const text11 = e.kind === "kickoff" && a2.goal ? brief ? `${a2.goal}
-
----
-
-${brief}` : a2.goal : e.text;
-    return [
-      /* @__PURE__ */ jsx("text", { role: "omp.hub.title", text: head2 }, "title"),
-      /* @__PURE__ */ jsx("text", { spans: [{ s: "dim mono", t: e.at }] }, "at"),
-      /* @__PURE__ */ jsx("md", { text: text11, tone: e.kind === "think" ? "muted" : void 0 }, "body")
-    ];
-  }
-  return [
-    /* @__PURE__ */ jsx("text", { role: "omp.hub.title", spans: [{ s: "mono strong", t: e.name }] }, "title"),
-    /* @__PURE__ */ jsx(
-      "kv",
-      {
-        items: facts([
-          ["Status", [{ s: e.status === "error" ? "error" : e.status === "ok" ? "success" : "accent", t: e.status === "ok" ? "ok" : e.status }]],
-          ["Started", e.at],
-          ["Took", e.took !== void 0 ? duration(e.took) : void 0]
-        ]),
-        role: "omp.hub.kv"
-      },
-      "facts"
-    ),
-    ...e.args ? [
-      /* @__PURE__ */ jsx("section", { head: "Arguments", children: /* @__PURE__ */ jsx("code", { text: e.args, wrap: true }, "code") }, "args")
-    ] : [],
-    ...e.result ? [
-      /* @__PURE__ */ jsx("section", { head: "Result", children: /* @__PURE__ */ jsx("code", { text: e.result, wrap: true }, "code") }, "result")
-    ] : []
-  ];
-}
-function stepSpans(e) {
-  switch (e.kind) {
-    case "tool":
-      return [
-        { s: e.status === "error" ? "error mono" : "mono", t: e.name },
-        { s: "muted", t: ` ${e.args}` }
-      ];
-    case "think":
-      return [{ s: "muted", t: e.text }];
-    case "kickoff":
-      return [{ s: "dim", t: "Task: " }, { t: e.text }];
-    default:
-      return [{ t: e.text }];
-  }
-}
-
-// src/processes/cron.ts
-var CRON_POLL_MS = 5e3;
-function isMonitor(job) {
-  return Boolean(job.monitor_script || job.monitor_url);
-}
-function isPaused(job) {
-  return job.enabled === false || job.state === "paused";
-}
-function jobError(job) {
-  return job.last_error || job.last_fire_error || job.last_delivery_error || void 0;
-}
-function jobTone(job) {
-  return isPaused(job) ? "muted" : jobError(job) || job.last_status === "error" ? "error" : "accent";
-}
-function ownJobs(calls) {
-  const ids = /* @__PURE__ */ new Set();
-  for (const c of calls) {
-    const r = record(c.result);
-    const job = record(r?.job);
-    const id = r?.job_id ?? job?.job_id ?? job?.id;
-    if (c.name === "cronjob_manage" && typeof id === "string" && id) {
-      ids.add(id);
-    }
-  }
-  return ids;
-}
-var Cron = class {
-  #host;
-  #jobs = [];
-  #error;
-  #warning;
-  #loaded = false;
-  #watchers = 0;
-  #timer;
-  #busy = /* @__PURE__ */ new Set();
-  constructor(host) {
-    this.#host = host;
-  }
-  jobs() {
-    return this.#jobs;
-  }
-  /** Why the list could not load (an old gateway, a refused scope). */
-  get error() {
-    return this.#error;
-  }
-  /** The gateway's note that no scheduler runs (the jobs are saved but do not fire). */
-  get warning() {
-    return this.#warning;
-  }
-  get loaded() {
-    return this.#loaded;
-  }
-  /** An action is in flight for `id`. */
-  busy(id) {
-    return this.#busy.has(id);
-  }
-  /** Polls while the returned release has not run (the Cron tab shows). */
-  watch() {
-    this.#watchers++;
-    if (this.#watchers === 1) {
-      void this.#tick();
-    }
-    let released = false;
-    return () => {
-      if (!released) {
-        released = true;
-        if (--this.#watchers === 0) {
-          clearTimeout(this.#timer);
-          this.#timer = void 0;
-        }
-      }
-    };
-  }
-  /** Pauses, resumes or removes job `id`; throws the gateway's error. */
-  async act(action, id) {
-    this.#busy.add(id);
-    this.#host.changed();
-    try {
-      const r = await rpc(this.#host.gw, "cron.manage", { action, name: id });
-      if (r?.success === false || r?.error) {
-        throw new Error(r.error || `Could not ${action} the job`);
-      }
-    } finally {
-      this.#busy.delete(id);
-      await this.refresh();
-    }
-  }
-  async refresh() {
-    try {
-      const r = await rpc(this.#host.gw, "cron.manage", { action: "list", include_disabled: true });
-      if (r?.success === false && r.error) {
-        throw new Error(r.error);
-      }
-      this.#jobs = (r?.jobs ?? []).filter((j) => typeof j?.job_id === "string");
-      this.#warning = r?.warning ?? void 0;
-      this.#error = void 0;
-    } catch (error) {
-      this.#error = errorText(error);
-    }
-    this.#loaded = true;
-    this.#host.changed();
-  }
-  async #tick() {
-    await this.refresh();
-    if (this.#watchers > 0) {
-      clearTimeout(this.#timer);
-      this.#timer = setTimeout(() => void this.#tick(), CRON_POLL_MS);
-    }
-  }
-};
-function relative(iso, now) {
-  const at = iso ? Date.parse(iso) : NaN;
-  if (Number.isNaN(at)) {
-    return "";
-  }
-  const d = at - now;
-  const s2 = Math.abs(d) / 1e3;
-  const [n, unit] = s2 < 45 ? [0, ""] : s2 < 3600 ? [Math.round(s2 / 60), "m"] : s2 < 86400 ? [Math.round(s2 / 3600), "h"] : [Math.round(s2 / 86400), "d"];
-  return n === 0 ? "now" : d > 0 ? `in ${n}${unit}` : `${n}${unit} ago`;
 }
 
 // src/overlays/background.tsx
@@ -34019,7 +31296,7 @@ function batchQuery(refs) {
   return { query: `query(${decls.join(", ")}) { ${parts3.join("\n")} }`, variables };
 }
 var obj = (v) => v && typeof v === "object" && !Array.isArray(v) ? v : void 0;
-var str5 = (v) => typeof v === "string" ? v : "";
+var str4 = (v) => typeof v === "string" ? v : "";
 var num4 = (v) => typeof v === "number" ? v : 0;
 var nodes = (v) => {
   const list8 = obj(v)?.nodes;
@@ -34053,20 +31330,20 @@ function checkStatus(status, conclusion) {
 function parseCheck(n) {
   if (n.__typename === "StatusContext") {
     return {
-      description: str5(n.description) || void 0,
-      name: str5(n.context),
-      startedAt: str5(n.createdAt) || void 0,
-      status: checkStatus("COMPLETED", str5(n.state)),
-      url: str5(n.targetUrl) || void 0
+      description: str4(n.description) || void 0,
+      name: str4(n.context),
+      startedAt: str4(n.createdAt) || void 0,
+      status: checkStatus("COMPLETED", str4(n.state)),
+      url: str4(n.targetUrl) || void 0
     };
   }
-  const workflow = str5(obj(obj(obj(n.checkSuite)?.workflowRun)?.workflow)?.name);
+  const workflow = str4(obj(obj(obj(n.checkSuite)?.workflowRun)?.workflow)?.name);
   return {
-    completedAt: str5(n.completedAt) || void 0,
-    name: str5(n.name),
-    startedAt: str5(n.startedAt) || void 0,
-    status: checkStatus(str5(n.status), str5(n.conclusion)),
-    url: str5(n.detailsUrl) || void 0,
+    completedAt: str4(n.completedAt) || void 0,
+    name: str4(n.name),
+    startedAt: str4(n.startedAt) || void 0,
+    status: checkStatus(str4(n.status), str4(n.conclusion)),
+    url: str4(n.detailsUrl) || void 0,
     workflow: workflow || void 0
   };
 }
@@ -34125,15 +31402,15 @@ function parsePullRequest(ref, repo) {
   const reviews = /* @__PURE__ */ new Map();
   for (const n of nodes(p3.reviewRequests)) {
     const who = obj(n.requestedReviewer);
-    const login = str5(who?.login) || str5(who?.name);
+    const login = str4(who?.login) || str4(who?.name);
     if (login) {
       reviews.set(login, "PENDING");
     }
   }
   for (const n of nodes(p3.latestReviews)) {
-    const login = str5(obj(n.author)?.login);
+    const login = str4(obj(n.author)?.login);
     if (login && !reviews.has(login)) {
-      reviews.set(login, str5(n.state));
+      reviews.set(login, str4(n.state));
     }
   }
   const rollup = obj(obj(obj(nodes(p3.commits)[0]?.commit)?.statusCheckRollup)?.contexts);
@@ -34146,32 +31423,32 @@ function parsePullRequest(ref, repo) {
   return {
     ...ref,
     additions: num4(p3.additions),
-    author: str5(obj(p3.author)?.login) || "ghost",
-    autoMerge: str5(obj(p3.autoMergeRequest)?.mergeMethod) || null,
-    base: str5(p3.baseRefName),
+    author: str4(obj(p3.author)?.login) || "ghost",
+    autoMerge: str4(obj(p3.autoMergeRequest)?.mergeMethod) || null,
+    base: str4(p3.baseRefName),
     behindBy: typeof behind === "number" ? behind : null,
-    body: str5(p3.body),
+    body: str4(p3.body),
     canUpdate: p3.viewerCanUpdate === true,
     changedFiles: num4(p3.changedFiles),
     checks: dedupeChecks(nodes(rollup).map(parseCheck)),
-    closedAt: str5(p3.closedAt) || null,
-    createdAt: str5(p3.createdAt),
+    closedAt: str4(p3.closedAt) || null,
+    createdAt: str4(p3.createdAt),
     deletions: num4(p3.deletions),
     draft: p3.isDraft === true,
-    head: str5(p3.headRefName),
-    headOid: str5(p3.headRefOid),
-    id: str5(p3.id),
-    labels: nodes(p3.labels).map((n) => str5(n.name)),
+    head: str4(p3.headRefName),
+    headOid: str4(p3.headRefOid),
+    id: str4(p3.id),
+    labels: nodes(p3.labels).map((n) => str4(n.name)),
     mergeMethods: methods,
-    mergeState: str5(p3.mergeStateStatus),
-    mergeable: MERGEABLE[str5(p3.mergeable)] ?? "unknown",
-    mergedAt: str5(p3.mergedAt) || null,
-    reviewDecision: str5(p3.reviewDecision) || null,
+    mergeState: str4(p3.mergeStateStatus),
+    mergeable: MERGEABLE[str4(p3.mergeable)] ?? "unknown",
+    mergedAt: str4(p3.mergedAt) || null,
+    reviewDecision: str4(p3.reviewDecision) || null,
     reviewers: [...reviews].map(([login, state]) => ({ login, state })),
-    state: STATE[str5(p3.state)] ?? "open",
-    title: str5(p3.title),
-    updatedAt: str5(p3.updatedAt),
-    url: str5(p3.url) || ref.url
+    state: STATE[str4(p3.state)] ?? "open",
+    title: str4(p3.title),
+    updatedAt: str4(p3.updatedAt),
+    url: str4(p3.url) || ref.url
   };
 }
 var ACTIVITY_QUERY = `query($o: String!, $r: String!, $n: Int!) {
@@ -34187,24 +31464,24 @@ function parseActivity(data) {
   if (!p3) {
     return [];
   }
-  const who = (n) => str5(obj(n.author)?.login) || "ghost";
+  const who = (n) => str4(obj(n.author)?.login) || "ghost";
   const items = [
-    ...nodes(p3.comments).map((n) => ({ at: str5(n.createdAt), author: who(n), body: str5(n.body), kind: "comment", url: str5(n.url) })),
-    ...nodes(p3.reviews).filter((n) => str5(n.body).trim() || str5(n.state) !== "COMMENTED").map((n) => ({ at: str5(n.submittedAt), author: who(n), body: str5(n.body), kind: "review", state: str5(n.state), url: str5(n.url) })),
+    ...nodes(p3.comments).map((n) => ({ at: str4(n.createdAt), author: who(n), body: str4(n.body), kind: "comment", url: str4(n.url) })),
+    ...nodes(p3.reviews).filter((n) => str4(n.body).trim() || str4(n.state) !== "COMMENTED").map((n) => ({ at: str4(n.submittedAt), author: who(n), body: str4(n.body), kind: "review", state: str4(n.state), url: str4(n.url) })),
     ...nodes(p3.reviewThreads).flatMap((t2) => {
       const [first, ...rest] = nodes(t2.comments);
       return first ? [
         {
-          at: str5(first.createdAt),
+          at: str4(first.createdAt),
           author: who(first),
-          body: str5(first.body),
+          body: str4(first.body),
           kind: "thread",
           line: typeof t2.line === "number" ? t2.line : null,
           outdated: t2.isOutdated === true,
-          path: str5(t2.path),
-          replies: rest.map((n) => ({ at: str5(n.createdAt), author: who(n), body: str5(n.body) })),
+          path: str4(t2.path),
+          replies: rest.map((n) => ({ at: str4(n.createdAt), author: who(n), body: str4(n.body) })),
           resolved: t2.isResolved === true,
-          url: str5(first.url)
+          url: str4(first.url)
         }
       ] : [];
     }),
@@ -34212,11 +31489,11 @@ function parseActivity(data) {
       const c = obj(n.commit) ?? {};
       const a2 = obj(c.author);
       return {
-        at: str5(c.committedDate),
-        author: str5(obj(a2?.user)?.login) || str5(a2?.name) || "ghost",
-        body: str5(c.messageHeadline),
+        at: str4(c.committedDate),
+        author: str4(obj(a2?.user)?.login) || str4(a2?.name) || "ghost",
+        body: str4(c.messageHeadline),
         kind: "commit",
-        url: str5(c.url)
+        url: str4(c.url)
       };
     })
   ];
@@ -34226,10 +31503,10 @@ function parseFiles(rows) {
   return (Array.isArray(rows) ? rows : []).map(obj).filter((r) => Boolean(r)).map((r) => ({
     additions: num4(r.additions),
     deletions: num4(r.deletions),
-    patch: str5(r.patch) || void 0,
-    path: str5(r.filename),
-    previous: str5(r.previous_filename) || void 0,
-    status: str5(r.status)
+    patch: str4(r.patch) || void 0,
+    path: str4(r.filename),
+    previous: str4(r.previous_filename) || void 0,
+    status: str4(r.status)
   }));
 }
 function failedRuns(checks2) {
@@ -34241,6 +31518,33 @@ function failedRuns(checks2) {
     }
   }
   return [...ids];
+}
+
+// src/code/lang.ts
+var LANGS = {
+  c: "c",
+  cpp: "cpp",
+  css: "css",
+  go: "go",
+  html: "html",
+  java: "java",
+  js: "javascript",
+  json: "json",
+  jsx: "jsx",
+  md: "markdown",
+  py: "python",
+  rb: "ruby",
+  rs: "rust",
+  sh: "bash",
+  toml: "toml",
+  ts: "typescript",
+  tsx: "tsx",
+  yaml: "yaml",
+  yml: "yaml"
+};
+function langOf(path2) {
+  const ext = path2?.split(".").pop()?.toLowerCase();
+  return ext ? LANGS[ext] : void 0;
 }
 
 // src/view/ui/button.tsx
@@ -36717,7 +34021,7 @@ function createState(options) {
     options,
     patch,
     qNesting: 0,
-    resolve: resolve4,
+    resolve: resolve3,
     toFlow,
     toSpecificContent
   };
@@ -36763,7 +34067,7 @@ function one2(node3, parent) {
 function patch(origin, node3) {
   if (origin.position) node3.position = position(origin);
 }
-function resolve4(url) {
+function resolve3(url) {
   const base3 = this.frozenBaseUrl;
   if (url === null || url === void 0) {
     return "";
@@ -38491,7 +35795,7 @@ function htmlKind(value) {
 }
 
 // node_modules/mdast-util-to-markdown/lib/join.js
-var join5 = [joinDefaults];
+var join4 = [joinDefaults];
 function joinDefaults(left, right, parent, state) {
   if (right.type === "code" && formatCodeAsIndented(right, state) && (left.type === "list" || left.type === right.type && formatCodeAsIndented(left, state))) {
     return false;
@@ -41309,7 +38613,7 @@ function indentLines(value, map4) {
 
 // node_modules/mdast-util-to-markdown/lib/util/safe.js
 var own6 = {}.hasOwnProperty;
-function safe2(state, input2, config3) {
+function safe(state, input2, config3) {
   const value = (config3.before || "") + (input2 || "") + (config3.after || "");
   const positions = [];
   const result = [];
@@ -41468,7 +38772,7 @@ function toMarkdown(tree, options) {
     handle: void 0,
     indentLines,
     indexStack: [],
-    join: [...join5],
+    join: [...join4],
     options: {},
     safe: safeBound,
     stack: [],
@@ -41523,7 +38827,7 @@ function containerFlowBound(parent, info) {
   return containerFlow(parent, this, info);
 }
 function safeBound(value, config3) {
-  return safe2(this, value, config3);
+  return safe(this, value, config3);
 }
 
 // node_modules/mdast-util-gfm-table/lib/index.js
@@ -59553,7 +56857,7 @@ import { default as default2 } from "node:path";
 import { default as default3 } from "node:process";
 
 // node_modules/vfile/lib/minurl.js
-import { fileURLToPath as fileURLToPath2 } from "node:url";
+import { fileURLToPath } from "node:url";
 
 // node_modules/vfile/lib/minurl.shared.js
 function isUrl(fileUrlOrPath) {
@@ -59737,7 +57041,7 @@ var VFile = class {
    */
   set path(path2) {
     if (isUrl(path2)) {
-      path2 = fileURLToPath2(path2);
+      path2 = fileURLToPath(path2);
     }
     assertNonEmpty(path2, "path");
     if (this.path !== path2) {
@@ -60728,7 +58032,7 @@ function markdown(nodes2, links) {
   });
   return toMarkdown(mdast, { extensions: [gfmToMarkdown()] }).replace(/\n{3,}/g, "\n\n").replace(/^> \\\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\][ \t]*/gim, "> [!$1]\n> ").trim();
 }
-function parts2(nodes2, links) {
+function parts(nodes2, links) {
   const out = [];
   let run5 = [];
   const flush = () => {
@@ -60745,12 +58049,12 @@ function parts2(nodes2, links) {
       out.push({
         kind: "details",
         open: n.properties.open !== void 0 && n.properties.open !== false,
-        parts: parts2(n.children.filter((c) => c !== summary4), links),
+        parts: parts(n.children.filter((c) => c !== summary4), links),
         summary: (summary4 ? toText(summary4) : "").replace(/\s+/g, " ").trim() || "Details"
       });
     } else if (n.type === "element" && holdsDetails(n)) {
       flush();
-      out.push(...parts2(n.children, links));
+      out.push(...parts(n.children, links));
     } else {
       run5.push(n);
     }
@@ -60759,7 +58063,7 @@ function parts2(nodes2, links) {
   return out;
 }
 function parseBody(src, links = {}) {
-  return parts2(bodyHast(src).children, links);
+  return parts(bodyHast(src).children, links);
 }
 function bodyNodes(src, key2 = "body", empty3 = "No description.", links = {}) {
   const ps = src.trim() ? parseBody(src, links) : [];
@@ -61930,25 +59234,25 @@ function preview3(row2, isCurrent) {
 }
 
 // .hermes-src/ui-tui/src/lib/history.ts
-import { appendFileSync as appendFileSync3, existsSync as existsSync3, mkdirSync as mkdirSync3, readFileSync as readFileSync2 } from "node:fs";
-import { homedir as homedir8 } from "node:os";
-import { join as join6 } from "node:path";
+import { appendFileSync as appendFileSync3, existsSync as existsSync2, mkdirSync as mkdirSync2, readFileSync } from "node:fs";
+import { homedir as homedir4 } from "node:os";
+import { join as join5 } from "node:path";
 var MAX2 = 1e3;
-var dir = process.env.HERMES_HOME ?? join6(homedir8(), ".hermes");
-var file = join6(dir, ".hermes_history");
+var dir = process.env.HERMES_HOME ?? join5(homedir4(), ".hermes");
+var file = join5(dir, ".hermes_history");
 var cache = null;
 function load() {
   if (cache) {
     return cache;
   }
   try {
-    if (!existsSync3(file)) {
+    if (!existsSync2(file)) {
       cache = [];
       return cache;
     }
     const entries = [];
     let current = [];
-    for (const line of readFileSync2(file, "utf8").split("\n")) {
+    for (const line of readFileSync(file, "utf8").split("\n")) {
       if (line.startsWith("+")) {
         current.push(line.slice(1));
       } else if (current.length) {
@@ -61979,8 +59283,8 @@ function append(line) {
     items.splice(0, items.length - MAX2);
   }
   try {
-    if (!existsSync3(dir)) {
-      mkdirSync3(dir, { recursive: true });
+    if (!existsSync2(dir)) {
+      mkdirSync2(dir, { recursive: true });
     }
     const ts = (/* @__PURE__ */ new Date()).toISOString().replace("T", " ").replace("Z", "");
     const encoded = trimmed.split("\n").map((l) => `+${l}`).join("\n");
@@ -62641,7 +59945,7 @@ function unmaskEdit(secret, ev) {
 
 // src/overlays/prompts.tsx
 var RECOMMENDED = /\s*\(recommended\)\s*$/i;
-var str6 = (v) => typeof v === "string" ? v : "";
+var str5 = (v) => typeof v === "string" ? v : "";
 var isCtrlC = (k) => k.ctrl && k.name === "c";
 var TIMEOUT_NOTICES = {
   approval: "Approval timed out: the command was not run. Ask Hermes to try again when you are ready to answer.",
@@ -62765,8 +60069,8 @@ var APPROVALS = [
 ];
 function approvalOverlay(host, req) {
   const p3 = req.params;
-  const command = str6(p3.command) && withoutTernEnv(str6(p3.command));
-  const description = str6(p3.description);
+  const command = str5(p3.command) && withoutTernEnv(str5(p3.command));
+  const description = str5(p3.description);
   const smartDenied = p3.smart_denied === true;
   const offered = Array.isArray(p3.choices) ? p3.choices.filter((c) => typeof c === "string") : [];
   const allowed = new Set(
@@ -62852,8 +60156,8 @@ function questionsOf(raw2) {
       return [];
     }
     const choices = "choices" in q2 && Array.isArray(q2.choices) ? q2.choices.filter((c) => typeof c === "string") : [];
-    const question = str6(q2.question).trim();
-    return question ? [{ choices, multi: "multi_select" in q2 && q2.multi_select === true, qid: str6(q2.qid), question }] : [];
+    const question = str5(q2.question).trim();
+    return question ? [{ choices, multi: "multi_select" in q2 && q2.multi_select === true, qid: str5(q2.qid), question }] : [];
   });
 }
 function tabLabel(question) {
@@ -63090,7 +60394,7 @@ function clarifyOverlay(host, req) {
 function maskedOverlay(host, req) {
   const p3 = req.params;
   const key2 = `prompt:${req.id}`;
-  const site = str6(p3.site) || str6(p3.origin);
+  const site = str5(p3.site) || str5(p3.origin);
   const login = req.method === "vault.save_login";
   const code7 = req.method === "vault.code";
   const fields = login ? [
@@ -63098,8 +60402,8 @@ function maskedOverlay(host, req) {
     { id: "password", label: "Password", masked: true, value: new Composer() }
   ] : [{ id: "value", label: code7 ? "Type the code" : "Hidden while you type", masked: !code7, value: new Composer() }];
   let at = 0;
-  const title = req.method === "sudo" ? "Password for sudo" : req.method === "secret" ? str6(p3.prompt) || `Value for ${str6(p3.env_var) || "a secret"}` : req.method === "vault.unlock_prompt" ? `Master password for ${str6(p3.display_name) || str6(p3.backend) || "the password manager"}` : login ? `Save a login for ${site || "this site"}` : `Code for ${site || "this site"}`;
-  const note = req.method === "secret" ? str6(p3.env_var) : code7 ? [str6(p3.hint), "typed into the page only \xB7 never shown to the model"].filter(Boolean).join(" \xB7 ") : "";
+  const title = req.method === "sudo" ? "Password for sudo" : req.method === "secret" ? str5(p3.prompt) || `Value for ${str5(p3.env_var) || "a secret"}` : req.method === "vault.unlock_prompt" ? `Master password for ${str5(p3.display_name) || str5(p3.backend) || "the password manager"}` : login ? `Save a login for ${site || "this site"}` : `Code for ${site || "this site"}`;
+  const note = req.method === "secret" ? str5(p3.env_var) : code7 ? [str5(p3.hint), "typed into the page only \xB7 never shown to the model"].filter(Boolean).join(" \xB7 ") : "";
   const sending = { busy: false, error: "" };
   const finish = (cancel) => {
     const [first, second] = fields;
@@ -63118,7 +60422,7 @@ function maskedOverlay(host, req) {
     node: () => /* @__PURE__ */ jsx("overlay", { anchor: "bottom", modal: true, role: "omp.overlay.ask", size: "md", children: /* @__PURE__ */ jsxs("col", { gap: "md", children: [
       /* @__PURE__ */ jsx("md", { role: "omp.ask.question", text: title }, "question"),
       note ? /* @__PURE__ */ jsx("text", { spans: [{ s: req.method === "secret" ? "mono dim" : "muted", t: note }], wrap: "word" }, "note") : null,
-      str6(p3.command) ? /* @__PURE__ */ jsx("code", { lang: "bash", text: withoutTernEnv(str6(p3.command)) }, "command") : null,
+      str5(p3.command) ? /* @__PURE__ */ jsx("code", { lang: "bash", text: withoutTernEnv(str5(p3.command)) }, "command") : null,
       fields.map((f, i) => /* @__PURE__ */ jsx(
         "input",
         {
@@ -63219,10 +60523,10 @@ import { DatabaseSync } from "node:sqlite";
 import { promisify as promisify3 } from "node:util";
 
 // src/hermes/paths.ts
-import { homedir as homedir9 } from "node:os";
-import { join as join7 } from "node:path";
+import { homedir as homedir5 } from "node:os";
+import { join as join6 } from "node:path";
 function stateDbPath(env2 = process.env) {
-  return join7(env2.HERMES_HOME || join7(homedir9(), ".hermes"), "state.db");
+  return join6(env2.HERMES_HOME || join6(homedir5(), ".hermes"), "state.db");
 }
 
 // src/hermes/sessionIndex.ts
@@ -63287,7 +60591,7 @@ SELECT r.id, COALESCE(NULLIF(r.display_name, ''), r.title, '') AS title, r.sourc
 FROM spans sp JOIN sessions r ON r.id = sp.root LEFT JOIN sessions tip ON tip.id = sp.tip
 ORDER BY sp.last_active DESC
 LIMIT ?`;
-function flat2(text11) {
+function flat(text11) {
   return (text11 ?? "").replace(/^\[[A-Z][A-Z -]+\][^\n]*\n?/gm, "").replace(/\s+/g, " ").trim();
 }
 function storedSessions(limit = 400, db = stateDbPath()) {
@@ -63303,7 +60607,7 @@ function storedSessions(limit = 400, db = stateDbPath()) {
       messages: Number(r.messages) || 0,
       model: r.model ?? "",
       pinned: r.pinned === 1,
-      preview: flat2(r.preview).slice(0, 400),
+      preview: flat(r.preview).slice(0, 400),
       repoRoot: r.repo_root ?? "",
       source: r.source ?? "",
       startedAt: Math.round((r.started_at ?? 0) * 1e3),
@@ -63530,7 +60834,7 @@ ${s2.preview} ${s2.cwd} ${s2.branch} ${s2.id}`, { scattered: false });
           selected,
           size: "lg",
           state,
-          subtitle: [{ s: "muted", t: workspace ? shortPath2(workspace) : "" }],
+          subtitle: [{ s: "muted", t: workspace ? shortPath(workspace) : "" }],
           tab: tab2,
           tabs: [
             { count: hereCount, id: "here", label: project },
@@ -63603,7 +60907,7 @@ function preview4(s2, now, isCurrent, running, reply) {
       {
         items: facts([
           ["Status", status],
-          ["Folder", s2.cwd && [{ s: "mono", t: shortPath2(s2.cwd) }]],
+          ["Folder", s2.cwd && [{ s: "mono", t: shortPath(s2.cwd) }]],
           ["Branch", s2.branch && [{ s: "mono", t: s2.branch }]],
           ["Last active", `${dateOf(s2.lastActive)} \xB7 ${ageOf(s2.lastActive, now)} ago`],
           ["Started", dateOf(s2.startedAt)],
@@ -63622,7 +60926,7 @@ function preview4(s2, now, isCurrent, running, reply) {
     ] : []
   ];
 }
-var shortPath2 = (path2) => homeTilde(path2, launchEnv().home);
+var shortPath = (path2) => homeTilde(path2, launchEnv().home);
 function ageOf(at, now) {
   const m = Math.max(0, Math.round((now - at) / 6e4));
   if (m < 60) {
@@ -64028,13 +61332,13 @@ var REFUSED_COMMANDS = [
 import { DatabaseSync as DatabaseSync3 } from "node:sqlite";
 
 // src/github/links.ts
-import { readFileSync as readFileSync3 } from "node:fs";
-import { homedir as homedir10 } from "node:os";
-import { join as join8 } from "node:path";
+import { readFileSync as readFileSync2 } from "node:fs";
+import { homedir as homedir6 } from "node:os";
+import { join as join7 } from "node:path";
 import { DatabaseSync as DatabaseSync2 } from "node:sqlite";
 var LINK_TOOLS = /* @__PURE__ */ new Set(["link_pull_request", "list_pull_requests", "unlink_pull_request"]);
 function linksPath(env2 = process.env) {
-  return join8(env2.HERMES_HOME || join8(homedir10(), ".hermes"), "plugin-data", "hermes-tern", "pull-requests.json");
+  return join7(env2.HERMES_HOME || join7(homedir6(), ".hermes"), "plugin-data", "hermes-tern", "pull-requests.json");
 }
 function refOf(v) {
   const r = record(v);
@@ -64077,7 +61381,7 @@ function ancestry(sid, db = stateDbPath()) {
 function storedLinks(sid, file2 = linksPath(), lineage = ancestry) {
   let data;
   try {
-    data = JSON.parse(readFileSync3(file2, "utf8"));
+    data = JSON.parse(readFileSync2(file2, "utf8"));
   } catch {
     return [];
   }
@@ -64460,6 +61764,1929 @@ function steerState(turn, index2) {
   return turn.status === "live" ? "pending" : "next";
 }
 
+// src/workLog.ts
+import { homedir as homedir10 } from "node:os";
+
+// src/bridge.ts
+var BRIDGE = "tool_call";
+var BATCH = "connectors__execute";
+var TITLES = {
+  discord: "Discord",
+  figma: "Figma",
+  github: "GitHub",
+  gmail: "Gmail",
+  googlecalendar: "Google Calendar",
+  googledocs: "Google Docs",
+  googledrive: "Google Drive",
+  jira: "Jira",
+  linear: "Linear",
+  notion: "Notion",
+  outlook: "Outlook",
+  slack: "Slack",
+  stripe_mcp: "Stripe",
+  todoist: "Todoist"
+};
+function appTitle(slug) {
+  const known2 = TITLES[slug.trim().toLowerCase()];
+  if (known2) {
+    return known2;
+  }
+  const words3 = slug.split(/[-_\s]+/).filter(Boolean);
+  if (words3.length > 1 && words3.at(-1).toLowerCase() === "mcp") {
+    words3.pop();
+  }
+  return words3.map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
+}
+function actionPhrase(tool, app2 = "") {
+  const prefix2 = `${app2.replace(/-/g, "_").toUpperCase()}_`;
+  const text11 = app2 && tool.toUpperCase().startsWith(prefix2) ? tool.slice(prefix2.length) : tool;
+  return text11.split(/[-_\s]+/).filter(Boolean).join(" ").toLowerCase();
+}
+function appOf(name, args) {
+  const [prefix2, connector, ...tool] = name.split("__");
+  if (prefix2 === "connectors" && connector && tool.length && name !== BATCH) {
+    const alias = typeof args?.connector_alias === "string" && args.connector_alias.trim() ? ` (${args.connector_alias.trim()})` : "";
+    return { action: actionPhrase(tool.join("__"), connector) + alias, app: appTitle(connector), kind: "connector" };
+  }
+  const mcp = name.match(/^mcp__(.+?)__(.+)$/);
+  return mcp ? { action: actionPhrase(mcp[2]), app: appTitle(mcp[1]), kind: "mcp" } : void 0;
+}
+function entriesOf(args) {
+  const list8 = Array.isArray(args.calls) ? args.calls : [args];
+  return list8.flatMap((e) => {
+    const r = record(e);
+    const name = r?.name;
+    return typeof name === "string" && name ? [{ args: record(r?.arguments) ?? {}, name }] : [];
+  });
+}
+function unwrap(name, args) {
+  if (name !== BRIDGE && name !== BATCH) {
+    return { args, name };
+  }
+  const entries = entriesOf(args);
+  if (entries.length === 1) {
+    return { ...entries[0], via: "tool_call" };
+  }
+  return entries.length ? { args, batch: entries.map((e) => ({ ...e, status: "running" })), name, via: "tool_call" } : { args, name };
+}
+function batchResults(result) {
+  const results = record(result)?.results;
+  if (!Array.isArray(results)) {
+    return void 0;
+  }
+  return results.map((e) => {
+    const r = record(e) ?? {};
+    const err = r.error;
+    return err === void 0 || err === null ? { result: r.response } : { error: typeof err === "string" ? err : String(record(err)?.message ?? "") || JSON.stringify(err) };
+  });
+}
+function settleBridge(call) {
+  if (call.via !== "tool_call") {
+    return void 0;
+  }
+  const outcomes = batchResults(call.result);
+  if (!outcomes) {
+    return void 0;
+  }
+  if (call.batch) {
+    call.batch.forEach((e, i) => {
+      const o2 = outcomes[i];
+      e.status = o2?.error ? "error" : "done";
+      e.result = o2?.result;
+      e.error = o2?.error;
+    });
+    return call.batch.every((e) => e.status === "error");
+  }
+  const o = outcomes[0];
+  call.result = o?.error ? { error: o.error } : o?.result;
+  return Boolean(o?.error);
+}
+function callApp(call) {
+  if (call.batch) {
+    const apps = call.batch.map((e) => appOf(e.name, e.args));
+    const first = apps[0];
+    return first && apps.every((a2) => a2?.app === first.app) ? { ...first, action: `${call.batch.length} calls` } : void 0;
+  }
+  return appOf(call.name, call.args);
+}
+
+// src/connections.ts
+import { existsSync as existsSync3, mkdirSync as mkdirSync3, readdirSync, readFileSync as readFileSync3, rmSync, writeFileSync } from "node:fs";
+import { homedir as homedir7 } from "node:os";
+import { join as join8 } from "node:path";
+var CONNECT_TOOL = "manage_connections";
+var POLL_MS2 = 2e3;
+var STALE_MS = 2 * 6e4;
+var dataDir = (env2 = process.env) => join8(env2.HERMES_HOME || join8(homedir7(), ".hermes"), "plugin-data", "hermes-tern");
+var REASONS = /* @__PURE__ */ new Set(["all_resolved", "continued", "deadline", "error", "superseded"]);
+var safe2 = (part) => part.replace(/[^A-Za-z0-9_-]/g, "_");
+var cardStem = (callId, opId) => opId ? `${safe2(callId)}.${safe2(opId)}` : safe2(callId);
+var alive = (pid) => {
+  if (typeof pid !== "number") {
+    return true;
+  }
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    return error.code === "EPERM";
+  }
+};
+function readCard(key2, dir2 = dataDir(), now = Date.now()) {
+  const file2 = join8(dir2, "connections", `${key2}.json`);
+  try {
+    const data = JSON.parse(readFileSync3(file2, "utf8"));
+    if (!Array.isArray(data.targets)) {
+      return void 0;
+    }
+    const error = typeof data.error === "string" && data.error ? data.error : void 0;
+    const updated = typeof data.updated_at === "number" ? data.updated_at * 1e3 : now;
+    let settled;
+    if (typeof data.settled_by === "string" && REASONS.has(data.settled_by)) {
+      settled = data.settled_by;
+    } else if (data.watching !== true) {
+      settled = error ? "error" : data.targets.some((t2) => waiting2({ state: String(record(t2)?.state ?? "") })) ? "deadline" : "all_resolved";
+    } else if (!alive(data.pid) || now - updated > STALE_MS) {
+      settled = "stopped";
+    }
+    return { error, key: key2, settled, targets: data.targets, told: existsSync3(join8(dir2, "connections", `${key2}.told`)) };
+  } catch {
+    return void 0;
+  }
+}
+function findCard(call, dir2 = dataDir()) {
+  const op = record(call.result)?.op_id;
+  const prefix2 = `${safe2(call.id)}.`;
+  if (typeof op === "string" && op) {
+    return existsSync3(join8(dir2, "connections", `${cardStem(call.id, op)}.json`)) ? cardStem(call.id, op) : void 0;
+  }
+  let names;
+  try {
+    names = readdirSync(join8(dir2, "connections"));
+  } catch {
+    return void 0;
+  }
+  const keys2 = names.flatMap((n) => {
+    const key2 = n.endsWith(".json") ? n.slice(0, -5) : "";
+    return key2 === safe2(call.id) || key2.startsWith(prefix2) && !key2.slice(prefix2.length).includes(".") ? [key2] : [];
+  });
+  if (keys2.length < 2) {
+    return keys2[0];
+  }
+  const createdAt = (key2) => {
+    try {
+      const at = record(readFileSync3(join8(dir2, "connections", `${key2}.json`), "utf8"))?.created_at;
+      return typeof at === "number" ? at * 1e3 : 0;
+    } catch {
+      return 0;
+    }
+  };
+  return keys2.map((key2) => ({ gap: Math.abs(createdAt(key2) - call.startedAt), key: key2 })).sort((a2, b) => a2.gap - b.gap)[0]?.key;
+}
+function claimTold(key2, dir2 = dataDir()) {
+  try {
+    writeFileSync(join8(dir2, "connections", `${key2}.told`), "", { flag: "wx" });
+    return true;
+  } catch {
+    return false;
+  }
+}
+var TERN_PANE_VARS = ["TERN_PANE", "TERN_PANE_SOCKET", "TERN_WINDOW_KEY", "TERN_WINDOW_SOCKET", "TERN_DAEMON_SOCKET"];
+function ternPane(env2 = process.env) {
+  const vars = Object.fromEntries(TERN_PANE_VARS.flatMap((k) => env2[k] ? [[k, env2[k]]] : []));
+  return vars.TERN_PANE ? vars : void 0;
+}
+function markViewer(sid, previous3, dir2 = dataDir(), env2 = process.env) {
+  const viewers = join8(dir2, "viewers");
+  try {
+    if (previous3 && previous3 !== sid) {
+      rmSync(join8(viewers, `${previous3}.json`), { force: true });
+    }
+    if (sid) {
+      mkdirSync3(viewers, { recursive: true });
+      writeFileSync(join8(viewers, `${sid}.json`), JSON.stringify({ pid: process.pid, tern: ternPane(env2) }));
+    }
+  } catch {
+  }
+}
+function connectTargets(call, card) {
+  if (call.name !== CONNECT_TOOL) {
+    return [];
+  }
+  const targets = card?.targets ?? record(call.result)?.targets;
+  return parseTargets(Array.isArray(targets) ? targets : []);
+}
+function loadConnect(call, dir2 = dataDir(), now = Date.now()) {
+  if (call.name !== CONNECT_TOOL) {
+    return void 0;
+  }
+  const key2 = call.connect?.key ?? findCard(call, dir2);
+  const file2 = key2 ? readCard(key2, dir2, now) : void 0;
+  const targets = connectTargets(call, file2);
+  if (!targets.length) {
+    return void 0;
+  }
+  return {
+    error: file2?.error,
+    key: file2?.key,
+    opened: call.connect?.opened ?? [],
+    // Continue settles the card at once, as on the desktop; the watcher sees the claim on its next read.
+    settled: file2?.settled ?? (file2?.told || call.connect?.told ? "continued" : void 0),
+    targets,
+    told: Boolean(file2?.told || call.connect?.told)
+  };
+}
+function parseTargets(targets) {
+  return targets.flatMap((t2) => {
+    const r = record(t2);
+    const name = typeof r?.name === "string" ? r.name : "";
+    return name ? [
+      {
+        alias: typeof r?.alias === "string" && r.alias ? r.alias : void 0,
+        detail: typeof r?.detail === "string" && r.detail ? r.detail : void 0,
+        name,
+        state: typeof r?.state === "string" ? r.state : "pending",
+        title: appTitle(name),
+        url: typeof r?.connect_url === "string" && r.connect_url ? r.connect_url : void 0
+      }
+    ] : [];
+  });
+}
+var waiting2 = (t2) => t2.state === "initiated" || t2.state === "pending";
+var allConnected = (card) => {
+  const own13 = card.targets.filter((t2) => t2.state !== "superseded");
+  return own13.length > 0 && own13.every((t2) => t2.state === "connected");
+};
+function isConnectCall(call) {
+  const card = call.connect;
+  return card ? card.settled !== "superseded" && card.targets.some((t2) => t2.url) : connectTargets(call).some((t2) => t2.url);
+}
+var and = (names) => names.length < 3 ? names.join(" and ") : `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`;
+function continueMessage(targets) {
+  const names = targets.filter((t2) => t2.state === "connected" || waiting2(t2)).map((t2) => t2.title);
+  return `I've authorized ${and(names) || "the apps"}. Check with manage_connections status and carry on.`;
+}
+function connectedMessage(targets) {
+  const names = targets.filter((t2) => t2.state === "connected").map((t2) => t2.title);
+  return `${and(names)} ${names.length === 1 ? "is" : "are"} connected now. Carry on.`;
+}
+
+// src/media.ts
+import { homedir as homedir9 } from "node:os";
+import { isAbsolute as isAbsolute2 } from "node:path";
+import { fileURLToPath as fileURLToPath2 } from "node:url";
+
+// src/hermes/images.ts
+import { readFile as readFile2 } from "node:fs/promises";
+import { homedir as homedir8 } from "node:os";
+import { extname as extname2, resolve as resolve4 } from "node:path";
+var MAX_IMAGE_BYTES = 20 * 1024 * 1024;
+function imageFormat(bytes) {
+  if (bytes.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))) {
+    return { mime: "image/png", ext: ".png" };
+  }
+  if (bytes[0] === 255 && bytes[1] === 216 && bytes[2] === 255) {
+    return { mime: "image/jpeg", ext: ".jpg" };
+  }
+  if (/^GIF8[79]a$/.test(bytes.subarray(0, 6).toString("ascii"))) {
+    return { mime: "image/gif", ext: ".gif" };
+  }
+  if (bytes.subarray(0, 4).toString("ascii") === "RIFF" && bytes.subarray(8, 12).toString("ascii") === "WEBP") {
+    return { mime: "image/webp", ext: ".webp" };
+  }
+  return null;
+}
+function imageSize(bytes) {
+  const format = imageFormat(bytes)?.mime;
+  const size = (w, h2) => w > 0 && h2 > 0 ? { h: h2, w } : void 0;
+  try {
+    if (format === "image/png") {
+      return size(bytes.readUInt32BE(16), bytes.readUInt32BE(20));
+    }
+    if (format === "image/gif") {
+      return size(bytes.readUInt16LE(6), bytes.readUInt16LE(8));
+    }
+    if (format === "image/webp") {
+      const chunk = bytes.subarray(12, 16).toString("ascii");
+      if (chunk === "VP8X") {
+        return size(bytes.readUIntLE(24, 3) + 1, bytes.readUIntLE(27, 3) + 1);
+      }
+      if (chunk === "VP8L") {
+        const b = bytes.readUInt32LE(21);
+        return size((b & 16383) + 1, (b >> 14 & 16383) + 1);
+      }
+      return size(bytes.readUInt16LE(26) & 16383, bytes.readUInt16LE(28) & 16383);
+    }
+    if (format === "image/jpeg") {
+      for (let i = 2; i + 9 < bytes.length; ) {
+        if (bytes[i] !== 255) {
+          return void 0;
+        }
+        const marker2 = bytes[i + 1];
+        if (marker2 >= 192 && marker2 <= 207 && marker2 !== 196 && marker2 !== 200 && marker2 !== 204) {
+          return size(bytes.readUInt16BE(i + 7), bytes.readUInt16BE(i + 5));
+        }
+        i += 2 + bytes.readUInt16BE(i + 2);
+      }
+    }
+  } catch {
+  }
+  return void 0;
+}
+async function uploadImage(gw2, sid, raw2, cwd) {
+  const path2 = resolve4(cwd, raw2.replace(/^~(?=$|\/)/, homedir8()));
+  const bytes = await readFile2(path2);
+  if (bytes.length > MAX_IMAGE_BYTES) {
+    throw new Error("the image is larger than 20 MB");
+  }
+  const format = imageFormat(bytes);
+  if (!format) {
+    throw new Error(`${extname2(path2) || "this file"} is not a PNG, JPEG, GIF or WebP image`);
+  }
+  const r = await rpc(gw2, "image.attach_bytes", {
+    session_id: sid,
+    filename: `image${format.ext}`,
+    content_base64: bytes.toString("base64")
+  });
+  if (!r?.path) {
+    throw new Error("the gateway did not store the image");
+  }
+  return { bytes, mime: format.mime, path: r.path };
+}
+
+// src/media.ts
+var str6 = (v) => typeof v === "string" && v.trim() ? v.trim() : void 0;
+var MAX_BYTES = 16 * 1024 * 1024;
+var FETCH_MS = 2e4;
+function shownImage(call) {
+  if (call.status === "error" || call.status === "cancelled") {
+    return void 0;
+  }
+  const r = record(call.result);
+  if (r?.success === false) {
+    return void 0;
+  }
+  if (call.name === "image_generate") {
+    return str6(r?.host_image) ?? str6(r?.image);
+  }
+  if (call.name.startsWith("browser")) {
+    const summary4 = call.resultText ?? str6(r?.text_summary) ?? "";
+    return str6(record(r?.meta)?.screenshot_path) ?? str6(r?.screenshot_path) ?? /Screenshot path: (\S+)/.exec(summary4)?.[1];
+  }
+  return void 0;
+}
+function localSource(src) {
+  if (/^file:\/\//i.test(src)) {
+    try {
+      return { path: fileURLToPath2(src) };
+    } catch {
+      return void 0;
+    }
+  }
+  const path2 = src.replace(/^~(?=\/)/, homedir9());
+  return isAbsolute2(path2) ? { path: path2 } : void 0;
+}
+var Media = class {
+  #host;
+  #fetch;
+  #loads = /* @__PURE__ */ new Map();
+  /** What each settled load gave, so a call rebuilt from history gets it before the next frame. */
+  #loaded = /* @__PURE__ */ new Map();
+  constructor(host, fetcher = (url, init) => fetch(url, init)) {
+    this.#host = host;
+    this.#fetch = fetcher;
+  }
+  /**
+   * Gets the image `call` shows ready: a URL's bytes land on `call.image` (null when they could
+   * not be had) and `done` runs. A local file needs nothing; Tern reads it.
+   */
+  show(call, done) {
+    const src = shownImage(call);
+    if (!src || localSource(src) || call.image !== void 0) {
+      return;
+    }
+    if (this.#loaded.has(src)) {
+      call.image = this.#loaded.get(src);
+      return;
+    }
+    void this.load(src).then((image3) => {
+      call.image = image3;
+      done();
+    });
+  }
+  /** `show` for every call of `entries` (a transcript loaded from history). */
+  showAll(entries, done) {
+    for (const e of entries) {
+      for (const b of e.kind === "turn" ? e.blocks : []) {
+        if (b.kind === "tool") {
+          this.show(b.call, () => done(b.call));
+        }
+      }
+    }
+  }
+  /** `src` (a data or http(s) URL) as a blob; null when it is no image or cannot be fetched. */
+  load(src) {
+    let load2 = this.#loads.get(src);
+    if (!load2) {
+      load2 = this.#bytes(src).then(
+        (bytes) => this.#blob(bytes),
+        () => null
+      ).then((image3) => {
+        this.#loaded.set(src, image3);
+        return image3;
+      });
+      this.#loads.set(src, load2);
+    }
+    return load2;
+  }
+  async #bytes(src) {
+    const data = /^data:image\/[\w.+-]+;base64,(.*)$/s.exec(src);
+    if (data) {
+      return Buffer.from(data[1] ?? "", "base64");
+    }
+    if (!/^https?:\/\//i.test(src)) {
+      return void 0;
+    }
+    const r = await this.#fetch(src, { signal: AbortSignal.timeout(FETCH_MS) });
+    const size = Number(r.headers.get("content-length") ?? 0);
+    return r.ok && size <= MAX_BYTES ? Buffer.from(await r.arrayBuffer()) : void 0;
+  }
+  #blob(bytes) {
+    const format = bytes && bytes.length <= MAX_BYTES ? imageFormat(bytes) : null;
+    const blob = format && bytes ? this.#host.blob(bytes, format.mime) : void 0;
+    return blob ? { blob } : null;
+  }
+};
+
+// src/vendor/t3code/commandLabel.ts
+var MAX_COMMAND_SEGMENTS = 64;
+var SHELL_PROGRAMS = /* @__PURE__ */ new Set(["sh", "bash", "zsh", "dash", "ash", "ksh", "fish"]);
+var WINDOWS_SHELL_PROGRAMS = /* @__PURE__ */ new Set([
+  "cmd",
+  "cmd.exe",
+  "powershell",
+  "powershell.exe",
+  "pwsh",
+  "pwsh.exe"
+]);
+var SHELL_OPTIONS_WITH_VALUE = /* @__PURE__ */ new Set(["-o", "-O", "--rcfile", "--init-file"]);
+var SHELL_COMMAND_WRAPPERS = /* @__PURE__ */ new Set(["builtin", "command", "exec"]);
+var SHELL_PRECOMMAND_MODIFIERS = /* @__PURE__ */ new Set(["nocorrect", "noglob", "time"]);
+var POWERSHELL_SETUP_PROGRAMS = /* @__PURE__ */ new Set(["pop-location", "push-location", "set-location"]);
+var POWERSHELL_FLAGS = /* @__PURE__ */ new Set(["-mta", "-nologo", "-noninteractive", "-noprofile", "-sta"]);
+var POWERSHELL_OPTIONS_WITH_VALUE = /* @__PURE__ */ new Set([
+  "-configurationname",
+  "-executionpolicy",
+  "-inputformat",
+  "-outputformat",
+  "-version",
+  "-windowstyle",
+  "-workingdirectory"
+]);
+var START_PROCESS_FLAGS = /* @__PURE__ */ new Set([
+  "-confirm",
+  "-debug",
+  "-loaduserprofile",
+  "-nonewwindow",
+  "-passthru",
+  "-usenewenvironment",
+  "-verbose",
+  "-wait",
+  "-whatif"
+]);
+var START_PROCESS_OPTIONS_WITH_VALUE = /* @__PURE__ */ new Set([
+  "-argumentlist",
+  "-credential",
+  "-environment",
+  "-erroraction",
+  "-errorvariable",
+  "-informationaction",
+  "-informationvariable",
+  "-outbuffer",
+  "-outvariable",
+  "-pipelinevariable",
+  "-progressaction",
+  "-redirectstandarderror",
+  "-redirectstandardinput",
+  "-redirectstandardoutput",
+  "-verb",
+  "-warningaction",
+  "-warningvariable",
+  "-windowstyle",
+  "-workingdirectory"
+]);
+var SKIPPABLE_SUDO_PROBES = /* @__PURE__ */ new Set(["[", "[[", "test", "true"]);
+var NON_PROGRAM_PREFIX_CHARACTERS = "<>(){}[];|&$`#!%@:";
+var NON_PROGRAM_SUFFIX_CHARACTERS = "){]}`";
+var NON_DESCRIPTIVE_SHELL_PROGRAMS = /* @__PURE__ */ new Set([
+  "!",
+  "#",
+  ".",
+  ":",
+  "[",
+  "[[",
+  "alias",
+  "and",
+  "autoload",
+  "begin",
+  "bg",
+  "bind",
+  "bindkey",
+  "break",
+  "builtin",
+  "caller",
+  "case",
+  "catch",
+  "cd",
+  "command",
+  "compgen",
+  "complete",
+  "compopt",
+  "continue",
+  "coproc",
+  "declare",
+  "dirs",
+  "disown",
+  "do",
+  "done",
+  "elif",
+  "else",
+  "enable",
+  "end",
+  "esac",
+  "eval",
+  "exec",
+  "exit",
+  "export",
+  "false",
+  "fc",
+  "fg",
+  "fi",
+  "finally",
+  "for",
+  "foreach",
+  "function",
+  "getopts",
+  "history",
+  "if",
+  "in",
+  "jobs",
+  "let",
+  "local",
+  "logout",
+  "mapfile",
+  "nocorrect",
+  "noglob",
+  "not",
+  "or",
+  "popd",
+  "pushd",
+  "read",
+  "readarray",
+  "readonly",
+  "repeat",
+  "return",
+  "select",
+  "set",
+  "setopt",
+  "shift",
+  "shopt",
+  "source",
+  "switch",
+  "suspend",
+  "test",
+  "then",
+  "time",
+  "times",
+  "trap",
+  "try",
+  "true",
+  "type",
+  "typeset",
+  "ulimit",
+  "umask",
+  "unalias",
+  "until",
+  "unset",
+  "unsetopt",
+  "wait",
+  "while"
+]);
+var TERMINAL_SHELL_PROGRAMS = /* @__PURE__ */ new Set([
+  "and",
+  "begin",
+  "break",
+  "case",
+  "catch",
+  "continue",
+  "coproc",
+  "do",
+  "done",
+  "elif",
+  "else",
+  "end",
+  "esac",
+  "eval",
+  "exec",
+  "exit",
+  "false",
+  "fi",
+  "finally",
+  "for",
+  "foreach",
+  "function",
+  "if",
+  "in",
+  "not",
+  "or",
+  "repeat",
+  "return",
+  "select",
+  "switch",
+  "then",
+  "try",
+  "until",
+  "while"
+]);
+function shellCommandArgumentIndex(tokens2, start) {
+  for (let index2 = start; index2 < tokens2.length; index2 += 1) {
+    const option = tokens2[index2];
+    if (option === "--" || !option.startsWith("-")) return null;
+    if (SHELL_OPTIONS_WITH_VALUE.has(option)) {
+      index2 += 1;
+      continue;
+    }
+    if (option === "--command" || /^-[a-zA-Z]*c[a-zA-Z]*$/.test(option)) return index2 + 1;
+  }
+  return null;
+}
+var COMMAND_WRAPPER_OPTIONS_WITH_VALUE = {
+  env: /* @__PURE__ */ new Set(["-C", "--chdir", "-S", "--split-string", "-u", "--unset"]),
+  sudo: /* @__PURE__ */ new Set(["-C", "--close-from", "-D", "--chdir", "-g", "--group", "-u", "--user"])
+};
+var COMMAND_WRAPPER_FLAGS = {
+  env: /* @__PURE__ */ new Set(["-0", "--null", "-i", "--ignore-environment", "--debug", "-v"]),
+  sudo: /* @__PURE__ */ new Set(["-A", "--askpass", "-b", "--background", "-E", "-H", "-i", "-n", "-S"])
+};
+function tokenizeShellCommand(command) {
+  const input2 = command.trim();
+  const tokens2 = [];
+  let current = "";
+  let quote2 = null;
+  let escaping = false;
+  let inBackticks = false;
+  let substitutionDepth = 0;
+  let parameterExpansionDepth = 0;
+  let tokenStarted = false;
+  for (let index2 = 0; index2 < input2.length; index2 += 1) {
+    const character = input2[index2];
+    if (escaping) {
+      current += character;
+      escaping = false;
+      tokenStarted = true;
+      continue;
+    }
+    if (character === "\\" && quote2 !== "'") {
+      const nextCharacter = input2[index2 + 1];
+      const isWindowsPath = quote2 === null && /^(?:[A-Za-z]:|\.{1,2})(?:\\[^\s]*)?$/u.test(current);
+      if ((quote2 === '"' || isWindowsPath) && nextCharacter !== void 0 && nextCharacter !== '"' && nextCharacter !== "\\" && nextCharacter !== "$" && nextCharacter !== "`" && nextCharacter !== "\n") {
+        current += character;
+        tokenStarted = true;
+        continue;
+      }
+      escaping = true;
+      tokenStarted = true;
+      continue;
+    }
+    if (inBackticks) {
+      current += character;
+      if (character === "`") inBackticks = false;
+      tokenStarted = true;
+      continue;
+    }
+    if (quote2 !== null) {
+      if (character === quote2) {
+        quote2 = null;
+      } else {
+        current += character;
+      }
+      tokenStarted = true;
+      continue;
+    }
+    if (character === "`") {
+      current += character;
+      inBackticks = true;
+      tokenStarted = true;
+      continue;
+    }
+    if (character === "$" && input2[index2 + 1] === "{") {
+      current += "${";
+      parameterExpansionDepth += 1;
+      tokenStarted = true;
+      index2 += 1;
+      continue;
+    }
+    if (character === "{" && parameterExpansionDepth > 0) {
+      current += character;
+      parameterExpansionDepth += 1;
+      tokenStarted = true;
+      continue;
+    }
+    if (character === "}" && parameterExpansionDepth > 0) {
+      current += character;
+      parameterExpansionDepth -= 1;
+      tokenStarted = true;
+      continue;
+    }
+    if (character === "$" && input2[index2 + 1] === "(") {
+      current += "$(";
+      substitutionDepth += 1;
+      tokenStarted = true;
+      index2 += 1;
+      continue;
+    }
+    if (character === "(") {
+      current += character;
+      substitutionDepth += 1;
+      tokenStarted = true;
+      continue;
+    }
+    if (character === ")" && substitutionDepth > 0) {
+      current += character;
+      substitutionDepth -= 1;
+      tokenStarted = true;
+      continue;
+    }
+    if (character === '"' || character === "'") {
+      quote2 = character;
+      tokenStarted = true;
+      continue;
+    }
+    if (/\s/u.test(character)) {
+      if (substitutionDepth > 0 || parameterExpansionDepth > 0) {
+        current += character;
+        tokenStarted = true;
+        continue;
+      }
+      if (tokenStarted) {
+        tokens2.push(current);
+        current = "";
+        tokenStarted = false;
+      }
+      continue;
+    }
+    current += character;
+    tokenStarted = true;
+  }
+  if (quote2 !== null || escaping || inBackticks || substitutionDepth > 0 || parameterExpansionDepth > 0) {
+    return null;
+  }
+  if (tokenStarted) tokens2.push(current);
+  return tokens2;
+}
+function commandWithoutShellComments(command, end, comments) {
+  let result = "";
+  let cursor = 0;
+  for (const comment6 of comments) {
+    if (comment6.start >= end) break;
+    result += command.slice(cursor, comment6.start);
+    cursor = Math.min(comment6.end, end);
+  }
+  return result + command.slice(cursor, end);
+}
+function readHeredocDelimiter(command, start, stripTabs) {
+  let index2 = start;
+  while (command[index2] === " " || command[index2] === "	") index2 += 1;
+  let delimiter = "";
+  let quote2 = null;
+  let escaping = false;
+  for (; index2 < command.length; index2 += 1) {
+    const character = command[index2];
+    if (escaping) {
+      delimiter += character;
+      escaping = false;
+      continue;
+    }
+    if (character === "\\" && quote2 !== "'") {
+      escaping = true;
+      continue;
+    }
+    if (quote2 !== null) {
+      if (character === quote2) quote2 = null;
+      else delimiter += character;
+      continue;
+    }
+    if (character === '"' || character === "'") {
+      quote2 = character;
+      continue;
+    }
+    if (/\s/u.test(character) || ";&|<>()".includes(character)) break;
+    delimiter += character;
+  }
+  if (!delimiter || quote2 !== null || escaping) return null;
+  return { heredoc: { delimiter, stripTabs }, end: index2 };
+}
+function commandAfterHeredocs(command, start, heredocs) {
+  let cursor = start;
+  for (const heredoc of heredocs) {
+    let foundDelimiter = false;
+    while (cursor <= command.length) {
+      const newlineIndex = command.indexOf("\n", cursor);
+      const lineEnd2 = newlineIndex === -1 ? command.length : newlineIndex;
+      const line = command.slice(cursor, lineEnd2).replace(/\r$/u, "");
+      const comparableLine = heredoc.stripTabs ? line.replace(/^\t+/u, "") : line;
+      cursor = newlineIndex === -1 ? command.length : newlineIndex + 1;
+      if (comparableLine === heredoc.delimiter) {
+        foundDelimiter = true;
+        break;
+      }
+      if (newlineIndex === -1) break;
+    }
+    if (!foundDelimiter) return null;
+  }
+  return command.slice(cursor).trim() || null;
+}
+function splitFirstShellCommand(command) {
+  let quote2 = null;
+  let powerShellHereStringQuote = null;
+  let escaping = false;
+  let inBackticks = false;
+  let inComment = false;
+  let substitutionDepth = 0;
+  let parameterExpansionDepth = 0;
+  const heredocs = [];
+  const comments = [];
+  let commentStart = 0;
+  let separatorBeforeHeredocs = null;
+  for (let index2 = 0; index2 < command.length; index2 += 1) {
+    const character = command[index2];
+    if (powerShellHereStringQuote !== null) {
+      if (character === powerShellHereStringQuote && command[index2 + 1] === "@" && (index2 === 0 || command[index2 - 1] === "\n")) {
+        powerShellHereStringQuote = null;
+        index2 += 1;
+      }
+      continue;
+    }
+    if (inComment) {
+      if (character !== "\n") continue;
+      inComment = false;
+      comments.push({ start: commentStart, end: index2 });
+    }
+    if (escaping) {
+      escaping = false;
+      continue;
+    }
+    if (character === "\\" && quote2 !== "'") {
+      escaping = true;
+      continue;
+    }
+    if (inBackticks) {
+      if (character === "`") inBackticks = false;
+      continue;
+    }
+    if (quote2 !== null) {
+      if (character === quote2) quote2 = null;
+      continue;
+    }
+    if (character === "@" && (command[index2 + 1] === '"' || command[index2 + 1] === "'") && (command[index2 + 2] === "\n" || command[index2 + 2] === "\r" && command[index2 + 3] === "\n")) {
+      powerShellHereStringQuote = command[index2 + 1];
+      index2 += 1;
+      continue;
+    }
+    if (character === '"' || character === "'") {
+      quote2 = character;
+      continue;
+    }
+    if (character === "`") {
+      inBackticks = true;
+      continue;
+    }
+    if (character === "#" && (index2 === 0 || /\s/u.test(command[index2 - 1]) || ";&|(".includes(command[index2 - 1]))) {
+      inComment = true;
+      commentStart = index2;
+      continue;
+    }
+    if (character === "$" && command[index2 + 1] === "{") {
+      parameterExpansionDepth += 1;
+      index2 += 1;
+      continue;
+    }
+    if (character === "{" && parameterExpansionDepth > 0) {
+      parameterExpansionDepth += 1;
+      continue;
+    }
+    if (character === "}" && parameterExpansionDepth > 0) {
+      parameterExpansionDepth -= 1;
+      continue;
+    }
+    if (character === "(") {
+      substitutionDepth += 1;
+      continue;
+    }
+    if (character === ")" && substitutionDepth > 0) {
+      substitutionDepth -= 1;
+      continue;
+    }
+    if (substitutionDepth > 0 || parameterExpansionDepth > 0) continue;
+    if (character === "<" && command[index2 + 1] === "<" && command[index2 + 2] !== "<") {
+      const stripTabs = command[index2 + 2] === "-";
+      const delimiter = readHeredocDelimiter(command, index2 + (stripTabs ? 3 : 2), stripTabs);
+      if (delimiter === null) {
+        return { firstCommand: command.trim(), remainingCommand: null, separator: null };
+      }
+      heredocs.push(delimiter.heredoc);
+      index2 = delimiter.end - 1;
+      continue;
+    }
+    const isDoubleOperator = character === "&" && command[index2 + 1] === "&" || character === "|" && (command[index2 + 1] === "|" || command[index2 + 1] === "&");
+    const isRedirectionAmpersand = character === "&" && (command[index2 - 1] === ">" || command[index2 - 1] === "<" || command[index2 + 1] === ">");
+    if (!isDoubleOperator && !";&|\n".includes(character) || isRedirectionAmpersand) continue;
+    if (character === "\n" && heredocs.length > 0) {
+      const separator = separatorBeforeHeredocs;
+      const firstCommand2 = commandWithoutShellComments(
+        command,
+        separator?.index ?? index2,
+        comments
+      ).trimStart();
+      const commandBeforeHeredocs = separator ? command.slice(separator.index + separator.length, index2).trim() : "";
+      const commandFollowingHeredocs = commandAfterHeredocs(command, index2 + 1, heredocs);
+      const remainingCommand = [commandBeforeHeredocs, commandFollowingHeredocs].filter((part) => Boolean(part)).join("\n");
+      return {
+        firstCommand: firstCommand2,
+        remainingCommand: remainingCommand || null,
+        separator: separator ? command.slice(separator.index, separator.index + separator.length) : "\n"
+      };
+    }
+    if (heredocs.length > 0) {
+      separatorBeforeHeredocs ??= {
+        index: index2,
+        length: isDoubleOperator ? 2 : 1
+      };
+      if (isDoubleOperator) index2 += 1;
+      continue;
+    }
+    const firstCommand = commandWithoutShellComments(command, index2, comments).trimStart();
+    let nextCommandIndex = index2 + (isDoubleOperator ? 2 : 1);
+    while (/\s/u.test(command[nextCommandIndex] ?? "")) nextCommandIndex += 1;
+    const nextCommand = command.slice(nextCommandIndex).trim();
+    return {
+      firstCommand,
+      remainingCommand: nextCommand || null,
+      separator: isDoubleOperator ? command.slice(index2, index2 + 2) : character
+    };
+  }
+  if (inComment) comments.push({ start: commentStart, end: command.length });
+  return {
+    firstCommand: commandWithoutShellComments(command, command.length, comments).trim(),
+    remainingCommand: null,
+    separator: null
+  };
+}
+function commandWithoutLeadingShellComments(command) {
+  let remainingCommand = command.trimStart();
+  while (remainingCommand.startsWith("#")) {
+    const newlineIndex = remainingCommand.indexOf("\n");
+    if (newlineIndex === -1) return null;
+    remainingCommand = remainingCommand.slice(newlineIndex + 1).trimStart();
+  }
+  return remainingCommand || null;
+}
+function withoutShellLineContinuations(command) {
+  let normalizedCommand = "";
+  let quote2 = null;
+  let escaping = false;
+  for (let index2 = 0; index2 < command.length; index2 += 1) {
+    const character = command[index2];
+    if (escaping) {
+      normalizedCommand += character;
+      escaping = false;
+      continue;
+    }
+    if (character === "\\" && quote2 !== "'") {
+      if (command[index2 + 1] === "\n") {
+        index2 += 1;
+        continue;
+      }
+      if (command[index2 + 1] === "\r" && command[index2 + 2] === "\n") {
+        index2 += 2;
+        continue;
+      }
+      normalizedCommand += character;
+      escaping = true;
+      continue;
+    }
+    if (quote2 !== null) {
+      if (character === quote2) quote2 = null;
+    } else if (character === '"' || character === "'") {
+      quote2 = character;
+    }
+    normalizedCommand += character;
+  }
+  return normalizedCommand;
+}
+function indexAfterShellRedirection(tokens2, index2) {
+  const token = tokens2[index2];
+  if (!token || /^[<>]\(/u.test(token)) return null;
+  const match = token.match(
+    /^(?:(?:(?:\d+|\*|\{[A-Za-z_][A-Za-z0-9_]*\})?(?:<<<|<<-|<<|<>|>>|>\||<&|>&|<|>))|&>>|&>)(.*)$/u
+  );
+  if (!match) return null;
+  if (match[1]) return index2 + 1;
+  return tokens2[index2 + 1] === void 0 ? tokens2.length + 1 : index2 + 2;
+}
+function serializeShellTokens(tokens2) {
+  return tokens2.map((token) => `'${token.replaceAll("'", "'\\''")}'`).join(" ");
+}
+function transparentWrapperCommandIndex(wrapper, tokens2, index2) {
+  if (wrapper === "bundle") {
+    return tokens2[index2 + 1] === "exec" && tokens2[index2 + 2] !== void 0 ? index2 + 2 : null;
+  }
+  if (wrapper === "nohup") {
+    let targetIndex = index2 + 1;
+    if (tokens2[targetIndex] === "--") targetIndex += 1;
+    const target = tokens2[targetIndex];
+    return target && !target.startsWith("-") ? targetIndex : null;
+  }
+  if (wrapper === "script") {
+    return /^-[adkpqr]+$/u.test(tokens2[index2 + 1] ?? "") && tokens2[index2 + 3] !== void 0 ? index2 + 3 : null;
+  }
+  if (wrapper === "arch") {
+    if (/^-(?:arm64|arm64e|i386|x86_64)$/u.test(tokens2[index2 + 1] ?? "")) {
+      return tokens2[index2 + 2] !== void 0 ? index2 + 2 : null;
+    }
+    return tokens2[index2 + 1] === "-arch" && tokens2[index2 + 3] !== void 0 ? index2 + 3 : null;
+  }
+  if (wrapper === "timeout" || wrapper === "gtimeout") {
+    return /^(?:\d+(?:\.\d*)?|\.\d+)[smhd]?$/u.test(tokens2[index2 + 1] ?? "") && tokens2[index2 + 2] !== void 0 ? index2 + 2 : null;
+  }
+  return null;
+}
+function staticProgramName(value) {
+  const trimmedValue = value.trim();
+  if (!trimmedValue || /^[A-Za-z][A-Za-z0-9+.-]*:(?![\\/])/u.test(trimmedValue)) return null;
+  const program = trimmedValue.split(/[\\/]/u).at(-1);
+  if (!program || /\s/u.test(program) && !/[\\/]/u.test(trimmedValue) || NON_PROGRAM_PREFIX_CHARACTERS.includes(program[0] ?? "") || NON_PROGRAM_SUFFIX_CHARACTERS.includes(program.at(-1) ?? "")) {
+    return null;
+  }
+  return program;
+}
+function leadingPowerShellLiteral(command) {
+  const input2 = command.trimStart();
+  const quote2 = input2[0];
+  if (quote2 !== '"' && quote2 !== "'") return staticProgramName(input2.match(/^\S+/u)?.[0] ?? "");
+  let value = "";
+  for (let index2 = 1; index2 < input2.length; index2 += 1) {
+    const character = input2[index2];
+    if (character === "`" && input2[index2 + 1] !== void 0) {
+      value += input2[index2 + 1];
+      index2 += 1;
+      continue;
+    }
+    if (character === quote2) {
+      if (quote2 === "'" && input2[index2 + 1] === "'") {
+        value += "'";
+        index2 += 1;
+        continue;
+      }
+      return staticProgramName(value);
+    }
+    value += character;
+  }
+  return null;
+}
+function powerShellCallOperatorProgramName(command) {
+  const match = command.match(/^\s*&\s+([\s\S]*)$/u);
+  return match ? leadingPowerShellLiteral(match[1]) : void 0;
+}
+function powerShellAssignmentProgramName(command, depth, remainingCommand, segmentsRemaining) {
+  const assignment = command.match(
+    /^\s*\$(?:(env|global|local|script):)?[A-Za-z_][A-Za-z0-9_]*\s*=\s*([\s\S]*)$/iu
+  );
+  if (!assignment) return { matched: false, program: null };
+  if (assignment[1]?.toLowerCase() === "env") {
+    return {
+      matched: true,
+      program: remainingCommand ? commandProgramNameInternal(remainingCommand, depth, "shell", segmentsRemaining - 1) : null
+    };
+  }
+  const value = assignment[2].trim();
+  if (/^(?:\[ordered\]\s*)?@\s*[{(]/iu.test(value)) {
+    return { matched: true, program: null };
+  }
+  const calledProgram = powerShellCallOperatorProgramName(value);
+  if (calledProgram !== void 0) return { matched: true, program: calledProgram };
+  const directCommand = value.match(/^(?:@?\(\s*)?([A-Za-z][A-Za-z0-9_.-]*)\b/u)?.[1];
+  if (directCommand && !NON_DESCRIPTIVE_SHELL_PROGRAMS.has(directCommand.toLowerCase())) {
+    const parsedCommand = commandProgramNameInternal(value, depth + 1, "shell", segmentsRemaining);
+    return { matched: true, program: parsedCommand ?? directCommand };
+  }
+  return {
+    matched: true,
+    program: remainingCommand ? commandProgramNameInternal(remainingCommand, depth, "shell", segmentsRemaining - 1) : null
+  };
+}
+function windowsShellPayloadProgramName(shell, tokens2, start, depth, remainingCommand, separator, segmentsRemaining) {
+  const parsePayload = (payload) => {
+    if (!payload) return null;
+    const command = remainingCommand && separator ? `${payload} ${separator} ${remainingCommand}` : payload;
+    return commandProgramNameInternal(command, depth + 1, "shell", segmentsRemaining);
+  };
+  if (shell === "cmd" || shell === "cmd.exe") {
+    for (let index2 = start; index2 < tokens2.length; index2 += 1) {
+      const option = tokens2[index2].toLowerCase();
+      if (option !== "/c" && option !== "/k") continue;
+      const payload = tokens2[index2 + 1];
+      return {
+        matched: true,
+        program: parsePayload(payload)
+      };
+    }
+    return { matched: false, program: null };
+  }
+  for (let index2 = start; index2 < tokens2.length; index2 += 1) {
+    const option = tokens2[index2].toLowerCase();
+    if (option === "-command" || option === "-c") {
+      const payload = tokens2[index2 + 1];
+      return {
+        matched: true,
+        program: parsePayload(payload)
+      };
+    }
+    if (option === "-file" || option === "-f") {
+      return { matched: true, program: staticProgramName(tokens2[index2 + 1] ?? "") };
+    }
+    if (option === "-encodedcommand" || option === "-enc" || option === "-e") {
+      return { matched: true, program: null };
+    }
+    if (POWERSHELL_OPTIONS_WITH_VALUE.has(option)) {
+      index2 += 1;
+      continue;
+    }
+    if (POWERSHELL_FLAGS.has(option)) continue;
+    if (!option.startsWith("-")) {
+      return { matched: true, program: staticProgramName(tokens2[index2]) };
+    }
+  }
+  return { matched: false, program: null };
+}
+function startProcessProgramName(tokens2, start) {
+  for (let index2 = start; index2 < tokens2.length; index2 += 1) {
+    const token = tokens2[index2];
+    const option = token.toLowerCase();
+    if (option === "-filepath") return staticProgramName(tokens2[index2 + 1] ?? "");
+    if (START_PROCESS_FLAGS.has(option)) continue;
+    if (START_PROCESS_OPTIONS_WITH_VALUE.has(option)) {
+      if (tokens2[index2 + 1] === void 0) return null;
+      index2 += 1;
+      continue;
+    }
+    if (token.startsWith("-")) return null;
+    return staticProgramName(token);
+  }
+  return null;
+}
+function literalAssignmentProgram(token) {
+  const assignment = token.match(/^([A-Za-z_][A-Za-z0-9_]*)=(.*)$/su);
+  if (!assignment) return null;
+  const name = assignment[1];
+  let value = assignment[2].trim();
+  if (!value || /[$`]/u.test(value)) return { name, program: null };
+  if (value.startsWith("(") && value.endsWith(")")) {
+    const arrayTokens = tokenizeShellCommand(value.slice(1, -1));
+    value = arrayTokens?.[0] ?? "";
+  } else if (/\s/u.test(value) && !/[\\/]/u.test(value)) {
+    return { name, program: null };
+  }
+  return { name, program: staticProgramName(value) };
+}
+function referencedCommandAlias(token) {
+  const reference = token.match(
+    /^\$(?:([A-Za-z_][A-Za-z0-9_]*)|\{([A-Za-z_][A-Za-z0-9_]*)(?:\[@\])?\})$/u
+  );
+  return reference?.[1] ?? reference?.[2] ?? null;
+}
+function literalCommandAliasProgramName(command) {
+  const aliases = /* @__PURE__ */ new Map();
+  let remainingCommand = command;
+  let controlFlowDepth = 0;
+  for (let segmentCount = 0; remainingCommand && segmentCount < 64; segmentCount += 1) {
+    const commandWithoutComments = commandWithoutLeadingShellComments(remainingCommand);
+    if (commandWithoutComments === null) return null;
+    const commandSplit = splitFirstShellCommand(commandWithoutComments);
+    const tokens2 = tokenizeShellCommand(withoutShellLineContinuations(commandSplit.firstCommand));
+    if (tokens2 === null) return null;
+    let commandIndex = tokens2[0] === "do" || tokens2[0] === "then" ? 1 : 0;
+    while (commandIndex < tokens2.length) {
+      const indexAfterRedirection = indexAfterShellRedirection(tokens2, commandIndex);
+      if (indexAfterRedirection !== null && indexAfterRedirection <= tokens2.length) {
+        commandIndex = indexAfterRedirection;
+        continue;
+      }
+      if (/^[A-Za-z_][A-Za-z0-9_]*\+?=/u.test(tokens2[commandIndex] ?? "")) {
+        commandIndex += 1;
+        continue;
+      }
+      break;
+    }
+    const aliasName = referencedCommandAlias(tokens2[commandIndex] ?? "");
+    const aliasedProgram = aliasName ? aliases.get(aliasName) : void 0;
+    if (aliasedProgram) return aliasedProgram;
+    const leadingToken = tokens2[0];
+    if (leadingToken === "fi" || leadingToken === "done" || leadingToken === "esac") {
+      controlFlowDepth = Math.max(0, controlFlowDepth - 1);
+    }
+    if (leadingToken === "if" || leadingToken === "for" || leadingToken === "while" || leadingToken === "until" || leadingToken === "select" || leadingToken === "case") {
+      controlFlowDepth += 1;
+    }
+    if (controlFlowDepth === 0 && leadingToken === "unset") {
+      for (const name of tokens2.slice(1)) aliases.delete(name);
+    }
+    const assignmentStart = tokens2[0] === "export" ? 1 : 0;
+    const assignments = tokens2.slice(assignmentStart).map(literalAssignmentProgram);
+    if (controlFlowDepth === 0 && assignments.length > 0 && assignments.every((assignment) => assignment !== null)) {
+      for (const assignment of assignments) {
+        if (assignment.program) aliases.set(assignment.name, assignment.program);
+        else aliases.delete(assignment.name);
+      }
+    }
+    remainingCommand = commandSplit.remainingCommand;
+  }
+  return null;
+}
+function wrappedShellCommandProgramName(wrapper, tokens2, start, depth, remainingCommand, segmentsRemaining) {
+  let index2 = start;
+  if (wrapper === "command") {
+    while (index2 < tokens2.length) {
+      const option = tokens2[index2];
+      if (option === "--") {
+        index2 += 1;
+        break;
+      }
+      if (!option.startsWith("-") || option === "-") break;
+      if (option !== "-p") return null;
+      index2 += 1;
+    }
+  } else if (wrapper === "builtin") {
+    if (tokens2[index2] === "--") index2 += 1;
+    else if (tokens2[index2]?.startsWith("-")) return null;
+  } else if (wrapper === "exec") {
+    while (index2 < tokens2.length) {
+      const option = tokens2[index2];
+      if (option === "--") {
+        index2 += 1;
+        break;
+      }
+      if (option === "-a") {
+        if (tokens2[index2 + 1] === void 0) return null;
+        index2 += 2;
+        continue;
+      }
+      if (/^-a.+/u.test(option) || /^-[cl]+$/u.test(option)) {
+        index2 += 1;
+        continue;
+      }
+      if (option.startsWith("-") && option !== "-") return null;
+      break;
+    }
+  }
+  const wrappedTokens = tokens2.slice(index2);
+  if (wrappedTokens.length === 0) return null;
+  let targetIndex = 0;
+  while (targetIndex < wrappedTokens.length) {
+    const indexAfterRedirection = indexAfterShellRedirection(wrappedTokens, targetIndex);
+    if (indexAfterRedirection === null || indexAfterRedirection > wrappedTokens.length) break;
+    targetIndex = indexAfterRedirection;
+  }
+  const target = wrappedTokens[targetIndex];
+  if (target && /^[A-Za-z_][A-Za-z0-9_]*\+?=/u.test(target)) return null;
+  const wrappedProgram = commandProgramNameInternal(
+    serializeShellTokens(wrappedTokens),
+    depth + 1,
+    wrapper === "exec" ? "exec" : "shell",
+    segmentsRemaining
+  );
+  if (wrappedProgram !== null) return wrappedProgram;
+  if (wrapper !== "exec" && target && target === target.toLowerCase() && NON_DESCRIPTIVE_SHELL_PROGRAMS.has(target) && !TERMINAL_SHELL_PROGRAMS.has(target) && remainingCommand) {
+    return commandProgramNameInternal(remainingCommand, depth, "shell", segmentsRemaining - 1);
+  }
+  return null;
+}
+function parseCommandProgramName(command, depth, context, segmentsRemaining) {
+  if (depth >= 8 || segmentsRemaining <= 0) return null;
+  const commandWithoutComments = commandWithoutLeadingShellComments(command);
+  if (commandWithoutComments === null) return null;
+  if (/^(?:catch|finally|for|foreach|function|if|param|switch|try|while)\s*[{(]/iu.test(
+    commandWithoutComments
+  )) {
+    return null;
+  }
+  if (/^[A-Za-z_][A-Za-z0-9_]*\s*\(\s*\)\s*\{/u.test(commandWithoutComments)) return null;
+  if (commandWithoutComments.startsWith("[[")) return null;
+  const commandSplit = splitFirstShellCommand(commandWithoutComments);
+  if (/^@["'](?:\r?\n)/u.test(commandSplit.firstCommand.trimStart())) {
+    return commandSplit.remainingCommand ? commandProgramNameInternal(
+      commandSplit.remainingCommand,
+      depth,
+      "shell",
+      segmentsRemaining - 1
+    ) : null;
+  }
+  const powerShellAssignment = powerShellAssignmentProgramName(
+    commandSplit.firstCommand,
+    depth,
+    commandSplit.remainingCommand,
+    segmentsRemaining
+  );
+  if (powerShellAssignment.matched) return powerShellAssignment.program;
+  const windowsPath = commandSplit.firstCommand.match(
+    /^\s*((?:\.{1,2}|%[A-Za-z_][A-Za-z0-9_]*%|\$env:[A-Za-z_][A-Za-z0-9_]*)\\\S+)/iu
+  )?.[1];
+  if (windowsPath) return staticProgramName(windowsPath);
+  const tokens2 = tokenizeShellCommand(withoutShellLineContinuations(commandSplit.firstCommand));
+  if (tokens2 === null) return null;
+  const firstCharacter2 = commandSplit.firstCommand.trimStart()[0];
+  if (tokens2.length === 1 && (firstCharacter2 === '"' || firstCharacter2 === "'") && /[\s()=]/u.test(tokens2[0] ?? "") && !/[\\/]/u.test(tokens2[0] ?? "")) {
+    return commandSplit.remainingCommand ? commandProgramNameInternal(
+      commandSplit.remainingCommand,
+      depth,
+      context,
+      segmentsRemaining - 1
+    ) : null;
+  }
+  let index2 = 0;
+  let wrapper = null;
+  let executionContext = context;
+  let sawAssignment = false;
+  let sawRedirection = false;
+  while (index2 < tokens2.length) {
+    const token = tokens2[index2];
+    if (!token) return null;
+    const indexAfterRedirection = indexAfterShellRedirection(tokens2, index2);
+    if (indexAfterRedirection !== null) {
+      if (indexAfterRedirection > tokens2.length) return null;
+      sawRedirection = true;
+      index2 = indexAfterRedirection;
+      continue;
+    }
+    if (/^[A-Za-z_][A-Za-z0-9_]*\+?=/.test(token)) {
+      sawAssignment = true;
+      index2 += 1;
+      continue;
+    }
+    if (executionContext === "shell" && token === ":") {
+      return commandSplit.remainingCommand ? commandProgramNameInternal(
+        commandSplit.remainingCommand,
+        depth,
+        executionContext,
+        segmentsRemaining - 1
+      ) : null;
+    }
+    if (NON_PROGRAM_PREFIX_CHARACTERS.includes(token[0] ?? "") && !(token.startsWith("$") && token.includes("/"))) {
+      return executionContext === "shell" && token.startsWith("[") && commandSplit.remainingCommand ? commandProgramNameInternal(
+        commandSplit.remainingCommand,
+        depth,
+        executionContext,
+        segmentsRemaining - 1
+      ) : null;
+    }
+    const tokenProgram = token.split(/[\\/]/).at(-1);
+    const isUnqualifiedToken = token === tokenProgram;
+    if (tokenProgram === "env" || tokenProgram === "sudo") {
+      wrapper = tokenProgram;
+      executionContext = "exec";
+      index2 += 1;
+      continue;
+    }
+    if (wrapper !== null && token === "--") {
+      wrapper = null;
+      index2 += 1;
+      continue;
+    }
+    if (wrapper !== null && token.startsWith("-")) {
+      if (wrapper === "env" && (token === "-S" || token === "--split-string")) {
+        const splitCommand = tokens2[index2 + 1];
+        return splitCommand ? commandProgramNameInternal(splitCommand, depth + 1, executionContext, segmentsRemaining) : null;
+      }
+      if (wrapper === "env" && token.startsWith("--split-string=")) {
+        return commandProgramNameInternal(
+          token.slice("--split-string=".length),
+          depth + 1,
+          executionContext,
+          segmentsRemaining
+        );
+      }
+      if (COMMAND_WRAPPER_OPTIONS_WITH_VALUE[wrapper].has(token)) {
+        if (tokens2[index2 + 1] === void 0) return null;
+        index2 += 2;
+        continue;
+      }
+      if (COMMAND_WRAPPER_FLAGS[wrapper].has(token)) {
+        index2 += 1;
+        continue;
+      }
+      const equalsIndex = token.indexOf("=");
+      if (token.startsWith("--") && equalsIndex > 2) {
+        if (!COMMAND_WRAPPER_OPTIONS_WITH_VALUE[wrapper].has(token.slice(0, equalsIndex))) {
+          return null;
+        }
+        index2 += 1;
+        continue;
+      }
+      if (/^-[A-Za-z].+/.test(token) && !token.startsWith("--")) {
+        let consumesNextToken = false;
+        for (const [optionIndex, option] of token.slice(1).split("").entries()) {
+          const shortOption = `-${option}`;
+          if (COMMAND_WRAPPER_OPTIONS_WITH_VALUE[wrapper].has(shortOption)) {
+            consumesNextToken = optionIndex === token.length - 2;
+            break;
+          }
+          if (!COMMAND_WRAPPER_FLAGS[wrapper].has(shortOption)) return null;
+        }
+        if (consumesNextToken && tokens2[index2 + 1] === void 0) return null;
+        index2 += consumesNextToken ? 2 : 1;
+        continue;
+      }
+      return null;
+    }
+    if (tokenProgram && SHELL_PROGRAMS.has(tokenProgram.replace(/\.exe$/i, "").toLowerCase())) {
+      const scriptIndex = shellCommandArgumentIndex(tokens2, index2 + 1);
+      if (scriptIndex !== null) {
+        const script = tokens2[scriptIndex];
+        return script ? commandProgramNameInternal(script, depth + 1, "shell", segmentsRemaining) : null;
+      }
+    }
+    const lowerTokenProgram = tokenProgram?.toLowerCase();
+    if (lowerTokenProgram && WINDOWS_SHELL_PROGRAMS.has(lowerTokenProgram)) {
+      const payload = windowsShellPayloadProgramName(
+        lowerTokenProgram,
+        tokens2,
+        index2 + 1,
+        depth,
+        commandSplit.remainingCommand,
+        commandSplit.separator,
+        segmentsRemaining
+      );
+      if (payload.matched) return payload.program;
+    }
+    if (lowerTokenProgram === "start-process") {
+      const startedProgram = startProcessProgramName(tokens2, index2 + 1);
+      if (startedProgram !== null) return startedProgram;
+    }
+    if (executionContext === "shell" && isUnqualifiedToken && tokenProgram && SHELL_PRECOMMAND_MODIFIERS.has(tokenProgram)) {
+      index2 += 1;
+      if (tokenProgram === "time" && tokens2[index2] === "-p") index2 += 1;
+      if (tokens2[index2]?.startsWith("-")) return null;
+      continue;
+    }
+    if (isUnqualifiedToken && tokenProgram) {
+      const targetIndex = transparentWrapperCommandIndex(tokenProgram, tokens2, index2);
+      if (targetIndex !== null) {
+        const wrappedProgram = commandProgramNameInternal(
+          serializeShellTokens(tokens2.slice(targetIndex)),
+          depth + 1,
+          "exec",
+          segmentsRemaining
+        );
+        if (wrappedProgram !== null) return wrappedProgram;
+      }
+    }
+    if (isUnqualifiedToken && tokenProgram && SHELL_COMMAND_WRAPPERS.has(tokenProgram)) {
+      return wrappedShellCommandProgramName(
+        tokenProgram,
+        tokens2,
+        index2 + 1,
+        depth,
+        commandSplit.remainingCommand,
+        segmentsRemaining
+      );
+    }
+    if ((executionContext === "shell" || wrapper === "sudo" && tokenProgram && SKIPPABLE_SUDO_PROBES.has(tokenProgram)) && isUnqualifiedToken && tokenProgram && NON_DESCRIPTIVE_SHELL_PROGRAMS.has(tokenProgram) && (!TERMINAL_SHELL_PROGRAMS.has(tokenProgram) || tokenProgram === "false" && commandSplit.separator !== "&&") && commandSplit.remainingCommand) {
+      return commandProgramNameInternal(
+        commandSplit.remainingCommand,
+        depth,
+        "shell",
+        segmentsRemaining - 1
+      );
+    }
+    if (executionContext === "shell" && isUnqualifiedToken && lowerTokenProgram && POWERSHELL_SETUP_PROGRAMS.has(lowerTokenProgram) && commandSplit.remainingCommand) {
+      return commandProgramNameInternal(
+        commandSplit.remainingCommand,
+        depth,
+        "shell",
+        segmentsRemaining - 1
+      );
+    }
+    if (!tokenProgram || isUnqualifiedToken && NON_DESCRIPTIVE_SHELL_PROGRAMS.has(tokenProgram) || NON_PROGRAM_PREFIX_CHARACTERS.includes(tokenProgram[0] ?? "") || NON_PROGRAM_SUFFIX_CHARACTERS.includes(tokenProgram.at(-1) ?? "") || tokenProgram.endsWith("()") || /^[A-Za-z_][A-Za-z0-9_]*\(\)\{$/u.test(tokenProgram)) {
+      return null;
+    }
+    return tokenProgram || null;
+  }
+  if ((sawAssignment || sawRedirection) && wrapper === null && commandSplit.remainingCommand) {
+    return commandProgramNameInternal(
+      commandSplit.remainingCommand,
+      depth,
+      executionContext,
+      segmentsRemaining - 1
+    );
+  }
+  return null;
+}
+function commandProgramNameInternal(command, depth, context, segmentsRemaining = MAX_COMMAND_SEGMENTS) {
+  if (segmentsRemaining <= 0) return null;
+  const calledProgram = powerShellCallOperatorProgramName(command);
+  if (calledProgram !== void 0) return calledProgram;
+  return parseCommandProgramName(command, depth, context, segmentsRemaining) ?? (context === "shell" ? literalCommandAliasProgramName(command) : null);
+}
+function commandProgramName(command, depth = 0) {
+  return commandProgramNameInternal(command, depth, "shell", MAX_COMMAND_SEGMENTS);
+}
+var CONTROL_CHARACTERS = /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/gu;
+function commandDisplayText(command) {
+  return withVisibleControlCharacters(withoutShellWrapper(command));
+}
+function withVisibleControlCharacters(text11) {
+  return text11.replace(
+    CONTROL_CHARACTERS,
+    (character) => character === "\x7F" ? "\u2421" : String.fromCharCode(9216 + character.charCodeAt(0))
+  );
+}
+function withoutShellWrapper(command) {
+  const trimmed = command.trim();
+  const split2 = splitFirstShellCommand(trimmed);
+  if (split2.remainingCommand !== null) return trimmed;
+  const tokens2 = tokenizeShellCommand(trimmed);
+  const program = tokens2?.[0]?.split(/[\\/]/u).at(-1)?.replace(/\.exe$/iu, "");
+  if (!tokens2 || !program || !SHELL_PROGRAMS.has(program)) return trimmed;
+  const scriptIndex = shellCommandArgumentIndex(tokens2, 1);
+  if (scriptIndex === null || scriptIndex !== tokens2.length - 1) return trimmed;
+  return tokens2[scriptIndex]?.trim() || trimmed;
+}
+var POWERSHELL_VERBS = new Set(
+  `Add Approve Assert Backup Block Build Checkpoint Clear Close Compare Complete Compress Confirm Connect Convert ConvertFrom ConvertTo Copy Debug Deny Deploy Disable Disconnect Dismount Edit Enable Enter Exit Expand Export Find ForEach Format Get Grant Group Hide Import Initialize Install Invoke Join Limit Lock Measure Merge Mount Move New Open Optimize Out Ping Pop Protect Publish Push Read Receive Redo Register Remove Rename Repair Request Reset Resize Resolve Restart Restore Resume Revoke Save Search Select Send Set Show Skip Sort Split Start Step Stop Submit Suspend Switch Sync Tee Test Trace Unblock Undo Uninstall Unlock Unprotect Unpublish Unregister Update Use Wait Watch Where Write`.split(
+    " "
+  )
+);
+
+// src/workLog.ts
+var SOLO = /* @__PURE__ */ new Set(["clarify", "delegate_task", "todo", "todo_list"]);
+function ownsCard(call) {
+  return SOLO.has(call.name) || isBackgroundCall(call) || waiting3(call) || isConnectCall(call) || call.name === "image_generate" || showsImage(call);
+}
+function waiting3(call) {
+  return isWatchCall(call) && call.status === "running";
+}
+function showsImage(call) {
+  return shownImage(call) !== void 0;
+}
+function pieces(blocks2, turn = blocks2) {
+  const out = [];
+  let items = [];
+  const plan = turn.findLast((b) => b.kind === "tool" && isTodoName(b.call.name) && b.call.todos?.length);
+  for (const b of blocks2) {
+    if (b.kind === "thinking" || b.kind === "tool" && (!ownsCard(b.call) || isTodoName(b.call.name) && b !== plan)) {
+      items.push(b);
+      continue;
+    }
+    if (items.length) {
+      out.push({ items, kind: "work" });
+      items = [];
+    }
+    out.push({ block: b, kind: "block" });
+  }
+  if (items.length) {
+    out.push({ items, kind: "work" });
+  }
+  return out;
+}
+function visibleItems(items) {
+  return items.filter((i) => i.kind === "tool" || i.text.trim());
+}
+function foldOf(turn) {
+  if (turn.status !== "done") {
+    return void 0;
+  }
+  const answer = turn.blocks.findLastIndex((b) => b.kind === "text" && b.text.trim());
+  const hidden2 = /* @__PURE__ */ new Set();
+  for (const [i, b] of turn.blocks.entries()) {
+    if (i === answer || b.kind === "steer" || b.kind === "compaction") {
+      continue;
+    }
+    if (b.kind === "tool" && (isBackgroundCall(b.call) || waiting3(b.call) || isConnectCall(b.call) || showsImage(b.call) || b.call.subagents?.some((a2) => a2.status === "running" || a2.status === "queued"))) {
+      continue;
+    }
+    if (answer >= 0 && i > answer && b.kind === "tool" && b.call.status !== "done") {
+      continue;
+    }
+    hidden2.add(b.id);
+  }
+  if (hidden2.size === 0) {
+    return void 0;
+  }
+  const ms = (turn.endedAt ?? turn.startedAt) - turn.startedAt;
+  return { hidden: hidden2, label: workedFor(ms) };
+}
+var workedFor = (ms) => ms > 0 ? `Worked for ${durationCompact(ms)}` : "Worked";
+function parts2(turn) {
+  const fold = foldOf(turn);
+  if (!fold) {
+    return [{ blocks: [...turn.blocks], kind: "shown" }];
+  }
+  const out = [];
+  const show = (b) => {
+    const last = out.at(-1);
+    if (last?.kind === "shown") {
+      last.blocks.push(b);
+    } else {
+      out.push({ blocks: [b], kind: "shown" });
+    }
+  };
+  let stretch = [];
+  let from = turn.startedAt;
+  const flush = (to) => {
+    const hidden2 = stretch.filter((b) => fold.hidden.has(b.id));
+    if (hidden2.length) {
+      out.push({ blocks: hidden2, key: `fold${hidden2[0].id}`, kind: "fold", label: workedFor(to - from) });
+    }
+    stretch.filter((b) => !fold.hidden.has(b.id)).forEach(show);
+    stretch = [];
+  };
+  for (const b of turn.blocks) {
+    if (b.kind === "steer" || b.kind === "compaction") {
+      flush(b.at);
+      show(b);
+      from = b.kind === "compaction" ? b.compaction.endedAt ?? b.at : b.at;
+    } else {
+      stretch.push(b);
+    }
+  }
+  flush(turn.endedAt ?? from);
+  return out;
+}
+function actionOf(call) {
+  if (appsOf(call).length) {
+    return "app";
+  }
+  if (isTodoName(call.name)) {
+    return "plan";
+  }
+  switch (call.name) {
+    case "tool_search":
+    case "tool_describe":
+      return "lookup";
+    case "terminal":
+    case "execute_code":
+    case "process":
+    case "process_manage":
+      return "command";
+    case "read_file":
+      return "read";
+    case "patch":
+    case "write_file":
+      return "edit";
+    case "search_files":
+      return "code-search";
+    case "web_search":
+      return "search";
+    case "web_extract":
+      return "fetch";
+  }
+  return call.name.startsWith("browser") ? "browser" : "other";
+}
+var and2 = (words3) => words3.length < 3 ? words3.join(" and ") : `${words3.slice(0, -1).join(", ")}, and ${words3.at(-1)}`;
+function actionLabel(action, n, calls = []) {
+  switch (action) {
+    case "app": {
+      const apps = [...new Set(calls.flatMap(appsOf))];
+      const uses = calls.reduce((k, c) => k + (c.batch?.length ?? 1), 0);
+      return apps.length === 1 ? `Used ${apps[0]}${uses > 1 ? ` ${uses} times` : ""}` : `Used ${and2(apps)}`;
+    }
+    case "command":
+      return `Ran ${plural(n, "command")}`;
+    case "read":
+      return `Read ${plural(n, "file")}`;
+    case "edit":
+      return `Changed ${plural(n, "file")}`;
+    case "code-search":
+      return `Searched code ${plural(n, "time")}`;
+    case "search":
+      return `Searched the web ${plural(n, "time")}`;
+    case "fetch":
+      return `Read ${plural(n, "page")}`;
+    case "browser":
+      return `Used browser ${plural(n, "time")}`;
+    case "lookup":
+      return `Looked up tools${n > 1 ? ` ${n} times` : ""}`;
+    case "plan":
+      return `Updated the plan${n > 1 ? ` ${n} times` : ""}`;
+    case "other":
+      return `Used ${plural(n, "tool")}`;
+  }
+}
+function appsOf(call) {
+  const apps = (call.batch ?? [call]).map((e) => callApp({ args: e.args, name: e.name })?.app);
+  return apps.every(Boolean) ? [...new Set(apps)] : [];
+}
+var priority = (a2) => a2 === "command" || a2 === "edit" || a2 === "app" ? 0 : a2 === "other" || a2 === "lookup" ? 2 : 1;
+function summarize(items) {
+  const calls = items.flatMap((i) => i.kind === "tool" ? [i.call] : []);
+  if (!calls.length) {
+    return items.length === 1 ? "Thought" : `Thought (\xD7${items.length})`;
+  }
+  const groups = /* @__PURE__ */ new Map();
+  for (const c of calls) {
+    const a2 = actionOf(c);
+    groups.set(a2, [...groups.get(a2) ?? [], c]);
+  }
+  const all8 = [...groups].map(([action, list8], index2) => ({
+    count: list8.length,
+    index: index2,
+    label: actionLabel(action, action === "edit" ? editedFiles(list8) : list8.length, list8),
+    priority: priority(action)
+  }));
+  const picked = [...all8].sort((a2, b) => a2.priority - b.priority || a2.index - b.index).slice(0, 2).sort((a2, b) => a2.index - b.index);
+  const labels = picked.map((p3) => p3.label);
+  const rest = calls.length - picked.reduce((n, p3) => n + p3.count, 0);
+  if (rest > 0) {
+    labels.push(`Performed ${plural(rest, "other action")}`);
+  }
+  const words3 = labels.map((l, i) => i === 0 ? l : l.charAt(0).toLowerCase() + l.slice(1));
+  return words3.length < 3 ? words3.join(" and ") : `${words3.slice(0, -1).join(", ")}, and ${words3.at(-1)}`;
+}
+function editedFiles(calls) {
+  const paths = /* @__PURE__ */ new Set();
+  let unnamed = 0;
+  for (const c of calls) {
+    const path2 = nonEmpty(c.args.path);
+    if (path2) {
+      paths.add(path2);
+    } else {
+      unnamed++;
+    }
+  }
+  return paths.size + unnamed;
+}
+function groupIcon(items) {
+  const actions = new Set(items.flatMap((i) => i.kind === "tool" ? [actionOf(i.call)] : []));
+  if (!actions.size) {
+    return "brain";
+  }
+  return actions.size === 1 ? actionIcon([...actions][0]) : "hammer";
+}
+function actionIcon(action) {
+  switch (action) {
+    case "app":
+      return "plug";
+    case "lookup":
+      return "search";
+    case "plan":
+      return "list-checks";
+    case "command":
+      return "terminal";
+    case "read":
+      return "eye";
+    case "edit":
+      return "pencil";
+    case "code-search":
+      return "search";
+    case "search":
+    case "fetch":
+      return "globe";
+    case "browser":
+      return "compass";
+    case "other":
+      return "wrench";
+  }
+}
+var shortPath2 = (path2) => relativePath(path2, { cwd: launchEnv().cwd, home: homedir10() });
+function stepLabel(call) {
+  const a2 = call.args;
+  const path2 = nonEmpty(a2.path);
+  const app2 = callApp(call);
+  if (app2) {
+    return `${app2.app} \xB7 ${app2.action}`;
+  }
+  if (call.batch) {
+    return call.batch.map((e) => stepLabel({ ...call, args: e.args, batch: void 0, name: e.name })).join(", ");
+  }
+  if (isTodoName(call.name)) {
+    return planStep(call.todosBefore, call.todos);
+  }
+  switch (call.name) {
+    case "terminal": {
+      const command = nonEmpty(a2.command) ?? call.context;
+      return command ? flat2(commandDisplayText(command)) : "Command";
+    }
+    case "read_file":
+      return path2 ? `Read ${shortPath2(path2)}` : "Read file";
+    case "patch":
+      return path2 ? `Edited ${shortPath2(path2)}` : "Edited a file";
+    case "write_file":
+      return path2 ? `Wrote ${shortPath2(path2)}` : "Wrote a file";
+    case "search_files": {
+      const pattern = nonEmpty(a2.pattern) ?? call.context;
+      const where = path2 && path2 !== "." ? ` in ${shortPath2(path2)}` : "";
+      return a2.target === "files" ? `Searched files ${pattern}${where}` : `Searched ${pattern}${where}`;
+    }
+    case "web_search":
+      return nonEmpty(a2.query) ? `Searched the web for ${a2.query}` : "Web search";
+    case "web_extract": {
+      const urls = Array.isArray(a2.urls) ? a2.urls.filter((u) => typeof u === "string") : [];
+      const first = urls[0] ?? nonEmpty(a2.url);
+      return first ? `Read ${first}${urls.length > 1 ? ` +${urls.length - 1} more` : ""}` : "Read a page";
+    }
+    case "execute_code":
+      return call.context ? flat2(call.context) : "Ran a script";
+    case "link_pull_request":
+    case "unlink_pull_request": {
+      const verb = call.name === "link_pull_request" ? "Linked" : "Unlinked";
+      const pr = nonEmpty(a2.url)?.match(/github[^/]*\/([^/]+\/[^/]+)\/pull\/(\d+)/);
+      const repo = pr?.[1] ?? nonEmpty(a2.repository);
+      const number4 = pr?.[2] ?? (typeof a2.number === "number" ? String(a2.number) : void 0);
+      return repo && number4 ? `${verb} ${repo}#${number4}` : `${verb} a pull request`;
+    }
+    case "list_pull_requests":
+      return "Listed linked pull requests";
+    case "skill_view":
+      return nonEmpty(a2.name) ? `Read skill ${a2.name}` : "Read a skill";
+    case "skills_list":
+      return "Listed skills";
+    case "tool_search": {
+      const q2 = Array.isArray(a2.queries) ? a2.queries.filter((x) => typeof x === "string") : [nonEmpty(a2.queries) ?? nonEmpty(a2.query)].filter(Boolean);
+      return q2.length ? `Searched tools for ${q2.join(", ")}` : "Searched tools";
+    }
+    case "tool_describe": {
+      const names = (Array.isArray(a2.names) ? a2.names : [a2.names]).filter((x) => typeof x === "string" && x !== "");
+      const named = names.map((n) => {
+        const app3 = callApp({ args: {}, name: n });
+        return app3 ? `${app3.app} \xB7 ${app3.action}` : n.replace(/_/g, " ");
+      });
+      return named.length ? `Read how to call ${named.join(", ")}` : "Read tool details";
+    }
+  }
+  const name = call.name.replace(/_/g, " ");
+  const label = name.charAt(0).toUpperCase() + name.slice(1);
+  return call.context ? `${label}: ${flat2(call.context)}` : label;
+}
+var MARK = { cancelled: "\u2717", completed: "\u2713", in_progress: "\u2192", pending: "\u25CB" };
+function planStep(before, after) {
+  if (!after?.length) {
+    return "Plan updated";
+  }
+  if (!before?.length) {
+    return `Planned ${plural(after.length, "step")}`;
+  }
+  const changes = after.flatMap((t2) => {
+    const was = before.find((b) => b.id === t2.id);
+    return !was ? [`+ ${t2.content}`] : was.status !== t2.status ? [`${MARK[t2.status]} ${t2.content}`] : [];
+  });
+  return changes.length ? `Plan updated: ${changes.join(", ")}` : "Plan updated";
+}
+function liveLabel(item3, active = false) {
+  if (item3.kind === "thinking") {
+    return thoughtTitle(item3) || (item3.endedAt === void 0 || active ? "Thinking" : "Thought");
+  }
+  const call = item3.call;
+  const status = active && call.status === "done" ? "running" : call.status;
+  const command = call.name === "terminal" ? nonEmpty(call.args.command) ?? call.context : void 0;
+  if (!command) {
+    return status === "running" ? presentTense(stepLabel(call)) : stepLabel(call);
+  }
+  const verb = { cancelled: "Stopped", done: "Ran", error: "Failed", running: "Running" }[status];
+  return `${verb} ${commandProgramName(command) ?? "command"}`;
+}
+function busyLabel(call) {
+  return `${liveLabel({ call, id: call.id, kind: "tool" }, true)}\u2026`;
+}
+function preparingLabel(name) {
+  const app2 = callApp({ args: {}, name });
+  return `Preparing ${app2 ? `${app2.app} \xB7 ${app2.action}` : name.replace(/_/g, " ")}\u2026`;
+}
+var PRESENT = {
+  Edited: "Editing",
+  Linked: "Linking",
+  Listed: "Listing",
+  Looked: "Looking",
+  Read: "Reading",
+  Searched: "Searching",
+  Unlinked: "Unlinking",
+  Used: "Using",
+  Wrote: "Writing"
+};
+function presentTense(label) {
+  const [verb = "", ...rest] = label.split(" ");
+  return PRESENT[verb] ? [PRESENT[verb], ...rest].join(" ") : label;
+}
+function thoughtLine(markdown2) {
+  return flat2(
+    markdown2.replace(/!?\[([^\]]*)\]\([^)]*\)/g, "$1").replace(/^[ \t]*(?:#{1,6}|[-*+]|\d+\.)[ \t]+/gm, "").replace(/`+|\*\*|~~/g, "").replace(/(^|[^\w*])[*_]([^*_\n]+)[*_](?![\w*])/g, "$1$2")
+  );
+}
+function thoughtTitle(item3) {
+  const line = thoughtLine(item3.text);
+  return item3.label ? line ? `${item3.label}: ${line}` : item3.label : line;
+}
+var flat2 = (text11) => text11.replace(/\s+/g, " ").trim();
+
 // src/preformatted.ts
 var BOX = /[─-╿]/;
 var RULE2 = /^\s*\+[-=+]{3,}\+?\s*$/;
@@ -64775,6 +64002,836 @@ function breakdownBody(items) {
   ];
 }
 
+// src/view/tools/cards/image.tsx
+function imageCard(call, result, look, src) {
+  const said = call.status === "running" ? void 0 : nonEmpty(result?.analysis) ?? nonEmpty(result?.text_summary);
+  return {
+    ...look,
+    body: [
+      ...src ? [imageNode(call, src)] : [],
+      ...said ? [/* @__PURE__ */ jsx("text", { lines: 6, spans: [{ s: "muted", t: clip(said, { mark: "line", max: 2e3 }) }], wrap: "word" }, "said")] : []
+    ],
+    folded: false,
+    target: nonEmpty(call.args.prompt) ?? nonEmpty(call.args.question) ?? (call.context || void 0),
+    targetKind: "text"
+  };
+}
+function imageNode(call, src) {
+  const source = localSource(src) ?? call.image;
+  const alt = nonEmpty(call.args.prompt) ?? "Image";
+  if (source) {
+    return /* @__PURE__ */ jsx("image", { alt: clip(alt, { mark: "line", max: 200 }), role: "hermes.tool.image", ...source }, "image");
+  }
+  const link3 = /^https?:\/\//i.test(src) ? [{ href: src, t: clip(src, { mark: "line", max: 120 }) }] : [];
+  return /* @__PURE__ */ jsx(
+    "text",
+    {
+      spans: [{ s: "muted", t: call.image === null ? `Could not load the image${link3.length ? ": " : "."}` : "Loading the image\u2026" }, ...call.image === null ? link3 : []],
+      wrap: "word"
+    },
+    "image"
+  );
+}
+
+// src/view/tools/cards/generic.tsx
+var PROCESS_ACTIONS = {
+  close: "Close process input",
+  kill: "Stop process",
+  list: "List processes",
+  log: "Read process output",
+  poll: "Check process",
+  submit: "Send to process",
+  wait: "Wait for process",
+  write: "Write to process"
+};
+function genericCard(call, result) {
+  const look = isProcessTool(call.name) ? { name: "terminal", title: PROCESS_ACTIONS[String(call.args.action)] ?? "Process" } : call.name.startsWith("browser") ? { name: "browser", title: humanize(call.name.replace(/^browser_?/, "")) || "Browser" } : call.name === "session_search" ? { name: "search", title: "Session search" } : call.name === "vision_analyze" ? { name: "image", title: "Vision" } : call.name === "image_generate" ? { name: "image", title: "Image" } : { name: call.name, title: humanize(call.name) };
+  const src = shownImage(call);
+  if (src || call.name === "image_generate") {
+    return imageCard(call, result, look, src);
+  }
+  const chart = isWatchCall(call) && call.process?.chart ? tilesNode([{ process: call.process, view: call.process.chart }]) : void 0;
+  return {
+    ...look,
+    body: [...chart ? [chart] : [], ...genericBody(call)],
+    folded: !chart,
+    frame: "inline",
+    target: (isProcessTool(call.name) && call.process ? commandLine(call.process.command) : void 0) ?? nonEmpty(call.args.query) ?? nonEmpty(call.args.url) ?? (call.context || void 0),
+    targetKind: nonEmpty(call.args.url) ? "path" : nonEmpty(call.args.query) ? "query" : "text"
+  };
+}
+function genericBody(call) {
+  const text11 = call.resultText ?? (call.result === void 0 ? void 0 : pretty(call.result));
+  if (!text11 || call.status === "running") {
+    return [];
+  }
+  return [/* @__PURE__ */ jsx("code", { lang: /^\s*[[{]/.test(text11) ? "json" : "text", text: clip(text11, { mark: "line", max: 4e3 }) }, "out")];
+}
+function errorOf(call) {
+  const result = record(call.result);
+  return nonEmpty(result?.error) ?? nonEmpty(call.summary) ?? (typeof call.result === "string" && !result ? call.result : void 0);
+}
+function humanize(name) {
+  const words3 = name.replace(/[_-]+/g, " ").trim();
+  return words3.charAt(0).toUpperCase() + words3.slice(1);
+}
+function pretty(v) {
+  return typeof v === "string" ? v : JSON.stringify(v, null, 2);
+}
+
+// src/view/tools/cards/app.tsx
+function appCard(call, app2) {
+  return {
+    badges: [{ text: app2.kind === "mcp" ? "MCP" : "connector" }],
+    body: call.batch ? batchBody(call) : appBody(call),
+    folded: true,
+    frame: "inline",
+    name: "plug",
+    target: app2.action,
+    targetKind: "text",
+    title: app2.app
+  };
+}
+function batchCard(call, batch2) {
+  const apps = appsOf(call);
+  return {
+    badges: apps.length ? [{ text: "connectors" }] : void 0,
+    body: batchBody(call),
+    folded: true,
+    frame: "inline",
+    name: "plug",
+    target: `${batch2.length} calls`,
+    targetKind: "text",
+    title: apps.length ? apps.join(", ") : "Tool calls"
+  };
+}
+function appBody(call) {
+  const facts2 = Object.entries(call.args).filter(([k, v]) => k !== "connector_alias" && v !== void 0 && v !== null && v !== "").slice(0, 12).map(([k, v]) => ({ k: [{ t: k.replace(/_/g, " ") }], v: clip(typeof v === "string" ? v : JSON.stringify(v), { mark: "line", max: 300 }) }));
+  const error = call.status === "error" ? errorOf(call) : void 0;
+  return [
+    ...facts2.length ? [/* @__PURE__ */ jsx("kv", { items: facts2 }, "args")] : [],
+    ...error ? [/* @__PURE__ */ jsx("text", { spans: [{ s: "error", t: clip(error, { mark: "line", max: 1200 }) }], wrap: "word" }, "error")] : genericBody(call)
+  ];
+}
+function batchBody(call) {
+  return (call.batch ?? []).flatMap((e, i) => {
+    const app2 = callApp({ args: e.args, name: e.name });
+    const tone = e.status === "error" ? "error" : e.status === "running" ? "pending" : "success";
+    const answer = e.error ?? (e.result === void 0 ? void 0 : pretty(e.result));
+    return [
+      /* @__PURE__ */ jsxs("row", { align: "center", gap: "sm", children: [
+        /* @__PURE__ */ jsx("icon", { name: e.status === "error" ? "x" : e.status === "running" ? "clock" : "check", tone }, "i"),
+        /* @__PURE__ */ jsx("text", { grow: 1, spans: [{ t: app2 ? `${app2.app} \xB7 ${app2.action}` : humanize(e.name) }], truncate: "end", wrap: "none" }, "t")
+      ] }, `e${i}`),
+      ...e.error ? [/* @__PURE__ */ jsx("text", { spans: [{ s: "error", t: clip(e.error, { mark: "line", max: 600 }) }], wrap: "word" }, `r${i}`)] : answer && call.status !== "running" ? [/* @__PURE__ */ jsx("code", { lang: /^\s*[[{]/.test(answer) ? "json" : "text", max: { h: "8lines" }, text: clip(answer, { mark: "line", max: 2e3 }), wrap: true }, `r${i}`)] : []
+    ];
+  });
+}
+
+// src/view/tools/cards/ask.tsx
+function askCard(call, result) {
+  const qs = (Array.isArray(call.args.questions) ? call.args.questions : nonEmpty(call.args.question) ? [call.args] : []).map((q2) => record(q2)).filter((q2) => q2 !== void 0);
+  const responses = Array.isArray(result?.responses) ? result.responses.map((r) => record(r)) : [];
+  const body = [];
+  for (const [i, q2] of qs.entries()) {
+    const choices = Array.isArray(q2.choices) ? q2.choices.map((c) => nonEmpty(c)).filter((c) => c !== void 0) : [];
+    const raw2 = responses[i]?.user_response;
+    const answers = (Array.isArray(raw2) ? raw2 : [raw2]).map((a2) => nonEmpty(a2)).filter((a2) => a2 !== void 0);
+    if (qs.length > 1) {
+      body.push(/* @__PURE__ */ jsx("md", { children: nonEmpty(q2.question) ?? "" }, `q${i}`));
+    }
+    for (const [j, c] of choices.entries()) {
+      body.push(answerRow(`q${i}.o${j}`, c, answers.includes(c)));
+    }
+    for (const [j, typed] of answers.filter((a2) => !choices.includes(a2)).entries()) {
+      body.push(answerRow(`q${i}.a${j}`, typed, true));
+    }
+    if (!answers.length && call.status !== "running" && result !== void 0) {
+      const skipped = responses[i]?.status === "skipped";
+      body.push(/* @__PURE__ */ jsx("text", { role: "omp.tool.notice", spans: [{ s: "muted", t: skipped ? "Skipped" : "No answer" }] }, `q${i}.none`));
+    }
+  }
+  return {
+    body,
+    name: "ask",
+    // Several questions each read in the body; the head counts them instead of repeating one.
+    target: qs.length > 1 ? `${qs.length} questions` : nonEmpty(qs[0]?.question) ?? call.context,
+    targetKind: "text",
+    title: "Ask"
+  };
+}
+function answerRow(key2, text11, picked) {
+  return /* @__PURE__ */ jsxs("row", { role: picked ? "omp.tool.answer" : "omp.tool.answer.off", children: [
+    /* @__PURE__ */ jsx("text", { spans: [picked ? { s: "success", t: "\u2713" } : { s: "dim", t: "\xB7" }] }, "c"),
+    /* @__PURE__ */ jsx("text", { spans: [{ t: text11 }] }, "t")
+  ] }, key2);
+}
+
+// src/view/tools/cards/connect.tsx
+var PENDING = { icon: "clock", tone: "muted", word: "needs authorizing" };
+var CONNECT_STATE = {
+  connected: { icon: "check", tone: "success", word: "connected" },
+  expired: { icon: "clock", tone: "error", word: "link expired" },
+  failed: { icon: "x", tone: "error", word: "failed" },
+  initiated: { icon: "clock", tone: "pending", word: "waiting for your browser" },
+  not_connected: { icon: "minus", tone: "muted", word: "not connected" },
+  pending: PENDING,
+  skipped: { icon: "minus", tone: "muted", word: "skipped" },
+  superseded: { icon: "minus", tone: "muted", word: "asked again below" }
+};
+var SETTLED_NOTE = {
+  all_resolved: "All connected.",
+  continued: "Sent to Hermes.",
+  deadline: "Stopped waiting after 15 minutes. Ask Hermes to connect again.",
+  error: "Hermes stopped watching these links.",
+  stopped: "Hermes stopped watching these links. Ask Hermes to connect again.",
+  superseded: "A later request replaced this one."
+};
+function connectCard(call) {
+  const card = call.connect ?? { opened: [], targets: connectTargets(call), told: false };
+  const { settled, targets } = card;
+  const ref = card.key ?? call.id;
+  const stateOf = (t2) => settled && waiting2(t2) ? "not_connected" : t2.state === "initiated" && !card.opened.includes(t2.name) ? "pending" : t2.state;
+  const open = settled ? [] : targets.filter(waiting2);
+  const rows = targets.map((t2, i) => {
+    const look = CONNECT_STATE[stateOf(t2)] ?? PENDING;
+    return /* @__PURE__ */ jsxs("row", { align: "center", gap: "sm", role: "hermes.connect.row", children: [
+      /* @__PURE__ */ jsx("icon", { name: look.icon, tone: look.tone }, "i"),
+      /* @__PURE__ */ jsx(
+        "text",
+        {
+          grow: 1,
+          spans: [
+            { s: "strong", t: t2.title },
+            ...t2.alias ? [{ s: "muted", t: ` (${t2.alias})` }] : [],
+            { s: look.tone ?? "muted", t: `  ${look.word}` },
+            ...t2.detail && look.tone === "error" ? [{ s: "muted", t: ` \xB7 ${t2.detail}` }] : []
+          ],
+          truncate: "end",
+          wrap: "none"
+        },
+        "n"
+      ),
+      t2.url && !settled && waiting2(t2) ? /* @__PURE__ */ jsx("row", { actions: { click: `connect-open=${ref}:${t2.name}` }, align: "center", gap: "xs", role: "hermes.connect.open", title: t2.url, children: /* @__PURE__ */ jsx("text", { text: "Authorize \u2197" }, "t") }, "go") : null
+    ] }, `t${i}`);
+  });
+  const note = card.told ? open.length || settled && settled !== "all_resolved" ? "Sent to Hermes." : "All connected. Hermes carries on." : settled ? `${SETTLED_NOTE[settled]}${settled === "error" && card.error ? ` ${card.error}` : ""}` : void 0;
+  return {
+    body: [
+      ...rows,
+      ...note ? [/* @__PURE__ */ jsx("text", { spans: [{ s: "muted", t: note }], wrap: "word" }, "done")] : [
+        /* @__PURE__ */ jsxs("row", { align: "center", gap: "sm", children: [
+          /* @__PURE__ */ jsx(
+            "text",
+            {
+              grow: 1,
+              spans: [
+                {
+                  s: "muted",
+                  t: open.length ? "Authorize in the browser. Hermes hears when every app is connected." : "All set."
+                }
+              ],
+              wrap: "word"
+            },
+            "hint"
+          ),
+          open.length ? /* @__PURE__ */ jsx("row", { actions: { click: `connect-continue=${ref}` }, align: "center", role: "hermes.connect.continue", children: /* @__PURE__ */ jsx("text", { text: "Done, continue" }, "t") }, "go") : null
+        ] }, "foot")
+      ]
+    ],
+    name: "plug",
+    target: `${targets.filter((t2) => t2.state === "connected").length} of ${targets.filter((t2) => t2.state !== "superseded").length} connected`,
+    targetKind: "text",
+    title: allConnected(card) ? "Apps connected" : "Connect apps"
+  };
+}
+
+// src/code/diff.ts
+function plainDiff(raw2) {
+  return hunks(raw2.replace(/\x1b\[[0-9;]*m/g, ""));
+}
+function hunks(diff2) {
+  const lines = diff2?.split("\n") ?? [];
+  const start = lines.findIndex((l) => l.startsWith("@@"));
+  return start < 0 ? void 0 : lines.slice(start).join("\n").trimEnd();
+}
+function diffStats(diff2) {
+  let added = 0;
+  let removed = 0;
+  for (const line of diff2.split("\n")) {
+    if (line.startsWith("+") && !line.startsWith("+++")) {
+      added++;
+    } else if (line.startsWith("-") && !line.startsWith("---")) {
+      removed++;
+    }
+  }
+  return { added, removed };
+}
+
+// src/view/tools/cards/edit.tsx
+function editCard(call, result) {
+  const path2 = nonEmpty(call.args.path) ?? call.context;
+  const lang = langOf(path2);
+  const diff2 = hunks(nonEmpty(result?.diff)) ?? (call.diff ? plainDiff(call.diff) : void 0);
+  const content5 = nonEmpty(call.args.content);
+  const write = call.name === "write_file";
+  const head2 = {
+    name: write ? "write" : "edit",
+    target: path2,
+    targetKind: "path",
+    title: write ? "Write" : "Edit"
+  };
+  if (write && content5 && (!diff2 || diff2.startsWith("@@ -0,0 "))) {
+    const text11 = content5.replace(/\n$/, "");
+    const lines = text11.split("\n").length;
+    return {
+      ...head2,
+      badges: diff2 ? [{ text: "new file", tone: "success" }] : void 0,
+      body: [/* @__PURE__ */ jsx("code", { lang: lang ?? "text", numbers: true, text: text11 }, "code")],
+      folded: true,
+      meta: [plural(lines, "line")],
+      preview: { lines: 8 }
+    };
+  }
+  if (!diff2) {
+    return { ...head2, body: [] };
+  }
+  const { added, removed } = diffStats(diff2);
+  return { ...head2, body: [/* @__PURE__ */ jsx("diff", { lang, text: diff2 }, "diff")], meta: [`+${added} \u2212${removed}`] };
+}
+
+// src/view/tools/cards/eval.tsx
+function evalCard(call, result) {
+  const code7 = nonEmpty(call.args.code) ?? "";
+  const output = nonEmpty(result?.output) ?? nonEmpty(result?.stdout) ?? call.resultText;
+  const error = nonEmpty(result?.error) ?? nonEmpty(result?.stderr);
+  return {
+    badges: [{ text: "python" }],
+    body: [
+      /* @__PURE__ */ jsxs("col", { role: "omp.tool.eval.cell", children: [
+        /* @__PURE__ */ jsxs("row", { align: "start", role: "omp.tool.eval.input", children: [
+          /* @__PURE__ */ jsx("icon", { aria: "Input", name: "arrow-left", role: "omp.tool.eval.prompt" }, "0"),
+          /* @__PURE__ */ jsx("col", { grow: 1, children: /* @__PURE__ */ jsx("code", { lang: "python", max: { h: "20lines" }, numbers: false, text: code7, wrap: true }, "code") }, "source")
+        ] }, "input"),
+        output || error ? /* @__PURE__ */ jsxs("row", { align: "start", role: "omp.tool.eval.result", children: [
+          /* @__PURE__ */ jsx("icon", { aria: "Output", name: "arrow-right", role: "omp.tool.eval.prompt" }, "0"),
+          /* @__PURE__ */ jsxs("col", { grow: 1, role: "omp.tool.eval.outputs", children: [
+            output ? /* @__PURE__ */ jsx("ansi", { follow: false, max: { h: "20lines" }, role: "omp.tool.eval.output", text: output.replace(/\n$/, "") }, "out") : null,
+            error ? /* @__PURE__ */ jsx("text", { role: "omp.tool.error", spans: [{ s: "error", t: error }], wrap: "word" }, "err") : null
+          ] }, "outputs")
+        ] }, "result") : null
+      ] }, "cell-0")
+    ],
+    folded: false,
+    name: "eval",
+    role: "omp.tool.eval",
+    title: firstLine(code7)?.startsWith("#") ? firstLine(code7)?.replace(/^#+\s*/, "") ?? "Eval" : "Eval"
+  };
+}
+function firstLine(text11) {
+  return text11?.split("\n").find((l) => l.trim())?.trim();
+}
+
+// src/transcript/todos.ts
+var TODO_LOOK = {
+  cancelled: { item: "dropped" },
+  completed: { item: "done" },
+  in_progress: { item: "active" },
+  pending: { item: "pending" }
+};
+function currentTodos(entries) {
+  for (let i = entries.length - 1; i >= 0; i--) {
+    const e = entries[i];
+    if (e?.kind !== "turn") {
+      continue;
+    }
+    const hit = e.blocks.findLast((b) => b.kind === "tool" && b.call.todos?.length);
+    if (hit?.kind === "tool") {
+      return hit.call.todos;
+    }
+  }
+  return void 0;
+}
+function todosOf(args, current) {
+  const raw2 = Array.isArray(args.todos) ? args.todos : [];
+  return args.merge === true ? mergeTodos(current ?? [], raw2) : toTodos(raw2);
+}
+function mergeTodos(current, patch6) {
+  const out = current.map((t2) => ({ ...t2 }));
+  for (const item3 of patch6) {
+    const r = record(item3);
+    const id = String(r?.id ?? "").trim();
+    if (!r || !id) {
+      continue;
+    }
+    const cur = out.find((t2) => t2.id === id);
+    if (!cur) {
+      if (String(r.content ?? "").trim()) {
+        out.push(...toTodos([{ ...r, id }]));
+      }
+      continue;
+    }
+    const content5 = String(r.content ?? "").trim();
+    const status = String(r.status ?? "").trim().toLowerCase();
+    if (content5) {
+      cur.content = content5;
+    }
+    if (status === "pending" || status === "in_progress" || status === "completed" || status === "cancelled") {
+      cur.status = status;
+    }
+    if ("parent" in r) {
+      const parent = String(r.parent ?? "").trim();
+      if (parent && parent !== id) {
+        cur.parent = parent;
+      } else {
+        delete cur.parent;
+      }
+    }
+  }
+  return out;
+}
+function toTodos(raw2) {
+  const out = [];
+  for (const item3 of raw2) {
+    if (!item3 || typeof item3 !== "object") {
+      continue;
+    }
+    const id = "id" in item3 ? String(item3.id) : String(out.length);
+    const content5 = "content" in item3 ? String(item3.content) : "";
+    const status = "status" in item3 ? String(item3.status) : "pending";
+    const parent = "parent" in item3 && item3.parent ? String(item3.parent) : void 0;
+    out.push({
+      content: content5,
+      id,
+      ...parent && { parent },
+      status: status === "completed" || status === "in_progress" || status === "cancelled" ? status : "pending"
+    });
+  }
+  return out;
+}
+
+// src/view/todos.tsx
+function checklistNode(todos) {
+  const item3 = (t2) => ({ id: t2.id, status: TODO_LOOK[t2.status].item, text: t2.content });
+  const roots = todos.filter((t2) => !t2.parent);
+  const nested = todos.some((t2) => t2.parent);
+  const phases = nested ? roots.map((r) => {
+    const kids = todos.filter((t2) => t2.parent === r.id);
+    return {
+      collapsed: kids.length > 0 && kids.every((k) => k.status === "completed"),
+      id: r.id,
+      items: kids.length ? kids.map(item3) : [item3(r)],
+      title: r.content
+    };
+  }) : [{ id: "all", items: roots.map(item3) }];
+  return /* @__PURE__ */ jsx("checklist", { mode: "full", phases }, "list");
+}
+
+// src/view/tools/cards/inline.tsx
+function todoCard(call) {
+  return {
+    body: call.todos?.length ? [checklistNode(call.todos)] : [],
+    name: "todo",
+    target: todoCount(call.todos),
+    targetKind: "text",
+    title: "Todo"
+  };
+}
+function memoryCard(call, result) {
+  return {
+    body: [],
+    frame: "inline",
+    meta: nonEmpty(result?.usage) ? [`${result?.usage}`] : void 0,
+    name: "memory",
+    target: call.context || nonEmpty(call.args.action),
+    targetKind: "text",
+    title: "Memory"
+  };
+}
+function skillsCard(result) {
+  const skills = Array.isArray(result?.skills) ? result.skills : [];
+  const names = skills.map((s2) => nonEmpty(record(s2)?.name) ?? nonEmpty(s2)).filter((n) => n !== void 0);
+  return {
+    body: names.length ? [/* @__PURE__ */ jsx("text", { spans: [{ s: "muted", t: names.join(" \xB7 ") }], wrap: "word" }, "names")] : [],
+    folded: true,
+    frame: "inline",
+    meta: [
+      names.length ? plural(names.length, "skill") : nonEmpty(result?.message) ?? "no skills"
+    ],
+    name: "skill",
+    title: "Skills"
+  };
+}
+function skillCard(call, result) {
+  return {
+    body: nonEmpty(result?.content) ? [/* @__PURE__ */ jsx("md", { children: clip(nonEmpty(result?.content) ?? "", { mark: "line", max: 6e3 }) }, "body")] : [],
+    folded: true,
+    frame: "inline",
+    name: "skill",
+    target: nonEmpty(call.args.name) ?? call.context,
+    targetKind: "text",
+    title: "Skill"
+  };
+}
+function todoCount(todos) {
+  if (!todos?.length) {
+    return void 0;
+  }
+  return `${todos.filter((t2) => t2.status === "completed").length}/${todos.length}`;
+}
+
+// src/view/tools/cards/read.tsx
+function readCard2(call, result) {
+  const path2 = nonEmpty(call.args.path) ?? call.context;
+  const content5 = nonEmpty(result?.content);
+  const total = typeof result?.total_lines === "number" ? result.total_lines : void 0;
+  const numbered = content5 ? [...content5.matchAll(/^ *(\d+)\|/gm)] : [];
+  const first = numbered.length ? Number(numbered[0]?.[1]) : void 0;
+  const last = numbered.length ? Number(numbered.at(-1)?.[1]) : void 0;
+  const whole = first === 1 && last !== void 0 && last === total;
+  const meta3 = first !== void 0 && last !== void 0 ? [whole ? `${total} lines` : `:${first}-${last}`] : [];
+  return {
+    body: content5 ? [/* @__PURE__ */ jsx("code", { lang: langOf(path2), numbers: true, start: first, text: content5.replace(/^ *\d+\|/gm, "") }, "code")] : [],
+    folded: true,
+    frame: "inline",
+    meta: meta3,
+    name: "read",
+    target: path2,
+    targetKind: "path",
+    title: "Read"
+  };
+}
+
+// src/view/tools/cards/search.tsx
+function searchCard(call, result) {
+  const pattern = nonEmpty(call.args.pattern) ?? call.context;
+  const where = nonEmpty(call.args.path);
+  const inPath = where && where !== "." ? ` \xB7 in ${where}` : "";
+  const files = Array.isArray(result?.files) ? result.files.map((f) => nonEmpty(f)).filter((f) => f !== void 0) : void 0;
+  if (files || call.args.target === "files") {
+    const list8 = (files ?? []).map((f) => f.replace(/^\.\//, ""));
+    const total2 = typeof result?.total_count === "number" ? result.total_count : list8.length;
+    return {
+      body: list8.slice(0, 200).map((f, i) => {
+        const slash = f.lastIndexOf("/");
+        return /* @__PURE__ */ jsx("row", { role: "omp.tool.file", title: slash > 0 ? f.slice(0, slash + 1) : void 0, children: /* @__PURE__ */ jsx("text", { spans: [{ s: "path", t: slash > 0 ? f.slice(slash + 1) : f }] }, "p") }, `f${i}`);
+      }),
+      folded: list8.length > 20,
+      frame: "inline",
+      meta: files ? [`${plural(total2, "file")}${inPath}`] : void 0,
+      name: "glob",
+      target: pattern,
+      targetKind: "pattern",
+      title: "Glob"
+    };
+  }
+  const matches = Array.isArray(result?.matches) ? result.matches.map((m) => record(m)).filter((m) => m !== void 0) : void 0;
+  const byFile = /* @__PURE__ */ new Map();
+  for (const m of matches ?? []) {
+    const path2 = (nonEmpty(m.path) ?? "").replace(/^\.\//, "");
+    const list8 = byFile.get(path2) ?? [];
+    list8.push({ line: typeof m.line === "number" ? m.line : 0, text: typeof m.content === "string" ? m.content : "" });
+    byFile.set(path2, list8);
+  }
+  const total = typeof result?.total_count === "number" ? result.total_count : matches?.length ?? 0;
+  const body = [];
+  let fileIndex = 0;
+  for (const [path2, hits] of byFile) {
+    const f = `f${fileIndex++}`;
+    body.push(
+      /* @__PURE__ */ jsxs("row", { role: "omp.tool.file", children: [
+        /* @__PURE__ */ jsx("text", { spans: [{ s: "path", t: path2 }] }, "p"),
+        /* @__PURE__ */ jsx("text", { role: "omp.tool.chip", spans: [{ t: String(hits.length) }] }, "n")
+      ] }, f)
+    );
+    let run5 = [];
+    let runIndex = 0;
+    const flush = () => {
+      const start = run5[0]?.line ?? 1;
+      if (runIndex > 0) {
+        body.push(/* @__PURE__ */ jsx("text", { role: "omp.tool.context", spans: [{ s: "muted", t: "\u2026" }] }, `${f}.g${runIndex}`));
+      }
+      body.push(
+        /* @__PURE__ */ jsx(
+          "code",
+          {
+            lang: langOf(path2),
+            marks: run5.map((h2) => ({ line: h2.line, tone: "accent" })),
+            numbers: true,
+            start,
+            text: run5.map((h2) => h2.text).join("\n")
+          },
+          `${f}.c${runIndex++}`
+        )
+      );
+      run5 = [];
+    };
+    for (const hit of hits) {
+      if (run5.length && hit.line !== (run5.at(-1)?.line ?? 0) + 1) {
+        flush();
+      }
+      run5.push(hit);
+    }
+    if (run5.length) {
+      flush();
+    }
+  }
+  return {
+    body,
+    folded: total > 40,
+    frame: "inline",
+    meta: matches ? [`${plural(total, "match", "matches")} \xB7 ${plural(byFile.size, "file")}${inPath}`] : void 0,
+    name: "grep",
+    target: pattern,
+    targetKind: "pattern",
+    title: "Grep"
+  };
+}
+
+// src/view/tools/cards/terminal.tsx
+function bashCard(call, result, instead) {
+  const output = (nonEmpty(result?.output) ?? call.resultText)?.replace(/\s*\[Command interrupted\]\s*$/, "");
+  const error = nonEmpty(result?.error);
+  const command = (nonEmpty(call.args.command) ?? call.context ?? "").trim();
+  const line = commandLine(command);
+  const running = call.status === "running";
+  return {
+    body: [
+      ...command && command !== line ? [/* @__PURE__ */ jsx("code", { lang: "bash", max: { h: "12lines" }, role: "omp.tool.command", text: command }, "cmd")] : [],
+      ...instead ? [instead] : output ? [/* @__PURE__ */ jsx("ansi", { follow: true, max: { h: "20lines" }, text: output }, "out")] : [],
+      ...error ? [/* @__PURE__ */ jsx("text", { role: "omp.tool.error", spans: [{ s: "error", t: error }], wrap: "word" }, "err")] : []
+    ],
+    folded: true,
+    lang: "bash",
+    name: "bash",
+    preview: { tail: running ? 4 : 3 },
+    // A short command is the head's target; a longer one shows whole in the body instead.
+    target: command === line ? line || void 0 : void 0,
+    targetKind: "command",
+    title: describeCommand(command)
+  };
+}
+function backgroundCard(call, result, now) {
+  const w = watchersOf(call);
+  const id = processIdOf(call) ?? call.process?.id;
+  const line = id ? processLine(call, id, now) : void 0;
+  const chart = call.process?.chart && primaryNode(call.process.chart);
+  const card = bashCard(call, result, line && chart ? /* @__PURE__ */ jsxs("col", { gap: "xs", children: [
+    line,
+    chart
+  ] }, "process") : line);
+  return {
+    ...card,
+    badges: [
+      { text: "background" },
+      ...w.notify ? [{ text: "notify on exit" }] : [],
+      ...w.patterns.map((p3) => ({ text: `watch: ${clip(p3, { mark: "line", max: 32 })}` })),
+      ...w.heartbeat ? [{ text: `every ${w.heartbeat}s` }] : []
+    ],
+    folded: line ? false : card.folded
+  };
+}
+function processLine(call, id, now) {
+  const p3 = call.process;
+  const live = !p3 || isRunning2(p3);
+  const tone = p3 ? processTone(p3.status) : "muted";
+  return /* @__PURE__ */ jsxs(
+    "row",
+    {
+      actions: { click: `open-process=${id}`, menu: [`open-process=${id}`] },
+      align: "center",
+      gap: "xs",
+      role: "omp.tool.process",
+      title: "Open in the Background sheet  \u2325J",
+      children: [
+        p3 && live ? /* @__PURE__ */ jsx("spinner", { style: "dots", tone: "accent" }, "state-icon") : /* @__PURE__ */ jsx("icon", { name: p3 ? PROCESS_LOOK[p3.status].icon : "pending", tone }, "state-icon"),
+        /* @__PURE__ */ jsx("text", { spans: [{ s: tone, t: p3 ? processVerdict(p3) : "starting" }], wrap: "none" }, "state"),
+        p3 ? /* @__PURE__ */ jsx("text", { spans: [{ s: "dim", t: "\xB7" }], wrap: "none" }, "sep1") : null,
+        p3 && live ? /* @__PURE__ */ jsx("elapsed", { age: age(p3, p3.startedAt, now), format: "short" }, "time") : null,
+        p3 && !live ? /* @__PURE__ */ jsx("text", { spans: [{ s: "muted", t: duration(processElapsed(p3, now)) }], wrap: "none" }, "took") : null,
+        p3?.lastLine ? /* @__PURE__ */ jsx("text", { spans: [{ s: "dim", t: "\xB7" }], wrap: "none" }, "sep2") : null,
+        p3?.lastLine ? /* @__PURE__ */ jsx("text", { grow: 1, spans: [{ s: "muted mono", t: p3.lastLine }], truncate: "end", wrap: "none" }, "last") : null
+      ]
+    },
+    "process"
+  );
+}
+
+// src/view/tools/cards/web.tsx
+function webSearchCard(call, result) {
+  const data = record(result?.data);
+  const hits = (Array.isArray(data?.web) ? data.web : Array.isArray(result?.results) ? result.results : []).map((h2) => record(h2)).filter((h2) => h2 !== void 0);
+  return {
+    body: hits.length ? [
+      /* @__PURE__ */ jsx("col", { role: "omp.tool.sources", children: hits.map((h2, i) => sourceRow(`s${i}`, nonEmpty(h2.title) ?? nonEmpty(h2.url) ?? "", nonEmpty(h2.url))) }, "s")
+    ] : [],
+    frame: "inline",
+    meta: hits.length ? [plural(hits.length, "source")] : void 0,
+    name: "web_search",
+    target: nonEmpty(call.args.query) ?? call.context,
+    targetKind: "query",
+    title: "Web search"
+  };
+}
+function fetchCard(call, result) {
+  const pages = (Array.isArray(result?.results) ? result.results : []).map((p3) => record(p3)).filter((p3) => p3 !== void 0);
+  const urls = Array.isArray(call.args.urls) ? call.args.urls.map((u) => nonEmpty(u)).filter((u) => u !== void 0) : [];
+  const body = [];
+  for (const [i, p3] of pages.entries()) {
+    body.push(sourceRow(`s${i}`, nonEmpty(p3.title) ?? nonEmpty(p3.url) ?? "", nonEmpty(p3.url)));
+    const content5 = nonEmpty(p3.content);
+    if (content5) {
+      body.push(/* @__PURE__ */ jsx("md", { children: clip(content5, { mark: "line", max: 4e3 }) }, `b${i}`));
+    }
+  }
+  const chars = pages.reduce((n, p3) => n + (nonEmpty(p3.content)?.length ?? 0), 0);
+  return {
+    body,
+    folded: true,
+    meta: pages.length ? [`${plural(pages.length, "page")} \xB7 ${compact(chars)} chars`] : void 0,
+    name: "fetch",
+    preview: { lines: 6 },
+    target: urls.length > 1 ? `${urls[0]} +${urls.length - 1}` : urls[0] ?? nonEmpty(call.args.url) ?? call.context,
+    targetKind: "path",
+    title: "Fetch"
+  };
+}
+function sourceRow(key2, title, url) {
+  let host = "";
+  try {
+    host = url ? new URL(url).hostname.replace(/^www\./, "") : "";
+  } catch {
+    host = "";
+  }
+  return /* @__PURE__ */ jsxs("row", { role: "omp.tool.source", children: [
+    /* @__PURE__ */ jsx("text", { role: "omp.tool.chip", spans: [{ t: (host.charAt(0) || "\xB7").toUpperCase() }] }, "d"),
+    /* @__PURE__ */ jsx("text", { spans: [url ? { href: url, t: title } : { t: title }] }, "t"),
+    host ? /* @__PURE__ */ jsx("text", { spans: [{ s: "muted", t: host }] }, "m") : null
+  ] }, key2);
+}
+
+// src/view/tools/shell.tsx
+function toolNode(call, now) {
+  const solo = call.name === "delegate_task" ? soloTask(call, now) : void 0;
+  if (solo) {
+    return solo;
+  }
+  const card = cardOf(call, now);
+  const status = card.status ?? call.status;
+  const running = status === "running";
+  const body = [...card.body];
+  const error = call.status === "error" ? errorOf(call) : void 0;
+  if (call.status === "cancelled") {
+    body.push(
+      /* @__PURE__ */ jsx(
+        "text",
+        {
+          role: "omp.tool.notice",
+          spans: [{ s: "muted", t: `Interrupted by user after ${duration(call.duration ?? 0)}` }]
+        },
+        "cancelled"
+      )
+    );
+  }
+  const collapsed = call.status === "error" ? false : card.folded;
+  return node(
+    "tool",
+    {
+      age: running ? age(call, call.startedAt, now) : void 0,
+      badges: card.badges,
+      collapsed: body.length > 0 ? collapsed : void 0,
+      collapsible: body.length > 0 ? true : void 0,
+      // A background start's exit 0 only says it started; its process line tells how it ended.
+      exit: call.name === "terminal" && !running && call.status !== "cancelled" && !isBackgroundCall(call) ? exitOf(call) : void 0,
+      frame: card.frame === "inline" && (running || !body.length || card.name !== "web_search") ? "inline" : void 0,
+      key: call.id,
+      lang: card.lang,
+      meta: card.meta?.length ? card.meta : void 0,
+      name: card.name,
+      note: call.status === "cancelled" ? "cancelled" : error && !card.body.length ? error : void 0,
+      preview: card.preview,
+      role: card.role,
+      status,
+      target: card.target,
+      targetKind: card.target ? card.targetKind : void 0,
+      title: card.title,
+      took: running ? void 0 : card.took ?? call.duration
+    },
+    body
+  );
+}
+function toolDetail(call, now) {
+  const card = cardOf(call, now);
+  const body = [...card.body];
+  const command = call.name === "terminal" ? (nonEmpty(call.args.command) ?? call.context ?? "").trim() : "";
+  if (command && command === commandLine(command)) {
+    body.unshift(/* @__PURE__ */ jsx("code", { lang: "bash", max: { h: "12lines" }, role: "omp.tool.command", text: command }, "cmd"));
+  }
+  const exit3 = call.name === "terminal" && call.status !== "running" && !isBackgroundCall(call) ? exitOf(call) : void 0;
+  if (exit3) {
+    body.push(/* @__PURE__ */ jsx("text", { spans: [{ s: "error", t: `exit ${exit3}` }] }, "exit"));
+  }
+  const error = call.status === "error" && !card.body.length ? errorOf(call) : void 0;
+  if (error) {
+    body.push(/* @__PURE__ */ jsx("text", { role: "omp.tool.error", spans: [{ s: "error", t: error }], wrap: "word" }, "err"));
+  }
+  if (call.status === "cancelled") {
+    body.push(/* @__PURE__ */ jsx("text", { spans: [{ s: "muted", t: `Interrupted by user after ${duration(call.duration ?? 0)}` }] }, "cancelled"));
+  }
+  return body;
+}
+function cardOf(call, now) {
+  const result = record(call.result);
+  const app2 = callApp(call);
+  if (app2) {
+    return appCard(call, app2);
+  }
+  if (call.batch) {
+    return batchCard(call, call.batch);
+  }
+  switch (call.name) {
+    case "terminal":
+      return isBackgroundCall(call) ? backgroundCard(call, result, now) : bashCard(call, result);
+    case "read_file":
+      return readCard2(call, result);
+    case "patch":
+    case "write_file":
+      return editCard(call, result);
+    case "search_files":
+      return searchCard(call, result);
+    case "web_search":
+      return webSearchCard(call, result);
+    case "web_extract":
+      return fetchCard(call, result);
+    case CONNECT_TOOL:
+      if (isConnectCall(call)) {
+        return connectCard(call);
+      }
+      break;
+    // `todo` is the legacy name stored transcripts and older backends keep.
+    case "todo":
+    case "todo_list":
+      return todoCard(call);
+    case "delegate_task":
+      return taskCard(call, result, now);
+    case "clarify":
+      return askCard(call, result);
+    case "execute_code":
+      return evalCard(call, result);
+    case "memory":
+      return memoryCard(call, result);
+    case "skills_list":
+      return skillsCard(result);
+    case "skill_view":
+      return skillCard(call, result);
+  }
+  return genericCard(call, result);
+}
+function exitOf(call) {
+  const code7 = record(call.result)?.exit_code;
+  return typeof code7 === "number" ? code7 : void 0;
+}
+
 // src/view/ui/fold.tsx
 function foldSection(f) {
   return node("section", { collapsed: true, collapsible: true, head: `${f.id}.head`, key: f.key, role: f.role }, [f.head, f.body]);
@@ -65029,7 +65086,7 @@ function turnNode(turn, id, cx) {
   if (live) {
     children3.push(workingNode(turn, cx.now));
   }
-  for (const part of parts(turn)) {
+  for (const part of parts2(turn)) {
     children3.push(
       ...part.kind === "fold" ? [foldNode(part, `${id}.${part.key}`, pieceNodes(turn, part.blocks, `${id}.${part.key}`, cx))] : pieceNodes(turn, part.blocks, id, cx)
     );
@@ -70216,7 +70273,7 @@ function shellsPill(s2, focused) {
   const charts = live ? s2.charts ?? [] : [];
   const fresh = latest(charts)?.view;
   const figure = fresh && glance(fresh);
-  const title = ["Background processes  \u2325J", ...charts.map((c) => `${c.process.id}  ${summary(c.view)}`)].join("\n");
+  const title = ["Background processes  \u2325J", ...charts.map((c) => `${c.process.id}  ${summary2(c.view)}`)].join("\n");
   const card = hovercard(charts);
   return pill({
     children: [
@@ -70855,7 +70912,7 @@ var App = class {
           this.changed();
         }
         const seen = next3.key ?? call.id;
-        if (next3.targets.some(waiting) && !next3.settled) {
+        if (next3.targets.some(waiting2) && !next3.settled) {
           this.#connectSeen.add(seen);
         }
         if (!next3.told && this.#connectSeen.has(seen) && allConnected(next3) && (!next3.key || claimTold(next3.key))) {

@@ -14,7 +14,7 @@ import { COMPACTING_LABEL } from '../status.js'
 import { type AutomationLine, automationNode, type Reconnecting, reconnectNode } from './automation.js'
 import { plural } from './format.js'
 import { compact } from './time.js'
-import { checklistNode } from './tools.js'
+import { checklistNode } from './todos.js'
 import { workingRow } from './ui/live.js'
 import { pill } from './ui/pill.js'
 

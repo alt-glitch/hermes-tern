@@ -164,7 +164,6 @@
   "src/usage.ts @typescript-eslint/no-non-null-assertion": 13,
   "src/view/describe.ts @typescript-eslint/no-non-null-assertion": 9,
   "src/view/dock.tsx @typescript-eslint/no-non-null-assertion": 4,
-  "src/view/tools.tsx @typescript-eslint/no-non-null-assertion": 1,
   "src/view/transcript.tsx @typescript-eslint/consistent-type-assertions": 3,
   "src/view/welcome.tsx @typescript-eslint/no-unsafe-argument": 1,
   "src/view/welcome.tsx no-restricted-syntax": 1,
