@@ -8,7 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { toolCallId } from '../core/ids.js'
 
-import { FakeGateway, fakeTern } from './fakes.js'
+import { FakeGateway, fakeTern, must } from './fakes.js'
 
 const home = mkdtempSync(join(tmpdir(), 'hermes-tern-connect-'))
 process.env.HERMES_HOME = home
@@ -89,7 +89,7 @@ describe('the connect card', () => {
     writeCard('call_a.op1', drive('initiated'))
 
     gw.event(complete('call_a', 'op1'))
-    const call = app.transcript.call(toolCallId('call_a'))!
+    const call = must(app.transcript.call(toolCallId('call_a')))
     expect(call.connect).toMatchObject({ key: 'call_a.op1', settled: undefined, told: false })
 
     writeCard('call_a.op1', drive('connected', { settled_by: 'all_resolved', watching: false }))
@@ -118,7 +118,7 @@ describe('the connect card', () => {
     const app = await started()
     writeCard('call_b.op3', drive('initiated'))
     gw.event(complete('call_b', 'op3'))
-    const ref = app.transcript.call(toolCallId('call_b'))!.connect!.key!
+    const ref = must(must(app.transcript.call(toolCallId('call_b'))).connect?.key)
 
     tern.send({ act: 'connect-continue', ev: 'action', value: ref })
     await flush()
@@ -127,7 +127,7 @@ describe('the connect card', () => {
 
     expect(told(gw, app)).toEqual(["I've authorized Google Drive. Check with manage_connections status and carry on."])
     // As on the desktop, Continue settles the card: no Authorize, no Continue, the wait is over.
-    expect(app.transcript.call(toolCallId('call_b'))!.connect).toMatchObject({ settled: 'continued', told: true })
+    expect(must(app.transcript.call(toolCallId('call_b'))).connect).toMatchObject({ settled: 'continued', told: true })
 
     // The resume brings the call back without its result: the card is found by its call id.
     gw.handlers.set('session.resume', p => ({
@@ -143,7 +143,7 @@ describe('the connect card', () => {
     await flush()
     await flush()
 
-    const again = app.transcript.call(toolCallId('call_b'))!
+    const again = must(app.transcript.call(toolCallId('call_b')))
     expect(again).not.toBe(undefined)
     expect(again.connect).toMatchObject({ key: 'call_b.op3', told: true })
   })
@@ -169,14 +169,14 @@ describe('the connect card', () => {
     await flush()
 
     // Its gateway is gone: the card is a summary, its app not connected, with no controls.
-    const stopped = app.transcript.call(toolCallId('call_c'))!
+    const stopped = must(app.transcript.call(toolCallId('call_c')))
     expect(stopped.connect).toMatchObject({ settled: 'stopped' })
     const view = JSON.stringify(toolNode(stopped, Date.now()))
     expect(view).toContain('not connected')
     expect(view).not.toContain('connect-open')
     expect(view).not.toContain('connect-continue')
     // A card a later request replaced is the plain tool call.
-    expect(JSON.stringify(toolNode(app.transcript.call(toolCallId('call_d'))!, Date.now()))).not.toContain('hermes.connect.row')
+    expect(JSON.stringify(toolNode(must(app.transcript.call(toolCallId('call_d'))), Date.now()))).not.toContain('hermes.connect.row')
     expect(told(gw, app)).toEqual([])
   })
 })

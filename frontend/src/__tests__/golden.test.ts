@@ -8,6 +8,7 @@ import { join } from 'node:path'
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { must } from './fakes.js'
 import { fixture, logLines, replay, replays } from './replays.js'
 
 const ids = vi.hoisted(() => ({ n: 0 }))
@@ -84,7 +85,7 @@ describe('golden replays', () => {
     process.env['HERMES_TERN_EVENT_LOG'] = log
 
     try {
-      await replay(replays['an approval and a clarify question']!)
+      await replay(must(replays['an approval and a clarify question']))
     } finally {
       delete process.env['HERMES_TERN_EVENT_LOG']
     }

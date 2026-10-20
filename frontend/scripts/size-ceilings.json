@@ -1,5 +1,5 @@
 {
-  "src/__tests__/app.test.ts": 663,
+  "src/__tests__/app.test.ts": 662,
   "src/agents/store.ts": 705,
   "src/overlays/prompts.tsx": 833,
   "src/processes/widgets/runtime.ts": 889,

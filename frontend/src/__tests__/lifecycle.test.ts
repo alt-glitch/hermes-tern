@@ -6,8 +6,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { readLaunchEnv } from '../config/env.js'
 import { storedSessionId } from '../core/ids.js'
+import { record } from '../wire/json.js'
 
-import { FakeGateway, fakeTern, given } from './fakes.js'
+import { FakeGateway, fakeTern, given, key, must, stubOverlay } from './fakes.js'
 
 process.env.HERMES_HOME = mkdtempSync(join(tmpdir(), 'hermes-tern-lifecycle-'))
 
@@ -39,7 +40,7 @@ async function started(gw: FakeGateway) {
 }
 
 const notices = (app: InstanceType<typeof App>) =>
-  app.transcript.entries.flatMap(e => (e.kind === 'notice' ? [(e as unknown as { text: string }).text] : []))
+  app.transcript.entries.flatMap(e => (e.kind === 'notice' ? [e.text] : []))
 
 let gw: FakeGateway
 let created = 0
@@ -119,7 +120,7 @@ describe('session lifecycle', () => {
     openSessionPicker(app)
     // The list loads after the sheet is up (it asks git for the project).
     await vi.waitFor(() => {
-      app.overlays.at(-1)!.onKey({ name: 'enter' } as never)
+      must(app.overlays.at(-1)).onKey(key('enter'))
       expect(gw.methods('session.resume')).toHaveLength(1)
     })
     await flush()
@@ -196,13 +197,13 @@ describe('session lifecycle', () => {
       const [first, second] = answers
 
       if (staleFirst) {
-        first!()
+        must(first)()
         await flush()
-        second!()
+        must(second)()
       } else {
-        second!()
+        must(second)()
         await flush()
-        first!()
+        must(first)()
       }
 
       await Promise.all([stale, winner])
@@ -225,11 +226,11 @@ describe('session lifecycle', () => {
     const skipped = app.resume(storedSessionId('a'))
     const chosen = app.resume(storedSessionId('b'))
     await flush()
-    answers.get('a')!()
+    must(answers.get('a'))()
     await skipped
     expect(gw.methods('session.detach')).toHaveLength(0)
 
-    answers.get('b')!()
+    must(answers.get('b'))()
     await chosen
     await flush()
 
@@ -274,15 +275,15 @@ describe('session lifecycle', () => {
     const app = await started(gw)
     // The tab title goes out as an OSC on stdout.
     vi.spyOn(process.stdout, 'write').mockReturnValue(true)
-    gw.handlers.set('session.mutate', p => ({ title: (p.payload as { title: string }).title }))
-    app.open({ key: 'prompt:old', node: () => null as never, onKey: () => true })
+    gw.handlers.set('session.mutate', p => ({ title: record(p.payload)?.['title'] }))
+    app.open(stubOverlay('prompt:old'))
 
     await app.newSession('Release notes')
     await flush()
 
     expect(app.session.ref.live).toBe('s2')
     expect(app.overlays.some(o => o.key.startsWith('prompt:'))).toBe(false)
-    expect(gw.methods('session.mutate')[0]!.params).toMatchObject({ operation: 'rename', payload: { title: 'Release notes' }, session_id: 's2' })
+    expect(must(gw.methods('session.mutate')[0]).params).toMatchObject({ operation: 'rename', payload: { title: 'Release notes' }, session_id: 's2' })
     expect(app.title.text).toBe('Release notes')
   })
 

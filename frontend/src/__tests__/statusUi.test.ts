@@ -8,7 +8,7 @@ import { join } from 'node:path'
 import { type Key, plain } from '@stencil-hq/tern'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { FakeGateway, fakeTern, given, key, type Reply } from './fakes.js'
+import { FakeGateway, fakeTern, given, key, must, type Reply } from './fakes.js'
 
 vi.mock('@tui/lib/history.js', () => ({ append: () => undefined, load: () => [] }))
 
@@ -27,7 +27,7 @@ function setup(replies: Record<string, Reply> = {}, canonical = true) {
   const gw = new FakeGateway({ canonical, replies })
   const tern = fakeTern({ cols: 100, draws: true })
   /** The last frame's dock. */
-  const shown = () => (tern.frame as { dock?: unknown[] } | undefined)?.dock ?? []
+  const shown = () => tern.region('dock') ?? []
 
   const app = new App(tern.session, gw.client, '1.0.0')
   void app.run()
@@ -45,7 +45,7 @@ function setup(replies: Record<string, Reply> = {}, canonical = true) {
   const dock = async () => {
     await settle()
 
-    return plain({ dock: shown() } as never, 200)
+    return plain({ dock: shown() }, 200)
   }
 
   /** The dock's nodes as JSON, for what plain text leaves out (icons). */
@@ -152,11 +152,11 @@ describe('App: fast mode', () => {
     const { app, sent } = setup({ 'config.set': p => ({ key: 'fast', value: p.value === 'toggle' ? 'fast' : 'normal' }) })
     given.info(app, { model: 'gpt-5' })
 
-    await localCommand('fast')!.run(app, '')
+    await must(localCommand('fast')).run(app, '')
     expect(sent('config.set')).toEqual([{ key: 'fast', session_id: 's1', value: 'toggle' }])
     expect(app.session.info).toMatchObject({ fast: true, service_tier: 'priority' })
 
-    await localCommand('fast')!.run(app, 'off')
+    await must(localCommand('fast')).run(app, 'off')
     expect(sent('config.set').at(-1)).toEqual({ key: 'fast', session_id: 's1', value: 'normal' })
     expect(app.session.info).toMatchObject({ fast: false, service_tier: '' })
   })
@@ -168,7 +168,7 @@ describe('App: fast mode', () => {
       }
     })
 
-    await localCommand('fast')!.run(app, 'on')
+    await must(localCommand('fast')).run(app, 'on')
     expect(app.transcript.entries.at(-1)).toMatchObject({ text: 'This model has no fast mode on its current route.' })
     expect(fastValue('ultrafast')).toBe('ultrafast')
     expect(fastValue('warp')).toBeNull()
@@ -226,7 +226,7 @@ describe('the effort chip and its levels', () => {
     app.changed()
     expect(await dock()).toContain('medium')
 
-    rememberCaps([{ capabilities: { 'plain-model': { fast: false, reasoning: false } }, models: ['plain-model'], name: 'P', slug: 'p' } as never])
+    rememberCaps([{ capabilities: { 'plain-model': { fast: false, reasoning: false } }, models: ['plain-model'], name: 'P', slug: 'p' }])
     app.changed()
     expect(await dock()).not.toContain('medium')
   })
@@ -280,9 +280,9 @@ describe('App: setting the effort', () => {
     const { app, sent } = setup(mutation())
     given.info(app, { model: 'm' })
 
-    await localCommand('reasoning')!.run(app, 'ultra')
+    await must(localCommand('reasoning')).run(app, 'ultra')
     await settle()
     expect(sent('session.mutate')[0]).toMatchObject({ operation: 'reasoning', payload: { effort: 'ultra' } })
-    expect(localCommand('reasoning')!.run(app, 'show')).toBe(false)
+    expect(must(localCommand('reasoning')).run(app, 'show')).toBe(false)
   })
 })

@@ -4,12 +4,13 @@
 // arranges what a test starts from through the stores' own APIs.
 import { EventEmitter } from 'node:events'
 
-import type { Key, Session } from '@stencil-hq/tern'
+import { type Key, node, Node, type Region, type RegionName, type Renderable, type Session, Span, type ViewInput } from '@stencil-hq/tern'
 import type { GatewayClient } from '@tui/gatewayClient.js'
 import type { SessionInfo } from '@tui/types.js'
 
 import type { SessionView } from '../app/ports.js'
 import { liveSessionId } from '../core/ids.js'
+import type { Overlay } from '../overlay.js'
 import type { SessionState } from '../session/state.js'
 import type { Activity, Busy } from '../turn/activity.js'
 
@@ -24,7 +25,7 @@ export interface Call {
 
 /** A key as Tern reports it: `name` with no modifiers unless `mods` says so. */
 export function key(name: string, mods: Partial<Key> = {}): Key {
-  return { alt: false, ctrl: false, meta: false, name, shift: false, ...mods } as Key
+  return { alt: false, ctrl: false, meta: false, name, shift: false, ...mods }
 }
 
 /** A shared-gateway stand-in: `request` answers from `handlers` (else `{}`), `event` feeds the app. */
@@ -42,6 +43,7 @@ export class FakeGateway extends EventEmitter {
 
   /** This fake as the gateway type App takes. */
   get client(): GatewayClient {
+    // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- boundary: this fake stands in for the gateway client
     return this as unknown as GatewayClient
   }
 
@@ -96,7 +98,7 @@ export function fakeTern({ cols = 80, draws = false, features = [] }: FakeTernOp
   const waiting: ((r: IteratorResult<TernInput>) => void)[] = []
   const opened: unknown[] = []
   const focused: (string | null)[] = []
-  let frame: unknown
+  let frame: Renderable | undefined
 
   const blank: object = new Proxy({}, { get: (_, name) => (name === 'closed' ? true : () => blank) })
   const surface = draws
@@ -104,7 +106,7 @@ export function fakeTern({ cols = 80, draws = false, features = [] }: FakeTernOp
         closed: false,
         focus: (id: string | null) => void focused.push(id),
         palette: () => undefined,
-        render: (tree: unknown) => void (frame = tree),
+        render: (tree: Renderable) => void (frame = tree),
         stylesheet: () => undefined
       }
     : blank
@@ -140,11 +142,14 @@ export function fakeTern({ cols = 80, draws = false, features = [] }: FakeTernOp
 
   return {
     /** This fake as the Tern session type App takes. */
+    // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- boundary: this fake stands in for a Tern session
     session: session as unknown as Session,
     /** The tree the surface drew last (undefined until a drawing surface renders). */
-    get frame(): unknown {
+    get frame(): Renderable | undefined {
       return frame
     },
+    /** Region `name` of the frame drawn last: the app draws a view by region. */
+    region: (name: RegionName): Region => (isView(frame) ? frame[name] : undefined),
     /** The options of each surface opened. */
     opened,
     /** Each caret move a drawing surface was sent, in order. */
@@ -160,6 +165,10 @@ export function fakeTern({ cols = 80, draws = false, features = [] }: FakeTernOp
   }
 }
 
+/** Whether `view` is a view by region (the app's frames), not bare nodes. */
+function isView(view: Renderable | undefined): view is ViewInput {
+  return typeof view === 'object' && view !== null && !(view instanceof Node) && !(view instanceof Span) && !Array.isArray(view)
+}
 
 /**
  * Lets the app finish what its last input or event started: one event-loop turn (its render is a
@@ -191,4 +200,25 @@ export const given = {
   session(chat: { readonly session: Pick<SessionState, 'ref'> }, live: string) {
     chat.session.ref = { live: liveSessionId(live), stored: chat.session.ref.stored }
   }
+}
+
+/** The nodes at the top of `region` (a list, one node, or none), as the app drew them. */
+export function topNodes(region: Region): Node[] {
+  const items: readonly unknown[] = Array.isArray(region) ? region : [region]
+
+  return items.filter(n => n instanceof Node)
+}
+
+/** `value`, failing the test where it is missing (null or undefined). */
+export function must<T>(value: T, what = 'a value'): NonNullable<T> {
+  if (value === undefined || value === null) {
+    throw new Error(`expected ${what}`)
+  }
+
+  return value
+}
+
+/** An overlay with nothing to show that takes every key, for a test to open (`modal`: a question sheet). */
+export function stubOverlay(key: string, { modal }: { modal?: boolean } = {}): Overlay {
+  return { key, ...(modal === undefined ? {} : { modal }), node: () => node('col'), onKey: () => true }
 }

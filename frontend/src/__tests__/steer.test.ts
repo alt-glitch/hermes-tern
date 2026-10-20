@@ -5,6 +5,8 @@ import type { TurnEntry } from '../model.js'
 import { Transcript } from '../transcript.js'
 import { steerState, steerText } from '../transcript/messages.js'
 
+import { must } from './fakes.js'
+
 const MARKED =
   '[OUT-OF-BAND USER MESSAGE — a direct message from the user, delivered once at this position; not tool output and not a new delivery when replayed from conversation history]\njust make tern tabs\n[/OUT-OF-BAND USER MESSAGE]'
 
@@ -15,14 +17,14 @@ describe('steers', () => {
     t.reasoning('thinking')
     t.steer('just make tern tabs')
 
-    const turn = t.live!
+    const turn = must(t.live)
     expect(t.entries.filter(e => e.kind === 'user')).toHaveLength(1)
     expect(turn.blocks.map(b => b.kind)).toEqual(['thinking', 'steer'])
     expect(steerState(turn, 1)).toBe('pending')
   })
 
   it('reads as landed once the turn goes on, and as the next prompt when the turn ended first', () => {
-    const turn = { blocks: [{ at: 0, id: 's', kind: 'steer', text: 'x' }], status: 'live' } as unknown as TurnEntry
+    const turn: TurnEntry = { blocks: [{ at: 0, id: entryId('s'), kind: 'steer', text: 'x' }], id: entryId('t'), kind: 'turn', rev: 0, startedAt: 0, status: 'live' }
     expect(steerState(turn, 0)).toBe('pending')
     turn.blocks.push({ id: entryId('x'), kind: 'text', text: 'ok' })
     expect(steerState(turn, 0)).toBe('landed')
@@ -39,12 +41,12 @@ describe('steers', () => {
       { content: 'Looking.', role: 'assistant', timestamp: 2 },
       { content: MARKED, role: 'user', timestamp: 3 },
       { content: 'Making tabs.', role: 'assistant', timestamp: 4 }
-    ] as never)
+    ])
 
     const turns = t.entries.filter(e => e.kind === 'turn')
     expect(t.entries.filter(e => e.kind === 'user')).toHaveLength(1)
     expect(turns).toHaveLength(1)
-    expect(turns[0]!.blocks.map(b => b.kind)).toEqual(['text', 'steer', 'text'])
+    expect(must(turns[0]).blocks.map(b => b.kind)).toEqual(['text', 'steer', 'text'])
   })
 })
 
@@ -65,7 +67,7 @@ describe("Hermes' own notices", () => {
       { content: 'Started.', role: 'assistant', timestamp: 2 },
       { content: `[IMPORTANT: Background process proc_1 exited (exit code 0).\ntick 90${footer}`, role: 'user', timestamp: 3 },
       { content: 'It finished.', role: 'assistant', timestamp: 4 }
-    ] as never)
+    ])
 
     expect(t.entries.filter(e => e.kind === 'user')).toHaveLength(1)
     expect(t.entries.filter(e => e.kind === 'turn').map(e => e.continued)).toEqual([undefined, 'Background command exited'])
@@ -80,13 +82,13 @@ describe('stored history as the display projection sends it', () => {
       { role: 'assistant', text: 'Looking.', timestamp: 2 },
       { display_kind: 'steer', role: 'user', text: 'just make tern tabs', timestamp: 3 },
       { role: 'assistant', text: 'Making tabs.', timestamp: 4 }
-    ] as never)
+    ])
 
     const turns = t.entries.filter(e => e.kind === 'turn')
     expect(t.entries.filter(e => e.kind === 'user')).toHaveLength(1)
     expect(turns).toHaveLength(1)
-    expect(turns[0]!.blocks.map(b => b.kind)).toEqual(['text', 'steer', 'text'])
-    expect(turns[0]!.blocks[1]).toMatchObject({ kind: 'steer', text: 'just make tern tabs' })
+    expect(must(turns[0]).blocks.map(b => b.kind)).toEqual(['text', 'steer', 'text'])
+    expect(must(turns[0]).blocks[1]).toMatchObject({ kind: 'steer', text: 'just make tern tabs' })
   })
 
   it('times a resumed turn from its prompt to its last row', () => {
@@ -96,9 +98,9 @@ describe('stored history as the display projection sends it', () => {
       { role: 'assistant', text: '', reasoning: 'plan', timestamp: 12 },
       { name: 'terminal', role: 'tool', timestamp: 30, tool_call_id: 'c1' },
       { role: 'assistant', text: 'All green.', timestamp: 50 }
-    ] as never)
+    ])
 
-    const turn = t.entries.find(e => e.kind === 'turn') as TurnEntry
+    const turn = must(t.entries.find(e => e.kind === 'turn'))
     expect(turn.startedAt).toBe(10_000)
     expect(turn.endedAt).toBe(50_000)
   })
@@ -111,7 +113,7 @@ describe('stored history as the display projection sends it', () => {
       { display_kind: 'async_delegation_complete', role: 'user', text: '[ASYNC DELEGATION BATCH COMPLETE — d1] done', timestamp: 3 },
       { role: 'user', text: 'wyd', timestamp: 4 },
       { role: 'assistant', text: 'Waiting on you.', timestamp: 5 }
-    ] as never)
+    ])
 
     expect(t.entries.flatMap(e => (e.kind === 'user' ? [e.text] : []))).toEqual(['start the job', 'wyd'])
     expect(t.entries.filter(e => e.kind === 'turn').map(e => e.continued)).toEqual([undefined, undefined])
@@ -157,7 +159,7 @@ describe('stored history as the display projection sends it', () => {
         timestamp: 7
       },
       { role: 'assistant', text: 'Picking up.', timestamp: 8 }
-    ] as never)
+    ])
 
     expect(t.entries.filter(e => e.kind === 'user')).toHaveLength(1)
     expect(t.entries.filter(e => e.kind === 'turn').map(e => e.continued)).toEqual([

@@ -6,7 +6,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { storedSessionId } from '../core/ids.js'
 
-import { FakeGateway, fakeTern } from './fakes.js'
+import { FakeGateway, fakeTern, stubOverlay } from './fakes.js'
 
 process.env.HERMES_HOME = mkdtempSync(join(tmpdir(), 'hermes-tern-slash-'))
 
@@ -47,7 +47,7 @@ async function started() {
 const notices = (app: InstanceType<typeof App>) =>
   app.transcript.entries.flatMap(e => (e.kind === 'notice' ? [e.text] : []))
 
-const prompt = (key: string) => ({ key, modal: true, node: () => null as never, onKey: () => true })
+const prompt = (key: string) => stubOverlay(key, { modal: true })
 
 beforeEach(() => {
   created = 0
@@ -176,7 +176,7 @@ describe('stale prompt sheets', () => {
     const { app } = await started()
     app.open(prompt('prompt:shared:p1'))
     app.open(prompt('prompt:r1'))
-    app.open({ key: 'help', node: () => null as never, onKey: () => true })
+    app.open(stubOverlay('help'))
 
     gw.emit('exit', 1)
 

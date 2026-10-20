@@ -2,10 +2,10 @@ import { mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import type { Key } from '@stencil-hq/tern'
+import type { Key, Node } from '@stencil-hq/tern'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { FakeGateway, fakeTern, given, key, type Reply, settle as settleGateway } from './fakes.js'
+import { FakeGateway, fakeTern, given, key, must, type Reply, settle as settleGateway, stubOverlay, topNodes } from './fakes.js'
 
 vi.mock('@tui/lib/history.js', () => ({ append: () => undefined, load: () => [] }))
 
@@ -22,7 +22,7 @@ writeFileSync(png, Buffer.from([137, 80, 78, 71, 13, 10, 26, 10, 0, 0]))
 let gateway: FakeGateway
 
 /** The app on a fake Tern and gateway: keys go in, gateway requests come out (`canonical`: the shared gateway). */
-function setup(replies: Record<string, Reply> = {}, { canonical = true, features = [] as string[] } = {}) {
+function setup(replies: Record<string, Reply> = {}, { canonical = true, features = [] }: { canonical?: boolean; features?: string[] } = {}) {
   const gw = (gateway = new FakeGateway({ canonical, replies }))
   let uploads = 0
 
@@ -58,12 +58,11 @@ function setup(replies: Record<string, Reply> = {}, { canonical = true, features
 
   /** The dock's queued rows as last rendered: their text and which actions they offer. */
   const queuedRows = () => {
-    const dock = JSON.parse(JSON.stringify((tern.frame as { dock: unknown[] }).dock)) as { k: string; p?: { key?: string; role?: string; text?: string }; c?: never[] }[]
-    const rows = dock.find(n => n.p?.role === 'omp.queue')?.c ?? []
+    const rows = topNodes(tern.region('dock')).find(n => n.props['role'] === 'omp.queue')?.children ?? []
 
-    return rows.map((r: { c: { p?: { role?: string; text?: string } }[] }) => ({
-      actions: r.c.flatMap(c => (c.p?.role === 'omp.queue.steer' ? ['steer'] : c.p?.role === 'omp.queue.edit' ? ['edit'] : [])),
-      text: r.c.find(c => c.p?.text !== undefined)?.p?.text
+    return rows.map((r: Node) => ({
+      actions: r.children.flatMap(c => (c.props['role'] === 'omp.queue.steer' ? ['steer'] : c.props['role'] === 'omp.queue.edit' ? ['edit'] : [])),
+      text: r.children.find(c => c.props['text'] !== undefined)?.props['text']
     }))
   }
 
@@ -287,7 +286,7 @@ describe('App: Ctrl+C with a sheet open', () => {
     await press(key('c', { ctrl: true }))
     expect(respond).toHaveBeenCalledWith({ value: '' })
 
-    app.open({ key: 'picker', modal: true, node: () => null as never, onKey: () => true })
+    app.open(stubOverlay('picker', { modal: true }))
     await press(key('c', { ctrl: true }))
     expect(app.overlays).toHaveLength(0)
   })
@@ -416,7 +415,7 @@ describe('App: Enter while a turn runs (busy_input_mode)', () => {
     expect(users(app)).toEqual([])
     expect(queuedRows()).toEqual([{ actions: ['edit'], text: 'next one ↵ 📎 1 image' }])
 
-    const row = { admission_id: 'a1', input_id: submit!.submission_id, status: 'queued', user: 'next one' }
+    const row = { admission_id: 'a1', input_id: must(submit).submission_id, status: 'queued', user: 'next one' }
     emit('event', { payload: { pending_submissions: [row] }, session_id: 's1', type: 'session.info' })
     emit('event', { payload: { text: 'first reply' }, session_id: 's1', type: 'message.complete' })
     emit('event', { payload: {}, session_id: 's1', type: 'message.start' })
@@ -446,7 +445,7 @@ describe('App: Enter while a turn runs (busy_input_mode)', () => {
     expect(users(app)).toEqual([])
     expect(queuedRows()).toEqual([{ actions: ['steer', 'edit'], text: '/fanout if needed' }])
 
-    const row = { admission_id: 'a1', input_id: submit!.submission_id, status: 'queued', user: body }
+    const row = { admission_id: 'a1', input_id: must(submit).submission_id, status: 'queued', user: body }
     emit('event', { payload: { pending_submissions: [row] }, session_id: 's1', type: 'session.info' })
     emit('event', { payload: { text: 'first reply' }, session_id: 's1', type: 'message.complete' })
     emit('event', { payload: {}, session_id: 's1', type: 'message.start' })
@@ -461,7 +460,7 @@ describe('App: Enter while a turn runs (busy_input_mode)', () => {
     const { app, emit, press, sent, type } = setup()
     await type('hello')
     await press(key('enter'))
-    const row = { admission_id: 'a1', input_id: sent('prompt.submit')[0]!.submission_id, status: 'queued', user: 'hello' }
+    const row = { admission_id: 'a1', input_id: must(sent('prompt.submit')[0]).submission_id, status: 'queued', user: 'hello' }
 
     emit('event', { payload: { pending_submissions: [row] }, session_id: 's1', type: 'session.info' })
     emit('event', { payload: { pending_submissions: [{ ...row, status: 'started' }] }, session_id: 's1', type: 'session.info' })
@@ -495,7 +494,7 @@ describe('App: Enter while a turn runs (busy_input_mode)', () => {
     app.transcript.start()
     await type('use tabs')
     await press(key('enter'))
-    const row = { admission_id: 'a1', input_id: sent('prompt.submit')[0]!.submission_id, status: 'queued', user: 'use tabs' }
+    const row = { admission_id: 'a1', input_id: must(sent('prompt.submit')[0]).submission_id, status: 'queued', user: 'use tabs' }
     emit('event', { payload: { pending_submissions: [row] }, session_id: 's1', type: 'session.info' })
     await settle()
     expect(queuedRows()).toEqual([{ actions: ['steer', 'edit'], text: 'use tabs' }])
@@ -521,7 +520,7 @@ describe('App: Enter while a turn runs (busy_input_mode)', () => {
     given.busy(app, { ...busy })
     await type('fix me')
     await press(key('enter'))
-    const row = { admission_id: 'a1', input_id: sent('prompt.submit')[0]!.submission_id, status: 'queued', user: 'fix me' }
+    const row = { admission_id: 'a1', input_id: must(sent('prompt.submit')[0]).submission_id, status: 'queued', user: 'fix me' }
     emit('event', { payload: { pending_submissions: [row] }, session_id: 's1', type: 'session.info' })
 
     await press(key('up', { alt: true }))
@@ -657,7 +656,7 @@ describe('App: the session folder reaches Tern', () => {
     const osc7 = write.mock.calls.map(c => String(c[0])).filter(s => s.startsWith('\x1b]7;'))
     write.mockRestore()
     expect(osc7).toHaveLength(2)
-    expect(osc7[0]).toMatch(/^\x1b\]7;file:\/\/[^/]*\/repo\/\.worktrees\/wt%201\x07$/)
-    expect(osc7[1]).toMatch(/\/elsewhere\x07$/)
+    expect(osc7[0]).toMatch(/^\x1b\]7;file:\/\/[^/]*\/repo\/\.worktrees\/wt%201\x07$/) // eslint-disable-line no-control-regex -- the OSC 7 escape is what this checks
+    expect(osc7[1]).toMatch(/\/elsewhere\x07$/) // eslint-disable-line no-control-regex -- the OSC's BEL terminator is what this checks
   })
 })
