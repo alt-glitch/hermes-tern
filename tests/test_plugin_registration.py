@@ -36,7 +36,7 @@ def ctx():
 def test_registers_only_public_plugin_apis(ctx):
     assert {n for n, _, _ in ctx.calls} == {
         "register_cli_command", "register_auxiliary_task", "register_tool", "register_system_prompt_section",
-        "register_hook", "register_middleware"}
+        "register_hook", "register_middleware", "register_skill"}
 
 
 def test_the_tools_hook_and_middleware_are_the_declared_ones(ctx):

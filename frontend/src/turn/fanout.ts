@@ -78,15 +78,18 @@ export interface MessageFanout {
   summarize(): void
   /** Sends the oldest queued prompt, if the session is idle now. */
   drain(): void
+  /** Checks the finished reply's figures, and asks the agent once to resend those that would not render. */
+  checkFigures(p: MessageCompletePayload): void
 }
 
 /**
- * A message.complete that ends the turn: the transcript folds it, the working line and any
- * compaction end, the queue drains, and the PRs and the sidebar read again, in that order.
+ * A message.complete that ends the turn: the transcript folds it, the working line ends, its
+ * figures are checked, any compaction ends, the queue drains, and the PRs and the sidebar read again, in that order.
  */
 export function afterMessageComplete(p: MessageCompletePayload, cx: MessageFanout) {
   cx.transcript.complete(p)
   cx.activity.endBusy()
+  cx.checkFigures(p)
   cx.activity.endCompaction()
   // A compaction Hermes aborted sends no done edge; one that committed has its summary stored now.
   cx.transcript.compactions.uncompact('running')
