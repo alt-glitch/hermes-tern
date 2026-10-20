@@ -104,7 +104,7 @@ export class ConnectWatcher {
       const missed = this.#noCard.get(call)
 
       // A running call has no card yet; by its call id alone it would take an earlier call's.
-      if (call.connect?.settled || call.status === 'running' || (missed !== undefined && now - missed < NO_CARD_MS)) {
+      if (call.connect?.settled || call.outcome.kind === 'running' || (missed !== undefined && now - missed < NO_CARD_MS)) {
         continue
       }
 

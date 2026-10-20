@@ -46,7 +46,8 @@ const call = (name: string, args: Record<string, unknown>, { id = 'c1', ...more 
   id: toolCallId(id),
   name,
   startedAt: 0,
-  status: 'done',
+  outcome: { duration: 0, kind: 'done' },
+  via: { kind: 'direct' },
   ...more
 })
 
@@ -145,12 +146,12 @@ describe('shownImage: the image a tool call showed', () => {
   it('image_generate: the host file before the agent-side one, nothing on failure or while it runs', () => {
     expect(shownImage(call('image_generate', {}, { result: { host_image: '/h/i.png', image: '/sandbox/i.png', success: true } }))).toBe('/h/i.png')
     expect(shownImage(call('image_generate', {}, { result: JSON.stringify({ image: 'https://x/i.png', success: true }) }))).toBe('https://x/i.png')
-    expect(shownImage(call('image_generate', {}, { result: { error: 'quota', image: null, success: false }, status: 'error' }))).toBeUndefined()
-    expect(shownImage(call('image_generate', { prompt: 'a cat' }, { status: 'running' }))).toBeUndefined()
+    expect(shownImage(call('image_generate', {}, { result: { error: 'quota', image: null, success: false }, outcome: { duration: 0, kind: 'error' } }))).toBeUndefined()
+    expect(shownImage(call('image_generate', { prompt: 'a cat' }, { outcome: { kind: 'running' } }))).toBeUndefined()
   })
 
   it('vision_analyze shows none (it folds); a browser screenshot: the path in its result', () => {
-    expect(shownImage(call('vision_analyze', { image_url: '/h/a.png' }, { status: 'running' }))).toBeUndefined()
+    expect(shownImage(call('vision_analyze', { image_url: '/h/a.png' }, { outcome: { kind: 'running' } }))).toBeUndefined()
     expect(shownImage(call('browser_vision', {}, { result: { meta: { screenshot_path: '/h/s.png' } } }))).toBe('/h/s.png')
     expect(shownImage(call('browser_vision', {}, { result: { analysis: 'a page', screenshot_path: '/h/t.png', success: true } }))).toBe('/h/t.png')
     expect(shownImage(call('browser_vision', {}, { resultText: 'Looks fine. Screenshot path: /h/u.png' }))).toBe('/h/u.png')
@@ -230,7 +231,7 @@ describe('image cards', () => {
   })
 
   it('a failed image_generate keeps its error note and shows no image', () => {
-    const c = call('image_generate', { prompt: 'x' }, { result: { error: 'Content policy', image: null, success: false }, status: 'error' })
+    const c = call('image_generate', { prompt: 'x' }, { result: { error: 'Content policy', image: null, success: false }, outcome: { duration: 0, kind: 'error' } })
     const n = tree(toolNode(c, 0))
     expect(images(n)).toEqual([])
     expect(n.p?.note).toContain('Content policy')
@@ -257,7 +258,7 @@ describe('image cards', () => {
     expect([...(foldOf(turn)?.hidden ?? [])]).toEqual(['b1'])
 
     // A failed one has no image to keep in view.
-    const failed = { ...img, status: 'error' as const }
+    const failed: ToolCall = { ...img, outcome: { duration: 0, kind: 'error' } }
     expect(foldOf({ ...turn, blocks: [{ call: failed, id: entryId('b2'), kind: 'tool' }, blocks[2]!] })?.hidden.has('b2')).toBe(true)
   })
 })

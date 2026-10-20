@@ -245,7 +245,8 @@ const CALL: ToolCall = {
   id: toolCallId('c1'),
   name: 'terminal',
   startedAt: 0,
-  status: 'done'
+  outcome: { duration: 0, kind: 'done' },
+  via: { kind: 'direct' }
 }
 
 describe('afterToolComplete', () => {

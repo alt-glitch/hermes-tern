@@ -166,7 +166,7 @@ export class Agents {
 
       if (this.#track(call, at)) {
         this.#tracked.add(call)
-      } else if (call.result === undefined && call.status !== 'running' && !call.subagents?.length) {
+      } else if (call.result === undefined && call.outcome.kind !== 'running' && !call.subagents?.length) {
         bare = true
       }
     }

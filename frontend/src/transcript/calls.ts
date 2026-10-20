@@ -46,6 +46,11 @@ export function callsWhere(entries: readonly Entry[], match: (call: ToolCall) =>
   return entries.flatMap(e => (e.kind === 'turn' ? e.blocks.flatMap(b => (b.kind === 'tool' && match(b.call) ? [b.call] : [])) : []))
 }
 
+/** How long `call` took, in milliseconds; undefined while it runs. */
+export function tookMs(call: Pick<ToolCall, 'outcome'>): number | undefined {
+  return call.outcome.kind === 'running' ? undefined : call.outcome.duration
+}
+
 /** The task tool's names: `todo_list`, and `todo`, the legacy alias in stored transcripts. */
 export function isTodoName(name: string): boolean {
   return name === 'todo_list' || name === 'todo'

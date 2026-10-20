@@ -6,7 +6,7 @@
 // or args its parser did not expect) gives way to the generic one through withView, and the pane
 // hears of it once per tool name (faults.ts).
 
-import { appsOf, type BatchEntry, callApp } from '../../bridge.js'
+import { appsOf, batchOf, type BatchEntry, callApp } from '../../bridge.js'
 import type { ToolCall } from '../../model.js'
 import { type DetailOf, detailOf, type ToolKey, toolKeyOf } from '../../tools/detail.js'
 
@@ -150,7 +150,7 @@ function matched(call: ToolCall): CallView | undefined {
     return { ...hookless(call), card: () => appCard(call, app), step: () => `${app.app} · ${app.action}` }
   }
 
-  const batch = call.batch
+  const batch = batchOf(call)
 
   if (batch) {
     return {
@@ -165,9 +165,7 @@ function matched(call: ToolCall): CallView | undefined {
 
 /** A batch entry as a call of its own: the batch's call with the entry's tool and args. */
 function entryCall(call: ToolCall, e: BatchEntry): ToolCall {
-  const { batch, ...rest } = call
-
-  return { ...rest, args: e.args, name: e.name }
+  return { ...call, args: e.args, name: e.name, via: { kind: 'bridged' } }
 }
 
 /** What an app or batch view shares: no hooks, and `app` while every call it made acts in an app, else its tool's action. */

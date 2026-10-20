@@ -2,7 +2,8 @@
 
 import type { JSX } from '@stencil-hq/tern'
 
-import { type AppTool, appsOf, callApp } from '../../../bridge.js'
+import { appOf, type AppTool, appsOf, type BatchEntry } from '../../../bridge.js'
+import type { NonEmpty } from '../../../core/assert.js'
 import type { ToolCall } from '../../../model.js'
 import { clip } from '../../format.js'
 import type { Card } from '../types.js'
@@ -13,7 +14,7 @@ import { errorOf, genericBody, humanize, pretty } from './generic.js'
 export function appCard(call: ToolCall, app: AppTool): Card {
   return {
     badges: [{ text: app.kind === 'mcp' ? 'MCP' : 'connector' }],
-    body: call.batch ? batchBody(call) : appBody(call),
+    body: call.via.kind === 'batch' ? batchBody(call, call.via.entries) : appBody(call),
     folded: true,
     frame: 'inline',
     name: 'plug',
@@ -24,12 +25,12 @@ export function appCard(call: ToolCall, app: AppTool): Card {
 }
 
 /** A batch of tool calls with no one app: the apps it reached head it, one line per entry below. */
-export function batchCard(call: ToolCall, batch: NonNullable<ToolCall['batch']>): Card {
+export function batchCard(call: ToolCall, batch: NonEmpty<BatchEntry>): Card {
   const apps = appsOf(call)
 
   return {
     badges: apps.length ? [{ text: 'connectors' }] : undefined,
-    body: batchBody(call),
+    body: batchBody(call, batch),
     folded: true,
     frame: 'inline',
     name: 'plug',
@@ -46,7 +47,7 @@ function appBody(call: ToolCall): JSX.Element[] {
     .slice(0, 12)
     .map(([k, v]) => ({ k: [{ t: k.replace(/_/g, ' ') }], v: clip(typeof v === 'string' ? v : JSON.stringify(v), { mark: 'line', max: 300 }) }))
 
-  const error = call.status === 'error' ? errorOf(call) : undefined
+  const error = call.outcome.kind === 'error' ? errorOf(call) : undefined
 
   return [
     ...(facts.length ? [<kv items={facts} key="args" />] : []),
@@ -55,20 +56,21 @@ function appBody(call: ToolCall): JSX.Element[] {
 }
 
 /** A batch: one line per entry with its outcome, then each answer. */
-function batchBody(call: ToolCall): JSX.Element[] {
-  return (call.batch ?? []).flatMap((e, i) => {
-    const app = callApp({ args: e.args, name: e.name })
-    const tone = e.status === 'error' ? 'error' : e.status === 'running' ? 'pending' : 'success'
-    const answer = e.error ?? (e.result === undefined ? undefined : pretty(e.result))
+function batchBody(call: ToolCall, batch: readonly BatchEntry[]): JSX.Element[] {
+  return batch.flatMap(({ args, name, outcome }, i) => {
+    const app = appOf(name, args)
+    const tone = outcome.kind === 'error' ? 'error' : outcome.kind === 'running' ? 'pending' : 'success'
+    const error = outcome.kind === 'error' ? outcome.error : undefined
+    const answer = error ?? (outcome.kind !== 'done' || outcome.result === undefined ? undefined : pretty(outcome.result))
 
     return [
       <row align="center" gap="sm" key={`e${i}`}>
-        <icon key="i" name={e.status === 'error' ? 'x' : e.status === 'running' ? 'clock' : 'check'} tone={tone} />
-        <text grow={1} key="t" spans={[{ t: app ? `${app.app} · ${app.action}` : humanize(e.name) }]} truncate="end" wrap="none" />
+        <icon key="i" name={outcome.kind === 'error' ? 'x' : outcome.kind === 'running' ? 'clock' : 'check'} tone={tone} />
+        <text grow={1} key="t" spans={[{ t: app ? `${app.app} · ${app.action}` : humanize(name) }]} truncate="end" wrap="none" />
       </row>,
-      ...(e.error
-        ? [<text key={`r${i}`} spans={[{ s: 'error', t: clip(e.error, { mark: 'line', max: 600 }) }]} wrap="word" />]
-        : answer && call.status !== 'running'
+      ...(error
+        ? [<text key={`r${i}`} spans={[{ s: 'error', t: clip(error, { mark: 'line', max: 600 }) }]} wrap="word" />]
+        : answer && call.outcome.kind !== 'running'
           ? [<code key={`r${i}`} lang={/^\s*[[{]/.test(answer) ? 'json' : 'text'} max={{ h: '8lines' }} text={clip(answer, { mark: 'line', max: 2000 })} wrap />]
           : [])
     ]

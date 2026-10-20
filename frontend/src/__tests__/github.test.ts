@@ -33,15 +33,16 @@ const ref = (number: number, repository = 'acme/app'): PrRef => ({
   url: `https://github.com/${repository}/pull/${number}`
 })
 
-const linkCall = (linked: PrRef[], status: ToolCall['status'] = 'done'): ToolCall => ({
+const linkCall = (linked: PrRef[], kind: 'done' | 'error' = 'done'): ToolCall => ({
   args: {},
   argsText: '',
   context: '',
   id: toolCallId('l'),
   name: 'link_pull_request',
   result: JSON.stringify({ already_linked: false, linked }),
+  outcome: { duration: 0, kind },
   startedAt: 0,
-  status
+  via: { kind: 'direct' }
 })
 
 const prJson = (over: Record<string, unknown> = {}) => ({

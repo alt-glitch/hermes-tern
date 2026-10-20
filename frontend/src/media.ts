@@ -23,7 +23,7 @@ const FETCH_MS = 20_000
  * call that showed none, failed, or (image_generate) has not answered yet.
  */
 export function shownImage(call: ToolCall): string | undefined {
-  if (call.status === 'error' || call.status === 'cancelled') {
+  if (call.outcome.kind === 'error' || call.outcome.kind === 'cancelled') {
     return undefined
   }
 

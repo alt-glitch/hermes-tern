@@ -17,7 +17,8 @@ const call = (name: string, result: unknown): ToolCall => ({
   name,
   result: JSON.stringify(result),
   startedAt: 0,
-  status: 'done'
+  outcome: { duration: 0, kind: 'done' },
+  via: { kind: 'direct' }
 })
 
 describe('cron jobs', () => {

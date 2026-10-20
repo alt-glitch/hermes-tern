@@ -6,7 +6,7 @@
 
 import type { JSX } from '@stencil-hq/tern'
 
-import { callApp } from '../../../bridge.js'
+import { appOf } from '../../../bridge.js'
 import { shownImage } from '../../../media.js'
 import type { ToolCall } from '../../../model.js'
 import { tilesNode } from '../../../processes/widgets/view.js'
@@ -93,7 +93,7 @@ export const toolDescribeView: ToolView<'tool_describe'> = {
   ...plain(own, 'lookup'),
   step: (_call, d) => {
     const named = d.names.map(n => {
-      const app = callApp({ args: {}, name: n })
+      const app = appOf(n)
 
       return app ? `${app.app} · ${app.action}` : n.replace(/_/g, ' ')
     })
@@ -148,7 +148,7 @@ export function genericCard(call: ToolCall, d: GenericFields, look: Look): Card 
 export function genericBody(call: ToolCall): JSX.Element[] {
   const text = call.resultText ?? (call.result === undefined ? undefined : pretty(call.result))
 
-  if (!text || call.status === 'running') {
+  if (!text || call.outcome.kind === 'running') {
     return []
   }
 
@@ -183,7 +183,7 @@ export function plainErrorOf(call: ToolCall): string | undefined {
 /** Why `call` failed, with `result` its result as an object. */
 function errorIn(call: ToolCall, result: Record<string, unknown> | undefined): string | undefined {
   return (
-    nonEmpty(result?.['error']) ?? nonEmpty(call.summary) ?? (typeof call.result === 'string' && !result ? call.result : undefined)
+    nonEmpty(result?.['error']) ?? nonEmpty(call.outcome.kind === 'running' ? undefined : call.outcome.summary) ?? (typeof call.result === 'string' && !result ? call.result : undefined)
   )
 }
 

@@ -28,7 +28,7 @@ function taskCard(call: ToolCall, d: TaskDetail, now: number): Card {
   // Until the first subagent event, the requested tasks stand in as pending rows.
   const rows = agents.length
     ? agents.map(a => agentNode(a, now))
-    : call.status === 'running' || d.dispatched
+    : call.outcome.kind === 'running' || d.dispatched
       ? goals.map((g, i) => <agent key={`p${i}`} name={`Agent ${i + 1}`} status="pending" task={g} />)
       : settledRows(goals, d.results)
 
@@ -106,7 +106,7 @@ function outcome(r: TaskResult | undefined): { status: string; summary: string |
  * sheet (a click away), not here. A failed dispatch keeps the Task card, which says why.
  */
 function soloTask(call: ToolCall, d: TaskDetail, now: number): JSX.Element | undefined {
-  if (d.tasks.length > 1 || (call.subagents?.length ?? 0) > 1 || call.status === 'error' || d.failed) {
+  if (d.tasks.length > 1 || (call.subagents?.length ?? 0) > 1 || call.outcome.kind === 'error' || d.failed) {
     return undefined
   }
 
@@ -119,7 +119,7 @@ function soloTask(call: ToolCall, d: TaskDetail, now: number): JSX.Element | und
   }
 
   // Before its first event the request stands in; a resumed one has only its result.
-  const pending = call.status === 'running' || d.dispatched
+  const pending = call.outcome.kind === 'running' || d.dispatched
   const { status, summary } = pending ? { status: 'pending', summary: undefined } : outcome(d.results[0])
 
   return (

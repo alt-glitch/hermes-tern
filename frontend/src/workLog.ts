@@ -4,7 +4,7 @@
 // and read 2 files"), each step one line; a finished turn folds everything but its answer
 // behind "Worked for 54s". The views in view/workLog.tsx draw what this derives.
 
-import { appsOf, callApp } from './bridge.js'
+import { appOf, appsOf, batchOf } from './bridge.js'
 import { isConnectCall } from './connections.js'
 import { shownImage } from './media.js'
 import type { Block, ToolCall, TurnEntry } from './model.js'
@@ -41,7 +41,7 @@ export function ownsCard(call: ToolCall): boolean {
 
 /** A process wait, poll or log still running. */
 function waiting(call: ToolCall): boolean {
-  return isWatchCall(call) && call.status === 'running'
+  return isWatchCall(call) && call.outcome.kind === 'running'
 }
 
 /** A call with an image to show; its card stays out of the fold, so the picture is in view. */
@@ -125,7 +125,7 @@ export function foldOf(turn: TurnEntry): Fold | undefined {
       continue
     }
 
-    if (answer >= 0 && i > answer && b.kind === 'tool' && b.call.status !== 'done') {
+    if (answer >= 0 && i > answer && b.kind === 'tool' && b.call.outcome.kind !== 'done') {
       continue
     }
 
@@ -212,7 +212,7 @@ function actionLabel(action: Action, n: number, calls: readonly ToolCall[] = [])
     case 'app': {
       // "Used Linear 3 times", "Used Linear and Slack": the apps, as connectors are not interchangeable.
       const apps = [...new Set(calls.flatMap(appsOf))]
-      const uses = calls.reduce((k, c) => k + (c.batch?.length ?? 1), 0)
+      const uses = calls.reduce((k, c) => k + (batchOf(c)?.length ?? 1), 0)
 
       return apps.length === 1 ? `Used ${apps[0]}${uses > 1 ? ` ${uses} times` : ''}` : `Used ${and(apps)}`
     }
@@ -349,7 +349,7 @@ export function liveLabel(item: WorkItem, active = false): string {
   }
 
   const call = item.call
-  const status = active && call.status === 'done' ? 'running' : call.status
+  const status = active && call.outcome.kind === 'done' ? 'running' : call.outcome.kind
   const command = call.name === 'terminal' ? (nonEmpty(call.args['command']) ?? call.context) : undefined
 
   if (!command) {
@@ -368,7 +368,7 @@ export function busyLabel(call: ToolCall): string {
 
 /** The working line while the model writes a call: only its name is known yet. */
 export function preparingLabel(name: string): string {
-  const app = callApp({ args: {}, name })
+  const app = appOf(name)
 
   return `Preparing ${app ? `${app.app} · ${app.action}` : name.replace(/_/g, ' ')}…`
 }

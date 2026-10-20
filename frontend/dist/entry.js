@@ -26045,7 +26045,7 @@ function taskCard(call, d, now) {
   const tasks = d.tasks;
   const goals = tasks.length ? tasks.map((t2) => t2.goal ?? "") : d.goal ? [d.goal] : [];
   const agents2 = call.subagents ?? [];
-  const rows2 = agents2.length ? agents2.map((a2) => agentNode(a2, now)) : call.status === "running" || d.dispatched ? goals.map((g, i) => /* @__PURE__ */ jsx("agent", { name: `Agent ${i + 1}`, status: "pending", task: g }, `p${i}`)) : settledRows(goals, d.results);
+  const rows2 = agents2.length ? agents2.map((a2) => agentNode(a2, now)) : call.outcome.kind === "running" || d.dispatched ? goals.map((g, i) => /* @__PURE__ */ jsx("agent", { name: `Agent ${i + 1}`, status: "pending", task: g }, `p${i}`)) : settledRows(goals, d.results);
   const context = d.context ?? (tasks.length === 1 ? tasks[0]?.context : void 0);
   const working = agents2.some((a2) => a2.status === "running" || a2.status === "queued") || !agents2.length && d.dispatched;
   const settled2 = agents2.filter((a2) => a2.status !== "running" && a2.status !== "queued");
@@ -26093,7 +26093,7 @@ function outcome(r) {
   return { status, summary: r?.summary ?? r?.error };
 }
 function soloTask(call, d, now) {
-  if (d.tasks.length > 1 || (call.subagents?.length ?? 0) > 1 || call.status === "error" || d.failed) {
+  if (d.tasks.length > 1 || (call.subagents?.length ?? 0) > 1 || call.outcome.kind === "error" || d.failed) {
     return void 0;
   }
   const goal = d.tasks[0]?.goal ?? d.goal ?? call.subagents?.[0]?.goal ?? "Delegated task";
@@ -26102,7 +26102,7 @@ function soloTask(call, d, now) {
   if (a2) {
     return agentNode(a2, now, { key: call.id, name });
   }
-  const pending = call.status === "running" || d.dispatched;
+  const pending = call.outcome.kind === "running" || d.dispatched;
   const { status, summary: summary4 } = pending ? { status: "pending", summary: void 0 } : outcome(d.results[0]);
   return /* @__PURE__ */ jsx(
     "agent",
@@ -26124,6 +26124,25 @@ function briefOf(call, index2) {
 }
 function briefNode(head2, text15) {
   return /* @__PURE__ */ jsx("section", { collapsed: true, collapsible: true, head: head2, role: "hermes.task.brief", children: /* @__PURE__ */ jsx("md", { children: text15 }, "md") }, "brief");
+}
+
+// src/core/assert.ts
+function isNonEmpty(list9) {
+  return list9.length > 0;
+}
+function assertNever(value, what = "variant") {
+  throw new Error(`Unexpected ${what}: ${shown(value)}`);
+}
+function oneOf(values) {
+  const known2 = new Set(values);
+  return (value) => known2.has(value);
+}
+function shown(value) {
+  try {
+    return typeof value === "string" ? value : JSON.stringify(value) ?? String(value);
+  } catch {
+    return String(value);
+  }
 }
 
 // src/bridge.ts
@@ -26179,14 +26198,23 @@ function entriesOf(args) {
   });
 }
 function unwrap(name, args) {
+  const direct = { args, name, via: { kind: "direct" } };
   if (name !== BRIDGE && name !== BATCH) {
-    return { args, name };
+    return direct;
   }
   const entries = entriesOf(args);
-  if (entries.length === 1) {
-    return { ...entries[0], via: "tool_call" };
+  const [only] = entries;
+  if (only && entries.length === 1) {
+    return { ...only, via: { kind: "bridged" } };
   }
-  return entries.length ? { args, batch: entries.map((e) => ({ ...e, status: "running" })), name, via: "tool_call" } : { args, name };
+  const batch2 = entries.map((e) => ({ ...e, outcome: { kind: "running" } }));
+  return isNonEmpty(batch2) ? { args, name, via: { entries: batch2, kind: "batch" } } : direct;
+}
+function nextVia(prev, next2) {
+  return next2.kind !== "direct" ? next2 : prev.kind === "batch" ? { kind: "bridged" } : prev;
+}
+function batchOf(call) {
+  return call.via.kind === "batch" ? call.via.entries : void 0;
 }
 function batchResults(result) {
   const results = record(result)?.results;
@@ -26200,36 +26228,36 @@ function batchResults(result) {
   });
 }
 function settleBridge(call) {
-  if (call.via !== "tool_call") {
+  if (call.via.kind === "direct") {
     return void 0;
   }
   const outcomes = batchResults(call.result);
   if (!outcomes) {
     return void 0;
   }
-  if (call.batch) {
-    call.batch.forEach((e, i) => {
+  if (call.via.kind === "batch") {
+    const entries = call.via.entries;
+    entries.forEach((e, i) => {
       const o2 = outcomes[i];
-      e.status = o2?.error ? "error" : "done";
-      e.result = o2?.result;
-      e.error = o2?.error;
+      e.outcome = o2?.error ? { error: o2.error, kind: "error" } : { kind: "done", result: o2?.result };
     });
-    return call.batch.every((e) => e.status === "error");
+    return entries.every((e) => e.outcome.kind === "error");
   }
   const o = outcomes[0];
   call.result = o?.error ? { error: o.error } : o?.result;
   return Boolean(o?.error);
 }
 function appsOf(call) {
-  const apps = (call.batch ?? [call]).map((e) => callApp({ args: e.args, name: e.name })?.app);
+  const apps = (batchOf(call) ?? [call]).map((e) => appOf(e.name, e.args)?.app);
   const named2 = apps.filter((a2) => Boolean(a2));
   return named2.length === apps.length ? [...new Set(named2)] : [];
 }
 function callApp(call) {
-  if (call.batch) {
-    const apps = call.batch.map((e) => appOf(e.name, e.args));
+  const batch2 = batchOf(call);
+  if (batch2) {
+    const apps = batch2.map((e) => appOf(e.name, e.args));
     const first2 = apps[0];
-    return first2 && apps.every((a2) => a2?.app === first2.app) ? { ...first2, action: `${call.batch.length} calls` } : void 0;
+    return first2 && apps.every((a2) => a2?.app === first2.app) ? { ...first2, action: `${batch2.length} calls` } : void 0;
   }
   return appOf(call.name, call.args);
 }
@@ -26322,7 +26350,7 @@ var str3 = (v) => typeof v === "string" && v.trim() ? v.trim() : void 0;
 var MAX_BYTES = 16 * 1024 * 1024;
 var FETCH_MS = 2e4;
 function shownImage(call) {
-  if (call.status === "error" || call.status === "cancelled") {
+  if (call.outcome.kind === "error" || call.outcome.kind === "cancelled") {
     return void 0;
   }
   const r = record(call.result);
@@ -26729,6 +26757,9 @@ function callIn(turn, match) {
 function callsWhere(entries, match) {
   return entries.flatMap((e) => e.kind === "turn" ? e.blocks.flatMap((b) => b.kind === "tool" && match(b.call) ? [b.call] : []) : []);
 }
+function tookMs(call) {
+  return call.outcome.kind === "running" ? void 0 : call.outcome.duration;
+}
 function isTodoName(name) {
   return name === "todo_list" || name === "todo";
 }
@@ -27011,7 +27042,7 @@ function withoutTernEnv(command) {
 
 // src/view/tools/cards/image.tsx
 function imageCard(call, d, look, src) {
-  const said = call.status === "running" ? void 0 : d.said;
+  const said = call.outcome.kind === "running" ? void 0 : d.said;
   return {
     ...look,
     body: [
@@ -27081,7 +27112,7 @@ var toolDescribeView = {
   ...plain2(own, "lookup"),
   step: (_call, d) => {
     const named2 = d.names.map((n) => {
-      const app2 = callApp({ args: {}, name: n });
+      const app2 = appOf(n);
       return app2 ? `${app2.app} \xB7 ${app2.action}` : n.replace(/_/g, " ");
     });
     return named2.length ? `Read how to call ${named2.join(", ")}` : "Read tool details";
@@ -27113,7 +27144,7 @@ function genericCard(call, d, look) {
 }
 function genericBody(call) {
   const text15 = call.resultText ?? (call.result === void 0 ? void 0 : pretty(call.result));
-  if (!text15 || call.status === "running") {
+  if (!text15 || call.outcome.kind === "running") {
     return [];
   }
   return [/* @__PURE__ */ jsx("code", { lang: /^\s*[[{]/.test(text15) ? "json" : "text", text: clip(text15, { mark: "line", max: 4e3 }) }, "out")];
@@ -27135,7 +27166,7 @@ function plainErrorOf(call) {
   return errorIn(call, record(call.result));
 }
 function errorIn(call, result) {
-  return nonEmpty(result?.["error"]) ?? nonEmpty(call.summary) ?? (typeof call.result === "string" && !result ? call.result : void 0);
+  return nonEmpty(result?.["error"]) ?? nonEmpty(call.outcome.kind === "running" ? void 0 : call.outcome.summary) ?? (typeof call.result === "string" && !result ? call.result : void 0);
 }
 function humanize(name) {
   const words3 = name.replace(/[_-]+/g, " ").trim();
@@ -27149,7 +27180,7 @@ function pretty(v) {
 function appCard(call, app2) {
   return {
     badges: [{ text: app2.kind === "mcp" ? "MCP" : "connector" }],
-    body: call.batch ? batchBody(call) : appBody(call),
+    body: call.via.kind === "batch" ? batchBody(call, call.via.entries) : appBody(call),
     folded: true,
     frame: "inline",
     name: "plug",
@@ -27162,7 +27193,7 @@ function batchCard(call, batch2) {
   const apps = appsOf(call);
   return {
     badges: apps.length ? [{ text: "connectors" }] : void 0,
-    body: batchBody(call),
+    body: batchBody(call, batch2),
     folded: true,
     frame: "inline",
     name: "plug",
@@ -27173,23 +27204,24 @@ function batchCard(call, batch2) {
 }
 function appBody(call) {
   const facts2 = Object.entries(call.args).filter(([k, v]) => k !== "connector_alias" && v !== void 0 && v !== null && v !== "").slice(0, 12).map(([k, v]) => ({ k: [{ t: k.replace(/_/g, " ") }], v: clip(typeof v === "string" ? v : JSON.stringify(v), { mark: "line", max: 300 }) }));
-  const error = call.status === "error" ? errorOf(call) : void 0;
+  const error = call.outcome.kind === "error" ? errorOf(call) : void 0;
   return [
     ...facts2.length ? [/* @__PURE__ */ jsx("kv", { items: facts2 }, "args")] : [],
     ...error ? [/* @__PURE__ */ jsx("text", { spans: [{ s: "error", t: clip(error, { mark: "line", max: 1200 }) }], wrap: "word" }, "error")] : genericBody(call)
   ];
 }
-function batchBody(call) {
-  return (call.batch ?? []).flatMap((e, i) => {
-    const app2 = callApp({ args: e.args, name: e.name });
-    const tone = e.status === "error" ? "error" : e.status === "running" ? "pending" : "success";
-    const answer = e.error ?? (e.result === void 0 ? void 0 : pretty(e.result));
+function batchBody(call, batch2) {
+  return batch2.flatMap(({ args, name, outcome: outcome2 }, i) => {
+    const app2 = appOf(name, args);
+    const tone = outcome2.kind === "error" ? "error" : outcome2.kind === "running" ? "pending" : "success";
+    const error = outcome2.kind === "error" ? outcome2.error : void 0;
+    const answer = error ?? (outcome2.kind !== "done" || outcome2.result === void 0 ? void 0 : pretty(outcome2.result));
     return [
       /* @__PURE__ */ jsxs("row", { align: "center", gap: "sm", children: [
-        /* @__PURE__ */ jsx("icon", { name: e.status === "error" ? "x" : e.status === "running" ? "clock" : "check", tone }, "i"),
-        /* @__PURE__ */ jsx("text", { grow: 1, spans: [{ t: app2 ? `${app2.app} \xB7 ${app2.action}` : humanize(e.name) }], truncate: "end", wrap: "none" }, "t")
+        /* @__PURE__ */ jsx("icon", { name: outcome2.kind === "error" ? "x" : outcome2.kind === "running" ? "clock" : "check", tone }, "i"),
+        /* @__PURE__ */ jsx("text", { grow: 1, spans: [{ t: app2 ? `${app2.app} \xB7 ${app2.action}` : humanize(name) }], truncate: "end", wrap: "none" }, "t")
       ] }, `e${i}`),
-      ...e.error ? [/* @__PURE__ */ jsx("text", { spans: [{ s: "error", t: clip(e.error, { mark: "line", max: 600 }) }], wrap: "word" }, `r${i}`)] : answer && call.status !== "running" ? [/* @__PURE__ */ jsx("code", { lang: /^\s*[[{]/.test(answer) ? "json" : "text", max: { h: "8lines" }, text: clip(answer, { mark: "line", max: 2e3 }), wrap: true }, `r${i}`)] : []
+      ...error ? [/* @__PURE__ */ jsx("text", { spans: [{ s: "error", t: clip(error, { mark: "line", max: 600 }) }], wrap: "word" }, `r${i}`)] : answer && call.outcome.kind !== "running" ? [/* @__PURE__ */ jsx("code", { lang: /^\s*[[{]/.test(answer) ? "json" : "text", max: { h: "8lines" }, text: clip(answer, { mark: "line", max: 2e3 }), wrap: true }, `r${i}`)] : []
     ];
   });
 }
@@ -27211,7 +27243,7 @@ function askCard(call, d) {
     for (const [j, typed] of answers.filter((a2) => !choices.includes(a2)).entries()) {
       body.push(answerRow(`q${i}.a${j}`, typed, true));
     }
-    if (!answers.length && call.status !== "running" && d.answered) {
+    if (!answers.length && call.outcome.kind !== "running" && d.answered) {
       const skipped2 = d.responses[i]?.skipped === true;
       body.push(/* @__PURE__ */ jsx("text", { role: "omp.tool.notice", spans: [{ s: "muted", t: skipped2 ? "Skipped" : "No answer" }] }, `q${i}.none`));
     }
@@ -28544,22 +28576,6 @@ function pipe(in_, out) {
     in: in_,
     out
   });
-}
-
-// src/core/assert.ts
-function assertNever(value, what = "variant") {
-  throw new Error(`Unexpected ${what}: ${shown(value)}`);
-}
-function oneOf(values) {
-  const known2 = new Set(values);
-  return (value) => known2.has(value);
-}
-function shown(value) {
-  try {
-    return typeof value === "string" ? value : JSON.stringify(value) ?? String(value);
-  } catch {
-    return String(value);
-  }
 }
 
 // src/wire/schemas.ts
@@ -32619,7 +32635,7 @@ function bashCard(call, d, instead) {
   const error = d.error;
   const command = commandOf(call, d);
   const line = commandLine(command);
-  const running2 = call.status === "running";
+  const running2 = call.outcome.kind === "running";
   return {
     body: [
       ...command && command !== line ? [/* @__PURE__ */ jsx("code", { lang: "bash", max: { h: "12lines" }, role: "omp.tool.command", text: command }, "cmd")] : [],
@@ -32845,7 +32861,7 @@ function matched(call) {
   if (app2) {
     return { ...hookless(call), card: () => appCard(call, app2), step: () => `${app2.app} \xB7 ${app2.action}` };
   }
-  const batch2 = call.batch;
+  const batch2 = batchOf(call);
   if (batch2) {
     return {
       ...hookless(call),
@@ -32856,8 +32872,7 @@ function matched(call) {
   return void 0;
 }
 function entryCall(call, e) {
-  const { batch: batch2, ...rest } = call;
-  return { ...rest, args: e.args, name: e.name };
+  return { ...call, args: e.args, name: e.name, via: { kind: "bridged" } };
 }
 function hookless(call) {
   return {
@@ -64569,7 +64584,7 @@ function refOf(v) {
   return host && repository && number4 > 0 ? { host, number: number4, repository, url: typeof r?.url === "string" ? r.url : `https://${host}/${repository}/pull/${number4}` } : void 0;
 }
 function linkedFromResult(call) {
-  if (!LINK_TOOLS.has(call.name) || call.status !== "done") {
+  if (!LINK_TOOLS.has(call.name) || call.outcome.kind !== "done") {
     return void 0;
   }
   const linked = record(call.result)?.linked;
@@ -64992,7 +65007,7 @@ function ownsCard(call) {
   return SOLO.has(call.name) || isBackgroundCall(call) || waiting3(call) || isConnectCall(call) || call.name === "image_generate" || showsImage(call);
 }
 function waiting3(call) {
-  return isWatchCall(call) && call.status === "running";
+  return isWatchCall(call) && call.outcome.kind === "running";
 }
 function showsImage(call) {
   return shownImage(call) !== void 0;
@@ -65033,7 +65048,7 @@ function foldOf(turn) {
     if (b.kind === "tool" && (isBackgroundCall(b.call) || waiting3(b.call) || isConnectCall(b.call) || showsImage(b.call) || b.call.subagents?.some((a2) => a2.status === "running" || a2.status === "queued"))) {
       continue;
     }
-    if (answer >= 0 && i > answer && b.kind === "tool" && b.call.status !== "done") {
+    if (answer >= 0 && i > answer && b.kind === "tool" && b.call.outcome.kind !== "done") {
       continue;
     }
     hidden2.add(b.id);
@@ -65089,7 +65104,7 @@ function actionLabel(action, n, calls = []) {
   switch (action) {
     case "app": {
       const apps = [...new Set(calls.flatMap(appsOf))];
-      const uses = calls.reduce((k, c) => k + (c.batch?.length ?? 1), 0);
+      const uses = calls.reduce((k, c) => k + (batchOf(c)?.length ?? 1), 0);
       return apps.length === 1 ? `Used ${apps[0]}${uses > 1 ? ` ${uses} times` : ""}` : `Used ${and2(apps)}`;
     }
     case "command":
@@ -65171,7 +65186,7 @@ function liveLabel(item3, active = false) {
     return thoughtTitle(item3) || (item3.endedAt === void 0 || active ? "Thinking" : "Thought");
   }
   const call = item3.call;
-  const status = active && call.status === "done" ? "running" : call.status;
+  const status = active && call.outcome.kind === "done" ? "running" : call.outcome.kind;
   const command = call.name === "terminal" ? nonEmpty(call.args["command"]) ?? call.context : void 0;
   if (!command) {
     return status === "running" ? presentTense(stepLabel(call)) : stepLabel(call);
@@ -65183,7 +65198,7 @@ function busyLabel(call) {
   return `${liveLabel({ call, id: call.id, kind: "tool" }, true)}\u2026`;
 }
 function preparingLabel(name) {
-  const app2 = callApp({ args: {}, name });
+  const app2 = appOf(name);
   return `Preparing ${app2 ? `${app2.app} \xB7 ${app2.action}` : name.replace(/_/g, " ")}\u2026`;
 }
 var PRESENT = {
@@ -65539,23 +65554,23 @@ function drawTool(call, view, whyFailed, now) {
     return solo;
   }
   const card = view.card(now);
-  const status = card.status ?? call.status;
+  const status = card.status ?? call.outcome.kind;
   const running2 = status === "running";
   const body = [...card.body];
-  const error = call.status === "error" ? whyFailed(call) : void 0;
-  if (call.status === "cancelled") {
+  const error = call.outcome.kind === "error" ? whyFailed(call) : void 0;
+  if (call.outcome.kind === "cancelled") {
     body.push(
       /* @__PURE__ */ jsx(
         "text",
         {
           role: "omp.tool.notice",
-          spans: [{ s: "muted", t: `Interrupted by user after ${duration(call.duration ?? 0)}` }]
+          spans: [{ s: "muted", t: `Interrupted by user after ${duration(call.outcome.duration)}` }]
         },
         "cancelled"
       )
     );
   }
-  const collapsed = call.status === "error" ? false : card.folded;
+  const collapsed = call.outcome.kind === "error" ? false : card.folded;
   const lang = { lang: card.lang };
   return /* @__PURE__ */ jsx(
     "tool",
@@ -65564,19 +65579,19 @@ function drawTool(call, view, whyFailed, now) {
       badges: card.badges,
       collapsed: body.length > 0 ? collapsed : void 0,
       collapsible: body.length > 0 ? true : void 0,
-      exit: !running2 && call.status !== "cancelled" ? view.exit() : void 0,
+      exit: !running2 && call.outcome.kind !== "cancelled" ? view.exit() : void 0,
       frame: card.frame === "inline" && (running2 || !body.length || !card.framedWithBody) ? "inline" : void 0,
       ...lang,
       meta: card.meta?.length ? card.meta : void 0,
       name: card.name,
-      note: call.status === "cancelled" ? "cancelled" : error && !card.body.length ? error : void 0,
+      note: call.outcome.kind === "cancelled" ? "cancelled" : error && !card.body.length ? error : void 0,
       preview: card.preview,
       role: card.role,
       status,
       target: card.target,
       targetKind: card.target ? card.targetKind : void 0,
       title: card.title,
-      took: running2 ? void 0 : card.took ?? call.duration,
+      took: running2 ? void 0 : card.took ?? tookMs(call),
       children: body
     },
     call.id
@@ -65589,16 +65604,16 @@ function drawDetail(call, view, whyFailed, now) {
   if (prefix2) {
     body.unshift(prefix2);
   }
-  const exit3 = call.status !== "running" ? view.exit() : void 0;
+  const exit3 = call.outcome.kind !== "running" ? view.exit() : void 0;
   if (exit3) {
     body.push(/* @__PURE__ */ jsx("text", { spans: [{ s: "error", t: `exit ${exit3}` }] }, "exit"));
   }
-  const error = call.status === "error" && !card.body.length ? whyFailed(call) : void 0;
+  const error = call.outcome.kind === "error" && !card.body.length ? whyFailed(call) : void 0;
   if (error) {
     body.push(/* @__PURE__ */ jsx("text", { role: "omp.tool.error", spans: [{ s: "error", t: error }], wrap: "word" }, "err"));
   }
-  if (call.status === "cancelled") {
-    body.push(/* @__PURE__ */ jsx("text", { spans: [{ s: "muted", t: `Interrupted by user after ${duration(call.duration ?? 0)}` }] }, "cancelled"));
+  if (call.outcome.kind === "cancelled") {
+    body.push(/* @__PURE__ */ jsx("text", { spans: [{ s: "muted", t: `Interrupted by user after ${duration(call.outcome.duration)}` }] }, "cancelled"));
   }
   return body;
 }
@@ -65683,7 +65698,7 @@ function liveText(label) {
 }
 function latestFailed(items) {
   const last = items.findLast((i) => i.kind === "tool");
-  return last?.kind === "tool" && last.call.status === "error";
+  return last?.kind === "tool" && last.call.outcome.kind === "error";
 }
 function thinkingRow() {
   return /* @__PURE__ */ jsxs("row", { align: "center", gap: "sm", role: "hermes.work.row", children: [
@@ -65711,8 +65726,8 @@ function workNode(items, parent, live, now) {
     return itemNode(shown3[0], parent, now, key2);
   }
   const calls = shown3.flatMap((i) => i.kind === "tool" ? [i.call] : []);
-  const failed = calls.at(-1)?.status === "error";
-  const latest2 = shown3.findLast((i) => i.kind === "tool" && i.call.status === "running") ?? shown3.at(-1);
+  const failed = calls.at(-1)?.outcome.kind === "error";
+  const latest2 = shown3.findLast((i) => i.kind === "tool" && i.call.outcome.kind === "running") ?? shown3.at(-1);
   const head2 = live ? /* @__PURE__ */ jsxs("row", { align: "center", gap: "sm", children: [
     /* @__PURE__ */ jsx("icon", { name: itemIcon(latest2) }, "icon"),
     liveText(liveLabel(latest2, true)),
@@ -65742,11 +65757,11 @@ function itemNode(item3, parent, now, key2 = item3.id) {
   }
   const call = item3.call;
   const detail = toolDetail(call, now);
-  const running2 = call.status === "running";
+  const running2 = call.outcome.kind === "running";
   const head2 = /* @__PURE__ */ jsxs("row", { align: "center", gap: "sm", title: call.context || void 0, children: [
-    /* @__PURE__ */ jsx("icon", { name: itemIcon(item3), tone: call.status === "error" ? "error" : void 0 }, "icon"),
+    /* @__PURE__ */ jsx("icon", { name: itemIcon(item3), tone: call.outcome.kind === "error" ? "error" : void 0 }, "icon"),
     running2 ? liveText(stepLabel(call)) : /* @__PURE__ */ jsx("text", { grow: 1, spans: labelSpans(call), truncate: "end", wrap: "none" }, "label"),
-    call.status === "error" ? /* @__PURE__ */ jsx("icon", { name: "x", tone: "error" }, "failed") : null
+    call.outcome.kind === "error" ? /* @__PURE__ */ jsx("icon", { name: "x", tone: "error" }, "failed") : null
   ] }, "head");
   if (!detail.length) {
     return /* @__PURE__ */ jsx("col", { role: "hermes.work.row", children: head2 }, key2);
@@ -65760,7 +65775,7 @@ function itemNode(item3, parent, now, key2 = item3.id) {
   });
 }
 function labelSpans(call) {
-  const entries = (call.batch ?? [call]).map((e) => callApp({ args: e.args, name: e.name }));
+  const entries = (batchOf(call) ?? [call]).map((e) => appOf(e.name, e.args));
   if (!entries.every(Boolean)) {
     return [{ s: "muted", t: stepLabel(call) }];
   }
@@ -69989,7 +70004,7 @@ var Agents = class {
       }
       if (this.#track(call, at)) {
         this.#tracked.add(call);
-      } else if (call.result === void 0 && call.status !== "running" && !call.subagents?.length) {
+      } else if (call.result === void 0 && call.outcome.kind !== "running" && !call.subagents?.length) {
         bare = true;
       }
     }
@@ -71170,7 +71185,7 @@ var ConnectWatcher = class {
     const now = Date.now();
     for (const call of this.#host.transcript.calls(CONNECT_TOOL)) {
       const missed = this.#noCard.get(call);
-      if (call.connect?.settled || call.status === "running" || missed !== void 0 && now - missed < NO_CARD_MS) {
+      if (call.connect?.settled || call.outcome.kind === "running" || missed !== void 0 && now - missed < NO_CARD_MS) {
         continue;
       }
       const next2 = loadConnect(call, this.#dir);
@@ -73752,7 +73767,7 @@ function history({ kept, messages: messages2, compactions, id }) {
         existing.result = result ?? existing.result;
         existing.diff = diff2 ?? existing.diff;
         if (settleBridge(existing)) {
-          existing.status = "error";
+          existing.outcome = { duration: 0, kind: "error" };
         }
         continue;
       }
@@ -73761,18 +73776,16 @@ function history({ kept, messages: messages2, compactions, id }) {
       const call = {
         args,
         argsText: "",
-        batch: u.batch,
         context: m.context ?? "",
         diff: diff2,
-        duration: 0,
         id: callId,
         name: u.name,
+        outcome: { duration: 0, kind: "done" },
         result,
         startedAt: at,
-        status: "done",
         via: u.via
       };
-      call.status = settleBridge(call) ?? Boolean(record(call.result)?.error) ? "error" : "done";
+      call.outcome = { duration: 0, kind: settleBridge(call) ?? Boolean(record(call.result)?.error) ? "error" : "done" };
       if (isTodoName(call.name)) {
         call.todosBefore = todos2;
       }
@@ -74152,12 +74165,11 @@ var Transcript = class {
     const call = {
       args: shownArgs(u.args),
       argsText: p3.args_text ?? "",
-      batch: u.batch,
       context: withoutTernEnv(p3.context ?? ""),
       id: toolCallId(p3.tool_id),
       name: u.name,
+      outcome: { kind: "running" },
       startedAt: at,
-      status: "running",
       via: u.via
     };
     const before = this.currentTodos();
@@ -74184,8 +74196,8 @@ var Transcript = class {
     const { call, turn } = found;
     const output = record(p3.result)?.output;
     const interrupted = p3.name === "terminal" && typeof output === "string" && /\[Command interrupted\]\s*$/.test(output);
-    call.duration = typeof p3.duration_s === "number" ? Math.round(p3.duration_s * 1e3) : at - call.startedAt;
-    call.summary = p3.summary ?? void 0;
+    const duration3 = typeof p3.duration_s === "number" ? Math.round(p3.duration_s * 1e3) : at - call.startedAt;
+    const summary4 = p3.summary ?? void 0;
     call.resultText = p3.result_text ?? void 0;
     call.result = p3.result;
     call.diff = p3.inline_diff ?? void 0;
@@ -74193,11 +74205,11 @@ var Transcript = class {
       const u = unwrap(p3.name, p3.args);
       call.args = shownArgs(u.args);
       call.name = u.name;
-      call.via = u.via ?? call.via;
-      call.batch = u.batch;
+      call.via = nextVia(call.via, u.via);
     }
     const bridged = settleBridge(call);
-    call.status = interrupted ? "cancelled" : bridged ?? isToolError(p3) ? "error" : "done";
+    const kind = interrupted ? "cancelled" : bridged ?? isToolError(p3) ? "error" : "done";
+    call.outcome = summary4 === void 0 ? { duration: duration3, kind } : { duration: duration3, kind, summary: summary4 };
     if (Array.isArray(p3.todos)) {
       call.todos = toTodos(p3.todos);
     }
@@ -74234,9 +74246,8 @@ var Transcript = class {
     }
     turn.blocks = turn.blocks.filter((b) => b.kind !== "text" || b.text.trim());
     for (const b of turn.blocks) {
-      if (b.kind === "tool" && b.call.status === "running") {
-        b.call.status = p3.status === "error" ? "error" : p3.status === "interrupted" ? "cancelled" : "done";
-        b.call.duration ??= at - b.call.startedAt;
+      if (b.kind === "tool" && b.call.outcome.kind === "running") {
+        b.call.outcome = { duration: at - b.call.startedAt, kind: p3.status === "error" ? "error" : p3.status === "interrupted" ? "cancelled" : "done" };
       }
     }
     turn.endedAt = at;

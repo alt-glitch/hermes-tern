@@ -20,7 +20,8 @@ const call = (name: string, args: Record<string, unknown>, { id = 'c1', ...more 
   id: toolCallId(id),
   name,
   startedAt: 0,
-  status: 'done',
+  outcome: { duration: 0, kind: 'done' },
+  via: { kind: 'direct' },
   ...more
 })
 
@@ -67,7 +68,7 @@ describe('tool cards', () => {
   it('draws a one-agent delegation as its agent row alone, with no pills and no brief', () => {
     const args = { context: 'Long brief for the agent', goal: 'Audit the repo' }
     const result = { delegation_id: 'd1', mode: 'background', status: 'dispatched' }
-    const live = tree(toolNode(call('delegate_task', args, { result, status: 'running' }), 0))
+    const live = tree(toolNode(call('delegate_task', args, { result, outcome: { kind: 'running' } }), 0))
     expect([live.k, live.p?.name, live.p?.task, live.p?.status, live.p?.agent, live.p?.badges]).toEqual([
       'agent',
       'Background agent',
@@ -79,7 +80,7 @@ describe('tool cards', () => {
     expect(JSON.stringify(live)).not.toContain('Long brief')
 
     const agent = { calls: 1, goal: 'Audit the repo', id: 'sa-1', index: 0, startedAt: 0, status: 'running' as const, tokens: 0, toolCount: 2 }
-    const running = tree(toolNode(call('delegate_task', args, { result, status: 'done', subagents: [agent] }), 5))
+    const running = tree(toolNode(call('delegate_task', args, { result, outcome: { duration: 0, kind: 'done' }, subagents: [agent] }), 5))
     expect([running.k, running.p?.key, running.p?.name, running.p?.role]).toEqual(['agent', 'c1', 'Background agent', 'hermes.task.solo'])
 
     // A resumed one: its result's report folds inside the row.
@@ -88,7 +89,7 @@ describe('tool cards', () => {
     expect(JSON.stringify(done)).toContain('all clear')
 
     // A dispatch that failed keeps the Task card, which says why.
-    expect(tree(toolNode(call('delegate_task', args, { result: { error: 'no model' }, status: 'error' }), 0)).k).toBe('tool')
+    expect(tree(toolNode(call('delegate_task', args, { result: { error: 'no model' }, outcome: { duration: 0, kind: 'error' } }), 0)).k).toBe('tool')
   })
 
   it("folds a several-agent delegation's shared brief, and its rows carry no type pill", () => {
@@ -148,7 +149,7 @@ describe('a card that throws', () => {
     const notices: string[] = []
     onCardFault(noticeSink(text => void notices.push(text)))
     // No output: the reason goes in the head (and the step), read from the summary.
-    const failed = broken('c3', { status: 'error', summary: 'boom' })
+    const failed = broken('c3', { outcome: { duration: 0, kind: 'error', summary: 'boom' } })
 
     expect(tree(toolNode(failed, 0))).toMatchObject({ k: 'tool', p: { note: 'boom', status: 'error' } })
     expect(toolDetail(failed, 0).flatMap(n => words(tree(n)))).toEqual(['boom'])

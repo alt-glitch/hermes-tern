@@ -357,7 +357,8 @@ describe('process calls show their process', () => {
     name,
     result,
     startedAt: 0,
-    status: 'done'
+    outcome: { duration: 0, kind: 'done' },
+    via: { kind: 'direct' }
   })
 
   it('links a wait, poll or log by its id prefix, as omp tiles the jobs a wait watches', () => {

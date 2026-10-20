@@ -35,8 +35,8 @@ function refOf(v: unknown): PrRef | undefined {
 }
 
 /** The list a link tool's result carries (`linked`), when the call succeeded. */
-export function linkedFromResult(call: Pick<ToolCall, 'name' | 'result' | 'status'>): PrRef[] | undefined {
-  if (!LINK_TOOLS.has(call.name) || call.status !== 'done') {
+export function linkedFromResult(call: Pick<ToolCall, 'name' | 'outcome' | 'result'>): PrRef[] | undefined {
+  if (!LINK_TOOLS.has(call.name) || call.outcome.kind !== 'done') {
     return undefined
   }
 

@@ -10,6 +10,7 @@
 import type { JSX } from '@stencil-hq/tern'
 
 import type { ToolCall } from '../../model.js'
+import { tookMs } from '../../transcript/calls.js'
 import { duration } from '../format.js'
 import { age } from '../time.js'
 
@@ -39,24 +40,24 @@ function drawTool(call: ToolCall, view: CallView, whyFailed: ErrorReader, now: n
   }
 
   const card = view.card(now)
-  const status = card.status ?? call.status
+  const status = card.status ?? call.outcome.kind
   const running = status === 'running'
   const body = [...card.body]
-  const error = call.status === 'error' ? whyFailed(call) : undefined
+  const error = call.outcome.kind === 'error' ? whyFailed(call) : undefined
 
-  if (call.status === 'cancelled') {
+  if (call.outcome.kind === 'cancelled') {
     body.push(
       <text
         key="cancelled"
         role="omp.tool.notice"
-        spans={[{ s: 'muted', t: `Interrupted by user after ${duration(call.duration ?? 0)}` }]}
+        spans={[{ s: 'muted', t: `Interrupted by user after ${duration(call.outcome.duration)}` }]}
       />
     )
   }
 
   // A failure with output unfolds to show it (omp's failed bash); one without
   // says why in the head (omp's failed read).
-  const collapsed = call.status === 'error' ? false : card.folded
+  const collapsed = call.outcome.kind === 'error' ? false : card.folded
 
   // boundary: Tern's ToolProps has no `lang` yet (an upstream ask), so it rides in one unchecked spread.
   const lang = { lang: card.lang }
@@ -67,20 +68,20 @@ function drawTool(call: ToolCall, view: CallView, whyFailed: ErrorReader, now: n
       badges={card.badges}
       collapsed={body.length > 0 ? collapsed : undefined}
       collapsible={body.length > 0 ? true : undefined}
-      exit={!running && call.status !== 'cancelled' ? view.exit() : undefined}
+      exit={!running && call.outcome.kind !== 'cancelled' ? view.exit() : undefined}
       frame={card.frame === 'inline' && (running || !body.length || !card.framedWithBody) ? 'inline' : undefined}
       key={call.id}
       {...lang}
       meta={card.meta?.length ? card.meta : undefined}
       name={card.name}
-      note={call.status === 'cancelled' ? 'cancelled' : error && !card.body.length ? error : undefined}
+      note={call.outcome.kind === 'cancelled' ? 'cancelled' : error && !card.body.length ? error : undefined}
       preview={card.preview}
       role={card.role}
       status={status}
       target={card.target}
       targetKind={card.target ? card.targetKind : undefined}
       title={card.title}
-      took={running ? undefined : (card.took ?? call.duration)}
+      took={running ? undefined : (card.took ?? tookMs(call))}
     >
       {body}
     </tool>
@@ -98,20 +99,20 @@ function drawDetail(call: ToolCall, view: CallView, whyFailed: ErrorReader, now:
     body.unshift(prefix)
   }
 
-  const exit = call.status !== 'running' ? view.exit() : undefined
+  const exit = call.outcome.kind !== 'running' ? view.exit() : undefined
 
   if (exit) {
     body.push(<text key="exit" spans={[{ s: 'error', t: `exit ${exit}` }]} />)
   }
 
-  const error = call.status === 'error' && !card.body.length ? whyFailed(call) : undefined
+  const error = call.outcome.kind === 'error' && !card.body.length ? whyFailed(call) : undefined
 
   if (error) {
     body.push(<text key="err" role="omp.tool.error" spans={[{ s: 'error', t: error }]} wrap="word" />)
   }
 
-  if (call.status === 'cancelled') {
-    body.push(<text key="cancelled" spans={[{ s: 'muted', t: `Interrupted by user after ${duration(call.duration ?? 0)}` }]} />)
+  if (call.outcome.kind === 'cancelled') {
+    body.push(<text key="cancelled" spans={[{ s: 'muted', t: `Interrupted by user after ${duration(call.outcome.duration)}` }]} />)
   }
 
   return body

@@ -10,7 +10,7 @@ import type { Card } from '../types.js'
 
 /** The image itself, open; what the tool said of it under it (not the JSON it came in). */
 export function imageCard(call: ToolCall, d: GenericFields, look: { name: string; title: string }, src: string | undefined): Card {
-  const said = call.status === 'running' ? undefined : d.said
+  const said = call.outcome.kind === 'running' ? undefined : d.said
 
   return {
     ...look,

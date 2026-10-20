@@ -7,6 +7,7 @@ import type { SubagentEventPayload, Usage } from '@hermes/shared/gateway-events'
 import type { LiveLog } from './agents/liveLog.js'
 import type { BatchEntry } from './bridge.js'
 import type { ConnectCard } from './connections.js'
+import type { NonEmpty } from './core/assert.js'
 import type { BlockKey, EntryId, ToolCallId } from './core/ids.js'
 import type { ChartView } from './processes/widgets/types.js'
 
@@ -78,6 +79,21 @@ export interface BackgroundProcess {
   chart?: ChartView
 }
 
+/**
+ * Where a tool call stands: running, else how it ended. An ended call knows how long it took
+ * (milliseconds) and, from `tool.complete`, the gateway's one-line summary.
+ */
+export type ToolOutcome =
+  | { kind: 'running' }
+  | { kind: 'cancelled' | 'done' | 'error'; duration: number; summary?: string }
+
+/**
+ * How a call reached its tool. `bridged`: through Tool Search's `tool_call` bridge, and the call's
+ * `name` and `args` are the one tool it ran. `batch`: a bridge call of several tools (a connector
+ * batch), each entry with its own outcome.
+ */
+export type Via = { kind: 'direct' } | { kind: 'bridged' } | { kind: 'batch'; entries: NonEmpty<BatchEntry> }
+
 /** One tool call, from `tool.start` to `tool.complete`. */
 export interface ToolCall {
   id: ToolCallId
@@ -86,11 +102,9 @@ export interface ToolCall {
   argsText: string
   /** The gateway's one-line description of the call (`context`). */
   context: string
-  status: 'cancelled' | 'done' | 'error' | 'running'
+  /** Running, else how it ended; replaced whole when it changes (the call stays the same object). */
+  outcome: ToolOutcome
   startedAt: number
-  /** Milliseconds, once done. */
-  duration?: number
-  summary?: string
   resultText?: string
   result?: unknown
   /** A unified diff of the files the call changed. */
@@ -101,10 +115,8 @@ export interface ToolCall {
   subagents?: Subagent[]
   /** The background process a `terminal(background=true)` call started (or a `process` call watches), while the store follows it. */
   process?: BackgroundProcess
-  /** It ran through Tool Search's `tool_call` bridge; `name` and `args` are the tool it ran. */
-  via?: 'tool_call'
-  /** A bridge call of several tools (a connector batch): each with its own outcome. */
-  batch?: BatchEntry[]
+  /** How it was called: directly, or through Tool Search's `tool_call` bridge (one tool, or a batch). */
+  via: Via
   /** A no-card `manage_connections` call's card: its apps, their states kept current by the app's poll. */
   connect?: ConnectCard
   /** The image it showed (media.ts), once a URL's bytes arrived; null when they could not be fetched. */

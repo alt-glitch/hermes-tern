@@ -62,7 +62,7 @@
   "src/agents/liveLog.ts @typescript-eslint/no-non-null-assertion": 1,
   "src/backendNotes.ts @typescript-eslint/consistent-type-assertions": 1,
   "src/backendNotes.ts @typescript-eslint/no-restricted-imports": 1,
-  "src/bridge.ts @typescript-eslint/no-non-null-assertion": 4,
+  "src/bridge.ts @typescript-eslint/no-non-null-assertion": 3,
   "src/commands.ts @typescript-eslint/no-non-null-assertion": 1,
   "src/compaction.ts @typescript-eslint/no-non-null-assertion": 3,
   "src/composer.ts @typescript-eslint/no-restricted-imports": 1,

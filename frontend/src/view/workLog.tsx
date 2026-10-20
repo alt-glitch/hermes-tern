@@ -6,7 +6,7 @@
 
 import type { JSX, Span } from '@stencil-hq/tern'
 
-import { callApp } from '../bridge.js'
+import { appOf, batchOf } from '../bridge.js'
 import type { ToolCall, TurnEntry } from '../model.js'
 import {
   actionIcon,
@@ -55,7 +55,7 @@ function liveText(label: string): JSX.Element {
 export function latestFailed(items: readonly WorkItem[]): boolean {
   const last = items.findLast(i => i.kind === 'tool')
 
-  return last?.kind === 'tool' && last.call.status === 'error'
+  return last?.kind === 'tool' && last.call.outcome.kind === 'error'
 }
 
 export function thinkingRow(): JSX.Element {
@@ -102,8 +102,8 @@ export function workNode(items: readonly WorkItem[], parent: string, live: boole
   }
 
   const calls = shown.flatMap(i => (i.kind === 'tool' ? [i.call] : []))
-  const failed = calls.at(-1)?.status === 'error'
-  const latest = shown.findLast(i => i.kind === 'tool' && i.call.status === 'running') ?? shown.at(-1)!
+  const failed = calls.at(-1)?.outcome.kind === 'error'
+  const latest = shown.findLast(i => i.kind === 'tool' && i.call.outcome.kind === 'running') ?? shown.at(-1)!
 
   const head = live ? (
     <row align="center" gap="sm" key="head">
@@ -149,13 +149,13 @@ function itemNode(item: WorkItem, parent: string, now: number, key: string = ite
 
   const call = item.call
   const detail = toolDetail(call, now)
-  const running = call.status === 'running'
+  const running = call.outcome.kind === 'running'
 
   const head = (
     <row align="center" gap="sm" key="head" title={call.context || undefined}>
-      <icon key="icon" name={itemIcon(item)} tone={call.status === 'error' ? 'error' : undefined} />
+      <icon key="icon" name={itemIcon(item)} tone={call.outcome.kind === 'error' ? 'error' : undefined} />
       {running ? liveText(stepLabel(call)) : <text grow={1} key="label" spans={labelSpans(call)} truncate="end" wrap="none" />}
-      {call.status === 'error' ? <icon key="failed" name="x" tone="error" /> : null}
+      {call.outcome.kind === 'error' ? <icon key="failed" name="x" tone="error" /> : null}
     </row>
   )
 
@@ -182,7 +182,7 @@ function itemNode(item: WorkItem, parent: string, now: number, key: string = ite
 
 /** A step's words; a connector's app stands out from what it did there ("Linear · create issue"). */
 function labelSpans(call: ToolCall): Span[] {
-  const entries = (call.batch ?? [call]).map(e => callApp({ args: e.args, name: e.name }))
+  const entries = (batchOf(call) ?? [call]).map(e => appOf(e.name, e.args))
 
   if (!entries.every(Boolean)) {
     return [{ s: 'muted', t: stepLabel(call) }]

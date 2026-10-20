@@ -178,7 +178,7 @@ describe('Transcript', () => {
     )
 
     const [call] = tools(turnOf(t.entries))
-    expect(call).toMatchObject({ args: { path: 'a.py' }, duration: 250, id: 'c1', name: 'read_file', status: 'done' })
+    expect(call).toMatchObject({ args: { path: 'a.py' }, id: 'c1', name: 'read_file', outcome: { duration: 250, kind: 'done' } })
   })
 
   it('fails a terminal call with a non-zero exit and cancels an interrupted one', () => {
@@ -194,7 +194,7 @@ describe('Transcript', () => {
       2
     )
 
-    expect(tools(turnOf(t.entries)).map(c => c.status)).toEqual(['error', 'cancelled'])
+    expect(tools(turnOf(t.entries)).map(c => c.outcome.kind)).toEqual(['error', 'cancelled'])
   })
 
   it('cancels calls still running when the turn is interrupted', () => {
@@ -205,7 +205,7 @@ describe('Transcript', () => {
 
     const turn = turnOf(t.entries)
     expect(turn.status).toBe('interrupted')
-    expect(tools(turn)[0]).toMatchObject({ duration: 2, status: 'cancelled' })
+    expect(tools(turn)[0]).toMatchObject({ outcome: { duration: 2, kind: 'cancelled' } })
   })
 
   it('splits a failed request into code, message and advice', () => {
@@ -343,7 +343,7 @@ describe('Transcript', () => {
     expect(t.entries.map(e => e.kind)).toEqual(['user', 'turn'])
     const turn = turnOf(t.entries)
     expect(kinds(turn)).toEqual(['thinking', 'tool', 'text', 'tool', 'tool', 'tool', 'text'])
-    expect(tools(turn).map(c => [c.name, c.status])).toEqual([
+    expect(tools(turn).map(c => [c.name, c.outcome.kind])).toEqual([
       ['todo_list', 'done'],
       ['terminal', 'done'],
       ['patch', 'done'],
@@ -400,7 +400,7 @@ describe('Transcript', () => {
   })
 
   it('finds the newest call when a tool id repeats: the newest turn, its last block', () => {
-    const call = (path: string): ToolCall => ({ args: { path }, argsText: path, context: '', id: toolCallId('c1'), name: 'read_file', startedAt: 0, status: 'done' })
+    const call = (path: string): ToolCall => ({ args: { path }, argsText: path, context: '', id: toolCallId('c1'), name: 'read_file', outcome: { duration: 0, kind: 'done' }, startedAt: 0, via: { kind: 'direct' } })
     const turn = (...paths: string[]): TurnEntry => ({
       blocks: paths.map(path => ({ call: call(path), id: toolCallId('c1'), kind: 'tool' as const })),
       id: entryId('t'),
@@ -485,7 +485,7 @@ describe('Transcript: late events after a turn ended', () => {
 
     expect(t.live).toBeUndefined()
     expect(turns(t)).toHaveLength(1)
-    expect(tools(turnOf(t.entries)).map(c => [c.id, c.status])).toEqual([['late', 'done']])
+    expect(tools(turnOf(t.entries)).map(c => [c.id, c.outcome.kind])).toEqual([['late', 'done']])
   })
 
   it('the next turn starts fresh after them, not inside the turn that ended', () => {

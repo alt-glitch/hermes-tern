@@ -1,6 +1,7 @@
 // Tool calls of every tool the views know, with the arg and result shapes each reads (and some
 // they must read past): the registry test checks each call's step line, action and icon.
 
+import type { BatchEntry } from '../bridge.js'
 import { toolCallId } from '../core/ids.js'
 import type { ToolCall } from '../model.js'
 
@@ -8,7 +9,7 @@ let n = 0
 
 /** A settled call of tool `name`; `more` sets its result, status, context and the rest. */
 export function call(name: string, args: Record<string, unknown> = {}, more: Partial<ToolCall> = {}): ToolCall {
-  return { args, argsText: '', context: '', id: toolCallId(`f${++n}`), name, startedAt: 1_000, status: 'done', duration: 1_200, ...more }
+  return { args, argsText: '', context: '', id: toolCallId(`f${++n}`), name, outcome: { duration: 1_200, kind: 'done' }, startedAt: 1_000, via: { kind: 'direct' }, ...more }
 }
 
 const todos = [
@@ -16,9 +17,10 @@ const todos = [
   { content: 'Run the suite', id: '2', status: 'in_progress' as const }
 ]
 
-const batch = (...names: string[]): Pick<ToolCall, 'batch' | 'via'> => ({
-  batch: names.map((name, i) => ({ args: { title: `t${i}` }, name, result: { ok: i }, status: 'done' as const })),
-  via: 'tool_call'
+const entry = (name: string, i: number): BatchEntry => ({ args: { title: `t${i}` }, name, outcome: { kind: 'done', result: { ok: i } } })
+
+const batch = (first: string, ...names: string[]): Pick<ToolCall, 'via'> => ({
+  via: { entries: [entry(first, 0), ...names.map((name, i) => entry(name, i + 1))], kind: 'batch' }
 })
 
 /** Every fixture call, built fresh. */
@@ -29,15 +31,15 @@ export function fixtureCalls(): ToolCall[] {
     call('terminal', { command: 'ls -la' }, { result: { exit_code: 0, output: 'a\nb\n' } }),
     call('terminal', {}, { context: 'npm test' }),
     call('terminal', {}),
-    call('terminal', { command: "sh -c 'cat a\n  | head'" }, { result: JSON.stringify({ exit_code: 2, output: 'oops' }), status: 'error' }),
+    call('terminal', { command: "sh -c 'cat a\n  | head'" }, { result: JSON.stringify({ exit_code: 2, output: 'oops' }), outcome: { duration: 1_200, kind: 'error' } }),
     call('terminal', { command: 'for f in *; do\n  echo "$f"\ndone' }, { result: { error: 'no such file', exit_code: 1 } }),
     call('terminal', { background: true, command: 'npm run dev' }, { result: { session_id: 'proc_1' } }),
-    call('terminal', { command: 'sleep 99' }, { result: { session_id: 'proc_2' }, status: 'running' }),
-    call('terminal', { command: 'make' }, { status: 'cancelled' }),
+    call('terminal', { command: 'sleep 99' }, { result: { session_id: 'proc_2' }, outcome: { kind: 'running' } }),
+    call('terminal', { command: 'make' }, { outcome: { duration: 1_200, kind: 'cancelled' } }),
     call('read_file', { path: 'src/a.ts' }, { result: { content: '   1|const a = 1\n   2|export {}', total_lines: 2 } }),
     call('read_file', { path: 'src/b.ts' }, { result: JSON.stringify({ content: '  10|x\n  11|y', total_lines: 40 }) }),
     call('read_file', {}, { context: 'notes.md' }),
-    call('read_file', { path: 7 }, { result: { error: 'denied' }, status: 'error' }),
+    call('read_file', { path: 7 }, { result: { error: 'denied' }, outcome: { duration: 1_200, kind: 'error' } }),
     call('patch', { path: 'src/a.ts' }, { result: { diff: '--- a\n+++ b\n@@ -1 +1 @@\n-a\n+b' } }),
     call('patch', {}, { diff: '-x\n+y' }),
     call('write_file', { content: 'hello\nworld\n', path: 'docs/new.md' }, { result: { diff: '@@ -0,0 +1,2 @@\n+hello\n+world' } }),
@@ -53,7 +55,7 @@ export function fixtureCalls(): ToolCall[] {
     call('web_extract', { urls: ['', 'https://d.io'] }),
     call('web_extract', {}),
     call('execute_code', { code: '# Sum\nprint(1)' }, { context: 'print(1)\n', result: { output: '1\n' } }),
-    call('execute_code', { code: 'x' }, { result: { stderr: 'boom' }, status: 'error' }),
+    call('execute_code', { code: 'x' }, { result: { stderr: 'boom' }, outcome: { duration: 1_200, kind: 'error' } }),
     call('link_pull_request', { url: 'https://github.com/o/r/pull/12' }),
     call('link_pull_request', { number: 3, repository: 'o/r' }),
     call('unlink_pull_request', {}),
@@ -72,7 +74,7 @@ export function fixtureCalls(): ToolCall[] {
     call('todo_list', { todos }, { todos, todosBefore: [{ content: 'Write tests', id: '1', status: 'pending' }] }),
     call('delegate_task', { goal: 'Audit the repo' }, { context: 'audit', result: { results: [{ status: 'ok', summary: 'all clear' }] } }),
     call('delegate_task', { context: 'shared', tasks: [{ goal: 'g1' }, 'x', { context: 'own', goal: 'g2' }] }, { result: { mode: 'background', status: 'dispatched' } }),
-    call('delegate_task', { tasks: [{ goal: 'g1' }] }, { result: { error: 'no model' }, status: 'error' }),
+    call('delegate_task', { tasks: [{ goal: 'g1' }] }, { result: { error: 'no model' }, outcome: { duration: 1_200, kind: 'error' } }),
     call('clarify', { choices: ['a', 'b'], question: 'Pick?' }, { result: { responses: [{ user_response: 'b' }] } }),
     call('clarify', { questions: [{ question: 'One?' }, { choices: ['x'], question: 'Two?' }] }, { result: { responses: [null, { status: 'skipped' }] } }),
     call('memory', { action: 'add' }, { context: 'add: likes tabs', result: { usage: '12% full' } }),
@@ -85,14 +87,14 @@ export function fixtureCalls(): ToolCall[] {
     call('session_search', { query: 'last week' }),
     call('vision_analyze', { question: 'what?' }, { result: { analysis: 'A chart.', success: true } }),
     call('image_generate', { prompt: 'a red fox' }, { result: { image: '/h/fox.png', success: true } }),
-    call('image_generate', { prompt: 'pending' }, { status: 'running' }),
+    call('image_generate', { prompt: 'pending' }, { outcome: { kind: 'running' } }),
     call('manage_connections', { action: 'connect' }, { result: { targets: [{ connect_url: 'https://auth/l', name: 'linear', state: 'initiated' }] } }),
     call('manage_connections', { action: 'status' }, { result: { targets: [{ name: 'linear', state: 'connected' }] } }),
     call('unknown_tool', { url: 'https://x.io' }, { context: 'something\n  on two lines' }),
     call('weird-name', { query: 'q' }, { result: 'plain text result' }),
     call('other', {}),
     call('connectors__linear__LINEAR_CREATE_ISSUE', { connector_alias: 'work', title: 'Bug' }, { result: { id: 1 } }),
-    call('mcp__slack__send_message', { text: 'hi' }, { result: { error: 'nope' }, status: 'error' }),
+    call('mcp__slack__send_message', { text: 'hi' }, { result: { error: 'nope' }, outcome: { duration: 1_200, kind: 'error' } }),
     call('tool_call', { calls: [] }, batch('connectors__linear__LINEAR_CREATE_ISSUE', 'mcp__slack__send_message')),
     call('tool_call', { calls: [] }, batch('connectors__linear__LINEAR_CREATE_ISSUE', 'read_file')),
     call('tool_call', { calls: [] }, batch('connectors__linear__LINEAR_CREATE_ISSUE', 'connectors__linear__LINEAR_GET_ISSUE'))

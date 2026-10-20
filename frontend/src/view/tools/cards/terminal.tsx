@@ -46,7 +46,7 @@ function bashCard(call: ToolCall, d: TerminalDetail, instead?: JSX.Element): Car
   const error = d.error
   const command = commandOf(call, d)
   const line = commandLine(command)
-  const running = call.status === 'running'
+  const running = call.outcome.kind === 'running'
 
   // The head says what the step is for and shows the command on one line, so it never grows
   // when the card opens; a command longer than that line opens into the body, above its output.

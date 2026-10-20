@@ -14,7 +14,7 @@ import type {
   Usage
 } from '@hermes/shared/gateway-events'
 
-import { settleBridge, unwrap } from './bridge.js'
+import { nextVia, settleBridge, unwrap } from './bridge.js'
 import type { StoredCompaction } from './compaction.js'
 import { type EntryId, entryId, type ToolCallId, toolCallId } from './core/ids.js'
 import type { Compaction, Counters, Entry, NoticeEntry, Todo, ToolCall, TurnEntry, UserAttachment } from './model.js'
@@ -337,12 +337,11 @@ export class Transcript {
     const call: ToolCall = {
       args: shownArgs(u.args),
       argsText: p.args_text ?? '',
-      batch: u.batch,
       context: withoutTernEnv(p.context ?? ''),
       id: toolCallId(p.tool_id),
       name: u.name,
+      outcome: { kind: 'running' },
       startedAt: at,
-      status: 'running',
       via: u.via
     }
 
@@ -386,8 +385,8 @@ export class Transcript {
     const interrupted =
       p.name === 'terminal' && typeof output === 'string' && /\[Command interrupted\]\s*$/.test(output)
 
-    call.duration = typeof p.duration_s === 'number' ? Math.round(p.duration_s * 1000) : at - call.startedAt
-    call.summary = p.summary ?? undefined
+    const duration = typeof p.duration_s === 'number' ? Math.round(p.duration_s * 1000) : at - call.startedAt
+    const summary = p.summary ?? undefined
     call.resultText = p.result_text ?? undefined
     call.result = p.result
     call.diff = p.inline_diff ?? undefined
@@ -396,13 +395,13 @@ export class Transcript {
       const u = unwrap(p.name, p.args)
       call.args = shownArgs(u.args)
       call.name = u.name
-      call.via = u.via ?? call.via
-      call.batch = u.batch
+      call.via = nextVia(call.via, u.via)
     }
 
     // A connector call's outcome is its entry in the batch result.
     const bridged = settleBridge(call)
-    call.status = interrupted ? 'cancelled' : (bridged ?? isToolError(p)) ? 'error' : 'done'
+    const kind = interrupted ? 'cancelled' : (bridged ?? isToolError(p)) ? 'error' : 'done'
+    call.outcome = summary === undefined ? { duration, kind } : { duration, kind, summary }
 
     if (Array.isArray(p.todos)) {
       call.todos = toTodos(p.todos)
@@ -456,9 +455,8 @@ export class Transcript {
     turn.blocks = turn.blocks.filter(b => b.kind !== 'text' || b.text.trim())
 
     for (const b of turn.blocks) {
-      if (b.kind === 'tool' && b.call.status === 'running') {
-        b.call.status = p.status === 'error' ? 'error' : p.status === 'interrupted' ? 'cancelled' : 'done'
-        b.call.duration ??= at - b.call.startedAt
+      if (b.kind === 'tool' && b.call.outcome.kind === 'running') {
+        b.call.outcome = { duration: at - b.call.startedAt, kind: p.status === 'error' ? 'error' : p.status === 'interrupted' ? 'cancelled' : 'done' }
       }
     }
 

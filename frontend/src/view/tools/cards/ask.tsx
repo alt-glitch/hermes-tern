@@ -33,7 +33,7 @@ function askCard(call: ToolCall, d: AskDetail): Card {
     }
 
     // History drops clarify's result: with none, the answer is unknown, not missing.
-    if (!answers.length && call.status !== 'running' && d.answered) {
+    if (!answers.length && call.outcome.kind !== 'running' && d.answered) {
       const skipped = d.responses[i]?.skipped === true
       body.push(<text key={`q${i}.none`} role="omp.tool.notice" spans={[{ s: 'muted', t: skipped ? 'Skipped' : 'No answer' }]} />)
     }

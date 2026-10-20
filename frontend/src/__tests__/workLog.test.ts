@@ -15,7 +15,8 @@ const call = (name: string, args: Record<string, unknown> = {}, more: Partial<To
   id: toolCallId(`${name}-${JSON.stringify(args)}`),
   name,
   startedAt: 0,
-  status: 'done',
+  outcome: { duration: 0, kind: 'done' },
+  via: { kind: 'direct' },
   ...more
 })
 
@@ -198,11 +199,11 @@ describe('parts', () => {
 
 describe('labels', () => {
   it('names the running program, without a shell wrapper', () => {
-    const running = (command: string) => tool('a', call('terminal', { command }, { status: 'running' }))
+    const running = (command: string) => tool('a', call('terminal', { command }, { outcome: { kind: 'running' } }))
 
     expect(liveLabel(running('ls -la && git log'))).toBe('Running ls')
     expect(liveLabel(running("bash -lc 'npm test'"))).toBe('Running npm')
-    expect(liveLabel(tool('a', call('terminal', { command: 'ls' }, { status: 'error' })))).toBe('Failed ls')
+    expect(liveLabel(tool('a', call('terminal', { command: 'ls' }, { outcome: { duration: 0, kind: 'error' } })))).toBe('Failed ls')
   })
 
   it('keeps the live step in the present tense while the turn works on, as t3code does', () => {
@@ -211,7 +212,7 @@ describe('labels', () => {
     expect(liveLabel(done(call('terminal', { command: 'sed -n 1p a' })), true)).toBe('Running sed')
     expect(liveLabel(done(call('terminal', { command: 'sed -n 1p a' })))).toBe('Ran sed')
     expect(liveLabel(done(call('read_file', { path: 'a.ts' })), true)).toBe('Reading a.ts')
-    expect(liveLabel(done(call('terminal', { command: 'x' }, { status: 'error' })), true)).toBe('Failed x')
+    expect(liveLabel(done(call('terminal', { command: 'x' }, { outcome: { duration: 0, kind: 'error' } })), true)).toBe('Failed x')
     expect(presentTense('Searched tools for x')).toBe('Searching tools for x')
   })
 
@@ -248,7 +249,7 @@ describe('labels', () => {
 
 describe('busy labels', () => {
   it('names the running call as its step reads, not by its wire name', () => {
-    const running = { status: 'running' as const }
+    const running: Partial<ToolCall> = { outcome: { kind: 'running' } }
     expect(busyLabel(call('read_file', { path: '/x/a.ts' }, running))).toBe('Reading /x/a.ts…')
     expect(busyLabel(call('terminal', { command: 'ls -la' }, running))).toBe('Running ls…')
     expect(busyLabel(call('connectors__linear__LINEAR_CREATE_ISSUE', {}, running))).toMatch(/^Linear · .*issue.*…$/i)

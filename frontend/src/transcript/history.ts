@@ -171,7 +171,7 @@ export function history({ kept, messages, compactions, id }: HistorySource): Ent
         existing.diff = diff ?? existing.diff
 
         if (settleBridge(existing)) {
-          existing.status = 'error'
+          existing.outcome = { duration: 0, kind: 'error' }
         }
 
         continue
@@ -184,19 +184,17 @@ export function history({ kept, messages, compactions, id }: HistorySource): Ent
       const call: ToolCall = {
         args,
         argsText: '',
-        batch: u.batch,
         context: m.context ?? '',
         diff,
-        duration: 0,
         id: callId,
         name: u.name,
+        outcome: { duration: 0, kind: 'done' },
         result,
         startedAt: at,
-        status: 'done',
         via: u.via
       }
 
-      call.status = (settleBridge(call) ?? Boolean(record(call.result)?.error)) ? 'error' : 'done'
+      call.outcome = { duration: 0, kind: (settleBridge(call) ?? Boolean(record(call.result)?.error)) ? 'error' : 'done' }
 
       if (isTodoName(call.name)) {
         call.todosBefore = todos
