@@ -18,7 +18,7 @@ import type { StoredCompaction } from '../hermes/compactions.js'
 import type { Compaction, Counters, Entry, NoticeEntry, Todo, ToolCall, TurnEntry, UserAttachment } from '../model.js'
 import { nextVia, settleBridge, unwrap } from '../tools/bridge.js'
 import { detailOf } from '../tools/detail.js'
-import { withoutTernEnv } from '../view/describe.js'
+import { withoutTernEnv } from '../tools/terminal.js'
 import { record } from '../wire/json.js'
 
 import { callIn, callsWhere, findCall, isBackgroundCall, isTodoName, isToolError, isWatchCall, type Located } from './calls.js'

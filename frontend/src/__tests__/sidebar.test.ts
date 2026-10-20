@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from 'vitest'
 
+import { Sidebar, type SidebarHost } from '../chrome/sidebar.js'
 import { liveSessionId } from '../core/ids.js'
 import type { GitState } from '../git/status.js'
-import { Sidebar, type SidebarHost } from '../sidebar.js'
 
 import { must, stub } from './fakes.js'
 

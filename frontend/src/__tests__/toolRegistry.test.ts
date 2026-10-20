@@ -7,7 +7,7 @@ import { describe, expect, it } from 'vitest'
 import { detailOf, resultOf, toolKeyOf } from '../tools/detail.js'
 import { hubIconOf } from '../view/tools/registry.js'
 import { toolDetail, toolNode } from '../view/tools/shell.js'
-import { actionIcon, actionOf, groupIcon, stepLabel, summarize, type WorkItem } from '../workLog.js'
+import { actionIcon, actionOf, groupIcon, stepLabel, summarize, type WorkItem } from '../view/workLogModel.js'
 
 import { call, fixtureCalls } from './toolFixtures.js'
 

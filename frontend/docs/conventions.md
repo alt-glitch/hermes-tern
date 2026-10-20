@@ -93,6 +93,11 @@ code that puts one kind where another belongs fails to compile unless it says so
 - Value imports from `@tui/*` outside `src/hermes/**` and `src/wire/**`: the Hermes sources move
   with `hermes update`, so their runtime code comes in through those two directories.
   `import type` from `@tui/*` is fine anywhere.
+- `view/` outside the modules that draw: `src/view/**`, the composition roots (`src/app/**`, the
+  watch pane's `src/watch/**`), the sheets (`src/overlays/**`, `src/prompts/**`, `src/prs/**`) and
+  any `.tsx` module. A store, the wire, the turn or the transcript does not depend on how it is
+  drawn: what both sides need (a type, a text helper) lives on the non-view side, and a label the
+  views own reaches a gateway handler as a port (`TurnCx.labels`). `import type` counts too.
 
 ## JSON parsing at the boundary
 

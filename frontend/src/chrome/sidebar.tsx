@@ -5,17 +5,17 @@
 
 import type { JSX, PrefsRow } from '@stencil-hq/tern'
 
-import type { ChatPorts } from './app/ports.js'
-import { copyToClipboard } from './clipboard.js'
-import { launchEnv } from './config/env.js'
-import { optional } from './core/assert.js'
-import type { Ticket } from './core/epoch.js'
-import { type LiveSessionId, prKey } from './core/ids.js'
-import { Poller } from './core/poller.js'
-import { type GitState, gitState } from './git/status.js'
-import { checksState } from './github/pullRequest.js'
-import { type ChangesHost, openChanges } from './overlays/changes.js'
-import { openPullRequests, type PullRequestsSheetHost, stateLabel } from './overlays/pullRequests.js'
+import type { ChatPorts } from '../app/ports.js'
+import { copyToClipboard } from '../clipboard.js'
+import { launchEnv } from '../config/env.js'
+import { optional } from '../core/assert.js'
+import type { Ticket } from '../core/epoch.js'
+import { type LiveSessionId, prKey } from '../core/ids.js'
+import { Poller } from '../core/poller.js'
+import { type GitState, gitState } from '../git/status.js'
+import { checksState } from '../github/pullRequest.js'
+import { type ChangesHost, openChanges } from '../overlays/changes.js'
+import { openPullRequests, type PullRequestsSheetHost, stateLabel } from '../overlays/pullRequests.js'
 
 /** What the session sidebar reaches of the app. */
 export type SidebarHost = Pick<ChatPorts, 'changed' | 'prs' | 'session'> & ChangesHost & PullRequestsSheetHost

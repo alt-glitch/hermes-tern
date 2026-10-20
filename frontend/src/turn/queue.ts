@@ -14,7 +14,6 @@ import type { Image } from '../draft/attachments.js'
 import type { NoticeEntry } from '../model.js'
 import { internalNotice } from '../transcript/messages.js'
 import type { SessionTicket } from '../session/state.js'
-import type { QueuedRow } from '../view/queued.js'
 import { admissionOf, type Requester, rpc } from '../wire/rpc.js'
 
 import { steerTurn } from './control.js'
@@ -52,6 +51,19 @@ function waitsFor(target: HeldTarget, ref: SessionRef): boolean {
       return target.ref.live === ref.live || (target.ref.stored !== null && target.ref.stored === ref.stored)
   }
 }
+
+/**
+ * A prompt waiting behind the turn (t3code's queued row). `local`: held by this pane; `mine`: this
+ * pane's row in the shared gateway's queue. Both have Edit, and Steer while `steer` says so.
+ * `sending`: this pane's row still on its way to the gateway; `foreign`: another window's row
+ * (`elsewhere`: queued there or before a reconnect; `unknown`: its turn's outcome is unknown).
+ * The last two are shown, not acted on.
+ */
+export type QueuedRow =
+  | { kind: 'local'; text: string; steer: boolean }
+  | { kind: 'mine'; text: string; steer: boolean }
+  | { kind: 'sending'; text: string }
+  | { kind: 'foreign'; text: string; note: 'elsewhere' | 'unknown' }
 
 /** What the prompt queue reaches of the app. */
 export interface QueueHost {

@@ -21,8 +21,8 @@ import {
 } from '../connections/cards.js'
 import { entryId, liveSessionId, storedSessionId, toolCallId } from '../core/ids.js'
 import type { ToolCall, TurnEntry } from '../model.js'
+import { foldOf, ownsCard } from '../view/workLogModel.js'
 import { decodeJson } from '../wire/json.js'
-import { foldOf, ownsCard } from '../workLog.js'
 
 const result = {
   note: 'Show each connect_url to the user; they open it in a browser to authorize.',

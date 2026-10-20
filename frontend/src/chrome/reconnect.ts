@@ -2,7 +2,13 @@
 // redial line (`gateway.reconnecting`) until the next gateway.ready, re-rendered when each wait ends.
 
 import type { NoticeEntry } from '../model.js'
-import type { Reconnecting } from '../view/automation.js'
+
+/** The gateway is being redialled: which try, and when the next one starts. */
+export interface Reconnecting {
+  attempt: number
+  /** When the next try starts (ms since the epoch). */
+  dueAt: number
+}
 
 /** What the connection's state reaches of the app. */
 export interface ReconnectHost {

@@ -5,9 +5,8 @@ import { admissionId, inputId, type LiveSessionId, liveSessionId, storedSessionI
 import type { Image } from '../draft/attachments.js'
 import { sessionTicket } from '../session/state.js'
 import type { Prompt } from '../turn/prompt.js'
-import { PromptQueue, type QueueHost } from '../turn/queue.js'
+import { PromptQueue, type QueuedRow, type QueueHost } from '../turn/queue.js'
 import { dockNodes } from '../view/dock.js'
-import type { QueuedRow } from '../view/queued.js'
 import type { PendingRow, PendingStatus } from '../wire/schemas.js'
 
 import { dockActions, dockContext } from './dockFakes.js'

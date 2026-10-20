@@ -5,7 +5,7 @@ import { entryId, subagentKey, toolCallId } from '../core/ids.js'
 import type { ToolCall, TurnEntry } from '../model.js'
 import { toolDetail, toolNode } from '../view/tools/shell.js'
 import { entryNode, type TranscriptContext } from '../view/transcript.js'
-import { actionOf, stepLabel } from '../workLog.js'
+import { actionOf, stepLabel } from '../view/workLogModel.js'
 
 import { spanTexts, tree } from './fakes.js'
 

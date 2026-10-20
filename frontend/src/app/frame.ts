@@ -4,10 +4,10 @@
 // sent only when that changed. Every step but those three only reads.
 
 import type { Hud } from '../chrome/hud.js'
+import type { Sidebar } from '../chrome/sidebar.js'
 import type { Completion } from '../overlays/completion.js'
 import type { Overlay } from '../overlays/overlay.js'
 import type { PrAside } from '../prs/aside.js'
-import type { Sidebar } from '../sidebar.js'
 import { INPUT_ID, type SurfaceHost } from '../surface/host.js'
 import type { Transcript } from '../transcript/store.js'
 import { type DockActions, dockNodes } from '../view/dock.js'

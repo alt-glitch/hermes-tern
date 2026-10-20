@@ -16,7 +16,7 @@ import { Transcript } from '../transcript/store.js'
 import { imageChip } from '../view/dock.js'
 import { toolNode } from '../view/tools/shell.js'
 import { entryNode, type TranscriptContext } from '../view/transcript.js'
-import { foldOf, ownsCard, pieces } from '../workLog.js'
+import { foldOf, ownsCard, pieces } from '../view/workLogModel.js'
 
 import { FakeGateway, must, tree } from './fakes.js'
 

@@ -12,6 +12,7 @@ import { tickWhileOpen } from '../overlays/sheet.js'
 import { INPUT_ID, SurfaceHost } from '../surface/host.js'
 import { runInput } from '../surface/input.js'
 import { reportCwd, setTabTitle } from '../surface/osc.js'
+import { STYLES } from '../view/styles.js'
 
 import { fakeTern, key } from './fakes.js'
 
@@ -219,7 +220,7 @@ describe('runInput', () => {
 describe('SurfaceHost', () => {
   it('opens the chat surface, as the chat and the subagent pane both draw it', () => {
     const tern = fakeTern({ draws: true })
-    const host = new SurfaceHost(tern.session, 'agent 1')
+    const host = new SurfaceHost(tern.session, 'agent 1', STYLES)
 
     expect(tern.opened).toEqual([{ id: 'hermes', mode: 'inline', role: 'omp.session', title: 'agent 1' }])
     expect(host.closed).toBe(false)
@@ -227,7 +228,7 @@ describe('SurfaceHost', () => {
 
   it('sends the caret when it moves, and always when asked outright', () => {
     const tern = fakeTern({ draws: true })
-    const host = new SurfaceHost(tern.session, 'hermes')
+    const host = new SurfaceHost(tern.session, 'hermes', STYLES)
 
     host.follow(INPUT_ID)
     expect(tern.focused).toEqual([])

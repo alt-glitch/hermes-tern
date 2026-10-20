@@ -8,17 +8,17 @@ import type { JSX } from '@stencil-hq/tern'
 import { optional } from '../core/assert.js'
 import type { Block, Compaction, Entry, NoticeEntry, TurnEntry, UserAttachment, UserEntry } from '../model.js'
 import { steerState } from '../transcript/messages.js'
-import { turnEndedAt } from '../transcript/turns.js'
-import { parts, pieces } from '../workLog.js'
+import { answerText, turnEndedAt } from '../transcript/turns.js'
 
 import { duration } from './format.js'
-import { age, compact } from './time.js'
 import { slashBody } from './slash.js'
+import { age, compact } from './time.js'
 import { toolNode } from './tools/shell.js'
 import { foldSection, headedCard } from './ui/fold.js'
 import { shimmerText } from './ui/live.js'
 import { type WelcomeContext, welcomeNode } from './welcome.js'
 import { foldNode, latestFailed, thinkingRow, workingNode, workNode } from './workLog.js'
+import { parts, pieces } from './workLogModel.js'
 
 /** What entry views need from the app. */
 export interface TranscriptContext {
@@ -294,13 +294,6 @@ function copyButton(text: string, id: string, role: string, title: string, cx: T
       title={copied ? 'Copied' : title}
     />
   )
-}
-
-/** The answer: the turn's last text, the one its fold leaves in view (notes before it fold away). */
-export function answerText(turn: TurnEntry): string {
-  const last = turn.blocks.findLast(b => b.kind === 'text' && b.text.trim())
-
-  return last?.kind === 'text' ? last.text.trim() : ''
 }
 
 function usageNode(turn: TurnEntry, answer: string, cx: TranscriptContext): JSX.Element {

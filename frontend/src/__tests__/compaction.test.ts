@@ -9,7 +9,7 @@ import { describe, expect, it } from 'vitest'
 import { handoff, lineTokens, storedCompactions } from '../hermes/compactions.js'
 import type { Compaction, Entry, TurnEntry } from '../model.js'
 import { Transcript } from '../transcript/store.js'
-import { parts } from '../workLog.js'
+import { parts } from '../view/workLogModel.js'
 
 import { must } from './fakes.js'
 

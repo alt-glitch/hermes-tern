@@ -4,7 +4,7 @@
 import type { ApprovalChoice, ApprovalResult } from '@hermes/shared/gateway-events'
 
 import type { Overlay, OverlayHost } from '../overlays/overlay.js'
-import { withoutTernEnv } from '../view/describe.js'
+import { withoutTernEnv } from '../tools/terminal.js'
 import { actionsRow } from '../view/ui/button.js'
 
 import { answerWith, isCtrlC, type Option, type Sending, sendingLine } from './ask.js'

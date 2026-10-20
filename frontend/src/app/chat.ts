@@ -11,6 +11,7 @@ import type { GatewayClient } from '@tui/gatewayClient.js'
 
 import logo from '../../assets/logo.png'
 import type { Agents } from '../agents/store.js'
+import type { Sidebar } from '../chrome/sidebar.js'
 import { sessionHost } from '../commands/host.js'
 import type { SessionHost } from '../commands/session.js'
 import { dispatched } from '../commands/slash.js'
@@ -35,7 +36,6 @@ import { applyEffort } from '../session/effort.js'
 import type { SessionState } from '../session/state.js'
 import type { SessionTitle } from '../session/title.js'
 import { fileSettings, type SettingsSource, type ThemeMode } from '../settings.js'
-import type { Sidebar } from '../sidebar.js'
 import { onTernEvent } from '../surface/actions.js'
 import { INPUT_ID, SurfaceHost } from '../surface/host.js'
 import { runInput } from '../surface/input.js'
@@ -43,7 +43,9 @@ import type { Transcript } from '../transcript/store.js'
 import type { Activity, Busy } from '../turn/activity.js'
 import { IMAGE_ONLY_PROMPT } from '../turn/prompt.js'
 import type { PromptQueue } from '../turn/queue.js'
+import { STYLES } from '../view/styles.js'
 import { noticeSink, onCardFault } from '../view/tools/faults.js'
+import { busyLabel, preparingLabel } from '../view/workLogModel.js'
 
 import { AppActions } from './actions.js'
 import { drawFrame, type FrameCx } from './frame.js'
@@ -126,7 +128,7 @@ export class App implements ChatPorts {
 
   async run(): Promise<number> {
     const s = this.#s
-    this.#surface = new SurfaceHost(this.#tern, 'hermes')
+    this.#surface = new SurfaceHost(this.#tern, 'hermes', STYLES)
     this.#view = {
       ...s,
       actions: this.#act.dock,
@@ -156,6 +158,7 @@ export class App implements ChatPorts {
       drain: () => this.queue.drain(),
       eventLog: this.#launch.eventLog,
       gw: this.#gw,
+      labels: { busy: busyLabel, preparing: preparingLabel },
       reportCwd: () => this.#act.reportCwd(),
       request: req => this.#act.onRequest(req),
       setCompacting: on => this.#act.setCompacting(on),

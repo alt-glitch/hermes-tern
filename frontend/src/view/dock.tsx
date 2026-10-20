@@ -7,17 +7,20 @@
 import type { EditEvent, JSX, SendEvent, Tone } from '@stencil-hq/tern'
 
 import type { Pill } from '../chrome/hud.js'
+import type { Reconnecting } from '../chrome/reconnect.js'
 import { assertNever, optional } from '../core/assert.js'
+import type { ComposerImage } from '../draft/attachments.js'
 import type { Composer } from '../draft/composer.js'
-import type { ImageSource, Todo } from '../model.js'
+import type { Todo } from '../model.js'
 import { type ChartEntry, glance, glanceSpans, hovercard, latest, miniSpark, summary } from '../processes/widgets/view.js'
 import { DEFAULT_EFFORT, effortText } from '../session/effort.js'
 import { COMPACTING_LABEL } from '../status.js'
 import { todoProgress } from '../transcript/todos.js'
+import type { QueuedRow } from '../turn/queue.js'
 
-import { type AutomationLine, automationNode, type Reconnecting, reconnectNode } from './automation.js'
+import { type AutomationLine, automationNode, reconnectNode } from './automation.js'
 import { plural } from './format.js'
-import { type QueuedRow, queuedNode } from './queued.js'
+import { queuedNode } from './queued.js'
 import { compact } from './time.js'
 import { checklistNode } from './todos.js'
 import { workingRow } from './ui/live.js'
@@ -123,17 +126,6 @@ export interface DockActions {
   onTodos(): void
   onGoal(): void
   onLoop(): void
-}
-
-/** An image attached to the draft. */
-export interface ComposerImage {
-  label: string
-  /** Its size, under the name. */
-  caption?: string
-  /** The thumbnail; unset where Tern can be sent no blob and the file is not here. */
-  image?: ImageSource
-  /** Still read or uploaded: the chip says so. */
-  pending?: boolean
 }
 
 /** The agent's todo list as a pill: a ring that fills as items are done, and the one under way. */

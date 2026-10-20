@@ -1,11 +1,11 @@
-// What the reducer and the views read and write of one turn: when it ended, its thoughts ending,
-// the text that closes its last response, its share of the session's usage, and a call's args as
-// the views show them.
+// What the reducer, the commands and the views read and write of one turn: when it ended, its
+// thoughts ending, the text that closes its last response, its answer, its share of the session's
+// usage, and a call's args as the views show them.
 
 import type { Usage } from '@hermes/shared/gateway-events'
 
 import type { TurnEntry } from '../model.js'
-import { withoutTernEnv } from '../view/describe.js'
+import { withoutTernEnv } from '../tools/terminal.js'
 
 /** When `turn` ended: undefined while it is live, and for a stored turn whose rows carry no time. */
 export function turnEndedAt(turn: Pick<TurnEntry, 'end'>): number | undefined {
@@ -35,6 +35,13 @@ export function trailingText(turn: TurnEntry): string {
   }
 
   return out
+}
+
+/** The answer: the turn's last text, the one its fold leaves in view (notes before it fold away). */
+export function answerText(turn: TurnEntry): string {
+  const last = turn.blocks.findLast(b => b.kind === 'text' && b.text.trim())
+
+  return last?.kind === 'text' ? last.text.trim() : ''
 }
 
 /** One turn's share of the session totals: `now` minus `before`, field by field. */

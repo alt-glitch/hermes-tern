@@ -4,13 +4,13 @@
 import type { Agents } from '../../agents/store.js'
 import { toolCallId } from '../../core/ids.js'
 import type { PullRequests } from '../../github/store.js'
+import type { ToolCall } from '../../model.js'
 import type { SessionState } from '../../session/state.js'
 import { statusEffect } from '../../status.js'
 import type { Transcript } from '../../transcript/store.js'
 import type { Activity } from '../../turn/activity.js'
 import { afterMessageComplete, afterToolComplete, type MessageFanout, type ToolFanout } from '../../turn/fanout.js'
 import type { PromptQueue } from '../../turn/queue.js'
-import { busyLabel, preparingLabel } from '../../workLog.js'
 import type { EventOf, Handlers, Outcome } from '../dispatch.js'
 import { moaLabel, moaReferenceLabel } from '../moa.js'
 
@@ -44,6 +44,8 @@ export interface TurnCx extends ToolFanout, MessageFanout {
   readonly queue: { readonly server: Pick<PromptQueue['server'], 'settlesQueuedRow'> }
   /** The backend warnings shown already. */
   readonly warned: Warned
+  /** The working line's words for a call (view/workLogModel.ts): one that just started, and one the model still writes. */
+  readonly labels: { busy(call: ToolCall): string; preparing(name: string): string }
   /** A compaction started or ended; prompts held behind one go once it ends. */
   setCompacting(on: boolean): void
   /** Gives the compactions seen here their summaries from the store, `delay` ms from now. */
@@ -129,7 +131,7 @@ export const turnHandlers = {
   },
 
   'tool.generating': (ev, cx) => {
-    cx.activity.relabel(ev.payload?.name ? preparingLabel(ev.payload.name) : 'Preparing a tool…')
+    cx.activity.relabel(ev.payload?.name ? cx.labels.preparing(ev.payload.name) : 'Preparing a tool…')
 
     return 'render'
   },
@@ -139,7 +141,7 @@ export const turnHandlers = {
       cx.transcript.toolStart(ev.payload)
       // The call as its step reads (a bridged or connector call as its app), not its wire name.
       const call = cx.transcript.call(toolCallId(ev.payload.tool_id))
-      cx.activity.relabel(call ? busyLabel(call) : `Running ${ev.payload.name}…`)
+      cx.activity.relabel(call ? cx.labels.busy(call) : `Running ${ev.payload.name}…`)
       // vision_analyze names its image up front.
       cx.showImage(call)
     }

@@ -4,6 +4,7 @@
 import type { MessageCompletePayload, ToolCompletePayload } from '@hermes/shared/gateway-events'
 
 import type { Agents } from '../agents/store.js'
+import type { Sidebar } from '../chrome/sidebar.js'
 import { CONNECT_TOOL } from '../connections/cards.js'
 import type { ConnectWatcher } from '../connections/watcher.js'
 import { toolCallId } from '../core/ids.js'
@@ -11,7 +12,6 @@ import { LINK_TOOLS } from '../github/links.js'
 import type { PullRequests } from '../github/store.js'
 import type { ToolCall } from '../model.js'
 import type { Processes } from '../processes/store.js'
-import type { Sidebar } from '../sidebar.js'
 import type { Transcript } from '../transcript/store.js'
 
 import type { Activity } from './activity.js'

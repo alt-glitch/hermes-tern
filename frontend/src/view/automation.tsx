@@ -5,6 +5,7 @@
 
 import type { JSX, Tone } from '@stencil-hq/tern'
 
+import type { Reconnecting } from '../chrome/reconnect.js'
 import type { GoalState, GoalView, LoopView } from '../session/automation.js'
 
 import { countdownAge } from './time.js'
@@ -18,13 +19,6 @@ export interface AutomationLine {
   loopOwner: object | null
   onGoal(): void
   onLoop(): void
-}
-
-/** The gateway is being redialled: which try, and when the next one starts. */
-export interface Reconnecting {
-  attempt: number
-  /** When the next try starts (ms since the epoch). */
-  dueAt: number
 }
 
 /** A part of the line: a pill the keyboard can hold, with no inner part. */

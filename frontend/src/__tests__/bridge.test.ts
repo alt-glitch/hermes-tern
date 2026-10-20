@@ -4,7 +4,7 @@ import { toolCallId } from '../core/ids.js'
 import type { ToolCall } from '../model.js'
 import { appOf, batchOf, callApp, unwrap } from '../tools/bridge.js'
 import { Transcript } from '../transcript/store.js'
-import { stepLabel, summarize } from '../workLog.js'
+import { stepLabel, summarize } from '../view/workLogModel.js'
 
 import { must, stub } from './fakes.js'
 

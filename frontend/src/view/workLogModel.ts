@@ -2,21 +2,23 @@
 // MessagesTimeline.logic.ts and packages/client-runtime/src/work-log/presentation.ts):
 // consecutive tool calls and thoughts form one work group with a summary ("Ran 3 commands
 // and read 2 files"), each step one line; a finished turn folds everything but its answer
-// behind "Worked for 54s". The views in view/workLog.tsx draw what this derives.
+// behind "Worked for 54s". The views in workLog.tsx draw what this derives; the working line
+// takes its labels from here too (the gateway's turn handler is handed them).
 
-import { isConnectCall } from './connections/cards.js'
-import { isNonEmpty } from './core/assert.js'
-import { shownImage } from './media.js'
-import type { Block, ToolCall, TurnEntry } from './model.js'
-import { appOf, appsOf, batchOf } from './tools/bridge.js'
-import { detailOf } from './tools/detail.js'
-import { isBackgroundCall, isTodoName, isWatchCall } from './transcript/calls.js'
-import { compactionEndedAt } from './transcript/compactions.js'
-import { turnEndedAt } from './transcript/turns.js'
-import { commandProgramName } from './vendor/t3code/commandLabel.js'
-import { durationCompact, flat, plural } from './view/format.js'
-import { ACTION_ICON, withView } from './view/tools/registry.js'
-import type { Action } from './view/tools/types.js'
+import { isConnectCall } from '../connections/cards.js'
+import { isNonEmpty } from '../core/assert.js'
+import { shownImage } from '../media.js'
+import type { Block, ToolCall, TurnEntry } from '../model.js'
+import { appOf, appsOf, batchOf } from '../tools/bridge.js'
+import { detailOf } from '../tools/detail.js'
+import { isBackgroundCall, isTodoName, isWatchCall } from '../transcript/calls.js'
+import { compactionEndedAt } from '../transcript/compactions.js'
+import { turnEndedAt } from '../transcript/turns.js'
+import { commandProgramName } from '../vendor/t3code/commandLabel.js'
+
+import { durationCompact, flat, plural } from './format.js'
+import { ACTION_ICON, withView } from './tools/registry.js'
+import type { Action } from './tools/types.js'
 
 /** A step of a work group: a tool call or a thought. */
 export type WorkItem = Extract<Block, { kind: 'thinking' | 'tool' }>

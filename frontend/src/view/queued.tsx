@@ -4,19 +4,7 @@
 import type { JSX } from '@stencil-hq/tern'
 
 import { assertNever } from '../core/assert.js'
-
-/**
- * A prompt waiting behind the turn (t3code's queued row). `local`: held by this pane; `mine`: this
- * pane's row in the shared gateway's queue. Both have Edit, and Steer while `steer` says so.
- * `sending`: this pane's row still on its way to the gateway; `foreign`: another window's row
- * (`elsewhere`: queued there or before a reconnect; `unknown`: its turn's outcome is unknown).
- * The last two are shown, not acted on.
- */
-export type QueuedRow =
-  | { kind: 'local'; text: string; steer: boolean }
-  | { kind: 'mine'; text: string; steer: boolean }
-  | { kind: 'sending'; text: string }
-  | { kind: 'foreign'; text: string; note: 'elsewhere' | 'unknown' }
+import type { QueuedRow } from '../turn/queue.js'
 
 /** What a queued row's buttons do, by its index: Edit pulls it into the composer; Steer (absent when no turn runs) sends it into the turn. */
 export interface QueuedActions {

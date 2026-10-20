@@ -6,7 +6,7 @@ import type { Todo } from '../model.js'
 import { Transcript } from '../transcript/store.js'
 import { durationCompact } from '../view/format.js'
 import { planStep } from '../view/tools/cards/inline.js'
-import { busyLabel, foldOf, liveLabel, parts, pieces, preparingLabel, presentTense, stepLabel, summarize, thoughtLine, thoughtTitle, type WorkItem } from '../workLog.js'
+import { busyLabel, foldOf, liveLabel, parts, pieces, preparingLabel, presentTense, stepLabel, summarize, thoughtLine, thoughtTitle, type WorkItem } from '../view/workLogModel.js'
 
 import { must } from './fakes.js'
 

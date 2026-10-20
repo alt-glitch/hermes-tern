@@ -29,9 +29,19 @@ export const SECTIONS = {
 const ZOD = { message: `Import zod/mini, not the zod root. ${see('restricted-imports')}`, name: 'zod' }
 const EFFECT = `This package does not use Effect. ${see('restricted-imports')}`
 
-/** The import rule: zod's root and Effect everywhere, plus App outside entry.ts and the tests, and @tui values outside hermes/ and wire/. */
-function imports({ app, tui }) {
+/**
+ * The import rule: zod's root and Effect everywhere, plus App outside entry.ts and the tests, @tui
+ * values outside hermes/ and wire/, and view/ outside the modules that draw (VIEWS).
+ */
+function imports({ app, tui, view }) {
   const patterns = [{ group: ['effect/*'], message: EFFECT }]
+
+  if (view) {
+    patterns.push({
+      message: `Only the modules that draw import view/ (VIEWS in eslint.config.js): a store, the wire, the turn or the transcript does not depend on how it is drawn. ${see('restricted-imports')}`,
+      regex: '(^|/)view/'
+    })
+  }
 
   if (app) {
     patterns.push({
@@ -50,6 +60,13 @@ function imports({ app, tui }) {
 
   return ['error', { paths: [ZOD, { message: EFFECT, name: 'effect' }], patterns }]
 }
+
+/**
+ * The modules that may import view/: view/ itself, the composition roots (app/, the watch pane's
+ * watch/), the sheets (overlays/, prompts/, prs/) and every .tsx module (a node builder, wherever
+ * its subject lives: the sidebar, an agent's row, a process's chart).
+ */
+const VIEWS = ['src/view/**', 'src/app/**', 'src/watch/**', 'src/overlays/**', 'src/prompts/**', 'src/prs/**', 'src/**/*.tsx']
 
 const JSON_PARSE = {
   message: `JSON.parse belongs at a boundary: wire/ decodes, tools/ reads tool details. ${see('json-parsing-at-the-boundary')}`,
@@ -70,7 +87,7 @@ export const rules = defineConfig([
     rules: {
       '@typescript-eslint/consistent-type-assertions': ['error', { assertionStyle: 'never' }],
       '@typescript-eslint/no-non-null-assertion': 'error',
-      '@typescript-eslint/no-restricted-imports': imports({ app: true, tui: true }),
+      '@typescript-eslint/no-restricted-imports': imports({ app: true, tui: true, view: true }),
       '@typescript-eslint/no-unnecessary-type-assertion': 'error',
       '@typescript-eslint/no-unsafe-argument': 'error',
       '@typescript-eslint/no-unsafe-member-access': 'error',
@@ -79,10 +96,11 @@ export const rules = defineConfig([
       'no-restricted-syntax': ['error', JSON_PARSE]
     }
   },
-  { files: ['src/entry.ts', 'src/__tests__/**'], rules: { '@typescript-eslint/no-restricted-imports': imports({ app: false, tui: true }) } },
+  { files: VIEWS, rules: { '@typescript-eslint/no-restricted-imports': imports({ app: true, tui: true, view: false }) } },
+  { files: ['src/entry.ts', 'src/__tests__/**'], rules: { '@typescript-eslint/no-restricted-imports': imports({ app: false, tui: true, view: false }) } },
   {
     files: ['src/hermes/**', 'src/wire/**'],
-    rules: { '@typescript-eslint/no-restricted-imports': imports({ app: true, tui: false }) }
+    rules: { '@typescript-eslint/no-restricted-imports': imports({ app: true, tui: false, view: true }) }
   },
   {
     files: ['src/wire/**', 'src/core/ids.ts', 'src/gateway/dispatch.ts'],

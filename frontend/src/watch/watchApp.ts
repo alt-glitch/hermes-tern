@@ -25,6 +25,7 @@ import { INPUT_ID, SurfaceHost } from '../surface/host.js'
 import { runInput } from '../surface/input.js'
 import { Transcript } from '../transcript/store.js'
 import { type DockActions, dockNodes } from '../view/dock.js'
+import { STYLES } from '../view/styles.js'
 import { noticeSink, onCardFault } from '../view/tools/faults.js'
 import { entryNode } from '../view/transcript.js'
 import { rpc } from '../wire/rpc.js'
@@ -115,7 +116,7 @@ export class WatchApp {
   }
 
   async run(): Promise<number> {
-    this.#surface = new SurfaceHost(this.#tern, this.#spec.name)
+    this.#surface = new SurfaceHost(this.#tern, this.#spec.name, STYLES)
     const theme = this.#settings.load().theme ?? 'tern'
     this.#surface.palette(paletteFor(theme, undefined))
     this.#gw.on('event', (ev: AnyGatewayEvent) => {

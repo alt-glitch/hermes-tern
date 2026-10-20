@@ -1,4 +1,5 @@
-// The terminal tool's detail: the command, how it ran, and what it printed.
+// The terminal tool's detail: the command, how it ran, and what it printed; and a command without
+// the plugin's Tern pane prefix, as every view and store shows it.
 
 import { num, type Raw, text } from './fields.js'
 
@@ -27,4 +28,18 @@ export function terminalDetail({ args, result }: Raw): TerminalDetail {
     output: text(result?.['output']),
     tool: 'terminal'
   }
+}
+
+/**
+ * The prefix the plugin's `tool_request` middleware puts before a command so it runs with the chat's
+ * Tern pane (`tern_env.py`): `export TERN_PANE=… …;` and/or `unset TERN_…;`. It is not what the agent
+ * wrote, so the views and the stores leave it out.
+ */
+const TERN_ENV = /^\s*(?:export (?:TERN_[A-Z_]+=(?:'[^']*'|"[^"]*"|[^\s;]+) ?)+; ?)?(?:unset (?:TERN_[A-Z_]+ ?)+; ?)?/
+
+/** `command` without the plugin's Tern pane prefix. */
+export function withoutTernEnv(command: string): string {
+  const m = TERN_ENV.exec(command)
+
+  return m?.[0] ? command.slice(m[0].length) : command
 }

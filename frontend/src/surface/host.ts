@@ -1,10 +1,8 @@
 // The pane's one inline surface on a Tern session, as the chat and the subagent pane both open it:
-// role `omp.session` (so Tern's chat styles apply) with this frontend's stylesheet, and the caret
-// sent only when it moves.
+// role `omp.session` (so Tern's chat styles apply) with this frontend's stylesheet (view/styles.ts,
+// which the pane hands in), and the caret sent only when it moves.
 
 import type { Palette, Renderable, RevealAt, ScrollTo, Session, Surface } from '@stencil-hq/tern'
-
-import { STYLES } from '../view/styles.js'
 
 /** The composer's `editor` node id (dock → composer → line → input): where the caret rests. */
 export const INPUT_ID = 'dock.composer.line.input'
@@ -14,10 +12,10 @@ export class SurfaceHost {
   readonly #surface: Surface
   #focus: string | null = INPUT_ID
 
-  /** Opens the surface on `tern`, titled `title` (the tab's name until a program sets one). */
-  constructor(tern: Session, title: string) {
+  /** Opens the surface on `tern`, titled `title` (the tab's name until a program sets one), wearing `styles`. */
+  constructor(tern: Session, title: string, styles: string) {
     this.#surface = tern.open({ id: 'hermes', mode: 'inline', role: 'omp.session', title })
-    this.#surface.stylesheet('hermes-tern', STYLES)
+    this.#surface.stylesheet('hermes-tern', styles)
   }
 
   /** Whether Tern dropped the surface or it was closed: it draws nothing more. */

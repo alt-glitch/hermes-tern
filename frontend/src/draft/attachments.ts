@@ -12,7 +12,6 @@ import { errorText } from '../core/errors.js'
 import { imagePathOf, withClipboardImage } from '../hermes/clipboardImage.js'
 import { type Attachment, imageSize, uploadImage } from '../hermes/images.js'
 import type { ImageSource, NoticeEntry } from '../model.js'
-import type { ComposerImage } from '../view/dock.js'
 import { rpc } from '../wire/rpc.js'
 
 /**
@@ -20,6 +19,17 @@ import { rpc } from '../wire/rpc.js'
  * its chip shows, and the thumbnail and size the chip and the prompt's bubble show.
  */
 export type Image = Attachment & { name: string; preview?: ImageSource; caption?: string }
+
+/** An image attached to the draft, as its chip shows it. */
+export interface ComposerImage {
+  label: string
+  /** Its size, under the name. */
+  caption?: string
+  /** The thumbnail; unset where Tern can be sent no blob and the file is not here. */
+  image?: ImageSource
+  /** Still read or uploaded: the chip says so. */
+  pending?: boolean
+}
 
 /** An image being read or uploaded: its chip, until it lands or fails. */
 interface Slot {

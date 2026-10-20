@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
-import { commandLine, describeCommand, withoutTernEnv } from '../view/describe.js'
+import { withoutTernEnv } from '../tools/terminal.js'
+import { commandLine, describeCommand } from '../view/describe.js'
 
 describe('describeCommand', () => {
   it('names a heredoc script shipped to a host by the script, the host and its sections', () => {

@@ -18,7 +18,7 @@ import { openSessionPicker, type SessionsHost } from '../overlays/sessions.js'
 import { isThemeMode, openThemePicker, type ThemeHost } from '../overlays/theme.js'
 import { LEVELS } from '../session/effort.js'
 import { fastCommand, type FastHost } from '../session/fast.js'
-import { answerText } from '../view/transcript.js'
+import { answerText } from '../transcript/turns.js'
 import { rpc } from '../wire/rpc.js'
 
 import { CONTROL_COMMANDS } from './control.js'

@@ -9,6 +9,12 @@ import type { JSX, Span } from '@stencil-hq/tern'
 import { isDefined, isNonEmpty, optional } from '../core/assert.js'
 import type { ToolCall, TurnEntry } from '../model.js'
 import { appOf, batchOf } from '../tools/bridge.js'
+
+import { clockShort } from './format.js'
+import { age } from './time.js'
+import { toolDetail } from './tools/shell.js'
+import { foldSection } from './ui/fold.js'
+import { shimmerText } from './ui/live.js'
 import {
   actionIcon,
   actionOf,
@@ -20,13 +26,7 @@ import {
   thoughtTitle,
   visibleItems,
   type WorkItem
-} from '../workLog.js'
-
-import { clockShort } from './format.js'
-import { age } from './time.js'
-import { toolDetail } from './tools/shell.js'
-import { foldSection } from './ui/fold.js'
-import { shimmerText } from './ui/live.js'
+} from './workLogModel.js'
 
 /** "Working for 12s" over a running turn, ruled off from its steps. */
 export function workingNode(turn: TurnEntry, now: number): JSX.Element {
