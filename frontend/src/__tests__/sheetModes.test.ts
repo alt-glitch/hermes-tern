@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { HUB_CLICKS, type HubAction, hubKey, type HubState, initialHub, reduceHub } from '../agents/hub.js'
+import { subagentKey } from '../core/ids.js'
 import type { BackgroundProcess, Subagent } from '../model.js'
 import type { CronJob } from '../processes/cron.js'
 import { initialSheet, reduceSheet, SHEET_CLICKS, type SheetFacts, sheetKey, type SheetState } from '../processes/sheet.js'
@@ -13,6 +14,7 @@ function agent(id: string, status: Subagent['status'], steps = 0): Subagent {
     goal: `goal of ${id}`,
     id,
     index: 0,
+    key: subagentKey(id),
     log: { entries: Array.from({ length: steps }, (_, i) => ({ at: '10:00:00', kind: 'note' as const, text: `step ${i}` })) },
     startedAt: 0,
     status,

@@ -6,9 +6,10 @@ import type { GatewayClient } from '@tui/gatewayClient.js'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { parseLiveLog } from '../agents/liveLog.js'
-import { completionOutcomes, mergeTail, OUTCOME_UNKNOWN } from '../agents/rows.js'
+import { applyListRow, completionOutcomes, dispatchRows, endedStatus, mergeTail, OUTCOME_UNKNOWN } from '../agents/rows.js'
 import { Agents, readLogFile } from '../agents/store.js'
 import { liveSessionId } from '../core/ids.js'
+import type { Subagent } from '../model.js'
 import { Transcript } from '../transcript.js'
 
 import { FakeGateway, must } from './fakes.js'
@@ -60,6 +61,33 @@ describe('mergeTail', () => {
 
   it('keeps a gap when the log outgrew a tail, dropping the cut first line', () => {
     expect(mergeTail(log(1, 2), `ep 6\n${log(7, 8)}`)).toBe(log(1, 2) + log(7, 8))
+  })
+})
+
+describe('subagent rows', () => {
+  it('keeps a placeholder row and its node key when the owner names the child', () => {
+    const list: Subagent[] = []
+    dispatchRows(list, { delegationId: 'deleg_1', goals: ['Read the docs'], ids: [], paths: [] }, 0)
+    const [row] = list
+
+    expect(row).toMatchObject({ id: 'task-0', key: 'p0' })
+    applyListRow(must(row), { delegation_id: 'deleg_1', depth: 0, subagent_id: 'sa-0-abcd' })
+    expect(list).toEqual([row])
+    expect(row).toMatchObject({ id: 'sa-0-abcd', key: 'p0', status: 'running' })
+  })
+
+  it('reads every reported end through one status parser', () => {
+    expect(['completed', 'success', 'unknown', 'interrupted', 'cancelled', 'failed', 'error', 'timeout', '?'].map(endedStatus)).toEqual([
+      'done',
+      'done',
+      'done',
+      'cancelled',
+      'cancelled',
+      'failed',
+      'failed',
+      'failed',
+      undefined
+    ])
   })
 })
 
@@ -182,6 +210,61 @@ describe('Agents', () => {
     expect(transcript.delegations()[0]!.subagents).toEqual([agent])
     await vi.waitFor(() => expect(agent!.tool).toBe('read_file'))
     expect(changes).toBeGreaterThan(0)
+  })
+
+  it('folds background subagents into the delegating call after its turn ended', () => {
+    const t = new Transcript()
+    t.messageStart(0)
+    t.toolStart({ args: { tasks: [{ goal: 'a' }, { goal: 'b' }] }, name: 'delegate_task', tool_id: 'd1' }, 1)
+    t.toolComplete(
+      {
+        name: 'delegate_task',
+        result: { delegation_id: 'deleg_1', mode: 'background', status: 'dispatched' },
+        tool_id: 'd1'
+      },
+      2
+    )
+    t.complete({ status: 'complete', text: 'Dispatched.' }, 3)
+    t.user({ at: 4, text: 'next' })
+    t.messageStart(5)
+
+    const agents = new Agents({ changed: () => undefined, gw: new FakeGateway().client, sid: liveSessionId('s1'), transcript: t })
+    const base = { delegation_id: 'deleg_1', task_count: 2 }
+    agents.apply('subagent.start', { ...base, goal: 'b', subagent_id: 's1', task_index: 1 }, 6)
+    agents.apply('subagent.start', { ...base, goal: 'a', subagent_id: 's0', task_index: 0 }, 6)
+    agents.apply(
+      'subagent.tool',
+      { ...base, goal: 'a', subagent_id: 's0', task_index: 0, tool_name: 'terminal', tool_preview: 'ls' },
+      7
+    )
+    agents.apply(
+      'subagent.complete',
+      { ...base, api_calls: 2, goal: 'a', status: 'completed', subagent_id: 's0', summary: 'Done', task_index: 0 },
+      9
+    )
+
+    const [call, ...later] = t.delegations()
+    expect(call?.subagents?.map(a => [a.id, a.status, a.calls])).toEqual([
+      ['s0', 'done', 2],
+      ['s1', 'running', 0]
+    ])
+    expect(later).toEqual([])
+    // Each row is keyed by the id it was made under.
+    expect(call?.subagents?.map(a => a.key)).toEqual(['s0', 's1'])
+  })
+
+
+  it('bumps the turn holding the call an event changed', () => {
+    const t = new Transcript()
+    const turn = t.messageStart(0)
+    t.toolStart({ name: 'delegate_task', tool_id: 'd1' }, 1)
+    const agents = new Agents({ changed: () => undefined, gw: new FakeGateway().client, sid: liveSessionId('s1'), transcript: t })
+    const rev = turn.rev
+
+    agents.apply('subagent.start', { goal: 'a', subagent_id: 's0', task_count: 1, task_index: 0 }, 2)
+
+    expect(turn.rev).toBe(rev + 1)
+    expect(agents.all().map(a => [a.id, a.status])).toEqual([['s0', 'running']])
   })
 
   it('does not probe a session with no delegate_task call', () => {

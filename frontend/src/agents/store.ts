@@ -3,7 +3,8 @@
 // owner's live registry: status, model, tool count, steerability) and each child's live
 // transcript log (tools/delegation_live_log.py), whose path the dispatch result names. The log
 // outlives the child, so a finished agent keeps its timeline and final status. Where a gateway
-// does send `subagent.*` events, Transcript.subagent folds them into the same rows. A resumed
+// does send `subagent.*` events, apply() folds them into the same rows: this store is the only
+// writer of the rows. A resumed
 // session's history drops the dispatch result, so its still-running children are found by one
 // `subagent.list` probe and attached to the delegate_task call that asked for their goals. The
 // rows and how each source folds into them are rows.ts's; this reads and polls.
@@ -12,6 +13,7 @@ import { readFile, stat } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 
+import type { SubagentEventPayload } from '@hermes/shared/gateway-events'
 import type { GatewayClient } from '@tui/gatewayClient.js'
 
 import type { Ticket } from '../core/epoch.js'
@@ -35,13 +37,15 @@ import {
   dispatchRows,
   endUnseen,
   findRow,
+  foldEvent,
   isRunning,
   type ListRow,
   MAX_LOG_BYTES,
   mergeTail,
   nestedChild,
   type Owners,
-  ownersOf
+  ownersOf,
+  type SubagentEventType
 } from './rows.js'
 
 /** What the store reaches of the app. */
@@ -177,6 +181,24 @@ export class Agents {
       // A probe during a round in flight runs right after it.
       this.#probe = true
       this.#poller.poke()
+    }
+  }
+
+  /**
+   * A `subagent.*` event, where the gateway sends them, folded into the rows of the delegate_task
+   * call that dispatched it. A background delegation reports after its turn ended (maybe after
+   * newer turns started), so its call is found by its delegation id first; else it is the newest
+   * delegate_task call of the live (else the last) turn.
+   */
+  apply(type: SubagentEventType, event: SubagentEventPayload, at = Date.now()) {
+    const transcript = this.#host.transcript
+    const id = event.delegation_id
+    const call =
+      (id ? transcript.delegations().findLast(c => record(c.result)?.['delegation_id'] === id) : undefined) ??
+      transcript.lastCall(c => c.name === 'delegate_task')
+
+    if (call) {
+      transcript.mutateCall(call, c => foldEvent(c, { at, event, type }))
     }
   }
 

@@ -14,6 +14,7 @@ import { parseLiveLog } from '../agents/liveLog.js'
 import { applyLog, isRunning } from '../agents/rows.js'
 import { Composer } from '../composer.js'
 import { errorText } from '../core/errors.js'
+import { subagentKey } from '../core/ids.js'
 import { Poller } from '../core/poller.js'
 import { RenderScheduler } from '../core/scheduler.js'
 import { Media } from '../media.js'
@@ -103,6 +104,7 @@ export class WatchApp {
       goal: spec.goal,
       id: spec.subagent,
       index: spec.index,
+      key: subagentKey(spec.subagent),
       logPath: spec.log,
       name: spec.name,
       startedAt: spec.startedAt,

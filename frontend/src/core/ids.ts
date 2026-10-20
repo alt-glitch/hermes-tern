@@ -32,6 +32,11 @@ export type EntryId = Brand<string, 'EntryId'>
 export type ProcessId = Brand<string, 'ProcessId'>
 /** The owner's id for a subagent. */
 export type SubagentId = Brand<string, 'SubagentId'>
+/**
+ * A subagent row's node key, fixed when the row is made: a dispatch placeholder's (`p<task>`)
+ * stays when the owner names the child, so Tern keeps the row's timer.
+ */
+export type SubagentKey = Brand<string, 'SubagentKey'>
 /** The id of the delegation that dispatched subagents. */
 export type DelegationId = Brand<string, 'DelegationId'>
 /** A linked pull request's key: `host/repository#number`. */
@@ -69,6 +74,8 @@ export const entryId = (raw: string) => raw as EntryId
 export const processId = (raw: string) => raw as ProcessId
 /** `raw` as a subagent id. */
 export const subagentId = (raw: string) => raw as SubagentId
+/** `raw` as a subagent row's node key. */
+export const subagentKey = (raw: string) => raw as SubagentKey
 /** `raw` as a delegation id. */
 export const delegationId = (raw: string) => raw as DelegationId
 /** The key of pull request `number` in `repository` on `host`. */

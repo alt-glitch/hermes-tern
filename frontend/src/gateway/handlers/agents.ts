@@ -1,25 +1,24 @@
 // The session's subagents as the owner streams them: a spawn, its start, thoughts, tool calls and
-// progress, and its end, each folded into the delegation's Task card.
+// progress, and its end, each folded by the agents store into the delegation's Task card.
 
+import type { SubagentEventType } from '../../agents/rows.js'
+import type { Agents } from '../../agents/store.js'
 import type { PullRequests } from '../../github/store.js'
-import type { Transcript } from '../../transcript.js'
 import type { EventOf, Handlers, Outcome } from '../dispatch.js'
 
 /** What the subagents' events reach of the app. */
 export interface AgentsCx {
-  readonly transcript: Pick<Transcript, 'subagent'>
+  readonly agents: Pick<Agents, 'apply'>
   readonly prs: Pick<PullRequests, 'relink'>
 }
 
 /** The subagent events, one body for all six. */
-type SubagentEvent = EventOf<
-  'subagent.complete' | 'subagent.progress' | 'subagent.spawn_requested' | 'subagent.start' | 'subagent.thinking' | 'subagent.tool'
->
+type SubagentEvent = EventOf<SubagentEventType>
 
 /** A subagent's step, folded into its row; at its end, the PRs it linked are filed under this conversation. */
 function subagent(ev: SubagentEvent, cx: AgentsCx): Outcome {
   if (ev.payload) {
-    cx.transcript.subagent(ev.type, ev.payload)
+    cx.agents.apply(ev.type, ev.payload)
   }
 
   if (ev.type === 'subagent.complete') {

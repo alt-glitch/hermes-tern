@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { entryId, toolCallId } from '../core/ids.js'
+import { entryId, subagentKey, toolCallId } from '../core/ids.js'
 import type { Block, ToolCall, TurnEntry } from '../model.js'
 import type { Todo } from '../model.js'
 import { Transcript } from '../transcript.js'
@@ -164,7 +164,7 @@ describe('foldOf', () => {
 
   it('keeps a background process and a delegation with running agents in view', () => {
     const bg = tool('bg', call('terminal', { background: true, command: 'sleep 9' }))
-    const agents = tool('d', call('delegate_task', {}, { subagents: [{ calls: 0, goal: 'g', id: 'x', index: 0, startedAt: 0, status: 'running', tokens: 0, toolCount: 0 }] }))
+    const agents = tool('d', call('delegate_task', {}, { subagents: [{ calls: 0, goal: 'g', id: 'x', index: 0, key: subagentKey('x'), startedAt: 0, status: 'running', tokens: 0, toolCount: 0 }] }))
 
     expect([...(foldOf(turn([bg, agents, tool('a', call('terminal')), text('answer')]))?.hidden ?? [])]).toEqual(['a'])
   })

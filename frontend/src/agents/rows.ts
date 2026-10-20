@@ -1,11 +1,14 @@
 // The subagent rows of the Task cards, and how each source folds into them: a delegate_task
-// dispatch result makes the rows, a `subagent.list` row moves one (or adds a nested child under
-// its parent, or a resumed session's child under the call that asked for it), a live log tells its
-// timeline and end, and an async-delegation completion tells an end nothing else did. Pure: the
-// store (store.ts) does the reading and the polling.
+// dispatch result makes the rows, a `subagent.*` event (where the gateway sends them) makes or
+// moves one, a `subagent.list` row moves one (or adds a nested child under its parent, or a
+// resumed session's child under the call that asked for it), a live log tells its timeline and
+// end, and an async-delegation completion tells an end nothing else did. Each row's node key is
+// fixed when it is made. Pure: the store (store.ts) does the reading and the polling, and is the
+// only writer of the rows.
 
-import type { SubagentSnapshot } from '@hermes/shared/gateway-events'
+import type { SubagentEventPayload, SubagentSnapshot } from '@hermes/shared/gateway-events'
 
+import { subagentKey } from '../core/ids.js'
 import type { Subagent, ToolCall } from '../model.js'
 import { parseJson, record } from '../wire/json.js'
 
@@ -13,6 +16,22 @@ import { clockToMs, type LiveLog, runningTool } from './liveLog.js'
 
 /** One row of `subagent.list` (gateway/session_ancillary.py `_SUBAGENT_FIELDS`). */
 export type ListRow = SubagentSnapshot
+
+/** The `subagent.*` events. */
+export type SubagentEventType =
+  | 'subagent.complete'
+  | 'subagent.progress'
+  | 'subagent.spawn_requested'
+  | 'subagent.start'
+  | 'subagent.thinking'
+  | 'subagent.tool'
+
+/** One `subagent.*` event: its type, its payload, and when it arrived. */
+export interface SubagentEvent {
+  type: SubagentEventType
+  event: SubagentEventPayload
+  at: number
+}
 
 /** Each agent with the delegate_task call whose card shows it. */
 export type Owners = Map<Subagent, ToolCall>
@@ -80,13 +99,12 @@ export function dispatchRows(list: Subagent[], d: Dispatch, at: number) {
     let a = list.find(x => x.id === id)
 
     if (!a) {
-      a = { calls: 0, goal, id, index: i, startedAt: at, status: 'queued', tokens: 0, toolCount: 0 }
+      // The node key stays put when the first poll renames a `task-<i>` placeholder, so Tern keeps its timer.
+      a = { calls: 0, goal, id, index: i, key: subagentKey(`p${i}`), startedAt: at, status: 'queued', tokens: 0, toolCount: 0 }
       list.push(a)
     }
 
     const path = d.paths[i]
-    // The node key stays put when the first poll renames a `task-<i>` placeholder, so Tern keeps its timer.
-    a.key ??= `p${i}`
     a.delegationId = d.delegationId
     a.depth = 0
     a.logPath = typeof path === 'string' ? path : undefined
@@ -129,6 +147,7 @@ export function nestedChild(owners: Owners, row: ListRow): Subagent | undefined 
     goal: row.goal ?? '',
     id: row.subagent_id,
     index: parent.index,
+    key: subagentKey(row.subagent_id),
     name: `${agentName(parent)}.${siblings + 1}`,
     parentId: parent.id,
     startedAt: Date.now(),
@@ -177,7 +196,7 @@ export function attachRow(owners: Owners, call: ToolCall, index: number, row: Li
     goal: row.goal ?? '',
     id: row.subagent_id,
     index,
-    key: `p${index}`,
+    key: subagentKey(`p${index}`),
     logPath,
     startedAt: Date.now(),
     status: 'running',
@@ -313,8 +332,16 @@ export function applyOutcome(a: Subagent, status: string): boolean {
   return true
 }
 
-/** A completion's task status as a row status; undefined for one that says nothing (`?`). */
-function endedStatus(status: string): Subagent['status'] | undefined {
+/** How a row ended. */
+export type EndedStatus = Extract<Subagent['status'], 'cancelled' | 'done' | 'failed'>
+
+/**
+ * An ended child's status as its row says it, whoever reports it: the owner's `subagent.complete`
+ * (SubagentStatus), its log's final line, an async-delegation completion. Completed (or success,
+ * or unknown: it ended, nothing says it failed) is done; interrupted or cancelled is cancelled;
+ * any other end (failed, error, timeout, …) failed. Undefined for one that says nothing (`?`).
+ */
+export function endedStatus(status: string): EndedStatus | undefined {
   if (status === '?') {
     return undefined
   }
@@ -324,6 +351,48 @@ function endedStatus(status: string): Subagent['status'] | undefined {
   }
 
   return status === 'interrupted' || status === 'cancelled' ? 'cancelled' : 'failed'
+}
+
+/**
+ * Folds `subagent.*` event `e` into `call`'s rows: the row for its subagent (a new one in task
+ * order), its counts, its status and its current tool. An end that says nothing of how is a
+ * failure, as the owner reports a success.
+ */
+export function foldEvent(call: ToolCall, { type, event, at }: SubagentEvent) {
+  const list = (call.subagents ??= [])
+  const id = event.subagent_id ?? `task-${event.task_index}`
+  let agent = list.find(a => a.id === id)
+
+  if (!agent) {
+    agent = { calls: 0, goal: event.goal, id, index: event.task_index, key: subagentKey(id), startedAt: at, status: 'queued', tokens: 0, toolCount: 0 }
+    list.push(agent)
+    list.sort((a, b) => a.index - b.index)
+  }
+
+  agent.last = event
+  agent.goal = event.goal || agent.goal
+  agent.model = event.model ?? agent.model
+  agent.toolCount = event.tool_count ?? agent.toolCount
+  agent.calls = event.api_calls ?? agent.calls
+  agent.tokens = (event.input_tokens ?? 0) + (event.output_tokens ?? 0) || agent.tokens
+
+  if (type === 'subagent.start') {
+    agent.status = 'running'
+    agent.startedAt = at
+  } else if (type === 'subagent.tool') {
+    agent.status = 'running'
+    agent.tool = event.tool_name ?? agent.tool
+    agent.toolPreview = event.tool_preview ?? event.text ?? undefined
+    agent.toolSince = { at }
+  } else if (type === 'subagent.complete') {
+    agent.status = endedStatus(event.status ?? '') ?? 'failed'
+    agent.summary = event.summary ?? undefined
+    agent.duration =
+      typeof event.duration_seconds === 'number' ? Math.round(event.duration_seconds * 1000) : at - agent.startedAt
+    agent.tool = undefined
+  } else if (event.status === 'running') {
+    agent.status = 'running'
+  }
 }
 
 /** The task index a top-level child's id names (`sa-<i>-…`, tools/delegate_tool.py). */
@@ -356,7 +425,8 @@ export function applyLog(a: Subagent, log: LiveLog) {
   a.toolCount = Math.max(a.toolCount, tools)
 
   if (log.status) {
-    a.status = log.status === 'completed' ? 'done' : log.status === 'interrupted' ? 'cancelled' : 'failed'
+    // A final line that says nothing of how (`status=?`) is a failure, as the child reports a success.
+    a.status = endedStatus(log.status) ?? 'failed'
     a.summary = log.summary ?? a.summary
     a.duration = log.duration !== undefined ? Math.round(log.duration * 1000) : a.duration
     a.exitReason = log.exitReason ?? log.error ?? a.exitReason

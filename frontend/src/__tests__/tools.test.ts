@@ -1,7 +1,7 @@
 import type { JSX } from '@stencil-hq/tern'
 import { describe, expect, it } from 'vitest'
 
-import { entryId, toolCallId } from '../core/ids.js'
+import { entryId, subagentKey, toolCallId } from '../core/ids.js'
 import type { ToolCall, TurnEntry } from '../model.js'
 import { toolDetail, toolNode } from '../view/tools/shell.js'
 import { entryNode, type TranscriptContext } from '../view/transcript.js'
@@ -79,7 +79,7 @@ describe('tool cards', () => {
     ])
     expect(JSON.stringify(live)).not.toContain('Long brief')
 
-    const agent = { calls: 1, goal: 'Audit the repo', id: 'sa-1', index: 0, startedAt: 0, status: 'running' as const, tokens: 0, toolCount: 2 }
+    const agent = { calls: 1, goal: 'Audit the repo', id: 'sa-1', index: 0, key: subagentKey('sa-1'), startedAt: 0, status: 'running' as const, tokens: 0, toolCount: 2 }
     const running = tree(toolNode(call('delegate_task', args, { result, outcome: { duration: 0, kind: 'done' }, subagents: [agent] }), 5))
     expect([running.k, running.p?.key, running.p?.name, running.p?.role]).toEqual(['agent', 'c1', 'Background agent', 'hermes.task.solo'])
 

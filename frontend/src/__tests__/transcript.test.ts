@@ -288,44 +288,6 @@ describe('Transcript', () => {
     expect(tools(turnOf(t.entries))[0]?.todos?.map(x => x.status)).toEqual(['completed', 'pending'])
   })
 
-  it('folds background subagents into the delegating call after its turn ended', () => {
-    const t = new Transcript()
-    t.messageStart(0)
-    t.toolStart({ args: { tasks: [{ goal: 'a' }, { goal: 'b' }] }, name: 'delegate_task', tool_id: 'd1' }, 1)
-    t.toolComplete(
-      {
-        name: 'delegate_task',
-        result: { delegation_id: 'deleg_1', mode: 'background', status: 'dispatched' },
-        tool_id: 'd1'
-      },
-      2
-    )
-    t.complete({ status: 'complete', text: 'Dispatched.' }, 3)
-    t.user({ at: 4, text: 'next' })
-    t.messageStart(5)
-
-    const base = { delegation_id: 'deleg_1', task_count: 2 }
-    t.subagent('subagent.start', { ...base, goal: 'b', subagent_id: 's1', task_index: 1 }, 6)
-    t.subagent('subagent.start', { ...base, goal: 'a', subagent_id: 's0', task_index: 0 }, 6)
-    t.subagent(
-      'subagent.tool',
-      { ...base, goal: 'a', subagent_id: 's0', task_index: 0, tool_name: 'terminal', tool_preview: 'ls' },
-      7
-    )
-    t.subagent(
-      'subagent.complete',
-      { ...base, api_calls: 2, goal: 'a', status: 'completed', subagent_id: 's0', summary: 'Done', task_index: 0 },
-      9
-    )
-
-    const call = tools(turnOf(t.entries.slice(0, 1)))[0]
-    expect(call?.subagents?.map(a => [a.id, a.status, a.calls])).toEqual([
-      ['s0', 'done', 2],
-      ['s1', 'running', 0]
-    ])
-    expect(tools(turnOf(t.entries))).toEqual([])
-  })
-
   it('loads resumed messages with tool calls, edit results and bridged todos', () => {
     const t = new Transcript()
 

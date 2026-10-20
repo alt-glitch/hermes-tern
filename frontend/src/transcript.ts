@@ -7,7 +7,6 @@
 import type {
   InflightTurn,
   MessageCompletePayload,
-  SubagentEventPayload,
   ToolCompletePayload,
   ToolStartPayload,
   TranscriptMessage,
@@ -22,7 +21,6 @@ import { callIn, callsWhere, findCall, isBackgroundCall, isTodoName, isToolError
 import { type CompactionStart, Compactions } from './transcript/compactions.js'
 import { history, storedUser } from './transcript/history.js'
 import { continuation, displayNotice, failure, internalNotice, passable, type UserPrompt, userEntry } from './transcript/messages.js'
-import { foldSubagent } from './transcript/subagents.js'
 import { currentTodos, todosOf, toTodos } from './transcript/todos.js'
 import { endThinking, shownArgs, trailingText, usageSince } from './transcript/turns.js'
 import { withoutTernEnv } from './view/describe.js'
@@ -420,22 +418,6 @@ export class Transcript {
     }
   }
 
-  subagent(type: string, p: SubagentEventPayload, at = Date.now()) {
-    // Background delegations report after their turn ended (and maybe after newer turns
-    // started): find the call that dispatched them by its delegation id first.
-    const found =
-      (p.delegation_id
-        ? findCall(this.#entries, c => c.name === 'delegate_task' && record(c.result)?.delegation_id === p.delegation_id)
-        : undefined) ?? this.#lastTool(c => c.name === 'delegate_task')
-
-    if (!found) {
-      return
-    }
-
-    foldSubagent(found.call, { at, event: p, type })
-    found.turn.rev++
-  }
-
   complete(p: MessageCompletePayload, at = Date.now()) {
     const turn = this.#open(at)
     endThinking(turn, at)
@@ -549,6 +531,11 @@ export class Transcript {
   /** The calls of tool `name` in the transcript, oldest first. */
   calls(name: string): ToolCall[] {
     return callsWhere(this.#entries, call => call.name === name)
+  }
+
+  /** The newest call matching `match` in the live (else the last) turn. */
+  lastCall(match: (call: ToolCall) => boolean): ToolCall | undefined {
+    return this.#lastTool(match)?.call
   }
 
   /** The call with tool id `id`, in any turn. */

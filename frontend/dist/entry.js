@@ -24726,6 +24726,7 @@ var inputId = (raw2) => raw2;
 var newInputId = () => inputId(randomUUID2());
 var toolCallId = (raw2) => raw2;
 var entryId = (raw2) => raw2;
+var subagentKey = (raw2) => raw2;
 var prKey = (ref) => `${ref.host}/${ref.repository}#${ref.number}`;
 var stackKey = (host, repository, number4) => `${host}/${repository}#stack:${number4}`;
 var overlayKey = (raw2) => raw2;
@@ -25262,11 +25263,10 @@ function dispatchRows(list9, d, at) {
     const id = typeof named2 === "string" && named2 ? named2 : `task-${i}`;
     let a2 = list9.find((x) => x.id === id);
     if (!a2) {
-      a2 = { calls: 0, goal, id, index: i, startedAt: at, status: "queued", tokens: 0, toolCount: 0 };
+      a2 = { calls: 0, goal, id, index: i, key: subagentKey(`p${i}`), startedAt: at, status: "queued", tokens: 0, toolCount: 0 };
       list9.push(a2);
     }
     const path2 = d.paths[i];
-    a2.key ??= `p${i}`;
     a2.delegationId = d.delegationId;
     a2.depth = 0;
     a2.logPath = typeof path2 === "string" ? path2 : void 0;
@@ -25297,6 +25297,7 @@ function nestedChild(owners, row2) {
     goal: row2.goal ?? "",
     id: row2.subagent_id,
     index: parent.index,
+    key: subagentKey(row2.subagent_id),
     name: `${agentName(parent)}.${siblings + 1}`,
     parentId: parent.id,
     startedAt: Date.now(),
@@ -25329,7 +25330,7 @@ function attachRow(owners, call, index2, row2, logPath) {
     goal: row2.goal ?? "",
     id: row2.subagent_id,
     index: index2,
-    key: `p${index2}`,
+    key: subagentKey(`p${index2}`),
     logPath,
     startedAt: Date.now(),
     status: "running",
@@ -25425,6 +25426,38 @@ function endedStatus(status) {
   }
   return status === "interrupted" || status === "cancelled" ? "cancelled" : "failed";
 }
+function foldEvent(call, { type, event, at }) {
+  const list9 = call.subagents ??= [];
+  const id = event.subagent_id ?? `task-${event.task_index}`;
+  let agent = list9.find((a2) => a2.id === id);
+  if (!agent) {
+    agent = { calls: 0, goal: event.goal, id, index: event.task_index, key: subagentKey(id), startedAt: at, status: "queued", tokens: 0, toolCount: 0 };
+    list9.push(agent);
+    list9.sort((a2, b) => a2.index - b.index);
+  }
+  agent.last = event;
+  agent.goal = event.goal || agent.goal;
+  agent.model = event.model ?? agent.model;
+  agent.toolCount = event.tool_count ?? agent.toolCount;
+  agent.calls = event.api_calls ?? agent.calls;
+  agent.tokens = (event.input_tokens ?? 0) + (event.output_tokens ?? 0) || agent.tokens;
+  if (type === "subagent.start") {
+    agent.status = "running";
+    agent.startedAt = at;
+  } else if (type === "subagent.tool") {
+    agent.status = "running";
+    agent.tool = event.tool_name ?? agent.tool;
+    agent.toolPreview = event.tool_preview ?? event.text ?? void 0;
+    agent.toolSince = { at };
+  } else if (type === "subagent.complete") {
+    agent.status = endedStatus(event.status ?? "") ?? "failed";
+    agent.summary = event.summary ?? void 0;
+    agent.duration = typeof event.duration_seconds === "number" ? Math.round(event.duration_seconds * 1e3) : at - agent.startedAt;
+    agent.tool = void 0;
+  } else if (event.status === "running") {
+    agent.status = "running";
+  }
+}
 function taskIndex(row2) {
   const index2 = Number(/^sa-(\d+)-/.exec(row2.subagent_id)?.[1]);
   return Number.isInteger(index2) ? index2 : void 0;
@@ -25445,7 +25478,7 @@ function applyLog(a2, log) {
   const tools2 = log.entries.filter((e) => e.kind === "tool").length;
   a2.toolCount = Math.max(a2.toolCount, tools2);
   if (log.status) {
-    a2.status = log.status === "completed" ? "done" : log.status === "interrupted" ? "cancelled" : "failed";
+    a2.status = endedStatus(log.status) ?? "failed";
     a2.summary = log.summary ?? a2.summary;
     a2.duration = log.duration !== void 0 ? Math.round(log.duration * 1e3) : a2.duration;
     a2.exitReason = log.exitReason ?? log.error ?? a2.exitReason;
@@ -25499,7 +25532,7 @@ function agentNode(a2, now, solo) {
       } : void 0,
       children: a2.summary ? /* @__PURE__ */ jsx("md", { children: a2.summary }, "o") : null
     },
-    solo?.key ?? a2.key ?? a2.id
+    solo?.key ?? a2.key
   );
 }
 
@@ -66986,7 +67019,7 @@ var IGNORED = [
 // src/gateway/handlers/agents.ts
 function subagent(ev, cx) {
   if (ev.payload) {
-    cx.transcript.subagent(ev.type, ev.payload);
+    cx.agents.apply(ev.type, ev.payload);
   }
   if (ev.type === "subagent.complete") {
     cx.prs.relink();
@@ -70228,6 +70261,20 @@ var Agents = class {
     } else if (bare) {
       this.#probe = true;
       this.#poller.poke();
+    }
+  }
+  /**
+   * A `subagent.*` event, where the gateway sends them, folded into the rows of the delegate_task
+   * call that dispatched it. A background delegation reports after its turn ended (maybe after
+   * newer turns started), so its call is found by its delegation id first; else it is the newest
+   * delegate_task call of the live (else the last) turn.
+   */
+  apply(type, event, at = Date.now()) {
+    const transcript = this.#host.transcript;
+    const id = event.delegation_id;
+    const call = (id ? transcript.delegations().findLast((c) => record(c.result)?.["delegation_id"] === id) : void 0) ?? transcript.lastCall((c) => c.name === "delegate_task");
+    if (call) {
+      transcript.mutateCall(call, (c) => foldEvent(c, { at, event, type }));
     }
   }
   /** Queues steering text into a running agent; the owner answers `queued` or `rejected`. */
@@ -73904,49 +73951,6 @@ function detailsText(details) {
   return out.join("\n\n");
 }
 
-// src/transcript/subagents.ts
-function foldSubagent(call, { type, event, at }) {
-  const list9 = call.subagents ??= [];
-  const key2 = event.subagent_id ?? `task-${event.task_index}`;
-  let agent = list9.find((a2) => a2.id === key2);
-  if (!agent) {
-    agent = {
-      calls: 0,
-      goal: event.goal,
-      id: key2,
-      index: event.task_index,
-      startedAt: at,
-      status: "queued",
-      tokens: 0,
-      toolCount: 0
-    };
-    list9.push(agent);
-    list9.sort((a2, b) => a2.index - b.index);
-  }
-  agent.last = event;
-  agent.goal = event.goal || agent.goal;
-  agent.model = event.model ?? agent.model;
-  agent.toolCount = event.tool_count ?? agent.toolCount;
-  agent.calls = event.api_calls ?? agent.calls;
-  agent.tokens = (event.input_tokens ?? 0) + (event.output_tokens ?? 0) || agent.tokens;
-  if (type === "subagent.start") {
-    agent.status = "running";
-    agent.startedAt = at;
-  } else if (type === "subagent.tool") {
-    agent.status = "running";
-    agent.tool = event.tool_name ?? agent.tool;
-    agent.toolPreview = event.tool_preview ?? event.text ?? void 0;
-    agent.toolSince = { at };
-  } else if (type === "subagent.complete") {
-    agent.status = event.status === "completed" ? "done" : event.status === "interrupted" ? "cancelled" : "failed";
-    agent.summary = event.summary ?? void 0;
-    agent.duration = typeof event.duration_seconds === "number" ? Math.round(event.duration_seconds * 1e3) : at - agent.startedAt;
-    agent.tool = void 0;
-  } else if (event.status === "running") {
-    agent.status = "running";
-  }
-}
-
 // src/transcript.ts
 var Transcript = class {
   #entries = [];
@@ -74256,14 +74260,6 @@ var Transcript = class {
       found.turn.rev++;
     }
   }
-  subagent(type, p3, at = Date.now()) {
-    const found = (p3.delegation_id ? findCall(this.#entries, (c) => c.name === "delegate_task" && record(c.result)?.delegation_id === p3.delegation_id) : void 0) ?? this.#lastTool((c) => c.name === "delegate_task");
-    if (!found) {
-      return;
-    }
-    foldSubagent(found.call, { at, event: p3, type });
-    found.turn.rev++;
-  }
   complete(p3, at = Date.now()) {
     const turn = this.#open(at);
     endThinking(turn, at);
@@ -74355,6 +74351,10 @@ var Transcript = class {
   /** The calls of tool `name` in the transcript, oldest first. */
   calls(name) {
     return callsWhere(this.#entries, (call) => call.name === name);
+  }
+  /** The newest call matching `match` in the live (else the last) turn. */
+  lastCall(match) {
+    return this.#lastTool(match)?.call;
   }
   /** The call with tool id `id`, in any turn. */
   call(id) {
@@ -75407,6 +75407,7 @@ var WatchApp = class {
       goal: spec.goal,
       id: spec.subagent,
       index: spec.index,
+      key: subagentKey(spec.subagent),
       logPath: spec.log,
       name: spec.name,
       startedAt: spec.startedAt,

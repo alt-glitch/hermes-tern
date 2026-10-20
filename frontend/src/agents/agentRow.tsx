@@ -37,7 +37,7 @@ export function agentNode(a: Subagent, now: number, solo?: Solo): JSX.Element {
       collapsed={a.summary ? true : undefined}
       collapsible={a.summary ? true : undefined}
       depth={a.depth || undefined}
-      key={solo?.key ?? a.key ?? a.id}
+      key={solo?.key ?? a.key}
       model={a.model}
       name={solo?.name ?? agentName(a)}
       role={solo ? 'hermes.task.solo' : undefined}

@@ -8,7 +8,7 @@ import type { LiveLog } from './agents/liveLog.js'
 import type { BatchEntry } from './bridge.js'
 import type { ConnectCard } from './connections.js'
 import type { NonEmpty } from './core/assert.js'
-import type { BlockKey, EntryId, ToolCallId } from './core/ids.js'
+import type { BlockKey, EntryId, SubagentKey, ToolCallId } from './core/ids.js'
 import type { ChartView } from './processes/widgets/types.js'
 
 /** One todo item as the `todo_list` tool reports it. */
@@ -21,11 +21,12 @@ export interface Todo {
 
 /** One delegated child agent, folded from `subagent.*` events. */
 export interface Subagent {
+  /** The owner's id for it, or a dispatch placeholder's (`task-<i>`) until the owner names it. */
   id: string
   goal: string
   index: number
-  /** The row's node key when it differs from `id`: a dispatch placeholder keeps it after the owner names the child. */
-  key?: string
+  /** The row's node key, set when the row is made and never changed. */
+  readonly key: SubagentKey
   /** Display name, for nested children (`Agent 2.1`); else `Agent <index + 1>`. */
   name?: string
   status: 'cancelled' | 'done' | 'failed' | 'queued' | 'running'
