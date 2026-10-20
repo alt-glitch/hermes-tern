@@ -22,7 +22,7 @@ import { fileSettings, type SettingsSource } from '../settings.js'
 import { INPUT_ID, SurfaceHost } from '../surface/host.js'
 import { runInput } from '../surface/input.js'
 import { Transcript } from '../transcript.js'
-import { dockNodes } from '../view/dock.js'
+import { type DockActions, dockNodes } from '../view/dock.js'
 import { entryNode } from '../view/transcript.js'
 import { rpc } from '../wire/rpc.js'
 
@@ -31,6 +31,9 @@ import type { WatchSpec } from './spec.js'
 
 const POLL_MS = 1000
 const EXIT_ARM_MS = 1500
+
+/** A dock button this pane does not show. */
+const none = () => undefined
 
 export class WatchApp {
   readonly transcript = new Transcript()
@@ -52,6 +55,37 @@ export class WatchApp {
   readonly #renders = new RenderScheduler(() => this.#render())
   #exitArmed = 0
   #done = Promise.withResolvers<number>()
+  /** The dock's buttons: the composer steers the agent and Stop stops it; this pane has no pills, queue, chips or chips' sheets. */
+  readonly #dock: DockActions = {
+    onAgents: none,
+    onEdit: ev => {
+      this.composer.edit(ev)
+      this.changed()
+    },
+    onEffort: none,
+    onGoal: none,
+    onInterrupt: () => void this.#stop(),
+    onLoop: none,
+    onModel: none,
+    onPrs: none,
+    onQueueEdit: none,
+    onQueueSteer: none,
+    onRemoveAttachment: none,
+    onSend: ev => {
+      void this.#submit(ev.text)
+      this.changed()
+    },
+    onShells: none,
+    onSubmit: () => {
+      void this.#submit(this.composer.take())
+      this.changed()
+    },
+    onTodos: none,
+    onUndo: () => {
+      this.composer.undo()
+      this.changed()
+    }
+  }
 
   constructor(tern: Session, gw: GatewayClient, spec: WatchSpec, settings: SettingsSource = fileSettings()) {
     this.#tern = tern
@@ -328,41 +362,23 @@ export class WatchApp {
     const cx = { copy: () => undefined, now, welcome: { tip: '', version: '' } }
 
     this.#surface.render({
-      dock: dockNodes({
-        branch: '',
-        busy: running
-          ? { label: a.tool ? `Running ${a.tool}…` : 'Working…', since: a, startedAt: a.startedAt }
-          : undefined,
-        composer: this.composer,
-        cwd: '',
-        effort: '',
-        inputId: INPUT_ID,
-        model: a.model ?? '',
-        now,
-        onEdit: ev => {
-          this.composer.edit(ev)
-          this.changed()
+      dock: dockNodes(
+        {
+          activity: running ? { kind: 'turn', label: a.tool ? `Running ${a.tool}…` : 'Working…', since: a, startedAt: a.startedAt } : { kind: 'idle' },
+          composer: {
+            attachments: [],
+            draft: this.composer,
+            placeholder: running ? `Steer ${a.name} — /stop ends it` : `${a.name} has finished`,
+            ready: running
+          },
+          now,
+          pills: {},
+          queue: { canSteer: false, rows: [] },
+          route: { effort: '', model: a.model ?? '' },
+          status: { branch: '' }
         },
-        onEffort: () => undefined,
-        onInterrupt: () => void this.#stop(),
-        onModel: () => undefined,
-        onQueueEdit: () => undefined,
-        onSend: ev => {
-          void this.#submit(ev.text)
-          this.changed()
-        },
-        onSubmit: () => {
-          void this.#submit(this.composer.take())
-          this.changed()
-        },
-        onUndo: () => {
-          this.composer.undo()
-          this.changed()
-        },
-        placeholder: running ? `Steer ${a.name} — /stop ends it` : `${a.name} has finished`,
-        queued: [],
-        ready: running
-      }),
+        this.#dock
+      ),
       main: [
         // The agent row heads the pane: status, model, tools, timer, the step it runs.
         agentNode({ ...a, summary: undefined }, now),

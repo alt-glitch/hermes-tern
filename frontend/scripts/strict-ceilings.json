@@ -15,7 +15,7 @@
   "src/agents/agentRow.tsx": 2,
   "src/agents/liveLog.ts": 2,
   "src/agents/store.ts": 32,
-  "src/app.ts": 4,
+  "src/app.ts": 1,
   "src/automation.ts": 2,
   "src/bridge.ts": 12,
   "src/clipboard.ts": 2,
@@ -75,5 +75,5 @@
   "src/view/transcript.tsx": 3,
   "src/view/workLog.tsx": 4,
   "src/watch/spec.ts": 6,
-  "src/watch/watchApp.ts": 5
+  "src/watch/watchApp.ts": 4
 }

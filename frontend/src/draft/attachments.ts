@@ -194,27 +194,29 @@ export class Attachments {
     this.#pending = []
   }
 
-  /** The composer's chips: the landed images, then those on their way, each with its ✕. */
+  /** The composer's chips: the landed images, then those on their way. */
   chips(): ComposerImage[] {
     return [
-      ...this.#items.map((a, i) => ({
+      ...this.#items.map(a => ({
         ...(a.caption === undefined ? {} : { caption: a.caption }),
         ...(a.preview ? { image: a.preview } : {}),
-        label: a.name,
-        onRemove: () => {
-          this.#items.splice(i, 1)
-          this.#host.changed()
-        }
+        label: a.name
       })),
-      ...this.#pending.map(slot => ({
-        label: slot.name,
-        onRemove: () => {
-          this.#end(slot)
-          this.#host.changed()
-        },
-        pending: true
-      }))
+      ...this.#pending.map(slot => ({ label: slot.name, pending: true }))
     ]
+  }
+
+  /** Chip `index`'s ✕: a landed image leaves the draft; one on its way lands nowhere. */
+  remove(index: number) {
+    const slot = this.#pending[index - this.#items.length]
+
+    if (index < this.#items.length) {
+      this.#items.splice(index, 1)
+    } else if (slot) {
+      this.#end(slot)
+    }
+
+    this.#host.changed()
   }
 
   /** Uploads `path` for the next prompt; its chip says "attaching…" (in `slot`) until it lands or fails. */

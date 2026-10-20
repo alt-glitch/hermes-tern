@@ -265,7 +265,7 @@ describe('image cards', () => {
 describe('the composer chip of an attached image', () => {
   it('shows the thumbnail, name and size, and drops the image only from its ✕', () => {
     const onRemove = vi.fn()
-    const n = tree(imageChip({ caption: '1280×720 · 12 KB', image: { blob: 'b1' }, label: 'pasted image 1', onRemove }, 0))
+    const n = tree(imageChip({ caption: '1280×720 · 12 KB', image: { blob: 'b1' }, label: 'pasted image 1' }, 0, onRemove))
 
     expect(n).toMatchObject({ k: 'card', p: { head: [{ t: 'pasted image 1' }], role: 'omp.composer.chip' } })
     expect(n.p?.actions).toBeUndefined()
@@ -278,13 +278,13 @@ describe('the composer chip of an attached image', () => {
 
   it('says it is attaching while the image is read and uploaded, and can be removed meanwhile', () => {
     const onRemove = vi.fn()
-    const n = tree(imageChip({ label: 'pasted image 1', onRemove, pending: true }, 0))
+    const n = tree(imageChip({ label: 'pasted image 1', pending: true }, 0, onRemove))
     expect(n.c?.[1]?.p?.spans).toEqual([{ fx: 'shimmer', s: 'dim', t: 'Attaching…' }])
     expect(n.c?.[2]?.p).toMatchObject({ actions: { click: 'click' }, role: 'hermes.composer.remove' })
   })
 
   it('an icon in the thumbnail’s place when there is no image to show', () => {
-    expect(tree(imageChip({ label: 'a.png', onRemove: () => undefined }, 0)).c?.[0]).toMatchObject({ k: 'icon', p: { name: 'image' } })
+    expect(tree(imageChip({ label: 'a.png' }, 0, () => undefined)).c?.[0]).toMatchObject({ k: 'icon', p: { name: 'image' } })
   })
 })
 
@@ -423,7 +423,7 @@ describe('Attachments: the draft\'s images', () => {
     await vi.waitFor(() => expect(gw.sent('image.attach_bytes')).toHaveLength(1))
 
     expect(a.uploading).toBe(true)
-    expect(a.chips()).toEqual([{ label: 'clip_1.png', onRemove: expect.any(Function), pending: true }])
+    expect(a.chips()).toEqual([{ label: 'clip_1.png', pending: true }])
 
     a.clearAll()
     land({ path: '/uploads/late.png' })
@@ -467,7 +467,7 @@ describe('Attachments: the draft\'s images', () => {
     await a.fromPath(shot)
     changed.mockClear()
 
-    a.chips()[0]?.onRemove()
+    a.remove(0)
 
     expect(a.items.map(i => i.path)).toEqual(['/uploads/2.png'])
     expect(changed).toHaveBeenCalledTimes(1)

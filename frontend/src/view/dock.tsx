@@ -1,11 +1,14 @@
 // The `dock` region: the working row while a turn runs, queued prompts, and
 // the glass composer (omp.editor) with its model chip, effort, context
 // hairline and session cost. Roles match omp's so Tern's composer sheets apply.
+// What it shows is data (DockContext, view/dockModel.ts builds it); what its
+// buttons do is DockActions, bound once.
 
 import type { EditEvent, JSX, SendEvent, Tone } from '@stencil-hq/tern'
 
 import type { Composer } from '../composer.js'
 import type { Pill } from '../chrome/hud.js'
+import { assertNever } from '../core/assert.js'
 import type { ImageSource, Todo } from '../model.js'
 import { DEFAULT_EFFORT, effortText } from '../session/effort.js'
 import { type ChartEntry, glance, glanceSpans, hovercard, latest, miniSpark, summary } from '../processes/widgets/view.js'
@@ -20,69 +23,106 @@ import { checklistNode } from './todos.js'
 import { workingRow } from './ui/live.js'
 import { pill } from './ui/pill.js'
 
-/** What the dock shows. */
+/** What the dock shows, by part; dockModel() builds it each frame. */
 export interface DockContext {
-  composer: Composer
-  /** The `editor` node's full id, for the caret overlay and focus. */
-  inputId: string
-  placeholder: string
+  readonly now: number
+  /** What holds the session: the working row's state. */
+  readonly activity: DockActivity
+  readonly composer: DockComposer
+  /** The model and reasoning effort on the composer's bar. */
+  readonly route: DockRoute
+  /** The lines and pills between the queue and the composer. */
+  readonly pills: DockPills
+  readonly queue: DockQueue
+  /** The status strip under the composer. */
+  readonly status: StatusLine
+}
+
+/**
+ * What holds the session, for the view only: nothing, a turn (or a send's `{!cmd}`s), or a
+ * compaction with no turn (/compress), whose row says so with nothing to stop.
+ */
+export type DockActivity =
+  | { readonly kind: 'idle' }
+  | { readonly kind: 'turn'; readonly since: object; readonly startedAt: number; readonly label: string }
+  | { readonly kind: 'compacting'; readonly since: object; readonly startedAt: number }
+
+/** The composer: the draft, what Tern's editor shows over it, and the images the prompt carries. */
+export interface DockComposer {
+  readonly draft: Composer
+  readonly placeholder: string
   /** The agent accepts prompts (for Tern's `send`). */
-  ready: boolean
-  busy?: { since: object; startedAt: number; label: string }
-  /** A compaction runs with no turn (/compress): the working row says so, with nothing to stop. */
-  compacting?: { since: object; startedAt: number }
-  queued: readonly QueuedRow[]
-  model: string
+  readonly ready: boolean
+  /** The completion's ghost text after the caret. */
+  readonly ghost?: string | undefined
+  /** Images the next prompt carries, as chips in the composer: a thumbnail (a click opens it large) and a remove button. */
+  readonly attachments: readonly ComposerImage[]
+}
+
+/** The model chip and the effort chip. */
+export interface DockRoute {
+  readonly model: string
   /** The session runs on a priority tier: a bolt on the model chip. */
-  fast?: 'fast' | 'ultrafast'
+  readonly fast?: 'fast' | 'ultrafast' | undefined
   /** Hermes's reasoning effort (`none` = off); empty is the default level, shown muted. */
-  effort: string
+  readonly effort: string
   /** The level the route really sends, when it clamps the pick (`ultra` → `max`). */
-  effortWire?: string
+  readonly effortWire?: string | undefined
   /** False for a model without reasoning: no effort chip. */
-  reasons?: boolean
-  /** Working directory, already shortened for display. */
-  cwd: string
-  branch: string
-  context?: { used: number; max: number }
-  cost?: number
-  ghost?: string
-  now: number
-  onInterrupt(): void
-  onSubmit(): void
-  /** Tern submitted text into the composer (`send` feature). */
-  onSend(ev: SendEvent): void
+  readonly reasons?: boolean | undefined
+}
+
+/** The reconnect line, the goal and loop line, and the pills above the composer. */
+export interface DockPills {
+  /** The pill holding the keyboard (Down from an empty prompt). */
+  readonly focused?: Pill | undefined
+  /** The agent's todo list: its pill (on the working line while a turn runs) and the panel it opens. */
+  readonly todos?: TodosPill | undefined
+  /** Running subagents: the pill above the composer that opens the agents hub (none at 0). */
+  readonly agents?: number | undefined
+  /** Background processes: the shells pill that opens the Background sheet. */
+  readonly shells?: ShellsPill | undefined
+  /** The conversation's pull requests: the PR pill that opens the Pull requests sheet. */
+  readonly prs?: PrsPill | undefined
+  /** The standing goal and loop: one line above the pills. */
+  readonly automation?: Omit<AutomationLine, 'onGoal' | 'onLoop'> | undefined
+  /** The gateway is being redialled. */
+  readonly reconnecting?: Reconnecting | undefined
+}
+
+/** The prompts waiting behind the turn. */
+export interface DockQueue {
+  readonly rows: readonly QueuedRow[]
+  /** A turn runs, so a row's Steer can inject it. */
+  readonly canSteer: boolean
+}
+
+/** What the dock's buttons and fields do. Bound once: none of them depends on the frame. */
+export interface DockActions {
   /** Native editing: Tern replaced a range of the composer's text. */
   onEdit(ev: EditEvent): void
+  /** Tern submitted text into the composer (`send` feature). */
+  onSend(ev: SendEvent): void
+  onSubmit(): void
   onUndo(): void
+  onInterrupt(): void
   onModel(): void
   onEffort(): void
   /** The effort pill's context menu, by action: choose a level, save the current one as the default. */
-  onEffortMenu?: Record<string, () => void>
+  readonly onEffortMenu?: Readonly<Record<string, () => void>> | undefined
   /** Pull the queued prompt at `index` back into the composer. */
   onQueueEdit(index: number): void
-  /** Inject the queued prompt at `index` into the running turn; absent when no turn runs. */
-  onQueueSteer?(index: number): void
-  /** The session's cache hit (percent) and recent tokens per second, when known. */
-  rates?: { cache?: number; tps?: number }
-  /** Running subagents: the pill above the composer that opens the agents hub. */
-  agents?: { running: number; onOpen(): void }
-  /** Background processes: the shells pill that opens the Background sheet. */
-  shells?: ShellsPill
-  /** The conversation's pull requests: the PR pill that opens the Pull requests sheet. */
-  prs?: PrsPill
-  /** The agent's todo list: its pill (on the working line while a turn runs) and the panel it opens. */
-  todos?: TodosPill
-  /** The status strip under the composer. */
-  status?: StatusLine
-  /** Images the next prompt carries, as chips in the composer: a thumbnail (a click opens it large) and a remove button. */
-  attachments?: ComposerImage[]
-  /** The pill holding the keyboard (Down from an empty prompt). */
-  focused?: Pill
-  /** The standing goal and loop: one line above the pills. */
-  automation?: AutomationLine
-  /** The gateway is being redialled. */
-  reconnecting?: Reconnecting
+  /** Inject the queued prompt at `index` into the running turn; offered only while the queue's `canSteer`. */
+  onQueueSteer(index: number): void
+  /** Drop the composer's image chip at `index`. */
+  onRemoveAttachment(index: number): void
+  onAgents(): void
+  onShells(): void
+  onPrs(): void
+  /** Fold the todo panel open or shut. */
+  onTodos(): void
+  onGoal(): void
+  onLoop(): void
 }
 
 /** An image attached to the draft. */
@@ -94,33 +134,34 @@ export interface ComposerImage {
   image?: ImageSource
   /** Still read or uploaded: the chip says so. */
   pending?: boolean
-  onRemove(): void
 }
 
 /** The agent's todo list as a pill: a ring that fills as items are done, and the one under way. */
 export interface TodosPill {
   list: Todo[]
   open: boolean
-  onToggle(): void
 }
 
 /** The flat strip under the composer: where the session is and what it has spent. */
 export interface StatusLine {
-  title?: string
-  tokens?: number
-  /** Context used, 0–1. */
-  context?: number
+  readonly title?: string | undefined
+  readonly branch: string
+  readonly tokens?: number | undefined
+  /** The context window's use; also the composer's hairline. */
+  readonly context?: { readonly used: number; readonly max: number } | undefined
   /** Times the context was compressed this session (Ink's `cmp N`). */
-  compressions?: number
+  readonly compressions?: number | undefined
+  readonly cost?: number | undefined
+  /** The session's cache hit (percent) and recent tokens per second, when known. */
+  readonly rates?: { readonly cache?: number | undefined; readonly tps?: number | undefined } | undefined
   /** The gateway's newest out-of-band notice (credits, a slow start), in its tone. */
-  notice?: { text: string; tone: 'error' | 'info' | 'success' | 'warning' }
+  readonly notice?: { text: string; tone: 'error' | 'info' | 'success' | 'warning' } | undefined
 }
 
 /** The PR pill: the newest linked PR, or how many there are, toned by their checks. */
 export interface PrsPill {
   text: string
   tone: Tone
-  onOpen(): void
 }
 
 /** The shells pill: how many run, else how the recently exited ones ended. */
@@ -132,40 +173,41 @@ export interface ShellsPill {
   exited: number
   /** The newest exit's tone (success, error, warning). */
   tone: Tone
-  onOpen(): void
 }
 
 /** The `dock` region's nodes: the working row, the queued prompts and the composer. */
-export function dockNodes(cx: DockContext): JSX.Element[] {
+export function dockNodes(cx: DockContext, on: DockActions): JSX.Element[] {
   const nodes: JSX.Element[] = []
+  const { activity, pills: p } = cx
+  const busy = activity.kind === 'turn'
 
-  if (cx.busy || cx.compacting) {
+  if (activity.kind !== 'idle') {
     nodes.push(
       <col key="hud" role="omp.hud.status">
-        {cx.busy ? workingNode(cx) : compactingNode(cx.compacting!, cx.now)}
+        {activityNode(activity, cx, on)}
       </col>
     )
   }
 
-  if (cx.queued.length) {
-    nodes.push(queuedNode(cx.queued, { edit: cx.onQueueEdit, steer: cx.onQueueSteer }))
+  if (cx.queue.rows.length) {
+    nodes.push(queuedNode(cx.queue.rows, { edit: on.onQueueEdit, steer: cx.queue.canSteer ? on.onQueueSteer : undefined }))
   }
 
-  if (cx.todos?.open) {
+  if (p.todos?.open) {
     nodes.push(
       <col key="todos" role="hermes.todos">
-        {checklistNode(cx.todos.list)}
+        {checklistNode(p.todos.list)}
       </col>
     )
   }
 
-  const reconnect = reconnectNode(cx.reconnecting, cx.now)
+  const reconnect = reconnectNode(p.reconnecting, cx.now)
 
   if (reconnect) {
     nodes.push(reconnect)
   }
 
-  const automation = automationNode(cx.automation, cx.now, cx.focused)
+  const automation = automationNode(p.automation && { ...p.automation, onGoal: on.onGoal, onLoop: on.onLoop }, cx.now, p.focused)
 
   if (automation) {
     nodes.push(automation)
@@ -173,29 +215,43 @@ export function dockNodes(cx: DockContext): JSX.Element[] {
 
   const pills = [
     // While a turn runs the todo pill rides the working line instead.
-    cx.todos && !cx.busy ? todosPillNode(cx.todos, cx.focused === 'todos') : null,
-    cx.agents?.running ? agentsPill(cx.agents.running, cx.agents.onOpen, cx.focused === 'agents') : null,
-    cx.shells && (cx.shells.running || cx.shells.exited) ? shellsPill(cx.shells, cx.focused === 'shells') : null,
-    cx.prs ? prsPillNode(cx.prs, cx.focused === 'prs') : null
-  ].filter(p => p !== null)
+    p.todos && !busy ? todosPillNode(p.todos, on.onTodos, p.focused === 'todos') : null,
+    p.agents ? agentsPill(p.agents, on.onAgents, p.focused === 'agents') : null,
+    p.shells && (p.shells.running || p.shells.exited) ? shellsPill(p.shells, on.onShells, p.focused === 'shells') : null,
+    p.prs ? prsPillNode(p.prs, on.onPrs, p.focused === 'prs') : null
+  ].filter(n => n !== null)
 
   if (pills.length) {
     nodes.push(
       <row key="agents" role="omp.hud">
-        {cx.focused ? hudHint() : null}
+        {p.focused ? hudHint() : null}
         {pills}
       </row>
     )
   }
 
-  nodes.push(composerNode(cx))
-  nodes.push(statusLine(cx))
+  nodes.push(composerNode(cx, on))
+  nodes.push(statusLine(cx, on))
 
   return nodes
 }
 
+/** The working row: the turn's, or the compaction's while /compress runs with no turn. */
+function activityNode(a: Exclude<DockActivity, { kind: 'idle' }>, cx: DockContext, on: DockActions): JSX.Element {
+  switch (a.kind) {
+    case 'turn':
+      return workingNode(a, cx, on)
+
+    case 'compacting':
+      return compactingNode(a, cx.now)
+
+    default:
+      return assertNever(a, 'dock activity')
+  }
+}
+
 /** The todo pill: a ring that fills as items are done, `2/5`, and the item under way. */
-function todosPillNode(t: TodosPill, focused: boolean): JSX.Element | null {
+function todosPillNode(t: TodosPill, onToggle: () => void, focused: boolean): JSX.Element | null {
   const { current, done, total } = todoProgress(t.list)
 
   if (!total) {
@@ -218,7 +274,7 @@ function todosPillNode(t: TodosPill, focused: boolean): JSX.Element | null {
     ],
     focused,
     key: 'todos',
-    onClick: t.onToggle,
+    onClick: onToggle,
     seg: 'hermes.todos.pill',
     title: t.open ? 'Hide the todo list' : 'Show the todo list'
   })
@@ -228,9 +284,9 @@ function todosPillNode(t: TodosPill, focused: boolean): JSX.Element | null {
  * The flat strip under everything (hermes-for-tern's console bar): the brand, the session's title
  * and branch on the left; tokens, context, cache, speed, cost and the send or stop key on the right.
  */
-function statusLine(cx: DockContext): JSX.Element {
-  const s = cx.status ?? {}
-  const context = s.context ?? (cx.context && cx.context.max > 0 ? cx.context.used / cx.context.max : undefined)
+function statusLine(cx: DockContext, on: DockActions): JSX.Element {
+  const s = cx.status
+  const context = s.context && s.context.max > 0 ? s.context.used / s.context.max : undefined
 
   return (
     <status key="statusline" role="hermes.statusline">
@@ -245,8 +301,8 @@ function statusLine(cx: DockContext): JSX.Element {
           title={s.notice.text}
         />
       ) : null}
-      {cx.branch ? (
-        <seg icon="git-branch" key="git" priority={4} spans={[{ s: 'statusLineGitClean', t: cx.branch }]} title={`Branch ${cx.branch}`} />
+      {s.branch ? (
+        <seg icon="git-branch" key="git" priority={4} spans={[{ s: 'statusLineGitClean', t: s.branch }]} title={`Branch ${s.branch}`} />
       ) : null}
       {s.tokens ? <seg key="tokens" priority={2} side="right" spans={[{ t: `${s.tokens.toLocaleString()} tokens` }]} /> : null}
       {context !== undefined ? (
@@ -269,32 +325,32 @@ function statusLine(cx: DockContext): JSX.Element {
           title="Times the context was compressed this session"
         />
       ) : null}
-      {cx.rates?.cache !== undefined ? (
+      {s.rates?.cache !== undefined ? (
         <seg
           icon="cache"
           key="cache"
           priority={1}
           side="right"
-          spans={[{ t: `${Math.round(cx.rates.cache)}%` }]}
+          spans={[{ t: `${Math.round(s.rates.cache)}%` }]}
           title="Prompt tokens served from the provider's cache, this session"
         />
       ) : null}
-      {cx.rates?.tps ? (
+      {s.rates?.tps ? (
         <seg
           icon="fast"
           key="tps"
           priority={1}
           side="right"
-          spans={[{ t: `${Math.round(cx.rates.tps)} t/s` }]}
+          spans={[{ t: `${Math.round(s.rates.tps)} t/s` }]}
           title="Output tokens per second over the recent model calls"
         />
       ) : null}
-      {cx.cost ? <seg key="cost" priority={3} side="right" spans={[{ t: `$${cx.cost.toFixed(2)}` }]} title="Session cost" /> : null}
+      {s.cost ? <seg key="cost" priority={3} side="right" spans={[{ t: `$${s.cost.toFixed(2)}` }]} title="Session cost" /> : null}
       <seg key="newline" priority={1} side="right" spans={[{ s: 'muted', t: '⇧⏎ newline' }]} />
-      {cx.busy ? (
-        <seg key="action" onClick={cx.onInterrupt} priority={10} role="hermes.statusline.stop" side="right" spans={[{ t: 'esc esc stop' }]} />
+      {cx.activity.kind === 'turn' ? (
+        <seg key="action" onClick={on.onInterrupt} priority={10} role="hermes.statusline.stop" side="right" spans={[{ t: 'esc esc stop' }]} />
       ) : (
-        <seg key="action" onClick={cx.onSubmit} priority={10} role="hermes.statusline.send" side="right" spans={[{ t: '⏎ send' }]} />
+        <seg key="action" onClick={on.onSubmit} priority={10} role="hermes.statusline.send" side="right" spans={[{ t: '⏎ send' }]} />
       )}
     </status>
   )
@@ -323,7 +379,7 @@ function agentsPill(running: number, onOpen: () => void, focused: boolean): JSX.
  * for a minute. While processes chart their output, the freshest chart's figure and mini chart
  * follow the count, and the hover card shows every running process as a tile.
  */
-function shellsPill(s: ShellsPill, focused: boolean): JSX.Element {
+function shellsPill(s: ShellsPill, onOpen: () => void, focused: boolean): JSX.Element {
   const live = s.running > 0
   const n = live ? s.running : s.exited
   const charts = live ? (s.charts ?? []) : []
@@ -347,18 +403,18 @@ function shellsPill(s: ShellsPill, focused: boolean): JSX.Element {
     focused,
     hovercard: card,
     key: 'shells',
-    onClick: s.onOpen,
+    onClick: onOpen,
     title
   })
 }
 
 /** The PR pill, in the shells pill's style. */
-function prsPillNode(p: PrsPill, focused: boolean): JSX.Element {
+function prsPillNode(p: PrsPill, onOpen: () => void, focused: boolean): JSX.Element {
   return pill({
     children: [<icon key="icon" name="merge" tone={p.tone === 'muted' ? undefined : p.tone} />, <text key="text" text={p.text} wrap="none" />],
     focused,
     key: 'prs',
-    onClick: p.onOpen,
+    onClick: onOpen,
     title: 'Pull requests  ⌥P'
   })
 }
@@ -377,9 +433,7 @@ function hudHint(): JSX.Element {
   )
 }
 
-function workingNode(cx: DockContext): JSX.Element {
-  const busy = cx.busy!
-
+function workingNode(busy: Extract<DockActivity, { kind: 'turn' }>, cx: DockContext, on: DockActions): JSX.Element {
   return workingRow({
     label: busy.label,
     now: cx.now,
@@ -387,8 +441,8 @@ function workingNode(cx: DockContext): JSX.Element {
     startedAt: busy.startedAt,
     trailing: [
       <row grow={1} key="fill" />,
-      cx.todos ? todosPillNode(cx.todos, false) : null,
-      <row align="center" gap="xs" key="stop" onClick={cx.onInterrupt} role="omp.working.stop" title="Stop  esc esc">
+      cx.pills.todos ? todosPillNode(cx.pills.todos, on.onTodos, false) : null,
+      <row align="center" gap="xs" key="stop" onClick={on.onInterrupt} role="omp.working.stop" title="Stop  esc esc">
         <kbd key="k" keys={['esc']} />
         <kbd key="k2" keys={['esc']} />
         <text key="t" text="Stop" />
@@ -398,7 +452,7 @@ function workingNode(cx: DockContext): JSX.Element {
 }
 
 /** The working row while /compress runs: what holds the session, and for how long. */
-function compactingNode(c: NonNullable<DockContext['compacting']>, now: number): JSX.Element {
+function compactingNode(c: Extract<DockActivity, { kind: 'compacting' }>, now: number): JSX.Element {
   return workingRow({
     label: COMPACTING_LABEL,
     now,
@@ -409,99 +463,88 @@ function compactingNode(c: NonNullable<DockContext['compacting']>, now: number):
 }
 
 /** The effort chip: the level (the default one muted), and `ultra→max` where the route clamps it. */
-function effortChip(cx: DockContext): JSX.Element {
-  const text = effortText(cx.effort, cx.effortWire)
+function effortChip(r: DockRoute, on: DockActions): JSX.Element {
+  const text = effortText(r.effort, r.effortWire)
   // The glyph draws what is sent.
-  const glyph = cx.effort === 'none' ? 'off' : cx.effortWire || cx.effort || DEFAULT_EFFORT
-  const clamp = text.includes('→') ? ` (this route sends ${cx.effortWire})` : ''
+  const glyph = r.effort === 'none' ? 'off' : r.effortWire || r.effort || DEFAULT_EFFORT
+  const clamp = text.includes('→') ? ` (this route sends ${r.effortWire})` : ''
 
   return (
     <row
       align="center"
       gap="xs"
       key="effort"
-      onClick={cx.onEffort}
-      onMenu={cx.onEffortMenu}
+      onClick={on.onEffort}
+      onMenu={on.onEffortMenu}
       role="omp.composer.effort"
-      title={`Reasoning effort: ${text}${cx.effort ? clamp : ' (the default)'} · click to cycle  ⇧⇥ · right-click to choose or save as default`}
+      title={`Reasoning effort: ${text}${r.effort ? clamp : ' (the default)'} · click to cycle  ⇧⇥ · right-click to choose or save as default`}
     >
       <effort key="glyph" level={glyph} />
-      <text key="level" spans={[{ s: cx.effort ? undefined : 'muted', t: text }]} wrap="none" />
+      <text key="level" spans={[{ s: r.effort ? undefined : 'muted', t: text }]} wrap="none" />
     </row>
   )
 }
 
-function composerNode(cx: DockContext): JSX.Element {
-  const { composer } = cx
-  const ctx = cx.context
-  const share = ctx && ctx.max > 0 ? ctx.used / ctx.max : undefined
+function composerNode(cx: DockContext, on: DockActions): JSX.Element {
+  const { draft, attachments } = cx.composer
+  const { route } = cx
+  const busy = cx.activity.kind === 'turn'
 
   return (
     <col key="composer" role="omp.editor">
-      {cx.busy ? <row key="streak" role="hermes.streak" /> : null}
-      {share === undefined || share < 0.01 ? null : (
-        // The bar alone on the composer's edge: its % and total sat in the pills' row and collided
-        // with them; the status strip says the % and the tooltip the rest.
-        <meter
-          key="context"
-          role="omp.composer.context"
-          style="bar"
-          thresholds={{ bad: 0.85, warn: 0.6 }}
-          title={`Context ${Math.round(share * 100)}% used\n${compact(ctx!.used)} of ${compact(ctx!.max)} tokens\n/usage shows the breakdown`}
-          value={share}
-        />
-      )}
-      <row gap="sm" hidden={!cx.attachments?.length} key="chips" role="omp.composer.chips" wrap>
-        {(cx.attachments ?? []).map(imageChip)}
+      {busy ? <row key="streak" role="hermes.streak" /> : null}
+      {contextMeter(cx.status.context)}
+      <row gap="sm" hidden={!attachments.length} key="chips" role="omp.composer.chips" wrap>
+        {attachments.map((a, i) => imageChip(a, i, on.onRemoveAttachment))}
       </row>
       <row align="start" gap="sm" key="line" role="omp.composer.line">
         <editor
-          anchor={composer.anchor}
-          cursor={composer.cursor}
-          decor={composer.decor}
-          ghost={cx.ghost || undefined}
+          anchor={draft.anchor}
+          cursor={draft.cursor}
+          decor={draft.decor}
+          ghost={cx.composer.ghost || undefined}
           key="input"
           maxLines={18}
-          onEdit={cx.onEdit}
-          onSend={cx.onSend}
-          onUndo={cx.onUndo}
-          placeholder={cx.placeholder}
-          sendable={cx.ready}
-          text={composer.text}
+          onEdit={on.onEdit}
+          onSend={on.onSend}
+          onUndo={on.onUndo}
+          placeholder={cx.composer.placeholder}
+          sendable={cx.composer.ready}
+          text={draft.text}
         />
       </row>
       <row align="center" gap="sm" key="bar" role="omp.composer.bar">
-        {cx.model ? (
+        {route.model ? (
           <row
             align="center"
             gap="xs"
             key="model"
-            onClick={cx.onModel}
+            onClick={on.onModel}
             role="omp.composer.model"
-            title={`Model: ${cx.model}${cx.fast ? ` · ${cx.fast === 'ultrafast' ? 'ultrafast' : 'fast'} mode (priority processing, billed higher; /fast turns it off)` : ''} · click to switch`}
+            title={`Model: ${route.model}${route.fast ? ` · ${route.fast === 'ultrafast' ? 'ultrafast' : 'fast'} mode (priority processing, billed higher; /fast turns it off)` : ''} · click to switch`}
           >
             <icon key="icon" name="model" />
-            <text key="name" spans={[{ t: cx.model }]} wrap="none" />
-            {cx.fast ? <icon key="fast" name="bolt" role="hermes.composer.fast" tone="warning" /> : null}
-            {cx.fast === 'ultrafast' ? <icon key="fast2" name="bolt" role="hermes.composer.fast" tone="warning" /> : null}
+            <text key="name" spans={[{ t: route.model }]} wrap="none" />
+            {route.fast ? <icon key="fast" name="bolt" role="hermes.composer.fast" tone="warning" /> : null}
+            {route.fast === 'ultrafast' ? <icon key="fast2" name="bolt" role="hermes.composer.fast" tone="warning" /> : null}
             <icon key="chev" name="chev" />
           </row>
         ) : null}
-        {cx.reasons !== false ? effortChip(cx) : null}
+        {route.reasons !== false ? effortChip(route, on) : null}
         {/* Tern puts its folder chip right before the composer's status node: an empty one keeps
             the chip there and the send key at the end. */}
         <status grow={1} key="extras" role="omp.composer.extras" transparent />
-        {cx.busy ? (
+        {busy ? (
           <text
             key="stop"
-            onClick={cx.onInterrupt}
+            onClick={on.onInterrupt}
             role="omp.composer.stop"
             text="Stop"
             title="Stop  esc esc"
             tone="error"
           />
         ) : (
-          <kbd key="send" keys={['enter']} onClick={cx.onSubmit} role="omp.composer.send" title="Send  ⏎" />
+          <kbd key="send" keys={['enter']} onClick={on.onSubmit} role="omp.composer.send" title="Send  ⏎" />
         )}
       </row>
     </col>
@@ -509,11 +552,30 @@ function composerNode(cx: DockContext): JSX.Element {
 }
 
 /**
+ * The context bar alone on the composer's edge, from 1% used: its % and total sat in the pills'
+ * row and collided with them; the status strip says the % and the tooltip the rest.
+ */
+function contextMeter(ctx: StatusLine['context']): JSX.Element | null {
+  const share = ctx && ctx.max > 0 ? ctx.used / ctx.max : undefined
+
+  return !ctx || share === undefined || share < 0.01 ? null : (
+    <meter
+      key="context"
+      role="omp.composer.context"
+      style="bar"
+      thresholds={{ bad: 0.85, warn: 0.6 }}
+      title={`Context ${Math.round(share * 100)}% used\n${compact(ctx.used)} of ${compact(ctx.max)} tokens\n/usage shows the breakdown`}
+      value={share}
+    />
+  )
+}
+
+/**
  * An attached image as omp's composer chip (a card Tern lays out as a 36px thumbnail beside the
  * name and its size), as t3code's composer shows one: a click on the thumbnail opens it large in
- * Tern's lightbox; the ✕ drops it.
+ * Tern's lightbox; the ✕ drops it (`onRemove` gets the chip's index).
  */
-export function imageChip(a: ComposerImage, i: number): JSX.Element {
+export function imageChip(a: ComposerImage, i: number, onRemove: (index: number) => void): JSX.Element {
   return (
     <card head={[{ s: 'strong', t: a.label }]} key={`a${i}`} role="omp.composer.chip" title={a.label} tone="accent">
       {a.image ? <image alt={a.label} key="thumb" {...a.image} /> : <icon key="thumb" name="image" />}
@@ -522,7 +584,7 @@ export function imageChip(a: ComposerImage, i: number): JSX.Element {
         spans={[a.pending ? { fx: 'shimmer', s: 'dim', t: 'Attaching…' } : { s: 'dim', t: a.caption ?? 'image' }]}
         wrap="none"
       />
-      <icon key="remove" name="x" onClick={a.onRemove} role="hermes.composer.remove" title={`Remove ${a.label}`} />
+      <icon key="remove" name="x" onClick={() => onRemove(i)} role="hermes.composer.remove" title={`Remove ${a.label}`} />
     </card>
   )
 }

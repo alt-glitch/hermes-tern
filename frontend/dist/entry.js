@@ -25343,1129 +25343,6 @@ function applyLog(a2, log) {
   }
 }
 
-// src/core/errors.ts
-function errorText(error) {
-  return error instanceof Error ? error.message : String(error);
-}
-
-// src/automation.ts
-function cadence(loop) {
-  if (loop.mode === "self_paced") {
-    return "self-paced";
-  }
-  const s2 = loop.interval_seconds;
-  return `every ${s2 % 3600 === 0 ? `${s2 / 3600}h` : s2 % 60 === 0 ? `${s2 / 60}m` : `${s2}s`}`;
-}
-var clock = (epochSeconds) => new Date(epochSeconds * 1e3).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-function goalView(goal) {
-  if (!goal || goal.status !== "active" && goal.status !== "paused") {
-    return null;
-  }
-  const barrier = goal.status === "active" ? goal.wait_barrier : null;
-  const wait = barrier ? [barrier.type === "until" ? `until ${clock(barrier.until_at)}` : `on ${barrier.type} ${barrier.target}`, barrier.reason].filter(Boolean).join(" \xB7 ") : "";
-  return {
-    criteria: goal.subgoals ?? [],
-    detail: barrier ? wait : goal.status === "paused" ? goal.paused_reason ?? "" : "",
-    maxTurns: goal.max_turns,
-    reason: goal.last_reason ?? void 0,
-    state: goal.status === "paused" ? "paused" : barrier ? "waiting" : goal.last_verdict === "blocked" ? "blocked" : "active",
-    title: goal.title,
-    turns: goal.turns_used,
-    verdict: goal.last_verdict ?? void 0
-  };
-}
-function loopView(loop, now = Date.now()) {
-  if (!loop || loop.status !== "active" && loop.status !== "paused") {
-    return null;
-  }
-  const dueAt = loop.next_due_at > 0 ? loop.next_due_at * 1e3 : void 0;
-  const state = loop.status === "paused" ? "paused" : loop.awaiting_response ? "running" : loop.deferred_by_goal ? "deferred" : dueAt !== void 0 && dueAt > now ? "active" : "due";
-  return {
-    cadence: cadence(loop),
-    detail: loop.status === "paused" ? loop.paused_reason ?? "" : "",
-    dueAt: state === "active" ? dueAt : void 0,
-    fired: loop.ticks_fired,
-    prompt: loop.prompt,
-    runs: loop.times ? `${loop.ticks_fired}/${loop.times} runs` : `${loop.ticks_fired} run${loop.ticks_fired === 1 ? "" : "s"}`,
-    state,
-    times: loop.times,
-    until: loop.until ?? ""
-  };
-}
-var ACTION_LABELS = {
-  "goal.clear": "clear the goal",
-  "goal.pause": "pause the goal",
-  "goal.resume": "resume the goal",
-  "goal.unwait": "stop the goal waiting",
-  "loop.pause": "pause the loop",
-  "loop.resume": "resume the loop",
-  "loop.stop": "stop the loop"
-};
-var Automation = class {
-  #host;
-  #sid = null;
-  #snapshot = null;
-  /** Bumped by every update, so a read that started before one never overwrites it. */
-  #seq = 0;
-  #timer;
-  /** The verb in flight, if any (the sheet's buttons wait for it). */
-  pending;
-  constructor(host) {
-    this.#host = host;
-  }
-  get goal() {
-    return goalView(this.#snapshot?.goal);
-  }
-  loop(now = Date.now()) {
-    return loopView(this.#snapshot?.loop, now);
-  }
-  /** The loop's raw snapshot: a new object per update, so its countdown re-anchors only then. */
-  get loopSnapshot() {
-    return this.#snapshot?.loop ?? null;
-  }
-  /** Another session is shown: forget the last one's state and read this one's. */
-  adopt(sid) {
-    this.#sid = sid;
-    this.#set(null);
-    void this.#read(sid);
-  }
-  /** A `session.control.update` (or a verb's reply) for session `sid`. */
-  apply(sid, control) {
-    if (sid && sid !== this.#sid) {
-      return;
-    }
-    this.#seq++;
-    this.#set(control ?? null);
-  }
-  async #read(sid) {
-    const seq = this.#seq;
-    try {
-      const r = await rpc(this.#host.gw, "session.control.read", { session_id: sid });
-      if (sid === this.#sid && seq === this.#seq) {
-        this.#set(r?.control ?? null);
-      }
-    } catch {
-    }
-  }
-  /** Runs `action` on the open session; the reply's snapshot repaints, its dispatch runs as a typed command's. */
-  async act(action) {
-    const sid = this.#sid;
-    if (!sid || this.pending) {
-      return;
-    }
-    this.pending = action;
-    this.#host.changed();
-    try {
-      const r = await rpc(this.#host.gw, "session.control", { action, session_id: sid });
-      this.apply(sid, r?.control);
-      if (r?.dispatch?.type && sid === this.#host.sid) {
-        await this.#host.runDispatch(r.dispatch, `/${action.replace(".", " ")}`);
-      }
-    } catch (error) {
-      this.#host.transcript.notice(
-        `Could not ${ACTION_LABELS[action]}: ${errorText(error)}`,
-        "error"
-      );
-    } finally {
-      this.pending = void 0;
-      this.#host.changed();
-    }
-  }
-  #set(control) {
-    if (JSON.stringify(control) !== JSON.stringify(this.#snapshot)) {
-      this.#snapshot = control;
-      this.#host.changed();
-    }
-    this.#arm();
-  }
-  /** Re-renders when the loop falls due, so its countdown turns into "due". Tern ticks the countdown itself. */
-  #arm() {
-    clearTimeout(this.#timer);
-    const due = this.loop()?.dueAt;
-    if (due !== void 0) {
-      this.#timer = setTimeout(() => this.#host.changed(), Math.max(0, due - Date.now()) + 50);
-      this.#timer.unref?.();
-    }
-  }
-};
-
-// src/transcript/todos.ts
-var TODO_LOOK = {
-  cancelled: { item: "dropped" },
-  completed: { item: "done" },
-  in_progress: { item: "active" },
-  pending: { item: "pending" }
-};
-function todoProgress(list9) {
-  const live = list9.filter((t2) => t2.status !== "cancelled");
-  const done = live.filter((t2) => t2.status === "completed").length;
-  const current = live.find((t2) => t2.status === "in_progress") ?? live.find((t2) => t2.status === "pending");
-  return { current: current?.content ?? "", done, total: live.length };
-}
-function currentTodos(entries) {
-  for (let i = entries.length - 1; i >= 0; i--) {
-    const e = entries[i];
-    if (e?.kind !== "turn") {
-      continue;
-    }
-    const hit = e.blocks.findLast((b) => b.kind === "tool" && b.call.todos?.length);
-    if (hit?.kind === "tool") {
-      return hit.call.todos;
-    }
-  }
-  return void 0;
-}
-function todosOf(args, current) {
-  const raw2 = Array.isArray(args.todos) ? args.todos : [];
-  return args.merge === true ? mergeTodos(current ?? [], raw2) : toTodos(raw2);
-}
-function mergeTodos(current, patch6) {
-  const out = current.map((t2) => ({ ...t2 }));
-  for (const item3 of patch6) {
-    const r = record(item3);
-    const id = String(r?.id ?? "").trim();
-    if (!r || !id) {
-      continue;
-    }
-    const cur = out.find((t2) => t2.id === id);
-    if (!cur) {
-      if (String(r.content ?? "").trim()) {
-        out.push(...toTodos([{ ...r, id }]));
-      }
-      continue;
-    }
-    const content5 = String(r.content ?? "").trim();
-    const status = String(r.status ?? "").trim().toLowerCase();
-    if (content5) {
-      cur.content = content5;
-    }
-    if (status === "pending" || status === "in_progress" || status === "completed" || status === "cancelled") {
-      cur.status = status;
-    }
-    if ("parent" in r) {
-      const parent = String(r.parent ?? "").trim();
-      if (parent && parent !== id) {
-        cur.parent = parent;
-      } else {
-        delete cur.parent;
-      }
-    }
-  }
-  return out;
-}
-function toTodos(raw2) {
-  const out = [];
-  for (const item3 of raw2) {
-    if (!item3 || typeof item3 !== "object") {
-      continue;
-    }
-    const id = "id" in item3 ? String(item3.id) : String(out.length);
-    const content5 = "content" in item3 ? String(item3.content) : "";
-    const status = "status" in item3 ? String(item3.status) : "pending";
-    const parent = "parent" in item3 && item3.parent ? String(item3.parent) : void 0;
-    out.push({
-      content: content5,
-      id,
-      ...parent && { parent },
-      status: status === "completed" || status === "in_progress" || status === "cancelled" ? status : "pending"
-    });
-  }
-  return out;
-}
-
-// src/chrome/hud.ts
-var plain = (k) => !k.ctrl && !k.alt && !k.meta && !k.shift;
-function hudKey(k, cx) {
-  const { focused, pills: pills2 } = cx;
-  if (!focused || !pills2.includes(focused)) {
-    return k.name === "down" && plain(k) && cx.idle && pills2.length ? { consumed: true, focused: pills2[0] } : { consumed: false };
-  }
-  const at = pills2.indexOf(focused);
-  switch (plain(k) ? k.name : "") {
-    case "left":
-      return { consumed: true, focused: pills2[Math.max(0, at - 1)] };
-    case "right":
-      return { consumed: true, focused: pills2[Math.min(pills2.length - 1, at + 1)] };
-    case "enter":
-    case "space":
-      return { consumed: true, open: focused };
-    case "escape":
-    case "up":
-      return { consumed: true };
-    case "down":
-      return { consumed: true, focused };
-    default:
-      return { consumed: false };
-  }
-}
-function todos(list9, busy) {
-  if (!list9?.length) {
-    return void 0;
-  }
-  const { done, total } = todoProgress(list9);
-  return total && (busy || done < total) ? list9 : void 0;
-}
-function pills(s2) {
-  return [
-    // While a turn runs the todo pill rides the working line, where the keys don't reach it.
-    ...s2.todos && !s2.busy ? ["todos"] : [],
-    ...s2.agents ? ["agents"] : [],
-    ...s2.shells ? ["shells"] : [],
-    ...s2.prs ? ["prs"] : [],
-    ...s2.goal ? ["goal"] : [],
-    ...s2.loop ? ["loop"] : []
-  ];
-}
-var Hud = class {
-  #host;
-  #focused;
-  #todosOpen = false;
-  constructor(host) {
-    this.#host = host;
-  }
-  /** The pill holding the keys (Down from an empty prompt), if any. */
-  get focused() {
-    return this.#focused;
-  }
-  /** The todo panel above the composer is open. */
-  get todosOpen() {
-    return this.#todosOpen;
-  }
-  /** Down from an empty prompt focuses the pills; ←/→, Enter and Esc/↑ while one holds the keys. True when the key ends here. */
-  key(k, cx) {
-    const out = hudKey(k, { ...cx, ...this.#focused ? { focused: this.#focused } : {} });
-    this.#focused = out.focused;
-    if (out.open) {
-      this.#open(out.open);
-    }
-    return out.consumed;
-  }
-  /** Folds the todo panel open or shut. */
-  toggleTodos() {
-    this.#todosOpen = !this.#todosOpen;
-    this.#host.changed();
-  }
-  /** Each frame: a pill that left (its last process aged out) hands the keys back. */
-  prune(shown2) {
-    this.#focused = this.#focused && shown2.includes(this.#focused) ? this.#focused : void 0;
-  }
-  /** The composer took the focus back (a click in it). */
-  release() {
-    this.#focused = void 0;
-  }
-  #open(pill2) {
-    switch (pill2) {
-      case "todos":
-        this.toggleTodos();
-        break;
-      case "agents":
-      case "goal":
-      case "loop":
-      case "prs":
-      case "shells":
-        this.#host.open(pill2);
-        break;
-    }
-  }
-};
-
-// src/chrome/notices.ts
-var TONES = { error: "error", success: "success", warn: "warning", warning: "warning" };
-var Notices = class {
-  #list = [];
-  #seq = 0;
-  /** Adds or replaces the notice; returns it (undefined for an empty one). */
-  show(p3, now = Date.now()) {
-    const text12 = p3.text?.trim();
-    if (!text12) {
-      return void 0;
-    }
-    const key2 = p3.key || p3.id || `n${++this.#seq}`;
-    const ttl = p3.kind === "ttl" && typeof p3.ttl_ms === "number" && p3.ttl_ms > 0 ? p3.ttl_ms : void 0;
-    const notice = { key: key2, text: text12, tone: TONES[p3.level ?? ""] ?? "info", ...ttl ? { expires: now + ttl } : {} };
-    this.#list = [...this.#list.filter((n) => n.key !== key2), notice];
-    return notice;
-  }
-  /** Drops the notice with `key`; true when one went. */
-  clear(key2) {
-    const before = this.#list.length;
-    this.#list = this.#list.filter((n) => n.key !== key2);
-    return this.#list.length !== before;
-  }
-  /** The newest notice still live at `now`. */
-  current(now = Date.now()) {
-    this.#list = this.#list.filter((n) => !n.expires || n.expires > now);
-    return this.#list.at(-1);
-  }
-  /** When the next `ttl` notice expires, if one is live. */
-  nextExpiry() {
-    const at = this.#list.flatMap((n) => n.expires ? [n.expires] : []);
-    return at.length ? Math.min(...at) : void 0;
-  }
-  /** Forgets every notice (another session is shown). */
-  reset() {
-    this.#list = [];
-  }
-};
-function isLoginNotice(p3) {
-  return Boolean(p3.key?.startsWith("login:"));
-}
-var NoticeStrip = class {
-  #host;
-  #notices = new Notices();
-  #timer;
-  constructor(host) {
-    this.#host = host;
-  }
-  /** Adds or replaces the notice, and re-arms the expiry render. */
-  show(p3) {
-    this.#notices.show(p3);
-    this.#arm();
-  }
-  /** Drops the notice with `key`. */
-  clear(key2) {
-    this.#notices.clear(key2);
-  }
-  /** The notice the strip shows at `now`. */
-  current(now = Date.now()) {
-    return this.#notices.current(now);
-  }
-  /** Forgets every notice (another session is shown). */
-  reset() {
-    this.#notices.reset();
-  }
-  /** Stops the expiry render. */
-  dispose() {
-    clearTimeout(this.#timer);
-  }
-  /** Re-renders when the next `ttl` notice expires, so the strip drops it on time. */
-  #arm() {
-    clearTimeout(this.#timer);
-    const at = this.#notices.nextExpiry();
-    if (at !== void 0) {
-      this.#timer = setTimeout(() => {
-        this.#notices.current();
-        this.#arm();
-        this.#host.changed();
-      }, Math.max(0, at - Date.now()) + 10);
-    }
-  }
-};
-
-// src/chrome/reconnect.ts
-var Reconnect = class {
-  #host;
-  /** The connection is down until the next gateway.ready (its one line is shown). */
-  #offline = false;
-  /** The gateway is being redialled until the next gateway.ready. */
-  #redial;
-  #timer;
-  constructor(host) {
-    this.#host = host;
-  }
-  /** The redial the dock shows: which try, and when the next one starts. */
-  get redial() {
-    return this.#redial;
-  }
-  /**
-   * The gateway exited: the line to show, once per outage (each failed redial exits again). An
-   * attached gateway (and its turn) lives on, so its line says the pane reconnects.
-   */
-  lost(attached, code7) {
-    const first = !this.#offline;
-    this.#offline = true;
-    if (!first) {
-      return void 0;
-    }
-    return attached ? { text: "Lost the connection to Hermes; reconnecting\u2026", tone: "warning" } : { text: `The agent backend exited${code7 === null ? "" : ` (${code7})`}.`, tone: "error" };
-  }
-  /** One line for the whole outage: each try replaces it, and re-renders when the wait ends. */
-  redialing(attempt, delayMs) {
-    clearTimeout(this.#timer);
-    this.#redial = { attempt, dueAt: Date.now() + delayMs };
-    this.#timer = setTimeout(() => this.#host.changed(), delayMs + 50);
-    this.#timer.unref?.();
-  }
-  /** gateway.ready: the connection is up, and the redial line goes. */
-  ready() {
-    this.#offline = false;
-    clearTimeout(this.#timer);
-    this.#redial = void 0;
-  }
-  /** Stops the redial line's re-render. */
-  dispose() {
-    clearTimeout(this.#timer);
-  }
-};
-
-// .hermes-src/node_modules/@hermes/shared/src/color.ts
-var HEX6_RE = /^#?([0-9a-f]{6})$/i;
-var HEX3_RE = /^#?([0-9a-f]{3})$/i;
-var RGB_FN_RE = /^rgba?\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})/i;
-var clampChannel = (v) => Math.max(0, Math.min(255, Math.round(v)));
-function parseColor(input2) {
-  const value = input2.trim();
-  let m = HEX6_RE.exec(value);
-  if (m) {
-    const n = parseInt(m[1], 16);
-    return [n >> 16 & 255, n >> 8 & 255, n & 255];
-  }
-  m = HEX3_RE.exec(value);
-  if (m) {
-    const [r, g, b] = m[1];
-    return [parseInt(r + r, 16), parseInt(g + g, 16), parseInt(b + b, 16)];
-  }
-  m = RGB_FN_RE.exec(value);
-  if (m) {
-    return [clampChannel(Number(m[1])), clampChannel(Number(m[2])), clampChannel(Number(m[3]))];
-  }
-  return null;
-}
-var toHex = (rgb) => "#" + rgb.map((c) => clampChannel(c).toString(16).padStart(2, "0")).join("");
-function mix(a2, b, t2) {
-  const pa = parseColor(a2);
-  const pb = parseColor(b);
-  if (!pa || !pb) {
-    return a2;
-  }
-  return toHex([pa[0] + (pb[0] - pa[0]) * t2, pa[1] + (pb[1] - pa[1]) * t2, pa[2] + (pb[2] - pa[2]) * t2]);
-}
-function channelLuminance(value) {
-  const normalized = value / 255;
-  return normalized <= 0.03928 ? normalized / 12.92 : ((normalized + 0.055) / 1.055) ** 2.4;
-}
-function relativeLuminance(color2) {
-  const rgb = parseColor(color2);
-  return rgb ? 0.2126 * channelLuminance(rgb[0]) + 0.7152 * channelLuminance(rgb[1]) + 0.0722 * channelLuminance(rgb[2]) : null;
-}
-function contrastRatio(a2, b) {
-  const la = relativeLuminance(a2);
-  const lb = relativeLuminance(b);
-  if (la === null || lb === null) {
-    return null;
-  }
-  const [hi, lo] = la >= lb ? [la, lb] : [lb, la];
-  return (hi + 0.05) / (lo + 0.05);
-}
-
-// .hermes-src/ui-tui/src/lib/color.ts
-var clampChannel2 = (v) => Math.max(0, Math.min(255, Math.round(v)));
-function liftForContrast(color2, bg, ratio) {
-  const fg = parseColor(color2);
-  const bgLum = relativeLuminance(bg);
-  if (!fg || bgLum === null) {
-    return color2;
-  }
-  if ((contrastRatio(color2, bg) ?? 21) >= ratio) {
-    return color2;
-  }
-  let [r, g, b] = fg;
-  if (bgLum > 0.5) {
-    let cr = contrastRatio(toHex([r, g, b]), bg) ?? 21;
-    while (cr < ratio && (r > 0 || g > 0 || b > 0)) {
-      r -= Math.ceil(r * 0.1);
-      g -= Math.ceil(g * 0.1);
-      b -= Math.ceil(b * 0.1);
-      cr = contrastRatio(toHex([r, g, b]), bg) ?? 21;
-    }
-  } else {
-    let cr = contrastRatio(toHex([r, g, b]), bg) ?? 21;
-    while (cr < ratio && (r < 255 || g < 255 || b < 255)) {
-      r = Math.min(255, r + Math.ceil((255 - r) * 0.1));
-      g = Math.min(255, g + Math.ceil((255 - g) * 0.1));
-      b = Math.min(255, b + Math.ceil((255 - b) * 0.1));
-      cr = contrastRatio(toHex([r, g, b]), bg) ?? 21;
-    }
-  }
-  return toHex([r, g, b]);
-}
-function grayOf(color2) {
-  const rgb = parseColor(color2);
-  if (!rgb) {
-    return color2;
-  }
-  const gray = clampChannel2(0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2]);
-  return toHex([gray, gray, gray]);
-}
-var desaturate = (color2, s2) => mix(color2, grayOf(color2), s2);
-
-// .hermes-src/ui-tui/src/theme.ts
-var XTERM_6_LEVELS = [0, 95, 135, 175, 215, 255];
-var ANSI_LIGHT_MAX_LUMINANCE = 0.72;
-var ANSI_LIGHT_TARGET_LUMINANCE = 0.34;
-var ANSI_LIGHT_MIN_SATURATION = 0.22;
-var ANSI_MUTED_BUCKET = 245;
-var ANSI_NORMALIZED_FOREGROUNDS = [
-  "text",
-  "label",
-  "ok",
-  "error",
-  "warn",
-  "prompt",
-  "statusFg",
-  "statusGood",
-  "statusWarn",
-  "statusBad",
-  "statusCritical",
-  "shellDollar",
-  "tool"
-];
-var ANSI_MUTED_FOREGROUNDS = ["muted", "sessionLabel", "sessionBorder", "thinking"];
-function xtermEightBitRgb(colorNumber) {
-  if (colorNumber >= 232) {
-    const value = 8 + (colorNumber - 232) * 10;
-    return [value, value, value];
-  }
-  if (colorNumber >= 16) {
-    const offset = colorNumber - 16;
-    return [
-      XTERM_6_LEVELS[Math.floor(offset / 36) % 6],
-      XTERM_6_LEVELS[Math.floor(offset / 6) % 6],
-      XTERM_6_LEVELS[offset % 6]
-    ];
-  }
-  return [0, 0, 0];
-}
-var rgbLuminance = (red, green, blue) => relativeLuminance(toHex([red, green, blue])) ?? 0;
-function rgbToHsl(red, green, blue) {
-  const rn = red / 255;
-  const gn = green / 255;
-  const bn = blue / 255;
-  const max = Math.max(rn, gn, bn);
-  const min = Math.min(rn, gn, bn);
-  const lightness = (max + min) / 2;
-  if (max === min) {
-    return [0, 0, lightness];
-  }
-  const delta = max - min;
-  const saturation = lightness > 0.5 ? delta / (2 - max - min) : delta / (max + min);
-  const hue = max === rn ? (gn - bn) / delta + (gn < bn ? 6 : 0) : max === gn ? (bn - rn) / delta + 2 : (rn - gn) / delta + 4;
-  return [hue / 6, saturation, lightness];
-}
-function circularDistance(a2, b) {
-  const distance = Math.abs(a2 - b);
-  return Math.min(distance, 1 - distance);
-}
-function richEightBitColorNumber(red, green, blue) {
-  const [, saturation, lightness] = rgbToHsl(red, green, blue);
-  if (saturation < 0.15) {
-    const gray = Math.round(lightness * 25);
-    return gray === 0 ? 16 : gray === 25 ? 231 : 231 + gray;
-  }
-  const sixRed = red < 95 ? red / 95 : 1 + (red - 95) / 40;
-  const sixGreen = green < 95 ? green / 95 : 1 + (green - 95) / 40;
-  const sixBlue = blue < 95 ? blue / 95 : 1 + (blue - 95) / 40;
-  return 16 + 36 * Math.round(sixRed) + 6 * Math.round(sixGreen) + Math.round(sixBlue);
-}
-function bestReadableAnsiColor(red, green, blue) {
-  const [hue, saturation, lightness] = rgbToHsl(red, green, blue);
-  let bestColor = richEightBitColorNumber(red, green, blue);
-  let bestScore = Number.POSITIVE_INFINITY;
-  for (let colorNumber = 16; colorNumber <= 255; colorNumber += 1) {
-    const [candidateRed, candidateGreen, candidateBlue] = xtermEightBitRgb(colorNumber);
-    const candidateLuminance = rgbLuminance(candidateRed, candidateGreen, candidateBlue);
-    if (candidateLuminance > ANSI_LIGHT_MAX_LUMINANCE) {
-      continue;
-    }
-    const [candidateHue, candidateSaturation, candidateLightness] = rgbToHsl(
-      candidateRed,
-      candidateGreen,
-      candidateBlue
-    );
-    const saturationFloorPenalty = candidateSaturation < ANSI_LIGHT_MIN_SATURATION ? (ANSI_LIGHT_MIN_SATURATION - candidateSaturation) * 3 : 0;
-    const score = circularDistance(candidateHue, hue) * 4 + Math.abs(candidateSaturation - Math.max(ANSI_LIGHT_MIN_SATURATION, saturation)) * 0.8 + Math.abs(candidateLightness - Math.min(lightness, ANSI_LIGHT_TARGET_LUMINANCE)) * 2 + saturationFloorPenalty;
-    if (score < bestScore) {
-      bestColor = colorNumber;
-      bestScore = score;
-    }
-  }
-  return bestColor;
-}
-function normalizeAnsiForeground(color2) {
-  const rgb = parseColor(color2);
-  if (!rgb) {
-    return color2;
-  }
-  const richAnsi = richEightBitColorNumber(rgb[0], rgb[1], rgb[2]);
-  const richRgb = xtermEightBitRgb(richAnsi);
-  const ansi = rgbLuminance(richRgb[0], richRgb[1], richRgb[2]) > ANSI_LIGHT_MAX_LUMINANCE ? bestReadableAnsiColor(rgb[0], rgb[1], rgb[2]) : richAnsi;
-  return `ansi256(${ansi})`;
-}
-var BRAND = {
-  name: "Hermes Agent",
-  icon: "\u2624",
-  prompt: "\u276F",
-  welcome: "Type your message or /help for commands.",
-  goodbye: "Goodbye! \u2624",
-  tool: "\u250A",
-  helpHeader: "(^_^)? Commands"
-};
-var cleanPromptSymbol = (s2, fallback) => {
-  const cleaned = String(s2 ?? "").replace(/\s+/g, " ").trim();
-  return cleaned || fallback;
-};
-var DIFF_DARK = {
-  diffAdded: "rgb(220,255,220)",
-  diffRemoved: "rgb(255,220,220)",
-  diffAddedWord: "rgb(36,138,61)",
-  diffRemovedWord: "rgb(207,34,46)"
-};
-var DIFF_LIGHT = {
-  diffAdded: "rgb(200,240,200)",
-  diffRemoved: "rgb(240,200,200)",
-  diffAddedWord: "rgb(27,94,32)",
-  diffRemovedWord: "rgb(183,28,28)"
-};
-function buildPalette(seeds, isLight) {
-  const tones = deriveTones(seeds);
-  const surface = seeds.surface ?? tones.surface;
-  const activeRow = seeds.activeRow ?? (seeds.surface ? mix(surface, seeds.accent, 0.22) : tones.activeRow);
-  const muted = seeds.muted ?? tones.muted;
-  return {
-    primary: seeds.primary,
-    accent: seeds.accent,
-    border: seeds.border ?? tones.border,
-    text: seeds.text,
-    muted,
-    completionBg: surface,
-    completionCurrentBg: activeRow,
-    completionMetaBg: surface,
-    completionMetaCurrentBg: activeRow,
-    label: tones.label,
-    ok: seeds.ok,
-    error: seeds.error,
-    warn: seeds.warn,
-    // Element tokens: independently settable, but default to their semantic
-    // parents (tool marker → accent, reasoning body → muted).
-    tool: seeds.accent,
-    thinking: muted,
-    // Code-syntax tokens default to brand tokens (unchanged highlighting)
-    // but are independently skinnable.
-    syntaxString: seeds.accent,
-    syntaxNumber: seeds.text,
-    syntaxKeyword: seeds.border ?? tones.border,
-    syntaxComment: muted,
-    prompt: seeds.prompt ?? seeds.text,
-    // sessionLabel/sessionBorder track the muted tone — "same role, same
-    // colour" by design (#11300).
-    sessionLabel: muted,
-    sessionBorder: muted,
-    statusBg: surface,
-    statusFg: tones.statusFg,
-    statusGood: seeds.statusGood,
-    statusWarn: seeds.statusWarn,
-    statusBad: seeds.statusBad,
-    statusCritical: seeds.statusCritical,
-    selectionBg: seeds.selection ?? tones.selection,
-    ...isLight ? DIFF_LIGHT : DIFF_DARK,
-    shellDollar: seeds.shellDollar
-  };
-}
-var DARK_SEEDS = {
-  accent: "#FFBF00",
-  // The classic Hermes navy surfaces are IDENTITY, not derivation drift —
-  // keep them as explicit fill seeds (the ladder derives them for skins
-  // that don't care).
-  activeRow: "#333355",
-  bg: "#101014",
-  border: "#CD7F32",
-  error: "#ef5350",
-  ok: "#4caf50",
-  primary: "#FFD700",
-  prompt: "#FFF8DC",
-  selection: "#3a3a55",
-  shellDollar: "#4dabf7",
-  statusBad: "#FF8C00",
-  statusCritical: "#FF6B6B",
-  statusGood: "#8FBC8F",
-  statusWarn: "#FFD700",
-  surface: "#1a1a2e",
-  text: "#FFF8DC",
-  warn: "#ffa726"
-};
-var LIGHT_SEEDS = {
-  accent: "#956E00",
-  bg: "#ffffff",
-  border: "#A56628",
-  error: "#C14240",
-  ok: "#367E39",
-  primary: "#867000",
-  prompt: "#2B2014",
-  shellDollar: "#377BB3",
-  statusBad: "#A65A00",
-  statusCritical: "#B94D4D",
-  statusGood: "#5C7A5C",
-  statusWarn: "#867000",
-  text: "#3D2F13",
-  warn: "#956115"
-};
-var DARK_THEME = {
-  color: buildPalette(DARK_SEEDS, false),
-  brand: BRAND,
-  bannerLogo: "",
-  bannerHero: ""
-};
-var LIGHT_THEME = {
-  color: buildPalette(LIGHT_SEEDS, true),
-  brand: BRAND,
-  bannerLogo: "",
-  bannerHero: ""
-};
-var DISPLAY_MIN_CONTRAST = 1.45;
-var SEMANTIC_MIN_CONTRAST = 2.2;
-var LIGHT_DISPLAY_MIN_CONTRAST = 1.18;
-var LIGHT_SEMANTIC_MIN_CONTRAST = 1.6;
-var DISPLAY_FOREGROUNDS = [
-  "primary",
-  "accent",
-  "text",
-  "label",
-  "prompt",
-  "statusFg",
-  "border",
-  "muted",
-  "sessionLabel",
-  "sessionBorder",
-  "shellDollar"
-];
-var SEMANTIC_FOREGROUNDS = [
-  "ok",
-  "error",
-  "warn",
-  "statusGood",
-  "statusWarn",
-  "statusBad",
-  "statusCritical"
-];
-var ADAPTIVE_BACKGROUNDS = [
-  "completionBg",
-  "completionCurrentBg",
-  "completionMetaBg",
-  "completionMetaCurrentBg",
-  "statusBg",
-  "selectionBg"
-];
-var LIGHT_BG_MIN_LUMINANCE = 0.4;
-var DARK_BG_MAX_LUMINANCE = 0.35;
-function adaptColorsToBackground(colors, isLight, base3, bg) {
-  const out = { ...colors };
-  const displayFloor = isLight ? LIGHT_DISPLAY_MIN_CONTRAST : DISPLAY_MIN_CONTRAST;
-  const semanticFloor = isLight ? LIGHT_SEMANTIC_MIN_CONTRAST : SEMANTIC_MIN_CONTRAST;
-  for (const key2 of DISPLAY_FOREGROUNDS) {
-    out[key2] = liftForContrast(out[key2], bg, displayFloor);
-  }
-  for (const key2 of SEMANTIC_FOREGROUNDS) {
-    out[key2] = liftForContrast(out[key2], bg, semanticFloor);
-  }
-  for (const key2 of ADAPTIVE_BACKGROUNDS) {
-    const luminance = relativeLuminance(out[key2]);
-    if (luminance === null) {
-      continue;
-    }
-    if (isLight ? luminance < LIGHT_BG_MIN_LUMINANCE : luminance > DARK_BG_MAX_LUMINANCE) {
-      out[key2] = base3[key2];
-    }
-  }
-  return out;
-}
-function referenceBackground(isLight, env2 = process.env) {
-  const cached2 = (env2.HERMES_TUI_BACKGROUND ?? "").trim();
-  if (cached2 && backgroundLuminance(cached2) !== null) {
-    return cached2.startsWith("#") ? cached2 : `#${cached2}`;
-  }
-  return isLight ? "#ffffff" : "#101014";
-}
-function deriveTones(seeds) {
-  const { accent, bg, text: text12 } = seeds;
-  const isLight = (relativeLuminance(bg) ?? 0) > 0.5;
-  const surface = mix(bg, desaturate(accent, 0.15), isLight ? 0.045 : 0.09);
-  return {
-    // Light knobs are fitted to the lift canon (xterm minimumContrastRatio
-    // 4.5 of the classic dark golds against white — see LIGHT_SEEDS), not
-    // to ink blends: muted #946C08 ≈ desat(accent .05), label #8E6B13 ≈
-    // desat(mix(accent, text, .03), .15), statusFg #6F6F6F ≈ gray 30% lift.
-    muted: isLight ? desaturate(accent, 0.05) : desaturate(mix(accent, bg, 0.19), 0.16),
-    label: isLight ? desaturate(mix(accent, text12, 0.03), 0.15) : desaturate(mix(accent, bg, 0.13), 0.16),
-    statusFg: grayOf(mix(text12, bg, isLight ? 0.3 : 0.24)),
-    surface,
-    activeRow: mix(surface, accent, 0.25),
-    selection: isLight && seeds.shellDollar ? mix(bg, seeds.shellDollar, 0.2) : mix(surface, accent, 0.28),
-    border: mix(accent, bg, 0.25)
-  };
-}
-var TRUE_RE = /^(?:1|true|yes|on)$/;
-var FALSE_RE = /^(?:0|false|no|off)$/;
-var LIGHT_DEFAULT_TERM_PROGRAMS = /* @__PURE__ */ new Set(["Apple_Terminal"]);
-var LUMA_LIGHT_THRESHOLD = 0.6;
-var HEX_3_RE = /^[0-9a-f]{3}$/;
-var HEX_6_RE = /^[0-9a-f]{6}$/;
-function backgroundLuminance(raw2) {
-  const v = raw2.trim().toLowerCase();
-  if (!v) {
-    return null;
-  }
-  const hex = v.startsWith("#") ? v.slice(1) : v;
-  const rgb = HEX_6_RE.test(hex) ? [parseInt(hex.slice(0, 2), 16), parseInt(hex.slice(2, 4), 16), parseInt(hex.slice(4, 6), 16)] : HEX_3_RE.test(hex) ? [parseInt(hex[0] + hex[0], 16), parseInt(hex[1] + hex[1], 16), parseInt(hex[2] + hex[2], 16)] : null;
-  if (!rgb) {
-    return null;
-  }
-  return (0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2]) / 255;
-}
-function detectLightMode(env2 = process.env, lightDefaultTermPrograms = LIGHT_DEFAULT_TERM_PROGRAMS) {
-  const lightFlag = (env2.HERMES_TUI_LIGHT ?? "").trim().toLowerCase();
-  if (TRUE_RE.test(lightFlag)) {
-    return true;
-  }
-  if (FALSE_RE.test(lightFlag)) {
-    return false;
-  }
-  const themeFlag = (env2.HERMES_TUI_THEME ?? "").trim().toLowerCase();
-  if (themeFlag === "light") {
-    return true;
-  }
-  if (themeFlag === "dark") {
-    return false;
-  }
-  const bgHint = backgroundLuminance(env2.HERMES_TUI_BACKGROUND ?? "");
-  if (bgHint !== null) {
-    return bgHint >= LUMA_LIGHT_THRESHOLD;
-  }
-  const colorfgbg = (env2.COLORFGBG ?? "").trim();
-  if (colorfgbg) {
-    const lastField = colorfgbg.split(";").at(-1) ?? "";
-    if (/^\d+$/.test(lastField)) {
-      const bg = Number(lastField);
-      if (bg === 7 || bg === 15) {
-        return true;
-      }
-      if (bg >= 0 && bg < 16) {
-        return false;
-      }
-    }
-  }
-  const termProgram = (env2.TERM_PROGRAM ?? "").trim();
-  return lightDefaultTermPrograms.has(termProgram);
-}
-function shouldNormalizeAnsiLightTheme(env2 = process.env, isLight = detectLightMode(env2)) {
-  const colorTerm = (env2.COLORTERM ?? "").trim().toLowerCase();
-  const termProgram = (env2.TERM_PROGRAM ?? "").trim();
-  return termProgram === "Apple_Terminal" && colorTerm !== "truecolor" && colorTerm !== "24bit" && isLight;
-}
-function normalizeThemeForAnsiLightTerminal(theme, env2 = process.env, isLight = detectLightMode(env2)) {
-  if (!shouldNormalizeAnsiLightTheme(env2, isLight)) {
-    return theme;
-  }
-  const color2 = { ...theme.color };
-  for (const key2 of ANSI_NORMALIZED_FOREGROUNDS) {
-    color2[key2] = normalizeAnsiForeground(color2[key2]);
-  }
-  for (const key2 of ANSI_MUTED_FOREGROUNDS) {
-    color2[key2] = `ansi256(${ANSI_MUTED_BUCKET})`;
-  }
-  return { ...theme, color: color2 };
-}
-var DEFAULT_LIGHT_MODE = detectLightMode();
-var DEFAULT_THEME = normalizeThemeForAnsiLightTerminal(
-  DEFAULT_LIGHT_MODE ? LIGHT_THEME : DARK_THEME,
-  process.env,
-  DEFAULT_LIGHT_MODE
-);
-var authoredBackground = (raw2) => {
-  const v = (raw2 ?? "").trim();
-  return backgroundLuminance(v) === null ? null : v.startsWith("#") ? v : `#${v}`;
-};
-function skinIsLight(colors, env2 = process.env) {
-  const authored = backgroundLuminance(colors["background"] ?? "");
-  return authored === null ? detectLightMode(env2) : authored >= LUMA_LIGHT_THRESHOLD;
-}
-function fromSkin(colors, branding, bannerLogo = "", bannerHero = "", toolPrefix = "", helpHeader = "") {
-  const skinBg = authoredBackground(colors["background"]);
-  const isLight = skinIsLight(colors);
-  const bg = skinBg ?? referenceBackground(isLight);
-  const base3 = isLight ? LIGHT_SEEDS : DARK_SEEDS;
-  const d = isLight ? LIGHT_THEME : DARK_THEME;
-  const c = (k) => colors[k];
-  const hasSkinColors = Object.keys(colors).length > 0;
-  const identityFills = hasSkinColors ? {} : { activeRow: base3.activeRow, muted: base3.muted, selection: base3.selection, surface: base3.surface };
-  const seeds = {
-    ...identityFills,
-    accent: c("ui_accent") ?? c("banner_accent") ?? base3.accent,
-    bg,
-    border: c("ui_border") ?? c("banner_border") ?? base3.border,
-    error: c("ui_error") ?? base3.error,
-    ok: c("ui_ok") ?? base3.ok,
-    primary: c("ui_primary") ?? c("banner_title") ?? base3.primary,
-    prompt: c("prompt") ?? c("banner_text") ?? base3.prompt,
-    shellDollar: c("shell_dollar") ?? base3.shellDollar,
-    statusBad: c("status_bar_bad") ?? base3.statusBad,
-    statusCritical: c("status_bar_critical") ?? c("ui_error") ?? base3.statusCritical,
-    statusGood: c("status_bar_good") ?? c("ui_ok") ?? base3.statusGood,
-    statusWarn: c("status_bar_warn") ?? c("ui_warn") ?? base3.statusWarn,
-    text: c("ui_text") ?? c("banner_text") ?? base3.text,
-    warn: c("ui_warn") ?? base3.warn
-  };
-  const derived = buildPalette(seeds, isLight);
-  const surface = c("completion_menu_bg") ?? c("background") ?? derived.completionBg;
-  const activeRow = c("completion_menu_current_bg") ?? (c("completion_menu_bg") ? mix(surface, seeds.accent, 0.22) : derived.completionCurrentBg);
-  const assembled = {
-    ...derived,
-    muted: c("banner_dim") ?? derived.muted,
-    label: c("ui_label") ?? derived.label,
-    completionBg: surface,
-    completionCurrentBg: activeRow,
-    completionMetaBg: c("completion_menu_meta_bg") ?? surface,
-    completionMetaCurrentBg: c("completion_menu_meta_current_bg") ?? activeRow,
-    sessionLabel: c("session_label") ?? c("banner_dim") ?? derived.sessionLabel,
-    sessionBorder: c("session_border") ?? c("banner_dim") ?? derived.sessionBorder,
-    statusBg: c("status_bar_bg") ?? surface,
-    statusFg: c("status_bar_text") ?? c("ui_text") ?? c("banner_text") ?? derived.statusFg,
-    selectionBg: c("selection_bg") ?? c("completion_menu_current_bg") ?? derived.selectionBg,
-    // Element tokens + skinnable diffs (theme-sdk): overridable, else the
-    // derived defaults (tool→accent, thinking→muted, diff_* → DIFF_* ladder).
-    // thinking tracks the EFFECTIVE muted (banner_dim override included), not
-    // just derived.muted, so recoloring muted carries the reasoning body with it.
-    tool: c("ui_tool") ?? derived.tool,
-    thinking: c("ui_thinking") ?? c("banner_dim") ?? derived.thinking,
-    diffAdded: c("diff_added") ?? derived.diffAdded,
-    diffRemoved: c("diff_removed") ?? derived.diffRemoved,
-    diffAddedWord: c("diff_added_word") ?? derived.diffAddedWord,
-    diffRemovedWord: c("diff_removed_word") ?? derived.diffRemovedWord,
-    // Code-syntax tokens: overridable, else the derived brand-token defaults.
-    syntaxString: c("syntax_string") ?? derived.syntaxString,
-    syntaxNumber: c("syntax_number") ?? derived.syntaxNumber,
-    syntaxKeyword: c("syntax_keyword") ?? derived.syntaxKeyword,
-    syntaxComment: c("syntax_comment") ?? c("banner_dim") ?? derived.syntaxComment
-  };
-  const adapted = shouldNormalizeAnsiLightTheme(process.env, isLight) ? assembled : adaptColorsToBackground(assembled, isLight, derived, bg);
-  return normalizeThemeForAnsiLightTerminal(
-    {
-      // The element tokens theme-sdk introduced (ui_primary, ui_text,
-      // ui_border, ui_ok/warn/error, ui_tool, ui_thinking, shell_dollar,
-      // status_bar_*, diff_*) are read into `seeds`/`assembled` above and
-      // flow through buildPalette → adaptColorsToBackground, so `adapted`
-      // already honors them AND applies #20379's contrast/polarity machinery.
-      // Emitting a hand-mapped color block here would bypass that adaptation
-      // and regress theme quality.
-      color: adapted,
-      brand: {
-        name: branding.agent_name ?? d.brand.name,
-        icon: d.brand.icon,
-        prompt: cleanPromptSymbol(branding.prompt_symbol, d.brand.prompt),
-        welcome: branding.welcome ?? d.brand.welcome,
-        goodbye: branding.goodbye ?? d.brand.goodbye,
-        tool: toolPrefix || d.brand.tool,
-        helpHeader: branding.help_header ?? (helpHeader || d.brand.helpHeader)
-      },
-      bannerLogo,
-      bannerHero
-    },
-    process.env,
-    isLight
-  );
-}
-
-// src/palette.ts
-var NOUS = {
-  dark: {
-    accent: "#F5B820",
-    dim: "#77746D",
-    error: "#E5484D",
-    mdLink: "#7A9CFF",
-    muted: "#9A968C",
-    selectedBg: "#26262A",
-    statusLinePath: "#9A968C",
-    text: "#EDE8DC"
-  },
-  light: {
-    accent: "#956E00",
-    dim: "#8A867C",
-    error: "#C93C42",
-    mdLink: "#2F5BD8",
-    muted: "#6B675E",
-    statusLinePath: "#6B675E"
-  }
-};
-function paletteFor(mode, skin) {
-  if (mode === "nous") {
-    return { dark: NOUS.dark, light: NOUS.light, name: { dark: "nous", light: "nous" } };
-  }
-  if (mode === "skin" && skin) {
-    const name = skin.name || "default";
-    return {
-      dark: semantic(resolve3(skin, "dark")),
-      light: semantic(resolve3(skin, "light")),
-      name: { dark: name, light: name }
-    };
-  }
-  return { dark: {}, light: {}, name: { dark: "tern", light: "tern" } };
-}
-function resolve3(skin, polarity) {
-  const light = polarity === "light";
-  const colors = { ...skin.colors, ...light ? skin.light_colors : skin.dark_colors };
-  const saved = process.env.HERMES_TUI_LIGHT;
-  process.env.HERMES_TUI_LIGHT = light ? "1" : "0";
-  try {
-    return fromSkin(colors, skin.branding ?? {}).color;
-  } finally {
-    if (saved === void 0) {
-      delete process.env.HERMES_TUI_LIGHT;
-    } else {
-      process.env.HERMES_TUI_LIGHT = saved;
-    }
-  }
-}
-function semantic(c) {
-  const out = {
-    accent: c.accent,
-    borderAccent: c.accent,
-    error: c.error,
-    mdListBullet: c.accent,
-    statusLineModel: c.accent,
-    success: c.ok,
-    warning: c.warn
-  };
-  for (const key2 in out) {
-    if (!/^#[0-9a-f]{3,8}$/i.test(out[key2] ?? "")) {
-      delete out[key2];
-    }
-  }
-  return out;
-}
-
-// src/chrome/theme.ts
-var Theme = class {
-  #host;
-  #mode;
-  /** The skin the gateway last reported; only the `skin` theme mode wears it. */
-  #skin;
-  /** `mode` is the one settings.json kept. */
-  constructor(host, mode) {
-    this.#host = host;
-    this.#mode = mode;
-  }
-  /** Whose colors the surface wears. */
-  get mode() {
-    return this.#mode;
-  }
-  /** Sends the palette of the mode and skin now. */
-  apply() {
-    this.#host.palette(paletteFor(this.#mode, this.#skin));
-  }
-  /** The gateway's skin (gateway.ready, skin.changed); none keeps the last one. */
-  skin(skin) {
-    if (skin) {
-      this.#skin = skin;
-      this.apply();
-    }
-  }
-  /** Switches the mode now and keeps it for the next launch. */
-  set(mode) {
-    this.#mode = mode;
-    this.#host.settings.save({ theme: mode });
-    this.apply();
-  }
-};
-
 // src/clipboard.ts
 import { spawn } from "node:child_process";
 function copyToClipboard(text12, env2 = process.env) {
@@ -26476,77 +25353,6 @@ function copyToClipboard(text12, env2 = process.env) {
     });
     child.stdin.end(text12);
   }
-}
-
-// src/config/env.ts
-function readLaunchEnv(env2 = process.env, cwd = process.cwd()) {
-  return Object.freeze({
-    cwd: env2["HERMES_CWD"] || cwd,
-    eventLog: env2["HERMES_TERN_EVENT_LOG"] ?? "",
-    home: env2["HOME"],
-    image: env2["HERMES_TUI_IMAGE"]?.trim() ?? "",
-    pythonSrcRoot: env2["HERMES_PYTHON_SRC_ROOT"] ?? "",
-    query: env2["HERMES_TUI_QUERY"]?.trim() ?? "",
-    resume: env2["HERMES_TUI_RESUME"]?.trim() ?? "",
-    sessionCwd: env2["HERMES_TUI_CWD"]?.trim() ?? "",
-    version: env2["HERMES_VERSION"] ?? ""
-  });
-}
-var launch;
-function launchEnv() {
-  return launch ??= readLaunchEnv();
-}
-
-// src/commands/host.ts
-function sessionHost(cx) {
-  const ticket = cx.state.ticket();
-  const { sid } = ticket;
-  return {
-    busy: Boolean(cx.activity.busy),
-    // A steer that fell back to the queue: steering carries no images.
-    canonical: cx.gw.isCanonical,
-    enqueue: (text12) => cx.router.behind({ images: [], kind: "app", text: text12 }),
-    gw: cx.gw,
-    notice: (text12, tone) => {
-      cx.transcript.notice(text12, tone);
-      cx.changed();
-    },
-    // The shared gateway (the one /branch runs on) answers a resume with one id for both kinds.
-    open: async (id) => {
-      await cx.life.resume(id);
-      return durable(cx.state.ref) === id;
-    },
-    panel: (title, text12) => {
-      cx.transcript.panel(title, text12);
-      cx.changed();
-    },
-    compressing: (state) => {
-      if (state === "start") {
-        cx.transcript.compacting({ before: cx.state.usage?.context_used || void 0, manual: true });
-      } else if (state === "none") {
-        cx.transcript.uncompact();
-      } else {
-        cx.transcript.compacted(Date.now(), state);
-      }
-      cx.setCompacting(state === "start", { manual: true });
-      cx.changed();
-    },
-    queued: cx.queue.count(),
-    reload: async () => {
-      if (sid && ticket.isCurrent()) {
-        await cx.life.reload(sid);
-      }
-    },
-    send: (text12) => cx.router.send({ images: [], kind: "app", text: text12 }),
-    sid,
-    stale: () => !ticket.isCurrent(),
-    steered: (text12) => {
-      cx.transcript.steer(text12);
-      cx.changed();
-    },
-    // /queue: behind the turn whatever busy_input_mode says.
-    submit: (text12) => cx.submit(text12)
-  };
 }
 
 // node_modules/@hermes/shared/src/slash.ts
@@ -26573,6 +25379,11 @@ function parseCommandDispatch(raw2) {
     default:
       return null;
   }
+}
+
+// src/core/errors.ts
+function errorText(error) {
+  return error instanceof Error ? error.message : String(error);
 }
 
 // src/hermes/mutate.ts
@@ -27165,6 +25976,27 @@ function resultOf(call) {
 
 // src/view/tools/steps.ts
 import { homedir as homedir3 } from "node:os";
+
+// src/config/env.ts
+function readLaunchEnv(env2 = process.env, cwd = process.cwd()) {
+  return Object.freeze({
+    cwd: env2["HERMES_CWD"] || cwd,
+    eventLog: env2["HERMES_TERN_EVENT_LOG"] ?? "",
+    home: env2["HOME"],
+    image: env2["HERMES_TUI_IMAGE"]?.trim() ?? "",
+    pythonSrcRoot: env2["HERMES_PYTHON_SRC_ROOT"] ?? "",
+    query: env2["HERMES_TUI_QUERY"]?.trim() ?? "",
+    resume: env2["HERMES_TUI_RESUME"]?.trim() ?? "",
+    sessionCwd: env2["HERMES_TUI_CWD"]?.trim() ?? "",
+    version: env2["HERMES_VERSION"] ?? ""
+  });
+}
+var launch;
+function launchEnv() {
+  return launch ??= readLaunchEnv();
+}
+
+// src/view/tools/steps.ts
 function shortPath(path2) {
   return relativePath(path2, { cwd: launchEnv().cwd, home: homedir3() });
 }
@@ -27382,7 +26214,7 @@ import { fileURLToPath } from "node:url";
 // src/hermes/images.ts
 import { readFile as readFile2 } from "node:fs/promises";
 import { homedir as homedir4 } from "node:os";
-import { extname as extname2, resolve as resolve4 } from "node:path";
+import { extname as extname2, resolve as resolve3 } from "node:path";
 var MAX_IMAGE_BYTES = 20 * 1024 * 1024;
 function imageFormat(bytes) {
   if (bytes.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))) {
@@ -27437,7 +26269,7 @@ function imageSize(bytes) {
   return void 0;
 }
 async function uploadImage(gw2, sid, raw2, cwd) {
-  const path2 = resolve4(cwd, raw2.replace(/^~(?=$|\/)/, homedir4()));
+  const path2 = resolve3(cwd, raw2.replace(/^~(?=$|\/)/, homedir4()));
   const bytes = await readFile2(path2);
   if (bytes.length > MAX_IMAGE_BYTES) {
     throw new Error("the image is larger than 20 MB");
@@ -27593,20 +26425,20 @@ function toneStyle(tone) {
   }
 }
 var sp = (t2, s2) => s2 ? { s: s2, t: t2 } : { t: t2 };
-var plain2 = (text12) => text12.replace(/\s+/g, " ").trim();
+var plain = (text12) => text12.replace(/\s+/g, " ").trim();
 var fraction = (value, max) => !(max > 0) || !Number.isFinite(value) ? 0 : Math.min(1, Math.max(0, value / max));
 var extra = (props) => props;
 function glance(view) {
   const h2 = view.headline;
-  if (h2 && plain2(h2.text)) {
-    return { text: plain2(h2.text), ...h2.label ? { label: plain2(h2.label) } : {}, ...h2.trend ? { trend: h2.trend } : {} };
+  if (h2 && plain(h2.text)) {
+    return { text: plain(h2.text), ...h2.label ? { label: plain(h2.label) } : {}, ...h2.trend ? { trend: h2.trend } : {} };
   }
   for (const b of view.blocks) {
-    if (b.kind === "spark" && b.values.length && plain2(b.last)) {
-      return { label: plain2(b.label), text: plain2(b.last) };
+    if (b.kind === "spark" && b.values.length && plain(b.last)) {
+      return { label: plain(b.label), text: plain(b.last) };
     }
-    if (b.kind === "meter" && plain2(b.text)) {
-      return { label: plain2(b.label), text: plain2(b.text) };
+    if (b.kind === "meter" && plain(b.text)) {
+      return { label: plain(b.label), text: plain(b.text) };
     }
   }
   return void 0;
@@ -27616,7 +26448,7 @@ function latest(entries) {
 }
 function summary(view) {
   const g = glance(view);
-  const title = plain2(view.title);
+  const title = plain(view.title);
   if (!g || view.state !== "live") {
     return title;
   }
@@ -27638,13 +26470,13 @@ function primarySpark(view, points = MINI_SPARK_POINTS) {
   return { ...spark, values: spark.values.slice(from), ...spark.tips ? { tips: spark.tips.slice(from) } : {} };
 }
 function sparkProps(b) {
-  const marks = (b.marks ?? []).map((m) => ({ value: m.value, ...m.tone ? { tone: m.tone } : {}, ...m.label ? { title: plain2(m.label) } : {} }));
+  const marks = (b.marks ?? []).map((m) => ({ value: m.value, ...m.tone ? { tone: m.tone } : {}, ...m.label ? { title: plain(m.label) } : {} }));
   return {
     kind: "bars",
     max: b.max,
     min: b.min,
     series: b.values.map((value, i) => b.tips?.[i] ? { title: b.tips[i], value } : { value }),
-    summary: `${plain2(b.label)} ${plain2(b.last)}`,
+    summary: `${plain(b.label)} ${plain(b.last)}`,
     token: toneStyle(b.tone ?? DEFAULT_TONE) ?? "accent",
     ...marks.length ? { marks } : {}
   };
@@ -27684,7 +26516,7 @@ function figureSpans(g) {
 function tile({ process: p3, view }) {
   const live = view.state === "live" ? view : void 0;
   const g = live && glance(live);
-  const title = plain2(live?.title ?? "") || plain2(p3.command.split(/\r?\n/, 1)[0] ?? "") || p3.id;
+  const title = plain(live?.title ?? "") || plain(p3.command.split(/\r?\n/, 1)[0] ?? "") || p3.id;
   const visual = tileVisual(live?.blocks[0]);
   const look = PROCESS_LOOK[p3.status];
   return /* @__PURE__ */ jsxs("col", { gap: "xs", role: "omp.job.tile", tone: look.tone, children: [
@@ -27719,9 +26551,9 @@ function tileVisual(b) {
       const rest = b.items.length - TILE_BARS;
       return b.items.length ? /* @__PURE__ */ jsxs("col", { gap: "xs", role: "omp.job.tile.bars", children: [
         b.items.slice(0, TILE_BARS).map((item3, i) => /* @__PURE__ */ jsxs("row", { align: "center", gap: "sm", role: "omp.job.tile.bar", children: [
-          /* @__PURE__ */ jsx("text", { role: "omp.job.tile.key", spans: [sp(plain2(item3.label), "dim")], truncate: "end", wrap: "none" }, "key"),
+          /* @__PURE__ */ jsx("text", { role: "omp.job.tile.key", spans: [sp(plain(item3.label), "dim")], truncate: "end", wrap: "none" }, "key"),
           tileMeter(fraction(item3.value, b.max), item3.tone),
-          /* @__PURE__ */ jsx("text", { role: "omp.job.tile.num", spans: [sp(plain2(item3.text))], wrap: "none" }, "num")
+          /* @__PURE__ */ jsx("text", { role: "omp.job.tile.num", spans: [sp(plain(item3.text))], wrap: "none" }, "num")
         ] }, `${i}`)),
         rest > 0 ? /* @__PURE__ */ jsx("text", { role: "omp.job.tile.more", spans: [sp(`+${rest} more`, "dim")], wrap: "none" }, "more") : null
       ] }, "visual") : void 0;
@@ -27734,7 +26566,7 @@ function tileVisual(b) {
           spans: b.items.flatMap((item3, i) => [
             ...i ? [sp("   ")] : [],
             sp("\u25CF\xA0", toneStyle(item3.tone)),
-            sp(plain2(item3.label).replaceAll(" ", "\xA0"), "dim")
+            sp(plain(item3.label).replaceAll(" ", "\xA0"), "dim")
           ]),
           wrap: "word"
         },
@@ -27745,14 +26577,14 @@ function tileVisual(b) {
   }
 }
 function tileNotes(p3, view, live, lead) {
-  const stage = plain2(view.stage ?? "");
+  const stage = plain(view.stage ?? "");
   const failed = p3.exitCode ? `exit ${p3.exitCode}` : "";
   const notes = [];
   for (const b of live?.blocks ?? []) {
     if (b.kind === "stat" && b.items.length) {
       notes.push(/* @__PURE__ */ jsx("text", { role: "omp.job.tile.stats", spans: statSpans(b), truncate: "end", wrap: "none" }, `note-${notes.length}`));
-    } else if (b.kind === "text" && plain2(b.text) && plain2(b.text) !== stage) {
-      notes.push(/* @__PURE__ */ jsx("text", { role: "omp.job.tile.note", spans: [sp(plain2(b.text), "dim")], truncate: "end", wrap: "none" }, `note-${notes.length}`));
+    } else if (b.kind === "text" && plain(b.text) && plain(b.text) !== stage) {
+      notes.push(/* @__PURE__ */ jsx("text", { role: "omp.job.tile.note", spans: [sp(plain(b.text), "dim")], truncate: "end", wrap: "none" }, `note-${notes.length}`));
     }
   }
   if (stage || failed) {
@@ -27766,17 +26598,17 @@ function tileNotes(p3, view, live, lead) {
 function statSpans(b) {
   return b.items.flatMap((item3, i) => [
     ...i ? [sp(" \xB7 ", "dim")] : [],
-    sp(`${plain2(item3.label)} `, "dim"),
-    sp(plain2(item3.text), toneStyle(item3.tone)),
+    sp(`${plain(item3.label)} `, "dim"),
+    sp(plain(item3.text), toneStyle(item3.tone)),
     ...item3.trend ? [sp(` ${item3.trend.text}`, toneStyle(item3.trend.tone))] : []
   ]);
 }
 function chartNode(view, key2 = "chart") {
-  const stage = view.stage ? plain2(view.stage) : "";
+  const stage = view.stage ? plain(view.stage) : "";
   const h2 = view.state === "live" ? glance({ ...view, blocks: [] }) : void 0;
   return /* @__PURE__ */ jsxs("col", { gap: "xs", role: "omp.job.widget", children: [
     /* @__PURE__ */ jsxs("row", { align: "baseline", gap: "sm", role: "omp.job.widget.head", children: [
-      /* @__PURE__ */ jsx("text", { role: "omp.job.widget.title", spans: [sp(plain2(view.title), "strong")], truncate: "end", wrap: "none", ...extra(stage ? {} : { grow: 1 }) }, "title"),
+      /* @__PURE__ */ jsx("text", { role: "omp.job.widget.title", spans: [sp(plain(view.title), "strong")], truncate: "end", wrap: "none", ...extra(stage ? {} : { grow: 1 }) }, "title"),
       stage ? /* @__PURE__ */ jsx("text", { grow: 1, role: "omp.job.widget.stage", spans: [sp(stage, "muted")], truncate: "end", wrap: "none" }, "stage") : null,
       view.state === "authoring" ? /* @__PURE__ */ jsx("shimmer", { text: "charting\u2026" }, "authoring") : null,
       h2 ? /* @__PURE__ */ jsx("text", { role: "omp.job.widget.headline", spans: glanceSpans(h2), wrap: "none" }, "headline") : null
@@ -27794,11 +26626,11 @@ function blockNode(b, key2) {
       return sparkNode(b, key2);
     case "bars":
       return /* @__PURE__ */ jsxs("col", { gap: "xs", role: "omp.job.widget.bars", children: [
-        /* @__PURE__ */ jsx("text", { role: "omp.job.widget.caption", spans: [sp(plain2(b.label), "dim")], truncate: "end", wrap: "none" }, "caption"),
+        /* @__PURE__ */ jsx("text", { role: "omp.job.widget.caption", spans: [sp(plain(b.label), "dim")], truncate: "end", wrap: "none" }, "caption"),
         b.items.length ? b.items.map(
           (item3, i) => labelled(
             item3.label,
-            /* @__PURE__ */ jsx("meter", { grow: 1, label: plain2(item3.text), size: "sm", value: fraction(item3.value, b.max), ...extra(item3.tone ? { tone: item3.tone } : {}) }, "meter"),
+            /* @__PURE__ */ jsx("meter", { grow: 1, label: plain(item3.text), size: "sm", value: fraction(item3.value, b.max), ...extra(item3.tone ? { tone: item3.tone } : {}) }, "meter"),
             "omp.job.widget.bar",
             `${i}`
           )
@@ -27807,7 +26639,7 @@ function blockNode(b, key2) {
     case "meter":
       return labelled(
         b.label,
-        /* @__PURE__ */ jsx("meter", { grow: 1, label: plain2(b.text), size: "sm", value: fraction(b.value, 1), ...extra(b.tone ? { tone: b.tone } : {}) }, "meter"),
+        /* @__PURE__ */ jsx("meter", { grow: 1, label: plain(b.text), size: "sm", value: fraction(b.value, 1), ...extra(b.tone ? { tone: b.tone } : {}) }, "meter"),
         "omp.job.widget.meter",
         key2
       );
@@ -27815,31 +26647,31 @@ function blockNode(b, key2) {
       return /* @__PURE__ */ jsx("text", { role: "omp.job.widget.stat", spans: statSpans(b), truncate: "end", wrap: "none" }, key2);
     case "grid":
       return /* @__PURE__ */ jsxs("col", { gap: "xs", role: "omp.job.widget.grid", children: [
-        /* @__PURE__ */ jsx("text", { role: "omp.job.widget.caption", spans: [sp(plain2(b.label), "dim")], truncate: "end", wrap: "none" }, "caption"),
-        b.items.length ? /* @__PURE__ */ jsx("row", { gap: "xs", role: "omp.job.widget.cells", wrap: true, children: b.items.map((item3, i) => /* @__PURE__ */ jsx("badge", { text: plain2(item3.label), title: plain2(item3.text), tone: item3.tone }, `${i}`)) }, "cells") : waiting()
+        /* @__PURE__ */ jsx("text", { role: "omp.job.widget.caption", spans: [sp(plain(b.label), "dim")], truncate: "end", wrap: "none" }, "caption"),
+        b.items.length ? /* @__PURE__ */ jsx("row", { gap: "xs", role: "omp.job.widget.cells", wrap: true, children: b.items.map((item3, i) => /* @__PURE__ */ jsx("badge", { text: plain(item3.label), title: plain(item3.text), tone: item3.tone }, `${i}`)) }, "cells") : waiting()
       ] }, key2);
     case "text":
-      return /* @__PURE__ */ jsx("text", { role: "omp.job.widget.text", spans: [sp(plain2(b.text), "muted")], truncate: "end", wrap: "none" }, key2);
+      return /* @__PURE__ */ jsx("text", { role: "omp.job.widget.text", spans: [sp(plain(b.text), "muted")], truncate: "end", wrap: "none" }, key2);
   }
 }
 function sparkNode(b, key2) {
   if (!b.values.length) {
     return labelled(b.label, waiting(), "omp.job.widget.spark", key2);
   }
-  const label = plain2(b.label);
-  const last = plain2(b.last);
+  const label = plain(b.label);
+  const last = plain(b.last);
   return /* @__PURE__ */ jsxs("row", { align: "center", gap: "sm", role: "omp.job.widget.spark", children: [
     node("chart", { ...sparkProps(b), grow: 1, key: "chart", size: "md" }),
     /* @__PURE__ */ jsxs("col", { gap: "none", role: "omp.job.widget.side", children: [
       /* @__PURE__ */ jsx("text", { spans: [sp(last, "num strong")], wrap: "none" }, "last"),
       label && !last.endsWith(label) ? /* @__PURE__ */ jsx("text", { spans: [sp(label, "muted")], truncate: "end", wrap: "none" }, "label") : null,
-      (b.marks ?? []).map((m, i) => /* @__PURE__ */ jsx("text", { spans: [sp("\u2504 ", toneStyle(m.tone ?? "muted")), sp(plain2(m.label), "dim")], truncate: "end", wrap: "none" }, `mark-${i}`))
+      (b.marks ?? []).map((m, i) => /* @__PURE__ */ jsx("text", { spans: [sp("\u2504 ", toneStyle(m.tone ?? "muted")), sp(plain(m.label), "dim")], truncate: "end", wrap: "none" }, `mark-${i}`))
     ] }, "side")
   ] }, key2);
 }
 function labelled(label, content5, role, key2) {
   return /* @__PURE__ */ jsxs("row", { align: "center", gap: "sm", role, children: [
-    /* @__PURE__ */ jsx("text", { max: { w: "12ch" }, min: { w: "12ch" }, spans: [sp(plain2(label), "muted")], truncate: "end", wrap: "none" }, "label"),
+    /* @__PURE__ */ jsx("text", { max: { w: "12ch" }, min: { w: "12ch" }, spans: [sp(plain(label), "muted")], truncate: "end", wrap: "none" }, "label"),
     content5
   ] }, key2);
 }
@@ -28181,17 +27013,17 @@ function imageNode(call, d, src) {
 
 // src/view/tools/cards/generic.tsx
 var own = (call) => ({ name: call.name, title: humanize(call.name) });
-var plain3 = (look, action = "other") => ({ action, card: (call, d) => genericCard(call, d, look(call)), step: namedStep });
-var otherView = plain3(own);
-var sessionSearchView = plain3(() => ({ name: "search", title: "Session search" }));
-var visionView = plain3(() => ({ name: "image", title: "Vision" }));
+var plain2 = (look, action = "other") => ({ action, card: (call, d) => genericCard(call, d, look(call)), step: namedStep });
+var otherView = plain2(own);
+var sessionSearchView = plain2(() => ({ name: "search", title: "Session search" }));
+var visionView = plain2(() => ({ name: "image", title: "Vision" }));
 var imageGenerateView = {
   action: "other",
   card: (call, d) => imageCard(call, d, { name: "image", title: "Image" }, shownImage(call)),
   step: namedStep
 };
 var browserView = {
-  ...plain3((call) => ({ name: "browser", title: humanize(call.name.replace(/^browser_?/, "")) || "Browser" }), "browser"),
+  ...plain2((call) => ({ name: "browser", title: humanize(call.name.replace(/^browser_?/, "")) || "Browser" }), "browser"),
   hubIcon: (name) => name === "browser_navigate" ? "web" : "wrench"
 };
 var PROCESS_ACTIONS = {
@@ -28213,11 +27045,11 @@ var processView = {
   step: namedStep
 };
 var toolSearchView = {
-  ...plain3(own, "lookup"),
+  ...plain2(own, "lookup"),
   step: (_call, d) => d.queries.length ? `Searched tools for ${d.queries.join(", ")}` : "Searched tools"
 };
 var toolDescribeView = {
-  ...plain3(own, "lookup"),
+  ...plain2(own, "lookup"),
   step: (_call, d) => {
     const named2 = d.names.map((n) => {
       const app2 = callApp({ args: {}, name: n });
@@ -28232,9 +27064,9 @@ function pullRequestStep(verb, d) {
   const number4 = pr?.["number"] ?? (d.number === void 0 ? void 0 : String(d.number));
   return repo && number4 ? `${verb} ${repo}#${number4}` : `${verb} a pull request`;
 }
-var linkView = { ...plain3(own), step: (_call, d) => pullRequestStep("Linked", d) };
-var unlinkView = { ...plain3(own), step: (_call, d) => pullRequestStep("Unlinked", d) };
-var listPullRequestsView = { ...plain3(own), step: () => "Listed linked pull requests" };
+var linkView = { ...plain2(own), step: (_call, d) => pullRequestStep("Linked", d) };
+var unlinkView = { ...plain2(own), step: (_call, d) => pullRequestStep("Unlinked", d) };
+var listPullRequestsView = { ...plain2(own), step: () => "Listed linked pull requests" };
 function genericCard(call, d, look) {
   const src = shownImage(call);
   if (src) {
@@ -28730,6 +27562,90 @@ function evalCard(call, d) {
 }
 function firstLine(text12) {
   return text12?.split("\n").find((l) => l.trim())?.trim();
+}
+
+// src/transcript/todos.ts
+var TODO_LOOK = {
+  cancelled: { item: "dropped" },
+  completed: { item: "done" },
+  in_progress: { item: "active" },
+  pending: { item: "pending" }
+};
+function todoProgress(list9) {
+  const live = list9.filter((t2) => t2.status !== "cancelled");
+  const done = live.filter((t2) => t2.status === "completed").length;
+  const current = live.find((t2) => t2.status === "in_progress") ?? live.find((t2) => t2.status === "pending");
+  return { current: current?.content ?? "", done, total: live.length };
+}
+function currentTodos(entries) {
+  for (let i = entries.length - 1; i >= 0; i--) {
+    const e = entries[i];
+    if (e?.kind !== "turn") {
+      continue;
+    }
+    const hit = e.blocks.findLast((b) => b.kind === "tool" && b.call.todos?.length);
+    if (hit?.kind === "tool") {
+      return hit.call.todos;
+    }
+  }
+  return void 0;
+}
+function todosOf(args, current) {
+  const raw2 = Array.isArray(args.todos) ? args.todos : [];
+  return args.merge === true ? mergeTodos(current ?? [], raw2) : toTodos(raw2);
+}
+function mergeTodos(current, patch6) {
+  const out = current.map((t2) => ({ ...t2 }));
+  for (const item3 of patch6) {
+    const r = record(item3);
+    const id = String(r?.id ?? "").trim();
+    if (!r || !id) {
+      continue;
+    }
+    const cur = out.find((t2) => t2.id === id);
+    if (!cur) {
+      if (String(r.content ?? "").trim()) {
+        out.push(...toTodos([{ ...r, id }]));
+      }
+      continue;
+    }
+    const content5 = String(r.content ?? "").trim();
+    const status = String(r.status ?? "").trim().toLowerCase();
+    if (content5) {
+      cur.content = content5;
+    }
+    if (status === "pending" || status === "in_progress" || status === "completed" || status === "cancelled") {
+      cur.status = status;
+    }
+    if ("parent" in r) {
+      const parent = String(r.parent ?? "").trim();
+      if (parent && parent !== id) {
+        cur.parent = parent;
+      } else {
+        delete cur.parent;
+      }
+    }
+  }
+  return out;
+}
+function toTodos(raw2) {
+  const out = [];
+  for (const item3 of raw2) {
+    if (!item3 || typeof item3 !== "object") {
+      continue;
+    }
+    const id = "id" in item3 ? String(item3.id) : String(out.length);
+    const content5 = "content" in item3 ? String(item3.content) : "";
+    const status = "status" in item3 ? String(item3.status) : "pending";
+    const parent = "parent" in item3 && item3.parent ? String(item3.parent) : void 0;
+    out.push({
+      content: content5,
+      id,
+      ...parent && { parent },
+      status: status === "completed" || status === "in_progress" || status === "cancelled" ? status : "pending"
+    });
+  }
+  return out;
 }
 
 // src/view/todos.tsx
@@ -30232,7 +29148,7 @@ function betterValue(value, where, errors) {
 
 // src/processes/widgets/spec.ts
 var AGGS = ["last", "first", "min", "max", "mean", "sum", "count", "rate", "delta", "change"];
-var TONES2 = ["neutral", "accent", "info", "success", "warning", "error", "pending", "muted", "user"];
+var TONES = ["neutral", "accent", "info", "success", "warning", "error", "pending", "muted", "user"];
 var MAX_TITLE_CHARS = 48;
 var MAX_RULES = 12;
 var MAX_BLOCKS = 4;
@@ -30276,7 +29192,7 @@ var SPEC_SCHEMA = {
           min: NUMBER,
           target: NUMBER,
           targetLabel: STRING,
-          tones: { additionalProperties: { enum: TONES2 }, type: "object" },
+          tones: { additionalProperties: { enum: TONES }, type: "object" },
           total: { anyOf: [NUMBER, VALUE_REF_SCHEMA] },
           unit: STRING
         },
@@ -30768,10 +29684,10 @@ function parseBlock(value, where, errors) {
             errors.push(`${where}.tones: at most ${MAX_GRID_TONES} entries`);
             break;
           }
-          if (typeof tone === "string" && TONES2.includes(tone)) {
+          if (typeof tone === "string" && TONES.includes(tone)) {
             tones[status] = tone;
           } else {
-            errors.push(`${where}.tones.${status}: expected one of ${TONES2.join(", ")}`);
+            errors.push(`${where}.tones.${status}: expected one of ${TONES.join(", ")}`);
           }
         }
       }
@@ -37548,7 +36464,7 @@ function createState(options) {
     options,
     patch,
     qNesting: 0,
-    resolve: resolve5,
+    resolve: resolve4,
     toFlow,
     toSpecificContent
   };
@@ -37594,7 +36510,7 @@ function one2(node3, parent) {
 function patch(origin, node3) {
   if (origin.position) node3.position = position(origin);
 }
-function resolve5(url) {
+function resolve4(url) {
   const base3 = this.frozenBaseUrl;
   if (url === null || url === void 0) {
     return "";
@@ -38428,12 +37344,12 @@ function map2(line, _, blank) {
 function patternInScope(stack, pattern) {
   return listInScope(stack, pattern.inConstruct, true) && !listInScope(stack, pattern.notInConstruct, false);
 }
-function listInScope(stack, list9, none) {
+function listInScope(stack, list9, none2) {
   if (typeof list9 === "string") {
     list9 = [list9];
   }
   if (!list9 || list9.length === 0) {
-    return none;
+    return none2;
   }
   let index2 = -1;
   while (++index2 < list9.length) {
@@ -62349,7 +61265,7 @@ function menuRow(e, now, on, onClick) {
     ] }, "r")
   ] }, prKey(e.ref));
 }
-function prsPill(entries, onOpen) {
+function prsPill(entries) {
   const newest = entries.at(-1);
   if (!newest) {
     return void 0;
@@ -62358,12 +61274,11 @@ function prsPill(entries, onOpen) {
   const pr = newest.pr;
   if (entries.length === 1) {
     const what = !pr ? "" : pr.state !== "open" ? stateLabel(pr).toLowerCase() : pr.checks.length ? `checks ${checksState(pr.checks)}` : stateLabel(pr).toLowerCase();
-    return { onOpen, text: `#${newest.ref.number}${what ? ` \xB7 ${what}` : ""}`, tone: prTone(newest) };
+    return { text: `#${newest.ref.number}${what ? ` \xB7 ${what}` : ""}`, tone: prTone(newest) };
   }
   const failing = open.some((p3) => checksState(p3.checks) === "failing");
   const pending = open.some((p3) => checksState(p3.checks) === "pending");
   return {
-    onOpen,
     text: `${entries.length} PRs${open.length ? ` \xB7 ${open.length} open` : ""}`,
     tone: failing ? "error" : pending ? "warning" : open.length ? "success" : "muted"
   };
@@ -66942,1274 +65857,6 @@ async function dispatched(raw2, cx, { arg, title }) {
   }
 }
 
-// src/connections/watcher.ts
-var ConnectWatcher = class {
-  #host;
-  /** Where the card files are; unset: the plugin's data folder, read at each poll. */
-  #dir;
-  #timer;
-  /** Connect cards (by file) this pane saw with an app still waiting. */
-  #seen = /* @__PURE__ */ new Set();
-  /** Connect calls that drew no card (a status read, a call with nothing to authorize): never again. */
-  #noCard = /* @__PURE__ */ new WeakSet();
-  /** `dir`: the plugin's data folder the card files are under (tests point it at their own). */
-  constructor(host, { dir: dir2 } = {}) {
-    this.#host = host;
-    this.#dir = dir2;
-  }
-  /**
-   * Reads every connect card now (a new call or a reloaded transcript does not wait for the next
-   * poll), then polls while some card is watched: a settled card never moves again.
-   */
-  watch() {
-    clearTimeout(this.#timer);
-    this.#tick();
-  }
-  /** A connect card's Continue: tell the agent which apps the user authorized, as the tool asks. */
-  continue(ref) {
-    const call = this.#call(ref);
-    const card = call?.connect;
-    if (!call || !card || card.told || card.settled) {
-      return;
-    }
-    this.#host.transcript.mutateCall(call, () => {
-      card.told = true;
-      card.settled = "continued";
-    });
-    if (!card.key || claimTold(card.key, this.#dir)) {
-      this.#host.tell(continueMessage(card.targets));
-    }
-    this.#host.changed();
-  }
-  /** A connect card's Authorize: the app's link in the browser, and its row waits on the browser now. */
-  open(ref, name) {
-    const call = this.#call(ref);
-    const card = call?.connect;
-    const target = card?.targets.find((t2) => t2.name === name);
-    if (!call || !card || !target?.url) {
-      return;
-    }
-    this.#host.openUrl(target.url);
-    this.#host.transcript.mutateCall(call, () => card.opened = [.../* @__PURE__ */ new Set([...card.opened, name])]);
-    this.#host.changed();
-  }
-  /** Stops the poll. */
-  dispose() {
-    clearTimeout(this.#timer);
-  }
-  #tick() {
-    this.#timer = void 0;
-    let open = false;
-    for (const call of this.#host.transcript.calls(CONNECT_TOOL)) {
-      if (call.connect?.settled || call.status === "running" || this.#noCard.has(call)) {
-        continue;
-      }
-      const next3 = loadConnect(call, this.#dir);
-      if (!next3) {
-        this.#noCard.add(call);
-        continue;
-      }
-      if (JSON.stringify(next3) !== JSON.stringify(call.connect)) {
-        this.#host.transcript.mutateCall(call, (c) => c.connect = next3);
-        this.#host.changed();
-      }
-      const seen = next3.key ?? call.id;
-      if (next3.targets.some(waiting2) && !next3.settled) {
-        this.#seen.add(seen);
-      }
-      if (!next3.told && this.#seen.has(seen) && allConnected(next3) && (!next3.key || claimTold(next3.key, this.#dir))) {
-        this.#host.transcript.mutateCall(call, () => next3.told = true);
-        this.#host.tell(connectedMessage(next3.targets));
-        this.#host.changed();
-      } else if (next3.key && !next3.settled) {
-        open = true;
-      }
-    }
-    if (open) {
-      this.#timer = setTimeout(() => this.#tick(), POLL_MS2);
-    }
-  }
-  /** The connect card `ref` names (its file, or its call id when it has none). */
-  #call(ref) {
-    return this.#host.transcript.calls(CONNECT_TOOL).findLast((c) => (c.connect?.key ?? c.id) === ref);
-  }
-};
-
-// src/core/disposables.ts
-var Disposables = class {
-  #teardowns = /* @__PURE__ */ new Set();
-  #disposed = false;
-  /** Whether dispose() ran. */
-  get disposed() {
-    return this.#disposed;
-  }
-  /**
-   * Runs `teardown` at dispose (at once when that already ran). The returned function drops it
-   * unrun: the thing ended on its own.
-   */
-  add(teardown) {
-    if (this.#disposed) {
-      teardown();
-      return () => void 0;
-    }
-    const entry = () => teardown();
-    this.#teardowns.add(entry);
-    return () => void this.#teardowns.delete(entry);
-  }
-  /** setTimeout, cleared at dispose unless it fired first. */
-  timeout(fn, ms) {
-    const timer = setTimeout(() => {
-      drop();
-      fn();
-    }, ms);
-    const drop = this.add(() => clearTimeout(timer));
-    return timer;
-  }
-  /**
-   * Runs every teardown once, the newest first. One that throws does not stop the rest; the first
-   * error is thrown after all of them ran.
-   */
-  dispose() {
-    if (this.#disposed) {
-      return;
-    }
-    this.#disposed = true;
-    const teardowns = [...this.#teardowns].reverse();
-    this.#teardowns.clear();
-    const errors = [];
-    for (const teardown of teardowns) {
-      try {
-        teardown();
-      } catch (error) {
-        errors.push(error);
-      }
-    }
-    if (errors.length) {
-      throw errors[0];
-    }
-  }
-};
-
-// src/core/scheduler.ts
-var RenderScheduler = class {
-  #render;
-  #scheduled = false;
-  constructor(render3) {
-    this.#render = render3;
-  }
-  /** Renders on the next turn of the event loop (setImmediate), once however often it is asked. */
-  request() {
-    if (this.#scheduled) {
-      return;
-    }
-    this.#scheduled = true;
-    setImmediate(() => {
-      this.#scheduled = false;
-      this.#render();
-    });
-  }
-};
-
-// src/draft/attachments.ts
-import { existsSync as existsSync5 } from "node:fs";
-import { basename as basename3 } from "node:path";
-
-// src/hermes/clipboardImage.ts
-import { execFile as execFile6 } from "node:child_process";
-import { existsSync as existsSync4 } from "node:fs";
-import { mkdtemp, rm } from "node:fs/promises";
-import { homedir as homedir11, tmpdir } from "node:os";
-import { join as join10, resolve as resolve6 } from "node:path";
-import { promisify as promisify5 } from "node:util";
-var execFileP = promisify5(execFile6);
-var runFile = async (file2, args, options) => (await execFileP(file2, args, options)).stdout;
-var IMAGE = /\.(png|jpe?g|gif|webp)$/i;
-var MAC_SCRIPT = `ObjC.import('AppKit');
-function run(argv) {
-  const pb = $.NSPasteboard.generalPasteboard;
-  const url = pb.stringForType('public.file-url');
-  if (url && !url.isNil()) {
-    const path = $.NSURL.URLWithString(url).path;
-    if (path && !path.isNil()) return 'file:' + path.js;
-  }
-  let d = pb.dataForType('public.png');
-  if (!d || d.isNil()) {
-    const t = pb.dataForType('public.tiff');
-    if (!t || t.isNil()) return 'false';
-    const rep = $.NSBitmapImageRep.imageRepWithData(t);
-    if (!rep || rep.isNil()) return 'false';
-    d = rep.representationUsingTypeProperties($.NSBitmapImageFileTypePNG, $({}));
-  }
-  return d && !d.isNil() && d.writeToFileAtomically(argv[0], true) ? 'true' : 'false';
-}`;
-async function extractClipboardImage(dest, env2, platform = process.platform, run6 = runFile) {
-  if (platform === "darwin") {
-    let answer;
-    try {
-      answer = (await run6("osascript", ["-l", "JavaScript", "-e", MAC_SCRIPT, dest], { timeout: 5e3 })).trim();
-    } catch {
-    }
-    if (answer?.startsWith("file:")) {
-      const file2 = answer.slice("file:".length);
-      return IMAGE.test(file2) && existsSync4(file2) ? file2 : void 0;
-    }
-    if (answer !== void 0) {
-      return answer === "true" && existsSync4(dest) ? dest : void 0;
-    }
-  }
-  const root7 = env2.HERMES_PYTHON_SRC_ROOT;
-  const python = env2.HERMES_PYTHON?.trim() || "python3";
-  if (!root7) {
-    return void 0;
-  }
-  const stdout = await run6(python, [join10(root7, "ui-tui/scripts/clipboard_image.py"), dest], {
-    cwd: root7,
-    env: { ...env2, PYTHONPATH: root7 },
-    timeout: 15e3
-  });
-  return stdout.trim() === "true" && existsSync4(dest) ? dest : void 0;
-}
-async function withClipboardImage(use, env2 = process.env, extract = extractClipboardImage) {
-  const dir2 = await mkdtemp(join10(tmpdir(), "hermes-tern-clipboard-"));
-  try {
-    const path2 = await extract(join10(dir2, "clipboard.png"), env2);
-    return path2 ? await use(path2) : void 0;
-  } finally {
-    await rm(dir2, { force: true, recursive: true });
-  }
-}
-function imagePathOf(text12, cwd) {
-  let raw2 = text12.trim();
-  if (!raw2 || raw2.includes("\n")) {
-    return void 0;
-  }
-  raw2 = raw2.replace(/^(['"])(.*)\1$/, "$2");
-  if (raw2.startsWith("file://")) {
-    try {
-      raw2 = decodeURIComponent(new URL(raw2).pathname);
-    } catch {
-      return void 0;
-    }
-  }
-  raw2 = raw2.replace(/\\(.)/g, "$1").replace(/^~(?=$|\/)/, homedir11());
-  if (!IMAGE.test(raw2)) {
-    return void 0;
-  }
-  const path2 = resolve6(cwd, raw2);
-  return existsSync4(path2) ? path2 : void 0;
-}
-
-// src/draft/attachments.ts
-var Attachments = class {
-  #host;
-  #clipboard;
-  /** The images attached to the draft: the next prompt entered takes them. */
-  #items = [];
-  /** Images being read or uploaded for the draft: an "attaching…" chip each until they land. */
-  #pending = [];
-  /** The launcher's startup image until it is attached to the first session (the queue waits for it). */
-  #startup;
-  /** `startup`: the launcher's `--image` (''); `clipboard`: reads the clipboard's image (tests fake it). */
-  constructor(host, { clipboard = (use) => withClipboardImage(use), startup = "" } = {}) {
-    this.#host = host;
-    this.#clipboard = clipboard;
-    this.#startup = startup;
-  }
-  /** The images that landed, in the order they were attached. */
-  get items() {
-    return this.#items;
-  }
-  /** An image is still being read or uploaded: a prompt sent now would miss it. */
-  get uploading() {
-    return this.#pending.length > 0;
-  }
-  /** Any image, landed or on its way: the draft is not empty. */
-  get any() {
-    return this.#items.length > 0 || this.#pending.length > 0;
-  }
-  /** The launcher's startup image is still to be attached (the queue waits for it). */
-  get awaitingStartup() {
-    return Boolean(this.#startup);
-  }
-  /** A paste that is an image (no text: the clipboard's; one image path: that file); false for text. */
-  paste(text12) {
-    if (!text12.trim()) {
-      void this.fromClipboard(true);
-      return true;
-    }
-    const path2 = imagePathOf(text12, this.#host.cwd());
-    if (path2) {
-      void this.#attach(path2, basename3(path2));
-      return true;
-    }
-    return false;
-  }
-  /** Attaches the clipboard's image to the next prompt (`quiet`: an empty paste, which may hold none). */
-  async fromClipboard(quiet) {
-    const slot = this.#start(`pasted image ${this.#items.length + this.#pending.length + 1}`);
-    try {
-      const found = await this.#clipboard(async (path2) => {
-        await this.#attach(path2, slot.name, slot);
-        return true;
-      });
-      if (!found && !quiet) {
-        this.#host.note("No image on the clipboard.", "warning");
-      }
-    } catch (error) {
-      this.#host.note(`Could not read the clipboard image: ${errorText(error)}`, "error");
-    } finally {
-      this.#end(slot);
-      this.#host.changed();
-    }
-  }
-  /** `/image <path>`: attaches that image file (resolved against the session's folder) to the next prompt. */
-  async fromPath(raw2) {
-    const path2 = imagePathOf(raw2, this.#host.cwd());
-    if (!path2) {
-      this.#host.note(`Not an image file: ${raw2.trim()} (PNG, JPEG, GIF or WebP)`, "warning");
-      return this.#host.changed();
-    }
-    await this.#attach(path2, basename3(path2));
-  }
-  /**
-   * `hermes -q … --image …`: attaches the launcher's image to session `sid` (the first one): on the
-   * shared gateway to the startup query at the queue's head, else by path to the session itself.
-   * A failure is a warning, and the queue goes on without it.
-   */
-  async attachStartup(sid) {
-    const path2 = this.#startup;
-    try {
-      if (this.#host.gw.isCanonical) {
-        const image3 = this.#image(await uploadImage(this.#host.gw, sid, path2, this.#host.launchCwd), basename3(path2));
-        if (!this.#host.attachToHead(image3)) {
-          this.#items.push(image3);
-        }
-      } else {
-        await rpc(this.#host.gw, "image.attach", { path: path2, session_id: sid });
-      }
-    } catch (error) {
-      this.#host.note(`Could not attach ${path2}: ${errorText(error)}`, "warning");
-    }
-    this.#startup = "";
-  }
-  /** The draft's images, which leave the composer with the prompt that takes them. */
-  take() {
-    const images = this.#items;
-    this.#items = [];
-    return images;
-  }
-  /** A prompt that did not go is back in the composer: its images go before the draft's. */
-  restore(images) {
-    this.#items = [...images, ...this.#items];
-  }
-  /** The images that landed go; one still uploading lands after (Esc Esc). */
-  clear() {
-    this.#items = [];
-  }
-  /** Every image goes, and the uploads in flight land nowhere (Ctrl+C). */
-  clearAll() {
-    this.#items = [];
-    this.#pending = [];
-  }
-  /** The composer's chips: the landed images, then those on their way, each with its ✕. */
-  chips() {
-    return [
-      ...this.#items.map((a2, i) => ({
-        ...a2.caption === void 0 ? {} : { caption: a2.caption },
-        ...a2.preview ? { image: a2.preview } : {},
-        label: a2.name,
-        onRemove: () => {
-          this.#items.splice(i, 1);
-          this.#host.changed();
-        }
-      })),
-      ...this.#pending.map((slot) => ({
-        label: slot.name,
-        onRemove: () => {
-          this.#end(slot);
-          this.#host.changed();
-        },
-        pending: true
-      }))
-    ];
-  }
-  /** Uploads `path` for the next prompt; its chip says "attaching…" (in `slot`) until it lands or fails. */
-  async #attach(path2, name, slot = this.#start(name)) {
-    const sid = this.#host.sid();
-    try {
-      if (!sid) {
-        this.#host.note("Wait for the session to start before attaching an image.", "warning");
-        return;
-      }
-      const image3 = this.#image(await uploadImage(this.#host.gw, sid, path2, this.#host.launchCwd), name);
-      if (this.#pending.includes(slot)) {
-        this.#items.push(image3);
-      }
-    } catch (error) {
-      this.#host.note(`Could not attach ${name}: ${errorText(error)}`, "error");
-    } finally {
-      this.#end(slot);
-      this.#host.changed();
-    }
-  }
-  #start(name) {
-    const slot = { name };
-    this.#pending.push(slot);
-    this.#host.changed();
-    return slot;
-  }
-  #end(slot) {
-    this.#pending = this.#pending.filter((s2) => s2 !== slot);
-  }
-  /**
-   * An uploaded image with its thumbnail: its bytes as a blob, else the gateway's copy where that
-   * is on this machine. The bytes are not kept.
-   */
-  #image({ bytes, ...attachment }, name) {
-    const size = imageSize(bytes);
-    const kb = bytes.length / 1024;
-    const blob = this.#host.blob(bytes, attachment.mime);
-    const preview5 = blob ? { blob } : existsSync5(attachment.path) ? { path: attachment.path } : void 0;
-    const caption = [size && `${size.w}\xD7${size.h}`, kb >= 1024 ? `${(kb / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(kb))} KB`];
-    return { ...attachment, caption: caption.filter(Boolean).join(" \xB7 "), name, ...preview5 ? { preview: preview5 } : {} };
-  }
-};
-
-// src/draft/keys.ts
-var EXIT_ARM_MS = 1500;
-var DOUBLE_ESC_MS = 500;
-var KEYS2 = {
-  agents: { label: "alt+a", name: "a", with: ["alt"], without: ["ctrl", "meta"] },
-  background: { label: "alt+j", name: "j", with: ["alt"], without: ["ctrl", "meta"] },
-  cancel: { label: "ctrl+c", name: "c", with: ["ctrl"] },
-  // Pressed twice: a single Esc never cancels work.
-  clearOrStop: { label: "escape escape", name: "escape", with: [] },
-  clipboardImage: { label: "ctrl+v", name: "v", with: ["ctrl"], without: ["alt", "meta"] },
-  dequeue: { label: "alt+up", name: "up", with: ["alt"] },
-  effort: { label: "shift+tab", name: "tab", with: ["shift"] },
-  prs: { label: "alt+p", name: "p", with: ["alt"], without: ["ctrl", "meta"] },
-  quit: { label: "ctrl+d", name: "d", with: ["ctrl"] },
-  sidebar: { label: "alt+s", name: "s", with: ["alt"], without: ["ctrl", "meta"] },
-  steer: { label: "alt+enter", name: "enter", with: ["alt"] }
-};
-function matches(key2, match) {
-  return key2.name === match.name && match.with.every((m) => key2[m]) && !match.without?.some((m) => key2[m]);
-}
-function hasDraft(cx) {
-  return Boolean(cx.composer.text || cx.attachments.any);
-}
-function clearDraft(cx) {
-  if (cx.composer.text.trim()) {
-    cx.composer.take();
-  } else {
-    cx.composer.set("");
-  }
-  cx.attachments.clear();
-}
-function ctrlC(cx) {
-  if (hasDraft(cx)) {
-    cx.composer.set("");
-    cx.attachments.clearAll();
-    return;
-  }
-  if (cx.busy()) {
-    return cx.interrupt();
-  }
-  const now = cx.now();
-  if (now - cx.presses.exit < EXIT_ARM_MS) {
-    return cx.quit();
-  }
-  cx.presses.exit = now;
-  cx.transcript.notice("Press Ctrl+C again to exit.");
-}
-var cancel = (key2, cx, top) => {
-  if (!matches(key2, KEYS2.cancel)) {
-    return false;
-  }
-  if (!top) {
-    ctrlC(cx);
-  } else if (top.cancel) {
-    top.cancel();
-  } else {
-    cx.close(top);
-  }
-  return true;
-};
-var overlay = (key2, _cx, top) => top?.onKey(key2) === true;
-var modal = (_key, _cx, top) => top?.modal === true;
-var hud = (key2, cx) => cx.hud(key2);
-var completion = (key2, cx) => cx.completion.onKey(key2);
-var doubleEsc = (key2, cx) => {
-  if (!matches(key2, KEYS2.clearOrStop)) {
-    return false;
-  }
-  const now = cx.now();
-  const double = now - cx.presses.esc <= DOUBLE_ESC_MS;
-  cx.presses.esc = double ? 0 : now;
-  if (double && hasDraft(cx)) {
-    clearDraft(cx);
-  } else if (double && cx.busy()) {
-    cx.interrupt();
-  }
-  return true;
-};
-var effort = (key2, cx) => {
-  if (!matches(key2, KEYS2.effort)) {
-    return false;
-  }
-  cx.cycleEffort();
-  return true;
-};
-var SHEETS = [
-  [KEYS2.agents, (cx) => cx.openAgents()],
-  [KEYS2.background, (cx) => cx.openBackground()],
-  [KEYS2.sidebar, (cx) => cx.toggleSidebar()],
-  [KEYS2.prs, (cx) => cx.openPrs()]
-];
-var sheets = (key2, cx) => {
-  const hit = SHEETS.find(([match]) => matches(key2, match));
-  hit?.[1](cx);
-  return hit !== void 0;
-};
-var dequeue = (key2, cx) => {
-  if (!matches(key2, KEYS2.dequeue) || !cx.queue.count()) {
-    return false;
-  }
-  cx.queue.dequeue(0);
-  return true;
-};
-var steer2 = (key2, cx) => {
-  if (!matches(key2, KEYS2.steer) || !cx.busy() || !cx.queue.count() || cx.composer.text) {
-    return false;
-  }
-  cx.queue.steer(0);
-  return true;
-};
-var quit = (key2, cx) => {
-  if (!matches(key2, KEYS2.quit) || hasDraft(cx)) {
-    return false;
-  }
-  cx.quit();
-  return true;
-};
-var pasteImage = (key2, cx) => key2.name === "paste" && cx.attachments.paste(key2.text ?? "");
-var clipboardImage = (key2, cx) => {
-  if (!matches(key2, KEYS2.clipboardImage)) {
-    return false;
-  }
-  cx.attachClipboardImage();
-  return true;
-};
-var composer = (key2, cx) => {
-  if (cx.composer.key(key2) === "submit") {
-    cx.submitDraft();
-  }
-  return true;
-};
-var KEY_RULES = [
-  cancel,
-  overlay,
-  modal,
-  hud,
-  completion,
-  doubleEsc,
-  effort,
-  sheets,
-  dequeue,
-  steer2,
-  quit,
-  pasteImage,
-  clipboardImage,
-  composer
-];
-function onKey(key2, cx, top) {
-  KEY_RULES.some((rule) => rule(key2, cx, top));
-}
-
-// src/core/epoch.ts
-var Epoch = class {
-  #generation = 0;
-  #controller = new AbortController();
-  /** The present generation: 0 until the first `next()`. */
-  get generation() {
-    return this.#generation;
-  }
-  /** A ticket for the present generation: current until the next `next()`. */
-  current() {
-    const generation = this.#generation;
-    return { isCurrent: () => generation === this.#generation, signal: this.#controller.signal };
-  }
-  /** Ends the present generation (its tickets go stale, their signal aborts) and returns a ticket for the new one. */
-  next() {
-    const ended = this.#controller;
-    this.#controller = new AbortController();
-    this.#generation++;
-    ended.abort();
-    return this.current();
-  }
-};
-
-// src/flow.ts
-var Switches = class {
-  /** One generation per switch: a switch's token is the generation its `begin` started. */
-  #epoch = new Epoch();
-  #pending = false;
-  /** Whether a switch is in flight. */
-  get pending() {
-    return this.#pending;
-  }
-  /** Bumped by every `begin`: read before an await, it tells whether a switch began since. */
-  get generation() {
-    return this.#epoch.generation;
-  }
-  /** Starts a switch and returns its token; earlier tokens go stale. */
-  begin() {
-    this.#pending = true;
-    this.#epoch.next();
-    return this.#epoch.generation;
-  }
-  /** Whether switch `token` is still the latest one (its result may apply). */
-  current(token) {
-    return token === this.#epoch.generation;
-  }
-  /** A ticket that goes stale once another switch begins (its signal aborts then). */
-  since() {
-    return this.#epoch.current();
-  }
-  /** Ends switch `token` (adopted or failed); a superseded token leaves the newer switch pending. */
-  end(token) {
-    if (this.current(token)) {
-      this.#pending = false;
-    }
-  }
-  /**
-   * Routes a server request for `sessionId` while `active` is shown: another
-   * session's request waits while a switch is in flight (it may be the one
-   * being adopted) and is dropped otherwise.
-   */
-  route(active, sessionId) {
-    if (!sessionId || !active || sessionId === active) {
-      return "show";
-    }
-    return this.#pending ? "hold" : "drop";
-  }
-};
-function ownsEvent(active, ev) {
-  return !ev.session_id || !active || ev.session_id === active || ev.type.startsWith("gateway.");
-}
-function busyFrom(r, now = Date.now()) {
-  if (!r.running && r.status !== "working" && r.status !== "waiting") {
-    return null;
-  }
-  return { label: "Working\u2026", since: {}, startedAt: r.turn_started_at ? r.turn_started_at * 1e3 : now };
-}
-
-// src/gateway/coverage.ts
-var IGNORED = [
-  "agent.print",
-  "billing.step_up.verification",
-  "bot_relay.outbox.pending",
-  "browser.controller.cancel",
-  "browser.controller.command",
-  "browser.progress",
-  "connection.request",
-  "connection.update",
-  "cron.changed",
-  "dashboard.new_session_requested",
-  "display.install.done",
-  "display.install.log",
-  "display.lease",
-  "display.status",
-  "free_tier.challenge",
-  "gateway.stderr",
-  "message.reaction",
-  "onboarding.ended",
-  "pairing.changed",
-  "pane.reveal",
-  "pet.changed",
-  "pet.generate.progress",
-  "pet.hatch.progress",
-  "platforms.changed",
-  "preview.close",
-  "preview.open",
-  "preview.restart.complete",
-  "preview.restart.progress",
-  "projects.changed",
-  "reaction",
-  "session.reclaimed",
-  "session.resume_progress",
-  "setup.ready",
-  "skills.changed",
-  "terminal.close",
-  "tip.show",
-  "tool.output_risk",
-  "voice.interrupted",
-  "voice.partial",
-  "voice.status",
-  "voice.transcript",
-  "wake.detected"
-];
-
-// src/gateway/handlers/agents.ts
-function subagent(ev, cx) {
-  if (ev.payload) {
-    cx.transcript.subagent(ev.type, ev.payload);
-  }
-  if (ev.type === "subagent.complete") {
-    cx.prs.relink();
-  }
-  return "render";
-}
-var agentHandlers = {
-  "subagent.spawn_requested": subagent,
-  "subagent.start": subagent,
-  "subagent.thinking": subagent,
-  "subagent.tool": subagent,
-  "subagent.progress": subagent,
-  "subagent.complete": subagent
-};
-
-// src/backendNotes.ts
-var STDERR_LINE_CAP = 120;
-var STDERR_LINES_MAX = 4;
-function slowStartNotes(stderrTail) {
-  const problems = (stderrTail ?? "").split("\n").map((l) => l.trim()).filter((l) => l && stderrLooksLikeProblem(l)).slice(-STDERR_LINES_MAX);
-  return [
-    { text: "The agent backend is slow to start. Still waiting\u2026", tone: "warning" },
-    ...problems.map((l) => ({ text: l.slice(0, STDERR_LINE_CAP), tone: "error" }))
-  ];
-}
-function protocolNote(preview5, warned2) {
-  return warned2 ? void 0 : { text: `The agent backend wrote unexpected output: ${String(preview5 ?? "").slice(0, STDERR_LINE_CAP)}`, tone: "info" };
-}
-function isDeadStream(err) {
-  const code7 = err?.code;
-  return code7 === "EIO" || code7 === "EPIPE";
-}
-var FaultBudget = class {
-  constructor(max = 10, windowMs = 5e3) {
-    this.max = max;
-    this.windowMs = windowMs;
-  }
-  max;
-  windowMs;
-  #at = [];
-  /** Records a fault at `now`; false once more than `max` landed within the window. */
-  take(now = Date.now()) {
-    this.#at = [...this.#at.filter((t2) => now - t2 < this.windowMs), now];
-    return this.#at.length <= this.max;
-  }
-};
-
-// src/gateway/handlers/chrome.ts
-function answered(ev, cx) {
-  if (ev.payload && "text" in ev.payload && typeof ev.payload.text === "string" && ev.payload.text.trim()) {
-    const question = "question" in ev.payload && typeof ev.payload.question === "string" ? ev.payload.question.trim() : "";
-    const task = "task_id" in ev.payload && typeof ev.payload.task_id === "string" ? ` ${ev.payload.task_id}` : "";
-    cx.transcript.panel(
-      ev.type === "btw.complete" ? `/btw${question ? ` ${question}` : ""}` : `Background task${task}`,
-      ev.payload.text
-    );
-  }
-  return "render";
-}
-var chromeHandlers = {
-  "skin.changed": (ev, cx) => {
-    cx.theme.skin(ev.payload);
-    return "render";
-  },
-  "notification.show": (ev, cx) => {
-    const p3 = ev.payload;
-    if (p3 && isLoginNotice(p3)) {
-      if (p3.text?.trim()) {
-        cx.transcript.panel("/login", p3.text);
-      }
-      return "render";
-    }
-    if (p3) {
-      cx.notices.show(p3);
-    }
-    return "render";
-  },
-  "notification.clear": (ev, cx) => {
-    cx.notices.clear(ev.payload?.key);
-    return "render";
-  },
-  // What the background self-improvement review saved to memory or skills.
-  "review.summary": (ev, cx) => {
-    const text12 = String(ev.payload?.text ?? "").trim();
-    if (!text12) {
-      return "quiet";
-    }
-    cx.transcript.notice(text12);
-    return "render";
-  },
-  notice: (ev, cx) => {
-    cx.transcript.notice(ev.payload?.message ?? "");
-    return "render";
-  },
-  error: (ev, cx) => {
-    cx.transcript.notice(ev.payload?.message ?? "error", "error");
-    return "render";
-  },
-  "gateway.start_timeout": (ev, cx) => {
-    for (const note of slowStartNotes(ev.payload?.stderr_tail)) {
-      cx.transcript.notice(note.text, note.tone);
-    }
-    return "render";
-  },
-  "gateway.protocol_error": (ev, cx) => {
-    const note = protocolNote(ev.payload?.preview, cx.warned.protocol);
-    cx.warned.protocol = true;
-    if (!note) {
-      return "quiet";
-    }
-    cx.transcript.notice(note.text, note.tone);
-    return "render";
-  },
-  "background.complete": answered,
-  "btw.complete": answered
-};
-
-// src/gateway/handlers/processes.ts
-var processHandlers = {
-  // Quiet here: the store asks for its own render once it folded the chunk.
-  "agent.terminal.output": (ev, cx) => {
-    if (ev.payload?.process_id) {
-      cx.processes.output(ev.payload.process_id, ev.payload.chunk ?? "");
-    }
-    return "quiet";
-  }
-};
-
-// src/gateway/handlers/prompts.ts
-function asked(ev, cx) {
-  const req = sharedPromptRequest(ev, cx.gw, (message) => {
-    cx.transcript.notice(message, "warning");
-    cx.changed();
-  });
-  if (req) {
-    cx.request(req);
-  }
-  return "render";
-}
-function settled(ev, cx) {
-  cx.sheets.drop(sharedPromptId(ev.payload?.prompt_id));
-  return "render";
-}
-var promptHandlers = {
-  "request.cancel": (ev, cx) => {
-    const id = ev.payload?.id;
-    const notice = promptTimeoutNotice(ev.payload?.method, ev.payload?.reason);
-    const held = cx.life.unhold(id);
-    const shown2 = held || cx.sheets.shows(id);
-    cx.sheets.drop(id);
-    if (notice && shown2) {
-      cx.transcript.notice(notice, "warning");
-    }
-    return "render";
-  },
-  "approval.request": asked,
-  "clarify.request": asked,
-  "approval.settled": settled,
-  "clarify.settled": settled,
-  "approval.cancelled": (ev, cx) => {
-    cx.sheets.dropByApproval(ev.payload?.request_ids);
-    return "render";
-  }
-};
-
-// node_modules/@hermes/shared/src/usage-tick.ts
-var num5 = (value) => value !== null && value !== void 0 && Number.isFinite(value) ? value : void 0;
-var round1 = (value) => Math.round(value * 10) / 10;
-var pct = (part, whole) => Math.max(0, Math.min(100, Math.round(part / whole * 100)));
-var COUNTERS = [
-  ["calls", ["api_calls"]],
-  ["input", ["input_tokens", "prompt_tokens"]],
-  ["output", ["output_tokens", "completion_tokens"]],
-  ["reasoning", ["reasoning_tokens"]],
-  ["prompt", ["prompt_tokens"]],
-  ["completion", ["completion_tokens"]],
-  ["total", ["total_tokens"]]
-];
-function contextFields(p3) {
-  const used = num5(p3.last_prompt_tokens) ?? 0;
-  const max = num5(p3.context_length) ?? 0;
-  const compressions = num5(p3.compression_count);
-  const fields = p3.context_source == null || compressions === void 0 ? {} : { compressions };
-  if (!used || !max) {
-    return fields;
-  }
-  const source2 = p3.context_source || "provider_usage";
-  const clamped = Math.min(used, max);
-  return {
-    ...fields,
-    context_estimated: source2 !== "provider_usage",
-    context_max: max,
-    context_percent: pct(clamped, max),
-    context_source: source2,
-    context_used: clamped
-  };
-}
-function rateFields(p3) {
-  const fields = {};
-  const promptTotal = num5(p3.prompt_tokens) ?? 0;
-  const cacheRead = num5(p3.cache_read_tokens) ?? 0;
-  const latency = num5(p3.avg_latency_s);
-  const tps = num5(p3.tokens_per_s);
-  const subagents = num5(p3.active_subagents);
-  if (promptTotal > 0 && cacheRead > 0) {
-    fields.cache_hit_pct = pct(cacheRead, promptTotal);
-  }
-  if (latency !== void 0) {
-    fields.avg_latency_s = round1(latency);
-  }
-  if (tps !== void 0) {
-    fields.avg_tps = round1(tps);
-  }
-  if (subagents !== void 0) {
-    fields.active_subagents = subagents;
-  }
-  return fields;
-}
-function usageFromTick(payload) {
-  if (!payload) {
-    return void 0;
-  }
-  if ("usage" in payload && payload.usage) {
-    return payload.usage;
-  }
-  const usage = {};
-  for (const [key2, sources] of COUNTERS) {
-    const values = sources.map((source2) => num5(payload[source2]));
-    const value = values.find(Boolean) ?? values.find((v) => v !== void 0);
-    if (value !== void 0) {
-      usage[key2] = value;
-    }
-  }
-  const derived = { ...usage, ...contextFields(payload), ...rateFields(payload) };
-  if (Object.keys(derived).length === 0) {
-    return void 0;
-  }
-  return payload.model ? { ...derived, model: payload.model } : derived;
-}
-
-// src/turn/prompt.ts
-var IMAGE_ONLY_PROMPT = "What do you see in this image?";
-function shownText(prompt) {
-  return (prompt.kind === "command" ? prompt.display : void 0) ?? prompt.text;
-}
-function userText(text12, images) {
-  const count = images.length ? `\u{1F4CE} ${images.length} image${images.length === 1 ? "" : "s"}` : "";
-  return [text12, count].filter(Boolean).join("\n\n");
-}
-function userImages(images) {
-  return images.map((i) => ({ kind: "image", name: i.name, ...i.preview ? { source: i.preview } : {} }));
-}
-
-// src/gateway/handlers/session.ts
-var sessionHandlers = {
-  "gateway.ready": (ev, cx) => {
-    cx.reconnect.ready();
-    cx.theme.skin(ev.payload?.skin);
-    cx.life.ready();
-    return "render";
-  },
-  "gateway.reconnecting": (ev, cx) => {
-    cx.reconnect.redialing(ev.payload?.attempt ?? 1, ev.payload?.delay_ms ?? 0);
-    return "render";
-  },
-  // The goal and loop line: every set, pause, resume, stop, wakeup and judged turn.
-  "session.control.update": (ev, cx) => {
-    cx.automation.apply(ev.session_id ?? cx.sid(), ev.payload?.control);
-    return "quiet";
-  },
-  "session.info": (ev, cx) => {
-    const { session: session2, transcript } = cx;
-    const cwd = session2.info?.cwd;
-    session2.info = ev.payload ? { ...session2.info, ...ev.payload } : session2.info;
-    session2.usage = ev.payload?.usage ?? session2.usage;
-    transcript.contextUsed(session2.usage?.context_used ?? 0);
-    for (const started of cx.queue.server.update(pendingRows(ev.payload))) {
-      const own14 = started.own?.item.prompt;
-      transcript.started(own14 ? shownText(own14) : started.text, void 0, own14 ? userImages(own14.images) : []);
-    }
-    cx.title.set(typeof ev.payload?.title === "string" ? ev.payload.title : void 0);
-    if (session2.info?.cwd && session2.info.cwd !== cwd) {
-      cx.prs.poke();
-      cx.reportCwd();
-    }
-    return "render";
-  },
-  "session.usage": (ev, cx) => {
-    const { session: session2, transcript } = cx;
-    const tick2 = usageFromTick(ev.payload);
-    session2.usage = tick2 ? { ...session2.usage, ...tick2 } : session2.usage;
-    transcript.contextUsed(session2.usage?.context_used ?? 0);
-    const counters = usageCounters(ev.payload);
-    if (counters) {
-      transcript.usageTick(counters.counters, counters.tps);
-    }
-    return "render";
-  },
-  "session.title": (ev, cx) => {
-    cx.title.set(ev.payload?.title);
-    return "render";
-  },
-  // A title set by /title or Hermes' auto-titler reaches viewers only as a changed session list.
-  "sessions.changed": (_ev, cx) => {
-    cx.title.read();
-    return "quiet";
-  },
-  // The view fell behind: a fresh resume brings the snapshot and a new subscription.
-  "session.replay_gap": (ev, cx) => {
-    cx.life.fellBehind(ev.session_id);
-    return "quiet";
-  }
-};
-
-// src/moa.ts
-function moaLabel(ev) {
-  switch (ev.type) {
-    case "moa.progress":
-      return typeof ev.payload?.refs_done === "number" && typeof ev.payload.refs_total === "number" ? `MoA: refs ${ev.payload.refs_done}/${ev.payload.refs_total}` : void 0;
-    case "moa.phase":
-      return ev.payload?.phase === "aggregator" ? "Aggregating\u2026" : void 0;
-    case "moa.aggregating":
-      return "Aggregating\u2026";
-  }
-}
-function moaReferenceLabel(label, index2, count) {
-  return index2 && count ? `Reference ${index2}/${count} \xB7 ${label}` : `Reference \xB7 ${label}`;
-}
-
-// src/status.ts
-var COMPACTING_LABEL = "Compacting context\u2026";
-function statusEffect(payload, last) {
-  const text12 = payload?.text?.trim();
-  const kind = payload?.kind ?? "";
-  if (!text12) {
-    return kind === "ready" ? { compacting: false } : {};
-  }
-  if (kind === "goal") {
-    return { notice: { text: text12, tone: text12.startsWith("\u2713") ? "success" : "info" } };
-  }
-  if (kind === "compacting" || kind === "compressing") {
-    return { compacting: true, label: COMPACTING_LABEL, ...counted(text12) };
-  }
-  if (kind === "compacted" || kind === "ready") {
-    return { compacting: false, label: text12, ...counted(text12) };
-  }
-  if (kind === "warn" || kind === "approval" || kind === "error") {
-    return text12 === last ? {} : { note: text12, notice: { text: text12, tone: kind === "error" ? "error" : "warning" } };
-  }
-  return { label: text12 };
-}
-function counted(text12) {
-  const tokens2 = lineTokens(text12);
-  return tokens2.before || tokens2.after ? { tokens: tokens2 } : {};
-}
-
-// src/turn/fanout.ts
-var CHANGES_FILES = ["patch", "terminal", "write_file", "execute_code"];
-function afterToolComplete(p3, cx) {
-  cx.showImage(cx.transcript.call(toolCallId(p3.tool_id)));
-  cx.agents.scan();
-  if (p3.name === "delegate_task") {
-    cx.prs.relink();
-  }
-  if (LINK_TOOLS.has(p3.name)) {
-    const call = cx.transcript.calls(p3.name).at(-1);
-    if (call) {
-      cx.prs.onCall(call);
-    }
-  }
-  if (CHANGES_FILES.includes(p3.name)) {
-    cx.sidebar.poke();
-  }
-  if (p3.name === CONNECT_TOOL) {
-    cx.connect.watch();
-  }
-  if (p3.name === "terminal") {
-    cx.processes.poke();
-  }
-}
-function afterMessageComplete(p3, cx) {
-  cx.transcript.complete(p3);
-  cx.activity.endBusy();
-  cx.activity.endCompaction();
-  cx.transcript.uncompact(true);
-  cx.summarize();
-  cx.drain();
-  cx.prs.poke();
-  cx.sidebar.poke();
-}
-
-// src/gateway/handlers/turn.ts
-function kaomojiLabel(text12) {
-  const word = text12.match(/([A-Za-z][A-Za-z ]*[A-Za-z])\.{2,}\s*$/)?.[1];
-  return word ? `${word.charAt(0).toUpperCase()}${word.slice(1)}\u2026` : "";
-}
-function moaStep(ev, cx) {
-  cx.activity.relabel(moaLabel(ev) ?? "");
-  return "render";
-}
-var turnHandlers = {
-  "message.start": (ev, cx) => {
-    if (!cx.activity.busy) {
-      cx.activity.startBusy("Working\u2026");
-      cx.changed();
-    }
-    cx.transcript.start();
-    if (ev.payload?.display_kind === "async_delegation_complete" && ev.payload.text) {
-      cx.agents.settle(ev.payload.text);
-    }
-    return "render";
-  },
-  "message.delta": (ev, cx) => {
-    cx.transcript.text(ev.payload?.text ?? "");
-    cx.activity.relabel("Writing\u2026");
-    return "render";
-  },
-  "reasoning.delta": (ev, cx) => {
-    cx.transcript.reasoning(ev.payload?.text ?? "");
-    cx.activity.relabel("Thinking\u2026");
-    return "render";
-  },
-  "reasoning.available": (ev, cx) => {
-    cx.transcript.reasoningBlock(ev.payload?.text ?? "");
-    return "render";
-  },
-  // Mixture-of-Agents: each reference model's answer, then the aggregator's turn.
-  "moa.reference": (ev, cx) => {
-    if (ev.payload) {
-      cx.transcript.reference(moaReferenceLabel(ev.payload.label || "reference", ev.payload.index, ev.payload.count), ev.payload.text ?? "");
-    }
-    return "render";
-  },
-  "moa.progress": moaStep,
-  "moa.phase": moaStep,
-  "moa.aggregating": moaStep,
-  "thinking.delta": (ev, cx) => {
-    cx.activity.relabel(kaomojiLabel(ev.payload?.text ?? ""));
-    return "render";
-  },
-  "message.interim": (ev, cx) => {
-    cx.transcript.interim(ev.payload?.text ?? "", { alreadyStreamed: Boolean(ev.payload?.already_streamed) });
-    return "render";
-  },
-  "tool.generating": (ev, cx) => {
-    cx.activity.relabel(ev.payload?.name ? preparingLabel(ev.payload.name) : "Preparing a tool\u2026");
-    return "render";
-  },
-  "tool.start": (ev, cx) => {
-    if (ev.payload) {
-      cx.transcript.toolStart(ev.payload);
-      const call = cx.transcript.call(toolCallId(ev.payload.tool_id));
-      cx.activity.relabel(call ? busyLabel(call) : `Running ${ev.payload.name}\u2026`);
-      cx.showImage(call);
-    }
-    return "render";
-  },
-  "tool.complete": (ev, cx) => {
-    if (ev.payload) {
-      cx.transcript.toolComplete(ev.payload);
-      afterToolComplete(ev.payload, cx);
-    }
-    return "render";
-  },
-  "todo.updated": (ev, cx) => {
-    cx.transcript.todos(ev.payload?.todos ?? []);
-    return "render";
-  },
-  "message.complete": (ev, cx) => {
-    if (cx.queue.server.settlesQueuedRow(ev.payload)) {
-      return "quiet";
-    }
-    afterMessageComplete(ev.payload ?? {}, cx);
-    return "render";
-  },
-  "status.update": (ev, cx) => {
-    const effect = statusEffect(ev.payload, cx.warned.status);
-    if (effect.compacting !== void 0) {
-      cx.setCompacting(effect.compacting);
-    }
-    if (effect.compacting) {
-      cx.transcript.compacting({ before: effect.tokens?.before ?? (cx.session.usage?.context_used || void 0) });
-    } else if (effect.compacting === false) {
-      cx.transcript.compacted(Date.now(), effect.tokens);
-      cx.summarize(1500);
-    }
-    if (effect.label) {
-      cx.activity.relabel(effect.label, { status: true });
-    }
-    if (effect.notice) {
-      cx.warned.status = effect.note ?? cx.warned.status;
-      cx.transcript.notice(effect.notice.text, effect.notice.tone);
-    }
-    return "render";
-  }
-};
-
-// src/gateway/dispatch.ts
-var HANDLERS = {
-  ...sessionHandlers,
-  ...turnHandlers,
-  ...agentHandlers,
-  ...processHandlers,
-  ...promptHandlers,
-  ...chromeHandlers
-};
-var TABLE = HANDLERS;
-var IGNORED_TYPES = new Set(IGNORED);
-function run4(ev, cx) {
-  return TABLE[ev.type]?.(ev, cx);
-}
-function dispatcher(cx, unknown4 = () => void 0) {
-  const told = /* @__PURE__ */ new Set();
-  return (ev) => {
-    if (!ownsEvent(cx.sid(), ev)) {
-      return "quiet";
-    }
-    if (Object.hasOwn(TABLE, ev.type)) {
-      return run4(ev, cx) ?? "quiet";
-    }
-    if (!IGNORED_TYPES.has(ev.type) && !told.has(ev.type)) {
-      told.add(ev.type);
-      unknown4(ev.type);
-    }
-    return "quiet";
-  };
-}
-
-// src/gateway/eventLog.ts
-import { appendFileSync as appendFileSync4 } from "node:fs";
-function eventLog(path2) {
-  const write = (line) => {
-    if (path2) {
-      appendFileSync4(path2, `${JSON.stringify(line)}
-`);
-    }
-  };
-  return {
-    event: (ev) => write(ev),
-    request: (req) => write({ request: { id: req.id, method: req.method, params: req.params } }),
-    unknown: (type) => write({ unknown: type })
-  };
-}
-
-// src/hermes/activeSessionFile.ts
-import { writeFileSync as writeFileSync2 } from "node:fs";
-var writeActiveSessionFile = (sessionId, file2 = process.env.HERMES_TUI_ACTIVE_SESSION_FILE) => {
-  if (!file2 || !sessionId) {
-    return;
-  }
-  try {
-    writeFileSync2(file2, JSON.stringify({ session_id: sessionId }), { mode: 384 });
-  } catch {
-  }
-};
-
 // .hermes-src/ui-tui/src/protocol/interpolation.ts
 var INTERPOLATION_RE = /\{!(.+?)\}/g;
 
@@ -68516,2434 +66163,6 @@ function openAutomation(host, which) {
   };
   host.open(overlay2);
 }
-
-// .hermes-src/ui-tui/src/domain/slash.ts
-var INLINE_SLASH_RE = /\s\/([a-zA-Z][\w-]*)?$/;
-var inlineSlashTrigger = (text12) => {
-  const match = INLINE_SLASH_RE.exec(text12);
-  if (!match) {
-    return null;
-  }
-  const query = match[1] ?? "";
-  return { query, start: text12.length - query.length - 1 };
-};
-var applyCompletion = (value, rowText2, compReplace) => {
-  const text12 = value[compReplace - 1] === "/" && rowText2.startsWith("/") ? rowText2.slice(1) : rowText2;
-  return value.slice(0, compReplace) + text12;
-};
-var completionToApplyOnSubmit = (value, rowText2, compReplace, isLocalCommand = () => false) => {
-  const typed = value.trim();
-  if (!rowText2 || /^\/[\w-]+$/.test(typed) && isLocalCommand(typed.slice(1))) {
-    return null;
-  }
-  const next3 = applyCompletion(value, rowText2, compReplace);
-  return next3 !== value && next3.trimEnd() !== value.trimEnd() ? next3 : null;
-};
-
-// src/hermes/completion.ts
-var TAB_PATH_RE = /(?<=^|\s)((?:["']?(?:[A-Za-z]:[\\/]|\.{1,2}\/|~\/|\/|@|[^"'`\s]+\/))[^\s]*)$/;
-function completionRequestForInput(input2, scope = {}) {
-  const isSlashCommand = looksLikeSlashCommand(input2);
-  const pathWord = isSlashCommand ? null : input2.match(TAB_PATH_RE)?.[1] ?? null;
-  if (isSlashCommand && /^\/model(?:\s|$)/.test(input2)) {
-    return null;
-  }
-  const inline = inlineSlashTrigger(input2);
-  if (inline) {
-    return { method: "complete.slash", params: { text: `/${inline.query}` }, replaceFrom: inline.start + 1, skillsOnly: true };
-  }
-  if (isSlashCommand) {
-    return { method: "complete.slash", params: { text: input2 }, replaceFrom: 1 };
-  }
-  if (!pathWord) {
-    return null;
-  }
-  const { cwd, sid } = scope;
-  return {
-    method: "complete.path",
-    params: { word: pathWord, ...cwd ? { cwd } : {}, ...sid ? { session_id: sid } : {} },
-    replaceFrom: input2.length - pathWord.length
-  };
-}
-
-// src/overlays/completion.tsx
-var DEBOUNCE_MS = 60;
-var Completion = class {
-  items = [];
-  selected = 0;
-  /** Where an accepted row's text replaces the input. */
-  #replaceFrom = 0;
-  /** The text before the caret the items answer. */
-  #for = "";
-  /** The text before the caret last queried (scheduled, in flight or answered); null until the first update. */
-  #asked = null;
-  /** Bumped by every new query and every dismissal: replies of an older generation are dropped. */
-  #gen = 0;
-  #timer;
-  #composer;
-  #host;
-  #gw;
-  #sid;
-  constructor(host, gw2, sid) {
-    this.#host = host;
-    this.#gw = gw2;
-    this.#sid = sid;
-  }
-  get open() {
-    return this.items.length > 0;
-  }
-  /** The dim suffix the selected row would add after the caret, while the live text still leads to it. */
-  get ghost() {
-    const row2 = this.items[this.selected];
-    const composer2 = this.#composer;
-    if (!row2 || !composer2 || composer2.cursor !== composer2.text.length) {
-      return "";
-    }
-    const next3 = applyCompletion(this.#for, row2.text, this.#replaceFrom);
-    return next3.startsWith(composer2.text) ? next3.slice(composer2.text.length) : "";
-  }
-  /** Re-queries when the text before the composer's caret changed since the last query; cheap otherwise. */
-  update(composer2) {
-    this.#composer = composer2;
-    const before = composer2.text.slice(0, composer2.cursor);
-    if (before === this.#asked) {
-      return;
-    }
-    this.#asked = before;
-    const gen = ++this.#gen;
-    clearTimeout(this.#timer);
-    this.#timer = void 0;
-    const request = requestFor(before, this.#sid());
-    if (!request) {
-      this.dismiss();
-      return;
-    }
-    this.#timer = setTimeout(() => {
-      this.#timer = void 0;
-      const sid = this.#sid();
-      const params = request.method === "complete.slash" && sid ? { ...request.params, session_id: sid } : request.params;
-      rpc(this.#gw, request.method, params).then((r) => {
-        if (gen !== this.#gen || composer2.text.slice(0, composer2.cursor) !== before) {
-          return;
-        }
-        const items = r?.items ?? [];
-        this.items = request.method !== "complete.slash" ? items : request.skillsOnly ? items.filter((i) => i.kind === "skill") : slashItems(items, before);
-        this.selected = 0;
-        this.#for = before;
-        this.#replaceFrom = request.method === "complete.slash" && !request.skillsOnly ? r?.replace_from ?? 1 : request.replaceFrom;
-        this.#host.changed();
-      }).catch(() => {
-        if (gen === this.#gen) {
-          this.dismiss();
-        }
-      });
-    }, DEBOUNCE_MS);
-  }
-  /** Hides the list and drops pending queries; it reopens once the text before the caret changes. */
-  dismiss() {
-    this.#gen++;
-    clearTimeout(this.#timer);
-    this.#timer = void 0;
-    if (this.items.length) {
-      this.items = [];
-      this.#host.changed();
-    }
-    this.#for = "";
-  }
-  /** Keys while the list is open: ↑/↓ move, Tab accepts, Enter accepts a changing row, Esc closes. */
-  onKey(key2) {
-    const composer2 = this.#composer;
-    if (!this.open || !composer2) {
-      return false;
-    }
-    if (composer2.browsing && (key2.name === "up" || key2.name === "down")) {
-      return false;
-    }
-    switch (key2.name) {
-      case "up":
-        this.selected = (this.selected - 1 + this.items.length) % this.items.length;
-        return true;
-      case "down":
-        this.selected = (this.selected + 1) % this.items.length;
-        return true;
-      case "escape":
-        this.dismiss();
-        return true;
-      case "tab":
-        return this.#accept(applyCompletion(this.#for, this.items[this.selected]?.text ?? "", this.#replaceFrom));
-      case "enter": {
-        if (key2.shift || key2.alt || composer2.text.slice(0, composer2.cursor) !== this.#for) {
-          return false;
-        }
-        const next3 = completionToApplyOnSubmit(this.#for, this.items[this.selected]?.text, this.#replaceFrom);
-        if (next3 === null) {
-          this.dismiss();
-          return false;
-        }
-        return this.#accept(next3);
-      }
-    }
-    return false;
-  }
-  /** The overlay nodes for the `layer` region (none while closed). */
-  nodes(inputId2) {
-    if (!this.open) {
-      return [];
-    }
-    const listId = "layer.complete.select.list";
-    return [
-      /* @__PURE__ */ jsx("overlay", { anchor: { caret: inputId2 }, role: "omp.autocomplete", children: /* @__PURE__ */ jsx("col", { role: "omp.select", children: /* @__PURE__ */ jsx(
-        "list",
-        {
-          empty: this.#for.includes("@") ? "No files" : "No items",
-          max: { lines: 8 },
-          onActivate: (ev) => this.#pick(ev.item, listId, { accept: true }),
-          onSelect: (ev) => this.#pick(ev.item, listId, { accept: false }),
-          selected: `${listId}.${this.selected}`,
-          children: this.items.map((item3, i) => /* @__PURE__ */ jsx(
-            "item",
-            {
-              detail: item3.meta && item3.meta !== "dir" ? oneLine(item3.meta) : void 0,
-              icon: iconOf(item3),
-              label: labelOf(item3, this.#for, this.#replaceFrom)
-            },
-            String(i)
-          ))
-        },
-        "list"
-      ) }, "select") }, "complete")
-    ];
-  }
-  #pick(itemId, listId, { accept }) {
-    const i = Number(itemId.slice(listId.length + 1));
-    if (Number.isInteger(i) && this.items[i]) {
-      this.selected = i;
-      if (accept) {
-        this.#accept(applyCompletion(this.#for, this.items[i].text, this.#replaceFrom));
-      }
-      this.#host.changed();
-    }
-  }
-  /** Replaces the text before the caret with `before`; false when the items answer older text than the live one. */
-  #accept(before) {
-    const composer2 = this.#composer;
-    if (!composer2 || composer2.text.slice(0, composer2.cursor) !== this.#for) {
-      return false;
-    }
-    const finished = /(?:^|\s)@[^\s]*[^\s/:]$/.test(before);
-    const spaced = finished && composer2.text[composer2.cursor] === " ";
-    composer2.splice(0, composer2.cursor + (spaced ? 1 : 0), finished ? `${before} ` : before);
-    this.dismiss();
-    this.update(composer2);
-    return true;
-  }
-};
-function slashItems(items, typed) {
-  const word = (text12) => text12.replace(/^\//, "").split(/\s/)[0]?.toLowerCase() ?? "";
-  if (HIDDEN_COMMANDS.has(word(typed))) {
-    return [];
-  }
-  const kept = items.filter((i) => !(i.kind === "command" && HIDDEN_COMMANDS.has(word(i.text))));
-  if (/\s/.test(typed)) {
-    return kept;
-  }
-  const query = typed.slice(1).toLowerCase();
-  const listed = new Set(kept.map((i) => word(i.text)));
-  const rank2 = (item3, aliases = []) => query ? scoreSlashMenuItem({ aliases: [...aliases], description: item3.meta ?? "", id: word(item3.text) }, query) : 1;
-  const own14 = localCommands().flatMap(
-    (c) => c.help && !listed.has(c.name) ? [{ aliases: c.aliases, item: { display: `/${c.name}`, kind: "command", meta: c.help, text: `/${c.name}` } }] : []
-  );
-  const commands = [
-    ...kept.filter((i) => i.kind !== "skill").map((item3) => ({ item: item3, score: rank2(item3) })),
-    // Ours match by name or alias only: their help words ("the", "and") would flood every query.
-    ...own14.map((o) => ({ item: o.item, score: rank2(o.item, o.aliases) })).filter((o) => o.score < 3)
-  ].sort((a2, b) => a2.score - b.score).map((o) => o.item);
-  return [...commands, ...kept.filter((i) => i.kind === "skill")];
-}
-var COMMAND_ICONS = {
-  clear: "eraser",
-  compress: "compress",
-  cron: "clock",
-  help: "help",
-  history: "history",
-  model: "sparkle",
-  new: "plus",
-  personality: "user",
-  quit: "log-out",
-  reasoning: "brain",
-  resume: "play",
-  retry: "repeat",
-  save: "save",
-  skills: "skill",
-  tools: "tools",
-  undo: "undo",
-  usage: "gauge",
-  yolo: "shield-alert"
-};
-function isPath(item3) {
-  return !item3.kind && !item3.text.startsWith("/");
-}
-function iconOf(item3) {
-  if (isPath(item3)) {
-    return (item3.display || item3.text).endsWith("/") ? "folder" : "file";
-  }
-  if (item3.kind === "skill") {
-    return "skill";
-  }
-  return COMMAND_ICONS[item3.text.replace(/^\//, "").split(/\s/)[0] ?? ""] ?? "slash";
-}
-function labelOf(item3, typed, replaceFrom) {
-  const label = (item3.display || item3.text).replace(/^\//, "");
-  const base3 = isPath(item3) ? "strong" : void 0;
-  const query = typed.slice(replaceFrom).replace(/^[/@]/, "").replace(/^(file|folder):/, "").split("/").pop() ?? "";
-  const at = query ? label.toLowerCase().indexOf(query.toLowerCase()) : -1;
-  if (at < 0) {
-    return [{ s: base3, t: label }];
-  }
-  return [
-    { s: base3, t: label.slice(0, at) },
-    { s: base3 ? `${base3} mark` : "mark", t: label.slice(at, at + query.length) },
-    { s: base3, t: label.slice(at + query.length) }
-  ].filter((s2) => s2.t);
-}
-function requestFor(before, sid) {
-  const lineStart2 = before.lastIndexOf("\n") + 1;
-  const request = completionRequestForInput(before.slice(lineStart2), { sid });
-  if (!request || !lineStart2) {
-    return request;
-  }
-  return request.method === "complete.slash" ? { ...request, replaceFrom: request.replaceFrom + lineStart2, skillsOnly: true } : { ...request, replaceFrom: request.replaceFrom + lineStart2 };
-}
-
-// src/overlays/help.tsx
-var KEY8 = "help";
-var HOTKEYS = [
-  {
-    group: "Editing",
-    rows: [
-      [["enter"], "Send message"],
-      [["shift+enter", "alt+enter"], "New line"],
-      [["up", "down"], "Move between lines / browse history"],
-      [["tab"], "Accept the completion"],
-      [["alt+left", "alt+right", "alt+f"], "Move by word"],
-      [["ctrl+a", "ctrl+e"], "Start / end of line"],
-      [["ctrl+w", "alt+backspace"], "Delete word backwards"],
-      [["ctrl+u"], "Delete to start of line"],
-      [["alt+d"], "Delete word forward"],
-      [["ctrl+k"], "Delete to end of line (joins the next line at its end)"],
-      [["ctrl+y"], "Paste the last deleted text"],
-      [["ctrl+z", "shift+ctrl+z"], "Undo / redo"],
-      [["cmd+b", "cmd+i"], "Bold / italic (Markdown) on the selection or at the caret"],
-      [["shift+left", "shift+right"], "Select"],
-      [["shift+enter"], "In a list item: the next item (an empty item ends the list)"]
-    ]
-  },
-  {
-    group: "Control",
-    rows: [
-      [["escape"], "Close the completion"],
-      [[KEYS2.clearOrStop.label], "Clear the draft into the history (Up brings it back) / stop the agent"],
-      [[KEYS2.effort.label], "Cycle the reasoning effort (/effort picks one; Ctrl+G there saves it as the default)"],
-      [[KEYS2.dequeue.label], "Edit the oldest queued prompt"],
-      [[KEYS2.steer.label], "Steer the running turn with the oldest queued prompt (empty prompt)"],
-      [[KEYS2.agents.label], "Agents"],
-      [[KEYS2.background.label], "Background processes and cron jobs (/ps)"],
-      [[KEYS2.prs.label], "Pull requests Hermes linked (/prs)"],
-      [[KEYS2.sidebar.label], "Session sidebar: branch, PRs, changes (/sidebar)"],
-      [[KEYS2.clipboardImage.label], "Attach the clipboard image (also \u2318V of an image, a dropped image file, /paste)"],
-      [["down"], "Focus the agents / shells / PR pills (empty prompt); \u2190 \u2192 switch, Enter opens, Esc returns"],
-      [[KEYS2.cancel.label], "Answer no to the open sheet / clear the draft and images / interrupt / exit (twice)"],
-      [[KEYS2.quit.label], "Delete forward / exit (empty prompt)"]
-    ]
-  }
-];
-async function openHelp(host) {
-  let catalog = {};
-  const sid = host.session.ref.live;
-  try {
-    catalog = await rpc(host.gw, "commands.catalog", sid ? { session_id: sid } : {});
-  } catch (error) {
-    host.transcript.notice(
-      `Could not load the command list: ${errorText(error)}`,
-      "warning"
-    );
-  }
-  const own14 = localCommands().flatMap(
-    (c) => c.help ? [[[`/${c.name}`, ...(c.aliases ?? []).map((a2) => `/${a2}`)].join(" \xB7 "), c.help]] : []
-  );
-  const runs3 = ([command = ""]) => !HIDDEN_COMMANDS.has(command.replace(/^\//, "").split(/\s/)[0] ?? "");
-  const categories = [
-    { name: "Tern", pairs: own14 },
-    ...(catalog.categories?.length ? catalog.categories : [{ name: "Commands", pairs: catalog.pairs ?? [] }]).map((c) => ({ ...c, pairs: (c.pairs ?? []).filter(runs3) })).filter((c) => c.pairs.length)
-  ];
-  const overlay2 = {
-    key: KEY8,
-    modal: true,
-    node: () => /* @__PURE__ */ jsx("overlay", { anchor: "center", head: "Commands and shortcuts", modal: true, role: "omp.overlay.hotkeys", size: "lg", children: /* @__PURE__ */ jsxs("col", { gap: "lg", children: [
-      HOTKEYS.map(({ group, rows }) => /* @__PURE__ */ jsx("section", { head: group, role: "omp.hotkeys.group", children: /* @__PURE__ */ jsx(
-        "table",
-        {
-          cols: [
-            { head: "Key", id: "keys" },
-            { grow: 1, head: "Action", id: "action" }
-          ],
-          role: "omp.hotkeys.table",
-          rows: rows.map(([keys2, action], i) => ({
-            cells: {
-              action: [{ t: action }],
-              keys: keys2.flatMap((k, j) => [...j ? [{ s: "dim", t: " " }] : [], { s: "key", t: k }])
-            },
-            id: String(i)
-          }))
-        },
-        "table"
-      ) }, `keys-${group}`)),
-      categories.map((c) => /* @__PURE__ */ jsx("section", { head: c.name, role: "omp.hotkeys.group", children: /* @__PURE__ */ jsx(
-        "table",
-        {
-          cols: [
-            { head: "Command", id: "command" },
-            { grow: 1, head: "Description", id: "action" }
-          ],
-          role: "omp.hotkeys.table",
-          rows: (c.pairs ?? []).map(([command = "", text12 = ""], i) => ({
-            // The `(usage: …)` tail is `/help <command>`'s business; the table keeps the summary.
-            cells: {
-              action: [{ t: text12.replace(/\s*\(usage: .+\)\s*$/, "") }],
-              command: [{ s: "mono", t: command }]
-            },
-            id: String(i)
-          }))
-        },
-        "table"
-      ) }, `cmd-${c.name}`)),
-      actionsRow([{ hint: "escape", key: "close", keys: ["escape"], label: "Close", onClick: () => host.close(overlay2) }])
-    ] }, "body") }, KEY8),
-    onKey: (k) => {
-      if (k.name === "escape" || k.name === "enter" || k.name === "q") {
-        host.close(overlay2);
-      }
-      return true;
-    }
-  };
-  host.open(overlay2);
-}
-
-// src/github/branch.ts
-import { execFile as execFile7 } from "node:child_process";
-import { promisify as promisify6 } from "node:util";
-var run5 = promisify6(execFile7);
-function parseRemote(url) {
-  const m = url.match(/^[\w.-]+@([^:/]+):([^/]+\/[^/]+?)(?:\.git)?\/?$/) ?? url.match(/^(?:https?|ssh|git):\/\/(?:[^@/]+@)?([^/:]+)(?::\d+)?\/([^/]+\/[^/]+?)(?:\.git)?\/?$/);
-  if (!m) {
-    return void 0;
-  }
-  const host = m[1].toLowerCase();
-  return host === "github.com" || host.split(".").includes("github") ? { host, repository: m[2].toLowerCase() } : void 0;
-}
-async function git2(cwd, ...args) {
-  const { stdout } = await run5("git", ["-C", cwd, ...args], { timeout: 5e3 });
-  return stdout.trim();
-}
-async function branchTarget(cwd) {
-  try {
-    const branch2 = await git2(cwd, "symbolic-ref", "--quiet", "--short", "HEAD");
-    const [remote = "", ref = ""] = (await git2(cwd, "for-each-ref", "--format=%(upstream:remotename)%00%(upstream:remoteref)", `refs/heads/${branch2}`)).split("\0");
-    const name = remote || "origin";
-    const parsed2 = parseRemote(await git2(cwd, "remote", "get-url", name));
-    const head2 = ref.replace(/^refs\/heads\//, "") || branch2;
-    const fallback = ["main", "master"];
-    const defaultBranch = (await git2(cwd, "symbolic-ref", "--quiet", "--short", `refs/remotes/${name}/HEAD`).catch(() => "")).replace(
-      `${name}/`,
-      ""
-    );
-    if (!parsed2 || !head2 || (defaultBranch ? head2 === defaultBranch : fallback.includes(head2))) {
-      return void 0;
-    }
-    return { ...parsed2, head: head2 };
-  } catch {
-    return void 0;
-  }
-}
-var BY_HEAD = `query($o: String!, $r: String!, $h: String!) {
-  repository(owner: $o, name: $r) {
-    pullRequests(headRefName: $h, first: 10, orderBy: {field: UPDATED_AT, direction: DESC}, states: [OPEN, MERGED, CLOSED]) {
-      nodes { number url state headRepositoryOwner { login } }
-    }
-  }
-}`;
-async function branchPullRequest(gh, target) {
-  const [o, r] = target.repository.split("/");
-  const data = await gh.graphql(target.host, BY_HEAD, { h: target.head, o, r });
-  const prs = (data.repository?.pullRequests?.nodes ?? []).filter((p3) => (p3.headRepositoryOwner?.login ?? "").toLowerCase() === o);
-  const pr = prs.find((p3) => p3.state === "OPEN") ?? prs[0];
-  return pr ? { host: target.host, number: pr.number, repository: target.repository, url: pr.url } : void 0;
-}
-function stackQuery(refs) {
-  const variables = {};
-  const decls = [];
-  const parts3 = refs.map((ref, i) => {
-    const [owner, name] = ref.repository.split("/");
-    variables[`o${i}`] = owner;
-    variables[`r${i}`] = name;
-    variables[`n${i}`] = ref.number;
-    decls.push(`$o${i}: String!, $r${i}: String!, $n${i}: Int!`);
-    return `p${i}: repository(owner: $o${i}, name: $r${i}) { pullRequest(number: $n${i}) { stack { number } } }`;
-  });
-  return { query: `query(${decls.join(", ")}) { ${parts3.join("\n")} }`, variables };
-}
-function parseStacks(host, repository, rows) {
-  return (Array.isArray(rows) ? rows : []).flatMap((row2) => {
-    const s2 = row2;
-    if (typeof s2?.number !== "number" || !Array.isArray(s2.pull_requests)) {
-      return [];
-    }
-    return [
-      {
-        base: typeof s2.base === "string" ? s2.base : s2.base?.ref ?? "",
-        host,
-        key: stackKey(host, repository, s2.number),
-        layers: s2.pull_requests.filter((p3) => typeof p3.number === "number").map((p3) => ({ head: p3.head?.ref ?? "", number: p3.number, state: p3.merged_at ? "merged" : p3.state ?? "open" })),
-        number: s2.number,
-        repository
-      }
-    ];
-  });
-}
-
-// src/github/client.ts
-var GitHubError = class extends Error {
-  constructor(message, status) {
-    super(message);
-    this.status = status;
-  }
-  status;
-};
-var api = (host) => host === "github.com" ? "https://api.github.com" : `https://${host}/api/v3`;
-var graphqlUrl = (host) => host === "github.com" ? "https://api.github.com/graphql" : `https://${host}/api/graphql`;
-function tokens(env2 = process.env) {
-  return async (host) => {
-    const own14 = host === "github.com" ? env2.GITHUB_TOKEN || env2.GH_TOKEN : env2.GITHUB_ENTERPRISE_TOKEN || env2.GH_ENTERPRISE_TOKEN;
-    if (own14) {
-      return own14;
-    }
-    const name = host === "github.com" ? "GITHUB_TOKEN" : "GITHUB_ENTERPRISE_TOKEN";
-    throw new GitHubError(`No GitHub token for ${host}. Set one with \`hermes config set ${name} <token>\`, then open a new pane.`);
-  };
-}
-function github(token = tokens()) {
-  async function call(host, url, init) {
-    const res = await fetch(url, {
-      ...init,
-      headers: {
-        Accept: "application/vnd.github+json",
-        Authorization: `Bearer ${await token(host)}`,
-        "User-Agent": "hermes-tern",
-        "X-GitHub-Api-Version": "2022-11-28",
-        ...init.body ? { "Content-Type": "application/json" } : {}
-      },
-      signal: AbortSignal.timeout(3e4)
-    });
-    const text12 = await res.text();
-    const json = text12 ? JSON.parse(text12) : void 0;
-    if (!res.ok) {
-      const message = json?.message;
-      throw new GitHubError(message ? `GitHub: ${message}` : `GitHub answered ${res.status}`, res.status);
-    }
-    return json;
-  }
-  return {
-    async graphql(host, query, variables = {}) {
-      const out = await call(host, graphqlUrl(host), {
-        body: JSON.stringify({ query, variables }),
-        method: "POST"
-      });
-      if (!out.data) {
-        throw new GitHubError(out.errors?.map((e) => e.message).join("; ") || "GitHub sent no data");
-      }
-      return out.data;
-    },
-    rest(host, method, path2, body) {
-      return call(host, `${api(host)}${path2}`, { body: body === void 0 ? void 0 : JSON.stringify(body), method });
-    }
-  };
-}
-
-// src/github/store.ts
-var OPEN_MS = 6e4;
-var PENDING_MS = 3e4;
-var BATCH2 = 20;
-var BRANCH_HIT_MS = 6e4;
-var BRANCH_MISS_MS = 3e5;
-var NO_STACK_FIELD = /Field '?stack'? doesn't exist/i;
-var STAMP = { activity: "activityAt", files: "filesAt" };
-var FAILURE = { activity: "activityError", files: "filesError" };
-var RETRY_MS = 3e4;
-var MUTATIONS = {
-  close: "mutation($id: ID!) { closePullRequest(input: {pullRequestId: $id}) { clientMutationId } }",
-  draft: "mutation($id: ID!) { convertPullRequestToDraft(input: {pullRequestId: $id}) { clientMutationId } }",
-  merge: "mutation($id: ID!, $m: PullRequestMergeMethod!, $oid: GitObjectID) { mergePullRequest(input: {pullRequestId: $id, mergeMethod: $m, expectedHeadOid: $oid}) { clientMutationId } }",
-  ready: "mutation($id: ID!) { markPullRequestReadyForReview(input: {pullRequestId: $id}) { clientMutationId } }",
-  reopen: "mutation($id: ID!) { reopenPullRequest(input: {pullRequestId: $id}) { clientMutationId } }",
-  "update-branch": "mutation($id: ID!, $oid: GitObjectID) { updatePullRequestBranch(input: {pullRequestId: $id, expectedHeadOid: $oid}) { clientMutationId } }"
-};
-var PullRequests = class {
-  #host;
-  #gh;
-  #links;
-  #sid = null;
-  #refs = [];
-  #entries = /* @__PURE__ */ new Map();
-  #branch;
-  /** Native stacks by key, from the PRs' stack membership. */
-  #stacks = /* @__PURE__ */ new Map();
-  /** Hosts whose GraphQL has no stack fields (GHES): not asked again. */
-  #noStacks = /* @__PURE__ */ new Set();
-  #branchOf;
-  /** Why nothing could be read at all (no token). */
-  #error;
-  #timer;
-  #loading = false;
-  #again = false;
-  #disposed = false;
-  #busy = /* @__PURE__ */ new Set();
-  /** The activity and files reads in flight (`key:activity`, `key:files`). */
-  #reading = /* @__PURE__ */ new Set();
-  /** When each of those last failed. */
-  #failedAt = /* @__PURE__ */ new Map();
-  constructor(host, gh = github(), links = (sid) => storedLinks(sid), branchOf = branchTarget) {
-    this.#host = host;
-    this.#gh = gh;
-    this.#links = links;
-    this.#branchOf = branchOf;
-  }
-  /** The linked PRs (oldest link first), then the branch's PR, then stack layers none of them are. */
-  entries() {
-    const seen = /* @__PURE__ */ new Set();
-    const out = [];
-    const add = (ref, source2) => {
-      const key2 = prKey(ref);
-      if (!seen.has(key2)) {
-        seen.add(key2);
-        const e = this.#entry(ref);
-        e.source = source2;
-        out.push(e);
-      }
-    };
-    this.#refs.forEach((r) => add(r, "linked"));
-    if (this.#branch?.ref) {
-      add(this.#branch.ref, "branch");
-    }
-    const inStack = (s2, ref) => ref.host === s2.host && ref.repository === s2.repository && s2.layers.some((l) => l.number === ref.number);
-    for (const s2 of this.#stacks.values()) {
-      if (out.some((e) => inStack(s2, e.ref))) {
-        s2.layers.forEach((l) => add({ host: s2.host, number: l.number, repository: s2.repository, url: `https://${s2.host}/${s2.repository}/pull/${l.number}` }, "stack"));
-      }
-    }
-    for (const e of out) {
-      e.stack = [...this.#stacks.values()].find((s2) => inStack(s2, e.ref));
-    }
-    return out;
-  }
-  /** The native stacks the list's PRs sit in. */
-  stacks() {
-    return [...this.#stacks.values()];
-  }
-  /** The key of the listed PR whose key reads `raw` (a node id's), if one is listed. */
-  keyOf(raw2) {
-    return this.entries().map((e) => prKey(e.ref)).find((key2) => key2 === raw2);
-  }
-  get(key2) {
-    return this.#entries.get(key2);
-  }
-  get error() {
-    return this.#error;
-  }
-  get loading() {
-    return this.#loading;
-  }
-  busy(key2) {
-    return this.#busy.has(key2);
-  }
-  /** A session was adopted (a resume, a switch): its stored links replace the old ones. */
-  adopt() {
-    const sid = this.#host.sid();
-    if (sid === this.#sid) {
-      return;
-    }
-    this.#sid = sid;
-    this.#refs = sid ? this.#links(sid) : [];
-    this.#branch = void 0;
-    this.#stacks.clear();
-    this.#host.changed();
-    this.poke();
-  }
-  /** A finished tool call: a link tool's result is the conversation's whole list. */
-  onCall(call) {
-    const linked = linkedFromResult(call);
-    if (!linked) {
-      return;
-    }
-    const before = this.#refs.map(prKey).join();
-    this.#refs = linked;
-    if (linked.map(prKey).join() !== before) {
-      this.#host.changed();
-      this.poke();
-    }
-  }
-  /**
-   * Reads the stored links again. A subagent runs in a session of its own and links under this
-   * conversation (pull_requests.py), with no link result in this transcript.
-   */
-  relink() {
-    const sid = this.#host.sid();
-    if (!sid || sid !== this.#sid) {
-      return;
-    }
-    const linked = this.#links(sid);
-    if (linked.map(prKey).join() !== this.#refs.map(prKey).join()) {
-      this.#refs = linked;
-      this.#host.changed();
-      this.poke();
-    }
-  }
-  /** Reads every linked PR now. */
-  poke() {
-    clearTimeout(this.#timer);
-    this.#timer = void 0;
-    void this.#tick();
-  }
-  dispose() {
-    this.#disposed = true;
-    clearTimeout(this.#timer);
-  }
-  /** Comments, reviews and commits of `key`, read once per PR update. */
-  activity(key2) {
-    return this.#detail(key2, "activity", async (e) => {
-      const [o, r] = e.ref.repository.split("/");
-      e.activity = parseActivity(await this.#gh.graphql(e.ref.host, ACTIVITY_QUERY, { n: e.ref.number, o, r }));
-    });
-  }
-  /** The changed files of `key` with their patches (the first 300). */
-  files(key2) {
-    return this.#detail(key2, "files", async (e) => {
-      const files = [];
-      for (let page = 1; page <= 3; page++) {
-        const rows = await this.#gh.rest(e.ref.host, "GET", `/repos/${e.ref.repository}/pulls/${e.ref.number}/files?per_page=100&page=${page}`);
-        files.push(...parseFiles(rows));
-        if (rows.length < 100) {
-          break;
-        }
-      }
-      e.files = files;
-    });
-  }
-  /**
-   * Reads one tab's data of `key` once per PR update, so the sheet may ask on every frame: one read
-   * at a time, and a failed one (its error on the entry) again after `RETRY_MS`.
-   */
-  async #detail(key2, what, read) {
-    const e = this.#entries.get(key2);
-    const id = `${key2}:${what}`;
-    const failed = this.#failedAt.get(id);
-    if (!e?.pr || this.#reading.has(id) || e[what] && e[STAMP[what]] === e.pr.updatedAt || failed && Date.now() - failed < RETRY_MS) {
-      return;
-    }
-    const at = e.pr.updatedAt;
-    this.#reading.add(id);
-    try {
-      await read(e);
-      e[STAMP[what]] = at;
-      e[FAILURE[what]] = void 0;
-      this.#failedAt.delete(id);
-    } catch (error) {
-      e[FAILURE[what]] = errorText(error);
-      this.#failedAt.set(id, Date.now());
-      throw error;
-    } finally {
-      this.#reading.delete(id);
-      this.#host.changed();
-    }
-  }
-  /** Changes PR `key` on GitHub; throws GitHub's error. `merge` uses `method`, the repository's first by default. */
-  async act(action, key2, method) {
-    const pr = this.#entries.get(key2)?.pr;
-    if (!pr) {
-      throw new Error("That pull request has not loaded yet.");
-    }
-    this.#busy.add(key2);
-    this.#host.changed();
-    try {
-      if (action === "rerun") {
-        const runs3 = failedRuns(pr.checks);
-        if (!runs3.length) {
-          throw new Error("No failed GitHub Actions run to re-run.");
-        }
-        for (const id of runs3) {
-          await this.#gh.rest(pr.host, "POST", `/repos/${pr.repository}/actions/runs/${id}/rerun-failed-jobs`);
-        }
-      } else {
-        await this.#gh.graphql(pr.host, MUTATIONS[action], {
-          id: pr.id,
-          ...action === "merge" ? { m: (method ?? pr.mergeMethods[0] ?? "merge").toUpperCase(), oid: pr.headOid } : {},
-          ...action === "update-branch" ? { oid: pr.headOid } : {}
-        });
-      }
-    } finally {
-      this.#busy.delete(key2);
-      this.poke();
-    }
-  }
-  #entry(ref) {
-    const key2 = prKey(ref);
-    let e = this.#entries.get(key2);
-    if (!e) {
-      e = { ref, source: "linked" };
-      this.#entries.set(key2, e);
-    }
-    return e;
-  }
-  #schedule() {
-    clearTimeout(this.#timer);
-    const open = this.entries().filter((e) => !e.pr || e.pr.state === "open");
-    if (this.#disposed || !open.length) {
-      return;
-    }
-    const pending = open.some((e) => e.pr && checksState(e.pr.checks) === "pending");
-    this.#timer = setTimeout(() => void this.#tick(), pending ? PENDING_MS : OPEN_MS);
-  }
-  async #tick() {
-    if (this.#loading) {
-      this.#again = true;
-      return;
-    }
-    this.#loading = true;
-    try {
-      do {
-        this.#again = false;
-        await this.#read();
-      } while (this.#again);
-    } finally {
-      this.#loading = false;
-      this.#schedule();
-      this.#host.changed();
-    }
-  }
-  /** The branch's PR, looked up again once its last answer is old or the session moved. */
-  async #readBranch() {
-    const cwd = this.#host.cwd();
-    const now = Date.now();
-    const b = this.#branch;
-    if (!cwd) {
-      this.#branch = void 0;
-      return;
-    }
-    const target = await this.#branchOf(cwd);
-    const same = b && b.cwd === cwd && b.target?.head === target?.head && b.target?.repository === target?.repository;
-    if (same && now - b.at < (b.ref ? BRANCH_HIT_MS : BRANCH_MISS_MS)) {
-      return;
-    }
-    let ref;
-    try {
-      ref = target ? await branchPullRequest(this.#gh, target) : void 0;
-    } catch {
-      ref = same ? b.ref : void 0;
-    }
-    this.#branch = { at: now, cwd, ref, target };
-  }
-  /** Which PRs sit in a GitHub stack, and that stack's layers; new layers are read next round. */
-  async #readStacks(entries) {
-    const before = [...this.#stacks.keys()].join();
-    const byHost = /* @__PURE__ */ new Map();
-    for (const e of entries) {
-      if (e.pr && !this.#noStacks.has(e.ref.host) && e.ref.host === "github.com") {
-        byHost.set(e.ref.host, [...byHost.get(e.ref.host) ?? [], e]);
-      }
-    }
-    for (const [host, list9] of byHost) {
-      const { query, variables } = stackQuery(list9.slice(0, BATCH2).map((e) => e.ref));
-      let data;
-      try {
-        data = await this.#gh.graphql(host, query, variables);
-      } catch (error) {
-        if (NO_STACK_FIELD.test(errorText(error))) {
-          this.#noStacks.add(host);
-        }
-        continue;
-      }
-      const asked2 = /* @__PURE__ */ new Set();
-      for (const [i, e] of list9.slice(0, BATCH2).entries()) {
-        const n = data[`p${i}`]?.pullRequest?.stack?.number;
-        const key2 = typeof n === "number" ? stackKey(host, e.ref.repository, n) : void 0;
-        if (!key2 || asked2.has(key2)) {
-          continue;
-        }
-        asked2.add(key2);
-        try {
-          const rows = await this.#gh.rest(host, "GET", `/repos/${e.ref.repository}/stacks?pull_request=${e.ref.number}`);
-          parseStacks(host, e.ref.repository, rows).forEach((s2) => this.#stacks.set(s2.key, s2));
-        } catch {
-        }
-      }
-    }
-    return [...this.#stacks.keys()].join() !== before;
-  }
-  async #read() {
-    await this.#readBranch();
-    await this.#readPrs();
-    if (await this.#readStacks(this.entries())) {
-      await this.#readPrs();
-    }
-  }
-  async #readPrs() {
-    const entries = this.entries();
-    const byHost = /* @__PURE__ */ new Map();
-    for (const e of entries) {
-      byHost.set(e.ref.host, [...byHost.get(e.ref.host) ?? [], e]);
-    }
-    let failed;
-    for (const [host, list9] of byHost) {
-      for (let i = 0; i < list9.length; i += BATCH2) {
-        const chunk = list9.slice(i, i + BATCH2);
-        const { query, variables } = batchQuery(chunk.map((e) => e.ref));
-        try {
-          const data = await this.#gh.graphql(host, query, variables);
-          chunk.forEach((e, j) => {
-            const pr = parsePullRequest(e.ref, data[`p${j}`]);
-            e.pr = pr ?? e.pr;
-            e.error = pr ? void 0 : "GitHub has no such pull request, or this token cannot see it.";
-          });
-        } catch (error) {
-          failed = errorText(error);
-          chunk.forEach((e) => e.error = failed);
-        }
-      }
-    }
-    this.#error = entries.length && entries.every((e) => e.error && !e.pr) ? failed : void 0;
-  }
-};
-
-// src/prs/aside.tsx
-var PrAside = class {
-  #host;
-  #view;
-  /** `host` is what the PR view reaches; the aside lends it the same one. */
-  constructor(host) {
-    this.#host = host;
-  }
-  get open() {
-    return this.#view !== void 0;
-  }
-  show(focus) {
-    if (!this.#view) {
-      this.#view = new PrView(this.#host);
-    }
-    if (focus) {
-      this.#view.select(focus);
-    }
-    this.#host.prs.poke();
-    this.#host.changed();
-  }
-  close() {
-    this.#view?.dispose();
-    this.#view = void 0;
-    this.#host.changed();
-  }
-  node(id) {
-    const view = this.#view;
-    if (!view) {
-      return null;
-    }
-    const now = Date.now();
-    const current = view.current();
-    return /* @__PURE__ */ jsx(
-      "prefs",
-      {
-        onAction: {
-          close: (ev) => {
-            if (!ev.value) {
-              this.close();
-            }
-          }
-        },
-        page: "pr",
-        pages: [],
-        role: "hermes.pr.aside",
-        sections: [],
-        title: current ? `${current.ref.repository.split("/")[1] ?? current.ref.repository} #${current.ref.number}` : "Pull requests",
-        children: /* @__PURE__ */ jsxs("col", { gap: "md", role: "hermes.pr.asideview", children: [
-          view.switcher(true),
-          view.header(now),
-          view.tabBar(),
-          /* @__PURE__ */ jsx("col", { gap: "md", role: "hermes.pr.body", children: view.body(`${id}.view.body`, now, "narrow") }, "body"),
-          view.actions()
-        ] }, "view")
-      },
-      "prs"
-    );
-  }
-};
-
-// src/session/adopt.ts
-function adoptSteps(host) {
-  const { state, transcript } = host;
-  return [
-    // The ids first: every step after reads the adopted session.
-    {
-      adopt: ({ ref }) => {
-        state.ref = ref;
-      }
-    },
-    {
-      adopt: ({ previous: previous3, ref }) => {
-        if (ref.live !== previous3.live) {
-          host.sheets.dropAll();
-          transcript.forgetCompactions();
-          state.busyMode = "queue";
-        }
-      }
-    },
-    // Read on every adopt: a reconnect may land on a gateway whose config changed.
-    { adopt: () => host.readBusyMode() },
-    // The session's own queue, from the snapshot (a reattach's rows of this pane become read-only rows).
-    { adopt: ({ r }) => host.queue.server.reset(pendingRows(r.info)) },
-    { adopt: ({ ref }) => host.showThoughts(ref.live) },
-    {
-      adopt: ({ previous: previous3, ref }) => {
-        host.markViewer(durable(ref), previous3.stored);
-        host.writeActiveSession(durable(ref));
-      }
-    },
-    {
-      adopt: ({ r }) => {
-        state.info = r.info ?? state.info;
-        state.usage = r.info?.usage ?? null;
-      }
-    },
-    // Another session: its own name (or none yet) on the tab.
-    { adopt: ({ r }) => host.title.adopt(typeof r.info?.title === "string" ? r.info.title : void 0) },
-    { adopt: () => host.reportCwd() },
-    {
-      adopt: ({ r }) => {
-        host.activity.set(busyFrom(r));
-        host.notices.reset();
-        host.activity.endCompaction();
-        host.forgetStatusNote();
-        transcript.usageBase(r.info?.usage ?? void 0);
-      }
-    },
-    {
-      adopt: ({ r, ref }) => {
-        if (r.messages?.length) {
-          transcript.load(r.messages, storedCompactions(durable(ref)));
-          host.agents.scan();
-          host.media.showAll(transcript.entries, (call) => host.imageLanded(call));
-        }
-      }
-    },
-    {
-      adopt: ({ ref }) => {
-        host.processes.poke();
-        host.connect.watch();
-        host.prs.adopt();
-        host.automation.adopt(ref.live);
-      }
-    },
-    {
-      adopt: ({ r }) => {
-        if (r.inflight) {
-          transcript.inflight(r.inflight, host.activity.busy?.startedAt);
-        }
-      }
-    },
-    { adopt: () => host.changed() }
-  ];
-}
-function adoptAll(steps, a2) {
-  for (const step of steps) {
-    step.adopt(a2);
-  }
-}
-
-// src/hermes/create.ts
-function createParams({ canonical, cols, cwd }) {
-  return canonical ? { ...localCreationOptions(), ...cwd ? { cwd } : {} } : { cols, ...cwd ? { cwd } : {} };
-}
-
-// src/session/views.ts
-var SessionViews = class {
-  #gw;
-  /** Shared-gateway subscriptions this view holds, by session id. */
-  #subscriptions = /* @__PURE__ */ new Map();
-  /** What superseded switches attached; released once no switch is in flight (see `release`). */
-  #stale = [];
-  /**
-   * The last `session.detach` in flight per session: a resume of that id waits for it (they share a
-   * subscription id). Set under the runtime id detached and read under the id a resume names: the
-   * shared gateway, the one that detaches, answers with one id for both.
-   */
-  #detaching = /* @__PURE__ */ new Map();
-  constructor(gw2) {
-    this.#gw = gw2;
-  }
-  /** Takes the ids of an adopted snapshot `r`, keeping its subscription (the shared gateway's). */
-  adopt(r) {
-    const { ref, subscription: subscription2 } = snapshotIds(r);
-    if (subscription2) {
-      this.#subscriptions.set(ref.live, subscription2);
-    }
-    return ref;
-  }
-  /** The detach of session `id` still in flight, if any. */
-  detaching(id) {
-    return this.#detaching.get(id);
-  }
-  /** A switch's result that a later switch superseded: nothing will show it. */
-  superseded(r) {
-    this.#stale.push(r);
-  }
-  /** Leaves every session this pane holds a subscription to. */
-  leaveAll(endReason) {
-    return Promise.all([...this.#subscriptions.keys()].map((sid) => this.leave(sid, endReason)));
-  }
-  /** Stops showing session `sid`: a shared-gateway view detaches (the session keeps running for its other viewers); a private gateway closes it. */
-  async leave(sid, endReason) {
-    const subscription2 = this.#subscriptions.get(sid);
-    if (!this.#gw.isCanonical) {
-      await rpc(this.#gw, "session.close", { session_id: sid }).catch(() => void 0);
-      return;
-    }
-    if (!subscription2) {
-      return;
-    }
-    this.#subscriptions.delete(sid);
-    await this.#detach(sid, subscription2, endReason);
-  }
-  /**
-   * Releases what superseded switches attached, once the adopted session (`shown`) is known. The
-   * gateway gives this view one subscription per session, so a stale result for the shown session
-   * is the live view's own and stays; others detach with no end reason (nobody chose to close them).
-   */
-  release(shown2) {
-    const stale = this.#stale;
-    this.#stale = [];
-    for (const r of stale) {
-      const { ref, subscription: subscription2 } = snapshotIds(r);
-      if (ref.live === shown2 || subscription2 && this.#subscriptions.get(ref.live) === subscription2) {
-        continue;
-      }
-      if (!this.#gw.isCanonical) {
-        void rpc(this.#gw, "session.close", { session_id: ref.live }).catch(() => void 0);
-      } else if (subscription2) {
-        void this.#detach(ref.live, subscription2);
-      }
-    }
-  }
-  /** Sends `session.detach`, one at a time per session; `endReason` lets the owner end it once no viewer remains. */
-  #detach(sid, subscription2, endReason) {
-    const send = () => rpc(this.#gw, "session.detach", {
-      ...endReason ? { end_reason: endReason } : {},
-      session_id: sid,
-      subscription_id: subscription2
-    });
-    const run6 = (this.#detaching.get(sid)?.then(send) ?? send()).catch(() => void 0);
-    this.#detaching.set(sid, run6);
-    void run6.then(() => {
-      if (this.#detaching.get(sid) === run6) {
-        this.#detaching.delete(sid);
-      }
-    });
-    return run6;
-  }
-};
-
-// src/session/lifecycle.ts
-var SessionLifecycle = class {
-  #host;
-  /** What an adopt runs, in order (session/adopt.ts). */
-  #steps;
-  #switches = new Switches();
-  /** The sessions this pane views: its subscriptions, detaches in flight, and superseded switches' results. */
-  #views;
-  /** Server requests for another session, kept while a switch is in flight. */
-  #heldRequests = [];
-  constructor(host, steps) {
-    this.#host = host;
-    this.#steps = steps;
-    this.#views = new SessionViews(host.gw);
-  }
-  /** Whether a session switch is in flight: prompts and the queue wait for the session it adopts. */
-  get switching() {
-    return this.#switches.pending;
-  }
-  /**
-   * A ticket for a reply to the shown session (a slash command's): stale once the view left it, or
-   * while a switch begun since is in flight (Ink's stale()).
-   */
-  replyTicket() {
-    const session2 = this.#host.state.ticket();
-    const since = this.#switches.since();
-    return {
-      isCurrent: () => session2.isCurrent() && !(this.#switches.pending && !since.isCurrent()),
-      signal: session2.signal,
-      sid: session2.sid
-    };
-  }
-  /** gateway.ready: a reconnect's reattaches the shown session; only a sessionless app bootstraps. */
-  ready() {
-    const { stored } = this.#host.state.ref;
-    void (stored ? this.reattach(stored) : this.#bootstrap());
-  }
-  /** The gateway went away: the runtime session died with it, and nothing can answer the held requests. */
-  lost() {
-    const { state } = this.#host;
-    state.ref = { live: null, stored: state.ref.stored };
-    this.#heldRequests = [];
-  }
-  /**
-   * session.replay_gap for `sessionId`: the view fell behind and the owner retired its subscription
-   * (the socket is fine, so no reconnect re-attaches it). A fresh resume brings the snapshot and a
-   * new subscription.
-   */
-  fellBehind(sessionId) {
-    const ref = this.#host.state.ref;
-    if (isLive(ref) && sessionId === ref.live) {
-      void this.reattach(durable(ref), "Reloaded the session: this view fell behind its events.");
-    }
-  }
-  /** Routes a server request: another session's waits while a switch is in flight (held here), or drops. */
-  route(req) {
-    const route = this.#switches.route(this.#host.state.ref.live, req.params.session_id);
-    if (route === "hold") {
-      this.#heldRequests.push(req);
-    }
-    return route;
-  }
-  /** request.cancel for request `id`: true when it was held here (it is dropped). */
-  unhold(id) {
-    const held = this.#heldRequests.some((r) => r.id === id);
-    this.#heldRequests = this.#heldRequests.filter((r) => r.id !== id);
-    return held;
-  }
-  /** Leaves every session this pane holds a subscription to (quitting). */
-  leaveAll(endReason) {
-    return this.#views.leaveAll(endReason);
-  }
-  /** The first session: HERMES_TUI_RESUME's, else a new one; then the launcher's startup image, if any. */
-  async #bootstrap() {
-    const host = this.#host;
-    const resume = host.launch.resume;
-    try {
-      await (resume ? this.resume(storedSessionId(resume)) : this.newSession());
-    } catch (error) {
-      host.transcript.notice(`Could not start a session: ${errorText(error)}`, "error");
-      host.changed();
-      return;
-    }
-    const sid = host.state.ref.live;
-    if (sid && host.awaitingStartup()) {
-      await host.attachStartup(sid);
-    }
-  }
-  /** After a reconnect (or a replay gap): resumes the shown session under `id` (its runtime id or subscription died). */
-  async reattach(id, notice = "Reconnected to the agent backend.") {
-    const host = this.#host;
-    try {
-      if (await this.reload(id)) {
-        host.transcript.notice(notice);
-      }
-    } catch (error) {
-      host.transcript.notice(`Could not reattach the session: ${errorText(error)}`, "error");
-    }
-    host.changed();
-  }
-  /** Closes the open session and starts a fresh one with an empty transcript, named `title` if given. */
-  async newSession(title) {
-    if (this.#busySwitch()) {
-      return;
-    }
-    const host = this.#host;
-    const previous3 = host.state.ref.live;
-    const token = this.#switches.begin();
-    try {
-      const setup = await rpc(host.gw, "setup.status", {});
-      if (!this.#switches.current(token)) {
-        return;
-      }
-      if (setup?.provider_configured === false) {
-        host.transcript.notice("No model provider is configured. Run `hermes setup`, then start again.", "warning");
-        return;
-      }
-      const r = await rpc(
-        host.gw,
-        "session.create",
-        createParams({ canonical: host.gw.isCanonical, cols: host.cols(), cwd: host.launch.sessionCwd })
-      );
-      if (!this.#switches.current(token)) {
-        this.#views.superseded(r);
-        return;
-      }
-      this.#fresh();
-      this.#adopt(r);
-      if (previous3 && previous3 !== r.session_id) {
-        void this.#views.leave(previous3, "tui_close");
-      }
-    } finally {
-      this.#settle(token);
-    }
-    const sid = host.state.ref.live;
-    if (title && sid) {
-      await host.rename(sid, title);
-    }
-  }
-  /** Resumes stored session `id`: its history replaces the transcript, and the session it leaves is closed. */
-  async resume(id) {
-    if (this.#busySwitch()) {
-      return;
-    }
-    const previous3 = this.#host.state.ref.live;
-    const r = await this.reload(id);
-    if (r && previous3 && previous3 !== r.session_id) {
-      void this.#views.leave(previous3, "tui_close");
-    }
-  }
-  /**
-   * Resumes and adopts session `id` (its stored id, or a runtime id when none is known); undefined
-   * when a later switch superseded this one.
-   */
-  async reload(id) {
-    const host = this.#host;
-    const token = this.#switches.begin();
-    const hold = host.gw.holdAttach(id);
-    let snapshot3;
-    try {
-      const detaching = this.#views.detaching(id);
-      if (detaching) {
-        await detaching;
-        if (!this.#switches.current(token)) {
-          return void 0;
-        }
-      }
-      const r = await rpc(host.gw, "session.resume", { cols: host.cols(), session_id: id });
-      if (!this.#switches.current(token)) {
-        this.#views.superseded(r);
-        return void 0;
-      }
-      this.#fresh();
-      this.#adopt(r);
-      snapshot3 = r;
-      host.sheets.dropShared();
-      host.gw.hydrateSharedPrompts(r);
-      return r;
-    } finally {
-      host.gw.settleAttach(hold, snapshot3);
-      this.#settle(token);
-    }
-  }
-  /** Refuses a session switch while a turn runs (its queue and prompts belong to this session); true when refused. */
-  #busySwitch() {
-    const host = this.#host;
-    if (!host.busy()) {
-      return false;
-    }
-    host.transcript.notice("Wait for the current turn to finish (or press Esc twice) before switching sessions.", "warning");
-    host.changed();
-    return true;
-  }
-  /** An empty transcript with its welcome, for the session about to be adopted. */
-  #fresh() {
-    const { transcript } = this.#host;
-    transcript.clear();
-    transcript.push({ id: transcript.id("w"), kind: "welcome" });
-  }
-  /** Takes on snapshot `r`: its ids (and the shared gateway's subscription), then each adopt step in order. */
-  #adopt(r) {
-    const ref = this.#views.adopt(r);
-    adoptAll(this.#steps, { previous: this.#host.state.ref, r, ref });
-  }
-  /**
-   * Ends switch `token`. Once none is in flight, in this order: what superseded switches attached is
-   * released, the held requests open (or drop), the queue drains, and the pane renders.
-   */
-  #settle(token) {
-    const host = this.#host;
-    this.#switches.end(token);
-    if (this.#switches.pending) {
-      return;
-    }
-    this.#views.release(host.state.ref.live);
-    const held = this.#heldRequests;
-    this.#heldRequests = [];
-    for (const req of held) {
-      host.request(req);
-    }
-    host.drain();
-    host.changed();
-  }
-};
-
-// src/session/state.ts
-function sessionTicket(shown2, signal) {
-  const sid = shown2();
-  return { isCurrent: () => shown2() === sid, signal, sid };
-}
-var SessionState = class {
-  #changed;
-  #ref = NO_SESSION;
-  #info = null;
-  #usage = null;
-  #busyMode = "queue";
-  /** One generation per shown runtime id: a ticket's signal aborts once the view leaves its session. */
-  #shown = new Epoch();
-  constructor(changed) {
-    this.#changed = changed;
-  }
-  /** The open session's ids: the runtime id requests name, and the stored id it is saved under. */
-  get ref() {
-    return this.#ref;
-  }
-  set ref(ref) {
-    if (ref.live !== this.#ref.live) {
-      this.#shown.next();
-    }
-    this.#ref = ref;
-    this.#changed();
-  }
-  /** The gateway's session.info, merged; null before the first session. */
-  get info() {
-    return this.#info;
-  }
-  set info(info) {
-    this.#info = info;
-    this.#changed();
-  }
-  /** The session's token and context counters. */
-  get usage() {
-    return this.#usage;
-  }
-  set usage(usage) {
-    this.#usage = usage;
-    this.#changed();
-  }
-  /** What Enter does while a turn runs (`display.busy_input_mode`); queue until the gateway says. */
-  get busyMode() {
-    return this.#busyMode;
-  }
-  set busyMode(mode) {
-    this.#busyMode = mode;
-    this.#changed();
-  }
-  /** A ticket for the session shown now: current while the view shows it. */
-  ticket() {
-    return sessionTicket(() => this.#ref.live, this.#shown.current().signal);
-  }
-};
-
-// src/session/thoughts.ts
-function showThoughts(host, sid) {
-  if (host.settings.load().thoughts === false) {
-    return;
-  }
-  rpc(host.gw, "config.set", { key: "show_reasoning", session_id: sid, value: "on" }).catch((error) => {
-    host.notice(`Could not turn on thoughts: ${error.message}`, "warning");
-  });
-}
-
-// src/surface/osc.ts
-import { hostname } from "node:os";
-function setTabTitle(title, out = process.stdout) {
-  out.write(`\x1B]2;${title.replace(/[\x00-\x1f]/g, " ")}\x07`);
-}
-function reportCwd(cwd, out = process.stdout) {
-  out.write(`\x1B]7;file://${hostname()}${encodeURI(cwd)}\x07`);
-}
-
-// src/session/title.ts
-var READ_MS = 400;
-var SessionTitle = class {
-  #host;
-  #text = "";
-  #timer;
-  constructor(host) {
-    this.#host = host;
-  }
-  /** The title; '' while the session has none. */
-  get text() {
-    return this.#text;
-  }
-  /** Names the session `title` (trimmed) on the strip and the tab; true when it changed. */
-  set(title) {
-    const next3 = title?.trim();
-    if (!next3 || next3 === this.#text) {
-      return false;
-    }
-    this.#text = next3;
-    setTabTitle(next3);
-    return true;
-  }
-  /** Another session is shown: its own name (or none yet) on the tab, and a read of the list. */
-  adopt(title) {
-    this.#text = "";
-    this.set(title);
-    this.read();
-  }
-  /**
-   * Reads the session's title from the session list, a moment after the list changed: the shared
-   * gateway tells viewers only that (`sessions.changed`) when /title or the auto-titler names it,
-   * and serves no `session.title`. The session is among the newest rows; its stored id finds it.
-   */
-  read() {
-    clearTimeout(this.#timer);
-    this.#timer = setTimeout(() => void this.#fetch(), READ_MS);
-  }
-  /** Names session `sid` (`/new <title>`): the shared gateway's rename mutation, a private one's `session.title`. */
-  async rename(sid, title) {
-    const host = this.#host;
-    try {
-      const r = host.gw.isCanonical ? await mutateSession(host.gw, sid, "rename", { title }) : await rpc(host.gw, "session.title", { session_id: sid, title });
-      if (sid === host.session.ref.live && this.set(String(r?.title ?? title))) {
-        host.changed();
-      }
-    } catch (error) {
-      host.notice(`Could not name the session: ${errorText(error)}`, "warning");
-    }
-  }
-  /** Stops a pending list read. */
-  dispose() {
-    clearTimeout(this.#timer);
-  }
-  async #fetch() {
-    const { live: sid, stored } = this.#host.session.ref;
-    const ids = new Set([sid, stored].filter(Boolean));
-    if (!sid) {
-      return;
-    }
-    try {
-      const r = await rpc(this.#host.gw, "session.list", { limit: 20 });
-      const row2 = r?.sessions?.find((x) => ids.has(x.id ?? "") || ids.has(x.resolved_id ?? ""));
-      if (sid === this.#host.session.ref.live && this.set(row2?.title)) {
-        this.#host.changed();
-      }
-    } catch {
-    }
-  }
-};
-
-// src/sidebar.tsx
-var POLL_MS3 = 5e3;
-var ACTS = ["close", "page", "copy-branch", "open-pr", "diff", "all-files"];
-var MAX_FILES = 40;
-var Sidebar = class {
-  #host;
-  #open = false;
-  #state;
-  #cwd = null;
-  #timer;
-  #reading = false;
-  #copied = false;
-  #copiedTimer;
-  constructor(host) {
-    this.#host = host;
-  }
-  get open() {
-    return this.#open;
-  }
-  get state() {
-    return this.#state;
-  }
-  toggle() {
-    this.#open = !this.#open;
-    clearTimeout(this.#timer);
-    if (this.#open) {
-      void this.refresh();
-    }
-    this.#host.changed();
-  }
-  /** Reads git again now (a tool changed files, the turn ended). */
-  poke() {
-    if (this.#open) {
-      void this.refresh();
-    }
-  }
-  dispose() {
-    this.#open = false;
-    clearTimeout(this.#timer);
-  }
-  async refresh() {
-    const cwd = this.#host.session.info?.cwd || null;
-    if (this.#reading) {
-      return;
-    }
-    this.#reading = true;
-    clearTimeout(this.#timer);
-    try {
-      this.#state = cwd ? await gitState(cwd) : void 0;
-      this.#cwd = cwd;
-    } finally {
-      this.#reading = false;
-      if (this.#open) {
-        this.#timer = setTimeout(() => void this.refresh(), POLL_MS3);
-      }
-      this.#host.changed();
-    }
-  }
-  node(id) {
-    if (!this.#open) {
-      return null;
-    }
-    const host = this.#host;
-    const git3 = this.#state;
-    const prs = host.prs.entries().toReversed();
-    const files = git3?.files ?? [];
-    const added = files.reduce((n, f) => n + f.additions, 0);
-    const removed = files.reduce((n, f) => n + f.deletions, 0);
-    const where = git3?.upstream ? git3.ahead || git3.behind ? [git3.ahead && `${git3.ahead} ahead`, git3.behind && `${git3.behind} behind`].filter(Boolean).join(", ") + ` of ${git3.upstream}` : `Up to date with ${git3.upstream}` : "Not pushed: no upstream";
-    const branchRows = git3 ? [
-      {
-        control: git3.branch ? { act: "copy-branch", k: "action", label: this.#copied ? "Copied" : "Copy" } : void 0,
-        hint: git3.branch ? where : "Detached HEAD",
-        id: "branch",
-        label: git3.branch ?? "No branch"
-      }
-    ] : [{ disabled: this.#cwd ? "This folder is not in a git repository." : "The session has no folder yet.", id: "branch", label: "No git" }];
-    const prRows = prs.length ? prs.map((e) => ({
-      control: { act: "open-pr", k: "action", label: "Open" },
-      hint: e.pr ? [
-        stateLabel(e.pr),
-        e.pr.checks.length ? `checks ${checksState(e.pr.checks)}` : "",
-        e.source === "branch" ? "this branch" : e.source === "stack" ? "stack layer" : ""
-      ].filter(Boolean).join(" \xB7 ") : e.error ?? "Reading GitHub\u2026",
-      id: `pr:${prKey(e.ref)}`,
-      label: `#${e.ref.number} ${e.pr?.title ?? e.ref.repository}`,
-      warning: e.pr?.state === "open" && e.pr.mergeable === "conflicting" ? "Conflicts with its base branch" : void 0
-    })) : [{ disabled: "Hermes links each PR it opens; the branch\u2019s PR shows here too.", id: "no-prs", label: "None yet" }];
-    const fileRows = files.length ? files.slice(0, MAX_FILES).map((f) => ({
-      control: { act: "diff", k: "action", label: "Diff" },
-      hint: `${f.status}${f.staged ? ", staged" : ""} \xB7 +${f.additions} \u2212${f.deletions}`,
-      id: `file:${f.path}`,
-      label: f.path
-    })) : git3 ? [{ disabled: "Nothing changed since the last commit.", id: "no-files", label: "Clean" }] : [];
-    return /* @__PURE__ */ jsx(
-      "prefs",
-      {
-        lead: git3 ? git3.root.replace(launchEnv().home ?? "\0", "~") : host.session.info?.cwd ?? "",
-        onAction: Object.fromEntries(ACTS.map((act) => [act, (ev) => this.#action(act, ev.value)])),
-        page: "session",
-        pages: [{ icon: "branch", id: "session", label: "Session" }],
-        sections: [
-          { id: "branch", rows: branchRows, title: "Branch" },
-          { id: "prs", rows: prRows, title: `Pull requests${prs.length ? ` \xB7 ${prs.length}` : ""}` },
-          ...fileRows.length ? [
-            {
-              id: "files",
-              rows: [
-                ...fileRows,
-                ...files.length > MAX_FILES ? [{ control: { act: "all-files", k: "action", label: "Show all" }, id: "more", label: `${files.length - MAX_FILES} more` }] : []
-              ],
-              title: files.length ? `Changes \xB7 ${files.length} files \xB7 +${added} \u2212${removed}` : "Changes"
-            }
-          ] : []
-        ],
-        title: "Session"
-      },
-      "sidebar"
-    );
-  }
-  #action(act, value) {
-    const row2 = typeof value === "string" ? value : "";
-    switch (act) {
-      case "close":
-        if (!row2) {
-          this.toggle();
-        }
-        return;
-      case "copy-branch":
-        if (this.#state?.branch) {
-          copyToClipboard(this.#state.branch);
-          this.#copied = true;
-          clearTimeout(this.#copiedTimer);
-          this.#copiedTimer = setTimeout(() => {
-            this.#copied = false;
-            this.#host.changed();
-          }, 1500);
-          this.#host.changed();
-        }
-        return;
-      case "open-pr":
-        return openPullRequests(this.#host, this.#host.prs.keyOf(row2.replace(/^pr:/, "")));
-      case "diff":
-        return openChanges(this.#host, row2.replace(/^file:/, ""));
-      case "all-files":
-        return openChanges(this.#host);
-    }
-  }
-};
-
-// src/processes/widgets/author.ts
-import { spawn as spawn2 } from "node:child_process";
-import { join as join11 } from "node:path";
-var MAX_BRIEF_CHARS = 1500;
-var MAX_SAMPLE_LINE_CHARS = 300;
-var MAX_SAMPLE_BYTES = 12 * 1024;
-var MAX_SHAPE_REPEATS = 3;
-var REQUEST_TIMEOUT_MS2 = 12e4;
-var SYSTEM_PROMPT = `You design the live status widget of a coding agent's background process (benchmark, eval, CI, tests, build, training, server). From the command and samples of its output you write a spec once; plain code then runs its regexes on every new line and redraws the widget until the process ends. Nobody can fix it later: its rules MUST match the real lines.
-
-A widget charts a quantity that shows how the process is going: throughput, latency, loss, tests or trials passed, progress toward a total the process states. When the output has none, call \`respond\` with only \`{"skip":"<why>"}\`; no widget beats a meaningless one. Never chart activity: lines or matches seen, words like \`error\` inside file contents.
-
-Otherwise call \`respond\` with:
-- \`title\` (\u2264 48 chars): what is watched.
-- \`rules\` (1\u201312) \`{from, match, key?, text?, count?, scale?}\`:
-  - \`from\`: the sample source id carrying the data (\`out\` for the process's output, \`file:1\` for a log file the command writes to), \`*\` for all.
-  - \`match\`: a JavaScript regex on one line; no lookaround or backreferences. Copy the literal text around the data from the samples; allow varying digits (\`[\\d.]+\`) and widths (\`\\s+\`).
-  - Each named group \`(?P<name>\u2026)\` feeds field \`name\` (\`[a-z][a-z0-9_]*\`) with its number (\`1,234\`, \`4.5k\` parse). One rule can capture several fields of a line.
-  - \`key\`: the rule's group naming a series (model, shard, CI job); the rule's fields keep one series per key. Not a field itself.
-  - \`text\`: the rule's group kept as text (status word, test name).
-  - \`count\`: a field counting matching lines.
-  - \`scale\`: multiplies the rule's numbers.
-- \`blocks\` (1\u20134, most important first), each on a \`field\`:
-  - \`spark\`: numbers over time. \`label\`, \`key?\` (one key value, e.g. \`gpt-5\`), \`unit?\`, \`better?\` (\`higher\`|\`lower\`), \`target?\` + \`targetLabel?\` (goal line the command or output states), \`min?\`, \`max?\`.
-  - \`bars\`: one bar per key, reduced by \`agg\`. \`label\`, \`unit?\`, \`max?\`, \`better?\`.
-  - \`meter\`: \`agg\` out of a \`total\` (a value ref, or a number the process or its output states; never a guess), \`label\`, \`unit?\`.
-  - \`stat\`: \`items\`, 1\u20134 value refs with \`label\`.
-  - \`grid\`: a cell per key, coloured by latest text. \`label\`, \`tones\`: lowercase status substring \u2192 \`success\`|\`error\`|\`warning\`|\`pending\`|\`info\`|\`muted\`|\`neutral\`.
-  - \`text\`: the field's latest text.
-- \`headline?\`: the value ref to glance at. \`stage?\`: field whose latest text is the current step.
-
-Value ref: \`{field, agg, label?, key?, unit?, digits?, better?}\`; \`key\` is one key value, \`better\` adds a trend arrow. \`agg\` over numbers: \`last\` \`first\` \`min\` \`max\` \`mean\` \`sum\` \`delta\` \`change\` (%); over matches: \`count\`, \`rate\` (/s, last minute).
-
-Chart what a watcher wants: throughput or latency against the goal, progress toward a known total, per-model results, failures. Few accurate blocks; never invent lines the samples lack. Omit optional properties you do not need.
-
-Examples:
-
-\`req 8 rps=56 p50=41ms\`, goal 60 req/s:
-{"title":"load test \xB7 rps","rules":[{"from":"out","match":"^req \\\\d+ rps=(?P<rps>[\\\\d.]+) p50=(?P<p50>[\\\\d.]+)ms"}],"blocks":[{"kind":"spark","field":"rps","label":"req/s","unit":"req/s","better":"higher","target":60,"targetLabel":"goal 60"},{"kind":"stat","items":[{"field":"p50","agg":"last","label":"p50","unit":"ms","better":"lower"}]}],"headline":{"field":"rps","agg":"last","unit":"req/s","better":"higher"}}
-
-\`finish bash openai/gpt-5 t2: reward=1 tests=27/36 turns=5\`, 9 trials:
-{"title":"eval \xB7 tests passed per model","rules":[{"from":"out","match":"^finish \\\\S+ (?P<model>\\\\S+) t\\\\d+: .*tests=(?P<passed>\\\\d+)/\\\\d+","key":"model","count":"trials"}],"blocks":[{"kind":"bars","field":"passed","agg":"mean","label":"tests passed","max":36,"better":"higher"},{"kind":"meter","field":"trials","agg":"count","total":9,"label":"trials"}]}
-
-\`\u2713 lint (1m02s)\` / \`\u2717 test-linux (4m11s)\` / \`* build-macos\`:
-{"title":"CI \xB7 6 jobs","rules":[{"from":"*","match":"^(?P<mark>[\u2713\u2717*-])\\\\s+(?P<name>\\\\S+)","key":"name","text":"mark"}],"blocks":[{"kind":"grid","field":"mark","label":"jobs","tones":{"\u2713":"success","\u2717":"error","*":"pending","-":"muted"}}]}
-
-pytest, \`tests/test_api.py::test_login PASSED [ 12%]\`:
-{"title":"pytest \xB7 tests/","rules":[{"from":"out","match":" PASSED ","count":"pass"},{"from":"out","match":" FAILED ","count":"fail"},{"from":"out","match":"^(?P<current>\\\\S+::\\\\S+) \\\\w+\\\\s+\\\\[\\\\s*(?P<pct>\\\\d+)%\\\\]","text":"current"}],"blocks":[{"kind":"meter","field":"pct","agg":"last","total":100,"label":"progress","unit":"%"},{"kind":"stat","items":[{"field":"pass","agg":"count","label":"passed"},{"field":"fail","agg":"count","label":"failed"}]}],"stage":"current"}`;
-var byteLength = (s2) => Buffer.byteLength(s2) + 1;
-var clip2 = (text12, max) => text12.length > max ? `${text12.slice(0, max - 1)}\u2026` : text12;
-function promptSources(sources) {
-  let budget = MAX_SAMPLE_BYTES;
-  return sources.map((source2, index2) => {
-    const share = Math.floor(budget / (sources.length - index2));
-    const take = (lines, limit) => {
-      const out = [];
-      const shapes = /* @__PURE__ */ new Map();
-      let used = 0;
-      for (const line of lines) {
-        const trimmed = line.trimStart();
-        if (trimmed.startsWith("```") || trimmed.startsWith("~~~")) {
-          continue;
-        }
-        const shape = trimmed.replace(/\d+/g, "0").replace(/\s+/g, " ");
-        const repeats = shapes.get(shape) ?? 0;
-        if (repeats >= MAX_SHAPE_REPEATS) {
-          continue;
-        }
-        shapes.set(shape, repeats + 1);
-        const sample = clip2(line, MAX_SAMPLE_LINE_CHARS);
-        if (used + byteLength(sample) > limit) {
-          break;
-        }
-        used += byteLength(sample);
-        out.push(sample);
-      }
-      budget -= used;
-      return out;
-    };
-    const tail = take(source2.tail.slice().reverse(), source2.head.length ? Math.floor(share * 2 / 3) : share).reverse();
-    const head2 = take(source2.head, share - tail.reduce((n, l) => n + byteLength(l), 0));
-    return {
-      head: head2,
-      id: source2.id,
-      label: source2.label,
-      lines: source2.lines,
-      omitted: Math.max(0, source2.lines - head2.length - tail.length),
-      size: source2.size,
-      tail
-    };
-  });
-}
-function renderPrompt(request) {
-  const fence = (body) => `\`\`\`
-${body}
-\`\`\``;
-  const out = ["<job>", "Background process. Command:", fence(clip2(request.command.trim(), MAX_BRIEF_CHARS)), "</job>", "", "<sources>"];
-  for (const s2 of promptSources(request.sources)) {
-    const omitted = s2.omitted ? ` ${s2.omitted} not shown: the middle, and repeats of a line that differ only in numbers.` : "";
-    const tail = s2.tail.length ? [...s2.omitted ? ["[\u2026]"] : [], ...s2.tail] : [];
-    out.push(`## \`${s2.id}\` \u2014 ${s2.label}`, `${s2.lines} lines so far (${s2.size} characters).${omitted}`, fence([...s2.head, ...tail].join("\n")));
-  }
-  out.push("</sources>");
-  if (request.previous) {
-    out.push(
-      "",
-      `A spec is already in place, but ${request.previous.reason}. Write a replacement that matches the lines above:`,
-      fence(JSON.stringify(request.previous.spec))
-    );
-  }
-  if (request.rejected) {
-    out.push(
-      "",
-      "Your previous answer was rejected:",
-      fence(clip2(request.rejected.answer, 4e3)),
-      "Problems:",
-      ...request.rejected.errors.map((e) => `- ${e}`),
-      "Fix every problem and call `respond` again."
-    );
-  }
-  return out.join("\n");
-}
-function hermesAuthor(env2 = process.env) {
-  const python = env2.HERMES_PYTHON?.trim();
-  const root7 = env2.HERMES_PYTHON_SRC_ROOT;
-  const ui = env2.HERMES_TUI_DIR;
-  if (!python || !root7 || !ui) {
-    return void 0;
-  }
-  const script = join11(ui, "..", "widget_author.py");
-  return (request, signal) => new Promise((resolve7, reject) => {
-    const child = spawn2(python, [script], {
-      cwd: root7,
-      env: { ...env2, PYTHONPATH: root7 },
-      signal,
-      stdio: ["pipe", "pipe", "ignore"],
-      timeout: REQUEST_TIMEOUT_MS2
-    });
-    let stdout = "";
-    child.stdout.setEncoding("utf8").on("data", (chunk) => stdout += chunk);
-    child.on("error", reject);
-    child.stdin.on("error", () => void 0);
-    child.on("close", () => {
-      try {
-        const reply = JSON.parse(stdout.trim().split("\n").at(-1) ?? "");
-        return reply.unavailable ? resolve7(void 0) : reply.error ? reject(new Error(reply.error)) : resolve7(reply.answer);
-      } catch {
-        reject(new Error("widget_author.py gave no answer"));
-      }
-    });
-    child.stdin.end(JSON.stringify({ schema: SPEC_SCHEMA, system: SYSTEM_PROMPT, user: renderPrompt(request) }));
-  });
-}
-
-// src/processes/widgets/memory.ts
-import { mkdirSync as mkdirSync4, readdirSync as readdirSync2, readFileSync as readFileSync5, rmSync as rmSync2, statSync, writeFileSync as writeFileSync3 } from "node:fs";
-import { join as join12 } from "node:path";
-var KEEP_MS = 7 * 24 * 36e5;
-var safe3 = (id) => /^[\w.-]{1,128}$/.test(id);
-function chartMemory(dir2 = join12(dataDir(), "charts"), now = Date.now) {
-  return {
-    load(id) {
-      if (!safe3(id)) {
-        return void 0;
-      }
-      try {
-        const value = JSON.parse(readFileSync5(join12(dir2, `${id}.json`), "utf8"));
-        if (value && typeof value === "object" && typeof value.skip === "number") {
-          return { skip: value.skip };
-        }
-        const checked = validateSpec(value);
-        return checked.ok ? checked.spec : void 0;
-      } catch {
-        return void 0;
-      }
-    },
-    save(id, value) {
-      if (!safe3(id)) {
-        return;
-      }
-      try {
-        mkdirSync4(dir2, { recursive: true });
-        writeFileSync3(join12(dir2, `${id}.json`), JSON.stringify(value));
-        for (const name of readdirSync2(dir2)) {
-          const file2 = join12(dir2, name);
-          if (now() - statSync(file2).mtimeMs > KEEP_MS) {
-            rmSync2(file2, { force: true });
-          }
-        }
-      } catch {
-      }
-    }
-  };
-}
-
-// src/settings.ts
-import { mkdirSync as mkdirSync5, readFileSync as readFileSync6, writeFileSync as writeFileSync4 } from "node:fs";
-import { homedir as homedir12 } from "node:os";
-import { dirname, join as join13 } from "node:path";
-function settingsFile(env2 = process.env) {
-  return join13(env2.HERMES_HOME || join13(homedir12(), ".hermes"), "hermes-tern", "settings.json");
-}
-function loadSettings(file2 = settingsFile()) {
-  try {
-    const parsed2 = JSON.parse(readFileSync6(file2, "utf8"));
-    return parsed2 && typeof parsed2 === "object" ? parsed2 : {};
-  } catch {
-    return {};
-  }
-}
-function saveSettings(patch6, file2 = settingsFile()) {
-  const next3 = { ...loadSettings(file2), ...patch6 };
-  mkdirSync5(dirname(file2), { recursive: true });
-  writeFileSync4(file2, `${JSON.stringify(next3, null, 2)}
-`);
-  return next3;
-}
-function fileSettings(file2) {
-  return {
-    load: () => loadSettings(file2 ?? settingsFile()),
-    save: (patch6) => saveSettings(patch6, file2 ?? settingsFile())
-  };
-}
-
-// src/turn/activity.ts
-var NO_COMPACTION = { kind: "none" };
-var Activity = class {
-  #busy = null;
-  #compaction = NO_COMPACTION;
-  /** The working row; null when no turn (or expansion) runs. */
-  get busy() {
-    return this.#busy;
-  }
-  /** Sets the busy state as given (a resumed session's, or one a test arranges). */
-  set(busy) {
-    this.#busy = busy;
-  }
-  /** A new working row labelled `label`, with an age of its own. */
-  startBusy(label, now = Date.now()) {
-    this.#busy = { label, since: {}, startedAt: now };
-  }
-  /**
-   * Relabels the working row, keeping its age. An empty label, or none running, changes nothing.
-   * The stream's labels wait while the context is compacted; `status`: a label of the user's or
-   * a status line's own (the interrupt's 'Stopping…', a retry), which shows then too.
-   */
-  relabel(label, { status = false } = {}) {
-    if (this.#busy && label && (status || this.#compaction.kind === "none")) {
-      this.#busy = { ...this.#busy, label };
-    }
-  }
-  /** No turn runs now. */
-  endBusy() {
-    this.#busy = null;
-  }
-  /** The compaction phase. */
-  get compaction() {
-    return this.#compaction;
-  }
-  /** The running compaction, or undefined. */
-  get compacting() {
-    return this.#compaction.kind === "running" ? this.#compaction : void 0;
-  }
-  /** A compaction started; one already running keeps its age (a /compress and its own status edge). */
-  startCompaction({ manual }, now = Date.now()) {
-    if (this.#compaction.kind === "none") {
-      this.#compaction = { kind: "running", manual, since: {}, startedAt: now };
-    }
-  }
-  /** No compaction runs now. */
-  endCompaction() {
-    this.#compaction = NO_COMPACTION;
-  }
-};
-
-// src/turn/serverQueue.ts
-function busyModeOf(raw2) {
-  const v = typeof raw2 === "string" ? raw2.trim().toLowerCase() : "";
-  return v === "interrupt" || v === "steer" ? v : "queue";
-}
-function ownRow(own14) {
-  return own14.admission.kind === "admitted" ? { id: own14.admission.id, kind: "mine", own: own14, text: own14.display } : { kind: "sending", own: own14, text: own14.display };
-}
-var isServerQueued = (row2) => row2.status === "queued" || row2.status === "unknown";
-var ServerQueue = class {
-  rows = [];
-  #own = [];
-  /** Input ids whose bubble this pane painted (an idle send, or a started admission). */
-  #shown = /* @__PURE__ */ new Set();
-  /** Admissions seen queued and never started: a `cancelled` completion of one is not the turn's. */
-  #queuedOnly = /* @__PURE__ */ new Set();
-  /** Input ids of own admissions the FIFO has listed. */
-  #listed = /* @__PURE__ */ new Set();
-  /** Another session: its FIFO from the resume snapshot, and none of the last one's bookkeeping. */
-  reset(rows) {
-    this.#own.length = 0;
-    this.#shown.clear();
-    this.#queuedOnly.clear();
-    this.#listed.clear();
-    this.rows = [];
-    this.update(rows);
-  }
-  /** A prompt about to be admitted behind the turn; its row shows at once. */
-  admit(own14) {
-    this.#own.push(own14);
-  }
-  /** Forgets an own admission (refused, withdrawn, or back in the composer). */
-  drop(own14) {
-    const at = this.#own.indexOf(own14);
-    if (at >= 0) {
-      this.#own.splice(at, 1);
-    }
-  }
-  /** A prompt whose bubble this pane painted when it sent it. */
-  shown(inputId2) {
-    this.#shown.add(inputId2);
-  }
-  /**
-   * Takes the FIFO from a session.info (or a reconnect's resume) and returns the bubbles owed,
-   * in order: this pane's admissions that started, and another viewer's rows this pane saw move
-   * from queued to started (a resume snapshot's started row is already in the replayed history).
-   */
-  update(rows) {
-    if (!rows) {
-      return [];
-    }
-    const was = new Set(this.rows.filter((r) => r.status === "queued").map((r) => r.admission_id));
-    const owed = [];
-    for (const row2 of rows) {
-      if (row2.status === "queued") {
-        this.#queuedOnly.add(row2.admission_id);
-      }
-      if (row2.status !== "started") {
-        continue;
-      }
-      this.#queuedOnly.delete(row2.admission_id);
-      if (row2.input_id && this.#shown.has(row2.input_id)) {
-        continue;
-      }
-      const own14 = this.#own.find((o) => o.inputId === row2.input_id);
-      if (own14 || was.has(row2.admission_id)) {
-        if (row2.input_id) {
-          this.#shown.add(row2.input_id);
-        }
-        if (own14) {
-          this.drop(own14);
-        }
-        owed.push({ own: own14, text: own14?.display ?? row2.user });
-      }
-    }
-    this.rows = rows;
-    const listed = new Set(rows.map((r) => r.input_id));
-    for (const own14 of [...this.#own]) {
-      if (listed.has(own14.inputId)) {
-        this.#listed.add(own14.inputId);
-      } else if (this.#listed.has(own14.inputId)) {
-        this.drop(own14);
-      }
-    }
-    return owed;
-  }
-  /** Withdrawn by this pane: its row's `cancelled` completion must not end the running turn. */
-  withdrawn(admissionId2) {
-    this.#queuedOnly.add(admissionId2);
-  }
-  /** A message.complete that only settles a queued row nobody started (prompt.cancel's), not the running turn. */
-  settlesQueuedRow(payload) {
-    const id = cancelledAdmission(payload);
-    return id !== void 0 && this.#queuedOnly.has(id);
-  }
-  /** The rows that still wait, oldest first: the FIFO's, then admissions it does not list yet. */
-  queued() {
-    const rows = this.rows.filter(isServerQueued).map((row2) => {
-      const own14 = this.#own.find((o) => o.inputId === row2.input_id);
-      return own14 ? ownRow(own14) : { kind: "theirs", row: row2, text: row2.user };
-    });
-    const listed = new Set(this.rows.map((r) => r.input_id));
-    return [...rows, ...this.#own.filter((o) => !listed.has(o.inputId)).map(ownRow)];
-  }
-};
-
-// src/turn/queue.ts
-var PromptQueue = class {
-  /** Prompts held here until they can be sent: no session yet, a switch in flight, or a private gateway's busy turn. */
-  held = [];
-  /** The shared gateway's queue for this session: its FIFO, this pane's admissions, the bubbles they owe. */
-  server = new ServerQueue();
-  #host;
-  constructor(host) {
-    this.#host = host;
-  }
-  /** Holds `prompt` behind the others. */
-  hold(prompt) {
-    this.held.push(prompt);
-  }
-  /** Holds `prompt` ahead of the others (a send that found a switch in flight). */
-  holdFirst(prompt) {
-    this.held.unshift(prompt);
-  }
-  /**
-   * The startup image goes to the startup query at the queue's head, into its images in place;
-   * false when nothing is held.
-   */
-  attachToHead(image3) {
-    const head2 = this.held[0];
-    head2?.images.push(image3);
-    return Boolean(head2);
-  }
-  /** Prompts waiting behind the turn: this pane's own queue, then the shared gateway's. */
-  count() {
-    return this.held.length + this.server.queued().length;
-  }
-  /** The dock's queued rows, in count()'s order, with what each one's Edit and Steer can do. */
-  rows() {
-    const steer3 = this.#host.busy();
-    return [
-      ...this.held.map((p3) => ({ kind: "local", steer: steer3, text: userText(shownText(p3), p3.images) })),
-      ...this.server.queued().map((q2) => {
-        switch (q2.kind) {
-          case "theirs":
-            return { kind: "foreign", note: q2.row.status === "unknown" ? "unknown" : "elsewhere", text: internalNotice(q2.text) ?? q2.text };
-          // Withdrawing it needs the gateway's id for it: until prompt.submit answers it is on its way.
-          case "sending":
-            return { kind: "sending", text: q2.text };
-          case "mine":
-            return { kind: "mine", steer: steer3 && !q2.own.item.prompt.images.length, text: q2.text };
-        }
-      })
-    ];
-  }
-  /**
-   * Admits `prompt` into session `sid`'s FIFO now (Ink's busy-time admission): crash-durable, and in
-   * every viewer's queue. Its bubble waits until the gateway starts it; a refusal puts it back in
-   * the composer. `sent`: what to send instead of expanding the prompt again (a re-queued steer).
-   */
-  async admit(sid, prompt, sent) {
-    const host = this.#host;
-    const ticket = host.ticket();
-    const ready = sent === void 0 ? await host.expanded(sid, prompt) : { images: prompt.images, text: sent };
-    if (!ready || !ticket.isCurrent()) {
-      return;
-    }
-    const own14 = {
-      admission: { kind: "pending" },
-      display: userText(shownText(prompt), prompt.images),
-      inputId: newInputId(),
-      item: { prompt, sent: ready.text }
-    };
-    const attachments = ready.images.map(({ mime, path: path2 }) => ({ mime, path: path2 }));
-    this.server.admit(own14);
-    host.changed();
-    try {
-      const r = await rpc(host.gw, "prompt.submit", {
-        queued: true,
-        session_id: sid,
-        submission_id: own14.inputId,
-        text: ready.text || (attachments.length ? IMAGE_ONLY_PROMPT : ""),
-        ...attachments.length ? { attachments } : {}
-      });
-      const id = admissionOf(r);
-      if (id !== void 0) {
-        own14.admission = { id, kind: "admitted" };
-      }
-    } catch (error) {
-      this.server.drop(own14);
-      if (ticket.isCurrent()) {
-        host.transcript.notice(`Not queued: ${errorText(error)}. Your message is back in the composer.`, "error");
-        host.restore(prompt);
-      }
-    }
-    host.changed();
-  }
-  /** Alt+Up / a queued row's Edit: queued prompt `index` (the oldest by default) back into the composer. */
-  dequeue(index2 = 0) {
-    const host = this.#host;
-    if (index2 < this.held.length) {
-      const [next3] = this.held.splice(index2, 1);
-      if (next3) {
-        host.restore(next3);
-        host.changed();
-      }
-      return;
-    }
-    const ticket = host.ticket();
-    const { sid } = ticket;
-    const q2 = this.#mine(index2);
-    if (!sid || !q2) {
-      return;
-    }
-    void this.#withdraw(sid, q2).then((out) => {
-      if (out && ticket.isCurrent()) {
-        host.restore(q2.own.item.prompt);
-      }
-      host.changed();
-    });
-  }
-  /** Alt+Enter / a queued row's Steer: injects queued prompt `index` into the running turn instead of waiting for it to end. */
-  steer(index2) {
-    const host = this.#host;
-    const ticket = host.ticket();
-    const { sid } = ticket;
-    if (!host.busy() || !sid) {
-      return;
-    }
-    if (index2 >= this.held.length) {
-      return void this.#steerServerQueued(ticket, sid, index2);
-    }
-    const prompt = this.held[index2];
-    if (!prompt) {
-      return;
-    }
-    if (prompt.images.length) {
-      host.transcript.notice("A queued prompt with images cannot steer the turn. It stays queued.", "warning");
-      return host.changed();
-    }
-    const { text: text12 } = prompt;
-    this.held.splice(index2, 1);
-    host.changed();
-    void steerTurn(host.gw, sid, text12).then((r) => {
-      if (r.ok) {
-        host.transcript.steer(text12);
-      } else {
-        this.held.splice(index2, 0, prompt);
-        host.transcript.notice(
-          r.error ? `Steer failed: ${r.error}. It stays queued.` : "The turn ended before the steer landed. It will send as the next prompt.",
-          "warning"
-        );
-        this.drain();
-      }
-      host.changed();
-    });
-  }
-  /** Sends the oldest held prompt once the session is adopted and idle (no turn, switch or startup image pending). */
-  drain() {
-    if (!this.#host.canDrain()) {
-      return;
-    }
-    const next3 = this.held.shift();
-    if (next3) {
-      this.#host.send(next3);
-    }
-  }
-  /** The shared gateway's queued row at dock index `index`, if this pane can act on it. */
-  #mine(index2) {
-    const q2 = this.server.queued()[index2 - this.held.length];
-    return q2?.kind === "mine" ? q2 : void 0;
-  }
-  /**
-   * Takes this pane's admission out of the gateway's queue (prompt.cancel); true once withdrawn,
-   * false when it started meanwhile (it runs as its own turn) or the gateway refused.
-   */
-  async #withdraw(sid, q2) {
-    this.server.withdrawn(q2.id);
-    try {
-      const r = await rpc(this.#host.gw, "prompt.cancel", { admission_id: q2.id, session_id: sid });
-      if (r?.status !== "terminal") {
-        return false;
-      }
-    } catch (error) {
-      this.#host.transcript.notice(`Could not take the prompt out of the queue: ${errorText(error)}`, "error");
-      this.#host.changed();
-      return false;
-    }
-    this.server.drop(q2.own);
-    return true;
-  }
-  /**
-   * A Steer on a row in the gateway's queue: withdrawn from it, then steered into the turn; a steer
-   * that does not land goes back into the queue, at its end.
-   */
-  async #steerServerQueued(ticket, sid, index2) {
-    const host = this.#host;
-    const q2 = this.#mine(index2);
-    if (!q2) {
-      return;
-    }
-    const { prompt, sent } = q2.own.item;
-    if (prompt.images.length) {
-      host.transcript.notice("A queued prompt with images cannot steer the turn. It stays queued.", "warning");
-      return host.changed();
-    }
-    if (!await this.#withdraw(sid, q2) || !ticket.isCurrent()) {
-      return;
-    }
-    const r = await steerTurn(host.gw, sid, sent);
-    if (!ticket.isCurrent()) {
-      return;
-    }
-    if (r.ok) {
-      host.transcript.steer(shownText(prompt));
-    } else {
-      host.transcript.notice(
-        r.error ? `Steer failed: ${r.error}. Queued again, at the end.` : "The turn ended before the steer landed. Queued again.",
-        "warning"
-      );
-      void this.admit(sid, prompt, sent);
-    }
-    host.changed();
-  }
-};
-
-// src/turn/expand.ts
-var EXPANDING_LABEL = "Running {!\u2026}";
-function hasCommands(prompt) {
-  return typedCommands(prompt.text, prompt.pasted).length > 0;
-}
-async function expand2(host, sid, prompt) {
-  if (prompt.kind !== "typed" || !hasCommands(prompt)) {
-    return prompt;
-  }
-  try {
-    return { images: prompt.images, text: await interpolate(host.gw, sid, prompt.text, prompt.pasted) };
-  } catch (error) {
-    host.transcript.notice(`Not sent: a {!\u2026} command failed: ${shellError(error)}.`, "error");
-    host.restore(prompt);
-    host.changed();
-    return void 0;
-  }
-}
-
-// src/turn/router.ts
-function gateTurn(s2) {
-  if (s2.busy) {
-    return "busy";
-  }
-  if (s2.compacting) {
-    return "behind";
-  }
-  return "send";
-}
-function gateSubmit(s2) {
-  if (!s2.sid || s2.switching) {
-    return "hold";
-  }
-  return gateTurn(s2);
-}
-function gateBehind(s2) {
-  if (!s2.canonical || !s2.sid || s2.switching) {
-    return { kind: "hold" };
-  }
-  return { kind: "admit", sid: s2.sid };
-}
-function gateSend(s2) {
-  if (!s2.sid || s2.switching) {
-    return { kind: "hold" };
-  }
-  return { kind: "send", sid: s2.sid };
-}
-function gateDrain(s2) {
-  return !(s2.busy || s2.compacting || !s2.sid || s2.switching || s2.awaitingStartup);
-}
-var PromptRouter = class {
-  #host;
-  constructor(host) {
-    this.#host = host;
-  }
-  /** Sends, queues or holds `prompt` as its entry's gate says; while a turn runs, as `mode` says. */
-  route(prompt, mode, entry) {
-    const s2 = this.#host.gates();
-    switch (entry === "typed" ? gateSubmit(s2) : gateTurn(s2)) {
-      case "hold":
-        return this.#host.queue.hold(prompt);
-      case "busy":
-        return void this.#busyInput(prompt, mode);
-      case "behind":
-        return this.behind(prompt);
-      case "send":
-        return this.send(prompt);
-    }
-  }
-  /**
-   * A prompt entered while a turn runs, as Ink's handleBusyInput: `steer` injects it into the turn,
-   * `interrupt` redirects the turn with it, `queue` puts it behind the turn. A steer or redirect
-   * carries no images, and one the gateway refuses is queued instead.
-   */
-  async #busyInput(prompt, mode) {
-    const host = this.#host;
-    const ticket = host.ticket();
-    const { sid } = ticket;
-    if (!sid || mode === "queue" || prompt.images.length) {
-      return this.behind(prompt);
-    }
-    const ready = await this.expanded(sid, prompt);
-    if (!ready || !ticket.isCurrent()) {
-      return;
-    }
-    const r = await (mode === "steer" ? steerTurn : redirectTurn)(host.gw, sid, ready.text);
-    if (!ticket.isCurrent()) {
-      return;
-    }
-    if (r.ok) {
-      host.transcript.steer(shownText(prompt));
-    } else {
-      if (r.error) {
-        host.transcript.notice(`${mode === "steer" ? "Steer" : "Redirect"} failed: ${r.error}. Queued instead.`, "warning");
-      }
-      this.behind(prompt);
-    }
-    host.changed();
-  }
-  /** Puts `prompt` behind the running turn: into the shared gateway's queue at once, else held here. */
-  behind(prompt) {
-    const host = this.#host;
-    const gate = gateBehind(host.gates());
-    if (gate.kind === "hold") {
-      host.queue.hold(prompt);
-      host.queue.drain();
-      return host.changed();
-    }
-    void host.queue.admit(gate.sid, prompt);
-  }
-  /** `prompt` with its `{!cmd}`s run (a typed prompt's); undefined when one failed (the prompt is back in the composer). */
-  expanded(sid, prompt) {
-    return expand2(this.#host, sid, prompt);
-  }
-  /**
-   * Sends `prompt` now; `queued` marks a drained queue entry (the gateway must queue it, never steer
-   * with it). A typed prompt's `{!cmd}`s run first and their output takes their place; `display` is
-   * what the transcript shows.
-   */
-  send(prompt, { display = prompt.kind === "command" ? prompt.display : void 0, queued = false } = {}) {
-    const host = this.#host;
-    const gate = gateSend(host.gates());
-    if (gate.kind === "hold") {
-      host.queue.holdFirst(prompt);
-      return;
-    }
-    const { sid } = gate;
-    if (prompt.kind === "typed" && hasCommands(prompt)) {
-      host.activity.startBusy(EXPANDING_LABEL);
-      host.changed();
-      void this.expanded(sid, prompt).then((ready) => {
-        host.activity.endBusy();
-        if (ready) {
-          this.send({ images: ready.images, kind: "app", text: ready.text }, { display: prompt.text, queued });
-        } else {
-          host.queue.drain();
-          host.changed();
-        }
-      });
-      return;
-    }
-    const { images } = prompt;
-    const text12 = prompt.text || (images.length ? IMAGE_ONLY_PROMPT : "");
-    const attachments = images.map(({ mime, path: path2 }) => ({ mime, path: path2 }));
-    const submission = newInputId();
-    host.transcript.user({ attachments: userImages(images), text: display?.trim() || prompt.text });
-    host.queue.server.shown(submission);
-    host.activity.startBusy("Working\u2026");
-    host.changed();
-    rpc(host.gw, "prompt.submit", {
-      session_id: sid,
-      submission_id: submission,
-      text: text12,
-      ...queued ? { queued } : {},
-      ...attachments.length ? { attachments } : {}
-    }).catch((error) => {
-      host.transcript.notice(`Not sent: ${error.message}. Your message is back in the composer.`, "error");
-      host.activity.endBusy();
-      host.restore(prompt);
-      host.queue.drain();
-      host.changed();
-    });
-  }
-};
 
 // src/view/styles.ts
 var STYLES = css`
@@ -71684,6 +66903,5313 @@ var SurfaceHost = class {
   }
   scroll(id, to) {
     this.#surface.scroll(id, to);
+  }
+};
+
+// src/surface/osc.ts
+import { hostname } from "node:os";
+function setTabTitle(title, out = process.stdout) {
+  out.write(`\x1B]2;${title.replace(/[\x00-\x1f]/g, " ")}\x07`);
+}
+function reportCwd(cwd, out = process.stdout) {
+  out.write(`\x1B]7;file://${hostname()}${encodeURI(cwd)}\x07`);
+}
+
+// src/turn/prompt.ts
+var IMAGE_ONLY_PROMPT = "What do you see in this image?";
+function shownText(prompt) {
+  return (prompt.kind === "command" ? prompt.display : void 0) ?? prompt.text;
+}
+function userText(text12, images) {
+  const count = images.length ? `\u{1F4CE} ${images.length} image${images.length === 1 ? "" : "s"}` : "";
+  return [text12, count].filter(Boolean).join("\n\n");
+}
+function userImages(images) {
+  return images.map((i) => ({ kind: "image", name: i.name, ...i.preview ? { source: i.preview } : {} }));
+}
+
+// src/turn/serverQueue.ts
+function busyModeOf(raw2) {
+  const v = typeof raw2 === "string" ? raw2.trim().toLowerCase() : "";
+  return v === "interrupt" || v === "steer" ? v : "queue";
+}
+function ownRow(own14) {
+  return own14.admission.kind === "admitted" ? { id: own14.admission.id, kind: "mine", own: own14, text: own14.display } : { kind: "sending", own: own14, text: own14.display };
+}
+var isServerQueued = (row2) => row2.status === "queued" || row2.status === "unknown";
+var ServerQueue = class {
+  rows = [];
+  #own = [];
+  /** Input ids whose bubble this pane painted (an idle send, or a started admission). */
+  #shown = /* @__PURE__ */ new Set();
+  /** Admissions seen queued and never started: a `cancelled` completion of one is not the turn's. */
+  #queuedOnly = /* @__PURE__ */ new Set();
+  /** Input ids of own admissions the FIFO has listed. */
+  #listed = /* @__PURE__ */ new Set();
+  /** Another session: its FIFO from the resume snapshot, and none of the last one's bookkeeping. */
+  reset(rows) {
+    this.#own.length = 0;
+    this.#shown.clear();
+    this.#queuedOnly.clear();
+    this.#listed.clear();
+    this.rows = [];
+    this.update(rows);
+  }
+  /** A prompt about to be admitted behind the turn; its row shows at once. */
+  admit(own14) {
+    this.#own.push(own14);
+  }
+  /** Forgets an own admission (refused, withdrawn, or back in the composer). */
+  drop(own14) {
+    const at = this.#own.indexOf(own14);
+    if (at >= 0) {
+      this.#own.splice(at, 1);
+    }
+  }
+  /** A prompt whose bubble this pane painted when it sent it. */
+  shown(inputId2) {
+    this.#shown.add(inputId2);
+  }
+  /**
+   * Takes the FIFO from a session.info (or a reconnect's resume) and returns the bubbles owed,
+   * in order: this pane's admissions that started, and another viewer's rows this pane saw move
+   * from queued to started (a resume snapshot's started row is already in the replayed history).
+   */
+  update(rows) {
+    if (!rows) {
+      return [];
+    }
+    const was = new Set(this.rows.filter((r) => r.status === "queued").map((r) => r.admission_id));
+    const owed = [];
+    for (const row2 of rows) {
+      if (row2.status === "queued") {
+        this.#queuedOnly.add(row2.admission_id);
+      }
+      if (row2.status !== "started") {
+        continue;
+      }
+      this.#queuedOnly.delete(row2.admission_id);
+      if (row2.input_id && this.#shown.has(row2.input_id)) {
+        continue;
+      }
+      const own14 = this.#own.find((o) => o.inputId === row2.input_id);
+      if (own14 || was.has(row2.admission_id)) {
+        if (row2.input_id) {
+          this.#shown.add(row2.input_id);
+        }
+        if (own14) {
+          this.drop(own14);
+        }
+        owed.push({ own: own14, text: own14?.display ?? row2.user });
+      }
+    }
+    this.rows = rows;
+    const listed = new Set(rows.map((r) => r.input_id));
+    for (const own14 of [...this.#own]) {
+      if (listed.has(own14.inputId)) {
+        this.#listed.add(own14.inputId);
+      } else if (this.#listed.has(own14.inputId)) {
+        this.drop(own14);
+      }
+    }
+    return owed;
+  }
+  /** Withdrawn by this pane: its row's `cancelled` completion must not end the running turn. */
+  withdrawn(admissionId2) {
+    this.#queuedOnly.add(admissionId2);
+  }
+  /** A message.complete that only settles a queued row nobody started (prompt.cancel's), not the running turn. */
+  settlesQueuedRow(payload) {
+    const id = cancelledAdmission(payload);
+    return id !== void 0 && this.#queuedOnly.has(id);
+  }
+  /** The rows that still wait, oldest first: the FIFO's, then admissions it does not list yet. */
+  queued() {
+    const rows = this.rows.filter(isServerQueued).map((row2) => {
+      const own14 = this.#own.find((o) => o.inputId === row2.input_id);
+      return own14 ? ownRow(own14) : { kind: "theirs", row: row2, text: row2.user };
+    });
+    const listed = new Set(this.rows.map((r) => r.input_id));
+    return [...rows, ...this.#own.filter((o) => !listed.has(o.inputId)).map(ownRow)];
+  }
+};
+
+// src/chrome/hud.ts
+var plain3 = (k) => !k.ctrl && !k.alt && !k.meta && !k.shift;
+function hudKey(k, cx) {
+  const { focused, pills: pills2 } = cx;
+  if (!focused || !pills2.includes(focused)) {
+    return k.name === "down" && plain3(k) && cx.idle && pills2.length ? { consumed: true, focused: pills2[0] } : { consumed: false };
+  }
+  const at = pills2.indexOf(focused);
+  switch (plain3(k) ? k.name : "") {
+    case "left":
+      return { consumed: true, focused: pills2[Math.max(0, at - 1)] };
+    case "right":
+      return { consumed: true, focused: pills2[Math.min(pills2.length - 1, at + 1)] };
+    case "enter":
+    case "space":
+      return { consumed: true, open: focused };
+    case "escape":
+    case "up":
+      return { consumed: true };
+    case "down":
+      return { consumed: true, focused };
+    default:
+      return { consumed: false };
+  }
+}
+function todos(list9, busy) {
+  if (!list9?.length) {
+    return void 0;
+  }
+  const { done, total } = todoProgress(list9);
+  return total && (busy || done < total) ? list9 : void 0;
+}
+function pills(s2) {
+  return [
+    // While a turn runs the todo pill rides the working line, where the keys don't reach it.
+    ...s2.todos && !s2.busy ? ["todos"] : [],
+    ...s2.agents ? ["agents"] : [],
+    ...s2.shells ? ["shells"] : [],
+    ...s2.prs ? ["prs"] : [],
+    ...s2.goal ? ["goal"] : [],
+    ...s2.loop ? ["loop"] : []
+  ];
+}
+var Hud = class {
+  #host;
+  #focused;
+  #todosOpen = false;
+  constructor(host) {
+    this.#host = host;
+  }
+  /** The pill holding the keys (Down from an empty prompt), if any. */
+  get focused() {
+    return this.#focused;
+  }
+  /** The todo panel above the composer is open. */
+  get todosOpen() {
+    return this.#todosOpen;
+  }
+  /** Down from an empty prompt focuses the pills; ←/→, Enter and Esc/↑ while one holds the keys. True when the key ends here. */
+  key(k, cx) {
+    const out = hudKey(k, { ...cx, ...this.#focused ? { focused: this.#focused } : {} });
+    this.#focused = out.focused;
+    if (out.open) {
+      this.#open(out.open);
+    }
+    return out.consumed;
+  }
+  /** Folds the todo panel open or shut. */
+  toggleTodos() {
+    this.#todosOpen = !this.#todosOpen;
+    this.#host.changed();
+  }
+  /** Each frame: a pill that left (its last process aged out) hands the keys back. */
+  prune(shown2) {
+    this.#focused = this.#focused && shown2.includes(this.#focused) ? this.#focused : void 0;
+  }
+  /** The composer took the focus back (a click in it). */
+  release() {
+    this.#focused = void 0;
+  }
+  #open(pill2) {
+    switch (pill2) {
+      case "todos":
+        this.toggleTodos();
+        break;
+      case "agents":
+      case "goal":
+      case "loop":
+      case "prs":
+      case "shells":
+        this.#host.open(pill2);
+        break;
+    }
+  }
+};
+
+// src/view/dockModel.ts
+var PLACEHOLDER = "Ask Hermes \u2014 / commands \xB7 @ files";
+var IDLE = { kind: "idle" };
+function isModal(overlays) {
+  return overlays.at(-1)?.modal === true;
+}
+function shownTodos(src) {
+  return todos(src.transcript.currentTodos(), Boolean(src.activity.busy));
+}
+function shownPills(src, now) {
+  return pills({
+    agents: src.agents.running().length,
+    busy: Boolean(src.activity.busy),
+    goal: Boolean(src.automation.goal),
+    loop: Boolean(src.automation.loop(now)),
+    prs: src.prs.entries().length,
+    shells: src.processes.recent(now).length,
+    todos: shownTodos(src)
+  });
+}
+function dockActivity(a2) {
+  const { busy, compacting } = a2;
+  if (busy) {
+    return { kind: "turn", label: busy.label, since: busy.since, startedAt: busy.startedAt };
+  }
+  return compacting ? { kind: "compacting", since: compacting.since, startedAt: compacting.startedAt } : IDLE;
+}
+function dockModel(src, now) {
+  const { info, usage } = src.session;
+  const modal2 = isModal(src.overlays);
+  const used = usage?.context_used ?? 0;
+  const max = usage?.context_max ?? 0;
+  const list9 = shownTodos(src);
+  return {
+    activity: dockActivity(src.activity),
+    composer: {
+      attachments: src.attachments.chips(),
+      draft: src.composer,
+      ghost: modal2 ? "" : src.completion.ghost,
+      placeholder: PLACEHOLDER,
+      ready: src.session.ref.live !== null
+    },
+    now,
+    pills: {
+      agents: src.agents.running().length,
+      automation: { goal: src.automation.goal, loop: src.automation.loop(now), loopOwner: src.automation.loopSnapshot },
+      focused: modal2 ? void 0 : src.hud.focused,
+      prs: prsPill(src.prs.entries()),
+      reconnecting: src.reconnect.redial,
+      shells: shellsOf(src.processes, now),
+      todos: list9 ? { list: list9, open: src.hud.todosOpen } : void 0
+    },
+    queue: { canSteer: src.activity.busy !== null, rows: src.queue.rows() },
+    route: {
+      effort: info?.reasoning_effort ?? "",
+      effortWire: info?.reasoning_effort_wire || void 0,
+      fast: fastTier(info),
+      model: info?.model ?? "",
+      reasons: capsOf(info)?.reasoning
+    },
+    status: {
+      branch: info?.branch ?? "",
+      compressions: typeof usage?.compressions === "number" ? usage.compressions : void 0,
+      context: max > 0 ? { max, used } : void 0,
+      cost: usage?.cost_usd ?? void 0,
+      notice: src.notices.current(now),
+      rates: {
+        cache: typeof usage?.cache_hit_pct === "number" ? usage.cache_hit_pct : void 0,
+        tps: typeof usage?.avg_tps === "number" && usage.avg_tps > 0 ? usage.avg_tps : void 0
+      },
+      title: src.title.text || void 0,
+      tokens: typeof usage?.total === "number" ? usage.total : void 0
+    }
+  };
+}
+function shellsOf(processes, now) {
+  const recent = processes.recent(now);
+  const exited = recent.filter((p3) => !isRunning2(p3));
+  return {
+    charts: recent.flatMap((p3) => p3.chart && isRunning2(p3) ? [{ process: p3, view: p3.chart }] : []),
+    exited: exited.length,
+    running: recent.length - exited.length,
+    // The roster puts the newest exit first.
+    tone: exited[0] ? processTone(exited[0].status) : "muted"
+  };
+}
+
+// src/app/actions.ts
+var COPIED_MS3 = 1500;
+var AppActions = class {
+  #cx;
+  /** The prompt whose Copy button reads Copied, until the timer clears it. */
+  #copied;
+  #copiedTimer;
+  /** The folder last reported to Tern by OSC 7. */
+  #reportedCwd;
+  /** What the dock's buttons and fields do. */
+  dock;
+  /** What the key rules (draft/keys.ts) reach. */
+  keys;
+  /** What the Tern actions (surface/actions.ts) reach. */
+  events;
+  /** What a slash command reaches (commands/slash.ts). */
+  slash;
+  /** What the control and session commands' host is made from (commands/host.ts). */
+  host;
+  constructor(cx) {
+    this.#cx = cx;
+    const { attachments, chat, composer: composer2, gw: gw2, life, queue: queue2, transcript } = cx;
+    const changed = () => cx.changed();
+    this.dock = {
+      onAgents: () => openAgents(chat),
+      onEdit: (ev) => {
+        composer2.edit(ev);
+        changed();
+      },
+      onEffort: () => cycleEffort(chat),
+      onEffortMenu: {
+        "choose-effort": () => openEffortPicker(chat),
+        "save-effort-as-default": () => void chat.setEffort(cx.state.info?.reasoning_effort || DEFAULT_EFFORT, "global")
+      },
+      onGoal: () => openAutomation(chat, "goal"),
+      onInterrupt: () => this.interrupt(),
+      onLoop: () => openAutomation(chat, "loop"),
+      onModel: () => openModelPicker(chat),
+      onPrs: () => openPrMenu(chat),
+      onQueueEdit: (i) => queue2.dequeue(i),
+      onQueueSteer: (i) => queue2.steer(i),
+      onRemoveAttachment: (i) => attachments.remove(i),
+      onSend: (ev) => {
+        this.submit(ev.text);
+        changed();
+      },
+      onShells: () => openBackground(chat),
+      onSubmit: () => {
+        this.submitDraft();
+        changed();
+      },
+      onTodos: () => cx.hud.toggleTodos(),
+      onUndo: () => {
+        composer2.undo();
+        changed();
+      }
+    };
+    this.keys = {
+      attachClipboardImage: () => void attachments.fromClipboard(false),
+      attachments,
+      busy: () => cx.activity.busy !== null,
+      close: (overlay2) => chat.close(overlay2),
+      completion: cx.completion,
+      composer: composer2,
+      cycleEffort: () => cycleEffort(chat),
+      hud: (key2) => this.hudKey(key2),
+      interrupt: () => this.interrupt(),
+      now: Date.now,
+      openAgents: () => openAgents(chat),
+      openBackground: () => openBackground(chat),
+      openPrs: () => openPrMenu(chat),
+      presses: cx.presses,
+      queue: queue2,
+      quit: () => chat.quit(),
+      submitDraft: () => this.submitDraft(),
+      toggleSidebar: () => this.toggleSidebar(),
+      transcript
+    };
+    this.events = {
+      connect: cx.connect,
+      focusComposer: () => {
+        cx.hud.release();
+        cx.surface().focus(INPUT_ID);
+      },
+      modal: () => isModal(chat.overlays),
+      openAgent: (id) => void this.openAgent(id),
+      openProcess: (id) => openBackground(chat, id),
+      openUrl
+    };
+    this.slash = {
+      attachments,
+      catalog: new CommandCatalog(gw2),
+      changed,
+      composer: composer2,
+      gw: gw2,
+      host: chat,
+      life,
+      prompt: (item3) => cx.router.route(item3, cx.state.busyMode, "command"),
+      transcript
+    };
+    this.host = {
+      activity: cx.activity,
+      changed,
+      gw: gw2,
+      life,
+      queue: queue2,
+      router: cx.router,
+      setCompacting: (on, opts) => this.setCompacting(on, opts),
+      state: cx.state,
+      submit: (text12) => this.submit(text12, true, "queue"),
+      transcript
+    };
+  }
+  /** The entry whose Copy button reads Copied. */
+  get copied() {
+    return this.#copied;
+  }
+  /** A Copy button: `text` to the clipboard, and its button reads Copied for a moment. */
+  copy = (text12, id) => {
+    copyToClipboard(text12);
+    this.#copied = id;
+    this.#cx.changed();
+    clearTimeout(this.#copiedTimer);
+    this.#copiedTimer = setTimeout(() => {
+      this.#copied = void 0;
+      this.#cx.changed();
+    }, COPIED_MS3);
+  };
+  /** Clears the Copied timer. */
+  dispose() {
+    clearTimeout(this.#copiedTimer);
+  }
+  // ── Prompts and commands ───────────────────────────────────────────
+  /** Sends the composer's draft, with the pastes it holds. */
+  submitDraft() {
+    const pasted = [...this.#cx.composer.pasted];
+    this.submit(this.#cx.composer.take(), true, this.#cx.state.busyMode, pasted);
+  }
+  /**
+   * Sends or queues a prompt, or runs a command; `draft`: the user entered it (it takes the draft's
+   * images). While a turn runs the prompt goes as `busy` says: the session's busy_input_mode for
+   * a typed one; a message the app writes (a connect result) waits behind the turn. `pasted`:
+   * the draft's pastes, whose `{!cmd}`s and leading `!` stay as written.
+   */
+  submit(raw2, draft = true, busy = draft ? this.#cx.state.busyMode : "queue", pasted = []) {
+    const { attachments, composer: composer2, transcript } = this.#cx;
+    const text12 = raw2.trim();
+    if (draft && attachments.uploading && !text12.startsWith("/")) {
+      composer2.set(raw2);
+      composer2.repasted(pasted);
+      transcript.notice("An image is still attaching. Send again in a moment.", "warning");
+      return;
+    }
+    if (!text12 && !(draft && attachments.items.length)) {
+      return;
+    }
+    if (text12.startsWith("/")) {
+      void runSlash(text12, this.slash);
+      return;
+    }
+    if (text12.startsWith("!") && text12.slice(1).trim() && !pasted.some((p3) => text12.startsWith(p3.trim().split("\n")[0] ?? ""))) {
+      void this.#shell(text12.slice(1).trim());
+      return;
+    }
+    this.#cx.router.route({ images: draft ? attachments.take() : [], kind: "typed", pasted, text: text12 }, busy, "typed");
+  }
+  /** What the router's gates read: the session, the switch in flight, the turn, the compaction and the startup image. */
+  gates() {
+    const { activity } = this.#cx;
+    return {
+      awaitingStartup: this.#cx.attachments.awaitingStartup,
+      busy: activity.busy !== null,
+      canonical: this.#cx.gw.isCanonical,
+      compacting: activity.compacting !== void 0,
+      sid: this.#cx.state.ref.live,
+      switching: this.#cx.life.switching
+    };
+  }
+  /** Puts a prompt that did not go back into the composer, before any text there, with its images. */
+  restore(prompt) {
+    const { composer: composer2 } = this.#cx;
+    const text12 = shownText(prompt);
+    composer2.set(text12 && composer2.text ? `${text12}
+${composer2.text}` : text12 || composer2.text);
+    composer2.repasted(prompt.kind === "typed" ? prompt.pasted : []);
+    this.#cx.attachments.restore(prompt.images);
+  }
+  /** `!cmd`: runs `command` in the session's folder and shows its output; nothing reaches the model. */
+  async #shell(command) {
+    const { transcript } = this.#cx;
+    const sid = this.#cx.state.ref.live;
+    if (!sid) {
+      transcript.notice("Wait for the session to start before running a shell command.", "warning");
+      return this.#cx.changed();
+    }
+    transcript.user({ text: `!${command}` });
+    this.#cx.changed();
+    try {
+      for (const line of shellLines(await shellExec(this.#cx.gw, sid, command))) {
+        transcript.notice(line.text, line.failed ? "warning" : "info");
+      }
+    } catch (error) {
+      transcript.notice(`!${command} did not run: ${shellError(error)}.`, "error");
+    }
+    this.#cx.changed();
+  }
+  /** Stops the running turn: the working line says Stopping… until the stream's next label. */
+  interrupt() {
+    const { activity } = this.#cx;
+    const sid = this.#cx.state.ref.live;
+    if (!sid) {
+      return;
+    }
+    activity.relabel("Stopping\u2026", { status: true });
+    interruptTurn(this.#cx.gw, sid).catch((error) => {
+      const why = errorText(error);
+      if (activity.busy && !why.includes("stale_generation")) {
+        activity.relabel("Working\u2026", { status: true });
+        this.#cx.transcript.notice(`Could not stop the turn: ${why}`, "error");
+        this.#cx.changed();
+      }
+    });
+    this.#cx.changed();
+  }
+  /**
+   * A compaction started (`manual`: /compress's) or ended. While one runs the working line says so
+   * until its done edge, and with no turn running the dock shows it and prompts queue behind it;
+   * those go once it ends.
+   */
+  setCompacting(on, { manual = false } = {}) {
+    if (on) {
+      this.#cx.activity.startCompaction({ manual });
+    } else {
+      this.#cx.activity.endCompaction();
+      this.#cx.queue.drain();
+    }
+  }
+  /** Gives the compactions seen here their summaries from the store, `delay` ms from now. */
+  summarize(delay = 0) {
+    const { state, transcript } = this.#cx;
+    const ticket = state.ticket();
+    if (!transcript.unsummarized) {
+      return;
+    }
+    this.#cx.timers.timeout(() => {
+      const stored = state.info?.stored_session_id || state.ref.stored;
+      if (ticket.isCurrent() && stored && transcript.unsummarized) {
+        transcript.summarize(storedCompactions(stored));
+        this.#cx.changed();
+      }
+    }, delay);
+  }
+  /** Reads the shown session's busy_input_mode; an older gateway without it leaves Enter queueing (the TUI default). */
+  async readBusyMode() {
+    const ticket = this.#cx.state.ticket();
+    if (!ticket.sid) {
+      return;
+    }
+    try {
+      const r = await rpc(this.#cx.gw, "config.get", { key: "busy", session_id: ticket.sid });
+      if (ticket.isCurrent()) {
+        this.#cx.state.busyMode = busyModeOf(r?.value);
+      }
+    } catch {
+    }
+  }
+  /** `hermes -q … --image …`: attaches the image to the first session, then lets the startup query go. */
+  async attachStartupImage(sid) {
+    await this.#cx.attachments.attachStartup(sid);
+    this.#cx.queue.drain();
+    this.#cx.changed();
+  }
+  // ── Gateway requests and images ────────────────────────────────────
+  /** A server request: its prompt sheet, unless a switch holds it or it is another session's. */
+  onRequest(req) {
+    if (this.#cx.life.route(req) !== "show") {
+      return;
+    }
+    const overlay2 = promptOverlay(this.#cx.chat, req);
+    if (!overlay2) {
+      req.fail(-32601, `${req.method} is not supported by the Tern frontend`);
+      return;
+    }
+    this.#cx.sheets.open(overlay2, req);
+  }
+  /** `bytes` sent to Tern as a blob; undefined where it takes none, or for more than a blob holds. */
+  blob(bytes, mime) {
+    if (!this.#cx.tern.caps.features.includes("blobs")) {
+      return void 0;
+    }
+    try {
+      return this.#cx.tern.blob(bytes, mime);
+    } catch {
+      return void 0;
+    }
+  }
+  /** Has `call`'s image (a URL's) fetched; its card shows it once it lands. */
+  showImage(call) {
+    if (call) {
+      this.#cx.media.show(call, () => this.imageLanded(call));
+    }
+  }
+  /** A tool call's image landed: its card draws again. */
+  imageLanded(call) {
+    this.#cx.transcript.touchCall(call);
+    this.#cx.changed();
+  }
+  /** Tells Tern the session's folder when it moved (`hermes -w tern`, a moved workspace): OSC 7. */
+  reportCwd() {
+    const cwd = this.#cx.state.info?.cwd;
+    if (cwd && cwd !== this.#reportedCwd) {
+      this.#reportedCwd = cwd;
+      reportCwd(cwd);
+    }
+  }
+  // ── Pills, the sidebar and the PR aside ────────────────────────────
+  /** Down from an empty prompt focuses the pills; ←/→, Enter and Esc/↑ while one holds the keys. */
+  hudKey(key2) {
+    const { activity, chat, completion: completion2, composer: composer2, transcript } = this.#cx;
+    const { agents: agents2, automation, processes, prs } = chat;
+    return this.#cx.hud.key(key2, {
+      idle: !composer2.text && !composer2.browsing && !completion2.open,
+      pills: shownPills({ activity, agents: agents2, automation, processes, prs, transcript }, Date.now())
+    });
+  }
+  /** Opens the sheet behind a pill. */
+  openPill(pill2) {
+    const { chat } = this.#cx;
+    switch (pill2) {
+      case "agents":
+        openAgents(chat);
+        break;
+      case "shells":
+        openBackground(chat);
+        break;
+      case "prs":
+        openPrMenu(chat);
+        break;
+      case "goal":
+      case "loop":
+        openAutomation(chat, pill2);
+        break;
+    }
+  }
+  /** Opens or closes the session sidebar (Tern's aside); says why where Tern has none. */
+  toggleSidebar() {
+    const { prAside, sidebar: sidebar2 } = this.#cx;
+    if (!this.#cx.tern.caps.features.includes("aside")) {
+      this.#cx.transcript.notice("This Tern has no side panel (the aside feature). /changes and /prs still work.", "warning");
+      this.#cx.changed();
+      return;
+    }
+    if (!sidebar2.open && prAside.open) {
+      prAside.close();
+    }
+    sidebar2.toggle();
+  }
+  /** Docks PR `key` at the pane's right edge, in place of the session sidebar. */
+  openPrAside(key2) {
+    if (!this.#cx.tern.caps.features.includes("aside")) {
+      return openPrSheet(this.#cx.chat, key2);
+    }
+    if (this.#cx.sidebar.open) {
+      this.#cx.sidebar.toggle();
+    }
+    this.#cx.prAside.show(key2);
+  }
+  /** Shows subagent `id` beside the chat in a Tern split; its timeline sheet where no split can open. */
+  async openAgent(id) {
+    const { chat, state } = this.#cx;
+    const a2 = chat.agents.all().find((x) => x.id === id);
+    const sid = state.ref.live;
+    if (!a2 || !sid) {
+      return;
+    }
+    const cwd = state.info?.cwd || this.#cx.launch.home || "/";
+    if (!await openSidebar(specOf(a2, agentName(a2), sid, state.ref.stored), cwd)) {
+      openAgents(chat, { id, watch: true });
+    }
+  }
+};
+
+// src/status.ts
+var COMPACTING_LABEL = "Compacting context\u2026";
+function statusEffect(payload, last) {
+  const text12 = payload?.text?.trim();
+  const kind = payload?.kind ?? "";
+  if (!text12) {
+    return kind === "ready" ? { compacting: false } : {};
+  }
+  if (kind === "goal") {
+    return { notice: { text: text12, tone: text12.startsWith("\u2713") ? "success" : "info" } };
+  }
+  if (kind === "compacting" || kind === "compressing") {
+    return { compacting: true, label: COMPACTING_LABEL, ...counted(text12) };
+  }
+  if (kind === "compacted" || kind === "ready") {
+    return { compacting: false, label: text12, ...counted(text12) };
+  }
+  if (kind === "warn" || kind === "approval" || kind === "error") {
+    return text12 === last ? {} : { note: text12, notice: { text: text12, tone: kind === "error" ? "error" : "warning" } };
+  }
+  return { label: text12 };
+}
+function counted(text12) {
+  const tokens2 = lineTokens(text12);
+  return tokens2.before || tokens2.after ? { tokens: tokens2 } : {};
+}
+
+// src/view/queued.tsx
+function queuedNode(queued, on) {
+  return /* @__PURE__ */ jsx("col", { gap: "xs", role: "omp.queue", children: queued.map((q2, i) => /* @__PURE__ */ jsxs("row", { align: "center", gap: "sm", role: "omp.queue.item", title: queuedTitle(q2), children: [
+    /* @__PURE__ */ jsx("icon", { name: q2.kind === "sending" ? "clock" : "corner-down-right" }, "icon"),
+    /* @__PURE__ */ jsx("text", { grow: 1, text: q2.text.replace(/\s*\r?\n\s*/g, " \u21B5 "), truncate: "end", wrap: "none" }, "text"),
+    i === 0 && queued.length > 1 ? /* @__PURE__ */ jsx("badge", { role: "omp.queue.count", text: `${queued.length}` }, "count") : null,
+    q2.kind === "foreign" && q2.note === "unknown" ? /* @__PURE__ */ jsx("badge", { text: "unknown", tone: "warning" }, "note") : null,
+    on.steer && editable(q2) && q2.steer ? /* @__PURE__ */ jsxs(
+      "row",
+      {
+        align: "center",
+        gap: "xs",
+        onClick: () => on.steer?.(i),
+        role: "omp.queue.steer",
+        title: `Steer the running turn with this instead${i === 0 ? "  \u2325\u21B5" : ""}`,
+        children: [
+          /* @__PURE__ */ jsx("icon", { name: "corner-up-right" }, "i"),
+          i === 0 ? /* @__PURE__ */ jsx("kbd", { keys: ["alt", "enter"] }, "k") : null,
+          /* @__PURE__ */ jsx("text", { text: "Steer" }, "t")
+        ]
+      },
+      "steer"
+    ) : null,
+    editable(q2) ? /* @__PURE__ */ jsxs(
+      "row",
+      {
+        align: "center",
+        gap: "xs",
+        onClick: () => on.edit(i),
+        role: "omp.queue.edit",
+        title: `Edit in the composer${i === 0 ? "  \u2325\u2191" : ""}`,
+        children: [
+          i === 0 ? /* @__PURE__ */ jsx("kbd", { keys: ["alt", "up"] }, "k") : null,
+          /* @__PURE__ */ jsx("text", { text: "Edit" }, "t")
+        ]
+      },
+      "edit"
+    ) : null
+  ] }, `q${i}`)) }, "queue");
+}
+function queuedTitle(q2) {
+  switch (q2.kind) {
+    case "local":
+    case "mine":
+      return "Queued";
+    case "sending":
+      return "Queuing\u2026";
+    case "foreign":
+      return q2.note === "elsewhere" ? "Queued by another window (or before a reconnect)" : "Queued behind a turn whose outcome is unknown";
+    default:
+      return assertNever(q2, "queued row");
+  }
+}
+function editable(q2) {
+  return q2.kind === "local" || q2.kind === "mine";
+}
+
+// src/view/dock.tsx
+function dockNodes(cx, on) {
+  const nodes2 = [];
+  const { activity, pills: p3 } = cx;
+  const busy = activity.kind === "turn";
+  if (activity.kind !== "idle") {
+    nodes2.push(
+      /* @__PURE__ */ jsx("col", { role: "omp.hud.status", children: activityNode(activity, cx, on) }, "hud")
+    );
+  }
+  if (cx.queue.rows.length) {
+    nodes2.push(queuedNode(cx.queue.rows, { edit: on.onQueueEdit, steer: cx.queue.canSteer ? on.onQueueSteer : void 0 }));
+  }
+  if (p3.todos?.open) {
+    nodes2.push(
+      /* @__PURE__ */ jsx("col", { role: "hermes.todos", children: checklistNode(p3.todos.list) }, "todos")
+    );
+  }
+  const reconnect = reconnectNode(p3.reconnecting, cx.now);
+  if (reconnect) {
+    nodes2.push(reconnect);
+  }
+  const automation = automationNode(p3.automation && { ...p3.automation, onGoal: on.onGoal, onLoop: on.onLoop }, cx.now, p3.focused);
+  if (automation) {
+    nodes2.push(automation);
+  }
+  const pills2 = [
+    // While a turn runs the todo pill rides the working line instead.
+    p3.todos && !busy ? todosPillNode(p3.todos, on.onTodos, p3.focused === "todos") : null,
+    p3.agents ? agentsPill(p3.agents, on.onAgents, p3.focused === "agents") : null,
+    p3.shells && (p3.shells.running || p3.shells.exited) ? shellsPill(p3.shells, on.onShells, p3.focused === "shells") : null,
+    p3.prs ? prsPillNode(p3.prs, on.onPrs, p3.focused === "prs") : null
+  ].filter((n) => n !== null);
+  if (pills2.length) {
+    nodes2.push(
+      /* @__PURE__ */ jsxs("row", { role: "omp.hud", children: [
+        p3.focused ? hudHint() : null,
+        pills2
+      ] }, "agents")
+    );
+  }
+  nodes2.push(composerNode(cx, on));
+  nodes2.push(statusLine(cx, on));
+  return nodes2;
+}
+function activityNode(a2, cx, on) {
+  switch (a2.kind) {
+    case "turn":
+      return workingNode2(a2, cx, on);
+    case "compacting":
+      return compactingNode(a2, cx.now);
+    default:
+      return assertNever(a2, "dock activity");
+  }
+}
+function todosPillNode(t2, onToggle, focused) {
+  const { current, done, total } = todoProgress(t2.list);
+  if (!total) {
+    return null;
+  }
+  const finished = done === total;
+  return pill({
+    children: [
+      /* @__PURE__ */ jsx("meter", { size: "sm", style: "ring", value: done / total }, "ring"),
+      /* @__PURE__ */ jsx("text", { spans: [{ s: "muted", t: "todos " }, { t: `${done}/${total}` }, { s: "muted", t: " \xB7 " }], wrap: "none" }, "count"),
+      /* @__PURE__ */ jsx(
+        "text",
+        {
+          role: "hermes.todos.now",
+          spans: [{ s: finished ? "success" : void 0, t: finished ? "all done" : current }],
+          truncate: "end",
+          wrap: "none"
+        },
+        "now"
+      )
+    ],
+    focused,
+    key: "todos",
+    onClick: onToggle,
+    seg: "hermes.todos.pill",
+    title: t2.open ? "Hide the todo list" : "Show the todo list"
+  });
+}
+function statusLine(cx, on) {
+  const s2 = cx.status;
+  const context = s2.context && s2.context.max > 0 ? s2.context.used / s2.context.max : void 0;
+  return /* @__PURE__ */ jsxs("status", { role: "hermes.statusline", children: [
+    /* @__PURE__ */ jsx("seg", { priority: 9, role: "hermes.statusline.brand", spans: [{ t: "\u2624 hermes" }] }, "brand"),
+    s2.title ? /* @__PURE__ */ jsx("seg", { priority: 3, spans: [{ t: s2.title }], title: s2.title }, "title") : null,
+    s2.notice ? /* @__PURE__ */ jsx(
+      "seg",
+      {
+        priority: 6,
+        role: s2.notice.tone === "info" ? void 0 : `hermes.statusline.${s2.notice.tone === "warning" ? "warn" : s2.notice.tone === "error" ? "bad" : "good"}`,
+        spans: [{ t: s2.notice.text }],
+        title: s2.notice.text
+      },
+      "notice"
+    ) : null,
+    s2.branch ? /* @__PURE__ */ jsx("seg", { icon: "git-branch", priority: 4, spans: [{ s: "statusLineGitClean", t: s2.branch }], title: `Branch ${s2.branch}` }, "git") : null,
+    s2.tokens ? /* @__PURE__ */ jsx("seg", { priority: 2, side: "right", spans: [{ t: `${s2.tokens.toLocaleString()} tokens` }] }, "tokens") : null,
+    context !== void 0 ? /* @__PURE__ */ jsx(
+      "seg",
+      {
+        priority: 5,
+        role: context >= 0.85 ? "hermes.statusline.bad" : context >= 0.6 ? "hermes.statusline.warn" : void 0,
+        side: "right",
+        spans: [{ t: `${Math.round(context * 100)}% context` }],
+        title: "/usage shows the breakdown"
+      },
+      "context"
+    ) : null,
+    s2.compressions ? /* @__PURE__ */ jsx(
+      "seg",
+      {
+        priority: 2,
+        role: s2.compressions >= 10 ? "hermes.statusline.bad" : s2.compressions >= 5 ? "hermes.statusline.warn" : void 0,
+        side: "right",
+        spans: [{ t: `cmp ${s2.compressions}` }],
+        title: "Times the context was compressed this session"
+      },
+      "compressions"
+    ) : null,
+    s2.rates?.cache !== void 0 ? /* @__PURE__ */ jsx(
+      "seg",
+      {
+        icon: "cache",
+        priority: 1,
+        side: "right",
+        spans: [{ t: `${Math.round(s2.rates.cache)}%` }],
+        title: "Prompt tokens served from the provider's cache, this session"
+      },
+      "cache"
+    ) : null,
+    s2.rates?.tps ? /* @__PURE__ */ jsx(
+      "seg",
+      {
+        icon: "fast",
+        priority: 1,
+        side: "right",
+        spans: [{ t: `${Math.round(s2.rates.tps)} t/s` }],
+        title: "Output tokens per second over the recent model calls"
+      },
+      "tps"
+    ) : null,
+    s2.cost ? /* @__PURE__ */ jsx("seg", { priority: 3, side: "right", spans: [{ t: `$${s2.cost.toFixed(2)}` }], title: "Session cost" }, "cost") : null,
+    /* @__PURE__ */ jsx("seg", { priority: 1, side: "right", spans: [{ s: "muted", t: "\u21E7\u23CE newline" }] }, "newline"),
+    cx.activity.kind === "turn" ? /* @__PURE__ */ jsx("seg", { onClick: on.onInterrupt, priority: 10, role: "hermes.statusline.stop", side: "right", spans: [{ t: "esc esc stop" }] }, "action") : /* @__PURE__ */ jsx("seg", { onClick: on.onSubmit, priority: 10, role: "hermes.statusline.send", side: "right", spans: [{ t: "\u23CE send" }] }, "action")
+  ] }, "statusline");
+}
+function agentsPill(running, onOpen, focused) {
+  return pill({
+    children: [
+      /* @__PURE__ */ jsx("icon", { name: "users" }, "icon"),
+      /* @__PURE__ */ jsx("spinner", { style: "dots", tone: "accent" }, "spin"),
+      /* @__PURE__ */ jsx("text", { text: `${plural(running, "agent")} running`, wrap: "none" }, "text")
+    ],
+    focused,
+    key: "pill",
+    onClick: onOpen,
+    title: "Agents  \u2325A"
+  });
+}
+function shellsPill(s2, onOpen, focused) {
+  const live = s2.running > 0;
+  const n = live ? s2.running : s2.exited;
+  const charts = live ? s2.charts ?? [] : [];
+  const fresh = latest(charts)?.view;
+  const figure = fresh && glance(fresh);
+  const title = ["Background processes  \u2325J", ...charts.map((c) => `${c.process.id}  ${summary(c.view)}`)].join("\n");
+  const card = hovercard(charts);
+  return pill({
+    children: [
+      /* @__PURE__ */ jsx("icon", { name: "terminal" }, "icon"),
+      live ? /* @__PURE__ */ jsx("spinner", { style: "dots", tone: "accent" }, "spin") : /* @__PURE__ */ jsx("icon", { name: s2.tone === "success" ? "done" : s2.tone === "error" ? "failed" : "aborted", tone: s2.tone }, "end"),
+      /* @__PURE__ */ jsx("text", { spans: [{ s: live ? void 0 : "muted", t: `${plural(n, "shell")}${live ? "" : " exited"}` }], wrap: "none" }, "text"),
+      figure ? /* @__PURE__ */ jsx("text", { role: "omp.hud.glance", spans: glanceSpans(figure), wrap: "none" }, "glance") : null,
+      fresh ? miniSpark(fresh) : null
+    ],
+    focused,
+    hovercard: card,
+    key: "shells",
+    onClick: onOpen,
+    title
+  });
+}
+function prsPillNode(p3, onOpen, focused) {
+  return pill({
+    children: [/* @__PURE__ */ jsx("icon", { name: "merge", tone: p3.tone === "muted" ? void 0 : p3.tone }, "icon"), /* @__PURE__ */ jsx("text", { text: p3.text, wrap: "none" }, "text")],
+    focused,
+    key: "prs",
+    onClick: onOpen,
+    title: "Pull requests  \u2325P"
+  });
+}
+function hudHint() {
+  return /* @__PURE__ */ jsxs("row", { align: "center", gap: "xs", role: "omp.hud.hint", children: [
+    /* @__PURE__ */ jsx("kbd", { keys: ["enter"] }, "enter"),
+    /* @__PURE__ */ jsx("text", { text: "open" }, "open"),
+    /* @__PURE__ */ jsx("kbd", { keys: ["left", "right"] }, "lr"),
+    /* @__PURE__ */ jsx("text", { text: "switch" }, "move"),
+    /* @__PURE__ */ jsx("kbd", { keys: ["esc"] }, "esc"),
+    /* @__PURE__ */ jsx("text", { text: "back" }, "back")
+  ] }, "hint");
+}
+function workingNode2(busy, cx, on) {
+  return workingRow({
+    label: busy.label,
+    now: cx.now,
+    since: busy.since,
+    startedAt: busy.startedAt,
+    trailing: [
+      /* @__PURE__ */ jsx("row", { grow: 1 }, "fill"),
+      cx.pills.todos ? todosPillNode(cx.pills.todos, on.onTodos, false) : null,
+      /* @__PURE__ */ jsxs("row", { align: "center", gap: "xs", onClick: on.onInterrupt, role: "omp.working.stop", title: "Stop  esc esc", children: [
+        /* @__PURE__ */ jsx("kbd", { keys: ["esc"] }, "k"),
+        /* @__PURE__ */ jsx("kbd", { keys: ["esc"] }, "k2"),
+        /* @__PURE__ */ jsx("text", { text: "Stop" }, "t")
+      ] }, "stop")
+    ]
+  });
+}
+function compactingNode(c, now) {
+  return workingRow({
+    label: COMPACTING_LABEL,
+    now,
+    since: c.since,
+    startedAt: c.startedAt,
+    title: "Prompts sent now wait in the queue until the compaction ends"
+  });
+}
+function effortChip(r, on) {
+  const text12 = effortText(r.effort, r.effortWire);
+  const glyph = r.effort === "none" ? "off" : r.effortWire || r.effort || DEFAULT_EFFORT;
+  const clamp2 = text12.includes("\u2192") ? ` (this route sends ${r.effortWire})` : "";
+  return /* @__PURE__ */ jsxs(
+    "row",
+    {
+      align: "center",
+      gap: "xs",
+      onClick: on.onEffort,
+      onMenu: on.onEffortMenu,
+      role: "omp.composer.effort",
+      title: `Reasoning effort: ${text12}${r.effort ? clamp2 : " (the default)"} \xB7 click to cycle  \u21E7\u21E5 \xB7 right-click to choose or save as default`,
+      children: [
+        /* @__PURE__ */ jsx("effort", { level: glyph }, "glyph"),
+        /* @__PURE__ */ jsx("text", { spans: [{ s: r.effort ? void 0 : "muted", t: text12 }], wrap: "none" }, "level")
+      ]
+    },
+    "effort"
+  );
+}
+function composerNode(cx, on) {
+  const { draft, attachments } = cx.composer;
+  const { route } = cx;
+  const busy = cx.activity.kind === "turn";
+  return /* @__PURE__ */ jsxs("col", { role: "omp.editor", children: [
+    busy ? /* @__PURE__ */ jsx("row", { role: "hermes.streak" }, "streak") : null,
+    contextMeter(cx.status.context),
+    /* @__PURE__ */ jsx("row", { gap: "sm", hidden: !attachments.length, role: "omp.composer.chips", wrap: true, children: attachments.map((a2, i) => imageChip(a2, i, on.onRemoveAttachment)) }, "chips"),
+    /* @__PURE__ */ jsx("row", { align: "start", gap: "sm", role: "omp.composer.line", children: /* @__PURE__ */ jsx(
+      "editor",
+      {
+        anchor: draft.anchor,
+        cursor: draft.cursor,
+        decor: draft.decor,
+        ghost: cx.composer.ghost || void 0,
+        maxLines: 18,
+        onEdit: on.onEdit,
+        onSend: on.onSend,
+        onUndo: on.onUndo,
+        placeholder: cx.composer.placeholder,
+        sendable: cx.composer.ready,
+        text: draft.text
+      },
+      "input"
+    ) }, "line"),
+    /* @__PURE__ */ jsxs("row", { align: "center", gap: "sm", role: "omp.composer.bar", children: [
+      route.model ? /* @__PURE__ */ jsxs(
+        "row",
+        {
+          align: "center",
+          gap: "xs",
+          onClick: on.onModel,
+          role: "omp.composer.model",
+          title: `Model: ${route.model}${route.fast ? ` \xB7 ${route.fast === "ultrafast" ? "ultrafast" : "fast"} mode (priority processing, billed higher; /fast turns it off)` : ""} \xB7 click to switch`,
+          children: [
+            /* @__PURE__ */ jsx("icon", { name: "model" }, "icon"),
+            /* @__PURE__ */ jsx("text", { spans: [{ t: route.model }], wrap: "none" }, "name"),
+            route.fast ? /* @__PURE__ */ jsx("icon", { name: "bolt", role: "hermes.composer.fast", tone: "warning" }, "fast") : null,
+            route.fast === "ultrafast" ? /* @__PURE__ */ jsx("icon", { name: "bolt", role: "hermes.composer.fast", tone: "warning" }, "fast2") : null,
+            /* @__PURE__ */ jsx("icon", { name: "chev" }, "chev")
+          ]
+        },
+        "model"
+      ) : null,
+      route.reasons !== false ? effortChip(route, on) : null,
+      /* @__PURE__ */ jsx("status", { grow: 1, role: "omp.composer.extras", transparent: true }, "extras"),
+      busy ? /* @__PURE__ */ jsx(
+        "text",
+        {
+          onClick: on.onInterrupt,
+          role: "omp.composer.stop",
+          text: "Stop",
+          title: "Stop  esc esc",
+          tone: "error"
+        },
+        "stop"
+      ) : /* @__PURE__ */ jsx("kbd", { keys: ["enter"], onClick: on.onSubmit, role: "omp.composer.send", title: "Send  \u23CE" }, "send")
+    ] }, "bar")
+  ] }, "composer");
+}
+function contextMeter(ctx) {
+  const share = ctx && ctx.max > 0 ? ctx.used / ctx.max : void 0;
+  return !ctx || share === void 0 || share < 0.01 ? null : /* @__PURE__ */ jsx(
+    "meter",
+    {
+      role: "omp.composer.context",
+      style: "bar",
+      thresholds: { bad: 0.85, warn: 0.6 },
+      title: `Context ${Math.round(share * 100)}% used
+${compact(ctx.used)} of ${compact(ctx.max)} tokens
+/usage shows the breakdown`,
+      value: share
+    },
+    "context"
+  );
+}
+function imageChip(a2, i, onRemove) {
+  return /* @__PURE__ */ jsxs("card", { head: [{ s: "strong", t: a2.label }], role: "omp.composer.chip", title: a2.label, tone: "accent", children: [
+    a2.image ? /* @__PURE__ */ jsx("image", { alt: a2.label, ...a2.image }, "thumb") : /* @__PURE__ */ jsx("icon", { name: "image" }, "thumb"),
+    /* @__PURE__ */ jsx(
+      "text",
+      {
+        spans: [a2.pending ? { fx: "shimmer", s: "dim", t: "Attaching\u2026" } : { s: "dim", t: a2.caption ?? "image" }],
+        wrap: "none"
+      },
+      "caption"
+    ),
+    /* @__PURE__ */ jsx("icon", { name: "x", onClick: () => onRemove(i), role: "hermes.composer.remove", title: `Remove ${a2.label}` }, "remove")
+  ] }, `a${i}`);
+}
+
+// src/app/frame.ts
+function drawFrame(cx, now = Date.now()) {
+  if (cx.surface.closed) {
+    return;
+  }
+  const modal2 = isModal(cx.overlays);
+  const entries = transcriptContext(cx, now);
+  cx.hud.prune(shownPills(cx, now));
+  if (!modal2) {
+    cx.completion.update(cx.composer);
+  }
+  cx.surface.render({
+    dock: dockNodes(dockModel(cx, now), cx.actions),
+    layer: [
+      ...cx.aside() ? [cx.prAside.open ? cx.prAside.node("layer.prs") : cx.sidebar.node("layer.sidebar")].filter((n) => n !== null) : [],
+      ...cx.overlays.map((o) => o.node(`layer.${o.key}`)),
+      ...modal2 ? [] : cx.completion.nodes(INPUT_ID)
+    ],
+    main: cx.transcript.entries.map((e) => entryNode(e, `main.${e.id}`, entries))
+  });
+  cx.surface.follow(focusOf(cx));
+}
+function transcriptContext(cx, now) {
+  const info = cx.session.info;
+  const backend = info?.version && info.version !== "unknown" ? `v${info.version}` : "";
+  return {
+    copied: cx.copies.copied,
+    copy: cx.copies.copy,
+    now,
+    welcome: { ...cx.welcome, version: cx.welcome.version || backend }
+  };
+}
+function focusOf(cx) {
+  const top = cx.overlays.at(-1);
+  return top?.focus ? top.focus(`layer.${top.key}`) : top?.modal || cx.hud.focused ? null : INPUT_ID;
+}
+
+// src/automation.ts
+function cadence(loop) {
+  if (loop.mode === "self_paced") {
+    return "self-paced";
+  }
+  const s2 = loop.interval_seconds;
+  return `every ${s2 % 3600 === 0 ? `${s2 / 3600}h` : s2 % 60 === 0 ? `${s2 / 60}m` : `${s2}s`}`;
+}
+var clock = (epochSeconds) => new Date(epochSeconds * 1e3).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+function goalView(goal) {
+  if (!goal || goal.status !== "active" && goal.status !== "paused") {
+    return null;
+  }
+  const barrier = goal.status === "active" ? goal.wait_barrier : null;
+  const wait = barrier ? [barrier.type === "until" ? `until ${clock(barrier.until_at)}` : `on ${barrier.type} ${barrier.target}`, barrier.reason].filter(Boolean).join(" \xB7 ") : "";
+  return {
+    criteria: goal.subgoals ?? [],
+    detail: barrier ? wait : goal.status === "paused" ? goal.paused_reason ?? "" : "",
+    maxTurns: goal.max_turns,
+    reason: goal.last_reason ?? void 0,
+    state: goal.status === "paused" ? "paused" : barrier ? "waiting" : goal.last_verdict === "blocked" ? "blocked" : "active",
+    title: goal.title,
+    turns: goal.turns_used,
+    verdict: goal.last_verdict ?? void 0
+  };
+}
+function loopView(loop, now = Date.now()) {
+  if (!loop || loop.status !== "active" && loop.status !== "paused") {
+    return null;
+  }
+  const dueAt = loop.next_due_at > 0 ? loop.next_due_at * 1e3 : void 0;
+  const state = loop.status === "paused" ? "paused" : loop.awaiting_response ? "running" : loop.deferred_by_goal ? "deferred" : dueAt !== void 0 && dueAt > now ? "active" : "due";
+  return {
+    cadence: cadence(loop),
+    detail: loop.status === "paused" ? loop.paused_reason ?? "" : "",
+    dueAt: state === "active" ? dueAt : void 0,
+    fired: loop.ticks_fired,
+    prompt: loop.prompt,
+    runs: loop.times ? `${loop.ticks_fired}/${loop.times} runs` : `${loop.ticks_fired} run${loop.ticks_fired === 1 ? "" : "s"}`,
+    state,
+    times: loop.times,
+    until: loop.until ?? ""
+  };
+}
+var ACTION_LABELS = {
+  "goal.clear": "clear the goal",
+  "goal.pause": "pause the goal",
+  "goal.resume": "resume the goal",
+  "goal.unwait": "stop the goal waiting",
+  "loop.pause": "pause the loop",
+  "loop.resume": "resume the loop",
+  "loop.stop": "stop the loop"
+};
+var Automation = class {
+  #host;
+  #sid = null;
+  #snapshot = null;
+  /** Bumped by every update, so a read that started before one never overwrites it. */
+  #seq = 0;
+  #timer;
+  /** The verb in flight, if any (the sheet's buttons wait for it). */
+  pending;
+  constructor(host) {
+    this.#host = host;
+  }
+  get goal() {
+    return goalView(this.#snapshot?.goal);
+  }
+  loop(now = Date.now()) {
+    return loopView(this.#snapshot?.loop, now);
+  }
+  /** The loop's raw snapshot: a new object per update, so its countdown re-anchors only then. */
+  get loopSnapshot() {
+    return this.#snapshot?.loop ?? null;
+  }
+  /** Another session is shown: forget the last one's state and read this one's. */
+  adopt(sid) {
+    this.#sid = sid;
+    this.#set(null);
+    void this.#read(sid);
+  }
+  /** A `session.control.update` (or a verb's reply) for session `sid`. */
+  apply(sid, control) {
+    if (sid && sid !== this.#sid) {
+      return;
+    }
+    this.#seq++;
+    this.#set(control ?? null);
+  }
+  async #read(sid) {
+    const seq = this.#seq;
+    try {
+      const r = await rpc(this.#host.gw, "session.control.read", { session_id: sid });
+      if (sid === this.#sid && seq === this.#seq) {
+        this.#set(r?.control ?? null);
+      }
+    } catch {
+    }
+  }
+  /** Runs `action` on the open session; the reply's snapshot repaints, its dispatch runs as a typed command's. */
+  async act(action) {
+    const sid = this.#sid;
+    if (!sid || this.pending) {
+      return;
+    }
+    this.pending = action;
+    this.#host.changed();
+    try {
+      const r = await rpc(this.#host.gw, "session.control", { action, session_id: sid });
+      this.apply(sid, r?.control);
+      if (r?.dispatch?.type && sid === this.#host.sid) {
+        await this.#host.runDispatch(r.dispatch, `/${action.replace(".", " ")}`);
+      }
+    } catch (error) {
+      this.#host.transcript.notice(
+        `Could not ${ACTION_LABELS[action]}: ${errorText(error)}`,
+        "error"
+      );
+    } finally {
+      this.pending = void 0;
+      this.#host.changed();
+    }
+  }
+  #set(control) {
+    if (JSON.stringify(control) !== JSON.stringify(this.#snapshot)) {
+      this.#snapshot = control;
+      this.#host.changed();
+    }
+    this.#arm();
+  }
+  /** Re-renders when the loop falls due, so its countdown turns into "due". Tern ticks the countdown itself. */
+  #arm() {
+    clearTimeout(this.#timer);
+    const due = this.loop()?.dueAt;
+    if (due !== void 0) {
+      this.#timer = setTimeout(() => this.#host.changed(), Math.max(0, due - Date.now()) + 50);
+      this.#timer.unref?.();
+    }
+  }
+};
+
+// src/chrome/notices.ts
+var TONES2 = { error: "error", success: "success", warn: "warning", warning: "warning" };
+var Notices = class {
+  #list = [];
+  #seq = 0;
+  /** Adds or replaces the notice; returns it (undefined for an empty one). */
+  show(p3, now = Date.now()) {
+    const text12 = p3.text?.trim();
+    if (!text12) {
+      return void 0;
+    }
+    const key2 = p3.key || p3.id || `n${++this.#seq}`;
+    const ttl = p3.kind === "ttl" && typeof p3.ttl_ms === "number" && p3.ttl_ms > 0 ? p3.ttl_ms : void 0;
+    const notice = { key: key2, text: text12, tone: TONES2[p3.level ?? ""] ?? "info", ...ttl ? { expires: now + ttl } : {} };
+    this.#list = [...this.#list.filter((n) => n.key !== key2), notice];
+    return notice;
+  }
+  /** Drops the notice with `key`; true when one went. */
+  clear(key2) {
+    const before = this.#list.length;
+    this.#list = this.#list.filter((n) => n.key !== key2);
+    return this.#list.length !== before;
+  }
+  /** The newest notice still live at `now`. */
+  current(now = Date.now()) {
+    this.#list = this.#list.filter((n) => !n.expires || n.expires > now);
+    return this.#list.at(-1);
+  }
+  /** When the next `ttl` notice expires, if one is live. */
+  nextExpiry() {
+    const at = this.#list.flatMap((n) => n.expires ? [n.expires] : []);
+    return at.length ? Math.min(...at) : void 0;
+  }
+  /** Forgets every notice (another session is shown). */
+  reset() {
+    this.#list = [];
+  }
+};
+function isLoginNotice(p3) {
+  return Boolean(p3.key?.startsWith("login:"));
+}
+var NoticeStrip = class {
+  #host;
+  #notices = new Notices();
+  #timer;
+  constructor(host) {
+    this.#host = host;
+  }
+  /** Adds or replaces the notice, and re-arms the expiry render. */
+  show(p3) {
+    this.#notices.show(p3);
+    this.#arm();
+  }
+  /** Drops the notice with `key`. */
+  clear(key2) {
+    this.#notices.clear(key2);
+  }
+  /** The notice the strip shows at `now`. */
+  current(now = Date.now()) {
+    return this.#notices.current(now);
+  }
+  /** Forgets every notice (another session is shown). */
+  reset() {
+    this.#notices.reset();
+  }
+  /** Stops the expiry render. */
+  dispose() {
+    clearTimeout(this.#timer);
+  }
+  /** Re-renders when the next `ttl` notice expires, so the strip drops it on time. */
+  #arm() {
+    clearTimeout(this.#timer);
+    const at = this.#notices.nextExpiry();
+    if (at !== void 0) {
+      this.#timer = setTimeout(() => {
+        this.#notices.current();
+        this.#arm();
+        this.#host.changed();
+      }, Math.max(0, at - Date.now()) + 10);
+    }
+  }
+};
+
+// src/chrome/reconnect.ts
+var Reconnect = class {
+  #host;
+  /** The connection is down until the next gateway.ready (its one line is shown). */
+  #offline = false;
+  /** The gateway is being redialled until the next gateway.ready. */
+  #redial;
+  #timer;
+  constructor(host) {
+    this.#host = host;
+  }
+  /** The redial the dock shows: which try, and when the next one starts. */
+  get redial() {
+    return this.#redial;
+  }
+  /**
+   * The gateway exited: the line to show, once per outage (each failed redial exits again). An
+   * attached gateway (and its turn) lives on, so its line says the pane reconnects.
+   */
+  lost(attached, code7) {
+    const first = !this.#offline;
+    this.#offline = true;
+    if (!first) {
+      return void 0;
+    }
+    return attached ? { text: "Lost the connection to Hermes; reconnecting\u2026", tone: "warning" } : { text: `The agent backend exited${code7 === null ? "" : ` (${code7})`}.`, tone: "error" };
+  }
+  /** One line for the whole outage: each try replaces it, and re-renders when the wait ends. */
+  redialing(attempt, delayMs) {
+    clearTimeout(this.#timer);
+    this.#redial = { attempt, dueAt: Date.now() + delayMs };
+    this.#timer = setTimeout(() => this.#host.changed(), delayMs + 50);
+    this.#timer.unref?.();
+  }
+  /** gateway.ready: the connection is up, and the redial line goes. */
+  ready() {
+    this.#offline = false;
+    clearTimeout(this.#timer);
+    this.#redial = void 0;
+  }
+  /** Stops the redial line's re-render. */
+  dispose() {
+    clearTimeout(this.#timer);
+  }
+};
+
+// .hermes-src/node_modules/@hermes/shared/src/color.ts
+var HEX6_RE = /^#?([0-9a-f]{6})$/i;
+var HEX3_RE = /^#?([0-9a-f]{3})$/i;
+var RGB_FN_RE = /^rgba?\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})/i;
+var clampChannel = (v) => Math.max(0, Math.min(255, Math.round(v)));
+function parseColor(input2) {
+  const value = input2.trim();
+  let m = HEX6_RE.exec(value);
+  if (m) {
+    const n = parseInt(m[1], 16);
+    return [n >> 16 & 255, n >> 8 & 255, n & 255];
+  }
+  m = HEX3_RE.exec(value);
+  if (m) {
+    const [r, g, b] = m[1];
+    return [parseInt(r + r, 16), parseInt(g + g, 16), parseInt(b + b, 16)];
+  }
+  m = RGB_FN_RE.exec(value);
+  if (m) {
+    return [clampChannel(Number(m[1])), clampChannel(Number(m[2])), clampChannel(Number(m[3]))];
+  }
+  return null;
+}
+var toHex = (rgb) => "#" + rgb.map((c) => clampChannel(c).toString(16).padStart(2, "0")).join("");
+function mix(a2, b, t2) {
+  const pa = parseColor(a2);
+  const pb = parseColor(b);
+  if (!pa || !pb) {
+    return a2;
+  }
+  return toHex([pa[0] + (pb[0] - pa[0]) * t2, pa[1] + (pb[1] - pa[1]) * t2, pa[2] + (pb[2] - pa[2]) * t2]);
+}
+function channelLuminance(value) {
+  const normalized = value / 255;
+  return normalized <= 0.03928 ? normalized / 12.92 : ((normalized + 0.055) / 1.055) ** 2.4;
+}
+function relativeLuminance(color2) {
+  const rgb = parseColor(color2);
+  return rgb ? 0.2126 * channelLuminance(rgb[0]) + 0.7152 * channelLuminance(rgb[1]) + 0.0722 * channelLuminance(rgb[2]) : null;
+}
+function contrastRatio(a2, b) {
+  const la = relativeLuminance(a2);
+  const lb = relativeLuminance(b);
+  if (la === null || lb === null) {
+    return null;
+  }
+  const [hi, lo] = la >= lb ? [la, lb] : [lb, la];
+  return (hi + 0.05) / (lo + 0.05);
+}
+
+// .hermes-src/ui-tui/src/lib/color.ts
+var clampChannel2 = (v) => Math.max(0, Math.min(255, Math.round(v)));
+function liftForContrast(color2, bg, ratio) {
+  const fg = parseColor(color2);
+  const bgLum = relativeLuminance(bg);
+  if (!fg || bgLum === null) {
+    return color2;
+  }
+  if ((contrastRatio(color2, bg) ?? 21) >= ratio) {
+    return color2;
+  }
+  let [r, g, b] = fg;
+  if (bgLum > 0.5) {
+    let cr = contrastRatio(toHex([r, g, b]), bg) ?? 21;
+    while (cr < ratio && (r > 0 || g > 0 || b > 0)) {
+      r -= Math.ceil(r * 0.1);
+      g -= Math.ceil(g * 0.1);
+      b -= Math.ceil(b * 0.1);
+      cr = contrastRatio(toHex([r, g, b]), bg) ?? 21;
+    }
+  } else {
+    let cr = contrastRatio(toHex([r, g, b]), bg) ?? 21;
+    while (cr < ratio && (r < 255 || g < 255 || b < 255)) {
+      r = Math.min(255, r + Math.ceil((255 - r) * 0.1));
+      g = Math.min(255, g + Math.ceil((255 - g) * 0.1));
+      b = Math.min(255, b + Math.ceil((255 - b) * 0.1));
+      cr = contrastRatio(toHex([r, g, b]), bg) ?? 21;
+    }
+  }
+  return toHex([r, g, b]);
+}
+function grayOf(color2) {
+  const rgb = parseColor(color2);
+  if (!rgb) {
+    return color2;
+  }
+  const gray = clampChannel2(0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2]);
+  return toHex([gray, gray, gray]);
+}
+var desaturate = (color2, s2) => mix(color2, grayOf(color2), s2);
+
+// .hermes-src/ui-tui/src/theme.ts
+var XTERM_6_LEVELS = [0, 95, 135, 175, 215, 255];
+var ANSI_LIGHT_MAX_LUMINANCE = 0.72;
+var ANSI_LIGHT_TARGET_LUMINANCE = 0.34;
+var ANSI_LIGHT_MIN_SATURATION = 0.22;
+var ANSI_MUTED_BUCKET = 245;
+var ANSI_NORMALIZED_FOREGROUNDS = [
+  "text",
+  "label",
+  "ok",
+  "error",
+  "warn",
+  "prompt",
+  "statusFg",
+  "statusGood",
+  "statusWarn",
+  "statusBad",
+  "statusCritical",
+  "shellDollar",
+  "tool"
+];
+var ANSI_MUTED_FOREGROUNDS = ["muted", "sessionLabel", "sessionBorder", "thinking"];
+function xtermEightBitRgb(colorNumber) {
+  if (colorNumber >= 232) {
+    const value = 8 + (colorNumber - 232) * 10;
+    return [value, value, value];
+  }
+  if (colorNumber >= 16) {
+    const offset = colorNumber - 16;
+    return [
+      XTERM_6_LEVELS[Math.floor(offset / 36) % 6],
+      XTERM_6_LEVELS[Math.floor(offset / 6) % 6],
+      XTERM_6_LEVELS[offset % 6]
+    ];
+  }
+  return [0, 0, 0];
+}
+var rgbLuminance = (red, green, blue) => relativeLuminance(toHex([red, green, blue])) ?? 0;
+function rgbToHsl(red, green, blue) {
+  const rn = red / 255;
+  const gn = green / 255;
+  const bn = blue / 255;
+  const max = Math.max(rn, gn, bn);
+  const min = Math.min(rn, gn, bn);
+  const lightness = (max + min) / 2;
+  if (max === min) {
+    return [0, 0, lightness];
+  }
+  const delta = max - min;
+  const saturation = lightness > 0.5 ? delta / (2 - max - min) : delta / (max + min);
+  const hue = max === rn ? (gn - bn) / delta + (gn < bn ? 6 : 0) : max === gn ? (bn - rn) / delta + 2 : (rn - gn) / delta + 4;
+  return [hue / 6, saturation, lightness];
+}
+function circularDistance(a2, b) {
+  const distance = Math.abs(a2 - b);
+  return Math.min(distance, 1 - distance);
+}
+function richEightBitColorNumber(red, green, blue) {
+  const [, saturation, lightness] = rgbToHsl(red, green, blue);
+  if (saturation < 0.15) {
+    const gray = Math.round(lightness * 25);
+    return gray === 0 ? 16 : gray === 25 ? 231 : 231 + gray;
+  }
+  const sixRed = red < 95 ? red / 95 : 1 + (red - 95) / 40;
+  const sixGreen = green < 95 ? green / 95 : 1 + (green - 95) / 40;
+  const sixBlue = blue < 95 ? blue / 95 : 1 + (blue - 95) / 40;
+  return 16 + 36 * Math.round(sixRed) + 6 * Math.round(sixGreen) + Math.round(sixBlue);
+}
+function bestReadableAnsiColor(red, green, blue) {
+  const [hue, saturation, lightness] = rgbToHsl(red, green, blue);
+  let bestColor = richEightBitColorNumber(red, green, blue);
+  let bestScore = Number.POSITIVE_INFINITY;
+  for (let colorNumber = 16; colorNumber <= 255; colorNumber += 1) {
+    const [candidateRed, candidateGreen, candidateBlue] = xtermEightBitRgb(colorNumber);
+    const candidateLuminance = rgbLuminance(candidateRed, candidateGreen, candidateBlue);
+    if (candidateLuminance > ANSI_LIGHT_MAX_LUMINANCE) {
+      continue;
+    }
+    const [candidateHue, candidateSaturation, candidateLightness] = rgbToHsl(
+      candidateRed,
+      candidateGreen,
+      candidateBlue
+    );
+    const saturationFloorPenalty = candidateSaturation < ANSI_LIGHT_MIN_SATURATION ? (ANSI_LIGHT_MIN_SATURATION - candidateSaturation) * 3 : 0;
+    const score = circularDistance(candidateHue, hue) * 4 + Math.abs(candidateSaturation - Math.max(ANSI_LIGHT_MIN_SATURATION, saturation)) * 0.8 + Math.abs(candidateLightness - Math.min(lightness, ANSI_LIGHT_TARGET_LUMINANCE)) * 2 + saturationFloorPenalty;
+    if (score < bestScore) {
+      bestColor = colorNumber;
+      bestScore = score;
+    }
+  }
+  return bestColor;
+}
+function normalizeAnsiForeground(color2) {
+  const rgb = parseColor(color2);
+  if (!rgb) {
+    return color2;
+  }
+  const richAnsi = richEightBitColorNumber(rgb[0], rgb[1], rgb[2]);
+  const richRgb = xtermEightBitRgb(richAnsi);
+  const ansi = rgbLuminance(richRgb[0], richRgb[1], richRgb[2]) > ANSI_LIGHT_MAX_LUMINANCE ? bestReadableAnsiColor(rgb[0], rgb[1], rgb[2]) : richAnsi;
+  return `ansi256(${ansi})`;
+}
+var BRAND = {
+  name: "Hermes Agent",
+  icon: "\u2624",
+  prompt: "\u276F",
+  welcome: "Type your message or /help for commands.",
+  goodbye: "Goodbye! \u2624",
+  tool: "\u250A",
+  helpHeader: "(^_^)? Commands"
+};
+var cleanPromptSymbol = (s2, fallback) => {
+  const cleaned = String(s2 ?? "").replace(/\s+/g, " ").trim();
+  return cleaned || fallback;
+};
+var DIFF_DARK = {
+  diffAdded: "rgb(220,255,220)",
+  diffRemoved: "rgb(255,220,220)",
+  diffAddedWord: "rgb(36,138,61)",
+  diffRemovedWord: "rgb(207,34,46)"
+};
+var DIFF_LIGHT = {
+  diffAdded: "rgb(200,240,200)",
+  diffRemoved: "rgb(240,200,200)",
+  diffAddedWord: "rgb(27,94,32)",
+  diffRemovedWord: "rgb(183,28,28)"
+};
+function buildPalette(seeds, isLight) {
+  const tones = deriveTones(seeds);
+  const surface = seeds.surface ?? tones.surface;
+  const activeRow = seeds.activeRow ?? (seeds.surface ? mix(surface, seeds.accent, 0.22) : tones.activeRow);
+  const muted = seeds.muted ?? tones.muted;
+  return {
+    primary: seeds.primary,
+    accent: seeds.accent,
+    border: seeds.border ?? tones.border,
+    text: seeds.text,
+    muted,
+    completionBg: surface,
+    completionCurrentBg: activeRow,
+    completionMetaBg: surface,
+    completionMetaCurrentBg: activeRow,
+    label: tones.label,
+    ok: seeds.ok,
+    error: seeds.error,
+    warn: seeds.warn,
+    // Element tokens: independently settable, but default to their semantic
+    // parents (tool marker → accent, reasoning body → muted).
+    tool: seeds.accent,
+    thinking: muted,
+    // Code-syntax tokens default to brand tokens (unchanged highlighting)
+    // but are independently skinnable.
+    syntaxString: seeds.accent,
+    syntaxNumber: seeds.text,
+    syntaxKeyword: seeds.border ?? tones.border,
+    syntaxComment: muted,
+    prompt: seeds.prompt ?? seeds.text,
+    // sessionLabel/sessionBorder track the muted tone — "same role, same
+    // colour" by design (#11300).
+    sessionLabel: muted,
+    sessionBorder: muted,
+    statusBg: surface,
+    statusFg: tones.statusFg,
+    statusGood: seeds.statusGood,
+    statusWarn: seeds.statusWarn,
+    statusBad: seeds.statusBad,
+    statusCritical: seeds.statusCritical,
+    selectionBg: seeds.selection ?? tones.selection,
+    ...isLight ? DIFF_LIGHT : DIFF_DARK,
+    shellDollar: seeds.shellDollar
+  };
+}
+var DARK_SEEDS = {
+  accent: "#FFBF00",
+  // The classic Hermes navy surfaces are IDENTITY, not derivation drift —
+  // keep them as explicit fill seeds (the ladder derives them for skins
+  // that don't care).
+  activeRow: "#333355",
+  bg: "#101014",
+  border: "#CD7F32",
+  error: "#ef5350",
+  ok: "#4caf50",
+  primary: "#FFD700",
+  prompt: "#FFF8DC",
+  selection: "#3a3a55",
+  shellDollar: "#4dabf7",
+  statusBad: "#FF8C00",
+  statusCritical: "#FF6B6B",
+  statusGood: "#8FBC8F",
+  statusWarn: "#FFD700",
+  surface: "#1a1a2e",
+  text: "#FFF8DC",
+  warn: "#ffa726"
+};
+var LIGHT_SEEDS = {
+  accent: "#956E00",
+  bg: "#ffffff",
+  border: "#A56628",
+  error: "#C14240",
+  ok: "#367E39",
+  primary: "#867000",
+  prompt: "#2B2014",
+  shellDollar: "#377BB3",
+  statusBad: "#A65A00",
+  statusCritical: "#B94D4D",
+  statusGood: "#5C7A5C",
+  statusWarn: "#867000",
+  text: "#3D2F13",
+  warn: "#956115"
+};
+var DARK_THEME = {
+  color: buildPalette(DARK_SEEDS, false),
+  brand: BRAND,
+  bannerLogo: "",
+  bannerHero: ""
+};
+var LIGHT_THEME = {
+  color: buildPalette(LIGHT_SEEDS, true),
+  brand: BRAND,
+  bannerLogo: "",
+  bannerHero: ""
+};
+var DISPLAY_MIN_CONTRAST = 1.45;
+var SEMANTIC_MIN_CONTRAST = 2.2;
+var LIGHT_DISPLAY_MIN_CONTRAST = 1.18;
+var LIGHT_SEMANTIC_MIN_CONTRAST = 1.6;
+var DISPLAY_FOREGROUNDS = [
+  "primary",
+  "accent",
+  "text",
+  "label",
+  "prompt",
+  "statusFg",
+  "border",
+  "muted",
+  "sessionLabel",
+  "sessionBorder",
+  "shellDollar"
+];
+var SEMANTIC_FOREGROUNDS = [
+  "ok",
+  "error",
+  "warn",
+  "statusGood",
+  "statusWarn",
+  "statusBad",
+  "statusCritical"
+];
+var ADAPTIVE_BACKGROUNDS = [
+  "completionBg",
+  "completionCurrentBg",
+  "completionMetaBg",
+  "completionMetaCurrentBg",
+  "statusBg",
+  "selectionBg"
+];
+var LIGHT_BG_MIN_LUMINANCE = 0.4;
+var DARK_BG_MAX_LUMINANCE = 0.35;
+function adaptColorsToBackground(colors, isLight, base3, bg) {
+  const out = { ...colors };
+  const displayFloor = isLight ? LIGHT_DISPLAY_MIN_CONTRAST : DISPLAY_MIN_CONTRAST;
+  const semanticFloor = isLight ? LIGHT_SEMANTIC_MIN_CONTRAST : SEMANTIC_MIN_CONTRAST;
+  for (const key2 of DISPLAY_FOREGROUNDS) {
+    out[key2] = liftForContrast(out[key2], bg, displayFloor);
+  }
+  for (const key2 of SEMANTIC_FOREGROUNDS) {
+    out[key2] = liftForContrast(out[key2], bg, semanticFloor);
+  }
+  for (const key2 of ADAPTIVE_BACKGROUNDS) {
+    const luminance = relativeLuminance(out[key2]);
+    if (luminance === null) {
+      continue;
+    }
+    if (isLight ? luminance < LIGHT_BG_MIN_LUMINANCE : luminance > DARK_BG_MAX_LUMINANCE) {
+      out[key2] = base3[key2];
+    }
+  }
+  return out;
+}
+function referenceBackground(isLight, env2 = process.env) {
+  const cached2 = (env2.HERMES_TUI_BACKGROUND ?? "").trim();
+  if (cached2 && backgroundLuminance(cached2) !== null) {
+    return cached2.startsWith("#") ? cached2 : `#${cached2}`;
+  }
+  return isLight ? "#ffffff" : "#101014";
+}
+function deriveTones(seeds) {
+  const { accent, bg, text: text12 } = seeds;
+  const isLight = (relativeLuminance(bg) ?? 0) > 0.5;
+  const surface = mix(bg, desaturate(accent, 0.15), isLight ? 0.045 : 0.09);
+  return {
+    // Light knobs are fitted to the lift canon (xterm minimumContrastRatio
+    // 4.5 of the classic dark golds against white — see LIGHT_SEEDS), not
+    // to ink blends: muted #946C08 ≈ desat(accent .05), label #8E6B13 ≈
+    // desat(mix(accent, text, .03), .15), statusFg #6F6F6F ≈ gray 30% lift.
+    muted: isLight ? desaturate(accent, 0.05) : desaturate(mix(accent, bg, 0.19), 0.16),
+    label: isLight ? desaturate(mix(accent, text12, 0.03), 0.15) : desaturate(mix(accent, bg, 0.13), 0.16),
+    statusFg: grayOf(mix(text12, bg, isLight ? 0.3 : 0.24)),
+    surface,
+    activeRow: mix(surface, accent, 0.25),
+    selection: isLight && seeds.shellDollar ? mix(bg, seeds.shellDollar, 0.2) : mix(surface, accent, 0.28),
+    border: mix(accent, bg, 0.25)
+  };
+}
+var TRUE_RE = /^(?:1|true|yes|on)$/;
+var FALSE_RE = /^(?:0|false|no|off)$/;
+var LIGHT_DEFAULT_TERM_PROGRAMS = /* @__PURE__ */ new Set(["Apple_Terminal"]);
+var LUMA_LIGHT_THRESHOLD = 0.6;
+var HEX_3_RE = /^[0-9a-f]{3}$/;
+var HEX_6_RE = /^[0-9a-f]{6}$/;
+function backgroundLuminance(raw2) {
+  const v = raw2.trim().toLowerCase();
+  if (!v) {
+    return null;
+  }
+  const hex = v.startsWith("#") ? v.slice(1) : v;
+  const rgb = HEX_6_RE.test(hex) ? [parseInt(hex.slice(0, 2), 16), parseInt(hex.slice(2, 4), 16), parseInt(hex.slice(4, 6), 16)] : HEX_3_RE.test(hex) ? [parseInt(hex[0] + hex[0], 16), parseInt(hex[1] + hex[1], 16), parseInt(hex[2] + hex[2], 16)] : null;
+  if (!rgb) {
+    return null;
+  }
+  return (0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2]) / 255;
+}
+function detectLightMode(env2 = process.env, lightDefaultTermPrograms = LIGHT_DEFAULT_TERM_PROGRAMS) {
+  const lightFlag = (env2.HERMES_TUI_LIGHT ?? "").trim().toLowerCase();
+  if (TRUE_RE.test(lightFlag)) {
+    return true;
+  }
+  if (FALSE_RE.test(lightFlag)) {
+    return false;
+  }
+  const themeFlag = (env2.HERMES_TUI_THEME ?? "").trim().toLowerCase();
+  if (themeFlag === "light") {
+    return true;
+  }
+  if (themeFlag === "dark") {
+    return false;
+  }
+  const bgHint = backgroundLuminance(env2.HERMES_TUI_BACKGROUND ?? "");
+  if (bgHint !== null) {
+    return bgHint >= LUMA_LIGHT_THRESHOLD;
+  }
+  const colorfgbg = (env2.COLORFGBG ?? "").trim();
+  if (colorfgbg) {
+    const lastField = colorfgbg.split(";").at(-1) ?? "";
+    if (/^\d+$/.test(lastField)) {
+      const bg = Number(lastField);
+      if (bg === 7 || bg === 15) {
+        return true;
+      }
+      if (bg >= 0 && bg < 16) {
+        return false;
+      }
+    }
+  }
+  const termProgram = (env2.TERM_PROGRAM ?? "").trim();
+  return lightDefaultTermPrograms.has(termProgram);
+}
+function shouldNormalizeAnsiLightTheme(env2 = process.env, isLight = detectLightMode(env2)) {
+  const colorTerm = (env2.COLORTERM ?? "").trim().toLowerCase();
+  const termProgram = (env2.TERM_PROGRAM ?? "").trim();
+  return termProgram === "Apple_Terminal" && colorTerm !== "truecolor" && colorTerm !== "24bit" && isLight;
+}
+function normalizeThemeForAnsiLightTerminal(theme, env2 = process.env, isLight = detectLightMode(env2)) {
+  if (!shouldNormalizeAnsiLightTheme(env2, isLight)) {
+    return theme;
+  }
+  const color2 = { ...theme.color };
+  for (const key2 of ANSI_NORMALIZED_FOREGROUNDS) {
+    color2[key2] = normalizeAnsiForeground(color2[key2]);
+  }
+  for (const key2 of ANSI_MUTED_FOREGROUNDS) {
+    color2[key2] = `ansi256(${ANSI_MUTED_BUCKET})`;
+  }
+  return { ...theme, color: color2 };
+}
+var DEFAULT_LIGHT_MODE = detectLightMode();
+var DEFAULT_THEME = normalizeThemeForAnsiLightTerminal(
+  DEFAULT_LIGHT_MODE ? LIGHT_THEME : DARK_THEME,
+  process.env,
+  DEFAULT_LIGHT_MODE
+);
+var authoredBackground = (raw2) => {
+  const v = (raw2 ?? "").trim();
+  return backgroundLuminance(v) === null ? null : v.startsWith("#") ? v : `#${v}`;
+};
+function skinIsLight(colors, env2 = process.env) {
+  const authored = backgroundLuminance(colors["background"] ?? "");
+  return authored === null ? detectLightMode(env2) : authored >= LUMA_LIGHT_THRESHOLD;
+}
+function fromSkin(colors, branding, bannerLogo = "", bannerHero = "", toolPrefix = "", helpHeader = "") {
+  const skinBg = authoredBackground(colors["background"]);
+  const isLight = skinIsLight(colors);
+  const bg = skinBg ?? referenceBackground(isLight);
+  const base3 = isLight ? LIGHT_SEEDS : DARK_SEEDS;
+  const d = isLight ? LIGHT_THEME : DARK_THEME;
+  const c = (k) => colors[k];
+  const hasSkinColors = Object.keys(colors).length > 0;
+  const identityFills = hasSkinColors ? {} : { activeRow: base3.activeRow, muted: base3.muted, selection: base3.selection, surface: base3.surface };
+  const seeds = {
+    ...identityFills,
+    accent: c("ui_accent") ?? c("banner_accent") ?? base3.accent,
+    bg,
+    border: c("ui_border") ?? c("banner_border") ?? base3.border,
+    error: c("ui_error") ?? base3.error,
+    ok: c("ui_ok") ?? base3.ok,
+    primary: c("ui_primary") ?? c("banner_title") ?? base3.primary,
+    prompt: c("prompt") ?? c("banner_text") ?? base3.prompt,
+    shellDollar: c("shell_dollar") ?? base3.shellDollar,
+    statusBad: c("status_bar_bad") ?? base3.statusBad,
+    statusCritical: c("status_bar_critical") ?? c("ui_error") ?? base3.statusCritical,
+    statusGood: c("status_bar_good") ?? c("ui_ok") ?? base3.statusGood,
+    statusWarn: c("status_bar_warn") ?? c("ui_warn") ?? base3.statusWarn,
+    text: c("ui_text") ?? c("banner_text") ?? base3.text,
+    warn: c("ui_warn") ?? base3.warn
+  };
+  const derived = buildPalette(seeds, isLight);
+  const surface = c("completion_menu_bg") ?? c("background") ?? derived.completionBg;
+  const activeRow = c("completion_menu_current_bg") ?? (c("completion_menu_bg") ? mix(surface, seeds.accent, 0.22) : derived.completionCurrentBg);
+  const assembled = {
+    ...derived,
+    muted: c("banner_dim") ?? derived.muted,
+    label: c("ui_label") ?? derived.label,
+    completionBg: surface,
+    completionCurrentBg: activeRow,
+    completionMetaBg: c("completion_menu_meta_bg") ?? surface,
+    completionMetaCurrentBg: c("completion_menu_meta_current_bg") ?? activeRow,
+    sessionLabel: c("session_label") ?? c("banner_dim") ?? derived.sessionLabel,
+    sessionBorder: c("session_border") ?? c("banner_dim") ?? derived.sessionBorder,
+    statusBg: c("status_bar_bg") ?? surface,
+    statusFg: c("status_bar_text") ?? c("ui_text") ?? c("banner_text") ?? derived.statusFg,
+    selectionBg: c("selection_bg") ?? c("completion_menu_current_bg") ?? derived.selectionBg,
+    // Element tokens + skinnable diffs (theme-sdk): overridable, else the
+    // derived defaults (tool→accent, thinking→muted, diff_* → DIFF_* ladder).
+    // thinking tracks the EFFECTIVE muted (banner_dim override included), not
+    // just derived.muted, so recoloring muted carries the reasoning body with it.
+    tool: c("ui_tool") ?? derived.tool,
+    thinking: c("ui_thinking") ?? c("banner_dim") ?? derived.thinking,
+    diffAdded: c("diff_added") ?? derived.diffAdded,
+    diffRemoved: c("diff_removed") ?? derived.diffRemoved,
+    diffAddedWord: c("diff_added_word") ?? derived.diffAddedWord,
+    diffRemovedWord: c("diff_removed_word") ?? derived.diffRemovedWord,
+    // Code-syntax tokens: overridable, else the derived brand-token defaults.
+    syntaxString: c("syntax_string") ?? derived.syntaxString,
+    syntaxNumber: c("syntax_number") ?? derived.syntaxNumber,
+    syntaxKeyword: c("syntax_keyword") ?? derived.syntaxKeyword,
+    syntaxComment: c("syntax_comment") ?? c("banner_dim") ?? derived.syntaxComment
+  };
+  const adapted = shouldNormalizeAnsiLightTheme(process.env, isLight) ? assembled : adaptColorsToBackground(assembled, isLight, derived, bg);
+  return normalizeThemeForAnsiLightTerminal(
+    {
+      // The element tokens theme-sdk introduced (ui_primary, ui_text,
+      // ui_border, ui_ok/warn/error, ui_tool, ui_thinking, shell_dollar,
+      // status_bar_*, diff_*) are read into `seeds`/`assembled` above and
+      // flow through buildPalette → adaptColorsToBackground, so `adapted`
+      // already honors them AND applies #20379's contrast/polarity machinery.
+      // Emitting a hand-mapped color block here would bypass that adaptation
+      // and regress theme quality.
+      color: adapted,
+      brand: {
+        name: branding.agent_name ?? d.brand.name,
+        icon: d.brand.icon,
+        prompt: cleanPromptSymbol(branding.prompt_symbol, d.brand.prompt),
+        welcome: branding.welcome ?? d.brand.welcome,
+        goodbye: branding.goodbye ?? d.brand.goodbye,
+        tool: toolPrefix || d.brand.tool,
+        helpHeader: branding.help_header ?? (helpHeader || d.brand.helpHeader)
+      },
+      bannerLogo,
+      bannerHero
+    },
+    process.env,
+    isLight
+  );
+}
+
+// src/palette.ts
+var NOUS = {
+  dark: {
+    accent: "#F5B820",
+    dim: "#77746D",
+    error: "#E5484D",
+    mdLink: "#7A9CFF",
+    muted: "#9A968C",
+    selectedBg: "#26262A",
+    statusLinePath: "#9A968C",
+    text: "#EDE8DC"
+  },
+  light: {
+    accent: "#956E00",
+    dim: "#8A867C",
+    error: "#C93C42",
+    mdLink: "#2F5BD8",
+    muted: "#6B675E",
+    statusLinePath: "#6B675E"
+  }
+};
+function paletteFor(mode, skin) {
+  if (mode === "nous") {
+    return { dark: NOUS.dark, light: NOUS.light, name: { dark: "nous", light: "nous" } };
+  }
+  if (mode === "skin" && skin) {
+    const name = skin.name || "default";
+    return {
+      dark: semantic(resolve5(skin, "dark")),
+      light: semantic(resolve5(skin, "light")),
+      name: { dark: name, light: name }
+    };
+  }
+  return { dark: {}, light: {}, name: { dark: "tern", light: "tern" } };
+}
+function resolve5(skin, polarity) {
+  const light = polarity === "light";
+  const colors = { ...skin.colors, ...light ? skin.light_colors : skin.dark_colors };
+  const saved = process.env.HERMES_TUI_LIGHT;
+  process.env.HERMES_TUI_LIGHT = light ? "1" : "0";
+  try {
+    return fromSkin(colors, skin.branding ?? {}).color;
+  } finally {
+    if (saved === void 0) {
+      delete process.env.HERMES_TUI_LIGHT;
+    } else {
+      process.env.HERMES_TUI_LIGHT = saved;
+    }
+  }
+}
+function semantic(c) {
+  const out = {
+    accent: c.accent,
+    borderAccent: c.accent,
+    error: c.error,
+    mdListBullet: c.accent,
+    statusLineModel: c.accent,
+    success: c.ok,
+    warning: c.warn
+  };
+  for (const key2 in out) {
+    if (!/^#[0-9a-f]{3,8}$/i.test(out[key2] ?? "")) {
+      delete out[key2];
+    }
+  }
+  return out;
+}
+
+// src/chrome/theme.ts
+var Theme = class {
+  #host;
+  #mode;
+  /** The skin the gateway last reported; only the `skin` theme mode wears it. */
+  #skin;
+  /** `mode` is the one settings.json kept. */
+  constructor(host, mode) {
+    this.#host = host;
+    this.#mode = mode;
+  }
+  /** Whose colors the surface wears. */
+  get mode() {
+    return this.#mode;
+  }
+  /** Sends the palette of the mode and skin now. */
+  apply() {
+    this.#host.palette(paletteFor(this.#mode, this.#skin));
+  }
+  /** The gateway's skin (gateway.ready, skin.changed); none keeps the last one. */
+  skin(skin) {
+    if (skin) {
+      this.#skin = skin;
+      this.apply();
+    }
+  }
+  /** Switches the mode now and keeps it for the next launch. */
+  set(mode) {
+    this.#mode = mode;
+    this.#host.settings.save({ theme: mode });
+    this.apply();
+  }
+};
+
+// src/commands/host.ts
+function sessionHost(cx) {
+  const ticket = cx.state.ticket();
+  const { sid } = ticket;
+  return {
+    busy: Boolean(cx.activity.busy),
+    // A steer that fell back to the queue: steering carries no images.
+    canonical: cx.gw.isCanonical,
+    enqueue: (text12) => cx.router.behind({ images: [], kind: "app", text: text12 }),
+    gw: cx.gw,
+    notice: (text12, tone) => {
+      cx.transcript.notice(text12, tone);
+      cx.changed();
+    },
+    // The shared gateway (the one /branch runs on) answers a resume with one id for both kinds.
+    open: async (id) => {
+      await cx.life.resume(id);
+      return durable(cx.state.ref) === id;
+    },
+    panel: (title, text12) => {
+      cx.transcript.panel(title, text12);
+      cx.changed();
+    },
+    compressing: (state) => {
+      if (state === "start") {
+        cx.transcript.compacting({ before: cx.state.usage?.context_used || void 0, manual: true });
+      } else if (state === "none") {
+        cx.transcript.uncompact();
+      } else {
+        cx.transcript.compacted(Date.now(), state);
+      }
+      cx.setCompacting(state === "start", { manual: true });
+      cx.changed();
+    },
+    queued: cx.queue.count(),
+    reload: async () => {
+      if (sid && ticket.isCurrent()) {
+        await cx.life.reload(sid);
+      }
+    },
+    send: (text12) => cx.router.send({ images: [], kind: "app", text: text12 }),
+    sid,
+    stale: () => !ticket.isCurrent(),
+    steered: (text12) => {
+      cx.transcript.steer(text12);
+      cx.changed();
+    },
+    // /queue: behind the turn whatever busy_input_mode says.
+    submit: (text12) => cx.submit(text12)
+  };
+}
+
+// src/connections/watcher.ts
+var ConnectWatcher = class {
+  #host;
+  /** Where the card files are; unset: the plugin's data folder, read at each poll. */
+  #dir;
+  #timer;
+  /** Connect cards (by file) this pane saw with an app still waiting. */
+  #seen = /* @__PURE__ */ new Set();
+  /** Connect calls that drew no card (a status read, a call with nothing to authorize): never again. */
+  #noCard = /* @__PURE__ */ new WeakSet();
+  /** `dir`: the plugin's data folder the card files are under (tests point it at their own). */
+  constructor(host, { dir: dir2 } = {}) {
+    this.#host = host;
+    this.#dir = dir2;
+  }
+  /**
+   * Reads every connect card now (a new call or a reloaded transcript does not wait for the next
+   * poll), then polls while some card is watched: a settled card never moves again.
+   */
+  watch() {
+    clearTimeout(this.#timer);
+    this.#tick();
+  }
+  /** A connect card's Continue: tell the agent which apps the user authorized, as the tool asks. */
+  continue(ref) {
+    const call = this.#call(ref);
+    const card = call?.connect;
+    if (!call || !card || card.told || card.settled) {
+      return;
+    }
+    this.#host.transcript.mutateCall(call, () => {
+      card.told = true;
+      card.settled = "continued";
+    });
+    if (!card.key || claimTold(card.key, this.#dir)) {
+      this.#host.tell(continueMessage(card.targets));
+    }
+    this.#host.changed();
+  }
+  /** A connect card's Authorize: the app's link in the browser, and its row waits on the browser now. */
+  open(ref, name) {
+    const call = this.#call(ref);
+    const card = call?.connect;
+    const target = card?.targets.find((t2) => t2.name === name);
+    if (!call || !card || !target?.url) {
+      return;
+    }
+    this.#host.openUrl(target.url);
+    this.#host.transcript.mutateCall(call, () => card.opened = [.../* @__PURE__ */ new Set([...card.opened, name])]);
+    this.#host.changed();
+  }
+  /** Stops the poll. */
+  dispose() {
+    clearTimeout(this.#timer);
+  }
+  #tick() {
+    this.#timer = void 0;
+    let open = false;
+    for (const call of this.#host.transcript.calls(CONNECT_TOOL)) {
+      if (call.connect?.settled || call.status === "running" || this.#noCard.has(call)) {
+        continue;
+      }
+      const next3 = loadConnect(call, this.#dir);
+      if (!next3) {
+        this.#noCard.add(call);
+        continue;
+      }
+      if (JSON.stringify(next3) !== JSON.stringify(call.connect)) {
+        this.#host.transcript.mutateCall(call, (c) => c.connect = next3);
+        this.#host.changed();
+      }
+      const seen = next3.key ?? call.id;
+      if (next3.targets.some(waiting2) && !next3.settled) {
+        this.#seen.add(seen);
+      }
+      if (!next3.told && this.#seen.has(seen) && allConnected(next3) && (!next3.key || claimTold(next3.key, this.#dir))) {
+        this.#host.transcript.mutateCall(call, () => next3.told = true);
+        this.#host.tell(connectedMessage(next3.targets));
+        this.#host.changed();
+      } else if (next3.key && !next3.settled) {
+        open = true;
+      }
+    }
+    if (open) {
+      this.#timer = setTimeout(() => this.#tick(), POLL_MS2);
+    }
+  }
+  /** The connect card `ref` names (its file, or its call id when it has none). */
+  #call(ref) {
+    return this.#host.transcript.calls(CONNECT_TOOL).findLast((c) => (c.connect?.key ?? c.id) === ref);
+  }
+};
+
+// src/core/disposables.ts
+var Disposables = class {
+  #teardowns = /* @__PURE__ */ new Set();
+  #disposed = false;
+  /** Whether dispose() ran. */
+  get disposed() {
+    return this.#disposed;
+  }
+  /**
+   * Runs `teardown` at dispose (at once when that already ran). The returned function drops it
+   * unrun: the thing ended on its own.
+   */
+  add(teardown) {
+    if (this.#disposed) {
+      teardown();
+      return () => void 0;
+    }
+    const entry = () => teardown();
+    this.#teardowns.add(entry);
+    return () => void this.#teardowns.delete(entry);
+  }
+  /** setTimeout, cleared at dispose unless it fired first. */
+  timeout(fn, ms) {
+    const timer = setTimeout(() => {
+      drop();
+      fn();
+    }, ms);
+    const drop = this.add(() => clearTimeout(timer));
+    return timer;
+  }
+  /**
+   * Runs every teardown once, the newest first. One that throws does not stop the rest; the first
+   * error is thrown after all of them ran.
+   */
+  dispose() {
+    if (this.#disposed) {
+      return;
+    }
+    this.#disposed = true;
+    const teardowns = [...this.#teardowns].reverse();
+    this.#teardowns.clear();
+    const errors = [];
+    for (const teardown of teardowns) {
+      try {
+        teardown();
+      } catch (error) {
+        errors.push(error);
+      }
+    }
+    if (errors.length) {
+      throw errors[0];
+    }
+  }
+};
+
+// src/core/scheduler.ts
+var RenderScheduler = class {
+  #render;
+  #scheduled = false;
+  constructor(render3) {
+    this.#render = render3;
+  }
+  /** Renders on the next turn of the event loop (setImmediate), once however often it is asked. */
+  request() {
+    if (this.#scheduled) {
+      return;
+    }
+    this.#scheduled = true;
+    setImmediate(() => {
+      this.#scheduled = false;
+      this.#render();
+    });
+  }
+};
+
+// src/draft/attachments.ts
+import { existsSync as existsSync5 } from "node:fs";
+import { basename as basename3 } from "node:path";
+
+// src/hermes/clipboardImage.ts
+import { execFile as execFile6 } from "node:child_process";
+import { existsSync as existsSync4 } from "node:fs";
+import { mkdtemp, rm } from "node:fs/promises";
+import { homedir as homedir11, tmpdir } from "node:os";
+import { join as join10, resolve as resolve6 } from "node:path";
+import { promisify as promisify5 } from "node:util";
+var execFileP = promisify5(execFile6);
+var runFile = async (file2, args, options) => (await execFileP(file2, args, options)).stdout;
+var IMAGE = /\.(png|jpe?g|gif|webp)$/i;
+var MAC_SCRIPT = `ObjC.import('AppKit');
+function run(argv) {
+  const pb = $.NSPasteboard.generalPasteboard;
+  const url = pb.stringForType('public.file-url');
+  if (url && !url.isNil()) {
+    const path = $.NSURL.URLWithString(url).path;
+    if (path && !path.isNil()) return 'file:' + path.js;
+  }
+  let d = pb.dataForType('public.png');
+  if (!d || d.isNil()) {
+    const t = pb.dataForType('public.tiff');
+    if (!t || t.isNil()) return 'false';
+    const rep = $.NSBitmapImageRep.imageRepWithData(t);
+    if (!rep || rep.isNil()) return 'false';
+    d = rep.representationUsingTypeProperties($.NSBitmapImageFileTypePNG, $({}));
+  }
+  return d && !d.isNil() && d.writeToFileAtomically(argv[0], true) ? 'true' : 'false';
+}`;
+async function extractClipboardImage(dest, env2, platform = process.platform, run6 = runFile) {
+  if (platform === "darwin") {
+    let answer;
+    try {
+      answer = (await run6("osascript", ["-l", "JavaScript", "-e", MAC_SCRIPT, dest], { timeout: 5e3 })).trim();
+    } catch {
+    }
+    if (answer?.startsWith("file:")) {
+      const file2 = answer.slice("file:".length);
+      return IMAGE.test(file2) && existsSync4(file2) ? file2 : void 0;
+    }
+    if (answer !== void 0) {
+      return answer === "true" && existsSync4(dest) ? dest : void 0;
+    }
+  }
+  const root7 = env2.HERMES_PYTHON_SRC_ROOT;
+  const python = env2.HERMES_PYTHON?.trim() || "python3";
+  if (!root7) {
+    return void 0;
+  }
+  const stdout = await run6(python, [join10(root7, "ui-tui/scripts/clipboard_image.py"), dest], {
+    cwd: root7,
+    env: { ...env2, PYTHONPATH: root7 },
+    timeout: 15e3
+  });
+  return stdout.trim() === "true" && existsSync4(dest) ? dest : void 0;
+}
+async function withClipboardImage(use, env2 = process.env, extract = extractClipboardImage) {
+  const dir2 = await mkdtemp(join10(tmpdir(), "hermes-tern-clipboard-"));
+  try {
+    const path2 = await extract(join10(dir2, "clipboard.png"), env2);
+    return path2 ? await use(path2) : void 0;
+  } finally {
+    await rm(dir2, { force: true, recursive: true });
+  }
+}
+function imagePathOf(text12, cwd) {
+  let raw2 = text12.trim();
+  if (!raw2 || raw2.includes("\n")) {
+    return void 0;
+  }
+  raw2 = raw2.replace(/^(['"])(.*)\1$/, "$2");
+  if (raw2.startsWith("file://")) {
+    try {
+      raw2 = decodeURIComponent(new URL(raw2).pathname);
+    } catch {
+      return void 0;
+    }
+  }
+  raw2 = raw2.replace(/\\(.)/g, "$1").replace(/^~(?=$|\/)/, homedir11());
+  if (!IMAGE.test(raw2)) {
+    return void 0;
+  }
+  const path2 = resolve6(cwd, raw2);
+  return existsSync4(path2) ? path2 : void 0;
+}
+
+// src/draft/attachments.ts
+var Attachments = class {
+  #host;
+  #clipboard;
+  /** The images attached to the draft: the next prompt entered takes them. */
+  #items = [];
+  /** Images being read or uploaded for the draft: an "attaching…" chip each until they land. */
+  #pending = [];
+  /** The launcher's startup image until it is attached to the first session (the queue waits for it). */
+  #startup;
+  /** `startup`: the launcher's `--image` (''); `clipboard`: reads the clipboard's image (tests fake it). */
+  constructor(host, { clipboard = (use) => withClipboardImage(use), startup = "" } = {}) {
+    this.#host = host;
+    this.#clipboard = clipboard;
+    this.#startup = startup;
+  }
+  /** The images that landed, in the order they were attached. */
+  get items() {
+    return this.#items;
+  }
+  /** An image is still being read or uploaded: a prompt sent now would miss it. */
+  get uploading() {
+    return this.#pending.length > 0;
+  }
+  /** Any image, landed or on its way: the draft is not empty. */
+  get any() {
+    return this.#items.length > 0 || this.#pending.length > 0;
+  }
+  /** The launcher's startup image is still to be attached (the queue waits for it). */
+  get awaitingStartup() {
+    return Boolean(this.#startup);
+  }
+  /** A paste that is an image (no text: the clipboard's; one image path: that file); false for text. */
+  paste(text12) {
+    if (!text12.trim()) {
+      void this.fromClipboard(true);
+      return true;
+    }
+    const path2 = imagePathOf(text12, this.#host.cwd());
+    if (path2) {
+      void this.#attach(path2, basename3(path2));
+      return true;
+    }
+    return false;
+  }
+  /** Attaches the clipboard's image to the next prompt (`quiet`: an empty paste, which may hold none). */
+  async fromClipboard(quiet) {
+    const slot = this.#start(`pasted image ${this.#items.length + this.#pending.length + 1}`);
+    try {
+      const found = await this.#clipboard(async (path2) => {
+        await this.#attach(path2, slot.name, slot);
+        return true;
+      });
+      if (!found && !quiet) {
+        this.#host.note("No image on the clipboard.", "warning");
+      }
+    } catch (error) {
+      this.#host.note(`Could not read the clipboard image: ${errorText(error)}`, "error");
+    } finally {
+      this.#end(slot);
+      this.#host.changed();
+    }
+  }
+  /** `/image <path>`: attaches that image file (resolved against the session's folder) to the next prompt. */
+  async fromPath(raw2) {
+    const path2 = imagePathOf(raw2, this.#host.cwd());
+    if (!path2) {
+      this.#host.note(`Not an image file: ${raw2.trim()} (PNG, JPEG, GIF or WebP)`, "warning");
+      return this.#host.changed();
+    }
+    await this.#attach(path2, basename3(path2));
+  }
+  /**
+   * `hermes -q … --image …`: attaches the launcher's image to session `sid` (the first one): on the
+   * shared gateway to the startup query at the queue's head, else by path to the session itself.
+   * A failure is a warning, and the queue goes on without it.
+   */
+  async attachStartup(sid) {
+    const path2 = this.#startup;
+    try {
+      if (this.#host.gw.isCanonical) {
+        const image3 = this.#image(await uploadImage(this.#host.gw, sid, path2, this.#host.launchCwd), basename3(path2));
+        if (!this.#host.attachToHead(image3)) {
+          this.#items.push(image3);
+        }
+      } else {
+        await rpc(this.#host.gw, "image.attach", { path: path2, session_id: sid });
+      }
+    } catch (error) {
+      this.#host.note(`Could not attach ${path2}: ${errorText(error)}`, "warning");
+    }
+    this.#startup = "";
+  }
+  /** The draft's images, which leave the composer with the prompt that takes them. */
+  take() {
+    const images = this.#items;
+    this.#items = [];
+    return images;
+  }
+  /** A prompt that did not go is back in the composer: its images go before the draft's. */
+  restore(images) {
+    this.#items = [...images, ...this.#items];
+  }
+  /** The images that landed go; one still uploading lands after (Esc Esc). */
+  clear() {
+    this.#items = [];
+  }
+  /** Every image goes, and the uploads in flight land nowhere (Ctrl+C). */
+  clearAll() {
+    this.#items = [];
+    this.#pending = [];
+  }
+  /** The composer's chips: the landed images, then those on their way. */
+  chips() {
+    return [
+      ...this.#items.map((a2) => ({
+        ...a2.caption === void 0 ? {} : { caption: a2.caption },
+        ...a2.preview ? { image: a2.preview } : {},
+        label: a2.name
+      })),
+      ...this.#pending.map((slot) => ({ label: slot.name, pending: true }))
+    ];
+  }
+  /** Chip `index`'s ✕: a landed image leaves the draft; one on its way lands nowhere. */
+  remove(index2) {
+    const slot = this.#pending[index2 - this.#items.length];
+    if (index2 < this.#items.length) {
+      this.#items.splice(index2, 1);
+    } else if (slot) {
+      this.#end(slot);
+    }
+    this.#host.changed();
+  }
+  /** Uploads `path` for the next prompt; its chip says "attaching…" (in `slot`) until it lands or fails. */
+  async #attach(path2, name, slot = this.#start(name)) {
+    const sid = this.#host.sid();
+    try {
+      if (!sid) {
+        this.#host.note("Wait for the session to start before attaching an image.", "warning");
+        return;
+      }
+      const image3 = this.#image(await uploadImage(this.#host.gw, sid, path2, this.#host.launchCwd), name);
+      if (this.#pending.includes(slot)) {
+        this.#items.push(image3);
+      }
+    } catch (error) {
+      this.#host.note(`Could not attach ${name}: ${errorText(error)}`, "error");
+    } finally {
+      this.#end(slot);
+      this.#host.changed();
+    }
+  }
+  #start(name) {
+    const slot = { name };
+    this.#pending.push(slot);
+    this.#host.changed();
+    return slot;
+  }
+  #end(slot) {
+    this.#pending = this.#pending.filter((s2) => s2 !== slot);
+  }
+  /**
+   * An uploaded image with its thumbnail: its bytes as a blob, else the gateway's copy where that
+   * is on this machine. The bytes are not kept.
+   */
+  #image({ bytes, ...attachment }, name) {
+    const size = imageSize(bytes);
+    const kb = bytes.length / 1024;
+    const blob = this.#host.blob(bytes, attachment.mime);
+    const preview5 = blob ? { blob } : existsSync5(attachment.path) ? { path: attachment.path } : void 0;
+    const caption = [size && `${size.w}\xD7${size.h}`, kb >= 1024 ? `${(kb / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(kb))} KB`];
+    return { ...attachment, caption: caption.filter(Boolean).join(" \xB7 "), name, ...preview5 ? { preview: preview5 } : {} };
+  }
+};
+
+// src/draft/keys.ts
+var EXIT_ARM_MS = 1500;
+var DOUBLE_ESC_MS = 500;
+var KEYS2 = {
+  agents: { label: "alt+a", name: "a", with: ["alt"], without: ["ctrl", "meta"] },
+  background: { label: "alt+j", name: "j", with: ["alt"], without: ["ctrl", "meta"] },
+  cancel: { label: "ctrl+c", name: "c", with: ["ctrl"] },
+  // Pressed twice: a single Esc never cancels work.
+  clearOrStop: { label: "escape escape", name: "escape", with: [] },
+  clipboardImage: { label: "ctrl+v", name: "v", with: ["ctrl"], without: ["alt", "meta"] },
+  dequeue: { label: "alt+up", name: "up", with: ["alt"] },
+  effort: { label: "shift+tab", name: "tab", with: ["shift"] },
+  prs: { label: "alt+p", name: "p", with: ["alt"], without: ["ctrl", "meta"] },
+  quit: { label: "ctrl+d", name: "d", with: ["ctrl"] },
+  sidebar: { label: "alt+s", name: "s", with: ["alt"], without: ["ctrl", "meta"] },
+  steer: { label: "alt+enter", name: "enter", with: ["alt"] }
+};
+function matches(key2, match) {
+  return key2.name === match.name && match.with.every((m) => key2[m]) && !match.without?.some((m) => key2[m]);
+}
+function hasDraft(cx) {
+  return Boolean(cx.composer.text || cx.attachments.any);
+}
+function clearDraft(cx) {
+  if (cx.composer.text.trim()) {
+    cx.composer.take();
+  } else {
+    cx.composer.set("");
+  }
+  cx.attachments.clear();
+}
+function ctrlC(cx) {
+  if (hasDraft(cx)) {
+    cx.composer.set("");
+    cx.attachments.clearAll();
+    return;
+  }
+  if (cx.busy()) {
+    return cx.interrupt();
+  }
+  const now = cx.now();
+  if (now - cx.presses.exit < EXIT_ARM_MS) {
+    return cx.quit();
+  }
+  cx.presses.exit = now;
+  cx.transcript.notice("Press Ctrl+C again to exit.");
+}
+var cancel = (key2, cx, top) => {
+  if (!matches(key2, KEYS2.cancel)) {
+    return false;
+  }
+  if (!top) {
+    ctrlC(cx);
+  } else if (top.cancel) {
+    top.cancel();
+  } else {
+    cx.close(top);
+  }
+  return true;
+};
+var overlay = (key2, _cx, top) => top?.onKey(key2) === true;
+var modal = (_key, _cx, top) => top?.modal === true;
+var hud = (key2, cx) => cx.hud(key2);
+var completion = (key2, cx) => cx.completion.onKey(key2);
+var doubleEsc = (key2, cx) => {
+  if (!matches(key2, KEYS2.clearOrStop)) {
+    return false;
+  }
+  const now = cx.now();
+  const double = now - cx.presses.esc <= DOUBLE_ESC_MS;
+  cx.presses.esc = double ? 0 : now;
+  if (double && hasDraft(cx)) {
+    clearDraft(cx);
+  } else if (double && cx.busy()) {
+    cx.interrupt();
+  }
+  return true;
+};
+var effort = (key2, cx) => {
+  if (!matches(key2, KEYS2.effort)) {
+    return false;
+  }
+  cx.cycleEffort();
+  return true;
+};
+var SHEETS = [
+  [KEYS2.agents, (cx) => cx.openAgents()],
+  [KEYS2.background, (cx) => cx.openBackground()],
+  [KEYS2.sidebar, (cx) => cx.toggleSidebar()],
+  [KEYS2.prs, (cx) => cx.openPrs()]
+];
+var sheets = (key2, cx) => {
+  const hit = SHEETS.find(([match]) => matches(key2, match));
+  hit?.[1](cx);
+  return hit !== void 0;
+};
+var dequeue = (key2, cx) => {
+  if (!matches(key2, KEYS2.dequeue) || !cx.queue.count()) {
+    return false;
+  }
+  cx.queue.dequeue(0);
+  return true;
+};
+var steer2 = (key2, cx) => {
+  if (!matches(key2, KEYS2.steer) || !cx.busy() || !cx.queue.count() || cx.composer.text) {
+    return false;
+  }
+  cx.queue.steer(0);
+  return true;
+};
+var quit = (key2, cx) => {
+  if (!matches(key2, KEYS2.quit) || hasDraft(cx)) {
+    return false;
+  }
+  cx.quit();
+  return true;
+};
+var pasteImage = (key2, cx) => key2.name === "paste" && cx.attachments.paste(key2.text ?? "");
+var clipboardImage = (key2, cx) => {
+  if (!matches(key2, KEYS2.clipboardImage)) {
+    return false;
+  }
+  cx.attachClipboardImage();
+  return true;
+};
+var composer = (key2, cx) => {
+  if (cx.composer.key(key2) === "submit") {
+    cx.submitDraft();
+  }
+  return true;
+};
+var KEY_RULES = [
+  cancel,
+  overlay,
+  modal,
+  hud,
+  completion,
+  doubleEsc,
+  effort,
+  sheets,
+  dequeue,
+  steer2,
+  quit,
+  pasteImage,
+  clipboardImage,
+  composer
+];
+function onKey(key2, cx, top) {
+  KEY_RULES.some((rule) => rule(key2, cx, top));
+}
+
+// src/core/epoch.ts
+var Epoch = class {
+  #generation = 0;
+  #controller = new AbortController();
+  /** The present generation: 0 until the first `next()`. */
+  get generation() {
+    return this.#generation;
+  }
+  /** A ticket for the present generation: current until the next `next()`. */
+  current() {
+    const generation = this.#generation;
+    return { isCurrent: () => generation === this.#generation, signal: this.#controller.signal };
+  }
+  /** Ends the present generation (its tickets go stale, their signal aborts) and returns a ticket for the new one. */
+  next() {
+    const ended = this.#controller;
+    this.#controller = new AbortController();
+    this.#generation++;
+    ended.abort();
+    return this.current();
+  }
+};
+
+// src/flow.ts
+var Switches = class {
+  /** One generation per switch: a switch's token is the generation its `begin` started. */
+  #epoch = new Epoch();
+  #pending = false;
+  /** Whether a switch is in flight. */
+  get pending() {
+    return this.#pending;
+  }
+  /** Bumped by every `begin`: read before an await, it tells whether a switch began since. */
+  get generation() {
+    return this.#epoch.generation;
+  }
+  /** Starts a switch and returns its token; earlier tokens go stale. */
+  begin() {
+    this.#pending = true;
+    this.#epoch.next();
+    return this.#epoch.generation;
+  }
+  /** Whether switch `token` is still the latest one (its result may apply). */
+  current(token) {
+    return token === this.#epoch.generation;
+  }
+  /** A ticket that goes stale once another switch begins (its signal aborts then). */
+  since() {
+    return this.#epoch.current();
+  }
+  /** Ends switch `token` (adopted or failed); a superseded token leaves the newer switch pending. */
+  end(token) {
+    if (this.current(token)) {
+      this.#pending = false;
+    }
+  }
+  /**
+   * Routes a server request for `sessionId` while `active` is shown: another
+   * session's request waits while a switch is in flight (it may be the one
+   * being adopted) and is dropped otherwise.
+   */
+  route(active, sessionId) {
+    if (!sessionId || !active || sessionId === active) {
+      return "show";
+    }
+    return this.#pending ? "hold" : "drop";
+  }
+};
+function ownsEvent(active, ev) {
+  return !ev.session_id || !active || ev.session_id === active || ev.type.startsWith("gateway.");
+}
+function busyFrom(r, now = Date.now()) {
+  if (!r.running && r.status !== "working" && r.status !== "waiting") {
+    return null;
+  }
+  return { label: "Working\u2026", since: {}, startedAt: r.turn_started_at ? r.turn_started_at * 1e3 : now };
+}
+
+// src/gateway/coverage.ts
+var IGNORED = [
+  "agent.print",
+  "billing.step_up.verification",
+  "bot_relay.outbox.pending",
+  "browser.controller.cancel",
+  "browser.controller.command",
+  "browser.progress",
+  "connection.request",
+  "connection.update",
+  "cron.changed",
+  "dashboard.new_session_requested",
+  "display.install.done",
+  "display.install.log",
+  "display.lease",
+  "display.status",
+  "free_tier.challenge",
+  "gateway.stderr",
+  "message.reaction",
+  "onboarding.ended",
+  "pairing.changed",
+  "pane.reveal",
+  "pet.changed",
+  "pet.generate.progress",
+  "pet.hatch.progress",
+  "platforms.changed",
+  "preview.close",
+  "preview.open",
+  "preview.restart.complete",
+  "preview.restart.progress",
+  "projects.changed",
+  "reaction",
+  "session.reclaimed",
+  "session.resume_progress",
+  "setup.ready",
+  "skills.changed",
+  "terminal.close",
+  "tip.show",
+  "tool.output_risk",
+  "voice.interrupted",
+  "voice.partial",
+  "voice.status",
+  "voice.transcript",
+  "wake.detected"
+];
+
+// src/gateway/handlers/agents.ts
+function subagent(ev, cx) {
+  if (ev.payload) {
+    cx.transcript.subagent(ev.type, ev.payload);
+  }
+  if (ev.type === "subagent.complete") {
+    cx.prs.relink();
+  }
+  return "render";
+}
+var agentHandlers = {
+  "subagent.spawn_requested": subagent,
+  "subagent.start": subagent,
+  "subagent.thinking": subagent,
+  "subagent.tool": subagent,
+  "subagent.progress": subagent,
+  "subagent.complete": subagent
+};
+
+// src/backendNotes.ts
+var STDERR_LINE_CAP = 120;
+var STDERR_LINES_MAX = 4;
+function slowStartNotes(stderrTail) {
+  const problems = (stderrTail ?? "").split("\n").map((l) => l.trim()).filter((l) => l && stderrLooksLikeProblem(l)).slice(-STDERR_LINES_MAX);
+  return [
+    { text: "The agent backend is slow to start. Still waiting\u2026", tone: "warning" },
+    ...problems.map((l) => ({ text: l.slice(0, STDERR_LINE_CAP), tone: "error" }))
+  ];
+}
+function protocolNote(preview5, warned2) {
+  return warned2 ? void 0 : { text: `The agent backend wrote unexpected output: ${String(preview5 ?? "").slice(0, STDERR_LINE_CAP)}`, tone: "info" };
+}
+function isDeadStream(err) {
+  const code7 = err?.code;
+  return code7 === "EIO" || code7 === "EPIPE";
+}
+var FaultBudget = class {
+  constructor(max = 10, windowMs = 5e3) {
+    this.max = max;
+    this.windowMs = windowMs;
+  }
+  max;
+  windowMs;
+  #at = [];
+  /** Records a fault at `now`; false once more than `max` landed within the window. */
+  take(now = Date.now()) {
+    this.#at = [...this.#at.filter((t2) => now - t2 < this.windowMs), now];
+    return this.#at.length <= this.max;
+  }
+};
+
+// src/gateway/handlers/chrome.ts
+function answered(ev, cx) {
+  if (ev.payload && "text" in ev.payload && typeof ev.payload.text === "string" && ev.payload.text.trim()) {
+    const question = "question" in ev.payload && typeof ev.payload.question === "string" ? ev.payload.question.trim() : "";
+    const task = "task_id" in ev.payload && typeof ev.payload.task_id === "string" ? ` ${ev.payload.task_id}` : "";
+    cx.transcript.panel(
+      ev.type === "btw.complete" ? `/btw${question ? ` ${question}` : ""}` : `Background task${task}`,
+      ev.payload.text
+    );
+  }
+  return "render";
+}
+var chromeHandlers = {
+  "skin.changed": (ev, cx) => {
+    cx.theme.skin(ev.payload);
+    return "render";
+  },
+  "notification.show": (ev, cx) => {
+    const p3 = ev.payload;
+    if (p3 && isLoginNotice(p3)) {
+      if (p3.text?.trim()) {
+        cx.transcript.panel("/login", p3.text);
+      }
+      return "render";
+    }
+    if (p3) {
+      cx.notices.show(p3);
+    }
+    return "render";
+  },
+  "notification.clear": (ev, cx) => {
+    cx.notices.clear(ev.payload?.key);
+    return "render";
+  },
+  // What the background self-improvement review saved to memory or skills.
+  "review.summary": (ev, cx) => {
+    const text12 = String(ev.payload?.text ?? "").trim();
+    if (!text12) {
+      return "quiet";
+    }
+    cx.transcript.notice(text12);
+    return "render";
+  },
+  notice: (ev, cx) => {
+    cx.transcript.notice(ev.payload?.message ?? "");
+    return "render";
+  },
+  error: (ev, cx) => {
+    cx.transcript.notice(ev.payload?.message ?? "error", "error");
+    return "render";
+  },
+  "gateway.start_timeout": (ev, cx) => {
+    for (const note of slowStartNotes(ev.payload?.stderr_tail)) {
+      cx.transcript.notice(note.text, note.tone);
+    }
+    return "render";
+  },
+  "gateway.protocol_error": (ev, cx) => {
+    const note = protocolNote(ev.payload?.preview, cx.warned.protocol);
+    cx.warned.protocol = true;
+    if (!note) {
+      return "quiet";
+    }
+    cx.transcript.notice(note.text, note.tone);
+    return "render";
+  },
+  "background.complete": answered,
+  "btw.complete": answered
+};
+
+// src/gateway/handlers/processes.ts
+var processHandlers = {
+  // Quiet here: the store asks for its own render once it folded the chunk.
+  "agent.terminal.output": (ev, cx) => {
+    if (ev.payload?.process_id) {
+      cx.processes.output(ev.payload.process_id, ev.payload.chunk ?? "");
+    }
+    return "quiet";
+  }
+};
+
+// src/gateway/handlers/prompts.ts
+function asked(ev, cx) {
+  const req = sharedPromptRequest(ev, cx.gw, (message) => {
+    cx.transcript.notice(message, "warning");
+    cx.changed();
+  });
+  if (req) {
+    cx.request(req);
+  }
+  return "render";
+}
+function settled(ev, cx) {
+  cx.sheets.drop(sharedPromptId(ev.payload?.prompt_id));
+  return "render";
+}
+var promptHandlers = {
+  "request.cancel": (ev, cx) => {
+    const id = ev.payload?.id;
+    const notice = promptTimeoutNotice(ev.payload?.method, ev.payload?.reason);
+    const held = cx.life.unhold(id);
+    const shown2 = held || cx.sheets.shows(id);
+    cx.sheets.drop(id);
+    if (notice && shown2) {
+      cx.transcript.notice(notice, "warning");
+    }
+    return "render";
+  },
+  "approval.request": asked,
+  "clarify.request": asked,
+  "approval.settled": settled,
+  "clarify.settled": settled,
+  "approval.cancelled": (ev, cx) => {
+    cx.sheets.dropByApproval(ev.payload?.request_ids);
+    return "render";
+  }
+};
+
+// node_modules/@hermes/shared/src/usage-tick.ts
+var num5 = (value) => value !== null && value !== void 0 && Number.isFinite(value) ? value : void 0;
+var round1 = (value) => Math.round(value * 10) / 10;
+var pct = (part, whole) => Math.max(0, Math.min(100, Math.round(part / whole * 100)));
+var COUNTERS = [
+  ["calls", ["api_calls"]],
+  ["input", ["input_tokens", "prompt_tokens"]],
+  ["output", ["output_tokens", "completion_tokens"]],
+  ["reasoning", ["reasoning_tokens"]],
+  ["prompt", ["prompt_tokens"]],
+  ["completion", ["completion_tokens"]],
+  ["total", ["total_tokens"]]
+];
+function contextFields(p3) {
+  const used = num5(p3.last_prompt_tokens) ?? 0;
+  const max = num5(p3.context_length) ?? 0;
+  const compressions = num5(p3.compression_count);
+  const fields = p3.context_source == null || compressions === void 0 ? {} : { compressions };
+  if (!used || !max) {
+    return fields;
+  }
+  const source2 = p3.context_source || "provider_usage";
+  const clamped = Math.min(used, max);
+  return {
+    ...fields,
+    context_estimated: source2 !== "provider_usage",
+    context_max: max,
+    context_percent: pct(clamped, max),
+    context_source: source2,
+    context_used: clamped
+  };
+}
+function rateFields(p3) {
+  const fields = {};
+  const promptTotal = num5(p3.prompt_tokens) ?? 0;
+  const cacheRead = num5(p3.cache_read_tokens) ?? 0;
+  const latency = num5(p3.avg_latency_s);
+  const tps = num5(p3.tokens_per_s);
+  const subagents = num5(p3.active_subagents);
+  if (promptTotal > 0 && cacheRead > 0) {
+    fields.cache_hit_pct = pct(cacheRead, promptTotal);
+  }
+  if (latency !== void 0) {
+    fields.avg_latency_s = round1(latency);
+  }
+  if (tps !== void 0) {
+    fields.avg_tps = round1(tps);
+  }
+  if (subagents !== void 0) {
+    fields.active_subagents = subagents;
+  }
+  return fields;
+}
+function usageFromTick(payload) {
+  if (!payload) {
+    return void 0;
+  }
+  if ("usage" in payload && payload.usage) {
+    return payload.usage;
+  }
+  const usage = {};
+  for (const [key2, sources] of COUNTERS) {
+    const values = sources.map((source2) => num5(payload[source2]));
+    const value = values.find(Boolean) ?? values.find((v) => v !== void 0);
+    if (value !== void 0) {
+      usage[key2] = value;
+    }
+  }
+  const derived = { ...usage, ...contextFields(payload), ...rateFields(payload) };
+  if (Object.keys(derived).length === 0) {
+    return void 0;
+  }
+  return payload.model ? { ...derived, model: payload.model } : derived;
+}
+
+// src/gateway/handlers/session.ts
+var sessionHandlers = {
+  "gateway.ready": (ev, cx) => {
+    cx.reconnect.ready();
+    cx.theme.skin(ev.payload?.skin);
+    cx.life.ready();
+    return "render";
+  },
+  "gateway.reconnecting": (ev, cx) => {
+    cx.reconnect.redialing(ev.payload?.attempt ?? 1, ev.payload?.delay_ms ?? 0);
+    return "render";
+  },
+  // The goal and loop line: every set, pause, resume, stop, wakeup and judged turn.
+  "session.control.update": (ev, cx) => {
+    cx.automation.apply(ev.session_id ?? cx.sid(), ev.payload?.control);
+    return "quiet";
+  },
+  "session.info": (ev, cx) => {
+    const { session: session2, transcript } = cx;
+    const cwd = session2.info?.cwd;
+    session2.info = ev.payload ? { ...session2.info, ...ev.payload } : session2.info;
+    session2.usage = ev.payload?.usage ?? session2.usage;
+    transcript.contextUsed(session2.usage?.context_used ?? 0);
+    for (const started of cx.queue.server.update(pendingRows(ev.payload))) {
+      const own14 = started.own?.item.prompt;
+      transcript.started(own14 ? shownText(own14) : started.text, void 0, own14 ? userImages(own14.images) : []);
+    }
+    cx.title.set(typeof ev.payload?.title === "string" ? ev.payload.title : void 0);
+    if (session2.info?.cwd && session2.info.cwd !== cwd) {
+      cx.prs.poke();
+      cx.reportCwd();
+    }
+    return "render";
+  },
+  "session.usage": (ev, cx) => {
+    const { session: session2, transcript } = cx;
+    const tick2 = usageFromTick(ev.payload);
+    session2.usage = tick2 ? { ...session2.usage, ...tick2 } : session2.usage;
+    transcript.contextUsed(session2.usage?.context_used ?? 0);
+    const counters = usageCounters(ev.payload);
+    if (counters) {
+      transcript.usageTick(counters.counters, counters.tps);
+    }
+    return "render";
+  },
+  "session.title": (ev, cx) => {
+    cx.title.set(ev.payload?.title);
+    return "render";
+  },
+  // A title set by /title or Hermes' auto-titler reaches viewers only as a changed session list.
+  "sessions.changed": (_ev, cx) => {
+    cx.title.read();
+    return "quiet";
+  },
+  // The view fell behind: a fresh resume brings the snapshot and a new subscription.
+  "session.replay_gap": (ev, cx) => {
+    cx.life.fellBehind(ev.session_id);
+    return "quiet";
+  }
+};
+
+// src/moa.ts
+function moaLabel(ev) {
+  switch (ev.type) {
+    case "moa.progress":
+      return typeof ev.payload?.refs_done === "number" && typeof ev.payload.refs_total === "number" ? `MoA: refs ${ev.payload.refs_done}/${ev.payload.refs_total}` : void 0;
+    case "moa.phase":
+      return ev.payload?.phase === "aggregator" ? "Aggregating\u2026" : void 0;
+    case "moa.aggregating":
+      return "Aggregating\u2026";
+  }
+}
+function moaReferenceLabel(label, index2, count) {
+  return index2 && count ? `Reference ${index2}/${count} \xB7 ${label}` : `Reference \xB7 ${label}`;
+}
+
+// src/turn/fanout.ts
+var CHANGES_FILES = ["patch", "terminal", "write_file", "execute_code"];
+function afterToolComplete(p3, cx) {
+  cx.showImage(cx.transcript.call(toolCallId(p3.tool_id)));
+  cx.agents.scan();
+  if (p3.name === "delegate_task") {
+    cx.prs.relink();
+  }
+  if (LINK_TOOLS.has(p3.name)) {
+    const call = cx.transcript.calls(p3.name).at(-1);
+    if (call) {
+      cx.prs.onCall(call);
+    }
+  }
+  if (CHANGES_FILES.includes(p3.name)) {
+    cx.sidebar.poke();
+  }
+  if (p3.name === CONNECT_TOOL) {
+    cx.connect.watch();
+  }
+  if (p3.name === "terminal") {
+    cx.processes.poke();
+  }
+}
+function afterMessageComplete(p3, cx) {
+  cx.transcript.complete(p3);
+  cx.activity.endBusy();
+  cx.activity.endCompaction();
+  cx.transcript.uncompact(true);
+  cx.summarize();
+  cx.drain();
+  cx.prs.poke();
+  cx.sidebar.poke();
+}
+
+// src/gateway/handlers/turn.ts
+function kaomojiLabel(text12) {
+  const word = text12.match(/([A-Za-z][A-Za-z ]*[A-Za-z])\.{2,}\s*$/)?.[1];
+  return word ? `${word.charAt(0).toUpperCase()}${word.slice(1)}\u2026` : "";
+}
+function moaStep(ev, cx) {
+  cx.activity.relabel(moaLabel(ev) ?? "");
+  return "render";
+}
+var turnHandlers = {
+  "message.start": (ev, cx) => {
+    if (!cx.activity.busy) {
+      cx.activity.startBusy("Working\u2026");
+      cx.changed();
+    }
+    cx.transcript.start();
+    if (ev.payload?.display_kind === "async_delegation_complete" && ev.payload.text) {
+      cx.agents.settle(ev.payload.text);
+    }
+    return "render";
+  },
+  "message.delta": (ev, cx) => {
+    cx.transcript.text(ev.payload?.text ?? "");
+    cx.activity.relabel("Writing\u2026");
+    return "render";
+  },
+  "reasoning.delta": (ev, cx) => {
+    cx.transcript.reasoning(ev.payload?.text ?? "");
+    cx.activity.relabel("Thinking\u2026");
+    return "render";
+  },
+  "reasoning.available": (ev, cx) => {
+    cx.transcript.reasoningBlock(ev.payload?.text ?? "");
+    return "render";
+  },
+  // Mixture-of-Agents: each reference model's answer, then the aggregator's turn.
+  "moa.reference": (ev, cx) => {
+    if (ev.payload) {
+      cx.transcript.reference(moaReferenceLabel(ev.payload.label || "reference", ev.payload.index, ev.payload.count), ev.payload.text ?? "");
+    }
+    return "render";
+  },
+  "moa.progress": moaStep,
+  "moa.phase": moaStep,
+  "moa.aggregating": moaStep,
+  "thinking.delta": (ev, cx) => {
+    cx.activity.relabel(kaomojiLabel(ev.payload?.text ?? ""));
+    return "render";
+  },
+  "message.interim": (ev, cx) => {
+    cx.transcript.interim(ev.payload?.text ?? "", { alreadyStreamed: Boolean(ev.payload?.already_streamed) });
+    return "render";
+  },
+  "tool.generating": (ev, cx) => {
+    cx.activity.relabel(ev.payload?.name ? preparingLabel(ev.payload.name) : "Preparing a tool\u2026");
+    return "render";
+  },
+  "tool.start": (ev, cx) => {
+    if (ev.payload) {
+      cx.transcript.toolStart(ev.payload);
+      const call = cx.transcript.call(toolCallId(ev.payload.tool_id));
+      cx.activity.relabel(call ? busyLabel(call) : `Running ${ev.payload.name}\u2026`);
+      cx.showImage(call);
+    }
+    return "render";
+  },
+  "tool.complete": (ev, cx) => {
+    if (ev.payload) {
+      cx.transcript.toolComplete(ev.payload);
+      afterToolComplete(ev.payload, cx);
+    }
+    return "render";
+  },
+  "todo.updated": (ev, cx) => {
+    cx.transcript.todos(ev.payload?.todos ?? []);
+    return "render";
+  },
+  "message.complete": (ev, cx) => {
+    if (cx.queue.server.settlesQueuedRow(ev.payload)) {
+      return "quiet";
+    }
+    afterMessageComplete(ev.payload ?? {}, cx);
+    return "render";
+  },
+  "status.update": (ev, cx) => {
+    const effect = statusEffect(ev.payload, cx.warned.status);
+    if (effect.compacting !== void 0) {
+      cx.setCompacting(effect.compacting);
+    }
+    if (effect.compacting) {
+      cx.transcript.compacting({ before: effect.tokens?.before ?? (cx.session.usage?.context_used || void 0) });
+    } else if (effect.compacting === false) {
+      cx.transcript.compacted(Date.now(), effect.tokens);
+      cx.summarize(1500);
+    }
+    if (effect.label) {
+      cx.activity.relabel(effect.label, { status: true });
+    }
+    if (effect.notice) {
+      cx.warned.status = effect.note ?? cx.warned.status;
+      cx.transcript.notice(effect.notice.text, effect.notice.tone);
+    }
+    return "render";
+  }
+};
+
+// src/gateway/dispatch.ts
+var HANDLERS = {
+  ...sessionHandlers,
+  ...turnHandlers,
+  ...agentHandlers,
+  ...processHandlers,
+  ...promptHandlers,
+  ...chromeHandlers
+};
+var TABLE = HANDLERS;
+var IGNORED_TYPES = new Set(IGNORED);
+function run4(ev, cx) {
+  return TABLE[ev.type]?.(ev, cx);
+}
+function dispatcher(cx, unknown4 = () => void 0) {
+  const told = /* @__PURE__ */ new Set();
+  return (ev) => {
+    if (!ownsEvent(cx.sid(), ev)) {
+      return "quiet";
+    }
+    if (Object.hasOwn(TABLE, ev.type)) {
+      return run4(ev, cx) ?? "quiet";
+    }
+    if (!IGNORED_TYPES.has(ev.type) && !told.has(ev.type)) {
+      told.add(ev.type);
+      unknown4(ev.type);
+    }
+    return "quiet";
+  };
+}
+
+// src/gateway/eventLog.ts
+import { appendFileSync as appendFileSync4 } from "node:fs";
+function eventLog(path2) {
+  const write = (line) => {
+    if (path2) {
+      appendFileSync4(path2, `${JSON.stringify(line)}
+`);
+    }
+  };
+  return {
+    event: (ev) => write(ev),
+    request: (req) => write({ request: { id: req.id, method: req.method, params: req.params } }),
+    unknown: (type) => write({ unknown: type })
+  };
+}
+
+// src/gateway/follow.ts
+function followGateway(gw2, cx) {
+  const log = eventLog(cx.eventLog);
+  const dispatch = dispatcher(cx, (type) => log.unknown(type));
+  gw2.on("event", (ev) => {
+    log.event(ev);
+    if (dispatch(ev) === "render") {
+      cx.changed();
+    }
+  });
+  gw2.on("request", (req) => {
+    log.request(req);
+    cx.request(req);
+  });
+  gw2.on("exit", (code7) => {
+    const lost = cx.reconnect.lost(gw2.attached, code7);
+    if (lost) {
+      cx.transcript.notice(lost.text, lost.tone);
+    }
+    cx.life.lost();
+    cx.activity.endBusy();
+    cx.sheets.dropAll();
+    cx.transcript.interrupt();
+    cx.changed();
+  });
+  gw2.drain();
+}
+
+// src/hermes/activeSessionFile.ts
+import { writeFileSync as writeFileSync2 } from "node:fs";
+var writeActiveSessionFile = (sessionId, file2 = process.env.HERMES_TUI_ACTIVE_SESSION_FILE) => {
+  if (!file2 || !sessionId) {
+    return;
+  }
+  try {
+    writeFileSync2(file2, JSON.stringify({ session_id: sessionId }), { mode: 384 });
+  } catch {
+  }
+};
+
+// src/github/branch.ts
+import { execFile as execFile7 } from "node:child_process";
+import { promisify as promisify6 } from "node:util";
+var run5 = promisify6(execFile7);
+function parseRemote(url) {
+  const m = url.match(/^[\w.-]+@([^:/]+):([^/]+\/[^/]+?)(?:\.git)?\/?$/) ?? url.match(/^(?:https?|ssh|git):\/\/(?:[^@/]+@)?([^/:]+)(?::\d+)?\/([^/]+\/[^/]+?)(?:\.git)?\/?$/);
+  if (!m) {
+    return void 0;
+  }
+  const host = m[1].toLowerCase();
+  return host === "github.com" || host.split(".").includes("github") ? { host, repository: m[2].toLowerCase() } : void 0;
+}
+async function git2(cwd, ...args) {
+  const { stdout } = await run5("git", ["-C", cwd, ...args], { timeout: 5e3 });
+  return stdout.trim();
+}
+async function branchTarget(cwd) {
+  try {
+    const branch2 = await git2(cwd, "symbolic-ref", "--quiet", "--short", "HEAD");
+    const [remote = "", ref = ""] = (await git2(cwd, "for-each-ref", "--format=%(upstream:remotename)%00%(upstream:remoteref)", `refs/heads/${branch2}`)).split("\0");
+    const name = remote || "origin";
+    const parsed2 = parseRemote(await git2(cwd, "remote", "get-url", name));
+    const head2 = ref.replace(/^refs\/heads\//, "") || branch2;
+    const fallback = ["main", "master"];
+    const defaultBranch = (await git2(cwd, "symbolic-ref", "--quiet", "--short", `refs/remotes/${name}/HEAD`).catch(() => "")).replace(
+      `${name}/`,
+      ""
+    );
+    if (!parsed2 || !head2 || (defaultBranch ? head2 === defaultBranch : fallback.includes(head2))) {
+      return void 0;
+    }
+    return { ...parsed2, head: head2 };
+  } catch {
+    return void 0;
+  }
+}
+var BY_HEAD = `query($o: String!, $r: String!, $h: String!) {
+  repository(owner: $o, name: $r) {
+    pullRequests(headRefName: $h, first: 10, orderBy: {field: UPDATED_AT, direction: DESC}, states: [OPEN, MERGED, CLOSED]) {
+      nodes { number url state headRepositoryOwner { login } }
+    }
+  }
+}`;
+async function branchPullRequest(gh, target) {
+  const [o, r] = target.repository.split("/");
+  const data = await gh.graphql(target.host, BY_HEAD, { h: target.head, o, r });
+  const prs = (data.repository?.pullRequests?.nodes ?? []).filter((p3) => (p3.headRepositoryOwner?.login ?? "").toLowerCase() === o);
+  const pr = prs.find((p3) => p3.state === "OPEN") ?? prs[0];
+  return pr ? { host: target.host, number: pr.number, repository: target.repository, url: pr.url } : void 0;
+}
+function stackQuery(refs) {
+  const variables = {};
+  const decls = [];
+  const parts3 = refs.map((ref, i) => {
+    const [owner, name] = ref.repository.split("/");
+    variables[`o${i}`] = owner;
+    variables[`r${i}`] = name;
+    variables[`n${i}`] = ref.number;
+    decls.push(`$o${i}: String!, $r${i}: String!, $n${i}: Int!`);
+    return `p${i}: repository(owner: $o${i}, name: $r${i}) { pullRequest(number: $n${i}) { stack { number } } }`;
+  });
+  return { query: `query(${decls.join(", ")}) { ${parts3.join("\n")} }`, variables };
+}
+function parseStacks(host, repository, rows) {
+  return (Array.isArray(rows) ? rows : []).flatMap((row2) => {
+    const s2 = row2;
+    if (typeof s2?.number !== "number" || !Array.isArray(s2.pull_requests)) {
+      return [];
+    }
+    return [
+      {
+        base: typeof s2.base === "string" ? s2.base : s2.base?.ref ?? "",
+        host,
+        key: stackKey(host, repository, s2.number),
+        layers: s2.pull_requests.filter((p3) => typeof p3.number === "number").map((p3) => ({ head: p3.head?.ref ?? "", number: p3.number, state: p3.merged_at ? "merged" : p3.state ?? "open" })),
+        number: s2.number,
+        repository
+      }
+    ];
+  });
+}
+
+// src/github/client.ts
+var GitHubError = class extends Error {
+  constructor(message, status) {
+    super(message);
+    this.status = status;
+  }
+  status;
+};
+var api = (host) => host === "github.com" ? "https://api.github.com" : `https://${host}/api/v3`;
+var graphqlUrl = (host) => host === "github.com" ? "https://api.github.com/graphql" : `https://${host}/api/graphql`;
+function tokens(env2 = process.env) {
+  return async (host) => {
+    const own14 = host === "github.com" ? env2.GITHUB_TOKEN || env2.GH_TOKEN : env2.GITHUB_ENTERPRISE_TOKEN || env2.GH_ENTERPRISE_TOKEN;
+    if (own14) {
+      return own14;
+    }
+    const name = host === "github.com" ? "GITHUB_TOKEN" : "GITHUB_ENTERPRISE_TOKEN";
+    throw new GitHubError(`No GitHub token for ${host}. Set one with \`hermes config set ${name} <token>\`, then open a new pane.`);
+  };
+}
+function github(token = tokens()) {
+  async function call(host, url, init) {
+    const res = await fetch(url, {
+      ...init,
+      headers: {
+        Accept: "application/vnd.github+json",
+        Authorization: `Bearer ${await token(host)}`,
+        "User-Agent": "hermes-tern",
+        "X-GitHub-Api-Version": "2022-11-28",
+        ...init.body ? { "Content-Type": "application/json" } : {}
+      },
+      signal: AbortSignal.timeout(3e4)
+    });
+    const text12 = await res.text();
+    const json = text12 ? JSON.parse(text12) : void 0;
+    if (!res.ok) {
+      const message = json?.message;
+      throw new GitHubError(message ? `GitHub: ${message}` : `GitHub answered ${res.status}`, res.status);
+    }
+    return json;
+  }
+  return {
+    async graphql(host, query, variables = {}) {
+      const out = await call(host, graphqlUrl(host), {
+        body: JSON.stringify({ query, variables }),
+        method: "POST"
+      });
+      if (!out.data) {
+        throw new GitHubError(out.errors?.map((e) => e.message).join("; ") || "GitHub sent no data");
+      }
+      return out.data;
+    },
+    rest(host, method, path2, body) {
+      return call(host, `${api(host)}${path2}`, { body: body === void 0 ? void 0 : JSON.stringify(body), method });
+    }
+  };
+}
+
+// src/github/store.ts
+var OPEN_MS = 6e4;
+var PENDING_MS = 3e4;
+var BATCH2 = 20;
+var BRANCH_HIT_MS = 6e4;
+var BRANCH_MISS_MS = 3e5;
+var NO_STACK_FIELD = /Field '?stack'? doesn't exist/i;
+var STAMP = { activity: "activityAt", files: "filesAt" };
+var FAILURE = { activity: "activityError", files: "filesError" };
+var RETRY_MS = 3e4;
+var MUTATIONS = {
+  close: "mutation($id: ID!) { closePullRequest(input: {pullRequestId: $id}) { clientMutationId } }",
+  draft: "mutation($id: ID!) { convertPullRequestToDraft(input: {pullRequestId: $id}) { clientMutationId } }",
+  merge: "mutation($id: ID!, $m: PullRequestMergeMethod!, $oid: GitObjectID) { mergePullRequest(input: {pullRequestId: $id, mergeMethod: $m, expectedHeadOid: $oid}) { clientMutationId } }",
+  ready: "mutation($id: ID!) { markPullRequestReadyForReview(input: {pullRequestId: $id}) { clientMutationId } }",
+  reopen: "mutation($id: ID!) { reopenPullRequest(input: {pullRequestId: $id}) { clientMutationId } }",
+  "update-branch": "mutation($id: ID!, $oid: GitObjectID) { updatePullRequestBranch(input: {pullRequestId: $id, expectedHeadOid: $oid}) { clientMutationId } }"
+};
+var PullRequests = class {
+  #host;
+  #gh;
+  #links;
+  #sid = null;
+  #refs = [];
+  #entries = /* @__PURE__ */ new Map();
+  #branch;
+  /** Native stacks by key, from the PRs' stack membership. */
+  #stacks = /* @__PURE__ */ new Map();
+  /** Hosts whose GraphQL has no stack fields (GHES): not asked again. */
+  #noStacks = /* @__PURE__ */ new Set();
+  #branchOf;
+  /** Why nothing could be read at all (no token). */
+  #error;
+  #timer;
+  #loading = false;
+  #again = false;
+  #disposed = false;
+  #busy = /* @__PURE__ */ new Set();
+  /** The activity and files reads in flight (`key:activity`, `key:files`). */
+  #reading = /* @__PURE__ */ new Set();
+  /** When each of those last failed. */
+  #failedAt = /* @__PURE__ */ new Map();
+  constructor(host, gh = github(), links = (sid) => storedLinks(sid), branchOf = branchTarget) {
+    this.#host = host;
+    this.#gh = gh;
+    this.#links = links;
+    this.#branchOf = branchOf;
+  }
+  /** The linked PRs (oldest link first), then the branch's PR, then stack layers none of them are. */
+  entries() {
+    const seen = /* @__PURE__ */ new Set();
+    const out = [];
+    const add = (ref, source2) => {
+      const key2 = prKey(ref);
+      if (!seen.has(key2)) {
+        seen.add(key2);
+        const e = this.#entry(ref);
+        e.source = source2;
+        out.push(e);
+      }
+    };
+    this.#refs.forEach((r) => add(r, "linked"));
+    if (this.#branch?.ref) {
+      add(this.#branch.ref, "branch");
+    }
+    const inStack = (s2, ref) => ref.host === s2.host && ref.repository === s2.repository && s2.layers.some((l) => l.number === ref.number);
+    for (const s2 of this.#stacks.values()) {
+      if (out.some((e) => inStack(s2, e.ref))) {
+        s2.layers.forEach((l) => add({ host: s2.host, number: l.number, repository: s2.repository, url: `https://${s2.host}/${s2.repository}/pull/${l.number}` }, "stack"));
+      }
+    }
+    for (const e of out) {
+      e.stack = [...this.#stacks.values()].find((s2) => inStack(s2, e.ref));
+    }
+    return out;
+  }
+  /** The native stacks the list's PRs sit in. */
+  stacks() {
+    return [...this.#stacks.values()];
+  }
+  /** The key of the listed PR whose key reads `raw` (a node id's), if one is listed. */
+  keyOf(raw2) {
+    return this.entries().map((e) => prKey(e.ref)).find((key2) => key2 === raw2);
+  }
+  get(key2) {
+    return this.#entries.get(key2);
+  }
+  get error() {
+    return this.#error;
+  }
+  get loading() {
+    return this.#loading;
+  }
+  busy(key2) {
+    return this.#busy.has(key2);
+  }
+  /** A session was adopted (a resume, a switch): its stored links replace the old ones. */
+  adopt() {
+    const sid = this.#host.sid();
+    if (sid === this.#sid) {
+      return;
+    }
+    this.#sid = sid;
+    this.#refs = sid ? this.#links(sid) : [];
+    this.#branch = void 0;
+    this.#stacks.clear();
+    this.#host.changed();
+    this.poke();
+  }
+  /** A finished tool call: a link tool's result is the conversation's whole list. */
+  onCall(call) {
+    const linked = linkedFromResult(call);
+    if (!linked) {
+      return;
+    }
+    const before = this.#refs.map(prKey).join();
+    this.#refs = linked;
+    if (linked.map(prKey).join() !== before) {
+      this.#host.changed();
+      this.poke();
+    }
+  }
+  /**
+   * Reads the stored links again. A subagent runs in a session of its own and links under this
+   * conversation (pull_requests.py), with no link result in this transcript.
+   */
+  relink() {
+    const sid = this.#host.sid();
+    if (!sid || sid !== this.#sid) {
+      return;
+    }
+    const linked = this.#links(sid);
+    if (linked.map(prKey).join() !== this.#refs.map(prKey).join()) {
+      this.#refs = linked;
+      this.#host.changed();
+      this.poke();
+    }
+  }
+  /** Reads every linked PR now. */
+  poke() {
+    clearTimeout(this.#timer);
+    this.#timer = void 0;
+    void this.#tick();
+  }
+  dispose() {
+    this.#disposed = true;
+    clearTimeout(this.#timer);
+  }
+  /** Comments, reviews and commits of `key`, read once per PR update. */
+  activity(key2) {
+    return this.#detail(key2, "activity", async (e) => {
+      const [o, r] = e.ref.repository.split("/");
+      e.activity = parseActivity(await this.#gh.graphql(e.ref.host, ACTIVITY_QUERY, { n: e.ref.number, o, r }));
+    });
+  }
+  /** The changed files of `key` with their patches (the first 300). */
+  files(key2) {
+    return this.#detail(key2, "files", async (e) => {
+      const files = [];
+      for (let page = 1; page <= 3; page++) {
+        const rows = await this.#gh.rest(e.ref.host, "GET", `/repos/${e.ref.repository}/pulls/${e.ref.number}/files?per_page=100&page=${page}`);
+        files.push(...parseFiles(rows));
+        if (rows.length < 100) {
+          break;
+        }
+      }
+      e.files = files;
+    });
+  }
+  /**
+   * Reads one tab's data of `key` once per PR update, so the sheet may ask on every frame: one read
+   * at a time, and a failed one (its error on the entry) again after `RETRY_MS`.
+   */
+  async #detail(key2, what, read) {
+    const e = this.#entries.get(key2);
+    const id = `${key2}:${what}`;
+    const failed = this.#failedAt.get(id);
+    if (!e?.pr || this.#reading.has(id) || e[what] && e[STAMP[what]] === e.pr.updatedAt || failed && Date.now() - failed < RETRY_MS) {
+      return;
+    }
+    const at = e.pr.updatedAt;
+    this.#reading.add(id);
+    try {
+      await read(e);
+      e[STAMP[what]] = at;
+      e[FAILURE[what]] = void 0;
+      this.#failedAt.delete(id);
+    } catch (error) {
+      e[FAILURE[what]] = errorText(error);
+      this.#failedAt.set(id, Date.now());
+      throw error;
+    } finally {
+      this.#reading.delete(id);
+      this.#host.changed();
+    }
+  }
+  /** Changes PR `key` on GitHub; throws GitHub's error. `merge` uses `method`, the repository's first by default. */
+  async act(action, key2, method) {
+    const pr = this.#entries.get(key2)?.pr;
+    if (!pr) {
+      throw new Error("That pull request has not loaded yet.");
+    }
+    this.#busy.add(key2);
+    this.#host.changed();
+    try {
+      if (action === "rerun") {
+        const runs3 = failedRuns(pr.checks);
+        if (!runs3.length) {
+          throw new Error("No failed GitHub Actions run to re-run.");
+        }
+        for (const id of runs3) {
+          await this.#gh.rest(pr.host, "POST", `/repos/${pr.repository}/actions/runs/${id}/rerun-failed-jobs`);
+        }
+      } else {
+        await this.#gh.graphql(pr.host, MUTATIONS[action], {
+          id: pr.id,
+          ...action === "merge" ? { m: (method ?? pr.mergeMethods[0] ?? "merge").toUpperCase(), oid: pr.headOid } : {},
+          ...action === "update-branch" ? { oid: pr.headOid } : {}
+        });
+      }
+    } finally {
+      this.#busy.delete(key2);
+      this.poke();
+    }
+  }
+  #entry(ref) {
+    const key2 = prKey(ref);
+    let e = this.#entries.get(key2);
+    if (!e) {
+      e = { ref, source: "linked" };
+      this.#entries.set(key2, e);
+    }
+    return e;
+  }
+  #schedule() {
+    clearTimeout(this.#timer);
+    const open = this.entries().filter((e) => !e.pr || e.pr.state === "open");
+    if (this.#disposed || !open.length) {
+      return;
+    }
+    const pending = open.some((e) => e.pr && checksState(e.pr.checks) === "pending");
+    this.#timer = setTimeout(() => void this.#tick(), pending ? PENDING_MS : OPEN_MS);
+  }
+  async #tick() {
+    if (this.#loading) {
+      this.#again = true;
+      return;
+    }
+    this.#loading = true;
+    try {
+      do {
+        this.#again = false;
+        await this.#read();
+      } while (this.#again);
+    } finally {
+      this.#loading = false;
+      this.#schedule();
+      this.#host.changed();
+    }
+  }
+  /** The branch's PR, looked up again once its last answer is old or the session moved. */
+  async #readBranch() {
+    const cwd = this.#host.cwd();
+    const now = Date.now();
+    const b = this.#branch;
+    if (!cwd) {
+      this.#branch = void 0;
+      return;
+    }
+    const target = await this.#branchOf(cwd);
+    const same = b && b.cwd === cwd && b.target?.head === target?.head && b.target?.repository === target?.repository;
+    if (same && now - b.at < (b.ref ? BRANCH_HIT_MS : BRANCH_MISS_MS)) {
+      return;
+    }
+    let ref;
+    try {
+      ref = target ? await branchPullRequest(this.#gh, target) : void 0;
+    } catch {
+      ref = same ? b.ref : void 0;
+    }
+    this.#branch = { at: now, cwd, ref, target };
+  }
+  /** Which PRs sit in a GitHub stack, and that stack's layers; new layers are read next round. */
+  async #readStacks(entries) {
+    const before = [...this.#stacks.keys()].join();
+    const byHost = /* @__PURE__ */ new Map();
+    for (const e of entries) {
+      if (e.pr && !this.#noStacks.has(e.ref.host) && e.ref.host === "github.com") {
+        byHost.set(e.ref.host, [...byHost.get(e.ref.host) ?? [], e]);
+      }
+    }
+    for (const [host, list9] of byHost) {
+      const { query, variables } = stackQuery(list9.slice(0, BATCH2).map((e) => e.ref));
+      let data;
+      try {
+        data = await this.#gh.graphql(host, query, variables);
+      } catch (error) {
+        if (NO_STACK_FIELD.test(errorText(error))) {
+          this.#noStacks.add(host);
+        }
+        continue;
+      }
+      const asked2 = /* @__PURE__ */ new Set();
+      for (const [i, e] of list9.slice(0, BATCH2).entries()) {
+        const n = data[`p${i}`]?.pullRequest?.stack?.number;
+        const key2 = typeof n === "number" ? stackKey(host, e.ref.repository, n) : void 0;
+        if (!key2 || asked2.has(key2)) {
+          continue;
+        }
+        asked2.add(key2);
+        try {
+          const rows = await this.#gh.rest(host, "GET", `/repos/${e.ref.repository}/stacks?pull_request=${e.ref.number}`);
+          parseStacks(host, e.ref.repository, rows).forEach((s2) => this.#stacks.set(s2.key, s2));
+        } catch {
+        }
+      }
+    }
+    return [...this.#stacks.keys()].join() !== before;
+  }
+  async #read() {
+    await this.#readBranch();
+    await this.#readPrs();
+    if (await this.#readStacks(this.entries())) {
+      await this.#readPrs();
+    }
+  }
+  async #readPrs() {
+    const entries = this.entries();
+    const byHost = /* @__PURE__ */ new Map();
+    for (const e of entries) {
+      byHost.set(e.ref.host, [...byHost.get(e.ref.host) ?? [], e]);
+    }
+    let failed;
+    for (const [host, list9] of byHost) {
+      for (let i = 0; i < list9.length; i += BATCH2) {
+        const chunk = list9.slice(i, i + BATCH2);
+        const { query, variables } = batchQuery(chunk.map((e) => e.ref));
+        try {
+          const data = await this.#gh.graphql(host, query, variables);
+          chunk.forEach((e, j) => {
+            const pr = parsePullRequest(e.ref, data[`p${j}`]);
+            e.pr = pr ?? e.pr;
+            e.error = pr ? void 0 : "GitHub has no such pull request, or this token cannot see it.";
+          });
+        } catch (error) {
+          failed = errorText(error);
+          chunk.forEach((e) => e.error = failed);
+        }
+      }
+    }
+    this.#error = entries.length && entries.every((e) => e.error && !e.pr) ? failed : void 0;
+  }
+};
+
+// src/overlay.ts
+var OverlayStack = class {
+  /** The overlays, bottom first; changed only through open() and close(). */
+  items = [];
+  #host;
+  constructor(host) {
+    this.#host = host;
+  }
+  open(overlay2) {
+    const same = this.items.find((o) => o.key === overlay2.key);
+    if (same) {
+      this.close(same);
+    }
+    this.items.push(overlay2);
+    this.#host.opened(overlay2);
+    this.#host.changed();
+  }
+  close(overlay2) {
+    const at = this.items.indexOf(overlay2);
+    if (at >= 0) {
+      this.items.splice(at, 1);
+      this.#host.closed(overlay2);
+      overlay2.onClose?.();
+      this.#host.changed();
+    }
+  }
+};
+
+// .hermes-src/ui-tui/src/domain/slash.ts
+var INLINE_SLASH_RE = /\s\/([a-zA-Z][\w-]*)?$/;
+var inlineSlashTrigger = (text12) => {
+  const match = INLINE_SLASH_RE.exec(text12);
+  if (!match) {
+    return null;
+  }
+  const query = match[1] ?? "";
+  return { query, start: text12.length - query.length - 1 };
+};
+var applyCompletion = (value, rowText2, compReplace) => {
+  const text12 = value[compReplace - 1] === "/" && rowText2.startsWith("/") ? rowText2.slice(1) : rowText2;
+  return value.slice(0, compReplace) + text12;
+};
+var completionToApplyOnSubmit = (value, rowText2, compReplace, isLocalCommand = () => false) => {
+  const typed = value.trim();
+  if (!rowText2 || /^\/[\w-]+$/.test(typed) && isLocalCommand(typed.slice(1))) {
+    return null;
+  }
+  const next3 = applyCompletion(value, rowText2, compReplace);
+  return next3 !== value && next3.trimEnd() !== value.trimEnd() ? next3 : null;
+};
+
+// src/hermes/completion.ts
+var TAB_PATH_RE = /(?<=^|\s)((?:["']?(?:[A-Za-z]:[\\/]|\.{1,2}\/|~\/|\/|@|[^"'`\s]+\/))[^\s]*)$/;
+function completionRequestForInput(input2, scope = {}) {
+  const isSlashCommand = looksLikeSlashCommand(input2);
+  const pathWord = isSlashCommand ? null : input2.match(TAB_PATH_RE)?.[1] ?? null;
+  if (isSlashCommand && /^\/model(?:\s|$)/.test(input2)) {
+    return null;
+  }
+  const inline = inlineSlashTrigger(input2);
+  if (inline) {
+    return { method: "complete.slash", params: { text: `/${inline.query}` }, replaceFrom: inline.start + 1, skillsOnly: true };
+  }
+  if (isSlashCommand) {
+    return { method: "complete.slash", params: { text: input2 }, replaceFrom: 1 };
+  }
+  if (!pathWord) {
+    return null;
+  }
+  const { cwd, sid } = scope;
+  return {
+    method: "complete.path",
+    params: { word: pathWord, ...cwd ? { cwd } : {}, ...sid ? { session_id: sid } : {} },
+    replaceFrom: input2.length - pathWord.length
+  };
+}
+
+// src/overlays/completion.tsx
+var DEBOUNCE_MS = 60;
+var Completion = class {
+  items = [];
+  selected = 0;
+  /** Where an accepted row's text replaces the input. */
+  #replaceFrom = 0;
+  /** The text before the caret the items answer. */
+  #for = "";
+  /** The text before the caret last queried (scheduled, in flight or answered); null until the first update. */
+  #asked = null;
+  /** Bumped by every new query and every dismissal: replies of an older generation are dropped. */
+  #gen = 0;
+  #timer;
+  #composer;
+  #host;
+  #gw;
+  #sid;
+  constructor(host, gw2, sid) {
+    this.#host = host;
+    this.#gw = gw2;
+    this.#sid = sid;
+  }
+  get open() {
+    return this.items.length > 0;
+  }
+  /** The dim suffix the selected row would add after the caret, while the live text still leads to it. */
+  get ghost() {
+    const row2 = this.items[this.selected];
+    const composer2 = this.#composer;
+    if (!row2 || !composer2 || composer2.cursor !== composer2.text.length) {
+      return "";
+    }
+    const next3 = applyCompletion(this.#for, row2.text, this.#replaceFrom);
+    return next3.startsWith(composer2.text) ? next3.slice(composer2.text.length) : "";
+  }
+  /** Re-queries when the text before the composer's caret changed since the last query; cheap otherwise. */
+  update(composer2) {
+    this.#composer = composer2;
+    const before = composer2.text.slice(0, composer2.cursor);
+    if (before === this.#asked) {
+      return;
+    }
+    this.#asked = before;
+    const gen = ++this.#gen;
+    clearTimeout(this.#timer);
+    this.#timer = void 0;
+    const request = requestFor(before, this.#sid());
+    if (!request) {
+      this.dismiss();
+      return;
+    }
+    this.#timer = setTimeout(() => {
+      this.#timer = void 0;
+      const sid = this.#sid();
+      const params = request.method === "complete.slash" && sid ? { ...request.params, session_id: sid } : request.params;
+      rpc(this.#gw, request.method, params).then((r) => {
+        if (gen !== this.#gen || composer2.text.slice(0, composer2.cursor) !== before) {
+          return;
+        }
+        const items = r?.items ?? [];
+        this.items = request.method !== "complete.slash" ? items : request.skillsOnly ? items.filter((i) => i.kind === "skill") : slashItems(items, before);
+        this.selected = 0;
+        this.#for = before;
+        this.#replaceFrom = request.method === "complete.slash" && !request.skillsOnly ? r?.replace_from ?? 1 : request.replaceFrom;
+        this.#host.changed();
+      }).catch(() => {
+        if (gen === this.#gen) {
+          this.dismiss();
+        }
+      });
+    }, DEBOUNCE_MS);
+  }
+  /** Hides the list and drops pending queries; it reopens once the text before the caret changes. */
+  dismiss() {
+    this.#gen++;
+    clearTimeout(this.#timer);
+    this.#timer = void 0;
+    if (this.items.length) {
+      this.items = [];
+      this.#host.changed();
+    }
+    this.#for = "";
+  }
+  /** Keys while the list is open: ↑/↓ move, Tab accepts, Enter accepts a changing row, Esc closes. */
+  onKey(key2) {
+    const composer2 = this.#composer;
+    if (!this.open || !composer2) {
+      return false;
+    }
+    if (composer2.browsing && (key2.name === "up" || key2.name === "down")) {
+      return false;
+    }
+    switch (key2.name) {
+      case "up":
+        this.selected = (this.selected - 1 + this.items.length) % this.items.length;
+        return true;
+      case "down":
+        this.selected = (this.selected + 1) % this.items.length;
+        return true;
+      case "escape":
+        this.dismiss();
+        return true;
+      case "tab":
+        return this.#accept(applyCompletion(this.#for, this.items[this.selected]?.text ?? "", this.#replaceFrom));
+      case "enter": {
+        if (key2.shift || key2.alt || composer2.text.slice(0, composer2.cursor) !== this.#for) {
+          return false;
+        }
+        const next3 = completionToApplyOnSubmit(this.#for, this.items[this.selected]?.text, this.#replaceFrom);
+        if (next3 === null) {
+          this.dismiss();
+          return false;
+        }
+        return this.#accept(next3);
+      }
+    }
+    return false;
+  }
+  /** The overlay nodes for the `layer` region (none while closed). */
+  nodes(inputId2) {
+    if (!this.open) {
+      return [];
+    }
+    const listId = "layer.complete.select.list";
+    return [
+      /* @__PURE__ */ jsx("overlay", { anchor: { caret: inputId2 }, role: "omp.autocomplete", children: /* @__PURE__ */ jsx("col", { role: "omp.select", children: /* @__PURE__ */ jsx(
+        "list",
+        {
+          empty: this.#for.includes("@") ? "No files" : "No items",
+          max: { lines: 8 },
+          onActivate: (ev) => this.#pick(ev.item, listId, { accept: true }),
+          onSelect: (ev) => this.#pick(ev.item, listId, { accept: false }),
+          selected: `${listId}.${this.selected}`,
+          children: this.items.map((item3, i) => /* @__PURE__ */ jsx(
+            "item",
+            {
+              detail: item3.meta && item3.meta !== "dir" ? oneLine(item3.meta) : void 0,
+              icon: iconOf(item3),
+              label: labelOf(item3, this.#for, this.#replaceFrom)
+            },
+            String(i)
+          ))
+        },
+        "list"
+      ) }, "select") }, "complete")
+    ];
+  }
+  #pick(itemId, listId, { accept }) {
+    const i = Number(itemId.slice(listId.length + 1));
+    if (Number.isInteger(i) && this.items[i]) {
+      this.selected = i;
+      if (accept) {
+        this.#accept(applyCompletion(this.#for, this.items[i].text, this.#replaceFrom));
+      }
+      this.#host.changed();
+    }
+  }
+  /** Replaces the text before the caret with `before`; false when the items answer older text than the live one. */
+  #accept(before) {
+    const composer2 = this.#composer;
+    if (!composer2 || composer2.text.slice(0, composer2.cursor) !== this.#for) {
+      return false;
+    }
+    const finished = /(?:^|\s)@[^\s]*[^\s/:]$/.test(before);
+    const spaced = finished && composer2.text[composer2.cursor] === " ";
+    composer2.splice(0, composer2.cursor + (spaced ? 1 : 0), finished ? `${before} ` : before);
+    this.dismiss();
+    this.update(composer2);
+    return true;
+  }
+};
+function slashItems(items, typed) {
+  const word = (text12) => text12.replace(/^\//, "").split(/\s/)[0]?.toLowerCase() ?? "";
+  if (HIDDEN_COMMANDS.has(word(typed))) {
+    return [];
+  }
+  const kept = items.filter((i) => !(i.kind === "command" && HIDDEN_COMMANDS.has(word(i.text))));
+  if (/\s/.test(typed)) {
+    return kept;
+  }
+  const query = typed.slice(1).toLowerCase();
+  const listed = new Set(kept.map((i) => word(i.text)));
+  const rank2 = (item3, aliases = []) => query ? scoreSlashMenuItem({ aliases: [...aliases], description: item3.meta ?? "", id: word(item3.text) }, query) : 1;
+  const own14 = localCommands().flatMap(
+    (c) => c.help && !listed.has(c.name) ? [{ aliases: c.aliases, item: { display: `/${c.name}`, kind: "command", meta: c.help, text: `/${c.name}` } }] : []
+  );
+  const commands = [
+    ...kept.filter((i) => i.kind !== "skill").map((item3) => ({ item: item3, score: rank2(item3) })),
+    // Ours match by name or alias only: their help words ("the", "and") would flood every query.
+    ...own14.map((o) => ({ item: o.item, score: rank2(o.item, o.aliases) })).filter((o) => o.score < 3)
+  ].sort((a2, b) => a2.score - b.score).map((o) => o.item);
+  return [...commands, ...kept.filter((i) => i.kind === "skill")];
+}
+var COMMAND_ICONS = {
+  clear: "eraser",
+  compress: "compress",
+  cron: "clock",
+  help: "help",
+  history: "history",
+  model: "sparkle",
+  new: "plus",
+  personality: "user",
+  quit: "log-out",
+  reasoning: "brain",
+  resume: "play",
+  retry: "repeat",
+  save: "save",
+  skills: "skill",
+  tools: "tools",
+  undo: "undo",
+  usage: "gauge",
+  yolo: "shield-alert"
+};
+function isPath(item3) {
+  return !item3.kind && !item3.text.startsWith("/");
+}
+function iconOf(item3) {
+  if (isPath(item3)) {
+    return (item3.display || item3.text).endsWith("/") ? "folder" : "file";
+  }
+  if (item3.kind === "skill") {
+    return "skill";
+  }
+  return COMMAND_ICONS[item3.text.replace(/^\//, "").split(/\s/)[0] ?? ""] ?? "slash";
+}
+function labelOf(item3, typed, replaceFrom) {
+  const label = (item3.display || item3.text).replace(/^\//, "");
+  const base3 = isPath(item3) ? "strong" : void 0;
+  const query = typed.slice(replaceFrom).replace(/^[/@]/, "").replace(/^(file|folder):/, "").split("/").pop() ?? "";
+  const at = query ? label.toLowerCase().indexOf(query.toLowerCase()) : -1;
+  if (at < 0) {
+    return [{ s: base3, t: label }];
+  }
+  return [
+    { s: base3, t: label.slice(0, at) },
+    { s: base3 ? `${base3} mark` : "mark", t: label.slice(at, at + query.length) },
+    { s: base3, t: label.slice(at + query.length) }
+  ].filter((s2) => s2.t);
+}
+function requestFor(before, sid) {
+  const lineStart2 = before.lastIndexOf("\n") + 1;
+  const request = completionRequestForInput(before.slice(lineStart2), { sid });
+  if (!request || !lineStart2) {
+    return request;
+  }
+  return request.method === "complete.slash" ? { ...request, replaceFrom: request.replaceFrom + lineStart2, skillsOnly: true } : { ...request, replaceFrom: request.replaceFrom + lineStart2 };
+}
+
+// src/overlays/help.tsx
+var KEY8 = "help";
+var HOTKEYS = [
+  {
+    group: "Editing",
+    rows: [
+      [["enter"], "Send message"],
+      [["shift+enter", "alt+enter"], "New line"],
+      [["up", "down"], "Move between lines / browse history"],
+      [["tab"], "Accept the completion"],
+      [["alt+left", "alt+right", "alt+f"], "Move by word"],
+      [["ctrl+a", "ctrl+e"], "Start / end of line"],
+      [["ctrl+w", "alt+backspace"], "Delete word backwards"],
+      [["ctrl+u"], "Delete to start of line"],
+      [["alt+d"], "Delete word forward"],
+      [["ctrl+k"], "Delete to end of line (joins the next line at its end)"],
+      [["ctrl+y"], "Paste the last deleted text"],
+      [["ctrl+z", "shift+ctrl+z"], "Undo / redo"],
+      [["cmd+b", "cmd+i"], "Bold / italic (Markdown) on the selection or at the caret"],
+      [["shift+left", "shift+right"], "Select"],
+      [["shift+enter"], "In a list item: the next item (an empty item ends the list)"]
+    ]
+  },
+  {
+    group: "Control",
+    rows: [
+      [["escape"], "Close the completion"],
+      [[KEYS2.clearOrStop.label], "Clear the draft into the history (Up brings it back) / stop the agent"],
+      [[KEYS2.effort.label], "Cycle the reasoning effort (/effort picks one; Ctrl+G there saves it as the default)"],
+      [[KEYS2.dequeue.label], "Edit the oldest queued prompt"],
+      [[KEYS2.steer.label], "Steer the running turn with the oldest queued prompt (empty prompt)"],
+      [[KEYS2.agents.label], "Agents"],
+      [[KEYS2.background.label], "Background processes and cron jobs (/ps)"],
+      [[KEYS2.prs.label], "Pull requests Hermes linked (/prs)"],
+      [[KEYS2.sidebar.label], "Session sidebar: branch, PRs, changes (/sidebar)"],
+      [[KEYS2.clipboardImage.label], "Attach the clipboard image (also \u2318V of an image, a dropped image file, /paste)"],
+      [["down"], "Focus the agents / shells / PR pills (empty prompt); \u2190 \u2192 switch, Enter opens, Esc returns"],
+      [[KEYS2.cancel.label], "Answer no to the open sheet / clear the draft and images / interrupt / exit (twice)"],
+      [[KEYS2.quit.label], "Delete forward / exit (empty prompt)"]
+    ]
+  }
+];
+async function openHelp(host) {
+  let catalog = {};
+  const sid = host.session.ref.live;
+  try {
+    catalog = await rpc(host.gw, "commands.catalog", sid ? { session_id: sid } : {});
+  } catch (error) {
+    host.transcript.notice(
+      `Could not load the command list: ${errorText(error)}`,
+      "warning"
+    );
+  }
+  const own14 = localCommands().flatMap(
+    (c) => c.help ? [[[`/${c.name}`, ...(c.aliases ?? []).map((a2) => `/${a2}`)].join(" \xB7 "), c.help]] : []
+  );
+  const runs3 = ([command = ""]) => !HIDDEN_COMMANDS.has(command.replace(/^\//, "").split(/\s/)[0] ?? "");
+  const categories = [
+    { name: "Tern", pairs: own14 },
+    ...(catalog.categories?.length ? catalog.categories : [{ name: "Commands", pairs: catalog.pairs ?? [] }]).map((c) => ({ ...c, pairs: (c.pairs ?? []).filter(runs3) })).filter((c) => c.pairs.length)
+  ];
+  const overlay2 = {
+    key: KEY8,
+    modal: true,
+    node: () => /* @__PURE__ */ jsx("overlay", { anchor: "center", head: "Commands and shortcuts", modal: true, role: "omp.overlay.hotkeys", size: "lg", children: /* @__PURE__ */ jsxs("col", { gap: "lg", children: [
+      HOTKEYS.map(({ group, rows }) => /* @__PURE__ */ jsx("section", { head: group, role: "omp.hotkeys.group", children: /* @__PURE__ */ jsx(
+        "table",
+        {
+          cols: [
+            { head: "Key", id: "keys" },
+            { grow: 1, head: "Action", id: "action" }
+          ],
+          role: "omp.hotkeys.table",
+          rows: rows.map(([keys2, action], i) => ({
+            cells: {
+              action: [{ t: action }],
+              keys: keys2.flatMap((k, j) => [...j ? [{ s: "dim", t: " " }] : [], { s: "key", t: k }])
+            },
+            id: String(i)
+          }))
+        },
+        "table"
+      ) }, `keys-${group}`)),
+      categories.map((c) => /* @__PURE__ */ jsx("section", { head: c.name, role: "omp.hotkeys.group", children: /* @__PURE__ */ jsx(
+        "table",
+        {
+          cols: [
+            { head: "Command", id: "command" },
+            { grow: 1, head: "Description", id: "action" }
+          ],
+          role: "omp.hotkeys.table",
+          rows: (c.pairs ?? []).map(([command = "", text12 = ""], i) => ({
+            // The `(usage: …)` tail is `/help <command>`'s business; the table keeps the summary.
+            cells: {
+              action: [{ t: text12.replace(/\s*\(usage: .+\)\s*$/, "") }],
+              command: [{ s: "mono", t: command }]
+            },
+            id: String(i)
+          }))
+        },
+        "table"
+      ) }, `cmd-${c.name}`)),
+      actionsRow([{ hint: "escape", key: "close", keys: ["escape"], label: "Close", onClick: () => host.close(overlay2) }])
+    ] }, "body") }, KEY8),
+    onKey: (k) => {
+      if (k.name === "escape" || k.name === "enter" || k.name === "q") {
+        host.close(overlay2);
+      }
+      return true;
+    }
+  };
+  host.open(overlay2);
+}
+
+// src/processes/widgets/author.ts
+import { spawn as spawn2 } from "node:child_process";
+import { join as join11 } from "node:path";
+var MAX_BRIEF_CHARS = 1500;
+var MAX_SAMPLE_LINE_CHARS = 300;
+var MAX_SAMPLE_BYTES = 12 * 1024;
+var MAX_SHAPE_REPEATS = 3;
+var REQUEST_TIMEOUT_MS2 = 12e4;
+var SYSTEM_PROMPT = `You design the live status widget of a coding agent's background process (benchmark, eval, CI, tests, build, training, server). From the command and samples of its output you write a spec once; plain code then runs its regexes on every new line and redraws the widget until the process ends. Nobody can fix it later: its rules MUST match the real lines.
+
+A widget charts a quantity that shows how the process is going: throughput, latency, loss, tests or trials passed, progress toward a total the process states. When the output has none, call \`respond\` with only \`{"skip":"<why>"}\`; no widget beats a meaningless one. Never chart activity: lines or matches seen, words like \`error\` inside file contents.
+
+Otherwise call \`respond\` with:
+- \`title\` (\u2264 48 chars): what is watched.
+- \`rules\` (1\u201312) \`{from, match, key?, text?, count?, scale?}\`:
+  - \`from\`: the sample source id carrying the data (\`out\` for the process's output, \`file:1\` for a log file the command writes to), \`*\` for all.
+  - \`match\`: a JavaScript regex on one line; no lookaround or backreferences. Copy the literal text around the data from the samples; allow varying digits (\`[\\d.]+\`) and widths (\`\\s+\`).
+  - Each named group \`(?P<name>\u2026)\` feeds field \`name\` (\`[a-z][a-z0-9_]*\`) with its number (\`1,234\`, \`4.5k\` parse). One rule can capture several fields of a line.
+  - \`key\`: the rule's group naming a series (model, shard, CI job); the rule's fields keep one series per key. Not a field itself.
+  - \`text\`: the rule's group kept as text (status word, test name).
+  - \`count\`: a field counting matching lines.
+  - \`scale\`: multiplies the rule's numbers.
+- \`blocks\` (1\u20134, most important first), each on a \`field\`:
+  - \`spark\`: numbers over time. \`label\`, \`key?\` (one key value, e.g. \`gpt-5\`), \`unit?\`, \`better?\` (\`higher\`|\`lower\`), \`target?\` + \`targetLabel?\` (goal line the command or output states), \`min?\`, \`max?\`.
+  - \`bars\`: one bar per key, reduced by \`agg\`. \`label\`, \`unit?\`, \`max?\`, \`better?\`.
+  - \`meter\`: \`agg\` out of a \`total\` (a value ref, or a number the process or its output states; never a guess), \`label\`, \`unit?\`.
+  - \`stat\`: \`items\`, 1\u20134 value refs with \`label\`.
+  - \`grid\`: a cell per key, coloured by latest text. \`label\`, \`tones\`: lowercase status substring \u2192 \`success\`|\`error\`|\`warning\`|\`pending\`|\`info\`|\`muted\`|\`neutral\`.
+  - \`text\`: the field's latest text.
+- \`headline?\`: the value ref to glance at. \`stage?\`: field whose latest text is the current step.
+
+Value ref: \`{field, agg, label?, key?, unit?, digits?, better?}\`; \`key\` is one key value, \`better\` adds a trend arrow. \`agg\` over numbers: \`last\` \`first\` \`min\` \`max\` \`mean\` \`sum\` \`delta\` \`change\` (%); over matches: \`count\`, \`rate\` (/s, last minute).
+
+Chart what a watcher wants: throughput or latency against the goal, progress toward a known total, per-model results, failures. Few accurate blocks; never invent lines the samples lack. Omit optional properties you do not need.
+
+Examples:
+
+\`req 8 rps=56 p50=41ms\`, goal 60 req/s:
+{"title":"load test \xB7 rps","rules":[{"from":"out","match":"^req \\\\d+ rps=(?P<rps>[\\\\d.]+) p50=(?P<p50>[\\\\d.]+)ms"}],"blocks":[{"kind":"spark","field":"rps","label":"req/s","unit":"req/s","better":"higher","target":60,"targetLabel":"goal 60"},{"kind":"stat","items":[{"field":"p50","agg":"last","label":"p50","unit":"ms","better":"lower"}]}],"headline":{"field":"rps","agg":"last","unit":"req/s","better":"higher"}}
+
+\`finish bash openai/gpt-5 t2: reward=1 tests=27/36 turns=5\`, 9 trials:
+{"title":"eval \xB7 tests passed per model","rules":[{"from":"out","match":"^finish \\\\S+ (?P<model>\\\\S+) t\\\\d+: .*tests=(?P<passed>\\\\d+)/\\\\d+","key":"model","count":"trials"}],"blocks":[{"kind":"bars","field":"passed","agg":"mean","label":"tests passed","max":36,"better":"higher"},{"kind":"meter","field":"trials","agg":"count","total":9,"label":"trials"}]}
+
+\`\u2713 lint (1m02s)\` / \`\u2717 test-linux (4m11s)\` / \`* build-macos\`:
+{"title":"CI \xB7 6 jobs","rules":[{"from":"*","match":"^(?P<mark>[\u2713\u2717*-])\\\\s+(?P<name>\\\\S+)","key":"name","text":"mark"}],"blocks":[{"kind":"grid","field":"mark","label":"jobs","tones":{"\u2713":"success","\u2717":"error","*":"pending","-":"muted"}}]}
+
+pytest, \`tests/test_api.py::test_login PASSED [ 12%]\`:
+{"title":"pytest \xB7 tests/","rules":[{"from":"out","match":" PASSED ","count":"pass"},{"from":"out","match":" FAILED ","count":"fail"},{"from":"out","match":"^(?P<current>\\\\S+::\\\\S+) \\\\w+\\\\s+\\\\[\\\\s*(?P<pct>\\\\d+)%\\\\]","text":"current"}],"blocks":[{"kind":"meter","field":"pct","agg":"last","total":100,"label":"progress","unit":"%"},{"kind":"stat","items":[{"field":"pass","agg":"count","label":"passed"},{"field":"fail","agg":"count","label":"failed"}]}],"stage":"current"}`;
+var byteLength = (s2) => Buffer.byteLength(s2) + 1;
+var clip2 = (text12, max) => text12.length > max ? `${text12.slice(0, max - 1)}\u2026` : text12;
+function promptSources(sources) {
+  let budget = MAX_SAMPLE_BYTES;
+  return sources.map((source2, index2) => {
+    const share = Math.floor(budget / (sources.length - index2));
+    const take = (lines, limit) => {
+      const out = [];
+      const shapes = /* @__PURE__ */ new Map();
+      let used = 0;
+      for (const line of lines) {
+        const trimmed = line.trimStart();
+        if (trimmed.startsWith("```") || trimmed.startsWith("~~~")) {
+          continue;
+        }
+        const shape = trimmed.replace(/\d+/g, "0").replace(/\s+/g, " ");
+        const repeats = shapes.get(shape) ?? 0;
+        if (repeats >= MAX_SHAPE_REPEATS) {
+          continue;
+        }
+        shapes.set(shape, repeats + 1);
+        const sample = clip2(line, MAX_SAMPLE_LINE_CHARS);
+        if (used + byteLength(sample) > limit) {
+          break;
+        }
+        used += byteLength(sample);
+        out.push(sample);
+      }
+      budget -= used;
+      return out;
+    };
+    const tail = take(source2.tail.slice().reverse(), source2.head.length ? Math.floor(share * 2 / 3) : share).reverse();
+    const head2 = take(source2.head, share - tail.reduce((n, l) => n + byteLength(l), 0));
+    return {
+      head: head2,
+      id: source2.id,
+      label: source2.label,
+      lines: source2.lines,
+      omitted: Math.max(0, source2.lines - head2.length - tail.length),
+      size: source2.size,
+      tail
+    };
+  });
+}
+function renderPrompt(request) {
+  const fence = (body) => `\`\`\`
+${body}
+\`\`\``;
+  const out = ["<job>", "Background process. Command:", fence(clip2(request.command.trim(), MAX_BRIEF_CHARS)), "</job>", "", "<sources>"];
+  for (const s2 of promptSources(request.sources)) {
+    const omitted = s2.omitted ? ` ${s2.omitted} not shown: the middle, and repeats of a line that differ only in numbers.` : "";
+    const tail = s2.tail.length ? [...s2.omitted ? ["[\u2026]"] : [], ...s2.tail] : [];
+    out.push(`## \`${s2.id}\` \u2014 ${s2.label}`, `${s2.lines} lines so far (${s2.size} characters).${omitted}`, fence([...s2.head, ...tail].join("\n")));
+  }
+  out.push("</sources>");
+  if (request.previous) {
+    out.push(
+      "",
+      `A spec is already in place, but ${request.previous.reason}. Write a replacement that matches the lines above:`,
+      fence(JSON.stringify(request.previous.spec))
+    );
+  }
+  if (request.rejected) {
+    out.push(
+      "",
+      "Your previous answer was rejected:",
+      fence(clip2(request.rejected.answer, 4e3)),
+      "Problems:",
+      ...request.rejected.errors.map((e) => `- ${e}`),
+      "Fix every problem and call `respond` again."
+    );
+  }
+  return out.join("\n");
+}
+function hermesAuthor(env2 = process.env) {
+  const python = env2.HERMES_PYTHON?.trim();
+  const root7 = env2.HERMES_PYTHON_SRC_ROOT;
+  const ui = env2.HERMES_TUI_DIR;
+  if (!python || !root7 || !ui) {
+    return void 0;
+  }
+  const script = join11(ui, "..", "widget_author.py");
+  return (request, signal) => new Promise((resolve7, reject) => {
+    const child = spawn2(python, [script], {
+      cwd: root7,
+      env: { ...env2, PYTHONPATH: root7 },
+      signal,
+      stdio: ["pipe", "pipe", "ignore"],
+      timeout: REQUEST_TIMEOUT_MS2
+    });
+    let stdout = "";
+    child.stdout.setEncoding("utf8").on("data", (chunk) => stdout += chunk);
+    child.on("error", reject);
+    child.stdin.on("error", () => void 0);
+    child.on("close", () => {
+      try {
+        const reply = JSON.parse(stdout.trim().split("\n").at(-1) ?? "");
+        return reply.unavailable ? resolve7(void 0) : reply.error ? reject(new Error(reply.error)) : resolve7(reply.answer);
+      } catch {
+        reject(new Error("widget_author.py gave no answer"));
+      }
+    });
+    child.stdin.end(JSON.stringify({ schema: SPEC_SCHEMA, system: SYSTEM_PROMPT, user: renderPrompt(request) }));
+  });
+}
+
+// src/processes/widgets/memory.ts
+import { mkdirSync as mkdirSync4, readdirSync as readdirSync2, readFileSync as readFileSync5, rmSync as rmSync2, statSync, writeFileSync as writeFileSync3 } from "node:fs";
+import { join as join12 } from "node:path";
+var KEEP_MS = 7 * 24 * 36e5;
+var safe3 = (id) => /^[\w.-]{1,128}$/.test(id);
+function chartMemory(dir2 = join12(dataDir(), "charts"), now = Date.now) {
+  return {
+    load(id) {
+      if (!safe3(id)) {
+        return void 0;
+      }
+      try {
+        const value = JSON.parse(readFileSync5(join12(dir2, `${id}.json`), "utf8"));
+        if (value && typeof value === "object" && typeof value.skip === "number") {
+          return { skip: value.skip };
+        }
+        const checked = validateSpec(value);
+        return checked.ok ? checked.spec : void 0;
+      } catch {
+        return void 0;
+      }
+    },
+    save(id, value) {
+      if (!safe3(id)) {
+        return;
+      }
+      try {
+        mkdirSync4(dir2, { recursive: true });
+        writeFileSync3(join12(dir2, `${id}.json`), JSON.stringify(value));
+        for (const name of readdirSync2(dir2)) {
+          const file2 = join12(dir2, name);
+          if (now() - statSync(file2).mtimeMs > KEEP_MS) {
+            rmSync2(file2, { force: true });
+          }
+        }
+      } catch {
+      }
+    }
+  };
+}
+
+// src/prs/aside.tsx
+var PrAside = class {
+  #host;
+  #view;
+  /** `host` is what the PR view reaches; the aside lends it the same one. */
+  constructor(host) {
+    this.#host = host;
+  }
+  get open() {
+    return this.#view !== void 0;
+  }
+  show(focus) {
+    if (!this.#view) {
+      this.#view = new PrView(this.#host);
+    }
+    if (focus) {
+      this.#view.select(focus);
+    }
+    this.#host.prs.poke();
+    this.#host.changed();
+  }
+  close() {
+    this.#view?.dispose();
+    this.#view = void 0;
+    this.#host.changed();
+  }
+  node(id) {
+    const view = this.#view;
+    if (!view) {
+      return null;
+    }
+    const now = Date.now();
+    const current = view.current();
+    return /* @__PURE__ */ jsx(
+      "prefs",
+      {
+        onAction: {
+          close: (ev) => {
+            if (!ev.value) {
+              this.close();
+            }
+          }
+        },
+        page: "pr",
+        pages: [],
+        role: "hermes.pr.aside",
+        sections: [],
+        title: current ? `${current.ref.repository.split("/")[1] ?? current.ref.repository} #${current.ref.number}` : "Pull requests",
+        children: /* @__PURE__ */ jsxs("col", { gap: "md", role: "hermes.pr.asideview", children: [
+          view.switcher(true),
+          view.header(now),
+          view.tabBar(),
+          /* @__PURE__ */ jsx("col", { gap: "md", role: "hermes.pr.body", children: view.body(`${id}.view.body`, now, "narrow") }, "body"),
+          view.actions()
+        ] }, "view")
+      },
+      "prs"
+    );
+  }
+};
+
+// src/session/adopt.ts
+function adoptSteps(host) {
+  const { state, transcript } = host;
+  return [
+    // The ids first: every step after reads the adopted session.
+    {
+      adopt: ({ ref }) => {
+        state.ref = ref;
+      }
+    },
+    {
+      adopt: ({ previous: previous3, ref }) => {
+        if (ref.live !== previous3.live) {
+          host.sheets.dropAll();
+          transcript.forgetCompactions();
+          state.busyMode = "queue";
+        }
+      }
+    },
+    // Read on every adopt: a reconnect may land on a gateway whose config changed.
+    { adopt: () => host.readBusyMode() },
+    // The session's own queue, from the snapshot (a reattach's rows of this pane become read-only rows).
+    { adopt: ({ r }) => host.queue.server.reset(pendingRows(r.info)) },
+    { adopt: ({ ref }) => host.showThoughts(ref.live) },
+    {
+      adopt: ({ previous: previous3, ref }) => {
+        host.markViewer(durable(ref), previous3.stored);
+        host.writeActiveSession(durable(ref));
+      }
+    },
+    {
+      adopt: ({ r }) => {
+        state.info = r.info ?? state.info;
+        state.usage = r.info?.usage ?? null;
+      }
+    },
+    // Another session: its own name (or none yet) on the tab.
+    { adopt: ({ r }) => host.title.adopt(typeof r.info?.title === "string" ? r.info.title : void 0) },
+    { adopt: () => host.reportCwd() },
+    {
+      adopt: ({ r }) => {
+        host.activity.set(busyFrom(r));
+        host.notices.reset();
+        host.activity.endCompaction();
+        host.forgetStatusNote();
+        transcript.usageBase(r.info?.usage ?? void 0);
+      }
+    },
+    {
+      adopt: ({ r, ref }) => {
+        if (r.messages?.length) {
+          transcript.load(r.messages, storedCompactions(durable(ref)));
+          host.agents.scan();
+          host.media.showAll(transcript.entries, (call) => host.imageLanded(call));
+        }
+      }
+    },
+    {
+      adopt: ({ ref }) => {
+        host.processes.poke();
+        host.connect.watch();
+        host.prs.adopt();
+        host.automation.adopt(ref.live);
+      }
+    },
+    {
+      adopt: ({ r }) => {
+        if (r.inflight) {
+          transcript.inflight(r.inflight, host.activity.busy?.startedAt);
+        }
+      }
+    },
+    { adopt: () => host.changed() }
+  ];
+}
+function adoptAll(steps, a2) {
+  for (const step of steps) {
+    step.adopt(a2);
+  }
+}
+
+// src/hermes/create.ts
+function createParams({ canonical, cols, cwd }) {
+  return canonical ? { ...localCreationOptions(), ...cwd ? { cwd } : {} } : { cols, ...cwd ? { cwd } : {} };
+}
+
+// src/session/views.ts
+var SessionViews = class {
+  #gw;
+  /** Shared-gateway subscriptions this view holds, by session id. */
+  #subscriptions = /* @__PURE__ */ new Map();
+  /** What superseded switches attached; released once no switch is in flight (see `release`). */
+  #stale = [];
+  /**
+   * The last `session.detach` in flight per session: a resume of that id waits for it (they share a
+   * subscription id). Set under the runtime id detached and read under the id a resume names: the
+   * shared gateway, the one that detaches, answers with one id for both.
+   */
+  #detaching = /* @__PURE__ */ new Map();
+  constructor(gw2) {
+    this.#gw = gw2;
+  }
+  /** Takes the ids of an adopted snapshot `r`, keeping its subscription (the shared gateway's). */
+  adopt(r) {
+    const { ref, subscription: subscription2 } = snapshotIds(r);
+    if (subscription2) {
+      this.#subscriptions.set(ref.live, subscription2);
+    }
+    return ref;
+  }
+  /** The detach of session `id` still in flight, if any. */
+  detaching(id) {
+    return this.#detaching.get(id);
+  }
+  /** A switch's result that a later switch superseded: nothing will show it. */
+  superseded(r) {
+    this.#stale.push(r);
+  }
+  /** Leaves every session this pane holds a subscription to. */
+  leaveAll(endReason) {
+    return Promise.all([...this.#subscriptions.keys()].map((sid) => this.leave(sid, endReason)));
+  }
+  /** Stops showing session `sid`: a shared-gateway view detaches (the session keeps running for its other viewers); a private gateway closes it. */
+  async leave(sid, endReason) {
+    const subscription2 = this.#subscriptions.get(sid);
+    if (!this.#gw.isCanonical) {
+      await rpc(this.#gw, "session.close", { session_id: sid }).catch(() => void 0);
+      return;
+    }
+    if (!subscription2) {
+      return;
+    }
+    this.#subscriptions.delete(sid);
+    await this.#detach(sid, subscription2, endReason);
+  }
+  /**
+   * Releases what superseded switches attached, once the adopted session (`shown`) is known. The
+   * gateway gives this view one subscription per session, so a stale result for the shown session
+   * is the live view's own and stays; others detach with no end reason (nobody chose to close them).
+   */
+  release(shown2) {
+    const stale = this.#stale;
+    this.#stale = [];
+    for (const r of stale) {
+      const { ref, subscription: subscription2 } = snapshotIds(r);
+      if (ref.live === shown2 || subscription2 && this.#subscriptions.get(ref.live) === subscription2) {
+        continue;
+      }
+      if (!this.#gw.isCanonical) {
+        void rpc(this.#gw, "session.close", { session_id: ref.live }).catch(() => void 0);
+      } else if (subscription2) {
+        void this.#detach(ref.live, subscription2);
+      }
+    }
+  }
+  /** Sends `session.detach`, one at a time per session; `endReason` lets the owner end it once no viewer remains. */
+  #detach(sid, subscription2, endReason) {
+    const send = () => rpc(this.#gw, "session.detach", {
+      ...endReason ? { end_reason: endReason } : {},
+      session_id: sid,
+      subscription_id: subscription2
+    });
+    const run6 = (this.#detaching.get(sid)?.then(send) ?? send()).catch(() => void 0);
+    this.#detaching.set(sid, run6);
+    void run6.then(() => {
+      if (this.#detaching.get(sid) === run6) {
+        this.#detaching.delete(sid);
+      }
+    });
+    return run6;
+  }
+};
+
+// src/session/lifecycle.ts
+var SessionLifecycle = class {
+  #host;
+  /** What an adopt runs, in order (session/adopt.ts). */
+  #steps;
+  #switches = new Switches();
+  /** The sessions this pane views: its subscriptions, detaches in flight, and superseded switches' results. */
+  #views;
+  /** Server requests for another session, kept while a switch is in flight. */
+  #heldRequests = [];
+  constructor(host, steps) {
+    this.#host = host;
+    this.#steps = steps;
+    this.#views = new SessionViews(host.gw);
+  }
+  /** Whether a session switch is in flight: prompts and the queue wait for the session it adopts. */
+  get switching() {
+    return this.#switches.pending;
+  }
+  /**
+   * A ticket for a reply to the shown session (a slash command's): stale once the view left it, or
+   * while a switch begun since is in flight (Ink's stale()).
+   */
+  replyTicket() {
+    const session2 = this.#host.state.ticket();
+    const since = this.#switches.since();
+    return {
+      isCurrent: () => session2.isCurrent() && !(this.#switches.pending && !since.isCurrent()),
+      signal: session2.signal,
+      sid: session2.sid
+    };
+  }
+  /** gateway.ready: a reconnect's reattaches the shown session; only a sessionless app bootstraps. */
+  ready() {
+    const { stored } = this.#host.state.ref;
+    void (stored ? this.reattach(stored) : this.#bootstrap());
+  }
+  /** The gateway went away: the runtime session died with it, and nothing can answer the held requests. */
+  lost() {
+    const { state } = this.#host;
+    state.ref = { live: null, stored: state.ref.stored };
+    this.#heldRequests = [];
+  }
+  /**
+   * session.replay_gap for `sessionId`: the view fell behind and the owner retired its subscription
+   * (the socket is fine, so no reconnect re-attaches it). A fresh resume brings the snapshot and a
+   * new subscription.
+   */
+  fellBehind(sessionId) {
+    const ref = this.#host.state.ref;
+    if (isLive(ref) && sessionId === ref.live) {
+      void this.reattach(durable(ref), "Reloaded the session: this view fell behind its events.");
+    }
+  }
+  /** Routes a server request: another session's waits while a switch is in flight (held here), or drops. */
+  route(req) {
+    const route = this.#switches.route(this.#host.state.ref.live, req.params.session_id);
+    if (route === "hold") {
+      this.#heldRequests.push(req);
+    }
+    return route;
+  }
+  /** request.cancel for request `id`: true when it was held here (it is dropped). */
+  unhold(id) {
+    const held = this.#heldRequests.some((r) => r.id === id);
+    this.#heldRequests = this.#heldRequests.filter((r) => r.id !== id);
+    return held;
+  }
+  /** Leaves every session this pane holds a subscription to (quitting). */
+  leaveAll(endReason) {
+    return this.#views.leaveAll(endReason);
+  }
+  /** The first session: HERMES_TUI_RESUME's, else a new one; then the launcher's startup image, if any. */
+  async #bootstrap() {
+    const host = this.#host;
+    const resume = host.launch.resume;
+    try {
+      await (resume ? this.resume(storedSessionId(resume)) : this.newSession());
+    } catch (error) {
+      host.transcript.notice(`Could not start a session: ${errorText(error)}`, "error");
+      host.changed();
+      return;
+    }
+    const sid = host.state.ref.live;
+    if (sid && host.awaitingStartup()) {
+      await host.attachStartup(sid);
+    }
+  }
+  /** After a reconnect (or a replay gap): resumes the shown session under `id` (its runtime id or subscription died). */
+  async reattach(id, notice = "Reconnected to the agent backend.") {
+    const host = this.#host;
+    try {
+      if (await this.reload(id)) {
+        host.transcript.notice(notice);
+      }
+    } catch (error) {
+      host.transcript.notice(`Could not reattach the session: ${errorText(error)}`, "error");
+    }
+    host.changed();
+  }
+  /** Closes the open session and starts a fresh one with an empty transcript, named `title` if given. */
+  async newSession(title) {
+    if (this.#busySwitch()) {
+      return;
+    }
+    const host = this.#host;
+    const previous3 = host.state.ref.live;
+    const token = this.#switches.begin();
+    try {
+      const setup = await rpc(host.gw, "setup.status", {});
+      if (!this.#switches.current(token)) {
+        return;
+      }
+      if (setup?.provider_configured === false) {
+        host.transcript.notice("No model provider is configured. Run `hermes setup`, then start again.", "warning");
+        return;
+      }
+      const r = await rpc(
+        host.gw,
+        "session.create",
+        createParams({ canonical: host.gw.isCanonical, cols: host.cols(), cwd: host.launch.sessionCwd })
+      );
+      if (!this.#switches.current(token)) {
+        this.#views.superseded(r);
+        return;
+      }
+      this.#fresh();
+      this.#adopt(r);
+      if (previous3 && previous3 !== r.session_id) {
+        void this.#views.leave(previous3, "tui_close");
+      }
+    } finally {
+      this.#settle(token);
+    }
+    const sid = host.state.ref.live;
+    if (title && sid) {
+      await host.rename(sid, title);
+    }
+  }
+  /** Resumes stored session `id`: its history replaces the transcript, and the session it leaves is closed. */
+  async resume(id) {
+    if (this.#busySwitch()) {
+      return;
+    }
+    const previous3 = this.#host.state.ref.live;
+    const r = await this.reload(id);
+    if (r && previous3 && previous3 !== r.session_id) {
+      void this.#views.leave(previous3, "tui_close");
+    }
+  }
+  /**
+   * Resumes and adopts session `id` (its stored id, or a runtime id when none is known); undefined
+   * when a later switch superseded this one.
+   */
+  async reload(id) {
+    const host = this.#host;
+    const token = this.#switches.begin();
+    const hold = host.gw.holdAttach(id);
+    let snapshot3;
+    try {
+      const detaching = this.#views.detaching(id);
+      if (detaching) {
+        await detaching;
+        if (!this.#switches.current(token)) {
+          return void 0;
+        }
+      }
+      const r = await rpc(host.gw, "session.resume", { cols: host.cols(), session_id: id });
+      if (!this.#switches.current(token)) {
+        this.#views.superseded(r);
+        return void 0;
+      }
+      this.#fresh();
+      this.#adopt(r);
+      snapshot3 = r;
+      host.sheets.dropShared();
+      host.gw.hydrateSharedPrompts(r);
+      return r;
+    } finally {
+      host.gw.settleAttach(hold, snapshot3);
+      this.#settle(token);
+    }
+  }
+  /** Refuses a session switch while a turn runs (its queue and prompts belong to this session); true when refused. */
+  #busySwitch() {
+    const host = this.#host;
+    if (!host.busy()) {
+      return false;
+    }
+    host.transcript.notice("Wait for the current turn to finish (or press Esc twice) before switching sessions.", "warning");
+    host.changed();
+    return true;
+  }
+  /** An empty transcript with its welcome, for the session about to be adopted. */
+  #fresh() {
+    const { transcript } = this.#host;
+    transcript.clear();
+    transcript.push({ id: transcript.id("w"), kind: "welcome" });
+  }
+  /** Takes on snapshot `r`: its ids (and the shared gateway's subscription), then each adopt step in order. */
+  #adopt(r) {
+    const ref = this.#views.adopt(r);
+    adoptAll(this.#steps, { previous: this.#host.state.ref, r, ref });
+  }
+  /**
+   * Ends switch `token`. Once none is in flight, in this order: what superseded switches attached is
+   * released, the held requests open (or drop), the queue drains, and the pane renders.
+   */
+  #settle(token) {
+    const host = this.#host;
+    this.#switches.end(token);
+    if (this.#switches.pending) {
+      return;
+    }
+    this.#views.release(host.state.ref.live);
+    const held = this.#heldRequests;
+    this.#heldRequests = [];
+    for (const req of held) {
+      host.request(req);
+    }
+    host.drain();
+    host.changed();
+  }
+};
+
+// src/session/state.ts
+function sessionTicket(shown2, signal) {
+  const sid = shown2();
+  return { isCurrent: () => shown2() === sid, signal, sid };
+}
+var SessionState = class {
+  #changed;
+  #ref = NO_SESSION;
+  #info = null;
+  #usage = null;
+  #busyMode = "queue";
+  /** One generation per shown runtime id: a ticket's signal aborts once the view leaves its session. */
+  #shown = new Epoch();
+  constructor(changed) {
+    this.#changed = changed;
+  }
+  /** The open session's ids: the runtime id requests name, and the stored id it is saved under. */
+  get ref() {
+    return this.#ref;
+  }
+  set ref(ref) {
+    if (ref.live !== this.#ref.live) {
+      this.#shown.next();
+    }
+    this.#ref = ref;
+    this.#changed();
+  }
+  /** The gateway's session.info, merged; null before the first session. */
+  get info() {
+    return this.#info;
+  }
+  set info(info) {
+    this.#info = info;
+    this.#changed();
+  }
+  /** The session's token and context counters. */
+  get usage() {
+    return this.#usage;
+  }
+  set usage(usage) {
+    this.#usage = usage;
+    this.#changed();
+  }
+  /** What Enter does while a turn runs (`display.busy_input_mode`); queue until the gateway says. */
+  get busyMode() {
+    return this.#busyMode;
+  }
+  set busyMode(mode) {
+    this.#busyMode = mode;
+    this.#changed();
+  }
+  /** A ticket for the session shown now: current while the view shows it. */
+  ticket() {
+    return sessionTicket(() => this.#ref.live, this.#shown.current().signal);
+  }
+};
+
+// src/session/thoughts.ts
+function showThoughts(host, sid) {
+  if (host.settings.load().thoughts === false) {
+    return;
+  }
+  rpc(host.gw, "config.set", { key: "show_reasoning", session_id: sid, value: "on" }).catch((error) => {
+    host.notice(`Could not turn on thoughts: ${error.message}`, "warning");
+  });
+}
+
+// src/session/title.ts
+var READ_MS = 400;
+var SessionTitle = class {
+  #host;
+  #text = "";
+  #timer;
+  constructor(host) {
+    this.#host = host;
+  }
+  /** The title; '' while the session has none. */
+  get text() {
+    return this.#text;
+  }
+  /** Names the session `title` (trimmed) on the strip and the tab; true when it changed. */
+  set(title) {
+    const next3 = title?.trim();
+    if (!next3 || next3 === this.#text) {
+      return false;
+    }
+    this.#text = next3;
+    setTabTitle(next3);
+    return true;
+  }
+  /** Another session is shown: its own name (or none yet) on the tab, and a read of the list. */
+  adopt(title) {
+    this.#text = "";
+    this.set(title);
+    this.read();
+  }
+  /**
+   * Reads the session's title from the session list, a moment after the list changed: the shared
+   * gateway tells viewers only that (`sessions.changed`) when /title or the auto-titler names it,
+   * and serves no `session.title`. The session is among the newest rows; its stored id finds it.
+   */
+  read() {
+    clearTimeout(this.#timer);
+    this.#timer = setTimeout(() => void this.#fetch(), READ_MS);
+  }
+  /** Names session `sid` (`/new <title>`): the shared gateway's rename mutation, a private one's `session.title`. */
+  async rename(sid, title) {
+    const host = this.#host;
+    try {
+      const r = host.gw.isCanonical ? await mutateSession(host.gw, sid, "rename", { title }) : await rpc(host.gw, "session.title", { session_id: sid, title });
+      if (sid === host.session.ref.live && this.set(String(r?.title ?? title))) {
+        host.changed();
+      }
+    } catch (error) {
+      host.notice(`Could not name the session: ${errorText(error)}`, "warning");
+    }
+  }
+  /** Stops a pending list read. */
+  dispose() {
+    clearTimeout(this.#timer);
+  }
+  async #fetch() {
+    const { live: sid, stored } = this.#host.session.ref;
+    const ids = new Set([sid, stored].filter(Boolean));
+    if (!sid) {
+      return;
+    }
+    try {
+      const r = await rpc(this.#host.gw, "session.list", { limit: 20 });
+      const row2 = r?.sessions?.find((x) => ids.has(x.id ?? "") || ids.has(x.resolved_id ?? ""));
+      if (sid === this.#host.session.ref.live && this.set(row2?.title)) {
+        this.#host.changed();
+      }
+    } catch {
+    }
+  }
+};
+
+// src/settings.ts
+import { mkdirSync as mkdirSync5, readFileSync as readFileSync6, writeFileSync as writeFileSync4 } from "node:fs";
+import { homedir as homedir12 } from "node:os";
+import { dirname, join as join13 } from "node:path";
+function settingsFile(env2 = process.env) {
+  return join13(env2.HERMES_HOME || join13(homedir12(), ".hermes"), "hermes-tern", "settings.json");
+}
+function loadSettings(file2 = settingsFile()) {
+  try {
+    const parsed2 = JSON.parse(readFileSync6(file2, "utf8"));
+    return parsed2 && typeof parsed2 === "object" ? parsed2 : {};
+  } catch {
+    return {};
+  }
+}
+function saveSettings(patch6, file2 = settingsFile()) {
+  const next3 = { ...loadSettings(file2), ...patch6 };
+  mkdirSync5(dirname(file2), { recursive: true });
+  writeFileSync4(file2, `${JSON.stringify(next3, null, 2)}
+`);
+  return next3;
+}
+function fileSettings(file2) {
+  return {
+    load: () => loadSettings(file2 ?? settingsFile()),
+    save: (patch6) => saveSettings(patch6, file2 ?? settingsFile())
+  };
+}
+
+// src/sidebar.tsx
+var POLL_MS3 = 5e3;
+var ACTS = ["close", "page", "copy-branch", "open-pr", "diff", "all-files"];
+var MAX_FILES = 40;
+var Sidebar = class {
+  #host;
+  #open = false;
+  #state;
+  #cwd = null;
+  #timer;
+  #reading = false;
+  #copied = false;
+  #copiedTimer;
+  constructor(host) {
+    this.#host = host;
+  }
+  get open() {
+    return this.#open;
+  }
+  get state() {
+    return this.#state;
+  }
+  toggle() {
+    this.#open = !this.#open;
+    clearTimeout(this.#timer);
+    if (this.#open) {
+      void this.refresh();
+    }
+    this.#host.changed();
+  }
+  /** Reads git again now (a tool changed files, the turn ended). */
+  poke() {
+    if (this.#open) {
+      void this.refresh();
+    }
+  }
+  dispose() {
+    this.#open = false;
+    clearTimeout(this.#timer);
+  }
+  async refresh() {
+    const cwd = this.#host.session.info?.cwd || null;
+    if (this.#reading) {
+      return;
+    }
+    this.#reading = true;
+    clearTimeout(this.#timer);
+    try {
+      this.#state = cwd ? await gitState(cwd) : void 0;
+      this.#cwd = cwd;
+    } finally {
+      this.#reading = false;
+      if (this.#open) {
+        this.#timer = setTimeout(() => void this.refresh(), POLL_MS3);
+      }
+      this.#host.changed();
+    }
+  }
+  node(id) {
+    if (!this.#open) {
+      return null;
+    }
+    const host = this.#host;
+    const git3 = this.#state;
+    const prs = host.prs.entries().toReversed();
+    const files = git3?.files ?? [];
+    const added = files.reduce((n, f) => n + f.additions, 0);
+    const removed = files.reduce((n, f) => n + f.deletions, 0);
+    const where = git3?.upstream ? git3.ahead || git3.behind ? [git3.ahead && `${git3.ahead} ahead`, git3.behind && `${git3.behind} behind`].filter(Boolean).join(", ") + ` of ${git3.upstream}` : `Up to date with ${git3.upstream}` : "Not pushed: no upstream";
+    const branchRows = git3 ? [
+      {
+        control: git3.branch ? { act: "copy-branch", k: "action", label: this.#copied ? "Copied" : "Copy" } : void 0,
+        hint: git3.branch ? where : "Detached HEAD",
+        id: "branch",
+        label: git3.branch ?? "No branch"
+      }
+    ] : [{ disabled: this.#cwd ? "This folder is not in a git repository." : "The session has no folder yet.", id: "branch", label: "No git" }];
+    const prRows = prs.length ? prs.map((e) => ({
+      control: { act: "open-pr", k: "action", label: "Open" },
+      hint: e.pr ? [
+        stateLabel(e.pr),
+        e.pr.checks.length ? `checks ${checksState(e.pr.checks)}` : "",
+        e.source === "branch" ? "this branch" : e.source === "stack" ? "stack layer" : ""
+      ].filter(Boolean).join(" \xB7 ") : e.error ?? "Reading GitHub\u2026",
+      id: `pr:${prKey(e.ref)}`,
+      label: `#${e.ref.number} ${e.pr?.title ?? e.ref.repository}`,
+      warning: e.pr?.state === "open" && e.pr.mergeable === "conflicting" ? "Conflicts with its base branch" : void 0
+    })) : [{ disabled: "Hermes links each PR it opens; the branch\u2019s PR shows here too.", id: "no-prs", label: "None yet" }];
+    const fileRows = files.length ? files.slice(0, MAX_FILES).map((f) => ({
+      control: { act: "diff", k: "action", label: "Diff" },
+      hint: `${f.status}${f.staged ? ", staged" : ""} \xB7 +${f.additions} \u2212${f.deletions}`,
+      id: `file:${f.path}`,
+      label: f.path
+    })) : git3 ? [{ disabled: "Nothing changed since the last commit.", id: "no-files", label: "Clean" }] : [];
+    return /* @__PURE__ */ jsx(
+      "prefs",
+      {
+        lead: git3 ? git3.root.replace(launchEnv().home ?? "\0", "~") : host.session.info?.cwd ?? "",
+        onAction: Object.fromEntries(ACTS.map((act) => [act, (ev) => this.#action(act, ev.value)])),
+        page: "session",
+        pages: [{ icon: "branch", id: "session", label: "Session" }],
+        sections: [
+          { id: "branch", rows: branchRows, title: "Branch" },
+          { id: "prs", rows: prRows, title: `Pull requests${prs.length ? ` \xB7 ${prs.length}` : ""}` },
+          ...fileRows.length ? [
+            {
+              id: "files",
+              rows: [
+                ...fileRows,
+                ...files.length > MAX_FILES ? [{ control: { act: "all-files", k: "action", label: "Show all" }, id: "more", label: `${files.length - MAX_FILES} more` }] : []
+              ],
+              title: files.length ? `Changes \xB7 ${files.length} files \xB7 +${added} \u2212${removed}` : "Changes"
+            }
+          ] : []
+        ],
+        title: "Session"
+      },
+      "sidebar"
+    );
+  }
+  #action(act, value) {
+    const row2 = typeof value === "string" ? value : "";
+    switch (act) {
+      case "close":
+        if (!row2) {
+          this.toggle();
+        }
+        return;
+      case "copy-branch":
+        if (this.#state?.branch) {
+          copyToClipboard(this.#state.branch);
+          this.#copied = true;
+          clearTimeout(this.#copiedTimer);
+          this.#copiedTimer = setTimeout(() => {
+            this.#copied = false;
+            this.#host.changed();
+          }, 1500);
+          this.#host.changed();
+        }
+        return;
+      case "open-pr":
+        return openPullRequests(this.#host, this.#host.prs.keyOf(row2.replace(/^pr:/, "")));
+      case "diff":
+        return openChanges(this.#host, row2.replace(/^file:/, ""));
+      case "all-files":
+        return openChanges(this.#host);
+    }
   }
 };
 
@@ -72585,404 +73111,450 @@ function shownArgs(args) {
   return typeof args.command === "string" ? { ...args, command: withoutTernEnv(args.command) } : args;
 }
 
-// src/view/queued.tsx
-function queuedNode(queued, on) {
-  return /* @__PURE__ */ jsx("col", { gap: "xs", role: "omp.queue", children: queued.map((q2, i) => /* @__PURE__ */ jsxs("row", { align: "center", gap: "sm", role: "omp.queue.item", title: queuedTitle(q2), children: [
-    /* @__PURE__ */ jsx("icon", { name: q2.kind === "sending" ? "clock" : "corner-down-right" }, "icon"),
-    /* @__PURE__ */ jsx("text", { grow: 1, text: q2.text.replace(/\s*\r?\n\s*/g, " \u21B5 "), truncate: "end", wrap: "none" }, "text"),
-    i === 0 && queued.length > 1 ? /* @__PURE__ */ jsx("badge", { role: "omp.queue.count", text: `${queued.length}` }, "count") : null,
-    q2.kind === "foreign" && q2.note === "unknown" ? /* @__PURE__ */ jsx("badge", { text: "unknown", tone: "warning" }, "note") : null,
-    on.steer && editable(q2) && q2.steer ? /* @__PURE__ */ jsxs(
-      "row",
-      {
-        align: "center",
-        gap: "xs",
-        onClick: () => on.steer?.(i),
-        role: "omp.queue.steer",
-        title: `Steer the running turn with this instead${i === 0 ? "  \u2325\u21B5" : ""}`,
-        children: [
-          /* @__PURE__ */ jsx("icon", { name: "corner-up-right" }, "i"),
-          i === 0 ? /* @__PURE__ */ jsx("kbd", { keys: ["alt", "enter"] }, "k") : null,
-          /* @__PURE__ */ jsx("text", { text: "Steer" }, "t")
-        ]
-      },
-      "steer"
-    ) : null,
-    editable(q2) ? /* @__PURE__ */ jsxs(
-      "row",
-      {
-        align: "center",
-        gap: "xs",
-        onClick: () => on.edit(i),
-        role: "omp.queue.edit",
-        title: `Edit in the composer${i === 0 ? "  \u2325\u2191" : ""}`,
-        children: [
-          i === 0 ? /* @__PURE__ */ jsx("kbd", { keys: ["alt", "up"] }, "k") : null,
-          /* @__PURE__ */ jsx("text", { text: "Edit" }, "t")
-        ]
-      },
-      "edit"
-    ) : null
-  ] }, `q${i}`)) }, "queue");
-}
-function queuedTitle(q2) {
-  switch (q2.kind) {
-    case "local":
-    case "mine":
-      return "Queued";
-    case "sending":
-      return "Queuing\u2026";
-    case "foreign":
-      return q2.note === "elsewhere" ? "Queued by another window (or before a reconnect)" : "Queued behind a turn whose outcome is unknown";
-    default:
-      return assertNever(q2, "queued row");
+// src/turn/activity.ts
+var NO_COMPACTION = { kind: "none" };
+var Activity = class {
+  #busy = null;
+  #compaction = NO_COMPACTION;
+  /** The working row; null when no turn (or expansion) runs. */
+  get busy() {
+    return this.#busy;
   }
+  /** Sets the busy state as given (a resumed session's, or one a test arranges). */
+  set(busy) {
+    this.#busy = busy;
+  }
+  /** A new working row labelled `label`, with an age of its own. */
+  startBusy(label, now = Date.now()) {
+    this.#busy = { label, since: {}, startedAt: now };
+  }
+  /**
+   * Relabels the working row, keeping its age. An empty label, or none running, changes nothing.
+   * The stream's labels wait while the context is compacted; `status`: a label of the user's or
+   * a status line's own (the interrupt's 'Stopping…', a retry), which shows then too.
+   */
+  relabel(label, { status = false } = {}) {
+    if (this.#busy && label && (status || this.#compaction.kind === "none")) {
+      this.#busy = { ...this.#busy, label };
+    }
+  }
+  /** No turn runs now. */
+  endBusy() {
+    this.#busy = null;
+  }
+  /** The compaction phase. */
+  get compaction() {
+    return this.#compaction;
+  }
+  /** The running compaction, or undefined. */
+  get compacting() {
+    return this.#compaction.kind === "running" ? this.#compaction : void 0;
+  }
+  /** A compaction started; one already running keeps its age (a /compress and its own status edge). */
+  startCompaction({ manual }, now = Date.now()) {
+    if (this.#compaction.kind === "none") {
+      this.#compaction = { kind: "running", manual, since: {}, startedAt: now };
+    }
+  }
+  /** No compaction runs now. */
+  endCompaction() {
+    this.#compaction = NO_COMPACTION;
+  }
+};
+
+// src/turn/queue.ts
+var PromptQueue = class {
+  /** Prompts held here until they can be sent: no session yet, a switch in flight, or a private gateway's busy turn. */
+  held = [];
+  /** The shared gateway's queue for this session: its FIFO, this pane's admissions, the bubbles they owe. */
+  server = new ServerQueue();
+  #host;
+  constructor(host) {
+    this.#host = host;
+  }
+  /** Holds `prompt` behind the others. */
+  hold(prompt) {
+    this.held.push(prompt);
+  }
+  /** Holds `prompt` ahead of the others (a send that found a switch in flight). */
+  holdFirst(prompt) {
+    this.held.unshift(prompt);
+  }
+  /**
+   * The startup image goes to the startup query at the queue's head, into its images in place;
+   * false when nothing is held.
+   */
+  attachToHead(image3) {
+    const head2 = this.held[0];
+    head2?.images.push(image3);
+    return Boolean(head2);
+  }
+  /** Prompts waiting behind the turn: this pane's own queue, then the shared gateway's. */
+  count() {
+    return this.held.length + this.server.queued().length;
+  }
+  /** The dock's queued rows, in count()'s order, with what each one's Edit and Steer can do. */
+  rows() {
+    const steer3 = this.#host.busy();
+    return [
+      ...this.held.map((p3) => ({ kind: "local", steer: steer3, text: userText(shownText(p3), p3.images) })),
+      ...this.server.queued().map((q2) => {
+        switch (q2.kind) {
+          case "theirs":
+            return { kind: "foreign", note: q2.row.status === "unknown" ? "unknown" : "elsewhere", text: internalNotice(q2.text) ?? q2.text };
+          // Withdrawing it needs the gateway's id for it: until prompt.submit answers it is on its way.
+          case "sending":
+            return { kind: "sending", text: q2.text };
+          case "mine":
+            return { kind: "mine", steer: steer3 && !q2.own.item.prompt.images.length, text: q2.text };
+        }
+      })
+    ];
+  }
+  /**
+   * Admits `prompt` into session `sid`'s FIFO now (Ink's busy-time admission): crash-durable, and in
+   * every viewer's queue. Its bubble waits until the gateway starts it; a refusal puts it back in
+   * the composer. `sent`: what to send instead of expanding the prompt again (a re-queued steer).
+   */
+  async admit(sid, prompt, sent) {
+    const host = this.#host;
+    const ticket = host.ticket();
+    const ready = sent === void 0 ? await host.expanded(sid, prompt) : { images: prompt.images, text: sent };
+    if (!ready || !ticket.isCurrent()) {
+      return;
+    }
+    const own14 = {
+      admission: { kind: "pending" },
+      display: userText(shownText(prompt), prompt.images),
+      inputId: newInputId(),
+      item: { prompt, sent: ready.text }
+    };
+    const attachments = ready.images.map(({ mime, path: path2 }) => ({ mime, path: path2 }));
+    this.server.admit(own14);
+    host.changed();
+    try {
+      const r = await rpc(host.gw, "prompt.submit", {
+        queued: true,
+        session_id: sid,
+        submission_id: own14.inputId,
+        text: ready.text || (attachments.length ? IMAGE_ONLY_PROMPT : ""),
+        ...attachments.length ? { attachments } : {}
+      });
+      const id = admissionOf(r);
+      if (id !== void 0) {
+        own14.admission = { id, kind: "admitted" };
+      }
+    } catch (error) {
+      this.server.drop(own14);
+      if (ticket.isCurrent()) {
+        host.transcript.notice(`Not queued: ${errorText(error)}. Your message is back in the composer.`, "error");
+        host.restore(prompt);
+      }
+    }
+    host.changed();
+  }
+  /** Alt+Up / a queued row's Edit: queued prompt `index` (the oldest by default) back into the composer. */
+  dequeue(index2 = 0) {
+    const host = this.#host;
+    if (index2 < this.held.length) {
+      const [next3] = this.held.splice(index2, 1);
+      if (next3) {
+        host.restore(next3);
+        host.changed();
+      }
+      return;
+    }
+    const ticket = host.ticket();
+    const { sid } = ticket;
+    const q2 = this.#mine(index2);
+    if (!sid || !q2) {
+      return;
+    }
+    void this.#withdraw(sid, q2).then((out) => {
+      if (out && ticket.isCurrent()) {
+        host.restore(q2.own.item.prompt);
+      }
+      host.changed();
+    });
+  }
+  /** Alt+Enter / a queued row's Steer: injects queued prompt `index` into the running turn instead of waiting for it to end. */
+  steer(index2) {
+    const host = this.#host;
+    const ticket = host.ticket();
+    const { sid } = ticket;
+    if (!host.busy() || !sid) {
+      return;
+    }
+    if (index2 >= this.held.length) {
+      return void this.#steerServerQueued(ticket, sid, index2);
+    }
+    const prompt = this.held[index2];
+    if (!prompt) {
+      return;
+    }
+    if (prompt.images.length) {
+      host.transcript.notice("A queued prompt with images cannot steer the turn. It stays queued.", "warning");
+      return host.changed();
+    }
+    const { text: text12 } = prompt;
+    this.held.splice(index2, 1);
+    host.changed();
+    void steerTurn(host.gw, sid, text12).then((r) => {
+      if (r.ok) {
+        host.transcript.steer(text12);
+      } else {
+        this.held.splice(index2, 0, prompt);
+        host.transcript.notice(
+          r.error ? `Steer failed: ${r.error}. It stays queued.` : "The turn ended before the steer landed. It will send as the next prompt.",
+          "warning"
+        );
+        this.drain();
+      }
+      host.changed();
+    });
+  }
+  /** Sends the oldest held prompt once the session is adopted and idle (no turn, switch or startup image pending). */
+  drain() {
+    if (!this.#host.canDrain()) {
+      return;
+    }
+    const next3 = this.held.shift();
+    if (next3) {
+      this.#host.send(next3);
+    }
+  }
+  /** The shared gateway's queued row at dock index `index`, if this pane can act on it. */
+  #mine(index2) {
+    const q2 = this.server.queued()[index2 - this.held.length];
+    return q2?.kind === "mine" ? q2 : void 0;
+  }
+  /**
+   * Takes this pane's admission out of the gateway's queue (prompt.cancel); true once withdrawn,
+   * false when it started meanwhile (it runs as its own turn) or the gateway refused.
+   */
+  async #withdraw(sid, q2) {
+    this.server.withdrawn(q2.id);
+    try {
+      const r = await rpc(this.#host.gw, "prompt.cancel", { admission_id: q2.id, session_id: sid });
+      if (r?.status !== "terminal") {
+        return false;
+      }
+    } catch (error) {
+      this.#host.transcript.notice(`Could not take the prompt out of the queue: ${errorText(error)}`, "error");
+      this.#host.changed();
+      return false;
+    }
+    this.server.drop(q2.own);
+    return true;
+  }
+  /**
+   * A Steer on a row in the gateway's queue: withdrawn from it, then steered into the turn; a steer
+   * that does not land goes back into the queue, at its end.
+   */
+  async #steerServerQueued(ticket, sid, index2) {
+    const host = this.#host;
+    const q2 = this.#mine(index2);
+    if (!q2) {
+      return;
+    }
+    const { prompt, sent } = q2.own.item;
+    if (prompt.images.length) {
+      host.transcript.notice("A queued prompt with images cannot steer the turn. It stays queued.", "warning");
+      return host.changed();
+    }
+    if (!await this.#withdraw(sid, q2) || !ticket.isCurrent()) {
+      return;
+    }
+    const r = await steerTurn(host.gw, sid, sent);
+    if (!ticket.isCurrent()) {
+      return;
+    }
+    if (r.ok) {
+      host.transcript.steer(shownText(prompt));
+    } else {
+      host.transcript.notice(
+        r.error ? `Steer failed: ${r.error}. Queued again, at the end.` : "The turn ended before the steer landed. Queued again.",
+        "warning"
+      );
+      void this.admit(sid, prompt, sent);
+    }
+    host.changed();
+  }
+};
+
+// src/turn/expand.ts
+var EXPANDING_LABEL = "Running {!\u2026}";
+function hasCommands(prompt) {
+  return typedCommands(prompt.text, prompt.pasted).length > 0;
 }
-function editable(q2) {
-  return q2.kind === "local" || q2.kind === "mine";
+async function expand2(host, sid, prompt) {
+  if (prompt.kind !== "typed" || !hasCommands(prompt)) {
+    return prompt;
+  }
+  try {
+    return { images: prompt.images, text: await interpolate(host.gw, sid, prompt.text, prompt.pasted) };
+  } catch (error) {
+    host.transcript.notice(`Not sent: a {!\u2026} command failed: ${shellError(error)}.`, "error");
+    host.restore(prompt);
+    host.changed();
+    return void 0;
+  }
 }
 
-// src/view/dock.tsx
-function dockNodes(cx) {
-  const nodes2 = [];
-  if (cx.busy || cx.compacting) {
-    nodes2.push(
-      /* @__PURE__ */ jsx("col", { role: "omp.hud.status", children: cx.busy ? workingNode2(cx) : compactingNode(cx.compacting, cx.now) }, "hud")
-    );
+// src/turn/router.ts
+function gateTurn(s2) {
+  if (s2.busy) {
+    return "busy";
   }
-  if (cx.queued.length) {
-    nodes2.push(queuedNode(cx.queued, { edit: cx.onQueueEdit, steer: cx.onQueueSteer }));
+  if (s2.compacting) {
+    return "behind";
   }
-  if (cx.todos?.open) {
-    nodes2.push(
-      /* @__PURE__ */ jsx("col", { role: "hermes.todos", children: checklistNode(cx.todos.list) }, "todos")
-    );
+  return "send";
+}
+function gateSubmit(s2) {
+  if (!s2.sid || s2.switching) {
+    return "hold";
   }
-  const reconnect = reconnectNode(cx.reconnecting, cx.now);
-  if (reconnect) {
-    nodes2.push(reconnect);
+  return gateTurn(s2);
+}
+function gateBehind(s2) {
+  if (!s2.canonical || !s2.sid || s2.switching) {
+    return { kind: "hold" };
   }
-  const automation = automationNode(cx.automation, cx.now, cx.focused);
-  if (automation) {
-    nodes2.push(automation);
+  return { kind: "admit", sid: s2.sid };
+}
+function gateSend(s2) {
+  if (!s2.sid || s2.switching) {
+    return { kind: "hold" };
   }
-  const pills2 = [
-    // While a turn runs the todo pill rides the working line instead.
-    cx.todos && !cx.busy ? todosPillNode(cx.todos, cx.focused === "todos") : null,
-    cx.agents?.running ? agentsPill(cx.agents.running, cx.agents.onOpen, cx.focused === "agents") : null,
-    cx.shells && (cx.shells.running || cx.shells.exited) ? shellsPill(cx.shells, cx.focused === "shells") : null,
-    cx.prs ? prsPillNode(cx.prs, cx.focused === "prs") : null
-  ].filter((p3) => p3 !== null);
-  if (pills2.length) {
-    nodes2.push(
-      /* @__PURE__ */ jsxs("row", { role: "omp.hud", children: [
-        cx.focused ? hudHint() : null,
-        pills2
-      ] }, "agents")
-    );
+  return { kind: "send", sid: s2.sid };
+}
+function gateDrain(s2) {
+  return !(s2.busy || s2.compacting || !s2.sid || s2.switching || s2.awaitingStartup);
+}
+var PromptRouter = class {
+  #host;
+  constructor(host) {
+    this.#host = host;
   }
-  nodes2.push(composerNode(cx));
-  nodes2.push(statusLine(cx));
-  return nodes2;
-}
-function todosPillNode(t2, focused) {
-  const { current, done, total } = todoProgress(t2.list);
-  if (!total) {
-    return null;
+  /** Sends, queues or holds `prompt` as its entry's gate says; while a turn runs, as `mode` says. */
+  route(prompt, mode, entry) {
+    const s2 = this.#host.gates();
+    switch (entry === "typed" ? gateSubmit(s2) : gateTurn(s2)) {
+      case "hold":
+        return this.#host.queue.hold(prompt);
+      case "busy":
+        return void this.#busyInput(prompt, mode);
+      case "behind":
+        return this.behind(prompt);
+      case "send":
+        return this.send(prompt);
+    }
   }
-  const finished = done === total;
-  return pill({
-    children: [
-      /* @__PURE__ */ jsx("meter", { size: "sm", style: "ring", value: done / total }, "ring"),
-      /* @__PURE__ */ jsx("text", { spans: [{ s: "muted", t: "todos " }, { t: `${done}/${total}` }, { s: "muted", t: " \xB7 " }], wrap: "none" }, "count"),
-      /* @__PURE__ */ jsx(
-        "text",
-        {
-          role: "hermes.todos.now",
-          spans: [{ s: finished ? "success" : void 0, t: finished ? "all done" : current }],
-          truncate: "end",
-          wrap: "none"
-        },
-        "now"
-      )
-    ],
-    focused,
-    key: "todos",
-    onClick: t2.onToggle,
-    seg: "hermes.todos.pill",
-    title: t2.open ? "Hide the todo list" : "Show the todo list"
-  });
-}
-function statusLine(cx) {
-  const s2 = cx.status ?? {};
-  const context = s2.context ?? (cx.context && cx.context.max > 0 ? cx.context.used / cx.context.max : void 0);
-  return /* @__PURE__ */ jsxs("status", { role: "hermes.statusline", children: [
-    /* @__PURE__ */ jsx("seg", { priority: 9, role: "hermes.statusline.brand", spans: [{ t: "\u2624 hermes" }] }, "brand"),
-    s2.title ? /* @__PURE__ */ jsx("seg", { priority: 3, spans: [{ t: s2.title }], title: s2.title }, "title") : null,
-    s2.notice ? /* @__PURE__ */ jsx(
-      "seg",
-      {
-        priority: 6,
-        role: s2.notice.tone === "info" ? void 0 : `hermes.statusline.${s2.notice.tone === "warning" ? "warn" : s2.notice.tone === "error" ? "bad" : "good"}`,
-        spans: [{ t: s2.notice.text }],
-        title: s2.notice.text
-      },
-      "notice"
-    ) : null,
-    cx.branch ? /* @__PURE__ */ jsx("seg", { icon: "git-branch", priority: 4, spans: [{ s: "statusLineGitClean", t: cx.branch }], title: `Branch ${cx.branch}` }, "git") : null,
-    s2.tokens ? /* @__PURE__ */ jsx("seg", { priority: 2, side: "right", spans: [{ t: `${s2.tokens.toLocaleString()} tokens` }] }, "tokens") : null,
-    context !== void 0 ? /* @__PURE__ */ jsx(
-      "seg",
-      {
-        priority: 5,
-        role: context >= 0.85 ? "hermes.statusline.bad" : context >= 0.6 ? "hermes.statusline.warn" : void 0,
-        side: "right",
-        spans: [{ t: `${Math.round(context * 100)}% context` }],
-        title: "/usage shows the breakdown"
-      },
-      "context"
-    ) : null,
-    s2.compressions ? /* @__PURE__ */ jsx(
-      "seg",
-      {
-        priority: 2,
-        role: s2.compressions >= 10 ? "hermes.statusline.bad" : s2.compressions >= 5 ? "hermes.statusline.warn" : void 0,
-        side: "right",
-        spans: [{ t: `cmp ${s2.compressions}` }],
-        title: "Times the context was compressed this session"
-      },
-      "compressions"
-    ) : null,
-    cx.rates?.cache !== void 0 ? /* @__PURE__ */ jsx(
-      "seg",
-      {
-        icon: "cache",
-        priority: 1,
-        side: "right",
-        spans: [{ t: `${Math.round(cx.rates.cache)}%` }],
-        title: "Prompt tokens served from the provider's cache, this session"
-      },
-      "cache"
-    ) : null,
-    cx.rates?.tps ? /* @__PURE__ */ jsx(
-      "seg",
-      {
-        icon: "fast",
-        priority: 1,
-        side: "right",
-        spans: [{ t: `${Math.round(cx.rates.tps)} t/s` }],
-        title: "Output tokens per second over the recent model calls"
-      },
-      "tps"
-    ) : null,
-    cx.cost ? /* @__PURE__ */ jsx("seg", { priority: 3, side: "right", spans: [{ t: `$${cx.cost.toFixed(2)}` }], title: "Session cost" }, "cost") : null,
-    /* @__PURE__ */ jsx("seg", { priority: 1, side: "right", spans: [{ s: "muted", t: "\u21E7\u23CE newline" }] }, "newline"),
-    cx.busy ? /* @__PURE__ */ jsx("seg", { onClick: cx.onInterrupt, priority: 10, role: "hermes.statusline.stop", side: "right", spans: [{ t: "esc esc stop" }] }, "action") : /* @__PURE__ */ jsx("seg", { onClick: cx.onSubmit, priority: 10, role: "hermes.statusline.send", side: "right", spans: [{ t: "\u23CE send" }] }, "action")
-  ] }, "statusline");
-}
-function agentsPill(running, onOpen, focused) {
-  return pill({
-    children: [
-      /* @__PURE__ */ jsx("icon", { name: "users" }, "icon"),
-      /* @__PURE__ */ jsx("spinner", { style: "dots", tone: "accent" }, "spin"),
-      /* @__PURE__ */ jsx("text", { text: `${plural(running, "agent")} running`, wrap: "none" }, "text")
-    ],
-    focused,
-    key: "pill",
-    onClick: onOpen,
-    title: "Agents  \u2325A"
-  });
-}
-function shellsPill(s2, focused) {
-  const live = s2.running > 0;
-  const n = live ? s2.running : s2.exited;
-  const charts = live ? s2.charts ?? [] : [];
-  const fresh = latest(charts)?.view;
-  const figure = fresh && glance(fresh);
-  const title = ["Background processes  \u2325J", ...charts.map((c) => `${c.process.id}  ${summary(c.view)}`)].join("\n");
-  const card = hovercard(charts);
-  return pill({
-    children: [
-      /* @__PURE__ */ jsx("icon", { name: "terminal" }, "icon"),
-      live ? /* @__PURE__ */ jsx("spinner", { style: "dots", tone: "accent" }, "spin") : /* @__PURE__ */ jsx("icon", { name: s2.tone === "success" ? "done" : s2.tone === "error" ? "failed" : "aborted", tone: s2.tone }, "end"),
-      /* @__PURE__ */ jsx("text", { spans: [{ s: live ? void 0 : "muted", t: `${plural(n, "shell")}${live ? "" : " exited"}` }], wrap: "none" }, "text"),
-      figure ? /* @__PURE__ */ jsx("text", { role: "omp.hud.glance", spans: glanceSpans(figure), wrap: "none" }, "glance") : null,
-      fresh ? miniSpark(fresh) : null
-    ],
-    focused,
-    hovercard: card,
-    key: "shells",
-    onClick: s2.onOpen,
-    title
-  });
-}
-function prsPillNode(p3, focused) {
-  return pill({
-    children: [/* @__PURE__ */ jsx("icon", { name: "merge", tone: p3.tone === "muted" ? void 0 : p3.tone }, "icon"), /* @__PURE__ */ jsx("text", { text: p3.text, wrap: "none" }, "text")],
-    focused,
-    key: "prs",
-    onClick: p3.onOpen,
-    title: "Pull requests  \u2325P"
-  });
-}
-function hudHint() {
-  return /* @__PURE__ */ jsxs("row", { align: "center", gap: "xs", role: "omp.hud.hint", children: [
-    /* @__PURE__ */ jsx("kbd", { keys: ["enter"] }, "enter"),
-    /* @__PURE__ */ jsx("text", { text: "open" }, "open"),
-    /* @__PURE__ */ jsx("kbd", { keys: ["left", "right"] }, "lr"),
-    /* @__PURE__ */ jsx("text", { text: "switch" }, "move"),
-    /* @__PURE__ */ jsx("kbd", { keys: ["esc"] }, "esc"),
-    /* @__PURE__ */ jsx("text", { text: "back" }, "back")
-  ] }, "hint");
-}
-function workingNode2(cx) {
-  const busy = cx.busy;
-  return workingRow({
-    label: busy.label,
-    now: cx.now,
-    since: busy.since,
-    startedAt: busy.startedAt,
-    trailing: [
-      /* @__PURE__ */ jsx("row", { grow: 1 }, "fill"),
-      cx.todos ? todosPillNode(cx.todos, false) : null,
-      /* @__PURE__ */ jsxs("row", { align: "center", gap: "xs", onClick: cx.onInterrupt, role: "omp.working.stop", title: "Stop  esc esc", children: [
-        /* @__PURE__ */ jsx("kbd", { keys: ["esc"] }, "k"),
-        /* @__PURE__ */ jsx("kbd", { keys: ["esc"] }, "k2"),
-        /* @__PURE__ */ jsx("text", { text: "Stop" }, "t")
-      ] }, "stop")
-    ]
-  });
-}
-function compactingNode(c, now) {
-  return workingRow({
-    label: COMPACTING_LABEL,
-    now,
-    since: c.since,
-    startedAt: c.startedAt,
-    title: "Prompts sent now wait in the queue until the compaction ends"
-  });
-}
-function effortChip(cx) {
-  const text12 = effortText(cx.effort, cx.effortWire);
-  const glyph = cx.effort === "none" ? "off" : cx.effortWire || cx.effort || DEFAULT_EFFORT;
-  const clamp2 = text12.includes("\u2192") ? ` (this route sends ${cx.effortWire})` : "";
-  return /* @__PURE__ */ jsxs(
-    "row",
-    {
-      align: "center",
-      gap: "xs",
-      onClick: cx.onEffort,
-      onMenu: cx.onEffortMenu,
-      role: "omp.composer.effort",
-      title: `Reasoning effort: ${text12}${cx.effort ? clamp2 : " (the default)"} \xB7 click to cycle  \u21E7\u21E5 \xB7 right-click to choose or save as default`,
-      children: [
-        /* @__PURE__ */ jsx("effort", { level: glyph }, "glyph"),
-        /* @__PURE__ */ jsx("text", { spans: [{ s: cx.effort ? void 0 : "muted", t: text12 }], wrap: "none" }, "level")
-      ]
-    },
-    "effort"
-  );
-}
-function composerNode(cx) {
-  const { composer: composer2 } = cx;
-  const ctx = cx.context;
-  const share = ctx && ctx.max > 0 ? ctx.used / ctx.max : void 0;
-  return /* @__PURE__ */ jsxs("col", { role: "omp.editor", children: [
-    cx.busy ? /* @__PURE__ */ jsx("row", { role: "hermes.streak" }, "streak") : null,
-    share === void 0 || share < 0.01 ? null : (
-      // The bar alone on the composer's edge: its % and total sat in the pills' row and collided
-      // with them; the status strip says the % and the tooltip the rest.
-      /* @__PURE__ */ jsx(
-        "meter",
-        {
-          role: "omp.composer.context",
-          style: "bar",
-          thresholds: { bad: 0.85, warn: 0.6 },
-          title: `Context ${Math.round(share * 100)}% used
-${compact(ctx.used)} of ${compact(ctx.max)} tokens
-/usage shows the breakdown`,
-          value: share
-        },
-        "context"
-      )
-    ),
-    /* @__PURE__ */ jsx("row", { gap: "sm", hidden: !cx.attachments?.length, role: "omp.composer.chips", wrap: true, children: (cx.attachments ?? []).map(imageChip) }, "chips"),
-    /* @__PURE__ */ jsx("row", { align: "start", gap: "sm", role: "omp.composer.line", children: /* @__PURE__ */ jsx(
-      "editor",
-      {
-        anchor: composer2.anchor,
-        cursor: composer2.cursor,
-        decor: composer2.decor,
-        ghost: cx.ghost || void 0,
-        maxLines: 18,
-        onEdit: cx.onEdit,
-        onSend: cx.onSend,
-        onUndo: cx.onUndo,
-        placeholder: cx.placeholder,
-        sendable: cx.ready,
-        text: composer2.text
-      },
-      "input"
-    ) }, "line"),
-    /* @__PURE__ */ jsxs("row", { align: "center", gap: "sm", role: "omp.composer.bar", children: [
-      cx.model ? /* @__PURE__ */ jsxs(
-        "row",
-        {
-          align: "center",
-          gap: "xs",
-          onClick: cx.onModel,
-          role: "omp.composer.model",
-          title: `Model: ${cx.model}${cx.fast ? ` \xB7 ${cx.fast === "ultrafast" ? "ultrafast" : "fast"} mode (priority processing, billed higher; /fast turns it off)` : ""} \xB7 click to switch`,
-          children: [
-            /* @__PURE__ */ jsx("icon", { name: "model" }, "icon"),
-            /* @__PURE__ */ jsx("text", { spans: [{ t: cx.model }], wrap: "none" }, "name"),
-            cx.fast ? /* @__PURE__ */ jsx("icon", { name: "bolt", role: "hermes.composer.fast", tone: "warning" }, "fast") : null,
-            cx.fast === "ultrafast" ? /* @__PURE__ */ jsx("icon", { name: "bolt", role: "hermes.composer.fast", tone: "warning" }, "fast2") : null,
-            /* @__PURE__ */ jsx("icon", { name: "chev" }, "chev")
-          ]
-        },
-        "model"
-      ) : null,
-      cx.reasons !== false ? effortChip(cx) : null,
-      /* @__PURE__ */ jsx("status", { grow: 1, role: "omp.composer.extras", transparent: true }, "extras"),
-      cx.busy ? /* @__PURE__ */ jsx(
-        "text",
-        {
-          onClick: cx.onInterrupt,
-          role: "omp.composer.stop",
-          text: "Stop",
-          title: "Stop  esc esc",
-          tone: "error"
-        },
-        "stop"
-      ) : /* @__PURE__ */ jsx("kbd", { keys: ["enter"], onClick: cx.onSubmit, role: "omp.composer.send", title: "Send  \u23CE" }, "send")
-    ] }, "bar")
-  ] }, "composer");
-}
-function imageChip(a2, i) {
-  return /* @__PURE__ */ jsxs("card", { head: [{ s: "strong", t: a2.label }], role: "omp.composer.chip", title: a2.label, tone: "accent", children: [
-    a2.image ? /* @__PURE__ */ jsx("image", { alt: a2.label, ...a2.image }, "thumb") : /* @__PURE__ */ jsx("icon", { name: "image" }, "thumb"),
-    /* @__PURE__ */ jsx(
-      "text",
-      {
-        spans: [a2.pending ? { fx: "shimmer", s: "dim", t: "Attaching\u2026" } : { s: "dim", t: a2.caption ?? "image" }],
-        wrap: "none"
-      },
-      "caption"
-    ),
-    /* @__PURE__ */ jsx("icon", { name: "x", onClick: a2.onRemove, role: "hermes.composer.remove", title: `Remove ${a2.label}` }, "remove")
-  ] }, `a${i}`);
-}
+  /**
+   * A prompt entered while a turn runs, as Ink's handleBusyInput: `steer` injects it into the turn,
+   * `interrupt` redirects the turn with it, `queue` puts it behind the turn. A steer or redirect
+   * carries no images, and one the gateway refuses is queued instead.
+   */
+  async #busyInput(prompt, mode) {
+    const host = this.#host;
+    const ticket = host.ticket();
+    const { sid } = ticket;
+    if (!sid || mode === "queue" || prompt.images.length) {
+      return this.behind(prompt);
+    }
+    const ready = await this.expanded(sid, prompt);
+    if (!ready || !ticket.isCurrent()) {
+      return;
+    }
+    const r = await (mode === "steer" ? steerTurn : redirectTurn)(host.gw, sid, ready.text);
+    if (!ticket.isCurrent()) {
+      return;
+    }
+    if (r.ok) {
+      host.transcript.steer(shownText(prompt));
+    } else {
+      if (r.error) {
+        host.transcript.notice(`${mode === "steer" ? "Steer" : "Redirect"} failed: ${r.error}. Queued instead.`, "warning");
+      }
+      this.behind(prompt);
+    }
+    host.changed();
+  }
+  /** Puts `prompt` behind the running turn: into the shared gateway's queue at once, else held here. */
+  behind(prompt) {
+    const host = this.#host;
+    const gate = gateBehind(host.gates());
+    if (gate.kind === "hold") {
+      host.queue.hold(prompt);
+      host.queue.drain();
+      return host.changed();
+    }
+    void host.queue.admit(gate.sid, prompt);
+  }
+  /** `prompt` with its `{!cmd}`s run (a typed prompt's); undefined when one failed (the prompt is back in the composer). */
+  expanded(sid, prompt) {
+    return expand2(this.#host, sid, prompt);
+  }
+  /**
+   * Sends `prompt` now; `queued` marks a drained queue entry (the gateway must queue it, never steer
+   * with it). A typed prompt's `{!cmd}`s run first and their output takes their place; `display` is
+   * what the transcript shows.
+   */
+  send(prompt, { display = prompt.kind === "command" ? prompt.display : void 0, queued = false } = {}) {
+    const host = this.#host;
+    const gate = gateSend(host.gates());
+    if (gate.kind === "hold") {
+      host.queue.holdFirst(prompt);
+      return;
+    }
+    const { sid } = gate;
+    if (prompt.kind === "typed" && hasCommands(prompt)) {
+      host.activity.startBusy(EXPANDING_LABEL);
+      host.changed();
+      void this.expanded(sid, prompt).then((ready) => {
+        host.activity.endBusy();
+        if (ready) {
+          this.send({ images: ready.images, kind: "app", text: ready.text }, { display: prompt.text, queued });
+        } else {
+          host.queue.drain();
+          host.changed();
+        }
+      });
+      return;
+    }
+    const { images } = prompt;
+    const text12 = prompt.text || (images.length ? IMAGE_ONLY_PROMPT : "");
+    const attachments = images.map(({ mime, path: path2 }) => ({ mime, path: path2 }));
+    const submission = newInputId();
+    host.transcript.user({ attachments: userImages(images), text: display?.trim() || prompt.text });
+    host.queue.server.shown(submission);
+    host.activity.startBusy("Working\u2026");
+    host.changed();
+    rpc(host.gw, "prompt.submit", {
+      session_id: sid,
+      submission_id: submission,
+      text: text12,
+      ...queued ? { queued } : {},
+      ...attachments.length ? { attachments } : {}
+    }).catch((error) => {
+      host.transcript.notice(`Not sent: ${error.message}. Your message is back in the composer.`, "error");
+      host.activity.endBusy();
+      host.restore(prompt);
+      host.queue.drain();
+      host.changed();
+    });
+  }
+};
 
 // src/app.ts
-var COPIED_MS3 = 1500;
 var QUIT_DETACH_MS = 1500;
 var App = class {
   /** The open session's ids, info, usage and busy-input mode; every write renders. */
   #state = new SessionState(() => this.changed());
   transcript = new Transcript();
   /** Images tool calls showed, a URL's bytes fetched once and sent as a blob. */
-  media = new Media({ blob: (bytes, mime) => this.#blob(bytes, mime) });
+  media = new Media({ blob: (bytes, mime) => this.#act.blob(bytes, mime) });
   /** The session's subagents, followed while they run (Task cards, the pill, the hub). */
   agents = new Agents(this);
   /** The session's background processes (the shells pill, the Background sheet, background cards). */
@@ -72994,13 +73566,9 @@ var App = class {
   /** The session's title, on the status strip and the tab. */
   #title = new SessionTitle(this);
   /** The pills above the composer: the one holding the keys, and the todo panel's fold. */
-  #hud = new Hud({ changed: () => this.changed(), open: (pill2) => this.#openPill(pill2) });
+  #hud = new Hud({ changed: () => this.changed(), open: (pill2) => this.#act.openPill(pill2) });
   /** The conversation's PRs; links are stored under the stored session id the tools see. */
-  prs = new PullRequests({
-    changed: () => this.changed(),
-    cwd: () => this.info?.cwd || null,
-    sid: () => durable(this.#state.ref)
-  });
+  prs = new PullRequests({ changed: () => this.changed(), cwd: () => this.info?.cwd || null, sid: () => durable(this.#state.ref) });
   /** The pull request docked at the pane's right edge (the PR aside). */
   prAside = new PrAside({
     changed: () => this.changed(),
@@ -73011,67 +73579,59 @@ var App = class {
     scroll: (id, to) => this.scroll(id, to)
   });
   composer = new Composer();
-  overlays = [];
+  /** The open overlays; a modal one takes the keys from the completion list. */
+  #stack = new OverlayStack({
+    changed: () => this.changed(),
+    closed: (overlay2) => this.#sheets.closed(overlay2),
+    opened: (overlay2) => {
+      if (overlay2.modal) {
+        this.#completion.dismiss();
+      }
+    }
+  });
+  overlays = this.#stack.items;
   /** The session as the ports read it: its ids and `info`, live. */
   session = this.#state;
   /** The working line's busy state and the compaction phase: their one owner. */
   #activity = new Activity();
-  /** The prompts waiting behind the turn: held here, and the shared gateway's queue for this session. */
-  #queue;
-  /** Where each prompt goes: sent, the busy path, behind the turn, or held. */
-  #router;
-  #tern;
-  #gw;
-  #completion;
-  #welcome;
-  #launch;
-  #surface;
-  #renders = new RenderScheduler(() => this.#render());
+  #renders = new RenderScheduler(() => this.#frame());
   /** Timers with no field of their own (a compaction's summary read, the quit's detach wait). */
   #timers = new Disposables();
   /** The last lone Esc and the first Ctrl+C of a quit, for the double presses. */
   #presses = { esc: 0, exit: 0 };
   #done = Promise.withResolvers();
-  /** Which session the pane shows and how it switches: views, held requests, the adopt steps. */
-  #life;
   /** The prompt sheets the gateway's questions opened, and their approval-queue ids. */
   #sheets = new PromptSheets(this);
-  /** The draft's images, those still uploading, and the launcher's startup image. */
-  #attachments;
   /** The connect cards, kept current from the plugin's files. */
-  #connect = new ConnectWatcher({
-    changed: () => this.changed(),
-    openUrl,
-    tell: (text12) => this.#submit(text12, false),
-    transcript: this.transcript
-  });
-  /** The folder last reported to Tern by OSC 7. */
-  #reportedCwd;
-  /** Whose colors the surface wears, and the gateway's skin. */
-  #theme;
-  /** Background processes get live charts (settings.json `jobCharts`). */
-  #jobCharts;
-  /** The prompt whose Copy button reads Copied, until the timer clears it. */
-  #copied;
-  #copiedTimer;
+  #connect = new ConnectWatcher({ changed: () => this.changed(), openUrl, tell: (text12) => this.#act.submit(text12, false), transcript: this.transcript });
   /** The gateway connection: down until the next gateway.ready, and its redial line. */
   #reconnect = new Reconnect(this);
   /** The backend warnings shown already (stray output, the last status warning), so each stays one line. */
   #warned = { protocol: false, status: void 0 };
   /** The gateway's keyed notices (credits, a slow start); the newest rides the status strip. */
   #notices = new NoticeStrip(this);
-  /** The development tap (HERMES_TERN_EVENT_LOG): every event and server request, as JSON lines. */
-  #log;
-  /** What each gateway event does to the pane (gateway/handlers/*), and whether it renders. */
-  #dispatch;
-  /** What the key rules (draft/keys.ts) reach. */
-  #keys;
-  /** What the Tern actions (surface/actions.ts) reach. */
-  #actions;
-  /** What a slash command reaches (commands/slash.ts). */
-  #slash;
-  /** What the control and session commands' host is made from (commands/host.ts). */
-  #host;
+  #tern;
+  #gw;
+  #launch;
+  /** The draft's images, those still uploading, and the launcher's startup image. */
+  #attachments;
+  /** The prompts waiting behind the turn: held here, and the shared gateway's queue for this session. */
+  #queue;
+  /** Where each prompt goes: sent, the busy path, behind the turn, or held. */
+  #router;
+  /** Which session the pane shows and how it switches: views, held requests, the adopt steps. */
+  #life;
+  /** Whose colors the surface wears, and the gateway's skin. */
+  #theme;
+  #completion;
+  #welcome;
+  /** Background processes get live charts (settings.json `jobCharts`). */
+  #jobCharts;
+  /** What the user starts and the stores call back into, bound once. */
+  #act;
+  #surface;
+  /** What each frame draws from (app/frame.ts); set once run() opened the surface. */
+  #view;
   /** `launch` and `settings` are what entry.ts read once at startup; unset, each reads its default. */
   constructor(tern, gw2, version2, { launch: launch3 = readLaunchEnv(), settings: settings2 = fileSettings() } = {}) {
     this.#tern = tern;
@@ -73080,7 +73640,7 @@ var App = class {
     this.#attachments = new Attachments(
       {
         attachToHead: (image3) => this.#queue.attachToHead(image3),
-        blob: (bytes, mime) => this.#blob(bytes, mime),
+        blob: (bytes, mime) => this.#act.blob(bytes, mime),
         changed: () => this.changed(),
         cwd: () => this.info?.cwd || launch3.cwd,
         gw: gw2,
@@ -73092,11 +73652,11 @@ var App = class {
     );
     this.#queue = new PromptQueue({
       busy: () => Boolean(this.busy),
-      canDrain: () => gateDrain(this.#gates()),
+      canDrain: () => gateDrain(this.#act.gates()),
       changed: () => this.changed(),
       expanded: (sid, prompt) => this.#router.expanded(sid, prompt),
       gw: gw2,
-      restore: (prompt) => this.#restore(prompt),
+      restore: (prompt) => this.#act.restore(prompt),
       send: (prompt) => this.#router.send(prompt, { queued: true }),
       ticket: () => this.#state.ticket(),
       transcript: this.transcript
@@ -73104,52 +73664,39 @@ var App = class {
     this.#router = new PromptRouter({
       activity: this.#activity,
       changed: () => this.changed(),
-      gates: () => this.#gates(),
+      gates: () => this.#act.gates(),
       gw: gw2,
       queue: this.#queue,
-      restore: (prompt) => this.#restore(prompt),
+      restore: (prompt) => this.#act.restore(prompt),
       ticket: () => this.#state.ticket(),
       transcript: this.transcript
     });
     this.#life = new SessionLifecycle(
       {
-        attachStartup: (sid) => this.#attachStartupImage(sid),
+        attachStartup: (sid) => this.#act.attachStartupImage(sid),
         awaitingStartup: () => this.#attachments.awaitingStartup,
         busy: () => Boolean(this.busy),
         changed: () => this.changed(),
         cols: () => tern.caps.cols,
-        drain: () => this.#drainQueue(),
+        drain: () => this.#queue.drain(),
         gw: gw2,
         launch: launch3,
         rename: (sid, title) => this.#title.rename(sid, title),
-        request: (req) => this.#onRequest(req),
+        request: (req) => this.#act.onRequest(req),
         sheets: this.#sheets,
         state: this.#state,
         transcript: this.transcript
       },
       adoptSteps({
-        activity: this.#activity,
-        agents: this.agents,
-        automation: this.automation,
-        changed: () => this.changed(),
-        connect: this.#connect,
+        ...this.#stores(),
         forgetStatusNote: () => {
           this.#warned.status = void 0;
         },
-        imageLanded: (call) => this.#imageLanded(call),
+        imageLanded: (call) => this.#act.imageLanded(call),
         markViewer,
-        media: this.media,
-        notices: this.#notices,
-        processes: this.processes,
-        prs: this.prs,
-        queue: this.#queue,
-        readBusyMode: () => void this.#readBusyMode(),
-        reportCwd: () => this.#reportCwd(),
-        sheets: this.#sheets,
+        readBusyMode: () => void this.#act.readBusyMode(),
+        reportCwd: () => this.#act.reportCwd(),
         showThoughts: (sid) => showThoughts({ gw: gw2, notice: (text12, tone) => this.notice(text12, tone), settings: settings2 }, sid),
-        state: this.#state,
-        title: this.#title,
-        transcript: this.transcript,
         writeActiveSession: writeActiveSessionFile
       })
     );
@@ -73157,95 +73704,45 @@ var App = class {
     this.#theme = new Theme({ palette: (palette) => this.#surface.palette(palette), settings: settings2 }, saved.theme ?? "tern");
     this.#jobCharts = saved.jobCharts !== false;
     this.#completion = new Completion(this, gw2, () => this.sid);
-    this.#welcome = {
-      tip: randomTip(launch3.pythonSrcRoot),
-      version: version2 && version2 !== "unknown" ? `v${version2}` : ""
-    };
-    this.#log = eventLog(launch3.eventLog);
-    this.#dispatch = dispatcher(
-      {
-        activity: this.#activity,
-        agents: this.agents,
-        automation: this.automation,
-        changed: () => this.changed(),
-        connect: this.#connect,
-        drain: () => this.#drainQueue(),
-        gw: gw2,
-        life: this.#life,
-        notices: this.#notices,
-        processes: this.processes,
-        prs: this.prs,
-        queue: this.#queue,
-        reconnect: this.#reconnect,
-        reportCwd: () => this.#reportCwd(),
-        request: (req) => this.#onRequest(req),
-        session: this.#state,
-        setCompacting: (on) => this.#setCompacting(on),
-        sheets: this.#sheets,
-        showImage: (call) => this.#showImage(call),
-        sid: () => this.sid,
-        sidebar: this.sidebar,
-        summarize: (delay) => this.#summarize(delay),
-        theme: this.#theme,
-        title: this.#title,
-        transcript: this.transcript,
-        warned: this.#warned
-      },
-      (type) => this.#log.unknown(type)
-    );
-    this.#keys = {
-      attachClipboardImage: () => void this.attachClipboardImage(false),
+    this.#welcome = { tip: randomTip(launch3.pythonSrcRoot), version: version2 && version2 !== "unknown" ? `v${version2}` : "" };
+    this.#act = new AppActions({
+      ...this.#stores(),
       attachments: this.#attachments,
-      busy: () => Boolean(this.busy),
-      close: (overlay2) => this.close(overlay2),
+      chat: this,
       completion: this.#completion,
-      composer: this.composer,
-      cycleEffort: () => cycleEffort(this),
-      hud: (key2) => this.#hudKey(key2),
-      interrupt: () => this.#interrupt(),
-      now: Date.now,
-      openAgents: () => openAgents(this),
-      openBackground: () => openBackground(this),
-      openPrs: () => openPrMenu(this),
-      presses: this.#presses,
-      queue: this.#queue,
-      quit: () => this.quit(),
-      submitDraft: () => this.#submitDraft(),
-      toggleSidebar: () => this.toggleSidebar(),
-      transcript: this.transcript
-    };
-    this.#actions = {
-      connect: this.#connect,
-      focusComposer: () => {
-        this.#hud.release();
-        this.#surface.focus(INPUT_ID);
-      },
-      modal: () => this.overlays.at(-1)?.modal === true,
-      openAgent: (id) => void this.openAgent(id),
-      openProcess: (id) => openBackground(this, id),
-      openUrl
-    };
-    this.#slash = {
-      attachments: this.#attachments,
-      catalog: new CommandCatalog(gw2),
-      changed: () => this.changed(),
-      composer: this.composer,
       gw: gw2,
-      host: this,
+      launch: launch3,
       life: this.#life,
-      prompt: (item3) => this.#router.route(item3, this.#state.busyMode, "command"),
-      transcript: this.transcript
-    };
-    this.#host = {
-      activity: this.#activity,
-      changed: () => this.changed(),
-      gw: gw2,
-      life: this.#life,
-      queue: this.#queue,
       router: this.#router,
-      setCompacting: (on, opts) => this.#setCompacting(on, opts),
+      surface: () => this.#surface,
+      tern
+    });
+  }
+  /** The stores most contexts share: those the fields made, and the queue. */
+  #stores() {
+    return {
+      activity: this.#activity,
+      agents: this.agents,
+      automation: this.automation,
+      changed: () => this.changed(),
+      composer: this.composer,
+      connect: this.#connect,
+      hud: this.#hud,
+      media: this.media,
+      notices: this.#notices,
+      overlays: this.overlays,
+      prAside: this.prAside,
+      presses: this.#presses,
+      processes: this.processes,
+      prs: this.prs,
+      queue: this.#queue,
+      reconnect: this.#reconnect,
+      session: this.#state,
+      sheets: this.#sheets,
+      sidebar: this.sidebar,
       state: this.#state,
-      submit: (text12) => this.#submit(text12, true, "queue"),
+      timers: this.#timers,
+      title: this.#title,
       transcript: this.transcript
     };
   }
@@ -73263,13 +73760,6 @@ var App = class {
   }
   set info(info) {
     this.#state.info = info;
-  }
-  /** The session's token and context counters. */
-  get usage() {
-    return this.#state.usage;
-  }
-  set usage(usage) {
-    this.#state.usage = usage;
   }
   /** The running turn (or a send's `{!cmd}`s), null when idle; tests arrange it, and Activity owns it. */
   get busy() {
@@ -73301,8 +73791,22 @@ var App = class {
   get gw() {
     return this.#gw;
   }
+  /** Whose colors the surface wears (`/theme`). */
+  get theme() {
+    return this.#theme.mode;
+  }
   async run() {
     this.#surface = new SurfaceHost(this.#tern, "hermes");
+    this.#view = {
+      ...this.#stores(),
+      actions: this.#act.dock,
+      aside: () => this.#tern.caps.features.includes("aside"),
+      attachments: this.#attachments,
+      completion: this.#completion,
+      copies: this.#act,
+      surface: this.#surface,
+      welcome: this.#welcome
+    };
     this.#theme.apply();
     if (this.#tern.caps.features.includes("blobs")) {
       this.#welcome.logo = this.#tern.blob(logo_default, "image/png");
@@ -73312,42 +73816,32 @@ var App = class {
     if (query || this.#attachments.awaitingStartup) {
       this.#queue.hold({ images: [], kind: "app", text: query || IMAGE_ONLY_PROMPT });
     }
-    this.#gw.on("event", (ev) => {
-      this.#log.event(ev);
-      if (this.#dispatch(ev) === "render") {
-        this.changed();
-      }
+    followGateway(this.#gw, {
+      ...this.#stores(),
+      drain: () => this.#queue.drain(),
+      eventLog: this.#launch.eventLog,
+      gw: this.#gw,
+      life: this.#life,
+      reportCwd: () => this.#act.reportCwd(),
+      request: (req) => this.#act.onRequest(req),
+      setCompacting: (on) => this.#act.setCompacting(on),
+      showImage: (call) => this.#act.showImage(call),
+      sid: () => this.sid,
+      summarize: (delay) => this.#act.summarize(delay),
+      theme: this.#theme,
+      warned: this.#warned
     });
-    this.#gw.on("request", (req) => {
-      this.#log.request(req);
-      this.#onRequest(req);
-    });
-    this.#gw.on("exit", (code8) => {
-      const lost = this.#reconnect.lost(this.#gw.attached, code8);
-      if (lost) {
-        this.transcript.notice(lost.text, lost.tone);
-      }
-      this.#life.lost();
-      this.#activity.endBusy();
-      this.#sheets.dropAll();
-      this.transcript.interrupt();
-      this.changed();
-    });
-    this.#gw.drain();
     this.processes.poke();
-    this.#render();
+    this.#frame();
     this.#surface.focus(INPUT_ID);
     void runInput(this.#tern, {
       after: () => this.changed(),
       onError: (error) => this.transcript.notice(`Input failed: ${errorText(error)}`, "error"),
-      onEvent: (event) => onTernEvent(event, this.#actions),
-      onKey: (key2) => onKey(key2, this.#keys, this.overlays.at(-1))
+      onEvent: (event) => onTernEvent(event, this.#act.events),
+      onKey: (key2) => onKey(key2, this.#act.keys, this.overlays.at(-1))
     }).then(() => this.quit());
     const code7 = await this.#done.promise;
-    await Promise.race([
-      this.#life.leaveAll("tui_shutdown"),
-      new Promise((resolve7) => this.#timers.timeout(() => resolve7(void 0), QUIT_DETACH_MS))
-    ]);
+    await Promise.race([this.#life.leaveAll("tui_shutdown"), new Promise((resolve7) => this.#timers.timeout(() => resolve7(void 0), QUIT_DETACH_MS))]);
     this.dispose();
     await this.#tern.close();
     this.#gw.kill("exit");
@@ -73358,7 +73852,7 @@ var App = class {
    * Quitting calls it once the sessions detached (or the wait gave up), before Tern closes.
    */
   dispose() {
-    clearTimeout(this.#copiedTimer);
+    this.#act.dispose();
     this.#timers.dispose();
     this.#connect.dispose();
     this.#notices.dispose();
@@ -73369,26 +73863,17 @@ var App = class {
     this.prs.dispose();
     this.sidebar.dispose();
   }
-  // ── OverlayHost ────────────────────────────────────────────────────
+  /** One frame of the whole view, once run() opened the surface. */
+  #frame() {
+    if (this.#view) {
+      drawFrame(this.#view);
+    }
+  }
   open(overlay2) {
-    const same = this.overlays.find((o) => o.key === overlay2.key);
-    if (same) {
-      this.close(same);
-    }
-    this.overlays.push(overlay2);
-    if (overlay2.modal) {
-      this.#completion.dismiss();
-    }
-    this.changed();
+    this.#stack.open(overlay2);
   }
   close(overlay2) {
-    const at = this.overlays.indexOf(overlay2);
-    if (at >= 0) {
-      this.overlays.splice(at, 1);
-      this.#sheets.closed(overlay2);
-      overlay2.onClose?.();
-      this.changed();
-    }
+    this.#stack.close(overlay2);
   }
   changed() {
     this.#renders.request();
@@ -73400,60 +73885,8 @@ var App = class {
   }
   /** An error nothing caught (a rejected promise no caller awaited): shown, so the pane lives on. */
   fault(reason) {
-    this.transcript.notice(`Unexpected error: ${errorText(reason)}`, "error");
-    this.changed();
+    this.notice(`Unexpected error: ${errorText(reason)}`, "error");
   }
-  // ── Input ──────────────────────────────────────────────────────────
-  /** The agent's todo list while it matters: a turn runs, or something on it is still open. */
-  #todos() {
-    return todos(this.transcript.currentTodos(), Boolean(this.busy));
-  }
-  /** The pills above the composer, left to right. */
-  #pills(now = Date.now()) {
-    return pills({
-      agents: this.agents.running().length,
-      busy: Boolean(this.busy),
-      goal: Boolean(this.automation.goal),
-      loop: Boolean(this.automation.loop(now)),
-      prs: this.prs.entries().length,
-      shells: this.processes.recent(now).length,
-      todos: this.#todos()
-    });
-  }
-  /** Down from an empty prompt focuses the pills; ←/→, Enter and Esc/↑ while one holds the keys. */
-  #hudKey(key2) {
-    return this.#hud.key(key2, {
-      idle: !this.composer.text && !this.composer.browsing && !this.#completion.open,
-      pills: this.#pills()
-    });
-  }
-  /** Opens the sheet behind a pill. */
-  #openPill(pill2) {
-    switch (pill2) {
-      case "agents":
-        openAgents(this);
-        break;
-      case "shells":
-        openBackground(this);
-        break;
-      case "prs":
-        openPrMenu(this);
-        break;
-      case "goal":
-      case "loop":
-        openAutomation(this, pill2);
-        break;
-    }
-  }
-  /** Tells Tern the session's folder when it moved (`hermes -w tern`, a moved workspace): OSC 7. */
-  #reportCwd() {
-    const cwd = this.info?.cwd;
-    if (cwd && cwd !== this.#reportedCwd) {
-      this.#reportedCwd = cwd;
-      reportCwd(cwd);
-    }
-  }
-  /** Attaches the clipboard's image to the next prompt (`quiet`: an empty paste, which may hold none). */
   attachClipboardImage(quiet) {
     return this.#attachments.fromClipboard(quiet);
   }
@@ -73461,386 +73894,51 @@ var App = class {
   attachImagePath(raw2) {
     return this.#attachments.fromPath(raw2);
   }
-  /** `bytes` sent to Tern as a blob; undefined where it takes none, or for more than a blob holds. */
-  #blob(bytes, mime) {
-    if (!this.#tern.caps.features.includes("blobs")) {
-      return void 0;
-    }
-    try {
-      return this.#tern.blob(bytes, mime);
-    } catch {
-      return void 0;
-    }
-  }
-  /** Has `call`'s image (a URL's) fetched; its card shows it once it lands. */
-  #showImage(call) {
-    if (call) {
-      this.media.show(call, () => this.#imageLanded(call));
-    }
-  }
-  #imageLanded(call) {
-    this.transcript.touchCall(call);
-    this.changed();
-  }
-  /** Opens or closes the session sidebar (Tern's aside); says why where Tern has none. */
   toggleSidebar() {
-    if (!this.#tern.caps.features.includes("aside")) {
-      this.transcript.notice("This Tern has no side panel (the aside feature). /changes and /prs still work.", "warning");
-      this.changed();
-      return;
-    }
-    if (!this.sidebar.open && this.prAside.open) {
-      this.prAside.close();
-    }
-    this.sidebar.toggle();
+    this.#act.toggleSidebar();
   }
-  /** Brings node `id` into view (a PR's file, say). */
   reveal(id) {
     this.#surface.reveal(id, "start");
   }
-  /** Scrolls the scroll container holding node `id`. */
   scroll(id, to) {
     this.#surface.scroll(id, to);
   }
-  /** Docks PR `key` at the pane's right edge, in place of the session sidebar. */
   openPrAside(key2) {
-    if (!this.#tern.caps.features.includes("aside")) {
-      return openPrSheet(this, key2);
-    }
-    if (this.sidebar.open) {
-      this.sidebar.toggle();
-    }
-    this.prAside.show(key2);
+    this.#act.openPrAside(key2);
   }
   /** A subagent ended: the PRs it linked are filed under this conversation (pull_requests.py). */
   agentEnded() {
     this.prs.relink();
   }
-  /** Shows subagent `id` beside the chat in a Tern split; its timeline sheet where no split can open. */
-  async openAgent(id) {
-    const a2 = this.agents.all().find((x) => x.id === id);
-    if (!a2 || !this.sid) {
-      return;
-    }
-    const cwd = this.info?.cwd || this.#launch.home || "/";
-    if (!await openSidebar(specOf(a2, agentName(a2), this.sid, this.storedSid), cwd)) {
-      openAgents(this, { id, watch: true });
-    }
+  openAgent(id) {
+    return this.#act.openAgent(id);
   }
-  /** `/help`: the keyboard shortcuts and every command, in the help sheet. */
   openHelp() {
     return openHelp(this);
-  }
-  #copy(text12, id) {
-    copyToClipboard(text12);
-    this.#copied = id;
-    this.changed();
-    clearTimeout(this.#copiedTimer);
-    this.#copiedTimer = setTimeout(() => {
-      this.#copied = void 0;
-      this.changed();
-    }, COPIED_MS3);
   }
   quit(code7 = 0) {
     markViewer(null, durable(this.#state.ref));
     this.#done.resolve(code7);
   }
-  // ── Prompts and commands ───────────────────────────────────────────
-  /** Sends the composer's draft, with the pastes it holds. */
-  #submitDraft() {
-    const pasted = [...this.composer.pasted];
-    this.#submit(this.composer.take(), true, this.#state.busyMode, pasted);
-  }
-  /**
-   * Sends or queues a prompt, or runs a command; `draft`: the user entered it (it takes the draft's
-   * images). While a turn runs the prompt goes as `busy` says: the session's busy_input_mode for
-   * a typed one; a message the app writes (a connect result) waits behind the turn. `pasted`:
-   * the draft's pastes, whose `{!cmd}`s and leading `!` stay as written.
-   */
-  #submit(raw2, draft = true, busy = draft ? this.#state.busyMode : "queue", pasted = []) {
-    const text12 = raw2.trim();
-    if (draft && this.#attachments.uploading && !text12.startsWith("/")) {
-      this.composer.set(raw2);
-      this.composer.repasted(pasted);
-      this.transcript.notice("An image is still attaching. Send again in a moment.", "warning");
-      return;
-    }
-    if (!text12 && !(draft && this.#attachments.items.length)) {
-      return;
-    }
-    if (text12.startsWith("/")) {
-      void runSlash(text12, this.#slash);
-      return;
-    }
-    if (text12.startsWith("!") && text12.slice(1).trim() && !pasted.some((p3) => text12.startsWith(p3.trim().split("\n")[0]))) {
-      void this.#shell(text12.slice(1).trim());
-      return;
-    }
-    this.#router.route({ images: draft ? this.#attachments.take() : [], kind: "typed", pasted, text: text12 }, busy, "typed");
-  }
-  /** What the router's gates read: the session, the switch in flight, the turn, the compaction and the startup image. */
-  #gates() {
-    return {
-      awaitingStartup: this.#attachments.awaitingStartup,
-      busy: this.#activity.busy !== null,
-      canonical: this.#gw.isCanonical,
-      compacting: this.#activity.compacting !== void 0,
-      sid: this.sid,
-      switching: this.#life.switching
-    };
-  }
-  /** Puts a prompt that did not go back into the composer, before any text there, with its images. */
-  #restore(prompt) {
-    const text12 = shownText(prompt);
-    this.composer.set(text12 && this.composer.text ? `${text12}
-${this.composer.text}` : text12 || this.composer.text);
-    this.composer.repasted(prompt.kind === "typed" ? prompt.pasted : []);
-    this.#attachments.restore(prompt.images);
-  }
-  /** `!cmd`: runs `command` in the session's folder and shows its output; nothing reaches the model. */
-  async #shell(command) {
-    const sid = this.sid;
-    if (!sid) {
-      this.transcript.notice("Wait for the session to start before running a shell command.", "warning");
-      return this.changed();
-    }
-    this.transcript.user({ text: `!${command}` });
-    this.changed();
-    try {
-      for (const line of shellLines(await shellExec(this.#gw, sid, command))) {
-        this.transcript.notice(line.text, line.failed ? "warning" : "info");
-      }
-    } catch (error) {
-      this.transcript.notice(`!${command} did not run: ${shellError(error)}.`, "error");
-    }
-    this.changed();
-  }
-  #interrupt() {
-    if (!this.sid) {
-      return;
-    }
-    this.#activity.relabel("Stopping\u2026", { status: true });
-    interruptTurn(this.#gw, this.sid).catch((error) => {
-      const why = errorText(error);
-      if (this.busy && !why.includes("stale_generation")) {
-        this.#activity.relabel("Working\u2026", { status: true });
-        this.transcript.notice(`Could not stop the turn: ${why}`, "error");
-        this.changed();
-      }
-    });
-    this.changed();
-  }
-  /** The gateway-backed commands' view of this app (/steer, /queue, /stop, /tools, /undo, /compress, …). */
   control() {
-    return sessionHost(this.#host);
+    return sessionHost(this.#act.host);
   }
-  /**
-   * A compaction started (`manual`: /compress's) or ended. While one runs the working line says so
-   * until its done edge, and with no turn running the dock shows it and prompts queue behind it;
-   * those go once it ends.
-   */
-  #setCompacting(on, { manual = false } = {}) {
-    if (on) {
-      this.#activity.startCompaction({ manual });
-    } else {
-      this.#activity.endCompaction();
-      this.#drainQueue();
-    }
-  }
-  /** Gives the compactions seen here their summaries from the store, `delay` ms from now. */
-  #summarize(delay = 0) {
-    const ticket = this.#state.ticket();
-    if (!this.transcript.unsummarized) {
-      return;
-    }
-    this.#timers.timeout(() => {
-      const stored = this.info?.stored_session_id || this.storedSid;
-      if (ticket.isCurrent() && stored && this.transcript.unsummarized) {
-        this.transcript.summarize(storedCompactions(stored));
-        this.changed();
-      }
-    }, delay);
-  }
-  // ── Sessions ───────────────────────────────────────────────────────
-  /** `hermes -q … --image …`: attaches the image to the first session, then lets the startup query go. */
-  async #attachStartupImage(sid) {
-    await this.#attachments.attachStartup(sid);
-    this.#drainQueue();
-    this.changed();
-  }
-  /** Closes the open session and starts a fresh one with an empty transcript, named `title` if given. */
   newSession(title) {
     return this.#life.newSession(title);
   }
-  /** Resumes stored session `id`: its history replaces the transcript, and the session it leaves is closed. */
   resume(id) {
     return this.#life.resume(id);
   }
   /** Acts on a command's dispatch envelope from outside a typed command (a goal or loop sheet's button). */
   runDispatch(raw2, title) {
-    return dispatched(raw2, this.#slash, { arg: "", title });
+    return dispatched(raw2, this.#act.slash, { arg: "", title });
   }
-  // ── Gateway ────────────────────────────────────────────────────────
-  #onRequest(req) {
-    if (this.#life.route(req) !== "show") {
-      return;
-    }
-    const overlay2 = promptOverlay(this, req);
-    if (!overlay2) {
-      req.fail(-32601, `${req.method} is not supported by the Tern frontend`);
-      return;
-    }
-    this.#sheets.open(overlay2, req);
-  }
-  /** Whose colors the surface wears (`/theme`). */
-  get theme() {
-    return this.#theme.mode;
-  }
-  /** Switches the theme mode now and keeps it for the next launch. */
   setTheme(mode) {
     this.#theme.set(mode);
     this.changed();
   }
-  /** Sets the reasoning effort for this session, or also as the default of every new one (session/effort.ts). */
   setEffort(value, scope) {
     return applyEffort(this, value, scope);
-  }
-  /** Reads the shown session's busy_input_mode; an older gateway without it leaves Enter queueing (the TUI default). */
-  async #readBusyMode() {
-    const ticket = this.#state.ticket();
-    if (!ticket.sid) {
-      return;
-    }
-    try {
-      const r = await rpc(this.#gw, "config.get", { key: "busy", session_id: ticket.sid });
-      if (ticket.isCurrent()) {
-        this.#state.busyMode = busyModeOf(r?.value);
-      }
-    } catch {
-    }
-  }
-  /** Sends the oldest queued prompt once the session is adopted and idle (no turn, switch or startup image pending). */
-  #drainQueue() {
-    this.#queue.drain();
-  }
-  // ── View ───────────────────────────────────────────────────────────
-  #render() {
-    if (this.#surface.closed) {
-      return;
-    }
-    const now = Date.now();
-    const info = this.info;
-    const usage = this.usage;
-    const backend = info?.version && info.version !== "unknown" ? `v${info.version}` : "";
-    const cx = {
-      copied: this.#copied,
-      copy: (text12, id) => this.#copy(text12, id),
-      now,
-      welcome: { ...this.#welcome, version: this.#welcome.version || backend }
-    };
-    this.#hud.prune(this.#pills(now));
-    const recent = this.processes.recent(now);
-    const exited = recent.filter((p3) => !isRunning2(p3));
-    const used = usage?.context_used ?? 0;
-    const max = usage?.context_max ?? 0;
-    const modal2 = this.overlays.at(-1)?.modal === true;
-    if (!modal2) {
-      this.#completion.update(this.composer);
-    }
-    this.#surface.render({
-      dock: dockNodes({
-        branch: info?.branch ?? "",
-        busy: this.busy ?? void 0,
-        compacting: this.busy ? void 0 : this.#activity.compacting,
-        composer: this.composer,
-        context: max > 0 ? { max, used } : void 0,
-        cost: usage?.cost_usd ?? void 0,
-        cwd: info?.cwd ? homeTilde(info.cwd, this.#launch.home) : "",
-        effort: info?.reasoning_effort ?? "",
-        effortWire: info?.reasoning_effort_wire || void 0,
-        fast: fastTier(info),
-        reasons: capsOf(info)?.reasoning,
-        automation: {
-          goal: this.automation.goal,
-          loop: this.automation.loop(now),
-          loopOwner: this.automation.loopSnapshot,
-          onGoal: () => openAutomation(this, "goal"),
-          onLoop: () => openAutomation(this, "loop")
-        },
-        reconnecting: this.#reconnect.redial,
-        ghost: modal2 ? "" : this.#completion.ghost,
-        inputId: INPUT_ID,
-        model: info?.model ?? "",
-        now,
-        onEdit: (ev) => {
-          this.composer.edit(ev);
-          this.changed();
-        },
-        onEffort: () => cycleEffort(this),
-        onEffortMenu: {
-          "choose-effort": () => openEffortPicker(this),
-          "save-effort-as-default": () => void this.setEffort(this.info?.reasoning_effort || DEFAULT_EFFORT, "global")
-        },
-        onInterrupt: () => this.#interrupt(),
-        onModel: () => openModelPicker(this),
-        onQueueEdit: (i) => this.#queue.dequeue(i),
-        onQueueSteer: this.busy ? (i) => this.#queue.steer(i) : void 0,
-        onSend: (ev) => {
-          this.#submit(ev.text);
-          this.changed();
-        },
-        onSubmit: () => {
-          this.#submitDraft();
-          this.changed();
-        },
-        onUndo: () => {
-          this.composer.undo();
-          this.changed();
-        },
-        agents: { onOpen: () => openAgents(this), running: this.agents.running().length },
-        prs: prsPill(this.prs.entries(), () => openPrMenu(this)),
-        attachments: this.#attachments.chips(),
-        status: {
-          compressions: typeof usage?.compressions === "number" ? usage.compressions : void 0,
-          notice: this.#notices.current(now),
-          title: this.#title.text || void 0,
-          tokens: typeof usage?.total === "number" ? usage.total : void 0
-        },
-        todos: (() => {
-          const list9 = this.#todos();
-          return list9 ? {
-            list: list9,
-            onToggle: () => this.#hud.toggleTodos(),
-            open: this.#hud.todosOpen
-          } : void 0;
-        })(),
-        focused: modal2 ? void 0 : this.#hud.focused,
-        shells: {
-          charts: recent.flatMap((p3) => p3.chart && isRunning2(p3) ? [{ process: p3, view: p3.chart }] : []),
-          exited: exited.length,
-          onOpen: () => openBackground(this),
-          running: recent.length - exited.length,
-          // The roster puts the newest exit first.
-          tone: exited[0] ? processTone(exited[0].status) : "muted"
-        },
-        rates: {
-          cache: typeof usage?.cache_hit_pct === "number" ? usage.cache_hit_pct : void 0,
-          tps: typeof usage?.avg_tps === "number" && usage.avg_tps > 0 ? usage.avg_tps : void 0
-        },
-        placeholder: "Ask Hermes \u2014 / commands \xB7 @ files",
-        queued: this.#queue.rows(),
-        ready: this.sid !== null
-      }),
-      layer: [
-        ...this.#tern.caps.features.includes("aside") ? [this.prAside.open ? this.prAside.node("layer.prs") : this.sidebar.node("layer.sidebar")].filter((n) => n !== null) : [],
-        ...this.overlays.map((o) => o.node(`layer.${o.key}`)),
-        ...modal2 ? [] : this.#completion.nodes(INPUT_ID)
-      ],
-      main: this.transcript.entries.map((e) => entryNode(e, `main.${e.id}`, cx))
-    });
-    const top = this.overlays.at(-1);
-    const focus = top?.focus ? top.focus(`layer.${top.key}`) : top?.modal || this.#hud.focused ? null : INPUT_ID;
-    this.#surface.follow(focus);
   }
 };
 
@@ -73944,6 +74042,7 @@ function parseArgs(raw2) {
 // src/watch/watchApp.ts
 var POLL_MS4 = 1e3;
 var EXIT_ARM_MS2 = 1500;
+var none = () => void 0;
 var WatchApp = class {
   transcript = new Transcript();
   composer = new Composer();
@@ -73964,6 +74063,37 @@ var WatchApp = class {
   #renders = new RenderScheduler(() => this.#render());
   #exitArmed = 0;
   #done = Promise.withResolvers();
+  /** The dock's buttons: the composer steers the agent and Stop stops it; this pane has no pills, queue, chips or chips' sheets. */
+  #dock = {
+    onAgents: none,
+    onEdit: (ev) => {
+      this.composer.edit(ev);
+      this.changed();
+    },
+    onEffort: none,
+    onGoal: none,
+    onInterrupt: () => void this.#stop(),
+    onLoop: none,
+    onModel: none,
+    onPrs: none,
+    onQueueEdit: none,
+    onQueueSteer: none,
+    onRemoveAttachment: none,
+    onSend: (ev) => {
+      void this.#submit(ev.text);
+      this.changed();
+    },
+    onShells: none,
+    onSubmit: () => {
+      void this.#submit(this.composer.take());
+      this.changed();
+    },
+    onTodos: none,
+    onUndo: () => {
+      this.composer.undo();
+      this.changed();
+    }
+  };
   constructor(tern, gw2, spec, settings2 = fileSettings()) {
     this.#tern = tern;
     this.#gw = gw2;
@@ -74178,39 +74308,23 @@ var WatchApp = class {
     const running = isRunning(a2);
     const cx = { copy: () => void 0, now, welcome: { tip: "", version: "" } };
     this.#surface.render({
-      dock: dockNodes({
-        branch: "",
-        busy: running ? { label: a2.tool ? `Running ${a2.tool}\u2026` : "Working\u2026", since: a2, startedAt: a2.startedAt } : void 0,
-        composer: this.composer,
-        cwd: "",
-        effort: "",
-        inputId: INPUT_ID,
-        model: a2.model ?? "",
-        now,
-        onEdit: (ev) => {
-          this.composer.edit(ev);
-          this.changed();
+      dock: dockNodes(
+        {
+          activity: running ? { kind: "turn", label: a2.tool ? `Running ${a2.tool}\u2026` : "Working\u2026", since: a2, startedAt: a2.startedAt } : { kind: "idle" },
+          composer: {
+            attachments: [],
+            draft: this.composer,
+            placeholder: running ? `Steer ${a2.name} \u2014 /stop ends it` : `${a2.name} has finished`,
+            ready: running
+          },
+          now,
+          pills: {},
+          queue: { canSteer: false, rows: [] },
+          route: { effort: "", model: a2.model ?? "" },
+          status: { branch: "" }
         },
-        onEffort: () => void 0,
-        onInterrupt: () => void this.#stop(),
-        onModel: () => void 0,
-        onQueueEdit: () => void 0,
-        onSend: (ev) => {
-          void this.#submit(ev.text);
-          this.changed();
-        },
-        onSubmit: () => {
-          void this.#submit(this.composer.take());
-          this.changed();
-        },
-        onUndo: () => {
-          this.composer.undo();
-          this.changed();
-        },
-        placeholder: running ? `Steer ${a2.name} \u2014 /stop ends it` : `${a2.name} has finished`,
-        queued: [],
-        ready: running
-      }),
+        this.#dock
+      ),
       main: [
         // The agent row heads the pane: status, model, tools, timer, the step it runs.
         agentNode({ ...a2, summary: void 0 }, now),

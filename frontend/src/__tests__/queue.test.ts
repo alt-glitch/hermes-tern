@@ -1,16 +1,16 @@
 import { Node, type NodeJson } from '@stencil-hq/tern'
 import { describe, expect, it } from 'vitest'
 
-import { Composer } from '../composer.js'
 import { admissionId, inputId, type LiveSessionId, liveSessionId } from '../core/ids.js'
 import type { Image } from '../draft/attachments.js'
 import { sessionTicket } from '../session/state.js'
 import type { Prompt } from '../turn/prompt.js'
 import { PromptQueue, type QueueHost } from '../turn/queue.js'
-import { type DockContext, dockNodes } from '../view/dock.js'
+import { dockNodes } from '../view/dock.js'
 import type { QueuedRow } from '../view/queued.js'
 import type { PendingRow, PendingStatus } from '../wire/schemas.js'
 
+import { dockActions, dockContext } from './dockFakes.js'
 import { FakeGateway, settle } from './fakes.js'
 
 const S1 = liveSessionId('s1')
@@ -251,28 +251,7 @@ describe('PromptQueue', () => {
 
 /** The dock's queued rows as drawn: icon, title, text, badges and actions. */
 function drawn(queued: QueuedRow[], steer = true) {
-  const cx: DockContext = {
-    branch: '',
-    composer: new Composer(),
-    cwd: '',
-    effort: '',
-    inputId: 'dock.input',
-    model: 'm',
-    now: 0,
-    onEdit: () => undefined,
-    onEffort: () => undefined,
-    onInterrupt: () => undefined,
-    onModel: () => undefined,
-    onQueueEdit: () => undefined,
-    ...(steer ? { onQueueSteer: () => undefined } : {}),
-    onSend: () => undefined,
-    onSubmit: () => undefined,
-    onUndo: () => undefined,
-    placeholder: '',
-    queued,
-    ready: true
-  }
-  const rows = dockNodes(cx).flatMap(n => (n instanceof Node && n.props['role'] === 'omp.queue' ? n.toJSON().c ?? [] : []))
+  const rows = dockNodes(dockContext({ queue: { canSteer: steer, rows: queued } }), dockActions()).flatMap(n => (n instanceof Node && n.props['role'] === 'omp.queue' ? n.toJSON().c ?? [] : []))
   const prop = (n: NodeJson, name: string) => n.p?.[name]
 
   return rows.map(r => ({

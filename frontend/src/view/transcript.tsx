@@ -25,7 +25,7 @@ export interface TranscriptContext {
   /** Copies a prompt's or an answer's text; `id` is its entry id. */
   copy(text: string, id: string): void
   /** The entry copied a moment ago, whose copy button shows a check. */
-  copied?: string
+  copied?: string | undefined
 }
 
 const kNode = Symbol('tsp.node')

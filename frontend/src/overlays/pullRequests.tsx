@@ -202,7 +202,7 @@ function menuRow(e: Entry, now: number, on: boolean, onClick: () => void): JSX.E
 }
 
 /** The PR pill: the newest linked PR (`#22 · checks passing`), or how many there are. */
-export function prsPill(entries: Entry[], onOpen: () => void): PrsPill | undefined {
+export function prsPill(entries: Entry[]): PrsPill | undefined {
   const newest = entries.at(-1)
 
   if (!newest) {
@@ -215,14 +215,13 @@ export function prsPill(entries: Entry[], onOpen: () => void): PrsPill | undefin
   if (entries.length === 1) {
     const what = !pr ? '' : pr.state !== 'open' ? stateLabel(pr).toLowerCase() : pr.checks.length ? `checks ${checksState(pr.checks)}` : stateLabel(pr).toLowerCase()
 
-    return { onOpen, text: `#${newest.ref.number}${what ? ` · ${what}` : ''}`, tone: prTone(newest) }
+    return { text: `#${newest.ref.number}${what ? ` · ${what}` : ''}`, tone: prTone(newest) }
   }
 
   const failing = open.some(p => checksState(p.checks) === 'failing')
   const pending = open.some(p => checksState(p.checks) === 'pending')
 
   return {
-    onOpen,
     text: `${entries.length} PRs${open.length ? ` · ${open.length} open` : ''}`,
     tone: failing ? 'error' : pending ? 'warning' : open.length ? 'success' : 'muted'
   }
