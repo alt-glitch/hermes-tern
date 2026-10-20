@@ -11,6 +11,8 @@ import type { BackgroundProcess, ToolCall } from '../model.js'
 import { isWatchCall, type Transcript } from '../transcript.js'
 import { withoutTernEnv } from '../view/describe.js'
 import { record } from '../wire/json.js'
+import { rpc, rpcParsed } from '../wire/rpc.js'
+import { processList, type ProcessRow } from '../wire/schemas.js'
 
 import { Charts, type ChartsOptions } from './widgets/registry.js'
 
@@ -20,25 +22,6 @@ export interface ProcessesHost {
   readonly sid: string | null
   readonly transcript: Transcript
   changed(): void
-}
-
-/**
- * One row of `process.list`. The shared gateway (gateway/session_ancillary.py `process_snapshot`)
- * sends `started_epoch` and a 32k `output_tail`; the per-session gateway
- * (tools/process_registry.py `list_sessions`) sends `uptime_seconds` and `output_preview`.
- * Neither says how a process notifies: that is only in the terminal call's arguments.
- */
-export interface ProcessEntry {
-  session_id: string
-  command?: string
-  status?: string
-  exit_code?: number | null
-  started_epoch?: number | null
-  uptime_seconds?: number | null
-  exited_at?: number | null
-  completion_reason?: string | null
-  output_tail?: string
-  output_preview?: string
 }
 
 /** How much output a process keeps between polls: the shared gateway's `output_tail` is 32k. */
@@ -52,7 +35,7 @@ export const IDLE_MS = 5000
 const REASON_STATUS: Record<string, BackgroundProcess['status']> = { failed_start: 'failed', killed: 'killed', lost: 'lost' }
 
 /** Hermes' mapping: running until exited, then the completion reason, else the exit code. */
-export function processStatus(entry: Pick<ProcessEntry, 'completion_reason' | 'exit_code' | 'status'>): BackgroundProcess['status'] {
+export function processStatus(entry: Pick<ProcessRow, 'completion_reason' | 'exit_code' | 'status'>): BackgroundProcess['status'] {
   if (entry.status !== 'exited') {
     return 'running'
   }
@@ -80,7 +63,7 @@ export function lastLine(output: string): string {
 }
 
 /** `entry` folded into `prev` (kept as the same object, so Tern timers keyed on it stay put). */
-export function foldEntry(prev: BackgroundProcess | undefined, entry: ProcessEntry, now: number): BackgroundProcess {
+export function foldEntry(prev: BackgroundProcess | undefined, entry: ProcessRow, now: number): BackgroundProcess {
   const status = processStatus(entry)
   const output = entry.output_tail ?? entry.output_preview ?? prev?.output ?? ''
   const startedAt =
@@ -303,7 +286,8 @@ export class Processes {
     this.#host.changed()
 
     try {
-      const r = await this.#host.gw.request<{ status?: string }>('process.kill', { process_id: id, session_id: this.#host.sid })
+      const sid = this.#host.sid
+      const r = sid ? await rpc(this.#host.gw, 'process.kill', { process_id: id, session_id: sid }) : undefined
 
       return r?.status
     } finally {
@@ -319,7 +303,7 @@ export class Processes {
     this.#host.changed()
 
     try {
-      const r = await this.#host.gw.request<{ killed?: number }>('process.stop', { session_id: this.#host.sid })
+      const r = await rpc(this.#host.gw, 'process.stop', { session_id: this.#host.sid })
 
       return typeof r?.killed === 'number' ? r.killed : 0
     } finally {
@@ -397,10 +381,10 @@ export class Processes {
       return changed ? this.#host.changed() : undefined
     }
 
-    let rows: ProcessEntry[]
+    let rows: ProcessRow[]
 
     try {
-      rows = (await this.#host.gw.request<{ processes?: ProcessEntry[] }>('process.list', { session_id: sid }))?.processes ?? []
+      rows = await rpcParsed(this.#host.gw, 'process.list', { session_id: sid }, processList)
     } catch {
       // A gateway without process.list, or a session it no longer holds live.
       return changed ? this.#host.changed() : undefined
@@ -415,7 +399,7 @@ export class Processes {
     const listed = new Set<string>()
 
     for (const row of rows) {
-      if (typeof row?.session_id !== 'string' || !row.session_id) {
+      if (!row.session_id) {
         continue
       }
 

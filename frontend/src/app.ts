@@ -7,13 +7,7 @@ import { randomUUID } from 'node:crypto'
 import { appendFileSync, existsSync } from 'node:fs'
 import { basename } from 'node:path'
 
-import type {
-  SessionLiveInfo,
-  SessionResumeResult,
-  SkinPayload,
-  TranscriptMessage,
-  Usage
-} from '@hermes/shared/gateway-events'
+import type { SessionResumeResult, SkinPayload, Usage } from '@hermes/shared/gateway-events'
 import type { ServerRequest } from '@hermes/shared/json-rpc-channel'
 import { parseCommandDispatch } from '@hermes/shared/slash'
 import type { Key, ScrollTo, Session, TspEvent } from '@stencil-hq/tern'
@@ -22,6 +16,7 @@ import { localCreationOptions } from '@tui/canonicalGateway.js'
 import { usageFromTick } from '@tui/domain/usage.js'
 import type { GatewayClient } from '@tui/gatewayClient.js'
 import type { AnyGatewayEvent } from '@tui/gatewayTypes.js'
+import type { SessionInfo } from '@tui/types.js'
 
 import logo from '../assets/logo.png'
 
@@ -75,7 +70,7 @@ import { isRunning as processRuns, Processes, processTone } from './processes/st
 import { hermesAuthor } from './processes/widgets/author.js'
 import { chartMemory } from './processes/widgets/memory.js'
 import { fileSettings, type SettingsSource, type ThemeMode } from './settings.js'
-import { type BusyMode, busyModeOf, type OwnAdmission, type PendingRow, ServerQueue, type ServerQueued } from './serverQueue.js'
+import { type BusyMode, busyModeOf, type OwnAdmission, ServerQueue, type ServerQueued } from './serverQueue.js'
 import { INPUT_ID, SurfaceHost } from './surface/host.js'
 import { runInput } from './surface/input.js'
 import { reportCwd, setTabTitle } from './surface/osc.js'
@@ -84,6 +79,8 @@ import { storedCompactions } from './compaction.js'
 import type { Reconnecting } from './view/automation.js'
 import { dockNodes, type QueuedRow, todoProgress } from './view/dock.js'
 import { entryNode } from './view/transcript.js'
+import { type AdaptedSnapshot, rpc } from './wire/rpc.js'
+import { pendingRows, usageCounters } from './wire/schemas.js'
 import { busyLabel, preparingLabel } from './workLog.js'
 import { openSidebar, specOf } from './watch/spec.js'
 import { randomTip, type WelcomeContext } from './view/welcome.js'
@@ -93,17 +90,15 @@ const EXIT_ARM_MS = 1500
 const DOUBLE_ESC_MS = 500
 /** How long a prompt's Copy button reads Copied. */
 const COPIED_MS = 1500
-/** session.create's result, or session.resume's with the state of a turn it may be in. */
-interface CreateResult extends Partial<
-  Pick<SessionResumeResult, 'inflight' | 'running' | 'status' | 'turn_started_at'>
-> {
-  session_id: string
-  /** This view's subscription on the shared gateway: what `session.detach` releases. */
-  subscription_id?: string
-  stored_session_id?: string | null
-  info?: SessionLiveInfo
-  messages?: TranscriptMessage[]
-}
+/**
+ * What the pane reads of session.create's or session.resume's result, from either gateway: the
+ * shared gateway's subscription, and the state of a turn a resumed session may be in.
+ */
+type Snapshot = Pick<AdaptedSnapshot, 'session_id'> &
+  Partial<Pick<AdaptedSnapshot, 'messages' | 'subscription_id'>> &
+  Partial<Pick<SessionResumeResult, 'inflight' | 'running' | 'status' | 'stored_session_id' | 'turn_started_at'>> & {
+    info?: SessionInfo
+  }
 
 /**
  * An uploaded image a prompt carries (the shared gateway takes it on prompt.submit), with the name
@@ -175,7 +170,7 @@ export class App implements ChatPorts {
   sid: string | null = null
   /** The stored (database) id of the open session: what `session.list` rows are keyed by. */
   storedSid: string | null = null
-  info: SessionLiveInfo | null = null
+  info: SessionInfo | null = null
   /** The session as the ports read it: `sid`, `storedSid` and `info`, live. */
   readonly session: SessionView = sessionView(this)
   usage: Usage | null = null
@@ -207,7 +202,7 @@ export class App implements ChatPorts {
   /** Shared-gateway subscriptions this view holds, by session id. */
   readonly #subscriptions = new Map<string, string>()
   /** What superseded switches attached; disposed once no switch is in flight (see #disposeStale). */
-  #stale: CreateResult[] = []
+  #stale: Snapshot[] = []
   /** The last `session.detach` in flight per session: a resume of that id waits for it (they share a subscription id). */
   readonly #detaching = new Map<string, Promise<unknown>>()
   /** Open approval prompts' overlay keys → their approval-queue `request_id` (what approval.cancelled names). */
@@ -624,9 +619,7 @@ export class App implements ChatPorts {
     }
 
     try {
-      const r = await this.#gw.request<{ sessions?: { id?: string; resolved_id?: string | null; title?: string }[] }>('session.list', {
-        limit: 20
-      })
+      const r = await rpc(this.#gw, 'session.list', { limit: 20 })
       const row = r?.sessions?.find(x => ids.has(x.id ?? '') || ids.has(x.resolved_id ?? ''))
 
       if (sid === this.sid && this.#setTitle(row?.title)) {
@@ -1153,7 +1146,7 @@ export class App implements ChatPorts {
     this.changed()
 
     try {
-      const r = await this.#gw.request<{ admission_id?: string } | null>('prompt.submit', {
+      const r = await rpc(this.#gw, 'prompt.submit', {
         queued: true,
         session_id: sid,
         submission_id: own.inputId,
@@ -1161,7 +1154,8 @@ export class App implements ChatPorts {
         ...(attachments.length ? { attachments } : {})
       })
 
-      own.admissionId = r?.admission_id
+      // Only the shared gateway admits into a queue; its receipt names the admission.
+      own.admissionId = r && 'admission_id' in r ? r.admission_id : undefined
     } catch (error) {
       this.#server.drop(own)
 
@@ -1234,23 +1228,21 @@ export class App implements ChatPorts {
     // Its bubble is up: the gateway's queued → started for it owes none.
     this.#server.shown(submission)
     this.#startBusy('Working…')
-    this.#gw
-      // The shared gateway admits a prompt by its submission id (a retry with the same id is one turn).
-      .request('prompt.submit', {
-        session_id: sid,
-        submission_id: submission,
-        text,
-        ...(queued ? { queued } : {}),
-        ...(attachments.length ? { attachments } : {})
-      })
-      .catch((error: Error) => {
-        // Back to the composer, not re-sent: a timeout may come after the gateway admitted it.
-        this.transcript.notice(`Not sent: ${error.message}. Your message is back in the composer.`, 'error')
-        this.busy = null
-        this.#restore(item)
-        this.#drainQueue()
-        this.changed()
-      })
+    // The shared gateway admits a prompt by its submission id (a retry with the same id is one turn).
+    rpc(this.#gw, 'prompt.submit', {
+      session_id: sid,
+      submission_id: submission,
+      text,
+      ...(queued ? { queued } : {}),
+      ...(attachments.length ? { attachments } : {})
+    }).catch((error: Error) => {
+      // Back to the composer, not re-sent: a timeout may come after the gateway admitted it.
+      this.transcript.notice(`Not sent: ${error.message}. Your message is back in the composer.`, 'error')
+      this.busy = null
+      this.#restore(item)
+      this.#drainQueue()
+      this.changed()
+    })
   }
 
   /** The draft's images, which leave the composer with the prompt that takes them. */
@@ -1351,7 +1343,7 @@ export class App implements ChatPorts {
     const title = `/${name}${arg ? ` ${arg}` : ''}`
 
     try {
-      const r = await this.#gw.request<unknown>('slash.exec', { command: text.slice(1), session_id: sid })
+      const r = await rpc(this.#gw, 'slash.exec', { command: text.slice(1), session_id: sid })
 
       if (stale()) {
         return
@@ -1369,7 +1361,7 @@ export class App implements ChatPorts {
         this.transcript.notice(describeSlashExecError(name, error), isUnsupportedCommand(error) ? 'warning' : 'error')
       } else {
         try {
-          const r = await this.#gw.request<unknown>('command.dispatch', { arg, name, session_id: sid })
+          const r = await rpc(this.#gw, 'command.dispatch', { arg, name, session_id: sid })
 
           if (stale()) {
             return
@@ -1531,7 +1523,7 @@ export class App implements ChatPorts {
         const images = this.queue[0]?.images ?? this.#attachments
         images.push(image)
       } else {
-        await this.#gw.request('image.attach', { path, session_id: sid })
+        await rpc(this.#gw, 'image.attach', { path, session_id: sid })
       }
     } catch (error) {
       this.transcript.notice(
@@ -1571,7 +1563,7 @@ export class App implements ChatPorts {
     const token = this.#switches.begin()
 
     try {
-      const setup = await this.#gw.request<{ provider_configured?: boolean | null }>('setup.status', {})
+      const setup = await rpc(this.#gw, 'setup.status', {})
 
       if (!this.#switches.current(token)) {
         return
@@ -1586,7 +1578,8 @@ export class App implements ChatPorts {
       const cwd = this.#launch.sessionCwd
 
       // The shared gateway takes the launch flags (`hermes tern -m … --yolo -s …`) as the session's creation policy.
-      const r = await this.#gw.request<CreateResult>(
+      const r: Snapshot = await rpc(
+        this.#gw,
         'session.create',
         this.#gw.isCanonical
           ? { ...localCreationOptions(), ...(cwd ? { cwd } : {}) }
@@ -1622,7 +1615,7 @@ export class App implements ChatPorts {
     try {
       const r = this.#gw.isCanonical
         ? await mutateSession(this.#gw, sid, 'rename', { title })
-        : await this.#gw.request<{ title?: string } | null>('session.title', { session_id: sid, title })
+        : await rpc(this.#gw, 'session.title', { session_id: sid, title })
 
       if (sid === this.sid && this.#setTitle(String(r?.title ?? title))) {
         this.changed()
@@ -1660,11 +1653,11 @@ export class App implements ChatPorts {
   }
 
   /** Resumes and adopts stored session `id`; undefined when a later switch superseded this one. */
-  async #resume(id: string): Promise<CreateResult | undefined> {
+  async #resume(id: string): Promise<Snapshot | undefined> {
     const token = this.#switches.begin()
     // Frames for `id` that beat the snapshot wait, then replay only what the snapshot lacks.
     const hold = this.#gw.holdAttach(id)
-    let snapshot: CreateResult | undefined
+    let snapshot: Snapshot | undefined
 
     try {
       const detaching = this.#detaching.get(id)
@@ -1678,7 +1671,7 @@ export class App implements ChatPorts {
         }
       }
 
-      const r = await this.#gw.request<CreateResult>('session.resume', { cols: this.#tern.caps.cols, session_id: id })
+      const r: Snapshot = await rpc(this.#gw, 'session.resume', { cols: this.#tern.caps.cols, session_id: id })
 
       if (!this.#switches.current(token)) {
         this.#stale.push(r)
@@ -1702,7 +1695,7 @@ export class App implements ChatPorts {
     }
   }
 
-  #adopt(r: CreateResult) {
+  #adopt(r: Snapshot) {
     this.#subscribe(r)
 
     if (r.session_id !== this.sid) {
@@ -1760,7 +1753,7 @@ export class App implements ChatPorts {
     this.changed()
   }
 
-  #subscribe(r: CreateResult) {
+  #subscribe(r: Snapshot) {
     if (r.subscription_id) {
       this.#subscriptions.set(r.session_id, r.subscription_id)
     }
@@ -1771,7 +1764,7 @@ export class App implements ChatPorts {
     const subscription = this.#subscriptions.get(sid)
 
     if (!this.#gw.isCanonical) {
-      await this.#gw.request('session.close', { session_id: sid }).catch(() => undefined)
+      await rpc(this.#gw, 'session.close', { session_id: sid }).catch(() => undefined)
 
       return
     }
@@ -1787,7 +1780,7 @@ export class App implements ChatPorts {
   /** Sends `session.detach`, one at a time per session; `endReason` lets the owner end it once no viewer remains. */
   #detach(sid: string, subscription: string, endReason?: 'tui_close' | 'tui_shutdown') {
     const send = () =>
-      this.#gw.request('session.detach', {
+      rpc(this.#gw, 'session.detach', {
         ...(endReason ? { end_reason: endReason } : {}),
         session_id: sid,
         subscription_id: subscription
@@ -1818,7 +1811,7 @@ export class App implements ChatPorts {
       }
 
       if (!this.#gw.isCanonical) {
-        void this.#gw.request('session.close', { session_id: r.session_id }).catch(() => undefined)
+        void rpc(this.#gw, 'session.close', { session_id: r.session_id }).catch(() => undefined)
       } else if (r.subscription_id) {
         void this.#detach(r.session_id, r.subscription_id)
       }
@@ -1980,15 +1973,10 @@ export class App implements ChatPorts {
         const tick = usageFromTick(ev.payload)
         this.usage = tick ? { ...this.usage, ...tick } : this.usage
         t.contextUsed(this.usage?.context_used ?? 0)
-        const raw = ev.payload as Record<string, unknown> | undefined
-        const counters = {
-          prompt: Number(raw?.prompt_tokens ?? 0),
-          read: Number(raw?.cache_read_tokens ?? 0),
-          total: Number(raw?.total_tokens ?? 0)
-        }
+        const counters = usageCounters(ev.payload)
 
-        if (Object.values(counters).every(Number.isFinite)) {
-          t.usageTick(counters, typeof raw?.tokens_per_s === 'number' ? raw.tokens_per_s : undefined)
+        if (counters) {
+          t.usageTick(counters.counters, counters.tps)
         }
 
         break
@@ -2059,7 +2047,7 @@ export class App implements ChatPorts {
       case 'moa.phase':
 
       case 'moa.aggregating':
-        this.#label(moaLabel(ev.type, ev.payload as Record<string, unknown> | undefined) ?? '')
+        this.#label(moaLabel(ev) ?? '')
 
         break
 
@@ -2449,7 +2437,7 @@ export class App implements ChatPorts {
       return
     }
 
-    this.#gw.request('config.set', { key: 'show_reasoning', session_id: sid, value: 'on' }).catch((error: Error) => {
+    rpc(this.#gw, 'config.set', { key: 'show_reasoning', session_id: sid, value: 'on' }).catch((error: Error) => {
       this.transcript.notice(`Could not turn on thoughts: ${error.message}`, 'warning')
       this.changed()
     })
@@ -2497,11 +2485,12 @@ export class App implements ChatPorts {
    */
   async #withdraw(sid: string, q: ServerQueued<Admitted>): Promise<boolean> {
     const own = q.own!
+    const admissionId = own.admissionId!
     // Its `cancelled` completion can come before the reply.
-    this.#server.withdrawn(own.admissionId!)
+    this.#server.withdrawn(admissionId)
 
     try {
-      const r = await this.#gw.request<{ status?: string } | null>('prompt.cancel', { admission_id: own.admissionId, session_id: sid })
+      const r = await rpc(this.#gw, 'prompt.cancel', { admission_id: admissionId, session_id: sid })
 
       if (r?.status !== 'terminal') {
         return false
@@ -2638,7 +2627,7 @@ export class App implements ChatPorts {
   /** Reads session `sid`'s busy_input_mode; an older gateway without it leaves Enter queueing (the TUI default). */
   async #readBusyMode(sid: string) {
     try {
-      const r = await this.#gw.request<{ value?: unknown } | null>('config.get', { key: 'busy', session_id: sid })
+      const r = await rpc(this.#gw, 'config.get', { key: 'busy', session_id: sid })
 
       if (sid === this.sid) {
         this.#busyMode = busyModeOf(r?.value)
@@ -2831,13 +2820,6 @@ function userText(text: string, images: readonly unknown[]): string {
 /** A sent prompt's images, drawn as thumbnails in its bubble. */
 function userImages(images: readonly Image[]): UserAttachment[] {
   return images.map(i => ({ kind: 'image', name: i.name, ...(i.preview ? { source: i.preview } : {}) }))
-}
-
-/** The shared gateway's FIFO on a session.info or snapshot `info` (the client maps `pending` to it). */
-function pendingRows(info: unknown): PendingRow[] | undefined {
-  const rows = (info as { pending_submissions?: unknown } | null | undefined)?.pending_submissions
-
-  return Array.isArray(rows) ? (rows as PendingRow[]) : undefined
 }
 
 /** `( •_•)>⌐■-■ cogitating...` → `Cogitating…`: hermes's kawaii status without the face. */

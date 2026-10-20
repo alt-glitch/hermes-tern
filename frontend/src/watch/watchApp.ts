@@ -24,22 +24,13 @@ import { Transcript } from '../transcript.js'
 import { dockNodes } from '../view/dock.js'
 import { agentNode } from '../view/tools.js'
 import { entryNode } from '../view/transcript.js'
+import { rpc } from '../wire/rpc.js'
 
 import { ChildStore } from './child.js'
 import type { WatchSpec } from './spec.js'
 
 const POLL_MS = 1000
 const EXIT_ARM_MS = 1500
-
-interface ListRow {
-  subagent_id?: string
-  model?: string | null
-  status?: string
-  tool_count?: number
-  last_tool?: string | null
-  accepting_steer?: boolean
-  started_at?: number
-}
 
 export class WatchApp {
   readonly transcript = new Transcript()
@@ -151,7 +142,7 @@ export class WatchApp {
     const a = this.#agent
 
     try {
-      const r = await this.#gw.request<{ subagents?: ListRow[] }>('subagent.list', { session_id: this.#spec.sid })
+      const r = await rpc(this.#gw, 'subagent.list', { session_id: this.#spec.sid })
       const row = r?.subagents?.find(x => x.subagent_id === a.id)
 
       if (!row) {
@@ -294,7 +285,7 @@ export class WatchApp {
     }
 
     try {
-      const r = await this.#gw.request<{ status?: string }>('subagent.steer', {
+      const r = await rpc(this.#gw, 'subagent.steer', {
         session_id: this.#spec.sid,
         subagent_id: a.id,
         text
@@ -318,7 +309,7 @@ export class WatchApp {
     }
 
     try {
-      const r = await this.#gw.request<{ found?: boolean }>('subagent.interrupt', {
+      const r = await rpc(this.#gw, 'subagent.interrupt', {
         session_id: this.#spec.sid,
         subagent_id: a.id
       })

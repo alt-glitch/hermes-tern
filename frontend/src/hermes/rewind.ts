@@ -1,7 +1,10 @@
 // `/undo` and `/retry` targets on the shared gateway: the `session.mutate` rewind payload names
 // the newest human user turn of the snapshot its CAS tuple came from. Ported from Hermes'
 // ui-tui/src/app/slash/canonicalSessionCommands.ts (lastTurnRewind, retryTurnRewind, retryText).
-import type { Snapshot } from './mutate.js'
+import type { AdaptedSnapshot } from '../wire/rpc.js'
+
+/** The snapshot rows a rewind target is read from. */
+type Rows = Partial<Pick<AdaptedSnapshot, 'messages' | 'stored_messages'>>
 
 const COMPACTION_MARKERS = ['[CONTEXT COMPACTION', '[CONTEXT SUMMARY]:', '[END OF PRIOR CONTEXT']
 
@@ -12,10 +15,10 @@ const isUserTurn = (row: Record<string, unknown>) =>
   Number.isSafeInteger(row.row_id) &&
   !(typeof row.content === 'string' && COMPACTION_MARKERS.some(marker => (row.content as string).includes(marker)))
 
-const lastUserTurn = (snapshot: Snapshot) => (snapshot.stored_messages ?? snapshot.messages ?? []).findLast(isUserTurn)
+const lastUserTurn = (snapshot: Rows) => (snapshot.stored_messages ?? snapshot.messages ?? []).findLast(isUserTurn)
 
 /** The rewind payload for the newest user turn; null when there is none. */
-export function lastTurnRewind(snapshot: Snapshot): { target_message_id: number } | null {
+export function lastTurnRewind(snapshot: Rows): { target_message_id: number } | null {
   const target = lastUserTurn(snapshot)
 
   return target ? { target_message_id: target.row_id as number } : null
@@ -41,7 +44,7 @@ export function retryText(content: unknown): string | null {
 }
 
 /** /retry's rewind payload, checked on the snapshot so a turn it cannot resend is never rewound. */
-export function retryTurnRewind(snapshot: Snapshot): { target_message_id: number } | null {
+export function retryTurnRewind(snapshot: Rows): { target_message_id: number } | null {
   const target = lastUserTurn(snapshot)
   const text = target ? retryText(target.content) : ''
 

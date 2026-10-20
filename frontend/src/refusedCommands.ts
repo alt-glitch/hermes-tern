@@ -6,11 +6,21 @@
 // The rest are Ink-TUI-only or messaging-only: hidden from completion and /help, and typing one
 // anyway says why in a line instead of the gateway's generic refusal.
 
+import type {
+  AgentPluginRow,
+  CurrentSubscription,
+  SubscriptionStateResult,
+  SubscriptionTierOption,
+  UsageModel
+} from '@hermes/shared/gateway-events'
+
 import type { ChatPorts } from './app/ports.js'
+import { oneOf } from './core/assert.js'
 import { errorText } from './core/errors.js'
 import type { NoticeEntry } from './model.js'
 import { type BackgroundHost, openBackground } from './overlays/background.js'
 import { openHermesSplit } from './watch/spec.js'
+import { type ResultOf, rpc } from './wire/rpc.js'
 
 /** What these commands reach of the app. */
 export type RefusedHost = Pick<ChatPorts, 'gw' | 'session' | 'transcript'> & BackgroundHost
@@ -25,16 +35,9 @@ export interface RefusedCommand {
 
 const words = (arg: string) => arg.trim().split(/\s+/).filter(Boolean)
 
-interface CliExec {
-  blocked?: boolean
-  code?: number
-  hint?: string | null
-  output?: string
-}
-
 /** `hermes <argv>` on the gateway host, headless; its output in a panel titled `title`. */
 async function cliPanel(host: RefusedHost, title: string, argv: string[]) {
-  const r = await host.gw.request<CliExec | null>('cli.exec', { argv })
+  const r = await rpc(host.gw, 'cli.exec', { argv })
 
   if (r?.blocked) {
     return host.transcript.notice(r.hint || `\`hermes ${argv.join(' ')}\` cannot run here.`, 'warning')
@@ -47,12 +50,7 @@ async function cliPanel(host: RefusedHost, title: string, argv: string[]) {
   }
 }
 
-interface BrowserManage {
-  browser_use?: boolean
-  connected?: boolean
-  messages?: string[]
-  url?: string | null
-}
+const isBrowserAction = oneOf(['connect', 'disconnect', 'status', 'use'])
 
 /** `/browser [status|use [on|off]|connect [url]|disconnect]`, as Ink's ops.ts sends it. */
 async function browser(host: RefusedHost, arg: string) {
@@ -60,7 +58,7 @@ async function browser(host: RefusedHost, arg: string) {
   const action = first.toLowerCase()
   const note = (text: string, tone?: NoticeEntry['tone']) => host.transcript.notice(text, tone)
 
-  if (!['connect', 'disconnect', 'status', 'use'].includes(action)) {
+  if (!isBrowserAction(action)) {
     return note('Usage: /browser [status|use [on|off]|connect [url]|disconnect]', 'warning')
   }
 
@@ -71,10 +69,10 @@ async function browser(host: RefusedHost, arg: string) {
   }
 
   const url = action === 'connect' ? rest.join(' ').trim() || 'http://127.0.0.1:9222' : undefined
-  let r: BrowserManage | null
+  let r: ResultOf<'browser.manage'>
 
   try {
-    r = await host.gw.request<BrowserManage | null>('browser.manage', {
+    r = await rpc(host.gw, 'browser.manage', {
       action,
       session_id: host.session.ref.live,
       ...(url ? { url } : {}),
@@ -115,19 +113,8 @@ async function browser(host: RefusedHost, arg: string) {
   )
 }
 
-interface PluginRow {
-  description?: string
-  name: string
-  source?: string
-  status?: string
-  version?: string
-}
-
-interface PluginsList {
-  bundled_count?: number
-  plugins?: PluginRow[]
-  user_count?: number
-}
+/** What a plugin's line reads of its `plugins.manage` row. */
+type PluginRow = Pick<AgentPluginRow, 'name'> & Partial<Pick<AgentPluginRow, 'description' | 'source' | 'status' | 'version'>>
 
 /** One Markdown line per plugin: ✓ enabled, ✗ disabled, else its status in words. */
 export function pluginLines(rows: readonly PluginRow[]): string[] {
@@ -156,7 +143,7 @@ async function plugins(host: RefusedHost, arg: string) {
     )
   }
 
-  const r = await host.gw.request<PluginsList | null>('plugins.manage', { action: 'list' })
+  const r = await rpc(host.gw, 'plugins.manage', { action: 'list' })
   const rows = r?.plugins ?? []
   const user = rows.filter(p => p.source !== 'bundled')
   // No user plugins: the bundled ones, so the list is never empty when some exist (as the hub falls back).
@@ -176,25 +163,11 @@ async function plugins(host: RefusedHost, arg: string) {
   )
 }
 
-interface SubscriptionState {
-  logged_in?: boolean
-  error?: string | null
-  can_change_plan?: boolean
-  org_name?: string | null
-  org_id?: string | null
-  role?: string | null
-  portal_url?: string | null
-  current?: {
-    tier_name?: string | null
-    monthly_credits?: string | null
-    credits_remaining?: string | null
-    pending_downgrade_tier_name?: string | null
-    pending_downgrade_display?: string | null
-    cancel_at_period_end?: boolean
-    cancellation_effective_display?: string | null
-  } | null
-  tiers?: { is_current?: boolean; dollars_per_month_display?: string }[]
-  usage?: { available?: boolean; renews_display?: string | null }
+/** What the `/subscription` panel reads of `subscription.state`: any field may be missing. */
+type SubscriptionState = Partial<Pick<SubscriptionStateResult, 'can_change_plan' | 'org_id' | 'org_name' | 'portal_url' | 'role'>> & {
+  current?: Partial<CurrentSubscription> | null
+  tiers?: Partial<SubscriptionTierOption>[] | null
+  usage?: Partial<UsageModel> | null
 }
 
 /** Ink's buildManageUrl: `<portal origin>/manage-subscription?org_id=…`, or null without a portal. */
@@ -246,7 +219,7 @@ export function subscriptionText(s: SubscriptionState): string {
 }
 
 async function subscription(host: RefusedHost) {
-  const s = await host.gw.request<SubscriptionState | null>('subscription.state', {})
+  const s = await rpc(host.gw, 'subscription.state', {})
 
   if (!s?.logged_in) {
     return host.transcript.notice(

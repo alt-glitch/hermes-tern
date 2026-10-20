@@ -10,6 +10,7 @@ import type { GatewayClient } from '@tui/gatewayClient.js'
 
 import { errorText } from './core/errors.js'
 import type { NoticeEntry } from './model.js'
+import { rpc } from './wire/rpc.js'
 
 /** What the store reaches of the app. */
 export interface AutomationHost {
@@ -206,7 +207,7 @@ export class Automation {
     const seq = this.#seq
 
     try {
-      const r = await this.#host.gw.request<{ control?: SessionControlSnapshot }>('session.control.read', { session_id: sid })
+      const r = await rpc(this.#host.gw, 'session.control.read', { session_id: sid })
 
       if (sid === this.#sid && seq === this.#seq) {
         this.#set(r?.control ?? null)
@@ -228,10 +229,7 @@ export class Automation {
     this.#host.changed()
 
     try {
-      const r = await this.#host.gw.request<{ control?: SessionControlSnapshot; dispatch?: Record<string, unknown> }>(
-        'session.control',
-        { action, session_id: sid }
-      )
+      const r = await rpc(this.#host.gw, 'session.control', { action, session_id: sid })
 
       this.apply(sid, r?.control)
 

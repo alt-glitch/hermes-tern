@@ -17,6 +17,7 @@ import { mutateSession } from '../hermes/mutate.js'
 import { inWorkspace, lastReply, sessionLabel, type StoredSession, storedSessions, workspaceOf } from '../hermes/sessionIndex.js'
 import type { Overlay } from '../overlay.js'
 import { oneLine } from '../view/describe.js'
+import { rpc } from '../wire/rpc.js'
 
 import { editQuery, hitRuns, moveSelection, rank } from './search.js'
 
@@ -51,11 +52,12 @@ export function openSessionPicker(host: SessionsHost) {
     // The open session may have no messages yet; every other empty one is litter.
     const [key, live] = await Promise.all([
       workspaceOf(cwd),
-      host.gw.request<{ sessions?: { id?: string; running?: boolean }[] }>('session.list', { limit: 200 }).catch(() => ({ sessions: [] }))
+      rpc(host.gw, 'session.list', { limit: 200 }).catch(() => ({ sessions: [] }))
     ])
 
     workspace = key
-    running = new Set((live.sessions ?? []).filter(s => s.running && s.id).map(s => s.id!))
+    // Only the shared gateway's rows say whether the session runs.
+    running = new Set((live.sessions ?? []).filter(s => 'running' in s && s.running && s.id).map(s => s.id))
     sessions = storedSessions(LIMIT).filter(s => s.messages > 0 || s.id === current)
     tab = sessions.some(s => inWorkspace(s, workspace)) ? 'here' : 'all'
     selected = rows().find(s => s.id !== current)?.id ?? rows()[0]?.id
@@ -89,7 +91,7 @@ export function openSessionPicker(host: SessionsHost) {
 
     try {
       // The shared gateway deletes through a revision-fenced mutation (the whole lineage).
-      await (host.gw.isCanonical ? mutateSession(host.gw, id, 'delete', {}) : host.gw.request('session.delete', { session_id: id }))
+      await (host.gw.isCanonical ? mutateSession(host.gw, id, 'delete', {}) : rpc(host.gw, 'session.delete', { session_id: id }))
       sessions = sessions.filter(s => s.id !== id)
     } catch (error) {
       host.transcript.notice(errorText(error), 'error')

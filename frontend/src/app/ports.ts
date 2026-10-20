@@ -3,9 +3,9 @@
 // imports App, and App is the one place that implements them all. The names are the ones the
 // ports keep: a later package changes what stands behind a port, not the code that reads it.
 
-import type { SessionLiveInfo } from '@hermes/shared/gateway-events'
 import type { ScrollTo } from '@stencil-hq/tern'
 import type { GatewayClient } from '@tui/gatewayClient.js'
+import type { SessionInfo } from '@tui/types.js'
 
 import type { Agents } from '../agents/store.js'
 import type { Automation } from '../automation.js'
@@ -37,14 +37,14 @@ export interface SessionView {
    * The gateway's session.info, merged. Writable: a picker that switched the model or the fast
    * tier shows the change before the gateway's next session.info confirms it.
    */
-  info: SessionLiveInfo | null
+  info: SessionInfo | null
 }
 
 /** Where a SessionView reads: the app's session fields, as they are until a session store holds them. */
 export interface SessionFields {
   readonly sid: string | null
   readonly storedSid: string | null
-  info: SessionLiveInfo | null
+  info: SessionInfo | null
 }
 
 /** The live view of `fields`: each read sees the current ids and info, and `info` writes through. */

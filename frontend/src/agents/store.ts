@@ -11,11 +11,13 @@ import { readFile, stat } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 
+import type { SubagentSnapshot } from '@hermes/shared/gateway-events'
 import type { GatewayClient } from '@tui/gatewayClient.js'
 
 import type { Subagent, ToolCall } from '../model.js'
 import type { Transcript } from '../transcript.js'
 import { record } from '../wire/json.js'
+import { rpc } from '../wire/rpc.js'
 
 import { clockToMs, parseLiveLog, runningTool, type LiveLog } from './liveLog.js'
 
@@ -30,19 +32,7 @@ export interface AgentsHost {
 }
 
 /** One row of `subagent.list` (gateway/session_ancillary.py `_SUBAGENT_FIELDS`). */
-interface ListRow {
-  subagent_id?: string
-  parent_id?: string | null
-  depth?: number
-  goal?: string
-  delegation_id?: string
-  model?: string | null
-  started_at?: number
-  status?: string
-  tool_count?: number
-  last_tool?: string | null
-  accepting_steer?: boolean
-}
+type ListRow = SubagentSnapshot
 
 const POLL_MS = 1000
 /** Logs are compact (one capped line per event); a runaway one is read from its tail. */
@@ -127,28 +117,33 @@ export class Agents {
 
   /** Queues steering text into a running agent; the owner answers `queued` or `rejected`. */
   async steer(a: Subagent, text: string): Promise<boolean> {
-    const r = await this.#host.gw.request<{ status?: string }>('subagent.steer', {
-      session_id: this.#host.sid,
-      subagent_id: a.id,
-      text
-    })
+    const sid = this.#host.sid
+
+    if (!sid) {
+      return false
+    }
+
+    const r = await rpc(this.#host.gw, 'subagent.steer', { session_id: sid, subagent_id: a.id, text })
 
     return r?.status === 'queued'
   }
 
   /** Interrupts a running agent; its partial result still returns to the parent. */
   async stop(a: Subagent): Promise<boolean> {
-    const r = await this.#host.gw.request<{ found?: boolean }>('subagent.interrupt', {
-      session_id: this.#host.sid,
-      subagent_id: a.id
-    })
+    const sid = this.#host.sid
+
+    if (!sid) {
+      return false
+    }
+
+    const r = await rpc(this.#host.gw, 'subagent.interrupt', { session_id: sid, subagent_id: a.id })
 
     return Boolean(r?.found)
   }
 
   /** Blocks (or unblocks) new subagent spawns on the gateway; running children keep going. */
   async pause(paused: boolean): Promise<boolean> {
-    const r = await this.#host.gw.request<{ paused?: boolean }>('delegation.pause', {
+    const r = await rpc(this.#host.gw, 'delegation.pause', {
       paused,
       ...(this.#host.sid ? { session_id: this.#host.sid } : {})
     })
@@ -295,7 +290,7 @@ export class Agents {
     let rows: ListRow[]
 
     try {
-      rows = (await this.#host.gw.request<{ subagents?: ListRow[] }>('subagent.list', { session_id: sid }))?.subagents ?? []
+      rows = (await rpc(this.#host.gw, 'subagent.list', { session_id: sid }))?.subagents ?? []
     } catch {
       // A session the owner no longer holds live (or a worker it cannot project): the logs still tell.
       return
@@ -398,10 +393,10 @@ export class Agents {
     const siblings = list.filter(a => a.parentId === parent.id).length
     const child: Subagent = {
       calls: 0,
-      delegationId: row.delegation_id,
+      delegationId: row.delegation_id ?? undefined,
       depth: (parent.depth ?? 0) + 1,
       goal: row.goal ?? '',
-      id: row.subagent_id!,
+      id: row.subagent_id,
       index: parent.index,
       name: `${agentName(parent)}.${siblings + 1}`,
       parentId: parent.id,
@@ -447,10 +442,10 @@ export class Agents {
 
     const a: Subagent = {
       calls: 0,
-      delegationId: row.delegation_id,
+      delegationId: row.delegation_id ?? undefined,
       depth: 0,
-      goal: row.goal!,
-      id: row.subagent_id!,
+      goal: row.goal ?? goal,
+      id: row.subagent_id,
       index,
       key: `p${index}`,
       logPath: row.delegation_id ? await manifestLog(row.delegation_id, index) : undefined,
@@ -495,7 +490,7 @@ export class Agents {
 
     if (text === undefined && this.#listed.has(a.id) && this.#host.sid) {
       try {
-        const r = await this.#host.gw.request<{ available?: boolean; text?: string; truncated?: boolean }>('subagent.tail', {
+        const r = await rpc(this.#host.gw, 'subagent.tail', {
           session_id: this.#host.sid,
           subagent_id: a.id
         })

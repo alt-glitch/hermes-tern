@@ -8,6 +8,7 @@ import { scoreSlashMenuItem } from '@tui/app/slash/fuzzyScore.js'
 import type { GatewayClient } from '@tui/gatewayClient.js'
 
 import { HIDDEN_COMMANDS, localCommands } from './commands.js'
+import { rpc } from './wire/rpc.js'
 
 export type Resolution = { name: string } | { ambiguous: string[] } | null
 
@@ -91,15 +92,13 @@ export class CommandCatalog {
   get(sid: string): Promise<CommandsCatalogResult | undefined> {
     if (!this.#pending || this.#sid !== sid) {
       this.#sid = sid
-      const pending = this.#gw
-        .request<CommandsCatalogResult>('commands.catalog', { session_id: sid })
-        .catch(() => {
-          if (this.#pending === pending) {
-            this.#pending = undefined
-          }
+      const pending = rpc(this.#gw, 'commands.catalog', { session_id: sid }).catch(() => {
+        if (this.#pending === pending) {
+          this.#pending = undefined
+        }
 
-          return undefined
-        })
+        return undefined
+      })
 
       this.#pending = pending
     }

@@ -8,6 +8,7 @@ import type { ChatPorts } from '../app/ports.js'
 import { errorText } from '../core/errors.js'
 import { mutateSession } from '../hermes/mutate.js'
 import { capsOf } from '../modelCaps.js'
+import { rpc } from '../wire/rpc.js'
 
 /** Hermes' levels (hermes_constants.VALID_REASONING_EFFORTS, with `none` for off), lowest first. */
 export const LEVELS: { id: string; label: string; detail: string }[] = [
@@ -79,7 +80,7 @@ export async function applyEffort(host: EffortSetter, value: string, scope: 'glo
     if (scope === 'session' && host.gw.isCanonical) {
       await mutateSession(host.gw, sid, 'reasoning', { effort: value })
     } else {
-      await host.gw.request('config.set', { key: 'reasoning', scope, session_id: sid, value })
+      await rpc(host.gw, 'config.set', { key: 'reasoning', scope, session_id: sid, value })
     }
 
     if (scope === 'global') {

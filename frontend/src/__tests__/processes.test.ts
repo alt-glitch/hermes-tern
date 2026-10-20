@@ -6,7 +6,6 @@ import {
   foldEntry,
   isRecent,
   lastLine,
-  type ProcessEntry,
   Processes,
   processStatus,
   processVerdict,
@@ -15,6 +14,7 @@ import {
   watchersOf
 } from '../processes/store.js'
 import { Transcript } from '../transcript.js'
+import type { ProcessRow } from '../wire/schemas.js'
 
 const NOW = 1_800_000_000_000
 
@@ -50,7 +50,7 @@ describe('lastLine', () => {
 
 describe('foldEntry', () => {
   it('reads the shared gateway projection and keeps the same object across polls', () => {
-    const entry: ProcessEntry = {
+    const entry: ProcessRow = {
       command: 'for i in 1 2; do echo $i; done',
       output_tail: 'tick 1\ntick 2\n',
       session_id: 'proc_a',
@@ -129,7 +129,7 @@ describe('Processes', () => {
       tool_id: 't1'
     })
 
-    let rows: ProcessEntry[] = [
+    let rows: ProcessRow[] = [
       { command: 'sleep 90', output_tail: 'tick 1\n', session_id: 'proc_a', started_epoch: NOW / 1000, status: 'running' }
     ]
     const request = vi.fn(async (method: string) => (method === 'process.list' ? { processes: rows } : {}))
@@ -158,7 +158,7 @@ describe('Processes', () => {
   it('adds printed output to its process as it arrives, and polls for a process it does not know', async () => {
     vi.useFakeTimers({ now: NOW })
     const transcript = new Transcript()
-    const rows: ProcessEntry[] = [{ command: 'sleep 90', output_tail: 'tick 1\n', session_id: 'proc_a', status: 'running' }]
+    const rows: ProcessRow[] = [{ command: 'sleep 90', output_tail: 'tick 1\n', session_id: 'proc_a', status: 'running' }]
     const request = vi.fn(async () => ({ processes: rows }))
     const store = new Processes({ changed: vi.fn(), gw: { request } as unknown as Pick<GatewayClient, 'request'>, sid: 's1', transcript })
 

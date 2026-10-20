@@ -45,6 +45,12 @@ noise, and it hides the real assertions among the dead ones. Remove it.
 everything it touches. Type external data as `unknown` and parse it (`record()` from
 `wire/json.ts`, or a `zod/mini` schema at a real boundary) into a named type.
 
+Gateway requests go through `rpc(gw, method, params)` in `wire/rpc.ts`, not `gw.request<T>()`:
+the method names its params and its result from the generated contract (the classic result, or
+the shared gateway's as the client adapts it). A shape that differs between gateway versions
+(`process.list` rows, a `session.usage` tick, the `pending_submissions` FIFO) is read with
+`rpcParsed()` or a schema in `wire/schemas.ts`.
+
 ## Exhaustive switches
 
 `@typescript-eslint/switch-exhaustiveness-check`: a `switch` over a union with no `default` must

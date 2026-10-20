@@ -9,6 +9,7 @@ import type { ControlHost } from './controlCommands.js'
 import { errorText } from './core/errors.js'
 import { type MutationResult, mutateSession } from './hermes/mutate.js'
 import { lastTurnRewind, retryText, retryTurnRewind } from './hermes/rewind.js'
+import { rpc } from './wire/rpc.js'
 
 /** What a session command needs beyond a control command's host; App.control() supplies it. */
 export interface SessionHost extends ControlHost {
@@ -182,7 +183,7 @@ async function branch(host: SessionHost, arg: string) {
   }
 
   // Hermes names an untitled branch after its parent ("Bug hunt #2").
-  const info = await host.gw.request<{ title?: string | null } | null>('session.info', { session_id: child }).catch(() => null)
+  const info = await rpc(host.gw, 'session.info', { session_id: child }).catch(() => null)
 
   host.notice(`Branched → ${info?.title?.trim() || title || child}`)
 }
@@ -192,30 +193,23 @@ async function save(host: SessionHost) {
     return host.notice('No active session: nothing to save.', 'warning')
   }
 
-  const r = await host.gw.request<{ file?: string } | null>('session.save', { session_id: host.sid })
+  const r = await rpc(host.gw, 'session.save', { session_id: host.sid })
 
   host.notice(r?.file ? `Conversation saved to: ${r.file}` : 'Could not save the conversation.', r?.file ? 'info' : 'error')
 }
 
 async function reloadEnv(host: SessionHost) {
   // The shared gateway reloads `.env` only for a session this view controls.
-  const r = await host.gw.request<{ updated?: number } | null>('reload.env', host.sid ? { session_id: host.sid } : {})
+  const r = await rpc(host.gw, 'reload.env', host.sid ? { session_id: host.sid } : {})
 
   host.notice(`Reloaded .env (${plural(Number(r?.updated ?? 0), 'var')} updated).`)
 }
 
 async function reloadSkills(host: SessionHost) {
   // Bound to the session, so the rescan sees its repo's project-local skills.
-  const r = await host.gw.request<{ output?: string } | null>('skills.reload', host.sid ? { session_id: host.sid } : {})
+  const r = await rpc(host.gw, 'skills.reload', host.sid ? { session_id: host.sid } : {})
 
   host.panel('Reload Skills', r?.output?.trim() || 'Skills reloaded.')
-}
-
-interface ReloadMcp {
-  message?: string
-  /** The calling chat's tools: `applied`, `unchanged`, or `busy` (they apply after its turn). */
-  session?: string
-  unavailable?: string[]
 }
 
 /**
@@ -227,32 +221,13 @@ async function reloadMcp(host: SessionHost): Promise<boolean | void> {
     return false
   }
 
-  const r = await host.gw.request<ReloadMcp | null>('reload.mcp', { confirm: true, ...(host.sid ? { session_id: host.sid } : {}) })
+  const r = await rpc(host.gw, 'reload.mcp', { confirm: true, ...(host.sid ? { session_id: host.sid } : {}) })
 
   host.panel('Reload MCP', r?.message?.trim() || 'MCP servers reloaded.')
 
   if (r?.unavailable?.length) {
     host.notice(`Did not connect: ${r.unavailable.join(', ')}.`, 'warning')
   }
-}
-
-interface RollbackList {
-  enabled?: boolean
-  checkpoints?: { hash: string; timestamp?: string; message?: string }[]
-}
-
-interface RollbackDiff {
-  diff?: string
-  stat?: string
-}
-
-interface RollbackRestore {
-  success?: boolean
-  error?: string
-  message?: string
-  reason?: string
-  restored_to?: string
-  history_removed?: number
 }
 
 /** `/rollback [list] | diff <checkpoint> | <checkpoint> [file]`: the session's filesystem checkpoints. */
@@ -265,7 +240,7 @@ async function rollback(host: SessionHost, arg: string) {
   const sub = first.toLowerCase()
 
   if (!sub || sub === 'list' || sub === 'ls') {
-    const r = await host.gw.request<RollbackList | null>('rollback.list', { session_id: host.sid })
+    const r = await rpc(host.gw, 'rollback.list', { session_id: host.sid })
     const checkpoints = r?.checkpoints ?? []
 
     if (!r?.enabled) {
@@ -279,7 +254,7 @@ async function rollback(host: SessionHost, arg: string) {
     return host.panel(
       'Rollback checkpoints',
       checkpoints
-        .map((c, i) => `${i + 1}. ${c.hash.slice(0, 10)}  ${[c.timestamp, c.message].filter(Boolean).join(' · ') || '(no metadata)'}`)
+        .map((c, i) => `${i + 1}. ${(c.hash ?? '').slice(0, 10)}  ${[c.timestamp, c.message].filter(Boolean).join(' · ') || '(no metadata)'}`)
         .join('\n')
     )
   }
@@ -290,14 +265,14 @@ async function rollback(host: SessionHost, arg: string) {
     }
 
     // The plain diff: `rendered` is painted for a terminal.
-    const r = await host.gw.request<RollbackDiff | null>('rollback.diff', { hash: rest[0], session_id: host.sid })
+    const r = await rpc(host.gw, 'rollback.diff', { hash: rest[0], session_id: host.sid })
     const text = [r?.stat?.trim(), r?.diff?.trim()].filter(Boolean).join('\n\n')
 
     return text ? host.panel('Rollback diff', text) : host.notice('No changes since this checkpoint.')
   }
 
   const file = rest.join(' ').trim()
-  const r = await host.gw.request<RollbackRestore | null>('rollback.restore', {
+  const r = await rpc(host.gw, 'rollback.restore', {
     ...(file ? { file_path: file } : {}),
     hash: first,
     session_id: host.sid

@@ -5,15 +5,7 @@
 // Its user bubble waits until the authority starts it, so it lands after the reply it waited
 // for. Ported from Ink's app/pendingBubbles.ts and hooks/useQueue.ts (server rows).
 
-/** One row of the authority's FIFO (`info.pending_submissions`). */
-export interface PendingRow {
-  admission_id: string
-  /** The submission id the submitter chose (this pane's `submission_id`). */
-  input_id?: string
-  status: string
-  /** The prompt's text. */
-  user: string
-}
+import type { PendingRow } from './wire/schemas.js'
 
 /** What Enter does while a turn runs (`display.busy_input_mode`, read with `config.get {key:'busy'}`). */
 export type BusyMode = 'interrupt' | 'queue' | 'steer'

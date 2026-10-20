@@ -38,7 +38,7 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
   isNodeMode || !mod || !mod.__esModule ? __defProp(target, "default", { value: mod, enumerable: true }) : target,
   mod
 ));
-var __toBinaryNode = Uint8Array.fromBase64 || ((base64) => new Uint8Array(Buffer.from(base64, "base64")));
+var __toBinaryNode = Uint8Array.fromBase64 || ((base642) => new Uint8Array(Buffer.from(base642, "base64")));
 
 // .hermes-src/ui-tui/node_modules/undici/lib/core/symbols.js
 var require_symbols = __commonJS({
@@ -781,16 +781,16 @@ var require_util = __commonJS({
     function isStream(obj2) {
       return obj2 && typeof obj2 === "object" && typeof obj2.pipe === "function" && typeof obj2.on === "function";
     }
-    function isBlobLike(object) {
-      if (object === null) {
+    function isBlobLike(object2) {
+      if (object2 === null) {
         return false;
-      } else if (object instanceof Blob2) {
+      } else if (object2 instanceof Blob2) {
         return true;
-      } else if (typeof object !== "object") {
+      } else if (typeof object2 !== "object") {
         return false;
       } else {
-        const sTag = object[Symbol.toStringTag];
-        return (sTag === "Blob" || sTag === "File") && ("stream" in object && typeof object.stream === "function" || "arrayBuffer" in object && typeof object.arrayBuffer === "function");
+        const sTag = object2[Symbol.toStringTag];
+        return (sTag === "Blob" || sTag === "File") && ("stream" in object2 && typeof object2.stream === "function" || "arrayBuffer" in object2 && typeof object2.arrayBuffer === "function");
       }
     }
     function buildURL(url, queryParams) {
@@ -1072,8 +1072,8 @@ var require_util = __commonJS({
         }
       );
     }
-    function isFormDataLike(object) {
-      return object && typeof object === "object" && typeof object.append === "function" && typeof object.delete === "function" && typeof object.get === "function" && typeof object.getAll === "function" && typeof object.has === "function" && typeof object.set === "function" && object[Symbol.toStringTag] === "FormData";
+    function isFormDataLike(object2) {
+      return object2 && typeof object2 === "object" && typeof object2.append === "function" && typeof object2.delete === "function" && typeof object2.get === "function" && typeof object2.getAll === "function" && typeof object2.has === "function" && typeof object2.set === "function" && object2[Symbol.toStringTag] === "FormData";
     }
     function addAbortListener(signal, listener) {
       if ("addEventListener" in signal) {
@@ -1265,36 +1265,36 @@ var require_diagnostics = __commonJS({
       const debuglog = fetchDebuglog.enabled ? fetchDebuglog : undiciDebugLog;
       diagnosticsChannel.channel("undici:client:beforeConnect").subscribe((evt) => {
         const {
-          connectParams: { version, protocol, port, host }
+          connectParams: { version: version2, protocol, port, host }
         } = evt;
         debuglog(
           "connecting to %s using %s%s",
           `${host}${port ? `:${port}` : ""}`,
           protocol,
-          version
+          version2
         );
       });
       diagnosticsChannel.channel("undici:client:connected").subscribe((evt) => {
         const {
-          connectParams: { version, protocol, port, host }
+          connectParams: { version: version2, protocol, port, host }
         } = evt;
         debuglog(
           "connected to %s using %s%s",
           `${host}${port ? `:${port}` : ""}`,
           protocol,
-          version
+          version2
         );
       });
       diagnosticsChannel.channel("undici:client:connectError").subscribe((evt) => {
         const {
-          connectParams: { version, protocol, port, host },
+          connectParams: { version: version2, protocol, port, host },
           error
         } = evt;
         debuglog(
           "connection to %s using %s%s errored - %s",
           `${host}${port ? `:${port}` : ""}`,
           protocol,
-          version,
+          version2,
           error.message
         );
       });
@@ -1343,31 +1343,31 @@ var require_diagnostics = __commonJS({
         const debuglog = undiciDebugLog.enabled ? undiciDebugLog : websocketDebuglog;
         diagnosticsChannel.channel("undici:client:beforeConnect").subscribe((evt) => {
           const {
-            connectParams: { version, protocol, port, host }
+            connectParams: { version: version2, protocol, port, host }
           } = evt;
           debuglog(
             "connecting to %s%s using %s%s",
             host,
             port ? `:${port}` : "",
             protocol,
-            version
+            version2
           );
         });
         diagnosticsChannel.channel("undici:client:connected").subscribe((evt) => {
           const {
-            connectParams: { version, protocol, port, host }
+            connectParams: { version: version2, protocol, port, host }
           } = evt;
           debuglog(
             "connected to %s%s using %s%s",
             host,
             port ? `:${port}` : "",
             protocol,
-            version
+            version2
           );
         });
         diagnosticsChannel.channel("undici:client:connectError").subscribe((evt) => {
           const {
-            connectParams: { version, protocol, port, host },
+            connectParams: { version: version2, protocol, port, host },
             error
           } = evt;
           debuglog(
@@ -1375,7 +1375,7 @@ var require_diagnostics = __commonJS({
             host,
             port ? `:${port}` : "",
             protocol,
-            version,
+            version2,
             error.message
           );
         });
@@ -3652,8 +3652,8 @@ var require_webidl = __commonJS({
           });
         }
         for (const options of converters) {
-          const { key: key2, defaultValue, required, converter } = options;
-          if (required === true) {
+          const { key: key2, defaultValue, required: required2, converter } = options;
+          if (required2 === true) {
             if (!Object.hasOwn(dictionary, key2)) {
               throw webidl.errors.exception({
                 header: prefix2,
@@ -3666,7 +3666,7 @@ var require_webidl = __commonJS({
           if (hasDefault && value !== null) {
             value ??= defaultValue();
           }
-          if (required || hasDefault || value !== void 0) {
+          if (required2 || hasDefault || value !== void 0) {
             value = converter(value, prefix2, `${argument}.${key2}`);
             if (options.allowedValues && !options.allowedValues.includes(value)) {
               throw webidl.errors.exception({
@@ -3898,8 +3898,8 @@ var require_util2 = __commonJS({
       }
       return "allowed";
     }
-    function isErrorLike(object) {
-      return object instanceof Error || (object?.constructor?.name === "Error" || object?.constructor?.name === "DOMException");
+    function isErrorLike(object2) {
+      return object2 instanceof Error || (object2?.constructor?.name === "Error" || object2?.constructor?.name === "DOMException");
     }
     function isValidReasonPhrase(statusText) {
       for (let i = 0; i < statusText.length; ++i) {
@@ -4324,7 +4324,7 @@ var require_util2 = __commonJS({
         return new FastIterableIterator(target, kind);
       };
     }
-    function iteratorMixin(name, object, kInternalIterator, keyIndex = 0, valueIndex = 1) {
+    function iteratorMixin(name, object2, kInternalIterator, keyIndex = 0, valueIndex = 1) {
       const makeIterator = createIterator(name, kInternalIterator, keyIndex, valueIndex);
       const properties2 = {
         keys: {
@@ -4332,7 +4332,7 @@ var require_util2 = __commonJS({
           enumerable: true,
           configurable: true,
           value: function keys2() {
-            webidl.brandCheck(this, object);
+            webidl.brandCheck(this, object2);
             return makeIterator(this, "key");
           }
         },
@@ -4341,7 +4341,7 @@ var require_util2 = __commonJS({
           enumerable: true,
           configurable: true,
           value: function values() {
-            webidl.brandCheck(this, object);
+            webidl.brandCheck(this, object2);
             return makeIterator(this, "value");
           }
         },
@@ -4350,7 +4350,7 @@ var require_util2 = __commonJS({
           enumerable: true,
           configurable: true,
           value: function entries() {
-            webidl.brandCheck(this, object);
+            webidl.brandCheck(this, object2);
             return makeIterator(this, "key+value");
           }
         },
@@ -4359,7 +4359,7 @@ var require_util2 = __commonJS({
           enumerable: true,
           configurable: true,
           value: function forEach(callbackfn, thisArg = globalThis) {
-            webidl.brandCheck(this, object);
+            webidl.brandCheck(this, object2);
             webidl.argumentLengthCheck(arguments, 1, `${name}.forEach`);
             if (typeof callbackfn !== "function") {
               throw new TypeError(
@@ -4372,7 +4372,7 @@ var require_util2 = __commonJS({
           }
         }
       };
-      return Object.defineProperties(object.prototype, {
+      return Object.defineProperties(object2.prototype, {
         ...properties2,
         [Symbol.iterator]: {
           writable: true,
@@ -4720,7 +4720,7 @@ var require_symbols2 = __commonJS({
 var require_file = __commonJS({
   ".hermes-src/ui-tui/node_modules/undici/lib/web/fetch/file.js"(exports, module) {
     "use strict";
-    var { Blob: Blob2, File } = __require("node:buffer");
+    var { Blob: Blob2, File: File2 } = __require("node:buffer");
     var { kState } = require_symbols2();
     var { webidl } = require_webidl();
     var FileLike = class _FileLike {
@@ -4772,8 +4772,8 @@ var require_file = __commonJS({
       }
     };
     webidl.converters.Blob = webidl.interfaceConverter(Blob2);
-    function isFileLike(object) {
-      return object instanceof File || object && (typeof object.stream === "function" || typeof object.arrayBuffer === "function") && object[Symbol.toStringTag] === "File";
+    function isFileLike(object2) {
+      return object2 instanceof File2 || object2 && (typeof object2.stream === "function" || typeof object2.arrayBuffer === "function") && object2[Symbol.toStringTag] === "File";
     }
     module.exports = { FileLike, isFileLike };
   }
@@ -4790,7 +4790,7 @@ var require_formdata = __commonJS({
     var { webidl } = require_webidl();
     var { File: NativeFile } = __require("node:buffer");
     var nodeUtil = __require("node:util");
-    var File = globalThis.File ?? NativeFile;
+    var File2 = globalThis.File ?? NativeFile;
     var FormData = class _FormData {
       constructor(form) {
         webidl.util.markAsUncloneable(this);
@@ -4910,14 +4910,14 @@ var require_formdata = __commonJS({
       if (typeof value === "string") {
       } else {
         if (!isFileLike(value)) {
-          value = value instanceof Blob ? new File([value], "blob", { type: value.type }) : new FileLike(value, "blob", { type: value.type });
+          value = value instanceof Blob ? new File2([value], "blob", { type: value.type }) : new FileLike(value, "blob", { type: value.type });
         }
         if (filename !== void 0) {
           const options = {
             type: value.type,
             lastModified: value.lastModified
           };
-          value = value instanceof NativeFile ? new File([value], filename, options) : new FileLike(value, filename, options);
+          value = value instanceof NativeFile ? new File2([value], filename, options) : new FileLike(value, filename, options);
         }
       }
       return { name, value };
@@ -4937,7 +4937,7 @@ var require_formdata_parser = __commonJS({
     var { makeEntry } = require_formdata();
     var assert = __require("node:assert");
     var { File: NodeFile } = __require("node:buffer");
-    var File = globalThis.File ?? NodeFile;
+    var File2 = globalThis.File ?? NodeFile;
     var formDataNameBuffer = Buffer.from('form-data; name="');
     var filenameBuffer = Buffer.from("; filename");
     var dd = Buffer.from("--");
@@ -5024,7 +5024,7 @@ var require_formdata_parser = __commonJS({
           if (!isAsciiString(contentType)) {
             contentType = "";
           }
-          value = new File([body], filename, { type: contentType });
+          value = new File2([body], filename, { type: contentType });
         } else {
           value = utf8DecodeBytes(Buffer.from(body));
         }
@@ -5221,12 +5221,12 @@ var require_body = __commonJS({
         }
       });
     }
-    function extractBody(object, keepalive = false) {
+    function extractBody(object2, keepalive = false) {
       let stream = null;
-      if (object instanceof ReadableStream) {
-        stream = object;
-      } else if (isBlobLike(object)) {
-        stream = object.stream();
+      if (object2 instanceof ReadableStream) {
+        stream = object2;
+      } else if (isBlobLike(object2)) {
+        stream = object2.stream();
       } else {
         stream = new ReadableStream({
           async pull(controller) {
@@ -5246,17 +5246,17 @@ var require_body = __commonJS({
       let source = null;
       let length = null;
       let type = null;
-      if (typeof object === "string") {
-        source = object;
+      if (typeof object2 === "string") {
+        source = object2;
         type = "text/plain;charset=UTF-8";
-      } else if (object instanceof URLSearchParams) {
-        source = object.toString();
+      } else if (object2 instanceof URLSearchParams) {
+        source = object2.toString();
         type = "application/x-www-form-urlencoded;charset=UTF-8";
-      } else if (isArrayBuffer(object)) {
-        source = new Uint8Array(object.slice());
-      } else if (ArrayBuffer.isView(object)) {
-        source = new Uint8Array(object.buffer.slice(object.byteOffset, object.byteOffset + object.byteLength));
-      } else if (util.isFormDataLike(object)) {
+      } else if (isArrayBuffer(object2)) {
+        source = new Uint8Array(object2.slice());
+      } else if (ArrayBuffer.isView(object2)) {
+        source = new Uint8Array(object2.buffer.slice(object2.byteOffset, object2.byteOffset + object2.byteLength));
+      } else if (util.isFormDataLike(object2)) {
         const boundary = `----formdata-undici-0${`${random(1e11)}`.padStart(11, "0")}`;
         const prefix2 = `--${boundary}\r
 Content-Disposition: form-data`;
@@ -5266,7 +5266,7 @@ Content-Disposition: form-data`;
         const rn = new Uint8Array([13, 10]);
         length = 0;
         let hasUnknownSizeValue = false;
-        for (const [name, value] of object) {
+        for (const [name, value] of object2) {
           if (typeof value === "string") {
             const chunk2 = textEncoder.encode(prefix2 + `; name="${escape(normalizeLinefeeds(name))}"\r
 \r
@@ -5294,7 +5294,7 @@ Content-Type: ${value.type || "application/octet-stream"}\r
         if (hasUnknownSizeValue) {
           length = null;
         }
-        source = object;
+        source = object2;
         action = async function* () {
           for (const part of blobParts) {
             if (part.stream) {
@@ -5305,22 +5305,22 @@ Content-Type: ${value.type || "application/octet-stream"}\r
           }
         };
         type = `multipart/form-data; boundary=${boundary}`;
-      } else if (isBlobLike(object)) {
-        source = object;
-        length = object.size;
-        if (object.type) {
-          type = object.type;
+      } else if (isBlobLike(object2)) {
+        source = object2;
+        length = object2.size;
+        if (object2.type) {
+          type = object2.type;
         }
-      } else if (typeof object[Symbol.asyncIterator] === "function") {
+      } else if (typeof object2[Symbol.asyncIterator] === "function") {
         if (keepalive) {
           throw new TypeError("keepalive");
         }
-        if (util.isDisturbed(object) || object.locked) {
+        if (util.isDisturbed(object2) || object2.locked) {
           throw new TypeError(
             "Response body object should not be disturbed or locked"
           );
         }
-        stream = object instanceof ReadableStream ? object : ReadableStreamFrom(object);
+        stream = object2 instanceof ReadableStream ? object2 : ReadableStreamFrom(object2);
       }
       if (typeof source === "string" || util.isBuffer(source)) {
         length = Buffer.byteLength(source);
@@ -5329,7 +5329,7 @@ Content-Type: ${value.type || "application/octet-stream"}\r
         let iterator;
         stream = new ReadableStream({
           async start() {
-            iterator = action(object)[Symbol.asyncIterator]();
+            iterator = action(object2)[Symbol.asyncIterator]();
           },
           async pull(controller) {
             const { value, done } = await iterator.next();
@@ -5357,12 +5357,12 @@ Content-Type: ${value.type || "application/octet-stream"}\r
       const body = { stream, source, length };
       return [body, type];
     }
-    function safelyExtractBody(object, keepalive = false) {
-      if (object instanceof ReadableStream) {
-        assert(!util.isDisturbed(object), "The body has already been consumed.");
-        assert(!object.locked, "The stream is locked.");
+    function safelyExtractBody(object2, keepalive = false) {
+      if (object2 instanceof ReadableStream) {
+        assert(!util.isDisturbed(object2), "The body has already been consumed.");
+        assert(!object2.locked, "The stream is locked.");
       }
-      return extractBody(object, keepalive);
+      return extractBody(object2, keepalive);
     }
     function cloneBody(instance, body) {
       const [out1, out2] = body.stream.tee();
@@ -5442,12 +5442,12 @@ Content-Type: ${value.type || "application/octet-stream"}\r
     function mixinBody(prototype) {
       Object.assign(prototype.prototype, bodyMixinMethods(prototype));
     }
-    async function consumeBody(object, convertBytesToJSValue, instance) {
-      webidl.brandCheck(object, instance);
-      if (bodyUnusable(object)) {
+    async function consumeBody(object2, convertBytesToJSValue, instance) {
+      webidl.brandCheck(object2, instance);
+      if (bodyUnusable(object2)) {
         throw new TypeError("Body is unusable: Body has already been read");
       }
-      throwIfAborted(object[kState]);
+      throwIfAborted(object2[kState]);
       const promise = createDeferredPromise();
       const errorSteps = (error) => promise.reject(error);
       const successSteps = (data) => {
@@ -5457,15 +5457,15 @@ Content-Type: ${value.type || "application/octet-stream"}\r
           errorSteps(e);
         }
       };
-      if (object[kState].body == null) {
+      if (object2[kState].body == null) {
         successSteps(Buffer.allocUnsafe(0));
         return promise.promise;
       }
-      await fullyReadBody(object[kState].body, successSteps, errorSteps);
+      await fullyReadBody(object2[kState].body, successSteps, errorSteps);
       return promise.promise;
     }
-    function bodyUnusable(object) {
-      const body = object[kState].body;
+    function bodyUnusable(object2) {
+      const body = object2[kState].body;
       return body != null && (body.stream.locked || util.isDisturbed(body.stream));
     }
     function parseJSONFromBytes(bytes) {
@@ -7109,15 +7109,15 @@ var require_client_h2 = __commonJS({
     }
     function writeStream(abort, socket, expectsPayload, h2stream, body, client, request, contentLength) {
       assert(contentLength !== 0 || client[kRunning] === 0, "stream body cannot be pipelined");
-      const pipe = pipeline2(
+      const pipe2 = pipeline2(
         body,
         h2stream,
         (err) => {
           if (err) {
-            util.destroy(pipe, err);
+            util.destroy(pipe2, err);
             abort(err);
           } else {
-            util.removeAllListeners(pipe);
+            util.removeAllListeners(pipe2);
             request.onRequestSent();
             if (!expectsPayload) {
               socket[kReset] = true;
@@ -7126,7 +7126,7 @@ var require_client_h2 = __commonJS({
           }
         }
       );
-      util.addListener(pipe, "data", onPipeData);
+      util.addListener(pipe2, "data", onPipeData);
       function onPipeData(chunk) {
         request.onBodySent(chunk);
       }
@@ -8332,9 +8332,9 @@ var require_balanced_pool = __commonJS({
         if (allClientsBusy) {
           return;
         }
-        let counter = 0;
+        let counter2 = 0;
         let maxWeightIndex = this[kClients].findIndex((pool) => !pool[kNeedDrain]);
-        while (counter++ < this[kClients].length) {
+        while (counter2++ < this[kClients].length) {
           this[kIndex] = (this[kIndex] + 1) % this[kClients].length;
           const pool = this[kClients][this[kIndex]];
           if (pool[kWeight] > this[kClients][maxWeightIndex][kWeight] && !pool[kNeedDrain]) {
@@ -8956,7 +8956,7 @@ var require_retry_handler = __commonJS({
           errorCodes,
           methods
         } = retryOptions;
-        const { counter } = state;
+        const { counter: counter2 } = state;
         if (code7 && code7 !== "UND_ERR_REQ_RETRY" && !errorCodes.includes(code7)) {
           cb(err);
           return;
@@ -8969,7 +8969,7 @@ var require_retry_handler = __commonJS({
           cb(err);
           return;
         }
-        if (counter > maxRetries) {
+        if (counter2 > maxRetries) {
           cb(err);
           return;
         }
@@ -8978,7 +8978,7 @@ var require_retry_handler = __commonJS({
           retryAfterHeader = Number(retryAfterHeader);
           retryAfterHeader = Number.isNaN(retryAfterHeader) ? calculateRetryAfterHeader(retryAfterHeader) : retryAfterHeader * 1e3;
         }
-        const retryTimeout = retryAfterHeader > 0 ? Math.min(retryAfterHeader, maxTimeout) : Math.min(minTimeout * timeoutFactor ** (counter - 1), maxTimeout);
+        const retryTimeout = retryAfterHeader > 0 ? Math.min(retryAfterHeader, maxTimeout) : Math.min(minTimeout * timeoutFactor ** (counter2 - 1), maxTimeout);
         setTimeout(() => cb(null), retryTimeout);
       }
       onHeaders(statusCode, rawHeaders, resume, statusMessage) {
@@ -10463,10 +10463,10 @@ var require_mock_utils = __commonJS({
       }
     }
     function buildHeadersFromArray(headers) {
-      const clone = headers.slice();
+      const clone2 = headers.slice();
       const entries = [];
-      for (let index2 = 0; index2 < clone.length; index2 += 2) {
-        entries.push([clone[index2], clone[index2 + 1]]);
+      for (let index2 = 0; index2 < clone2.length; index2 += 2) {
+        entries.push([clone2[index2], clone2[index2 + 1]]);
       }
       return Object.fromEntries(entries);
     }
@@ -11566,8 +11566,8 @@ var require_dns = __commonJS({
         }
         this.#records.set(origin.hostname, records);
       }
-      getHandler(meta2, opts) {
-        return new DNSDispatchHandler(this, meta2, opts);
+      getHandler(meta3, opts) {
+        return new DNSDispatchHandler(this, meta3, opts);
       }
     };
     var DNSDispatchHandler = class extends DecoratorHandler {
@@ -11710,10 +11710,10 @@ var require_headers = __commonJS({
       while (j > i && isHTTPWhiteSpaceCharCode(potentialValue.charCodeAt(i))) ++i;
       return i === 0 && j === potentialValue.length ? potentialValue : potentialValue.substring(i, j);
     }
-    function fill(headers, object) {
-      if (Array.isArray(object)) {
-        for (let i = 0; i < object.length; ++i) {
-          const header = object[i];
+    function fill(headers, object2) {
+      if (Array.isArray(object2)) {
+        for (let i = 0; i < object2.length; ++i) {
+          const header = object2[i];
           if (header.length !== 2) {
             throw webidl.errors.exception({
               header: "Headers constructor",
@@ -11722,10 +11722,10 @@ var require_headers = __commonJS({
           }
           appendHeader(headers, header[0], header[1]);
         }
-      } else if (typeof object === "object" && object !== null) {
-        const keys2 = Object.keys(object);
+      } else if (typeof object2 === "object" && object2 !== null) {
+        const keys2 = Object.keys(object2);
         for (let i = 0; i < keys2.length; ++i) {
-          appendHeader(headers, keys2[i], object[keys2[i]]);
+          appendHeader(headers, keys2[i], object2[keys2[i]]);
         }
       } else {
         throw webidl.errors.conversionFailed({
@@ -11878,24 +11878,24 @@ var require_headers = __commonJS({
       // https://fetch.spec.whatwg.org/#convert-header-names-to-a-sorted-lowercase-set
       toSortedArray() {
         const size = this[kHeadersMap].size;
-        const array = new Array(size);
+        const array2 = new Array(size);
         if (size <= 32) {
           if (size === 0) {
-            return array;
+            return array2;
           }
           const iterator = this[kHeadersMap][Symbol.iterator]();
           const firstValue = iterator.next().value;
-          array[0] = [firstValue[0], firstValue[1].value];
+          array2[0] = [firstValue[0], firstValue[1].value];
           assert(firstValue[1].value !== null);
           for (let i = 1, j = 0, right = 0, left = 0, pivot = 0, x, value; i < size; ++i) {
             value = iterator.next().value;
-            x = array[i] = [value[0], value[1].value];
+            x = array2[i] = [value[0], value[1].value];
             assert(x[1] !== null);
             left = 0;
             right = i;
             while (left < right) {
               pivot = left + (right - left >> 1);
-              if (array[pivot][0] <= x[0]) {
+              if (array2[pivot][0] <= x[0]) {
                 left = pivot + 1;
               } else {
                 right = pivot;
@@ -11904,22 +11904,22 @@ var require_headers = __commonJS({
             if (i !== pivot) {
               j = i;
               while (j > left) {
-                array[j] = array[--j];
+                array2[j] = array2[--j];
               }
-              array[left] = x;
+              array2[left] = x;
             }
           }
           if (!iterator.next().done) {
             throw new TypeError("Unreachable");
           }
-          return array;
+          return array2;
         } else {
           let i = 0;
           for (const { 0: name, 1: { value } } of this[kHeadersMap]) {
-            array[i++] = [name, value];
+            array2[i++] = [name, value];
             assert(value !== null);
           }
-          return array.sort(compareHeaderName);
+          return array2.sort(compareHeaderName);
         }
       }
     };
@@ -14716,7 +14716,7 @@ var require_util4 = __commonJS({
     var { serializeAMimeType, parseMIMEType } = require_data_url();
     var { types } = __require("node:util");
     var { StringDecoder: StringDecoder2 } = __require("string_decoder");
-    var { btoa } = __require("node:buffer");
+    var { btoa: btoa2 } = __require("node:buffer");
     var staticPropertyDescriptors = {
       enumerable: true,
       writable: false,
@@ -14808,9 +14808,9 @@ var require_util4 = __commonJS({
           dataURL += ";base64,";
           const decoder4 = new StringDecoder2("latin1");
           for (const chunk of bytes) {
-            dataURL += btoa(decoder4.write(chunk));
+            dataURL += btoa2(decoder4.write(chunk));
           }
-          dataURL += btoa(decoder4.end());
+          dataURL += btoa2(decoder4.end());
           return dataURL;
         }
         case "Text": {
@@ -14827,7 +14827,7 @@ var require_util4 = __commonJS({
           if (encoding === "failure") {
             encoding = "UTF-8";
           }
-          return decode2(bytes, encoding);
+          return decode3(bytes, encoding);
         }
         case "ArrayBuffer": {
           const sequence = combineByteSequences(bytes);
@@ -14844,7 +14844,7 @@ var require_util4 = __commonJS({
         }
       }
     }
-    function decode2(ioQueue, encoding) {
+    function decode3(ioQueue, encoding) {
       const bytes = combineByteSequences(ioQueue);
       const BOMEncoding = BOMSniffing(bytes);
       let slice = 0;
@@ -15986,11 +15986,11 @@ var require_util6 = __commonJS({
       "Dec"
     ];
     var IMFPaddedNumbers = Array(61).fill(0).map((_, i) => i.toString().padStart(2, "0"));
-    function toIMFDate(date) {
-      if (typeof date === "number") {
-        date = new Date(date);
+    function toIMFDate(date2) {
+      if (typeof date2 === "number") {
+        date2 = new Date(date2);
       }
-      return `${IMFDays[date.getUTCDay()]}, ${IMFPaddedNumbers[date.getUTCDate()]} ${IMFMonths[date.getUTCMonth()]} ${date.getUTCFullYear()} ${IMFPaddedNumbers[date.getUTCHours()]}:${IMFPaddedNumbers[date.getUTCMinutes()]}:${IMFPaddedNumbers[date.getUTCSeconds()]} GMT`;
+      return `${IMFDays[date2.getUTCDay()]}, ${IMFPaddedNumbers[date2.getUTCDate()]} ${IMFMonths[date2.getUTCMonth()]} ${date2.getUTCFullYear()} ${IMFPaddedNumbers[date2.getUTCHours()]}:${IMFPaddedNumbers[date2.getUTCMinutes()]}:${IMFPaddedNumbers[date2.getUTCSeconds()]} GMT`;
     }
     function validateCookieMaxAge(maxAge) {
       if (maxAge < 0) {
@@ -18846,7 +18846,7 @@ var require_extend = __commonJS({
       }
       return toStr.call(arr) === "[object Array]";
     };
-    var isPlainObject2 = function isPlainObject3(obj2) {
+    var isPlainObject3 = function isPlainObject4(obj2) {
       if (!obj2 || toStr.call(obj2) !== "[object Object]") {
         return false;
       }
@@ -18882,8 +18882,8 @@ var require_extend = __commonJS({
       }
       return obj2[name];
     };
-    module.exports = function extend2() {
-      var options, name, src, copy, copyIsArray, clone;
+    module.exports = function extend3() {
+      var options, name, src, copy, copyIsArray, clone2;
       var target = arguments[0];
       var i = 1;
       var length = arguments.length;
@@ -18903,14 +18903,14 @@ var require_extend = __commonJS({
             src = getProperty(target, name);
             copy = getProperty(options, name);
             if (target !== copy) {
-              if (deep && copy && (isPlainObject2(copy) || (copyIsArray = isArray(copy)))) {
+              if (deep && copy && (isPlainObject3(copy) || (copyIsArray = isArray(copy)))) {
                 if (copyIsArray) {
                   copyIsArray = false;
-                  clone = src && isArray(src) ? src : [];
+                  clone2 = src && isArray(src) ? src : [];
                 } else {
-                  clone = src && isPlainObject2(src) ? src : {};
+                  clone2 = src && isPlainObject3(src) ? src : {};
                 }
-                setProperty(target, { name, newValue: extend2(deep, clone, copy) });
+                setProperty(target, { name, newValue: extend3(deep, clone2, copy) });
               } else if (typeof copy !== "undefined") {
                 setProperty(target, { name, newValue: copy });
               }
@@ -19154,52 +19154,52 @@ function decodeEvent(raw2) {
   const ev = str(raw2, "ev");
   const sf = str(raw2, "sf");
   const id = str(raw2, "id");
-  const unknown3 = () => defined({ ev: "unknown", raw: raw2 }, { sf });
+  const unknown4 = () => defined({ ev: "unknown", raw: raw2 }, { sf });
   switch (ev) {
     case "ack": {
       const s2 = num(raw2, "s");
-      return sf !== void 0 && s2 !== void 0 ? { ev, sf, s: s2, raw: raw2 } : unknown3();
+      return sf !== void 0 && s2 !== void 0 ? { ev, sf, s: s2, raw: raw2 } : unknown4();
     }
     case "resize": {
       const cols = num(raw2, "cols");
       if (cols === void 0)
-        return unknown3();
+        return unknown4();
       return defined({ ev, cols, raw: raw2 }, { sf, cell: cell(raw2), visible: bool(raw2, "visible") });
     }
     case "theme": {
       const dark = bool(raw2, "dark");
-      return dark !== void 0 ? { ev, dark, raw: raw2 } : unknown3();
+      return dark !== void 0 ? { ev, dark, raw: raw2 } : unknown4();
     }
     case "motion": {
       const reduce = bool(raw2, "reduce");
-      return reduce !== void 0 ? { ev, reduce, raw: raw2 } : unknown3();
+      return reduce !== void 0 ? { ev, reduce, raw: raw2 } : unknown4();
     }
     case "visible": {
       const visible = bool(raw2, "visible");
-      return visible !== void 0 ? defined({ ev, visible, raw: raw2 }, { sf }) : unknown3();
+      return visible !== void 0 ? defined({ ev, visible, raw: raw2 }, { sf }) : unknown4();
     }
     case "toggle": {
       const collapsed = bool(raw2, "collapsed");
       if (sf === void 0 || id === void 0 || collapsed === void 0)
-        return unknown3();
+        return unknown4();
       return defined({ ev, sf, id, collapsed, raw: raw2 }, { key: str(raw2, "key") });
     }
     case "select":
     case "activate": {
       const item3 = str(raw2, "item") ?? id;
       if (sf === void 0 || id === void 0 || item3 === void 0)
-        return unknown3();
+        return unknown4();
       return defined({ ev, sf, id, item: item3, raw: raw2 }, { values: formValues(raw2) });
     }
     case "action": {
       const act = str(raw2, "act");
       if (sf === void 0 || id === void 0 || act === void 0)
-        return unknown3();
+        return unknown4();
       return defined({ ev, sf, id, act, raw: raw2 }, { value: str(raw2, "value"), mods: mods(raw2), values: formValues(raw2) });
     }
     case "change": {
       if (sf === void 0 || id === void 0)
-        return unknown3();
+        return unknown4();
       return defined({ ev, sf, id, raw: raw2 }, {
         value: raw2["value"],
         checked: bool(raw2, "checked"),
@@ -19210,7 +19210,7 @@ function decodeEvent(raw2) {
     }
     case "focus":
     case "undo":
-      return sf !== void 0 && id !== void 0 ? { ev, sf, id, raw: raw2 } : unknown3();
+      return sf !== void 0 && id !== void 0 ? { ev, sf, id, raw: raw2 } : unknown4();
     case "edit": {
       const from = num(raw2, "from");
       const to = num(raw2, "to");
@@ -19218,20 +19218,20 @@ function decodeEvent(raw2) {
       const cursor = num(raw2, "cursor");
       const len = num(raw2, "len");
       if (sf === void 0 || id === void 0 || from === void 0 || to === void 0 || text11 === void 0 || cursor === void 0 || len === void 0) {
-        return unknown3();
+        return unknown4();
       }
       return { ev, sf, id, from, to, text: text11, cursor, len, raw: raw2 };
     }
     case "send": {
       const text11 = str(raw2, "text");
-      return sf !== void 0 && id !== void 0 && text11 !== void 0 ? { ev, sf, id, text: text11, raw: raw2 } : unknown3();
+      return sf !== void 0 && id !== void 0 && text11 !== void 0 ? { ev, sf, id, text: text11, raw: raw2 } : unknown4();
     }
     case "error":
       return defined({ ev, msg: str(raw2, "msg") ?? "", raw: raw2 }, { sf, s: num(raw2, "s"), op: num(raw2, "op"), sheet: str(raw2, "sheet"), id });
     case "gone":
       return defined({ ev, ids: strings(raw2, "ids") ?? [], raw: raw2 }, { sf });
     default:
-      return unknown3();
+      return unknown4();
   }
 }
 function decodeReply(raw2) {
@@ -19418,14 +19418,14 @@ var InputParser = class {
         this.#held = bytes.slice(bytes.length - hold);
         return out;
       }
-      const esc = bytes.indexOf(ESC, i);
-      if (esc < 0)
+      const esc2 = bytes.indexOf(ESC, i);
+      if (esc2 < 0)
         break;
-      const found = escapeAt(bytes, esc);
+      const found = escapeAt(bytes, esc2);
       switch (found.kind) {
         case "need":
-          pass(esc);
-          this.#held = bytes.slice(esc);
+          pass(esc2);
+          this.#held = bytes.slice(esc2);
           return out;
         case "pass":
           i = found.end;
@@ -19435,13 +19435,13 @@ var InputParser = class {
           this.#paste = true;
           break;
         case "da1":
-          pass(esc);
+          pass(esc2);
           out.push({ type: "da1" });
           i = found.end;
           keys2 = i;
           break;
         case "tsp":
-          pass(esc);
+          pass(esc2);
           this.#message = { parts: [], size: 0, esc: false };
           i = found.start;
           keys2 = i;
@@ -22249,7 +22249,7 @@ var hubsEn = {
         lastTurn: "Last turn",
         // {0} replay index, {1} history length
         replay: (index2, total) => `Replay ${index2}/${total}`,
-        finishedAt: (time) => ` \xB7 finished ${time}`
+        finishedAt: (time2) => ` \xB7 finished ${time2}`
       },
       // {0} max spawn depth, {1} max concurrent children
       caps: (depth, children3) => `caps d${depth}/${children3}`,
@@ -23462,7 +23462,7 @@ var subscriptionEn = {
       plan: (plan) => `Plan: ${plan}`,
       transition: (to) => ` \u2192 ${to}`,
       left: (amount) => ` \xB7 ${amount} left`,
-      renews: (date) => ` \xB7 renews ${date}`,
+      renews: (date2) => ` \xB7 renews ${date2}`,
       viewOnly: " \xB7 view only",
       // The pending-transition target when the subscription cancels at period end.
       cancels: "cancels"
@@ -23504,7 +23504,7 @@ var subscriptionEn = {
       upgradeNowProrated: "Upgrade now (prorated charge)",
       scheduleChangeTo: (plan) => `Schedule change to ${plan}`,
       // {0} current plan name, {1} period-end date
-      cancelBody: (plan, date) => `Cancel ${plan} \u2014 it stays active until ${date}, then will not renew.`,
+      cancelBody: (plan, date2) => `Cancel ${plan} \u2014 it stays active until ${date2}, then will not renew.`,
       cancelKeepCredits: "You keep your remaining credits for this period. You can resume before it ends.",
       upgradeTo: (plan) => `Upgrade to ${plan}.`,
       chargedNow: (amount) => `You will be charged ${amount} now (prorated).`,
@@ -23513,7 +23513,7 @@ var subscriptionEn = {
       cardCharged: (card) => `${card} \u2014 the card on your subscription \u2014 will be charged.`,
       cardChargedGeneric: "The card on your subscription will be charged.",
       // {0} target plan name, {1} effective date
-      scheduledBody: (plan, date) => `Change to ${plan} \u2014 takes effect ${date}. No charge now; you keep your current plan until then.`,
+      scheduledBody: (plan, date2) => `Change to ${plan} \u2014 takes effect ${date2}. No charge now; you keep your current plan until then.`,
       noOp: (plan) => `You are already on ${plan} \u2014 nothing to change.`,
       blockedFallback: "That change cannot be made here \u2014 manage it on the portal.",
       hint: "\u2191/\u2193 select \xB7 Enter confirm \xB7 Esc back"
@@ -24901,6 +24901,14 @@ function record(v) {
   return v && typeof v === "object" && !Array.isArray(v) ? v : void 0;
 }
 
+// src/wire/rpc.ts
+function rpc(gw2, method, params) {
+  return gw2.request(method, params);
+}
+async function rpcParsed(gw2, method, params, schema2) {
+  return schema2.parse(await gw2.request(method, params));
+}
+
 // src/agents/liveLog.ts
 var LINE = /^(\d{2}:\d{2}:\d{2}) (\S+)\s*\| (.*)$/;
 var TOOL = /^-> ([^(]+)\((.*)\)$/;
@@ -24952,9 +24960,9 @@ function final(log, at, body) {
   if (status) {
     log.status = status;
   }
-  const duration3 = /(?:^|\s)duration=([\d.]+)s/.exec(body)?.[1];
-  if (duration3) {
-    log.duration = Number(duration3);
+  const duration4 = /(?:^|\s)duration=([\d.]+)s/.exec(body)?.[1];
+  if (duration4) {
+    log.duration = Number(duration4);
   }
   const summary4 = /summary: (.*)$/.exec(body)?.[1];
   if (summary4) {
@@ -24968,7 +24976,7 @@ function final(log, at, body) {
   if (error) {
     log.error = error;
   }
-  if (!status && !duration3 && !summary4) {
+  if (!status && !duration4 && !summary4) {
     log.entries.push({ at, kind: "note", text: body });
   }
 }
@@ -25059,24 +25067,25 @@ var Agents = class {
   }
   /** Queues steering text into a running agent; the owner answers `queued` or `rejected`. */
   async steer(a2, text11) {
-    const r = await this.#host.gw.request("subagent.steer", {
-      session_id: this.#host.sid,
-      subagent_id: a2.id,
-      text: text11
-    });
+    const sid = this.#host.sid;
+    if (!sid) {
+      return false;
+    }
+    const r = await rpc(this.#host.gw, "subagent.steer", { session_id: sid, subagent_id: a2.id, text: text11 });
     return r?.status === "queued";
   }
   /** Interrupts a running agent; its partial result still returns to the parent. */
   async stop(a2) {
-    const r = await this.#host.gw.request("subagent.interrupt", {
-      session_id: this.#host.sid,
-      subagent_id: a2.id
-    });
+    const sid = this.#host.sid;
+    if (!sid) {
+      return false;
+    }
+    const r = await rpc(this.#host.gw, "subagent.interrupt", { session_id: sid, subagent_id: a2.id });
     return Boolean(r?.found);
   }
   /** Blocks (or unblocks) new subagent spawns on the gateway; running children keep going. */
   async pause(paused) {
-    const r = await this.#host.gw.request("delegation.pause", {
+    const r = await rpc(this.#host.gw, "delegation.pause", {
       paused,
       ...this.#host.sid ? { session_id: this.#host.sid } : {}
     });
@@ -25188,7 +25197,7 @@ var Agents = class {
     }
     let rows;
     try {
-      rows = (await this.#host.gw.request("subagent.list", { session_id: sid }))?.subagents ?? [];
+      rows = (await rpc(this.#host.gw, "subagent.list", { session_id: sid }))?.subagents ?? [];
     } catch {
       return;
     }
@@ -25263,7 +25272,7 @@ var Agents = class {
     const siblings = list8.filter((a2) => a2.parentId === parent.id).length;
     const child = {
       calls: 0,
-      delegationId: row2.delegation_id,
+      delegationId: row2.delegation_id ?? void 0,
       depth: (parent.depth ?? 0) + 1,
       goal: row2.goal ?? "",
       id: row2.subagent_id,
@@ -25300,9 +25309,9 @@ var Agents = class {
     }
     const a2 = {
       calls: 0,
-      delegationId: row2.delegation_id,
+      delegationId: row2.delegation_id ?? void 0,
       depth: 0,
-      goal: row2.goal,
+      goal: row2.goal ?? goal,
       id: row2.subagent_id,
       index: index2,
       key: `p${index2}`,
@@ -25340,7 +25349,7 @@ var Agents = class {
     }
     if (text11 === void 0 && this.#listed.has(a2.id) && this.#host.sid) {
       try {
-        const r = await this.#host.gw.request("subagent.tail", {
+        const r = await rpc(this.#host.gw, "subagent.tail", {
           session_id: this.#host.sid,
           subagent_id: a2.id
         });
@@ -25600,7 +25609,7 @@ var Automation = class {
   async #read(sid) {
     const seq = this.#seq;
     try {
-      const r = await this.#host.gw.request("session.control.read", { session_id: sid });
+      const r = await rpc(this.#host.gw, "session.control.read", { session_id: sid });
       if (sid === this.#sid && seq === this.#seq) {
         this.#set(r?.control ?? null);
       }
@@ -25616,10 +25625,7 @@ var Automation = class {
     this.pending = action;
     this.#host.changed();
     try {
-      const r = await this.#host.gw.request(
-        "session.control",
-        { action, session_id: sid }
-      );
+      const r = await rpc(this.#host.gw, "session.control", { action, session_id: sid });
       this.apply(sid, r?.control);
       if (r?.dispatch?.type && sid === this.#host.sid) {
         await this.#host.runDispatch(r.dispatch, `/${action.replace(".", " ")}`);
@@ -25685,23 +25691,25 @@ function launchEnv() {
 
 // src/hermes/mutate.ts
 import { randomUUID as randomUUID2 } from "node:crypto";
+var isSafeInteger = (value) => Number.isSafeInteger(value);
 async function currentGeneration(gw2, sid) {
-  const snapshot3 = await gw2.request("session.resume", { session_id: sid });
-  if (!Number.isSafeInteger(snapshot3?.execution_generation)) {
+  const snapshot3 = await rpc(gw2, "session.resume", { session_id: sid });
+  const generation = snapshot3 && "execution_generation" in snapshot3 ? snapshot3.execution_generation : void 0;
+  if (!isSafeInteger(generation)) {
     throw new Error("The session did not report its execution generation; try again.");
   }
-  return snapshot3.execution_generation;
+  return generation;
 }
 async function mutateSession(gw2, sid, operation, payload) {
-  const snapshot3 = await gw2.request("session.resume", { session_id: sid });
-  if (!Number.isSafeInteger(snapshot3?.revision) || !Number.isSafeInteger(snapshot3?.execution_generation)) {
+  const snapshot3 = await rpc(gw2, "session.resume", { session_id: sid });
+  if (!snapshot3 || !("revision" in snapshot3) || !isSafeInteger(snapshot3.revision) || !isSafeInteger(snapshot3.execution_generation)) {
     throw new Error("The session did not report its revision; try again.");
   }
   const body = typeof payload === "function" ? payload(snapshot3) : payload;
   if (!body) {
     return null;
   }
-  const result = await gw2.request("session.mutate", {
+  const result = await rpc(gw2, "session.mutate", {
     session_id: sid,
     request_id: randomUUID2(),
     expected_revision: snapshot3.revision,
@@ -25741,12 +25749,12 @@ function modelPayload(arg) {
 var preview = (text11) => text11.length > 60 ? `${text11.slice(0, 57)}\u2026` : text11;
 async function interruptTurn(gw2, sid) {
   const execution_generation = await currentGeneration(gw2, sid);
-  await gw2.request("session.interrupt", { session_id: sid, execution_generation });
+  await rpc(gw2, "session.interrupt", { session_id: sid, execution_generation });
 }
 async function steerTurn(gw2, sid, text11) {
   try {
     const execution_generation = await currentGeneration(gw2, sid);
-    const r = await gw2.request("session.steer", { session_id: sid, execution_generation, text: text11 });
+    const r = await rpc(gw2, "session.steer", { session_id: sid, execution_generation, text: text11 });
     return r?.status === "queued" ? { ok: true } : { ok: false };
   } catch (e) {
     return errorText(e).includes("stale_generation") ? { ok: false } : { error: errorText(e), ok: false };
@@ -25755,7 +25763,7 @@ async function steerTurn(gw2, sid, text11) {
 async function redirectTurn(gw2, sid, text11) {
   try {
     const execution_generation = await currentGeneration(gw2, sid);
-    const r = await gw2.request("session.redirect", { session_id: sid, execution_generation, text: text11 });
+    const r = await rpc(gw2, "session.redirect", { session_id: sid, execution_generation, text: text11 });
     return r?.status === "redirected" || r?.status === "queued" ? { ok: true } : { ok: false };
   } catch (e) {
     return errorText(e).includes("stale_generation") ? { ok: false } : { error: errorText(e), ok: false };
@@ -25801,7 +25809,7 @@ async function stop(host) {
     }
   }
   try {
-    const r = await host.gw.request("process.stop", { session_id: host.sid });
+    const r = await rpc(host.gw, "process.stop", { session_id: host.sid });
     if (typeof r?.killed === "number") {
       notes.push(`Stopped ${r.killed} background process${r.killed === 1 ? "" : "es"}.`);
     }
@@ -25818,7 +25826,7 @@ async function tools(host, arg) {
     return host.notice("No active session.", "warning");
   }
   try {
-    const r = await host.gw.request("tools.show", { session_id: host.sid });
+    const r = await rpc(host.gw, "tools.show", { session_id: host.sid });
     const sections2 = (r?.sections ?? []).filter((s2) => s2.tools?.length);
     const lines = sections2.map((s2) => `[${s2.name}] ${s2.tools.map((t2) => t2.name).join(", ")}`);
     host.notice(lines.length ? [...lines, `Total: ${r?.total ?? 0} tools`].join("\n") : "No tools available.");
@@ -25834,7 +25842,7 @@ async function side(host, text11, kind) {
     return host.notice("No active session.", "warning");
   }
   try {
-    const r = await host.gw.request(kind === "bg" ? "prompt.background" : "prompt.btw", {
+    const r = await rpc(host.gw, kind === "bg" ? "prompt.background" : "prompt.btw", {
       session_id: host.sid,
       text: text11
     });
@@ -25873,7 +25881,7 @@ async function setFast(host, value) {
     return false;
   }
   try {
-    const r = await host.gw.request("config.set", { key: "fast", session_id: sid, value });
+    const r = await rpc(host.gw, "config.set", { key: "fast", session_id: sid, value });
     const word = fastWord(r?.value);
     if (sid === host.session.ref.live) {
       host.session.info = { ...host.session.info, fast: word !== "normal", service_tier: TIERS[word] };
@@ -25893,7 +25901,7 @@ async function setFast(host, value) {
 }
 async function fastCommand(host, arg) {
   if (arg.trim().toLowerCase() === "status") {
-    const r = await host.gw.request("config.get", { key: "fast", session_id: host.session.ref.live });
+    const r = await rpc(host.gw, "config.get", { key: "fast", session_id: host.session.ref.live });
     return host.transcript.notice(`Fast mode: ${fastWord(r?.value)}.`);
   }
   const value = fastValue(arg);
@@ -26275,7 +26283,7 @@ async function uploadImage(gw2, sid, raw2, cwd) {
   if (!format) {
     throw new Error(`${extname2(path2) || "this file"} is not a PNG, JPEG, GIF or WebP image`);
   }
-  const r = await gw2.request("image.attach_bytes", {
+  const r = await rpc(gw2, "image.attach_bytes", {
     session_id: sid,
     filename: `image${format.ext}`,
     content_base64: bytes.toString("base64")
@@ -27248,14 +27256,14 @@ var Transcript = class {
         turn.endedAt = Math.max(turn.endedAt ?? at, at);
       }
       if (m.role === "assistant") {
-        const meta2 = record(m.display_metadata);
+        const meta3 = record(m.display_metadata);
         const thought = storedThought(m);
         if (thought.trim()) {
           turn.blocks.push({ endedAt: at, id: this.id("k"), kind: "thinking", startedAt: at, text: thought });
         }
         if (m.display_kind === "failed_turn") {
-          const surface = record(meta2?.error_surface);
-          const error = str4(meta2?.error) ?? str4(surface?.message);
+          const surface = record(meta3?.error_surface);
+          const error = str4(meta3?.error) ?? str4(surface?.message);
           turn.status = "error";
           Object.assign(turn, error ? failure(error, surface?.code) : {});
           turn.errorHint = text11.trim() || void 0;
@@ -27270,7 +27278,7 @@ var Transcript = class {
         if (reply.trim()) {
           turn.blocks.push({ id: this.id("x"), kind: "text", text: reply });
         }
-        if (meta2?.interrupted === true) {
+        if (meta3?.interrupted === true) {
           turn.status = "interrupted";
         }
       } else if (m.role === "tool") {
@@ -27575,15 +27583,15 @@ function displayNotice(kind, metadata) {
   if (kind !== "async_delegation_complete" && kind !== "process_complete") {
     return void 0;
   }
-  const meta2 = record(metadata);
-  const shown = typeof meta2?.display_text === "string" ? meta2.display_text.trim() : "";
+  const meta3 = record(metadata);
+  const shown = typeof meta3?.display_text === "string" ? meta3.display_text.trim() : "";
   if (shown) {
     return shown;
   }
   if (kind === "process_complete") {
     return "Background command finished";
   }
-  const count = typeof meta2?.task_count === "number" ? meta2.task_count : void 0;
+  const count = typeof meta3?.task_count === "number" ? meta3.task_count : void 0;
   return count === 1 ? "Subagent finished" : count === void 0 ? "Subagents finished" : `${count} subagents finished`;
 }
 var INTERNAL_FOOTER = "[INTERNAL NOTIFICATION \u2014 generated by the Hermes gateway";
@@ -27648,6 +27656,1007 @@ function steerState(turn, index2) {
     return "landed";
   }
   return turn.status === "live" ? "pending" : "next";
+}
+
+// node_modules/zod/v4/core/core.js
+var _a;
+// @__NO_SIDE_EFFECTS__
+function $constructor(name, initializer2, params) {
+  function init(inst, def) {
+    if (!inst._zod) {
+      Object.defineProperty(inst, "_zod", {
+        value: {
+          def,
+          constr: _,
+          traits: /* @__PURE__ */ new Set()
+        },
+        enumerable: false
+      });
+    }
+    if (inst._zod.traits.has(name)) {
+      return;
+    }
+    inst._zod.traits.add(name);
+    initializer2(inst, def);
+    const proto2 = _.prototype;
+    const keys2 = Object.keys(proto2);
+    for (let i = 0; i < keys2.length; i++) {
+      const k = keys2[i];
+      if (!(k in inst)) {
+        inst[k] = proto2[k].bind(inst);
+      }
+    }
+  }
+  const Parent = params?.Parent ?? Object;
+  class Definition extends Parent {
+  }
+  Object.defineProperty(Definition, "name", { value: name });
+  function _(def) {
+    var _a3;
+    const inst = params?.Parent ? new Definition() : this;
+    init(inst, def);
+    (_a3 = inst._zod).deferred ?? (_a3.deferred = []);
+    for (const fn of inst._zod.deferred) {
+      fn();
+    }
+    return inst;
+  }
+  Object.defineProperty(_, "init", { value: init });
+  Object.defineProperty(_, Symbol.hasInstance, {
+    value: (inst) => {
+      if (params?.Parent && inst instanceof params.Parent)
+        return true;
+      return inst?._zod?.traits?.has(name);
+    }
+  });
+  Object.defineProperty(_, "name", { value: name });
+  return _;
+}
+var $ZodAsyncError = class extends Error {
+  constructor() {
+    super(`Encountered Promise during synchronous parse. Use .parseAsync() instead.`);
+  }
+};
+var $ZodEncodeError = class extends Error {
+  constructor(name) {
+    super(`Encountered unidirectional transform during encode: ${name}`);
+    this.name = "ZodEncodeError";
+  }
+};
+(_a = globalThis).__zod_globalConfig ?? (_a.__zod_globalConfig = {});
+var globalConfig = globalThis.__zod_globalConfig;
+function config(newConfig) {
+  if (newConfig)
+    Object.assign(globalConfig, newConfig);
+  return globalConfig;
+}
+
+// node_modules/zod/v4/core/util.js
+function jsonStringifyReplacer(_, value) {
+  if (typeof value === "bigint")
+    return value.toString();
+  return value;
+}
+function cached(getter) {
+  const set = false;
+  return {
+    get value() {
+      if (!set) {
+        const value = getter();
+        Object.defineProperty(this, "value", { value });
+        return value;
+      }
+      throw new Error("cached value already set");
+    }
+  };
+}
+function cleanRegex(source) {
+  const start = source.startsWith("^") ? 1 : 0;
+  const end = source.endsWith("$") ? source.length - 1 : source.length;
+  return source.slice(start, end);
+}
+var EVALUATING = /* @__PURE__ */ Symbol("evaluating");
+function defineLazy(object2, key2, getter) {
+  let value = void 0;
+  Object.defineProperty(object2, key2, {
+    get() {
+      if (value === EVALUATING) {
+        return void 0;
+      }
+      if (value === void 0) {
+        value = EVALUATING;
+        value = getter();
+      }
+      return value;
+    },
+    set(v) {
+      Object.defineProperty(object2, key2, {
+        value: v
+        // configurable: true,
+      });
+    },
+    configurable: true
+  });
+}
+var captureStackTrace = "captureStackTrace" in Error ? Error.captureStackTrace : (..._args) => {
+};
+function isObject(data) {
+  return typeof data === "object" && data !== null && !Array.isArray(data);
+}
+function clone(inst, def, params) {
+  const cl = new inst._zod.constr(def ?? inst._zod.def);
+  if (!def || params?.parent)
+    cl._zod.parent = inst;
+  return cl;
+}
+function normalizeParams(_params) {
+  const params = _params;
+  if (!params)
+    return {};
+  if (typeof params === "string")
+    return { error: () => params };
+  if (params?.message !== void 0) {
+    if (params?.error !== void 0)
+      throw new Error("Cannot specify both `message` and `error` params");
+    params.error = params.message;
+  }
+  delete params.message;
+  if (typeof params.error === "string")
+    return { ...params, error: () => params.error };
+  return params;
+}
+function optionalKeys(shape) {
+  return Object.keys(shape).filter((k) => {
+    return shape[k]._zod.optin === "optional" && shape[k]._zod.optout === "optional";
+  });
+}
+var NUMBER_FORMAT_RANGES = {
+  safeint: [Number.MIN_SAFE_INTEGER, Number.MAX_SAFE_INTEGER],
+  int32: [-2147483648, 2147483647],
+  uint32: [0, 4294967295],
+  float32: [-34028234663852886e22, 34028234663852886e22],
+  float64: [-Number.MAX_VALUE, Number.MAX_VALUE]
+};
+function aborted(x, startIndex = 0) {
+  if (x.aborted === true)
+    return true;
+  for (let i = startIndex; i < x.issues.length; i++) {
+    if (x.issues[i]?.continue !== true) {
+      return true;
+    }
+  }
+  return false;
+}
+function explicitlyAborted(x, startIndex = 0) {
+  if (x.aborted === true)
+    return true;
+  for (let i = startIndex; i < x.issues.length; i++) {
+    if (x.issues[i]?.continue === false) {
+      return true;
+    }
+  }
+  return false;
+}
+function prefixIssues(path2, issues) {
+  return issues.map((iss) => {
+    var _a3;
+    (_a3 = iss).path ?? (_a3.path = []);
+    iss.path.unshift(path2);
+    return iss;
+  });
+}
+function unwrapMessage(message) {
+  return typeof message === "string" ? message : message?.message;
+}
+function finalizeIssue(iss, ctx, config3) {
+  const message = iss.message ? iss.message : unwrapMessage(iss.inst?._zod.def?.error?.(iss)) ?? unwrapMessage(ctx?.error?.(iss)) ?? unwrapMessage(config3.customError?.(iss)) ?? unwrapMessage(config3.localeError?.(iss)) ?? "Invalid input";
+  const { inst: _inst, continue: _continue, input: _input, ...rest } = iss;
+  rest.path ?? (rest.path = []);
+  rest.message = message;
+  if (ctx?.reportInput) {
+    rest.input = _input;
+  }
+  return rest;
+}
+
+// node_modules/zod/v4/core/errors.js
+var initializer = (inst, def) => {
+  inst.name = "$ZodError";
+  Object.defineProperty(inst, "_zod", {
+    value: inst._zod,
+    enumerable: false
+  });
+  Object.defineProperty(inst, "issues", {
+    value: def,
+    enumerable: false
+  });
+  inst.message = JSON.stringify(def, jsonStringifyReplacer, 2);
+  Object.defineProperty(inst, "toString", {
+    value: () => inst.message,
+    enumerable: false
+  });
+};
+var $ZodError = $constructor("$ZodError", initializer);
+var $ZodRealError = $constructor("$ZodError", initializer, { Parent: Error });
+
+// node_modules/zod/v4/core/parse.js
+var _parse = (_Err) => (schema2, value, _ctx, _params) => {
+  const ctx = _ctx ? { ..._ctx, async: false } : { async: false };
+  const result = schema2._zod.run({ value, issues: [] }, ctx);
+  if (result instanceof Promise) {
+    throw new $ZodAsyncError();
+  }
+  if (result.issues.length) {
+    const e = new (_params?.Err ?? _Err)(result.issues.map((iss) => finalizeIssue(iss, ctx, config())));
+    captureStackTrace(e, _params?.callee);
+    throw e;
+  }
+  return result.value;
+};
+var parse = /* @__PURE__ */ _parse($ZodRealError);
+var _parseAsync = (_Err) => async (schema2, value, _ctx, params) => {
+  const ctx = _ctx ? { ..._ctx, async: true } : { async: true };
+  let result = schema2._zod.run({ value, issues: [] }, ctx);
+  if (result instanceof Promise)
+    result = await result;
+  if (result.issues.length) {
+    const e = new (params?.Err ?? _Err)(result.issues.map((iss) => finalizeIssue(iss, ctx, config())));
+    captureStackTrace(e, params?.callee);
+    throw e;
+  }
+  return result.value;
+};
+var parseAsync = /* @__PURE__ */ _parseAsync($ZodRealError);
+var _safeParse = (_Err) => (schema2, value, _ctx) => {
+  const ctx = _ctx ? { ..._ctx, async: false } : { async: false };
+  const result = schema2._zod.run({ value, issues: [] }, ctx);
+  if (result instanceof Promise) {
+    throw new $ZodAsyncError();
+  }
+  return result.issues.length ? {
+    success: false,
+    error: new (_Err ?? $ZodError)(result.issues.map((iss) => finalizeIssue(iss, ctx, config())))
+  } : { success: true, data: result.value };
+};
+var safeParse = /* @__PURE__ */ _safeParse($ZodRealError);
+var _safeParseAsync = (_Err) => async (schema2, value, _ctx) => {
+  const ctx = _ctx ? { ..._ctx, async: true } : { async: true };
+  let result = schema2._zod.run({ value, issues: [] }, ctx);
+  if (result instanceof Promise)
+    result = await result;
+  return result.issues.length ? {
+    success: false,
+    error: new _Err(result.issues.map((iss) => finalizeIssue(iss, ctx, config())))
+  } : { success: true, data: result.value };
+};
+var safeParseAsync = /* @__PURE__ */ _safeParseAsync($ZodRealError);
+
+// node_modules/zod/v4/core/regexes.js
+var dateSource = `(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))`;
+var date = /* @__PURE__ */ new RegExp(`^${dateSource}$`);
+var string = (params) => {
+  const regex = params ? `[\\s\\S]{${params?.minimum ?? 0},${params?.maximum ?? ""}}` : `[\\s\\S]*`;
+  return new RegExp(`^${regex}$`);
+};
+var number = /^-?\d+(?:\.\d+)?$/;
+
+// node_modules/zod/v4/core/versions.js
+var version = {
+  major: 4,
+  minor: 4,
+  patch: 3
+};
+
+// node_modules/zod/v4/core/schemas.js
+var $ZodType = /* @__PURE__ */ $constructor("$ZodType", (inst, def) => {
+  var _a3;
+  inst ?? (inst = {});
+  inst._zod.def = def;
+  inst._zod.bag = inst._zod.bag || {};
+  inst._zod.version = version;
+  const checks2 = [...inst._zod.def.checks ?? []];
+  if (inst._zod.traits.has("$ZodCheck")) {
+    checks2.unshift(inst);
+  }
+  for (const ch of checks2) {
+    for (const fn of ch._zod.onattach) {
+      fn(inst);
+    }
+  }
+  if (checks2.length === 0) {
+    (_a3 = inst._zod).deferred ?? (_a3.deferred = []);
+    inst._zod.deferred?.push(() => {
+      inst._zod.run = inst._zod.parse;
+    });
+  } else {
+    const runChecks = (payload, checks3, ctx) => {
+      let isAborted = aborted(payload);
+      let asyncResult;
+      for (const ch of checks3) {
+        if (ch._zod.def.when) {
+          if (explicitlyAborted(payload))
+            continue;
+          const shouldRun = ch._zod.def.when(payload);
+          if (!shouldRun)
+            continue;
+        } else if (isAborted) {
+          continue;
+        }
+        const currLen = payload.issues.length;
+        const _ = ch._zod.check(payload);
+        if (_ instanceof Promise && ctx?.async === false) {
+          throw new $ZodAsyncError();
+        }
+        if (asyncResult || _ instanceof Promise) {
+          asyncResult = (asyncResult ?? Promise.resolve()).then(async () => {
+            await _;
+            const nextLen = payload.issues.length;
+            if (nextLen === currLen)
+              return;
+            if (!isAborted)
+              isAborted = aborted(payload, currLen);
+          });
+        } else {
+          const nextLen = payload.issues.length;
+          if (nextLen === currLen)
+            continue;
+          if (!isAborted)
+            isAborted = aborted(payload, currLen);
+        }
+      }
+      if (asyncResult) {
+        return asyncResult.then(() => {
+          return payload;
+        });
+      }
+      return payload;
+    };
+    const handleCanaryResult = (canary, payload, ctx) => {
+      if (aborted(canary)) {
+        canary.aborted = true;
+        return canary;
+      }
+      const checkResult = runChecks(payload, checks2, ctx);
+      if (checkResult instanceof Promise) {
+        if (ctx.async === false)
+          throw new $ZodAsyncError();
+        return checkResult.then((checkResult2) => inst._zod.parse(checkResult2, ctx));
+      }
+      return inst._zod.parse(checkResult, ctx);
+    };
+    inst._zod.run = (payload, ctx) => {
+      if (ctx.skipChecks) {
+        return inst._zod.parse(payload, ctx);
+      }
+      if (ctx.direction === "backward") {
+        const canary = inst._zod.parse({ value: payload.value, issues: [] }, { ...ctx, skipChecks: true });
+        if (canary instanceof Promise) {
+          return canary.then((canary2) => {
+            return handleCanaryResult(canary2, payload, ctx);
+          });
+        }
+        return handleCanaryResult(canary, payload, ctx);
+      }
+      const result = inst._zod.parse(payload, ctx);
+      if (result instanceof Promise) {
+        if (ctx.async === false)
+          throw new $ZodAsyncError();
+        return result.then((result2) => runChecks(result2, checks2, ctx));
+      }
+      return runChecks(result, checks2, ctx);
+    };
+  }
+  defineLazy(inst, "~standard", () => ({
+    validate: (value) => {
+      try {
+        const r = safeParse(inst, value);
+        return r.success ? { value: r.data } : { issues: r.error?.issues };
+      } catch (_) {
+        return safeParseAsync(inst, value).then((r) => r.success ? { value: r.data } : { issues: r.error?.issues });
+      }
+    },
+    vendor: "zod",
+    version: 1
+  }));
+});
+var $ZodString = /* @__PURE__ */ $constructor("$ZodString", (inst, def) => {
+  $ZodType.init(inst, def);
+  inst._zod.pattern = [...inst?._zod.bag?.patterns ?? []].pop() ?? string(inst._zod.bag);
+  inst._zod.parse = (payload, _) => {
+    if (def.coerce)
+      try {
+        payload.value = String(payload.value);
+      } catch (_2) {
+      }
+    if (typeof payload.value === "string")
+      return payload;
+    payload.issues.push({
+      expected: "string",
+      code: "invalid_type",
+      input: payload.value,
+      inst
+    });
+    return payload;
+  };
+});
+var $ZodNumber = /* @__PURE__ */ $constructor("$ZodNumber", (inst, def) => {
+  $ZodType.init(inst, def);
+  inst._zod.pattern = inst._zod.bag.pattern ?? number;
+  inst._zod.parse = (payload, _ctx) => {
+    if (def.coerce)
+      try {
+        payload.value = Number(payload.value);
+      } catch (_) {
+      }
+    const input2 = payload.value;
+    if (typeof input2 === "number" && !Number.isNaN(input2) && Number.isFinite(input2)) {
+      return payload;
+    }
+    const received = typeof input2 === "number" ? Number.isNaN(input2) ? "NaN" : !Number.isFinite(input2) ? "Infinity" : void 0 : void 0;
+    payload.issues.push({
+      expected: "number",
+      code: "invalid_type",
+      input: input2,
+      inst,
+      ...received ? { received } : {}
+    });
+    return payload;
+  };
+});
+var $ZodUnknown = /* @__PURE__ */ $constructor("$ZodUnknown", (inst, def) => {
+  $ZodType.init(inst, def);
+  inst._zod.parse = (payload) => payload;
+});
+function handleArrayResult(result, final2, index2) {
+  if (result.issues.length) {
+    final2.issues.push(...prefixIssues(index2, result.issues));
+  }
+  final2.value[index2] = result.value;
+}
+var $ZodArray = /* @__PURE__ */ $constructor("$ZodArray", (inst, def) => {
+  $ZodType.init(inst, def);
+  inst._zod.parse = (payload, ctx) => {
+    const input2 = payload.value;
+    if (!Array.isArray(input2)) {
+      payload.issues.push({
+        expected: "array",
+        code: "invalid_type",
+        input: input2,
+        inst
+      });
+      return payload;
+    }
+    payload.value = Array(input2.length);
+    const proms = [];
+    for (let i = 0; i < input2.length; i++) {
+      const item3 = input2[i];
+      const result = def.element._zod.run({
+        value: item3,
+        issues: []
+      }, ctx);
+      if (result instanceof Promise) {
+        proms.push(result.then((result2) => handleArrayResult(result2, payload, i)));
+      } else {
+        handleArrayResult(result, payload, i);
+      }
+    }
+    if (proms.length) {
+      return Promise.all(proms).then(() => payload);
+    }
+    return payload;
+  };
+});
+function handlePropertyResult(result, final2, key2, input2, isOptionalIn, isOptionalOut) {
+  const isPresent = key2 in input2;
+  if (result.issues.length) {
+    if (isOptionalIn && isOptionalOut && !isPresent) {
+      return;
+    }
+    final2.issues.push(...prefixIssues(key2, result.issues));
+  }
+  if (!isPresent && !isOptionalIn) {
+    if (!result.issues.length) {
+      final2.issues.push({
+        code: "invalid_type",
+        expected: "nonoptional",
+        input: void 0,
+        path: [key2]
+      });
+    }
+    return;
+  }
+  if (result.value === void 0) {
+    if (isPresent) {
+      final2.value[key2] = void 0;
+    }
+  } else {
+    final2.value[key2] = result.value;
+  }
+}
+function normalizeDef(def) {
+  const keys2 = Object.keys(def.shape);
+  for (const k of keys2) {
+    if (!def.shape?.[k]?._zod?.traits?.has("$ZodType")) {
+      throw new Error(`Invalid element at key "${k}": expected a Zod schema`);
+    }
+  }
+  const okeys = optionalKeys(def.shape);
+  return {
+    ...def,
+    keys: keys2,
+    keySet: new Set(keys2),
+    numKeys: keys2.length,
+    optionalKeys: new Set(okeys)
+  };
+}
+function handleCatchall(proms, input2, payload, ctx, def, inst) {
+  const unrecognized = [];
+  const keySet = def.keySet;
+  const _catchall = def.catchall._zod;
+  const t2 = _catchall.def.type;
+  const isOptionalIn = _catchall.optin === "optional";
+  const isOptionalOut = _catchall.optout === "optional";
+  for (const key2 in input2) {
+    if (key2 === "__proto__")
+      continue;
+    if (keySet.has(key2))
+      continue;
+    if (t2 === "never") {
+      unrecognized.push(key2);
+      continue;
+    }
+    const r = _catchall.run({ value: input2[key2], issues: [] }, ctx);
+    if (r instanceof Promise) {
+      proms.push(r.then((r2) => handlePropertyResult(r2, payload, key2, input2, isOptionalIn, isOptionalOut)));
+    } else {
+      handlePropertyResult(r, payload, key2, input2, isOptionalIn, isOptionalOut);
+    }
+  }
+  if (unrecognized.length) {
+    payload.issues.push({
+      code: "unrecognized_keys",
+      keys: unrecognized,
+      input: input2,
+      inst
+    });
+  }
+  if (!proms.length)
+    return payload;
+  return Promise.all(proms).then(() => {
+    return payload;
+  });
+}
+var $ZodObject = /* @__PURE__ */ $constructor("$ZodObject", (inst, def) => {
+  $ZodType.init(inst, def);
+  const desc = Object.getOwnPropertyDescriptor(def, "shape");
+  if (!desc?.get) {
+    const sh = def.shape;
+    Object.defineProperty(def, "shape", {
+      get: () => {
+        const newSh = { ...sh };
+        Object.defineProperty(def, "shape", {
+          value: newSh
+        });
+        return newSh;
+      }
+    });
+  }
+  const _normalized = cached(() => normalizeDef(def));
+  defineLazy(inst._zod, "propValues", () => {
+    const shape = def.shape;
+    const propValues = {};
+    for (const key2 in shape) {
+      const field = shape[key2]._zod;
+      if (field.values) {
+        propValues[key2] ?? (propValues[key2] = /* @__PURE__ */ new Set());
+        for (const v of field.values)
+          propValues[key2].add(v);
+      }
+    }
+    return propValues;
+  });
+  const isObject2 = isObject;
+  const catchall = def.catchall;
+  let value;
+  inst._zod.parse = (payload, ctx) => {
+    value ?? (value = _normalized.value);
+    const input2 = payload.value;
+    if (!isObject2(input2)) {
+      payload.issues.push({
+        expected: "object",
+        code: "invalid_type",
+        input: input2,
+        inst
+      });
+      return payload;
+    }
+    payload.value = {};
+    const proms = [];
+    const shape = value.shape;
+    for (const key2 of value.keys) {
+      const el = shape[key2];
+      const isOptionalIn = el._zod.optin === "optional";
+      const isOptionalOut = el._zod.optout === "optional";
+      const r = el._zod.run({ value: input2[key2], issues: [] }, ctx);
+      if (r instanceof Promise) {
+        proms.push(r.then((r2) => handlePropertyResult(r2, payload, key2, input2, isOptionalIn, isOptionalOut)));
+      } else {
+        handlePropertyResult(r, payload, key2, input2, isOptionalIn, isOptionalOut);
+      }
+    }
+    if (!catchall) {
+      return proms.length ? Promise.all(proms).then(() => payload) : payload;
+    }
+    return handleCatchall(proms, input2, payload, ctx, _normalized.value, inst);
+  };
+});
+var $ZodTransform = /* @__PURE__ */ $constructor("$ZodTransform", (inst, def) => {
+  $ZodType.init(inst, def);
+  inst._zod.optin = "optional";
+  inst._zod.parse = (payload, ctx) => {
+    if (ctx.direction === "backward") {
+      throw new $ZodEncodeError(inst.constructor.name);
+    }
+    const _out = def.transform(payload.value, payload);
+    if (ctx.async) {
+      const output = _out instanceof Promise ? _out : Promise.resolve(_out);
+      return output.then((output2) => {
+        payload.value = output2;
+        payload.fallback = true;
+        return payload;
+      });
+    }
+    if (_out instanceof Promise) {
+      throw new $ZodAsyncError();
+    }
+    payload.value = _out;
+    payload.fallback = true;
+    return payload;
+  };
+});
+function handleOptionalResult(result, input2) {
+  if (input2 === void 0 && (result.issues.length || result.fallback)) {
+    return { issues: [], value: void 0 };
+  }
+  return result;
+}
+var $ZodOptional = /* @__PURE__ */ $constructor("$ZodOptional", (inst, def) => {
+  $ZodType.init(inst, def);
+  inst._zod.optin = "optional";
+  inst._zod.optout = "optional";
+  defineLazy(inst._zod, "values", () => {
+    return def.innerType._zod.values ? /* @__PURE__ */ new Set([...def.innerType._zod.values, void 0]) : void 0;
+  });
+  defineLazy(inst._zod, "pattern", () => {
+    const pattern = def.innerType._zod.pattern;
+    return pattern ? new RegExp(`^(${cleanRegex(pattern.source)})?$`) : void 0;
+  });
+  inst._zod.parse = (payload, ctx) => {
+    if (def.innerType._zod.optin === "optional") {
+      const input2 = payload.value;
+      const result = def.innerType._zod.run(payload, ctx);
+      if (result instanceof Promise)
+        return result.then((r) => handleOptionalResult(r, input2));
+      return handleOptionalResult(result, input2);
+    }
+    if (payload.value === void 0) {
+      return payload;
+    }
+    return def.innerType._zod.run(payload, ctx);
+  };
+});
+var $ZodNullable = /* @__PURE__ */ $constructor("$ZodNullable", (inst, def) => {
+  $ZodType.init(inst, def);
+  defineLazy(inst._zod, "optin", () => def.innerType._zod.optin);
+  defineLazy(inst._zod, "optout", () => def.innerType._zod.optout);
+  defineLazy(inst._zod, "pattern", () => {
+    const pattern = def.innerType._zod.pattern;
+    return pattern ? new RegExp(`^(${cleanRegex(pattern.source)}|null)$`) : void 0;
+  });
+  defineLazy(inst._zod, "values", () => {
+    return def.innerType._zod.values ? /* @__PURE__ */ new Set([...def.innerType._zod.values, null]) : void 0;
+  });
+  inst._zod.parse = (payload, ctx) => {
+    if (payload.value === null)
+      return payload;
+    return def.innerType._zod.run(payload, ctx);
+  };
+});
+var $ZodCatch = /* @__PURE__ */ $constructor("$ZodCatch", (inst, def) => {
+  $ZodType.init(inst, def);
+  inst._zod.optin = "optional";
+  defineLazy(inst._zod, "optout", () => def.innerType._zod.optout);
+  defineLazy(inst._zod, "values", () => def.innerType._zod.values);
+  inst._zod.parse = (payload, ctx) => {
+    if (ctx.direction === "backward") {
+      return def.innerType._zod.run(payload, ctx);
+    }
+    const result = def.innerType._zod.run(payload, ctx);
+    if (result instanceof Promise) {
+      return result.then((result2) => {
+        payload.value = result2.value;
+        if (result2.issues.length) {
+          payload.value = def.catchValue({
+            ...payload,
+            error: {
+              issues: result2.issues.map((iss) => finalizeIssue(iss, ctx, config()))
+            },
+            input: payload.value
+          });
+          payload.issues = [];
+          payload.fallback = true;
+        }
+        return payload;
+      });
+    }
+    payload.value = result.value;
+    if (result.issues.length) {
+      payload.value = def.catchValue({
+        ...payload,
+        error: {
+          issues: result.issues.map((iss) => finalizeIssue(iss, ctx, config()))
+        },
+        input: payload.value
+      });
+      payload.issues = [];
+      payload.fallback = true;
+    }
+    return payload;
+  };
+});
+var $ZodPipe = /* @__PURE__ */ $constructor("$ZodPipe", (inst, def) => {
+  $ZodType.init(inst, def);
+  defineLazy(inst._zod, "values", () => def.in._zod.values);
+  defineLazy(inst._zod, "optin", () => def.in._zod.optin);
+  defineLazy(inst._zod, "optout", () => def.out._zod.optout);
+  defineLazy(inst._zod, "propValues", () => def.in._zod.propValues);
+  inst._zod.parse = (payload, ctx) => {
+    if (ctx.direction === "backward") {
+      const right = def.out._zod.run(payload, ctx);
+      if (right instanceof Promise) {
+        return right.then((right2) => handlePipeResult(right2, def.in, ctx));
+      }
+      return handlePipeResult(right, def.in, ctx);
+    }
+    const left = def.in._zod.run(payload, ctx);
+    if (left instanceof Promise) {
+      return left.then((left2) => handlePipeResult(left2, def.out, ctx));
+    }
+    return handlePipeResult(left, def.out, ctx);
+  };
+});
+function handlePipeResult(left, next3, ctx) {
+  if (left.issues.length) {
+    left.aborted = true;
+    return left;
+  }
+  return next3._zod.run({ value: left.value, issues: left.issues, fallback: left.fallback }, ctx);
+}
+
+// node_modules/zod/v4/core/api.js
+// @__NO_SIDE_EFFECTS__
+function _string(Class, params) {
+  return new Class({
+    type: "string",
+    ...normalizeParams(params)
+  });
+}
+// @__NO_SIDE_EFFECTS__
+function _number(Class, params) {
+  return new Class({
+    type: "number",
+    checks: [],
+    ...normalizeParams(params)
+  });
+}
+// @__NO_SIDE_EFFECTS__
+function _unknown(Class) {
+  return new Class({
+    type: "unknown"
+  });
+}
+
+// node_modules/zod/v4/mini/schemas.js
+var ZodMiniType = /* @__PURE__ */ $constructor("ZodMiniType", (inst, def) => {
+  if (!inst._zod)
+    throw new Error("Uninitialized schema in ZodMiniType.");
+  $ZodType.init(inst, def);
+  inst.def = def;
+  inst.type = def.type;
+  inst.parse = (data, params) => parse(inst, data, params, { callee: inst.parse });
+  inst.safeParse = (data, params) => safeParse(inst, data, params);
+  inst.parseAsync = async (data, params) => parseAsync(inst, data, params, { callee: inst.parseAsync });
+  inst.safeParseAsync = async (data, params) => safeParseAsync(inst, data, params);
+  inst.check = (...checks2) => {
+    return inst.clone({
+      ...def,
+      checks: [
+        ...def.checks ?? [],
+        ...checks2.map((ch) => typeof ch === "function" ? {
+          _zod: { check: ch, def: { check: "custom" }, onattach: [] }
+        } : ch)
+      ]
+    }, { parent: true });
+  };
+  inst.with = inst.check;
+  inst.clone = (_def, params) => clone(inst, _def, params);
+  inst.brand = () => inst;
+  inst.register = ((reg, meta3) => {
+    reg.add(inst, meta3);
+    return inst;
+  });
+  inst.apply = (fn) => fn(inst);
+});
+var ZodMiniString = /* @__PURE__ */ $constructor("ZodMiniString", (inst, def) => {
+  $ZodString.init(inst, def);
+  ZodMiniType.init(inst, def);
+});
+// @__NO_SIDE_EFFECTS__
+function string2(params) {
+  return _string(ZodMiniString, params);
+}
+var ZodMiniNumber = /* @__PURE__ */ $constructor("ZodMiniNumber", (inst, def) => {
+  $ZodNumber.init(inst, def);
+  ZodMiniType.init(inst, def);
+});
+// @__NO_SIDE_EFFECTS__
+function number2(params) {
+  return _number(ZodMiniNumber, params);
+}
+var ZodMiniUnknown = /* @__PURE__ */ $constructor("ZodMiniUnknown", (inst, def) => {
+  $ZodUnknown.init(inst, def);
+  ZodMiniType.init(inst, def);
+});
+// @__NO_SIDE_EFFECTS__
+function unknown() {
+  return _unknown(ZodMiniUnknown);
+}
+var ZodMiniArray = /* @__PURE__ */ $constructor("ZodMiniArray", (inst, def) => {
+  $ZodArray.init(inst, def);
+  ZodMiniType.init(inst, def);
+});
+// @__NO_SIDE_EFFECTS__
+function array(element6, params) {
+  return new ZodMiniArray({
+    type: "array",
+    element: element6,
+    ...normalizeParams(params)
+  });
+}
+var ZodMiniObject = /* @__PURE__ */ $constructor("ZodMiniObject", (inst, def) => {
+  $ZodObject.init(inst, def);
+  ZodMiniType.init(inst, def);
+  defineLazy(inst, "shape", () => def.shape);
+});
+// @__NO_SIDE_EFFECTS__
+function object(shape, params) {
+  const def = {
+    type: "object",
+    shape: shape ?? {},
+    ...normalizeParams(params)
+  };
+  return new ZodMiniObject(def);
+}
+var ZodMiniTransform = /* @__PURE__ */ $constructor("ZodMiniTransform", (inst, def) => {
+  $ZodTransform.init(inst, def);
+  ZodMiniType.init(inst, def);
+});
+// @__NO_SIDE_EFFECTS__
+function transform(fn) {
+  return new ZodMiniTransform({
+    type: "transform",
+    transform: fn
+  });
+}
+var ZodMiniOptional = /* @__PURE__ */ $constructor("ZodMiniOptional", (inst, def) => {
+  $ZodOptional.init(inst, def);
+  ZodMiniType.init(inst, def);
+});
+// @__NO_SIDE_EFFECTS__
+function optional(innerType) {
+  return new ZodMiniOptional({
+    type: "optional",
+    innerType
+  });
+}
+var ZodMiniNullable = /* @__PURE__ */ $constructor("ZodMiniNullable", (inst, def) => {
+  $ZodNullable.init(inst, def);
+  ZodMiniType.init(inst, def);
+});
+// @__NO_SIDE_EFFECTS__
+function nullable(innerType) {
+  return new ZodMiniNullable({
+    type: "nullable",
+    innerType
+  });
+}
+// @__NO_SIDE_EFFECTS__
+function nullish(innerType) {
+  return /* @__PURE__ */ optional(/* @__PURE__ */ nullable(innerType));
+}
+var ZodMiniCatch = /* @__PURE__ */ $constructor("ZodMiniCatch", (inst, def) => {
+  $ZodCatch.init(inst, def);
+  ZodMiniType.init(inst, def);
+});
+// @__NO_SIDE_EFFECTS__
+function _catch(innerType, catchValue) {
+  return new ZodMiniCatch({
+    type: "catch",
+    innerType,
+    catchValue: typeof catchValue === "function" ? catchValue : () => catchValue
+  });
+}
+var ZodMiniPipe = /* @__PURE__ */ $constructor("ZodMiniPipe", (inst, def) => {
+  $ZodPipe.init(inst, def);
+  ZodMiniType.init(inst, def);
+});
+// @__NO_SIDE_EFFECTS__
+function pipe(in_, out) {
+  return new ZodMiniPipe({
+    type: "pipe",
+    in: in_,
+    out
+  });
+}
+
+// src/core/assert.ts
+function oneOf(values) {
+  const known2 = new Set(values);
+  return (value) => known2.has(value);
+}
+
+// src/wire/schemas.ts
+var loose = (schema2) => _catch(optional(schema2), void 0);
+function rowsOf(item3, items) {
+  return items.flatMap((raw2) => {
+    const row2 = item3.safeParse(raw2);
+    return row2.success ? [row2.data] : [];
+  });
+}
+var processRow = object({
+  session_id: string2(),
+  command: loose(string2()),
+  status: loose(string2()),
+  exit_code: loose(nullable(number2())),
+  started_epoch: loose(nullable(number2())),
+  uptime_seconds: loose(nullable(number2())),
+  exited_at: loose(nullable(number2())),
+  completion_reason: loose(nullable(string2())),
+  output_tail: loose(nullable(string2())),
+  output_preview: loose(string2())
+});
+var processList = pipe(
+  _catch(object({ processes: nullish(array(unknown())) }), {}),
+  transform((answer) => rowsOf(processRow, answer.processes ?? []))
+);
+var PENDING_STATUSES = ["queued", "started", "unknown", "terminal"];
+var isPendingStatus = oneOf(PENDING_STATUSES);
+var pendingRow = object({
+  admission_id: string2(),
+  /** The submission id the submitter chose (this pane's `submission_id`). */
+  input_id: loose(string2()),
+  status: pipe(optional(unknown()), transform((status) => isPendingStatus(status) ? status : "other")),
+  /** The prompt's text. */
+  user: _catch(string2(), "")
+});
+function pendingRows(info) {
+  const { pending_submissions: rows } = info ?? {};
+  return Array.isArray(rows) ? rowsOf(pendingRow, rows) : void 0;
+}
+var counter = pipe(optional(unknown()), transform((value) => Number(value ?? 0)));
+var tick = _catch(
+  object({
+    prompt_tokens: counter,
+    cache_read_tokens: counter,
+    total_tokens: counter,
+    tokens_per_s: loose(number2())
+  }),
+  { cache_read_tokens: 0, prompt_tokens: 0, tokens_per_s: void 0, total_tokens: 0 }
+);
+function usageCounters(payload) {
+  const parsed = tick.parse(payload);
+  const counters = { prompt: parsed.prompt_tokens, read: parsed.cache_read_tokens, total: parsed.total_tokens };
+  return Object.values(counters).every(Number.isFinite) ? { counters, tps: parsed.tokens_per_s } : void 0;
 }
 
 // src/processes/widgets/files.ts
@@ -27834,12 +28843,6 @@ function formatRatio(value, total, unit) {
 
 // src/processes/widgets/spec.ts
 import { setFlagsFromString } from "node:v8";
-
-// src/core/assert.ts
-function oneOf(values) {
-  const known2 = new Set(values);
-  return (value) => known2.has(value);
-}
 
 // src/processes/widgets/check.ts
 var FIELD_NAME = /^[a-z][a-z0-9_]{0,23}$/;
@@ -28380,7 +29383,7 @@ function parseBlock(value, where, errors) {
   const label = () => str5(value.label, `${where}.label`, errors, { cut: MAX_LABEL_CHARS, required: true }) ?? "";
   const unit = () => str5(value.unit, `${where}.unit`, errors, { cut: MAX_UNIT_CHARS });
   const field = () => fieldName(value.field, `${where}.field`, errors) ?? "";
-  const optional = (entry, name) => entry === void 0 ? {} : { [name]: entry };
+  const optional2 = (entry, name) => entry === void 0 ? {} : { [name]: entry };
   let block;
   switch (value.kind) {
     case "spark":
@@ -28388,13 +29391,13 @@ function parseBlock(value, where, errors) {
         field: field(),
         kind: "spark",
         label: label(),
-        ...optional(str5(value.key, `${where}.key`, errors, { max: 120 }), "key"),
-        ...optional(unit(), "unit"),
-        ...optional(betterValue(value.better, `${where}.better`, errors), "better"),
-        ...optional(num3(value.target, `${where}.target`, errors), "target"),
-        ...optional(str5(value.targetLabel, `${where}.targetLabel`, errors, { cut: MAX_LABEL_CHARS }), "targetLabel"),
-        ...optional(num3(value.min, `${where}.min`, errors), "min"),
-        ...optional(num3(value.max, `${where}.max`, errors), "max")
+        ...optional2(str5(value.key, `${where}.key`, errors, { max: 120 }), "key"),
+        ...optional2(unit(), "unit"),
+        ...optional2(betterValue(value.better, `${where}.better`, errors), "better"),
+        ...optional2(num3(value.target, `${where}.target`, errors), "target"),
+        ...optional2(str5(value.targetLabel, `${where}.targetLabel`, errors, { cut: MAX_LABEL_CHARS }), "targetLabel"),
+        ...optional2(num3(value.min, `${where}.min`, errors), "min"),
+        ...optional2(num3(value.max, `${where}.max`, errors), "max")
       };
       break;
     case "bars":
@@ -28403,9 +29406,9 @@ function parseBlock(value, where, errors) {
         field: field(),
         kind: "bars",
         label: label(),
-        ...optional(unit(), "unit"),
-        ...optional(num3(value.max, `${where}.max`, errors), "max"),
-        ...optional(betterValue(value.better, `${where}.better`, errors), "better")
+        ...optional2(unit(), "unit"),
+        ...optional2(num3(value.max, `${where}.max`, errors), "max"),
+        ...optional2(betterValue(value.better, `${where}.better`, errors), "better")
       };
       break;
     case "meter": {
@@ -28431,8 +29434,8 @@ function parseBlock(value, where, errors) {
         kind: "meter",
         label: label(),
         total: total ?? 1,
-        ...optional(str5(value.key, `${where}.key`, errors, { max: 120 }), "key"),
-        ...optional(unit(), "unit")
+        ...optional2(str5(value.key, `${where}.key`, errors, { max: 120 }), "key"),
+        ...optional2(unit(), "unit")
       };
       break;
     }
@@ -29478,7 +30481,8 @@ var Processes = class {
     this.#stopping.add(id);
     this.#host.changed();
     try {
-      const r = await this.#host.gw.request("process.kill", { process_id: id, session_id: this.#host.sid });
+      const sid = this.#host.sid;
+      const r = sid ? await rpc(this.#host.gw, "process.kill", { process_id: id, session_id: sid }) : void 0;
       return r?.status;
     } finally {
       this.#stopping.delete(id);
@@ -29491,7 +30495,7 @@ var Processes = class {
     ids.forEach((id) => this.#stopping.add(id));
     this.#host.changed();
     try {
-      const r = await this.#host.gw.request("process.stop", { session_id: this.#host.sid });
+      const r = await rpc(this.#host.gw, "process.stop", { session_id: this.#host.sid });
       return typeof r?.killed === "number" ? r.killed : 0;
     } finally {
       ids.forEach((id) => this.#stopping.delete(id));
@@ -29553,7 +30557,7 @@ var Processes = class {
     }
     let rows;
     try {
-      rows = (await this.#host.gw.request("process.list", { session_id: sid }))?.processes ?? [];
+      rows = await rpcParsed(this.#host.gw, "process.list", { session_id: sid }, processList);
     } catch {
       return changed ? this.#host.changed() : void 0;
     }
@@ -29564,7 +30568,7 @@ var Processes = class {
     const touched = /* @__PURE__ */ new Set();
     const listed = /* @__PURE__ */ new Set();
     for (const row2 of rows) {
-      if (typeof row2?.session_id !== "string" || !row2.session_id) {
+      if (!row2.session_id) {
         continue;
       }
       listed.add(row2.session_id);
@@ -31346,8 +32350,8 @@ function stepLabel(call) {
       const verb = call.name === "link_pull_request" ? "Linked" : "Unlinked";
       const pr = str6(a2.url)?.match(/github[^/]*\/([^/]+\/[^/]+)\/pull\/(\d+)/);
       const repo = pr?.[1] ?? str6(a2.repository);
-      const number2 = pr?.[2] ?? (typeof a2.number === "number" ? String(a2.number) : void 0);
-      return repo && number2 ? `${verb} ${repo}#${number2}` : `${verb} a pull request`;
+      const number4 = pr?.[2] ?? (typeof a2.number === "number" ? String(a2.number) : void 0);
+      return repo && number4 ? `${verb} ${repo}#${number4}` : `${verb} a pull request`;
     }
     case "list_pull_requests":
       return "Listed linked pull requests";
@@ -31714,12 +32718,12 @@ function readCard2(call, result) {
   const first = numbered.length ? Number(numbered[0]?.[1]) : void 0;
   const last = numbered.length ? Number(numbered.at(-1)?.[1]) : void 0;
   const whole = first === 1 && last !== void 0 && last === total;
-  const meta2 = first !== void 0 && last !== void 0 ? [whole ? `${total} lines` : `:${first}-${last}`] : [];
+  const meta3 = first !== void 0 && last !== void 0 ? [whole ? `${total} lines` : `:${first}-${last}`] : [];
   return {
     body: content5 ? [/* @__PURE__ */ jsx("code", { lang: langOf(path2), numbers: true, start: first, text: content5.replace(/^ *\d+\|/gm, "") }, "code")] : [],
     folded: true,
     frame: "inline",
-    meta: meta2,
+    meta: meta3,
     name: "read",
     target: path2,
     targetKind: "path",
@@ -31900,14 +32904,14 @@ function taskCard(call, result, now) {
   const working = agents2.some((a2) => a2.status === "running" || a2.status === "queued") || !agents2.length && result?.status === "dispatched";
   const settled = agents2.filter((a2) => a2.status !== "running" && a2.status !== "queued");
   const count = goals.length || agents2.length;
-  let meta2;
+  let meta3;
   let took2;
   if (agents2.length && !working) {
     const ok3 = agents2.filter((a2) => a2.status === "done").length;
     const stopped = agents2.filter((a2) => a2.status === "cancelled").length;
     const failed = agents2.length - ok3 - stopped;
     const requests = agents2.reduce((n, a2) => n + a2.calls, 0);
-    meta2 = [
+    meta3 = [
       `${ok3} succeeded`,
       failed ? `${failed} failed` : "",
       stopped ? `${stopped} stopped` : "",
@@ -31915,13 +32919,13 @@ function taskCard(call, result, now) {
     ].filter(Boolean).join(" \xB7 ");
     took2 = Math.max(...agents2.map((a2) => a2.startedAt + (a2.duration ?? 0))) - call.startedAt;
   } else if (settled.length) {
-    meta2 = `${settled.length} of ${count} done`;
+    meta3 = `${settled.length} of ${count} done`;
   }
   return {
     badges: result?.mode === "background" ? [{ text: "background" }] : void 0,
     // The agents first; the brief they share stays folded.
     body: [...rows, ...context ? [briefNode("Shared brief", context)] : []],
-    meta: meta2 ? [meta2] : void 0,
+    meta: meta3 ? [meta3] : void 0,
     name: "task",
     status: working ? "running" : void 0,
     target: count ? `${count} agent${count === 1 ? "" : "s"}` : void 0,
@@ -32924,7 +33928,7 @@ var Cron = class {
     this.#busy.add(id);
     this.#host.changed();
     try {
-      const r = await this.#host.gw.request("cron.manage", { action, name: id });
+      const r = await rpc(this.#host.gw, "cron.manage", { action, name: id });
       if (r?.success === false || r?.error) {
         throw new Error(r.error || `Could not ${action} the job`);
       }
@@ -32935,7 +33939,7 @@ var Cron = class {
   }
   async refresh() {
     try {
-      const r = await this.#host.gw.request("cron.manage", { action: "list", include_disabled: true });
+      const r = await rpc(this.#host.gw, "cron.manage", { action: "list", include_disabled: true });
       if (r?.success === false && r.error) {
         throw new Error(r.error);
       }
@@ -33669,7 +34673,7 @@ function capsOf(info) {
 }
 async function loadCaps(gw2, sid) {
   try {
-    const r = await gw2.request("model.options", sid ? { session_id: sid } : {});
+    const r = await rpc(gw2, "model.options", sid ? { session_id: sid } : {});
     rememberCaps(r?.providers ?? []);
   } catch {
   }
@@ -33718,7 +34722,7 @@ async function applyEffort(host, value, scope) {
     if (scope === "session" && host.gw.isCanonical) {
       await mutateSession(host.gw, sid, "reasoning", { effort: value });
     } else {
-      await host.gw.request("config.set", { key: "reasoning", scope, session_id: sid, value });
+      await rpc(host.gw, "config.set", { key: "reasoning", scope, session_id: sid, value });
     }
     if (scope === "global") {
       host.transcript.notice(`Reasoning effort ${value === "none" ? "off" : value} is now the default for new sessions.`);
@@ -33754,7 +34758,7 @@ function openEffortPicker(host, global2 = false) {
       host.changed();
     });
   }
-  const pick = async (id) => {
+  const pick2 = async (id) => {
     if (!id || !levels.some((l) => l.id === id)) {
       return;
     }
@@ -33789,9 +34793,9 @@ function openEffortPicker(host, global2 = false) {
             saveDefault = !saveDefault;
             host.changed();
           },
-          use: () => void pick(selected)
+          use: () => void pick2(selected)
         },
-        onActivate: (ev) => void pick(ev.item),
+        onActivate: (ev) => void pick2(ev.item),
         onSelect: (ev) => {
           selected = ev.item;
           host.changed();
@@ -33814,7 +34818,7 @@ function openEffortPicker(host, global2 = false) {
       if (k.name === "escape") {
         host.close(overlay);
       } else if (k.name === "enter") {
-        void pick(selected);
+        void pick2(selected);
       } else if (k.ctrl && k.name === "g") {
         saveDefault = !saveDefault;
       } else {
@@ -33856,8 +34860,8 @@ function refOf(v) {
   const r = record(v);
   const host = typeof r?.host === "string" ? r.host : "";
   const repository = typeof r?.repository === "string" ? r.repository : "";
-  const number2 = typeof r?.number === "number" ? r.number : 0;
-  return host && repository && number2 > 0 ? { host, number: number2, repository, url: typeof r?.url === "string" ? r.url : `https://${host}/${repository}/pull/${number2}` } : void 0;
+  const number4 = typeof r?.number === "number" ? r.number : 0;
+  return host && repository && number4 > 0 ? { host, number: number4, repository, url: typeof r?.url === "string" ? r.url : `https://${host}/${repository}/pull/${number4}` } : void 0;
 }
 function linkedFromResult(call) {
   if (!LINK_TOOLS.has(call.name) || call.status !== "done") {
@@ -33992,11 +34996,11 @@ function parseCheck(n) {
 }
 function dedupeChecks(checks2) {
   const newest = /* @__PURE__ */ new Map();
-  const time = (c) => Date.parse(c.completedAt ?? c.startedAt ?? "") || 0;
+  const time2 = (c) => Date.parse(c.completedAt ?? c.startedAt ?? "") || 0;
   for (const c of checks2) {
     const key2 = `${c.workflow ?? ""}\0${c.name}`;
     const prev = newest.get(key2);
-    if (!prev || time(c) >= time(prev)) {
+    if (!prev || time2(c) >= time2(prev)) {
       newest.set(key2, c);
     }
   }
@@ -34210,18 +35214,18 @@ var deserializer = ($2, _) => {
         return arr;
       }
       case OBJECT: {
-        const object = as({}, index2);
+        const object2 = as({}, index2);
         for (const [key2, index3] of value) {
           const k = unpair(key2), value2 = unpair(index3);
-          if (k === "__proto__") defineProperty(object, k, {
+          if (k === "__proto__") defineProperty(object2, k, {
             value: value2,
             configurable: true,
             enumerable: true,
             writable: true
           });
-          else object[k] = value2;
+          else object2[k] = value2;
         }
-        return object;
+        return object2;
       }
       case DATE:
         return as(new Date(value), index2);
@@ -35916,10 +36920,10 @@ var basic = convertElement([
   "var",
   "wbr"
 ]);
-var meta = convertElement("meta");
+var meta2 = convertElement("meta");
 function phrasing(value) {
   return Boolean(
-    value.type === "text" || basic(value) || embedded(value) || isBodyOkLink(value) || meta(value) && hasProperty(value, "itemProp")
+    value.type === "text" || basic(value) || embedded(value) || isBodyOkLink(value) || meta2(value) && hasProperty(value, "itemProp")
   );
 }
 
@@ -36767,11 +37771,11 @@ function toMdast(tree, options) {
 }
 
 // node_modules/mdast-util-find-and-replace/node_modules/escape-string-regexp/index.js
-function escapeStringRegexp(string3) {
-  if (typeof string3 !== "string") {
+function escapeStringRegexp(string5) {
+  if (typeof string5 !== "string") {
     throw new TypeError("Expected a string");
   }
-  return string3.replace(/[|\\{}()[\]^$+*?.]/g, "\\$&").replace(/-/g, "\\x2d");
+  return string5.replace(/[|\\{}()[\]^$+*?.]/g, "\\$&").replace(/-/g, "\\x2d");
 }
 
 // node_modules/mdast-util-find-and-replace/lib/index.js
@@ -37079,10 +38083,10 @@ function splitUrl(url) {
   }
   return [url, trail2];
 }
-function previous(match, email) {
+function previous(match, email2) {
   const code7 = match.input.charCodeAt(match.index - 1);
   return (match.index === 0 || unicodeWhitespace(code7) || unicodePunctuation(code7)) && // If it’s an email, the previous character should not be a slash.
-  (!email || code7 !== 47);
+  (!email2 || code7 !== 47);
 }
 
 // node_modules/micromark-util-normalize-identifier/index.js
@@ -40709,9 +41713,9 @@ function decodeNumericCharacterReference(value, base3) {
 // node_modules/micromark-util-decode-string/index.js
 var characterEscapeOrReference = /\\([!-/:-@[-`{-~])|&(#(?:\d{1,7}|x[\da-f]{1,6})|[\da-z]{1,31});/gi;
 function decodeString(value) {
-  return value.replace(characterEscapeOrReference, decode);
+  return value.replace(characterEscapeOrReference, decode2);
 }
-function decode($0, $1, $2) {
+function decode2($0, $1, $2) {
   if ($1) {
     return $1;
   }
@@ -40884,7 +41888,7 @@ function check(tokens2, before, after) {
 function containerPhrasing(parent, state, info) {
   return serialize3(phrasing4(parent, state, info), info.before, info.after);
 }
-function encode(tokens2, start) {
+function encode2(tokens2, start) {
   const token = tokens2[start ? 0 : tokens2.length - 1];
   if (!token || token.attention) return;
   const character = start ? firstCharacter(token.value) : lastCharacter(token.value);
@@ -41071,7 +42075,7 @@ function render2(items, chosen, before, after) {
     if (typeof item3 === "string") {
       const token = { value: item3, attention: void 0 };
       if (encodeAfter && encodeAfter === firstCharacter(item3)) {
-        encode([token], true);
+        encode2([token], true);
       }
       encodeAfter = void 0;
       tokens2.push(token);
@@ -41092,16 +42096,16 @@ function render2(items, chosen, before, after) {
       head2.charCodeAt(0),
       marker2
     );
-    if (open.inside) encode(inside, true);
+    if (open.inside) encode2(inside, true);
     const tail = inside.length > 0 ? lastCharacter(inside[inside.length - 1].value) : "";
     const close = encodeInfo(
       outsideAfter.charCodeAt(0),
       tail.charCodeAt(tail.length - 1),
       marker2
     );
-    if (close.inside) encode(inside, false);
+    if (close.inside) encode2(inside, false);
     if (open.outside && outsideBefore !== "\n" && outsideBefore !== "\r") {
-      encode(tokens2, false);
+      encode2(tokens2, false);
     }
     if (close.outside) encodeAfter = outsideAfter;
     tokens2.push({ value: sequence, attention: item3 }, ...inside, {
@@ -41203,18 +42207,18 @@ function indentLines(value, map4) {
 
 // node_modules/mdast-util-to-markdown/lib/util/safe.js
 var own6 = {}.hasOwnProperty;
-function safe2(state, input2, config2) {
-  const value = (config2.before || "") + (input2 || "") + (config2.after || "");
+function safe2(state, input2, config3) {
+  const value = (config3.before || "") + (input2 || "") + (config3.after || "");
   const positions = [];
   const result = [];
   const infos = {};
   const percentEncode = state.stack.includes("autolink");
-  const offset = config2.before ? config2.before.length : 0;
-  const end = value.length - (config2.after ? config2.after.length : 0);
+  const offset = config3.before ? config3.before.length : 0;
+  const end = value.length - (config3.after ? config3.after.length : 0);
   let index2 = -1;
   while (++index2 < state.unsafe.length) {
     const pattern = state.unsafe[index2];
-    if (!patternInScope(state.stack, pattern) || !nodeInScope(pattern.beforeNode, config2.beforeNode) || !nodeInScope(pattern.afterNode, config2.afterNode)) {
+    if (!patternInScope(state.stack, pattern) || !nodeInScope(pattern.beforeNode, config3.beforeNode) || !nodeInScope(pattern.afterNode, config3.afterNode)) {
       continue;
     }
     const expression = state.compilePattern(pattern);
@@ -41278,7 +42282,7 @@ function safe2(state, input2, config2) {
         "%" + value.charCodeAt(position4).toString(16).toUpperCase().padStart(2, "0")
       );
       start++;
-    } else if (/[!-/:-@[-`{-~]/.test(value.charAt(position4)) && (!config2.encode || !config2.encode.includes(value.charAt(position4)))) {
+    } else if (/[!-/:-@[-`{-~]/.test(value.charAt(position4)) && (!config3.encode || !config3.encode.includes(value.charAt(position4)))) {
       result.push("\\");
     } else {
       result.push(encodeCharacterReference(value.charCodeAt(position4)));
@@ -41286,7 +42290,7 @@ function safe2(state, input2, config2) {
     }
   }
   const rest = value.slice(start, end);
-  result.push(percentEncode ? rest : escapeBackslashes(rest, config2.after));
+  result.push(percentEncode ? rest : escapeBackslashes(rest, config3.after));
   return result.join("");
 }
 function nodeInScope(types, node3) {
@@ -41320,8 +42324,8 @@ function escapeBackslashes(value, after) {
 }
 
 // node_modules/mdast-util-to-markdown/lib/util/track.js
-function track(config2) {
-  const options = config2 || {};
+function track(config3) {
+  const options = config3 || {};
   const now = options.now || {};
   let lineShift = options.lineShift || 0;
   let line = now.line || 1;
@@ -41374,7 +42378,7 @@ function toMarkdown(tree, options) {
   }
   state.handle = zwitch("type", {
     invalid,
-    unknown,
+    unknown: unknown2,
     handlers: state.handlers
   });
   let result = state.handle(
@@ -41398,7 +42402,7 @@ function toMarkdown(tree, options) {
 function invalid(value) {
   throw new Error("Cannot handle value `" + value + "`, expected node");
 }
-function unknown(value) {
+function unknown2(value) {
   const node3 = (
     /** @type {Nodes} */
     value
@@ -41416,8 +42420,8 @@ function containerPhrasingBound(parent, info) {
 function containerFlowBound(parent, info) {
   return containerFlow(parent, this, info);
 }
-function safeBound(value, config2) {
-  return safe2(this, value, config2);
+function safeBound(value, config3) {
+  return safe2(this, value, config3);
 }
 
 // node_modules/mdast-util-gfm-table/lib/index.js
@@ -41739,19 +42743,19 @@ Info.prototype.space = void 0;
 // node_modules/property-information/lib/util/types.js
 var types_exports = {};
 __export(types_exports, {
-  boolean: () => boolean,
+  boolean: () => boolean2,
   booleanish: () => booleanish,
   commaOrSpaceSeparated: () => commaOrSpaceSeparated,
   commaSeparated: () => commaSeparated,
-  number: () => number,
+  number: () => number3,
   overloadedBoolean: () => overloadedBoolean,
   spaceSeparated: () => spaceSeparated
 });
 var powers = 0;
-var boolean = increment();
+var boolean2 = increment();
 var booleanish = increment();
 var overloadedBoolean = increment();
-var number = increment();
+var number3 = increment();
 var spaceSeparated = increment();
 var commaSeparated = increment();
 var commaOrSpaceSeparated = increment();
@@ -41826,9 +42830,9 @@ var aria = create4({
     ariaAutoComplete: null,
     ariaBusy: booleanish,
     ariaChecked: booleanish,
-    ariaColCount: number,
-    ariaColIndex: number,
-    ariaColSpan: number,
+    ariaColCount: number3,
+    ariaColIndex: number3,
+    ariaColSpan: number3,
     ariaControls: spaceSeparated,
     ariaCurrent: null,
     ariaDescribedBy: spaceSeparated,
@@ -41845,7 +42849,7 @@ var aria = create4({
     ariaKeyShortcuts: null,
     ariaLabel: null,
     ariaLabelledBy: spaceSeparated,
-    ariaLevel: number,
+    ariaLevel: number3,
     ariaLive: null,
     ariaModal: booleanish,
     ariaMultiLine: booleanish,
@@ -41853,21 +42857,21 @@ var aria = create4({
     ariaOrientation: null,
     ariaOwns: spaceSeparated,
     ariaPlaceholder: null,
-    ariaPosInSet: number,
+    ariaPosInSet: number3,
     ariaPressed: booleanish,
     ariaReadOnly: booleanish,
     ariaRelevant: null,
     ariaRequired: booleanish,
     ariaRoleDescription: spaceSeparated,
-    ariaRowCount: number,
-    ariaRowIndex: number,
-    ariaRowSpan: number,
+    ariaRowCount: number3,
+    ariaRowIndex: number3,
+    ariaRowSpan: number3,
     ariaSelected: booleanish,
-    ariaSetSize: number,
+    ariaSetSize: number3,
     ariaSort: null,
-    ariaValueMax: number,
-    ariaValueMin: number,
-    ariaValueNow: number,
+    ariaValueMax: number3,
+    ariaValueMin: number3,
+    ariaValueNow: number3,
     ariaValueText: null,
     role: null
   },
@@ -41903,43 +42907,43 @@ var html2 = create4({
     accessKey: spaceSeparated,
     action: null,
     allow: null,
-    allowFullScreen: boolean,
-    allowPaymentRequest: boolean,
-    allowUserMedia: boolean,
-    alpha: boolean,
+    allowFullScreen: boolean2,
+    allowPaymentRequest: boolean2,
+    allowUserMedia: boolean2,
+    alpha: boolean2,
     alt: null,
     as: null,
-    async: boolean,
+    async: boolean2,
     autoCapitalize: null,
     autoComplete: spaceSeparated,
-    autoFocus: boolean,
-    autoPlay: boolean,
+    autoFocus: boolean2,
+    autoPlay: boolean2,
     blocking: spaceSeparated,
     capture: null,
     charSet: null,
-    checked: boolean,
+    checked: boolean2,
     cite: null,
     className: spaceSeparated,
     closedBy: null,
     colorSpace: null,
-    cols: number,
-    colSpan: number,
+    cols: number3,
+    colSpan: number3,
     command: null,
     commandFor: null,
     content: null,
     contentEditable: booleanish,
-    controls: boolean,
+    controls: boolean2,
     controlsList: spaceSeparated,
-    coords: number | commaSeparated,
+    coords: number3 | commaSeparated,
     crossOrigin: null,
     data: null,
     dateTime: null,
     decoding: null,
-    default: boolean,
-    defer: boolean,
+    default: boolean2,
+    defer: boolean2,
     dir: null,
     dirName: null,
-    disabled: boolean,
+    disabled: boolean2,
     download: overloadedBoolean,
     draggable: booleanish,
     encType: null,
@@ -41949,12 +42953,12 @@ var html2 = create4({
     formAction: null,
     formEncType: null,
     formMethod: null,
-    formNoValidate: boolean,
+    formNoValidate: boolean2,
     formTarget: null,
     headers: spaceSeparated,
-    height: number,
+    height: number3,
     hidden: overloadedBoolean,
-    high: number,
+    high: number3,
     href: null,
     hrefLang: null,
     htmlFor: spaceSeparated,
@@ -41962,15 +42966,15 @@ var html2 = create4({
     id: null,
     imageSizes: null,
     imageSrcSet: null,
-    inert: boolean,
+    inert: boolean2,
     inputMode: null,
     integrity: null,
     is: null,
-    isMap: boolean,
+    isMap: boolean2,
     itemId: null,
     itemProp: spaceSeparated,
     itemRef: spaceSeparated,
-    itemScope: boolean,
+    itemScope: boolean2,
     itemType: spaceSeparated,
     kind: null,
     label: null,
@@ -41978,21 +42982,21 @@ var html2 = create4({
     language: null,
     list: null,
     loading: null,
-    loop: boolean,
-    low: number,
+    loop: boolean2,
+    low: number3,
     manifest: null,
     max: null,
-    maxLength: number,
+    maxLength: number3,
     media: null,
     method: null,
     min: null,
-    minLength: number,
-    multiple: boolean,
-    muted: boolean,
+    minLength: number3,
+    multiple: boolean2,
+    muted: boolean2,
     name: null,
     nonce: null,
-    noModule: boolean,
-    noValidate: boolean,
+    noModule: boolean2,
+    noValidate: boolean2,
     onAbort: null,
     onAfterPrint: null,
     onAuxClick: null,
@@ -42081,56 +43085,56 @@ var html2 = create4({
     onVolumeChange: null,
     onWaiting: null,
     onWheel: null,
-    open: boolean,
-    optimum: number,
+    open: boolean2,
+    optimum: number3,
     pattern: null,
     ping: spaceSeparated,
     placeholder: null,
-    playsInline: boolean,
+    playsInline: boolean2,
     popover: null,
     popoverTarget: null,
     popoverTargetAction: null,
     poster: null,
     preload: null,
-    readOnly: boolean,
+    readOnly: boolean2,
     referrerPolicy: null,
     rel: spaceSeparated,
-    required: boolean,
-    reversed: boolean,
-    rows: number,
-    rowSpan: number,
+    required: boolean2,
+    reversed: boolean2,
+    rows: number3,
+    rowSpan: number3,
     sandbox: spaceSeparated,
     scope: null,
-    scoped: boolean,
-    seamless: boolean,
-    selected: boolean,
-    shadowRootClonable: boolean,
-    shadowRootCustomElementRegistry: boolean,
-    shadowRootDelegatesFocus: boolean,
+    scoped: boolean2,
+    seamless: boolean2,
+    selected: boolean2,
+    shadowRootClonable: boolean2,
+    shadowRootCustomElementRegistry: boolean2,
+    shadowRootDelegatesFocus: boolean2,
     shadowRootMode: null,
-    shadowRootSerializable: boolean,
+    shadowRootSerializable: boolean2,
     shape: null,
-    size: number,
+    size: number3,
     sizes: null,
     slot: null,
-    span: number,
+    span: number3,
     spellCheck: booleanish,
     src: null,
     srcDoc: null,
     srcLang: null,
     srcSet: null,
-    start: number,
+    start: number3,
     step: null,
     style: null,
-    tabIndex: number,
+    tabIndex: number3,
     target: null,
     title: null,
     translate: null,
     type: null,
-    typeMustMatch: boolean,
+    typeMustMatch: boolean2,
     useMap: null,
     value: booleanish,
-    width: number,
+    width: number3,
     wrap: null,
     writingSuggestions: null,
     // Legacy.
@@ -42147,11 +43151,11 @@ var html2 = create4({
     // `<body>`. Use CSS `background-image` instead
     bgColor: null,
     // `<body>` and table elements. Use CSS `background-color` instead
-    border: number,
+    border: number3,
     // `<table>`. Use CSS `border-width` instead,
     borderColor: null,
     // `<table>`. Use CSS `border-color` instead,
-    bottomMargin: number,
+    bottomMargin: number3,
     // `<body>`
     cellPadding: null,
     // `<table>`
@@ -42173,9 +43177,9 @@ var html2 = create4({
     // `<object>`
     color: null,
     // `<font>` and `<hr>`. Use CSS instead
-    compact: boolean,
+    compact: boolean2,
     // Lists. Use CSS to reduce space between items instead
-    declare: boolean,
+    declare: boolean2,
     // `<object>`
     event: null,
     // `<script>`
@@ -42185,9 +43189,9 @@ var html2 = create4({
     // `<table>`
     frameBorder: null,
     // `<iframe>`. Use CSS `border` instead
-    hSpace: number,
+    hSpace: number3,
     // `<img>` and `<object>`
-    leftMargin: number,
+    leftMargin: number3,
     // `<body>`
     link: null,
     // `<body>`. Use CSS `a:link {color: *}` instead
@@ -42195,17 +43199,17 @@ var html2 = create4({
     // `<frame>`, `<iframe>`, and `<img>`. Use an `<a>`
     lowSrc: null,
     // `<img>`. Use a `<picture>`
-    marginHeight: number,
+    marginHeight: number3,
     // `<body>`
-    marginWidth: number,
+    marginWidth: number3,
     // `<body>`
-    noResize: boolean,
+    noResize: boolean2,
     // `<frame>`
-    noHref: boolean,
+    noHref: boolean2,
     // `<area>`. Use no href instead of an explicit `nohref`
-    noShade: boolean,
+    noShade: boolean2,
     // `<hr>`. Use background-color and height instead of borders
-    noWrap: boolean,
+    noWrap: boolean2,
     // `<td>` and `<th>`
     object: null,
     // `<applet>`
@@ -42215,7 +43219,7 @@ var html2 = create4({
     // `<isindex>`
     rev: null,
     // `<link>`
-    rightMargin: number,
+    rightMargin: number3,
     // `<body>`
     rules: null,
     // `<table>`
@@ -42229,7 +43233,7 @@ var html2 = create4({
     // `<table>`
     text: null,
     // `<body>`. Use CSS `color` instead
-    topMargin: number,
+    topMargin: number3,
     // `<body>`
     valueType: null,
     // `<param>`
@@ -42239,20 +43243,20 @@ var html2 = create4({
     // Several. Use CSS `vertical-align` instead
     vLink: null,
     // `<body>`. Use CSS `a:visited {color}` instead
-    vSpace: number,
+    vSpace: number3,
     // `<img>` and `<object>`
     // Non-standard Properties.
     allowTransparency: null,
     autoCorrect: null,
     autoSave: null,
-    credentialless: boolean,
-    disablePictureInPicture: boolean,
-    disableRemotePlayback: boolean,
+    credentialless: boolean2,
+    disablePictureInPicture: boolean2,
+    disableRemotePlayback: boolean2,
     exportParts: commaSeparated,
     part: spaceSeparated,
     prefix: null,
     property: null,
-    results: number,
+    results: number3,
     security: null,
     unselectable: null
   },
@@ -42440,27 +43444,27 @@ var svg = create4({
   },
   properties: {
     about: commaOrSpaceSeparated,
-    accentHeight: number,
+    accentHeight: number3,
     accumulate: null,
     additive: null,
     alignmentBaseline: null,
-    alphabetic: number,
-    amplitude: number,
+    alphabetic: number3,
+    amplitude: number3,
     arabicForm: null,
-    ascent: number,
+    ascent: number3,
     attributeName: null,
     attributeType: null,
-    azimuth: number,
+    azimuth: number3,
     bandwidth: null,
     baselineShift: null,
     baseFrequency: null,
     baseProfile: null,
     bbox: null,
     begin: null,
-    bias: number,
+    bias: number3,
     by: null,
     calcMode: null,
-    capHeight: number,
+    capHeight: number3,
     className: spaceSeparated,
     clip: null,
     clipPath: null,
@@ -42481,26 +43485,26 @@ var svg = create4({
     d: null,
     dataType: null,
     defaultAction: null,
-    descent: number,
-    diffuseConstant: number,
+    descent: number3,
+    diffuseConstant: number3,
     direction: null,
     display: null,
     dur: null,
-    divisor: number,
+    divisor: number3,
     dominantBaseline: null,
-    download: boolean,
+    download: boolean2,
     dx: null,
     dy: null,
     edgeMode: null,
     editable: null,
-    elevation: number,
+    elevation: number3,
     enableBackground: null,
     end: null,
     event: null,
-    exponent: number,
+    exponent: number3,
     externalResourcesRequired: null,
     fill: null,
-    fillOpacity: number,
+    fillOpacity: number3,
     fillRule: null,
     filter: null,
     filterRes: null,
@@ -42530,27 +43534,27 @@ var svg = create4({
     gradientTransform: null,
     gradientUnits: null,
     handler: null,
-    hanging: number,
+    hanging: number3,
     hatchContentUnits: null,
     hatchUnits: null,
     height: null,
     href: null,
     hrefLang: null,
-    horizAdvX: number,
-    horizOriginX: number,
-    horizOriginY: number,
+    horizAdvX: number3,
+    horizOriginX: number3,
+    horizOriginY: number3,
     id: null,
-    ideographic: number,
+    ideographic: number3,
     imageRendering: null,
     initialVisibility: null,
     in: null,
     in2: null,
-    intercept: number,
-    k: number,
-    k1: number,
-    k2: number,
-    k3: number,
-    k4: number,
+    intercept: number3,
+    k: number3,
+    k1: number3,
+    k2: number3,
+    k3: number3,
+    k4: number3,
     kernelMatrix: commaOrSpaceSeparated,
     kernelUnitLength: null,
     keyPoints: null,
@@ -42564,7 +43568,7 @@ var svg = create4({
     lengthAdjust: null,
     letterSpacing: null,
     lightingColor: null,
-    limitingConeAngle: number,
+    limitingConeAngle: number3,
     local: null,
     markerEnd: null,
     markerMid: null,
@@ -42581,7 +43585,7 @@ var svg = create4({
     media: null,
     mediaCharacterEncoding: null,
     mediaContentEncodings: null,
-    mediaSize: number,
+    mediaSize: number3,
     mediaTime: null,
     method: null,
     min: null,
@@ -42687,12 +43691,12 @@ var svg = create4({
     origin: null,
     overflow: null,
     overlay: null,
-    overlinePosition: number,
-    overlineThickness: number,
+    overlinePosition: number3,
+    overlineThickness: number3,
     paintOrder: null,
     panose1: null,
     path: null,
-    pathLength: number,
+    pathLength: number3,
     patternContentUnits: null,
     patternTransform: null,
     patternUnits: null,
@@ -42702,9 +43706,9 @@ var svg = create4({
     playbackOrder: null,
     pointerEvents: null,
     points: null,
-    pointsAtX: number,
-    pointsAtY: number,
-    pointsAtZ: number,
+    pointsAtX: number3,
+    pointsAtY: number3,
+    pointsAtZ: number3,
     preserveAlpha: null,
     preserveAspectRatio: null,
     primitiveUnits: null,
@@ -42736,8 +43740,8 @@ var svg = create4({
     side: null,
     slope: null,
     snapshotTime: null,
-    specularConstant: number,
-    specularExponent: number,
+    specularConstant: number3,
+    specularExponent: number3,
     spreadMethod: null,
     spacing: null,
     startOffset: null,
@@ -42747,30 +43751,30 @@ var svg = create4({
     stitchTiles: null,
     stopColor: null,
     stopOpacity: null,
-    strikethroughPosition: number,
-    strikethroughThickness: number,
+    strikethroughPosition: number3,
+    strikethroughThickness: number3,
     string: null,
     stroke: null,
     strokeDashArray: commaOrSpaceSeparated,
     strokeDashOffset: null,
     strokeLineCap: null,
     strokeLineJoin: null,
-    strokeMiterLimit: number,
-    strokeOpacity: number,
+    strokeMiterLimit: number3,
+    strokeOpacity: number3,
     strokeWidth: null,
     style: null,
-    surfaceScale: number,
+    surfaceScale: number3,
     syncBehavior: null,
     syncBehaviorDefault: null,
     syncMaster: null,
     syncTolerance: null,
     syncToleranceDefault: null,
     systemLanguage: commaOrSpaceSeparated,
-    tabIndex: number,
+    tabIndex: number3,
     tableValues: null,
     target: null,
-    targetX: number,
-    targetY: number,
+    targetX: number3,
+    targetY: number3,
     textAnchor: null,
     textDecoration: null,
     textRendering: null,
@@ -42785,22 +43789,22 @@ var svg = create4({
     transformOrigin: null,
     u1: null,
     u2: null,
-    underlinePosition: number,
-    underlineThickness: number,
+    underlinePosition: number3,
+    underlineThickness: number3,
     unicode: null,
     unicodeBidi: null,
     unicodeRange: null,
-    unitsPerEm: number,
+    unitsPerEm: number3,
     values: null,
-    vAlphabetic: number,
-    vMathematical: number,
+    vAlphabetic: number3,
+    vMathematical: number3,
     vectorEffect: null,
-    vHanging: number,
-    vIdeographic: number,
+    vHanging: number3,
+    vIdeographic: number3,
     version: null,
-    vertAdvY: number,
-    vertOriginX: number,
-    vertOriginY: number,
+    vertAdvY: number3,
+    vertOriginX: number3,
+    vertOriginY: number3,
     viewBox: null,
     viewTarget: null,
     visibility: null,
@@ -42812,7 +43816,7 @@ var svg = create4({
     x1: null,
     x2: null,
     xChannelSelector: null,
-    xHeight: number,
+    xHeight: number3,
     y: null,
     y1: null,
     y2: null,
@@ -42899,7 +43903,7 @@ var html3 = merge([aria, html2, xlink, xmlns, xml], "html");
 var svg2 = merge([aria, svg, xlink, xmlns, xml], "svg");
 
 // node_modules/comma-separated-tokens/index.js
-function parse(value) {
+function parse2(value) {
   const tokens2 = [];
   const input2 = String(value || "");
   let index2 = input2.indexOf(",");
@@ -42966,7 +43970,7 @@ function parseSelector(selector, defaultTagName) {
 }
 
 // node_modules/space-separated-tokens/index.js
-function parse2(value) {
+function parse3(value) {
   const input2 = String(value || "").trim();
   return input2 ? input2.split(/[ \t\n\r\f]+/g) : [];
 }
@@ -43051,11 +44055,11 @@ function addProperty(schema2, properties2, key2, value) {
     result = value;
   } else if (typeof value === "string") {
     if (info.spaceSeparated) {
-      result = parse2(value);
+      result = parse3(value);
     } else if (info.commaSeparated) {
-      result = parse(value);
+      result = parse2(value);
     } else if (info.commaOrSpaceSeparated) {
-      result = parse2(parse(value).join(" "));
+      result = parse3(parse2(value).join(" "));
     } else {
       result = parsePrimitive(info, info.property, value);
     }
@@ -43943,7 +44947,7 @@ var htmlDecodeTree = /* @__PURE__ */ new Uint16Array(
 );
 
 // node_modules/entities/dist/esm/decode-codepoint.js
-var _a;
+var _a2;
 var decodeMap = /* @__PURE__ */ new Map([
   [0, 65533],
   // C1 Unicode control character reference replacements
@@ -43977,7 +44981,7 @@ var decodeMap = /* @__PURE__ */ new Map([
 ]);
 var fromCodePoint = (
   // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition, n/no-unsupported-features/es-builtins
-  (_a = String.fromCodePoint) !== null && _a !== void 0 ? _a : function(codePoint) {
+  (_a2 = String.fromCodePoint) !== null && _a2 !== void 0 ? _a2 : function(codePoint) {
     let output = "";
     if (codePoint > 65535) {
       codePoint -= 65536;
@@ -43989,11 +44993,11 @@ var fromCodePoint = (
   }
 );
 function replaceCodePoint(codePoint) {
-  var _a2;
+  var _a3;
   if (codePoint >= 55296 && codePoint <= 57343 || codePoint > 1114111) {
     return 65533;
   }
-  return (_a2 = decodeMap.get(codePoint)) !== null && _a2 !== void 0 ? _a2 : codePoint;
+  return (_a3 = decodeMap.get(codePoint)) !== null && _a3 !== void 0 ? _a3 : codePoint;
 }
 
 // node_modules/entities/dist/esm/decode.js
@@ -44190,9 +45194,9 @@ var EntityDecoder = class {
    * @returns The number of characters that were consumed.
    */
   emitNumericEntity(lastCp, expectedLength) {
-    var _a2;
+    var _a3;
     if (this.consumed <= expectedLength) {
-      (_a2 = this.errors) === null || _a2 === void 0 ? void 0 : _a2.absenceOfDigitsInNumericCharacterReference(this.consumed);
+      (_a3 = this.errors) === null || _a3 === void 0 ? void 0 : _a3.absenceOfDigitsInNumericCharacterReference(this.consumed);
       return 0;
     }
     if (lastCp === CharCodes.SEMI) {
@@ -44252,11 +45256,11 @@ var EntityDecoder = class {
    * @returns The number of characters consumed.
    */
   emitNotTerminatedNamedEntity() {
-    var _a2;
+    var _a3;
     const { result, decodeTree } = this;
     const valueLength = (decodeTree[result] & BinTrieFlags.VALUE_LENGTH) >> 14;
     this.emitNamedEntityData(result, valueLength, this.consumed);
-    (_a2 = this.errors) === null || _a2 === void 0 ? void 0 : _a2.missingSemicolonAfterCharacterReference();
+    (_a3 = this.errors) === null || _a3 === void 0 ? void 0 : _a3.missingSemicolonAfterCharacterReference();
     return this.consumed;
   }
   /**
@@ -44284,7 +45288,7 @@ var EntityDecoder = class {
    * @returns The number of characters consumed.
    */
   end() {
-    var _a2;
+    var _a3;
     switch (this.state) {
       case EntityDecoderState.NamedEntity: {
         return this.result !== 0 && (this.decodeMode !== DecodingMode.Attribute || this.result === this.treeIndex) ? this.emitNotTerminatedNamedEntity() : 0;
@@ -44297,7 +45301,7 @@ var EntityDecoder = class {
         return this.emitNumericEntity(0, 3);
       }
       case EntityDecoderState.NumericStart: {
-        (_a2 = this.errors) === null || _a2 === void 0 ? void 0 : _a2.absenceOfDigitsInNumericCharacterReference(this.consumed);
+        (_a3 = this.errors) === null || _a3 === void 0 ? void 0 : _a3.absenceOfDigitsInNumericCharacterReference(this.consumed);
         return 0;
       }
       case EntityDecoderState.EntityStart: {
@@ -44750,8 +45754,8 @@ var TAG_NAME_TO_ID = /* @__PURE__ */ new Map([
   [TAG_NAMES.XMP, TAG_ID.XMP]
 ]);
 function getTagID(tagName) {
-  var _a2;
-  return (_a2 = TAG_NAME_TO_ID.get(tagName)) !== null && _a2 !== void 0 ? _a2 : TAG_ID.UNKNOWN;
+  var _a3;
+  return (_a3 = TAG_NAME_TO_ID.get(tagName)) !== null && _a3 !== void 0 ? _a3 : TAG_ID.UNKNOWN;
 }
 var $ = TAG_ID;
 var SPECIAL_ELEMENTS = {
@@ -45018,8 +46022,8 @@ var Tokenizer = class {
   }
   //Errors
   _err(code7, cpOffset = 0) {
-    var _a2, _b;
-    (_b = (_a2 = this.handler).onParseError) === null || _b === void 0 ? void 0 : _b.call(_a2, this.preprocessor.getError(code7, cpOffset));
+    var _a3, _b;
+    (_b = (_a3 = this.handler).onParseError) === null || _b === void 0 ? void 0 : _b.call(_a3, this.preprocessor.getError(code7, cpOffset));
   }
   // NOTE: `offset` may never run across line boundaries.
   getCurrentLocation(offset) {
@@ -45161,13 +46165,13 @@ var Tokenizer = class {
     this.currentLocation = this.getCurrentLocation(0);
   }
   _leaveAttrName() {
-    var _a2;
+    var _a3;
     var _b;
     const token = this.currentToken;
     if (getTokenAttr(token, this.currentAttr.name) === null) {
       token.attrs.push(this.currentAttr);
       if (token.location && this.currentLocation) {
-        const attrLocations = (_a2 = (_b = token.location).attrs) !== null && _a2 !== void 0 ? _a2 : _b.attrs = /* @__PURE__ */ Object.create(null);
+        const attrLocations = (_a3 = (_b = token.location).attrs) !== null && _a3 !== void 0 ? _a3 : _b.attrs = /* @__PURE__ */ Object.create(null);
         attrLocations[this.currentAttr.name] = this.currentLocation;
         this._leaveAttrValue();
       }
@@ -48507,10 +49511,10 @@ var Parser = class {
   //Errors
   /** @internal */
   _err(token, code7, beforeToken) {
-    var _a2;
+    var _a3;
     if (!this.onParseError)
       return;
-    const loc = (_a2 = token.location) !== null && _a2 !== void 0 ? _a2 : BASE_LOC;
+    const loc = (_a3 = token.location) !== null && _a3 !== void 0 ? _a3 : BASE_LOC;
     const err = {
       code: code7,
       startLine: loc.startLine,
@@ -48525,18 +49529,18 @@ var Parser = class {
   //Stack events
   /** @internal */
   onItemPush(node3, tid, isTop) {
-    var _a2, _b;
-    (_b = (_a2 = this.treeAdapter).onItemPush) === null || _b === void 0 ? void 0 : _b.call(_a2, node3);
+    var _a3, _b;
+    (_b = (_a3 = this.treeAdapter).onItemPush) === null || _b === void 0 ? void 0 : _b.call(_a3, node3);
     if (isTop && this.openElements.stackTop > 0)
       this._setContextModes(node3, tid);
   }
   /** @internal */
   onItemPop(node3, isTop) {
-    var _a2, _b;
+    var _a3, _b;
     if (this.options.sourceCodeLocationInfo) {
       this._setEndLocation(node3, this.currentToken);
     }
-    (_b = (_a2 = this.treeAdapter).onItemPop) === null || _b === void 0 ? void 0 : _b.call(_a2, node3, this.openElements.current);
+    (_b = (_a3 = this.treeAdapter).onItemPop) === null || _b === void 0 ? void 0 : _b.call(_a3, node3, this.openElements.current);
     if (isTop) {
       let current;
       let currentTagId;
@@ -50610,9 +51614,9 @@ function eofInBody(p3, token) {
   }
 }
 function endTagInText(p3, token) {
-  var _a2;
+  var _a3;
   if (token.tagID === TAG_ID.SCRIPT) {
-    (_a2 = p3.scriptHandler) === null || _a2 === void 0 ? void 0 : _a2.call(p3, p3.openElements.current);
+    (_a3 = p3.scriptHandler) === null || _a3 === void 0 ? void 0 : _a3.call(p3, p3.openElements.current);
   }
   p3.openElements.pop();
   p3.insertionMode = p3.originalInsertionMode;
@@ -51274,7 +52278,7 @@ function startTagAfterBody(p3, token) {
   }
 }
 function endTagAfterBody(p3, token) {
-  var _a2;
+  var _a3;
   if (token.tagID === TAG_ID.HTML) {
     if (!p3.fragmentContext) {
       p3.insertionMode = InsertionMode.AFTER_AFTER_BODY;
@@ -51282,7 +52286,7 @@ function endTagAfterBody(p3, token) {
     if (p3.options.sourceCodeLocationInfo && p3.openElements.tagIDs[0] === TAG_ID.HTML) {
       p3._setEndLocation(p3.openElements.items[0], token);
       const bodyElement = p3.openElements.items[1];
-      if (bodyElement && !((_a2 = p3.treeAdapter.getNodeSourceCodeLocation(bodyElement)) === null || _a2 === void 0 ? void 0 : _a2.endTag)) {
+      if (bodyElement && !((_a3 = p3.treeAdapter.getNodeSourceCodeLocation(bodyElement)) === null || _a3 === void 0 ? void 0 : _a3.endTag)) {
         p3._setEndLocation(bodyElement, token);
       }
     }
@@ -51467,7 +52471,7 @@ function raw(tree, options) {
   const document3 = documentMode(tree);
   const one5 = zwitch("type", {
     handlers: { root: root4, element: element4, text: text4, comment: comment3, doctype: doctype2, raw: handleRaw },
-    unknown: unknown2
+    unknown: unknown3
   });
   const state = {
     parser: document3 ? new Parser(parseOptions) : Parser.getFragmentParser(void 0, parseOptions),
@@ -51547,15 +52551,15 @@ function doctype2(node3, state) {
 }
 function stitch(node3, state) {
   state.stitches = true;
-  const clone = cloneWithoutChildren2(node3);
-  if ("children" in node3 && "children" in clone) {
+  const clone2 = cloneWithoutChildren2(node3);
+  if ("children" in node3 && "children" in clone2) {
     const fakeRoot = (
       /** @type {Root} */
       raw({ type: "root", children: node3.children }, state.options)
     );
-    clone.children = fakeRoot.children;
+    clone2.children = fakeRoot.children;
   }
-  comment3({ type: "comment", value: { stitch: clone } }, state);
+  comment3({ type: "comment", value: { stitch: clone2 } }, state);
 }
 function comment3(node3, state) {
   const data = node3.value;
@@ -51590,7 +52594,7 @@ function handleRaw(node3, state) {
     state.parser.tokenizer._callState(cp);
   }
 }
-function unknown2(node_, state) {
+function unknown3(node_, state) {
   const node3 = (
     /** @type {Nodes} */
     node_
@@ -51948,7 +52952,7 @@ function sanitize(node3, options) {
     schema: options ? { ...defaultSchema, ...options } : defaultSchema,
     stack: []
   };
-  const replace2 = transform(state, node3);
+  const replace2 = transform2(state, node3);
   if (replace2) {
     if (Array.isArray(replace2)) {
       if (replace2.length === 1) {
@@ -51962,7 +52966,7 @@ function sanitize(node3, options) {
   }
   return result;
 }
-function transform(state, node3) {
+function transform2(state, node3) {
   if (node3 && typeof node3 === "object") {
     const unsafe2 = (
       /** @type {Record<string, Readonly<unknown>>} */
@@ -52065,7 +53069,7 @@ function children2(state, children3) {
     );
     let index2 = -1;
     while (++index2 < childrenUnknown.length) {
-      const value = transform(state, childrenUnknown[index2]);
+      const value = transform2(state, childrenUnknown[index2]);
       if (value) {
         if (Array.isArray(value)) {
           results.push(...value);
@@ -52080,7 +53084,7 @@ function children2(state, children3) {
 function properties(state, properties2) {
   const tagName = state.stack[state.stack.length - 1];
   const attributes = state.schema.attributes;
-  const required = state.schema.required;
+  const required2 = state.schema.required;
   const specific = attributes && own9.call(attributes, tagName) ? attributes[tagName] : void 0;
   const defaults = attributes && own9.call(attributes, "*") ? attributes["*"] : void 0;
   const properties_ = (
@@ -52106,8 +53110,8 @@ function properties(state, properties2) {
       }
     }
   }
-  if (required && own9.call(required, tagName)) {
-    const properties3 = required[tagName];
+  if (required2 && own9.call(required2, tagName)) {
+    const properties3 = required2[tagName];
     for (key2 in properties3) {
       if (own9.call(properties3, key2) && !own9.call(result, key2)) {
         result[key2] = properties3[key2];
@@ -53218,9 +54222,9 @@ function tokenizeCodeFenced(effects, ok3, nok) {
     effects.enter("chunkString", {
       contentType: "string"
     });
-    return meta2(code7);
+    return meta3(code7);
   }
-  function meta2(code7) {
+  function meta3(code7) {
     if (code7 === null || markdownLineEnding(code7)) {
       effects.exit("chunkString");
       effects.exit("codeFencedFenceMeta");
@@ -53230,7 +54234,7 @@ function tokenizeCodeFenced(effects, ok3, nok) {
       return nok(code7);
     }
     effects.consume(code7);
-    return meta2;
+    return meta3;
   }
   function atNonLazyBreak(code7) {
     return effects.attempt(closeStart, after, contentBefore)(code7);
@@ -55745,7 +56749,7 @@ function resolveToPotentialGfmFootnoteCall(events, context) {
   marker2.end.column++;
   marker2.end.offset++;
   marker2.end._bufferIndex++;
-  const string3 = {
+  const string5 = {
     type: "gfmFootnoteCallString",
     start: Object.assign({}, marker2.end),
     end: Object.assign({}, events[events.length - 1][1].start)
@@ -55753,8 +56757,8 @@ function resolveToPotentialGfmFootnoteCall(events, context) {
   const chunk = {
     type: "chunkString",
     contentType: "string",
-    start: Object.assign({}, string3.start),
-    end: Object.assign({}, string3.end)
+    start: Object.assign({}, string5.start),
+    end: Object.assign({}, string5.end)
   };
   const replacement = [
     // Take the `labelImageMarker` (now `data`, the `!`)
@@ -55768,10 +56772,10 @@ function resolveToPotentialGfmFootnoteCall(events, context) {
     ["enter", marker2, context],
     ["exit", marker2, context],
     // Everything in between.
-    ["enter", string3, context],
+    ["enter", string5, context],
     ["enter", chunk, context],
     ["exit", chunk, context],
-    ["exit", string3, context],
+    ["exit", string5, context],
     // The ending (`]`, properly parsed and labelled).
     events[events.length - 2],
     events[events.length - 1],
@@ -56918,7 +57922,7 @@ function initializeFlow(effects) {
 var resolver = {
   resolveAll: createResolver()
 };
-var string = initializeFactory("string");
+var string3 = initializeFactory("string");
 var text7 = initializeFactory("text");
 function initializeFactory(field) {
   return {
@@ -57066,7 +58070,7 @@ __export(constructs_exports, {
   flow: () => flow3,
   flowInitial: () => flowInitial,
   insideSpan: () => insideSpan,
-  string: () => string2,
+  string: () => string4,
   text: () => text8
 });
 var document2 = {
@@ -57103,7 +58107,7 @@ var flow3 = {
   [96]: codeFenced,
   [126]: codeFenced
 };
-var string2 = {
+var string4 = {
   [38]: characterReference,
   [92]: characterEscape
 };
@@ -57458,7 +58462,7 @@ function serializeChunks(chunks2, expandTabs) {
 }
 
 // node_modules/micromark/lib/parse.js
-function parse3(options) {
+function parse4(options) {
   const settings2 = options || {};
   const constructs2 = (
     /** @type {FullNormalizedExtension} */
@@ -57471,7 +58475,7 @@ function parse3(options) {
     document: create5(document),
     flow: create5(flow2),
     lazy: {},
-    string: create5(string),
+    string: create5(string3),
     text: create5(text7)
   };
   return parser;
@@ -57603,10 +58607,10 @@ function fromMarkdown(value, encoding, options) {
     options = encoding;
     encoding = void 0;
   }
-  return compiler(options)(postprocess(parse3(options).document().write(preprocess()(value, encoding, true))));
+  return compiler(options)(postprocess(parse4(options).document().write(preprocess()(value, encoding, true))));
 }
 function compiler(options) {
-  const config2 = {
+  const config3 = {
     afterExit: [],
     beforeEnter: [],
     transforms: [],
@@ -57706,7 +58710,7 @@ function compiler(options) {
       thematicBreak: closer()
     }
   };
-  configure2(config2, (options || {}).mdastExtensions || []);
+  configure2(config3, (options || {}).mdastExtensions || []);
   const data = {};
   return compile;
   function compile(events) {
@@ -57718,7 +58722,7 @@ function compiler(options) {
     const context = {
       stack: [tree],
       tokenStack: [],
-      config: config2,
+      config: config3,
       enter,
       exit: exit3,
       buffer,
@@ -57742,9 +58746,9 @@ function compiler(options) {
     events = prepared;
     index2 = -1;
     while (++index2 < events.length) {
-      const handler = config2[events[index2][0]];
-      if (events[index2][0] === "enter" && config2.beforeEnter.length > 0) {
-        callListeners(config2.beforeEnter, {
+      const handler = config3[events[index2][0]];
+      if (events[index2][0] === "enter" && config3.beforeEnter.length > 0) {
+        callListeners(config3.beforeEnter, {
           ...context,
           sliceSerialize: events[index2][2].sliceSerialize
         }, events[index2][1]);
@@ -57755,8 +58759,8 @@ function compiler(options) {
           sliceSerialize: events[index2][2].sliceSerialize
         }, events[index2][1]);
       }
-      if (events[index2][0] === "exit" && config2.afterExit.length > 0) {
-        callListeners(config2.afterExit, {
+      if (events[index2][0] === "exit" && config3.afterExit.length > 0) {
+        callListeners(config3.afterExit, {
           ...context,
           sliceSerialize: events[index2][2].sliceSerialize
         }, events[index2][1]);
@@ -57780,8 +58784,8 @@ function compiler(options) {
       })
     };
     index2 = -1;
-    while (++index2 < config2.transforms.length) {
-      tree = config2.transforms[index2](tree) || tree;
+    while (++index2 < config3.transforms.length) {
+      tree = config3.transforms[index2](tree) || tree;
     }
     return tree;
   }
@@ -58043,7 +59047,7 @@ function compiler(options) {
       this.data.atHardBreak = void 0;
       return;
     }
-    if (!this.data.setextHeadingSlurpLineEnding && config2.canContainEols.includes(context.type)) {
+    if (!this.data.setextHeadingSlurpLineEnding && config3.canContainEols.includes(context.type)) {
       onenterdata.call(this, token);
       onexitdata.call(this, token);
     }
@@ -58095,10 +59099,10 @@ function compiler(options) {
     this.data.referenceType = void 0;
   }
   function onexitlabeltext(token) {
-    const string3 = this.sliceSerialize(token);
+    const string5 = this.sliceSerialize(token);
     const ancestor = this.stack[this.stack.length - 2];
-    ancestor.label = decodeString(string3);
-    ancestor.identifier = normalizeIdentifier(string3).toLowerCase();
+    ancestor.label = decodeString(string5);
+    ancestor.identifier = normalizeIdentifier(string5).toLowerCase();
   }
   function onexitlabel() {
     const fragment2 = this.stack[this.stack.length - 1];
@@ -58456,14 +59460,14 @@ function footnoteReference2(state, node3) {
   const id = String(node3.identifier).toUpperCase();
   const safeId = normalizeUri(id.toLowerCase());
   const index2 = state.footnoteOrder.indexOf(id);
-  let counter;
+  let counter2;
   let reuseCounter = state.footnoteCounts.get(id);
   if (reuseCounter === void 0) {
     reuseCounter = 0;
     state.footnoteOrder.push(id);
-    counter = state.footnoteOrder.length;
+    counter2 = state.footnoteOrder.length;
   } else {
-    counter = index2 + 1;
+    counter2 = index2 + 1;
   }
   reuseCounter += 1;
   state.footnoteCounts.set(id, reuseCounter);
@@ -58476,7 +59480,7 @@ function footnoteReference2(state, node3) {
       dataFootnoteRef: true,
       ariaDescribedBy: ["footnote-label"]
     },
-    children: [{ type: "text", value: String(counter) }]
+    children: [{ type: "text", value: String(counter2) }]
   };
   state.patch(node3, link3);
   const sup = {
@@ -58623,7 +59627,7 @@ function link2(state, node3) {
 // node_modules/mdast-util-to-hast/lib/handlers/list-item.js
 function listItem2(state, node3, parent) {
   const results = state.all(node3);
-  const loose = parent ? listLoose(parent) : listItemLoose(node3);
+  const loose2 = parent ? listLoose(parent) : listItemLoose(node3);
   const properties2 = {};
   const children3 = [];
   if (typeof node3.checked === "boolean") {
@@ -58649,17 +59653,17 @@ function listItem2(state, node3, parent) {
   let index2 = -1;
   while (++index2 < results.length) {
     const child = results[index2];
-    if (loose || index2 !== 0 || child.type !== "element" || child.tagName !== "p") {
+    if (loose2 || index2 !== 0 || child.type !== "element" || child.tagName !== "p") {
       children3.push({ type: "text", value: "\n" });
     }
-    if (child.type === "element" && child.tagName === "p" && !loose) {
+    if (child.type === "element" && child.tagName === "p" && !loose2) {
       children3.push(...child.children);
     } else {
       children3.push(child);
     }
   }
   const tail = results[results.length - 1];
-  if (tail && (loose || tail.type !== "element" || tail.tagName !== "p")) {
+  if (tail && (loose2 || tail.type !== "element" || tail.tagName !== "p")) {
     children3.push({ type: "text", value: "\n" });
   }
   const result = { type: "element", tagName: "li", properties: properties2, children: children3 };
@@ -58667,16 +59671,16 @@ function listItem2(state, node3, parent) {
   return state.applyData(node3, result);
 }
 function listLoose(node3) {
-  let loose = false;
+  let loose2 = false;
   if (node3.type === "list") {
-    loose = node3.spread || false;
+    loose2 = node3.spread || false;
     const children3 = node3.children;
     let index2 = -1;
-    while (!loose && ++index2 < children3.length) {
-      loose = listItemLoose(children3[index2]);
+    while (!loose2 && ++index2 < children3.length) {
+      loose2 = listItemLoose(children3[index2]);
     }
   }
-  return loose;
+  return loose2;
 }
 function listItemLoose(node3) {
   const spread = node3.spread;
@@ -59074,8 +60078,8 @@ function createState2(tree, options) {
       }
       return esm_default(node3);
     }
-    const unknown3 = state.options.unknownHandler || defaultUnknownHandler;
-    return unknown3(state, node3, parent);
+    const unknown4 = state.options.unknownHandler || defaultUnknownHandler;
+    return unknown4(state, node3, parent);
   }
   function all8(parent) {
     const values = [];
@@ -59144,17 +60148,17 @@ function defaultUnknownHandler(state, node3) {
   state.patch(node3, result);
   return state.applyData(node3, result);
 }
-function wrap2(nodes2, loose) {
+function wrap2(nodes2, loose2) {
   const result = [];
   let index2 = -1;
-  if (loose) {
+  if (loose2) {
     result.push({ type: "text", value: "\n" });
   }
   while (++index2 < nodes2.length) {
     if (index2) result.push({ type: "text", value: "\n" });
     result.push(nodes2[index2]);
   }
-  if (loose && nodes2.length > 0) {
+  if (loose2 && nodes2.length > 0) {
     result.push({ type: "text", value: "\n" });
   }
   return result;
@@ -59212,7 +60216,7 @@ function bail(error) {
 var import_extend = __toESM(require_extend(), 1);
 
 // node_modules/is-plain-obj/index.js
-function isPlainObject(value) {
+function isPlainObject2(value) {
   if (typeof value !== "object" || value === null) {
     return false;
   }
@@ -60523,7 +61527,7 @@ var Processor = class _Processor extends CallableInstance {
       } else if (parameters2.length > 0) {
         let [primary, ...rest] = parameters2;
         const currentPrimary = attachers[entryIndex][1];
-        if (isPlainObject(currentPrimary) && isPlainObject(primary)) {
+        if (isPlainObject2(currentPrimary) && isPlainObject2(primary)) {
           primary = (0, import_extend.default)(true, currentPrimary, primary);
         }
         attachers[entryIndex] = [plugin, primary, ...rest];
@@ -60550,7 +61554,7 @@ function assertUnfrozen(name, frozen) {
   }
 }
 function assertNode(node3) {
-  if (!isPlainObject(node3) || typeof node3.type !== "string") {
+  if (!isPlainObject2(node3) || typeof node3.type !== "string") {
     throw new TypeError("Expected node, got `" + node3 + "`");
   }
 }
@@ -61250,9 +62254,9 @@ function commitRun(commits, key2, now) {
   ] }, key2);
 }
 function took(c, now) {
-  return c.startedAt && c.completedAt ? duration2(Date.parse(c.completedAt) - Date.parse(c.startedAt)) : c.startedAt && c.status === "pending" ? `${duration2(now - Date.parse(c.startedAt))}\u2026` : "";
+  return c.startedAt && c.completedAt ? duration3(Date.parse(c.completedAt) - Date.parse(c.startedAt)) : c.startedAt && c.status === "pending" ? `${duration3(now - Date.parse(c.startedAt))}\u2026` : "";
 }
-function duration2(ms) {
+function duration3(ms) {
   const s2 = Math.max(0, Math.round(ms / 1e3));
   return s2 < 60 ? `${s2}s` : s2 < 3600 ? `${Math.floor(s2 / 60)}m ${s2 % 60}s` : `${Math.floor(s2 / 3600)}h ${Math.floor(s2 % 3600 / 60)}m`;
 }
@@ -61369,7 +62373,7 @@ function openPrMenu(host) {
   let selected = entries()[0] ? prKey(entries()[0].ref) : void 0;
   host.prs.poke();
   const close = () => host.close(overlay);
-  const pick = (key2) => {
+  const pick2 = (key2) => {
     close();
     if (key2) {
       openPullRequests(host, key2);
@@ -61381,7 +62385,7 @@ function openPrMenu(host) {
     node: () => {
       const now = Date.now();
       return /* @__PURE__ */ jsxs("overlay", { anchor: { node: "dock.agents", side: "above" }, role: "hermes.pr.menu", children: [
-        /* @__PURE__ */ jsx("col", { gap: "none", role: "hermes.pr.menu.list", children: entries().map((e) => menuRow(e, now, prKey(e.ref) === selected, () => pick(prKey(e.ref)))) }, "list"),
+        /* @__PURE__ */ jsx("col", { gap: "none", role: "hermes.pr.menu.list", children: entries().map((e) => menuRow(e, now, prKey(e.ref) === selected, () => pick2(prKey(e.ref)))) }, "list"),
         /* @__PURE__ */ jsx("row", { align: "center", gap: "xs", role: "hermes.pr.menu.foot", children: /* @__PURE__ */ jsx("text", { spans: [{ s: "dim", t: "Opens beside the chat \xB7 " }, { s: "dim", t: "/prs 22 opens #22" }], wrap: "none" }, "l") }, "foot")
       ] }, MENU);
     },
@@ -61391,7 +62395,7 @@ function openPrMenu(host) {
       if (k.name === "escape") {
         close();
       } else if (k.name === "enter") {
-        pick(selected);
+        pick2(selected);
       } else if (k.name === "up" || k.name === "k") {
         selected = keys2[Math.max(0, at - 1)];
       } else if (k.name === "down" || k.name === "j") {
@@ -61481,15 +62485,19 @@ async function mutateModel(host, value, confirmed) {
   const result = await mutateSession(host.gw, sid ?? "", "model", { ...modelPayload(value), ...confirm ? { confirm } : {} });
   if (result.status === "confirmation_required" && typeof result.confirm === "string" && !confirmed) {
     confirmTokens.set(key2, result.confirm);
-    return { confirm_message: result.confirm_message, confirm_required: true };
+    return {
+      confirm_required: true,
+      key: "model",
+      ...result.confirm_message === void 0 ? {} : { confirm_message: result.confirm_message }
+    };
   }
   if (result.status === "confirmation_required") {
     throw new Error(result.confirm_message || "The model switch needs confirming again; try once more.");
   }
-  return { value: result.model ?? "" };
+  return { key: "model", value: result.model ?? "" };
 }
 async function switchModel(host, value, confirmed = false) {
-  const r = host.gw.isCanonical ? await mutateModel(host, value, confirmed) : await host.gw.request("config.set", {
+  const r = host.gw.isCanonical ? await mutateModel(host, value, confirmed) : await rpc(host.gw, "config.set", {
     confirm_expensive_model: confirmed,
     key: "model",
     session_id: host.session.ref.live,
@@ -61535,7 +62543,7 @@ function openModelPicker(host) {
     host.changed();
     try {
       const sid = host.session.ref.live;
-      const r = await host.gw.request("model.options", sid ? { session_id: sid } : {});
+      const r = await rpc(host.gw, "model.options", sid ? { session_id: sid } : {});
       const list8 = r.providers ?? [];
       rememberCaps(list8);
       const names = providerDisplayNames(list8);
@@ -61963,10 +62971,10 @@ function inlineMarks(line, from, at, mark2) {
     rest = rest.slice(0, start) + "\0".repeat(len) + rest.slice(start + len);
   };
   for (const m of [...rest.matchAll(CODE_SPAN)]) {
-    const tick = m[1].length;
-    mark2(at + m.index, at + m.index + tick, "dim");
-    mark2(at + m.index + tick, at + m.index + m[0].length - tick, "code");
-    mark2(at + m.index + m[0].length - tick, at + m.index + m[0].length, "dim");
+    const tick2 = m[1].length;
+    mark2(at + m.index, at + m.index + tick2, "dim");
+    mark2(at + m.index + tick2, at + m.index + m[0].length - tick2, "code");
+    mark2(at + m.index + m[0].length - tick2, at + m.index + m[0].length, "dim");
     take(m.index, m[0].length);
   }
   for (const m of [...rest.matchAll(LINK)]) {
@@ -62220,7 +63228,7 @@ var Composer = class {
   }
   /** Handles one editing key; false when the key isn't the composer's. */
   key(key2) {
-    const { alt, ctrl, meta: meta2, shift } = key2;
+    const { alt, ctrl, meta: meta3, shift } = key2;
     const name = key2.name;
     if (name === "paste") {
       const s2 = (key2.text ?? "").replace(/\r\n?/g, "\n");
@@ -62246,15 +63254,15 @@ var Composer = class {
       }
       return "submit";
     }
-    if (meta2 && !ctrl && !alt && (name === "b" || name === "i")) {
+    if (meta3 && !ctrl && !alt && (name === "b" || name === "i")) {
       const [from, to] = this.selection;
       return this.#apply(toggleMark(this.text, from, to, name === "b" ? "**" : "_"));
     }
-    if ((ctrl || meta2) && name === "z") {
+    if ((ctrl || meta3) && name === "z") {
       shift ? this.redo() : this.undo();
       return true;
     }
-    if (ctrl && !meta2 && !alt) {
+    if (ctrl && !meta3 && !alt) {
       switch (name) {
         case "a":
           return this.#move(lineStart(this.text, this.cursor));
@@ -62293,7 +63301,7 @@ var Composer = class {
       }
       return false;
     }
-    if (alt && !ctrl && !meta2) {
+    if (alt && !ctrl && !meta3) {
       switch (name) {
         case "b":
           return this.#move(prevWord(this.text, this.cursor));
@@ -62314,7 +63322,7 @@ var Composer = class {
       this.anchor = anchor !== void 0 && anchor !== this.cursor ? anchor : void 0;
       return moved2;
     }
-    if (key2.text && !ctrl && !meta2) {
+    if (key2.text && !ctrl && !meta3) {
       this.insert(key2.text);
       return true;
     }
@@ -62322,10 +63330,10 @@ var Composer = class {
   }
   /** The editing and motion keys without modifiers that change their meaning; undefined for others. */
   #motion(key2) {
-    const { alt, meta: meta2 } = key2;
+    const { alt, meta: meta3 } = key2;
     switch (key2.name) {
       case "backspace":
-        if (meta2) {
+        if (meta3) {
           return this.#cut(lineStart(this.text, this.cursor), this.cursor);
         }
         return this.#remove(alt ? prevWord(this.text, this.cursor) : prevGrapheme(this.text, this.cursor), this.cursor);
@@ -62333,20 +63341,20 @@ var Composer = class {
         return this.#remove(this.cursor, alt ? nextWord(this.text, this.cursor) : nextGrapheme(this.text, this.cursor));
       case "left":
         return this.#move(
-          meta2 ? lineStart(this.text, this.cursor) : alt ? prevWord(this.text, this.cursor) : prevGrapheme(this.text, this.cursor)
+          meta3 ? lineStart(this.text, this.cursor) : alt ? prevWord(this.text, this.cursor) : prevGrapheme(this.text, this.cursor)
         );
       case "right":
         return this.#move(
-          meta2 ? lineEnd(this.text, this.cursor) : alt ? nextWord(this.text, this.cursor) : nextGrapheme(this.text, this.cursor)
+          meta3 ? lineEnd(this.text, this.cursor) : alt ? nextWord(this.text, this.cursor) : nextGrapheme(this.text, this.cursor)
         );
       case "home":
         return this.#move(lineStart(this.text, this.cursor));
       case "end":
         return this.#move(lineEnd(this.text, this.cursor));
       case "up":
-        return meta2 ? this.#move(0) : this.#vertical(-1);
+        return meta3 ? this.#move(0) : this.#vertical(-1);
       case "down":
-        return meta2 ? this.#move(this.text.length) : this.#vertical(1);
+        return meta3 ? this.#move(this.text.length) : this.#vertical(1);
     }
     return void 0;
   }
@@ -62588,7 +63596,7 @@ function actionsRow(buttons) {
     ))
   ] }, "actions");
 }
-function optionList(listKey, id, options, selected, select2, pick) {
+function optionList(listKey, id, options, selected, select2, pick2) {
   const at = (item3) => options.findIndex((o) => `${id}.${o.id}` === item3);
   return /* @__PURE__ */ jsx(
     "list",
@@ -62596,7 +63604,7 @@ function optionList(listKey, id, options, selected, select2, pick) {
       onActivate: (ev) => {
         const i = at(ev.item);
         if (i >= 0) {
-          pick(i);
+          pick2(i);
         }
       },
       onSelect: (ev) => {
@@ -63305,10 +64313,10 @@ function openSessionPicker(host) {
     const cwd = host.session.info?.cwd || launchEnv().cwd;
     const [key2, live] = await Promise.all([
       workspaceOf(cwd),
-      host.gw.request("session.list", { limit: 200 }).catch(() => ({ sessions: [] }))
+      rpc(host.gw, "session.list", { limit: 200 }).catch(() => ({ sessions: [] }))
     ]);
     workspace = key2;
-    running = new Set((live.sessions ?? []).filter((s2) => s2.running && s2.id).map((s2) => s2.id));
+    running = new Set((live.sessions ?? []).filter((s2) => "running" in s2 && s2.running && s2.id).map((s2) => s2.id));
     sessions = storedSessions(LIMIT).filter((s2) => s2.messages > 0 || s2.id === current);
     tab2 = sessions.some((s2) => inWorkspace(s2, workspace)) ? "here" : "all";
     selected = rows().find((s2) => s2.id !== current)?.id ?? rows()[0]?.id;
@@ -63333,7 +64341,7 @@ function openSessionPicker(host) {
   const remove = async (id) => {
     deleting = null;
     try {
-      await (host.gw.isCanonical ? mutateSession(host.gw, id, "delete", {}) : host.gw.request("session.delete", { session_id: id }));
+      await (host.gw.isCanonical ? mutateSession(host.gw, id, "delete", {}) : rpc(host.gw, "session.delete", { session_id: id }));
       sessions = sessions.filter((s2) => s2.id !== id);
     } catch (error) {
       host.transcript.notice(errorText(error), "error");
@@ -63584,7 +64592,7 @@ function isThemeMode(v) {
 function openThemePicker(host) {
   const before = host.theme;
   let selected = before;
-  const pick = (mode) => {
+  const pick2 = (mode) => {
     if (mode) {
       selected = mode;
       host.setTheme(mode);
@@ -63618,10 +64626,10 @@ function openThemePicker(host) {
           use: () => host.close(overlay)
         },
         onActivate: (ev) => {
-          pick(ev.item);
+          pick2(ev.item);
           host.close(overlay);
         },
-        onSelect: (ev) => pick(ev.item),
+        onSelect: (ev) => pick2(ev.item),
         selected,
         size: "md",
         title: "Theme"
@@ -63635,7 +64643,7 @@ function openThemePicker(host) {
       } else if (k.name === "enter") {
         host.close(overlay);
       } else {
-        pick(moveSelection(k, MODES.map((m) => m.id), selected));
+        pick2(moveSelection(k, MODES.map((m) => m.id), selected));
       }
       return true;
     }
@@ -63722,7 +64730,7 @@ async function openHermesSplit(args, cwd, env2 = process.env) {
 // src/refusedCommands.ts
 var words2 = (arg) => arg.trim().split(/\s+/).filter(Boolean);
 async function cliPanel(host, title, argv) {
-  const r = await host.gw.request("cli.exec", { argv });
+  const r = await rpc(host.gw, "cli.exec", { argv });
   if (r?.blocked) {
     return host.transcript.notice(r.hint || `\`hermes ${argv.join(" ")}\` cannot run here.`, "warning");
   }
@@ -63731,11 +64739,12 @@ async function cliPanel(host, title, argv) {
     host.transcript.notice(`\`hermes ${argv.join(" ")}\` exited with code ${r.code}.`, "warning");
   }
 }
+var isBrowserAction = oneOf(["connect", "disconnect", "status", "use"]);
 async function browser(host, arg) {
   const [first = "status", ...rest] = words2(arg);
   const action = first.toLowerCase();
   const note = (text11, tone) => host.transcript.notice(text11, tone);
-  if (!["connect", "disconnect", "status", "use"].includes(action)) {
+  if (!isBrowserAction(action)) {
     return note("Usage: /browser [status|use [on|off]|connect [url]|disconnect]", "warning");
   }
   const mode = action === "use" ? (rest[0] ?? "on").toLowerCase() : void 0;
@@ -63745,7 +64754,7 @@ async function browser(host, arg) {
   const url = action === "connect" ? rest.join(" ").trim() || "http://127.0.0.1:9222" : void 0;
   let r;
   try {
-    r = await host.gw.request("browser.manage", {
+    r = await rpc(host.gw, "browser.manage", {
       action,
       session_id: host.session.ref.live,
       ...url ? { url } : {},
@@ -63790,7 +64799,7 @@ async function plugins(host, arg) {
       "warning"
     );
   }
-  const r = await host.gw.request("plugins.manage", { action: "list" });
+  const r = await rpc(host.gw, "plugins.manage", { action: "list" });
   const rows = r?.plugins ?? [];
   const user = rows.filter((p3) => p3.source !== "bundled");
   const shown = sub === "all" || !user.length ? rows : user;
@@ -63837,7 +64846,7 @@ function subscriptionText(s2) {
   return [...lines, "", change].join("\n");
 }
 async function subscription(host) {
-  const s2 = await host.gw.request("subscription.state", {});
+  const s2 = await rpc(host.gw, "subscription.state", {});
   if (!s2?.logged_in) {
     return host.transcript.notice(
       s2?.error ? `Could not load the subscription: ${s2.error}` : "Not logged into Nous Portal: run /login, then /subscription.",
@@ -63846,7 +64855,7 @@ async function subscription(host) {
   }
   host.transcript.panel("Subscription", subscriptionText(s2));
 }
-function config(host, arg) {
+function config2(host, arg) {
   const argv = words2(arg);
   return cliPanel(host, `/config${argv.length ? ` ${argv.join(" ")}` : ""}`, [
     "config",
@@ -63903,7 +64912,7 @@ var ROUTED = [
   { name: "browser", run: browser },
   { name: "plugins", run: plugins },
   { aliases: ["upgrade"], name: "subscription", run: subscription },
-  { name: "config", run: config },
+  { name: "config", run: config2 },
   { name: "worktree", run: worktree },
   { aliases: ["snap"], name: "snapshot", run: snapshot2 },
   { name: "update", run: update }
@@ -64137,29 +65146,29 @@ async function branch(host, arg) {
   if (host.stale() || !await host.open(child)) {
     return;
   }
-  const info = await host.gw.request("session.info", { session_id: child }).catch(() => null);
+  const info = await rpc(host.gw, "session.info", { session_id: child }).catch(() => null);
   host.notice(`Branched \u2192 ${info?.title?.trim() || title || child}`);
 }
 async function save(host) {
   if (!host.sid) {
     return host.notice("No active session: nothing to save.", "warning");
   }
-  const r = await host.gw.request("session.save", { session_id: host.sid });
+  const r = await rpc(host.gw, "session.save", { session_id: host.sid });
   host.notice(r?.file ? `Conversation saved to: ${r.file}` : "Could not save the conversation.", r?.file ? "info" : "error");
 }
 async function reloadEnv(host) {
-  const r = await host.gw.request("reload.env", host.sid ? { session_id: host.sid } : {});
+  const r = await rpc(host.gw, "reload.env", host.sid ? { session_id: host.sid } : {});
   host.notice(`Reloaded .env (${plural2(Number(r?.updated ?? 0), "var")} updated).`);
 }
 async function reloadSkills(host) {
-  const r = await host.gw.request("skills.reload", host.sid ? { session_id: host.sid } : {});
+  const r = await rpc(host.gw, "skills.reload", host.sid ? { session_id: host.sid } : {});
   host.panel("Reload Skills", r?.output?.trim() || "Skills reloaded.");
 }
 async function reloadMcp(host) {
   if (!host.canonical) {
     return false;
   }
-  const r = await host.gw.request("reload.mcp", { confirm: true, ...host.sid ? { session_id: host.sid } : {} });
+  const r = await rpc(host.gw, "reload.mcp", { confirm: true, ...host.sid ? { session_id: host.sid } : {} });
   host.panel("Reload MCP", r?.message?.trim() || "MCP servers reloaded.");
   if (r?.unavailable?.length) {
     host.notice(`Did not connect: ${r.unavailable.join(", ")}.`, "warning");
@@ -64172,7 +65181,7 @@ async function rollback(host, arg) {
   const [first = "", ...rest] = arg.trim().split(/\s+/).filter(Boolean);
   const sub = first.toLowerCase();
   if (!sub || sub === "list" || sub === "ls") {
-    const r2 = await host.gw.request("rollback.list", { session_id: host.sid });
+    const r2 = await rpc(host.gw, "rollback.list", { session_id: host.sid });
     const checkpoints = r2?.checkpoints ?? [];
     if (!r2?.enabled) {
       return host.notice("Checkpoints are not enabled.");
@@ -64182,19 +65191,19 @@ async function rollback(host, arg) {
     }
     return host.panel(
       "Rollback checkpoints",
-      checkpoints.map((c, i) => `${i + 1}. ${c.hash.slice(0, 10)}  ${[c.timestamp, c.message].filter(Boolean).join(" \xB7 ") || "(no metadata)"}`).join("\n")
+      checkpoints.map((c, i) => `${i + 1}. ${(c.hash ?? "").slice(0, 10)}  ${[c.timestamp, c.message].filter(Boolean).join(" \xB7 ") || "(no metadata)"}`).join("\n")
     );
   }
   if (sub === "diff") {
     if (!rest[0]) {
       return host.notice("Usage: /rollback diff <checkpoint>", "warning");
     }
-    const r2 = await host.gw.request("rollback.diff", { hash: rest[0], session_id: host.sid });
+    const r2 = await rpc(host.gw, "rollback.diff", { hash: rest[0], session_id: host.sid });
     const text11 = [r2?.stat?.trim(), r2?.diff?.trim()].filter(Boolean).join("\n\n");
     return text11 ? host.panel("Rollback diff", text11) : host.notice("No changes since this checkpoint.");
   }
   const file2 = rest.join(" ").trim();
-  const r = await host.gw.request("rollback.restore", {
+  const r = await rpc(host.gw, "rollback.restore", {
     ...file2 ? { file_path: file2 } : {},
     hash: first,
     session_id: host.sid
@@ -64694,9 +65703,9 @@ function entryNode(e, id, cx) {
   const holder = e;
   const built = holder;
   const rev = `${e.kind === "turn" || e.kind === "compaction" ? e.rev : 0}${cx.copied === e.id ? "+copied" : ""}`;
-  const cached = built[kNode];
-  if (cached?.rev === rev) {
-    return cached.node;
+  const cached2 = built[kNode];
+  if (cached2?.rev === rev) {
+    return cached2.node;
   }
   const node3 = buildEntry(e, id, cx);
   built[kNode] = { node: node3, rev };
@@ -65034,10 +66043,10 @@ var COMMANDS3 = [
     name: "skin",
     run: async (host, arg) => {
       if (!arg.trim()) {
-        const r = await host.gw.request("config.get", { key: "skin" });
+        const r = await rpc(host.gw, "config.get", { key: "skin" });
         host.transcript.notice(`skin: ${r?.value || "default"}`);
       } else {
-        const r = await host.gw.request("config.set", { key: "skin", value: arg.trim() });
+        const r = await rpc(host.gw, "config.set", { key: "skin", value: arg.trim() });
         host.transcript.notice(`skin \u2192 ${r?.value || arg.trim()}`);
       }
       if (host.theme !== "skin") {
@@ -65329,14 +66338,15 @@ function hudKey(k, cx) {
 }
 
 // src/moa.ts
-function moaLabel(type, payload) {
-  if (type === "moa.progress" && typeof payload?.refs_done === "number" && typeof payload.refs_total === "number") {
-    return `MoA: refs ${payload.refs_done}/${payload.refs_total}`;
+function moaLabel(ev) {
+  switch (ev.type) {
+    case "moa.progress":
+      return typeof ev.payload?.refs_done === "number" && typeof ev.payload.refs_total === "number" ? `MoA: refs ${ev.payload.refs_done}/${ev.payload.refs_total}` : void 0;
+    case "moa.phase":
+      return ev.payload?.phase === "aggregator" ? "Aggregating\u2026" : void 0;
+    case "moa.aggregating":
+      return "Aggregating\u2026";
   }
-  if (type === "moa.aggregating" || type === "moa.phase" && payload?.phase === "aggregator") {
-    return "Aggregating\u2026";
-  }
-  return void 0;
 }
 function moaReferenceLabel(label, index2, count) {
   return index2 && count ? `Reference ${index2}/${count} \xB7 ${label}` : `Reference \xB7 ${label}`;
@@ -65456,7 +66466,7 @@ function shellError(error) {
   return REFUSALS.find(([code7]) => text11.includes(code7))?.[1] ?? describeRpcError(error);
 }
 async function shellExec(gw2, sid, command) {
-  const r = await gw2.request("shell.exec", { command, session_id: sid });
+  const r = await rpc(gw2, "shell.exec", { command, session_id: sid });
   if (!r || typeof r !== "object") {
     throw new Error("invalid response: shell.exec");
   }
@@ -65489,20 +66499,18 @@ async function interpolate(gw2, sid, text11, pasted = []) {
 // src/hermes/sharedPrompts.ts
 var sharedPromptId = (promptId) => `shared:${String(promptId)}`;
 function sharedPromptRequest(ev, gw2, onNotice) {
-  const kind = ev.type === "approval.request" ? "approval" : ev.type === "clarify.request" ? "clarify" : null;
-  const shared = ev.payload ?? {};
-  if (!kind || !shared.prompt_id || !ev.session_id || typeof shared.execution_generation !== "number") {
+  const kind = ev.type === "approval.request" ? "approval" : "clarify";
+  const shared = ev.payload;
+  if (!shared?.prompt_id || !ev.session_id || typeof shared.execution_generation !== "number") {
     return null;
   }
   const control = { session_id: ev.session_id, execution_generation: shared.execution_generation, prompt_id: shared.prompt_id };
-  const single = typeof shared.question === "string" ? shared.question.trim() : "";
-  const batch2 = Array.isArray(shared.questions) && shared.questions.length ? shared.questions : null;
-  const questions = batch2 ?? (single ? [{ choices: shared.choices ?? [], multi_select: shared.multi_select === true, qid: shared.prompt_id, question: single }] : []);
+  const questions = ev.type === "clarify.request" ? clarifyQuestions(ev.payload, shared.prompt_id) : [];
   let answered;
-  const send = (method, params) => {
-    answered ??= gw2.request(method, { ...params, ...control }).then(
+  const send = (respond) => {
+    answered ??= respond().then(
       (r) => {
-        if (r?.status === "already_resolved") {
+        if (r && "status" in r && r.status === "already_resolved") {
           onNotice("That question was already answered (by another window, or it timed out).");
         }
       },
@@ -65517,10 +66525,15 @@ function sharedPromptRequest(ev, gw2, onNotice) {
     id: sharedPromptId(shared.prompt_id),
     method: kind,
     params: { ...shared, questions, session_id: ev.session_id },
-    respond: (result) => kind === "approval" ? send("approval.respond", { choice: result.choice ?? "deny" }) : send("clarify.respond", { answer: firstAnswer(result.answers) }),
+    respond: ({ answers, choice: choice2 }) => kind === "approval" ? send(() => rpc(gw2, "approval.respond", { choice: typeof choice2 === "string" ? choice2 : "deny", ...control })) : send(() => rpc(gw2, "clarify.respond", { answer: firstAnswer(answers), ...control })),
     // Unanswered here: the prompt stays pending for another viewer or its own timeout.
     fail: () => void 0
   };
+}
+function clarifyQuestions(clarify, promptId) {
+  const single = typeof clarify?.question === "string" ? clarify.question.trim() : "";
+  const batch2 = Array.isArray(clarify?.questions) && clarify.questions.length ? clarify.questions : null;
+  return batch2 ?? (single ? [{ choices: clarify?.choices ?? [], multi_select: clarify?.multi_select === true, qid: promptId, question: single }] : []);
 }
 function firstAnswer(answers) {
   if (!answers || typeof answers !== "object") {
@@ -65911,7 +66924,7 @@ var Completion = class {
       this.#timer = void 0;
       const sid = this.#sid();
       const params = request.method === "complete.slash" && sid ? { ...request.params, session_id: sid } : request.params;
-      this.#gw.request(request.method, params).then((r) => {
+      rpc(this.#gw, request.method, params).then((r) => {
         if (gen !== this.#gen || composer.text.slice(0, composer.cursor) !== before) {
           return;
         }
@@ -66150,7 +67163,7 @@ async function openHelp(host) {
   let catalog = {};
   const sid = host.session.ref.live;
   try {
-    catalog = await host.gw.request("commands.catalog", sid ? { session_id: sid } : {});
+    catalog = await rpc(host.gw, "commands.catalog", sid ? { session_id: sid } : {});
   } catch (error) {
     host.transcript.notice(
       `Could not load the command list: ${errorText(error)}`,
@@ -66606,9 +67619,9 @@ function adaptColorsToBackground(colors, isLight, base3, bg) {
   return out;
 }
 function referenceBackground(isLight, env2 = process.env) {
-  const cached = (env2.HERMES_TUI_BACKGROUND ?? "").trim();
-  if (cached && backgroundLuminance(cached) !== null) {
-    return cached.startsWith("#") ? cached : `#${cached}`;
+  const cached2 = (env2.HERMES_TUI_BACKGROUND ?? "").trim();
+  if (cached2 && backgroundLuminance(cached2) !== null) {
+    return cached2.startsWith("#") ? cached2 : `#${cached2}`;
   }
   return isLight ? "#ffffff" : "#101014";
 }
@@ -67618,7 +68631,7 @@ var CommandCatalog = class {
   get(sid) {
     if (!this.#pending || this.#sid !== sid) {
       this.#sid = sid;
-      const pending = this.#gw.request("commands.catalog", { session_id: sid }).catch(() => {
+      const pending = rpc(this.#gw, "commands.catalog", { session_id: sid }).catch(() => {
         if (this.#pending === pending) {
           this.#pending = void 0;
         }
@@ -69314,7 +70327,7 @@ var App = class {
   #reconnecting;
   #reconnectTimer;
   /** `launch` and `settings` are what entry.ts read once at startup; unset, each reads its default. */
-  constructor(tern, gw2, version, { launch: launch3 = readLaunchEnv(), settings: settings2 = fileSettings() } = {}) {
+  constructor(tern, gw2, version2, { launch: launch3 = readLaunchEnv(), settings: settings2 = fileSettings() } = {}) {
     this.#tern = tern;
     this.#gw = gw2;
     this.#launch = launch3;
@@ -69327,7 +70340,7 @@ var App = class {
     this.#catalog = new CommandCatalog(gw2);
     this.#welcome = {
       tip: randomTip(launch3.pythonSrcRoot),
-      version: version && version !== "unknown" ? `v${version}` : ""
+      version: version2 && version2 !== "unknown" ? `v${version2}` : ""
     };
   }
   /** The gateway, for overlays that issue their own RPCs. */
@@ -69597,9 +70610,7 @@ var App = class {
       return;
     }
     try {
-      const r = await this.#gw.request("session.list", {
-        limit: 20
-      });
+      const r = await rpc(this.#gw, "session.list", { limit: 20 });
       const row2 = r?.sessions?.find((x) => ids.has(x.id ?? "") || ids.has(x.resolved_id ?? ""));
       if (sid === this.sid && this.#setTitle(row2?.title)) {
         this.changed();
@@ -69636,7 +70647,7 @@ var App = class {
    */
   #watchConnections() {
     clearTimeout(this.#connectTimer);
-    const tick = () => {
+    const tick2 = () => {
       this.#connectTimer = void 0;
       let open = false;
       for (const call of this.transcript.calls(CONNECT_TOOL)) {
@@ -69667,10 +70678,10 @@ var App = class {
         }
       }
       if (open) {
-        this.#connectTimer = setTimeout(tick, POLL_MS2);
+        this.#connectTimer = setTimeout(tick2, POLL_MS2);
       }
     };
-    tick();
+    tick2();
   }
   /** The connect card `ref` names (its file, or its call id when it has none). */
   #connectCall(ref) {
@@ -69994,14 +71005,14 @@ var App = class {
     this.#server.admit(own13);
     this.changed();
     try {
-      const r = await this.#gw.request("prompt.submit", {
+      const r = await rpc(this.#gw, "prompt.submit", {
         queued: true,
         session_id: sid,
         submission_id: own13.inputId,
         text: ready.text || (attachments.length ? IMAGE_ONLY_PROMPT : ""),
         ...attachments.length ? { attachments } : {}
       });
-      own13.admissionId = r?.admission_id;
+      own13.admissionId = r && "admission_id" in r ? r.admission_id : void 0;
     } catch (error) {
       this.#server.drop(own13);
       if (sid === this.sid) {
@@ -70060,7 +71071,7 @@ var App = class {
     this.transcript.user(display?.trim() || item3.text, void 0, false, userImages(images));
     this.#server.shown(submission);
     this.#startBusy("Working\u2026");
-    this.#gw.request("prompt.submit", {
+    rpc(this.#gw, "prompt.submit", {
       session_id: sid,
       submission_id: submission,
       text: text11,
@@ -70147,7 +71158,7 @@ ${this.composer.text}` : text11 || this.composer.text);
     }
     const title = `/${name}${arg ? ` ${arg}` : ""}`;
     try {
-      const r = await this.#gw.request("slash.exec", { command: text11.slice(1), session_id: sid });
+      const r = await rpc(this.#gw, "slash.exec", { command: text11.slice(1), session_id: sid });
       if (stale()) {
         return;
       }
@@ -70160,7 +71171,7 @@ ${this.composer.text}` : text11 || this.composer.text);
         this.transcript.notice(describeSlashExecError(name, error), isUnsupportedCommand(error) ? "warning" : "error");
       } else {
         try {
-          const r = await this.#gw.request("command.dispatch", { arg, name, session_id: sid });
+          const r = await rpc(this.#gw, "command.dispatch", { arg, name, session_id: sid });
           if (stale()) {
             return;
           }
@@ -70293,7 +71304,7 @@ ${this.composer.text}` : text11 || this.composer.text);
         const images = this.queue[0]?.images ?? this.#attachments;
         images.push(image3);
       } else {
-        await this.#gw.request("image.attach", { path: path2, session_id: sid });
+        await rpc(this.#gw, "image.attach", { path: path2, session_id: sid });
       }
     } catch (error) {
       this.transcript.notice(
@@ -70327,7 +71338,7 @@ ${this.composer.text}` : text11 || this.composer.text);
     const previous3 = this.sid;
     const token = this.#switches.begin();
     try {
-      const setup = await this.#gw.request("setup.status", {});
+      const setup = await rpc(this.#gw, "setup.status", {});
       if (!this.#switches.current(token)) {
         return;
       }
@@ -70336,7 +71347,8 @@ ${this.composer.text}` : text11 || this.composer.text);
         return;
       }
       const cwd = this.#launch.sessionCwd;
-      const r = await this.#gw.request(
+      const r = await rpc(
+        this.#gw,
         "session.create",
         this.#gw.isCanonical ? { ...localCreationOptions(), ...cwd ? { cwd } : {} } : { cols: this.#tern.caps.cols, ...cwd ? { cwd } : {} }
       );
@@ -70360,7 +71372,7 @@ ${this.composer.text}` : text11 || this.composer.text);
   /** Names session `sid` (`/new <title>`): the shared gateway's rename mutation, a private one's `session.title`. */
   async #rename(sid, title) {
     try {
-      const r = this.#gw.isCanonical ? await mutateSession(this.#gw, sid, "rename", { title }) : await this.#gw.request("session.title", { session_id: sid, title });
+      const r = this.#gw.isCanonical ? await mutateSession(this.#gw, sid, "rename", { title }) : await rpc(this.#gw, "session.title", { session_id: sid, title });
       if (sid === this.sid && this.#setTitle(String(r?.title ?? title))) {
         this.changed();
       }
@@ -70402,7 +71414,7 @@ ${this.composer.text}` : text11 || this.composer.text);
           return void 0;
         }
       }
-      const r = await this.#gw.request("session.resume", { cols: this.#tern.caps.cols, session_id: id });
+      const r = await rpc(this.#gw, "session.resume", { cols: this.#tern.caps.cols, session_id: id });
       if (!this.#switches.current(token)) {
         this.#stale.push(r);
         return void 0;
@@ -70468,7 +71480,7 @@ ${this.composer.text}` : text11 || this.composer.text);
   async #leave(sid, endReason) {
     const subscription2 = this.#subscriptions.get(sid);
     if (!this.#gw.isCanonical) {
-      await this.#gw.request("session.close", { session_id: sid }).catch(() => void 0);
+      await rpc(this.#gw, "session.close", { session_id: sid }).catch(() => void 0);
       return;
     }
     if (!subscription2) {
@@ -70479,7 +71491,7 @@ ${this.composer.text}` : text11 || this.composer.text);
   }
   /** Sends `session.detach`, one at a time per session; `endReason` lets the owner end it once no viewer remains. */
   #detach(sid, subscription2, endReason) {
-    const send = () => this.#gw.request("session.detach", {
+    const send = () => rpc(this.#gw, "session.detach", {
       ...endReason ? { end_reason: endReason } : {},
       session_id: sid,
       subscription_id: subscription2
@@ -70506,7 +71518,7 @@ ${this.composer.text}` : text11 || this.composer.text);
         continue;
       }
       if (!this.#gw.isCanonical) {
-        void this.#gw.request("session.close", { session_id: r.session_id }).catch(() => void 0);
+        void rpc(this.#gw, "session.close", { session_id: r.session_id }).catch(() => void 0);
       } else if (r.subscription_id) {
         void this.#detach(r.session_id, r.subscription_id);
       }
@@ -70617,17 +71629,12 @@ ${this.composer.text}` : text11 || this.composer.text);
         break;
       }
       case "session.usage": {
-        const tick = usageFromTick(ev.payload);
-        this.usage = tick ? { ...this.usage, ...tick } : this.usage;
+        const tick2 = usageFromTick(ev.payload);
+        this.usage = tick2 ? { ...this.usage, ...tick2 } : this.usage;
         t2.contextUsed(this.usage?.context_used ?? 0);
-        const raw2 = ev.payload;
-        const counters = {
-          prompt: Number(raw2?.prompt_tokens ?? 0),
-          read: Number(raw2?.cache_read_tokens ?? 0),
-          total: Number(raw2?.total_tokens ?? 0)
-        };
-        if (Object.values(counters).every(Number.isFinite)) {
-          t2.usageTick(counters, typeof raw2?.tokens_per_s === "number" ? raw2.tokens_per_s : void 0);
+        const counters = usageCounters(ev.payload);
+        if (counters) {
+          t2.usageTick(counters.counters, counters.tps);
         }
         break;
       }
@@ -70674,7 +71681,7 @@ ${this.composer.text}` : text11 || this.composer.text);
       case "moa.progress":
       case "moa.phase":
       case "moa.aggregating":
-        this.#label(moaLabel(ev.type, ev.payload) ?? "");
+        this.#label(moaLabel(ev) ?? "");
         break;
       case "thinking.delta":
         this.#label(kaomojiLabel(ev.payload?.text ?? ""));
@@ -70947,7 +71954,7 @@ ${this.composer.text}` : text11 || this.composer.text);
     if (this.#settings.load().thoughts === false) {
       return;
     }
-    this.#gw.request("config.set", { key: "show_reasoning", session_id: sid, value: "on" }).catch((error) => {
+    rpc(this.#gw, "config.set", { key: "show_reasoning", session_id: sid, value: "on" }).catch((error) => {
       this.transcript.notice(`Could not turn on thoughts: ${error.message}`, "warning");
       this.changed();
     });
@@ -70984,9 +71991,10 @@ ${this.composer.text}` : text11 || this.composer.text);
    */
   async #withdraw(sid, q2) {
     const own13 = q2.own;
-    this.#server.withdrawn(own13.admissionId);
+    const admissionId = own13.admissionId;
+    this.#server.withdrawn(admissionId);
     try {
-      const r = await this.#gw.request("prompt.cancel", { admission_id: own13.admissionId, session_id: sid });
+      const r = await rpc(this.#gw, "prompt.cancel", { admission_id: admissionId, session_id: sid });
       if (r?.status !== "terminal") {
         return false;
       }
@@ -71089,7 +72097,7 @@ ${this.composer.text}` : text11 || this.composer.text);
   /** Reads session `sid`'s busy_input_mode; an older gateway without it leaves Enter queueing (the TUI default). */
   async #readBusyMode(sid) {
     try {
-      const r = await this.#gw.request("config.get", { key: "busy", session_id: sid });
+      const r = await rpc(this.#gw, "config.get", { key: "busy", session_id: sid });
       if (sid === this.sid) {
         this.#busyMode = busyModeOf(r?.value);
       }
@@ -71254,10 +72262,6 @@ function userText(text11, images) {
 }
 function userImages(images) {
   return images.map((i) => ({ kind: "image", name: i.name, ...i.preview ? { source: i.preview } : {} }));
-}
-function pendingRows(info) {
-  const rows = info?.pending_submissions;
-  return Array.isArray(rows) ? rows : void 0;
 }
 function kaomojiLabel(text11) {
   const word = text11.match(/([A-Za-z][A-Za-z ]*[A-Za-z])\.{2,}\s*$/)?.[1];
@@ -71459,7 +72463,7 @@ var WatchApp = class {
   async #poll() {
     const a2 = this.#agent;
     try {
-      const r = await this.#gw.request("subagent.list", { session_id: this.#spec.sid });
+      const r = await rpc(this.#gw, "subagent.list", { session_id: this.#spec.sid });
       const row2 = r?.subagents?.find((x) => x.subagent_id === a2.id);
       if (!row2) {
         if (this.#listed && !a2.logPath) {
@@ -71565,7 +72569,7 @@ var WatchApp = class {
       return this.changed();
     }
     try {
-      const r = await this.#gw.request("subagent.steer", {
+      const r = await rpc(this.#gw, "subagent.steer", {
         session_id: this.#spec.sid,
         subagent_id: a2.id,
         text: text11
@@ -71585,7 +72589,7 @@ var WatchApp = class {
       return;
     }
     try {
-      const r = await this.#gw.request("subagent.interrupt", {
+      const r = await rpc(this.#gw, "subagent.interrupt", {
         session_id: this.#spec.sid,
         subagent_id: a2.id
       });

@@ -3,7 +3,7 @@
 // changes and shown as a caret-anchored list (`omp.autocomplete`).
 // Tab accepts; Enter accepts a row that changes the token, else submits.
 
-import type { CompletionItem } from '@hermes/shared/gateway-events'
+import type { CompleteSlashResult, CompletionItem } from '@hermes/shared/gateway-events'
 import type { JSX, Key } from '@stencil-hq/tern'
 import { scoreSlashMenuItem } from '@tui/app/slash/fuzzyScore.js'
 import { applyCompletion, completionToApplyOnSubmit } from '@tui/domain/slash.js'
@@ -15,6 +15,7 @@ import { oneLine } from '../view/describe.js'
 
 import type { Composer } from '../composer.js'
 import type { OverlayHost } from '../overlay.js'
+import { rpc } from '../wire/rpc.js'
 
 const DEBOUNCE_MS = 60
 
@@ -88,9 +89,9 @@ export class Completion {
       const params =
         request.method === 'complete.slash' && sid ? { ...request.params, session_id: sid } : request.params
 
-      this.#gw
-        .request<{ items?: CompletionItem[]; replace_from?: number | null }>(request.method, params)
-        .then(r => {
+      rpc(this.#gw, request.method, params)
+        // Either method's answer: only complete.slash's says where its replacement starts.
+        .then((r: CompleteSlashResult) => {
           if (gen !== this.#gen || composer.text.slice(0, composer.cursor) !== before) {
             return
           }

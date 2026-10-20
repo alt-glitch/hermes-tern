@@ -7,6 +7,7 @@ import type { GatewayClient } from '@tui/gatewayClient.js'
 import { errorText } from './core/errors.js'
 import { currentGeneration } from './hermes/mutate.js'
 import type { NoticeEntry } from './model.js'
+import { rpc } from './wire/rpc.js'
 
 /** What a control command needs from the app; App.control() supplies it. */
 export interface ControlHost {
@@ -36,11 +37,7 @@ const preview = (text: string) => (text.length > 60 ? `${text.slice(0, 57)}…` 
 export async function interruptTurn(gw: ControlHost['gw'], sid: string) {
   const execution_generation = await currentGeneration(gw, sid)
 
-  await gw.request('session.interrupt', { session_id: sid, execution_generation })
-}
-
-interface SteerResult {
-  status?: string
+  await rpc(gw, 'session.interrupt', { session_id: sid, execution_generation })
 }
 
 /** Why a steer did not land; the text is for the user. */
@@ -50,7 +47,7 @@ export type SteerOutcome = { ok: true } | { ok: false; error?: string }
 export async function steerTurn(gw: ControlHost['gw'], sid: string, text: string): Promise<SteerOutcome> {
   try {
     const execution_generation = await currentGeneration(gw, sid)
-    const r = await gw.request<SteerResult | null>('session.steer', { session_id: sid, execution_generation, text })
+    const r = await rpc(gw, 'session.steer', { session_id: sid, execution_generation, text })
 
     return r?.status === 'queued' ? { ok: true } : { ok: false }
   } catch (e) {
@@ -67,7 +64,7 @@ export async function steerTurn(gw: ControlHost['gw'], sid: string, text: string
 export async function redirectTurn(gw: ControlHost['gw'], sid: string, text: string): Promise<SteerOutcome> {
   try {
     const execution_generation = await currentGeneration(gw, sid)
-    const r = await gw.request<SteerResult | null>('session.redirect', { session_id: sid, execution_generation, text })
+    const r = await rpc(gw, 'session.redirect', { session_id: sid, execution_generation, text })
 
     return r?.status === 'redirected' || r?.status === 'queued' ? { ok: true } : { ok: false }
   } catch (e) {
@@ -127,7 +124,7 @@ async function stop(host: ControlHost) {
   }
 
   try {
-    const r = await host.gw.request<{ killed?: number } | null>('process.stop', { session_id: host.sid })
+    const r = await rpc(host.gw, 'process.stop', { session_id: host.sid })
 
     if (typeof r?.killed === 'number') {
       notes.push(`Stopped ${r.killed} background process${r.killed === 1 ? '' : 'es'}.`)
@@ -137,11 +134,6 @@ async function stop(host: ControlHost) {
   }
 
   host.notice(notes.join(' ') || 'Nothing to stop.')
-}
-
-interface ToolsShowResult {
-  sections?: { name: string; tools?: { name: string }[] }[]
-  total?: number
 }
 
 async function tools(host: ControlHost, arg: string) {
@@ -157,9 +149,9 @@ async function tools(host: ControlHost, arg: string) {
 
   try {
     // The owner's catalog for this session (toolsets, MCP and plugin tools), as Ink's /tools reads it.
-    const r = await host.gw.request<ToolsShowResult | null>('tools.show', { session_id: host.sid })
+    const r = await rpc(host.gw, 'tools.show', { session_id: host.sid })
     const sections = (r?.sections ?? []).filter(s => s.tools?.length)
-    const lines = sections.map(s => `[${s.name}] ${s.tools!.map(t => t.name).join(', ')}`)
+    const lines = sections.map(s => `[${s.name}] ${s.tools.map(t => t.name).join(', ')}`)
 
     host.notice(lines.length ? [...lines, `Total: ${r?.total ?? 0} tools`].join('\n') : 'No tools available.')
   } catch (e) {
@@ -181,7 +173,7 @@ async function side(host: ControlHost, text: string, kind: 'bg' | 'btw') {
   }
 
   try {
-    const r = await host.gw.request<{ task_id?: string } | null>(kind === 'bg' ? 'prompt.background' : 'prompt.btw', {
+    const r = await rpc(host.gw, kind === 'bg' ? 'prompt.background' : 'prompt.btw', {
       session_id: host.sid,
       text
     })

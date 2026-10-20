@@ -9,6 +9,7 @@ import type { GatewayClient } from '@tui/gatewayClient.js'
 import type { SessionView } from './app/ports.js'
 import { errorText } from './core/errors.js'
 import type { NoticeEntry } from './model.js'
+import { rpc } from './wire/rpc.js'
 
 export type FastWord = 'fast' | 'normal' | 'ultrafast'
 
@@ -50,7 +51,7 @@ export async function setFast(host: FastHost, value: string): Promise<boolean> {
   }
 
   try {
-    const r = await host.gw.request<{ value?: string }>('config.set', { key: 'fast', session_id: sid, value })
+    const r = await rpc(host.gw, 'config.set', { key: 'fast', session_id: sid, value })
     const word = fastWord(r?.value)
 
     if (sid === host.session.ref.live) {
@@ -77,7 +78,7 @@ export async function setFast(host: FastHost, value: string): Promise<boolean> {
 /** `/fast [on|off|fast|ultrafast|normal|toggle|status]`: no word toggles. */
 export async function fastCommand(host: FastHost, arg: string) {
   if (arg.trim().toLowerCase() === 'status') {
-    const r = await host.gw.request<{ value?: string }>('config.get', { key: 'fast', session_id: host.session.ref.live })
+    const r = await rpc(host.gw, 'config.get', { key: 'fast', session_id: host.session.ref.live })
 
     return host.transcript.notice(`Fast mode: ${fastWord(r?.value)}.`)
   }

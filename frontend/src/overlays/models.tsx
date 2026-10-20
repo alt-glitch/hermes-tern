@@ -6,7 +6,7 @@
 // Save as default keeps the model and effort for new sessions where the gateway can write the
 // default (a private one: the shared gateway switches the session only).
 
-import type { ConfigSetResult, ModelOptionProvider, ModelOptionsResult } from '@hermes/shared/gateway-events'
+import type { ConfigSetResult, ModelOptionProvider } from '@hermes/shared/gateway-events'
 import { modelSearchText } from '@hermes/shared/model-search-text'
 import type { JSX, Key, KvItem, PickerColumn, PickerGroup, PickerItem, PickerScope } from '@stencil-hq/tern'
 import { providerDisplayNames } from '@tui/domain/providers.js'
@@ -18,6 +18,7 @@ import { modelPayload, mutateSession } from '../hermes/mutate.js'
 import { rememberCaps } from '../modelCaps.js'
 import type { Overlay } from '../overlay.js'
 import { levelsFor } from '../session/effort.js'
+import { rpc } from '../wire/rpc.js'
 
 import { editQuery, hitRuns, moveSelection, rank } from './search.js'
 
@@ -53,21 +54,25 @@ async function mutateModel(host: ModelsHost, value: string, confirmed: boolean):
   if (result.status === 'confirmation_required' && typeof result.confirm === 'string' && !confirmed) {
     confirmTokens.set(key, result.confirm)
 
-    return { confirm_message: result.confirm_message, confirm_required: true } as ConfigSetResult
+    return {
+      confirm_required: true,
+      key: 'model',
+      ...(result.confirm_message === undefined ? {} : { confirm_message: result.confirm_message })
+    } satisfies ConfigSetResult
   }
 
   if (result.status === 'confirmation_required') {
     throw new Error(result.confirm_message || 'The model switch needs confirming again; try once more.')
   }
 
-  return { value: result.model ?? '' } as ConfigSetResult
+  return { key: 'model', value: result.model ?? '' } satisfies ConfigSetResult
 }
 
 /** Switches the session's model to `value` (`<model> [--provider <slug>] [--session|--global]`); reports the switch in the transcript unless it needs a confirmation. */
 export async function switchModel(host: ModelsHost, value: string, confirmed = false): Promise<ConfigSetResult> {
   const r = host.gw.isCanonical
     ? await mutateModel(host, value, confirmed)
-    : await host.gw.request<ConfigSetResult>('config.set', {
+    : await rpc(host.gw, 'config.set', {
         confirm_expensive_model: confirmed,
         key: 'model',
         session_id: host.session.ref.live,
@@ -129,7 +134,7 @@ export function openModelPicker(host: ModelsHost) {
 
     try {
       const sid = host.session.ref.live
-      const r = await host.gw.request<ModelOptionsResult>('model.options', sid ? { session_id: sid } : {})
+      const r = await rpc(host.gw, 'model.options', sid ? { session_id: sid } : {})
       const list = r.providers ?? []
       rememberCaps(list)
       const names = providerDisplayNames(list)

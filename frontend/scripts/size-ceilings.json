@@ -1,7 +1,7 @@
 {
   "src/__tests__/app.test.ts": 663,
-  "src/agents/store.ts": 711,
-  "src/app.ts": 2854,
+  "src/agents/store.ts": 706,
+  "src/app.ts": 2836,
   "src/composer.ts": 605,
   "src/overlays/prompts.tsx": 863,
   "src/processes/widgets/runtime.ts": 889,

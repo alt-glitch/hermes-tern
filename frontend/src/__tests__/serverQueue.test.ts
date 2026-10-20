@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest'
 
-import { busyModeOf, type PendingRow, ServerQueue } from '../serverQueue.js'
+import { busyModeOf, ServerQueue } from '../serverQueue.js'
+import type { PendingRow, PendingStatus } from '../wire/schemas.js'
 
-const row = (id: string, status: string, user = id, input = `in-${id}`): PendingRow => ({ admission_id: id, input_id: input, status, user })
+const row = (id: string, status: PendingStatus, user = id, input = `in-${id}`): PendingRow => ({ admission_id: id, input_id: input, status, user })
 
 describe('ServerQueue', () => {
   it("shows a resumed session's queued rows, but owes no bubble for a row the snapshot already started", () => {

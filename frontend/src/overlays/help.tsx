@@ -10,6 +10,7 @@ import type { ChatPorts } from '../app/ports.js'
 import { HIDDEN_COMMANDS, localCommands } from '../commands.js'
 import { errorText } from '../core/errors.js'
 import type { Overlay } from '../overlay.js'
+import { rpc } from '../wire/rpc.js'
 
 /** What the help sheet reaches of the app. */
 export type HelpHost = Pick<ChatPorts, 'close' | 'gw' | 'open' | 'session' | 'transcript'>
@@ -64,7 +65,7 @@ export async function openHelp(host: HelpHost) {
   const sid = host.session.ref.live
 
   try {
-    catalog = await host.gw.request<CommandsCatalogResult>('commands.catalog', sid ? { session_id: sid } : {})
+    catalog = await rpc(host.gw, 'commands.catalog', sid ? { session_id: sid } : {})
   } catch (error) {
     host.transcript.notice(
       `Could not load the command list: ${errorText(error)}`,

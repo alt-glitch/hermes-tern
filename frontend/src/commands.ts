@@ -21,6 +21,7 @@ import { REFUSED_COMMANDS, type RefusedHost } from './refusedCommands.js'
 import { LEVELS } from './session/effort.js'
 import { SESSION_COMMANDS } from './sessionCommands.js'
 import { answerText } from './view/transcript.js'
+import { rpc } from './wire/rpc.js'
 
 /** What the commands reach of the app. */
 export type CommandHost = Pick<
@@ -193,10 +194,10 @@ const COMMANDS: readonly LocalCommand[] = [
     name: 'skin',
     run: async (host, arg) => {
       if (!arg.trim()) {
-        const r = await host.gw.request<{ value?: string }>('config.get', { key: 'skin' })
+        const r = await rpc(host.gw, 'config.get', { key: 'skin' })
         host.transcript.notice(`skin: ${r?.value || 'default'}`)
       } else {
-        const r = await host.gw.request<{ value?: string }>('config.set', { key: 'skin', value: arg.trim() })
+        const r = await rpc(host.gw, 'config.set', { key: 'skin', value: arg.trim() })
         host.transcript.notice(`skin → ${r?.value || arg.trim()}`)
       }
 
