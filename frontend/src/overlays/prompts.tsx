@@ -240,12 +240,19 @@ export function promptOverlay(host: OverlayHost, req: ServerRequest): Overlay | 
 
 // ── Approval ───────────────────────────────────────────────────────────
 
-const APPROVALS: Option[] = [
-  { detail: 'Run it this time only', id: 'once', label: 'Allow once' },
-  { detail: 'Allow matching commands until the session ends', id: 'session', label: 'Allow for this session' },
-  { detail: 'Remember this approval for every session', id: 'always', label: 'Always allow' },
-  { detail: 'Tell the agent not to run it', id: 'deny', label: 'Deny' }
-]
+/** The approval's answers, one button each, in the order the action row shows them (Enter's last). */
+const APPROVALS = [
+  { detail: 'Tell the agent not to run it', id: 'deny', keys: ['escape'], label: 'Deny', typed: 'n' },
+  { detail: 'Remember this approval for every session', id: 'always', keys: ['a'], label: 'Always allow', typed: 'a' },
+  {
+    detail: 'Allow matching commands until the session ends',
+    id: 'session',
+    keys: ['s'],
+    label: 'Allow for this session',
+    typed: 's'
+  },
+  { detail: 'Run it this time only', id: 'once', keys: ['enter'], label: 'Allow once', typed: 'y' }
+] as const
 
 function approvalOverlay(host: OverlayHost, req: ServerRequest): Overlay {
   const p = req.params
@@ -269,10 +276,9 @@ function approvalOverlay(host: OverlayHost, req: ServerRequest): Overlay {
     allowed.delete('session')
   }
 
-  const options = APPROVALS.filter(o => allowed.has(o.id))
+  const choices = APPROVALS.filter(c => allowed.has(c.id))
   const key = `prompt:${req.id}`
   const sending: Sending = { busy: false, error: '' }
-  let selected = 0
 
   const answer = (choice: string) => answerWith(host, overlay, req, sending, { choice })
   // After a refused answer, Esc closes the sheet unanswered: a retry may never land (a stale turn).
@@ -282,13 +288,12 @@ function approvalOverlay(host: OverlayHost, req: ServerRequest): Overlay {
     key,
     modal: true,
     cancel: decline,
-    node: id => (
+    node: () => (
       <overlay anchor="bottom" key={key} modal role="omp.overlay.ask" size="md">
         <col gap="md" key="body">
           <md key="question" role="omp.ask.question" text="Allow this command?" />
-          {command ? <code key="command" lang="bash" text={command} /> : null}
           {description || smartDenied ? (
-            <row align="center" gap="xs" key="why">
+            <row align="start" gap="xs" key="why">
               <icon key="icon" name="shield" tone={smartDenied ? 'error' : 'warning'} />
               <md
                 key="text"
@@ -296,48 +301,32 @@ function approvalOverlay(host: OverlayHost, req: ServerRequest): Overlay {
               />
             </row>
           ) : null}
-          {optionList(
-            'options',
-            `${id}.body.options`,
-            options,
-            selected,
-            i => {
-              selected = i
-              host.changed()
-            },
-            i => answer(options[i]?.id ?? 'deny')
-          )}
+          {command ? <code key="command" lang="bash" max={{ h: '12lines' }} text={command} wrap /> : null}
           {sendingLine(sending)}
-          {actionsRow([
-            { hint: 'n · escape', key: 'deny', keys: ['escape'], label: 'Deny', onClick: () => answer('deny') },
-            {
-              hint: 'enter · y allows once · up/down move',
-              key: 'choose',
-              keys: ['enter'],
-              label: 'Choose',
-              onClick: () => answer(options[selected]?.id ?? 'deny'),
-              primary: true
-            }
-          ])}
+          {actionsRow(
+            choices.map(c => ({
+              hint: `${c.detail} · ${c.id === 'deny' ? 'escape, n' : c.id === 'once' ? 'enter, y' : c.typed}`,
+              key: c.id,
+              keys: [...c.keys],
+              label: c.label,
+              onClick: () => answer(c.id),
+              primary: c.id === 'once'
+            }))
+          )}
         </col>
       </overlay>
     ),
     onKey: k => {
-      const n = Number.parseInt(k.name, 10)
-      const to = moved(k, selected, options.length)
-
       if (isCtrlC(k) || k.name === 'escape') {
         decline()
-      } else if (to !== undefined) {
-        selected = to
-      } else if (n >= 1 && n <= options.length) {
-        answer(options[n - 1]?.id ?? 'deny')
       } else if (k.name === 'enter') {
-        answer(options[selected]?.id ?? 'deny')
-      } else if (k.name === 'n') {
-        answer('deny')
-      } else if (k.name === 'y') {
-        answer('once')
+        answer(choices.some(c => c.id === 'once') ? 'once' : 'deny')
+      } else if (!k.ctrl && !k.meta && !k.alt) {
+        const typed = choices.find(c => c.typed === k.name)
+
+        if (typed) {
+          answer(typed.id)
+        }
       }
 
       return true

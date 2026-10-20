@@ -62846,10 +62846,16 @@ function promptOverlay(host, req) {
   }
 }
 var APPROVALS = [
-  { detail: "Run it this time only", id: "once", label: "Allow once" },
-  { detail: "Allow matching commands until the session ends", id: "session", label: "Allow for this session" },
-  { detail: "Remember this approval for every session", id: "always", label: "Always allow" },
-  { detail: "Tell the agent not to run it", id: "deny", label: "Deny" }
+  { detail: "Tell the agent not to run it", id: "deny", keys: ["escape"], label: "Deny", typed: "n" },
+  { detail: "Remember this approval for every session", id: "always", keys: ["a"], label: "Always allow", typed: "a" },
+  {
+    detail: "Allow matching commands until the session ends",
+    id: "session",
+    keys: ["s"],
+    label: "Allow for this session",
+    typed: "s"
+  },
+  { detail: "Run it this time only", id: "once", keys: ["enter"], label: "Allow once", typed: "y" }
 ];
 function approvalOverlay(host, req) {
   const p3 = req.params;
@@ -62863,20 +62869,18 @@ function approvalOverlay(host, req) {
   if (p3.allow_session === false) {
     allowed.delete("session");
   }
-  const options = APPROVALS.filter((o) => allowed.has(o.id));
+  const choices = APPROVALS.filter((c) => allowed.has(c.id));
   const key2 = `prompt:${req.id}`;
   const sending = { busy: false, error: "" };
-  let selected = 0;
   const answer = (choice) => answerWith(host, overlay, req, sending, { choice });
   const decline = () => sending.error ? host.close(overlay) : answer("deny");
   const overlay = {
     key: key2,
     modal: true,
     cancel: decline,
-    node: (id) => /* @__PURE__ */ jsx("overlay", { anchor: "bottom", modal: true, role: "omp.overlay.ask", size: "md", children: /* @__PURE__ */ jsxs("col", { gap: "md", children: [
+    node: () => /* @__PURE__ */ jsx("overlay", { anchor: "bottom", modal: true, role: "omp.overlay.ask", size: "md", children: /* @__PURE__ */ jsxs("col", { gap: "md", children: [
       /* @__PURE__ */ jsx("md", { role: "omp.ask.question", text: "Allow this command?" }, "question"),
-      command ? /* @__PURE__ */ jsx("code", { lang: "bash", text: command }, "command") : null,
-      description || smartDenied ? /* @__PURE__ */ jsxs("row", { align: "center", gap: "xs", children: [
+      description || smartDenied ? /* @__PURE__ */ jsxs("row", { align: "start", gap: "xs", children: [
         /* @__PURE__ */ jsx("icon", { name: "shield", tone: smartDenied ? "error" : "warning" }, "icon"),
         /* @__PURE__ */ jsx(
           "md",
@@ -62886,45 +62890,29 @@ function approvalOverlay(host, req) {
           "text"
         )
       ] }, "why") : null,
-      optionList(
-        "options",
-        `${id}.body.options`,
-        options,
-        selected,
-        (i) => {
-          selected = i;
-          host.changed();
-        },
-        (i) => answer(options[i]?.id ?? "deny")
-      ),
+      command ? /* @__PURE__ */ jsx("code", { lang: "bash", max: { h: "12lines" }, text: command, wrap: true }, "command") : null,
       sendingLine(sending),
-      actionsRow([
-        { hint: "n \xB7 escape", key: "deny", keys: ["escape"], label: "Deny", onClick: () => answer("deny") },
-        {
-          hint: "enter \xB7 y allows once \xB7 up/down move",
-          key: "choose",
-          keys: ["enter"],
-          label: "Choose",
-          onClick: () => answer(options[selected]?.id ?? "deny"),
-          primary: true
-        }
-      ])
+      actionsRow(
+        choices.map((c) => ({
+          hint: `${c.detail} \xB7 ${c.id === "deny" ? "escape, n" : c.id === "once" ? "enter, y" : c.typed}`,
+          key: c.id,
+          keys: [...c.keys],
+          label: c.label,
+          onClick: () => answer(c.id),
+          primary: c.id === "once"
+        }))
+      )
     ] }, "body") }, key2),
     onKey: (k) => {
-      const n = Number.parseInt(k.name, 10);
-      const to = moved(k, selected, options.length);
       if (isCtrlC(k) || k.name === "escape") {
         decline();
-      } else if (to !== void 0) {
-        selected = to;
-      } else if (n >= 1 && n <= options.length) {
-        answer(options[n - 1]?.id ?? "deny");
       } else if (k.name === "enter") {
-        answer(options[selected]?.id ?? "deny");
-      } else if (k.name === "n") {
-        answer("deny");
-      } else if (k.name === "y") {
-        answer("once");
+        answer(choices.some((c) => c.id === "once") ? "once" : "deny");
+      } else if (!k.ctrl && !k.meta && !k.alt) {
+        const typed = choices.find((c) => c.typed === k.name);
+        if (typed) {
+          answer(typed.id);
+        }
       }
       return true;
     }
