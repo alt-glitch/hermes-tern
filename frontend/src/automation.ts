@@ -166,6 +166,7 @@ export class Automation {
   /** Bumped by every update, so a read that started before one never overwrites it. */
   #seq = 0
   #timer: NodeJS.Timeout | undefined
+  readonly #watchers = new Set<() => void>()
   /** The verb in flight, if any (the sheet's buttons wait for it). */
   pending: AutomationAction | undefined
 
@@ -184,6 +185,14 @@ export class Automation {
   /** The loop's raw snapshot: a new object per update, so its countdown re-anchors only then. */
   get loopSnapshot(): LoopSnapshot | null {
     return this.#snapshot?.loop ?? null
+  }
+
+  /** Calls `watcher` after each change of the snapshot (the sheet closes when nothing stands); the returned function stops it. */
+  watch(watcher: () => void): () => void {
+    const entry = () => watcher()
+    this.#watchers.add(entry)
+
+    return () => void this.#watchers.delete(entry)
   }
 
   /** Another session is shown: forget the last one's state and read this one's. */
@@ -251,6 +260,10 @@ export class Automation {
     if (JSON.stringify(control) !== JSON.stringify(this.#snapshot)) {
       this.#snapshot = control
       this.#host.changed()
+
+      for (const watcher of [...this.#watchers]) {
+        watcher()
+      }
     }
 
     this.#arm()

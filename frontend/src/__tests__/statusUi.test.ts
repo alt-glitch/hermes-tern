@@ -112,6 +112,21 @@ describe('App: the goal and loop line', () => {
     expect(sent('session.control')).toEqual([{ action: 'goal.pause', session_id: 's1' }])
     expect(app.automation.goal?.state).toBe('paused')
   })
+
+  it('closes the sheet once the goal no longer stands (cleared here or by another viewer)', async () => {
+    const { app, emit, press } = setup()
+
+    app.automation.adopt('s1')
+    emit('event', { payload: { control: control({ goal }) }, session_id: 's1', type: 'session.control.update' })
+    await settle()
+    await press(key('down'))
+    await press(key('enter'))
+    expect(app.overlays.at(-1)?.key).toBe('automation:goal')
+
+    emit('event', { payload: { control: control({}) }, session_id: 's1', type: 'session.control.update' })
+    await settle()
+    expect(app.overlays.map(o => o.key)).not.toContain('automation:goal')
+  })
 })
 
 describe('App: reconnecting', () => {

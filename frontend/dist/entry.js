@@ -63625,6 +63625,7 @@ var MODES = [
 function isThemeMode(v) {
   return MODES.some((m) => m.id === v);
 }
+var modeOf = (item3) => item3 !== void 0 && isThemeMode(item3) ? item3 : void 0;
 function openThemePicker(host) {
   const before = host.theme;
   let selected = before;
@@ -63662,10 +63663,10 @@ function openThemePicker(host) {
           use: () => host.close(overlay2)
         },
         onActivate: (ev) => {
-          pick2(ev.item);
+          pick2(modeOf(ev.item));
           host.close(overlay2);
         },
-        onSelect: (ev) => pick2(ev.item),
+        onSelect: (ev) => pick2(modeOf(ev.item)),
         selected,
         size: "md",
         title: "Theme"
@@ -63679,7 +63680,7 @@ function openThemePicker(host) {
       } else if (k.name === "enter") {
         host.close(overlay2);
       } else {
-        pick2(moveSelection(k, MODES.map((m) => m.id), selected));
+        pick2(modeOf(moveSelection(k, MODES.map((m) => m.id), selected)));
       }
       return true;
     }
@@ -68107,21 +68108,34 @@ function openAutomation(host, which) {
     }
     void host.automation.act(b.action);
   };
-  const current = () => which === "goal" ? host.automation.goal : host.automation.loop();
+  const current = () => {
+    if (which === "goal") {
+      const view2 = host.automation.goal;
+      return view2 ? { view: view2, which } : void 0;
+    }
+    const view = host.automation.loop();
+    return view ? { view, which } : void 0;
+  };
+  const closeIfGone = () => {
+    if (!current()) {
+      queueMicrotask(() => host.close(overlay2));
+    }
+  };
+  const unwatch = host.automation.watch(closeIfGone);
   const overlay2 = {
     key: key2,
     modal: true,
+    onClose: unwatch,
     node: () => {
       const now = Date.now();
-      const view = current();
-      if (!view) {
-        queueMicrotask(() => host.close(overlay2));
+      const sheet = current();
+      if (!sheet) {
         return /* @__PURE__ */ jsx("overlay", { anchor: "bottom", modal: true, size: "md" }, key2);
       }
       const pending = host.automation.pending;
       const buttons = [
         { hint: "escape", key: "close", keys: ["escape"], label: "Close", onClick: () => host.close(overlay2) },
-        ...automationButtons(which, view).map((b, i) => ({
+        ...automationButtons(sheet.which, sheet.view).map((b, i) => ({
           hint: i === 0 ? `enter \xB7 ${b.keys.join(" \xB7 ")}` : b.keys.join(" \xB7 "),
           key: b.action,
           keys: b.keys,
@@ -68134,12 +68148,12 @@ function openAutomation(host, which) {
         "overlay",
         {
           anchor: "bottom",
-          head: [{ t: which === "goal" ? "Goal" : "Loop" }],
+          head: [{ t: sheet.which === "goal" ? "Goal" : "Loop" }],
           modal: true,
           role: "hermes.automation.sheet",
           size: "md",
           children: /* @__PURE__ */ jsxs("col", { gap: "md", children: [
-            which === "goal" ? goalBody(view) : loopBody(view, host.automation.loopSnapshot ?? view, now),
+            sheet.which === "goal" ? goalBody(sheet.view) : loopBody(sheet.view, host.automation.loopSnapshot ?? sheet.view, now),
             actionsRow(buttons)
           ] }, "body")
         },
@@ -68151,17 +68165,19 @@ function openAutomation(host, which) {
         host.close(overlay2);
         return true;
       }
-      const view = current();
-      const b = view ? automationButtons(which, view).find((b2) => b2.keys.includes(k.name) && !k.ctrl && !k.meta) : void 0;
+      const sheet = current();
+      const offered = sheet ? automationButtons(sheet.which, sheet.view) : void 0;
+      const b = offered?.find((b2) => b2.keys.includes(k.name) && !k.ctrl && !k.meta);
       if (b) {
         run6(b);
-      } else if (k.name === "enter" && view) {
-        run6(automationButtons(which, view)[0]);
+      } else if (k.name === "enter" && offered) {
+        run6(offered[0]);
       }
       return true;
     }
   };
   host.open(overlay2);
+  closeIfGone();
 }
 
 // src/surface/osc.ts
@@ -69341,6 +69357,7 @@ var Automation = class {
   /** Bumped by every update, so a read that started before one never overwrites it. */
   #seq = 0;
   #timer;
+  #watchers = /* @__PURE__ */ new Set();
   /** The verb in flight, if any (the sheet's buttons wait for it). */
   pending;
   constructor(host) {
@@ -69355,6 +69372,12 @@ var Automation = class {
   /** The loop's raw snapshot: a new object per update, so its countdown re-anchors only then. */
   get loopSnapshot() {
     return this.#snapshot?.loop ?? null;
+  }
+  /** Calls `watcher` after each change of the snapshot (the sheet closes when nothing stands); the returned function stops it. */
+  watch(watcher) {
+    const entry = () => watcher();
+    this.#watchers.add(entry);
+    return () => void this.#watchers.delete(entry);
   }
   /** Another session is shown: forget the last one's state and read this one's. */
   adopt(sid) {
@@ -69408,6 +69431,9 @@ var Automation = class {
     if (JSON.stringify(control) !== JSON.stringify(this.#snapshot)) {
       this.#snapshot = control;
       this.#host.changed();
+      for (const watcher of [...this.#watchers]) {
+        watcher();
+      }
     }
     this.#arm();
   }

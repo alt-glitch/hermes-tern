@@ -24,6 +24,9 @@ export function isThemeMode(v: string): v is ThemeMode {
   return MODES.some(m => m.id === v)
 }
 
+/** The mode a picker row names; undefined for none (or a row this picker does not list). */
+const modeOf = (item: string | undefined): ThemeMode | undefined => (item !== undefined && isThemeMode(item) ? item : undefined)
+
 /** Opens the theme picker; the selection previews live and Esc puts the old mode back. */
 export function openThemePicker(host: ThemeHost) {
   const before = host.theme
@@ -64,10 +67,10 @@ export function openThemePicker(host: ThemeHost) {
           use: () => host.close(overlay)
         }}
         onActivate={ev => {
-          pick(ev.item as ThemeMode)
+          pick(modeOf(ev.item))
           host.close(overlay)
         }}
-        onSelect={ev => pick(ev.item as ThemeMode)}
+        onSelect={ev => pick(modeOf(ev.item))}
         selected={selected}
         size="md"
         title="Theme"
@@ -80,7 +83,7 @@ export function openThemePicker(host: ThemeHost) {
       } else if (k.name === 'enter') {
         host.close(overlay)
       } else {
-        pick(moveSelection(k, MODES.map(m => m.id), selected) as ThemeMode | undefined)
+        pick(modeOf(moveSelection(k, MODES.map(m => m.id), selected)))
       }
 
       return true
