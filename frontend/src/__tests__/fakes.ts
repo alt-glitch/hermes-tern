@@ -143,3 +143,17 @@ export function fakeTern({ cols = 80, draws = false, features = [] }: FakeTernOp
   }
 }
 
+
+/**
+ * Lets the app finish what its last input or event started: one event-loop turn (its render is a
+ * setImmediate), and another while each turn sent the gateway more requests. A reply a test holds
+ * open is not waited for.
+ */
+export async function settle(gw: FakeGateway) {
+  let sent: number
+
+  do {
+    sent = gw.calls.length
+    await new Promise(resolve => setImmediate(resolve))
+  } while (gw.calls.length !== sent)
+}

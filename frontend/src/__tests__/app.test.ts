@@ -5,7 +5,7 @@ import { join } from 'node:path'
 import type { Key } from '@stencil-hq/tern'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { FakeGateway, fakeTern, key, type Reply } from './fakes.js'
+import { FakeGateway, fakeTern, key, type Reply, settle as settleGateway } from './fakes.js'
 
 vi.mock('@tui/lib/history.js', () => ({ append: () => undefined, load: () => [] }))
 
@@ -18,9 +18,12 @@ const { App } = await import('../app.js')
 const png = join(home, 'shot.png')
 writeFileSync(png, Buffer.from([137, 80, 78, 71, 13, 10, 26, 10, 0, 0]))
 
+/** The gateway of the app the running test set up. */
+let gateway: FakeGateway
+
 /** The app on a fake Tern and gateway: keys go in, gateway requests come out (`canonical`: the shared gateway). */
 function setup(replies: Record<string, Reply> = {}, { canonical = true, features = [] as string[] } = {}) {
-  const gw = new FakeGateway({ canonical, replies })
+  const gw = (gateway = new FakeGateway({ canonical, replies }))
   let uploads = 0
 
   if (!replies['image.attach_bytes']) {
@@ -67,7 +70,8 @@ function setup(replies: Record<string, Reply> = {}, { canonical = true, features
   return { app, attach, emit, press, queuedRows, sent, type }
 }
 
-const settle = () => new Promise(resolve => setTimeout(resolve, 5))
+/** Waits until the app has handled what the test fed it (no fixed sleep). */
+const settle = () => settleGateway(gateway)
 const busy = { label: 'Working…', since: {}, startedAt: 0 }
 
 beforeEach(() => {
