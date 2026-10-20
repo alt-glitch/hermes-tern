@@ -1197,17 +1197,9 @@
           }
          },
          {
-          "k": "code",
-          "p": {
-           "lang": "bash",
-           "text": "rm -rf build",
-           "key": "command"
-          }
-         },
-         {
           "k": "row",
           "p": {
-           "align": "center",
+           "align": "start",
            "gap": "xs",
            "key": "why"
           },
@@ -1230,82 +1222,16 @@
           ]
          },
          {
-          "k": "list",
+          "k": "code",
           "p": {
-           "role": "omp.ask.options",
-           "selected": "layer.prompt:shared:p1.body.options.once",
-           "key": "options"
-          },
-          "c": [
-           {
-            "k": "item",
-            "p": {
-             "detail": [
-              {
-               "t": "Run it this time only"
-              }
-             ],
-             "label": [
-              {
-               "t": "Allow once"
-              }
-             ],
-             "role": "omp.ask.option",
-             "key": "once"
-            }
+           "lang": "bash",
+           "max": {
+            "h": "12lines"
            },
-           {
-            "k": "item",
-            "p": {
-             "detail": [
-              {
-               "t": "Allow matching commands until the session ends"
-              }
-             ],
-             "label": [
-              {
-               "t": "Allow for this session"
-              }
-             ],
-             "role": "omp.ask.option",
-             "key": "session"
-            }
-           },
-           {
-            "k": "item",
-            "p": {
-             "detail": [
-              {
-               "t": "Remember this approval for every session"
-              }
-             ],
-             "label": [
-              {
-               "t": "Always allow"
-              }
-             ],
-             "role": "omp.ask.option",
-             "key": "always"
-            }
-           },
-           {
-            "k": "item",
-            "p": {
-             "detail": [
-              {
-               "t": "Tell the agent not to run it"
-              }
-             ],
-             "label": [
-              {
-               "t": "Deny"
-              }
-             ],
-             "role": "omp.ask.option",
-             "key": "deny"
-            }
-           }
-          ]
+           "text": "rm -rf build",
+           "wrap": true,
+           "key": "command"
+          }
          },
          {
           "k": "row",
@@ -1329,7 +1255,7 @@
              "align": "center",
              "gap": "xs",
              "role": "omp.btn",
-             "title": "Deny  n · escape",
+             "title": "Deny  Tell the agent not to run it · escape, n",
              "key": "deny",
              "actions": {
               "click": "click"
@@ -1360,9 +1286,8 @@
              "align": "center",
              "gap": "xs",
              "role": "omp.btn",
-             "title": "Choose  enter · y allows once · up/down move",
-             "tone": "accent",
-             "key": "choose",
+             "title": "Always allow  Remember this approval for every session · a",
+             "key": "always",
              "actions": {
               "click": "click"
              }
@@ -1371,7 +1296,70 @@
              {
               "k": "text",
               "p": {
-               "text": "Choose",
+               "text": "Always allow",
+               "key": "label"
+              }
+             },
+             {
+              "k": "kbd",
+              "p": {
+               "keys": [
+                "a"
+               ],
+               "key": "keys"
+              }
+             }
+            ]
+           },
+           {
+            "k": "row",
+            "p": {
+             "align": "center",
+             "gap": "xs",
+             "role": "omp.btn",
+             "title": "Allow for this session  Allow matching commands until the session ends · s",
+             "key": "session",
+             "actions": {
+              "click": "click"
+             }
+            },
+            "c": [
+             {
+              "k": "text",
+              "p": {
+               "text": "Allow for this session",
+               "key": "label"
+              }
+             },
+             {
+              "k": "kbd",
+              "p": {
+               "keys": [
+                "s"
+               ],
+               "key": "keys"
+              }
+             }
+            ]
+           },
+           {
+            "k": "row",
+            "p": {
+             "align": "center",
+             "gap": "xs",
+             "role": "omp.btn",
+             "title": "Allow once  Run it this time only · enter, y",
+             "tone": "accent",
+             "key": "once",
+             "actions": {
+              "click": "click"
+             }
+            },
+            "c": [
+             {
+              "k": "text",
+              "p": {
+               "text": "Allow once",
                "key": "label"
               }
              },
@@ -5722,17 +5710,9 @@
           }
          },
          {
-          "k": "code",
-          "p": {
-           "lang": "bash",
-           "text": "git push --force",
-           "key": "command"
-          }
-         },
-         {
           "k": "row",
           "p": {
-           "align": "center",
+           "align": "start",
            "gap": "xs",
            "key": "why"
           },
@@ -5755,82 +5735,16 @@
           ]
          },
          {
-          "k": "list",
+          "k": "code",
           "p": {
-           "role": "omp.ask.options",
-           "selected": "layer.prompt:r1.body.options.once",
-           "key": "options"
-          },
-          "c": [
-           {
-            "k": "item",
-            "p": {
-             "detail": [
-              {
-               "t": "Run it this time only"
-              }
-             ],
-             "label": [
-              {
-               "t": "Allow once"
-              }
-             ],
-             "role": "omp.ask.option",
-             "key": "once"
-            }
+           "lang": "bash",
+           "max": {
+            "h": "12lines"
            },
-           {
-            "k": "item",
-            "p": {
-             "detail": [
-              {
-               "t": "Allow matching commands until the session ends"
-              }
-             ],
-             "label": [
-              {
-               "t": "Allow for this session"
-              }
-             ],
-             "role": "omp.ask.option",
-             "key": "session"
-            }
-           },
-           {
-            "k": "item",
-            "p": {
-             "detail": [
-              {
-               "t": "Remember this approval for every session"
-              }
-             ],
-             "label": [
-              {
-               "t": "Always allow"
-              }
-             ],
-             "role": "omp.ask.option",
-             "key": "always"
-            }
-           },
-           {
-            "k": "item",
-            "p": {
-             "detail": [
-              {
-               "t": "Tell the agent not to run it"
-              }
-             ],
-             "label": [
-              {
-               "t": "Deny"
-              }
-             ],
-             "role": "omp.ask.option",
-             "key": "deny"
-            }
-           }
-          ]
+           "text": "git push --force",
+           "wrap": true,
+           "key": "command"
+          }
          },
          {
           "k": "row",
@@ -5854,7 +5768,7 @@
              "align": "center",
              "gap": "xs",
              "role": "omp.btn",
-             "title": "Deny  n · escape",
+             "title": "Deny  Tell the agent not to run it · escape, n",
              "key": "deny",
              "actions": {
               "click": "click"
@@ -5885,9 +5799,8 @@
              "align": "center",
              "gap": "xs",
              "role": "omp.btn",
-             "title": "Choose  enter · y allows once · up/down move",
-             "tone": "accent",
-             "key": "choose",
+             "title": "Always allow  Remember this approval for every session · a",
+             "key": "always",
              "actions": {
               "click": "click"
              }
@@ -5896,7 +5809,70 @@
              {
               "k": "text",
               "p": {
-               "text": "Choose",
+               "text": "Always allow",
+               "key": "label"
+              }
+             },
+             {
+              "k": "kbd",
+              "p": {
+               "keys": [
+                "a"
+               ],
+               "key": "keys"
+              }
+             }
+            ]
+           },
+           {
+            "k": "row",
+            "p": {
+             "align": "center",
+             "gap": "xs",
+             "role": "omp.btn",
+             "title": "Allow for this session  Allow matching commands until the session ends · s",
+             "key": "session",
+             "actions": {
+              "click": "click"
+             }
+            },
+            "c": [
+             {
+              "k": "text",
+              "p": {
+               "text": "Allow for this session",
+               "key": "label"
+              }
+             },
+             {
+              "k": "kbd",
+              "p": {
+               "keys": [
+                "s"
+               ],
+               "key": "keys"
+              }
+             }
+            ]
+           },
+           {
+            "k": "row",
+            "p": {
+             "align": "center",
+             "gap": "xs",
+             "role": "omp.btn",
+             "title": "Allow once  Run it this time only · enter, y",
+             "tone": "accent",
+             "key": "once",
+             "actions": {
+              "click": "click"
+             }
+            },
+            "c": [
+             {
+              "k": "text",
+              "p": {
+               "text": "Allow once",
                "key": "label"
               }
              },

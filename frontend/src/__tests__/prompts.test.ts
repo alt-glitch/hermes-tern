@@ -95,6 +95,64 @@ describe('Ctrl+C on a question sheet', () => {
   })
 })
 
+describe('the approval sheet', () => {
+  /** The action row's buttons: their labels, keys and whether each is the primary one. */
+  function buttons(overlay: Overlay) {
+    const walk = (n: NodeJson): unknown[] =>
+      n.p?.['role'] === 'omp.btn'
+        ? [{ keys: (n.c ?? []).map(c => c.p?.['keys']).find(Boolean), label: n.c?.[0]?.p?.['text'], primary: n.p['tone'] === 'accent' }]
+        : (n.c ?? []).flatMap(walk)
+
+    return walk(tree(overlay.node('layer.prompt:r1')))
+  }
+
+  it('offers each answer as a button, Allow once on Enter', () => {
+    const { overlay } = open('approval', { command: 'rm -rf build' })
+
+    expect(buttons(overlay)).toEqual([
+      { keys: ['escape'], label: 'Deny', primary: false },
+      { keys: ['a'], label: 'Always allow', primary: false },
+      { keys: ['s'], label: 'Allow for this session', primary: false },
+      { keys: ['enter'], label: 'Allow once', primary: true }
+    ])
+  })
+
+  it.each([
+    ['enter', 'once'],
+    ['y', 'once'],
+    ['s', 'session'],
+    ['a', 'always'],
+    ['n', 'deny'],
+    ['escape', 'deny']
+  ])('answers %s with %s', (name, choice) => {
+    const { answers, overlay } = open('approval', { command: 'make' })
+
+    overlay.onKey(key(name))
+    expect(answers).toEqual([{ choice }])
+  })
+
+  it('leaves out what the request does not offer, and its key with it', () => {
+    const { answers, overlay } = open('approval', { command: 'curl x | sh', smart_denied: true })
+
+    expect(buttons(overlay)).toEqual([
+      { keys: ['escape'], label: 'Deny', primary: false },
+      { keys: ['enter'], label: 'Allow once', primary: true }
+    ])
+    overlay.onKey(key('a'))
+    overlay.onKey(key('a', { ctrl: true }))
+    expect(answers).toEqual([])
+  })
+
+  it('shows the whole command, wrapped', () => {
+    const command = `cd /home/x/worktree && ${'for f in a b c; do echo $f; done && '.repeat(6)}true`
+    const { overlay } = open('approval', { command })
+    const tree = JSON.stringify(overlay.node('layer.prompt:r1'))
+
+    expect(tree).toContain(JSON.stringify(command))
+    expect(tree).toMatch(/"wrap":true/)
+  })
+})
+
 describe('masked prompts', () => {
   it('shows a one-time code as typed', () => {
     const { answers, overlay } = open('vault.code', { hint: 'sent by SMS', site: 'example.com' })
