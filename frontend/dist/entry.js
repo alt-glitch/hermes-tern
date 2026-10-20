@@ -1754,11 +1754,11 @@ var require_request = __commonJS({
           } else if (typeof val[i] === "object") {
             throw new InvalidArgumentError(`invalid ${key2} header`);
           } else {
-            const str8 = `${val[i]}`;
-            if (!isValidHeaderValue(str8)) {
+            const str7 = `${val[i]}`;
+            if (!isValidHeaderValue(str7)) {
               throw new InvalidArgumentError(`invalid ${key2} header`);
             }
-            arr.push(str8);
+            arr.push(str7);
           }
         }
         val = arr;
@@ -3323,25 +3323,25 @@ var require_data_url = __commonJS({
     function isHTTPWhiteSpace(char) {
       return char === 13 || char === 10 || char === 9 || char === 32;
     }
-    function removeHTTPWhitespace(str8, leading = true, trailing = true) {
-      return removeChars(str8, leading, trailing, isHTTPWhiteSpace);
+    function removeHTTPWhitespace(str7, leading = true, trailing = true) {
+      return removeChars(str7, leading, trailing, isHTTPWhiteSpace);
     }
     function isASCIIWhitespace(char) {
       return char === 13 || char === 10 || char === 9 || char === 12 || char === 32;
     }
-    function removeASCIIWhitespace(str8, leading = true, trailing = true) {
-      return removeChars(str8, leading, trailing, isASCIIWhitespace);
+    function removeASCIIWhitespace(str7, leading = true, trailing = true) {
+      return removeChars(str7, leading, trailing, isASCIIWhitespace);
     }
-    function removeChars(str8, leading, trailing, predicate) {
+    function removeChars(str7, leading, trailing, predicate) {
       let lead = 0;
-      let trail2 = str8.length - 1;
+      let trail2 = str7.length - 1;
       if (leading) {
-        while (lead < str8.length && predicate(str8.charCodeAt(lead))) lead++;
+        while (lead < str7.length && predicate(str7.charCodeAt(lead))) lead++;
       }
       if (trailing) {
-        while (trail2 > 0 && predicate(str8.charCodeAt(trail2))) trail2--;
+        while (trail2 > 0 && predicate(str7.charCodeAt(trail2))) trail2--;
       }
-      return lead === 0 && trail2 === str8.length - 1 ? str8 : str8.slice(lead, trail2 + 1);
+      return lead === 0 && trail2 === str7.length - 1 ? str7 : str7.slice(lead, trail2 + 1);
     }
     function isomorphicDecode(input2) {
       const length = input2.length;
@@ -5260,7 +5260,7 @@ var require_body = __commonJS({
         const boundary = `----formdata-undici-0${`${random(1e11)}`.padStart(11, "0")}`;
         const prefix2 = `--${boundary}\r
 Content-Disposition: form-data`;
-        const escape = (str8) => str8.replace(/\n/g, "%0A").replace(/\r/g, "%0D").replace(/"/g, "%22");
+        const escape = (str7) => str7.replace(/\n/g, "%0A").replace(/\r/g, "%0D").replace(/"/g, "%22");
         const normalizeLinefeeds = (value) => value.replace(/\r?\n|\r/g, "\r\n");
         const blobParts = [];
         const rn = new Uint8Array([13, 10]);
@@ -16244,9 +16244,9 @@ var require_cookies = __commonJS({
       webidl.argumentLengthCheck(arguments, 2, "setCookie");
       webidl.brandCheck(headers, Headers, { strict: false });
       cookie = webidl.converters.Cookie(cookie);
-      const str8 = stringify3(cookie);
-      if (str8) {
-        headers.append("Set-Cookie", str8);
+      const str7 = stringify3(cookie);
+      if (str7) {
+        headers.append("Set-Cookie", str7);
       }
     }
     webidl.converters.DeleteCookieAttributes = webidl.dictionaryConverter([
@@ -19214,17 +19214,17 @@ function decodeEvent(raw2) {
     case "edit": {
       const from = num(raw2, "from");
       const to = num(raw2, "to");
-      const text12 = str(raw2, "text");
+      const text13 = str(raw2, "text");
       const cursor = num(raw2, "cursor");
       const len = num(raw2, "len");
-      if (sf === void 0 || id === void 0 || from === void 0 || to === void 0 || text12 === void 0 || cursor === void 0 || len === void 0) {
+      if (sf === void 0 || id === void 0 || from === void 0 || to === void 0 || text13 === void 0 || cursor === void 0 || len === void 0) {
         return unknown4();
       }
-      return { ev, sf, id, from, to, text: text12, cursor, len, raw: raw2 };
+      return { ev, sf, id, from, to, text: text13, cursor, len, raw: raw2 };
     }
     case "send": {
-      const text12 = str(raw2, "text");
-      return sf !== void 0 && id !== void 0 && text12 !== void 0 ? { ev, sf, id, text: text12, raw: raw2 } : unknown4();
+      const text13 = str(raw2, "text");
+      return sf !== void 0 && id !== void 0 && text13 !== void 0 ? { ev, sf, id, text: text13, raw: raw2 } : unknown4();
     }
     case "error":
       return defined({ ev, msg: str(raw2, "msg") ?? "", raw: raw2 }, { sf, s: num(raw2, "s"), op: num(raw2, "op"), sheet: str(raw2, "sheet"), id });
@@ -19545,8 +19545,8 @@ function modsOf(param) {
     meta: (bits & 8) !== 0
   };
 }
-function key(name, mods2, text12) {
-  return text12 === void 0 ? { name, ...mods2 } : { name, text: text12, ...mods2 };
+function key(name, mods2, text13) {
+  return text13 === void 0 ? { name, ...mods2 } : { name, text: text13, ...mods2 };
 }
 var LETTER_KEYS = {
   A: "up",
@@ -20120,21 +20120,21 @@ function createNode(kind, input2, children3) {
     if (run6.length > 0)
       Object.assign(props, textProps(run6));
   } else if (kind === "el") {
-    let text12 = "";
+    let text13 = "";
     for (const part of parts3) {
       if (part instanceof Span)
         throw new TypeError("el takes no spans; use html.span");
       if (typeof part === "string") {
         if (nodes2.length === 0)
-          text12 += part;
+          text13 += part;
         else
           nodes2.push(new Node("el", { tag: "span", text: part }));
       } else {
         nodes2.push(part);
       }
     }
-    if (text12 !== "")
-      props["text"] = text12;
+    if (text13 !== "")
+      props["text"] = text13;
   } else {
     nodes2 = containerChildren(parts3);
   }
@@ -20193,8 +20193,8 @@ function jsx(type, props, key2) {
 var jsxs = jsx;
 
 // node_modules/@stencil-hq/tern/dist/css.js
-function css(strings3, ...values) {
-  return String.raw(strings3, ...values);
+function css(strings4, ...values) {
+  return String.raw(strings4, ...values);
 }
 
 // node_modules/@stencil-hq/tern/dist/reconcile.js
@@ -20338,11 +20338,11 @@ var View = class _View {
   }
 };
 function diff(old, now, ops) {
-  const text12 = isTextKind(now.kind);
+  const text13 = isTextKind(now.kind);
   const set = {};
   let changed = false;
   for (const key2 in now.props) {
-    if (text12 && key2 === "text")
+    if (text13 && key2 === "text")
       continue;
     const value = now.props[key2];
     if (value === void 0 || jsonEqual(old.props[key2], value))
@@ -20351,14 +20351,14 @@ function diff(old, now, ops) {
     changed = true;
   }
   for (const key2 in old.props) {
-    if (!(text12 && key2 === "text") && !(key2 in now.props)) {
+    if (!(text13 && key2 === "text") && !(key2 in now.props)) {
       set[key2] = null;
       changed = true;
     }
   }
   if (changed)
     ops.push(["set", now.id, set]);
-  if (text12) {
+  if (text13) {
     const before = old.props["text"];
     const after = now.props["text"];
     if (!jsonEqual(before, after)) {
@@ -21382,10 +21382,10 @@ var JsonRpcRequestChannel = class {
    * on it too (mirror it, record seq, …) or `null` when the text was not
    * JSON or not a JSON object (`null`, a scalar).
    */
-  handleFrame(text12) {
+  handleFrame(text13) {
     let frame;
     try {
-      frame = JSON.parse(text12);
+      frame = JSON.parse(text13);
     } catch {
       return null;
     }
@@ -21773,7 +21773,7 @@ var canonicalEn = {
     queue: {
       unconfirmedPrefix: "[unconfirmed \xB7 Alt+K retry] ",
       // {0}=admission status identifier (unknown; queued rows render plain), {1}=input text
-      serverRow: (status, text12) => `[${status}] ${text12}`,
+      serverRow: (status, text13) => `[${status}] ${text13}`,
       discardFailed: (message) => `discard failed: ${message}`,
       journalCleanupFailed: (message) => `input delivered; journal cleanup failed: ${message}`,
       notSavedQueueKept: (message) => `input not saved: ${message} \u2014 queue kept`,
@@ -23201,7 +23201,7 @@ Use /rollback <N> --all to restore those too.`,
     },
     ownedBy: (surface) => `owned by ${surface}`,
     // {0}=text, {1}=hint from the gateway
-    withHint: (text12, hint) => `${text12} \u2014 ${hint}`,
+    withHint: (text13, hint) => `${text13} \u2014 ${hint}`,
     notStarted: (reason) => `wake: not started \u2014 ${reason}`,
     forPhrase: (phrase) => `for \u201C${phrase}\u201D`,
     // {0}=detail suffix (" for “phrase” · provider · enabled in config" or empty)
@@ -23556,7 +23556,7 @@ var subscriptionEn = {
 var userMessagesEn = {
   userMessages: {
     /** `{0}` = the (already clipped) raw detail text. */
-    details: (text12) => `Details: ${text12}`,
+    details: (text13) => `Details: ${text13}`,
     backend: {
       restarting: "Hermes stopped unexpectedly \u2014 restarting and reopening your chat (the reply in progress was lost).",
       restartingActivity: "Hermes stopped unexpectedly \xB7 restarting\u2026",
@@ -24368,21 +24368,21 @@ var GatewayClient = class extends EventEmitter {
     this.publish(ev);
   }
   handleWebSocketFrame(raw2) {
-    const text12 = wireFrameText(raw2);
-    if (!text12) {
+    const text13 = wireFrameText(raw2);
+    if (!text13) {
       return;
     }
-    const frame = this.channel.handleFrame(text12);
+    const frame = this.channel.handleFrame(text13);
     if (!frame) {
-      this.protocolError("malformed websocket frame", text12, "(empty frame)");
+      this.protocolError("malformed websocket frame", text13, "(empty frame)");
       return;
     }
     if (frame.method === "event") {
-      this.mirrorEventToSidecar(text12);
+      this.mirrorEventToSidecar(text13);
     }
   }
-  protocolError(what, text12, emptyLabel) {
-    const preview5 = text12.trim().slice(0, MAX_LOG_PREVIEW) || emptyLabel;
+  protocolError(what, text13, emptyLabel) {
+    const preview5 = text13.trim().slice(0, MAX_LOG_PREVIEW) || emptyLabel;
     this.pushLog(`[protocol] ${what}: ${preview5}`);
     this.publish({ type: "gateway.protocol_error", payload: { preview: preview5 } });
   }
@@ -24443,7 +24443,7 @@ var GatewayClient = class extends EventEmitter {
       const ws = new WebSocketCtor(attachUrl, protocols);
       let settled2 = false;
       this.ws = ws;
-      this.channel.attach({ send: (text12) => ws.send(text12) });
+      this.channel.attach({ send: (text13) => ws.send(text13) });
       const connectPromise = new Promise((resolve7, reject) => {
         ws.addEventListener(
           "open",
@@ -24743,10 +24743,10 @@ function sessionHost(cx) {
     busy: Boolean(cx.activity.busy),
     // A steer that fell back to the queue: steering carries no images.
     canonical: cx.gw.isCanonical,
-    enqueue: (text12) => cx.router.behind({ images: [], kind: "app", text: text12 }),
+    enqueue: (text13) => cx.router.behind({ images: [], kind: "app", text: text13 }),
     gw: cx.gw,
-    notice: (text12, tone) => {
-      cx.transcript.notice(text12, tone);
+    notice: (text13, tone) => {
+      cx.transcript.notice(text13, tone);
       cx.changed();
     },
     // The shared gateway (the one /branch runs on) answers a resume with one id for both kinds.
@@ -24754,8 +24754,8 @@ function sessionHost(cx) {
       await cx.life.resume(id);
       return durable(cx.state.ref) === id;
     },
-    panel: (title, text12) => {
-      cx.transcript.panel(title, text12);
+    panel: (title, text13) => {
+      cx.transcript.panel(title, text13);
       cx.changed();
     },
     compressing: (state) => {
@@ -24775,21 +24775,21 @@ function sessionHost(cx) {
         await cx.life.reload(sid);
       }
     },
-    send: (text12) => cx.router.send({ images: [], kind: "app", text: text12 }),
+    send: (text13) => cx.router.send({ images: [], kind: "app", text: text13 }),
     sid,
     stale: () => !ticket.isCurrent(),
-    steered: (text12) => {
-      cx.transcript.steer(text12);
+    steered: (text13) => {
+      cx.transcript.steer(text13);
       cx.changed();
     },
     // /queue: behind the turn whatever busy_input_mode says.
-    submit: (text12) => cx.submit(text12)
+    submit: (text13) => cx.submit(text13)
   };
 }
 
 // node_modules/@hermes/shared/src/slash.ts
 var SLASH_COMMAND_RE = /^\/[^\s/]*(?:\s|$)/;
-var looksLikeSlashCommand = (text12) => SLASH_COMMAND_RE.test(text12);
+var looksLikeSlashCommand = (text13) => SLASH_COMMAND_RE.test(text13);
 var str2 = (value) => typeof value === "string" ? value : void 0;
 function parseCommandDispatch(raw2) {
   if (!raw2 || typeof raw2 !== "object" || Array.isArray(raw2)) {
@@ -24815,13 +24815,13 @@ function parseCommandDispatch(raw2) {
 
 // src/clipboard.ts
 import { spawn } from "node:child_process";
-function copyToClipboard(text12, env2 = process.env) {
-  process.stdout.write(`\x1B]52;c;${Buffer.from(text12).toString("base64")}\x07`);
+function copyToClipboard(text13, env2 = process.env) {
+  process.stdout.write(`\x1B]52;c;${Buffer.from(text13).toString("base64")}\x07`);
   if (process.platform === "darwin" && !env2.SSH_CONNECTION && !env2.SSH_TTY) {
     const child = spawn("pbcopy", [], { stdio: ["pipe", "ignore", "ignore"] });
     child.on("error", () => {
     });
-    child.stdin.end(text12);
+    child.stdin.end(text13);
   }
 }
 
@@ -24907,52 +24907,52 @@ function modelPayload(arg) {
 }
 
 // src/controlCommands.ts
-var preview = (text12) => text12.length > 60 ? `${text12.slice(0, 57)}\u2026` : text12;
+var preview = (text13) => text13.length > 60 ? `${text13.slice(0, 57)}\u2026` : text13;
 async function interruptTurn(gw2, sid) {
   const execution_generation = await currentGeneration(gw2, sid);
   await rpc(gw2, "session.interrupt", { session_id: sid, execution_generation });
 }
-async function steerTurn(gw2, sid, text12) {
+async function steerTurn(gw2, sid, text13) {
   try {
     const execution_generation = await currentGeneration(gw2, sid);
-    const r = await rpc(gw2, "session.steer", { session_id: sid, execution_generation, text: text12 });
+    const r = await rpc(gw2, "session.steer", { session_id: sid, execution_generation, text: text13 });
     return r?.status === "queued" ? { ok: true } : { ok: false };
   } catch (e) {
     return errorText(e).includes("stale_generation") ? { ok: false } : { error: errorText(e), ok: false };
   }
 }
-async function redirectTurn(gw2, sid, text12) {
+async function redirectTurn(gw2, sid, text13) {
   try {
     const execution_generation = await currentGeneration(gw2, sid);
-    const r = await rpc(gw2, "session.redirect", { session_id: sid, execution_generation, text: text12 });
+    const r = await rpc(gw2, "session.redirect", { session_id: sid, execution_generation, text: text13 });
     return r?.status === "redirected" || r?.status === "queued" ? { ok: true } : { ok: false };
   } catch (e) {
     return errorText(e).includes("stale_generation") ? { ok: false } : { error: errorText(e), ok: false };
   }
 }
-async function steer(host, text12) {
-  if (!text12) {
+async function steer(host, text13) {
+  if (!text13) {
     return host.notice("Usage: /steer <guidance for the active turn>", "warning");
   }
   if (!host.busy || !host.sid) {
-    host.enqueue(text12);
-    return host.notice(`No active turn \u2014 queued as next prompt: ${preview(text12)}`);
+    host.enqueue(text13);
+    return host.notice(`No active turn \u2014 queued as next prompt: ${preview(text13)}`);
   }
-  const r = await steerTurn(host.gw, host.sid, text12);
+  const r = await steerTurn(host.gw, host.sid, text13);
   if (r.ok) {
-    return host.steered ? host.steered(text12) : host.notice(`Steer queued for the active turn: ${preview(text12)}`);
+    return host.steered ? host.steered(text13) : host.notice(`Steer queued for the active turn: ${preview(text13)}`);
   }
   if (r.error) {
     return host.notice(`/steer failed: ${r.error}`, "error");
   }
-  host.enqueue(text12);
+  host.enqueue(text13);
   host.notice("Turn ended before the steer landed \u2014 queued as next prompt", "warning");
 }
-function queue(host, text12) {
-  if (!text12) {
+function queue(host, text13) {
+  if (!text13) {
     return host.notice(`${host.queued} queued message${host.queued === 1 ? "" : "s"}`);
   }
-  host.submit(text12);
+  host.submit(text13);
 }
 async function stop(host) {
   if (!host.sid) {
@@ -24995,8 +24995,8 @@ async function tools(host, arg) {
     host.notice(`/tools failed: ${errorText(e)}`, "error");
   }
 }
-async function side(host, text12, kind) {
-  if (!text12) {
+async function side(host, text13, kind) {
+  if (!text13) {
     return host.notice(kind === "bg" ? "Usage: /bg <prompt>" : "Usage: /btw <question>", "warning");
   }
   if (!host.sid) {
@@ -25005,11 +25005,11 @@ async function side(host, text12, kind) {
   try {
     const r = await rpc(host.gw, kind === "bg" ? "prompt.background" : "prompt.btw", {
       session_id: host.sid,
-      text: text12
+      text: text13
     });
     if (r?.task_id) {
       host.notice(
-        kind === "bg" ? `Background task ${r.task_id} started: ${preview(text12)}` : `btw ${r.task_id}: answering from a snapshot of this conversation`
+        kind === "bg" ? `Background task ${r.task_id} started: ${preview(text13)}` : `btw ${r.task_id}: answering from a snapshot of this conversation`
       );
     }
   } catch (e) {
@@ -25119,9 +25119,9 @@ function record(v) {
   }
   return v && typeof v === "object" && !Array.isArray(v) ? v : void 0;
 }
-function parseJson(text12) {
+function parseJson(text13) {
   try {
-    return JSON.parse(text12);
+    return JSON.parse(text13);
   } catch {
     return void 0;
   }
@@ -25131,9 +25131,9 @@ function parseJson(text12) {
 var LINE = /^(\d{2}:\d{2}:\d{2}) (\S+)\s*\| (.*)$/;
 var TOOL = /^-> ([^(]+)\((.*)\)$/;
 var RESULT = /^(\S+) (ok|ERROR)(?: ([\d.]+)s)?: ?(.*)$/;
-function parseLiveLog(text12) {
+function parseLiveLog(text13) {
   const log = { entries: [] };
-  for (const raw2 of text12.split("\n")) {
+  for (const raw2 of text13.split("\n")) {
     const m = LINE.exec(raw2);
     if (!m) {
       continue;
@@ -25284,12 +25284,12 @@ var Agents = class {
     }
   }
   /** Queues steering text into a running agent; the owner answers `queued` or `rejected`. */
-  async steer(a2, text12) {
+  async steer(a2, text13) {
     const sid = this.#host.sid;
     if (!sid) {
       return false;
     }
-    const r = await rpc(this.#host.gw, "subagent.steer", { session_id: sid, subagent_id: a2.id, text: text12 });
+    const r = await rpc(this.#host.gw, "subagent.steer", { session_id: sid, subagent_id: a2.id, text: text13 });
     return r?.status === "queued";
   }
   /** Interrupts a running agent; its partial result still returns to the parent. */
@@ -25312,8 +25312,8 @@ var Agents = class {
    * Applies an async-delegation completion (the model text of its `message.start`,
    * tools/process_registry_notifications.py) to the rows whose log never told their outcome.
    */
-  settle(text12) {
-    const done = completionOutcomes(text12);
+  settle(text13) {
+    const done = completionOutcomes(text13);
     if (!done) {
       return;
     }
@@ -25549,7 +25549,7 @@ var Agents = class {
   }
   /** Reads `a`'s log from disk (else its tail over the gateway); true when it changed. */
   async #readLog(a2, force = false) {
-    let text12;
+    let text13;
     if (this.#readableLog(a2)) {
       try {
         const path2 = a2.logPath;
@@ -25559,29 +25559,29 @@ var Agents = class {
         }
         this.#sizes.set(path2, size);
         const bytes = await readFile(path2);
-        text12 = bytes.subarray(Math.max(0, bytes.length - MAX_LOG_BYTES)).toString("utf8");
+        text13 = bytes.subarray(Math.max(0, bytes.length - MAX_LOG_BYTES)).toString("utf8");
       } catch {
         this.#unreadable.add(a2.logPath);
       }
     }
-    if (text12 === void 0 && this.#listed.has(a2.id) && this.#host.sid) {
+    if (text13 === void 0 && this.#listed.has(a2.id) && this.#host.sid) {
       try {
         const r = await rpc(this.#host.gw, "subagent.tail", {
           session_id: this.#host.sid,
           subagent_id: a2.id
         });
         if (r?.available && typeof r.text === "string") {
-          text12 = r.truncated ? mergeTail(this.#tails.get(a2.id) ?? "", r.text) : r.text;
-          this.#tails.set(a2.id, text12);
+          text13 = r.truncated ? mergeTail(this.#tails.get(a2.id) ?? "", r.text) : r.text;
+          this.#tails.set(a2.id, text13);
         }
       } catch {
-        text12 = void 0;
+        text13 = void 0;
       }
     }
-    if (text12 === void 0) {
+    if (text13 === void 0) {
       return false;
     }
-    applyLog(a2, parseLiveLog(text12));
+    applyLog(a2, parseLiveLog(text13));
     return true;
   }
   /** Marks the card showing `a` changed (#poll and #readLog changed its row), and tells when it ended. */
@@ -25616,19 +25616,19 @@ function mergeTail(seen, tail) {
   merged ??= seen + (seen && !seen.endsWith("\n") ? "\n" : "") + tail.slice(tail.indexOf("\n") + 1);
   return merged.length > MAX_LOG_BYTES ? merged.slice(merged.indexOf("\n", merged.length - MAX_LOG_BYTES) + 1) : merged;
 }
-function completionOutcomes(text12) {
-  const head2 = /^\[ASYNC DELEGATION (BATCH COMPLETE|COMPLETE|TASK FAILED) — ([^\],]+)(?:, task (\d+)\/\d+)?\]/.exec(text12.trim());
+function completionOutcomes(text13) {
+  const head2 = /^\[ASYNC DELEGATION (BATCH COMPLETE|COMPLETE|TASK FAILED) — ([^\],]+)(?:, task (\d+)\/\d+)?\]/.exec(text13.trim());
   if (!head2) {
     return void 0;
   }
   const [, kind, delegationId, task] = head2;
   const outcomes = /* @__PURE__ */ new Map();
   if (kind === "BATCH COMPLETE") {
-    for (const m of text12.matchAll(/^--- \S+ TASK (\d+)\/\d+.*\(status=([^,)\s]+)/gm)) {
+    for (const m of text13.matchAll(/^--- \S+ TASK (\d+)\/\d+.*\(status=([^,)\s]+)/gm)) {
       outcomes.set(Number(m[1]) - 1, m[2]);
     }
   } else {
-    const status = /^Status: (\S+)/m.exec(text12)?.[1];
+    const status = /^Status: (\S+)/m.exec(text13)?.[1];
     if (status) {
       outcomes.set(kind === "TASK FAILED" ? Number(task) - 1 : 0, status);
     }
@@ -25673,8 +25673,8 @@ async function manifestLog(delegationId, index2, env2 = process.env) {
   const home = env2.HERMES_HOME || join2(homedir2(), ".hermes");
   for (const root7 of [join2(home, "delegation_cache", "live"), join2(home, "cache", "delegation", "live")]) {
     try {
-      const text12 = await readFile(join2(root7, delegationId, "manifest.json"), "utf8");
-      const tasks = record(text12.replace(/^\uFEFF/, ""))?.tasks;
+      const text13 = await readFile(join2(root7, delegationId, "manifest.json"), "utf8");
+      const tasks = record(text13.replace(/^\uFEFF/, ""))?.tasks;
       const log = Array.isArray(tasks) ? record(tasks.find((t2) => record(t2)?.index === index2))?.log : void 0;
       if (typeof log === "string" && log) {
         return log;
@@ -25785,13 +25785,13 @@ function rank(items, query, textOf2, { scattered = true } = {}) {
   }
   const scored = [];
   items.forEach((item3, index2) => {
-    const text12 = textOf2(item3).toLowerCase();
+    const text13 = textOf2(item3).toLowerCase();
     const positions = /* @__PURE__ */ new Set();
     let score = 0;
     for (const word of words3) {
-      const at = text12.indexOf(word);
+      const at = text13.indexOf(word);
       if (at >= 0) {
-        const boundary = at === 0 || /[\s/_.:-]/.test(text12[at - 1] ?? "");
+        const boundary = at === 0 || /[\s/_.:-]/.test(text13[at - 1] ?? "");
         score += 100 - Math.min(at, 50) + (boundary ? 25 : 0);
         for (let i = at; i < at + word.length; i++) {
           positions.add(i);
@@ -25803,7 +25803,7 @@ function rank(items, query, textOf2, { scattered = true } = {}) {
       }
       let from = 0;
       for (const ch of word) {
-        const i = text12.indexOf(ch, from);
+        const i = text13.indexOf(ch, from);
         if (i < 0) {
           return;
         }
@@ -25889,9 +25889,9 @@ function reduceHub(state, action, agents2) {
     case "steerCancel":
       return { state: state.ask.kind === "steering" ? { ...state, ask: NONE } : state };
     case "steerSend": {
-      const text12 = state.ask.kind === "steering" ? state.ask.text.trim() : "";
+      const text13 = state.ask.kind === "steering" ? state.ask.text.trim() : "";
       const next2 = { ...state, ask: state.ask.kind === "steering" ? NONE : state.ask };
-      return a2 && text12 ? { effect: { agent: a2, kind: "steer", text: text12 }, state: next2 } : { state: next2 };
+      return a2 && text13 ? { effect: { agent: a2, kind: "steer", text: text13 }, state: next2 } : { state: next2 };
     }
     case "stop":
       return running(a2) ? { state: { ...state, ask: { kind: "confirmStop" } } } : { state };
@@ -25912,8 +25912,8 @@ function hubKey(state, k, agents2) {
     if (k.name === "enter") {
       return { type: "steerSend" };
     }
-    const text12 = editQuery(k, ask.text);
-    return text12 === void 0 ? void 0 : { text: text12, type: "steerEdit" };
+    const text13 = editQuery(k, ask.text);
+    return text13 === void 0 ? void 0 : { text: text13, type: "steerEdit" };
   }
   if (ask.kind === "confirmStop") {
     return k.name === "enter" || k.name === "y" ? { type: "stopConfirm" } : k.name === "escape" || k.name === "n" ? { type: "stopCancel" } : void 0;
@@ -25971,15 +25971,15 @@ var HUB_CLICKS = {
 function nonEmpty(v) {
   return typeof v === "string" && v ? v : void 0;
 }
-function clip(text12, o) {
-  if (text12.length <= o.max) {
-    return text12;
+function clip(text13, o) {
+  if (text13.length <= o.max) {
+    return text13;
   }
-  return o.mark === "line" ? `${text12.slice(0, o.max)}
-\u2026` : `${text12.slice(0, o.max - 1)}\u2026`;
+  return o.mark === "line" ? `${text13.slice(0, o.max)}
+\u2026` : `${text13.slice(0, o.max - 1)}\u2026`;
 }
-function flat(text12) {
-  return text12.replace(/\s+/g, " ").trim();
+function flat(text13) {
+  return text13.replace(/\s+/g, " ").trim();
 }
 function plural(n, one5, many = `${one5}s`) {
   return `${n} ${n === 1 ? one5 : many}`;
@@ -26366,8 +26366,8 @@ function briefOf(call, index2) {
   const d = detailOf(call);
   return d.tool === "delegate_task" ? d.briefs[index2] ?? d.context : void 0;
 }
-function briefNode(head2, text12) {
-  return /* @__PURE__ */ jsx("section", { collapsed: true, collapsible: true, head: head2, role: "hermes.task.brief", children: /* @__PURE__ */ jsx("md", { children: text12 }, "md") }, "brief");
+function briefNode(head2, text13) {
+  return /* @__PURE__ */ jsx("section", { collapsed: true, collapsible: true, head: head2, role: "hermes.task.brief", children: /* @__PURE__ */ jsx("md", { children: text13 }, "md") }, "brief");
 }
 
 // src/bridge.ts
@@ -26402,8 +26402,8 @@ function appTitle(slug) {
 }
 function actionPhrase(tool, app2 = "") {
   const prefix2 = `${app2.replace(/-/g, "_").toUpperCase()}_`;
-  const text12 = app2 && tool.toUpperCase().startsWith(prefix2) ? tool.slice(prefix2.length) : tool;
-  return text12.split(/[-_\s]+/).filter(Boolean).join(" ").toLowerCase();
+  const text13 = app2 && tool.toUpperCase().startsWith(prefix2) ? tool.slice(prefix2.length) : tool;
+  return text13.split(/[-_\s]+/).filter(Boolean).join(" ").toLowerCase();
 }
 function appOf(name, args) {
   const [prefix2, connector, ...tool] = name.split("__");
@@ -26697,7 +26697,7 @@ function toneStyle(tone) {
   }
 }
 var sp = (t2, s2) => s2 ? { s: s2, t: t2 } : { t: t2 };
-var plain = (text12) => text12.replace(/\s+/g, " ").trim();
+var plain = (text13) => text13.replace(/\s+/g, " ").trim();
 var fraction = (value, max) => !(max > 0) || !Number.isFinite(value) ? 0 : Math.min(1, Math.max(0, value / max));
 var extra = (props) => props;
 function glance(view) {
@@ -27149,8 +27149,8 @@ var CMDLETS = {
   "start-process": "start a process",
   "stop-process": "stop a process"
 };
-function powershellScript(text12) {
-  const used = [...new Set([...text12.matchAll(/\b([A-Z][a-z]+-[A-Z][A-Za-z]+)\b/g)].map((m) => m[1].toLowerCase()))];
+function powershellScript(text13) {
+  const used = [...new Set([...text13.matchAll(/\b([A-Z][a-z]+-[A-Z][A-Za-z]+)\b/g)].map((m) => m[1].toLowerCase()))];
   const said = [...new Set(used.map((c) => CMDLETS[c] ?? (c.startsWith("get-") ? `read ${c.slice(4)}` : void 0)).filter(Boolean))];
   return said.length ? said.slice(0, 2).join(" and ") : void 0;
 }
@@ -27206,12 +27206,12 @@ function segments(line) {
 var SETUP = /* @__PURE__ */ new Set(["cd", "export", "set", "source", ".", "true", "clear", "pushd", "popd"]);
 var FILTERS = /* @__PURE__ */ new Set(["head", "tail", "grep", "sort", "uniq", "wc", "cut", "tr", "awk", "jq", "tee", "column", "less", "cat", "xargs", "sed"]);
 function describeCommand(command) {
-  const text12 = command.trim();
-  if (!text12) {
+  const text13 = command.trim();
+  if (!text13) {
     return "Run a command";
   }
   const docs = [];
-  const line = text12.replace(/<<-?\s*['"]?(\w+)['"]?([^\n]*)\n([\s\S]*?)\n\s*\1\s*(?=\n|$)/g, (_m, _tag, rest, body) => {
+  const line = text13.replace(/<<-?\s*['"]?(\w+)['"]?([^\n]*)\n([\s\S]*?)\n\s*\1\s*(?=\n|$)/g, (_m, _tag, rest, body) => {
     docs.push(body);
     return rest;
   });
@@ -27243,8 +27243,8 @@ function commandLine(command, n = 96) {
   const flat3 = command.replace(/<<-?\s*['"]?(\w+)['"]?[\s\S]*?\n\s*\1\s*(?=\n|$)/g, "<<'$1' \u2026").replace(/\s+/g, " ").trim();
   return clip(flat3, { max: n });
 }
-function oneLine(text12) {
-  return text12.replace(/\s+/g, " ").trim();
+function oneLine(text13) {
+  return text13.replace(/\s+/g, " ").trim();
 }
 var TERN_ENV = /^\s*(?:export (?:TERN_[A-Z_]+=(?:'[^']*'|"[^"]*"|[^\s;]+) ?)+; ?)?(?:unset (?:TERN_[A-Z_]+ ?)+; ?)?/;
 function withoutTernEnv(command) {
@@ -27355,11 +27355,11 @@ function genericCard(call, d, look) {
   };
 }
 function genericBody(call) {
-  const text12 = call.resultText ?? (call.result === void 0 ? void 0 : pretty(call.result));
-  if (!text12 || call.status === "running") {
+  const text13 = call.resultText ?? (call.result === void 0 ? void 0 : pretty(call.result));
+  if (!text13 || call.status === "running") {
     return [];
   }
-  return [/* @__PURE__ */ jsx("code", { lang: /^\s*[[{]/.test(text12) ? "json" : "text", text: clip(text12, { mark: "line", max: 4e3 }) }, "out")];
+  return [/* @__PURE__ */ jsx("code", { lang: /^\s*[[{]/.test(text13) ? "json" : "text", text: clip(text13, { mark: "line", max: 4e3 }) }, "out")];
 }
 function errorOf(call) {
   const result = resultOf(call);
@@ -27453,10 +27453,10 @@ function askCard(call, d) {
     title: "Ask"
   };
 }
-function answerRow(key2, text12, picked) {
+function answerRow(key2, text13, picked) {
   return /* @__PURE__ */ jsxs("row", { role: picked ? "omp.tool.answer" : "omp.tool.answer.off", children: [
     /* @__PURE__ */ jsx("text", { spans: [picked ? { s: "success", t: "\u2713" } : { s: "dim", t: "\xB7" }] }, "c"),
-    /* @__PURE__ */ jsx("text", { spans: [{ t: text12 }] }, "t")
+    /* @__PURE__ */ jsx("text", { spans: [{ t: text13 }] }, "t")
   ] }, key2);
 }
 
@@ -27780,12 +27780,12 @@ function editCard(call, d) {
     title: write ? "Write" : "Edit"
   };
   if (write && content5 && (!diff2 || diff2.startsWith("@@ -0,0 "))) {
-    const text12 = content5.replace(/\n$/, "");
-    const lines = text12.split("\n").length;
+    const text13 = content5.replace(/\n$/, "");
+    const lines = text13.split("\n").length;
     return {
       ...head2,
       badges: diff2 ? [{ text: "new file", tone: "success" }] : void 0,
-      body: [/* @__PURE__ */ jsx("code", { lang: lang ?? "text", numbers: true, text: text12 }, "code")],
+      body: [/* @__PURE__ */ jsx("code", { lang: lang ?? "text", numbers: true, text: text13 }, "code")],
       folded: true,
       meta: [plural(lines, "line")],
       preview: { lines: 8 }
@@ -27832,8 +27832,8 @@ function evalCard(call, d) {
     title: firstLine(code7)?.startsWith("#") ? firstLine(code7)?.replace(/^#+\s*/, "") ?? "Eval" : "Eval"
   };
 }
-function firstLine(text12) {
-  return text12?.split("\n").find((l) => l.trim())?.trim();
+function firstLine(text13) {
+  return text13?.split("\n").find((l) => l.trim())?.trim();
 }
 
 // src/transcript/todos.ts
@@ -29244,8 +29244,8 @@ var FileTap = class {
     const start = Math.min(Math.max(from, this.#start), end);
     return { end, open: this.#open, start, text: this.#text.slice(start - this.#start) };
   }
-  #append(text12) {
-    this.#text += text12;
+  #append(text13) {
+    this.#text += text13;
     const excess = this.#text.length - CAPACITY;
     if (excess > CAPACITY / 4) {
       this.#text = this.#text.slice(excess);
@@ -29292,26 +29292,26 @@ function formatNumber(value, unit, digits) {
   }
   const scaled = unitStep(value, unit);
   if (scaled) {
-    const text13 = formatNumber(value / scaled.step, scaled.unit, digits ?? (Math.abs(value / scaled.step) >= 100 ? 0 : 1));
-    return digits === void 0 ? text13.replace(/\.0(?= )/, "") : text13;
+    const text14 = formatNumber(value / scaled.step, scaled.unit, digits ?? (Math.abs(value / scaled.step) >= 100 ? 0 : 1));
+    return digits === void 0 ? text14.replace(/\.0(?= )/, "") : text14;
   }
   const magnitude = Math.abs(value);
-  let text12;
+  let text13;
   if (magnitude >= COMPACT_FROM) {
     for (const [step, suffix] of COMPACT_STEPS) {
       if (magnitude < step) {
         continue;
       }
       const scaled2 = value / step;
-      text12 = `${scaled2.toFixed(digits ?? (Math.abs(scaled2) >= 100 ? 0 : 1))}${suffix}`;
+      text13 = `${scaled2.toFixed(digits ?? (Math.abs(scaled2) >= 100 ? 0 : 1))}${suffix}`;
       break;
     }
   }
-  text12 ??= Number.isInteger(value) && digits === void 0 ? String(value) : value.toFixed(digits ?? (magnitude >= 100 ? 0 : magnitude >= 10 ? 1 : 2));
+  text13 ??= Number.isInteger(value) && digits === void 0 ? String(value) : value.toFixed(digits ?? (magnitude >= 100 ? 0 : magnitude >= 10 ? 1 : 2));
   if (!unit) {
-    return text12;
+    return text13;
   }
-  return unit === "%" ? `${text12}%` : `${text12} ${unit}`;
+  return unit === "%" ? `${text13}%` : `${text13} ${unit}`;
 }
 function formatTrend(first, last, better, unit) {
   const delta = last - first;
@@ -29342,7 +29342,7 @@ import { setFlagsFromString } from "node:v8";
 
 // src/processes/widgets/check.ts
 var FIELD_NAME = /^[a-z][a-z0-9_]{0,23}$/;
-var cut = (text12, max) => text12.length > max ? `${text12.slice(0, max - 1)}\u2026` : text12;
+var cut = (text13, max) => text13.length > max ? `${text13.slice(0, max - 1)}\u2026` : text13;
 function list2(value, where, errors, min, max) {
   if (!Array.isArray(value)) {
     errors.push(`${where}: expected an array`);
@@ -29379,8 +29379,8 @@ function str4(value, where, errors, o = {}) {
   return o.cut === void 0 ? trimmed : cut(unescape(trimmed), o.cut);
 }
 var ENTITIES = { "&#39;": "'", "&amp;": "&", "&gt;": ">", "&lt;": "<", "&quot;": '"' };
-function unescape(text12) {
-  return text12.replace(/&(?:amp|lt|gt|quot|#39);/g, (e) => ENTITIES[e] ?? e);
+function unescape(text13) {
+  return text13.replace(/&(?:amp|lt|gt|quot|#39);/g, (e) => ENTITIES[e] ?? e);
 }
 function num3(value, where, errors) {
   if (value === void 0 || value === null) {
@@ -29563,9 +29563,9 @@ var LineMatcher = class {
   /** Every hit: the line's index, the pattern's index and its captures by group position. */
   matchLines(lines) {
     const hits = [];
-    lines.forEach((text12, line) => {
+    lines.forEach((text13, line) => {
       this.#patterns.forEach((re2, pattern) => {
-        const m = re2.exec(text12);
+        const m = re2.exec(text13);
         if (m) {
           hits.push({ captures: this.#names[pattern].map((name) => m.groups?.[name]), line, pattern });
         }
@@ -29604,15 +29604,15 @@ function aggNeedsValue(agg) {
 }
 var NUMBER_PREFIX = /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?/;
 var SUFFIX_SCALE = { G: 1e9, K: 1e3, M: 1e6, k: 1e3 };
-function parseValue(text12) {
-  const first = text12.charCodeAt(0);
-  if (first >= 48 && first <= 57 && !/[xXbBoO]/.test(text12.charAt(1))) {
-    const plain4 = Number(text12);
+function parseValue(text13) {
+  const first = text13.charCodeAt(0);
+  if (first >= 48 && first <= 57 && !/[xXbBoO]/.test(text13.charAt(1))) {
+    const plain4 = Number(text13);
     if (Number.isFinite(plain4)) {
       return plain4;
     }
   }
-  const compact2 = text12.trim().replace(/[,_]/g, "");
+  const compact2 = text13.trim().replace(/[,_]/g, "");
   const match = NUMBER_PREFIX.exec(compact2);
   if (!match) {
     return Number.NaN;
@@ -29643,8 +29643,8 @@ function validateSpec(value, samples, brief) {
 var WRITTEN_NUMBER = /\d[\d,_]*(?:\.\d+)?[kKMG]?/g;
 function checkStatedNumbers(spec, samples, brief, errors) {
   const stated = /* @__PURE__ */ new Set();
-  const collect = (text12) => {
-    for (const m of text12.matchAll(WRITTEN_NUMBER)) {
+  const collect = (text13) => {
+    for (const m of text13.matchAll(WRITTEN_NUMBER)) {
       stated.add(parseValue(m[0]));
     }
   };
@@ -29704,10 +29704,10 @@ function dryRun(spec, matcher, samples, numeric, errors) {
 function fieldFeeds(spec) {
   const fields = /* @__PURE__ */ new Map();
   for (const rule of spec.rules) {
-    for (const { count, field, text: text12 } of ruleFields(rule)) {
+    for (const { count, field, text: text13 } of ruleFields(rule)) {
       const feed = fields.get(field) ?? { keyGroups: /* @__PURE__ */ new Set(), text: false, value: false };
-      feed.value ||= !text12 && !count;
-      feed.text ||= text12;
+      feed.value ||= !text13 && !count;
+      feed.text ||= text13;
       if (rule.key !== void 0) {
         feed.keyGroups.add(rule.key);
       }
@@ -29825,19 +29825,19 @@ function parseRule(value, where, errors) {
     return raw2;
   };
   const key2 = group("key");
-  const text12 = group("text");
+  const text13 = group("text");
   const count = value.count === void 0 ? void 0 : fieldName(value.count, `${where}.count`, errors);
   const scale = num3(value.scale, `${where}.scale`, errors);
   if (from === void 0 || match === void 0) {
     return void 0;
   }
   const groups = patternGroupNames(match);
-  const wrap4 = text12 !== void 0 && FIELD_NAME.test(text12) && groups.size === 0;
+  const wrap4 = text13 !== void 0 && FIELD_NAME.test(text13) && groups.size === 0;
   const keyGroup = key2 !== void 0 && groups.has(key2) ? key2 : void 0;
-  const textGroup = text12 !== void 0 && (wrap4 || groups.has(text12)) ? text12 : void 0;
+  const textGroup = text13 !== void 0 && (wrap4 || groups.has(text13)) ? text13 : void 0;
   return {
     from,
-    match: wrap4 ? `(?P<${text12}>${match})` : match,
+    match: wrap4 ? `(?P<${text13}>${match})` : match,
     ...keyGroup !== void 0 ? { key: keyGroup } : {},
     ...textGroup !== void 0 ? { text: textGroup } : {},
     ...count !== void 0 ? { count } : {},
@@ -29987,7 +29987,7 @@ var MAX_STAGE_CHARS = 200;
 var MAX_TEXT_CHARS = 200;
 var MAX_BAR_ITEMS = 16;
 var MAX_GRID_ITEMS = 48;
-var cut2 = (text12, max) => text12.length > max ? `${text12.slice(0, max - 1)}\u2026` : text12;
+var cut2 = (text13, max) => text13.length > max ? `${text13.slice(0, max - 1)}\u2026` : text13;
 var ESCAPES = /\x1b\[[0-?]*[ -/]*[@-~]|\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)|\x1b[@-_]|[\x00-\x08\x0b-\x1f\x7f]/g;
 function clean2(line) {
   return line.replace(/\t/g, " ").replace(ESCAPES, "");
@@ -30003,22 +30003,22 @@ var SourceLineReader = class {
   /** New complete lines; `flush` also ends the line in progress (the process exited). */
   read(flush) {
     const chunk = this.source.read(this.#cursor);
-    let text12 = chunk.text;
+    let text13 = chunk.text;
     if (chunk.start > this.#cursor) {
       this.#partial = "";
       this.#torn = true;
     }
     this.#cursor = Math.max(this.#cursor, chunk.end);
     if (this.#torn) {
-      const lineEnd2 = text12.search(/[\r\n]/);
+      const lineEnd2 = text13.search(/[\r\n]/);
       if (lineEnd2 === -1) {
-        text12 = "";
+        text13 = "";
       } else {
-        text12 = text12.slice(lineEnd2 + 1);
+        text13 = text13.slice(lineEnd2 + 1);
         this.#torn = false;
       }
     }
-    const raw2 = (this.#partial + text12).replace(/\r\n?/g, "\n").split("\n");
+    const raw2 = (this.#partial + text13).replace(/\r\n?/g, "\n").split("\n");
     this.#partial = (raw2.pop() ?? "").slice(0, MAX_LINE_CHARS * 2);
     if ((flush || !chunk.open) && this.#partial) {
       raw2.push(this.#partial);
@@ -30030,7 +30030,7 @@ var SourceLineReader = class {
 function emptySeries() {
   return { count: 0, first: 0, last: 0, max: -Infinity, min: Infinity, recent: [], ring: [], sum: 0, updatedAt: 0, values: 0 };
 }
-function pushMatch(s2, value, text12, line, t2) {
+function pushMatch(s2, value, text13, line, t2) {
   s2.count++;
   const bucket = s2.recent.at(-1);
   if (bucket?.t === t2) {
@@ -30058,8 +30058,8 @@ function pushMatch(s2, value, text12, line, t2) {
       s2.ring.splice(0, s2.ring.length - RING_POINTS);
     }
   }
-  if (text12) {
-    s2.text = text12;
+  if (text13) {
+    s2.text = text13;
   }
   s2.line = line;
   s2.updatedAt = t2;
@@ -30299,7 +30299,7 @@ var ChartRuntime = class {
       }
     }
   }
-  #push(name, key2, value, text12, line, t2) {
+  #push(name, key2, value, text13, line, t2) {
     let field = this.#fields.get(name);
     if (!field) {
       const all8 = emptySeries();
@@ -30311,9 +30311,9 @@ var ChartRuntime = class {
       series = emptySeries();
       field.keys.set(key2, series);
     }
-    pushMatch(series, value, text12, line, t2);
+    pushMatch(series, value, text13, line, t2);
     if (series !== field.all) {
-      pushMatch(field.all, value, text12, line, t2);
+      pushMatch(field.all, value, text13, line, t2);
     }
   }
   /** First and last lines per source, most active first, for the author and the dry run. */
@@ -30374,8 +30374,8 @@ var ChartRuntime = class {
   }
   #specStage() {
     const field = this.spec?.stage ? this.#fields.get(this.spec.stage) : void 0;
-    const text12 = (field?.all.text ?? field?.all.line)?.trim();
-    return text12 ? cut2(text12, MAX_STAGE_CHARS) : void 0;
+    const text13 = (field?.all.text ?? field?.all.line)?.trim();
+    return text13 ? cut2(text13, MAX_STAGE_CHARS) : void 0;
   }
   /** The last non-empty line of the most recently active source. */
   #lastLine() {
@@ -30398,13 +30398,13 @@ var ChartRuntime = class {
     const series = this.#series(ref.field, ref.key);
     const value = aggregate(series, ref.agg, now, this.startTime);
     const unit = ref.agg === "change" ? "%" : ref.unit;
-    const text12 = value === void 0 ? "\u2014" : formatNumber(value, unit, ref.digits);
+    const text13 = value === void 0 ? "\u2014" : formatNumber(value, unit, ref.digits);
     const trend = ref.better && TREND_AGGS.has(ref.agg) && series.values >= 2 ? formatTrend(series.first, series.last, ref.better, ref.unit) : void 0;
-    return { text: text12, value, ...trend ? { trend } : {} };
+    return { text: text13, value, ...trend ? { trend } : {} };
   }
   #headline(ref, now) {
-    const { text: text12, trend, value } = this.#value(ref, now);
-    return value === void 0 ? void 0 : { text: text12, ...ref.label ? { label: ref.label } : {}, ...trend ? { trend } : {} };
+    const { text: text13, trend, value } = this.#value(ref, now);
+    return value === void 0 ? void 0 : { text: text13, ...ref.label ? { label: ref.label } : {}, ...trend ? { trend } : {} };
   }
   #block(block, now) {
     switch (block.kind) {
@@ -30444,8 +30444,8 @@ var ChartRuntime = class {
       case "stat":
         return {
           items: block.items.map((item3) => {
-            const { text: text12, trend } = this.#value(item3, now);
-            return { label: item3.label, text: text12, ...trend ? { trend } : {} };
+            const { text: text13, trend } = this.#value(item3, now);
+            return { label: item3.label, text: text13, ...trend ? { trend } : {} };
           }),
           kind: "stat"
         };
@@ -30455,8 +30455,8 @@ var ChartRuntime = class {
         const labels = keyLabels(entries.map(([k]) => k));
         return {
           items: entries.map(([k, s2], i) => {
-            const text12 = cut2(s2.text ?? (s2.values ? formatNumber(s2.last) : s2.line?.trim() ?? ""), MAX_TEXT_CHARS);
-            return { label: labels[i] || k || block.label, text: text12, tone: gridTone(block.tones, text12) };
+            const text13 = cut2(s2.text ?? (s2.values ? formatNumber(s2.last) : s2.line?.trim() ?? ""), MAX_TEXT_CHARS);
+            return { label: labels[i] || k || block.label, text: text13, tone: gridTone(block.tones, text13) };
           }),
           kind: "grid",
           label: block.label
@@ -30530,8 +30530,8 @@ function keyLabels(keys2) {
   const short = keys2.map((k) => k.slice(k.lastIndexOf("/") + 1));
   return short.every(Boolean) && new Set(short).size === short.length ? short : keys2.slice();
 }
-function gridTone(tones, text12) {
-  const lower = text12.toLowerCase();
+function gridTone(tones, text13) {
+  const lower = text13.toLowerCase();
   for (const [status, tone] of Object.entries(tones)) {
     if (lower.includes(status.toLowerCase())) {
       return tone;
@@ -30598,8 +30598,8 @@ var OutputTap = class {
     const start = Math.min(Math.max(from, this.#start), end);
     return { end, open: this.#open, start, text: this.#text.slice(start - this.#start) };
   }
-  #append(text12) {
-    this.#text += text12;
+  #append(text13) {
+    this.#text += text13;
     const excess = this.#text.length - TAP_CAPACITY;
     if (excess > TAP_CAPACITY / 4) {
       this.#text = this.#text.slice(excess);
@@ -30817,9 +30817,9 @@ function lastLine(output) {
   const lines = output.replace(ESCAPES2, "").split("\n");
   for (let i = lines.length - 1; i >= 0; i--) {
     const draws = lines[i].split("\r");
-    const text12 = (draws.findLast((d) => d.trim()) ?? "").replace(/\s+/g, " ").trim();
-    if (text12) {
-      return text12;
+    const text13 = (draws.findLast((d) => d.trim()) ?? "").replace(/\s+/g, " ").trim();
+    if (text13) {
+      return text13;
     }
   }
   return "";
@@ -32231,8 +32231,8 @@ var CONTROL_CHARACTERS = /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/gu;
 function commandDisplayText(command) {
   return withVisibleControlCharacters(withoutShellWrapper(command));
 }
-function withVisibleControlCharacters(text12) {
-  return text12.replace(
+function withVisibleControlCharacters(text13) {
+  return text13.replace(
     CONTROL_CHARACTERS,
     (character) => character === "\x7F" ? "\u2421" : String.fromCharCode(9216 + character.charCodeAt(0))
   );
@@ -32532,9 +32532,9 @@ function openAgents(host, focus) {
   let state = initialHub(agents2(), focus?.id);
   const stopTicking = tickWhileOpen(host, TICK_MS);
   const close = () => host.close(overlay2);
-  const sendSteer = async (a2, text12) => {
+  const sendSteer = async (a2, text13) => {
     await reportError(host.transcript, async () => {
-      const queued = await host.agents.steer(a2, text12);
+      const queued = await host.agents.steer(a2, text13);
       host.transcript.notice(
         queued ? `Steering queued for ${agentName(a2)}.` : `${agentName(a2)} is not taking steering now.`,
         queued ? "info" : "warning"
@@ -32807,7 +32807,7 @@ function stepItem(e, id, a2) {
 function stepPreview(e, a2, brief) {
   if (e.kind !== "tool") {
     const head2 = { assistant: "Answer", kickoff: "Task", note: "Note", think: "Thinking" }[e.kind];
-    const text12 = e.kind === "kickoff" && a2.goal ? brief ? `${a2.goal}
+    const text13 = e.kind === "kickoff" && a2.goal ? brief ? `${a2.goal}
 
 ---
 
@@ -32815,7 +32815,7 @@ ${brief}` : a2.goal : e.text;
     return [
       /* @__PURE__ */ jsx("text", { role: "omp.hub.title", text: head2 }, "title"),
       /* @__PURE__ */ jsx("text", { spans: [{ s: "dim mono", t: e.at }] }, "at"),
-      /* @__PURE__ */ jsx("md", { text: text12, tone: e.kind === "think" ? "muted" : void 0 }, "body")
+      /* @__PURE__ */ jsx("md", { text: text13, tone: e.kind === "think" ? "muted" : void 0 }, "body")
     ];
   }
   return [
@@ -33469,9 +33469,9 @@ async function git(cwd, ...args) {
   return stdout;
 }
 var KIND = { A: "added", C: "copied", D: "deleted", M: "modified", R: "renamed", T: "modified" };
-function parseStatus(text12) {
+function parseStatus(text13) {
   const state = { ahead: 0, behind: 0, files: [] };
-  const records2 = text12.split("\0");
+  const records2 = text13.split("\0");
   for (let i = 0; i < records2.length; i++) {
     const line = records2[i];
     if (line.startsWith("# branch.head ")) {
@@ -33498,9 +33498,9 @@ function parseStatus(text12) {
   }
   return state;
 }
-function applyNumstat(files, text12) {
+function applyNumstat(files, text13) {
   const byPath = new Map(files.map((f) => [f.path, f]));
-  const records2 = text12.split("\0");
+  const records2 = text13.split("\0");
   for (let i = 0; i < records2.length; i++) {
     const [add, del2, ...rest] = records2[i].split("	");
     let path2 = rest.join("	");
@@ -33563,8 +33563,8 @@ function openChanges(host, focus) {
       return;
     }
     diffs.set(f.path, null);
-    void fileDiff(state.root, f).then((text12) => {
-      diffs.set(f.path, text12);
+    void fileDiff(state.root, f).then((text13) => {
+      diffs.set(f.path, text13);
       host.changed();
     });
   };
@@ -37992,12 +37992,12 @@ function linkReference(node3, _, state, info) {
   let subexit = state.enter("label");
   const tracker = state.createTracker(info);
   let value = tracker.move("[");
-  const text12 = state.containerPhrasing(node3, {
+  const text13 = state.containerPhrasing(node3, {
     before: value,
     after: "]",
     ...tracker.current()
   });
-  value += tracker.move(text12 + "][");
+  value += tracker.move(text13 + "][");
   subexit();
   const stack = state.stack;
   state.stack = stack.filter(function(d) {
@@ -38012,7 +38012,7 @@ function linkReference(node3, _, state, info) {
   subexit();
   state.stack = stack;
   exit3();
-  if (type === "full" || !text12 || text12 !== reference) {
+  if (type === "full" || !text13 || text13 !== reference) {
     value += tracker.move(reference + "]");
   } else if (type === "shortcut") {
     value = value.slice(0, -1);
@@ -47956,22 +47956,22 @@ var defaultTreeAdapter = {
       node3.parentNode = null;
     }
   },
-  insertText(parentNode, text12) {
+  insertText(parentNode, text13) {
     if (parentNode.childNodes.length > 0) {
       const prevNode = parentNode.childNodes[parentNode.childNodes.length - 1];
       if (defaultTreeAdapter.isTextNode(prevNode)) {
-        prevNode.value += text12;
+        prevNode.value += text13;
         return;
       }
     }
-    defaultTreeAdapter.appendChild(parentNode, defaultTreeAdapter.createTextNode(text12));
+    defaultTreeAdapter.appendChild(parentNode, defaultTreeAdapter.createTextNode(text13));
   },
-  insertTextBefore(parentNode, text12, referenceNode) {
+  insertTextBefore(parentNode, text13, referenceNode) {
     const prevNode = parentNode.childNodes[parentNode.childNodes.indexOf(referenceNode) - 1];
     if (prevNode && defaultTreeAdapter.isTextNode(prevNode)) {
-      prevNode.value += text12;
+      prevNode.value += text13;
     } else {
-      defaultTreeAdapter.insertBefore(parentNode, defaultTreeAdapter.createTextNode(text12), referenceNode);
+      defaultTreeAdapter.insertBefore(parentNode, defaultTreeAdapter.createTextNode(text13), referenceNode);
     }
   },
   adoptAttributes(recipient, attrs) {
@@ -52702,7 +52702,7 @@ function resolveAllAttention(events, context) {
             },
             end
           };
-          const text12 = {
+          const text13 = {
             type: use > 1 ? "strongText" : "emphasisText",
             start: {
               ...events[open][1].end
@@ -52730,9 +52730,9 @@ function resolveAllAttention(events, context) {
           if (events[open][1].end.offset - events[open][1].start.offset) {
             nextEvents = push(nextEvents, [["enter", events[open][1], context], ["exit", events[open][1], context]]);
           }
-          nextEvents = push(nextEvents, [["enter", group, context], ["enter", openingSequence, context], ["exit", openingSequence, context], ["enter", text12, context]]);
+          nextEvents = push(nextEvents, [["enter", group, context], ["enter", openingSequence, context], ["exit", openingSequence, context], ["enter", text13, context]]);
           nextEvents = push(nextEvents, resolveAll(context.parser.constructs.insideSpan.null, events.slice(open + 1, index2), context));
-          nextEvents = push(nextEvents, [["exit", text12, context], ["enter", closingSequence, context], ["exit", closingSequence, context], ["exit", group, context]]);
+          nextEvents = push(nextEvents, [["exit", text13, context], ["enter", closingSequence, context], ["exit", closingSequence, context], ["exit", group, context]]);
           let offset = 0;
           if (events[index2][1].end.offset - events[index2][1].start.offset) {
             offset = 2;
@@ -54234,13 +54234,13 @@ function resolveHeadingAtx(events, context) {
       start: events[contentStart][1].start,
       end: events[contentEnd][1].end
     };
-    const text12 = {
+    const text13 = {
       type: "chunkText",
       start: events[contentStart][1].start,
       end: events[contentEnd][1].end,
       contentType: "text"
     };
-    splice(events, contentStart, contentEnd - contentStart + 1, [["enter", content5, context], ["enter", text12, context], ["exit", text12, context], ["exit", content5, context]]);
+    splice(events, contentStart, contentEnd - contentStart + 1, [["enter", content5, context], ["enter", text13, context], ["exit", text13, context], ["exit", content5, context]]);
   }
   return events;
 }
@@ -55042,7 +55042,7 @@ function resolveToLabelEnd(events, context) {
       ...events[close][1].end
     }
   };
-  const text12 = {
+  const text13 = {
     type: "labelText",
     start: {
       ...events[open + offset + 2][1].end
@@ -55053,9 +55053,9 @@ function resolveToLabelEnd(events, context) {
   };
   media2 = [["enter", group, context], ["enter", label, context]];
   media2 = push(media2, events.slice(open + 1, open + offset + 3));
-  media2 = push(media2, [["enter", text12, context]]);
+  media2 = push(media2, [["enter", text13, context]]);
   media2 = push(media2, resolveAll(context.parser.constructs.insideSpan.null, events.slice(open + offset + 4, close - 3), context));
-  media2 = push(media2, [["exit", text12, context], events[close - 2], events[close - 1], ["exit", label, context]]);
+  media2 = push(media2, [["exit", text13, context], events[close - 2], events[close - 1], ["exit", label, context]]);
   media2 = push(media2, events.slice(close + 1));
   media2 = push(media2, [["exit", group, context]]);
   splice(events, open, events.length, media2);
@@ -55547,7 +55547,7 @@ function resolveToSetextUnderline(events, context) {
   const editMap = new EditMap();
   let index2 = events.length;
   let content5;
-  let text12;
+  let text13;
   let definition3;
   while (index2--) {
     if (events[index2][0] === "enter") {
@@ -55556,7 +55556,7 @@ function resolveToSetextUnderline(events, context) {
         break;
       }
       if (events[index2][1].type === "paragraph") {
-        text12 = index2;
+        text13 = index2;
       }
     } else {
       if (events[index2][1].type === "content") {
@@ -55576,9 +55576,9 @@ function resolveToSetextUnderline(events, context) {
       ...events[events.length - 1][1].end
     }
   };
-  events[text12][1].type = "setextHeadingText";
+  events[text13][1].type = "setextHeadingText";
   if (definition3) {
-    editMap.add(text12, 0, [["enter", heading5, context]]);
+    editMap.add(text13, 0, [["enter", heading5, context]]);
     editMap.add(definition3 + 1, 0, [["exit", events[content5][1], context]]);
     events[content5][1].end = {
       ...events[definition3][1].end
@@ -55944,17 +55944,17 @@ function gfmStrikethrough(options) {
               start: Object.assign({}, events[open][1].start),
               end: Object.assign({}, events[index2][1].end)
             };
-            const text12 = {
+            const text13 = {
               type: "strikethroughText",
               start: Object.assign({}, events[open][1].end),
               end: Object.assign({}, events[index2][1].start)
             };
-            const nextEvents = [["enter", strikethrough2, context], ["enter", events[open][1], context], ["exit", events[open][1], context], ["enter", text12, context]];
+            const nextEvents = [["enter", strikethrough2, context], ["enter", events[open][1], context], ["exit", events[open][1], context], ["enter", text13, context]];
             const insideSpan2 = context.parser.constructs.insideSpan.null;
             if (insideSpan2) {
               splice(nextEvents, nextEvents.length, 0, resolveAll(insideSpan2, events.slice(open + 1, index2), context));
             }
-            splice(nextEvents, nextEvents.length, 0, [["exit", text12, context], ["enter", events[index2][1], context], ["exit", events[index2][1], context], ["exit", strikethrough2, context]]);
+            splice(nextEvents, nextEvents.length, 0, [["exit", text13, context], ["enter", events[index2][1], context], ["exit", events[index2][1], context], ["exit", strikethrough2, context]]);
             splice(events, open - 1, index2 - open + 3, nextEvents);
             index2 = open + nextEvents.length - 2;
             break;
@@ -56902,10 +56902,10 @@ function initializeFactory(field) {
   function initializeText(effects) {
     const self2 = this;
     const constructs2 = this.parser.constructs[field];
-    const text12 = effects.attempt(constructs2, start, notText);
+    const text13 = effects.attempt(constructs2, start, notText);
     return start;
     function start(code7) {
-      return atBreak(code7) ? text12(code7) : notText(code7);
+      return atBreak(code7) ? text13(code7) : notText(code7);
     }
     function notText(code7) {
       if (code7 === null) {
@@ -56919,7 +56919,7 @@ function initializeFactory(field) {
     function data(code7) {
       if (atBreak(code7)) {
         effects.exit("data");
-        return text12(code7);
+        return text13(code7);
       }
       effects.consume(code7);
       return data;
@@ -57994,7 +57994,7 @@ function compiler(options) {
     const siblings = node3.children;
     let tail = siblings[siblings.length - 1];
     if (!tail || tail.type !== "text") {
-      tail = text12();
+      tail = text13();
       tail.position = {
         start: point4(token.start),
         // @ts-expect-error: we’ll add `end` later.
@@ -58253,7 +58253,7 @@ function compiler(options) {
       position: void 0
     };
   }
-  function text12() {
+  function text13() {
     return {
       type: "text",
       value: "",
@@ -58545,13 +58545,13 @@ function image2(state, node3) {
 
 // node_modules/mdast-util-to-hast/lib/handlers/inline-code.js
 function inlineCode3(state, node3) {
-  const text12 = { type: "text", value: node3.value.replace(/\r?\n|\r/g, " ") };
-  state.patch(node3, text12);
+  const text13 = { type: "text", value: node3.value.replace(/\r?\n|\r/g, " ") };
+  state.patch(node3, text13);
   const result = {
     type: "element",
     tagName: "code",
     properties: {},
-    children: [text12]
+    children: [text13]
   };
   state.patch(node3, result);
   return state.applyData(node3, result);
@@ -60600,9 +60600,9 @@ function parts(nodes2, links) {
   const out = [];
   let run6 = [];
   const flush = () => {
-    const text12 = run6.length ? markdown(run6, links) : "";
-    if (text12) {
-      out.push({ kind: "md", text: text12 });
+    const text13 = run6.length ? markdown(run6, links) : "";
+    if (text13) {
+      out.push({ kind: "md", text: text13 });
     }
     run6 = [];
   };
@@ -61284,7 +61284,7 @@ function openPrSheet(host, focus) {
   const view = new PrView(
     {
       changed: () => host.changed(),
-      notice: (text12, tone) => host.notice(text12, tone),
+      notice: (text13, tone) => host.notice(text13, tone),
       open: openUrl,
       prs: host.prs,
       reveal: (id) => host.reveal(id),
@@ -61796,6 +61796,276 @@ function preview3(row2, isCurrent) {
   ];
 }
 
+// src/prompts/ask.tsx
+var isCtrlC = (k) => k.ctrl && k.name === "c";
+function optionList(listKey, id, options, selected, select2, pick2) {
+  const at = (item3) => options.findIndex((o) => `${id}.${o.id}` === item3);
+  return /* @__PURE__ */ jsx(
+    "list",
+    {
+      onActivate: (ev) => {
+        const i = at(ev.item);
+        if (i >= 0) {
+          pick2(i);
+        }
+      },
+      onSelect: (ev) => {
+        const i = at(ev.item);
+        if (i >= 0) {
+          select2(i);
+        }
+      },
+      role: "omp.ask.options",
+      selected: options[selected] ? `${id}.${options[selected].id}` : void 0,
+      children: options.map((o) => /* @__PURE__ */ jsx(
+        "item",
+        {
+          detail: o.detail ? [o.role === "omp.ask.other" ? { s: "dim", t: o.detail } : { t: o.detail }] : void 0,
+          icon: o.checked ? "check" : void 0,
+          label: [{ t: o.label }],
+          role: o.role ?? "omp.ask.option",
+          tone: o.checked ? "success" : void 0,
+          value: o.recommended ? [{ s: "accent", t: "Recommended" }] : void 0
+        },
+        o.id
+      ))
+    },
+    listKey
+  );
+}
+function answerWith(host, overlay2, req, state, result) {
+  if (state.busy) {
+    return;
+  }
+  const sent = req.respond(result);
+  if (!isThenable(sent)) {
+    return host.close(overlay2);
+  }
+  state.busy = true;
+  state.error = "";
+  host.changed();
+  sent.then(
+    () => host.close(overlay2),
+    (error) => {
+      state.busy = false;
+      state.error = errorText(error);
+      host.changed();
+    }
+  );
+}
+var isThenable = (v) => typeof v === "object" && v !== null && "then" in v && typeof v.then === "function";
+function settleQuietly(sent) {
+  if (isThenable(sent)) {
+    sent.then(void 0, () => void 0);
+  }
+}
+function sendingLine(state) {
+  if (state.error) {
+    return /* @__PURE__ */ jsx(
+      "text",
+      {
+        spans: [{ s: "error", t: `Not answered: ${state.error}. Answer again, or Esc to close without answering.` }],
+        wrap: "word"
+      },
+      "sending"
+    );
+  }
+  return state.busy ? /* @__PURE__ */ jsx("text", { spans: [{ s: "dim", t: "Sending\u2026" }] }, "sending") : null;
+}
+function moved(key2, at, count) {
+  if (key2.name === "up" || key2.ctrl && key2.name === "p") {
+    return (at - 1 + count) % count;
+  }
+  if (key2.name === "down" || key2.ctrl && key2.name === "n") {
+    return (at + 1) % count;
+  }
+  return void 0;
+}
+
+// src/hermes/sharedPrompts.ts
+var sharedPromptId = (promptId) => `shared:${String(promptId)}`;
+function sharedPromptRequest(ev, gw2, onNotice) {
+  const kind = ev.type === "approval.request" ? "approval" : "clarify";
+  const shared = ev.payload;
+  if (!shared?.prompt_id || !ev.session_id || typeof shared.execution_generation !== "number") {
+    return null;
+  }
+  const control = { session_id: ev.session_id, execution_generation: shared.execution_generation, prompt_id: shared.prompt_id };
+  const questions = ev.type === "clarify.request" ? clarifyQuestions(ev.payload, shared.prompt_id) : [];
+  let answered2;
+  const send = (respond) => {
+    answered2 ??= respond().then(
+      (r) => {
+        if (r && "status" in r && r.status === "already_resolved") {
+          onNotice("That question was already answered (by another window, or it timed out).");
+        }
+      },
+      (error) => {
+        answered2 = void 0;
+        throw error;
+      }
+    );
+    return answered2;
+  };
+  return {
+    id: sharedPromptId(shared.prompt_id),
+    method: kind,
+    params: { ...shared, questions, session_id: ev.session_id },
+    respond: ({ answers, choice: choice2 }) => kind === "approval" ? send(() => rpc(gw2, "approval.respond", { choice: typeof choice2 === "string" ? choice2 : "deny", ...control })) : send(() => rpc(gw2, "clarify.respond", { answer: firstAnswer(answers), ...control })),
+    // Unanswered here: the prompt stays pending for another viewer or its own timeout.
+    fail: () => void 0
+  };
+}
+function clarifyQuestions(clarify, promptId) {
+  const single = typeof clarify?.question === "string" ? clarify.question.trim() : "";
+  const batch2 = Array.isArray(clarify?.questions) && clarify.questions.length ? clarify.questions : null;
+  return batch2 ?? (single ? [{ choices: clarify?.choices ?? [], multi_select: clarify?.multi_select === true, qid: promptId, question: single }] : []);
+}
+function firstAnswer(answers) {
+  if (!answers || typeof answers !== "object") {
+    return "";
+  }
+  const first = Object.values(answers)[0];
+  return Array.isArray(first) ? first.join(", ") : typeof first === "string" ? first : "";
+}
+
+// src/prompts/sheets.ts
+var PREFIX = "prompt:";
+var promptKey = (id) => overlayKey(`${PREFIX}${id}`);
+var PromptSheets = class {
+  #host;
+  /** Open approval sheets' keys → their approval-queue `request_id` (what approval.cancelled names). */
+  #approvals = /* @__PURE__ */ new Map();
+  constructor(host) {
+    this.#host = host;
+  }
+  /** Opens `overlay`, the sheet for `prompt`; an approval's queue id is kept while the sheet is open. */
+  open(overlay2, prompt) {
+    this.#host.open(overlay2);
+    if (prompt.kind === "approval" && prompt.requestId !== void 0) {
+      this.#approvals.set(overlay2.key, prompt.requestId);
+    }
+  }
+  /** `overlay` left the stack (the app's close): its approval id goes with it. */
+  closed(overlay2) {
+    this.#approvals.delete(overlay2.key);
+  }
+  /** Whether the sheet for request `id` is open. */
+  shows(id) {
+    const key2 = promptKey(String(id));
+    return this.#host.overlays.some((o) => o.key === key2);
+  }
+  /**
+   * Closes the sheet for request `id`: request.cancel's, or a shared prompt's `sharedPromptId`
+   * (approval.settled, clarify.settled).
+   */
+  drop(id) {
+    const key2 = promptKey(String(id));
+    this.#drop((k) => k === key2);
+  }
+  /** Closes every shared prompt's sheet: a resume re-hydrates those still pending. */
+  dropShared() {
+    const prefix2 = promptKey(sharedPromptId(""));
+    this.#drop((k) => k.startsWith(prefix2));
+  }
+  /** Closes the approvals whose queue ids `requestIds` names (approval.cancelled). */
+  dropByApproval(requestIds) {
+    this.#drop((k) => requestIds?.includes(this.#approvals.get(k) ?? "") ?? false);
+  }
+  /** Closes every prompt sheet: nothing can answer them now, or they are another session's. */
+  dropAll() {
+    this.#drop(() => true);
+  }
+  /** Closes the prompt sheets whose key `picked` names; other overlays stay. */
+  #drop(picked) {
+    for (const o of [...this.#host.overlays]) {
+      if (o.key.startsWith(PREFIX) && picked(o.key)) {
+        this.#host.close(o);
+      }
+    }
+  }
+};
+
+// src/prompts/approval.tsx
+var APPROVALS = {
+  always: { detail: "Remember this approval for every session", label: "Always allow" },
+  deny: { detail: "Tell the agent not to run it", label: "Deny" },
+  once: { detail: "Run it this time only", label: "Allow once" },
+  session: { detail: "Allow matching commands until the session ends", label: "Allow for this session" }
+};
+function approvalOverlay(host, prompt) {
+  const { description, req, smartDenied } = prompt;
+  const command = prompt.command && withoutTernEnv(prompt.command);
+  const options = prompt.choices.map((id) => ({ id, ...APPROVALS[id] }));
+  const key2 = promptKey(req.id);
+  const sending = { busy: false, error: "" };
+  let selected = 0;
+  const answer = (choice2) => answerWith(host, overlay2, req, sending, { choice: choice2 });
+  const chosen = (i) => answer(options[i]?.id ?? "deny");
+  const decline = () => sending.error ? host.close(overlay2) : answer("deny");
+  const overlay2 = {
+    key: key2,
+    modal: true,
+    cancel: decline,
+    node: (id) => /* @__PURE__ */ jsx("overlay", { anchor: "bottom", modal: true, role: "omp.overlay.ask", size: "md", children: /* @__PURE__ */ jsxs("col", { gap: "md", children: [
+      /* @__PURE__ */ jsx("md", { role: "omp.ask.question", text: "Allow this command?" }, "question"),
+      command ? /* @__PURE__ */ jsx("code", { lang: "bash", text: command }, "command") : null,
+      description || smartDenied ? /* @__PURE__ */ jsxs("row", { align: "center", gap: "xs", children: [
+        /* @__PURE__ */ jsx("icon", { name: "shield", tone: smartDenied ? "error" : "warning" }, "icon"),
+        /* @__PURE__ */ jsx(
+          "md",
+          {
+            text: `${smartDenied ? "**The safety check advised against it**" : "**Flagged**"}${description ? ` \xB7 ${description}` : ""}`
+          },
+          "text"
+        )
+      ] }, "why") : null,
+      optionList(
+        "options",
+        `${id}.body.options`,
+        options,
+        selected,
+        (i) => {
+          selected = i;
+          host.changed();
+        },
+        chosen
+      ),
+      sendingLine(sending),
+      actionsRow([
+        { hint: "n \xB7 escape", key: "deny", keys: ["escape"], label: "Deny", onClick: () => answer("deny") },
+        {
+          hint: "enter \xB7 y allows once \xB7 up/down move",
+          key: "choose",
+          keys: ["enter"],
+          kind: "primary",
+          label: "Choose",
+          onClick: () => chosen(selected)
+        }
+      ])
+    ] }, "body") }, key2),
+    onKey: (k) => {
+      const n = Number.parseInt(k.name, 10);
+      const to = moved(k, selected, options.length);
+      if (isCtrlC(k) || k.name === "escape") {
+        decline();
+      } else if (to !== void 0) {
+        selected = to;
+      } else if (n >= 1 && n <= options.length) {
+        chosen(n - 1);
+      } else if (k.name === "enter") {
+        chosen(selected);
+      } else if (k.name === "n") {
+        answer("deny");
+      } else if (k.name === "y") {
+        answer("once");
+      }
+      return true;
+    }
+  };
+  return overlay2;
+}
+
 // .hermes-src/ui-tui/src/lib/history.ts
 import { appendFileSync as appendFileSync3, existsSync as existsSync3, mkdirSync as mkdirSync3, readFileSync as readFileSync2 } from "node:fs";
 import { homedir as homedir8 } from "node:os";
@@ -61871,11 +62141,11 @@ var ITALIC_STAR = /(?<![*\\])\*(?=[^\s*])([^\n*]*?[^\s*\\])\*(?!\*)/g;
 var ITALIC_UNDERSCORE = /(?<![\w\\])_(?=[^\s_])([^\n_]*?[^\s_\\])_(?![\w])/g;
 var STRIKE = /~~(?=\S)([^\n]*?\S)~~/g;
 var LINK = /\[([^\]\n]+)\]\(([^)\s]+)\)/g;
-function markdownDecor(text12) {
-  if (!text12) {
+function markdownDecor(text13) {
+  if (!text13) {
     return [];
   }
-  const marks = Array.from({ length: text12.length }, () => []);
+  const marks = Array.from({ length: text13.length }, () => []);
   const mark2 = (from, to, s2) => {
     for (let i = from; i < to; i++) {
       if (!marks[i].includes(s2)) {
@@ -61885,7 +62155,7 @@ function markdownDecor(text12) {
   };
   let at = 0;
   let fenced = false;
-  for (const line of text12.split("\n")) {
+  for (const line of text13.split("\n")) {
     const end = at + line.length;
     if (FENCE.test(line)) {
       mark2(at, end, "dim");
@@ -61976,11 +62246,11 @@ function runs2(marks) {
   }
   return out;
 }
-function listNewline(text12, cursor) {
-  const start = text12.lastIndexOf("\n", cursor - 1) + 1;
-  const nl = text12.indexOf("\n", cursor);
-  const end = nl < 0 ? text12.length : nl;
-  const line = text12.slice(start, end);
+function listNewline(text13, cursor) {
+  const start = text13.lastIndexOf("\n", cursor - 1) + 1;
+  const nl = text13.indexOf("\n", cursor);
+  const end = nl < 0 ? text13.length : nl;
+  const line = text13.slice(start, end);
   const m = LIST2.exec(line);
   if (!m || cursor - start < m[0].length) {
     return void 0;
@@ -61995,55 +62265,55 @@ function listNewline(text12, cursor) {
 ${indent2}${next2}${gap}${box ? "[ ] " : ""}`;
   return { cursor: cursor + insert.length, from: cursor, text: insert, to: cursor };
 }
-function toggleMark(text12, from, to, marker2) {
+function toggleMark(text13, from, to, marker2) {
   const n = marker2.length;
   if (from !== to) {
-    if (text12.slice(from - n, from) === marker2 && text12.slice(to, to + n) === marker2 && !doubled(text12, from - n, to + n, marker2)) {
-      return { anchor: from - n, cursor: to - n, from: from - n, text: text12.slice(from, to), to: to + n };
+    if (text13.slice(from - n, from) === marker2 && text13.slice(to, to + n) === marker2 && !doubled(text13, from - n, to + n, marker2)) {
+      return { anchor: from - n, cursor: to - n, from: from - n, text: text13.slice(from, to), to: to + n };
     }
-    const inner = text12.slice(from, to);
+    const inner = text13.slice(from, to);
     if (inner.length > 2 * n && inner.startsWith(marker2) && inner.endsWith(marker2)) {
       return { anchor: from, cursor: to - 2 * n, from, text: inner.slice(n, -n), to };
     }
     return { anchor: from + n, cursor: to + n, from, text: `${marker2}${inner}${marker2}`, to };
   }
   const at = from;
-  if (text12.slice(at - n, at) === marker2 && text12.slice(at, at + n) === marker2) {
+  if (text13.slice(at - n, at) === marker2 && text13.slice(at, at + n) === marker2) {
     return { cursor: at - n, from: at - n, text: "", to: at + n };
   }
-  const run6 = markedRun(text12, at, marker2);
+  const run6 = markedRun(text13, at, marker2);
   if (run6 && at === run6.close) {
     return { cursor: at + n, from: at, text: "", to: at };
   }
   if (run6) {
-    const inner = text12.slice(run6.open + n, run6.close);
+    const inner = text13.slice(run6.open + n, run6.close);
     return { cursor: at - n, from: run6.open, text: inner, to: run6.close + n };
   }
-  const word = wordAt(text12, at);
+  const word = wordAt(text13, at);
   if (word) {
-    return { cursor: at + n, from: word.from, text: `${marker2}${text12.slice(word.from, word.to)}${marker2}`, to: word.to };
+    return { cursor: at + n, from: word.from, text: `${marker2}${text13.slice(word.from, word.to)}${marker2}`, to: word.to };
   }
   return { cursor: at + n, from: at, text: `${marker2}${marker2}`, to: at };
 }
 var WORD = /[\p{L}\p{N}'’-]/u;
-function wordAt(text12, at) {
+function wordAt(text13, at) {
   let from = at;
   let to = at;
-  while (from > 0 && WORD.test(text12[from - 1] ?? "")) {
+  while (from > 0 && WORD.test(text13[from - 1] ?? "")) {
     from--;
   }
-  while (to < text12.length && WORD.test(text12[to] ?? "")) {
+  while (to < text13.length && WORD.test(text13[to] ?? "")) {
     to++;
   }
   return from < to ? { from, to } : void 0;
 }
-function doubled(text12, open, close, marker2) {
-  return marker2.length === 1 && (text12[open - 1] === marker2 || text12[close] === marker2);
+function doubled(text13, open, close, marker2) {
+  return marker2.length === 1 && (text13[open - 1] === marker2 || text13[close] === marker2);
 }
-function markedRun(text12, at, marker2) {
-  const start = text12.lastIndexOf("\n", at - 1) + 1;
-  const nl = text12.indexOf("\n", at);
-  const line = text12.slice(start, nl < 0 ? text12.length : nl);
+function markedRun(text13, at, marker2) {
+  const start = text13.lastIndexOf("\n", at - 1) + 1;
+  const nl = text13.indexOf("\n", at);
+  const line = text13.slice(start, nl < 0 ? text13.length : nl);
   const re2 = marker2 === "**" ? /\*\*(?=\S)([^\n]*?\S)\*\*/g : /(?<![\w_])_(?=[^\s_])([^\n_]*?[^\s_])_(?![\w_])/g;
   for (const m of line.matchAll(re2)) {
     const open = start + m.index;
@@ -62098,15 +62368,15 @@ var Composer = class {
   get browsing() {
     return this.#browse >= 0;
   }
-  set(text12, cursor = text12.length) {
+  set(text13, cursor = text13.length) {
     this.#record({ merge: false });
-    this.text = text12;
-    this.cursor = clamp(cursor, text12.length);
+    this.text = text13;
+    this.cursor = clamp(cursor, text13.length);
   }
   /** Clears the draft after a submit, remembering it in the prompt history. */
   take() {
-    const text12 = this.text;
-    append(text12);
+    const text13 = this.text;
+    append(text13);
     this.#pasted = [];
     this.#undo = [];
     this.#redo = [];
@@ -62114,7 +62384,7 @@ var Composer = class {
     this.text = "";
     this.cursor = 0;
     this.anchor = void 0;
-    return text12;
+    return text13;
   }
   /** Types `s` at the caret, over the selection if there is one. */
   insert(s2) {
@@ -62321,8 +62591,8 @@ var Composer = class {
     return true;
   }
   /** Applies a Markdown edit as one undo step, with the selection it leaves. */
-  #apply({ anchor, cursor, from, text: text12, to }) {
-    this.#replace({ cursor, from, merge: false, s: text12, to });
+  #apply({ anchor, cursor, from, text: text13, to }) {
+    this.#replace({ cursor, from, merge: false, s: text13, to });
     this.anchor = anchor !== void 0 && anchor !== this.cursor ? anchor : void 0;
     return true;
   }
@@ -62355,12 +62625,12 @@ var Composer = class {
       return true;
     }
     this.#browse = at;
-    const text12 = at === items.length ? this.#draft : items[at] ?? "";
+    const text13 = at === items.length ? this.#draft : items[at] ?? "";
     if (at === items.length) {
       this.#browse = -1;
     }
-    this.text = text12;
-    this.cursor = text12.length;
+    this.text = text13;
+    this.cursor = text13.length;
     this.anchor = void 0;
     return true;
   }
@@ -62408,19 +62678,19 @@ var Composer = class {
 function clamp(n, max) {
   return Math.max(0, Math.min(max, n));
 }
-function lineStart(text12, at) {
-  return at <= 0 ? 0 : text12.lastIndexOf("\n", at - 1) + 1;
+function lineStart(text13, at) {
+  return at <= 0 ? 0 : text13.lastIndexOf("\n", at - 1) + 1;
 }
-function lineEnd(text12, at) {
-  const i = text12.indexOf("\n", at);
-  return i < 0 ? text12.length : i;
+function lineEnd(text13, at) {
+  const i = text13.indexOf("\n", at);
+  return i < 0 ? text13.length : i;
 }
-function boundaryAt(text12, at) {
-  if (at >= text12.length) {
-    return text12.length;
+function boundaryAt(text13, at) {
+  if (at >= text13.length) {
+    return text13.length;
   }
   let floor = 0;
-  for (const { index: index2 } of graphemes.segment(text12)) {
+  for (const { index: index2 } of graphemes.segment(text13)) {
     if (index2 > at) {
       break;
     }
@@ -62428,9 +62698,9 @@ function boundaryAt(text12, at) {
   }
   return floor;
 }
-function prevGrapheme(text12, at) {
+function prevGrapheme(text13, at) {
   let prev = 0;
-  for (const { index: index2 } of graphemes.segment(text12)) {
+  for (const { index: index2 } of graphemes.segment(text13)) {
     if (index2 >= at) {
       break;
     }
@@ -62438,412 +62708,47 @@ function prevGrapheme(text12, at) {
   }
   return prev;
 }
-function nextGrapheme(text12, at) {
-  for (const { index: index2, segment } of graphemes.segment(text12)) {
+function nextGrapheme(text13, at) {
+  for (const { index: index2, segment } of graphemes.segment(text13)) {
     if (index2 >= at) {
       return index2 + segment.length;
     }
   }
-  return text12.length;
+  return text13.length;
 }
-function prevWord(text12, at) {
+function prevWord(text13, at) {
   let i = at;
-  while (i > 0 && !WORD2.test(text12[i - 1] ?? "")) {
+  while (i > 0 && !WORD2.test(text13[i - 1] ?? "")) {
     i--;
   }
-  while (i > 0 && WORD2.test(text12[i - 1] ?? "")) {
+  while (i > 0 && WORD2.test(text13[i - 1] ?? "")) {
     i--;
   }
   return i;
 }
-function nextWord(text12, at) {
+function nextWord(text13, at) {
   let i = at;
-  while (i < text12.length && !WORD2.test(text12[i] ?? "")) {
+  while (i < text13.length && !WORD2.test(text13[i] ?? "")) {
     i++;
   }
-  while (i < text12.length && WORD2.test(text12[i] ?? "")) {
+  while (i < text13.length && WORD2.test(text13[i] ?? "")) {
     i++;
   }
   return i;
 }
-function pastedCommand(text12) {
-  return text12.includes("{!") || text12.trimStart().startsWith("!");
+function pastedCommand(text13) {
+  return text13.includes("{!") || text13.trimStart().startsWith("!");
 }
 
-// src/mask.ts
-var graphemes2 = new Intl.Segmenter(void 0, { granularity: "grapheme" });
-var BULLET = "\u2022";
-function boundaries(secret) {
-  const at = [];
-  for (const { index: index2 } of graphemes2.segment(secret)) {
-    at.push(index2);
-  }
-  at.push(secret.length);
-  return at;
-}
-function maskOf(secret) {
-  return BULLET.repeat(boundaries(secret).length - 1);
-}
-function maskedOffset(secret, at) {
-  const bounds = boundaries(secret);
-  let n = 0;
-  while (n + 1 < bounds.length && (bounds[n + 1] ?? 0) <= at) {
-    n++;
-  }
-  return n;
-}
-function unmaskEdit(secret, ev) {
-  const bounds = boundaries(secret);
-  const count = bounds.length - 1;
-  if (ev.len !== count) {
-    return null;
-  }
-  const real = (masked) => bounds[Math.max(0, Math.min(count, masked))] ?? secret.length;
-  const from = real(ev.from);
-  const to = real(ev.to);
-  const after = ev.cursor - ev.from - ev.text.length;
-  const cursor = ev.cursor <= ev.from ? real(ev.cursor) : after <= 0 ? from + (ev.cursor - ev.from) : real(ev.to + after) - to + from + ev.text.length;
-  return { cursor, from, len: secret.length, text: ev.text, to };
-}
-
-// src/hermes/sharedPrompts.ts
-var sharedPromptId = (promptId) => `shared:${String(promptId)}`;
-function sharedPromptRequest(ev, gw2, onNotice) {
-  const kind = ev.type === "approval.request" ? "approval" : "clarify";
-  const shared = ev.payload;
-  if (!shared?.prompt_id || !ev.session_id || typeof shared.execution_generation !== "number") {
-    return null;
-  }
-  const control = { session_id: ev.session_id, execution_generation: shared.execution_generation, prompt_id: shared.prompt_id };
-  const questions = ev.type === "clarify.request" ? clarifyQuestions(ev.payload, shared.prompt_id) : [];
-  let answered2;
-  const send = (respond) => {
-    answered2 ??= respond().then(
-      (r) => {
-        if (r && "status" in r && r.status === "already_resolved") {
-          onNotice("That question was already answered (by another window, or it timed out).");
-        }
-      },
-      (error) => {
-        answered2 = void 0;
-        throw error;
-      }
-    );
-    return answered2;
-  };
-  return {
-    id: sharedPromptId(shared.prompt_id),
-    method: kind,
-    params: { ...shared, questions, session_id: ev.session_id },
-    respond: ({ answers, choice: choice2 }) => kind === "approval" ? send(() => rpc(gw2, "approval.respond", { choice: typeof choice2 === "string" ? choice2 : "deny", ...control })) : send(() => rpc(gw2, "clarify.respond", { answer: firstAnswer(answers), ...control })),
-    // Unanswered here: the prompt stays pending for another viewer or its own timeout.
-    fail: () => void 0
-  };
-}
-function clarifyQuestions(clarify, promptId) {
-  const single = typeof clarify?.question === "string" ? clarify.question.trim() : "";
-  const batch2 = Array.isArray(clarify?.questions) && clarify.questions.length ? clarify.questions : null;
-  return batch2 ?? (single ? [{ choices: clarify?.choices ?? [], multi_select: clarify?.multi_select === true, qid: promptId, question: single }] : []);
-}
-function firstAnswer(answers) {
-  if (!answers || typeof answers !== "object") {
-    return "";
-  }
-  const first = Object.values(answers)[0];
-  return Array.isArray(first) ? first.join(", ") : typeof first === "string" ? first : "";
-}
-
-// src/prompts/sheets.ts
-var PREFIX = "prompt:";
-var promptKey = (id) => overlayKey(`${PREFIX}${id}`);
-var PromptSheets = class {
-  #host;
-  /** Open approval sheets' keys → their approval-queue `request_id` (what approval.cancelled names). */
-  #approvals = /* @__PURE__ */ new Map();
-  constructor(host) {
-    this.#host = host;
-  }
-  /** Opens `overlay`, the sheet for `req`; an approval's queue id is kept while the sheet is open. */
-  open(overlay2, req) {
-    this.#host.open(overlay2);
-    const queued = req.params["request_id"];
-    if (req.method === "approval" && typeof queued === "string") {
-      this.#approvals.set(overlay2.key, queued);
-    }
-  }
-  /** `overlay` left the stack (the app's close): its approval id goes with it. */
-  closed(overlay2) {
-    this.#approvals.delete(overlay2.key);
-  }
-  /** Whether the sheet for request `id` is open. */
-  shows(id) {
-    const key2 = promptKey(String(id));
-    return this.#host.overlays.some((o) => o.key === key2);
-  }
-  /**
-   * Closes the sheet for request `id`: request.cancel's, or a shared prompt's `sharedPromptId`
-   * (approval.settled, clarify.settled).
-   */
-  drop(id) {
-    const key2 = promptKey(String(id));
-    this.#drop((k) => k === key2);
-  }
-  /** Closes every shared prompt's sheet: a resume re-hydrates those still pending. */
-  dropShared() {
-    const prefix2 = promptKey(sharedPromptId(""));
-    this.#drop((k) => k.startsWith(prefix2));
-  }
-  /** Closes the approvals whose queue ids `requestIds` names (approval.cancelled). */
-  dropByApproval(requestIds) {
-    this.#drop((k) => requestIds?.includes(this.#approvals.get(k) ?? "") ?? false);
-  }
-  /** Closes every prompt sheet: nothing can answer them now, or they are another session's. */
-  dropAll() {
-    this.#drop(() => true);
-  }
-  /** Closes the prompt sheets whose key `picked` names; other overlays stay. */
-  #drop(picked) {
-    for (const o of [...this.#host.overlays]) {
-      if (o.key.startsWith(PREFIX) && picked(o.key)) {
-        this.#host.close(o);
-      }
-    }
-  }
-};
-
-// src/overlays/prompts.tsx
+// src/prompts/clarify.tsx
 var RECOMMENDED = /\s*\(recommended\)\s*$/i;
-var str6 = (v) => typeof v === "string" ? v : "";
-var isCtrlC = (k) => k.ctrl && k.name === "c";
-var TIMEOUT_NOTICES = {
-  approval: "Approval timed out: the command was not run. Ask Hermes to try again when you are ready to answer.",
-  secret: "Secret prompt closed: no answer in time, so the step that needed it was skipped. Send your request again when you are ready to enter it.",
-  sudo: "Password prompt closed: no answer in time, so the command was skipped. Send your request again when you are ready to enter it.",
-  "vault.code": "Verification-code prompt closed: no answer in time, so the sign-in was skipped. Send your request again when you have the code.",
-  "vault.save_login": "Save-login prompt closed: no answer in time, so nothing was saved. Send your request again when you are ready.",
-  "vault.unlock_prompt": "Unlock prompt closed: no answer in time, so the password manager stayed locked. Send your request again when you are ready to unlock it."
-};
-function promptTimeoutNotice(method, reason) {
-  return reason === "timeout" && typeof method === "string" ? TIMEOUT_NOTICES[method] ?? null : null;
-}
-function optionList(listKey, id, options, selected, select2, pick2) {
-  const at = (item3) => options.findIndex((o) => `${id}.${o.id}` === item3);
-  return /* @__PURE__ */ jsx(
-    "list",
-    {
-      onActivate: (ev) => {
-        const i = at(ev.item);
-        if (i >= 0) {
-          pick2(i);
-        }
-      },
-      onSelect: (ev) => {
-        const i = at(ev.item);
-        if (i >= 0) {
-          select2(i);
-        }
-      },
-      role: "omp.ask.options",
-      selected: options[selected] ? `${id}.${options[selected].id}` : void 0,
-      children: options.map((o) => /* @__PURE__ */ jsx(
-        "item",
-        {
-          detail: o.detail ? [o.role === "omp.ask.other" ? { s: "dim", t: o.detail } : { t: o.detail }] : void 0,
-          icon: o.checked ? "check" : void 0,
-          label: [{ t: o.label }],
-          role: o.role ?? "omp.ask.option",
-          tone: o.checked ? "success" : void 0,
-          value: o.recommended ? [{ s: "accent", t: "Recommended" }] : void 0
-        },
-        o.id
-      ))
-    },
-    listKey
-  );
-}
-function answerWith(host, overlay2, req, state, result) {
-  if (state.busy) {
-    return;
-  }
-  const sent = req.respond(result);
-  if (!isThenable(sent)) {
-    return host.close(overlay2);
-  }
-  state.busy = true;
-  state.error = "";
-  host.changed();
-  sent.then(
-    () => host.close(overlay2),
-    (error) => {
-      state.busy = false;
-      state.error = errorText(error);
-      host.changed();
-    }
-  );
-}
-var isThenable = (v) => typeof v === "object" && v !== null && typeof v.then === "function";
-function settleQuietly(sent) {
-  if (isThenable(sent)) {
-    sent.then(void 0, () => void 0);
-  }
-}
-function sendingLine(state) {
-  if (state.error) {
-    return /* @__PURE__ */ jsx(
-      "text",
-      {
-        spans: [{ s: "error", t: `Not answered: ${state.error}. Answer again, or Esc to close without answering.` }],
-        wrap: "word"
-      },
-      "sending"
-    );
-  }
-  return state.busy ? /* @__PURE__ */ jsx("text", { spans: [{ s: "dim", t: "Sending\u2026" }] }, "sending") : null;
-}
-function moved(key2, at, count) {
-  if (key2.name === "up" || key2.ctrl && key2.name === "p") {
-    return (at - 1 + count) % count;
-  }
-  if (key2.name === "down" || key2.ctrl && key2.name === "n") {
-    return (at + 1) % count;
-  }
-  return void 0;
-}
-function promptOverlay(host, req) {
-  switch (req.method) {
-    case "approval":
-      return approvalOverlay(host, req);
-    case "clarify":
-      if (!questionsOf(req.params.questions).length) {
-        settleQuietly(req.respond({}));
-        return null;
-      }
-      return clarifyOverlay(host, req);
-    case "sudo":
-    case "secret":
-    case "vault.unlock_prompt":
-    case "vault.code":
-    case "vault.save_login":
-      return maskedOverlay(host, req);
-    default:
-      return null;
-  }
-}
-var APPROVALS = [
-  { detail: "Run it this time only", id: "once", label: "Allow once" },
-  { detail: "Allow matching commands until the session ends", id: "session", label: "Allow for this session" },
-  { detail: "Remember this approval for every session", id: "always", label: "Always allow" },
-  { detail: "Tell the agent not to run it", id: "deny", label: "Deny" }
-];
-function approvalOverlay(host, req) {
-  const p3 = req.params;
-  const command = str6(p3.command) && withoutTernEnv(str6(p3.command));
-  const description = str6(p3.description);
-  const smartDenied = p3.smart_denied === true;
-  const offered = Array.isArray(p3.choices) ? p3.choices.filter((c) => typeof c === "string") : [];
-  const allowed = new Set(
-    offered.length ? offered : smartDenied ? ["once", "deny"] : p3.allow_permanent === false ? ["once", "session", "deny"] : ["once", "session", "always", "deny"]
-  );
-  if (p3.allow_session === false) {
-    allowed.delete("session");
-  }
-  const options = APPROVALS.filter((o) => allowed.has(o.id));
-  const key2 = promptKey(req.id);
-  const sending = { busy: false, error: "" };
-  let selected = 0;
-  const answer = (choice2) => answerWith(host, overlay2, req, sending, { choice: choice2 });
-  const decline = () => sending.error ? host.close(overlay2) : answer("deny");
-  const overlay2 = {
-    key: key2,
-    modal: true,
-    cancel: decline,
-    node: (id) => /* @__PURE__ */ jsx("overlay", { anchor: "bottom", modal: true, role: "omp.overlay.ask", size: "md", children: /* @__PURE__ */ jsxs("col", { gap: "md", children: [
-      /* @__PURE__ */ jsx("md", { role: "omp.ask.question", text: "Allow this command?" }, "question"),
-      command ? /* @__PURE__ */ jsx("code", { lang: "bash", text: command }, "command") : null,
-      description || smartDenied ? /* @__PURE__ */ jsxs("row", { align: "center", gap: "xs", children: [
-        /* @__PURE__ */ jsx("icon", { name: "shield", tone: smartDenied ? "error" : "warning" }, "icon"),
-        /* @__PURE__ */ jsx(
-          "md",
-          {
-            text: `${smartDenied ? "**The safety check advised against it**" : "**Flagged**"}${description ? ` \xB7 ${description}` : ""}`
-          },
-          "text"
-        )
-      ] }, "why") : null,
-      optionList(
-        "options",
-        `${id}.body.options`,
-        options,
-        selected,
-        (i) => {
-          selected = i;
-          host.changed();
-        },
-        (i) => answer(options[i]?.id ?? "deny")
-      ),
-      sendingLine(sending),
-      actionsRow([
-        { hint: "n \xB7 escape", key: "deny", keys: ["escape"], label: "Deny", onClick: () => answer("deny") },
-        {
-          hint: "enter \xB7 y allows once \xB7 up/down move",
-          key: "choose",
-          keys: ["enter"],
-          kind: "primary",
-          label: "Choose",
-          onClick: () => answer(options[selected]?.id ?? "deny")
-        }
-      ])
-    ] }, "body") }, key2),
-    onKey: (k) => {
-      const n = Number.parseInt(k.name, 10);
-      const to = moved(k, selected, options.length);
-      if (isCtrlC(k) || k.name === "escape") {
-        decline();
-      } else if (to !== void 0) {
-        selected = to;
-      } else if (n >= 1 && n <= options.length) {
-        answer(options[n - 1]?.id ?? "deny");
-      } else if (k.name === "enter") {
-        answer(options[selected]?.id ?? "deny");
-      } else if (k.name === "n") {
-        answer("deny");
-      } else if (k.name === "y") {
-        answer("once");
-      }
-      return true;
-    }
-  };
-  return overlay2;
-}
-function questionsOf(raw2) {
-  if (!Array.isArray(raw2)) {
-    return [];
-  }
-  return raw2.flatMap((q2) => {
-    if (!q2 || typeof q2 !== "object" || !("qid" in q2) || !("question" in q2)) {
-      return [];
-    }
-    const choices = "choices" in q2 && Array.isArray(q2.choices) ? q2.choices.filter((c) => typeof c === "string") : [];
-    const question = str6(q2.question).trim();
-    return question ? [{ choices, multi: "multi_select" in q2 && q2.multi_select === true, qid: str6(q2.qid), question }] : [];
-  });
-}
 function tabLabel(question) {
   const words3 = question.replace(/[?.!:]+$/, "").split(/\s+/);
   return words3.length > 4 ? `${words3.slice(0, 4).join(" ")}\u2026` : words3.join(" ");
 }
-function clarifyOverlay(host, req) {
-  const questions = questionsOf(req.params.questions);
-  const answers = {};
-  const preset = req.params.answers;
-  if (preset && typeof preset === "object") {
-    for (const qid in preset) {
-      const v = Reflect.get(preset, qid);
-      if (typeof v === "string" || v === null) {
-        answers[qid] = v;
-      }
-    }
-  }
+function clarifyOverlay(host, prompt) {
+  const { questions, req } = prompt;
+  const answers = { ...prompt.answers };
   const drafts = questions.map(() => ({
     other: new Composer(),
     picked: /* @__PURE__ */ new Set(),
@@ -62852,7 +62757,7 @@ function clarifyOverlay(host, req) {
   }));
   const key2 = promptKey(req.id);
   const sending = { busy: false, error: "" };
-  const respond = (result) => answerWith(host, overlay2, req, sending, result);
+  const respond = (result) => answerWith(host, overlay2, req, sending, { ...result });
   const cancel2 = () => sending.error ? host.close(overlay2) : respond({});
   let step = Math.max(
     0,
@@ -63059,19 +62964,56 @@ function clarifyOverlay(host, req) {
   };
   return overlay2;
 }
-function maskedOverlay(host, req) {
-  const p3 = req.params;
+
+// src/mask.ts
+var graphemes2 = new Intl.Segmenter(void 0, { granularity: "grapheme" });
+var BULLET = "\u2022";
+function boundaries(secret) {
+  const at = [];
+  for (const { index: index2 } of graphemes2.segment(secret)) {
+    at.push(index2);
+  }
+  at.push(secret.length);
+  return at;
+}
+function maskOf(secret) {
+  return BULLET.repeat(boundaries(secret).length - 1);
+}
+function maskedOffset(secret, at) {
+  const bounds = boundaries(secret);
+  let n = 0;
+  while (n + 1 < bounds.length && (bounds[n + 1] ?? 0) <= at) {
+    n++;
+  }
+  return n;
+}
+function unmaskEdit(secret, ev) {
+  const bounds = boundaries(secret);
+  const count = bounds.length - 1;
+  if (ev.len !== count) {
+    return null;
+  }
+  const real = (masked) => bounds[Math.max(0, Math.min(count, masked))] ?? secret.length;
+  const from = real(ev.from);
+  const to = real(ev.to);
+  const after = ev.cursor - ev.from - ev.text.length;
+  const cursor = ev.cursor <= ev.from ? real(ev.cursor) : after <= 0 ? from + (ev.cursor - ev.from) : real(ev.to + after) - to + from + ev.text.length;
+  return { cursor, from, len: secret.length, text: ev.text, to };
+}
+
+// src/prompts/masked.tsx
+function maskedOverlay(host, prompt) {
+  const { method, req, site } = prompt;
   const key2 = promptKey(req.id);
-  const site = str6(p3.site) || str6(p3.origin);
-  const login = req.method === "vault.save_login";
-  const code7 = req.method === "vault.code";
+  const login = method === "vault.save_login";
+  const code7 = method === "vault.code";
   const fields = login ? [
     { id: "identifier", label: "Username or email", masked: false, value: new Composer() },
     { id: "password", label: "Password", masked: true, value: new Composer() }
   ] : [{ id: "value", label: code7 ? "Type the code" : "Hidden while you type", masked: !code7, value: new Composer() }];
   let at = 0;
-  const title = req.method === "sudo" ? "Password for sudo" : req.method === "secret" ? str6(p3.prompt) || `Value for ${str6(p3.env_var) || "a secret"}` : req.method === "vault.unlock_prompt" ? `Master password for ${str6(p3.display_name) || str6(p3.backend) || "the password manager"}` : login ? `Save a login for ${site || "this site"}` : `Code for ${site || "this site"}`;
-  const note = req.method === "secret" ? str6(p3.env_var) : code7 ? [str6(p3.hint), "typed into the page only \xB7 never shown to the model"].filter(Boolean).join(" \xB7 ") : "";
+  const title = method === "sudo" ? "Password for sudo" : method === "secret" ? prompt.prompt || `Value for ${prompt.envVar || "a secret"}` : method === "vault.unlock_prompt" ? `Master password for ${prompt.manager || "the password manager"}` : login ? `Save a login for ${site || "this site"}` : `Code for ${site || "this site"}`;
+  const note = method === "secret" ? prompt.envVar : code7 ? [prompt.hint, "typed into the page only \xB7 never shown to the model"].filter(Boolean).join(" \xB7 ") : "";
   const sending = { busy: false, error: "" };
   const finish = (cancel2) => {
     const [first, second] = fields;
@@ -63089,8 +63031,8 @@ function maskedOverlay(host, req) {
     focus: (id) => `${id}.body.${fields[at]?.id ?? "value"}`,
     node: () => /* @__PURE__ */ jsx("overlay", { anchor: "bottom", modal: true, role: "omp.overlay.ask", size: "md", children: /* @__PURE__ */ jsxs("col", { gap: "md", children: [
       /* @__PURE__ */ jsx("md", { role: "omp.ask.question", text: title }, "question"),
-      note ? /* @__PURE__ */ jsx("text", { spans: [{ s: req.method === "secret" ? "mono dim" : "muted", t: note }], wrap: "word" }, "note") : null,
-      str6(p3.command) ? /* @__PURE__ */ jsx("code", { lang: "bash", text: withoutTernEnv(str6(p3.command)) }, "command") : null,
+      note ? /* @__PURE__ */ jsx("text", { spans: [{ s: method === "secret" ? "mono dim" : "muted", t: note }], wrap: "word" }, "note") : null,
+      prompt.command ? /* @__PURE__ */ jsx("code", { lang: "bash", text: withoutTernEnv(prompt.command) }, "command") : null,
       fields.map((f, i) => /* @__PURE__ */ jsx(
         "input",
         {
@@ -63142,6 +63084,33 @@ function maskedOverlay(host, req) {
     }
   };
   return overlay2;
+}
+
+// src/overlays/prompts.tsx
+var TIMEOUT_NOTICES = {
+  approval: "Approval timed out: the command was not run. Ask Hermes to try again when you are ready to answer.",
+  secret: "Secret prompt closed: no answer in time, so the step that needed it was skipped. Send your request again when you are ready to enter it.",
+  sudo: "Password prompt closed: no answer in time, so the command was skipped. Send your request again when you are ready to enter it.",
+  "vault.code": "Verification-code prompt closed: no answer in time, so the sign-in was skipped. Send your request again when you have the code.",
+  "vault.save_login": "Save-login prompt closed: no answer in time, so nothing was saved. Send your request again when you are ready.",
+  "vault.unlock_prompt": "Unlock prompt closed: no answer in time, so the password manager stayed locked. Send your request again when you are ready to unlock it."
+};
+function promptTimeoutNotice(method, reason) {
+  return reason === "timeout" && typeof method === "string" ? TIMEOUT_NOTICES[method] ?? null : null;
+}
+function promptOverlay(host, prompt) {
+  switch (prompt.kind) {
+    case "approval":
+      return approvalOverlay(host, prompt);
+    case "clarify":
+      if (!prompt.questions.length) {
+        settleQuietly(prompt.req.respond({}));
+        return null;
+      }
+      return clarifyOverlay(host, prompt);
+    case "masked":
+      return maskedOverlay(host, prompt);
+  }
 }
 function confirmOverlay(host, ask) {
   const key2 = `confirm:${ask.title}`;
@@ -63259,8 +63228,8 @@ SELECT r.id, COALESCE(NULLIF(r.display_name, ''), r.title, '') AS title, r.sourc
 FROM spans sp JOIN sessions r ON r.id = sp.root LEFT JOIN sessions tip ON tip.id = sp.tip
 ORDER BY sp.last_active DESC
 LIMIT ?`;
-function flat2(text12) {
-  return (text12 ?? "").replace(/^\[[A-Z][A-Z -]+\][^\n]*\n?/gm, "").replace(/\s+/g, " ").trim();
+function flat2(text13) {
+  return (text13 ?? "").replace(/^\[[A-Z][A-Z -]+\][^\n]*\n?/gm, "").replace(/\s+/g, " ").trim();
 }
 function storedSessions(limit = 400, db = stateDbPath()) {
   let conn;
@@ -63781,7 +63750,7 @@ var isBrowserAction = oneOf(["connect", "disconnect", "status", "use"]);
 async function browser(host, arg) {
   const [first = "status", ...rest] = words2(arg);
   const action = first.toLowerCase();
-  const note = (text12, tone) => host.transcript.notice(text12, tone);
+  const note = (text13, tone) => host.transcript.notice(text13, tone);
   if (!isBrowserAction(action)) {
     return note("Usage: /browser [status|use [on|off]|connect [url]|disconnect]", "warning");
   }
@@ -64088,12 +64057,12 @@ function storedCompactions(sid, db = stateDbPath(), lineage = ancestry) {
   }
 }
 function handoff(content5) {
-  const text12 = textOf(content5);
-  const from = text12.indexOf(MARKER2);
+  const text13 = textOf(content5);
+  const from = text13.indexOf(MARKER2);
   if (from < 0) {
     return {};
   }
-  const body = text12.slice(from);
+  const body = text13.slice(from);
   const count = /\bThe (\d+) compacted message/.exec(body);
   const start = body.indexOf("\n## ");
   const end = body.indexOf(END);
@@ -64114,13 +64083,13 @@ function textOf(content5) {
     return content5;
   }
 }
-function lineTokens(text12) {
+function lineTokens(text13) {
   const num6 = (s2) => Number(s2.replace(/,/g, ""));
-  const pair3 = /~([\d,]+)\s*→\s*~([\d,]+)\s*tok/.exec(text12);
+  const pair3 = /~([\d,]+)\s*→\s*~([\d,]+)\s*tok/.exec(text13);
   if (pair3) {
     return { after: num6(pair3[2]), before: num6(pair3[1]) };
   }
-  const one5 = /~([\d,]+)\s*tok/.exec(text12);
+  const one5 = /~([\d,]+)\s*tok/.exec(text13);
   return one5 ? { before: num6(one5[1]) } : {};
 }
 
@@ -64134,25 +64103,25 @@ function lastTurnRewind(snapshot3) {
 }
 var TEXT_PARTS = /* @__PURE__ */ new Set(["input_text", "output_text", "text"]);
 function retryText(content5) {
-  let text12 = "";
+  let text13 = "";
   for (const part of typeof content5 === "string" ? [content5] : Array.isArray(content5) ? content5 : [null]) {
     if (typeof part === "string") {
-      text12 += part;
+      text13 += part;
     } else if (part?.type && TEXT_PARTS.has(part.type) && typeof part.text === "string" && Object.keys(part).length === 2) {
-      text12 += part.text;
+      text13 += part.text;
     } else {
       return null;
     }
   }
-  return text12.trim() ? text12 : "";
+  return text13.trim() ? text13 : "";
 }
 function retryTurnRewind(snapshot3) {
   const target = lastUserTurn(snapshot3);
-  const text12 = target ? retryText(target.content) : "";
-  if (text12 === null) {
+  const text13 = target ? retryText(target.content) : "";
+  if (text13 === null) {
     throw new Error("/retry: retry does not support media or unknown content parts");
   }
-  return target && text12 ? { target_message_id: target.row_id } : null;
+  return target && text13 ? { target_message_id: target.row_id } : null;
 }
 
 // src/sessionCommands.ts
@@ -64179,8 +64148,8 @@ async function rewind(host, intent) {
   if (intent === "undo") {
     return host.notice(`Undid ${plural2(removed, "message")}.`);
   }
-  const text12 = retryText(result.target_message?.content);
-  return text12 ? host.send(text12) : host.notice("Nothing to retry.");
+  const text13 = retryText(result.target_message?.content);
+  return text13 ? host.send(text13) : host.notice("Nothing to retry.");
 }
 function compressReport(summary4) {
   const head2 = summary4?.headline ? `${summary4.noop ? "" : "\u2713 "}${summary4.headline}` : "\u2713 Transcript compressed.";
@@ -64302,8 +64271,8 @@ async function rollback(host, arg) {
       return host.notice("Usage: /rollback diff <checkpoint>", "warning");
     }
     const r2 = await rpc(host.gw, "rollback.diff", { hash: rest[0], session_id: host.sid });
-    const text12 = [r2?.stat?.trim(), r2?.diff?.trim()].filter(Boolean).join("\n\n");
-    return text12 ? host.panel("Rollback diff", text12) : host.notice("No changes since this checkpoint.");
+    const text13 = [r2?.stat?.trim(), r2?.diff?.trim()].filter(Boolean).join("\n\n");
+    return text13 ? host.panel("Rollback diff", text13) : host.notice("No changes since this checkpoint.");
   }
   const file2 = rest.join(" ").trim();
   const r = await rpc(host.gw, "rollback.restore", {
@@ -64340,8 +64309,8 @@ var COMMANDS2 = [
 var SESSION_COMMANDS = COMMANDS2.map((c) => ({ ...c, run: guarded2(c.name, c.run) }));
 
 // src/transcript/messages.ts
-function userEntry(id, { text: text12, at = Date.now(), steered = false, attachments = [] }) {
-  return { at, id, kind: "user", text: text12, ...steered ? { steered } : {}, ...attachments.length ? { attachments } : {} };
+function userEntry(id, { text: text13, at = Date.now(), steered = false, attachments = [] }) {
+  return { at, id, kind: "user", text: text13, ...steered ? { steered } : {}, ...attachments.length ? { attachments } : {} };
 }
 function failure(error, code7) {
   const http = /^HTTP (\d{3}):\s*/.exec(error);
@@ -64371,36 +64340,36 @@ function displayNotice(kind, metadata) {
 }
 var INTERNAL_FOOTER = "[INTERNAL NOTIFICATION \u2014 generated by the Hermes gateway";
 function internalNotice(content5) {
-  const text12 = content5.trim();
-  if (text12.startsWith("[ASYNC DELEGATION BATCH COMPLETE")) {
+  const text13 = content5.trim();
+  if (text13.startsWith("[ASYNC DELEGATION BATCH COMPLETE")) {
     return "Subagents finished";
   }
-  if (text12.startsWith("[ASYNC DELEGATION COMPLETE")) {
+  if (text13.startsWith("[ASYNC DELEGATION COMPLETE")) {
     return "Subagent finished";
   }
-  if (text12.startsWith("[ASYNC DELEGATION TASK FAILED")) {
+  if (text13.startsWith("[ASYNC DELEGATION TASK FAILED")) {
     return "Subagent failed";
   }
-  if (text12.startsWith("[Continuing toward your standing goal]")) {
+  if (text13.startsWith("[Continuing toward your standing goal]")) {
     return "Continuing toward the goal";
   }
-  const wakeup = /^\[\/loop wakeup #(\d+)(?:, ([^\]]+))?\]/.exec(text12);
+  const wakeup = /^\[\/loop wakeup #(\d+)(?:, ([^\]]+))?\]/.exec(text13);
   if (wakeup) {
     return `Loop run #${wakeup[1]}${wakeup[2] ? ` \xB7 ${wakeup[2]}` : ""}`;
   }
-  const watch2 = /^\[IMPORTANT: Background process \S+ matched watch pattern "([^"]*)"/.exec(text12);
+  const watch2 = /^\[IMPORTANT: Background process \S+ matched watch pattern "([^"]*)"/.exec(text13);
   if (watch2) {
     return `Watcher matched "${watch2[1]}"`;
   }
-  if (/^\[Background process \S+ heartbeat/.test(text12)) {
+  if (/^\[Background process \S+ heartbeat/.test(text13)) {
     return "Background command still running";
   }
-  const done = /^\[IMPORTANT: Background process \S+ ([^(]+?) \(exit code ([^)\s]+)/.exec(text12);
+  const done = /^\[IMPORTANT: Background process \S+ ([^(]+?) \(exit code ([^)\s]+)/.exec(text13);
   if (done) {
     const how = done[1] === "completed normally" ? "finished" : done[1];
     return `Background command ${how}${done[2] === "0" ? "" : ` (exit ${done[2]})`}`;
   }
-  return text12.includes(INTERNAL_FOOTER) ? "Hermes notice" : void 0;
+  return text13.includes(INTERNAL_FOOTER) ? "Hermes notice" : void 0;
 }
 function continuation(prev) {
   if (prev?.kind !== "turn") {
@@ -64418,11 +64387,11 @@ function continuation(prev) {
 var STEER_OPEN = "[OUT-OF-BAND USER MESSAGE";
 var STEER_CLOSE = "[/OUT-OF-BAND USER MESSAGE]";
 function steerText(content5) {
-  const text12 = content5.trim();
-  if (!text12.startsWith(STEER_OPEN)) {
+  const text13 = content5.trim();
+  if (!text13.startsWith(STEER_OPEN)) {
     return void 0;
   }
-  const body = text12.slice(text12.indexOf("]") + 1);
+  const body = text13.slice(text13.indexOf("]") + 1);
   const end = body.lastIndexOf(STEER_CLOSE);
   return (end >= 0 ? body.slice(0, end) : body).trim();
 }
@@ -64663,20 +64632,20 @@ var BOX = /[─-╿]/;
 var RULE2 = /^\s*\+[-=+]{3,}\+?\s*$/;
 var COLUMNS = /^\s{0,4}[^\s•\-*>#`|][^\n]*?\S {2,}\S/;
 var ESC3 = String.fromCharCode(27);
-function isPreformatted(text12) {
-  if (text12.includes(`${ESC3}[`) || BOX.test(text12)) {
+function isPreformatted(text13) {
+  if (text13.includes(`${ESC3}[`) || BOX.test(text13)) {
     return true;
   }
-  const lines = text12.split("\n").filter((l) => l.trim());
+  const lines = text13.split("\n").filter((l) => l.trim());
   if (lines.some((l) => RULE2.test(l))) {
     return true;
   }
   const aligned = lines.filter((l) => COLUMNS.test(l)).length;
   return aligned >= 3 && aligned >= lines.length / 2;
 }
-function hardBreaks(text12) {
+function hardBreaks(text13) {
   let fenced = false;
-  return text12.split("\n").map((line, i, all8) => {
+  return text13.split("\n").map((line, i, all8) => {
     if (/^\s*(```|~~~)/.test(line)) {
       fenced = !fenced;
       return line;
@@ -64811,8 +64780,8 @@ function slashBody(e) {
   }
   return [textBody(e.text, "body")];
 }
-function textBody(text12, key2) {
-  return isPreformatted(text12) ? /* @__PURE__ */ jsx("ansi", { text: text12 }, key2) : /* @__PURE__ */ jsx("md", { children: hardBreaks(text12) }, key2);
+function textBody(text13, key2) {
+  return isPreformatted(text13) ? /* @__PURE__ */ jsx("ansi", { text: text13 }, key2) : /* @__PURE__ */ jsx("md", { children: hardBreaks(text13) }, key2);
 }
 function heading4(icon, title, note) {
   return /* @__PURE__ */ jsxs("row", { align: "center", gap: "xs", children: [
@@ -65089,18 +65058,18 @@ function welcomeNode(key2, cx) {
 }
 var TIP_LINE = /^\s+t\d+:\s+"((?:[^"\\]|\\.)*)"\s*$/;
 function randomTip(root7) {
-  let text12;
+  let text13;
   try {
-    text12 = readFileSync4(join9(root7, "locales", "en.yaml"), "utf8");
+    text13 = readFileSync4(join9(root7, "locales", "en.yaml"), "utf8");
   } catch {
     return "";
   }
-  const start = text12.search(/^tips:\s*$/m);
+  const start = text13.search(/^tips:\s*$/m);
   if (start < 0) {
     return "";
   }
   const tips = [];
-  for (const line of text12.slice(start).split("\n").slice(1)) {
+  for (const line of text13.slice(start).split("\n").slice(1)) {
     if (/^\S/.test(line)) {
       break;
     }
@@ -65121,8 +65090,8 @@ function workingNode(turn, now) {
 }
 var LIVE_MAX = 120;
 function liveText(label) {
-  const text12 = label.length > LIVE_MAX ? `${label.slice(0, LIVE_MAX - 1)}\u2026` : label;
-  return shimmerText({ key: "label", role: "hermes.work.live", text: text12 });
+  const text13 = label.length > LIVE_MAX ? `${label.slice(0, LIVE_MAX - 1)}\u2026` : label;
+  return shimmerText({ key: "label", role: "hermes.work.live", text: text13 });
 }
 function latestFailed(items) {
   const last = items.findLast((i) => i.kind === "tool");
@@ -65378,13 +65347,13 @@ function steerNode(b, state) {
     ] }, "how")
   ] }, b.id);
 }
-function copyButton(text12, id, role, title, cx) {
+function copyButton(text13, id, role, title, cx) {
   const copied = cx.copied === id;
   return /* @__PURE__ */ jsx(
     "icon",
     {
       name: copied ? "check" : "copy",
-      onClick: () => cx.copy(text12, id),
+      onClick: () => cx.copy(text13, id),
       role,
       title: copied ? "Copied" : title
     },
@@ -65634,12 +65603,12 @@ function copyAnswer(host, arg) {
   }
   const answers = host.transcript.entries.flatMap((e) => e.kind === "turn" && answerText(e) ? [answerText(e)] : []);
   const at = n === void 0 ? answers.length : Math.min(n, answers.length);
-  const text12 = answers[at - 1];
-  if (!text12) {
+  const text13 = answers[at - 1];
+  if (!text13) {
     return host.transcript.notice("No answer to copy yet.", "warning");
   }
-  copyToClipboard(text12);
-  host.transcript.notice(`Copied ${n === void 0 ? "the last answer" : `answer ${at}`} (${text12.length} characters).`);
+  copyToClipboard(text13);
+  host.transcript.notice(`Copied ${n === void 0 ? "the last answer" : `answer ${at}`} (${text13.length} characters).`);
 }
 function historyText(entries, arg) {
   const preview5 = Math.max(80, Number.parseInt(arg, 10) || 400);
@@ -65690,11 +65659,11 @@ var RPC_UNKNOWN_METHOD = -32601;
 var DETAIL_LIMIT = 300;
 var rpcShape = (err) => err instanceof Error ? { code: err.code, message: err.message } : {};
 var detailLine = (raw2) => {
-  const text12 = (raw2 ?? "").replace(/\s+/g, " ").trim();
-  if (!text12) {
+  const text13 = (raw2 ?? "").replace(/\s+/g, " ").trim();
+  if (!text13) {
     return null;
   }
-  return t("userMessages.details", text12.length > DETAIL_LIMIT ? `${text12.slice(0, DETAIL_LIMIT - 1)}\u2026` : text12);
+  return t("userMessages.details", text13.length > DETAIL_LIMIT ? `${text13.slice(0, DETAIL_LIMIT - 1)}\u2026` : text13);
 };
 var STDERR_PROBLEM_RE = /Traceback|\b[A-Z][A-Za-z]*(?:Error|Exception)\b:|CRITICAL|\[gateway-turn\]|\[gateway-exit\]|^gateway (?:absent|conflict|draining|inaccessible|incompatible|starting|unavailable): /;
 var stderrLooksLikeProblem = (line) => STDERR_PROBLEM_RE.test(line);
@@ -65709,44 +65678,44 @@ var NOT_CONNECTED_RE = /^gateway not (?:connected|running)\b/;
 var TIMED_OUT_RE = /^request timed out after (\d+)s/;
 var RPC_ERROR_ROWS = [
   [
-    (code7, text12) => (code7 === RPC_SESSION_NOT_FOUND || code7 === void 0) && SESSION_NOT_FOUND_RE.test(text12),
+    (code7, text13) => (code7 === RPC_SESSION_NOT_FOUND || code7 === void 0) && SESSION_NOT_FOUND_RE.test(text13),
     () => t("userMessages.rpc.sessionNotFound")
   ],
-  [(_code, text12) => NOT_CONNECTED_RE.test(text12), () => t("userMessages.rpc.notConnected")],
-  [(_code, text12) => TIMED_OUT_RE.exec(text12), (m) => t("userMessages.rpc.timedOut", m?.[1] ?? "?")]
+  [(_code, text13) => NOT_CONNECTED_RE.test(text13), () => t("userMessages.rpc.notConnected")],
+  [(_code, text13) => TIMED_OUT_RE.exec(text13), (m) => t("userMessages.rpc.timedOut", m?.[1] ?? "?")]
 ];
 var rpcErrorLogSink = null;
-var logReplacedWireText = (code7, text12) => {
-  rpcErrorLogSink?.(`[rpc] ${code7 === void 0 ? "" : `code=${code7} `}${text12}`);
+var logReplacedWireText = (code7, text13) => {
+  rpcErrorLogSink?.(`[rpc] ${code7 === void 0 ? "" : `code=${code7} `}${text13}`);
 };
 var describeRpcError = (err) => {
   const { code: code7, message } = rpcShape(err);
-  const text12 = message ?? (typeof err === "string" && err.trim() ? err : t("rpc.requestFailed"));
+  const text13 = message ?? (typeof err === "string" && err.trim() ? err : t("rpc.requestFailed"));
   if (isVersionSkewError(err)) {
-    logReplacedWireText(code7, text12);
+    logReplacedWireText(code7, text13);
     return versionSkewMessage();
   }
   for (const [matcher, render3] of RPC_ERROR_ROWS) {
-    const m = matcher(code7, text12);
+    const m = matcher(code7, text13);
     if (m) {
-      logReplacedWireText(code7, text12);
+      logReplacedWireText(code7, text13);
       return render3(m === true ? null : m);
     }
   }
-  return text12;
+  return text13;
 };
 var isUnsupportedCommand = (err) => err?.data?.reason === "unsupported_command";
 var describeSlashExecError = (command, err) => {
   const { message } = rpcShape(err);
-  const text12 = message ?? "";
+  const text13 = message ?? "";
   if (isUnsupportedCommand(err)) {
     return t("canonical.controls.notAvailable", command);
   }
-  if (/slash worker timed out/.test(text12)) {
+  if (/slash worker timed out/.test(text13)) {
     return t("userMessages.rpc.slashTimedOut", command);
   }
-  if (/slash worker (?:exited|closed pipe|start failed)/.test(text12)) {
-    const detail = detailLine(text12.replace(/^slash worker (?:exited|closed pipe:?|start failed:?)\s*/, ""));
+  if (/slash worker (?:exited|closed pipe|start failed)/.test(text13)) {
+    const detail = detailLine(text13.replace(/^slash worker (?:exited|closed pipe:?|start failed:?)\s*/, ""));
     return [t("userMessages.rpc.slashCrashed", command), detail].filter(Boolean).join("\n");
   }
   return describeRpcError(err);
@@ -65875,8 +65844,8 @@ function commandEnvelope(raw2) {
     warning: "warning" in legacy && typeof legacy.warning === "string" ? legacy.warning : void 0
   };
 }
-async function runSlash(text12, cx, resolve7 = true) {
-  const [typed = "", ...rest] = text12.slice(1).split(/\s+/);
+async function runSlash(text13, cx, resolve7 = true) {
+  const [typed = "", ...rest] = text13.slice(1).split(/\s+/);
   const name = typed.toLowerCase();
   const arg = rest.join(" ");
   const local = localCommand(name);
@@ -65915,7 +65884,7 @@ async function runSlash(text12, cx, resolve7 = true) {
   }
   const title = `/${name}${arg ? ` ${arg}` : ""}`;
   try {
-    const r = await rpc(cx.gw, "slash.exec", { command: text12.slice(1), session_id: sid });
+    const r = await rpc(cx.gw, "slash.exec", { command: text13.slice(1), session_id: sid });
     if (stale()) {
       return;
     }
@@ -66332,13 +66301,13 @@ var Notices = class {
   #seq = 0;
   /** Adds or replaces the notice; returns it (undefined for an empty one). */
   show(p3, now = Date.now()) {
-    const text12 = p3.text?.trim();
-    if (!text12) {
+    const text13 = p3.text?.trim();
+    if (!text13) {
       return void 0;
     }
     const key2 = p3.key || p3.id || `n${++this.#seq}`;
     const ttl = p3.kind === "ttl" && typeof p3.ttl_ms === "number" && p3.ttl_ms > 0 ? p3.ttl_ms : void 0;
-    const notice = { key: key2, text: text12, tone: TONES2[p3.level ?? ""] ?? "info", ...ttl ? { expires: now + ttl } : {} };
+    const notice = { key: key2, text: text13, tone: TONES2[p3.level ?? ""] ?? "info", ...ttl ? { expires: now + ttl } : {} };
     this.#list = [...this.#list.filter((n) => n.key !== key2), notice];
     return notice;
   }
@@ -66444,11 +66413,11 @@ var chromeHandlers = {
   },
   // What the background self-improvement review saved to memory or skills.
   "review.summary": (ev, cx) => {
-    const text12 = String(ev.payload?.text ?? "").trim();
-    if (!text12) {
+    const text13 = String(ev.payload?.text ?? "").trim();
+    if (!text13) {
       return "quiet";
     }
-    cx.transcript.notice(text12);
+    cx.transcript.notice(text13);
     return "render";
   },
   notice: (ev, cx) => {
@@ -66606,9 +66575,9 @@ var IMAGE_ONLY_PROMPT = "What do you see in this image?";
 function shownText(prompt) {
   return (prompt.kind === "command" ? prompt.display : void 0) ?? prompt.text;
 }
-function userText(text12, images) {
+function userText(text13, images) {
   const count = images.length ? `\u{1F4CE} ${images.length} image${images.length === 1 ? "" : "s"}` : "";
-  return [text12, count].filter(Boolean).join("\n\n");
+  return [text13, count].filter(Boolean).join("\n\n");
 }
 function userImages(images) {
   return images.map((i) => ({ kind: "image", name: i.name, ...i.preview ? { source: i.preview } : {} }));
@@ -66693,27 +66662,27 @@ function moaReferenceLabel(label, index2, count) {
 // src/status.ts
 var COMPACTING_LABEL = "Compacting context\u2026";
 function statusEffect(payload, last) {
-  const text12 = payload?.text?.trim();
+  const text13 = payload?.text?.trim();
   const kind = payload?.kind ?? "";
-  if (!text12) {
+  if (!text13) {
     return kind === "ready" ? { compacting: false } : {};
   }
   if (kind === "goal") {
-    return { notice: { text: text12, tone: text12.startsWith("\u2713") ? "success" : "info" } };
+    return { notice: { text: text13, tone: text13.startsWith("\u2713") ? "success" : "info" } };
   }
   if (kind === "compacting" || kind === "compressing") {
-    return { compacting: true, label: COMPACTING_LABEL, ...counted(text12) };
+    return { compacting: true, label: COMPACTING_LABEL, ...counted(text13) };
   }
   if (kind === "compacted" || kind === "ready") {
-    return { compacting: false, label: text12, ...counted(text12) };
+    return { compacting: false, label: text13, ...counted(text13) };
   }
   if (kind === "warn" || kind === "approval" || kind === "error") {
-    return text12 === last ? {} : { note: text12, notice: { text: text12, tone: kind === "error" ? "error" : "warning" } };
+    return text13 === last ? {} : { note: text13, notice: { text: text13, tone: kind === "error" ? "error" : "warning" } };
   }
-  return { label: text12 };
+  return { label: text13 };
 }
-function counted(text12) {
-  const tokens2 = lineTokens(text12);
+function counted(text13) {
+  const tokens2 = lineTokens(text13);
   return tokens2.before || tokens2.after ? { tokens: tokens2 } : {};
 }
 
@@ -66753,8 +66722,8 @@ function afterMessageComplete(p3, cx) {
 }
 
 // src/gateway/handlers/turn.ts
-function kaomojiLabel(text12) {
-  const word = text12.match(/([A-Za-z][A-Za-z ]*[A-Za-z])\.{2,}\s*$/)?.[1];
+function kaomojiLabel(text13) {
+  const word = text13.match(/([A-Za-z][A-Za-z ]*[A-Za-z])\.{2,}\s*$/)?.[1];
   return word ? `${word.charAt(0).toUpperCase()}${word.slice(1)}\u2026` : "";
 }
 function moaStep(ev, cx) {
@@ -67024,10 +66993,10 @@ async function openHelp(host) {
             { grow: 1, head: "Description", id: "action" }
           ],
           role: "omp.hotkeys.table",
-          rows: (c.pairs ?? []).map(([command = "", text12 = ""], i) => ({
+          rows: (c.pairs ?? []).map(([command = "", text13 = ""], i) => ({
             // The `(usage: …)` tail is `/help <command>`'s business; the table keeps the summary.
             cells: {
-              action: [{ t: text12.replace(/\s*\(usage: .+\)\s*$/, "") }],
+              action: [{ t: text13.replace(/\s*\(usage: .+\)\s*$/, "") }],
               command: [{ s: "mono", t: command }]
             },
             id: String(i)
@@ -67871,8 +67840,8 @@ var REFUSALS = [
   ["command_failed", "the command could not start"]
 ];
 function shellError(error) {
-  const text12 = errorText(error);
-  return REFUSALS.find(([code7]) => text12.includes(code7))?.[1] ?? describeRpcError(error);
+  const text13 = errorText(error);
+  return REFUSALS.find(([code7]) => text13.includes(code7))?.[1] ?? describeRpcError(error);
 }
 async function shellExec(gw2, sid, command) {
   const r = await rpc(gw2, "shell.exec", { command, session_id: sid });
@@ -67888,11 +67857,11 @@ function shellLines(r) {
     ...r.code !== 0 || !out ? [{ failed: r.code !== 0, text: `exit ${r.code}` }] : []
   ];
 }
-function typedCommands(text12, pasted = []) {
-  return [...text12.matchAll(new RegExp(INTERPOLATION_RE.source, "g"))].filter((m) => !pasted.some((p3) => p3.includes(m[0])));
+function typedCommands(text13, pasted = []) {
+  return [...text13.matchAll(new RegExp(INTERPOLATION_RE.source, "g"))].filter((m) => !pasted.some((p3) => p3.includes(m[0])));
 }
-async function interpolate(gw2, sid, text12, pasted = []) {
-  const matches2 = typedCommands(text12, pasted);
+async function interpolate(gw2, sid, text13, pasted = []) {
+  const matches2 = typedCommands(text13, pasted);
   const results = await Promise.all(
     matches2.map(async (m) => {
       const r = await shellExec(gw2, sid, m[1] ?? "");
@@ -67901,7 +67870,7 @@ async function interpolate(gw2, sid, text12, pasted = []) {
   );
   return matches2.reduceRight(
     (acc, m, i) => acc.slice(0, m.index) + (results[i] ?? "") + acc.slice((m.index ?? 0) + m[0].length),
-    text12
+    text13
   );
 }
 
@@ -68178,6 +68147,113 @@ function openAutomation(host, which) {
   };
   host.open(overlay2);
   closeIfGone();
+}
+
+// node_modules/@hermes/shared/src/gateway-contract.generated.ts
+var SERVER_REQUEST_METHODS = [
+  "approval",
+  "clarify",
+  "display.install.sudo",
+  "preview.act",
+  "preview.read",
+  "secret",
+  "setup_beat",
+  "sudo",
+  "terminal.read",
+  "theme.apply",
+  "theme.pick",
+  "tour",
+  "vault.code",
+  "vault.save_login",
+  "vault.unlock_prompt",
+  "window.read"
+];
+
+// src/wire/requests.ts
+var KNOWN = new Set(SERVER_REQUEST_METHODS);
+function serverRequest(req) {
+  return KNOWN.has(req.method) ? req : void 0;
+}
+
+// src/prompts/parse.ts
+var text12 = (v) => typeof v === "string" ? v : "";
+var strings3 = (v) => Array.isArray(v) ? v.filter((x) => typeof x === "string") : [];
+var APPROVAL_ORDER = ["once", "session", "always", "deny"];
+function parsePrompt(req) {
+  const known2 = serverRequest(req);
+  if (!known2) {
+    return void 0;
+  }
+  switch (known2.method) {
+    case "approval":
+      return approvalOf(req, known2);
+    case "clarify":
+      return { answers: lockedAnswers(known2.params.answers), kind: "clarify", questions: questionsOf(known2.params.questions), req };
+    case "sudo":
+    case "secret":
+    case "vault.unlock_prompt":
+    case "vault.code":
+    case "vault.save_login":
+      return maskedOf(req, known2.method, known2.params);
+    default:
+      return void 0;
+  }
+}
+function approvalOf(req, { params: p3 }) {
+  const smartDenied = p3.smart_denied === true;
+  const offered = strings3(p3.choices);
+  const allowed = new Set(
+    offered.length ? offered : smartDenied ? ["once", "deny"] : p3.allow_permanent === false ? ["once", "session", "deny"] : ["once", "session", "always", "deny"]
+  );
+  if (p3.allow_session === false) {
+    allowed.delete("session");
+  }
+  return {
+    choices: APPROVAL_ORDER.filter((c) => allowed.has(c)),
+    command: text12(p3.command),
+    description: text12(p3.description),
+    kind: "approval",
+    req,
+    requestId: typeof p3.request_id === "string" ? p3.request_id : void 0,
+    smartDenied
+  };
+}
+function questionsOf(raw2) {
+  if (!Array.isArray(raw2)) {
+    return [];
+  }
+  return raw2.flatMap((q2) => {
+    if (!q2 || typeof q2 !== "object" || !("qid" in q2) || !("question" in q2)) {
+      return [];
+    }
+    const question = text12(q2.question).trim();
+    return question ? [{ choices: "choices" in q2 ? strings3(q2.choices) : [], multi: "multi_select" in q2 && q2.multi_select === true, qid: text12(q2.qid), question }] : [];
+  });
+}
+function lockedAnswers(preset) {
+  const answers = {};
+  if (preset && typeof preset === "object") {
+    for (const qid in preset) {
+      const v = Reflect.get(preset, qid);
+      if (typeof v === "string" || v === null) {
+        answers[qid] = v;
+      }
+    }
+  }
+  return answers;
+}
+function maskedOf(req, method, p3) {
+  return {
+    command: text12(p3.command),
+    envVar: text12(p3.env_var),
+    hint: text12(p3.hint),
+    kind: "masked",
+    manager: text12(p3.display_name) || text12(p3.backend),
+    method,
+    prompt: text12(p3.prompt),
+    req,
+    site: text12(p3.site) || text12(p3.origin)
+  };
 }
 
 // src/surface/osc.ts
@@ -68587,7 +68663,7 @@ var AppActions = class {
       router: cx.router,
       setCompacting: (on, opts) => this.setCompacting(on, opts),
       state: cx.state,
-      submit: (text12) => this.submit(text12, true, "queue"),
+      submit: (text13) => this.submit(text13, true, "queue"),
       transcript
     };
   }
@@ -68596,8 +68672,8 @@ var AppActions = class {
     return this.#copied;
   }
   /** A Copy button: `text` to the clipboard, and its button reads Copied for a moment. */
-  copy = (text12, id) => {
-    copyToClipboard(text12);
+  copy = (text13, id) => {
+    copyToClipboard(text13);
     this.#copied = id;
     this.#cx.changed();
     clearTimeout(this.#copiedTimer);
@@ -68624,25 +68700,25 @@ var AppActions = class {
    */
   submit(raw2, draft = true, busy = draft ? this.#cx.state.busyMode : "queue", pasted = []) {
     const { attachments, composer: composer2, transcript } = this.#cx;
-    const text12 = raw2.trim();
-    if (draft && attachments.uploading && !text12.startsWith("/")) {
+    const text13 = raw2.trim();
+    if (draft && attachments.uploading && !text13.startsWith("/")) {
       composer2.set(raw2);
       composer2.repasted(pasted);
       transcript.notice("An image is still attaching. Send again in a moment.", "warning");
       return;
     }
-    if (!text12 && !(draft && attachments.items.length)) {
+    if (!text13 && !(draft && attachments.items.length)) {
       return;
     }
-    if (text12.startsWith("/")) {
-      void runSlash(text12, this.slash);
+    if (text13.startsWith("/")) {
+      void runSlash(text13, this.slash);
       return;
     }
-    if (text12.startsWith("!") && text12.slice(1).trim() && !pasted.some((p3) => text12.startsWith(p3.trim().split("\n")[0] ?? ""))) {
-      void this.#shell(text12.slice(1).trim());
+    if (text13.startsWith("!") && text13.slice(1).trim() && !pasted.some((p3) => text13.startsWith(p3.trim().split("\n")[0] ?? ""))) {
+      void this.#shell(text13.slice(1).trim());
       return;
     }
-    this.#cx.router.route({ images: draft ? attachments.take() : [], kind: "typed", pasted, text: text12 }, busy, "typed");
+    this.#cx.router.route({ images: draft ? attachments.take() : [], kind: "typed", pasted, text: text13 }, busy, "typed");
   }
   /** What the router's gates read: the session, the switch in flight, the turn, the compaction and the startup image. */
   gates() {
@@ -68659,9 +68735,9 @@ var AppActions = class {
   /** Puts a prompt that did not go back into the composer, before any text there, with its images. */
   restore(prompt) {
     const { composer: composer2 } = this.#cx;
-    const text12 = shownText(prompt);
-    composer2.set(text12 && composer2.text ? `${text12}
-${composer2.text}` : text12 || composer2.text);
+    const text13 = shownText(prompt);
+    composer2.set(text13 && composer2.text ? `${text13}
+${composer2.text}` : text13 || composer2.text);
     composer2.repasted(prompt.kind === "typed" ? prompt.pasted : []);
     this.#cx.attachments.restore(prompt.images);
   }
@@ -68756,12 +68832,13 @@ ${composer2.text}` : text12 || composer2.text);
     if (this.#cx.life.route(req) !== "show") {
       return;
     }
-    const overlay2 = promptOverlay(this.#cx.chat, req);
-    if (!overlay2) {
+    const prompt = parsePrompt(req);
+    const overlay2 = prompt && promptOverlay(this.#cx.chat, prompt);
+    if (!prompt || !overlay2) {
       req.fail(-32601, `${req.method} is not supported by the Tern frontend`);
       return;
     }
-    this.#cx.sheets.open(overlay2, req);
+    this.#cx.sheets.open(overlay2, prompt);
   }
   /** `bytes` sent to Tern as a blob; undefined where it takes none, or for more than a blob holds. */
   blob(bytes, mime) {
@@ -69149,9 +69226,9 @@ function compactingNode(c, now) {
   });
 }
 function effortChip(r, on) {
-  const text12 = effortText(r.effort, r.effortWire);
+  const text13 = effortText(r.effort, r.effortWire);
   const glyph = r.effort === "none" ? "off" : r.effortWire || r.effort || DEFAULT_EFFORT;
-  const clamp2 = text12.includes("\u2192") ? ` (this route sends ${r.effortWire})` : "";
+  const clamp2 = text13.includes("\u2192") ? ` (this route sends ${r.effortWire})` : "";
   return /* @__PURE__ */ jsxs(
     "row",
     {
@@ -69160,10 +69237,10 @@ function effortChip(r, on) {
       onClick: on.onEffort,
       onMenu: on.onEffortMenu,
       role: "omp.composer.effort",
-      title: `Reasoning effort: ${text12}${r.effort ? clamp2 : " (the default)"} \xB7 click to cycle  \u21E7\u21E5 \xB7 right-click to choose or save as default`,
+      title: `Reasoning effort: ${text13}${r.effort ? clamp2 : " (the default)"} \xB7 click to cycle  \u21E7\u21E5 \xB7 right-click to choose or save as default`,
       children: [
         /* @__PURE__ */ jsx("effort", { level: glyph }, "glyph"),
-        /* @__PURE__ */ jsx("text", { spans: [{ s: r.effort ? void 0 : "muted", t: text12 }], wrap: "none" }, "level")
+        /* @__PURE__ */ jsx("text", { spans: [{ s: r.effort ? void 0 : "muted", t: text13 }], wrap: "none" }, "level")
       ]
     },
     "effort"
@@ -69872,7 +69949,7 @@ function referenceBackground(isLight, env2 = process.env) {
   return isLight ? "#ffffff" : "#101014";
 }
 function deriveTones(seeds) {
-  const { accent, bg, text: text12 } = seeds;
+  const { accent, bg, text: text13 } = seeds;
   const isLight = (relativeLuminance(bg) ?? 0) > 0.5;
   const surface = mix(bg, desaturate(accent, 0.15), isLight ? 0.045 : 0.09);
   return {
@@ -69881,8 +69958,8 @@ function deriveTones(seeds) {
     // to ink blends: muted #946C08 ≈ desat(accent .05), label #8E6B13 ≈
     // desat(mix(accent, text, .03), .15), statusFg #6F6F6F ≈ gray 30% lift.
     muted: isLight ? desaturate(accent, 0.05) : desaturate(mix(accent, bg, 0.19), 0.16),
-    label: isLight ? desaturate(mix(accent, text12, 0.03), 0.15) : desaturate(mix(accent, bg, 0.13), 0.16),
-    statusFg: grayOf(mix(text12, bg, isLight ? 0.3 : 0.24)),
+    label: isLight ? desaturate(mix(accent, text13, 0.03), 0.15) : desaturate(mix(accent, bg, 0.13), 0.16),
+    statusFg: grayOf(mix(text13, bg, isLight ? 0.3 : 0.24)),
     surface,
     activeRow: mix(surface, accent, 0.25),
     selection: isLight && seeds.shellDollar ? mix(bg, seeds.shellDollar, 0.2) : mix(surface, accent, 0.28),
@@ -70378,8 +70455,8 @@ async function withClipboardImage(use, env2 = process.env, extract = extractClip
     await rm(dir2, { force: true, recursive: true });
   }
 }
-function imagePathOf(text12, cwd) {
-  let raw2 = text12.trim();
+function imagePathOf(text13, cwd) {
+  let raw2 = text13.trim();
   if (!raw2 || raw2.includes("\n")) {
     return void 0;
   }
@@ -70432,12 +70509,12 @@ var Attachments = class {
     return Boolean(this.#startup);
   }
   /** A paste that is an image (no text: the clipboard's; one image path: that file); false for text. */
-  paste(text12) {
-    if (!text12.trim()) {
+  paste(text13) {
+    if (!text13.trim()) {
       void this.fromClipboard(true);
       return true;
     }
-    const path2 = imagePathOf(text12, this.#host.cwd());
+    const path2 = imagePathOf(text13, this.#host.cwd());
     if (path2) {
       void this.#attach(path2, basename3(path2));
       return true;
@@ -70689,8 +70766,8 @@ function github(token = tokens()) {
       },
       signal: AbortSignal.timeout(3e4)
     });
-    const text12 = await res.text();
-    const json = text12 ? JSON.parse(text12) : void 0;
+    const text13 = await res.text();
+    const json = text13 ? JSON.parse(text13) : void 0;
     if (!res.ok) {
       const message = json?.message;
       throw new GitHubError(message ? `GitHub: ${message}` : `GitHub answered ${res.status}`, res.status);
@@ -71110,17 +71187,17 @@ var OverlayStack = class {
 
 // .hermes-src/ui-tui/src/domain/slash.ts
 var INLINE_SLASH_RE = /\s\/([a-zA-Z][\w-]*)?$/;
-var inlineSlashTrigger = (text12) => {
-  const match = INLINE_SLASH_RE.exec(text12);
+var inlineSlashTrigger = (text13) => {
+  const match = INLINE_SLASH_RE.exec(text13);
   if (!match) {
     return null;
   }
   const query = match[1] ?? "";
-  return { query, start: text12.length - query.length - 1 };
+  return { query, start: text13.length - query.length - 1 };
 };
 var applyCompletion = (value, rowText2, compReplace) => {
-  const text12 = value[compReplace - 1] === "/" && rowText2.startsWith("/") ? rowText2.slice(1) : rowText2;
-  return value.slice(0, compReplace) + text12;
+  const text13 = value[compReplace - 1] === "/" && rowText2.startsWith("/") ? rowText2.slice(1) : rowText2;
+  return value.slice(0, compReplace) + text13;
 };
 var completionToApplyOnSubmit = (value, rowText2, compReplace, isLocalCommand = () => false) => {
   const typed = value.trim();
@@ -71330,7 +71407,7 @@ var Completion = class {
   }
 };
 function slashItems(items, typed) {
-  const word = (text12) => text12.replace(/^\//, "").split(/\s/)[0]?.toLowerCase() ?? "";
+  const word = (text13) => text13.replace(/^\//, "").split(/\s/)[0]?.toLowerCase() ?? "";
   if (HIDDEN_COMMANDS.has(word(typed))) {
     return [];
   }
@@ -71455,7 +71532,7 @@ Examples:
 pytest, \`tests/test_api.py::test_login PASSED [ 12%]\`:
 {"title":"pytest \xB7 tests/","rules":[{"from":"out","match":" PASSED ","count":"pass"},{"from":"out","match":" FAILED ","count":"fail"},{"from":"out","match":"^(?P<current>\\\\S+::\\\\S+) \\\\w+\\\\s+\\\\[\\\\s*(?P<pct>\\\\d+)%\\\\]","text":"current"}],"blocks":[{"kind":"meter","field":"pct","agg":"last","total":100,"label":"progress","unit":"%"},{"kind":"stat","items":[{"field":"pass","agg":"count","label":"passed"},{"field":"fail","agg":"count","label":"failed"}]}],"stage":"current"}`;
 var byteLength = (s2) => Buffer.byteLength(s2) + 1;
-var clip2 = (text12, max) => text12.length > max ? `${text12.slice(0, max - 1)}\u2026` : text12;
+var clip2 = (text13, max) => text13.length > max ? `${text13.slice(0, max - 1)}\u2026` : text13;
 function promptSources(sources) {
   let budget = MAX_SAMPLE_BYTES;
   return sources.map((source2, index2) => {
@@ -72509,41 +72586,41 @@ var CONTEXT_REF = new RegExp(`^(?:\\S+ )?@(file|folder|url|image):${VALUE}`, "gm
 var IMAGE_FILE = /\.(png|jpe?g|gif|webp)$/i;
 var unquote2 = (v) => /^([`"']).*\1$/.test(v) ? v.slice(1, -1) : v;
 function splitPrompt(raw2) {
-  let text12 = raw2;
+  let text13 = raw2;
   let hinted = [];
-  const hints = HINTS.exec(text12);
+  const hints = HINTS.exec(text13);
   if (hints) {
     const paths = [...(hints[1] ?? "").matchAll(/^\[Image attached(?: at)?: (.+)\]$/gm)].map((m) => m[1]);
     const placeholders = (hints[2] ?? "").split("[screenshot]").length - 1;
     if (placeholders === 0 || placeholders === paths.length) {
-      text12 = text12.slice(0, hints.index);
+      text13 = text13.slice(0, hints.index);
       hinted = paths;
     }
   }
   const refs = [];
-  text12 = text12.replace(IMAGE_LINE, (_line, value) => {
+  text13 = text13.replace(IMAGE_LINE, (_line, value) => {
     refs.push(unquote2(value));
     return "";
   });
   if (refs.length) {
-    text12 = text12.replace(SCREENSHOT_LINE, "");
+    text13 = text13.replace(SCREENSHOT_LINE, "");
   }
   const files = [];
-  const marker2 = ATTACHED_CONTEXT.exec(text12);
+  const marker2 = ATTACHED_CONTEXT.exec(text13);
   if (marker2) {
-    const context = text12.slice(marker2.index + marker2[0].length);
-    text12 = text12.slice(0, marker2.index);
+    const context = text13.slice(marker2.index + marker2[0].length);
+    text13 = text13.slice(0, marker2.index);
     for (const m of context.matchAll(CONTEXT_REF)) {
       const ref = `@${m[1]}:${m[2]}`;
       const end = context.indexOf("\n", m.index);
       const line = context.slice(m.index, end < 0 ? void 0 : end);
       const disk = /available on disk at `([^`]+)`/.exec(line)?.[1];
-      if (!text12.includes(ref) && !files.some((f) => f.ref === ref)) {
+      if (!text13.includes(ref) && !files.some((f) => f.ref === ref)) {
         files.push({ ref, ...disk ? { path: disk } : {} });
       }
     }
   }
-  return { files, images: [...refs, ...hinted], text: text12.replace(CONTEXT_WARNINGS, "").replace(/\n{3,}/g, "\n\n").trim() };
+  return { files, images: [...refs, ...hinted], text: text13.replace(CONTEXT_WARNINGS, "").replace(/\n{3,}/g, "\n\n").trim() };
 }
 function promptAttachments(parts3, exists = existsSync6) {
   const local = (p3) => p3.startsWith("/") && exists(p3);
@@ -72578,8 +72655,8 @@ function history({ kept, messages: messages2, compactions, id }) {
   let todos2;
   for (const m of messages2) {
     const at = typeof m.timestamp === "number" ? m.timestamp * 1e3 : 0;
-    const text12 = typeof m.text === "string" ? m.text : typeof m.content === "string" ? m.content : "";
-    const steered = m.role === "user" ? m.display_kind === "steer" ? text12.trim() : steerText(text12) : void 0;
+    const text13 = typeof m.text === "string" ? m.text : typeof m.content === "string" ? m.content : "";
+    const steered = m.role === "user" ? m.display_kind === "steer" ? text13.trim() : steerText(text13) : void 0;
     while (at > 0 && marks[0] && marks[0].at <= at) {
       due.push(marks[0]);
       marks.shift();
@@ -72592,19 +72669,19 @@ function history({ kept, messages: messages2, compactions, id }) {
     if (m.role === "user") {
       turn = void 0;
       promptAt = at;
-      const notice = displayNotice(m.display_kind, m.display_metadata) ?? internalNotice(text12);
+      const notice = displayNotice(m.display_kind, m.display_metadata) ?? internalNotice(text13);
       if (notice) {
         pendingContinued = notice;
       } else {
         pendingContinued = void 0;
-        entries.push(storedUser(id("u"), steered ?? text12, at));
+        entries.push(storedUser(id("u"), steered ?? text13, at));
       }
       continue;
     }
     if (m.role === "system") {
       turn = void 0;
-      if (text12.trim()) {
-        entries.push({ id: id("n"), kind: "notice", text: text12, tone: "info" });
+      if (text13.trim()) {
+        entries.push({ id: id("n"), kind: "notice", text: text13, tone: "info" });
       }
       continue;
     }
@@ -72626,13 +72703,13 @@ function history({ kept, messages: messages2, compactions, id }) {
       }
       if (m.display_kind === "failed_turn") {
         const surface = record(meta3?.error_surface);
-        const error = str7(meta3?.error) ?? str7(surface?.message);
+        const error = str6(meta3?.error) ?? str6(surface?.message);
         turn.status = "error";
         Object.assign(turn, error ? failure(error, surface?.code) : {});
-        turn.errorHint = text12.trim() || void 0;
+        turn.errorHint = text13.trim() || void 0;
         continue;
       }
-      const reply = typeof m.display_content === "string" ? m.display_content : text12;
+      const reply = typeof m.display_content === "string" ? m.display_content : text13;
       const notes = Array.isArray(m.display_commentary) ? m.display_commentary.filter((n) => typeof n === "string" && Boolean(n.trim())) : [];
       const flat3 = (s2) => s2.replace(/\s+/g, " ").trim();
       if (!reply.trim() || flat3(notes.join("\n\n")) !== flat3(reply)) {
@@ -72647,7 +72724,7 @@ function history({ kept, messages: messages2, compactions, id }) {
     } else if (m.role === "tool") {
       const callId = toolCallId(m.tool_call_id ?? id("c"));
       const result = typeof m.content === "string" && m.content ? m.content : void 0;
-      const diff2 = str7(record(record(m.display_metadata)?.tool_result_metadata)?.inline_diff);
+      const diff2 = str6(record(record(m.display_metadata)?.tool_result_metadata)?.inline_diff);
       const existing = calls.get(callId);
       if (existing) {
         existing.result = result ?? existing.result;
@@ -72693,23 +72770,23 @@ function storedUser(id, raw2, at) {
   const parts3 = splitPrompt(raw2);
   return userEntry(id, { at, attachments: promptAttachments(parts3), text: parts3.text });
 }
-var str7 = (v) => typeof v === "string" && v.trim() ? v : void 0;
+var str6 = (v) => typeof v === "string" && v.trim() ? v : void 0;
 function storedThought(m) {
   if (typeof m.display_reasoning === "string") {
     return detailsText(m.display_reasoning);
   }
-  return str7(m.reasoning) ?? str7(m.reasoning_content) ?? detailsText(m.reasoning_details);
+  return str6(m.reasoning) ?? str6(m.reasoning_content) ?? detailsText(m.reasoning_details);
 }
 function detailsText(details) {
   let blocks2 = details;
   if (typeof blocks2 === "string") {
-    const text12 = blocks2.trim();
-    if (!text12.startsWith("[") && !text12.startsWith("{")) {
-      return text12;
+    const text13 = blocks2.trim();
+    if (!text13.startsWith("[") && !text13.startsWith("{")) {
+      return text13;
     }
-    blocks2 = parseJson(text12);
+    blocks2 = parseJson(text13);
     if (blocks2 === void 0) {
-      return text12;
+      return text13;
     }
   }
   const out = [];
@@ -72718,10 +72795,10 @@ function detailsText(details) {
     if (!r || r.type === "reasoning.encrypted") {
       continue;
     }
-    const summary4 = Array.isArray(r.summary) ? r.summary.map((s2) => typeof s2 === "string" ? s2 : str7(record(s2)?.text) ?? "").join("\n\n") : r.summary;
-    const text12 = [summary4, r.thinking, r.content, r.text].map(str7).find(Boolean)?.trim();
-    if (text12 && !out.includes(text12)) {
-      out.push(text12);
+    const summary4 = Array.isArray(r.summary) ? r.summary.map((s2) => typeof s2 === "string" ? s2 : str6(record(s2)?.text) ?? "").join("\n\n") : r.summary;
+    const text13 = [summary4, r.thinking, r.content, r.text].map(str6).find(Boolean)?.trim();
+    if (text13 && !out.includes(text13)) {
+      out.push(text13);
     }
   }
   return out.join("\n\n");
@@ -72834,12 +72911,12 @@ var Transcript = class {
    * A steer the gateway took for the running turn: it shows inside that turn, where it was sent,
    * since the agent reads it before its next step. With no turn running it is a plain prompt.
    */
-  steer(text12, at = Date.now()) {
+  steer(text13, at = Date.now()) {
     const turn = this.live;
     if (!turn) {
-      return this.user({ at, text: text12 });
+      return this.user({ at, text: text13 });
     }
-    turn.blocks.push({ at, id: this.id("s"), kind: "steer", text: text12 });
+    turn.blocks.push({ at, id: this.id("s"), kind: "steer", text: text13 });
     turn.rev++;
   }
   /** A prompt bubble at the end. */
@@ -72850,9 +72927,9 @@ var Transcript = class {
    * A queued prompt the shared gateway just started. Its message.start came first, so the bubble
    * goes before the turn it opened while that turn is still empty; else at the end.
    */
-  started(text12, at = Date.now(), attachments = []) {
+  started(text13, at = Date.now(), attachments = []) {
     const live = this.live;
-    const notice = attachments.length ? void 0 : internalNotice(text12);
+    const notice = attachments.length ? void 0 : internalNotice(text13);
     if (notice) {
       if (live && !live.blocks.length) {
         live.continued = notice;
@@ -72863,18 +72940,18 @@ var Transcript = class {
       return;
     }
     if (live && !live.blocks.length && this.#entries.at(-1) === live) {
-      this.#entries.splice(-1, 0, userEntry(this.id("u"), { at, attachments, text: text12 }));
+      this.#entries.splice(-1, 0, userEntry(this.id("u"), { at, attachments, text: text13 }));
       live.continued = void 0;
       live.rev++;
       return;
     }
-    this.user({ at, attachments, text: text12 });
+    this.user({ at, attachments, text: text13 });
   }
-  notice(text12, tone = "info") {
-    this.push({ id: this.id("n"), kind: "notice", text: text12, tone });
+  notice(text13, tone = "info") {
+    this.push({ id: this.id("n"), kind: "notice", text: text13, tone });
   }
-  panel(title, text12) {
-    this.push({ id: this.id("p"), kind: "panel", text: text12, title });
+  panel(title, text13) {
+    this.push({ id: this.id("p"), kind: "panel", text: text13, title });
   }
   /**
    * The context started compacting (`before`: its tokens, when known). Inside a running turn that
@@ -72930,16 +73007,16 @@ var Transcript = class {
     this.#continued = void 0;
     return turn;
   }
-  reasoning(text12, at = Date.now()) {
-    if (!text12) {
+  reasoning(text13, at = Date.now()) {
+    if (!text13) {
       return;
     }
     const turn = this.start(at);
     const last = turn.blocks.at(-1);
     if (last?.kind === "thinking" && last.endedAt === void 0) {
-      last.text += text12;
+      last.text += text13;
     } else {
-      turn.blocks.push({ id: this.id("k"), kind: "thinking", startedAt: at, text: text12 });
+      turn.blocks.push({ id: this.id("k"), kind: "thinking", startedAt: at, text: text13 });
     }
     turn.rev++;
   }
@@ -72948,42 +73025,42 @@ var Transcript = class {
    * Hermes also relays each response's visible text through `reasoning.available`, so text the
    * turn already shows is not a thought either.
    */
-  reasoningBlock(text12, at = Date.now()) {
+  reasoningBlock(text13, at = Date.now()) {
     const turn = this.start(at);
-    const incoming = text12.trim();
+    const incoming = text13.trim();
     if (!incoming || turn.blocks.some((b) => b.kind === "thinking" && !b.label || b.kind === "text" && b.text.includes(incoming))) {
       return;
     }
-    turn.blocks.push({ endedAt: at, id: this.id("k"), kind: "thinking", startedAt: at, text: text12 });
+    turn.blocks.push({ endedAt: at, id: this.id("k"), kind: "thinking", startedAt: at, text: text13 });
     turn.rev++;
   }
   /** A Mixture-of-Agents reference model's answer: a sealed thought block of its own, under `label`. */
-  reference(label, text12, at = Date.now()) {
+  reference(label, text13, at = Date.now()) {
     const turn = this.start(at);
     endThinking(turn, at);
-    turn.blocks.push({ endedAt: at, id: this.id("k"), kind: "thinking", label, startedAt: at, text: text12.trim() });
+    turn.blocks.push({ endedAt: at, id: this.id("k"), kind: "thinking", label, startedAt: at, text: text13.trim() });
     turn.rev++;
   }
-  text(text12, at = Date.now()) {
-    if (!text12) {
+  text(text13, at = Date.now()) {
+    if (!text13) {
       return;
     }
     const turn = this.start(at);
     endThinking(turn, at);
     const last = turn.blocks.at(-1);
     if (last?.kind === "text") {
-      last.text += text12;
+      last.text += text13;
     } else {
-      turn.blocks.push({ id: this.id("x"), kind: "text", text: text12 });
+      turn.blocks.push({ id: this.id("x"), kind: "text", text: text13 });
     }
     turn.rev++;
   }
   /** Interim commentary: seals the streamed text so the next delta starts a new block. */
-  interim(text12, { alreadyStreamed }, at = Date.now()) {
+  interim(text13, { alreadyStreamed }, at = Date.now()) {
     const turn = this.start(at);
     endThinking(turn, at);
-    if (!alreadyStreamed && text12.trim()) {
-      turn.blocks.push({ id: this.id("x"), kind: "text", text: text12 });
+    if (!alreadyStreamed && text13.trim()) {
+      turn.blocks.push({ id: this.id("x"), kind: "text", text: text13 });
     }
     turn.blocks.push({ id: this.id("x"), kind: "text", text: "" });
     turn.rev++;
@@ -73391,12 +73468,12 @@ var PromptQueue = class {
       host.transcript.notice("A queued prompt with images cannot steer the turn. It stays queued.", "warning");
       return host.changed();
     }
-    const { text: text12 } = prompt;
+    const { text: text13 } = prompt;
     this.held.splice(index2, 1);
     host.changed();
-    void steerTurn(host.gw, sid, text12).then((r) => {
+    void steerTurn(host.gw, sid, text13).then((r) => {
       if (r.ok) {
-        host.transcript.steer(text12);
+        host.transcript.steer(text13);
       } else {
         this.held.splice(index2, 0, prompt);
         host.transcript.notice(
@@ -73619,7 +73696,7 @@ var PromptRouter = class {
       return;
     }
     const { images } = prompt;
-    const text12 = prompt.text || (images.length ? IMAGE_ONLY_PROMPT : "");
+    const text13 = prompt.text || (images.length ? IMAGE_ONLY_PROMPT : "");
     const attachments = images.map(({ mime, path: path2 }) => ({ mime, path: path2 }));
     const submission = newInputId();
     host.transcript.user({ attachments: userImages(images), text: display?.trim() || prompt.text });
@@ -73629,7 +73706,7 @@ var PromptRouter = class {
     rpc(host.gw, "prompt.submit", {
       session_id: sid,
       submission_id: submission,
-      text: text12,
+      text: text13,
       ...queued ? { queued } : {},
       ...attachments.length ? { attachments } : {}
     }).catch((error) => {
@@ -73671,7 +73748,7 @@ function chatStores(chat, { act, gw: gw2, launch: launch3, settings: settings2, 
   const prs = new PullRequests({ changed, cwd: () => session2.info?.cwd || null, sid: () => durable(session2.ref) });
   const prAside = new PrAside({
     changed,
-    notice: (text12, tone) => chat.notice(text12, tone),
+    notice: (text13, tone) => chat.notice(text13, tone),
     open: openUrl,
     prs,
     reveal: (id) => chat.reveal(id),
@@ -73690,7 +73767,7 @@ function chatStores(chat, { act, gw: gw2, launch: launch3, settings: settings2, 
   const timers = new Disposables();
   const presses = { esc: 0, exit: 0 };
   const sheets2 = new PromptSheets(chat);
-  const connect2 = new ConnectWatcher({ changed, openUrl, tell: (text12) => act().submit(text12, false), transcript });
+  const connect2 = new ConnectWatcher({ changed, openUrl, tell: (text13) => act().submit(text13, false), transcript });
   const reconnect = new Reconnect(chat);
   const warned2 = { protocol: false, status: void 0 };
   const notices = new NoticeStrip(chat);
@@ -73702,7 +73779,7 @@ function chatStores(chat, { act, gw: gw2, launch: launch3, settings: settings2, 
       cwd: () => session2.info?.cwd || launch3.cwd,
       gw: gw2,
       launchCwd: launch3.cwd,
-      note: (text12, tone) => transcript.notice(text12, tone),
+      note: (text13, tone) => transcript.notice(text13, tone),
       sid: () => session2.ref.live
     },
     { startup: launch3.image }
@@ -73763,7 +73840,7 @@ function chatStores(chat, { act, gw: gw2, launch: launch3, settings: settings2, 
       drain: () => queue2.drain(),
       gw: gw2,
       launch: launch3,
-      rename: (sid, text12) => title.rename(sid, text12),
+      rename: (sid, text13) => title.rename(sid, text13),
       request: (req) => act().onRequest(req),
       sheets: sheets2,
       state: session2,
@@ -73778,7 +73855,7 @@ function chatStores(chat, { act, gw: gw2, launch: launch3, settings: settings2, 
       markViewer,
       readBusyMode: () => void act().readBusyMode(),
       reportCwd: () => act().reportCwd(),
-      showThoughts: (sid) => showThoughts({ gw: gw2, notice: (text12, tone) => chat.notice(text12, tone), settings: settings2 }, sid),
+      showThoughts: (sid) => showThoughts({ gw: gw2, notice: (text13, tone) => chat.notice(text13, tone), settings: settings2 }, sid),
       writeActiveSession: writeActiveSessionFile
     })
   );
@@ -73937,8 +74014,8 @@ var App = class {
     this.#renders.request();
   }
   /** A notice in the transcript, rendered now. */
-  notice(text12, tone) {
-    this.transcript.notice(text12, tone);
+  notice(text13, tone) {
+    this.transcript.notice(text13, tone);
     this.changed();
   }
   /** An error nothing caught (a rejected promise no caller awaited): shown, so the pane lives on. */
@@ -74250,12 +74327,12 @@ var WatchApp = class {
       return false;
     }
     try {
-      const text12 = await readFile3(path2, "utf8");
-      if (text12.length === this.#logSize) {
+      const text13 = await readFile3(path2, "utf8");
+      if (text13.length === this.#logSize) {
         return false;
       }
-      this.#logSize = text12.length;
-      applyLog(this.#agent, parseLiveLog(text12));
+      this.#logSize = text13.length;
+      applyLog(this.#agent, parseLiveLog(text13));
       return true;
     } catch {
       return false;
@@ -74317,12 +74394,12 @@ var WatchApp = class {
     }
   }
   async #submit(raw2) {
-    const text12 = raw2.trim();
+    const text13 = raw2.trim();
     const a2 = this.#agent;
-    if (!text12) {
+    if (!text13) {
       return;
     }
-    if (text12 === "/stop") {
+    if (text13 === "/stop") {
       return this.#stop();
     }
     if (!isRunning(a2)) {
@@ -74333,7 +74410,7 @@ var WatchApp = class {
       const r = await rpc(this.#gw, "subagent.steer", {
         session_id: this.#spec.sid,
         subagent_id: a2.id,
-        text: text12
+        text: text13
       });
       this.transcript.notice(
         r?.status === "queued" ? `Steering sent: it reaches ${a2.name} after its current step.` : `${a2.name} is not taking steering now.`,

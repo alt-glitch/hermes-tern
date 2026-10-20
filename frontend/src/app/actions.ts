@@ -34,6 +34,7 @@ import { openModelPicker } from '../overlays/models.js'
 import { promptOverlay } from '../overlays/prompts.js'
 import { openPrMenu, openPrSheet, openUrl } from '../overlays/pullRequests.js'
 import type { PrAside } from '../prs/aside.js'
+import { parsePrompt } from '../prompts/parse.js'
 import type { PromptSheets } from '../prompts/sheets.js'
 import { cycleEffort, DEFAULT_EFFORT } from '../session/effort.js'
 import type { SessionLifecycle } from '../session/lifecycle.js'
@@ -421,15 +422,16 @@ export class AppActions {
       return
     }
 
-    const overlay = promptOverlay(this.#cx.chat, req)
+    const prompt = parsePrompt(req)
+    const overlay = prompt && promptOverlay(this.#cx.chat, prompt)
 
-    if (!overlay) {
+    if (!prompt || !overlay) {
       req.fail(-32601, `${req.method} is not supported by the Tern frontend`)
 
       return
     }
 
-    this.#cx.sheets.open(overlay, req)
+    this.#cx.sheets.open(overlay, prompt)
   }
 
   /** `bytes` sent to Tern as a blob; undefined where it takes none, or for more than a blob holds. */

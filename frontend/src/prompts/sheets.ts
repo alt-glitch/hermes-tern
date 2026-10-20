@@ -4,11 +4,11 @@
 // approval queue's own ids (approval.cancelled), and a reattach, a switch or a lost gateway drops
 // them all. The key is built here, once, and only here is a key read back.
 
-import type { ServerRequest } from '@hermes/shared/json-rpc-channel'
-
 import { type OverlayKey, overlayKey } from '../core/ids.js'
 import { sharedPromptId } from '../hermes/sharedPrompts.js'
 import type { Overlay, OverlayHost } from '../overlay.js'
+
+import type { PromptRequest } from './parse.js'
 
 const PREFIX = 'prompt:'
 
@@ -31,13 +31,12 @@ export class PromptSheets {
     this.#host = host
   }
 
-  /** Opens `overlay`, the sheet for `req`; an approval's queue id is kept while the sheet is open. */
-  open(overlay: Overlay, req: ServerRequest) {
+  /** Opens `overlay`, the sheet for `prompt`; an approval's queue id is kept while the sheet is open. */
+  open(overlay: Overlay, prompt: PromptRequest) {
     this.#host.open(overlay)
-    const queued = req.params['request_id']
 
-    if (req.method === 'approval' && typeof queued === 'string') {
-      this.#approvals.set(overlay.key, queued)
+    if (prompt.kind === 'approval' && prompt.requestId !== undefined) {
+      this.#approvals.set(overlay.key, prompt.requestId)
     }
   }
 

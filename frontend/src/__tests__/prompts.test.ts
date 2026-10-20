@@ -5,6 +5,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { sharedPromptRequest } from '../hermes/sharedPrompts.js'
 import type { Overlay, OverlayHost } from '../overlay.js'
 import { promptOverlay, promptTimeoutNotice } from '../overlays/prompts.js'
+import { parsePrompt, type PromptRequest } from '../prompts/parse.js'
 import { promptKey, PromptSheets } from '../prompts/sheets.js'
 
 function key(name: string, mods: Partial<Key> = {}): Key {
@@ -12,6 +13,17 @@ function key(name: string, mods: Partial<Key> = {}): Key {
 }
 
 const ctrlC = key('c', { ctrl: true })
+
+/** `req` read as the sheets read it. */
+function parsed(req: ServerRequest): PromptRequest {
+  const prompt = parsePrompt(req)
+
+  if (!prompt) {
+    throw new Error(`no prompt for ${req.method}`)
+  }
+
+  return prompt
+}
 
 function open(method: string, params: Record<string, unknown>) {
   const answers: Record<string, unknown>[] = []
@@ -26,7 +38,7 @@ function open(method: string, params: Record<string, unknown>) {
     respond: result => answers.push(result)
   }
 
-  const overlay = promptOverlay(host, req)
+  const overlay = promptOverlay(host, parsed(req))
 
   if (!overlay) {
     throw new Error(`no sheet for ${method}`)
@@ -149,7 +161,7 @@ function shared(type: 'approval.request' | 'clarify.request', payload: Record<st
 
   const closed: Overlay[] = []
   const host: OverlayHost = { changed: () => undefined, close: o => closed.push(o), open: () => undefined }
-  const overlay = promptOverlay(host, req)!
+  const overlay = promptOverlay(host, parsed(req))!
 
   return { closed, notices, overlay, replies, req, request }
 }
@@ -251,7 +263,7 @@ describe('PromptSheets', () => {
 
     const sheet = (key: string): Overlay => ({ ...open('sudo', {}).overlay, key })
     const request = (id: string, method = 'clarify', params: Record<string, unknown> = {}): ServerRequest => ({ fail: () => undefined, id, method, params, respond: () => undefined })
-    const show = (id: string, method?: string, params?: Record<string, unknown>) => sheets.open(sheet(promptKey(id)), request(id, method, params))
+    const show = (id: string, method?: string, params?: Record<string, unknown>) => sheets.open(sheet(promptKey(id)), parsed(request(id, method, params)))
     const keys = () => overlays.map(o => o.key)
 
     return { closed, keys, overlays, sheet, sheets, show }
