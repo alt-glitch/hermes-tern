@@ -87,7 +87,7 @@
   "src/agents/store.ts no-restricted-syntax": 1,
   "src/app.ts @typescript-eslint/consistent-type-assertions": 1,
   "src/app.ts @typescript-eslint/no-non-null-assertion": 1,
-  "src/app.ts @typescript-eslint/no-restricted-imports": 3,
+  "src/app.ts @typescript-eslint/no-restricted-imports": 2,
   "src/app.ts @typescript-eslint/switch-exhaustiveness-check": 1,
   "src/backendNotes.ts @typescript-eslint/consistent-type-assertions": 1,
   "src/backendNotes.ts @typescript-eslint/no-restricted-imports": 1,

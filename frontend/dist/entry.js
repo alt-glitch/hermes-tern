@@ -25528,21 +25528,6 @@ function applyLog(a2, log) {
   }
 }
 
-// src/app/ports.ts
-function sessionView(fields, ids) {
-  return {
-    get info() {
-      return fields.info;
-    },
-    set info(info) {
-      fields.info = info;
-    },
-    get ref() {
-      return ids();
-    }
-  };
-}
-
 // src/core/errors.ts
 function errorText(error) {
   return error instanceof Error ? error.message : String(error);
@@ -67200,9 +67185,33 @@ var Attachments = class {
   }
 };
 
+// src/core/epoch.ts
+var Epoch = class {
+  #generation = 0;
+  #controller = new AbortController();
+  /** The present generation: 0 until the first `next()`. */
+  get generation() {
+    return this.#generation;
+  }
+  /** A ticket for the present generation: current until the next `next()`. */
+  current() {
+    const generation = this.#generation;
+    return { isCurrent: () => generation === this.#generation, signal: this.#controller.signal };
+  }
+  /** Ends the present generation (its tickets go stale, their signal aborts) and returns a ticket for the new one. */
+  next() {
+    const ended = this.#controller;
+    this.#controller = new AbortController();
+    this.#generation++;
+    ended.abort();
+    return this.current();
+  }
+};
+
 // src/flow.ts
 var Switches = class {
-  #generation = 0;
+  /** One generation per switch: a switch's token is the generation its `begin` started. */
+  #epoch = new Epoch();
   #pending = false;
   /** Whether a switch is in flight. */
   get pending() {
@@ -67210,16 +67219,21 @@ var Switches = class {
   }
   /** Bumped by every `begin`: read before an await, it tells whether a switch began since. */
   get generation() {
-    return this.#generation;
+    return this.#epoch.generation;
   }
   /** Starts a switch and returns its token; earlier tokens go stale. */
   begin() {
     this.#pending = true;
-    return ++this.#generation;
+    this.#epoch.next();
+    return this.#epoch.generation;
   }
   /** Whether switch `token` is still the latest one (its result may apply). */
   current(token) {
-    return token === this.#generation;
+    return token === this.#epoch.generation;
+  }
+  /** A ticket that goes stale once another switch begins (its signal aborts then). */
+  since() {
+    return this.#epoch.current();
   }
   /** Ends switch `token` (adopted or failed); a superseded token leaves the newer switch pending. */
   end(token) {
@@ -68611,6 +68625,461 @@ var PrAside = class {
   }
 };
 
+// src/session/adopt.ts
+function adoptSteps(host) {
+  const { state, transcript } = host;
+  return [
+    // The ids first: every step after reads the adopted session.
+    {
+      adopt: ({ ref }) => {
+        state.ref = ref;
+      }
+    },
+    {
+      adopt: ({ previous: previous3, ref }) => {
+        if (ref.live !== previous3.live) {
+          host.sheets.dropAll();
+          transcript.forgetCompactions();
+          state.busyMode = "queue";
+        }
+      }
+    },
+    // Read on every adopt: a reconnect may land on a gateway whose config changed.
+    { adopt: () => host.readBusyMode() },
+    // The session's own queue, from the snapshot (a reattach's rows of this pane become read-only rows).
+    { adopt: ({ r }) => host.queue.server.reset(pendingRows(r.info)) },
+    { adopt: ({ ref }) => host.showThoughts(ref.live) },
+    {
+      adopt: ({ previous: previous3, ref }) => {
+        host.markViewer(durable(ref), previous3.stored);
+        host.writeActiveSession(durable(ref));
+      }
+    },
+    {
+      adopt: ({ r }) => {
+        state.info = r.info ?? state.info;
+        state.usage = r.info?.usage ?? null;
+      }
+    },
+    // Another session: its own name (or none yet) on the tab.
+    { adopt: ({ r }) => host.title.adopt(typeof r.info?.title === "string" ? r.info.title : void 0) },
+    { adopt: () => host.reportCwd() },
+    {
+      adopt: ({ r }) => {
+        host.activity.set(busyFrom(r));
+        host.notices.reset();
+        host.activity.endCompaction();
+        host.forgetStatusNote();
+        transcript.usageBase(r.info?.usage ?? void 0);
+      }
+    },
+    {
+      adopt: ({ r, ref }) => {
+        if (r.messages?.length) {
+          transcript.load(r.messages, storedCompactions(durable(ref)));
+          host.agents.scan();
+          host.media.showAll(transcript.entries, (call) => host.imageLanded(call));
+        }
+      }
+    },
+    {
+      adopt: ({ ref }) => {
+        host.processes.poke();
+        host.connect.watch();
+        host.prs.adopt();
+        host.automation.adopt(ref.live);
+      }
+    },
+    {
+      adopt: ({ r }) => {
+        if (r.inflight) {
+          transcript.inflight(r.inflight, host.activity.busy?.startedAt);
+        }
+      }
+    },
+    { adopt: () => host.changed() }
+  ];
+}
+function adoptAll(steps, a2) {
+  for (const step of steps) {
+    step.adopt(a2);
+  }
+}
+
+// src/hermes/create.ts
+function createParams({ canonical, cols, cwd }) {
+  return canonical ? { ...localCreationOptions(), ...cwd ? { cwd } : {} } : { cols, ...cwd ? { cwd } : {} };
+}
+
+// src/session/views.ts
+var SessionViews = class {
+  #gw;
+  /** Shared-gateway subscriptions this view holds, by session id. */
+  #subscriptions = /* @__PURE__ */ new Map();
+  /** What superseded switches attached; released once no switch is in flight (see `release`). */
+  #stale = [];
+  /**
+   * The last `session.detach` in flight per session: a resume of that id waits for it (they share a
+   * subscription id). Set under the runtime id detached and read under the id a resume names: the
+   * shared gateway, the one that detaches, answers with one id for both.
+   */
+  #detaching = /* @__PURE__ */ new Map();
+  constructor(gw2) {
+    this.#gw = gw2;
+  }
+  /** Takes the ids of an adopted snapshot `r`, keeping its subscription (the shared gateway's). */
+  adopt(r) {
+    const { ref, subscription: subscription2 } = snapshotIds(r);
+    if (subscription2) {
+      this.#subscriptions.set(ref.live, subscription2);
+    }
+    return ref;
+  }
+  /** The detach of session `id` still in flight, if any. */
+  detaching(id) {
+    return this.#detaching.get(id);
+  }
+  /** A switch's result that a later switch superseded: nothing will show it. */
+  superseded(r) {
+    this.#stale.push(r);
+  }
+  /** Leaves every session this pane holds a subscription to. */
+  leaveAll(endReason) {
+    return Promise.all([...this.#subscriptions.keys()].map((sid) => this.leave(sid, endReason)));
+  }
+  /** Stops showing session `sid`: a shared-gateway view detaches (the session keeps running for its other viewers); a private gateway closes it. */
+  async leave(sid, endReason) {
+    const subscription2 = this.#subscriptions.get(sid);
+    if (!this.#gw.isCanonical) {
+      await rpc(this.#gw, "session.close", { session_id: sid }).catch(() => void 0);
+      return;
+    }
+    if (!subscription2) {
+      return;
+    }
+    this.#subscriptions.delete(sid);
+    await this.#detach(sid, subscription2, endReason);
+  }
+  /**
+   * Releases what superseded switches attached, once the adopted session (`shown`) is known. The
+   * gateway gives this view one subscription per session, so a stale result for the shown session
+   * is the live view's own and stays; others detach with no end reason (nobody chose to close them).
+   */
+  release(shown2) {
+    const stale = this.#stale;
+    this.#stale = [];
+    for (const r of stale) {
+      const { ref, subscription: subscription2 } = snapshotIds(r);
+      if (ref.live === shown2 || subscription2 && this.#subscriptions.get(ref.live) === subscription2) {
+        continue;
+      }
+      if (!this.#gw.isCanonical) {
+        void rpc(this.#gw, "session.close", { session_id: ref.live }).catch(() => void 0);
+      } else if (subscription2) {
+        void this.#detach(ref.live, subscription2);
+      }
+    }
+  }
+  /** Sends `session.detach`, one at a time per session; `endReason` lets the owner end it once no viewer remains. */
+  #detach(sid, subscription2, endReason) {
+    const send = () => rpc(this.#gw, "session.detach", {
+      ...endReason ? { end_reason: endReason } : {},
+      session_id: sid,
+      subscription_id: subscription2
+    });
+    const run5 = (this.#detaching.get(sid)?.then(send) ?? send()).catch(() => void 0);
+    this.#detaching.set(sid, run5);
+    void run5.then(() => {
+      if (this.#detaching.get(sid) === run5) {
+        this.#detaching.delete(sid);
+      }
+    });
+    return run5;
+  }
+};
+
+// src/session/lifecycle.ts
+var SessionLifecycle = class {
+  #host;
+  /** What an adopt runs, in order (session/adopt.ts). */
+  #steps;
+  #switches = new Switches();
+  /** The sessions this pane views: its subscriptions, detaches in flight, and superseded switches' results. */
+  #views;
+  /** Server requests for another session, kept while a switch is in flight. */
+  #heldRequests = [];
+  constructor(host, steps) {
+    this.#host = host;
+    this.#steps = steps;
+    this.#views = new SessionViews(host.gw);
+  }
+  /** Whether a session switch is in flight: prompts and the queue wait for the session it adopts. */
+  get switching() {
+    return this.#switches.pending;
+  }
+  /**
+   * A ticket for a reply to the shown session (a slash command's): stale once the view left it, or
+   * while a switch begun since is in flight (Ink's stale()).
+   */
+  replyTicket() {
+    const session2 = this.#host.state.ticket();
+    const since = this.#switches.since();
+    return {
+      isCurrent: () => session2.isCurrent() && !(this.#switches.pending && !since.isCurrent()),
+      signal: session2.signal,
+      sid: session2.sid
+    };
+  }
+  /** gateway.ready: a reconnect's reattaches the shown session; only a sessionless app bootstraps. */
+  ready() {
+    const { stored } = this.#host.state.ref;
+    void (stored ? this.reattach(stored) : this.#bootstrap());
+  }
+  /** The gateway went away: the runtime session died with it, and nothing can answer the held requests. */
+  lost() {
+    const { state } = this.#host;
+    state.ref = { live: null, stored: state.ref.stored };
+    this.#heldRequests = [];
+  }
+  /**
+   * session.replay_gap for `sessionId`: the view fell behind and the owner retired its subscription
+   * (the socket is fine, so no reconnect re-attaches it). A fresh resume brings the snapshot and a
+   * new subscription.
+   */
+  fellBehind(sessionId) {
+    const ref = this.#host.state.ref;
+    if (isLive(ref) && sessionId === ref.live) {
+      void this.reattach(durable(ref), "Reloaded the session: this view fell behind its events.");
+    }
+  }
+  /** Routes a server request: another session's waits while a switch is in flight (held here), or drops. */
+  route(req) {
+    const route = this.#switches.route(this.#host.state.ref.live, req.params.session_id);
+    if (route === "hold") {
+      this.#heldRequests.push(req);
+    }
+    return route;
+  }
+  /** request.cancel for request `id`: true when it was held here (it is dropped). */
+  unhold(id) {
+    const held = this.#heldRequests.some((r) => r.id === id);
+    this.#heldRequests = this.#heldRequests.filter((r) => r.id !== id);
+    return held;
+  }
+  /** Leaves every session this pane holds a subscription to (quitting). */
+  leaveAll(endReason) {
+    return this.#views.leaveAll(endReason);
+  }
+  /** The first session: HERMES_TUI_RESUME's, else a new one; then the launcher's startup image, if any. */
+  async #bootstrap() {
+    const host = this.#host;
+    const resume = host.launch.resume;
+    try {
+      await (resume ? this.resume(storedSessionId(resume)) : this.newSession());
+    } catch (error) {
+      host.transcript.notice(`Could not start a session: ${errorText(error)}`, "error");
+      host.changed();
+      return;
+    }
+    const sid = host.state.ref.live;
+    if (sid && host.awaitingStartup()) {
+      await host.attachStartup(sid);
+    }
+  }
+  /** After a reconnect (or a replay gap): resumes the shown session under `id` (its runtime id or subscription died). */
+  async reattach(id, notice = "Reconnected to the agent backend.") {
+    const host = this.#host;
+    try {
+      if (await this.reload(id)) {
+        host.transcript.notice(notice);
+      }
+    } catch (error) {
+      host.transcript.notice(`Could not reattach the session: ${errorText(error)}`, "error");
+    }
+    host.changed();
+  }
+  /** Closes the open session and starts a fresh one with an empty transcript, named `title` if given. */
+  async newSession(title) {
+    if (this.#busySwitch()) {
+      return;
+    }
+    const host = this.#host;
+    const previous3 = host.state.ref.live;
+    const token = this.#switches.begin();
+    try {
+      const setup = await rpc(host.gw, "setup.status", {});
+      if (!this.#switches.current(token)) {
+        return;
+      }
+      if (setup?.provider_configured === false) {
+        host.transcript.notice("No model provider is configured. Run `hermes setup`, then start again.", "warning");
+        return;
+      }
+      const r = await rpc(
+        host.gw,
+        "session.create",
+        createParams({ canonical: host.gw.isCanonical, cols: host.cols(), cwd: host.launch.sessionCwd })
+      );
+      if (!this.#switches.current(token)) {
+        this.#views.superseded(r);
+        return;
+      }
+      this.#fresh();
+      this.#adopt(r);
+      if (previous3 && previous3 !== r.session_id) {
+        void this.#views.leave(previous3, "tui_close");
+      }
+    } finally {
+      this.#settle(token);
+    }
+    const sid = host.state.ref.live;
+    if (title && sid) {
+      await host.rename(sid, title);
+    }
+  }
+  /** Resumes stored session `id`: its history replaces the transcript, and the session it leaves is closed. */
+  async resume(id) {
+    if (this.#busySwitch()) {
+      return;
+    }
+    const previous3 = this.#host.state.ref.live;
+    const r = await this.reload(id);
+    if (r && previous3 && previous3 !== r.session_id) {
+      void this.#views.leave(previous3, "tui_close");
+    }
+  }
+  /**
+   * Resumes and adopts session `id` (its stored id, or a runtime id when none is known); undefined
+   * when a later switch superseded this one.
+   */
+  async reload(id) {
+    const host = this.#host;
+    const token = this.#switches.begin();
+    const hold = host.gw.holdAttach(id);
+    let snapshot3;
+    try {
+      const detaching = this.#views.detaching(id);
+      if (detaching) {
+        await detaching;
+        if (!this.#switches.current(token)) {
+          return void 0;
+        }
+      }
+      const r = await rpc(host.gw, "session.resume", { cols: host.cols(), session_id: id });
+      if (!this.#switches.current(token)) {
+        this.#views.superseded(r);
+        return void 0;
+      }
+      this.#fresh();
+      this.#adopt(r);
+      snapshot3 = r;
+      host.sheets.dropShared();
+      host.gw.hydrateSharedPrompts(r);
+      return r;
+    } finally {
+      host.gw.settleAttach(hold, snapshot3);
+      this.#settle(token);
+    }
+  }
+  /** Refuses a session switch while a turn runs (its queue and prompts belong to this session); true when refused. */
+  #busySwitch() {
+    const host = this.#host;
+    if (!host.busy()) {
+      return false;
+    }
+    host.transcript.notice("Wait for the current turn to finish (or press Esc twice) before switching sessions.", "warning");
+    host.changed();
+    return true;
+  }
+  /** An empty transcript with its welcome, for the session about to be adopted. */
+  #fresh() {
+    const { transcript } = this.#host;
+    transcript.clear();
+    transcript.push({ id: transcript.id("w"), kind: "welcome" });
+  }
+  /** Takes on snapshot `r`: its ids (and the shared gateway's subscription), then each adopt step in order. */
+  #adopt(r) {
+    const ref = this.#views.adopt(r);
+    adoptAll(this.#steps, { previous: this.#host.state.ref, r, ref });
+  }
+  /**
+   * Ends switch `token`. Once none is in flight, in this order: what superseded switches attached is
+   * released, the held requests open (or drop), the queue drains, and the pane renders.
+   */
+  #settle(token) {
+    const host = this.#host;
+    this.#switches.end(token);
+    if (this.#switches.pending) {
+      return;
+    }
+    this.#views.release(host.state.ref.live);
+    const held = this.#heldRequests;
+    this.#heldRequests = [];
+    for (const req of held) {
+      host.request(req);
+    }
+    host.drain();
+    host.changed();
+  }
+};
+
+// src/session/state.ts
+function sessionTicket(shown2, signal) {
+  const sid = shown2();
+  return { isCurrent: () => shown2() === sid, signal, sid };
+}
+var SessionState = class {
+  #changed;
+  #ref = NO_SESSION;
+  #info = null;
+  #usage = null;
+  #busyMode = "queue";
+  /** One generation per shown runtime id: a ticket's signal aborts once the view leaves its session. */
+  #shown = new Epoch();
+  constructor(changed) {
+    this.#changed = changed;
+  }
+  /** The open session's ids: the runtime id requests name, and the stored id it is saved under. */
+  get ref() {
+    return this.#ref;
+  }
+  set ref(ref) {
+    if (ref.live !== this.#ref.live) {
+      this.#shown.next();
+    }
+    this.#ref = ref;
+    this.#changed();
+  }
+  /** The gateway's session.info, merged; null before the first session. */
+  get info() {
+    return this.#info;
+  }
+  set info(info) {
+    this.#info = info;
+    this.#changed();
+  }
+  /** The session's token and context counters. */
+  get usage() {
+    return this.#usage;
+  }
+  set usage(usage) {
+    this.#usage = usage;
+    this.#changed();
+  }
+  /** What Enter does while a turn runs (`display.busy_input_mode`); queue until the gateway says. */
+  get busyMode() {
+    return this.#busyMode;
+  }
+  set busyMode(mode) {
+    this.#busyMode = mode;
+    this.#changed();
+  }
+  /** A ticket for the session shown now: current while the view shows it. */
+  ticket() {
+    return sessionTicket(() => this.#ref.live, this.#shown.current().signal);
+  }
+};
+
 // src/session/thoughts.ts
 function showThoughts(host, sid) {
   if (host.settings.load().thoughts === false) {
@@ -68698,93 +69167,6 @@ var SessionTitle = class {
       }
     } catch {
     }
-  }
-};
-
-// src/session/views.ts
-var SessionViews = class {
-  #gw;
-  /** Shared-gateway subscriptions this view holds, by session id. */
-  #subscriptions = /* @__PURE__ */ new Map();
-  /** What superseded switches attached; released once no switch is in flight (see `release`). */
-  #stale = [];
-  /**
-   * The last `session.detach` in flight per session: a resume of that id waits for it (they share a
-   * subscription id). Set under the runtime id detached and read under the id a resume names: the
-   * shared gateway, the one that detaches, answers with one id for both.
-   */
-  #detaching = /* @__PURE__ */ new Map();
-  constructor(gw2) {
-    this.#gw = gw2;
-  }
-  /** Takes the ids of an adopted snapshot `r`, keeping its subscription (the shared gateway's). */
-  adopt(r) {
-    const { ref, subscription: subscription2 } = snapshotIds(r);
-    if (subscription2) {
-      this.#subscriptions.set(ref.live, subscription2);
-    }
-    return ref;
-  }
-  /** The detach of session `id` still in flight, if any. */
-  detaching(id) {
-    return this.#detaching.get(id);
-  }
-  /** A switch's result that a later switch superseded: nothing will show it. */
-  superseded(r) {
-    this.#stale.push(r);
-  }
-  /** Leaves every session this pane holds a subscription to. */
-  leaveAll(endReason) {
-    return Promise.all([...this.#subscriptions.keys()].map((sid) => this.leave(sid, endReason)));
-  }
-  /** Stops showing session `sid`: a shared-gateway view detaches (the session keeps running for its other viewers); a private gateway closes it. */
-  async leave(sid, endReason) {
-    const subscription2 = this.#subscriptions.get(sid);
-    if (!this.#gw.isCanonical) {
-      await rpc(this.#gw, "session.close", { session_id: sid }).catch(() => void 0);
-      return;
-    }
-    if (!subscription2) {
-      return;
-    }
-    this.#subscriptions.delete(sid);
-    await this.#detach(sid, subscription2, endReason);
-  }
-  /**
-   * Releases what superseded switches attached, once the adopted session (`shown`) is known. The
-   * gateway gives this view one subscription per session, so a stale result for the shown session
-   * is the live view's own and stays; others detach with no end reason (nobody chose to close them).
-   */
-  release(shown2) {
-    const stale = this.#stale;
-    this.#stale = [];
-    for (const r of stale) {
-      const { ref, subscription: subscription2 } = snapshotIds(r);
-      if (ref.live === shown2 || subscription2 && this.#subscriptions.get(ref.live) === subscription2) {
-        continue;
-      }
-      if (!this.#gw.isCanonical) {
-        void rpc(this.#gw, "session.close", { session_id: ref.live }).catch(() => void 0);
-      } else if (subscription2) {
-        void this.#detach(ref.live, subscription2);
-      }
-    }
-  }
-  /** Sends `session.detach`, one at a time per session; `endReason` lets the owner end it once no viewer remains. */
-  #detach(sid, subscription2, endReason) {
-    const send = () => rpc(this.#gw, "session.detach", {
-      ...endReason ? { end_reason: endReason } : {},
-      session_id: sid,
-      subscription_id: subscription2
-    });
-    const run5 = (this.#detaching.get(sid)?.then(send) ?? send()).catch(() => void 0);
-    this.#detaching.set(sid, run5);
-    void run5.then(() => {
-      if (this.#detaching.get(sid) === run5) {
-        this.#detaching.delete(sid);
-      }
-    });
-    return run5;
   }
 };
 
@@ -69478,8 +69860,9 @@ var PromptQueue = class {
    */
   async admit(sid, prompt, sent) {
     const host = this.#host;
+    const ticket = host.ticket();
     const ready = sent === void 0 ? await host.expanded(sid, prompt) : { images: prompt.images, text: sent };
-    if (!ready || sid !== host.sid()) {
+    if (!ready || !ticket.isCurrent()) {
       return;
     }
     const own14 = {
@@ -69505,7 +69888,7 @@ var PromptQueue = class {
       }
     } catch (error) {
       this.server.drop(own14);
-      if (sid === host.sid()) {
+      if (ticket.isCurrent()) {
         host.transcript.notice(`Not queued: ${errorText(error)}. Your message is back in the composer.`, "error");
         host.restore(prompt);
       }
@@ -69523,13 +69906,14 @@ var PromptQueue = class {
       }
       return;
     }
-    const sid = host.sid();
+    const ticket = host.ticket();
+    const { sid } = ticket;
     const q2 = this.#mine(index2);
     if (!sid || !q2) {
       return;
     }
     void this.#withdraw(sid, q2).then((out) => {
-      if (out && sid === host.sid()) {
+      if (out && ticket.isCurrent()) {
         host.restore(q2.own.item.prompt);
       }
       host.changed();
@@ -69538,12 +69922,13 @@ var PromptQueue = class {
   /** Alt+Enter / a queued row's Steer: injects queued prompt `index` into the running turn instead of waiting for it to end. */
   steer(index2) {
     const host = this.#host;
-    const sid = host.sid();
+    const ticket = host.ticket();
+    const { sid } = ticket;
     if (!host.busy() || !sid) {
       return;
     }
     if (index2 >= this.held.length) {
-      return void this.#steerServerQueued(sid, index2);
+      return void this.#steerServerQueued(ticket, sid, index2);
     }
     const prompt = this.held[index2];
     if (!prompt) {
@@ -69608,7 +69993,7 @@ var PromptQueue = class {
    * A Steer on a row in the gateway's queue: withdrawn from it, then steered into the turn; a steer
    * that does not land goes back into the queue, at its end.
    */
-  async #steerServerQueued(sid, index2) {
+  async #steerServerQueued(ticket, sid, index2) {
     const host = this.#host;
     const q2 = this.#mine(index2);
     if (!q2) {
@@ -69619,11 +70004,11 @@ var PromptQueue = class {
       host.transcript.notice("A queued prompt with images cannot steer the turn. It stays queued.", "warning");
       return host.changed();
     }
-    if (!await this.#withdraw(sid, q2) || sid !== host.sid()) {
+    if (!await this.#withdraw(sid, q2) || !ticket.isCurrent()) {
       return;
     }
     const r = await steerTurn(host.gw, sid, sent);
-    if (sid !== host.sid()) {
+    if (!ticket.isCurrent()) {
       return;
     }
     if (r.ok) {
@@ -69715,16 +70100,17 @@ var PromptRouter = class {
    */
   async #busyInput(prompt, mode) {
     const host = this.#host;
-    const { sid } = host.gates();
+    const ticket = host.ticket();
+    const { sid } = ticket;
     if (!sid || mode === "queue" || prompt.images.length) {
       return this.behind(prompt);
     }
     const ready = await this.expanded(sid, prompt);
-    if (!ready || sid !== host.gates().sid) {
+    if (!ready || !ticket.isCurrent()) {
       return;
     }
     const r = await (mode === "steer" ? steerTurn : redirectTurn)(host.gw, sid, ready.text);
-    if (sid !== host.gates().sid) {
+    if (!ticket.isCurrent()) {
       return;
     }
     if (r.ok) {
@@ -71814,6 +72200,8 @@ var DOUBLE_ESC_MS = 500;
 var COPIED_MS3 = 1500;
 var QUIT_DETACH_MS = 1500;
 var App = class {
+  /** The open session's ids, info, usage and busy-input mode; every write renders. */
+  #state = new SessionState(() => this.changed());
   transcript = new Transcript();
   /** Images tool calls showed, a URL's bytes fetched once and sent as a blob. */
   media = new Media({ blob: (bytes, mime) => this.#blob(bytes, mime) });
@@ -71833,7 +72221,7 @@ var App = class {
   prs = new PullRequests({
     changed: () => this.changed(),
     cwd: () => this.info?.cwd || null,
-    sid: () => durable(this.#ids)
+    sid: () => durable(this.#state.ref)
   });
   /** The pull request docked at the pane's right edge (the PR aside). */
   prAside = new PrAside({
@@ -71846,20 +72234,14 @@ var App = class {
   });
   composer = new Composer();
   overlays = [];
-  /** The open session's ids: the runtime id requests name, and the stored id it is saved under. */
-  #ids = NO_SESSION;
-  info = null;
   /** The session as the ports read it: its ids and `info`, live. */
-  session = sessionView(this, () => this.#ids);
-  usage = null;
+  session = this.#state;
   /** The working line's busy state and the compaction phase: their one owner. */
   #activity = new Activity();
   /** The prompts waiting behind the turn: held here, and the shared gateway's queue for this session. */
   #queue;
   /** Where each prompt goes: sent, the busy path, behind the turn, or held. */
   #router;
-  /** What Enter does while a turn runs (`display.busy_input_mode`); queue until the gateway says. */
-  #busyMode = "queue";
   #tern;
   #gw;
   #completion;
@@ -71867,7 +72249,6 @@ var App = class {
   #catalog;
   #welcome;
   #launch;
-  #settings;
   #surface;
   #renders = new RenderScheduler(() => this.#render());
   /** Timers with no field of their own (a compaction's summary read, the quit's detach wait). */
@@ -71875,11 +72256,8 @@ var App = class {
   #exitArmed = 0;
   #lastEsc = 0;
   #done = Promise.withResolvers();
-  #switches = new Switches();
-  /** Server requests for another session, kept while a switch is in flight. */
-  #heldRequests = [];
-  /** The sessions this pane views: its subscriptions, detaches in flight, and superseded switches' results. */
-  #views;
+  /** Which session the pane shows and how it switches: views, held requests, the adopt steps. */
+  #life;
   /** The prompt sheets the gateway's questions opened, and their approval-queue ids. */
   #sheets = new PromptSheets(this);
   /** The draft's images, those still uploading, and the launcher's startup image. */
@@ -71912,9 +72290,7 @@ var App = class {
   constructor(tern, gw2, version2, { launch: launch3 = readLaunchEnv(), settings: settings2 = fileSettings() } = {}) {
     this.#tern = tern;
     this.#gw = gw2;
-    this.#views = new SessionViews(gw2);
     this.#launch = launch3;
-    this.#settings = settings2;
     this.#attachments = new Attachments(
       {
         attachToHead: (image3) => this.#queue.attachToHead(image3),
@@ -71936,7 +72312,7 @@ var App = class {
       gw: gw2,
       restore: (prompt) => this.#restore(prompt),
       send: (prompt) => this.#router.send(prompt, { queued: true }),
-      sid: () => this.sid,
+      ticket: () => this.#state.ticket(),
       transcript: this.transcript
     });
     this.#router = new PromptRouter({
@@ -71946,8 +72322,51 @@ var App = class {
       gw: gw2,
       queue: this.#queue,
       restore: (prompt) => this.#restore(prompt),
+      ticket: () => this.#state.ticket(),
       transcript: this.transcript
     });
+    this.#life = new SessionLifecycle(
+      {
+        attachStartup: (sid) => this.#attachStartupImage(sid),
+        awaitingStartup: () => this.#attachments.awaitingStartup,
+        busy: () => Boolean(this.busy),
+        changed: () => this.changed(),
+        cols: () => tern.caps.cols,
+        drain: () => this.#drainQueue(),
+        gw: gw2,
+        launch: launch3,
+        rename: (sid, title) => this.#title.rename(sid, title),
+        request: (req) => this.#onRequest(req),
+        sheets: this.#sheets,
+        state: this.#state,
+        transcript: this.transcript
+      },
+      adoptSteps({
+        activity: this.#activity,
+        agents: this.agents,
+        automation: this.automation,
+        changed: () => this.changed(),
+        connect: this.#connect,
+        forgetStatusNote: () => {
+          this.#lastStatusNote = void 0;
+        },
+        imageLanded: (call) => this.#imageLanded(call),
+        markViewer,
+        media: this.media,
+        notices: this.#notices,
+        processes: this.processes,
+        prs: this.prs,
+        queue: this.#queue,
+        readBusyMode: () => void this.#readBusyMode(),
+        reportCwd: () => this.#reportCwd(),
+        sheets: this.#sheets,
+        showThoughts: (sid) => showThoughts({ gw: gw2, notice: (text12, tone) => this.notice(text12, tone), settings: settings2 }, sid),
+        state: this.#state,
+        title: this.#title,
+        transcript: this.transcript,
+        writeActiveSession: writeActiveSessionFile
+      })
+    );
     const saved = settings2.load();
     this.#theme = new Theme({ palette: (palette) => this.#surface.palette(palette), settings: settings2 }, saved.theme ?? "tern");
     this.#jobCharts = saved.jobCharts !== false;
@@ -71960,11 +72379,25 @@ var App = class {
   }
   /** The open session's runtime id: null before the first session and while the gateway is down. */
   get sid() {
-    return this.#ids.live;
+    return this.#state.ref.live;
   }
   /** Sets the runtime id, keeping the stored one (tests arrange a session this way). */
   set sid(id) {
-    this.#ids = { live: id === null ? null : liveSessionId(id), stored: this.#ids.stored };
+    this.#state.ref = { live: id === null ? null : liveSessionId(id), stored: this.#state.ref.stored };
+  }
+  /** The gateway's session.info, merged (tests arrange it; SessionState owns it). */
+  get info() {
+    return this.#state.info;
+  }
+  set info(info) {
+    this.#state.info = info;
+  }
+  /** The session's token and context counters. */
+  get usage() {
+    return this.#state.usage;
+  }
+  set usage(usage) {
+    this.#state.usage = usage;
   }
   /** The running turn (or a send's `{!cmd}`s), null when idle; tests arrange it, and Activity owns it. */
   get busy() {
@@ -71982,11 +72415,11 @@ var App = class {
   }
   /** The stored (database) id of the open session: what `session.list` rows are keyed by. */
   get storedSid() {
-    return this.#ids.stored;
+    return this.#state.ref.stored;
   }
   /** Sets the stored id, keeping the runtime one (tests arrange a session this way). */
   set storedSid(id) {
-    this.#ids = { live: this.#ids.live, stored: id === null ? null : storedSessionId(id) };
+    this.#state.ref = { live: this.#state.ref.live, stored: id === null ? null : storedSessionId(id) };
   }
   /** The session's title, as Hermes names it (`session.title`); '' while it has none. */
   get title() {
@@ -72027,9 +72460,8 @@ var App = class {
       if (lost) {
         this.transcript.notice(lost.text, lost.tone);
       }
-      this.#ids = { live: null, stored: this.#ids.stored };
+      this.#life.lost();
       this.#activity.endBusy();
-      this.#heldRequests = [];
       this.#sheets.dropAll();
       this.transcript.interrupt();
       this.changed();
@@ -72046,7 +72478,7 @@ var App = class {
     }).then(() => this.quit());
     const code7 = await this.#done.promise;
     await Promise.race([
-      this.#views.leaveAll("tui_shutdown"),
+      this.#life.leaveAll("tui_shutdown"),
       new Promise((resolve7) => this.#timers.timeout(() => resolve7(void 0), QUIT_DETACH_MS))
     ]);
     this.dispose();
@@ -72361,14 +72793,14 @@ var App = class {
     }, COPIED_MS3);
   }
   quit(code7 = 0) {
-    markViewer(null, durable(this.#ids));
+    markViewer(null, durable(this.#state.ref));
     this.#done.resolve(code7);
   }
   // ── Prompts and commands ───────────────────────────────────────────
   /** Sends the composer's draft, with the pastes it holds. */
   #submitDraft() {
     const pasted = [...this.composer.pasted];
-    this.#submit(this.composer.take(), true, this.#busyMode, pasted);
+    this.#submit(this.composer.take(), true, this.#state.busyMode, pasted);
   }
   /**
    * Sends or queues a prompt, or runs a command; `draft`: the user entered it (it takes the draft's
@@ -72376,7 +72808,7 @@ var App = class {
    * a typed one; a message the app writes (a connect result) waits behind the turn. `pasted`:
    * the draft's pastes, whose `{!cmd}`s and leading `!` stay as written.
    */
-  #submit(raw2, draft = true, busy = draft ? this.#busyMode : "queue", pasted = []) {
+  #submit(raw2, draft = true, busy = draft ? this.#state.busyMode : "queue", pasted = []) {
     const text12 = raw2.trim();
     if (draft && this.#attachments.uploading && !text12.startsWith("/")) {
       this.composer.set(raw2);
@@ -72405,7 +72837,7 @@ var App = class {
       canonical: this.#gw.isCanonical,
       compacting: this.#activity.compacting !== void 0,
       sid: this.sid,
-      switching: this.#switches.pending
+      switching: this.#life.switching
     };
   }
   /** Puts a prompt that did not go back into the composer, before any text there, with its images. */
@@ -72454,9 +72886,9 @@ ${this.composer.text}` : text12 || this.composer.text);
         return this.changed();
       }
     }
-    const sid = this.sid;
-    const generation = this.#switches.generation;
-    const stale = () => this.sid !== sid || this.#switches.pending && this.#switches.generation !== generation;
+    const ticket = this.#life.replyTicket();
+    const { sid } = ticket;
+    const stale = () => !ticket.isCurrent();
     if (resolve7) {
       const to = resolveSlashName(name, sid ? await this.#catalog.get(sid) : void 0);
       if (stale()) {
@@ -72520,7 +72952,8 @@ ${this.composer.text}` : text12 || this.composer.text);
   }
   /** The gateway-backed commands' view of this app (/steer, /queue, /stop, /tools, /undo, /compress, …). */
   control() {
-    const sid = this.sid;
+    const ticket = this.#state.ticket();
+    const { sid } = ticket;
     return {
       busy: Boolean(this.busy),
       // A steer that fell back to the queue: steering carries no images.
@@ -72534,7 +72967,7 @@ ${this.composer.text}` : text12 || this.composer.text);
       // The shared gateway (the one /branch runs on) answers a resume with one id for both kinds.
       open: async (id) => {
         await this.resume(id);
-        return durable(this.#ids) === id;
+        return durable(this.#state.ref) === id;
       },
       panel: (title, text12) => {
         this.transcript.panel(title, text12);
@@ -72553,13 +72986,13 @@ ${this.composer.text}` : text12 || this.composer.text);
       },
       queued: this.#queue.count(),
       reload: async () => {
-        if (sid && this.sid === sid) {
-          await this.#resume(sid);
+        if (sid && ticket.isCurrent()) {
+          await this.#life.reload(sid);
         }
       },
       send: (text12) => this.#router.send({ images: [], kind: "app", text: text12 }),
       sid,
-      stale: () => this.sid !== sid,
+      stale: () => !ticket.isCurrent(),
       steered: (text12) => {
         this.transcript.steer(text12);
         this.changed();
@@ -72583,184 +73016,32 @@ ${this.composer.text}` : text12 || this.composer.text);
   }
   /** Gives the compactions seen here their summaries from the store, `delay` ms from now. */
   #summarize(delay = 0) {
-    const sid = this.sid;
+    const ticket = this.#state.ticket();
     if (!this.transcript.unsummarized) {
       return;
     }
     this.#timers.timeout(() => {
       const stored = this.info?.stored_session_id || this.storedSid;
-      if (this.sid === sid && stored && this.transcript.unsummarized) {
+      if (ticket.isCurrent() && stored && this.transcript.unsummarized) {
         this.transcript.summarize(storedCompactions(stored));
         this.changed();
       }
     }, delay);
   }
   // ── Sessions ───────────────────────────────────────────────────────
-  /** The first session: HERMES_TUI_RESUME's, else a new one; then the launcher's startup image, if any. */
-  async #bootstrap() {
-    const resume = this.#launch.resume;
-    try {
-      await (resume ? this.resume(storedSessionId(resume)) : this.newSession());
-    } catch (error) {
-      this.transcript.notice(
-        `Could not start a session: ${errorText(error)}`,
-        "error"
-      );
-      this.changed();
-      return;
-    }
-    if (this.sid && this.#attachments.awaitingStartup) {
-      await this.#attachStartupImage(this.sid);
-    }
-  }
   /** `hermes -q … --image …`: attaches the image to the first session, then lets the startup query go. */
   async #attachStartupImage(sid) {
     await this.#attachments.attachStartup(sid);
     this.#drainQueue();
     this.changed();
   }
-  /** After a reconnect (or a replay gap): resumes the shown session under `id` (its runtime id or subscription died). */
-  async #reattach(id, notice = "Reconnected to the agent backend.") {
-    try {
-      if (await this.#resume(id)) {
-        this.transcript.notice(notice);
-      }
-    } catch (error) {
-      this.transcript.notice(
-        `Could not reattach the session: ${errorText(error)}`,
-        "error"
-      );
-    }
-    this.changed();
-  }
   /** Closes the open session and starts a fresh one with an empty transcript, named `title` if given. */
-  async newSession(title) {
-    if (this.#busySwitch()) {
-      return;
-    }
-    const previous3 = this.sid;
-    const token = this.#switches.begin();
-    try {
-      const setup = await rpc(this.#gw, "setup.status", {});
-      if (!this.#switches.current(token)) {
-        return;
-      }
-      if (setup?.provider_configured === false) {
-        this.transcript.notice("No model provider is configured. Run `hermes setup`, then start again.", "warning");
-        return;
-      }
-      const cwd = this.#launch.sessionCwd;
-      const r = await rpc(
-        this.#gw,
-        "session.create",
-        this.#gw.isCanonical ? { ...localCreationOptions(), ...cwd ? { cwd } : {} } : { cols: this.#tern.caps.cols, ...cwd ? { cwd } : {} }
-      );
-      if (!this.#switches.current(token)) {
-        this.#views.superseded(r);
-        return;
-      }
-      this.transcript.clear();
-      this.transcript.push({ id: this.transcript.id("w"), kind: "welcome" });
-      this.#adopt(r);
-      if (previous3 && previous3 !== r.session_id) {
-        void this.#views.leave(previous3, "tui_close");
-      }
-    } finally {
-      this.#settle(token);
-    }
-    if (title && this.sid) {
-      await this.#title.rename(this.sid, title);
-    }
-  }
-  /** Refuses a session switch while a turn runs (its queue and prompts belong to this session); true when refused. */
-  #busySwitch() {
-    if (!this.busy) {
-      return false;
-    }
-    this.transcript.notice("Wait for the current turn to finish (or press Esc twice) before switching sessions.", "warning");
-    this.changed();
-    return true;
+  newSession(title) {
+    return this.#life.newSession(title);
   }
   /** Resumes stored session `id`: its history replaces the transcript, and the session it leaves is closed. */
-  async resume(id) {
-    if (this.#busySwitch()) {
-      return;
-    }
-    const previous3 = this.sid;
-    const r = await this.#resume(id);
-    if (r && previous3 && previous3 !== r.session_id) {
-      void this.#views.leave(previous3, "tui_close");
-    }
-  }
-  /**
-   * Resumes and adopts session `id` (its stored id, or a runtime id when none is known); undefined
-   * when a later switch superseded this one.
-   */
-  async #resume(id) {
-    const token = this.#switches.begin();
-    const hold = this.#gw.holdAttach(id);
-    let snapshot3;
-    try {
-      const detaching = this.#views.detaching(id);
-      if (detaching) {
-        await detaching;
-        if (!this.#switches.current(token)) {
-          return void 0;
-        }
-      }
-      const r = await rpc(this.#gw, "session.resume", { cols: this.#tern.caps.cols, session_id: id });
-      if (!this.#switches.current(token)) {
-        this.#views.superseded(r);
-        return void 0;
-      }
-      this.transcript.clear();
-      this.transcript.push({ id: this.transcript.id("w"), kind: "welcome" });
-      this.#adopt(r);
-      snapshot3 = r;
-      this.#sheets.dropShared();
-      this.#gw.hydrateSharedPrompts(r);
-      return r;
-    } finally {
-      this.#gw.settleAttach(hold, snapshot3);
-      this.#settle(token);
-    }
-  }
-  #adopt(r) {
-    const ref = this.#views.adopt(r);
-    if (ref.live !== this.sid) {
-      this.#sheets.dropAll();
-      this.transcript.forgetCompactions();
-      this.#busyMode = "queue";
-    }
-    void this.#readBusyMode(ref.live);
-    this.#queue.server.reset(pendingRows(r.info));
-    const previousStored = this.#ids.stored;
-    this.#ids = ref;
-    showThoughts({ gw: this.#gw, notice: (text12, tone) => this.notice(text12, tone), settings: this.#settings }, ref.live);
-    markViewer(durable(ref), previousStored);
-    writeActiveSessionFile(durable(ref));
-    this.info = r.info ?? this.info;
-    this.usage = r.info?.usage ?? null;
-    this.#title.adopt(typeof r.info?.title === "string" ? r.info.title : void 0);
-    this.#reportCwd();
-    this.#activity.set(busyFrom(r));
-    this.#notices.reset();
-    this.#activity.endCompaction();
-    this.#lastStatusNote = void 0;
-    this.transcript.usageBase(r.info?.usage ?? void 0);
-    if (r.messages?.length) {
-      this.transcript.load(r.messages, storedCompactions(durable(ref)));
-      this.agents.scan();
-      this.media.showAll(this.transcript.entries, (call) => this.#imageLanded(call));
-    }
-    this.processes.poke();
-    this.#connect.watch();
-    this.prs.adopt();
-    this.automation.adopt(ref.live);
-    if (r.inflight) {
-      this.transcript.inflight(r.inflight, this.busy?.startedAt);
-    }
-    this.changed();
+  resume(id) {
+    return this.#life.resume(id);
   }
   /** Acts on a command's dispatch envelope from outside a typed command (a goal or loop sheet's button). */
   runDispatch(raw2, title) {
@@ -72769,7 +73050,7 @@ ${this.composer.text}` : text12 || this.composer.text);
   /** Acts on a slash.exec / command.dispatch answer: output, a skill or message to send, an alias or a prefill. */
   /** A prompt a slash command made (a skill, a `send`): while a turn runs it takes the busy path a typed one does. */
   #prompt(item3) {
-    this.#router.route(item3, this.#busyMode, "command");
+    this.#router.route(item3, this.#state.busyMode, "command");
   }
   async #dispatched(raw2, title, arg) {
     const d = parseCommandDispatch(raw2);
@@ -72806,21 +73087,6 @@ ${this.composer.text}` : text12 || this.composer.text);
         this.composer.set(d.message);
     }
   }
-  /** Ends switch `token`; once none is in flight, held requests for the adopted session open and the queue drains. */
-  #settle(token) {
-    this.#switches.end(token);
-    if (this.#switches.pending) {
-      return;
-    }
-    this.#views.release(this.sid);
-    const held = this.#heldRequests;
-    this.#heldRequests = [];
-    for (const req of held) {
-      this.#onRequest(req);
-    }
-    this.#drainQueue();
-    this.changed();
-  }
   // ── Gateway ────────────────────────────────────────────────────────
   #onGatewayEvent(ev) {
     if (!ownsEvent(this.sid, ev)) {
@@ -72831,7 +73097,7 @@ ${this.composer.text}` : text12 || this.composer.text);
       case "gateway.ready":
         this.#reconnect.ready();
         this.#theme.skin(ev.payload?.skin);
-        void (this.#ids.stored ? this.#reattach(this.#ids.stored) : this.#bootstrap());
+        this.#life.ready();
         break;
       case "skin.changed":
         this.#theme.skin(ev.payload);
@@ -72876,12 +73142,9 @@ ${this.composer.text}` : text12 || this.composer.text);
       case "sessions.changed":
         this.#title.read();
         return;
-      // The view fell behind and the owner retired its subscription (the socket is fine, so no
-      // reconnect re-attaches it): a fresh resume brings the snapshot and a new subscription.
+      // The view fell behind: a fresh resume brings the snapshot and a new subscription.
       case "session.replay_gap":
-        if (isLive(this.#ids) && ev.session_id === this.#ids.live) {
-          void this.#reattach(durable(this.#ids), "Reloaded the session: this view fell behind its events.");
-        }
+        this.#life.fellBehind(ev.session_id);
         return;
       case "message.start":
         if (!this.busy) {
@@ -73070,8 +73333,8 @@ ${this.composer.text}` : text12 || this.composer.text);
       case "request.cancel": {
         const id = ev.payload?.id;
         const notice = promptTimeoutNotice(ev.payload?.method, ev.payload?.reason);
-        const shown2 = this.#heldRequests.some((r) => r.id === id) || this.#sheets.shows(id);
-        this.#heldRequests = this.#heldRequests.filter((r) => r.id !== id);
+        const held = this.#life.unhold(id);
+        const shown2 = held || this.#sheets.shows(id);
         this.#sheets.drop(id);
         if (notice && shown2) {
           t2.notice(notice, "warning");
@@ -73102,12 +73365,7 @@ ${this.composer.text}` : text12 || this.composer.text);
     this.changed();
   }
   #onRequest(req) {
-    const route = this.#switches.route(this.sid, req.params.session_id);
-    if (route === "hold") {
-      this.#heldRequests.push(req);
-      return;
-    }
-    if (route === "drop") {
+    if (this.#life.route(req) !== "show") {
       return;
     }
     const overlay = promptOverlay(this, req);
@@ -73130,12 +73388,16 @@ ${this.composer.text}` : text12 || this.composer.text);
   setEffort(value, scope) {
     return applyEffort(this, value, scope);
   }
-  /** Reads session `sid`'s busy_input_mode; an older gateway without it leaves Enter queueing (the TUI default). */
-  async #readBusyMode(sid) {
+  /** Reads the shown session's busy_input_mode; an older gateway without it leaves Enter queueing (the TUI default). */
+  async #readBusyMode() {
+    const ticket = this.#state.ticket();
+    if (!ticket.sid) {
+      return;
+    }
     try {
-      const r = await rpc(this.#gw, "config.get", { key: "busy", session_id: sid });
-      if (sid === this.sid) {
-        this.#busyMode = busyModeOf(r?.value);
+      const r = await rpc(this.#gw, "config.get", { key: "busy", session_id: ticket.sid });
+      if (ticket.isCurrent()) {
+        this.#state.busyMode = busyModeOf(r?.value);
       }
     } catch {
     }

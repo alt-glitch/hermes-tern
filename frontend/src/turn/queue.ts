@@ -10,6 +10,7 @@ import { errorText } from '../core/errors.js'
 import type { Image } from '../draft/attachments.js'
 import type { NoticeEntry } from '../model.js'
 import { internalNotice } from '../transcript/messages.js'
+import type { SessionTicket } from '../session/state.js'
 import type { QueuedRow } from '../view/queued.js'
 import { admissionOf, type Requester, rpc } from '../wire/rpc.js'
 
@@ -32,8 +33,8 @@ export interface QueueHost {
     notice(text: string, tone?: NoticeEntry['tone']): void
     steer(text: string): void
   }
-  /** The shown session's runtime id; null before the first one. */
-  sid(): LiveSessionId | null
+  /** A ticket for the shown session (its runtime id is null before the first one). */
+  ticket(): SessionTicket
   /** A turn runs (Steer is offered, and acts). */
   busy(): boolean
   /** The session is adopted and idle: the oldest held prompt may go. */
@@ -115,9 +116,11 @@ export class PromptQueue {
    */
   async admit(sid: LiveSessionId, prompt: Prompt, sent?: string) {
     const host = this.#host
+    // Every caller passes the shown session's id: the ticket guards the awaits below.
+    const ticket = host.ticket()
     const ready = sent === undefined ? await host.expanded(sid, prompt) : { images: prompt.images, text: sent }
 
-    if (!ready || sid !== host.sid()) {
+    if (!ready || !ticket.isCurrent()) {
       return
     }
 
@@ -148,7 +151,7 @@ export class PromptQueue {
     } catch (error) {
       this.server.drop(own)
 
-      if (sid === host.sid()) {
+      if (ticket.isCurrent()) {
         host.transcript.notice(`Not queued: ${errorText(error)}. Your message is back in the composer.`, 'error')
         host.restore(prompt)
       }
@@ -172,7 +175,8 @@ export class PromptQueue {
       return
     }
 
-    const sid = host.sid()
+    const ticket = host.ticket()
+    const { sid } = ticket
     const q = this.#mine(index)
 
     if (!sid || !q) {
@@ -180,7 +184,7 @@ export class PromptQueue {
     }
 
     void this.#withdraw(sid, q).then(out => {
-      if (out && sid === host.sid()) {
+      if (out && ticket.isCurrent()) {
         host.restore(q.own.item.prompt)
       }
 
@@ -191,14 +195,15 @@ export class PromptQueue {
   /** Alt+Enter / a queued row's Steer: injects queued prompt `index` into the running turn instead of waiting for it to end. */
   steer(index: number) {
     const host = this.#host
-    const sid = host.sid()
+    const ticket = host.ticket()
+    const { sid } = ticket
 
     if (!host.busy() || !sid) {
       return
     }
 
     if (index >= this.held.length) {
-      return void this.#steerServerQueued(sid, index)
+      return void this.#steerServerQueued(ticket, sid, index)
     }
 
     const prompt = this.held[index]
@@ -286,7 +291,7 @@ export class PromptQueue {
    * A Steer on a row in the gateway's queue: withdrawn from it, then steered into the turn; a steer
    * that does not land goes back into the queue, at its end.
    */
-  async #steerServerQueued(sid: LiveSessionId, index: number) {
+  async #steerServerQueued(ticket: SessionTicket, sid: LiveSessionId, index: number) {
     const host = this.#host
     const q = this.#mine(index)
 
@@ -302,13 +307,13 @@ export class PromptQueue {
       return host.changed()
     }
 
-    if (!(await this.#withdraw(sid, q)) || sid !== host.sid()) {
+    if (!(await this.#withdraw(sid, q)) || !ticket.isCurrent()) {
       return
     }
 
     const r = await steerTurn(host.gw, sid, sent)
 
-    if (sid !== host.sid()) {
+    if (!ticket.isCurrent()) {
       return
     }
 

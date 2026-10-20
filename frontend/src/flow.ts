@@ -4,6 +4,7 @@
 
 import type { SessionResumeResult } from '@hermes/shared/gateway-events'
 
+import { Epoch, type Ticket } from './core/epoch.js'
 import type { LiveSessionId } from './core/ids.js'
 import type { Busy } from './turn/activity.js'
 
@@ -16,7 +17,8 @@ export type RequestRoute = 'show' | 'hold' | 'drop'
  * is pending, prompts and the queue wait for the session it adopts.
  */
 export class Switches {
-  #generation = 0
+  /** One generation per switch: a switch's token is the generation its `begin` started. */
+  readonly #epoch = new Epoch()
   #pending = false
 
   /** Whether a switch is in flight. */
@@ -26,19 +28,25 @@ export class Switches {
 
   /** Bumped by every `begin`: read before an await, it tells whether a switch began since. */
   get generation(): number {
-    return this.#generation
+    return this.#epoch.generation
   }
 
   /** Starts a switch and returns its token; earlier tokens go stale. */
   begin(): number {
     this.#pending = true
+    this.#epoch.next()
 
-    return ++this.#generation
+    return this.#epoch.generation
   }
 
   /** Whether switch `token` is still the latest one (its result may apply). */
   current(token: number): boolean {
-    return token === this.#generation
+    return token === this.#epoch.generation
+  }
+
+  /** A ticket that goes stale once another switch begins (its signal aborts then). */
+  since(): Ticket {
+    return this.#epoch.current()
   }
 
   /** Ends switch `token` (adopted or failed); a superseded token leaves the newer switch pending. */

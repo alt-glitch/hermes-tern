@@ -32,26 +32,6 @@ export interface SessionView {
   info: SessionInfo | null
 }
 
-/** Where a SessionView reads: the app's session info, as it is until a session store holds it. */
-export interface SessionFields {
-  info: SessionInfo | null
-}
-
-/** The live view of `fields` and `ids()`: each read sees the current ids and info, and `info` writes through. */
-export function sessionView(fields: SessionFields, ids: () => SessionIds): SessionView {
-  return {
-    get info() {
-      return fields.info
-    },
-    set info(info) {
-      fields.info = info
-    },
-    get ref() {
-      return ids()
-    }
-  }
-}
-
 /** Everything the app lends; a consumer takes `Pick<ChatPorts, …>` of it. */
 export interface ChatPorts extends OverlayHost {
   readonly session: SessionView

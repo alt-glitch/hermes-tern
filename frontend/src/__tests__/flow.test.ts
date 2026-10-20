@@ -23,6 +23,21 @@ describe('Switches', () => {
     expect(s.pending).toBe(false)
   })
 
+  it('hands out tickets that go stale once another switch begins', () => {
+    const s = new Switches()
+    const before = s.since()
+    const token = s.begin()
+
+    expect(before.isCurrent()).toBe(false)
+    expect(before.signal.aborted).toBe(true)
+    expect(s.generation).toBe(token)
+
+    const during = s.since()
+    s.end(token)
+    // Ending a switch begins none: a ticket from during it stays current.
+    expect(during.isCurrent()).toBe(true)
+  })
+
   it('holds another session’s request only while a switch is in flight', () => {
     const s = new Switches()
 

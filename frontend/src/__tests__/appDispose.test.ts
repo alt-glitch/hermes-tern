@@ -197,6 +197,19 @@ describe('quitting', () => {
     expect(dispose.mock.invocationCallOrder[0]).toBeLessThan(close.mock.invocationCallOrder[0] ?? 0)
   })
 
+  it('unmarks the viewer at once, before the run ends and the sessions detach', async () => {
+    const { app, done, gw } = await started()
+    expect(existsSync(viewer)).toBe(true)
+
+    app.quit()
+
+    // markViewer runs inside quit(); the detach waits for the run to see `done`.
+    expect(existsSync(viewer)).toBe(false)
+    expect(gw.sent('session.detach')).toEqual([])
+    await expect(done).resolves.toBe(0)
+    expect(gw.sent('session.detach')).toHaveLength(1)
+  })
+
   it('stops waiting for a detach that never answers after QUIT_DETACH_MS', async () => {
     const { app, done, gw, tern } = await started()
     gw.handlers.set('session.detach', () => new Promise(() => undefined))

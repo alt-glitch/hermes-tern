@@ -8,6 +8,7 @@ import type { GatewayClient } from '@tui/gatewayClient.js'
 
 import { redirectTurn, steerTurn } from '../controlCommands.js'
 import { type LiveSessionId, newInputId } from '../core/ids.js'
+import type { SessionTicket } from '../session/state.js'
 import type { Transcript } from '../transcript.js'
 import { rpc } from '../wire/rpc.js'
 
@@ -102,6 +103,8 @@ export interface RouterHost {
   readonly transcript: Pick<Transcript, 'notice' | 'steer' | 'user'>
   /** The session's state, for the gates. */
   gates(): GateState
+  /** A ticket for the shown session, to check after an await. */
+  ticket(): SessionTicket
   /** Puts a prompt that did not go back into the composer. */
   restore(prompt: Prompt): void
   /** Asks for a render. */
@@ -148,7 +151,8 @@ export class PromptRouter {
    */
   async #busyInput(prompt: Prompt, mode: BusyMode) {
     const host = this.#host
-    const { sid } = host.gates()
+    const ticket = host.ticket()
+    const { sid } = ticket
 
     if (!sid || mode === 'queue' || prompt.images.length) {
       return this.behind(prompt)
@@ -156,13 +160,13 @@ export class PromptRouter {
 
     const ready = await this.expanded(sid, prompt)
 
-    if (!ready || sid !== host.gates().sid) {
+    if (!ready || !ticket.isCurrent()) {
       return
     }
 
     const r = await (mode === 'steer' ? steerTurn : redirectTurn)(host.gw, sid, ready.text)
 
-    if (sid !== host.gates().sid) {
+    if (!ticket.isCurrent()) {
       return
     }
 

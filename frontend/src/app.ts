@@ -5,12 +5,11 @@
 
 import { appendFileSync } from 'node:fs'
 
-import type { SessionResumeResult, Usage } from '@hermes/shared/gateway-events'
+import type { Usage } from '@hermes/shared/gateway-events'
 import type { ServerRequest } from '@hermes/shared/json-rpc-channel'
 import { parseCommandDispatch } from '@hermes/shared/slash'
 import type { Key, ScrollTo, Session, TspEvent } from '@stencil-hq/tern'
 import { describeSlashExecError, isUnsupportedCommand, shouldFallbackToDispatch } from '@tui/app/userMessages.js'
-import { localCreationOptions } from '@tui/canonicalGateway.js'
 import { usageFromTick } from '@tui/domain/usage.js'
 import type { GatewayClient } from '@tui/gatewayClient.js'
 import type { AnyGatewayEvent } from '@tui/gatewayTypes.js'
@@ -19,7 +18,7 @@ import type { SessionInfo } from '@tui/types.js'
 import logo from '../assets/logo.png'
 
 import { agentName, Agents } from './agents/store.js'
-import { type ChatPorts, type SessionView, sessionView } from './app/ports.js'
+import type { ChatPorts, SessionView } from './app/ports.js'
 import { Automation } from './automation.js'
 import { Hud, pills, type Pill, type SheetPill, todos } from './chrome/hud.js'
 import { isLoginNotice, NoticeStrip } from './chrome/notices.js'
@@ -34,15 +33,11 @@ import { interruptTurn } from './controlCommands.js'
 import { Disposables } from './core/disposables.js'
 import { errorText } from './core/errors.js'
 import {
-  type DurableSessionId,
   durable,
   entryId,
-  isLive,
   type LiveSessionId,
   liveSessionId,
-  NO_SESSION,
   type PrKey,
-  type SessionIds,
   type StoredSessionId,
   storedSessionId,
   toolCallId
@@ -50,7 +45,7 @@ import {
 import { RenderScheduler } from './core/scheduler.js'
 import { Attachments } from './draft/attachments.js'
 import { fastTier } from './fast.js'
-import { busyFrom, ownsEvent, Switches } from './flow.js'
+import { ownsEvent } from './flow.js'
 import { protocolNote, slowStartNotes } from './backendNotes.js'
 import { moaLabel, moaReferenceLabel } from './moa.js'
 import type { Overlay } from './overlay.js'
@@ -75,10 +70,12 @@ import { PullRequests } from './github/store.js'
 import { Cron } from './processes/cron.js'
 import { PrAside } from './prs/aside.js'
 import { PromptSheets } from './prompts/sheets.js'
+import { adoptSteps } from './session/adopt.js'
 import { applyEffort, cycleEffort, DEFAULT_EFFORT } from './session/effort.js'
+import { SessionLifecycle } from './session/lifecycle.js'
+import { SessionState } from './session/state.js'
 import { showThoughts } from './session/thoughts.js'
 import { SessionTitle } from './session/title.js'
-import { SessionViews } from './session/views.js'
 import { Sidebar } from './sidebar.js'
 import type { SessionHost } from './sessionCommands.js'
 import { ambiguousNotice, CommandCatalog, resolveSlashName } from './slashResolve.js'
@@ -100,7 +97,7 @@ import { storedCompactions } from './compaction.js'
 import { dockNodes } from './view/dock.js'
 import { homeTilde } from './view/format.js'
 import { entryNode } from './view/transcript.js'
-import { type AdaptedSnapshot, rpc } from './wire/rpc.js'
+import { rpc } from './wire/rpc.js'
 import { pendingRows, usageCounters } from './wire/schemas.js'
 import { busyLabel, preparingLabel } from './workLog.js'
 import { openSidebar, specOf } from './watch/spec.js'
@@ -111,21 +108,13 @@ const EXIT_ARM_MS = 1500
 const DOUBLE_ESC_MS = 500
 /** How long a prompt's Copy button reads Copied. */
 const COPIED_MS = 1500
-/**
- * What the pane reads of session.create's or session.resume's result, from either gateway: the
- * shared gateway's subscription, and the state of a turn a resumed session may be in.
- */
-type Snapshot = Pick<AdaptedSnapshot, 'session_id'> &
-  Partial<Pick<AdaptedSnapshot, 'messages' | 'subscription_id'>> &
-  Partial<Pick<SessionResumeResult, 'inflight' | 'running' | 'status' | 'stored_session_id' | 'turn_started_at'>> & {
-    info?: SessionInfo
-  }
-
 /** How long quitting waits for the sessions to detach. */
 const QUIT_DETACH_MS = 1500
 
 /** Runs the Tern frontend until the user quits; resolves the exit code. */
 export class App implements ChatPorts {
+  /** The open session's ids, info, usage and busy-input mode; every write renders. */
+  readonly #state = new SessionState(() => this.changed())
   readonly transcript = new Transcript()
   /** Images tool calls showed, a URL's bytes fetched once and sent as a blob. */
   readonly media = new Media({ blob: (bytes, mime) => this.#blob(bytes, mime) })
@@ -145,7 +134,7 @@ export class App implements ChatPorts {
   readonly prs: PullRequests = new PullRequests({
     changed: () => this.changed(),
     cwd: () => this.info?.cwd || null,
-    sid: () => durable(this.#ids)
+    sid: () => durable(this.#state.ref)
   })
   /** The pull request docked at the pane's right edge (the PR aside). */
   readonly prAside: PrAside = new PrAside({
@@ -158,20 +147,14 @@ export class App implements ChatPorts {
   })
   readonly composer = new Composer()
   readonly overlays: Overlay[] = []
-  /** The open session's ids: the runtime id requests name, and the stored id it is saved under. */
-  #ids: SessionIds = NO_SESSION
-  info: SessionInfo | null = null
   /** The session as the ports read it: its ids and `info`, live. */
-  readonly session: SessionView = sessionView(this, () => this.#ids)
-  usage: Usage | null = null
+  readonly session: SessionView = this.#state
   /** The working line's busy state and the compaction phase: their one owner. */
   readonly #activity = new Activity()
   /** The prompts waiting behind the turn: held here, and the shared gateway's queue for this session. */
   readonly #queue: PromptQueue
   /** Where each prompt goes: sent, the busy path, behind the turn, or held. */
   readonly #router: PromptRouter
-  /** What Enter does while a turn runs (`display.busy_input_mode`); queue until the gateway says. */
-  #busyMode: BusyMode = 'queue'
   readonly #tern: Session
   readonly #gw: GatewayClient
   readonly #completion: Completion
@@ -179,7 +162,6 @@ export class App implements ChatPorts {
   readonly #catalog: CommandCatalog
   readonly #welcome: WelcomeContext
   readonly #launch: LaunchEnv
-  readonly #settings: SettingsSource
   #surface!: SurfaceHost
   readonly #renders = new RenderScheduler(() => this.#render())
   /** Timers with no field of their own (a compaction's summary read, the quit's detach wait). */
@@ -187,11 +169,8 @@ export class App implements ChatPorts {
   #exitArmed = 0
   #lastEsc = 0
   #done = Promise.withResolvers<number>()
-  readonly #switches = new Switches()
-  /** Server requests for another session, kept while a switch is in flight. */
-  #heldRequests: ServerRequest[] = []
-  /** The sessions this pane views: its subscriptions, detaches in flight, and superseded switches' results. */
-  readonly #views: SessionViews
+  /** Which session the pane shows and how it switches: views, held requests, the adopt steps. */
+  readonly #life: SessionLifecycle
   /** The prompt sheets the gateway's questions opened, and their approval-queue ids. */
   readonly #sheets: PromptSheets = new PromptSheets(this)
   /** The draft's images, those still uploading, and the launcher's startup image. */
@@ -225,9 +204,7 @@ export class App implements ChatPorts {
   constructor(tern: Session, gw: GatewayClient, version: string, { launch = readLaunchEnv(), settings = fileSettings() }: { launch?: LaunchEnv; settings?: SettingsSource } = {}) {
     this.#tern = tern
     this.#gw = gw
-    this.#views = new SessionViews(gw)
     this.#launch = launch
-    this.#settings = settings
     this.#attachments = new Attachments(
       {
         attachToHead: image => this.#queue.attachToHead(image),
@@ -249,7 +226,7 @@ export class App implements ChatPorts {
       gw,
       restore: prompt => this.#restore(prompt),
       send: prompt => this.#router.send(prompt, { queued: true }),
-      sid: () => this.sid,
+      ticket: () => this.#state.ticket(),
       transcript: this.transcript
     })
     this.#router = new PromptRouter({
@@ -259,8 +236,51 @@ export class App implements ChatPorts {
       gw,
       queue: this.#queue,
       restore: prompt => this.#restore(prompt),
+      ticket: () => this.#state.ticket(),
       transcript: this.transcript
     })
+    this.#life = new SessionLifecycle(
+      {
+        attachStartup: sid => this.#attachStartupImage(sid),
+        awaitingStartup: () => this.#attachments.awaitingStartup,
+        busy: () => Boolean(this.busy),
+        changed: () => this.changed(),
+        cols: () => tern.caps.cols,
+        drain: () => this.#drainQueue(),
+        gw,
+        launch,
+        rename: (sid, title) => this.#title.rename(sid, title),
+        request: req => this.#onRequest(req),
+        sheets: this.#sheets,
+        state: this.#state,
+        transcript: this.transcript
+      },
+      adoptSteps({
+        activity: this.#activity,
+        agents: this.agents,
+        automation: this.automation,
+        changed: () => this.changed(),
+        connect: this.#connect,
+        forgetStatusNote: () => {
+          this.#lastStatusNote = undefined
+        },
+        imageLanded: call => this.#imageLanded(call),
+        markViewer,
+        media: this.media,
+        notices: this.#notices,
+        processes: this.processes,
+        prs: this.prs,
+        queue: this.#queue,
+        readBusyMode: () => void this.#readBusyMode(),
+        reportCwd: () => this.#reportCwd(),
+        sheets: this.#sheets,
+        showThoughts: sid => showThoughts({ gw, notice: (text, tone) => this.notice(text, tone), settings }, sid),
+        state: this.#state,
+        title: this.#title,
+        transcript: this.transcript,
+        writeActiveSession: writeActiveSessionFile
+      })
+    )
     const saved = settings.load()
     this.#theme = new Theme({ palette: palette => this.#surface.palette(palette), settings }, saved.theme ?? 'tern')
     this.#jobCharts = saved.jobCharts !== false
@@ -274,12 +294,30 @@ export class App implements ChatPorts {
 
   /** The open session's runtime id: null before the first session and while the gateway is down. */
   get sid(): LiveSessionId | null {
-    return this.#ids.live
+    return this.#state.ref.live
   }
 
   /** Sets the runtime id, keeping the stored one (tests arrange a session this way). */
   set sid(id: string | null) {
-    this.#ids = { live: id === null ? null : liveSessionId(id), stored: this.#ids.stored }
+    this.#state.ref = { live: id === null ? null : liveSessionId(id), stored: this.#state.ref.stored }
+  }
+
+  /** The gateway's session.info, merged (tests arrange it; SessionState owns it). */
+  get info(): SessionInfo | null {
+    return this.#state.info
+  }
+
+  set info(info: SessionInfo | null) {
+    this.#state.info = info
+  }
+
+  /** The session's token and context counters. */
+  get usage(): Usage | null {
+    return this.#state.usage
+  }
+
+  set usage(usage: Usage | null) {
+    this.#state.usage = usage
   }
 
   /** The running turn (or a send's `{!cmd}`s), null when idle; tests arrange it, and Activity owns it. */
@@ -302,12 +340,12 @@ export class App implements ChatPorts {
 
   /** The stored (database) id of the open session: what `session.list` rows are keyed by. */
   get storedSid(): StoredSessionId | null {
-    return this.#ids.stored
+    return this.#state.ref.stored
   }
 
   /** Sets the stored id, keeping the runtime one (tests arrange a session this way). */
   set storedSid(id: string | null) {
-    this.#ids = { live: this.#ids.live, stored: id === null ? null : storedSessionId(id) }
+    this.#state.ref = { live: this.#state.ref.live, stored: id === null ? null : storedSessionId(id) }
   }
 
   /** The session's title, as Hermes names it (`session.title`); '' while it has none. */
@@ -363,11 +401,11 @@ export class App implements ChatPorts {
         this.transcript.notice(lost.text, lost.tone)
       }
 
-      // The runtime session died with the process: prompts queue until the next gateway.ready reattaches.
-      this.#ids = { live: null, stored: this.#ids.stored }
+      // The runtime session died with the process: prompts queue until the next gateway.ready
+      // reattaches, and nothing can answer the held requests now.
+      this.#life.lost()
       this.#activity.endBusy()
-      // Nothing can answer the sheets now; the reattach re-opens the questions still pending.
-      this.#heldRequests = []
+      // Nothing can answer the sheets either; the reattach re-opens the questions still pending.
       this.#sheets.dropAll()
       this.transcript.interrupt()
       this.changed()
@@ -387,7 +425,7 @@ export class App implements ChatPorts {
     const code = await this.#done.promise
     // Bounded, as Ink's deferExitForClose: a dead socket must not hold the terminal.
     await Promise.race([
-      this.#views.leaveAll('tui_shutdown'),
+      this.#life.leaveAll('tui_shutdown'),
       new Promise(resolve => this.#timers.timeout(() => resolve(undefined), QUIT_DETACH_MS))
     ])
     this.dispose()
@@ -808,7 +846,7 @@ export class App implements ChatPorts {
   }
 
   quit(code = 0) {
-    markViewer(null, durable(this.#ids))
+    markViewer(null, durable(this.#state.ref))
     this.#done.resolve(code)
   }
 
@@ -818,7 +856,7 @@ export class App implements ChatPorts {
   #submitDraft() {
     const pasted = [...this.composer.pasted]
 
-    this.#submit(this.composer.take(), true, this.#busyMode, pasted)
+    this.#submit(this.composer.take(), true, this.#state.busyMode, pasted)
   }
 
   /**
@@ -827,7 +865,7 @@ export class App implements ChatPorts {
    * a typed one; a message the app writes (a connect result) waits behind the turn. `pasted`:
    * the draft's pastes, whose `{!cmd}`s and leading `!` stay as written.
    */
-  #submit(raw: string, draft = true, busy: BusyMode = draft ? this.#busyMode : 'queue', pasted: readonly string[] = []) {
+  #submit(raw: string, draft = true, busy: BusyMode = draft ? this.#state.busyMode : 'queue', pasted: readonly string[] = []) {
     const text = raw.trim()
 
     // An image still uploading would miss the prompt: the words wait in the composer for it.
@@ -869,7 +907,7 @@ export class App implements ChatPorts {
       canonical: this.#gw.isCanonical,
       compacting: this.#activity.compacting !== undefined,
       sid: this.sid,
-      switching: this.#switches.pending
+      switching: this.#life.switching
     }
   }
 
@@ -933,9 +971,9 @@ export class App implements ChatPorts {
     // The reply belongs to the session it was typed in: once the view left it, or a switch begun since
     // is in flight, the reply is dropped (Ink's stale()), so a late skill or /plan never sends its prompt
     // to the next session.
-    const sid = this.sid
-    const generation = this.#switches.generation
-    const stale = () => this.sid !== sid || (this.#switches.pending && this.#switches.generation !== generation)
+    const ticket = this.#life.replyTicket()
+    const { sid } = ticket
+    const stale = () => !ticket.isCurrent()
 
     if (resolve) {
       // Sessionless (starting, or the backend is down), only this frontend's own commands resolve.
@@ -1025,7 +1063,8 @@ export class App implements ChatPorts {
 
   /** The gateway-backed commands' view of this app (/steer, /queue, /stop, /tools, /undo, /compress, …). */
   control(): SessionHost {
-    const sid = this.sid
+    const ticket = this.#state.ticket()
+    const { sid } = ticket
 
     return {
       busy: Boolean(this.busy),
@@ -1041,7 +1080,7 @@ export class App implements ChatPorts {
       open: async id => {
         await this.resume(id)
 
-        return durable(this.#ids) === id
+        return durable(this.#state.ref) === id
       },
       panel: (title, text) => {
         this.transcript.panel(title, text)
@@ -1062,13 +1101,13 @@ export class App implements ChatPorts {
       },
       queued: this.#queue.count(),
       reload: async () => {
-        if (sid && this.sid === sid) {
-          await this.#resume(sid)
+        if (sid && ticket.isCurrent()) {
+          await this.#life.reload(sid)
         }
       },
       send: text => this.#router.send({ images: [], kind: 'app', text }),
       sid,
-      stale: () => this.sid !== sid,
+      stale: () => !ticket.isCurrent(),
       steered: text => {
         this.transcript.steer(text)
         this.changed()
@@ -1094,7 +1133,7 @@ export class App implements ChatPorts {
 
   /** Gives the compactions seen here their summaries from the store, `delay` ms from now. */
   #summarize(delay = 0) {
-    const sid = this.sid
+    const ticket = this.#state.ticket()
 
     if (!this.transcript.unsummarized) {
       return
@@ -1103,7 +1142,7 @@ export class App implements ChatPorts {
     this.#timers.timeout(() => {
       const stored = this.info?.stored_session_id || this.storedSid
 
-      if (this.sid === sid && stored && this.transcript.unsummarized) {
+      if (ticket.isCurrent() && stored && this.transcript.unsummarized) {
         this.transcript.summarize(storedCompactions(stored))
         this.changed()
       }
@@ -1112,27 +1151,6 @@ export class App implements ChatPorts {
 
   // ── Sessions ───────────────────────────────────────────────────────
 
-  /** The first session: HERMES_TUI_RESUME's, else a new one; then the launcher's startup image, if any. */
-  async #bootstrap() {
-    const resume = this.#launch.resume
-
-    try {
-      await (resume ? this.resume(storedSessionId(resume)) : this.newSession())
-    } catch (error) {
-      this.transcript.notice(
-        `Could not start a session: ${errorText(error)}`,
-        'error'
-      )
-      this.changed()
-
-      return
-    }
-
-    if (this.sid && this.#attachments.awaitingStartup) {
-      await this.#attachStartupImage(this.sid)
-    }
-  }
-
   /** `hermes -q … --image …`: attaches the image to the first session, then lets the startup query go. */
   async #attachStartupImage(sid: string) {
     await this.#attachments.attachStartup(sid)
@@ -1140,204 +1158,14 @@ export class App implements ChatPorts {
     this.changed()
   }
 
-  /** After a reconnect (or a replay gap): resumes the shown session under `id` (its runtime id or subscription died). */
-  async #reattach(id: DurableSessionId, notice = 'Reconnected to the agent backend.') {
-    try {
-      if (await this.#resume(id)) {
-        this.transcript.notice(notice)
-      }
-    } catch (error) {
-      this.transcript.notice(
-        `Could not reattach the session: ${errorText(error)}`,
-        'error'
-      )
-    }
-
-    this.changed()
-  }
-
   /** Closes the open session and starts a fresh one with an empty transcript, named `title` if given. */
-  async newSession(title?: string) {
-    if (this.#busySwitch()) {
-      return
-    }
-
-    const previous = this.sid
-    const token = this.#switches.begin()
-
-    try {
-      const setup = await rpc(this.#gw, 'setup.status', {})
-
-      if (!this.#switches.current(token)) {
-        return
-      }
-
-      if (setup?.provider_configured === false) {
-        this.transcript.notice('No model provider is configured. Run `hermes setup`, then start again.', 'warning')
-
-        return
-      }
-
-      const cwd = this.#launch.sessionCwd
-
-      // The shared gateway takes the launch flags (`hermes tern -m … --yolo -s …`) as the session's creation policy.
-      const r: Snapshot = await rpc(
-        this.#gw,
-        'session.create',
-        this.#gw.isCanonical
-          ? { ...localCreationOptions(), ...(cwd ? { cwd } : {}) }
-          : { cols: this.#tern.caps.cols, ...(cwd ? { cwd } : {}) }
-      )
-
-      if (!this.#switches.current(token)) {
-        // A later switch won; nothing will ever show this session.
-        this.#views.superseded(r)
-
-        return
-      }
-
-      this.transcript.clear()
-      this.transcript.push({ id: this.transcript.id('w'), kind: 'welcome' })
-      this.#adopt(r)
-
-      // Only now: a failed create leaves the view on the session it still receives.
-      if (previous && previous !== r.session_id) {
-        void this.#views.leave(previous, 'tui_close')
-      }
-    } finally {
-      this.#settle(token)
-    }
-
-    if (title && this.sid) {
-      await this.#title.rename(this.sid, title)
-    }
-  }
-
-  /** Refuses a session switch while a turn runs (its queue and prompts belong to this session); true when refused. */
-  #busySwitch(): boolean {
-    if (!this.busy) {
-      return false
-    }
-
-    this.transcript.notice('Wait for the current turn to finish (or press Esc twice) before switching sessions.', 'warning')
-    this.changed()
-
-    return true
+  newSession(title?: string): Promise<void> {
+    return this.#life.newSession(title)
   }
 
   /** Resumes stored session `id`: its history replaces the transcript, and the session it leaves is closed. */
-  async resume(id: StoredSessionId) {
-    if (this.#busySwitch()) {
-      return
-    }
-
-    const previous = this.sid
-    const r = await this.#resume(id)
-
-    if (r && previous && previous !== r.session_id) {
-      void this.#views.leave(previous, 'tui_close')
-    }
-  }
-
-  /**
-   * Resumes and adopts session `id` (its stored id, or a runtime id when none is known); undefined
-   * when a later switch superseded this one.
-   */
-  async #resume(id: DurableSessionId): Promise<Snapshot | undefined> {
-    const token = this.#switches.begin()
-    // Frames for `id` that beat the snapshot wait, then replay only what the snapshot lacks.
-    const hold = this.#gw.holdAttach(id)
-    let snapshot: Snapshot | undefined
-
-    try {
-      const detaching = this.#views.detaching(id)
-
-      if (detaching) {
-        // A detach that lands after this attach would drop the subscription the attach reuses.
-        await detaching
-
-        if (!this.#switches.current(token)) {
-          return undefined
-        }
-      }
-
-      const r: Snapshot = await rpc(this.#gw, 'session.resume', { cols: this.#tern.caps.cols, session_id: id })
-
-      if (!this.#switches.current(token)) {
-        this.#views.superseded(r)
-
-        return undefined
-      }
-
-      this.transcript.clear()
-      this.transcript.push({ id: this.transcript.id('w'), kind: 'welcome' })
-      this.#adopt(r)
-      snapshot = r
-      // An approval or question already waiting on the session opens its sheet. A sheet from before
-      // the reattach may have been answered or pruned meanwhile (its settled event is not replayed).
-      this.#sheets.dropShared()
-      this.#gw.hydrateSharedPrompts(r)
-
-      return r
-    } finally {
-      this.#gw.settleAttach(hold, snapshot)
-      this.#settle(token)
-    }
-  }
-
-  #adopt(r: Snapshot) {
-    const ref = this.#views.adopt(r)
-
-    if (ref.live !== this.sid) {
-      // The last session's approvals and questions are not this one's (a resume hydrates its own after).
-      this.#sheets.dropAll()
-      this.transcript.forgetCompactions()
-      this.#busyMode = 'queue'
-    }
-
-    // Read on every adopt: a reconnect may land on a gateway whose config changed.
-    void this.#readBusyMode(ref.live)
-
-    // The session's own queue, from the snapshot (a reattach's rows of this pane become read-only rows).
-    this.#queue.server.reset(pendingRows(r.info))
-
-    const previousStored = this.#ids.stored
-    this.#ids = ref
-    showThoughts({ gw: this.#gw, notice: (text, tone) => this.notice(text, tone), settings: this.#settings }, ref.live)
-    // This pane shows the session now: the plugin's Python half sends its connect results here as a card.
-    markViewer(durable(ref), previousStored)
-    writeActiveSessionFile(durable(ref))
-    this.info = r.info ?? this.info
-    this.usage = r.info?.usage ?? null
-    // Another session: its own name (or none yet) on the tab.
-    this.#title.adopt(typeof r.info?.title === 'string' ? r.info.title : undefined)
-    this.#reportCwd()
-    // A resumed session may be mid-turn: Esc Esc stops it and new prompts go as busy_input_mode says.
-    this.#activity.set(busyFrom(r))
-    // The last session's notices and status lines are not this one's.
-    this.#notices.reset()
-    this.#activity.endCompaction()
-    this.#lastStatusNote = undefined
-    this.transcript.usageBase(r.info?.usage ?? undefined)
-
-    if (r.messages?.length) {
-      // The history leaves the compactions out; the store says where they were.
-      this.transcript.load(r.messages, storedCompactions(durable(ref)))
-      this.agents.scan()
-      this.media.showAll(this.transcript.entries, call => this.#imageLanded(call))
-    }
-
-    // The new session's processes and PRs (and none of the last one's), and its open connect cards.
-    this.processes.poke()
-    this.#connect.watch()
-    this.prs.adopt()
-    this.automation.adopt(ref.live)
-
-    if (r.inflight) {
-      this.transcript.inflight(r.inflight, this.busy?.startedAt)
-    }
-
-    this.changed()
+  resume(id: StoredSessionId): Promise<void> {
+    return this.#life.resume(id)
   }
 
   /** Acts on a command's dispatch envelope from outside a typed command (a goal or loop sheet's button). */
@@ -1348,7 +1176,7 @@ export class App implements ChatPorts {
   /** Acts on a slash.exec / command.dispatch answer: output, a skill or message to send, an alias or a prefill. */
   /** A prompt a slash command made (a skill, a `send`): while a turn runs it takes the busy path a typed one does. */
   #prompt(item: Prompt) {
-    this.#router.route(item, this.#busyMode, 'command')
+    this.#router.route(item, this.#state.busyMode, 'command')
   }
 
   async #dispatched(raw: unknown, title: string, arg: string) {
@@ -1402,26 +1230,6 @@ export class App implements ChatPorts {
     }
   }
 
-  /** Ends switch `token`; once none is in flight, held requests for the adopted session open and the queue drains. */
-  #settle(token: number) {
-    this.#switches.end(token)
-
-    if (this.#switches.pending) {
-      return
-    }
-
-    this.#views.release(this.sid)
-    const held = this.#heldRequests
-    this.#heldRequests = []
-
-    for (const req of held) {
-      this.#onRequest(req)
-    }
-
-    this.#drainQueue()
-    this.changed()
-  }
-
   // ── Gateway ────────────────────────────────────────────────────────
 
   #onGatewayEvent(ev: AnyGatewayEvent) {
@@ -1436,8 +1244,7 @@ export class App implements ChatPorts {
       case 'gateway.ready':
         this.#reconnect.ready()
         this.#theme.skin(ev.payload?.skin)
-        // A reconnect's ready reattaches the shown session; only a sessionless app bootstraps.
-        void (this.#ids.stored ? this.#reattach(this.#ids.stored) : this.#bootstrap())
+        this.#life.ready()
 
         break
 
@@ -1506,12 +1313,9 @@ export class App implements ChatPorts {
 
         return
 
-      // The view fell behind and the owner retired its subscription (the socket is fine, so no
-      // reconnect re-attaches it): a fresh resume brings the snapshot and a new subscription.
+      // The view fell behind: a fresh resume brings the snapshot and a new subscription.
       case 'session.replay_gap':
-        if (isLive(this.#ids) && ev.session_id === this.#ids.live) {
-          void this.#reattach(durable(this.#ids), 'Reloaded the session: this view fell behind its events.')
-        }
+        this.#life.fellBehind(ev.session_id)
 
         return
 
@@ -1797,10 +1601,9 @@ export class App implements ChatPorts {
         const id = ev.payload?.id
         const notice = promptTimeoutNotice(ev.payload?.method, ev.payload?.reason)
         // Only for a card this window still shows (or holds): an answered one needs no line.
-        const shown =
-          this.#heldRequests.some(r => r.id === id) || this.#sheets.shows(id)
+        const held = this.#life.unhold(id)
+        const shown = held || this.#sheets.shows(id)
 
-        this.#heldRequests = this.#heldRequests.filter(r => r.id !== id)
         this.#sheets.drop(id)
 
         if (notice && shown) {
@@ -1846,16 +1649,8 @@ export class App implements ChatPorts {
   }
 
   #onRequest(req: ServerRequest) {
-    const route = this.#switches.route(this.sid, req.params.session_id)
-
-    if (route === 'hold') {
-      this.#heldRequests.push(req)
-
-      return
-    }
-
-    // Another session's prompt: it settles when that session closes.
-    if (route === 'drop') {
+    // Held while a switch is in flight, or another session's prompt (it settles when that session closes).
+    if (this.#life.route(req) !== 'show') {
       return
     }
 
@@ -1886,13 +1681,19 @@ export class App implements ChatPorts {
     return applyEffort(this, value, scope)
   }
 
-  /** Reads session `sid`'s busy_input_mode; an older gateway without it leaves Enter queueing (the TUI default). */
-  async #readBusyMode(sid: string) {
-    try {
-      const r = await rpc(this.#gw, 'config.get', { key: 'busy', session_id: sid })
+  /** Reads the shown session's busy_input_mode; an older gateway without it leaves Enter queueing (the TUI default). */
+  async #readBusyMode() {
+    const ticket = this.#state.ticket()
 
-      if (sid === this.sid) {
-        this.#busyMode = busyModeOf(r?.value)
+    if (!ticket.sid) {
+      return
+    }
+
+    try {
+      const r = await rpc(this.#gw, 'config.get', { key: 'busy', session_id: ticket.sid })
+
+      if (ticket.isCurrent()) {
+        this.#state.busyMode = busyModeOf(r?.value)
       }
     } catch {
       // Keeps `queue`.

@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest'
 import { Composer } from '../composer.js'
 import { admissionId, inputId, type LiveSessionId, liveSessionId } from '../core/ids.js'
 import type { Image } from '../draft/attachments.js'
+import { sessionTicket } from '../session/state.js'
 import type { Prompt } from '../turn/prompt.js'
 import { PromptQueue, type QueueHost } from '../turn/queue.js'
 import { type DockContext, dockNodes } from '../view/dock.js'
@@ -43,7 +44,7 @@ function setup({ busy = true, canDrain = false, sid = S1 }: { busy?: boolean; ca
     gw: gw.client,
     restore: prompt => log.push(`restore ${prompt.text}`),
     send: prompt => log.push(`send ${prompt.text}`),
-    sid: () => state.sid,
+    ticket: () => sessionTicket(() => state.sid, new AbortController().signal),
     transcript: {
       notice: (text, tone) => log.push(`${tone ?? 'info'}: ${text}`),
       steer: text => log.push(`steer ${text}`)
