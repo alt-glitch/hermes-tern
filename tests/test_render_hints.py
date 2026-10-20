@@ -21,11 +21,6 @@ def test_the_section_is_for_sessions_a_tern_pane_shows(monkeypatch):
     assert len(render_hints.PROMPT) < 4000
 
 
-def test_the_skill_ships_with_the_plugin():
-    assert render_hints.SKILL.is_file()
-    assert render_hints.SKILL.read_text().startswith("---\nname: tern-rendering\n")
-
-
 @pytest.fixture(scope="module")
 def check():
     spec = importlib.util.spec_from_file_location("figure_check", ROOT / "figure_check.py")

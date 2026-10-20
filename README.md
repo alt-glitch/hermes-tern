@@ -62,7 +62,6 @@ A pane remembers its conversation. If `hermes tern` dies in a pane (a crash, a k
 | `tool_request` middleware | The agent's shell commands run with the chat's `TERN_PANE`, so `tern open` works beside the chat |
 | `tern_charts` auxiliary task | Writes the rules behind a background process's live chart (`auxiliary.tern_charts` picks its model) |
 | System prompt sections | Tell the agent to link the PRs it opens, and (only in a session a Tern pane shows) what Tern draws in a reply |
-| `tern-rendering` skill | The full reference for figures in a reply: every mermaid kind Tern draws, svg rules, math, media |
 
 ## The chat
 
