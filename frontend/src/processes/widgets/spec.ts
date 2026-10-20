@@ -315,7 +315,7 @@ export class LineMatcher {
         const m = re.exec(text)
 
         if (m) {
-          hits.push({ captures: this.#names[pattern]!.map(name => m.groups?.[name]), line, pattern })
+          hits.push({ captures: (this.#names[pattern] ?? []).map(name => m.groups?.[name]), line, pattern })
         }
       })
     })
@@ -352,7 +352,7 @@ export function ruleReadsSource(from: string, id: string): boolean {
 
 /** Named groups a pattern declares, in pattern order. */
 export function patternGroupNames(pattern: string): Set<string> {
-  return new Set([...pattern.matchAll(NAMED_GROUP)].map(m => m[1]!))
+  return new Set([...pattern.matchAll(NAMED_GROUP)].flatMap(m => m[1] ?? []))
 }
 
 /** The fields a rule feeds: one per named group but `key`, then its `count`. */
@@ -478,14 +478,14 @@ function dryRun(spec: Spec, matcher: LineMatcher, samples: readonly SampleLines[
     seen = true
 
     for (const hit of matcher.matchLines(sample.lines)) {
-      const rule = spec.rules[hit.pattern]!
+      const rule = spec.rules[hit.pattern]
 
-      if (!ruleReadsSource(rule.from, sample.id)) {
+      if (!rule || !ruleReadsSource(rule.from, sample.id)) {
         continue
       }
 
       matches++
-      groups[hit.pattern]!.forEach((field, at) => {
+      groups[hit.pattern]?.forEach((field, at) => {
         const captured = hit.captures[at]
 
         if (field === rule.key || field === rule.text || captured === undefined) {

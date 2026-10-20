@@ -5,11 +5,11 @@
 // chat) one subagent's pane.
 
 import { connect } from '@stencil-hq/tern'
-import { GatewayClient } from '@tui/gatewayClient.js'
 
 import { App } from './app/chat.js'
 import { FaultBudget, isDeadStream } from './backendNotes.js'
 import { launchEnv } from './config/env.js'
+import { GatewayClient } from './hermes/gatewayClient.js'
 import { fileSettings } from './settings.js'
 import { readWatchSpec } from './watch/spec.js'
 import { WatchApp } from './watch/watchApp.js'

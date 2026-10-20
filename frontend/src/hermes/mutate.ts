@@ -4,7 +4,7 @@
 // `session.resume`, as there.
 import { randomUUID } from 'node:crypto'
 
-import type { SessionMutateResult } from '@hermes/shared/gateway-events'
+import type { CompressionSummary, SessionMutateResult } from '@hermes/shared/gateway-events'
 import type { GatewayClient } from '@tui/gatewayClient.js'
 
 import { type AdaptedSnapshot, rpc } from '../wire/rpc.js'
@@ -26,6 +26,8 @@ export type MutationResult = SessionMutateResult & {
   branched_session_id?: string
   /** A `rename`'s stored title. */
   title?: string
+  /** A `compress`'s report, as the classic `session.compress` result carries it. */
+  summary?: CompressionSummary | null
 }
 
 type Payload = Record<string, unknown>
@@ -109,15 +111,16 @@ export function modelPayload(arg: string): Record<string, string> {
 
   const payload: Record<string, string> = { model }
 
-  while (parts.length) {
-    const flag = parts.shift()!
-
+  for (let flag = parts.shift(); flag !== undefined; flag = parts.shift()) {
     if (flag === '--session' || flag === '--tui-session') {
       continue
     }
 
-    if (flag === '--provider' && parts[0] && !parts[0].startsWith('--')) {
-      payload['provider'] = parts.shift()!
+    const value = parts[0]
+
+    if (flag === '--provider' && value && !value.startsWith('--')) {
+      payload['provider'] = value
+      parts.shift()
 
       continue
     }

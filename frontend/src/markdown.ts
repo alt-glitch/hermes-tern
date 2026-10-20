@@ -14,18 +14,18 @@ export interface Splice {
 }
 
 const FENCE = /^\s*(```|~~~)/
-const HEADING = /^(#{1,6})(\s+)/
-const QUOTE = /^(\s*>+\s?)/
-const LIST = /^(\s*)([-*+]|\d{1,9}[.)])(\s+)(\[[ xX]\](?:\s+|$))?/
+const HEADING = /^(?<marker>#{1,6})(\s+)/
+const QUOTE = /^(?<marker>\s*>+\s?)/
+const LIST = /^(?<indent>\s*)(?<bullet>[-*+]|\d{1,9}[.)])(\s+)(?<box>\[[ xX]\](?:\s+|$))?/
 const RULE = /^\s*([-*_])(\s*\1){2,}\s*$/
 // Inline marks. Each runs on a copy where earlier marks are blanked out (same length), so a
 // bold's `**` is never read as two italic `*`s and nothing inside a code span is styled.
-const CODE_SPAN = /(`+)(?!`)([^\n]*?[^`\n])\1(?!`)/g
+const CODE_SPAN = /(?<ticks>`+)(?!`)([^\n]*?[^`\n])\k<ticks>(?!`)/g
 const BOLD = /(\*\*|__)(?=\S)([^\n]*?\S)\1/g
 const ITALIC_STAR = /(?<![*\\])\*(?=[^\s*])([^\n*]*?[^\s*\\])\*(?!\*)/g
 const ITALIC_UNDERSCORE = /(?<![\w\\])_(?=[^\s_])([^\n_]*?[^\s_\\])_(?![\w])/g
 const STRIKE = /~~(?=\S)([^\n]*?\S)~~/g
-const LINK = /\[([^\]\n]+)\]\(([^)\s]+)\)/g
+const LINK = /\[(?<label>[^\]\n]+)\]\(([^)\s]+)\)/g
 
 /**
  * The draft's Markdown as non-overlapping `decor` runs: markers dim, bold `strong`, italic
@@ -39,9 +39,9 @@ export function markdownDecor(text: string): Decor[] {
 
   const marks: string[][] = Array.from({ length: text.length }, () => [])
   const mark = (from: number, to: number, s: string) => {
-    for (let i = from; i < to; i++) {
-      if (!marks[i]!.includes(s)) {
-        marks[i]!.push(s)
+    for (const tokens of marks.slice(from, to)) {
+      if (!tokens.includes(s)) {
+        tokens.push(s)
       }
     }
   }
@@ -77,25 +77,29 @@ function blockMarks(line: string, at: number, mark: (from: number, to: number, s
   const heading = HEADING.exec(line)
   const quote = heading ? null : QUOTE.exec(line)
 
+  // A match fills every group the defaults below stand in for; they only satisfy the index signature.
   if (heading) {
-    mark(at, at + heading[1]!.length, 'dim')
+    const { marker = '' } = heading.groups ?? {}
+    mark(at, at + marker.length, 'dim')
     body = heading[0].length
     mark(at + body, at + line.length, 'strong')
   } else if (quote) {
-    mark(at, at + quote[1]!.length, 'dim')
-    body = quote[1]!.length
+    const { marker = '' } = quote.groups ?? {}
+    mark(at, at + marker.length, 'dim')
+    body = marker.length
     mark(at + body, at + line.length, 'muted')
   }
 
   const list = LIST.exec(line.slice(body))
 
   if (list) {
-    const start = body + list[1]!.length
-    mark(at + start, at + start + list[2]!.length, 'accent')
+    const { box, bullet = '', indent = '' } = list.groups ?? {}
+    const start = body + indent.length
+    mark(at + start, at + start + bullet.length, 'accent')
 
-    if (list[4]) {
-      const box = body + list[0].length - list[4].length
-      mark(at + box, at + box + 3, 'accent')
+    if (box) {
+      const boxAt = body + list[0].length - box.length
+      mark(at + boxAt, at + boxAt + 3, 'accent')
     }
 
     body += list[0].length
@@ -112,7 +116,7 @@ function inlineMarks(line: string, from: number, at: number, mark: (from: number
   }
 
   for (const m of [...rest.matchAll(CODE_SPAN)]) {
-    const tick = m[1]!.length
+    const tick = m.groups?.['ticks']?.length ?? 0
     mark(at + m.index, at + m.index + tick, 'dim')
     mark(at + m.index + tick, at + m.index + m[0].length - tick, 'code')
     mark(at + m.index + m[0].length - tick, at + m.index + m[0].length, 'dim')
@@ -120,7 +124,7 @@ function inlineMarks(line: string, from: number, at: number, mark: (from: number
   }
 
   for (const m of [...rest.matchAll(LINK)]) {
-    const label = m[1]!.length
+    const label = m.groups?.['label']?.length ?? 0
     mark(at + m.index, at + m.index + 1, 'dim')
     mark(at + m.index + 1, at + m.index + 1 + label, 'link')
     mark(at + m.index + 1 + label, at + m.index + m[0].length, 'dim')
@@ -152,9 +156,9 @@ function runs(marks: string[][]): Decor[] {
   let from = 0
 
   for (let i = 1; i <= marks.length; i++) {
-    const s = marks[from]!.join(' ')
+    const s = marks[from]?.join(' ') ?? ''
 
-    if (i < marks.length && marks[i]!.join(' ') === s) {
+    if (i < marks.length && marks[i]?.join(' ') === s) {
       continue
     }
 

@@ -66,9 +66,6 @@ const plain = (text: string) => text.replace(/\s+/g, ' ').trim()
 
 const fraction = (value: number, max: number) => (!(max > 0) || !Number.isFinite(value) ? 0 : Math.min(1, Math.max(0, value / max)))
 
-/** Props the SDK's JSX types do not know yet, spread onto an element. */
-const extra = (props: Record<string, unknown>) => props as object
-
 export function glance(view: ChartView): Glance | undefined {
   const h = view.headline
 
@@ -327,7 +324,7 @@ export function chartNode(view: ChartView, key = 'chart'): JSX.Element {
   return (
     <col gap="xs" key={key} role="omp.job.widget">
       <row align="baseline" gap="sm" key="head" role="omp.job.widget.head">
-        <text key="title" role="omp.job.widget.title" spans={[sp(plain(view.title), 'strong')]} truncate="end" wrap="none" {...extra(stage ? {} : { grow: 1 })} />
+        <text key="title" role="omp.job.widget.title" spans={[sp(plain(view.title), 'strong')]} truncate="end" wrap="none" {...(stage ? {} : { grow: 1 })} />
         {stage ? <text grow={1} key="stage" role="omp.job.widget.stage" spans={[sp(stage, 'muted')]} truncate="end" wrap="none" /> : null}
         {view.state === 'authoring' ? <shimmer key="authoring" text="charting…" /> : null}
         {h ? <text key="headline" role="omp.job.widget.headline" spans={glanceSpans(h)} wrap="none" /> : null}
@@ -357,7 +354,7 @@ function blockNode(b: ChartBlock, key: string): JSX.Element {
             ? b.items.map((item, i) =>
                 labelled(
                   item.label,
-                  <meter grow={1} key="meter" label={plain(item.text)} size="sm" value={fraction(item.value, b.max)} {...extra(item.tone ? { tone: item.tone } : {})} />,
+                  <meter grow={1} key="meter" label={plain(item.text)} size="sm" value={fraction(item.value, b.max)} {...(item.tone ? { tone: item.tone } : {})} />,
                   'omp.job.widget.bar',
                   `${i}`
                 )
@@ -369,7 +366,7 @@ function blockNode(b: ChartBlock, key: string): JSX.Element {
     case 'meter':
       return labelled(
         b.label,
-        <meter grow={1} key="meter" label={plain(b.text)} size="sm" value={fraction(b.value, 1)} {...extra(b.tone ? { tone: b.tone } : {})} />,
+        <meter grow={1} key="meter" label={plain(b.text)} size="sm" value={fraction(b.value, 1)} {...(b.tone ? { tone: b.tone } : {})} />,
         'omp.job.widget.meter',
         key
       )

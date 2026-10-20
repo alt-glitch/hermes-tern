@@ -107,7 +107,8 @@ const pageLength = (rows: unknown) => (Array.isArray(rows) ? rows.length : 0)
 
 export type PrAction = 'close' | 'draft' | 'merge' | 'ready' | 'reopen' | 'rerun' | 'update-branch'
 
-const MUTATIONS: Partial<Record<PrAction, string>> = {
+/** The GraphQL mutation of each action but `rerun` (a REST call per failed run). */
+const MUTATIONS: Record<Exclude<PrAction, 'rerun'>, string> = {
   close: 'mutation($id: ID!) { closePullRequest(input: {pullRequestId: $id}) { clientMutationId } }',
   draft: 'mutation($id: ID!) { convertPullRequestToDraft(input: {pullRequestId: $id}) { clientMutationId } }',
   merge:
@@ -347,7 +348,7 @@ export class PullRequests {
           await this.#gh.rest(pr.host, 'POST', `/repos/${pr.repository}/actions/runs/${id}/rerun-failed-jobs`)
         }
       } else {
-        await this.#gh.graphql(pr.host, MUTATIONS[action]!, {
+        await this.#gh.graphql(pr.host, MUTATIONS[action], {
           id: pr.id,
           ...(action === 'merge' ? { m: (method ?? pr.mergeMethods[0] ?? 'merge').toUpperCase(), oid: pr.headOid } : {}),
           ...(action === 'update-branch' ? { oid: pr.headOid } : {})

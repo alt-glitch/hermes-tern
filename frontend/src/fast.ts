@@ -32,11 +32,14 @@ export function fastTier(info: SessionLiveInfo | null | undefined): 'fast' | 'ul
   return info?.fast ? (info.service_tier === 'ultrafast' ? 'ultrafast' : 'fast') : undefined
 }
 
+/** The words `/fast` takes, and the value each sends. */
+const FAST_WORDS: Record<string, string> = { '': 'toggle', fast: 'fast', normal: 'normal', off: 'normal', on: 'fast', toggle: 'toggle', ultrafast: 'ultrafast' }
+
 /** `/fast <arg>`'s value for config.set, or null for a word it does not take. */
 export function fastValue(arg: string): string | null {
   const word = arg.trim().toLowerCase()
 
-  return ({ '': 'toggle', fast: 'fast', normal: 'normal', off: 'normal', on: 'fast', toggle: 'toggle', ultrafast: 'ultrafast' } as Record<string, string>)[word] ?? null
+  return FAST_WORDS[word] ?? null
 }
 
 const describe = (word: FastWord) =>

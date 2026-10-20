@@ -25,7 +25,7 @@ const quote = (s: string) => `'${clip(s, { max: 32 })}'`
 /** The first argument that is not a flag (and not a flag's value, for the flags listed). */
 function operand(args: readonly string[], valued: ReadonlySet<string> = new Set()): string | undefined {
   for (let i = 0; i < args.length; i++) {
-    const a = args[i]!
+    const a = args[i] ?? ''
 
     if (valued.has(a)) {
       i++
@@ -68,7 +68,11 @@ const GIT: Record<string, string> = {
 type Describer = (args: string[]) => string | undefined
 
 const COMMANDS: Record<string, Describer> = {
-  cat: a => (operand(a) ? `Read ${base(operand(a)!)}` : 'Read input'),
+  cat: a => {
+    const file = operand(a)
+
+    return file ? `Read ${base(file)}` : 'Read input'
+  },
   cd: a => `Go to ${base(operand(a) ?? '~')}`,
   chmod: a => `Change mode of ${base(operands(a).at(-1) ?? 'files')}`,
   cp: a => `Copy ${base(operands(a)[0] ?? 'files')}`,
@@ -79,7 +83,11 @@ const COMMANDS: Record<string, Describer> = {
   },
   docker: a => `Docker ${operand(a) ?? ''}`.trim(),
   echo: () => 'Print text',
-  fd: a => (operand(a) ? `Find ${quote(operand(a)!)}` : 'Find files'),
+  fd: a => {
+    const pattern = operand(a)
+
+    return pattern ? `Find ${quote(pattern)}` : 'Find files'
+  },
   find: a => {
     const name = a[a.indexOf('-name') + 1]
 
@@ -94,14 +102,22 @@ const COMMANDS: Record<string, Describer> = {
     return sub ? (GIT[sub] ?? `Git ${sub}`) : 'Git'
   },
   grep: a => searchTitle(a),
-  head: a => (operand(a, new Set(['-n', '-c'])) ? `Read the start of ${base(operand(a, new Set(['-n', '-c']))!)}` : 'Read the start'),
+  head: a => {
+    const file = operand(a, new Set(['-n', '-c']))
+
+    return file ? `Read the start of ${base(file)}` : 'Read the start'
+  },
   kill: () => 'Stop a process',
   less: a => `Read ${base(operand(a) ?? 'output')}`,
   ls: a => `List ${base(operand(a) ?? 'files')}`,
   make: a => `Make ${operand(a) ?? ''}`.trim(),
   mkdir: a => `Create ${base(operands(a).at(-1) ?? 'a folder')}`,
   mv: a => `Move ${base(operands(a)[0] ?? 'files')}`,
-  node: a => (operand(a) ? `Run ${base(operand(a)!)}` : 'Run Node'),
+  node: a => {
+    const script = operand(a)
+
+    return script ? `Run ${base(script)}` : 'Run Node'
+  },
   npm: a => npmTitle(a),
   npx: a => `Run ${operand(a) ?? 'a package'}`,
   pkill: a => `Stop ${operand(a) ?? 'processes'}`,
@@ -194,7 +210,7 @@ const CMDLETS: Record<string, string> = {
 
 /** A PowerShell script by the cmdlets it uses: "List files and list processes". */
 function powershellScript(text: string): string | undefined {
-  const used = [...new Set([...text.matchAll(/\b([A-Z][a-z]+-[A-Z][A-Za-z]+)\b/g)].map(m => m[1]!.toLowerCase()))]
+  const used = [...new Set([...text.matchAll(/\b([A-Z][a-z]+-[A-Z][A-Za-z]+)\b/g)].flatMap(m => m[1]?.toLowerCase() ?? []))]
   const said = [...new Set(used.map(c => CMDLETS[c] ?? (c.startsWith('get-') ? `read ${c.slice(4)}` : undefined)).filter(Boolean))]
 
   return said.length ? said.slice(0, 2).join(' and ') : undefined
@@ -228,7 +244,9 @@ function sections(script: string): string[] {
 function head(segment: string): { cmd: string; raw: string; args: string[] } | undefined {
   const w = words(segment)
 
-  while (w.length && (/^[A-Za-z_]\w*=/.test(w[0]!) || w[0] === 'sudo' || w[0] === 'env' || w[0] === 'time' || w[0] === 'exec')) {
+  const setup = (word: string) => /^[A-Za-z_]\w*=/.test(word) || word === 'sudo' || word === 'env' || word === 'time' || word === 'exec'
+
+  while (w[0] !== undefined && setup(w[0])) {
     w.shift()
   }
 
@@ -244,7 +262,7 @@ function segments(line: string): string[] {
   let q: string | undefined
 
   for (let i = 0; i < line.length; i++) {
-    const c = line[i]!
+    const c = line.charAt(i)
 
     if (q) {
       cur += c
@@ -324,7 +342,7 @@ export function describeCommand(command: string): string {
     // Two labels when they fit, else the first and a count.
     const two = `${title}: ${labels.slice(0, 2).join(', ')}${labels.length > 2 ? ` +${labels.length - 2}` : ''}`
 
-    title = two.length <= MAX ? two : `${title}: ${clip(labels[0]!, { max: 32 })}${labels.length > 1 ? ` +${labels.length - 1}` : ''}`
+    title = two.length <= MAX ? two : `${title}: ${clip(labels[0] ?? '', { max: 32 })}${labels.length > 1 ? ` +${labels.length - 1}` : ''}`
   } else if (docs.length && /^Read input|^Read /.test(title) && real[0]?.cmd === 'cat') {
     // `cat > file <<EOF` alone writes a file.
     title = `Write ${base(operands(real[0].args).at(-1) ?? 'a file')}`

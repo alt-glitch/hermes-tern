@@ -130,7 +130,8 @@ export function openPrSheet(host: PullRequestsSheetHost, focus?: PrKey) {
  */
 export function openPrMenu(host: PullRequestsSheetHost) {
   const entries = () => host.prs.entries().toReversed()
-  let selected = entries()[0] ? prKey(entries()[0]!.ref) : undefined
+  const first = entries()[0]
+  let selected = first ? prKey(first.ref) : undefined
 
   host.prs.poke()
 

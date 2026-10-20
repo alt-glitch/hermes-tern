@@ -313,13 +313,13 @@ function usageNode(turn: TurnEntry, answer: string, cx: TranscriptContext): JSX.
   const title = `This turn: ${duration(ms)} · ${total.toLocaleString()} tokens (${input.toLocaleString()} in · ${output.toLocaleString()} out)${cost}`
 
   const tps = (typeof u.avg_tps === 'number' && u.avg_tps > 0 ? u.avg_tps : undefined) ?? turn.tps
-  const facts: [string, string, string][] = total
+  const facts: (readonly [string, string, string])[] = total
     ? [
         ['time', 'time', duration(ms)],
         ['tokens', 'tokens', compact(total)],
-        ...(turn.cacheHit !== undefined ? [['cache', 'cache', `${turn.cacheHit}%`] as [string, string, string]] : []),
-        ...(tps ? [['speed', 'fast', `${Math.round(tps)} t/s`] as [string, string, string]] : []),
-        ...(cost ? [['cost', 'cost', cost.replace(/^ · /, '')] as [string, string, string]] : [])
+        ...(turn.cacheHit !== undefined ? [['cache', 'cache', `${turn.cacheHit}%`] as const] : []),
+        ...(tps ? [['speed', 'fast', `${Math.round(tps)} t/s`] as const] : []),
+        ...(cost ? [['cost', 'cost', cost.replace(/^ · /, '')] as const] : [])
       ]
     : []
   const detail = [

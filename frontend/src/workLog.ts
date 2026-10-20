@@ -6,6 +6,7 @@
 
 import { appOf, appsOf, batchOf } from './bridge.js'
 import { isConnectCall } from './connections.js'
+import { isNonEmpty } from './core/assert.js'
 import { shownImage } from './media.js'
 import type { Block, ToolCall, TurnEntry } from './model.js'
 import { isBackgroundCall, isTodoName, isWatchCall } from './transcript/calls.js'
@@ -179,8 +180,8 @@ export function parts(turn: TurnEntry): Part[] {
   const flush = (to: number) => {
     const hidden = stretch.filter(b => fold.hidden.has(b.id))
 
-    if (hidden.length) {
-      out.push({ blocks: hidden, key: `fold${hidden[0]!.id}`, kind: 'fold', label: workedFor(to - from) })
+    if (isNonEmpty(hidden)) {
+      out.push({ blocks: hidden, key: `fold${hidden[0].id}`, kind: 'fold', label: workedFor(to - from) })
     }
 
     stretch.filter(b => !fold.hidden.has(b.id)).forEach(show)
@@ -318,11 +319,13 @@ function editedFiles(calls: readonly ToolCall[]): number {
 export function groupIcon(items: readonly WorkItem[]): string {
   const actions = new Set(items.flatMap(i => (i.kind === 'tool' ? [actionOf(i.call)] : [])))
 
-  if (!actions.size) {
+  const [only] = actions
+
+  if (!only) {
     return 'brain'
   }
 
-  return actions.size === 1 ? actionIcon([...actions][0]!) : 'hammer'
+  return actions.size === 1 ? actionIcon(only) : 'hammer'
 }
 
 /** A step's icon: its action's. */

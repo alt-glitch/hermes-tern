@@ -47,7 +47,7 @@ export function parseStatus(text: string): Omit<GitState, 'root'> {
   const records = text.split('\0')
 
   for (let i = 0; i < records.length; i++) {
-    const line = records[i]!
+    const line = records[i] ?? ''
 
     if (line.startsWith('# branch.head ')) {
       const head = line.slice(14)
@@ -63,7 +63,7 @@ export function parseStatus(text: string): Omit<GitState, 'root'> {
       const xy = parts[1] ?? '..'
       const path = parts.slice(line.startsWith('1 ') ? 8 : 9).join(' ')
       const from = line.startsWith('2 ') ? records[++i] : undefined
-      const code = xy[0] !== '.' ? xy[0]! : xy[1]!
+      const code = (xy[0] !== '.' ? xy[0] : xy[1]) ?? ''
       state.files.push({ additions: 0, deletions: 0, from, path, staged: xy[0] !== '.', status: KIND[code] ?? 'modified' })
     } else if (line.startsWith('u ')) {
       state.files.push({ additions: 0, deletions: 0, path: line.split(' ').slice(10).join(' '), staged: false, status: 'conflicted' })
@@ -81,7 +81,7 @@ export function applyNumstat(files: ChangedFile[], text: string) {
   const records = text.split('\0')
 
   for (let i = 0; i < records.length; i++) {
-    const [add, del, ...rest] = records[i]!.split('\t')
+    const [add, del, ...rest] = (records[i] ?? '').split('\t')
     // A rename has an empty path, then two records: old and new. The new one is what status names.
     let path = rest.join('\t')
 

@@ -25,17 +25,18 @@ export interface BranchTarget {
 
 /** `git@github.com:Owner/Repo.git`, `https://github.com/owner/repo`, `ssh://git@host/o/r.git` → host and repo. */
 export function parseRemote(url: string): { host: string; repository: string } | undefined {
-  const m =
-    url.match(/^[\w.-]+@([^:/]+):([^/]+\/[^/]+?)(?:\.git)?\/?$/) ??
-    url.match(/^(?:https?|ssh|git):\/\/(?:[^@/]+@)?([^/:]+)(?::\d+)?\/([^/]+\/[^/]+?)(?:\.git)?\/?$/)
+  const m = (
+    /^[\w.-]+@(?<host>[^:/]+):(?<repo>[^/]+\/[^/]+?)(?:\.git)?\/?$/.exec(url) ??
+    /^(?:https?|ssh|git):\/\/(?:[^@/]+@)?(?<host>[^/:]+)(?::\d+)?\/(?<repo>[^/]+\/[^/]+?)(?:\.git)?\/?$/.exec(url)
+  )?.groups
 
   if (!m) {
     return undefined
   }
 
-  const host = m[1]!.toLowerCase()
+  const host = (m['host'] ?? '').toLowerCase()
 
-  return host === 'github.com' || host.split('.').includes('github') ? { host, repository: m[2]!.toLowerCase() } : undefined
+  return host === 'github.com' || host.split('.').includes('github') ? { host, repository: (m['repo'] ?? '').toLowerCase() } : undefined
 }
 
 async function git(cwd: string, ...args: string[]): Promise<string> {

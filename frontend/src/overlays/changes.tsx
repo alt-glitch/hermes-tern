@@ -63,10 +63,12 @@ export function openChanges(host: ChangesHost, focus?: string) {
     modal: true,
     node: () => sheetNode(),
     onKey: (k: Key) => {
+      const file = current()
+
       if (k.name === 'escape') {
         host.close(overlay)
-      } else if (k.name === 'c' && !k.ctrl && !k.alt && !k.meta && current()) {
-        copyToClipboard(current()!.path)
+      } else if (k.name === 'c' && !k.ctrl && !k.alt && !k.meta && file) {
+        copyToClipboard(file.path)
       } else if (k.name === 'r' && k.shift) {
         void read()
       } else {

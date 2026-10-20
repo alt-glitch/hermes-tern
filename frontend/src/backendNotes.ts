@@ -1,8 +1,7 @@
 // What the backend's own failures put on screen: a slow start's diagnosis, protocol noise, and the
 // stray faults the pane survives (Ink's setupGracefulExit).
 
-import { stderrLooksLikeProblem } from '@tui/app/userMessages.js'
-
+import { stderrLooksLikeProblem } from './hermes/stderr.js'
 import type { NoticeEntry } from './model.js'
 
 interface Note {
@@ -37,7 +36,7 @@ export function protocolNote(preview: string | null | undefined, warned: boolean
 
 /** A write to a closed terminal: nothing can be shown any more, so the pane must exit. */
 export function isDeadStream(err: unknown): boolean {
-  const code = (err as { code?: unknown } | null)?.code
+  const code = typeof err === 'object' && err !== null && 'code' in err ? err.code : undefined
 
   return code === 'EIO' || code === 'EPIPE'
 }

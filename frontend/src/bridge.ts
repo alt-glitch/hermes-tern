@@ -60,7 +60,7 @@ export function appTitle(slug: string): string {
   const words = slug.split(/[-_\s]+/).filter(Boolean)
 
   // `granola_mcp` is Granola: the transport is not part of the app's name.
-  if (words.length > 1 && words.at(-1)!.toLowerCase() === 'mcp') {
+  if (words.length > 1 && words.at(-1)?.toLowerCase() === 'mcp') {
     words.pop()
   }
 
@@ -86,9 +86,9 @@ export function appOf(name: string, args?: Record<string, unknown>): AppTool | u
     return { action: actionPhrase(tool.join('__'), connector) + alias, app: appTitle(connector), kind: 'connector' }
   }
 
-  const mcp = name.match(/^mcp__(.+?)__(.+)$/)
+  const mcp = /^mcp__(?<app>.+?)__(?<tool>.+)$/.exec(name)?.groups
 
-  return mcp ? { action: actionPhrase(mcp[2]!), app: appTitle(mcp[1]!), kind: 'mcp' } : undefined
+  return mcp ? { action: actionPhrase(mcp['tool'] ?? ''), app: appTitle(mcp['app'] ?? ''), kind: 'mcp' } : undefined
 }
 
 /** The calls a bridge call asks for: `{name, arguments}` or `{calls: [{name, arguments}…]}`. */

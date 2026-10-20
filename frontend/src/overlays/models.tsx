@@ -9,13 +9,13 @@
 import type { ConfigSetResult, ModelOptionProvider } from '@hermes/shared/gateway-events'
 import { modelSearchText } from '@hermes/shared/model-search-text'
 import type { JSX, Key, KvItem, PickerColumn, PickerGroup, PickerItem, PickerScope } from '@stencil-hq/tern'
-import { providerDisplayNames } from '@tui/domain/providers.js'
 
 import type { ChatPorts } from '../app/ports.js'
 import { optional } from '../core/assert.js'
 import { errorText } from '../core/errors.js'
 import { setFast } from '../fast.js'
 import { modelPayload, mutateSession } from '../hermes/mutate.js'
+import { providerDisplayNames } from '../hermes/providers.js'
 import { rememberCaps } from '../modelCaps.js'
 import type { Overlay } from '../overlay.js'
 import { levelsFor } from '../session/effort.js'
@@ -376,7 +376,7 @@ export function openModelPicker(host: ModelsHost) {
         const row = rows.find(r => r.id === selected)
         const levels = levelsFor(row && caps(row))
         const at = levels.findIndex(l => l.id === effort)
-        effort = levels.length ? levels[(at + (k.shift ? levels.length - 1 : 1)) % levels.length]!.id : effort
+        effort = levels[(at + (k.shift ? levels.length - 1 : 1)) % levels.length]?.id ?? effort
 
         return true
       }

@@ -5,13 +5,11 @@
 
 import type { CompleteSlashResult, CompletionItem } from '@hermes/shared/gateway-events'
 import type { JSX, Key } from '@stencil-hq/tern'
-import { scoreSlashMenuItem } from '@tui/app/slash/fuzzyScore.js'
-import { applyCompletion, completionToApplyOnSubmit } from '@tui/domain/slash.js'
 import type { GatewayClient } from '@tui/gatewayClient.js'
 
 import { HIDDEN_COMMANDS, localCommands } from '../commands.js'
 import { optional } from '../core/assert.js'
-import { completionRequestForInput } from '../hermes/completion.js'
+import { applyCompletion, completionRequestForInput, completionToApplyOnSubmit, scoreSlashMenuItem } from '../hermes/completion.js'
 import { oneLine } from '../view/describe.js'
 
 import type { Composer } from '../composer.js'
@@ -179,9 +177,10 @@ export class Completion {
 
         return this.#accept(next)
       }
-    }
 
-    return false
+      default:
+        return false
+    }
   }
 
   /** The overlay nodes for the `layer` region (none while closed). */

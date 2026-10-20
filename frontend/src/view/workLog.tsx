@@ -7,7 +7,7 @@
 import type { JSX, Span } from '@stencil-hq/tern'
 
 import { appOf, batchOf } from '../bridge.js'
-import { optional } from '../core/assert.js'
+import { isDefined, isNonEmpty, optional } from '../core/assert.js'
 import type { ToolCall, TurnEntry } from '../model.js'
 import {
   actionIcon,
@@ -91,20 +91,20 @@ export function foldNode(part: Extract<Part, { kind: 'fold' }>, id: string, chil
 export function workNode(items: readonly WorkItem[], parent: string, live: boolean, now: number): JSX.Element | null {
   const shown = visibleItems(items)
 
-  if (!shown.length) {
+  if (!isNonEmpty(shown)) {
     return null
   }
 
-  const key = `w${items[0]!.id}`
+  const key = `w${(items[0] ?? shown[0]).id}`
   const id = `${parent}.${key}`
 
   if (!live && shown.length === 1) {
-    return itemNode(shown[0]!, parent, now, key)
+    return itemNode(shown[0], parent, now, key)
   }
 
   const calls = shown.flatMap(i => (i.kind === 'tool' ? [i.call] : []))
   const failed = calls.at(-1)?.outcome.kind === 'error'
-  const latest = shown.findLast(i => i.kind === 'tool' && i.call.outcome.kind === 'running') ?? shown.at(-1)!
+  const latest = shown.findLast(i => i.kind === 'tool' && i.call.outcome.kind === 'running') ?? shown.at(-1) ?? shown[0]
 
   const head = live ? (
     <row align="center" gap="sm" key="head">
@@ -118,7 +118,7 @@ export function workNode(items: readonly WorkItem[], parent: string, live: boole
       <text key="label" spans={[{ s: 'muted', t: summarize(shown) }]} truncate="end" wrap="none" />
       <icon key="chev" name="chev" role="hermes.work.chev" />
       <spacer grow={1} key="gap" />
-      <text key="time" role="hermes.work.time" spans={[{ s: 'dim', t: clockShort(startOf(shown[0]!)) }]} wrap="none" />
+      <text key="time" role="hermes.work.time" spans={[{ s: 'dim', t: clockShort(startOf(shown[0])) }]} wrap="none" />
     </row>
   )
 
@@ -184,15 +184,16 @@ function itemNode(item: WorkItem, parent: string, now: number, key: string = ite
 /** A step's words; a connector's app stands out from what it did there ("Linear · create issue"). */
 function labelSpans(call: ToolCall): Span[] {
   const entries = (batchOf(call) ?? [call]).map(e => appOf(e.name, e.args))
+  const apps = entries.filter(isDefined)
 
-  if (!entries.every(Boolean)) {
+  if (apps.length < entries.length) {
     return [{ s: 'muted', t: stepLabel(call) }]
   }
 
-  return entries.flatMap((app, i) => [
+  return apps.flatMap((app, i) => [
     ...(i ? [{ s: 'muted', t: ', ' }] : []),
-    { t: app!.app },
-    { s: 'muted', t: ` · ${app!.action}` }
+    { t: app.app },
+    { s: 'muted', t: ` · ${app.action}` }
   ])
 }
 

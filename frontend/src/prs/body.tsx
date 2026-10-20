@@ -7,9 +7,9 @@
 import type { JSX } from '@stencil-hq/tern'
 import type { Element, ElementContent, Root as HastRoot, RootContent } from 'hast'
 import { toMdast } from 'hast-util-to-mdast'
-import { findAndReplace } from 'mdast-util-find-and-replace'
+import { findAndReplace, type FindAndReplaceList, type FindAndReplaceTuple } from 'mdast-util-find-and-replace'
 import { toText } from 'hast-util-to-text'
-import type { Root as MdRoot } from 'mdast'
+import type { Link, Root as MdRoot } from 'mdast'
 import { gfmToMarkdown } from 'mdast-util-gfm'
 import { toMarkdown } from 'mdast-util-to-markdown'
 import rehypeRaw from 'rehype-raw'
@@ -35,7 +35,7 @@ const pipeline = unified().use(remarkParse).use(remarkGfm).use(remarkRehype, { a
 
 /** The body as sanitized HTML (hast), as GitHub renders it. */
 export function bodyHast(src: string): HastRoot {
-  return pipeline.runSync(pipeline.parse(src)) as HastRoot
+  return pipeline.runSync(pipeline.parse(src))
 }
 
 const isDetails = (n: RootContent | ElementContent): boolean => n.type === 'element' && n.tagName === 'details'
@@ -58,21 +58,20 @@ export interface BodyLinks {
 function autolink(mdast: MdRoot, links: BodyLinks) {
   const host = links.repo?.match(/^https?:\/\/[^/]+/)?.[0] ?? 'https://github.com'
 
-  findAndReplace(
-    mdast,
-    [
-      ...(links.repo
-        ? [[/(?<![\w&/#])#(\d+)\b/g, (_: string, n: string) => ({ children: [{ type: 'text', value: `#\u2060${n}` }], type: 'link', url: `${links.repo}/issues/${n}` })] as const]
-        : []),
-      [/(?<![\w/@.])@([a-z\d](?:[a-z\d-]{0,38}))\b(?!\.\w)/gi, (all: string, login: string) => ({ children: [{ type: 'text', value: all }], type: 'link', url: `${host}/${login}` })]
-    ] as never,
-    { ignore: ['link', 'linkReference', 'inlineCode', 'code'] }
-  )
+  const link = (text: string, url: string): Link => ({ children: [{ type: 'text', value: text }], type: 'link', url })
+  const list: FindAndReplaceList = [
+    ...(links.repo ? [[/(?<![\w&/#])#(\d+)\b/g, (_: string, n: string) => link(`#\u2060${n}`, `${links.repo}/issues/${n}`)] satisfies FindAndReplaceTuple] : []),
+    [/(?<![\w/@.])@([a-z\d](?:[a-z\d-]{0,38}))\b(?!\.\w)/gi, (all: string, login: string) => link(all, `${host}/${login}`)]
+  ]
+
+  findAndReplace(mdast, list, { ignore: ['link', 'linkReference', 'inlineCode', 'code'] })
 }
 
 /** Nodes as Markdown: what GitHub drew, said in the dialect Tern's `md` draws. */
 function markdown(nodes: (RootContent | ElementContent)[], links: BodyLinks): string {
-  const mdast = toMdast({ children: nodes as RootContent[], type: 'root' }) as MdRoot
+  const tree = toMdast({ children: nodes, type: 'root' })
+  // A hast root comes back as an mdast root; the wrap only satisfies the type.
+  const mdast: MdRoot = tree.type === 'root' ? tree : { children: [tree], type: 'root' }
 
   autolink(mdast, links)
 
@@ -82,7 +81,9 @@ function markdown(nodes: (RootContent | ElementContent)[], links: BodyLinks): st
 
     visit(link, 'image', (image, j, holder) => {
       badge = true
-      holder?.children.splice(j!, 1, { type: 'text', value: image.alt ?? '' })
+      if (j !== undefined) {
+        holder?.children.splice(j, 1, { type: 'text', value: image.alt ?? '' })
+      }
     })
 
     if (badge && parent && i !== undefined) {

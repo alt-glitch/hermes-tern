@@ -58,8 +58,8 @@ const ESCAPES = /\x1b\[[0-?]*[ -/]*[@-~]|\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)|\x1b[
 export function lastLine(output: string): string {
   const lines = output.replace(ESCAPES, '').split('\n')
 
-  for (let i = lines.length - 1; i >= 0; i--) {
-    const draws = lines[i]!.split('\r')
+  for (const line of lines.toReversed()) {
+    const draws = line.split('\r')
     const text = (draws.findLast(d => d.trim()) ?? '').replace(/\s+/g, ' ').trim()
 
     if (text) {
@@ -499,8 +499,10 @@ export function linkCalls(calls: readonly ToolCall[], procs: readonly Background
     const ref = isWatchCall(call) ? String(call.args['session_id']).trim() : ''
     const matches = ref ? procs.filter(p => p.id.startsWith(ref)) : []
 
-    if (matches.length === 1) {
-      owners.set(call, matches[0]!)
+    const [only] = matches
+
+    if (only && matches.length === 1) {
+      owners.set(call, only)
     }
   }
 

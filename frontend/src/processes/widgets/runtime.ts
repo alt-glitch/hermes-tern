@@ -155,14 +155,9 @@ function pushMatch(s: Series, value: number | undefined, text: string | undefine
     bucket.n++
   } else {
     s.recent.push({ n: 1, t })
-    const horizon = t - RATE_WINDOW_MS
-    let stale = 0
-
-    while (stale < s.recent.length && s.recent[stale]!.t < horizon) {
-      stale++
-    }
-
-    s.recent.splice(0, stale)
+    // The buckets before the first one inside the window are stale.
+    const fresh = s.recent.findIndex(b => b.t >= t - RATE_WINDOW_MS)
+    s.recent.splice(0, fresh < 0 ? s.recent.length : fresh)
   }
 
   if (value !== undefined) {
@@ -258,13 +253,10 @@ export function downsample(ring: readonly { t: number; v: number }[], points: nu
   for (let b = 0; b < points; b++) {
     const from = Math.floor((b * ring.length) / points)
     const to = Math.floor(((b + 1) * ring.length) / points)
-    let sum = 0
+    const bucket = ring.slice(from, to)
+    const sum = bucket.reduce((n, p) => n + p.v, 0)
 
-    for (let i = from; i < to; i++) {
-      sum += ring[i]!.v
-    }
-
-    out.push({ t: ring[to - 1]!.t, v: sum / (to - from) })
+    out.push({ t: bucket.at(-1)?.t ?? 0, v: sum / (to - from) })
   }
 
   return out
@@ -432,8 +424,10 @@ export class ChartRuntime {
     const newest: string[] = []
 
     for (let i = lines.length - 1; i >= tailFrom && newest.length < SAMPLE_TAIL_LINES; i--) {
-      if (lines[i]!.trim()) {
-        newest.push(lines[i]!)
+      const line = lines[i] ?? ''
+
+      if (line.trim()) {
+        newest.push(line)
       }
     }
 
@@ -450,7 +444,7 @@ export class ChartRuntime {
     this.#lastLineAt = t
     stats.recent.push({ n: fresh, t })
 
-    while (stats.recent.length && stats.recent[0]!.t < t - RATE_WINDOW_MS) {
+    while ((stats.recent[0]?.t ?? Infinity) < t - RATE_WINDOW_MS) {
       stats.recent.shift()
     }
   }
@@ -478,13 +472,12 @@ export class ChartRuntime {
       return undefined
     }
 
-    const patterns = [...byPattern.keys()]
-    const matcher = new LineMatcher(patterns)
+    const matcher = new LineMatcher([...byPattern.keys()])
     const groups = matcher.groupNames()
 
     const entry: SourceMatcher = {
       matcher,
-      rules: patterns.map((p, i) => byPattern.get(p)!.map(r => compileRule(r, groups[i]!)))
+      rules: [...byPattern.values()].map((rules, i) => rules.map(r => compileRule(r, groups[i] ?? [])))
     }
 
     this.#matchers.set(id, entry)
@@ -503,9 +496,9 @@ export class ChartRuntime {
     const capture = (captures: Captures, at: number) => (at < 0 ? undefined : captures[at])
 
     for (const hit of hits) {
-      const line = lines[hit.line]!
+      const line = lines[hit.line] ?? ''
 
-      for (const rule of entry.rules[hit.pattern]!) {
+      for (const rule of entry.rules[hit.pattern] ?? []) {
         const key = capture(hit.captures, rule.key)?.trim() ?? ''
 
         for (const c of rule.captures) {
@@ -537,19 +530,13 @@ export class ChartRuntime {
       this.#lastMatchAt = t
     }
 
-    const lastMatched = hits.length ? hits.at(-1)!.line : -1
-    let unmatched = 0
-
-    for (let i = lastMatched + 1; i < lines.length; i++) {
-      if (lines[i]!.trim()) {
-        unmatched++
-      }
-    }
+    const lastMatched = hits.at(-1)?.line ?? -1
+    const unmatched = lines.slice(lastMatched + 1).filter(l => l.trim()).length
 
     this.#unmatchedLines = lastMatched >= 0 ? unmatched : this.#unmatchedLines + unmatched
 
     for (let i = lines.length - 1; i >= 0; i--) {
-      const line = lines[i]!.trim()
+      const line = lines[i]?.trim()
 
       if (line && !matched.has(i)) {
         this.#lastUnmatchedLine = cut(line, MAX_STAGE_CHARS)
@@ -719,8 +706,8 @@ export class ChartRuntime {
         return {
           items: entries.map(([k], i) => ({
             label: labels[i] || k || block.label,
-            text: formatNumber(values[i]!, unit),
-            value: values[i]!,
+            text: formatNumber(values[i] ?? 0, unit),
+            value: values[i] ?? 0,
             ...(best !== undefined && values[i] === best ? { tone: 'success' } : {})
           })),
           kind: 'bars',
@@ -785,7 +772,7 @@ export class ChartRuntime {
     const marks =
       block.target === undefined
         ? undefined
-        : [{ label: block.targetLabel ?? `target ${formatNumber(block.target, block.unit)}`, tone: 'muted' as Tone, value: block.target }]
+        : [{ label: block.targetLabel ?? `target ${formatNumber(block.target, block.unit)}`, tone: 'muted' as const, value: block.target }]
 
     const { max, min } = sparkDomain([...values, ...(marks ?? []).map(m => m.value)], block.min, block.max)
     let tone: Tone | undefined

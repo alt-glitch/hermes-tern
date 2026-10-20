@@ -4,9 +4,9 @@
 // events count.
 
 import type { Decor, Key } from '@stencil-hq/tern'
-import { append as appendHistory, load as loadHistory } from '@tui/lib/history.js'
 
 import { type Snapshot, UndoHistory } from './draft/undo.js'
+import { append as appendHistory, load as loadHistory } from './hermes/history.js'
 import { listNewline, markdownDecor, type Splice, toggleMark } from './markdown.js'
 
 /** What a key asked the app to do beyond editing. */
@@ -276,9 +276,10 @@ export class Composer {
 
         case 'right':
           return this.#move(nextWord(this.text, this.cursor))
-      }
 
-      return false
+        default:
+          return false
+      }
     }
 
     // Readline's Meta word keys (Alt+B/F/D), as terminals send them.
@@ -292,6 +293,10 @@ export class Composer {
 
         case 'd':
           return this.#cut(this.cursor, nextWord(this.text, this.cursor))
+
+        default:
+          // Any other Alt key edits as the plain key does, below.
+          break
       }
     }
 
@@ -366,9 +371,10 @@ export class Composer {
 
       case 'down':
         return meta ? this.#move(this.text.length) : this.#vertical(1)
-    }
 
-    return undefined
+      default:
+        return undefined
+    }
   }
 
   /** A new line at the caret; in a list item, the next item's marker comes with it. */

@@ -4,10 +4,10 @@
 // /prs, /sidebar, …) are candidates too: the gateway's canon never lists them.
 
 import type { CommandsCatalogResult } from '@hermes/shared/gateway-events'
-import { scoreSlashMenuItem } from '@tui/app/slash/fuzzyScore.js'
 import type { GatewayClient } from '@tui/gatewayClient.js'
 
 import { HIDDEN_COMMANDS, localCommands } from './commands.js'
+import { scoreSlashMenuItem } from './hermes/completion.js'
 import { rpc } from './wire/rpc.js'
 
 export type Resolution = { name: string } | { ambiguous: string[] } | null
@@ -63,8 +63,10 @@ export function resolveSlashName(
   const best = Math.min(...scored.map(s => s.score))
   const matches = [...new Set(scored.filter(s => s.score === best).map(s => s.target))]
 
-  if (matches.length === 1 && matches[0]!.toLowerCase() !== needle) {
-    return { name: matches[0]!.slice(1) }
+  const [only] = matches
+
+  if (only !== undefined && matches.length === 1 && only.toLowerCase() !== needle) {
+    return { name: only.slice(1) }
   }
 
   return matches.length > 1 ? { ambiguous: matches } : null

@@ -41,7 +41,7 @@ export function splitPrompt(raw: string): PromptParts {
   const hints = HINTS.exec(text)
 
   if (hints) {
-    const paths = [...(hints[1] ?? '').matchAll(/^\[Image attached(?: at)?: (.+)\]$/gm)].map(m => m[1]!)
+    const paths = [...(hints[1] ?? '').matchAll(/^\[Image attached(?: at)?: (?<path>.+)\]$/gm)].flatMap(m => m.groups?.['path'] ?? [])
     const placeholders = (hints[2] ?? '').split('[screenshot]').length - 1
 
     if (placeholders === 0 || placeholders === paths.length) {

@@ -73,7 +73,7 @@ export function imageSize(bytes: Buffer): { w: number; h: number } | undefined {
           return undefined
         }
 
-        const marker = bytes[i + 1]!
+        const marker = bytes.readUInt8(i + 1)
 
         if (marker >= 0xc0 && marker <= 0xcf && marker !== 0xc4 && marker !== 0xc8 && marker !== 0xcc) {
           return size(bytes.readUInt16BE(i + 7), bytes.readUInt16BE(i + 5))

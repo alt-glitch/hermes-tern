@@ -159,13 +159,13 @@ const COMMANDS: readonly LocalCommand[] = [
     run: (host, arg) => {
       const words = arg.trim().split(/\s+/).filter(Boolean)
       const global = words.includes('--global') || words.includes('default')
-      const level = words.find(w => LEVELS.some(l => l.id === w || l.label === w))
+      const level = words.flatMap(w => LEVELS.find(l => l.id === w || l.label === w) ?? []).at(0)
 
       if (!level) {
         return openEffortPicker(host, global)
       }
 
-      void host.setEffort(LEVELS.find(l => l.id === level || l.label === level)!.id, global ? 'global' : 'session')
+      void host.setEffort(level.id, global ? 'global' : 'session')
     }
   },
   {

@@ -40,6 +40,97 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
 ));
 var __toBinaryNode = Uint8Array.fromBase64 || ((base642) => new Uint8Array(Buffer.from(base642, "base64")));
 
+// node_modules/extend/index.js
+var require_extend = __commonJS({
+  "node_modules/extend/index.js"(exports, module) {
+    "use strict";
+    var hasOwn = Object.prototype.hasOwnProperty;
+    var toStr = Object.prototype.toString;
+    var defineProperty2 = Object.defineProperty;
+    var gOPD = Object.getOwnPropertyDescriptor;
+    var isArray = function isArray2(arr) {
+      if (typeof Array.isArray === "function") {
+        return Array.isArray(arr);
+      }
+      return toStr.call(arr) === "[object Array]";
+    };
+    var isPlainObject3 = function isPlainObject4(obj) {
+      if (!obj || toStr.call(obj) !== "[object Object]") {
+        return false;
+      }
+      var hasOwnConstructor = hasOwn.call(obj, "constructor");
+      var hasIsPrototypeOf = obj.constructor && obj.constructor.prototype && hasOwn.call(obj.constructor.prototype, "isPrototypeOf");
+      if (obj.constructor && !hasOwnConstructor && !hasIsPrototypeOf) {
+        return false;
+      }
+      var key2;
+      for (key2 in obj) {
+      }
+      return typeof key2 === "undefined" || hasOwn.call(obj, key2);
+    };
+    var setProperty = function setProperty2(target, options) {
+      if (defineProperty2 && options.name === "__proto__") {
+        defineProperty2(target, options.name, {
+          enumerable: true,
+          configurable: true,
+          value: options.newValue,
+          writable: true
+        });
+      } else {
+        target[options.name] = options.newValue;
+      }
+    };
+    var getProperty = function getProperty2(obj, name) {
+      if (name === "__proto__") {
+        if (!hasOwn.call(obj, name)) {
+          return void 0;
+        } else if (gOPD) {
+          return gOPD(obj, name).value;
+        }
+      }
+      return obj[name];
+    };
+    module.exports = function extend3() {
+      var options, name, src, copy, copyIsArray, clone2;
+      var target = arguments[0];
+      var i = 1;
+      var length = arguments.length;
+      var deep = false;
+      if (typeof target === "boolean") {
+        deep = target;
+        target = arguments[1] || {};
+        i = 2;
+      }
+      if (target == null || typeof target !== "object" && typeof target !== "function") {
+        target = {};
+      }
+      for (; i < length; ++i) {
+        options = arguments[i];
+        if (options != null) {
+          for (name in options) {
+            src = getProperty(target, name);
+            copy = getProperty(options, name);
+            if (target !== copy) {
+              if (deep && copy && (isPlainObject3(copy) || (copyIsArray = isArray(copy)))) {
+                if (copyIsArray) {
+                  copyIsArray = false;
+                  clone2 = src && isArray(src) ? src : [];
+                } else {
+                  clone2 = src && isPlainObject3(src) ? src : {};
+                }
+                setProperty(target, { name, newValue: extend3(deep, clone2, copy) });
+              } else if (typeof copy !== "undefined") {
+                setProperty(target, { name, newValue: copy });
+              }
+            }
+          }
+        }
+      }
+      return target;
+    };
+  }
+});
+
 // .hermes-src/ui-tui/node_modules/undici/lib/core/symbols.js
 var require_symbols = __commonJS({
   ".hermes-src/ui-tui/node_modules/undici/lib/core/symbols.js"(exports, module) {
@@ -18832,97 +18923,6 @@ var require_undici = __commonJS({
   }
 });
 
-// node_modules/extend/index.js
-var require_extend = __commonJS({
-  "node_modules/extend/index.js"(exports, module) {
-    "use strict";
-    var hasOwn = Object.prototype.hasOwnProperty;
-    var toStr = Object.prototype.toString;
-    var defineProperty2 = Object.defineProperty;
-    var gOPD = Object.getOwnPropertyDescriptor;
-    var isArray = function isArray2(arr) {
-      if (typeof Array.isArray === "function") {
-        return Array.isArray(arr);
-      }
-      return toStr.call(arr) === "[object Array]";
-    };
-    var isPlainObject3 = function isPlainObject4(obj) {
-      if (!obj || toStr.call(obj) !== "[object Object]") {
-        return false;
-      }
-      var hasOwnConstructor = hasOwn.call(obj, "constructor");
-      var hasIsPrototypeOf = obj.constructor && obj.constructor.prototype && hasOwn.call(obj.constructor.prototype, "isPrototypeOf");
-      if (obj.constructor && !hasOwnConstructor && !hasIsPrototypeOf) {
-        return false;
-      }
-      var key2;
-      for (key2 in obj) {
-      }
-      return typeof key2 === "undefined" || hasOwn.call(obj, key2);
-    };
-    var setProperty = function setProperty2(target, options) {
-      if (defineProperty2 && options.name === "__proto__") {
-        defineProperty2(target, options.name, {
-          enumerable: true,
-          configurable: true,
-          value: options.newValue,
-          writable: true
-        });
-      } else {
-        target[options.name] = options.newValue;
-      }
-    };
-    var getProperty = function getProperty2(obj, name) {
-      if (name === "__proto__") {
-        if (!hasOwn.call(obj, name)) {
-          return void 0;
-        } else if (gOPD) {
-          return gOPD(obj, name).value;
-        }
-      }
-      return obj[name];
-    };
-    module.exports = function extend3() {
-      var options, name, src, copy, copyIsArray, clone2;
-      var target = arguments[0];
-      var i = 1;
-      var length = arguments.length;
-      var deep = false;
-      if (typeof target === "boolean") {
-        deep = target;
-        target = arguments[1] || {};
-        i = 2;
-      }
-      if (target == null || typeof target !== "object" && typeof target !== "function") {
-        target = {};
-      }
-      for (; i < length; ++i) {
-        options = arguments[i];
-        if (options != null) {
-          for (name in options) {
-            src = getProperty(target, name);
-            copy = getProperty(options, name);
-            if (target !== copy) {
-              if (deep && copy && (isPlainObject3(copy) || (copyIsArray = isArray(copy)))) {
-                if (copyIsArray) {
-                  copyIsArray = false;
-                  clone2 = src && isArray(src) ? src : [];
-                } else {
-                  clone2 = src && isPlainObject3(src) ? src : {};
-                }
-                setProperty(target, { name, newValue: extend3(deep, clone2, copy) });
-              } else if (typeof copy !== "undefined") {
-                setProperty(target, { name, newValue: copy });
-              }
-            }
-          }
-        }
-      }
-      return target;
-    };
-  }
-});
-
 // node_modules/@stencil-hq/tern/dist/wire.js
 import { createHash } from "node:crypto";
 var PROTOCOL_VERSION = 1;
@@ -21147,3553 +21147,6 @@ async function connect(options = {}) {
   return await session2.handshake() ? session2 : null;
 }
 
-// .hermes-src/ui-tui/src/gatewayClient.ts
-import { EventEmitter } from "node:events";
-
-// .hermes-src/node_modules/@hermes/shared/src/json-rpc-channel.ts
-var isServerRequestFrame = (frame) => typeof frame.id === "string" && typeof frame.method === "string" && frame.method !== "event";
-var JsonRpcGatewayError = class extends Error {
-  code;
-  data;
-  constructor(message, options) {
-    super(message);
-    this.name = "JsonRpcGatewayError";
-    this.code = options?.code;
-    this.data = options?.data;
-  }
-};
-var JSON_RPC_METHOD_NOT_FOUND = -32601;
-var JSON_RPC_INTERNAL_ERROR = -32603;
-var JSON_RPC_SESSION_NOT_SHOWN = 4404;
-function jsonRpcErrorFromFrame(raw2, fallbackMessage = "Hermes RPC failed") {
-  const err = raw2 && typeof raw2 === "object" ? raw2 : {};
-  return new JsonRpcGatewayError(typeof err.message === "string" && err.message ? err.message : fallbackMessage, {
-    code: typeof err.code === "number" ? err.code : void 0,
-    data: err.data
-  });
-}
-var DEFAULT_REQUEST_TIMEOUT_MS = 12e4;
-var DEFAULT_HEARTBEAT_INTERVAL_MS = 15e3;
-var DEFAULT_HEARTBEAT_DEADLINE_MS = 45e3;
-var MAX_OUTSTANDING_PINGS = 8;
-var wireDecoder = new TextDecoder();
-function wireFrameText(raw2) {
-  if (typeof raw2 === "string") {
-    return raw2;
-  }
-  if (raw2 instanceof ArrayBuffer || ArrayBuffer.isView(raw2)) {
-    return wireDecoder.decode(raw2);
-  }
-  return null;
-}
-var unrefTimer = (timer) => {
-  ;
-  timer?.unref?.();
-};
-var JsonRpcRequestChannel = class {
-  nextId = 0;
-  pending = /* @__PURE__ */ new Map();
-  transport = null;
-  heartbeatTimer = null;
-  heartbeatSequence = 0;
-  outstandingPings = /* @__PURE__ */ new Set();
-  lastLivenessAt = 0;
-  /** The bound generation's backend counts `decline` as one client abstaining (see `ServerRequest.decline`). */
-  backendCountsDeclines = false;
-  requestHandlers = [];
-  options;
-  constructor(options = {}) {
-    this.options = {
-      createRequestId: options.createRequestId ?? ((nextId) => `${options.requestIdPrefix ?? "r"}${nextId}`),
-      heartbeatDeadlineMs: options.heartbeatDeadlineMs ?? DEFAULT_HEARTBEAT_DEADLINE_MS,
-      heartbeatIntervalMs: options.heartbeatIntervalMs ?? DEFAULT_HEARTBEAT_INTERVAL_MS,
-      heartbeatLiveness: options.heartbeatLiveness ?? "response",
-      onEvent: options.onEvent,
-      onHeartbeatFailure: options.onHeartbeatFailure,
-      onRequestHandlerError: options.onRequestHandlerError,
-      onUnhandledRequest: options.onUnhandledRequest,
-      requestIdPrefix: options.requestIdPrefix ?? "r",
-      requestTimeoutMs: options.requestTimeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS,
-      unrefTimers: options.unrefTimers ?? false
-    };
-  }
-  get defaultRequestTimeoutMs() {
-    return this.options.requestTimeoutMs;
-  }
-  get connected() {
-    return this.transport !== null;
-  }
-  /** Bind a new connection generation. Any previous generation's heartbeat stops; its pending calls are the owner's to reject. */
-  attach(transport) {
-    this.stopHeartbeat();
-    this.transport = transport;
-    this.lastLivenessAt = Date.now();
-    this.backendCountsDeclines = false;
-  }
-  /** Drop the transport and fail every in-flight call with `error`. */
-  detach(error) {
-    this.stopHeartbeat();
-    this.transport = null;
-    this.rejectAllPending(error);
-  }
-  /** True while `transport` is the bound generation (owners gate stale socket callbacks on this). */
-  owns(transport) {
-    return this.transport === transport;
-  }
-  request(method, params = {}, timeoutMs = this.options.requestTimeoutMs, signal, notConnectedError = () => new Error("gateway not connected")) {
-    const transport = this.transport;
-    if (!transport) {
-      return Promise.reject(notConnectedError());
-    }
-    if (signal?.aborted) {
-      return Promise.reject(new DOMException("Aborted", "AbortError"));
-    }
-    const id = this.options.createRequestId(++this.nextId);
-    return new Promise((resolve7, reject) => {
-      let onAbort;
-      const detachAbort = () => {
-        if (onAbort && signal) {
-          signal.removeEventListener("abort", onAbort);
-        }
-      };
-      const pending = {
-        resolve: (value) => {
-          detachAbort();
-          resolve7(value);
-        },
-        reject: (error) => {
-          detachAbort();
-          reject(error);
-        }
-      };
-      if (timeoutMs > 0) {
-        pending.timer = setTimeout(() => {
-          if (this.pending.delete(id)) {
-            detachAbort();
-            const seconds = Math.round(timeoutMs / 1e3);
-            reject(new Error(`request timed out after ${seconds}s: ${method}`));
-          }
-        }, timeoutMs);
-        if (this.options.unrefTimers) {
-          unrefTimer(pending.timer);
-        }
-      }
-      if (signal) {
-        onAbort = () => {
-          this.clearPending(id);
-          detachAbort();
-          reject(new DOMException("Aborted", "AbortError"));
-        };
-        signal.addEventListener("abort", onAbort, { once: true });
-      }
-      this.pending.set(id, pending);
-      try {
-        transport.send(JSON.stringify({ jsonrpc: "2.0", id, method, params }));
-      } catch (error) {
-        this.clearPending(id);
-        detachAbort();
-        reject(error instanceof Error ? error : new Error(String(error)));
-      }
-    });
-  }
-  /**
-   * Register a handler for server→client requests (clarify, approval, sudo,
-   * …). Handlers are tried in registration order until one accepts (returns
-   * anything but `false`); an unhandled request is answered `-32601` so the
-   * backend never waits out its deadline against a client that cannot answer.
-   */
-  onRequest(handler) {
-    this.requestHandlers.push(handler);
-    return () => {
-      const index2 = this.requestHandlers.indexOf(handler);
-      if (index2 >= 0) {
-        this.requestHandlers.splice(index2, 1);
-      }
-    };
-  }
-  /**
-   * Deliver a server request to the handlers. Live frames arrive through
-   * `handleFrame`; owners call this directly for `open_requests` returned by a
-   * reconnect replay (`replayed: true`) so an unanswered question survives a
-   * dropped socket.
-   */
-  deliverRequest(id, method, params, replayed = false) {
-    let settled2 = false;
-    const send = (frame) => {
-      if (settled2) {
-        return;
-      }
-      settled2 = true;
-      try {
-        this.transport?.send(JSON.stringify({ jsonrpc: "2.0", id, ...frame }));
-      } catch {
-      }
-    };
-    const request = {
-      id,
-      method,
-      params,
-      replayed,
-      respond: (result) => send({ result }),
-      fail: (code7, message) => send({ error: { code: code7, message } }),
-      decline: (message) => {
-        if (this.backendCountsDeclines) {
-          send({ error: { code: JSON_RPC_SESSION_NOT_SHOWN, message } });
-        }
-      }
-    };
-    for (const handler of this.requestHandlers) {
-      let accepted;
-      try {
-        accepted = handler(request);
-      } catch (error) {
-        request.fail(JSON_RPC_INTERNAL_ERROR, `server request handler crashed: ${method}`);
-        this.options.onRequestHandlerError?.(error instanceof Error ? error : new Error(String(error)), {
-          id,
-          method,
-          params
-        });
-        return false;
-      }
-      if (accepted !== false) {
-        return true;
-      }
-    }
-    request.fail(JSON_RPC_METHOD_NOT_FOUND, `no handler for server request: ${method}`);
-    this.options.onUnhandledRequest?.({ id, method, params });
-    return false;
-  }
-  deliverOpenRequests(result) {
-    const open = result?.open_requests;
-    if (!Array.isArray(open)) {
-      return;
-    }
-    for (const entry of open) {
-      if (typeof entry?.id === "string" && typeof entry.method === "string") {
-        const params = entry.params && typeof entry.params === "object" ? entry.params : {};
-        this.deliverRequest(entry.id, entry.method, params, true);
-      }
-    }
-  }
-  /**
-   * Route one inbound frame: a response settles its pending call, an
-   * `event` notification reaches `onEvent`, a server→client request reaches
-   * the `onRequest` handlers. Returns the decoded frame so the owner can act
-   * on it too (mirror it, record seq, …) or `null` when the text was not
-   * JSON or not a JSON object (`null`, a scalar).
-   */
-  handleFrame(text15) {
-    let frame;
-    try {
-      frame = JSON.parse(text15);
-    } catch {
-      return null;
-    }
-    if (!frame || typeof frame !== "object") {
-      return null;
-    }
-    if (this.options.heartbeatLiveness === "any-inbound") {
-      this.lastLivenessAt = Date.now();
-    }
-    if (isServerRequestFrame(frame)) {
-      const params = frame.params && typeof frame.params === "object" ? frame.params : {};
-      this.deliverRequest(frame.id, frame.method, params);
-      return frame;
-    }
-    if (frame.id !== void 0 && frame.id !== null) {
-      if (typeof frame.id === "string" && this.outstandingPings.delete(frame.id)) {
-        this.lastLivenessAt = Date.now();
-        return frame;
-      }
-      const call = this.pending.get(frame.id);
-      if (call) {
-        this.lastLivenessAt = Date.now();
-        this.clearPending(frame.id);
-        if (frame.error) {
-          call.reject(jsonRpcErrorFromFrame(frame.error));
-        } else {
-          this.deliverOpenRequests(frame.result);
-          call.resolve(frame.result);
-        }
-      }
-      return frame;
-    }
-    if (frame.method === "event" && frame.params && typeof frame.params.type === "string") {
-      if (frame.params.type === "gateway.ready") {
-        this.advertiseCapabilities();
-      }
-      this.options.onEvent?.(frame.params);
-    }
-    return frame;
-  }
-  /**
-   * Tell the backend, once per connection generation, that this client answers
-   * server→client requests (a handler result or `-32601`). Without it a
-   * backend treats a WebSocket client as a build that predates server requests
-   * and fails every clarify/approval/… for it immediately instead of stalling
-   * the agent for the full deadline. An older backend answers `-32601` here;
-   * that is ignored.
-   */
-  advertiseCapabilities() {
-    const transport = this.transport;
-    this.request("client.capabilities", { server_requests: true }).then((result) => {
-      if (this.transport === transport) {
-        this.backendCountsDeclines = result?.declines_not_shown === true;
-      }
-    }).catch(() => void 0);
-  }
-  /**
-   * Begin the `gateway.ping` keepalive on the bound transport. Only call when
-   * `gateway.ready.heartbeat` advertised support — an older backend would
-   * answer with -32601 and never count as alive. What counts as liveness is
-   * `heartbeatLiveness`; a full deadline without it drops the transport.
-   */
-  startHeartbeat() {
-    this.stopHeartbeat();
-    this.lastLivenessAt = Date.now();
-    const transport = this.transport;
-    if (!transport || this.options.heartbeatIntervalMs <= 0 || this.options.heartbeatDeadlineMs <= 0) {
-      return;
-    }
-    let lastPingAt = 0;
-    this.heartbeatTimer = setInterval(() => {
-      if (this.transport !== transport) {
-        return;
-      }
-      const now = Date.now();
-      if (lastPingAt > this.lastLivenessAt && now - this.lastLivenessAt >= this.options.heartbeatDeadlineMs) {
-        this.failHeartbeat(new Error("WebSocket heartbeat acknowledgement timed out"));
-        return;
-      }
-      const id = `heartbeat-${++this.heartbeatSequence}`;
-      this.outstandingPings.add(id);
-      if (this.outstandingPings.size > MAX_OUTSTANDING_PINGS) {
-        this.outstandingPings.delete(this.outstandingPings.values().next().value);
-      }
-      lastPingAt = now;
-      try {
-        transport.send(JSON.stringify({ jsonrpc: "2.0", id, method: "gateway.ping", params: {} }));
-      } catch (error) {
-        this.failHeartbeat(error instanceof Error ? error : new Error(String(error)));
-      }
-    }, this.options.heartbeatIntervalMs);
-    if (this.options.unrefTimers) {
-      unrefTimer(this.heartbeatTimer);
-    }
-  }
-  stopHeartbeat() {
-    this.outstandingPings.clear();
-    if (this.heartbeatTimer !== null) {
-      clearInterval(this.heartbeatTimer);
-      this.heartbeatTimer = null;
-    }
-  }
-  failHeartbeat(error) {
-    this.stopHeartbeat();
-    this.options.onHeartbeatFailure?.(error);
-  }
-  clearPending(id) {
-    const call = this.pending.get(id);
-    if (call?.timer) {
-      clearTimeout(call.timer);
-    }
-    this.pending.delete(id);
-  }
-  rejectAllPending(error) {
-    for (const [id, call] of this.pending) {
-      if (call.timer) {
-        clearTimeout(call.timer);
-      }
-      this.pending.delete(id);
-      call.reject(error);
-    }
-  }
-};
-
-// .hermes-src/node_modules/@hermes/shared/src/reconnect-backoff.ts
-var DEFAULT_BASE_DELAY_MS = 300;
-var DEFAULT_CAP_MS = 15e3;
-var MAX_EXPONENT = 32;
-function reconnectBackoffDelayMs(attempt2, options = {}) {
-  const baseDelayMs = options.baseDelayMs ?? DEFAULT_BASE_DELAY_MS;
-  const capMs = options.capMs ?? DEFAULT_CAP_MS;
-  const exponent = Math.min(Math.max(0, Math.trunc(attempt2)), MAX_EXPONENT);
-  const ceiling = Math.min(capMs, baseDelayMs * 2 ** exponent);
-  return options.jitter === false ? ceiling : Math.random() * ceiling;
-}
-
-// .hermes-src/ui-tui/src/gatewayClient.ts
-var import_undici = __toESM(require_undici(), 1);
-
-// .hermes-src/ui-tui/src/canonicalGateway.ts
-import { randomUUID } from "node:crypto";
-
-// .hermes-src/node_modules/nanostores/clean-stores/index.js
-var clean = /* @__PURE__ */ Symbol("clean");
-
-// .hermes-src/node_modules/nanostores/atom/index.js
-var listenerQueue = [];
-var lqIndex = 0;
-var batchSeen = null;
-var QUEUE_ITEMS_PER_LISTENER = 4;
-var nanostoresGlobal = globalThis.nanostoresGlobal ||= { epoch: 0 };
-var drainQueue = () => {
-  for (lqIndex = 0; lqIndex < listenerQueue.length; lqIndex += QUEUE_ITEMS_PER_LISTENER) {
-    listenerQueue[lqIndex](
-      listenerQueue[lqIndex + 1].value,
-      listenerQueue[lqIndex + 2],
-      listenerQueue[lqIndex + 3]
-    );
-  }
-  listenerQueue.length = 0;
-};
-var atom = /* @__NO_SIDE_EFFECTS__ */ (initialValue) => {
-  let listeners = [];
-  let $atom = {
-    get() {
-      if (!$atom.lc) {
-        $atom.listen(() => {
-        })();
-      }
-      return $atom.value;
-    },
-    init: initialValue,
-    lc: 0,
-    listen(listener) {
-      $atom.lc = listeners.push(listener);
-      return () => {
-        for (let i = lqIndex + QUEUE_ITEMS_PER_LISTENER; i < listenerQueue.length; ) {
-          if (listenerQueue[i] === listener) {
-            listenerQueue.splice(i, QUEUE_ITEMS_PER_LISTENER);
-          } else {
-            i += QUEUE_ITEMS_PER_LISTENER;
-          }
-        }
-        let index2 = listeners.indexOf(listener);
-        if (~index2) {
-          listeners.splice(index2, 1);
-          if (!--$atom.lc) $atom.off();
-        }
-      };
-    },
-    notify(oldValue, changedKey) {
-      nanostoresGlobal.epoch++;
-      let runListenerQueue = !listenerQueue.length && !batchSeen;
-      for (let listener of listeners) {
-        if (batchSeen?.has(listener)) continue;
-        batchSeen?.add(listener);
-        listenerQueue.push(
-          listener,
-          $atom,
-          oldValue,
-          batchSeen ? void 0 : changedKey
-        );
-      }
-      if (runListenerQueue) {
-        drainQueue();
-      }
-    },
-    /* It will be called on last listener unsubscribing.
-       We will redefine it in onMount and onStop. */
-    off() {
-    },
-    set(newValue) {
-      let oldValue = $atom.value;
-      if (oldValue !== newValue) {
-        $atom.value = newValue;
-        $atom.notify(oldValue);
-      }
-    },
-    subscribe(listener) {
-      let unbind = $atom.listen(listener);
-      listener($atom.value);
-      return unbind;
-    },
-    value: initialValue
-  };
-  if (process.env.NODE_ENV !== "production") {
-    $atom[clean] = () => {
-      listeners = [];
-      $atom.lc = 0;
-      $atom.off();
-    };
-  }
-  return $atom;
-};
-
-// .hermes-src/ui-tui/src/i18n/en/app.ts
-var appEn = {
-  notice: {}
-};
-
-// .hermes-src/ui-tui/src/i18n/en/billing.ts
-var billingEn = {
-  billing: {
-    common: {
-      cancel: "Cancel",
-      back: "Back",
-      manageOnPortal: "Manage on portal",
-      noSavedCard: "No saved card on file",
-      payment: (card) => `Payment: ${card}`,
-      invalid: "invalid"
-    },
-    overview: {
-      title: (balance) => `Top up \xB7 balance ${balance}`,
-      org: (name) => `Org: ${name}`,
-      // args: 0 = threshold, 1 = reload-to amount
-      autoReloadOn: (threshold, reloadTo) => `Auto-reload: on (below ${threshold} \u2192 ${reloadTo})`,
-      autoReloadOff: "Auto-reload: off",
-      needsBillingPermissions: "Billing actions need someone with billing permissions (owner, admin, or finance admin).",
-      remoteSpendingOff: "Remote spending is off for this org \u2014 a billing admin can turn it on from the portal's Hermes Agent page.",
-      addFunds: "Add funds",
-      autoReload: "Auto-reload",
-      monthlyLimit: "Monthly limit",
-      card: (card) => `Card: ${card}`,
-      noCardHint: "No saved card on file \u2014 \u201CAdd funds\u201D walks you through adding one.",
-      hint: (count2) => `\u2191/\u2193 select \xB7 1-${count2} quick pick \xB7 Enter confirm \xB7 Esc close`
-    },
-    buy: {
-      title: "Add funds",
-      addCardOnPortal: "Add a card on the portal",
-      checkAgain: "I\u2019ve added it \u2014 check again",
-      customAmount: "Custom amount\u2026",
-      refreshFailed: "Could not refresh billing state \u2014 try again in a moment.",
-      cardFound: (card) => `\u2713 Card found: ${card} \u2014 pick an amount.`,
-      stillNoCard: "Still no card on file \u2014 finish adding it on the portal, then check again.",
-      invalidPreset: "Invalid preset.",
-      invalidAmount: "Invalid amount.",
-      addCardThenCheckAgain: "Add a card on the billing page, then come back and pick \u201Ccheck again\u201D.",
-      portalLinkFailed: "Could not build the portal link \u2014 is your portal configured?",
-      enterCustomAmount: "Enter a custom amount:",
-      typingHint: "Enter confirm \xB7 Esc back",
-      noSavedCardLine: "No saved card on file.",
-      addCardOnce: "Add a card once on the portal billing page \u2014 after that you can top up right from the terminal.",
-      checkingForCard: "Checking for a card\u2026",
-      hint: (count2) => `\u2191/\u2193 select \xB7 1-${count2} quick pick \xB7 Enter confirm \xB7 Esc back`
-    },
-    confirm: {
-      title: "Confirm purchase",
-      total: (amount) => `Total: ${amount}`,
-      portalCardCharged: "Your card saved on the portal will be charged.",
-      authorization: "By confirming, you allow Nous Research to charge your card.",
-      payNow: (amount) => `Pay ${amount} now`,
-      hint: "\u2191/\u2193 select \xB7 Enter confirm \xB7 Y/N quick \xB7 Esc back"
-    },
-    stepUp: {
-      openingBrowser: "Opening your browser to allow Remote Spending\u2026",
-      notAllowed: "! Couldn't allow Remote Spending \u2014 someone with billing permissions (owner, admin, or finance admin) has to approve it. Your card was not charged.",
-      allowedResuming: "\u2713 Remote Spending allowed \u2014 resuming your purchase.",
-      stillNeedsApproval: "! Remote Spending still needs approval \u2014 run /topup to try again. Your card was not charged.",
-      declined: "No charge made. Run /topup when you want to allow Remote Spending.",
-      title: "Allow Remote Spending",
-      waitingForBrowser: "Waiting for your browser\u2026",
-      approveInPage: "Approve in the page that just opened.",
-      heldHere: (amount) => `Your ${amount} top-up is held here and resumes when you're done.`,
-      escCancel: "Esc cancel",
-      grantedTitle: "Remote Spending allowed",
-      readyToFinish: (amount) => `Your ${amount} top-up is ready to finish.`,
-      pressEnterToResume: "Press Enter to resume",
-      grantedHint: "Enter resume \xB7 Esc cancel",
-      resuming: (amount) => `Resuming your ${amount} top-up\u2026`,
-      promptTitle: "One-time setup",
-      promptBody: "To charge from this terminal, allow Remote Spending once.",
-      promptDetail: (amount) => `It opens your browser to authorize, then your ${amount} top-up picks up right here.`,
-      allow: "Allow Remote Spending",
-      notNow: "Not now",
-      promptHint: "\u2191/\u2193 select \xB7 Enter confirm \xB7 Y/N quick \xB7 Esc cancel"
-    },
-    autoReload: {
-      title: "Auto-reload",
-      description: "Automatically add funds when your balance is low.",
-      aDifferentCard: "a different card",
-      yourCard: "your card",
-      manageCardOnPortal: "Use your card on file \u2014 manage on portal",
-      agreeAndTurnOn: "Agree and turn on",
-      turnOff: "Turn off",
-      thresholdError: (error) => `Threshold: ${error}`,
-      reloadToError: (error) => `Reload-to: ${error}`,
-      reloadToMustExceedThreshold: "Reload-to amount must be greater than the threshold.",
-      noCardManageOnPortal: "\u{1F534} No saved card \u2014 manage billing on the portal.",
-      // args: 0 = threshold, 1 = reload-to amount
-      turnedOn: (threshold, reloadTo) => `\u2705 Auto-reload on: below ${threshold} \u2192 reload to ${reloadTo}.`,
-      turnedOff: "\u2705 Auto-reload turned off.",
-      cardOnFile: (card) => `Card on file: ${card}`,
-      distinctCardWarning: (card) => `\u26A0 Auto-refill is charging ${card} \u2014 not your card on file.`,
-      thresholdLabel: "When balance falls below:",
-      reloadToLabel: "Reload balance to:",
-      authorization: (card) => `By confirming, you authorize Nous Research to charge ${card} whenever your balance falls below the threshold. Turn off any time here or on the portal.`,
-      hint: "\u2191/\u2193 move \xB7 Tab switch field \xB7 Enter next/confirm \xB7 Esc back"
-    },
-    limit: {
-      title: "Monthly spend limit",
-      // args: 0 = spent, 1 = limit
-      usage: (spent, limit) => `${spent} of ${limit} used this month`,
-      usageDefaultCeiling: (spent, limit) => `${spent} of ${limit} used this month (default ceiling)`,
-      noCapVisible: "No monthly cap visible (managed on the portal).",
-      readOnly: "The monthly limit is set on the portal \u2014 shown here read-only.",
-      hint: (count2) => `\u2191/\u2193 select \xB7 1-${count2} quick pick \xB7 Enter confirm \xB7 Esc back`
-    }
-  }
-};
-
-// .hermes-src/ui-tui/src/i18n/en/canonical.ts
-var canonicalEn = {
-  canonical: {
-    // app/slash/canonicalSessionControls.ts + canonicalSessionCommands.ts
-    controls: {
-      modelUsage: "usage: /model <model> [--provider <provider>] [--session]",
-      unsupportedModelOption: (flag2) => `unsupported canonical model option: ${flag2}`,
-      identityUnavailable: "session execution identity unavailable; reconnect before editing",
-      compressedStale: "compressed transcript is stale; reopen the session",
-      compressed: "\u2713 transcript compressed",
-      notAvailable: (command) => `/${command} is not available on the shared gateway yet`,
-      launchToolsets: (toolsets) => `toolsets fixed at session launch: ${toolsets}`,
-      retryUnsupported: "/retry: retry does not support media or unknown content parts"
-    },
-    // app/submissionCore.ts — durable admission receipts.
-    submit: {
-      correction: (status) => `correction ${status}`,
-      correctionRejected: "correction rejected \u2014 input retained",
-      admissionNotConfirmed: "admission not confirmed \u2014 input retained; use Alt+K to retry with the same identity",
-      statusAdmissionUnconfirmed: "admission unconfirmed",
-      executionUnconfirmed: (message) => `execution status unconfirmed: ${message}`,
-      legacyDelivery: "durable admission unavailable for this session \u2014 using legacy delivery",
-      legacyUnconfirmed: "legacy delivery unconfirmed \u2014 input retained; check the session before sending a new input",
-      legacyUnconfirmedWith: (message) => `legacy delivery unconfirmed: ${message} \u2014 input retained; check the session before sending a new input`,
-      statusDeliveryUnconfirmed: "delivery unconfirmed",
-      deliveryNotResent: "delivery unconfirmed \u2014 check the session before sending a new input; retained input was not resent",
-      busyTextOnly: "busy corrections accept text only \u2014 image input retained; submit it with /queue",
-      inputRetained: (message) => `input retained: ${message} \u2014 Alt+K retries the same submission`,
-      imageNotSubmitted: (message) => `image not submitted: ${message} \u2014 input retained`,
-      statusImageNotSubmitted: "image not submitted",
-      interruptFailed: (message) => `interrupt failed: ${message}`,
-      startupQuerySwitched: "startup query skipped: active session changed"
-    },
-    // hooks/useQueue.ts, app/useSubmission.ts, app/useComposerState.ts — the local input journal.
-    queue: {
-      unconfirmedPrefix: "[unconfirmed \xB7 Alt+K retry] ",
-      // {0}=admission status identifier (unknown; queued rows render plain), {1}=input text
-      serverRow: (status, text15) => `[${status}] ${text15}`,
-      discardFailed: (message) => `discard failed: ${message}`,
-      journalCleanupFailed: (message) => `input delivered; journal cleanup failed: ${message}`,
-      notSavedQueueKept: (message) => `input not saved: ${message} \u2014 queue kept`,
-      notSavedDraftKept: (message) => `input not saved: ${message} \u2014 draft kept`,
-      statusInputNotSaved: "input not saved",
-      unknownExecution: "unknown execution \u2014 Ctrl+X to discard before retrying",
-      invalidRecord: (name) => `Invalid pending input record: ${name}`,
-      clipboardImageFailed: (message) => `clipboard image failed: ${message}`
-    },
-    // lib/imageAttachments.ts — owner-staged image validation.
-    images: {
-      unsupported: "Unsupported image: expected PNG, JPEG, GIF, or WebP bytes",
-      tooLarge: "Image exceeds 20 MiB upload limit",
-      notFound: (path2) => `Image not found: ${path2}`,
-      noOwnerPath: "Image upload did not return an owner path"
-    },
-    // canonicalGateway.ts — launch-contract refusals.
-    launch: {
-      noTuiPolicy: "gateway does not support tui session policy; update/restart the gateway",
-      unsupportedOptions: (options) => `gateway does not support TUI launch options: ${options}`,
-      invalidToolProgress: (value) => `invalid HERMES_TUI_TOOL_PROGRESS: ${value}`
-    }
-  }
-};
-
-// .hermes-src/ui-tui/src/i18n/en/chatBits.ts
-var chatBitsEn = {
-  chatBits: {
-    branding: {
-      tagFull: "Nous Research \xB7 Messenger of the Digital Gods",
-      tagMid: "Messenger of the Digital Gods",
-      scanningSkills: "scanning skills",
-      moreCategories: (count2) => `(and ${count2} more categories\u2026)`,
-      moreToolsets: (count2) => `(and ${count2} more toolsets\u2026)`,
-      toolsOne: (count2) => `${count2} tool`,
-      toolsOther: (count2) => `${count2} tools`,
-      lazy: "(lazy)",
-      disabled: "disabled",
-      connecting: "connecting",
-      configured: "configured",
-      failed: "failed",
-      noSystemPrompt: "No system prompt loaded.",
-      sessionLabel: "Session: ",
-      availableTools: "Available Tools",
-      availableSkills: "Available Skills",
-      inCategoriesOne: (count2) => `in ${count2} category`,
-      inCategoriesOther: (count2) => `in ${count2} categories`,
-      systemPrompt: "System Prompt",
-      charsSuffix: (count2) => `\u2014 ${count2} chars`,
-      mcpServers: "MCP Servers",
-      connected: "connected",
-      // `count` is a number, or '…' while a lazy boot is still counting.
-      toolsSummary: (count2) => `${count2} tools`,
-      skillsSummary: (count2) => `${count2} skills`,
-      mcpSummary: (count2) => `${count2} MCP`,
-      helpHint: "/help for commands",
-      commitsBehindOne: (count2) => `! ${count2} commit behind`,
-      commitsBehindOther: (count2) => `! ${count2} commits behind`,
-      runPrefix: " - run ",
-      toUpdate: " to update"
-    },
-    thinking: {
-      thinking: "Thinking",
-      toolCalls: "Tool calls",
-      progress: "Progress",
-      spawned: "Spawned",
-      spawnTree: "Spawn tree",
-      activity: "Activity",
-      subagentFallback: (index2) => `Subagent ${index2}`,
-      statusQueued: "queued",
-      statusRunning: "running",
-      toolsOne: (count2) => `${count2} tool`,
-      toolsOther: (count2) => `${count2} tools`,
-      tokShort: (tokens2) => `${tokens2} tok`,
-      subtreeTools: (count2) => `+${count2}t sub`,
-      // {0} = depth of the spawned children, {1} = total descendants.
-      spawnedSuffix: (depth, total) => `d${depth} \xB7 ${total} total`,
-      drafting: "drafting...",
-      analyzingToolOutput: "analyzing tool output\u2026",
-      argsHeader: "Args:",
-      approxTokens: (count2) => `~${count2} tokens`,
-      approxTotal: (count2) => `~${count2} total`,
-      agentsToMonitor: "(/agents to monitor)",
-      agentsHint: "(/agents)"
-    },
-    messageLine: {
-      emptyToolResult: "(empty tool result)",
-      systemMessage: "(system message)",
-      chars: (count2) => `${count2} chars`,
-      longMessage: "[long message]",
-      response: "Response"
-    },
-    todo: {
-      title: "Todo",
-      incompleteOne: (pending) => `\xB7 incomplete \xB7 ${pending} still pending`,
-      incompleteOther: (pending) => `\xB7 incomplete \xB7 ${pending} still pending/in_progress`
-    },
-    queued: {
-      header: (count2) => `queued (${count2})`,
-      editing: (position4) => ` \xB7 editing ${position4} \xB7 Ctrl+X delete \xB7 Esc cancel`,
-      more: (count2) => `\u2026and ${count2} more`
-    },
-    entry: {
-      noTty: "hermes-tui: no TTY",
-      // {0} = memory level ('high' | 'critical'), {1} = formatted heap size, {2} = dump path.
-      memoryDump: (level, heap, path2) => `hermes-tui: ${level} memory (${heap}) \u2014 auto heap dump \u2192 ${path2}`,
-      dumpFailed: "(failed)",
-      exitingOom: "hermes-tui: exiting to avoid OOM; restart to recover",
-      heapClimbing: (heap) => `hermes-tui: heap climbing fast (${heap}) \u2014 a large tool output or long session may be straining memory`
-    }
-  }
-};
-
-// .hermes-src/ui-tui/src/i18n/en/chrome.ts
-var chromeEn = {
-  status: {
-    summoning: "summoning hermes\u2026",
-    ready: "ready",
-    running: "running\u2026",
-    mcpReloaded: "MCP reloaded after config change",
-    compacting: "compacting",
-    devCredits: " (dev credits)",
-    sessionCount: (count2) => `${count2} ${count2 === 1 ? "session" : "sessions"}`,
-    paused: "\u23F8 paused",
-    resumesWhenSubagentFinishes: "\u21A9 resumes when subagent finishes",
-    resumesWhenSubagentsFinish: (count2) => `\u21A9 resumes when ${count2} subagents finish`,
-    bgTasks: (count2) => `${count2} bg`,
-    compressions: (count2) => `cmp ${count2}`,
-    fast: "fast"
-  },
-  composer: {
-    interruptHint: "Ctrl+C to interrupt\u2026",
-    placeholders: {
-      ask: "Ask me anything\u2026",
-      explain: 'Try "explain this codebase"',
-      test: 'Try "write a test for\u2026"',
-      refactor: 'Try "refactor the auth module"',
-      help: 'Try "/help" for commands',
-      lint: 'Try "fix the lint errors"',
-      config: 'Try "how does the config loader work?"'
-    }
-  },
-  hints: {
-    copySelection: "copy selection",
-    ctrlCMac: "clear draft / interrupt / exit",
-    copySelectionForwarded: "copy selection when forwarded by the terminal",
-    ctrlC: "copy selection / clear draft / interrupt / exit",
-    exit: "exit",
-    openEditor: "open $EDITOR (Alt+G fallback for VSCode/Cursor)",
-    redraw: "redraw / repaint",
-    paste: "paste text; /paste attaches clipboard image",
-    discardDraft: "discard draft (recall with \u2191)",
-    applyCompletion: "apply completion",
-    arrows: "completions / queue edit / history",
-    sessionSwitcher: "open live session switcher (deletes queued message while editing)",
-    expandAgents: "expand live agents (keeps your draft)",
-    collapseAgents: "collapse / restore live agent preview",
-    modelPicker: "open model picker (keeps your draft; applies to next turn mid-stream)",
-    homeEnd: "home / end of line",
-    undoRedo: "undo / redo input edits",
-    deleteWord: "delete word",
-    killLine: "kill to line start / end (repeat across lines)",
-    jumpWord: "jump word",
-    lineStartEnd: "start / end of line",
-    newline: "insert newline",
-    continuation: "multi-line continuation (fallback)",
-    shell: "run a shell command (e.g. !ls, !git status)",
-    interpolate: 'interpolate shell output inline (e.g. "branch is {!git branch --show-current}")'
-  },
-  help: {
-    quickHelp: "? quick help",
-    quickHelpTail: "  \xB7  type /help for the full panel  \xB7  backspace to dismiss",
-    commonCommands: "Common commands",
-    hotkeys: "Hotkeys",
-    commands: {
-      help: "full list of commands + hotkeys",
-      clear: "start a new session",
-      resume: "switch live or resume past sessions",
-      details: "control transcript detail level",
-      copy: "copy selection or last assistant message",
-      quit: "exit hermes"
-    }
-  }
-};
-
-// .hermes-src/ui-tui/src/i18n/en/connection.ts
-var connectionEn = {
-  connection: {
-    // Card title verb, indexed by the target's `action` (backend value, not shown raw).
-    verb: {
-      authorize: "Authorize",
-      connect: "Connect",
-      enable: "Enable",
-      install: "Install",
-      reconnect: "Reconnect"
-    },
-    // {0} app, {1} account name the agent chose
-    namedAccount: (app2, alias) => `Hermes named this ${app2} account ${alias}. Rename it anytime.`,
-    header: {
-      // {0} title, {1} account name
-      account: (title, alias) => `${title} \xB7 ${alias}`,
-      moreToAnswer: (count2) => `${count2} more to answer after this one.`
-    },
-    field: {
-      set: "Set",
-      required: (label) => `${label} is required.`
-    },
-    selector: {
-      skip: "Skip",
-      tryAgain: "Try again"
-    },
-    failure: {
-      expired: "The link expired.",
-      failed: "That did not work."
-    },
-    status: {
-      finishing: "Finishing\u2026",
-      working: "Working\u2026",
-      pending: "Pending\u2026"
-    },
-    authorized: {
-      title: "Authorized. Tools unavailable.",
-      continue: "Continue",
-      hint: "Enter or Esc continue"
-    },
-    hint: {
-      finishing: "Esc close \xB7 Ctrl+C stop the turn",
-      browser: "Enter open in browser \xB7 Esc skip \xB7 Ctrl+C stop the turn",
-      working: "Esc skip \xB7 Ctrl+C stop the turn",
-      retry: "\u2190/\u2192 select \xB7 Enter confirm \xB7 Esc skip \xB7 Ctrl+C stop the turn",
-      form: "\u2191/\u2193 or Tab move \xB7 \u2190/\u2192 select \xB7 Enter confirm \xB7 Esc skip \xB7 Ctrl+C stop the turn"
-    },
-    notice: {
-      answerNotDelivered: "That answer did not reach Hermes. Try again.",
-      restartFailed: "Hermes could not start that again. Try again.",
-      browserDidNotOpen: "The browser did not open. Copy the link above."
-    }
-  },
-  journey: {
-    title: "Journey",
-    subtitle: "learned skills & memories over time",
-    closeHint: "Esc/q close",
-    error: (message) => `error: ${message}`,
-    loading: "assembling your learning map\u2026",
-    empty: "No learning yet \u2014 your learned skills and memories will start mapping out here as you use Hermes.",
-    noDetail: "No additional detail recorded yet.",
-    notice: {
-      cannotEdit: "cannot edit",
-      noChanges: "no changes"
-    },
-    confirmDelete: (label) => `delete ${label}? y/N`,
-    slice: {
-      skillsOne: (count2) => `${count2} skill`,
-      skillsOther: (count2) => `${count2} skills`,
-      memoriesOne: (count2) => `${count2} memory`,
-      memoriesOther: (count2) => `${count2} memories`
-    },
-    hint: {
-      item: "\u2191\u2193/jk scroll \xB7 PgUp/PgDn page \xB7 e edit \xB7 d delete \xB7 Esc/\u2190 back \xB7 q close",
-      // Timeline hint segments; the component joins the applicable ones with ' · '.
-      move: "\u2191\u2193/jk move",
-      open: "Enter/\u2192 open",
-      edit: "e edit",
-      delete: "d delete",
-      topBottom: "g/G top/bottom",
-      close: "q close"
-    }
-  }
-};
-
-// .hermes-src/ui-tui/src/i18n/en/connectors.ts
-var connectorsEn = {
-  connectors: {
-    title: "Connector accounts",
-    loading: "loading accounts\u2026",
-    empty: "No connector accounts yet. Press a to add one.",
-    unnamedTag: "(unnamed)",
-    retiredFolded: (count2) => `${count2} retired (Tab to show)`,
-    retiredShown: (count2) => `${count2} retired shown (Tab to hide)`,
-    status: {
-      active: "active",
-      expired: "expired",
-      failed: "failed",
-      inactive: "inactive",
-      pending: "pending",
-      retired: "retired",
-      revoked: "revoked"
-    },
-    rename: {
-      // {0} app, {1} current name
-      title: (app2, name) => `Rename ${app2} account ${name}`,
-      hint: "Enter save \xB7 Esc cancel"
-    },
-    add: {
-      pickApp: "Add an account to which app?",
-      pickHint: "\u2191/\u2193 select \xB7 Enter choose \xB7 Esc cancel",
-      noApps: "No connectors are available to add.",
-      name: (app2) => `Name the new ${app2} account`,
-      nameHint: "Enter connect \xB7 Esc cancel"
-    },
-    link: {
-      // {0} app, {1} name
-      title: (app2, name) => `Connect ${app2} account ${name}`,
-      reconnectTitle: (app2, name) => `Reconnect ${app2} account ${name}`,
-      waiting: "Waiting for you to finish in the browser\u2026",
-      hint: "Enter open in browser \xB7 Esc stop waiting",
-      starting: "Starting\u2026"
-    },
-    remove: {
-      // {0} app, {1} name
-      confirm: (app2, name) => `Remove ${app2} account ${name}? This signs Hermes out of it.`
-    },
-    notice: {
-      // {0} app, {1} name
-      connected: (app2, name) => `${app2} account ${name} is connected.`,
-      renamed: (app2, name) => `Renamed to ${name} (${app2}).`,
-      removed: (app2, name) => `Removed ${app2} account ${name}.`,
-      notConnected: (app2) => `${app2} did not connect. Try again.`,
-      stopped: "Stopped waiting. The link still works until it expires.",
-      waitEnded: "Stopped waiting: the link expired. The list shows where the account stands.",
-      nameInvalid: "Use 1-32 lowercase letters, digits or -, starting with a letter or digit.",
-      nameTaken: "That name is already used.",
-      retiredNoReconnect: "A retired account cannot be reconnected. Add another account instead.",
-      browserDidNotOpen: "The browser did not open. Copy the link above."
-    },
-    hint: "r rename \xB7 a add \xB7 c reconnect \xB7 x remove \xB7 Tab retired \xB7 Esc/q close",
-    // The selected account works, so the repair key is not offered.
-    hintHealthy: "r rename \xB7 a add \xB7 x remove \xB7 Tab retired \xB7 Esc/q close",
-    errorLine: (message) => `error: ${message}`
-  }
-};
-
-// .hermes-src/ui-tui/src/i18n/en/content.ts
-var contentEn = {
-  content: {
-    // Keyed by tool name (untranslated identifier) → progress verb.
-    verbs: {
-      browser: "browsing",
-      clarify: "asking",
-      create_file: "creating",
-      delegate_task: "delegating",
-      delete_file: "deleting",
-      execute_code: "executing",
-      image_generate: "generating",
-      list_files: "listing",
-      memory: "remembering",
-      patch: "patching",
-      read_file: "reading",
-      run_command: "running",
-      search_code: "searching",
-      search_files: "searching",
-      terminal: "terminal",
-      web_extract: "extracting",
-      web_search: "searching",
-      write_file: "writing"
-    },
-    fortunes: {
-      fortune01: "you are one clean refactor away from clarity",
-      fortune02: "a tiny rename today prevents a huge bug tomorrow",
-      fortune03: "your next commit message will be immaculate",
-      fortune04: "the edge case you are ignoring is already solved in your head",
-      fortune05: "minimal diff, maximal calm",
-      fortune06: "today favors bold deletions over new abstractions",
-      fortune07: "the right helper is already in your codebase",
-      fortune08: "you will ship before overthinking catches up",
-      fortune09: "tests are about to save your future self",
-      fortune10: "your instincts are correctly suspicious of that one branch"
-    },
-    legendaryFortunes: {
-      legendary01: "legendary drop: one-line fix, first try",
-      legendary02: "legendary drop: every flaky test passes cleanly",
-      legendary03: "legendary drop: your diff teaches by itself"
-    },
-    // Kaomoji are language-neutral but keyed so a pack may swap them.
-    faces: {
-      face01: "(\uFF61\u2022\u0301\uFE3F\u2022\u0300\uFF61)",
-      face02: "(\u25D4_\u25D4)",
-      face03: "(\xAC\u203F\xAC)",
-      face04: "( \u2022_\u2022)>\u2310\u25A0-\u25A0",
-      face05: "(\u2310\u25A0_\u25A0)",
-      face06: "(\xB4\uFF65_\uFF65`)",
-      face07: "\u25C9_\u25C9",
-      face08: "(\xB0\u30ED\xB0)",
-      face09: "( \u02D8\u2323\u02D8)\u2661",
-      face10: "\u30FD(>\u2200<\u2606)\u2606",
-      face11: "\u0669(\u0E51\u275B\u1D17\u275B\u0E51)\u06F6",
-      face12: "(\u2299_\u2299)",
-      face13: "(\xAC_\xAC)",
-      face14: "( \u0361\xB0 \u035C\u0296 \u0361\xB0)",
-      face15: "\u0CA0_\u0CA0"
-    },
-    setup: {
-      title: "Setup Required",
-      intro: "Hermes needs a model provider before the TUI can start a session.",
-      actions: "Actions",
-      setupRow: "run the first-time setup wizard in-place (adds a provider)",
-      modelRow: "pick a model (needs a session \u2014 add a provider first)",
-      exitRow: "exit and run `hermes setup` manually",
-      footer: "In the dashboard the Models page sets the profile default; on Desktop it is Settings -> Models."
-    }
-  }
-};
-
-// .hermes-src/ui-tui/src/i18n/en/gatewayMsg.ts
-var gatewayMsgEn = {
-  gatewayMsg: {
-    // Free-text status-bar phrases nothing compares against.
-    status: {
-      recoveringSession: "recovering session\u2026",
-      forgingSession: "forging session\u2026",
-      resumingMostRecent: "resuming most recent\u2026",
-      protocolWarning: "protocol warning"
-    },
-    startup: {
-      querySkipped: "startup query skipped: no active session",
-      imageAttachFailed: (message) => `startup image attach failed: ${message}`,
-      commandCatalogUnavailable: (message) => `command catalog unavailable: ${message}`
-    },
-    clarify: {
-      // Reason shown as "(…)" after an abandoned clarify prompt.
-      timedOut: "timed out"
-    },
-    agents: {
-      workingNudge: "subagents working \xB7 /agents to watch live"
-    },
-    // Brief status-bar echo of a goal status.update; leading glyph mirrors the backend line.
-    goal: {
-      complete: "\u2713 goal complete",
-      continuing: "\u21BB goal continuing",
-      paused: "\u23F8 goal paused"
-    },
-    billing: {
-      openLinkRemoteSpending: "\u{1F4B3} Open this link to allow Remote Spending:",
-      enterCode: (code7) => `If prompted, enter code: ${code7}`
-    },
-    voice: {
-      stopPhrase: "voice: stop phrase \u2014 voice chat ended",
-      noSpeechLimit: "voice: no speech detected 3 times, continuous mode stopped"
-    },
-    wake: {
-      // {0}=profile name (used twice: in the notice and in the suggested command)
-      otherProfile: (profile) => `wake phrase for profile '${profile}' \u2014 run: hermes -p ${profile} --tui`,
-      failed: (message) => `wake: ${message}`
-    },
-    protocol: {
-      noiseDetected: "protocol noise detected \xB7 /logs to inspect",
-      noise: (preview5) => `protocol noise: ${preview5}`
-    },
-    moa: {
-      // {0}=references done {1}=references total (pre-formatted strings)
-      refs: (done, total) => `MoA: refs ${done}/${total}`,
-      aggregating: "MoA: aggregating\u2026"
-    },
-    error: {
-      unknown: "unknown error"
-    }
-  }
-};
-
-// .hermes-src/ui-tui/src/i18n/en/hubs.ts
-var hubsEn = {
-  hubs: {
-    // Shared list-window affordances for the Skills / Plugins hubs.
-    list: {
-      moreAbove: (count2) => ` \u2191 ${count2} more`,
-      moreBelow: (count2) => ` \u2193 ${count2} more`,
-      errorLine: (message) => `error: ${message}`
-    },
-    agents: {
-      title: {
-        spawnTree: "Spawn tree",
-        pausedSuffix: " \xB7 \u23F8 paused",
-        lastTurn: "Last turn",
-        // {0} replay index, {1} history length
-        replay: (index2, total) => `Replay ${index2}/${total}`,
-        finishedAt: (time2) => ` \xB7 finished ${time2}`
-      },
-      // {0} max spawn depth, {1} max concurrent children
-      caps: (depth, children3) => `caps d${depth}/${children3}`,
-      inheritModel: "inherit",
-      subagentFallback: "subagent",
-      empty: "No subagents this turn. Trigger delegate_task to populate the tree.",
-      timeline: "Timeline",
-      processes: "Processes",
-      sort: {
-        depthFirst: "spawn order",
-        durationDesc: "slowest",
-        status: "status",
-        toolsDesc: "busiest"
-      },
-      filter: {
-        all: "all",
-        failed: "failed",
-        leaf: "leaves",
-        running: "running"
-      },
-      status: {
-        completed: "completed",
-        error: "error",
-        failed: "failed",
-        interrupted: "interrupted",
-        queued: "queued",
-        running: "running",
-        timeout: "timeout"
-      },
-      section: {
-        budget: "Budget",
-        files: "Files",
-        toolCalls: "Tool calls",
-        output: "Output",
-        progress: "Progress",
-        summary: "Summary"
-      },
-      detail: {
-        depth: "depth",
-        model: "model",
-        toolsets: "toolsets",
-        tools: "tools",
-        // {0} own tool count, {1} subtree tool count
-        toolsValue: (own14, subtree) => `${own14} (subtree ${subtree})`,
-        subtree: "subtree",
-        // {0} descendant count, {1} max depth below, {2} active count
-        subtreeValueOne: (count2, depth, active) => `${count2} agent \xB7 d${depth} \xB7 \u26A1${active}`,
-        subtreeValueOther: (count2, depth, active) => `${count2} agents \xB7 d${depth} \xB7 \u26A1${active}`,
-        elapsed: "elapsed",
-        iteration: "iteration",
-        apiCalls: "api calls",
-        tokens: "tokens",
-        // {0} formatted input tokens, {1} formatted output tokens
-        tokensValue: (input2, output) => `${input2} in \xB7 ${output} out`,
-        reasoningSuffix: (tokens2) => ` \xB7 ${tokens2} reasoning`,
-        subtreeTokens: "subtree tokens",
-        filesMore: (count2) => `\u2026+${count2} more`
-      },
-      diff: {
-        title: "Replay diff",
-        subtitle: "baseline vs candidate \xB7 esc/q close",
-        baseline: "A \xB7 baseline",
-        candidate: "B \xB7 candidate",
-        delta: "\u0394",
-        agents: "agents",
-        tools: "tools",
-        depth: "depth",
-        duration: "duration",
-        tokens: "tokens"
-      },
-      flash: {
-        turnFinished: "turn finished \xB7 inspect freely \xB7 q to close",
-        replayLocked: "replay mode \u2014 controls disabled",
-        killing: (id) => `killing ${id}`,
-        notFound: (id) => `not found: ${id}`,
-        killFailed: (id) => `kill failed: ${id}`,
-        killingSubtreeOne: (count2) => `killing subtree \xB7 ${count2} node`,
-        killingSubtreeOther: (count2) => `killing subtree \xB7 ${count2} nodes`,
-        spawningPaused: "spawning paused",
-        spawningResumed: "spawning resumed",
-        pauseFailed: "pause failed",
-        liveTurn: "live turn",
-        // {0} replay index, {1} history length
-        replay: (index2, total) => `replay \xB7 ${index2}/${total}`
-      },
-      hint: {
-        controlsLocked: " \xB7 controls locked",
-        // {0} is `pause` / `resume` below
-        controls: (pauseVerb) => ` \xB7 e steer \xB7 t tail \xB7 x stop \xB7 X subtree \xB7 p ${pauseVerb}`,
-        pause: "pause",
-        resume: "resume",
-        footerReplay: "Enter/d detail \xB7 e steer \xB7 x stop \xB7 Esc back",
-        footerLive: "Enter/t tail \xB7 d detail \xB7 e steer \xB7 x stop \xB7 Esc back",
-        listNavReplay: "Enter/\u2192 detail",
-        listNavLive: "Enter tail \xB7 d/\u2192 detail",
-        // {0} listNavReplay/listNavLive, {1} controls hint, {2} sort label, {3} filter label, {4} history hint
-        list: (nav, controls, sort, filter, history2) => `\u2191\u2193/jk move \xB7 g/G top/bottom \xB7 ${nav}${controls} \xB7 s sort:${sort} \xB7 f filter:${filter}${history2} \xB7 q close`,
-        // {0} replay index, {1} history length
-        history: (index2, total) => ` \xB7 [ / ] history ${index2}/${total}`,
-        detail: (controls) => `\u2191\u2193/jk scroll \xB7 PgUp/PgDn page \xB7 g/G top/bottom \xB7 Esc/\u2190 back to list${controls} \xB7 q close`
-      }
-    },
-    agentsPanel: {
-      running: (count2) => `${count2} running`,
-      done: (count2) => `${count2} done`,
-      liveAgents: (count2) => `${count2} live agents`,
-      procs: (count2) => `${count2} procs`,
-      procsDone: (count2) => `${count2} done`,
-      moreHidden: (count2) => ` \xB7 +${count2} more`,
-      processes: "Processes",
-      collapsedHint: " \xB7 Ctrl+T expand \xB7 Ctrl+R restore",
-      expandedHint: " \xB7 Ctrl+T expand \xB7 Ctrl+R collapse"
-    },
-    agentControls: {
-      queued: "Queued for child \u2014 applied at the next tool boundary.",
-      notQueued: "Not queued: child has finished or is no longer accepting guidance.",
-      notQueuedError: (message) => `Not queued: ${message}`,
-      steerTitle: (id) => `Steer ${id}`,
-      steerIntro: "Guidance queues at the next tool boundary; current work is not interrupted.",
-      queueing: "Queueing\u2026",
-      steerHint: "Enter queue \xB7 Esc back \xB7 main composer draft is preserved",
-      loadingTranscript: "Loading live transcript\u2026",
-      truncatedPrefix: "[last 16 KiB]",
-      transcriptUnavailable: "Live transcript unavailable; child may have finished. Progress and output remain below.",
-      transcriptRefreshFailed: "Could not refresh live transcript.",
-      transcriptTitle: "Live transcript"
-    },
-    skills: {
-      title: "Skills Hub",
-      loading: "loading skills\u2026",
-      loadingOne: "loading\u2026",
-      installing: "installing\u2026",
-      selectCategory: "select a category",
-      // {0} category name, {1} skill count
-      categoryRow: (category, count2) => `${category} \xB7 ${count2} skills`,
-      skillCount: (count2) => `${count2} skill(s)`,
-      emptyCategory: "no skills in this category",
-      pathLine: (path2) => `path: ${path2}`,
-      hintCancel: "Esc/q cancel",
-      hintCategory: "\u2191/\u2193 select \xB7 Enter open \xB7 1-9,0 quick \xB7 Esc/q cancel",
-      hintSkill: "\u2191/\u2193 select \xB7 Enter open \xB7 1-9,0 quick \xB7 Esc back \xB7 q close",
-      hintSkillEmpty: "Esc back \xB7 q close",
-      hintActions: "i reinspect \xB7 x reinstall \xB7 Enter/Esc back \xB7 q close"
-    },
-    plugins: {
-      title: "Plugins Hub",
-      loading: "loading plugins\u2026",
-      updating: "updating\u2026",
-      empty: "no plugins installed",
-      // `hermes plugins install owner/repo` is a CLI command: keep it verbatim.
-      installHint: "install: hermes plugins install owner/repo",
-      status: {
-        disabled: "disabled",
-        notEnabled: "not enabled"
-      },
-      bundledTag: " [bundled]",
-      userScope: (count2) => `${count2} user plugin(s)`,
-      bundledSuffix: (count2) => ` \xB7 +${count2} bundled (Tab)`,
-      allScope: (count2) => `all ${count2} plugins`,
-      hintClose: "Esc/q close",
-      hintList: "\u2191/\u2193 select \xB7 Enter/Space toggle \xB7 Tab user/all \xB7 1-9,0 quick \xB7 Esc/q close"
-    }
-  }
-};
-
-// .hermes-src/ui-tui/src/i18n/en/lib.ts
-var libEn = {
-  common: {
-    yes: "yes",
-    no: "no",
-    cancel: "cancel",
-    unknown: "unknown"
-  }
-};
-
-// .hermes-src/ui-tui/src/i18n/en/libText.ts
-var libTextEn = {
-  libText: {
-    // gatewayClient.ts — transport-drop reasons that reject in-flight RPCs and
-    // therefore surface in the transcript. `gateway not connected` /
-    // `gateway not running` are deliberately NOT here: app/userMessages.ts
-    // parses them (NOT_CONNECTED_RE) and rewrites them into plain words.
-    gateway: {
-      restarting: "gateway restarting",
-      exited: "gateway exited",
-      /** {0} = exit code */
-      exitedWithCode: (code7) => `gateway exited (${code7})`,
-      /** {0} = child process error message */
-      error: (message) => `gateway error: ${message}`,
-      websocketUnavailable: "gateway websocket unavailable",
-      websocketConnectionFailed: "gateway websocket connection failed",
-      /** {0} = websocket close code */
-      websocketClosedDuringConnect: (code7) => `gateway websocket closed (${code7}) during connect`,
-      websocketClosed: "gateway websocket closed",
-      /** {0} = websocket close code */
-      websocketClosedWithCode: (code7) => `gateway websocket closed (${code7})`,
-      websocketStartupFailed: "gateway websocket startup failed",
-      attachUrlChanged: "gateway attach url changed",
-      closed: "gateway closed"
-    },
-    // lib/terminalSetup.ts — /terminal-setup result messages. {0} = IDE label
-    // (VS Code / Cursor / Windsurf) unless noted.
-    terminalSetup: {
-      mustRunLocally: (label) => `${label} terminal setup must be run on the local machine, not inside an SSH session.`,
-      settingsPathUnknown: (label) => `Could not determine ${label} settings path on this platform.`,
-      /** {0} = IDE label, {1} = keybindings.json path */
-      keybindingsNotArray: (label, file2) => `${label} keybindings.json is not a JSON array: ${file2}`,
-      /** {0} = IDE label, {1} = error text */
-      readFailed: (label, error) => `Failed to read ${label} keybindings: ${error}`,
-      /** {0} = keybindings.json path, {1} = comma-joined conflicting key chords */
-      conflicts: (file2, keys2) => `Existing terminal keybindings would conflict in ${file2}: ${keys2}`,
-      alreadyConfigured: (label) => `${label} terminal keybindings already configured.`,
-      /** {0} = count, {1} = IDE label */
-      addedOne: (count2, label) => `Added ${count2} ${label} terminal keybinding`,
-      /** {0} = count, {1} = IDE label */
-      addedOther: (count2, label) => `Added ${count2} ${label} terminal keybindings`,
-      /** {0} = count */
-      migratedOne: (count2) => `migrated ${count2} legacy binding to CSI u encoding`,
-      /** {0} = count */
-      migratedOther: (count2) => `migrated ${count2} legacy bindings to CSI u encoding`,
-      /** {0} = comma-joined summary parts, {1} = keybindings.json path */
-      summaryIn: (parts3, file2) => `${parts3} in ${file2}`,
-      /** {0} = IDE label, {1} = error text */
-      configureFailed: (label, error) => `Failed to configure ${label} terminal shortcuts: ${error}`,
-      noSupportedIde: "No supported IDE terminal detected. Supported: VS Code, Cursor, Windsurf."
-    },
-    // lib/terminalParity.ts — startup hints about the host terminal.
-    terminalParity: {
-      /** {0} = detected IDE id (vscode / cursor / windsurf) */
-      ideSetup: (terminal) => `Detected ${terminal} terminal \xB7 run /terminal-setup for best Cmd+Enter / undo parity`,
-      appleTerminal: "Apple Terminal detected \xB7 use /paste for image-only clipboard fallback, and try Ctrl+A / Ctrl+E / Ctrl+U if Cmd+\u2190/\u2192/\u232B gets rewritten",
-      tmux: "tmux detected \xB7 clipboard copy/paste uses passthrough when available; allow-passthrough improves OSC52 reliability",
-      remote: "SSH session detected \xB7 text clipboard can bridge via OSC52, but image clipboard and local screenshot paths still depend on the machine running Hermes"
-    },
-    // lib/billingDialog.ts — the out-of-credits confirm dialog.
-    billingDialog: {
-      dismiss: "Dismiss",
-      topUp: "Top up",
-      nousDetail: "Your Nous credit balance is exhausted \u2014 top up to keep going.",
-      nousTitle: "Out of Nous credits",
-      yourProvider: "your provider",
-      openBillingPage: "Open billing page",
-      switchProvider: "Switch provider",
-      /** {0} = provider label */
-      providerDetail: (label) => `${label} reports your credits or billing are exhausted.`,
-      /** {0} = provider label */
-      providerTitle: (label) => `Out of credits \xB7 ${label}`
-    },
-    // lib/subagentTree.ts — the `d2 · 7 agents · 124 tools · 2m 14s` summary chip.
-    subagentTree: {
-      /** {0} = pre-formatted count */
-      agentsOne: (count2) => `${count2} agent`,
-      /** {0} = pre-formatted count */
-      agentsOther: (count2) => `${count2} agents`,
-      /** {0} = pre-formatted count */
-      toolsOne: (count2) => `${count2} tool`,
-      /** {0} = pre-formatted count */
-      toolsOther: (count2) => `${count2} tools`,
-      /** {0} = compact token count (`12k`) */
-      tokens: (count2) => `${count2} tok`
-    },
-    // lib/text.ts — transcript trail / clarify prose.
-    text: {
-      showingLiveTail: "showing live tail",
-      /** {0} = label prefix, {1} = omitted line count, {2} = omitted char count (both pre-formatted) */
-      omittedLinesChars: (prefix2, lines, chars) => `[${prefix2}; omitted ${lines} lines / ${chars} chars]`,
-      /** {0} = label prefix, {1} = omitted char count (pre-formatted) */
-      omittedChars: (prefix2, chars) => `[${prefix2}; omitted ${chars} chars]`,
-      argsLabel: "Args",
-      resultLabel: "Result",
-      errorLabel: "Error",
-      /** {0} = pre-formatted line count; sits inside a `[[ … ]]` composer token */
-      pasteLinesChip: (count2) => `[${count2} lines]`,
-      /** {0} = question count */
-      clarifyHead: (count2) => `ask (${count2} questions)`,
-      /** {0} = question, {1} = locked answer */
-      clarifyAnswered: (question, answer) => `\u2713 ${question} \u2192 ${answer}`,
-      /** {0} = question */
-      clarifyUnanswered: (question) => `\xB7 ${question} (no answer)`,
-      /** {0} = why the batch ended */
-      clarifyReason: (reason) => `(${reason})`
-    },
-    // lib/agentRows.ts — docked agents panel row fallbacks.
-    agentRows: {
-      starting: "Starting\u2026",
-      agent: "agent",
-      resultReady: "result ready"
-    },
-    // domain/messages.ts — transcript replay projections.
-    messages: {
-      messageFallback: "(message)",
-      /** {0} = the first few words of the message */
-      longMessage: (prefix2) => `${prefix2} [long message]`,
-      modelChanged: "model changed",
-      resumedInterruptedTurn: "resumed interrupted turn",
-      personalityChanged: "personality changed",
-      backgroundProcessFinished: "background process finished",
-      backgroundAgentWorkFinished: "background agent work finished",
-      /** {0} = count */
-      backgroundAgentsFinishedOne: (count2) => `${count2} background agent finished`,
-      /** {0} = count */
-      backgroundAgentsFinishedOther: (count2) => `${count2} background agents finished`
-    },
-    // domain/attachments.ts — the composer token an attached image renders as.
-    attachments: {
-      /** {0} = 1-based image index; must stay inside `[[ … ]]` (PASTE_SNIPPET_RE) */
-      imageToken: (index2) => `[[ Image ${index2} ]]`
-    },
-    // hooks/useCompletion.ts — the placeholder row when the completer RPC fails.
-    completion: {
-      unavailable: "completion unavailable",
-      unavailableMeta: "unavailable"
-    }
-  }
-};
-
-// .hermes-src/ui-tui/src/i18n/en/overlays.ts
-var overlaysEn = {
-  prompt: {
-    approval: {
-      title: "\u26A0 approval required",
-      moreLines: (count2) => `\u2026 +${count2} more line${count2 === 1 ? "" : "s"} (full text above)`,
-      once: "Allow once",
-      session: "Allow this session",
-      always: "Always allow",
-      deny: "Deny"
-    },
-    clarify: {
-      other: "Other (type your answer)",
-      skipped: "(skipped)",
-      toggle: "Space toggle",
-      confirmAndContinue: "confirm and continue",
-      lockAnswer: "lock answer",
-      typingHint: (enterAction) => `Enter ${enterAction} \xB7 Esc back`,
-      hint: (enterAction) => `\u2191/\u2193 select \xB7 Enter ${enterAction} \xB7 Tab/Shift+Tab switch question \xB7 Esc/Ctrl+C cancel`
-    },
-    confirm: {
-      confirm: "Yes",
-      cancel: "No",
-      hint: "\u2191/\u2193 select \xB7 Enter confirm \xB7 Y/N quick \xB7 Esc cancel"
-    }
-  }
-};
-
-// .hermes-src/ui-tui/src/i18n/en/pickers.ts
-var pickersEn = {
-  pickers: {
-    common: {
-      // {0} = the human-readable error message (never a machine code).
-      error: (message) => `error: ${message}`,
-      // {0} = the RPC method name (e.g. `model.options`) — not translated.
-      invalidResponse: (method) => `invalid response: ${method}`,
-      moreAbove: (count2) => ` \u2191 ${count2} more`,
-      moreBelow: (count2) => ` \u2193 ${count2} more`,
-      filter: (query) => `filter: ${query}`,
-      typeToFilter: "type to filter"
-    },
-    model: {
-      loading: "loading models\u2026",
-      noProviders: "no providers available",
-      failedToSaveKey: "failed to save key",
-      // {0} = the provider's key env var name (e.g. OPENAI_API_KEY).
-      pasteKeyToActivate: (keyEnv) => `paste ${keyEnv} to activate`,
-      runHermesModelToConfigure: "run `hermes model` to configure",
-      escQCancelHint: "Esc/q cancel",
-      reasoning: {
-        none: "none (disable reasoning)",
-        keepCurrent: "Keep current effort"
-      },
-      key: {
-        // {0} = provider display name.
-        title: (providerName) => `Configure ${providerName}`,
-        pasteBelow: "Paste your API key below (saved to ~/.hermes/.env)",
-        empty: "(empty)",
-        saving: "saving\u2026",
-        hint: "Enter save \xB7 Ctrl+U clear \xB7 Esc back"
-      },
-      disconnect: {
-        // {0} = provider display name.
-        title: (providerName) => `Disconnect ${providerName}?`,
-        // {0} = provider display name.
-        removesCredentials: (providerName) => `This removes saved credentials for ${providerName}.`,
-        reauthLater: "You can re-authenticate later by selecting it again.",
-        disconnecting: "disconnecting\u2026",
-        hint: "y/Enter confirm \xB7 n/Esc cancel"
-      },
-      provider: {
-        title: "Select provider (step 1/3)",
-        subtitle: "Full model IDs on the next step \xB7 Enter to continue",
-        // {0} = current model id (or the `unknown` leaf below).
-        current: (model) => `Current: ${model}`,
-        unknown: "(unknown)",
-        noKey: "(no key)",
-        needsSetup: "(needs setup)",
-        modelCountOne: (count2) => `${count2} model`,
-        modelCountOther: (count2) => `${count2} models`,
-        filterHint: "type to filter \xB7 \u2191/\u2193 select",
-        // {0} = provider warning text from the backend.
-        warning: (warning) => `warning: ${warning}`,
-        noMatches: "no providers match",
-        hint: "\u2191/\u2193 select \xB7 Enter choose \xB7 ^d disconnect \xB7 Esc clear/back \xB7 q close"
-      },
-      persist: {
-        // {0} = one of `scopeGlobal` / `scopeSession`.
-        label: (scope) => `persist: ${scope}`,
-        scopeGlobal: "global",
-        scopeSession: "session",
-        toggleHint: " \xB7 ^g toggle",
-        onlySuffix: " only"
-      },
-      effort: {
-        title: "Reasoning effort (step 3/3)",
-        // {0} = the pending model id.
-        subtitle: (model) => `${model} \xB7 applies with the switch (same scope) \xB7 Esc back`,
-        hint: "\u2191/\u2193 select \xB7 Enter switch \xB7 Esc back \xB7 q close"
-      },
-      modelStage: {
-        title: "Select model (step 2/3)",
-        // {0} = provider display name (or the `unknownProvider` leaf below).
-        subtitle: (providerName) => `${providerName} \xB7 Esc back`,
-        unknownProvider: "(unknown provider)",
-        noMatches: "no models match filter",
-        noneListed: "no models listed for this provider",
-        hint: "\u2191/\u2193 select \xB7 Enter next \xB7 Esc clear/back \xB7 q close",
-        emptyHint: "Esc back \xB7 q close"
-      }
-    },
-    session: {
-      title: "Sessions",
-      loading: "loading sessions\u2026",
-      modelUnknown: "model?",
-      currentOrDefault: "current/default",
-      liveSessionsOne: (count2) => `${count2} live session`,
-      liveSessionsOther: (count2) => `${count2} live sessions`,
-      // {0} = live session count, {1} = resumable session count.
-      counts: (liveCount, resumableCount) => `${liveCount} live \xB7 ${resumableCount} resumable`,
-      age: {
-        today: "today",
-        yesterday: "yesterday",
-        daysAgo: (days) => `${days}d ago`
-      },
-      status: {
-        idle: "idle",
-        starting: "starting",
-        waiting: "waiting",
-        working: "working"
-      },
-      errors: {
-        couldNotLoadResumable: "could not load resumable sessions",
-        alreadyClosed: "session was already closed",
-        notAttached: "this view is not attached to that session \u2014 nothing was closed"
-      },
-      row: {
-        new: "new",
-        draft: "\u270E draft",
-        startNew: "Start a new live session",
-        current: "current",
-        untitled: "(untitled)",
-        closing: "closing\u2026",
-        deleting: "deleting\u2026",
-        pressDAgain: "press d again to delete",
-        messageCount: (count2) => `${count2} msgs`
-      },
-      noOtherSessions: "no other sessions \u2014 Enter on +new to start one",
-      promptLabel: "prompt \u203A ",
-      // {0} = the draft model label (short model id or `currentOrDefault`).
-      draftModel: (label) => `model: ${label}`,
-      selectNewPrefix: "Select ",
-      newRowMarker: "+new",
-      selectNewSuffix: " to type a prompt",
-      // Hint fragments are concatenated with hotkey tokens in code, so the
-      // leading/trailing spaces and ` · ` separators are part of each leaf.
-      hint: {
-        resumableLabel: "Resumable:",
-        resume: " resume \xB7 ",
-        delete: " delete",
-        newRowLabel: "New row:",
-        typePrompt: " type prompt \xB7 ",
-        start: " start \xB7 ",
-        model: " model",
-        sessionRowLabel: "Session row:",
-        switch: " switch \xB7 ",
-        close: " close",
-        move: " move \xB7 ",
-        new: " new \xB7 ",
-        refresh: " refresh \xB7 "
-      }
-    },
-    pet: {
-      title: "Pets",
-      loading: "loading pets\u2026",
-      adopting: "adopting\u2026",
-      petCountOne: (count2) => `${count2} pet`,
-      petCountOther: (count2) => `${count2} pets`,
-      // {0} = the filter text the user typed.
-      noMatches: (query) => `no pets match "${query}"`,
-      noneAvailable: "no pets available",
-      officialTag: " \xB7 official",
-      escCancelHint: "Esc cancel",
-      hint: "\u2191/\u2193 select \xB7 Enter adopt \xB7 type to filter \xB7 Esc cancel"
-    }
-  }
-};
-
-// .hermes-src/ui-tui/src/i18n/en/secure.ts
-var secureEn = {
-  secure: {
-    sudo: {
-      title: "sudo password required"
-    },
-    secret: {
-      forEnvVar: (envVar) => `for ${envVar}`
-    },
-    vault: {
-      unlockTitle: (displayName) => `Unlock ${displayName} for this session`,
-      unlockHint: "master password \xB7 hidden \xB7 goes to the manager CLI only \xB7 Esc keeps it locked",
-      saveTitle: (site) => `Save your ${site} login`,
-      saveIdentifierHint: "email or username \xB7 password comes next \xB7 Esc or empty skips saving",
-      savePasswordTitle: (identifier) => `Password for ${identifier}`,
-      savePasswordHint: (site) => `hidden \xB7 encrypted on this machine for ${site} \xB7 never shown to the model`,
-      codeTitle: (site) => `Verification code for ${site}`,
-      codeHint: "typed into the page only \xB7 never shown to the model \xB7 Esc skips"
-    }
-  }
-};
-
-// .hermes-src/ui-tui/src/i18n/en/session.ts
-var sessionEn = {
-  session: {
-    // Free-text status-bar phrases (patchUiState({ status })) that nothing compares against.
-    status: {
-      setupRequired: "setup required",
-      setupRunning: "setup running\u2026",
-      startingAgent: "starting agent\u2026",
-      waitingForInput: "waiting for input\u2026",
-      switchingSession: "switching session\u2026",
-      resuming: "resuming\u2026",
-      interrupting: "interrupting\u2026",
-      reconnecting: "reconnecting\u2026",
-      restarting: "restarting\u2026",
-      stopped: "stopped",
-      closingSession: "closing session\u2026",
-      approvalNeeded: "approval needed",
-      sudoPasswordNeeded: "sudo password needed",
-      secretInputNeeded: "secret input needed",
-      unlockVault: (displayName) => `unlock ${displayName}`,
-      saveLogin: (site) => `save login for ${site}`,
-      verificationCode: (site) => `verification code for ${site}`
-    },
-    // Shared by the rpc wrapper (useMainApp) and the lifecycle paths; `error: ` prefix stays literal.
-    common: {
-      invalidResponse: (method) => `invalid response: ${method}`,
-      // useSubmission.interpolate: a `{!cmd}` that could not run refuses the whole submit.
-      interpolationFailed: (message) => `not sent: {!\u2026} could not run (${message}) \u2014 input retained`
-    },
-    lifecycle: {
-      newLiveSessionStarted: "new live session started",
-      sessionTitleSet: (title) => `session title set: ${title}`,
-      titleQueuedSuffix: " (queued while session initializes)",
-      failedToSetTitle: (message) => `failed to set session title: ${message}`,
-      switchSessions: "switch sessions",
-      interruptBeforeSwitch: (what) => `interrupt the current turn before trying to ${what}`
-    },
-    main: {
-      failedToStartLiveSession: "failed to start new live session",
-      invalidModelSwitchResponse: "invalid response: model switch",
-      modelSwitched: (model) => `model \u2192 ${model}`,
-      widgetLive: (id) => `widget /${id} is live \u2014 type /${id} to open`,
-      widgetRemoved: (id) => `widget /${id} removed (file deleted)`,
-      // {0}=file {1}=message
-      widgetFailedToLoad: (file2, message) => `widget ${file2} failed to load: ${message}`,
-      clarifyQuestionsOne: (count2) => `${count2} question`,
-      clarifyQuestionsOther: (count2) => `${count2} questions`,
-      skipped: "(skipped)",
-      voiceRec: "\u25CF REC",
-      voiceStt: "\u25C9 STT",
-      voiceOn: "voice on",
-      voiceOff: "voice off",
-      voiceTtsSuffix: " [tts]"
-    },
-    approval: {
-      denied: "denied",
-      approved: (choice2) => `approved (${choice2})`
-    },
-    input: {
-      dashboardNewSession: "starting a fresh dashboard chat...",
-      voiceStillTranscribing: "voice: still transcribing; try again shortly",
-      voiceModeOff: "voice: mode is off \u2014 enable with /voice on",
-      voiceError: (message) => `voice error: ${message}`,
-      sudoCancelled: "sudo cancelled",
-      secretCancelled: "secret entry cancelled",
-      vaultStaysLocked: (displayName) => `${displayName} stays locked`,
-      loginNotSaved: (site) => `login for ${site} not saved`,
-      codeSkipped: (site) => `verification code for ${site} skipped`,
-      failedToOpenEditor: "failed to open editor",
-      failedToOpenEditorWith: (message) => `failed to open editor: ${message}`,
-      yoloNeedsSession: "yolo needs an active session",
-      yoloOn: "yolo on",
-      yoloOff: "yolo off",
-      yoloToggleFailed: "failed to toggle yolo"
-    },
-    turn: {
-      interrupted: "interrupted"
-    },
-    request: {
-      dangerousCommand: "dangerous command"
-    },
-    handoff: {
-      launching: (command) => `launching \`hermes ${command}\`\u2026`,
-      launchError: (error) => `error launching hermes: ${error}`,
-      // {0}=subcommand {1}=exit code
-      exitedWithCode: (subcommand, code7) => `hermes ${subcommand} exited with code ${code7}`,
-      stillNoProvider: "still no provider configured"
-    }
-  }
-};
-
-// .hermes-src/ui-tui/src/i18n/en/slash.ts
-var slashEn = {
-  rpc: {
-    requestFailed: "request failed"
-  }
-};
-
-// .hermes-src/ui-tui/src/i18n/en/slashCmd/core.ts
-var slashCmdCoreEn = {
-  core: {
-    help: {
-      skillCommandsAvailable: (count2) => `${count2} skill commands available \u2014 /skills to browse`,
-      connectors: "manage connector accounts (rename, add another, reconnect, remove)",
-      detailsGlobal: "set global agent detail visibility mode",
-      detailsSection: "override one section (thinking/tools/subagents/activity)",
-      fortune: "show a random or daily local fortune",
-      gridTest: "open the interactive widget-grid demo",
-      dialogTest: "open a sample dialog overlay with a faked backdrop",
-      tuiSection: "TUI"
-    },
-    quit: {
-      dashboardDisabled: "exit is disabled in hosted dashboard chat \u2014 use /new to start a fresh session"
-    },
-    update: {
-      dashboardDisabled: "update is disabled in hosted dashboard chat \u2014 the hosted environment is managed separately",
-      exiting: "exiting TUI to run update..."
-    },
-    mouse: {
-      usage: "usage: /mouse [on|off|toggle|wheel|buttons|all]",
-      tracking: (mode) => `mouse tracking ${mode}`
-    },
-    clear: {
-      switchSessions: "switch sessions",
-      forgingSession: "forging session\u2026",
-      newSessionStarted: "new session started",
-      cancelLabel: "No, keep going",
-      confirmNew: "Yes, start a new session",
-      confirmClear: "Yes, clear the session",
-      detail: "This ends the current conversation and clears the transcript.",
-      titleNew: "Start a new session?",
-      titleClear: "Clear the current session?"
-    },
-    redraw: {
-      done: "ui redrawn"
-    },
-    status: {
-      noActiveSession: "no active session",
-      empty: "(no status)",
-      pageTitle: "Status"
-    },
-    title: {
-      noActiveSession: "no active session",
-      current: (title) => `title: ${title}`,
-      none: "no title set",
-      usage: "usage: /title <your session title>",
-      queuedSuffix: " (queued while session initializes)",
-      // {0}=title, {1}=suffix ('' or queuedSuffix)
-      set: (title, suffix) => `session title set: ${title}${suffix}`
-    },
-    density: {
-      usage: "usage: /density [on|off|toggle]",
-      state: (mode) => `density ${mode}`
-    },
-    details: {
-      usage: "usage: /details [hidden|collapsed|expanded|cycle]  or  /details <section> [hidden|collapsed|expanded|reset]",
-      sectionUsage: "usage: /details <section> [hidden|collapsed|expanded|reset]",
-      // {0}=mode, {1}=overrides summary ('' or '  (a=b c=d)')
-      current: (mode, overrides) => `details: ${mode}${overrides}`,
-      // {0}=section, {1}=mode or 'reset'
-      section: (section, mode) => `details ${section}: ${mode}`,
-      reset: "reset"
-    },
-    fortune: {
-      usage: "usage: /fortune [random|daily]"
-    },
-    copy: {
-      copiedCharsOne: (count2) => `copied ${count2} character`,
-      copiedCharsOther: (count2) => `copied ${count2} characters`,
-      clipboardFailed: "clipboard copy failed \u2014 try HERMES_TUI_FORCE_OSC52=1 to force the escape sequence",
-      usage: "usage: /copy [number]",
-      nothingToCopy: "nothing to copy \u2014 start a conversation first",
-      sentOsc52: "sent OSC52 copy sequence (terminal support required)",
-      copied: "copied to clipboard",
-      failed: (error) => `copy failed: ${error}`
-    },
-    paste: {
-      usage: "usage: /paste"
-    },
-    prompt: {
-      editorFailed: (error) => `editor failed: ${error}`
-    },
-    terminalSetup: {
-      usage: "usage: /terminal-setup [auto|vscode|cursor|windsurf]",
-      restartIde: "restart the IDE terminal for the new keybindings to take effect",
-      failed: (error) => `terminal setup failed: ${error}`
-    },
-    logs: {
-      pageTitle: "Logs",
-      none: "no gateway logs"
-    },
-    history: {
-      noConversation: "no conversation yet",
-      youTag: (index2) => `You #${index2}`,
-      hermesTag: (index2) => `Hermes #${index2}`,
-      toolCallsOne: (count2) => `(${count2} tool call)`,
-      toolCallsOther: (count2) => `(${count2} tool calls)`,
-      empty: "(empty)",
-      pageTitle: "History"
-    },
-    save: {
-      noConversation: "no conversation yet",
-      noActiveSession: "no active session \u2014 nothing to save",
-      saved: (file2) => `conversation saved to: ${file2}`,
-      failed: "failed to save"
-    },
-    focus: {
-      statusOn: "focus view on \u2014 only your prompt and the final response",
-      statusOff: "focus view off",
-      usage: "usage: /focus [on|off|status]",
-      enabled: "focus view enabled \u2014 just your prompt and the final response",
-      disabled: "focus view disabled"
-    },
-    statusbar: {
-      usage: "usage: /statusbar [on|off|top|bottom|toggle]",
-      state: (mode) => `status bar ${mode}`
-    },
-    battery: {
-      // {0}=on|off, {1}=plug icon, {2}=percent
-      statusLive: (state, icon, percent) => `battery indicator ${state} \u2014 currently ${icon} ${percent}%`,
-      statusNoBattery: (state) => `battery indicator ${state} \u2014 no battery detected on this machine`,
-      state: (state) => `battery indicator ${state}`,
-      usage: "usage: /battery [on|off|status]"
-    },
-    queue: {
-      countOne: (count2) => `${count2} queued message`,
-      countOther: (count2) => `${count2} queued messages`,
-      queued: (preview5) => `queued: "${preview5}"`
-    },
-    steer: {
-      usage: "usage: /steer <prompt>",
-      noActiveTurnQueued: (preview5) => `no active turn \u2014 queued for next: "${preview5}"`,
-      queued: (preview5) => `steer queued \u2014 arrives after next tool call: "${preview5}"`,
-      rejected: "steer rejected \u2014 no active turn, queued for next turn"
-    },
-    undo: {
-      nothing: "nothing to undo",
-      undidOne: (count2) => `undid ${count2} message`,
-      undidOther: (count2) => `undid ${count2} messages`
-    },
-    retry: {
-      nothing: "nothing to retry"
-    }
-  },
-  debug: {
-    widgetsReload: {
-      loaded: (names) => `loaded: ${names}`,
-      none: "no user widgets found",
-      summary: (parts3) => `widgets \u2014 ${parts3}`
-    },
-    heapdump: {
-      // {0}=heap size, {1}=rss size (pre-formatted)
-      writing: (heap, rss) => `writing heap dump (heap ${heap} \xB7 rss ${rss})\u2026`,
-      failed: (error) => `heapdump failed: ${error}`,
-      unknownError: "unknown error",
-      heapPath: (path2) => `heapdump: ${path2}`,
-      diagPath: (path2) => `diagnostics: ${path2}`
-    },
-    themeInfo: {
-      panelTitle: "Theme",
-      osc11Background: "OSC-11 background",
-      noReply: "(no reply)",
-      unset: "(unset)",
-      detectedMode: "detected mode",
-      light: "light",
-      dark: "dark"
-    },
-    mem: {
-      panelTitle: "Memory",
-      heapUsed: "heap used",
-      heapTotal: "heap total",
-      external: "external",
-      arrayBuffers: "array buffers",
-      rss: "rss",
-      uptime: "uptime",
-      seconds: (count2) => `${count2}s`
-    }
-  },
-  setup: {
-    setup: {
-      done: "setup complete \u2014 starting session\u2026"
-    }
-  }
-};
-
-// .hermes-src/ui-tui/src/i18n/en/slashCmd/ops.ts
-var slashCmdOpsEn = {
-  ops: {
-    stop: {
-      stoppedOne: (count2) => `stopped ${count2} background process`,
-      stoppedOther: (count2) => `stopped ${count2} background processes`
-    },
-    reloadMcp: {
-      confirmRequired: "/reload-mcp requires confirmation",
-      reloaded: "MCP servers reloaded",
-      reloadedAlways: "MCP servers reloaded \xB7 future /reload-mcp will run without confirmation",
-      complete: "reload complete"
-    },
-    reloadEnv: {
-      reloadedOne: (count2) => `reloaded .env (${count2} var updated)`,
-      reloadedOther: (count2) => `reloaded .env (${count2} vars updated)`
-    },
-    browser: {
-      usage: "usage: /browser [connect|disconnect|status|use] [url] \xB7 persistent: set browser.cdp_url in config.yaml",
-      checking: (url) => `checking Chromium-family browser remote debugging at ${url}...`,
-      connected: (url) => `browser connected: ${url}`,
-      urlUnavailable: "(url unavailable)",
-      notConnected: "browser not connected (try /browser connect <url> or set browser.cdp_url in config.yaml)",
-      disconnected: "browser disconnected",
-      connectedLive: "Browser connected to live Chromium-family browser via CDP",
-      endpoint: (url) => `Endpoint: ${url}`,
-      nextCallUsesEndpoint: "next browser tool call will use this CDP endpoint",
-      useUsage: "Usage: /browser use [off]",
-      useEnabled: "Browser Use mode enabled \u2014 browser_exec via the Browser Use CLI 3.0",
-      useDisabled: "Browser Use mode disabled \u2014 built-in browser tools restored",
-      newSessionsOnly: "applies to new sessions \u2014 this one keeps its current tools (/new to start one)",
-      modeBrowserUse: "Browser: Browser Use mode (browser_exec via the Browser Use CLI 3.0)"
-    },
-    rollback: {
-      noSession: "no active session \u2014 nothing to rollback",
-      notEnabled: "checkpoints are not enabled",
-      noneFound: "no checkpoints found",
-      listTitle: "Rollback checkpoints",
-      noMetadata: "(no metadata)",
-      usageDiff: "usage: /rollback diff <checkpoint>",
-      noChanges: "no changes since this checkpoint",
-      diffTitle: "Rollback diff",
-      failed: (error) => `rollback failed: ${error}`,
-      unknownError: "unknown error",
-      workspaceTarget: "workspace",
-      restoredDetail: "restored",
-      // {0}=target (file path or "workspace"), {1}=detail
-      restored: (target, detail) => `rollback restored ${target}: ${detail}`,
-      // {0}=summarized paths; main's CLI lines for what a safe whole-tree restore left alone
-      keptUserEdits: (files) => `\u21B7 Kept your hand-edits: ${files}
-Use /rollback <N> --all to restore those too.`,
-      keptOversize: (files) => `\u21B7 Kept (too large for checkpoints, no stored copy to revert to): ${files}`,
-      failedDeletes: (files) => `\u26A0\uFE0F Could not remove (left in place): ${files}`,
-      // {0}=count of paths not listed
-      morePaths: (count2) => ` (+${count2} more)`
-    },
-    agents: {
-      paused: "delegation \xB7 paused",
-      resumed: "delegation \xB7 resumed",
-      statePaused: "paused",
-      stateActive: "active",
-      // {0}=state (paused/active), {1}=max spawn depth, {2}=max concurrent children
-      status: (state, depth, children3) => `delegation \xB7 ${state} \xB7 caps d${depth}/${children3}`
-    },
-    replay: {
-      noneOnDisk: "no archived spawn trees on disk for this session",
-      subagentsLabel: (count2) => `${count2} subagents`,
-      archivedTitle: "Archived spawn trees",
-      usageLoad: "usage: /replay load <path>",
-      snapshotEmpty: "snapshot empty or unreadable",
-      noneThisSession: "no completed spawn trees this session \xB7 try /replay list",
-      indexOutOfRange: (max) => `replay: index out of range 1..${max} \xB7 use /replay list for disk`
-    },
-    replayDiff: {
-      usage: "usage: /replay-diff <a> <b>  (e.g. /replay-diff 1 2 for last two)",
-      unresolved: (count2) => `replay-diff: could not resolve indices \xB7 history has ${count2} entries`
-    },
-    reloadSkills: {
-      reloaded: "skills reloaded",
-      pageTitle: "Reload Skills"
-    },
-    slashWorker: {
-      warning: (warning) => `warning: ${warning}`,
-      skillsNoOutput: "/skills: no output",
-      skillsTitle: "Skills",
-      pluginsNoOutput: "/plugins: no output",
-      pluginsTitle: "Plugins",
-      toolsNoOutput: "/tools: no output",
-      toolsTitle: "Tools"
-    },
-    skills: {
-      listTitle: "Skills",
-      usageInspect: "usage: /skills inspect <name>",
-      unknownSkill: (name) => `unknown skill: ${name}`,
-      rowName: "Name",
-      rowCategory: "Category",
-      rowPath: "Path",
-      inspectTitle: "Skill",
-      usageSearch: "usage: /skills search <query>",
-      noResults: (query) => `no results for: ${query}`,
-      searchTitle: (query) => `Search: ${query}`,
-      usageInstall: "usage: /skills install <name or url>",
-      installing: (name) => `installing ${name}\u2026`,
-      installed: (name) => `installed ${name}`,
-      installFailed: "install failed",
-      usageBrowse: "usage: /skills browse [page]  (page must be a positive number)",
-      fetching: "fetching community skills (scans 6 sources, may take ~15s)\u2026",
-      noneOnPage: (page) => `no skills on page ${page}`,
-      // {0}=page, {1}=total skills
-      noneOnPageWithTotal: (page, total) => `no skills on page ${page} (total ${total})`,
-      // {0}=page, {1}=total pages
-      pageOf: (page, total) => `page ${page} of ${total}`,
-      skillsTotal: (count2) => `${count2} skills total`,
-      browseMore: (nextPage) => `/skills browse ${nextPage} for more`,
-      browseTitle: "Browse Skills",
-      browseTitlePage: (page) => `Browse Skills \u2014 p${page}`
-    },
-    tools: {
-      usage: (subcommand) => `usage: /tools ${subcommand} <name> [name ...]`,
-      builtinExample: (subcommand) => `built-in toolset: /tools ${subcommand} web`,
-      mcpExample: (subcommand) => `MCP tool: /tools ${subcommand} github:create_issue`,
-      disabled: (names) => `disabled: ${names}`,
-      enabled: (names) => `enabled: ${names}`,
-      unknownToolsets: (names) => `unknown toolsets: ${names}`,
-      missingServers: (names) => `missing MCP servers: ${names}`,
-      sessionReset: "session reset. new tool configuration is active."
-    }
-  },
-  wake: {
-    usage: "usage: /wake [on|off|status]",
-    reason: {
-      disabled: "disabled (config wake_word.enabled)",
-      disabledForSurface: "scoped to another surface (config wake_word.surface)",
-      notOwner: "another surface owns the listener",
-      owned: "another surface owns the listener",
-      unavailable: "unavailable",
-      unknown: "unknown"
-    },
-    ownedBy: (surface) => `owned by ${surface}`,
-    // {0}=text, {1}=hint from the gateway
-    withHint: (text15, hint) => `${text15} \u2014 ${hint}`,
-    notStarted: (reason) => `wake: not started \u2014 ${reason}`,
-    forPhrase: (phrase) => `for \u201C${phrase}\u201D`,
-    // {0}=detail suffix (" for “phrase” · provider · enabled in config" or empty)
-    listening: (details) => `wake: listening${details}`,
-    micSilent: "\u26A0 mic delivers only silence",
-    // {0}=owner surface, {1}=detail suffix
-    offOwnedBy: (surface, details) => `wake: off here \xB7 listener owned by ${surface}${details}`,
-    unavailable: "wake: unavailable",
-    off: (details) => `wake: off${details} \xB7 /wake on to arm`,
-    enabledInConfig: "enabled in config",
-    disabledInConfig: "disabled in config",
-    listenerOff: (details) => `wake: listener off${details}`,
-    notOwnerStop: "this surface doesn\u2019t own the listener",
-    notRunning: "not running",
-    // {0}=reason, {1}=detail suffix
-    nothingToStop: (reason, details) => `wake: nothing to stop \u2014 ${reason}${details}`
-  }
-};
-
-// .hermes-src/ui-tui/src/i18n/en/slashCmd/session.ts
-var slashCmdSessionEn = {
-  session: {
-    bg: {
-      started: (taskId) => `bg ${taskId} started`,
-      usage: "/bg <prompt>"
-    },
-    branch: {
-      branched: (title) => `branched \u2192 ${title}`
-    },
-    btw: {
-      answering: (taskId) => `btw ${taskId} \u2014 answering from a conversation snapshot`,
-      usage: "/btw <question>"
-    },
-    busy: {
-      mode: (mode) => `busy input mode: ${mode}`,
-      usage: "usage: /busy [queue|steer|interrupt|status]"
-    },
-    compress: {
-      // {0}=message count (pre-formatted)
-      compressedOne: (count2) => `compressed ${count2} message`,
-      compressedOther: (count2) => `compressed ${count2} messages`,
-      nothing: "nothing to compress",
-      // {0}=compact token count, appended to compressedOne/Other
-      tokSuffix: (tokens2) => ` \xB7 ${tokens2} tok`
-    },
-    fast: {
-      mode: (mode) => `fast mode: ${mode}`,
-      usage: "usage: /fast [normal|fast|ultrafast|status|on|off|toggle]"
-    },
-    indicator: {
-      current: (style2) => `indicator: ${style2}`,
-      switched: (style2) => `indicator \u2192 ${style2}`,
-      usage: (styles) => `usage: /indicator [${styles}]`
-    },
-    model: {
-      cancel: "Cancel",
-      confirmStale: "Model not switched: the session changed before the confirmation landed; run /model again.",
-      confirmTitle: (model) => `Confirm model switch to ${model}`,
-      // {0}=model picked during a turn, {1}=the owner's refusal reason
-      deferredRefused: (model, reason) => `model switch to ${model} failed (${reason}); keeping the current model`,
-      expensiveDetail: "This model has unusually high known pricing.",
-      expensiveTitle: "Expensive model selection",
-      invalidResponse: "error: invalid response: model switch",
-      switchAnyway: "Switch anyway",
-      switched: (model) => `model \u2192 ${model}`,
-      switchedDeferred: (model) => `model \u2192 ${model} (applies next turn)`
-    },
-    personality: {
-      changed: (value) => `personality: ${value}`,
-      changedCleared: (value) => `personality: ${value} \xB7 transcript cleared`,
-      defaultValue: "default"
-    },
-    pet: {
-      noOutput: "/pet: no output",
-      // {0}=warning text, {1}=command output
-      warning: (warning, body) => `warning: ${warning}
-${body}`
-    },
-    reasoning: {
-      current: (value) => `reasoning: ${value}`,
-      // {0}=effort value, {1}=display mode
-      currentWithDisplay: (value, display) => `reasoning: ${value} \xB7 display ${display}`
-    },
-    sessions: {
-      busyGuardAction: "switch sessions"
-    },
-    skin: {
-      current: (skin) => `skin: ${skin}`,
-      defaultValue: "default",
-      switched: (skin) => `skin \u2192 ${skin}`
-    },
-    theme: {
-      current: (theme) => `theme: ${theme}`,
-      switched: (theme) => `theme \u2192 ${theme}`,
-      usage: "usage: /theme [auto|light|dark]"
-    },
-    usage: {
-      balanceTitle: "Balance",
-      compressions: (count2) => `Compressions: ${count2}`,
-      // {0}=used tokens (with ~ mark when estimated), {1}=max tokens, {2}=percent (with ~ mark)
-      context: (used, max, percent) => `Context: ${used} / ${max} (${percent}%)`,
-      cta: "Run /subscription to change plan \xB7 /topup to add to your balance",
-      freeNote: "> Free \xB7 free models only. Run /subscription to reach paid models.",
-      freePlan: "Free",
-      lowBalanceFallback: "under $5",
-      lowNote: (left) => `! Low balance \xB7 ${left} left. Run /topup or /subscription.`,
-      noCalls: "no API calls yet",
-      nousBalanceTitle: "Nous balance",
-      plan: (plan) => `Plan: ${plan}`,
-      // {0}=plan name, {1}=renewal date display
-      planRenews: (plan, renews) => `Plan: ${plan} \xB7 renews ${renews}`,
-      rowApiCalls: "API calls",
-      rowInputTokens: "Input tokens",
-      rowModel: "Model",
-      rowOutputTokens: "Output tokens",
-      rowTotalTokens: "Total tokens",
-      usageTitle: "Usage"
-    },
-    verbose: {
-      current: (value) => `verbose: ${value}`
-    },
-    voice: {
-      disabled: "Voice mode disabled.",
-      enabled: "Voice mode enabled",
-      enabledWithTts: "Voice mode enabled (TTS enabled)",
-      off: "OFF",
-      offHint: "  /voice off  to disable voice mode",
-      on: "ON",
-      recordHint: (recordKey) => `  ${recordKey} to start/stop recording`,
-      requirements: "  Requirements:",
-      statusMode: (mode) => `  Mode:       ${mode}`,
-      statusRecordKey: (recordKey) => `  Record key: ${recordKey}`,
-      statusTitle: "Voice Mode Status",
-      statusTts: (tts) => `  TTS:        ${tts}`,
-      ttsDisabled: "Voice TTS disabled.",
-      ttsEnabled: "Voice TTS enabled.",
-      ttsHint: "  /voice tts  to toggle speech output"
-    },
-    yolo: {
-      off: "yolo off",
-      on: "yolo on"
-    }
-  },
-  subscription: {
-    billingUnreachable: "Could not reach the billing service \u2014 check your connection, then retry.",
-    manageUrlFailed: "Could not build manage URL \u2014 is your portal configured?",
-    notLoggedIn: "Not logged into Nous Portal \u2014 run /portal to log in, then /subscription.",
-    openBrowserFailedManage: (url) => `Could not open browser \u2014 visit your subscription page manually at ${url}`,
-    openBrowserFailedPortal: (url) => `Could not open browser \u2014 visit ${url} to finish.`,
-    openingManage: "Opening your subscription page in the browser \u2014 finish there, then re-run /subscription.",
-    openingPortal: "Opening the portal in your browser \u2014 finish there, then re-run /subscription."
-  },
-  topup: {
-    charge: {
-      authenticationRequired: "\u{1F534} Your bank requires verification (3DS). Complete it on the portal to finish this purchase.",
-      cardDeclined: "\u{1F534} Your card was declined. Try another card on the portal.",
-      couldNotCheck: (reason) => `\u{1F534} Could not check the charge: ${reason}`,
-      couldNotCheckFallback: "error",
-      creditsFallback: "Credits",
-      failedReason: (reason) => `\u{1F534} The charge didn't go through (${reason}).`,
-      paymentMethodExpired: "\u{1F534} Your card has expired. Update it on the portal.",
-      // {0}=pre-formatted dollar amount ("$100") or creditsFallback
-      settled: (amount) => `\u2705 ${amount} added.`,
-      submitted: "\u{1F4B3} Charge submitted \u2014 confirming settlement\u2026",
-      timedOut: "\u{1F7E1} Still processing after 5 minutes \u2014 this is a timeout, not a failure. Check /topup or the portal shortly.",
-      unconfirmed: "\u{1F7E1} Your last charge\u2019s outcome is unconfirmed \u2014 check your balance/history before retrying."
-    },
-    error: {
-      autoTopUpDisabledFailures: "Auto-reload was turned off after repeated charge failures. Fix the card issue, then re-enable it from /topup \u2192 Auto-reload.",
-      consentRequired: "This action needs a one-time card confirmation and consent step on the portal before it can proceed.",
-      generic: (message) => `\u{1F534} ${message}`,
-      genericFallback: "Billing request failed.",
-      idempotencyConflict: "\u{1F534} That charge key was already used for a different amount. Start a fresh top-up.",
-      insufficientScope: "This needs Remote Spending allowed. Start a top-up to allow it, then retry.",
-      monthlyCapExceeded: "\u{1F534} Monthly spend cap reached.",
-      // {0}=remaining USD headroom (number as sent by the server)
-      monthlyCapExceededRemaining: (remaining) => `\u{1F534} Monthly spend cap reached \u2014 $${remaining} headroom left.`,
-      noPaymentMethod: "\u{1F4B3} No saved card for terminal charges yet. Set one up on the portal (one-time credit buys don't save a reusable card).",
-      orgAccessDenied: "This token isn't bound to an org you can manage. Sign in with the right org, or manage this on the portal.",
-      portal: (url) => `Portal: ${url}`,
-      // {0}=retry suffix from retryIn (or '')
-      rateLimited: (retrySuffix) => `\u{1F7E1} Too many charges right now${retrySuffix}. This isn't a payment failure.`,
-      remoteSpendingDisabled: "Remote spending is off for this account \u2014 a billing admin can turn it on from the portal's Hermes Agent page.",
-      retryIn: (minutes) => ` (try again in ~${minutes} min)`,
-      revokedByAdmin: "An admin stopped remote spending for this terminal.",
-      revokedByYou: "You stopped remote spending for this terminal.",
-      // {0}=who-revoked sentence (revokedByAdmin / revokedByYou)
-      revokedReconnect: (who) => `${who} Reconnect to restore \u2014 run /portal to re-authorize this terminal.`,
-      roleRequired: "Adding funds needs someone with billing permissions (owner, admin, or finance admin), or manage this on the portal.",
-      sessionRevoked: "Your session was logged out. Run /portal to log in again.",
-      // {0}=retry suffix from retryIn (or '')
-      stripeUnavailable: (retrySuffix) => `\u{1F7E1} Stripe is having trouble right now \u2014 try again shortly${retrySuffix}.`,
-      upgradeCapExceeded: "\u{1F534} Daily plan-change limit reached (5 per org) \u2014 try again tomorrow, or manage this on the portal."
-    },
-    notLoggedIn: "\u{1F4B3} Not logged into Nous Portal \u2014 run /portal to log in, then /topup.",
-    openingPortal: (url) => `Opening portal: ${url}`,
-    validate: {
-      invalid: "Enter a dollar amount, e.g. 100 (max 2 decimal places).",
-      maximum: (max) => `Maximum is $${max}.`,
-      minimum: (min) => `Minimum is $${min}.`,
-      notPositive: "Amount must be greater than $0."
-    }
-  }
-};
-
-// .hermes-src/ui-tui/src/i18n/en/slashCmd.ts
-var slashCmdEn = {
-  slashCmd: {
-    ...slashCmdCoreEn,
-    ...slashCmdOpsEn,
-    ...slashCmdSessionEn
-  }
-};
-
-// .hermes-src/ui-tui/src/i18n/en/subscription.ts
-var subscriptionEn = {
-  subscription: {
-    // Fallbacks substituted for missing backend values + row labels shared by
-    // several screens.
-    shared: {
-      periodEndFallback: "the end of the billing period",
-      thisPlan: "this plan",
-      yourNewPlan: "your new plan",
-      yourPlan: "your plan",
-      theSelectedPlan: "the selected plan",
-      freePlan: "Free",
-      back: "Back",
-      close: "Close",
-      cancel: "Cancel",
-      manageOnPortal: "Manage on portal"
-    },
-    // Outcome messages produced by the RPC → result mappers.
-    result: {
-      genericError: "Something went wrong. Try again, or manage on the portal.",
-      upgradeUnconfirmed: "Couldn\u2019t confirm the upgrade \u2014 your card may or may not have been charged. Re-run /subscription to check your plan before trying again.",
-      verifyCard: "Please verify your card in the portal to finish this upgrade.",
-      cardDeclinedTryDifferent: "Your card was declined \u2014 try a different card on the portal.",
-      alreadyOn: (plan) => `You are already on ${plan}.`,
-      upgraded: (plan) => `Upgraded to ${plan}. Your new monthly credits land in a moment.`,
-      requiresAction: "This upgrade needs extra verification (3DS). Finish it on the portal.",
-      paymentFailed: "Your card was declined. Update your payment method on the portal and try again.",
-      scopeStillDenied: "Remote Spending still isn\u2019t active for this terminal \u2014 the authorization didn\u2019t take. Retry, or make this change on the portal.",
-      couldNotPreview: "Could not preview that change.",
-      cancellationScheduled: "Scheduled \u2014 your plan stays active until the end of the billing period, then it cancels. Nothing changes today.",
-      changeScheduled: "Scheduled \u2014 your plan doesn\u2019t change today. You keep your current plan until the end of the billing period, then it switches.",
-      resumed: "Your pending change was undone \u2014 you stay on your current plan."
-    },
-    // Typed denials from the remote-spending step-up.
-    stepUpDenial: {
-      sessionRevoked: "Your session expired \u2014 run /portal to log in again, then retry the change.",
-      remoteSpendingRevoked: "Remote spending was stopped for this terminal \u2014 reconnect from the portal, then retry.",
-      rateLimited: "Too many attempts \u2014 wait a moment, then try again.",
-      notAllowed: "Remote Spending was not allowed \u2014 someone with billing permissions (owner, admin, or finance admin) must approve it. You can also make this change on the portal."
-    },
-    // The one-line plan status at the top of the overview.
-    status: {
-      freePlan: "Plan: Free \xB7 free models only",
-      plan: (plan) => `Plan: ${plan}`,
-      transition: (to) => ` \u2192 ${to}`,
-      left: (amount) => ` \xB7 ${amount} left`,
-      renews: (date2) => ` \xB7 renews ${date2}`,
-      viewOnly: " \xB7 view only",
-      // The pending-transition target when the subscription cancels at period end.
-      cancels: "cancels"
-    },
-    overview: {
-      scheduledChange: "\u23F3 Scheduled change",
-      keepUntilThen: (plan) => `You keep ${plan} (and its credits) until then.`,
-      freeNudge: "Paid models need a subscription. Start one to reach them.",
-      lowNudge: (amount) => `Low balance \xB7 ${amount} left. Top up or upgrade before a mid-run cutoff.`,
-      lowNudgeAmountFallback: "under $5",
-      noPortalUrl: "\u{1F534} No portal URL available \u2014 manage your subscription on the Nous portal.",
-      keepPlanUndo: (plan) => `Keep ${plan} (undo this change)`,
-      changePlan: "Change plan",
-      cancelSubscription: "Cancel subscription",
-      // {0} tier name, {1} monthly price display (e.g. "$20")
-      tierRow: (name, price) => `${name} \xB7 ${price}/mo`,
-      creditsPerMonth: (credits) => ` \xB7 $${credits} credits/mo`,
-      startSubscription: "Start a subscription",
-      org: (name) => `Org: ${name}`,
-      hint: "\u2191/\u2193 select \xB7 Enter confirm \xB7 Esc close"
-    },
-    picker: {
-      title: "Change plan",
-      current: (plan) => `Current: ${plan}. Pick a plan to see the effect before confirming.`,
-      noOtherPlans: "No other plans are available to switch to right now.",
-      // {0} tier name, {1} monthly price display, {2} direction (upgrade/downgrade)
-      tierRow: (name, price, direction) => `${name} \xB7 ${price}/mo \xB7 ${direction}`,
-      upgrade: "upgrade",
-      downgrade: "downgrade",
-      hint: "\u2191/\u2193 select \xB7 Enter preview \xB7 Esc back"
-    },
-    confirm: {
-      titleCancellation: "Confirm cancellation",
-      titleChange: "Confirm plan change",
-      chipChargedNow: "charged now",
-      chipScheduled: "scheduled \xB7 not today",
-      working: "Working\u2026",
-      payAndUpgrade: (amount) => `Pay ${amount} & upgrade now`,
-      upgradeNowProrated: "Upgrade now (prorated charge)",
-      scheduleChangeTo: (plan) => `Schedule change to ${plan}`,
-      // {0} current plan name, {1} period-end date
-      cancelBody: (plan, date2) => `Cancel ${plan} \u2014 it stays active until ${date2}, then will not renew.`,
-      cancelKeepCredits: "You keep your remaining credits for this period. You can resume before it ends.",
-      upgradeTo: (plan) => `Upgrade to ${plan}.`,
-      chargedNow: (amount) => `You will be charged ${amount} now (prorated).`,
-      chargedProrated: "You will be charged the prorated amount now.",
-      creditsDelta: (delta) => `Monthly credits change: ${delta}.`,
-      cardCharged: (card) => `${card} \u2014 the card on your subscription \u2014 will be charged.`,
-      cardChargedGeneric: "The card on your subscription will be charged.",
-      // {0} target plan name, {1} effective date
-      scheduledBody: (plan, date2) => `Change to ${plan} \u2014 takes effect ${date2}. No charge now; you keep your current plan until then.`,
-      noOp: (plan) => `You are already on ${plan} \u2014 nothing to change.`,
-      blockedFallback: "That change cannot be made here \u2014 manage it on the portal.",
-      hint: "\u2191/\u2193 select \xB7 Enter confirm \xB7 Esc back"
-    },
-    resultScreen: {
-      titleApplying: "Applying\u2026",
-      titleStillApplying: "Still applying",
-      titleDone: "Done",
-      titleFailed: "Could not complete",
-      stillApplying: "Your upgrade succeeded and is still applying \u2014 refresh in a moment.",
-      rerunHint: "Re-run /subscription anytime to review it.",
-      openPortalToFinish: "Open the portal to finish",
-      hint: "\u2191/\u2193 select \xB7 Enter \xB7 Esc close"
-    },
-    stepUp: {
-      title: "Remote Spending",
-      promptBody: "Changing your plan needs Remote Spending allowed for this terminal. Allow it here, then continue.",
-      promptNote: "Someone with billing permissions (owner, admin, or finance admin) approves it once in the browser.",
-      waiting: "Opening your browser to approve\u2026 finish there, then come back \u2014 nothing is charged until you continue.",
-      granted: "Remote Spending allowed. Continue to finish your change.",
-      resuming: "Applying your change\u2026",
-      allow: "Allow Remote Spending",
-      continue: "Continue",
-      continueChange: "Continue the change",
-      hintWaiting: "Waiting for approval\u2026 \xB7 Esc to cancel",
-      hintWorking: "Working\u2026",
-      hint: "\u2191/\u2193 select \xB7 Enter \xB7 Esc back"
-    },
-    team: {
-      title: "Team subscription",
-      orgFallback: "a team org",
-      body: (org) => `This terminal is connected to ${org}. Teams run on a shared balance \xB7 use /topup to add funds.`,
-      personalNote: "Personal subscriptions live on your personal account.",
-      hint: "Enter/Esc close"
-    }
-  }
-};
-
-// .hermes-src/ui-tui/src/i18n/en/userMessages.ts
-var userMessagesEn = {
-  userMessages: {
-    /** `{0}` = the (already clipped) raw detail text. */
-    details: (text15) => `Details: ${text15}`,
-    backend: {
-      restarting: "Hermes stopped unexpectedly \u2014 restarting and reopening your chat (the reply in progress was lost).",
-      restartingActivity: "Hermes stopped unexpectedly \xB7 restarting\u2026",
-      connectionLost: "Connection to Hermes lost \u2014 reconnecting and reopening your chat\u2026",
-      connectionLostActivity: "connection lost \xB7 reconnecting\u2026",
-      gaveUpTitle: "Hermes stopped and could not be restarted. Your chat is saved.",
-      /** `{0}` = process exit code. */
-      gaveUpTitleWithCode: (code7) => `Hermes stopped (exit code ${code7}) and could not be restarted. Your chat is saved.`,
-      gaveUpReconnect: "Hermes keeps trying to reconnect in the background and reopens this chat when it succeeds; if it does not, type /resume.",
-      gaveUpLogs: "Type /logs for the full log, or /quit and run `hermes doctor` to check the install.",
-      gaveUpActivity: "Hermes stopped \xB7 /logs for details",
-      /** `{0}` = seconds until the next attempt. */
-      reconnecting: (secs) => `retrying in ${secs}s`,
-      /** `{0}` = seconds until the next attempt, `{1}` = attempt number. */
-      reconnectingAttempt: (secs, attempt2) => `retrying in ${secs}s (attempt ${attempt2})`,
-      slowStart: "Hermes is taking longer than usual to start. Still waiting\u2026 If it never connects: /logs shows the last backend output; /quit and run `hermes doctor`.",
-      slowStartStatus: "still starting\u2026",
-      stderrProblem: "Something went wrong inside Hermes \xB7 /logs for details",
-      /** `{0}` = the Python exception class name (e.g. `ValueError`). */
-      stderrProblemNamed: (what) => `Something went wrong inside Hermes (${what}) \xB7 /logs for details`
-    },
-    rpc: {
-      versionSkew: "The terminal UI and the Hermes backend are out of sync (different versions). Run /update, or exit and run `hermes update`, then start the TUI again.",
-      sessionNotFound: "This chat is no longer attached to the backend (it was idle or the backend restarted). Your history is saved: type /resume to reopen it.",
-      notConnected: "Hermes is not connected right now, so that was not sent. It reconnects automatically; wait a moment and try again, or type /logs if this persists.",
-      /** `{0}` = timeout in seconds. */
-      timedOut: (secs) => `Hermes did not answer within ${secs}s. Try again; if it keeps happening, type /logs and report the last lines.`,
-      /** `{0}` = slash command name without the slash. */
-      slashTimedOut: (command) => `/${command} did not finish: the command helper timed out. Try again; if it keeps happening, type /logs and report the last lines.`,
-      /** `{0}` = slash command name without the slash. */
-      slashCrashed: (command) => `/${command} did not finish: the command helper crashed. Try again; type /logs for the trace.`
-    },
-    turn: {
-      /** `{0}` = failure title (possibly with provider suffix). */
-      notAnswered: (title) => `${title}. Your message was not answered.`,
-      /** `{0}` = failure title, `{1}` = provider id. */
-      withProvider: (title, provider) => `${title} (${provider})`,
-      // `hintNoRetry` is the next step when error_surface.retryable is false —
-      // it replaces the "/retry" advice with picking another model.
-      code: {
-        auth: { title: "The model provider rejected the API key", hint: "Fix the key with /model, then /retry." },
-        authPermanent: {
-          title: "The model provider rejected the API key",
-          hint: "Fix the key with /model, then /retry."
-        },
-        billing: {
-          title: "The model provider reports no credit left",
-          hint: "Top up the account or switch with /model."
-        },
-        billingUnverified: {
-          title: "The model provider reports no credit left",
-          hint: "Top up the account or switch with /model."
-        },
-        contentPolicyBlocked: {
-          title: "The model provider refused this request (content policy)",
-          hint: "Rephrase and send again."
-        },
-        contextOverflow: { title: "The conversation is too long for this model", hint: "Run /compress, then /retry." },
-        formatError: {
-          title: "The model provider rejected the request format",
-          hint: "Try /retry; if it persists, switch with /model.",
-          hintNoRetry: "Pick another model with /model; if it persists, switch with /model."
-        },
-        modelNotFound: {
-          title: "The model provider does not know this model",
-          hint: "Pick another model with /model."
-        },
-        overloaded: { title: "The model provider is overloaded", hint: "Wait a moment, then /retry." },
-        payloadTooLarge: { title: "The request was too large for this model", hint: "Run /compress, then /retry." },
-        providerPolicyBlocked: {
-          title: "The model provider refused this request (account policy)",
-          hint: "Switch with /model."
-        },
-        rateLimit: { title: "The model provider is rate-limiting requests", hint: "Wait a moment, then /retry." },
-        serverError: { title: "The model provider had an internal error", hint: "Wait a moment, then /retry." },
-        sslCertVerification: {
-          title: "The connection to the model provider could not be verified (TLS)",
-          hint: "Check the endpoint's certificate, then /retry."
-        },
-        timeout: {
-          title: "The model provider did not answer in time",
-          hint: "Try /retry; if it keeps happening, switch with /model.",
-          hintNoRetry: "Pick another model with /model; if it keeps happening, switch with /model."
-        },
-        upstreamBlocked: {
-          title: "A firewall/CDN in front of the model provider blocked the request",
-          hint: "Set a User-Agent via the provider's extra_headers, or switch with /model."
-        },
-        upstreamRateLimit: {
-          title: "The model provider is rate-limiting requests",
-          hint: "Wait a moment, then /retry."
-        }
-      },
-      layer: {
-        auth: { title: "The model provider rejected the credentials", hint: "Fix them with /model, then /retry." },
-        billing: {
-          title: "The model provider reports no credit left",
-          hint: "Top up the account or switch with /model."
-        },
-        disk: { title: "The disk is full, so Hermes could not save the turn", hint: "Free some space, then /retry." },
-        endpoint: {
-          title: "Your custom model endpoint did not answer",
-          hint: "Check the endpoint is running, then /retry."
-        },
-        gateway: {
-          title: "Hermes hit an internal error while running this turn",
-          hint: "Send /retry; type /logs for the trace.",
-          hintNoRetry: "Pick another model with /model; type /logs for the trace."
-        },
-        provider: {
-          title: "The model provider returned an error",
-          hint: "Send /retry, or switch with /model.",
-          hintNoRetry: "Pick another model with /model, or switch with /model."
-        },
-        streaming: {
-          title: "The connection to the model provider dropped mid-reply",
-          hint: "Send /retry.",
-          hintNoRetry: "Pick another model with /model."
-        }
-      },
-      fallback: {
-        title: "The request failed",
-        hint: "Send /retry, or switch with /model.",
-        hintNoRetry: "Pick another model with /model, or switch with /model."
-      }
-    },
-    promptTimeout: {
-      secret: "Secret prompt closed: no answer in time, so the step that needed it was skipped. Send your request again when you are ready to enter it.",
-      sudo: "Password prompt closed: no answer in time, so the command was skipped. Send your request again when you are ready to enter it.",
-      vaultCode: "Verification-code prompt closed: no answer in time, so the sign-in was skipped. Send your request again when you have the code.",
-      vaultSaveLogin: "Save-login prompt closed: no answer in time, so nothing was saved. Send your request again when you are ready.",
-      vaultUnlockPrompt: "Unlock prompt closed: no answer in time, so the password manager stayed locked. Send your request again when you are ready to unlock it."
-    },
-    credential: {
-      currentProvider: "the current provider",
-      /** `{0}` = provider id (or `currentProvider`), used twice in the sentence. */
-      missingKey: (provider) => `No API key is set for ${provider}, so messages will fail. Type /model, pick ${provider}, and paste a key (or run /setup).`
-    },
-    skills: {
-      noneInstalled: "No skills installed yet. Type /skills browse to see the catalog, or /skills install <name>."
-    }
-  }
-};
-
-// .hermes-src/ui-tui/src/i18n/en.ts
-var en = {
-  ...chromeEn,
-  ...overlaysEn,
-  ...appEn,
-  ...slashEn,
-  ...slashCmdEn,
-  ...userMessagesEn,
-  ...libEn,
-  ...sessionEn,
-  ...gatewayMsgEn,
-  ...libTextEn,
-  ...pickersEn,
-  ...hubsEn,
-  ...secureEn,
-  ...contentEn,
-  ...chatBitsEn,
-  ...billingEn,
-  ...subscriptionEn,
-  ...connectionEn,
-  ...canonicalEn,
-  ...connectorsEn
-};
-
-// .hermes-src/ui-tui/src/i18n/merge.ts
-function isRecord(value) {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-// .hermes-src/ui-tui/src/i18n/runtime.ts
-var DEFAULT_LOCALE = "en";
-var $locale = atom(DEFAULT_LOCALE);
-var $catalog = atom(en);
-function resolvePath(source2, key2) {
-  return key2.split(".").reduce((current, part) => isRecord(current) ? current[part] : void 0, source2);
-}
-function render(value, args) {
-  if (typeof value === "string") {
-    return value;
-  }
-  if (typeof value === "function") {
-    return value(...args);
-  }
-  return null;
-}
-function translateFrom(source2, locale, key2, args) {
-  const active = render(resolvePath(source2(locale), key2), args);
-  if (active !== null) {
-    return active;
-  }
-  if (locale !== DEFAULT_LOCALE) {
-    const fallback = render(resolvePath(source2(DEFAULT_LOCALE), key2), args);
-    if (fallback !== null) {
-      return fallback;
-    }
-  }
-  return key2;
-}
-function t(key2, ...args) {
-  return translateFrom((locale) => locale === DEFAULT_LOCALE ? en : $catalog.get(), $locale.get(), key2, args);
-}
-
-// .hermes-src/ui-tui/src/canonicalGateway.ts
-function canonicalRequest(method, original, contract) {
-  const params = { ...original };
-  if (method === "session.create") {
-    delete params.cols;
-    params.source = "tui";
-    params.request_id ??= randomUUID();
-    if (!contract?.sources.includes("tui")) {
-      throw new Error(t("canonical.launch.noTuiPolicy"));
-    }
-    if (!contract.parameters.includes("client_env")) {
-      delete params.client_env;
-    }
-    const unsupported = Object.keys(params).filter((key2) => !contract.parameters.includes(key2));
-    if (unsupported.length) {
-      throw new Error(t("canonical.launch.unsupportedOptions", unsupported.join(", ")));
-    }
-  }
-  if (["prompt.submit", "session.steer", "session.redirect"].includes(method) && params.submission_id) {
-    params.input_id = params.submission_id;
-    delete params.submission_id;
-  }
-  if (method === "session.resume" || method === "session.activate") {
-    method = "session.resume";
-    const renders = !params.omit_messages;
-    delete params.cols;
-    delete params.omit_messages;
-    if (renders) {
-      params.display_projection = true;
-    }
-  }
-  return { method, params };
-}
-function canonicalResult(method, value, request = {}) {
-  if (!value || typeof value !== "object") {
-    return value;
-  }
-  if (["prompt.submit", "session.steer", "session.redirect"].includes(method) && value.ref) {
-    return { ...value, input_id: request.input_id, target_profile_home: value.ref.profile_id, target_session_id: value.ref.session_id };
-  }
-  if (["session.create", "session.resume", "session.activate"].includes(method)) {
-    const stored = Array.isArray(value.messages) ? value.messages.map((row2) => row2 && typeof row2 === "object" ? { ...row2, text: rowText(row2.content), name: row2.tool_name } : row2) : value.messages;
-    const { display_messages: display, ...rest } = value;
-    const messages2 = Array.isArray(display) ? display : stored;
-    return { ...rest, messages: messages2, stored_messages: stored, info: {
-      ...value.info,
-      stored_session_id: value.stored_session_id,
-      execution_epoch: String(value.authority_epoch),
-      execution_generation: value.execution_generation,
-      running: value.running,
-      pending_submissions: pendingSubmissions(value.pending)
-    } };
-  }
-  return value;
-}
-function rowText(content5) {
-  if (!Array.isArray(content5)) {
-    return content5;
-  }
-  return content5.map((part) => typeof part === "string" ? part : typeof part?.text === "string" ? part.text : part?.type ? String(part.type).includes("image") ? "[image]" : `[${part.type}]` : "").filter(Boolean).join("\n");
-}
-function pendingSubmissions(pending) {
-  if (!Array.isArray(pending)) {
-    return void 0;
-  }
-  return pending.filter((row2) => row2 && typeof row2 === "object").map((row2) => ({
-    ...row2,
-    user: row2.text,
-    target_profile_home: row2.ref?.profile_id,
-    target_session_id: row2.ref?.session_id
-  }));
-}
-function canonicalEvent(event) {
-  const pending = pendingSubmissions(event.payload?.pending);
-  return pending ? { ...event, payload: { ...event.payload, pending_submissions: pending } } : event;
-}
-function localCreationOptions(env2 = process.env) {
-  const fields = {
-    model: env2.HERMES_MODEL,
-    provider: env2.HERMES_TUI_PROVIDER,
-    cwd: env2.HERMES_CWD
-  };
-  const options = Object.fromEntries(Object.entries(fields).filter(([, value]) => value));
-  if (env2.HERMES_TUI_TOOLSETS) {
-    options.toolsets = env2.HERMES_TUI_TOOLSETS.split(",");
-  }
-  const skills = [...new Set((env2.HERMES_TUI_SKILLS ?? "").split(/[,\n]/).map((name) => name.trim()).filter(Boolean))];
-  if (skills.length) {
-    options.skills = skills;
-  }
-  const clientEnv = parseClientEnv(env2.HERMES_TUI_CLIENT_ENV);
-  if (clientEnv) {
-    options.client_env = clientEnv;
-  }
-  if (env2.HERMES_TUI_MAX_TURNS) {
-    const turns = Number(env2.HERMES_TUI_MAX_TURNS);
-    options.max_turns = Number.isInteger(turns) ? turns : env2.HERMES_TUI_MAX_TURNS.trim();
-  }
-  const truthy = (value) => ["1", "true", "yes", "on"].includes((value ?? "").trim().toLowerCase());
-  for (const [field, value] of [
-    ["yolo", env2.HERMES_YOLO_MODE],
-    ["ignore_rules", env2.HERMES_IGNORE_RULES],
-    ["safe_mode", env2.HERMES_SAFE_MODE],
-    ["ignore_user_config", env2.HERMES_IGNORE_USER_CONFIG],
-    ["checkpoints", env2.HERMES_TUI_CHECKPOINTS],
-    ["pass_session_id", env2.HERMES_TUI_PASS_SESSION_ID],
-    ["accept_hooks", env2.HERMES_ACCEPT_HOOKS]
-  ]) {
-    if (truthy(value)) {
-      options[field] = true;
-    }
-  }
-  return options;
-}
-function parseClientEnv(raw2) {
-  if (!raw2) {
-    return void 0;
-  }
-  try {
-    const value = JSON.parse(raw2);
-    if (value && typeof value === "object" && !Array.isArray(value) && Object.values(value).every((item3) => typeof item3 === "string")) {
-      return value;
-    }
-  } catch {
-  }
-  return void 0;
-}
-var TOOL_PROGRESS_MODES = /* @__PURE__ */ new Set(["off", "new", "all", "verbose"]);
-function launchToolProgress(env2 = process.env) {
-  const raw2 = env2.HERMES_TUI_TOOL_PROGRESS?.trim().toLowerCase();
-  if (!raw2) {
-    return void 0;
-  }
-  if (!TOOL_PROGRESS_MODES.has(raw2)) {
-    throw new Error(t("canonical.launch.invalidToolProgress", raw2));
-  }
-  return raw2;
-}
-
-// .hermes-src/ui-tui/src/lib/circularBuffer.ts
-var CircularBuffer = class {
-  constructor(capacity) {
-    this.capacity = capacity;
-    if (!Number.isInteger(capacity) || capacity <= 0) {
-      throw new RangeError(`CircularBuffer capacity must be a positive integer, got ${capacity}`);
-    }
-    this.buf = new Array(capacity);
-  }
-  capacity;
-  buf;
-  head = 0;
-  len = 0;
-  push(item3) {
-    this.buf[this.head] = item3;
-    this.head = (this.head + 1) % this.capacity;
-    if (this.len < this.capacity) {
-      this.len++;
-    }
-  }
-  tail(n = this.len) {
-    const take = Math.min(Math.max(0, n), this.len);
-    const start = this.len < this.capacity ? 0 : this.head;
-    const out = new Array(take);
-    for (let i = 0; i < take; i++) {
-      out[i] = this.buf[(start + this.len - take + i) % this.capacity];
-    }
-    return out;
-  }
-  drain() {
-    const out = this.tail();
-    this.clear();
-    return out;
-  }
-  clear() {
-    this.buf = new Array(this.capacity);
-    this.head = 0;
-    this.len = 0;
-  }
-};
-
-// .hermes-src/ui-tui/src/lib/parentLog.ts
-import { appendFileSync as appendFileSync2, mkdirSync } from "node:fs";
-import { homedir } from "node:os";
-import { join } from "node:path";
-var logDir = join(process.env.HERMES_HOME?.trim() || join(homedir(), ".hermes"), "logs");
-var CRASH_LOG = join(logDir, "tui_gateway_crash.log");
-var enabled = !process.env.VITEST;
-var MAX_BREADCRUMB = 4096;
-var warned = false;
-function recordParentLifecycle(line) {
-  if (!enabled) {
-    return;
-  }
-  try {
-    const oneLine2 = line.replace(/[\r\n]+/g, " \u21B5 ");
-    const capped = oneLine2.length > MAX_BREADCRUMB ? `${oneLine2.slice(0, MAX_BREADCRUMB)}\u2026 [truncated ${oneLine2.length} chars]` : oneLine2;
-    mkdirSync(logDir, { recursive: true });
-    appendFileSync2(CRASH_LOG, `[tui-parent] ${(/* @__PURE__ */ new Date()).toISOString()} ${capped}
-`);
-  } catch {
-    if (!warned) {
-      warned = true;
-      process.stderr.write("hermes-tui: parent lifecycle log unavailable\n");
-    }
-  }
-}
-
-// .hermes-src/ui-tui/src/localGatewayBootstrap.ts
-import { execFile } from "node:child_process";
-import { resolve as resolve2 } from "node:path";
-import { promisify } from "node:util";
-
-// .hermes-src/ui-tui/src/lib/pythonHelpers.ts
-import { existsSync } from "node:fs";
-import { resolve } from "node:path";
-function pythonHelperPath(name, pythonRoot) {
-  const bundled = resolve(import.meta.dirname, "scripts", name);
-  return existsSync(bundled) ? bundled : resolve(pythonRoot, "ui-tui/scripts", name);
-}
-
-// .hermes-src/ui-tui/src/localGatewayBootstrap.ts
-var resolvePython = () => {
-  const configured = process.env.HERMES_PYTHON?.trim();
-  if (configured) {
-    return configured;
-  }
-  return process.platform === "win32" ? "python" : "python3";
-};
-var isTerminalBootstrapFailure = (message) => /^gateway unavailable: /m.test(message);
-var bootstrapLocalGateway = async (start, recover = false) => {
-  const root7 = process.env.HERMES_PYTHON_SRC_ROOT ?? resolve2(import.meta.dirname, "../../");
-  const { stdout } = await promisify(execFile)(
-    resolvePython(),
-    [pythonHelperPath("gateway_bootstrap.py", root7), ...start ? ["--start"] : recover ? ["--recover"] : []],
-    { cwd: root7, env: { ...process.env, PYTHONPATH: root7, HERMES_PYTHON_SRC_ROOT: root7 }, timeout: 4e4, maxBuffer: 1024 * 1024 }
-  );
-  return JSON.parse(stdout);
-};
-
-// .hermes-src/ui-tui/src/gatewayClient.ts
-var MAX_GATEWAY_LOG_LINES = 200;
-var MAX_LOG_LINE_BYTES = 4096;
-var MAX_BUFFERED_EVENTS = 2e3;
-var MAX_LOG_PREVIEW = 240;
-var STARTUP_TIMEOUT_MS = Math.max(5e3, parseInt(process.env.HERMES_TUI_STARTUP_TIMEOUT_MS ?? "15000", 10) || 15e3);
-var REQUEST_TIMEOUT_MS = Math.max(3e4, parseInt(process.env.HERMES_TUI_RPC_TIMEOUT_MS ?? "120000", 10) || 12e4);
-var WS_CONNECTING = 0;
-var WS_OPEN = 1;
-var WS_CLOSING = 2;
-var WS_CLOSED = 3;
-var RECONNECT_BASE_MS = 1e3;
-var RECONNECT_MAX_MS = 3e4;
-var getWebSocketCtor = () => typeof WebSocket === "undefined" ? import_undici.WebSocket : WebSocket;
-var truncateLine = (line) => line.length > MAX_LOG_LINE_BYTES ? `${line.slice(0, MAX_LOG_LINE_BYTES)}\u2026 [truncated ${line.length} bytes]` : line;
-var resolveGatewayAttachUrl = () => {
-  const raw2 = process.env.HERMES_TUI_GATEWAY_URL?.trim();
-  return raw2 ? raw2 : null;
-};
-var resolveSidecarUrl = () => {
-  const raw2 = process.env.HERMES_TUI_SIDECAR_URL?.trim();
-  return raw2 ? raw2 : null;
-};
-var _USERINFO_FALLBACK_RE = /^([a-z][a-z0-9+.-]*:\/\/)[^/?#@]*@/i;
-var redactUrl = (raw2) => {
-  if (!raw2) {
-    return raw2;
-  }
-  try {
-    const url = new URL(raw2);
-    const userInfo = url.username || url.password ? "***@" : "";
-    const query = url.search ? "?***" : "";
-    return `${url.protocol}//${userInfo}${url.host}${url.pathname}${query}`;
-  } catch {
-    const noUserInfo = raw2.replace(_USERINFO_FALLBACK_RE, "$1***@");
-    const queryIdx = noUserInfo.indexOf("?");
-    return queryIdx >= 0 ? `${noUserInfo.slice(0, queryIdx)}?***` : noUserInfo;
-  }
-};
-var OWNER_RECOVERY_LIMIT = 3;
-var OWNER_RECOVERY_WINDOW_MS = 6e4;
-var GatewayClient = class extends EventEmitter {
-  constructor(bootstrap = bootstrapLocalGateway) {
-    super();
-    this.bootstrap = bootstrap;
-    this.setMaxListeners(0);
-    this.channel.onRequest((request) => {
-      if (this.subscribed) {
-        this.emit("request", request);
-      } else {
-        this.bufferedRequests.push(request);
-      }
-    });
-  }
-  bootstrap;
-  ws = null;
-  wsConnectPromise = null;
-  sidecarWs = null;
-  attachUrl = null;
-  sidecarUrl = null;
-  logs = new CircularBuffer(MAX_GATEWAY_LOG_LINES);
-  // Request ids, pending map, timeouts, error mapping and the gateway.ping
-  // heartbeat are shared with the desktop/web WebSocket client; this class
-  // only owns the two transports (child stdio, attached socket) and the
-  // buffered-event replay that Ink's mount order needs.
-  channel = new JsonRpcRequestChannel({
-    // A mid-turn socket streams deltas every second; killing the only
-    // transport that carried live traffic split sessions that completed
-    // server-side (#115251). Count any inbound frame as liveness, exactly
-    // like the desktop/web client; a silent drop still trips the deadline.
-    heartbeatLiveness: "any-inbound",
-    onEvent: (ev) => this.publishWire(ev),
-    onHeartbeatFailure: () => this.onHeartbeatFailure(),
-    onRequestHandlerError: (error, req) => this.pushLog(`[protocol] server request handler crashed: ${req.method} (${error.message})`),
-    onUnhandledRequest: (req) => this.pushLog(`[protocol] unhandled server request: ${req.method}`),
-    requestTimeoutMs: REQUEST_TIMEOUT_MS,
-    unrefTimers: true
-  });
-  bufferedEvents = new CircularBuffer(MAX_BUFFERED_EVENTS);
-  // Server→client requests (clarify, approval, sudo, …) follow the same
-  // mount-order contract as events: an attached session mid-turn can send one
-  // the instant the socket opens, before the Ink handler is registered.
-  bufferedRequests = [];
-  pendingExit;
-  ready = false;
-  readyTimer = null;
-  subscribed = false;
-  drainGeneration = 0;
-  reconnectTimer = null;
-  reconnectAttempts = 0;
-  // Set on kill() so we never auto-reconnect after an intentional shutdown.
-  disposed = false;
-  bootstrapFlight = null;
-  bootstrapError = null;
-  localStarted = false;
-  localGeneration = 0;
-  recoveryAttempts = [];
-  isCanonical = false;
-  creationContract;
-  describedSkin;
-  describeFlight;
-  attachHold = null;
-  // The last session.create whose outcome is in doubt (see createCanonical).
-  unsettledCreate;
-  get attached() {
-    return this.attachUrl !== null;
-  }
-  /** Frames off the socket. On a canonical gateway the owner's execution stamp rides on
-   * the params (`authority_epoch`/`execution_generation`); fold it into the payload the
-   * pre-cutover handlers read, and let this client own readiness (it publishes
-   * `gateway.ready` itself after `runtime.describe`, so the listener's ready would be a
-   * second one) while still negotiating the transport's heartbeat capability. */
-  publishWire(ev) {
-    if (!this.isCanonical && ev.type === "gateway.ready" && this.attachUrl !== null && ev.payload?.session_authority === true) {
-      return this.adoptCanonicalAttach(ev);
-    }
-    if (this.isCanonical && ev.type === "gateway.ready") {
-      if (ev.payload?.heartbeat && this.ws?.readyState === WS_OPEN) {
-        this.channel.startHeartbeat();
-      }
-      return;
-    }
-    if (this.isCanonical) {
-      const shared = ev;
-      const payload = canonicalEvent(ev).payload ?? {};
-      const epoch = shared.authority_epoch ?? payload.authority_epoch;
-      const generation = shared.execution_generation ?? payload.execution_generation;
-      ev.payload = {
-        ...payload,
-        ...epoch !== void 0 ? { execution_epoch: String(epoch) } : {},
-        ...generation !== void 0 ? { execution_generation: generation } : {}
-      };
-      if (this.attachHold && ev.session_id === this.attachHold.sid) {
-        this.attachHold.frames.push(ev);
-        return;
-      }
-    }
-    this.publish(ev);
-  }
-  adoptCanonicalAttach(ev) {
-    const ws = this.ws;
-    this.isCanonical = true;
-    if (ev.payload?.heartbeat && ws?.readyState === WS_OPEN) {
-      this.channel.startHeartbeat();
-    }
-    this.describeThenReady(ws, { skin: ev.payload?.skin });
-  }
-  /** Canonical readiness is runtime.describe on this socket. A failed describe is a transport
-   * failure (B2-21): drop the socket onto the backoff path, which redials and re-describes. */
-  describeThenReady(ws, payload) {
-    this.describeFlight = void 0;
-    void this.describeRuntime().then(() => {
-      const ready = payload.skin === void 0 && this.describedSkin ? { ...payload, skin: this.describedSkin } : payload;
-      if (this.ws === ws) {
-        this.publish({ type: "gateway.ready", payload: ready });
-      }
-    }).catch((error) => {
-      this.publish({ type: "gateway.start_timeout", payload: {
-        python: "runtime.describe",
-        cwd: "",
-        stderr_tail: String(error)
-      } });
-      if (this.ws === ws) {
-        this.closeGatewaySocket();
-        this.handleTransportExit(1, String(error));
-      }
-    });
-  }
-  publish(ev) {
-    if (ev.type === "gateway.ready") {
-      this.ready = true;
-      this.clearReconnect();
-      this.reconnectAttempts = 0;
-      if (this.readyTimer) {
-        clearTimeout(this.readyTimer);
-        this.readyTimer = null;
-      }
-      if (ev.payload?.heartbeat === true && this.ws?.readyState === WS_OPEN) {
-        this.channel.startHeartbeat();
-      }
-    }
-    if (this.subscribed) {
-      return void this.emit("event", ev);
-    }
-    this.bufferedEvents.push(ev);
-  }
-  clearReadyTimer() {
-    if (this.readyTimer) {
-      clearTimeout(this.readyTimer);
-      this.readyTimer = null;
-    }
-  }
-  closeSidecarSocket() {
-    try {
-      this.sidecarWs?.close();
-    } catch {
-    } finally {
-      this.sidecarWs = null;
-    }
-  }
-  closeGatewaySocket() {
-    const ws = this.ws;
-    this.ws = null;
-    this.wsConnectPromise = null;
-    try {
-      ws?.close();
-    } catch {
-    }
-  }
-  // The shared heartbeat found no inbound frame for a full deadline: force the
-  // socket closed so the ordinary close path reconnects (issue #32997).
-  onHeartbeatFailure() {
-    const ws = this.ws;
-    if (!ws) {
-      return;
-    }
-    this.lifecycle("[lifecycle] websocket silent drop detected (heartbeat ack timeout); forcing reconnect");
-    try {
-      ws.close();
-    } catch {
-    }
-  }
-  scheduleReconnect() {
-    if (this.disposed || this.reconnectTimer !== null) {
-      return;
-    }
-    const delay = reconnectBackoffDelayMs(this.reconnectAttempts, {
-      baseDelayMs: RECONNECT_BASE_MS,
-      capMs: RECONNECT_MAX_MS,
-      jitter: false
-    });
-    this.reconnectAttempts += 1;
-    this.lifecycle(`[lifecycle] scheduling gateway reconnect in ${delay}ms (attempt ${this.reconnectAttempts})`);
-    this.publish({ type: "gateway.reconnecting", payload: { attempt: this.reconnectAttempts, delay_ms: delay } });
-    this.reconnectTimer = setTimeout(() => {
-      this.reconnectTimer = null;
-      if (this.disposed) {
-        return;
-      }
-      this.start();
-      this.drain();
-    }, delay);
-    this.reconnectTimer.unref?.();
-  }
-  clearReconnect() {
-    if (this.reconnectTimer !== null) {
-      clearTimeout(this.reconnectTimer);
-      this.reconnectTimer = null;
-    }
-  }
-  resetStartupState() {
-    this.channel.detach(new Error(t("libText.gateway.restarting")));
-    this.ready = false;
-    this.drainGeneration += 1;
-    this.bufferedEvents.clear();
-    this.bufferedRequests = [];
-    this.pendingExit = void 0;
-    this.clearReadyTimer();
-  }
-  startReadyTimer(python, cwd) {
-    this.readyTimer = setTimeout(() => {
-      if (this.ready) {
-        return;
-      }
-      const stderrTail = this.getLogTail(20);
-      this.lifecycle(`[startup] timed out waiting for gateway.ready (python=${python}, cwd=${cwd})`);
-      this.publish({
-        type: "gateway.start_timeout",
-        payload: { cwd, python, stderr_tail: stderrTail }
-      });
-    }, STARTUP_TIMEOUT_MS);
-  }
-  handleTransportExit(code7, reason) {
-    this.clearReadyTimer();
-    this.ready = false;
-    this.closeSidecarSocket();
-    this.lifecycle(`[lifecycle] transport exit code=${code7 ?? "null"} reason=${reason ?? "none"}`);
-    this.channel.detach(
-      new Error(reason || (code7 === null ? t("libText.gateway.exited") : t("libText.gateway.exitedWithCode", code7)))
-    );
-    this.scheduleReconnect();
-    if (this.subscribed) {
-      this.emit("exit", code7);
-    } else {
-      this.pendingExit = code7;
-    }
-  }
-  connectSidecarMirror() {
-    this.closeSidecarSocket();
-    if (!this.sidecarUrl) {
-      return;
-    }
-    const WebSocketCtor = getWebSocketCtor();
-    if (typeof WebSocketCtor === "undefined") {
-      this.pushLog(`[sidecar] WebSocket unavailable; skipping mirror to ${redactUrl(this.sidecarUrl)}`);
-      return;
-    }
-    try {
-      const ws = new WebSocketCtor(this.sidecarUrl);
-      this.sidecarWs = ws;
-      ws.addEventListener("close", () => {
-        if (this.sidecarWs === ws) {
-          this.sidecarWs = null;
-        }
-      });
-      ws.addEventListener("error", () => {
-        this.pushLog("[sidecar] mirror connection error");
-      });
-    } catch (err) {
-      this.pushLog(`[sidecar] failed to connect ${redactUrl(this.sidecarUrl)} (constructor error)`);
-      this.sidecarWs = null;
-    }
-  }
-  mirrorEventToSidecar(rawFrame) {
-    const ws = this.sidecarWs;
-    if (!ws || ws.readyState !== WS_OPEN) {
-      return;
-    }
-    try {
-      ws.send(rawFrame);
-    } catch {
-    }
-  }
-  /** B2-19: hold this session's canonical frames while its resume/activate is in flight. Fanout
-   * frames can beat the reply; the caller applies the snapshot, then settleAttach replays only the
-   * held frames after the snapshot (same replay_epoch, seq > last_sequence). */
-  holdAttach(sessionId) {
-    if (!this.isCanonical) {
-      return null;
-    }
-    return this.attachHold = { sid: sessionId, frames: [] };
-  }
-  /** End a hold: with the applied snapshot, replay only frames it does not contain; without one
-   * (failed or superseded attach), deliver what was held. A replaced hold is a no-op. */
-  settleAttach(hold, snapshot3) {
-    if (!hold || this.attachHold !== hold) {
-      return;
-    }
-    this.attachHold = null;
-    const fence = snapshot3;
-    for (const ev of hold.frames) {
-      const { replay_epoch: epoch, seq } = ev;
-      if (!fence || epoch === fence.replay_epoch && typeof seq === "number" && seq > Number(fence.last_sequence ?? -1)) {
-        this.publish(ev);
-      }
-    }
-  }
-  hydrateSharedPrompts(snapshot3) {
-    if (!this.isCanonical) {
-      return;
-    }
-    const result = snapshot3;
-    for (const prompt of result.prompts ?? []) {
-      this.publishLocalEvent({
-        type: `${prompt.kind}.request`,
-        session_id: result.session_id,
-        payload: { ...prompt, execution_epoch: String(result.authority_epoch) }
-      });
-    }
-  }
-  publishLocalEvent(ev) {
-    const frame = JSON.stringify({ jsonrpc: "2.0", method: "event", params: ev });
-    this.mirrorEventToSidecar(frame);
-    this.publish(ev);
-  }
-  handleWebSocketFrame(raw2) {
-    const text15 = wireFrameText(raw2);
-    if (!text15) {
-      return;
-    }
-    const frame = this.channel.handleFrame(text15);
-    if (!frame) {
-      this.protocolError("malformed websocket frame", text15, "(empty frame)");
-      return;
-    }
-    if (frame.method === "event") {
-      this.mirrorEventToSidecar(text15);
-    }
-  }
-  protocolError(what, text15, emptyLabel) {
-    const preview5 = text15.trim().slice(0, MAX_LOG_PREVIEW) || emptyLabel;
-    this.pushLog(`[protocol] ${what}: ${preview5}`);
-    this.publish({ type: "gateway.protocol_error", payload: { preview: preview5 } });
-  }
-  startLocalGateway() {
-    const generation = ++this.localGeneration;
-    const start = !this.localStarted;
-    const recover = !start && this.claimOwnerRecovery();
-    this.localStarted = true;
-    this.bootstrapError = null;
-    this.bootstrapFlight = this.bootstrap(start, recover).then((grant) => {
-      if (this.disposed || generation !== this.localGeneration) {
-        return;
-      }
-      this.attachUrl = grant.url;
-      this.isCanonical = true;
-      this.lifecycle(`[lifecycle] attached shared gateway ${start ? "start" : recover ? "recover" : "discover"} url=${redactUrl(grant.url)} profile=${grant.profile_id} instance=${grant.instance_id}`);
-      this.startAttachedGateway(grant.url, grant.protocols);
-    }).catch((error) => {
-      if (this.disposed || generation !== this.localGeneration) {
-        return;
-      }
-      this.bootstrapError = error instanceof Error ? error : new Error(String(error));
-      this.clearReadyTimer();
-      this.publish({ type: "gateway.start_timeout", payload: {
-        python: "gateway ensure",
-        cwd: "",
-        stderr_tail: this.bootstrapError.message
-      } });
-      this.channel.detach(this.bootstrapError);
-      if (isTerminalBootstrapFailure(this.bootstrapError.message)) {
-        this.lifecycle(`[lifecycle] gateway bootstrap cannot start; not retrying: ${this.bootstrapError.message.match(/^gateway unavailable: .*$/m)?.[0]}`);
-        return;
-      }
-      this.scheduleReconnect();
-    });
-  }
-  /** One slot of the sliding owner re-ensure budget, so a crash-looping owner is not respawned forever. */
-  claimOwnerRecovery(now = Date.now()) {
-    this.recoveryAttempts = this.recoveryAttempts.filter((at) => now - at < OWNER_RECOVERY_WINDOW_MS);
-    if (this.recoveryAttempts.length >= OWNER_RECOVERY_LIMIT) {
-      return false;
-    }
-    this.recoveryAttempts.push(now);
-    return true;
-  }
-  startAttachedGateway(attachUrl, protocols) {
-    const safeAttachUrl = redactUrl(attachUrl);
-    this.startReadyTimer("websocket", safeAttachUrl);
-    const WebSocketCtor = getWebSocketCtor();
-    if (typeof WebSocketCtor === "undefined") {
-      const line = `[startup] WebSocket API unavailable; cannot attach to ${safeAttachUrl}`;
-      this.pushLog(line);
-      this.publish({ type: "gateway.stderr", payload: { line } });
-      this.handleTransportExit(1, t("libText.gateway.websocketUnavailable"));
-      return;
-    }
-    try {
-      const ws = new WebSocketCtor(attachUrl, protocols);
-      let settled2 = false;
-      this.ws = ws;
-      this.channel.attach({ send: (text15) => ws.send(text15) });
-      const connectPromise = new Promise((resolve7, reject) => {
-        ws.addEventListener(
-          "open",
-          () => {
-            if (this.ws !== ws) {
-              return;
-            }
-            if (!settled2) {
-              settled2 = true;
-              resolve7();
-            }
-            this.connectSidecarMirror();
-            if (this.isCanonical) {
-              this.describeThenReady(ws, {});
-            }
-          },
-          { once: true }
-        );
-        ws.addEventListener(
-          "error",
-          () => {
-            if (!settled2) {
-              this.pushLog("[startup] gateway websocket connect error");
-              settled2 = true;
-              reject(new Error(t("libText.gateway.websocketConnectionFailed")));
-            }
-          },
-          { once: true }
-        );
-        ws.addEventListener(
-          "close",
-          (ev) => {
-            if (!settled2) {
-              settled2 = true;
-              reject(new Error(t("libText.gateway.websocketClosedDuringConnect", ev.code)));
-            }
-          },
-          { once: true }
-        );
-      });
-      connectPromise.catch(() => {
-      });
-      this.wsConnectPromise = connectPromise;
-      ws.addEventListener("message", (ev) => {
-        if (this.ws === ws) {
-          this.handleWebSocketFrame(ev.data);
-        }
-      });
-      ws.addEventListener("close", (ev) => {
-        if (this.ws !== ws) {
-          this.pushLog(`[lifecycle] stale websocket close ignored code=${ev.code}`);
-          return;
-        }
-        this.pushLog(`[lifecycle] websocket close code=${ev.code}`);
-        this.ws = null;
-        this.wsConnectPromise = null;
-        this.handleTransportExit(
-          ev.code,
-          ev.code ? t("libText.gateway.websocketClosedWithCode", ev.code) : t("libText.gateway.websocketClosed")
-        );
-      });
-      ws.addEventListener("error", () => {
-        const line = "[gateway] websocket transport error";
-        this.pushLog(line);
-        this.publish({ type: "gateway.stderr", payload: { line } });
-      });
-    } catch (err) {
-      this.pushLog(`[startup] failed to connect websocket gateway ${safeAttachUrl} (constructor error)`);
-      this.handleTransportExit(1, t("libText.gateway.websocketStartupFailed"));
-    }
-  }
-  start() {
-    if (this.disposed) {
-      this.pushLog("[lifecycle] start() ignored after kill()");
-      return;
-    }
-    this.disposed = false;
-    this.clearReconnect();
-    const attachUrl = resolveGatewayAttachUrl();
-    const sidecarUrl = resolveSidecarUrl();
-    this.attachUrl = attachUrl;
-    this.sidecarUrl = sidecarUrl;
-    this.resetStartupState();
-    this.closeGatewaySocket();
-    this.closeSidecarSocket();
-    if (attachUrl) {
-      this.isCanonical = false;
-      this.creationContract = void 0;
-      this.startAttachedGateway(attachUrl);
-      return;
-    }
-    this.startLocalGateway();
-  }
-  pushLog(line) {
-    this.logs.push(truncateLine(line));
-  }
-  /** Record a client-side diagnostic line in the /logs tail (raw wire text the UI replaced with plain copy). */
-  recordLog(line) {
-    this.pushLog(line);
-  }
-  // Death-explaining breadcrumbs (spawn / exit / kill / replace) — kept in the
-  // in-memory tail for /logs AND persisted to the gateway crash log so the
-  // reason survives a parent exit and lands next to the child's SIGTERM panic.
-  lifecycle(line) {
-    this.pushLog(line);
-    recordParentLifecycle(line);
-  }
-  drain() {
-    const generation = this.drainGeneration;
-    queueMicrotask(() => {
-      if (this.drainGeneration !== generation) {
-        return;
-      }
-      this.subscribed = true;
-      for (const ev of this.bufferedEvents.drain()) {
-        this.emit("event", ev);
-      }
-      for (const request of this.bufferedRequests.splice(0)) {
-        this.emit("request", request);
-      }
-      if (this.pendingExit !== void 0) {
-        const code7 = this.pendingExit;
-        this.pendingExit = void 0;
-        this.emit("exit", code7);
-      }
-    });
-  }
-  getLogTail(limit = 20) {
-    return this.logs.tail(Math.max(1, limit)).join("\n");
-  }
-  async ensureAttachedWebSocket(method) {
-    if (!this.attachUrl) {
-      throw new Error("gateway not running");
-    }
-    if (!this.ws || this.ws.readyState === WS_CLOSED || this.ws.readyState === WS_CLOSING) {
-      this.start();
-      if (!resolveGatewayAttachUrl()) {
-        await this.bootstrapFlight;
-      }
-    }
-    if (this.ws?.readyState === WS_CONNECTING) {
-      try {
-        await this.wsConnectPromise;
-      } catch (err) {
-        throw err instanceof Error ? err : new Error(String(err));
-      }
-    }
-    if (!this.ws || this.ws.readyState !== WS_OPEN) {
-      throw new Error(`gateway not connected: ${method}`);
-    }
-    return this.ws;
-  }
-  notConnected = (method) => new Error(`gateway not connected: ${method}`);
-  /** The owner's session.create contract. A failed read is not cached: the next
-   * session.create asks again instead of reporting an outdated gateway forever. */
-  describeRuntime() {
-    if (!this.describeFlight) {
-      const flight = this.requestOverWebSocket("runtime.describe").then(
-        (description) => {
-          this.creationContract = description.session_create;
-          this.describedSkin = description.skin && typeof description.skin === "object" ? description.skin : void 0;
-        },
-        (error) => {
-          if (this.describeFlight === flight) {
-            this.describeFlight = void 0;
-          }
-          throw error;
-        }
-      );
-      this.describeFlight = flight;
-    }
-    return this.describeFlight;
-  }
-  requestOverWebSocket(method, params = {}, timeoutMs) {
-    return this.ensureAttachedWebSocket(method).then(() => this.channel.request(method, params, timeoutMs, void 0, () => this.notConnected(method)));
-  }
-  request(method, params = {}, timeoutMs) {
-    const attachUrl = resolveGatewayAttachUrl();
-    if (attachUrl) {
-      if (this.attachUrl !== attachUrl) {
-        this.channel.detach(new Error(t("libText.gateway.attachUrlChanged")));
-        this.start();
-      }
-      return this.isCanonical ? this.requestCanonical(method, params, timeoutMs) : this.requestOverWebSocket(method, params, timeoutMs);
-    }
-    if (!this.bootstrapFlight) {
-      this.start();
-    }
-    return this.bootstrapFlight.then(() => {
-      if (this.bootstrapError) {
-        throw this.bootstrapError;
-      }
-      return this.requestCanonical(method, params, timeoutMs);
-    });
-  }
-  /** One request through the canonical wire adapter (local grant or negotiated explicit attach). */
-  requestCanonical(method, params, timeoutMs) {
-    return (async () => {
-      if (method === "session.create" && !this.creationContract) {
-        await this.describeRuntime();
-      }
-      const request = canonicalRequest(method, params, this.creationContract);
-      if (request.method === "session.create") {
-        return this.createCanonical(request.params, timeoutMs);
-      }
-      const value = await this.requestOverWebSocket(request.method, request.params, timeoutMs);
-      return canonicalResult(method, value, request.params);
-    })();
-  }
-  /** session.create plus the launch tool-progress pin, as one outcome for the caller. The owner keys a
-   * local session by request_id, so a create that failed after it may have committed (lost ACK, or the
-   * pin refused after the ACK) is retried with the SAME request_id when the options match: the owner
-   * answers with the session it already minted and the pin is reapplied, never a second session. */
-  async createCanonical(prepared, timeoutMs) {
-    const toolProgress = launchToolProgress();
-    const { request_id: _fresh, ...options } = prepared;
-    const key2 = JSON.stringify(Object.keys(options).sort().map((name) => [name, options[name]]));
-    const retry = this.unsettledCreate?.key === key2 ? this.unsettledCreate : void 0;
-    this.unsettledCreate = void 0;
-    const params = retry ? { ...prepared, request_id: retry.requestId } : prepared;
-    let acknowledged = false;
-    try {
-      const value = await this.requestOverWebSocket("session.create", params, timeoutMs);
-      acknowledged = true;
-      if (toolProgress) {
-        const sid = value?.session_id;
-        await this.requestOverWebSocket("config.set", { key: "verbose", session_id: sid, value: toolProgress });
-      }
-      return canonicalResult("session.create", value, params);
-    } catch (error) {
-      if (acknowledged || !(error instanceof JsonRpcGatewayError)) {
-        this.unsettledCreate = { key: key2, requestId: params.request_id };
-      }
-      throw error;
-    }
-  }
-  kill(reason = "requested") {
-    this.disposed = true;
-    this.localGeneration++;
-    this.clearReconnect();
-    this.reconnectAttempts = 0;
-    this.channel.stopHeartbeat();
-    this.lifecycle(`[lifecycle] GatewayClient.kill reason=${reason} (detach only)`);
-    this.closeGatewaySocket();
-    this.closeSidecarSocket();
-    this.clearReadyTimer();
-    this.channel.detach(new Error(t("libText.gateway.closed")));
-  }
-};
-
 // assets/logo.png
 var logo_default = __toBinaryNode("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");
 
@@ -24717,13 +21170,13 @@ function launchEnv() {
 }
 
 // src/core/ids.ts
-import { randomUUID as randomUUID2 } from "node:crypto";
+import { randomUUID } from "node:crypto";
 var liveSessionId = (raw2) => raw2;
 var storedSessionId = (raw2) => raw2;
 var subscriptionId = (raw2) => raw2;
 var admissionId = (raw2) => raw2;
 var inputId = (raw2) => raw2;
-var newInputId = () => inputId(randomUUID2());
+var newInputId = () => inputId(randomUUID());
 var toolCallId = (raw2) => raw2;
 var entryId = (raw2) => raw2;
 var subagentKey = (raw2) => raw2;
@@ -24842,7 +21295,7 @@ function errorCode(error) {
 }
 
 // src/hermes/mutate.ts
-import { randomUUID as randomUUID3 } from "node:crypto";
+import { randomUUID as randomUUID2 } from "node:crypto";
 
 // src/wire/rpc.ts
 function rpc(gw2, method, params) {
@@ -24883,7 +21336,7 @@ async function mutateSession(gw2, sid, operation, payload) {
   }
   const result = await rpc(gw2, "session.mutate", {
     session_id: sid,
-    request_id: randomUUID3(),
+    request_id: randomUUID2(),
     expected_revision: snapshot3.revision,
     ...operation === "rename" ? {} : { expected_generation: snapshot3.execution_generation },
     operation,
@@ -24901,13 +21354,14 @@ function modelPayload(arg) {
     throw new Error("Usage: /model <name> [--provider <slug>]");
   }
   const payload = { model };
-  while (parts3.length) {
-    const flag2 = parts3.shift();
+  for (let flag2 = parts3.shift(); flag2 !== void 0; flag2 = parts3.shift()) {
     if (flag2 === "--session" || flag2 === "--tui-session") {
       continue;
     }
-    if (flag2 === "--provider" && parts3[0] && !parts3[0].startsWith("--")) {
-      payload["provider"] = parts3.shift();
+    const value = parts3[0];
+    if (flag2 === "--provider" && value && !value.startsWith("--")) {
+      payload["provider"] = value;
+      parts3.shift();
       continue;
     }
     throw new Error(
@@ -25042,9 +21496,10 @@ var fastWord = (value) => value === "fast" || value === "ultrafast" ? value : "n
 function fastTier(info) {
   return info?.fast ? info.service_tier === "ultrafast" ? "ultrafast" : "fast" : void 0;
 }
+var FAST_WORDS = { "": "toggle", fast: "fast", normal: "normal", off: "normal", on: "fast", toggle: "toggle", ultrafast: "ultrafast" };
 function fastValue(arg) {
   const word = arg.trim().toLowerCase();
-  return { "": "toggle", fast: "fast", normal: "normal", off: "normal", on: "fast", toggle: "toggle", ultrafast: "ultrafast" }[word] ?? null;
+  return FAST_WORDS[word] ?? null;
 }
 var describe2 = (word) => word === "normal" ? "Fast mode off." : `${word === "fast" ? "Fast" : "Ultrafast"} mode on: priority processing, billed higher.`;
 async function setFast(host, value) {
@@ -26083,9 +22538,9 @@ function resultOf(call) {
 }
 
 // src/view/tools/steps.ts
-import { homedir as homedir2 } from "node:os";
+import { homedir } from "node:os";
 function shortPath(path2) {
-  return relativePath(path2, { cwd: launchEnv().cwd, home: homedir2() });
+  return relativePath(path2, { cwd: launchEnv().cwd, home: homedir() });
 }
 function namedStep(call) {
   const name = call.name.replace(/_/g, " ");
@@ -26210,7 +22665,7 @@ function appTitle(slug) {
     return known2;
   }
   const words3 = slug.split(/[-_\s]+/).filter(Boolean);
-  if (words3.length > 1 && words3.at(-1).toLowerCase() === "mcp") {
+  if (words3.length > 1 && words3.at(-1)?.toLowerCase() === "mcp") {
     words3.pop();
   }
   return words3.map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
@@ -26226,8 +22681,8 @@ function appOf(name, args) {
     const alias = typeof args?.["connector_alias"] === "string" && args["connector_alias"].trim() ? ` (${args["connector_alias"].trim()})` : "";
     return { action: actionPhrase(tool.join("__"), connector) + alias, app: appTitle(connector), kind: "connector" };
   }
-  const mcp = name.match(/^mcp__(.+?)__(.+)$/);
-  return mcp ? { action: actionPhrase(mcp[2]), app: appTitle(mcp[1]), kind: "mcp" } : void 0;
+  const mcp = /^mcp__(?<app>.+?)__(?<tool>.+)$/.exec(name)?.groups;
+  return mcp ? { action: actionPhrase(mcp["tool"] ?? ""), app: appTitle(mcp["app"] ?? ""), kind: "mcp" } : void 0;
 }
 function entriesOf(args) {
   const list9 = Array.isArray(args["calls"]) ? args["calls"] : [args];
@@ -26303,14 +22758,14 @@ function callApp(call) {
 }
 
 // src/media.ts
-import { homedir as homedir4 } from "node:os";
+import { homedir as homedir3 } from "node:os";
 import { isAbsolute } from "node:path";
 import { fileURLToPath } from "node:url";
 
 // src/hermes/images.ts
 import { readFile } from "node:fs/promises";
-import { homedir as homedir3 } from "node:os";
-import { extname as extname2, resolve as resolve3 } from "node:path";
+import { homedir as homedir2 } from "node:os";
+import { extname as extname2, resolve } from "node:path";
 var MAX_IMAGE_BYTES = 20 * 1024 * 1024;
 function imageFormat(bytes) {
   if (bytes.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))) {
@@ -26353,7 +22808,7 @@ function imageSize(bytes) {
         if (bytes[i] !== 255) {
           return void 0;
         }
-        const marker2 = bytes[i + 1];
+        const marker2 = bytes.readUInt8(i + 1);
         if (marker2 >= 192 && marker2 <= 207 && marker2 !== 196 && marker2 !== 200 && marker2 !== 204) {
           return size(bytes.readUInt16BE(i + 7), bytes.readUInt16BE(i + 5));
         }
@@ -26365,7 +22820,7 @@ function imageSize(bytes) {
   return void 0;
 }
 async function uploadImage(gw2, sid, raw2, cwd) {
-  const path2 = resolve3(cwd, raw2.replace(/^~(?=$|\/)/, homedir3()));
+  const path2 = resolve(cwd, raw2.replace(/^~(?=$|\/)/, homedir2()));
   const bytes = await readFile(path2);
   if (bytes.length > MAX_IMAGE_BYTES) {
     throw new Error("the image is larger than 20 MB");
@@ -26414,7 +22869,7 @@ function localSource(src) {
       return void 0;
     }
   }
-  const path2 = src.replace(/^~(?=\/)/, homedir4());
+  const path2 = src.replace(/^~(?=\/)/, homedir3());
   return isAbsolute(path2) ? { path: path2 } : void 0;
 }
 var Media = class {
@@ -26524,7 +22979,6 @@ function toneStyle(tone) {
 var sp = (t2, s2) => s2 ? { s: s2, t: t2 } : { t: t2 };
 var plain = (text15) => text15.replace(/\s+/g, " ").trim();
 var fraction = (value, max) => !(max > 0) || !Number.isFinite(value) ? 0 : Math.min(1, Math.max(0, value / max));
-var extra = (props) => props;
 function glance(view) {
   const h2 = view.headline;
   if (h2 && plain(h2.text)) {
@@ -26706,7 +23160,7 @@ function chartNode(view, key2 = "chart") {
   const h2 = view.state === "live" ? glance({ ...view, blocks: [] }) : void 0;
   return /* @__PURE__ */ jsxs("col", { gap: "xs", role: "omp.job.widget", children: [
     /* @__PURE__ */ jsxs("row", { align: "baseline", gap: "sm", role: "omp.job.widget.head", children: [
-      /* @__PURE__ */ jsx("text", { role: "omp.job.widget.title", spans: [sp(plain(view.title), "strong")], truncate: "end", wrap: "none", ...extra(stage ? {} : { grow: 1 }) }, "title"),
+      /* @__PURE__ */ jsx("text", { role: "omp.job.widget.title", spans: [sp(plain(view.title), "strong")], truncate: "end", wrap: "none", ...stage ? {} : { grow: 1 } }, "title"),
       stage ? /* @__PURE__ */ jsx("text", { grow: 1, role: "omp.job.widget.stage", spans: [sp(stage, "muted")], truncate: "end", wrap: "none" }, "stage") : null,
       view.state === "authoring" ? /* @__PURE__ */ jsx("shimmer", { text: "charting\u2026" }, "authoring") : null,
       h2 ? /* @__PURE__ */ jsx("text", { role: "omp.job.widget.headline", spans: glanceSpans(h2), wrap: "none" }, "headline") : null
@@ -26728,7 +23182,7 @@ function blockNode(b, key2) {
         b.items.length ? b.items.map(
           (item3, i) => labelled(
             item3.label,
-            /* @__PURE__ */ jsx("meter", { grow: 1, label: plain(item3.text), size: "sm", value: fraction(item3.value, b.max), ...extra(item3.tone ? { tone: item3.tone } : {}) }, "meter"),
+            /* @__PURE__ */ jsx("meter", { grow: 1, label: plain(item3.text), size: "sm", value: fraction(item3.value, b.max), ...item3.tone ? { tone: item3.tone } : {} }, "meter"),
             "omp.job.widget.bar",
             `${i}`
           )
@@ -26737,7 +23191,7 @@ function blockNode(b, key2) {
     case "meter":
       return labelled(
         b.label,
-        /* @__PURE__ */ jsx("meter", { grow: 1, label: plain(b.text), size: "sm", value: fraction(b.value, 1), ...extra(b.tone ? { tone: b.tone } : {}) }, "meter"),
+        /* @__PURE__ */ jsx("meter", { grow: 1, label: plain(b.text), size: "sm", value: fraction(b.value, 1), ...b.tone ? { tone: b.tone } : {} }, "meter"),
         "omp.job.widget.meter",
         key2
       );
@@ -26838,7 +23292,7 @@ var base = (path2) => path2.replace(/\/+$/, "").split(/[/\\]/).at(-1) || path2;
 var quote = (s2) => `'${clip(s2, { max: 32 })}'`;
 function operand(args, valued = /* @__PURE__ */ new Set()) {
   for (let i = 0; i < args.length; i++) {
-    const a2 = args[i];
+    const a2 = args[i] ?? "";
     if (valued.has(a2)) {
       i++;
     } else if (!a2.startsWith("-") || a2 === "-") {
@@ -26874,7 +23328,10 @@ var GIT = {
   worktree: "Manage worktrees"
 };
 var COMMANDS = {
-  cat: (a2) => operand(a2) ? `Read ${base(operand(a2))}` : "Read input",
+  cat: (a2) => {
+    const file2 = operand(a2);
+    return file2 ? `Read ${base(file2)}` : "Read input";
+  },
   cd: (a2) => `Go to ${base(operand(a2) ?? "~")}`,
   chmod: (a2) => `Change mode of ${base(operands(a2).at(-1) ?? "files")}`,
   cp: (a2) => `Copy ${base(operands(a2)[0] ?? "files")}`,
@@ -26884,7 +23341,10 @@ var COMMANDS = {
   },
   docker: (a2) => `Docker ${operand(a2) ?? ""}`.trim(),
   echo: () => "Print text",
-  fd: (a2) => operand(a2) ? `Find ${quote(operand(a2))}` : "Find files",
+  fd: (a2) => {
+    const pattern = operand(a2);
+    return pattern ? `Find ${quote(pattern)}` : "Find files";
+  },
   find: (a2) => {
     const name = a2[a2.indexOf("-name") + 1];
     return a2.includes("-name") && name ? `Find ${quote(name)}` : `Find files in ${base(operand(a2) ?? ".")}`;
@@ -26897,14 +23357,20 @@ var COMMANDS = {
     return sub ? GIT[sub] ?? `Git ${sub}` : "Git";
   },
   grep: (a2) => searchTitle(a2),
-  head: (a2) => operand(a2, /* @__PURE__ */ new Set(["-n", "-c"])) ? `Read the start of ${base(operand(a2, /* @__PURE__ */ new Set(["-n", "-c"])))}` : "Read the start",
+  head: (a2) => {
+    const file2 = operand(a2, /* @__PURE__ */ new Set(["-n", "-c"]));
+    return file2 ? `Read the start of ${base(file2)}` : "Read the start";
+  },
   kill: () => "Stop a process",
   less: (a2) => `Read ${base(operand(a2) ?? "output")}`,
   ls: (a2) => `List ${base(operand(a2) ?? "files")}`,
   make: (a2) => `Make ${operand(a2) ?? ""}`.trim(),
   mkdir: (a2) => `Create ${base(operands(a2).at(-1) ?? "a folder")}`,
   mv: (a2) => `Move ${base(operands(a2)[0] ?? "files")}`,
-  node: (a2) => operand(a2) ? `Run ${base(operand(a2))}` : "Run Node",
+  node: (a2) => {
+    const script = operand(a2);
+    return script ? `Run ${base(script)}` : "Run Node";
+  },
   npm: (a2) => npmTitle(a2),
   npx: (a2) => `Run ${operand(a2) ?? "a package"}`,
   pkill: (a2) => `Stop ${operand(a2) ?? "processes"}`,
@@ -26979,7 +23445,7 @@ var CMDLETS = {
   "stop-process": "stop a process"
 };
 function powershellScript(text15) {
-  const used = [...new Set([...text15.matchAll(/\b([A-Z][a-z]+-[A-Z][A-Za-z]+)\b/g)].map((m) => m[1].toLowerCase()))];
+  const used = [...new Set([...text15.matchAll(/\b([A-Z][a-z]+-[A-Z][A-Za-z]+)\b/g)].flatMap((m) => m[1]?.toLowerCase() ?? []))];
   const said = [...new Set(used.map((c) => CMDLETS[c] ?? (c.startsWith("get-") ? `read ${c.slice(4)}` : void 0)).filter(Boolean))];
   return said.length ? said.slice(0, 2).join(" and ") : void 0;
 }
@@ -26999,7 +23465,8 @@ function sections(script) {
 }
 function head(segment) {
   const w = words(segment);
-  while (w.length && (/^[A-Za-z_]\w*=/.test(w[0]) || w[0] === "sudo" || w[0] === "env" || w[0] === "time" || w[0] === "exec")) {
+  const setup = (word) => /^[A-Za-z_]\w*=/.test(word) || word === "sudo" || word === "env" || word === "time" || word === "exec";
+  while (w[0] !== void 0 && setup(w[0])) {
     w.shift();
   }
   const cmd = w.shift();
@@ -27010,7 +23477,7 @@ function segments(line) {
   let cur = "";
   let q2;
   for (let i = 0; i < line.length; i++) {
-    const c = line[i];
+    const c = line.charAt(i);
     if (q2) {
       cur += c;
       if (c === q2 && line[i - 1] !== "\\") {
@@ -27062,7 +23529,7 @@ function describeCommand(command) {
   title ??= "Run a command";
   if (labels.length) {
     const two = `${title}: ${labels.slice(0, 2).join(", ")}${labels.length > 2 ? ` +${labels.length - 2}` : ""}`;
-    title = two.length <= MAX ? two : `${title}: ${clip(labels[0], { max: 32 })}${labels.length > 1 ? ` +${labels.length - 1}` : ""}`;
+    title = two.length <= MAX ? two : `${title}: ${clip(labels[0] ?? "", { max: 32 })}${labels.length > 1 ? ` +${labels.length - 1}` : ""}`;
   } else if (docs.length && /^Read input|^Read /.test(title) && real2[0]?.cmd === "cat") {
     title = `Write ${base(operands(real2[0].args).at(-1) ?? "a file")}`;
   }
@@ -27306,9 +23773,9 @@ function answerRow(key2, text15, picked) {
 }
 
 // src/connections.ts
-import { existsSync as existsSync2, mkdirSync as mkdirSync2, readdirSync, rmSync, writeFileSync } from "node:fs";
-import { homedir as homedir5 } from "node:os";
-import { join as join2 } from "node:path";
+import { existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { homedir as homedir4 } from "node:os";
+import { join } from "node:path";
 
 // src/core/result.ts
 function attempt(fn) {
@@ -28783,7 +25250,7 @@ function readAuthorReply(stdout) {
 var CONNECT_TOOL = "manage_connections";
 var POLL_MS = 2e3;
 var STALE_MS = 2 * 6e4;
-var dataDir = (env2 = process.env) => join2(env2["HERMES_HOME"] || join2(homedir5(), ".hermes"), "plugin-data", "hermes-tern");
+var dataDir = (env2 = process.env) => join(env2["HERMES_HOME"] || join(homedir4(), ".hermes"), "plugin-data", "hermes-tern");
 var safe = (part) => part.replace(/[^A-Za-z0-9_-]/g, "_");
 var cardStem = (callId, opId) => opId ? `${safe(callId)}.${safe(opId)}` : safe(callId);
 var alive = (pid) => {
@@ -28798,7 +25265,7 @@ var alive = (pid) => {
   }
 };
 function readCard(key2, dir2 = dataDir(), now = Date.now()) {
-  const data = readCardFile(join2(dir2, "connections", `${key2}.json`));
+  const data = readCardFile(join(dir2, "connections", `${key2}.json`));
   if (!data) {
     return void 0;
   }
@@ -28812,17 +25279,17 @@ function readCard(key2, dir2 = dataDir(), now = Date.now()) {
   } else if (!alive(data.pid) || now - updated > STALE_MS) {
     settled2 = "stopped";
   }
-  return { error, key: key2, settled: settled2, targets: data.targets, told: existsSync2(join2(dir2, "connections", `${key2}.told`)) };
+  return { error, key: key2, settled: settled2, targets: data.targets, told: existsSync(join(dir2, "connections", `${key2}.told`)) };
 }
 function findCard(call, dir2 = dataDir()) {
   const op = record(call.result)?.["op_id"];
   const prefix2 = `${safe(call.id)}.`;
   if (typeof op === "string" && op) {
-    return existsSync2(join2(dir2, "connections", `${cardStem(call.id, op)}.json`)) ? cardStem(call.id, op) : void 0;
+    return existsSync(join(dir2, "connections", `${cardStem(call.id, op)}.json`)) ? cardStem(call.id, op) : void 0;
   }
   let names;
   try {
-    names = readdirSync(join2(dir2, "connections"));
+    names = readdirSync(join(dir2, "connections"));
   } catch {
     return void 0;
   }
@@ -28833,11 +25300,11 @@ function findCard(call, dir2 = dataDir()) {
   if (keys2.length < 2) {
     return keys2[0];
   }
-  const createdAt = (key2) => cardCreatedAt(join2(dir2, "connections", `${key2}.json`)) * 1e3;
+  const createdAt = (key2) => cardCreatedAt(join(dir2, "connections", `${key2}.json`)) * 1e3;
   return keys2.map((key2) => ({ gap: Math.abs(createdAt(key2) - call.startedAt), key: key2 })).sort((a2, b) => a2.gap - b.gap)[0]?.key;
 }
 function claimTold(key2, dir2 = dataDir()) {
-  const claim = attempt(() => writeFileSync(join2(dir2, "connections", `${key2}.told`), "", { flag: "wx" }));
+  const claim = attempt(() => writeFileSync(join(dir2, "connections", `${key2}.told`), "", { flag: "wx" }));
   if (claim.kind === "ok") {
     return { kind: "claimed" };
   }
@@ -28852,14 +25319,14 @@ function ternPane(env2 = process.env) {
   return vars["TERN_PANE"] ? vars : void 0;
 }
 function markViewer(sid, previous3, dir2 = dataDir(), env2 = process.env) {
-  const viewers = join2(dir2, "viewers");
+  const viewers = join(dir2, "viewers");
   try {
     if (previous3 && previous3 !== sid) {
-      rmSync(join2(viewers, `${previous3}.json`), { force: true });
+      rmSync(join(viewers, `${previous3}.json`), { force: true });
     }
     if (sid) {
-      mkdirSync2(viewers, { recursive: true });
-      writeFileSync(join2(viewers, `${sid}.json`), JSON.stringify({ pid: process.pid, tern: ternPane(env2) }));
+      mkdirSync(viewers, { recursive: true });
+      writeFileSync(join(viewers, `${sid}.json`), JSON.stringify({ pid: process.pid, tern: ternPane(env2) }));
     }
   } catch {
   }
@@ -29571,15 +26038,15 @@ var Poller = class {
 
 // src/processes/widgets/files.ts
 import { closeSync, fstatSync, openSync, readSync } from "node:fs";
-import { homedir as homedir6 } from "node:os";
-import { isAbsolute as isAbsolute2, join as join3, normalize } from "node:path";
+import { homedir as homedir5 } from "node:os";
+import { isAbsolute as isAbsolute2, join as join2, normalize } from "node:path";
 import { StringDecoder } from "node:string_decoder";
 var TARGET = /(?:^|[\s;&|(])(?:1|&)?>>?\s*([^\s;&|)<>]+)|\btee\s+(?:-a\s+)?([^\s;&|)<>-][^\s;&|)<>]*)/g;
 var CD = /^\s*cd\s+([^\s;&|]+)\s*(?:&&|;)/;
 var SKIP = /^\/dev\/|^&/;
 var unquote = (s2) => s2.replace(/^(['"])(.*)\1$/, "$2");
 function expand(path2, env2) {
-  const out = unquote(path2).replace(/^~(?=\/|$)/, env2["HOME"] || homedir6()).replace(/\$\{?(HOME|TMPDIR|USER)\}?/g, (_, name) => env2[name]?.replace(/\/$/, "") ?? `$${name}`);
+  const out = unquote(path2).replace(/^~(?=\/|$)/, env2["HOME"] || homedir5()).replace(/\$\{?(HOME|TMPDIR|USER)\}?/g, (_, name) => env2[name]?.replace(/\/$/, "") ?? `$${name}`);
   return out.includes("$") ? void 0 : out;
 }
 function outputFiles(command, env2 = process.env) {
@@ -29592,7 +26059,7 @@ function outputFiles(command, env2 = process.env) {
       continue;
     }
     const path2 = expand(raw2, env2);
-    const full = path2 && (isAbsolute2(path2) ? path2 : base3 && isAbsolute2(base3) ? join3(base3, path2) : void 0);
+    const full = path2 && (isAbsolute2(path2) ? path2 : base3 && isAbsolute2(base3) ? join2(base3, path2) : void 0);
     if (full && !files.includes(normalize(full))) {
       files.push(normalize(full));
     }
@@ -29981,16 +26448,16 @@ var LineMatcher = class {
       this.#patterns.forEach((re2, pattern) => {
         const m = re2.exec(text15);
         if (m) {
-          hits.push({ captures: this.#names[pattern].map((name) => m.groups?.[name]), line, pattern });
+          hits.push({ captures: (this.#names[pattern] ?? []).map((name) => m.groups?.[name]), line, pattern });
         }
       });
     });
     return hits;
   }
 };
-var isRecord2 = (v) => typeof v === "object" && v !== null && !Array.isArray(v);
+var isRecord = (v) => typeof v === "object" && v !== null && !Array.isArray(v);
 function specSkip(value) {
-  return isRecord2(value) && typeof value["skip"] === "string" && value["skip"].trim() ? value["skip"].trim() : void 0;
+  return isRecord(value) && typeof value["skip"] === "string" && value["skip"].trim() ? value["skip"].trim() : void 0;
 }
 function ruleReadsSource(from, id) {
   if (from === "*") {
@@ -29999,7 +26466,7 @@ function ruleReadsSource(from, id) {
   return from.endsWith("*") ? id.startsWith(from.slice(0, -1)) : from === id;
 }
 function patternGroupNames(pattern) {
-  return new Set([...pattern.matchAll(NAMED_GROUP)].map((m) => m[1]));
+  return new Set([...pattern.matchAll(NAMED_GROUP)].flatMap((m) => m[1] ?? []));
 }
 function ruleFields(rule) {
   const fields = [];
@@ -30088,11 +26555,11 @@ function dryRun(spec, matcher, samples, numeric, errors) {
     seen = true;
     for (const hit of matcher.matchLines(sample.lines)) {
       const rule = spec.rules[hit.pattern];
-      if (!ruleReadsSource(rule.from, sample.id)) {
+      if (!rule || !ruleReadsSource(rule.from, sample.id)) {
         continue;
       }
       matches2++;
-      groups[hit.pattern].forEach((field, at) => {
+      groups[hit.pattern]?.forEach((field, at) => {
         const captured = hit.captures[at];
         if (field === rule.key || field === rule.text || captured === void 0) {
           return;
@@ -30194,7 +26661,7 @@ function checkReferences(spec, errors) {
   return numeric;
 }
 function parseSpec(value, errors) {
-  if (!isRecord2(value)) {
+  if (!isRecord(value)) {
     errors.push("spec: expected an object");
     return void 0;
   }
@@ -30204,7 +26671,7 @@ function parseSpec(value, errors) {
   let headline;
   if (value["headline"] !== void 0) {
     const ref = parseValueRef(value["headline"], "headline", errors);
-    const label = isRecord2(value["headline"]) ? str4(value["headline"]["label"], "headline.label", errors, { cut: MAX_LABEL_CHARS }) : void 0;
+    const label = isRecord(value["headline"]) ? str4(value["headline"]["label"], "headline.label", errors, { cut: MAX_LABEL_CHARS }) : void 0;
     if (ref) {
       headline = label ? { ...ref, label } : ref;
     }
@@ -30216,7 +26683,7 @@ function parseSpec(value, errors) {
   return { blocks: blocks2, rules, title, ...headline ? { headline } : {}, ...stage ? { stage } : {} };
 }
 function parseRule(value, where, errors) {
-  if (!isRecord2(value)) {
+  if (!isRecord(value)) {
     errors.push(`${where}: expected an object`);
     return void 0;
   }
@@ -30253,7 +26720,7 @@ function parseRule(value, where, errors) {
   };
 }
 function parseValueRef(value, where, errors) {
-  if (!isRecord2(value)) {
+  if (!isRecord(value)) {
     errors.push(`${where}: expected an object`);
     return void 0;
   }
@@ -30279,7 +26746,7 @@ function parseValueRef(value, where, errors) {
   };
 }
 function parseBlock(value, where, errors) {
-  if (!isRecord2(value)) {
+  if (!isRecord(value)) {
     errors.push(`${where}: expected an object`);
     return void 0;
   }
@@ -30317,7 +26784,7 @@ function parseBlock(value, where, errors) {
       break;
     case "meter": {
       const whole = typeof value["total"] === "string" ? Number(value["total"]) : value["total"];
-      if (!isRecord2(whole) && (typeof whole !== "number" || Number.isNaN(whole))) {
+      if (!isRecord(whole) && (typeof whole !== "number" || Number.isNaN(whole))) {
         const ref = parseValueRef(value, where, errors);
         block = ref && { items: [{ ...ref, label: label() }], kind: "stat" };
         break;
@@ -30347,7 +26814,7 @@ function parseBlock(value, where, errors) {
       const items = list2(value["items"], `${where}.items`, errors, 1, MAX_STAT_ITEMS)?.map((item3, i) => {
         const at = `${where}.items[${i}]`;
         const ref = parseValueRef(item3, at, errors);
-        const itemLabel = isRecord2(item3) ? str4(item3["label"], `${at}.label`, errors, { cut: MAX_LABEL_CHARS, required: true }) : void 0;
+        const itemLabel = isRecord(item3) ? str4(item3["label"], `${at}.label`, errors, { cut: MAX_LABEL_CHARS, required: true }) : void 0;
         return ref && itemLabel !== void 0 ? { ...ref, label: itemLabel } : void 0;
       }) ?? [];
       block = { items: items.filter((i) => i !== void 0), kind: "stat" };
@@ -30355,7 +26822,7 @@ function parseBlock(value, where, errors) {
     }
     case "grid": {
       const tones = {};
-      if (!isRecord2(value["tones"])) {
+      if (!isRecord(value["tones"])) {
         errors.push(`${where}.tones: expected an object of status substring \u2192 tone`);
       } else {
         let n = 0;
@@ -30397,7 +26864,7 @@ var MAX_BAR_ITEMS = 16;
 var MAX_GRID_ITEMS = 48;
 var cut2 = (text15, max) => text15.length > max ? `${text15.slice(0, max - 1)}\u2026` : text15;
 var ESCAPES = /\x1b\[[0-?]*[ -/]*[@-~]|\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)|\x1b[@-_]|[\x00-\x08\x0b-\x1f\x7f]/g;
-function clean2(line) {
+function clean(line) {
   return line.replace(/\t/g, " ").replace(ESCAPES, "");
 }
 var SourceLineReader = class {
@@ -30432,7 +26899,7 @@ var SourceLineReader = class {
       raw2.push(this.#partial);
       this.#partial = "";
     }
-    return { end: chunk.end, lines: raw2.map((l) => clean2(l).slice(0, MAX_LINE_CHARS)), open: chunk.open };
+    return { end: chunk.end, lines: raw2.map((l) => clean(l).slice(0, MAX_LINE_CHARS)), open: chunk.open };
   }
 };
 function emptySeries() {
@@ -30445,12 +26912,8 @@ function pushMatch(s2, value, text15, line, t2) {
     bucket.n++;
   } else {
     s2.recent.push({ n: 1, t: t2 });
-    const horizon = t2 - RATE_WINDOW_MS;
-    let stale = 0;
-    while (stale < s2.recent.length && s2.recent[stale].t < horizon) {
-      stale++;
-    }
-    s2.recent.splice(0, stale);
+    const fresh = s2.recent.findIndex((b) => b.t >= t2 - RATE_WINDOW_MS);
+    s2.recent.splice(0, fresh < 0 ? s2.recent.length : fresh);
   }
   if (value !== void 0) {
     if (!s2.values) {
@@ -30517,11 +26980,9 @@ function downsample(ring, points) {
   for (let b = 0; b < points; b++) {
     const from = Math.floor(b * ring.length / points);
     const to = Math.floor((b + 1) * ring.length / points);
-    let sum = 0;
-    for (let i = from; i < to; i++) {
-      sum += ring[i].v;
-    }
-    out.push({ t: ring[to - 1].t, v: sum / (to - from) });
+    const bucket = ring.slice(from, to);
+    const sum = bucket.reduce((n, p3) => n + p3.v, 0);
+    out.push({ t: bucket.at(-1)?.t ?? 0, v: sum / (to - from) });
   }
   return out;
 }
@@ -30614,8 +27075,9 @@ var ChartRuntime = class {
     }
     const newest = [];
     for (let i = lines.length - 1; i >= tailFrom && newest.length < SAMPLE_TAIL_LINES; i--) {
-      if (lines[i].trim()) {
-        newest.push(lines[i]);
+      const line = lines[i] ?? "";
+      if (line.trim()) {
+        newest.push(line);
       }
     }
     if (newest.length) {
@@ -30629,7 +27091,7 @@ var ChartRuntime = class {
     stats.lastActiveAt = t2;
     this.#lastLineAt = t2;
     stats.recent.push({ n: fresh, t: t2 });
-    while (stats.recent.length && stats.recent[0].t < t2 - RATE_WINDOW_MS) {
+    while ((stats.recent[0]?.t ?? Infinity) < t2 - RATE_WINDOW_MS) {
       stats.recent.shift();
     }
   }
@@ -30649,12 +27111,11 @@ var ChartRuntime = class {
       this.#matchers.set(id, null);
       return void 0;
     }
-    const patterns = [...byPattern.keys()];
-    const matcher = new LineMatcher(patterns);
+    const matcher = new LineMatcher([...byPattern.keys()]);
     const groups = matcher.groupNames();
     const entry = {
       matcher,
-      rules: patterns.map((p3, i) => byPattern.get(p3).map((r) => compileRule(r, groups[i])))
+      rules: [...byPattern.values()].map((rules, i) => rules.map((r) => compileRule(r, groups[i] ?? [])))
     };
     this.#matchers.set(id, entry);
     return entry;
@@ -30667,8 +27128,8 @@ var ChartRuntime = class {
     const hits = entry.matcher.matchLines(lines);
     const capture = (captures, at) => at < 0 ? void 0 : captures[at];
     for (const hit of hits) {
-      const line = lines[hit.line];
-      for (const rule of entry.rules[hit.pattern]) {
+      const line = lines[hit.line] ?? "";
+      for (const rule of entry.rules[hit.pattern] ?? []) {
         const key2 = capture(hit.captures, rule.key)?.trim() ?? "";
         for (const c of rule.captures) {
           const captured = hit.captures[c.index];
@@ -30691,16 +27152,11 @@ var ChartRuntime = class {
     if (matched2.size) {
       this.#lastMatchAt = t2;
     }
-    const lastMatched = hits.length ? hits.at(-1).line : -1;
-    let unmatched = 0;
-    for (let i = lastMatched + 1; i < lines.length; i++) {
-      if (lines[i].trim()) {
-        unmatched++;
-      }
-    }
+    const lastMatched = hits.at(-1)?.line ?? -1;
+    const unmatched = lines.slice(lastMatched + 1).filter((l) => l.trim()).length;
     this.#unmatchedLines = lastMatched >= 0 ? unmatched : this.#unmatchedLines + unmatched;
     for (let i = lines.length - 1; i >= 0; i--) {
-      const line = lines[i].trim();
+      const line = lines[i]?.trim();
       if (line && !matched2.has(i)) {
         this.#lastUnmatchedLine = cut2(line, MAX_STAGE_CHARS);
         break;
@@ -30829,8 +27285,8 @@ var ChartRuntime = class {
         return {
           items: entries.map(([k], i) => ({
             label: labels[i] || k || block.label,
-            text: formatNumber(values[i], unit),
-            value: values[i],
+            text: formatNumber(values[i] ?? 0, unit),
+            value: values[i] ?? 0,
             ...best !== void 0 && values[i] === best ? { tone: "success" } : {}
           })),
           kind: "bars",
@@ -31242,8 +27698,8 @@ function processStatus(entry) {
 var ESCAPES2 = /\x1b\[[0-?]*[ -/]*[@-~]|\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)|\x1b[@-_]/g;
 function lastLine(output) {
   const lines = output.replace(ESCAPES2, "").split("\n");
-  for (let i = lines.length - 1; i >= 0; i--) {
-    const draws = lines[i].split("\r");
+  for (const line of lines.toReversed()) {
+    const draws = line.split("\r");
     const text15 = (draws.findLast((d) => d.trim()) ?? "").replace(/\s+/g, " ").trim();
     if (text15) {
       return text15;
@@ -31549,8 +28005,9 @@ function linkCalls(calls, procs) {
   for (const call of calls) {
     const ref = isWatchCall(call) ? String(call.args["session_id"]).trim() : "";
     const matches2 = ref ? procs.filter((p3) => p3.id.startsWith(ref)) : [];
-    if (matches2.length === 1) {
-      owners.set(call, matches2[0]);
+    const [only] = matches2;
+    if (only && matches2.length === 1) {
+      owners.set(call, only);
     }
   }
   const free = [...procs].sort((a2, b) => a2.startedAt - b.startedAt);
@@ -33918,9 +30375,9 @@ function watcherFacts(w) {
 }
 
 // src/git/status.ts
-import { execFile as execFile2 } from "node:child_process";
-import { promisify as promisify2 } from "node:util";
-var run = promisify2(execFile2);
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
+var run = promisify(execFile);
 async function git(cwd, ...args) {
   const { stdout } = await run("git", ["-C", cwd, ...args], { maxBuffer: 16 * 1024 * 1024, timeout: 1e4 });
   return stdout;
@@ -33930,7 +30387,7 @@ function parseStatus(text15) {
   const state = { ahead: 0, behind: 0, files: [] };
   const records2 = text15.split("\0");
   for (let i = 0; i < records2.length; i++) {
-    const line = records2[i];
+    const line = records2[i] ?? "";
     if (line.startsWith("# branch.head ")) {
       const head2 = line.slice(14);
       state.branch = head2 === "(detached)" ? void 0 : head2;
@@ -33945,7 +30402,7 @@ function parseStatus(text15) {
       const xy = parts3[1] ?? "..";
       const path2 = parts3.slice(line.startsWith("1 ") ? 8 : 9).join(" ");
       const from = line.startsWith("2 ") ? records2[++i] : void 0;
-      const code7 = xy[0] !== "." ? xy[0] : xy[1];
+      const code7 = (xy[0] !== "." ? xy[0] : xy[1]) ?? "";
       state.files.push({ additions: 0, deletions: 0, from, path: path2, staged: xy[0] !== ".", status: KIND[code7] ?? "modified" });
     } else if (line.startsWith("u ")) {
       state.files.push({ additions: 0, deletions: 0, path: line.split(" ").slice(10).join(" "), staged: false, status: "conflicted" });
@@ -33959,7 +30416,7 @@ function applyNumstat(files, text15) {
   const byPath = new Map(files.map((f) => [f.path, f]));
   const records2 = text15.split("\0");
   for (let i = 0; i < records2.length; i++) {
-    const [add, del2, ...rest] = records2[i].split("	");
+    const [add, del2, ...rest] = (records2[i] ?? "").split("	");
     let path2 = rest.join("	");
     if (rest.length && !path2) {
       path2 = records2[i + 2] ?? "";
@@ -34033,10 +30490,11 @@ function openChanges(host, focus) {
     modal: true,
     node: () => sheetNode(),
     onKey: (k) => {
+      const file2 = current();
       if (k.name === "escape") {
         host.close(overlay2);
-      } else if (k.name === "c" && !k.ctrl && !k.alt && !k.meta && current()) {
-        copyToClipboard(current().path);
+      } else if (k.name === "c" && !k.ctrl && !k.alt && !k.meta && file2) {
+        copyToClipboard(file2.path);
       } else if (k.name === "r" && k.shift) {
         void read();
       } else {
@@ -34323,7 +30781,7 @@ function openEffortPicker(host, global2 = false) {
 }
 
 // src/overlays/pullRequests.tsx
-import { execFile as execFile3 } from "node:child_process";
+import { execFile as execFile2 } from "node:child_process";
 
 // src/github/pullRequest.ts
 var CHECK_FIELDS = `
@@ -37205,7 +33663,7 @@ function createState(options) {
     options,
     patch,
     qNesting: 0,
-    resolve: resolve4,
+    resolve: resolve2,
     toFlow,
     toSpecificContent
   };
@@ -37251,7 +33709,7 @@ function one2(node3, parent) {
 function patch(origin, node3) {
   if (origin.position) node3.position = position(origin);
 }
-function resolve4(url) {
+function resolve2(url) {
   const base3 = this.frozenBaseUrl;
   if (url === null || url === void 0) {
     return "";
@@ -38979,7 +35437,7 @@ function htmlKind(value) {
 }
 
 // node_modules/mdast-util-to-markdown/lib/join.js
-var join4 = [joinDefaults];
+var join3 = [joinDefaults];
 function joinDefaults(left, right, parent, state) {
   if (right.type === "code" && formatCodeAsIndented(right, state) && (left.type === "list" || left.type === right.type && formatCodeAsIndented(left, state))) {
     return false;
@@ -41495,7 +37953,7 @@ function improve(items, chosen, mistake, before, after) {
       if (sequence === current) continue;
       const trial = new Map(chosen);
       trial.set(attention4, sequence);
-      const tokens2 = render2(items, trial, before, after);
+      const tokens2 = render(items, trial, before, after);
       const next2 = check(tokens2, before, after);
       if (!next2 || next2.index > mistake.index) {
         return { chosen: trial, mistake: next2, tokens: tokens2 };
@@ -41655,7 +38113,7 @@ function phrasing4(parent, state, info) {
   indexStack.pop();
   return results;
 }
-function render2(items, chosen, before, after) {
+function render(items, chosen, before, after) {
   const tokens2 = [];
   let encodeAfter;
   let previous3 = lastCharacter(before);
@@ -41679,7 +38137,7 @@ function render2(items, chosen, before, after) {
     const outsideAfter = firstCharacter(
       next2 === void 0 ? after : typeof next2 === "string" ? next2 : chosen.get(next2) || next2.sequences[0]
     );
-    const inside = render2(item3.children, chosen, sequence, sequence);
+    const inside = render(item3.children, chosen, sequence, sequence);
     const head2 = inside.length > 0 ? inside[0].value : "";
     const open = encodeInfo(
       outsideBefore.charCodeAt(outsideBefore.length - 1),
@@ -41708,7 +38166,7 @@ function render2(items, chosen, before, after) {
 }
 function serialize3(items, before, after) {
   let chosen = /* @__PURE__ */ new Map();
-  const initial = render2(items, chosen, before, after);
+  const initial = render(items, chosen, before, after);
   let tokens2 = initial;
   let mistake = check(tokens2, before, after);
   while (mistake) {
@@ -41956,7 +38414,7 @@ function toMarkdown(tree, options) {
     handle: void 0,
     indentLines,
     indexStack: [],
-    join: [...join4],
+    join: [...join3],
     options: {},
     safe: safeBound,
     stack: [],
@@ -52192,11 +48650,11 @@ function unknown3(node_, state) {
   if (state.options.passThrough && state.options.passThrough.includes(node3.type)) {
     stitch(node3, state);
   } else {
-    let extra2 = "";
+    let extra = "";
     if (knownMdxNames.has(node3.type)) {
-      extra2 = ". It looks like you are using MDX nodes with `hast-util-raw` (or `rehype-raw`). If you use this because you are using remark or rehype plugins that inject `'html'` nodes, then please raise an issue with that plugin, as its a bad and slow idea. If you use this because you are using markdown syntax, then you have to configure this utility (or plugin) to pass through these nodes (see `passThrough` in docs), but you can also migrate to use the MDX syntax";
+      extra = ". It looks like you are using MDX nodes with `hast-util-raw` (or `rehype-raw`). If you use this because you are using remark or rehype plugins that inject `'html'` nodes, then please raise an issue with that plugin, as its a bad and slow idea. If you use this because you are using markdown syntax, then you have to configure this utility (or plugin) to pass through these nodes (see `passThrough` in docs), but you can also migrate to use the MDX syntax";
     }
-    throw new Error("Cannot compile `" + node3.type + "` node" + extra2);
+    throw new Error("Cannot compile `" + node3.type + "` node" + extra);
   }
 }
 function resetTokenizer(state, point5) {
@@ -61190,23 +57648,24 @@ function holdsDetails(n) {
 }
 function autolink2(mdast, links) {
   const host = links.repo?.match(/^https?:\/\/[^/]+/)?.[0] ?? "https://github.com";
-  findAndReplace(
-    mdast,
-    [
-      ...links.repo ? [[/(?<![\w&/#])#(\d+)\b/g, (_, n) => ({ children: [{ type: "text", value: `#\u2060${n}` }], type: "link", url: `${links.repo}/issues/${n}` })]] : [],
-      [/(?<![\w/@.])@([a-z\d](?:[a-z\d-]{0,38}))\b(?!\.\w)/gi, (all8, login) => ({ children: [{ type: "text", value: all8 }], type: "link", url: `${host}/${login}` })]
-    ],
-    { ignore: ["link", "linkReference", "inlineCode", "code"] }
-  );
+  const link3 = (text15, url) => ({ children: [{ type: "text", value: text15 }], type: "link", url });
+  const list9 = [
+    ...links.repo ? [[/(?<![\w&/#])#(\d+)\b/g, (_, n) => link3(`#\u2060${n}`, `${links.repo}/issues/${n}`)]] : [],
+    [/(?<![\w/@.])@([a-z\d](?:[a-z\d-]{0,38}))\b(?!\.\w)/gi, (all8, login) => link3(all8, `${host}/${login}`)]
+  ];
+  findAndReplace(mdast, list9, { ignore: ["link", "linkReference", "inlineCode", "code"] });
 }
 function markdown(nodes, links) {
-  const mdast = toMdast({ children: nodes, type: "root" });
+  const tree = toMdast({ children: nodes, type: "root" });
+  const mdast = tree.type === "root" ? tree : { children: [tree], type: "root" };
   autolink2(mdast, links);
   visit(mdast, "link", (link3, i, parent) => {
     let badge = false;
     visit(link3, "image", (image3, j, holder) => {
       badge = true;
-      holder?.children.splice(j, 1, { type: "text", value: image3.alt ?? "" });
+      if (j !== void 0) {
+        holder?.children.splice(j, 1, { type: "text", value: image3.alt ?? "" });
+      }
     });
     if (badge && parent && i !== void 0) {
       parent.children.splice(i + 1, 0, { type: "text", value: " \xB7 " });
@@ -61844,7 +58303,7 @@ var SHEET = "pull-requests";
 var MENU = "pull-requests-menu";
 var TICK_MS3 = 3e4;
 function openUrl(url) {
-  execFile3(process.platform === "darwin" ? "open" : "xdg-open", [url], () => {
+  execFile2(process.platform === "darwin" ? "open" : "xdg-open", [url], () => {
   });
 }
 function prsCommand(host, arg) {
@@ -61913,7 +58372,8 @@ function openPrSheet(host, focus) {
 }
 function openPrMenu(host) {
   const entries = () => host.prs.entries().toReversed();
-  let selected = entries()[0] ? prKey(entries()[0].ref) : void 0;
+  const first2 = entries()[0];
+  let selected = first2 ? prKey(first2.ref) : void 0;
   host.prs.poke();
   const close = () => host.close(overlay2);
   const pick2 = (key2) => {
@@ -62287,7 +58747,7 @@ function openModelPicker(host) {
         const row2 = rows2.find((r) => r.id === selected);
         const levels = levelsFor(row2 && caps(row2));
         const at = levels.findIndex((l) => l.id === effort2);
-        effort2 = levels.length ? levels[(at + (k.shift ? levels.length - 1 : 1)) % levels.length].id : effort2;
+        effort2 = levels[(at + (k.shift ? levels.length - 1 : 1)) % levels.length]?.id ?? effort2;
         return true;
       }
       if (k.ctrl && k.name === "f") {
@@ -62651,69 +59111,6 @@ function approvalOverlay(host, prompt) {
   return overlay2;
 }
 
-// .hermes-src/ui-tui/src/lib/history.ts
-import { appendFileSync as appendFileSync3, existsSync as existsSync3, mkdirSync as mkdirSync3, readFileSync as readFileSync2 } from "node:fs";
-import { homedir as homedir7 } from "node:os";
-import { join as join5 } from "node:path";
-var MAX2 = 1e3;
-var dir = process.env.HERMES_HOME ?? join5(homedir7(), ".hermes");
-var file = join5(dir, ".hermes_history");
-var cache = null;
-function load() {
-  if (cache) {
-    return cache;
-  }
-  try {
-    if (!existsSync3(file)) {
-      cache = [];
-      return cache;
-    }
-    const entries = [];
-    let current = [];
-    for (const line of readFileSync2(file, "utf8").split("\n")) {
-      if (line.startsWith("+")) {
-        current.push(line.slice(1));
-      } else if (current.length) {
-        entries.push(current.join("\n"));
-        current = [];
-      }
-    }
-    if (current.length) {
-      entries.push(current.join("\n"));
-    }
-    cache = entries.slice(-MAX2);
-  } catch {
-    cache = [];
-  }
-  return cache;
-}
-function append(line) {
-  const trimmed = line.trim();
-  if (!trimmed) {
-    return;
-  }
-  const items = load();
-  if (items.at(-1) === trimmed) {
-    return;
-  }
-  items.push(trimmed);
-  if (items.length > MAX2) {
-    items.splice(0, items.length - MAX2);
-  }
-  try {
-    if (!existsSync3(dir)) {
-      mkdirSync3(dir, { recursive: true });
-    }
-    const ts = (/* @__PURE__ */ new Date()).toISOString().replace("T", " ").replace("Z", "");
-    const encoded = trimmed.split("\n").map((l) => `+${l}`).join("\n");
-    appendFileSync3(file, `
-# ${ts}
-${encoded}
-`);
-  } catch {
-  }
-}
-
 // src/draft/undo.ts
 var UNDO_MERGE_MS = 800;
 var MAX_STEPS = 200;
@@ -62765,27 +59162,90 @@ var UndoHistory = class {
   }
 };
 
+// .hermes-src/ui-tui/src/lib/history.ts
+import { appendFileSync as appendFileSync2, existsSync as existsSync2, mkdirSync as mkdirSync2, readFileSync as readFileSync2 } from "node:fs";
+import { homedir as homedir6 } from "node:os";
+import { join as join4 } from "node:path";
+var MAX2 = 1e3;
+var dir = process.env.HERMES_HOME ?? join4(homedir6(), ".hermes");
+var file = join4(dir, ".hermes_history");
+var cache = null;
+function load() {
+  if (cache) {
+    return cache;
+  }
+  try {
+    if (!existsSync2(file)) {
+      cache = [];
+      return cache;
+    }
+    const entries = [];
+    let current = [];
+    for (const line of readFileSync2(file, "utf8").split("\n")) {
+      if (line.startsWith("+")) {
+        current.push(line.slice(1));
+      } else if (current.length) {
+        entries.push(current.join("\n"));
+        current = [];
+      }
+    }
+    if (current.length) {
+      entries.push(current.join("\n"));
+    }
+    cache = entries.slice(-MAX2);
+  } catch {
+    cache = [];
+  }
+  return cache;
+}
+function append(line) {
+  const trimmed = line.trim();
+  if (!trimmed) {
+    return;
+  }
+  const items = load();
+  if (items.at(-1) === trimmed) {
+    return;
+  }
+  items.push(trimmed);
+  if (items.length > MAX2) {
+    items.splice(0, items.length - MAX2);
+  }
+  try {
+    if (!existsSync2(dir)) {
+      mkdirSync2(dir, { recursive: true });
+    }
+    const ts = (/* @__PURE__ */ new Date()).toISOString().replace("T", " ").replace("Z", "");
+    const encoded = trimmed.split("\n").map((l) => `+${l}`).join("\n");
+    appendFileSync2(file, `
+# ${ts}
+${encoded}
+`);
+  } catch {
+  }
+}
+
 // src/markdown.ts
 var FENCE = /^\s*(```|~~~)/;
-var HEADING = /^(#{1,6})(\s+)/;
-var QUOTE = /^(\s*>+\s?)/;
-var LIST2 = /^(\s*)([-*+]|\d{1,9}[.)])(\s+)(\[[ xX]\](?:\s+|$))?/;
+var HEADING = /^(?<marker>#{1,6})(\s+)/;
+var QUOTE = /^(?<marker>\s*>+\s?)/;
+var LIST2 = /^(?<indent>\s*)(?<bullet>[-*+]|\d{1,9}[.)])(\s+)(?<box>\[[ xX]\](?:\s+|$))?/;
 var RULE = /^\s*([-*_])(\s*\1){2,}\s*$/;
-var CODE_SPAN = /(`+)(?!`)([^\n]*?[^`\n])\1(?!`)/g;
+var CODE_SPAN = /(?<ticks>`+)(?!`)([^\n]*?[^`\n])\k<ticks>(?!`)/g;
 var BOLD = /(\*\*|__)(?=\S)([^\n]*?\S)\1/g;
 var ITALIC_STAR = /(?<![*\\])\*(?=[^\s*])([^\n*]*?[^\s*\\])\*(?!\*)/g;
 var ITALIC_UNDERSCORE = /(?<![\w\\])_(?=[^\s_])([^\n_]*?[^\s_\\])_(?![\w])/g;
 var STRIKE = /~~(?=\S)([^\n]*?\S)~~/g;
-var LINK = /\[([^\]\n]+)\]\(([^)\s]+)\)/g;
+var LINK = /\[(?<label>[^\]\n]+)\]\(([^)\s]+)\)/g;
 function markdownDecor(text15) {
   if (!text15) {
     return [];
   }
   const marks = Array.from({ length: text15.length }, () => []);
   const mark2 = (from, to, s2) => {
-    for (let i = from; i < to; i++) {
-      if (!marks[i].includes(s2)) {
-        marks[i].push(s2);
+    for (const tokens2 of marks.slice(from, to)) {
+      if (!tokens2.includes(s2)) {
+        tokens2.push(s2);
       }
     }
   };
@@ -62813,21 +59273,24 @@ function blockMarks(line, at, mark2) {
   const heading5 = HEADING.exec(line);
   const quote2 = heading5 ? null : QUOTE.exec(line);
   if (heading5) {
-    mark2(at, at + heading5[1].length, "dim");
+    const { marker: marker2 = "" } = heading5.groups ?? {};
+    mark2(at, at + marker2.length, "dim");
     body = heading5[0].length;
     mark2(at + body, at + line.length, "strong");
   } else if (quote2) {
-    mark2(at, at + quote2[1].length, "dim");
-    body = quote2[1].length;
+    const { marker: marker2 = "" } = quote2.groups ?? {};
+    mark2(at, at + marker2.length, "dim");
+    body = marker2.length;
     mark2(at + body, at + line.length, "muted");
   }
   const list9 = LIST2.exec(line.slice(body));
   if (list9) {
-    const start = body + list9[1].length;
-    mark2(at + start, at + start + list9[2].length, "accent");
-    if (list9[4]) {
-      const box = body + list9[0].length - list9[4].length;
-      mark2(at + box, at + box + 3, "accent");
+    const { box, bullet = "", indent: indent2 = "" } = list9.groups ?? {};
+    const start = body + indent2.length;
+    mark2(at + start, at + start + bullet.length, "accent");
+    if (box) {
+      const boxAt = body + list9[0].length - box.length;
+      mark2(at + boxAt, at + boxAt + 3, "accent");
     }
     body += list9[0].length;
   }
@@ -62839,14 +59302,14 @@ function inlineMarks(line, from, at, mark2) {
     rest = rest.slice(0, start) + "\0".repeat(len) + rest.slice(start + len);
   };
   for (const m of [...rest.matchAll(CODE_SPAN)]) {
-    const tick2 = m[1].length;
+    const tick2 = m.groups?.["ticks"]?.length ?? 0;
     mark2(at + m.index, at + m.index + tick2, "dim");
     mark2(at + m.index + tick2, at + m.index + m[0].length - tick2, "code");
     mark2(at + m.index + m[0].length - tick2, at + m.index + m[0].length, "dim");
     take(m.index, m[0].length);
   }
   for (const m of [...rest.matchAll(LINK)]) {
-    const label = m[1].length;
+    const label = m.groups?.["label"]?.length ?? 0;
     mark2(at + m.index, at + m.index + 1, "dim");
     mark2(at + m.index + 1, at + m.index + 1 + label, "link");
     mark2(at + m.index + 1 + label, at + m.index + m[0].length, "dim");
@@ -62871,8 +59334,8 @@ function runs2(marks) {
   const out = [];
   let from = 0;
   for (let i = 1; i <= marks.length; i++) {
-    const s2 = marks[from].join(" ");
-    if (i < marks.length && marks[i].join(" ") === s2) {
+    const s2 = marks[from]?.join(" ") ?? "";
+    if (i < marks.length && marks[i]?.join(" ") === s2) {
       continue;
     }
     if (s2) {
@@ -63162,8 +59625,9 @@ var Composer = class {
           return this.#move(prevWord(this.text, this.cursor));
         case "right":
           return this.#move(nextWord(this.text, this.cursor));
+        default:
+          return false;
       }
-      return false;
     }
     if (alt && !ctrl && !meta3) {
       switch (name) {
@@ -63173,6 +59637,8 @@ var Composer = class {
           return this.#move(nextWord(this.text, this.cursor));
         case "d":
           return this.#cut(this.cursor, nextWord(this.text, this.cursor));
+        default:
+          break;
       }
     }
     const selecting = shift && ["left", "right", "home", "end"].includes(name);
@@ -63219,8 +59685,9 @@ var Composer = class {
         return meta3 ? this.#move(0) : this.#vertical(-1);
       case "down":
         return meta3 ? this.#move(this.text.length) : this.#vertical(1);
+      default:
+        return void 0;
     }
-    return void 0;
   }
   /** A new line at the caret; in a list item, the next item's marker comes with it. */
   #newline() {
@@ -63788,9 +60255,9 @@ function confirmOverlay(host, ask) {
 import { basename as basename2 } from "node:path";
 
 // src/hermes/sessionIndex.ts
-import { execFile as execFile4 } from "node:child_process";
+import { execFile as execFile3 } from "node:child_process";
 import { DatabaseSync } from "node:sqlite";
-import { promisify as promisify3 } from "node:util";
+import { promisify as promisify2 } from "node:util";
 
 // src/wire/sqlite.ts
 var text12 = _catch(nullable(string2()), null);
@@ -63837,14 +60304,14 @@ function storedArgs(raw2) {
 }
 
 // src/hermes/paths.ts
-import { homedir as homedir8 } from "node:os";
-import { join as join6 } from "node:path";
+import { homedir as homedir7 } from "node:os";
+import { join as join5 } from "node:path";
 function stateDbPath(env2 = process.env) {
-  return join6(env2["HERMES_HOME"] || join6(homedir8(), ".hermes"), "state.db");
+  return join5(env2["HERMES_HOME"] || join5(homedir7(), ".hermes"), "state.db");
 }
 
 // src/hermes/sessionIndex.ts
-var run2 = promisify3(execFile4);
+var run2 = promisify2(execFile3);
 var SOURCES = ["acp", "cli", "desktop", "gui", "local", "tui"];
 var LISTABLE = `(s.parent_session_id IS NULL
   OR json_extract(s.model_config, '$._branched_from') IS NOT NULL
@@ -64354,9 +60821,9 @@ function openThemePicker(host) {
 }
 
 // src/watch/spec.ts
-import { execFile as execFile5 } from "node:child_process";
-import { promisify as promisify4 } from "node:util";
-var run3 = promisify4(execFile5);
+import { execFile as execFile4 } from "node:child_process";
+import { promisify as promisify3 } from "node:util";
+var run3 = promisify3(execFile4);
 var WATCH_ENV = "HERMES_TERN_WATCH";
 function readWatchSpec(env2 = process.env) {
   return readWatchSpecText(env2[WATCH_ENV]);
@@ -64660,12 +61127,12 @@ var REFUSED_COMMANDS = [
 import { DatabaseSync as DatabaseSync3 } from "node:sqlite";
 
 // src/github/links.ts
-import { homedir as homedir9 } from "node:os";
-import { join as join7 } from "node:path";
+import { homedir as homedir8 } from "node:os";
+import { join as join6 } from "node:path";
 import { DatabaseSync as DatabaseSync2 } from "node:sqlite";
 var LINK_TOOLS = /* @__PURE__ */ new Set(["link_pull_request", "list_pull_requests", "unlink_pull_request"]);
 function linksPath(env2 = process.env) {
-  return join7(env2["HERMES_HOME"] || join7(homedir9(), ".hermes"), "plugin-data", "hermes-tern", "pull-requests.json");
+  return join6(env2["HERMES_HOME"] || join6(homedir8(), ".hermes"), "plugin-data", "hermes-tern", "pull-requests.json");
 }
 function refOf(v) {
   const r = record(v);
@@ -64770,12 +61237,12 @@ function textOf(content5) {
 }
 function lineTokens(text15) {
   const num5 = (s2) => Number(s2.replace(/,/g, ""));
-  const pair3 = /~([\d,]+)\s*→\s*~([\d,]+)\s*tok/.exec(text15);
+  const pair3 = /~(?<before>[\d,]+)\s*→\s*~(?<after>[\d,]+)\s*tok/.exec(text15)?.groups;
   if (pair3) {
-    return { after: num5(pair3[2]), before: num5(pair3[1]) };
+    return { after: num5(pair3["after"] ?? ""), before: num5(pair3["before"] ?? "") };
   }
-  const one5 = /~([\d,]+)\s*tok/.exec(text15);
-  return one5 ? { before: num5(one5[1]) } : {};
+  const one5 = /~(?<before>[\d,]+)\s*tok/.exec(text15)?.groups;
+  return one5 ? { before: num5(one5["before"] ?? "") } : {};
 }
 
 // src/hermes/rewind.ts
@@ -64835,7 +61302,8 @@ async function rewind(host, intent) {
   if (intent === "undo") {
     return host.notice(`Undid ${plural2(removed, "message")}.`);
   }
-  const text15 = retryText(result["target_message"]?.content);
+  const target = result["target_message"];
+  const text15 = retryText(typeof target === "object" && target !== null && "content" in target ? target.content : void 0);
   return text15 ? host.send(text15) : host.notice("Nothing to retry.");
 }
 function compressReport(summary4) {
@@ -64875,7 +61343,7 @@ async function compress(host, arg) {
   if (result.status === "preview") {
     return host.notice(Array.isArray(result["lines"]) ? result["lines"].join("\n") : "Nothing to preview.");
   }
-  const summary4 = result["summary"];
+  const summary4 = result.summary;
   const num5 = (v) => typeof v === "number" && v > 0 ? v : void 0;
   const kept = result.status === "noop" || result.status === "aborted" || Boolean(summary4?.noop || summary4?.aborted || summary4?.refused_would_grow);
   if (result.status !== "pending") {
@@ -65370,7 +61838,7 @@ function parts2(turn) {
   let from = turn.startedAt;
   const flush = (to) => {
     const hidden2 = stretch.filter((b) => fold.hidden.has(b.id));
-    if (hidden2.length) {
+    if (isNonEmpty(hidden2)) {
       out.push({ blocks: hidden2, key: `fold${hidden2[0].id}`, kind: "fold", label: workedFor(to - from) });
     }
     stretch.filter((b) => !fold.hidden.has(b.id)).forEach(show);
@@ -65462,10 +61930,11 @@ function editedFiles(calls) {
 }
 function groupIcon(items) {
   const actions = new Set(items.flatMap((i) => i.kind === "tool" ? [actionOf(i.call)] : []));
-  if (!actions.size) {
+  const [only] = actions;
+  if (!only) {
     return "brain";
   }
-  return actions.size === 1 ? actionIcon([...actions][0]) : "hammer";
+  return actions.size === 1 ? actionIcon(only) : "hammer";
 }
 function actionIcon(action) {
   return ACTION_ICON[action];
@@ -65936,7 +62405,7 @@ function workingRow(w) {
 
 // src/view/welcome.tsx
 import { readFileSync as readFileSync3 } from "node:fs";
-import { join as join8 } from "node:path";
+import { join as join7 } from "node:path";
 function welcomeNode(key2, cx) {
   return /* @__PURE__ */ jsxs("card", { role: "omp.welcome", children: [
     /* @__PURE__ */ jsxs("row", { align: "center", gap: "md", role: "omp.welcome.lockup", children: [
@@ -65956,7 +62425,7 @@ var TIP_LINE = /^\s+t\d+:\s+"((?:[^"\\]|\\.)*)"\s*$/;
 function randomTip(root7) {
   let text15;
   try {
-    text15 = readFileSync3(join8(root7, "locales", "en.yaml"), "utf8");
+    text15 = readFileSync3(join7(root7, "locales", "en.yaml"), "utf8");
   } catch {
     return "";
   }
@@ -65970,8 +62439,9 @@ function randomTip(root7) {
       break;
     }
     const quoted = TIP_LINE.exec(line)?.[1];
-    if (quoted) {
-      tips.push(JSON.parse(`"${quoted}"`));
+    const tip = quoted ? decodeJson(`"${quoted}"`) : void 0;
+    if (typeof tip === "string") {
+      tips.push(tip);
     }
   }
   return tips[Math.floor(Math.random() * tips.length)] ?? "";
@@ -66010,17 +62480,17 @@ function foldNode(part, id, children3) {
 }
 function workNode(items, parent, live, now) {
   const shown3 = visibleItems(items);
-  if (!shown3.length) {
+  if (!isNonEmpty(shown3)) {
     return null;
   }
-  const key2 = `w${items[0].id}`;
+  const key2 = `w${(items[0] ?? shown3[0]).id}`;
   const id = `${parent}.${key2}`;
   if (!live && shown3.length === 1) {
     return itemNode(shown3[0], parent, now, key2);
   }
   const calls = shown3.flatMap((i) => i.kind === "tool" ? [i.call] : []);
   const failed = calls.at(-1)?.outcome.kind === "error";
-  const latest2 = shown3.findLast((i) => i.kind === "tool" && i.call.outcome.kind === "running") ?? shown3.at(-1);
+  const latest2 = shown3.findLast((i) => i.kind === "tool" && i.call.outcome.kind === "running") ?? shown3.at(-1) ?? shown3[0];
   const head2 = live ? /* @__PURE__ */ jsxs("row", { align: "center", gap: "sm", children: [
     /* @__PURE__ */ jsx("icon", { name: itemIcon(latest2) }, "icon"),
     liveText(liveLabel(latest2, true)),
@@ -66069,10 +62539,11 @@ function itemNode(item3, parent, now, key2 = item3.id) {
 }
 function labelSpans(call) {
   const entries = (batchOf(call) ?? [call]).map((e) => appOf(e.name, e.args));
-  if (!entries.every(Boolean)) {
+  const apps = entries.filter(isDefined);
+  if (apps.length < entries.length) {
     return [{ s: "muted", t: stepLabel(call) }];
   }
-  return entries.flatMap((app2, i) => [
+  return apps.flatMap((app2, i) => [
     ...i ? [{ s: "muted", t: ", " }] : [],
     { t: app2.app },
     { s: "muted", t: ` \xB7 ${app2.action}` }
@@ -66404,11 +62875,11 @@ var COMMANDS3 = [
     run: (host, arg) => {
       const words3 = arg.trim().split(/\s+/).filter(Boolean);
       const global2 = words3.includes("--global") || words3.includes("default");
-      const level = words3.find((w) => LEVELS.some((l) => l.id === w || l.label === w));
+      const level = words3.flatMap((w) => LEVELS.find((l) => l.id === w || l.label === w) ?? []).at(0);
       if (!level) {
         return openEffortPicker(host, global2);
       }
-      void host.setEffort(LEVELS.find((l) => l.id === level || l.label === level).id, global2 ? "global" : "session");
+      void host.setEffort(level.id, global2 ? "global" : "session");
     }
   },
   {
@@ -66549,6 +63020,2241 @@ function localCommand(name) {
 }
 var localCommands = () => COMMANDS3;
 
+// .hermes-src/node_modules/nanostores/clean-stores/index.js
+var clean2 = /* @__PURE__ */ Symbol("clean");
+
+// .hermes-src/node_modules/nanostores/atom/index.js
+var listenerQueue = [];
+var lqIndex = 0;
+var batchSeen = null;
+var QUEUE_ITEMS_PER_LISTENER = 4;
+var nanostoresGlobal = globalThis.nanostoresGlobal ||= { epoch: 0 };
+var drainQueue = () => {
+  for (lqIndex = 0; lqIndex < listenerQueue.length; lqIndex += QUEUE_ITEMS_PER_LISTENER) {
+    listenerQueue[lqIndex](
+      listenerQueue[lqIndex + 1].value,
+      listenerQueue[lqIndex + 2],
+      listenerQueue[lqIndex + 3]
+    );
+  }
+  listenerQueue.length = 0;
+};
+var atom = /* @__NO_SIDE_EFFECTS__ */ (initialValue) => {
+  let listeners = [];
+  let $atom = {
+    get() {
+      if (!$atom.lc) {
+        $atom.listen(() => {
+        })();
+      }
+      return $atom.value;
+    },
+    init: initialValue,
+    lc: 0,
+    listen(listener) {
+      $atom.lc = listeners.push(listener);
+      return () => {
+        for (let i = lqIndex + QUEUE_ITEMS_PER_LISTENER; i < listenerQueue.length; ) {
+          if (listenerQueue[i] === listener) {
+            listenerQueue.splice(i, QUEUE_ITEMS_PER_LISTENER);
+          } else {
+            i += QUEUE_ITEMS_PER_LISTENER;
+          }
+        }
+        let index2 = listeners.indexOf(listener);
+        if (~index2) {
+          listeners.splice(index2, 1);
+          if (!--$atom.lc) $atom.off();
+        }
+      };
+    },
+    notify(oldValue, changedKey) {
+      nanostoresGlobal.epoch++;
+      let runListenerQueue = !listenerQueue.length && !batchSeen;
+      for (let listener of listeners) {
+        if (batchSeen?.has(listener)) continue;
+        batchSeen?.add(listener);
+        listenerQueue.push(
+          listener,
+          $atom,
+          oldValue,
+          batchSeen ? void 0 : changedKey
+        );
+      }
+      if (runListenerQueue) {
+        drainQueue();
+      }
+    },
+    /* It will be called on last listener unsubscribing.
+       We will redefine it in onMount and onStop. */
+    off() {
+    },
+    set(newValue) {
+      let oldValue = $atom.value;
+      if (oldValue !== newValue) {
+        $atom.value = newValue;
+        $atom.notify(oldValue);
+      }
+    },
+    subscribe(listener) {
+      let unbind = $atom.listen(listener);
+      listener($atom.value);
+      return unbind;
+    },
+    value: initialValue
+  };
+  if (process.env.NODE_ENV !== "production") {
+    $atom[clean2] = () => {
+      listeners = [];
+      $atom.lc = 0;
+      $atom.off();
+    };
+  }
+  return $atom;
+};
+
+// .hermes-src/ui-tui/src/i18n/en/app.ts
+var appEn = {
+  notice: {}
+};
+
+// .hermes-src/ui-tui/src/i18n/en/billing.ts
+var billingEn = {
+  billing: {
+    common: {
+      cancel: "Cancel",
+      back: "Back",
+      manageOnPortal: "Manage on portal",
+      noSavedCard: "No saved card on file",
+      payment: (card) => `Payment: ${card}`,
+      invalid: "invalid"
+    },
+    overview: {
+      title: (balance) => `Top up \xB7 balance ${balance}`,
+      org: (name) => `Org: ${name}`,
+      // args: 0 = threshold, 1 = reload-to amount
+      autoReloadOn: (threshold, reloadTo) => `Auto-reload: on (below ${threshold} \u2192 ${reloadTo})`,
+      autoReloadOff: "Auto-reload: off",
+      needsBillingPermissions: "Billing actions need someone with billing permissions (owner, admin, or finance admin).",
+      remoteSpendingOff: "Remote spending is off for this org \u2014 a billing admin can turn it on from the portal's Hermes Agent page.",
+      addFunds: "Add funds",
+      autoReload: "Auto-reload",
+      monthlyLimit: "Monthly limit",
+      card: (card) => `Card: ${card}`,
+      noCardHint: "No saved card on file \u2014 \u201CAdd funds\u201D walks you through adding one.",
+      hint: (count2) => `\u2191/\u2193 select \xB7 1-${count2} quick pick \xB7 Enter confirm \xB7 Esc close`
+    },
+    buy: {
+      title: "Add funds",
+      addCardOnPortal: "Add a card on the portal",
+      checkAgain: "I\u2019ve added it \u2014 check again",
+      customAmount: "Custom amount\u2026",
+      refreshFailed: "Could not refresh billing state \u2014 try again in a moment.",
+      cardFound: (card) => `\u2713 Card found: ${card} \u2014 pick an amount.`,
+      stillNoCard: "Still no card on file \u2014 finish adding it on the portal, then check again.",
+      invalidPreset: "Invalid preset.",
+      invalidAmount: "Invalid amount.",
+      addCardThenCheckAgain: "Add a card on the billing page, then come back and pick \u201Ccheck again\u201D.",
+      portalLinkFailed: "Could not build the portal link \u2014 is your portal configured?",
+      enterCustomAmount: "Enter a custom amount:",
+      typingHint: "Enter confirm \xB7 Esc back",
+      noSavedCardLine: "No saved card on file.",
+      addCardOnce: "Add a card once on the portal billing page \u2014 after that you can top up right from the terminal.",
+      checkingForCard: "Checking for a card\u2026",
+      hint: (count2) => `\u2191/\u2193 select \xB7 1-${count2} quick pick \xB7 Enter confirm \xB7 Esc back`
+    },
+    confirm: {
+      title: "Confirm purchase",
+      total: (amount) => `Total: ${amount}`,
+      portalCardCharged: "Your card saved on the portal will be charged.",
+      authorization: "By confirming, you allow Nous Research to charge your card.",
+      payNow: (amount) => `Pay ${amount} now`,
+      hint: "\u2191/\u2193 select \xB7 Enter confirm \xB7 Y/N quick \xB7 Esc back"
+    },
+    stepUp: {
+      openingBrowser: "Opening your browser to allow Remote Spending\u2026",
+      notAllowed: "! Couldn't allow Remote Spending \u2014 someone with billing permissions (owner, admin, or finance admin) has to approve it. Your card was not charged.",
+      allowedResuming: "\u2713 Remote Spending allowed \u2014 resuming your purchase.",
+      stillNeedsApproval: "! Remote Spending still needs approval \u2014 run /topup to try again. Your card was not charged.",
+      declined: "No charge made. Run /topup when you want to allow Remote Spending.",
+      title: "Allow Remote Spending",
+      waitingForBrowser: "Waiting for your browser\u2026",
+      approveInPage: "Approve in the page that just opened.",
+      heldHere: (amount) => `Your ${amount} top-up is held here and resumes when you're done.`,
+      escCancel: "Esc cancel",
+      grantedTitle: "Remote Spending allowed",
+      readyToFinish: (amount) => `Your ${amount} top-up is ready to finish.`,
+      pressEnterToResume: "Press Enter to resume",
+      grantedHint: "Enter resume \xB7 Esc cancel",
+      resuming: (amount) => `Resuming your ${amount} top-up\u2026`,
+      promptTitle: "One-time setup",
+      promptBody: "To charge from this terminal, allow Remote Spending once.",
+      promptDetail: (amount) => `It opens your browser to authorize, then your ${amount} top-up picks up right here.`,
+      allow: "Allow Remote Spending",
+      notNow: "Not now",
+      promptHint: "\u2191/\u2193 select \xB7 Enter confirm \xB7 Y/N quick \xB7 Esc cancel"
+    },
+    autoReload: {
+      title: "Auto-reload",
+      description: "Automatically add funds when your balance is low.",
+      aDifferentCard: "a different card",
+      yourCard: "your card",
+      manageCardOnPortal: "Use your card on file \u2014 manage on portal",
+      agreeAndTurnOn: "Agree and turn on",
+      turnOff: "Turn off",
+      thresholdError: (error) => `Threshold: ${error}`,
+      reloadToError: (error) => `Reload-to: ${error}`,
+      reloadToMustExceedThreshold: "Reload-to amount must be greater than the threshold.",
+      noCardManageOnPortal: "\u{1F534} No saved card \u2014 manage billing on the portal.",
+      // args: 0 = threshold, 1 = reload-to amount
+      turnedOn: (threshold, reloadTo) => `\u2705 Auto-reload on: below ${threshold} \u2192 reload to ${reloadTo}.`,
+      turnedOff: "\u2705 Auto-reload turned off.",
+      cardOnFile: (card) => `Card on file: ${card}`,
+      distinctCardWarning: (card) => `\u26A0 Auto-refill is charging ${card} \u2014 not your card on file.`,
+      thresholdLabel: "When balance falls below:",
+      reloadToLabel: "Reload balance to:",
+      authorization: (card) => `By confirming, you authorize Nous Research to charge ${card} whenever your balance falls below the threshold. Turn off any time here or on the portal.`,
+      hint: "\u2191/\u2193 move \xB7 Tab switch field \xB7 Enter next/confirm \xB7 Esc back"
+    },
+    limit: {
+      title: "Monthly spend limit",
+      // args: 0 = spent, 1 = limit
+      usage: (spent, limit) => `${spent} of ${limit} used this month`,
+      usageDefaultCeiling: (spent, limit) => `${spent} of ${limit} used this month (default ceiling)`,
+      noCapVisible: "No monthly cap visible (managed on the portal).",
+      readOnly: "The monthly limit is set on the portal \u2014 shown here read-only.",
+      hint: (count2) => `\u2191/\u2193 select \xB7 1-${count2} quick pick \xB7 Enter confirm \xB7 Esc back`
+    }
+  }
+};
+
+// .hermes-src/ui-tui/src/i18n/en/canonical.ts
+var canonicalEn = {
+  canonical: {
+    // app/slash/canonicalSessionControls.ts + canonicalSessionCommands.ts
+    controls: {
+      modelUsage: "usage: /model <model> [--provider <provider>] [--session]",
+      unsupportedModelOption: (flag2) => `unsupported canonical model option: ${flag2}`,
+      identityUnavailable: "session execution identity unavailable; reconnect before editing",
+      compressedStale: "compressed transcript is stale; reopen the session",
+      compressed: "\u2713 transcript compressed",
+      notAvailable: (command) => `/${command} is not available on the shared gateway yet`,
+      launchToolsets: (toolsets) => `toolsets fixed at session launch: ${toolsets}`,
+      retryUnsupported: "/retry: retry does not support media or unknown content parts"
+    },
+    // app/submissionCore.ts — durable admission receipts.
+    submit: {
+      correction: (status) => `correction ${status}`,
+      correctionRejected: "correction rejected \u2014 input retained",
+      admissionNotConfirmed: "admission not confirmed \u2014 input retained; use Alt+K to retry with the same identity",
+      statusAdmissionUnconfirmed: "admission unconfirmed",
+      executionUnconfirmed: (message) => `execution status unconfirmed: ${message}`,
+      legacyDelivery: "durable admission unavailable for this session \u2014 using legacy delivery",
+      legacyUnconfirmed: "legacy delivery unconfirmed \u2014 input retained; check the session before sending a new input",
+      legacyUnconfirmedWith: (message) => `legacy delivery unconfirmed: ${message} \u2014 input retained; check the session before sending a new input`,
+      statusDeliveryUnconfirmed: "delivery unconfirmed",
+      deliveryNotResent: "delivery unconfirmed \u2014 check the session before sending a new input; retained input was not resent",
+      busyTextOnly: "busy corrections accept text only \u2014 image input retained; submit it with /queue",
+      inputRetained: (message) => `input retained: ${message} \u2014 Alt+K retries the same submission`,
+      imageNotSubmitted: (message) => `image not submitted: ${message} \u2014 input retained`,
+      statusImageNotSubmitted: "image not submitted",
+      interruptFailed: (message) => `interrupt failed: ${message}`,
+      startupQuerySwitched: "startup query skipped: active session changed"
+    },
+    // hooks/useQueue.ts, app/useSubmission.ts, app/useComposerState.ts — the local input journal.
+    queue: {
+      unconfirmedPrefix: "[unconfirmed \xB7 Alt+K retry] ",
+      // {0}=admission status identifier (unknown; queued rows render plain), {1}=input text
+      serverRow: (status, text15) => `[${status}] ${text15}`,
+      discardFailed: (message) => `discard failed: ${message}`,
+      journalCleanupFailed: (message) => `input delivered; journal cleanup failed: ${message}`,
+      notSavedQueueKept: (message) => `input not saved: ${message} \u2014 queue kept`,
+      notSavedDraftKept: (message) => `input not saved: ${message} \u2014 draft kept`,
+      statusInputNotSaved: "input not saved",
+      unknownExecution: "unknown execution \u2014 Ctrl+X to discard before retrying",
+      invalidRecord: (name) => `Invalid pending input record: ${name}`,
+      clipboardImageFailed: (message) => `clipboard image failed: ${message}`
+    },
+    // lib/imageAttachments.ts — owner-staged image validation.
+    images: {
+      unsupported: "Unsupported image: expected PNG, JPEG, GIF, or WebP bytes",
+      tooLarge: "Image exceeds 20 MiB upload limit",
+      notFound: (path2) => `Image not found: ${path2}`,
+      noOwnerPath: "Image upload did not return an owner path"
+    },
+    // canonicalGateway.ts — launch-contract refusals.
+    launch: {
+      noTuiPolicy: "gateway does not support tui session policy; update/restart the gateway",
+      unsupportedOptions: (options) => `gateway does not support TUI launch options: ${options}`,
+      invalidToolProgress: (value) => `invalid HERMES_TUI_TOOL_PROGRESS: ${value}`
+    }
+  }
+};
+
+// .hermes-src/ui-tui/src/i18n/en/chatBits.ts
+var chatBitsEn = {
+  chatBits: {
+    branding: {
+      tagFull: "Nous Research \xB7 Messenger of the Digital Gods",
+      tagMid: "Messenger of the Digital Gods",
+      scanningSkills: "scanning skills",
+      moreCategories: (count2) => `(and ${count2} more categories\u2026)`,
+      moreToolsets: (count2) => `(and ${count2} more toolsets\u2026)`,
+      toolsOne: (count2) => `${count2} tool`,
+      toolsOther: (count2) => `${count2} tools`,
+      lazy: "(lazy)",
+      disabled: "disabled",
+      connecting: "connecting",
+      configured: "configured",
+      failed: "failed",
+      noSystemPrompt: "No system prompt loaded.",
+      sessionLabel: "Session: ",
+      availableTools: "Available Tools",
+      availableSkills: "Available Skills",
+      inCategoriesOne: (count2) => `in ${count2} category`,
+      inCategoriesOther: (count2) => `in ${count2} categories`,
+      systemPrompt: "System Prompt",
+      charsSuffix: (count2) => `\u2014 ${count2} chars`,
+      mcpServers: "MCP Servers",
+      connected: "connected",
+      // `count` is a number, or '…' while a lazy boot is still counting.
+      toolsSummary: (count2) => `${count2} tools`,
+      skillsSummary: (count2) => `${count2} skills`,
+      mcpSummary: (count2) => `${count2} MCP`,
+      helpHint: "/help for commands",
+      commitsBehindOne: (count2) => `! ${count2} commit behind`,
+      commitsBehindOther: (count2) => `! ${count2} commits behind`,
+      runPrefix: " - run ",
+      toUpdate: " to update"
+    },
+    thinking: {
+      thinking: "Thinking",
+      toolCalls: "Tool calls",
+      progress: "Progress",
+      spawned: "Spawned",
+      spawnTree: "Spawn tree",
+      activity: "Activity",
+      subagentFallback: (index2) => `Subagent ${index2}`,
+      statusQueued: "queued",
+      statusRunning: "running",
+      toolsOne: (count2) => `${count2} tool`,
+      toolsOther: (count2) => `${count2} tools`,
+      tokShort: (tokens2) => `${tokens2} tok`,
+      subtreeTools: (count2) => `+${count2}t sub`,
+      // {0} = depth of the spawned children, {1} = total descendants.
+      spawnedSuffix: (depth, total) => `d${depth} \xB7 ${total} total`,
+      drafting: "drafting...",
+      analyzingToolOutput: "analyzing tool output\u2026",
+      argsHeader: "Args:",
+      approxTokens: (count2) => `~${count2} tokens`,
+      approxTotal: (count2) => `~${count2} total`,
+      agentsToMonitor: "(/agents to monitor)",
+      agentsHint: "(/agents)"
+    },
+    messageLine: {
+      emptyToolResult: "(empty tool result)",
+      systemMessage: "(system message)",
+      chars: (count2) => `${count2} chars`,
+      longMessage: "[long message]",
+      response: "Response"
+    },
+    todo: {
+      title: "Todo",
+      incompleteOne: (pending) => `\xB7 incomplete \xB7 ${pending} still pending`,
+      incompleteOther: (pending) => `\xB7 incomplete \xB7 ${pending} still pending/in_progress`
+    },
+    queued: {
+      header: (count2) => `queued (${count2})`,
+      editing: (position4) => ` \xB7 editing ${position4} \xB7 Ctrl+X delete \xB7 Esc cancel`,
+      more: (count2) => `\u2026and ${count2} more`
+    },
+    entry: {
+      noTty: "hermes-tui: no TTY",
+      // {0} = memory level ('high' | 'critical'), {1} = formatted heap size, {2} = dump path.
+      memoryDump: (level, heap, path2) => `hermes-tui: ${level} memory (${heap}) \u2014 auto heap dump \u2192 ${path2}`,
+      dumpFailed: "(failed)",
+      exitingOom: "hermes-tui: exiting to avoid OOM; restart to recover",
+      heapClimbing: (heap) => `hermes-tui: heap climbing fast (${heap}) \u2014 a large tool output or long session may be straining memory`
+    }
+  }
+};
+
+// .hermes-src/ui-tui/src/i18n/en/chrome.ts
+var chromeEn = {
+  status: {
+    summoning: "summoning hermes\u2026",
+    ready: "ready",
+    running: "running\u2026",
+    mcpReloaded: "MCP reloaded after config change",
+    compacting: "compacting",
+    devCredits: " (dev credits)",
+    sessionCount: (count2) => `${count2} ${count2 === 1 ? "session" : "sessions"}`,
+    paused: "\u23F8 paused",
+    resumesWhenSubagentFinishes: "\u21A9 resumes when subagent finishes",
+    resumesWhenSubagentsFinish: (count2) => `\u21A9 resumes when ${count2} subagents finish`,
+    bgTasks: (count2) => `${count2} bg`,
+    compressions: (count2) => `cmp ${count2}`,
+    fast: "fast"
+  },
+  composer: {
+    interruptHint: "Ctrl+C to interrupt\u2026",
+    placeholders: {
+      ask: "Ask me anything\u2026",
+      explain: 'Try "explain this codebase"',
+      test: 'Try "write a test for\u2026"',
+      refactor: 'Try "refactor the auth module"',
+      help: 'Try "/help" for commands',
+      lint: 'Try "fix the lint errors"',
+      config: 'Try "how does the config loader work?"'
+    }
+  },
+  hints: {
+    copySelection: "copy selection",
+    ctrlCMac: "clear draft / interrupt / exit",
+    copySelectionForwarded: "copy selection when forwarded by the terminal",
+    ctrlC: "copy selection / clear draft / interrupt / exit",
+    exit: "exit",
+    openEditor: "open $EDITOR (Alt+G fallback for VSCode/Cursor)",
+    redraw: "redraw / repaint",
+    paste: "paste text; /paste attaches clipboard image",
+    discardDraft: "discard draft (recall with \u2191)",
+    applyCompletion: "apply completion",
+    arrows: "completions / queue edit / history",
+    sessionSwitcher: "open live session switcher (deletes queued message while editing)",
+    expandAgents: "expand live agents (keeps your draft)",
+    collapseAgents: "collapse / restore live agent preview",
+    modelPicker: "open model picker (keeps your draft; applies to next turn mid-stream)",
+    homeEnd: "home / end of line",
+    undoRedo: "undo / redo input edits",
+    deleteWord: "delete word",
+    killLine: "kill to line start / end (repeat across lines)",
+    jumpWord: "jump word",
+    lineStartEnd: "start / end of line",
+    newline: "insert newline",
+    continuation: "multi-line continuation (fallback)",
+    shell: "run a shell command (e.g. !ls, !git status)",
+    interpolate: 'interpolate shell output inline (e.g. "branch is {!git branch --show-current}")'
+  },
+  help: {
+    quickHelp: "? quick help",
+    quickHelpTail: "  \xB7  type /help for the full panel  \xB7  backspace to dismiss",
+    commonCommands: "Common commands",
+    hotkeys: "Hotkeys",
+    commands: {
+      help: "full list of commands + hotkeys",
+      clear: "start a new session",
+      resume: "switch live or resume past sessions",
+      details: "control transcript detail level",
+      copy: "copy selection or last assistant message",
+      quit: "exit hermes"
+    }
+  }
+};
+
+// .hermes-src/ui-tui/src/i18n/en/connection.ts
+var connectionEn = {
+  connection: {
+    // Card title verb, indexed by the target's `action` (backend value, not shown raw).
+    verb: {
+      authorize: "Authorize",
+      connect: "Connect",
+      enable: "Enable",
+      install: "Install",
+      reconnect: "Reconnect"
+    },
+    // {0} app, {1} account name the agent chose
+    namedAccount: (app2, alias) => `Hermes named this ${app2} account ${alias}. Rename it anytime.`,
+    header: {
+      // {0} title, {1} account name
+      account: (title, alias) => `${title} \xB7 ${alias}`,
+      moreToAnswer: (count2) => `${count2} more to answer after this one.`
+    },
+    field: {
+      set: "Set",
+      required: (label) => `${label} is required.`
+    },
+    selector: {
+      skip: "Skip",
+      tryAgain: "Try again"
+    },
+    failure: {
+      expired: "The link expired.",
+      failed: "That did not work."
+    },
+    status: {
+      finishing: "Finishing\u2026",
+      working: "Working\u2026",
+      pending: "Pending\u2026"
+    },
+    authorized: {
+      title: "Authorized. Tools unavailable.",
+      continue: "Continue",
+      hint: "Enter or Esc continue"
+    },
+    hint: {
+      finishing: "Esc close \xB7 Ctrl+C stop the turn",
+      browser: "Enter open in browser \xB7 Esc skip \xB7 Ctrl+C stop the turn",
+      working: "Esc skip \xB7 Ctrl+C stop the turn",
+      retry: "\u2190/\u2192 select \xB7 Enter confirm \xB7 Esc skip \xB7 Ctrl+C stop the turn",
+      form: "\u2191/\u2193 or Tab move \xB7 \u2190/\u2192 select \xB7 Enter confirm \xB7 Esc skip \xB7 Ctrl+C stop the turn"
+    },
+    notice: {
+      answerNotDelivered: "That answer did not reach Hermes. Try again.",
+      restartFailed: "Hermes could not start that again. Try again.",
+      browserDidNotOpen: "The browser did not open. Copy the link above."
+    }
+  },
+  journey: {
+    title: "Journey",
+    subtitle: "learned skills & memories over time",
+    closeHint: "Esc/q close",
+    error: (message) => `error: ${message}`,
+    loading: "assembling your learning map\u2026",
+    empty: "No learning yet \u2014 your learned skills and memories will start mapping out here as you use Hermes.",
+    noDetail: "No additional detail recorded yet.",
+    notice: {
+      cannotEdit: "cannot edit",
+      noChanges: "no changes"
+    },
+    confirmDelete: (label) => `delete ${label}? y/N`,
+    slice: {
+      skillsOne: (count2) => `${count2} skill`,
+      skillsOther: (count2) => `${count2} skills`,
+      memoriesOne: (count2) => `${count2} memory`,
+      memoriesOther: (count2) => `${count2} memories`
+    },
+    hint: {
+      item: "\u2191\u2193/jk scroll \xB7 PgUp/PgDn page \xB7 e edit \xB7 d delete \xB7 Esc/\u2190 back \xB7 q close",
+      // Timeline hint segments; the component joins the applicable ones with ' · '.
+      move: "\u2191\u2193/jk move",
+      open: "Enter/\u2192 open",
+      edit: "e edit",
+      delete: "d delete",
+      topBottom: "g/G top/bottom",
+      close: "q close"
+    }
+  }
+};
+
+// .hermes-src/ui-tui/src/i18n/en/connectors.ts
+var connectorsEn = {
+  connectors: {
+    title: "Connector accounts",
+    loading: "loading accounts\u2026",
+    empty: "No connector accounts yet. Press a to add one.",
+    unnamedTag: "(unnamed)",
+    retiredFolded: (count2) => `${count2} retired (Tab to show)`,
+    retiredShown: (count2) => `${count2} retired shown (Tab to hide)`,
+    status: {
+      active: "active",
+      expired: "expired",
+      failed: "failed",
+      inactive: "inactive",
+      pending: "pending",
+      retired: "retired",
+      revoked: "revoked"
+    },
+    rename: {
+      // {0} app, {1} current name
+      title: (app2, name) => `Rename ${app2} account ${name}`,
+      hint: "Enter save \xB7 Esc cancel"
+    },
+    add: {
+      pickApp: "Add an account to which app?",
+      pickHint: "\u2191/\u2193 select \xB7 Enter choose \xB7 Esc cancel",
+      noApps: "No connectors are available to add.",
+      name: (app2) => `Name the new ${app2} account`,
+      nameHint: "Enter connect \xB7 Esc cancel"
+    },
+    link: {
+      // {0} app, {1} name
+      title: (app2, name) => `Connect ${app2} account ${name}`,
+      reconnectTitle: (app2, name) => `Reconnect ${app2} account ${name}`,
+      waiting: "Waiting for you to finish in the browser\u2026",
+      hint: "Enter open in browser \xB7 Esc stop waiting",
+      starting: "Starting\u2026"
+    },
+    remove: {
+      // {0} app, {1} name
+      confirm: (app2, name) => `Remove ${app2} account ${name}? This signs Hermes out of it.`
+    },
+    notice: {
+      // {0} app, {1} name
+      connected: (app2, name) => `${app2} account ${name} is connected.`,
+      renamed: (app2, name) => `Renamed to ${name} (${app2}).`,
+      removed: (app2, name) => `Removed ${app2} account ${name}.`,
+      notConnected: (app2) => `${app2} did not connect. Try again.`,
+      stopped: "Stopped waiting. The link still works until it expires.",
+      waitEnded: "Stopped waiting: the link expired. The list shows where the account stands.",
+      nameInvalid: "Use 1-32 lowercase letters, digits or -, starting with a letter or digit.",
+      nameTaken: "That name is already used.",
+      retiredNoReconnect: "A retired account cannot be reconnected. Add another account instead.",
+      browserDidNotOpen: "The browser did not open. Copy the link above."
+    },
+    hint: "r rename \xB7 a add \xB7 c reconnect \xB7 x remove \xB7 Tab retired \xB7 Esc/q close",
+    // The selected account works, so the repair key is not offered.
+    hintHealthy: "r rename \xB7 a add \xB7 x remove \xB7 Tab retired \xB7 Esc/q close",
+    errorLine: (message) => `error: ${message}`
+  }
+};
+
+// .hermes-src/ui-tui/src/i18n/en/content.ts
+var contentEn = {
+  content: {
+    // Keyed by tool name (untranslated identifier) → progress verb.
+    verbs: {
+      browser: "browsing",
+      clarify: "asking",
+      create_file: "creating",
+      delegate_task: "delegating",
+      delete_file: "deleting",
+      execute_code: "executing",
+      image_generate: "generating",
+      list_files: "listing",
+      memory: "remembering",
+      patch: "patching",
+      read_file: "reading",
+      run_command: "running",
+      search_code: "searching",
+      search_files: "searching",
+      terminal: "terminal",
+      web_extract: "extracting",
+      web_search: "searching",
+      write_file: "writing"
+    },
+    fortunes: {
+      fortune01: "you are one clean refactor away from clarity",
+      fortune02: "a tiny rename today prevents a huge bug tomorrow",
+      fortune03: "your next commit message will be immaculate",
+      fortune04: "the edge case you are ignoring is already solved in your head",
+      fortune05: "minimal diff, maximal calm",
+      fortune06: "today favors bold deletions over new abstractions",
+      fortune07: "the right helper is already in your codebase",
+      fortune08: "you will ship before overthinking catches up",
+      fortune09: "tests are about to save your future self",
+      fortune10: "your instincts are correctly suspicious of that one branch"
+    },
+    legendaryFortunes: {
+      legendary01: "legendary drop: one-line fix, first try",
+      legendary02: "legendary drop: every flaky test passes cleanly",
+      legendary03: "legendary drop: your diff teaches by itself"
+    },
+    // Kaomoji are language-neutral but keyed so a pack may swap them.
+    faces: {
+      face01: "(\uFF61\u2022\u0301\uFE3F\u2022\u0300\uFF61)",
+      face02: "(\u25D4_\u25D4)",
+      face03: "(\xAC\u203F\xAC)",
+      face04: "( \u2022_\u2022)>\u2310\u25A0-\u25A0",
+      face05: "(\u2310\u25A0_\u25A0)",
+      face06: "(\xB4\uFF65_\uFF65`)",
+      face07: "\u25C9_\u25C9",
+      face08: "(\xB0\u30ED\xB0)",
+      face09: "( \u02D8\u2323\u02D8)\u2661",
+      face10: "\u30FD(>\u2200<\u2606)\u2606",
+      face11: "\u0669(\u0E51\u275B\u1D17\u275B\u0E51)\u06F6",
+      face12: "(\u2299_\u2299)",
+      face13: "(\xAC_\xAC)",
+      face14: "( \u0361\xB0 \u035C\u0296 \u0361\xB0)",
+      face15: "\u0CA0_\u0CA0"
+    },
+    setup: {
+      title: "Setup Required",
+      intro: "Hermes needs a model provider before the TUI can start a session.",
+      actions: "Actions",
+      setupRow: "run the first-time setup wizard in-place (adds a provider)",
+      modelRow: "pick a model (needs a session \u2014 add a provider first)",
+      exitRow: "exit and run `hermes setup` manually",
+      footer: "In the dashboard the Models page sets the profile default; on Desktop it is Settings -> Models."
+    }
+  }
+};
+
+// .hermes-src/ui-tui/src/i18n/en/gatewayMsg.ts
+var gatewayMsgEn = {
+  gatewayMsg: {
+    // Free-text status-bar phrases nothing compares against.
+    status: {
+      recoveringSession: "recovering session\u2026",
+      forgingSession: "forging session\u2026",
+      resumingMostRecent: "resuming most recent\u2026",
+      protocolWarning: "protocol warning"
+    },
+    startup: {
+      querySkipped: "startup query skipped: no active session",
+      imageAttachFailed: (message) => `startup image attach failed: ${message}`,
+      commandCatalogUnavailable: (message) => `command catalog unavailable: ${message}`
+    },
+    clarify: {
+      // Reason shown as "(…)" after an abandoned clarify prompt.
+      timedOut: "timed out"
+    },
+    agents: {
+      workingNudge: "subagents working \xB7 /agents to watch live"
+    },
+    // Brief status-bar echo of a goal status.update; leading glyph mirrors the backend line.
+    goal: {
+      complete: "\u2713 goal complete",
+      continuing: "\u21BB goal continuing",
+      paused: "\u23F8 goal paused"
+    },
+    billing: {
+      openLinkRemoteSpending: "\u{1F4B3} Open this link to allow Remote Spending:",
+      enterCode: (code7) => `If prompted, enter code: ${code7}`
+    },
+    voice: {
+      stopPhrase: "voice: stop phrase \u2014 voice chat ended",
+      noSpeechLimit: "voice: no speech detected 3 times, continuous mode stopped"
+    },
+    wake: {
+      // {0}=profile name (used twice: in the notice and in the suggested command)
+      otherProfile: (profile) => `wake phrase for profile '${profile}' \u2014 run: hermes -p ${profile} --tui`,
+      failed: (message) => `wake: ${message}`
+    },
+    protocol: {
+      noiseDetected: "protocol noise detected \xB7 /logs to inspect",
+      noise: (preview5) => `protocol noise: ${preview5}`
+    },
+    moa: {
+      // {0}=references done {1}=references total (pre-formatted strings)
+      refs: (done, total) => `MoA: refs ${done}/${total}`,
+      aggregating: "MoA: aggregating\u2026"
+    },
+    error: {
+      unknown: "unknown error"
+    }
+  }
+};
+
+// .hermes-src/ui-tui/src/i18n/en/hubs.ts
+var hubsEn = {
+  hubs: {
+    // Shared list-window affordances for the Skills / Plugins hubs.
+    list: {
+      moreAbove: (count2) => ` \u2191 ${count2} more`,
+      moreBelow: (count2) => ` \u2193 ${count2} more`,
+      errorLine: (message) => `error: ${message}`
+    },
+    agents: {
+      title: {
+        spawnTree: "Spawn tree",
+        pausedSuffix: " \xB7 \u23F8 paused",
+        lastTurn: "Last turn",
+        // {0} replay index, {1} history length
+        replay: (index2, total) => `Replay ${index2}/${total}`,
+        finishedAt: (time2) => ` \xB7 finished ${time2}`
+      },
+      // {0} max spawn depth, {1} max concurrent children
+      caps: (depth, children3) => `caps d${depth}/${children3}`,
+      inheritModel: "inherit",
+      subagentFallback: "subagent",
+      empty: "No subagents this turn. Trigger delegate_task to populate the tree.",
+      timeline: "Timeline",
+      processes: "Processes",
+      sort: {
+        depthFirst: "spawn order",
+        durationDesc: "slowest",
+        status: "status",
+        toolsDesc: "busiest"
+      },
+      filter: {
+        all: "all",
+        failed: "failed",
+        leaf: "leaves",
+        running: "running"
+      },
+      status: {
+        completed: "completed",
+        error: "error",
+        failed: "failed",
+        interrupted: "interrupted",
+        queued: "queued",
+        running: "running",
+        timeout: "timeout"
+      },
+      section: {
+        budget: "Budget",
+        files: "Files",
+        toolCalls: "Tool calls",
+        output: "Output",
+        progress: "Progress",
+        summary: "Summary"
+      },
+      detail: {
+        depth: "depth",
+        model: "model",
+        toolsets: "toolsets",
+        tools: "tools",
+        // {0} own tool count, {1} subtree tool count
+        toolsValue: (own14, subtree) => `${own14} (subtree ${subtree})`,
+        subtree: "subtree",
+        // {0} descendant count, {1} max depth below, {2} active count
+        subtreeValueOne: (count2, depth, active) => `${count2} agent \xB7 d${depth} \xB7 \u26A1${active}`,
+        subtreeValueOther: (count2, depth, active) => `${count2} agents \xB7 d${depth} \xB7 \u26A1${active}`,
+        elapsed: "elapsed",
+        iteration: "iteration",
+        apiCalls: "api calls",
+        tokens: "tokens",
+        // {0} formatted input tokens, {1} formatted output tokens
+        tokensValue: (input2, output) => `${input2} in \xB7 ${output} out`,
+        reasoningSuffix: (tokens2) => ` \xB7 ${tokens2} reasoning`,
+        subtreeTokens: "subtree tokens",
+        filesMore: (count2) => `\u2026+${count2} more`
+      },
+      diff: {
+        title: "Replay diff",
+        subtitle: "baseline vs candidate \xB7 esc/q close",
+        baseline: "A \xB7 baseline",
+        candidate: "B \xB7 candidate",
+        delta: "\u0394",
+        agents: "agents",
+        tools: "tools",
+        depth: "depth",
+        duration: "duration",
+        tokens: "tokens"
+      },
+      flash: {
+        turnFinished: "turn finished \xB7 inspect freely \xB7 q to close",
+        replayLocked: "replay mode \u2014 controls disabled",
+        killing: (id) => `killing ${id}`,
+        notFound: (id) => `not found: ${id}`,
+        killFailed: (id) => `kill failed: ${id}`,
+        killingSubtreeOne: (count2) => `killing subtree \xB7 ${count2} node`,
+        killingSubtreeOther: (count2) => `killing subtree \xB7 ${count2} nodes`,
+        spawningPaused: "spawning paused",
+        spawningResumed: "spawning resumed",
+        pauseFailed: "pause failed",
+        liveTurn: "live turn",
+        // {0} replay index, {1} history length
+        replay: (index2, total) => `replay \xB7 ${index2}/${total}`
+      },
+      hint: {
+        controlsLocked: " \xB7 controls locked",
+        // {0} is `pause` / `resume` below
+        controls: (pauseVerb) => ` \xB7 e steer \xB7 t tail \xB7 x stop \xB7 X subtree \xB7 p ${pauseVerb}`,
+        pause: "pause",
+        resume: "resume",
+        footerReplay: "Enter/d detail \xB7 e steer \xB7 x stop \xB7 Esc back",
+        footerLive: "Enter/t tail \xB7 d detail \xB7 e steer \xB7 x stop \xB7 Esc back",
+        listNavReplay: "Enter/\u2192 detail",
+        listNavLive: "Enter tail \xB7 d/\u2192 detail",
+        // {0} listNavReplay/listNavLive, {1} controls hint, {2} sort label, {3} filter label, {4} history hint
+        list: (nav, controls, sort, filter, history2) => `\u2191\u2193/jk move \xB7 g/G top/bottom \xB7 ${nav}${controls} \xB7 s sort:${sort} \xB7 f filter:${filter}${history2} \xB7 q close`,
+        // {0} replay index, {1} history length
+        history: (index2, total) => ` \xB7 [ / ] history ${index2}/${total}`,
+        detail: (controls) => `\u2191\u2193/jk scroll \xB7 PgUp/PgDn page \xB7 g/G top/bottom \xB7 Esc/\u2190 back to list${controls} \xB7 q close`
+      }
+    },
+    agentsPanel: {
+      running: (count2) => `${count2} running`,
+      done: (count2) => `${count2} done`,
+      liveAgents: (count2) => `${count2} live agents`,
+      procs: (count2) => `${count2} procs`,
+      procsDone: (count2) => `${count2} done`,
+      moreHidden: (count2) => ` \xB7 +${count2} more`,
+      processes: "Processes",
+      collapsedHint: " \xB7 Ctrl+T expand \xB7 Ctrl+R restore",
+      expandedHint: " \xB7 Ctrl+T expand \xB7 Ctrl+R collapse"
+    },
+    agentControls: {
+      queued: "Queued for child \u2014 applied at the next tool boundary.",
+      notQueued: "Not queued: child has finished or is no longer accepting guidance.",
+      notQueuedError: (message) => `Not queued: ${message}`,
+      steerTitle: (id) => `Steer ${id}`,
+      steerIntro: "Guidance queues at the next tool boundary; current work is not interrupted.",
+      queueing: "Queueing\u2026",
+      steerHint: "Enter queue \xB7 Esc back \xB7 main composer draft is preserved",
+      loadingTranscript: "Loading live transcript\u2026",
+      truncatedPrefix: "[last 16 KiB]",
+      transcriptUnavailable: "Live transcript unavailable; child may have finished. Progress and output remain below.",
+      transcriptRefreshFailed: "Could not refresh live transcript.",
+      transcriptTitle: "Live transcript"
+    },
+    skills: {
+      title: "Skills Hub",
+      loading: "loading skills\u2026",
+      loadingOne: "loading\u2026",
+      installing: "installing\u2026",
+      selectCategory: "select a category",
+      // {0} category name, {1} skill count
+      categoryRow: (category, count2) => `${category} \xB7 ${count2} skills`,
+      skillCount: (count2) => `${count2} skill(s)`,
+      emptyCategory: "no skills in this category",
+      pathLine: (path2) => `path: ${path2}`,
+      hintCancel: "Esc/q cancel",
+      hintCategory: "\u2191/\u2193 select \xB7 Enter open \xB7 1-9,0 quick \xB7 Esc/q cancel",
+      hintSkill: "\u2191/\u2193 select \xB7 Enter open \xB7 1-9,0 quick \xB7 Esc back \xB7 q close",
+      hintSkillEmpty: "Esc back \xB7 q close",
+      hintActions: "i reinspect \xB7 x reinstall \xB7 Enter/Esc back \xB7 q close"
+    },
+    plugins: {
+      title: "Plugins Hub",
+      loading: "loading plugins\u2026",
+      updating: "updating\u2026",
+      empty: "no plugins installed",
+      // `hermes plugins install owner/repo` is a CLI command: keep it verbatim.
+      installHint: "install: hermes plugins install owner/repo",
+      status: {
+        disabled: "disabled",
+        notEnabled: "not enabled"
+      },
+      bundledTag: " [bundled]",
+      userScope: (count2) => `${count2} user plugin(s)`,
+      bundledSuffix: (count2) => ` \xB7 +${count2} bundled (Tab)`,
+      allScope: (count2) => `all ${count2} plugins`,
+      hintClose: "Esc/q close",
+      hintList: "\u2191/\u2193 select \xB7 Enter/Space toggle \xB7 Tab user/all \xB7 1-9,0 quick \xB7 Esc/q close"
+    }
+  }
+};
+
+// .hermes-src/ui-tui/src/i18n/en/lib.ts
+var libEn = {
+  common: {
+    yes: "yes",
+    no: "no",
+    cancel: "cancel",
+    unknown: "unknown"
+  }
+};
+
+// .hermes-src/ui-tui/src/i18n/en/libText.ts
+var libTextEn = {
+  libText: {
+    // gatewayClient.ts — transport-drop reasons that reject in-flight RPCs and
+    // therefore surface in the transcript. `gateway not connected` /
+    // `gateway not running` are deliberately NOT here: app/userMessages.ts
+    // parses them (NOT_CONNECTED_RE) and rewrites them into plain words.
+    gateway: {
+      restarting: "gateway restarting",
+      exited: "gateway exited",
+      /** {0} = exit code */
+      exitedWithCode: (code7) => `gateway exited (${code7})`,
+      /** {0} = child process error message */
+      error: (message) => `gateway error: ${message}`,
+      websocketUnavailable: "gateway websocket unavailable",
+      websocketConnectionFailed: "gateway websocket connection failed",
+      /** {0} = websocket close code */
+      websocketClosedDuringConnect: (code7) => `gateway websocket closed (${code7}) during connect`,
+      websocketClosed: "gateway websocket closed",
+      /** {0} = websocket close code */
+      websocketClosedWithCode: (code7) => `gateway websocket closed (${code7})`,
+      websocketStartupFailed: "gateway websocket startup failed",
+      attachUrlChanged: "gateway attach url changed",
+      closed: "gateway closed"
+    },
+    // lib/terminalSetup.ts — /terminal-setup result messages. {0} = IDE label
+    // (VS Code / Cursor / Windsurf) unless noted.
+    terminalSetup: {
+      mustRunLocally: (label) => `${label} terminal setup must be run on the local machine, not inside an SSH session.`,
+      settingsPathUnknown: (label) => `Could not determine ${label} settings path on this platform.`,
+      /** {0} = IDE label, {1} = keybindings.json path */
+      keybindingsNotArray: (label, file2) => `${label} keybindings.json is not a JSON array: ${file2}`,
+      /** {0} = IDE label, {1} = error text */
+      readFailed: (label, error) => `Failed to read ${label} keybindings: ${error}`,
+      /** {0} = keybindings.json path, {1} = comma-joined conflicting key chords */
+      conflicts: (file2, keys2) => `Existing terminal keybindings would conflict in ${file2}: ${keys2}`,
+      alreadyConfigured: (label) => `${label} terminal keybindings already configured.`,
+      /** {0} = count, {1} = IDE label */
+      addedOne: (count2, label) => `Added ${count2} ${label} terminal keybinding`,
+      /** {0} = count, {1} = IDE label */
+      addedOther: (count2, label) => `Added ${count2} ${label} terminal keybindings`,
+      /** {0} = count */
+      migratedOne: (count2) => `migrated ${count2} legacy binding to CSI u encoding`,
+      /** {0} = count */
+      migratedOther: (count2) => `migrated ${count2} legacy bindings to CSI u encoding`,
+      /** {0} = comma-joined summary parts, {1} = keybindings.json path */
+      summaryIn: (parts3, file2) => `${parts3} in ${file2}`,
+      /** {0} = IDE label, {1} = error text */
+      configureFailed: (label, error) => `Failed to configure ${label} terminal shortcuts: ${error}`,
+      noSupportedIde: "No supported IDE terminal detected. Supported: VS Code, Cursor, Windsurf."
+    },
+    // lib/terminalParity.ts — startup hints about the host terminal.
+    terminalParity: {
+      /** {0} = detected IDE id (vscode / cursor / windsurf) */
+      ideSetup: (terminal) => `Detected ${terminal} terminal \xB7 run /terminal-setup for best Cmd+Enter / undo parity`,
+      appleTerminal: "Apple Terminal detected \xB7 use /paste for image-only clipboard fallback, and try Ctrl+A / Ctrl+E / Ctrl+U if Cmd+\u2190/\u2192/\u232B gets rewritten",
+      tmux: "tmux detected \xB7 clipboard copy/paste uses passthrough when available; allow-passthrough improves OSC52 reliability",
+      remote: "SSH session detected \xB7 text clipboard can bridge via OSC52, but image clipboard and local screenshot paths still depend on the machine running Hermes"
+    },
+    // lib/billingDialog.ts — the out-of-credits confirm dialog.
+    billingDialog: {
+      dismiss: "Dismiss",
+      topUp: "Top up",
+      nousDetail: "Your Nous credit balance is exhausted \u2014 top up to keep going.",
+      nousTitle: "Out of Nous credits",
+      yourProvider: "your provider",
+      openBillingPage: "Open billing page",
+      switchProvider: "Switch provider",
+      /** {0} = provider label */
+      providerDetail: (label) => `${label} reports your credits or billing are exhausted.`,
+      /** {0} = provider label */
+      providerTitle: (label) => `Out of credits \xB7 ${label}`
+    },
+    // lib/subagentTree.ts — the `d2 · 7 agents · 124 tools · 2m 14s` summary chip.
+    subagentTree: {
+      /** {0} = pre-formatted count */
+      agentsOne: (count2) => `${count2} agent`,
+      /** {0} = pre-formatted count */
+      agentsOther: (count2) => `${count2} agents`,
+      /** {0} = pre-formatted count */
+      toolsOne: (count2) => `${count2} tool`,
+      /** {0} = pre-formatted count */
+      toolsOther: (count2) => `${count2} tools`,
+      /** {0} = compact token count (`12k`) */
+      tokens: (count2) => `${count2} tok`
+    },
+    // lib/text.ts — transcript trail / clarify prose.
+    text: {
+      showingLiveTail: "showing live tail",
+      /** {0} = label prefix, {1} = omitted line count, {2} = omitted char count (both pre-formatted) */
+      omittedLinesChars: (prefix2, lines, chars) => `[${prefix2}; omitted ${lines} lines / ${chars} chars]`,
+      /** {0} = label prefix, {1} = omitted char count (pre-formatted) */
+      omittedChars: (prefix2, chars) => `[${prefix2}; omitted ${chars} chars]`,
+      argsLabel: "Args",
+      resultLabel: "Result",
+      errorLabel: "Error",
+      /** {0} = pre-formatted line count; sits inside a `[[ … ]]` composer token */
+      pasteLinesChip: (count2) => `[${count2} lines]`,
+      /** {0} = question count */
+      clarifyHead: (count2) => `ask (${count2} questions)`,
+      /** {0} = question, {1} = locked answer */
+      clarifyAnswered: (question, answer) => `\u2713 ${question} \u2192 ${answer}`,
+      /** {0} = question */
+      clarifyUnanswered: (question) => `\xB7 ${question} (no answer)`,
+      /** {0} = why the batch ended */
+      clarifyReason: (reason) => `(${reason})`
+    },
+    // lib/agentRows.ts — docked agents panel row fallbacks.
+    agentRows: {
+      starting: "Starting\u2026",
+      agent: "agent",
+      resultReady: "result ready"
+    },
+    // domain/messages.ts — transcript replay projections.
+    messages: {
+      messageFallback: "(message)",
+      /** {0} = the first few words of the message */
+      longMessage: (prefix2) => `${prefix2} [long message]`,
+      modelChanged: "model changed",
+      resumedInterruptedTurn: "resumed interrupted turn",
+      personalityChanged: "personality changed",
+      backgroundProcessFinished: "background process finished",
+      backgroundAgentWorkFinished: "background agent work finished",
+      /** {0} = count */
+      backgroundAgentsFinishedOne: (count2) => `${count2} background agent finished`,
+      /** {0} = count */
+      backgroundAgentsFinishedOther: (count2) => `${count2} background agents finished`
+    },
+    // domain/attachments.ts — the composer token an attached image renders as.
+    attachments: {
+      /** {0} = 1-based image index; must stay inside `[[ … ]]` (PASTE_SNIPPET_RE) */
+      imageToken: (index2) => `[[ Image ${index2} ]]`
+    },
+    // hooks/useCompletion.ts — the placeholder row when the completer RPC fails.
+    completion: {
+      unavailable: "completion unavailable",
+      unavailableMeta: "unavailable"
+    }
+  }
+};
+
+// .hermes-src/ui-tui/src/i18n/en/overlays.ts
+var overlaysEn = {
+  prompt: {
+    approval: {
+      title: "\u26A0 approval required",
+      moreLines: (count2) => `\u2026 +${count2} more line${count2 === 1 ? "" : "s"} (full text above)`,
+      once: "Allow once",
+      session: "Allow this session",
+      always: "Always allow",
+      deny: "Deny"
+    },
+    clarify: {
+      other: "Other (type your answer)",
+      skipped: "(skipped)",
+      toggle: "Space toggle",
+      confirmAndContinue: "confirm and continue",
+      lockAnswer: "lock answer",
+      typingHint: (enterAction) => `Enter ${enterAction} \xB7 Esc back`,
+      hint: (enterAction) => `\u2191/\u2193 select \xB7 Enter ${enterAction} \xB7 Tab/Shift+Tab switch question \xB7 Esc/Ctrl+C cancel`
+    },
+    confirm: {
+      confirm: "Yes",
+      cancel: "No",
+      hint: "\u2191/\u2193 select \xB7 Enter confirm \xB7 Y/N quick \xB7 Esc cancel"
+    }
+  }
+};
+
+// .hermes-src/ui-tui/src/i18n/en/pickers.ts
+var pickersEn = {
+  pickers: {
+    common: {
+      // {0} = the human-readable error message (never a machine code).
+      error: (message) => `error: ${message}`,
+      // {0} = the RPC method name (e.g. `model.options`) — not translated.
+      invalidResponse: (method) => `invalid response: ${method}`,
+      moreAbove: (count2) => ` \u2191 ${count2} more`,
+      moreBelow: (count2) => ` \u2193 ${count2} more`,
+      filter: (query) => `filter: ${query}`,
+      typeToFilter: "type to filter"
+    },
+    model: {
+      loading: "loading models\u2026",
+      noProviders: "no providers available",
+      failedToSaveKey: "failed to save key",
+      // {0} = the provider's key env var name (e.g. OPENAI_API_KEY).
+      pasteKeyToActivate: (keyEnv) => `paste ${keyEnv} to activate`,
+      runHermesModelToConfigure: "run `hermes model` to configure",
+      escQCancelHint: "Esc/q cancel",
+      reasoning: {
+        none: "none (disable reasoning)",
+        keepCurrent: "Keep current effort"
+      },
+      key: {
+        // {0} = provider display name.
+        title: (providerName) => `Configure ${providerName}`,
+        pasteBelow: "Paste your API key below (saved to ~/.hermes/.env)",
+        empty: "(empty)",
+        saving: "saving\u2026",
+        hint: "Enter save \xB7 Ctrl+U clear \xB7 Esc back"
+      },
+      disconnect: {
+        // {0} = provider display name.
+        title: (providerName) => `Disconnect ${providerName}?`,
+        // {0} = provider display name.
+        removesCredentials: (providerName) => `This removes saved credentials for ${providerName}.`,
+        reauthLater: "You can re-authenticate later by selecting it again.",
+        disconnecting: "disconnecting\u2026",
+        hint: "y/Enter confirm \xB7 n/Esc cancel"
+      },
+      provider: {
+        title: "Select provider (step 1/3)",
+        subtitle: "Full model IDs on the next step \xB7 Enter to continue",
+        // {0} = current model id (or the `unknown` leaf below).
+        current: (model) => `Current: ${model}`,
+        unknown: "(unknown)",
+        noKey: "(no key)",
+        needsSetup: "(needs setup)",
+        modelCountOne: (count2) => `${count2} model`,
+        modelCountOther: (count2) => `${count2} models`,
+        filterHint: "type to filter \xB7 \u2191/\u2193 select",
+        // {0} = provider warning text from the backend.
+        warning: (warning) => `warning: ${warning}`,
+        noMatches: "no providers match",
+        hint: "\u2191/\u2193 select \xB7 Enter choose \xB7 ^d disconnect \xB7 Esc clear/back \xB7 q close"
+      },
+      persist: {
+        // {0} = one of `scopeGlobal` / `scopeSession`.
+        label: (scope) => `persist: ${scope}`,
+        scopeGlobal: "global",
+        scopeSession: "session",
+        toggleHint: " \xB7 ^g toggle",
+        onlySuffix: " only"
+      },
+      effort: {
+        title: "Reasoning effort (step 3/3)",
+        // {0} = the pending model id.
+        subtitle: (model) => `${model} \xB7 applies with the switch (same scope) \xB7 Esc back`,
+        hint: "\u2191/\u2193 select \xB7 Enter switch \xB7 Esc back \xB7 q close"
+      },
+      modelStage: {
+        title: "Select model (step 2/3)",
+        // {0} = provider display name (or the `unknownProvider` leaf below).
+        subtitle: (providerName) => `${providerName} \xB7 Esc back`,
+        unknownProvider: "(unknown provider)",
+        noMatches: "no models match filter",
+        noneListed: "no models listed for this provider",
+        hint: "\u2191/\u2193 select \xB7 Enter next \xB7 Esc clear/back \xB7 q close",
+        emptyHint: "Esc back \xB7 q close"
+      }
+    },
+    session: {
+      title: "Sessions",
+      loading: "loading sessions\u2026",
+      modelUnknown: "model?",
+      currentOrDefault: "current/default",
+      liveSessionsOne: (count2) => `${count2} live session`,
+      liveSessionsOther: (count2) => `${count2} live sessions`,
+      // {0} = live session count, {1} = resumable session count.
+      counts: (liveCount, resumableCount) => `${liveCount} live \xB7 ${resumableCount} resumable`,
+      age: {
+        today: "today",
+        yesterday: "yesterday",
+        daysAgo: (days) => `${days}d ago`
+      },
+      status: {
+        idle: "idle",
+        starting: "starting",
+        waiting: "waiting",
+        working: "working"
+      },
+      errors: {
+        couldNotLoadResumable: "could not load resumable sessions",
+        alreadyClosed: "session was already closed",
+        notAttached: "this view is not attached to that session \u2014 nothing was closed"
+      },
+      row: {
+        new: "new",
+        draft: "\u270E draft",
+        startNew: "Start a new live session",
+        current: "current",
+        untitled: "(untitled)",
+        closing: "closing\u2026",
+        deleting: "deleting\u2026",
+        pressDAgain: "press d again to delete",
+        messageCount: (count2) => `${count2} msgs`
+      },
+      noOtherSessions: "no other sessions \u2014 Enter on +new to start one",
+      promptLabel: "prompt \u203A ",
+      // {0} = the draft model label (short model id or `currentOrDefault`).
+      draftModel: (label) => `model: ${label}`,
+      selectNewPrefix: "Select ",
+      newRowMarker: "+new",
+      selectNewSuffix: " to type a prompt",
+      // Hint fragments are concatenated with hotkey tokens in code, so the
+      // leading/trailing spaces and ` · ` separators are part of each leaf.
+      hint: {
+        resumableLabel: "Resumable:",
+        resume: " resume \xB7 ",
+        delete: " delete",
+        newRowLabel: "New row:",
+        typePrompt: " type prompt \xB7 ",
+        start: " start \xB7 ",
+        model: " model",
+        sessionRowLabel: "Session row:",
+        switch: " switch \xB7 ",
+        close: " close",
+        move: " move \xB7 ",
+        new: " new \xB7 ",
+        refresh: " refresh \xB7 "
+      }
+    },
+    pet: {
+      title: "Pets",
+      loading: "loading pets\u2026",
+      adopting: "adopting\u2026",
+      petCountOne: (count2) => `${count2} pet`,
+      petCountOther: (count2) => `${count2} pets`,
+      // {0} = the filter text the user typed.
+      noMatches: (query) => `no pets match "${query}"`,
+      noneAvailable: "no pets available",
+      officialTag: " \xB7 official",
+      escCancelHint: "Esc cancel",
+      hint: "\u2191/\u2193 select \xB7 Enter adopt \xB7 type to filter \xB7 Esc cancel"
+    }
+  }
+};
+
+// .hermes-src/ui-tui/src/i18n/en/secure.ts
+var secureEn = {
+  secure: {
+    sudo: {
+      title: "sudo password required"
+    },
+    secret: {
+      forEnvVar: (envVar) => `for ${envVar}`
+    },
+    vault: {
+      unlockTitle: (displayName) => `Unlock ${displayName} for this session`,
+      unlockHint: "master password \xB7 hidden \xB7 goes to the manager CLI only \xB7 Esc keeps it locked",
+      saveTitle: (site) => `Save your ${site} login`,
+      saveIdentifierHint: "email or username \xB7 password comes next \xB7 Esc or empty skips saving",
+      savePasswordTitle: (identifier) => `Password for ${identifier}`,
+      savePasswordHint: (site) => `hidden \xB7 encrypted on this machine for ${site} \xB7 never shown to the model`,
+      codeTitle: (site) => `Verification code for ${site}`,
+      codeHint: "typed into the page only \xB7 never shown to the model \xB7 Esc skips"
+    }
+  }
+};
+
+// .hermes-src/ui-tui/src/i18n/en/session.ts
+var sessionEn = {
+  session: {
+    // Free-text status-bar phrases (patchUiState({ status })) that nothing compares against.
+    status: {
+      setupRequired: "setup required",
+      setupRunning: "setup running\u2026",
+      startingAgent: "starting agent\u2026",
+      waitingForInput: "waiting for input\u2026",
+      switchingSession: "switching session\u2026",
+      resuming: "resuming\u2026",
+      interrupting: "interrupting\u2026",
+      reconnecting: "reconnecting\u2026",
+      restarting: "restarting\u2026",
+      stopped: "stopped",
+      closingSession: "closing session\u2026",
+      approvalNeeded: "approval needed",
+      sudoPasswordNeeded: "sudo password needed",
+      secretInputNeeded: "secret input needed",
+      unlockVault: (displayName) => `unlock ${displayName}`,
+      saveLogin: (site) => `save login for ${site}`,
+      verificationCode: (site) => `verification code for ${site}`
+    },
+    // Shared by the rpc wrapper (useMainApp) and the lifecycle paths; `error: ` prefix stays literal.
+    common: {
+      invalidResponse: (method) => `invalid response: ${method}`,
+      // useSubmission.interpolate: a `{!cmd}` that could not run refuses the whole submit.
+      interpolationFailed: (message) => `not sent: {!\u2026} could not run (${message}) \u2014 input retained`
+    },
+    lifecycle: {
+      newLiveSessionStarted: "new live session started",
+      sessionTitleSet: (title) => `session title set: ${title}`,
+      titleQueuedSuffix: " (queued while session initializes)",
+      failedToSetTitle: (message) => `failed to set session title: ${message}`,
+      switchSessions: "switch sessions",
+      interruptBeforeSwitch: (what) => `interrupt the current turn before trying to ${what}`
+    },
+    main: {
+      failedToStartLiveSession: "failed to start new live session",
+      invalidModelSwitchResponse: "invalid response: model switch",
+      modelSwitched: (model) => `model \u2192 ${model}`,
+      widgetLive: (id) => `widget /${id} is live \u2014 type /${id} to open`,
+      widgetRemoved: (id) => `widget /${id} removed (file deleted)`,
+      // {0}=file {1}=message
+      widgetFailedToLoad: (file2, message) => `widget ${file2} failed to load: ${message}`,
+      clarifyQuestionsOne: (count2) => `${count2} question`,
+      clarifyQuestionsOther: (count2) => `${count2} questions`,
+      skipped: "(skipped)",
+      voiceRec: "\u25CF REC",
+      voiceStt: "\u25C9 STT",
+      voiceOn: "voice on",
+      voiceOff: "voice off",
+      voiceTtsSuffix: " [tts]"
+    },
+    approval: {
+      denied: "denied",
+      approved: (choice2) => `approved (${choice2})`
+    },
+    input: {
+      dashboardNewSession: "starting a fresh dashboard chat...",
+      voiceStillTranscribing: "voice: still transcribing; try again shortly",
+      voiceModeOff: "voice: mode is off \u2014 enable with /voice on",
+      voiceError: (message) => `voice error: ${message}`,
+      sudoCancelled: "sudo cancelled",
+      secretCancelled: "secret entry cancelled",
+      vaultStaysLocked: (displayName) => `${displayName} stays locked`,
+      loginNotSaved: (site) => `login for ${site} not saved`,
+      codeSkipped: (site) => `verification code for ${site} skipped`,
+      failedToOpenEditor: "failed to open editor",
+      failedToOpenEditorWith: (message) => `failed to open editor: ${message}`,
+      yoloNeedsSession: "yolo needs an active session",
+      yoloOn: "yolo on",
+      yoloOff: "yolo off",
+      yoloToggleFailed: "failed to toggle yolo"
+    },
+    turn: {
+      interrupted: "interrupted"
+    },
+    request: {
+      dangerousCommand: "dangerous command"
+    },
+    handoff: {
+      launching: (command) => `launching \`hermes ${command}\`\u2026`,
+      launchError: (error) => `error launching hermes: ${error}`,
+      // {0}=subcommand {1}=exit code
+      exitedWithCode: (subcommand, code7) => `hermes ${subcommand} exited with code ${code7}`,
+      stillNoProvider: "still no provider configured"
+    }
+  }
+};
+
+// .hermes-src/ui-tui/src/i18n/en/slash.ts
+var slashEn = {
+  rpc: {
+    requestFailed: "request failed"
+  }
+};
+
+// .hermes-src/ui-tui/src/i18n/en/slashCmd/core.ts
+var slashCmdCoreEn = {
+  core: {
+    help: {
+      skillCommandsAvailable: (count2) => `${count2} skill commands available \u2014 /skills to browse`,
+      connectors: "manage connector accounts (rename, add another, reconnect, remove)",
+      detailsGlobal: "set global agent detail visibility mode",
+      detailsSection: "override one section (thinking/tools/subagents/activity)",
+      fortune: "show a random or daily local fortune",
+      gridTest: "open the interactive widget-grid demo",
+      dialogTest: "open a sample dialog overlay with a faked backdrop",
+      tuiSection: "TUI"
+    },
+    quit: {
+      dashboardDisabled: "exit is disabled in hosted dashboard chat \u2014 use /new to start a fresh session"
+    },
+    update: {
+      dashboardDisabled: "update is disabled in hosted dashboard chat \u2014 the hosted environment is managed separately",
+      exiting: "exiting TUI to run update..."
+    },
+    mouse: {
+      usage: "usage: /mouse [on|off|toggle|wheel|buttons|all]",
+      tracking: (mode) => `mouse tracking ${mode}`
+    },
+    clear: {
+      switchSessions: "switch sessions",
+      forgingSession: "forging session\u2026",
+      newSessionStarted: "new session started",
+      cancelLabel: "No, keep going",
+      confirmNew: "Yes, start a new session",
+      confirmClear: "Yes, clear the session",
+      detail: "This ends the current conversation and clears the transcript.",
+      titleNew: "Start a new session?",
+      titleClear: "Clear the current session?"
+    },
+    redraw: {
+      done: "ui redrawn"
+    },
+    status: {
+      noActiveSession: "no active session",
+      empty: "(no status)",
+      pageTitle: "Status"
+    },
+    title: {
+      noActiveSession: "no active session",
+      current: (title) => `title: ${title}`,
+      none: "no title set",
+      usage: "usage: /title <your session title>",
+      queuedSuffix: " (queued while session initializes)",
+      // {0}=title, {1}=suffix ('' or queuedSuffix)
+      set: (title, suffix) => `session title set: ${title}${suffix}`
+    },
+    density: {
+      usage: "usage: /density [on|off|toggle]",
+      state: (mode) => `density ${mode}`
+    },
+    details: {
+      usage: "usage: /details [hidden|collapsed|expanded|cycle]  or  /details <section> [hidden|collapsed|expanded|reset]",
+      sectionUsage: "usage: /details <section> [hidden|collapsed|expanded|reset]",
+      // {0}=mode, {1}=overrides summary ('' or '  (a=b c=d)')
+      current: (mode, overrides) => `details: ${mode}${overrides}`,
+      // {0}=section, {1}=mode or 'reset'
+      section: (section, mode) => `details ${section}: ${mode}`,
+      reset: "reset"
+    },
+    fortune: {
+      usage: "usage: /fortune [random|daily]"
+    },
+    copy: {
+      copiedCharsOne: (count2) => `copied ${count2} character`,
+      copiedCharsOther: (count2) => `copied ${count2} characters`,
+      clipboardFailed: "clipboard copy failed \u2014 try HERMES_TUI_FORCE_OSC52=1 to force the escape sequence",
+      usage: "usage: /copy [number]",
+      nothingToCopy: "nothing to copy \u2014 start a conversation first",
+      sentOsc52: "sent OSC52 copy sequence (terminal support required)",
+      copied: "copied to clipboard",
+      failed: (error) => `copy failed: ${error}`
+    },
+    paste: {
+      usage: "usage: /paste"
+    },
+    prompt: {
+      editorFailed: (error) => `editor failed: ${error}`
+    },
+    terminalSetup: {
+      usage: "usage: /terminal-setup [auto|vscode|cursor|windsurf]",
+      restartIde: "restart the IDE terminal for the new keybindings to take effect",
+      failed: (error) => `terminal setup failed: ${error}`
+    },
+    logs: {
+      pageTitle: "Logs",
+      none: "no gateway logs"
+    },
+    history: {
+      noConversation: "no conversation yet",
+      youTag: (index2) => `You #${index2}`,
+      hermesTag: (index2) => `Hermes #${index2}`,
+      toolCallsOne: (count2) => `(${count2} tool call)`,
+      toolCallsOther: (count2) => `(${count2} tool calls)`,
+      empty: "(empty)",
+      pageTitle: "History"
+    },
+    save: {
+      noConversation: "no conversation yet",
+      noActiveSession: "no active session \u2014 nothing to save",
+      saved: (file2) => `conversation saved to: ${file2}`,
+      failed: "failed to save"
+    },
+    focus: {
+      statusOn: "focus view on \u2014 only your prompt and the final response",
+      statusOff: "focus view off",
+      usage: "usage: /focus [on|off|status]",
+      enabled: "focus view enabled \u2014 just your prompt and the final response",
+      disabled: "focus view disabled"
+    },
+    statusbar: {
+      usage: "usage: /statusbar [on|off|top|bottom|toggle]",
+      state: (mode) => `status bar ${mode}`
+    },
+    battery: {
+      // {0}=on|off, {1}=plug icon, {2}=percent
+      statusLive: (state, icon, percent) => `battery indicator ${state} \u2014 currently ${icon} ${percent}%`,
+      statusNoBattery: (state) => `battery indicator ${state} \u2014 no battery detected on this machine`,
+      state: (state) => `battery indicator ${state}`,
+      usage: "usage: /battery [on|off|status]"
+    },
+    queue: {
+      countOne: (count2) => `${count2} queued message`,
+      countOther: (count2) => `${count2} queued messages`,
+      queued: (preview5) => `queued: "${preview5}"`
+    },
+    steer: {
+      usage: "usage: /steer <prompt>",
+      noActiveTurnQueued: (preview5) => `no active turn \u2014 queued for next: "${preview5}"`,
+      queued: (preview5) => `steer queued \u2014 arrives after next tool call: "${preview5}"`,
+      rejected: "steer rejected \u2014 no active turn, queued for next turn"
+    },
+    undo: {
+      nothing: "nothing to undo",
+      undidOne: (count2) => `undid ${count2} message`,
+      undidOther: (count2) => `undid ${count2} messages`
+    },
+    retry: {
+      nothing: "nothing to retry"
+    }
+  },
+  debug: {
+    widgetsReload: {
+      loaded: (names) => `loaded: ${names}`,
+      none: "no user widgets found",
+      summary: (parts3) => `widgets \u2014 ${parts3}`
+    },
+    heapdump: {
+      // {0}=heap size, {1}=rss size (pre-formatted)
+      writing: (heap, rss) => `writing heap dump (heap ${heap} \xB7 rss ${rss})\u2026`,
+      failed: (error) => `heapdump failed: ${error}`,
+      unknownError: "unknown error",
+      heapPath: (path2) => `heapdump: ${path2}`,
+      diagPath: (path2) => `diagnostics: ${path2}`
+    },
+    themeInfo: {
+      panelTitle: "Theme",
+      osc11Background: "OSC-11 background",
+      noReply: "(no reply)",
+      unset: "(unset)",
+      detectedMode: "detected mode",
+      light: "light",
+      dark: "dark"
+    },
+    mem: {
+      panelTitle: "Memory",
+      heapUsed: "heap used",
+      heapTotal: "heap total",
+      external: "external",
+      arrayBuffers: "array buffers",
+      rss: "rss",
+      uptime: "uptime",
+      seconds: (count2) => `${count2}s`
+    }
+  },
+  setup: {
+    setup: {
+      done: "setup complete \u2014 starting session\u2026"
+    }
+  }
+};
+
+// .hermes-src/ui-tui/src/i18n/en/slashCmd/ops.ts
+var slashCmdOpsEn = {
+  ops: {
+    stop: {
+      stoppedOne: (count2) => `stopped ${count2} background process`,
+      stoppedOther: (count2) => `stopped ${count2} background processes`
+    },
+    reloadMcp: {
+      confirmRequired: "/reload-mcp requires confirmation",
+      reloaded: "MCP servers reloaded",
+      reloadedAlways: "MCP servers reloaded \xB7 future /reload-mcp will run without confirmation",
+      complete: "reload complete"
+    },
+    reloadEnv: {
+      reloadedOne: (count2) => `reloaded .env (${count2} var updated)`,
+      reloadedOther: (count2) => `reloaded .env (${count2} vars updated)`
+    },
+    browser: {
+      usage: "usage: /browser [connect|disconnect|status|use] [url] \xB7 persistent: set browser.cdp_url in config.yaml",
+      checking: (url) => `checking Chromium-family browser remote debugging at ${url}...`,
+      connected: (url) => `browser connected: ${url}`,
+      urlUnavailable: "(url unavailable)",
+      notConnected: "browser not connected (try /browser connect <url> or set browser.cdp_url in config.yaml)",
+      disconnected: "browser disconnected",
+      connectedLive: "Browser connected to live Chromium-family browser via CDP",
+      endpoint: (url) => `Endpoint: ${url}`,
+      nextCallUsesEndpoint: "next browser tool call will use this CDP endpoint",
+      useUsage: "Usage: /browser use [off]",
+      useEnabled: "Browser Use mode enabled \u2014 browser_exec via the Browser Use CLI 3.0",
+      useDisabled: "Browser Use mode disabled \u2014 built-in browser tools restored",
+      newSessionsOnly: "applies to new sessions \u2014 this one keeps its current tools (/new to start one)",
+      modeBrowserUse: "Browser: Browser Use mode (browser_exec via the Browser Use CLI 3.0)"
+    },
+    rollback: {
+      noSession: "no active session \u2014 nothing to rollback",
+      notEnabled: "checkpoints are not enabled",
+      noneFound: "no checkpoints found",
+      listTitle: "Rollback checkpoints",
+      noMetadata: "(no metadata)",
+      usageDiff: "usage: /rollback diff <checkpoint>",
+      noChanges: "no changes since this checkpoint",
+      diffTitle: "Rollback diff",
+      failed: (error) => `rollback failed: ${error}`,
+      unknownError: "unknown error",
+      workspaceTarget: "workspace",
+      restoredDetail: "restored",
+      // {0}=target (file path or "workspace"), {1}=detail
+      restored: (target, detail) => `rollback restored ${target}: ${detail}`,
+      // {0}=summarized paths; main's CLI lines for what a safe whole-tree restore left alone
+      keptUserEdits: (files) => `\u21B7 Kept your hand-edits: ${files}
+Use /rollback <N> --all to restore those too.`,
+      keptOversize: (files) => `\u21B7 Kept (too large for checkpoints, no stored copy to revert to): ${files}`,
+      failedDeletes: (files) => `\u26A0\uFE0F Could not remove (left in place): ${files}`,
+      // {0}=count of paths not listed
+      morePaths: (count2) => ` (+${count2} more)`
+    },
+    agents: {
+      paused: "delegation \xB7 paused",
+      resumed: "delegation \xB7 resumed",
+      statePaused: "paused",
+      stateActive: "active",
+      // {0}=state (paused/active), {1}=max spawn depth, {2}=max concurrent children
+      status: (state, depth, children3) => `delegation \xB7 ${state} \xB7 caps d${depth}/${children3}`
+    },
+    replay: {
+      noneOnDisk: "no archived spawn trees on disk for this session",
+      subagentsLabel: (count2) => `${count2} subagents`,
+      archivedTitle: "Archived spawn trees",
+      usageLoad: "usage: /replay load <path>",
+      snapshotEmpty: "snapshot empty or unreadable",
+      noneThisSession: "no completed spawn trees this session \xB7 try /replay list",
+      indexOutOfRange: (max) => `replay: index out of range 1..${max} \xB7 use /replay list for disk`
+    },
+    replayDiff: {
+      usage: "usage: /replay-diff <a> <b>  (e.g. /replay-diff 1 2 for last two)",
+      unresolved: (count2) => `replay-diff: could not resolve indices \xB7 history has ${count2} entries`
+    },
+    reloadSkills: {
+      reloaded: "skills reloaded",
+      pageTitle: "Reload Skills"
+    },
+    slashWorker: {
+      warning: (warning) => `warning: ${warning}`,
+      skillsNoOutput: "/skills: no output",
+      skillsTitle: "Skills",
+      pluginsNoOutput: "/plugins: no output",
+      pluginsTitle: "Plugins",
+      toolsNoOutput: "/tools: no output",
+      toolsTitle: "Tools"
+    },
+    skills: {
+      listTitle: "Skills",
+      usageInspect: "usage: /skills inspect <name>",
+      unknownSkill: (name) => `unknown skill: ${name}`,
+      rowName: "Name",
+      rowCategory: "Category",
+      rowPath: "Path",
+      inspectTitle: "Skill",
+      usageSearch: "usage: /skills search <query>",
+      noResults: (query) => `no results for: ${query}`,
+      searchTitle: (query) => `Search: ${query}`,
+      usageInstall: "usage: /skills install <name or url>",
+      installing: (name) => `installing ${name}\u2026`,
+      installed: (name) => `installed ${name}`,
+      installFailed: "install failed",
+      usageBrowse: "usage: /skills browse [page]  (page must be a positive number)",
+      fetching: "fetching community skills (scans 6 sources, may take ~15s)\u2026",
+      noneOnPage: (page) => `no skills on page ${page}`,
+      // {0}=page, {1}=total skills
+      noneOnPageWithTotal: (page, total) => `no skills on page ${page} (total ${total})`,
+      // {0}=page, {1}=total pages
+      pageOf: (page, total) => `page ${page} of ${total}`,
+      skillsTotal: (count2) => `${count2} skills total`,
+      browseMore: (nextPage) => `/skills browse ${nextPage} for more`,
+      browseTitle: "Browse Skills",
+      browseTitlePage: (page) => `Browse Skills \u2014 p${page}`
+    },
+    tools: {
+      usage: (subcommand) => `usage: /tools ${subcommand} <name> [name ...]`,
+      builtinExample: (subcommand) => `built-in toolset: /tools ${subcommand} web`,
+      mcpExample: (subcommand) => `MCP tool: /tools ${subcommand} github:create_issue`,
+      disabled: (names) => `disabled: ${names}`,
+      enabled: (names) => `enabled: ${names}`,
+      unknownToolsets: (names) => `unknown toolsets: ${names}`,
+      missingServers: (names) => `missing MCP servers: ${names}`,
+      sessionReset: "session reset. new tool configuration is active."
+    }
+  },
+  wake: {
+    usage: "usage: /wake [on|off|status]",
+    reason: {
+      disabled: "disabled (config wake_word.enabled)",
+      disabledForSurface: "scoped to another surface (config wake_word.surface)",
+      notOwner: "another surface owns the listener",
+      owned: "another surface owns the listener",
+      unavailable: "unavailable",
+      unknown: "unknown"
+    },
+    ownedBy: (surface) => `owned by ${surface}`,
+    // {0}=text, {1}=hint from the gateway
+    withHint: (text15, hint) => `${text15} \u2014 ${hint}`,
+    notStarted: (reason) => `wake: not started \u2014 ${reason}`,
+    forPhrase: (phrase) => `for \u201C${phrase}\u201D`,
+    // {0}=detail suffix (" for “phrase” · provider · enabled in config" or empty)
+    listening: (details) => `wake: listening${details}`,
+    micSilent: "\u26A0 mic delivers only silence",
+    // {0}=owner surface, {1}=detail suffix
+    offOwnedBy: (surface, details) => `wake: off here \xB7 listener owned by ${surface}${details}`,
+    unavailable: "wake: unavailable",
+    off: (details) => `wake: off${details} \xB7 /wake on to arm`,
+    enabledInConfig: "enabled in config",
+    disabledInConfig: "disabled in config",
+    listenerOff: (details) => `wake: listener off${details}`,
+    notOwnerStop: "this surface doesn\u2019t own the listener",
+    notRunning: "not running",
+    // {0}=reason, {1}=detail suffix
+    nothingToStop: (reason, details) => `wake: nothing to stop \u2014 ${reason}${details}`
+  }
+};
+
+// .hermes-src/ui-tui/src/i18n/en/slashCmd/session.ts
+var slashCmdSessionEn = {
+  session: {
+    bg: {
+      started: (taskId) => `bg ${taskId} started`,
+      usage: "/bg <prompt>"
+    },
+    branch: {
+      branched: (title) => `branched \u2192 ${title}`
+    },
+    btw: {
+      answering: (taskId) => `btw ${taskId} \u2014 answering from a conversation snapshot`,
+      usage: "/btw <question>"
+    },
+    busy: {
+      mode: (mode) => `busy input mode: ${mode}`,
+      usage: "usage: /busy [queue|steer|interrupt|status]"
+    },
+    compress: {
+      // {0}=message count (pre-formatted)
+      compressedOne: (count2) => `compressed ${count2} message`,
+      compressedOther: (count2) => `compressed ${count2} messages`,
+      nothing: "nothing to compress",
+      // {0}=compact token count, appended to compressedOne/Other
+      tokSuffix: (tokens2) => ` \xB7 ${tokens2} tok`
+    },
+    fast: {
+      mode: (mode) => `fast mode: ${mode}`,
+      usage: "usage: /fast [normal|fast|ultrafast|status|on|off|toggle]"
+    },
+    indicator: {
+      current: (style2) => `indicator: ${style2}`,
+      switched: (style2) => `indicator \u2192 ${style2}`,
+      usage: (styles) => `usage: /indicator [${styles}]`
+    },
+    model: {
+      cancel: "Cancel",
+      confirmStale: "Model not switched: the session changed before the confirmation landed; run /model again.",
+      confirmTitle: (model) => `Confirm model switch to ${model}`,
+      // {0}=model picked during a turn, {1}=the owner's refusal reason
+      deferredRefused: (model, reason) => `model switch to ${model} failed (${reason}); keeping the current model`,
+      expensiveDetail: "This model has unusually high known pricing.",
+      expensiveTitle: "Expensive model selection",
+      invalidResponse: "error: invalid response: model switch",
+      switchAnyway: "Switch anyway",
+      switched: (model) => `model \u2192 ${model}`,
+      switchedDeferred: (model) => `model \u2192 ${model} (applies next turn)`
+    },
+    personality: {
+      changed: (value) => `personality: ${value}`,
+      changedCleared: (value) => `personality: ${value} \xB7 transcript cleared`,
+      defaultValue: "default"
+    },
+    pet: {
+      noOutput: "/pet: no output",
+      // {0}=warning text, {1}=command output
+      warning: (warning, body) => `warning: ${warning}
+${body}`
+    },
+    reasoning: {
+      current: (value) => `reasoning: ${value}`,
+      // {0}=effort value, {1}=display mode
+      currentWithDisplay: (value, display) => `reasoning: ${value} \xB7 display ${display}`
+    },
+    sessions: {
+      busyGuardAction: "switch sessions"
+    },
+    skin: {
+      current: (skin) => `skin: ${skin}`,
+      defaultValue: "default",
+      switched: (skin) => `skin \u2192 ${skin}`
+    },
+    theme: {
+      current: (theme) => `theme: ${theme}`,
+      switched: (theme) => `theme \u2192 ${theme}`,
+      usage: "usage: /theme [auto|light|dark]"
+    },
+    usage: {
+      balanceTitle: "Balance",
+      compressions: (count2) => `Compressions: ${count2}`,
+      // {0}=used tokens (with ~ mark when estimated), {1}=max tokens, {2}=percent (with ~ mark)
+      context: (used, max, percent) => `Context: ${used} / ${max} (${percent}%)`,
+      cta: "Run /subscription to change plan \xB7 /topup to add to your balance",
+      freeNote: "> Free \xB7 free models only. Run /subscription to reach paid models.",
+      freePlan: "Free",
+      lowBalanceFallback: "under $5",
+      lowNote: (left) => `! Low balance \xB7 ${left} left. Run /topup or /subscription.`,
+      noCalls: "no API calls yet",
+      nousBalanceTitle: "Nous balance",
+      plan: (plan) => `Plan: ${plan}`,
+      // {0}=plan name, {1}=renewal date display
+      planRenews: (plan, renews) => `Plan: ${plan} \xB7 renews ${renews}`,
+      rowApiCalls: "API calls",
+      rowInputTokens: "Input tokens",
+      rowModel: "Model",
+      rowOutputTokens: "Output tokens",
+      rowTotalTokens: "Total tokens",
+      usageTitle: "Usage"
+    },
+    verbose: {
+      current: (value) => `verbose: ${value}`
+    },
+    voice: {
+      disabled: "Voice mode disabled.",
+      enabled: "Voice mode enabled",
+      enabledWithTts: "Voice mode enabled (TTS enabled)",
+      off: "OFF",
+      offHint: "  /voice off  to disable voice mode",
+      on: "ON",
+      recordHint: (recordKey) => `  ${recordKey} to start/stop recording`,
+      requirements: "  Requirements:",
+      statusMode: (mode) => `  Mode:       ${mode}`,
+      statusRecordKey: (recordKey) => `  Record key: ${recordKey}`,
+      statusTitle: "Voice Mode Status",
+      statusTts: (tts) => `  TTS:        ${tts}`,
+      ttsDisabled: "Voice TTS disabled.",
+      ttsEnabled: "Voice TTS enabled.",
+      ttsHint: "  /voice tts  to toggle speech output"
+    },
+    yolo: {
+      off: "yolo off",
+      on: "yolo on"
+    }
+  },
+  subscription: {
+    billingUnreachable: "Could not reach the billing service \u2014 check your connection, then retry.",
+    manageUrlFailed: "Could not build manage URL \u2014 is your portal configured?",
+    notLoggedIn: "Not logged into Nous Portal \u2014 run /portal to log in, then /subscription.",
+    openBrowserFailedManage: (url) => `Could not open browser \u2014 visit your subscription page manually at ${url}`,
+    openBrowserFailedPortal: (url) => `Could not open browser \u2014 visit ${url} to finish.`,
+    openingManage: "Opening your subscription page in the browser \u2014 finish there, then re-run /subscription.",
+    openingPortal: "Opening the portal in your browser \u2014 finish there, then re-run /subscription."
+  },
+  topup: {
+    charge: {
+      authenticationRequired: "\u{1F534} Your bank requires verification (3DS). Complete it on the portal to finish this purchase.",
+      cardDeclined: "\u{1F534} Your card was declined. Try another card on the portal.",
+      couldNotCheck: (reason) => `\u{1F534} Could not check the charge: ${reason}`,
+      couldNotCheckFallback: "error",
+      creditsFallback: "Credits",
+      failedReason: (reason) => `\u{1F534} The charge didn't go through (${reason}).`,
+      paymentMethodExpired: "\u{1F534} Your card has expired. Update it on the portal.",
+      // {0}=pre-formatted dollar amount ("$100") or creditsFallback
+      settled: (amount) => `\u2705 ${amount} added.`,
+      submitted: "\u{1F4B3} Charge submitted \u2014 confirming settlement\u2026",
+      timedOut: "\u{1F7E1} Still processing after 5 minutes \u2014 this is a timeout, not a failure. Check /topup or the portal shortly.",
+      unconfirmed: "\u{1F7E1} Your last charge\u2019s outcome is unconfirmed \u2014 check your balance/history before retrying."
+    },
+    error: {
+      autoTopUpDisabledFailures: "Auto-reload was turned off after repeated charge failures. Fix the card issue, then re-enable it from /topup \u2192 Auto-reload.",
+      consentRequired: "This action needs a one-time card confirmation and consent step on the portal before it can proceed.",
+      generic: (message) => `\u{1F534} ${message}`,
+      genericFallback: "Billing request failed.",
+      idempotencyConflict: "\u{1F534} That charge key was already used for a different amount. Start a fresh top-up.",
+      insufficientScope: "This needs Remote Spending allowed. Start a top-up to allow it, then retry.",
+      monthlyCapExceeded: "\u{1F534} Monthly spend cap reached.",
+      // {0}=remaining USD headroom (number as sent by the server)
+      monthlyCapExceededRemaining: (remaining) => `\u{1F534} Monthly spend cap reached \u2014 $${remaining} headroom left.`,
+      noPaymentMethod: "\u{1F4B3} No saved card for terminal charges yet. Set one up on the portal (one-time credit buys don't save a reusable card).",
+      orgAccessDenied: "This token isn't bound to an org you can manage. Sign in with the right org, or manage this on the portal.",
+      portal: (url) => `Portal: ${url}`,
+      // {0}=retry suffix from retryIn (or '')
+      rateLimited: (retrySuffix) => `\u{1F7E1} Too many charges right now${retrySuffix}. This isn't a payment failure.`,
+      remoteSpendingDisabled: "Remote spending is off for this account \u2014 a billing admin can turn it on from the portal's Hermes Agent page.",
+      retryIn: (minutes) => ` (try again in ~${minutes} min)`,
+      revokedByAdmin: "An admin stopped remote spending for this terminal.",
+      revokedByYou: "You stopped remote spending for this terminal.",
+      // {0}=who-revoked sentence (revokedByAdmin / revokedByYou)
+      revokedReconnect: (who) => `${who} Reconnect to restore \u2014 run /portal to re-authorize this terminal.`,
+      roleRequired: "Adding funds needs someone with billing permissions (owner, admin, or finance admin), or manage this on the portal.",
+      sessionRevoked: "Your session was logged out. Run /portal to log in again.",
+      // {0}=retry suffix from retryIn (or '')
+      stripeUnavailable: (retrySuffix) => `\u{1F7E1} Stripe is having trouble right now \u2014 try again shortly${retrySuffix}.`,
+      upgradeCapExceeded: "\u{1F534} Daily plan-change limit reached (5 per org) \u2014 try again tomorrow, or manage this on the portal."
+    },
+    notLoggedIn: "\u{1F4B3} Not logged into Nous Portal \u2014 run /portal to log in, then /topup.",
+    openingPortal: (url) => `Opening portal: ${url}`,
+    validate: {
+      invalid: "Enter a dollar amount, e.g. 100 (max 2 decimal places).",
+      maximum: (max) => `Maximum is $${max}.`,
+      minimum: (min) => `Minimum is $${min}.`,
+      notPositive: "Amount must be greater than $0."
+    }
+  }
+};
+
+// .hermes-src/ui-tui/src/i18n/en/slashCmd.ts
+var slashCmdEn = {
+  slashCmd: {
+    ...slashCmdCoreEn,
+    ...slashCmdOpsEn,
+    ...slashCmdSessionEn
+  }
+};
+
+// .hermes-src/ui-tui/src/i18n/en/subscription.ts
+var subscriptionEn = {
+  subscription: {
+    // Fallbacks substituted for missing backend values + row labels shared by
+    // several screens.
+    shared: {
+      periodEndFallback: "the end of the billing period",
+      thisPlan: "this plan",
+      yourNewPlan: "your new plan",
+      yourPlan: "your plan",
+      theSelectedPlan: "the selected plan",
+      freePlan: "Free",
+      back: "Back",
+      close: "Close",
+      cancel: "Cancel",
+      manageOnPortal: "Manage on portal"
+    },
+    // Outcome messages produced by the RPC → result mappers.
+    result: {
+      genericError: "Something went wrong. Try again, or manage on the portal.",
+      upgradeUnconfirmed: "Couldn\u2019t confirm the upgrade \u2014 your card may or may not have been charged. Re-run /subscription to check your plan before trying again.",
+      verifyCard: "Please verify your card in the portal to finish this upgrade.",
+      cardDeclinedTryDifferent: "Your card was declined \u2014 try a different card on the portal.",
+      alreadyOn: (plan) => `You are already on ${plan}.`,
+      upgraded: (plan) => `Upgraded to ${plan}. Your new monthly credits land in a moment.`,
+      requiresAction: "This upgrade needs extra verification (3DS). Finish it on the portal.",
+      paymentFailed: "Your card was declined. Update your payment method on the portal and try again.",
+      scopeStillDenied: "Remote Spending still isn\u2019t active for this terminal \u2014 the authorization didn\u2019t take. Retry, or make this change on the portal.",
+      couldNotPreview: "Could not preview that change.",
+      cancellationScheduled: "Scheduled \u2014 your plan stays active until the end of the billing period, then it cancels. Nothing changes today.",
+      changeScheduled: "Scheduled \u2014 your plan doesn\u2019t change today. You keep your current plan until the end of the billing period, then it switches.",
+      resumed: "Your pending change was undone \u2014 you stay on your current plan."
+    },
+    // Typed denials from the remote-spending step-up.
+    stepUpDenial: {
+      sessionRevoked: "Your session expired \u2014 run /portal to log in again, then retry the change.",
+      remoteSpendingRevoked: "Remote spending was stopped for this terminal \u2014 reconnect from the portal, then retry.",
+      rateLimited: "Too many attempts \u2014 wait a moment, then try again.",
+      notAllowed: "Remote Spending was not allowed \u2014 someone with billing permissions (owner, admin, or finance admin) must approve it. You can also make this change on the portal."
+    },
+    // The one-line plan status at the top of the overview.
+    status: {
+      freePlan: "Plan: Free \xB7 free models only",
+      plan: (plan) => `Plan: ${plan}`,
+      transition: (to) => ` \u2192 ${to}`,
+      left: (amount) => ` \xB7 ${amount} left`,
+      renews: (date2) => ` \xB7 renews ${date2}`,
+      viewOnly: " \xB7 view only",
+      // The pending-transition target when the subscription cancels at period end.
+      cancels: "cancels"
+    },
+    overview: {
+      scheduledChange: "\u23F3 Scheduled change",
+      keepUntilThen: (plan) => `You keep ${plan} (and its credits) until then.`,
+      freeNudge: "Paid models need a subscription. Start one to reach them.",
+      lowNudge: (amount) => `Low balance \xB7 ${amount} left. Top up or upgrade before a mid-run cutoff.`,
+      lowNudgeAmountFallback: "under $5",
+      noPortalUrl: "\u{1F534} No portal URL available \u2014 manage your subscription on the Nous portal.",
+      keepPlanUndo: (plan) => `Keep ${plan} (undo this change)`,
+      changePlan: "Change plan",
+      cancelSubscription: "Cancel subscription",
+      // {0} tier name, {1} monthly price display (e.g. "$20")
+      tierRow: (name, price) => `${name} \xB7 ${price}/mo`,
+      creditsPerMonth: (credits) => ` \xB7 $${credits} credits/mo`,
+      startSubscription: "Start a subscription",
+      org: (name) => `Org: ${name}`,
+      hint: "\u2191/\u2193 select \xB7 Enter confirm \xB7 Esc close"
+    },
+    picker: {
+      title: "Change plan",
+      current: (plan) => `Current: ${plan}. Pick a plan to see the effect before confirming.`,
+      noOtherPlans: "No other plans are available to switch to right now.",
+      // {0} tier name, {1} monthly price display, {2} direction (upgrade/downgrade)
+      tierRow: (name, price, direction) => `${name} \xB7 ${price}/mo \xB7 ${direction}`,
+      upgrade: "upgrade",
+      downgrade: "downgrade",
+      hint: "\u2191/\u2193 select \xB7 Enter preview \xB7 Esc back"
+    },
+    confirm: {
+      titleCancellation: "Confirm cancellation",
+      titleChange: "Confirm plan change",
+      chipChargedNow: "charged now",
+      chipScheduled: "scheduled \xB7 not today",
+      working: "Working\u2026",
+      payAndUpgrade: (amount) => `Pay ${amount} & upgrade now`,
+      upgradeNowProrated: "Upgrade now (prorated charge)",
+      scheduleChangeTo: (plan) => `Schedule change to ${plan}`,
+      // {0} current plan name, {1} period-end date
+      cancelBody: (plan, date2) => `Cancel ${plan} \u2014 it stays active until ${date2}, then will not renew.`,
+      cancelKeepCredits: "You keep your remaining credits for this period. You can resume before it ends.",
+      upgradeTo: (plan) => `Upgrade to ${plan}.`,
+      chargedNow: (amount) => `You will be charged ${amount} now (prorated).`,
+      chargedProrated: "You will be charged the prorated amount now.",
+      creditsDelta: (delta) => `Monthly credits change: ${delta}.`,
+      cardCharged: (card) => `${card} \u2014 the card on your subscription \u2014 will be charged.`,
+      cardChargedGeneric: "The card on your subscription will be charged.",
+      // {0} target plan name, {1} effective date
+      scheduledBody: (plan, date2) => `Change to ${plan} \u2014 takes effect ${date2}. No charge now; you keep your current plan until then.`,
+      noOp: (plan) => `You are already on ${plan} \u2014 nothing to change.`,
+      blockedFallback: "That change cannot be made here \u2014 manage it on the portal.",
+      hint: "\u2191/\u2193 select \xB7 Enter confirm \xB7 Esc back"
+    },
+    resultScreen: {
+      titleApplying: "Applying\u2026",
+      titleStillApplying: "Still applying",
+      titleDone: "Done",
+      titleFailed: "Could not complete",
+      stillApplying: "Your upgrade succeeded and is still applying \u2014 refresh in a moment.",
+      rerunHint: "Re-run /subscription anytime to review it.",
+      openPortalToFinish: "Open the portal to finish",
+      hint: "\u2191/\u2193 select \xB7 Enter \xB7 Esc close"
+    },
+    stepUp: {
+      title: "Remote Spending",
+      promptBody: "Changing your plan needs Remote Spending allowed for this terminal. Allow it here, then continue.",
+      promptNote: "Someone with billing permissions (owner, admin, or finance admin) approves it once in the browser.",
+      waiting: "Opening your browser to approve\u2026 finish there, then come back \u2014 nothing is charged until you continue.",
+      granted: "Remote Spending allowed. Continue to finish your change.",
+      resuming: "Applying your change\u2026",
+      allow: "Allow Remote Spending",
+      continue: "Continue",
+      continueChange: "Continue the change",
+      hintWaiting: "Waiting for approval\u2026 \xB7 Esc to cancel",
+      hintWorking: "Working\u2026",
+      hint: "\u2191/\u2193 select \xB7 Enter \xB7 Esc back"
+    },
+    team: {
+      title: "Team subscription",
+      orgFallback: "a team org",
+      body: (org) => `This terminal is connected to ${org}. Teams run on a shared balance \xB7 use /topup to add funds.`,
+      personalNote: "Personal subscriptions live on your personal account.",
+      hint: "Enter/Esc close"
+    }
+  }
+};
+
+// .hermes-src/ui-tui/src/i18n/en/userMessages.ts
+var userMessagesEn = {
+  userMessages: {
+    /** `{0}` = the (already clipped) raw detail text. */
+    details: (text15) => `Details: ${text15}`,
+    backend: {
+      restarting: "Hermes stopped unexpectedly \u2014 restarting and reopening your chat (the reply in progress was lost).",
+      restartingActivity: "Hermes stopped unexpectedly \xB7 restarting\u2026",
+      connectionLost: "Connection to Hermes lost \u2014 reconnecting and reopening your chat\u2026",
+      connectionLostActivity: "connection lost \xB7 reconnecting\u2026",
+      gaveUpTitle: "Hermes stopped and could not be restarted. Your chat is saved.",
+      /** `{0}` = process exit code. */
+      gaveUpTitleWithCode: (code7) => `Hermes stopped (exit code ${code7}) and could not be restarted. Your chat is saved.`,
+      gaveUpReconnect: "Hermes keeps trying to reconnect in the background and reopens this chat when it succeeds; if it does not, type /resume.",
+      gaveUpLogs: "Type /logs for the full log, or /quit and run `hermes doctor` to check the install.",
+      gaveUpActivity: "Hermes stopped \xB7 /logs for details",
+      /** `{0}` = seconds until the next attempt. */
+      reconnecting: (secs) => `retrying in ${secs}s`,
+      /** `{0}` = seconds until the next attempt, `{1}` = attempt number. */
+      reconnectingAttempt: (secs, attempt2) => `retrying in ${secs}s (attempt ${attempt2})`,
+      slowStart: "Hermes is taking longer than usual to start. Still waiting\u2026 If it never connects: /logs shows the last backend output; /quit and run `hermes doctor`.",
+      slowStartStatus: "still starting\u2026",
+      stderrProblem: "Something went wrong inside Hermes \xB7 /logs for details",
+      /** `{0}` = the Python exception class name (e.g. `ValueError`). */
+      stderrProblemNamed: (what) => `Something went wrong inside Hermes (${what}) \xB7 /logs for details`
+    },
+    rpc: {
+      versionSkew: "The terminal UI and the Hermes backend are out of sync (different versions). Run /update, or exit and run `hermes update`, then start the TUI again.",
+      sessionNotFound: "This chat is no longer attached to the backend (it was idle or the backend restarted). Your history is saved: type /resume to reopen it.",
+      notConnected: "Hermes is not connected right now, so that was not sent. It reconnects automatically; wait a moment and try again, or type /logs if this persists.",
+      /** `{0}` = timeout in seconds. */
+      timedOut: (secs) => `Hermes did not answer within ${secs}s. Try again; if it keeps happening, type /logs and report the last lines.`,
+      /** `{0}` = slash command name without the slash. */
+      slashTimedOut: (command) => `/${command} did not finish: the command helper timed out. Try again; if it keeps happening, type /logs and report the last lines.`,
+      /** `{0}` = slash command name without the slash. */
+      slashCrashed: (command) => `/${command} did not finish: the command helper crashed. Try again; type /logs for the trace.`
+    },
+    turn: {
+      /** `{0}` = failure title (possibly with provider suffix). */
+      notAnswered: (title) => `${title}. Your message was not answered.`,
+      /** `{0}` = failure title, `{1}` = provider id. */
+      withProvider: (title, provider) => `${title} (${provider})`,
+      // `hintNoRetry` is the next step when error_surface.retryable is false —
+      // it replaces the "/retry" advice with picking another model.
+      code: {
+        auth: { title: "The model provider rejected the API key", hint: "Fix the key with /model, then /retry." },
+        authPermanent: {
+          title: "The model provider rejected the API key",
+          hint: "Fix the key with /model, then /retry."
+        },
+        billing: {
+          title: "The model provider reports no credit left",
+          hint: "Top up the account or switch with /model."
+        },
+        billingUnverified: {
+          title: "The model provider reports no credit left",
+          hint: "Top up the account or switch with /model."
+        },
+        contentPolicyBlocked: {
+          title: "The model provider refused this request (content policy)",
+          hint: "Rephrase and send again."
+        },
+        contextOverflow: { title: "The conversation is too long for this model", hint: "Run /compress, then /retry." },
+        formatError: {
+          title: "The model provider rejected the request format",
+          hint: "Try /retry; if it persists, switch with /model.",
+          hintNoRetry: "Pick another model with /model; if it persists, switch with /model."
+        },
+        modelNotFound: {
+          title: "The model provider does not know this model",
+          hint: "Pick another model with /model."
+        },
+        overloaded: { title: "The model provider is overloaded", hint: "Wait a moment, then /retry." },
+        payloadTooLarge: { title: "The request was too large for this model", hint: "Run /compress, then /retry." },
+        providerPolicyBlocked: {
+          title: "The model provider refused this request (account policy)",
+          hint: "Switch with /model."
+        },
+        rateLimit: { title: "The model provider is rate-limiting requests", hint: "Wait a moment, then /retry." },
+        serverError: { title: "The model provider had an internal error", hint: "Wait a moment, then /retry." },
+        sslCertVerification: {
+          title: "The connection to the model provider could not be verified (TLS)",
+          hint: "Check the endpoint's certificate, then /retry."
+        },
+        timeout: {
+          title: "The model provider did not answer in time",
+          hint: "Try /retry; if it keeps happening, switch with /model.",
+          hintNoRetry: "Pick another model with /model; if it keeps happening, switch with /model."
+        },
+        upstreamBlocked: {
+          title: "A firewall/CDN in front of the model provider blocked the request",
+          hint: "Set a User-Agent via the provider's extra_headers, or switch with /model."
+        },
+        upstreamRateLimit: {
+          title: "The model provider is rate-limiting requests",
+          hint: "Wait a moment, then /retry."
+        }
+      },
+      layer: {
+        auth: { title: "The model provider rejected the credentials", hint: "Fix them with /model, then /retry." },
+        billing: {
+          title: "The model provider reports no credit left",
+          hint: "Top up the account or switch with /model."
+        },
+        disk: { title: "The disk is full, so Hermes could not save the turn", hint: "Free some space, then /retry." },
+        endpoint: {
+          title: "Your custom model endpoint did not answer",
+          hint: "Check the endpoint is running, then /retry."
+        },
+        gateway: {
+          title: "Hermes hit an internal error while running this turn",
+          hint: "Send /retry; type /logs for the trace.",
+          hintNoRetry: "Pick another model with /model; type /logs for the trace."
+        },
+        provider: {
+          title: "The model provider returned an error",
+          hint: "Send /retry, or switch with /model.",
+          hintNoRetry: "Pick another model with /model, or switch with /model."
+        },
+        streaming: {
+          title: "The connection to the model provider dropped mid-reply",
+          hint: "Send /retry.",
+          hintNoRetry: "Pick another model with /model."
+        }
+      },
+      fallback: {
+        title: "The request failed",
+        hint: "Send /retry, or switch with /model.",
+        hintNoRetry: "Pick another model with /model, or switch with /model."
+      }
+    },
+    promptTimeout: {
+      secret: "Secret prompt closed: no answer in time, so the step that needed it was skipped. Send your request again when you are ready to enter it.",
+      sudo: "Password prompt closed: no answer in time, so the command was skipped. Send your request again when you are ready to enter it.",
+      vaultCode: "Verification-code prompt closed: no answer in time, so the sign-in was skipped. Send your request again when you have the code.",
+      vaultSaveLogin: "Save-login prompt closed: no answer in time, so nothing was saved. Send your request again when you are ready.",
+      vaultUnlockPrompt: "Unlock prompt closed: no answer in time, so the password manager stayed locked. Send your request again when you are ready to unlock it."
+    },
+    credential: {
+      currentProvider: "the current provider",
+      /** `{0}` = provider id (or `currentProvider`), used twice in the sentence. */
+      missingKey: (provider) => `No API key is set for ${provider}, so messages will fail. Type /model, pick ${provider}, and paste a key (or run /setup).`
+    },
+    skills: {
+      noneInstalled: "No skills installed yet. Type /skills browse to see the catalog, or /skills install <name>."
+    }
+  }
+};
+
+// .hermes-src/ui-tui/src/i18n/en.ts
+var en = {
+  ...chromeEn,
+  ...overlaysEn,
+  ...appEn,
+  ...slashEn,
+  ...slashCmdEn,
+  ...userMessagesEn,
+  ...libEn,
+  ...sessionEn,
+  ...gatewayMsgEn,
+  ...libTextEn,
+  ...pickersEn,
+  ...hubsEn,
+  ...secureEn,
+  ...contentEn,
+  ...chatBitsEn,
+  ...billingEn,
+  ...subscriptionEn,
+  ...connectionEn,
+  ...canonicalEn,
+  ...connectorsEn
+};
+
+// .hermes-src/ui-tui/src/i18n/merge.ts
+function isRecord2(value) {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+// .hermes-src/ui-tui/src/i18n/runtime.ts
+var DEFAULT_LOCALE = "en";
+var $locale = atom(DEFAULT_LOCALE);
+var $catalog = atom(en);
+function resolvePath(source2, key2) {
+  return key2.split(".").reduce((current, part) => isRecord2(current) ? current[part] : void 0, source2);
+}
+function render2(value, args) {
+  if (typeof value === "string") {
+    return value;
+  }
+  if (typeof value === "function") {
+    return value(...args);
+  }
+  return null;
+}
+function translateFrom(source2, locale, key2, args) {
+  const active = render2(resolvePath(source2(locale), key2), args);
+  if (active !== null) {
+    return active;
+  }
+  if (locale !== DEFAULT_LOCALE) {
+    const fallback = render2(resolvePath(source2(DEFAULT_LOCALE), key2), args);
+    if (fallback !== null) {
+      return fallback;
+    }
+  }
+  return key2;
+}
+function t(key2, ...args) {
+  return translateFrom((locale) => locale === DEFAULT_LOCALE ? en : $catalog.get(), $locale.get(), key2, args);
+}
+
 // .hermes-src/ui-tui/src/app/userMessages.ts
 var RPC_INVALID_PARAMS = 4e3;
 var RPC_SESSION_NOT_FOUND = 4001;
@@ -66641,6 +65347,29 @@ function dispatchError(name, error) {
   return describeSlashExecError(name, error);
 }
 
+// .hermes-src/ui-tui/src/domain/slash.ts
+var INLINE_SLASH_RE = /\s\/([a-zA-Z][\w-]*)?$/;
+var inlineSlashTrigger = (text15) => {
+  const match = INLINE_SLASH_RE.exec(text15);
+  if (!match) {
+    return null;
+  }
+  const query = match[1] ?? "";
+  return { query, start: text15.length - query.length - 1 };
+};
+var applyCompletion = (value, rowText2, compReplace) => {
+  const text15 = value[compReplace - 1] === "/" && rowText2.startsWith("/") ? rowText2.slice(1) : rowText2;
+  return value.slice(0, compReplace) + text15;
+};
+var completionToApplyOnSubmit = (value, rowText2, compReplace, isLocalCommand = () => false) => {
+  const typed = value.trim();
+  if (!rowText2 || /^\/[\w-]+$/.test(typed) && isLocalCommand(typed.slice(1))) {
+    return null;
+  }
+  const next2 = applyCompletion(value, rowText2, compReplace);
+  return next2 !== value && next2.trimEnd() !== value.trimEnd() ? next2 : null;
+};
+
 // .hermes-src/ui-tui/src/app/slash/fuzzyScore.ts
 function tokenizeSearchText(value) {
   const normalized = value.toLowerCase();
@@ -66668,6 +65397,32 @@ function scoreSlashMenuItem(item3, query) {
   const commandFields = [item3.id, item3.label ?? "", ...item3.aliases ?? []].filter(Boolean).flatMap(tokenizeSearchText);
   const descriptionFields = tokenizeSearchText(item3.description ?? "");
   return Math.min(scoreFields(commandFields, query, 0), scoreFields(descriptionFields, query, 3));
+}
+
+// src/hermes/completion.ts
+var TAB_PATH_RE = /(?<=^|\s)((?:["']?(?:[A-Za-z]:[\\/]|\.{1,2}\/|~\/|\/|@|[^"'`\s]+\/))[^\s]*)$/;
+function completionRequestForInput(input2, scope = {}) {
+  const isSlashCommand = looksLikeSlashCommand(input2);
+  const pathWord = isSlashCommand ? null : input2.match(TAB_PATH_RE)?.[1] ?? null;
+  if (isSlashCommand && /^\/model(?:\s|$)/.test(input2)) {
+    return null;
+  }
+  const inline = inlineSlashTrigger(input2);
+  if (inline) {
+    return { method: "complete.slash", params: { text: `/${inline.query}` }, replaceFrom: inline.start + 1, skillsOnly: true };
+  }
+  if (isSlashCommand) {
+    return { method: "complete.slash", params: { text: input2 }, replaceFrom: 1 };
+  }
+  if (!pathWord) {
+    return null;
+  }
+  const { cwd, sid } = scope;
+  return {
+    method: "complete.path",
+    params: { word: pathWord, ...cwd ? { cwd } : {}, ...sid ? { session_id: sid } : {} },
+    replaceFrom: input2.length - pathWord.length
+  };
 }
 
 // src/slashResolve.ts
@@ -66700,8 +65455,9 @@ function resolveSlashName(name, catalog) {
   const scored = [...canon].map(([alias, target]) => ({ score: scoreSlashMenuItem({ id: alias.slice(1) }, name.toLowerCase()), target })).filter((s2) => s2.score < 3);
   const best = Math.min(...scored.map((s2) => s2.score));
   const matches2 = [...new Set(scored.filter((s2) => s2.score === best).map((s2) => s2.target))];
-  if (matches2.length === 1 && matches2[0].toLowerCase() !== needle) {
-    return { name: matches2[0].slice(1) };
+  const [only] = matches2;
+  if (only !== void 0 && matches2.length === 1 && only.toLowerCase() !== needle) {
+    return { name: only.slice(1) };
   }
   return matches2.length > 1 ? { ambiguous: matches2 } : null;
 }
@@ -67096,7 +65852,7 @@ function protocolNote(preview5, warned2) {
   return warned2 ? void 0 : { text: `The agent backend wrote unexpected output: ${String(preview5 ?? "").slice(0, STDERR_LINE_CAP)}`, tone: "info" };
 }
 function isDeadStream(err) {
-  const code7 = err?.code;
+  const code7 = typeof err === "object" && err !== null && "code" in err ? err.code : void 0;
   return code7 === "EIO" || code7 === "EPIPE";
 }
 var FaultBudget = class {
@@ -67676,11 +66432,11 @@ function dispatcher(cx, unknown4 = () => void 0) {
 }
 
 // src/gateway/eventLog.ts
-import { appendFileSync as appendFileSync4 } from "node:fs";
+import { appendFileSync as appendFileSync3 } from "node:fs";
 function eventLog(path2) {
   const write = (line) => {
     if (path2) {
-      appendFileSync4(path2, `${JSON.stringify(line)}
+      appendFileSync3(path2, `${JSON.stringify(line)}
 `);
     }
   };
@@ -67838,18 +66594,18 @@ async function openHelp(host) {
 }
 
 // src/settings.ts
-import { mkdirSync as mkdirSync4, writeFileSync as writeFileSync2 } from "node:fs";
-import { homedir as homedir10 } from "node:os";
-import { dirname, join as join9 } from "node:path";
+import { mkdirSync as mkdirSync3, writeFileSync as writeFileSync2 } from "node:fs";
+import { homedir as homedir9 } from "node:os";
+import { dirname, join as join8 } from "node:path";
 function settingsFile2(env2 = process.env) {
-  return join9(env2["HERMES_HOME"] || join9(homedir10(), ".hermes"), "hermes-tern", "settings.json");
+  return join8(env2["HERMES_HOME"] || join8(homedir9(), ".hermes"), "hermes-tern", "settings.json");
 }
 function loadSettings(file2 = settingsFile2()) {
   return readSettings(file2);
 }
 function saveSettings(patch6, file2 = settingsFile2()) {
   const next2 = { ...readStoredSettings(file2), ...patch6 };
-  mkdirSync4(dirname(file2), { recursive: true });
+  mkdirSync3(dirname(file2), { recursive: true });
   writeFileSync2(file2, `${JSON.stringify(next2, null, 2)}
 `);
   return settingsOf(next2);
@@ -70216,8 +68972,8 @@ function focusOf(cx) {
 
 // src/agents/store.ts
 import { readFile as readFile2, stat } from "node:fs/promises";
-import { homedir as homedir11 } from "node:os";
-import { join as join10 } from "node:path";
+import { homedir as homedir10 } from "node:os";
+import { join as join9 } from "node:path";
 var POLL_MS2 = 1e3;
 var GRACE_POLLS = 3;
 var MISSING_READS = 3;
@@ -70550,10 +69306,10 @@ async function manifestLog(delegationId, index2, env2 = process.env) {
   if (!/^[\w-]+$/.test(delegationId)) {
     return void 0;
   }
-  const home = env2["HERMES_HOME"] || join10(homedir11(), ".hermes");
-  for (const root7 of [join10(home, "delegation_cache", "live"), join10(home, "cache", "delegation", "live")]) {
+  const home = env2["HERMES_HOME"] || join9(homedir10(), ".hermes");
+  for (const root7 of [join9(home, "delegation_cache", "live"), join9(home, "cache", "delegation", "live")]) {
     try {
-      const text15 = await readFile2(join10(root7, delegationId, "manifest.json"), "utf8");
+      const text15 = await readFile2(join9(root7, delegationId, "manifest.json"), "utf8");
       const tasks = record(text15.replace(/^\uFEFF/, ""))?.["tasks"];
       const log = Array.isArray(tasks) ? record(tasks.find((t2) => record(t2)?.["index"] === index2))?.["log"] : void 0;
       if (typeof log === "string" && log) {
@@ -71357,14 +70113,14 @@ function paletteFor(mode, skin) {
   if (mode === "skin" && skin) {
     const name = skin.name || "default";
     return {
-      dark: semantic(resolve5(skin, "dark")),
-      light: semantic(resolve5(skin, "light")),
+      dark: semantic(resolve3(skin, "dark")),
+      light: semantic(resolve3(skin, "light")),
       name: { dark: name, light: name }
     };
   }
   return { dark: {}, light: {}, name: { dark: "tern", light: "tern" } };
 }
-function resolve5(skin, polarity) {
+function resolve3(skin, polarity) {
   const light = polarity === "light";
   const colors = { ...skin.colors, ...light ? skin.light_colors : skin.dark_colors };
   const saved = process.env["HERMES_TUI_LIGHT"];
@@ -71583,17 +70339,17 @@ var Disposables = class {
 };
 
 // src/draft/attachments.ts
-import { existsSync as existsSync5 } from "node:fs";
+import { existsSync as existsSync4 } from "node:fs";
 import { basename as basename3 } from "node:path";
 
 // src/hermes/clipboardImage.ts
-import { execFile as execFile6 } from "node:child_process";
-import { existsSync as existsSync4 } from "node:fs";
+import { execFile as execFile5 } from "node:child_process";
+import { existsSync as existsSync3 } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
-import { homedir as homedir12, tmpdir } from "node:os";
-import { join as join11, resolve as resolve6 } from "node:path";
-import { promisify as promisify5 } from "node:util";
-var execFileP = promisify5(execFile6);
+import { homedir as homedir11, tmpdir } from "node:os";
+import { join as join10, resolve as resolve4 } from "node:path";
+import { promisify as promisify4 } from "node:util";
+var execFileP = promisify4(execFile5);
 var runFile = async (file2, args, options) => (await execFileP(file2, args, options)).stdout;
 var IMAGE = /\.(png|jpe?g|gif|webp)$/i;
 var MAC_SCRIPT = `ObjC.import('AppKit');
@@ -71623,10 +70379,10 @@ async function extractClipboardImage(dest, env2, platform = process.platform, ru
     }
     if (answer?.startsWith("file:")) {
       const file2 = answer.slice("file:".length);
-      return IMAGE.test(file2) && existsSync4(file2) ? file2 : void 0;
+      return IMAGE.test(file2) && existsSync3(file2) ? file2 : void 0;
     }
     if (answer !== void 0) {
-      return answer === "true" && existsSync4(dest) ? dest : void 0;
+      return answer === "true" && existsSync3(dest) ? dest : void 0;
     }
   }
   const root7 = env2["HERMES_PYTHON_SRC_ROOT"];
@@ -71634,17 +70390,17 @@ async function extractClipboardImage(dest, env2, platform = process.platform, ru
   if (!root7) {
     return void 0;
   }
-  const stdout = await run6(python, [join11(root7, "ui-tui/scripts/clipboard_image.py"), dest], {
+  const stdout = await run6(python, [join10(root7, "ui-tui/scripts/clipboard_image.py"), dest], {
     cwd: root7,
     env: { ...env2, PYTHONPATH: root7 },
     timeout: 15e3
   });
-  return stdout.trim() === "true" && existsSync4(dest) ? dest : void 0;
+  return stdout.trim() === "true" && existsSync3(dest) ? dest : void 0;
 }
 async function withClipboardImage(use, env2 = process.env, extract = extractClipboardImage) {
-  const dir2 = await mkdtemp(join11(tmpdir(), "hermes-tern-clipboard-"));
+  const dir2 = await mkdtemp(join10(tmpdir(), "hermes-tern-clipboard-"));
   try {
-    const path2 = await extract(join11(dir2, "clipboard.png"), env2);
+    const path2 = await extract(join10(dir2, "clipboard.png"), env2);
     return path2 ? await use(path2) : void 0;
   } finally {
     await rm(dir2, { force: true, recursive: true });
@@ -71663,12 +70419,12 @@ function imagePathOf(text15, cwd) {
       return void 0;
     }
   }
-  raw2 = raw2.replace(/\\(.)/g, "$1").replace(/^~(?=$|\/)/, homedir12());
+  raw2 = raw2.replace(/\\(.)/g, "$1").replace(/^~(?=$|\/)/, homedir11());
   if (!IMAGE.test(raw2)) {
     return void 0;
   }
-  const path2 = resolve6(cwd, raw2);
-  return existsSync4(path2) ? path2 : void 0;
+  const path2 = resolve4(cwd, raw2);
+  return existsSync3(path2) ? path2 : void 0;
 }
 
 // src/draft/attachments.ts
@@ -71840,23 +70596,23 @@ var Attachments = class {
     const size = imageSize(bytes);
     const kb = bytes.length / 1024;
     const blob = this.#host.blob(bytes, attachment.mime);
-    const preview5 = blob ? { blob } : existsSync5(attachment.path) ? { path: attachment.path } : void 0;
+    const preview5 = blob ? { blob } : existsSync4(attachment.path) ? { path: attachment.path } : void 0;
     const caption = [size && `${size.w}\xD7${size.h}`, kb >= 1024 ? `${(kb / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(kb))} KB`];
     return { ...attachment, caption: caption.filter(Boolean).join(" \xB7 "), name, ...preview5 ? { preview: preview5 } : {} };
   }
 };
 
 // src/github/branch.ts
-import { execFile as execFile7 } from "node:child_process";
-import { promisify as promisify6 } from "node:util";
-var run5 = promisify6(execFile7);
+import { execFile as execFile6 } from "node:child_process";
+import { promisify as promisify5 } from "node:util";
+var run5 = promisify5(execFile6);
 function parseRemote(url) {
-  const m = url.match(/^[\w.-]+@([^:/]+):([^/]+\/[^/]+?)(?:\.git)?\/?$/) ?? url.match(/^(?:https?|ssh|git):\/\/(?:[^@/]+@)?([^/:]+)(?::\d+)?\/([^/]+\/[^/]+?)(?:\.git)?\/?$/);
+  const m = (/^[\w.-]+@(?<host>[^:/]+):(?<repo>[^/]+\/[^/]+?)(?:\.git)?\/?$/.exec(url) ?? /^(?:https?|ssh|git):\/\/(?:[^@/]+@)?(?<host>[^/:]+)(?::\d+)?\/(?<repo>[^/]+\/[^/]+?)(?:\.git)?\/?$/.exec(url))?.groups;
   if (!m) {
     return void 0;
   }
-  const host = m[1].toLowerCase();
-  return host === "github.com" || host.split(".").includes("github") ? { host, repository: m[2].toLowerCase() } : void 0;
+  const host = (m["host"] ?? "").toLowerCase();
+  return host === "github.com" || host.split(".").includes("github") ? { host, repository: (m["repo"] ?? "").toLowerCase() } : void 0;
 }
 async function git2(cwd, ...args) {
   const { stdout } = await run5("git", ["-C", cwd, ...args], { timeout: 5e3 });
@@ -72434,55 +71190,6 @@ var OverlayStack = class {
   }
 };
 
-// .hermes-src/ui-tui/src/domain/slash.ts
-var INLINE_SLASH_RE = /\s\/([a-zA-Z][\w-]*)?$/;
-var inlineSlashTrigger = (text15) => {
-  const match = INLINE_SLASH_RE.exec(text15);
-  if (!match) {
-    return null;
-  }
-  const query = match[1] ?? "";
-  return { query, start: text15.length - query.length - 1 };
-};
-var applyCompletion = (value, rowText2, compReplace) => {
-  const text15 = value[compReplace - 1] === "/" && rowText2.startsWith("/") ? rowText2.slice(1) : rowText2;
-  return value.slice(0, compReplace) + text15;
-};
-var completionToApplyOnSubmit = (value, rowText2, compReplace, isLocalCommand = () => false) => {
-  const typed = value.trim();
-  if (!rowText2 || /^\/[\w-]+$/.test(typed) && isLocalCommand(typed.slice(1))) {
-    return null;
-  }
-  const next2 = applyCompletion(value, rowText2, compReplace);
-  return next2 !== value && next2.trimEnd() !== value.trimEnd() ? next2 : null;
-};
-
-// src/hermes/completion.ts
-var TAB_PATH_RE = /(?<=^|\s)((?:["']?(?:[A-Za-z]:[\\/]|\.{1,2}\/|~\/|\/|@|[^"'`\s]+\/))[^\s]*)$/;
-function completionRequestForInput(input2, scope = {}) {
-  const isSlashCommand = looksLikeSlashCommand(input2);
-  const pathWord = isSlashCommand ? null : input2.match(TAB_PATH_RE)?.[1] ?? null;
-  if (isSlashCommand && /^\/model(?:\s|$)/.test(input2)) {
-    return null;
-  }
-  const inline = inlineSlashTrigger(input2);
-  if (inline) {
-    return { method: "complete.slash", params: { text: `/${inline.query}` }, replaceFrom: inline.start + 1, skillsOnly: true };
-  }
-  if (isSlashCommand) {
-    return { method: "complete.slash", params: { text: input2 }, replaceFrom: 1 };
-  }
-  if (!pathWord) {
-    return null;
-  }
-  const { cwd, sid } = scope;
-  return {
-    method: "complete.path",
-    params: { word: pathWord, ...cwd ? { cwd } : {}, ...sid ? { session_id: sid } : {} },
-    replaceFrom: input2.length - pathWord.length
-  };
-}
-
 // src/overlays/completion.tsx
 var DEBOUNCE_MS = 60;
 var Completion = class {
@@ -72599,8 +71306,9 @@ var Completion = class {
         }
         return this.#accept(next2);
       }
+      default:
+        return false;
     }
-    return false;
   }
   /** The overlay nodes for the `layer` region (none while closed). */
   nodes(inputId2) {
@@ -72734,12 +71442,12 @@ function requestFor(before, sid) {
 
 // src/processes/widgets/author.ts
 import { spawn as spawn2 } from "node:child_process";
-import { join as join12 } from "node:path";
+import { join as join11 } from "node:path";
 var MAX_BRIEF_CHARS = 1500;
 var MAX_SAMPLE_LINE_CHARS = 300;
 var MAX_SAMPLE_BYTES = 12 * 1024;
 var MAX_SHAPE_REPEATS = 3;
-var REQUEST_TIMEOUT_MS2 = 12e4;
+var REQUEST_TIMEOUT_MS = 12e4;
 var SYSTEM_PROMPT = `You design the live status widget of a coding agent's background process (benchmark, eval, CI, tests, build, training, server). From the command and samples of its output you write a spec once; plain code then runs its regexes on every new line and redraws the widget until the process ends. Nobody can fix it later: its rules MUST match the real lines.
 
 A widget charts a quantity that shows how the process is going: throughput, latency, loss, tests or trials passed, progress toward a total the process states. When the output has none, call \`respond\` with only \`{"skip":"<why>"}\`; no widget beats a meaningless one. Never chart activity: lines or matches seen, words like \`error\` inside file contents.
@@ -72861,14 +71569,14 @@ function hermesAuthor(env2 = process.env) {
   if (!python || !root7 || !ui) {
     return void 0;
   }
-  const script = join12(ui, "..", "widget_author.py");
+  const script = join11(ui, "..", "widget_author.py");
   return (request, signal) => new Promise((resolve7, reject) => {
     const child = spawn2(python, [script], {
       cwd: root7,
       env: { ...env2, PYTHONPATH: root7 },
       signal,
       stdio: ["pipe", "pipe", "ignore"],
-      timeout: REQUEST_TIMEOUT_MS2
+      timeout: REQUEST_TIMEOUT_MS
     });
     let stdout = "";
     child.stdout.setEncoding("utf8").on("data", (chunk) => stdout += chunk);
@@ -72889,17 +71597,17 @@ function hermesAuthor(env2 = process.env) {
 }
 
 // src/processes/widgets/memory.ts
-import { mkdirSync as mkdirSync5, readdirSync as readdirSync2, rmSync as rmSync2, statSync, writeFileSync as writeFileSync4 } from "node:fs";
-import { join as join13 } from "node:path";
+import { mkdirSync as mkdirSync4, readdirSync as readdirSync2, rmSync as rmSync2, statSync, writeFileSync as writeFileSync4 } from "node:fs";
+import { join as join12 } from "node:path";
 var KEEP_MS = 7 * 24 * 36e5;
 var safe3 = (id) => /^[\w.-]{1,128}$/.test(id);
-function chartMemory(dir2 = join13(dataDir(), "charts"), now = Date.now) {
+function chartMemory(dir2 = join12(dataDir(), "charts"), now = Date.now) {
   return {
     load(id) {
       if (!safe3(id)) {
         return void 0;
       }
-      const value = readJsonFile(join13(dir2, `${id}.json`));
+      const value = readJsonFile(join12(dir2, `${id}.json`));
       const skip = chartSkip(value);
       if (value === void 0 || skip) {
         return skip;
@@ -72916,10 +71624,10 @@ function chartMemory(dir2 = join13(dataDir(), "charts"), now = Date.now) {
         return;
       }
       try {
-        mkdirSync5(dir2, { recursive: true });
-        writeFileSync4(join13(dir2, `${id}.json`), JSON.stringify(value));
+        mkdirSync4(dir2, { recursive: true });
+        writeFileSync4(join12(dir2, `${id}.json`), JSON.stringify(value));
         for (const name of readdirSync2(dir2)) {
-          const file2 = join13(dir2, name);
+          const file2 = join12(dir2, name);
           if (now() - statSync(file2).mtimeMs > KEEP_MS) {
             rmSync2(file2, { force: true });
           }
@@ -73133,6 +71841,146 @@ function adoptAll(steps, a2) {
   for (const step of steps) {
     step.adopt(a2);
   }
+}
+
+// .hermes-src/ui-tui/src/canonicalGateway.ts
+import { randomUUID as randomUUID3 } from "node:crypto";
+function canonicalRequest(method, original, contract) {
+  const params = { ...original };
+  if (method === "session.create") {
+    delete params.cols;
+    params.source = "tui";
+    params.request_id ??= randomUUID3();
+    if (!contract?.sources.includes("tui")) {
+      throw new Error(t("canonical.launch.noTuiPolicy"));
+    }
+    if (!contract.parameters.includes("client_env")) {
+      delete params.client_env;
+    }
+    const unsupported = Object.keys(params).filter((key2) => !contract.parameters.includes(key2));
+    if (unsupported.length) {
+      throw new Error(t("canonical.launch.unsupportedOptions", unsupported.join(", ")));
+    }
+  }
+  if (["prompt.submit", "session.steer", "session.redirect"].includes(method) && params.submission_id) {
+    params.input_id = params.submission_id;
+    delete params.submission_id;
+  }
+  if (method === "session.resume" || method === "session.activate") {
+    method = "session.resume";
+    const renders = !params.omit_messages;
+    delete params.cols;
+    delete params.omit_messages;
+    if (renders) {
+      params.display_projection = true;
+    }
+  }
+  return { method, params };
+}
+function canonicalResult(method, value, request = {}) {
+  if (!value || typeof value !== "object") {
+    return value;
+  }
+  if (["prompt.submit", "session.steer", "session.redirect"].includes(method) && value.ref) {
+    return { ...value, input_id: request.input_id, target_profile_home: value.ref.profile_id, target_session_id: value.ref.session_id };
+  }
+  if (["session.create", "session.resume", "session.activate"].includes(method)) {
+    const stored = Array.isArray(value.messages) ? value.messages.map((row2) => row2 && typeof row2 === "object" ? { ...row2, text: rowText(row2.content), name: row2.tool_name } : row2) : value.messages;
+    const { display_messages: display, ...rest } = value;
+    const messages2 = Array.isArray(display) ? display : stored;
+    return { ...rest, messages: messages2, stored_messages: stored, info: {
+      ...value.info,
+      stored_session_id: value.stored_session_id,
+      execution_epoch: String(value.authority_epoch),
+      execution_generation: value.execution_generation,
+      running: value.running,
+      pending_submissions: pendingSubmissions(value.pending)
+    } };
+  }
+  return value;
+}
+function rowText(content5) {
+  if (!Array.isArray(content5)) {
+    return content5;
+  }
+  return content5.map((part) => typeof part === "string" ? part : typeof part?.text === "string" ? part.text : part?.type ? String(part.type).includes("image") ? "[image]" : `[${part.type}]` : "").filter(Boolean).join("\n");
+}
+function pendingSubmissions(pending) {
+  if (!Array.isArray(pending)) {
+    return void 0;
+  }
+  return pending.filter((row2) => row2 && typeof row2 === "object").map((row2) => ({
+    ...row2,
+    user: row2.text,
+    target_profile_home: row2.ref?.profile_id,
+    target_session_id: row2.ref?.session_id
+  }));
+}
+function canonicalEvent(event) {
+  const pending = pendingSubmissions(event.payload?.pending);
+  return pending ? { ...event, payload: { ...event.payload, pending_submissions: pending } } : event;
+}
+function localCreationOptions(env2 = process.env) {
+  const fields = {
+    model: env2.HERMES_MODEL,
+    provider: env2.HERMES_TUI_PROVIDER,
+    cwd: env2.HERMES_CWD
+  };
+  const options = Object.fromEntries(Object.entries(fields).filter(([, value]) => value));
+  if (env2.HERMES_TUI_TOOLSETS) {
+    options.toolsets = env2.HERMES_TUI_TOOLSETS.split(",");
+  }
+  const skills = [...new Set((env2.HERMES_TUI_SKILLS ?? "").split(/[,\n]/).map((name) => name.trim()).filter(Boolean))];
+  if (skills.length) {
+    options.skills = skills;
+  }
+  const clientEnv = parseClientEnv(env2.HERMES_TUI_CLIENT_ENV);
+  if (clientEnv) {
+    options.client_env = clientEnv;
+  }
+  if (env2.HERMES_TUI_MAX_TURNS) {
+    const turns = Number(env2.HERMES_TUI_MAX_TURNS);
+    options.max_turns = Number.isInteger(turns) ? turns : env2.HERMES_TUI_MAX_TURNS.trim();
+  }
+  const truthy = (value) => ["1", "true", "yes", "on"].includes((value ?? "").trim().toLowerCase());
+  for (const [field, value] of [
+    ["yolo", env2.HERMES_YOLO_MODE],
+    ["ignore_rules", env2.HERMES_IGNORE_RULES],
+    ["safe_mode", env2.HERMES_SAFE_MODE],
+    ["ignore_user_config", env2.HERMES_IGNORE_USER_CONFIG],
+    ["checkpoints", env2.HERMES_TUI_CHECKPOINTS],
+    ["pass_session_id", env2.HERMES_TUI_PASS_SESSION_ID],
+    ["accept_hooks", env2.HERMES_ACCEPT_HOOKS]
+  ]) {
+    if (truthy(value)) {
+      options[field] = true;
+    }
+  }
+  return options;
+}
+function parseClientEnv(raw2) {
+  if (!raw2) {
+    return void 0;
+  }
+  try {
+    const value = JSON.parse(raw2);
+    if (value && typeof value === "object" && !Array.isArray(value) && Object.values(value).every((item3) => typeof item3 === "string")) {
+      return value;
+    }
+  } catch {
+  }
+  return void 0;
+}
+var TOOL_PROGRESS_MODES = /* @__PURE__ */ new Set(["off", "new", "all", "verbose"]);
+function launchToolProgress(env2 = process.env) {
+  const raw2 = env2.HERMES_TUI_TOOL_PROGRESS?.trim().toLowerCase();
+  if (!raw2) {
+    return void 0;
+  }
+  if (!TOOL_PROGRESS_MODES.has(raw2)) {
+    throw new Error(t("canonical.launch.invalidToolProgress", raw2));
+  }
+  return raw2;
 }
 
 // src/hermes/create.ts
@@ -73766,7 +72614,7 @@ var Sidebar = class {
 };
 
 // src/promptRefs.ts
-import { existsSync as existsSync6 } from "node:fs";
+import { existsSync as existsSync5 } from "node:fs";
 import { basename as basename4 } from "node:path";
 var VALUE = "(`[^`\\n]+`|\"[^\"\\n]+\"|'[^'\\n]+'|\\S+)";
 var IMAGE_LINE = new RegExp(`^@image:${VALUE}[ \\t]*$`, "gm");
@@ -73782,7 +72630,7 @@ function splitPrompt(raw2) {
   let hinted = [];
   const hints = HINTS.exec(text15);
   if (hints) {
-    const paths = [...(hints[1] ?? "").matchAll(/^\[Image attached(?: at)?: (.+)\]$/gm)].map((m) => m[1]);
+    const paths = [...(hints[1] ?? "").matchAll(/^\[Image attached(?: at)?: (?<path>.+)\]$/gm)].flatMap((m) => m.groups?.["path"] ?? []);
     const placeholders = (hints[2] ?? "").split("[screenshot]").length - 1;
     if (placeholders === 0 || placeholders === paths.length) {
       text15 = text15.slice(0, hints.index);
@@ -73814,7 +72662,7 @@ function splitPrompt(raw2) {
   }
   return { files, images: [...refs, ...hinted], text: text15.replace(CONTEXT_WARNINGS, "").replace(/\n{3,}/g, "\n\n").trim() };
 }
-function promptAttachments(parts3, exists = existsSync6) {
+function promptAttachments(parts3, exists = existsSync5) {
   const local = (p3) => p3.startsWith("/") && exists(p3);
   return [
     ...parts3.images.map((p3) => ({ kind: "image", name: basename4(p3), ...local(p3) ? { source: { path: p3 } } : {} })),
@@ -75290,6 +74138,1176 @@ var App = class {
   }
   setEffort(value, scope) {
     return applyEffort(this, value, scope);
+  }
+};
+
+// .hermes-src/ui-tui/src/gatewayClient.ts
+import { EventEmitter } from "node:events";
+
+// .hermes-src/node_modules/@hermes/shared/src/json-rpc-channel.ts
+var isServerRequestFrame = (frame) => typeof frame.id === "string" && typeof frame.method === "string" && frame.method !== "event";
+var JsonRpcGatewayError = class extends Error {
+  code;
+  data;
+  constructor(message, options) {
+    super(message);
+    this.name = "JsonRpcGatewayError";
+    this.code = options?.code;
+    this.data = options?.data;
+  }
+};
+var JSON_RPC_METHOD_NOT_FOUND = -32601;
+var JSON_RPC_INTERNAL_ERROR = -32603;
+var JSON_RPC_SESSION_NOT_SHOWN = 4404;
+function jsonRpcErrorFromFrame(raw2, fallbackMessage = "Hermes RPC failed") {
+  const err = raw2 && typeof raw2 === "object" ? raw2 : {};
+  return new JsonRpcGatewayError(typeof err.message === "string" && err.message ? err.message : fallbackMessage, {
+    code: typeof err.code === "number" ? err.code : void 0,
+    data: err.data
+  });
+}
+var DEFAULT_REQUEST_TIMEOUT_MS = 12e4;
+var DEFAULT_HEARTBEAT_INTERVAL_MS = 15e3;
+var DEFAULT_HEARTBEAT_DEADLINE_MS = 45e3;
+var MAX_OUTSTANDING_PINGS = 8;
+var wireDecoder = new TextDecoder();
+function wireFrameText(raw2) {
+  if (typeof raw2 === "string") {
+    return raw2;
+  }
+  if (raw2 instanceof ArrayBuffer || ArrayBuffer.isView(raw2)) {
+    return wireDecoder.decode(raw2);
+  }
+  return null;
+}
+var unrefTimer = (timer) => {
+  ;
+  timer?.unref?.();
+};
+var JsonRpcRequestChannel = class {
+  nextId = 0;
+  pending = /* @__PURE__ */ new Map();
+  transport = null;
+  heartbeatTimer = null;
+  heartbeatSequence = 0;
+  outstandingPings = /* @__PURE__ */ new Set();
+  lastLivenessAt = 0;
+  /** The bound generation's backend counts `decline` as one client abstaining (see `ServerRequest.decline`). */
+  backendCountsDeclines = false;
+  requestHandlers = [];
+  options;
+  constructor(options = {}) {
+    this.options = {
+      createRequestId: options.createRequestId ?? ((nextId) => `${options.requestIdPrefix ?? "r"}${nextId}`),
+      heartbeatDeadlineMs: options.heartbeatDeadlineMs ?? DEFAULT_HEARTBEAT_DEADLINE_MS,
+      heartbeatIntervalMs: options.heartbeatIntervalMs ?? DEFAULT_HEARTBEAT_INTERVAL_MS,
+      heartbeatLiveness: options.heartbeatLiveness ?? "response",
+      onEvent: options.onEvent,
+      onHeartbeatFailure: options.onHeartbeatFailure,
+      onRequestHandlerError: options.onRequestHandlerError,
+      onUnhandledRequest: options.onUnhandledRequest,
+      requestIdPrefix: options.requestIdPrefix ?? "r",
+      requestTimeoutMs: options.requestTimeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS,
+      unrefTimers: options.unrefTimers ?? false
+    };
+  }
+  get defaultRequestTimeoutMs() {
+    return this.options.requestTimeoutMs;
+  }
+  get connected() {
+    return this.transport !== null;
+  }
+  /** Bind a new connection generation. Any previous generation's heartbeat stops; its pending calls are the owner's to reject. */
+  attach(transport) {
+    this.stopHeartbeat();
+    this.transport = transport;
+    this.lastLivenessAt = Date.now();
+    this.backendCountsDeclines = false;
+  }
+  /** Drop the transport and fail every in-flight call with `error`. */
+  detach(error) {
+    this.stopHeartbeat();
+    this.transport = null;
+    this.rejectAllPending(error);
+  }
+  /** True while `transport` is the bound generation (owners gate stale socket callbacks on this). */
+  owns(transport) {
+    return this.transport === transport;
+  }
+  request(method, params = {}, timeoutMs = this.options.requestTimeoutMs, signal, notConnectedError = () => new Error("gateway not connected")) {
+    const transport = this.transport;
+    if (!transport) {
+      return Promise.reject(notConnectedError());
+    }
+    if (signal?.aborted) {
+      return Promise.reject(new DOMException("Aborted", "AbortError"));
+    }
+    const id = this.options.createRequestId(++this.nextId);
+    return new Promise((resolve7, reject) => {
+      let onAbort;
+      const detachAbort = () => {
+        if (onAbort && signal) {
+          signal.removeEventListener("abort", onAbort);
+        }
+      };
+      const pending = {
+        resolve: (value) => {
+          detachAbort();
+          resolve7(value);
+        },
+        reject: (error) => {
+          detachAbort();
+          reject(error);
+        }
+      };
+      if (timeoutMs > 0) {
+        pending.timer = setTimeout(() => {
+          if (this.pending.delete(id)) {
+            detachAbort();
+            const seconds = Math.round(timeoutMs / 1e3);
+            reject(new Error(`request timed out after ${seconds}s: ${method}`));
+          }
+        }, timeoutMs);
+        if (this.options.unrefTimers) {
+          unrefTimer(pending.timer);
+        }
+      }
+      if (signal) {
+        onAbort = () => {
+          this.clearPending(id);
+          detachAbort();
+          reject(new DOMException("Aborted", "AbortError"));
+        };
+        signal.addEventListener("abort", onAbort, { once: true });
+      }
+      this.pending.set(id, pending);
+      try {
+        transport.send(JSON.stringify({ jsonrpc: "2.0", id, method, params }));
+      } catch (error) {
+        this.clearPending(id);
+        detachAbort();
+        reject(error instanceof Error ? error : new Error(String(error)));
+      }
+    });
+  }
+  /**
+   * Register a handler for server→client requests (clarify, approval, sudo,
+   * …). Handlers are tried in registration order until one accepts (returns
+   * anything but `false`); an unhandled request is answered `-32601` so the
+   * backend never waits out its deadline against a client that cannot answer.
+   */
+  onRequest(handler) {
+    this.requestHandlers.push(handler);
+    return () => {
+      const index2 = this.requestHandlers.indexOf(handler);
+      if (index2 >= 0) {
+        this.requestHandlers.splice(index2, 1);
+      }
+    };
+  }
+  /**
+   * Deliver a server request to the handlers. Live frames arrive through
+   * `handleFrame`; owners call this directly for `open_requests` returned by a
+   * reconnect replay (`replayed: true`) so an unanswered question survives a
+   * dropped socket.
+   */
+  deliverRequest(id, method, params, replayed = false) {
+    let settled2 = false;
+    const send = (frame) => {
+      if (settled2) {
+        return;
+      }
+      settled2 = true;
+      try {
+        this.transport?.send(JSON.stringify({ jsonrpc: "2.0", id, ...frame }));
+      } catch {
+      }
+    };
+    const request = {
+      id,
+      method,
+      params,
+      replayed,
+      respond: (result) => send({ result }),
+      fail: (code7, message) => send({ error: { code: code7, message } }),
+      decline: (message) => {
+        if (this.backendCountsDeclines) {
+          send({ error: { code: JSON_RPC_SESSION_NOT_SHOWN, message } });
+        }
+      }
+    };
+    for (const handler of this.requestHandlers) {
+      let accepted;
+      try {
+        accepted = handler(request);
+      } catch (error) {
+        request.fail(JSON_RPC_INTERNAL_ERROR, `server request handler crashed: ${method}`);
+        this.options.onRequestHandlerError?.(error instanceof Error ? error : new Error(String(error)), {
+          id,
+          method,
+          params
+        });
+        return false;
+      }
+      if (accepted !== false) {
+        return true;
+      }
+    }
+    request.fail(JSON_RPC_METHOD_NOT_FOUND, `no handler for server request: ${method}`);
+    this.options.onUnhandledRequest?.({ id, method, params });
+    return false;
+  }
+  deliverOpenRequests(result) {
+    const open = result?.open_requests;
+    if (!Array.isArray(open)) {
+      return;
+    }
+    for (const entry of open) {
+      if (typeof entry?.id === "string" && typeof entry.method === "string") {
+        const params = entry.params && typeof entry.params === "object" ? entry.params : {};
+        this.deliverRequest(entry.id, entry.method, params, true);
+      }
+    }
+  }
+  /**
+   * Route one inbound frame: a response settles its pending call, an
+   * `event` notification reaches `onEvent`, a server→client request reaches
+   * the `onRequest` handlers. Returns the decoded frame so the owner can act
+   * on it too (mirror it, record seq, …) or `null` when the text was not
+   * JSON or not a JSON object (`null`, a scalar).
+   */
+  handleFrame(text15) {
+    let frame;
+    try {
+      frame = JSON.parse(text15);
+    } catch {
+      return null;
+    }
+    if (!frame || typeof frame !== "object") {
+      return null;
+    }
+    if (this.options.heartbeatLiveness === "any-inbound") {
+      this.lastLivenessAt = Date.now();
+    }
+    if (isServerRequestFrame(frame)) {
+      const params = frame.params && typeof frame.params === "object" ? frame.params : {};
+      this.deliverRequest(frame.id, frame.method, params);
+      return frame;
+    }
+    if (frame.id !== void 0 && frame.id !== null) {
+      if (typeof frame.id === "string" && this.outstandingPings.delete(frame.id)) {
+        this.lastLivenessAt = Date.now();
+        return frame;
+      }
+      const call = this.pending.get(frame.id);
+      if (call) {
+        this.lastLivenessAt = Date.now();
+        this.clearPending(frame.id);
+        if (frame.error) {
+          call.reject(jsonRpcErrorFromFrame(frame.error));
+        } else {
+          this.deliverOpenRequests(frame.result);
+          call.resolve(frame.result);
+        }
+      }
+      return frame;
+    }
+    if (frame.method === "event" && frame.params && typeof frame.params.type === "string") {
+      if (frame.params.type === "gateway.ready") {
+        this.advertiseCapabilities();
+      }
+      this.options.onEvent?.(frame.params);
+    }
+    return frame;
+  }
+  /**
+   * Tell the backend, once per connection generation, that this client answers
+   * server→client requests (a handler result or `-32601`). Without it a
+   * backend treats a WebSocket client as a build that predates server requests
+   * and fails every clarify/approval/… for it immediately instead of stalling
+   * the agent for the full deadline. An older backend answers `-32601` here;
+   * that is ignored.
+   */
+  advertiseCapabilities() {
+    const transport = this.transport;
+    this.request("client.capabilities", { server_requests: true }).then((result) => {
+      if (this.transport === transport) {
+        this.backendCountsDeclines = result?.declines_not_shown === true;
+      }
+    }).catch(() => void 0);
+  }
+  /**
+   * Begin the `gateway.ping` keepalive on the bound transport. Only call when
+   * `gateway.ready.heartbeat` advertised support — an older backend would
+   * answer with -32601 and never count as alive. What counts as liveness is
+   * `heartbeatLiveness`; a full deadline without it drops the transport.
+   */
+  startHeartbeat() {
+    this.stopHeartbeat();
+    this.lastLivenessAt = Date.now();
+    const transport = this.transport;
+    if (!transport || this.options.heartbeatIntervalMs <= 0 || this.options.heartbeatDeadlineMs <= 0) {
+      return;
+    }
+    let lastPingAt = 0;
+    this.heartbeatTimer = setInterval(() => {
+      if (this.transport !== transport) {
+        return;
+      }
+      const now = Date.now();
+      if (lastPingAt > this.lastLivenessAt && now - this.lastLivenessAt >= this.options.heartbeatDeadlineMs) {
+        this.failHeartbeat(new Error("WebSocket heartbeat acknowledgement timed out"));
+        return;
+      }
+      const id = `heartbeat-${++this.heartbeatSequence}`;
+      this.outstandingPings.add(id);
+      if (this.outstandingPings.size > MAX_OUTSTANDING_PINGS) {
+        this.outstandingPings.delete(this.outstandingPings.values().next().value);
+      }
+      lastPingAt = now;
+      try {
+        transport.send(JSON.stringify({ jsonrpc: "2.0", id, method: "gateway.ping", params: {} }));
+      } catch (error) {
+        this.failHeartbeat(error instanceof Error ? error : new Error(String(error)));
+      }
+    }, this.options.heartbeatIntervalMs);
+    if (this.options.unrefTimers) {
+      unrefTimer(this.heartbeatTimer);
+    }
+  }
+  stopHeartbeat() {
+    this.outstandingPings.clear();
+    if (this.heartbeatTimer !== null) {
+      clearInterval(this.heartbeatTimer);
+      this.heartbeatTimer = null;
+    }
+  }
+  failHeartbeat(error) {
+    this.stopHeartbeat();
+    this.options.onHeartbeatFailure?.(error);
+  }
+  clearPending(id) {
+    const call = this.pending.get(id);
+    if (call?.timer) {
+      clearTimeout(call.timer);
+    }
+    this.pending.delete(id);
+  }
+  rejectAllPending(error) {
+    for (const [id, call] of this.pending) {
+      if (call.timer) {
+        clearTimeout(call.timer);
+      }
+      this.pending.delete(id);
+      call.reject(error);
+    }
+  }
+};
+
+// .hermes-src/node_modules/@hermes/shared/src/reconnect-backoff.ts
+var DEFAULT_BASE_DELAY_MS = 300;
+var DEFAULT_CAP_MS = 15e3;
+var MAX_EXPONENT = 32;
+function reconnectBackoffDelayMs(attempt2, options = {}) {
+  const baseDelayMs = options.baseDelayMs ?? DEFAULT_BASE_DELAY_MS;
+  const capMs = options.capMs ?? DEFAULT_CAP_MS;
+  const exponent = Math.min(Math.max(0, Math.trunc(attempt2)), MAX_EXPONENT);
+  const ceiling = Math.min(capMs, baseDelayMs * 2 ** exponent);
+  return options.jitter === false ? ceiling : Math.random() * ceiling;
+}
+
+// .hermes-src/ui-tui/src/gatewayClient.ts
+var import_undici = __toESM(require_undici(), 1);
+
+// .hermes-src/ui-tui/src/lib/circularBuffer.ts
+var CircularBuffer = class {
+  constructor(capacity) {
+    this.capacity = capacity;
+    if (!Number.isInteger(capacity) || capacity <= 0) {
+      throw new RangeError(`CircularBuffer capacity must be a positive integer, got ${capacity}`);
+    }
+    this.buf = new Array(capacity);
+  }
+  capacity;
+  buf;
+  head = 0;
+  len = 0;
+  push(item3) {
+    this.buf[this.head] = item3;
+    this.head = (this.head + 1) % this.capacity;
+    if (this.len < this.capacity) {
+      this.len++;
+    }
+  }
+  tail(n = this.len) {
+    const take = Math.min(Math.max(0, n), this.len);
+    const start = this.len < this.capacity ? 0 : this.head;
+    const out = new Array(take);
+    for (let i = 0; i < take; i++) {
+      out[i] = this.buf[(start + this.len - take + i) % this.capacity];
+    }
+    return out;
+  }
+  drain() {
+    const out = this.tail();
+    this.clear();
+    return out;
+  }
+  clear() {
+    this.buf = new Array(this.capacity);
+    this.head = 0;
+    this.len = 0;
+  }
+};
+
+// .hermes-src/ui-tui/src/lib/parentLog.ts
+import { appendFileSync as appendFileSync4, mkdirSync as mkdirSync5 } from "node:fs";
+import { homedir as homedir12 } from "node:os";
+import { join as join13 } from "node:path";
+var logDir = join13(process.env.HERMES_HOME?.trim() || join13(homedir12(), ".hermes"), "logs");
+var CRASH_LOG = join13(logDir, "tui_gateway_crash.log");
+var enabled = !process.env.VITEST;
+var MAX_BREADCRUMB = 4096;
+var warned = false;
+function recordParentLifecycle(line) {
+  if (!enabled) {
+    return;
+  }
+  try {
+    const oneLine2 = line.replace(/[\r\n]+/g, " \u21B5 ");
+    const capped = oneLine2.length > MAX_BREADCRUMB ? `${oneLine2.slice(0, MAX_BREADCRUMB)}\u2026 [truncated ${oneLine2.length} chars]` : oneLine2;
+    mkdirSync5(logDir, { recursive: true });
+    appendFileSync4(CRASH_LOG, `[tui-parent] ${(/* @__PURE__ */ new Date()).toISOString()} ${capped}
+`);
+  } catch {
+    if (!warned) {
+      warned = true;
+      process.stderr.write("hermes-tui: parent lifecycle log unavailable\n");
+    }
+  }
+}
+
+// .hermes-src/ui-tui/src/localGatewayBootstrap.ts
+import { execFile as execFile7 } from "node:child_process";
+import { resolve as resolve6 } from "node:path";
+import { promisify as promisify6 } from "node:util";
+
+// .hermes-src/ui-tui/src/lib/pythonHelpers.ts
+import { existsSync as existsSync6 } from "node:fs";
+import { resolve as resolve5 } from "node:path";
+function pythonHelperPath(name, pythonRoot) {
+  const bundled = resolve5(import.meta.dirname, "scripts", name);
+  return existsSync6(bundled) ? bundled : resolve5(pythonRoot, "ui-tui/scripts", name);
+}
+
+// .hermes-src/ui-tui/src/localGatewayBootstrap.ts
+var resolvePython = () => {
+  const configured = process.env.HERMES_PYTHON?.trim();
+  if (configured) {
+    return configured;
+  }
+  return process.platform === "win32" ? "python" : "python3";
+};
+var isTerminalBootstrapFailure = (message) => /^gateway unavailable: /m.test(message);
+var bootstrapLocalGateway = async (start, recover = false) => {
+  const root7 = process.env.HERMES_PYTHON_SRC_ROOT ?? resolve6(import.meta.dirname, "../../");
+  const { stdout } = await promisify6(execFile7)(
+    resolvePython(),
+    [pythonHelperPath("gateway_bootstrap.py", root7), ...start ? ["--start"] : recover ? ["--recover"] : []],
+    { cwd: root7, env: { ...process.env, PYTHONPATH: root7, HERMES_PYTHON_SRC_ROOT: root7 }, timeout: 4e4, maxBuffer: 1024 * 1024 }
+  );
+  return JSON.parse(stdout);
+};
+
+// .hermes-src/ui-tui/src/gatewayClient.ts
+var MAX_GATEWAY_LOG_LINES = 200;
+var MAX_LOG_LINE_BYTES = 4096;
+var MAX_BUFFERED_EVENTS = 2e3;
+var MAX_LOG_PREVIEW = 240;
+var STARTUP_TIMEOUT_MS = Math.max(5e3, parseInt(process.env.HERMES_TUI_STARTUP_TIMEOUT_MS ?? "15000", 10) || 15e3);
+var REQUEST_TIMEOUT_MS2 = Math.max(3e4, parseInt(process.env.HERMES_TUI_RPC_TIMEOUT_MS ?? "120000", 10) || 12e4);
+var WS_CONNECTING = 0;
+var WS_OPEN = 1;
+var WS_CLOSING = 2;
+var WS_CLOSED = 3;
+var RECONNECT_BASE_MS = 1e3;
+var RECONNECT_MAX_MS = 3e4;
+var getWebSocketCtor = () => typeof WebSocket === "undefined" ? import_undici.WebSocket : WebSocket;
+var truncateLine = (line) => line.length > MAX_LOG_LINE_BYTES ? `${line.slice(0, MAX_LOG_LINE_BYTES)}\u2026 [truncated ${line.length} bytes]` : line;
+var resolveGatewayAttachUrl = () => {
+  const raw2 = process.env.HERMES_TUI_GATEWAY_URL?.trim();
+  return raw2 ? raw2 : null;
+};
+var resolveSidecarUrl = () => {
+  const raw2 = process.env.HERMES_TUI_SIDECAR_URL?.trim();
+  return raw2 ? raw2 : null;
+};
+var _USERINFO_FALLBACK_RE = /^([a-z][a-z0-9+.-]*:\/\/)[^/?#@]*@/i;
+var redactUrl = (raw2) => {
+  if (!raw2) {
+    return raw2;
+  }
+  try {
+    const url = new URL(raw2);
+    const userInfo = url.username || url.password ? "***@" : "";
+    const query = url.search ? "?***" : "";
+    return `${url.protocol}//${userInfo}${url.host}${url.pathname}${query}`;
+  } catch {
+    const noUserInfo = raw2.replace(_USERINFO_FALLBACK_RE, "$1***@");
+    const queryIdx = noUserInfo.indexOf("?");
+    return queryIdx >= 0 ? `${noUserInfo.slice(0, queryIdx)}?***` : noUserInfo;
+  }
+};
+var OWNER_RECOVERY_LIMIT = 3;
+var OWNER_RECOVERY_WINDOW_MS = 6e4;
+var GatewayClient = class extends EventEmitter {
+  constructor(bootstrap = bootstrapLocalGateway) {
+    super();
+    this.bootstrap = bootstrap;
+    this.setMaxListeners(0);
+    this.channel.onRequest((request) => {
+      if (this.subscribed) {
+        this.emit("request", request);
+      } else {
+        this.bufferedRequests.push(request);
+      }
+    });
+  }
+  bootstrap;
+  ws = null;
+  wsConnectPromise = null;
+  sidecarWs = null;
+  attachUrl = null;
+  sidecarUrl = null;
+  logs = new CircularBuffer(MAX_GATEWAY_LOG_LINES);
+  // Request ids, pending map, timeouts, error mapping and the gateway.ping
+  // heartbeat are shared with the desktop/web WebSocket client; this class
+  // only owns the two transports (child stdio, attached socket) and the
+  // buffered-event replay that Ink's mount order needs.
+  channel = new JsonRpcRequestChannel({
+    // A mid-turn socket streams deltas every second; killing the only
+    // transport that carried live traffic split sessions that completed
+    // server-side (#115251). Count any inbound frame as liveness, exactly
+    // like the desktop/web client; a silent drop still trips the deadline.
+    heartbeatLiveness: "any-inbound",
+    onEvent: (ev) => this.publishWire(ev),
+    onHeartbeatFailure: () => this.onHeartbeatFailure(),
+    onRequestHandlerError: (error, req) => this.pushLog(`[protocol] server request handler crashed: ${req.method} (${error.message})`),
+    onUnhandledRequest: (req) => this.pushLog(`[protocol] unhandled server request: ${req.method}`),
+    requestTimeoutMs: REQUEST_TIMEOUT_MS2,
+    unrefTimers: true
+  });
+  bufferedEvents = new CircularBuffer(MAX_BUFFERED_EVENTS);
+  // Server→client requests (clarify, approval, sudo, …) follow the same
+  // mount-order contract as events: an attached session mid-turn can send one
+  // the instant the socket opens, before the Ink handler is registered.
+  bufferedRequests = [];
+  pendingExit;
+  ready = false;
+  readyTimer = null;
+  subscribed = false;
+  drainGeneration = 0;
+  reconnectTimer = null;
+  reconnectAttempts = 0;
+  // Set on kill() so we never auto-reconnect after an intentional shutdown.
+  disposed = false;
+  bootstrapFlight = null;
+  bootstrapError = null;
+  localStarted = false;
+  localGeneration = 0;
+  recoveryAttempts = [];
+  isCanonical = false;
+  creationContract;
+  describedSkin;
+  describeFlight;
+  attachHold = null;
+  // The last session.create whose outcome is in doubt (see createCanonical).
+  unsettledCreate;
+  get attached() {
+    return this.attachUrl !== null;
+  }
+  /** Frames off the socket. On a canonical gateway the owner's execution stamp rides on
+   * the params (`authority_epoch`/`execution_generation`); fold it into the payload the
+   * pre-cutover handlers read, and let this client own readiness (it publishes
+   * `gateway.ready` itself after `runtime.describe`, so the listener's ready would be a
+   * second one) while still negotiating the transport's heartbeat capability. */
+  publishWire(ev) {
+    if (!this.isCanonical && ev.type === "gateway.ready" && this.attachUrl !== null && ev.payload?.session_authority === true) {
+      return this.adoptCanonicalAttach(ev);
+    }
+    if (this.isCanonical && ev.type === "gateway.ready") {
+      if (ev.payload?.heartbeat && this.ws?.readyState === WS_OPEN) {
+        this.channel.startHeartbeat();
+      }
+      return;
+    }
+    if (this.isCanonical) {
+      const shared = ev;
+      const payload = canonicalEvent(ev).payload ?? {};
+      const epoch = shared.authority_epoch ?? payload.authority_epoch;
+      const generation = shared.execution_generation ?? payload.execution_generation;
+      ev.payload = {
+        ...payload,
+        ...epoch !== void 0 ? { execution_epoch: String(epoch) } : {},
+        ...generation !== void 0 ? { execution_generation: generation } : {}
+      };
+      if (this.attachHold && ev.session_id === this.attachHold.sid) {
+        this.attachHold.frames.push(ev);
+        return;
+      }
+    }
+    this.publish(ev);
+  }
+  adoptCanonicalAttach(ev) {
+    const ws = this.ws;
+    this.isCanonical = true;
+    if (ev.payload?.heartbeat && ws?.readyState === WS_OPEN) {
+      this.channel.startHeartbeat();
+    }
+    this.describeThenReady(ws, { skin: ev.payload?.skin });
+  }
+  /** Canonical readiness is runtime.describe on this socket. A failed describe is a transport
+   * failure (B2-21): drop the socket onto the backoff path, which redials and re-describes. */
+  describeThenReady(ws, payload) {
+    this.describeFlight = void 0;
+    void this.describeRuntime().then(() => {
+      const ready = payload.skin === void 0 && this.describedSkin ? { ...payload, skin: this.describedSkin } : payload;
+      if (this.ws === ws) {
+        this.publish({ type: "gateway.ready", payload: ready });
+      }
+    }).catch((error) => {
+      this.publish({ type: "gateway.start_timeout", payload: {
+        python: "runtime.describe",
+        cwd: "",
+        stderr_tail: String(error)
+      } });
+      if (this.ws === ws) {
+        this.closeGatewaySocket();
+        this.handleTransportExit(1, String(error));
+      }
+    });
+  }
+  publish(ev) {
+    if (ev.type === "gateway.ready") {
+      this.ready = true;
+      this.clearReconnect();
+      this.reconnectAttempts = 0;
+      if (this.readyTimer) {
+        clearTimeout(this.readyTimer);
+        this.readyTimer = null;
+      }
+      if (ev.payload?.heartbeat === true && this.ws?.readyState === WS_OPEN) {
+        this.channel.startHeartbeat();
+      }
+    }
+    if (this.subscribed) {
+      return void this.emit("event", ev);
+    }
+    this.bufferedEvents.push(ev);
+  }
+  clearReadyTimer() {
+    if (this.readyTimer) {
+      clearTimeout(this.readyTimer);
+      this.readyTimer = null;
+    }
+  }
+  closeSidecarSocket() {
+    try {
+      this.sidecarWs?.close();
+    } catch {
+    } finally {
+      this.sidecarWs = null;
+    }
+  }
+  closeGatewaySocket() {
+    const ws = this.ws;
+    this.ws = null;
+    this.wsConnectPromise = null;
+    try {
+      ws?.close();
+    } catch {
+    }
+  }
+  // The shared heartbeat found no inbound frame for a full deadline: force the
+  // socket closed so the ordinary close path reconnects (issue #32997).
+  onHeartbeatFailure() {
+    const ws = this.ws;
+    if (!ws) {
+      return;
+    }
+    this.lifecycle("[lifecycle] websocket silent drop detected (heartbeat ack timeout); forcing reconnect");
+    try {
+      ws.close();
+    } catch {
+    }
+  }
+  scheduleReconnect() {
+    if (this.disposed || this.reconnectTimer !== null) {
+      return;
+    }
+    const delay = reconnectBackoffDelayMs(this.reconnectAttempts, {
+      baseDelayMs: RECONNECT_BASE_MS,
+      capMs: RECONNECT_MAX_MS,
+      jitter: false
+    });
+    this.reconnectAttempts += 1;
+    this.lifecycle(`[lifecycle] scheduling gateway reconnect in ${delay}ms (attempt ${this.reconnectAttempts})`);
+    this.publish({ type: "gateway.reconnecting", payload: { attempt: this.reconnectAttempts, delay_ms: delay } });
+    this.reconnectTimer = setTimeout(() => {
+      this.reconnectTimer = null;
+      if (this.disposed) {
+        return;
+      }
+      this.start();
+      this.drain();
+    }, delay);
+    this.reconnectTimer.unref?.();
+  }
+  clearReconnect() {
+    if (this.reconnectTimer !== null) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
+  }
+  resetStartupState() {
+    this.channel.detach(new Error(t("libText.gateway.restarting")));
+    this.ready = false;
+    this.drainGeneration += 1;
+    this.bufferedEvents.clear();
+    this.bufferedRequests = [];
+    this.pendingExit = void 0;
+    this.clearReadyTimer();
+  }
+  startReadyTimer(python, cwd) {
+    this.readyTimer = setTimeout(() => {
+      if (this.ready) {
+        return;
+      }
+      const stderrTail = this.getLogTail(20);
+      this.lifecycle(`[startup] timed out waiting for gateway.ready (python=${python}, cwd=${cwd})`);
+      this.publish({
+        type: "gateway.start_timeout",
+        payload: { cwd, python, stderr_tail: stderrTail }
+      });
+    }, STARTUP_TIMEOUT_MS);
+  }
+  handleTransportExit(code7, reason) {
+    this.clearReadyTimer();
+    this.ready = false;
+    this.closeSidecarSocket();
+    this.lifecycle(`[lifecycle] transport exit code=${code7 ?? "null"} reason=${reason ?? "none"}`);
+    this.channel.detach(
+      new Error(reason || (code7 === null ? t("libText.gateway.exited") : t("libText.gateway.exitedWithCode", code7)))
+    );
+    this.scheduleReconnect();
+    if (this.subscribed) {
+      this.emit("exit", code7);
+    } else {
+      this.pendingExit = code7;
+    }
+  }
+  connectSidecarMirror() {
+    this.closeSidecarSocket();
+    if (!this.sidecarUrl) {
+      return;
+    }
+    const WebSocketCtor = getWebSocketCtor();
+    if (typeof WebSocketCtor === "undefined") {
+      this.pushLog(`[sidecar] WebSocket unavailable; skipping mirror to ${redactUrl(this.sidecarUrl)}`);
+      return;
+    }
+    try {
+      const ws = new WebSocketCtor(this.sidecarUrl);
+      this.sidecarWs = ws;
+      ws.addEventListener("close", () => {
+        if (this.sidecarWs === ws) {
+          this.sidecarWs = null;
+        }
+      });
+      ws.addEventListener("error", () => {
+        this.pushLog("[sidecar] mirror connection error");
+      });
+    } catch (err) {
+      this.pushLog(`[sidecar] failed to connect ${redactUrl(this.sidecarUrl)} (constructor error)`);
+      this.sidecarWs = null;
+    }
+  }
+  mirrorEventToSidecar(rawFrame) {
+    const ws = this.sidecarWs;
+    if (!ws || ws.readyState !== WS_OPEN) {
+      return;
+    }
+    try {
+      ws.send(rawFrame);
+    } catch {
+    }
+  }
+  /** B2-19: hold this session's canonical frames while its resume/activate is in flight. Fanout
+   * frames can beat the reply; the caller applies the snapshot, then settleAttach replays only the
+   * held frames after the snapshot (same replay_epoch, seq > last_sequence). */
+  holdAttach(sessionId) {
+    if (!this.isCanonical) {
+      return null;
+    }
+    return this.attachHold = { sid: sessionId, frames: [] };
+  }
+  /** End a hold: with the applied snapshot, replay only frames it does not contain; without one
+   * (failed or superseded attach), deliver what was held. A replaced hold is a no-op. */
+  settleAttach(hold, snapshot3) {
+    if (!hold || this.attachHold !== hold) {
+      return;
+    }
+    this.attachHold = null;
+    const fence = snapshot3;
+    for (const ev of hold.frames) {
+      const { replay_epoch: epoch, seq } = ev;
+      if (!fence || epoch === fence.replay_epoch && typeof seq === "number" && seq > Number(fence.last_sequence ?? -1)) {
+        this.publish(ev);
+      }
+    }
+  }
+  hydrateSharedPrompts(snapshot3) {
+    if (!this.isCanonical) {
+      return;
+    }
+    const result = snapshot3;
+    for (const prompt of result.prompts ?? []) {
+      this.publishLocalEvent({
+        type: `${prompt.kind}.request`,
+        session_id: result.session_id,
+        payload: { ...prompt, execution_epoch: String(result.authority_epoch) }
+      });
+    }
+  }
+  publishLocalEvent(ev) {
+    const frame = JSON.stringify({ jsonrpc: "2.0", method: "event", params: ev });
+    this.mirrorEventToSidecar(frame);
+    this.publish(ev);
+  }
+  handleWebSocketFrame(raw2) {
+    const text15 = wireFrameText(raw2);
+    if (!text15) {
+      return;
+    }
+    const frame = this.channel.handleFrame(text15);
+    if (!frame) {
+      this.protocolError("malformed websocket frame", text15, "(empty frame)");
+      return;
+    }
+    if (frame.method === "event") {
+      this.mirrorEventToSidecar(text15);
+    }
+  }
+  protocolError(what, text15, emptyLabel) {
+    const preview5 = text15.trim().slice(0, MAX_LOG_PREVIEW) || emptyLabel;
+    this.pushLog(`[protocol] ${what}: ${preview5}`);
+    this.publish({ type: "gateway.protocol_error", payload: { preview: preview5 } });
+  }
+  startLocalGateway() {
+    const generation = ++this.localGeneration;
+    const start = !this.localStarted;
+    const recover = !start && this.claimOwnerRecovery();
+    this.localStarted = true;
+    this.bootstrapError = null;
+    this.bootstrapFlight = this.bootstrap(start, recover).then((grant) => {
+      if (this.disposed || generation !== this.localGeneration) {
+        return;
+      }
+      this.attachUrl = grant.url;
+      this.isCanonical = true;
+      this.lifecycle(`[lifecycle] attached shared gateway ${start ? "start" : recover ? "recover" : "discover"} url=${redactUrl(grant.url)} profile=${grant.profile_id} instance=${grant.instance_id}`);
+      this.startAttachedGateway(grant.url, grant.protocols);
+    }).catch((error) => {
+      if (this.disposed || generation !== this.localGeneration) {
+        return;
+      }
+      this.bootstrapError = error instanceof Error ? error : new Error(String(error));
+      this.clearReadyTimer();
+      this.publish({ type: "gateway.start_timeout", payload: {
+        python: "gateway ensure",
+        cwd: "",
+        stderr_tail: this.bootstrapError.message
+      } });
+      this.channel.detach(this.bootstrapError);
+      if (isTerminalBootstrapFailure(this.bootstrapError.message)) {
+        this.lifecycle(`[lifecycle] gateway bootstrap cannot start; not retrying: ${this.bootstrapError.message.match(/^gateway unavailable: .*$/m)?.[0]}`);
+        return;
+      }
+      this.scheduleReconnect();
+    });
+  }
+  /** One slot of the sliding owner re-ensure budget, so a crash-looping owner is not respawned forever. */
+  claimOwnerRecovery(now = Date.now()) {
+    this.recoveryAttempts = this.recoveryAttempts.filter((at) => now - at < OWNER_RECOVERY_WINDOW_MS);
+    if (this.recoveryAttempts.length >= OWNER_RECOVERY_LIMIT) {
+      return false;
+    }
+    this.recoveryAttempts.push(now);
+    return true;
+  }
+  startAttachedGateway(attachUrl, protocols) {
+    const safeAttachUrl = redactUrl(attachUrl);
+    this.startReadyTimer("websocket", safeAttachUrl);
+    const WebSocketCtor = getWebSocketCtor();
+    if (typeof WebSocketCtor === "undefined") {
+      const line = `[startup] WebSocket API unavailable; cannot attach to ${safeAttachUrl}`;
+      this.pushLog(line);
+      this.publish({ type: "gateway.stderr", payload: { line } });
+      this.handleTransportExit(1, t("libText.gateway.websocketUnavailable"));
+      return;
+    }
+    try {
+      const ws = new WebSocketCtor(attachUrl, protocols);
+      let settled2 = false;
+      this.ws = ws;
+      this.channel.attach({ send: (text15) => ws.send(text15) });
+      const connectPromise = new Promise((resolve7, reject) => {
+        ws.addEventListener(
+          "open",
+          () => {
+            if (this.ws !== ws) {
+              return;
+            }
+            if (!settled2) {
+              settled2 = true;
+              resolve7();
+            }
+            this.connectSidecarMirror();
+            if (this.isCanonical) {
+              this.describeThenReady(ws, {});
+            }
+          },
+          { once: true }
+        );
+        ws.addEventListener(
+          "error",
+          () => {
+            if (!settled2) {
+              this.pushLog("[startup] gateway websocket connect error");
+              settled2 = true;
+              reject(new Error(t("libText.gateway.websocketConnectionFailed")));
+            }
+          },
+          { once: true }
+        );
+        ws.addEventListener(
+          "close",
+          (ev) => {
+            if (!settled2) {
+              settled2 = true;
+              reject(new Error(t("libText.gateway.websocketClosedDuringConnect", ev.code)));
+            }
+          },
+          { once: true }
+        );
+      });
+      connectPromise.catch(() => {
+      });
+      this.wsConnectPromise = connectPromise;
+      ws.addEventListener("message", (ev) => {
+        if (this.ws === ws) {
+          this.handleWebSocketFrame(ev.data);
+        }
+      });
+      ws.addEventListener("close", (ev) => {
+        if (this.ws !== ws) {
+          this.pushLog(`[lifecycle] stale websocket close ignored code=${ev.code}`);
+          return;
+        }
+        this.pushLog(`[lifecycle] websocket close code=${ev.code}`);
+        this.ws = null;
+        this.wsConnectPromise = null;
+        this.handleTransportExit(
+          ev.code,
+          ev.code ? t("libText.gateway.websocketClosedWithCode", ev.code) : t("libText.gateway.websocketClosed")
+        );
+      });
+      ws.addEventListener("error", () => {
+        const line = "[gateway] websocket transport error";
+        this.pushLog(line);
+        this.publish({ type: "gateway.stderr", payload: { line } });
+      });
+    } catch (err) {
+      this.pushLog(`[startup] failed to connect websocket gateway ${safeAttachUrl} (constructor error)`);
+      this.handleTransportExit(1, t("libText.gateway.websocketStartupFailed"));
+    }
+  }
+  start() {
+    if (this.disposed) {
+      this.pushLog("[lifecycle] start() ignored after kill()");
+      return;
+    }
+    this.disposed = false;
+    this.clearReconnect();
+    const attachUrl = resolveGatewayAttachUrl();
+    const sidecarUrl = resolveSidecarUrl();
+    this.attachUrl = attachUrl;
+    this.sidecarUrl = sidecarUrl;
+    this.resetStartupState();
+    this.closeGatewaySocket();
+    this.closeSidecarSocket();
+    if (attachUrl) {
+      this.isCanonical = false;
+      this.creationContract = void 0;
+      this.startAttachedGateway(attachUrl);
+      return;
+    }
+    this.startLocalGateway();
+  }
+  pushLog(line) {
+    this.logs.push(truncateLine(line));
+  }
+  /** Record a client-side diagnostic line in the /logs tail (raw wire text the UI replaced with plain copy). */
+  recordLog(line) {
+    this.pushLog(line);
+  }
+  // Death-explaining breadcrumbs (spawn / exit / kill / replace) — kept in the
+  // in-memory tail for /logs AND persisted to the gateway crash log so the
+  // reason survives a parent exit and lands next to the child's SIGTERM panic.
+  lifecycle(line) {
+    this.pushLog(line);
+    recordParentLifecycle(line);
+  }
+  drain() {
+    const generation = this.drainGeneration;
+    queueMicrotask(() => {
+      if (this.drainGeneration !== generation) {
+        return;
+      }
+      this.subscribed = true;
+      for (const ev of this.bufferedEvents.drain()) {
+        this.emit("event", ev);
+      }
+      for (const request of this.bufferedRequests.splice(0)) {
+        this.emit("request", request);
+      }
+      if (this.pendingExit !== void 0) {
+        const code7 = this.pendingExit;
+        this.pendingExit = void 0;
+        this.emit("exit", code7);
+      }
+    });
+  }
+  getLogTail(limit = 20) {
+    return this.logs.tail(Math.max(1, limit)).join("\n");
+  }
+  async ensureAttachedWebSocket(method) {
+    if (!this.attachUrl) {
+      throw new Error("gateway not running");
+    }
+    if (!this.ws || this.ws.readyState === WS_CLOSED || this.ws.readyState === WS_CLOSING) {
+      this.start();
+      if (!resolveGatewayAttachUrl()) {
+        await this.bootstrapFlight;
+      }
+    }
+    if (this.ws?.readyState === WS_CONNECTING) {
+      try {
+        await this.wsConnectPromise;
+      } catch (err) {
+        throw err instanceof Error ? err : new Error(String(err));
+      }
+    }
+    if (!this.ws || this.ws.readyState !== WS_OPEN) {
+      throw new Error(`gateway not connected: ${method}`);
+    }
+    return this.ws;
+  }
+  notConnected = (method) => new Error(`gateway not connected: ${method}`);
+  /** The owner's session.create contract. A failed read is not cached: the next
+   * session.create asks again instead of reporting an outdated gateway forever. */
+  describeRuntime() {
+    if (!this.describeFlight) {
+      const flight = this.requestOverWebSocket("runtime.describe").then(
+        (description) => {
+          this.creationContract = description.session_create;
+          this.describedSkin = description.skin && typeof description.skin === "object" ? description.skin : void 0;
+        },
+        (error) => {
+          if (this.describeFlight === flight) {
+            this.describeFlight = void 0;
+          }
+          throw error;
+        }
+      );
+      this.describeFlight = flight;
+    }
+    return this.describeFlight;
+  }
+  requestOverWebSocket(method, params = {}, timeoutMs) {
+    return this.ensureAttachedWebSocket(method).then(() => this.channel.request(method, params, timeoutMs, void 0, () => this.notConnected(method)));
+  }
+  request(method, params = {}, timeoutMs) {
+    const attachUrl = resolveGatewayAttachUrl();
+    if (attachUrl) {
+      if (this.attachUrl !== attachUrl) {
+        this.channel.detach(new Error(t("libText.gateway.attachUrlChanged")));
+        this.start();
+      }
+      return this.isCanonical ? this.requestCanonical(method, params, timeoutMs) : this.requestOverWebSocket(method, params, timeoutMs);
+    }
+    if (!this.bootstrapFlight) {
+      this.start();
+    }
+    return this.bootstrapFlight.then(() => {
+      if (this.bootstrapError) {
+        throw this.bootstrapError;
+      }
+      return this.requestCanonical(method, params, timeoutMs);
+    });
+  }
+  /** One request through the canonical wire adapter (local grant or negotiated explicit attach). */
+  requestCanonical(method, params, timeoutMs) {
+    return (async () => {
+      if (method === "session.create" && !this.creationContract) {
+        await this.describeRuntime();
+      }
+      const request = canonicalRequest(method, params, this.creationContract);
+      if (request.method === "session.create") {
+        return this.createCanonical(request.params, timeoutMs);
+      }
+      const value = await this.requestOverWebSocket(request.method, request.params, timeoutMs);
+      return canonicalResult(method, value, request.params);
+    })();
+  }
+  /** session.create plus the launch tool-progress pin, as one outcome for the caller. The owner keys a
+   * local session by request_id, so a create that failed after it may have committed (lost ACK, or the
+   * pin refused after the ACK) is retried with the SAME request_id when the options match: the owner
+   * answers with the session it already minted and the pin is reapplied, never a second session. */
+  async createCanonical(prepared, timeoutMs) {
+    const toolProgress = launchToolProgress();
+    const { request_id: _fresh, ...options } = prepared;
+    const key2 = JSON.stringify(Object.keys(options).sort().map((name) => [name, options[name]]));
+    const retry = this.unsettledCreate?.key === key2 ? this.unsettledCreate : void 0;
+    this.unsettledCreate = void 0;
+    const params = retry ? { ...prepared, request_id: retry.requestId } : prepared;
+    let acknowledged = false;
+    try {
+      const value = await this.requestOverWebSocket("session.create", params, timeoutMs);
+      acknowledged = true;
+      if (toolProgress) {
+        const sid = value?.session_id;
+        await this.requestOverWebSocket("config.set", { key: "verbose", session_id: sid, value: toolProgress });
+      }
+      return canonicalResult("session.create", value, params);
+    } catch (error) {
+      if (acknowledged || !(error instanceof JsonRpcGatewayError)) {
+        this.unsettledCreate = { key: key2, requestId: params.request_id };
+      }
+      throw error;
+    }
+  }
+  kill(reason = "requested") {
+    this.disposed = true;
+    this.localGeneration++;
+    this.clearReconnect();
+    this.reconnectAttempts = 0;
+    this.channel.stopHeartbeat();
+    this.lifecycle(`[lifecycle] GatewayClient.kill reason=${reason} (detach only)`);
+    this.closeGatewaySocket();
+    this.closeSidecarSocket();
+    this.clearReadyTimer();
+    this.channel.detach(new Error(t("libText.gateway.closed")));
   }
 };
 

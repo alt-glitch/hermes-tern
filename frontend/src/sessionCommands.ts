@@ -4,6 +4,8 @@
 // verbs (gateway/session_tui_ops.py, session_tui_side.py,
 // session_ancillary.py). Mirrors Hermes' ui-tui/src/app/slash/commands/{core,session,ops}.ts and
 // canonicalSessionCommands.ts / canonicalSessionControls.ts.
+import type { CompressionSummary } from '@hermes/shared/gateway-events'
+
 import { lineTokens } from './compaction.js'
 import type { ControlHost } from './controlCommands.js'
 import { errorText } from './core/errors.js'
@@ -70,22 +72,14 @@ async function rewind(host: SessionHost, intent: 'retry' | 'undo') {
   }
 
   // The rewound turn's own text, not whatever this view typed last.
-  const text = retryText((result['target_message'] as { content?: unknown } | undefined)?.content)
+  const target = result['target_message']
+  const text = retryText(typeof target === 'object' && target !== null && 'content' in target ? target.content : undefined)
 
   return text ? host.send(text) : host.notice('Nothing to retry.')
 }
 
-interface CompressSummary {
-  aborted?: boolean
-  headline?: string
-  noop?: boolean
-  note?: string
-  refused_would_grow?: boolean
-  token_line?: string
-}
-
 /** The owner's report (headline, token line, note), as the native /compress prints it. */
-export function compressReport(summary: CompressSummary | null | undefined): string {
+export function compressReport(summary: CompressionSummary | null | undefined): string {
   const head = summary?.headline ? `${summary.noop ? '' : '✓ '}${summary.headline}` : '✓ Transcript compressed.'
 
   return [head, ...[summary?.token_line, summary?.note].filter(Boolean).map(line => `  ${line}`)].join('\n')
@@ -140,7 +134,7 @@ async function compress(host: SessionHost, arg: string) {
     return host.notice(Array.isArray(result['lines']) ? result['lines'].join('\n') : 'Nothing to preview.')
   }
 
-  const summary = result['summary'] as CompressSummary | undefined
+  const summary = result.summary
   const num = (v: unknown) => (typeof v === 'number' && v > 0 ? v : undefined)
   const kept = result.status === 'noop' || result.status === 'aborted' || Boolean(summary?.noop || summary?.aborted || summary?.refused_would_grow)
 
