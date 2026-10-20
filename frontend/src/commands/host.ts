@@ -31,6 +31,8 @@ export interface SessionHostCx {
   setCompacting(on: boolean, opts: { manual: boolean }): void
   /** Submits `text` as the draft would, behind the turn whatever busy_input_mode says. */
   submit(text: string): void
+  /** Puts `text` in the composer, before any draft there. */
+  draft(text: string): void
 }
 
 /** The control and session commands' view of the shown session, made now. */
@@ -43,6 +45,10 @@ export function sessionHost(cx: SessionHostCx): SessionHost {
   return {
     get busy() {
       return cx.activity.busy !== null
+    },
+    draft: text => {
+      cx.draft(text)
+      cx.changed()
     },
     // A steer that fell back to the queue: steering carries no images.
     canonical: cx.gw.isCanonical,
