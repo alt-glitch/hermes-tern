@@ -21,6 +21,8 @@ vi.mock('../hermes/sessionIndex.js', async importOriginal => ({
 
 const { App } = await import('../app.js')
 const { POLL_MS } = await import('../connections.js')
+const { ConnectWatcher } = await import('../connections/watcher.js')
+const { Transcript } = await import('../transcript.js')
 const { toolNode } = await import('../view/tools/shell.js')
 
 const cards = join(home, 'plugin-data', 'hermes-tern', 'connections')
@@ -176,5 +178,101 @@ describe('the connect card', () => {
     // A card a later request replaced is the plain tool call.
     expect(JSON.stringify(toolNode(app.transcript.call(toolCallId('call_d'))!, Date.now()))).not.toContain('hermes.connect.row')
     expect(told(gw, app)).toEqual([])
+  })
+})
+
+describe('ConnectWatcher on a fake host', () => {
+  /** Its own data folder, so the claims of the App tests above are not its. */
+  const dir = mkdtempSync(join(tmpdir(), 'hermes-tern-watcher-'))
+
+  function card(stem: string, data: Record<string, unknown>) {
+    mkdirSync(join(dir, 'connections'), { recursive: true })
+    writeFileSync(join(dir, 'connections', `${stem}.json`), JSON.stringify({ pid: process.pid, updated_at: Date.now() / 1000, ...data }))
+  }
+
+  function watcher() {
+    const transcript = new Transcript()
+    const mutate = vi.spyOn(transcript, 'mutateCall')
+    const told: string[] = []
+    const opened: string[] = []
+    const changed = vi.fn()
+    const w = new ConnectWatcher({ changed, openUrl: url => void opened.push(url), tell: text => void told.push(text), transcript }, { dir })
+
+    /** A finished manage_connections call for operation `op`. */
+    const call = (id: string, op: string) => {
+      transcript.toolComplete(complete(id, op).payload)
+      const c = transcript.call(toolCallId(id))
+
+      if (!c) {
+        throw new Error(`no call ${id}`)
+      }
+
+      return c
+    }
+
+    return { call, changed, mutate, opened, told, w }
+  }
+
+  it('polls an open card, writes through mutateCall, tells once, and stops once it settles', () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    const { call, mutate, told, w } = watcher()
+    card('call_w.op1', drive('initiated'))
+    const c = call('call_w', 'op1')
+
+    w.watch()
+    expect(c.connect).toMatchObject({ key: 'call_w.op1', settled: undefined, told: false })
+    expect(mutate).toHaveBeenCalledTimes(1)
+    expect(vi.getTimerCount()).toBe(1)
+
+    card('call_w.op1', drive('connected', { settled_by: 'all_resolved', watching: false }))
+    vi.advanceTimersByTime(POLL_MS)
+
+    expect(c.connect).toMatchObject({ settled: 'all_resolved', told: true })
+    expect(told).toEqual(['Google Drive is connected now. Carry on.'])
+    // The card's new state, then its told mark.
+    expect(mutate).toHaveBeenCalledTimes(3)
+    expect(vi.getTimerCount()).toBe(0)
+  })
+
+  it('a card first seen settled stays quiet: nobody saw it wait', () => {
+    const { call, told, w } = watcher()
+    card('call_s.op1', drive('connected', { settled_by: 'all_resolved', watching: false }))
+    const c = call('call_s', 'op1')
+
+    w.watch()
+
+    expect(c.connect).toMatchObject({ settled: 'all_resolved', told: false })
+    expect(told).toEqual([])
+  })
+
+  it('Continue settles the card and tells the agent once; Authorize opens the link and marks the row', () => {
+    const { call, opened, told, w } = watcher()
+    card('call_k.op1', drive('initiated'))
+    const c = call('call_k', 'op1')
+    w.watch()
+    w.dispose()
+
+    w.open('call_k.op1', 'googledrive')
+    expect(opened).toEqual(['https://portal/x'])
+    expect(c.connect?.opened).toEqual(['googledrive'])
+
+    w.continue('call_k.op1')
+    w.continue('call_k.op1')
+
+    expect(told).toEqual(["I've authorized Google Drive. Check with manage_connections status and carry on."])
+    expect(c.connect).toMatchObject({ settled: 'continued', told: true })
+  })
+
+  it('dispose stops the poll', () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    const { call, w } = watcher()
+    card('call_d.op1', drive('initiated'))
+    call('call_d', 'op1')
+
+    w.watch()
+    expect(vi.getTimerCount()).toBe(1)
+
+    w.dispose()
+    expect(vi.getTimerCount()).toBe(0)
   })
 })

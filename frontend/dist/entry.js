@@ -24695,8 +24695,7 @@ var GatewayClient = class extends EventEmitter {
 };
 
 // src/app.ts
-import { appendFileSync as appendFileSync4, existsSync as existsSync6 } from "node:fs";
-import { basename as basename4 } from "node:path";
+import { appendFileSync as appendFileSync4 } from "node:fs";
 
 // node_modules/@hermes/shared/src/slash.ts
 var SLASH_COMMAND_RE = /^\/[^\s/]*(?:\s|$)/;
@@ -24919,6 +24918,7 @@ var toolCallId = (raw2) => raw2;
 var entryId = (raw2) => raw2;
 var prKey = (ref) => `${ref.host}/${ref.repository}#${ref.number}`;
 var stackKey = (host, repository, number4) => `${host}/${repository}#stack:${number4}`;
+var overlayKey = (raw2) => raw2;
 var isLive = (ids) => ids.live !== null;
 var NO_SESSION = { live: null, stored: null };
 function durable(ids) {
@@ -63577,6 +63577,111 @@ function unmaskEdit(secret, ev) {
   return { cursor, from, len: secret.length, text: ev.text, to };
 }
 
+// src/hermes/sharedPrompts.ts
+var sharedPromptId = (promptId) => `shared:${String(promptId)}`;
+function sharedPromptRequest(ev, gw2, onNotice) {
+  const kind = ev.type === "approval.request" ? "approval" : "clarify";
+  const shared = ev.payload;
+  if (!shared?.prompt_id || !ev.session_id || typeof shared.execution_generation !== "number") {
+    return null;
+  }
+  const control = { session_id: ev.session_id, execution_generation: shared.execution_generation, prompt_id: shared.prompt_id };
+  const questions = ev.type === "clarify.request" ? clarifyQuestions(ev.payload, shared.prompt_id) : [];
+  let answered;
+  const send = (respond) => {
+    answered ??= respond().then(
+      (r) => {
+        if (r && "status" in r && r.status === "already_resolved") {
+          onNotice("That question was already answered (by another window, or it timed out).");
+        }
+      },
+      (error) => {
+        answered = void 0;
+        throw error;
+      }
+    );
+    return answered;
+  };
+  return {
+    id: sharedPromptId(shared.prompt_id),
+    method: kind,
+    params: { ...shared, questions, session_id: ev.session_id },
+    respond: ({ answers, choice: choice2 }) => kind === "approval" ? send(() => rpc(gw2, "approval.respond", { choice: typeof choice2 === "string" ? choice2 : "deny", ...control })) : send(() => rpc(gw2, "clarify.respond", { answer: firstAnswer(answers), ...control })),
+    // Unanswered here: the prompt stays pending for another viewer or its own timeout.
+    fail: () => void 0
+  };
+}
+function clarifyQuestions(clarify, promptId) {
+  const single = typeof clarify?.question === "string" ? clarify.question.trim() : "";
+  const batch2 = Array.isArray(clarify?.questions) && clarify.questions.length ? clarify.questions : null;
+  return batch2 ?? (single ? [{ choices: clarify?.choices ?? [], multi_select: clarify?.multi_select === true, qid: promptId, question: single }] : []);
+}
+function firstAnswer(answers) {
+  if (!answers || typeof answers !== "object") {
+    return "";
+  }
+  const first = Object.values(answers)[0];
+  return Array.isArray(first) ? first.join(", ") : typeof first === "string" ? first : "";
+}
+
+// src/prompts/sheets.ts
+var PREFIX = "prompt:";
+var promptKey = (id) => overlayKey(`${PREFIX}${id}`);
+var PromptSheets = class {
+  #host;
+  /** Open approval sheets' keys → their approval-queue `request_id` (what approval.cancelled names). */
+  #approvals = /* @__PURE__ */ new Map();
+  constructor(host) {
+    this.#host = host;
+  }
+  /** Opens `overlay`, the sheet for `req`; an approval's queue id is kept while the sheet is open. */
+  open(overlay, req) {
+    this.#host.open(overlay);
+    const queued = req.params["request_id"];
+    if (req.method === "approval" && typeof queued === "string") {
+      this.#approvals.set(overlay.key, queued);
+    }
+  }
+  /** `overlay` left the stack (the app's close): its approval id goes with it. */
+  closed(overlay) {
+    this.#approvals.delete(overlay.key);
+  }
+  /** Whether the sheet for request `id` is open. */
+  shows(id) {
+    const key2 = promptKey(String(id));
+    return this.#host.overlays.some((o) => o.key === key2);
+  }
+  /**
+   * Closes the sheet for request `id`: request.cancel's, or a shared prompt's `sharedPromptId`
+   * (approval.settled, clarify.settled).
+   */
+  drop(id) {
+    const key2 = promptKey(String(id));
+    this.#drop((k) => k === key2);
+  }
+  /** Closes every shared prompt's sheet: a resume re-hydrates those still pending. */
+  dropShared() {
+    const prefix2 = promptKey(sharedPromptId(""));
+    this.#drop((k) => k.startsWith(prefix2));
+  }
+  /** Closes the approvals whose queue ids `requestIds` names (approval.cancelled). */
+  dropByApproval(requestIds) {
+    this.#drop((k) => requestIds?.includes(this.#approvals.get(k) ?? "") ?? false);
+  }
+  /** Closes every prompt sheet: nothing can answer them now, or they are another session's. */
+  dropAll() {
+    this.#drop(() => true);
+  }
+  /** Closes the prompt sheets whose key `picked` names; other overlays stay. */
+  #drop(picked) {
+    for (const o of [...this.#host.overlays]) {
+      if (o.key.startsWith(PREFIX) && picked(o.key)) {
+        this.#host.close(o);
+      }
+    }
+  }
+};
+
 // src/overlays/prompts.tsx
 var RECOMMENDED = /\s*\(recommended\)\s*$/i;
 var str6 = (v) => typeof v === "string" ? v : "";
@@ -63714,7 +63819,7 @@ function approvalOverlay(host, req) {
     allowed.delete("session");
   }
   const options = APPROVALS.filter((o) => allowed.has(o.id));
-  const key2 = `prompt:${req.id}`;
+  const key2 = promptKey(req.id);
   const sending = { busy: false, error: "" };
   let selected = 0;
   const answer = (choice2) => answerWith(host, overlay, req, sending, { choice: choice2 });
@@ -63816,7 +63921,7 @@ function clarifyOverlay(host, req) {
     selected: 0,
     typing: false
   }));
-  const key2 = `prompt:${req.id}`;
+  const key2 = promptKey(req.id);
   const sending = { busy: false, error: "" };
   const respond = (result) => answerWith(host, overlay, req, sending, result);
   const cancel = () => sending.error ? host.close(overlay) : respond({});
@@ -64027,7 +64132,7 @@ function clarifyOverlay(host, req) {
 }
 function maskedOverlay(host, req) {
   const p3 = req.params;
-  const key2 = `prompt:${req.id}`;
+  const key2 = promptKey(req.id);
   const site = str6(p3.site) || str6(p3.origin);
   const login = req.method === "vault.save_login";
   const code7 = req.method === "vault.code";
@@ -66647,6 +66752,99 @@ function localCommand(name) {
 }
 var localCommands = () => COMMANDS3;
 
+// src/connections/watcher.ts
+var ConnectWatcher = class {
+  #host;
+  /** Where the card files are; unset: the plugin's data folder, read at each poll. */
+  #dir;
+  #timer;
+  /** Connect cards (by file) this pane saw with an app still waiting. */
+  #seen = /* @__PURE__ */ new Set();
+  /** Connect calls that drew no card (a status read, a call with nothing to authorize): never again. */
+  #noCard = /* @__PURE__ */ new WeakSet();
+  /** `dir`: the plugin's data folder the card files are under (tests point it at their own). */
+  constructor(host, { dir: dir2 } = {}) {
+    this.#host = host;
+    this.#dir = dir2;
+  }
+  /**
+   * Reads every connect card now (a new call or a reloaded transcript does not wait for the next
+   * poll), then polls while some card is watched: a settled card never moves again.
+   */
+  watch() {
+    clearTimeout(this.#timer);
+    this.#tick();
+  }
+  /** A connect card's Continue: tell the agent which apps the user authorized, as the tool asks. */
+  continue(ref) {
+    const call = this.#call(ref);
+    const card = call?.connect;
+    if (!call || !card || card.told || card.settled) {
+      return;
+    }
+    this.#host.transcript.mutateCall(call, () => {
+      card.told = true;
+      card.settled = "continued";
+    });
+    if (!card.key || claimTold(card.key, this.#dir)) {
+      this.#host.tell(continueMessage(card.targets));
+    }
+    this.#host.changed();
+  }
+  /** A connect card's Authorize: the app's link in the browser, and its row waits on the browser now. */
+  open(ref, name) {
+    const call = this.#call(ref);
+    const card = call?.connect;
+    const target = card?.targets.find((t2) => t2.name === name);
+    if (!call || !card || !target?.url) {
+      return;
+    }
+    this.#host.openUrl(target.url);
+    this.#host.transcript.mutateCall(call, () => card.opened = [.../* @__PURE__ */ new Set([...card.opened, name])]);
+    this.#host.changed();
+  }
+  /** Stops the poll. */
+  dispose() {
+    clearTimeout(this.#timer);
+  }
+  #tick() {
+    this.#timer = void 0;
+    let open = false;
+    for (const call of this.#host.transcript.calls(CONNECT_TOOL)) {
+      if (call.connect?.settled || call.status === "running" || this.#noCard.has(call)) {
+        continue;
+      }
+      const next3 = loadConnect(call, this.#dir);
+      if (!next3) {
+        this.#noCard.add(call);
+        continue;
+      }
+      if (JSON.stringify(next3) !== JSON.stringify(call.connect)) {
+        this.#host.transcript.mutateCall(call, (c) => c.connect = next3);
+        this.#host.changed();
+      }
+      const seen = next3.key ?? call.id;
+      if (next3.targets.some(waiting2) && !next3.settled) {
+        this.#seen.add(seen);
+      }
+      if (!next3.told && this.#seen.has(seen) && allConnected(next3) && (!next3.key || claimTold(next3.key, this.#dir))) {
+        this.#host.transcript.mutateCall(call, () => next3.told = true);
+        this.#host.tell(connectedMessage(next3.targets));
+        this.#host.changed();
+      } else if (next3.key && !next3.settled) {
+        open = true;
+      }
+    }
+    if (open) {
+      this.#timer = setTimeout(() => this.#tick(), POLL_MS2);
+    }
+  }
+  /** The connect card `ref` names (its file, or its call id when it has none). */
+  #call(ref) {
+    return this.#host.transcript.calls(CONNECT_TOOL).findLast((c) => (c.connect?.key ?? c.id) === ref);
+  }
+};
+
 // src/core/disposables.ts
 var Disposables = class {
   #teardowns = /* @__PURE__ */ new Set();
@@ -66719,6 +66917,271 @@ var RenderScheduler = class {
       this.#scheduled = false;
       this.#render();
     });
+  }
+};
+
+// src/draft/attachments.ts
+import { existsSync as existsSync5 } from "node:fs";
+import { basename as basename3 } from "node:path";
+
+// src/hermes/clipboardImage.ts
+import { execFile as execFile6 } from "node:child_process";
+import { existsSync as existsSync4 } from "node:fs";
+import { mkdtemp, rm } from "node:fs/promises";
+import { homedir as homedir11, tmpdir } from "node:os";
+import { join as join10, resolve as resolve6 } from "node:path";
+import { promisify as promisify5 } from "node:util";
+var execFileP = promisify5(execFile6);
+var runFile = async (file2, args, options) => (await execFileP(file2, args, options)).stdout;
+var IMAGE = /\.(png|jpe?g|gif|webp)$/i;
+var MAC_SCRIPT = `ObjC.import('AppKit');
+function run(argv) {
+  const pb = $.NSPasteboard.generalPasteboard;
+  const url = pb.stringForType('public.file-url');
+  if (url && !url.isNil()) {
+    const path = $.NSURL.URLWithString(url).path;
+    if (path && !path.isNil()) return 'file:' + path.js;
+  }
+  let d = pb.dataForType('public.png');
+  if (!d || d.isNil()) {
+    const t = pb.dataForType('public.tiff');
+    if (!t || t.isNil()) return 'false';
+    const rep = $.NSBitmapImageRep.imageRepWithData(t);
+    if (!rep || rep.isNil()) return 'false';
+    d = rep.representationUsingTypeProperties($.NSBitmapImageFileTypePNG, $({}));
+  }
+  return d && !d.isNil() && d.writeToFileAtomically(argv[0], true) ? 'true' : 'false';
+}`;
+async function extractClipboardImage(dest, env2, platform = process.platform, run5 = runFile) {
+  if (platform === "darwin") {
+    let answer;
+    try {
+      answer = (await run5("osascript", ["-l", "JavaScript", "-e", MAC_SCRIPT, dest], { timeout: 5e3 })).trim();
+    } catch {
+    }
+    if (answer?.startsWith("file:")) {
+      const file2 = answer.slice("file:".length);
+      return IMAGE.test(file2) && existsSync4(file2) ? file2 : void 0;
+    }
+    if (answer !== void 0) {
+      return answer === "true" && existsSync4(dest) ? dest : void 0;
+    }
+  }
+  const root7 = env2.HERMES_PYTHON_SRC_ROOT;
+  const python = env2.HERMES_PYTHON?.trim() || "python3";
+  if (!root7) {
+    return void 0;
+  }
+  const stdout = await run5(python, [join10(root7, "ui-tui/scripts/clipboard_image.py"), dest], {
+    cwd: root7,
+    env: { ...env2, PYTHONPATH: root7 },
+    timeout: 15e3
+  });
+  return stdout.trim() === "true" && existsSync4(dest) ? dest : void 0;
+}
+async function withClipboardImage(use, env2 = process.env, extract = extractClipboardImage) {
+  const dir2 = await mkdtemp(join10(tmpdir(), "hermes-tern-clipboard-"));
+  try {
+    const path2 = await extract(join10(dir2, "clipboard.png"), env2);
+    return path2 ? await use(path2) : void 0;
+  } finally {
+    await rm(dir2, { force: true, recursive: true });
+  }
+}
+function imagePathOf(text12, cwd) {
+  let raw2 = text12.trim();
+  if (!raw2 || raw2.includes("\n")) {
+    return void 0;
+  }
+  raw2 = raw2.replace(/^(['"])(.*)\1$/, "$2");
+  if (raw2.startsWith("file://")) {
+    try {
+      raw2 = decodeURIComponent(new URL(raw2).pathname);
+    } catch {
+      return void 0;
+    }
+  }
+  raw2 = raw2.replace(/\\(.)/g, "$1").replace(/^~(?=$|\/)/, homedir11());
+  if (!IMAGE.test(raw2)) {
+    return void 0;
+  }
+  const path2 = resolve6(cwd, raw2);
+  return existsSync4(path2) ? path2 : void 0;
+}
+
+// src/draft/attachments.ts
+var Attachments = class {
+  #host;
+  #clipboard;
+  /** The images attached to the draft: the next prompt entered takes them. */
+  #items = [];
+  /** Images being read or uploaded for the draft: an "attaching…" chip each until they land. */
+  #pending = [];
+  /** The launcher's startup image until it is attached to the first session (the queue waits for it). */
+  #startup;
+  /** `startup`: the launcher's `--image` (''); `clipboard`: reads the clipboard's image (tests fake it). */
+  constructor(host, { clipboard = (use) => withClipboardImage(use), startup = "" } = {}) {
+    this.#host = host;
+    this.#clipboard = clipboard;
+    this.#startup = startup;
+  }
+  /** The images that landed, in the order they were attached. */
+  get items() {
+    return this.#items;
+  }
+  /** An image is still being read or uploaded: a prompt sent now would miss it. */
+  get uploading() {
+    return this.#pending.length > 0;
+  }
+  /** Any image, landed or on its way: the draft is not empty. */
+  get any() {
+    return this.#items.length > 0 || this.#pending.length > 0;
+  }
+  /** The launcher's startup image is still to be attached (the queue waits for it). */
+  get awaitingStartup() {
+    return Boolean(this.#startup);
+  }
+  /** A paste that is an image (no text: the clipboard's; one image path: that file); false for text. */
+  paste(text12) {
+    if (!text12.trim()) {
+      void this.fromClipboard(true);
+      return true;
+    }
+    const path2 = imagePathOf(text12, this.#host.cwd());
+    if (path2) {
+      void this.#attach(path2, basename3(path2));
+      return true;
+    }
+    return false;
+  }
+  /** Attaches the clipboard's image to the next prompt (`quiet`: an empty paste, which may hold none). */
+  async fromClipboard(quiet) {
+    const slot = this.#start(`pasted image ${this.#items.length + this.#pending.length + 1}`);
+    try {
+      const found = await this.#clipboard(async (path2) => {
+        await this.#attach(path2, slot.name, slot);
+        return true;
+      });
+      if (!found && !quiet) {
+        this.#host.note("No image on the clipboard.", "warning");
+      }
+    } catch (error) {
+      this.#host.note(`Could not read the clipboard image: ${errorText(error)}`, "error");
+    } finally {
+      this.#end(slot);
+      this.#host.changed();
+    }
+  }
+  /** `/image <path>`: attaches that image file (resolved against the session's folder) to the next prompt. */
+  async fromPath(raw2) {
+    const path2 = imagePathOf(raw2, this.#host.cwd());
+    if (!path2) {
+      this.#host.note(`Not an image file: ${raw2.trim()} (PNG, JPEG, GIF or WebP)`, "warning");
+      return this.#host.changed();
+    }
+    await this.#attach(path2, basename3(path2));
+  }
+  /**
+   * `hermes -q … --image …`: attaches the launcher's image to session `sid` (the first one): on the
+   * shared gateway to the startup query at the queue's head, else by path to the session itself.
+   * A failure is a warning, and the queue goes on without it.
+   */
+  async attachStartup(sid) {
+    const path2 = this.#startup;
+    try {
+      if (this.#host.gw.isCanonical) {
+        const image3 = this.#image(await uploadImage(this.#host.gw, sid, path2, this.#host.launchCwd), basename3(path2));
+        if (!this.#host.attachToHead(image3)) {
+          this.#items.push(image3);
+        }
+      } else {
+        await rpc(this.#host.gw, "image.attach", { path: path2, session_id: sid });
+      }
+    } catch (error) {
+      this.#host.note(`Could not attach ${path2}: ${errorText(error)}`, "warning");
+    }
+    this.#startup = "";
+  }
+  /** The draft's images, which leave the composer with the prompt that takes them. */
+  take() {
+    const images = this.#items;
+    this.#items = [];
+    return images;
+  }
+  /** A prompt that did not go is back in the composer: its images go before the draft's. */
+  restore(images) {
+    this.#items = [...images, ...this.#items];
+  }
+  /** The images that landed go; one still uploading lands after (Esc Esc). */
+  clear() {
+    this.#items = [];
+  }
+  /** Every image goes, and the uploads in flight land nowhere (Ctrl+C). */
+  clearAll() {
+    this.#items = [];
+    this.#pending = [];
+  }
+  /** The composer's chips: the landed images, then those on their way, each with its ✕. */
+  chips() {
+    return [
+      ...this.#items.map((a2, i) => ({
+        ...a2.caption === void 0 ? {} : { caption: a2.caption },
+        ...a2.preview ? { image: a2.preview } : {},
+        label: a2.name,
+        onRemove: () => {
+          this.#items.splice(i, 1);
+          this.#host.changed();
+        }
+      })),
+      ...this.#pending.map((slot) => ({
+        label: slot.name,
+        onRemove: () => {
+          this.#end(slot);
+          this.#host.changed();
+        },
+        pending: true
+      }))
+    ];
+  }
+  /** Uploads `path` for the next prompt; its chip says "attaching…" (in `slot`) until it lands or fails. */
+  async #attach(path2, name, slot = this.#start(name)) {
+    const sid = this.#host.sid();
+    try {
+      if (!sid) {
+        this.#host.note("Wait for the session to start before attaching an image.", "warning");
+        return;
+      }
+      const image3 = this.#image(await uploadImage(this.#host.gw, sid, path2, this.#host.launchCwd), name);
+      if (this.#pending.includes(slot)) {
+        this.#items.push(image3);
+      }
+    } catch (error) {
+      this.#host.note(`Could not attach ${name}: ${errorText(error)}`, "error");
+    } finally {
+      this.#end(slot);
+      this.#host.changed();
+    }
+  }
+  #start(name) {
+    const slot = { name };
+    this.#pending.push(slot);
+    this.#host.changed();
+    return slot;
+  }
+  #end(slot) {
+    this.#pending = this.#pending.filter((s2) => s2 !== slot);
+  }
+  /**
+   * An uploaded image with its thumbnail: its bytes as a blob, else the gateway's copy where that
+   * is on this machine. The bytes are not kept.
+   */
+  #image({ bytes, ...attachment }, name) {
+    const size = imageSize(bytes);
+    const kb = bytes.length / 1024;
+    const blob = this.#host.blob(bytes, attachment.mime);
+    const preview5 = blob ? { blob } : existsSync5(attachment.path) ? { path: attachment.path } : void 0;
+    const caption = [size && `${size.w}\xD7${size.h}`, kb >= 1024 ? `${(kb / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(kb))} KB`];
+    return { ...attachment, caption: caption.filter(Boolean).join(" \xB7 "), name, ...preview5 ? { preview: preview5 } : {} };
   }
 };
 
@@ -66830,91 +67293,6 @@ var writeActiveSessionFile = (sessionId, file2 = process.env.HERMES_TUI_ACTIVE_S
   }
 };
 
-// src/hermes/clipboardImage.ts
-import { execFile as execFile6 } from "node:child_process";
-import { existsSync as existsSync4 } from "node:fs";
-import { mkdtemp, rm } from "node:fs/promises";
-import { homedir as homedir11, tmpdir } from "node:os";
-import { join as join10, resolve as resolve6 } from "node:path";
-import { promisify as promisify5 } from "node:util";
-var execFileP = promisify5(execFile6);
-var runFile = async (file2, args, options) => (await execFileP(file2, args, options)).stdout;
-var IMAGE = /\.(png|jpe?g|gif|webp)$/i;
-var MAC_SCRIPT = `ObjC.import('AppKit');
-function run(argv) {
-  const pb = $.NSPasteboard.generalPasteboard;
-  const url = pb.stringForType('public.file-url');
-  if (url && !url.isNil()) {
-    const path = $.NSURL.URLWithString(url).path;
-    if (path && !path.isNil()) return 'file:' + path.js;
-  }
-  let d = pb.dataForType('public.png');
-  if (!d || d.isNil()) {
-    const t = pb.dataForType('public.tiff');
-    if (!t || t.isNil()) return 'false';
-    const rep = $.NSBitmapImageRep.imageRepWithData(t);
-    if (!rep || rep.isNil()) return 'false';
-    d = rep.representationUsingTypeProperties($.NSBitmapImageFileTypePNG, $({}));
-  }
-  return d && !d.isNil() && d.writeToFileAtomically(argv[0], true) ? 'true' : 'false';
-}`;
-async function extractClipboardImage(dest, env2, platform = process.platform, run5 = runFile) {
-  if (platform === "darwin") {
-    let answer;
-    try {
-      answer = (await run5("osascript", ["-l", "JavaScript", "-e", MAC_SCRIPT, dest], { timeout: 5e3 })).trim();
-    } catch {
-    }
-    if (answer?.startsWith("file:")) {
-      const file2 = answer.slice("file:".length);
-      return IMAGE.test(file2) && existsSync4(file2) ? file2 : void 0;
-    }
-    if (answer !== void 0) {
-      return answer === "true" && existsSync4(dest) ? dest : void 0;
-    }
-  }
-  const root7 = env2.HERMES_PYTHON_SRC_ROOT;
-  const python = env2.HERMES_PYTHON?.trim() || "python3";
-  if (!root7) {
-    return void 0;
-  }
-  const stdout = await run5(python, [join10(root7, "ui-tui/scripts/clipboard_image.py"), dest], {
-    cwd: root7,
-    env: { ...env2, PYTHONPATH: root7 },
-    timeout: 15e3
-  });
-  return stdout.trim() === "true" && existsSync4(dest) ? dest : void 0;
-}
-async function withClipboardImage(use, env2 = process.env, extract = extractClipboardImage) {
-  const dir2 = await mkdtemp(join10(tmpdir(), "hermes-tern-clipboard-"));
-  try {
-    const path2 = await extract(join10(dir2, "clipboard.png"), env2);
-    return path2 ? await use(path2) : void 0;
-  } finally {
-    await rm(dir2, { force: true, recursive: true });
-  }
-}
-function imagePathOf(text12, cwd) {
-  let raw2 = text12.trim();
-  if (!raw2 || raw2.includes("\n")) {
-    return void 0;
-  }
-  raw2 = raw2.replace(/^(['"])(.*)\1$/, "$2");
-  if (raw2.startsWith("file://")) {
-    try {
-      raw2 = decodeURIComponent(new URL(raw2).pathname);
-    } catch {
-      return void 0;
-    }
-  }
-  raw2 = raw2.replace(/\\(.)/g, "$1").replace(/^~(?=$|\/)/, homedir11());
-  if (!IMAGE.test(raw2)) {
-    return void 0;
-  }
-  const path2 = resolve6(cwd, raw2);
-  return existsSync4(path2) ? path2 : void 0;
-}
-
 // .hermes-src/ui-tui/src/protocol/interpolation.ts
 var INTERPOLATION_RE = /\{!(.+?)\}/g;
 
@@ -66960,53 +67338,6 @@ async function interpolate(gw2, sid, text12, pasted = []) {
     (acc, m, i) => acc.slice(0, m.index) + (results[i] ?? "") + acc.slice((m.index ?? 0) + m[0].length),
     text12
   );
-}
-
-// src/hermes/sharedPrompts.ts
-var sharedPromptId = (promptId) => `shared:${String(promptId)}`;
-function sharedPromptRequest(ev, gw2, onNotice) {
-  const kind = ev.type === "approval.request" ? "approval" : "clarify";
-  const shared = ev.payload;
-  if (!shared?.prompt_id || !ev.session_id || typeof shared.execution_generation !== "number") {
-    return null;
-  }
-  const control = { session_id: ev.session_id, execution_generation: shared.execution_generation, prompt_id: shared.prompt_id };
-  const questions = ev.type === "clarify.request" ? clarifyQuestions(ev.payload, shared.prompt_id) : [];
-  let answered;
-  const send = (respond) => {
-    answered ??= respond().then(
-      (r) => {
-        if (r && "status" in r && r.status === "already_resolved") {
-          onNotice("That question was already answered (by another window, or it timed out).");
-        }
-      },
-      (error) => {
-        answered = void 0;
-        throw error;
-      }
-    );
-    return answered;
-  };
-  return {
-    id: sharedPromptId(shared.prompt_id),
-    method: kind,
-    params: { ...shared, questions, session_id: ev.session_id },
-    respond: ({ answers, choice: choice2 }) => kind === "approval" ? send(() => rpc(gw2, "approval.respond", { choice: typeof choice2 === "string" ? choice2 : "deny", ...control })) : send(() => rpc(gw2, "clarify.respond", { answer: firstAnswer(answers), ...control })),
-    // Unanswered here: the prompt stays pending for another viewer or its own timeout.
-    fail: () => void 0
-  };
-}
-function clarifyQuestions(clarify, promptId) {
-  const single = typeof clarify?.question === "string" ? clarify.question.trim() : "";
-  const batch2 = Array.isArray(clarify?.questions) && clarify.questions.length ? clarify.questions : null;
-  return batch2 ?? (single ? [{ choices: clarify?.choices ?? [], multi_select: clarify?.multi_select === true, qid: promptId, question: single }] : []);
-}
-function firstAnswer(answers) {
-  if (!answers || typeof answers !== "object") {
-    return "";
-  }
-  const first = Object.values(answers)[0];
-  return Array.isArray(first) ? first.join(", ") : typeof first === "string" ? first : "";
 }
 
 // src/view/ui/pill.tsx
@@ -69920,8 +70251,8 @@ function within(c, at) {
 }
 
 // src/promptRefs.ts
-import { existsSync as existsSync5 } from "node:fs";
-import { basename as basename3 } from "node:path";
+import { existsSync as existsSync6 } from "node:fs";
+import { basename as basename4 } from "node:path";
 var VALUE = "(`[^`\\n]+`|\"[^\"\\n]+\"|'[^'\\n]+'|\\S+)";
 var IMAGE_LINE = new RegExp(`^@image:${VALUE}[ \\t]*$`, "gm");
 var SCREENSHOT_LINE = /^\[screenshot\][ \t]*(?:\n|$)/gm;
@@ -69968,12 +70299,12 @@ function splitPrompt(raw2) {
   }
   return { files, images: [...refs, ...hinted], text: text12.replace(CONTEXT_WARNINGS, "").replace(/\n{3,}/g, "\n\n").trim() };
 }
-function promptAttachments(parts3, exists = existsSync5) {
+function promptAttachments(parts3, exists = existsSync6) {
   const local = (p3) => p3.startsWith("/") && exists(p3);
   return [
-    ...parts3.images.map((p3) => ({ kind: "image", name: basename3(p3), ...local(p3) ? { source: { path: p3 } } : {} })),
+    ...parts3.images.map((p3) => ({ kind: "image", name: basename4(p3), ...local(p3) ? { source: { path: p3 } } : {} })),
     ...parts3.files.map(({ path: path2, ref }) => {
-      const name = basename3(unquote2(ref.replace(/^@\w+:/, "")));
+      const name = basename4(unquote2(ref.replace(/^@\w+:/, "")));
       return path2 && IMAGE_FILE.test(path2) && local(path2) ? { kind: "image", name, source: { path: path2 } } : { kind: "file", name };
     })
   ];
@@ -71074,16 +71405,19 @@ var App = class {
   #heldRequests = [];
   /** The sessions this pane views: its subscriptions, detaches in flight, and superseded switches' results. */
   #views;
-  /** Open approval prompts' overlay keys → their approval-queue `request_id` (what approval.cancelled names). */
-  #approvalIds = /* @__PURE__ */ new Map();
-  /** The launcher's startup image until it is attached to the first session (the queue waits for it). */
-  #startupImage;
-  /** The images attached to the draft: the next prompt entered takes them. */
-  #attachments = [];
+  /** The prompt sheets the gateway's questions opened, and their approval-queue ids. */
+  #sheets = new PromptSheets(this);
+  /** The draft's images, those still uploading, and the launcher's startup image. */
+  #attachments;
+  /** The connect cards, kept current from the plugin's files. */
+  #connect = new ConnectWatcher({
+    changed: () => this.changed(),
+    openUrl,
+    tell: (text12) => this.#submit(text12, false),
+    transcript: this.transcript
+  });
   /** The folder last reported to Tern by OSC 7. */
   #reportedCwd;
-  /** Images being read or uploaded for the draft: an "attaching…" chip each until they land. */
-  #attaching = [];
   /** Whose colors the surface wears, and the gateway's skin. */
   #theme;
   /** Background processes get live charts (settings.json `jobCharts`). */
@@ -71111,7 +71445,19 @@ var App = class {
     this.#views = new SessionViews(gw2);
     this.#launch = launch3;
     this.#settings = settings2;
-    this.#startupImage = launch3.image;
+    this.#attachments = new Attachments(
+      {
+        attachToHead: (image3) => this.#attachToHead(image3),
+        blob: (bytes, mime) => this.#blob(bytes, mime),
+        changed: () => this.changed(),
+        cwd: () => this.info?.cwd || launch3.cwd,
+        gw: gw2,
+        launchCwd: launch3.cwd,
+        note: (text12, tone) => this.transcript.notice(text12, tone),
+        sid: () => this.sid
+      },
+      { startup: launch3.image }
+    );
     const saved = settings2.load();
     this.#theme = new Theme({ palette: (palette) => this.#surface.palette(palette), settings: settings2 }, saved.theme ?? "tern");
     this.#jobCharts = saved.jobCharts !== false;
@@ -71154,7 +71500,7 @@ var App = class {
     }
     this.transcript.push({ id: entryId("welcome"), kind: "welcome" });
     const query = this.#launch.query;
-    if (query || this.#startupImage) {
+    if (query || this.#attachments.awaitingStartup) {
       this.queue.push({ images: [], text: query || "What do you see in this image?" });
     }
     const log = this.#launch.eventLog;
@@ -71180,7 +71526,7 @@ var App = class {
       this.#ids = { live: null, stored: this.#ids.stored };
       this.busy = null;
       this.#heldRequests = [];
-      this.#dropPrompts(() => true);
+      this.#sheets.dropAll();
       this.transcript.interrupt();
       this.changed();
     });
@@ -71209,10 +71555,9 @@ var App = class {
    * Quitting calls it once the sessions detached (or the wait gave up), before Tern closes.
    */
   dispose() {
-    for (const timer of [this.#copiedTimer, this.#connectTimer]) {
-      clearTimeout(timer);
-    }
+    clearTimeout(this.#copiedTimer);
     this.#timers.dispose();
+    this.#connect.dispose();
     this.#notices.dispose();
     this.#reconnect.dispose();
     this.#title.dispose();
@@ -71237,7 +71582,7 @@ var App = class {
     const at = this.overlays.indexOf(overlay);
     if (at >= 0) {
       this.overlays.splice(at, 1);
-      this.#approvalIds.delete(overlay.key);
+      this.#sheets.closed(overlay);
       overlay.onClose?.();
       this.changed();
     }
@@ -71311,7 +71656,7 @@ var App = class {
     if (key2.ctrl && key2.name === "d" && !this.#hasDraft()) {
       return this.quit();
     }
-    if (key2.name === "paste" && this.#pasteImage(key2.text ?? "")) {
+    if (key2.name === "paste" && this.#attachments.paste(key2.text ?? "")) {
       return;
     }
     if (key2.ctrl && key2.name === "v" && !key2.alt && !key2.meta) {
@@ -71334,11 +71679,11 @@ var App = class {
       return openUrl(ev.value);
     }
     if (ev.ev === "action" && ev.act === "connect-continue" && ev.value) {
-      return this.#connectContinue(ev.value);
+      return this.#connect.continue(ev.value);
     }
     if (ev.ev === "action" && ev.act === "connect-open" && ev.value) {
       const at = ev.value.lastIndexOf(":");
-      return this.#connectOpen(ev.value.slice(0, at), ev.value.slice(at + 1));
+      return this.#connect.open(ev.value.slice(0, at), ev.value.slice(at + 1));
     }
     if (ev.ev === "focus" && ev.id === INPUT_ID && !this.overlays.at(-1)?.modal) {
       this.#hud.release();
@@ -71394,163 +71739,22 @@ var App = class {
       reportCwd(cwd);
     }
   }
-  #connectTimer;
-  /** Connect cards (by file) this pane saw with an app still waiting. */
-  #connectSeen = /* @__PURE__ */ new Set();
-  /** Connect calls that drew no card (a status read, a call with nothing to authorize): never again. */
-  #noCard = /* @__PURE__ */ new WeakSet();
-  /**
-   * Keeps each connect card current from the file the plugin's watcher writes (links and states),
-   * and tells the agent once every app of a card is connected, as the desktop's card settles the call.
-   * A settled card never moves again, so the poll runs only while some card is watched.
-   */
-  #watchConnections() {
-    clearTimeout(this.#connectTimer);
-    const tick2 = () => {
-      this.#connectTimer = void 0;
-      let open = false;
-      for (const call of this.transcript.calls(CONNECT_TOOL)) {
-        if (call.connect?.settled || call.status === "running" || this.#noCard.has(call)) {
-          continue;
-        }
-        const next3 = loadConnect(call);
-        if (!next3) {
-          this.#noCard.add(call);
-          continue;
-        }
-        if (JSON.stringify(next3) !== JSON.stringify(call.connect)) {
-          this.transcript.mutateCall(call, (c) => c.connect = next3);
-          this.changed();
-        }
-        const seen = next3.key ?? call.id;
-        if (next3.targets.some(waiting2) && !next3.settled) {
-          this.#connectSeen.add(seen);
-        }
-        if (!next3.told && this.#connectSeen.has(seen) && allConnected(next3) && (!next3.key || claimTold(next3.key))) {
-          this.transcript.mutateCall(call, () => next3.told = true);
-          this.#submit(connectedMessage(next3.targets), false);
-          this.changed();
-        } else if (next3.key && !next3.settled) {
-          open = true;
-        }
-      }
-      if (open) {
-        this.#connectTimer = setTimeout(tick2, POLL_MS2);
-      }
-    };
-    tick2();
-  }
-  /** The connect card `ref` names (its file, or its call id when it has none). */
-  #connectCall(ref) {
-    return this.transcript.calls(CONNECT_TOOL).findLast((c) => (c.connect?.key ?? c.id) === ref);
-  }
-  /** A connect card's Continue: tell the agent which apps the user authorized, as the tool asks. */
-  #connectContinue(ref) {
-    const call = this.#connectCall(ref);
-    const card = call?.connect;
-    if (!call || !card || card.told || card.settled) {
-      return;
-    }
-    this.transcript.mutateCall(call, () => {
-      card.told = true;
-      card.settled = "continued";
-    });
-    if (!card.key || claimTold(card.key)) {
-      this.#submit(continueMessage(card.targets), false);
-    }
-    this.changed();
-  }
-  /** A connect card's Authorize: the app's link in the browser, and its row waits on the browser now. */
-  #connectOpen(ref, name) {
-    const call = this.#connectCall(ref);
-    const card = call?.connect;
-    const target = card?.targets.find((t2) => t2.name === name);
-    if (!call || !card || !target?.url) {
-      return;
-    }
-    openUrl(target.url);
-    this.transcript.mutateCall(call, () => card.opened = [.../* @__PURE__ */ new Set([...card.opened, name])]);
-    this.changed();
-  }
-  /** A paste that is an image (no text: the clipboard's; one image path: that file); false for text. */
-  #pasteImage(text12) {
-    if (!text12.trim()) {
-      void this.attachClipboardImage(true);
-      return true;
-    }
-    const path2 = imagePathOf(text12, this.info?.cwd || this.#launch.cwd);
-    if (path2) {
-      void this.#attachImage(path2, basename4(path2));
-      return true;
-    }
-    return false;
-  }
   /** Attaches the clipboard's image to the next prompt (`quiet`: an empty paste, which may hold none). */
-  async attachClipboardImage(quiet) {
-    const slot = this.#startAttaching(`pasted image ${this.#attachments.length + this.#attaching.length + 1}`);
-    try {
-      const found = await withClipboardImage(async (path2) => {
-        await this.#attachImage(path2, slot.name, slot);
-        return true;
-      });
-      if (!found && !quiet) {
-        this.transcript.notice("No image on the clipboard.", "warning");
-      }
-    } catch (error) {
-      this.transcript.notice(`Could not read the clipboard image: ${errorText(error)}`, "error");
-    } finally {
-      this.#endAttaching(slot);
-      this.changed();
-    }
+  attachClipboardImage(quiet) {
+    return this.#attachments.fromClipboard(quiet);
   }
   /** `/image <path>`: attaches that image file (resolved against the session's folder) to the next prompt. */
-  async attachImagePath(raw2) {
-    const path2 = imagePathOf(raw2, this.info?.cwd || this.#launch.cwd);
-    if (!path2) {
-      this.transcript.notice(`Not an image file: ${raw2.trim()} (PNG, JPEG, GIF or WebP)`, "warning");
-      return this.changed();
-    }
-    await this.#attachImage(path2, basename4(path2));
-  }
-  /** Uploads `path` for the next prompt; its chip says "attaching…" (in `slot`) until it lands or fails. */
-  async #attachImage(path2, name, slot = this.#startAttaching(name)) {
-    const sid = this.sid;
-    try {
-      if (!sid) {
-        this.transcript.notice("Wait for the session to start before attaching an image.", "warning");
-        return;
-      }
-      const image3 = this.#image(await uploadImage(this.#gw, sid, path2, this.#launch.cwd), name);
-      if (this.#attaching.includes(slot)) {
-        this.#attachments.push(image3);
-      }
-    } catch (error) {
-      this.transcript.notice(`Could not attach ${name}: ${errorText(error)}`, "error");
-    } finally {
-      this.#endAttaching(slot);
-      this.changed();
-    }
-  }
-  #startAttaching(name) {
-    const slot = { name };
-    this.#attaching.push(slot);
-    this.changed();
-    return slot;
-  }
-  #endAttaching(slot) {
-    this.#attaching = this.#attaching.filter((s2) => s2 !== slot);
+  attachImagePath(raw2) {
+    return this.#attachments.fromPath(raw2);
   }
   /**
-   * An uploaded image with its thumbnail: its bytes as a blob, else the gateway's copy where that
-   * is on this machine. The bytes are not kept.
+   * The startup image goes to the startup query at the queue's head, into its images in place;
+   * false when the queue is empty.
    */
-  #image({ bytes, ...attachment }, name) {
-    const size = imageSize(bytes);
-    const kb = bytes.length / 1024;
-    const blob = this.#blob(bytes, attachment.mime);
-    const preview5 = blob ? { blob } : existsSync6(attachment.path) ? { path: attachment.path } : void 0;
-    const caption = [size && `${size.w}\xD7${size.h}`, kb >= 1024 ? `${(kb / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(kb))} KB`];
-    return { ...attachment, caption: caption.filter(Boolean).join(" \xB7 "), name, ...preview5 ? { preview: preview5 } : {} };
+  #attachToHead(image3) {
+    const head2 = this.queue[0];
+    head2?.images.push(image3);
+    return Boolean(head2);
   }
   /** `bytes` sent to Tern as a blob; undefined where it takes none, or for more than a blob holds. */
   #blob(bytes, mime) {
@@ -71624,7 +71828,7 @@ var App = class {
   }
   /** Text or images in the composer: Ctrl+C clears them before it interrupts, Ctrl+D never exits over them. */
   #hasDraft() {
-    return Boolean(this.composer.text || this.#attachments.length || this.#attaching.length);
+    return Boolean(this.composer.text || this.#attachments.any);
   }
   /** Esc Esc: the draft's text goes to the prompt history (Up brings it back), its images go. */
   #clearDraft() {
@@ -71633,13 +71837,12 @@ var App = class {
     } else {
       this.composer.set("");
     }
-    this.#attachments = [];
+    this.#attachments.clear();
   }
   #ctrlC() {
     if (this.#hasDraft()) {
       this.composer.set("");
-      this.#attachments = [];
-      this.#attaching = [];
+      this.#attachments.clearAll();
       return;
     }
     if (this.busy) {
@@ -71680,13 +71883,13 @@ var App = class {
    */
   #submit(raw2, draft = true, busy = draft ? this.#busyMode : "queue", pasted = []) {
     const text12 = raw2.trim();
-    if (draft && this.#attaching.length && !text12.startsWith("/")) {
+    if (draft && this.#attachments.uploading && !text12.startsWith("/")) {
       this.composer.set(raw2);
       this.composer.repasted(pasted);
       this.transcript.notice("An image is still attaching. Send again in a moment.", "warning");
       return;
     }
-    if (!text12 && !(draft && this.#attachments.length)) {
+    if (!text12 && !(draft && this.#attachments.items.length)) {
       return;
     }
     if (text12.startsWith("/")) {
@@ -71697,7 +71900,7 @@ var App = class {
       void this.#shell(text12.slice(1).trim());
       return;
     }
-    const item3 = { expand: true, images: draft ? this.#takeImages() : [], pasted, text: text12 };
+    const item3 = { expand: true, images: draft ? this.#attachments.take() : [], pasted, text: text12 };
     if (!this.sid || this.#switches.pending) {
       this.queue.push(item3);
       return;
@@ -71843,19 +72046,13 @@ var App = class {
       this.changed();
     });
   }
-  /** The draft's images, which leave the composer with the prompt that takes them. */
-  #takeImages() {
-    const images = this.#attachments;
-    this.#attachments = [];
-    return images;
-  }
   /** Puts a prompt that did not go back into the composer, before any text there, with its images. */
   #restore({ display, images, pasted = [], text: sent }) {
     const text12 = display ?? sent;
     this.composer.set(text12 && this.composer.text ? `${text12}
 ${this.composer.text}` : text12 || this.composer.text);
     this.composer.repasted(pasted);
-    this.#attachments = [...images, ...this.#attachments];
+    this.#attachments.restore(images);
   }
   /** `!cmd`: runs `command` in the session's folder and shows its output; nothing reaches the model. */
   async #shell(command) {
@@ -72050,28 +72247,13 @@ ${this.composer.text}` : text12 || this.composer.text);
       this.changed();
       return;
     }
-    if (this.sid && this.#startupImage) {
+    if (this.sid && this.#attachments.awaitingStartup) {
       await this.#attachStartupImage(this.sid);
     }
   }
   /** `hermes -q … --image …`: attaches the image to the first session, then lets the startup query go. */
   async #attachStartupImage(sid) {
-    const path2 = this.#startupImage;
-    try {
-      if (this.#gw.isCanonical) {
-        const image3 = this.#image(await uploadImage(this.#gw, sid, path2, this.#launch.cwd), basename4(path2));
-        const images = this.queue[0]?.images ?? this.#attachments;
-        images.push(image3);
-      } else {
-        await rpc(this.#gw, "image.attach", { path: path2, session_id: sid });
-      }
-    } catch (error) {
-      this.transcript.notice(
-        `Could not attach ${path2}: ${errorText(error)}`,
-        "warning"
-      );
-    }
-    this.#startupImage = "";
+    await this.#attachments.attachStartup(sid);
     this.#drainQueue();
     this.changed();
   }
@@ -72173,7 +72355,7 @@ ${this.composer.text}` : text12 || this.composer.text);
       this.transcript.push({ id: this.transcript.id("w"), kind: "welcome" });
       this.#adopt(r);
       snapshot3 = r;
-      this.#dropPrompts((key2) => key2.startsWith(`prompt:${sharedPromptId("")}`));
+      this.#sheets.dropShared();
       this.#gw.hydrateSharedPrompts(r);
       return r;
     } finally {
@@ -72184,7 +72366,7 @@ ${this.composer.text}` : text12 || this.composer.text);
   #adopt(r) {
     const ref = this.#views.adopt(r);
     if (ref.live !== this.sid) {
-      this.#dropPrompts(() => true);
+      this.#sheets.dropAll();
       this.transcript.forgetCompactions();
       this.#busyMode = "queue";
     }
@@ -72210,7 +72392,7 @@ ${this.composer.text}` : text12 || this.composer.text);
       this.media.showAll(this.transcript.entries, (call) => this.#imageLanded(call));
     }
     this.processes.poke();
-    this.#watchConnections();
+    this.#connect.watch();
     this.prs.adopt();
     this.automation.adopt(ref.live);
     if (r.inflight) {
@@ -72255,12 +72437,12 @@ ${this.composer.text}` : text12 || this.composer.text);
       case "alias":
         return this.#slash(`/${d.target}${arg ? ` ${arg}` : ""}`);
       case "skill":
-        return d.message?.trim() ? this.#prompt({ display: d.display || title, images: this.#takeImages(), text: d.message }) : this.transcript.notice(`${title}: the skill sent no message`, "error");
+        return d.message?.trim() ? this.#prompt({ display: d.display || title, images: this.#attachments.take(), text: d.message }) : this.transcript.notice(`${title}: the skill sent no message`, "error");
       case "send":
         if (d.notice?.trim()) {
           this.transcript.notice(d.notice);
         }
-        return d.message?.trim() ? this.#prompt({ display: d.display, images: this.#takeImages(), text: d.message }) : void 0;
+        return d.message?.trim() ? this.#prompt({ display: d.display, images: this.#attachments.take(), text: d.message }) : void 0;
       case "prefill":
         if (d.notice?.trim()) {
           this.transcript.notice(d.notice);
@@ -72411,7 +72593,7 @@ ${this.composer.text}` : text12 || this.composer.text);
             this.sidebar.poke();
           }
           if (ev.payload.name === CONNECT_TOOL) {
-            this.#watchConnections();
+            this.#connect.watch();
           }
           if (ev.payload.name === "terminal") {
             this.processes.poke();
@@ -72531,9 +72713,9 @@ ${this.composer.text}` : text12 || this.composer.text);
       case "request.cancel": {
         const id = ev.payload?.id;
         const notice = promptTimeoutNotice(ev.payload?.method, ev.payload?.reason);
-        const shown = this.#heldRequests.some((r) => r.id === id) || this.overlays.some((o) => o.key === `prompt:${id}`);
+        const shown = this.#heldRequests.some((r) => r.id === id) || this.#sheets.shows(id);
         this.#heldRequests = this.#heldRequests.filter((r) => r.id !== id);
-        this.#dropPrompts((key2) => key2 === `prompt:${id}`);
+        this.#sheets.drop(id);
         if (notice && shown) {
           t2.notice(notice, "warning");
         }
@@ -72552,10 +72734,10 @@ ${this.composer.text}` : text12 || this.composer.text);
       }
       case "approval.settled":
       case "clarify.settled":
-        this.#dropPrompts((key2) => key2 === `prompt:${sharedPromptId(ev.payload?.prompt_id)}`);
+        this.#sheets.drop(sharedPromptId(ev.payload?.prompt_id));
         break;
       case "approval.cancelled":
-        this.#dropPrompts((key2) => ev.payload?.request_ids.includes(this.#approvalIds.get(key2) ?? "") ?? false);
+        this.#sheets.dropByApproval(ev.payload?.request_ids);
         break;
       default:
         return;
@@ -72576,18 +72758,7 @@ ${this.composer.text}` : text12 || this.composer.text);
       req.fail(-32601, `${req.method} is not supported by the Tern frontend`);
       return;
     }
-    this.open(overlay);
-    if (req.method === "approval" && typeof req.params.request_id === "string") {
-      this.#approvalIds.set(overlay.key, req.params.request_id);
-    }
-  }
-  /** Closes the prompt overlays whose key `cancelled` picks (the gateway withdrew their requests). */
-  #dropPrompts(cancelled) {
-    for (const o of [...this.overlays]) {
-      if (o.key.startsWith("prompt:") && cancelled(o.key)) {
-        this.close(o);
-      }
-    }
+    this.#sheets.open(overlay, req);
   }
   /** Whose colors the surface wears (`/theme`). */
   get theme() {
@@ -72751,7 +72922,7 @@ ${this.composer.text}` : text12 || this.composer.text);
   }
   /** Sends the oldest queued prompt once the session is adopted and idle (no turn, switch or startup image pending). */
   #drainQueue() {
-    if (this.busy || this.#compacting || !this.sid || this.#switches.pending || this.#startupImage) {
+    if (this.busy || this.#compacting || !this.sid || this.#switches.pending || this.#attachments.awaitingStartup) {
       return;
     }
     const next3 = this.queue.shift();
@@ -72835,25 +73006,7 @@ ${this.composer.text}` : text12 || this.composer.text);
         },
         agents: { onOpen: () => openAgents(this), running: this.agents.running().length },
         prs: prsPill(this.prs.entries(), () => openPrMenu(this)),
-        attachments: [
-          ...this.#attachments.map((a2, i) => ({
-            caption: a2.caption,
-            image: a2.preview,
-            label: a2.name,
-            onRemove: () => {
-              this.#attachments.splice(i, 1);
-              this.changed();
-            }
-          })),
-          ...this.#attaching.map((slot) => ({
-            label: slot.name,
-            onRemove: () => {
-              this.#endAttaching(slot);
-              this.changed();
-            },
-            pending: true
-          }))
-        ],
+        attachments: this.#attachments.chips(),
         status: {
           compressions: typeof usage?.compressions === "number" ? usage.compressions : void 0,
           notice: this.#notices.current(now),

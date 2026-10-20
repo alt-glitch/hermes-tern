@@ -3,8 +3,7 @@
 // transcript, keys go to the top overlay or the composer, and every change
 // schedules one render of the whole view; the SDK diffs it into frame ops.
 
-import { appendFileSync, existsSync } from 'node:fs'
-import { basename } from 'node:path'
+import { appendFileSync } from 'node:fs'
 
 import type { SessionResumeResult, Usage } from '@hermes/shared/gateway-events'
 import type { ServerRequest } from '@hermes/shared/json-rpc-channel'
@@ -30,6 +29,7 @@ import { copyToClipboard } from './clipboard.js'
 import { type LaunchEnv, readLaunchEnv } from './config/env.js'
 import { localCommand } from './commands.js'
 import { Composer } from './composer.js'
+import { ConnectWatcher } from './connections/watcher.js'
 import { interruptTurn, redirectTurn, steerTurn } from './controlCommands.js'
 import { Disposables } from './core/disposables.js'
 import { errorText } from './core/errors.js'
@@ -49,16 +49,15 @@ import {
   toolCallId
 } from './core/ids.js'
 import { RenderScheduler } from './core/scheduler.js'
+import { Attachments, type Image } from './draft/attachments.js'
 import { fastTier } from './fast.js'
 import { type Busy, busyFrom, ownsEvent, Switches } from './flow.js'
 import { protocolNote, slowStartNotes } from './backendNotes.js'
 import { moaLabel, moaReferenceLabel } from './moa.js'
 import type { Overlay } from './overlay.js'
 import { writeActiveSessionFile } from './hermes/activeSessionFile.js'
-import { imagePathOf, withClipboardImage } from './hermes/clipboardImage.js'
-import { type Attachment, imageSize, uploadImage } from './hermes/images.js'
 import { Media } from './media.js'
-import type { ImageSource, NoticeEntry, ToolCall, UserAttachment } from './model.js'
+import type { NoticeEntry, ToolCall, UserAttachment } from './model.js'
 import { interpolate, shellError, shellExec, shellLines, typedCommands } from './hermes/shell.js'
 import { sharedPromptId, sharedPromptRequest } from './hermes/sharedPrompts.js'
 import { openAgents } from './overlays/agents.js'
@@ -71,11 +70,12 @@ import { openHelp } from './overlays/help.js'
 import { capsOf } from './modelCaps.js'
 import { promptOverlay, promptTimeoutNotice } from './overlays/prompts.js'
 import { openPrMenu, openPrSheet, openUrl, prsPill } from './overlays/pullRequests.js'
-import { allConnected, claimTold, CONNECT_TOOL, connectedMessage, continueMessage, loadConnect, markViewer, POLL_MS, waiting } from './connections.js'
+import { CONNECT_TOOL, markViewer } from './connections.js'
 import { LINK_TOOLS } from './github/links.js'
 import { PullRequests } from './github/store.js'
 import { Cron } from './processes/cron.js'
 import { PrAside } from './prs/aside.js'
+import { PromptSheets } from './prompts/sheets.js'
 import { applyEffort, cycleEffort, DEFAULT_EFFORT } from './session/effort.js'
 import { showThoughts } from './session/thoughts.js'
 import { SessionTitle } from './session/title.js'
@@ -118,12 +118,6 @@ type Snapshot = Pick<AdaptedSnapshot, 'session_id'> &
   Partial<Pick<SessionResumeResult, 'inflight' | 'running' | 'status' | 'stored_session_id' | 'turn_started_at'>> & {
     info?: SessionInfo
   }
-
-/**
- * An uploaded image a prompt carries (the shared gateway takes it on prompt.submit), with the name
- * its chip shows, and the thumbnail and size the chip and the prompt's bubble show.
- */
-type Image = Attachment & { name: string; preview?: ImageSource; caption?: string }
 
 /**
  * What a prompt of images alone asks, as Ink (ui-tui/src/app/submissionCore.ts) and the desktop
@@ -219,16 +213,19 @@ export class App implements ChatPorts {
   #heldRequests: ServerRequest[] = []
   /** The sessions this pane views: its subscriptions, detaches in flight, and superseded switches' results. */
   readonly #views: SessionViews
-  /** Open approval prompts' overlay keys → their approval-queue `request_id` (what approval.cancelled names). */
-  readonly #approvalIds = new Map<string, string>()
-  /** The launcher's startup image until it is attached to the first session (the queue waits for it). */
-  #startupImage: string
-  /** The images attached to the draft: the next prompt entered takes them. */
-  #attachments: Image[] = []
+  /** The prompt sheets the gateway's questions opened, and their approval-queue ids. */
+  readonly #sheets: PromptSheets = new PromptSheets(this)
+  /** The draft's images, those still uploading, and the launcher's startup image. */
+  readonly #attachments: Attachments
+  /** The connect cards, kept current from the plugin's files. */
+  readonly #connect: ConnectWatcher = new ConnectWatcher({
+    changed: () => this.changed(),
+    openUrl,
+    tell: text => this.#submit(text, false),
+    transcript: this.transcript
+  })
   /** The folder last reported to Tern by OSC 7. */
   #reportedCwd: string | undefined
-  /** Images being read or uploaded for the draft: an "attaching…" chip each until they land. */
-  #attaching: { name: string }[] = []
   /** Whose colors the surface wears, and the gateway's skin. */
   readonly #theme: Theme
   /** Background processes get live charts (settings.json `jobCharts`). */
@@ -257,7 +254,19 @@ export class App implements ChatPorts {
     this.#views = new SessionViews(gw)
     this.#launch = launch
     this.#settings = settings
-    this.#startupImage = launch.image
+    this.#attachments = new Attachments(
+      {
+        attachToHead: image => this.#attachToHead(image),
+        blob: (bytes, mime) => this.#blob(bytes, mime),
+        changed: () => this.changed(),
+        cwd: () => this.info?.cwd || launch.cwd,
+        gw,
+        launchCwd: launch.cwd,
+        note: (text, tone) => this.transcript.notice(text, tone),
+        sid: () => this.sid
+      },
+      { startup: launch.image }
+    )
     const saved = settings.load()
     this.#theme = new Theme({ palette: palette => this.#surface.palette(palette), settings }, saved.theme ?? 'tern')
     this.#jobCharts = saved.jobCharts !== false
@@ -312,7 +321,7 @@ export class App implements ChatPorts {
     // `hermes -q …`: the launcher's query is the first prompt, sent literally once the first session is adopted.
     const query = this.#launch.query
 
-    if (query || this.#startupImage) {
+    if (query || this.#attachments.awaitingStartup) {
       this.queue.push({ images: [], text: query || 'What do you see in this image?' })
     }
 
@@ -347,7 +356,7 @@ export class App implements ChatPorts {
       this.busy = null
       // Nothing can answer the sheets now; the reattach re-opens the questions still pending.
       this.#heldRequests = []
-      this.#dropPrompts(() => true)
+      this.#sheets.dropAll()
       this.transcript.interrupt()
       this.changed()
     })
@@ -381,11 +390,9 @@ export class App implements ChatPorts {
    * Quitting calls it once the sessions detached (or the wait gave up), before Tern closes.
    */
   dispose() {
-    for (const timer of [this.#copiedTimer, this.#connectTimer]) {
-      clearTimeout(timer)
-    }
-
+    clearTimeout(this.#copiedTimer)
     this.#timers.dispose()
+    this.#connect.dispose()
     this.#notices.dispose()
     this.#reconnect.dispose()
     this.#title.dispose()
@@ -420,7 +427,7 @@ export class App implements ChatPorts {
 
     if (at >= 0) {
       this.overlays.splice(at, 1)
-      this.#approvalIds.delete(overlay.key)
+      this.#sheets.closed(overlay)
       overlay.onClose?.()
       this.changed()
     }
@@ -526,7 +533,7 @@ export class App implements ChatPorts {
 
     // An image: a paste with no text (what a terminal sends for a clipboard image), a pasted or
     // dropped image path, or Ctrl+V.
-    if (key.name === 'paste' && this.#pasteImage(key.text ?? '')) {
+    if (key.name === 'paste' && this.#attachments.paste(key.text ?? '')) {
       return
     }
 
@@ -558,14 +565,14 @@ export class App implements ChatPorts {
     }
 
     if (ev.ev === 'action' && ev.act === 'connect-continue' && ev.value) {
-      return this.#connectContinue(ev.value)
+      return this.#connect.continue(ev.value)
     }
 
     // `<card>:<app>`: the card names the row, as call ids repeat.
     if (ev.ev === 'action' && ev.act === 'connect-open' && ev.value) {
       const at = ev.value.lastIndexOf(':')
 
-      return this.#connectOpen(ev.value.slice(0, at), ev.value.slice(at + 1))
+      return this.#connect.open(ev.value.slice(0, at), ev.value.slice(at + 1))
     }
 
     if (ev.ev === 'focus' && ev.id === INPUT_ID && !this.overlays.at(-1)?.modal) {
@@ -637,215 +644,25 @@ export class App implements ChatPorts {
     }
   }
 
-  #connectTimer: NodeJS.Timeout | undefined
-  /** Connect cards (by file) this pane saw with an app still waiting. */
-  readonly #connectSeen = new Set<string>()
-  /** Connect calls that drew no card (a status read, a call with nothing to authorize): never again. */
-  readonly #noCard = new WeakSet<object>()
-
-  /**
-   * Keeps each connect card current from the file the plugin's watcher writes (links and states),
-   * and tells the agent once every app of a card is connected, as the desktop's card settles the call.
-   * A settled card never moves again, so the poll runs only while some card is watched.
-   */
-  #watchConnections() {
-    // A new call or a reloaded transcript reads now, not at the next poll.
-    clearTimeout(this.#connectTimer)
-
-    const tick = () => {
-      this.#connectTimer = undefined
-      let open = false
-
-      for (const call of this.transcript.calls(CONNECT_TOOL)) {
-        // A running call has no card yet; by its call id alone it would take an earlier call's.
-        if (call.connect?.settled || call.status === 'running' || this.#noCard.has(call)) {
-          continue
-        }
-
-        const next = loadConnect(call)
-
-        if (!next) {
-          this.#noCard.add(call)
-          continue
-        }
-
-        if (JSON.stringify(next) !== JSON.stringify(call.connect)) {
-          this.transcript.mutateCall(call, c => (c.connect = next))
-          this.changed()
-        }
-
-        const seen = next.key ?? call.id
-
-        if (next.targets.some(waiting) && !next.settled) {
-          this.#connectSeen.add(seen)
-        }
-
-        // Only a card this pane saw waiting: a resumed session's long-settled card stays quiet. Only
-        // one pane tells: the claim is the card's.
-        if (!next.told && this.#connectSeen.has(seen) && allConnected(next) && (!next.key || claimTold(next.key))) {
-          this.transcript.mutateCall(call, () => (next.told = true))
-          this.#submit(connectedMessage(next.targets), false)
-          this.changed()
-        } else if (next.key && !next.settled) {
-          open = true
-        }
-      }
-
-      if (open) {
-        this.#connectTimer = setTimeout(tick, POLL_MS)
-      }
-    }
-
-    tick()
-  }
-
-  /** The connect card `ref` names (its file, or its call id when it has none). */
-  #connectCall(ref: string) {
-    return this.transcript.calls(CONNECT_TOOL).findLast(c => (c.connect?.key ?? c.id) === ref)
-  }
-
-  /** A connect card's Continue: tell the agent which apps the user authorized, as the tool asks. */
-  #connectContinue(ref: string) {
-    const call = this.#connectCall(ref)
-    const card = call?.connect
-
-    if (!call || !card || card.told || card.settled) {
-      return
-    }
-
-    // As on the desktop, Continue settles the card: an app still waiting did not connect.
-    this.transcript.mutateCall(call, () => {
-      card.told = true
-      card.settled = 'continued'
-    })
-
-    // Another pane's message already told the agent.
-    if (!card.key || claimTold(card.key)) {
-      this.#submit(continueMessage(card.targets), false)
-    }
-
-    this.changed()
-  }
-
-  /** A connect card's Authorize: the app's link in the browser, and its row waits on the browser now. */
-  #connectOpen(ref: string, name: string) {
-    const call = this.#connectCall(ref)
-    const card = call?.connect
-    const target = card?.targets.find(t => t.name === name)
-
-    if (!call || !card || !target?.url) {
-      return
-    }
-
-    openUrl(target.url)
-    this.transcript.mutateCall(call, () => (card.opened = [...new Set([...card.opened, name])]))
-    this.changed()
-  }
-
-  /** A paste that is an image (no text: the clipboard's; one image path: that file); false for text. */
-  #pasteImage(text: string): boolean {
-    if (!text.trim()) {
-      void this.attachClipboardImage(true)
-
-      return true
-    }
-
-    const path = imagePathOf(text, this.info?.cwd || this.#launch.cwd)
-
-    if (path) {
-      void this.#attachImage(path, basename(path))
-
-      return true
-    }
-
-    return false
-  }
-
   /** Attaches the clipboard's image to the next prompt (`quiet`: an empty paste, which may hold none). */
-  async attachClipboardImage(quiet: boolean) {
-    // The chip shows at once; reading the clipboard and uploading fill it in.
-    const slot = this.#startAttaching(`pasted image ${this.#attachments.length + this.#attaching.length + 1}`)
-
-    try {
-      const found = await withClipboardImage(async path => {
-        await this.#attachImage(path, slot.name, slot)
-
-        return true
-      })
-
-      if (!found && !quiet) {
-        this.transcript.notice('No image on the clipboard.', 'warning')
-      }
-    } catch (error) {
-      this.transcript.notice(`Could not read the clipboard image: ${errorText(error)}`, 'error')
-    } finally {
-      this.#endAttaching(slot)
-      this.changed()
-    }
+  attachClipboardImage(quiet: boolean): Promise<void> {
+    return this.#attachments.fromClipboard(quiet)
   }
 
   /** `/image <path>`: attaches that image file (resolved against the session's folder) to the next prompt. */
-  async attachImagePath(raw: string) {
-    const path = imagePathOf(raw, this.info?.cwd || this.#launch.cwd)
-
-    if (!path) {
-      this.transcript.notice(`Not an image file: ${raw.trim()} (PNG, JPEG, GIF or WebP)`, 'warning')
-
-      return this.changed()
-    }
-
-    await this.#attachImage(path, basename(path))
-  }
-
-  /** Uploads `path` for the next prompt; its chip says "attaching…" (in `slot`) until it lands or fails. */
-  async #attachImage(path: string, name: string, slot = this.#startAttaching(name)) {
-    const sid = this.sid
-
-    try {
-      if (!sid) {
-        this.transcript.notice('Wait for the session to start before attaching an image.', 'warning')
-
-        return
-      }
-
-      const image = this.#image(await uploadImage(this.#gw, sid, path, this.#launch.cwd), name)
-
-      // Its chip was removed (✕, Ctrl+C) while it uploaded: the prompt does not take it.
-      if (this.#attaching.includes(slot)) {
-        this.#attachments.push(image)
-      }
-    } catch (error) {
-      this.transcript.notice(`Could not attach ${name}: ${errorText(error)}`, 'error')
-    } finally {
-      this.#endAttaching(slot)
-      this.changed()
-    }
-  }
-
-  #startAttaching(name: string): { name: string } {
-    const slot = { name }
-    this.#attaching.push(slot)
-    this.changed()
-
-    return slot
-  }
-
-  #endAttaching(slot: { name: string }) {
-    this.#attaching = this.#attaching.filter(s => s !== slot)
+  attachImagePath(raw: string): Promise<void> {
+    return this.#attachments.fromPath(raw)
   }
 
   /**
-   * An uploaded image with its thumbnail: its bytes as a blob, else the gateway's copy where that
-   * is on this machine. The bytes are not kept.
+   * The startup image goes to the startup query at the queue's head, into its images in place;
+   * false when the queue is empty.
    */
-  #image({ bytes, ...attachment }: Attachment & { bytes: Buffer }, name: string): Image {
-    const size = imageSize(bytes)
-    const kb = bytes.length / 1024
-    const blob = this.#blob(bytes, attachment.mime)
-    const preview = blob ? { blob } : existsSync(attachment.path) ? { path: attachment.path } : undefined
-    const caption = [size && `${size.w}×${size.h}`, kb >= 1024 ? `${(kb / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(kb))} KB`]
+  #attachToHead(image: Image): boolean {
+    const head = this.queue[0]
+    head?.images.push(image)
 
-    return { ...attachment, caption: caption.filter(Boolean).join(' · '), name, ...(preview ? { preview } : {}) }
+    return Boolean(head)
   }
 
   /** `bytes` sent to Tern as a blob; undefined where it takes none, or for more than a blob holds. */
@@ -940,7 +757,7 @@ export class App implements ChatPorts {
 
   /** Text or images in the composer: Ctrl+C clears them before it interrupts, Ctrl+D never exits over them. */
   #hasDraft(): boolean {
-    return Boolean(this.composer.text || this.#attachments.length || this.#attaching.length)
+    return Boolean(this.composer.text || this.#attachments.any)
   }
 
   /** Esc Esc: the draft's text goes to the prompt history (Up brings it back), its images go. */
@@ -951,14 +768,14 @@ export class App implements ChatPorts {
       this.composer.set('')
     }
 
-    this.#attachments = []
+    // Its images go; one still uploading lands after.
+    this.#attachments.clear()
   }
 
   #ctrlC() {
     if (this.#hasDraft()) {
       this.composer.set('')
-      this.#attachments = []
-      this.#attaching = []
+      this.#attachments.clearAll()
 
       return
     }
@@ -1013,7 +830,7 @@ export class App implements ChatPorts {
     const text = raw.trim()
 
     // An image still uploading would miss the prompt: the words wait in the composer for it.
-    if (draft && this.#attaching.length && !text.startsWith('/')) {
+    if (draft && this.#attachments.uploading && !text.startsWith('/')) {
       this.composer.set(raw)
       this.composer.repasted(pasted)
       this.transcript.notice('An image is still attaching. Send again in a moment.', 'warning')
@@ -1022,7 +839,7 @@ export class App implements ChatPorts {
     }
 
     // Images alone are a prompt: the bubble shows just them (the gateway gets Ink's stand-in words).
-    if (!text && !(draft && this.#attachments.length)) {
+    if (!text && !(draft && this.#attachments.items.length)) {
       return
     }
 
@@ -1040,7 +857,7 @@ export class App implements ChatPorts {
     }
 
     // The draft's images go with this prompt, whenever it is sent; a message the app writes leaves them.
-    const item: Queued = { expand: true, images: draft ? this.#takeImages() : [], pasted, text }
+    const item: Queued = { expand: true, images: draft ? this.#attachments.take() : [], pasted, text }
 
     if (!this.sid || this.#switches.pending) {
       this.queue.push(item)
@@ -1228,20 +1045,12 @@ export class App implements ChatPorts {
     })
   }
 
-  /** The draft's images, which leave the composer with the prompt that takes them. */
-  #takeImages(): Image[] {
-    const images = this.#attachments
-    this.#attachments = []
-
-    return images
-  }
-
   /** Puts a prompt that did not go back into the composer, before any text there, with its images. */
   #restore({ display, images, pasted = [], text: sent }: Queued) {
     const text = display ?? sent
     this.composer.set(text && this.composer.text ? `${text}\n${this.composer.text}` : text || this.composer.text)
     this.composer.repasted(pasted)
-    this.#attachments = [...images, ...this.#attachments]
+    this.#attachments.restore(images)
   }
 
   /** `!cmd`: runs `command` in the session's folder and shows its output; nothing reaches the model. */
@@ -1491,32 +1300,14 @@ export class App implements ChatPorts {
       return
     }
 
-    if (this.sid && this.#startupImage) {
+    if (this.sid && this.#attachments.awaitingStartup) {
       await this.#attachStartupImage(this.sid)
     }
   }
 
   /** `hermes -q … --image …`: attaches the image to the first session, then lets the startup query go. */
   async #attachStartupImage(sid: string) {
-    const path = this.#startupImage
-
-    try {
-      if (this.#gw.isCanonical) {
-        const image = this.#image(await uploadImage(this.#gw, sid, path, this.#launch.cwd), basename(path))
-        // The startup query waits at the queue's head for this image.
-        const images = this.queue[0]?.images ?? this.#attachments
-        images.push(image)
-      } else {
-        await rpc(this.#gw, 'image.attach', { path, session_id: sid })
-      }
-    } catch (error) {
-      this.transcript.notice(
-        `Could not attach ${path}: ${errorText(error)}`,
-        'warning'
-      )
-    }
-
-    this.#startupImage = ''
+    await this.#attachments.attachStartup(sid)
     this.#drainQueue()
     this.changed()
   }
@@ -1656,7 +1447,7 @@ export class App implements ChatPorts {
       snapshot = r
       // An approval or question already waiting on the session opens its sheet. A sheet from before
       // the reattach may have been answered or pruned meanwhile (its settled event is not replayed).
-      this.#dropPrompts(key => key.startsWith(`prompt:${sharedPromptId('')}`))
+      this.#sheets.dropShared()
       this.#gw.hydrateSharedPrompts(r)
 
       return r
@@ -1671,7 +1462,7 @@ export class App implements ChatPorts {
 
     if (ref.live !== this.sid) {
       // The last session's approvals and questions are not this one's (a resume hydrates its own after).
-      this.#dropPrompts(() => true)
+      this.#sheets.dropAll()
       this.transcript.forgetCompactions()
       this.#busyMode = 'queue'
     }
@@ -1710,7 +1501,7 @@ export class App implements ChatPorts {
 
     // The new session's processes and PRs (and none of the last one's), and its open connect cards.
     this.processes.poke()
-    this.#watchConnections()
+    this.#connect.watch()
     this.prs.adopt()
     this.automation.adopt(ref.live)
 
@@ -1772,7 +1563,7 @@ export class App implements ChatPorts {
       case 'skill':
         // `message` is the expanded skill body for the model; the transcript shows the invocation.
         return d.message?.trim()
-          ? this.#prompt({ display: d.display || title, images: this.#takeImages(), text: d.message })
+          ? this.#prompt({ display: d.display || title, images: this.#attachments.take(), text: d.message })
           : this.transcript.notice(`${title}: the skill sent no message`, 'error')
 
       case 'send':
@@ -1780,7 +1571,7 @@ export class App implements ChatPorts {
           this.transcript.notice(d.notice)
         }
 
-        return d.message?.trim() ? this.#prompt({ display: d.display, images: this.#takeImages(), text: d.message }) : undefined
+        return d.message?.trim() ? this.#prompt({ display: d.display, images: this.#attachments.take(), text: d.message }) : undefined
 
       case 'prefill':
         if (d.notice?.trim()) {
@@ -2005,7 +1796,7 @@ export class App implements ChatPorts {
           }
 
           if (ev.payload.name === CONNECT_TOOL) {
-            this.#watchConnections()
+            this.#connect.watch()
           }
 
           if (ev.payload.name === 'terminal') {
@@ -2186,10 +1977,10 @@ export class App implements ChatPorts {
         const notice = promptTimeoutNotice(ev.payload?.method, ev.payload?.reason)
         // Only for a card this window still shows (or holds): an answered one needs no line.
         const shown =
-          this.#heldRequests.some(r => r.id === id) || this.overlays.some(o => o.key === `prompt:${id}`)
+          this.#heldRequests.some(r => r.id === id) || this.#sheets.shows(id)
 
         this.#heldRequests = this.#heldRequests.filter(r => r.id !== id)
-        this.#dropPrompts(key => key === `prompt:${id}`)
+        this.#sheets.drop(id)
 
         if (notice && shown) {
           t.notice(notice, 'warning')
@@ -2217,12 +2008,12 @@ export class App implements ChatPorts {
 
       case 'clarify.settled':
         // Answered here or by another viewer: the sheet goes either way.
-        this.#dropPrompts(key => key === `prompt:${sharedPromptId(ev.payload?.prompt_id)}`)
+        this.#sheets.drop(sharedPromptId(ev.payload?.prompt_id))
 
         break
 
       case 'approval.cancelled':
-        this.#dropPrompts(key => ev.payload?.request_ids.includes(this.#approvalIds.get(key) ?? '') ?? false)
+        this.#sheets.dropByApproval(ev.payload?.request_ids)
 
         break
 
@@ -2255,20 +2046,7 @@ export class App implements ChatPorts {
       return
     }
 
-    this.open(overlay)
-
-    if (req.method === 'approval' && typeof req.params.request_id === 'string') {
-      this.#approvalIds.set(overlay.key, req.params.request_id)
-    }
-  }
-
-  /** Closes the prompt overlays whose key `cancelled` picks (the gateway withdrew their requests). */
-  #dropPrompts(cancelled: (key: string) => boolean) {
-    for (const o of [...this.overlays]) {
-      if (o.key.startsWith('prompt:') && cancelled(o.key)) {
-        this.close(o)
-      }
-    }
+    this.#sheets.open(overlay, req)
   }
 
   /** Whose colors the surface wears (`/theme`). */
@@ -2485,7 +2263,7 @@ export class App implements ChatPorts {
 
   /** Sends the oldest queued prompt once the session is adopted and idle (no turn, switch or startup image pending). */
   #drainQueue() {
-    if (this.busy || this.#compacting || !this.sid || this.#switches.pending || this.#startupImage) {
+    if (this.busy || this.#compacting || !this.sid || this.#switches.pending || this.#attachments.awaitingStartup) {
       return
     }
 
@@ -2580,25 +2358,7 @@ export class App implements ChatPorts {
         },
         agents: { onOpen: () => openAgents(this), running: this.agents.running().length },
         prs: prsPill(this.prs.entries(), () => openPrMenu(this)),
-        attachments: [
-          ...this.#attachments.map((a, i) => ({
-            caption: a.caption,
-            image: a.preview,
-            label: a.name,
-            onRemove: () => {
-              this.#attachments.splice(i, 1)
-              this.changed()
-            }
-          })),
-          ...this.#attaching.map(slot => ({
-            label: slot.name,
-            onRemove: () => {
-              this.#endAttaching(slot)
-              this.changed()
-            },
-            pending: true
-          }))
-        ],
+        attachments: this.#attachments.chips(),
         status: {
           compressions: typeof usage?.compressions === 'number' ? usage.compressions : undefined,
           notice: this.#notices.current(now),

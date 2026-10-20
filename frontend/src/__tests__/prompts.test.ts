@@ -5,6 +5,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { sharedPromptRequest } from '../hermes/sharedPrompts.js'
 import type { Overlay, OverlayHost } from '../overlay.js'
 import { promptOverlay, promptTimeoutNotice } from '../overlays/prompts.js'
+import { promptKey, PromptSheets } from '../prompts/sheets.js'
 
 function key(name: string, mods: Partial<Key> = {}): Key {
   return { alt: false, ctrl: false, meta: false, name, shift: false, ...mods } as Key
@@ -225,5 +226,99 @@ describe('a shared prompt sheet', () => {
 
     expect(closed).toEqual([overlay])
     expect(notices).toEqual(['That question was already answered (by another window, or it timed out).'])
+  })
+})
+
+describe('PromptSheets', () => {
+  /** A stack the way App keeps it: open replaces a same-key overlay, close tells the sheets. */
+  function stack() {
+    const overlays: Overlay[] = []
+    const closed: string[] = []
+
+    const sheets: PromptSheets = new PromptSheets({
+      close: o => {
+        const at = overlays.indexOf(o)
+
+        if (at >= 0) {
+          overlays.splice(at, 1)
+          sheets.closed(o)
+          closed.push(o.key)
+        }
+      },
+      open: o => void overlays.push(o),
+      overlays
+    })
+
+    const sheet = (key: string): Overlay => ({ ...open('sudo', {}).overlay, key })
+    const request = (id: string, method = 'clarify', params: Record<string, unknown> = {}): ServerRequest => ({ fail: () => undefined, id, method, params, respond: () => undefined })
+    const show = (id: string, method?: string, params?: Record<string, unknown>) => sheets.open(sheet(promptKey(id)), request(id, method, params))
+    const keys = () => overlays.map(o => o.key)
+
+    return { closed, keys, overlays, sheet, sheets, show }
+  }
+
+  it('keys a sheet by its request id, as each prompt overlay does', () => {
+    expect(promptKey('r1')).toBe('prompt:r1')
+    expect(open('approval', { command: 'ls' }).overlay.key).toBe(promptKey('r1'))
+    expect(open('sudo', {}).overlay.key).toBe(promptKey('r1'))
+  })
+
+  it('drop closes the sheet for one request id, and shows says whether it is open', () => {
+    const { keys, sheets, show } = stack()
+    show('r1')
+    show('r2')
+
+    expect(sheets.shows('r1')).toBe(true)
+    sheets.drop('r1')
+
+    expect(keys()).toEqual(['prompt:r2'])
+    expect(sheets.shows('r1')).toBe(false)
+  })
+
+  it('dropShared closes every shared prompt\'s sheet and keeps a legacy request\'s', () => {
+    const { keys, sheets, show } = stack()
+    show('shared:p1')
+    show('r1')
+    show('shared:p2')
+
+    sheets.dropShared()
+
+    expect(keys()).toEqual(['prompt:r1'])
+  })
+
+  it('dropAll closes every prompt sheet and leaves the other overlays', () => {
+    const { keys, overlays, sheet, sheets, show } = stack()
+    show('r1')
+    overlays.push(sheet('help'))
+    show('shared:p1')
+
+    sheets.dropAll()
+
+    expect(keys()).toEqual(['help'])
+  })
+
+  it('dropByApproval closes the approvals whose queue ids it names', () => {
+    const { keys, sheets, show } = stack()
+    show('r1', 'approval', { request_id: 'q1' })
+    show('r2', 'approval', { request_id: 'q2' })
+    show('r3')
+
+    sheets.dropByApproval(['q2', 'q9'])
+    expect(keys()).toEqual(['prompt:r1', 'prompt:r3'])
+
+    sheets.dropByApproval(undefined)
+    expect(keys()).toEqual(['prompt:r1', 'prompt:r3'])
+  })
+
+  it('a closed approval forgets its queue id: a sheet that takes its key after it is not that approval', () => {
+    const { closed, keys, sheets, show } = stack()
+    show('r1', 'approval', { request_id: 'q1' })
+    sheets.drop('r1')
+    show('r1', 'sudo')
+
+    sheets.dropByApproval(['q1'])
+
+    expect(keys()).toEqual(['prompt:r1'])
+    expect(closed).toEqual(['prompt:r1'])
   })
 })

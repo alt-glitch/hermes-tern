@@ -1,9 +1,10 @@
-import { mkdtempSync } from 'node:fs'
+import { mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { readLaunchEnv } from '../config/env.js'
 import { storedSessionId } from '../core/ids.js'
 
 import { FakeGateway, fakeTern } from './fakes.js'
@@ -71,6 +72,22 @@ describe('session lifecycle', () => {
     const app = await started(gw)
 
     expect(app.sid).toBe('s1')
+  })
+
+  it("the launcher's --image waits for the first session, then goes with the startup query", async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'hermes-tern-startup-'))
+    writeFileSync(join(dir, 'shot.png'), Buffer.from([137, 80, 78, 71, 13, 10, 26, 10, 0, 0]))
+    gw.handlers.set('image.attach_bytes', () => ({ path: '/uploads/1.png' }))
+    const app = new App(fakeTern().session, gw.client, '', { launch: readLaunchEnv({ HERMES_TUI_IMAGE: 'shot.png' }, dir) })
+    void app.run()
+    expect(app.queue).toEqual([{ images: [], text: 'What do you see in this image?' }])
+
+    gw.event({ type: 'gateway.ready', payload: {} })
+    await vi.waitFor(() => expect(gw.methods('prompt.submit')).toHaveLength(1))
+
+    expect(gw.sent('image.attach_bytes').map(p => p['session_id'])).toEqual(['s1'])
+    expect(gw.sent('prompt.submit')[0]).toMatchObject({ attachments: [{ mime: 'image/png', path: '/uploads/1.png' }], text: 'What do you see in this image?' })
+    expect(app.queue).toEqual([])
   })
 
   it('reloads the shown session on a replay gap, with a fresh subscription and its turn state', async () => {

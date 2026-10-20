@@ -1,9 +1,8 @@
-// Questions the agent waits on (server requests): a dangerous-command
-// approval, clarify's single/multi-choice or free-text questions, and masked
-// values (sudo, secrets, vault prompts). Each is a modal bottom sheet in the
-// shapes and roles omp's ask sheet uses (`omp.overlay.ask`, its options and
-// action row), which Tern's chat styles size like the composer and read to
-// show the pane as waiting for input.
+// Questions the agent waits on (server requests): a dangerous-command approval, clarify's
+// single/multi-choice or free-text questions, and masked values (sudo, secrets, vault prompts).
+// Each is a modal bottom sheet in the shapes and roles omp's ask sheet uses (`omp.overlay.ask`,
+// its options and action row), which Tern's chat styles size like the composer and read to show
+// the pane as waiting for input. A sheet is keyed by its request id (prompts/sheets.ts).
 
 import type { ServerRequest } from '@hermes/shared/json-rpc-channel'
 import type { JSX, Key } from '@stencil-hq/tern'
@@ -12,6 +11,7 @@ import { Composer } from '../composer.js'
 import { errorText } from '../core/errors.js'
 import { maskedOffset, maskOf, unmaskEdit } from '../mask.js'
 import type { Overlay, OverlayHost } from '../overlay.js'
+import { promptKey } from '../prompts/sheets.js'
 import { withoutTernEnv } from '../view/describe.js'
 import { actionsRow } from '../view/ui/button.js'
 
@@ -241,7 +241,7 @@ function approvalOverlay(host: OverlayHost, req: ServerRequest): Overlay {
   }
 
   const options = APPROVALS.filter(o => allowed.has(o.id))
-  const key = `prompt:${req.id}`
+  const key = promptKey(req.id)
   const sending: Sending = { busy: false, error: '' }
   let selected = 0
 
@@ -383,7 +383,7 @@ function clarifyOverlay(host: OverlayHost, req: ServerRequest): Overlay {
     typing: false
   }))
 
-  const key = `prompt:${req.id}`
+  const key = promptKey(req.id)
   const sending: Sending = { busy: false, error: '' }
   const respond = (result: Record<string, unknown>) => answerWith(host, overlay, req, sending, result)
   // After a refused answer, Esc closes the sheet unanswered: a retry may never land (a stale turn).
@@ -653,7 +653,7 @@ interface Field {
 
 function maskedOverlay(host: OverlayHost, req: ServerRequest): Overlay {
   const p = req.params
-  const key = `prompt:${req.id}`
+  const key = promptKey(req.id)
   const site = str(p.site) || str(p.origin)
   const login = req.method === 'vault.save_login'
 

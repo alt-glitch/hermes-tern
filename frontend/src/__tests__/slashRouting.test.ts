@@ -150,6 +150,28 @@ describe('stale prompt sheets', () => {
     expect(app.overlays.map(o => o.key)).toEqual(['prompt:r1'])
   })
 
+  it('approval.cancelled closes the approvals it names, and not a sheet that took a closed one\'s key', async () => {
+    const { app } = await started()
+    const sid = app.sid ?? ''
+    const ask = (id: string, method: string, params: Record<string, unknown>) =>
+      gw.emit('request', { fail: () => undefined, id, method, params: { session_id: sid, ...params }, respond: () => undefined })
+
+    ask('r1', 'approval', { command: 'ls', request_id: 'q1' })
+    ask('r2', 'approval', { command: 'make', request_id: 'q2' })
+    const answered = app.overlays.find(o => o.key === 'prompt:r1')
+    expect(answered).toBeDefined()
+
+    if (answered) {
+      app.close(answered)
+    }
+
+    ask('r1', 'sudo', {})
+
+    gw.event({ payload: { request_ids: ['q1', 'q2'] }, session_id: sid, type: 'approval.cancelled' })
+
+    expect(app.overlays.map(o => o.key)).toEqual(['prompt:r1'])
+  })
+
   it('the backend exiting closes every prompt sheet', async () => {
     const { app } = await started()
     app.open(prompt('prompt:shared:p1'))
