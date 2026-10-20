@@ -137,6 +137,7 @@ export class App implements ChatPorts {
 
     followGateway(this.#gw, {
       ...s,
+      checkFigures: p => this.#act.checkFigures(p),
       drain: () => s.queue.drain(),
       eventLog: this.#launch.eventLog,
       gw: this.#gw,
