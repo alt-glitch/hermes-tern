@@ -10,7 +10,9 @@
     "bundle:report": "node scripts/bundle-report.mjs",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run",
-    "check": "node scripts/check-hermes-src.mjs && bun run typecheck && bun run test"
+    "check:size": "node scripts/check-size.mjs",
+    "check:strict": "node scripts/check-strict.mjs",
+    "check": "node scripts/check-hermes-src.mjs && bun run typecheck && bun run test && bun run check:size && bun run check:strict"
   },
   "dependencies": {
     "@hermes/shared": "file:.hermes-src/apps/shared",
