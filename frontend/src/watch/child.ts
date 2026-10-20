@@ -6,20 +6,28 @@
 import { DatabaseSync } from 'node:sqlite'
 
 import type { TranscriptMessage } from '@hermes/shared/gateway-events'
+import * as z from 'zod/mini'
 
 import { stateDbPath } from '../hermes/paths.js'
+import { first, real, rows, storedArgs, storedCalls, text } from '../wire/sqlite.js'
+
+/** One `messages` row, as this reads it. A role that is not text reads as '' (a row nothing draws). */
+const messageRow = z.object({
+  id: z.number(),
+  role: z.catch(z.string(), ''),
+  content: text,
+  tool_call_id: text,
+  tool_calls: text,
+  tool_name: text,
+  timestamp: real,
+  reasoning: text
+})
 
 /** One `messages` row, as this reads it. */
-interface Row {
-  id: number
-  role: string
-  content: string | null
-  tool_call_id: string | null
-  tool_calls: string | null
-  tool_name: string | null
-  timestamp: number
-  reasoning: string | null
-}
+export type MessageRow = z.infer<typeof messageRow>
+
+const childRow = z.object({ id: z.string() })
+const lastRow = z.object({ id: real })
 
 export class ChildStore {
   readonly #db: DatabaseSync
@@ -40,39 +48,31 @@ export class ChildStore {
       return undefined
     }
 
-    const row = this.#db
-      .prepare(
-        `SELECT s.id AS id FROM sessions s
-         WHERE s.parent_session_id IN (${ids.map(() => '?').join(',')}) AND s.source = 'subagent'
-           AND s.started_at >= ?
-           AND (SELECT m.content FROM messages m WHERE m.session_id = s.id AND m.role = 'user'
-                ORDER BY m.id LIMIT 1) = ?
-         ORDER BY s.started_at DESC LIMIT 1`
-      )
-      .get(...ids, Math.max(0, since / 1000 - 5), goal) as { id?: string } | undefined
+    const stmt = this.#db.prepare(
+      `SELECT s.id AS id FROM sessions s
+       WHERE s.parent_session_id IN (${ids.map(() => '?').join(',')}) AND s.source = 'subagent'
+         AND s.started_at >= ?
+         AND (SELECT m.content FROM messages m WHERE m.session_id = s.id AND m.role = 'user'
+              ORDER BY m.id LIMIT 1) = ?
+       ORDER BY s.started_at DESC LIMIT 1`
+    )
 
-    return row?.id
+    return first(stmt, childRow, ...ids, Math.max(0, since / 1000 - 5), goal)?.id
   }
 
   /** The child's active messages as the gateway's transcript messages, oldest first. */
   messages(session: string): TranscriptMessage[] {
-    const rows = this.#db
-      .prepare(
-        `SELECT id, role, content, tool_call_id, tool_calls, tool_name, timestamp, reasoning
-         FROM messages WHERE session_id = ? AND active = 1 ORDER BY id`
-      )
-      .all(session) as unknown as Row[]
+    const stmt = this.#db.prepare(
+      `SELECT id, role, content, tool_call_id, tool_calls, tool_name, timestamp, reasoning
+       FROM messages WHERE session_id = ? AND active = 1 ORDER BY id`
+    )
 
-    return toTranscript(rows)
+    return toTranscript(rows(stmt, messageRow, session))
   }
 
   /** The newest message id of `session`, to tell whether anything changed. */
   last(session: string): number {
-    const row = this.#db.prepare('SELECT MAX(id) AS id FROM messages WHERE session_id = ?').get(session) as
-      | { id?: number | null }
-      | undefined
-
-    return row?.id ?? 0
+    return first(this.#db.prepare('SELECT MAX(id) AS id FROM messages WHERE session_id = ?'), lastRow, session)?.id ?? 0
   }
 
   close() {
@@ -80,39 +80,33 @@ export class ChildStore {
   }
 }
 
-interface StoredCall {
-  id?: string
-  call_id?: string
-  function?: { name?: string; arguments?: string }
-}
-
 /**
  * Rows to the shape `Transcript.load` reads: each call an assistant row made becomes a tool
  * message carrying its name and arguments, and the matching `tool` row fills in its result.
  */
-export function toTranscript(rows: readonly Row[]): TranscriptMessage[] {
+export function toTranscript(rows: readonly MessageRow[]): TranscriptMessage[] {
   const out: TranscriptMessage[] = []
 
   for (const r of rows) {
     const timestamp = r.timestamp
 
     if (r.role === 'user' || r.role === 'system') {
-      out.push({ content: r.content ?? '', role: r.role, timestamp } as TranscriptMessage)
+      out.push({ content: r.content ?? '', role: r.role, timestamp })
 
       continue
     }
 
     if (r.role === 'assistant') {
-      out.push({ content: r.content ?? '', reasoning: r.reasoning ?? undefined, role: 'assistant', timestamp } as TranscriptMessage)
+      out.push({ content: r.content ?? '', reasoning: r.reasoning, role: 'assistant', timestamp })
 
-      for (const call of parseCalls(r.tool_calls)) {
+      for (const call of storedCalls(r.tool_calls)) {
         out.push({
-          args: parseArgs(call.function?.arguments),
+          args: storedArgs(call.function?.arguments),
           name: call.function?.name ?? 'tool',
           role: 'tool',
           timestamp,
-          tool_call_id: call.id ?? call.call_id
-        } as TranscriptMessage)
+          tool_call_id: call.id ?? call.call_id ?? null
+        })
       }
 
       continue
@@ -121,33 +115,13 @@ export function toTranscript(rows: readonly Row[]): TranscriptMessage[] {
     if (r.role === 'tool') {
       out.push({
         content: r.content ?? '',
-        name: r.tool_name ?? undefined,
+        name: r.tool_name,
         role: 'tool',
         timestamp,
-        tool_call_id: r.tool_call_id ?? undefined
-      } as TranscriptMessage)
+        tool_call_id: r.tool_call_id
+      })
     }
   }
 
   return out
-}
-
-function parseCalls(raw: string | null): StoredCall[] {
-  try {
-    const parsed: unknown = raw ? JSON.parse(raw) : []
-
-    return Array.isArray(parsed) ? (parsed as StoredCall[]) : []
-  } catch {
-    return []
-  }
-}
-
-function parseArgs(raw: string | undefined): Record<string, unknown> {
-  try {
-    const parsed: unknown = raw ? JSON.parse(raw) : {}
-
-    return parsed && typeof parsed === 'object' ? (parsed as Record<string, unknown>) : {}
-  } catch {
-    return {}
-  }
 }

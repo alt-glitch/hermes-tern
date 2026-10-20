@@ -5,8 +5,12 @@
 
 import { DatabaseSync } from 'node:sqlite'
 
+import * as z from 'zod/mini'
+
 import { ancestry } from './github/links.js'
 import { stateDbPath } from './hermes/paths.js'
+import { parseJson } from './wire/json.js'
+import { rows } from './wire/sqlite.js'
 
 /** A compaction the store knows of: when its summary was written (epoch ms), and the summary. */
 export interface StoredCompaction {
@@ -28,6 +32,9 @@ const QUERY = (n: number) => `SELECT timestamp, content FROM messages
     AND role IN ('user', 'assistant') AND instr(content, '${MARKER}') > 0
   ORDER BY id`
 
+/** A handoff row; one with no numeric timestamp is skipped. */
+const handoffRow = z.object({ timestamp: z.number(), content: z.optional(z.unknown()) })
+
 /** The compactions of stored session `sid`'s conversation, oldest first; empty without the store. */
 export function storedCompactions(sid: string, db = stateDbPath(), lineage: (sid: string) => string[] = ancestry): StoredCompaction[] {
   const ids = lineage(sid)
@@ -36,8 +43,7 @@ export function storedCompactions(sid: string, db = stateDbPath(), lineage: (sid
     const conn = new DatabaseSync(db, { readOnly: true })
 
     try {
-      const rows = conn.prepare(QUERY(ids.length)).all(...ids) as { timestamp?: unknown; content?: unknown }[]
-      const out = rows.flatMap(r => (typeof r.timestamp === 'number' ? [{ at: r.timestamp * 1000, ...handoff(r.content) }] : []))
+      const out = rows(conn.prepare(QUERY(ids.length)), handoffRow, ...ids).map(r => ({ at: r.timestamp * 1000, ...handoff(r.content) }))
 
       // A summary copied into the continuing session (a protected tail) is the same compaction.
       return out.filter((c, i) => !out.slice(0, i).some(o => o.summary === c.summary && Math.abs(o.at - c.at) < 60_000))
@@ -68,6 +74,9 @@ export function handoff(content: unknown): Omit<StoredCompaction, 'at'> {
   return { ...(summary ? { summary } : {}), ...(count ? { messages: Number(count[1]) } : {}) }
 }
 
+/** A part of a JSON content list with text; any other part reads as ''. */
+const textPart = z.object({ text: z.string() })
+
 /** A stored row's text: a string, or the text parts of a JSON content list. */
 function textOf(content: unknown): string {
   if (typeof content !== 'string') {
@@ -78,15 +87,9 @@ function textOf(content: unknown): string {
     return content
   }
 
-  try {
-    const parts: unknown = JSON.parse(content)
+  const parts = parseJson(content)
 
-    return Array.isArray(parts)
-      ? parts.map(p => (p && typeof p === 'object' && typeof (p as { text?: unknown }).text === 'string' ? (p as { text: string }).text : '')).join('\n')
-      : content
-  } catch {
-    return content
-  }
+  return Array.isArray(parts) ? parts.map(p => textPart.safeParse(p).data?.text ?? '').join('\n') : content
 }
 
 /** The token counts in one of Hermes' compaction lines ("~182,000 tokens", "~250,000 → ~120,000 tokens"). */

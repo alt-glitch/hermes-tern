@@ -6,6 +6,7 @@ import { node } from '@stencil-hq/tern'
 
 import { langOf } from '../code/lang.js'
 import type { PrFile, PullRequest } from '../github/pullRequest.js'
+import { shown } from '../github/remote.js'
 import type { Entry } from '../github/store.js'
 
 /** How much room the view has: `wide` draws the files beside their list. */
@@ -19,15 +20,17 @@ const LONG_DIFF = 400
  * the cards; a click on one brings its card into view (`reveal`).
  */
 export function filesTab(e: Entry, pr: PullRequest, id: string, density: PrDensity, reveal?: (id: string) => void): JSX.Element[] {
-  if (!e.files) {
-    return [<text key="load" spans={[{ s: e.filesError ? 'error' : 'muted', t: e.filesError ?? 'Reading the files…' }]} />]
+  const { error, value: files } = shown(e.files)
+
+  if (!files) {
+    return [<text key="load" spans={[{ s: error ? 'error' : 'muted', t: error ?? 'Reading the files…' }]} />]
   }
 
-  if (!e.files.length) {
+  if (!files.length) {
     return [<text key="none" spans={[{ s: 'muted', t: 'No files changed.' }]} />]
   }
 
-  const cards = e.files.map((f, i) => fileCard(f, `f${i}`))
+  const cards = files.map((f, i) => fileCard(f, `f${i}`))
 
   if (density === 'narrow') {
     return cards
@@ -35,7 +38,7 @@ export function filesTab(e: Entry, pr: PullRequest, id: string, density: PrDensi
 
   const list = (
     <col gap="none" key="list" role="hermes.pr.filelist">
-      {e.files.map((f, i) => {
+      {files.map((f, i) => {
         const slash = f.path.lastIndexOf('/')
 
         return (
@@ -52,7 +55,7 @@ export function filesTab(e: Entry, pr: PullRequest, id: string, density: PrDensi
           </row>
         )
       })}
-      {e.files.length < pr.changedFiles ? <text key="more" spans={[{ s: 'muted', t: `${pr.changedFiles - e.files.length} more on GitHub` }]} /> : null}
+      {files.length < pr.changedFiles ? <text key="more" spans={[{ s: 'muted', t: `${pr.changedFiles - files.length} more on GitHub` }]} /> : null}
     </col>
   )
 

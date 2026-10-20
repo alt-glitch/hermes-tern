@@ -115,33 +115,40 @@ describe('PrView', () => {
   }
 
   it('shows the description, then says the conversation is loading, or why it failed', () => {
-    const entry = { pr, ref, source: 'linked' } as Entry
+    const entry = { activity: { kind: 'idle' }, files: { kind: 'idle' }, pr, ref, source: 'linked' } as Entry
     const { prs, view } = viewOf(entry)
 
     expect(text(view.body('b', 0))).toContain('Fixes it.')
     expect(text(view.body('b', 0))).toContain('Reading the conversation…')
     expect(prs.activity).toHaveBeenCalled()
-    expect(text(viewOf({ ...entry, activityError: 'GitHub answered 502' }).view.body('b', 0))).toContain('GitHub answered 502')
+    expect(text(viewOf({ ...entry, activity: { error: 'GitHub answered 502', failedAt: 0, kind: 'failed' } }).view.body('b', 0))).toContain('GitHub answered 502')
   })
 
   it('reads the files only on the Files tab, and says why they failed', () => {
-    const entry = { filesError: 'timeout', pr, ref, source: 'linked' } as Entry
+    const entry = { activity: { kind: 'idle' }, files: { error: 'timeout', failedAt: 0, kind: 'failed' }, pr, ref, source: 'linked' } as Entry
     const { prs, view } = viewOf(entry)
 
     view.setTab('files')
     expect(prs.files).toHaveBeenCalled()
     expect(text(view.body('b', 0))).toContain('timeout')
     // An older list stays up while a newer read fails.
-    expect(text(viewOf({ ...entry, files: [{ additions: 1, deletions: 0, patch: '@@ -1 +1 @@\n-a\n+b', path: 'a.ts', status: 'modified' }] }).view.body('b', 0))).not.toContain('timeout')
+    const files = [{ additions: 1, deletions: 0, patch: '@@ -1 +1 @@\n-a\n+b', path: 'a.ts', status: 'modified' }]
+    const last = { at: pr.updatedAt, value: files }
+    expect(text(viewOf({ ...entry, files: { error: 'timeout', failedAt: 0, kind: 'failed', last } }).view.body('b', 0))).not.toContain('timeout')
   })
 
   it('folds a run of commits into one line and draws a review verdict without words as a line', () => {
     const entry = {
-      activity: [
-        { at: '2026-10-19T10:01:00Z', author: 'sid', body: 'one', kind: 'commit', url: 'https://github.com/acme/app/commit/1111111aaa' },
-        { at: '2026-10-19T10:02:00Z', author: 'sid', body: 'two', kind: 'commit', url: 'https://github.com/acme/app/commit/2222222bbb' },
-        { at: '2026-10-19T10:03:00Z', author: 'ana', body: '', kind: 'review', state: 'APPROVED' }
-      ],
+      activity: {
+        at: pr.updatedAt,
+        kind: 'ready',
+        value: [
+          { at: '2026-10-19T10:01:00Z', author: 'sid', body: 'one', kind: 'commit', url: 'https://github.com/acme/app/commit/1111111aaa' },
+          { at: '2026-10-19T10:02:00Z', author: 'sid', body: 'two', kind: 'commit', url: 'https://github.com/acme/app/commit/2222222bbb' },
+          { at: '2026-10-19T10:03:00Z', author: 'ana', body: '', kind: 'review', state: 'APPROVED' }
+        ]
+      },
+      files: { kind: 'idle' },
       pr,
       ref,
       source: 'linked'

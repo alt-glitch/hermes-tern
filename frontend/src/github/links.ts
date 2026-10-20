@@ -3,14 +3,17 @@
 // conversation's root session (pull_requests.py); a live turn's link calls carry the whole list in
 // their results, so the sheet follows them without reading the file again.
 
-import { readFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 
+import * as z from 'zod/mini'
+
 import { stateDbPath } from '../hermes/paths.js'
 import type { ToolCall } from '../model.js'
+import { readLinksFile } from '../wire/files.js'
 import { record } from '../wire/json.js'
+import { first, text } from '../wire/sqlite.js'
 
 import type { PrRef } from './pullRequest.js'
 
@@ -51,6 +54,8 @@ const CONTINUES = `SELECT p.id AS p FROM sessions c JOIN sessions p ON p.id = c.
   WHERE c.id = ? AND p.end_reason = 'compression' AND COALESCE(c.source, '') != 'tool'
     AND ${['_branched_from', '_delegate_from', '_reset_from'].map(marker).join(' AND ')}`
 
+const parentRow = z.object({ p: text })
+
 /**
  * Session `sid`'s ancestors, itself first: compression gives a conversation a new session whose
  * `parent_session_id` is the one it continues. Read-only, and empty when the database is not there.
@@ -65,13 +70,13 @@ export function ancestry(sid: string, db = stateDbPath()): string[] {
       const parent = conn.prepare(CONTINUES)
 
       for (let i = 0; i < 100; i++) {
-        const row = parent.get(chain.at(-1)!) as { p?: string | null } | undefined
+        const p = first(parent, parentRow, chain.at(-1) ?? sid)?.p
 
-        if (!row?.p || chain.includes(row.p)) {
+        if (!p || chain.includes(p)) {
           break
         }
 
-        chain.push(row.p)
+        chain.push(p)
       }
     } finally {
       conn.close()
@@ -85,22 +90,20 @@ export function ancestry(sid: string, db = stateDbPath()): string[] {
 
 /** The links stored for session `sid`'s conversation, oldest first. */
 export function storedLinks(sid: string, file = linksPath(), lineage: (sid: string) => string[] = ancestry): PrRef[] {
-  let data: { aliases?: Record<string, string>; conversations?: Record<string, unknown[]> }
+  const data = readLinksFile(file)
 
-  try {
-    data = JSON.parse(readFileSync(file, 'utf8')) as typeof data
-  } catch {
+  if (!data) {
     return []
   }
 
-  const aliases = data.aliases ?? {}
-  const root = lineage(sid).find(id => aliases[id] || data.conversations?.[id])
+  const { aliases, conversations } = data
+  const root = lineage(sid).find(id => aliases[id] || conversations[id])
 
   if (!root) {
     return []
   }
 
-  const links = data.conversations?.[aliases[root] ?? root]
+  const links = conversations[aliases[root] ?? root]
 
   return Array.isArray(links) ? links.map(refOf).filter((r): r is PrRef => Boolean(r)) : []
 }

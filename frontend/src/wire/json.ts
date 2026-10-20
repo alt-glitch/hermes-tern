@@ -21,3 +21,8 @@ export function parseJson(text: string): unknown {
     return undefined
   }
 }
+
+/** The value JSON text holds, unread; throws a SyntaxError when the text is not JSON (parseJson falls back instead). */
+export function decodeJson(text: string): unknown {
+  return JSON.parse(text)
+}

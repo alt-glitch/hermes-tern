@@ -4,6 +4,7 @@
 import type { JSX, SpanData, Tone } from '@stencil-hq/tern'
 
 import type { ActivityItem, PullRequest } from '../github/pullRequest.js'
+import { shown } from '../github/remote.js'
 import type { Entry } from '../github/store.js'
 import { relative } from '../processes/cron.js'
 import { plural } from '../view/format.js'
@@ -28,8 +29,10 @@ export function conversation(e: Entry, pr: PullRequest, now: number): JSX.Elemen
     comment('desc', [{ s: 'strong', t: pr.author }, { s: 'muted', t: ' opened this' }], pr.createdAt, now, pr.body, pr.url, links, 'No description provided.')
   ]
 
-  if (!e.activity) {
-    out.push(<text key="load" spans={[{ s: e.activityError ? 'error' : 'muted', t: e.activityError ?? 'Reading the conversation…' }]} />)
+  const { error, value: activity } = shown(e.activity)
+
+  if (!activity) {
+    out.push(<text key="load" spans={[{ s: error ? 'error' : 'muted', t: error ?? 'Reading the conversation…' }]} />)
 
     return out
   }
@@ -46,7 +49,7 @@ export function conversation(e: Entry, pr: PullRequest, now: number): JSX.Elemen
     }
   }
 
-  e.activity.forEach((a, i) => {
+  activity.forEach((a, i) => {
     if (a.kind === 'commit') {
       commits.push(a)
 

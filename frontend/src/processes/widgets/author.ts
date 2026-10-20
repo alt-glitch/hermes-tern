@@ -7,6 +7,8 @@
 import { spawn } from 'node:child_process'
 import { join } from 'node:path'
 
+import { readAuthorReply } from '../../wire/files.js'
+
 import type { SourceSample } from './runtime.js'
 import { SPEC_SCHEMA, type Spec } from './spec.js'
 
@@ -218,12 +220,14 @@ export function hermesAuthor(env: NodeJS.ProcessEnv = process.env): Author | und
       // A script that dies before reading its request closes the pipe; `close` says how it ended.
       child.stdin.on('error', () => undefined)
       child.on('close', () => {
-        try {
-          const reply = JSON.parse(stdout.trim().split('\n').at(-1) ?? '') as { answer?: unknown; error?: string; unavailable?: boolean }
+        const reply = readAuthorReply(stdout)
 
-          return reply.unavailable ? resolve(undefined) : reply.error ? reject(new Error(reply.error)) : resolve(reply.answer)
-        } catch {
+        if (!reply) {
           reject(new Error('widget_author.py gave no answer'))
+        } else if (reply.kind === 'error') {
+          reject(new Error(reply.message))
+        } else {
+          resolve(reply.kind === 'answer' ? reply.answer : undefined)
         }
       })
       child.stdin.end(JSON.stringify({ schema: SPEC_SCHEMA, system: SYSTEM_PROMPT, user: renderPrompt(request) }))

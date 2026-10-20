@@ -4,6 +4,11 @@
 // environment works too. Another tool's login (the GitHub CLI's) is never read: the plugin catalog's
 // rule 11. No token, no PR data: callers show why.
 
+import * as z from 'zod/mini'
+
+import { decodeJson } from '../wire/json.js'
+import { loose } from '../wire/schemas.js'
+
 /** Why GitHub could not answer, in words for the sheet. */
 export class GitHubError extends Error {
   constructor(
@@ -14,10 +19,27 @@ export class GitHubError extends Error {
   }
 }
 
+/**
+ * GitHub's two APIs. Each answer is unread JSON: the caller decodes it with its own schema
+ * (pullRequest.ts, branch.ts), as the shapes are the caller's to know.
+ */
 export interface GitHub {
-  graphql<T>(host: string, query: string, variables?: Record<string, unknown>): Promise<T>
-  rest<T>(host: string, method: string, path: string, body?: unknown): Promise<T>
+  /** The query's `data`; throws GitHub's errors when it sent none. */
+  graphql(host: string, query: string, variables?: Record<string, unknown>): Promise<unknown>
+  rest(host: string, method: string, path: string, body?: unknown): Promise<unknown>
 }
+
+/** An error answer's body: GitHub's words, when it sent some. */
+const failure = z.catch(z.object({ message: loose(z.string()) }), {})
+
+/** A GraphQL answer: partial data comes with errors (one PR of a batch gone), and no data with only errors. */
+const graphqlAnswer = z.catch(
+  z.object({
+    data: z.optional(z.unknown()),
+    errors: loose(z.array(z.catch(z.object({ message: z.string() }), { message: '' })))
+  }),
+  { data: undefined }
+)
 
 const api = (host: string) => (host === 'github.com' ? 'https://api.github.com' : `https://${host}/api/v3`)
 const graphqlUrl = (host: string) => (host === 'github.com' ? 'https://api.github.com/graphql' : `https://${host}/api/graphql`)
@@ -39,7 +61,8 @@ export function tokens(env: NodeJS.ProcessEnv = process.env): (host: string) => 
 }
 
 export function github(token = tokens()): GitHub {
-  async function call<T>(host: string, url: string, init: RequestInit): Promise<T> {
+  /** Sends one request and decodes its answer with `answer`; throws GitHub's words for a failed one. */
+  async function call<T>(answer: z.ZodMiniType<T>, host: string, url: string, init: RequestInit): Promise<T> {
     const res = await fetch(url, {
       ...init,
       headers: {
@@ -53,20 +76,21 @@ export function github(token = tokens()): GitHub {
     })
 
     const text = await res.text()
-    const json = text ? (JSON.parse(text) as unknown) : undefined
+    // A body that is not JSON throws its SyntaxError, as it always did.
+    const json = text ? decodeJson(text) : undefined
 
     if (!res.ok) {
-      const message = (json as { message?: string } | undefined)?.message
+      const { message } = failure.parse(json)
 
       throw new GitHubError(message ? `GitHub: ${message}` : `GitHub answered ${res.status}`, res.status)
     }
 
-    return json as T
+    return answer.parse(json)
   }
 
   return {
-    async graphql<T>(host: string, query: string, variables: Record<string, unknown> = {}) {
-      const out = await call<{ data?: T; errors?: { message: string }[] }>(host, graphqlUrl(host), {
+    async graphql(host: string, query: string, variables: Record<string, unknown> = {}) {
+      const out = await call(graphqlAnswer, host, graphqlUrl(host), {
         body: JSON.stringify({ query, variables }),
         method: 'POST'
       })
@@ -78,8 +102,8 @@ export function github(token = tokens()): GitHub {
 
       return out.data
     },
-    rest<T>(host: string, method: string, path: string, body?: unknown) {
-      return call<T>(host, `${api(host)}${path}`, { body: body === undefined ? undefined : JSON.stringify(body), method })
+    rest(host: string, method: string, path: string, body?: unknown) {
+      return call(z.unknown(), host, `${api(host)}${path}`, { body: body === undefined ? undefined : JSON.stringify(body), method })
     }
   }
 }

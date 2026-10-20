@@ -8,12 +8,13 @@ import { errorText } from '../core/errors.js'
 import { type DurableSessionId, type PrKey, prKey, type StackKey, stackKey } from '../core/ids.js'
 import type { ToolCall } from '../model.js'
 
-import { type BranchTarget, branchPullRequest, branchTarget, parseStacks, type Stack, stackQuery } from './branch.js'
+import { type BranchTarget, branchPullRequest, branchTarget, parseStacks, type Stack, stackNumber, stackQuery } from './branch.js'
 import { type GitHub, github } from './client.js'
 import { linkedFromResult, storedLinks } from './links.js'
 import {
   ACTIVITY_QUERY,
   type ActivityItem,
+  batchAnswers,
   batchQuery,
   checksState,
   failedRuns,
@@ -25,6 +26,7 @@ import {
   type PrRef,
   type PullRequest
 } from './pullRequest.js'
+import { lastRead, type Remote, type Settled } from './remote.js'
 
 export const OPEN_MS = 60_000
 export const PENDING_MS = 30_000
@@ -58,25 +60,41 @@ export interface Entry {
   pr?: PullRequest
   /** GitHub's answer when it could not read this PR. */
   error?: string
-  activity?: ActivityItem[]
-  files?: PrFile[]
-  /** The `updatedAt` the activity was read at; a newer PR reads it again. */
-  activityAt?: string
-  /** The `updatedAt` the files were read at, kept apart: one tab's read says nothing of the other. */
-  filesAt?: string
-  /** GitHub's answer when the last activity read failed. */
-  activityError?: string
-  /** GitHub's answer when the last files read failed. */
-  filesError?: string
+  /** The Conversation tab's comments, reviews and commits. */
+  activity: Remote<ActivityItem[]>
+  /** The Files tab's files, kept apart: one tab's read says nothing of the other. */
+  files: Remote<PrFile[]>
 }
 
-/** The data a tab reads on demand. */
-type Detail = 'activity' | 'files'
+/** One tab's data on an entry, and how it is read. */
+interface Tab<T> {
+  get(e: Entry): Remote<T>
+  set(e: Entry, remote: Remote<T>): void
+  read(e: Entry): Promise<T>
+}
 
-const STAMP = { activity: 'activityAt', files: 'filesAt' } as const
-const FAILURE = { activity: 'activityError', files: 'filesError' } as const
 /** How soon a failed activity or files read is tried again. */
 const RETRY_MS = 30_000
+
+/**
+ * Whether a tab's settled data wants a read for the PR at `updatedAt`: not once read for that
+ * update, and after a failed read only once `RETRY_MS` has passed.
+ */
+function due<T>(remote: Settled<T>, updatedAt: string, now: number): boolean {
+  switch (remote.kind) {
+    case 'idle':
+      return true
+
+    case 'ready':
+      return remote.at !== updatedAt
+
+    case 'failed':
+      return remote.last?.at !== updatedAt && now - remote.failedAt >= RETRY_MS
+  }
+}
+
+/** How many rows a page of the files answer holds; a page that is not a list ends the reading. */
+const pageLength = (rows: unknown) => (Array.isArray(rows) ? rows.length : 0)
 
 export type PrAction = 'close' | 'draft' | 'merge' | 'ready' | 'reopen' | 'rerun' | 'update-branch'
 
@@ -111,10 +129,6 @@ export class PullRequests {
   #again = false
   #disposed = false
   readonly #busy = new Set<PrKey>()
-  /** The activity and files reads in flight (`key:activity`, `key:files`). */
-  readonly #reading = new Set<string>()
-  /** When each of those last failed. */
-  readonly #failedAt = new Map<string, number>()
 
   constructor(
     host: PullRequestsHost,
@@ -257,27 +271,36 @@ export class PullRequests {
 
   /** Comments, reviews and commits of `key`, read once per PR update. */
   activity(key: PrKey): Promise<void> {
-    return this.#detail(key, 'activity', async e => {
-      const [o, r] = e.ref.repository.split('/')
-      e.activity = parseActivity(await this.#gh.graphql(e.ref.host, ACTIVITY_QUERY, { n: e.ref.number, o, r }))
+    return this.#detail(key, {
+      get: e => e.activity,
+      read: async e => {
+        const [o, r] = e.ref.repository.split('/')
+
+        return parseActivity(await this.#gh.graphql(e.ref.host, ACTIVITY_QUERY, { n: e.ref.number, o, r }))
+      },
+      set: (e, remote) => (e.activity = remote)
     })
   }
 
   /** The changed files of `key` with their patches (the first 300). */
   files(key: PrKey): Promise<void> {
-    return this.#detail(key, 'files', async e => {
-      const files: PrFile[] = []
+    return this.#detail(key, {
+      get: e => e.files,
+      read: async e => {
+        const files: PrFile[] = []
 
-      for (let page = 1; page <= 3; page++) {
-        const rows = await this.#gh.rest<unknown[]>(e.ref.host, 'GET', `/repos/${e.ref.repository}/pulls/${e.ref.number}/files?per_page=100&page=${page}`)
-        files.push(...parseFiles(rows))
+        for (let page = 1; page <= 3; page++) {
+          const rows = await this.#gh.rest(e.ref.host, 'GET', `/repos/${e.ref.repository}/pulls/${e.ref.number}/files?per_page=100&page=${page}`)
+          files.push(...parseFiles(rows))
 
-        if (rows.length < 100) {
-          break
+          if (pageLength(rows) < 100) {
+            break
+          }
         }
-      }
 
-      e.files = files
+        return files
+      },
+      set: (e, remote) => (e.files = remote)
     })
   }
 
@@ -285,29 +308,23 @@ export class PullRequests {
    * Reads one tab's data of `key` once per PR update, so the sheet may ask on every frame: one read
    * at a time, and a failed one (its error on the entry) again after `RETRY_MS`.
    */
-  async #detail(key: PrKey, what: Detail, read: (e: Entry) => Promise<void>): Promise<void> {
+  async #detail<T>(key: PrKey, tab: Tab<T>): Promise<void> {
     const e = this.#entries.get(key)
-    const id = `${key}:${what}`
-    const failed = this.#failedAt.get(id)
+    const was = e && tab.get(e)
 
-    if (!e?.pr || this.#reading.has(id) || (e[what] && e[STAMP[what]] === e.pr.updatedAt) || (failed && Date.now() - failed < RETRY_MS)) {
+    if (!e?.pr || !was || was.kind === 'loading' || !due(was, e.pr.updatedAt, Date.now())) {
       return
     }
 
     const at = e.pr.updatedAt
-    this.#reading.add(id)
+    tab.set(e, { kind: 'loading', was })
 
     try {
-      await read(e)
-      e[STAMP[what]] = at
-      e[FAILURE[what]] = undefined
-      this.#failedAt.delete(id)
+      tab.set(e, { at, kind: 'ready', value: await tab.read(e) })
     } catch (error) {
-      e[FAILURE[what]] = errorText(error)
-      this.#failedAt.set(id, Date.now())
+      tab.set(e, { error: errorText(error), failedAt: Date.now(), kind: 'failed', last: lastRead(was) })
       throw error
     } finally {
-      this.#reading.delete(id)
       this.#host.changed()
     }
   }
@@ -352,7 +369,7 @@ export class PullRequests {
     let e = this.#entries.get(key)
 
     if (!e) {
-      e = { ref, source: 'linked' }
+      e = { activity: { kind: 'idle' }, files: { kind: 'idle' }, ref, source: 'linked' }
       this.#entries.set(key, e)
     }
 
@@ -436,10 +453,10 @@ export class PullRequests {
 
     for (const [host, list] of byHost) {
       const { query, variables } = stackQuery(list.slice(0, BATCH).map(e => e.ref))
-      let data: Record<string, { pullRequest?: { stack?: { number?: number } | null } | null } | null>
+      let answers: Record<string, unknown>
 
       try {
-        data = await this.#gh.graphql(host, query, variables)
+        answers = batchAnswers.parse(await this.#gh.graphql(host, query, variables))
       } catch (error) {
         // Only a schema without the field turns stacks off; a timeout, a 5xx or a rate limit tries again next round.
         if (NO_STACK_FIELD.test(errorText(error))) {
@@ -452,8 +469,8 @@ export class PullRequests {
       const asked = new Set<StackKey>()
 
       for (const [i, e] of list.slice(0, BATCH).entries()) {
-        const n = data[`p${i}`]?.pullRequest?.stack?.number
-        const key = typeof n === 'number' ? stackKey(host, e.ref.repository, n) : undefined
+        const n = stackNumber(answers[`p${i}`])
+        const key = n === undefined ? undefined : stackKey(host, e.ref.repository, n)
 
         if (!key || asked.has(key)) {
           continue
@@ -499,10 +516,10 @@ export class PullRequests {
         const { query, variables } = batchQuery(chunk.map(e => e.ref))
 
         try {
-          const data = await this.#gh.graphql<Record<string, unknown>>(host, query, variables)
+          const answers = batchAnswers.parse(await this.#gh.graphql(host, query, variables))
 
           chunk.forEach((e, j) => {
-            const pr = parsePullRequest(e.ref, data[`p${j}`])
+            const pr = parsePullRequest(e.ref, answers[`p${j}`])
             e.pr = pr ?? e.pr
             e.error = pr ? undefined : 'GitHub has no such pull request, or this token cannot see it.'
           })

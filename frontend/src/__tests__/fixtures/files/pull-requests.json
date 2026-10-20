@@ -1,0 +1,18 @@
+{
+ "conversations": {
+  "root_1": [
+   {
+    "host": "github.com",
+    "repository": "acme/app",
+    "number": 7,
+    "url": "https://github.com/acme/app/pull/7",
+    "linked_at": 1792500000.5,
+    "session_id": "sess_2",
+    "cwd": "/w"
+   }
+  ]
+ },
+ "aliases": {
+  "sess_2": "root_1"
+ }
+}

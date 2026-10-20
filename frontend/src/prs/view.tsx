@@ -12,6 +12,7 @@ import { copyToClipboard } from '../clipboard.js'
 import { errorText } from '../core/errors.js'
 import { type PrKey, prKey } from '../core/ids.js'
 import { checksSummary, failedRuns, type MergeMethod, type PullRequest } from '../github/pullRequest.js'
+import { shown } from '../github/remote.js'
 import type { Entry, PrAction, PullRequests } from '../github/store.js'
 import { relative } from '../processes/cron.js'
 import { clip, plural } from '../view/format.js'
@@ -357,7 +358,7 @@ export class PrView {
   tabBar(): JSX.Element {
     const e = this.current()
     const pr = e?.pr
-    const comments = e?.activity?.filter(a => a.kind !== 'commit').length
+    const comments = e && shown(e.activity).value?.filter(a => a.kind !== 'commit').length
 
     return (
       <row align="center" gap="sm" key="tabs" role="hermes.pr.tabs" wrap>

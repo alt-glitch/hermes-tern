@@ -2,6 +2,10 @@
 // mapping follow T3 Code's PullRequestCore query and gitHubPullRequestJson.ts (MIT, T3 Tools Inc.),
 // cut down to what a terminal sheet draws.
 
+import * as z from 'zod/mini'
+
+import { rowsOf } from '../wire/schemas.js'
+
 export interface PrRef {
   host: string
   /** `owner/repo`, lower case. */
@@ -106,18 +110,88 @@ export function batchQuery(refs: readonly PrRef[]): { query: string; variables: 
   return { query: `query(${decls.join(', ')}) { ${parts.join('\n')} }`, variables }
 }
 
+/** A batch query's answers by alias (`p0`, `p1`…); an answer that is not an object has none. */
+export const batchAnswers = z.catch(z.record(z.string(), z.unknown()), {})
+
 // ── Parsing ───────────────────────────────────────────────────────────────────────────────────
+// GitHub's answers read through node schemas as leniently as T3 Code's decoders: text GitHub did
+// not send reads as '', a count as 0, a flag as unset, an object as one with every field at that
+// default, and a list of nodes keeps only the nodes that are objects.
 
-type Json = Record<string, unknown>
+/** Text; '' when GitHub sent none. */
+const text = z.catch(z.string(), '')
+/** A count; 0 when GitHub sent none. */
+const count = z.catch(z.number(), 0)
+/** A flag, set only by `true`. */
+const flag = z.catch(z.boolean(), false)
 
-const obj = (v: unknown): Json | undefined => (v && typeof v === 'object' && !Array.isArray(v) ? (v as Json) : undefined)
-const str = (v: unknown): string => (typeof v === 'string' ? v : '')
-const num = (v: unknown): number => (typeof v === 'number' ? v : 0)
-const nodes = (v: unknown): Json[] => {
-  const list = obj(v)?.nodes
+/** `schema`'s object, or the object `{}` reads as (each field at its default) when GitHub sent none. */
+const orEmpty = <T>(schema: z.ZodMiniType<T>) => z.catch(schema, () => schema.parse({}))
 
-  return Array.isArray(list) ? list.map(obj).filter((x): x is Json => Boolean(x)) : []
-}
+/** A connection's `nodes`, each read by `node`; one that is not an object is dropped, and no list reads as none. */
+const nodesOf = <T>(node: z.ZodMiniType<T>) =>
+  z.pipe(z.catch(z.object({ nodes: z.catch(z.array(z.unknown()), []) }), { nodes: [] }), z.transform(c => rowsOf(node, c.nodes)))
+
+/** A user as GitHub names one; '' for a deleted account. */
+const actor = orEmpty(z.object({ login: text }))
+
+/** One status context or check run of a commit's rollup (CHECK_FIELDS). */
+const checkNode = z.object({
+  __typename: text,
+  context: text,
+  state: text,
+  targetUrl: text,
+  description: text,
+  createdAt: text,
+  name: text,
+  status: text,
+  conclusion: text,
+  startedAt: text,
+  completedAt: text,
+  detailsUrl: text,
+  checkSuite: orEmpty(z.object({ workflowRun: orEmpty(z.object({ workflow: orEmpty(z.object({ name: text })) })) }))
+})
+
+type CheckNode = z.infer<typeof checkNode>
+
+/** One PR as PR_FIELDS asks for it. */
+const prNode = z.object({
+  id: text,
+  title: text,
+  url: text,
+  body: text,
+  state: text,
+  isDraft: flag,
+  mergeable: text,
+  mergeStateStatus: text,
+  reviewDecision: text,
+  additions: count,
+  deletions: count,
+  changedFiles: count,
+  createdAt: text,
+  updatedAt: text,
+  mergedAt: text,
+  closedAt: text,
+  headRefName: text,
+  baseRefName: text,
+  headRefOid: text,
+  viewerCanUpdate: flag,
+  author: actor,
+  autoMergeRequest: orEmpty(z.object({ mergeMethod: text })),
+  baseRef: orEmpty(z.object({ compare: orEmpty(z.object({ behindBy: z.catch(z.nullable(z.number()), null) })) })),
+  labels: nodesOf(z.object({ name: text })),
+  reviewRequests: nodesOf(z.object({ requestedReviewer: orEmpty(z.object({ login: text, name: text })) })),
+  latestReviews: nodesOf(z.object({ author: actor, state: text })),
+  commits: nodesOf(z.object({ commit: orEmpty(z.object({ statusCheckRollup: orEmpty(z.object({ contexts: nodesOf(checkNode) })) })) }))
+})
+
+/** One aliased `repository` answer of batchQuery: the merge methods it allows, and its PR. */
+const repoNode = z.object({
+  squashMergeAllowed: z.optional(z.unknown()),
+  mergeCommitAllowed: z.optional(z.unknown()),
+  rebaseMergeAllowed: z.optional(z.unknown()),
+  pullRequest: prNode
+})
 
 /** T3 Code's check status mapping (gitHubPullRequestJson.ts). */
 export function checkStatus(status: string, conclusion: string): CheckStatus {
@@ -157,26 +231,24 @@ export function checkStatus(status: string, conclusion: string): CheckStatus {
   }
 }
 
-export function parseCheck(n: Json): Check {
+export function parseCheck(n: CheckNode): Check {
   if (n.__typename === 'StatusContext') {
     return {
-      description: str(n.description) || undefined,
-      name: str(n.context),
-      startedAt: str(n.createdAt) || undefined,
-      status: checkStatus('COMPLETED', str(n.state)),
-      url: str(n.targetUrl) || undefined
+      description: n.description || undefined,
+      name: n.context,
+      startedAt: n.createdAt || undefined,
+      status: checkStatus('COMPLETED', n.state),
+      url: n.targetUrl || undefined
     }
   }
 
-  const workflow = str(obj(obj(obj(n.checkSuite)?.workflowRun)?.workflow)?.name)
-
   return {
-    completedAt: str(n.completedAt) || undefined,
-    name: str(n.name),
-    startedAt: str(n.startedAt) || undefined,
-    status: checkStatus(str(n.status), str(n.conclusion)),
-    url: str(n.detailsUrl) || undefined,
-    workflow: workflow || undefined
+    completedAt: n.completedAt || undefined,
+    name: n.name,
+    startedAt: n.startedAt || undefined,
+    status: checkStatus(n.status, n.conclusion),
+    url: n.detailsUrl || undefined,
+    workflow: n.checkSuite.workflowRun.workflow.name || undefined
   }
 }
 
@@ -257,18 +329,18 @@ const MERGEABLE: Record<string, PullRequest['mergeable']> = { CONFLICTING: 'conf
 
 /** One aliased `repository` answer; undefined when GitHub had no such PR (or no access). */
 export function parsePullRequest(ref: PrRef, repo: unknown): PullRequest | undefined {
-  const r = obj(repo)
-  const p = obj(r?.pullRequest)
+  const read = repoNode.safeParse(repo)
 
-  if (!r || !p) {
+  if (!read.success) {
     return undefined
   }
 
+  const r = read.data
+  const p = r.pullRequest
   const reviews = new Map<string, string>()
 
-  for (const n of nodes(p.reviewRequests)) {
-    const who = obj(n.requestedReviewer)
-    const login = str(who?.login) || str(who?.name)
+  for (const n of p.reviewRequests) {
+    const login = n.requestedReviewer.login || n.requestedReviewer.name
 
     if (login) {
       reviews.set(login, 'PENDING')
@@ -276,51 +348,50 @@ export function parsePullRequest(ref: PrRef, repo: unknown): PullRequest | undef
   }
 
   // Someone who reviewed drops off reviewRequests: their latest review stands for them.
-  for (const n of nodes(p.latestReviews)) {
-    const login = str(obj(n.author)?.login)
+  for (const n of p.latestReviews) {
+    const login = n.author.login
 
     if (login && !reviews.has(login)) {
-      reviews.set(login, str(n.state))
+      reviews.set(login, n.state)
     }
   }
 
-  const rollup = obj(obj(obj(nodes(p.commits)[0]?.commit)?.statusCheckRollup)?.contexts)
+  const rollup = p.commits[0]?.commit.statusCheckRollup.contexts ?? []
   const methods: MergeMethod[] = [
     ...(r.squashMergeAllowed ? (['squash'] as const) : []),
     ...(r.mergeCommitAllowed ? (['merge'] as const) : []),
     ...(r.rebaseMergeAllowed ? (['rebase'] as const) : [])
   ]
-  const behind = obj(obj(p.baseRef)?.compare)?.behindBy
 
   return {
     ...ref,
-    additions: num(p.additions),
-    author: str(obj(p.author)?.login) || 'ghost',
-    autoMerge: str(obj(p.autoMergeRequest)?.mergeMethod) || null,
-    base: str(p.baseRefName),
-    behindBy: typeof behind === 'number' ? behind : null,
-    body: str(p.body),
-    canUpdate: p.viewerCanUpdate === true,
-    changedFiles: num(p.changedFiles),
-    checks: dedupeChecks(nodes(rollup).map(parseCheck)),
-    closedAt: str(p.closedAt) || null,
-    createdAt: str(p.createdAt),
-    deletions: num(p.deletions),
-    draft: p.isDraft === true,
-    head: str(p.headRefName),
-    headOid: str(p.headRefOid),
-    id: str(p.id),
-    labels: nodes(p.labels).map(n => str(n.name)),
+    additions: p.additions,
+    author: p.author.login || 'ghost',
+    autoMerge: p.autoMergeRequest.mergeMethod || null,
+    base: p.baseRefName,
+    behindBy: p.baseRef.compare.behindBy,
+    body: p.body,
+    canUpdate: p.viewerCanUpdate,
+    changedFiles: p.changedFiles,
+    checks: dedupeChecks(rollup.map(parseCheck)),
+    closedAt: p.closedAt || null,
+    createdAt: p.createdAt,
+    deletions: p.deletions,
+    draft: p.isDraft,
+    head: p.headRefName,
+    headOid: p.headRefOid,
+    id: p.id,
+    labels: p.labels.map(n => n.name),
     mergeMethods: methods,
-    mergeState: str(p.mergeStateStatus),
-    mergeable: MERGEABLE[str(p.mergeable)] ?? 'unknown',
-    mergedAt: str(p.mergedAt) || null,
-    reviewDecision: str(p.reviewDecision) || null,
+    mergeState: p.mergeStateStatus,
+    mergeable: MERGEABLE[p.mergeable] ?? 'unknown',
+    mergedAt: p.mergedAt || null,
+    reviewDecision: p.reviewDecision || null,
     reviewers: [...reviews].map(([login, state]) => ({ login, state })),
-    state: STATE[str(p.state)] ?? 'open',
-    title: str(p.title),
-    updatedAt: str(p.updatedAt),
-    url: str(p.url) || ref.url
+    state: STATE[p.state] ?? 'open',
+    title: p.title,
+    updatedAt: p.updatedAt,
+    url: p.url || ref.url
   }
 }
 
@@ -351,52 +422,75 @@ export const ACTIVITY_QUERY = `query($o: String!, $r: String!, $n: Int!) {
     commits(last: 30) { nodes { commit { oid messageHeadline committedDate url author { name user { login } } } } }
   } } }`
 
+/** One comment: on the PR, or in a review thread. */
+const commentNode = z.object({ author: actor, body: text, createdAt: text, url: text })
+
+/** ACTIVITY_QUERY's answer. */
+const activityAnswer = z.object({
+  repository: z.object({
+    pullRequest: z.object({
+      comments: nodesOf(commentNode),
+      reviews: nodesOf(z.object({ author: actor, state: text, body: text, submittedAt: text, url: text })),
+      reviewThreads: nodesOf(
+        z.object({
+          isResolved: flag,
+          isOutdated: flag,
+          path: text,
+          line: z.catch(z.nullable(z.number()), null),
+          comments: nodesOf(commentNode)
+        })
+      ),
+      commits: nodesOf(
+        z.object({
+          commit: orEmpty(z.object({ messageHeadline: text, committedDate: text, url: text, author: orEmpty(z.object({ name: text, user: actor })) }))
+        })
+      )
+    })
+  })
+})
+
 /** Everything said and pushed on the PR, oldest first. Reviews with no words and no verdict are dropped. */
 export function parseActivity(data: unknown): ActivityItem[] {
-  const p = obj(obj(obj(data)?.repository)?.pullRequest)
+  const read = activityAnswer.safeParse(data)
 
-  if (!p) {
+  if (!read.success) {
     return []
   }
 
-  const who = (n: Json) => str(obj(n.author)?.login) || 'ghost'
+  const p = read.data.repository.pullRequest
+  const who = (n: { author: { login: string } }) => n.author.login || 'ghost'
   const items: ActivityItem[] = [
-    ...nodes(p.comments).map(n => ({ at: str(n.createdAt), author: who(n), body: str(n.body), kind: 'comment' as const, url: str(n.url) })),
-    ...nodes(p.reviews)
-      .filter(n => str(n.body).trim() || str(n.state) !== 'COMMENTED')
-      .map(n => ({ at: str(n.submittedAt), author: who(n), body: str(n.body), kind: 'review' as const, state: str(n.state), url: str(n.url) })),
-    ...nodes(p.reviewThreads).flatMap(t => {
-      const [first, ...rest] = nodes(t.comments)
+    ...p.comments.map(n => ({ at: n.createdAt, author: who(n), body: n.body, kind: 'comment' as const, url: n.url })),
+    ...p.reviews
+      .filter(n => n.body.trim() || n.state !== 'COMMENTED')
+      .map(n => ({ at: n.submittedAt, author: who(n), body: n.body, kind: 'review' as const, state: n.state, url: n.url })),
+    ...p.reviewThreads.flatMap(t => {
+      const [first, ...rest] = t.comments
 
       return first
         ? [
             {
-              at: str(first.createdAt),
+              at: first.createdAt,
               author: who(first),
-              body: str(first.body),
+              body: first.body,
               kind: 'thread' as const,
-              line: typeof t.line === 'number' ? t.line : null,
-              outdated: t.isOutdated === true,
-              path: str(t.path),
-              replies: rest.map(n => ({ at: str(n.createdAt), author: who(n), body: str(n.body) })),
-              resolved: t.isResolved === true,
-              url: str(first.url)
+              line: t.line,
+              outdated: t.isOutdated,
+              path: t.path,
+              replies: rest.map(n => ({ at: n.createdAt, author: who(n), body: n.body })),
+              resolved: t.isResolved,
+              url: first.url
             }
           ]
         : []
     }),
-    ...nodes(p.commits).map(n => {
-      const c = obj(n.commit) ?? {}
-      const a = obj(c.author)
-
-      return {
-        at: str(c.committedDate),
-        author: str(obj(a?.user)?.login) || str(a?.name) || 'ghost',
-        body: str(c.messageHeadline),
-        kind: 'commit' as const,
-        url: str(c.url)
-      }
-    })
+    ...p.commits.map(({ commit: c }) => ({
+      at: c.committedDate,
+      author: c.author.user.login || c.author.name || 'ghost',
+      body: c.messageHeadline,
+      kind: 'commit' as const,
+      url: c.url
+    }))
   ]
 
   return items.sort((a, b) => Date.parse(a.at) - Date.parse(b.at))
@@ -414,18 +508,19 @@ export interface PrFile {
   previous?: string
 }
 
+/** One row of `GET /pulls/{n}/files`. */
+const fileRow = z.object({ filename: text, previous_filename: text, status: text, additions: count, deletions: count, patch: text })
+
+/** A page of the files answer; a row that is not an object is dropped, and an answer that is not a list holds none. */
 export function parseFiles(rows: unknown): PrFile[] {
-  return (Array.isArray(rows) ? rows : [])
-    .map(obj)
-    .filter((r): r is Json => Boolean(r))
-    .map(r => ({
-      additions: num(r.additions),
-      deletions: num(r.deletions),
-      patch: str(r.patch) || undefined,
-      path: str(r.filename),
-      previous: str(r.previous_filename) || undefined,
-      status: str(r.status)
-    }))
+  return rowsOf(fileRow, Array.isArray(rows) ? rows : []).map(r => ({
+    additions: r.additions,
+    deletions: r.deletions,
+    patch: r.patch || undefined,
+    path: r.filename,
+    previous: r.previous_filename || undefined,
+    status: r.status
+  }))
 }
 
 /** The Actions run ids behind failed checks, for "Re-run failed jobs". */

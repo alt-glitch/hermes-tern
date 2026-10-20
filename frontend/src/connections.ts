@@ -13,13 +13,14 @@
 // moves a row; a newer call for the same account replaces the card; a settled card is a static
 // summary with no controls and no polling, its unresolved rows not connected.
 
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 
 import { appTitle } from './bridge.js'
 import type { DurableSessionId } from './core/ids.js'
 import type { ToolCall } from './model.js'
+import { cardCreatedAt, readCardFile } from './wire/files.js'
 import { record } from './wire/json.js'
 
 export const CONNECT_TOOL = 'manage_connections'
@@ -41,8 +42,6 @@ export const dataDir = (env: NodeJS.ProcessEnv = process.env) => join(env.HERMES
  */
 export type SettleReason = 'all_resolved' | 'continued' | 'deadline' | 'error' | 'stopped' | 'superseded'
 
-const REASONS = new Set<string>(['all_resolved', 'continued', 'deadline', 'error', 'superseded'])
-
 /** The card the plugin's watcher keeps for one call: the apps, their links and states. */
 export interface CardFile {
   /** Its name without `.json`: `<call id>.<op id>`, or `<call id>` from before cards had an op. */
@@ -59,8 +58,9 @@ const safe = (part: string) => part.replace(/[^A-Za-z0-9_-]/g, '_')
 
 export const cardStem = (callId: string, opId?: string) => (opId ? `${safe(callId)}.${safe(opId)}` : safe(callId))
 
-const alive = (pid: unknown) => {
-  if (typeof pid !== 'number') {
+/** Whether process `pid` runs (as this user or another); a card that names none counts as alive. */
+const alive = (pid: number | undefined) => {
+  if (pid === undefined) {
     return true
   }
 
@@ -69,37 +69,31 @@ const alive = (pid: unknown) => {
 
     return true
   } catch (error) {
-    return (error as NodeJS.ErrnoException).code === 'EPERM'
+    return error instanceof Error && 'code' in error && error.code === 'EPERM'
   }
 }
 
 export function readCard(key: string, dir = dataDir(), now = Date.now()): CardFile | undefined {
-  const file = join(dir, 'connections', `${key}.json`)
+  const data = readCardFile(join(dir, 'connections', `${key}.json`))
 
-  try {
-    const data = JSON.parse(readFileSync(file, 'utf8')) as Record<string, unknown>
-
-    if (!Array.isArray(data.targets)) {
-      return undefined
-    }
-
-    const error = typeof data.error === 'string' && data.error ? data.error : undefined
-    const updated = typeof data.updated_at === 'number' ? data.updated_at * 1000 : now
-    let settled: SettleReason | undefined
-
-    if (typeof data.settled_by === 'string' && REASONS.has(data.settled_by)) {
-      settled = data.settled_by as SettleReason
-    } else if (data.watching !== true) {
-      // A card from before `settled_by`: it stopped at the end, or on an error.
-      settled = error ? 'error' : data.targets.some(t => waiting({ state: String(record(t)?.state ?? '') })) ? 'deadline' : 'all_resolved'
-    } else if (!alive(data.pid) || now - updated > STALE_MS) {
-      settled = 'stopped'
-    }
-
-    return { error, key, settled, targets: data.targets, told: existsSync(join(dir, 'connections', `${key}.told`)) }
-  } catch {
+  if (!data) {
     return undefined
   }
+
+  const error = data.error || undefined
+  const updated = data.updated_at === undefined ? now : data.updated_at * 1000
+  let settled: SettleReason | undefined
+
+  if (data.settled_by) {
+    settled = data.settled_by
+  } else if (data.watching !== true) {
+    // A card from before `settled_by`: it stopped at the end, or on an error.
+    settled = error ? 'error' : data.targets.some(t => waiting({ state: String(record(t)?.state ?? '') })) ? 'deadline' : 'all_resolved'
+  } else if (!alive(data.pid) || now - updated > STALE_MS) {
+    settled = 'stopped'
+  }
+
+  return { error, key, settled, targets: data.targets, told: existsSync(join(dir, 'connections', `${key}.told`)) }
 }
 
 /**
@@ -134,15 +128,7 @@ export function findCard(call: Pick<ToolCall, 'id' | 'result' | 'startedAt'>, di
     return keys[0]
   }
 
-  const createdAt = (key: string) => {
-    try {
-      const at = record(readFileSync(join(dir, 'connections', `${key}.json`), 'utf8'))?.created_at
-
-      return typeof at === 'number' ? at * 1000 : 0
-    } catch {
-      return 0
-    }
-  }
+  const createdAt = (key: string) => cardCreatedAt(join(dir, 'connections', `${key}.json`)) * 1000
 
   return keys.map(key => ({ gap: Math.abs(createdAt(key) - call.startedAt), key })).sort((a, b) => a.gap - b.gap)[0]?.key
 }

@@ -13,10 +13,10 @@ import { type AdmissionId, admissionId, type InputId, inputId } from '../core/id
 import type { Counters } from '../model.js'
 
 /** `schema`, or undefined when the field is missing or not that shape (the old code read it unchecked). */
-const loose = <T>(schema: z.ZodMiniType<T>) => z.catch(z.optional(schema), undefined)
+export const loose = <T>(schema: z.ZodMiniType<T>) => z.catch(z.optional(schema), undefined)
 
 /** Keeps the items `item` reads and drops the rest. */
-function rowsOf<T>(item: z.ZodMiniType<T>, items: readonly unknown[]): T[] {
+export function rowsOf<T>(item: z.ZodMiniType<T>, items: readonly unknown[]): T[] {
   return items.flatMap(raw => {
     const row = item.safeParse(raw)
 
