@@ -9,6 +9,7 @@ import { join } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
 
 import { storedSessionId } from '../core/ids.js'
+import { Activity } from '../turn/activity.js'
 
 import { FakeGateway, fakeTern, given, key, type Reply, settle } from './fakes.js'
 
@@ -76,5 +77,50 @@ describe('a session switch waits for a compaction', () => {
     expect(gw.sent('session.resume').filter(p => p['session_id'] === 'b')).toEqual([])
     expect(app.session.ref.live).toBe('s1')
     expect(notices().at(-1)).toBe('Wait for the compaction to finish before switching sessions.')
+  })
+})
+
+describe('the working row is ended only by the work that owns it', () => {
+  it("Activity: a ticket ends its own row only; the turn's start, a new row or a set ends the ticket", () => {
+    const a = new Activity()
+    const send = a.startBusy('Working…', 1)
+    a.turnStarted(2)
+    expect(a.busy).toMatchObject({ label: 'Working…', startedAt: 1 })
+
+    a.endBusy(send)
+    expect(a.busy).not.toBeNull()
+
+    const expansion = a.startBusy('Running {!…}')
+    a.set({ label: 'Thinking…', since: {}, startedAt: 3 })
+    a.endBusy(expansion)
+    expect(a.busy?.label).toBe('Thinking…')
+
+    // The gateway's word ends whatever runs; a turn with no row up gets one of its own.
+    a.endBusy()
+    expect(a.busy).toBeNull()
+    a.turnStarted(4)
+    expect(a.busy).toMatchObject({ label: 'Working…', startedAt: 4 })
+
+    const own = a.startBusy('Working…')
+    a.endBusy(own)
+    expect(a.busy).toBeNull()
+  })
+
+  it("a {!cmd} that fails after the turn started leaves the turn's row, and nothing drains into the turn", async () => {
+    const shell = held()
+    const { app, emit, enter, gw } = setup({ 'shell.exec': shell.reply }, { canonical: false })
+    await enter('today is {!date}')
+    await enter('next')
+    expect(app.queue.held).toMatchObject([{ text: 'next' }])
+
+    // The turn starts (another viewer's prompt, say) while the expansion runs: it takes the row.
+    await emit('message.start')
+    const row = app.activity.busy
+    shell.reject(new Error('no date here'))
+    await vi.waitFor(() => expect(app.composer.text).toBe('today is {!date}'))
+
+    expect(app.activity.busy).toBe(row)
+    expect(gw.sent('prompt.submit')).toEqual([])
+    expect(app.queue.held).toMatchObject([{ text: 'next' }])
   })
 })

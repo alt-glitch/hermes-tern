@@ -37,7 +37,7 @@ export interface TurnCx extends ToolFanout, MessageFanout {
     | 'toolStart'
     | 'uncompact'
   >
-  readonly activity: Pick<Activity, 'busy' | 'endBusy' | 'endCompaction' | 'relabel' | 'startBusy'>
+  readonly activity: Pick<Activity, 'endBusy' | 'endCompaction' | 'relabel' | 'turnStarted'>
   readonly agents: Pick<Agents, 'scan' | 'settle'>
   readonly prs: Pick<PullRequests, 'onCall' | 'poke' | 'relink'>
   readonly session: Pick<SessionState, 'usage'>
@@ -69,10 +69,8 @@ function moaStep(ev: EventOf<'moa.aggregating' | 'moa.phase' | 'moa.progress'>, 
 /** The turn's events. */
 export const turnHandlers = {
   'message.start': (ev, cx) => {
-    if (!cx.activity.busy) {
-      cx.activity.startBusy('Working…')
-      cx.changed()
-    }
+    // The turn owns the working row from here: a send's late answer no longer ends it.
+    cx.activity.turnStarted()
 
     cx.transcript.start()
 

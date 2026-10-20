@@ -233,10 +233,11 @@ export class PromptRouter {
 
     if (prompt.kind === 'typed' && hasCommands(prompt)) {
       // The expansion counts as busy: the working line says so, and nothing else is sent meanwhile.
-      host.activity.startBusy(EXPANDING_LABEL)
+      // A turn that starts meanwhile takes the row, and the expansion's end leaves it.
+      const row = host.activity.startBusy(EXPANDING_LABEL)
       host.changed()
       void this.expanded(sid, prompt).then(ready => {
-        host.activity.endBusy()
+        host.activity.endBusy(row)
 
         if (ready) {
           this.send({ images: ready.images, kind: 'app', text: ready.text }, { display: prompt.text, queued })

@@ -67194,10 +67194,7 @@ function moaStep(ev, cx) {
 }
 var turnHandlers = {
   "message.start": (ev, cx) => {
-    if (!cx.activity.busy) {
-      cx.activity.startBusy("Working\u2026");
-      cx.changed();
-    }
+    cx.activity.turnStarted();
     cx.transcript.start();
     if (ev.payload?.display_kind === "async_delegation_complete" && ev.payload.text) {
       cx.agents.settle(ev.payload.text);
@@ -74149,17 +74146,30 @@ var NO_COMPACTION = { kind: "none" };
 var Activity = class {
   #busy = null;
   #compaction = NO_COMPACTION;
+  /** Who may end the row: each new row, and the turn taking one over, ends the last owner's tickets. */
+  #owner = new Epoch();
   /** The working row; null when no turn (or expansion) runs. */
   get busy() {
     return this.#busy;
   }
-  /** Sets the busy state as given (a resumed session's, or one a test arranges). */
+  /** Sets the busy state as given (a resumed session's, or one a test arranges); no earlier ticket ends it. */
   set(busy) {
     this.#busy = busy;
+    this.#owner.next();
   }
-  /** A new working row labelled `label`, with an age of its own. */
+  /** A new working row labelled `label`, with an age of its own; the ticket ends it (endBusy). */
   startBusy(label, now = Date.now()) {
     this.#busy = { label, since: {}, startedAt: now };
+    return this.#owner.next();
+  }
+  /**
+   * The gateway's turn started (message.start). A row already up (a send's, or its `{!cmd}`s')
+   * keeps its label and age, but the work that put it up can no longer end it; with none up, a
+   * 'Working…' row of its own.
+   */
+  turnStarted(now = Date.now()) {
+    this.#busy ??= { label: "Working\u2026", since: {}, startedAt: now };
+    this.#owner.next();
   }
   /**
    * Relabels the working row, keeping its age. An empty label, or none running, changes nothing.
@@ -74171,9 +74181,16 @@ var Activity = class {
       this.#busy = { ...this.#busy, label };
     }
   }
-  /** No turn runs now. */
-  endBusy() {
+  /**
+   * No turn runs now. With `ticket` (a send's, an expansion's), only while that work still owns
+   * the row; without one, whatever runs (the gateway said the turn ended, or went away).
+   */
+  endBusy(ticket) {
+    if (ticket && !ticket.isCurrent()) {
+      return;
+    }
     this.#busy = null;
+    this.#owner.next();
   }
   /** The compaction phase. */
   get compaction() {
@@ -74549,10 +74566,10 @@ var PromptRouter = class {
     }
     const { sid } = gate;
     if (prompt.kind === "typed" && hasCommands(prompt)) {
-      host.activity.startBusy(EXPANDING_LABEL);
+      const row2 = host.activity.startBusy(EXPANDING_LABEL);
       host.changed();
       void this.expanded(sid, prompt).then((ready) => {
-        host.activity.endBusy();
+        host.activity.endBusy(row2);
         if (ready) {
           this.send({ images: ready.images, kind: "app", text: ready.text }, { display: prompt.text, queued });
         } else {
