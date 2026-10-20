@@ -7927,11 +7927,11 @@ var require_fixed_queue = __commonJS({
       }
       shift() {
         const tail = this.tail;
-        const next3 = tail.shift();
+        const next2 = tail.shift();
         if (tail.isEmpty() && tail.next !== null) {
           this.tail = tail.next;
         }
-        return next3;
+        return next2;
       }
     };
   }
@@ -8045,8 +8045,8 @@ var require_pool_base = __commonJS({
       }
       get [kRunning]() {
         let ret = 0;
-        for (const { [kRunning]: running } of this[kClients]) {
-          ret += running;
+        for (const { [kRunning]: running2 } of this[kClients]) {
+          ret += running2;
         }
         return ret;
       }
@@ -17431,18 +17431,18 @@ var require_receiver = __commonJS({
         const buffer = Buffer.allocUnsafe(n);
         let offset = 0;
         while (offset !== n) {
-          const next3 = this.#buffers[0];
-          const { length } = next3;
+          const next2 = this.#buffers[0];
+          const { length } = next2;
           if (length + offset === n) {
             buffer.set(this.#buffers.shift(), offset);
             break;
           } else if (length + offset > n) {
-            buffer.set(next3.subarray(0, n - offset), offset);
-            this.#buffers[0] = next3.subarray(n - offset);
+            buffer.set(next2.subarray(0, n - offset), offset);
+            this.#buffers[0] = next2.subarray(n - offset);
             break;
           } else {
             buffer.set(this.#buffers.shift(), offset);
-            offset += next3.length;
+            offset += next2.length;
           }
         }
         this.#byteOffset -= n;
@@ -19341,16 +19341,16 @@ function matchPrefix(bytes, at, prefix2) {
   return at + prefix2.length;
 }
 function escapeAt(bytes, i) {
-  const next3 = bytes[i + 1];
-  if (next3 === void 0)
+  const next2 = bytes[i + 1];
+  if (next2 === void 0)
     return { kind: "need" };
-  if (next3 === 95 || next3 === 93) {
-    const end2 = matchPrefix(bytes, i + 2, next3 === 95 ? APC_TSP : OSC_TSP);
+  if (next2 === 95 || next2 === 93) {
+    const end2 = matchPrefix(bytes, i + 2, next2 === 95 ? APC_TSP : OSC_TSP);
     if (end2 === "need")
       return { kind: "need" };
     return end2 < 0 ? { kind: "pass", end: i + 2 } : { kind: "tsp", start: end2 };
   }
-  if (next3 !== 91)
+  if (next2 !== 91)
     return { kind: "pass", end: i + 1 };
   let j = i + 2;
   while (j < bytes.length && (bytes[j] ?? 0) >= 48 && (bytes[j] ?? 0) <= 63)
@@ -19777,17 +19777,17 @@ var KeyDecoder = class {
     const b = bytes[i] ?? 0;
     if (b !== ESC2)
       return this.#plain(bytes, i, out, false, final2);
-    const next3 = bytes[i + 1];
-    if (next3 === void 0) {
+    const next2 = bytes[i + 1];
+    if (next2 === void 0) {
       if (!final2)
         return 0;
       out.push(key("escape", NO_MODS));
       return 1;
     }
-    if (next3 === 91 || next3 === 79) {
+    if (next2 === 91 || next2 === 79) {
       return this.#sequence(bytes, i, i, out, false, final2);
     }
-    if (next3 === ESC2) {
+    if (next2 === ESC2) {
       const after = bytes[i + 2];
       if (after === void 0 && !final2)
         return 0;
@@ -19798,7 +19798,7 @@ var KeyDecoder = class {
       out.push(key("escape", { ...NO_MODS, alt: true }));
       return 2;
     }
-    if (next3 === 93 || next3 === 95) {
+    if (next2 === 93 || next2 === 95) {
       for (let j = i + 2; j < bytes.length; j++) {
         if (bytes[j] === 7)
           return j + 1 - i;
@@ -20319,11 +20319,11 @@ var View = class _View {
     return this.#index.get(id);
   }
   /** The ops turning this view into `next` in surface `surface`. */
-  ops(next3, surface) {
+  ops(next2, surface) {
     const ops = [];
     REGIONS.forEach((_, i) => {
       const old = this.regions[i];
-      const now = next3.regions[i];
+      const now = next2.regions[i];
       if (old && !now)
         ops.push(["del", old.id]);
       else if (!old && now)
@@ -20413,23 +20413,23 @@ function children(old, now, ops) {
       same.push({ at, was: o.at });
   });
   const stay = new Set(rising(same.map((s2) => s2.was)).map((k) => same[k]?.at));
-  let next3 = null;
+  let next2 = null;
   for (let at = now.children.length - 1; at >= 0; at--) {
     const child = now.children[at];
     if (!child)
       continue;
     const o = before.get(child.id);
     if (!o) {
-      ops.push(["add", child.id, now.id, next3, child.wire()]);
+      ops.push(["add", child.id, now.id, next2, child.wire()]);
     } else if (o.tree.kind !== child.kind) {
       ops.push(["del", child.id]);
-      ops.push(["add", child.id, now.id, next3, child.wire()]);
+      ops.push(["add", child.id, now.id, next2, child.wire()]);
     } else {
       if (!stay.has(at))
-        ops.push(["move", child.id, now.id, next3]);
+        ops.push(["move", child.id, now.id, next2]);
       diff(o.tree, child, ops);
     }
-    next3 = child.id;
+    next2 = child.id;
   }
 }
 
@@ -20488,9 +20488,9 @@ var Surface = class {
   render(view) {
     if (this.#closed)
       return;
-    const next3 = View.from(view);
-    this.#latest = next3;
-    this.#pending = next3;
+    const next2 = View.from(view);
+    this.#latest = next2;
+    this.#pending = next2;
     this.#pump();
   }
   /** Installs (or with `null` removes) stylesheet `name`. */
@@ -20643,11 +20643,11 @@ var Surface = class {
   /** Sends the pending difference and queued ops as one frame, when there are any. */
   #flush() {
     const ops = [];
-    const next3 = this.#pending;
-    if (this.#resetMain && (next3 || this.#queue.length > 0))
+    const next2 = this.#pending;
+    if (this.#resetMain && (next2 || this.#queue.length > 0))
       ops.push(["del", "main"]);
-    if (next3)
-      ops.push(...this.#sent.ops(next3, this.id));
+    if (next2)
+      ops.push(...this.#sent.ops(next2, this.id));
     ops.push(...this.#queue);
     if (ops.length > 0) {
       const seq = this.#seq + 1;
@@ -20656,8 +20656,8 @@ var Surface = class {
       this.#resetMain = false;
     }
     this.#queue = [];
-    if (next3) {
-      this.#sent = next3;
+    if (next2) {
+      this.#sent = next2;
       this.#pending = void 0;
     }
   }
@@ -25715,7 +25715,7 @@ function applyLog(a2, log) {
 // src/agents/agentRow.tsx
 function agentNode(a2, now, solo) {
   const status = SUBAGENT_LOOK[a2.status].row;
-  const running = a2.status === "running";
+  const running2 = a2.status === "running";
   return /* @__PURE__ */ jsx(
     "agent",
     {
@@ -25731,12 +25731,12 @@ function agentNode(a2, now, solo) {
         requests: a2.calls || void 0,
         tokens: a2.tokens || void 0,
         tools: a2.toolCount || void 0,
-        ...running ? { age: Math.max(0, now - a2.startedAt) } : { took: a2.duration }
+        ...running2 ? { age: Math.max(0, now - a2.startedAt) } : { took: a2.duration }
       },
       status,
       task: a2.goal,
       title: `Open ${solo ? "the agent" : agentName(a2)} beside the chat`,
-      tool: running && a2.tool ? {
+      tool: running2 && a2.tool ? {
         age: a2.toolSince ? age(a2.toolSince, a2.toolSince.at, now) : void 0,
         intent: a2.toolPreview,
         name: a2.tool
@@ -25746,6 +25746,226 @@ function agentNode(a2, now, solo) {
     solo?.key ?? a2.key ?? a2.id
   );
 }
+
+// src/overlays/search.ts
+var PAGE = 10;
+function editQuery(key2, query) {
+  if (key2.name === "backspace") {
+    return key2.alt || key2.ctrl ? query.replace(/\S*\s*$/, "") : query.slice(0, -1);
+  }
+  if (key2.ctrl && key2.name === "u") {
+    return "";
+  }
+  if (key2.name === "paste" || key2.text && !key2.ctrl && !key2.meta) {
+    return query + (key2.text ?? "").replace(/\s+/g, " ");
+  }
+  return void 0;
+}
+function moveSelection(key2, ids, selected) {
+  if (!ids.length) {
+    return void 0;
+  }
+  const at = selected === void 0 ? -1 : ids.indexOf(selected);
+  const step = key2.name === "up" || key2.ctrl && key2.name === "p" ? -1 : key2.name === "down" || key2.ctrl && key2.name === "n" ? 1 : key2.name === "page_up" ? -PAGE : key2.name === "page_down" ? PAGE : 0;
+  if (step) {
+    return ids[Math.max(0, Math.min(ids.length - 1, at + step))];
+  }
+  if (key2.name === "home") {
+    return ids[0];
+  }
+  if (key2.name === "end") {
+    return ids.at(-1);
+  }
+  return void 0;
+}
+function rank(items, query, textOf2, { scattered = true } = {}) {
+  const words3 = query.toLowerCase().split(/\s+/).filter(Boolean);
+  if (!words3.length) {
+    return items.map((item3) => ({ item: item3, positions: [] }));
+  }
+  const scored = [];
+  items.forEach((item3, index2) => {
+    const text12 = textOf2(item3).toLowerCase();
+    const positions = /* @__PURE__ */ new Set();
+    let score = 0;
+    for (const word of words3) {
+      const at = text12.indexOf(word);
+      if (at >= 0) {
+        const boundary = at === 0 || /[\s/_.:-]/.test(text12[at - 1] ?? "");
+        score += 100 - Math.min(at, 50) + (boundary ? 25 : 0);
+        for (let i = at; i < at + word.length; i++) {
+          positions.add(i);
+        }
+        continue;
+      }
+      if (!scattered) {
+        return;
+      }
+      let from = 0;
+      for (const ch of word) {
+        const i = text12.indexOf(ch, from);
+        if (i < 0) {
+          return;
+        }
+        positions.add(i);
+        from = i + 1;
+      }
+      score += 10;
+    }
+    scored.push({ index: index2, item: item3, positions: [...positions].sort((a2, b) => a2 - b), score });
+  });
+  return scored.sort((a2, b) => b.score - a2.score || a2.index - b.index).map(({ item: item3, positions }) => ({ item: item3, positions }));
+}
+function hitRuns(positions, limit) {
+  const runs3 = [];
+  for (const p3 of positions) {
+    if (p3 >= limit) {
+      break;
+    }
+    const last = runs3.at(-1);
+    if (last && last[1] === p3) {
+      last[1] = p3 + 1;
+    } else {
+      runs3.push([p3, p3 + 1]);
+    }
+  }
+  return runs3;
+}
+
+// src/agents/hub.ts
+var NONE = { kind: "none" };
+var LIST = { kind: "list" };
+function initialHub(agents2, focus) {
+  return {
+    ask: NONE,
+    selected: focus ?? agents2.find(isRunning)?.id ?? agents2[0]?.id,
+    tab: agents2.some(isRunning) ? "running" : "all",
+    view: LIST
+  };
+}
+function currentAgent(state, agents2) {
+  const id = state.view.kind === "timeline" ? state.view.agent : state.selected;
+  return agents2.find((a2) => a2.id === id);
+}
+function shownAgents(state, agents2) {
+  return state.tab === "running" ? agents2.filter(isRunning) : [...agents2];
+}
+function stepIds(a2) {
+  return (a2.log?.entries ?? []).map((_, i) => `e${i}`);
+}
+var running = (a2) => Boolean(a2 && isRunning(a2));
+function reduceHub(state, action, agents2) {
+  const a2 = currentAgent(state, agents2);
+  switch (action.type) {
+    case "back":
+      return state.view.kind === "timeline" ? { state: { ...state, selected: state.view.agent, view: LIST } } : { effect: { kind: "close" }, state };
+    case "tab":
+      return { state: { ...state, tab: action.tab } };
+    case "select":
+      return { state: { ...state, ask: state.ask.kind === "confirmStop" ? NONE : state.ask, selected: action.id } };
+    case "step": {
+      if (state.view.kind !== "timeline" || !a2) {
+        return { state };
+      }
+      const step = action.id === stepIds(a2).at(-1) ? void 0 : action.id;
+      return { state: { ...state, view: { ...state.view, step } } };
+    }
+    case "listed":
+      return action.ids.some((id) => id === state.selected) ? { state } : { state: { ...state, selected: action.ids[0] } };
+    case "watch": {
+      const picked = agents2.find((x) => x.id === state.selected);
+      return picked ? { effect: { agent: picked, kind: "refresh" }, state: { ...state, view: { agent: picked.id, kind: "timeline", step: void 0 } } } : { state };
+    }
+    case "beside": {
+      const id = action.id ?? state.selected;
+      return id ? { effect: { id, kind: "beside" }, state } : { state };
+    }
+    case "pause":
+      return { effect: { kind: "pause" }, state };
+    case "steer":
+      return running(a2) ? { state: { ...state, ask: { kind: "steering", text: "" } } } : { state };
+    case "steerEdit":
+      return state.ask.kind === "steering" ? { state: { ...state, ask: { kind: "steering", text: action.text } } } : { state };
+    case "steerCancel":
+      return { state: state.ask.kind === "steering" ? { ...state, ask: NONE } : state };
+    case "steerSend": {
+      const text12 = state.ask.kind === "steering" ? state.ask.text.trim() : "";
+      const next2 = { ...state, ask: state.ask.kind === "steering" ? NONE : state.ask };
+      return a2 && text12 ? { effect: { agent: a2, kind: "steer", text: text12 }, state: next2 } : { state: next2 };
+    }
+    case "stop":
+      return running(a2) ? { state: { ...state, ask: { kind: "confirmStop" } } } : { state };
+    case "stopCancel":
+      return { state: state.ask.kind === "confirmStop" ? { ...state, ask: NONE } : state };
+    case "stopConfirm": {
+      const next2 = state.ask.kind === "confirmStop" ? { ...state, ask: NONE } : state;
+      return running(a2) ? { effect: { agent: a2, kind: "stop" }, state: next2 } : { state: next2 };
+    }
+  }
+}
+function hubKey(state, k, agents2) {
+  const { ask, view } = state;
+  if (ask.kind === "steering") {
+    if (k.name === "escape") {
+      return { type: "steerCancel" };
+    }
+    if (k.name === "enter") {
+      return { type: "steerSend" };
+    }
+    const text12 = editQuery(k, ask.text);
+    return text12 === void 0 ? void 0 : { text: text12, type: "steerEdit" };
+  }
+  if (ask.kind === "confirmStop") {
+    return k.name === "enter" || k.name === "y" ? { type: "stopConfirm" } : k.name === "escape" || k.name === "n" ? { type: "stopCancel" } : void 0;
+  }
+  const a2 = currentAgent(state, agents2);
+  const bare = !k.ctrl && !k.alt;
+  if (k.name === "escape") {
+    return { type: "back" };
+  }
+  if (k.name === "s" && bare && running(a2)) {
+    return { type: "steer" };
+  }
+  if (k.name === "x" && bare && running(a2)) {
+    return { type: "stop" };
+  }
+  if (view.kind === "timeline" && a2) {
+    const ids = stepIds(a2);
+    const moved3 = moveSelection(k, ids, view.step ?? ids.at(-1));
+    return moved3 === void 0 ? void 0 : { id: moved3, type: "step" };
+  }
+  if (k.name === "enter") {
+    return { type: "beside" };
+  }
+  if (k.name === "t" && bare) {
+    return { type: "watch" };
+  }
+  if (k.name === "p" && bare) {
+    return { type: "pause" };
+  }
+  if (k.name === "tab") {
+    return { tab: state.tab === "running" ? "all" : "running", type: "tab" };
+  }
+  const moved2 = moveSelection(
+    k,
+    shownAgents(state, agents2).map((x) => x.id),
+    state.selected
+  );
+  return moved2 === void 0 ? void 0 : { id: moved2, type: "select" };
+}
+var HUB_CLICKS = {
+  beside: () => ({ type: "beside" }),
+  cancel: () => ({ type: "stopCancel" }),
+  close: () => ({ type: "back" }),
+  confirm: () => ({ type: "stopConfirm" }),
+  pause: () => ({ type: "pause" }),
+  steer: () => ({ type: "steer" }),
+  "steer-cancel": () => ({ type: "steerCancel" }),
+  "steer-send": () => ({ type: "steerSend" }),
+  stop: () => ({ type: "stop" }),
+  tab: (ev) => ({ tab: ev.value === "running" ? "running" : "all", type: "tab" }),
+  watch: () => ({ type: "watch" })
+};
 
 // src/view/format.ts
 function nonEmpty(v) {
@@ -28686,12 +28906,12 @@ var $ZodPipe = /* @__PURE__ */ $constructor("$ZodPipe", (inst, def) => {
     return handlePipeResult(left, def.out, ctx);
   };
 });
-function handlePipeResult(left, next3, ctx) {
+function handlePipeResult(left, next2, ctx) {
   if (left.issues.length) {
     left.aborted = true;
     return left;
   }
-  return next3._zod.run({ value: left.value, issues: left.issues, fallback: left.fallback }, ctx);
+  return next2._zod.run({ value: left.value, issues: left.issues, fallback: left.fallback }, ctx);
 }
 
 // node_modules/zod/v4/core/api.js
@@ -29296,8 +29516,8 @@ function nestedQuantifier(pattern) {
       groups.push(false);
     } else if (c === ")") {
       const inner = groups.pop() ?? false;
-      const next3 = pattern[i + 1];
-      if (inner && (next3 === "+" || next3 === "*" || next3 === "{")) {
+      const next2 = pattern[i + 1];
+      if (inner && (next2 === "+" || next2 === "*" || next2 === "{")) {
         return true;
       }
       if (inner && groups.length) {
@@ -32056,7 +32276,7 @@ function bashCard(call, d, instead) {
   const error = d.error;
   const command = commandOf(call, d);
   const line = commandLine(command);
-  const running = call.status === "running";
+  const running2 = call.status === "running";
   return {
     body: [
       ...command && command !== line ? [/* @__PURE__ */ jsx("code", { lang: "bash", max: { h: "12lines" }, role: "omp.tool.command", text: command }, "cmd")] : [],
@@ -32066,7 +32286,7 @@ function bashCard(call, d, instead) {
     folded: true,
     lang: "bash",
     name: "bash",
-    preview: { tail: running ? 4 : 3 },
+    preview: { tail: running2 ? 4 : 3 },
     // A short command is the head's target; a longer one shows whole in the body instead.
     target: command === line ? line || void 0 : void 0,
     targetKind: "command",
@@ -32284,91 +32504,6 @@ function facts(list9) {
   return list9.flatMap(([name, value]) => value ? [{ k: [{ t: name }], v: value }] : []);
 }
 
-// src/overlays/search.ts
-var PAGE = 10;
-function editQuery(key2, query) {
-  if (key2.name === "backspace") {
-    return key2.alt || key2.ctrl ? query.replace(/\S*\s*$/, "") : query.slice(0, -1);
-  }
-  if (key2.ctrl && key2.name === "u") {
-    return "";
-  }
-  if (key2.name === "paste" || key2.text && !key2.ctrl && !key2.meta) {
-    return query + (key2.text ?? "").replace(/\s+/g, " ");
-  }
-  return void 0;
-}
-function moveSelection(key2, ids, selected) {
-  if (!ids.length) {
-    return void 0;
-  }
-  const at = selected === void 0 ? -1 : ids.indexOf(selected);
-  const step = key2.name === "up" || key2.ctrl && key2.name === "p" ? -1 : key2.name === "down" || key2.ctrl && key2.name === "n" ? 1 : key2.name === "page_up" ? -PAGE : key2.name === "page_down" ? PAGE : 0;
-  if (step) {
-    return ids[Math.max(0, Math.min(ids.length - 1, at + step))];
-  }
-  if (key2.name === "home") {
-    return ids[0];
-  }
-  if (key2.name === "end") {
-    return ids.at(-1);
-  }
-  return void 0;
-}
-function rank(items, query, textOf2, { scattered = true } = {}) {
-  const words3 = query.toLowerCase().split(/\s+/).filter(Boolean);
-  if (!words3.length) {
-    return items.map((item3) => ({ item: item3, positions: [] }));
-  }
-  const scored = [];
-  items.forEach((item3, index2) => {
-    const text12 = textOf2(item3).toLowerCase();
-    const positions = /* @__PURE__ */ new Set();
-    let score = 0;
-    for (const word of words3) {
-      const at = text12.indexOf(word);
-      if (at >= 0) {
-        const boundary = at === 0 || /[\s/_.:-]/.test(text12[at - 1] ?? "");
-        score += 100 - Math.min(at, 50) + (boundary ? 25 : 0);
-        for (let i = at; i < at + word.length; i++) {
-          positions.add(i);
-        }
-        continue;
-      }
-      if (!scattered) {
-        return;
-      }
-      let from = 0;
-      for (const ch of word) {
-        const i = text12.indexOf(ch, from);
-        if (i < 0) {
-          return;
-        }
-        positions.add(i);
-        from = i + 1;
-      }
-      score += 10;
-    }
-    scored.push({ index: index2, item: item3, positions: [...positions].sort((a2, b) => a2 - b), score });
-  });
-  return scored.sort((a2, b) => b.score - a2.score || a2.index - b.index).map(({ item: item3, positions }) => ({ item: item3, positions }));
-}
-function hitRuns(positions, limit) {
-  const runs3 = [];
-  for (const p3 of positions) {
-    if (p3 >= limit) {
-      break;
-    }
-    const last = runs3.at(-1);
-    if (last && last[1] === p3) {
-      last[1] = p3 + 1;
-    } else {
-      runs3.push([p3, p3 + 1]);
-    }
-  }
-  return runs3;
-}
-
 // src/overlays/sheet.ts
 function tickWhileOpen(host, ms) {
   const timer = setInterval(() => host.changed(), ms);
@@ -32394,37 +32529,10 @@ var TICK_MS = 1e3;
 var RECENT = 6;
 function openAgents(host, focus) {
   const agents2 = () => host.agents.all();
-  let tab2 = host.agents.running().length ? "running" : "all";
-  let selected = focus?.id ?? agents2().find(isRunning)?.id ?? agents2()[0]?.id;
-  let watching;
-  let step;
-  let steer3;
-  let stopping = false;
+  let state = initialHub(agents2(), focus?.id);
   const stopTicking = tickWhileOpen(host, TICK_MS);
   const close = () => host.close(overlay2);
-  const current = () => agents2().find((a2) => a2.id === (watching ?? selected));
-  const watch2 = (id) => {
-    const a2 = agents2().find((x) => x.id === id);
-    if (!a2) {
-      return;
-    }
-    watching = a2.id;
-    step = void 0;
-    void host.agents.refresh(a2);
-  };
-  const beside = (id) => {
-    if (id) {
-      close();
-      void host.openAgent(id);
-    }
-  };
-  const sendSteer = async () => {
-    const a2 = current();
-    const text12 = steer3?.trim();
-    steer3 = void 0;
-    if (!a2 || !text12) {
-      return host.changed();
-    }
+  const sendSteer = async (a2, text12) => {
     await reportError(host.transcript, async () => {
       const queued = await host.agents.steer(a2, text12);
       host.transcript.notice(
@@ -32434,12 +32542,7 @@ function openAgents(host, focus) {
     });
     host.changed();
   };
-  const stop2 = async () => {
-    const a2 = current();
-    stopping = false;
-    if (!a2 || !isRunning(a2)) {
-      return host.changed();
-    }
+  const stop2 = async (a2) => {
     await reportError(host.transcript, async () => {
       if (!await host.agents.stop(a2)) {
         host.transcript.notice(`${agentName(a2)} already finished.`, "warning");
@@ -32454,8 +32557,40 @@ function openAgents(host, focus) {
     });
     host.changed();
   };
-  const shown2 = () => tab2 === "running" ? agents2().filter(isRunning) : agents2();
-  const steps = (a2) => a2.log?.entries ?? [];
+  const run6 = (effect) => {
+    switch (effect.kind) {
+      case "close":
+        return close();
+      case "beside":
+        close();
+        return void host.openAgent(effect.id);
+      case "refresh":
+        return void host.agents.refresh(effect.agent);
+      case "steer":
+        return void sendSteer(effect.agent, effect.text);
+      case "stop":
+        return void stop2(effect.agent);
+      case "pause":
+        return void togglePause();
+    }
+  };
+  const act = (action) => {
+    if (!action) {
+      return;
+    }
+    const step = reduceHub(state, action, agents2());
+    state = step.state;
+    if (step.effect) {
+      run6(step.effect);
+    }
+  };
+  const click = (action) => {
+    act(action);
+    host.changed();
+  };
+  const handlers3 = Object.fromEntries(
+    Object.entries(HUB_CLICKS).map(([id, action]) => [id, (ev) => click(action(ev))])
+  );
   const overlay2 = {
     key: KEY,
     modal: true,
@@ -32464,68 +32599,18 @@ function openAgents(host, focus) {
     onClose: stopTicking,
     node: () => {
       const now = Date.now();
-      const watched = watching ? agents2().find((a2) => a2.id === watching) : void 0;
+      const watched = state.view.kind === "timeline" ? currentAgent(state, agents2()) : void 0;
       return watched ? timelineNode(watched, now) : hubNode(now);
     },
     onKey: (k) => {
-      const a2 = current();
-      if (steer3 !== void 0) {
-        if (k.name === "escape") {
-          steer3 = void 0;
-        } else if (k.name === "enter") {
-          void sendSteer();
-        } else {
-          steer3 = editQuery(k, steer3) ?? steer3;
-        }
-        return true;
-      }
-      if (stopping) {
-        if (k.name === "enter" || k.name === "y") {
-          void stop2();
-        } else if (k.name === "escape" || k.name === "n") {
-          stopping = false;
-        }
-        return true;
-      }
-      if (k.name === "escape") {
-        if (watching) {
-          selected = watching;
-          watching = void 0;
-        } else {
-          close();
-        }
-      } else if (k.name === "s" && !k.ctrl && !k.alt && a2 && isRunning(a2)) {
-        steer3 = "";
-      } else if (k.name === "x" && !k.ctrl && !k.alt && a2 && isRunning(a2)) {
-        stopping = true;
-      } else if (watching && a2) {
-        const ids = steps(a2).map((_, i) => `e${i}`);
-        const moved2 = moveSelection(k, ids, step ?? ids.at(-1));
-        if (moved2 !== void 0) {
-          step = moved2 === ids.at(-1) ? void 0 : moved2;
-        }
-      } else if (k.name === "enter") {
-        beside(selected);
-      } else if (k.name === "t" && !k.ctrl && !k.alt) {
-        watch2(selected);
-      } else if (k.name === "p" && !k.ctrl && !k.alt) {
-        void togglePause();
-      } else if (k.name === "tab") {
-        tab2 = tab2 === "running" ? "all" : "running";
-      } else {
-        selected = moveSelection(
-          k,
-          shown2().map((x) => x.id),
-          selected
-        ) ?? selected;
-      }
+      act(hubKey(state, k, agents2()));
       return true;
     }
   };
-  const steerProps = (a2) => steer3 !== void 0 && a2 ? { placeholder: `Steer ${agentName(a2)}: type, then Enter (Esc cancels)`, query: steer3 } : {};
+  const steerProps = (a2) => state.ask.kind === "steering" && a2 ? { placeholder: `Steer ${agentName(a2)}: type, then Enter (Esc cancels)`, query: state.ask.text } : {};
   const actions = (a2, inTimeline) => {
-    const running = Boolean(a2 && isRunning(a2));
-    if (steer3 !== void 0) {
+    const running2 = Boolean(a2 && isRunning(a2));
+    if (state.ask.kind === "steering") {
       return [
         { end: true, id: "steer-cancel", keys: ["esc"], label: "Cancel" },
         { id: "steer-send", keys: ["enter"], label: "Send", primary: true }
@@ -32538,62 +32623,22 @@ function openAgents(host, focus) {
         { id: "pause", keys: ["p"], label: host.agents.paused ? "Resume spawns" : "Pause spawns" }
       ],
       {
-        disabled: running ? a2?.steerable === false ? "Not taking steering now" : void 0 : "Finished",
+        disabled: running2 ? a2?.steerable === false ? "Not taking steering now" : void 0 : "Finished",
         id: "steer",
         keys: ["s"],
         label: "Steer"
       },
-      { danger: true, disabled: running ? void 0 : "Finished", id: "stop", keys: ["x"], label: "Stop" },
+      { danger: true, disabled: running2 ? void 0 : "Finished", id: "stop", keys: ["x"], label: "Stop" },
       { end: true, id: "close", keys: ["esc"], label: inTimeline ? "Back" : "Close" }
     ];
   };
-  const handlers3 = {
-    cancel: () => {
-      stopping = false;
-      host.changed();
-    },
-    close: () => {
-      if (watching) {
-        selected = watching;
-        watching = void 0;
-        host.changed();
-      } else {
-        close();
-      }
-    },
-    confirm: () => void stop2(),
-    pause: () => void togglePause(),
-    steer: () => {
-      steer3 = "";
-      host.changed();
-    },
-    "steer-cancel": () => {
-      steer3 = void 0;
-      host.changed();
-    },
-    "steer-send": () => void sendSteer(),
-    stop: () => {
-      stopping = true;
-      host.changed();
-    },
-    tab: (ev) => {
-      tab2 = ev.value === "running" ? "running" : "all";
-      host.changed();
-    },
-    beside: () => beside(selected),
-    watch: () => {
-      watch2(selected);
-      host.changed();
-    }
-  };
+  const stopping = () => state.ask.kind === "confirmStop";
   function hubNode(now) {
     const all8 = agents2();
-    const list9 = shown2();
-    const running = all8.filter(isRunning).length;
-    if (!list9.some((a3) => a3.id === selected)) {
-      selected = list9[0]?.id;
-    }
-    const a2 = list9.find((x) => x.id === selected);
+    const list9 = shownAgents(state, all8);
+    const running2 = all8.filter(isRunning).length;
+    act({ ids: list9.map((x) => x.id), type: "listed" });
+    const a2 = list9.find((x) => x.id === state.selected);
     const columns = [
       { format: "num", head: "Tools", id: "tools", priority: 3 },
       { format: "elapsed", head: "Time", id: "time", priority: 5 }
@@ -32603,30 +32648,26 @@ function openAgents(host, focus) {
       {
         actions: actions(a2, false),
         columns,
-        confirm: stopping && a2 ? { act: "confirm", label: "Stop", text: `Stop ${agentName(a2)}? Its partial work returns to Hermes.` } : void 0,
-        empty: tab2 === "running" ? "No agents running. Tab shows finished ones." : "No subagents in this session yet",
+        confirm: stopping() && a2 ? { act: "confirm", label: "Stop", text: `Stop ${agentName(a2)}? Its partial work returns to Hermes.` } : void 0,
+        empty: state.tab === "running" ? "No agents running. Tab shows finished ones." : "No subagents in this session yet",
         icon: "agents",
         items: all8.map((x) => hubItem(x, now)),
         layout: all8.some((x) => x.depth) ? "tree" : "rows",
         noun: "agents",
         onAction: handlers3,
-        onActivate: (ev) => beside(ev.item),
-        onSelect: (ev) => {
-          selected = ev.item;
-          stopping = false;
-          host.changed();
-        },
+        onActivate: (ev) => act({ id: ev.item, type: "beside" }),
+        onSelect: (ev) => click({ id: ev.item, type: "select" }),
         order: list9.map((x) => x.id),
         preview: "side",
-        selected,
+        selected: state.selected,
         size: "lg",
         subtitle: [
           { s: "muted", t: summary2(all8) },
           ...host.agents.paused ? [{ s: "warning", t: " \xB7 spawns paused (gateway-wide)" }] : []
         ],
-        tab: tab2,
+        tab: state.tab,
         tabs: [
-          { count: running, id: "running", label: "Running" },
+          { count: running2, id: "running", label: "Running" },
           { count: all8.length, id: "all", label: "All" }
         ],
         title: "Agents",
@@ -32638,10 +32679,12 @@ function openAgents(host, focus) {
     );
   }
   function timelineNode(a2, now) {
-    const entries = steps(a2);
-    const ids = entries.map((_, i) => `e${i}`);
+    const entries = a2.log?.entries ?? [];
+    const ids = stepIds(a2);
+    const step = state.view.kind === "timeline" ? state.view.step : void 0;
     const sel = step && ids.includes(step) ? step : ids.at(-1);
     const at = sel ? ids.indexOf(sel) : -1;
+    const shown2 = entries[at];
     return /* @__PURE__ */ jsx(
       "picker",
       {
@@ -32650,17 +32693,14 @@ function openAgents(host, focus) {
           { format: "dim", head: "At", id: "at", min: 8, priority: 2 },
           { format: "elapsed", head: "Took", id: "took", priority: 4 }
         ],
-        confirm: stopping ? { act: "confirm", label: "Stop", text: `Stop ${agentName(a2)}? Its partial work returns to Hermes.` } : void 0,
+        confirm: stopping() ? { act: "confirm", label: "Stop", text: `Stop ${agentName(a2)}? Its partial work returns to Hermes.` } : void 0,
         empty: a2.logPath || a2.log ? "Nothing logged yet" : "This agent has no live transcript",
         icon: "agent",
         items: entries.map((e, i) => stepItem(e, `e${i}`, a2)),
         layout: "timeline",
         noun: "steps",
         onAction: handlers3,
-        onSelect: (ev) => {
-          step = ev.item === ids.at(-1) ? void 0 : ev.item;
-          host.changed();
-        },
+        onSelect: (ev) => click({ id: ev.item, type: "step" }),
         preview: "side",
         selected: sel,
         size: "lg",
@@ -32668,14 +32708,14 @@ function openAgents(host, focus) {
         title: agentName(a2),
         total: entries.length,
         ...steerProps(a2),
-        children: at >= 0 ? stepPreview(entries[at], a2, briefFor(host, a2)) : [agentNode(a2, now)]
+        children: shown2 ? stepPreview(shown2, a2, briefFor(host, a2)) : [agentNode(a2, now)]
       },
       KEY
     );
   }
   host.open(overlay2);
   if (focus?.watch) {
-    watch2(focus.id);
+    act({ type: "watch" });
   }
 }
 function summary2(all8) {
@@ -32811,7 +32851,8 @@ function stepSpans(e) {
       return [{ s: "muted", t: e.text }];
     case "kickoff":
       return [{ s: "dim", t: "Task: " }, { t: e.text }];
-    default:
+    case "assistant":
+    case "note":
       return [{ t: e.text }];
   }
 }
@@ -32937,37 +32978,165 @@ function relative(iso, now) {
   return n === 0 ? "now" : d > 0 ? `in ${n}${unit}` : `${n}${unit} ago`;
 }
 
+// src/processes/sheet.ts
+var SHEET_TABS = ["running", "all", "cron"];
+function initialSheet(processes, at) {
+  const focus = typeof at === "string" ? at : void 0;
+  const focused = focus ? processes.find((p3) => p3.id === focus) : void 0;
+  const tab2 = typeof at === "object" ? at.tab : focused ? isRunning2(focused) ? "running" : "all" : processes.some(isRunning2) ? "running" : "all";
+  return {
+    confirm: void 0,
+    copied: void 0,
+    expanded: false,
+    job: void 0,
+    selected: focus ?? processes.find(isRunning2)?.id ?? processes[0]?.id,
+    tab: tab2
+  };
+}
+function shownProcesses(state, processes) {
+  return state.tab === "running" ? processes.filter(isRunning2) : [...processes];
+}
+function currentProcess(state, facts2) {
+  return facts2.processes.find((p3) => p3.id === state.selected);
+}
+function currentJob(state, facts2) {
+  return facts2.jobs.find((j) => j.job_id === state.job);
+}
+function nextTab(tab2, back) {
+  return SHEET_TABS[(SHEET_TABS.indexOf(tab2) + (back ? SHEET_TABS.length - 1 : 1)) % SHEET_TABS.length] ?? tab2;
+}
+function reduceSheet(state, action, facts2) {
+  const settled2 = { ...state, confirm: void 0 };
+  switch (action.type) {
+    case "back":
+      return state.expanded ? { state: { ...state, expanded: false } } : { effect: { kind: "close" }, state };
+    case "tab":
+      return { state: { ...settled2, expanded: false, tab: action.tab } };
+    case "select":
+      return { state: { ...settled2, selected: action.id } };
+    case "selectJob":
+      return { state: { ...settled2, job: action.id } };
+    case "listed":
+      return action.ids.some((id) => id === state.selected) ? { state } : { state: { ...state, selected: action.ids[0] } };
+    case "jobsListed":
+      return action.ids.some((id) => id === state.job) ? { state } : { state: { ...state, job: action.ids[0] } };
+    case "expand":
+      return { state: { ...state, expanded: Boolean(currentProcess(state, facts2)) && !state.expanded } };
+    case "activate":
+      return { state: { ...state, expanded: true, selected: action.id } };
+    case "ask": {
+      const p3 = currentProcess(state, facts2);
+      const can = action.what === "one" ? Boolean(p3 && isRunning2(p3) && !facts2.stopping(p3.id)) : facts2.processes.some(isRunning2);
+      return can ? { state: { ...state, confirm: action.what } } : { state };
+    }
+    case "askRemove":
+      return currentJob(state, facts2) ? { state: { ...state, confirm: "job" } } : { state };
+    case "toggleJob": {
+      const j = currentJob(state, facts2);
+      if (!j) {
+        return { state };
+      }
+      return facts2.busy(j.job_id) ? { state: settled2 } : { effect: { action: isPaused(j) ? "resume" : "pause", job: j, kind: "job" }, state: settled2 };
+    }
+    case "cancel":
+      return { state: settled2 };
+    case "confirm":
+      return { state: settled2, ...confirmed(state, facts2) };
+    case "copy": {
+      const p3 = currentProcess(state, facts2);
+      return p3 ? { effect: { command: p3.command, kind: "copy" }, state: { ...state, copied: p3.id } } : { state };
+    }
+    case "uncopy":
+      return { state: { ...state, copied: void 0 } };
+  }
+}
+function confirmed(state, facts2) {
+  if (state.confirm === "all") {
+    return { effect: { kind: "stopAll" } };
+  }
+  if (state.confirm === "job") {
+    const j = currentJob(state, facts2);
+    return j && !facts2.busy(j.job_id) ? { effect: { action: "remove", job: j, kind: "job" } } : {};
+  }
+  const p3 = currentProcess(state, facts2);
+  return p3 && isRunning2(p3) ? { effect: { kind: "stopOne", process: p3 } } : {};
+}
+function sheetKey(state, k, facts2) {
+  if (state.confirm) {
+    return k.name === "enter" || k.name === "y" ? { type: "confirm" } : k.name === "escape" || k.name === "n" ? { type: "cancel" } : void 0;
+  }
+  const bare = !k.ctrl && !k.alt && !k.meta;
+  if (k.name === "escape") {
+    return { type: "back" };
+  }
+  if (state.tab === "cron") {
+    if (k.name === "tab") {
+      return { tab: nextTab(state.tab, k.shift), type: "tab" };
+    }
+    if (k.name === "p" && bare && !k.shift) {
+      return { type: "toggleJob" };
+    }
+    if (k.name === "d" && bare && !k.shift) {
+      return { type: "askRemove" };
+    }
+    const moved3 = moveSelection(
+      k,
+      facts2.jobs.map((j) => j.job_id),
+      state.job
+    );
+    return moved3 === void 0 ? void 0 : { id: moved3, type: "selectJob" };
+  }
+  if (k.name === "enter") {
+    return { type: "expand" };
+  }
+  if (k.name === "k" && bare) {
+    return { type: "ask", what: k.shift ? "all" : "one" };
+  }
+  if (k.name === "c" && bare && !k.shift) {
+    return { type: "copy" };
+  }
+  if (k.name === "tab" && !state.expanded) {
+    return { tab: nextTab(state.tab, k.shift), type: "tab" };
+  }
+  const moved2 = moveSelection(
+    k,
+    shownProcesses(state, facts2.processes).map((p3) => p3.id),
+    state.selected
+  );
+  return moved2 === void 0 ? void 0 : { id: moved2, type: "select" };
+}
+var SHEET_CLICKS = {
+  all: () => ({ type: "ask", what: "all" }),
+  cancel: () => ({ type: "cancel" }),
+  close: () => ({ type: "back" }),
+  confirm: () => ({ type: "confirm" }),
+  copy: () => ({ type: "copy" }),
+  expand: () => ({ type: "expand" }),
+  remove: () => ({ type: "askRemove" }),
+  stop: () => ({ type: "ask", what: "one" }),
+  tab: (ev) => ({ tab: SHEET_TABS.find((t2) => t2 === ev.value) ?? "all", type: "tab" }),
+  toggle: () => ({ type: "toggleJob" })
+};
+
 // src/overlays/background.tsx
 var KEY2 = "background";
 var TICK_MS2 = 1e3;
 var COPIED_MS = 1500;
-var TABS = ["running", "all", "cron"];
 function openBackground(host, at) {
   const procs = () => host.processes.all();
-  const focus = typeof at === "string" ? at : void 0;
-  const focused = focus ? host.processes.get(focus) : void 0;
-  let tab2 = focused ? isRunning2(focused) ? "running" : "all" : host.processes.running().length ? "running" : "all";
-  if (typeof at === "object") {
-    tab2 = at.tab;
-  }
-  let selected = focus ?? procs().find(isRunning2)?.id ?? procs()[0]?.id;
-  let expanded = false;
-  let confirm;
-  let job;
-  let copied;
+  let state = initialSheet(procs(), at);
   let copiedTimer;
   const release = host.processes.watch();
   const releaseCron = host.cron.watch();
   const stopTicking = tickWhileOpen(host, TICK_MS2);
   const close = () => host.close(overlay2);
-  const shown2 = () => tab2 === "running" ? procs().filter(isRunning2) : procs();
-  const current = () => procs().find((p3) => p3.id === selected);
-  const stopOne = async () => {
-    const p3 = current();
-    confirm = void 0;
-    if (!p3 || !isRunning2(p3)) {
-      return host.changed();
-    }
+  const sheetFacts = () => ({
+    busy: (id) => host.cron.busy(id),
+    jobs: host.cron.jobs(),
+    processes: procs(),
+    stopping: (id) => host.processes.stopping(id)
+  });
+  const stopOne = async (p3) => {
     await reportError(host.transcript, async () => {
       const status = await host.processes.kill(p3.id);
       if (status && status !== "killed") {
@@ -32977,55 +33146,55 @@ function openBackground(host, at) {
     host.changed();
   };
   const stopAll = async () => {
-    confirm = void 0;
     await reportError(host.transcript, async () => {
       const n = await host.processes.stopAll();
       host.transcript.notice(`Stopped ${plural(n, "background process", "background processes")}.`);
     });
     host.changed();
   };
-  const copy = () => {
-    const p3 = current();
-    if (!p3) {
-      return;
-    }
-    copyToClipboard(p3.command);
-    copied = p3.id;
-    clearTimeout(copiedTimer);
-    copiedTimer = setTimeout(() => {
-      copied = void 0;
-      host.changed();
-    }, COPIED_MS);
-    host.changed();
-  };
-  const ask = (what) => {
-    const p3 = current();
-    if (what === "one" ? p3 && isRunning2(p3) && !host.processes.stopping(p3.id) : host.processes.running().length) {
-      confirm = what;
-    }
-  };
-  const currentJob = () => host.cron.jobs().find((j) => j.job_id === job);
-  const actJob = async (action) => {
-    const j = currentJob();
-    confirm = void 0;
-    if (!j || host.cron.busy(j.job_id)) {
-      return host.changed();
-    }
+  const actJob = async (action, j) => {
     await reportError(host.transcript, () => host.cron.act(action, j.job_id));
     host.changed();
   };
-  const toggleJob = () => {
-    const j = currentJob();
-    if (j) {
-      void actJob(isPaused(j) ? "resume" : "pause");
+  const copy = (command) => {
+    copyToClipboard(command);
+    clearTimeout(copiedTimer);
+    copiedTimer = setTimeout(() => {
+      act({ type: "uncopy" });
+      host.changed();
+    }, COPIED_MS);
+  };
+  const run6 = (effect) => {
+    switch (effect.kind) {
+      case "close":
+        return close();
+      case "stopOne":
+        return void stopOne(effect.process);
+      case "stopAll":
+        return void stopAll();
+      case "job":
+        return void actJob(effect.action, effect.job);
+      case "copy":
+        return copy(effect.command);
     }
   };
-  const askRemove = () => {
-    if (currentJob()) {
-      confirm = "job";
+  const act = (action) => {
+    if (!action) {
+      return;
+    }
+    const step = reduceSheet(state, action, sheetFacts());
+    state = step.state;
+    if (step.effect) {
+      run6(step.effect);
     }
   };
-  const settle2 = () => void (confirm === "all" ? stopAll() : confirm === "job" ? actJob("remove") : stopOne());
+  const click = (action) => {
+    act(action);
+    host.changed();
+  };
+  const handlers3 = Object.fromEntries(
+    Object.entries(SHEET_CLICKS).map(([id, action]) => [id, (ev) => click(action(ev))])
+  );
   const overlay2 = {
     key: KEY2,
     modal: true,
@@ -33039,94 +33208,12 @@ function openBackground(host, at) {
     },
     node: () => sheetNode(Date.now()),
     onKey: (k) => {
-      if (confirm) {
-        if (k.name === "enter" || k.name === "y") {
-          settle2();
-        } else if (k.name === "escape" || k.name === "n") {
-          confirm = void 0;
-        }
-        return true;
-      }
-      const bare = !k.ctrl && !k.alt && !k.meta;
-      if (k.name === "escape") {
-        if (expanded) {
-          expanded = false;
-        } else {
-          close();
-        }
-      } else if (tab2 === "cron") {
-        if (k.name === "tab") {
-          tab2 = next(tab2, k.shift);
-        } else if (k.name === "p" && bare && !k.shift) {
-          toggleJob();
-        } else if (k.name === "d" && bare && !k.shift) {
-          askRemove();
-        } else {
-          job = moveSelection(
-            k,
-            host.cron.jobs().map((j) => j.job_id),
-            job
-          ) ?? job;
-        }
-      } else if (k.name === "enter") {
-        expanded = Boolean(current()) && !expanded;
-      } else if (k.name === "k" && bare) {
-        ask(k.shift ? "all" : "one");
-      } else if (k.name === "c" && bare && !k.shift) {
-        copy();
-      } else if (k.name === "tab" && !expanded) {
-        tab2 = next(tab2, k.shift);
-      } else {
-        selected = moveSelection(
-          k,
-          shown2().map((p3) => p3.id),
-          selected
-        ) ?? selected;
-      }
+      act(sheetKey(state, k, sheetFacts()));
       return true;
     }
   };
-  const handlers3 = {
-    all: () => {
-      ask("all");
-      host.changed();
-    },
-    cancel: () => {
-      confirm = void 0;
-      host.changed();
-    },
-    close: () => {
-      if (expanded) {
-        expanded = false;
-        host.changed();
-      } else {
-        close();
-      }
-    },
-    confirm: settle2,
-    copy,
-    expand: () => {
-      expanded = Boolean(current()) && !expanded;
-      host.changed();
-    },
-    remove: () => {
-      askRemove();
-      host.changed();
-    },
-    stop: () => {
-      ask("one");
-      host.changed();
-    },
-    tab: (ev) => {
-      tab2 = TABS.find((t2) => t2 === ev.value) ?? "all";
-      expanded = false;
-      confirm = void 0;
-      host.changed();
-    },
-    toggle: toggleJob
-  };
   function sheetNode(now) {
-    return tab2 === "cron" ? cronNode(now) : processNode(now);
+    return state.tab === "cron" ? cronNode(now) : processNode(now);
   }
   const tabs = () => [
     { count: host.processes.running().length, id: "running", label: "Running" },
@@ -33136,10 +33223,8 @@ function openBackground(host, at) {
   function cronNode(now) {
     const jobs = host.cron.jobs();
     const own14 = ownJobs(host.transcript.calls("cronjob_manage"));
-    if (!jobs.some((j2) => j2.job_id === job)) {
-      job = jobs[0]?.job_id;
-    }
-    const j = jobs.find((x) => x.job_id === job);
+    act({ ids: jobs.map((x) => x.job_id), type: "jobsListed" });
+    const j = jobs.find((x) => x.job_id === state.job);
     const busy = j ? host.cron.busy(j.job_id) : false;
     const columns = [
       { format: "dim", head: "Schedule", id: "schedule", min: 10, priority: 1 },
@@ -33161,23 +33246,19 @@ function openBackground(host, at) {
           { end: true, id: "close", keys: ["esc"], label: "Close" }
         ],
         columns,
-        confirm: confirm === "job" && j ? { act: "confirm", label: "Remove", text: `Remove ${j.name || j.job_id}? It will not run again.` } : void 0,
+        confirm: state.confirm === "job" && j ? { act: "confirm", label: "Remove", text: `Remove ${j.name || j.job_id}? It will not run again.` } : void 0,
         empty: host.cron.error ? `Could not list cron jobs: ${host.cron.error}` : host.cron.loaded ? "No cron jobs. Ask Hermes to schedule one or to watch something." : "Loading cron jobs\u2026",
         icon: "clock",
         items: jobs.map((x) => jobItem(x, now, own14.has(x.job_id), host.cron.busy(x.job_id))),
         noun: "jobs",
         onAction: handlers3,
-        onSelect: (ev) => {
-          job = ev.item;
-          confirm = void 0;
-          host.changed();
-        },
+        onSelect: (ev) => click({ id: ev.item, type: "selectJob" }),
         order: jobs.map((x) => x.job_id),
         preview: "side",
-        selected: job,
+        selected: state.job,
         size: "lg",
         subtitle: [{ s: "muted", t: host.cron.warning ?? cronSummary(jobs) }],
-        tab: tab2,
+        tab: state.tab,
         tabs: tabs(),
         title: "Background",
         total: jobs.length,
@@ -33188,12 +33269,11 @@ function openBackground(host, at) {
   }
   function processNode(now) {
     const all8 = procs();
-    const list9 = shown2();
-    const running = all8.filter(isRunning2).length;
-    if (!list9.some((p4) => p4.id === selected)) {
-      selected = list9[0]?.id;
-    }
-    const p3 = list9.find((x) => x.id === selected);
+    const list9 = shownProcesses(state, all8);
+    const running2 = all8.filter(isRunning2).length;
+    act({ ids: list9.map((x) => x.id), type: "listed" });
+    const { confirm, copied, expanded } = state;
+    const p3 = list9.find((x) => x.id === state.selected);
     const call = p3 && callOf(host, p3.id);
     const columns = [
       { format: "dim", head: "Last output", id: "last", min: 16, priority: 1 },
@@ -33213,33 +33293,25 @@ function openBackground(host, at) {
             keys: ["k"],
             label: p3 && host.processes.stopping(p3.id) ? "Stopping\u2026" : "Stop"
           },
-          { danger: true, disabled: running ? void 0 : "None running", id: "all", keys: ["shift+k"], label: "Stop all" },
+          { danger: true, disabled: running2 ? void 0 : "None running", id: "all", keys: ["shift+k"], label: "Stop all" },
           { end: true, id: "close", keys: ["esc"], label: expanded ? "Back" : "Close" }
         ],
         columns,
-        confirm: confirm === "all" ? { act: "confirm", label: "Stop all", text: `Stop ${plural(running, "background process", "background processes")}?` } : confirm === "one" && p3 ? { act: "confirm", label: "Stop", text: `Stop ${describeCommand(p3.command)}?` } : void 0,
-        empty: tab2 === "running" ? "No background processes running. Tab shows the finished ones." : "No background processes in this session",
+        confirm: confirm === "all" ? { act: "confirm", label: "Stop all", text: `Stop ${plural(running2, "background process", "background processes")}?` } : confirm === "one" && p3 ? { act: "confirm", label: "Stop", text: `Stop ${describeCommand(p3.command)}?` } : void 0,
+        empty: state.tab === "running" ? "No background processes running. Tab shows the finished ones." : "No background processes in this session",
         focus: expanded ? "preview" : void 0,
         icon: "terminal",
         items: all8.map((x) => item(x, now, host.processes.stopping(x.id))),
         noun: "processes",
         onAction: handlers3,
-        onActivate: (ev) => {
-          selected = ev.item;
-          expanded = true;
-          host.changed();
-        },
-        onSelect: (ev) => {
-          selected = ev.item;
-          confirm = void 0;
-          host.changed();
-        },
+        onActivate: (ev) => click({ id: ev.item, type: "activate" }),
+        onSelect: (ev) => click({ id: ev.item, type: "select" }),
         order: list9.map((x) => x.id),
         preview: "side",
-        selected,
+        selected: state.selected,
         size: "lg",
         subtitle: [{ s: "muted", t: summary3(all8) }],
-        tab: tab2,
+        tab: state.tab,
         tabs: tabs(),
         title: "Background",
         total: all8.length,
@@ -33249,9 +33321,6 @@ function openBackground(host, at) {
     );
   }
   host.open(overlay2);
-}
-function next(tab2, back) {
-  return TABS[(TABS.indexOf(tab2) + (back ? TABS.length - 1 : 1)) % TABS.length];
 }
 function cronSummary(jobs) {
   return countSummary(jobs, [
@@ -33684,12 +33753,12 @@ async function applyEffort(host, value, scope) {
   host.changed();
 }
 function cycleEffort(host) {
-  const next3 = nextEffort(host.session.info?.reasoning_effort ?? "", capsOf(host.session.info));
-  if (!next3) {
+  const next2 = nextEffort(host.session.info?.reasoning_effort ?? "", capsOf(host.session.info));
+  if (!next2) {
     host.transcript.notice("This model has no reasoning effort to set.", "warning");
     return host.changed();
   }
-  void host.setEffort(next3, "session");
+  void host.setEffort(next2, "session");
 }
 
 // src/overlays/effort.tsx
@@ -38265,16 +38334,16 @@ var htmlRawNames = ["pre", "script", "style", "textarea"];
 // node_modules/mdast-util-to-markdown/lib/util/html-kind.js
 function htmlKind(value) {
   if (value.charCodeAt(0) !== 60) return;
-  const next3 = value.charCodeAt(1);
-  if (next3 === 33) {
+  const next2 = value.charCodeAt(1);
+  if (next2 === 33) {
     const code8 = value.charCodeAt(2);
     if (code8 === 45) return 2;
     if (code8 === 91) return 5;
     if (asciiAlpha(code8)) return 4;
     return;
   }
-  if (next3 === 63) return 3;
-  const closing = next3 === 47;
+  if (next2 === 63) return 3;
+  const closing = next2 === 47;
   const start = closing ? 2 : 1;
   let end = start;
   let code7 = value.charCodeAt(end);
@@ -40753,11 +40822,11 @@ function check(tokens2, before, after) {
     }
     const head2 = index2 ? tokens2[index2 - 1].value : before;
     const previous3 = classifyCharacter(head2.charCodeAt(head2.length - 1));
-    const next3 = classifyCharacter(
+    const next2 = classifyCharacter(
       (end < tokens2.length ? tokens2[end].value : after).charCodeAt(0)
     );
-    const open = !next3 || next3 === 2 && Boolean(previous3);
-    const close = !previous3 || previous3 === 2 && Boolean(next3);
+    const open = !next2 || next2 === 2 && Boolean(previous3);
+    const close = !previous3 || previous3 === 2 && Boolean(next2);
     const run6 = {
       tokens: tokens2.slice(index2, end),
       markers: [],
@@ -40765,7 +40834,7 @@ function check(tokens2, before, after) {
       end: 0,
       // Underscores are strict, they cannot open or close inside words.
       open: strict ? open && (Boolean(previous3) || !close) : open,
-      close: strict ? close && (Boolean(next3) || !open) : close,
+      close: strict ? close && (Boolean(next2) || !open) : close,
       // All builtins can split runs.
       split: strict !== void 0
     };
@@ -40807,9 +40876,9 @@ function improve(items, chosen, mistake, before, after) {
       const trial = new Map(chosen);
       trial.set(attention4, sequence);
       const tokens2 = render2(items, trial, before, after);
-      const next3 = check(tokens2, before, after);
-      if (!next3 || next3.index > mistake.index) {
-        return { chosen: trial, mistake: next3, tokens: tokens2 };
+      const next2 = check(tokens2, before, after);
+      if (!next2 || next2.index > mistake.index) {
+        return { chosen: trial, mistake: next2, tokens: tokens2 };
       }
     }
   }
@@ -40985,10 +41054,10 @@ function render2(items, chosen, before, after) {
     }
     const sequence = chosen.get(item3) || item3.sequences[0];
     const marker2 = sequence.charAt(0);
-    const next3 = items[index2 + 1];
+    const next2 = items[index2 + 1];
     const outsideBefore = previous3;
     const outsideAfter = firstCharacter(
-      next3 === void 0 ? after : typeof next3 === "string" ? next3 : chosen.get(next3) || next3.sequences[0]
+      next2 === void 0 ? after : typeof next2 === "string" ? next2 : chosen.get(next2) || next2.sequences[0]
     );
     const inside = render2(item3.children, chosen, sequence, sequence);
     const head2 = inside.length > 0 ? inside[0].value : "";
@@ -41023,14 +41092,14 @@ function serialize3(items, before, after) {
   let tokens2 = initial;
   let mistake = check(tokens2, before, after);
   while (mistake) {
-    const next3 = improve(items, chosen, mistake, before, after);
-    if (!next3) {
+    const next2 = improve(items, chosen, mistake, before, after);
+    if (!next2) {
       tokens2 = initial;
       break;
     }
-    chosen = next3.chosen;
-    tokens2 = next3.tokens;
-    mistake = next3.mistake;
+    chosen = next2.chosen;
+    tokens2 = next2.tokens;
+    mistake = next2.mistake;
   }
   let result = "";
   for (const token of tokens2) result += token.value;
@@ -43089,7 +43158,7 @@ function location(file2) {
       while (true) {
         let end = indices[index2];
         if (end === void 0) {
-          const eol2 = next2(value, indices[index2 - 1]);
+          const eol2 = next(value, indices[index2 - 1]);
           end = eol2 === -1 ? value.length + 1 : eol2 + 1;
           indices[index2] = end;
         }
@@ -43108,7 +43177,7 @@ function location(file2) {
     if (point5 && typeof point5.line === "number" && typeof point5.column === "number" && !Number.isNaN(point5.line) && !Number.isNaN(point5.column)) {
       while (indices.length < point5.line) {
         const from = indices[indices.length - 1];
-        const eol2 = next2(value, from);
+        const eol2 = next(value, from);
         const end = eol2 === -1 ? value.length + 1 : eol2 + 1;
         if (from === end) break;
         indices.push(end);
@@ -43118,7 +43187,7 @@ function location(file2) {
     }
   }
 }
-function next2(value, from) {
+function next(value, from) {
   const cr = value.indexOf("\r", from);
   const lf = value.indexOf("\n", from);
   if (lf === -1) return cr;
@@ -52555,9 +52624,9 @@ function normalizeUri(value) {
         replace2 = String.fromCharCode(code7);
       }
     } else if (code7 > 55295 && code7 < 57344) {
-      const next3 = value.charCodeAt(index2 + 1);
-      if (code7 < 56320 && next3 > 56319 && next3 < 57344) {
-        replace2 = String.fromCharCode(code7, next3);
+      const next2 = value.charCodeAt(index2 + 1);
+      if (code7 < 56320 && next2 > 56319 && next2 < 57344) {
+        replace2 = String.fromCharCode(code7, next2);
         skip = 1;
       } else {
         replace2 = "\uFFFD";
@@ -52808,9 +52877,9 @@ function tokenizeAutolink(effects, ok3, nok) {
   }
   function emailValue(code7) {
     if ((code7 === 45 || asciiAlphanumeric(code7)) && size++ < 63) {
-      const next3 = code7 === 45 ? emailValue : emailLabel;
+      const next2 = code7 === 45 ? emailValue : emailLabel;
       effects.consume(code7);
-      return next3;
+      return next2;
     }
     return nok(code7);
   }
@@ -56076,11 +56145,11 @@ function tokenizeTable(effects, ok3, nok) {
       }
     }
     const tail = index2 > -1 ? self2.events[index2][1].type : null;
-    const next3 = tail === "tableHead" || tail === "tableRow" ? bodyRowStart : headRowBefore;
-    if (next3 === bodyRowStart && self2.parser.lazy[self2.now().line]) {
+    const next2 = tail === "tableHead" || tail === "tableRow" ? bodyRowStart : headRowBefore;
+    if (next2 === bodyRowStart && self2.parser.lazy[self2.now().line]) {
       return nok(code7);
     }
-    return next3(code7);
+    return next2(code7);
   }
   function headRowBefore(code7) {
     effects.enter("tableHead");
@@ -57442,9 +57511,9 @@ function preprocess() {
             break;
           }
           case 9: {
-            const next3 = Math.ceil(column2 / 4) * 4;
+            const next2 = Math.ceil(column2 / 4) * 4;
             chunks2.push(-2);
-            while (column2++ < next3) {
+            while (column2++ < next2) {
               chunks2.push(-1);
             }
             break;
@@ -59136,8 +59205,8 @@ function trough() {
     if (typeof callback !== "function") {
       throw new TypeError("Expected function as last argument, not " + callback);
     }
-    next3(null, ...values);
-    function next3(error, ...output) {
+    next2(null, ...values);
+    function next2(error, ...output) {
       const fn = fns[++middlewareIndex];
       let index2 = -1;
       if (error) {
@@ -59151,7 +59220,7 @@ function trough() {
       }
       values = output;
       if (fn) {
-        wrap3(fn, next3)(...output);
+        wrap3(fn, next2)(...output);
       } else {
         callback(null, ...output);
       }
@@ -61370,13 +61439,13 @@ var providerDisplayNames = (providers) => {
 var KEY5 = "models";
 var ALL = "all";
 var confirmTokens = /* @__PURE__ */ new Map();
-async function mutateModel(host, value, confirmed) {
+async function mutateModel(host, value, confirmed2) {
   const sid = host.session.ref.live;
   const key2 = `${sid} ${value}`;
-  const confirm = confirmed ? confirmTokens.get(key2) : void 0;
+  const confirm = confirmed2 ? confirmTokens.get(key2) : void 0;
   confirmTokens.delete(key2);
   const result = await mutateSession(host.gw, sid ?? "", "model", { ...modelPayload(value), ...confirm ? { confirm } : {} });
-  if (result.status === "confirmation_required" && typeof result.confirm === "string" && !confirmed) {
+  if (result.status === "confirmation_required" && typeof result.confirm === "string" && !confirmed2) {
     confirmTokens.set(key2, result.confirm);
     return {
       confirm_required: true,
@@ -61389,9 +61458,9 @@ async function mutateModel(host, value, confirmed) {
   }
   return { key: "model", value: result.model ?? "" };
 }
-async function switchModel(host, value, confirmed = false) {
-  const r = host.gw.isCanonical ? await mutateModel(host, value, confirmed) : await rpc(host.gw, "config.set", {
-    confirm_expensive_model: confirmed,
+async function switchModel(host, value, confirmed2 = false) {
+  const r = host.gw.isCanonical ? await mutateModel(host, value, confirmed2) : await rpc(host.gw, "config.set", {
+    confirm_expensive_model: confirmed2,
     key: "model",
     session_id: host.session.ref.live,
     value
@@ -61459,14 +61528,14 @@ function openModelPicker(host) {
     }
     host.changed();
   };
-  const choose = async (id, confirmed = false) => {
+  const choose = async (id, confirmed2 = false) => {
     const row2 = rows.find((r) => r.id === id);
     if (!row2 || busy) {
       return;
     }
     busy = true;
     try {
-      const r = await switchModel(host, pickerValue(row2.model, row2.provider.slug, canSave && global2), confirmed);
+      const r = await switchModel(host, pickerValue(row2.model, row2.provider.slug, canSave && global2), confirmed2);
       if (r.confirm_required) {
         confirm = { row: row2, text: r.confirm_message || r.warning || `${row2.model} is expensive. Switch anyway?` };
       } else {
@@ -61794,7 +61863,7 @@ ${encoded}
 var FENCE = /^\s*(```|~~~)/;
 var HEADING = /^(#{1,6})(\s+)/;
 var QUOTE = /^(\s*>+\s?)/;
-var LIST = /^(\s*)([-*+]|\d{1,9}[.)])(\s+)(\[[ xX]\](?:\s+|$))?/;
+var LIST2 = /^(\s*)([-*+]|\d{1,9}[.)])(\s+)(\[[ xX]\](?:\s+|$))?/;
 var RULE = /^\s*([-*_])(\s*\1){2,}\s*$/;
 var CODE_SPAN = /(`+)(?!`)([^\n]*?[^`\n])\1(?!`)/g;
 var BOLD = /(\*\*|__)(?=\S)([^\n]*?\S)\1/g;
@@ -61846,7 +61915,7 @@ function blockMarks(line, at, mark2) {
     body = quote2[1].length;
     mark2(at + body, at + line.length, "muted");
   }
-  const list9 = LIST.exec(line.slice(body));
+  const list9 = LIST2.exec(line.slice(body));
   if (list9) {
     const start = body + list9[1].length;
     mark2(at + start, at + start + list9[2].length, "accent");
@@ -61912,7 +61981,7 @@ function listNewline(text12, cursor) {
   const nl = text12.indexOf("\n", cursor);
   const end = nl < 0 ? text12.length : nl;
   const line = text12.slice(start, end);
-  const m = LIST.exec(line);
+  const m = LIST2.exec(line);
   if (!m || cursor - start < m[0].length) {
     return void 0;
   }
@@ -61921,9 +61990,9 @@ function listNewline(text12, cursor) {
   }
   const [, indent2 = "", bullet = "", gap = " ", box] = m;
   const n = /^\d+/.exec(bullet)?.[0];
-  const next3 = n ? `${Number(n) + 1}${bullet.slice(n.length)}` : bullet;
+  const next2 = n ? `${Number(n) + 1}${bullet.slice(n.length)}` : bullet;
   const insert = `
-${indent2}${next3}${gap}${box ? "[ ] " : ""}`;
+${indent2}${next2}${gap}${box ? "[ ] " : ""}`;
   return { cursor: cursor + insert.length, from: cursor, text: insert, to: cursor };
 }
 function toggleMark(text12, from, to, marker2) {
@@ -62099,13 +62168,13 @@ var Composer = class {
     this.#browse = -1;
   }
   redo() {
-    const next3 = this.#redo.pop();
-    if (!next3) {
+    const next2 = this.#redo.pop();
+    if (!next2) {
       return;
     }
     this.#undo.push({ cursor: this.cursor, text: this.text });
-    this.text = next3.text;
-    this.cursor = next3.cursor;
+    this.text = next2.text;
+    this.cursor = next2.cursor;
     this.anchor = void 0;
     this.#lastEdit = 0;
     this.#browse = -1;
@@ -62804,10 +62873,10 @@ function clarifyOverlay(host, req) {
     if (q2) {
       answers[q2.qid] = answer;
     }
-    const next3 = questions.findIndex((other, i) => i > step && !(other.qid in answers));
+    const next2 = questions.findIndex((other, i) => i > step && !(other.qid in answers));
     const first = questions.findIndex((other) => !(other.qid in answers));
-    if (next3 >= 0 || first >= 0) {
-      step = next3 >= 0 ? next3 : first;
+    if (next2 >= 0 || first >= 0) {
+      step = next2 >= 0 ? next2 : first;
       host.changed();
       return;
     }
@@ -63268,7 +63337,7 @@ var DAY = 864e5;
 function openSessionPicker(host) {
   let state = "loading";
   let sessions = [];
-  let running = /* @__PURE__ */ new Set();
+  let running2 = /* @__PURE__ */ new Set();
   let workspace = "";
   let tab2 = "here";
   let query = "";
@@ -63286,7 +63355,7 @@ function openSessionPicker(host) {
       rpc(host.gw, "session.list", { limit: 200 }).catch(() => ({ sessions: [] }))
     ]);
     workspace = key2;
-    running = new Set((live.sessions ?? []).filter((s2) => "running" in s2 && s2.running && s2.id).map((s2) => s2.id));
+    running2 = new Set((live.sessions ?? []).filter((s2) => "running" in s2 && s2.running && s2.id).map((s2) => s2.id));
     sessions = storedSessions(LIMIT).filter((s2) => s2.messages > 0 || s2.id === current);
     tab2 = sessions.some((s2) => inWorkspace(s2, workspace)) ? "here" : "all";
     selected = rows().find((s2) => s2.id !== current)?.id ?? rows()[0]?.id;
@@ -63391,7 +63460,7 @@ ${s2.preview} ${s2.cwd} ${s2.branch} ${s2.id}`, { scattered: false });
           empty: tab2 === "here" ? `No sessions in ${project} yet. Tab shows every folder.` : "No saved sessions yet",
           hits,
           icon: "history",
-          items: rows().map((x) => itemOf2(x, now, running.has(x.id), tab2 === "all" && !here(x))),
+          items: rows().map((x) => itemOf2(x, now, running2.has(x.id), tab2 === "all" && !here(x))),
           layout: "cards",
           noun: "sessions",
           onAction: {
@@ -63441,7 +63510,7 @@ ${s2.preview} ${s2.cwd} ${s2.branch} ${s2.id}`, { scattered: false });
           ],
           title: "Sessions",
           total: rows().length,
-          children: s2 ? preview4(s2, now, s2.id === current, running.has(s2.id), replies.get(s2.id) ?? "") : null
+          children: s2 ? preview4(s2, now, s2.id === current, running2.has(s2.id), replies.get(s2.id) ?? "") : null
         },
         KEY6
       );
@@ -63482,11 +63551,11 @@ ${s2.preview} ${s2.cwd} ${s2.branch} ${s2.id}`, { scattered: false });
   host.open(overlay2);
   setTimeout(() => void load2(), 0);
 }
-function itemOf2(s2, now, running, elsewhere) {
+function itemOf2(s2, now, running2, elsewhere) {
   const label = sessionLabel(s2);
   return {
     badges: [
-      ...running ? [{ text: "running", tone: "accent" }] : [],
+      ...running2 ? [{ text: "running", tone: "accent" }] : [],
       ...s2.branch ? [{ text: s2.branch, title: `Branch ${s2.branch}` }] : [],
       ...elsewhere && s2.cwd ? [{ text: basename2(s2.cwd), title: s2.cwd }] : []
     ],
@@ -63497,8 +63566,8 @@ function itemOf2(s2, now, running, elsewhere) {
     title: s2.cwd || void 0
   };
 }
-function preview4(s2, now, isCurrent, running, reply) {
-  const status = isCurrent ? [{ s: "success", t: "open here" }] : running ? [{ s: "accent", t: "running in another pane" }] : void 0;
+function preview4(s2, now, isCurrent, running2, reply) {
+  const status = isCurrent ? [{ s: "success", t: "open here" }] : running2 ? [{ s: "accent", t: "running in another pane" }] : void 0;
   return [
     /* @__PURE__ */ jsx("text", { role: "omp.picker.title", text: sessionLabel(s2) }, "title"),
     /* @__PURE__ */ jsx(
@@ -64611,8 +64680,8 @@ function hardBreaks(text12) {
       fenced = !fenced;
       return line;
     }
-    const next3 = all8[i + 1];
-    return fenced || !line.trim() || next3 === void 0 || !next3.trim() ? line : `${line}  `;
+    const next2 = all8[i + 1];
+    return fenced || !line.trim() || next2 === void 0 || !next2.trim() ? line : `${line}  `;
   }).join("\n");
 }
 
@@ -64912,7 +64981,7 @@ function toolNode(call, now) {
   }
   const card = view.card(now);
   const status = card.status ?? call.status;
-  const running = status === "running";
+  const running2 = status === "running";
   const body = [...card.body];
   const error = call.status === "error" ? errorOf(call) : void 0;
   if (call.status === "cancelled") {
@@ -64932,12 +65001,12 @@ function toolNode(call, now) {
   return /* @__PURE__ */ jsx(
     "tool",
     {
-      age: running ? age(call, call.startedAt, now) : void 0,
+      age: running2 ? age(call, call.startedAt, now) : void 0,
       badges: card.badges,
       collapsed: body.length > 0 ? collapsed : void 0,
       collapsible: body.length > 0 ? true : void 0,
-      exit: !running && call.status !== "cancelled" ? view.exit() : void 0,
-      frame: card.frame === "inline" && (running || !body.length || !card.framedWithBody) ? "inline" : void 0,
+      exit: !running2 && call.status !== "cancelled" ? view.exit() : void 0,
+      frame: card.frame === "inline" && (running2 || !body.length || !card.framedWithBody) ? "inline" : void 0,
       ...lang,
       meta: card.meta?.length ? card.meta : void 0,
       name: card.name,
@@ -64948,7 +65017,7 @@ function toolNode(call, now) {
       target: card.target,
       targetKind: card.target ? card.targetKind : void 0,
       title: card.title,
-      took: running ? void 0 : card.took ?? call.duration,
+      took: running2 ? void 0 : card.took ?? call.duration,
       children: body
     },
     call.id
@@ -65115,10 +65184,10 @@ function itemNode(item3, parent, now, key2 = item3.id) {
   }
   const call = item3.call;
   const detail = toolDetail(call, now);
-  const running = call.status === "running";
+  const running2 = call.status === "running";
   const head2 = /* @__PURE__ */ jsxs("row", { align: "center", gap: "sm", title: call.context || void 0, children: [
     /* @__PURE__ */ jsx("icon", { name: itemIcon(item3), tone: call.status === "error" ? "error" : void 0 }, "icon"),
-    running ? liveText(stepLabel(call)) : /* @__PURE__ */ jsx("text", { grow: 1, spans: labelSpans(call), truncate: "end", wrap: "none" }, "label"),
+    running2 ? liveText(stepLabel(call)) : /* @__PURE__ */ jsx("text", { grow: 1, spans: labelSpans(call), truncate: "end", wrap: "none" }, "label"),
     call.status === "error" ? /* @__PURE__ */ jsx("icon", { name: "x", tone: "error" }, "failed") : null
   ] }, "head");
   if (!detail.length) {
@@ -65356,18 +65425,18 @@ function usageNode(turn, answer, cx) {
 }
 var COMPACTED_TITLE = "Hermes summarized the conversation before this line to free context. From here on the agent works from that summary; the turns above stay here for you.";
 function compactionNode(c, key2, id, now) {
-  const running = c.status === "running";
+  const running2 = c.status === "running";
   const tokens2 = c.before && c.after ? `${compact(c.before)} \u2192 ${compact(c.after)} tokens` : c.before ? `${compact(c.before)} tokens` : "";
   const took2 = c.endedAt && c.endedAt - c.startedAt >= 1e3 ? duration(c.endedAt - c.startedAt) : "";
-  const facts2 = running ? [tokens2] : [tokens2, c.messages ? `${c.messages.toLocaleString()} messages summarized` : "", took2, c.manual ? "/compress" : ""];
+  const facts2 = running2 ? [tokens2] : [tokens2, c.messages ? `${c.messages.toLocaleString()} messages summarized` : "", took2, c.manual ? "/compress" : ""];
   const detail = facts2.filter(Boolean).join(" \xB7 ");
-  const line = /* @__PURE__ */ jsxs("row", { align: "center", gap: "xs", role: "hermes.compaction.line", title: running ? void 0 : COMPACTED_TITLE, children: [
-    running ? shimmerText({ key: "what", text: "Compacting context" }) : /* @__PURE__ */ jsx("icon", { name: "compaction" }, "icon"),
-    running ? null : /* @__PURE__ */ jsx("text", { spans: [{ s: "muted", t: "Context compacted" }], wrap: "none" }, "what"),
-    running ? /* @__PURE__ */ jsx("elapsed", { age: age(c, c.startedAt, now), format: "short" }, "age") : null,
+  const line = /* @__PURE__ */ jsxs("row", { align: "center", gap: "xs", role: "hermes.compaction.line", title: running2 ? void 0 : COMPACTED_TITLE, children: [
+    running2 ? shimmerText({ key: "what", text: "Compacting context" }) : /* @__PURE__ */ jsx("icon", { name: "compaction" }, "icon"),
+    running2 ? null : /* @__PURE__ */ jsx("text", { spans: [{ s: "muted", t: "Context compacted" }], wrap: "none" }, "what"),
+    running2 ? /* @__PURE__ */ jsx("elapsed", { age: age(c, c.startedAt, now), format: "short" }, "age") : null,
     detail ? /* @__PURE__ */ jsx("text", { spans: [{ s: "dim", t: `\xB7 ${detail}` }], truncate: "end", wrap: "none" }, "facts") : null
   ] }, "head");
-  if (running || !c.summary) {
+  if (running2 || !c.summary) {
     return /* @__PURE__ */ jsx("col", { role: "hermes.compaction", children: line }, key2);
   }
   return foldSection({
@@ -66993,11 +67062,11 @@ function loadSettings(file2 = settingsFile()) {
   }
 }
 function saveSettings(patch6, file2 = settingsFile()) {
-  const next3 = { ...loadSettings(file2), ...patch6 };
+  const next2 = { ...loadSettings(file2), ...patch6 };
   mkdirSync4(dirname(file2), { recursive: true });
-  writeFileSync2(file2, `${JSON.stringify(next3, null, 2)}
+  writeFileSync2(file2, `${JSON.stringify(next2, null, 2)}
 `);
-  return next3;
+  return next2;
 }
 function fileSettings(file2) {
   return {
@@ -68982,12 +69051,12 @@ function statusLine(cx, on) {
     cx.activity.kind === "turn" ? /* @__PURE__ */ jsx("seg", { onClick: on.onInterrupt, priority: 10, role: "hermes.statusline.stop", side: "right", spans: [{ t: "esc esc stop" }] }, "action") : /* @__PURE__ */ jsx("seg", { onClick: on.onSubmit, priority: 10, role: "hermes.statusline.send", side: "right", spans: [{ t: "\u23CE send" }] }, "action")
   ] }, "statusline");
 }
-function agentsPill(running, onOpen, focused) {
+function agentsPill(running2, onOpen, focused) {
   return pill({
     children: [
       /* @__PURE__ */ jsx("icon", { name: "users" }, "icon"),
       /* @__PURE__ */ jsx("spinner", { style: "dots", tone: "accent" }, "spin"),
-      /* @__PURE__ */ jsx("text", { text: `${plural(running, "agent")} running`, wrap: "none" }, "text")
+      /* @__PURE__ */ jsx("text", { text: `${plural(running2, "agent")} running`, wrap: "none" }, "text")
     ],
     focused,
     key: "pill",
@@ -70129,24 +70198,24 @@ var ConnectWatcher = class {
       if (call.connect?.settled || call.status === "running" || this.#noCard.has(call)) {
         continue;
       }
-      const next3 = loadConnect(call, this.#dir);
-      if (!next3) {
+      const next2 = loadConnect(call, this.#dir);
+      if (!next2) {
         this.#noCard.add(call);
         continue;
       }
-      if (JSON.stringify(next3) !== JSON.stringify(call.connect)) {
-        this.#host.transcript.mutateCall(call, (c) => c.connect = next3);
+      if (JSON.stringify(next2) !== JSON.stringify(call.connect)) {
+        this.#host.transcript.mutateCall(call, (c) => c.connect = next2);
         this.#host.changed();
       }
-      const seen = next3.key ?? call.id;
-      if (next3.targets.some(waiting2) && !next3.settled) {
+      const seen = next2.key ?? call.id;
+      if (next2.targets.some(waiting2) && !next2.settled) {
         this.#seen.add(seen);
       }
-      if (!next3.told && this.#seen.has(seen) && allConnected(next3) && (!next3.key || claimTold(next3.key, this.#dir))) {
-        this.#host.transcript.mutateCall(call, () => next3.told = true);
-        this.#host.tell(connectedMessage(next3.targets));
+      if (!next2.told && this.#seen.has(seen) && allConnected(next2) && (!next2.key || claimTold(next2.key, this.#dir))) {
+        this.#host.transcript.mutateCall(call, () => next2.told = true);
+        this.#host.tell(connectedMessage(next2.targets));
         this.#host.changed();
-      } else if (next3.key && !next3.settled) {
+      } else if (next2.key && !next2.settled) {
         open = true;
       }
     }
@@ -71032,8 +71101,8 @@ var completionToApplyOnSubmit = (value, rowText2, compReplace, isLocalCommand = 
   if (!rowText2 || /^\/[\w-]+$/.test(typed) && isLocalCommand(typed.slice(1))) {
     return null;
   }
-  const next3 = applyCompletion(value, rowText2, compReplace);
-  return next3 !== value && next3.trimEnd() !== value.trimEnd() ? next3 : null;
+  const next2 = applyCompletion(value, rowText2, compReplace);
+  return next2 !== value && next2.trimEnd() !== value.trimEnd() ? next2 : null;
 };
 
 // src/hermes/completion.ts
@@ -71095,8 +71164,8 @@ var Completion = class {
     if (!row2 || !composer2 || composer2.cursor !== composer2.text.length) {
       return "";
     }
-    const next3 = applyCompletion(this.#for, row2.text, this.#replaceFrom);
-    return next3.startsWith(composer2.text) ? next3.slice(composer2.text.length) : "";
+    const next2 = applyCompletion(this.#for, row2.text, this.#replaceFrom);
+    return next2.startsWith(composer2.text) ? next2.slice(composer2.text.length) : "";
   }
   /** Re-queries when the text before the composer's caret changed since the last query; cheap otherwise. */
   update(composer2) {
@@ -71171,12 +71240,12 @@ var Completion = class {
         if (key2.shift || key2.alt || composer2.text.slice(0, composer2.cursor) !== this.#for) {
           return false;
         }
-        const next3 = completionToApplyOnSubmit(this.#for, this.items[this.selected]?.text, this.#replaceFrom);
-        if (next3 === null) {
+        const next2 = completionToApplyOnSubmit(this.#for, this.items[this.selected]?.text, this.#replaceFrom);
+        if (next2 === null) {
           this.dismiss();
           return false;
         }
-        return this.#accept(next3);
+        return this.#accept(next2);
       }
     }
     return false;
@@ -72047,12 +72116,12 @@ var SessionTitle = class {
   }
   /** Names the session `title` (trimmed) on the strip and the tab; true when it changed. */
   set(title) {
-    const next3 = title?.trim();
-    if (!next3 || next3 === this.#text) {
+    const next2 = title?.trim();
+    if (!next2 || next2 === this.#text) {
       return false;
     }
-    this.#text = next3;
-    setTabTitle(next3);
+    this.#text = next2;
+    setTabTitle(next2);
     return true;
   }
   /** Another session is shown: its own name (or none yet) on the tab, and a read of the list. */
@@ -72266,11 +72335,11 @@ var Compactions = class {
    * later lines of the same compaction only fill in the count.
    */
   compacting({ before, at = Date.now(), manual = false }) {
-    const running = this.#seen.findLast((c) => c.status === "running");
-    if (running) {
-      running.before ??= before || void 0;
-      running.manual ||= manual || void 0;
-      return this.#touch(running);
+    const running2 = this.#seen.findLast((c) => c.status === "running");
+    if (running2) {
+      running2.before ??= before || void 0;
+      running2.manual ||= manual || void 0;
+      return this.#touch(running2);
     }
     const compaction = { startedAt: at, status: "running", ...before ? { before } : {}, ...manual ? { manual } : {} };
     this.#seen.push(compaction);
@@ -72293,14 +72362,14 @@ var Compactions = class {
    * after its `ready` edge, so they also reach the compaction that just ended).
    */
   compacted(at = Date.now(), tokens2 = {}) {
-    const running = this.#seen.findLast((c2) => c2.status === "running");
-    const c = running ?? (tokens2.before || tokens2.after ? this.#seen.at(-1) : void 0);
+    const running2 = this.#seen.findLast((c2) => c2.status === "running");
+    const c = running2 ?? (tokens2.before || tokens2.after ? this.#seen.at(-1) : void 0);
     if (!c) {
       return;
     }
-    if (running) {
-      running.status = "done";
-      running.endedAt = at;
+    if (running2) {
+      running2.status = "done";
+      running2.endedAt = at;
     }
     c.before = tokens2.before || c.before;
     c.after = tokens2.after || c.after;
@@ -72310,9 +72379,9 @@ var Compactions = class {
    * The last compaction did not happen after all: Hermes aborted it (no done edge came before the
    * turn ended; `running` drops only a running one) or /compress changed nothing.
    */
-  uncompact(running = false) {
+  uncompact(running2 = false) {
     const c = this.#seen.at(-1);
-    if (!c || running && c.status !== "running") {
+    if (!c || running2 && c.status !== "running") {
       return;
     }
     this.#seen.pop();
@@ -72794,8 +72863,8 @@ var Transcript = class {
     this.#compactions.compacted(at, tokens2);
   }
   /** The last compaction did not happen after all (`running`: drop it only while it runs). */
-  uncompact(running = false) {
-    this.#compactions.uncompact(running);
+  uncompact(running2 = false) {
+    this.#compactions.uncompact(running2);
   }
   /** A context reading (tokens in use): the first one under the last compaction's `before` is what it left. */
   contextUsed(used) {
@@ -73257,9 +73326,9 @@ var PromptQueue = class {
   dequeue(index2 = 0) {
     const host = this.#host;
     if (index2 < this.held.length) {
-      const [next3] = this.held.splice(index2, 1);
-      if (next3) {
-        host.restore(next3);
+      const [next2] = this.held.splice(index2, 1);
+      if (next2) {
+        host.restore(next2);
         host.changed();
       }
       return;
@@ -73318,9 +73387,9 @@ var PromptQueue = class {
     if (!this.#host.canDrain()) {
       return;
     }
-    const next3 = this.held.shift();
-    if (next3) {
-      this.#host.send(next3);
+    const next2 = this.held.shift();
+    if (next2) {
+      this.#host.send(next2);
     }
   }
   /** The shared gateway's queued row at dock index `index`, if this pane can act on it. */
@@ -74268,17 +74337,17 @@ var WatchApp = class {
   #render() {
     const now = Date.now();
     const a2 = this.#agent;
-    const running = isRunning(a2);
+    const running2 = isRunning(a2);
     const cx = { copy: () => void 0, now, welcome: { tip: "", version: "" } };
     this.#surface.render({
       dock: dockNodes(
         {
-          activity: running ? { kind: "turn", label: a2.tool ? `Running ${a2.tool}\u2026` : "Working\u2026", since: a2, startedAt: a2.startedAt } : { kind: "idle" },
+          activity: running2 ? { kind: "turn", label: a2.tool ? `Running ${a2.tool}\u2026` : "Working\u2026", since: a2, startedAt: a2.startedAt } : { kind: "idle" },
           composer: {
             attachments: [],
             draft: this.composer,
-            placeholder: running ? `Steer ${a2.name} \u2014 /stop ends it` : `${a2.name} has finished`,
-            ready: running
+            placeholder: running2 ? `Steer ${a2.name} \u2014 /stop ends it` : `${a2.name} has finished`,
+            ready: running2
           },
           now,
           pills: {},

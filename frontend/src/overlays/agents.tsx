@@ -13,6 +13,18 @@ import type { Subagent } from '../model.js'
 import type { Overlay } from '../overlay.js'
 
 import { agentNode } from '../agents/agentRow.js'
+import {
+  currentAgent,
+  HUB_CLICKS,
+  type HubAction,
+  type HubEffect,
+  hubKey,
+  type HubState,
+  initialHub,
+  reduceHub,
+  shownAgents,
+  stepIds
+} from '../agents/hub.js'
 import type { LogEntry } from '../agents/liveLog.js'
 import { SUBAGENT_LOOK } from '../agents/look.js'
 import { agentName, isRunning } from '../agents/store.js'
@@ -21,7 +33,6 @@ import { briefOf } from '../view/tools/cards/task.js'
 import { hubIconOf } from '../view/tools/registry.js'
 import { facts } from '../view/ui/facts.js'
 
-import { editQuery, moveSelection } from './search.js'
 import { countSummary, reportError, tickWhileOpen } from './sheet.js'
 
 /** What the agents hub reaches of the app. */
@@ -32,55 +43,15 @@ const KEY = 'agents'
 const TICK_MS = 1000
 const RECENT = 6
 
-type Tab = 'running' | 'all'
-
 /** Opens the hub, on agent `focus` when given (its timeline when `watch`). */
 export function openAgents(host: AgentsSheetHost, focus?: { id: string; watch?: boolean }) {
   const agents = () => host.agents.all()
-  let tab: Tab = host.agents.running().length ? 'running' : 'all'
-  let selected = focus?.id ?? agents().find(isRunning)?.id ?? agents()[0]?.id
-  /** The agent whose timeline is open, if any. */
-  let watching: string | undefined
-  /** The selected timeline step; undefined follows the newest. */
-  let step: string | undefined
-  /** The steering message being typed, if any. */
-  let steer: string | undefined
-  let stopping = false
+  let state: HubState = initialHub(agents(), focus?.id)
 
   const stopTicking = tickWhileOpen(host, TICK_MS)
   const close = () => host.close(overlay)
 
-  const current = () => agents().find(a => a.id === (watching ?? selected))
-
-  const watch = (id: string | undefined) => {
-    const a = agents().find(x => x.id === id)
-
-    if (!a) {
-      return
-    }
-
-    watching = a.id
-    step = undefined
-    void host.agents.refresh(a)
-  }
-
-  /** Opens the agent in a split beside the chat and closes the hub; its timeline here when no split can open. */
-  const beside = (id: string | undefined) => {
-    if (id) {
-      close()
-      void host.openAgent(id)
-    }
-  }
-
-  const sendSteer = async () => {
-    const a = current()
-    const text = steer?.trim()
-    steer = undefined
-
-    if (!a || !text) {
-      return host.changed()
-    }
-
+  const sendSteer = async (a: Subagent, text: string) => {
     await reportError(host.transcript, async () => {
       const queued = await host.agents.steer(a, text)
       host.transcript.notice(
@@ -92,14 +63,7 @@ export function openAgents(host: AgentsSheetHost, focus?: { id: string; watch?: 
     host.changed()
   }
 
-  const stop = async () => {
-    const a = current()
-    stopping = false
-
-    if (!a || !isRunning(a)) {
-      return host.changed()
-    }
-
+  const stop = async (a: Subagent) => {
     await reportError(host.transcript, async () => {
       if (!(await host.agents.stop(a))) {
         host.transcript.notice(`${agentName(a)} already finished.`, 'warning')
@@ -119,9 +83,53 @@ export function openAgents(host: AgentsSheetHost, focus?: { id: string; watch?: 
     host.changed()
   }
 
-  const shown = (): Subagent[] => (tab === 'running' ? agents().filter(isRunning) : agents())
+  const run = (effect: HubEffect) => {
+    switch (effect.kind) {
+      case 'close':
+        return close()
 
-  const steps = (a: Subagent): LogEntry[] => a.log?.entries ?? []
+      case 'beside':
+        // Opens the agent in a split beside the chat and closes the hub; its timeline here when no split can open.
+        close()
+
+        return void host.openAgent(effect.id)
+
+      case 'refresh':
+        return void host.agents.refresh(effect.agent)
+
+      case 'steer':
+        return void sendSteer(effect.agent, effect.text)
+
+      case 'stop':
+        return void stop(effect.agent)
+
+      case 'pause':
+        return void togglePause()
+    }
+  }
+
+  /** Applies `action` and runs its effect; a click also re-renders (a key's render follows the key). */
+  const act = (action: HubAction | undefined) => {
+    if (!action) {
+      return
+    }
+
+    const step = reduceHub(state, action, agents())
+    state = step.state
+
+    if (step.effect) {
+      run(step.effect)
+    }
+  }
+
+  const click = (action: HubAction) => {
+    act(action)
+    host.changed()
+  }
+
+  const handlers = Object.fromEntries(
+    Object.entries(HUB_CLICKS).map(([id, action]) => [id, (ev: { value?: string }) => click(action(ev))])
+  )
 
   const overlay: Overlay = {
     key: KEY,
@@ -131,83 +139,26 @@ export function openAgents(host: AgentsSheetHost, focus?: { id: string; watch?: 
     onClose: stopTicking,
     node: () => {
       const now = Date.now()
-      const watched = watching ? agents().find(a => a.id === watching) : undefined
+      const watched = state.view.kind === 'timeline' ? currentAgent(state, agents()) : undefined
 
       return watched ? timelineNode(watched, now) : hubNode(now)
     },
     onKey: (k: Key) => {
-      const a = current()
-
-      if (steer !== undefined) {
-        if (k.name === 'escape') {
-          steer = undefined
-        } else if (k.name === 'enter') {
-          void sendSteer()
-        } else {
-          steer = editQuery(k, steer) ?? steer
-        }
-
-        return true
-      }
-
-      if (stopping) {
-        if (k.name === 'enter' || k.name === 'y') {
-          void stop()
-        } else if (k.name === 'escape' || k.name === 'n') {
-          stopping = false
-        }
-
-        return true
-      }
-
-      if (k.name === 'escape') {
-        if (watching) {
-          selected = watching
-          watching = undefined
-        } else {
-          close()
-        }
-      } else if (k.name === 's' && !k.ctrl && !k.alt && a && isRunning(a)) {
-        steer = ''
-      } else if (k.name === 'x' && !k.ctrl && !k.alt && a && isRunning(a)) {
-        stopping = true
-      } else if (watching && a) {
-        const ids = steps(a).map((_, i) => `e${i}`)
-        const moved = moveSelection(k, ids, step ?? ids.at(-1))
-
-        if (moved !== undefined) {
-          // Back on the newest step: follow again.
-          step = moved === ids.at(-1) ? undefined : moved
-        }
-      } else if (k.name === 'enter') {
-        beside(selected)
-      } else if (k.name === 't' && !k.ctrl && !k.alt) {
-        watch(selected)
-      } else if (k.name === 'p' && !k.ctrl && !k.alt) {
-        void togglePause()
-      } else if (k.name === 'tab') {
-        tab = tab === 'running' ? 'all' : 'running'
-      } else {
-        selected = moveSelection(
-          k,
-          shown().map(x => x.id),
-          selected
-        ) ?? selected
-      }
+      act(hubKey(state, k, agents()))
 
       return true
     }
   }
 
   const steerProps = (a: Subagent | undefined) =>
-    steer !== undefined && a
-      ? { placeholder: `Steer ${agentName(a)}: type, then Enter (Esc cancels)`, query: steer }
+    state.ask.kind === 'steering' && a
+      ? { placeholder: `Steer ${agentName(a)}: type, then Enter (Esc cancels)`, query: state.ask.text }
       : {}
 
   const actions = (a: Subagent | undefined, inTimeline: boolean) => {
     const running = Boolean(a && isRunning(a))
 
-    if (steer !== undefined) {
+    if (state.ask.kind === 'steering') {
       return [
         { end: true, id: 'steer-cancel', keys: ['esc'], label: 'Cancel' },
         { id: 'steer-send', keys: ['enter'], label: 'Send', primary: true }
@@ -233,56 +184,16 @@ export function openAgents(host: AgentsSheetHost, focus?: { id: string; watch?: 
     ]
   }
 
-  const handlers = {
-    cancel: () => {
-      stopping = false
-      host.changed()
-    },
-    close: () => {
-      if (watching) {
-        selected = watching
-        watching = undefined
-        host.changed()
-      } else {
-        close()
-      }
-    },
-    confirm: () => void stop(),
-    pause: () => void togglePause(),
-    steer: () => {
-      steer = ''
-      host.changed()
-    },
-    'steer-cancel': () => {
-      steer = undefined
-      host.changed()
-    },
-    'steer-send': () => void sendSteer(),
-    stop: () => {
-      stopping = true
-      host.changed()
-    },
-    tab: (ev: { value?: string }) => {
-      tab = ev.value === 'running' ? 'running' : 'all'
-      host.changed()
-    },
-    beside: () => beside(selected),
-    watch: () => {
-      watch(selected)
-      host.changed()
-    }
-  }
+  const stopping = () => state.ask.kind === 'confirmStop'
 
   function hubNode(now: number): JSX.Element {
     const all = agents()
-    const list = shown()
+    const list = shownAgents(state, all)
     const running = all.filter(isRunning).length
 
-    if (!list.some(a => a.id === selected)) {
-      selected = list[0]?.id
-    }
+    act({ ids: list.map(x => x.id), type: 'listed' })
 
-    const a = list.find(x => x.id === selected)
+    const a = list.find(x => x.id === state.selected)
     const columns: PickerColumn[] = [
       { format: 'num', head: 'Tools', id: 'tools', priority: 3 },
       { format: 'elapsed', head: 'Time', id: 'time', priority: 5 }
@@ -292,29 +203,25 @@ export function openAgents(host: AgentsSheetHost, focus?: { id: string; watch?: 
       <picker
         actions={actions(a, false)}
         columns={columns}
-        confirm={stopping && a ? { act: 'confirm', label: 'Stop', text: `Stop ${agentName(a)}? Its partial work returns to Hermes.` } : undefined}
-        empty={tab === 'running' ? 'No agents running. Tab shows finished ones.' : 'No subagents in this session yet'}
+        confirm={stopping() && a ? { act: 'confirm', label: 'Stop', text: `Stop ${agentName(a)}? Its partial work returns to Hermes.` } : undefined}
+        empty={state.tab === 'running' ? 'No agents running. Tab shows finished ones.' : 'No subagents in this session yet'}
         icon="agents"
         items={all.map(x => hubItem(x, now))}
         key={KEY}
         layout={all.some(x => x.depth) ? 'tree' : 'rows'}
         noun="agents"
         onAction={handlers}
-        onActivate={ev => beside(ev.item)}
-        onSelect={ev => {
-          selected = ev.item
-          stopping = false
-          host.changed()
-        }}
+        onActivate={ev => act({ id: ev.item, type: 'beside' })}
+        onSelect={ev => click({ id: ev.item, type: 'select' })}
         order={list.map(x => x.id)}
         preview="side"
-        selected={selected}
+        selected={state.selected}
         size="lg"
         subtitle={[
           { s: 'muted', t: summary(all) },
           ...(host.agents.paused ? [{ s: 'warning', t: ' · spawns paused (gateway-wide)' }] : [])
         ]}
-        tab={tab}
+        tab={state.tab}
         tabs={[
           { count: running, id: 'running', label: 'Running' },
           { count: all.length, id: 'all', label: 'All' }
@@ -329,10 +236,12 @@ export function openAgents(host: AgentsSheetHost, focus?: { id: string; watch?: 
   }
 
   function timelineNode(a: Subagent, now: number): JSX.Element {
-    const entries = steps(a)
-    const ids = entries.map((_, i) => `e${i}`)
+    const entries = a.log?.entries ?? []
+    const ids = stepIds(a)
+    const step = state.view.kind === 'timeline' ? state.view.step : undefined
     const sel = step && ids.includes(step) ? step : ids.at(-1)
     const at = sel ? ids.indexOf(sel) : -1
+    const shown = entries[at]
 
     return (
       <picker
@@ -341,7 +250,7 @@ export function openAgents(host: AgentsSheetHost, focus?: { id: string; watch?: 
           { format: 'dim', head: 'At', id: 'at', min: 8, priority: 2 },
           { format: 'elapsed', head: 'Took', id: 'took', priority: 4 }
         ]}
-        confirm={stopping ? { act: 'confirm', label: 'Stop', text: `Stop ${agentName(a)}? Its partial work returns to Hermes.` } : undefined}
+        confirm={stopping() ? { act: 'confirm', label: 'Stop', text: `Stop ${agentName(a)}? Its partial work returns to Hermes.` } : undefined}
         empty={a.logPath || a.log ? 'Nothing logged yet' : 'This agent has no live transcript'}
         icon="agent"
         items={entries.map((e, i) => stepItem(e, `e${i}`, a))}
@@ -349,10 +258,7 @@ export function openAgents(host: AgentsSheetHost, focus?: { id: string; watch?: 
         layout="timeline"
         noun="steps"
         onAction={handlers}
-        onSelect={ev => {
-          step = ev.item === ids.at(-1) ? undefined : ev.item
-          host.changed()
-        }}
+        onSelect={ev => click({ id: ev.item, type: 'step' })}
         preview="side"
         selected={sel}
         size="lg"
@@ -361,7 +267,7 @@ export function openAgents(host: AgentsSheetHost, focus?: { id: string; watch?: 
         total={entries.length}
         {...steerProps(a)}
       >
-        {at >= 0 ? stepPreview(entries[at]!, a, briefFor(host, a)) : [agentNode(a, now)]}
+        {shown ? stepPreview(shown, a, briefFor(host, a)) : [agentNode(a, now)]}
       </picker>
     )
   }
@@ -369,7 +275,7 @@ export function openAgents(host: AgentsSheetHost, focus?: { id: string; watch?: 
   host.open(overlay)
 
   if (focus?.watch) {
-    watch(focus.id)
+    act({ type: 'watch' })
   }
 }
 
@@ -540,7 +446,9 @@ function stepSpans(e: LogEntry): { s?: string; t: string }[] {
     case 'kickoff':
       return [{ s: 'dim', t: 'Task: ' }, { t: e.text }]
 
-    default:
+    case 'assistant':
+
+    case 'note':
       return [{ t: e.text }]
   }
 }
