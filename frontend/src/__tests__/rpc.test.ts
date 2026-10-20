@@ -74,7 +74,7 @@ describe('processList', () => {
     )
 
     expect(row).toEqual({ command: 'npm run dev', output_tail: 'ready\n', session_id: 'proc_a', started_epoch: NOW / 1000, status: 'running' })
-    expect(foldEntry(undefined, row, NOW + 5000)).toMatchObject({ lastLine: 'ready', startedAt: NOW, status: 'running' })
+    expect(foldEntry(undefined, row, NOW + 5000)).toMatchObject({ lastLine: 'ready', startedAt: NOW, state: { status: 'running' } })
   })
 
   it("reads the per-session gateway's rows: an uptime and an output preview", () => {
@@ -86,7 +86,7 @@ describe('processList', () => {
       })
     )
 
-    expect(foldEntry(undefined, row, NOW)).toMatchObject({ exitCode: 2, lastLine: 'error 2', startedAt: NOW - 30_000, status: 'failed' })
+    expect(foldEntry(undefined, row, NOW)).toMatchObject({ lastLine: 'error 2', startedAt: NOW - 30_000, state: { exitCode: 2, status: 'failed' } })
   })
 
   it('reads no answer, and an answer with no list, as no processes', () => {

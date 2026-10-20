@@ -29,7 +29,7 @@ const proc = (id: string, over: Partial<BackgroundProcess> = {}): BackgroundProc
   lastLine: '',
   output: '',
   startedAt: NOW - 10_000,
-  status: 'running',
+  state: { status: 'running' },
   ...over
 })
 
@@ -64,12 +64,12 @@ describe('foldEntry', () => {
     }
     const p = foldEntry(undefined, entry, NOW)
 
-    expect(p).toMatchObject({ id: 'proc_a', lastLine: 'tick 2', startedAt: NOW - 5000, status: 'running' })
+    expect(p).toMatchObject({ id: 'proc_a', lastLine: 'tick 2', startedAt: NOW - 5000, state: { status: 'running' } })
 
     const q = foldEntry(p, { ...entry, completion_reason: 'killed', exit_code: -15, exited_at: NOW / 1000, status: 'exited' }, NOW)
 
     expect(q).toBe(p)
-    expect(q).toMatchObject({ exitCode: -15, exitedAt: NOW, reason: 'killed', status: 'killed' })
+    expect(q).toMatchObject({ state: { exitCode: -15, exitedAt: NOW, reason: 'killed', status: 'killed' } })
     expect(processVerdict(q)).toBe('killed')
   })
 
@@ -84,16 +84,16 @@ describe('foldEntry', () => {
 describe('retention and order', () => {
   it('keeps exits for 60 s; one with no exit time leaves at once', () => {
     expect(isRecent(proc('a'), NOW)).toBe(true)
-    expect(isRecent(proc('b', { exitedAt: NOW - RETAIN_MS, status: 'done' }), NOW)).toBe(true)
-    expect(isRecent(proc('c', { exitedAt: NOW - RETAIN_MS - 1, status: 'done' }), NOW)).toBe(false)
-    expect(isRecent(proc('d', { status: 'failed' }), NOW)).toBe(false)
+    expect(isRecent(proc('b', { state: { exitedAt: NOW - RETAIN_MS, status: 'done' } }), NOW)).toBe(true)
+    expect(isRecent(proc('c', { state: { exitedAt: NOW - RETAIN_MS - 1, status: 'done' } }), NOW)).toBe(false)
+    expect(isRecent(proc('d', { state: { status: 'failed' } }), NOW)).toBe(false)
   })
 
   it('lists running first (longest running first), then exits newest first', () => {
     const list = [
-      proc('exited-old', { exitedAt: NOW - 30_000, status: 'done' }),
+      proc('exited-old', { state: { exitedAt: NOW - 30_000, status: 'done' } }),
       proc('young', { startedAt: NOW - 1000 }),
-      proc('exited-new', { exitedAt: NOW - 1000, status: 'failed' }),
+      proc('exited-new', { state: { exitedAt: NOW - 1000, status: 'failed' } }),
       proc('old', { startedAt: NOW - 60_000 })
     ]
 
@@ -153,7 +153,7 @@ describe('Processes', () => {
     rows = [{ ...rows[0]!, exit_code: 0, exited_at: (NOW + 1000) / 1000, status: 'exited' }]
     await vi.advanceTimersByTimeAsync(1000)
 
-    expect(store.recent().map(p => p.status)).toEqual(['done'])
+    expect(store.recent().map(p => p.state.status)).toEqual(['done'])
     await vi.advanceTimersByTimeAsync(RETAIN_MS + 5000)
     expect(store.recent()).toEqual([])
     expect(store.all().map(p => p.id)).toEqual(['proc_a'])
@@ -202,17 +202,20 @@ describe('Processes', () => {
 
     store.poke()
     await vi.advanceTimersByTimeAsync(0)
-    expect(store.get('proc_a')?.status).toBe('running')
+    const first = must(store.get('proc_a'))
+    expect(first.state.status).toBe('running')
 
     // Two failures could be a blip: it still runs, polled every second.
     down = true
     await vi.advanceTimersByTimeAsync(2 * FAST_MS)
-    expect(store.get('proc_a')?.status).toBe('running')
+    expect(store.get('proc_a')?.state.status).toBe('running')
 
     changed.mockClear()
     await vi.advanceTimersByTimeAsync(FAST_MS)
     const p = must(store.get('proc_a'))
-    expect(p.status).toBe('unknown')
+    // The same object: Tern timers keyed on it stay put.
+    expect(p).toBe(first)
+    expect(p.state.status).toBe('unknown')
     expect(processVerdict(p)).toBe('unknown')
     expect(store.recent()).toEqual([p])
     expect(changed).toHaveBeenCalled()
@@ -226,7 +229,8 @@ describe('Processes', () => {
 
     down = false
     await vi.advanceTimersByTimeAsync(IDLE_MS)
-    expect(store.get('proc_a')?.status).toBe('running')
+    expect(store.get('proc_a')).toBe(first)
+    expect(first.state.status).toBe('running')
     store.dispose()
   })
 })

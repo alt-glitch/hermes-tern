@@ -62,15 +62,10 @@ export interface BackgroundProcess {
   /** The registry's process id (`proc_…`): `process.list`'s `session_id`, the terminal result's `session_id`. */
   id: string
   command: string
-  /** `unknown`: it ran, and `process.list` has failed since (see Processes), so nothing says whether it still does. */
-  status: 'done' | 'failed' | 'killed' | 'lost' | 'running' | 'unknown'
+  /** Running, else how it ended; replaced whole when it changes (the process stays the same object). */
+  state: ProcessState
   /** Epoch milliseconds. */
   startedAt: number
-  /** Epoch milliseconds, once it exited and the gateway says when. */
-  exitedAt?: number
-  exitCode?: number
-  /** The registry's `completion_reason` (killed, lost, failed_start, …). */
-  reason?: string
   /** The newest output the gateway sends (its tail). */
   output: string
   /** The last non-empty output line, plain text. */
@@ -93,6 +88,20 @@ export type ToolOutcome =
  * batch), each entry with its own outcome.
  */
 export type Via = { kind: 'direct' } | { kind: 'bridged' } | { kind: 'batch'; entries: NonEmpty<BatchEntry> }
+
+/**
+ * Where a background process stands, as `process.list` last said. `unknown`: it ran, and
+ * `process.list` has failed since (see Processes), so nothing says whether it still does. An
+ * ended one has, as far as the gateway says: when it exited (epoch milliseconds), its exit code,
+ * and the registry's `completion_reason` (killed, lost, failed_start, …).
+ */
+export type ProcessState =
+  | { status: 'running' }
+  | { status: 'unknown' }
+  | { status: 'done' | 'failed' | 'killed' | 'lost'; exitedAt?: number; exitCode?: number; reason?: string }
+
+/** A background process that was seen to end: how. */
+export type ProcessEnd = Exclude<ProcessState, { status: 'running' | 'unknown' }>
 
 /** One tool call, from `tool.start` to `tool.complete`. */
 export interface ToolCall {

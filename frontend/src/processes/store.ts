@@ -10,7 +10,7 @@ import type { GatewayClient } from '@tui/gatewayClient.js'
 
 import type { LiveSessionId } from '../core/ids.js'
 import { Poller } from '../core/poller.js'
-import type { BackgroundProcess, ToolCall } from '../model.js'
+import type { BackgroundProcess, ProcessEnd, ProcessState, ToolCall } from '../model.js'
 import type { Transcript } from '../transcript.js'
 import { isWatchCall } from '../transcript/calls.js'
 import { withoutTernEnv } from '../view/describe.js'
@@ -40,10 +40,10 @@ export const IDLE_MS = 5000
 /** Failed `process.list` polls in a row after which a running process shows as unknown. */
 export const FAILED_POLLS = 3
 
-const REASON_STATUS: Record<string, BackgroundProcess['status']> = { failed_start: 'failed', killed: 'killed', lost: 'lost' }
+const REASON_STATUS: Record<string, ProcessEnd['status']> = { failed_start: 'failed', killed: 'killed', lost: 'lost' }
 
 /** Hermes' mapping: running until exited, then the completion reason, else the exit code. */
-export function processStatus(entry: Pick<ProcessRow, 'completion_reason' | 'exit_code' | 'status'>): BackgroundProcess['status'] {
+export function processStatus(entry: Pick<ProcessRow, 'completion_reason' | 'exit_code' | 'status'>): 'running' | ProcessEnd['status'] {
   if (entry.status !== 'exited') {
     return 'running'
   }
@@ -72,39 +72,61 @@ export function lastLine(output: string): string {
 
 /** `entry` folded into `prev` (kept as the same object, so Tern timers keyed on it stay put). */
 export function foldEntry(prev: BackgroundProcess | undefined, entry: ProcessRow, now: number): BackgroundProcess {
-  const status = processStatus(entry)
+  const state = stateOf(entry, prev && endOf(prev))
   const output = entry.output_tail ?? entry.output_preview ?? prev?.output ?? ''
   const startedAt =
     typeof entry.started_epoch === 'number'
       ? entry.started_epoch * 1000
       : (prev?.startedAt ?? now - Math.max(0, entry.uptime_seconds ?? 0) * 1000)
 
-  const p: BackgroundProcess = prev ?? { command: '', id: entry.session_id, lastLine: '', output: '', startedAt, status }
+  const p: BackgroundProcess = prev ?? { command: '', id: entry.session_id, lastLine: '', output: '', startedAt, state }
 
   p.command = withoutTernEnv((entry.command ?? '').trim()) || p.command || 'background process'
-  p.status = status
+  p.state = state
   p.startedAt = startedAt
   p.output = output
   p.lastLine = lastLine(output)
-  p.exitCode = typeof entry.exit_code === 'number' && status !== 'running' ? entry.exit_code : undefined
-  p.reason = status !== 'running' ? (entry.completion_reason ?? undefined) : undefined
-  p.exitedAt = status === 'running' ? undefined : typeof entry.exited_at === 'number' && entry.exited_at ? entry.exited_at * 1000 : p.exitedAt
 
   return p
 }
 
+/** What `entry` says of its process; an exit time it does not give stays the one `was` had. */
+function stateOf(entry: ProcessRow, was: ProcessEnd | undefined): ProcessState {
+  const status = processStatus(entry)
+
+  if (status === 'running') {
+    return { status }
+  }
+
+  const exitedAt = typeof entry.exited_at === 'number' && entry.exited_at ? entry.exited_at * 1000 : was?.exitedAt
+
+  return {
+    status,
+    ...(exitedAt === undefined ? {} : { exitedAt }),
+    ...(typeof entry.exit_code === 'number' ? { exitCode: entry.exit_code } : {}),
+    ...(typeof entry.completion_reason === 'string' ? { reason: entry.completion_reason } : {})
+  }
+}
+
+/** How `p` ended; undefined while it is not seen to end. */
+export function endOf(p: BackgroundProcess): ProcessEnd | undefined {
+  return p.state.status === 'running' || p.state.status === 'unknown' ? undefined : p.state
+}
+
 export function isRunning(p: BackgroundProcess): boolean {
-  return p.status === 'running'
+  return p.state.status === 'running'
 }
 
 /** Not seen to end: running, or unknown (it ran when `process.list` last answered). */
 export function isUnended(p: BackgroundProcess): boolean {
-  return p.status === 'running' || p.status === 'unknown'
+  return !endOf(p)
 }
 
 /** Still on the pill: not seen to end, or exited within the retention window (an exit with no time is not). */
 export function isRecent(p: BackgroundProcess, now: number): boolean {
-  return isUnended(p) || (p.exitedAt !== undefined && now - p.exitedAt <= RETAIN_MS)
+  const exitedAt = endOf(p)?.exitedAt
+
+  return isUnended(p) || (exitedAt !== undefined && now - exitedAt <= RETAIN_MS)
 }
 
 /** Running first, longest-running first; then exited ones, newest exit first. */
@@ -116,23 +138,25 @@ export function sortProcesses(list: readonly BackgroundProcess[]): BackgroundPro
         : 1
       : isRunning(a)
         ? a.startedAt - b.startedAt
-        : (b.exitedAt ?? 0) - (a.exitedAt ?? 0)
+        : (endOf(b)?.exitedAt ?? 0) - (endOf(a)?.exitedAt ?? 0)
   )
 }
 
 /** How long it ran (so far, while not seen to end). */
 export function processElapsed(p: BackgroundProcess, now: number): number {
-  return Math.max(0, (p.exitedAt ?? (isUnended(p) ? now : p.startedAt)) - p.startedAt)
+  return Math.max(0, (endOf(p)?.exitedAt ?? (isUnended(p) ? now : p.startedAt)) - p.startedAt)
 }
 
 /** The status's palette tone: accent while running, then success, error or warning. */
-export function processTone(status: BackgroundProcess['status']): ProcessLook['tone'] {
+export function processTone(status: ProcessState['status']): ProcessLook['tone'] {
   return PROCESS_LOOK[status].tone
 }
 
 /** `running`, `exit 0`, `exit 2`, `killed`, `lost`, `unknown`, `failed to start`. */
 export function processVerdict(p: BackgroundProcess): string {
-  switch (p.status) {
+  const { state } = p
+
+  switch (state.status) {
     case 'running':
       return 'running'
 
@@ -141,10 +165,10 @@ export function processVerdict(p: BackgroundProcess): string {
     case 'lost':
 
     case 'unknown':
-      return p.status
+      return state.status
 
     default:
-      return p.reason === 'failed_start' ? 'failed to start' : `exit ${p.exitCode ?? '?'}`
+      return state.reason === 'failed_start' ? 'failed to start' : `exit ${state.exitCode ?? '?'}`
   }
 }
 
@@ -390,8 +414,7 @@ export class Processes {
 
       if (isUnended(p)) {
         // Gone from the registry while running (a restarted gateway): Hermes calls that lost.
-        p.status = 'lost'
-        p.exitedAt = now
+        p.state = { exitedAt: now, status: 'lost' }
         touched.add(p)
       } else if (!isRecent(p, now)) {
         this.#byId.delete(p.id)
@@ -403,7 +426,7 @@ export class Processes {
     changed = this.#chart([...this.#byId.values()]) || changed
     changed = this.#link(touched) || touched.size > 0 || changed
     const shown = this.recent(now)
-      .map(p => `${p.id}:${p.status}`)
+      .map(p => `${p.id}:${p.state.status}`)
       .join()
 
     if (shown !== this.#shown) {
@@ -428,7 +451,7 @@ export class Processes {
     }
 
     const touched = new Set([...this.#byId.values()].filter(isRunning))
-    touched.forEach(p => (p.status = 'unknown'))
+    touched.forEach(p => (p.state = { status: 'unknown' }))
 
     return this.#link(touched) || touched.size > 0
   }
@@ -502,5 +525,7 @@ export function linkCalls(calls: readonly ToolCall[], procs: readonly Background
 }
 
 function snapshot(p: BackgroundProcess): string {
-  return `${p.status}|${p.exitCode}|${p.exitedAt}|${p.startedAt}|${p.output.slice(-120)}|${p.lastLine}|${p.command}`
+  const end = endOf(p)
+
+  return `${p.state.status}|${end?.exitCode}|${end?.exitedAt}|${p.startedAt}|${p.output.slice(-120)}|${p.lastLine}|${p.command}`
 }

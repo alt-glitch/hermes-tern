@@ -41,7 +41,7 @@
   "src/overlays/sessions.tsx": 2,
   "src/palette.ts": 4,
   "src/processes/cron.ts": 4,
-  "src/processes/store.ts": 22,
+  "src/processes/store.ts": 19,
   "src/processes/widgets/author.ts": 3,
   "src/processes/widgets/files.ts": 1,
   "src/processes/widgets/registry.ts": 7,

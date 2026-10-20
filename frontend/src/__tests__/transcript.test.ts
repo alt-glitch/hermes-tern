@@ -208,6 +208,25 @@ describe('Transcript', () => {
     expect(tools(turn)[0]).toMatchObject({ outcome: { duration: 2, kind: 'cancelled' } })
   })
 
+  it('keeps each call, compaction and turn the same object as it ends: only its outcome, state or end is replaced', () => {
+    const t = new Transcript()
+    const turn = t.messageStart(0)
+    t.toolStart({ name: 'terminal', tool_id: 'c1' }, 1)
+    const call = t.call(toolCallId('c1'))
+    const compaction = t.compacting({ at: 2, before: 90_000 })
+
+    t.toolComplete({ name: 'terminal', result: { exit_code: 0, output: 'ok' }, tool_id: 'c1' }, 3)
+    t.compacted(4, { after: 20_000 })
+    t.complete({ status: 'complete', text: 'done' }, 5)
+
+    expect(turnOf(t.entries)).toBe(turn)
+    expect(tools(turn)[0]).toBe(call)
+    expect(call?.outcome).toEqual({ duration: 2, kind: 'done' })
+    expect(compaction.state).toEqual({ after: 20_000, endedAt: 4, status: 'done' })
+    expect(turn.blocks.some(b => b.kind === 'compaction' && b.compaction === compaction)).toBe(true)
+    expect(turn.end).toEqual({ endedAt: 5, status: 'done' })
+  })
+
   it('splits a failed request into code, message and advice', () => {
     const t = new Transcript()
     t.messageStart(0)

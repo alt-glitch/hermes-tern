@@ -26575,14 +26575,14 @@ function tile({ process: p3, view }) {
   const g = live && glance(live);
   const title = plain(live?.title ?? "") || plain(p3.command.split(/\r?\n/, 1)[0] ?? "") || p3.id;
   const visual = tileVisual(live?.blocks[0]);
-  const look = PROCESS_LOOK[p3.status];
+  const look = PROCESS_LOOK[p3.state.status];
   return /* @__PURE__ */ jsxs("col", { gap: "xs", role: "omp.job.tile", tone: look.tone, children: [
     /* @__PURE__ */ jsxs("row", { align: "center", gap: "xs", role: "omp.job.tile.head", children: [
       /* @__PURE__ */ jsx(
         "text",
         {
           role: "omp.job.tile.dot",
-          spans: [{ s: toneStyle(look.tone), t: look.glyph, ...p3.status === "running" ? { fx: "pulse" } : {} }],
+          spans: [{ s: toneStyle(look.tone), t: look.glyph, ...p3.state.status === "running" ? { fx: "pulse" } : {} }],
           wrap: "none"
         },
         "dot"
@@ -26635,7 +26635,8 @@ function tileVisual(b) {
 }
 function tileNotes(p3, view, live, lead) {
   const stage = plain(view.stage ?? "");
-  const failed = p3.exitCode ? `exit ${p3.exitCode}` : "";
+  const code7 = "exitCode" in p3.state ? p3.state.exitCode : void 0;
+  const failed = code7 ? `exit ${code7}` : "";
   const notes = [];
   for (const b of live?.blocks ?? []) {
     if (b.kind === "stat" && b.items.length) {
@@ -28914,10 +28915,10 @@ function connectCard(call) {
   const card = call.connect ?? { opened: [], targets: connectTargets(call), told: false };
   const { settled: settled2, targets } = card;
   const ref = card.key ?? call.id;
-  const stateOf = (t2) => settled2 && waiting2(t2) ? "not_connected" : t2.state === "initiated" && !card.opened.includes(t2.name) ? "pending" : t2.state;
+  const stateOf2 = (t2) => settled2 && waiting2(t2) ? "not_connected" : t2.state === "initiated" && !card.opened.includes(t2.name) ? "pending" : t2.state;
   const open = settled2 ? [] : targets.filter(waiting2);
   const rows2 = targets.map((t2, i) => {
-    const look = CONNECT_STATE[stateOf(t2)] ?? PENDING;
+    const look = CONNECT_STATE[stateOf2(t2)] ?? PENDING;
     return /* @__PURE__ */ jsxs("row", { align: "center", gap: "sm", role: "hermes.connect.row", children: [
       /* @__PURE__ */ jsx("icon", { name: look.icon, tone: look.tone }, "i"),
       /* @__PURE__ */ jsx(
@@ -31055,7 +31056,7 @@ var Charts = class {
       return;
     }
     const now = this.#now();
-    const settled2 = entry.process.status !== "running";
+    const settled2 = entry.process.state.status !== "running";
     entry.tap.update(entry.process.output);
     entry.files.forEach((f) => f.update());
     if (settled2) {
@@ -31165,7 +31166,7 @@ var Charts = class {
       this.#memory?.save(entry.process.id, spec);
       entry.runtime = new ChartRuntime(spec, entry.process.startedAt, this.#now);
       entry.tap.update(entry.process.output);
-      entry.runtime.ingest([entry.tap, ...entry.files], entry.process.status !== "running");
+      entry.runtime.ingest([entry.tap, ...entry.files], entry.process.state.status !== "running");
     }
     if (this.#recompute(entry)) {
       this.#changed();
@@ -31199,50 +31200,65 @@ function lastLine(output) {
   return "";
 }
 function foldEntry(prev, entry, now) {
-  const status = processStatus(entry);
+  const state = stateOf(entry, prev && endOf(prev));
   const output = entry.output_tail ?? entry.output_preview ?? prev?.output ?? "";
   const startedAt = typeof entry.started_epoch === "number" ? entry.started_epoch * 1e3 : prev?.startedAt ?? now - Math.max(0, entry.uptime_seconds ?? 0) * 1e3;
-  const p3 = prev ?? { command: "", id: entry.session_id, lastLine: "", output: "", startedAt, status };
+  const p3 = prev ?? { command: "", id: entry.session_id, lastLine: "", output: "", startedAt, state };
   p3.command = withoutTernEnv((entry.command ?? "").trim()) || p3.command || "background process";
-  p3.status = status;
+  p3.state = state;
   p3.startedAt = startedAt;
   p3.output = output;
   p3.lastLine = lastLine(output);
-  p3.exitCode = typeof entry.exit_code === "number" && status !== "running" ? entry.exit_code : void 0;
-  p3.reason = status !== "running" ? entry.completion_reason ?? void 0 : void 0;
-  p3.exitedAt = status === "running" ? void 0 : typeof entry.exited_at === "number" && entry.exited_at ? entry.exited_at * 1e3 : p3.exitedAt;
   return p3;
 }
+function stateOf(entry, was) {
+  const status = processStatus(entry);
+  if (status === "running") {
+    return { status };
+  }
+  const exitedAt = typeof entry.exited_at === "number" && entry.exited_at ? entry.exited_at * 1e3 : was?.exitedAt;
+  return {
+    status,
+    ...exitedAt === void 0 ? {} : { exitedAt },
+    ...typeof entry.exit_code === "number" ? { exitCode: entry.exit_code } : {},
+    ...typeof entry.completion_reason === "string" ? { reason: entry.completion_reason } : {}
+  };
+}
+function endOf(p3) {
+  return p3.state.status === "running" || p3.state.status === "unknown" ? void 0 : p3.state;
+}
 function isRunning2(p3) {
-  return p3.status === "running";
+  return p3.state.status === "running";
 }
 function isUnended(p3) {
-  return p3.status === "running" || p3.status === "unknown";
+  return !endOf(p3);
 }
 function isRecent(p3, now) {
-  return isUnended(p3) || p3.exitedAt !== void 0 && now - p3.exitedAt <= RETAIN_MS;
+  const exitedAt = endOf(p3)?.exitedAt;
+  return isUnended(p3) || exitedAt !== void 0 && now - exitedAt <= RETAIN_MS;
 }
 function sortProcesses(list9) {
   return [...list9].sort(
-    (a2, b) => isRunning2(a2) !== isRunning2(b) ? isRunning2(a2) ? -1 : 1 : isRunning2(a2) ? a2.startedAt - b.startedAt : (b.exitedAt ?? 0) - (a2.exitedAt ?? 0)
+    (a2, b) => isRunning2(a2) !== isRunning2(b) ? isRunning2(a2) ? -1 : 1 : isRunning2(a2) ? a2.startedAt - b.startedAt : (endOf(b)?.exitedAt ?? 0) - (endOf(a2)?.exitedAt ?? 0)
   );
 }
 function processElapsed(p3, now) {
-  return Math.max(0, (p3.exitedAt ?? (isUnended(p3) ? now : p3.startedAt)) - p3.startedAt);
+  return Math.max(0, (endOf(p3)?.exitedAt ?? (isUnended(p3) ? now : p3.startedAt)) - p3.startedAt);
 }
 function processTone(status) {
   return PROCESS_LOOK[status].tone;
 }
 function processVerdict(p3) {
-  switch (p3.status) {
+  const { state } = p3;
+  switch (state.status) {
     case "running":
       return "running";
     case "killed":
     case "lost":
     case "unknown":
-      return p3.status;
+      return state.status;
     default:
-      return p3.reason === "failed_start" ? "failed to start" : `exit ${p3.exitCode ?? "?"}`;
+      return state.reason === "failed_start" ? "failed to start" : `exit ${state.exitCode ?? "?"}`;
   }
 }
 var strings2 = (v) => Array.isArray(v) ? v.filter((x) => typeof x === "string" && x !== "") : [];
@@ -31420,8 +31436,7 @@ var Processes = class {
         continue;
       }
       if (isUnended(p3)) {
-        p3.status = "lost";
-        p3.exitedAt = now;
+        p3.state = { exitedAt: now, status: "lost" };
         touched.add(p3);
       } else if (!isRecent(p3, now)) {
         this.#byId.delete(p3.id);
@@ -31431,7 +31446,7 @@ var Processes = class {
     this.#charts.retain(new Set(this.#byId.keys()));
     changed = this.#chart([...this.#byId.values()]) || changed;
     changed = this.#link(touched) || touched.size > 0 || changed;
-    const shown3 = this.recent(now).map((p3) => `${p3.id}:${p3.status}`).join();
+    const shown3 = this.recent(now).map((p3) => `${p3.id}:${p3.state.status}`).join();
     if (shown3 !== this.#shown) {
       this.#shown = shown3;
       changed = true;
@@ -31450,7 +31465,7 @@ var Processes = class {
       return false;
     }
     const touched = new Set([...this.#byId.values()].filter(isRunning2));
-    touched.forEach((p3) => p3.status = "unknown");
+    touched.forEach((p3) => p3.state = { status: "unknown" });
     return this.#link(touched) || touched.size > 0;
   }
   /** Points each background terminal card at its process; true when a card changed. */
@@ -31501,7 +31516,8 @@ function linkCalls(calls, procs) {
   return owners;
 }
 function snapshot(p3) {
-  return `${p3.status}|${p3.exitCode}|${p3.exitedAt}|${p3.startedAt}|${p3.output.slice(-120)}|${p3.lastLine}|${p3.command}`;
+  const end = endOf(p3);
+  return `${p3.state.status}|${end?.exitCode}|${end?.exitedAt}|${p3.startedAt}|${p3.output.slice(-120)}|${p3.lastLine}|${p3.command}`;
 }
 
 // src/vendor/t3code/commandLabel.ts
@@ -32675,7 +32691,7 @@ function backgroundCard(call, d, now) {
 function processLine(call, id, now) {
   const p3 = call.process;
   const live = !p3 || isRunning2(p3);
-  const tone = p3 ? processTone(p3.status) : "muted";
+  const tone = p3 ? processTone(p3.state.status) : "muted";
   return /* @__PURE__ */ jsxs(
     "row",
     {
@@ -32685,7 +32701,7 @@ function processLine(call, id, now) {
       role: "omp.tool.process",
       title: "Open in the Background sheet  \u2325J",
       children: [
-        p3 && live ? /* @__PURE__ */ jsx("spinner", { style: "dots", tone: "accent" }, "state-icon") : /* @__PURE__ */ jsx("icon", { name: p3 ? PROCESS_LOOK[p3.status].icon : "pending", tone }, "state-icon"),
+        p3 && live ? /* @__PURE__ */ jsx("spinner", { style: "dots", tone: "accent" }, "state-icon") : /* @__PURE__ */ jsx("icon", { name: p3 ? PROCESS_LOOK[p3.state.status].icon : "pending", tone }, "state-icon"),
         /* @__PURE__ */ jsx("text", { spans: [{ s: tone, t: p3 ? processVerdict(p3) : "starting" }], wrap: "none" }, "state"),
         p3 ? /* @__PURE__ */ jsx("text", { spans: [{ s: "dim", t: "\xB7" }], wrap: "none" }, "sep1") : null,
         p3 && live ? /* @__PURE__ */ jsx("elapsed", { age: age(p3, p3.startedAt, now), format: "short" }, "time") : null,
@@ -33770,17 +33786,17 @@ function callOf(host, id) {
 }
 function summary3(all8) {
   return countSummary(all8, [
-    [(p3) => p3.status === "running", "running"],
-    [(p3) => p3.status === "done", "exited"],
-    [(p3) => p3.status === "failed", "failed"],
-    [(p3) => p3.status === "killed" || p3.status === "lost", "stopped"],
-    [(p3) => p3.status === "unknown", "unknown"]
+    [(p3) => p3.state.status === "running", "running"],
+    [(p3) => p3.state.status === "done", "exited"],
+    [(p3) => p3.state.status === "failed", "failed"],
+    [(p3) => p3.state.status === "killed" || p3.state.status === "lost", "stopped"],
+    [(p3) => p3.state.status === "unknown", "unknown"]
   ]);
 }
 function item(p3, now, stopping) {
   return {
     detail: commandLine(p3.command, 120),
-    dot: processTone(p3.status),
+    dot: processTone(p3.state.status),
     facts: {
       last: p3.lastLine || (isRunning2(p3) ? "starting\u2026" : ""),
       status: stopping ? "stopping\u2026" : isRunning2(p3) ? "running" : processVerdict(p3),
@@ -33794,6 +33810,7 @@ function item(p3, now, stopping) {
 }
 function preview2(p3, call, now) {
   const w = call ? watchersOf(call) : void 0;
+  const end = endOf(p3);
   return [
     /* @__PURE__ */ jsx("text", { role: "omp.hub.title", text: describeCommand(p3.command) }, "title"),
     /* @__PURE__ */ jsx("code", { lang: "bash", max: { h: "6lines" }, role: "omp.tool.command", text: p3.command, wrap: true }, "cmd"),
@@ -33801,11 +33818,11 @@ function preview2(p3, call, now) {
       "kv",
       {
         items: facts([
-          ["Status", [{ s: processTone(p3.status), t: isRunning2(p3) ? PROCESS_LOOK.running.word : `${PROCESS_LOOK[p3.status].word} \xB7 ${processVerdict(p3)}` }]],
+          ["Status", [{ s: processTone(p3.state.status), t: isRunning2(p3) ? PROCESS_LOOK.running.word : `${PROCESS_LOOK[p3.state.status].word} \xB7 ${processVerdict(p3)}` }]],
           ["Started", clockSeconds(p3.startedAt)],
           [isRunning2(p3) ? "Running for" : "Ran for", duration(processElapsed(p3, now))],
-          ["Exited", p3.exitedAt ? `${clockSeconds(p3.exitedAt)} \xB7 ${duration(now - p3.exitedAt)} ago` : void 0],
-          ["Reason", p3.status !== "running" && p3.reason?.replace(/_/g, " ")],
+          ["Exited", end?.exitedAt ? `${clockSeconds(end.exitedAt)} \xB7 ${duration(now - end.exitedAt)} ago` : void 0],
+          ["Reason", end?.reason?.replace(/_/g, " ")],
           ...w ? watcherFacts(w) : [],
           ["Process", [{ s: "mono dim", t: p3.id }]]
         ]),
@@ -33828,7 +33845,7 @@ function outputView(p3, now) {
       "text",
       {
         spans: [
-          { s: processTone(p3.status), t: isRunning2(p3) ? "running" : processVerdict(p3) },
+          { s: processTone(p3.state.status), t: isRunning2(p3) ? "running" : processVerdict(p3) },
           { s: "muted", t: ` \xB7 ${duration(processElapsed(p3, now))}` }
         ]
       },
@@ -69289,7 +69306,7 @@ function shellsOf(processes, now) {
     exited: exited.length,
     running: recent.length - exited.length,
     // The roster puts the newest exit first.
-    tone: exited[0] ? processTone(exited[0].status) : "muted"
+    tone: exited[0] ? processTone(exited[0].state.status) : "muted"
   };
 }
 

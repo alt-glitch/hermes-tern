@@ -26,6 +26,7 @@ import {
   shownProcesses
 } from '../processes/sheet.js'
 import {
+  endOf,
   isRunning,
   processElapsed,
   processIdOf,
@@ -374,18 +375,18 @@ function callOf(host: BackgroundHost, id: string): ToolCall | undefined {
 
 function summary(all: BackgroundProcess[]): string {
   return countSummary(all, [
-    [p => p.status === 'running', 'running'],
-    [p => p.status === 'done', 'exited'],
-    [p => p.status === 'failed', 'failed'],
-    [p => p.status === 'killed' || p.status === 'lost', 'stopped'],
-    [p => p.status === 'unknown', 'unknown']
+    [p => p.state.status === 'running', 'running'],
+    [p => p.state.status === 'done', 'exited'],
+    [p => p.state.status === 'failed', 'failed'],
+    [p => p.state.status === 'killed' || p.state.status === 'lost', 'stopped'],
+    [p => p.state.status === 'unknown', 'unknown']
   ])
 }
 
 function item(p: BackgroundProcess, now: number, stopping: boolean): PickerItem {
   return {
     detail: commandLine(p.command, 120),
-    dot: processTone(p.status),
+    dot: processTone(p.state.status),
     facts: {
       last: p.lastLine || (isRunning(p) ? 'starting…' : ''),
       status: stopping ? 'stopping…' : isRunning(p) ? 'running' : processVerdict(p),
@@ -400,17 +401,18 @@ function item(p: BackgroundProcess, now: number, stopping: boolean): PickerItem 
 
 function preview(p: BackgroundProcess, call: ToolCall | undefined, now: number): JSX.Element[] {
   const w = call ? watchersOf(call) : undefined
+  const end = endOf(p)
 
   return [
     <text key="title" role="omp.hub.title" text={describeCommand(p.command)} />,
     <code key="cmd" lang="bash" max={{ h: '6lines' }} role="omp.tool.command" text={p.command} wrap />,
     <kv
       items={facts([
-        ['Status', [{ s: processTone(p.status), t: isRunning(p) ? PROCESS_LOOK.running.word : `${PROCESS_LOOK[p.status].word} · ${processVerdict(p)}` }]],
+        ['Status', [{ s: processTone(p.state.status), t: isRunning(p) ? PROCESS_LOOK.running.word : `${PROCESS_LOOK[p.state.status].word} · ${processVerdict(p)}` }]],
         ['Started', clockSeconds(p.startedAt)],
         [isRunning(p) ? 'Running for' : 'Ran for', duration(processElapsed(p, now))],
-        ['Exited', p.exitedAt ? `${clockSeconds(p.exitedAt)} · ${duration(now - p.exitedAt)} ago` : undefined],
-        ['Reason', p.status !== 'running' && p.reason?.replace(/_/g, ' ')],
+        ['Exited', end?.exitedAt ? `${clockSeconds(end.exitedAt)} · ${duration(now - end.exitedAt)} ago` : undefined],
+        ['Reason', end?.reason?.replace(/_/g, ' ')],
         ...(w ? watcherFacts(w) : []),
         ['Process', [{ s: 'mono dim', t: p.id }]]
       ])}
@@ -439,7 +441,7 @@ function outputView(p: BackgroundProcess, now: number): JSX.Element[] {
     <text
       key="state"
       spans={[
-        { s: processTone(p.status), t: isRunning(p) ? 'running' : processVerdict(p) },
+        { s: processTone(p.state.status), t: isRunning(p) ? 'running' : processVerdict(p) },
         { s: 'muted', t: ` · ${duration(processElapsed(p, now))}` }
       ]}
     />,

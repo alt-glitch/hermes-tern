@@ -39,7 +39,7 @@ const proc = (over: Partial<BackgroundProcess> = {}): BackgroundProcess => ({
   lastLine: '',
   output: '',
   startedAt: 0,
-  status: 'running',
+  state: { status: 'running' },
   ...over
 })
 
@@ -265,7 +265,7 @@ describe('Charts', () => {
     const p = proc({ output: lines(5) })
 
     expect(charts.view(p)?.state).toBe('authoring')
-    p.status = 'done'
+    p.state = { status: 'done' }
     now += 1000
     expect(charts.view(p)?.state).toBe('fallback')
     release(LOAD)
@@ -278,7 +278,7 @@ describe('Charts', () => {
     expect(charts.view(proc())).toBeUndefined()
 
     const on = new Charts(() => undefined)
-    const p = proc({ output: 'one\n', status: 'done' })
+    const p = proc({ output: 'one\n', state: { status: 'done' } })
     const view = on.view(p)
     p.output = 'one\ntwo\n'
     expect(on.view(p)).toBe(view)

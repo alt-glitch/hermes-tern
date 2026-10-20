@@ -236,7 +236,7 @@ export class Charts {
     }
 
     const now = this.#now()
-    const settled = entry.process.status !== 'running'
+    const settled = entry.process.state.status !== 'running'
     entry.tap.update(entry.process.output)
     entry.files.forEach(f => f.update())
 
@@ -386,7 +386,7 @@ export class Charts {
       // A new spec rereads the output from its oldest retained text.
       entry.runtime = new ChartRuntime(spec, entry.process.startedAt, this.#now)
       entry.tap.update(entry.process.output)
-      entry.runtime.ingest([entry.tap, ...entry.files], entry.process.status !== 'running')
+      entry.runtime.ingest([entry.tap, ...entry.files], entry.process.state.status !== 'running')
     }
 
     if (this.#recompute(entry)) {

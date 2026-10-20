@@ -207,7 +207,7 @@ export function tile({ process: p, view }: ChartEntry): JSX.Element {
   const g = live && glance(live)
   const title = plain(live?.title ?? '') || plain(p.command.split(/\r?\n/, 1)[0] ?? '') || p.id
   const visual = tileVisual(live?.blocks[0])
-  const look = PROCESS_LOOK[p.status]
+  const look = PROCESS_LOOK[p.state.status]
 
   return (
     <col gap="xs" key={p.id} role="omp.job.tile" tone={look.tone}>
@@ -215,7 +215,7 @@ export function tile({ process: p, view }: ChartEntry): JSX.Element {
         <text
           key="dot"
           role="omp.job.tile.dot"
-          spans={[{ s: toneStyle(look.tone), t: look.glyph, ...(p.status === 'running' ? { fx: 'pulse' } : {}) }]}
+          spans={[{ s: toneStyle(look.tone), t: look.glyph, ...(p.state.status === 'running' ? { fx: 'pulse' } : {}) }]}
           wrap="none"
         />
         <text grow={1} key="title" role="omp.job.tile.title" spans={[sp(title)]} truncate="end" wrap="none" />
@@ -282,7 +282,8 @@ function tileVisual(b: Block | undefined): JSX.Element | undefined {
 function tileNotes(p: BackgroundProcess, view: ChartView, live: ChartView | undefined, lead: boolean): JSX.Element[] {
   // A live chart's stage is a line no rule read; the matched lines are what its figures show.
   const stage = plain(view.stage ?? '')
-  const failed = p.exitCode ? `exit ${p.exitCode}` : ''
+  const code = 'exitCode' in p.state ? p.state.exitCode : undefined
+  const failed = code ? `exit ${code}` : ''
   const notes: JSX.Element[] = []
 
   for (const b of live?.blocks ?? []) {

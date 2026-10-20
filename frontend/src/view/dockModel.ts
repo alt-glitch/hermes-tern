@@ -152,6 +152,6 @@ function shellsOf(processes: DockSources['processes'], now: number): ShellsPill 
     exited: exited.length,
     running: recent.length - exited.length,
     // The roster puts the newest exit first.
-    tone: exited[0] ? processTone(exited[0].status) : 'muted'
+    tone: exited[0] ? processTone(exited[0].state.status) : 'muted'
   }
 }

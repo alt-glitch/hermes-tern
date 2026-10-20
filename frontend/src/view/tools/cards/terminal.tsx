@@ -98,7 +98,7 @@ function backgroundCard(call: ToolCall, d: TerminalDetail, now: number): Card {
 function processLine(call: ToolCall, id: string, now: number): JSX.Element {
   const p = call.process
   const live = !p || processRuns(p)
-  const tone = p ? processTone(p.status) : 'muted'
+  const tone = p ? processTone(p.state.status) : 'muted'
 
   return (
     <row
@@ -112,7 +112,7 @@ function processLine(call: ToolCall, id: string, now: number): JSX.Element {
       {p && live ? (
         <spinner key="state-icon" style="dots" tone="accent" />
       ) : (
-        <icon key="state-icon" name={p ? PROCESS_LOOK[p.status].icon : 'pending'} tone={tone} />
+        <icon key="state-icon" name={p ? PROCESS_LOOK[p.state.status].icon : 'pending'} tone={tone} />
       )}
       <text key="state" spans={[{ s: tone, t: p ? processVerdict(p) : 'starting' }]} wrap="none" />
       {p ? <text key="sep1" spans={[{ s: 'dim', t: '·' }]} wrap="none" /> : null}

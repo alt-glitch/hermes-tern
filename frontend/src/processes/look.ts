@@ -1,7 +1,7 @@
 // How a background process's status looks, everywhere one is drawn: its tone, the icon of an
 // ended one, its tile's glyph and the word the Background sheet uses.
 
-import type { BackgroundProcess } from '../model.js'
+import type { ProcessState } from '../model.js'
 
 /** The look of one status. */
 export interface ProcessLook {
@@ -23,4 +23,4 @@ export const PROCESS_LOOK = {
   lost: { glyph: '■', icon: 'aborted', tone: 'warning', word: 'Lost' },
   running: { glyph: '●', icon: 'running', tone: 'accent', word: 'Running' },
   unknown: { glyph: '?', icon: 'pending', tone: 'warning', word: 'Unknown' }
-} as const satisfies Record<BackgroundProcess['status'], ProcessLook>
+} as const satisfies Record<ProcessState['status'], ProcessLook>

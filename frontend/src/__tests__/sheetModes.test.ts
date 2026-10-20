@@ -114,8 +114,8 @@ describe('the agents hub reducer', () => {
   })
 })
 
-function process(id: string, status: BackgroundProcess['status']): BackgroundProcess {
-  return { command: `run ${id}`, id, lastLine: '', output: '', startedAt: 0, status }
+function process(id: string, status: 'done' | 'running'): BackgroundProcess {
+  return { command: `run ${id}`, id, lastLine: '', output: '', startedAt: 0, state: { status } }
 }
 
 const JOBS: CronJob[] = [{ job_id: 'j1', name: 'nightly' }, { enabled: false, job_id: 'j2' }]
