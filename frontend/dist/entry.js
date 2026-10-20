@@ -69214,17 +69214,21 @@ ${composer2.text}` : text15 || composer2.text);
     }
     this.#cx.changed();
   }
-  /** Stops the running turn: the working line says Stopping… until the stream's next label. */
+  /**
+   * Stops the running turn: the working line says Stopping… until the stream's next label. A
+   * failure speaks only for the turn it tried to stop: once that row is gone, it says nothing.
+   */
   interrupt() {
     const { activity } = this.#cx;
     const sid = this.#cx.state.ref.live;
+    const row2 = activity.busy?.since;
     if (!sid) {
       return;
     }
     activity.relabel("Stopping\u2026", { status: true });
     interruptTurn(this.#cx.gw, sid).catch((error) => {
       const why = errorText(error);
-      if (activity.busy && !why.includes("stale_generation")) {
+      if (row2 && activity.busy?.since === row2 && !why.includes("stale_generation")) {
         activity.relabel("Working\u2026", { status: true });
         this.#cx.transcript.notice(`Could not stop the turn: ${why}`, "error");
         this.#cx.changed();

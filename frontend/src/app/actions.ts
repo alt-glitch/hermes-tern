@@ -328,10 +328,15 @@ export class AppActions {
     this.#cx.changed()
   }
 
-  /** Stops the running turn: the working line says Stopping… until the stream's next label. */
+  /**
+   * Stops the running turn: the working line says Stopping… until the stream's next label. A
+   * failure speaks only for the turn it tried to stop: once that row is gone, it says nothing.
+   */
   interrupt() {
     const { activity } = this.#cx
     const sid = this.#cx.state.ref.live
+    // The turn being stopped, by its row (a relabel keeps it; the next turn's row is another).
+    const row = activity.busy?.since
 
     if (!sid) {
       return
@@ -344,7 +349,7 @@ export class AppActions {
       const why = errorText(error)
 
       // A stale generation means the turn already ended: nothing to say.
-      if (activity.busy && !why.includes('stale_generation')) {
+      if (row && activity.busy?.since === row && !why.includes('stale_generation')) {
         // 'Working…', not the label it replaced: whatever the turn shows now.
         activity.relabel('Working…', { status: true })
         this.#cx.transcript.notice(`Could not stop the turn: ${why}`, 'error')

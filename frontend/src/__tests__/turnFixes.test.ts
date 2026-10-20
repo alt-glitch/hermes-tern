@@ -136,4 +136,22 @@ describe('the working row is ended only by the work that owns it', () => {
     expect(app.activity.busy).toBe(row)
     expect(app.composer.text).toBe('hello')
   })
+  it("a failed interrupt that answers after its turn ended leaves the next turn's label, and says nothing", async () => {
+    const stop = held()
+    const { app, emit, gw, notices, press } = setup({ 'session.interrupt': stop.reply, 'session.resume': () => ({ execution_generation: 7 }) })
+    given.busy(app, { label: 'Thinking…', since: {}, startedAt: 0 })
+    await press('escape')
+    await press('escape')
+    expect(app.activity.busy?.label).toBe('Stopping…')
+
+    // That turn ends, and the next one is writing when the interrupt's failure comes.
+    await emit('message.complete', { text: 'done' })
+    await emit('message.start')
+    await emit('message.delta', { text: 'next' })
+    stop.reject(new Error('boom'))
+    await settle(gw)
+
+    expect(app.activity.busy?.label).toBe('Writing…')
+    expect(notices()).not.toContain('Could not stop the turn: boom')
+  })
 })
