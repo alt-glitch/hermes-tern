@@ -16,13 +16,13 @@ interface Node {
 const tree = (n: JSX.Element): Node => JSON.parse(JSON.stringify(n)) as Node
 
 function words(n: Node): string[] {
-  const spans = Array.isArray(n.p?.spans) ? (n.p.spans as { t: string }[]).map(s => s.t) : []
+  const spans = Array.isArray(n.p?.['spans']) ? (n.p['spans'] as { t: string }[]).map(s => s.t) : []
 
-  return [...spans, ...(typeof n.p?.text === 'string' && n.k === 'md' ? [n.p.text] : []), ...(n.c ?? []).flatMap(words)]
+  return [...spans, ...(typeof n.p?.['text'] === 'string' && n.k === 'md' ? [n.p['text']] : []), ...(n.c ?? []).flatMap(words)]
 }
 
 function roles(n: Node): string[] {
-  return [...(typeof n.p?.role === 'string' ? [n.p.role] : []), ...(n.c ?? []).flatMap(roles)]
+  return [...(typeof n.p?.['role'] === 'string' ? [n.p['role']] : []), ...(n.c ?? []).flatMap(roles)]
 }
 
 const cx: TranscriptContext = { copy: () => {}, now: 0, welcome: {} as never }

@@ -21,7 +21,7 @@ const unquote = (s: string) => s.replace(/^(['"])(.*)\1$/, '$2')
 /** `$HOME`, `${TMPDIR}` and `~` expanded from `env`; undefined when another variable is left. */
 function expand(path: string, env: NodeJS.ProcessEnv): string | undefined {
   const out = unquote(path)
-    .replace(/^~(?=\/|$)/, env.HOME || homedir())
+    .replace(/^~(?=\/|$)/, env['HOME'] || homedir())
     .replace(/\$\{?(HOME|TMPDIR|USER)\}?/g, (_, name: string) => env[name]?.replace(/\/$/, '') ?? `$${name}`)
 
   return out.includes('$') ? undefined : out

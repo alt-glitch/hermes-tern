@@ -7,6 +7,7 @@ import { execFile } from 'node:child_process'
 import type { JSX, Key } from '@stencil-hq/tern'
 
 import type { ChatPorts } from '../app/ports.js'
+import { optional } from '../core/assert.js'
 import { type PrKey, prKey } from '../core/ids.js'
 import { checksState } from '../github/pullRequest.js'
 import type { Entry } from '../github/store.js'
@@ -188,7 +189,7 @@ function menuRow(e: Entry, now: number, on: boolean, onClick: () => void): JSX.E
   const what = !pr ? (e.error ? 'unreadable' : 'reading…') : pr.state !== 'open' ? stateLabel(pr).toLowerCase() : pr.checks.length ? `checks ${checksState(pr.checks)}` : stateLabel(pr).toLowerCase()
 
   return (
-    <row align="center" gap="sm" key={prKey(e.ref)} mark={on ? 'pick' : undefined} onClick={onClick} role="hermes.pr.menu.row" title={pr?.url ?? e.ref.url}>
+    <row align="center" gap="sm" key={prKey(e.ref)} {...optional('mark', on ? 'pick' : undefined)} onClick={onClick} role="hermes.pr.menu.row" title={pr?.url ?? e.ref.url}>
       <icon key="i" name="merge" tone={prTone(e)} />
       <col gap="none" grow={1} key="t" min={{ w: 0 }}>
         <text key="title" spans={[{ s: 'strong', t: pr?.title ?? `#${e.ref.number}` }]} truncate="end" wrap="none" />

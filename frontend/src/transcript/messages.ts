@@ -45,7 +45,7 @@ export function displayNotice(kind: string | null | undefined, metadata: unknown
   }
 
   const meta = record(metadata)
-  const shown = typeof meta?.display_text === 'string' ? meta.display_text.trim() : ''
+  const shown = typeof meta?.['display_text'] === 'string' ? meta['display_text'].trim() : ''
 
   if (shown) {
     return shown
@@ -55,7 +55,7 @@ export function displayNotice(kind: string | null | undefined, metadata: unknown
     return 'Background command finished'
   }
 
-  const count = typeof meta?.task_count === 'number' ? meta.task_count : undefined
+  const count = typeof meta?.['task_count'] === 'number' ? meta['task_count'] : undefined
 
   return count === 1 ? 'Subagent finished' : count === undefined ? 'Subagents finished' : `${count} subagents finished`
 }
@@ -125,14 +125,14 @@ export function continuation(prev: Entry | undefined): string | undefined {
   }
 
   const background = prev.blocks.some(
-    b => b.kind === 'tool' && b.call.name === 'delegate_task' && record(b.call.result)?.mode === 'background'
+    b => b.kind === 'tool' && b.call.name === 'delegate_task' && record(b.call.result)?.['mode'] === 'background'
   )
 
   if (background) {
     return 'Subagents finished'
   }
 
-  const shell = prev.blocks.some(b => b.kind === 'tool' && b.call.name === 'terminal' && b.call.args.background === true)
+  const shell = prev.blocks.some(b => b.kind === 'tool' && b.call.name === 'terminal' && b.call.args['background'] === true)
 
   return shell ? 'Background command finished' : 'Continued on its own'
 }

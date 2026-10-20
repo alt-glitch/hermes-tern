@@ -71,9 +71,9 @@ export async function applyEffort(host: EffortSetter, value: string, scope: 'glo
     return
   }
 
-  const before = session.info && { reasoning_effort: session.info.reasoning_effort, reasoning_effort_wire: session.info.reasoning_effort_wire }
+  const before = session.info && { effort: session.info.reasoning_effort, wire: session.info.reasoning_effort_wire }
   // Shown at once (and a quick second press steps from it); session.info confirms, with the wire level.
-  session.info = session.info && { ...session.info, reasoning_effort: value, reasoning_effort_wire: undefined }
+  session.info = session.info && withEffort(session.info, value, undefined)
   host.changed()
 
   try {
@@ -89,7 +89,7 @@ export async function applyEffort(host: EffortSetter, value: string, scope: 'glo
   } catch (error) {
     // Back to what the session runs, unless something newer has replaced the guess since.
     if (sid === session.ref.live && session.info && before && session.info.reasoning_effort === value) {
-      session.info = { ...session.info, ...before }
+      session.info = withEffort(session.info, before.effort, before.wire)
     }
 
     host.transcript.notice(`Could not set the reasoning effort: ${errorText(error)}`, 'error')
@@ -109,4 +109,24 @@ export function cycleEffort(host: Pick<ChatPorts, 'changed' | 'session' | 'setEf
   }
 
   void host.setEffort(next, 'session')
+}
+
+/** `info` with its effort and wire level set to these; one that is undefined is left out. */
+function withEffort<T extends { reasoning_effort?: string; reasoning_effort_wire?: string }>(info: T, effort: string | undefined, wire: string | undefined): T {
+  const out = { ...info }
+
+  // In place, so the fields keep their positions.
+  if (effort === undefined) {
+    delete out.reasoning_effort
+  } else {
+    out.reasoning_effort = effort
+  }
+
+  if (wire === undefined) {
+    delete out.reasoning_effort_wire
+  } else {
+    out.reasoning_effort_wire = wire
+  }
+
+  return out
 }

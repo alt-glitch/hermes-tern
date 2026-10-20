@@ -192,26 +192,26 @@ const strings = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is
 export function watchersOf(call: Pick<ToolCall, 'args' | 'result'>): Watchers {
   const r = record(call.result)
 
-  if (typeof r?.session_id === 'string') {
+  if (typeof r?.['session_id'] === 'string') {
     return {
-      heartbeat: typeof r.heartbeat_seconds === 'number' ? r.heartbeat_seconds : 0,
-      notify: r.notify_on_complete === true,
-      patterns: strings(r.watch_patterns)
+      heartbeat: typeof r['heartbeat_seconds'] === 'number' ? r['heartbeat_seconds'] : 0,
+      notify: r['notify_on_complete'] === true,
+      patterns: strings(r['watch_patterns'])
     }
   }
 
   const a = call.args
-  const beat = typeof a.heartbeat === 'number' && a.heartbeat > 0 ? Math.max(60, Math.floor(a.heartbeat)) : 0
-  let notify = a.notify_on_complete === true
-  let patterns = strings(a.watch_patterns)
+  const beat = typeof a['heartbeat'] === 'number' && a['heartbeat'] > 0 ? Math.max(60, Math.floor(a['heartbeat'])) : 0
+  let notify = a['notify_on_complete'] === true
+  let patterns = strings(a['watch_patterns'])
 
   // `notify` is the advertised flag and wins over the legacy pair.
-  if (typeof a.notify === 'boolean') {
-    notify = a.notify
+  if (typeof a['notify'] === 'boolean') {
+    notify = a['notify']
     patterns = []
-  } else if (Array.isArray(a.notify)) {
+  } else if (Array.isArray(a['notify'])) {
     notify = false
-    patterns = strings(a.notify)
+    patterns = strings(a['notify'])
   }
 
   notify ||= beat > 0
@@ -221,7 +221,7 @@ export function watchersOf(call: Pick<ToolCall, 'args' | 'result'>): Watchers {
 
 /** The process id a background terminal call's result names. */
 export function processIdOf(call: ToolCall): string | undefined {
-  const id = record(call.result)?.session_id
+  const id = record(call.result)?.['session_id']
 
   return typeof id === 'string' && id ? id : undefined
 }
@@ -496,7 +496,7 @@ export function linkCalls(calls: readonly ToolCall[], procs: readonly Background
 
   // A process tool call names its process by id or a unique prefix of it; many calls may watch one.
   for (const call of calls) {
-    const ref = isWatchCall(call) ? String(call.args.session_id).trim() : ''
+    const ref = isWatchCall(call) ? String(call.args['session_id']).trim() : ''
     const matches = ref ? procs.filter(p => p.id.startsWith(ref)) : []
 
     if (matches.length === 1) {
@@ -507,7 +507,7 @@ export function linkCalls(calls: readonly ToolCall[], procs: readonly Background
   const free = [...procs].sort((a, b) => a.startedAt - b.startedAt)
 
   for (const call of calls) {
-    const command = typeof call.args.command === 'string' ? call.args.command.trim() : ''
+    const command = typeof call.args['command'] === 'string' ? call.args['command'].trim() : ''
 
     if (owners.has(call) || processIdOf(call) || !command || call.name !== 'terminal') {
       continue

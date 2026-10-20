@@ -38,8 +38,8 @@ export interface GoalView {
   /** Why it is held: the wait (`until 14:30`, `on session x`) or the pause reason. */
   detail: string
   /** The judge's last verdict (`continue`, `blocked`, `wait`, …) and its reason. */
-  verdict?: string
-  reason?: string
+  verdict?: string | undefined
+  reason?: string | undefined
   criteria: string[]
 }
 
@@ -57,7 +57,7 @@ export interface LoopView {
   /** The run limit; 0 is none. */
   times: number
   /** When the next run is due (ms since the epoch); only while it counts down. */
-  dueAt?: number
+  dueAt?: number | undefined
   until: string
   detail: string
 }

@@ -39,14 +39,21 @@ export function trailingText(turn: TurnEntry): string {
 
 /** One turn's share of the session totals: `now` minus `before`, field by field. */
 export function usageSince(now: Usage, before: Usage | undefined): Usage {
-  const less = (key: 'cost_usd' | 'input' | 'output' | 'total') => {
+  const out: Usage = { ...now }
+
+  // In place, so a field keeps its position; one `now` does not count as a number is left out.
+  for (const key of ['cost_usd', 'input', 'output', 'total'] as const) {
     const a = now[key]
     const b = before?.[key]
 
-    return typeof a === 'number' ? Math.max(0, a - (typeof b === 'number' ? b : 0)) : undefined
+    if (typeof a === 'number') {
+      out[key] = Math.max(0, a - (typeof b === 'number' ? b : 0))
+    } else {
+      delete out[key]
+    }
   }
 
-  return { ...now, cost_usd: less('cost_usd'), input: less('input'), output: less('output'), total: less('total') }
+  return out
 }
 
 /** A call's args as views show them: a shell command as the agent wrote it, without the pane prefix the plugin's middleware adds (completion events carry the args that ran). */

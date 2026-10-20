@@ -22,7 +22,7 @@ export interface SessionHost extends ControlHost {
   /** Re-reads the session's transcript from the gateway (after a rewind, compression or restore). */
   reload(): Promise<void>
   /** /compress started, changed nothing, or ended with the owner's token counts: the transcript's compaction rule. */
-  compressing(state: 'none' | 'start' | { before?: number; after?: number }): void
+  compressing(state: 'none' | 'start' | { before?: number | undefined; after?: number | undefined }): void
   /** Sends `text` as a prompt now. */
   send(text: string): void
   /** Shows stored session `id` in this view; false when the view did not move to it. */
@@ -49,7 +49,7 @@ async function rewind(host: SessionHost, intent: 'retry' | 'undo') {
   }
 
   const result = await mutateSession(host.gw, host.sid, 'rewind', intent === 'retry' ? retryTurnRewind : lastTurnRewind)
-  const removed = Number(result?.rewound_count ?? 0)
+  const removed = Number(result?.['rewound_count'] ?? 0)
 
   if (host.stale()) {
     return
@@ -70,7 +70,7 @@ async function rewind(host: SessionHost, intent: 'retry' | 'undo') {
   }
 
   // The rewound turn's own text, not whatever this view typed last.
-  const text = retryText((result.target_message as { content?: unknown } | undefined)?.content)
+  const text = retryText((result['target_message'] as { content?: unknown } | undefined)?.content)
 
   return text ? host.send(text) : host.notice('Nothing to retry.')
 }
@@ -137,10 +137,10 @@ async function compress(host: SessionHost, arg: string) {
 
   if (result.status === 'preview') {
     // `--preview` is a read-only report.
-    return host.notice(Array.isArray(result.lines) ? result.lines.join('\n') : 'Nothing to preview.')
+    return host.notice(Array.isArray(result['lines']) ? result['lines'].join('\n') : 'Nothing to preview.')
   }
 
-  const summary = result.summary as CompressSummary | undefined
+  const summary = result['summary'] as CompressSummary | undefined
   const num = (v: unknown) => (typeof v === 'number' && v > 0 ? v : undefined)
   const kept = result.status === 'noop' || result.status === 'aborted' || Boolean(summary?.noop || summary?.aborted || summary?.refused_would_grow)
 
@@ -149,7 +149,7 @@ async function compress(host: SessionHost, arg: string) {
   if (result.status !== 'pending') {
     // The shared gateway's receipt gives the counts only in its token line ("~248 → ~831 tokens").
     const line = lineTokens(summary?.token_line ?? '')
-    host.compressing(kept ? 'none' : { after: num(result.after_tokens) ?? line.after, before: num(result.before_tokens) ?? line.before })
+    host.compressing(kept ? 'none' : { after: num(result['after_tokens']) ?? line.after, before: num(result['before_tokens']) ?? line.before })
   }
 
   if (result.status !== 'noop') {
@@ -285,7 +285,7 @@ async function rollback(host: SessionHost, arg: string) {
   })
 
   if (!r?.success) {
-    return host.notice(`Rollback failed: ${r?.error || r?.message || 'unknown error'}`, 'error')
+    return host.notice(`Rollback failed: ${r?.error || r?.['message'] || 'unknown error'}`, 'error')
   }
 
   // A whole-tree restore also rewinds the transcript to before the newest user turn.
@@ -293,7 +293,7 @@ async function rollback(host: SessionHost, arg: string) {
     await host.reload()
   }
 
-  host.notice(`Rollback restored ${file || 'the workspace'}: ${r.reason || r.message || r.restored_to || 'restored'}`)
+  host.notice(`Rollback restored ${file || 'the workspace'}: ${r.reason || r['message'] || r.restored_to || 'restored'}`)
 }
 
 /** Runs a command, reporting a gateway refusal as `/<name> failed: …`. */

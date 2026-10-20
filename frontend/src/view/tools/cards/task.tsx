@@ -3,6 +3,7 @@
 import type { JSX } from '@stencil-hq/tern'
 
 import { agentNode } from '../../../agents/agentRow.js'
+import { optional } from '../../../core/assert.js'
 import type { ToolCall } from '../../../model.js'
 import { detailOf } from '../../../tools/detail.js'
 import type { TaskDetail, TaskResult } from '../../../tools/task.js'
@@ -124,9 +125,9 @@ function soloTask(call: ToolCall, d: TaskDetail, now: number): JSX.Element | und
 
   return (
     <agent
-      collapsed={summary ? true : undefined}
-      collapsible={summary ? true : undefined}
       key={call.id}
+      {...optional('collapsed', summary ? true : undefined)}
+      {...optional('collapsible', summary ? true : undefined)}
       name={name}
       role="hermes.task.solo"
       status={status}

@@ -17,7 +17,7 @@ export interface StatusEffect {
   /** Compaction started (true) or ended (false): the transcript's compaction rule shows it. */
   compacting?: boolean
   /** The token counts the compaction line gave. */
-  tokens?: { before?: number; after?: number }
+  tokens?: { before?: number | undefined; after?: number | undefined }
   /** The warning to pass back as `last` next time. */
   note?: string
 }

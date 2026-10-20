@@ -49,9 +49,9 @@ export function currentTodos(entries: readonly Entry[]): Todo[] | undefined {
 
 /** A todo call's list from its args: the whole list, or with `merge: true` a patch on `current`. */
 export function todosOf(args: Record<string, unknown>, current: Todo[] | undefined): Todo[] {
-  const raw = Array.isArray(args.todos) ? args.todos : []
+  const raw = Array.isArray(args['todos']) ? args['todos'] : []
 
-  return args.merge === true ? mergeTodos(current ?? [], raw) : toTodos(raw)
+  return args['merge'] === true ? mergeTodos(current ?? [], raw) : toTodos(raw)
 }
 
 /** As TodoStore.write(merge=True): items update by id in the fields given, new ids append. */
@@ -60,7 +60,7 @@ function mergeTodos(current: Todo[], patch: unknown[]): Todo[] {
 
   for (const item of patch) {
     const r = record(item)
-    const id = String(r?.id ?? '').trim()
+    const id = String(r?.['id'] ?? '').trim()
 
     if (!r || !id) {
       continue
@@ -70,15 +70,15 @@ function mergeTodos(current: Todo[], patch: unknown[]): Todo[] {
 
     if (!cur) {
       // Hermes rejects a new item with no text, so it never joins the list.
-      if (String(r.content ?? '').trim()) {
+      if (String(r['content'] ?? '').trim()) {
         out.push(...toTodos([{ ...r, id }]))
       }
 
       continue
     }
 
-    const content = String(r.content ?? '').trim()
-    const status = String(r.status ?? '').trim().toLowerCase()
+    const content = String(r['content'] ?? '').trim()
+    const status = String(r['status'] ?? '').trim().toLowerCase()
 
     if (content) {
       cur.content = content
@@ -89,7 +89,7 @@ function mergeTodos(current: Todo[], patch: unknown[]): Todo[] {
     }
 
     if ('parent' in r) {
-      const parent = String(r.parent ?? '').trim()
+      const parent = String(r['parent'] ?? '').trim()
 
       if (parent && parent !== id) {
         cur.parent = parent

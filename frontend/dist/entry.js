@@ -24825,7 +24825,7 @@ function parseCommandDispatch(raw2) {
 import { spawn } from "node:child_process";
 function copyToClipboard(text15, env2 = process.env) {
   process.stdout.write(`\x1B]52;c;${Buffer.from(text15).toString("base64")}\x07`);
-  if (process.platform === "darwin" && !env2.SSH_CONNECTION && !env2.SSH_TTY) {
+  if (process.platform === "darwin" && !env2["SSH_CONNECTION"] && !env2["SSH_TTY"]) {
     const child = spawn("pbcopy", [], { stdio: ["pipe", "ignore", "ignore"] });
     child.on("error", () => {
     });
@@ -24907,7 +24907,7 @@ function modelPayload(arg) {
       continue;
     }
     if (flag2 === "--provider" && parts3[0] && !parts3[0].startsWith("--")) {
-      payload.provider = parts3.shift();
+      payload["provider"] = parts3.shift();
       continue;
     }
     throw new Error(
@@ -25083,6 +25083,35 @@ async function fastCommand(host, arg) {
   await setFast(host, value);
 }
 
+// src/core/assert.ts
+function isNonEmpty(list9) {
+  return list9.length > 0;
+}
+function assertNever(value, what = "variant") {
+  throw new Error(`Unexpected ${what}: ${shown(value)}`);
+}
+function isDefined(value) {
+  return value !== void 0 && value !== null;
+}
+function optional(key2, value) {
+  const out = {};
+  if (value !== void 0) {
+    out[key2] = value;
+  }
+  return out;
+}
+function oneOf(values) {
+  const known2 = new Set(values);
+  return (value) => known2.has(value);
+}
+function shown(value) {
+  try {
+    return typeof value === "string" ? value : JSON.stringify(value) ?? String(value);
+  } catch {
+    return String(value);
+  }
+}
+
 // src/view/time.ts
 var kAge = /* @__PURE__ */ Symbol("tsp.age");
 function age(owner, startedAt, now) {
@@ -25137,9 +25166,9 @@ function decodeJson(text15) {
 }
 
 // src/agents/liveLog.ts
-var LINE = /^(\d{2}:\d{2}:\d{2}) (\S+)\s*\| (.*)$/;
-var TOOL = /^-> ([^(]+)\((.*)\)$/;
-var RESULT = /^(\S+) (ok|ERROR)(?: ([\d.]+)s)?: ?(.*)$/;
+var LINE = /^(?<at>\d{2}:\d{2}:\d{2}) (?<role>\S+)\s*\| (?<body>.*)$/;
+var TOOL = /^-> (?<name>[^(]+)\((?<args>.*)\)$/;
+var RESULT = /^(?<name>\S+) (?<status>ok|ERROR)(?: (?<secs>[\d.]+)s)?: ?(?<text>.*)$/;
 function parseLiveLog(text15) {
   const log = { entries: [] };
   for (const raw2 of text15.split("\n")) {
@@ -25147,23 +25176,26 @@ function parseLiveLog(text15) {
     if (!m) {
       continue;
     }
-    const [, at, role, body] = m;
+    const { at = "", body = "", role = "" } = m.groups ?? {};
     switch (role) {
       case "user":
         log.entries.push({ at, kind: "kickoff", text: body.replace(/^kickoff: /, "") });
         break;
       case "tool": {
-        const t2 = TOOL.exec(body);
-        log.entries.push({ args: t2?.[2] ?? "", at, kind: "tool", name: t2?.[1]?.trim() || body, status: "running" });
+        const t2 = TOOL.exec(body)?.groups;
+        log.entries.push({ args: t2?.["args"] ?? "", at, kind: "tool", name: t2?.["name"]?.trim() || body, status: "running" });
         break;
       }
       case "result": {
-        const r = RESULT.exec(body);
-        const call = r && findLast(log.entries, (e) => e.kind === "tool" && e.status === "running" && e.name === r[1]);
+        const r = RESULT.exec(body)?.groups;
+        const call = r && log.entries.findLast((e) => e.kind === "tool" && e.status === "running" && e.name === r["name"]);
         if (call && call.kind === "tool" && r) {
-          call.status = r[2] === "ok" ? "ok" : "error";
-          call.result = r[4];
-          call.took = r[3] ? Math.round(Number(r[3]) * 1e3) : void 0;
+          const { secs, status, text: text16 = "" } = r;
+          call.status = status === "ok" ? "ok" : "error";
+          call.result = text16;
+          if (secs) {
+            call.took = Math.round(Number(secs) * 1e3);
+          }
         }
         break;
       }
@@ -25207,16 +25239,8 @@ function final(log, at, body) {
     log.entries.push({ at, kind: "note", text: body });
   }
 }
-function findLast(items, match) {
-  for (let i = items.length - 1; i >= 0; i--) {
-    if (match(items[i])) {
-      return items[i];
-    }
-  }
-  return void 0;
-}
 function runningTool(log) {
-  const last = findLast(log.entries, (e) => e.kind === "tool");
+  const last = log.entries.findLast((e) => e.kind === "tool");
   return last?.kind === "tool" && last.status === "running" ? last : void 0;
 }
 function clockToMs(clock2, now = Date.now()) {
@@ -25509,27 +25533,29 @@ function agentNode(a2, now, solo) {
     "agent",
     {
       actions: { click: `open-agent=${a2.id}`, menu: [`open-agent=${a2.id}`] },
-      badges: a2.exitReason && (a2.status !== "done" || a2.exitReason === OUTCOME_UNKNOWN) ? [{ text: a2.exitReason.replace(/_/g, " "), tone: "warning" }] : void 0,
-      collapsed: a2.summary ? true : void 0,
-      collapsible: a2.summary ? true : void 0,
-      depth: a2.depth || void 0,
-      model: a2.model,
+      ...a2.exitReason && (a2.status !== "done" || a2.exitReason === OUTCOME_UNKNOWN) ? { badges: [{ text: a2.exitReason.replace(/_/g, " "), tone: "warning" }] } : {},
+      ...optional("collapsed", a2.summary ? true : void 0),
+      ...optional("collapsible", a2.summary ? true : void 0),
+      ...optional("depth", a2.depth || void 0),
+      ...optional("model", a2.model),
       name: solo?.name ?? agentName(a2),
-      role: solo ? "hermes.task.solo" : void 0,
+      ...optional("role", solo ? "hermes.task.solo" : void 0),
       stats: {
-        requests: a2.calls || void 0,
-        tokens: a2.tokens || void 0,
-        tools: a2.toolCount || void 0,
-        ...running2 ? { age: Math.max(0, now - a2.startedAt) } : { took: a2.duration }
+        ...optional("requests", a2.calls || void 0),
+        ...optional("tokens", a2.tokens || void 0),
+        ...optional("tools", a2.toolCount || void 0),
+        ...running2 ? { age: Math.max(0, now - a2.startedAt) } : optional("took", a2.duration)
       },
       status,
       task: a2.goal,
       title: `Open ${solo ? "the agent" : agentName(a2)} beside the chat`,
-      tool: running2 && a2.tool ? {
-        age: a2.toolSince ? age(a2.toolSince, a2.toolSince.at, now) : void 0,
-        intent: a2.toolPreview,
-        name: a2.tool
-      } : void 0,
+      ...running2 && a2.tool ? {
+        tool: {
+          ...optional("age", a2.toolSince ? age(a2.toolSince, a2.toolSince.at, now) : void 0),
+          ...optional("intent", a2.toolPreview),
+          name: a2.tool
+        }
+      } : {},
       children: a2.summary ? /* @__PURE__ */ jsx("md", { children: a2.summary }, "o") : null
     },
     solo?.key ?? a2.key
@@ -26140,8 +26166,8 @@ function soloTask(call, d, now) {
   return /* @__PURE__ */ jsx(
     "agent",
     {
-      collapsed: summary4 ? true : void 0,
-      collapsible: summary4 ? true : void 0,
+      ...optional("collapsed", summary4 ? true : void 0),
+      ...optional("collapsible", summary4 ? true : void 0),
       name,
       role: "hermes.task.solo",
       status,
@@ -26157,28 +26183,6 @@ function briefOf(call, index2) {
 }
 function briefNode(head2, text15) {
   return /* @__PURE__ */ jsx("section", { collapsed: true, collapsible: true, head: head2, role: "hermes.task.brief", children: /* @__PURE__ */ jsx("md", { children: text15 }, "md") }, "brief");
-}
-
-// src/core/assert.ts
-function isNonEmpty(list9) {
-  return list9.length > 0;
-}
-function assertNever(value, what = "variant") {
-  throw new Error(`Unexpected ${what}: ${shown(value)}`);
-}
-function isDefined(value) {
-  return value !== void 0 && value !== null;
-}
-function oneOf(values) {
-  const known2 = new Set(values);
-  return (value) => known2.has(value);
-}
-function shown(value) {
-  try {
-    return typeof value === "string" ? value : JSON.stringify(value) ?? String(value);
-  } catch {
-    return String(value);
-  }
 }
 
 // src/bridge.ts
@@ -26219,18 +26223,18 @@ function actionPhrase(tool, app2 = "") {
 function appOf(name, args) {
   const [prefix2, connector, ...tool] = name.split("__");
   if (prefix2 === "connectors" && connector && tool.length && name !== BATCH) {
-    const alias = typeof args?.connector_alias === "string" && args.connector_alias.trim() ? ` (${args.connector_alias.trim()})` : "";
+    const alias = typeof args?.["connector_alias"] === "string" && args["connector_alias"].trim() ? ` (${args["connector_alias"].trim()})` : "";
     return { action: actionPhrase(tool.join("__"), connector) + alias, app: appTitle(connector), kind: "connector" };
   }
   const mcp = name.match(/^mcp__(.+?)__(.+)$/);
   return mcp ? { action: actionPhrase(mcp[2]), app: appTitle(mcp[1]), kind: "mcp" } : void 0;
 }
 function entriesOf(args) {
-  const list9 = Array.isArray(args.calls) ? args.calls : [args];
+  const list9 = Array.isArray(args["calls"]) ? args["calls"] : [args];
   return list9.flatMap((e) => {
     const r = record(e);
-    const name = r?.name;
-    return typeof name === "string" && name ? [{ args: record(r?.arguments) ?? {}, name }] : [];
+    const name = r?.["name"];
+    return typeof name === "string" && name ? [{ args: record(r?.["arguments"]) ?? {}, name }] : [];
   });
 }
 function unwrap(name, args) {
@@ -26253,14 +26257,14 @@ function batchOf(call) {
   return call.via.kind === "batch" ? call.via.entries : void 0;
 }
 function batchResults(result) {
-  const results = record(result)?.results;
+  const results = record(result)?.["results"];
   if (!Array.isArray(results)) {
     return void 0;
   }
   return results.map((e) => {
     const r = record(e) ?? {};
-    const err = r.error;
-    return err === void 0 || err === null ? { result: r.response } : { error: typeof err === "string" ? err : String(record(err)?.message ?? "") || JSON.stringify(err) };
+    const err = r["error"];
+    return err === void 0 || err === null ? { result: r["response"] } : { error: typeof err === "string" ? err : String(record(err)?.["message"] ?? "") || JSON.stringify(err) };
   });
 }
 function settleBridge(call) {
@@ -26390,15 +26394,15 @@ function shownImage(call) {
     return void 0;
   }
   const r = record(call.result);
-  if (r?.success === false) {
+  if (r?.["success"] === false) {
     return void 0;
   }
   if (call.name === "image_generate") {
-    return str3(r?.host_image) ?? str3(r?.image);
+    return str3(r?.["host_image"]) ?? str3(r?.["image"]);
   }
   if (call.name.startsWith("browser")) {
-    const summary4 = call.resultText ?? str3(r?.text_summary) ?? "";
-    return str3(record(r?.meta)?.screenshot_path) ?? str3(r?.screenshot_path) ?? /Screenshot path: (\S+)/.exec(summary4)?.[1];
+    const summary4 = call.resultText ?? str3(r?.["text_summary"]) ?? "";
+    return str3(record(r?.["meta"])?.["screenshot_path"]) ?? str3(r?.["screenshot_path"]) ?? /Screenshot path: (\S+)/.exec(summary4)?.[1];
   }
   return void 0;
 }
@@ -26618,7 +26622,7 @@ function tile({ process: p3, view }) {
         "text",
         {
           role: "omp.job.tile.dot",
-          spans: [{ s: toneStyle(look.tone), t: look.glyph, ...p3.state.status === "running" ? { fx: "pulse" } : {} }],
+          spans: [{ ...optional("s", toneStyle(look.tone)), t: look.glyph, ...p3.state.status === "running" ? { fx: "pulse" } : {} }],
           wrap: "none"
         },
         "dot"
@@ -26804,17 +26808,17 @@ function isProcessTool(name) {
   return name === "process_manage" || name === "process";
 }
 function isWatchCall(call) {
-  return isProcessTool(call.name) && ["log", "poll", "wait"].includes(String(call.args.action)) && typeof call.args.session_id === "string";
+  return isProcessTool(call.name) && ["log", "poll", "wait"].includes(String(call.args["action"])) && typeof call.args["session_id"] === "string";
 }
 function isBackgroundCall(call) {
-  return call.name === "terminal" && (call.args.background === true || typeof record(call.result)?.session_id === "string");
+  return call.name === "terminal" && (call.args["background"] === true || typeof record(call.result)?.["session_id"] === "string");
 }
 function isToolError(p3) {
   const r = record(p3.result);
-  if (r?.error) {
+  if (r?.["error"]) {
     return true;
   }
-  if (p3.name === "terminal" && typeof r?.exit_code === "number" && r.exit_code !== 0) {
+  if (p3.name === "terminal" && typeof r?.["exit_code"] === "number" && r["exit_code"] !== 0) {
     return true;
   }
   return typeof p3.summary === "string" && /^(error|failed)\b/i.test(p3.summary);
@@ -28569,7 +28573,7 @@ var ZodMiniOptional = /* @__PURE__ */ $constructor("ZodMiniOptional", (inst, def
   ZodMiniType.init(inst, def);
 });
 // @__NO_SIDE_EFFECTS__
-function optional(innerType) {
+function optional2(innerType) {
   return new ZodMiniOptional({
     type: "optional",
     innerType
@@ -28588,7 +28592,7 @@ function nullable(innerType) {
 }
 // @__NO_SIDE_EFFECTS__
 function nullish(innerType) {
-  return /* @__PURE__ */ optional(/* @__PURE__ */ nullable(innerType));
+  return /* @__PURE__ */ optional2(/* @__PURE__ */ nullable(innerType));
 }
 var ZodMiniCatch = /* @__PURE__ */ $constructor("ZodMiniCatch", (inst, def) => {
   $ZodCatch.init(inst, def);
@@ -28616,7 +28620,7 @@ function pipe(in_, out) {
 }
 
 // src/wire/schemas.ts
-var loose = (schema2) => _catch(optional(schema2), void 0);
+var loose = (schema2) => _catch(optional2(schema2), void 0);
 function rowsOf(item3, items) {
   return items.flatMap((raw2) => {
     const row2 = item3.safeParse(raw2);
@@ -28645,7 +28649,7 @@ var pendingRow = object({
   admission_id: pipe(string2(), transform(admissionId)),
   /** The submission id the submitter chose (this pane's `submission_id`). */
   input_id: loose(pipe(string2(), transform(inputId))),
-  status: pipe(optional(unknown()), transform((status) => isPendingStatus(status) ? status : "other")),
+  status: pipe(optional2(unknown()), transform((status) => isPendingStatus(status) ? status : "other")),
   /** The prompt's text. */
   user: _catch(string2(), "")
 });
@@ -28653,12 +28657,12 @@ function pendingRows(info) {
   const { pending_submissions: rows2 } = info ?? {};
   return Array.isArray(rows2) ? rowsOf(pendingRow, rows2) : void 0;
 }
-var settle = _catch(object({ admission_id: loose(string2()), outcome: optional(unknown()) }), {});
+var settle = _catch(object({ admission_id: loose(string2()), outcome: optional2(unknown()) }), {});
 function cancelledAdmission(payload) {
   const { admission_id: id, outcome: outcome2 } = settle.parse(payload ?? {});
   return outcome2 === "cancelled" && id !== void 0 ? admissionId(id) : void 0;
 }
-var counter = pipe(optional(unknown()), transform((value) => Number(value ?? 0)));
+var counter = pipe(optional2(unknown()), transform((value) => Number(value ?? 0)));
 var tick = _catch(
   object({
     prompt_tokens: counter,
@@ -28758,7 +28762,7 @@ var skipped = object({ skip: number2() });
 function chartSkip(value) {
   return skipped.safeParse(value).data;
 }
-var reply = _catch(object({ answer: optional(unknown()), error: optional(unknown()), unavailable: optional(unknown()) }), {
+var reply = _catch(object({ answer: optional2(unknown()), error: optional2(unknown()), unavailable: optional2(unknown()) }), {
   answer: void 0,
   error: void 0,
   unavailable: void 0
@@ -28779,7 +28783,7 @@ function readAuthorReply(stdout) {
 var CONNECT_TOOL = "manage_connections";
 var POLL_MS = 2e3;
 var STALE_MS = 2 * 6e4;
-var dataDir = (env2 = process.env) => join2(env2.HERMES_HOME || join2(homedir5(), ".hermes"), "plugin-data", "hermes-tern");
+var dataDir = (env2 = process.env) => join2(env2["HERMES_HOME"] || join2(homedir5(), ".hermes"), "plugin-data", "hermes-tern");
 var safe = (part) => part.replace(/[^A-Za-z0-9_-]/g, "_");
 var cardStem = (callId, opId) => opId ? `${safe(callId)}.${safe(opId)}` : safe(callId);
 var alive = (pid) => {
@@ -28804,14 +28808,14 @@ function readCard(key2, dir2 = dataDir(), now = Date.now()) {
   if (data.settled_by) {
     settled2 = data.settled_by;
   } else if (data.watching !== true) {
-    settled2 = error ? "error" : data.targets.some((t2) => waiting2({ state: String(record(t2)?.state ?? "") })) ? "deadline" : "all_resolved";
+    settled2 = error ? "error" : data.targets.some((t2) => waiting2({ state: String(record(t2)?.["state"] ?? "") })) ? "deadline" : "all_resolved";
   } else if (!alive(data.pid) || now - updated > STALE_MS) {
     settled2 = "stopped";
   }
   return { error, key: key2, settled: settled2, targets: data.targets, told: existsSync2(join2(dir2, "connections", `${key2}.told`)) };
 }
 function findCard(call, dir2 = dataDir()) {
-  const op = record(call.result)?.op_id;
+  const op = record(call.result)?.["op_id"];
   const prefix2 = `${safe(call.id)}.`;
   if (typeof op === "string" && op) {
     return existsSync2(join2(dir2, "connections", `${cardStem(call.id, op)}.json`)) ? cardStem(call.id, op) : void 0;
@@ -28845,7 +28849,7 @@ function mayTell(card, dir2 = dataDir()) {
 var TERN_PANE_VARS = ["TERN_PANE", "TERN_PANE_SOCKET", "TERN_WINDOW_KEY", "TERN_WINDOW_SOCKET", "TERN_DAEMON_SOCKET"];
 function ternPane(env2 = process.env) {
   const vars = Object.fromEntries(TERN_PANE_VARS.flatMap((k) => env2[k] ? [[k, env2[k]]] : []));
-  return vars.TERN_PANE ? vars : void 0;
+  return vars["TERN_PANE"] ? vars : void 0;
 }
 function markViewer(sid, previous3, dir2 = dataDir(), env2 = process.env) {
   const viewers = join2(dir2, "viewers");
@@ -28864,7 +28868,7 @@ function connectTargets(call, card) {
   if (call.name !== CONNECT_TOOL) {
     return [];
   }
-  const targets = card?.targets ?? record(call.result)?.targets;
+  const targets = card?.targets ?? record(call.result)?.["targets"];
   return parseTargets(Array.isArray(targets) ? targets : []);
 }
 function loadConnect(call, dir2 = dataDir(), now = Date.now()) {
@@ -28890,15 +28894,15 @@ function loadConnect(call, dir2 = dataDir(), now = Date.now()) {
 function parseTargets(targets) {
   return targets.flatMap((t2) => {
     const r = record(t2);
-    const name = typeof r?.name === "string" ? r.name : "";
+    const name = typeof r?.["name"] === "string" ? r["name"] : "";
     return name ? [
       {
-        alias: typeof r?.alias === "string" && r.alias ? r.alias : void 0,
-        detail: typeof r?.detail === "string" && r.detail ? r.detail : void 0,
+        alias: typeof r?.["alias"] === "string" && r["alias"] ? r["alias"] : void 0,
+        detail: typeof r?.["detail"] === "string" && r["detail"] ? r["detail"] : void 0,
         name,
-        state: typeof r?.state === "string" ? r.state : "pending",
+        state: typeof r?.["state"] === "string" ? r["state"] : "pending",
         title: appTitle(name),
-        url: typeof r?.connect_url === "string" && r.connect_url ? r.connect_url : void 0
+        url: typeof r?.["connect_url"] === "string" && r["connect_url"] ? r["connect_url"] : void 0
       }
     ] : [];
   });
@@ -28956,7 +28960,7 @@ function connectCard(call) {
   const rows2 = targets.map((t2, i) => {
     const look = CONNECT_STATE[stateOf2(t2)] ?? PENDING;
     return /* @__PURE__ */ jsxs("row", { align: "center", gap: "sm", role: "hermes.connect.row", children: [
-      /* @__PURE__ */ jsx("icon", { name: look.icon, tone: look.tone }, "i"),
+      /* @__PURE__ */ jsx("icon", { name: look.icon, ...optional("tone", look.tone) }, "i"),
       /* @__PURE__ */ jsx(
         "text",
         {
@@ -29096,7 +29100,7 @@ function editCard(call, d) {
     return { ...head2, body: [] };
   }
   const { added, removed } = diffStats(diff2);
-  return { ...head2, body: [/* @__PURE__ */ jsx("diff", { lang, text: diff2 }, "diff")], meta: [`+${added} \u2212${removed}`] };
+  return { ...head2, body: [/* @__PURE__ */ jsx("diff", { ...optional("lang", lang), text: diff2 }, "diff")], meta: [`+${added} \u2212${removed}`] };
 }
 
 // src/view/tools/cards/eval.tsx
@@ -29164,26 +29168,26 @@ function currentTodos(entries) {
   return void 0;
 }
 function todosOf(args, current) {
-  const raw2 = Array.isArray(args.todos) ? args.todos : [];
-  return args.merge === true ? mergeTodos(current ?? [], raw2) : toTodos(raw2);
+  const raw2 = Array.isArray(args["todos"]) ? args["todos"] : [];
+  return args["merge"] === true ? mergeTodos(current ?? [], raw2) : toTodos(raw2);
 }
 function mergeTodos(current, patch6) {
   const out = current.map((t2) => ({ ...t2 }));
   for (const item3 of patch6) {
     const r = record(item3);
-    const id = String(r?.id ?? "").trim();
+    const id = String(r?.["id"] ?? "").trim();
     if (!r || !id) {
       continue;
     }
     const cur = out.find((t2) => t2.id === id);
     if (!cur) {
-      if (String(r.content ?? "").trim()) {
+      if (String(r["content"] ?? "").trim()) {
         out.push(...toTodos([{ ...r, id }]));
       }
       continue;
     }
-    const content5 = String(r.content ?? "").trim();
-    const status = String(r.status ?? "").trim().toLowerCase();
+    const content5 = String(r["content"] ?? "").trim();
+    const status = String(r["status"] ?? "").trim().toLowerCase();
     if (content5) {
       cur.content = content5;
     }
@@ -29191,7 +29195,7 @@ function mergeTodos(current, patch6) {
       cur.status = status;
     }
     if ("parent" in r) {
-      const parent = String(r.parent ?? "").trim();
+      const parent = String(r["parent"] ?? "").trim();
       if (parent && parent !== id) {
         cur.parent = parent;
       } else {
@@ -29333,7 +29337,7 @@ function readCard2(call, d) {
   const whole = first2 === 1 && last !== void 0 && last === total;
   const meta3 = first2 !== void 0 && last !== void 0 ? [whole ? `${total} lines` : `:${first2}-${last}`] : [];
   return {
-    body: content5 ? [/* @__PURE__ */ jsx("code", { lang: langOf(path2), numbers: true, start: first2, text: content5.replace(/^ *\d+\|/gm, "") }, "code")] : [],
+    body: content5 ? [/* @__PURE__ */ jsx("code", { ...optional("lang", langOf(path2)), numbers: true, ...optional("start", first2), text: content5.replace(/^ *\d+\|/gm, "") }, "code")] : [],
     folded: true,
     frame: "inline",
     meta: meta3,
@@ -29366,7 +29370,7 @@ function searchCard(call, d) {
     return {
       body: list9.slice(0, 200).map((f, i) => {
         const slash = f.lastIndexOf("/");
-        return /* @__PURE__ */ jsx("row", { role: "omp.tool.file", title: slash > 0 ? f.slice(0, slash + 1) : void 0, children: /* @__PURE__ */ jsx("text", { spans: [{ s: "path", t: slash > 0 ? f.slice(slash + 1) : f }] }, "p") }, `f${i}`);
+        return /* @__PURE__ */ jsx("row", { role: "omp.tool.file", ...optional("title", slash > 0 ? f.slice(0, slash + 1) : void 0), children: /* @__PURE__ */ jsx("text", { spans: [{ s: "path", t: slash > 0 ? f.slice(slash + 1) : f }] }, "p") }, `f${i}`);
       }),
       folded: list9.length > 20,
       frame: "inline",
@@ -29407,7 +29411,7 @@ function searchCard(call, d) {
         /* @__PURE__ */ jsx(
           "code",
           {
-            lang: langOf(path2),
+            ...optional("lang", langOf(path2)),
             marks: run6.map((h2) => ({ line: h2.line, tone: "accent" })),
             numbers: true,
             start,
@@ -29575,7 +29579,7 @@ var CD = /^\s*cd\s+([^\s;&|]+)\s*(?:&&|;)/;
 var SKIP = /^\/dev\/|^&/;
 var unquote = (s2) => s2.replace(/^(['"])(.*)\1$/, "$2");
 function expand(path2, env2) {
-  const out = unquote(path2).replace(/^~(?=\/|$)/, env2.HOME || homedir6()).replace(/\$\{?(HOME|TMPDIR|USER)\}?/g, (_, name) => env2[name]?.replace(/\/$/, "") ?? `$${name}`);
+  const out = unquote(path2).replace(/^~(?=\/|$)/, env2["HOME"] || homedir6()).replace(/\$\{?(HOME|TMPDIR|USER)\}?/g, (_, name) => env2[name]?.replace(/\/$/, "") ?? `$${name}`);
   return out.includes("$") ? void 0 : out;
 }
 function outputFiles(command, env2 = process.env) {
@@ -29986,7 +29990,7 @@ var LineMatcher = class {
 };
 var isRecord2 = (v) => typeof v === "object" && v !== null && !Array.isArray(v);
 function specSkip(value) {
-  return isRecord2(value) && typeof value.skip === "string" && value.skip.trim() ? value.skip.trim() : void 0;
+  return isRecord2(value) && typeof value["skip"] === "string" && value["skip"].trim() ? value["skip"].trim() : void 0;
 }
 function ruleReadsSource(from, id) {
   if (from === "*") {
@@ -30194,18 +30198,18 @@ function parseSpec(value, errors) {
     errors.push("spec: expected an object");
     return void 0;
   }
-  const title = str4(value.title, "title", errors, { cut: MAX_TITLE_CHARS, required: true });
-  const rules = list2(value.rules, "rules", errors, 1, MAX_RULES)?.map((r, i) => parseRule(r, `rules[${i}]`, errors));
-  const blocks2 = list2(value.blocks, "blocks", errors, 1, MAX_BLOCKS)?.map((b, i) => parseBlock(b, `blocks[${i}]`, errors));
+  const title = str4(value["title"], "title", errors, { cut: MAX_TITLE_CHARS, required: true });
+  const rules = list2(value["rules"], "rules", errors, 1, MAX_RULES)?.map((r, i) => parseRule(r, `rules[${i}]`, errors));
+  const blocks2 = list2(value["blocks"], "blocks", errors, 1, MAX_BLOCKS)?.map((b, i) => parseBlock(b, `blocks[${i}]`, errors));
   let headline;
-  if (value.headline !== void 0) {
-    const ref = parseValueRef(value.headline, "headline", errors);
-    const label = isRecord2(value.headline) ? str4(value.headline.label, "headline.label", errors, { cut: MAX_LABEL_CHARS }) : void 0;
+  if (value["headline"] !== void 0) {
+    const ref = parseValueRef(value["headline"], "headline", errors);
+    const label = isRecord2(value["headline"]) ? str4(value["headline"]["label"], "headline.label", errors, { cut: MAX_LABEL_CHARS }) : void 0;
     if (ref) {
       headline = label ? { ...ref, label } : ref;
     }
   }
-  const stage = value.stage === void 0 ? void 0 : fieldName(value.stage, "stage", errors);
+  const stage = value["stage"] === void 0 ? void 0 : fieldName(value["stage"], "stage", errors);
   if (errors.length || title === void 0 || !rules?.every(isDefined) || !blocks2?.every(isDefined)) {
     return void 0;
   }
@@ -30216,11 +30220,11 @@ function parseRule(value, where, errors) {
     errors.push(`${where}: expected an object`);
     return void 0;
   }
-  const from = str4(value.from, `${where}.from`, errors, { required: true });
+  const from = str4(value["from"], `${where}.from`, errors, { required: true });
   if (from !== void 0 && !SOURCE_ID.test(from)) {
     errors.push(`${where}.from: invalid source id "${from}"`);
   }
-  const match = str4(value.match, `${where}.match`, errors, { max: MAX_PATTERN_CHARS, required: true });
+  const match = str4(value["match"], `${where}.match`, errors, { max: MAX_PATTERN_CHARS, required: true });
   const group = (name) => {
     const raw2 = str4(value[name], `${where}.${name}`, errors);
     if (raw2 !== void 0 && !GROUP_NAME.test(raw2)) {
@@ -30230,8 +30234,8 @@ function parseRule(value, where, errors) {
   };
   const key2 = group("key");
   const text15 = group("text");
-  const count2 = value.count === void 0 ? void 0 : fieldName(value.count, `${where}.count`, errors);
-  const scale = num3(value.scale, `${where}.scale`, errors);
+  const count2 = value["count"] === void 0 ? void 0 : fieldName(value["count"], `${where}.count`, errors);
+  const scale = num3(value["scale"], `${where}.scale`, errors);
   if (from === void 0 || match === void 0) {
     return void 0;
   }
@@ -30253,15 +30257,15 @@ function parseValueRef(value, where, errors) {
     errors.push(`${where}: expected an object`);
     return void 0;
   }
-  const field = fieldName(value.field, `${where}.field`, errors);
-  const key2 = str4(value.key, `${where}.key`, errors, { max: 120 });
-  const agg = choice(value.agg, AGGS, `${where}.agg`, errors);
-  const unit = str4(value.unit, `${where}.unit`, errors, { cut: MAX_UNIT_CHARS });
-  const digits = num3(value.digits, `${where}.digits`, errors);
+  const field = fieldName(value["field"], `${where}.field`, errors);
+  const key2 = str4(value["key"], `${where}.key`, errors, { max: 120 });
+  const agg = choice(value["agg"], AGGS, `${where}.agg`, errors);
+  const unit = str4(value["unit"], `${where}.unit`, errors, { cut: MAX_UNIT_CHARS });
+  const digits = num3(value["digits"], `${where}.digits`, errors);
   if (digits !== void 0 && (!Number.isInteger(digits) || digits < 0 || digits > 4)) {
     errors.push(`${where}.digits: expected an integer 0\u20134`);
   }
-  const better = betterValue(value.better, `${where}.better`, errors);
+  const better = betterValue(value["better"], `${where}.better`, errors);
   if (field === void 0 || agg === void 0) {
     return void 0;
   }
@@ -30280,39 +30284,39 @@ function parseBlock(value, where, errors) {
     return void 0;
   }
   const before = errors.length;
-  const label = () => str4(value.label, `${where}.label`, errors, { cut: MAX_LABEL_CHARS, required: true }) ?? "";
-  const unit = () => str4(value.unit, `${where}.unit`, errors, { cut: MAX_UNIT_CHARS });
-  const field = () => fieldName(value.field, `${where}.field`, errors) ?? "";
-  const optional2 = (entry, name) => entry === void 0 ? {} : { [name]: entry };
+  const label = () => str4(value["label"], `${where}.label`, errors, { cut: MAX_LABEL_CHARS, required: true }) ?? "";
+  const unit = () => str4(value["unit"], `${where}.unit`, errors, { cut: MAX_UNIT_CHARS });
+  const field = () => fieldName(value["field"], `${where}.field`, errors) ?? "";
+  const optional3 = (entry, name) => entry === void 0 ? {} : { [name]: entry };
   let block;
-  switch (value.kind) {
+  switch (value["kind"]) {
     case "spark":
       block = {
         field: field(),
         kind: "spark",
         label: label(),
-        ...optional2(str4(value.key, `${where}.key`, errors, { max: 120 }), "key"),
-        ...optional2(unit(), "unit"),
-        ...optional2(betterValue(value.better, `${where}.better`, errors), "better"),
-        ...optional2(num3(value.target, `${where}.target`, errors), "target"),
-        ...optional2(str4(value.targetLabel, `${where}.targetLabel`, errors, { cut: MAX_LABEL_CHARS }), "targetLabel"),
-        ...optional2(num3(value.min, `${where}.min`, errors), "min"),
-        ...optional2(num3(value.max, `${where}.max`, errors), "max")
+        ...optional3(str4(value["key"], `${where}.key`, errors, { max: 120 }), "key"),
+        ...optional3(unit(), "unit"),
+        ...optional3(betterValue(value["better"], `${where}.better`, errors), "better"),
+        ...optional3(num3(value["target"], `${where}.target`, errors), "target"),
+        ...optional3(str4(value["targetLabel"], `${where}.targetLabel`, errors, { cut: MAX_LABEL_CHARS }), "targetLabel"),
+        ...optional3(num3(value["min"], `${where}.min`, errors), "min"),
+        ...optional3(num3(value["max"], `${where}.max`, errors), "max")
       };
       break;
     case "bars":
       block = {
-        agg: choice(value.agg, AGGS, `${where}.agg`, errors) ?? "last",
+        agg: choice(value["agg"], AGGS, `${where}.agg`, errors) ?? "last",
         field: field(),
         kind: "bars",
         label: label(),
-        ...optional2(unit(), "unit"),
-        ...optional2(num3(value.max, `${where}.max`, errors), "max"),
-        ...optional2(betterValue(value.better, `${where}.better`, errors), "better")
+        ...optional3(unit(), "unit"),
+        ...optional3(num3(value["max"], `${where}.max`, errors), "max"),
+        ...optional3(betterValue(value["better"], `${where}.better`, errors), "better")
       };
       break;
     case "meter": {
-      const whole = typeof value.total === "string" ? Number(value.total) : value.total;
+      const whole = typeof value["total"] === "string" ? Number(value["total"]) : value["total"];
       if (!isRecord2(whole) && (typeof whole !== "number" || Number.isNaN(whole))) {
         const ref = parseValueRef(value, where, errors);
         block = ref && { items: [{ ...ref, label: label() }], kind: "stat" };
@@ -30326,24 +30330,24 @@ function parseBlock(value, where, errors) {
           total = whole;
         }
       } else {
-        total = parseValueRef(value.total, `${where}.total`, errors);
+        total = parseValueRef(value["total"], `${where}.total`, errors);
       }
       block = {
-        agg: choice(value.agg, AGGS, `${where}.agg`, errors) ?? "last",
+        agg: choice(value["agg"], AGGS, `${where}.agg`, errors) ?? "last",
         field: field(),
         kind: "meter",
         label: label(),
         total: total ?? 1,
-        ...optional2(str4(value.key, `${where}.key`, errors, { max: 120 }), "key"),
-        ...optional2(unit(), "unit")
+        ...optional3(str4(value["key"], `${where}.key`, errors, { max: 120 }), "key"),
+        ...optional3(unit(), "unit")
       };
       break;
     }
     case "stat": {
-      const items = list2(value.items, `${where}.items`, errors, 1, MAX_STAT_ITEMS)?.map((item3, i) => {
+      const items = list2(value["items"], `${where}.items`, errors, 1, MAX_STAT_ITEMS)?.map((item3, i) => {
         const at = `${where}.items[${i}]`;
         const ref = parseValueRef(item3, at, errors);
-        const itemLabel = isRecord2(item3) ? str4(item3.label, `${at}.label`, errors, { cut: MAX_LABEL_CHARS, required: true }) : void 0;
+        const itemLabel = isRecord2(item3) ? str4(item3["label"], `${at}.label`, errors, { cut: MAX_LABEL_CHARS, required: true }) : void 0;
         return ref && itemLabel !== void 0 ? { ...ref, label: itemLabel } : void 0;
       }) ?? [];
       block = { items: items.filter((i) => i !== void 0), kind: "stat" };
@@ -30351,11 +30355,11 @@ function parseBlock(value, where, errors) {
     }
     case "grid": {
       const tones = {};
-      if (!isRecord2(value.tones)) {
+      if (!isRecord2(value["tones"])) {
         errors.push(`${where}.tones: expected an object of status substring \u2192 tone`);
       } else {
         let n = 0;
-        for (const [status, tone] of Object.entries(value.tones)) {
+        for (const [status, tone] of Object.entries(value["tones"])) {
           if (++n > MAX_GRID_TONES) {
             errors.push(`${where}.tones: at most ${MAX_GRID_TONES} entries`);
             break;
@@ -31312,29 +31316,29 @@ function processVerdict(p3) {
 var strings2 = (v) => Array.isArray(v) ? v.filter((x) => typeof x === "string" && x !== "") : [];
 function watchersOf(call) {
   const r = record(call.result);
-  if (typeof r?.session_id === "string") {
+  if (typeof r?.["session_id"] === "string") {
     return {
-      heartbeat: typeof r.heartbeat_seconds === "number" ? r.heartbeat_seconds : 0,
-      notify: r.notify_on_complete === true,
-      patterns: strings2(r.watch_patterns)
+      heartbeat: typeof r["heartbeat_seconds"] === "number" ? r["heartbeat_seconds"] : 0,
+      notify: r["notify_on_complete"] === true,
+      patterns: strings2(r["watch_patterns"])
     };
   }
   const a2 = call.args;
-  const beat = typeof a2.heartbeat === "number" && a2.heartbeat > 0 ? Math.max(60, Math.floor(a2.heartbeat)) : 0;
-  let notify = a2.notify_on_complete === true;
-  let patterns = strings2(a2.watch_patterns);
-  if (typeof a2.notify === "boolean") {
-    notify = a2.notify;
+  const beat = typeof a2["heartbeat"] === "number" && a2["heartbeat"] > 0 ? Math.max(60, Math.floor(a2["heartbeat"])) : 0;
+  let notify = a2["notify_on_complete"] === true;
+  let patterns = strings2(a2["watch_patterns"]);
+  if (typeof a2["notify"] === "boolean") {
+    notify = a2["notify"];
     patterns = [];
-  } else if (Array.isArray(a2.notify)) {
+  } else if (Array.isArray(a2["notify"])) {
     notify = false;
-    patterns = strings2(a2.notify);
+    patterns = strings2(a2["notify"]);
   }
   notify ||= beat > 0;
   return { heartbeat: beat, notify, patterns: notify ? [] : patterns };
 }
 function processIdOf(call) {
-  const id = record(call.result)?.session_id;
+  const id = record(call.result)?.["session_id"];
   return typeof id === "string" && id ? id : void 0;
 }
 var Processes = class {
@@ -31543,7 +31547,7 @@ function linkCalls(calls, procs) {
     }
   }
   for (const call of calls) {
-    const ref = isWatchCall(call) ? String(call.args.session_id).trim() : "";
+    const ref = isWatchCall(call) ? String(call.args["session_id"]).trim() : "";
     const matches2 = ref ? procs.filter((p3) => p3.id.startsWith(ref)) : [];
     if (matches2.length === 1) {
       owners.set(call, matches2[0]);
@@ -31551,7 +31555,7 @@ function linkCalls(calls, procs) {
   }
   const free = [...procs].sort((a2, b) => a2.startedAt - b.startedAt);
   for (const call of calls) {
-    const command = typeof call.args.command === "string" ? call.args.command.trim() : "";
+    const command = typeof call.args["command"] === "string" ? call.args["command"].trim() : "";
     if (owners.has(call) || processIdOf(call) || !command || call.name !== "terminal") {
       continue;
     }
@@ -33071,12 +33075,12 @@ function openAgents(host, focus) {
         { id: "pause", keys: ["p"], label: host.agents.paused ? "Resume spawns" : "Pause spawns" }
       ],
       {
-        disabled: running2 ? a2?.steerable === false ? "Not taking steering now" : void 0 : "Finished",
+        ...optional("disabled", running2 ? a2?.steerable === false ? "Not taking steering now" : void 0 : "Finished"),
         id: "steer",
         keys: ["s"],
         label: "Steer"
       },
-      { danger: true, disabled: running2 ? void 0 : "Finished", id: "stop", keys: ["x"], label: "Stop" },
+      { danger: true, ...optional("disabled", running2 ? void 0 : "Finished"), id: "stop", keys: ["x"], label: "Stop" },
       { end: true, id: "close", keys: ["esc"], label: inTimeline ? "Back" : "Close" }
     ];
   };
@@ -33096,7 +33100,7 @@ function openAgents(host, focus) {
       {
         actions: actions(a2, false),
         columns,
-        confirm: stopping() && a2 ? { act: "confirm", label: "Stop", text: `Stop ${agentName(a2)}? Its partial work returns to Hermes.` } : void 0,
+        ...optional("confirm", stopping() && a2 ? { act: "confirm", label: "Stop", text: `Stop ${agentName(a2)}? Its partial work returns to Hermes.` } : void 0),
         empty: state.tab === "running" ? "No agents running. Tab shows finished ones." : "No subagents in this session yet",
         icon: "agents",
         items: all8.map((x) => hubItem(x, now)),
@@ -33107,7 +33111,7 @@ function openAgents(host, focus) {
         onSelect: (ev) => click({ id: ev.item, type: "select" }),
         order: list9.map((x) => x.id),
         preview: "side",
-        selected: state.selected,
+        ...optional("selected", state.selected),
         size: "lg",
         subtitle: [
           { s: "muted", t: summary2(all8) },
@@ -33141,7 +33145,7 @@ function openAgents(host, focus) {
           { format: "dim", head: "At", id: "at", min: 8, priority: 2 },
           { format: "elapsed", head: "Took", id: "took", priority: 4 }
         ],
-        confirm: stopping() ? { act: "confirm", label: "Stop", text: `Stop ${agentName(a2)}? Its partial work returns to Hermes.` } : void 0,
+        ...optional("confirm", stopping() ? { act: "confirm", label: "Stop", text: `Stop ${agentName(a2)}? Its partial work returns to Hermes.` } : void 0),
         empty: a2.logPath || a2.log ? "Nothing logged yet" : "This agent has no live transcript",
         icon: "agent",
         items: entries.map((e, i) => stepItem(e, `e${i}`, a2)),
@@ -33150,7 +33154,7 @@ function openAgents(host, focus) {
         onAction: handlers3,
         onSelect: (ev) => click({ id: ev.item, type: "step" }),
         preview: "side",
-        selected: sel,
+        ...optional("selected", sel),
         size: "lg",
         subtitle: [{ s: "muted", t: `${SUBAGENT_LOOK[a2.status].word} \xB7 ${a2.goal}` }],
         title: agentName(a2),
@@ -33179,7 +33183,7 @@ function elapsed(a2, now) {
 }
 function hubItem(a2, now) {
   return {
-    chips: a2.model ? [{ text: a2.model.split("/").at(-1) ?? a2.model }] : void 0,
+    ...optional("chips", a2.model ? [{ text: a2.model.split("/").at(-1) ?? a2.model }] : void 0),
     depth: a2.depth ?? 0,
     detail: a2.goal,
     dot: SUBAGENT_LOOK[a2.status].tone,
@@ -33234,14 +33238,14 @@ function stepItem(e, id, a2) {
   if (e.kind === "tool") {
     return {
       detail: e.args,
-      dot: e.status === "error" ? "error" : e.status === "running" && isRunning(a2) ? "accent" : void 0,
+      ...optional("dot", e.status === "error" ? "error" : e.status === "running" && isRunning(a2) ? "accent" : void 0),
       facts: { at: e.at, took: e.took !== void 0 ? duration(e.took) : "" },
       icon: hubIconOf(e.name),
       id,
       label: e.name,
       mono: true,
       node: "tool",
-      tone: e.status === "error" ? "error" : void 0
+      ...optional("tone", e.status === "error" ? "error" : void 0)
     };
   }
   return {
@@ -33249,7 +33253,7 @@ function stepItem(e, id, a2) {
     id,
     label: e.kind === "kickoff" ? `Task: ${e.text}` : e.kind === "think" ? `Thinking: ${e.text}` : e.text,
     node: e.kind === "kickoff" ? "user" : "assistant",
-    tone: e.kind === "think" || e.kind === "note" ? "muted" : void 0
+    ...optional("tone", e.kind === "think" || e.kind === "note" ? "muted" : void 0)
   };
 }
 function stepPreview(e, a2, brief) {
@@ -33263,7 +33267,7 @@ ${brief}` : a2.goal : e.text;
     return [
       /* @__PURE__ */ jsx("text", { role: "omp.hub.title", text: head2 }, "title"),
       /* @__PURE__ */ jsx("text", { spans: [{ s: "dim mono", t: e.at }] }, "at"),
-      /* @__PURE__ */ jsx("md", { text: text15, tone: e.kind === "think" ? "muted" : void 0 }, "body")
+      /* @__PURE__ */ jsx("md", { text: text15, ...optional("tone", e.kind === "think" ? "muted" : void 0) }, "body")
     ];
   }
   return [
@@ -33323,8 +33327,8 @@ function ownJobs(calls) {
   const ids = /* @__PURE__ */ new Set();
   for (const c of calls) {
     const r = record(c.result);
-    const job = record(r?.job);
-    const id = r?.job_id ?? job?.job_id ?? job?.id;
+    const job = record(r?.["job"]);
+    const id = r?.["job_id"] ?? job?.["job_id"] ?? job?.["id"];
     if (c.name === "cronjob_manage" && typeof id === "string" && id) {
       ids.add(id);
     }
@@ -33666,7 +33670,7 @@ function openBackground(host, at) {
   const tabs = () => [
     { count: host.processes.running().length, id: "running", label: "Running" },
     { count: procs().length, id: "all", label: "All" },
-    { count: host.cron.loaded ? host.cron.jobs().length : void 0, id: "cron", label: "Cron" }
+    { ...optional("count", host.cron.loaded ? host.cron.jobs().length : void 0), id: "cron", label: "Cron" }
   ];
   function cronNode(now) {
     const jobs = host.cron.jobs();
@@ -33684,17 +33688,17 @@ function openBackground(host, at) {
       {
         actions: [
           {
-            disabled: j ? busy ? "Working" : void 0 : "No job",
+            ...optional("disabled", j ? busy ? "Working" : void 0 : "No job"),
             id: "toggle",
             keys: ["p"],
             label: j && isPaused(j) ? "Resume" : "Pause",
             primary: true
           },
-          { danger: true, disabled: j ? busy ? "Working" : void 0 : "No job", id: "remove", keys: ["d"], label: "Remove" },
+          { danger: true, ...optional("disabled", j ? busy ? "Working" : void 0 : "No job"), id: "remove", keys: ["d"], label: "Remove" },
           { end: true, id: "close", keys: ["esc"], label: "Close" }
         ],
         columns,
-        confirm: state.confirm === "job" && j ? { act: "confirm", label: "Remove", text: `Remove ${j.name || j.job_id}? It will not run again.` } : void 0,
+        ...optional("confirm", state.confirm === "job" && j ? { act: "confirm", label: "Remove", text: `Remove ${j.name || j.job_id}? It will not run again.` } : void 0),
         empty: host.cron.error ? `Could not list cron jobs: ${host.cron.error}` : host.cron.loaded ? "No cron jobs. Ask Hermes to schedule one or to watch something." : "Loading cron jobs\u2026",
         icon: "clock",
         items: jobs.map((x) => jobItem(x, now, own14.has(x.job_id), host.cron.busy(x.job_id))),
@@ -33703,7 +33707,7 @@ function openBackground(host, at) {
         onSelect: (ev) => click({ id: ev.item, type: "selectJob" }),
         order: jobs.map((x) => x.job_id),
         preview: "side",
-        selected: state.job,
+        ...optional("selected", state.job),
         size: "lg",
         subtitle: [{ s: "muted", t: host.cron.warning ?? cronSummary(jobs) }],
         tab: state.tab,
@@ -33736,18 +33740,21 @@ function openBackground(host, at) {
           { id: "copy", keys: ["c"], label: copied && copied === p3?.id ? "Copied" : "Copy command" },
           {
             danger: true,
-            disabled: p3 && isRunning2(p3) ? host.processes.stopping(p3.id) ? "Stopping" : void 0 : "Not running",
+            ...optional("disabled", p3 && isRunning2(p3) ? host.processes.stopping(p3.id) ? "Stopping" : void 0 : "Not running"),
             id: "stop",
             keys: ["k"],
             label: p3 && host.processes.stopping(p3.id) ? "Stopping\u2026" : "Stop"
           },
-          { danger: true, disabled: running2 ? void 0 : "None running", id: "all", keys: ["shift+k"], label: "Stop all" },
+          { danger: true, ...optional("disabled", running2 ? void 0 : "None running"), id: "all", keys: ["shift+k"], label: "Stop all" },
           { end: true, id: "close", keys: ["esc"], label: expanded ? "Back" : "Close" }
         ],
         columns,
-        confirm: confirm === "all" ? { act: "confirm", label: "Stop all", text: `Stop ${plural(running2, "background process", "background processes")}?` } : confirm === "one" && p3 ? { act: "confirm", label: "Stop", text: `Stop ${describeCommand(p3.command)}?` } : void 0,
+        ...optional(
+          "confirm",
+          confirm === "all" ? { act: "confirm", label: "Stop all", text: `Stop ${plural(running2, "background process", "background processes")}?` } : confirm === "one" && p3 ? { act: "confirm", label: "Stop", text: `Stop ${describeCommand(p3.command)}?` } : void 0
+        ),
         empty: state.tab === "running" ? "No background processes running. Tab shows the finished ones." : "No background processes in this session",
-        focus: expanded ? "preview" : void 0,
+        ...optional("focus", expanded ? "preview" : void 0),
         icon: "terminal",
         items: all8.map((x) => item(x, now, host.processes.stopping(x.id))),
         noun: "processes",
@@ -33756,7 +33763,7 @@ function openBackground(host, at) {
         onSelect: (ev) => click({ id: ev.item, type: "select" }),
         order: list9.map((x) => x.id),
         preview: "side",
-        selected: state.selected,
+        ...optional("selected", state.selected),
         size: "lg",
         subtitle: [{ s: "muted", t: summary3(all8) }],
         tab: state.tab,
@@ -33781,7 +33788,7 @@ function jobItem(j, now, own14, busy) {
   const error = jobError(j);
   return {
     badges: [...isMonitor(j) ? [{ text: "monitor" }] : [], ...own14 ? [{ text: "this session", tone: "accent" }] : []],
-    detail: oneLine(j.prompt_preview || j.monitor_url || j.monitor_script || "") || void 0,
+    ...optional("detail", oneLine(j.prompt_preview || j.monitor_url || j.monitor_script || "") || void 0),
     dot: jobTone(j),
     facts: {
       last: busy ? "working\u2026" : error ? "failed" : j.last_run_at ? `${j.last_status ?? "ran"} ${relative(j.last_run_at, now)}` : "never ran",
@@ -33790,7 +33797,7 @@ function jobItem(j, now, own14, busy) {
     },
     id: j.job_id,
     label: j.name || j.job_id,
-    tone: isPaused(j) ? "muted" : void 0
+    ...optional("tone", isPaused(j) ? "muted" : void 0)
   };
 }
 function jobPreview(j, now, own14) {
@@ -33853,7 +33860,7 @@ function item(p3, now, stopping) {
     id: p3.id,
     label: describeCommand(p3.command),
     title: p3.command,
-    tone: isRunning2(p3) ? void 0 : "muted"
+    ...optional("tone", isRunning2(p3) ? void 0 : "muted")
   };
 }
 function preview2(p3, call, now) {
@@ -34056,7 +34063,7 @@ function openChanges(host, focus) {
       "picker",
       {
         actions: [
-          { disabled: f ? void 0 : "No file", id: "copy", keys: ["c"], label: "Copy path" },
+          { ...optional("disabled", f ? void 0 : "No file"), id: "copy", keys: ["c"], label: "Copy path" },
           { id: "refresh", keys: ["shift+r"], label: "Refresh" },
           { end: true, id: "close", keys: ["esc"], label: "Close", primary: true }
         ],
@@ -34076,7 +34083,7 @@ function openChanges(host, focus) {
         },
         order: list9.map((x) => x.path),
         preview: "below",
-        selected,
+        ...optional("selected", selected),
         size: "lg",
         state: state || failed ? "ready" : "loading",
         subtitle: [
@@ -34097,10 +34104,10 @@ function openChanges(host, focus) {
 function item2(f) {
   return {
     badges: [
-      ...f.status !== "modified" ? [{ text: f.status, tone: TONE[f.status] }] : [],
+      ...f.status !== "modified" ? [{ text: f.status, ...optional("tone", TONE[f.status]) }] : [],
       ...f.staged ? [{ text: "staged" }] : []
     ],
-    detail: f.from ? `from ${f.from}` : void 0,
+    ...optional("detail", f.from ? `from ${f.from}` : void 0),
     facts: { changes: [{ s: "success", t: `+${f.additions}` }, { t: " " }, { s: "error", t: `\u2212${f.deletions}` }] },
     id: f.path,
     label: f.path,
@@ -34182,8 +34189,8 @@ async function applyEffort(host, value, scope) {
   if (!sid) {
     return;
   }
-  const before = session2.info && { reasoning_effort: session2.info.reasoning_effort, reasoning_effort_wire: session2.info.reasoning_effort_wire };
-  session2.info = session2.info && { ...session2.info, reasoning_effort: value, reasoning_effort_wire: void 0 };
+  const before = session2.info && { effort: session2.info.reasoning_effort, wire: session2.info.reasoning_effort_wire };
+  session2.info = session2.info && withEffort(session2.info, value, void 0);
   host.changed();
   try {
     if (scope === "session" && host.gw.isCanonical) {
@@ -34196,7 +34203,7 @@ async function applyEffort(host, value, scope) {
     }
   } catch (error) {
     if (sid === session2.ref.live && session2.info && before && session2.info.reasoning_effort === value) {
-      session2.info = { ...session2.info, ...before };
+      session2.info = withEffort(session2.info, before.effort, before.wire);
     }
     host.transcript.notice(`Could not set the reasoning effort: ${errorText(error)}`, "error");
   }
@@ -34209,6 +34216,20 @@ function cycleEffort(host) {
     return host.changed();
   }
   void host.setEffort(next2, "session");
+}
+function withEffort(info, effort2, wire) {
+  const out = { ...info };
+  if (effort2 === void 0) {
+    delete out.reasoning_effort;
+  } else {
+    out.reasoning_effort = effort2;
+  }
+  if (wire === void 0) {
+    delete out.reasoning_effort_wire;
+  } else {
+    out.reasoning_effort_wire = wire;
+  }
+  return out;
 }
 
 // src/overlays/effort.tsx
@@ -34388,9 +34409,9 @@ var prNode = object({
   commits: nodesOf(object({ commit: orEmpty(object({ statusCheckRollup: orEmpty(object({ contexts: nodesOf(checkNode) })) })) }))
 });
 var repoNode = object({
-  squashMergeAllowed: optional(unknown()),
-  mergeCommitAllowed: optional(unknown()),
-  rebaseMergeAllowed: optional(unknown()),
+  squashMergeAllowed: optional2(unknown()),
+  mergeCommitAllowed: optional2(unknown()),
+  rebaseMergeAllowed: optional2(unknown()),
   pullRequest: prNode
 });
 function checkStatus(status, conclusion) {
@@ -34726,9 +34747,9 @@ function checksTab(pr, now) {
       },
       "sum"
     ),
-    ...groups.filter((g) => g.checks.length).map((g) => /* @__PURE__ */ jsx("section", { collapsed: !g.open, collapsible: true, head: `${g.head} \xB7 ${g.checks.length}`, role: "hermes.pr.checkgroup", children: g.checks.map((c, i) => /* @__PURE__ */ jsxs("row", { align: "center", gap: "sm", role: "hermes.pr.check", title: c.description, children: [
+    ...groups.filter((g) => g.checks.length).map((g) => /* @__PURE__ */ jsx("section", { collapsed: !g.open, collapsible: true, head: `${g.head} \xB7 ${g.checks.length}`, role: "hermes.pr.checkgroup", children: g.checks.map((c, i) => /* @__PURE__ */ jsxs("row", { align: "center", gap: "sm", role: "hermes.pr.check", ...optional("title", c.description), children: [
       /* @__PURE__ */ jsx("icon", { name: CHECK[c.status].icon, tone: CHECK[c.status].tone }, "i"),
-      /* @__PURE__ */ jsx("text", { grow: 1, spans: [{ href: c.url, t: c.name }], truncate: "end", wrap: "none" }, "n"),
+      /* @__PURE__ */ jsx("text", { grow: 1, spans: [{ ...optional("href", c.url), t: c.name }], truncate: "end", wrap: "none" }, "n"),
       c.workflow && !c.name.startsWith(`${c.workflow} /`) ? /* @__PURE__ */ jsx("text", { spans: [{ s: "dim", t: c.workflow }], truncate: "end", wrap: "none" }, "w") : null,
       /* @__PURE__ */ jsx("text", { spans: [{ s: CHECK[c.status].tone === "muted" ? "dim" : CHECK[c.status].tone, t: CHECK[c.status].word }], wrap: "none" }, "s"),
       /* @__PURE__ */ jsx("text", { spans: [{ s: "dim mono", t: took(c, now) }], wrap: "none" }, "t")
@@ -61155,7 +61176,7 @@ function isUint8Array2(value) {
 var schema = {
   ...defaultSchema,
   // GitHub keeps `open` on a fold; the default schema drops it.
-  attributes: { ...defaultSchema.attributes, details: [...defaultSchema.attributes?.details ?? [], "open"] },
+  attributes: { ...defaultSchema.attributes, details: [...defaultSchema.attributes?.["details"] ?? [], "open"] },
   // Drawn as Tern's own fold and checkboxes, so the ids clobber nothing.
   clobberPrefix: ""
 };
@@ -61347,7 +61368,7 @@ function commitRun(commits, last, key2, now) {
       const sha = c.url?.match(/\/commit\/([0-9a-f]{7})/)?.[1];
       return /* @__PURE__ */ jsxs("row", { align: "center", gap: "sm", role: "hermes.pr.commit", children: [
         /* @__PURE__ */ jsx("text", { grow: 1, spans: [{ t: c.body.split("\n")[0] ?? "" }], truncate: "end", wrap: "none" }, "m"),
-        sha ? /* @__PURE__ */ jsx("text", { spans: [{ href: c.url, s: "mono dim", t: sha }], wrap: "none" }, "s") : null
+        sha ? /* @__PURE__ */ jsx("text", { spans: [{ ...optional("href", c.url), s: "mono dim", t: sha }], wrap: "none" }, "s") : null
       ] }, `c${i}`);
     })
   ] }, key2);
@@ -61371,7 +61392,7 @@ function filesTab(e, pr, id, density, reveal) {
     files.map((f, i) => {
       const slash = f.path.lastIndexOf("/");
       return /* @__PURE__ */ jsxs("row", { align: "center", gap: "sm", onClick: () => reveal?.(`${id}.diffs.f${i}`), role: "hermes.pr.fileitem", title: f.path, children: [
-        /* @__PURE__ */ jsx("icon", { name: "file", tone: FILE_TONE[f.status] }, "i"),
+        /* @__PURE__ */ jsx("icon", { name: "file", ...optional("tone", FILE_TONE[f.status]) }, "i"),
         /* @__PURE__ */ jsx(
           "text",
           {
@@ -61413,7 +61434,7 @@ function fileCard(f, key2) {
       targetKind: "path",
       title: FILE_TITLE[f.status] ?? "Changed"
     },
-    f.patch ? [/* @__PURE__ */ jsx("diff", { lang: langOf(f.path), path: f.path, text: f.patch }, "d")] : [/* @__PURE__ */ jsx("text", { spans: [{ s: "muted", t: "Binary, or too large to show here." }] }, "none")]
+    f.patch ? [/* @__PURE__ */ jsx("diff", { ...optional("lang", langOf(f.path)), path: f.path, text: f.patch }, "d")] : [/* @__PURE__ */ jsx("text", { spans: [{ s: "muted", t: "Binary, or too large to show here." }] }, "none")]
   );
 }
 
@@ -61607,7 +61628,7 @@ var PrView = class {
     return /* @__PURE__ */ jsx(
       "tabs",
       {
-        active: this.#selected,
+        ...optional("active", this.#selected),
         items: entries.map((e) => ({
           id: prKey(e.ref),
           label: [{ s: prTone(e), t: "\u25CF " }, { t: `#${e.ref.number}` }, ...e.pr && !compact2 ? [{ s: "muted", t: ` ${clip(e.pr.title, { max: 28 })}` }] : []]
@@ -61933,7 +61954,7 @@ function openPrMenu(host) {
 function menuRow(e, now, on, onClick) {
   const pr = e.pr;
   const what = !pr ? e.error ? "unreadable" : "reading\u2026" : pr.state !== "open" ? stateLabel(pr).toLowerCase() : pr.checks.length ? `checks ${checksState(pr.checks)}` : stateLabel(pr).toLowerCase();
-  return /* @__PURE__ */ jsxs("row", { align: "center", gap: "sm", mark: on ? "pick" : void 0, onClick, role: "hermes.pr.menu.row", title: pr?.url ?? e.ref.url, children: [
+  return /* @__PURE__ */ jsxs("row", { align: "center", gap: "sm", ...optional("mark", on ? "pick" : void 0), onClick, role: "hermes.pr.menu.row", title: pr?.url ?? e.ref.url, children: [
     /* @__PURE__ */ jsx("icon", { name: "merge", tone: prTone(e) }, "i"),
     /* @__PURE__ */ jsxs("col", { gap: "none", grow: 1, min: { w: 0 }, children: [
       /* @__PURE__ */ jsx("text", { spans: [{ s: "strong", t: pr?.title ?? `#${e.ref.number}` }], truncate: "end", wrap: "none" }, "title"),
@@ -62153,7 +62174,7 @@ function openModelPicker(host) {
         { count: rows2.length, icon: "list", id: ALL, label: "All models" },
         ...providers.map(({ provider, name }) => ({
           count: provider.models?.length ?? 0,
-          dot: provider.warning ? "warning" : void 0,
+          ...optional("dot", provider.warning ? "warning" : void 0),
           group: "Providers",
           id: `provider:${provider.slug}`,
           label: name,
@@ -62172,14 +62193,14 @@ function openModelPicker(host) {
             { id: "use", keys: ["enter"], label: "Switch", primary: true }
           ],
           columns,
-          confirm: confirm ? { act: "confirm", label: "Switch anyway", text: confirm.text } : void 0,
+          ...optional("confirm", confirm ? { act: "confirm", label: "Switch anyway", text: confirm.text } : void 0),
           current: current ? [current] : [],
-          empty: query ? void 0 : "No models in this scope",
+          ...optional("empty", query ? void 0 : "No models in this scope"),
           hits,
           icon: "cpu",
           items: rows2.map(itemOf),
           layout: "rows",
-          message: state === "error" ? message : void 0,
+          ...optional("message", state === "error" ? message : void 0),
           noun: "models",
           onAction: {
             cancel: () => {
@@ -62224,14 +62245,16 @@ function openModelPicker(host) {
           query,
           scope,
           scopes,
-          selected,
+          ...optional("selected", selected),
           size: "lg",
           state,
-          strip: levels.length ? {
-            items: levels.map((l) => ({ id: l.id, label: l.label, on: l.id === effort2 })),
-            label: "Effort  \u2303E",
-            selected: effort2
-          } : void 0,
+          ...levels.length ? {
+            strip: {
+              items: levels.map((l) => ({ id: l.id, label: l.label, on: l.id === effort2 })),
+              label: "Effort  \u2303E",
+              selected: effort2
+            }
+          } : {},
           title: "Models",
           total: rows2.length,
           children: row2 ? preview3(row2, row2.id === current) : null
@@ -62307,8 +62330,11 @@ function itemOf(row2) {
       ...free ? [{ text: "free", tone: "success" }] : [],
       ...caps2?.ultrafast ? [{ text: "ultrafast", tone: "info" }] : caps2?.fast ? [{ text: "fast", tone: "info" }] : []
     ],
-    disabled: unavailable ? `${row2.providerName} doesn't offer ${row2.model} on this plan` : void 0,
-    facts: price && !free && price.input ? { price: `${price.input}\xB7${price.output}` } : free ? { price: "free" } : void 0,
+    ...optional("disabled", unavailable ? `${row2.providerName} doesn't offer ${row2.model} on this plan` : void 0),
+    ...optional(
+      "facts",
+      price && !free && price.input ? { price: `${price.input}\xB7${price.output}` } : free ? { price: "free" } : void 0
+    ),
     id: row2.id,
     label: row2.model,
     mono: true,
@@ -62375,16 +62401,16 @@ function optionList(listKey, id, options, selected, select2, pick2) {
         }
       },
       role: "omp.ask.options",
-      selected: options[selected] ? `${id}.${options[selected].id}` : void 0,
+      ...optional("selected", options[selected] ? `${id}.${options[selected].id}` : void 0),
       children: options.map((o) => /* @__PURE__ */ jsx(
         "item",
         {
-          detail: o.detail ? [o.role === "omp.ask.other" ? { s: "dim", t: o.detail } : { t: o.detail }] : void 0,
-          icon: o.checked ? "check" : void 0,
+          ...optional("detail", o.detail ? [o.role === "omp.ask.other" ? { s: "dim", t: o.detail } : { t: o.detail }] : void 0),
+          ...optional("icon", o.checked ? "check" : void 0),
           label: [{ t: o.label }],
           role: o.role ?? "omp.ask.option",
-          tone: o.checked ? "success" : void 0,
-          value: o.recommended ? [{ s: "accent", t: "Recommended" }] : void 0
+          ...optional("tone", o.checked ? "success" : void 0),
+          ...optional("value", o.recommended ? [{ s: "accent", t: "Recommended" }] : void 0)
         },
         o.id
       ))
@@ -63031,7 +63057,7 @@ var Composer = class {
     }
     if (ev.from === ev.to && !ev.text) {
       this.#cursor = clamp(ev.cursor, this.text.length);
-      const anchor = ev.raw?.anchor;
+      const anchor = ev.raw?.["anchor"];
       this.#anchor = typeof anchor === "number" && anchor !== this.cursor ? clamp(anchor, this.text.length) : void 0;
       return;
     }
@@ -63814,7 +63840,7 @@ function storedArgs(raw2) {
 import { homedir as homedir8 } from "node:os";
 import { join as join6 } from "node:path";
 function stateDbPath(env2 = process.env) {
-  return join6(env2.HERMES_HOME || join6(homedir8(), ".hermes"), "state.db");
+  return join6(env2["HERMES_HOME"] || join6(homedir8(), ".hermes"), "state.db");
 }
 
 // src/hermes/sessionIndex.ts
@@ -63893,8 +63919,8 @@ var sessionRow = object({
   model: text12,
   started_at: real,
   last_active: real,
-  messages: optional(unknown()),
-  pinned: optional(unknown()),
+  messages: optional2(unknown()),
+  pinned: optional2(unknown()),
   preview: text12
 });
 function flat2(text15) {
@@ -64088,13 +64114,13 @@ ${s2.preview} ${s2.cwd} ${s2.branch} ${s2.id}`, { scattered: false });
           actions: [
             { id: "delete", keys: ["backspace"], label: "Delete" },
             { end: true, id: "close", keys: ["esc"], label: "Close" },
-            { disabled: s2 ? void 0 : "No session", id: "resume", keys: ["enter"], label: s2?.id === current ? "Back to it" : "Resume", primary: true }
+            { ...optional("disabled", s2 ? void 0 : "No session"), id: "resume", keys: ["enter"], label: s2?.id === current ? "Back to it" : "Resume", primary: true }
           ],
           columns: [
             { format: "dim", id: "size", priority: 1 },
             { format: "time", id: "when", priority: 2 }
           ],
-          confirm: deleting ? { act: "confirm", label: "Delete", text: `Delete \u201C${sessionLabel(sessions.find((x) => x.id === deleting) ?? { preview: "", title: "" })}\u201D?` } : void 0,
+          ...optional("confirm", deleting ? { act: "confirm", label: "Delete", text: `Delete \u201C${sessionLabel(sessions.find((x) => x.id === deleting) ?? { preview: "", title: "" })}\u201D?` } : void 0),
           current: current ? [current] : [],
           empty: tab2 === "here" ? `No sessions in ${project} yet. Tab shows every folder.` : "No saved sessions yet",
           hits,
@@ -64138,7 +64164,7 @@ ${s2.preview} ${s2.cwd} ${s2.branch} ${s2.id}`, { scattered: false });
           placeholder: "Search titles, prompts, folders, branches\u2026",
           preview: "side",
           query,
-          selected,
+          ...optional("selected", selected),
           size: "lg",
           state,
           subtitle: [{ s: "muted", t: workspace ? shortPath2(workspace) : "" }],
@@ -64198,11 +64224,11 @@ function itemOf2(s2, now, running2, elsewhere) {
       ...s2.branch ? [{ text: s2.branch, title: `Branch ${s2.branch}` }] : [],
       ...elsewhere && s2.cwd ? [{ text: basename2(s2.cwd), title: s2.cwd }] : []
     ],
-    detail: s2.title && s2.preview ? oneLine(s2.preview) : void 0,
+    ...optional("detail", s2.title && s2.preview ? oneLine(s2.preview) : void 0),
     facts: { size: plural(s2.messages, "msg"), when: ageOf(s2.lastActive, now) },
     id: s2.id,
     label,
-    title: s2.cwd || void 0
+    ...optional("title", s2.cwd || void 0)
   };
 }
 function preview4(s2, now, isCurrent, running2, reply2) {
@@ -64350,16 +64376,16 @@ function specOf(a2, name, sid, stored) {
 }
 var sidebar;
 function hermesSplit(env2, vars, args) {
-  const pane = env2.TERN_PANE;
-  const python = env2.HERMES_PYTHON;
-  const src = env2.HERMES_PYTHON_SRC_ROOT;
+  const pane = env2["TERN_PANE"];
+  const python = env2["HERMES_PYTHON"];
+  const src = env2["HERMES_PYTHON_SRC_ROOT"];
   if (!pane || !python || !src) {
     return void 0;
   }
   const command = [
     "env",
     `PYTHONPATH=${src}`,
-    ...env2.HERMES_HOME ? [`HERMES_HOME=${env2.HERMES_HOME}`] : [],
+    ...env2["HERMES_HOME"] ? [`HERMES_HOME=${env2["HERMES_HOME"]}`] : [],
     ...vars,
     python,
     "-m",
@@ -64564,7 +64590,7 @@ function snapshot2(host, arg) {
   return cliPanel(host, "/snapshot create", ["backup", "--quick", ...label ? ["--label", label] : []]);
 }
 async function update(host) {
-  if (await openHermesSplit(["update"], host.session.info?.cwd || process.env.HOME || "/")) {
+  if (await openHermesSplit(["update"], host.session.info?.cwd || process.env["HOME"] || "/")) {
     return host.transcript.notice(
       "Running `hermes update` in the split below. Hermes may restart the gateway when it finishes."
     );
@@ -64624,7 +64650,7 @@ var HIDDEN_COMMANDS = new Set(HIDDEN.flatMap((h2) => [h2.name, ...h2.aliases ?? 
 var REFUSED_COMMANDS = [
   ...ROUTED.map((c) => ({ ...c, run: guarded(c.name, c.run) })),
   ...HIDDEN.map((h2) => ({
-    aliases: h2.aliases,
+    ...optional("aliases", h2.aliases),
     name: h2.name,
     run: (host) => host.transcript.notice(h2.why(h2.name), "warning")
   }))
@@ -64639,20 +64665,20 @@ import { join as join7 } from "node:path";
 import { DatabaseSync as DatabaseSync2 } from "node:sqlite";
 var LINK_TOOLS = /* @__PURE__ */ new Set(["link_pull_request", "list_pull_requests", "unlink_pull_request"]);
 function linksPath(env2 = process.env) {
-  return join7(env2.HERMES_HOME || join7(homedir9(), ".hermes"), "plugin-data", "hermes-tern", "pull-requests.json");
+  return join7(env2["HERMES_HOME"] || join7(homedir9(), ".hermes"), "plugin-data", "hermes-tern", "pull-requests.json");
 }
 function refOf(v) {
   const r = record(v);
-  const host = typeof r?.host === "string" ? r.host : "";
-  const repository = typeof r?.repository === "string" ? r.repository : "";
-  const number4 = typeof r?.number === "number" ? r.number : 0;
-  return host && repository && number4 > 0 ? { host, number: number4, repository, url: typeof r?.url === "string" ? r.url : `https://${host}/${repository}/pull/${number4}` } : void 0;
+  const host = typeof r?.["host"] === "string" ? r["host"] : "";
+  const repository = typeof r?.["repository"] === "string" ? r["repository"] : "";
+  const number4 = typeof r?.["number"] === "number" ? r["number"] : 0;
+  return host && repository && number4 > 0 ? { host, number: number4, repository, url: typeof r?.["url"] === "string" ? r["url"] : `https://${host}/${repository}/pull/${number4}` } : void 0;
 }
 function linkedFromResult(call) {
   if (!LINK_TOOLS.has(call.name) || call.outcome.kind !== "done") {
     return void 0;
   }
-  const linked = record(call.result)?.linked;
+  const linked = record(call.result)?.["linked"];
   return Array.isArray(linked) ? linked.map(refOf).filter((r) => Boolean(r)) : void 0;
 }
 var marker = (k) => `COALESCE(json_extract(CASE WHEN json_valid(c.model_config) THEN c.model_config ELSE '{}' END, '$.${k}'), '') != p.id`;
@@ -64703,7 +64729,7 @@ var QUERY2 = (n) => `SELECT timestamp, content FROM messages
   WHERE session_id IN (${Array(n).fill("?").join(", ")}) AND (active = 1 OR compacted = 1)
     AND role IN ('user', 'assistant') AND instr(content, '${MARKER2}') > 0
   ORDER BY id`;
-var handoffRow = object({ timestamp: number2(), content: optional(unknown()) });
+var handoffRow = object({ timestamp: number2(), content: optional2(unknown()) });
 function storedCompactions(sid, db = stateDbPath(), lineage = ancestry) {
   const ids = lineage(sid);
   try {
@@ -64795,7 +64821,7 @@ async function rewind(host, intent) {
     return host.notice(`Nothing to ${intent}.`);
   }
   const result = await mutateSession(host.gw, host.sid, "rewind", intent === "retry" ? retryTurnRewind : lastTurnRewind);
-  const removed = Number(result?.rewound_count ?? 0);
+  const removed = Number(result?.["rewound_count"] ?? 0);
   if (host.stale()) {
     return;
   }
@@ -64809,7 +64835,7 @@ async function rewind(host, intent) {
   if (intent === "undo") {
     return host.notice(`Undid ${plural2(removed, "message")}.`);
   }
-  const text15 = retryText(result.target_message?.content);
+  const text15 = retryText(result["target_message"]?.content);
   return text15 ? host.send(text15) : host.notice("Nothing to retry.");
 }
 function compressReport(summary4) {
@@ -64847,14 +64873,14 @@ async function compress(host, arg) {
     return;
   }
   if (result.status === "preview") {
-    return host.notice(Array.isArray(result.lines) ? result.lines.join("\n") : "Nothing to preview.");
+    return host.notice(Array.isArray(result["lines"]) ? result["lines"].join("\n") : "Nothing to preview.");
   }
-  const summary4 = result.summary;
+  const summary4 = result["summary"];
   const num5 = (v) => typeof v === "number" && v > 0 ? v : void 0;
   const kept = result.status === "noop" || result.status === "aborted" || Boolean(summary4?.noop || summary4?.aborted || summary4?.refused_would_grow);
   if (result.status !== "pending") {
     const line = lineTokens(summary4?.token_line ?? "");
-    host.compressing(kept ? "none" : { after: num5(result.after_tokens) ?? line.after, before: num5(result.before_tokens) ?? line.before });
+    host.compressing(kept ? "none" : { after: num5(result["after_tokens"]) ?? line.after, before: num5(result["before_tokens"]) ?? line.before });
   }
   if (result.status !== "noop") {
     await host.reload();
@@ -64945,12 +64971,12 @@ async function rollback(host, arg) {
     session_id: host.sid
   });
   if (!r?.success) {
-    return host.notice(`Rollback failed: ${r?.error || r?.message || "unknown error"}`, "error");
+    return host.notice(`Rollback failed: ${r?.error || r?.["message"] || "unknown error"}`, "error");
   }
   if ((r.history_removed ?? 0) > 0) {
     await host.reload();
   }
-  host.notice(`Rollback restored ${file2 || "the workspace"}: ${r.reason || r.message || r.restored_to || "restored"}`);
+  host.notice(`Rollback restored ${file2 || "the workspace"}: ${r.reason || r["message"] || r.restored_to || "restored"}`);
 }
 var guarded2 = (name, run6) => async (host, arg) => {
   try {
@@ -64990,14 +65016,14 @@ function displayNotice(kind, metadata) {
     return void 0;
   }
   const meta3 = record(metadata);
-  const shown3 = typeof meta3?.display_text === "string" ? meta3.display_text.trim() : "";
+  const shown3 = typeof meta3?.["display_text"] === "string" ? meta3["display_text"].trim() : "";
   if (shown3) {
     return shown3;
   }
   if (kind === "process_complete") {
     return "Background command finished";
   }
-  const count2 = typeof meta3?.task_count === "number" ? meta3.task_count : void 0;
+  const count2 = typeof meta3?.["task_count"] === "number" ? meta3["task_count"] : void 0;
   return count2 === 1 ? "Subagent finished" : count2 === void 0 ? "Subagents finished" : `${count2} subagents finished`;
 }
 var INTERNAL_FOOTER = "[INTERNAL NOTIFICATION \u2014 generated by the Hermes gateway";
@@ -65038,12 +65064,12 @@ function continuation(prev) {
     return void 0;
   }
   const background = prev.blocks.some(
-    (b) => b.kind === "tool" && b.call.name === "delegate_task" && record(b.call.result)?.mode === "background"
+    (b) => b.kind === "tool" && b.call.name === "delegate_task" && record(b.call.result)?.["mode"] === "background"
   );
   if (background) {
     return "Subagents finished";
   }
-  const shell = prev.blocks.some((b) => b.kind === "tool" && b.call.name === "terminal" && b.call.args.background === true);
+  const shell = prev.blocks.some((b) => b.kind === "tool" && b.call.name === "terminal" && b.call.args["background"] === true);
   return shell ? "Background command finished" : "Continued on its own";
 }
 var STEER_OPEN = "[OUT-OF-BAND USER MESSAGE";
@@ -65087,12 +65113,17 @@ function trailingText(turn) {
   return out;
 }
 function usageSince(now, before) {
-  const less = (key2) => {
+  const out = { ...now };
+  for (const key2 of ["cost_usd", "input", "output", "total"]) {
     const a2 = now[key2];
     const b = before?.[key2];
-    return typeof a2 === "number" ? Math.max(0, a2 - (typeof b === "number" ? b : 0)) : void 0;
-  };
-  return { ...now, cost_usd: less("cost_usd"), input: less("input"), output: less("output"), total: less("total") };
+    if (typeof a2 === "number") {
+      out[key2] = Math.max(0, a2 - (typeof b === "number" ? b : 0));
+    } else {
+      delete out[key2];
+    }
+  }
+  return out;
 }
 function shownArgs(args) {
   const command = args["command"];
@@ -65516,14 +65547,15 @@ function hardBreaks(text15) {
 }
 
 // src/usage.ts
-var HEADER = /^\s*(?:[^\p{L}\p{N}*\s]\S*\s+)?\*\*(.+?)\*\*\s*(.*)$/u;
+var HEADER = /^\s*(?:[^\p{L}\p{N}*\s]\S*\s+)?\*\*(?<title>.+?)\*\*\s*(?<inline>.*)$/u;
 var SUFFIX = { b: 1e9, k: 1e3, m: 1e6 };
 function parseCount(raw2) {
-  const m = /^~?\s*([\d,]*\.?\d+)\s*([kmb])?$/i.exec(raw2.trim());
+  const m = /^~?\s*(?<digits>[\d,]*\.?\d+)\s*(?<suffix>[kmb])?$/i.exec(raw2.trim());
   if (!m) {
     return NaN;
   }
-  return Number(m[1].replace(/,/g, "")) * (m[2] ? SUFFIX[m[2].toLowerCase()] : 1);
+  const { digits = "", suffix } = m.groups ?? {};
+  return Number(digits.replace(/,/g, "")) * (suffix ? SUFFIX[suffix.toLowerCase()] ?? 1 : 1);
 }
 function compactCount(n) {
   const unit = (v, s2) => `${v >= 100 ? Math.round(v) : Number(v.toFixed(1))}${s2}`;
@@ -65538,23 +65570,23 @@ function compactCount(n) {
 function limits(inline) {
   const out = [];
   for (const part of inline.split("|")) {
-    const m = /^\s*([A-Za-z]+):\s*([\d.,]+\s*[kmb]?)\s*\/\s*([\d.,]+\s*[kmb]?)(?:\s*\(resets?\s+(.+?)\))?\s*$/i.exec(part);
-    const left = m ? parseCount(m[2]) : NaN;
-    const limit = m ? parseCount(m[3]) : NaN;
+    const m = /^\s*(?<name>[A-Za-z]+):\s*(?<left>[\d.,]+\s*[kmb]?)\s*\/\s*(?<limit>[\d.,]+\s*[kmb]?)(?:\s*\(resets?\s+(?<reset>.+?)\))?\s*$/i.exec(part)?.groups;
+    const left = m ? parseCount(m["left"] ?? "") : NaN;
+    const limit = m ? parseCount(m["limit"] ?? "") : NaN;
     if (m && Number.isFinite(left) && limit > 0) {
-      out.push({ left, limit, name: m[1].toUpperCase(), reset: m[4] });
+      out.push({ left, limit, name: (m["name"] ?? "").toUpperCase(), reset: m["reset"] });
     }
   }
   return out;
 }
 function pair2(line) {
-  const m = /^\s*([^:]{1,40}):\s+(.+?)\s*$/.exec(line);
-  return m ? { key: m[1], value: m[2].replace(/^`(.*)`$/, "$1") } : void 0;
+  const m = /^\s*(?<key>[^:]{1,40}):\s+(?<value>.+?)\s*$/.exec(line)?.groups;
+  return m ? { key: m["key"] ?? "", value: (m["value"] ?? "").replace(/^`(.*)`$/, "$1") } : void 0;
 }
 function crumb(line) {
-  const m = /^\s*[•\-*]\s*(.+?):\s*(~?[\d.,]+\s*[kmb]?)(?:\s*\(~?(\d+(?:\.\d+)?)%\))?\s*$/i.exec(line);
-  const tokens2 = m ? parseCount(m[2]) : NaN;
-  return m && Number.isFinite(tokens2) ? { label: m[1], pct: m[3] ? Number(m[3]) : void 0, tokens: tokens2 } : void 0;
+  const m = /^\s*[•\-*]\s*(?<label>.+?):\s*(?<tokens>~?[\d.,]+\s*[kmb]?)(?:\s*\(~?(?<pct>\d+(?:\.\d+)?)%\))?\s*$/i.exec(line)?.groups;
+  const tokens2 = m ? parseCount(m["tokens"] ?? "") : NaN;
+  return m && Number.isFinite(tokens2) ? { label: m["label"] ?? "", pct: m["pct"] ? Number(m["pct"]) : void 0, tokens: tokens2 } : void 0;
 }
 function build(title, inline, body) {
   const name = title.replace(/:$/, "").trim();
@@ -65573,9 +65605,9 @@ function build(title, inline, body) {
     let context;
     for (const l of lines) {
       const p3 = pair2(l);
-      const c = p3 && /^context$/i.test(p3.key) ? /^([\d.,]+\s*[kmb]?)\s*\/\s*([\d.,]+\s*[kmb]?)/i.exec(p3.value) : null;
-      const used = c ? parseCount(c[1]) : NaN;
-      const max = c ? parseCount(c[2]) : NaN;
+      const c = p3 && /^context$/i.test(p3.key) ? /^(?<used>[\d.,]+\s*[kmb]?)\s*\/\s*(?<max>[\d.,]+\s*[kmb]?)/i.exec(p3.value)?.groups : void 0;
+      const used = c ? parseCount(c["used"] ?? "") : NaN;
+      const max = c ? parseCount(c["max"] ?? "") : NaN;
       if (Number.isFinite(used) && max > 0) {
         context = { max, used };
       } else if (p3) {
@@ -65615,7 +65647,7 @@ function parseUsage(raw2) {
     const h2 = HEADER.exec(line);
     if (h2) {
       flush();
-      head2 = { body: [], inline: h2[2].trim(), title: h2[1] };
+      head2 = { body: [], inline: (h2.groups?.["inline"] ?? "").trim(), title: h2.groups?.["title"] ?? "" };
     } else if (head2) {
       head2.body.push(line);
     } else if (line.trim()) {
@@ -65836,23 +65868,23 @@ function drawTool(call, view, whyFailed, now) {
   return /* @__PURE__ */ jsx(
     "tool",
     {
-      age: running2 ? age(call, call.startedAt, now) : void 0,
-      badges: card.badges,
-      collapsed: body.length > 0 ? collapsed : void 0,
-      collapsible: body.length > 0 ? true : void 0,
-      exit: !running2 && call.outcome.kind !== "cancelled" ? view.exit() : void 0,
-      frame: card.frame === "inline" && (running2 || !body.length || !card.framedWithBody) ? "inline" : void 0,
+      ...optional("age", running2 ? age(call, call.startedAt, now) : void 0),
+      ...optional("badges", card.badges),
+      ...optional("collapsed", body.length > 0 ? collapsed : void 0),
+      ...optional("collapsible", body.length > 0 ? true : void 0),
+      ...optional("exit", !running2 && call.outcome.kind !== "cancelled" ? view.exit() : void 0),
+      ...optional("frame", card.frame === "inline" && (running2 || !body.length || !card.framedWithBody) ? "inline" : void 0),
       ...lang,
-      meta: card.meta?.length ? card.meta : void 0,
+      ...optional("meta", card.meta?.length ? card.meta : void 0),
       name: card.name,
-      note: call.outcome.kind === "cancelled" ? "cancelled" : error && !card.body.length ? error : void 0,
-      preview: card.preview,
-      role: card.role,
+      ...optional("note", call.outcome.kind === "cancelled" ? "cancelled" : error && !card.body.length ? error : void 0),
+      ...optional("preview", card.preview),
+      ...optional("role", card.role),
       status,
-      target: card.target,
-      targetKind: card.target ? card.targetKind : void 0,
+      ...optional("target", card.target),
+      ...optional("targetKind", card.target ? card.targetKind : void 0),
       title: card.title,
-      took: running2 ? void 0 : card.took ?? tookMs(call),
+      ...optional("took", running2 ? void 0 : card.took ?? tookMs(call)),
       children: body
     },
     call.id
@@ -65994,7 +66026,7 @@ function workNode(items, parent, live, now) {
     liveText(liveLabel(latest2, true)),
     /* @__PURE__ */ jsx("icon", { name: "chev", role: "hermes.work.chev" }, "chev")
   ] }, "head") : /* @__PURE__ */ jsxs("row", { align: "center", gap: "sm", children: [
-    /* @__PURE__ */ jsx("icon", { name: groupIcon(shown3), tone: failed ? "error" : void 0 }, "icon"),
+    /* @__PURE__ */ jsx("icon", { name: groupIcon(shown3), ...optional("tone", failed ? "error" : void 0) }, "icon"),
     /* @__PURE__ */ jsx("text", { spans: [{ s: "muted", t: summarize(shown3) }], truncate: "end", wrap: "none" }, "label"),
     /* @__PURE__ */ jsx("icon", { name: "chev", role: "hermes.work.chev" }, "chev"),
     /* @__PURE__ */ jsx("spacer", { grow: 1 }, "gap"),
@@ -66006,7 +66038,7 @@ function itemNode(item3, parent, now, key2 = item3.id) {
   const id = `${parent}.${key2}`;
   if (item3.kind === "thinking") {
     return foldSection({
-      body: /* @__PURE__ */ jsx("md", { role: "hermes.work.thought", stream: item3.endedAt === void 0 || void 0, children: item3.text }, "body"),
+      body: /* @__PURE__ */ jsx("md", { role: "hermes.work.thought", ...optional("stream", item3.endedAt === void 0 || void 0), children: item3.text }, "body"),
       head: /* @__PURE__ */ jsxs("row", { align: "center", gap: "sm", children: [
         /* @__PURE__ */ jsx("icon", { name: "brain" }, "icon"),
         /* @__PURE__ */ jsx("text", { grow: 1, spans: [{ s: "muted", t: thoughtTitle(item3) }], truncate: "end", wrap: "none" }, "label")
@@ -66019,8 +66051,8 @@ function itemNode(item3, parent, now, key2 = item3.id) {
   const call = item3.call;
   const detail = toolDetail(call, now);
   const running2 = call.outcome.kind === "running";
-  const head2 = /* @__PURE__ */ jsxs("row", { align: "center", gap: "sm", title: call.context || void 0, children: [
-    /* @__PURE__ */ jsx("icon", { name: itemIcon(item3), tone: call.outcome.kind === "error" ? "error" : void 0 }, "icon"),
+  const head2 = /* @__PURE__ */ jsxs("row", { align: "center", gap: "sm", ...optional("title", call.context || void 0), children: [
+    /* @__PURE__ */ jsx("icon", { name: itemIcon(item3), ...optional("tone", call.outcome.kind === "error" ? "error" : void 0) }, "icon"),
     running2 ? liveText(stepLabel(call)) : /* @__PURE__ */ jsx("text", { grow: 1, spans: labelSpans(call), truncate: "end", wrap: "none" }, "label"),
     call.outcome.kind === "error" ? /* @__PURE__ */ jsx("icon", { name: "x", tone: "error" }, "failed") : null
   ] }, "head");
@@ -66187,7 +66219,7 @@ function pieceNodes(turn, blocks2, parent, cx) {
     const b = p3.block;
     switch (b.kind) {
       case "text":
-        return /* @__PURE__ */ jsx("md", { stream: live && b === lastText || void 0, children: b.text }, b.id);
+        return /* @__PURE__ */ jsx("md", { ...optional("stream", live && b === lastText || void 0), children: b.text }, b.id);
       case "tool":
         return toolNode(b.call, cx.now);
       case "steer":
@@ -66250,7 +66282,7 @@ function usageNode(turn, answer, cx) {
     turn.cacheHit !== void 0 ? `${turn.cacheHit}% of the prompt came from the cache` : "",
     tps ? `${tps.toFixed(1)} tokens per second (recent calls)` : ""
   ].filter(Boolean).join("\n");
-  return /* @__PURE__ */ jsxs("row", { align: "center", gap: "xs", role: "omp.turn.usage", title: total ? detail : void 0, children: [
+  return /* @__PURE__ */ jsxs("row", { align: "center", gap: "xs", role: "omp.turn.usage", ...optional("title", total ? detail : void 0), children: [
     answer ? copyButton(answer, turn.id, "omp.turn.copy", "Copy answer", cx) : null,
     facts2.flatMap(([key2, icon, value]) => [
       /* @__PURE__ */ jsx("icon", { name: icon }, `${key2}.icon`),
@@ -66266,7 +66298,7 @@ function compactionNode(c, key2, id, now) {
   const took2 = done?.endedAt && done.endedAt - c.startedAt >= 1e3 ? duration(done.endedAt - c.startedAt) : "";
   const facts2 = !done ? [tokens2] : [tokens2, done.messages ? `${done.messages.toLocaleString()} messages summarized` : "", took2, c.manual ? "/compress" : ""];
   const detail = facts2.filter(Boolean).join(" \xB7 ");
-  const line = /* @__PURE__ */ jsxs("row", { align: "center", gap: "xs", role: "hermes.compaction.line", title: running2 ? void 0 : COMPACTED_TITLE, children: [
+  const line = /* @__PURE__ */ jsxs("row", { align: "center", gap: "xs", role: "hermes.compaction.line", ...optional("title", running2 ? void 0 : COMPACTED_TITLE), children: [
     running2 ? shimmerText({ key: "what", text: "Compacting context" }) : /* @__PURE__ */ jsx("icon", { name: "compaction" }, "icon"),
     running2 ? null : /* @__PURE__ */ jsx("text", { spans: [{ s: "muted", t: "Context compacted" }], wrap: "none" }, "what"),
     running2 ? /* @__PURE__ */ jsx("elapsed", { age: age(c, c.startedAt, now), format: "short" }, "age") : null,
@@ -67810,7 +67842,7 @@ import { mkdirSync as mkdirSync4, writeFileSync as writeFileSync2 } from "node:f
 import { homedir as homedir10 } from "node:os";
 import { dirname, join as join9 } from "node:path";
 function settingsFile2(env2 = process.env) {
-  return join9(env2.HERMES_HOME || join9(homedir10(), ".hermes"), "hermes-tern", "settings.json");
+  return join9(env2["HERMES_HOME"] || join9(homedir10(), ".hermes"), "hermes-tern", "settings.json");
 }
 function loadSettings(file2 = settingsFile2()) {
   return readSettings(file2);
@@ -68790,7 +68822,7 @@ function automationButtons(which, view) {
     { action: "loop.stop", confirm: "Stop the loop?", keys: ["x"], label: "Stop" }
   ];
 }
-var kv = (k, v, s2) => ({ k: [{ t: k }], v: [{ s: s2, t: v }] });
+var kv = (k, v, s2) => ({ k: [{ t: k }], v: [{ ...optional("s", s2), t: v }] });
 function goalBody(g) {
   const facts2 = [
     kv("State", g.state),
@@ -69871,7 +69903,7 @@ function todosPillNode(t2, onToggle, focused) {
         "text",
         {
           role: "hermes.todos.now",
-          spans: [{ s: finished ? "success" : void 0, t: finished ? "all done" : current }],
+          spans: [{ ...optional("s", finished ? "success" : void 0), t: finished ? "all done" : current }],
           truncate: "end",
           wrap: "none"
         },
@@ -69895,7 +69927,7 @@ function statusLine(cx, on) {
       "seg",
       {
         priority: 6,
-        role: s2.notice.tone === "info" ? void 0 : `hermes.statusline.${s2.notice.tone === "warning" ? "warn" : s2.notice.tone === "error" ? "bad" : "good"}`,
+        ...optional("role", s2.notice.tone === "info" ? void 0 : `hermes.statusline.${s2.notice.tone === "warning" ? "warn" : s2.notice.tone === "error" ? "bad" : "good"}`),
         spans: [{ t: s2.notice.text }],
         title: s2.notice.text
       },
@@ -69907,7 +69939,7 @@ function statusLine(cx, on) {
       "seg",
       {
         priority: 5,
-        role: context >= 0.85 ? "hermes.statusline.bad" : context >= 0.6 ? "hermes.statusline.warn" : void 0,
+        ...optional("role", context >= 0.85 ? "hermes.statusline.bad" : context >= 0.6 ? "hermes.statusline.warn" : void 0),
         side: "right",
         spans: [{ t: `${Math.round(context * 100)}% context` }],
         title: "/usage shows the breakdown"
@@ -69918,7 +69950,7 @@ function statusLine(cx, on) {
       "seg",
       {
         priority: 2,
-        role: s2.compressions >= 10 ? "hermes.statusline.bad" : s2.compressions >= 5 ? "hermes.statusline.warn" : void 0,
+        ...optional("role", s2.compressions >= 10 ? "hermes.statusline.bad" : s2.compressions >= 5 ? "hermes.statusline.warn" : void 0),
         side: "right",
         spans: [{ t: `cmp ${s2.compressions}` }],
         title: "Times the context was compressed this session"
@@ -69977,7 +70009,7 @@ function shellsPill(s2, onOpen, focused) {
     children: [
       /* @__PURE__ */ jsx("icon", { name: "terminal" }, "icon"),
       live ? /* @__PURE__ */ jsx("spinner", { style: "dots", tone: "accent" }, "spin") : /* @__PURE__ */ jsx("icon", { name: s2.tone === "success" ? "done" : s2.tone === "error" ? "failed" : "aborted", tone: s2.tone }, "end"),
-      /* @__PURE__ */ jsx("text", { spans: [{ s: live ? void 0 : "muted", t: `${plural(n, "shell")}${live ? "" : " exited"}` }], wrap: "none" }, "text"),
+      /* @__PURE__ */ jsx("text", { spans: [{ ...optional("s", live ? void 0 : "muted"), t: `${plural(n, "shell")}${live ? "" : " exited"}` }], wrap: "none" }, "text"),
       figure ? /* @__PURE__ */ jsx("text", { role: "omp.hud.glance", spans: glanceSpans(figure), wrap: "none" }, "glance") : null,
       fresh ? miniSpark(fresh) : null
     ],
@@ -69990,7 +70022,7 @@ function shellsPill(s2, onOpen, focused) {
 }
 function prsPillNode(p3, onOpen, focused) {
   return pill({
-    children: [/* @__PURE__ */ jsx("icon", { name: "merge", tone: p3.tone === "muted" ? void 0 : p3.tone }, "icon"), /* @__PURE__ */ jsx("text", { text: p3.text, wrap: "none" }, "text")],
+    children: [/* @__PURE__ */ jsx("icon", { name: "merge", ...optional("tone", p3.tone === "muted" ? void 0 : p3.tone) }, "icon"), /* @__PURE__ */ jsx("text", { text: p3.text, wrap: "none" }, "text")],
     focused,
     key: "prs",
     onClick: onOpen,
@@ -70043,12 +70075,12 @@ function effortChip(r, on) {
       align: "center",
       gap: "xs",
       onClick: on.onEffort,
-      onMenu: on.onEffortMenu,
+      ...optional("onMenu", on.onEffortMenu),
       role: "omp.composer.effort",
       title: `Reasoning effort: ${text15}${r.effort ? clamp2 : " (the default)"} \xB7 click to cycle  \u21E7\u21E5 \xB7 right-click to choose or save as default`,
       children: [
         /* @__PURE__ */ jsx("effort", { level: glyph }, "glyph"),
-        /* @__PURE__ */ jsx("text", { spans: [{ s: r.effort ? void 0 : "muted", t: text15 }], wrap: "none" }, "level")
+        /* @__PURE__ */ jsx("text", { spans: [{ ...optional("s", r.effort ? void 0 : "muted"), t: text15 }], wrap: "none" }, "level")
       ]
     },
     "effort"
@@ -70065,10 +70097,10 @@ function composerNode(cx, on) {
     /* @__PURE__ */ jsx("row", { align: "start", gap: "sm", role: "omp.composer.line", children: /* @__PURE__ */ jsx(
       "editor",
       {
-        anchor: draft.anchor,
+        ...optional("anchor", draft.anchor),
         cursor: draft.cursor,
         decor: draft.decor,
-        ghost: cx.composer.ghost || void 0,
+        ...optional("ghost", cx.composer.ghost || void 0),
         maxLines: 18,
         onEdit: on.onEdit,
         onSend: on.onSend,
@@ -70518,12 +70550,12 @@ async function manifestLog(delegationId, index2, env2 = process.env) {
   if (!/^[\w-]+$/.test(delegationId)) {
     return void 0;
   }
-  const home = env2.HERMES_HOME || join10(homedir11(), ".hermes");
+  const home = env2["HERMES_HOME"] || join10(homedir11(), ".hermes");
   for (const root7 of [join10(home, "delegation_cache", "live"), join10(home, "cache", "delegation", "live")]) {
     try {
       const text15 = await readFile2(join10(root7, delegationId, "manifest.json"), "utf8");
-      const tasks = record(text15.replace(/^\uFEFF/, ""))?.tasks;
-      const log = Array.isArray(tasks) ? record(tasks.find((t2) => record(t2)?.index === index2))?.log : void 0;
+      const tasks = record(text15.replace(/^\uFEFF/, ""))?.["tasks"];
+      const log = Array.isArray(tasks) ? record(tasks.find((t2) => record(t2)?.["index"] === index2))?.["log"] : void 0;
       if (typeof log === "string" && log) {
         return log;
       }
@@ -71335,15 +71367,15 @@ function paletteFor(mode, skin) {
 function resolve5(skin, polarity) {
   const light = polarity === "light";
   const colors = { ...skin.colors, ...light ? skin.light_colors : skin.dark_colors };
-  const saved = process.env.HERMES_TUI_LIGHT;
-  process.env.HERMES_TUI_LIGHT = light ? "1" : "0";
+  const saved = process.env["HERMES_TUI_LIGHT"];
+  process.env["HERMES_TUI_LIGHT"] = light ? "1" : "0";
   try {
     return fromSkin(colors, skin.branding ?? {}).color;
   } finally {
     if (saved === void 0) {
-      delete process.env.HERMES_TUI_LIGHT;
+      delete process.env["HERMES_TUI_LIGHT"];
     } else {
-      process.env.HERMES_TUI_LIGHT = saved;
+      process.env["HERMES_TUI_LIGHT"] = saved;
     }
   }
 }
@@ -71597,8 +71629,8 @@ async function extractClipboardImage(dest, env2, platform = process.platform, ru
       return answer === "true" && existsSync4(dest) ? dest : void 0;
     }
   }
-  const root7 = env2.HERMES_PYTHON_SRC_ROOT;
-  const python = env2.HERMES_PYTHON?.trim() || "python3";
+  const root7 = env2["HERMES_PYTHON_SRC_ROOT"];
+  const python = env2["HERMES_PYTHON"]?.trim() || "python3";
   if (!root7) {
     return void 0;
   }
@@ -71900,7 +71932,7 @@ var layerRow = object({
   number: number2(),
   head: _catch(object({ ref: _catch(string2(), "") }), { ref: "" }),
   state: _catch(string2(), "open"),
-  merged_at: optional(unknown())
+  merged_at: optional2(unknown())
 });
 function layerOf(raw2) {
   if (raw2 === null) {
@@ -71931,7 +71963,7 @@ var GitHubError = class extends Error {
 var failure2 = _catch(object({ message: loose(string2()) }), {});
 var graphqlAnswer = _catch(
   object({
-    data: optional(unknown()),
+    data: optional2(unknown()),
     errors: loose(array(_catch(object({ message: string2() }), { message: "" })))
   }),
   { data: void 0 }
@@ -71940,7 +71972,7 @@ var api = (host) => host === "github.com" ? "https://api.github.com" : `https://
 var graphqlUrl = (host) => host === "github.com" ? "https://api.github.com/graphql" : `https://${host}/api/graphql`;
 function tokens(env2 = process.env) {
   return async (host) => {
-    const own14 = host === "github.com" ? env2.GITHUB_TOKEN || env2.GH_TOKEN : env2.GITHUB_ENTERPRISE_TOKEN || env2.GH_ENTERPRISE_TOKEN;
+    const own14 = host === "github.com" ? env2["GITHUB_TOKEN"] || env2["GH_TOKEN"] : env2["GITHUB_ENTERPRISE_TOKEN"] || env2["GH_ENTERPRISE_TOKEN"];
     if (own14) {
       return own14;
     }
@@ -71981,7 +72013,7 @@ function github(token = tokens()) {
       return out.data;
     },
     rest(host, method, path2, body) {
-      return call(unknown(), host, `${api(host)}${path2}`, { body: body === void 0 ? void 0 : JSON.stringify(body), method });
+      return call(unknown(), host, `${api(host)}${path2}`, { ...optional("body", body === void 0 ? void 0 : JSON.stringify(body)), method });
     }
   };
 }
@@ -72364,7 +72396,7 @@ var PullRequests = class {
 
 // src/hermes/activeSessionFile.ts
 import { writeFileSync as writeFileSync3 } from "node:fs";
-var writeActiveSessionFile = (sessionId, file2 = process.env.HERMES_TUI_ACTIVE_SESSION_FILE) => {
+var writeActiveSessionFile = (sessionId, file2 = process.env["HERMES_TUI_ACTIVE_SESSION_FILE"]) => {
   if (!file2 || !sessionId) {
     return;
   }
@@ -72588,7 +72620,7 @@ var Completion = class {
           children: this.items.map((item3, i) => /* @__PURE__ */ jsx(
             "item",
             {
-              detail: item3.meta && item3.meta !== "dir" ? oneLine(item3.meta) : void 0,
+              ...optional("detail", item3.meta && item3.meta !== "dir" ? oneLine(item3.meta) : void 0),
               icon: iconOf(item3),
               label: labelOf(item3, this.#for, this.#replaceFrom)
             },
@@ -72683,12 +72715,12 @@ function labelOf(item3, typed, replaceFrom) {
   const query = typed.slice(replaceFrom).replace(/^[/@]/, "").replace(/^(file|folder):/, "").split("/").pop() ?? "";
   const at = query ? label.toLowerCase().indexOf(query.toLowerCase()) : -1;
   if (at < 0) {
-    return [{ s: base3, t: label }];
+    return [{ ...optional("s", base3), t: label }];
   }
   return [
-    { s: base3, t: label.slice(0, at) },
+    { ...optional("s", base3), t: label.slice(0, at) },
     { s: base3 ? `${base3} mark` : "mark", t: label.slice(at, at + query.length) },
-    { s: base3, t: label.slice(at + query.length) }
+    { ...optional("s", base3), t: label.slice(at + query.length) }
   ].filter((s2) => s2.t);
 }
 function requestFor(before, sid) {
@@ -72823,9 +72855,9 @@ ${body}
   return out.join("\n");
 }
 function hermesAuthor(env2 = process.env) {
-  const python = env2.HERMES_PYTHON?.trim();
-  const root7 = env2.HERMES_PYTHON_SRC_ROOT;
-  const ui = env2.HERMES_TUI_DIR;
+  const python = env2["HERMES_PYTHON"]?.trim();
+  const root7 = env2["HERMES_PYTHON_SRC_ROOT"];
+  const ui = env2["HERMES_TUI_DIR"];
   if (!python || !root7 || !ui) {
     return void 0;
   }
@@ -73654,7 +73686,7 @@ var Sidebar = class {
     const where = git3?.upstream ? git3.ahead || git3.behind ? [git3.ahead && `${git3.ahead} ahead`, git3.behind && `${git3.behind} behind`].filter(Boolean).join(", ") + ` of ${git3.upstream}` : `Up to date with ${git3.upstream}` : "Not pushed: no upstream";
     const branchRows = git3 ? [
       {
-        control: git3.branch ? { act: "copy-branch", k: "action", label: this.#copied ? "Copied" : "Copy" } : void 0,
+        ...optional("control", git3.branch ? { act: "copy-branch", k: "action", label: this.#copied ? "Copied" : "Copy" } : void 0),
         hint: git3.branch ? where : "Detached HEAD",
         id: "branch",
         label: git3.branch ?? "No branch"
@@ -73669,7 +73701,7 @@ var Sidebar = class {
       ].filter(Boolean).join(" \xB7 ") : e.error ?? "Reading GitHub\u2026",
       id: `pr:${prKey(e.ref)}`,
       label: `#${e.ref.number} ${e.pr?.title ?? e.ref.repository}`,
-      warning: e.pr?.state === "open" && e.pr.mergeable === "conflicting" ? "Conflicts with its base branch" : void 0
+      ...optional("warning", e.pr?.state === "open" && e.pr.mergeable === "conflicting" ? "Conflicts with its base branch" : void 0)
     })) : [{ disabled: "Hermes links each PR it opens; the branch\u2019s PR shows here too.", id: "no-prs", label: "None yet" }];
     const fileRows = files.length ? files.slice(0, MAX_FILES).map((f) => ({
       control: { act: "diff", k: "action", label: "Diff" },
@@ -73863,14 +73895,14 @@ function history({ kept, messages: messages2, compactions, id }) {
         turn.blocks.push({ endedAt: at, id: id("k"), kind: "thinking", startedAt: at, text: thought });
       }
       if (m.display_kind === "failed_turn") {
-        const surface = record(meta3?.error_surface);
-        const error = str5(meta3?.error) ?? str5(surface?.message);
-        const card = error ? failure(error, surface?.code) : turn.end.status === "error" ? turn.end : {};
+        const surface = record(meta3?.["error_surface"]);
+        const error = str5(meta3?.["error"]) ?? str5(surface?.["message"]);
+        const card = error ? failure(error, surface?.["code"]) : turn.end.status === "error" ? turn.end : {};
         endTurn(turn, { ...card, hint: text15.trim() || void 0, status: "error" });
         continue;
       }
-      const reply2 = typeof m.display_content === "string" ? m.display_content : text15;
-      const notes = Array.isArray(m.display_commentary) ? m.display_commentary.filter((n) => typeof n === "string" && Boolean(n.trim())) : [];
+      const reply2 = typeof m["display_content"] === "string" ? m["display_content"] : text15;
+      const notes = Array.isArray(m["display_commentary"]) ? m["display_commentary"].filter((n) => typeof n === "string" && Boolean(n.trim())) : [];
       const flat3 = (s2) => s2.replace(/\s+/g, " ").trim();
       if (!reply2.trim() || flat3(notes.join("\n\n")) !== flat3(reply2)) {
         turn.blocks.push(...notes.map((n) => ({ id: id("x"), kind: "text", text: n })));
@@ -73878,13 +73910,13 @@ function history({ kept, messages: messages2, compactions, id }) {
       if (reply2.trim()) {
         turn.blocks.push({ id: id("x"), kind: "text", text: reply2 });
       }
-      if (meta3?.interrupted === true) {
+      if (meta3?.["interrupted"] === true) {
         endTurn(turn, { status: "interrupted" });
       }
     } else if (m.role === "tool") {
       const callId = toolCallId(m.tool_call_id ?? id("c"));
       const result = typeof m.content === "string" && m.content ? m.content : void 0;
-      const diff2 = str5(record(record(m.display_metadata)?.tool_result_metadata)?.inline_diff);
+      const diff2 = str5(record(record(m.display_metadata)?.["tool_result_metadata"])?.["inline_diff"]);
       const existing = calls.get(callId);
       if (existing) {
         existing.result = result ?? existing.result;
@@ -73908,11 +73940,11 @@ function history({ kept, messages: messages2, compactions, id }) {
         startedAt: at,
         via: u.via
       };
-      call.outcome = { duration: 0, kind: settleBridge(call) ?? Boolean(record(call.result)?.error) ? "error" : "done" };
+      call.outcome = { duration: 0, kind: settleBridge(call) ?? Boolean(record(call.result)?.["error"]) ? "error" : "done" };
       if (isTodoName(call.name)) {
         call.todosBefore = todos2;
       }
-      if (Array.isArray(args.todos)) {
+      if (Array.isArray(args["todos"])) {
         call.todos = todosOf(args, todos2);
         todos2 = call.todos;
       }
@@ -73934,10 +73966,10 @@ function endTurn(turn, end) {
 }
 var str5 = (v) => typeof v === "string" && v.trim() ? v : void 0;
 function storedThought(m) {
-  if (typeof m.display_reasoning === "string") {
-    return detailsText(m.display_reasoning);
+  if (typeof m["display_reasoning"] === "string") {
+    return detailsText(m["display_reasoning"]);
   }
-  return str5(m.reasoning) ?? str5(m.reasoning_content) ?? detailsText(m.reasoning_details);
+  return str5(m.reasoning) ?? str5(m["reasoning_content"]) ?? detailsText(m["reasoning_details"]);
 }
 function detailsText(details) {
   let blocks2 = details;
@@ -73954,11 +73986,11 @@ function detailsText(details) {
   const out = [];
   for (const block of Array.isArray(blocks2) ? blocks2 : [blocks2]) {
     const r = typeof block === "string" ? { text: block } : record(block);
-    if (!r || r.type === "reasoning.encrypted") {
+    if (!r || r["type"] === "reasoning.encrypted") {
       continue;
     }
-    const summary4 = Array.isArray(r.summary) ? r.summary.map((s2) => typeof s2 === "string" ? s2 : str5(record(s2)?.text) ?? "").join("\n\n") : r.summary;
-    const text15 = [summary4, r.thinking, r.content, r.text].map(str5).find(Boolean)?.trim();
+    const summary4 = Array.isArray(r["summary"]) ? r["summary"].map((s2) => typeof s2 === "string" ? s2 : str5(record(s2)?.["text"]) ?? "").join("\n\n") : r["summary"];
+    const text15 = [summary4, r["thinking"], r["content"], r["text"]].map(str5).find(Boolean)?.trim();
     if (text15 && !out.includes(text15)) {
       out.push(text15);
     }
@@ -74228,7 +74260,7 @@ var Transcript = class {
     if (isTodoName(call.name)) {
       call.todosBefore = before;
     }
-    if (Array.isArray(call.args.todos)) {
+    if (Array.isArray(call.args["todos"])) {
       call.todos = todosOf(call.args, before);
     }
     turn.blocks.push({ call, id: call.id, kind: "tool" });
@@ -74246,7 +74278,7 @@ var Transcript = class {
       return;
     }
     const { call, turn } = found;
-    const output = record(p3.result)?.output;
+    const output = record(p3.result)?.["output"];
     const interrupted = p3.name === "terminal" && typeof output === "string" && /\[Command interrupted\]\s*$/.test(output);
     const duration3 = typeof p3.duration_s === "number" ? Math.round(p3.duration_s * 1e3) : at - call.startedAt;
     const summary4 = p3.summary ?? void 0;
@@ -74302,7 +74334,7 @@ var Transcript = class {
     }
     turn.warning = p3.warning ?? void 0;
     if (p3.status === "error") {
-      const surfaced = p3.error_surface?.message;
+      const surfaced = p3.error_surface?.["message"];
       const error = typeof surfaced === "string" && surfaced || p3.error || final2 || "The request failed";
       const hint = final2.split(/\n\s*\n/)[0]?.trim();
       turn.end = { ...failure(error, p3.error_surface?.code), endedAt: at, ...hint ? { hint } : {}, status: "error" };

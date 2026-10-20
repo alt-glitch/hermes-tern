@@ -35,7 +35,7 @@ export const POLL_MS = 2000
  */
 export const STALE_MS = 2 * 60_000
 
-export const dataDir = (env: NodeJS.ProcessEnv = process.env) => join(env.HERMES_HOME || join(homedir(), '.hermes'), 'plugin-data', 'hermes-tern')
+export const dataDir = (env: NodeJS.ProcessEnv = process.env) => join(env['HERMES_HOME'] || join(homedir(), '.hermes'), 'plugin-data', 'hermes-tern')
 
 /**
  * Why nothing moves a card's rows any more (the desktop's settle reasons, and the plugin's own):
@@ -49,8 +49,8 @@ export interface CardFile {
   /** Its name without `.json`: `<call id>.<op id>`, or `<call id>` from before cards had an op. */
   key: string
   targets: unknown[]
-  settled?: SettleReason
-  error?: string
+  settled?: SettleReason | undefined
+  error?: string | undefined
   /** A pane already told the agent about it (its Continue, or every app connected). */
   told: boolean
 }
@@ -90,7 +90,7 @@ export function readCard(key: string, dir = dataDir(), now = Date.now()): CardFi
     settled = data.settled_by
   } else if (data.watching !== true) {
     // A card from before `settled_by`: it stopped at the end, or on an error.
-    settled = error ? 'error' : data.targets.some(t => waiting({ state: String(record(t)?.state ?? '') })) ? 'deadline' : 'all_resolved'
+    settled = error ? 'error' : data.targets.some(t => waiting({ state: String(record(t)?.['state'] ?? '') })) ? 'deadline' : 'all_resolved'
   } else if (!alive(data.pid) || now - updated > STALE_MS) {
     settled = 'stopped'
   }
@@ -104,7 +104,7 @@ export function readCard(key: string, dir = dataDir(), now = Date.now()): CardFi
  * ids, the one written closest to when the call ran.
  */
 export function findCard(call: Pick<ToolCall, 'id' | 'result' | 'startedAt'>, dir = dataDir()): string | undefined {
-  const op = record(call.result)?.op_id
+  const op = record(call.result)?.['op_id']
   const prefix = `${safe(call.id)}.`
 
   // A call that names its operation draws that card and no other.
@@ -164,7 +164,7 @@ export const TERN_PANE_VARS = ['TERN_PANE', 'TERN_PANE_SOCKET', 'TERN_WINDOW_KEY
 export function ternPane(env: NodeJS.ProcessEnv = process.env): Record<string, string> | undefined {
   const vars = Object.fromEntries(TERN_PANE_VARS.flatMap(k => (env[k] ? [[k, env[k]]] : [])))
 
-  return vars.TERN_PANE ? vars : undefined
+  return vars['TERN_PANE'] ? vars : undefined
 }
 
 /**
@@ -194,21 +194,21 @@ export interface ConnectTarget {
   name: string
   /** `Google Drive`. */
   title: string
-  alias?: string
+  alias?: string | undefined
   /** pending, initiated, connected, skipped, failed, expired, not_connected, superseded. */
   state: string
-  url?: string
-  detail?: string
+  url?: string | undefined
+  detail?: string | undefined
 }
 
 /** A connect call's card as the pane last read it. */
 export interface ConnectCard {
   /** Its file (`CardFile.key`); none when the call's own result carries the links. */
-  key?: string
+  key?: string | undefined
   targets: ConnectTarget[]
   /** Nothing moves the rows any more; the card is a summary. */
-  settled?: SettleReason
-  error?: string
+  settled?: SettleReason | undefined
+  error?: string | undefined
   /** The agent was told (this pane's Continue or its message, or another pane's). */
   told: boolean
   /** The apps whose link the user opened from this card: only those wait on the browser. */
@@ -222,7 +222,7 @@ export function connectTargets(call: Pick<ToolCall, 'name' | 'result'>, card?: P
   }
 
   // The watcher's file carries the links (kept out of the model's result) and the live states.
-  const targets = card?.targets ?? record(call.result)?.targets
+  const targets = card?.targets ?? record(call.result)?.['targets']
 
   return parseTargets(Array.isArray(targets) ? targets : [])
 }
@@ -255,17 +255,17 @@ export function loadConnect(call: ToolCall, dir = dataDir(), now = Date.now()): 
 function parseTargets(targets: unknown[]): ConnectTarget[] {
   return targets.flatMap(t => {
     const r = record(t)
-    const name = typeof r?.name === 'string' ? r.name : ''
+    const name = typeof r?.['name'] === 'string' ? r['name'] : ''
 
     return name
       ? [
           {
-            alias: typeof r?.alias === 'string' && r.alias ? r.alias : undefined,
-            detail: typeof r?.detail === 'string' && r.detail ? r.detail : undefined,
+            alias: typeof r?.['alias'] === 'string' && r['alias'] ? r['alias'] : undefined,
+            detail: typeof r?.['detail'] === 'string' && r['detail'] ? r['detail'] : undefined,
             name,
-            state: typeof r?.state === 'string' ? r.state : 'pending',
+            state: typeof r?.['state'] === 'string' ? r['state'] : 'pending',
             title: appTitle(name),
-            url: typeof r?.connect_url === 'string' && r.connect_url ? r.connect_url : undefined
+            url: typeof r?.['connect_url'] === 'string' && r['connect_url'] ? r['connect_url'] : undefined
           }
         ]
       : []

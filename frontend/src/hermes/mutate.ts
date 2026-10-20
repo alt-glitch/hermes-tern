@@ -117,7 +117,7 @@ export function modelPayload(arg: string): Record<string, string> {
     }
 
     if (flag === '--provider' && parts[0] && !parts[0].startsWith('--')) {
-      payload.provider = parts.shift()!
+      payload['provider'] = parts.shift()!
 
       continue
     }

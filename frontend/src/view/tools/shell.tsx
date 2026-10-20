@@ -9,6 +9,7 @@
 
 import type { JSX } from '@stencil-hq/tern'
 
+import { optional } from '../../core/assert.js'
 import type { ToolCall } from '../../model.js'
 import { tookMs } from '../../transcript/calls.js'
 import { duration } from '../format.js'
@@ -64,24 +65,24 @@ function drawTool(call: ToolCall, view: CallView, whyFailed: ErrorReader, now: n
 
   return (
     <tool
-      age={running ? age(call, call.startedAt, now) : undefined}
-      badges={card.badges}
-      collapsed={body.length > 0 ? collapsed : undefined}
-      collapsible={body.length > 0 ? true : undefined}
-      exit={!running && call.outcome.kind !== 'cancelled' ? view.exit() : undefined}
-      frame={card.frame === 'inline' && (running || !body.length || !card.framedWithBody) ? 'inline' : undefined}
       key={call.id}
+      {...optional('age', running ? age(call, call.startedAt, now) : undefined)}
+      {...optional('badges', card.badges)}
+      {...optional('collapsed', body.length > 0 ? collapsed : undefined)}
+      {...optional('collapsible', body.length > 0 ? true : undefined)}
+      {...optional('exit', !running && call.outcome.kind !== 'cancelled' ? view.exit() : undefined)}
+      {...optional('frame', card.frame === 'inline' && (running || !body.length || !card.framedWithBody) ? 'inline' : undefined)}
       {...lang}
-      meta={card.meta?.length ? card.meta : undefined}
+      {...optional('meta', card.meta?.length ? card.meta : undefined)}
       name={card.name}
-      note={call.outcome.kind === 'cancelled' ? 'cancelled' : error && !card.body.length ? error : undefined}
-      preview={card.preview}
-      role={card.role}
+      {...optional('note', call.outcome.kind === 'cancelled' ? 'cancelled' : error && !card.body.length ? error : undefined)}
+      {...optional('preview', card.preview)}
+      {...optional('role', card.role)}
       status={status}
-      target={card.target}
-      targetKind={card.target ? card.targetKind : undefined}
+      {...optional('target', card.target)}
+      {...optional('targetKind', card.target ? card.targetKind : undefined)}
       title={card.title}
-      took={running ? undefined : (card.took ?? tookMs(call))}
+      {...optional('took', running ? undefined : (card.took ?? tookMs(call)))}
     >
       {body}
     </tool>

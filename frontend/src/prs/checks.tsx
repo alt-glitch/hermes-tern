@@ -3,6 +3,7 @@
 
 import type { JSX, Tone } from '@stencil-hq/tern'
 
+import { optional } from '../core/assert.js'
 import { type Check, checkGroup, checksSummary, failedRuns, type PullRequest } from '../github/pullRequest.js'
 import { durationWhole, plural } from '../view/format.js'
 
@@ -55,9 +56,9 @@ export function checksTab(pr: PullRequest, now: number): JSX.Element[] {
       .map(g => (
         <section collapsed={!g.open} collapsible head={`${g.head} · ${g.checks.length}`} key={g.id} role="hermes.pr.checkgroup">
           {g.checks.map((c, i) => (
-            <row align="center" gap="sm" key={`k${i}`} role="hermes.pr.check" title={c.description}>
+            <row align="center" gap="sm" key={`k${i}`} role="hermes.pr.check" {...optional('title', c.description)}>
               <icon key="i" name={CHECK[c.status].icon} tone={CHECK[c.status].tone} />
-              <text grow={1} key="n" spans={[{ href: c.url, t: c.name }]} truncate="end" wrap="none" />
+              <text grow={1} key="n" spans={[{ ...optional('href', c.url), t: c.name }]} truncate="end" wrap="none" />
               {c.workflow && !c.name.startsWith(`${c.workflow} /`) ? <text key="w" spans={[{ s: 'dim', t: c.workflow }]} truncate="end" wrap="none" /> : null}
               <text key="s" spans={[{ s: CHECK[c.status].tone === 'muted' ? 'dim' : CHECK[c.status].tone, t: CHECK[c.status].word }]} wrap="none" />
               <text key="t" spans={[{ s: 'dim mono', t: took(c, now) }]} wrap="none" />

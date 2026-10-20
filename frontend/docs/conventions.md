@@ -100,6 +100,22 @@ value, so a module never holds the `any` that `JSON.parse` returns.
 `no-control-regex`: a control character in a regexp (`\x1b`, `\x07`) is usually a typo. Where
 stripping terminal escapes is the point, disable the rule for that line and say so (see below).
 
+## Index signatures and optional fields
+
+`bun run check:strict` (scripts/check-strict.mjs) compiles `src/` with two flags `tsconfig.json`
+does not turn on, and allows no error from either. The Hermes sources (`.hermes-src`) fail both
+and are skipped.
+
+- `noPropertyAccessFromIndexSignature`: a field of an untyped bag (`Record<string, unknown>`,
+  `process.env`, a regexp's `groups`) is read with brackets, `env['HERMES_HOME']`, so a read the
+  compiler cannot check looks different from one it can.
+- `exactOptionalPropertyTypes`: `field?: T` means the field may be missing, not that it may hold
+  `undefined`. Where undefined is a state a field of ours takes (cleared, not known yet), its type
+  says so: `field?: T | undefined`. Where the type is someone else's (Tern's props, Hermes'
+  contract), leave the field out: spread `optional('field', value)` from `core/assert.ts` in its
+  place, so the key order stays the same. In TSX, `key` goes before the first spread attribute: a
+  `key` after one makes the automatic runtime call `createElement`, which Tern does not have.
+
 ## Suppressions
 
 `scripts/check-suppressions.mjs` fails on an `eslint-disable` comment (any form) or a

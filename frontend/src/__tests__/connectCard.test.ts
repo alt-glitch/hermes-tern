@@ -11,7 +11,7 @@ import { toolCallId } from '../core/ids.js'
 import { FakeGateway, fakeTern, must } from './fakes.js'
 
 const home = mkdtempSync(join(tmpdir(), 'hermes-tern-connect-'))
-process.env.HERMES_HOME = home
+process.env['HERMES_HOME'] = home
 
 vi.mock('../hermes/sessionIndex.js', async importOriginal => ({
   ...(await importOriginal<typeof import('../hermes/sessionIndex.js')>()),
@@ -53,7 +53,7 @@ const complete = (id: string, op: string) => ({
 
 /** What the app sent the agent: prompts it submitted, and those queued behind a turn. */
 const told = (gw: FakeGateway, app: InstanceType<typeof App>) => [
-  ...gw.methods('prompt.submit').map(c => String(c.params.text)),
+  ...gw.methods('prompt.submit').map(c => String(c.params['text'])),
   ...app.queue.held.map(q => q.text)
 ]
 
@@ -133,12 +133,12 @@ describe('the connect card', () => {
 
     // The resume brings the call back without its result: the card is found by its call id.
     gw.handlers.set('session.resume', p => ({
-      info: { stored_session_id: p.session_id },
+      info: { stored_session_id: p['session_id'] },
       messages: [
         { role: 'user', text: 'connect drive', timestamp: Date.now() / 1000 },
         { args: { action: 'connect', connectors: ['googledrive'] }, name: 'manage_connections', role: 'tool', timestamp: Date.now() / 1000, tool_call_id: 'call_b' }
       ],
-      session_id: p.session_id,
+      session_id: p['session_id'],
       subscription_id: 'sub-again'
     }))
     gw.event({ payload: {}, type: 'gateway.ready' })
@@ -156,13 +156,13 @@ describe('the connect card', () => {
     writeCard('call_c.op4', drive('initiated', { created_at: now, pid: 2 ** 22 + 4321 }))
     writeCard('call_d.op5', drive('superseded', { created_at: now, settled_by: 'superseded', watching: false }))
     gw.handlers.set('session.resume', p => ({
-      info: { stored_session_id: p.session_id },
+      info: { stored_session_id: p['session_id'] },
       messages: [
         { role: 'user', text: 'connect drive', timestamp: now },
         { args: { action: 'connect' }, name: 'manage_connections', role: 'tool', timestamp: now, tool_call_id: 'call_d' },
         { args: { action: 'connect' }, name: 'manage_connections', role: 'tool', timestamp: now, tool_call_id: 'call_c' }
       ],
-      session_id: p.session_id,
+      session_id: p['session_id'],
       subscription_id: 'sub-again'
     }))
 

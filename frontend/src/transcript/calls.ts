@@ -63,7 +63,7 @@ export function isProcessTool(name: string): boolean {
 
 /** A process tool call that waits on, polls or reads one background process (omp's `wait`). */
 export function isWatchCall(call: ToolCall): boolean {
-  return isProcessTool(call.name) && ['log', 'poll', 'wait'].includes(String(call.args.action)) && typeof call.args.session_id === 'string'
+  return isProcessTool(call.name) && ['log', 'poll', 'wait'].includes(String(call.args['action'])) && typeof call.args['session_id'] === 'string'
 }
 
 /**
@@ -72,18 +72,18 @@ export function isWatchCall(call: ToolCall): boolean {
  * then names the process (`session_id`).
  */
 export function isBackgroundCall(call: ToolCall): boolean {
-  return call.name === 'terminal' && (call.args.background === true || typeof record(call.result)?.session_id === 'string')
+  return call.name === 'terminal' && (call.args['background'] === true || typeof record(call.result)?.['session_id'] === 'string')
 }
 
 /** A completed call that failed: an error result, a terminal command's nonzero exit, or a summary that says so. */
 export function isToolError(p: ToolCompletePayload): boolean {
   const r = record(p.result)
 
-  if (r?.error) {
+  if (r?.['error']) {
     return true
   }
 
-  if (p.name === 'terminal' && typeof r?.exit_code === 'number' && r.exit_code !== 0) {
+  if (p.name === 'terminal' && typeof r?.['exit_code'] === 'number' && r['exit_code'] !== 0) {
     return true
   }
 

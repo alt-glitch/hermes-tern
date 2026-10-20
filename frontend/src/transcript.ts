@@ -184,7 +184,7 @@ export class Transcript {
   }
 
   /** The running compaction ended (`tokens`: the owner's own counts, when it reports them). */
-  compacted(at = Date.now(), tokens: { before?: number; after?: number } = {}) {
+  compacted(at = Date.now(), tokens: { before?: number | undefined; after?: number | undefined } = {}) {
     this.#compactions.compacted(at, tokens)
   }
 
@@ -351,7 +351,7 @@ export class Transcript {
 
     // The call's own list shows while it runs (a merge patches the current one); tool.complete's
     // snapshot replaces it.
-    if (Array.isArray(call.args.todos)) {
+    if (Array.isArray(call.args['todos'])) {
       call.todos = todosOf(call.args, before)
     }
 
@@ -377,7 +377,7 @@ export class Transcript {
 
     const { call, turn } = found
 
-    const output = record(p.result)?.output
+    const output = record(p.result)?.['output']
 
     // An interrupted command still completes: hermes marks its output instead of failing it.
     const interrupted =
@@ -453,7 +453,7 @@ export class Transcript {
     turn.warning = p.warning ?? undefined
 
     if (p.status === 'error') {
-      const surfaced = p.error_surface?.message
+      const surfaced = p.error_surface?.['message']
       const error = (typeof surfaced === 'string' && surfaced) || p.error || final || 'The request failed'
       // The gateway's final text is advice ("wait and /retry, or /model …") followed by the raw error.
       const hint = final.split(/\n\s*\n/)[0]?.trim()

@@ -10,7 +10,7 @@ import { record } from '../wire/json.js'
 
 import { FakeGateway, fakeTern, given, key, must, stubOverlay } from './fakes.js'
 
-process.env.HERMES_HOME = mkdtempSync(join(tmpdir(), 'hermes-tern-lifecycle-'))
+process.env['HERMES_HOME'] = mkdtempSync(join(tmpdir(), 'hermes-tern-lifecycle-'))
 
 // The picker reads state.db; here it lists one other session.
 vi.mock('../hermes/sessionIndex.js', async importOriginal => ({
@@ -56,11 +56,11 @@ beforeEach(() => {
   })
   gw.handlers.set('session.resume', p => ({
     execution_generation: 1,
-    info: { stored_session_id: p.session_id },
+    info: { stored_session_id: p['session_id'] },
     revision: 1,
     running: false,
-    session_id: p.session_id,
-    subscription_id: `sub-${p.session_id}`
+    session_id: p['session_id'],
+    subscription_id: `sub-${p['session_id']}`
   }))
 })
 
@@ -94,7 +94,7 @@ describe('session lifecycle', () => {
   it('reloads the shown session on a replay gap, with a fresh subscription and its turn state', async () => {
     const app = await started(gw)
     given.busy(app, { label: 'Working…', since: {}, startedAt: Date.now() })
-    gw.handlers.set('session.resume', p => ({ running: false, session_id: p.session_id, subscription_id: 'sub-fresh' }))
+    gw.handlers.set('session.resume', p => ({ running: false, session_id: p['session_id'], subscription_id: 'sub-fresh' }))
 
     gw.event({ payload: { latest_seq: 9 }, session_id: 'other', type: 'session.replay_gap' })
     await flush()
@@ -104,7 +104,7 @@ describe('session lifecycle', () => {
     await flush()
     await flush()
 
-    expect(gw.methods('session.resume').map(c => c.params.session_id)).toEqual(['s1'])
+    expect(gw.methods('session.resume').map(c => c.params['session_id'])).toEqual(['s1'])
     expect(app.activity.busy).toBeNull()
     expect(notices(app).at(-1)).toMatch(/fell behind/)
   })
@@ -140,10 +140,10 @@ describe('session lifecycle', () => {
           { admission_id: 'a1', input_id: 'i1', status: 'started', user: 'running now' },
           { admission_id: 'a2', input_id: 'i2', status: 'queued', user: 'after that' }
         ],
-        stored_session_id: p.session_id
+        stored_session_id: p['session_id']
       },
       running: true,
-      session_id: p.session_id,
+      session_id: p['session_id'],
       subscription_id: 'sub-old'
     }))
     given.busy(app, null)
@@ -189,7 +189,7 @@ describe('session lifecycle', () => {
       const app = await started(gw)
       const answers: (() => void)[] = []
       // The gateway hands one actor the same subscription for every attach of a session.
-      gw.handlers.set('session.resume', p => new Promise(resolve => answers.push(() => resolve({ session_id: p.session_id, subscription_id: 'sub-x' }))))
+      gw.handlers.set('session.resume', p => new Promise(resolve => answers.push(() => resolve({ session_id: p['session_id'], subscription_id: 'sub-x' }))))
 
       const stale = app.resume(storedSessionId('x'))
       const winner = app.resume(storedSessionId('x'))
@@ -220,7 +220,7 @@ describe('session lifecycle', () => {
     const app = await started(gw)
     const answers = new Map<string, () => void>()
     gw.handlers.set('session.resume', p => new Promise(resolve => {
-      answers.set(String(p.session_id), () => resolve({ session_id: p.session_id, subscription_id: `sub-${p.session_id}` }))
+      answers.set(String(p['session_id']), () => resolve({ session_id: p['session_id'], subscription_id: `sub-${p['session_id']}` }))
     }))
 
     const skipped = app.resume(storedSessionId('a'))
@@ -249,12 +249,12 @@ describe('session lifecycle', () => {
     await app.resume(storedSessionId('b'))
     const back = app.resume(storedSessionId('s1'))
     await flush()
-    expect(gw.methods('session.resume').map(c => c.params.session_id)).toEqual(['b'])
+    expect(gw.methods('session.resume').map(c => c.params['session_id'])).toEqual(['b'])
 
     detached()
     await back
 
-    expect(gw.methods('session.resume').map(c => c.params.session_id)).toEqual(['b', 's1'])
+    expect(gw.methods('session.resume').map(c => c.params['session_id'])).toEqual(['b', 's1'])
     expect(app.session.ref.live).toBe('s1')
   })
 
@@ -275,7 +275,7 @@ describe('session lifecycle', () => {
     const app = await started(gw)
     // The tab title goes out as an OSC on stdout.
     vi.spyOn(process.stdout, 'write').mockReturnValue(true)
-    gw.handlers.set('session.mutate', p => ({ title: record(p.payload)?.['title'] }))
+    gw.handlers.set('session.mutate', p => ({ title: record(p['payload'])?.['title'] }))
     app.open(stubOverlay('prompt:old'))
 
     await app.newSession('Release notes')

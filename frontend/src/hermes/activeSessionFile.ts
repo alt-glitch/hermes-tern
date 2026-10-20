@@ -7,7 +7,7 @@ import type { DurableSessionId } from '../core/ids.js'
  * after the frontend exits (`HERMES_TUI_ACTIVE_SESSION_FILE`), for the
  * "resume with …" epilogue. Shared by the Ink TUI and the Tern frontend.
  */
-export const writeActiveSessionFile = (sessionId: DurableSessionId | null, file = process.env.HERMES_TUI_ACTIVE_SESSION_FILE) => {
+export const writeActiveSessionFile = (sessionId: DurableSessionId | null, file = process.env['HERMES_TUI_ACTIVE_SESSION_FILE']) => {
   if (!file || !sessionId) {
     return
   }

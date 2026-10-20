@@ -56,9 +56,9 @@ const NO_STACK_FIELD = /Field '?stack'? doesn't exist/i
 /** What the store knows of one PR, whichever session lists it. */
 export interface Entry {
   ref: PrRef
-  pr?: PullRequest
+  pr?: PullRequest | undefined
   /** GitHub's answer when it could not read this PR. */
-  error?: string
+  error?: string | undefined
   /** The Conversation tab's comments, reviews and commits. */
   activity: Remote<ActivityItem[]>
   /** The Files tab's files, kept apart: one tab's read says nothing of the other. */
@@ -69,7 +69,7 @@ export interface Entry {
 export interface Listed extends Entry {
   readonly source: Source
   /** The native stack it is a layer of. */
-  readonly stack?: Stack
+  readonly stack?: Stack | undefined
 }
 
 /** A PR on the list before anything was read of it. */
@@ -125,7 +125,7 @@ export class PullRequests {
   #sid: DurableSessionId | null = null
   #refs: PrRef[] = []
   readonly #entries = new Map<PrKey, Entry>()
-  #branch: { at: number; cwd: string; ref?: PrRef; target?: BranchTarget } | undefined
+  #branch: { at: number; cwd: string; ref?: PrRef | undefined; target?: BranchTarget | undefined } | undefined
   /** Native stacks by key, from the PRs' stack membership. */
   readonly #stacks = new Map<StackKey, Stack>()
   /** Hosts whose GraphQL has no stack fields (GHES): not asked again. */

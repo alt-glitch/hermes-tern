@@ -58,7 +58,7 @@ describe('Cron', () => {
   it('lists paused jobs too, acts by id and keeps the error when the gateway refuses', async () => {
     const request = vi.fn(
       async (_method: string, params: Record<string, unknown>): Promise<{ error?: string; jobs?: CronJob[]; success: boolean }> =>
-        params.action === 'list' ? { jobs: [job()], success: true } : { success: true }
+        params['action'] === 'list' ? { jobs: [job()], success: true } : { success: true }
     )
     const cron = new Cron({ changed: vi.fn(), gw: { request } as unknown as Pick<GatewayClient, 'request'> })
 

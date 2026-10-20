@@ -12,6 +12,7 @@ import type { JSX, Key, PickerGroup, PickerItem, Span } from '@stencil-hq/tern'
 
 import type { ChatPorts } from '../app/ports.js'
 import { launchEnv } from '../config/env.js'
+import { optional } from '../core/assert.js'
 import { errorText } from '../core/errors.js'
 import { durable, storedSessionId } from '../core/ids.js'
 import { mutateSession } from '../hermes/mutate.js'
@@ -178,19 +179,19 @@ export function openSessionPicker(host: SessionsHost) {
           actions={[
             { id: 'delete', keys: ['backspace'], label: 'Delete' },
             { end: true, id: 'close', keys: ['esc'], label: 'Close' },
-            { disabled: s ? undefined : 'No session', id: 'resume', keys: ['enter'], label: s?.id === current ? 'Back to it' : 'Resume', primary: true }
+            { ...optional('disabled', s ? undefined : 'No session'), id: 'resume', keys: ['enter'], label: s?.id === current ? 'Back to it' : 'Resume', primary: true }
           ]}
           columns={[
             { format: 'dim', id: 'size', priority: 1 },
             { format: 'time', id: 'when', priority: 2 }
           ]}
-          confirm={deleting ? { act: 'confirm', label: 'Delete', text: `Delete “${sessionLabel(sessions.find(x => x.id === deleting) ?? { preview: '', title: '' })}”?` } : undefined}
+          key={KEY}
+          {...optional('confirm', deleting ? { act: 'confirm', label: 'Delete', text: `Delete “${sessionLabel(sessions.find(x => x.id === deleting) ?? { preview: '', title: '' })}”?` } : undefined)}
           current={current ? [current] : []}
           empty={tab === 'here' ? `No sessions in ${project} yet. Tab shows every folder.` : 'No saved sessions yet'}
           hits={hits}
           icon="history"
           items={rows().map(x => itemOf(x, now, running.has(x.id), tab === 'all' && !here(x)))}
-          key={KEY}
           layout="cards"
           noun="sessions"
           onAction={{
@@ -229,7 +230,7 @@ export function openSessionPicker(host: SessionsHost) {
           placeholder="Search titles, prompts, folders, branches…"
           preview="side"
           query={query}
-          selected={selected}
+          {...optional('selected', selected)}
           size="lg"
           state={state}
           subtitle={[{ s: 'muted', t: workspace ? shortPath(workspace) : '' }]}
@@ -297,11 +298,11 @@ function itemOf(s: StoredSession, now: number, running: boolean, elsewhere: bool
       ...(s.branch ? [{ text: s.branch, title: `Branch ${s.branch}` }] : []),
       ...(elsewhere && s.cwd ? [{ text: basename(s.cwd), title: s.cwd }] : [])
     ],
-    detail: s.title && s.preview ? oneLine(s.preview) : undefined,
+    ...optional('detail', s.title && s.preview ? oneLine(s.preview) : undefined),
     facts: { size: plural(s.messages, 'msg'), when: ageOf(s.lastActive, now) },
     id: s.id,
     label,
-    title: s.cwd || undefined
+    ...optional('title', s.cwd || undefined)
   }
 }
 

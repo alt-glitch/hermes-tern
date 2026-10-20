@@ -10,6 +10,7 @@ import { applyCompletion, completionToApplyOnSubmit } from '@tui/domain/slash.js
 import type { GatewayClient } from '@tui/gatewayClient.js'
 
 import { HIDDEN_COMMANDS, localCommands } from '../commands.js'
+import { optional } from '../core/assert.js'
 import { completionRequestForInput } from '../hermes/completion.js'
 import { oneLine } from '../view/describe.js'
 
@@ -204,9 +205,9 @@ export class Completion {
           >
             {this.items.map((item, i) => (
               <item
-                detail={item.meta && item.meta !== 'dir' ? oneLine(item.meta) : undefined}
-                icon={iconOf(item)}
                 key={String(i)}
+                {...optional('detail', item.meta && item.meta !== 'dir' ? oneLine(item.meta) : undefined)}
+                icon={iconOf(item)}
                 label={labelOf(item, this.#for, this.#replaceFrom)}
               />
             ))}
@@ -348,13 +349,13 @@ function labelOf(item: CompletionItem, typed: string, replaceFrom: number) {
   const at = query ? label.toLowerCase().indexOf(query.toLowerCase()) : -1
 
   if (at < 0) {
-    return [{ s: base, t: label }]
+    return [{ ...optional('s', base), t: label }]
   }
 
   return [
-    { s: base, t: label.slice(0, at) },
+    { ...optional('s', base), t: label.slice(0, at) },
     { s: base ? `${base} mark` : 'mark', t: label.slice(at, at + query.length) },
-    { s: base, t: label.slice(at + query.length) }
+    { ...optional('s', base), t: label.slice(at + query.length) }
   ].filter(s => s.t)
 }
 

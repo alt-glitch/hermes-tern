@@ -131,7 +131,7 @@ describe('a resumed prompt with images', () => {
     const n = tree(entryNode(user, `main.${user.id}`, cx))
     expect(images(n).map(i => i.p)).toEqual([expect.objectContaining({ path: shot })])
     // The gone image is a chip with its name; no raw ref reaches the bubble.
-    expect(all(n).some(x => x.p?.role === 'hermes.user.attachment' && JSON.stringify(x).includes('clip_2.png'))).toBe(true)
+    expect(all(n).some(x => x.p?.['role'] === 'hermes.user.attachment' && JSON.stringify(x).includes('clip_2.png'))).toBe(true)
     expect(JSON.stringify(n)).not.toMatch(/@image:|\[screenshot\]/)
   })
 
@@ -214,7 +214,7 @@ describe('image cards', () => {
     const n = tree(toolNode(call('image_generate', { prompt: 'a red fox' }, { result: { image: '/h/fox.png', success: true } }), 0))
     expect(images(n).map(i => i.p)).toEqual([expect.objectContaining({ alt: 'a red fox', path: '/h/fox.png' })])
     expect(n.p).toMatchObject({ name: 'image', target: 'a red fox', title: 'Image' })
-    expect(n.p?.collapsed).toBe(false)
+    expect(n.p?.['collapsed']).toBe(false)
     expect(all(n).some(x => x.k === 'code')).toBe(false)
   })
 
@@ -223,7 +223,7 @@ describe('image cards', () => {
     const loading = call('image_generate', {}, { result: { image: url, success: true } })
     expect(JSON.stringify(tree(toolNode(loading, 0)))).toContain('Loading the image')
 
-    expect(images(tree(toolNode({ ...loading, image: { blob: 'b9' } }, 0))).map(i => i.p?.blob)).toEqual(['b9'])
+    expect(images(tree(toolNode({ ...loading, image: { blob: 'b9' } }, 0))).map(i => i.p?.['blob'])).toEqual(['b9'])
 
     const failed = JSON.stringify(tree(toolNode({ ...loading, image: null }, 0)))
     expect(failed).toContain('Could not load the image')
@@ -234,7 +234,7 @@ describe('image cards', () => {
     const c = call('image_generate', { prompt: 'x' }, { result: { error: 'Content policy', image: null, success: false }, outcome: { duration: 0, kind: 'error' } })
     const n = tree(toolNode(c, 0))
     expect(images(n)).toEqual([])
-    expect(n.p?.note).toContain('Content policy')
+    expect(n.p?.['note']).toContain('Content policy')
   })
 
   it('vision_analyze shows its analysis, not the image it looked at (the user already sees it)', () => {
@@ -269,18 +269,18 @@ describe('the composer chip of an attached image', () => {
     const n = tree(imageChip({ caption: '1280×720 · 12 KB', image: { blob: 'b1' }, label: 'pasted image 1' }, 0, onRemove))
 
     expect(n).toMatchObject({ k: 'card', p: { head: [{ t: 'pasted image 1' }], role: 'omp.composer.chip' } })
-    expect(n.p?.actions).toBeUndefined()
+    expect(n.p?.['actions']).toBeUndefined()
     expect(n.c?.map(c => c.k)).toEqual(['image', 'text', 'icon'])
     // No click of its own on the thumbnail: Tern opens it in its lightbox.
     expect(n.c?.[0]?.p).toMatchObject({ blob: 'b1' })
-    expect(n.c?.[0]?.p?.actions).toBeUndefined()
+    expect(n.c?.[0]?.p?.['actions']).toBeUndefined()
     expect(n.c?.[2]?.p).toMatchObject({ actions: { click: 'click' }, name: 'x', role: 'hermes.composer.remove' })
   })
 
   it('says it is attaching while the image is read and uploaded, and can be removed meanwhile', () => {
     const onRemove = vi.fn()
     const n = tree(imageChip({ label: 'pasted image 1', pending: true }, 0, onRemove))
-    expect(n.c?.[1]?.p?.spans).toEqual([{ fx: 'shimmer', s: 'dim', t: 'Attaching…' }])
+    expect(n.c?.[1]?.p?.['spans']).toEqual([{ fx: 'shimmer', s: 'dim', t: 'Attaching…' }])
     expect(n.c?.[2]?.p).toMatchObject({ actions: { click: 'click' }, role: 'hermes.composer.remove' })
   })
 

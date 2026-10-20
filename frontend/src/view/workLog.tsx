@@ -7,6 +7,7 @@
 import type { JSX, Span } from '@stencil-hq/tern'
 
 import { appOf, batchOf } from '../bridge.js'
+import { optional } from '../core/assert.js'
 import type { ToolCall, TurnEntry } from '../model.js'
 import {
   actionIcon,
@@ -113,7 +114,7 @@ export function workNode(items: readonly WorkItem[], parent: string, live: boole
     </row>
   ) : (
     <row align="center" gap="sm" key="head">
-      <icon key="icon" name={groupIcon(shown)} tone={failed ? 'error' : undefined} />
+      <icon key="icon" name={groupIcon(shown)} {...optional('tone', failed ? 'error' : undefined)} />
       <text key="label" spans={[{ s: 'muted', t: summarize(shown) }]} truncate="end" wrap="none" />
       <icon key="chev" name="chev" role="hermes.work.chev" />
       <spacer grow={1} key="gap" />
@@ -131,7 +132,7 @@ function itemNode(item: WorkItem, parent: string, now: number, key: string = ite
   if (item.kind === 'thinking') {
     return foldSection({
       body: (
-        <md key="body" role="hermes.work.thought" stream={item.endedAt === undefined || undefined}>
+        <md key="body" role="hermes.work.thought" {...optional('stream', item.endedAt === undefined || undefined)}>
           {item.text}
         </md>
       ),
@@ -152,8 +153,8 @@ function itemNode(item: WorkItem, parent: string, now: number, key: string = ite
   const running = call.outcome.kind === 'running'
 
   const head = (
-    <row align="center" gap="sm" key="head" title={call.context || undefined}>
-      <icon key="icon" name={itemIcon(item)} tone={call.outcome.kind === 'error' ? 'error' : undefined} />
+    <row align="center" gap="sm" key="head" {...optional('title', call.context || undefined)}>
+      <icon key="icon" name={itemIcon(item)} {...optional('tone', call.outcome.kind === 'error' ? 'error' : undefined)} />
       {running ? liveText(stepLabel(call)) : <text grow={1} key="label" spans={labelSpans(call)} truncate="end" wrap="none" />}
       {call.outcome.kind === 'error' ? <icon key="failed" name="x" tone="error" /> : null}
     </row>

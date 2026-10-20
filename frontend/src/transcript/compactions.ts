@@ -87,7 +87,7 @@ export class Compactions {
    * The running compaction ended. `tokens` are the owner's own counts (/compress reports them
    * after its `ready` edge, so they also reach the compaction that just ended).
    */
-  compacted(at = Date.now(), tokens: { before?: number; after?: number } = {}) {
+  compacted(at = Date.now(), tokens: { before?: number | undefined; after?: number | undefined } = {}) {
     const running = this.#seen.findLast(isRunning)
     const c = running ?? (tokens.before || tokens.after ? this.#seen.at(-1) : undefined)
 

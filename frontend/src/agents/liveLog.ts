@@ -32,9 +32,9 @@ export interface LiveLog {
   error?: string
 }
 
-const LINE = /^(\d{2}:\d{2}:\d{2}) (\S+)\s*\| (.*)$/
-const TOOL = /^-> ([^(]+)\((.*)\)$/
-const RESULT = /^(\S+) (ok|ERROR)(?: ([\d.]+)s)?: ?(.*)$/
+const LINE = /^(?<at>\d{2}:\d{2}:\d{2}) (?<role>\S+)\s*\| (?<body>.*)$/
+const TOOL = /^-> (?<name>[^(]+)\((?<args>.*)\)$/
+const RESULT = /^(?<name>\S+) (?<status>ok|ERROR)(?: (?<secs>[\d.]+)s)?: ?(?<text>.*)$/
 
 /** Parses a live log (or a tail of one); lines that don't parse, such as the header, are skipped. */
 export function parseLiveLog(text: string): LiveLog {
@@ -47,7 +47,8 @@ export function parseLiveLog(text: string): LiveLog {
       continue
     }
 
-    const [, at, role, body] = m as unknown as [string, string, string, string]
+    // A match fills every group of LINE; the defaults only satisfy the index signature.
+    const { at = '', body = '', role = '' } = m.groups ?? {}
 
     switch (role) {
       case 'user':
@@ -55,20 +56,25 @@ export function parseLiveLog(text: string): LiveLog {
         break
 
       case 'tool': {
-        const t = TOOL.exec(body)
-        log.entries.push({ args: t?.[2] ?? '', at, kind: 'tool', name: t?.[1]?.trim() || body, status: 'running' })
+        const t = TOOL.exec(body)?.groups
+        log.entries.push({ args: t?.['args'] ?? '', at, kind: 'tool', name: t?.['name']?.trim() || body, status: 'running' })
         break
       }
 
       case 'result': {
-        const r = RESULT.exec(body)
+        const r = RESULT.exec(body)?.groups
         // The result answers the newest running call of that tool (calls run one at a time per child).
-        const call = r && findLast(log.entries, e => e.kind === 'tool' && e.status === 'running' && e.name === r[1])
+        const call = r && log.entries.findLast(e => e.kind === 'tool' && e.status === 'running' && e.name === r['name'])
 
         if (call && call.kind === 'tool' && r) {
-          call.status = r[2] === 'ok' ? 'ok' : 'error'
-          call.result = r[4]
-          call.took = r[3] ? Math.round(Number(r[3]) * 1000) : undefined
+          const { secs, status, text = '' } = r
+          call.status = status === 'ok' ? 'ok' : 'error'
+          call.result = text
+
+          // A running call has no duration yet, so one without a duration stays without.
+          if (secs) {
+            call.took = Math.round(Number(secs) * 1000)
+          }
         }
 
         break
@@ -130,19 +136,9 @@ function final(log: LiveLog, at: string, body: string) {
   }
 }
 
-function findLast<T>(items: T[], match: (item: T) => boolean): T | undefined {
-  for (let i = items.length - 1; i >= 0; i--) {
-    if (match(items[i]!)) {
-      return items[i]
-    }
-  }
-
-  return undefined
-}
-
 /** The call still running at the end of the log, if any. */
 export function runningTool(log: LiveLog): Extract<LogEntry, { kind: 'tool' }> | undefined {
-  const last = findLast(log.entries, e => e.kind === 'tool')
+  const last = log.entries.findLast(e => e.kind === 'tool')
 
   return last?.kind === 'tool' && last.status === 'running' ? last : undefined
 }

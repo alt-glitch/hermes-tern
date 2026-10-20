@@ -7,6 +7,7 @@ import type { JSX, Key, KvItem } from '@stencil-hq/tern'
 import type { ChatPorts } from '../app/ports.js'
 import type { AutomationAction, GoalView, LoopView } from '../automation.js'
 import type { NonEmpty } from '../core/assert.js'
+import { optional } from '../core/assert.js'
 import type { Overlay } from '../overlay.js'
 import { countdownAge } from '../view/time.js'
 import { loopWhen, turnsText } from '../view/automation.js'
@@ -51,7 +52,7 @@ export function automationButtons(
   ]
 }
 
-const kv = (k: string, v: string, s?: string): KvItem => ({ k: [{ t: k }], v: [{ s, t: v }] })
+const kv = (k: string, v: string, s?: string): KvItem => ({ k: [{ t: k }], v: [{ ...optional('s', s), t: v }] })
 
 function goalBody(g: GoalView): JSX.Element[] {
   const facts: KvItem[] = [

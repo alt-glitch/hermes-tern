@@ -5,6 +5,7 @@ import type { JSX, Key, PickerItem } from '@stencil-hq/tern'
 
 import type { ChatPorts } from '../app/ports.js'
 import { copyToClipboard } from '../clipboard.js'
+import { optional } from '../core/assert.js'
 import { type ChangedFile, fileDiff, type GitState, gitState } from '../git/status.js'
 import type { Overlay } from '../overlay.js'
 
@@ -97,7 +98,7 @@ export function openChanges(host: ChangesHost, focus?: string) {
     return (
       <picker
         actions={[
-          { disabled: f ? undefined : 'No file', id: 'copy', keys: ['c'], label: 'Copy path' },
+          { ...optional('disabled', f ? undefined : 'No file'), id: 'copy', keys: ['c'], label: 'Copy path' },
           { id: 'refresh', keys: ['shift+r'], label: 'Refresh' },
           { end: true, id: 'close', keys: ['esc'], label: 'Close', primary: true }
         ]}
@@ -118,7 +119,7 @@ export function openChanges(host: ChangesHost, focus?: string) {
         }}
         order={list.map(x => x.path)}
         preview="below"
-        selected={selected}
+        {...optional('selected', selected)}
         size="lg"
         state={state || failed ? 'ready' : 'loading'}
         subtitle={[
@@ -141,10 +142,10 @@ export function openChanges(host: ChangesHost, focus?: string) {
 function item(f: ChangedFile): PickerItem {
   return {
     badges: [
-      ...(f.status !== 'modified' ? [{ text: f.status, tone: TONE[f.status] }] : []),
+      ...(f.status !== 'modified' ? [{ text: f.status, ...optional('tone', TONE[f.status]) }] : []),
       ...(f.staged ? [{ text: 'staged' }] : [])
     ],
-    detail: f.from ? `from ${f.from}` : undefined,
+    ...optional('detail', f.from ? `from ${f.from}` : undefined),
     facts: { changes: [{ s: 'success', t: `+${f.additions}` }, { t: ' ' }, { s: 'error', t: `−${f.deletions}` }] },
     id: f.path,
     label: f.path,

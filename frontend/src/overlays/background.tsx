@@ -10,6 +10,7 @@ import type { JSX, Key, PickerColumn, PickerItem } from '@stencil-hq/tern'
 
 import type { ChatPorts } from '../app/ports.js'
 import { copyToClipboard } from '../clipboard.js'
+import { optional } from '../core/assert.js'
 import type { BackgroundProcess, ToolCall } from '../model.js'
 import type { Overlay } from '../overlay.js'
 import { type CronAction, type CronJob, isMonitor, isPaused, jobError, jobTone, ownJobs, relative } from '../processes/cron.js'
@@ -173,7 +174,7 @@ export function openBackground(host: BackgroundHost, at?: string | { tab: 'cron'
   const tabs = () => [
     { count: host.processes.running().length, id: 'running', label: 'Running' },
     { count: procs().length, id: 'all', label: 'All' },
-    { count: host.cron.loaded ? host.cron.jobs().length : undefined, id: 'cron', label: 'Cron' }
+    { ...optional('count', host.cron.loaded ? host.cron.jobs().length : undefined), id: 'cron', label: 'Cron' }
   ]
 
   function cronNode(now: number): JSX.Element {
@@ -194,17 +195,18 @@ export function openBackground(host: BackgroundHost, at?: string | { tab: 'cron'
       <picker
         actions={[
           {
-            disabled: j ? (busy ? 'Working' : undefined) : 'No job',
+            ...optional('disabled', j ? (busy ? 'Working' : undefined) : 'No job'),
             id: 'toggle',
             keys: ['p'],
             label: j && isPaused(j) ? 'Resume' : 'Pause',
             primary: true
           },
-          { danger: true, disabled: j ? (busy ? 'Working' : undefined) : 'No job', id: 'remove', keys: ['d'], label: 'Remove' },
+          { danger: true, ...optional('disabled', j ? (busy ? 'Working' : undefined) : 'No job'), id: 'remove', keys: ['d'], label: 'Remove' },
           { end: true, id: 'close', keys: ['esc'], label: 'Close' }
         ]}
         columns={columns}
-        confirm={state.confirm === 'job' && j ? { act: 'confirm', label: 'Remove', text: `Remove ${j.name || j.job_id}? It will not run again.` } : undefined}
+        key={KEY}
+        {...optional('confirm', state.confirm === 'job' && j ? { act: 'confirm', label: 'Remove', text: `Remove ${j.name || j.job_id}? It will not run again.` } : undefined)}
         empty={
           host.cron.error
             ? `Could not list cron jobs: ${host.cron.error}`
@@ -214,13 +216,12 @@ export function openBackground(host: BackgroundHost, at?: string | { tab: 'cron'
         }
         icon="clock"
         items={jobs.map(x => jobItem(x, now, own.has(x.job_id), host.cron.busy(x.job_id)))}
-        key={KEY}
         noun="jobs"
         onAction={handlers}
         onSelect={ev => click({ id: ev.item, type: 'selectJob' })}
         order={jobs.map(x => x.job_id)}
         preview="side"
-        selected={state.job}
+        {...optional('selected', state.job)}
         size="lg"
         subtitle={[{ s: 'muted', t: host.cron.warning ?? cronSummary(jobs) }]}
         tab={state.tab}
@@ -256,34 +257,35 @@ export function openBackground(host: BackgroundHost, at?: string | { tab: 'cron'
           { id: 'copy', keys: ['c'], label: copied && copied === p?.id ? 'Copied' : 'Copy command' },
           {
             danger: true,
-            disabled: p && isRunning(p) ? (host.processes.stopping(p.id) ? 'Stopping' : undefined) : 'Not running',
+            ...optional('disabled', p && isRunning(p) ? (host.processes.stopping(p.id) ? 'Stopping' : undefined) : 'Not running'),
             id: 'stop',
             keys: ['k'],
             label: p && host.processes.stopping(p.id) ? 'Stopping…' : 'Stop'
           },
-          { danger: true, disabled: running ? undefined : 'None running', id: 'all', keys: ['shift+k'], label: 'Stop all' },
+          { danger: true, ...optional('disabled', running ? undefined : 'None running'), id: 'all', keys: ['shift+k'], label: 'Stop all' },
           { end: true, id: 'close', keys: ['esc'], label: expanded ? 'Back' : 'Close' }
         ]}
         columns={columns}
-        confirm={
+        key={KEY}
+        {...optional(
+          'confirm',
           confirm === 'all'
             ? { act: 'confirm', label: 'Stop all', text: `Stop ${plural(running, 'background process', 'background processes')}?` }
             : confirm === 'one' && p
               ? { act: 'confirm', label: 'Stop', text: `Stop ${describeCommand(p.command)}?` }
               : undefined
-        }
+        )}
         empty={state.tab === 'running' ? 'No background processes running. Tab shows the finished ones.' : 'No background processes in this session'}
-        focus={expanded ? 'preview' : undefined}
+        {...optional('focus', expanded ? 'preview' : undefined)}
         icon="terminal"
         items={all.map(x => item(x, now, host.processes.stopping(x.id)))}
-        key={KEY}
         noun="processes"
         onAction={handlers}
         onActivate={ev => click({ id: ev.item, type: 'activate' })}
         onSelect={ev => click({ id: ev.item, type: 'select' })}
         order={list.map(x => x.id)}
         preview="side"
-        selected={state.selected}
+        {...optional('selected', state.selected)}
         size="lg"
         subtitle={[{ s: 'muted', t: summary(all) }]}
         tab={state.tab}
@@ -312,7 +314,7 @@ function jobItem(j: CronJob, now: number, own: boolean, busy: boolean): PickerIt
 
   return {
     badges: [...(isMonitor(j) ? [{ text: 'monitor' }] : []), ...(own ? [{ text: 'this session', tone: 'accent' as const }] : [])],
-    detail: oneLine(j.prompt_preview || j.monitor_url || j.monitor_script || '') || undefined,
+    ...optional('detail', oneLine(j.prompt_preview || j.monitor_url || j.monitor_script || '') || undefined),
     dot: jobTone(j),
     facts: {
       last: busy ? 'working…' : error ? 'failed' : j.last_run_at ? `${j.last_status ?? 'ran'} ${relative(j.last_run_at, now)}` : 'never ran',
@@ -321,7 +323,7 @@ function jobItem(j: CronJob, now: number, own: boolean, busy: boolean): PickerIt
     },
     id: j.job_id,
     label: j.name || j.job_id,
-    tone: isPaused(j) ? 'muted' : undefined
+    ...optional('tone', isPaused(j) ? 'muted' : undefined)
   }
 }
 
@@ -395,7 +397,7 @@ function item(p: BackgroundProcess, now: number, stopping: boolean): PickerItem 
     id: p.id,
     label: describeCommand(p.command),
     title: p.command,
-    tone: isRunning(p) ? undefined : 'muted'
+    ...optional('tone', isRunning(p) ? undefined : 'muted')
   }
 }
 

@@ -9,6 +9,7 @@
 import type { JSX, Key, PickerColumn, PickerItem } from '@stencil-hq/tern'
 
 import type { ChatPorts } from '../app/ports.js'
+import { optional } from '../core/assert.js'
 import type { Subagent } from '../model.js'
 import type { Overlay } from '../overlay.js'
 
@@ -174,12 +175,12 @@ export function openAgents(host: AgentsSheetHost, focus?: { id: string; watch?: 
             { id: 'pause', keys: ['p'], label: host.agents.paused ? 'Resume spawns' : 'Pause spawns' }
           ]),
       {
-        disabled: running ? (a?.steerable === false ? ('Not taking steering now' as const) : undefined) : ('Finished' as const),
+        ...optional('disabled', running ? (a?.steerable === false ? 'Not taking steering now' : undefined) : 'Finished'),
         id: 'steer',
         keys: ['s'],
         label: 'Steer'
       },
-      { danger: true, disabled: running ? undefined : ('Finished' as const), id: 'stop', keys: ['x'], label: 'Stop' },
+      { danger: true, ...optional('disabled', running ? undefined : 'Finished'), id: 'stop', keys: ['x'], label: 'Stop' },
       { end: true, id: 'close', keys: ['esc'], label: inTimeline ? 'Back' : 'Close' }
     ]
   }
@@ -203,11 +204,11 @@ export function openAgents(host: AgentsSheetHost, focus?: { id: string; watch?: 
       <picker
         actions={actions(a, false)}
         columns={columns}
-        confirm={stopping() && a ? { act: 'confirm', label: 'Stop', text: `Stop ${agentName(a)}? Its partial work returns to Hermes.` } : undefined}
+        key={KEY}
+        {...optional('confirm', stopping() && a ? { act: 'confirm', label: 'Stop', text: `Stop ${agentName(a)}? Its partial work returns to Hermes.` } : undefined)}
         empty={state.tab === 'running' ? 'No agents running. Tab shows finished ones.' : 'No subagents in this session yet'}
         icon="agents"
         items={all.map(x => hubItem(x, now))}
-        key={KEY}
         layout={all.some(x => x.depth) ? 'tree' : 'rows'}
         noun="agents"
         onAction={handlers}
@@ -215,7 +216,7 @@ export function openAgents(host: AgentsSheetHost, focus?: { id: string; watch?: 
         onSelect={ev => click({ id: ev.item, type: 'select' })}
         order={list.map(x => x.id)}
         preview="side"
-        selected={state.selected}
+        {...optional('selected', state.selected)}
         size="lg"
         subtitle={[
           { s: 'muted', t: summary(all) },
@@ -250,17 +251,17 @@ export function openAgents(host: AgentsSheetHost, focus?: { id: string; watch?: 
           { format: 'dim', head: 'At', id: 'at', min: 8, priority: 2 },
           { format: 'elapsed', head: 'Took', id: 'took', priority: 4 }
         ]}
-        confirm={stopping() ? { act: 'confirm', label: 'Stop', text: `Stop ${agentName(a)}? Its partial work returns to Hermes.` } : undefined}
+        key={KEY}
+        {...optional('confirm', stopping() ? { act: 'confirm', label: 'Stop', text: `Stop ${agentName(a)}? Its partial work returns to Hermes.` } : undefined)}
         empty={a.logPath || a.log ? 'Nothing logged yet' : 'This agent has no live transcript'}
         icon="agent"
         items={entries.map((e, i) => stepItem(e, `e${i}`, a))}
-        key={KEY}
         layout="timeline"
         noun="steps"
         onAction={handlers}
         onSelect={ev => click({ id: ev.item, type: 'step' })}
         preview="side"
-        selected={sel}
+        {...optional('selected', sel)}
         size="lg"
         subtitle={[{ s: 'muted', t: `${SUBAGENT_LOOK[a.status].word} · ${a.goal}` }]}
         title={agentName(a)}
@@ -294,7 +295,7 @@ function elapsed(a: Subagent, now: number): string {
 
 function hubItem(a: Subagent, now: number): PickerItem {
   return {
-    chips: a.model ? [{ text: a.model.split('/').at(-1) ?? a.model }] : undefined,
+    ...optional('chips', a.model ? [{ text: a.model.split('/').at(-1) ?? a.model }] : undefined),
     depth: a.depth ?? 0,
     detail: a.goal,
     dot: SUBAGENT_LOOK[a.status].tone,
@@ -368,14 +369,14 @@ function stepItem(e: LogEntry, id: string, a: Subagent): PickerItem {
   if (e.kind === 'tool') {
     return {
       detail: e.args,
-      dot: e.status === 'error' ? 'error' : e.status === 'running' && isRunning(a) ? 'accent' : undefined,
+      ...optional('dot', e.status === 'error' ? 'error' : e.status === 'running' && isRunning(a) ? 'accent' : undefined),
       facts: { at: e.at, took: e.took !== undefined ? duration(e.took) : '' },
       icon: hubIconOf(e.name),
       id,
       label: e.name,
       mono: true,
       node: 'tool',
-      tone: e.status === 'error' ? 'error' : undefined
+      ...optional('tone', e.status === 'error' ? 'error' : undefined)
     }
   }
 
@@ -384,7 +385,7 @@ function stepItem(e: LogEntry, id: string, a: Subagent): PickerItem {
     id,
     label: e.kind === 'kickoff' ? `Task: ${e.text}` : e.kind === 'think' ? `Thinking: ${e.text}` : e.text,
     node: e.kind === 'kickoff' ? 'user' : 'assistant',
-    tone: e.kind === 'think' || e.kind === 'note' ? 'muted' : undefined
+    ...optional('tone', e.kind === 'think' || e.kind === 'note' ? 'muted' : undefined)
   }
 }
 
@@ -400,7 +401,7 @@ function stepPreview(e: LogEntry, a: Subagent, brief?: string): JSX.Element[] {
     return [
       <text key="title" role="omp.hub.title" text={head} />,
       <text key="at" spans={[{ s: 'dim mono', t: e.at }]} />,
-      <md key="body" text={text} tone={e.kind === 'think' ? 'muted' : undefined} />
+      <md key="body" text={text} {...optional('tone', e.kind === 'think' ? 'muted' : undefined)} />
     ]
   }
 

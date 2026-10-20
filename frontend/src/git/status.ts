@@ -10,7 +10,7 @@ const run = promisify(execFile)
 export interface ChangedFile {
   path: string
   /** Where a rename came from. */
-  from?: string
+  from?: string | undefined
   /** `modified`, `added`, `deleted`, `renamed`, `untracked`, `conflicted`. */
   status: string
   staged: boolean
@@ -22,7 +22,7 @@ export interface GitState {
   /** The checkout's top folder. */
   root: string
   /** Undefined on a detached HEAD. */
-  branch?: string
+  branch?: string | undefined
   upstream?: string
   ahead: number
   behind: number

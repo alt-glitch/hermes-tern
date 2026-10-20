@@ -5,6 +5,7 @@ import type { JSX, Tone } from '@stencil-hq/tern'
 import { node } from '@stencil-hq/tern'
 
 import { langOf } from '../code/lang.js'
+import { optional } from '../core/assert.js'
 import type { PrFile, PullRequest } from '../github/pullRequest.js'
 import { shown } from '../github/remote.js'
 import type { Entry } from '../github/store.js'
@@ -43,7 +44,7 @@ export function filesTab(e: Entry, pr: PullRequest, id: string, density: PrDensi
 
         return (
           <row align="center" gap="sm" key={`l${i}`} onClick={() => reveal?.(`${id}.diffs.f${i}`)} role="hermes.pr.fileitem" title={f.path}>
-            <icon key="i" name="file" tone={FILE_TONE[f.status]} />
+            <icon key="i" name="file" {...optional('tone', FILE_TONE[f.status])} />
             <text
               grow={1}
               key="p"
@@ -93,7 +94,7 @@ function fileCard(f: PrFile, key: string): JSX.Element {
       title: FILE_TITLE[f.status] ?? 'Changed'
     },
     f.patch
-      ? [<diff key="d" lang={langOf(f.path)} path={f.path} text={f.patch} />]
+      ? [<diff key="d" {...optional('lang', langOf(f.path))} path={f.path} text={f.patch} />]
       : [<text key="none" spans={[{ s: 'muted', t: 'Binary, or too large to show here.' }]} />]
   )
 }

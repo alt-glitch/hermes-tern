@@ -177,8 +177,8 @@ describe('Agents', () => {
     await mkdir(dir, { recursive: true })
     await writeFile(path, '12:00:01 tool     | -> read_file(a.md)\n')
     await writeFile(join(dir, 'manifest.json'), JSON.stringify({ tasks: [{ index: 0 }, { index: 1, log: path }] }))
-    const before = process.env.HERMES_HOME
-    process.env.HERMES_HOME = home
+    const before = process.env['HERMES_HOME']
+    process.env['HERMES_HOME'] = home
 
     // The display projection: a delegate_task row with its args and no result.
     const transcript = new Transcript()
@@ -200,7 +200,7 @@ describe('Agents', () => {
       store.scan()
       await vi.waitFor(() => expect(store!.running()).toHaveLength(1))
     } finally {
-      process.env.HERMES_HOME = before
+      process.env['HERMES_HOME'] = before
     }
 
     const [agent] = store.running()

@@ -1,6 +1,7 @@
 // The manage_connections tool's connect card: the apps to authorize, their states, and Continue.
 
 import { allConnected, type ConnectTarget, connectTargets, isConnectCall, type SettleReason, waiting } from '../../../connections.js'
+import { optional } from '../../../core/assert.js'
 import type { ToolCall } from '../../../model.js'
 import { namedStep } from '../steps.js'
 import type { Card, ToolView } from '../types.js'
@@ -66,7 +67,7 @@ function connectCard(call: ToolCall): Card {
 
     return (
       <row align="center" gap="sm" key={`t${i}`} role="hermes.connect.row">
-        <icon key="i" name={look.icon} tone={look.tone} />
+        <icon key="i" name={look.icon} {...optional('tone', look.tone)} />
         <text
           grow={1}
           key="n"

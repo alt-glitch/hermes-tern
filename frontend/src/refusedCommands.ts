@@ -15,7 +15,7 @@ import type {
 } from '@hermes/shared/gateway-events'
 
 import type { ChatPorts } from './app/ports.js'
-import { oneOf } from './core/assert.js'
+import { oneOf, optional } from './core/assert.js'
 import { errorText } from './core/errors.js'
 import type { NoticeEntry } from './model.js'
 import { type BackgroundHost, openBackground } from './overlays/background.js'
@@ -294,7 +294,7 @@ function snapshot(host: RefusedHost, arg: string) {
 
 /** `/update`: `hermes update` in a split below the chat, as Ink hands the terminal to it on exit. */
 async function update(host: RefusedHost) {
-  if (await openHermesSplit(['update'], host.session.info?.cwd || process.env.HOME || '/')) {
+  if (await openHermesSplit(['update'], host.session.info?.cwd || process.env['HOME'] || '/')) {
     return host.transcript.notice(
       'Running `hermes update` in the split below. Hermes may restart the gateway when it finishes.'
     )
@@ -368,7 +368,7 @@ export const HIDDEN_COMMANDS: ReadonlySet<string> = new Set(HIDDEN.flatMap(h => 
 export const REFUSED_COMMANDS: readonly RefusedCommand[] = [
   ...ROUTED.map(c => ({ ...c, run: guarded(c.name, c.run) })),
   ...HIDDEN.map(h => ({
-    aliases: h.aliases,
+    ...optional('aliases', h.aliases),
     name: h.name,
     run: (host: RefusedHost) => host.transcript.notice(h.why(h.name), 'warning')
   }))

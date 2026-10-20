@@ -1,6 +1,7 @@
 // The read_file tool: omp's read card, the numbered lines it got.
 
 import { langOf } from '../../../code/lang.js'
+import { optional } from '../../../core/assert.js'
 import type { ToolCall } from '../../../model.js'
 import type { ReadDetail } from '../../../tools/files.js'
 import { shortPath } from '../steps.js'
@@ -27,7 +28,7 @@ function readCard(call: ToolCall, d: ReadDetail): Card {
 
   return {
     body: content
-      ? [<code key="code" lang={langOf(path)} numbers start={first} text={content.replace(/^ *\d+\|/gm, '')} />]
+      ? [<code key="code" {...optional('lang', langOf(path))} numbers {...optional('start', first)} text={content.replace(/^ *\d+\|/gm, '')} />]
       : [],
     folded: true,
     frame: 'inline',

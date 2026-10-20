@@ -12,7 +12,7 @@ import { FakeGateway, fakeTern, given, key, must, type Reply } from './fakes.js'
 
 vi.mock('@tui/lib/history.js', () => ({ append: () => undefined, load: () => [] }))
 
-process.env.HERMES_HOME = mkdtempSync(join(tmpdir(), 'hermes-tern-status-'))
+process.env['HERMES_HOME'] = mkdtempSync(join(tmpdir(), 'hermes-tern-status-'))
 
 const { App } = await import('../app/chat.js')
 const { localCommand } = await import('../commands.js')
@@ -164,7 +164,7 @@ describe('App: fast mode', () => {
   })
 
   it('/fast toggles through config.set and patches the info from the reply', async () => {
-    const { app, sent } = setup({ 'config.set': p => ({ key: 'fast', value: p.value === 'toggle' ? 'fast' : 'normal' }) })
+    const { app, sent } = setup({ 'config.set': p => ({ key: 'fast', value: p['value'] === 'toggle' ? 'fast' : 'normal' }) })
     given.info(app, { model: 'gpt-5' })
 
     await must(localCommand('fast')).run(app, '')

@@ -309,7 +309,7 @@ interface SourceStats {
   lines: number
   head: string[]
   tail: string[]
-  lastLine?: string
+  lastLine?: string | undefined
   lastActiveAt: number
   /** Non-empty lines per refresh within the rate window. */
   recent: { t: number; n: number }[]

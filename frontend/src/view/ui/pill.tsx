@@ -11,7 +11,7 @@ export interface PillProps {
   onClick(): void
   title: string
   /** A card Tern shows while the pointer rests on the pill. */
-  hovercard?: NodeJson
+  hovercard?: NodeJson | undefined
   /** The pill's role; omp's `omp.hud.pill` by default. */
   role?: string
   /**

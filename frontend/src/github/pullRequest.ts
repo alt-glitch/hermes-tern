@@ -21,12 +21,12 @@ export type MergeMethod = 'merge' | 'rebase' | 'squash'
 
 export interface Check {
   name: string
-  workflow?: string
+  workflow?: string | undefined
   status: CheckStatus
-  url?: string
-  description?: string
-  startedAt?: string
-  completedAt?: string
+  url?: string | undefined
+  description?: string | undefined
+  startedAt?: string | undefined
+  completedAt?: string | undefined
 }
 
 export interface Reviewer {
@@ -504,8 +504,8 @@ export interface PrFile {
   additions: number
   deletions: number
   /** The unified diff; absent for a binary or a too-large file. */
-  patch?: string
-  previous?: string
+  patch?: string | undefined
+  previous?: string | undefined
 }
 
 /** One row of `GET /pulls/{n}/files`. */

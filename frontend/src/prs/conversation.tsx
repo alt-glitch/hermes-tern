@@ -3,6 +3,7 @@
 
 import type { JSX, SpanData, Tone } from '@stencil-hq/tern'
 
+import { optional } from '../core/assert.js'
 import type { ActivityItem, PullRequest } from '../github/pullRequest.js'
 import { shown } from '../github/remote.js'
 import type { Entry } from '../github/store.js'
@@ -152,7 +153,7 @@ function commitRun(commits: ActivityItem[], last: ActivityItem, key: string, now
         return (
           <row align="center" gap="sm" key={`c${i}`} role="hermes.pr.commit">
             <text grow={1} key="m" spans={[{ t: c.body.split('\n')[0] ?? '' }]} truncate="end" wrap="none" />
-            {sha ? <text key="s" spans={[{ href: c.url, s: 'mono dim', t: sha }]} wrap="none" /> : null}
+            {sha ? <text key="s" spans={[{ ...optional('href', c.url), s: 'mono dim', t: sha }]} wrap="none" /> : null}
           </row>
         )
       })}

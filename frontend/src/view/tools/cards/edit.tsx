@@ -2,6 +2,7 @@
 
 import { diffStats, hunks, plainDiff } from '../../../code/diff.js'
 import { langOf } from '../../../code/lang.js'
+import { optional } from '../../../core/assert.js'
 import type { ToolCall } from '../../../model.js'
 import type { EditDetail } from '../../../tools/files.js'
 import { plural } from '../../format.js'
@@ -60,5 +61,5 @@ function editCard(call: ToolCall, d: EditDetail): Card {
 
   const { added, removed } = diffStats(diff)
 
-  return { ...head, body: [<diff key="diff" lang={lang} text={diff} />], meta: [`+${added} −${removed}`] }
+  return { ...head, body: [<diff key="diff" {...optional('lang', lang)} text={diff} />], meta: [`+${added} −${removed}`] }
 }

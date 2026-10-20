@@ -48,8 +48,8 @@ export function ownJobs(calls: readonly ToolCall[]): Set<string> {
 
   for (const c of calls) {
     const r = record(c.result)
-    const job = record(r?.job)
-    const id = r?.job_id ?? job?.job_id ?? job?.id
+    const job = record(r?.['job'])
+    const id = r?.['job_id'] ?? job?.['job_id'] ?? job?.['id']
 
     if (c.name === 'cronjob_manage' && typeof id === 'string' && id) {
       ids.add(id)

@@ -194,9 +194,9 @@ export function renderPrompt(request: AuthorRequest): string {
  * when the launcher named no interpreter or checkout to run it with.
  */
 export function hermesAuthor(env: NodeJS.ProcessEnv = process.env): Author | undefined {
-  const python = env.HERMES_PYTHON?.trim()
-  const root = env.HERMES_PYTHON_SRC_ROOT
-  const ui = env.HERMES_TUI_DIR
+  const python = env['HERMES_PYTHON']?.trim()
+  const root = env['HERMES_PYTHON_SRC_ROOT']
+  const ui = env['HERMES_TUI_DIR']
 
   if (!python || !root || !ui) {
     return undefined

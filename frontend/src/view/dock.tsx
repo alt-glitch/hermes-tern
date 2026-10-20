@@ -8,7 +8,7 @@ import type { EditEvent, JSX, SendEvent, Tone } from '@stencil-hq/tern'
 
 import type { Composer } from '../composer.js'
 import type { Pill } from '../chrome/hud.js'
-import { assertNever } from '../core/assert.js'
+import { assertNever, optional } from '../core/assert.js'
 import type { ImageSource, Todo } from '../model.js'
 import { DEFAULT_EFFORT, effortText } from '../session/effort.js'
 import { type ChartEntry, glance, glanceSpans, hovercard, latest, miniSpark, summary } from '../processes/widgets/view.js'
@@ -267,7 +267,7 @@ function todosPillNode(t: TodosPill, onToggle: () => void, focused: boolean): JS
       <text
         key="now"
         role="hermes.todos.now"
-        spans={[{ s: finished ? 'success' : undefined, t: finished ? 'all done' : current }]}
+        spans={[{ ...optional('s', finished ? 'success' : undefined), t: finished ? 'all done' : current }]}
         truncate="end"
         wrap="none"
       />
@@ -296,7 +296,7 @@ function statusLine(cx: DockContext, on: DockActions): JSX.Element {
         <seg
           key="notice"
           priority={6}
-          role={s.notice.tone === 'info' ? undefined : `hermes.statusline.${s.notice.tone === 'warning' ? 'warn' : s.notice.tone === 'error' ? 'bad' : 'good'}`}
+          {...optional('role', s.notice.tone === 'info' ? undefined : `hermes.statusline.${s.notice.tone === 'warning' ? 'warn' : s.notice.tone === 'error' ? 'bad' : 'good'}`)}
           spans={[{ t: s.notice.text }]}
           title={s.notice.text}
         />
@@ -309,7 +309,7 @@ function statusLine(cx: DockContext, on: DockActions): JSX.Element {
         <seg
           key="context"
           priority={5}
-          role={context >= 0.85 ? 'hermes.statusline.bad' : context >= 0.6 ? 'hermes.statusline.warn' : undefined}
+          {...optional('role', context >= 0.85 ? 'hermes.statusline.bad' : context >= 0.6 ? 'hermes.statusline.warn' : undefined)}
           side="right"
           spans={[{ t: `${Math.round(context * 100)}% context` }]}
           title="/usage shows the breakdown"
@@ -319,7 +319,7 @@ function statusLine(cx: DockContext, on: DockActions): JSX.Element {
         <seg
           key="compressions"
           priority={2}
-          role={s.compressions >= 10 ? 'hermes.statusline.bad' : s.compressions >= 5 ? 'hermes.statusline.warn' : undefined}
+          {...optional('role', s.compressions >= 10 ? 'hermes.statusline.bad' : s.compressions >= 5 ? 'hermes.statusline.warn' : undefined)}
           side="right"
           spans={[{ t: `cmp ${s.compressions}` }]}
           title="Times the context was compressed this session"
@@ -396,7 +396,7 @@ function shellsPill(s: ShellsPill, onOpen: () => void, focused: boolean): JSX.El
       ) : (
         <icon key="end" name={s.tone === 'success' ? 'done' : s.tone === 'error' ? 'failed' : 'aborted'} tone={s.tone} />
       ),
-      <text key="text" spans={[{ s: live ? undefined : 'muted', t: `${plural(n, 'shell')}${live ? '' : ' exited'}` }]} wrap="none" />,
+      <text key="text" spans={[{ ...optional('s', live ? undefined : 'muted'), t: `${plural(n, 'shell')}${live ? '' : ' exited'}` }]} wrap="none" />,
       figure ? <text key="glance" role="omp.hud.glance" spans={glanceSpans(figure)} wrap="none" /> : null,
       fresh ? miniSpark(fresh) : null
     ],
@@ -411,7 +411,7 @@ function shellsPill(s: ShellsPill, onOpen: () => void, focused: boolean): JSX.El
 /** The PR pill, in the shells pill's style. */
 function prsPillNode(p: PrsPill, onOpen: () => void, focused: boolean): JSX.Element {
   return pill({
-    children: [<icon key="icon" name="merge" tone={p.tone === 'muted' ? undefined : p.tone} />, <text key="text" text={p.text} wrap="none" />],
+    children: [<icon key="icon" name="merge" {...optional('tone', p.tone === 'muted' ? undefined : p.tone)} />, <text key="text" text={p.text} wrap="none" />],
     focused,
     key: 'prs',
     onClick: onOpen,
@@ -475,12 +475,12 @@ function effortChip(r: DockRoute, on: DockActions): JSX.Element {
       gap="xs"
       key="effort"
       onClick={on.onEffort}
-      onMenu={on.onEffortMenu}
+      {...optional('onMenu', on.onEffortMenu)}
       role="omp.composer.effort"
       title={`Reasoning effort: ${text}${r.effort ? clamp : ' (the default)'} · click to cycle  ⇧⇥ · right-click to choose or save as default`}
     >
       <effort key="glyph" level={glyph} />
-      <text key="level" spans={[{ s: r.effort ? undefined : 'muted', t: text }]} wrap="none" />
+      <text key="level" spans={[{ ...optional('s', r.effort ? undefined : 'muted'), t: text }]} wrap="none" />
     </row>
   )
 }
@@ -499,11 +499,11 @@ function composerNode(cx: DockContext, on: DockActions): JSX.Element {
       </row>
       <row align="start" gap="sm" key="line" role="omp.composer.line">
         <editor
-          anchor={draft.anchor}
+          key="input"
+          {...optional('anchor', draft.anchor)}
           cursor={draft.cursor}
           decor={draft.decor}
-          ghost={cx.composer.ghost || undefined}
-          key="input"
+          {...optional('ghost', cx.composer.ghost || undefined)}
           maxLines={18}
           onEdit={on.onEdit}
           onSend={on.onSend}

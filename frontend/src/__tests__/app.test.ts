@@ -10,7 +10,7 @@ import { FakeGateway, fakeTern, given, key, must, type Reply, settle as settleGa
 vi.mock('@tui/lib/history.js', () => ({ append: () => undefined, load: () => [] }))
 
 const home = mkdtempSync(join(tmpdir(), 'hermes-tern-app-'))
-process.env.HERMES_HOME = home
+process.env['HERMES_HOME'] = home
 
 const { App } = await import('../app/chat.js')
 
@@ -74,8 +74,8 @@ const settle = () => settleGateway(gateway)
 const busy = { label: 'Working…', since: {}, startedAt: 0 }
 
 beforeEach(() => {
-  delete process.env.HERMES_TUI_QUERY
-  delete process.env.HERMES_TUI_IMAGE
+  delete process.env['HERMES_TUI_QUERY']
+  delete process.env['HERMES_TUI_IMAGE']
 })
 
 afterEach(() => {
@@ -305,7 +305,7 @@ describe('App: shell commands', () => {
   })
 
   it('splices {!cmd} output into the prompt and shows what was typed', async () => {
-    const { app, press, sent, type } = setup({ 'shell.exec': p => ({ code: 0, stderr: '', stdout: `<${String(p.command)}>\n` }) })
+    const { app, press, sent, type } = setup({ 'shell.exec': p => ({ code: 0, stderr: '', stdout: `<${String(p['command'])}>\n` }) })
     await type('today is {!date} ok')
     await press(key('enter'))
     await vi.waitFor(() => expect(sent('prompt.submit')).toHaveLength(1))
@@ -315,7 +315,7 @@ describe('App: shell commands', () => {
   })
 
   it('never runs a {!cmd} or a leading ! that came in a paste', async () => {
-    const { press, sent, type } = setup({ 'shell.exec': p => ({ code: 0, stderr: '', stdout: `<${String(p.command)}>` }) })
+    const { press, sent, type } = setup({ 'shell.exec': p => ({ code: 0, stderr: '', stdout: `<${String(p['command'])}>` }) })
     await type('log: ')
     await press(key('paste', { text: 'expect(x).toBe("{!rm -rf /}")\n' }))
     await type(' at {!date}')
@@ -351,7 +351,7 @@ describe('App: shell commands', () => {
 
 /** The session as the shared gateway starts it, with `mode` as its busy_input_mode. */
 const session = (mode: string): Record<string, Reply> => ({
-  'config.get': p => (p.key === 'busy' ? { key: 'busy', value: mode } : {}),
+  'config.get': p => (p['key'] === 'busy' ? { key: 'busy', value: mode } : {}),
   'session.create': () => ({ info: {}, session_id: 's1', subscription_id: 'sub1' }),
   'session.resume': () => ({ execution_generation: 7 }),
   'setup.status': () => ({ provider_configured: true })
@@ -415,7 +415,7 @@ describe('App: Enter while a turn runs (busy_input_mode)', () => {
     expect(users(app)).toEqual([])
     expect(queuedRows()).toEqual([{ actions: ['edit'], text: 'next one ↵ 📎 1 image' }])
 
-    const row = { admission_id: 'a1', input_id: must(submit).submission_id, status: 'queued', user: 'next one' }
+    const row = { admission_id: 'a1', input_id: must(submit)['submission_id'], status: 'queued', user: 'next one' }
     emit('event', { payload: { pending_submissions: [row] }, session_id: 's1', type: 'session.info' })
     emit('event', { payload: { text: 'first reply' }, session_id: 's1', type: 'message.complete' })
     emit('event', { payload: {}, session_id: 's1', type: 'message.start' })
@@ -445,7 +445,7 @@ describe('App: Enter while a turn runs (busy_input_mode)', () => {
     expect(users(app)).toEqual([])
     expect(queuedRows()).toEqual([{ actions: ['steer', 'edit'], text: '/fanout if needed' }])
 
-    const row = { admission_id: 'a1', input_id: must(submit).submission_id, status: 'queued', user: body }
+    const row = { admission_id: 'a1', input_id: must(submit)['submission_id'], status: 'queued', user: body }
     emit('event', { payload: { pending_submissions: [row] }, session_id: 's1', type: 'session.info' })
     emit('event', { payload: { text: 'first reply' }, session_id: 's1', type: 'message.complete' })
     emit('event', { payload: {}, session_id: 's1', type: 'message.start' })
@@ -460,7 +460,7 @@ describe('App: Enter while a turn runs (busy_input_mode)', () => {
     const { app, emit, press, sent, type } = setup()
     await type('hello')
     await press(key('enter'))
-    const row = { admission_id: 'a1', input_id: must(sent('prompt.submit')[0]).submission_id, status: 'queued', user: 'hello' }
+    const row = { admission_id: 'a1', input_id: must(sent('prompt.submit')[0])['submission_id'], status: 'queued', user: 'hello' }
 
     emit('event', { payload: { pending_submissions: [row] }, session_id: 's1', type: 'session.info' })
     emit('event', { payload: { pending_submissions: [{ ...row, status: 'started' }] }, session_id: 's1', type: 'session.info' })
@@ -494,7 +494,7 @@ describe('App: Enter while a turn runs (busy_input_mode)', () => {
     app.transcript.messageStart()
     await type('use tabs')
     await press(key('enter'))
-    const row = { admission_id: 'a1', input_id: must(sent('prompt.submit')[0]).submission_id, status: 'queued', user: 'use tabs' }
+    const row = { admission_id: 'a1', input_id: must(sent('prompt.submit')[0])['submission_id'], status: 'queued', user: 'use tabs' }
     emit('event', { payload: { pending_submissions: [row] }, session_id: 's1', type: 'session.info' })
     await settle()
     expect(queuedRows()).toEqual([{ actions: ['steer', 'edit'], text: 'use tabs' }])
@@ -520,7 +520,7 @@ describe('App: Enter while a turn runs (busy_input_mode)', () => {
     given.busy(app, { ...busy })
     await type('fix me')
     await press(key('enter'))
-    const row = { admission_id: 'a1', input_id: must(sent('prompt.submit')[0]).submission_id, status: 'queued', user: 'fix me' }
+    const row = { admission_id: 'a1', input_id: must(sent('prompt.submit')[0])['submission_id'], status: 'queued', user: 'fix me' }
     emit('event', { payload: { pending_submissions: [row] }, session_id: 's1', type: 'session.info' })
 
     await press(key('up', { alt: true }))

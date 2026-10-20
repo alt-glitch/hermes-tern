@@ -13,34 +13,37 @@ export interface RateLimit {
   left: number
   limit: number
   /** Time until the window resets, as the backend wrote it (`37m 26s`). */
-  reset?: string
+  reset?: string | undefined
 }
 
 export interface Crumb {
   label: string
   tokens: number
-  pct?: number
+  pct?: number | undefined
 }
 
 export type UsageSection =
   | { kind: 'limits'; title: string; items: RateLimit[] }
-  | { kind: 'session'; title: string; rows: Pair[]; context?: { used: number; max: number } }
-  | { kind: 'breakdown'; title: string; note?: string; items: Crumb[] }
+  | { kind: 'session'; title: string; rows: Pair[]; context?: { used: number; max: number } | undefined }
+  | { kind: 'breakdown'; title: string; note?: string | undefined; items: Crumb[] }
   | { kind: 'credits'; title: string; rows: Pair[]; notes: string[] }
   | { kind: 'text'; title: string; text: string }
 
-const HEADER = /^\s*(?:[^\p{L}\p{N}*\s]\S*\s+)?\*\*(.+?)\*\*\s*(.*)$/u
+const HEADER = /^\s*(?:[^\p{L}\p{N}*\s]\S*\s+)?\*\*(?<title>.+?)\*\*\s*(?<inline>.*)$/u
 const SUFFIX: Record<string, number> = { b: 1e9, k: 1e3, m: 1e6 }
 
 /** `1,234`, `33.6K`, `~8.0M` → a number; NaN when it is not one. */
 export function parseCount(raw: string): number {
-  const m = /^~?\s*([\d,]*\.?\d+)\s*([kmb])?$/i.exec(raw.trim())
+  const m = /^~?\s*(?<digits>[\d,]*\.?\d+)\s*(?<suffix>[kmb])?$/i.exec(raw.trim())
 
   if (!m) {
     return NaN
   }
 
-  return Number(m[1]!.replace(/,/g, '')) * (m[2] ? SUFFIX[m[2].toLowerCase()]! : 1)
+  // A match always has its digits; the suffix, when there, is one of SUFFIX's keys.
+  const { digits = '', suffix } = m.groups ?? {}
+
+  return Number(digits.replace(/,/g, '')) * (suffix ? (SUFFIX[suffix.toLowerCase()] ?? 1) : 1)
 }
 
 /** 132196 → `132K`, 800000 → `800K`, 8_000_000 → `8M`, 950 → `950`. */
@@ -62,12 +65,12 @@ function limits(inline: string): RateLimit[] {
   const out: RateLimit[] = []
 
   for (const part of inline.split('|')) {
-    const m = /^\s*([A-Za-z]+):\s*([\d.,]+\s*[kmb]?)\s*\/\s*([\d.,]+\s*[kmb]?)(?:\s*\(resets?\s+(.+?)\))?\s*$/i.exec(part)
-    const left = m ? parseCount(m[2]!) : NaN
-    const limit = m ? parseCount(m[3]!) : NaN
+    const m = /^\s*(?<name>[A-Za-z]+):\s*(?<left>[\d.,]+\s*[kmb]?)\s*\/\s*(?<limit>[\d.,]+\s*[kmb]?)(?:\s*\(resets?\s+(?<reset>.+?)\))?\s*$/i.exec(part)?.groups
+    const left = m ? parseCount(m['left'] ?? '') : NaN
+    const limit = m ? parseCount(m['limit'] ?? '') : NaN
 
     if (m && Number.isFinite(left) && limit > 0) {
-      out.push({ left, limit, name: m[1]!.toUpperCase(), reset: m[4] })
+      out.push({ left, limit, name: (m['name'] ?? '').toUpperCase(), reset: m['reset'] })
     }
   }
 
@@ -75,16 +78,16 @@ function limits(inline: string): RateLimit[] {
 }
 
 function pair(line: string): Pair | undefined {
-  const m = /^\s*([^:]{1,40}):\s+(.+?)\s*$/.exec(line)
+  const m = /^\s*(?<key>[^:]{1,40}):\s+(?<value>.+?)\s*$/.exec(line)?.groups
 
-  return m ? { key: m[1]!, value: m[2]!.replace(/^`(.*)`$/, '$1') } : undefined
+  return m ? { key: m['key'] ?? '', value: (m['value'] ?? '').replace(/^`(.*)`$/, '$1') } : undefined
 }
 
 function crumb(line: string): Crumb | undefined {
-  const m = /^\s*[•\-*]\s*(.+?):\s*(~?[\d.,]+\s*[kmb]?)(?:\s*\(~?(\d+(?:\.\d+)?)%\))?\s*$/i.exec(line)
-  const tokens = m ? parseCount(m[2]!) : NaN
+  const m = /^\s*[•\-*]\s*(?<label>.+?):\s*(?<tokens>~?[\d.,]+\s*[kmb]?)(?:\s*\(~?(?<pct>\d+(?:\.\d+)?)%\))?\s*$/i.exec(line)?.groups
+  const tokens = m ? parseCount(m['tokens'] ?? '') : NaN
 
-  return m && Number.isFinite(tokens) ? { label: m[1]!, pct: m[3] ? Number(m[3]) : undefined, tokens } : undefined
+  return m && Number.isFinite(tokens) ? { label: m['label'] ?? '', pct: m['pct'] ? Number(m['pct']) : undefined, tokens } : undefined
 }
 
 function build(title: string, inline: string, body: string[]): UsageSection {
@@ -112,9 +115,9 @@ function build(title: string, inline: string, body: string[]): UsageSection {
 
     for (const l of lines) {
       const p = pair(l)
-      const c = p && /^context$/i.test(p.key) ? /^([\d.,]+\s*[kmb]?)\s*\/\s*([\d.,]+\s*[kmb]?)/i.exec(p.value) : null
-      const used = c ? parseCount(c[1]!) : NaN
-      const max = c ? parseCount(c[2]!) : NaN
+      const c = p && /^context$/i.test(p.key) ? /^(?<used>[\d.,]+\s*[kmb]?)\s*\/\s*(?<max>[\d.,]+\s*[kmb]?)/i.exec(p.value)?.groups : undefined
+      const used = c ? parseCount(c['used'] ?? '') : NaN
+      const max = c ? parseCount(c['max'] ?? '') : NaN
 
       if (Number.isFinite(used) && max > 0) {
         context = { max, used }
@@ -167,7 +170,7 @@ export function parseUsage(raw: string): UsageSection[] | null {
 
     if (h) {
       flush()
-      head = { body: [], inline: h[2]!.trim(), title: h[1]! }
+      head = { body: [], inline: (h.groups?.['inline'] ?? '').trim(), title: h.groups?.['title'] ?? '' }
     } else if (head) {
       head.body.push(line)
     } else if (line.trim()) {

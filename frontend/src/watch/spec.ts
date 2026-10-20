@@ -58,10 +58,10 @@ let sidebar: string | undefined
  * isn't a Tern pane Tern's CLI can reach (over ssh, say) or the launcher named no interpreter.
  */
 function hermesSplit(env: NodeJS.ProcessEnv, vars: readonly string[], args: readonly string[]) {
-  const pane = env.TERN_PANE
-  const python = env.HERMES_PYTHON
+  const pane = env['TERN_PANE']
+  const python = env['HERMES_PYTHON']
   // The `hermes` wrapper puts its checkout on sys.path; the bare interpreter needs it said.
-  const src = env.HERMES_PYTHON_SRC_ROOT
+  const src = env['HERMES_PYTHON_SRC_ROOT']
 
   if (!pane || !python || !src) {
     return undefined
@@ -70,7 +70,7 @@ function hermesSplit(env: NodeJS.ProcessEnv, vars: readonly string[], args: read
   const command = [
     'env',
     `PYTHONPATH=${src}`,
-    ...(env.HERMES_HOME ? [`HERMES_HOME=${env.HERMES_HOME}`] : []),
+    ...(env['HERMES_HOME'] ? [`HERMES_HOME=${env['HERMES_HOME']}`] : []),
     ...vars,
     python,
     '-m',

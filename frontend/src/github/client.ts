@@ -6,6 +6,7 @@
 
 import * as z from 'zod/mini'
 
+import { optional } from '../core/assert.js'
 import { decodeJson } from '../wire/json.js'
 import { loose } from '../wire/schemas.js'
 
@@ -48,7 +49,7 @@ const graphqlUrl = (host: string) => (host === 'github.com' ? 'https://api.githu
 export function tokens(env: NodeJS.ProcessEnv = process.env): (host: string) => Promise<string> {
   return async host => {
     const own =
-      host === 'github.com' ? env.GITHUB_TOKEN || env.GH_TOKEN : env.GITHUB_ENTERPRISE_TOKEN || env.GH_ENTERPRISE_TOKEN
+      host === 'github.com' ? env['GITHUB_TOKEN'] || env['GH_TOKEN'] : env['GITHUB_ENTERPRISE_TOKEN'] || env['GH_ENTERPRISE_TOKEN']
 
     if (own) {
       return own
@@ -103,7 +104,7 @@ export function github(token = tokens()): GitHub {
       return out.data
     },
     rest(host: string, method: string, path: string, body?: unknown) {
-      return call(z.unknown(), host, `${api(host)}${path}`, { body: body === undefined ? undefined : JSON.stringify(body), method })
+      return call(z.unknown(), host, `${api(host)}${path}`, { ...optional('body', body === undefined ? undefined : JSON.stringify(body)), method })
     }
   }
 }

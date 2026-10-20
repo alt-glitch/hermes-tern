@@ -26,7 +26,7 @@ export type BodyPart = { kind: 'md'; text: string } | { kind: 'details'; summary
 const schema = {
   ...defaultSchema,
   // GitHub keeps `open` on a fold; the default schema drops it.
-  attributes: { ...defaultSchema.attributes, details: [...(defaultSchema.attributes?.details ?? []), 'open'] },
+  attributes: { ...defaultSchema.attributes, details: [...(defaultSchema.attributes?.['details'] ?? []), 'open'] },
   // Drawn as Tern's own fold and checkboxes, so the ids clobber nothing.
   clobberPrefix: ''
 }

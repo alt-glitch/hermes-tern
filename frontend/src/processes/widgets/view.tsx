@@ -6,6 +6,7 @@
 
 import { type JSX, Node, node, type NodeJson, type SpanData, type Tone } from '@stencil-hq/tern'
 
+import { optional } from '../../core/assert.js'
 import type { BackgroundProcess } from '../../model.js'
 import { PROCESS_LOOK } from '../look.js'
 
@@ -215,7 +216,7 @@ export function tile({ process: p, view }: ChartEntry): JSX.Element {
         <text
           key="dot"
           role="omp.job.tile.dot"
-          spans={[{ s: toneStyle(look.tone), t: look.glyph, ...(p.state.status === 'running' ? { fx: 'pulse' } : {}) }]}
+          spans={[{ ...optional('s', toneStyle(look.tone)), t: look.glyph, ...(p.state.status === 'running' ? { fx: 'pulse' } : {}) }]}
           wrap="none"
         />
         <text grow={1} key="title" role="omp.job.tile.title" spans={[sp(title)]} truncate="end" wrap="none" />

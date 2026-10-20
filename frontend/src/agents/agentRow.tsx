@@ -2,6 +2,7 @@
 
 import type { JSX } from '@stencil-hq/tern'
 
+import { optional } from '../core/assert.js'
 import type { Subagent } from '../model.js'
 import { age } from '../view/time.js'
 
@@ -28,37 +29,35 @@ export function agentNode(a: Subagent, now: number, solo?: Solo): JSX.Element {
     <agent
       // A click (or the context menu) opens the agent beside the chat; App handles the action.
       actions={{ click: `open-agent=${a.id}`, menu: [`open-agent=${a.id}`] }}
-      // A done row whose outcome nothing reported says so, rather than reading as a success.
-      badges={
-        a.exitReason && (a.status !== 'done' || a.exitReason === OUTCOME_UNKNOWN)
-          ? [{ text: a.exitReason.replace(/_/g, ' '), tone: 'warning' }]
-          : undefined
-      }
-      collapsed={a.summary ? true : undefined}
-      collapsible={a.summary ? true : undefined}
-      depth={a.depth || undefined}
       key={solo?.key ?? a.key}
-      model={a.model}
+      // A done row whose outcome nothing reported says so, rather than reading as a success.
+      {...(a.exitReason && (a.status !== 'done' || a.exitReason === OUTCOME_UNKNOWN)
+        ? { badges: [{ text: a.exitReason.replace(/_/g, ' '), tone: 'warning' }] }
+        : {})}
+      {...optional('collapsed', a.summary ? true : undefined)}
+      {...optional('collapsible', a.summary ? true : undefined)}
+      {...optional('depth', a.depth || undefined)}
+      {...optional('model', a.model)}
       name={solo?.name ?? agentName(a)}
-      role={solo ? 'hermes.task.solo' : undefined}
+      {...optional('role', solo ? 'hermes.task.solo' : undefined)}
       stats={{
-        requests: a.calls || undefined,
-        tokens: a.tokens || undefined,
-        tools: a.toolCount || undefined,
-        ...(running ? { age: Math.max(0, now - a.startedAt) } : { took: a.duration })
+        ...optional('requests', a.calls || undefined),
+        ...optional('tokens', a.tokens || undefined),
+        ...optional('tools', a.toolCount || undefined),
+        ...(running ? { age: Math.max(0, now - a.startedAt) } : optional('took', a.duration))
       }}
       status={status}
       task={a.goal}
       title={`Open ${solo ? 'the agent' : agentName(a)} beside the chat`}
-      tool={
-        running && a.tool
-          ? {
-              age: a.toolSince ? age(a.toolSince, a.toolSince.at, now) : undefined,
-              intent: a.toolPreview,
+      {...(running && a.tool
+        ? {
+            tool: {
+              ...optional('age', a.toolSince ? age(a.toolSince, a.toolSince.at, now) : undefined),
+              ...optional('intent', a.toolPreview),
               name: a.tool
             }
-          : undefined
-      }
+          }
+        : {})}
     >
       {a.summary ? <md key="o">{a.summary}</md> : null}
     </agent>

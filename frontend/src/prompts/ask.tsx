@@ -6,6 +6,7 @@
 import type { ServerRequest } from '@hermes/shared/json-rpc-channel'
 import type { JSX, Key } from '@stencil-hq/tern'
 
+import { optional } from '../core/assert.js'
 import { errorText } from '../core/errors.js'
 import type { Overlay, OverlayHost } from '../overlay.js'
 
@@ -52,17 +53,17 @@ export function optionList(
         }
       }}
       role="omp.ask.options"
-      selected={options[selected] ? `${id}.${options[selected].id}` : undefined}
+      {...optional('selected', options[selected] ? `${id}.${options[selected].id}` : undefined)}
     >
       {options.map(o => (
         <item
-          detail={o.detail ? [o.role === 'omp.ask.other' ? { s: 'dim', t: o.detail } : { t: o.detail }] : undefined}
-          icon={o.checked ? 'check' : undefined}
           key={o.id}
+          {...optional('detail', o.detail ? [o.role === 'omp.ask.other' ? { s: 'dim', t: o.detail } : { t: o.detail }] : undefined)}
+          {...optional('icon', o.checked ? 'check' : undefined)}
           label={[{ t: o.label }]}
           role={o.role ?? 'omp.ask.option'}
-          tone={o.checked ? 'success' : undefined}
-          value={o.recommended ? [{ s: 'accent', t: 'Recommended' }] : undefined}
+          {...optional('tone', o.checked ? 'success' : undefined)}
+          {...optional('value', o.recommended ? [{ s: 'accent', t: 'Recommended' }] : undefined)}
         />
       ))}
     </list>

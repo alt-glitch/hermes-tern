@@ -1,9 +1,9 @@
 #!/usr/bin/env node
-// The strict-error ratchet: what two flags tsconfig does not turn on yet would report, per src/
-// file. `noPropertyAccessFromIndexSignature` finds the dot reads on untyped bags (the boundary
-// parsing still to do) and `exactOptionalPropertyTypes` the optional fields set to undefined.
-// strict-ceilings.json holds each file's count; the total only goes down, so new code adds none
-// and a move may carry its count to a new file. Diagnostics in the Hermes sources (.hermes-src)
+// The strict-error ratchet: what two flags tsconfig does not turn on would report, per src/ file.
+// `noPropertyAccessFromIndexSignature` finds the dot reads on untyped bags and
+// `exactOptionalPropertyTypes` the optional fields set to undefined (docs/conventions.md, "Index
+// signatures and optional fields"). src/ has none of either: strict-ceilings.json is empty, and its
+// total only goes down, so no file may gain one. Diagnostics in the Hermes sources (.hermes-src)
 // are not ours and are skipped. `--update` lowers the ceilings after a fix.
 import { relative, resolve } from 'node:path'
 

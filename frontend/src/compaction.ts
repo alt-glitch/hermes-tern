@@ -93,7 +93,7 @@ function textOf(content: unknown): string {
 }
 
 /** The token counts in one of Hermes' compaction lines ("~182,000 tokens", "~250,000 → ~120,000 tokens"). */
-export function lineTokens(text: string): { before?: number; after?: number } {
+export function lineTokens(text: string): { before?: number | undefined; after?: number | undefined } {
   const num = (s: string) => Number(s.replace(/,/g, ''))
   const pair = /~([\d,]+)\s*→\s*~([\d,]+)\s*tok/.exec(text)
 

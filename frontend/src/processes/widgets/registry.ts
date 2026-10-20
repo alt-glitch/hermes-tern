@@ -107,7 +107,7 @@ export class OutputTap implements TextSource {
 
 export interface ChartsOptions {
   /** Writes specs; absent = fallback views only. */
-  author?: Author
+  author?: Author | undefined
   /** Where each process's rules (or the model's decline) are kept between panes. */
   memory?: ChartMemory
   /** Whether charts are on; read on every call. */

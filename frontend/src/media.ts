@@ -29,20 +29,20 @@ export function shownImage(call: ToolCall): string | undefined {
 
   const r = record(call.result)
 
-  if (r?.success === false) {
+  if (r?.['success'] === false) {
     return undefined
   }
 
   if (call.name === 'image_generate') {
     // host_image is the file on this side when the image was made inside a sandbox.
-    return str(r?.host_image) ?? str(r?.image)
+    return str(r?.['host_image']) ?? str(r?.['image'])
   }
 
   if (call.name.startsWith('browser')) {
     // browser_vision: its native-vision envelope keeps the file in `meta`; the aux-model answer at the top.
-    const summary = call.resultText ?? str(r?.text_summary) ?? ''
+    const summary = call.resultText ?? str(r?.['text_summary']) ?? ''
 
-    return str(record(r?.meta)?.screenshot_path) ?? str(r?.screenshot_path) ?? /Screenshot path: (\S+)/.exec(summary)?.[1]
+    return str(record(r?.['meta'])?.['screenshot_path']) ?? str(r?.['screenshot_path']) ?? /Screenshot path: (\S+)/.exec(summary)?.[1]
   }
 
   return undefined

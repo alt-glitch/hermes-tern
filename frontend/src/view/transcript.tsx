@@ -5,6 +5,7 @@
 
 import type { JSX } from '@stencil-hq/tern'
 
+import { optional } from '../core/assert.js'
 import type { Block, Compaction, Entry, NoticeEntry, TurnEntry, UserAttachment, UserEntry } from '../model.js'
 import { steerState } from '../transcript/messages.js'
 import { turnEndedAt } from '../transcript/turns.js'
@@ -237,7 +238,7 @@ function pieceNodes(turn: TurnEntry, blocks: readonly Block[], parent: string, c
     switch (b.kind) {
       case 'text':
         return (
-          <md key={b.id} stream={(live && b === lastText) || undefined}>
+          <md key={b.id} {...optional('stream', (live && b === lastText) || undefined)}>
             {b.text}
           </md>
         )
@@ -331,7 +332,7 @@ function usageNode(turn: TurnEntry, answer: string, cx: TranscriptContext): JSX.
 
   // Each fact its own icon and value, in a fixed order: time, tokens, cache, speed, cost.
   return (
-    <row align="center" gap="xs" key="usage" role="omp.turn.usage" title={total ? detail : undefined}>
+    <row align="center" gap="xs" key="usage" role="omp.turn.usage" {...optional('title', total ? detail : undefined)}>
       {answer ? copyButton(answer, turn.id, 'omp.turn.copy', 'Copy answer', cx) : null}
       {facts.flatMap(([key, icon, value]) => [
         <icon key={`${key}.icon`} name={icon} />,
@@ -360,7 +361,7 @@ function compactionNode(c: Compaction, key: string, id: string, now: number): JS
   const detail = facts.filter(Boolean).join(' · ')
 
   const line = (
-    <row align="center" gap="xs" key="head" role="hermes.compaction.line" title={running ? undefined : COMPACTED_TITLE}>
+    <row align="center" gap="xs" key="head" role="hermes.compaction.line" {...optional('title', running ? undefined : COMPACTED_TITLE)}>
       {running ? shimmerText({ key: 'what', text: 'Compacting context' }) : <icon key="icon" name="compaction" />}
       {running ? null : <text key="what" spans={[{ s: 'muted', t: 'Context compacted' }]} wrap="none" />}
       {running ? <elapsed age={age(c, c.startedAt, now)} format="short" key="age" /> : null}

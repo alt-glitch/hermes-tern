@@ -126,7 +126,7 @@ export class Composer {
 
     if (ev.from === ev.to && !ev.text) {
       this.#cursor = clamp(ev.cursor, this.text.length)
-      const anchor = ev.raw?.anchor
+      const anchor = ev.raw?.['anchor']
       this.#anchor = typeof anchor === 'number' && anchor !== this.cursor ? clamp(anchor, this.text.length) : undefined
 
       return

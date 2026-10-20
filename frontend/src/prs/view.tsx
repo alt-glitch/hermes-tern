@@ -9,6 +9,7 @@
 import type { JSX, Key, ScrollTo, Tone } from '@stencil-hq/tern'
 
 import { copyToClipboard } from '../clipboard.js'
+import { optional } from '../core/assert.js'
 import { errorText } from '../core/errors.js'
 import { type PrKey, prKey } from '../core/ids.js'
 import { checksSummary, failedRuns, type MergeMethod, type PullRequest } from '../github/pullRequest.js'
@@ -266,12 +267,12 @@ export class PrView {
 
     return (
       <tabs
-        active={this.#selected}
+        key="switch"
+        {...optional('active', this.#selected)}
         items={entries.map(e => ({
           id: prKey(e.ref),
           label: [{ s: prTone(e), t: '● ' }, { t: `#${e.ref.number}` }, ...(e.pr && !compact ? [{ s: 'muted', t: ` ${clip(e.pr.title, { max: 28 })}` }] : [])]
         }))}
-        key="switch"
         onSelect={ev => {
           const key = ev.item ? this.#host.prs.keyOf(ev.item) : undefined
 

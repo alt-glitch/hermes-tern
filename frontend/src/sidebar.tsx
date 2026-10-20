@@ -8,6 +8,7 @@ import type { JSX, PrefsRow } from '@stencil-hq/tern'
 import type { ChatPorts } from './app/ports.js'
 import { copyToClipboard } from './clipboard.js'
 import { launchEnv } from './config/env.js'
+import { optional } from './core/assert.js'
 import { type GitState, gitState } from './git/status.js'
 import { prKey } from './core/ids.js'
 import { checksState } from './github/pullRequest.js'
@@ -112,7 +113,7 @@ export class Sidebar {
     const branchRows: PrefsRow[] = git
       ? [
           {
-            control: git.branch ? { act: 'copy-branch', k: 'action', label: this.#copied ? 'Copied' : 'Copy' } : undefined,
+            ...optional('control', git.branch ? { act: 'copy-branch', k: 'action', label: this.#copied ? 'Copied' : 'Copy' } : undefined),
             hint: git.branch ? where : 'Detached HEAD',
             id: 'branch',
             label: git.branch ?? 'No branch'
@@ -134,7 +135,7 @@ export class Sidebar {
             : (e.error ?? 'Reading GitHub…'),
           id: `pr:${prKey(e.ref)}`,
           label: `#${e.ref.number} ${e.pr?.title ?? e.ref.repository}`,
-          warning: e.pr?.state === 'open' && e.pr.mergeable === 'conflicting' ? 'Conflicts with its base branch' : undefined
+          ...optional('warning', e.pr?.state === 'open' && e.pr.mergeable === 'conflicting' ? 'Conflicts with its base branch' : undefined)
         }))
       : [{ disabled: 'Hermes links each PR it opens; the branch’s PR shows here too.', id: 'no-prs', label: 'None yet' }]
 

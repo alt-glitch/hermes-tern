@@ -8,7 +8,7 @@ import { storedSessionId } from '../core/ids.js'
 
 import { FakeGateway, fakeTern, stubOverlay } from './fakes.js'
 
-process.env.HERMES_HOME = mkdtempSync(join(tmpdir(), 'hermes-tern-slash-'))
+process.env['HERMES_HOME'] = mkdtempSync(join(tmpdir(), 'hermes-tern-slash-'))
 
 vi.mock('../hermes/sessionIndex.js', async importOriginal => ({
   ...(await importOriginal<typeof import('../hermes/sessionIndex.js')>()),
@@ -59,10 +59,10 @@ beforeEach(() => {
     return { info: { stored_session_id: `s${created}` }, session_id: `s${created}`, subscription_id: `sub${created}` }
   })
   gw.handlers.set('session.resume', p => ({
-    info: { stored_session_id: p.session_id },
+    info: { stored_session_id: p['session_id'] },
     running: false,
-    session_id: p.session_id,
-    subscription_id: `sub-${p.session_id}`
+    session_id: p['session_id'],
+    subscription_id: `sub-${p['session_id']}`
   }))
   gw.handlers.set('commands.catalog', () => ({
     canon: { '/heartbeat': '/heartbeat', '/save': '/save', '/sessions': '/sessions', '/status': '/status', '/statusbar': '/statusbar', '/bundles': '/bundles', '/busy': '/busy', '/mouse': '/mouse' },
@@ -76,7 +76,7 @@ describe('slash name resolution', () => {
 
     await submit('/hea every 5m')
 
-    expect(gw.methods('slash.exec').map(c => c.params.command)).toEqual(['heartbeat every 5m'])
+    expect(gw.methods('slash.exec').map(c => c.params['command'])).toEqual(['heartbeat every 5m'])
   })
 
   it('says which commands an ambiguous prefix could mean, and runs none', async () => {
@@ -134,7 +134,7 @@ describe('a slash reply after a session switch', () => {
 
     await submit('/heartbeat check the build')
 
-    expect(gw.methods('prompt.submit').map(c => c.params.session_id)).toEqual(['s1'])
+    expect(gw.methods('prompt.submit').map(c => c.params['session_id'])).toEqual(['s1'])
   })
 })
 

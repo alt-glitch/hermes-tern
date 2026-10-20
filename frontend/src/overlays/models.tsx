@@ -12,6 +12,7 @@ import type { JSX, Key, KvItem, PickerColumn, PickerGroup, PickerItem, PickerSco
 import { providerDisplayNames } from '@tui/domain/providers.js'
 
 import type { ChatPorts } from '../app/ports.js'
+import { optional } from '../core/assert.js'
 import { errorText } from '../core/errors.js'
 import { setFast } from '../fast.js'
 import { modelPayload, mutateSession } from '../hermes/mutate.js'
@@ -250,7 +251,7 @@ export function openModelPicker(host: ModelsHost) {
         { count: rows.length, icon: 'list', id: ALL, label: 'All models' },
         ...providers.map(({ provider, name }) => ({
           count: provider.models?.length ?? 0,
-          dot: provider.warning ? ('warning' as const) : undefined,
+          ...optional('dot', provider.warning ? ('warning' as const) : undefined),
           group: 'Providers',
           id: `provider:${provider.slug}`,
           label: name,
@@ -270,15 +271,15 @@ export function openModelPicker(host: ModelsHost) {
             { id: 'use', keys: ['enter'], label: 'Switch', primary: true }
           ]}
           columns={columns}
-          confirm={confirm ? { act: 'confirm', label: 'Switch anyway', text: confirm.text } : undefined}
+          key={KEY}
+          {...optional('confirm', confirm ? { act: 'confirm', label: 'Switch anyway', text: confirm.text } : undefined)}
           current={current ? [current] : []}
-          empty={query ? undefined : 'No models in this scope'}
+          {...optional('empty', query ? undefined : 'No models in this scope')}
           hits={hits}
           icon="cpu"
           items={rows.map(itemOf)}
-          key={KEY}
           layout="rows"
-          message={state === 'error' ? message : undefined}
+          {...optional('message', state === 'error' ? message : undefined)}
           noun="models"
           onAction={{
             cancel: () => {
@@ -323,18 +324,18 @@ export function openModelPicker(host: ModelsHost) {
           query={query}
           scope={scope}
           scopes={scopes}
-          selected={selected}
+          {...optional('selected', selected)}
           size="lg"
           state={state}
-          strip={
-            levels.length
-              ? {
+          {...(levels.length
+            ? {
+                strip: {
                   items: levels.map(l => ({ id: l.id, label: l.label, on: l.id === effort })),
                   label: 'Effort  ⌃E',
                   selected: effort
                 }
-              : undefined
-          }
+              }
+            : {})}
           title="Models"
           total={rows.length}
         >
@@ -440,13 +441,15 @@ function itemOf(row: Row): PickerItem {
           ? [{ text: 'fast', tone: 'info' as const }]
           : [])
     ],
-    disabled: unavailable ? `${row.providerName} doesn't offer ${row.model} on this plan` : undefined,
-    facts:
+    ...optional('disabled', unavailable ? `${row.providerName} doesn't offer ${row.model} on this plan` : undefined),
+    ...optional(
+      'facts',
       price && !free && price.input
         ? { price: `${price.input}·${price.output}` }
         : free
           ? { price: 'free' }
-          : undefined,
+          : undefined
+    ),
     id: row.id,
     label: row.model,
     mono: true,

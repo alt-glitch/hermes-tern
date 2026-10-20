@@ -513,13 +513,13 @@ async function manifestLog(delegationId: string, index: number, env = process.en
     return undefined
   }
 
-  const home = env.HERMES_HOME || join(homedir(), '.hermes')
+  const home = env['HERMES_HOME'] || join(homedir(), '.hermes')
 
   for (const root of [join(home, 'delegation_cache', 'live'), join(home, 'cache', 'delegation', 'live')]) {
     try {
       const text = await readFile(join(root, delegationId, 'manifest.json'), 'utf8')
-      const tasks = record(text.replace(/^\uFEFF/, ''))?.tasks
-      const log = Array.isArray(tasks) ? record(tasks.find(t => record(t)?.index === index))?.log : undefined
+      const tasks = record(text.replace(/^\uFEFF/, ''))?.['tasks']
+      const log = Array.isArray(tasks) ? record(tasks.find(t => record(t)?.['index'] === index))?.['log'] : undefined
 
       if (typeof log === 'string' && log) {
         return log

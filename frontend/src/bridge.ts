@@ -81,7 +81,7 @@ export function appOf(name: string, args?: Record<string, unknown>): AppTool | u
   const [prefix, connector, ...tool] = name.split('__')
 
   if (prefix === 'connectors' && connector && tool.length && name !== BATCH) {
-    const alias = typeof args?.connector_alias === 'string' && args.connector_alias.trim() ? ` (${args.connector_alias.trim()})` : ''
+    const alias = typeof args?.['connector_alias'] === 'string' && args['connector_alias'].trim() ? ` (${args['connector_alias'].trim()})` : ''
 
     return { action: actionPhrase(tool.join('__'), connector) + alias, app: appTitle(connector), kind: 'connector' }
   }
@@ -93,13 +93,13 @@ export function appOf(name: string, args?: Record<string, unknown>): AppTool | u
 
 /** The calls a bridge call asks for: `{name, arguments}` or `{calls: [{name, arguments}…]}`. */
 function entriesOf(args: Record<string, unknown>): { name: string; args: Record<string, unknown> }[] {
-  const list = Array.isArray(args.calls) ? args.calls : [args]
+  const list = Array.isArray(args['calls']) ? args['calls'] : [args]
 
   return list.flatMap(e => {
     const r = record(e)
-    const name = r?.name
+    const name = r?.['name']
 
-    return typeof name === 'string' && name ? [{ args: record(r?.arguments) ?? {}, name }] : []
+    return typeof name === 'string' && name ? [{ args: record(r?.['arguments']) ?? {}, name }] : []
   })
 }
 
@@ -141,7 +141,7 @@ export function batchOf(call: Pick<ToolCall, 'via'>): NonEmpty<BatchEntry> | und
 
 /** A batch result (`{results: [{index, name, response | error}]}`) per entry, in call order. */
 export function batchResults(result: unknown): { result?: unknown; error?: string }[] | undefined {
-  const results = record(result)?.results
+  const results = record(result)?.['results']
 
   if (!Array.isArray(results)) {
     return undefined
@@ -149,11 +149,11 @@ export function batchResults(result: unknown): { result?: unknown; error?: strin
 
   return results.map(e => {
     const r = record(e) ?? {}
-    const err = r.error
+    const err = r['error']
 
     return err === undefined || err === null
-      ? { result: r.response }
-      : { error: typeof err === 'string' ? err : (String(record(err)?.message ?? '') || JSON.stringify(err)) }
+      ? { result: r['response'] }
+      : { error: typeof err === 'string' ? err : (String(record(err)?.['message'] ?? '') || JSON.stringify(err)) }
   })
 }
 

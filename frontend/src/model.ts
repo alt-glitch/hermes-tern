@@ -28,34 +28,34 @@ export interface Subagent {
   /** The row's node key, set when the row is made and never changed. */
   readonly key: SubagentKey
   /** Display name, for nested children (`Agent 2.1`); else `Agent <index + 1>`. */
-  name?: string
+  name?: string | undefined
   status: 'cancelled' | 'done' | 'failed' | 'queued' | 'running'
-  model?: string
-  tool?: string
-  toolPreview?: string
+  model?: string | undefined
+  tool?: string | undefined
+  toolPreview?: string | undefined
   /** When the current tool started; a fresh object per tool so its Tern timer is sent once. */
   toolSince?: { at: number }
   toolCount: number
   tokens: number
   calls: number
-  summary?: string
+  summary?: string | undefined
   startedAt: number
-  duration?: number
+  duration?: number | undefined
   last?: SubagentEventPayload
   /** The dispatching delegation's id. */
-  delegationId?: string
+  delegationId?: string | undefined
   /** Nesting below the delegating session: 0 for a child the session spawned. */
   depth?: number
   /** The subagent that spawned this one (nested delegation). */
   parentId?: string
   /** The live transcript log on this machine (`live_transcripts` of the dispatch result). */
-  logPath?: string
+  logPath?: string | undefined
   /** That log, parsed: the agent's timeline. */
   log?: LiveLog
   /** The owner takes steering text for it now (`accepting_steer`). */
-  steerable?: boolean
+  steerable?: boolean | undefined
   /** Why it ended, when the log says (max_iterations, …) or its error. */
-  exitReason?: string
+  exitReason?: string | undefined
 }
 
 /** A tracked background process (`terminal(background=true)`), as `process.list` last reported it. */
@@ -72,7 +72,7 @@ export interface BackgroundProcess {
   /** The last non-empty output line, plain text. */
   lastLine: string
   /** Its live chart (processes/widgets): kept by the store, the same object while it does not change. */
-  chart?: ChartView
+  chart?: ChartView | undefined
 }
 
 /**
@@ -115,22 +115,22 @@ export interface ToolCall {
   /** Running, else how it ended; replaced whole when it changes (the call stays the same object). */
   outcome: ToolOutcome
   startedAt: number
-  resultText?: string
+  resultText?: string | undefined
   result?: unknown
   /** A unified diff of the files the call changed. */
-  diff?: string
+  diff?: string | undefined
   todos?: Todo[]
   /** A todo call's list as the call found it: what its step line says it changed. */
-  todosBefore?: Todo[]
+  todosBefore?: Todo[] | undefined
   subagents?: Subagent[]
   /** The background process a `terminal(background=true)` call started (or a `process` call watches), while the store follows it. */
   process?: BackgroundProcess
   /** How it was called: directly, or through Tool Search's `tool_call` bridge (one tool, or a batch). */
   via: Via
   /** A no-card `manage_connections` call's card: its apps, their states kept current by the app's poll. */
-  connect?: ConnectCard
+  connect?: ConnectCard | undefined
   /** The image it showed (media.ts), once a URL's bytes arrived; null when they could not be fetched. */
-  image?: ImageSource | null
+  image?: ImageSource | null | undefined
 }
 
 /** A part of an assistant turn, in the order it streamed. */
@@ -155,9 +155,9 @@ export interface Compaction {
   /** Epoch ms; a stored one knows only when its summary was written. */
   startedAt: number
   /** Context tokens before, as Hermes' lines say. */
-  before?: number
+  before?: number | undefined
   /** /compress ran it, not Hermes on its own. */
-  manual?: boolean
+  manual?: boolean | undefined
 }
 
 /**
@@ -197,7 +197,7 @@ export interface TurnEntry {
   kind: 'turn'
   id: EntryId
   /** Why a turn with no prompt of its own started ("Subagents finished"): Hermes went on by itself. */
-  continued?: string
+  continued?: string | undefined
   /** Bumped on every change to the turn, so views rebuild only the turns that changed. */
   rev: number
   blocks: Block[]
@@ -206,14 +206,14 @@ export interface TurnEntry {
   end: TurnEnd
   usage?: Usage
   /** The session's cumulative counters when the turn began (from `session.usage` ticks). */
-  countersAtStart?: Counters
+  countersAtStart?: Counters | undefined
   /** This turn's share of prompt tokens read from the provider's cache, in percent. */
-  cacheHit?: number
+  cacheHit?: number | undefined
   /** Tokens this turn used, from the ticks (message.complete does not always carry usage). */
-  tickTokens?: number
+  tickTokens?: number | undefined
   /** Output tokens per second over the recent model calls, at the turn's last tick. */
-  tps?: number
-  warning?: string
+  tps?: number | undefined
+  warning?: string | undefined
 }
 
 /**
@@ -225,7 +225,7 @@ export interface TurnEntry {
 export type TurnEnd =
   | { status: 'live' }
   | { status: 'done' | 'interrupted'; endedAt?: number }
-  | { status: 'error'; endedAt?: number; error?: string; code?: string; hint?: string }
+  | { status: 'error'; endedAt?: number; error?: string | undefined; code?: string | undefined; hint?: string | undefined }
 
 /** A session's cumulative token counters, as `session.usage` ticks report them. */
 export interface Counters {

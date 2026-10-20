@@ -67,16 +67,16 @@ export function paletteFor(mode: ThemeMode, skin: HermesSkin | undefined): Palet
 function resolve(skin: HermesSkin, polarity: 'dark' | 'light'): ThemeColors {
   const light = polarity === 'light'
   const colors = { ...skin.colors, ...(light ? skin.light_colors : skin.dark_colors) }
-  const saved = process.env.HERMES_TUI_LIGHT
-  process.env.HERMES_TUI_LIGHT = light ? '1' : '0'
+  const saved = process.env['HERMES_TUI_LIGHT']
+  process.env['HERMES_TUI_LIGHT'] = light ? '1' : '0'
 
   try {
     return fromSkin(colors, skin.branding ?? {}).color
   } finally {
     if (saved === undefined) {
-      delete process.env.HERMES_TUI_LIGHT
+      delete process.env['HERMES_TUI_LIGHT']
     } else {
-      process.env.HERMES_TUI_LIGHT = saved
+      process.env['HERMES_TUI_LIGHT'] = saved
     }
   }
 }

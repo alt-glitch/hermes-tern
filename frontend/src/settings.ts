@@ -20,7 +20,7 @@ export interface Settings {
 }
 
 export function settingsFile(env: NodeJS.ProcessEnv = process.env): string {
-  return join(env.HERMES_HOME || join(homedir(), '.hermes'), 'hermes-tern', 'settings.json')
+  return join(env['HERMES_HOME'] || join(homedir(), '.hermes'), 'hermes-tern', 'settings.json')
 }
 
 /** The settings in `file`; a setting it does not hold, or holds as the wrong type, is unset (its default). */

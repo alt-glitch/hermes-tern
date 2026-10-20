@@ -3,6 +3,7 @@
 import type { JSX } from '@stencil-hq/tern'
 
 import { langOf } from '../../../code/lang.js'
+import { optional } from '../../../core/assert.js'
 import type { ToolCall } from '../../../model.js'
 import type { SearchDetail } from '../../../tools/search.js'
 import { plural } from '../../format.js'
@@ -38,7 +39,7 @@ function searchCard(call: ToolCall, d: SearchDetail): Card {
         const slash = f.lastIndexOf('/')
 
         return (
-          <row key={`f${i}`} role="omp.tool.file" title={slash > 0 ? f.slice(0, slash + 1) : undefined}>
+          <row key={`f${i}`} role="omp.tool.file" {...optional('title', slash > 0 ? f.slice(0, slash + 1) : undefined)}>
             <text key="p" spans={[{ s: 'path', t: slash > 0 ? f.slice(slash + 1) : f }]} />
           </row>
         )
@@ -90,7 +91,7 @@ function searchCard(call: ToolCall, d: SearchDetail): Card {
       body.push(
         <code
           key={`${f}.c${runIndex++}`}
-          lang={langOf(path)}
+          {...optional('lang', langOf(path))}
           marks={run.map(h => ({ line: h.line, tone: 'accent' }))}
           numbers
           start={start}

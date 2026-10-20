@@ -131,19 +131,19 @@ export function history({ kept, messages, compactions, id }: HistorySource): Ent
 
       // Hermes' own row closing a failed turn: the turn's error card, not the agent's answer.
       if (m.display_kind === 'failed_turn') {
-        const surface = record(meta?.error_surface)
-        const error = str(meta?.error) ?? str(surface?.message)
+        const surface = record(meta?.['error_surface'])
+        const error = str(meta?.['error']) ?? str(surface?.['message'])
         // A row with no error keeps the one an earlier row of the turn gave.
-        const card = error ? failure(error, surface?.code) : turn.end.status === 'error' ? turn.end : {}
+        const card = error ? failure(error, surface?.['code']) : turn.end.status === 'error' ? turn.end : {}
         endTurn(turn, { ...card, hint: text.trim() || undefined, status: 'error' })
 
         continue
       }
 
       // The commentary projection: interim messages apart, and a reply with raw commentary cleaned.
-      const reply = typeof m.display_content === 'string' ? m.display_content : text
-      const notes = Array.isArray(m.display_commentary)
-        ? m.display_commentary.filter((n): n is string => typeof n === 'string' && Boolean(n.trim()))
+      const reply = typeof m['display_content'] === 'string' ? m['display_content'] : text
+      const notes = Array.isArray(m['display_commentary'])
+        ? m['display_commentary'].filter((n): n is string => typeof n === 'string' && Boolean(n.trim()))
         : []
       const flat = (s: string) => s.replace(/\s+/g, ' ').trim()
 
@@ -157,7 +157,7 @@ export function history({ kept, messages, compactions, id }: HistorySource): Ent
       }
 
       // A reply the user stopped halfway is stored as far as it got.
-      if (meta?.interrupted === true) {
+      if (meta?.['interrupted'] === true) {
         endTurn(turn, { status: 'interrupted' })
       }
     } else if (m.role === 'tool') {
@@ -166,7 +166,7 @@ export function history({ kept, messages, compactions, id }: HistorySource): Ent
       // History keeps the result only for edit tools (`content`, JSON); the rest come back bare.
       const result = typeof m.content === 'string' && m.content ? m.content : undefined
       // The edit preview the live call showed (tool.complete's inline_diff), kept on the row.
-      const diff = str(record(record(m.display_metadata)?.tool_result_metadata)?.inline_diff)
+      const diff = str(record(record(m.display_metadata)?.['tool_result_metadata'])?.['inline_diff'])
       const existing = calls.get(callId)
 
       if (existing) {
@@ -197,14 +197,14 @@ export function history({ kept, messages, compactions, id }: HistorySource): Ent
         via: u.via
       }
 
-      call.outcome = { duration: 0, kind: (settleBridge(call) ?? Boolean(record(call.result)?.error)) ? 'error' : 'done' }
+      call.outcome = { duration: 0, kind: (settleBridge(call) ?? Boolean(record(call.result)?.['error'])) ? 'error' : 'done' }
 
       if (isTodoName(call.name)) {
         call.todosBefore = todos
       }
 
       // History drops todo results: the list is the stored args, a merge patching the one before.
-      if (Array.isArray(args.todos)) {
+      if (Array.isArray(args['todos'])) {
         call.todos = todosOf(args, todos)
         todos = call.todos
       }
@@ -241,11 +241,11 @@ const str = (v: unknown): string | undefined => (typeof v === 'string' && v.trim
  * `display_reasoning` (commentary taken out), else whichever field the provider kept it in.
  */
 function storedThought(m: TranscriptMessage): string {
-  if (typeof m.display_reasoning === 'string') {
-    return detailsText(m.display_reasoning)
+  if (typeof m['display_reasoning'] === 'string') {
+    return detailsText(m['display_reasoning'])
   }
 
-  return str(m.reasoning) ?? str(m.reasoning_content) ?? detailsText(m.reasoning_details)
+  return str(m.reasoning) ?? str(m['reasoning_content']) ?? detailsText(m['reasoning_details'])
 }
 
 /**
@@ -274,15 +274,15 @@ function detailsText(details: unknown): string {
   for (const block of Array.isArray(blocks) ? blocks : [blocks]) {
     const r = typeof block === 'string' ? { text: block } : record(block)
 
-    if (!r || r.type === 'reasoning.encrypted') {
+    if (!r || r['type'] === 'reasoning.encrypted') {
       continue
     }
 
     // OpenAI Responses keeps a summary as parts ({type: 'summary_text', text}).
-    const summary = Array.isArray(r.summary)
-      ? r.summary.map(s => (typeof s === 'string' ? s : (str(record(s)?.text) ?? ''))).join('\n\n')
-      : r.summary
-    const text = [summary, r.thinking, r.content, r.text].map(str).find(Boolean)?.trim()
+    const summary = Array.isArray(r['summary'])
+      ? r['summary'].map(s => (typeof s === 'string' ? s : (str(record(s)?.['text']) ?? ''))).join('\n\n')
+      : r['summary']
+    const text = [summary, r['thinking'], r['content'], r['text']].map(str).find(Boolean)?.trim()
 
     if (text && !out.includes(text)) {
       out.push(text)

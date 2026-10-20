@@ -320,7 +320,7 @@ describe('job chart views', () => {
     expect(card.k).toBe('col')
     const tiles = card.c![0]!
     expect(tiles.p).toMatchObject({ role: 'omp.job.tiles' })
-    expect(tiles.c!.map(t => t.p?.role)).toEqual(['omp.job.tile', 'omp.job.tile'])
+    expect(tiles.c!.map(t => t.p?.['role'])).toEqual(['omp.job.tile', 'omp.job.tile'])
     expect(JSON.stringify(tiles.c![0])).toContain('omp.job.tile.chart')
     expect(JSON.stringify(tiles.c![1])).toContain('omp.job.tile.lead')
   })

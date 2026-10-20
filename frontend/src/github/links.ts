@@ -20,17 +20,17 @@ import type { PrRef } from './pullRequest.js'
 export const LINK_TOOLS = new Set(['link_pull_request', 'list_pull_requests', 'unlink_pull_request'])
 
 export function linksPath(env: NodeJS.ProcessEnv = process.env): string {
-  return join(env.HERMES_HOME || join(homedir(), '.hermes'), 'plugin-data', 'hermes-tern', 'pull-requests.json')
+  return join(env['HERMES_HOME'] || join(homedir(), '.hermes'), 'plugin-data', 'hermes-tern', 'pull-requests.json')
 }
 
 function refOf(v: unknown): PrRef | undefined {
   const r = record(v)
-  const host = typeof r?.host === 'string' ? r.host : ''
-  const repository = typeof r?.repository === 'string' ? r.repository : ''
-  const number = typeof r?.number === 'number' ? r.number : 0
+  const host = typeof r?.['host'] === 'string' ? r['host'] : ''
+  const repository = typeof r?.['repository'] === 'string' ? r['repository'] : ''
+  const number = typeof r?.['number'] === 'number' ? r['number'] : 0
 
   return host && repository && number > 0
-    ? { host, number, repository, url: typeof r?.url === 'string' ? r.url : `https://${host}/${repository}/pull/${number}` }
+    ? { host, number, repository, url: typeof r?.['url'] === 'string' ? r['url'] : `https://${host}/${repository}/pull/${number}` }
     : undefined
 }
 
@@ -40,7 +40,7 @@ export function linkedFromResult(call: Pick<ToolCall, 'name' | 'outcome' | 'resu
     return undefined
   }
 
-  const linked = record(call.result)?.linked
+  const linked = record(call.result)?.['linked']
 
   return Array.isArray(linked) ? linked.map(refOf).filter((r): r is PrRef => Boolean(r)) : undefined
 }
