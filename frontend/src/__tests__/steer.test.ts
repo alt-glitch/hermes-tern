@@ -4,6 +4,7 @@ import { entryId } from '../core/ids.js'
 import type { TurnEntry } from '../model.js'
 import { Transcript } from '../transcript.js'
 import { steerState, steerText } from '../transcript/messages.js'
+import { turnEndedAt } from '../transcript/turns.js'
 
 import { must } from './fakes.js'
 
@@ -24,11 +25,11 @@ describe('steers', () => {
   })
 
   it('reads as landed once the turn goes on, and as the next prompt when the turn ended first', () => {
-    const turn: TurnEntry = { blocks: [{ at: 0, id: entryId('s'), kind: 'steer', text: 'x' }], id: entryId('t'), kind: 'turn', rev: 0, startedAt: 0, status: 'live' }
+    const turn: TurnEntry = { blocks: [{ at: 0, id: entryId('s'), kind: 'steer', text: 'x' }], end: { status: 'live' }, id: entryId('t'), kind: 'turn', rev: 0, startedAt: 0 }
     expect(steerState(turn, 0)).toBe('pending')
     turn.blocks.push({ id: entryId('x'), kind: 'text', text: 'ok' })
     expect(steerState(turn, 0)).toBe('landed')
-    expect(steerState({ ...turn, blocks: turn.blocks.slice(0, 1), status: 'done' }, 0)).toBe('next')
+    expect(steerState({ ...turn, blocks: turn.blocks.slice(0, 1), end: { status: 'done' } }, 0)).toBe('next')
   })
 
   it("keeps a stored steer inside its turn on resume, without Hermes' marker", () => {
@@ -102,7 +103,7 @@ describe('stored history as the display projection sends it', () => {
 
     const turn = must(t.entries.find(e => e.kind === 'turn'))
     expect(turn.startedAt).toBe(10_000)
-    expect(turn.endedAt).toBe(50_000)
+    expect(turn.kind === 'turn' && turnEndedAt(turn)).toBe(50_000)
   })
 
   it("drops a notice's reason when its reply was hidden and the user asked next", () => {

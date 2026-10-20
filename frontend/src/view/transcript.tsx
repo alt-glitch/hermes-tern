@@ -7,6 +7,7 @@ import type { JSX } from '@stencil-hq/tern'
 
 import type { Block, Compaction, Entry, NoticeEntry, TurnEntry, UserAttachment, UserEntry } from '../model.js'
 import { steerState } from '../transcript/messages.js'
+import { turnEndedAt } from '../transcript/turns.js'
 import { parts, pieces } from '../workLog.js'
 
 import { duration } from './format.js'
@@ -132,7 +133,7 @@ function attachmentsRow(list: readonly UserAttachment[]): JSX.Element {
 }
 
 function turnNode(turn: TurnEntry, id: string, cx: TranscriptContext): JSX.Element {
-  const live = turn.status === 'live'
+  const live = turn.end.status === 'live'
   const children: (JSX.Element | null)[] = []
 
   // A turn Hermes started by itself gets a quiet line saying why, so it does not read as part
@@ -164,26 +165,28 @@ function turnNode(turn: TurnEntry, id: string, cx: TranscriptContext): JSX.Eleme
 
   // t3code: once the newest step failed, its group stops shining and "Thinking" carries the turn.
   // A running compaction is its own live line.
-  const compacting = last?.kind === 'block' && last.block.kind === 'compaction' && last.block.compaction.status === 'running'
+  const compacting = last?.kind === 'block' && last.block.kind === 'compaction' && last.block.compaction.state.status === 'running'
 
   if (live && !compacting && (!last || (last.kind === 'block' && last.block.kind !== 'text') || (last.kind === 'work' && latestFailed(last.items)))) {
     children.push(thinkingRow())
   }
 
-  if (turn.status === 'error') {
+  const end = turn.end
+
+  if (end.status === 'error') {
     children.push(
       headedCard({
         body: [
           // A failed turn reloaded from an older store knows only Hermes' advice, not the error.
-          turn.error ? (
-            <text key="message" lines={8} role="omp.error.message" spans={[{ s: 'mono', t: turn.error }]} wrap="word" />
+          end.error ? (
+            <text key="message" lines={8} role="omp.error.message" spans={[{ s: 'mono', t: end.error }]} wrap="word" />
           ) : null,
-          turn.errorHint ? <md key="hint">{turn.errorHint}</md> : null
+          end.hint ? <md key="hint">{end.hint}</md> : null
         ],
         head: (
           <row gap="sm" key="head">
             <text key="title" spans={[{ s: 'error strong', t: 'Request failed' }]} />
-            {turn.errorCode ? <badge key="code" role="omp.error.code" text={turn.errorCode} tone="error" /> : null}
+            {end.code ? <badge key="code" role="omp.error.code" text={end.code} tone="error" /> : null}
           </row>
         ),
         id: `${id}.error`,
@@ -192,7 +195,7 @@ function turnNode(turn: TurnEntry, id: string, cx: TranscriptContext): JSX.Eleme
         tone: 'error'
       })
     )
-  } else if (turn.status === 'interrupted') {
+  } else if (end.status === 'interrupted') {
     children.push(
       <text key="abort" role="omp.assistant.abort" spans={[{ s: 'error', t: 'Interrupted' }]} wrap="word" />
     )
@@ -204,7 +207,7 @@ function turnNode(turn: TurnEntry, id: string, cx: TranscriptContext): JSX.Eleme
 
   const answer = answerText(turn)
 
-  if (!live && turn.endedAt && (answer || turn.usage?.total || turn.tickTokens)) {
+  if (!live && turnEndedAt(turn) && (answer || turn.usage?.total || turn.tickTokens)) {
     children.push(usageNode(turn, answer, cx))
   }
 
@@ -220,7 +223,7 @@ function turnNode(turn: TurnEntry, id: string, cx: TranscriptContext): JSX.Eleme
  * the work between them grouped. While the turn runs, its last group is the live line.
  */
 function pieceNodes(turn: TurnEntry, blocks: readonly Block[], parent: string, cx: TranscriptContext): (JSX.Element | null)[] {
-  const live = turn.status === 'live'
+  const live = turn.end.status === 'live'
   const ps = pieces(blocks, turn.blocks)
   const lastText = blocks.findLast(b => b.kind === 'text')
 
@@ -301,7 +304,7 @@ export function answerText(turn: TurnEntry): string {
 
 function usageNode(turn: TurnEntry, answer: string, cx: TranscriptContext): JSX.Element {
   const u = turn.usage ?? {}
-  const ms = (turn.endedAt ?? turn.startedAt) - turn.startedAt
+  const ms = (turnEndedAt(turn) ?? turn.startedAt) - turn.startedAt
   const input = u.input ?? u.prompt ?? 0
   const output = u.output ?? u.completion ?? 0
   const total = u.total || input + output || turn.tickTokens || 0
@@ -347,12 +350,13 @@ const COMPACTED_TITLE =
  * opens the summary the agent goes on from.
  */
 function compactionNode(c: Compaction, key: string, id: string, now: number): JSX.Element {
-  const running = c.status === 'running'
-  const tokens = c.before && c.after ? `${compact(c.before)} → ${compact(c.after)} tokens` : c.before ? `${compact(c.before)} tokens` : ''
-  const took = c.endedAt && c.endedAt - c.startedAt >= 1000 ? duration(c.endedAt - c.startedAt) : ''
-  const facts = running
+  const done = c.state.status === 'done' ? c.state : undefined
+  const running = !done
+  const tokens = c.before && done?.after ? `${compact(c.before)} → ${compact(done.after)} tokens` : c.before ? `${compact(c.before)} tokens` : ''
+  const took = done?.endedAt && done.endedAt - c.startedAt >= 1000 ? duration(done.endedAt - c.startedAt) : ''
+  const facts = !done
     ? [tokens]
-    : [tokens, c.messages ? `${c.messages.toLocaleString()} messages summarized` : '', took, c.manual ? '/compress' : '']
+    : [tokens, done.messages ? `${done.messages.toLocaleString()} messages summarized` : '', took, c.manual ? '/compress' : '']
   const detail = facts.filter(Boolean).join(' · ')
 
   const line = (
@@ -364,7 +368,7 @@ function compactionNode(c: Compaction, key: string, id: string, now: number): JS
     </row>
   )
 
-  if (running || !c.summary) {
+  if (!done?.summary) {
     return (
       <col key={key} role="hermes.compaction">
         {line}
@@ -375,7 +379,7 @@ function compactionNode(c: Compaction, key: string, id: string, now: number): JS
   return foldSection({
     body: [
       <text key="lead" role="hermes.compaction.lead" spans={[{ s: 'dim', t: 'The summary the agent goes on from:' }]} wrap="word" />,
-      <md key="summary">{c.summary}</md>
+      <md key="summary">{done.summary}</md>
     ],
     head: line,
     id,

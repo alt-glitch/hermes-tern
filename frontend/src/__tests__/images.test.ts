@@ -251,7 +251,7 @@ describe('image cards', () => {
       { call: img, id: entryId('b2'), kind: 'tool' as const },
       { id: entryId('b3'), kind: 'text' as const, text: 'Here it is.' }
     ]
-    const turn: TurnEntry = { blocks, endedAt: 9, id: entryId('t'), kind: 'turn', rev: 0, startedAt: 0, status: 'done' }
+    const turn: TurnEntry = { blocks, end: { endedAt: 9, status: 'done' }, id: entryId('t'), kind: 'turn', rev: 0, startedAt: 0 }
 
     expect(ownsCard(img)).toBe(true)
     expect(pieces(blocks).map(p => p.kind)).toEqual(['work', 'block', 'block'])

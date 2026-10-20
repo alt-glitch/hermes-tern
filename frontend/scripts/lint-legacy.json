@@ -21,7 +21,7 @@
   "src/__tests__/github.test.ts @typescript-eslint/no-non-null-assertion": 1,
   "src/__tests__/hermesSplit.test.ts @typescript-eslint/no-non-null-assertion": 1,
   "src/__tests__/history.test.ts @typescript-eslint/consistent-type-assertions": 5,
-  "src/__tests__/history.test.ts @typescript-eslint/no-non-null-assertion": 9,
+  "src/__tests__/history.test.ts @typescript-eslint/no-non-null-assertion": 8,
   "src/__tests__/history.test.ts no-restricted-syntax": 1,
   "src/__tests__/hud.test.ts @typescript-eslint/consistent-type-assertions": 1,
   "src/__tests__/hud.test.ts @typescript-eslint/no-unnecessary-type-assertion": 1,

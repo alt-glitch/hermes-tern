@@ -59,7 +59,7 @@ describe('resumed failed and interrupted turns', () => {
 
     const [turn] = turns(t.entries)
     expect(texts(turn!)).toEqual([])
-    expect(turn).toMatchObject({ error: 'This request is not valid.', errorCode: '400', errorHint: NOTICE, status: 'error' })
+    expect(turn?.end).toMatchObject({ code: '400', error: 'This request is not valid.', hint: NOTICE, status: 'error' })
   })
 
   it('keeps a boundary without metadata as the failure advice alone, said once', () => {
@@ -69,8 +69,8 @@ describe('resumed failed and interrupted turns', () => {
     ])
 
     const [turn] = turns(t.entries)
-    expect(turn).toMatchObject({ errorHint: NOTICE, status: 'error' })
-    expect(turn!.error).toBeUndefined()
+    expect(turn?.end).toMatchObject({ hint: NOTICE, status: 'error' })
+    expect(turn?.end.status === 'error' && turn.end.error).toBeUndefined()
 
     const n = tree(entryNode(turn!, `main.${turn!.id}`, cx))
     expect(roles(n)).toContain('omp.error')
@@ -85,7 +85,7 @@ describe('resumed failed and interrupted turns', () => {
     ])
 
     const [turn] = turns(t.entries)
-    expect(turn!.status).toBe('interrupted')
+    expect(turn!.end.status).toBe('interrupted')
     expect(texts(turn!)).toEqual(['Here is the start'])
   })
 })

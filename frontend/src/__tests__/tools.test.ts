@@ -169,7 +169,7 @@ describe('a card that throws', () => {
       { call: broken('c5'), id: entryId('b2'), kind: 'tool' as const },
       { id: entryId('b3'), kind: 'text' as const, text: 'Done.' }
     ]
-    const turn: TurnEntry = { blocks, endedAt: 9, id: entryId('t'), kind: 'turn', rev: 0, startedAt: 0, status: 'done' }
+    const turn: TurnEntry = { blocks, end: { endedAt: 9, status: 'done' }, id: entryId('t'), kind: 'turn', rev: 0, startedAt: 0 }
     const cx: TranscriptContext = { copy: () => undefined, now: 9, welcome: { tip: '', version: '' } }
 
     const n = tree(entryNode(turn, 'main.t', cx))

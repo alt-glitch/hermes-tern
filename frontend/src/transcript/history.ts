@@ -6,13 +6,14 @@ import type { TranscriptMessage } from '@hermes/shared/gateway-events'
 
 import { settleBridge, unwrap } from '../bridge.js'
 import { type EntryId, type ToolCallId, toolCallId } from '../core/ids.js'
-import type { Entry, Todo, ToolCall, TurnEntry, UserEntry } from '../model.js'
+import type { Entry, Todo, ToolCall, TurnEnd, TurnEntry, UserEntry } from '../model.js'
 import { promptAttachments, splitPrompt } from '../promptRefs.js'
 import { parseJson, record } from '../wire/json.js'
 import { isTodoName } from './calls.js'
 import type { RestoredCompaction } from './compactions.js'
 import { continuation, displayNotice, failure, internalNotice, passable, steerText, userEntry } from './messages.js'
 import { todosOf } from './todos.js'
+import { turnEndedAt } from './turns.js'
 
 /** What a reload reads. */
 export interface HistorySource {
@@ -107,15 +108,17 @@ export function history({ kept, messages, compactions, id }: HistorySource): Ent
 
     if (!turn) {
       const continued = pendingContinued ?? continuation(entries.findLast(passable))
-      turn = { blocks: [], continued, id: id('t'), kind: 'turn', rev: 0, startedAt: promptAt || at, status: 'done' }
+      turn = { blocks: [], continued, end: { status: 'done' }, id: id('t'), kind: 'turn', rev: 0, startedAt: promptAt || at }
       pendingContinued = undefined
       promptAt = 0
       entries.push(turn)
     }
 
     // The turn ended with its last stored row (the footer and the fold's duration read it).
-    if (at > 0) {
-      turn.endedAt = Math.max(turn.endedAt ?? at, at)
+    const end = turn.end
+
+    if (at > 0 && end.status !== 'live') {
+      turn.end = { ...end, endedAt: Math.max(end.endedAt ?? at, at) }
     }
 
     if (m.role === 'assistant') {
@@ -130,9 +133,9 @@ export function history({ kept, messages, compactions, id }: HistorySource): Ent
       if (m.display_kind === 'failed_turn') {
         const surface = record(meta?.error_surface)
         const error = str(meta?.error) ?? str(surface?.message)
-        turn.status = 'error'
-        Object.assign(turn, error ? failure(error, surface?.code) : {})
-        turn.errorHint = text.trim() || undefined
+        // A row with no error keeps the one an earlier row of the turn gave.
+        const card = error ? failure(error, surface?.code) : turn.end.status === 'error' ? turn.end : {}
+        endTurn(turn, { ...card, hint: text.trim() || undefined, status: 'error' })
 
         continue
       }
@@ -155,7 +158,7 @@ export function history({ kept, messages, compactions, id }: HistorySource): Ent
 
       // A reply the user stopped halfway is stored as far as it got.
       if (meta?.interrupted === true) {
-        turn.status = 'interrupted'
+        endTurn(turn, { status: 'interrupted' })
       }
     } else if (m.role === 'tool') {
       // A stored row with no call id gets an entry id in its place, unique in this transcript.
@@ -222,6 +225,13 @@ export function storedUser(id: EntryId, raw: string, at: number): UserEntry {
   const parts = splitPrompt(raw)
 
   return userEntry(id, { at, attachments: promptAttachments(parts), text: parts.text })
+}
+
+/** Ends stored turn `turn` as `end`, still at the time its rows gave so far (if any). */
+function endTurn(turn: TurnEntry, end: Exclude<TurnEnd, { status: 'live' }>) {
+  const at = turnEndedAt(turn)
+
+  turn.end = at === undefined ? end : { ...end, endedAt: at }
 }
 
 const str = (v: unknown): string | undefined => (typeof v === 'string' && v.trim() ? v : undefined)

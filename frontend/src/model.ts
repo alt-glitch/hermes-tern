@@ -140,20 +140,25 @@ export type Block =
  * summary from then on; the turns before it stay in the transcript for the user.
  */
 export interface Compaction {
-  status: 'done' | 'running'
+  /** Running, else done with what it left; replaced or filled in place (the compaction stays the same object). */
+  state: CompactionState
   /** Epoch ms; a stored one knows only when its summary was written. */
   startedAt: number
-  endedAt?: number
-  /** Context tokens before and after, as Hermes' lines and the next context reading say. */
+  /** Context tokens before, as Hermes' lines say. */
   before?: number
-  after?: number
-  /** How many messages it summarized. */
-  messages?: number
-  /** The summary the agent goes on from, without the handoff's instructions to the model. */
-  summary?: string
   /** /compress ran it, not Hermes on its own. */
   manual?: boolean
 }
+
+/**
+ * Where a compaction stands. A done one knows when it ended (a stored one does not), and later
+ * what it left: the context tokens after it (the owner's count or the next context reading), and
+ * from the store the messages it summarized and the summary the agent goes on from (without the
+ * handoff's instructions to the model).
+ */
+export type CompactionState =
+  | { status: 'running' }
+  | { status: 'done'; endedAt?: number; after?: number; messages?: number; summary?: string }
 
 /** An image an `image` node shows: a file Tern reads, or bytes sent once as a blob. */
 export type ImageSource = { path: string } | { blob: string }
@@ -187,8 +192,8 @@ export interface TurnEntry {
   rev: number
   blocks: Block[]
   startedAt: number
-  endedAt?: number
-  status: 'done' | 'error' | 'interrupted' | 'live'
+  /** Live while it streams, else how it ended; replaced whole when it changes (the turn stays the same object). */
+  end: TurnEnd
   usage?: Usage
   /** The session's cumulative counters when the turn began (from `session.usage` ticks). */
   countersAtStart?: Counters
@@ -198,13 +203,19 @@ export interface TurnEntry {
   tickTokens?: number
   /** Output tokens per second over the recent model calls, at the turn's last tick. */
   tps?: number
-  error?: string
-  /** The HTTP status or error code of a failed request, for the error card's badge. */
-  errorCode?: string
-  /** The gateway's advice on a failed request (what to try next). */
-  errorHint?: string
   warning?: string
 }
+
+/**
+ * How a turn stands: live while it streams, else how it ended and when (a stored turn whose rows
+ * carry no time does not know when). A failed one carries its error card: the message (a failed
+ * turn from an older store knows only the advice), the HTTP status or error code for its badge,
+ * and the gateway's advice on what to try next.
+ */
+export type TurnEnd =
+  | { status: 'live' }
+  | { status: 'done' | 'interrupted'; endedAt?: number }
+  | { status: 'error'; endedAt?: number; error?: string; code?: string; hint?: string }
 
 /** A session's cumulative token counters, as `session.usage` ticks report them. */
 export interface Counters {

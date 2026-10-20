@@ -13,7 +13,7 @@ function setup(entries: Entry[] = [], live?: TurnEntry) {
   return { compactions, entries }
 }
 
-const turn = (over: Partial<TurnEntry> = {}): TurnEntry => ({ blocks: [], id: entryId('t'), kind: 'turn', rev: 0, startedAt: 0, status: 'live', ...over })
+const turn = (over: Partial<TurnEntry> = {}): TurnEntry => ({ blocks: [], end: { status: 'live' }, id: entryId('t'), kind: 'turn', rev: 0, startedAt: 0, ...over })
 
 describe('Compactions', () => {
   it('puts a compaction between turns, before the empty live turn it was compacted for', () => {
@@ -23,7 +23,7 @@ describe('Compactions', () => {
     compactions.compacting({ at: 1_000, before: 90_000 })
 
     expect(entries.map(e => e.kind)).toEqual(['compaction', 'turn'])
-    expect(entries[0]).toMatchObject({ compaction: { before: 90_000, startedAt: 1_000, status: 'running' }, rev: 0 })
+    expect(entries[0]).toMatchObject({ compaction: { before: 90_000, startedAt: 1_000, state: { status: 'running' } }, rev: 0 })
   })
 
   it('makes it a step of a live turn that already did something, and bumps that turn', () => {
@@ -36,7 +36,7 @@ describe('Compactions', () => {
     expect(entries).toHaveLength(1)
     expect(live.blocks.map(b => b.kind)).toEqual(['text', 'compaction'])
     // A later line of the same compaction only fills in the count.
-    expect(live.blocks[1]).toMatchObject({ compaction: { before: 70_000, manual: true, status: 'running' } })
+    expect(live.blocks[1]).toMatchObject({ compaction: { before: 70_000, manual: true, state: { status: 'running' } } })
     expect(live.rev).toBe(2)
   })
 
@@ -51,7 +51,7 @@ describe('Compactions', () => {
     compactions.contextUsed(30_000)
 
     expect(entries).toEqual([
-      { compaction: { after: 20_000, before: 100_000, endedAt: 10, startedAt: 0, status: 'done' }, id: 'z0', kind: 'compaction', rev: 2 }
+      { compaction: { before: 100_000, startedAt: 0, state: { after: 20_000, endedAt: 10, status: 'done' } }, id: 'z0', kind: 'compaction', rev: 2 }
     ])
   })
 
@@ -76,8 +76,8 @@ describe('Compactions', () => {
     ])
 
     expect(restored).toEqual([
-      { at: 2_500, compaction: { endedAt: 2_000, messages: 9, startedAt: 1_000, status: 'done', summary: 'near' } },
-      { at: 60_000, compaction: { startedAt: 60_000, status: 'done', summary: 'far' } }
+      { at: 2_500, compaction: { startedAt: 1_000, state: { endedAt: 2_000, messages: 9, status: 'done', summary: 'near' } } },
+      { at: 60_000, compaction: { startedAt: 60_000, state: { status: 'done', summary: 'far' } } }
     ])
   })
 
@@ -86,7 +86,7 @@ describe('Compactions', () => {
 
     compactions.compacting({ at: 1_000 })
 
-    expect(compactions.restore([{ at: 1_500, summary: 's' }])).toEqual([{ at: 1_500, compaction: { startedAt: 1_500, status: 'done', summary: 's' } }])
+    expect(compactions.restore([{ at: 1_500, summary: 's' }])).toEqual([{ at: 1_500, compaction: { startedAt: 1_500, state: { status: 'done', summary: 's' } } }])
   })
 
   it('takes one back: an entry, or a step of the turn holding it', () => {
@@ -117,6 +117,6 @@ describe('Compactions', () => {
     compactions.forget()
 
     expect(compactions.unsummarized).toBe(false)
-    expect(compactions.restore([{ at: 2_000, summary: 's' }])).toEqual([{ at: 2_000, compaction: { startedAt: 2_000, status: 'done', summary: 's' } }])
+    expect(compactions.restore([{ at: 2_000, summary: 's' }])).toEqual([{ at: 2_000, compaction: { startedAt: 2_000, state: { status: 'done', summary: 's' } } }])
   })
 })

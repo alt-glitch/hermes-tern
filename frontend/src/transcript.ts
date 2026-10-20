@@ -231,11 +231,11 @@ export class Transcript {
       continued: this.#continued ?? continuation(this.#entries.findLast(passable)),
       // A session's first turn starts from zero; later ones from the last tick.
       countersAtStart: this.#counters ?? (this.#entries.some(e => e.kind === 'turn') ? undefined : { prompt: 0, read: 0, total: 0 }),
+      end: { status: 'live' },
       id: this.id('t'),
       kind: 'turn',
       rev: 0,
-      startedAt: at,
-      status: 'live'
+      startedAt: at
     }
     this.push(turn)
     this.#live = turn
@@ -460,7 +460,6 @@ export class Transcript {
       }
     }
 
-    turn.endedAt = at
     this.#live = undefined
     this.#ended = turn
 
@@ -470,14 +469,15 @@ export class Transcript {
     }
 
     turn.warning = p.warning ?? undefined
-    turn.status = p.status === 'error' ? 'error' : p.status === 'interrupted' ? 'interrupted' : 'done'
 
-    if (turn.status === 'error') {
+    if (p.status === 'error') {
       const surfaced = p.error_surface?.message
       const error = (typeof surfaced === 'string' && surfaced) || p.error || final || 'The request failed'
-      Object.assign(turn, failure(error, p.error_surface?.code))
       // The gateway's final text is advice ("wait and /retry, or /model …") followed by the raw error.
-      turn.errorHint = final.split(/\n\s*\n/)[0]?.trim() || undefined
+      const hint = final.split(/\n\s*\n/)[0]?.trim()
+      turn.end = { ...failure(error, p.error_surface?.code), endedAt: at, ...(hint ? { hint } : {}), status: 'error' }
+    } else {
+      turn.end = { endedAt: at, status: p.status === 'interrupted' ? 'interrupted' : 'done' }
     }
 
     turn.rev++

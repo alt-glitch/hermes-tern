@@ -9,6 +9,8 @@ import { isConnectCall } from './connections.js'
 import { shownImage } from './media.js'
 import type { Block, ToolCall, TurnEntry } from './model.js'
 import { isBackgroundCall, isTodoName, isWatchCall } from './transcript/calls.js'
+import { compactionEndedAt } from './transcript/compactions.js'
+import { turnEndedAt } from './transcript/turns.js'
 import { commandProgramName } from './vendor/t3code/commandLabel.js'
 import { durationCompact, flat, nonEmpty, plural } from './view/format.js'
 import { ACTION_ICON, withView } from './view/tools/registry.js'
@@ -99,7 +101,7 @@ export interface Fold {
  * or was interrupted does not fold, and neither does one with nothing to hide.
  */
 export function foldOf(turn: TurnEntry): Fold | undefined {
-  if (turn.status !== 'done') {
+  if (turn.end.status !== 'done') {
     return undefined
   }
 
@@ -136,7 +138,7 @@ export function foldOf(turn: TurnEntry): Fold | undefined {
     return undefined
   }
 
-  const ms = (turn.endedAt ?? turn.startedAt) - turn.startedAt
+  const ms = (turnEndedAt(turn) ?? turn.startedAt) - turn.startedAt
 
   return { hidden, label: workedFor(ms) }
 }
@@ -189,13 +191,13 @@ export function parts(turn: TurnEntry): Part[] {
     if (b.kind === 'steer' || b.kind === 'compaction') {
       flush(b.at)
       show(b)
-      from = b.kind === 'compaction' ? (b.compaction.endedAt ?? b.at) : b.at
+      from = b.kind === 'compaction' ? (compactionEndedAt(b.compaction) ?? b.at) : b.at
     } else {
       stretch.push(b)
     }
   }
 
-  flush(turn.endedAt ?? from)
+  flush(turnEndedAt(turn) ?? from)
 
   return out
 }

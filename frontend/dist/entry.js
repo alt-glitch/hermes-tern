@@ -64913,10 +64913,8 @@ function userEntry(id, { text: text15, at = Date.now(), steered = false, attachm
 }
 function failure(error, code7) {
   const http = /^HTTP (\d{3}):\s*/.exec(error);
-  return {
-    error: http ? error.slice(http[0].length) : error,
-    errorCode: http?.[1] ?? (typeof code7 === "string" && code7 ? code7 : void 0)
-  };
+  const badge = http?.[1] ?? (typeof code7 === "string" && code7 ? code7 : void 0);
+  return { error: http ? error.slice(http[0].length) : error, ...badge ? { code: badge } : {} };
 }
 var passable = (e) => e.kind !== "notice" && e.kind !== "compaction";
 function displayNotice(kind, metadata) {
@@ -64998,7 +64996,205 @@ function steerState(turn, index2) {
   if (turn.blocks.slice(index2 + 1).some((b) => b.kind !== "steer" && b.kind !== "compaction")) {
     return "landed";
   }
-  return turn.status === "live" ? "pending" : "next";
+  return turn.end.status === "live" ? "pending" : "next";
+}
+
+// src/transcript/turns.ts
+function turnEndedAt(turn) {
+  return turn.end.status === "live" ? void 0 : turn.end.endedAt;
+}
+function endThinking(turn, at) {
+  for (const b of turn.blocks) {
+    if (b.kind === "thinking" && b.endedAt === void 0) {
+      b.endedAt = at;
+    }
+  }
+}
+function trailingText(turn) {
+  let out = "";
+  for (const b of turn.blocks) {
+    if (b.kind === "tool" || b.kind === "text" && !b.text) {
+      out = "";
+    } else if (b.kind === "text") {
+      out += b.text;
+    }
+  }
+  return out;
+}
+function usageSince(now, before) {
+  const less = (key2) => {
+    const a2 = now[key2];
+    const b = before?.[key2];
+    return typeof a2 === "number" ? Math.max(0, a2 - (typeof b === "number" ? b : 0)) : void 0;
+  };
+  return { ...now, cost_usd: less("cost_usd"), input: less("input"), output: less("output"), total: less("total") };
+}
+function shownArgs(args) {
+  const command = args["command"];
+  return typeof command === "string" ? { ...args, command: withoutTernEnv(command) } : args;
+}
+
+// src/transcript/compactions.ts
+var Compactions = class {
+  #host;
+  #seen = [];
+  constructor(host) {
+    this.#host = host;
+  }
+  /**
+   * The context started compacting. Inside a running turn that already did something it is a
+   * step of that turn; else it goes between turns, before the turn it was compacted for. Hermes'
+   * later lines of the same compaction only fill in the count. Returns the compaction (the one
+   * already running, when it fills one in): the handle uncompact() takes back.
+   */
+  compacting({ before, at = Date.now(), manual = false }) {
+    const running2 = this.#seen.findLast(isRunning3);
+    if (running2) {
+      running2.before ??= before || void 0;
+      running2.manual ||= manual || void 0;
+      this.#touch(running2);
+      return running2;
+    }
+    const compaction = { startedAt: at, state: { status: "running" }, ...before ? { before } : {}, ...manual ? { manual } : {} };
+    this.#seen.push(compaction);
+    const live = this.#host.live();
+    if (live?.blocks.length) {
+      live.blocks.push({ at, compaction, id: this.#host.id("z"), kind: "compaction" });
+      live.rev++;
+      return compaction;
+    }
+    const entry = { compaction, id: this.#host.id("z"), kind: "compaction", rev: 0 };
+    const entries = this.#host.entries();
+    if (live && entries.at(-1) === live) {
+      entries.splice(-1, 0, entry);
+    } else {
+      entries.push(entry);
+    }
+    return compaction;
+  }
+  /**
+   * The running compaction ended. `tokens` are the owner's own counts (/compress reports them
+   * after its `ready` edge, so they also reach the compaction that just ended).
+   */
+  compacted(at = Date.now(), tokens2 = {}) {
+    const running2 = this.#seen.findLast(isRunning3);
+    const c = running2 ?? (tokens2.before || tokens2.after ? this.#seen.at(-1) : void 0);
+    if (!c) {
+      return;
+    }
+    const done = c.state.status === "running" ? { endedAt: at, status: "done" } : c.state;
+    c.before = tokens2.before || c.before;
+    c.state = { ...done, ...tokens2.after ? { after: tokens2.after } : {} };
+    this.#touch(c);
+  }
+  /**
+   * A compaction did not happen after all. `'running'`: Hermes aborted the last one (no done edge
+   * came before the turn ended), dropped only while it runs; a compaction: the one compacting()
+   * returned to /compress, which changed nothing (another one seen since stays).
+   */
+  uncompact(which) {
+    const last = this.#seen.at(-1);
+    const c = which === "running" ? last && isRunning3(last) ? last : void 0 : which;
+    const seen = c ? this.#seen.indexOf(c) : -1;
+    if (!c || seen < 0) {
+      return;
+    }
+    this.#seen.splice(seen, 1);
+    const entries = this.#host.entries();
+    const at = entries.findIndex((e) => e.kind === "compaction" && e.compaction === c);
+    if (at >= 0) {
+      entries.splice(at, 1);
+      return;
+    }
+    const turn = entries.findLast(
+      (e) => e.kind === "turn" && e.blocks.some((b) => b.kind === "compaction" && b.compaction === c)
+    );
+    if (turn) {
+      turn.blocks = turn.blocks.filter((b) => b.kind !== "compaction" || b.compaction !== c);
+      turn.rev++;
+    }
+  }
+  /**
+   * A context reading (tokens in use): the first one under the last compaction's `before` is what
+   * it left. A reading from before it finished (a stale tick) is not lower, so it is skipped.
+   */
+  contextUsed(used) {
+    const c = this.#seen.at(-1);
+    const state = c?.state;
+    if (!c || state?.status !== "done" || state.after !== void 0 || !(used > 0) || c.before && used >= c.before * 0.95) {
+      return;
+    }
+    c.state = { ...state, after: used };
+    this.#touch(c);
+  }
+  /** The compactions seen here that the store has no summary for yet. */
+  get unsummarized() {
+    return this.#seen.some((c) => c.state.status === "done" && c.state.summary === void 0);
+  }
+  /** Gives each seen compaction the stored summary written while it ran. */
+  summarize(stored) {
+    for (const [mark2, c] of this.#claims(stored)) {
+      if (c.state.status === "done" && c.state.summary === void 0) {
+        c.state = summarized(c.state, mark2);
+        this.#touch(c);
+      }
+    }
+  }
+  /**
+   * The compactions a reload shows for `stored`, oldest first: the one this view saw happen when
+   * there is one (its numbers stay, the store's summary fills in), else one from the store alone.
+   */
+  restore(stored) {
+    const marks = [...stored].sort((a2, b) => a2.at - b.at);
+    const claims = this.#claims(marks);
+    return marks.map((mark2) => ({ at: mark2.at, compaction: restored(mark2, claims.get(mark2)) }));
+  }
+  /** Another session is shown: the compactions seen were the last one's. */
+  forget() {
+    this.#seen = [];
+  }
+  /** Which stored compaction each seen one is: the nearest summary written while it ran, each once. */
+  #claims(stored) {
+    const out = /* @__PURE__ */ new Map();
+    for (const c of this.#seen) {
+      const end = compactionEndedAt(c) ?? c.startedAt;
+      const mark2 = stored.filter((s2) => c.state.status === "done" && !out.has(s2) && within(c, s2.at)).sort((a2, b) => Math.abs(a2.at - end) - Math.abs(b.at - end))[0];
+      if (mark2) {
+        out.set(mark2, c);
+      }
+    }
+    return out;
+  }
+  /** Marks the turn or entry showing `c` changed. */
+  #touch(c) {
+    const shown3 = this.#host.entries().findLast((e) => e.kind === "compaction" && e.compaction === c || e.kind === "turn" && e.blocks.some((b) => b.kind === "compaction" && b.compaction === c));
+    if (shown3?.kind === "compaction" || shown3?.kind === "turn") {
+      shown3.rev++;
+    }
+  }
+};
+function restored(mark2, seen) {
+  if (seen) {
+    if (seen.state.status === "done") {
+      seen.state = summarized(seen.state, mark2);
+    }
+    return seen;
+  }
+  return {
+    startedAt: mark2.at,
+    state: { status: "done", ...mark2.summary ? { summary: mark2.summary } : {}, ...mark2.messages ? { messages: mark2.messages } : {} }
+  };
+}
+function summarized(state, mark2) {
+  const { messages: _, ...rest } = state;
+  return { ...rest, summary: mark2.summary ?? "", ...mark2.messages === void 0 ? {} : { messages: mark2.messages } };
+}
+function compactionEndedAt(c) {
+  return c.state.status === "done" ? c.state.endedAt : void 0;
+}
+var isRunning3 = (c) => c.state.status === "running";
+function within(c, at) {
+  return at >= c.startedAt - 5e3 && at <= (compactionEndedAt(c) ?? Date.now()) + 15e3;
 }
 
 // src/workLog.ts
@@ -65036,7 +65232,7 @@ function visibleItems(items) {
   return items.filter((i) => i.kind === "tool" || i.text.trim());
 }
 function foldOf(turn) {
-  if (turn.status !== "done") {
+  if (turn.end.status !== "done") {
     return void 0;
   }
   const answer = turn.blocks.findLastIndex((b) => b.kind === "text" && b.text.trim());
@@ -65056,7 +65252,7 @@ function foldOf(turn) {
   if (hidden2.size === 0) {
     return void 0;
   }
-  const ms = (turn.endedAt ?? turn.startedAt) - turn.startedAt;
+  const ms = (turnEndedAt(turn) ?? turn.startedAt) - turn.startedAt;
   return { hidden: hidden2, label: workedFor(ms) };
 }
 var workedFor = (ms) => ms > 0 ? `Worked for ${durationCompact(ms)}` : "Worked";
@@ -65088,12 +65284,12 @@ function parts2(turn) {
     if (b.kind === "steer" || b.kind === "compaction") {
       flush(b.at);
       show(b);
-      from = b.kind === "compaction" ? b.compaction.endedAt ?? b.at : b.at;
+      from = b.kind === "compaction" ? compactionEndedAt(b.compaction) ?? b.at : b.at;
     } else {
       stretch.push(b);
     }
   }
-  flush(turn.endedAt ?? from);
+  flush(turnEndedAt(turn) ?? from);
   return out;
 }
 function actionOf(call) {
@@ -65859,7 +66055,7 @@ function attachmentsRow(list9) {
   ) }, "images");
 }
 function turnNode(turn, id, cx) {
-  const live = turn.status === "live";
+  const live = turn.end.status === "live";
   const children3 = [];
   if (turn.continued) {
     children3.push(
@@ -65878,21 +66074,22 @@ function turnNode(turn, id, cx) {
     );
   }
   const last = pieces(turn.blocks).at(-1);
-  const compacting = last?.kind === "block" && last.block.kind === "compaction" && last.block.compaction.status === "running";
+  const compacting = last?.kind === "block" && last.block.kind === "compaction" && last.block.compaction.state.status === "running";
   if (live && !compacting && (!last || last.kind === "block" && last.block.kind !== "text" || last.kind === "work" && latestFailed(last.items))) {
     children3.push(thinkingRow());
   }
-  if (turn.status === "error") {
+  const end = turn.end;
+  if (end.status === "error") {
     children3.push(
       headedCard({
         body: [
           // A failed turn reloaded from an older store knows only Hermes' advice, not the error.
-          turn.error ? /* @__PURE__ */ jsx("text", { lines: 8, role: "omp.error.message", spans: [{ s: "mono", t: turn.error }], wrap: "word" }, "message") : null,
-          turn.errorHint ? /* @__PURE__ */ jsx("md", { children: turn.errorHint }, "hint") : null
+          end.error ? /* @__PURE__ */ jsx("text", { lines: 8, role: "omp.error.message", spans: [{ s: "mono", t: end.error }], wrap: "word" }, "message") : null,
+          end.hint ? /* @__PURE__ */ jsx("md", { children: end.hint }, "hint") : null
         ],
         head: /* @__PURE__ */ jsxs("row", { gap: "sm", children: [
           /* @__PURE__ */ jsx("text", { spans: [{ s: "error strong", t: "Request failed" }] }, "title"),
-          turn.errorCode ? /* @__PURE__ */ jsx("badge", { role: "omp.error.code", text: turn.errorCode, tone: "error" }, "code") : null
+          end.code ? /* @__PURE__ */ jsx("badge", { role: "omp.error.code", text: end.code, tone: "error" }, "code") : null
         ] }, "head"),
         id: `${id}.error`,
         key: "error",
@@ -65900,7 +66097,7 @@ function turnNode(turn, id, cx) {
         tone: "error"
       })
     );
-  } else if (turn.status === "interrupted") {
+  } else if (end.status === "interrupted") {
     children3.push(
       /* @__PURE__ */ jsx("text", { role: "omp.assistant.abort", spans: [{ s: "error", t: "Interrupted" }], wrap: "word" }, "abort")
     );
@@ -65909,13 +66106,13 @@ function turnNode(turn, id, cx) {
     children3.push(/* @__PURE__ */ jsx("text", { role: "omp.notice", spans: [{ s: "warning", t: turn.warning }], wrap: "word" }, "warning"));
   }
   const answer = answerText(turn);
-  if (!live && turn.endedAt && (answer || turn.usage?.total || turn.tickTokens)) {
+  if (!live && turnEndedAt(turn) && (answer || turn.usage?.total || turn.tickTokens)) {
     children3.push(usageNode(turn, answer, cx));
   }
   return /* @__PURE__ */ jsx("col", { role: "omp.assistant", children: children3 }, turn.id);
 }
 function pieceNodes(turn, blocks2, parent, cx) {
-  const live = turn.status === "live";
+  const live = turn.end.status === "live";
   const ps = pieces(blocks2, turn.blocks);
   const lastText = blocks2.findLast((b) => b.kind === "text");
   return ps.map((p3, i) => {
@@ -65969,7 +66166,7 @@ function answerText(turn) {
 }
 function usageNode(turn, answer, cx) {
   const u = turn.usage ?? {};
-  const ms = (turn.endedAt ?? turn.startedAt) - turn.startedAt;
+  const ms = (turnEndedAt(turn) ?? turn.startedAt) - turn.startedAt;
   const input2 = u.input ?? u.prompt ?? 0;
   const output = u.output ?? u.completion ?? 0;
   const total = u.total || input2 + output || turn.tickTokens || 0;
@@ -65998,10 +66195,11 @@ function usageNode(turn, answer, cx) {
 }
 var COMPACTED_TITLE = "Hermes summarized the conversation before this line to free context. From here on the agent works from that summary; the turns above stay here for you.";
 function compactionNode(c, key2, id, now) {
-  const running2 = c.status === "running";
-  const tokens2 = c.before && c.after ? `${compact(c.before)} \u2192 ${compact(c.after)} tokens` : c.before ? `${compact(c.before)} tokens` : "";
-  const took2 = c.endedAt && c.endedAt - c.startedAt >= 1e3 ? duration(c.endedAt - c.startedAt) : "";
-  const facts2 = running2 ? [tokens2] : [tokens2, c.messages ? `${c.messages.toLocaleString()} messages summarized` : "", took2, c.manual ? "/compress" : ""];
+  const done = c.state.status === "done" ? c.state : void 0;
+  const running2 = !done;
+  const tokens2 = c.before && done?.after ? `${compact(c.before)} \u2192 ${compact(done.after)} tokens` : c.before ? `${compact(c.before)} tokens` : "";
+  const took2 = done?.endedAt && done.endedAt - c.startedAt >= 1e3 ? duration(done.endedAt - c.startedAt) : "";
+  const facts2 = !done ? [tokens2] : [tokens2, done.messages ? `${done.messages.toLocaleString()} messages summarized` : "", took2, c.manual ? "/compress" : ""];
   const detail = facts2.filter(Boolean).join(" \xB7 ");
   const line = /* @__PURE__ */ jsxs("row", { align: "center", gap: "xs", role: "hermes.compaction.line", title: running2 ? void 0 : COMPACTED_TITLE, children: [
     running2 ? shimmerText({ key: "what", text: "Compacting context" }) : /* @__PURE__ */ jsx("icon", { name: "compaction" }, "icon"),
@@ -66009,13 +66207,13 @@ function compactionNode(c, key2, id, now) {
     running2 ? /* @__PURE__ */ jsx("elapsed", { age: age(c, c.startedAt, now), format: "short" }, "age") : null,
     detail ? /* @__PURE__ */ jsx("text", { spans: [{ s: "dim", t: `\xB7 ${detail}` }], truncate: "end", wrap: "none" }, "facts") : null
   ] }, "head");
-  if (running2 || !c.summary) {
+  if (!done?.summary) {
     return /* @__PURE__ */ jsx("col", { role: "hermes.compaction", children: line }, key2);
   }
   return foldSection({
     body: [
       /* @__PURE__ */ jsx("text", { role: "hermes.compaction.lead", spans: [{ s: "dim", t: "The summary the agent goes on from:" }], wrap: "word" }, "lead"),
-      /* @__PURE__ */ jsx("md", { children: c.summary }, "summary")
+      /* @__PURE__ */ jsx("md", { children: done.summary }, "summary")
     ],
     head: line,
     id,
@@ -73456,160 +73654,6 @@ var Sidebar = class {
   }
 };
 
-// src/transcript/compactions.ts
-var Compactions = class {
-  #host;
-  #seen = [];
-  constructor(host) {
-    this.#host = host;
-  }
-  /**
-   * The context started compacting. Inside a running turn that already did something it is a
-   * step of that turn; else it goes between turns, before the turn it was compacted for. Hermes'
-   * later lines of the same compaction only fill in the count. Returns the compaction (the one
-   * already running, when it fills one in): the handle uncompact() takes back.
-   */
-  compacting({ before, at = Date.now(), manual = false }) {
-    const running2 = this.#seen.findLast((c) => c.status === "running");
-    if (running2) {
-      running2.before ??= before || void 0;
-      running2.manual ||= manual || void 0;
-      this.#touch(running2);
-      return running2;
-    }
-    const compaction = { startedAt: at, status: "running", ...before ? { before } : {}, ...manual ? { manual } : {} };
-    this.#seen.push(compaction);
-    const live = this.#host.live();
-    if (live?.blocks.length) {
-      live.blocks.push({ at, compaction, id: this.#host.id("z"), kind: "compaction" });
-      live.rev++;
-      return compaction;
-    }
-    const entry = { compaction, id: this.#host.id("z"), kind: "compaction", rev: 0 };
-    const entries = this.#host.entries();
-    if (live && entries.at(-1) === live) {
-      entries.splice(-1, 0, entry);
-    } else {
-      entries.push(entry);
-    }
-    return compaction;
-  }
-  /**
-   * The running compaction ended. `tokens` are the owner's own counts (/compress reports them
-   * after its `ready` edge, so they also reach the compaction that just ended).
-   */
-  compacted(at = Date.now(), tokens2 = {}) {
-    const running2 = this.#seen.findLast((c2) => c2.status === "running");
-    const c = running2 ?? (tokens2.before || tokens2.after ? this.#seen.at(-1) : void 0);
-    if (!c) {
-      return;
-    }
-    if (running2) {
-      running2.status = "done";
-      running2.endedAt = at;
-    }
-    c.before = tokens2.before || c.before;
-    c.after = tokens2.after || c.after;
-    this.#touch(c);
-  }
-  /**
-   * A compaction did not happen after all. `'running'`: Hermes aborted the last one (no done edge
-   * came before the turn ended), dropped only while it runs; a compaction: the one compacting()
-   * returned to /compress, which changed nothing (another one seen since stays).
-   */
-  uncompact(which) {
-    const last = this.#seen.at(-1);
-    const c = which === "running" ? last?.status === "running" ? last : void 0 : which;
-    const seen = c ? this.#seen.indexOf(c) : -1;
-    if (!c || seen < 0) {
-      return;
-    }
-    this.#seen.splice(seen, 1);
-    const entries = this.#host.entries();
-    const at = entries.findIndex((e) => e.kind === "compaction" && e.compaction === c);
-    if (at >= 0) {
-      entries.splice(at, 1);
-      return;
-    }
-    const turn = entries.findLast(
-      (e) => e.kind === "turn" && e.blocks.some((b) => b.kind === "compaction" && b.compaction === c)
-    );
-    if (turn) {
-      turn.blocks = turn.blocks.filter((b) => b.kind !== "compaction" || b.compaction !== c);
-      turn.rev++;
-    }
-  }
-  /**
-   * A context reading (tokens in use): the first one under the last compaction's `before` is what
-   * it left. A reading from before it finished (a stale tick) is not lower, so it is skipped.
-   */
-  contextUsed(used) {
-    const c = this.#seen.at(-1);
-    if (c?.status !== "done" || c.after !== void 0 || !(used > 0) || c.before && used >= c.before * 0.95) {
-      return;
-    }
-    c.after = used;
-    this.#touch(c);
-  }
-  /** The compactions seen here that the store has no summary for yet. */
-  get unsummarized() {
-    return this.#seen.some((c) => c.status === "done" && c.summary === void 0);
-  }
-  /** Gives each seen compaction the stored summary written while it ran. */
-  summarize(stored) {
-    for (const [mark2, c] of this.#claims(stored)) {
-      if (c.summary === void 0) {
-        c.summary = mark2.summary ?? "";
-        c.messages = mark2.messages;
-        this.#touch(c);
-      }
-    }
-  }
-  /**
-   * The compactions a reload shows for `stored`, oldest first: the one this view saw happen when
-   * there is one (its numbers stay, the store's summary fills in), else one from the store alone.
-   */
-  restore(stored) {
-    const marks = [...stored].sort((a2, b) => a2.at - b.at);
-    const claims = this.#claims(marks);
-    return marks.map((mark2) => ({ at: mark2.at, compaction: restored(mark2, claims.get(mark2)) }));
-  }
-  /** Another session is shown: the compactions seen were the last one's. */
-  forget() {
-    this.#seen = [];
-  }
-  /** Which stored compaction each seen one is: the nearest summary written while it ran, each once. */
-  #claims(stored) {
-    const out = /* @__PURE__ */ new Map();
-    for (const c of this.#seen) {
-      const end = c.endedAt ?? c.startedAt;
-      const mark2 = stored.filter((s2) => c.status === "done" && !out.has(s2) && within(c, s2.at)).sort((a2, b) => Math.abs(a2.at - end) - Math.abs(b.at - end))[0];
-      if (mark2) {
-        out.set(mark2, c);
-      }
-    }
-    return out;
-  }
-  /** Marks the turn or entry showing `c` changed. */
-  #touch(c) {
-    const shown3 = this.#host.entries().findLast((e) => e.kind === "compaction" && e.compaction === c || e.kind === "turn" && e.blocks.some((b) => b.kind === "compaction" && b.compaction === c));
-    if (shown3?.kind === "compaction" || shown3?.kind === "turn") {
-      shown3.rev++;
-    }
-  }
-};
-function restored(mark2, seen) {
-  if (seen) {
-    seen.summary = mark2.summary ?? "";
-    seen.messages = mark2.messages;
-    return seen;
-  }
-  return { startedAt: mark2.at, status: "done", ...mark2.summary ? { summary: mark2.summary } : {}, ...mark2.messages ? { messages: mark2.messages } : {} };
-}
-function within(c, at) {
-  return at >= c.startedAt - 5e3 && at <= (c.endedAt ?? Date.now()) + 15e3;
-}
-
 // src/promptRefs.ts
 import { existsSync as existsSync6 } from "node:fs";
 import { basename as basename4 } from "node:path";
@@ -73724,13 +73768,14 @@ function history({ kept, messages: messages2, compactions, id }) {
     }
     if (!turn) {
       const continued = pendingContinued ?? continuation(entries.findLast(passable));
-      turn = { blocks: [], continued, id: id("t"), kind: "turn", rev: 0, startedAt: promptAt || at, status: "done" };
+      turn = { blocks: [], continued, end: { status: "done" }, id: id("t"), kind: "turn", rev: 0, startedAt: promptAt || at };
       pendingContinued = void 0;
       promptAt = 0;
       entries.push(turn);
     }
-    if (at > 0) {
-      turn.endedAt = Math.max(turn.endedAt ?? at, at);
+    const end = turn.end;
+    if (at > 0 && end.status !== "live") {
+      turn.end = { ...end, endedAt: Math.max(end.endedAt ?? at, at) };
     }
     if (m.role === "assistant") {
       const meta3 = record(m.display_metadata);
@@ -73741,9 +73786,8 @@ function history({ kept, messages: messages2, compactions, id }) {
       if (m.display_kind === "failed_turn") {
         const surface = record(meta3?.error_surface);
         const error = str5(meta3?.error) ?? str5(surface?.message);
-        turn.status = "error";
-        Object.assign(turn, error ? failure(error, surface?.code) : {});
-        turn.errorHint = text15.trim() || void 0;
+        const card = error ? failure(error, surface?.code) : turn.end.status === "error" ? turn.end : {};
+        endTurn(turn, { ...card, hint: text15.trim() || void 0, status: "error" });
         continue;
       }
       const reply2 = typeof m.display_content === "string" ? m.display_content : text15;
@@ -73756,7 +73800,7 @@ function history({ kept, messages: messages2, compactions, id }) {
         turn.blocks.push({ id: id("x"), kind: "text", text: reply2 });
       }
       if (meta3?.interrupted === true) {
-        turn.status = "interrupted";
+        endTurn(turn, { status: "interrupted" });
       }
     } else if (m.role === "tool") {
       const callId = toolCallId(m.tool_call_id ?? id("c"));
@@ -73804,6 +73848,10 @@ function history({ kept, messages: messages2, compactions, id }) {
 function storedUser(id, raw2, at) {
   const parts3 = splitPrompt(raw2);
   return userEntry(id, { at, attachments: promptAttachments(parts3), text: parts3.text });
+}
+function endTurn(turn, end) {
+  const at = turnEndedAt(turn);
+  turn.end = at === void 0 ? end : { ...end, endedAt: at };
 }
 var str5 = (v) => typeof v === "string" && v.trim() ? v : void 0;
 function storedThought(m) {
@@ -73880,38 +73928,6 @@ function foldSubagent(call, { type, event, at }) {
   } else if (event.status === "running") {
     agent.status = "running";
   }
-}
-
-// src/transcript/turns.ts
-function endThinking(turn, at) {
-  for (const b of turn.blocks) {
-    if (b.kind === "thinking" && b.endedAt === void 0) {
-      b.endedAt = at;
-    }
-  }
-}
-function trailingText(turn) {
-  let out = "";
-  for (const b of turn.blocks) {
-    if (b.kind === "tool" || b.kind === "text" && !b.text) {
-      out = "";
-    } else if (b.kind === "text") {
-      out += b.text;
-    }
-  }
-  return out;
-}
-function usageSince(now, before) {
-  const less = (key2) => {
-    const a2 = now[key2];
-    const b = before?.[key2];
-    return typeof a2 === "number" ? Math.max(0, a2 - (typeof b === "number" ? b : 0)) : void 0;
-  };
-  return { ...now, cost_usd: less("cost_usd"), input: less("input"), output: less("output"), total: less("total") };
-}
-function shownArgs(args) {
-  const command = args["command"];
-  return typeof command === "string" ? { ...args, command: withoutTernEnv(command) } : args;
 }
 
 // src/transcript.ts
@@ -74080,11 +74096,11 @@ var Transcript = class {
       continued: this.#continued ?? continuation(this.#entries.findLast(passable)),
       // A session's first turn starts from zero; later ones from the last tick.
       countersAtStart: this.#counters ?? (this.#entries.some((e) => e.kind === "turn") ? void 0 : { prompt: 0, read: 0, total: 0 }),
+      end: { status: "live" },
       id: this.id("t"),
       kind: "turn",
       rev: 0,
-      startedAt: at,
-      status: "live"
+      startedAt: at
     };
     this.push(turn);
     this.#live = turn;
@@ -74250,7 +74266,6 @@ var Transcript = class {
         b.call.outcome = { duration: at - b.call.startedAt, kind: p3.status === "error" ? "error" : p3.status === "interrupted" ? "cancelled" : "done" };
       }
     }
-    turn.endedAt = at;
     this.#live = void 0;
     this.#ended = turn;
     if (p3.usage) {
@@ -74258,12 +74273,13 @@ var Transcript = class {
       this.#sessionUsage = p3.usage;
     }
     turn.warning = p3.warning ?? void 0;
-    turn.status = p3.status === "error" ? "error" : p3.status === "interrupted" ? "interrupted" : "done";
-    if (turn.status === "error") {
+    if (p3.status === "error") {
       const surfaced = p3.error_surface?.message;
       const error = typeof surfaced === "string" && surfaced || p3.error || final2 || "The request failed";
-      Object.assign(turn, failure(error, p3.error_surface?.code));
-      turn.errorHint = final2.split(/\n\s*\n/)[0]?.trim() || void 0;
+      const hint = final2.split(/\n\s*\n/)[0]?.trim();
+      turn.end = { ...failure(error, p3.error_surface?.code), endedAt: at, ...hint ? { hint } : {}, status: "error" };
+    } else {
+      turn.end = { endedAt: at, status: p3.status === "interrupted" ? "interrupted" : "done" };
     }
     turn.rev++;
   }

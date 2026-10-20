@@ -4,7 +4,7 @@
 
 import type { StoredCompaction } from '../compaction.js'
 import type { EntryId } from '../core/ids.js'
-import type { Compaction, CompactionEntry, Entry, TurnEntry } from '../model.js'
+import type { Compaction, CompactionEntry, CompactionState, Entry, TurnEntry } from '../model.js'
 
 /** What Compactions reads and changes of the transcript that holds it. */
 export interface CompactionHost {
@@ -23,6 +23,9 @@ export interface CompactionStart {
   at?: number
   manual?: boolean
 }
+
+/** A compaction's state once it ended. */
+type Done = Extract<CompactionState, { status: 'done' }>
 
 /** A stored compaction, as a reload shows it. */
 export interface RestoredCompaction {
@@ -47,7 +50,7 @@ export class Compactions {
    * already running, when it fills one in): the handle uncompact() takes back.
    */
   compacting({ before, at = Date.now(), manual = false }: CompactionStart): Compaction {
-    const running = this.#seen.findLast(c => c.status === 'running')
+    const running = this.#seen.findLast(isRunning)
 
     if (running) {
       running.before ??= before || undefined
@@ -57,7 +60,7 @@ export class Compactions {
       return running
     }
 
-    const compaction: Compaction = { startedAt: at, status: 'running', ...(before ? { before } : {}), ...(manual ? { manual } : {}) }
+    const compaction: Compaction = { startedAt: at, state: { status: 'running' }, ...(before ? { before } : {}), ...(manual ? { manual } : {}) }
     this.#seen.push(compaction)
     const live = this.#host.live()
 
@@ -85,20 +88,16 @@ export class Compactions {
    * after its `ready` edge, so they also reach the compaction that just ended).
    */
   compacted(at = Date.now(), tokens: { before?: number; after?: number } = {}) {
-    const running = this.#seen.findLast(c => c.status === 'running')
+    const running = this.#seen.findLast(isRunning)
     const c = running ?? (tokens.before || tokens.after ? this.#seen.at(-1) : undefined)
 
     if (!c) {
       return
     }
 
-    if (running) {
-      running.status = 'done'
-      running.endedAt = at
-    }
-
+    const done: Done = c.state.status === 'running' ? { endedAt: at, status: 'done' } : c.state
     c.before = tokens.before || c.before
-    c.after = tokens.after || c.after
+    c.state = { ...done, ...(tokens.after ? { after: tokens.after } : {}) }
     this.#touch(c)
   }
 
@@ -109,7 +108,7 @@ export class Compactions {
    */
   uncompact(which: Compaction | 'running') {
     const last = this.#seen.at(-1)
-    const c = which === 'running' ? (last?.status === 'running' ? last : undefined) : which
+    const c = which === 'running' ? (last && isRunning(last) ? last : undefined) : which
     const seen = c ? this.#seen.indexOf(c) : -1
 
     if (!c || seen < 0) {
@@ -142,26 +141,26 @@ export class Compactions {
    */
   contextUsed(used: number) {
     const c = this.#seen.at(-1)
+    const state = c?.state
 
-    if (c?.status !== 'done' || c.after !== undefined || !(used > 0) || (c.before && used >= c.before * 0.95)) {
+    if (!c || state?.status !== 'done' || state.after !== undefined || !(used > 0) || (c.before && used >= c.before * 0.95)) {
       return
     }
 
-    c.after = used
+    c.state = { ...state, after: used }
     this.#touch(c)
   }
 
   /** The compactions seen here that the store has no summary for yet. */
   get unsummarized(): boolean {
-    return this.#seen.some(c => c.status === 'done' && c.summary === undefined)
+    return this.#seen.some(c => c.state.status === 'done' && c.state.summary === undefined)
   }
 
   /** Gives each seen compaction the stored summary written while it ran. */
   summarize(stored: readonly StoredCompaction[]) {
     for (const [mark, c] of this.#claims(stored)) {
-      if (c.summary === undefined) {
-        c.summary = mark.summary ?? ''
-        c.messages = mark.messages
+      if (c.state.status === 'done' && c.state.summary === undefined) {
+        c.state = summarized(c.state, mark)
         this.#touch(c)
       }
     }
@@ -188,9 +187,9 @@ export class Compactions {
     const out = new Map<StoredCompaction, Compaction>()
 
     for (const c of this.#seen) {
-      const end = c.endedAt ?? c.startedAt
+      const end = compactionEndedAt(c) ?? c.startedAt
       const mark = stored
-        .filter(s => c.status === 'done' && !out.has(s) && within(c, s.at))
+        .filter(s => c.state.status === 'done' && !out.has(s) && within(c, s.at))
         .sort((a, b) => Math.abs(a.at - end) - Math.abs(b.at - end))[0]
 
       if (mark) {
@@ -216,16 +215,35 @@ export class Compactions {
 /** A stored compaction, as the one this view saw happen (`seen`) when there is one: its numbers stay. */
 function restored(mark: StoredCompaction, seen: Compaction | undefined): Compaction {
   if (seen) {
-    seen.summary = mark.summary ?? ''
-    seen.messages = mark.messages
+    // A seen one is claimed only once done.
+    if (seen.state.status === 'done') {
+      seen.state = summarized(seen.state, mark)
+    }
 
     return seen
   }
 
-  return { startedAt: mark.at, status: 'done', ...(mark.summary ? { summary: mark.summary } : {}), ...(mark.messages ? { messages: mark.messages } : {}) }
+  return {
+    startedAt: mark.at,
+    state: { status: 'done', ...(mark.summary ? { summary: mark.summary } : {}), ...(mark.messages ? { messages: mark.messages } : {}) }
+  }
 }
+
+/** Done compaction state `state` with stored compaction `mark`'s summary and count. */
+function summarized(state: Done, mark: StoredCompaction): CompactionState {
+  const { messages: _, ...rest } = state
+
+  return { ...rest, summary: mark.summary ?? '', ...(mark.messages === undefined ? {} : { messages: mark.messages }) }
+}
+
+/** When compaction `c` ended: undefined while it runs, and for a stored one. */
+export function compactionEndedAt(c: Compaction): number | undefined {
+  return c.state.status === 'done' ? c.state.endedAt : undefined
+}
+
+const isRunning = (c: Compaction) => c.state.status === 'running'
 
 /** A summary written at `at` belongs to compaction `c`: while it ran, give or take the clocks. */
 function within(c: Compaction, at: number): boolean {
-  return at >= c.startedAt - 5_000 && at <= (c.endedAt ?? Date.now()) + 15_000
+  return at >= c.startedAt - 5_000 && at <= (compactionEndedAt(c) ?? Date.now()) + 15_000
 }

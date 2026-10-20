@@ -1,10 +1,16 @@
-// What the reducer reads and writes of one turn: its thoughts ending, the text that closes its
-// last response, its share of the session's usage, and a call's args as the views show them.
+// What the reducer and the views read and write of one turn: when it ended, its thoughts ending,
+// the text that closes its last response, its share of the session's usage, and a call's args as
+// the views show them.
 
 import type { Usage } from '@hermes/shared/gateway-events'
 
 import type { TurnEntry } from '../model.js'
 import { withoutTernEnv } from '../view/describe.js'
+
+/** When `turn` ended: undefined while it is live, and for a stored turn whose rows carry no time. */
+export function turnEndedAt(turn: Pick<TurnEntry, 'end'>): number | undefined {
+  return turn.end.status === 'live' ? undefined : turn.end.endedAt
+}
 
 /** Ends the thoughts of `turn` still streaming. */
 export function endThinking(turn: TurnEntry, at: number) {

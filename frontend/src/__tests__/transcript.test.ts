@@ -40,7 +40,7 @@ describe('Transcript', () => {
     const turns = t.entries.filter(e => e.kind === 'turn')
     expect(turns).toHaveLength(1)
     expect(texts(turnOf(t.entries))).toEqual(['Working on it. Still here.'])
-    expect(turnOf(t.entries).status).toBe('done')
+    expect(turnOf(t.entries).end.status).toBe('done')
     expect(t.entries.at(-1)?.kind).toBe('notice')
     expect(t.live).toBeUndefined()
   })
@@ -102,7 +102,7 @@ describe('Transcript', () => {
 
     const turn = turnOf(t.entries)
     expect(texts(turn)).toEqual(['Looking first.', 'All done.'])
-    expect(turn.status).toBe('done')
+    expect(turn.end.status).toBe('done')
   })
 
   it('takes message.complete text when nothing streamed after the last tool', () => {
@@ -204,7 +204,7 @@ describe('Transcript', () => {
     t.complete({ status: 'interrupted' }, 3)
 
     const turn = turnOf(t.entries)
-    expect(turn.status).toBe('interrupted')
+    expect(turn.end.status).toBe('interrupted')
     expect(tools(turn)[0]).toMatchObject({ outcome: { duration: 2, kind: 'cancelled' } })
   })
 
@@ -221,10 +221,10 @@ describe('Transcript', () => {
       1
     )
 
-    expect(turnOf(t.entries)).toMatchObject({
+    expect(turnOf(t.entries).end).toMatchObject({
+      code: '500',
       error: 'upstream exploded',
-      errorCode: '500',
-      errorHint: 'custom returned a server error. Wait and send /retry.',
+      hint: 'custom returned a server error. Wait and send /retry.',
       status: 'error'
     })
     expect(texts(turnOf(t.entries))).toEqual([])
@@ -351,7 +351,7 @@ describe('Transcript', () => {
     ])
     expect(tools(turn)[0]?.todos).toEqual([{ content: 'Look', id: '1', status: 'completed' }])
     expect(tools(turn)[2]?.result).toContain('@@ -1 +1 @@')
-    expect(turn.status).toBe('done')
+    expect(turn.end.status).toBe('done')
   })
 
   it('applies a merge:true todo call as a patch on the list before it, live and resumed', () => {
@@ -403,11 +403,11 @@ describe('Transcript', () => {
     const call = (path: string): ToolCall => ({ args: { path }, argsText: path, context: '', id: toolCallId('c1'), name: 'read_file', outcome: { duration: 0, kind: 'done' }, startedAt: 0, via: { kind: 'direct' } })
     const turn = (...paths: string[]): TurnEntry => ({
       blocks: paths.map(path => ({ call: call(path), id: toolCallId('c1'), kind: 'tool' as const })),
+      end: { status: 'done' },
       id: entryId('t'),
       kind: 'turn',
       rev: 0,
-      startedAt: 0,
-      status: 'done'
+      startedAt: 0
     })
     const entries = [turn('a.ts', 'b.ts'), turn('c.ts', 'd.ts'), { id: entryId('n'), kind: 'notice' as const, text: '', tone: 'info' as const }]
 

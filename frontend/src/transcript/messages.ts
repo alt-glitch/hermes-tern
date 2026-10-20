@@ -3,7 +3,7 @@
 // failed request's error card.
 
 import type { EntryId } from '../core/ids.js'
-import type { Entry, TurnEntry, UserAttachment, UserEntry } from '../model.js'
+import type { Entry, TurnEnd, TurnEntry, UserAttachment, UserEntry } from '../model.js'
 import { record } from '../wire/json.js'
 
 /** A prompt bubble's parts: its words, when it was sent, whether it joined a running turn, what it carried. */
@@ -21,13 +21,11 @@ export function userEntry(id: EntryId, { text, at = Date.now(), steered = false,
 }
 
 /** A failed request's message and badge: an `HTTP 429: …` prefix becomes the code. */
-export function failure(error: string, code: unknown): Pick<TurnEntry, 'error' | 'errorCode'> {
+export function failure(error: string, code: unknown): Pick<Extract<TurnEnd, { status: 'error' }>, 'code' | 'error'> {
   const http = /^HTTP (\d{3}):\s*/.exec(error)
+  const badge = http?.[1] ?? (typeof code === 'string' && code ? code : undefined)
 
-  return {
-    error: http ? error.slice(http[0].length) : error,
-    errorCode: http?.[1] ?? (typeof code === 'string' && code ? code : undefined)
-  }
+  return { error: http ? error.slice(http[0].length) : error, ...(badge ? { code: badge } : {}) }
 }
 
 /** What a new turn looks past for the turn before it: notices and compactions. */
@@ -166,5 +164,5 @@ export function steerState(turn: TurnEntry, index: number): 'landed' | 'pending'
     return 'landed'
   }
 
-  return turn.status === 'live' ? 'pending' : 'next'
+  return turn.end.status === 'live' ? 'pending' : 'next'
 }

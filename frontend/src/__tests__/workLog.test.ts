@@ -26,12 +26,11 @@ const think = (id: string, t = 'hm'): Extract<Block, { kind: 'thinking' }> => ({
 
 const turn = (blocks: Block[], more: Partial<TurnEntry> = {}): TurnEntry => ({
   blocks,
-  endedAt: 54_000,
+  end: { endedAt: 54_000, status: 'done' },
   id: entryId('t'),
   kind: 'turn',
   rev: 0,
   startedAt: 0,
-  status: 'done',
   ...more
 })
 
@@ -157,9 +156,9 @@ describe('foldOf', () => {
   it('does not fold a running, failed or interrupted turn, or one with nothing to hide', () => {
     const blocks = [tool('a', call('terminal')), text('answer')]
 
-    expect(foldOf(turn(blocks, { status: 'live' }))).toBeUndefined()
-    expect(foldOf(turn(blocks, { status: 'error' }))).toBeUndefined()
-    expect(foldOf(turn(blocks, { status: 'interrupted' }))).toBeUndefined()
+    expect(foldOf(turn(blocks, { end: { status: 'live' } }))).toBeUndefined()
+    expect(foldOf(turn(blocks, { end: { endedAt: 54_000, status: 'error' } }))).toBeUndefined()
+    expect(foldOf(turn(blocks, { end: { endedAt: 54_000, status: 'interrupted' } }))).toBeUndefined()
     expect(foldOf(turn([text('answer')]))).toBeUndefined()
   })
 

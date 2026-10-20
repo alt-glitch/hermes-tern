@@ -231,12 +231,11 @@ describe('manage_connections without its card', () => {
         { call: c, id: entryId('b1'), kind: 'tool' },
         { id: entryId('b2'), kind: 'text', text: 'While you authorize those, I will start.' }
       ],
-      endedAt: 1000,
+      end: { endedAt: 1000, status: 'done' },
       id: entryId('t'),
       kind: 'turn',
       rev: 0,
-      startedAt: 0,
-      status: 'done'
+      startedAt: 0
     }
 
     expect(ownsCard(c)).toBe(true)

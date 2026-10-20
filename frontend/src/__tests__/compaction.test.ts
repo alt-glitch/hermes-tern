@@ -81,7 +81,7 @@ describe('compaction in the transcript', () => {
 
     const c = compactions(t)[0]!
     expect(shape(t.entries)).toEqual(['turn(text,compaction)'])
-    expect(c).toMatchObject({ before: 182_000, startedAt: 1_000, status: 'running' })
+    expect(c).toMatchObject({ before: 182_000, startedAt: 1_000, state: { status: 'running' } })
 
     // A later line of the same compaction does not start another.
     t.compacting({ at: 2_000, before: 190_000 })
@@ -90,7 +90,7 @@ describe('compaction in the transcript', () => {
     t.complete({ status: 'complete', text: 'done' }, 20_000)
     t.uncompact('running')
 
-    expect(compactions(t)).toEqual([expect.objectContaining({ before: 182_000, endedAt: 13_000, status: 'done' })])
+    expect(compactions(t)).toEqual([expect.objectContaining({ before: 182_000, state: { endedAt: 13_000, status: 'done' } })])
     expect(parts(lastTurn(t.entries)).map(p => (p.kind === 'fold' ? `fold:${p.label}` : p.blocks.map(b => b.kind).join()))).toEqual([
       'fold:Worked for 1.0s',
       'compaction,text'
@@ -120,14 +120,14 @@ describe('compaction in the transcript', () => {
     t.contextUsed(180_000)
     t.contextUsed(41_000)
     t.contextUsed(42_000)
-    expect(compactions(t)[0]).toMatchObject({ after: 41_000, before: 180_000 })
+    expect(compactions(t)[0]).toMatchObject({ before: 180_000, state: { after: 41_000 } })
 
     expect(t.unsummarized).toBe(true)
     // Summaries written well before or after it are other compactions'.
     t.summarize([{ at: 100_000, summary: 'later' }])
     expect(t.unsummarized).toBe(true)
     t.summarize([{ at: 6_000, messages: 12, summary: '## Goal' }])
-    expect(compactions(t)[0]).toMatchObject({ messages: 12, summary: '## Goal' })
+    expect(compactions(t)[0]).toMatchObject({ state: { messages: 12, summary: '## Goal' } })
     expect(t.unsummarized).toBe(false)
   })
 
@@ -172,8 +172,8 @@ describe('compaction in the transcript', () => {
     ])
 
     expect(shape(t.entries)).toEqual(['user', 'turn(text)', 'compaction', 'user', 'turn(tool,compaction,text)', 'compaction'])
-    expect(compactions(t).map(c => c.summary)).toEqual(['a', 'b', 'c'])
-    expect(compactions(t)[1]).toMatchObject({ after: 20_000, before: 90_000, messages: 3 })
+    expect(compactions(t).map(c => c.state.status === 'done' && c.state.summary)).toEqual(['a', 'b', 'c'])
+    expect(compactions(t)[1]).toMatchObject({ before: 90_000, state: { after: 20_000, messages: 3 } })
     expect(t.unsummarized).toBe(false)
   })
 

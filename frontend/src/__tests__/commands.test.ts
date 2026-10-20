@@ -134,11 +134,11 @@ const turn = (id: string, text: string, tools = 0): Entry => ({
     ...Array.from({ length: tools }, (_, i) => ({ call: {} as never, id: entryId(`${id}c${i}`), kind: 'tool' as const })),
     ...(text ? [{ id: entryId(`${id}x`), kind: 'text' as const, text }] : [])
   ],
+  end: { status: 'done' },
   id: entryId(id),
   kind: 'turn',
   rev: 0,
-  startedAt: 0,
-  status: 'done'
+  startedAt: 0
 })
 
 const user = (id: string, text: string): Entry => ({ at: 0, id: entryId(id), kind: 'user', text })
