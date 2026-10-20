@@ -4,3 +4,8 @@
 export function errorText(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
 }
+
+/** A Node system error's code (`ENOENT`, `EACCES`, `EEXIST`, …); undefined for any other throw. */
+export function errorCode(error: unknown): string | undefined {
+  return error instanceof Error && 'code' in error && typeof error.code === 'string' ? error.code : undefined
+}
