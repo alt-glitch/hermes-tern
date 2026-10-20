@@ -5,9 +5,7 @@
 
 import type { Usage } from '@hermes/shared/gateway-events'
 import type { ServerRequest } from '@hermes/shared/json-rpc-channel'
-import { parseCommandDispatch } from '@hermes/shared/slash'
-import type { Key, ScrollTo, Session, TspEvent } from '@stencil-hq/tern'
-import { describeSlashExecError, isUnsupportedCommand, shouldFallbackToDispatch } from '@tui/app/userMessages.js'
+import type { Key, ScrollTo, Session } from '@stencil-hq/tern'
 import type { GatewayClient } from '@tui/gatewayClient.js'
 import type { AnyGatewayEvent } from '@tui/gatewayTypes.js'
 import type { SessionInfo } from '@tui/types.js'
@@ -23,7 +21,8 @@ import { Reconnect } from './chrome/reconnect.js'
 import { Theme } from './chrome/theme.js'
 import { copyToClipboard } from './clipboard.js'
 import { type LaunchEnv, readLaunchEnv } from './config/env.js'
-import { localCommand } from './commands.js'
+import { sessionHost, type SessionHostCx } from './commands/host.js'
+import { dispatched, runSlash, type SlashCx } from './commands/slash.js'
 import { Composer } from './composer.js'
 import { ConnectWatcher } from './connections/watcher.js'
 import { interruptTurn } from './controlCommands.js'
@@ -32,6 +31,7 @@ import { errorText } from './core/errors.js'
 import { durable, entryId, type LiveSessionId, liveSessionId, type PrKey, type StoredSessionId, storedSessionId } from './core/ids.js'
 import { RenderScheduler } from './core/scheduler.js'
 import { Attachments } from './draft/attachments.js'
+import { type KeyCx, onKey, type Presses } from './draft/keys.js'
 import { fastTier } from './fast.js'
 import { dispatcher, type Outcome } from './gateway/dispatch.js'
 import { type EventLog, eventLog } from './gateway/eventLog.js'
@@ -64,7 +64,7 @@ import { showThoughts } from './session/thoughts.js'
 import { SessionTitle } from './session/title.js'
 import { Sidebar } from './sidebar.js'
 import type { SessionHost } from './sessionCommands.js'
-import { ambiguousNotice, CommandCatalog, resolveSlashName } from './slashResolve.js'
+import { CommandCatalog } from './slashResolve.js'
 import { isRunning as processRuns, Processes, processTone } from './processes/store.js'
 import { hermesAuthor } from './processes/widgets/author.js'
 import { chartMemory } from './processes/widgets/memory.js'
@@ -74,6 +74,7 @@ import { PromptQueue } from './turn/queue.js'
 import { IMAGE_ONLY_PROMPT, type Prompt, shownText } from './turn/prompt.js'
 import { type GateState, gateDrain, PromptRouter } from './turn/router.js'
 import { type BusyMode, busyModeOf } from './turn/serverQueue.js'
+import { type ActionCx, onTernEvent } from './surface/actions.js'
 import { INPUT_ID, SurfaceHost } from './surface/host.js'
 import { runInput } from './surface/input.js'
 import { reportCwd } from './surface/osc.js'
@@ -86,9 +87,6 @@ import { rpc } from './wire/rpc.js'
 import { openSidebar, specOf } from './watch/spec.js'
 import { randomTip, type WelcomeContext } from './view/welcome.js'
 
-const EXIT_ARM_MS = 1500
-/** Two Esc presses within this window are a double Esc (Ink's DOUBLE_ESC_MS). */
-const DOUBLE_ESC_MS = 500
 /** How long a prompt's Copy button reads Copied. */
 const COPIED_MS = 1500
 /** How long quitting waits for the sessions to detach. */
@@ -141,16 +139,14 @@ export class App implements ChatPorts {
   readonly #tern: Session
   readonly #gw: GatewayClient
   readonly #completion: Completion
-  /** `commands.catalog`, for resolving a typed alias or prefix (`/hea` → /heartbeat). */
-  readonly #catalog: CommandCatalog
   readonly #welcome: WelcomeContext
   readonly #launch: LaunchEnv
   #surface!: SurfaceHost
   readonly #renders = new RenderScheduler(() => this.#render())
   /** Timers with no field of their own (a compaction's summary read, the quit's detach wait). */
   readonly #timers = new Disposables()
-  #exitArmed = 0
-  #lastEsc = 0
+  /** The last lone Esc and the first Ctrl+C of a quit, for the double presses. */
+  readonly #presses: Presses = { esc: 0, exit: 0 }
   #done = Promise.withResolvers<number>()
   /** Which session the pane shows and how it switches: views, held requests, the adopt steps. */
   readonly #life: SessionLifecycle
@@ -184,6 +180,14 @@ export class App implements ChatPorts {
   readonly #log: EventLog
   /** What each gateway event does to the pane (gateway/handlers/*), and whether it renders. */
   readonly #dispatch: (ev: AnyGatewayEvent) => Outcome
+  /** What the key rules (draft/keys.ts) reach. */
+  readonly #keys: KeyCx
+  /** What the Tern actions (surface/actions.ts) reach. */
+  readonly #actions: ActionCx
+  /** What a slash command reaches (commands/slash.ts). */
+  readonly #slash: SlashCx
+  /** What the control and session commands' host is made from (commands/host.ts). */
+  readonly #host: SessionHostCx
 
   /** `launch` and `settings` are what entry.ts read once at startup; unset, each reads its default. */
   constructor(tern: Session, gw: GatewayClient, version: string, { launch = readLaunchEnv(), settings = fileSettings() }: { launch?: LaunchEnv; settings?: SettingsSource } = {}) {
@@ -270,7 +274,6 @@ export class App implements ChatPorts {
     this.#theme = new Theme({ palette: palette => this.#surface.palette(palette), settings }, saved.theme ?? 'tern')
     this.#jobCharts = saved.jobCharts !== false
     this.#completion = new Completion(this, gw, () => this.sid)
-    this.#catalog = new CommandCatalog(gw)
     this.#welcome = {
       tip: randomTip(launch.pythonSrcRoot),
       version: version && version !== 'unknown' ? `v${version}` : ''
@@ -307,6 +310,61 @@ export class App implements ChatPorts {
       },
       type => this.#log.unknown(type)
     )
+    this.#keys = {
+      attachClipboardImage: () => void this.attachClipboardImage(false),
+      attachments: this.#attachments,
+      busy: () => Boolean(this.busy),
+      close: overlay => this.close(overlay),
+      completion: this.#completion,
+      composer: this.composer,
+      cycleEffort: () => cycleEffort(this),
+      hud: key => this.#hudKey(key),
+      interrupt: () => this.#interrupt(),
+      now: Date.now,
+      openAgents: () => openAgents(this),
+      openBackground: () => openBackground(this),
+      openPrs: () => openPrMenu(this),
+      presses: this.#presses,
+      queue: this.#queue,
+      quit: () => this.quit(),
+      submitDraft: () => this.#submitDraft(),
+      toggleSidebar: () => this.toggleSidebar(),
+      transcript: this.transcript
+    }
+    this.#actions = {
+      connect: this.#connect,
+      focusComposer: () => {
+        this.#hud.release()
+        this.#surface.focus(INPUT_ID)
+      },
+      modal: () => this.overlays.at(-1)?.modal === true,
+      openAgent: id => void this.openAgent(id),
+      openProcess: id => openBackground(this, id),
+      openUrl
+    }
+    this.#slash = {
+      attachments: this.#attachments,
+      catalog: new CommandCatalog(gw),
+      changed: () => this.changed(),
+      composer: this.composer,
+      gw,
+      host: this,
+      life: this.#life,
+      prompt: item => this.#router.route(item, this.#state.busyMode, 'command'),
+      transcript: this.transcript
+    }
+    this.#host = {
+      activity: this.#activity,
+      changed: () => this.changed(),
+      gw,
+      life: this.#life,
+      queue: this.#queue,
+      router: this.#router,
+      setCompacting: (on, opts) => this.#setCompacting(on, opts),
+      state: this.#state,
+      submit: text => this.#submit(text, true, 'queue'),
+      transcript: this.transcript
+    }
   }
 
   /** The open session's runtime id: null before the first session and while the gateway is down. */
@@ -428,8 +486,8 @@ export class App implements ChatPorts {
     void runInput(this.#tern, {
       after: () => this.changed(),
       onError: error => this.transcript.notice(`Input failed: ${errorText(error)}`, 'error'),
-      onEvent: event => this.#onTernEvent(event),
-      onKey: key => this.#onKey(key)
+      onEvent: event => onTernEvent(event, this.#actions),
+      onKey: key => onKey(key, this.#keys, this.overlays.at(-1))
     }).then(() => this.quit())
 
     const code = await this.#done.promise
@@ -510,136 +568,6 @@ export class App implements ChatPorts {
   }
 
   // ── Input ──────────────────────────────────────────────────────────
-
-  #onKey(key: Key) {
-    const top = this.overlays.at(-1)
-
-    if (key.ctrl && key.name === 'c') {
-      // The sheet on top answers first: a prompt's safe answer (deny, skip, cancel), a picker closes.
-      if (top) {
-        return top.cancel ? top.cancel() : this.close(top)
-      }
-
-      return this.#ctrlC()
-    }
-
-    if (top?.onKey(key)) {
-      return
-    }
-
-    if (top?.modal) {
-      return
-    }
-
-    // Before the completion: Enter on a focused pill opens it.
-    if (this.#hudKey(key)) {
-      return
-    }
-
-    if (this.#completion.onKey(key)) {
-      return
-    }
-
-    // A single Esc never cancels work (Ink's resolveDoubleEscAction): a second one within
-    // DOUBLE_ESC_MS clears a draft into the prompt history, else stops the running turn.
-    if (key.name === 'escape') {
-      const now = Date.now()
-      const double = now - this.#lastEsc <= DOUBLE_ESC_MS
-      this.#lastEsc = double ? 0 : now
-
-      if (double && this.#hasDraft()) {
-        this.#clearDraft()
-      } else if (double && this.busy) {
-        this.#interrupt()
-      }
-
-      return
-    }
-
-    if (key.shift && key.name === 'tab') {
-      return cycleEffort(this)
-    }
-
-    // By the Alt modifier only: a typed å, ∫, ß or π (macOS Option without Meta, or a keyboard
-    // that has the letter) is text for the composer. Alt+B/F/D stay the composer's readline word
-    // keys: a Mac terminal sends Option+←/→ as ESC b / ESC f, which arrive as Alt+B / Alt+F.
-    if (key.alt && !key.ctrl && !key.meta) {
-      switch (key.name) {
-        case 'a':
-          return openAgents(this)
-
-        case 'j':
-          return openBackground(this)
-
-        case 's':
-          return this.toggleSidebar()
-
-        case 'p':
-          return openPrMenu(this)
-      }
-    }
-
-    if (key.alt && key.name === 'up' && this.#queue.count()) {
-      return this.#queue.dequeue(0)
-    }
-
-    if (key.alt && key.name === 'enter' && this.busy && this.#queue.count() && !this.composer.text) {
-      return this.#queue.steer(0)
-    }
-
-    if (key.ctrl && key.name === 'd' && !this.#hasDraft()) {
-      return this.quit()
-    }
-
-    // An image: a paste with no text (what a terminal sends for a clipboard image), a pasted or
-    // dropped image path, or Ctrl+V.
-    if (key.name === 'paste' && this.#attachments.paste(key.text ?? '')) {
-      return
-    }
-
-    if (key.ctrl && key.name === 'v' && !key.alt && !key.meta) {
-      return void this.attachClipboardImage(false)
-    }
-
-    const action = this.composer.key(key)
-
-    if (action === 'submit') {
-      this.#submitDraft()
-    }
-  }
-
-  #onTernEvent(ev: TspEvent) {
-    if (ev.ev === 'action' && ev.act === 'open-agent' && ev.value) {
-      void this.openAgent(ev.value)
-
-      return
-    }
-
-    if (ev.ev === 'action' && ev.act === 'open-process' && ev.value) {
-      return openBackground(this, ev.value)
-    }
-
-    // A connect card's Authorize: the app's link in the browser.
-    if (ev.ev === 'action' && ev.act === 'open-url' && ev.value) {
-      return openUrl(ev.value)
-    }
-
-    if (ev.ev === 'action' && ev.act === 'connect-continue' && ev.value) {
-      return this.#connect.continue(ev.value)
-    }
-
-    // `<card>:<app>`: the card names the row, as call ids repeat.
-    if (ev.ev === 'action' && ev.act === 'connect-open' && ev.value) {
-      const at = ev.value.lastIndexOf(':')
-
-      return this.#connect.open(ev.value.slice(0, at), ev.value.slice(at + 1))
-    }
-
-    if (ev.ev === 'focus' && ev.id === INPUT_ID && !this.overlays.at(-1)?.modal) {
-      this.#hud.release()
-      this.#surface.focus(INPUT_ID)
-    }
-  }
 
   /** The agent's todo list while it matters: a turn runs, or something on it is still open. */
   #todos() {
@@ -804,45 +732,6 @@ export class App implements ChatPorts {
     return openHelp(this)
   }
 
-  /** Text or images in the composer: Ctrl+C clears them before it interrupts, Ctrl+D never exits over them. */
-  #hasDraft(): boolean {
-    return Boolean(this.composer.text || this.#attachments.any)
-  }
-
-  /** Esc Esc: the draft's text goes to the prompt history (Up brings it back), its images go. */
-  #clearDraft() {
-    if (this.composer.text.trim()) {
-      this.composer.take()
-    } else {
-      this.composer.set('')
-    }
-
-    // Its images go; one still uploading lands after.
-    this.#attachments.clear()
-  }
-
-  #ctrlC() {
-    if (this.#hasDraft()) {
-      this.composer.set('')
-      this.#attachments.clearAll()
-
-      return
-    }
-
-    if (this.busy) {
-      return this.#interrupt()
-    }
-
-    const now = Date.now()
-
-    if (now - this.#exitArmed < EXIT_ARM_MS) {
-      return this.quit()
-    }
-
-    this.#exitArmed = now
-    this.transcript.notice('Press Ctrl+C again to exit.')
-  }
-
   #copy(text: string, id: string) {
     copyToClipboard(text)
     this.#copied = id
@@ -893,7 +782,7 @@ export class App implements ChatPorts {
     }
 
     if (text.startsWith('/')) {
-      void this.#slash(text)
+      void runSlash(text, this.#slash)
 
       return
     }
@@ -953,102 +842,6 @@ export class App implements ChatPorts {
     this.changed()
   }
 
-  /** Runs `/name arg`; `resolve`: expand a typed alias or prefix through the catalog first. */
-  async #slash(text: string, resolve = true): Promise<void> {
-    const [typed = '', ...rest] = text.slice(1).split(/\s+/)
-    const name = typed.toLowerCase()
-    const arg = rest.join(' ')
-    const local = localCommand(name)
-
-    if (local) {
-      try {
-        const handled = await local.run(this, arg)
-
-        if (local.name === 'reload-skills') {
-          this.#catalog.reset()
-        }
-
-        if (handled !== false) {
-          return this.changed()
-        }
-      } catch (error) {
-        this.transcript.notice(errorText(error), 'error')
-
-        return this.changed()
-      }
-    }
-
-    // The reply belongs to the session it was typed in: once the view left it, or a switch begun since
-    // is in flight, the reply is dropped (Ink's stale()), so a late skill or /plan never sends its prompt
-    // to the next session.
-    const ticket = this.#life.replyTicket()
-    const { sid } = ticket
-    const stale = () => !ticket.isCurrent()
-
-    if (resolve) {
-      // Sessionless (starting, or the backend is down), only this frontend's own commands resolve.
-      const to = resolveSlashName(name, sid ? await this.#catalog.get(sid) : undefined)
-
-      if (stale()) {
-        return
-      }
-
-      if (to && 'ambiguous' in to) {
-        this.transcript.notice(ambiguousNotice(name, to.ambiguous), 'warning')
-
-        return this.changed()
-      }
-
-      if (to) {
-        return this.#slash(`/${to.name}${arg ? ` ${arg}` : ''}`, false)
-      }
-    }
-
-    if (!sid) {
-      return
-    }
-
-    const title = `/${name}${arg ? ` ${arg}` : ''}`
-
-    try {
-      const r = await rpc(this.#gw, 'slash.exec', { command: text.slice(1), session_id: sid })
-
-      if (stale()) {
-        return
-      }
-
-      await this.#dispatched(r, title, arg)
-    } catch (error) {
-      if (stale()) {
-        return
-      }
-
-      // Only "slash.exec does not own this command" (skills, bundles) falls through to command.dispatch;
-      // re-dispatching any other refusal could run a mutating command twice.
-      if (isUnsupportedCommand(error) || !shouldFallbackToDispatch(error)) {
-        this.transcript.notice(describeSlashExecError(name, error), isUnsupportedCommand(error) ? 'warning' : 'error')
-      } else {
-        try {
-          const r = await rpc(this.#gw, 'command.dispatch', { arg, name, session_id: sid })
-
-          if (stale()) {
-            return
-          }
-
-          await this.#dispatched(r, title, arg)
-        } catch (dispatchError) {
-          if (stale()) {
-            return
-          }
-
-          this.transcript.notice(describeSlashExecError(name, dispatchError), 'error')
-        }
-      }
-    }
-
-    this.changed()
-  }
-
   #interrupt() {
     if (!this.sid) {
       return
@@ -1073,58 +866,7 @@ export class App implements ChatPorts {
 
   /** The gateway-backed commands' view of this app (/steer, /queue, /stop, /tools, /undo, /compress, …). */
   control(): SessionHost {
-    const ticket = this.#state.ticket()
-    const { sid } = ticket
-
-    return {
-      busy: Boolean(this.busy),
-      // A steer that fell back to the queue: steering carries no images.
-      canonical: this.#gw.isCanonical,
-      enqueue: text => this.#router.behind({ images: [], kind: 'app', text }),
-      gw: this.#gw,
-      notice: (text, tone) => {
-        this.transcript.notice(text, tone)
-        this.changed()
-      },
-      // The shared gateway (the one /branch runs on) answers a resume with one id for both kinds.
-      open: async id => {
-        await this.resume(id)
-
-        return durable(this.#state.ref) === id
-      },
-      panel: (title, text) => {
-        this.transcript.panel(title, text)
-        this.changed()
-      },
-      compressing: state => {
-        if (state === 'start') {
-          this.transcript.compacting({ before: this.usage?.context_used || undefined, manual: true })
-        } else if (state === 'none') {
-          this.transcript.uncompact()
-        } else {
-          this.transcript.compacted(Date.now(), state)
-        }
-
-        this.#setCompacting(state === 'start', { manual: true })
-
-        this.changed()
-      },
-      queued: this.#queue.count(),
-      reload: async () => {
-        if (sid && ticket.isCurrent()) {
-          await this.#life.reload(sid)
-        }
-      },
-      send: text => this.#router.send({ images: [], kind: 'app', text }),
-      sid,
-      stale: () => !ticket.isCurrent(),
-      steered: text => {
-        this.transcript.steer(text)
-        this.changed()
-      },
-      // /queue: behind the turn whatever busy_input_mode says.
-      submit: text => this.#submit(text, true, 'queue')
-    }
+    return sessionHost(this.#host)
   }
 
   /**
@@ -1180,64 +922,7 @@ export class App implements ChatPorts {
 
   /** Acts on a command's dispatch envelope from outside a typed command (a goal or loop sheet's button). */
   runDispatch(raw: unknown, title: string): Promise<void> {
-    return this.#dispatched(raw, title, '')
-  }
-
-  /** Acts on a slash.exec / command.dispatch answer: output, a skill or message to send, an alias or a prefill. */
-  /** A prompt a slash command made (a skill, a `send`): while a turn runs it takes the busy path a typed one does. */
-  #prompt(item: Prompt) {
-    this.#router.route(item, this.#state.busyMode, 'command')
-  }
-
-  async #dispatched(raw: unknown, title: string, arg: string) {
-    const d = parseCommandDispatch(raw)
-    const legacy = (raw ?? {}) as { output?: string; warning?: string }
-
-    if (legacy.warning) {
-      this.transcript.notice(legacy.warning, 'warning')
-    }
-
-    if (!d) {
-      if (legacy.output?.trim()) {
-        this.transcript.panel(title, legacy.output)
-      }
-
-      return
-    }
-
-    switch (d.type) {
-      case 'exec':
-
-      case 'plugin':
-        if (d.output?.trim()) {
-          this.transcript.panel(title, d.output)
-        }
-
-        return
-
-      case 'alias':
-        return this.#slash(`/${d.target}${arg ? ` ${arg}` : ''}`)
-
-      case 'skill':
-        // `message` is the expanded skill body for the model; the transcript shows the invocation.
-        return d.message?.trim()
-          ? this.#prompt({ display: d.display || title, images: this.#attachments.take(), kind: 'command', text: d.message })
-          : this.transcript.notice(`${title}: the skill sent no message`, 'error')
-
-      case 'send':
-        if (d.notice?.trim()) {
-          this.transcript.notice(d.notice)
-        }
-
-        return d.message?.trim() ? this.#prompt({ display: d.display, images: this.#attachments.take(), kind: 'command', text: d.message }) : undefined
-
-      case 'prefill':
-        if (d.notice?.trim()) {
-          this.transcript.notice(d.notice)
-        }
-
-        this.composer.set(d.message)
-    }
+    return dispatched(raw, this.#slash, { arg: '', title })
   }
 
   // ── Gateway ────────────────────────────────────────────────────────

@@ -10,7 +10,7 @@ import { currentGeneration } from './hermes/mutate.js'
 import type { NoticeEntry } from './model.js'
 import { rpc } from './wire/rpc.js'
 
-/** What a control command needs from the app; App.control() supplies it. */
+/** What a control command needs from the app; commands/host.ts's sessionHost() supplies it. */
 export interface ControlHost {
   gw: Pick<GatewayClient, 'request'>
   /** The open session's runtime id. */

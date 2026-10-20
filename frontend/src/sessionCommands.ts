@@ -12,7 +12,7 @@ import { type MutationResult, mutateSession } from './hermes/mutate.js'
 import { lastTurnRewind, retryText, retryTurnRewind } from './hermes/rewind.js'
 import { rpc } from './wire/rpc.js'
 
-/** What a session command needs beyond a control command's host; App.control() supplies it. */
+/** What a session command needs beyond a control command's host; commands/host.ts's sessionHost() supplies it. */
 export interface SessionHost extends ControlHost {
   /** The gateway is Hermes' shared one (only it serves `session.mutate`). */
   canonical: boolean
