@@ -338,3 +338,8 @@ export function commandLine(command: string, n = 96): string {
 
   return clip(flat, n)
 }
+
+/** `text` on one line: a list row is one line high, so a description with line breaks spills over its neighbours. */
+export function oneLine(text: string): string {
+  return text.replace(/\s+/g, ' ').trim()
+}

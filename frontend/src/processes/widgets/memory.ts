@@ -9,8 +9,8 @@ import { dataDir } from '../../connections.js'
 
 import { type Spec, validateSpec } from './spec.js'
 
-/** What is known of a process's chart: its rules, or that the model declined. */
-export type Remembered = Spec | 'skip'
+/** What is known of a process's chart: its rules, or that the model declined it at so many lines. */
+export type Remembered = Spec | { skip: number }
 
 export interface ChartMemory {
   load(id: string): Remembered | undefined
@@ -32,8 +32,8 @@ export function chartMemory(dir = join(dataDir(), 'charts'), now = Date.now): Ch
       try {
         const value: unknown = JSON.parse(readFileSync(join(dir, `${id}.json`), 'utf8'))
 
-        if (value === 'skip') {
-          return 'skip'
+        if (value && typeof value === 'object' && typeof (value as { skip?: unknown }).skip === 'number') {
+          return { skip: (value as { skip: number }).skip }
         }
 
         // Checked again: the file is outside the frontend's hands.

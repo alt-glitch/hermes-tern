@@ -14,6 +14,7 @@ import type { App } from '../app.js'
 import { mutateSession } from '../hermes/mutate.js'
 import { inWorkspace, lastReply, sessionLabel, type StoredSession, storedSessions, workspaceOf } from '../hermes/sessionIndex.js'
 import type { Overlay } from '../overlay.js'
+import { oneLine } from '../view/describe.js'
 
 import { editQuery, hitRuns, moveSelection, rank } from './search.js'
 
@@ -286,7 +287,7 @@ function itemOf(s: StoredSession, now: number, running: boolean, elsewhere: bool
       ...(s.branch ? [{ text: s.branch, title: `Branch ${s.branch}` }] : []),
       ...(elsewhere && s.cwd ? [{ text: basename(s.cwd), title: s.cwd }] : [])
     ],
-    detail: s.title && s.preview ? s.preview : undefined,
+    detail: s.title && s.preview ? oneLine(s.preview) : undefined,
     facts: { size: `${s.messages} msg${s.messages === 1 ? '' : 's'}`, when: ageOf(s.lastActive, now) },
     id: s.id,
     label,

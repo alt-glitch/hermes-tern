@@ -11,6 +11,7 @@ import type { GatewayClient } from '@tui/gatewayClient.js'
 
 import { HIDDEN_COMMANDS, localCommands } from '../commands.js'
 import { completionRequestForInput } from '../hermes/completion.js'
+import { oneLine } from '../view/describe.js'
 
 import type { Composer } from '../composer.js'
 import type { OverlayHost } from '../overlay.js'
@@ -202,7 +203,7 @@ export class Completion {
           >
             {this.items.map((item, i) => (
               <item
-                detail={item.meta && item.meta !== 'dir' ? item.meta : undefined}
+                detail={item.meta && item.meta !== 'dir' ? oneLine(item.meta) : undefined}
                 icon={iconOf(item)}
                 key={String(i)}
                 label={labelOf(item, this.#for, this.#replaceFrom)}
