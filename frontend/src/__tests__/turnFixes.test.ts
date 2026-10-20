@@ -8,8 +8,11 @@ import { join } from 'node:path'
 
 import { describe, expect, it, vi } from 'vitest'
 
+import { sessionHost } from '../commands/host.js'
 import { type LiveSessionId, liveSessionId, storedSessionId } from '../core/ids.js'
 import { sessionTicket } from '../session/state.js'
+import { SESSION_COMMANDS, type SessionHost } from '../sessionCommands.js'
+import { Transcript } from '../transcript.js'
 import { Activity } from '../turn/activity.js'
 import type { Prompt } from '../turn/prompt.js'
 import { PromptQueue, type QueueHost } from '../turn/queue.js'
@@ -301,5 +304,83 @@ describe("this pane's admissions into the shared gateway's queue", () => {
 
     expect(app.activity.busy).not.toBeNull()
     expect(app.composer.text).toBe('never mind')
+  })
+})
+
+describe('/compress takes back only its own compaction, and only in its own session', () => {
+  it('a /compress that fails after the view left its session leaves the new one alone, and says nothing there', async () => {
+    let stale = false
+    const compressing = vi.fn()
+    const notice = vi.fn()
+    const gw = new FakeGateway({
+      replies: {
+        'session.mutate': () => {
+          stale = true
+
+          throw new Error('boom')
+        },
+        'session.resume': () => ({ execution_generation: 7, revision: 3 })
+      }
+    })
+    const host: SessionHost = {
+      busy: false,
+      canonical: true,
+      compressing,
+      enqueue: () => undefined,
+      gw: gw.client,
+      notice,
+      open: () => Promise.resolve(true),
+      panel: () => undefined,
+      queued: 0,
+      reload: () => Promise.resolve(),
+      send: () => undefined,
+      sid: liveSessionId('s1'),
+      stale: () => stale,
+      submit: () => undefined
+    }
+
+    await SESSION_COMMANDS.find(c => c.name === 'compress')?.run(host, '')
+
+    expect(compressing.mock.calls).toEqual([['start']])
+    expect(notice).not.toHaveBeenCalled()
+  })
+
+  it('uncompact(c) drops compaction c, not the one seen last', () => {
+    const t = new Transcript()
+    const mine = t.compacting({ at: 1, manual: true })
+    t.compacted(2)
+    const hermes = t.compacting({ at: 3, before: 10 })
+    expect(hermes).not.toBe(mine)
+
+    t.uncompact(mine)
+    expect(t.entries.flatMap(e => (e.kind === 'compaction' ? [e.compaction] : []))).toEqual([hermes])
+
+    // A compaction already dropped (or never seen here) changes nothing.
+    t.uncompact(mine)
+    expect(t.entries.filter(e => e.kind === 'compaction')).toHaveLength(1)
+  })
+
+  it("the session host's 'none' takes back the compaction its 'start' opened", () => {
+    const t = new Transcript()
+    const host = sessionHost({
+      activity: new Activity(),
+      changed: () => undefined,
+      gw: new FakeGateway().client,
+      life: { reload: () => Promise.resolve(undefined), resume: () => Promise.resolve() },
+      queue: { count: () => 0 },
+      router: { behind: () => undefined, send: () => undefined },
+      setCompacting: () => undefined,
+      state: { ref: { live: liveSessionId('s1'), stored: null }, ticket: () => sessionTicket(() => liveSessionId('s1'), new AbortController().signal), usage: null },
+      submit: () => undefined,
+      transcript: t
+    })
+
+    host.compressing('start')
+    // Its own status edge ends it; Hermes starts another before /compress answers that nothing changed.
+    t.compacted(2)
+    const hermes = t.compacting({ at: 3, before: 10 })
+    host.compressing('none')
+
+    expect(t.entries.flatMap(e => (e.kind === 'compaction' ? [e.compaction] : []))).toEqual([hermes])
   })
 })

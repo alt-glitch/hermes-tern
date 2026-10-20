@@ -119,6 +119,11 @@ async function compress(host: SessionHost, arg: string) {
   try {
     result = await mutateSession(host.gw, host.sid, 'compress', focus ? { focus } : {})
   } catch (e) {
+    // The view left the session: the shown transcript (and its compaction) is another's.
+    if (host.stale()) {
+      return
+    }
+
     if (!preview) {
       host.compressing('none')
     }

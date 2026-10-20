@@ -43,16 +43,18 @@ export class Compactions {
   /**
    * The context started compacting. Inside a running turn that already did something it is a
    * step of that turn; else it goes between turns, before the turn it was compacted for. Hermes'
-   * later lines of the same compaction only fill in the count.
+   * later lines of the same compaction only fill in the count. Returns the compaction (the one
+   * already running, when it fills one in): the handle uncompact() takes back.
    */
-  compacting({ before, at = Date.now(), manual = false }: CompactionStart) {
+  compacting({ before, at = Date.now(), manual = false }: CompactionStart): Compaction {
     const running = this.#seen.findLast(c => c.status === 'running')
 
     if (running) {
       running.before ??= before || undefined
       running.manual ||= manual || undefined
+      this.#touch(running)
 
-      return this.#touch(running)
+      return running
     }
 
     const compaction: Compaction = { startedAt: at, status: 'running', ...(before ? { before } : {}), ...(manual ? { manual } : {}) }
@@ -63,7 +65,7 @@ export class Compactions {
       live.blocks.push({ at, compaction, id: this.#host.id('z'), kind: 'compaction' })
       live.rev++
 
-      return
+      return compaction
     }
 
     const entry: CompactionEntry = { compaction, id: this.#host.id('z'), kind: 'compaction', rev: 0 }
@@ -74,6 +76,8 @@ export class Compactions {
     } else {
       entries.push(entry)
     }
+
+    return compaction
   }
 
   /**
@@ -99,17 +103,20 @@ export class Compactions {
   }
 
   /**
-   * The last compaction did not happen after all: Hermes aborted it (no done edge came before the
-   * turn ended; `running` drops only a running one) or /compress changed nothing.
+   * A compaction did not happen after all. `'running'`: Hermes aborted the last one (no done edge
+   * came before the turn ended), dropped only while it runs; a compaction: the one compacting()
+   * returned to /compress, which changed nothing (another one seen since stays).
    */
-  uncompact(running = false) {
-    const c = this.#seen.at(-1)
+  uncompact(which: Compaction | 'running') {
+    const last = this.#seen.at(-1)
+    const c = which === 'running' ? (last?.status === 'running' ? last : undefined) : which
+    const seen = c ? this.#seen.indexOf(c) : -1
 
-    if (!c || (running && c.status !== 'running')) {
+    if (!c || seen < 0) {
       return
     }
 
-    this.#seen.pop()
+    this.#seen.splice(seen, 1)
     const entries = this.#host.entries()
     const at = entries.findIndex(e => e.kind === 'compaction' && e.compaction === c)
 

@@ -5,6 +5,7 @@
 import type { GatewayClient } from '@tui/gatewayClient.js'
 
 import { durable, type StoredSessionId } from '../core/ids.js'
+import type { Compaction } from '../model.js'
 import type { SessionLifecycle } from '../session/lifecycle.js'
 import type { SessionState } from '../session/state.js'
 import type { SessionHost } from '../sessionCommands.js'
@@ -33,6 +34,8 @@ export interface SessionHostCx {
 export function sessionHost(cx: SessionHostCx): SessionHost {
   const ticket = cx.state.ticket()
   const { sid } = ticket
+  /** The compaction /compress opened: the one its 'none' takes back. */
+  let started: Compaction | undefined
 
   return {
     busy: Boolean(cx.activity.busy),
@@ -56,9 +59,11 @@ export function sessionHost(cx: SessionHostCx): SessionHost {
     },
     compressing: state => {
       if (state === 'start') {
-        cx.transcript.compacting({ before: cx.state.usage?.context_used || undefined, manual: true })
+        started = cx.transcript.compacting({ before: cx.state.usage?.context_used || undefined, manual: true })
       } else if (state === 'none') {
-        cx.transcript.uncompact()
+        if (started) {
+          cx.transcript.uncompact(started)
+        }
       } else {
         cx.transcript.compacted(Date.now(), state)
       }

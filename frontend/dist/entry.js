@@ -24739,6 +24739,7 @@ function durable(ids) {
 function sessionHost(cx) {
   const ticket = cx.state.ticket();
   const { sid } = ticket;
+  let started;
   return {
     busy: Boolean(cx.activity.busy),
     // A steer that fell back to the queue: steering carries no images.
@@ -24760,9 +24761,11 @@ function sessionHost(cx) {
     },
     compressing: (state) => {
       if (state === "start") {
-        cx.transcript.compacting({ before: cx.state.usage?.context_used || void 0, manual: true });
+        started = cx.transcript.compacting({ before: cx.state.usage?.context_used || void 0, manual: true });
       } else if (state === "none") {
-        cx.transcript.uncompact();
+        if (started) {
+          cx.transcript.uncompact(started);
+        }
       } else {
         cx.transcript.compacted(Date.now(), state);
       }
@@ -64659,6 +64662,9 @@ async function compress(host, arg) {
   try {
     result = await mutateSession(host.gw, host.sid, "compress", focus ? { focus } : {});
   } catch (e) {
+    if (host.stale()) {
+      return;
+    }
     if (!preview5) {
       host.compressing("none");
     }
@@ -67176,7 +67182,7 @@ function afterMessageComplete(p3, cx) {
   cx.transcript.complete(p3);
   cx.activity.endBusy();
   cx.activity.endCompaction();
-  cx.transcript.uncompact(true);
+  cx.transcript.uncompact("running");
   cx.summarize();
   cx.drain();
   cx.prs.poke();
@@ -73312,14 +73318,16 @@ var Compactions = class {
   /**
    * The context started compacting. Inside a running turn that already did something it is a
    * step of that turn; else it goes between turns, before the turn it was compacted for. Hermes'
-   * later lines of the same compaction only fill in the count.
+   * later lines of the same compaction only fill in the count. Returns the compaction (the one
+   * already running, when it fills one in): the handle uncompact() takes back.
    */
   compacting({ before, at = Date.now(), manual = false }) {
     const running2 = this.#seen.findLast((c) => c.status === "running");
     if (running2) {
       running2.before ??= before || void 0;
       running2.manual ||= manual || void 0;
-      return this.#touch(running2);
+      this.#touch(running2);
+      return running2;
     }
     const compaction = { startedAt: at, status: "running", ...before ? { before } : {}, ...manual ? { manual } : {} };
     this.#seen.push(compaction);
@@ -73327,7 +73335,7 @@ var Compactions = class {
     if (live?.blocks.length) {
       live.blocks.push({ at, compaction, id: this.#host.id("z"), kind: "compaction" });
       live.rev++;
-      return;
+      return compaction;
     }
     const entry = { compaction, id: this.#host.id("z"), kind: "compaction", rev: 0 };
     const entries = this.#host.entries();
@@ -73336,6 +73344,7 @@ var Compactions = class {
     } else {
       entries.push(entry);
     }
+    return compaction;
   }
   /**
    * The running compaction ended. `tokens` are the owner's own counts (/compress reports them
@@ -73356,15 +73365,18 @@ var Compactions = class {
     this.#touch(c);
   }
   /**
-   * The last compaction did not happen after all: Hermes aborted it (no done edge came before the
-   * turn ended; `running` drops only a running one) or /compress changed nothing.
+   * A compaction did not happen after all. `'running'`: Hermes aborted the last one (no done edge
+   * came before the turn ended), dropped only while it runs; a compaction: the one compacting()
+   * returned to /compress, which changed nothing (another one seen since stays).
    */
-  uncompact(running2 = false) {
-    const c = this.#seen.at(-1);
-    if (!c || running2 && c.status !== "running") {
+  uncompact(which) {
+    const last = this.#seen.at(-1);
+    const c = which === "running" ? last?.status === "running" ? last : void 0 : which;
+    const seen = c ? this.#seen.indexOf(c) : -1;
+    if (!c || seen < 0) {
       return;
     }
-    this.#seen.pop();
+    this.#seen.splice(seen, 1);
     const entries = this.#host.entries();
     const at = entries.findIndex((e) => e.kind === "compaction" && e.compaction === c);
     if (at >= 0) {
@@ -73836,15 +73848,15 @@ var Transcript = class {
    * it was compacted for. Hermes' later lines of the same compaction only fill in the count.
    */
   compacting(start = {}) {
-    this.#compactions.compacting(start);
+    return this.#compactions.compacting(start);
   }
   /** The running compaction ended (`tokens`: the owner's own counts, when it reports them). */
   compacted(at = Date.now(), tokens2 = {}) {
     this.#compactions.compacted(at, tokens2);
   }
-  /** The last compaction did not happen after all (`running`: drop it only while it runs). */
-  uncompact(running2 = false) {
-    this.#compactions.uncompact(running2);
+  /** A compaction did not happen after all: the one compacting() returned, or (`'running'`) the last one while it runs. */
+  uncompact(which) {
+    this.#compactions.uncompact(which);
   }
   /** A context reading (tokens in use): the first one under the last compaction's `before` is what it left. */
   contextUsed(used) {

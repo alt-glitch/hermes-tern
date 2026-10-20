@@ -88,7 +88,7 @@ describe('compaction in the transcript', () => {
     t.compacted(13_000)
     t.text('done', 14_000)
     t.complete({ status: 'complete', text: 'done' }, 20_000)
-    t.uncompact(true)
+    t.uncompact('running')
 
     expect(compactions(t)).toEqual([expect.objectContaining({ before: 182_000, endedAt: 13_000, status: 'done' })])
     expect(parts(lastTurn(t.entries)).map(p => (p.kind === 'fold' ? `fold:${p.label}` : p.blocks.map(b => b.kind).join()))).toEqual([
@@ -137,14 +137,14 @@ describe('compaction in the transcript', () => {
     t.text('x', 1)
     t.compacting({ at: 2, before: 1 })
     t.complete({ status: 'complete', text: 'x' }, 3)
-    t.uncompact(true)
+    t.uncompact('running')
     expect(shape(t.entries)).toEqual(['turn(text)'])
 
-    t.compacting({ at: 4, before: 1 })
+    const done = t.compacting({ at: 4, before: 1 })
     t.compacted(5)
-    t.uncompact(true)
+    t.uncompact('running')
     expect(shape(t.entries)).toEqual(['turn(text)', 'compaction'])
-    t.uncompact()
+    t.uncompact(done)
     expect(shape(t.entries)).toEqual(['turn(text)'])
   })
 

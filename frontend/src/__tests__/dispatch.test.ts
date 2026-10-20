@@ -288,11 +288,11 @@ describe('afterMessageComplete', () => {
       prs: { poke: note('prs.poke') },
       sidebar: { poke: note('sidebar.poke') },
       summarize: note('summarize'),
-      transcript: { complete: note('complete'), uncompact: running => void log.push(`uncompact ${String(running)}`) }
+      transcript: { complete: note('complete'), uncompact: which => void log.push(`uncompact ${String(which)}`) }
     }
 
     afterMessageComplete({}, cx)
 
-    expect(log).toEqual(['complete', 'endBusy', 'endCompaction', 'uncompact true', 'summarize', 'drain', 'prs.poke', 'sidebar.poke'])
+    expect(log).toEqual(['complete', 'endBusy', 'endCompaction', 'uncompact running', 'summarize', 'drain', 'prs.poke', 'sidebar.poke'])
   })
 })

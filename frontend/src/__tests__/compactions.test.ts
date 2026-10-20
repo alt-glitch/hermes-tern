@@ -89,23 +89,23 @@ describe('Compactions', () => {
     expect(compactions.restore([{ at: 1_500, summary: 's' }])).toEqual([{ at: 1_500, compaction: { startedAt: 1_500, status: 'done', summary: 's' } }])
   })
 
-  it('takes back the last one: an entry, or a step of the turn holding it', () => {
+  it('takes one back: an entry, or a step of the turn holding it', () => {
     const live = turn({ blocks: [{ id: entryId('x'), kind: 'text', text: 'go' }] })
     const { compactions } = setup([live], live)
 
-    compactions.compacting({ at: 1 })
+    const c = compactions.compacting({ at: 1 })
     compactions.compacted(2)
     // `running` drops only a running one.
-    compactions.uncompact(true)
+    compactions.uncompact('running')
     expect(live.blocks.map(b => b.kind)).toEqual(['text', 'compaction'])
 
-    compactions.uncompact()
+    compactions.uncompact(c)
     expect(live.blocks.map(b => b.kind)).toEqual(['text'])
 
     const between = setup()
     between.compactions.compacting({ at: 3 })
     expect(between.entries).toHaveLength(1)
-    between.compactions.uncompact(true)
+    between.compactions.uncompact('running')
     expect(between.entries).toEqual([])
   })
 

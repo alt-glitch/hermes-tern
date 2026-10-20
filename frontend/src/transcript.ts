@@ -17,7 +17,7 @@ import type {
 import { settleBridge, unwrap } from './bridge.js'
 import type { StoredCompaction } from './compaction.js'
 import { type EntryId, entryId, type ToolCallId, toolCallId } from './core/ids.js'
-import type { Counters, Entry, NoticeEntry, Todo, ToolCall, TurnEntry, UserAttachment } from './model.js'
+import type { Compaction, Counters, Entry, NoticeEntry, Todo, ToolCall, TurnEntry, UserAttachment } from './model.js'
 import { callIn, callsWhere, findCall, isBackgroundCall, isTodoName, isToolError, isWatchCall, type Located } from './transcript/calls.js'
 import { type CompactionStart, Compactions } from './transcript/compactions.js'
 import { history, storedUser } from './transcript/history.js'
@@ -166,8 +166,8 @@ export class Transcript {
    * already did something it is a step of that turn; else it goes between turns, before the turn
    * it was compacted for. Hermes' later lines of the same compaction only fill in the count.
    */
-  compacting(start: CompactionStart = {}) {
-    this.#compactions.compacting(start)
+  compacting(start: CompactionStart = {}): Compaction {
+    return this.#compactions.compacting(start)
   }
 
   /** The running compaction ended (`tokens`: the owner's own counts, when it reports them). */
@@ -175,9 +175,9 @@ export class Transcript {
     this.#compactions.compacted(at, tokens)
   }
 
-  /** The last compaction did not happen after all (`running`: drop it only while it runs). */
-  uncompact(running = false) {
-    this.#compactions.uncompact(running)
+  /** A compaction did not happen after all: the one compacting() returned, or (`'running'`) the last one while it runs. */
+  uncompact(which: Compaction | 'running') {
+    this.#compactions.uncompact(which)
   }
 
   /** A context reading (tokens in use): the first one under the last compaction's `before` is what it left. */

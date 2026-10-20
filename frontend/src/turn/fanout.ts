@@ -88,7 +88,7 @@ export function afterMessageComplete(p: MessageCompletePayload, cx: MessageFanou
   cx.activity.endBusy()
   cx.activity.endCompaction()
   // A compaction Hermes aborted sends no done edge; one that committed has its summary stored now.
-  cx.transcript.uncompact(true)
+  cx.transcript.uncompact('running')
   cx.summarize()
   cx.drain()
   // The turn may have pushed a branch, opened a PR or changed files.
