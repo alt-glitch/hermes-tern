@@ -1,23 +1,24 @@
-# ui-tsp — Hermes for Tern
+# hermes-tern frontend
 
-A frontend for Hermes that describes its UI to [Tern](https://stencil.so/tern) over the
-Tern Surface Protocol (TSP) instead of painting terminal cells: the transcript, tool calls,
-thinking, the composer and every sheet are semantic nodes the terminal lays out, draws and
-animates natively. It is a sibling of the Ink TUI (`ui-tui/`) and talks to the same backend,
-`tui_gateway`, over the same JSON-RPC contract.
+The chat UI that `hermes tern` runs. It describes the UI to [Tern](https://stencil.so/tern) over
+the Tern Surface Protocol (TSP) instead of painting terminal cells: the transcript, tool calls,
+thinking, the composer and every sheet are semantic nodes that the terminal lays out, draws and
+animates natively. It is a sibling of Hermes' Ink TUI (`ui-tui/`), and it talks to the same
+backend, `tui_gateway`, over the same JSON-RPC contract.
 
 ## Running
 
-`hermes` picks it on its own inside Tern (`TERM_PROGRAM=tern`, outside tmux/screen/zellij):
+The plugin's `hermes tern` command (`../__init__.py`) runs `hermes chat --tui` with
+`HERMES_TUI_DIR` pointing here, so Hermes' launcher starts `dist/entry.js`. The frontend asks the
+terminal for TSP first. A terminal that does not answer makes it exit with code 75, and
+`hermes tern` runs the Ink TUI in its place.
 
-| Switch | Effect |
-| --- | --- |
-| `hermes --cli` | Classic REPL, as always |
-| `HERMES_TERN=0` or `display.tern: false` | Never try the Tern frontend |
-| `HERMES_TERN=1` | Try it even where `TERM_PROGRAM` doesn't say Tern (Tern over ssh) |
-
-The frontend asks the terminal for TSP first. A terminal that doesn't answer makes it exit with
-code 75, and the launcher runs the Ink TUI in its place (`hermes_cli/main_tui_launch.py`).
+```mermaid
+flowchart LR
+  GW[gateway events] --> L[session/lifecycle] --> D[gateway/dispatch] --> S[(stores)]
+  K[keys] --> KR[draft/keys] --> A[app/actions] --> R[turn/router] -->|wire/rpc| GW
+  S --> F[app/frame] --> T[Tern surface]
+```
 
 ## Layout
 
