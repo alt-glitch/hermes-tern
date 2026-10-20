@@ -229,7 +229,7 @@ describe('Composer: the pastes a draft holds', () => {
 
     await press(key('paste', { text: '!echo hi' }))
     await press(key('c', { ctrl: true }))
-    expect(app.composer.text).toBe('')
+    expect(app.stores.composer.text).toBe('')
 
     for (const ch of '!echo hi') {
       await press(key(ch, { text: ch }))
@@ -257,9 +257,9 @@ describe('Composer: the pastes a draft holds', () => {
 
     await press(key('paste', { text: '!echo hi' }))
     await press(key('c', { ctrl: true }))
-    expect(app.composer.text).toBe('')
+    expect(app.stores.composer.text).toBe('')
     await press(key('z', { ctrl: true }))
-    expect(app.composer.text).toBe('!echo hi')
+    expect(app.stores.composer.text).toBe('!echo hi')
 
     await press(key('enter'))
 

@@ -370,15 +370,15 @@ export class AppActions {
     const { state, transcript } = this.#cx
     const ticket = state.ticket()
 
-    if (!transcript.unsummarized) {
+    if (!transcript.compactions.unsummarized) {
       return
     }
 
     this.#cx.timers.timeout(() => {
       const stored = state.info?.stored_session_id || state.ref.stored
 
-      if (ticket.isCurrent() && stored && transcript.unsummarized) {
-        transcript.summarize(storedCompactions(stored))
+      if (ticket.isCurrent() && stored && transcript.compactions.unsummarized) {
+        transcript.compactions.summarize(storedCompactions(stored))
         this.#cx.changed()
       }
     }, delay)

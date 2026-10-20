@@ -12,6 +12,7 @@ import { NoticeStrip } from '../chrome/notices.js'
 import { Reconnect } from '../chrome/reconnect.js'
 import { Sidebar } from '../chrome/sidebar.js'
 import { Theme } from '../chrome/theme.js'
+import { dispatched } from '../commands/slash.js'
 import type { LaunchEnv } from '../config/env.js'
 import { markViewer } from '../connections/cards.js'
 import { ConnectWatcher } from '../connections/watcher.js'
@@ -50,14 +51,6 @@ import { randomTip, type WelcomeContext } from '../view/welcome.js'
 import type { AppActions } from './actions.js'
 import type { ChatPorts } from './ports.js'
 
-/** What the stores reach of the app: its ports, and the two calls only App answers. */
-export type StoresHost = ChatPorts & {
-  /** A subagent ended (the PRs it linked may be new). */
-  agentEnded(): void
-  /** Acts on a command's dispatch envelope (a goal resume sends its kickoff). */
-  runDispatch(raw: unknown, title: string): Promise<void>
-}
-
 /** What the stores are made over: the outside parties, what entry.ts read at startup, the app's later parts. */
 export interface StoresDeps {
   readonly tern: Session
@@ -78,7 +71,7 @@ export interface StoresDeps {
 export type ChatStores = ReturnType<typeof chatStores>
 
 /** Makes every store of the chat pane over `chat`'s ports, in the order they depend on each other. */
-export function chatStores(chat: StoresHost, { act, gw, launch, settings, surface, tern, version }: StoresDeps) {
+export function chatStores(chat: ChatPorts, { act, gw, launch, settings, surface, tern, version }: StoresDeps) {
   const changed = () => chat.changed()
   const saved = settings.load()
   const jobCharts = saved.jobCharts !== false
@@ -89,10 +82,12 @@ export function chatStores(chat: StoresHost, { act, gw, launch, settings, surfac
   const activity = new Activity()
   /** What the subagent, process and automation stores read of the app: the shown runtime id on each use. */
   const live = {
-    agentEnded: () => chat.agentEnded(),
+    // A subagent ended: the PRs it linked are filed under this conversation (pull_requests.py).
+    agentEnded: () => prs.relink(),
     changed,
     gw,
-    runDispatch: (raw: unknown, title: string) => chat.runDispatch(raw, title),
+    // A command's dispatch envelope from outside a typed command (a goal or loop sheet's button).
+    runDispatch: (raw: unknown, title: string) => dispatched(raw, act().slash, { arg: '', title }),
     get sid() {
       return session.ref.live
     },

@@ -14,35 +14,29 @@ import type { Agents } from '../agents/store.js'
 import type { Sidebar } from '../chrome/sidebar.js'
 import { sessionHost } from '../commands/host.js'
 import type { SessionHost } from '../commands/session.js'
-import { dispatched } from '../commands/slash.js'
 import { type LaunchEnv, readLaunchEnv } from '../config/env.js'
 import { markViewer } from '../connections/cards.js'
 import { errorText } from '../core/errors.js'
 import { durable, entryId, type PrKey, type StoredSessionId } from '../core/ids.js'
 import { RenderScheduler } from '../core/scheduler.js'
-import type { Composer } from '../draft/composer.js'
 import { onKey } from '../draft/keys.js'
 import { followGateway } from '../gateway/follow.js'
 import type { PullRequests } from '../github/store.js'
-import type { Media } from '../media.js'
 import type { NoticeEntry } from '../model.js'
 import { openHelp } from '../overlays/help.js'
 import type { Overlay } from '../overlays/overlay.js'
 import type { Cron } from '../processes/cron.js'
 import type { Processes } from '../processes/store.js'
-import type { PrAside } from '../prs/aside.js'
 import type { Automation } from '../session/automation.js'
 import { applyEffort } from '../session/effort.js'
 import type { SessionState } from '../session/state.js'
-import type { SessionTitle } from '../session/title.js'
 import { fileSettings, type SettingsSource, type ThemeMode } from '../settings.js'
 import { onTernEvent } from '../surface/actions.js'
 import { INPUT_ID, SurfaceHost } from '../surface/host.js'
 import { runInput } from '../surface/input.js'
 import type { Transcript } from '../transcript/store.js'
-import type { Activity, Busy } from '../turn/activity.js'
+import type { Busy } from '../turn/activity.js'
 import { IMAGE_ONLY_PROMPT } from '../turn/prompt.js'
-import type { PromptQueue } from '../turn/queue.js'
 import { STYLES } from '../view/styles.js'
 import { noticeSink, onCardFault } from '../view/tools/faults.js'
 import { busyLabel, preparingLabel } from '../view/workLogModel.js'
@@ -57,24 +51,18 @@ const QUIT_DETACH_MS = 1500
 
 /** Runs the Tern frontend until the user quits; resolves the exit code. */
 export class App implements ChatPorts {
-  // The stores the ports lend, and the tests read (app/stores.ts says what each one holds).
+  // The stores the ports lend (ChatPorts; app/stores.ts says what each one holds).
   readonly session: SessionState
   readonly transcript: Transcript
-  readonly activity: Activity
-  readonly media: Media
   readonly agents: Agents
   readonly processes: Processes
   readonly cron: Cron
   readonly sidebar: Sidebar
   readonly automation: Automation
-  readonly title: SessionTitle
   readonly prs: PullRequests
-  readonly prAside: PrAside
-  readonly composer: Composer
   readonly overlays: Overlay[]
-  readonly queue: PromptQueue
-  /** Every store, the ones above among them. */
-  readonly #s: ChatStores
+  /** Every store, the ports' among them: entry.ts and the tests reach the rest here, a module through its ports. */
+  readonly stores: ChatStores
   readonly #renders = new RenderScheduler(() => this.#frame())
   #done = Promise.withResolvers<number>()
   readonly #tern: Session
@@ -92,28 +80,22 @@ export class App implements ChatPorts {
     this.#gw = gw
     this.#launch = launch
     const s = chatStores(this, { act: () => this.#act, gw, launch, settings, surface: () => this.#surface, tern, version })
-    this.#s = s
+    this.stores = s
     this.session = s.session
     this.transcript = s.transcript
-    this.activity = s.activity
-    this.media = s.media
     this.agents = s.agents
     this.processes = s.processes
     this.cron = s.cron
     this.sidebar = s.sidebar
     this.automation = s.automation
-    this.title = s.title
     this.prs = s.prs
-    this.prAside = s.prAside
-    this.composer = s.composer
     this.overlays = s.overlays
-    this.queue = s.queue
     this.#act = new AppActions({ ...s, chat: this, gw, launch, surface: () => this.#surface, tern })
   }
 
   /** The running turn (or a send's `{!cmd}`s), null when idle. */
   get busy(): Busy | null {
-    return this.activity.busy
+    return this.stores.activity.busy
   }
 
   /** The gateway, for overlays that issue their own RPCs. */
@@ -123,11 +105,11 @@ export class App implements ChatPorts {
 
   /** Whose colors the surface wears (`/theme`). */
   get theme(): ThemeMode {
-    return this.#s.theme.mode
+    return this.stores.theme.mode
   }
 
   async run(): Promise<number> {
-    const s = this.#s
+    const s = this.stores
     this.#surface = new SurfaceHost(this.#tern, 'hermes', STYLES)
     this.#view = {
       ...s,
@@ -150,12 +132,12 @@ export class App implements ChatPorts {
     const query = this.#launch.query
 
     if (query || s.attachments.awaitingStartup) {
-      this.queue.hold({ images: [], kind: 'app', text: query || IMAGE_ONLY_PROMPT })
+      s.queue.hold({ images: [], kind: 'app', text: query || IMAGE_ONLY_PROMPT })
     }
 
     followGateway(this.#gw, {
       ...s,
-      drain: () => this.queue.drain(),
+      drain: () => s.queue.drain(),
       eventLog: this.#launch.eventLog,
       gw: this.#gw,
       labels: { busy: busyLabel, preparing: preparingLabel },
@@ -193,7 +175,7 @@ export class App implements ChatPorts {
    */
   dispose() {
     this.#act.dispose()
-    disposeStores(this.#s)
+    disposeStores(this.stores)
   }
 
   /** One frame of the whole view, once run() opened the surface. */
@@ -204,11 +186,11 @@ export class App implements ChatPorts {
   }
 
   open(overlay: Overlay) {
-    this.#s.stack.open(overlay)
+    this.stores.stack.open(overlay)
   }
 
   close(overlay: Overlay) {
-    this.#s.stack.close(overlay)
+    this.stores.stack.close(overlay)
   }
 
   changed() {
@@ -227,12 +209,12 @@ export class App implements ChatPorts {
   }
 
   attachClipboardImage(quiet: boolean): Promise<void> {
-    return this.#s.attachments.fromClipboard(quiet)
+    return this.stores.attachments.fromClipboard(quiet)
   }
 
   /** `/image <path>`: attaches that image file (resolved against the session's folder) to the next prompt. */
   attachImagePath(raw: string): Promise<void> {
-    return this.#s.attachments.fromPath(raw)
+    return this.stores.attachments.fromPath(raw)
   }
 
   toggleSidebar() {
@@ -249,11 +231,6 @@ export class App implements ChatPorts {
 
   openPrAside(key: PrKey | undefined) {
     this.#act.openPrAside(key)
-  }
-
-  /** A subagent ended: the PRs it linked are filed under this conversation (pull_requests.py). */
-  agentEnded() {
-    this.prs.relink()
   }
 
   openAgent(id: string): Promise<void> {
@@ -274,20 +251,15 @@ export class App implements ChatPorts {
   }
 
   newSession(title?: string): Promise<void> {
-    return this.#s.life.newSession(title)
+    return this.stores.life.newSession(title)
   }
 
   resume(id: StoredSessionId): Promise<void> {
-    return this.#s.life.resume(id)
-  }
-
-  /** Acts on a command's dispatch envelope from outside a typed command (a goal or loop sheet's button). */
-  runDispatch(raw: unknown, title: string): Promise<void> {
-    return dispatched(raw, this.#act.slash, { arg: '', title })
+    return this.stores.life.resume(id)
   }
 
   setTheme(mode: ThemeMode) {
-    this.#s.theme.set(mode)
+    this.stores.theme.set(mode)
     this.changed()
   }
 

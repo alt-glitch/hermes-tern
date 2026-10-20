@@ -7,6 +7,7 @@ import type { PullRequests } from '../../github/store.js'
 import type { ToolCall } from '../../model.js'
 import type { SessionState } from '../../session/state.js'
 import { statusEffect } from '../../status.js'
+import type { Compactions } from '../../transcript/compactions.js'
 import type { Transcript } from '../../transcript/store.js'
 import type { Activity } from '../../turn/activity.js'
 import { afterMessageComplete, afterToolComplete, type MessageFanout, type ToolFanout } from '../../turn/fanout.js'
@@ -22,8 +23,6 @@ export interface TurnCx extends ToolFanout, MessageFanout {
     Transcript,
     | 'call'
     | 'calls'
-    | 'compacted'
-    | 'compacting'
     | 'complete'
     | 'interim'
     | 'messageStart'
@@ -35,8 +34,7 @@ export interface TurnCx extends ToolFanout, MessageFanout {
     | 'todos'
     | 'toolComplete'
     | 'toolStart'
-    | 'uncompact'
-  >
+  > & { readonly compactions: Pick<Compactions, 'compacted' | 'compacting' | 'uncompact'> }
   readonly activity: Pick<Activity, 'endBusy' | 'endCompaction' | 'relabel' | 'turnStarted'>
   readonly agents: Pick<Agents, 'scan' | 'settle'>
   readonly prs: Pick<PullRequests, 'onCall' | 'poke' | 'relink'>
@@ -185,9 +183,9 @@ export const turnHandlers = {
     }
 
     if (effect.compacting) {
-      cx.transcript.compacting({ before: effect.tokens?.before ?? (cx.session.usage?.context_used || undefined) })
+      cx.transcript.compactions.compacting({ before: effect.tokens?.before ?? (cx.session.usage?.context_used || undefined) })
     } else if (effect.compacting === false) {
-      cx.transcript.compacted(Date.now(), effect.tokens)
+      cx.transcript.compactions.compacted(Date.now(), effect.tokens)
       // The store has the summary once the compaction commits (a moment after its done edge).
       cx.summarize(1500)
     }

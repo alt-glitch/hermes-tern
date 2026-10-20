@@ -213,10 +213,10 @@ describe('Transcript', () => {
     const turn = t.messageStart(0)
     t.toolStart({ name: 'terminal', tool_id: 'c1' }, 1)
     const call = t.call(toolCallId('c1'))
-    const compaction = t.compacting({ at: 2, before: 90_000 })
+    const compaction = t.compactions.compacting({ at: 2, before: 90_000 })
 
     t.toolComplete({ name: 'terminal', result: { exit_code: 0, output: 'ok' }, tool_id: 'c1' }, 3)
-    t.compacted(4, { after: 20_000 })
+    t.compactions.compacted(4, { after: 20_000 })
     t.complete({ status: 'complete', text: 'done' }, 5)
 
     expect(turnOf(t.entries)).toBe(turn)

@@ -54,7 +54,7 @@ const complete = (id: string, op: string) => ({
 /** What the app sent the agent: prompts it submitted, and those queued behind a turn. */
 const told = (gw: FakeGateway, app: InstanceType<typeof App>) => [
   ...gw.methods('prompt.submit').map(c => String(c.params['text'])),
-  ...app.queue.held.map(q => q.text)
+  ...app.stores.queue.held.map(q => q.text)
 ]
 
 let gw: FakeGateway

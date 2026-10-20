@@ -12,6 +12,7 @@ import { LINK_TOOLS } from '../github/links.js'
 import type { PullRequests } from '../github/store.js'
 import type { ToolCall } from '../model.js'
 import type { Processes } from '../processes/store.js'
+import type { Compactions } from '../transcript/compactions.js'
 import type { Transcript } from '../transcript/store.js'
 
 import type { Activity } from './activity.js'
@@ -69,7 +70,7 @@ export function afterToolComplete(p: Pick<ToolCompletePayload, 'name' | 'tool_id
 
 /** What a finished message tells. */
 export interface MessageFanout {
-  readonly transcript: Pick<Transcript, 'complete' | 'uncompact'>
+  readonly transcript: Pick<Transcript, 'complete'> & { readonly compactions: Pick<Compactions, 'uncompact'> }
   readonly activity: Pick<Activity, 'endBusy' | 'endCompaction'>
   readonly prs: Pick<PullRequests, 'poke'>
   readonly sidebar: Pick<Sidebar, 'poke'>
@@ -88,7 +89,7 @@ export function afterMessageComplete(p: MessageCompletePayload, cx: MessageFanou
   cx.activity.endBusy()
   cx.activity.endCompaction()
   // A compaction Hermes aborted sends no done edge; one that committed has its summary stored now.
-  cx.transcript.uncompact('running')
+  cx.transcript.compactions.uncompact('running')
   cx.summarize()
   cx.drain()
   // The turn may have pushed a branch, opened a PR or changed files.

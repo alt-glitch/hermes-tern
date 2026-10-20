@@ -27,8 +27,8 @@ describe('App: a refused prompt', () => {
     await settle()
 
     expect(sent('prompt.submit')).toHaveLength(1)
-    expect(app.activity.busy).toBeNull()
-    expect(app.composer.text).toBe('ship it')
+    expect(app.stores.activity.busy).toBeNull()
+    expect(app.stores.composer.text).toBe('ship it')
     expect(app.transcript.entries.at(-1)).toMatchObject({ kind: 'notice', text: expect.stringContaining('Not sent: session_busy') })
   })
 })
@@ -36,11 +36,11 @@ describe('App: a refused prompt', () => {
 describe('App: images in the draft', () => {
   it('a prompt queued behind the turn (private gateway) takes the images attached with it', async () => {
     const { app, attach, emit, press, sent, type } = setup({}, { canonical: false })
-    given.busy(app, { ...busy })
+    given.busy(app.stores, { ...busy })
     await attach()
     await type('first')
     await press(key('enter'))
-    expect(app.queue.held).toMatchObject([{ images: [{ path: '/uploads/1.png' }], text: 'first' }])
+    expect(app.stores.queue.held).toMatchObject([{ images: [{ path: '/uploads/1.png' }], text: 'first' }])
 
     // Typed while the first waits: no images of its own.
     await type('second')
@@ -50,7 +50,7 @@ describe('App: images in the draft', () => {
 
     const [submit] = sent('prompt.submit')
     expect(submit).toMatchObject({ attachments: [{ path: '/uploads/1.png' }], text: 'first' })
-    expect(app.queue.held).toMatchObject([{ images: [], text: 'second' }])
+    expect(app.stores.queue.held).toMatchObject([{ images: [], text: 'second' }])
   })
 
   it('Ctrl+C clears the images with the text, and Ctrl+D does not exit over an image', async () => {
@@ -70,17 +70,17 @@ describe('App: images in the draft', () => {
 
   it('Alt+Up brings a queued prompt (private gateway) back with its images', async () => {
     const { app, attach, press, type } = setup({}, { canonical: false })
-    given.busy(app, { ...busy })
+    given.busy(app.stores, { ...busy })
     await attach()
     await type('edit me')
     await press(key('enter'))
     await press(key('up', { alt: true }))
 
-    expect(app.composer.text).toBe('edit me')
-    expect(app.queue.held).toEqual([])
+    expect(app.stores.composer.text).toBe('edit me')
+    expect(app.stores.queue.held).toEqual([])
     // Back in the draft: Ctrl+D still sees it.
     const quit = vi.spyOn(app, 'quit')
-    app.composer.set('')
+    app.stores.composer.set('')
     await press(key('d', { ctrl: true }))
     expect(quit).not.toHaveBeenCalled()
   })
@@ -125,10 +125,10 @@ describe('App: a prompt of images alone', () => {
 
   it('a private gateway queues it behind a running turn; it goes when the turn ends', async () => {
     const { app, attach, emit, press, sent } = setup({}, { canonical: false })
-    given.busy(app, { ...busy })
+    given.busy(app.stores, { ...busy })
     await attach()
     await press(key('enter'))
-    expect(app.queue.held).toMatchObject([{ images: [{ path: '/uploads/1.png' }], text: '' }])
+    expect(app.stores.queue.held).toMatchObject([{ images: [{ path: '/uploads/1.png' }], text: '' }])
 
     emit('event', { payload: { text: 'done' }, session_id: 's1', type: 'message.complete' })
     await settle()
@@ -137,7 +137,7 @@ describe('App: a prompt of images alone', () => {
 
   it('the shared gateway admits it to its queue at once', async () => {
     const { app, attach, press, sent } = setup()
-    given.busy(app, { ...busy })
+    given.busy(app.stores, { ...busy })
     await attach()
     await press(key('enter'))
     await settle()
@@ -163,12 +163,12 @@ describe('App: an image while it attaches', () => {
     await press(key('enter'))
 
     expect(sent('prompt.submit')).toEqual([])
-    expect(app.composer.text).toBe('look')
+    expect(app.stores.composer.text).toBe('look')
     expect(app.transcript.entries.at(-1)).toMatchObject({ kind: 'notice', text: expect.stringContaining('still attaching') })
 
     u.finish('/uploads/slow.png')
     await settle()
-    app.composer.set('')
+    app.stores.composer.set('')
     await type('look')
     await press(key('enter'))
     expect(sent('prompt.submit')).toMatchObject([{ attachments: [{ path: '/uploads/slow.png' }], text: 'look' }])
@@ -195,7 +195,7 @@ describe('App: Ctrl+C with a sheet open', () => {
   it('denies an approval instead of clearing the hidden draft or interrupting the turn', async () => {
     const { app, emit, press, sent, type } = setup()
     await type('half typed')
-    given.busy(app, { ...busy })
+    given.busy(app.stores, { ...busy })
     const respond = vi.fn()
     emit('request', { fail: vi.fn(), id: 'r1', method: 'approval', params: { command: 'rm -rf x', session_id: 's1' }, respond })
     await settle()
@@ -204,9 +204,9 @@ describe('App: Ctrl+C with a sheet open', () => {
     await press(key('c', { ctrl: true }))
     expect(respond).toHaveBeenCalledWith({ choice: 'deny' })
     expect(app.overlays).toHaveLength(0)
-    expect(app.composer.text).toBe('half typed')
+    expect(app.stores.composer.text).toBe('half typed')
     expect(sent('session.interrupt')).toEqual([])
-    expect(app.activity.busy).not.toBeNull()
+    expect(app.stores.activity.busy).not.toBeNull()
   })
 
   it('cancels a secret prompt with the empty value, and closes a picker', async () => {
@@ -273,10 +273,10 @@ describe('App: shell commands', () => {
     })
     await type('x {!rm -rf /}')
     await press(key('enter'))
-    await vi.waitFor(() => expect(app.activity.busy).toBeNull())
+    await vi.waitFor(() => expect(app.stores.activity.busy).toBeNull())
 
     expect(sent('prompt.submit')).toEqual([])
-    expect(app.composer.text).toBe('x {!rm -rf /}')
+    expect(app.stores.composer.text).toBe('x {!rm -rf /}')
     expect(app.transcript.entries.at(-1)).toMatchObject({ kind: 'notice', tone: 'error' })
   })
 })
@@ -285,7 +285,7 @@ describe('App: shell commands', () => {
 describe('App: Esc', () => {
   it('one Esc never stops the turn; two quick ones do', async () => {
     const { app, press, sent } = setup({ 'session.resume': () => ({ execution_generation: 2 }) })
-    given.busy(app, { ...busy })
+    given.busy(app.stores, { ...busy })
 
     await press(key('escape'))
     expect(sent('session.interrupt')).toEqual([])
@@ -296,16 +296,16 @@ describe('App: Esc', () => {
 
   it('two Esc with a draft clear it into the history instead of stopping the turn', async () => {
     const { app, press, sent, type } = setup()
-    given.busy(app, { ...busy })
+    given.busy(app.stores, { ...busy })
     await type('half a thought')
 
     await press(key('escape'))
-    expect(app.composer.text).toBe('half a thought')
+    expect(app.stores.composer.text).toBe('half a thought')
     await press(key('escape'))
 
-    expect(app.composer.text).toBe('')
+    expect(app.stores.composer.text).toBe('')
     expect(sent('session.interrupt')).toEqual([])
-    expect(app.activity.busy).not.toBeNull()
+    expect(app.stores.activity.busy).not.toBeNull()
   })
 })
 
@@ -313,7 +313,7 @@ describe('App: Option characters', () => {
   it('a typed å, ∫, ß or π is text; Alt+letter still opens its panel', async () => {
     const { app, press, type } = setup()
     await type('åßπ∫')
-    expect(app.composer.text).toBe('åßπ∫')
+    expect(app.stores.composer.text).toBe('åßπ∫')
     expect(app.overlays).toEqual([])
 
     await press(key('a', { alt: true }))
@@ -326,11 +326,11 @@ describe('App: Option+← and Option+→ in a Mac terminal', () => {
     const { app, press, type } = setup()
     await type('hello brave world')
     await press(key('b', { alt: true }))
-    expect(app.composer.cursor).toBe('hello brave '.length)
+    expect(app.stores.composer.cursor).toBe('hello brave '.length)
     await press(key('b', { alt: true }))
-    expect(app.composer.cursor).toBe('hello '.length)
+    expect(app.stores.composer.cursor).toBe('hello '.length)
     await press(key('f', { alt: true }))
-    expect(app.composer.cursor).toBe('hello brave'.length)
+    expect(app.stores.composer.cursor).toBe('hello brave'.length)
     expect(app.overlays).toEqual([])
   })
 

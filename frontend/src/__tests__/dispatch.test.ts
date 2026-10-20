@@ -289,7 +289,7 @@ describe('afterMessageComplete', () => {
       prs: { poke: note('prs.poke') },
       sidebar: { poke: note('sidebar.poke') },
       summarize: note('summarize'),
-      transcript: { complete: note('complete'), uncompact: which => void log.push(`uncompact ${String(which)}`) }
+      transcript: { compactions: { uncompact: which => void log.push(`uncompact ${String(which)}`) }, complete: note('complete') }
     }
 
     afterMessageComplete({}, cx)

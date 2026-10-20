@@ -494,7 +494,12 @@ describe('sessionHost', () => {
         usage: null
       },
       submit: () => {},
-      transcript: { compacted: () => {}, compacting: () => ({ startedAt: 0, state: { status: 'running' } }), notice: () => {}, panel: () => {}, steer: () => {}, uncompact: () => {} }
+      transcript: {
+        compactions: { compacted: () => {}, compacting: () => ({ startedAt: 0, state: { status: 'running' } }), uncompact: () => {} },
+        notice: () => {},
+        panel: () => {},
+        steer: () => {}
+      }
     }
 
     const host = sessionHost(cx)

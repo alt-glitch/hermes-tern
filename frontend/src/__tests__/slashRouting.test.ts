@@ -36,7 +36,7 @@ async function started() {
 
   /** Types `text` into the composer and presses Enter. */
   const submit = async (text: string) => {
-    app.composer.set(text)
+    app.stores.composer.set(text)
     tern.press('enter')
     await flush()
   }

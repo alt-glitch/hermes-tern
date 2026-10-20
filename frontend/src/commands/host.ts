@@ -9,6 +9,7 @@ import { durable, type StoredSessionId } from '../core/ids.js'
 import type { Compaction } from '../model.js'
 import type { SessionLifecycle } from '../session/lifecycle.js'
 import type { SessionState } from '../session/state.js'
+import type { Compactions } from '../transcript/compactions.js'
 import type { Transcript } from '../transcript/store.js'
 import type { Activity } from '../turn/activity.js'
 import type { PromptQueue } from '../turn/queue.js'
@@ -24,7 +25,7 @@ export interface SessionHostCx {
   readonly queue: Pick<PromptQueue, 'count'>
   readonly router: Pick<PromptRouter, 'behind' | 'send'>
   readonly life: Pick<SessionLifecycle, 'reload' | 'resume'>
-  readonly transcript: Pick<Transcript, 'compacted' | 'compacting' | 'notice' | 'panel' | 'steer' | 'uncompact'>
+  readonly transcript: Pick<Transcript, 'notice' | 'panel' | 'steer'> & { readonly compactions: Pick<Compactions, 'compacted' | 'compacting' | 'uncompact'> }
   changed(): void
   /** A compaction started (`manual`: /compress's) or ended. */
   setCompacting(on: boolean, opts: { manual: boolean }): void
@@ -63,13 +64,13 @@ export function sessionHost(cx: SessionHostCx): SessionHost {
     },
     compressing: state => {
       if (state === 'start') {
-        started = cx.transcript.compacting({ before: cx.state.usage?.context_used || undefined, manual: true })
+        started = cx.transcript.compactions.compacting({ before: cx.state.usage?.context_used || undefined, manual: true })
       } else if (state === 'none') {
         if (started) {
-          cx.transcript.uncompact(started)
+          cx.transcript.compactions.uncompact(started)
         }
       } else {
-        cx.transcript.compacted(Date.now(), state)
+        cx.transcript.compactions.compacted(Date.now(), state)
       }
 
       cx.setCompacting(state === 'start', { manual: true })

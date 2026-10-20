@@ -11,6 +11,7 @@ import type { Automation } from '../../session/automation.js'
 import type { SessionLifecycle } from '../../session/lifecycle.js'
 import type { SessionState } from '../../session/state.js'
 import type { SessionTitle } from '../../session/title.js'
+import type { Compactions } from '../../transcript/compactions.js'
 import type { Transcript } from '../../transcript/store.js'
 import { shownText, userImages } from '../../turn/prompt.js'
 import type { PromptQueue } from '../../turn/queue.js'
@@ -28,7 +29,7 @@ export interface SessionCx {
   readonly automation: Pick<Automation, 'apply'>
   readonly title: Pick<SessionTitle, 'read' | 'set'>
   readonly queue: { readonly server: Pick<PromptQueue['server'], 'update'> }
-  readonly transcript: Pick<Transcript, 'contextUsed' | 'started' | 'usageTick'>
+  readonly transcript: Pick<Transcript, 'started' | 'usageTick'> & { readonly compactions: Pick<Compactions, 'contextUsed'> }
   readonly prs: Pick<PullRequests, 'poke'>
   /** Tells Tern the session's folder (OSC 7), when it moved. */
   reportCwd(): void
@@ -63,7 +64,7 @@ export const sessionHandlers = {
     // The shared owner's idle fanout carries only pending/revision/generation: merge, never replace.
     session.info = ev.payload ? { ...session.info, ...ev.payload } : session.info
     session.usage = ev.payload?.usage ?? session.usage
-    transcript.contextUsed(session.usage?.context_used ?? 0)
+    transcript.compactions.contextUsed(session.usage?.context_used ?? 0)
 
     // A queued prompt the gateway started gets its bubble now, after the reply it waited for.
     for (const started of cx.queue.server.update(pendingRows(ev.payload))) {
@@ -87,7 +88,7 @@ export const sessionHandlers = {
     // The shared owner sends its counters at the top level; older gateways nest them.
     const tick = usageFromTick(ev.payload)
     session.usage = tick ? { ...session.usage, ...tick } : session.usage
-    transcript.contextUsed(session.usage?.context_used ?? 0)
+    transcript.compactions.contextUsed(session.usage?.context_used ?? 0)
     const counters = usageCounters(ev.payload)
 
     if (counters) {

@@ -15,14 +15,14 @@ import type {
 
 import { type EntryId, entryId, type ToolCallId, toolCallId } from '../core/ids.js'
 import type { StoredCompaction } from '../hermes/compactions.js'
-import type { Compaction, Counters, Entry, NoticeEntry, Todo, ToolCall, TurnEntry, UserAttachment } from '../model.js'
+import type { Counters, Entry, NoticeEntry, Todo, ToolCall, TurnEntry, UserAttachment } from '../model.js'
 import { nextVia, settleBridge, unwrap } from '../tools/bridge.js'
 import { detailOf } from '../tools/detail.js'
 import { withoutTernEnv } from '../tools/terminal.js'
 import { record } from '../wire/json.js'
 
 import { callIn, callsWhere, findCall, isBackgroundCall, isTodoName, isToolError, isWatchCall, type Located } from './calls.js'
-import { type CompactionStart, Compactions } from './compactions.js'
+import { Compactions } from './compactions.js'
 import { history, storedUser } from './history.js'
 import { continuation, displayNotice, failure, internalNotice, passable, type UserPrompt, userEntry } from './messages.js'
 import { currentTodos, todosOf, toTodos } from './todos.js'
@@ -45,7 +45,8 @@ export class Transcript {
    * comes after it lands there, and opens no live turn of its own.
    */
   #ended: TurnEntry | undefined
-  readonly #compactions = new Compactions({ entries: () => this.#entries, id: prefix => this.id(prefix), live: () => this.#live })
+  /** The compactions part: a compaction's start, end and take-back, the context readings that size it, its stored summary. */
+  readonly compactions = new Compactions({ entries: () => this.#entries, id: prefix => this.id(prefix), live: () => this.#live })
 
   /** The entries, oldest first; only the transcript's own methods change the list. */
   get entries(): readonly Entry[] {
@@ -67,7 +68,7 @@ export class Transcript {
 
     if (session === 'other') {
       this.#counters = undefined
-      this.#compactions.forget()
+      this.compactions.forget()
     }
   }
 
@@ -174,40 +175,6 @@ export class Transcript {
 
   panel(title: string, text: string) {
     this.push({ id: this.id('p'), kind: 'panel', text, title })
-  }
-
-  /**
-   * The context started compacting (`before`: its tokens, when known). Inside a running turn that
-   * already did something it is a step of that turn; else it goes between turns, before the turn
-   * it was compacted for. Hermes' later lines of the same compaction only fill in the count.
-   */
-  compacting(start: CompactionStart = {}): Compaction {
-    return this.#compactions.compacting(start)
-  }
-
-  /** The running compaction ended (`tokens`: the owner's own counts, when it reports them). */
-  compacted(at = Date.now(), tokens: { before?: number | undefined; after?: number | undefined } = {}) {
-    this.#compactions.compacted(at, tokens)
-  }
-
-  /** A compaction did not happen after all: the one compacting() returned, or (`'running'`) the last one while it runs. */
-  uncompact(which: Compaction | 'running') {
-    this.#compactions.uncompact(which)
-  }
-
-  /** A context reading (tokens in use): the first one under the last compaction's `before` is what it left. */
-  contextUsed(used: number) {
-    this.#compactions.contextUsed(used)
-  }
-
-  /** The compactions seen here that the store has no summary for yet. */
-  get unsummarized(): boolean {
-    return this.#compactions.unsummarized
-  }
-
-  /** Gives each seen compaction the stored summary written while it ran. */
-  summarize(stored: readonly StoredCompaction[]) {
-    this.#compactions.summarize(stored)
   }
 
   /** message.start: opens the live turn, unless one is already streaming. */
@@ -487,7 +454,7 @@ export class Transcript {
     const kept = this.#entries.filter(e => e.kind === 'welcome')
     this.#live = undefined
     this.#ended = undefined
-    this.#entries = history({ compactions: this.#compactions.restore(stored), id: prefix => this.id(prefix), kept, messages })
+    this.#entries = history({ compactions: this.compactions.restore(stored), id: prefix => this.id(prefix), kept, messages })
   }
 
   /** A resumed session's unfinished turn: its prompt, then a live turn holding what streamed so far. */

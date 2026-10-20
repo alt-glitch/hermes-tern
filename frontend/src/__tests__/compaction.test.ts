@@ -79,18 +79,18 @@ describe('compaction in the transcript', () => {
     const t = new Transcript()
     t.messageStart(0)
     t.text('reading the repo', 1)
-    t.compacting({ at: 1_000, before: 182_000 })
+    t.compactions.compacting({ at: 1_000, before: 182_000 })
 
     const c = must(compactions(t)[0])
     expect(shape(t.entries)).toEqual(['turn(text,compaction)'])
     expect(c).toMatchObject({ before: 182_000, startedAt: 1_000, state: { status: 'running' } })
 
     // A later line of the same compaction does not start another.
-    t.compacting({ at: 2_000, before: 190_000 })
-    t.compacted(13_000)
+    t.compactions.compacting({ at: 2_000, before: 190_000 })
+    t.compactions.compacted(13_000)
     t.text('done', 14_000)
     t.complete({ status: 'complete', text: 'done' }, 20_000)
-    t.uncompact('running')
+    t.compactions.uncompact('running')
 
     expect(compactions(t)).toEqual([expect.objectContaining({ before: 182_000, state: { endedAt: 13_000, status: 'done' } })])
     expect(parts(lastTurn(t.entries)).map(p => (p.kind === 'fold' ? `fold:${p.label}` : p.blocks.map(b => b.kind).join()))).toEqual([
@@ -103,50 +103,50 @@ describe('compaction in the transcript', () => {
     const t = new Transcript()
     t.user({ at: 0, text: 'go on' })
     t.messageStart(1)
-    t.compacting({ at: 2 })
+    t.compactions.compacting({ at: 2 })
     expect(shape(t.entries)).toEqual(['user', 'compaction', 'turn()'])
-    t.compacted(3)
+    t.compactions.compacted(3)
     t.complete({ status: 'complete', text: 'ok' }, 4)
 
-    t.compacting({ at: 10, before: 50_000, manual: true })
+    t.compactions.compacting({ at: 10, before: 50_000, manual: true })
     expect(shape(t.entries)).toEqual(['user', 'compaction', 'turn(text)', 'compaction'])
     expect(compactions(t)[1]).toMatchObject({ manual: true })
   })
 
   it('takes the first lower context reading as what it left, and the stored summary', () => {
     const t = new Transcript()
-    t.compacting({ at: 1_000, before: 180_000 })
-    t.contextUsed(170_000)
-    t.compacted(5_000)
+    t.compactions.compacting({ at: 1_000, before: 180_000 })
+    t.compactions.contextUsed(170_000)
+    t.compactions.compacted(5_000)
     // A stale reading is not what it left.
-    t.contextUsed(180_000)
-    t.contextUsed(41_000)
-    t.contextUsed(42_000)
+    t.compactions.contextUsed(180_000)
+    t.compactions.contextUsed(41_000)
+    t.compactions.contextUsed(42_000)
     expect(compactions(t)[0]).toMatchObject({ before: 180_000, state: { after: 41_000 } })
 
-    expect(t.unsummarized).toBe(true)
+    expect(t.compactions.unsummarized).toBe(true)
     // Summaries written well before or after it are other compactions'.
-    t.summarize([{ at: 100_000, summary: 'later' }])
-    expect(t.unsummarized).toBe(true)
-    t.summarize([{ at: 6_000, messages: 12, summary: '## Goal' }])
+    t.compactions.summarize([{ at: 100_000, summary: 'later' }])
+    expect(t.compactions.unsummarized).toBe(true)
+    t.compactions.summarize([{ at: 6_000, messages: 12, summary: '## Goal' }])
     expect(compactions(t)[0]).toMatchObject({ state: { messages: 12, summary: '## Goal' } })
-    expect(t.unsummarized).toBe(false)
+    expect(t.compactions.unsummarized).toBe(false)
   })
 
   it('drops a compaction Hermes aborted (no done edge before the turn ended)', () => {
     const t = new Transcript()
     t.messageStart(0)
     t.text('x', 1)
-    t.compacting({ at: 2, before: 1 })
+    t.compactions.compacting({ at: 2, before: 1 })
     t.complete({ status: 'complete', text: 'x' }, 3)
-    t.uncompact('running')
+    t.compactions.uncompact('running')
     expect(shape(t.entries)).toEqual(['turn(text)'])
 
-    const done = t.compacting({ at: 4, before: 1 })
-    t.compacted(5)
-    t.uncompact('running')
+    const done = t.compactions.compacting({ at: 4, before: 1 })
+    t.compactions.compacted(5)
+    t.compactions.uncompact('running')
     expect(shape(t.entries)).toEqual(['turn(text)', 'compaction'])
-    t.uncompact(done)
+    t.compactions.uncompact(done)
     expect(shape(t.entries)).toEqual(['turn(text)'])
   })
 
@@ -165,8 +165,8 @@ describe('compaction in the transcript', () => {
 
     const t = new Transcript()
     // This view saw the one at 25 happen.
-    t.compacting({ at: 24_000, before: 90_000 })
-    t.compacted(26_000, { after: 20_000 })
+    t.compactions.compacting({ at: 24_000, before: 90_000 })
+    t.compactions.compacted(26_000, { after: 20_000 })
     t.load(messages, [
       { at: 40_000, summary: 'c' },
       { at: 15_000, summary: 'a' },
@@ -176,15 +176,15 @@ describe('compaction in the transcript', () => {
     expect(shape(t.entries)).toEqual(['user', 'turn(text)', 'compaction', 'user', 'turn(tool,compaction,text)', 'compaction'])
     expect(compactions(t).map(c => c.state.status === 'done' && c.state.summary)).toEqual(['a', 'b', 'c'])
     expect(compactions(t)[1]).toMatchObject({ before: 90_000, state: { after: 20_000, messages: 3 } })
-    expect(t.unsummarized).toBe(false)
+    expect(t.compactions.unsummarized).toBe(false)
   })
 
   it('does not count a compaction as the turn the next one continues', () => {
     const t = new Transcript()
     t.messageStart(0)
     t.complete({ status: 'complete', text: 'a' }, 1)
-    t.compacting({ at: 2, before: 1, manual: true })
-    t.compacted(3)
+    t.compactions.compacting({ at: 2, before: 1, manual: true })
+    t.compactions.compacted(3)
     expect(t.messageStart(4).continued).toBe('Continued on its own')
   })
 })

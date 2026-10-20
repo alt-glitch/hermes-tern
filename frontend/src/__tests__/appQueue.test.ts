@@ -45,7 +45,7 @@ describe('App: compaction', () => {
     await type('after it')
     await press(key('enter'))
     expect(sent('prompt.submit')).toEqual([])
-    expect(app.queue.held).toMatchObject([{ text: 'after it' }])
+    expect(app.stores.queue.held).toMatchObject([{ text: 'after it' }])
 
     emit('event', status('ready'))
     await settle()
@@ -54,11 +54,11 @@ describe('App: compaction', () => {
 
   it('a compaction inside a turn still offers Steer on a queued prompt (Hermes holds it until the compaction ends)', async () => {
     const { app, emit, press, queuedRows, type } = setup({ 'prompt.submit': () => ({ admission_id: 'a1', status: 'queued' }) })
-    given.busy(app, { ...busy })
+    given.busy(app.stores, { ...busy })
     emit('event', { payload: {}, session_id: 's1', type: 'message.start' })
     emit('event', status('compacting', '🗜️ Compacting context — summarizing earlier conversation so I can continue...'))
     await settle()
-    expect(app.activity.busy?.label).toBe('Compacting context…')
+    expect(app.stores.activity.busy?.label).toBe('Compacting context…')
 
     await type('look at the tests too')
     await press(key('enter'))
@@ -69,14 +69,14 @@ describe('App: compaction', () => {
 describe('App: Enter while a turn runs (busy_input_mode)', () => {
   it('queue: admits the prompt to the gateway at once, shows it queued, and paints its bubble when it starts', async () => {
     const { app, attach, emit, press, queuedRows, sent, type } = setup({ 'prompt.submit': () => ({ admission_id: 'a1', status: 'queued' }) })
-    given.busy(app, { ...busy })
+    given.busy(app.stores, { ...busy })
     await attach()
     await type('next one')
     await press(key('enter'))
 
     const [submit] = sent('prompt.submit')
     expect(submit).toMatchObject({ attachments: [{ path: '/uploads/1.png' }], queued: true, session_id: 's1', text: 'next one' })
-    expect(app.queue.held).toEqual([])
+    expect(app.stores.queue.held).toEqual([])
     expect(users(app)).toEqual([])
     expect(queuedRows()).toEqual([{ actions: ['edit'], text: 'next one ↵ 📎 1 image' }])
 
@@ -100,7 +100,7 @@ describe('App: Enter while a turn runs (busy_input_mode)', () => {
       'prompt.submit': () => ({ admission_id: 'a1', status: 'queued' }),
       'slash.exec': () => ({ display: '/fanout if needed', message: body, name: 'fanout', type: 'skill' })
     })
-    given.busy(app, { ...busy })
+    given.busy(app.stores, { ...busy })
     await type('/fanout if needed')
     await press(key('enter'))
     await settle()
@@ -136,7 +136,7 @@ describe('App: Enter while a turn runs (busy_input_mode)', () => {
 
   it("shows another window's queued prompt read-only, and its bubble when it starts", async () => {
     const { app, emit, queuedRows } = setup()
-    given.busy(app, { ...busy })
+    given.busy(app.stores, { ...busy })
     const row = { admission_id: 'b1', input_id: 'theirs', status: 'queued', user: 'from desktop' }
 
     emit('event', { payload: { pending_submissions: [row] }, session_id: 's1', type: 'session.info' })
@@ -155,7 +155,7 @@ describe('App: Enter while a turn runs (busy_input_mode)', () => {
       'session.resume': () => ({ execution_generation: 7 }),
       'session.steer': () => ({ status: 'queued' })
     })
-    given.busy(app, { ...busy })
+    given.busy(app.stores, { ...busy })
     app.transcript.messageStart()
     await type('use tabs')
     await press(key('enter'))
@@ -173,7 +173,7 @@ describe('App: Enter while a turn runs (busy_input_mode)', () => {
     expect(sent('prompt.cancel')).toEqual([{ admission_id: 'a1', session_id: 's1' }])
     expect(sent('session.steer')[0]).toMatchObject({ execution_generation: 7, session_id: 's1', text: 'use tabs' })
     expect(app.transcript.live?.blocks.map(b => b.kind)).toEqual(['steer'])
-    expect(app.activity.busy).not.toBeNull()
+    expect(app.stores.activity.busy).not.toBeNull()
     expect(queuedRows()).toEqual([])
   })
 
@@ -182,14 +182,14 @@ describe('App: Enter while a turn runs (busy_input_mode)', () => {
       'prompt.cancel': () => ({ status: 'terminal' }),
       'prompt.submit': () => ({ admission_id: 'a1', status: 'queued' })
     })
-    given.busy(app, { ...busy })
+    given.busy(app.stores, { ...busy })
     await type('fix me')
     await press(key('enter'))
     const row = { admission_id: 'a1', input_id: must(sent('prompt.submit')[0])['submission_id'], status: 'queued', user: 'fix me' }
     emit('event', { payload: { pending_submissions: [row] }, session_id: 's1', type: 'session.info' })
 
     await press(key('up', { alt: true }))
-    await vi.waitFor(() => expect(app.composer.text).toBe('fix me'))
+    await vi.waitFor(() => expect(app.stores.composer.text).toBe('fix me'))
     expect(sent('prompt.cancel')).toHaveLength(1)
   })
 
@@ -203,7 +203,7 @@ describe('App: Enter while a turn runs (busy_input_mode)', () => {
     emit('event', { payload: {}, type: 'gateway.ready' })
     await vi.waitFor(() => expect(sent('config.get')).toContainEqual({ key: 'busy', session_id: 's1' }))
     await settle()
-    given.busy(app, { ...busy })
+    given.busy(app.stores, { ...busy })
     app.transcript.messageStart()
 
     await type('look at the tests too')
@@ -225,7 +225,7 @@ describe('App: Enter while a turn runs (busy_input_mode)', () => {
     emit('event', { payload: {}, type: 'gateway.ready' })
     await vi.waitFor(() => expect(sent('config.get')).toContainEqual({ key: 'busy', session_id: 's1' }))
     await settle()
-    given.busy(app, { ...busy })
+    given.busy(app.stores, { ...busy })
 
     await type('no, use rust')
     await press(key('enter'))
@@ -239,7 +239,7 @@ describe('App: Enter while a turn runs (busy_input_mode)', () => {
     emit('event', { payload: {}, type: 'gateway.ready' })
     await vi.waitFor(() => expect(sent('config.get')).toContainEqual({ key: 'busy', session_id: 's1' }))
     await settle()
-    given.busy(app, { ...busy })
+    given.busy(app.stores, { ...busy })
 
     await type('/queue later please')
     await press(key('enter'))

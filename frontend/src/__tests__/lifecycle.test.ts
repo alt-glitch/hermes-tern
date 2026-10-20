@@ -81,19 +81,19 @@ describe('session lifecycle', () => {
     gw.handlers.set('image.attach_bytes', () => ({ path: '/uploads/1.png' }))
     const app = new App(fakeTern().session, gw.client, '', { launch: readLaunchEnv({ HERMES_TUI_IMAGE: 'shot.png' }, dir) })
     void app.run()
-    expect(app.queue.held).toEqual([{ images: [], kind: 'app', text: 'What do you see in this image?' }])
+    expect(app.stores.queue.held).toEqual([{ images: [], kind: 'app', text: 'What do you see in this image?' }])
 
     gw.event({ type: 'gateway.ready', payload: {} })
     await vi.waitFor(() => expect(gw.methods('prompt.submit')).toHaveLength(1))
 
     expect(gw.sent('image.attach_bytes').map(p => p['session_id'])).toEqual(['s1'])
     expect(gw.sent('prompt.submit')[0]).toMatchObject({ attachments: [{ mime: 'image/png', path: '/uploads/1.png' }], text: 'What do you see in this image?' })
-    expect(app.queue.held).toEqual([])
+    expect(app.stores.queue.held).toEqual([])
   })
 
   it('reloads the shown session on a replay gap, with a fresh subscription and its turn state', async () => {
     const app = await started(gw)
-    given.busy(app, { label: 'Working…', since: {}, startedAt: Date.now() })
+    given.busy(app.stores, { label: 'Working…', since: {}, startedAt: Date.now() })
     gw.handlers.set('session.resume', p => ({ running: false, session_id: p['session_id'], subscription_id: 'sub-fresh' }))
 
     gw.event({ payload: { latest_seq: 9 }, session_id: 'other', type: 'session.replay_gap' })
@@ -105,7 +105,7 @@ describe('session lifecycle', () => {
     await flush()
 
     expect(gw.methods('session.resume').map(c => c.params['session_id'])).toEqual(['s1'])
-    expect(app.activity.busy).toBeNull()
+    expect(app.stores.activity.busy).toBeNull()
     expect(notices(app).at(-1)).toMatch(/fell behind/)
   })
 
@@ -146,7 +146,7 @@ describe('session lifecycle', () => {
       session_id: p['session_id'],
       subscription_id: 'sub-old'
     }))
-    given.busy(app, null)
+    given.busy(app.stores, null)
 
     await app.resume(storedSessionId('old'))
 
@@ -260,14 +260,14 @@ describe('session lifecycle', () => {
 
   it('/new waits while a turn runs, so its queue never lands in the new session', async () => {
     const app = await started(gw)
-    given.busy(app, { label: 'Working…', since: {}, startedAt: Date.now() })
-    app.queue.hold({ images: [], kind: 'app', text: 'for the old chat' })
+    given.busy(app.stores, { label: 'Working…', since: {}, startedAt: Date.now() })
+    app.stores.queue.hold({ images: [], kind: 'app', text: 'for the old chat' })
 
     await app.newSession()
 
     expect(app.session.ref.live).toBe('s1')
     expect(gw.methods('session.create')).toHaveLength(1)
-    expect(app.queue.held).toEqual([{ images: [], kind: 'app', text: 'for the old chat' }])
+    expect(app.stores.queue.held).toEqual([{ images: [], kind: 'app', text: 'for the old chat' }])
     expect(notices(app).at(-1)).toMatch(/Wait for the current turn/)
   })
 
@@ -284,7 +284,7 @@ describe('session lifecycle', () => {
     expect(app.session.ref.live).toBe('s2')
     expect(app.overlays.some(o => o.key.startsWith('prompt:'))).toBe(false)
     expect(must(gw.methods('session.mutate')[0]).params).toMatchObject({ operation: 'rename', payload: { title: 'Release notes' }, session_id: 's2' })
-    expect(app.title.text).toBe('Release notes')
+    expect(app.stores.title.text).toBe('Release notes')
   })
 
   it('says the connection dropped once per outage, not once per redial', async () => {
