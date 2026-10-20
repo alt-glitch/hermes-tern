@@ -3,9 +3,12 @@
 // `omp.assistant` columns holding streamed `md`, work groups (workLog.tsx) and
 // `tool` cards, and an `omp.turn.usage` footer.
 
+import { homedir } from 'node:os'
+
 import { type JSX, node } from '@stencil-hq/tern'
 
 import type { Block, Compaction, Entry, NoticeEntry, TurnEntry, UserAttachment, UserEntry } from '../model.js'
+import { replyParts } from '../replyParts.js'
 import { steerState } from '../transcript.js'
 import { parts, pieces } from '../workLog.js'
 
@@ -222,11 +225,7 @@ function pieceNodes(turn: TurnEntry, blocks: readonly Block[], parent: string, c
 
     switch (b.kind) {
       case 'text':
-        return (
-          <md key={b.id} stream={(live && b === lastText) || undefined}>
-            {b.text}
-          </md>
-        )
+        return textNodes(b.id, b.text, live && b === lastText)
 
       case 'tool':
         return toolNode(b.call, cx.now)
@@ -241,6 +240,33 @@ function pieceNodes(turn: TurnEntry, blocks: readonly Block[], parent: string, c
         return null
     }
   })
+}
+
+/** A text block: its Markdown, with each media line (`MEDIA:/path`) as Tern's viewer for that file. */
+function textNodes(id: string, text: string, streaming: boolean): JSX.Element {
+  const parts = replyParts(text, streaming)
+
+  if (parts.length === 1 && parts[0]?.kind === 'md') {
+    return (
+      <md key={id} stream={streaming || undefined}>
+        {text}
+      </md>
+    )
+  }
+
+  return (
+    <col gap="sm" key={id} role="hermes.reply.parts">
+      {parts.map((p, i) =>
+        p.kind === 'md' ? (
+          <md key={`md${i}`} stream={(streaming && i === parts.length - 1) || undefined}>
+            {p.text}
+          </md>
+        ) : (
+          node('media', { key: `media${i}`, path: p.path.replace(/^~(?=\/)/, homedir()) })
+        )
+      )}
+    </col>
+  )
 }
 
 /** The reason line's icon: agents, a background command, a watcher, or Hermes going on. */
