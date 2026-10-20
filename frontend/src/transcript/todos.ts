@@ -4,6 +4,7 @@
 import type { ChecklistStatus } from '@stencil-hq/tern'
 
 import type { Entry, Todo } from '../model.js'
+import type { TodoDetail } from '../tools/misc.js'
 import { record } from '../wire/json.js'
 
 /** How a todo's status looks: its item's state in Tern's `checklist`. */
@@ -47,15 +48,13 @@ export function currentTodos(entries: readonly Entry[]): Todo[] | undefined {
   return undefined
 }
 
-/** A todo call's list from its args: the whole list, or with `merge: true` a patch on `current`. */
-export function todosOf(args: Record<string, unknown>, current: Todo[] | undefined): Todo[] {
-  const raw = Array.isArray(args['todos']) ? args['todos'] : []
-
-  return args['merge'] === true ? mergeTodos(current ?? [], raw) : toTodos(raw)
+/** A todo call's list from its detail: the whole list, or with `merge` a patch on `current`. */
+export function todosOf({ merge, todos }: Pick<TodoDetail, 'merge'> & { todos: readonly unknown[] }, current: Todo[] | undefined): Todo[] {
+  return merge ? mergeTodos(current ?? [], todos) : toTodos(todos)
 }
 
 /** As TodoStore.write(merge=True): items update by id in the fields given, new ids append. */
-function mergeTodos(current: Todo[], patch: unknown[]): Todo[] {
+function mergeTodos(current: Todo[], patch: readonly unknown[]): Todo[] {
   const out = current.map(t => ({ ...t }))
 
   for (const item of patch) {
@@ -103,7 +102,7 @@ function mergeTodos(current: Todo[], patch: unknown[]): Todo[] {
 }
 
 /** A todo snapshot's items as the list holds them: an unknown status is pending. */
-export function toTodos(raw: unknown[]): Todo[] {
+export function toTodos(raw: readonly unknown[]): Todo[] {
   const out: Todo[] = []
 
   for (const item of raw) {

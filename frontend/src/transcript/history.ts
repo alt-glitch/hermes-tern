@@ -8,6 +8,7 @@ import { settleBridge, unwrap } from '../bridge.js'
 import { type EntryId, type ToolCallId, toolCallId } from '../core/ids.js'
 import type { Entry, Todo, ToolCall, TurnEnd, TurnEntry, UserEntry } from '../model.js'
 import { promptAttachments, splitPrompt } from '../promptRefs.js'
+import { detailOf } from '../tools/detail.js'
 import { parseJson, record } from '../wire/json.js'
 import { isTodoName } from './calls.js'
 import type { RestoredCompaction } from './compactions.js'
@@ -204,8 +205,10 @@ export function history({ kept, messages, compactions, id }: HistorySource): Ent
       }
 
       // History drops todo results: the list is the stored args, a merge patching the one before.
-      if (Array.isArray(args['todos'])) {
-        call.todos = todosOf(args, todos)
+      const d = detailOf(call)
+
+      if (d.tool === 'todo_list' && d.todos) {
+        call.todos = todosOf({ merge: d.merge, todos: d.todos }, todos)
         todos = call.todos
       }
 

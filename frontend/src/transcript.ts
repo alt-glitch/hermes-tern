@@ -17,6 +17,7 @@ import { nextVia, settleBridge, unwrap } from './bridge.js'
 import type { StoredCompaction } from './compaction.js'
 import { type EntryId, entryId, type ToolCallId, toolCallId } from './core/ids.js'
 import type { Compaction, Counters, Entry, NoticeEntry, Todo, ToolCall, TurnEntry, UserAttachment } from './model.js'
+import { detailOf } from './tools/detail.js'
 import { callIn, callsWhere, findCall, isBackgroundCall, isTodoName, isToolError, isWatchCall, type Located } from './transcript/calls.js'
 import { type CompactionStart, Compactions } from './transcript/compactions.js'
 import { history, storedUser } from './transcript/history.js'
@@ -351,8 +352,10 @@ export class Transcript {
 
     // The call's own list shows while it runs (a merge patches the current one); tool.complete's
     // snapshot replaces it.
-    if (Array.isArray(call.args['todos'])) {
-      call.todos = todosOf(call.args, before)
+    const d = detailOf(call)
+
+    if (d.tool === 'todo_list' && d.todos) {
+      call.todos = todosOf({ merge: d.merge, todos: d.todos }, before)
     }
 
     turn.blocks.push({ call, id: call.id, kind: 'tool' })

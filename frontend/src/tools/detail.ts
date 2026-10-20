@@ -24,6 +24,8 @@ import {
   skillDetail,
   type SkillsDetail,
   skillsDetail,
+  type TodoDetail,
+  todoDetail,
   type ToolDescribeDetail,
   toolDescribeDetail,
   type ToolSearchDetail,
@@ -50,6 +52,7 @@ export type ToolDetail =
   | SkillsDetail
   | TaskDetail
   | TerminalDetail
+  | TodoDetail
   | ToolDescribeDetail
   | ToolSearchDetail
   | WebSearchDetail
@@ -79,7 +82,7 @@ const PARSERS: { [K in ToolKey]: (raw: Raw) => DetailOf<K> } = {
   skill_view: skillDetail,
   skills_list: skillsDetail,
   terminal: terminalDetail,
-  todo_list: plainDetail('todo_list'),
+  todo_list: todoDetail,
   tool_describe: toolDescribeDetail,
   tool_search: toolSearchDetail,
   unlink_pull_request: pullRequestDetail('unlink_pull_request'),

@@ -9,11 +9,12 @@ import { isConnectCall } from './connections.js'
 import { isNonEmpty } from './core/assert.js'
 import { shownImage } from './media.js'
 import type { Block, ToolCall, TurnEntry } from './model.js'
+import { detailOf } from './tools/detail.js'
 import { isBackgroundCall, isTodoName, isWatchCall } from './transcript/calls.js'
 import { compactionEndedAt } from './transcript/compactions.js'
 import { turnEndedAt } from './transcript/turns.js'
 import { commandProgramName } from './vendor/t3code/commandLabel.js'
-import { durationCompact, flat, nonEmpty, plural } from './view/format.js'
+import { durationCompact, flat, plural } from './view/format.js'
 import { ACTION_ICON, withView } from './view/tools/registry.js'
 import type { Action } from './view/tools/types.js'
 
@@ -303,7 +304,8 @@ function editedFiles(calls: readonly ToolCall[]): number {
   let unnamed = 0
 
   for (const c of calls) {
-    const path = nonEmpty(c.args['path'])
+    const d = detailOf(c)
+    const path = d.tool === 'patch' || d.tool === 'write_file' ? d.path : undefined
 
     if (path) {
       paths.add(path)
@@ -342,7 +344,6 @@ export function stepLabel(call: ToolCall): string {
   return withView(call, view => view.step())
 }
 
-/** The live line of a running group, after t3code's `liveWorkEntryLabel`: "Running ls". */
 /**
  * The live group's line for its newest step. `active` (the turn is still at work on it) keeps a
  * step that already ended in the present tense, as t3code's `liveActivityToolStatus` does: the
@@ -355,7 +356,8 @@ export function liveLabel(item: WorkItem, active = false): string {
 
   const call = item.call
   const status = active && call.outcome.kind === 'done' ? 'running' : call.outcome.kind
-  const command = call.name === 'terminal' ? (nonEmpty(call.args['command']) ?? call.context) : undefined
+  const d = detailOf(call)
+  const command = d.tool === 'terminal' ? (d.command ?? call.context) : undefined
 
   if (!command) {
     return status === 'running' ? presentTense(stepLabel(call)) : stepLabel(call)

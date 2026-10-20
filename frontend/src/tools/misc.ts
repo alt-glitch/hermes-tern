@@ -19,13 +19,21 @@ export interface GenericFields {
 }
 
 /** The tools with nothing of their own to read: only the generic card's fields. */
-type Plain = 'browser' | 'image_generate' | 'list_pull_requests' | 'manage_connections' | 'other' | 'session_search' | 'todo_list' | 'vision_analyze'
+type Plain = 'browser' | 'image_generate' | 'list_pull_requests' | 'manage_connections' | 'other' | 'session_search' | 'vision_analyze'
+
+/** A call of a tool with no detail of its own. `browser` is every `browser*` tool, and `other` any name no view takes. */
+export type PlainDetail = { [T in Plain]: GenericFields & { tool: T } }[Plain]
 
 /**
- * A call of a tool with no detail of its own. `browser` is every `browser*` tool, `todo_list` its
- * legacy name `todo` too (the view reads the call's todos), and `other` any name no view takes.
+ * A `todo_list` call (or `todo`, its legacy name), read once: the list it writes, which the
+ * transcript folds into the call's todos (the view reads those).
  */
-export type PlainDetail = { [T in Plain]: GenericFields & { tool: T } }[Plain]
+export interface TodoDetail extends GenericFields {
+  tool: 'todo_list'
+  /** The args' `todos`: the whole list, or with `merge` a patch on the one before; undefined when not a list. */
+  todos: unknown[] | undefined
+  merge: boolean
+}
 
 /** A `process_manage` call (or `process`, its name before Hermes renamed it), read once. */
 export interface ProcessDetail extends GenericFields {
@@ -102,6 +110,10 @@ export function genericFields({ args, result }: Raw): GenericFields {
 /** The parser of a tool with nothing of its own. */
 export function plainDetail<T extends Plain>(tool: T): (raw: Raw) => GenericFields & { tool: T } {
   return raw => ({ ...genericFields(raw), tool })
+}
+
+export function todoDetail(raw: Raw): TodoDetail {
+  return { ...genericFields(raw), merge: raw.args['merge'] === true, todos: list(raw.args['todos']), tool: 'todo_list' }
 }
 
 export function processDetail(raw: Raw): ProcessDetail {
