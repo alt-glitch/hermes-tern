@@ -1,8 +1,23 @@
 // The agent's todo list as its todo tool calls leave it: a call's whole list, or a merge that
 // patches the one before, and the newest snapshot in a transcript.
 
+import type { ChecklistStatus } from '@stencil-hq/tern'
+
 import type { Entry, Todo } from '../model.js'
 import { record } from '../wire/json.js'
+
+/** How a todo's status looks: its item's state in Tern's `checklist`. */
+export interface TodoLook {
+  item: ChecklistStatus
+}
+
+/** Each todo status's look. */
+export const TODO_LOOK = {
+  cancelled: { item: 'dropped' },
+  completed: { item: 'done' },
+  in_progress: { item: 'active' },
+  pending: { item: 'pending' }
+} as const satisfies Record<Todo['status'], TodoLook>
 
 /** The agent's todo list as its newest snapshot in `entries` left it (any turn), if it ever made one. */
 export function currentTodos(entries: readonly Entry[]): Todo[] | undefined {

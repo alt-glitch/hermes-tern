@@ -6,20 +6,21 @@
 // transcript log, one row per step, following the newest). S steers a running agent (the
 // search line becomes the message), X stops it. P pauses (or resumes) new spawns, gateway-wide.
 
-import type { JSX, Key, PickerColumn, PickerItem, Tone } from '@stencil-hq/tern'
+import type { JSX, Key, PickerColumn, PickerItem } from '@stencil-hq/tern'
 
 import type { ChatPorts } from '../app/ports.js'
-import { errorText } from '../core/errors.js'
 import type { Subagent } from '../model.js'
 import type { Overlay } from '../overlay.js'
 
 import type { LogEntry } from '../agents/liveLog.js'
+import { SUBAGENT_LOOK } from '../agents/look.js'
 import { agentName, isRunning } from '../agents/store.js'
-import { duration } from '../view/time.js'
+import { duration } from '../view/format.js'
 import { agentNode, briefOf } from '../view/tools.js'
+import { facts } from '../view/ui/facts.js'
 
 import { editQuery, moveSelection } from './search.js'
-import { tickWhileOpen } from './sheet.js'
+import { countSummary, reportError, tickWhileOpen } from './sheet.js'
 
 /** What the agents hub reaches of the app. */
 export type AgentsSheetHost = Pick<ChatPorts, 'agents' | 'changed' | 'close' | 'open' | 'openAgent' | 'transcript'>
@@ -30,22 +31,6 @@ const TICK_MS = 1000
 const RECENT = 6
 
 type Tab = 'running' | 'all'
-
-const DOT: Record<Subagent['status'], Tone> = {
-  cancelled: 'warning',
-  done: 'success',
-  failed: 'error',
-  queued: 'muted',
-  running: 'accent'
-}
-
-const STATUS: Record<Subagent['status'], string> = {
-  cancelled: 'Stopped',
-  done: 'Done',
-  failed: 'Failed',
-  queued: 'Queued',
-  running: 'Running'
-}
 
 /** Icons for the tools hermes children run most; the rest get a wrench. */
 const TOOL_ICON: Record<string, string> = {
@@ -107,15 +92,13 @@ export function openAgents(host: AgentsSheetHost, focus?: { id: string; watch?: 
       return host.changed()
     }
 
-    try {
+    await reportError(host.transcript, async () => {
       const queued = await host.agents.steer(a, text)
       host.transcript.notice(
         queued ? `Steering queued for ${agentName(a)}.` : `${agentName(a)} is not taking steering now.`,
         queued ? 'info' : 'warning'
       )
-    } catch (error) {
-      host.transcript.notice(errorText(error), 'error')
-    }
+    })
 
     host.changed()
   }
@@ -128,25 +111,21 @@ export function openAgents(host: AgentsSheetHost, focus?: { id: string; watch?: 
       return host.changed()
     }
 
-    try {
+    await reportError(host.transcript, async () => {
       if (!(await host.agents.stop(a))) {
         host.transcript.notice(`${agentName(a)} already finished.`, 'warning')
       }
-    } catch (error) {
-      host.transcript.notice(errorText(error), 'error')
-    }
+    })
 
     host.changed()
   }
 
   /** Blocks or unblocks new spawns (`delegation.pause`, every chat on the gateway); running agents keep going. */
   const togglePause = async () => {
-    try {
+    await reportError(host.transcript, async () => {
       const paused = await host.agents.pause(!host.agents.paused)
       host.transcript.notice(paused ? 'Subagent spawning paused for every chat on this gateway.' : 'Subagent spawning resumed.')
-    } catch (error) {
-      host.transcript.notice(errorText(error), 'error')
-    }
+    })
 
     host.changed()
   }
@@ -388,7 +367,7 @@ export function openAgents(host: AgentsSheetHost, focus?: { id: string; watch?: 
         preview="side"
         selected={sel}
         size="lg"
-        subtitle={[{ s: 'muted', t: `${STATUS[a.status]} · ${a.goal}` }]}
+        subtitle={[{ s: 'muted', t: `${SUBAGENT_LOOK[a.status].word} · ${a.goal}` }]}
         title={agentName(a)}
         total={entries.length}
         {...steerProps(a)}
@@ -406,15 +385,12 @@ export function openAgents(host: AgentsSheetHost, focus?: { id: string; watch?: 
 }
 
 function summary(all: Subagent[]): string {
-  const count = (s: Subagent['status']) => all.filter(a => a.status === s).length
-  const parts = [
-    [count('running') + count('queued'), 'running'],
-    [count('done'), 'done'],
-    [count('failed'), 'failed'],
-    [count('cancelled'), 'stopped']
-  ] as const
-
-  return parts.filter(([n]) => n).map(([n, label]) => `${n} ${label}`).join(' · ') || 'none yet'
+  return countSummary(all, [
+    [a => a.status === 'running' || a.status === 'queued', 'running'],
+    [a => a.status === 'done', 'done'],
+    [a => a.status === 'failed', 'failed'],
+    [a => a.status === 'cancelled', 'stopped']
+  ])
 }
 
 function elapsed(a: Subagent, now: number): string {
@@ -426,7 +402,7 @@ function hubItem(a: Subagent, now: number): PickerItem {
     chips: a.model ? [{ text: a.model.split('/').at(-1) ?? a.model }] : undefined,
     depth: a.depth ?? 0,
     detail: a.goal,
-    dot: DOT[a.status],
+    dot: SUBAGENT_LOOK[a.status].tone,
     facts: { time: elapsed(a, now), tools: a.toolCount },
     id: a.id,
     label: agentName(a),
@@ -443,22 +419,21 @@ function briefFor(host: AgentsSheetHost, a: Subagent): string | undefined {
 
 function hubPreview(a: Subagent, now: number, brief?: string): JSX.Element[] {
   const recent = (a.log?.entries ?? []).slice(-RECENT)
+  const look = SUBAGENT_LOOK[a.status]
 
   return [
     // A new node each time the selection moves: its timers need their true ages.
     agentNode(a, now),
     <kv
-      items={[
-        { k: [{ t: 'Status' }], v: [{ s: toneSpan(a.status), t: STATUS[a.status] }] },
-        ...(a.model ? [{ k: [{ t: 'Model' }], v: a.model }] : []),
-        { k: [{ t: 'Time' }], v: elapsed(a, now) },
-        { k: [{ t: 'Tools' }], v: String(a.toolCount) },
-        ...(a.exitReason ? [{ k: [{ t: 'Ended' }], v: a.exitReason.replace(/_/g, ' ') }] : []),
-        ...(isRunning(a) && a.steerable !== undefined
-          ? [{ k: [{ t: 'Steering' }], v: a.steerable ? 'open' : 'closed' }]
-          : []),
-        { k: [{ t: 'ID' }], v: [{ s: 'mono dim', t: a.id }] }
-      ]}
+      items={facts([
+        ['Status', [{ s: look.tone, t: look.word }]],
+        ['Model', a.model],
+        ['Time', elapsed(a, now)],
+        ['Tools', String(a.toolCount)],
+        ['Ended', a.exitReason?.replace(/_/g, ' ')],
+        ['Steering', isRunning(a) && a.steerable !== undefined ? (a.steerable ? 'open' : 'closed') : undefined],
+        ['ID', [{ s: 'mono dim', t: a.id }]]
+      ])}
       key="facts"
       role="omp.hub.kv"
     />,
@@ -537,14 +512,11 @@ function stepPreview(e: LogEntry, a: Subagent, brief?: string): JSX.Element[] {
   return [
     <text key="title" role="omp.hub.title" spans={[{ s: 'mono strong', t: e.name }]} />,
     <kv
-      items={[
-        {
-          k: [{ t: 'Status' }],
-          v: [{ s: e.status === 'error' ? 'error' : e.status === 'ok' ? 'success' : 'accent', t: e.status === 'ok' ? 'ok' : e.status }]
-        },
-        { k: [{ t: 'Started' }], v: e.at },
-        ...(e.took !== undefined ? [{ k: [{ t: 'Took' }], v: duration(e.took) }] : [])
-      ]}
+      items={facts([
+        ['Status', [{ s: e.status === 'error' ? 'error' : e.status === 'ok' ? 'success' : 'accent', t: e.status === 'ok' ? 'ok' : e.status }]],
+        ['Started', e.at],
+        ['Took', e.took !== undefined ? duration(e.took) : undefined]
+      ])}
       key="facts"
       role="omp.hub.kv"
     />,
@@ -582,8 +554,4 @@ function stepSpans(e: LogEntry): { s?: string; t: string }[] {
     default:
       return [{ t: e.text }]
   }
-}
-
-function toneSpan(status: Subagent['status']): string {
-  return { cancelled: 'warning', done: 'success', failed: 'error', queued: 'muted', running: 'accent' }[status]
 }

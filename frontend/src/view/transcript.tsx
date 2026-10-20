@@ -3,15 +3,18 @@
 // `omp.assistant` columns holding streamed `md`, work groups (workLog.tsx) and
 // `tool` cards, and an `omp.turn.usage` footer.
 
-import { type JSX, node } from '@stencil-hq/tern'
+import type { JSX } from '@stencil-hq/tern'
 
 import type { Block, Compaction, Entry, NoticeEntry, TurnEntry, UserAttachment, UserEntry } from '../model.js'
 import { steerState } from '../transcript/messages.js'
 import { parts, pieces } from '../workLog.js'
 
-import { age, compact, duration } from './time.js'
+import { duration } from './format.js'
+import { age, compact } from './time.js'
 import { slashBody } from './slash.js'
 import { toolNode } from './tools.js'
+import { foldSection, headedCard } from './ui/fold.js'
+import { shimmerText } from './ui/live.js'
 import { type WelcomeContext, welcomeNode } from './welcome.js'
 import { foldNode, latestFailed, thinkingRow, workingNode, workNode } from './workLog.js'
 
@@ -169,17 +172,25 @@ function turnNode(turn: TurnEntry, id: string, cx: TranscriptContext): JSX.Eleme
 
   if (turn.status === 'error') {
     children.push(
-      node('card', { head: `${id}.error.head`, key: 'error', role: 'omp.error', tone: 'error' }, [
-        <row gap="sm" key="head">
-          <text key="title" spans={[{ s: 'error strong', t: 'Request failed' }]} />
-          {turn.errorCode ? <badge key="code" role="omp.error.code" text={turn.errorCode} tone="error" /> : null}
-        </row>,
-        // A failed turn reloaded from an older store knows only Hermes' advice, not the error.
-        turn.error ? (
-          <text key="message" lines={8} role="omp.error.message" spans={[{ s: 'mono', t: turn.error }]} wrap="word" />
-        ) : null,
-        turn.errorHint ? <md key="hint">{turn.errorHint}</md> : null
-      ])
+      headedCard({
+        body: [
+          // A failed turn reloaded from an older store knows only Hermes' advice, not the error.
+          turn.error ? (
+            <text key="message" lines={8} role="omp.error.message" spans={[{ s: 'mono', t: turn.error }]} wrap="word" />
+          ) : null,
+          turn.errorHint ? <md key="hint">{turn.errorHint}</md> : null
+        ],
+        head: (
+          <row gap="sm" key="head">
+            <text key="title" spans={[{ s: 'error strong', t: 'Request failed' }]} />
+            {turn.errorCode ? <badge key="code" role="omp.error.code" text={turn.errorCode} tone="error" /> : null}
+          </row>
+        ),
+        id: `${id}.error`,
+        key: 'error',
+        role: 'omp.error',
+        tone: 'error'
+      })
     )
   } else if (turn.status === 'interrupted') {
     children.push(
@@ -346,16 +357,7 @@ function compactionNode(c: Compaction, key: string, id: string, now: number): JS
 
   const line = (
     <row align="center" gap="xs" key="head" role="hermes.compaction.line" title={running ? undefined : COMPACTED_TITLE}>
-      {running ? (
-        <shimmer
-          key="what"
-          mode="classic"
-          palette={{ high: 'accent', low: 'dim', mid: 'muted' }}
-          spans={[{ s: 'muted', t: 'Compacting context' }]}
-        />
-      ) : (
-        <icon key="icon" name="compaction" />
-      )}
+      {running ? shimmerText({ key: 'what', text: 'Compacting context' }) : <icon key="icon" name="compaction" />}
       {running ? null : <text key="what" spans={[{ s: 'muted', t: 'Context compacted' }]} wrap="none" />}
       {running ? <elapsed age={age(c, c.startedAt, now)} format="short" key="age" /> : null}
       {detail ? <text key="facts" spans={[{ s: 'dim', t: `· ${detail}` }]} truncate="end" wrap="none" /> : null}
@@ -370,11 +372,16 @@ function compactionNode(c: Compaction, key: string, id: string, now: number): JS
     )
   }
 
-  return node('section', { collapsed: true, collapsible: true, head: `${id}.head`, key, role: 'hermes.compaction' }, [
-    line,
-    <text key="lead" role="hermes.compaction.lead" spans={[{ s: 'dim', t: 'The summary the agent goes on from:' }]} wrap="word" />,
-    <md key="summary">{c.summary}</md>
-  ])
+  return foldSection({
+    body: [
+      <text key="lead" role="hermes.compaction.lead" spans={[{ s: 'dim', t: 'The summary the agent goes on from:' }]} wrap="word" />,
+      <md key="summary">{c.summary}</md>
+    ],
+    head: line,
+    id,
+    key,
+    role: 'hermes.compaction'
+  })
 }
 
 function noticeNode(e: NoticeEntry): JSX.Element {

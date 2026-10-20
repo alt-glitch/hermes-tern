@@ -14,6 +14,7 @@ import type { Overlay } from '../overlay.js'
 import { relative } from '../processes/cron.js'
 import { PrView, prTone, stateLabel } from '../prs/view.js'
 import type { PrsPill } from '../view/dock.js'
+import { button } from '../view/ui/button.js'
 
 import { tickWhileOpen } from './sheet.js'
 
@@ -93,10 +94,7 @@ export function openPrSheet(host: PullRequestsSheetHost, focus?: PrKey) {
             <row align="center" gap="sm" key="top" role="hermes.pr.top">
               {view.switcher() ?? <text key="title" spans={[{ s: 'strong', t: 'Pull request' }]} />}
               <spacer grow={1} key="fill" />
-              <row align="center" gap="xs" key="x" onClick={close} role="omp.btn" title="Close  esc">
-                <text key="l" text="Close" />
-                <kbd key="k" keys={['escape']} />
-              </row>
+              {button({ hint: 'esc', key: 'x', keys: ['escape'], label: 'Close', onClick: close })}
             </row>
             {view.header(now)}
             {view.tabBar()}

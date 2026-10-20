@@ -135,7 +135,6 @@
   "src/overlays/prompts.tsx @typescript-eslint/no-non-null-assertion": 2,
   "src/overlays/prompts.tsx @typescript-eslint/no-unnecessary-type-assertion": 2,
   "src/overlays/pullRequests.tsx @typescript-eslint/no-non-null-assertion": 1,
-  "src/overlays/sessions.tsx @typescript-eslint/consistent-type-assertions": 3,
   "src/overlays/theme.tsx @typescript-eslint/consistent-type-assertions": 3,
   "src/palette.ts @typescript-eslint/no-restricted-imports": 1,
   "src/processes/store.ts @typescript-eslint/no-non-null-assertion": 2,

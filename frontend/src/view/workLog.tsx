@@ -4,14 +4,13 @@
 // and a thought to its text. The group still running is a single shining line ("Running
 // ls"). Tern keeps each section's open state, so a click needs no round trip.
 
-import { type JSX, node, type Span } from '@stencil-hq/tern'
+import type { JSX, Span } from '@stencil-hq/tern'
 
 import { callApp } from '../bridge.js'
 import type { ToolCall, TurnEntry } from '../model.js'
 import {
   actionIcon,
   actionOf,
-  clock,
   groupIcon,
   liveLabel,
   type Part,
@@ -22,8 +21,11 @@ import {
   type WorkItem
 } from '../workLog.js'
 
+import { clockShort } from './format.js'
 import { age } from './time.js'
 import { toolDetail } from './tools.js'
+import { foldSection } from './ui/fold.js'
+import { shimmerText } from './ui/live.js'
 
 /** "Working for 12s" over a running turn, ruled off from its steps. */
 export function workingNode(turn: TurnEntry, now: number): JSX.Element {
@@ -46,7 +48,7 @@ const LIVE_MAX = 120
 function liveText(label: string): JSX.Element {
   const text = label.length > LIVE_MAX ? `${label.slice(0, LIVE_MAX - 1)}…` : label
 
-  return <shimmer key="label" mode="classic" palette={{ high: 'accent', low: 'dim', mid: 'muted' }} role="hermes.work.live" spans={[{ s: 'muted', t: text }]} />
+  return shimmerText({ key: 'label', role: 'hermes.work.live', text })
 }
 
 /** The newest step of `items` failed: the group no longer stands for live work. */
@@ -67,12 +69,17 @@ export function thinkingRow(): JSX.Element {
 
 /** "Worked for 54s": a finished stretch of the turn's steps and notes, folded until a click; `id` is its node id. */
 export function foldNode(part: Extract<Part, { kind: 'fold' }>, id: string, children: (JSX.Element | null)[]): JSX.Element {
-  return node('section', { collapsed: true, collapsible: true, head: `${id}.head`, key: part.key, role: 'hermes.turn.fold' }, [
-    <row align="center" gap="xs" key="head">
-      <text key="label" spans={[{ s: 'muted', t: part.label }]} wrap="none" />
-    </row>,
-    ...children
-  ])
+  return foldSection({
+    body: children,
+    head: (
+      <row align="center" gap="xs" key="head">
+        <text key="label" spans={[{ s: 'muted', t: part.label }]} wrap="none" />
+      </row>
+    ),
+    id,
+    key: part.key,
+    role: 'hermes.turn.fold'
+  })
 }
 
 /**
@@ -110,14 +117,11 @@ export function workNode(items: readonly WorkItem[], parent: string, live: boole
       <text key="label" spans={[{ s: 'muted', t: summarize(shown) }]} truncate="end" wrap="none" />
       <icon key="chev" name="chev" role="hermes.work.chev" />
       <spacer grow={1} key="gap" />
-      <text key="time" role="hermes.work.time" spans={[{ s: 'dim', t: clock(startOf(shown[0]!)) }]} wrap="none" />
+      <text key="time" role="hermes.work.time" spans={[{ s: 'dim', t: clockShort(startOf(shown[0]!)) }]} wrap="none" />
     </row>
   )
 
-  return node('section', { collapsed: true, collapsible: true, head: `${id}.head`, key, role: 'hermes.work.group' }, [
-    head,
-    ...shown.map(i => itemNode(i, id, now))
-  ])
+  return foldSection({ body: shown.map(i => itemNode(i, id, now)), head, id, key, role: 'hermes.work.group' })
 }
 
 /** One step: a call (opens to its output) or a thought (opens to its text). */
@@ -125,15 +129,22 @@ function itemNode(item: WorkItem, parent: string, now: number, key: string = ite
   const id = `${parent}.${key}`
 
   if (item.kind === 'thinking') {
-    return node('section', { collapsed: true, collapsible: true, head: `${id}.head`, key, role: 'hermes.work.row' }, [
-      <row align="center" gap="sm" key="head">
-        <icon key="icon" name="brain" />
-        <text grow={1} key="label" spans={[{ s: 'muted', t: thoughtTitle(item) }]} truncate="end" wrap="none" />
-      </row>,
-      <md key="body" role="hermes.work.thought" stream={item.endedAt === undefined || undefined}>
-        {item.text}
-      </md>
-    ])
+    return foldSection({
+      body: (
+        <md key="body" role="hermes.work.thought" stream={item.endedAt === undefined || undefined}>
+          {item.text}
+        </md>
+      ),
+      head: (
+        <row align="center" gap="sm" key="head">
+          <icon key="icon" name="brain" />
+          <text grow={1} key="label" spans={[{ s: 'muted', t: thoughtTitle(item) }]} truncate="end" wrap="none" />
+        </row>
+      ),
+      id,
+      key,
+      role: 'hermes.work.row'
+    })
   }
 
   const call = item.call
@@ -156,12 +167,17 @@ function itemNode(item: WorkItem, parent: string, now: number, key: string = ite
     )
   }
 
-  return node('section', { collapsed: true, collapsible: true, head: `${id}.head`, key, role: 'hermes.work.row' }, [
+  return foldSection({
+    body: (
+      <col gap="xs" key="detail" role="hermes.work.detail">
+        {detail}
+      </col>
+    ),
     head,
-    <col gap="xs" key="detail" role="hermes.work.detail">
-      {detail}
-    </col>
-  ])
+    id,
+    key,
+    role: 'hermes.work.row'
+  })
 }
 
 /** A step's words; a connector's app stands out from what it did there ("Linear · create issue"). */

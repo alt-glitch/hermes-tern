@@ -7,6 +7,7 @@
 import { type JSX, Node, node, type NodeJson, type SpanData, type Tone } from '@stencil-hq/tern'
 
 import type { BackgroundProcess } from '../../model.js'
+import { PROCESS_LOOK } from '../look.js'
 
 import type { Block, ChartView, SparkBlock, StatBlock, Trend } from './types.js'
 
@@ -178,9 +179,6 @@ export function tilesNode(entries: readonly ChartEntry[], key = 'tiles'): JSX.El
   )
 }
 
-const TILE_TONE: Record<BackgroundProcess['status'], Tone> = { done: 'success', failed: 'error', killed: 'warning', lost: 'warning', running: 'accent' }
-const TILE_GLYPH: Record<BackgroundProcess['status'], string> = { done: '✓', failed: '✕', killed: '■', lost: '■', running: '●' }
-
 /** A figure's leading number and the unit after it: `1.10k req/s`, `7/9 trials`, `68%`. */
 const FIGURE_NUMBER = /^([-+]?(?:\d[\d,]*(?:\.\d+)?|\.\d+)[kKMGT]?%?)(?:\s+|(?=\/)|$)(.*)$/
 
@@ -209,14 +207,15 @@ export function tile({ process: p, view }: ChartEntry): JSX.Element {
   const g = live && glance(live)
   const title = plain(live?.title ?? '') || plain(p.command.split(/\r?\n/, 1)[0] ?? '') || p.id
   const visual = tileVisual(live?.blocks[0])
+  const look = PROCESS_LOOK[p.status]
 
   return (
-    <col gap="xs" key={p.id} role="omp.job.tile" tone={TILE_TONE[p.status]}>
+    <col gap="xs" key={p.id} role="omp.job.tile" tone={look.tone}>
       <row align="center" gap="xs" key="head" role="omp.job.tile.head">
         <text
           key="dot"
           role="omp.job.tile.dot"
-          spans={[{ s: toneStyle(TILE_TONE[p.status]), t: TILE_GLYPH[p.status], ...(p.status === 'running' ? { fx: 'pulse' } : {}) }]}
+          spans={[{ s: toneStyle(look.tone), t: look.glyph, ...(p.status === 'running' ? { fx: 'pulse' } : {}) }]}
           wrap="none"
         />
         <text grow={1} key="title" role="omp.job.tile.title" spans={[sp(title)]} truncate="end" wrap="none" />

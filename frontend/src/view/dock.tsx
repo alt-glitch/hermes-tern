@@ -12,8 +12,11 @@ import { type ChartEntry, glance, glanceSpans, hovercard, latest, miniSpark, sum
 import { COMPACTING_LABEL } from '../status.js'
 
 import { type AutomationLine, automationNode, type Reconnecting, reconnectNode } from './automation.js'
-import { age, compact } from './time.js'
+import { plural } from './format.js'
+import { compact } from './time.js'
 import { checklistNode } from './tools.js'
+import { workingRow } from './ui/live.js'
+import { pill } from './ui/pill.js'
 
 /** What the dock shows. */
 export interface DockContext {
@@ -271,28 +274,24 @@ function todosPillNode(t: TodosPill, focused: boolean): JSX.Element | null {
 
   const finished = done === total
 
-  return (
-    <row
-      align="center"
-      key="todos"
-      mark={focused ? 'pick' : undefined}
-      onClick={t.onToggle}
-      role="omp.hud.pill"
-      title={t.open ? 'Hide the todo list' : 'Show the todo list'}
-    >
-      <row align="center" gap="xs" key="seg" role="hermes.todos.pill">
-        <meter key="ring" size="sm" style="ring" value={done / total} />
-        <text key="count" spans={[{ s: 'muted', t: 'todos ' }, { t: `${done}/${total}` }, { s: 'muted', t: ' · ' }]} wrap="none" />
-        <text
-          key="now"
-          role="hermes.todos.now"
-          spans={[{ s: finished ? 'success' : undefined, t: finished ? 'all done' : current }]}
-          truncate="end"
-          wrap="none"
-        />
-      </row>
-    </row>
-  )
+  return pill({
+    children: [
+      <meter key="ring" size="sm" style="ring" value={done / total} />,
+      <text key="count" spans={[{ s: 'muted', t: 'todos ' }, { t: `${done}/${total}` }, { s: 'muted', t: ' · ' }]} wrap="none" />,
+      <text
+        key="now"
+        role="hermes.todos.now"
+        spans={[{ s: finished ? 'success' : undefined, t: finished ? 'all done' : current }]}
+        truncate="end"
+        wrap="none"
+      />
+    ],
+    focused,
+    key: 'todos',
+    onClick: t.onToggle,
+    seg: 'hermes.todos.pill',
+    title: t.open ? 'Hide the todo list' : 'Show the todo list'
+  })
 }
 
 /**
@@ -376,15 +375,17 @@ function statusLine(cx: DockContext): JSX.Element {
  * entrance plays once. The content sits in an `omp.hud.seg`, omp's padded, hoverable pill part.
  */
 function agentsPill(running: number, onOpen: () => void, focused: boolean): JSX.Element {
-  return (
-    <row align="center" key="pill" mark={focused ? 'pick' : undefined} onClick={onOpen} role="omp.hud.pill" title="Agents  ⌥A">
-      <row align="center" gap="xs" key="seg" role="omp.hud.seg">
-        <icon key="icon" name="users" />
-        <spinner key="spin" style="dots" tone="accent" />
-        <text key="text" text={`${running} agent${running === 1 ? '' : 's'} running`} wrap="none" />
-      </row>
-    </row>
-  )
+  return pill({
+    children: [
+      <icon key="icon" name="users" />,
+      <spinner key="spin" style="dots" tone="accent" />,
+      <text key="text" text={`${plural(running, 'agent')} running`} wrap="none" />
+    ],
+    focused,
+    key: 'pill',
+    onClick: onOpen,
+    title: 'Agents  ⌥A'
+  })
 }
 
 /**
@@ -401,45 +402,35 @@ function shellsPill(s: ShellsPill, focused: boolean): JSX.Element {
   const title = ['Background processes  ⌥J', ...charts.map(c => `${c.process.id}  ${summary(c.view)}`)].join('\n')
   const card = hovercard(charts)
 
-  return (
-    <row
-      align="center"
-      key="shells"
-      mark={focused ? 'pick' : undefined}
-      onClick={s.onOpen}
-      role="omp.hud.pill"
-      title={title}
-      {...(card ? { hovercard: card } : {})}
-    >
-      <row align="center" gap="xs" key="seg" role="omp.hud.seg">
-        <icon key="icon" name="terminal" />
-        {live ? (
-          <spinner key="spin" style="dots" tone="accent" />
-        ) : (
-          <icon key="end" name={s.tone === 'success' ? 'done' : s.tone === 'error' ? 'failed' : 'aborted'} tone={s.tone} />
-        )}
-        <text
-          key="text"
-          spans={[{ s: live ? undefined : 'muted', t: `${n} shell${n === 1 ? '' : 's'}${live ? '' : ' exited'}` }]}
-          wrap="none"
-        />
-        {figure ? <text key="glance" role="omp.hud.glance" spans={glanceSpans(figure)} wrap="none" /> : null}
-        {fresh ? miniSpark(fresh) : null}
-      </row>
-    </row>
-  )
+  return pill({
+    children: [
+      <icon key="icon" name="terminal" />,
+      live ? (
+        <spinner key="spin" style="dots" tone="accent" />
+      ) : (
+        <icon key="end" name={s.tone === 'success' ? 'done' : s.tone === 'error' ? 'failed' : 'aborted'} tone={s.tone} />
+      ),
+      <text key="text" spans={[{ s: live ? undefined : 'muted', t: `${plural(n, 'shell')}${live ? '' : ' exited'}` }]} wrap="none" />,
+      figure ? <text key="glance" role="omp.hud.glance" spans={glanceSpans(figure)} wrap="none" /> : null,
+      fresh ? miniSpark(fresh) : null
+    ],
+    focused,
+    hovercard: card,
+    key: 'shells',
+    onClick: s.onOpen,
+    title
+  })
 }
 
 /** The PR pill, in the shells pill's style. */
 function prsPillNode(p: PrsPill, focused: boolean): JSX.Element {
-  return (
-    <row align="center" key="prs" mark={focused ? 'pick' : undefined} onClick={p.onOpen} role="omp.hud.pill" title="Pull requests  ⌥P">
-      <row align="center" gap="xs" key="seg" role="omp.hud.seg">
-        <icon key="icon" name="merge" tone={p.tone === 'muted' ? undefined : p.tone} />
-        <text key="text" text={p.text} wrap="none" />
-      </row>
-    </row>
-  )
+  return pill({
+    children: [<icon key="icon" name="merge" tone={p.tone === 'muted' ? undefined : p.tone} />, <text key="text" text={p.text} wrap="none" />],
+    focused,
+    key: 'prs',
+    onClick: p.onOpen,
+    title: 'Pull requests  ⌥P'
+  })
 }
 
 /** What the keys do while a pill holds them. */
@@ -459,45 +450,32 @@ function hudHint(): JSX.Element {
 function workingNode(cx: DockContext): JSX.Element {
   const busy = cx.busy!
 
-  return (
-    <row align="center" gap="sm" key="working" role="omp.working">
-      <spinner key="spinner" style="starburst" tone="accent" />
-      <shimmer
-        key="label"
-        mode="classic"
-        palette={{ high: 'accent', low: 'dim', mid: 'muted' }}
-        role="omp.working.label"
-        spans={[{ s: 'muted', t: busy.label }]}
-      />
-      <text key="sep" role="omp.working.sep" text="·" />
-      <elapsed age={age(busy.since, busy.startedAt, cx.now)} format="short" key="elapsed" />
-      <row grow={1} key="fill" />
-      {cx.todos ? todosPillNode(cx.todos, false) : null}
+  return workingRow({
+    label: busy.label,
+    now: cx.now,
+    since: busy.since,
+    startedAt: busy.startedAt,
+    trailing: [
+      <row grow={1} key="fill" />,
+      cx.todos ? todosPillNode(cx.todos, false) : null,
       <row align="center" gap="xs" key="stop" onClick={cx.onInterrupt} role="omp.working.stop" title="Stop  esc esc">
         <kbd key="k" keys={['esc']} />
         <kbd key="k2" keys={['esc']} />
         <text key="t" text="Stop" />
       </row>
-    </row>
-  )
+    ]
+  })
 }
 
 /** The working row while /compress runs: what holds the session, and for how long. */
 function compactingNode(c: NonNullable<DockContext['compacting']>, now: number): JSX.Element {
-  return (
-    <row align="center" gap="sm" key="working" role="omp.working" title="Prompts sent now wait in the queue until the compaction ends">
-      <spinner key="spinner" style="starburst" tone="accent" />
-      <shimmer
-        key="label"
-        mode="classic"
-        palette={{ high: 'accent', low: 'dim', mid: 'muted' }}
-        role="omp.working.label"
-        spans={[{ s: 'muted', t: COMPACTING_LABEL }]}
-      />
-      <text key="sep" role="omp.working.sep" text="·" />
-      <elapsed age={age(c.since, c.startedAt, now)} format="short" key="elapsed" />
-    </row>
-  )
+  return workingRow({
+    label: COMPACTING_LABEL,
+    now,
+    since: c.since,
+    startedAt: c.startedAt,
+    title: 'Prompts sent now wait in the queue until the compaction ends'
+  })
 }
 
 /** The effort chip: the level (the default one muted), and `ultra→max` where the route clamps it. */

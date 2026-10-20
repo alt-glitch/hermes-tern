@@ -1,12 +1,11 @@
 {
   "src/__tests__/app.test.ts": 663,
   "src/agents/store.ts": 705,
-  "src/app.ts": 2805,
-  "src/overlays/prompts.tsx": 863,
+  "src/app.ts": 2801,
+  "src/overlays/prompts.tsx": 833,
   "src/processes/widgets/runtime.ts": 889,
   "src/processes/widgets/spec.ts": 888,
-  "src/prs/view.tsx": 814,
-  "src/view/dock.tsx": 620,
-  "src/view/tools.tsx": 1242,
-  "src/workLog.ts": 674
+  "src/prs/view.tsx": 813,
+  "src/view/tools.tsx": 1221,
+  "src/workLog.ts": 629
 }

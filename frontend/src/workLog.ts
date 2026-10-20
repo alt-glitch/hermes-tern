@@ -12,6 +12,7 @@ import { isConnectCall } from './connections.js'
 import { shownImage } from './media.js'
 import type { Block, Todo, ToolCall, TurnEntry } from './model.js'
 import { isBackgroundCall, isTodoName, isWatchCall } from './transcript/calls.js'
+import { durationCompact, nonEmpty, plural, relativePath } from './view/format.js'
 import { commandDisplayText, commandProgramName } from './vendor/t3code/commandLabel.js'
 
 /** A step of a work group: a tool call or a thought. */
@@ -141,7 +142,7 @@ export function foldOf(turn: TurnEntry): Fold | undefined {
   return { hidden, label: workedFor(ms) }
 }
 
-const workedFor = (ms: number) => (ms > 0 ? `Worked for ${formatDuration(ms)}` : 'Worked')
+const workedFor = (ms: number) => (ms > 0 ? `Worked for ${durationCompact(ms)}` : 'Worked')
 
 /** A turn in reading order: folds ("Worked for 20s") and the blocks that stay in view. */
 export type Part = { blocks: Block[]; key: string; kind: 'fold'; label: string } | { blocks: Block[]; kind: 'shown' }
@@ -198,34 +199,6 @@ export function parts(turn: TurnEntry): Part[] {
   flush(turn.endedAt ?? from)
 
   return out
-}
-
-/** t3code's `formatDuration` (packages/shared/src/orchestrationTiming.ts): 820ms, 4.3s, 42s, 1m 2s. */
-export function formatDuration(ms: number): string {
-  if (!Number.isFinite(ms) || ms < 0) {
-    return '0ms'
-  }
-
-  if (ms < 1_000) {
-    return `${Math.max(1, Math.round(ms))}ms`
-  }
-
-  if (ms < 10_000) {
-    const tenths = Math.round(ms / 100) / 10
-
-    return tenths >= 10 ? '10s' : `${tenths.toFixed(1)}s`
-  }
-
-  if (ms < 60_000) {
-    return `${Math.round(ms / 1_000)}s`
-  }
-
-  const total = Math.round(ms / 1_000)
-  const h = Math.floor(total / 3_600)
-  const m = Math.floor((total % 3_600) / 60)
-  const s = total % 60
-
-  return [h ? `${h}h` : '', m ? `${m}m` : '', s ? `${s}s` : ''].filter(Boolean).join(' ')
 }
 
 /** What a call counts as in a summary, after t3code's `toolGroupAction`. */
@@ -288,7 +261,6 @@ export function actionOf(call: ToolCall): Action {
   return call.name.startsWith('browser') ? 'browser' : 'other'
 }
 
-const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`
 const and = (words: readonly string[]) => (words.length < 3 ? words.join(' and ') : `${words.slice(0, -1).join(', ')}, and ${words.at(-1)}`)
 
 function actionLabel(action: Action, n: number, calls: readonly ToolCall[] = []): string {
@@ -302,25 +274,25 @@ function actionLabel(action: Action, n: number, calls: readonly ToolCall[] = [])
     }
 
     case 'command':
-      return `Ran ${plural(n, 'command', 'commands')}`
+      return `Ran ${plural(n, 'command')}`
 
     case 'read':
-      return `Read ${plural(n, 'file', 'files')}`
+      return `Read ${plural(n, 'file')}`
 
     case 'edit':
-      return `Changed ${plural(n, 'file', 'files')}`
+      return `Changed ${plural(n, 'file')}`
 
     case 'code-search':
-      return `Searched code ${plural(n, 'time', 'times')}`
+      return `Searched code ${plural(n, 'time')}`
 
     case 'search':
-      return `Searched the web ${plural(n, 'time', 'times')}`
+      return `Searched the web ${plural(n, 'time')}`
 
     case 'fetch':
-      return `Read ${plural(n, 'page', 'pages')}`
+      return `Read ${plural(n, 'page')}`
 
     case 'browser':
-      return `Used browser ${plural(n, 'time', 'times')}`
+      return `Used browser ${plural(n, 'time')}`
 
     case 'lookup':
       return `Looked up tools${n > 1 ? ` ${n} times` : ''}`
@@ -329,7 +301,7 @@ function actionLabel(action: Action, n: number, calls: readonly ToolCall[] = [])
       return `Updated the plan${n > 1 ? ` ${n} times` : ''}`
 
     case 'other':
-      return `Used ${plural(n, 'tool', 'tools')}`
+      return `Used ${plural(n, 'tool')}`
   }
 }
 
@@ -378,7 +350,7 @@ export function summarize(items: readonly WorkItem[]): string {
   const rest = calls.length - picked.reduce((n, p) => n + p.count, 0)
 
   if (rest > 0) {
-    labels.push(`Performed ${plural(rest, 'other action', 'other actions')}`)
+    labels.push(`Performed ${plural(rest, 'other action')}`)
   }
 
   const words = labels.map((l, i) => (i === 0 ? l : l.charAt(0).toLowerCase() + l.slice(1)))
@@ -391,7 +363,7 @@ function editedFiles(calls: readonly ToolCall[]): number {
   let unnamed = 0
 
   for (const c of calls) {
-    const path = str(c.args.path)
+    const path = nonEmpty(c.args.path)
 
     if (path) {
       paths.add(path)
@@ -450,20 +422,8 @@ export function actionIcon(action: Action): string {
   }
 }
 
-const str = (v: unknown): string | undefined => (typeof v === 'string' && v ? v : undefined)
-
 /** A path as the user reads it: under the working folder relative, under home with `~`. */
-export function shortPath(path: string, cwd = launchEnv().cwd): string {
-  const root = cwd.replace(/\/+$/, '')
-
-  if (root && path.startsWith(`${root}/`)) {
-    return path.slice(root.length + 1)
-  }
-
-  const home = homedir()
-
-  return home && path.startsWith(`${home}/`) ? `~${path.slice(home.length)}` : path.replace(/^\.\//, '')
-}
+const shortPath = (path: string) => relativePath(path, { cwd: launchEnv().cwd, home: homedir() })
 
 /**
  * One step on one line, after t3code's `workEntryDisplayLabel`: a command as its text (without
@@ -471,7 +431,7 @@ export function shortPath(path: string, cwd = launchEnv().cwd): string {
  */
 export function stepLabel(call: ToolCall): string {
   const a = call.args
-  const path = str(a.path)
+  const path = nonEmpty(a.path)
   const app = callApp(call)
 
   if (app) {
@@ -488,7 +448,7 @@ export function stepLabel(call: ToolCall): string {
 
   switch (call.name) {
     case 'terminal': {
-      const command = str(a.command) ?? call.context
+      const command = nonEmpty(a.command) ?? call.context
 
       return command ? flat(commandDisplayText(command)) : 'Command'
     }
@@ -503,18 +463,18 @@ export function stepLabel(call: ToolCall): string {
       return path ? `Wrote ${shortPath(path)}` : 'Wrote a file'
 
     case 'search_files': {
-      const pattern = str(a.pattern) ?? call.context
+      const pattern = nonEmpty(a.pattern) ?? call.context
       const where = path && path !== '.' ? ` in ${shortPath(path)}` : ''
 
       return a.target === 'files' ? `Searched files ${pattern}${where}` : `Searched ${pattern}${where}`
     }
 
     case 'web_search':
-      return str(a.query) ? `Searched the web for ${a.query}` : 'Web search'
+      return nonEmpty(a.query) ? `Searched the web for ${a.query}` : 'Web search'
 
     case 'web_extract': {
       const urls = Array.isArray(a.urls) ? a.urls.filter(u => typeof u === 'string') : []
-      const first = urls[0] ?? str(a.url)
+      const first = urls[0] ?? nonEmpty(a.url)
 
       return first ? `Read ${first}${urls.length > 1 ? ` +${urls.length - 1} more` : ''}` : 'Read a page'
     }
@@ -526,8 +486,8 @@ export function stepLabel(call: ToolCall): string {
 
     case 'unlink_pull_request': {
       const verb = call.name === 'link_pull_request' ? 'Linked' : 'Unlinked'
-      const pr = str(a.url)?.match(/github[^/]*\/([^/]+\/[^/]+)\/pull\/(\d+)/)
-      const repo = pr?.[1] ?? str(a.repository)
+      const pr = nonEmpty(a.url)?.match(/github[^/]*\/([^/]+\/[^/]+)\/pull\/(\d+)/)
+      const repo = pr?.[1] ?? nonEmpty(a.repository)
       const number = pr?.[2] ?? (typeof a.number === 'number' ? String(a.number) : undefined)
 
       return repo && number ? `${verb} ${repo}#${number}` : `${verb} a pull request`
@@ -537,13 +497,13 @@ export function stepLabel(call: ToolCall): string {
       return 'Listed linked pull requests'
 
     case 'skill_view':
-      return str(a.name) ? `Read skill ${a.name}` : 'Read a skill'
+      return nonEmpty(a.name) ? `Read skill ${a.name}` : 'Read a skill'
 
     case 'skills_list':
       return 'Listed skills'
 
     case 'tool_search': {
-      const q = Array.isArray(a.queries) ? a.queries.filter(x => typeof x === 'string') : [str(a.queries) ?? str(a.query)].filter(Boolean)
+      const q = Array.isArray(a.queries) ? a.queries.filter(x => typeof x === 'string') : [nonEmpty(a.queries) ?? nonEmpty(a.query)].filter(Boolean)
 
       return q.length ? `Searched tools for ${q.join(', ')}` : 'Searched tools'
     }
@@ -581,7 +541,7 @@ export function planStep(before: readonly Todo[] | undefined, after: readonly To
   }
 
   if (!before?.length) {
-    return `Planned ${plural(after.length, 'step', 'steps')}`
+    return `Planned ${plural(after.length, 'step')}`
   }
 
   const changes = after.flatMap(t => {
@@ -606,7 +566,7 @@ export function liveLabel(item: WorkItem, active = false): string {
 
   const call = item.call
   const status = active && call.status === 'done' ? 'running' : call.status
-  const command = call.name === 'terminal' ? (str(call.args.command) ?? call.context) : undefined
+  const command = call.name === 'terminal' ? (nonEmpty(call.args.command) ?? call.context) : undefined
 
   if (!command) {
     return status === 'running' ? presentTense(stepLabel(call)) : stepLabel(call)
@@ -667,8 +627,3 @@ export function thoughtTitle(item: { label?: string; text: string }): string {
 }
 
 const flat = (text: string) => text.replace(/\s+/g, ' ').trim()
-
-/** `6:15 pm`: when a group started, for its hover line. */
-export function clock(at: number): string {
-  return new Date(at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }).toLowerCase()
-}

@@ -18,6 +18,8 @@ import { mutateSession } from '../hermes/mutate.js'
 import { inWorkspace, lastReply, sessionLabel, type StoredSession, storedSessions, workspaceOf } from '../hermes/sessionIndex.js'
 import type { Overlay } from '../overlay.js'
 import { oneLine } from '../view/describe.js'
+import { homeTilde, plural } from '../view/format.js'
+import { facts } from '../view/ui/facts.js'
 import { rpc } from '../wire/rpc.js'
 
 import { editQuery, hitRuns, moveSelection, rank } from './search.js'
@@ -296,7 +298,7 @@ function itemOf(s: StoredSession, now: number, running: boolean, elsewhere: bool
       ...(elsewhere && s.cwd ? [{ text: basename(s.cwd), title: s.cwd }] : [])
     ],
     detail: s.title && s.preview ? oneLine(s.preview) : undefined,
-    facts: { size: `${s.messages} msg${s.messages === 1 ? '' : 's'}`, when: ageOf(s.lastActive, now) },
+    facts: { size: plural(s.messages, 'msg'), when: ageOf(s.lastActive, now) },
     id: s.id,
     label,
     title: s.cwd || undefined
@@ -313,16 +315,16 @@ function preview(s: StoredSession, now: number, isCurrent: boolean, running: boo
   return [
     <text key="title" role="omp.picker.title" text={sessionLabel(s)} />,
     <kv
-      items={[
-        ...(status ? [{ k: [{ t: 'Status' }], v: status }] : []),
-        ...(s.cwd ? [{ k: [{ t: 'Folder' }], v: [{ s: 'mono', t: shortPath(s.cwd) }] as Span[] }] : []),
-        ...(s.branch ? [{ k: [{ t: 'Branch' }], v: [{ s: 'mono', t: s.branch }] as Span[] }] : []),
-        { k: [{ t: 'Last active' }], v: `${dateOf(s.lastActive)} · ${ageOf(s.lastActive, now)} ago` },
-        { k: [{ t: 'Started' }], v: dateOf(s.startedAt) },
-        { k: [{ t: 'Messages' }], v: String(s.messages) },
-        ...(s.model ? [{ k: [{ t: 'Model' }], v: [{ s: 'mono', t: s.model }] as Span[] }] : []),
-        { k: [{ t: 'Session' }], v: [{ s: 'mono dim', t: `${s.source} · ${s.id.replace(/^(local-)?(.{12}).*$/, '$1$2…')}` }] }
-      ]}
+      items={facts([
+        ['Status', status],
+        ['Folder', s.cwd && [{ s: 'mono', t: shortPath(s.cwd) }]],
+        ['Branch', s.branch && [{ s: 'mono', t: s.branch }]],
+        ['Last active', `${dateOf(s.lastActive)} · ${ageOf(s.lastActive, now)} ago`],
+        ['Started', dateOf(s.startedAt)],
+        ['Messages', String(s.messages)],
+        ['Model', s.model && [{ s: 'mono', t: s.model }]],
+        ['Session', [{ s: 'mono dim', t: `${s.source} · ${s.id.replace(/^(local-)?(.{12}).*$/, '$1$2…')}` }]]
+      ])}
       key="facts"
     />,
     ...(s.preview
@@ -342,11 +344,7 @@ function preview(s: StoredSession, now: number, isCurrent: boolean, running: boo
   ]
 }
 
-function shortPath(path: string): string {
-  const home = launchEnv().home
-
-  return home && path.startsWith(home) ? `~${path.slice(home.length)}` : path
-}
+const shortPath = (path: string) => homeTilde(path, launchEnv().home)
 
 /** `25m`, `2h`, `3d`, `1w`, `2mo`, `1y`: how long ago, as omp's session list writes it. */
 function ageOf(at: number, now: number): string {

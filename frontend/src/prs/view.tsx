@@ -24,7 +24,9 @@ import {
 } from '../github/pullRequest.js'
 import type { Entry, PrAction, PullRequests } from '../github/store.js'
 import { relative } from '../processes/cron.js'
+import { clip, durationWhole, plural } from '../view/format.js'
 import { langOf } from '../view/tools.js'
+import { button, type ButtonProps } from '../view/ui/button.js'
 
 import { type BodyLinks, bodyNodes } from './body.js'
 
@@ -331,7 +333,7 @@ export class PrView {
         active={this.selected}
         items={entries.map(e => ({
           id: prKey(e.ref),
-          label: [{ s: prTone(e), t: '● ' }, { t: `#${e.ref.number}` }, ...(e.pr && !compact ? [{ s: 'muted', t: ` ${clip(e.pr.title, 28)}` }] : [])]
+          label: [{ s: prTone(e), t: '● ' }, { t: `#${e.ref.number}` }, ...(e.pr && !compact ? [{ s: 'muted', t: ` ${clip(e.pr.title, { max: 28 })}` }] : [])]
         }))}
         key="switch"
         onSelect={ev => {
@@ -403,7 +405,7 @@ export class PrView {
               role="hermes.pr.size"
               shrink={0}
               spans={[
-                { s: 'muted', t: `${pr.changedFiles} file${pr.changedFiles === 1 ? '' : 's'}  ` },
+                { s: 'muted', t: `${plural(pr.changedFiles, 'file')}  ` },
                 { s: 'success', t: `+${pr.additions.toLocaleString()}` },
                 { t: ' ' },
                 { s: 'error', t: `−${pr.deletions.toLocaleString()}` }
@@ -492,26 +494,46 @@ export class PrView {
             spans={[{ t: merge ? `${METHOD_LABEL[method]} #${pr.number} into ` : `Close #${pr.number} without merging?` }, ...(merge ? [{ s: 'mono', t: `${pr.base}?` }] : [])]}
           />
           <spacer grow={1} key="fill" />
-          {button('no', 'Cancel', () => {
-            this.#confirm = undefined
-            this.#host.changed()
-          }, ['esc'])}
-          {button('yes', merge ? METHOD_LABEL[method] : 'Close PR', () => void this.act(this.#confirm!), ['enter'], merge ? 'primary' : 'danger')}
+          {prButton({
+            hint: 'esc',
+            key: 'no',
+            label: 'Cancel',
+            onClick: () => {
+              this.#confirm = undefined
+              this.#host.changed()
+            }
+          })}
+          {prButton({
+            hint: 'enter',
+            key: 'yes',
+            kind: merge ? 'primary' : 'danger',
+            label: merge ? METHOD_LABEL[method] : 'Close PR',
+            onClick: () => void this.act(this.#confirm!)
+          })}
         </row>
       )
     }
 
     return (
       <row align="center" gap="sm" key="actions" role="omp.actions">
-        {this.can('close') ? button('close', 'Close PR', () => this.ask('close'), ['x'], 'danger') : null}
-        {this.can('reopen') ? button('reopen', 'Reopen', () => void this.act('reopen')) : null}
-        {this.can('ready') ? button('ready', 'Ready for review', () => void this.act('ready'), ['d']) : null}
-        {this.can('update-branch') ? button('update', 'Update branch', () => void this.act('update-branch'), ['u']) : null}
-        {this.can('rerun') ? button('rerun', 'Re-run failed', () => void this.act('rerun'), ['f']) : null}
+        {this.can('close') ? prButton({ hint: 'x', key: 'close', kind: 'danger', label: 'Close PR', onClick: () => this.ask('close') }) : null}
+        {this.can('reopen') ? prButton({ key: 'reopen', label: 'Reopen', onClick: () => void this.act('reopen') }) : null}
+        {this.can('ready') ? prButton({ hint: 'd', key: 'ready', label: 'Ready for review', onClick: () => void this.act('ready') }) : null}
+        {this.can('update-branch')
+          ? prButton({ hint: 'u', key: 'update', label: 'Update branch', onClick: () => void this.act('update-branch') })
+          : null}
+        {this.can('rerun') ? prButton({ hint: 'f', key: 'rerun', label: 'Re-run failed', onClick: () => void this.act('rerun') }) : null}
         <spacer grow={1} key="fill" />
-        {button('copy', this.#copied && this.#copied === this.selected ? 'Copied' : 'Copy URL', () => this.copy(), ['c'])}
-        {button('open', 'Open on GitHub', () => this.openOnGitHub(), ['o'])}
-        {this.can('merge') ? button('merge', busy ? 'Working…' : METHOD_LABEL[method], () => this.ask('merge'), ['m'], 'primary') : null}
+        {prButton({
+          hint: 'c',
+          key: 'copy',
+          label: this.#copied && this.#copied === this.selected ? 'Copied' : 'Copy URL',
+          onClick: () => this.copy()
+        })}
+        {prButton({ hint: 'o', key: 'open', label: 'Open on GitHub', onClick: () => this.openOnGitHub() })}
+        {this.can('merge')
+          ? prButton({ hint: 'm', key: 'merge', kind: 'primary', label: busy ? 'Working…' : METHOD_LABEL[method], onClick: () => this.ask('merge') })
+          : null}
       </row>
     )
   }
@@ -602,25 +624,8 @@ function checksIcon(pr: PullRequest): string {
   return s === 'failing' ? 'failed' : s === 'pending' ? 'running' : s === 'passing' ? 'success' : 'info'
 }
 
-function button(key: string, label: string, onClick: () => void, keys?: string[], kind?: 'danger' | 'primary'): JSX.Element {
-  return (
-    <row
-      align="center"
-      gap="xs"
-      key={key}
-      onClick={onClick}
-      role="omp.btn"
-      title={keys ? `${label}  ${keys.join(' ')}` : label}
-      tone={kind === 'primary' ? 'accent' : kind === 'danger' ? 'error' : undefined}
-    >
-      <text key="l" text={label} wrap="none" />
-    </row>
-  )
-}
-
-function clip(text: string, max: number): string {
-  return text.length > max ? `${text.slice(0, max - 1)}…` : text
-}
+/** The action bar's buttons: the key in the tooltip only (the bar names none), the label on one line. */
+const prButton = (b: Omit<ButtonProps, 'keys' | 'wrap'>) => button({ ...b, wrap: 'none' })
 
 // ── Conversation ──────────────────────────────────────────────────────────────────────────────
 
@@ -737,7 +742,7 @@ function commitRun(commits: ActivityItem[], key: string, now: number): JSX.Eleme
           key="t"
           spans={[
             { s: 'strong', t: authors.join(', ') },
-            { s: 'muted', t: ` added ${commits.length} commit${commits.length === 1 ? '' : 's'}` },
+            { s: 'muted', t: ` added ${plural(commits.length, 'commit')}` },
             { s: 'dim', t: ` · ${relative(commits.at(-1)!.at, now)}` }
           ]}
         />
@@ -760,16 +765,10 @@ function commitRun(commits: ActivityItem[], key: string, now: number): JSX.Eleme
 
 function took(c: Check, now: number): string {
   return c.startedAt && c.completedAt
-    ? duration(Date.parse(c.completedAt) - Date.parse(c.startedAt))
+    ? durationWhole(Date.parse(c.completedAt) - Date.parse(c.startedAt))
     : c.startedAt && c.status === 'pending'
-      ? `${duration(now - Date.parse(c.startedAt))}…`
+      ? `${durationWhole(now - Date.parse(c.startedAt))}…`
       : ''
-}
-
-function duration(ms: number): string {
-  const s = Math.max(0, Math.round(ms / 1000))
-
-  return s < 60 ? `${s}s` : s < 3600 ? `${Math.floor(s / 60)}m ${s % 60}s` : `${Math.floor(s / 3600)}h ${Math.floor((s % 3600) / 60)}m`
 }
 
 /** The checks in four folds: failing and running open, passed and skipped folded. */
@@ -792,7 +791,7 @@ function checksTab(pr: PullRequest, now: number): JSX.Element[] {
       key="sum"
       spans={[
         { s: checksTone(pr), t: checksSummary(pr.checks) },
-        { s: 'dim', t: ` · on ${pr.headOid.slice(0, 7)}${runs ? ` · F re-runs ${runs} failed workflow run${runs === 1 ? '' : 's'}` : ''}` }
+        { s: 'dim', t: ` · on ${pr.headOid.slice(0, 7)}${runs ? ` · F re-runs ${plural(runs, 'failed workflow run')}` : ''}` }
       ]}
     />,
     ...groups

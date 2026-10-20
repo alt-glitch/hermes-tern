@@ -10,6 +10,7 @@ import type { ChatPorts } from '../app/ports.js'
 import { HIDDEN_COMMANDS, localCommands } from '../commands.js'
 import { errorText } from '../core/errors.js'
 import type { Overlay } from '../overlay.js'
+import { actionsRow } from '../view/ui/button.js'
 import { rpc } from '../wire/rpc.js'
 
 /** What the help sheet reaches of the app. */
@@ -132,20 +133,7 @@ export async function openHelp(host: HelpHost) {
               />
             </section>
           ))}
-          <row align="center" gap="sm" key="actions" role="omp.actions">
-            <spacer grow={1} key="fill" />
-            <row
-              align="center"
-              gap="xs"
-              key="close"
-              onClick={() => host.close(overlay)}
-              role="omp.btn"
-              title="Close  escape"
-            >
-              <text key="label" text="Close" />
-              <kbd key="keys" keys={['escape']} />
-            </row>
-          </row>
+          {actionsRow([{ hint: 'escape', key: 'close', keys: ['escape'], label: 'Close', onClick: () => host.close(overlay) }])}
         </col>
       </overlay>
     ),

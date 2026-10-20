@@ -16,6 +16,7 @@ import { record } from '../wire/json.js'
 import { rpc, rpcParsed } from '../wire/rpc.js'
 import { processList, type ProcessRow } from '../wire/schemas.js'
 
+import { PROCESS_LOOK, type ProcessLook } from './look.js'
 import { Charts, type ChartsOptions } from './widgets/registry.js'
 
 /** What the store reaches of the app. */
@@ -115,17 +116,9 @@ export function processElapsed(p: BackgroundProcess, now: number): number {
   return Math.max(0, (p.exitedAt ?? (isRunning(p) ? now : p.startedAt)) - p.startedAt)
 }
 
-const TONE: Record<BackgroundProcess['status'], 'accent' | 'error' | 'success' | 'warning'> = {
-  done: 'success',
-  failed: 'error',
-  killed: 'warning',
-  lost: 'warning',
-  running: 'accent'
-}
-
 /** The status's palette tone: accent while running, then success, error or warning. */
-export function processTone(status: BackgroundProcess['status']): 'accent' | 'error' | 'success' | 'warning' {
-  return TONE[status]
+export function processTone(status: BackgroundProcess['status']): ProcessLook['tone'] {
+  return PROCESS_LOOK[status].tone
 }
 
 /** `running`, `exit 0`, `exit 2`, `killed`, `lost`, `failed to start`. */

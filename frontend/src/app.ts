@@ -94,6 +94,7 @@ import { internalNotice } from './transcript/messages.js'
 import { storedCompactions } from './compaction.js'
 import type { Reconnecting } from './view/automation.js'
 import { dockNodes, type QueuedRow, todoProgress } from './view/dock.js'
+import { homeTilde } from './view/format.js'
 import { entryNode } from './view/transcript.js'
 import { type AdaptedSnapshot, admissionOf, rpc } from './wire/rpc.js'
 import { pendingRows, usageCounters } from './wire/schemas.js'
@@ -2660,7 +2661,7 @@ export class App implements ChatPorts {
         composer: this.composer,
         context: max > 0 ? { max, used } : undefined,
         cost: usage?.cost_usd ?? undefined,
-        cwd: info?.cwd ? shortPath(info.cwd, this.#launch.home) : '',
+        cwd: info?.cwd ? homeTilde(info.cwd, this.#launch.home) : '',
         effort: info?.reasoning_effort ?? '',
         effortWire: info?.reasoning_effort_wire || undefined,
         fast: fastTier(info),
@@ -2796,10 +2797,5 @@ function kaomojiLabel(text: string): string {
   const word = text.match(/([A-Za-z][A-Za-z ]*[A-Za-z])\.{2,}\s*$/)?.[1]
 
   return word ? `${word.charAt(0).toUpperCase()}${word.slice(1)}…` : ''
-}
-
-/** `path` with `home` (HOME) as `~`. */
-function shortPath(path: string, home: string | undefined): string {
-  return home && path.startsWith(home) ? `~${path.slice(home.length)}` : path
 }
 

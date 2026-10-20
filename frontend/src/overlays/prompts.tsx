@@ -13,6 +13,7 @@ import { errorText } from '../core/errors.js'
 import { maskedOffset, maskOf, unmaskEdit } from '../mask.js'
 import type { Overlay, OverlayHost } from '../overlay.js'
 import { withoutTernEnv } from '../view/describe.js'
+import { actionsRow } from '../view/ui/button.js'
 
 /** Strips the backend's `(Recommended)` suffix from clarify's first choice. */
 const RECOMMENDED = /\s*\(recommended\)\s*$/i
@@ -25,15 +26,6 @@ interface Option {
   checked?: boolean
   /** `omp.ask.option` (radio), `omp.ask.check` (checkbox) or `omp.ask.other`. */
   role?: string
-}
-
-export interface Button {
-  key: string
-  label: string
-  keys: string[]
-  hint: string
-  primary?: boolean
-  onClick(): void
 }
 
 const str = (v: unknown): string => (typeof v === 'string' ? v : '')
@@ -59,28 +51,6 @@ const TIMEOUT_NOTICES: Record<string, string> = {
 /** The transcript line for a `request.cancel`, or null (not a timeout; clarify records its own via tool.complete). */
 export function promptTimeoutNotice(method: unknown, reason: unknown): string | null {
   return reason === 'timeout' && typeof method === 'string' ? (TIMEOUT_NOTICES[method] ?? null) : null
-}
-
-export function actionsRow(buttons: Button[]): JSX.Element {
-  return (
-    <row align="center" gap="sm" key="actions" role="omp.actions">
-      <spacer grow={1} key="fill" />
-      {buttons.map(b => (
-        <row
-          align="center"
-          gap="xs"
-          key={b.key}
-          onClick={b.onClick}
-          role="omp.btn"
-          title={`${b.label}  ${b.hint}`}
-          tone={b.primary ? 'accent' : undefined}
-        >
-          <text key="label" text={b.label} />
-          <kbd key="keys" keys={b.keys} />
-        </row>
-      ))}
-    </row>
-  )
 }
 
 function optionList(
@@ -315,9 +285,9 @@ function approvalOverlay(host: OverlayHost, req: ServerRequest): Overlay {
               hint: 'enter · y allows once · up/down move',
               key: 'choose',
               keys: ['enter'],
+              kind: 'primary',
               label: 'Choose',
-              onClick: () => answer(options[selected]?.id ?? 'deny'),
-              primary: true
+              onClick: () => answer(options[selected]?.id ?? 'deny')
             }
           ])}
         </col>
@@ -604,9 +574,9 @@ function clarifyOverlay(host: OverlayHost, req: ServerRequest): Overlay {
                 hint: `enter${q.multi && !d.typing ? ' · space toggles' : ''} · up/down move${questions.length > 1 ? ' · tab switches question' : ''}`,
                 key: 'submit',
                 keys: ['enter'],
+                kind: 'primary',
                 label: last ? 'Submit' : 'Next',
-                onClick: submit,
-                primary: true
+                onClick: submit
               }
             ])}
           </col>
@@ -780,9 +750,9 @@ function maskedOverlay(host: OverlayHost, req: ServerRequest): Overlay {
               hint: 'enter',
               key: 'ok',
               keys: ['enter'],
+              kind: 'primary',
               label: login ? 'Save' : 'Submit',
-              onClick: () => finish(false),
-              primary: true
+              onClick: () => finish(false)
             }
           ])}
         </col>
@@ -840,9 +810,9 @@ export function confirmOverlay(
               hint: 'enter · y',
               key: 'ok',
               keys: ['enter'],
+              kind: 'primary',
               label: ask.confirm,
-              onClick: () => answer(true),
-              primary: true
+              onClick: () => answer(true)
             }
           ])}
         </col>

@@ -2,6 +2,8 @@
 // tool card heads. The command itself stays one click away in the card's body; this only has
 // to say what the step is for, in a few words, without a model call.
 
+import { clip } from './format.js'
+
 /** How long a title may get before it is cut. */
 const MAX = 72
 
@@ -18,8 +20,7 @@ function words(segment: string): string[] {
 }
 
 const base = (path: string) => path.replace(/\/+$/, '').split(/[/\\]/).at(-1) || path
-const quote = (s: string) => `'${clip(s, 32)}'`
-const clip = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1)}…` : s)
+const quote = (s: string) => `'${clip(s, { max: 32 })}'`
 
 /** The first argument that is not a flag (and not a flag's value, for the flags listed). */
 function operand(args: readonly string[], valued: ReadonlySet<string> = new Set()): string | undefined {
@@ -323,20 +324,20 @@ export function describeCommand(command: string): string {
     // Two labels when they fit, else the first and a count.
     const two = `${title}: ${labels.slice(0, 2).join(', ')}${labels.length > 2 ? ` +${labels.length - 2}` : ''}`
 
-    title = two.length <= MAX ? two : `${title}: ${clip(labels[0]!, 32)}${labels.length > 1 ? ` +${labels.length - 1}` : ''}`
+    title = two.length <= MAX ? two : `${title}: ${clip(labels[0]!, { max: 32 })}${labels.length > 1 ? ` +${labels.length - 1}` : ''}`
   } else if (docs.length && /^Read input|^Read /.test(title) && real[0]?.cmd === 'cat') {
     // `cat > file <<EOF` alone writes a file.
     title = `Write ${base(operands(real[0].args).at(-1) ?? 'a file')}`
   }
 
-  return clip(title.charAt(0).toUpperCase() + title.slice(1), MAX)
+  return clip(title.charAt(0).toUpperCase() + title.slice(1), { max: MAX })
 }
 
 /** `cmd` on one line, cut to `n` characters: the card head's view of the command. */
 export function commandLine(command: string, n = 96): string {
   const flat = command.replace(/<<-?\s*['"]?(\w+)['"]?[\s\S]*?\n\s*\1\s*(?=\n|$)/g, "<<'$1' …").replace(/\s+/g, ' ').trim()
 
-  return clip(flat, n)
+  return clip(flat, { max: n })
 }
 
 /** `text` on one line: a list row is one line high, so a description with line breaks spills over its neighbours. */

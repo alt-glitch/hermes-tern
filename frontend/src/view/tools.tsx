@@ -5,19 +5,23 @@
 
 import { type JSX, node } from '@stencil-hq/tern'
 
+import { SUBAGENT_LOOK } from '../agents/look.js'
 import { agentName, OUTCOME_UNKNOWN } from '../agents/store.js'
 import { callApp } from '../bridge.js'
 import { allConnected, CONNECT_TOOL, type ConnectTarget, connectTargets, isConnectCall, type SettleReason, waiting } from '../connections.js'
 import { localSource, shownImage } from '../media.js'
 import type { Subagent, Todo, ToolCall } from '../model.js'
+import { PROCESS_LOOK } from '../processes/look.js'
 import { isRunning as processRuns, processElapsed, processIdOf, processTone, processVerdict, watchersOf } from '../processes/store.js'
 import { primaryNode, tilesNode } from '../processes/widgets/view.js'
 import { isBackgroundCall, isProcessTool, isWatchCall } from '../transcript/calls.js'
+import { TODO_LOOK } from '../transcript/todos.js'
 import { record } from '../wire/json.js'
 import { appsOf } from '../workLog.js'
 
 import { commandLine, describeCommand } from './describe.js'
-import { age, compact, duration } from './time.js'
+import { clip, duration, nonEmpty, plural } from './format.js'
+import { age, compact } from './time.js'
 
 /** How one call presents: omp's tool props (minus status and timing) and its body. */
 interface Card {
@@ -40,8 +44,6 @@ interface Card {
   took?: number
   body: JSX.Element[]
 }
-
-const str = (v: unknown): string | undefined => (typeof v === 'string' && v ? v : undefined)
 
 /** The `tool` node of one call. */
 export function toolNode(call: ToolCall, now: number): JSX.Element {
@@ -106,7 +108,7 @@ export function toolNode(call: ToolCall, now: number): JSX.Element {
 export function toolDetail(call: ToolCall, now: number): JSX.Element[] {
   const card = cardOf(call, now)
   const body = [...card.body]
-  const command = call.name === 'terminal' ? (str(call.args.command) ?? call.context ?? '').trim() : ''
+  const command = call.name === 'terminal' ? (nonEmpty(call.args.command) ?? call.context ?? '').trim() : ''
 
   // A short command sat in the card's head, so its body lacks it.
   if (command && command === commandLine(command)) {
@@ -218,22 +220,22 @@ function cardOf(call: ToolCall, now: number): Card {
       return {
         body: [],
         frame: 'inline',
-        meta: str(result?.usage) ? [`${result?.usage}`] : undefined,
+        meta: nonEmpty(result?.usage) ? [`${result?.usage}`] : undefined,
         name: 'memory',
-        target: call.context || str(call.args.action),
+        target: call.context || nonEmpty(call.args.action),
         targetKind: 'text',
         title: 'Memory'
       }
     case 'skills_list': {
       const skills = Array.isArray(result?.skills) ? result.skills : []
-      const names = skills.map(s => str(record(s)?.name) ?? str(s)).filter(n => n !== undefined)
+      const names = skills.map(s => nonEmpty(record(s)?.name) ?? nonEmpty(s)).filter(n => n !== undefined)
 
       return {
         body: names.length ? [<text key="names" spans={[{ s: 'muted', t: names.join(' · ') }]} wrap="word" />] : [],
         folded: true,
         frame: 'inline',
         meta: [
-          names.length ? `${names.length} skill${names.length === 1 ? '' : 's'}` : (str(result?.message) ?? 'no skills')
+          names.length ? plural(names.length, 'skill') : (nonEmpty(result?.message) ?? 'no skills')
         ],
         name: 'skill',
         title: 'Skills'
@@ -242,11 +244,11 @@ function cardOf(call: ToolCall, now: number): Card {
 
     case 'skill_view':
       return {
-        body: str(result?.content) ? [<md key="body">{clip(str(result?.content) ?? '', 6000)}</md>] : [],
+        body: nonEmpty(result?.content) ? [<md key="body">{clip(nonEmpty(result?.content) ?? '', { mark: 'line', max: 6000 })}</md>] : [],
         folded: true,
         frame: 'inline',
         name: 'skill',
-        target: str(call.args.name) ?? call.context,
+        target: nonEmpty(call.args.name) ?? call.context,
         targetKind: 'text',
         title: 'Skill'
       }
@@ -268,16 +270,16 @@ function cardOf(call: ToolCall, now: number): Card {
 
   // The image itself, open; what the tool said of it under it (not the JSON it came in).
   if (src || call.name === 'image_generate') {
-    const said = call.status === 'running' ? undefined : (str(result?.analysis) ?? str(result?.text_summary))
+    const said = call.status === 'running' ? undefined : (nonEmpty(result?.analysis) ?? nonEmpty(result?.text_summary))
 
     return {
       ...look,
       body: [
         ...(src ? [imageNode(call, src)] : []),
-        ...(said ? [<text key="said" lines={6} spans={[{ s: 'muted', t: clip(said, 2000) }]} wrap="word" />] : [])
+        ...(said ? [<text key="said" lines={6} spans={[{ s: 'muted', t: clip(said, { mark: 'line', max: 2000 }) }]} wrap="word" />] : [])
       ],
       folded: false,
-      target: str(call.args.prompt) ?? str(call.args.question) ?? (call.context || undefined),
+      target: nonEmpty(call.args.prompt) ?? nonEmpty(call.args.question) ?? (call.context || undefined),
       targetKind: 'text'
     }
   }
@@ -290,8 +292,8 @@ function cardOf(call: ToolCall, now: number): Card {
     body: [...(chart ? [chart] : []), ...genericBody(call)],
     folded: !chart,
     frame: 'inline',
-    target: (isProcessTool(call.name) && call.process ? commandLine(call.process.command) : undefined) ?? str(call.args.query) ?? str(call.args.url) ?? (call.context || undefined),
-    targetKind: str(call.args.url) ? 'path' : str(call.args.query) ? 'query' : 'text'
+    target: (isProcessTool(call.name) && call.process ? commandLine(call.process.command) : undefined) ?? nonEmpty(call.args.query) ?? nonEmpty(call.args.url) ?? (call.context || undefined),
+    targetKind: nonEmpty(call.args.url) ? 'path' : nonEmpty(call.args.query) ? 'query' : 'text'
   }
 }
 
@@ -310,9 +312,9 @@ const PROCESS_ACTIONS: Record<string, string> = {
 /** `instead`, when given, takes the output's place (a background call's process line). */
 function bashCard(call: ToolCall, result: Record<string, unknown> | undefined, instead?: JSX.Element): Card {
   // The cancelled card's notice already says the command was interrupted.
-  const output = (str(result?.output) ?? call.resultText)?.replace(/\s*\[Command interrupted\]\s*$/, '')
-  const error = str(result?.error)
-  const command = (str(call.args.command) ?? call.context ?? '').trim()
+  const output = (nonEmpty(result?.output) ?? call.resultText)?.replace(/\s*\[Command interrupted\]\s*$/, '')
+  const error = nonEmpty(result?.error)
+  const command = (nonEmpty(call.args.command) ?? call.context ?? '').trim()
   const line = commandLine(command)
   const running = call.status === 'running'
 
@@ -356,7 +358,7 @@ function backgroundCard(call: ToolCall, result: Record<string, unknown> | undefi
     badges: [
       { text: 'background' },
       ...(w.notify ? [{ text: 'notify on exit' }] : []),
-      ...w.patterns.map(p => ({ text: `watch: ${clip(p, 32)}` })),
+      ...w.patterns.map(p => ({ text: `watch: ${clip(p, { mark: 'line', max: 32 })}` })),
       ...(w.heartbeat ? [{ text: `every ${w.heartbeat}s` }] : [])
     ],
     folded: line ? false : card.folded
@@ -380,7 +382,7 @@ function processLine(call: ToolCall, id: string, now: number): JSX.Element {
       {p && live ? (
         <spinner key="state-icon" style="dots" tone="accent" />
       ) : (
-        <icon key="state-icon" name={p ? (p.status === 'done' ? 'done' : p.status === 'failed' ? 'failed' : 'aborted') : 'pending'} tone={tone} />
+        <icon key="state-icon" name={p ? PROCESS_LOOK[p.status].icon : 'pending'} tone={tone} />
       )}
       <text key="state" spans={[{ s: tone, t: p ? processVerdict(p) : 'starting' }]} wrap="none" />
       {p ? <text key="sep1" spans={[{ s: 'dim', t: '·' }]} wrap="none" /> : null}
@@ -393,8 +395,8 @@ function processLine(call: ToolCall, id: string, now: number): JSX.Element {
 }
 
 function readCard(call: ToolCall, result: Record<string, unknown> | undefined): Card {
-  const path = str(call.args.path) ?? call.context
-  const content = str(result?.content)
+  const path = nonEmpty(call.args.path) ?? call.context
+  const content = nonEmpty(result?.content)
   const total = typeof result?.total_lines === 'number' ? result.total_lines : undefined
   const numbered = content ? [...content.matchAll(/^ *(\d+)\|/gm)] : []
   const first = numbered.length ? Number(numbered[0]?.[1]) : undefined
@@ -417,10 +419,10 @@ function readCard(call: ToolCall, result: Record<string, unknown> | undefined): 
 }
 
 function editCard(call: ToolCall, result: Record<string, unknown> | undefined): Card {
-  const path = str(call.args.path) ?? call.context
+  const path = nonEmpty(call.args.path) ?? call.context
   const lang = langOf(path)
-  const diff = hunks(str(result?.diff)) ?? (call.diff ? plainDiff(call.diff) : undefined)
-  const content = str(call.args.content)
+  const diff = hunks(nonEmpty(result?.diff)) ?? (call.diff ? plainDiff(call.diff) : undefined)
+  const content = nonEmpty(call.args.content)
   const write = call.name === 'write_file'
 
   const head = {
@@ -440,7 +442,7 @@ function editCard(call: ToolCall, result: Record<string, unknown> | undefined): 
       badges: diff ? [{ text: 'new file', tone: 'success' }] : undefined,
       body: [<code key="code" lang={lang ?? 'text'} numbers text={text} />],
       folded: true,
-      meta: [`${lines} line${lines === 1 ? '' : 's'}`],
+      meta: [plural(lines, 'line')],
       preview: { lines: 8 }
     }
   }
@@ -455,10 +457,10 @@ function editCard(call: ToolCall, result: Record<string, unknown> | undefined): 
 }
 
 function searchCard(call: ToolCall, result: Record<string, unknown> | undefined): Card {
-  const pattern = str(call.args.pattern) ?? call.context
-  const where = str(call.args.path)
+  const pattern = nonEmpty(call.args.pattern) ?? call.context
+  const where = nonEmpty(call.args.path)
   const inPath = where && where !== '.' ? ` · in ${where}` : ''
-  const files = Array.isArray(result?.files) ? result.files.map(f => str(f)).filter(f => f !== undefined) : undefined
+  const files = Array.isArray(result?.files) ? result.files.map(f => nonEmpty(f)).filter(f => f !== undefined) : undefined
 
   if (files || call.args.target === 'files') {
     const list = (files ?? []).map(f => f.replace(/^\.\//, ''))
@@ -476,7 +478,7 @@ function searchCard(call: ToolCall, result: Record<string, unknown> | undefined)
       }),
       folded: list.length > 20,
       frame: 'inline',
-      meta: files ? [`${total} file${total === 1 ? '' : 's'}${inPath}`] : undefined,
+      meta: files ? [`${plural(total, 'file')}${inPath}`] : undefined,
       name: 'glob',
       target: pattern,
       targetKind: 'pattern',
@@ -491,7 +493,7 @@ function searchCard(call: ToolCall, result: Record<string, unknown> | undefined)
   const byFile = new Map<string, { line: number; text: string }[]>()
 
   for (const m of matches ?? []) {
-    const path = (str(m.path) ?? '').replace(/^\.\//, '')
+    const path = (nonEmpty(m.path) ?? '').replace(/^\.\//, '')
     const list = byFile.get(path) ?? []
     list.push({ line: typeof m.line === 'number' ? m.line : 0, text: typeof m.content === 'string' ? m.content : '' })
     byFile.set(path, list)
@@ -552,7 +554,7 @@ function searchCard(call: ToolCall, result: Record<string, unknown> | undefined)
     folded: total > 40,
     frame: 'inline',
     meta: matches
-      ? [`${total} match${total === 1 ? '' : 'es'} · ${byFile.size} file${byFile.size === 1 ? '' : 's'}${inPath}`]
+      ? [`${plural(total, 'match', 'matches')} · ${plural(byFile.size, 'file')}${inPath}`]
       : undefined,
     name: 'grep',
     target: pattern,
@@ -572,14 +574,14 @@ function webSearchCard(call: ToolCall, result: Record<string, unknown> | undefin
     body: hits.length
       ? [
           <col key="s" role="omp.tool.sources">
-            {hits.map((h, i) => sourceRow(`s${i}`, str(h.title) ?? str(h.url) ?? '', str(h.url)))}
+            {hits.map((h, i) => sourceRow(`s${i}`, nonEmpty(h.title) ?? nonEmpty(h.url) ?? '', nonEmpty(h.url)))}
           </col>
         ]
       : [],
     frame: 'inline',
-    meta: hits.length ? [`${hits.length} source${hits.length === 1 ? '' : 's'}`] : undefined,
+    meta: hits.length ? [plural(hits.length, 'source')] : undefined,
     name: 'web_search',
-    target: str(call.args.query) ?? call.context,
+    target: nonEmpty(call.args.query) ?? call.context,
     targetKind: 'query',
     title: 'Web search'
   }
@@ -587,27 +589,27 @@ function webSearchCard(call: ToolCall, result: Record<string, unknown> | undefin
 
 function fetchCard(call: ToolCall, result: Record<string, unknown> | undefined): Card {
   const pages = (Array.isArray(result?.results) ? result.results : []).map(p => record(p)).filter(p => p !== undefined)
-  const urls = Array.isArray(call.args.urls) ? call.args.urls.map(u => str(u)).filter(u => u !== undefined) : []
+  const urls = Array.isArray(call.args.urls) ? call.args.urls.map(u => nonEmpty(u)).filter(u => u !== undefined) : []
   const body: JSX.Element[] = []
 
   for (const [i, p] of pages.entries()) {
-    body.push(sourceRow(`s${i}`, str(p.title) ?? str(p.url) ?? '', str(p.url)))
-    const content = str(p.content)
+    body.push(sourceRow(`s${i}`, nonEmpty(p.title) ?? nonEmpty(p.url) ?? '', nonEmpty(p.url)))
+    const content = nonEmpty(p.content)
 
     if (content) {
-      body.push(<md key={`b${i}`}>{clip(content, 4000)}</md>)
+      body.push(<md key={`b${i}`}>{clip(content, { mark: 'line', max: 4000 })}</md>)
     }
   }
 
-  const chars = pages.reduce((n, p) => n + (str(p.content)?.length ?? 0), 0)
+  const chars = pages.reduce((n, p) => n + (nonEmpty(p.content)?.length ?? 0), 0)
 
   return {
     body,
     folded: true,
-    meta: pages.length ? [`${pages.length} page${pages.length === 1 ? '' : 's'} · ${compact(chars)} chars`] : undefined,
+    meta: pages.length ? [`${plural(pages.length, 'page')} · ${compact(chars)} chars`] : undefined,
     name: 'fetch',
     preview: { lines: 6 },
-    target: urls.length > 1 ? `${urls[0]} +${urls.length - 1}` : (urls[0] ?? str(call.args.url) ?? call.context),
+    target: urls.length > 1 ? `${urls[0]} +${urls.length - 1}` : (urls[0] ?? nonEmpty(call.args.url) ?? call.context),
     targetKind: 'path',
     title: 'Fetch'
   }
@@ -636,9 +638,9 @@ function taskCard(call: ToolCall, result: Record<string, unknown> | undefined, n
   const tasks = Array.isArray(call.args.tasks) ? call.args.tasks.map(t => record(t)).filter(t => t !== undefined) : []
 
   const goals = tasks.length
-    ? tasks.map(t => str(t.goal) ?? '')
-    : str(call.args.goal)
-      ? [str(call.args.goal) ?? '']
+    ? tasks.map(t => nonEmpty(t.goal) ?? '')
+    : nonEmpty(call.args.goal)
+      ? [nonEmpty(call.args.goal) ?? '']
       : []
 
   const agents = call.subagents ?? []
@@ -650,7 +652,7 @@ function taskCard(call: ToolCall, result: Record<string, unknown> | undefined, n
       ? goals.map((g, i) => <agent key={`p${i}`} name={`Agent ${i + 1}`} status="pending" task={g} />)
       : settledRows(goals, result)
 
-  const context = str(call.args.context) ?? (tasks.length === 1 ? str(tasks[0]?.context) : undefined)
+  const context = nonEmpty(call.args.context) ?? (tasks.length === 1 ? nonEmpty(tasks[0]?.context) : undefined)
 
   const working =
     agents.some(a => a.status === 'running' || a.status === 'queued') ||
@@ -686,7 +688,7 @@ function taskCard(call: ToolCall, result: Record<string, unknown> | undefined, n
     meta: meta ? [meta] : undefined,
     name: 'task',
     status: working ? 'running' : undefined,
-    target: count ? `${count} agent${count === 1 ? '' : 's'}` : undefined,
+    target: count ? plural(count, 'agent') : undefined,
     targetKind: 'text',
     title: 'Task',
     took
@@ -720,17 +722,7 @@ function settledRows(goals: string[], result: Record<string, unknown> | undefine
  * rebuilt when something about the agent changed, so this sends no extra frames.
  */
 export function agentNode(a: Subagent, now: number, solo?: Solo): JSX.Element {
-  const status =
-    a.status === 'done'
-      ? 'done'
-      : a.status === 'failed'
-        ? 'failed'
-        : a.status === 'cancelled'
-          ? 'aborted'
-          : a.status === 'queued'
-            ? 'pending'
-            : 'running'
-
+  const status = SUBAGENT_LOOK[a.status].row
   const running = a.status === 'running'
 
   return (
@@ -776,11 +768,11 @@ export function agentNode(a: Subagent, now: number, solo?: Solo): JSX.Element {
 
 /** A settled agent's status and report from its `result.results` entry (none: idle). */
 function outcome(r: Record<string, unknown> | undefined): { status: string; summary?: string } {
-  const verdict = str(r?.status) ?? ''
+  const verdict = nonEmpty(r?.status) ?? ''
   // As the desktop's settledRowStatus: anything but a success (a timeout, an error) failed.
   const status = !r ? 'idle' : verdict === '' || verdict === 'ok' || verdict === 'completed' ? 'done' : 'failed'
 
-  return { status, summary: str(r?.summary) ?? str(r?.error) }
+  return { status, summary: nonEmpty(r?.summary) ?? nonEmpty(r?.error) }
 }
 
 /** A one-agent delegation's row in place of its Task card: its own key and name. */
@@ -802,7 +794,7 @@ function soloTask(call: ToolCall, now: number): JSX.Element | undefined {
     return undefined
   }
 
-  const goal = str(tasks[0]?.goal) ?? str(call.args.goal) ?? call.subagents?.[0]?.goal ?? 'Delegated task'
+  const goal = nonEmpty(tasks[0]?.goal) ?? nonEmpty(call.args.goal) ?? call.subagents?.[0]?.goal ?? 'Delegated task'
   const name = result?.mode === 'background' ? 'Background agent' : 'Agent'
   const a = call.subagents?.[0]
 
@@ -833,7 +825,7 @@ function soloTask(call: ToolCall, now: number): JSX.Element | undefined {
 /** The brief (`context`) delegation `call` gave its agent `index` beside the goal, if any. */
 export function briefOf(call: ToolCall, index: number): string | undefined {
   const tasks = Array.isArray(call.args.tasks) ? call.args.tasks.map(t => record(t)) : []
-  const context = str(tasks[index]?.context) ?? str(call.args.context)
+  const context = nonEmpty(tasks[index]?.context) ?? nonEmpty(call.args.context)
 
   return context
 }
@@ -848,7 +840,7 @@ function briefNode(head: string, text: string): JSX.Element {
 }
 
 function askCard(call: ToolCall, result: Record<string, unknown> | undefined): Card {
-  const qs = (Array.isArray(call.args.questions) ? call.args.questions : str(call.args.question) ? [call.args] : [])
+  const qs = (Array.isArray(call.args.questions) ? call.args.questions : nonEmpty(call.args.question) ? [call.args] : [])
     .map(q => record(q))
     .filter(q => q !== undefined)
 
@@ -856,14 +848,14 @@ function askCard(call: ToolCall, result: Record<string, unknown> | undefined): C
   const body: JSX.Element[] = []
 
   for (const [i, q] of qs.entries()) {
-    const choices = Array.isArray(q.choices) ? q.choices.map(c => str(c)).filter(c => c !== undefined) : []
+    const choices = Array.isArray(q.choices) ? q.choices.map(c => nonEmpty(c)).filter(c => c !== undefined) : []
     // A multi-select answer is a list of picks; a single answer a string.
     const raw = responses[i]?.user_response
-    const answers = (Array.isArray(raw) ? raw : [raw]).map(a => str(a)).filter(a => a !== undefined)
+    const answers = (Array.isArray(raw) ? raw : [raw]).map(a => nonEmpty(a)).filter(a => a !== undefined)
 
     // One question already reads in the head; several each get their own.
     if (qs.length > 1) {
-      body.push(<md key={`q${i}`}>{str(q.question) ?? ''}</md>)
+      body.push(<md key={`q${i}`}>{nonEmpty(q.question) ?? ''}</md>)
     }
 
     for (const [j, c] of choices.entries()) {
@@ -885,7 +877,7 @@ function askCard(call: ToolCall, result: Record<string, unknown> | undefined): C
     body,
     name: 'ask',
     // Several questions each read in the body; the head counts them instead of repeating one.
-    target: qs.length > 1 ? `${qs.length} questions` : (str(qs[0]?.question) ?? call.context),
+    target: qs.length > 1 ? `${qs.length} questions` : (nonEmpty(qs[0]?.question) ?? call.context),
     targetKind: 'text',
     title: 'Ask'
   }
@@ -901,9 +893,9 @@ function answerRow(key: string, text: string, picked: boolean): JSX.Element {
 }
 
 function evalCard(call: ToolCall, result: Record<string, unknown> | undefined): Card {
-  const code = str(call.args.code) ?? ''
-  const output = str(result?.output) ?? str(result?.stdout) ?? call.resultText
-  const error = str(result?.error) ?? str(result?.stderr)
+  const code = nonEmpty(call.args.code) ?? ''
+  const output = nonEmpty(result?.output) ?? nonEmpty(result?.stdout) ?? call.resultText
+  const error = nonEmpty(result?.error) ?? nonEmpty(result?.stderr)
 
   return {
     badges: [{ text: 'python' }],
@@ -1048,13 +1040,13 @@ function appBody(call: ToolCall): JSX.Element[] {
   const facts = Object.entries(call.args)
     .filter(([k, v]) => k !== 'connector_alias' && v !== undefined && v !== null && v !== '')
     .slice(0, 12)
-    .map(([k, v]) => ({ k: [{ t: k.replace(/_/g, ' ') }], v: clip(typeof v === 'string' ? v : JSON.stringify(v), 300) }))
+    .map(([k, v]) => ({ k: [{ t: k.replace(/_/g, ' ') }], v: clip(typeof v === 'string' ? v : JSON.stringify(v), { mark: 'line', max: 300 }) }))
 
   const error = call.status === 'error' ? errorOf(call) : undefined
 
   return [
     ...(facts.length ? [<kv items={facts} key="args" />] : []),
-    ...(error ? [<text key="error" spans={[{ s: 'error', t: clip(error, 1200) }]} wrap="word" />] : genericBody(call))
+    ...(error ? [<text key="error" spans={[{ s: 'error', t: clip(error, { mark: 'line', max: 1200 }) }]} wrap="word" />] : genericBody(call))
   ]
 }
 
@@ -1071,9 +1063,9 @@ function batchBody(call: ToolCall): JSX.Element[] {
         <text grow={1} key="t" spans={[{ t: app ? `${app.app} · ${app.action}` : humanize(e.name) }]} truncate="end" wrap="none" />
       </row>,
       ...(e.error
-        ? [<text key={`r${i}`} spans={[{ s: 'error', t: clip(e.error, 600) }]} wrap="word" />]
+        ? [<text key={`r${i}`} spans={[{ s: 'error', t: clip(e.error, { mark: 'line', max: 600 }) }]} wrap="word" />]
         : answer && call.status !== 'running'
-          ? [<code key={`r${i}`} lang={/^\s*[[{]/.test(answer) ? 'json' : 'text'} max={{ h: '8lines' }} text={clip(answer, 2000)} wrap />]
+          ? [<code key={`r${i}`} lang={/^\s*[[{]/.test(answer) ? 'json' : 'text'} max={{ h: '8lines' }} text={clip(answer, { mark: 'line', max: 2000 })} wrap />]
           : [])
     ]
   })
@@ -1082,14 +1074,14 @@ function batchBody(call: ToolCall): JSX.Element[] {
 /** The image a call showed; a click opens it large in Tern's lightbox. A URL shows once its bytes came. */
 function imageNode(call: ToolCall, src: string): JSX.Element {
   const source = localSource(src) ?? call.image
-  const alt = str(call.args.prompt) ?? 'Image'
+  const alt = nonEmpty(call.args.prompt) ?? 'Image'
 
   if (source) {
-    return <image alt={clip(alt, 200)} key="image" role="hermes.tool.image" {...source} />
+    return <image alt={clip(alt, { mark: 'line', max: 200 })} key="image" role="hermes.tool.image" {...source} />
   }
 
   // A data URL is no address to show; an http(s) one is, as a link.
-  const link = /^https?:\/\//i.test(src) ? [{ href: src, t: clip(src, 120) }] : []
+  const link = /^https?:\/\//i.test(src) ? [{ href: src, t: clip(src, { mark: 'line', max: 120 }) }] : []
 
   return (
     <text
@@ -1107,14 +1099,14 @@ function genericBody(call: ToolCall): JSX.Element[] {
     return []
   }
 
-  return [<code key="out" lang={/^\s*[[{]/.test(text) ? 'json' : 'text'} text={clip(text, 4000)} />]
+  return [<code key="out" lang={/^\s*[[{]/.test(text) ? 'json' : 'text'} text={clip(text, { mark: 'line', max: 4000 })} />]
 }
 
 function errorOf(call: ToolCall): string | undefined {
   const result = record(call.result)
 
   return (
-    str(result?.error) ?? str(call.summary) ?? (typeof call.result === 'string' && !result ? call.result : undefined)
+    nonEmpty(result?.error) ?? nonEmpty(call.summary) ?? (typeof call.result === 'string' && !result ? call.result : undefined)
   )
 }
 
@@ -1125,16 +1117,7 @@ function exitOf(call: ToolCall): number | undefined {
 }
 
 export function checklistNode(todos: Todo[]): JSX.Element {
-  const status = (t: Todo) =>
-    t.status === 'completed'
-      ? 'done'
-      : t.status === 'in_progress'
-        ? 'active'
-        : t.status === 'cancelled'
-          ? 'dropped'
-          : 'pending'
-
-  const item = (t: Todo) => ({ id: t.id, status: status(t), text: t.content })
+  const item = (t: Todo) => ({ id: t.id, status: TODO_LOOK[t.status].item, text: t.content })
   const roots = todos.filter(t => !t.parent)
   const nested = todos.some(t => t.parent)
 
@@ -1235,8 +1218,4 @@ function humanize(name: string): string {
 
 function pretty(v: unknown): string {
   return typeof v === 'string' ? v : JSON.stringify(v, null, 2)
-}
-
-function clip(text: string, max: number): string {
-  return text.length > max ? `${text.slice(0, max)}\n…` : text
 }

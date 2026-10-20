@@ -4,7 +4,8 @@ import { entryId, toolCallId } from '../core/ids.js'
 import type { Block, ToolCall, TurnEntry } from '../model.js'
 import type { Todo } from '../model.js'
 import { Transcript } from '../transcript.js'
-import { busyLabel, foldOf, formatDuration, liveLabel, parts, pieces, planStep, preparingLabel, presentTense, stepLabel, summarize, thoughtLine, thoughtTitle, type WorkItem } from '../workLog.js'
+import { durationCompact } from '../view/format.js'
+import { busyLabel, foldOf, liveLabel, parts, pieces, planStep, preparingLabel, presentTense, stepLabel, summarize, thoughtLine, thoughtTitle, type WorkItem } from '../workLog.js'
 
 const call = (name: string, args: Record<string, unknown> = {}, more: Partial<ToolCall> = {}): ToolCall => ({
   args,
@@ -240,7 +241,7 @@ describe('labels', () => {
   })
 
   it('formats durations as t3code does', () => {
-    expect([820, 4_300, 42_000, 62_000, 3_725_000].map(formatDuration)).toEqual(['820ms', '4.3s', '42s', '1m 2s', '1h 2m 5s'])
+    expect([820, 4_300, 42_000, 62_000, 3_725_000].map(durationCompact)).toEqual(['820ms', '4.3s', '42s', '1m 2s', '1h 2m 5s'])
   })
 })
 

@@ -9,8 +9,9 @@ import type { AutomationAction, GoalView, LoopView } from '../automation.js'
 import type { Overlay } from '../overlay.js'
 import { countdownAge } from '../view/time.js'
 import { loopWhen, turnsText } from '../view/automation.js'
+import { actionsRow, type ButtonProps } from '../view/ui/button.js'
 
-import { actionsRow, type Button, confirmOverlay } from './prompts.js'
+import { confirmOverlay } from './prompts.js'
 
 /** What the /goal and /loop sheets reach of the app. */
 export type AutomationSheetHost = Pick<ChatPorts, 'automation' | 'changed' | 'close' | 'open'>
@@ -144,15 +145,15 @@ export function openAutomation(host: AutomationSheetHost, which: 'goal' | 'loop'
       }
 
       const pending = host.automation.pending
-      const buttons: Button[] = [
+      const buttons: ButtonProps[] = [
         { hint: 'escape', key: 'close', keys: ['escape'], label: 'Close', onClick: () => host.close(overlay) },
-        ...automationButtons(which, view).map((b, i) => ({
+        ...automationButtons(which, view).map((b, i): ButtonProps => ({
           hint: i === 0 ? `enter · ${b.keys.join(' · ')}` : b.keys.join(' · '),
           key: b.action,
           keys: b.keys,
+          ...(i === 0 ? { kind: 'primary' } : {}),
           label: pending === b.action ? `${b.label}…` : b.label,
-          onClick: () => run(b),
-          primary: i === 0
+          onClick: () => run(b)
         }))
       ]
 
