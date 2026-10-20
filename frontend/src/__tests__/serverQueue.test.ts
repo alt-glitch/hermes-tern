@@ -71,6 +71,18 @@ describe('ServerQueue', () => {
     expect(q.queued()).toEqual([])
   })
 
+  it('admits a submitting own admission the FIFO lists as queued, by the id the FIFO gives it', () => {
+    const q = new ServerQueue<string>()
+    const own: OwnAdmission<string> = { admission: { kind: 'submitting' }, display: 'mine', inputId: inputId('in-x'), item: 'x' }
+    q.admit(own)
+    q.update([row('x', 'unknown')])
+    expect(own.admission).toEqual({ kind: 'submitting' })
+
+    q.update([row('x', 'queued')])
+    expect(own.admission).toEqual({ id: 'x', kind: 'admitted' })
+    expect(q.queued()).toEqual([{ id: 'x', kind: 'mine', own, text: 'mine' }])
+  })
+
   it('tells a withdrawn row’s cancelled completion from the running turn’s', () => {
     const q = new ServerQueue<string>()
     q.update([row('a', 'started'), row('b', 'queued')])

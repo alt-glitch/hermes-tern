@@ -207,13 +207,16 @@ export class PromptQueue {
         this.server.admitted(own, id)
       }
     } catch (error) {
-      this.server.drop(own)
+      // Back to the composer only while it was still being submitted: one the FIFO listed meanwhile
+      // waits there still (a late timeout; its row stays this pane's), one it started runs as its
+      // own turn, and one withdrawn left the queue on purpose.
+      if (own.admission.kind === 'submitting') {
+        this.server.drop(own)
 
-      // Back to the composer only while it was still being submitted: one the FIFO started meanwhile
-      // (a late timeout) runs as its own turn, and one withdrawn left the queue on purpose.
-      if (own.admission.kind === 'submitting' && ticket.isCurrent()) {
-        host.transcript.notice(`Not queued: ${errorText(error)}. Your message is back in the composer.`, 'error')
-        host.restore(prompt)
+        if (ticket.isCurrent()) {
+          host.transcript.notice(`Not queued: ${errorText(error)}. Your message is back in the composer.`, 'error')
+          host.restore(prompt)
+        }
       }
     }
 

@@ -183,6 +183,21 @@ describe('held prompts keep the session they were held for', () => {
     expect(notices()).toContain('A prompt queued for the last session is back in the composer.')
   })
 
+  it('the notice that says so stays when the adopted session brings its history', async () => {
+    const history = () => ({ info: { stored_session_id: 'sb' }, messages: [{ role: 'user', text: 'earlier' }], session_id: 'b' })
+    const { app, enter, gw, notices } = setup({ 'session.resume': history }, { canonical: false })
+    given.busy(app, { label: 'Working…', since: {}, startedAt: 0 })
+    await enter('for A')
+
+    gw.emit('exit', null)
+    await app.resume(storedSessionId('sb'))
+    await settle(gw)
+
+    expect(app.composer.text).toBe('for A')
+    expect(app.transcript.entries.flatMap(e => (e.kind === 'user' ? [e.text] : []))).toEqual(['earlier'])
+    expect(notices()).toContain('A prompt queued for the last session is back in the composer.')
+  })
+
   it('a reattach of the same stored session keeps the prompts held for it', async () => {
     const { app, enter, gw } = setup({ 'session.resume': resumed('s1b', 'st1') }, { canonical: false })
     app.session.ref = { live: app.session.ref.live, stored: storedSessionId('st1') }
@@ -284,6 +299,24 @@ describe("this pane's admissions into the shared gateway's queue", () => {
     expect(app.transcript.entries.flatMap(e => (e.kind === 'user' ? [e.text] : []))).toEqual(['next one'])
     expect(app.composer.text).toBe('')
     expect(notices()).not.toContain('Not queued: timed out. Your message is back in the composer.')
+  })
+
+  it("a prompt.submit that fails after the FIFO listed its admission keeps it queued as this pane's, not in the composer", async () => {
+    const submit = held()
+    const { app, emit, enter, gw, notices } = setup({ 'prompt.submit': submit.reply })
+    given.busy(app, { label: 'Working…', since: {}, startedAt: 0 })
+    await enter('next one')
+    const [sent] = gw.sent('prompt.submit')
+
+    // The FIFO lists it before prompt.submit answers; then the submit times out. The gateway still holds it.
+    const row = { admission_id: 'a1', input_id: sent?.['submission_id'], status: 'queued', user: 'next one' }
+    await emit('session.info', { pending_submissions: [row] })
+    submit.reject(new Error('timed out'))
+    await settle(gw)
+
+    expect(app.composer.text).toBe('')
+    expect(notices()).not.toContain('Not queued: timed out. Your message is back in the composer.')
+    expect(app.queue.server.queued()).toMatchObject([{ id: 'a1', kind: 'mine', text: 'next one' }])
   })
 
   it("a withdrawn row's cancelled completion that comes after the session.info dropping it still leaves the turn running", async () => {

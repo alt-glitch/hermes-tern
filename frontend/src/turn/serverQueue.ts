@@ -99,7 +99,10 @@ export class ServerQueue<T> {
     }
   }
 
-  /** prompt.submit named a submitting admission `id`: it can be withdrawn now. One that started or left meanwhile stays so. */
+  /**
+   * prompt.submit (or the FIFO listing it queued) named a submitting admission `id`: it can be
+   * withdrawn now. One that started or left meanwhile stays so.
+   */
   admitted(own: OwnAdmission<T>, id: AdmissionId) {
     if (own.admission.kind === 'submitting') {
       own.admission = { id, kind: 'admitted' }
@@ -133,6 +136,12 @@ export class ServerQueue<T> {
     for (const row of rows) {
       if (row.status === 'queued') {
         this.#queuedOnly.add(row.admission_id)
+        // The FIFO names an own admission before prompt.submit answers (it may time out yet): it is admitted.
+        const own = this.#own.find(o => o.inputId === row.input_id)
+
+        if (own) {
+          this.admitted(own, row.admission_id)
+        }
       }
 
       if (row.status !== 'started') {

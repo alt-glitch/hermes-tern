@@ -107,8 +107,6 @@ export function adoptSteps(host: AdoptHost): readonly Adoptable[] {
     { adopt: () => host.readBusyMode() },
     // The session's own queue, from the snapshot (a reattach's rows of this pane become read-only rows).
     { adopt: ({ r }) => host.queue.server.reset(pendingRows(r.info)) },
-    // Prompts held for another session go back to the composer, not to this one.
-    { adopt: ({ ref }) => host.queue.adopt(ref) },
     { adopt: ({ ref }) => host.showThoughts(ref.live) },
     {
       adopt: ({ previous, ref }) => {
@@ -149,6 +147,9 @@ export function adoptSteps(host: AdoptHost): readonly Adoptable[] {
         }
       }
     },
+    // Prompts held for another session go back to the composer, not to this one. After the history:
+    // load() keeps only the welcome, so the notice that says so is written into the loaded transcript.
+    { adopt: ({ ref }) => host.queue.adopt(ref) },
     {
       adopt: ({ ref }) => {
         // The new session's processes and PRs (and none of the last one's), and its open connect cards.

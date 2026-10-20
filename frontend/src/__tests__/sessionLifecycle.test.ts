@@ -206,7 +206,6 @@ describe('adoptSteps', () => {
       'busyMode queue',
       'readBusyMode',
       'queue.reset',
-      'queue.adopt b',
       'showThoughts b',
       'markViewer sb sa',
       'writeActiveSession sb',
@@ -224,6 +223,8 @@ describe('adoptSteps', () => {
       'transcript.load',
       'agents.scan',
       'media.showAll',
+      // Held prompts for another session go back after the history, so their notice stays.
+      'queue.adopt b',
       'processes.poke',
       'connect.watch',
       'prs.adopt',

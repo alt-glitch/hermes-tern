@@ -68767,7 +68767,10 @@ var ServerQueue = class {
       this.#own.splice(at, 1);
     }
   }
-  /** prompt.submit named a submitting admission `id`: it can be withdrawn now. One that started or left meanwhile stays so. */
+  /**
+   * prompt.submit (or the FIFO listing it queued) named a submitting admission `id`: it can be
+   * withdrawn now. One that started or left meanwhile stays so.
+   */
   admitted(own14, id) {
     if (own14.admission.kind === "submitting") {
       own14.admission = { id, kind: "admitted" };
@@ -68796,6 +68799,10 @@ var ServerQueue = class {
     for (const row2 of rows2) {
       if (row2.status === "queued") {
         this.#queuedOnly.add(row2.admission_id);
+        const own15 = this.#own.find((o) => o.inputId === row2.input_id);
+        if (own15) {
+          this.admitted(own15, row2.admission_id);
+        }
       }
       if (row2.status !== "started") {
         continue;
@@ -72641,8 +72648,6 @@ function adoptSteps(host) {
     { adopt: () => host.readBusyMode() },
     // The session's own queue, from the snapshot (a reattach's rows of this pane become read-only rows).
     { adopt: ({ r }) => host.queue.server.reset(pendingRows(r.info)) },
-    // Prompts held for another session go back to the composer, not to this one.
-    { adopt: ({ ref }) => host.queue.adopt(ref) },
     { adopt: ({ ref }) => host.showThoughts(ref.live) },
     {
       adopt: ({ previous: previous3, ref }) => {
@@ -72679,6 +72684,9 @@ function adoptSteps(host) {
         }
       }
     },
+    // Prompts held for another session go back to the composer, not to this one. After the history:
+    // load() keeps only the welcome, so the notice that says so is written into the loaded transcript.
+    { adopt: ({ ref }) => host.queue.adopt(ref) },
     {
       adopt: ({ ref }) => {
         host.processes.poke();
@@ -74363,10 +74371,12 @@ var PromptQueue = class {
         this.server.admitted(own14, id);
       }
     } catch (error) {
-      this.server.drop(own14);
-      if (own14.admission.kind === "submitting" && ticket.isCurrent()) {
-        host.transcript.notice(`Not queued: ${errorText(error)}. Your message is back in the composer.`, "error");
-        host.restore(prompt);
+      if (own14.admission.kind === "submitting") {
+        this.server.drop(own14);
+        if (ticket.isCurrent()) {
+          host.transcript.notice(`Not queued: ${errorText(error)}. Your message is back in the composer.`, "error");
+          host.restore(prompt);
+        }
       }
     }
     host.changed();
