@@ -5,11 +5,11 @@
   "description": "Hermes for Tern: the chat UI described over the Tern Surface Protocol instead of painted cells",
   "type": "module",
   "scripts": {
-    "setup": "node scripts/hermes-src.mjs && npm install",
+    "setup": "node scripts/hermes-src.mjs && bun install",
     "bundle": "node scripts/hermes-src.mjs && node scripts/build.mjs",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run",
-    "check": "npm run typecheck && npm run test"
+    "check": "bun run typecheck && bun run test"
   },
   "dependencies": {
     "@hermes/shared": "file:.hermes-src/apps/shared",
