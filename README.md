@@ -136,7 +136,32 @@ The agent gets three tools: `link_pull_request`, `unlink_pull_request` and `list
 Links are kept per conversation in `$HERMES_HOME/plugin-data/hermes-tern/pull-requests.json`, so
 they survive compression and resume. The list also shows two kinds of PR the agent did not link:
 the PR of the session's branch, and the other layers of a GitHub stack that a listed PR is part
-of. PRs are read from GitHub with your own token (`GH_TOKEN`, else `gh auth token`).
+of. PRs are read from GitHub with your own token, which Hermes provides: set it once with
+`hermes config set GITHUB_TOKEN <token>` (for example the output of `gh auth token`). The plugin
+never reads another tool's login.
+
+## Security and privacy
+
+What the plugin does beyond drawing the chat, so you can decide before installing:
+
+- **Network.** GitHub's API, with the token Hermes gives it (`GITHUB_TOKEN`), for the pull request
+  view and actions you click (merge and close ask first). The job charts send the command and
+  samples of a background process's output, redacted by Hermes first, to your own auxiliary model
+  (`auxiliary.tern_charts`), once per process. Nothing else; no telemetry.
+- **Commands.** A `tool_request` middleware adds `export TERN_PANE=…` (the chat's Tern pane) before
+  the agent's shell commands in sessions a Tern pane shows; approvals and guards see the command
+  as it runs. `!cmd` and `{!cmd}` in the composer run through Hermes' own `shell.exec` (its
+  dangerous-command refusal applies), and only when typed: a pasted `{!cmd}` never runs. The
+  composer's `/` commands are Hermes' own.
+- **Processes.** `hermes tern` runs `hermes chat --tui` in the same process. The chart helper
+  (`widget_author.py`) runs in Hermes' interpreter for one model request and exits. Opening the
+  sidebar or a file beside the chat runs Tern's own `tern` CLI.
+- **Reads outside its data.** Hermes' session database (read-only: a conversation's compression
+  lineage and its subagents' parents); the output of the session's background processes, and the
+  log files their commands write to (for charts); the files you open from the chat.
+- **Stored data.** `$HERMES_HOME/plugin-data/hermes-tern/`: linked pull requests, which panes show
+  which sessions (with their Tern variables), chart rules, connect cards.
+  `$HERMES_HOME/hermes-tern/settings.json`: theme and chart settings.
 
 ## How it works
 

@@ -12,3 +12,7 @@ requires_hermes: ">=0.22.2"
 provides_tools: [link_pull_request, unlink_pull_request, list_pull_requests]
 provides_hooks: [transform_tool_result]
 provides_middleware: [tool_request]
+optional_env:
+  - name: GITHUB_TOKEN
+    description: "GitHub token for the pull request view and its checks (`hermes config set GITHUB_TOKEN <token>`)"
+    password: true

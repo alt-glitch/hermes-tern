@@ -10872,7 +10872,7 @@ var require_mock_interceptor = __commonJS({
 var require_mock_client = __commonJS({
   ".hermes-src/ui-tui/node_modules/undici/lib/mock/mock-client.js"(exports, module) {
     "use strict";
-    var { promisify: promisify8 } = __require("node:util");
+    var { promisify: promisify7 } = __require("node:util");
     var Client = require_client();
     var { buildMockDispatch } = require_mock_utils();
     var {
@@ -10912,7 +10912,7 @@ var require_mock_client = __commonJS({
         return new MockInterceptor(opts, this[kDispatches]);
       }
       async [kClose]() {
-        await promisify8(this[kOriginalClose])();
+        await promisify7(this[kOriginalClose])();
         this[kConnected] = 0;
         this[kMockAgent][Symbols.kClients].delete(this[kOrigin]);
       }
@@ -10925,7 +10925,7 @@ var require_mock_client = __commonJS({
 var require_mock_pool = __commonJS({
   ".hermes-src/ui-tui/node_modules/undici/lib/mock/mock-pool.js"(exports, module) {
     "use strict";
-    var { promisify: promisify8 } = __require("node:util");
+    var { promisify: promisify7 } = __require("node:util");
     var Pool = require_pool();
     var { buildMockDispatch } = require_mock_utils();
     var {
@@ -10965,7 +10965,7 @@ var require_mock_pool = __commonJS({
         return new MockInterceptor(opts, this[kDispatches]);
       }
       async [kClose]() {
-        await promisify8(this[kOriginalClose])();
+        await promisify7(this[kOriginalClose])();
         this[kConnected] = 0;
         this[kMockAgent][Symbols.kClients].delete(this[kOrigin]);
       }
@@ -20063,25 +20063,25 @@ var PLAIN_TEXT = {
   badge: true,
   toast: true
 };
-function textProps(run6) {
-  if (run6.every((part) => typeof part === "string"))
-    return { text: run6.join("") };
-  return { spans: run6.map((part) => typeof part === "string" ? part : toJson(part) ?? null) };
+function textProps(run5) {
+  if (run5.every((part) => typeof part === "string"))
+    return { text: run5.join("") };
+  return { spans: run5.map((part) => typeof part === "string" ? part : toJson(part) ?? null) };
 }
 function containerChildren(parts3) {
   const out = [];
-  let run6 = [];
+  let run5 = [];
   const end = () => {
-    if (run6.length > 0)
-      out.push(new Node("text", textProps(run6)));
-    run6 = [];
+    if (run5.length > 0)
+      out.push(new Node("text", textProps(run5)));
+    run5 = [];
   };
   for (const part of parts3) {
     if (part instanceof Node) {
       end();
       out.push(part);
     } else {
-      run6.push(part);
+      run5.push(part);
     }
   }
   end();
@@ -20108,17 +20108,17 @@ function createNode(kind, input2, children3) {
   const parts3 = flatten([fromProps, children3]);
   let nodes2 = [];
   if (SPAN_TEXT[kind] || PLAIN_TEXT[kind]) {
-    const run6 = [];
+    const run5 = [];
     for (const part of parts3) {
       if (part instanceof Node && kind === "seg")
         nodes2.push(part);
       else if (part instanceof Node || part instanceof Span && PLAIN_TEXT[kind]) {
         throw new TypeError(`${kind} takes text children, got ${describe(part)}`);
       } else
-        run6.push(part);
+        run5.push(part);
     }
-    if (run6.length > 0)
-      Object.assign(props, textProps(run6));
+    if (run5.length > 0)
+      Object.assign(props, textProps(run5));
   } else if (kind === "el") {
     let text11 = "";
     for (const part of parts3) {
@@ -27691,9 +27691,9 @@ var FileTap = class {
       const length = Math.min(size - this.#offset, 4 * CAPACITY);
       if (length > 0) {
         const buf = Buffer.alloc(length);
-        const read2 = readSync(fd, buf, 0, length, this.#offset);
-        this.#offset += read2;
-        this.#append(this.#decoder.write(buf.subarray(0, read2)));
+        const read = readSync(fd, buf, 0, length, this.#offset);
+        this.#offset += read;
+        this.#append(this.#decoder.write(buf.subarray(0, read)));
       }
     } catch {
     } finally {
@@ -31759,10 +31759,10 @@ function searchCard(call, result) {
         /* @__PURE__ */ jsx("text", { role: "omp.tool.chip", spans: [{ t: String(hits.length) }] }, "n")
       ] }, f)
     );
-    let run6 = [];
+    let run5 = [];
     let runIndex = 0;
     const flush = () => {
-      const start = run6[0]?.line ?? 1;
+      const start = run5[0]?.line ?? 1;
       if (runIndex > 0) {
         body.push(/* @__PURE__ */ jsx("text", { role: "omp.tool.context", spans: [{ s: "muted", t: "\u2026" }] }, `${f}.g${runIndex}`));
       }
@@ -31771,23 +31771,23 @@ function searchCard(call, result) {
           "code",
           {
             lang: langOf(path2),
-            marks: run6.map((h2) => ({ line: h2.line, tone: "accent" })),
+            marks: run5.map((h2) => ({ line: h2.line, tone: "accent" })),
             numbers: true,
             start,
-            text: run6.map((h2) => h2.text).join("\n")
+            text: run5.map((h2) => h2.text).join("\n")
           },
           `${f}.c${runIndex++}`
         )
       );
-      run6 = [];
+      run5 = [];
     };
     for (const hit of hits) {
-      if (run6.length && hit.line !== (run6.at(-1)?.line ?? 0) + 1) {
+      if (run5.length && hit.line !== (run5.at(-1)?.line ?? 0) + 1) {
         flush();
       }
-      run6.push(hit);
+      run5.push(hit);
     }
-    if (run6.length) {
+    if (run5.length) {
       flush();
     }
   }
@@ -33495,7 +33495,7 @@ function openChanges(app2, focus) {
   let selected = focus;
   let failed = false;
   const diffs = /* @__PURE__ */ new Map();
-  const read2 = async () => {
+  const read = async () => {
     const cwd = app2.info?.cwd;
     state = cwd ? await gitState(cwd) : void 0;
     failed = !state;
@@ -33512,7 +33512,7 @@ function openChanges(app2, focus) {
       app2.changed();
     });
   };
-  void read2();
+  void read();
   const files = () => state?.files ?? [];
   const current = () => files().find((f) => f.path === selected);
   const overlay = {
@@ -33525,7 +33525,7 @@ function openChanges(app2, focus) {
       } else if (k.name === "c" && !k.ctrl && !k.alt && !k.meta && current()) {
         copyToClipboard(current().path);
       } else if (k.name === "r" && k.shift) {
-        void read2();
+        void read();
       } else {
         selected = moveSelection(
           k,
@@ -33562,7 +33562,7 @@ function openChanges(app2, focus) {
         onAction: {
           close: () => app2.close(overlay),
           copy: () => f && copyToClipboard(f.path),
-          refresh: () => void read2()
+          refresh: () => void read()
         },
         onSelect: (ev) => {
           selected = ev.item;
@@ -40874,7 +40874,7 @@ function check(tokens2, before, after) {
     );
     const open = !next3 || next3 === 2 && Boolean(previous3);
     const close = !previous3 || previous3 === 2 && Boolean(next3);
-    const run6 = {
+    const run5 = {
       tokens: tokens2.slice(index2, end),
       markers: [],
       start: 0,
@@ -40885,14 +40885,14 @@ function check(tokens2, before, after) {
       // All builtins can split runs.
       split: strict !== void 0
     };
-    for (const token of run6.tokens) {
-      wrong.set(token, [...run6.tokens]);
-      runOf.set(token, run6);
+    for (const token of run5.tokens) {
+      wrong.set(token, [...run5.tokens]);
+      runOf.set(token, run5);
       let size = token.value.length;
-      while (size--) run6.markers.push(token);
+      while (size--) run5.markers.push(token);
     }
-    run6.end = run6.markers.length;
-    runs3.push(run6);
+    run5.end = run5.markers.length;
+    runs3.push(run5);
     index2 = end;
   }
   pair(runs3, wrong);
@@ -59244,9 +59244,9 @@ function isPlainObject(value) {
 // node_modules/trough/lib/index.js
 function trough() {
   const fns = [];
-  const pipeline2 = { run: run6, use };
+  const pipeline2 = { run: run5, use };
   return pipeline2;
-  function run6(...values) {
+  function run5(...values) {
     let middlewareIndex = -1;
     const callback = values.pop();
     if (typeof callback !== "function") {
@@ -60645,13 +60645,13 @@ function markdown(nodes2, links) {
 }
 function parts2(nodes2, links) {
   const out = [];
-  let run6 = [];
+  let run5 = [];
   const flush = () => {
-    const text11 = run6.length ? markdown(run6, links) : "";
+    const text11 = run5.length ? markdown(run5, links) : "";
     if (text11) {
       out.push({ kind: "md", text: text11 });
     }
-    run6 = [];
+    run5 = [];
   };
   for (const n of nodes2) {
     if (n.type === "element" && n.tagName === "details") {
@@ -60667,7 +60667,7 @@ function parts2(nodes2, links) {
       flush();
       out.push(...parts2(n.children, links));
     } else {
-      run6.push(n);
+      run5.push(n);
     }
   }
   flush();
@@ -62195,13 +62195,13 @@ function toggleMark(text11, from, to, marker2) {
   if (text11.slice(at - n, at) === marker2 && text11.slice(at, at + n) === marker2) {
     return { cursor: at - n, from: at - n, text: "", to: at + n };
   }
-  const run6 = markedRun(text11, at, marker2);
-  if (run6 && at === run6.close) {
+  const run5 = markedRun(text11, at, marker2);
+  if (run5 && at === run5.close) {
     return { cursor: at + n, from: at, text: "", to: at };
   }
-  if (run6) {
-    const inner = text11.slice(run6.open + n, run6.close);
-    return { cursor: at - n, from: run6.open, text: inner, to: run6.close + n };
+  if (run5) {
+    const inner = text11.slice(run5.open + n, run5.close);
+    return { cursor: at - n, from: run5.open, text: inner, to: run5.close + n };
   }
   const word = wordAt(text11, at);
   if (word) {
@@ -64046,9 +64046,9 @@ async function update(app2) {
   }
   app2.transcript.notice("Run `hermes update` in a terminal to update Hermes.");
 }
-var guarded = (name, run6) => async (app2, arg) => {
+var guarded = (name, run5) => async (app2, arg) => {
   try {
-    return await run6(app2, arg);
+    return await run5(app2, arg);
   } catch (e) {
     app2.transcript.notice(`/${name} failed: ${errorText2(e)}`, "error");
   }
@@ -64363,9 +64363,9 @@ async function rollback(host, arg) {
   }
   host.notice(`Rollback restored ${file2 || "the workspace"}: ${r.reason || r.message || r.restored_to || "restored"}`);
 }
-var guarded2 = (name, run6) => async (host, arg) => {
+var guarded2 = (name, run5) => async (host, arg) => {
   try {
-    return await run6(host, arg);
+    return await run5(host, arg);
   } catch (e) {
     host.notice(`/${name} failed: ${errorText3(e)}`, "error");
   }
@@ -65463,11 +65463,11 @@ function run(argv) {
   }
   return d && !d.isNil() && d.writeToFileAtomically(argv[0], true) ? 'true' : 'false';
 }`;
-async function extractClipboardImage(dest, env2, platform = process.platform, run6 = runFile) {
+async function extractClipboardImage(dest, env2, platform = process.platform, run5 = runFile) {
   if (platform === "darwin") {
     let answer;
     try {
-      answer = (await run6("osascript", ["-l", "JavaScript", "-e", MAC_SCRIPT, dest], { timeout: 5e3 })).trim();
+      answer = (await run5("osascript", ["-l", "JavaScript", "-e", MAC_SCRIPT, dest], { timeout: 5e3 })).trim();
     } catch {
     }
     if (answer?.startsWith("file:")) {
@@ -65483,7 +65483,7 @@ async function extractClipboardImage(dest, env2, platform = process.platform, ru
   if (!root7) {
     return void 0;
   }
-  const stdout = await run6(python, [join10(root7, "ui-tui/scripts/clipboard_image.py"), dest], {
+  const stdout = await run5(python, [join10(root7, "ui-tui/scripts/clipboard_image.py"), dest], {
     cwd: root7,
     env: { ...env2, PYTHONPATH: root7 },
     timeout: 15e3
@@ -65784,7 +65784,7 @@ function loopBody(l, owner, now) {
 }
 function openAutomation(app2, which) {
   const key2 = `automation:${which}`;
-  const run6 = (b) => {
+  const run5 = (b) => {
     if (app2.automation.pending) {
       return;
     }
@@ -65820,7 +65820,7 @@ function openAutomation(app2, which) {
           key: b.action,
           keys: b.keys,
           label: pending === b.action ? `${b.label}\u2026` : b.label,
-          onClick: () => run6(b),
+          onClick: () => run5(b),
           primary: i === 0
         }))
       ];
@@ -65848,9 +65848,9 @@ function openAutomation(app2, which) {
       const view = current();
       const b = view ? automationButtons(which, view).find((b2) => b2.keys.includes(k.name) && !k.ctrl && !k.meta) : void 0;
       if (b) {
-        run6(b);
+        run5(b);
       } else if (k.name === "enter" && view) {
-        run6(automationButtons(which, view)[0]);
+        run5(automationButtons(which, view)[0]);
       }
       return true;
     }
@@ -67605,9 +67605,6 @@ function parseStacks(host, repository, rows) {
 }
 
 // src/github/client.ts
-import { execFile as execFile8 } from "node:child_process";
-import { promisify as promisify7 } from "node:util";
-var run5 = promisify7(execFile8);
 var GitHubError = class extends Error {
   constructor(message, status) {
     super(message);
@@ -67618,34 +67615,14 @@ var GitHubError = class extends Error {
 var api = (host) => host === "github.com" ? "https://api.github.com" : `https://${host}/api/v3`;
 var graphqlUrl = (host) => host === "github.com" ? "https://api.github.com/graphql" : `https://${host}/api/graphql`;
 function tokens(env2 = process.env) {
-  const cache2 = /* @__PURE__ */ new Map();
-  return (host) => {
-    let token = cache2.get(host);
-    if (!token) {
-      token = read(host, env2);
-      cache2.set(host, token);
-      token.catch(() => cache2.delete(host));
+  return async (host) => {
+    const own13 = host === "github.com" ? env2.GITHUB_TOKEN || env2.GH_TOKEN : env2.GITHUB_ENTERPRISE_TOKEN || env2.GH_ENTERPRISE_TOKEN;
+    if (own13) {
+      return own13;
     }
-    return token;
+    const name = host === "github.com" ? "GITHUB_TOKEN" : "GITHUB_ENTERPRISE_TOKEN";
+    throw new GitHubError(`No GitHub token for ${host}. Set one with \`hermes config set ${name} <token>\`, then open a new pane.`);
   };
-}
-async function read(host, env2) {
-  const own13 = host === "github.com" ? env2.GH_TOKEN || env2.GITHUB_TOKEN : env2.GH_ENTERPRISE_TOKEN || env2.GITHUB_ENTERPRISE_TOKEN;
-  if (own13) {
-    return own13;
-  }
-  try {
-    const { stdout } = await run5("gh", ["auth", "token", "--hostname", host], { timeout: 1e4 });
-    const token = stdout.trim();
-    if (token) {
-      return token;
-    }
-  } catch (error) {
-    if (error.code === "ENOENT") {
-      throw new GitHubError("The GitHub CLI (gh) is not installed. Install it and run `gh auth login`, or set GH_TOKEN.");
-    }
-  }
-  throw new GitHubError(`Not logged in to ${host}. Run \`gh auth login --hostname ${host}\`, or set GH_TOKEN.`);
 }
 function github(token = tokens()) {
   async function call(host, url, init) {
@@ -67854,7 +67831,7 @@ var PullRequests = class {
    * Reads one tab's data of `key` once per PR update, so the sheet may ask on every frame: one read
    * at a time, and a failed one (its error on the entry) again after `RETRY_MS`.
    */
-  async #detail(key2, what, read2) {
+  async #detail(key2, what, read) {
     const e = this.#entries.get(key2);
     const id = `${key2}:${what}`;
     const failed = this.#failedAt.get(id);
@@ -67864,7 +67841,7 @@ var PullRequests = class {
     const at = e.pr.updatedAt;
     this.#reading.add(id);
     try {
-      await read2(e);
+      await read(e);
       e[STAMP[what]] = at;
       e[FAILURE[what]] = void 0;
       this.#failedAt.delete(id);
@@ -70371,14 +70348,14 @@ ${this.composer.text}` : text11 || this.composer.text);
       session_id: sid,
       subscription_id: subscription2
     });
-    const run6 = (this.#detaching.get(sid)?.then(send) ?? send()).catch(() => void 0);
-    this.#detaching.set(sid, run6);
-    void run6.then(() => {
-      if (this.#detaching.get(sid) === run6) {
+    const run5 = (this.#detaching.get(sid)?.then(send) ?? send()).catch(() => void 0);
+    this.#detaching.set(sid, run5);
+    void run5.then(() => {
+      if (this.#detaching.get(sid) === run5) {
         this.#detaching.delete(sid);
       }
     });
-    return run6;
+    return run5;
   }
   /**
    * Releases what superseded switches attached, once the adopted session is known. The gateway gives
