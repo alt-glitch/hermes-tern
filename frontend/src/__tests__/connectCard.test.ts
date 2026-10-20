@@ -19,7 +19,7 @@ vi.mock('../hermes/sessionIndex.js', async importOriginal => ({
   storedSessions: () => []
 }))
 
-const { App } = await import('../app.js')
+const { App } = await import('../app/chat.js')
 const { POLL_MS } = await import('../connections.js')
 const { ConnectWatcher } = await import('../connections/watcher.js')
 const { Transcript } = await import('../transcript.js')
@@ -54,7 +54,7 @@ const complete = (id: string, op: string) => ({
 /** What the app sent the agent: prompts it submitted, and those queued behind a turn. */
 const told = (gw: FakeGateway, app: InstanceType<typeof App>) => [
   ...gw.methods('prompt.submit').map(c => String(c.params.text)),
-  ...app.queue.map(q => q.text)
+  ...app.queue.held.map(q => q.text)
 ]
 
 let gw: FakeGateway

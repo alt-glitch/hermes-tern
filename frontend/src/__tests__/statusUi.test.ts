@@ -8,13 +8,13 @@ import { join } from 'node:path'
 import { type Key, plain } from '@stencil-hq/tern'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { FakeGateway, fakeTern, key, type Reply } from './fakes.js'
+import { FakeGateway, fakeTern, given, key, type Reply } from './fakes.js'
 
 vi.mock('@tui/lib/history.js', () => ({ append: () => undefined, load: () => [] }))
 
 process.env.HERMES_HOME = mkdtempSync(join(tmpdir(), 'hermes-tern-status-'))
 
-const { App } = await import('../app.js')
+const { App } = await import('../app/chat.js')
 const { localCommand } = await import('../commands.js')
 const { fastValue, fastTier } = await import('../fast.js')
 const { forgetCaps, rememberCaps } = await import('../modelCaps.js')
@@ -31,7 +31,7 @@ function setup(replies: Record<string, Reply> = {}, canonical = true) {
 
   const app = new App(tern.session, gw.client, '1.0.0')
   void app.run()
-  app.sid = 's1'
+  given.session(app, 's1')
 
   const press = async (k: Key) => {
     await vi.waitFor(() => expect(tern.reading).toBe(true))
@@ -139,26 +139,26 @@ describe('App: fast mode', () => {
     expect(fastTier({ fast: false, service_tier: 'priority' })).toBeUndefined()
 
     const { app, raw } = setup()
-    app.info = { model: 'gpt-5' }
+    given.info(app, { model: 'gpt-5' })
     app.changed()
     expect(await raw()).not.toContain('"bolt"')
 
-    app.info = { fast: true, model: 'gpt-5', service_tier: 'priority' }
+    given.info(app, { fast: true, model: 'gpt-5', service_tier: 'priority' })
     app.changed()
     expect(await raw()).toContain('"bolt"')
   })
 
   it('/fast toggles through config.set and patches the info from the reply', async () => {
     const { app, sent } = setup({ 'config.set': p => ({ key: 'fast', value: p.value === 'toggle' ? 'fast' : 'normal' }) })
-    app.info = { model: 'gpt-5' }
+    given.info(app, { model: 'gpt-5' })
 
     await localCommand('fast')!.run(app, '')
     expect(sent('config.set')).toEqual([{ key: 'fast', session_id: 's1', value: 'toggle' }])
-    expect(app.info).toMatchObject({ fast: true, service_tier: 'priority' })
+    expect(app.session.info).toMatchObject({ fast: true, service_tier: 'priority' })
 
     await localCommand('fast')!.run(app, 'off')
     expect(sent('config.set').at(-1)).toEqual({ key: 'fast', session_id: 's1', value: 'normal' })
-    expect(app.info).toMatchObject({ fast: false, service_tier: '' })
+    expect(app.session.info).toMatchObject({ fast: false, service_tier: '' })
   })
 
   it('says when the route has no fast mode, and takes only its words', async () => {
@@ -185,7 +185,7 @@ describe('App: fast mode', () => {
       'session.mutate': () => ({ model: 'b', status: 'applied' }),
       'session.resume': () => ({ execution_generation: 1, revision: 1 })
     })
-    app.info = { model: 'a', reasoning_effort: 'medium' }
+    given.info(app, { model: 'a', reasoning_effort: 'medium' })
 
     openModelPicker(app)
     await settle()
@@ -222,7 +222,7 @@ describe('the effort chip and its levels', () => {
 
   it('is hidden for a model without reasoning, muted at the default', async () => {
     const { app, dock } = setup()
-    app.info = { model: 'plain-model', provider: 'p', reasoning_effort: '' }
+    given.info(app, { model: 'plain-model', provider: 'p', reasoning_effort: '' })
     app.changed()
     expect(await dock()).toContain('medium')
 
@@ -246,14 +246,14 @@ describe('App: setting the effort', () => {
 
   it('sends the session level as the reasoning mutation on the shared gateway', async () => {
     const { app, sent } = setup(mutation())
-    app.info = { model: 'm', reasoning_effort: 'low' }
+    given.info(app, { model: 'm', reasoning_effort: 'low' })
 
     await app.setEffort('high', 'session')
     expect(sent('session.mutate')).toEqual([
       expect.objectContaining({ expected_generation: 2, expected_revision: 7, operation: 'reasoning', payload: { effort: 'high' }, session_id: 's1' })
     ])
     expect(sent('config.set')).toEqual([])
-    expect(app.info?.reasoning_effort).toBe('high')
+    expect(app.session.info?.reasoning_effort).toBe('high')
   })
 
   it('keeps config.set scope=global for Save as default, and config.set on a private gateway', async () => {
@@ -269,16 +269,16 @@ describe('App: setting the effort', () => {
 
   it('rolls the chip back when the change is refused', async () => {
     const { app } = setup(mutation(true))
-    app.info = { model: 'm', reasoning_effort: 'low', reasoning_effort_wire: 'low' }
+    given.info(app, { model: 'm', reasoning_effort: 'low', reasoning_effort_wire: 'low' })
 
     await app.setEffort('high', 'session')
-    expect(app.info).toMatchObject({ reasoning_effort: 'low', reasoning_effort_wire: 'low' })
+    expect(app.session.info).toMatchObject({ reasoning_effort: 'low', reasoning_effort_wire: 'low' })
     expect(app.transcript.entries.at(-1)).toMatchObject({ text: expect.stringContaining('stale_revision'), tone: 'error' })
   })
 
   it('/reasoning <level> sets it the same way; its other forms stay the backend\'s', async () => {
     const { app, sent } = setup(mutation())
-    app.info = { model: 'm' }
+    given.info(app, { model: 'm' })
 
     await localCommand('reasoning')!.run(app, 'ultra')
     await settle()

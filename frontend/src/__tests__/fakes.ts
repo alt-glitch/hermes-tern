@@ -1,10 +1,17 @@
 // The app's two outside parties as in-process fakes, for tests that drive App: a Tern session
 // (keys and events in, frames out) and a gateway (requests recorded and answered, events fed in).
-// The casts to the real types live here, once, so test files hand App typed values.
+// The casts to the real types live here, once, so test files hand App typed values. `given`
+// arranges what a test starts from through the stores' own APIs.
 import { EventEmitter } from 'node:events'
 
 import type { Key, Session } from '@stencil-hq/tern'
 import type { GatewayClient } from '@tui/gatewayClient.js'
+import type { SessionInfo } from '@tui/types.js'
+
+import type { SessionView } from '../app/ports.js'
+import { liveSessionId } from '../core/ids.js'
+import type { SessionState } from '../session/state.js'
+import type { Activity, Busy } from '../turn/activity.js'
 
 /** One gateway answer: `request` resolves to what it returns and rejects with what it throws. */
 export type Reply = (params: Record<string, unknown>) => unknown
@@ -166,4 +173,22 @@ export async function settle(gw: FakeGateway) {
     sent = gw.calls.length
     await new Promise(resolve => setImmediate(resolve))
   } while (gw.calls.length !== sent)
+}
+
+/** What a test arranges before it acts, written through the stores as the app's own code writes them. */
+export const given = {
+  /** A turn runs, as `busy` describes it (null: none); returns it. */
+  busy<B extends Busy | null>(chat: { readonly activity: Pick<Activity, 'set'> }, busy: B): B {
+    chat.activity.set(busy)
+
+    return busy
+  },
+  /** The gateway's session.info is `info`. */
+  info(chat: { readonly session: Pick<SessionView, 'info'> }, info: SessionInfo | null) {
+    chat.session.info = info
+  },
+  /** The open session's runtime id is `live`; its stored id stays. */
+  session(chat: { readonly session: Pick<SessionState, 'ref'> }, live: string) {
+    chat.session.ref = { live: liveSessionId(live), stored: chat.session.ref.stored }
+  }
 }

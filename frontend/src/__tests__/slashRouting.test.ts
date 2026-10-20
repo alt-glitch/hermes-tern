@@ -16,7 +16,7 @@ vi.mock('../hermes/sessionIndex.js', async importOriginal => ({
   storedSessions: () => []
 }))
 
-const { App } = await import('../app.js')
+const { App } = await import('../app/chat.js')
 
 const flush = async () => {
   for (let i = 0; i < 4; i++) {
@@ -94,7 +94,7 @@ describe('slash name resolution', () => {
     await submit('/Clear')
 
     expect(gw.methods('session.create')).toHaveLength(2)
-    expect(app.sid).toBe('s2')
+    expect(app.session.ref.live).toBe('s2')
   })
 
   it('loads the catalog once per session, and again after /reload-skills', async () => {
@@ -120,7 +120,7 @@ describe('a slash reply after a session switch', () => {
     expect(gw.methods('slash.exec')).toHaveLength(1)
 
     await app.resume(storedSessionId('other'))
-    expect(app.sid).toBe('other')
+    expect(app.session.ref.live).toBe('other')
     reply.resolve({ message: 'check the build', type: 'send' })
     await flush()
 
@@ -152,7 +152,7 @@ describe('stale prompt sheets', () => {
 
   it('approval.cancelled closes the approvals it names, and not a sheet that took a closed one\'s key', async () => {
     const { app } = await started()
-    const sid = app.sid ?? ''
+    const sid = app.session.ref.live ?? ''
     const ask = (id: string, method: string, params: Record<string, unknown>) =>
       gw.emit('request', { fail: () => undefined, id, method, params: { session_id: sid, ...params }, respond: () => undefined })
 

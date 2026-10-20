@@ -54,7 +54,7 @@ vi.mock('../hermes/sessionIndex.js', async importOriginal => ({
 const home = mkdtempSync(join(tmpdir(), 'hermes-tern-dispatch-'))
 process.env['HERMES_HOME'] = home
 
-const { App } = await import('../app.js')
+const { App } = await import('../app/chat.js')
 
 beforeEach(() => {
   seen.length = 0

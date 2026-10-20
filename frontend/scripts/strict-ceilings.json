@@ -15,7 +15,7 @@
   "src/agents/agentRow.tsx": 2,
   "src/agents/liveLog.ts": 2,
   "src/agents/store.ts": 32,
-  "src/app.ts": 1,
+  "src/app/stores.ts": 1,
   "src/automation.ts": 2,
   "src/bridge.ts": 12,
   "src/clipboard.ts": 2,

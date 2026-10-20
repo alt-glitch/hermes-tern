@@ -23,7 +23,7 @@ vi.mock('../hermes/sessionIndex.js', async importOriginal => ({
   storedSessions: () => []
 }))
 
-const { App } = await import('../app.js')
+const { App } = await import('../app/chat.js')
 
 const flush = () => new Promise(resolve => setImmediate(resolve))
 

@@ -7,7 +7,7 @@
 import { connect } from '@stencil-hq/tern'
 import { GatewayClient } from '@tui/gatewayClient.js'
 
-import { App } from './app.js'
+import { App } from './app/chat.js'
 import { FaultBudget, isDeadStream } from './backendNotes.js'
 import { launchEnv } from './config/env.js'
 import { fileSettings } from './settings.js'

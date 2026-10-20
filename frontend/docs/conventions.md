@@ -82,8 +82,9 @@ code that puts one kind where another belongs fails to compile unless it says so
   small one.
 - `effect` and `effect/*`: this package does not use Effect. Brands, tagged unions, the Epoch
   ticket and disposables are plain TypeScript (the bundle size and per-pane startup decided it).
-- `app.js` from below `src/`: only the root modules import App. A module declares the ports it
-  uses (`Pick<ChatPorts, …>`, src/app/ports.ts) and App passes itself in.
+- `app/chat.js` outside `src/entry.ts` and the tests: App is the composition root, and only
+  entry.ts makes one. A module declares the ports it uses (`Pick<ChatPorts, …>`,
+  src/app/ports.ts) and App passes itself in.
 - Value imports from `@tui/*` outside `src/hermes/**` and `src/wire/**`: the Hermes sources move
   with `hermes update`, so their runtime code comes in through those two directories.
   `import type` from `@tui/*` is fine anywhere.

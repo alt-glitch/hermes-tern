@@ -40,7 +40,7 @@ vi.mock('../hermes/sessionIndex.js', async importOriginal => ({
   storedSessions: () => []
 }))
 
-const { App } = await import('../app.js')
+const { App } = await import('../app/chat.js')
 
 /** A session the gateway creates: runtime id `live-N`, and stored id `stored-N` unless `stored` is false. */
 function gateway({ stored = true } = {}) {
@@ -84,8 +84,8 @@ describe('a session with a stored id', () => {
     const gw = gateway()
     const { app } = await started(gw)
 
-    expect(app.sid).toBe('live-1')
-    expect(app.storedSid).toBe('stored-1')
+    expect(app.session.ref.live).toBe('live-1')
+    expect(app.session.ref.stored).toBe('stored-1')
     expect(app.session.ref).toEqual({ live: 'live-1', stored: 'stored-1' })
     expect(spy.markViewer.mock.calls).toEqual([['stored-1', null]])
     expect(spy.active.mock.calls).toEqual([['stored-1']])
@@ -105,7 +105,7 @@ describe('a session with a stored id', () => {
     await app.resume(storedSessionId('stored-2'))
     await settle(gw)
 
-    expect(app.sid).toBe('live-2')
+    expect(app.session.ref.live).toBe('live-2')
     expect(spy.markViewer.mock.calls.at(-1)).toEqual(['stored-2', 'stored-1'])
     expect(spy.active.mock.calls.at(-1)).toEqual(['stored-2'])
     expect(spy.compactions.mock.calls).toEqual([['stored-2']])
@@ -127,8 +127,8 @@ describe('a session with a stored id', () => {
     const { app } = await started(gw)
 
     gw.emit('exit', 1)
-    expect(app.sid).toBeNull()
-    expect(app.storedSid).toBe('stored-1')
+    expect(app.session.ref.live).toBeNull()
+    expect(app.session.ref.stored).toBe('stored-1')
     expect(app.session.ref).toEqual({ live: null, stored: 'stored-1' })
 
     gw.event({ payload: {}, type: 'gateway.ready' })
@@ -136,7 +136,7 @@ describe('a session with a stored id', () => {
 
     expect(resumed(gw)).toEqual(['stored-1'])
     expect(gw.sent('session.create')).toHaveLength(1)
-    expect(app.sid).toBe('live-of-stored-1')
+    expect(app.session.ref.live).toBe('live-of-stored-1')
   })
 
   it('reloads a session that fell behind under its stored id', async () => {
@@ -169,7 +169,7 @@ describe('a session with a stored id', () => {
     gw.handlers.set('session.resume', p => ({ info: { stored_session_id: p['session_id'] }, session_id: p['session_id'], subscription_id: 'sub-b' }))
 
     await expect(app.control().open(storedSessionId('branch-1'))).resolves.toBe(true)
-    expect(app.sid).toBe('branch-1')
+    expect(app.session.ref.live).toBe('branch-1')
 
     gw.handlers.set('session.resume', () => ({ info: { stored_session_id: 'elsewhere' }, session_id: 'elsewhere', subscription_id: 'sub-e' }))
     await expect(app.control().open(storedSessionId('branch-2'))).resolves.toBe(false)
@@ -181,7 +181,7 @@ describe('a session with no stored id', () => {
     const gw = gateway({ stored: false })
     const { app, done } = await started(gw)
 
-    expect(app.storedSid).toBeNull()
+    expect(app.session.ref.stored).toBeNull()
     expect(app.session.ref).toEqual({ live: 'live-1', stored: null })
     expect(spy.markViewer.mock.calls).toEqual([['live-1', null]])
     expect(spy.active.mock.calls).toEqual([['live-1']])
@@ -213,7 +213,7 @@ describe('a session with no stored id', () => {
 
     expect(resumed(gw)).toEqual([])
     expect(gw.sent('session.create')).toHaveLength(2)
-    expect(app.sid).toBe('live-2')
+    expect(app.session.ref.live).toBe('live-2')
   })
 
   it('reads no stored compactions: their summaries need a stored id', async () => {

@@ -11,13 +11,13 @@ import { liveSessionId } from '../core/ids.js'
 import { Activity } from '../turn/activity.js'
 import { gateBehind, gateDrain, gateSend, type GateState, gateSubmit, gateTurn } from '../turn/router.js'
 
-import { FakeGateway, fakeTern, key, type Reply, settle } from './fakes.js'
+import { FakeGateway, fakeTern, given, key, type Reply, settle } from './fakes.js'
 
 vi.mock('@tui/lib/history.js', () => ({ append: () => undefined, load: () => [] }))
 
 process.env['HERMES_HOME'] = mkdtempSync(join(tmpdir(), 'hermes-tern-gates-'))
 
-const { App } = await import('../app.js')
+const { App } = await import('../app/chat.js')
 
 const S1 = liveSessionId('s1')
 
@@ -186,7 +186,7 @@ function setup(replies: Record<string, Reply> = {}, { canonical = true } = {}) {
   const tern = fakeTern({ cols: 100, draws: true })
   const app = new App(tern.session, gw.client, '1.0.0')
   void app.run()
-  app.sid = 's1'
+  given.session(app, 's1')
 
   const press = async (k: string | ReturnType<typeof key>) => {
     await vi.waitFor(() => expect(tern.reading).toBe(true))
@@ -212,28 +212,27 @@ describe('App: the working line', () => {
   it("Esc Esc writes 'Stopping…', and the stream's next label replaces it", async () => {
     const stop = held()
     const { app, emit, press } = setup({ 'session.interrupt': stop.reply, 'session.resume': () => ({ execution_generation: 7 }) })
-    app.busy = { label: 'Thinking…', since: {}, startedAt: 0 }
-    const { since } = app.busy
+    const { since } = given.busy(app, { label: 'Thinking…', since: {}, startedAt: 0 })
 
     await press('escape')
     await press('escape')
-    expect(app.busy).toEqual({ label: 'Stopping…', since, startedAt: 0 })
+    expect(app.activity.busy).toEqual({ label: 'Stopping…', since, startedAt: 0 })
 
     await emit('message.delta', { text: 'still going' })
-    expect(app.busy).toEqual({ label: 'Writing…', since, startedAt: 0 })
+    expect(app.activity.busy).toEqual({ label: 'Writing…', since, startedAt: 0 })
   })
 
   it("a failed interrupt writes 'Working…' over whatever label came meanwhile", async () => {
     const stop = held()
     const { app, emit, press } = setup({ 'session.interrupt': stop.reply, 'session.resume': () => ({ execution_generation: 7 }) })
-    app.busy = { label: 'Thinking…', since: {}, startedAt: 0 }
+    given.busy(app, { label: 'Thinking…', since: {}, startedAt: 0 })
 
     await press(key('c', { ctrl: true }))
     await emit('message.delta', { text: 'more' })
-    expect(app.busy?.label).toBe('Writing…')
+    expect(app.activity.busy?.label).toBe('Writing…')
 
     stop.reject(new Error('boom'))
-    await vi.waitFor(() => expect(app.busy?.label).toBe('Working…'))
+    await vi.waitFor(() => expect(app.activity.busy?.label).toBe('Working…'))
     expect(app.transcript.entries.at(-1)).toMatchObject({ kind: 'notice', text: 'Could not stop the turn: boom' })
   })
 })
@@ -245,13 +244,13 @@ describe("App: a send's {!cmd} expansion counts as a turn", () => {
     await type('today is {!date}')
     await press('enter')
 
-    expect(app.busy?.label).toBe('Running {!…}')
+    expect(app.activity.busy?.label).toBe('Running {!…}')
     expect(app.control().busy).toBe(true)
 
     // The drain waits: a prompt behind it is held (a private gateway's queue), not sent.
     await type('next')
     await press('enter')
-    expect(app.queue).toMatchObject([{ text: 'next' }])
+    expect(app.queue.held).toMatchObject([{ text: 'next' }])
     expect(gw.sent('prompt.submit')).toEqual([])
 
     // A session switch is refused.
@@ -260,18 +259,18 @@ describe("App: a send's {!cmd} expansion counts as a turn", () => {
     expect(app.transcript.entries.at(-1)).toMatchObject({ kind: 'notice', text: expect.stringContaining('Wait for the current turn to finish') })
 
     // message.start finds a turn running and keeps its row; the stream's labels relabel it.
-    const { since } = app.busy ?? { since: undefined }
+    const { since } = app.activity.busy ?? { since: undefined }
     await emit('message.start')
-    expect(app.busy).toMatchObject({ label: 'Running {!…}', since })
+    expect(app.activity.busy).toMatchObject({ label: 'Running {!…}', since })
     await emit('message.delta', { text: 'hi' })
-    expect(app.busy).toMatchObject({ label: 'Writing…', since })
+    expect(app.activity.busy).toMatchObject({ label: 'Writing…', since })
 
     // Expanded: the prompt goes with a working row of its own, and the held one still waits.
     shell.resolve({ code: 0, stderr: '', stdout: 'Monday\n' })
     await vi.waitFor(() => expect(gw.sent('prompt.submit')).toHaveLength(1))
     expect(gw.sent('prompt.submit')[0]).toMatchObject({ text: 'today is Monday' })
-    expect(app.busy?.label).toBe('Working…')
-    expect(app.busy?.since).not.toBe(since)
-    expect(app.queue).toMatchObject([{ text: 'next' }])
+    expect(app.activity.busy?.label).toBe('Working…')
+    expect(app.activity.busy?.since).not.toBe(since)
+    expect(app.queue.held).toMatchObject([{ text: 'next' }])
   })
 })

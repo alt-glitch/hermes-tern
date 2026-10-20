@@ -149,7 +149,7 @@ export interface Played {
  * (ids, the prompt history, the session index) before the first replay, which imports App.
  */
 export async function replay({ fixture: name, replies, steps }: Replay): Promise<Played> {
-  const { App } = await import('../app.js')
+  const { App } = await import('../app/chat.js')
   const lines = fixture(name)
   const gw = new FakeGateway({ replies })
   const tern = fakeTern({ cols: 100, draws: true })

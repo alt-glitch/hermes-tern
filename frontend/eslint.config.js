@@ -29,14 +29,14 @@ export const SECTIONS = {
 const ZOD = { message: `Import zod/mini, not the zod root. ${see('restricted-imports')}`, name: 'zod' }
 const EFFECT = `This package does not use Effect. ${see('restricted-imports')}`
 
-/** The import rule: zod's root and Effect everywhere, plus App outside src/ and @tui values outside hermes/ and wire/. */
+/** The import rule: zod's root and Effect everywhere, plus App outside entry.ts and the tests, and @tui values outside hermes/ and wire/. */
 function imports({ app, tui }) {
   const patterns = [{ group: ['effect/*'], message: EFFECT }]
 
   if (app) {
     patterns.push({
-      message: `Only the root modules import App; a module takes the ports it uses. ${see('restricted-imports')}`,
-      regex: '^(\\.\\./)+app(\\.js)?$'
+      message: `Only entry.ts (and the tests) import App, the composition root; a module takes the ports it uses. ${see('restricted-imports')}`,
+      regex: '(^|/)app/chat(\\.js)?$|^\\./chat(\\.js)?$'
     })
   }
 
@@ -79,7 +79,7 @@ export const rules = defineConfig([
       'no-restricted-syntax': ['error', JSON_PARSE]
     }
   },
-  { files: ['src/*.{ts,tsx}'], rules: { '@typescript-eslint/no-restricted-imports': imports({ app: false, tui: true }) } },
+  { files: ['src/entry.ts', 'src/__tests__/**'], rules: { '@typescript-eslint/no-restricted-imports': imports({ app: false, tui: true }) } },
   {
     files: ['src/hermes/**', 'src/wire/**'],
     rules: { '@typescript-eslint/no-restricted-imports': imports({ app: true, tui: false }) }
