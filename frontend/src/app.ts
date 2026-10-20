@@ -3,14 +3,11 @@
 // transcript, keys go to the top overlay or the composer, and every change
 // schedules one render of the whole view; the SDK diffs it into frame ops.
 
-import { appendFileSync } from 'node:fs'
-
 import type { Usage } from '@hermes/shared/gateway-events'
 import type { ServerRequest } from '@hermes/shared/json-rpc-channel'
 import { parseCommandDispatch } from '@hermes/shared/slash'
 import type { Key, ScrollTo, Session, TspEvent } from '@stencil-hq/tern'
 import { describeSlashExecError, isUnsupportedCommand, shouldFallbackToDispatch } from '@tui/app/userMessages.js'
-import { usageFromTick } from '@tui/domain/usage.js'
 import type { GatewayClient } from '@tui/gatewayClient.js'
 import type { AnyGatewayEvent } from '@tui/gatewayTypes.js'
 import type { SessionInfo } from '@tui/types.js'
@@ -21,7 +18,7 @@ import { agentName, Agents } from './agents/store.js'
 import type { ChatPorts, SessionView } from './app/ports.js'
 import { Automation } from './automation.js'
 import { Hud, pills, type Pill, type SheetPill, todos } from './chrome/hud.js'
-import { isLoginNotice, NoticeStrip } from './chrome/notices.js'
+import { NoticeStrip } from './chrome/notices.js'
 import { Reconnect } from './chrome/reconnect.js'
 import { Theme } from './chrome/theme.js'
 import { copyToClipboard } from './clipboard.js'
@@ -32,28 +29,18 @@ import { ConnectWatcher } from './connections/watcher.js'
 import { interruptTurn } from './controlCommands.js'
 import { Disposables } from './core/disposables.js'
 import { errorText } from './core/errors.js'
-import {
-  durable,
-  entryId,
-  type LiveSessionId,
-  liveSessionId,
-  type PrKey,
-  type StoredSessionId,
-  storedSessionId,
-  toolCallId
-} from './core/ids.js'
+import { durable, entryId, type LiveSessionId, liveSessionId, type PrKey, type StoredSessionId, storedSessionId } from './core/ids.js'
 import { RenderScheduler } from './core/scheduler.js'
 import { Attachments } from './draft/attachments.js'
 import { fastTier } from './fast.js'
-import { ownsEvent } from './flow.js'
-import { protocolNote, slowStartNotes } from './backendNotes.js'
-import { moaLabel, moaReferenceLabel } from './moa.js'
+import { dispatcher, type Outcome } from './gateway/dispatch.js'
+import { type EventLog, eventLog } from './gateway/eventLog.js'
+import type { Warned } from './gateway/handlers/chrome.js'
 import type { Overlay } from './overlay.js'
 import { writeActiveSessionFile } from './hermes/activeSessionFile.js'
 import { Media } from './media.js'
 import type { NoticeEntry, ToolCall } from './model.js'
 import { shellError, shellExec, shellLines } from './hermes/shell.js'
-import { sharedPromptId, sharedPromptRequest } from './hermes/sharedPrompts.js'
 import { openAgents } from './overlays/agents.js'
 import { openAutomation } from './overlays/automation.js'
 import { openBackground } from './overlays/background.js'
@@ -62,10 +49,9 @@ import { openModelPicker } from './overlays/models.js'
 import { openEffortPicker } from './overlays/effort.js'
 import { openHelp } from './overlays/help.js'
 import { capsOf } from './modelCaps.js'
-import { promptOverlay, promptTimeoutNotice } from './overlays/prompts.js'
+import { promptOverlay } from './overlays/prompts.js'
 import { openPrMenu, openPrSheet, openUrl, prsPill } from './overlays/pullRequests.js'
-import { CONNECT_TOOL, markViewer } from './connections.js'
-import { LINK_TOOLS } from './github/links.js'
+import { markViewer } from './connections.js'
 import { PullRequests } from './github/store.js'
 import { Cron } from './processes/cron.js'
 import { PrAside } from './prs/aside.js'
@@ -79,14 +65,13 @@ import { SessionTitle } from './session/title.js'
 import { Sidebar } from './sidebar.js'
 import type { SessionHost } from './sessionCommands.js'
 import { ambiguousNotice, CommandCatalog, resolveSlashName } from './slashResolve.js'
-import { statusEffect } from './status.js'
 import { isRunning as processRuns, Processes, processTone } from './processes/store.js'
 import { hermesAuthor } from './processes/widgets/author.js'
 import { chartMemory } from './processes/widgets/memory.js'
 import { fileSettings, type SettingsSource, type ThemeMode } from './settings.js'
 import { Activity, type Busy } from './turn/activity.js'
 import { PromptQueue } from './turn/queue.js'
-import { IMAGE_ONLY_PROMPT, type Prompt, shownText, userImages } from './turn/prompt.js'
+import { IMAGE_ONLY_PROMPT, type Prompt, shownText } from './turn/prompt.js'
 import { type GateState, gateDrain, PromptRouter } from './turn/router.js'
 import { type BusyMode, busyModeOf } from './turn/serverQueue.js'
 import { INPUT_ID, SurfaceHost } from './surface/host.js'
@@ -98,8 +83,6 @@ import { dockNodes } from './view/dock.js'
 import { homeTilde } from './view/format.js'
 import { entryNode } from './view/transcript.js'
 import { rpc } from './wire/rpc.js'
-import { pendingRows, usageCounters } from './wire/schemas.js'
-import { busyLabel, preparingLabel } from './workLog.js'
 import { openSidebar, specOf } from './watch/spec.js'
 import { randomTip, type WelcomeContext } from './view/welcome.js'
 
@@ -193,12 +176,14 @@ export class App implements ChatPorts {
   #copiedTimer: NodeJS.Timeout | undefined
   /** The gateway connection: down until the next gateway.ready, and its redial line. */
   readonly #reconnect = new Reconnect(this)
-  /** Stray backend output was reported once already. */
-  #protocolWarned = false
+  /** The backend warnings shown already (stray output, the last status warning), so each stays one line. */
+  readonly #warned: Warned = { protocol: false, status: undefined }
   /** The gateway's keyed notices (credits, a slow start); the newest rides the status strip. */
   readonly #notices = new NoticeStrip(this)
-  /** The status warning shown last, so a repeated one stays one line. */
-  #lastStatusNote: string | undefined
+  /** The development tap (HERMES_TERN_EVENT_LOG): every event and server request, as JSON lines. */
+  readonly #log: EventLog
+  /** What each gateway event does to the pane (gateway/handlers/*), and whether it renders. */
+  readonly #dispatch: (ev: AnyGatewayEvent) => Outcome
 
   /** `launch` and `settings` are what entry.ts read once at startup; unset, each reads its default. */
   constructor(tern: Session, gw: GatewayClient, version: string, { launch = readLaunchEnv(), settings = fileSettings() }: { launch?: LaunchEnv; settings?: SettingsSource } = {}) {
@@ -262,7 +247,7 @@ export class App implements ChatPorts {
         changed: () => this.changed(),
         connect: this.#connect,
         forgetStatusNote: () => {
-          this.#lastStatusNote = undefined
+          this.#warned.status = undefined
         },
         imageLanded: call => this.#imageLanded(call),
         markViewer,
@@ -290,6 +275,38 @@ export class App implements ChatPorts {
       tip: randomTip(launch.pythonSrcRoot),
       version: version && version !== 'unknown' ? `v${version}` : ''
     }
+    this.#log = eventLog(launch.eventLog)
+    this.#dispatch = dispatcher(
+      {
+        activity: this.#activity,
+        agents: this.agents,
+        automation: this.automation,
+        changed: () => this.changed(),
+        connect: this.#connect,
+        drain: () => this.#drainQueue(),
+        gw,
+        life: this.#life,
+        notices: this.#notices,
+        processes: this.processes,
+        prs: this.prs,
+        queue: this.#queue,
+        reconnect: this.#reconnect,
+        reportCwd: () => this.#reportCwd(),
+        request: req => this.#onRequest(req),
+        session: this.#state,
+        setCompacting: on => this.#setCompacting(on),
+        sheets: this.#sheets,
+        showImage: call => this.#showImage(call),
+        sid: () => this.sid,
+        sidebar: this.sidebar,
+        summarize: delay => this.#summarize(delay),
+        theme: this.#theme,
+        title: this.#title,
+        transcript: this.transcript,
+        warned: this.#warned
+      },
+      type => this.#log.unknown(type)
+    )
   }
 
   /** The open session's runtime id: null before the first session and while the gateway is down. */
@@ -375,22 +392,15 @@ export class App implements ChatPorts {
       this.#queue.hold({ images: [], kind: 'app', text: query || IMAGE_ONLY_PROMPT })
     }
 
-    const log = this.#launch.eventLog
-
-    // Development (the lab, and the golden replays' fixtures): one JSON line per gateway event, as
-    // the event itself, and per server request, as `{"request": {id, method, params}}`.
     this.#gw.on('event', (ev: AnyGatewayEvent) => {
-      if (log) {
-        appendFileSync(log, `${JSON.stringify(ev)}\n`)
-      }
+      this.#log.event(ev)
 
-      this.#onGatewayEvent(ev)
+      if (this.#dispatch(ev) === 'render') {
+        this.changed()
+      }
     })
     this.#gw.on('request', (req: ServerRequest) => {
-      if (log) {
-        appendFileSync(log, `${JSON.stringify({ request: { id: req.id, method: req.method, params: req.params } })}\n`)
-      }
-
+      this.#log.request(req)
       this.#onRequest(req)
     })
     this.#gw.on('exit', (code: null | number) => {
@@ -1232,422 +1242,6 @@ export class App implements ChatPorts {
 
   // ── Gateway ────────────────────────────────────────────────────────
 
-  #onGatewayEvent(ev: AnyGatewayEvent) {
-    // Another session's traffic (one being closed, or left by a switch) never reaches this transcript.
-    if (!ownsEvent(this.sid, ev)) {
-      return
-    }
-
-    const t = this.transcript
-
-    switch (ev.type) {
-      case 'gateway.ready':
-        this.#reconnect.ready()
-        this.#theme.skin(ev.payload?.skin)
-        this.#life.ready()
-
-        break
-
-      case 'skin.changed':
-        this.#theme.skin(ev.payload)
-
-        break
-
-      // The goal and loop line: every set, pause, resume, stop, wakeup and judged turn.
-      case 'session.control.update':
-        this.automation.apply(ev.session_id ?? this.sid, ev.payload?.control)
-
-        return
-
-      case 'gateway.reconnecting':
-        this.#reconnect.redialing(ev.payload?.attempt ?? 1, ev.payload?.delay_ms ?? 0)
-
-        break
-
-      case 'session.info': {
-        const cwd = this.info?.cwd
-        // The shared owner's idle fanout carries only pending/revision/generation: merge, never replace.
-        this.info = ev.payload ? { ...this.info, ...ev.payload } : this.info
-        this.usage = ev.payload?.usage ?? this.usage
-        t.contextUsed(this.usage?.context_used ?? 0)
-
-        // A queued prompt the gateway started gets its bubble now, after the reply it waited for.
-        for (const started of this.#queue.server.update(pendingRows(ev.payload))) {
-          const own = started.own?.item.prompt
-          t.started(own ? shownText(own) : started.text, undefined, own ? userImages(own.images) : [])
-        }
-
-        this.#title.set(typeof ev.payload?.title === 'string' ? ev.payload.title : undefined)
-
-        // Another folder: another branch, maybe another PR.
-        if (this.info?.cwd && this.info.cwd !== cwd) {
-          this.prs.poke()
-          this.#reportCwd()
-        }
-
-        break
-      }
-
-      case 'session.usage': {
-        // The shared owner sends its counters at the top level; older gateways nest them.
-        const tick = usageFromTick(ev.payload)
-        this.usage = tick ? { ...this.usage, ...tick } : this.usage
-        t.contextUsed(this.usage?.context_used ?? 0)
-        const counters = usageCounters(ev.payload)
-
-        if (counters) {
-          t.usageTick(counters.counters, counters.tps)
-        }
-
-        break
-      }
-
-      case 'session.title':
-        this.#title.set(ev.payload?.title)
-
-        break
-
-      // A title set by /title or Hermes' auto-titler reaches viewers only as a changed session list.
-      case 'sessions.changed':
-        this.#title.read()
-
-        return
-
-      // The view fell behind: a fresh resume brings the snapshot and a new subscription.
-      case 'session.replay_gap':
-        this.#life.fellBehind(ev.session_id)
-
-        return
-
-      case 'message.start':
-        if (!this.busy) {
-          this.#activity.startBusy('Working…')
-          this.changed()
-        }
-
-        t.start()
-
-        // A delegation's completion turn carries its model text: each task's outcome, which a log
-        // this process cannot read (a remote gateway) never told.
-        if (ev.payload?.display_kind === 'async_delegation_complete' && ev.payload.text) {
-          this.agents.settle(ev.payload.text)
-        }
-
-        break
-
-      case 'message.delta':
-        t.text(ev.payload?.text ?? '')
-        this.#activity.relabel('Writing…')
-
-        break
-
-      case 'reasoning.delta':
-        t.reasoning(ev.payload?.text ?? '')
-        this.#activity.relabel('Thinking…')
-
-        break
-
-      case 'reasoning.available':
-        t.reasoningBlock(ev.payload?.text ?? '')
-
-        break
-
-      // Mixture-of-Agents: each reference model's answer, then the aggregator's turn.
-      case 'moa.reference':
-        if (ev.payload) {
-          t.reference(moaReferenceLabel(ev.payload.label || 'reference', ev.payload.index, ev.payload.count), ev.payload.text ?? '')
-        }
-
-        break
-
-      case 'moa.progress':
-
-      case 'moa.phase':
-
-      case 'moa.aggregating':
-        this.#activity.relabel(moaLabel(ev) ?? '')
-
-        break
-
-      case 'thinking.delta':
-        this.#activity.relabel(kaomojiLabel(ev.payload?.text ?? ''))
-
-        break
-
-      case 'message.interim':
-        t.interim(ev.payload?.text ?? '', { alreadyStreamed: Boolean(ev.payload?.already_streamed) })
-
-        break
-
-      case 'tool.generating':
-        this.#activity.relabel(ev.payload?.name ? preparingLabel(ev.payload.name) : 'Preparing a tool…')
-
-        break
-
-      case 'tool.start':
-        if (ev.payload) {
-          t.toolStart(ev.payload)
-          // The call as its step reads (a bridged or connector call as its app), not its wire name.
-          const call = t.call(toolCallId(ev.payload.tool_id))
-          this.#activity.relabel(call ? busyLabel(call) : `Running ${ev.payload.name}…`)
-          // vision_analyze names its image up front.
-          this.#showImage(call)
-        }
-
-        break
-
-      case 'tool.complete':
-        if (ev.payload) {
-          t.toolComplete(ev.payload)
-          this.#showImage(t.call(toolCallId(ev.payload.tool_id)))
-          // A dispatched delegation: its agents' rows start following the owner.
-          this.agents.scan()
-
-          if (ev.payload.name === 'delegate_task') {
-            // Its subagents (a foreground call's have ended) may have linked PRs.
-            this.prs.relink()
-          }
-
-          if (LINK_TOOLS.has(ev.payload.name)) {
-            const call = this.transcript.calls(ev.payload.name).at(-1)
-
-            if (call) {
-              this.prs.onCall(call)
-            }
-          }
-
-          if (['patch', 'terminal', 'write_file', 'execute_code'].includes(ev.payload.name)) {
-            this.sidebar.poke()
-          }
-
-          if (ev.payload.name === CONNECT_TOOL) {
-            this.#connect.watch()
-          }
-
-          if (ev.payload.name === 'terminal') {
-            // Maybe a background start: its card's live line begins now, not at the next idle poll.
-            this.processes.poke()
-          }
-        }
-
-        break
-
-      case 'agent.terminal.output':
-        if (ev.payload?.process_id) {
-          this.processes.output(ev.payload.process_id, ev.payload.chunk ?? '')
-        }
-
-        return
-
-      case 'todo.updated':
-        t.todos(ev.payload?.todos ?? [])
-
-        break
-
-      case 'subagent.spawn_requested':
-
-      case 'subagent.start':
-
-      case 'subagent.thinking':
-
-      case 'subagent.tool':
-
-      case 'subagent.progress':
-
-      case 'subagent.complete':
-        if (ev.payload) {
-          t.subagent(ev.type, ev.payload)
-        }
-
-        if (ev.type === 'subagent.complete') {
-          this.agentEnded()
-        }
-
-        break
-
-      case 'message.complete':
-        // prompt.cancel settles a withdrawn queued row with a completion of its own.
-        if (this.#queue.server.settlesQueuedRow(ev.payload)) {
-          return
-        }
-
-        t.complete(ev.payload ?? {})
-        this.#activity.endBusy()
-        this.#activity.endCompaction()
-        // A compaction Hermes aborted sends no done edge; one that committed has its summary stored now.
-        t.uncompact(true)
-        this.#summarize()
-        this.#drainQueue()
-        // The turn may have pushed a branch, opened a PR or changed files.
-        this.prs.poke()
-        this.sidebar.poke()
-
-        break
-
-      case 'status.update': {
-        // Lifecycle lines (retries, fallbacks) label the working line; warnings, compaction and goal
-        // verdicts are transcript lines.
-        const effect = statusEffect(ev.payload, this.#lastStatusNote)
-
-        if (effect.compacting !== undefined) {
-          this.#setCompacting(effect.compacting)
-        }
-
-        if (effect.compacting) {
-          t.compacting({ before: effect.tokens?.before ?? (this.usage?.context_used || undefined) })
-        } else if (effect.compacting === false) {
-          t.compacted(Date.now(), effect.tokens)
-          // The store has the summary once the compaction commits (a moment after its done edge).
-          this.#summarize(1500)
-        }
-
-        if (effect.label) {
-          this.#activity.relabel(effect.label, { status: true })
-        }
-
-        if (effect.notice) {
-          this.#lastStatusNote = effect.note ?? this.#lastStatusNote
-          t.notice(effect.notice.text, effect.notice.tone)
-        }
-
-        break
-      }
-
-      case 'notification.show': {
-        const p = ev.payload
-
-        // A /login step (its link and code, then the result) is read and clicked, so it goes in the transcript.
-        if (p && isLoginNotice(p)) {
-          if (p.text?.trim()) {
-            t.panel('/login', p.text)
-          }
-
-          break
-        }
-
-        if (p) {
-          this.#notices.show(p)
-        }
-
-        break
-      }
-
-      case 'notification.clear':
-        this.#notices.clear(ev.payload?.key)
-
-        break
-
-      // What the background self-improvement review saved to memory or skills.
-      case 'review.summary': {
-        const text = String(ev.payload?.text ?? '').trim()
-
-        if (!text) {
-          return
-        }
-
-        t.notice(text)
-
-        break
-      }
-
-      case 'notice':
-        t.notice(ev.payload?.message ?? '')
-
-        break
-
-      case 'error':
-        t.notice(ev.payload?.message ?? 'error', 'error')
-
-        break
-
-      case 'gateway.start_timeout':
-        // The client keeps waiting for ready; the stderr lines say why it is slow (wrong python, a missing dependency).
-        for (const note of slowStartNotes(ev.payload?.stderr_tail)) {
-          t.notice(note.text, note.tone)
-        }
-
-        break
-
-      case 'gateway.protocol_error': {
-        const note = protocolNote(ev.payload?.preview, this.#protocolWarned)
-        this.#protocolWarned = true
-
-        if (!note) {
-          return
-        }
-
-        t.notice(note.text, note.tone)
-
-        break
-      }
-
-      case 'background.complete':
-
-      case 'btw.complete':
-        if (ev.payload && 'text' in ev.payload && typeof ev.payload.text === 'string' && ev.payload.text.trim()) {
-          // Titled as Ink labels them: the task id /bg named, the question /btw asked.
-          const question = 'question' in ev.payload && typeof ev.payload.question === 'string' ? ev.payload.question.trim() : ''
-          const task = 'task_id' in ev.payload && typeof ev.payload.task_id === 'string' ? ` ${ev.payload.task_id}` : ''
-
-          t.panel(
-            ev.type === 'btw.complete' ? `/btw${question ? ` ${question}` : ''}` : `Background task${task}`,
-            ev.payload.text
-          )
-        }
-
-        break
-
-      case 'request.cancel': {
-        const id = ev.payload?.id
-        const notice = promptTimeoutNotice(ev.payload?.method, ev.payload?.reason)
-        // Only for a card this window still shows (or holds): an answered one needs no line.
-        const held = this.#life.unhold(id)
-        const shown = held || this.#sheets.shows(id)
-
-        this.#sheets.drop(id)
-
-        if (notice && shown) {
-          t.notice(notice, 'warning')
-        }
-
-        break
-      }
-
-      case 'approval.request':
-
-      case 'clarify.request': {
-        const req = sharedPromptRequest(ev, this.#gw, message => {
-          t.notice(message, 'warning')
-          this.changed()
-        })
-
-        if (req) {
-          this.#onRequest(req)
-        }
-
-        break
-      }
-
-      case 'approval.settled':
-
-      case 'clarify.settled':
-        // Answered here or by another viewer: the sheet goes either way.
-        this.#sheets.drop(sharedPromptId(ev.payload?.prompt_id))
-
-        break
-
-      case 'approval.cancelled':
-        this.#sheets.dropByApproval(ev.payload?.request_ids)
-
-        break
-
-      default:
-        return
-    }
-
-    this.changed()
-  }
-
   #onRequest(req: ServerRequest) {
     // Held while a switch is in flight, or another session's prompt (it settles when that session closes).
     if (this.#life.route(req) !== 'show') {
@@ -1841,11 +1435,3 @@ export class App implements ChatPorts {
     this.#surface.follow(focus)
   }
 }
-
-/** `( •_•)>⌐■-■ cogitating...` → `Cogitating…`: hermes's kawaii status without the face. */
-function kaomojiLabel(text: string): string {
-  const word = text.match(/([A-Za-z][A-Za-z ]*[A-Za-z])\.{2,}\s*$/)?.[1]
-
-  return word ? `${word.charAt(0).toUpperCase()}${word.slice(1)}…` : ''
-}
-

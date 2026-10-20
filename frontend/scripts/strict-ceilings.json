@@ -5,7 +5,6 @@
   "src/__tests__/connectCard.test.ts": 6,
   "src/__tests__/connections.test.ts": 1,
   "src/__tests__/cron.test.ts": 1,
-  "src/__tests__/golden.test.ts": 11,
   "src/__tests__/history.test.ts": 6,
   "src/__tests__/images.test.ts": 7,
   "src/__tests__/jobCharts.test.ts": 1,
