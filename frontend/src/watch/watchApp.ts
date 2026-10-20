@@ -11,9 +11,10 @@ import type { AnyGatewayEvent } from '@tui/gatewayTypes.js'
 
 import { agentNode } from '../agents/agentRow.js'
 import { parseLiveLog } from '../agents/liveLog.js'
-import { applyLog, isRunning } from '../agents/store.js'
+import { applyLog, isRunning } from '../agents/rows.js'
 import { Composer } from '../composer.js'
 import { errorText } from '../core/errors.js'
+import { Poller } from '../core/poller.js'
 import { RenderScheduler } from '../core/scheduler.js'
 import { Media } from '../media.js'
 import type { Subagent } from '../model.js'
@@ -51,7 +52,11 @@ export class WatchApp {
   #listed = false
   #ready = false
   #surface!: SurfaceHost
-  #timer: NodeJS.Timeout | undefined
+  /** The poll: every second until the agent ended and its stored transcript caught up. */
+  readonly #poller: Poller = new Poller({
+    cadence: () => (!isRunning(this.#agent) && this.#child ? 'off' : POLL_MS),
+    run: () => this.#tick()
+  })
   readonly #renders = new RenderScheduler(() => this.#render())
   #exitArmed = 0
   #done = Promise.withResolvers<number>()
@@ -113,7 +118,7 @@ export class WatchApp {
     this.#gw.on('event', (ev: AnyGatewayEvent) => {
       if (ev.type === 'gateway.ready') {
         this.#ready = true
-        void this.#tick()
+        this.#poller.poke()
       }
 
       // In `skin` mode the watcher wears the skin the session does, as the main pane does.
@@ -131,14 +136,13 @@ export class WatchApp {
       this.transcript.notice(`The session database is not readable here: ${String(error)}`, 'warning')
     }
 
-    this.#timer = setInterval(() => void this.#tick(), POLL_MS)
-    void this.#tick()
+    this.#poller.poke()
     this.#render()
     this.#surface.focus(INPUT_ID)
     void this.#readInput()
 
     const code = await this.#done.promise
-    clearInterval(this.#timer)
+    this.#poller.dispose()
     this.#store?.close()
     await this.#tern.close()
     this.#gw.kill('exit')
@@ -163,12 +167,6 @@ export class WatchApp {
 
     if (changed) {
       this.changed()
-    }
-
-    // Once it ended and the stored transcript caught up, nothing else will change.
-    if (!isRunning(a) && this.#child && this.#timer) {
-      clearInterval(this.#timer)
-      this.#timer = undefined
     }
   }
 

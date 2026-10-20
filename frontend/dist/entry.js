@@ -24829,6 +24829,9 @@ function copyToClipboard(text15, env2 = process.env) {
 function errorText(error) {
   return error instanceof Error ? error.message : String(error);
 }
+function errorCode(error) {
+  return error instanceof Error && "code" in error && typeof error.code === "string" ? error.code : void 0;
+}
 
 // src/hermes/mutate.ts
 import { randomUUID as randomUUID3 } from "node:crypto";
@@ -25103,11 +25106,6 @@ var SUBAGENT_LOOK = {
   running: { row: "running", tone: "accent", word: "Running" }
 };
 
-// src/agents/store.ts
-import { readFile, stat } from "node:fs/promises";
-import { homedir as homedir2 } from "node:os";
-import { join as join2 } from "node:path";
-
 // src/wire/json.ts
 function record(v) {
   if (typeof v === "string") {
@@ -25219,11 +25217,9 @@ function clockToMs(clock2, now = Date.now()) {
   return at > now + 6e4 ? at - 864e5 : at;
 }
 
-// src/agents/store.ts
-var POLL_MS = 1e3;
+// src/agents/rows.ts
 var MAX_LOG_BYTES = 2 * 1024 * 1024;
 var ENDED = /* @__PURE__ */ new Set(["cancelled", "done", "failed"]);
-var GRACE_POLLS = 3;
 var OUTCOME_UNKNOWN = "outcome unknown";
 function isRunning(a2) {
   return !ENDED.has(a2.status);
@@ -25231,381 +25227,140 @@ function isRunning(a2) {
 function agentName(a2) {
   return a2.name ?? `Agent ${a2.index + 1}`;
 }
-var Agents = class {
-  #host;
-  #timer;
-  #ticking = false;
-  #tracked = /* @__PURE__ */ new WeakSet();
-  /** Log sizes at the last read, by path; a log that did not grow is not read again. */
-  #sizes = /* @__PURE__ */ new Map();
-  /** Logs this process cannot read (a gateway on another machine): `subagent.tail` instead. */
-  #unreadable = /* @__PURE__ */ new Set();
-  /** Ids `subagent.list` reported: one that leaves the list has finished. */
-  #listed = /* @__PURE__ */ new Set();
-  /** Polls each unlisted row without a readable log has gone unseen. */
-  #unseen = /* @__PURE__ */ new WeakMap();
-  /** Rows whose end the host heard of. */
-  #ended = /* @__PURE__ */ new WeakSet();
-  /** The `subagent.tail` text read so far, by subagent id: each tail (the last 16 KB) is merged onto it. */
-  #tails = /* @__PURE__ */ new Map();
-  /**
-   * New delegate_task spawns are blocked, as this pane last set it (`delegation.pause`); undefined
-   * until then (the shared gateway serves no `delegation.status`). The gate is gateway-wide.
-   */
-  paused;
-  constructor(host) {
-    this.#host = host;
-  }
-  /** Every agent of the session's delegations, each delegation's rows in order. */
-  all() {
-    return [...this.#owners().keys()];
-  }
-  running() {
-    return this.all().filter(isRunning);
-  }
-  /**
-   * Takes over each dispatched delegate_task call not tracked yet, and polls while any agent runs.
-   * A call history brought back without its result (a resumed session) gets one `subagent.list`
-   * probe: its children still running are attached to it and followed from then on.
-   */
-  scan(at = Date.now()) {
-    let bare = false;
-    for (const call of this.#host.transcript.delegations()) {
-      if (this.#tracked.has(call)) {
-        continue;
-      }
-      if (this.#track(call, at)) {
-        this.#tracked.add(call);
-      } else if (call.result === void 0 && call.status !== "running" && !call.subagents?.length) {
-        bare = true;
-      }
-    }
-    if (this.running().length) {
-      this.#wake();
-    } else if (bare) {
-      void this.#tick(true);
+function ownersOf(calls) {
+  const owners = /* @__PURE__ */ new Map();
+  for (const call of calls) {
+    for (const a2 of call.subagents ?? []) {
+      owners.set(a2, call);
     }
   }
-  /** Queues steering text into a running agent; the owner answers `queued` or `rejected`. */
-  async steer(a2, text15) {
-    const sid = this.#host.sid;
-    if (!sid) {
-      return false;
-    }
-    const r = await rpc(this.#host.gw, "subagent.steer", { session_id: sid, subagent_id: a2.id, text: text15 });
-    return r?.status === "queued";
+  return owners;
+}
+var byTask = (x, y) => x.index - y.index || (x.depth ?? 0) - (y.depth ?? 0);
+function dispatchOf(result) {
+  const { delegation_id: delegationId, goals, live_transcripts: paths, status, subagent_ids: ids } = record(result) ?? {};
+  if (status !== "dispatched" || typeof delegationId !== "string") {
+    return void 0;
   }
-  /** Interrupts a running agent; its partial result still returns to the parent. */
-  async stop(a2) {
-    const sid = this.#host.sid;
-    if (!sid) {
-      return false;
+  return {
+    delegationId,
+    goals: Array.isArray(goals) ? goals.map((g) => typeof g === "string" ? g : "") : [],
+    ids: Array.isArray(ids) ? ids : [],
+    paths: Array.isArray(paths) ? paths : []
+  };
+}
+function dispatchRows(list9, d, at) {
+  d.goals.forEach((goal, i) => {
+    const named2 = d.ids[i];
+    const id = typeof named2 === "string" && named2 ? named2 : `task-${i}`;
+    let a2 = list9.find((x) => x.id === id);
+    if (!a2) {
+      a2 = { calls: 0, goal, id, index: i, startedAt: at, status: "queued", tokens: 0, toolCount: 0 };
+      list9.push(a2);
     }
-    const r = await rpc(this.#host.gw, "subagent.interrupt", { session_id: sid, subagent_id: a2.id });
-    return Boolean(r?.found);
+    const path2 = d.paths[i];
+    a2.key ??= `p${i}`;
+    a2.delegationId = d.delegationId;
+    a2.depth = 0;
+    a2.logPath = typeof path2 === "string" ? path2 : void 0;
+  });
+  list9.sort(byTask);
+}
+function findRow(owners, row2) {
+  const agents2 = [...owners.keys()];
+  const byId = agents2.find((a2) => a2.id === row2.subagent_id);
+  if (byId) {
+    return byId;
   }
-  /** Blocks (or unblocks) new subagent spawns on the gateway; running children keep going. */
-  async pause(paused) {
-    const r = await rpc(this.#host.gw, "delegation.pause", { paused, ...this.#host.sid ? { session_id: this.#host.sid } : {} });
-    this.paused = typeof r?.paused === "boolean" ? r.paused : paused;
-    this.#host.changed();
-    return this.paused;
+  const index2 = taskIndex(row2);
+  return (row2.depth ?? 0) === 0 && index2 !== void 0 ? agents2.find((a2) => a2.delegationId === row2.delegation_id && a2.id === `task-${index2}`) : void 0;
+}
+function nestedChild(owners, row2) {
+  const parent = [...owners.keys()].find((a2) => a2.id === row2.parent_id);
+  const call = parent && owners.get(parent);
+  if (!parent || !call?.subagents) {
+    return void 0;
   }
-  /**
-   * Applies an async-delegation completion (the model text of its `message.start`,
-   * tools/process_registry_notifications.py) to the rows whose log never told their outcome.
-   */
-  settle(text15) {
-    const done = completionOutcomes(text15);
-    if (!done) {
-      return;
-    }
-    let changed = false;
-    for (const a2 of this.all()) {
-      const status = a2.depth ? void 0 : done.outcomes.get(a2.index);
-      if (a2.delegationId !== done.delegationId || status === void 0 || a2.log?.status) {
-        continue;
-      }
-      const ended = endedStatus(status);
-      if (!ended) {
-        continue;
-      }
-      if (isRunning(a2)) {
-        a2.duration = Date.now() - a2.startedAt;
-      }
-      a2.status = ended;
-      a2.tool = void 0;
-      a2.exitReason = status === "unknown" ? OUTCOME_UNKNOWN : PLAIN_OUTCOMES.has(status) ? void 0 : status;
-      this.#touch(a2);
-      changed = true;
-    }
-    if (changed) {
-      this.#host.changed();
-    }
+  const list9 = call.subagents;
+  const siblings = list9.filter((a2) => a2.parentId === parent.id).length;
+  const child = {
+    calls: 0,
+    delegationId: row2.delegation_id ?? void 0,
+    depth: (parent.depth ?? 0) + 1,
+    goal: row2.goal ?? "",
+    id: row2.subagent_id,
+    index: parent.index,
+    name: `${agentName(parent)}.${siblings + 1}`,
+    parentId: parent.id,
+    startedAt: Date.now(),
+    status: "running",
+    tokens: 0,
+    toolCount: 0
+  };
+  let at = list9.indexOf(parent) + 1;
+  while (at < list9.length && (list9[at]?.depth ?? 0) > (parent.depth ?? 0)) {
+    at++;
   }
-  /** Reads `a`'s log now (the hub's timeline opening on it), whatever its state. */
-  async refresh(a2) {
-    if (await this.#readLog(a2, true)) {
-      this.#touch(a2);
-      this.#host.changed();
-    }
+  list9.splice(at, 0, child);
+  owners.set(child, call);
+  return child;
+}
+function askingCall(calls, row2) {
+  const index2 = taskIndex(row2);
+  const goal = row2.goal?.trim();
+  if ((row2.depth ?? 0) !== 0 || index2 === void 0 || !goal) {
+    return void 0;
   }
-  dispose() {
-    clearInterval(this.#timer);
-    this.#timer = void 0;
+  const call = calls.findLast((c) => c.result === void 0 && taskGoals(c)[index2] === goal && !c.subagents?.some((a2) => !a2.depth && a2.index === index2));
+  return call && { call, index: index2 };
+}
+function attachRow(owners, call, index2, row2, logPath) {
+  const a2 = {
+    calls: 0,
+    delegationId: row2.delegation_id ?? void 0,
+    depth: 0,
+    goal: row2.goal ?? "",
+    id: row2.subagent_id,
+    index: index2,
+    key: `p${index2}`,
+    logPath,
+    startedAt: Date.now(),
+    status: "running",
+    tokens: 0,
+    toolCount: 0
+  };
+  const list9 = call.subagents ??= [];
+  list9.push(a2);
+  list9.sort(byTask);
+  owners.set(a2, call);
+  return a2;
+}
+function applyListRow(a2, row2) {
+  a2.id = row2.subagent_id;
+  const revived = a2.status === "done" && a2.exitReason === OUTCOME_UNKNOWN;
+  if (revived) {
+    a2.status = "running";
+    a2.exitReason = void 0;
   }
-  #track(call, at) {
-    const r = record(call.result);
-    if (r?.status !== "dispatched" || typeof r.delegation_id !== "string") {
-      return false;
-    }
-    const goals = Array.isArray(r.goals) ? r.goals.map((g) => typeof g === "string" ? g : "") : [];
-    const ids = Array.isArray(r.subagent_ids) ? r.subagent_ids : [];
-    const paths = Array.isArray(r.live_transcripts) ? r.live_transcripts : [];
-    this.#host.transcript.mutateCall(call, (c) => {
-      const list9 = c.subagents ??= [];
-      goals.forEach((goal, i) => {
-        const id = typeof ids[i] === "string" && ids[i] ? ids[i] : `task-${i}`;
-        let a2 = list9.find((x) => x.id === id);
-        if (!a2) {
-          a2 = { calls: 0, goal, id, index: i, startedAt: at, status: "queued", tokens: 0, toolCount: 0 };
-          list9.push(a2);
-        }
-        a2.key ??= `p${i}`;
-        a2.delegationId = r.delegation_id;
-        a2.depth = 0;
-        a2.logPath = typeof paths[i] === "string" ? paths[i] : void 0;
-      });
-      list9.sort((a2, b) => a2.index - b.index || (a2.depth ?? 0) - (b.depth ?? 0));
-    });
-    return true;
-  }
-  #wake() {
-    this.#timer ??= setInterval(() => void this.#tick(), POLL_MS);
-    void this.#tick();
-  }
-  /** One poll and log read; `probe` polls even with nothing running yet (a resumed session). */
-  async #tick(probe = false) {
-    if (this.#ticking) {
-      return;
-    }
-    this.#ticking = true;
-    try {
-      if (!probe && !this.running().length) {
-        return this.dispose();
-      }
-      const changed = /* @__PURE__ */ new Set();
-      await this.#poll(changed);
-      const reads = await Promise.all(this.running().map(async (a2) => await this.#readLog(a2) ? a2 : void 0));
-      reads.forEach((a2) => a2 && changed.add(a2));
-      if (changed.size) {
-        changed.forEach((a2) => this.#touch(a2));
-        this.#host.changed();
-      }
-      if (probe && this.running().length) {
-        this.#timer ??= setInterval(() => void this.#tick(), POLL_MS);
-      }
-    } finally {
-      this.#ticking = false;
+  a2.model = row2.model ?? a2.model;
+  a2.toolCount = Math.max(a2.toolCount, row2.tool_count ?? 0);
+  a2.steerable = row2.accepting_steer ?? a2.steerable;
+  a2.startedAt = typeof row2.started_at === "number" ? row2.started_at * 1e3 : a2.startedAt;
+  if (a2.status === "queued" || a2.status === "running") {
+    a2.status = "running";
+    if (!a2.log && row2.last_tool && a2.tool !== row2.last_tool) {
+      a2.tool = row2.last_tool;
+      a2.toolSince = { at: Date.now() };
     }
   }
-  /** Folds `subagent.list` into the rows: new nested children, status, model, counts. */
-  async #poll(changed) {
-    const sid = this.#host.sid;
-    if (!sid) {
-      return;
-    }
-    let rows2;
-    try {
-      rows2 = (await rpc(this.#host.gw, "subagent.list", { session_id: sid }))?.subagents ?? [];
-    } catch {
-      return;
-    }
-    const owners = this.#owners();
-    const present = /* @__PURE__ */ new Set();
-    for (const row2 of rows2) {
-      const id = row2.subagent_id;
-      if (!id) {
-        continue;
-      }
-      present.add(id);
-      this.#listed.add(id);
-      const a2 = this.#find(owners, row2) ?? this.#adopt(owners, row2) ?? await this.#attach(owners, row2);
-      if (!a2) {
-        continue;
-      }
-      a2.id = id;
-      if (a2.status === "done" && a2.exitReason === OUTCOME_UNKNOWN) {
-        a2.status = "running";
-        a2.exitReason = void 0;
-        this.#ended.delete(a2);
-      }
-      a2.model = row2.model ?? a2.model;
-      a2.toolCount = Math.max(a2.toolCount, row2.tool_count ?? 0);
-      a2.steerable = row2.accepting_steer ?? a2.steerable;
-      a2.startedAt = typeof row2.started_at === "number" ? row2.started_at * 1e3 : a2.startedAt;
-      if (a2.status === "queued" || a2.status === "running") {
-        a2.status = "running";
-        if (!a2.log && row2.last_tool && a2.tool !== row2.last_tool) {
-          a2.tool = row2.last_tool;
-          a2.toolSince = { at: Date.now() };
-        }
-      }
-      changed.add(a2);
-    }
-    for (const a2 of owners.keys()) {
-      if (!isRunning(a2) || present.has(a2.id) || this.#readableLog(a2)) {
-        continue;
-      }
-      if (!this.#listed.has(a2.id)) {
-        const unseen = (this.#unseen.get(a2) ?? 0) + 1;
-        this.#unseen.set(a2, unseen);
-        if (unseen < GRACE_POLLS) {
-          continue;
-        }
-      }
-      a2.status = "done";
-      a2.exitReason = OUTCOME_UNKNOWN;
-      a2.duration = Date.now() - a2.startedAt;
-      a2.tool = void 0;
-      changed.add(a2);
-    }
-  }
-  /** The row `row` describes: by id, else a dispatch placeholder (`task-<i>`) of its delegation. */
-  #find(owners, row2) {
-    const agents2 = [...owners.keys()];
-    const byId = agents2.find((a2) => a2.id === row2.subagent_id);
-    if (byId) {
-      return byId;
-    }
-    const index2 = taskIndex(row2);
-    return (row2.depth ?? 0) === 0 && index2 !== void 0 ? agents2.find((a2) => a2.delegationId === row2.delegation_id && a2.id === `task-${index2}`) : void 0;
-  }
-  /** A nested child (an orchestrator's worker): a row under its parent, in the parent's card. */
-  #adopt(owners, row2) {
-    const parent = [...owners.keys()].find((a2) => a2.id === row2.parent_id);
-    const call = parent && owners.get(parent);
-    if (!parent || !call?.subagents) {
-      return void 0;
-    }
-    const list9 = call.subagents;
-    const siblings = list9.filter((a2) => a2.parentId === parent.id).length;
-    const child = {
-      calls: 0,
-      delegationId: row2.delegation_id ?? void 0,
-      depth: (parent.depth ?? 0) + 1,
-      goal: row2.goal ?? "",
-      id: row2.subagent_id,
-      index: parent.index,
-      name: `${agentName(parent)}.${siblings + 1}`,
-      parentId: parent.id,
-      startedAt: Date.now(),
-      status: "running",
-      tokens: 0,
-      toolCount: 0
-    };
-    let at = list9.indexOf(parent) + 1;
-    while (at < list9.length && (list9[at].depth ?? 0) > (parent.depth ?? 0)) {
-      at++;
-    }
-    list9.splice(at, 0, child);
-    owners.set(child, call);
-    return child;
-  }
-  /**
-   * A top-level child whose dispatch result the history dropped (a resumed session): a row on the
-   * newest result-less delegate_task call whose task `sa-<i>-` asked for its goal, its log found
-   * through the delegation's manifest (else read with `subagent.tail`).
-   */
-  async #attach(owners, row2) {
-    const index2 = taskIndex(row2);
-    const goal = row2.goal?.trim();
-    if ((row2.depth ?? 0) !== 0 || index2 === void 0 || !goal) {
-      return void 0;
-    }
-    const call = this.#host.transcript.delegations().findLast((c) => c.result === void 0 && taskGoals(c)[index2] === goal && !c.subagents?.some((a3) => !a3.depth && a3.index === index2));
-    if (!call) {
-      return void 0;
-    }
-    const a2 = {
-      calls: 0,
-      delegationId: row2.delegation_id ?? void 0,
-      depth: 0,
-      goal: row2.goal ?? goal,
-      id: row2.subagent_id,
-      index: index2,
-      key: `p${index2}`,
-      logPath: row2.delegation_id ? await manifestLog(row2.delegation_id, index2) : void 0,
-      startedAt: Date.now(),
-      status: "running",
-      tokens: 0,
-      toolCount: 0
-    };
-    const list9 = call.subagents ??= [];
-    list9.push(a2);
-    list9.sort((x, y) => x.index - y.index || (x.depth ?? 0) - (y.depth ?? 0));
-    owners.set(a2, call);
-    return a2;
-  }
-  #readableLog(a2) {
-    return Boolean(a2.logPath && !this.#unreadable.has(a2.logPath));
-  }
-  /** Reads `a`'s log from disk (else its tail over the gateway); true when it changed. */
-  async #readLog(a2, force = false) {
-    let text15;
-    if (this.#readableLog(a2)) {
-      try {
-        const path2 = a2.logPath;
-        const { size } = await stat(path2);
-        if (!force && this.#sizes.get(path2) === size) {
-          return false;
-        }
-        this.#sizes.set(path2, size);
-        const bytes = await readFile(path2);
-        text15 = bytes.subarray(Math.max(0, bytes.length - MAX_LOG_BYTES)).toString("utf8");
-      } catch {
-        this.#unreadable.add(a2.logPath);
-      }
-    }
-    if (text15 === void 0 && this.#listed.has(a2.id) && this.#host.sid) {
-      try {
-        const r = await rpc(this.#host.gw, "subagent.tail", {
-          session_id: this.#host.sid,
-          subagent_id: a2.id
-        });
-        if (r?.available && typeof r.text === "string") {
-          text15 = r.truncated ? mergeTail(this.#tails.get(a2.id) ?? "", r.text) : r.text;
-          this.#tails.set(a2.id, text15);
-        }
-      } catch {
-        text15 = void 0;
-      }
-    }
-    if (text15 === void 0) {
-      return false;
-    }
-    applyLog(a2, parseLiveLog(text15));
-    return true;
-  }
-  /** Marks the card showing `a` changed (#poll and #readLog changed its row), and tells when it ended. */
-  #touch(a2) {
-    this.#host.transcript.touchCall(this.#owners().get(a2));
-    if (!isRunning(a2) && !this.#ended.has(a2)) {
-      this.#ended.add(a2);
-      this.#host.agentEnded?.();
-    }
-  }
-  /** Each agent with the delegate_task call whose card shows it. */
-  #owners() {
-    const owners = /* @__PURE__ */ new Map();
-    for (const call of this.#host.transcript.delegations()) {
-      for (const a2 of call.subagents ?? []) {
-        owners.set(a2, call);
-      }
-    }
-    return owners;
-  }
-};
+  return revived;
+}
+function endUnseen(a2) {
+  a2.status = "done";
+  a2.exitReason = OUTCOME_UNKNOWN;
+  a2.duration = Date.now() - a2.startedAt;
+  a2.tool = void 0;
+}
 function mergeTail(seen, tail) {
   const lines = seen.split(/(?<=\n)/);
   let merged;
@@ -25624,11 +25379,13 @@ function completionOutcomes(text15) {
   if (!head2) {
     return void 0;
   }
-  const [, kind, delegationId, task] = head2;
+  const [, kind, delegationId = "", task] = head2;
   const outcomes = /* @__PURE__ */ new Map();
   if (kind === "BATCH COMPLETE") {
-    for (const m of text15.matchAll(/^--- \S+ TASK (\d+)\/\d+.*\(status=([^,)\s]+)/gm)) {
-      outcomes.set(Number(m[1]) - 1, m[2]);
+    for (const [, n, status] of text15.matchAll(/^--- \S+ TASK (\d+)\/\d+.*\(status=([^,)\s]+)/gm)) {
+      if (status) {
+        outcomes.set(Number(n) - 1, status);
+      }
     }
   } else {
     const status = /^Status: (\S+)/m.exec(text15)?.[1];
@@ -25639,6 +25396,19 @@ function completionOutcomes(text15) {
   return { delegationId: delegationId.trim(), outcomes };
 }
 var PLAIN_OUTCOMES = /* @__PURE__ */ new Set(["cancelled", "completed", "error", "failed", "interrupted", "success"]);
+function applyOutcome(a2, status) {
+  const ended = endedStatus(status);
+  if (!ended) {
+    return false;
+  }
+  if (isRunning(a2)) {
+    a2.duration = Date.now() - a2.startedAt;
+  }
+  a2.status = ended;
+  a2.tool = void 0;
+  a2.exitReason = status === "unknown" ? OUTCOME_UNKNOWN : PLAIN_OUTCOMES.has(status) ? void 0 : status;
+  return true;
+}
 function endedStatus(status) {
   if (status === "?") {
     return void 0;
@@ -25649,43 +25419,19 @@ function endedStatus(status) {
   return status === "interrupted" || status === "cancelled" ? "cancelled" : "failed";
 }
 function taskIndex(row2) {
-  const index2 = Number(/^sa-(\d+)-/.exec(row2.subagent_id ?? "")?.[1]);
+  const index2 = Number(/^sa-(\d+)-/.exec(row2.subagent_id)?.[1]);
   return Number.isInteger(index2) ? index2 : void 0;
 }
 function taskGoals(call) {
-  let tasks = call.args.tasks;
-  if (typeof tasks === "string") {
-    try {
-      tasks = JSON.parse(tasks);
-    } catch {
-      tasks = void 0;
-    }
-  }
+  const { goal, tasks: raw2 } = call.args;
+  const tasks = typeof raw2 === "string" ? parseJson(raw2) : raw2;
   if (Array.isArray(tasks) && tasks.length) {
     return tasks.map((t2) => {
-      const goal = record(t2)?.goal;
-      return typeof goal === "string" ? goal.trim() : "";
+      const { goal: task } = record(t2) ?? {};
+      return typeof task === "string" ? task.trim() : "";
     });
   }
-  return typeof call.args.goal === "string" ? [call.args.goal.trim()] : [];
-}
-async function manifestLog(delegationId, index2, env2 = process.env) {
-  if (!/^[\w-]+$/.test(delegationId)) {
-    return void 0;
-  }
-  const home = env2.HERMES_HOME || join2(homedir2(), ".hermes");
-  for (const root7 of [join2(home, "delegation_cache", "live"), join2(home, "cache", "delegation", "live")]) {
-    try {
-      const text15 = await readFile(join2(root7, delegationId, "manifest.json"), "utf8");
-      const tasks = record(text15.replace(/^\uFEFF/, ""))?.tasks;
-      const log = Array.isArray(tasks) ? record(tasks.find((t2) => record(t2)?.index === index2))?.log : void 0;
-      if (typeof log === "string" && log) {
-        return log;
-      }
-    } catch {
-    }
-  }
-  return void 0;
+  return typeof goal === "string" ? [goal.trim()] : [];
 }
 function applyLog(a2, log) {
   a2.log = log;
@@ -26271,9 +26017,9 @@ function resultOf(call) {
 }
 
 // src/view/tools/steps.ts
-import { homedir as homedir3 } from "node:os";
+import { homedir as homedir2 } from "node:os";
 function shortPath(path2) {
-  return relativePath(path2, { cwd: launchEnv().cwd, home: homedir3() });
+  return relativePath(path2, { cwd: launchEnv().cwd, home: homedir2() });
 }
 function namedStep(call) {
   const name = call.name.replace(/_/g, " ");
@@ -26482,13 +26228,13 @@ function callApp(call) {
 }
 
 // src/media.ts
-import { homedir as homedir5 } from "node:os";
+import { homedir as homedir4 } from "node:os";
 import { isAbsolute } from "node:path";
 import { fileURLToPath } from "node:url";
 
 // src/hermes/images.ts
-import { readFile as readFile2 } from "node:fs/promises";
-import { homedir as homedir4 } from "node:os";
+import { readFile } from "node:fs/promises";
+import { homedir as homedir3 } from "node:os";
 import { extname as extname2, resolve as resolve3 } from "node:path";
 var MAX_IMAGE_BYTES = 20 * 1024 * 1024;
 function imageFormat(bytes) {
@@ -26544,8 +26290,8 @@ function imageSize(bytes) {
   return void 0;
 }
 async function uploadImage(gw2, sid, raw2, cwd) {
-  const path2 = resolve3(cwd, raw2.replace(/^~(?=$|\/)/, homedir4()));
-  const bytes = await readFile2(path2);
+  const path2 = resolve3(cwd, raw2.replace(/^~(?=$|\/)/, homedir3()));
+  const bytes = await readFile(path2);
   if (bytes.length > MAX_IMAGE_BYTES) {
     throw new Error("the image is larger than 20 MB");
   }
@@ -26593,7 +26339,7 @@ function localSource(src) {
       return void 0;
     }
   }
-  const path2 = src.replace(/^~(?=\/)/, homedir5());
+  const path2 = src.replace(/^~(?=\/)/, homedir4());
   return isAbsolute(path2) ? { path: path2 } : void 0;
 }
 var Media = class {
@@ -27465,8 +27211,8 @@ function answerRow(key2, text15, picked) {
 
 // src/connections.ts
 import { existsSync as existsSync2, mkdirSync as mkdirSync2, readdirSync, rmSync, writeFileSync } from "node:fs";
-import { homedir as homedir6 } from "node:os";
-import { join as join3 } from "node:path";
+import { homedir as homedir5 } from "node:os";
+import { join as join2 } from "node:path";
 
 // src/wire/files.ts
 import { readFileSync } from "node:fs";
@@ -28946,9 +28692,9 @@ function readAuthorReply(stdout) {
 
 // src/connections.ts
 var CONNECT_TOOL = "manage_connections";
-var POLL_MS2 = 2e3;
+var POLL_MS = 2e3;
 var STALE_MS = 2 * 6e4;
-var dataDir = (env2 = process.env) => join3(env2.HERMES_HOME || join3(homedir6(), ".hermes"), "plugin-data", "hermes-tern");
+var dataDir = (env2 = process.env) => join2(env2.HERMES_HOME || join2(homedir5(), ".hermes"), "plugin-data", "hermes-tern");
 var safe = (part) => part.replace(/[^A-Za-z0-9_-]/g, "_");
 var cardStem = (callId, opId) => opId ? `${safe(callId)}.${safe(opId)}` : safe(callId);
 var alive = (pid) => {
@@ -28963,7 +28709,7 @@ var alive = (pid) => {
   }
 };
 function readCard(key2, dir2 = dataDir(), now = Date.now()) {
-  const data = readCardFile(join3(dir2, "connections", `${key2}.json`));
+  const data = readCardFile(join2(dir2, "connections", `${key2}.json`));
   if (!data) {
     return void 0;
   }
@@ -28977,17 +28723,17 @@ function readCard(key2, dir2 = dataDir(), now = Date.now()) {
   } else if (!alive(data.pid) || now - updated > STALE_MS) {
     settled2 = "stopped";
   }
-  return { error, key: key2, settled: settled2, targets: data.targets, told: existsSync2(join3(dir2, "connections", `${key2}.told`)) };
+  return { error, key: key2, settled: settled2, targets: data.targets, told: existsSync2(join2(dir2, "connections", `${key2}.told`)) };
 }
 function findCard(call, dir2 = dataDir()) {
   const op = record(call.result)?.op_id;
   const prefix2 = `${safe(call.id)}.`;
   if (typeof op === "string" && op) {
-    return existsSync2(join3(dir2, "connections", `${cardStem(call.id, op)}.json`)) ? cardStem(call.id, op) : void 0;
+    return existsSync2(join2(dir2, "connections", `${cardStem(call.id, op)}.json`)) ? cardStem(call.id, op) : void 0;
   }
   let names;
   try {
-    names = readdirSync(join3(dir2, "connections"));
+    names = readdirSync(join2(dir2, "connections"));
   } catch {
     return void 0;
   }
@@ -28998,12 +28744,12 @@ function findCard(call, dir2 = dataDir()) {
   if (keys2.length < 2) {
     return keys2[0];
   }
-  const createdAt = (key2) => cardCreatedAt(join3(dir2, "connections", `${key2}.json`)) * 1e3;
+  const createdAt = (key2) => cardCreatedAt(join2(dir2, "connections", `${key2}.json`)) * 1e3;
   return keys2.map((key2) => ({ gap: Math.abs(createdAt(key2) - call.startedAt), key: key2 })).sort((a2, b) => a2.gap - b.gap)[0]?.key;
 }
 function claimTold(key2, dir2 = dataDir()) {
   try {
-    writeFileSync(join3(dir2, "connections", `${key2}.told`), "", { flag: "wx" });
+    writeFileSync(join2(dir2, "connections", `${key2}.told`), "", { flag: "wx" });
     return true;
   } catch {
     return false;
@@ -29015,14 +28761,14 @@ function ternPane(env2 = process.env) {
   return vars.TERN_PANE ? vars : void 0;
 }
 function markViewer(sid, previous3, dir2 = dataDir(), env2 = process.env) {
-  const viewers = join3(dir2, "viewers");
+  const viewers = join2(dir2, "viewers");
   try {
     if (previous3 && previous3 !== sid) {
-      rmSync(join3(viewers, `${previous3}.json`), { force: true });
+      rmSync(join2(viewers, `${previous3}.json`), { force: true });
     }
     if (sid) {
       mkdirSync2(viewers, { recursive: true });
-      writeFileSync(join3(viewers, `${sid}.json`), JSON.stringify({ pid: process.pid, tern: ternPane(env2) }));
+      writeFileSync(join2(viewers, `${sid}.json`), JSON.stringify({ pid: process.pid, tern: ternPane(env2) }));
     }
   } catch {
   }
@@ -29609,15 +29355,15 @@ function searchCard(call, d) {
 
 // src/processes/widgets/files.ts
 import { closeSync, fstatSync, openSync, readSync } from "node:fs";
-import { homedir as homedir7 } from "node:os";
-import { isAbsolute as isAbsolute2, join as join4, normalize } from "node:path";
+import { homedir as homedir6 } from "node:os";
+import { isAbsolute as isAbsolute2, join as join3, normalize } from "node:path";
 import { StringDecoder } from "node:string_decoder";
 var TARGET = /(?:^|[\s;&|(])(?:1|&)?>>?\s*([^\s;&|)<>]+)|\btee\s+(?:-a\s+)?([^\s;&|)<>-][^\s;&|)<>]*)/g;
 var CD = /^\s*cd\s+([^\s;&|]+)\s*(?:&&|;)/;
 var SKIP = /^\/dev\/|^&/;
 var unquote = (s2) => s2.replace(/^(['"])(.*)\1$/, "$2");
 function expand(path2, env2) {
-  const out = unquote(path2).replace(/^~(?=\/|$)/, env2.HOME || homedir7()).replace(/\$\{?(HOME|TMPDIR|USER)\}?/g, (_, name) => env2[name]?.replace(/\/$/, "") ?? `$${name}`);
+  const out = unquote(path2).replace(/^~(?=\/|$)/, env2.HOME || homedir6()).replace(/\$\{?(HOME|TMPDIR|USER)\}?/g, (_, name) => env2[name]?.replace(/\/$/, "") ?? `$${name}`);
   return out.includes("$") ? void 0 : out;
 }
 function outputFiles(command, env2 = process.env) {
@@ -29630,7 +29376,7 @@ function outputFiles(command, env2 = process.env) {
       continue;
     }
     const path2 = expand(raw2, env2);
-    const full = path2 && (isAbsolute2(path2) ? path2 : base3 && isAbsolute2(base3) ? join4(base3, path2) : void 0);
+    const full = path2 && (isAbsolute2(path2) ? path2 : base3 && isAbsolute2(base3) ? join3(base3, path2) : void 0);
     if (full && !files.includes(normalize(full))) {
       files.push(normalize(full));
     }
@@ -38960,7 +38706,7 @@ function htmlKind(value) {
 }
 
 // node_modules/mdast-util-to-markdown/lib/join.js
-var join5 = [joinDefaults];
+var join4 = [joinDefaults];
 function joinDefaults(left, right, parent, state) {
   if (right.type === "code" && formatCodeAsIndented(right, state) && (left.type === "list" || left.type === right.type && formatCodeAsIndented(left, state))) {
     return false;
@@ -41937,7 +41683,7 @@ function toMarkdown(tree, options) {
     handle: void 0,
     indentLines,
     indexStack: [],
-    join: [...join5],
+    join: [...join4],
     options: {},
     safe: safeBound,
     stack: [],
@@ -62629,11 +62375,11 @@ function approvalOverlay(host, prompt) {
 
 // .hermes-src/ui-tui/src/lib/history.ts
 import { appendFileSync as appendFileSync3, existsSync as existsSync3, mkdirSync as mkdirSync3, readFileSync as readFileSync2 } from "node:fs";
-import { homedir as homedir8 } from "node:os";
-import { join as join6 } from "node:path";
+import { homedir as homedir7 } from "node:os";
+import { join as join5 } from "node:path";
 var MAX2 = 1e3;
-var dir = process.env.HERMES_HOME ?? join6(homedir8(), ".hermes");
-var file = join6(dir, ".hermes_history");
+var dir = process.env.HERMES_HOME ?? join5(homedir7(), ".hermes");
+var file = join5(dir, ".hermes_history");
 var cache = null;
 function load() {
   if (cache) {
@@ -63765,10 +63511,10 @@ function storedArgs(raw2) {
 }
 
 // src/hermes/paths.ts
-import { homedir as homedir9 } from "node:os";
-import { join as join7 } from "node:path";
+import { homedir as homedir8 } from "node:os";
+import { join as join6 } from "node:path";
 function stateDbPath(env2 = process.env) {
-  return join7(env2.HERMES_HOME || join7(homedir9(), ".hermes"), "state.db");
+  return join6(env2.HERMES_HOME || join6(homedir8(), ".hermes"), "state.db");
 }
 
 // src/hermes/sessionIndex.ts
@@ -64587,12 +64333,12 @@ var REFUSED_COMMANDS = [
 import { DatabaseSync as DatabaseSync3 } from "node:sqlite";
 
 // src/github/links.ts
-import { homedir as homedir10 } from "node:os";
-import { join as join8 } from "node:path";
+import { homedir as homedir9 } from "node:os";
+import { join as join7 } from "node:path";
 import { DatabaseSync as DatabaseSync2 } from "node:sqlite";
 var LINK_TOOLS = /* @__PURE__ */ new Set(["link_pull_request", "list_pull_requests", "unlink_pull_request"]);
 function linksPath(env2 = process.env) {
-  return join8(env2.HERMES_HOME || join8(homedir10(), ".hermes"), "plugin-data", "hermes-tern", "pull-requests.json");
+  return join7(env2.HERMES_HOME || join7(homedir9(), ".hermes"), "plugin-data", "hermes-tern", "pull-requests.json");
 }
 function refOf(v) {
   const r = record(v);
@@ -65654,7 +65400,7 @@ function workingRow(w) {
 
 // src/view/welcome.tsx
 import { readFileSync as readFileSync3 } from "node:fs";
-import { join as join9 } from "node:path";
+import { join as join8 } from "node:path";
 function welcomeNode(key2, cx) {
   return /* @__PURE__ */ jsxs("card", { role: "omp.welcome", children: [
     /* @__PURE__ */ jsxs("row", { align: "center", gap: "md", role: "omp.welcome.lockup", children: [
@@ -65674,7 +65420,7 @@ var TIP_LINE = /^\s+t\d+:\s+"((?:[^"\\]|\\.)*)"\s*$/;
 function randomTip(root7) {
   let text15;
   try {
-    text15 = readFileSync3(join9(root7, "locales", "en.yaml"), "utf8");
+    text15 = readFileSync3(join8(root7, "locales", "en.yaml"), "utf8");
   } catch {
     return "";
   }
@@ -67632,10 +67378,10 @@ async function openHelp(host) {
 
 // src/settings.ts
 import { mkdirSync as mkdirSync4, writeFileSync as writeFileSync2 } from "node:fs";
-import { homedir as homedir11 } from "node:os";
-import { dirname, join as join10 } from "node:path";
+import { homedir as homedir10 } from "node:os";
+import { dirname, join as join9 } from "node:path";
 function settingsFile2(env2 = process.env) {
-  return join10(env2.HERMES_HOME || join10(homedir11(), ".hermes"), "hermes-tern", "settings.json");
+  return join9(env2.HERMES_HOME || join9(homedir10(), ".hermes"), "hermes-tern", "settings.json");
 }
 function loadSettings(file2 = settingsFile2()) {
   return readSettings(file2);
@@ -69983,6 +69729,447 @@ function focusOf(cx) {
   return top?.focus ? top.focus(`layer.${top.key}`) : top?.modal || cx.hud.focused ? null : INPUT_ID;
 }
 
+// src/agents/store.ts
+import { readFile as readFile2, stat } from "node:fs/promises";
+import { homedir as homedir11 } from "node:os";
+import { join as join10 } from "node:path";
+
+// src/core/poller.ts
+var Poller = class {
+  #options;
+  #epoch = new Epoch();
+  #timer;
+  #running = false;
+  #again = false;
+  #watchers = 0;
+  #key;
+  #disposed = false;
+  constructor(options) {
+    this.#options = options;
+  }
+  /** A round is in flight. */
+  get running() {
+    return this.#running;
+  }
+  /** A `watch()` has not been released (an open sheet wants the fast cadence). */
+  get watched() {
+    return this.#watchers > 0;
+  }
+  /** A ticket for the present session: for reads outside a round (a sheet opening on one row). */
+  ticket() {
+    return this.#epoch.current();
+  }
+  /** Runs a round now, or one more right after the round in flight. */
+  poke() {
+    if (this.#disposed) {
+      return;
+    }
+    clearTimeout(this.#timer);
+    this.#timer = void 0;
+    if (this.#running) {
+      this.#again = true;
+      return;
+    }
+    void this.#loop();
+  }
+  /** Counts as watched (see `watched`) until the returned release runs; pokes now. */
+  watch() {
+    this.#watchers++;
+    this.poke();
+    let released = false;
+    return () => {
+      if (!released) {
+        released = true;
+        this.#watchers--;
+      }
+    };
+  }
+  /**
+   * Another session (`key`): the round in flight goes stale and its signal aborts; the next round
+   * reads for the new one. False, with nothing changed, when `key` is the one adopted last.
+   */
+  adopt(key2) {
+    if (Object.is(key2, this.#key)) {
+      return false;
+    }
+    this.#key = key2;
+    this.#epoch.next();
+    return true;
+  }
+  /** Stops polling for good: no round runs again, and the one in flight goes stale. */
+  dispose() {
+    this.#disposed = true;
+    clearTimeout(this.#timer);
+    this.#timer = void 0;
+    this.#epoch.next();
+  }
+  async #loop() {
+    this.#running = true;
+    try {
+      do {
+        this.#again = false;
+        await this.#round();
+      } while (this.#again && !this.#disposed);
+    } finally {
+      this.#running = false;
+      this.#schedule();
+      this.#options.settled?.();
+    }
+  }
+  async #round() {
+    try {
+      await this.#options.run(this.#epoch.current());
+    } catch (error) {
+      if (!this.#options.onError) {
+        throw error;
+      }
+      this.#options.onError(error);
+    }
+  }
+  #schedule() {
+    clearTimeout(this.#timer);
+    this.#timer = void 0;
+    const ms = this.#disposed ? "off" : this.#options.cadence();
+    if (ms !== "off") {
+      this.#timer = setTimeout(() => this.poke(), ms);
+    }
+  }
+};
+
+// src/agents/store.ts
+var POLL_MS2 = 1e3;
+var GRACE_POLLS = 3;
+var MISSING_READS = 3;
+async function readLogFile(path2, last) {
+  try {
+    const { size } = await stat(path2);
+    if (last === size) {
+      return { kind: "same" };
+    }
+    const bytes = await readFile2(path2);
+    return { kind: "ok", size, text: bytes.subarray(Math.max(0, bytes.length - MAX_LOG_BYTES)).toString("utf8") };
+  } catch (error) {
+    return errorCode(error) === "ENOENT" ? { kind: "notYet" } : { error, kind: "unreadable" };
+  }
+}
+var Agents = class {
+  #host;
+  /** The poll: every second while an agent runs, and a probe for a resumed session's children. */
+  #poller = new Poller({
+    cadence: () => this.running().length ? POLL_MS2 : "off",
+    run: (ticket) => this.#round(ticket)
+  });
+  /** The next round polls even with nothing running (a resumed session's probe). */
+  #probe = false;
+  #tracked = /* @__PURE__ */ new WeakSet();
+  /** Log sizes at the last read, by path; a log that did not grow is not read again. */
+  #sizes = /* @__PURE__ */ new Map();
+  /** Logs this process cannot read (a gateway on another machine): `subagent.tail` instead. */
+  #unreadable = /* @__PURE__ */ new Set();
+  /** Reads in a row that found no log file, by path (see MISSING_READS). */
+  #missing = /* @__PURE__ */ new Map();
+  /** Ids `subagent.list` reported: one that leaves the list has finished. */
+  #listed = /* @__PURE__ */ new Set();
+  /** Polls each unlisted row without a readable log has gone unseen. */
+  #unseen = /* @__PURE__ */ new WeakMap();
+  /** Rows whose end the host heard of. */
+  #ended = /* @__PURE__ */ new WeakSet();
+  /** The `subagent.tail` text read so far, by subagent id: each tail (the last 16 KB) is merged onto it. */
+  #tails = /* @__PURE__ */ new Map();
+  /**
+   * New delegate_task spawns are blocked, as this pane last set it (`delegation.pause`); undefined
+   * until then (the shared gateway serves no `delegation.status`). The gate is gateway-wide.
+   */
+  paused;
+  constructor(host) {
+    this.#host = host;
+  }
+  /** Every agent of the session's delegations, each delegation's rows in order. */
+  all() {
+    return [...this.#owners().keys()];
+  }
+  running() {
+    return this.all().filter(isRunning);
+  }
+  /**
+   * Another session is shown (`sid`): what the store learned of the last one's children (listed
+   * ids, log sizes, tails, unreadable logs) goes, and a poll in flight for it drops its answer.
+   */
+  adopt(sid) {
+    if (!this.#poller.adopt(sid)) {
+      return;
+    }
+    this.#listed.clear();
+    this.#sizes.clear();
+    this.#tails.clear();
+    this.#unreadable.clear();
+    this.#missing.clear();
+  }
+  /**
+   * Takes over each dispatched delegate_task call not tracked yet, and polls while any agent runs.
+   * A call history brought back without its result (a resumed session) gets one `subagent.list`
+   * probe: its children still running are attached to it and followed from then on.
+   */
+  scan(at = Date.now()) {
+    let bare = false;
+    for (const call of this.#host.transcript.delegations()) {
+      if (this.#tracked.has(call)) {
+        continue;
+      }
+      if (this.#track(call, at)) {
+        this.#tracked.add(call);
+      } else if (call.result === void 0 && call.status !== "running" && !call.subagents?.length) {
+        bare = true;
+      }
+    }
+    if (this.running().length) {
+      this.#poller.poke();
+    } else if (bare) {
+      this.#probe = true;
+      this.#poller.poke();
+    }
+  }
+  /** Queues steering text into a running agent; the owner answers `queued` or `rejected`. */
+  async steer(a2, text15) {
+    const sid = this.#host.sid;
+    if (!sid) {
+      return false;
+    }
+    const r = await rpc(this.#host.gw, "subagent.steer", { session_id: sid, subagent_id: a2.id, text: text15 });
+    return r?.status === "queued";
+  }
+  /** Interrupts a running agent; its partial result still returns to the parent. */
+  async stop(a2) {
+    const sid = this.#host.sid;
+    if (!sid) {
+      return false;
+    }
+    const r = await rpc(this.#host.gw, "subagent.interrupt", { session_id: sid, subagent_id: a2.id });
+    return Boolean(r?.found);
+  }
+  /** Blocks (or unblocks) new subagent spawns on the gateway; running children keep going. */
+  async pause(paused) {
+    const r = await rpc(this.#host.gw, "delegation.pause", { paused, ...this.#host.sid ? { session_id: this.#host.sid } : {} });
+    this.paused = typeof r?.paused === "boolean" ? r.paused : paused;
+    this.#host.changed();
+    return this.paused;
+  }
+  /**
+   * Applies an async-delegation completion (the model text of its `message.start`,
+   * tools/process_registry_notifications.py) to the rows whose log never told their outcome.
+   */
+  settle(text15) {
+    const done = completionOutcomes(text15);
+    if (!done) {
+      return;
+    }
+    let changed = false;
+    for (const a2 of this.all()) {
+      const status = a2.depth ? void 0 : done.outcomes.get(a2.index);
+      if (a2.delegationId !== done.delegationId || status === void 0 || a2.log?.status) {
+        continue;
+      }
+      if (!applyOutcome(a2, status)) {
+        continue;
+      }
+      this.#touch(a2);
+      changed = true;
+    }
+    if (changed) {
+      this.#host.changed();
+    }
+  }
+  /** Reads `a`'s log now (the hub's timeline opening on it), whatever its state. */
+  async refresh(a2) {
+    if (await this.#readLog(a2, this.#poller.ticket(), true)) {
+      this.#touch(a2);
+      this.#host.changed();
+    }
+  }
+  /** Stops the poll for good (the pane quits). */
+  dispose() {
+    this.#poller.dispose();
+  }
+  #track(call, at) {
+    const dispatch = dispatchOf(call.result);
+    if (!dispatch) {
+      return false;
+    }
+    this.#host.transcript.mutateCall(call, (c) => dispatchRows(c.subagents ??= [], dispatch, at));
+    return true;
+  }
+  /** One poll and log read; a probe polls even with nothing running yet (a resumed session). */
+  async #round(ticket) {
+    const probe = this.#probe;
+    this.#probe = false;
+    if (!probe && !this.running().length) {
+      return;
+    }
+    const changed = /* @__PURE__ */ new Set();
+    await this.#poll(changed, ticket);
+    if (!ticket.isCurrent()) {
+      return;
+    }
+    const reads = await Promise.all(this.running().map(async (a2) => await this.#readLog(a2, ticket) ? a2 : void 0));
+    if (!ticket.isCurrent()) {
+      return;
+    }
+    reads.forEach((a2) => a2 && changed.add(a2));
+    if (changed.size) {
+      changed.forEach((a2) => this.#touch(a2));
+      this.#host.changed();
+    }
+  }
+  /** Folds `subagent.list` into the rows: new nested children, status, model, counts. */
+  async #poll(changed, ticket) {
+    const sid = this.#host.sid;
+    if (!sid) {
+      return;
+    }
+    let rows2;
+    try {
+      rows2 = (await rpc(this.#host.gw, "subagent.list", { session_id: sid }))?.subagents ?? [];
+    } catch {
+      return;
+    }
+    if (!ticket.isCurrent()) {
+      return;
+    }
+    const owners = this.#owners();
+    const present = /* @__PURE__ */ new Set();
+    for (const row2 of rows2) {
+      const id = row2.subagent_id;
+      if (!id) {
+        continue;
+      }
+      present.add(id);
+      this.#listed.add(id);
+      const a2 = findRow(owners, row2) ?? nestedChild(owners, row2) ?? await this.#attach(owners, row2, ticket);
+      if (!ticket.isCurrent()) {
+        return;
+      }
+      if (!a2) {
+        continue;
+      }
+      if (applyListRow(a2, row2)) {
+        this.#ended.delete(a2);
+      }
+      changed.add(a2);
+    }
+    for (const a2 of owners.keys()) {
+      if (!isRunning(a2) || present.has(a2.id) || this.#logPath(a2)) {
+        continue;
+      }
+      if (!this.#listed.has(a2.id)) {
+        const unseen = (this.#unseen.get(a2) ?? 0) + 1;
+        this.#unseen.set(a2, unseen);
+        if (unseen < GRACE_POLLS) {
+          continue;
+        }
+      }
+      endUnseen(a2);
+      changed.add(a2);
+    }
+  }
+  /**
+   * A top-level child whose dispatch result the history dropped (a resumed session): a row on the
+   * call that asked for its goal, its log found through the delegation's manifest (else read with
+   * `subagent.tail`).
+   */
+  async #attach(owners, row2, ticket) {
+    const asked2 = askingCall(this.#host.transcript.delegations(), row2);
+    if (!asked2) {
+      return void 0;
+    }
+    const logPath = row2.delegation_id ? await manifestLog(row2.delegation_id, asked2.index) : void 0;
+    return ticket.isCurrent() ? attachRow(owners, asked2.call, asked2.index, row2, logPath) : void 0;
+  }
+  /** `a`'s log path while this process may read it. */
+  #logPath(a2) {
+    return a2.logPath && !this.#unreadable.has(a2.logPath) ? a2.logPath : void 0;
+  }
+  /** Reads `a`'s log from disk (else its tail over the gateway); true when it changed. */
+  async #readLog(a2, ticket, force = false) {
+    let text15;
+    const path2 = this.#logPath(a2);
+    if (path2) {
+      const read = await readLogFile(path2, force ? void 0 : this.#sizes.get(path2));
+      if (!ticket.isCurrent()) {
+        return false;
+      }
+      switch (read.kind) {
+        case "ok":
+          this.#sizes.set(path2, read.size);
+          this.#missing.delete(path2);
+          text15 = read.text;
+          break;
+        case "same":
+          return false;
+        case "notYet": {
+          const misses = (this.#missing.get(path2) ?? 0) + 1;
+          this.#missing.set(path2, misses);
+          if (misses >= MISSING_READS) {
+            this.#unreadable.add(path2);
+          }
+          break;
+        }
+        case "unreadable":
+          this.#unreadable.add(path2);
+      }
+    }
+    const sid = this.#host.sid;
+    if (text15 === void 0 && this.#listed.has(a2.id) && sid) {
+      try {
+        const r = await rpc(this.#host.gw, "subagent.tail", { session_id: sid, subagent_id: a2.id });
+        if (!ticket.isCurrent()) {
+          return false;
+        }
+        if (r?.available && typeof r.text === "string") {
+          text15 = r.truncated ? mergeTail(this.#tails.get(a2.id) ?? "", r.text) : r.text;
+          this.#tails.set(a2.id, text15);
+        }
+      } catch {
+        text15 = void 0;
+      }
+    }
+    if (text15 === void 0) {
+      return false;
+    }
+    applyLog(a2, parseLiveLog(text15));
+    return true;
+  }
+  /** Marks the card showing `a` changed (#poll and #readLog changed its row), and tells when it ended. */
+  #touch(a2) {
+    this.#host.transcript.touchCall(this.#owners().get(a2));
+    if (!isRunning(a2) && !this.#ended.has(a2)) {
+      this.#ended.add(a2);
+      this.#host.agentEnded?.();
+    }
+  }
+  /** Each agent with the delegate_task call whose card shows it. */
+  #owners() {
+    return ownersOf(this.#host.transcript.delegations());
+  }
+};
+async function manifestLog(delegationId, index2, env2 = process.env) {
+  if (!/^[\w-]+$/.test(delegationId)) {
+    return void 0;
+  }
+  const home = env2.HERMES_HOME || join10(homedir11(), ".hermes");
+  for (const root7 of [join10(home, "delegation_cache", "live"), join10(home, "cache", "delegation", "live")]) {
+    try {
+      const text15 = await readFile2(join10(root7, delegationId, "manifest.json"), "utf8");
+      const tasks = record(text15.replace(/^\uFEFF/, ""))?.tasks;
+      const log = Array.isArray(tasks) ? record(tasks.find((t2) => record(t2)?.index === index2))?.log : void 0;
+      if (typeof log === "string" && log) {
+        return log;
+      }
+    } catch {
+    }
+  }
+  return void 0;
+}
+
 // src/automation.ts
 function cadence(loop) {
   if (loop.mode === "self_paced") {
@@ -70932,7 +71119,7 @@ var ConnectWatcher = class {
       }
     }
     if (open) {
-      this.#timer = setTimeout(() => this.#tick(), POLL_MS2);
+      this.#timer = setTimeout(() => this.#tick(), POLL_MS);
     }
   }
   /** The connect card `ref` names (its file, or its call id when it has none). */
@@ -72438,6 +72625,8 @@ function adoptSteps(host) {
         transcript.usageBase(r.info?.usage ?? void 0);
       }
     },
+    // The last session's children are not this one's: a poll in flight for them drops its answer.
+    { adopt: ({ ref }) => host.agents.adopt(ref.live) },
     {
       adopt: ({ r, ref }) => {
         if (r.messages?.length) {
@@ -74840,7 +75029,11 @@ var WatchApp = class {
   #listed = false;
   #ready = false;
   #surface;
-  #timer;
+  /** The poll: every second until the agent ended and its stored transcript caught up. */
+  #poller = new Poller({
+    cadence: () => !isRunning(this.#agent) && this.#child ? "off" : POLL_MS4,
+    run: () => this.#tick()
+  });
   #renders = new RenderScheduler(() => this.#render());
   #exitArmed = 0;
   #done = Promise.withResolvers();
@@ -74900,7 +75093,7 @@ var WatchApp = class {
     this.#gw.on("event", (ev) => {
       if (ev.type === "gateway.ready") {
         this.#ready = true;
-        void this.#tick();
+        this.#poller.poke();
       }
       const skin = ev.type === "gateway.ready" ? ev.payload?.skin : ev.type === "skin.changed" ? ev.payload : void 0;
       if (skin) {
@@ -74913,13 +75106,12 @@ var WatchApp = class {
     } catch (error) {
       this.transcript.notice(`The session database is not readable here: ${String(error)}`, "warning");
     }
-    this.#timer = setInterval(() => void this.#tick(), POLL_MS4);
-    void this.#tick();
+    this.#poller.poke();
     this.#render();
     this.#surface.focus(INPUT_ID);
     void this.#readInput();
     const code7 = await this.#done.promise;
-    clearInterval(this.#timer);
+    this.#poller.dispose();
     this.#store?.close();
     await this.#tern.close();
     this.#gw.kill("exit");
@@ -74938,10 +75130,6 @@ var WatchApp = class {
     changed = this.#readTranscript() || changed;
     if (changed) {
       this.changed();
-    }
-    if (!isRunning(a2) && this.#child && this.#timer) {
-      clearInterval(this.#timer);
-      this.#timer = void 0;
     }
   }
   async #poll() {

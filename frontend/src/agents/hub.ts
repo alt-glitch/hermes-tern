@@ -9,7 +9,7 @@ import type { Key } from '@stencil-hq/tern'
 import type { Subagent } from '../model.js'
 import { editQuery, moveSelection } from '../overlays/search.js'
 
-import { isRunning } from './store.js'
+import { isRunning } from './rows.js'
 
 export type HubTab = 'all' | 'running'
 

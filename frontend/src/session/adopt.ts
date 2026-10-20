@@ -53,7 +53,7 @@ export interface Adoptable {
 export interface AdoptHost {
   readonly state: SessionState
   readonly activity: Pick<Activity, 'busy' | 'endCompaction' | 'set'>
-  readonly agents: Pick<Agents, 'scan'>
+  readonly agents: Pick<Agents, 'adopt' | 'scan'>
   readonly automation: Pick<Automation, 'adopt'>
   readonly connect: Pick<ConnectWatcher, 'watch'>
   readonly media: Pick<Media, 'showAll'>
@@ -135,6 +135,8 @@ export function adoptSteps(host: AdoptHost): readonly Adoptable[] {
         transcript.usageBase(r.info?.usage ?? undefined)
       }
     },
+    // The last session's children are not this one's: a poll in flight for them drops its answer.
+    { adopt: ({ ref }) => host.agents.adopt(ref.live) },
     {
       adopt: ({ r, ref }) => {
         if (r.messages?.length) {

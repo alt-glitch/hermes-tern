@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, writeFile } from 'node:fs/promises'
+import { chmod, mkdir, mkdtemp, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -6,9 +6,12 @@ import type { GatewayClient } from '@tui/gatewayClient.js'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { parseLiveLog } from '../agents/liveLog.js'
-import { Agents, completionOutcomes, mergeTail, OUTCOME_UNKNOWN } from '../agents/store.js'
+import { completionOutcomes, mergeTail, OUTCOME_UNKNOWN } from '../agents/rows.js'
+import { Agents, readLogFile } from '../agents/store.js'
 import { liveSessionId } from '../core/ids.js'
 import { Transcript } from '../transcript.js'
+
+import { FakeGateway, must } from './fakes.js'
 
 // A finished child's log as tools/delegation_live_log.py writes it (lab run, 2026-10-17).
 const DONE = `=== Hermes subagent live transcript ===
@@ -204,6 +207,121 @@ describe('Agents', () => {
     expect(await store.pause(false)).toBe(false)
     expect(store.paused).toBe(false)
     expect(changes).toBe(2)
+  })
+
+  describe('across a session switch', () => {
+    /** A resumed history with one result-less delegate_task call asking for `goal` (task 0). */
+    function resumed(transcript: Transcript, goal: string) {
+      transcript.load([
+        { role: 'user', text: 'go' },
+        { args: { tasks: [{ goal }] }, name: 'delegate_task', role: 'tool', tool_call_id: 'c1' }
+      ])
+    }
+
+    /** A store whose `subagent.list` answers wait for the test (`answer`, oldest first), on a shown session the test switches. */
+    function switching() {
+      const answers: ((rows: object[]) => void)[] = []
+      const gw = new FakeGateway({
+        replies: { 'subagent.list': () => new Promise(resolve => answers.push(rows => resolve({ subagents: rows }))) }
+      })
+      const transcript = new Transcript()
+      const shown = { sid: liveSessionId('a') }
+      const agents = new Agents({
+        changed: () => undefined,
+        gw: gw.client,
+        get sid() {
+          return shown.sid
+        },
+        transcript
+      })
+
+      return { agents, answer: (rows: object[]) => must(answers.shift())(rows), lists: () => gw.sent('subagent.list'), shown, transcript }
+    }
+
+    it("drops a poll for session A that answers after the switch to B, so A's child stays off B's card", async () => {
+      const { agents, answer, lists, shown, transcript } = switching()
+      store = agents
+      resumed(transcript, 'Read the docs')
+      agents.adopt(shown.sid)
+      agents.scan()
+      await vi.waitFor(() => expect(lists()).toHaveLength(1))
+
+      // Switch: B's history asks for the same goal.
+      shown.sid = liveSessionId('b')
+      agents.adopt(shown.sid)
+      resumed(transcript, 'Read the docs')
+      agents.scan()
+      answer([{ delegation_id: 'deleg_a', depth: 0, goal: 'Read the docs', status: 'running', subagent_id: 'sa-0-aaaa' }])
+
+      // B's own probe runs once A's poll is done with, and finds nothing.
+      await vi.waitFor(() => expect(lists()).toEqual([{ session_id: 'a' }, { session_id: 'b' }]))
+      answer([])
+      await new Promise(resolve => setImmediate(resolve))
+
+      expect(must(transcript.delegations()[0]).subagents).toBeUndefined()
+      expect(agents.all()).toEqual([])
+    })
+
+    it("runs a resumed session's probe that arrives while a poll is in flight, after it", async () => {
+      const { agents, answer, lists, shown, transcript } = switching()
+      store = agents
+      resumed(transcript, 'Old goal')
+      agents.adopt(shown.sid)
+      agents.scan()
+      await vi.waitFor(() => expect(lists()).toHaveLength(1))
+
+      shown.sid = liveSessionId('b')
+      agents.adopt(shown.sid)
+      resumed(transcript, 'Survey the layout')
+      agents.scan()
+      answer([])
+
+      await vi.waitFor(() => expect(lists()).toEqual([{ session_id: 'a' }, { session_id: 'b' }]))
+      answer([{ delegation_id: 'deleg_b', depth: 0, goal: 'Survey the layout', status: 'running', subagent_id: 'sa-0-bbbb' }])
+
+      await vi.waitFor(() => expect(agents.running().map(a => a.id)).toEqual(['sa-0-bbbb']))
+    })
+  })
+
+  describe('reading a log file', () => {
+    it("reads a log that was not there yet once it is: a missing file is 'not yet'", async () => {
+      const dir = await mkdtemp(join(tmpdir(), 'hermes-tern-agents-'))
+      const path = join(dir, 'task-0.log')
+
+      expect(await readLogFile(path, undefined)).toEqual({ kind: 'notYet' })
+
+      const agents = new Agents({ changed: () => undefined, gw: new FakeGateway().client, sid: liveSessionId('s1'), transcript: dispatched([path]) })
+      store = agents
+      agents.scan()
+      const agent = must(agents.all()[0])
+
+      await agents.refresh(agent)
+      expect(agent.log).toBeUndefined()
+
+      await writeFile(path, DONE)
+      await agents.refresh(agent)
+      expect(agent).toMatchObject({ status: 'done', summary: 'Finished the delegated task.' })
+    })
+
+    it('tells a log this process may not read apart from one that is not there, and one that did not grow', async () => {
+      const dir = await mkdtemp(join(tmpdir(), 'hermes-tern-agents-'))
+      const path = join(dir, 'task-0.log')
+      await writeFile(path, DONE)
+
+      expect(await readLogFile(path, undefined)).toMatchObject({ kind: 'ok', size: Buffer.byteLength(DONE) })
+      expect(await readLogFile(path, Buffer.byteLength(DONE))).toEqual({ kind: 'same' })
+
+      await chmod(path, 0)
+
+      try {
+        // Root reads it anyway; any other user may not.
+        if (process.getuid?.() !== 0) {
+          expect(await readLogFile(path, undefined)).toMatchObject({ error: expect.objectContaining({ code: 'EACCES' }), kind: 'unreadable' })
+        }
+      } finally {
+        await chmod(path, 0o644)
+      }
+    })
   })
 
   describe('with no log this process can read (a remote gateway)', () => {

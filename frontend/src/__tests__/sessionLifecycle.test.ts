@@ -149,7 +149,7 @@ function recordingHost() {
   const transcript = new Transcript()
   const host: AdoptHost = {
     activity: { busy: null, endCompaction: rec('activity.endCompaction'), set: rec('activity.set') },
-    agents: { scan: rec('agents.scan') },
+    agents: { adopt: sid => void log.push(`agents.adopt ${sid}`), scan: rec('agents.scan') },
     automation: { adopt: sid => void log.push(`automation.adopt ${sid}`) },
     changed: rec('changed'),
     connect: { watch: rec('connect.watch') },
@@ -218,6 +218,7 @@ describe('adoptSteps', () => {
       'activity.endCompaction',
       'forgetStatusNote',
       'transcript.usageBase',
+      'agents.adopt b',
       // The history.
       'transcript.load',
       'agents.scan',

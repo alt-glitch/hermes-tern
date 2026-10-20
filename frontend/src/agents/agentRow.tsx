@@ -6,7 +6,7 @@ import type { Subagent } from '../model.js'
 import { age } from '../view/time.js'
 
 import { SUBAGENT_LOOK } from './look.js'
-import { agentName, OUTCOME_UNKNOWN } from './store.js'
+import { agentName, OUTCOME_UNKNOWN } from './rows.js'
 
 /** A one-agent delegation's row in place of its Task card: its own key and name. */
 export interface Solo {

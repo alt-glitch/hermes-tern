@@ -27,7 +27,7 @@ import {
 } from '../agents/hub.js'
 import type { LogEntry } from '../agents/liveLog.js'
 import { SUBAGENT_LOOK } from '../agents/look.js'
-import { agentName, isRunning } from '../agents/store.js'
+import { agentName, isRunning } from '../agents/rows.js'
 import { duration } from '../view/format.js'
 import { briefOf } from '../view/tools/cards/task.js'
 import { hubIconOf } from '../view/tools/registry.js'
