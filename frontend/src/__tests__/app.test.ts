@@ -226,8 +226,8 @@ describe('App: an image while it attaches', () => {
 
   it('holds the prompt until it lands, then goes with it', async () => {
     const u = slowUpload()
-    const { app, press, sent, type } = setup({ 'image.attach_bytes': u.upload })
-    await press(key('paste', { text: png }))
+    const { app, attach, press, sent, type } = setup({ 'image.attach_bytes': u.upload })
+    await attach()
     await type('look')
     await press(key('enter'))
 
@@ -245,8 +245,8 @@ describe('App: an image while it attaches', () => {
 
   it('is dropped when Ctrl+C clears the draft before it lands', async () => {
     const u = slowUpload()
-    const { app, press, sent, type } = setup({ 'image.attach_bytes': u.upload })
-    await press(key('paste', { text: png }))
+    const { app, attach, press, sent, type } = setup({ 'image.attach_bytes': u.upload })
+    await attach()
     const quit = vi.spyOn(app, 'quit')
     await press(key('d', { ctrl: true }))
     expect(quit).not.toHaveBeenCalled()
