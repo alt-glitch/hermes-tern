@@ -66,6 +66,9 @@ export class WatchApp {
   /** The dock's buttons: the composer steers the agent and Stop stops it; this pane has no pills, queue, chips or chips' sheets. */
   readonly #dock: DockActions = {
     onAgents: none,
+    onDictate: none,
+    onDictationCancel: none,
+    onDictationDone: none,
     onEdit: ev => {
       this.composer.edit(ev)
       this.changed()

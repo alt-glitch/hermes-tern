@@ -29,10 +29,26 @@ interface Pane {
   /** The composer's answer to a key. */
   composerSays: 'submit' | null
   clock: number
+  /** A dictation capture is in flight; dictation takes the key (the record key, or Esc in a capture). */
+  capturing: boolean
+  dictates: boolean
 }
 
 function pane(over: Partial<Pane> = {}) {
-  const state: Pane = { busy: false, clock: 10_000, completion: false, composerSays: null, hud: false, image: false, images: false, queued: 0, text: '', ...over }
+  const state: Pane = {
+    busy: false,
+    capturing: false,
+    clock: 10_000,
+    completion: false,
+    composerSays: null,
+    dictates: false,
+    hud: false,
+    image: false,
+    images: false,
+    queued: 0,
+    text: '',
+    ...over
+  }
   const log: string[] = []
   const did = (what: string) => () => void log.push(what)
 
@@ -75,6 +91,25 @@ function pane(over: Partial<Pane> = {}) {
       }
     },
     cycleEffort: did('effort'),
+    dictation: {
+      cancel: () => {
+        const was = state.capturing
+        state.capturing = false
+
+        if (was) {
+          log.push('cancel capture')
+        }
+
+        return was
+      },
+      onKey: k => {
+        if (state.dictates) {
+          log.push(`dictation ${k.name}`)
+        }
+
+        return state.dictates
+      }
+    },
     hud: () => state.hud,
     interrupt: did('interrupt'),
     now: () => state.clock,
@@ -122,6 +157,7 @@ describe('the key rules', () => {
       'cancel',
       'overlay',
       'modal',
+      'dictation',
       'hud',
       'completion',
       'doubleEsc',
@@ -160,6 +196,14 @@ describe('the key rules', () => {
     expect(p.log.at(-1)).toBe('quit')
   })
 
+  it('1. Ctrl+C drops a dictation capture before it clears the draft or stops the turn', () => {
+    const p = pane({ busy: true, capturing: true, text: 'draft' })
+
+    onKey(ctrl('c'), p.cx, undefined)
+    expect(p.log).toEqual(['cancel capture'])
+    expect(p.state.text).toBe('draft')
+  })
+
   it('1. Ctrl+C after the exit window arms it again', () => {
     const p = pane()
 
@@ -190,7 +234,19 @@ describe('the key rules', () => {
     expect(p.log).toEqual(['dequeue 0'])
   })
 
-  it('4. the pills take their keys before the completion list and the composer', () => {
+  it('4. dictation takes its keys under a modal sheet’s, before the pills and the double Esc', () => {
+    const p = pane({ dictates: true, hud: true, text: 'draft' })
+
+    onKey(key('escape'), p.cx, sheet({ modal: true }))
+    expect(p.log).toEqual([])
+
+    onKey(key('escape'), p.cx, undefined)
+    onKey(key('escape'), p.cx, undefined)
+    expect(p.log).toEqual(['dictation escape', 'dictation escape'])
+    expect(p.state.text).toBe('draft')
+  })
+
+  it('5. the pills take their keys before the completion list and the composer', () => {
     const p = pane({ completion: true, hud: true })
 
     onKey(key('down'), p.cx, undefined)
@@ -202,7 +258,7 @@ describe('the key rules', () => {
     expect(p.log).toEqual(['composer'])
   })
 
-  it('5. the completion list takes its keys before Esc and the composer', () => {
+  it('6. the completion list takes its keys before Esc and the composer', () => {
     const p = pane({ busy: true, completion: true })
 
     onKey(key('escape'), p.cx, undefined)
@@ -212,7 +268,7 @@ describe('the key rules', () => {
     expect(p.cx.presses.esc).toBe(0)
   })
 
-  it('6. Esc Esc clears a draft into the history, else stops the turn; one Esc does nothing', () => {
+  it('7. Esc Esc clears a draft into the history, else stops the turn; one Esc does nothing', () => {
     const p = pane({ busy: true, text: 'draft' })
 
     onKey(key('escape'), p.cx, undefined)
@@ -236,7 +292,7 @@ describe('the key rules', () => {
     expect(p.log).toHaveLength(3)
   })
 
-  it('6. Esc Esc over images alone sets the empty text instead of taking it', () => {
+  it('7. Esc Esc over images alone sets the empty text instead of taking it', () => {
     const p = pane({ images: true, text: '  ' })
 
     onKey(key('escape'), p.cx, undefined)
@@ -244,14 +300,14 @@ describe('the key rules', () => {
     expect(p.log).toEqual(["set ''", 'clear images'])
   })
 
-  it('7. Shift+Tab cycles the reasoning effort', () => {
+  it('8. Shift+Tab cycles the reasoning effort', () => {
     const p = pane()
 
     onKey(key('tab', { shift: true }), p.cx, undefined)
     expect(p.log).toEqual(['effort'])
   })
 
-  it('8. Alt+A/J/S/P open their sheets, by the Alt modifier only', () => {
+  it('9. Alt+A/J/S/P open their sheets, by the Alt modifier only', () => {
     const p = pane()
 
     for (const name of ['a', 'j', 's', 'p']) {
@@ -267,7 +323,7 @@ describe('the key rules', () => {
     expect(p.log.slice(4)).toEqual(['composer', 'composer', 'composer'])
   })
 
-  it('9. Alt+Up edits the oldest queued prompt, when one waits', () => {
+  it('10. Alt+Up edits the oldest queued prompt, when one waits', () => {
     const p = pane()
 
     onKey(alt('up'), p.cx, undefined)
@@ -276,7 +332,7 @@ describe('the key rules', () => {
     expect(p.log).toEqual(['composer', 'dequeue 0'])
   })
 
-  it('10. Alt+Enter steers with the oldest queued prompt: a turn runs, one waits, the prompt is empty', () => {
+  it('11. Alt+Enter steers with the oldest queued prompt: a turn runs, one waits, the prompt is empty', () => {
     const p = pane({ busy: true, queued: 1 })
 
     onKey(alt('enter'), p.cx, undefined)
@@ -290,7 +346,7 @@ describe('the key rules', () => {
     }
   })
 
-  it('11. Ctrl+D quits on an empty prompt, and is the composer key over a draft', () => {
+  it('12. Ctrl+D quits on an empty prompt, and is the composer key over a draft', () => {
     const p = pane()
 
     onKey(ctrl('d'), p.cx, undefined)
@@ -304,7 +360,7 @@ describe('the key rules', () => {
     }
   })
 
-  it('12. a paste that is an image attaches it; one that is text goes to the composer', () => {
+  it('13. a paste that is an image attaches it; one that is text goes to the composer', () => {
     const p = pane({ image: true })
 
     onKey(key('paste', { text: '/tmp/a.png' }), p.cx, undefined)
@@ -315,7 +371,7 @@ describe('the key rules', () => {
     expect(p.log.slice(1)).toEqual(['paste ', 'composer'])
   })
 
-  it('13. Ctrl+V attaches the clipboard image, not with Alt or Meta held', () => {
+  it('14. Ctrl+V attaches the clipboard image, not with Alt or Meta held', () => {
     const p = pane()
 
     onKey(ctrl('v'), p.cx, undefined)
@@ -324,7 +380,7 @@ describe('the key rules', () => {
     expect(p.log).toEqual(['clipboard', 'composer', 'composer'])
   })
 
-  it('14. the composer takes the rest, and its submit sends the draft', () => {
+  it('15. the composer takes the rest, and its submit sends the draft', () => {
     const p = pane()
 
     onKey(key('x', { text: 'x' }), p.cx, undefined)

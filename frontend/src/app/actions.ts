@@ -23,6 +23,7 @@ import { Flash } from '../core/flash.js'
 import type { PrKey } from '../core/ids.js'
 import type { Attachments } from '../draft/attachments.js'
 import type { Composer } from '../draft/composer.js'
+import type { Dictation } from '../draft/dictation.js'
 import type { KeyCx, Presses } from '../draft/keys.js'
 import { storedCompactions } from '../hermes/compactions.js'
 import { shellError, shellExec, shellLines } from '../hermes/shell.js'
@@ -75,6 +76,7 @@ export interface ActionsCx {
   readonly completion: Completion
   readonly hud: Hud
   readonly composer: Composer
+  readonly dictation: Dictation
   readonly transcript: Transcript
   readonly media: Media
   readonly connect: ConnectWatcher
@@ -109,11 +111,14 @@ export class AppActions {
 
   constructor(cx: ActionsCx) {
     this.#cx = cx
-    const { attachments, chat, composer, gw, life, queue, transcript } = cx
+    const { attachments, chat, composer, dictation, gw, life, queue, transcript } = cx
     const changed = () => cx.changed()
 
     this.dock = {
       onAgents: () => openAgents(chat),
+      onDictate: () => dictation.toggle(),
+      onDictationCancel: () => void dictation.cancel(),
+      onDictationDone: () => dictation.finish(),
       onEdit: ev => {
         composer.edit(ev)
         changed()
@@ -154,6 +159,7 @@ export class AppActions {
       completion: cx.completion,
       composer,
       cycleEffort: () => cycleEffort(chat),
+      dictation,
       hud: key => this.hudKey(key),
       interrupt: () => this.interrupt(),
       now: Date.now,
@@ -222,8 +228,12 @@ export class AppActions {
 
   // ── Prompts and commands ───────────────────────────────────────────
 
-  /** Sends the composer's draft, with the pastes it holds. */
+  /** Sends the composer's draft, with the pastes it holds; while dictation listens, ends the capture instead. */
   submitDraft() {
+    if (this.#cx.dictation.capturing) {
+      return this.#cx.dictation.finish()
+    }
+
     const pasted = [...this.#cx.composer.pasted]
 
     this.submit(this.#cx.composer.take(), true, this.#cx.state.busyMode, pasted)
