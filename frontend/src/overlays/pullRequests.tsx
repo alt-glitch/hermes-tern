@@ -6,7 +6,7 @@ import { execFile } from 'node:child_process'
 
 import type { JSX, Key } from '@stencil-hq/tern'
 
-import type { App } from '../app.js'
+import type { ChatPorts } from '../app/ports.js'
 import { prKey } from '../github/links.js'
 import { checksState } from '../github/pullRequest.js'
 import type { Entry } from '../github/store.js'
@@ -14,6 +14,12 @@ import type { Overlay } from '../overlay.js'
 import { relative } from '../processes/cron.js'
 import { PrView, prTone, stateLabel } from '../prs/view.js'
 import type { PrsPill } from '../view/dock.js'
+
+/** What the pull request sheets reach of the app. */
+export type PullRequestsSheetHost = Pick<
+  ChatPorts,
+  'changed' | 'close' | 'notice' | 'open' | 'openPrAside' | 'overlays' | 'prs' | 'reveal' | 'scroll' | 'transcript'
+>
 
 export { stateLabel }
 
@@ -27,46 +33,43 @@ export function openUrl(url: string) {
 }
 
 /** `/prs` opens the newest PR, `/prs 22` PR #22. */
-export function prsCommand(app: App, arg: string) {
+export function prsCommand(host: PullRequestsSheetHost, arg: string) {
   const n = Number(arg.trim().replace(/^#/, ''))
-  const hit = Number.isInteger(n) && n > 0 ? app.prs.entries().find(e => e.ref.number === n) : undefined
+  const hit = Number.isInteger(n) && n > 0 ? host.prs.entries().find(e => e.ref.number === n) : undefined
 
   if (arg.trim() && !hit) {
-    app.transcript.notice(`No linked pull request #${arg.trim().replace(/^#/, '')}.`, 'warning')
+    host.transcript.notice(`No linked pull request #${arg.trim().replace(/^#/, '')}.`, 'warning')
 
-    return app.changed()
+    return host.changed()
   }
 
-  openPullRequests(app, hit ? prKey(hit.ref) : undefined)
+  openPullRequests(host, hit ? prKey(hit.ref) : undefined)
 }
 
 /** Docks PR `focus` (a key; else the newest) at the chat's right edge. */
-export function openPullRequests(app: App, focus?: string) {
-  const newest = app.prs.entries().at(-1)
+export function openPullRequests(host: PullRequestsSheetHost, focus?: string) {
+  const newest = host.prs.entries().at(-1)
 
-  app.openPrAside(focus ?? (newest ? prKey(newest.ref) : undefined))
+  host.openPrAside(focus ?? (newest ? prKey(newest.ref) : undefined))
 }
 
 /** The PR sheet: the whole view over the chat, Escape closes it. */
-export function openPrSheet(app: App, focus?: string) {
+export function openPrSheet(host: PullRequestsSheetHost, focus?: string) {
   const view = new PrView(
     {
-      changed: () => app.changed(),
-      notice: (text, tone) => {
-        app.transcript.notice(text, tone)
-        app.changed()
-      },
+      changed: () => host.changed(),
+      notice: (text, tone) => host.notice(text, tone),
       open: openUrl,
-      prs: app.prs,
-      reveal: id => app.reveal(id),
-      scroll: (id, to) => app.scroll(id, to)
+      prs: host.prs,
+      reveal: id => host.reveal(id),
+      scroll: (id, to) => host.scroll(id, to)
     },
     focus
   )
 
-  app.prs.poke()
+  host.prs.poke()
 
-  const timer = setInterval(() => (app.overlays.includes(overlay) ? app.changed() : end()), TICK_MS)
+  const timer = setInterval(() => (host.overlays.includes(overlay) ? host.changed() : end()), TICK_MS)
 
   function end() {
     clearInterval(timer)
@@ -75,7 +78,7 @@ export function openPrSheet(app: App, focus?: string) {
 
   const close = () => {
     end()
-    app.close(overlay)
+    host.close(overlay)
   }
 
   const overlay: Overlay = {
@@ -120,26 +123,26 @@ export function openPrSheet(app: App, focus?: string) {
     }
   }
 
-  app.open(overlay)
+  host.open(overlay)
 }
 
 /**
  * The PR pill's menu: every linked PR, newest first, each with its state and checks; a pick
  * opens it where PRs open. Its foot says where that is and switches it.
  */
-export function openPrMenu(app: App) {
-  const entries = () => app.prs.entries().toReversed()
+export function openPrMenu(host: PullRequestsSheetHost) {
+  const entries = () => host.prs.entries().toReversed()
   let selected = entries()[0] ? prKey(entries()[0]!.ref) : undefined
 
-  app.prs.poke()
+  host.prs.poke()
 
-  const close = () => app.close(overlay)
+  const close = () => host.close(overlay)
 
   const pick = (key: string | undefined) => {
     close()
 
     if (key) {
-      openPullRequests(app, key)
+      openPullRequests(host, key)
     }
   }
 
@@ -180,7 +183,7 @@ export function openPrMenu(app: App) {
     }
   }
 
-  app.open(overlay)
+  host.open(overlay)
 }
 
 function menuRow(e: Entry, now: number, on: boolean, onClick: () => void): JSX.Element {

@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import type { App } from '../app.js'
-import { localCommand } from '../commands.js'
+import { type CommandHost, localCommand } from '../commands.js'
 import { modelPayload } from '../hermes/mutate.js'
 import { pickerValue } from '../overlays/models.js'
 
@@ -23,7 +22,7 @@ describe('/skin', () => {
   const host = (theme: string, answers: Record<string, unknown>) => {
     const gw = fakeGateway(answers)
     const notices: string[] = []
-    const app = { gw, theme, transcript: { notice: (text: string) => notices.push(text) } } as unknown as App
+    const app = { gw, theme, transcript: { notice: (text: string) => notices.push(text) } } as unknown as CommandHost
 
     return { app, gw, notices }
   }

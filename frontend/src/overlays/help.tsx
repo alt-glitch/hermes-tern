@@ -6,10 +6,13 @@
 import type { CommandsCatalogResult } from '@hermes/shared/gateway-events'
 import type { Key, SpanData } from '@stencil-hq/tern'
 
-import type { App } from '../app.js'
+import type { ChatPorts } from '../app/ports.js'
 import { HIDDEN_COMMANDS, localCommands } from '../commands.js'
 import { errorText } from '../core/errors.js'
 import type { Overlay } from '../overlay.js'
+
+/** What the help sheet reaches of the app. */
+export type HelpHost = Pick<ChatPorts, 'close' | 'gw' | 'open' | 'session' | 'transcript'>
 
 const KEY = 'help'
 
@@ -56,13 +59,14 @@ const HOTKEYS: { group: string; rows: [string[], string][] }[] = [
 ]
 
 /** Opens the help sheet; the command list comes from the gateway's catalog. */
-export async function openHelp(app: App) {
+export async function openHelp(host: HelpHost) {
   let catalog: CommandsCatalogResult = {}
+  const sid = host.session.ref.live
 
   try {
-    catalog = await app.gw.request<CommandsCatalogResult>('commands.catalog', app.sid ? { session_id: app.sid } : {})
+    catalog = await host.gw.request<CommandsCatalogResult>('commands.catalog', sid ? { session_id: sid } : {})
   } catch (error) {
-    app.transcript.notice(
+    host.transcript.notice(
       `Could not load the command list: ${errorText(error)}`,
       'warning'
     )
@@ -133,7 +137,7 @@ export async function openHelp(app: App) {
               align="center"
               gap="xs"
               key="close"
-              onClick={() => app.close(overlay)}
+              onClick={() => host.close(overlay)}
               role="omp.btn"
               title="Close  escape"
             >
@@ -146,12 +150,12 @@ export async function openHelp(app: App) {
     ),
     onKey: (k: Key) => {
       if (k.name === 'escape' || k.name === 'enter' || k.name === 'q') {
-        app.close(overlay)
+        host.close(overlay)
       }
 
       return true
     }
   }
 
-  app.open(overlay)
+  host.open(overlay)
 }

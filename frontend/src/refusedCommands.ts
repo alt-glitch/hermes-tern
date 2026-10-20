@@ -6,12 +6,22 @@
 // The rest are Ink-TUI-only or messaging-only: hidden from completion and /help, and typing one
 // anyway says why in a line instead of the gateway's generic refusal.
 
-import type { App } from './app.js'
-import type { LocalCommand } from './commands.js'
+import type { ChatPorts } from './app/ports.js'
 import { errorText } from './core/errors.js'
 import type { NoticeEntry } from './model.js'
-import { openBackground } from './overlays/background.js'
+import { type BackgroundHost, openBackground } from './overlays/background.js'
 import { openHermesSplit } from './watch/spec.js'
+
+/** What these commands reach of the app. */
+export type RefusedHost = Pick<ChatPorts, 'gw' | 'session' | 'transcript'> & BackgroundHost
+
+/** A command this module answers: commands.ts's LocalCommand, on the ports these commands reach. */
+export interface RefusedCommand {
+  name: string
+  aliases?: readonly string[]
+  /** Runs `/name arg`; false hands it to `slash.exec`. */
+  run(host: RefusedHost, arg: string): boolean | void | Promise<boolean | void>
+}
 
 const words = (arg: string) => arg.trim().split(/\s+/).filter(Boolean)
 
@@ -23,17 +33,17 @@ interface CliExec {
 }
 
 /** `hermes <argv>` on the gateway host, headless; its output in a panel titled `title`. */
-async function cliPanel(app: App, title: string, argv: string[]) {
-  const r = await app.gw.request<CliExec | null>('cli.exec', { argv })
+async function cliPanel(host: RefusedHost, title: string, argv: string[]) {
+  const r = await host.gw.request<CliExec | null>('cli.exec', { argv })
 
   if (r?.blocked) {
-    return app.transcript.notice(r.hint || `\`hermes ${argv.join(' ')}\` cannot run here.`, 'warning')
+    return host.transcript.notice(r.hint || `\`hermes ${argv.join(' ')}\` cannot run here.`, 'warning')
   }
 
-  app.transcript.panel(title, r?.output?.trim() || '(no output)')
+  host.transcript.panel(title, r?.output?.trim() || '(no output)')
 
   if (r?.code) {
-    app.transcript.notice(`\`hermes ${argv.join(' ')}\` exited with code ${r.code}.`, 'warning')
+    host.transcript.notice(`\`hermes ${argv.join(' ')}\` exited with code ${r.code}.`, 'warning')
   }
 }
 
@@ -45,10 +55,10 @@ interface BrowserManage {
 }
 
 /** `/browser [status|use [on|off]|connect [url]|disconnect]`, as Ink's ops.ts sends it. */
-async function browser(app: App, arg: string) {
+async function browser(host: RefusedHost, arg: string) {
   const [first = 'status', ...rest] = words(arg)
   const action = first.toLowerCase()
-  const note = (text: string, tone?: NoticeEntry['tone']) => app.transcript.notice(text, tone)
+  const note = (text: string, tone?: NoticeEntry['tone']) => host.transcript.notice(text, tone)
 
   if (!['connect', 'disconnect', 'status', 'use'].includes(action)) {
     return note('Usage: /browser [status|use [on|off]|connect [url]|disconnect]', 'warning')
@@ -64,9 +74,9 @@ async function browser(app: App, arg: string) {
   let r: BrowserManage | null
 
   try {
-    r = await app.gw.request<BrowserManage | null>('browser.manage', {
+    r = await host.gw.request<BrowserManage | null>('browser.manage', {
       action,
-      session_id: app.sid,
+      session_id: host.session.ref.live,
       ...(url ? { url } : {}),
       ...(mode ? { enabled: mode === 'on' } : {})
     })
@@ -136,17 +146,17 @@ export function pluginLines(rows: readonly PluginRow[]): string[] {
  * `/plugins [list|all]`: the Plugins Hub's own list (`plugins.manage list`), user plugins first as
  * the hub shows them. Ink sends the changing subcommands to `slash.exec`, which the shared gateway refuses.
  */
-async function plugins(app: App, arg: string) {
+async function plugins(host: RefusedHost, arg: string) {
   const sub = (words(arg)[0] ?? 'list').toLowerCase()
 
   if (sub !== 'list' && sub !== 'ls' && sub !== 'all') {
-    return app.transcript.notice(
+    return host.transcript.notice(
       `Usage: /plugins [list|all]. To ${sub} a plugin, run \`hermes plugins ${sub} …\` in a terminal.`,
       'warning'
     )
   }
 
-  const r = await app.gw.request<PluginsList | null>('plugins.manage', { action: 'list' })
+  const r = await host.gw.request<PluginsList | null>('plugins.manage', { action: 'list' })
   const rows = r?.plugins ?? []
   const user = rows.filter(p => p.source !== 'bundled')
   // No user plugins: the bundled ones, so the list is never empty when some exist (as the hub falls back).
@@ -154,10 +164,10 @@ async function plugins(app: App, arg: string) {
   const hidden = rows.length - shown.length
 
   if (!rows.length) {
-    return app.transcript.notice('No plugins installed.')
+    return host.transcript.notice('No plugins installed.')
   }
 
-  app.transcript.panel(
+  host.transcript.panel(
     'Plugins',
     [
       ...pluginLines(shown),
@@ -235,11 +245,11 @@ export function subscriptionText(s: SubscriptionState): string {
   return [...lines, '', change].join('\n')
 }
 
-async function subscription(app: App) {
-  const s = await app.gw.request<SubscriptionState | null>('subscription.state', {})
+async function subscription(host: RefusedHost) {
+  const s = await host.gw.request<SubscriptionState | null>('subscription.state', {})
 
   if (!s?.logged_in) {
-    return app.transcript.notice(
+    return host.transcript.notice(
       s?.error
         ? `Could not load the subscription: ${s.error}`
         : 'Not logged into Nous Portal: run /login, then /subscription.',
@@ -247,14 +257,14 @@ async function subscription(app: App) {
     )
   }
 
-  app.transcript.panel('Subscription', subscriptionText(s))
+  host.transcript.panel('Subscription', subscriptionText(s))
 }
 
 /** `/config [show|get <key>|set <key> <value>|path|check|…]`: `hermes config …`; bare is `show`. */
-function config(app: App, arg: string) {
+function config(host: RefusedHost, arg: string) {
   const argv = words(arg)
 
-  return cliPanel(app, `/config${argv.length ? ` ${argv.join(' ')}` : ''}`, [
+  return cliPanel(host, `/config${argv.length ? ` ${argv.join(' ')}` : ''}`, [
     'config',
     ...(argv.length ? argv : ['show'])
   ])
@@ -265,13 +275,13 @@ function config(app: App, arg: string) {
  * the gateway's folder, not the session's). `/worktree new` moves the classic CLI's own process into
  * a tree; nothing here can move a shared session.
  */
-function worktree(app: App, arg: string) {
+function worktree(host: RefusedHost, arg: string) {
   const [first = 'list', ...rest] = words(arg)
   const sub = first.toLowerCase()
-  const cwd = app.info?.cwd
+  const cwd = host.session.info?.cwd
 
   if (sub === 'new') {
-    return app.transcript.notice(
+    return host.transcript.notice(
       '/worktree new runs only in the classic CLI. Start a session in a new worktree with `hermes -w` in a terminal.',
       'warning'
     )
@@ -280,25 +290,25 @@ function worktree(app: App, arg: string) {
   const head = sub === 'status' || sub === 'show' ? 'list' : sub
 
   if (!['audit', 'list', 'ls', 'prune'].includes(head)) {
-    return app.transcript.notice('Usage: /worktree [list|prune [--dry-run]]', 'warning')
+    return host.transcript.notice('Usage: /worktree [list|prune [--dry-run]]', 'warning')
   }
 
   if (!cwd) {
-    return app.transcript.notice('Wait for the session to start: /worktree needs its folder.', 'warning')
+    return host.transcript.notice('Wait for the session to start: /worktree needs its folder.', 'warning')
   }
 
-  return cliPanel(app, `/worktree ${[head, ...rest].join(' ')}`, ['worktree', head, ...rest, '--repo', cwd])
+  return cliPanel(host, `/worktree ${[head, ...rest].join(' ')}`, ['worktree', head, ...rest, '--repo', cwd])
 }
 
 /**
  * `/snapshot create [label]`: `hermes backup --quick`, the same quick state snapshot. Listing,
  * restoring and pruning them have no `hermes` command, so only the classic CLI does those.
  */
-function snapshot(app: App, arg: string) {
+function snapshot(host: RefusedHost, arg: string) {
   const [first = '', ...rest] = words(arg)
 
   if (first.toLowerCase() !== 'create') {
-    return app.transcript.notice(
+    return host.transcript.notice(
       '/snapshot list, restore and prune run only in the classic CLI (hermes --cli). Here, /snapshot create [label] takes one.',
       'warning'
     )
@@ -306,33 +316,33 @@ function snapshot(app: App, arg: string) {
 
   const label = rest.join(' ')
 
-  return cliPanel(app, '/snapshot create', ['backup', '--quick', ...(label ? ['--label', label] : [])])
+  return cliPanel(host, '/snapshot create', ['backup', '--quick', ...(label ? ['--label', label] : [])])
 }
 
 /** `/update`: `hermes update` in a split below the chat, as Ink hands the terminal to it on exit. */
-async function update(app: App) {
-  if (await openHermesSplit(['update'], app.info?.cwd || process.env.HOME || '/')) {
-    return app.transcript.notice(
+async function update(host: RefusedHost) {
+  if (await openHermesSplit(['update'], host.session.info?.cwd || process.env.HOME || '/')) {
+    return host.transcript.notice(
       'Running `hermes update` in the split below. Hermes may restart the gateway when it finishes.'
     )
   }
 
-  app.transcript.notice('Run `hermes update` in a terminal to update Hermes.')
+  host.transcript.notice('Run `hermes update` in a terminal to update Hermes.')
 }
 
 /** Runs a command, reporting a gateway refusal as `/<name> failed: …`. */
 const guarded =
-  (name: string, run: LocalCommand['run']): LocalCommand['run'] =>
-  async (app, arg) => {
+  (name: string, run: RefusedCommand['run']): RefusedCommand['run'] =>
+  async (host, arg) => {
     try {
-      return await run(app, arg)
+      return await run(host, arg)
     } catch (e) {
-      app.transcript.notice(`/${name} failed: ${errorText(e)}`, 'error')
+      host.transcript.notice(`/${name} failed: ${errorText(e)}`, 'error')
     }
   }
 
-const ROUTED: readonly LocalCommand[] = [
-  { name: 'cron', run: app => openBackground(app, { tab: 'cron' }) },
+const ROUTED: readonly RefusedCommand[] = [
+  { name: 'cron', run: host => openBackground(host, { tab: 'cron' }) },
   { name: 'browser', run: browser },
   { name: 'plugins', run: plugins },
   { aliases: ['upgrade'], name: 'subscription', run: subscription },
@@ -382,11 +392,11 @@ const HIDDEN: readonly { name: string; aliases?: readonly string[]; why: (name: 
 export const HIDDEN_COMMANDS: ReadonlySet<string> = new Set(HIDDEN.flatMap(h => [h.name, ...(h.aliases ?? [])]))
 
 /** The commands this module answers: the routed ones, then a line for each hidden one. */
-export const REFUSED_COMMANDS: readonly LocalCommand[] = [
+export const REFUSED_COMMANDS: readonly RefusedCommand[] = [
   ...ROUTED.map(c => ({ ...c, run: guarded(c.name, c.run) })),
   ...HIDDEN.map(h => ({
     aliases: h.aliases,
     name: h.name,
-    run: (app: App) => app.transcript.notice(h.why(h.name), 'warning')
+    run: (host: RefusedHost) => host.transcript.notice(h.why(h.name), 'warning')
   }))
 ]

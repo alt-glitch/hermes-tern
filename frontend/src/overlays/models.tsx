@@ -11,16 +11,18 @@ import { modelSearchText } from '@hermes/shared/model-search-text'
 import type { JSX, Key, KvItem, PickerColumn, PickerGroup, PickerItem, PickerScope } from '@stencil-hq/tern'
 import { providerDisplayNames } from '@tui/domain/providers.js'
 
-import type { App } from '../app.js'
+import type { ChatPorts } from '../app/ports.js'
 import { errorText } from '../core/errors.js'
 import { setFast } from '../fast.js'
 import { modelPayload, mutateSession } from '../hermes/mutate.js'
 import { rememberCaps } from '../modelCaps.js'
 import type { Overlay } from '../overlay.js'
-
-import { levelsFor } from './effort.js'
+import { levelsFor } from '../session/effort.js'
 
 import { editQuery, hitRuns, moveSelection, rank } from './search.js'
+
+/** What the model picker reaches of the app. */
+export type ModelsHost = Pick<ChatPorts, 'changed' | 'close' | 'gw' | 'open' | 'session' | 'setEffort' | 'transcript'>
 
 const KEY = 'models'
 const ALL = 'all'
@@ -41,11 +43,12 @@ interface Confirm {
 const confirmTokens = new Map<string, string>()
 
 /** A model switch on the shared gateway: a revision-fenced `session.mutate operation=model`, shaped like `config.set`'s reply. */
-async function mutateModel(app: App, value: string, confirmed: boolean): Promise<ConfigSetResult> {
-  const key = `${app.sid} ${value}`
+async function mutateModel(host: ModelsHost, value: string, confirmed: boolean): Promise<ConfigSetResult> {
+  const sid = host.session.ref.live
+  const key = `${sid} ${value}`
   const confirm = confirmed ? confirmTokens.get(key) : undefined
   confirmTokens.delete(key)
-  const result = await mutateSession(app.gw, app.sid ?? '', 'model', { ...modelPayload(value), ...(confirm ? { confirm } : {}) })
+  const result = await mutateSession(host.gw, sid ?? '', 'model', { ...modelPayload(value), ...(confirm ? { confirm } : {}) })
 
   if (result.status === 'confirmation_required' && typeof result.confirm === 'string' && !confirmed) {
     confirmTokens.set(key, result.confirm)
@@ -61,13 +64,13 @@ async function mutateModel(app: App, value: string, confirmed: boolean): Promise
 }
 
 /** Switches the session's model to `value` (`<model> [--provider <slug>] [--session|--global]`); reports the switch in the transcript unless it needs a confirmation. */
-export async function switchModel(app: App, value: string, confirmed = false): Promise<ConfigSetResult> {
-  const r = app.gw.isCanonical
-    ? await mutateModel(app, value, confirmed)
-    : await app.gw.request<ConfigSetResult>('config.set', {
+export async function switchModel(host: ModelsHost, value: string, confirmed = false): Promise<ConfigSetResult> {
+  const r = host.gw.isCanonical
+    ? await mutateModel(host, value, confirmed)
+    : await host.gw.request<ConfigSetResult>('config.set', {
         confirm_expensive_model: confirmed,
         key: 'model',
-        session_id: app.sid,
+        session_id: host.session.ref.live,
         value
       })
 
@@ -78,15 +81,15 @@ export async function switchModel(app: App, value: string, confirmed = false): P
   const model = typeof r.value === 'string' ? r.value : ''
 
   if (model) {
-    app.info = { ...app.info, model }
-    app.transcript.notice(r.deferred ? `Model switches to ${model} from the next turn.` : `Switched to ${model}.`)
+    host.session.info = { ...host.session.info, model }
+    host.transcript.notice(r.deferred ? `Model switches to ${model} from the next turn.` : `Switched to ${model}.`)
   }
 
   if (r.warning) {
-    app.transcript.notice(r.warning, 'warning')
+    host.transcript.notice(r.warning, 'warning')
   }
 
-  app.changed()
+  host.changed()
 
   return r
 }
@@ -97,7 +100,7 @@ export function pickerValue(model: string, provider: string, global: boolean): s
 }
 
 /** Opens the model picker over the session. */
-export function openModelPicker(app: App) {
+export function openModelPicker(host: ModelsHost) {
   let state: 'loading' | 'ready' | 'error' = 'loading'
   let message = ''
   let rows: Row[] = []
@@ -108,12 +111,12 @@ export function openModelPicker(app: App) {
   let selected: string | undefined
   let global = false
   // The shared gateway's model mutation switches this session only (as Desktop's and Ink's pickers there).
-  const canSave = !app.gw.isCanonical
+  const canSave = !host.gw.isCanonical
   /** The session's effort when the picker opened, and the one picked on the strip. */
-  const startEffort = app.info?.reasoning_effort || ''
+  const startEffort = host.session.info?.reasoning_effort || ''
   let effort = startEffort || 'medium'
   /** Fast mode as the session has it, and whether the user flipped it here. */
-  let fast = Boolean(app.info?.fast)
+  let fast = Boolean(host.session.info?.fast)
   let fastTouched = false
   let confirm: Confirm | null = null
   let busy = false
@@ -122,10 +125,11 @@ export function openModelPicker(app: App) {
 
   const load = async () => {
     state = 'loading'
-    app.changed()
+    host.changed()
 
     try {
-      const r = await app.gw.request<ModelOptionsResult>('model.options', app.sid ? { session_id: app.sid } : {})
+      const sid = host.session.ref.live
+      const r = await host.gw.request<ModelOptionsResult>('model.options', sid ? { session_id: sid } : {})
       const list = r.providers ?? []
       rememberCaps(list)
       const names = providerDisplayNames(list)
@@ -150,7 +154,7 @@ export function openModelPicker(app: App) {
       message = errorText(error)
     }
 
-    app.changed()
+    host.changed()
   }
 
   const choose = async (id: string | undefined, confirmed = false) => {
@@ -163,30 +167,30 @@ export function openModelPicker(app: App) {
     busy = true
 
     try {
-      const r = await switchModel(app, pickerValue(row.model, row.provider.slug, canSave && global), confirmed)
+      const r = await switchModel(host, pickerValue(row.model, row.provider.slug, canSave && global), confirmed)
 
       if (r.confirm_required) {
         confirm = { row, text: r.confirm_message || r.warning || `${row.model} is expensive. Switch anyway?` }
       } else {
-        app.close(overlay)
+        host.close(overlay)
 
         // The effort goes with the model: saved with it as the default, or set when it changed.
         if (levelsFor(caps(row)).some(l => l.id === effort) && ((canSave && global) || effort !== startEffort)) {
-          await app.setEffort(effort, canSave && global ? 'global' : 'session')
+          await host.setEffort(effort, canSave && global ? 'global' : 'session')
         }
 
         // After the switch: the gateway checks the tier against the session's new route.
         if (fastTouched && fastable(row)) {
-          await setFast(app, fast ? 'fast' : 'normal')
+          await setFast(host, fast ? 'fast' : 'normal')
         }
       }
     } catch (error) {
-      app.transcript.notice(errorText(error), 'error')
-      app.close(overlay)
+      host.transcript.notice(errorText(error), 'error')
+      host.close(overlay)
     }
 
     busy = false
-    app.changed()
+    host.changed()
   }
 
   const view = () => {
@@ -274,31 +278,31 @@ export function openModelPicker(app: App) {
           onAction={{
             cancel: () => {
               confirm = null
-              app.changed()
+              host.changed()
             },
             clear: () => {
               query = ''
-              app.changed()
+              host.changed()
             },
-            close: () => app.close(overlay),
+            close: () => host.close(overlay),
             confirm: () => void choose(confirm?.row.id, true),
             fast: () => {
               fast = !fast
               fastTouched = true
-              app.changed()
+              host.changed()
             },
             global: () => {
               global = !global
-              app.changed()
+              host.changed()
             },
             retry: () => void load(),
             scope: ev => {
               scope = ev.value ?? ALL
-              app.changed()
+              host.changed()
             },
             strip: ev => {
               effort = levels.find(l => l.id === ev.value)?.id ?? effort
-              app.changed()
+              host.changed()
             },
             use: () => void choose(selected)
           }}
@@ -306,7 +310,7 @@ export function openModelPicker(app: App) {
           onSelect={ev => {
             selected = ev.item
             confirm = null
-            app.changed()
+            host.changed()
           }}
           order={order}
           placeholder="Search models…"
@@ -345,7 +349,7 @@ export function openModelPicker(app: App) {
       }
 
       if (k.name === 'escape') {
-        app.close(overlay)
+        host.close(overlay)
 
         return true
       }
@@ -407,7 +411,7 @@ export function openModelPicker(app: App) {
     }
   }
 
-  app.open(overlay)
+  host.open(overlay)
   void load()
 }
 

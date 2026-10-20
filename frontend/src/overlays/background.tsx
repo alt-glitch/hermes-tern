@@ -8,7 +8,7 @@
 
 import type { JSX, Key, PickerColumn, PickerItem } from '@stencil-hq/tern'
 
-import type { App } from '../app.js'
+import type { ChatPorts } from '../app/ports.js'
 import { copyToClipboard } from '../clipboard.js'
 import { errorText } from '../core/errors.js'
 import type { BackgroundProcess, ToolCall } from '../model.js'
@@ -30,6 +30,9 @@ import { duration } from '../view/time.js'
 
 import { moveSelection } from './search.js'
 
+/** What the Background sheet reaches of the app. */
+export type BackgroundHost = Pick<ChatPorts, 'changed' | 'close' | 'cron' | 'open' | 'overlays' | 'processes' | 'transcript'>
+
 const KEY = 'background'
 /** Run times follow the clock while the sheet is open. */
 const TICK_MS = 1000
@@ -39,20 +42,14 @@ type Tab = 'all' | 'cron' | 'running'
 
 const TABS: Tab[] = ['running', 'all', 'cron']
 
-const STATUS: Record<BackgroundProcess['status'], string> = {
-  done: 'Exited',
-  failed: 'Failed',
-  killed: 'Stopped',
-  lost: 'Lost',
-  running: 'Running'
-}
+const STATUS: Record<BackgroundProcess['status'], string> = { done: 'Exited', failed: 'Failed', killed: 'Stopped', lost: 'Lost', running: 'Running' }
 
 /** Opens the sheet, on process `focus` when given, or on the Cron tab (`/cron`). */
-export function openBackground(app: App, at?: string | { tab: 'cron' }) {
-  const procs = () => app.processes.all()
+export function openBackground(host: BackgroundHost, at?: string | { tab: 'cron' }) {
+  const procs = () => host.processes.all()
   const focus = typeof at === 'string' ? at : undefined
-  const focused = focus ? app.processes.get(focus) : undefined
-  let tab: Tab = focused ? (isRunning(focused) ? 'running' : 'all') : app.processes.running().length ? 'running' : 'all'
+  const focused = focus ? host.processes.get(focus) : undefined
+  let tab: Tab = focused ? (isRunning(focused) ? 'running' : 'all') : host.processes.running().length ? 'running' : 'all'
 
   if (typeof at === 'object') {
     tab = at.tab
@@ -65,11 +62,11 @@ export function openBackground(app: App, at?: string | { tab: 'cron' }) {
   let job: string | undefined
   let copied: string | undefined
   let copiedTimer: NodeJS.Timeout | undefined
-  const release = app.processes.watch()
-  const releaseCron = app.cron.watch()
+  const release = host.processes.watch()
+  const releaseCron = host.cron.watch()
 
   // Ends with the sheet, however it closed (Esc, a session switch replacing the overlays).
-  const timer = setInterval(() => (app.overlays.includes(overlay) ? app.changed() : end()), TICK_MS)
+  const timer = setInterval(() => (host.overlays.includes(overlay) ? host.changed() : end()), TICK_MS)
 
   function end() {
     clearInterval(timer)
@@ -80,7 +77,7 @@ export function openBackground(app: App, at?: string | { tab: 'cron' }) {
 
   const close = () => {
     end()
-    app.close(overlay)
+    host.close(overlay)
   }
 
   const shown = (): BackgroundProcess[] => (tab === 'running' ? procs().filter(isRunning) : procs())
@@ -91,33 +88,33 @@ export function openBackground(app: App, at?: string | { tab: 'cron' }) {
     confirm = undefined
 
     if (!p || !isRunning(p)) {
-      return app.changed()
+      return host.changed()
     }
 
     try {
-      const status = await app.processes.kill(p.id)
+      const status = await host.processes.kill(p.id)
 
       if (status && status !== 'killed') {
-        app.transcript.notice(`${describeCommand(p.command)}: ${status.replace(/_/g, ' ')}.`, 'warning')
+        host.transcript.notice(`${describeCommand(p.command)}: ${status.replace(/_/g, ' ')}.`, 'warning')
       }
     } catch (error) {
-      app.transcript.notice(errorText(error), 'error')
+      host.transcript.notice(errorText(error), 'error')
     }
 
-    app.changed()
+    host.changed()
   }
 
   const stopAll = async () => {
     confirm = undefined
 
     try {
-      const n = await app.processes.stopAll()
-      app.transcript.notice(`Stopped ${n} background process${n === 1 ? '' : 'es'}.`)
+      const n = await host.processes.stopAll()
+      host.transcript.notice(`Stopped ${n} background process${n === 1 ? '' : 'es'}.`)
     } catch (error) {
-      app.transcript.notice(errorText(error), 'error')
+      host.transcript.notice(errorText(error), 'error')
     }
 
-    app.changed()
+    host.changed()
   }
 
   const copy = () => {
@@ -132,36 +129,36 @@ export function openBackground(app: App, at?: string | { tab: 'cron' }) {
     clearTimeout(copiedTimer)
     copiedTimer = setTimeout(() => {
       copied = undefined
-      app.changed()
+      host.changed()
     }, COPIED_MS)
-    app.changed()
+    host.changed()
   }
 
   const ask = (what: 'all' | 'one') => {
     const p = current()
 
-    if (what === 'one' ? p && isRunning(p) && !app.processes.stopping(p.id) : app.processes.running().length) {
+    if (what === 'one' ? p && isRunning(p) && !host.processes.stopping(p.id) : host.processes.running().length) {
       confirm = what
     }
   }
 
-  const currentJob = () => app.cron.jobs().find(j => j.job_id === job)
+  const currentJob = () => host.cron.jobs().find(j => j.job_id === job)
 
   const actJob = async (action: 'pause' | 'remove' | 'resume') => {
     const j = currentJob()
     confirm = undefined
 
-    if (!j || app.cron.busy(j.job_id)) {
-      return app.changed()
+    if (!j || host.cron.busy(j.job_id)) {
+      return host.changed()
     }
 
     try {
-      await app.cron.act(action, j.job_id)
+      await host.cron.act(action, j.job_id)
     } catch (error) {
-      app.transcript.notice(errorText(error), 'error')
+      host.transcript.notice(errorText(error), 'error')
     }
 
-    app.changed()
+    host.changed()
   }
 
   const toggleJob = () => {
@@ -215,7 +212,7 @@ export function openBackground(app: App, at?: string | { tab: 'cron' }) {
           job =
             moveSelection(
               k,
-              app.cron.jobs().map(j => j.job_id),
+              host.cron.jobs().map(j => j.job_id),
               job
             ) ?? job
         }
@@ -243,16 +240,16 @@ export function openBackground(app: App, at?: string | { tab: 'cron' }) {
   const handlers = {
     all: () => {
       ask('all')
-      app.changed()
+      host.changed()
     },
     cancel: () => {
       confirm = undefined
-      app.changed()
+      host.changed()
     },
     close: () => {
       if (expanded) {
         expanded = false
-        app.changed()
+        host.changed()
       } else {
         close()
       }
@@ -261,21 +258,21 @@ export function openBackground(app: App, at?: string | { tab: 'cron' }) {
     copy,
     expand: () => {
       expanded = Boolean(current()) && !expanded
-      app.changed()
+      host.changed()
     },
     remove: () => {
       askRemove()
-      app.changed()
+      host.changed()
     },
     stop: () => {
       ask('one')
-      app.changed()
+      host.changed()
     },
     tab: (ev: { value?: string }) => {
       tab = TABS.find(t => t === ev.value) ?? 'all'
       expanded = false
       confirm = undefined
-      app.changed()
+      host.changed()
     },
     toggle: toggleJob
   }
@@ -285,21 +282,21 @@ export function openBackground(app: App, at?: string | { tab: 'cron' }) {
   }
 
   const tabs = () => [
-    { count: app.processes.running().length, id: 'running', label: 'Running' },
+    { count: host.processes.running().length, id: 'running', label: 'Running' },
     { count: procs().length, id: 'all', label: 'All' },
-    { count: app.cron.loaded ? app.cron.jobs().length : undefined, id: 'cron', label: 'Cron' }
+    { count: host.cron.loaded ? host.cron.jobs().length : undefined, id: 'cron', label: 'Cron' }
   ]
 
   function cronNode(now: number): JSX.Element {
-    const jobs = app.cron.jobs()
-    const own = ownJobs(app.transcript.calls('cronjob_manage'))
+    const jobs = host.cron.jobs()
+    const own = ownJobs(host.transcript.calls('cronjob_manage'))
 
     if (!jobs.some(j => j.job_id === job)) {
       job = jobs[0]?.job_id
     }
 
     const j = jobs.find(x => x.job_id === job)
-    const busy = j ? app.cron.busy(j.job_id) : false
+    const busy = j ? host.cron.busy(j.job_id) : false
     const columns: PickerColumn[] = [
       { format: 'dim', head: 'Schedule', id: 'schedule', min: 10, priority: 1 },
       { format: 'dim', head: 'Next', id: 'next', priority: 3 },
@@ -322,27 +319,27 @@ export function openBackground(app: App, at?: string | { tab: 'cron' }) {
         columns={columns}
         confirm={confirm === 'job' && j ? { act: 'confirm', label: 'Remove', text: `Remove ${j.name || j.job_id}? It will not run again.` } : undefined}
         empty={
-          app.cron.error
-            ? `Could not list cron jobs: ${app.cron.error}`
-            : app.cron.loaded
+          host.cron.error
+            ? `Could not list cron jobs: ${host.cron.error}`
+            : host.cron.loaded
               ? 'No cron jobs. Ask Hermes to schedule one or to watch something.'
               : 'Loading cron jobs…'
         }
         icon="clock"
-        items={jobs.map(x => jobItem(x, now, own.has(x.job_id), app.cron.busy(x.job_id)))}
+        items={jobs.map(x => jobItem(x, now, own.has(x.job_id), host.cron.busy(x.job_id)))}
         key={KEY}
         noun="jobs"
         onAction={handlers}
         onSelect={ev => {
           job = ev.item
           confirm = undefined
-          app.changed()
+          host.changed()
         }}
         order={jobs.map(x => x.job_id)}
         preview="side"
         selected={job}
         size="lg"
-        subtitle={[{ s: 'muted', t: app.cron.warning ?? cronSummary(jobs) }]}
+        subtitle={[{ s: 'muted', t: host.cron.warning ?? cronSummary(jobs) }]}
         tab={tab}
         tabs={tabs()}
         title="Background"
@@ -363,7 +360,7 @@ export function openBackground(app: App, at?: string | { tab: 'cron' }) {
     }
 
     const p = list.find(x => x.id === selected)
-    const call = p && callOf(app, p.id)
+    const call = p && callOf(host, p.id)
     const columns: PickerColumn[] = [
       { format: 'dim', head: 'Last output', id: 'last', min: 16, priority: 1 },
       { format: 'dim', head: 'Status', id: 'status', priority: 3 },
@@ -377,10 +374,10 @@ export function openBackground(app: App, at?: string | { tab: 'cron' }) {
           { id: 'copy', keys: ['c'], label: copied && copied === p?.id ? 'Copied' : 'Copy command' },
           {
             danger: true,
-            disabled: p && isRunning(p) ? (app.processes.stopping(p.id) ? 'Stopping' : undefined) : 'Not running',
+            disabled: p && isRunning(p) ? (host.processes.stopping(p.id) ? 'Stopping' : undefined) : 'Not running',
             id: 'stop',
             keys: ['k'],
-            label: p && app.processes.stopping(p.id) ? 'Stopping…' : 'Stop'
+            label: p && host.processes.stopping(p.id) ? 'Stopping…' : 'Stop'
           },
           { danger: true, disabled: running ? undefined : 'None running', id: 'all', keys: ['shift+k'], label: 'Stop all' },
           { end: true, id: 'close', keys: ['esc'], label: expanded ? 'Back' : 'Close' }
@@ -396,19 +393,19 @@ export function openBackground(app: App, at?: string | { tab: 'cron' }) {
         empty={tab === 'running' ? 'No background processes running. Tab shows the finished ones.' : 'No background processes in this session'}
         focus={expanded ? 'preview' : undefined}
         icon="terminal"
-        items={all.map(x => item(x, now, app.processes.stopping(x.id)))}
+        items={all.map(x => item(x, now, host.processes.stopping(x.id)))}
         key={KEY}
         noun="processes"
         onAction={handlers}
         onActivate={ev => {
           selected = ev.item
           expanded = true
-          app.changed()
+          host.changed()
         }}
         onSelect={ev => {
           selected = ev.item
           confirm = undefined
-          app.changed()
+          host.changed()
         }}
         order={list.map(x => x.id)}
         preview="side"
@@ -425,7 +422,7 @@ export function openBackground(app: App, at?: string | { tab: 'cron' }) {
     )
   }
 
-  app.open(overlay)
+  host.open(overlay)
 }
 
 function next(tab: Tab, back: boolean): Tab {
@@ -507,8 +504,8 @@ function jobPreview(j: CronJob, now: number, own: boolean): JSX.Element[] {
 }
 
 /** The terminal call that started process `id`, for its watchers. */
-function callOf(app: App, id: string): ToolCall | undefined {
-  return app.transcript.backgroundCalls().find(c => isBackgroundCall(c) && (processIdOf(c) ?? c.process?.id) === id)
+function callOf(host: BackgroundHost, id: string): ToolCall | undefined {
+  return host.transcript.backgroundCalls().find(c => isBackgroundCall(c) && (processIdOf(c) ?? c.process?.id) === id)
 }
 
 function summary(all: BackgroundProcess[]): string {

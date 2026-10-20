@@ -5,13 +5,16 @@
 
 import type { JSX, PrefsRow } from '@stencil-hq/tern'
 
-import type { App } from './app.js'
+import type { ChatPorts } from './app/ports.js'
 import { copyToClipboard } from './clipboard.js'
 import { type GitState, gitState } from './git/status.js'
 import { prKey } from './github/links.js'
 import { checksState } from './github/pullRequest.js'
-import { openChanges } from './overlays/changes.js'
-import { openPullRequests, stateLabel } from './overlays/pullRequests.js'
+import { type ChangesHost, openChanges } from './overlays/changes.js'
+import { openPullRequests, type PullRequestsSheetHost, stateLabel } from './overlays/pullRequests.js'
+
+/** What the session sidebar reaches of the app. */
+export type SidebarHost = Pick<ChatPorts, 'changed' | 'prs' | 'session'> & ChangesHost & PullRequestsSheetHost
 
 const POLL_MS = 5000
 /** The sheet's actions: its close, and each row button's `act`. */
@@ -20,7 +23,7 @@ const ACTS = ['close', 'page', 'copy-branch', 'open-pr', 'diff', 'all-files'] as
 const MAX_FILES = 40
 
 export class Sidebar {
-  readonly #app: App
+  readonly #host: SidebarHost
   #open = false
   #state: GitState | undefined
   #cwd: string | null = null
@@ -29,8 +32,8 @@ export class Sidebar {
   #copied = false
   #copiedTimer: NodeJS.Timeout | undefined
 
-  constructor(app: App) {
-    this.#app = app
+  constructor(host: SidebarHost) {
+    this.#host = host
   }
 
   get open(): boolean {
@@ -49,7 +52,7 @@ export class Sidebar {
       void this.refresh()
     }
 
-    this.#app.changed()
+    this.#host.changed()
   }
 
   /** Reads git again now (a tool changed files, the turn ended). */
@@ -65,7 +68,7 @@ export class Sidebar {
   }
 
   async refresh() {
-    const cwd = this.#app.info?.cwd || null
+    const cwd = this.#host.session.info?.cwd || null
 
     if (this.#reading) {
       return
@@ -84,7 +87,7 @@ export class Sidebar {
         this.#timer = setTimeout(() => void this.refresh(), POLL_MS)
       }
 
-      this.#app.changed()
+      this.#host.changed()
     }
   }
 
@@ -93,9 +96,9 @@ export class Sidebar {
       return null
     }
 
-    const app = this.#app
+    const host = this.#host
     const git = this.#state
-    const prs = app.prs.entries().toReversed()
+    const prs = host.prs.entries().toReversed()
     const files = git?.files ?? []
     const added = files.reduce((n, f) => n + f.additions, 0)
     const removed = files.reduce((n, f) => n + f.deletions, 0)
@@ -148,7 +151,7 @@ export class Sidebar {
     return (
       <prefs
         key="sidebar"
-        lead={git ? git.root.replace(process.env.HOME ?? '\u0000', '~') : (app.info?.cwd ?? '')}
+        lead={git ? git.root.replace(process.env.HOME ?? '\u0000', '~') : (host.session.info?.cwd ?? '')}
         onAction={Object.fromEntries(ACTS.map(act => [act, (ev: { value?: unknown }) => this.#action(act, ev.value)]))}
         page="session"
         pages={[{ icon: 'branch', id: 'session', label: 'Session' }]}
@@ -194,21 +197,21 @@ export class Sidebar {
           clearTimeout(this.#copiedTimer)
           this.#copiedTimer = setTimeout(() => {
             this.#copied = false
-            this.#app.changed()
+            this.#host.changed()
           }, 1500)
-          this.#app.changed()
+          this.#host.changed()
         }
 
         return
 
       case 'open-pr':
-        return openPullRequests(this.#app, row.replace(/^pr:/, ''))
+        return openPullRequests(this.#host, row.replace(/^pr:/, ''))
 
       case 'diff':
-        return openChanges(this.#app, row.replace(/^file:/, ''))
+        return openChanges(this.#host, row.replace(/^file:/, ''))
 
       case 'all-files':
-        return openChanges(this.#app)
+        return openChanges(this.#host)
     }
   }
 }

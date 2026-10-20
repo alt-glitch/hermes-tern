@@ -27,6 +27,7 @@ import type { AnyGatewayEvent } from '@tui/gatewayTypes.js'
 import logo from '../assets/logo.png'
 
 import { agentName, Agents } from './agents/store.js'
+import { type ChatPorts, type SessionView, sessionView } from './app/ports.js'
 import { Automation } from './automation.js'
 import { copyToClipboard } from './clipboard.js'
 import { localCommand } from './commands.js'
@@ -38,12 +39,12 @@ import { type Busy, busyFrom, ownsEvent, Switches } from './flow.js'
 import { protocolNote, slowStartNotes } from './backendNotes.js'
 import { hudKey, type Pill } from './hud.js'
 import { moaLabel, moaReferenceLabel } from './moa.js'
-import type { Overlay, OverlayHost } from './overlay.js'
+import type { Overlay } from './overlay.js'
 import { writeActiveSessionFile } from './hermes/activeSessionFile.js'
 import { imagePathOf, withClipboardImage } from './hermes/clipboardImage.js'
 import { type Attachment, imageSize, uploadImage } from './hermes/images.js'
 import { Media } from './media.js'
-import type { ImageSource, ToolCall, UserAttachment } from './model.js'
+import type { ImageSource, NoticeEntry, ToolCall, UserAttachment } from './model.js'
 import { interpolate, shellError, shellExec, shellLines, typedCommands } from './hermes/shell.js'
 import { mutateSession } from './hermes/mutate.js'
 import { sharedPromptId, sharedPromptRequest } from './hermes/sharedPrompts.js'
@@ -52,7 +53,8 @@ import { openAutomation } from './overlays/automation.js'
 import { openBackground } from './overlays/background.js'
 import { Completion } from './overlays/completion.js'
 import { openModelPicker } from './overlays/models.js'
-import { DEFAULT_EFFORT, nextEffort, openEffortPicker } from './overlays/effort.js'
+import { openEffortPicker } from './overlays/effort.js'
+import { openHelp } from './overlays/help.js'
 import { capsOf } from './modelCaps.js'
 import { promptOverlay, promptTimeoutNotice } from './overlays/prompts.js'
 import { openPrMenu, openPrSheet, openUrl, prsPill } from './overlays/pullRequests.js'
@@ -63,6 +65,7 @@ import { LINK_TOOLS } from './github/links.js'
 import { PullRequests } from './github/store.js'
 import { Cron } from './processes/cron.js'
 import { PrAside } from './prs/aside.js'
+import { applyEffort, cycleEffort, DEFAULT_EFFORT } from './session/effort.js'
 import { Sidebar } from './sidebar.js'
 import type { SessionHost } from './sessionCommands.js'
 import { ambiguousNotice, CommandCatalog, resolveSlashName } from './slashResolve.js'
@@ -135,7 +138,7 @@ interface Admitted {
 }
 
 /** Runs the Tern frontend until the user quits; resolves the exit code. */
-export class App implements OverlayHost {
+export class App implements ChatPorts {
   readonly transcript = new Transcript()
   /** Images tool calls showed, a URL's bytes fetched once and sent as a blob. */
   readonly media = new Media({ blob: (bytes, mime) => this.#blob(bytes, mime) })
@@ -145,8 +148,6 @@ export class App implements OverlayHost {
   readonly processes: Processes = new Processes(this, { author: hermesAuthor(), enabled: () => this.#jobCharts, memory: chartMemory() })
   readonly cron: Cron = new Cron(this)
   readonly sidebar: Sidebar = new Sidebar(this)
-  /** The pull request docked at the pane's right edge (the PR aside). */
-  readonly prAside: PrAside = new PrAside(this)
   /** The session's standing /goal and /loop (the dock line above the pills and its sheets). */
   readonly automation: Automation = new Automation(this)
   /** The session's title, as Hermes names it (`session.title`). */
@@ -159,12 +160,23 @@ export class App implements OverlayHost {
     cwd: () => this.info?.cwd || null,
     sid: () => this.storedSid ?? this.sid
   })
+  /** The pull request docked at the pane's right edge (the PR aside). */
+  readonly prAside: PrAside = new PrAside({
+    changed: () => this.changed(),
+    notice: (text, tone) => this.notice(text, tone),
+    open: openUrl,
+    prs: this.prs,
+    reveal: id => this.reveal(id),
+    scroll: (id, to) => this.scroll(id, to)
+  })
   readonly composer = new Composer()
   readonly overlays: Overlay[] = []
   sid: string | null = null
   /** The stored (database) id of the open session: what `session.list` rows are keyed by. */
   storedSid: string | null = null
   info: SessionLiveInfo | null = null
+  /** The session as the ports read it: `sid`, `storedSid` and `info`, live. */
+  readonly session: SessionView = sessionView(this)
   usage: Usage | null = null
   busy: Busy | null = null
   /** Prompts held here until they can be sent: no session yet, a switch in flight, or a private gateway's busy turn. */
@@ -366,6 +378,12 @@ export class App implements OverlayHost {
     })
   }
 
+  /** A notice in the transcript, rendered now. */
+  notice(text: string, tone?: NoticeEntry['tone']) {
+    this.transcript.notice(text, tone)
+    this.changed()
+  }
+
   /** An error nothing caught (a rejected promise no caller awaited): shown, so the pane lives on. */
   fault(reason: unknown) {
     this.transcript.notice(`Unexpected error: ${errorText(reason)}`, 'error')
@@ -438,7 +456,7 @@ export class App implements OverlayHost {
     }
 
     if (key.shift && key.name === 'tab') {
-      return this.#cycleEffort()
+      return cycleEffort(this)
     }
 
     // By the Alt modifier only: a typed å, ∫, ß or π (macOS Option without Meta, or a keyboard
@@ -935,6 +953,11 @@ export class App implements OverlayHost {
     if (!(await openSidebar(specOf(a, agentName(a), this.sid, this.storedSid), cwd))) {
       openAgents(this, { id, watch: true })
     }
+  }
+
+  /** `/help`: the keyboard shortcuts and every command, in the help sheet. */
+  openHelp(): Promise<void> {
+    return openHelp(this)
   }
 
   /** Text or images in the composer: Ctrl+C clears them before it interrupts, Ctrl+D never exits over them. */
@@ -2430,57 +2453,9 @@ export class App implements OverlayHost {
     })
   }
 
-  /** Steps the session's reasoning effort up the levels its model takes; session.info echoes it back. */
-  #cycleEffort() {
-    const next = nextEffort(this.info?.reasoning_effort ?? '', capsOf(this.info))
-
-    if (!next) {
-      this.transcript.notice('This model has no reasoning effort to set.', 'warning')
-
-      return this.changed()
-    }
-
-    void this.setEffort(next, 'session')
-  }
-
-  /**
-   * Sets the reasoning effort: `session` for this session only (the pill, ⇧⇥), `global` also as
-   * config.yaml's `agent.reasoning_effort`, the default of every new session (Hermes' `/reasoning
-   * <level> --global`). On the shared gateway the session level is its revision-fenced `reasoning`
-   * mutation, as Ink and desktop send it: stored with the session, and session.info to every viewer.
-   */
-  async setEffort(value: string, scope: 'global' | 'session') {
-    const sid = this.sid
-
-    if (!sid) {
-      return
-    }
-
-    const before = this.info && { reasoning_effort: this.info.reasoning_effort, reasoning_effort_wire: this.info.reasoning_effort_wire }
-    // Shown at once (and a quick second press steps from it); session.info confirms, with the wire level.
-    this.info = this.info && { ...this.info, reasoning_effort: value, reasoning_effort_wire: undefined }
-    this.changed()
-
-    try {
-      if (scope === 'session' && this.#gw.isCanonical) {
-        await mutateSession(this.#gw, sid, 'reasoning', { effort: value })
-      } else {
-        await this.#gw.request('config.set', { key: 'reasoning', scope, session_id: sid, value })
-      }
-
-      if (scope === 'global') {
-        this.transcript.notice(`Reasoning effort ${value === 'none' ? 'off' : value} is now the default for new sessions.`)
-      }
-    } catch (error) {
-      // Back to what the session runs, unless something newer has replaced the guess since.
-      if (sid === this.sid && this.info && before && this.info.reasoning_effort === value) {
-        this.info = { ...this.info, ...before }
-      }
-
-      this.transcript.notice(`Could not set the reasoning effort: ${errorText(error)}`, 'error')
-    }
-
-    this.changed()
+  /** Sets the reasoning effort for this session, or also as the default of every new one (session/effort.ts). */
+  setEffort(value: string, scope: 'global' | 'session'): Promise<void> {
+    return applyEffort(this, value, scope)
   }
 
   /** Prompts waiting behind the turn: this pane's own queue, then the shared gateway's. */
@@ -2746,7 +2721,7 @@ export class App implements OverlayHost {
           this.composer.edit(ev)
           this.changed()
         },
-        onEffort: () => this.#cycleEffort(),
+        onEffort: () => cycleEffort(this),
         onEffortMenu: {
           'choose-effort': () => openEffortPicker(this),
           'save-effort-as-default': () => void this.setEffort(this.info?.reasoning_effort || DEFAULT_EFFORT, 'global')

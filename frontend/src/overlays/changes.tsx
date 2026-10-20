@@ -3,12 +3,15 @@
 
 import type { JSX, Key, PickerItem } from '@stencil-hq/tern'
 
-import type { App } from '../app.js'
+import type { ChatPorts } from '../app/ports.js'
 import { copyToClipboard } from '../clipboard.js'
 import { type ChangedFile, fileDiff, type GitState, gitState } from '../git/status.js'
 import type { Overlay } from '../overlay.js'
 
 import { moveSelection } from './search.js'
+
+/** What the Changes sheet reaches of the app. */
+export type ChangesHost = Pick<ChatPorts, 'changed' | 'close' | 'open' | 'session' | 'sidebar'>
 
 const KEY = 'changes'
 
@@ -21,20 +24,20 @@ const TONE: Record<string, 'error' | 'info' | 'success' | 'warning'> = {
 }
 
 /** Opens the sheet, on file `focus` when given. */
-export function openChanges(app: App, focus?: string) {
-  let state: GitState | undefined = app.sidebar.state
+export function openChanges(host: ChangesHost, focus?: string) {
+  let state: GitState | undefined = host.sidebar.state
   let selected = focus
   let failed = false
   /** Each file's diff; null while it is read. */
   const diffs = new Map<string, string | null>()
 
   const read = async () => {
-    const cwd = app.info?.cwd
+    const cwd = host.session.info?.cwd
 
     state = cwd ? await gitState(cwd) : undefined
     failed = !state
     diffs.clear()
-    app.changed()
+    host.changed()
   }
 
   const load = (f: ChangedFile | undefined) => {
@@ -45,7 +48,7 @@ export function openChanges(app: App, focus?: string) {
     diffs.set(f.path, null)
     void fileDiff(state.root, f).then(text => {
       diffs.set(f.path, text)
-      app.changed()
+      host.changed()
     })
   }
 
@@ -60,7 +63,7 @@ export function openChanges(app: App, focus?: string) {
     node: () => sheetNode(),
     onKey: (k: Key) => {
       if (k.name === 'escape') {
-        app.close(overlay)
+        host.close(overlay)
       } else if (k.name === 'c' && !k.ctrl && !k.alt && !k.meta && current()) {
         copyToClipboard(current()!.path)
       } else if (k.name === 'r' && k.shift) {
@@ -105,13 +108,13 @@ export function openChanges(app: App, focus?: string) {
         key={KEY}
         noun="files"
         onAction={{
-          close: () => app.close(overlay),
+          close: () => host.close(overlay),
           copy: () => f && copyToClipboard(f.path),
           refresh: () => void read()
         }}
         onSelect={ev => {
           selected = ev.item
-          app.changed()
+          host.changed()
         }}
         order={list.map(x => x.path)}
         preview="below"
@@ -132,7 +135,7 @@ export function openChanges(app: App, focus?: string) {
     )
   }
 
-  app.open(overlay)
+  host.open(overlay)
 }
 
 function item(f: ChangedFile): PickerItem {

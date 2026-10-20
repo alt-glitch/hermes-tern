@@ -25489,6 +25489,21 @@ function applyLog(a2, log) {
   }
 }
 
+// src/app/ports.ts
+function sessionView(fields) {
+  return {
+    get info() {
+      return fields.info;
+    },
+    set info(info) {
+      fields.info = info;
+    },
+    get ref() {
+      return { live: fields.sid, stored: fields.storedSid };
+    }
+  };
+}
+
 // src/core/errors.ts
 function errorText(error) {
   return error instanceof Error ? error.message : String(error);
@@ -25835,15 +25850,15 @@ function fastValue(arg) {
 }
 var describe2 = (word) => word === "normal" ? "Fast mode off." : `${word === "fast" ? "Fast" : "Ultrafast"} mode on: priority processing, billed higher.`;
 async function setFast(host, value) {
-  const sid = host.sid;
+  const sid = host.session.ref.live;
   if (!sid) {
     return false;
   }
   try {
     const r = await host.gw.request("config.set", { key: "fast", session_id: sid, value });
     const word = fastWord(r?.value);
-    if (sid === host.sid) {
-      host.info = { ...host.info, fast: word !== "normal", service_tier: TIERS[word] };
+    if (sid === host.session.ref.live) {
+      host.session.info = { ...host.session.info, fast: word !== "normal", service_tier: TIERS[word] };
     }
     host.transcript.notice(describe2(word));
     return true;
@@ -25860,7 +25875,7 @@ async function setFast(host, value) {
 }
 async function fastCommand(host, arg) {
   if (arg.trim().toLowerCase() === "status") {
-    const r = await host.gw.request("config.get", { key: "fast", session_id: host.sid });
+    const r = await host.gw.request("config.get", { key: "fast", session_id: host.session.ref.live });
     return host.transcript.notice(`Fast mode: ${fastWord(r?.value)}.`);
   }
   const value = fastValue(arg);
@@ -32370,18 +32385,18 @@ var TOOL_ICON = {
   web_search: "web",
   write_file: "write"
 };
-function openAgents(app2, focus) {
-  const agents2 = () => app2.agents.all();
-  let tab2 = app2.agents.running().length ? "running" : "all";
+function openAgents(host, focus) {
+  const agents2 = () => host.agents.all();
+  let tab2 = host.agents.running().length ? "running" : "all";
   let selected = focus?.id ?? agents2().find(isRunning)?.id ?? agents2()[0]?.id;
   let watching;
   let step;
   let steer2;
   let stopping = false;
-  const timer = setInterval(() => app2.overlays.includes(overlay) ? app2.changed() : clearInterval(timer), TICK_MS);
+  const timer = setInterval(() => host.overlays.includes(overlay) ? host.changed() : clearInterval(timer), TICK_MS);
   const close = () => {
     clearInterval(timer);
-    app2.close(overlay);
+    host.close(overlay);
   };
   const current = () => agents2().find((a2) => a2.id === (watching ?? selected));
   const watch2 = (id) => {
@@ -32391,12 +32406,12 @@ function openAgents(app2, focus) {
     }
     watching = a2.id;
     step = void 0;
-    void app2.agents.refresh(a2);
+    void host.agents.refresh(a2);
   };
   const beside = (id) => {
     if (id) {
       close();
-      void app2.openAgent(id);
+      void host.openAgent(id);
     }
   };
   const sendSteer = async () => {
@@ -32404,42 +32419,42 @@ function openAgents(app2, focus) {
     const text11 = steer2?.trim();
     steer2 = void 0;
     if (!a2 || !text11) {
-      return app2.changed();
+      return host.changed();
     }
     try {
-      const queued = await app2.agents.steer(a2, text11);
-      app2.transcript.notice(
+      const queued = await host.agents.steer(a2, text11);
+      host.transcript.notice(
         queued ? `Steering queued for ${agentName(a2)}.` : `${agentName(a2)} is not taking steering now.`,
         queued ? "info" : "warning"
       );
     } catch (error) {
-      app2.transcript.notice(errorText(error), "error");
+      host.transcript.notice(errorText(error), "error");
     }
-    app2.changed();
+    host.changed();
   };
   const stop2 = async () => {
     const a2 = current();
     stopping = false;
     if (!a2 || !isRunning(a2)) {
-      return app2.changed();
+      return host.changed();
     }
     try {
-      if (!await app2.agents.stop(a2)) {
-        app2.transcript.notice(`${agentName(a2)} already finished.`, "warning");
+      if (!await host.agents.stop(a2)) {
+        host.transcript.notice(`${agentName(a2)} already finished.`, "warning");
       }
     } catch (error) {
-      app2.transcript.notice(errorText(error), "error");
+      host.transcript.notice(errorText(error), "error");
     }
-    app2.changed();
+    host.changed();
   };
   const togglePause = async () => {
     try {
-      const paused = await app2.agents.pause(!app2.agents.paused);
-      app2.transcript.notice(paused ? "Subagent spawning paused for every chat on this gateway." : "Subagent spawning resumed.");
+      const paused = await host.agents.pause(!host.agents.paused);
+      host.transcript.notice(paused ? "Subagent spawning paused for every chat on this gateway." : "Subagent spawning resumed.");
     } catch (error) {
-      app2.transcript.notice(errorText(error), "error");
+      host.transcript.notice(errorText(error), "error");
     }
-    app2.changed();
+    host.changed();
   };
   const shown = () => tab2 === "running" ? agents2().filter(isRunning) : agents2();
   const steps = (a2) => a2.log?.entries ?? [];
@@ -32520,7 +32535,7 @@ function openAgents(app2, focus) {
       ...inTimeline ? [] : [
         { id: "watch", keys: ["t"], label: "Timeline" },
         { id: "beside", keys: ["enter"], label: "Open beside", primary: true },
-        { id: "pause", keys: ["p"], label: app2.agents.paused ? "Resume spawns" : "Pause spawns" }
+        { id: "pause", keys: ["p"], label: host.agents.paused ? "Resume spawns" : "Pause spawns" }
       ],
       {
         disabled: running ? a2?.steerable === false ? "Not taking steering now" : void 0 : "Finished",
@@ -32535,13 +32550,13 @@ function openAgents(app2, focus) {
   const handlers3 = {
     cancel: () => {
       stopping = false;
-      app2.changed();
+      host.changed();
     },
     close: () => {
       if (watching) {
         selected = watching;
         watching = void 0;
-        app2.changed();
+        host.changed();
       } else {
         close();
       }
@@ -32550,25 +32565,25 @@ function openAgents(app2, focus) {
     pause: () => void togglePause(),
     steer: () => {
       steer2 = "";
-      app2.changed();
+      host.changed();
     },
     "steer-cancel": () => {
       steer2 = void 0;
-      app2.changed();
+      host.changed();
     },
     "steer-send": () => void sendSteer(),
     stop: () => {
       stopping = true;
-      app2.changed();
+      host.changed();
     },
     tab: (ev) => {
       tab2 = ev.value === "running" ? "running" : "all";
-      app2.changed();
+      host.changed();
     },
     beside: () => beside(selected),
     watch: () => {
       watch2(selected);
-      app2.changed();
+      host.changed();
     }
   };
   function hubNode(now) {
@@ -32599,7 +32614,7 @@ function openAgents(app2, focus) {
         onSelect: (ev) => {
           selected = ev.item;
           stopping = false;
-          app2.changed();
+          host.changed();
         },
         order: list8.map((x) => x.id),
         preview: "side",
@@ -32607,7 +32622,7 @@ function openAgents(app2, focus) {
         size: "lg",
         subtitle: [
           { s: "muted", t: summary2(all8) },
-          ...app2.agents.paused ? [{ s: "warning", t: " \xB7 spawns paused (gateway-wide)" }] : []
+          ...host.agents.paused ? [{ s: "warning", t: " \xB7 spawns paused (gateway-wide)" }] : []
         ],
         tab: tab2,
         tabs: [
@@ -32617,7 +32632,7 @@ function openAgents(app2, focus) {
         title: "Agents",
         total: all8.length,
         ...steerProps(a2),
-        children: a2 ? hubPreview(a2, now, briefFor(app2, a2)) : null
+        children: a2 ? hubPreview(a2, now, briefFor(host, a2)) : null
       },
       KEY
     );
@@ -32644,7 +32659,7 @@ function openAgents(app2, focus) {
         onAction: handlers3,
         onSelect: (ev) => {
           step = ev.item === ids.at(-1) ? void 0 : ev.item;
-          app2.changed();
+          host.changed();
         },
         preview: "side",
         selected: sel,
@@ -32653,12 +32668,12 @@ function openAgents(app2, focus) {
         title: agentName(a2),
         total: entries.length,
         ...steerProps(a2),
-        children: at >= 0 ? stepPreview(entries[at], a2, briefFor(app2, a2)) : [agentNode(a2, now)]
+        children: at >= 0 ? stepPreview(entries[at], a2, briefFor(host, a2)) : [agentNode(a2, now)]
       },
       KEY
     );
   }
-  app2.open(overlay);
+  host.open(overlay);
   if (focus?.watch) {
     watch2(focus.id);
   }
@@ -32688,8 +32703,8 @@ function hubItem(a2, now) {
     title: a2.goal
   };
 }
-function briefFor(app2, a2) {
-  const call = app2.transcript.delegations().find((c) => c.subagents?.includes(a2));
+function briefFor(host, a2) {
+  const call = host.transcript.delegations().find((c) => c.subagents?.includes(a2));
   return call ? briefOf(call, a2.index) : void 0;
 }
 function hubPreview(a2, now, brief) {
@@ -32934,18 +32949,12 @@ var KEY2 = "background";
 var TICK_MS2 = 1e3;
 var COPIED_MS = 1500;
 var TABS = ["running", "all", "cron"];
-var STATUS2 = {
-  done: "Exited",
-  failed: "Failed",
-  killed: "Stopped",
-  lost: "Lost",
-  running: "Running"
-};
-function openBackground(app2, at) {
-  const procs = () => app2.processes.all();
+var STATUS2 = { done: "Exited", failed: "Failed", killed: "Stopped", lost: "Lost", running: "Running" };
+function openBackground(host, at) {
+  const procs = () => host.processes.all();
   const focus = typeof at === "string" ? at : void 0;
-  const focused = focus ? app2.processes.get(focus) : void 0;
-  let tab2 = focused ? isRunning2(focused) ? "running" : "all" : app2.processes.running().length ? "running" : "all";
+  const focused = focus ? host.processes.get(focus) : void 0;
+  let tab2 = focused ? isRunning2(focused) ? "running" : "all" : host.processes.running().length ? "running" : "all";
   if (typeof at === "object") {
     tab2 = at.tab;
   }
@@ -32955,9 +32964,9 @@ function openBackground(app2, at) {
   let job;
   let copied;
   let copiedTimer;
-  const release = app2.processes.watch();
-  const releaseCron = app2.cron.watch();
-  const timer = setInterval(() => app2.overlays.includes(overlay) ? app2.changed() : end(), TICK_MS2);
+  const release = host.processes.watch();
+  const releaseCron = host.cron.watch();
+  const timer = setInterval(() => host.overlays.includes(overlay) ? host.changed() : end(), TICK_MS2);
   function end() {
     clearInterval(timer);
     clearTimeout(copiedTimer);
@@ -32966,7 +32975,7 @@ function openBackground(app2, at) {
   }
   const close = () => {
     end();
-    app2.close(overlay);
+    host.close(overlay);
   };
   const shown = () => tab2 === "running" ? procs().filter(isRunning2) : procs();
   const current = () => procs().find((p3) => p3.id === selected);
@@ -32974,27 +32983,27 @@ function openBackground(app2, at) {
     const p3 = current();
     confirm = void 0;
     if (!p3 || !isRunning2(p3)) {
-      return app2.changed();
+      return host.changed();
     }
     try {
-      const status = await app2.processes.kill(p3.id);
+      const status = await host.processes.kill(p3.id);
       if (status && status !== "killed") {
-        app2.transcript.notice(`${describeCommand(p3.command)}: ${status.replace(/_/g, " ")}.`, "warning");
+        host.transcript.notice(`${describeCommand(p3.command)}: ${status.replace(/_/g, " ")}.`, "warning");
       }
     } catch (error) {
-      app2.transcript.notice(errorText(error), "error");
+      host.transcript.notice(errorText(error), "error");
     }
-    app2.changed();
+    host.changed();
   };
   const stopAll = async () => {
     confirm = void 0;
     try {
-      const n = await app2.processes.stopAll();
-      app2.transcript.notice(`Stopped ${n} background process${n === 1 ? "" : "es"}.`);
+      const n = await host.processes.stopAll();
+      host.transcript.notice(`Stopped ${n} background process${n === 1 ? "" : "es"}.`);
     } catch (error) {
-      app2.transcript.notice(errorText(error), "error");
+      host.transcript.notice(errorText(error), "error");
     }
-    app2.changed();
+    host.changed();
   };
   const copy = () => {
     const p3 = current();
@@ -33006,29 +33015,29 @@ function openBackground(app2, at) {
     clearTimeout(copiedTimer);
     copiedTimer = setTimeout(() => {
       copied = void 0;
-      app2.changed();
+      host.changed();
     }, COPIED_MS);
-    app2.changed();
+    host.changed();
   };
   const ask = (what) => {
     const p3 = current();
-    if (what === "one" ? p3 && isRunning2(p3) && !app2.processes.stopping(p3.id) : app2.processes.running().length) {
+    if (what === "one" ? p3 && isRunning2(p3) && !host.processes.stopping(p3.id) : host.processes.running().length) {
       confirm = what;
     }
   };
-  const currentJob = () => app2.cron.jobs().find((j) => j.job_id === job);
+  const currentJob = () => host.cron.jobs().find((j) => j.job_id === job);
   const actJob = async (action) => {
     const j = currentJob();
     confirm = void 0;
-    if (!j || app2.cron.busy(j.job_id)) {
-      return app2.changed();
+    if (!j || host.cron.busy(j.job_id)) {
+      return host.changed();
     }
     try {
-      await app2.cron.act(action, j.job_id);
+      await host.cron.act(action, j.job_id);
     } catch (error) {
-      app2.transcript.notice(errorText(error), "error");
+      host.transcript.notice(errorText(error), "error");
     }
-    app2.changed();
+    host.changed();
   };
   const toggleJob = () => {
     const j = currentJob();
@@ -33073,7 +33082,7 @@ function openBackground(app2, at) {
         } else {
           job = moveSelection(
             k,
-            app2.cron.jobs().map((j) => j.job_id),
+            host.cron.jobs().map((j) => j.job_id),
             job
           ) ?? job;
         }
@@ -33098,16 +33107,16 @@ function openBackground(app2, at) {
   const handlers3 = {
     all: () => {
       ask("all");
-      app2.changed();
+      host.changed();
     },
     cancel: () => {
       confirm = void 0;
-      app2.changed();
+      host.changed();
     },
     close: () => {
       if (expanded) {
         expanded = false;
-        app2.changed();
+        host.changed();
       } else {
         close();
       }
@@ -33116,21 +33125,21 @@ function openBackground(app2, at) {
     copy,
     expand: () => {
       expanded = Boolean(current()) && !expanded;
-      app2.changed();
+      host.changed();
     },
     remove: () => {
       askRemove();
-      app2.changed();
+      host.changed();
     },
     stop: () => {
       ask("one");
-      app2.changed();
+      host.changed();
     },
     tab: (ev) => {
       tab2 = TABS.find((t2) => t2 === ev.value) ?? "all";
       expanded = false;
       confirm = void 0;
-      app2.changed();
+      host.changed();
     },
     toggle: toggleJob
   };
@@ -33138,18 +33147,18 @@ function openBackground(app2, at) {
     return tab2 === "cron" ? cronNode(now) : processNode(now);
   }
   const tabs = () => [
-    { count: app2.processes.running().length, id: "running", label: "Running" },
+    { count: host.processes.running().length, id: "running", label: "Running" },
     { count: procs().length, id: "all", label: "All" },
-    { count: app2.cron.loaded ? app2.cron.jobs().length : void 0, id: "cron", label: "Cron" }
+    { count: host.cron.loaded ? host.cron.jobs().length : void 0, id: "cron", label: "Cron" }
   ];
   function cronNode(now) {
-    const jobs = app2.cron.jobs();
-    const own13 = ownJobs(app2.transcript.calls("cronjob_manage"));
+    const jobs = host.cron.jobs();
+    const own13 = ownJobs(host.transcript.calls("cronjob_manage"));
     if (!jobs.some((j2) => j2.job_id === job)) {
       job = jobs[0]?.job_id;
     }
     const j = jobs.find((x) => x.job_id === job);
-    const busy = j ? app2.cron.busy(j.job_id) : false;
+    const busy = j ? host.cron.busy(j.job_id) : false;
     const columns = [
       { format: "dim", head: "Schedule", id: "schedule", min: 10, priority: 1 },
       { format: "dim", head: "Next", id: "next", priority: 3 },
@@ -33171,21 +33180,21 @@ function openBackground(app2, at) {
         ],
         columns,
         confirm: confirm === "job" && j ? { act: "confirm", label: "Remove", text: `Remove ${j.name || j.job_id}? It will not run again.` } : void 0,
-        empty: app2.cron.error ? `Could not list cron jobs: ${app2.cron.error}` : app2.cron.loaded ? "No cron jobs. Ask Hermes to schedule one or to watch something." : "Loading cron jobs\u2026",
+        empty: host.cron.error ? `Could not list cron jobs: ${host.cron.error}` : host.cron.loaded ? "No cron jobs. Ask Hermes to schedule one or to watch something." : "Loading cron jobs\u2026",
         icon: "clock",
-        items: jobs.map((x) => jobItem(x, now, own13.has(x.job_id), app2.cron.busy(x.job_id))),
+        items: jobs.map((x) => jobItem(x, now, own13.has(x.job_id), host.cron.busy(x.job_id))),
         noun: "jobs",
         onAction: handlers3,
         onSelect: (ev) => {
           job = ev.item;
           confirm = void 0;
-          app2.changed();
+          host.changed();
         },
         order: jobs.map((x) => x.job_id),
         preview: "side",
         selected: job,
         size: "lg",
-        subtitle: [{ s: "muted", t: app2.cron.warning ?? cronSummary(jobs) }],
+        subtitle: [{ s: "muted", t: host.cron.warning ?? cronSummary(jobs) }],
         tab: tab2,
         tabs: tabs(),
         title: "Background",
@@ -33203,7 +33212,7 @@ function openBackground(app2, at) {
       selected = list8[0]?.id;
     }
     const p3 = list8.find((x) => x.id === selected);
-    const call = p3 && callOf(app2, p3.id);
+    const call = p3 && callOf(host, p3.id);
     const columns = [
       { format: "dim", head: "Last output", id: "last", min: 16, priority: 1 },
       { format: "dim", head: "Status", id: "status", priority: 3 },
@@ -33217,10 +33226,10 @@ function openBackground(app2, at) {
           { id: "copy", keys: ["c"], label: copied && copied === p3?.id ? "Copied" : "Copy command" },
           {
             danger: true,
-            disabled: p3 && isRunning2(p3) ? app2.processes.stopping(p3.id) ? "Stopping" : void 0 : "Not running",
+            disabled: p3 && isRunning2(p3) ? host.processes.stopping(p3.id) ? "Stopping" : void 0 : "Not running",
             id: "stop",
             keys: ["k"],
-            label: p3 && app2.processes.stopping(p3.id) ? "Stopping\u2026" : "Stop"
+            label: p3 && host.processes.stopping(p3.id) ? "Stopping\u2026" : "Stop"
           },
           { danger: true, disabled: running ? void 0 : "None running", id: "all", keys: ["shift+k"], label: "Stop all" },
           { end: true, id: "close", keys: ["esc"], label: expanded ? "Back" : "Close" }
@@ -33230,18 +33239,18 @@ function openBackground(app2, at) {
         empty: tab2 === "running" ? "No background processes running. Tab shows the finished ones." : "No background processes in this session",
         focus: expanded ? "preview" : void 0,
         icon: "terminal",
-        items: all8.map((x) => item(x, now, app2.processes.stopping(x.id))),
+        items: all8.map((x) => item(x, now, host.processes.stopping(x.id))),
         noun: "processes",
         onAction: handlers3,
         onActivate: (ev) => {
           selected = ev.item;
           expanded = true;
-          app2.changed();
+          host.changed();
         },
         onSelect: (ev) => {
           selected = ev.item;
           confirm = void 0;
-          app2.changed();
+          host.changed();
         },
         order: list8.map((x) => x.id),
         preview: "side",
@@ -33257,7 +33266,7 @@ function openBackground(app2, at) {
       KEY2
     );
   }
-  app2.open(overlay);
+  host.open(overlay);
 }
 function next(tab2, back) {
   return TABS[(TABS.indexOf(tab2) + (back ? TABS.length - 1 : 1)) % TABS.length];
@@ -33325,8 +33334,8 @@ function jobPreview(j, now, own13) {
     ] : []
   ];
 }
-function callOf(app2, id) {
-  return app2.transcript.backgroundCalls().find((c) => isBackgroundCall(c) && (processIdOf(c) ?? c.process?.id) === id);
+function callOf(host, id) {
+  return host.transcript.backgroundCalls().find((c) => isBackgroundCall(c) && (processIdOf(c) ?? c.process?.id) === id);
 }
 function summary3(all8) {
   const count = (s2) => all8.filter((p3) => p3.status === s2).length;
@@ -33495,17 +33504,17 @@ var TONE2 = {
   renamed: "info",
   untracked: "success"
 };
-function openChanges(app2, focus) {
-  let state = app2.sidebar.state;
+function openChanges(host, focus) {
+  let state = host.sidebar.state;
   let selected = focus;
   let failed = false;
   const diffs = /* @__PURE__ */ new Map();
   const read = async () => {
-    const cwd = app2.info?.cwd;
+    const cwd = host.session.info?.cwd;
     state = cwd ? await gitState(cwd) : void 0;
     failed = !state;
     diffs.clear();
-    app2.changed();
+    host.changed();
   };
   const load2 = (f) => {
     if (!f || !state || diffs.has(f.path)) {
@@ -33514,7 +33523,7 @@ function openChanges(app2, focus) {
     diffs.set(f.path, null);
     void fileDiff(state.root, f).then((text11) => {
       diffs.set(f.path, text11);
-      app2.changed();
+      host.changed();
     });
   };
   void read();
@@ -33526,7 +33535,7 @@ function openChanges(app2, focus) {
     node: () => sheetNode(),
     onKey: (k) => {
       if (k.name === "escape") {
-        app2.close(overlay);
+        host.close(overlay);
       } else if (k.name === "c" && !k.ctrl && !k.alt && !k.meta && current()) {
         copyToClipboard(current().path);
       } else if (k.name === "r" && k.shift) {
@@ -33565,13 +33574,13 @@ function openChanges(app2, focus) {
         items: list8.map(item2),
         noun: "files",
         onAction: {
-          close: () => app2.close(overlay),
+          close: () => host.close(overlay),
           copy: () => f && copyToClipboard(f.path),
           refresh: () => void read()
         },
         onSelect: (ev) => {
           selected = ev.item;
-          app2.changed();
+          host.changed();
         },
         order: list8.map((x) => x.path),
         preview: "below",
@@ -33591,7 +33600,7 @@ function openChanges(app2, focus) {
       KEY3
     );
   }
-  app2.open(overlay);
+  host.open(overlay);
 }
 function item2(f) {
   return {
@@ -33645,8 +33654,7 @@ async function loadCaps(gw2, sid) {
   }
 }
 
-// src/overlays/effort.tsx
-var KEY4 = "effort";
+// src/session/effort.ts
 var LEVELS = [
   { detail: "No reasoning tokens", id: "none", label: "off" },
   { detail: "The least thinking a model allows", id: "minimal", label: "minimal" },
@@ -33676,24 +33684,61 @@ function effortText(effort, wire) {
   const shown = effort === "none" ? "off" : effort || DEFAULT_EFFORT;
   return wire && effort && wire !== effort && effort !== "none" ? `${shown}\u2192${wire}` : shown;
 }
-function openEffortPicker(app2, global2 = false) {
-  const current = app2.info?.reasoning_effort || DEFAULT_EFFORT;
-  let levels = levelsFor(capsOf(app2.info));
+async function applyEffort(host, value, scope) {
+  const session2 = host.session;
+  const sid = session2.ref.live;
+  if (!sid) {
+    return;
+  }
+  const before = session2.info && { reasoning_effort: session2.info.reasoning_effort, reasoning_effort_wire: session2.info.reasoning_effort_wire };
+  session2.info = session2.info && { ...session2.info, reasoning_effort: value, reasoning_effort_wire: void 0 };
+  host.changed();
+  try {
+    if (scope === "session" && host.gw.isCanonical) {
+      await mutateSession(host.gw, sid, "reasoning", { effort: value });
+    } else {
+      await host.gw.request("config.set", { key: "reasoning", scope, session_id: sid, value });
+    }
+    if (scope === "global") {
+      host.transcript.notice(`Reasoning effort ${value === "none" ? "off" : value} is now the default for new sessions.`);
+    }
+  } catch (error) {
+    if (sid === session2.ref.live && session2.info && before && session2.info.reasoning_effort === value) {
+      session2.info = { ...session2.info, ...before };
+    }
+    host.transcript.notice(`Could not set the reasoning effort: ${errorText(error)}`, "error");
+  }
+  host.changed();
+}
+function cycleEffort(host) {
+  const next3 = nextEffort(host.session.info?.reasoning_effort ?? "", capsOf(host.session.info));
+  if (!next3) {
+    host.transcript.notice("This model has no reasoning effort to set.", "warning");
+    return host.changed();
+  }
+  void host.setEffort(next3, "session");
+}
+
+// src/overlays/effort.tsx
+var KEY4 = "effort";
+function openEffortPicker(host, global2 = false) {
+  const current = host.session.info?.reasoning_effort || DEFAULT_EFFORT;
+  let levels = levelsFor(capsOf(host.session.info));
   let selected = levels.some((l) => l.id === current) ? current : DEFAULT_EFFORT;
   let saveDefault = global2;
-  if (!capsOf(app2.info)) {
-    void loadCaps(app2.gw, app2.sid).then(() => {
-      levels = levelsFor(capsOf(app2.info));
+  if (!capsOf(host.session.info)) {
+    void loadCaps(host.gw, host.session.ref.live).then(() => {
+      levels = levelsFor(capsOf(host.session.info));
       selected = levels.some((l) => l.id === selected) ? selected : levels[0]?.id ?? selected;
-      app2.changed();
+      host.changed();
     });
   }
   const pick = async (id) => {
     if (!id || !levels.some((l) => l.id === id)) {
       return;
     }
-    app2.close(overlay);
-    await app2.setEffort(id, saveDefault ? "global" : "session");
+    host.close(overlay);
+    await host.setEffort(id, saveDefault ? "global" : "session");
   };
   const overlay = {
     key: KEY4,
@@ -33718,17 +33763,17 @@ function openEffortPicker(app2, global2 = false) {
         ),
         noun: "levels",
         onAction: {
-          close: () => app2.close(overlay),
+          close: () => host.close(overlay),
           global: () => {
             saveDefault = !saveDefault;
-            app2.changed();
+            host.changed();
           },
           use: () => void pick(selected)
         },
         onActivate: (ev) => void pick(ev.item),
         onSelect: (ev) => {
           selected = ev.item;
-          app2.changed();
+          host.changed();
         },
         order: levels.map((l) => l.id),
         preview: "none",
@@ -33737,7 +33782,7 @@ function openEffortPicker(app2, global2 = false) {
         subtitle: [
           {
             s: "muted",
-            t: `${saveDefault ? "for this session and every new one" : "for this session"}${app2.info?.reasoning_effort ? "" : ` \xB7 ${DEFAULT_EFFORT} is the default`}`
+            t: `${saveDefault ? "for this session and every new one" : "for this session"}${host.session.info?.reasoning_effort ? "" : ` \xB7 ${DEFAULT_EFFORT} is the default`}`
           }
         ],
         title: "Reasoning effort"
@@ -33746,7 +33791,7 @@ function openEffortPicker(app2, global2 = false) {
     ),
     onKey: (k) => {
       if (k.name === "escape") {
-        app2.close(overlay);
+        host.close(overlay);
       } else if (k.name === "enter") {
         void pick(selected);
       } else if (k.ctrl && k.name === "g") {
@@ -33761,7 +33806,7 @@ function openEffortPicker(app2, global2 = false) {
       return true;
     }
   };
-  app2.open(overlay);
+  host.open(overlay);
 }
 
 // src/overlays/pullRequests.tsx
@@ -61231,43 +61276,40 @@ function openUrl(url) {
   execFile3(process.platform === "darwin" ? "open" : "xdg-open", [url], () => {
   });
 }
-function prsCommand(app2, arg) {
+function prsCommand(host, arg) {
   const n = Number(arg.trim().replace(/^#/, ""));
-  const hit = Number.isInteger(n) && n > 0 ? app2.prs.entries().find((e) => e.ref.number === n) : void 0;
+  const hit = Number.isInteger(n) && n > 0 ? host.prs.entries().find((e) => e.ref.number === n) : void 0;
   if (arg.trim() && !hit) {
-    app2.transcript.notice(`No linked pull request #${arg.trim().replace(/^#/, "")}.`, "warning");
-    return app2.changed();
+    host.transcript.notice(`No linked pull request #${arg.trim().replace(/^#/, "")}.`, "warning");
+    return host.changed();
   }
-  openPullRequests(app2, hit ? prKey(hit.ref) : void 0);
+  openPullRequests(host, hit ? prKey(hit.ref) : void 0);
 }
-function openPullRequests(app2, focus) {
-  const newest = app2.prs.entries().at(-1);
-  app2.openPrAside(focus ?? (newest ? prKey(newest.ref) : void 0));
+function openPullRequests(host, focus) {
+  const newest = host.prs.entries().at(-1);
+  host.openPrAside(focus ?? (newest ? prKey(newest.ref) : void 0));
 }
-function openPrSheet(app2, focus) {
+function openPrSheet(host, focus) {
   const view = new PrView(
     {
-      changed: () => app2.changed(),
-      notice: (text11, tone) => {
-        app2.transcript.notice(text11, tone);
-        app2.changed();
-      },
+      changed: () => host.changed(),
+      notice: (text11, tone) => host.notice(text11, tone),
       open: openUrl,
-      prs: app2.prs,
-      reveal: (id) => app2.reveal(id),
-      scroll: (id, to) => app2.scroll(id, to)
+      prs: host.prs,
+      reveal: (id) => host.reveal(id),
+      scroll: (id, to) => host.scroll(id, to)
     },
     focus
   );
-  app2.prs.poke();
-  const timer = setInterval(() => app2.overlays.includes(overlay) ? app2.changed() : end(), TICK_MS3);
+  host.prs.poke();
+  const timer = setInterval(() => host.overlays.includes(overlay) ? host.changed() : end(), TICK_MS3);
   function end() {
     clearInterval(timer);
     view.dispose();
   }
   const close = () => {
     end();
-    app2.close(overlay);
+    host.close(overlay);
   };
   const overlay = {
     cancel: close,
@@ -61301,17 +61343,17 @@ function openPrSheet(app2, focus) {
       return true;
     }
   };
-  app2.open(overlay);
+  host.open(overlay);
 }
-function openPrMenu(app2) {
-  const entries = () => app2.prs.entries().toReversed();
+function openPrMenu(host) {
+  const entries = () => host.prs.entries().toReversed();
   let selected = entries()[0] ? prKey(entries()[0].ref) : void 0;
-  app2.prs.poke();
-  const close = () => app2.close(overlay);
+  host.prs.poke();
+  const close = () => host.close(overlay);
   const pick = (key2) => {
     close();
     if (key2) {
-      openPullRequests(app2, key2);
+      openPullRequests(host, key2);
     }
   };
   const overlay = {
@@ -61341,7 +61383,7 @@ function openPrMenu(app2) {
       return true;
     }
   };
-  app2.open(overlay);
+  host.open(overlay);
 }
 function menuRow(e, now, on, onClick) {
   const pr = e.pr;
@@ -61378,136 +61420,6 @@ function prsPill(entries, onOpen) {
   };
 }
 
-// src/overlays/help.tsx
-var KEY5 = "help";
-var HOTKEYS = [
-  {
-    group: "Editing",
-    rows: [
-      [["enter"], "Send message"],
-      [["shift+enter", "alt+enter"], "New line"],
-      [["up", "down"], "Move between lines / browse history"],
-      [["tab"], "Accept the completion"],
-      [["alt+left", "alt+right", "alt+f"], "Move by word"],
-      [["ctrl+a", "ctrl+e"], "Start / end of line"],
-      [["ctrl+w", "alt+backspace"], "Delete word backwards"],
-      [["ctrl+u"], "Delete to start of line"],
-      [["alt+d"], "Delete word forward"],
-      [["ctrl+k"], "Delete to end of line (joins the next line at its end)"],
-      [["ctrl+y"], "Paste the last deleted text"],
-      [["ctrl+z", "shift+ctrl+z"], "Undo / redo"],
-      [["cmd+b", "cmd+i"], "Bold / italic (Markdown) on the selection or at the caret"],
-      [["shift+left", "shift+right"], "Select"],
-      [["shift+enter"], "In a list item: the next item (an empty item ends the list)"]
-    ]
-  },
-  {
-    group: "Control",
-    rows: [
-      [["escape"], "Close the completion"],
-      [["escape escape"], "Clear the draft into the history (Up brings it back) / stop the agent"],
-      [["shift+tab"], "Cycle the reasoning effort (/effort picks one; Ctrl+G there saves it as the default)"],
-      [["alt+up"], "Edit the oldest queued prompt"],
-      [["alt+enter"], "Steer the running turn with the oldest queued prompt (empty prompt)"],
-      [["alt+a"], "Agents"],
-      [["alt+j"], "Background processes and cron jobs (/ps)"],
-      [["alt+p"], "Pull requests Hermes linked (/prs)"],
-      [["alt+s"], "Session sidebar: branch, PRs, changes (/sidebar)"],
-      [["ctrl+v"], "Attach the clipboard image (also \u2318V of an image, a dropped image file, /paste)"],
-      [["down"], "Focus the agents / shells / PR pills (empty prompt); \u2190 \u2192 switch, Enter opens, Esc returns"],
-      [["ctrl+c"], "Answer no to the open sheet / clear the draft and images / interrupt / exit (twice)"],
-      [["ctrl+d"], "Delete forward / exit (empty prompt)"]
-    ]
-  }
-];
-async function openHelp(app2) {
-  let catalog = {};
-  try {
-    catalog = await app2.gw.request("commands.catalog", app2.sid ? { session_id: app2.sid } : {});
-  } catch (error) {
-    app2.transcript.notice(
-      `Could not load the command list: ${errorText(error)}`,
-      "warning"
-    );
-  }
-  const own13 = localCommands().flatMap(
-    (c) => c.help ? [[[`/${c.name}`, ...(c.aliases ?? []).map((a2) => `/${a2}`)].join(" \xB7 "), c.help]] : []
-  );
-  const runs3 = ([command = ""]) => !HIDDEN_COMMANDS.has(command.replace(/^\//, "").split(/\s/)[0] ?? "");
-  const categories = [
-    { name: "Tern", pairs: own13 },
-    ...(catalog.categories?.length ? catalog.categories : [{ name: "Commands", pairs: catalog.pairs ?? [] }]).map((c) => ({ ...c, pairs: (c.pairs ?? []).filter(runs3) })).filter((c) => c.pairs.length)
-  ];
-  const overlay = {
-    key: KEY5,
-    modal: true,
-    node: () => /* @__PURE__ */ jsx("overlay", { anchor: "center", head: "Commands and shortcuts", modal: true, role: "omp.overlay.hotkeys", size: "lg", children: /* @__PURE__ */ jsxs("col", { gap: "lg", children: [
-      HOTKEYS.map(({ group, rows }) => /* @__PURE__ */ jsx("section", { head: group, role: "omp.hotkeys.group", children: /* @__PURE__ */ jsx(
-        "table",
-        {
-          cols: [
-            { head: "Key", id: "keys" },
-            { grow: 1, head: "Action", id: "action" }
-          ],
-          role: "omp.hotkeys.table",
-          rows: rows.map(([keys2, action], i) => ({
-            cells: {
-              action: [{ t: action }],
-              keys: keys2.flatMap((k, j) => [...j ? [{ s: "dim", t: " " }] : [], { s: "key", t: k }])
-            },
-            id: String(i)
-          }))
-        },
-        "table"
-      ) }, `keys-${group}`)),
-      categories.map((c) => /* @__PURE__ */ jsx("section", { head: c.name, role: "omp.hotkeys.group", children: /* @__PURE__ */ jsx(
-        "table",
-        {
-          cols: [
-            { head: "Command", id: "command" },
-            { grow: 1, head: "Description", id: "action" }
-          ],
-          role: "omp.hotkeys.table",
-          rows: (c.pairs ?? []).map(([command = "", text11 = ""], i) => ({
-            // The `(usage: …)` tail is `/help <command>`'s business; the table keeps the summary.
-            cells: {
-              action: [{ t: text11.replace(/\s*\(usage: .+\)\s*$/, "") }],
-              command: [{ s: "mono", t: command }]
-            },
-            id: String(i)
-          }))
-        },
-        "table"
-      ) }, `cmd-${c.name}`)),
-      /* @__PURE__ */ jsxs("row", { align: "center", gap: "sm", role: "omp.actions", children: [
-        /* @__PURE__ */ jsx("spacer", { grow: 1 }, "fill"),
-        /* @__PURE__ */ jsxs(
-          "row",
-          {
-            align: "center",
-            gap: "xs",
-            onClick: () => app2.close(overlay),
-            role: "omp.btn",
-            title: "Close  escape",
-            children: [
-              /* @__PURE__ */ jsx("text", { text: "Close" }, "label"),
-              /* @__PURE__ */ jsx("kbd", { keys: ["escape"] }, "keys")
-            ]
-          },
-          "close"
-        )
-      ] }, "actions")
-    ] }, "body") }, KEY5),
-    onKey: (k) => {
-      if (k.name === "escape" || k.name === "enter" || k.name === "q") {
-        app2.close(overlay);
-      }
-      return true;
-    }
-  };
-  app2.open(overlay);
-}
-
 // node_modules/@hermes/shared/src/model-search-text.ts
 var MODEL_SEARCH_ALIASES = {
   k3: ["kimi-k3", "kimi"],
@@ -61539,14 +61451,15 @@ var providerDisplayNames = (providers) => {
 };
 
 // src/overlays/models.tsx
-var KEY6 = "models";
+var KEY5 = "models";
 var ALL = "all";
 var confirmTokens = /* @__PURE__ */ new Map();
-async function mutateModel(app2, value, confirmed) {
-  const key2 = `${app2.sid} ${value}`;
+async function mutateModel(host, value, confirmed) {
+  const sid = host.session.ref.live;
+  const key2 = `${sid} ${value}`;
   const confirm = confirmed ? confirmTokens.get(key2) : void 0;
   confirmTokens.delete(key2);
-  const result = await mutateSession(app2.gw, app2.sid ?? "", "model", { ...modelPayload(value), ...confirm ? { confirm } : {} });
+  const result = await mutateSession(host.gw, sid ?? "", "model", { ...modelPayload(value), ...confirm ? { confirm } : {} });
   if (result.status === "confirmation_required" && typeof result.confirm === "string" && !confirmed) {
     confirmTokens.set(key2, result.confirm);
     return { confirm_message: result.confirm_message, confirm_required: true };
@@ -61556,11 +61469,11 @@ async function mutateModel(app2, value, confirmed) {
   }
   return { value: result.model ?? "" };
 }
-async function switchModel(app2, value, confirmed = false) {
-  const r = app2.gw.isCanonical ? await mutateModel(app2, value, confirmed) : await app2.gw.request("config.set", {
+async function switchModel(host, value, confirmed = false) {
+  const r = host.gw.isCanonical ? await mutateModel(host, value, confirmed) : await host.gw.request("config.set", {
     confirm_expensive_model: confirmed,
     key: "model",
-    session_id: app2.sid,
+    session_id: host.session.ref.live,
     value
   });
   if (r.confirm_required) {
@@ -61568,19 +61481,19 @@ async function switchModel(app2, value, confirmed = false) {
   }
   const model = typeof r.value === "string" ? r.value : "";
   if (model) {
-    app2.info = { ...app2.info, model };
-    app2.transcript.notice(r.deferred ? `Model switches to ${model} from the next turn.` : `Switched to ${model}.`);
+    host.session.info = { ...host.session.info, model };
+    host.transcript.notice(r.deferred ? `Model switches to ${model} from the next turn.` : `Switched to ${model}.`);
   }
   if (r.warning) {
-    app2.transcript.notice(r.warning, "warning");
+    host.transcript.notice(r.warning, "warning");
   }
-  app2.changed();
+  host.changed();
   return r;
 }
 function pickerValue(model, provider, global2) {
   return `${model} --provider ${provider} ${global2 ? "--global" : "--session"}`;
 }
-function openModelPicker(app2) {
+function openModelPicker(host) {
   let state = "loading";
   let message = "";
   let rows = [];
@@ -61590,19 +61503,20 @@ function openModelPicker(app2) {
   let scope = ALL;
   let selected;
   let global2 = false;
-  const canSave = !app2.gw.isCanonical;
-  const startEffort = app2.info?.reasoning_effort || "";
+  const canSave = !host.gw.isCanonical;
+  const startEffort = host.session.info?.reasoning_effort || "";
   let effort = startEffort || "medium";
-  let fast = Boolean(app2.info?.fast);
+  let fast = Boolean(host.session.info?.fast);
   let fastTouched = false;
   let confirm = null;
   let busy = false;
   let shown = [];
   const load2 = async () => {
     state = "loading";
-    app2.changed();
+    host.changed();
     try {
-      const r = await app2.gw.request("model.options", app2.sid ? { session_id: app2.sid } : {});
+      const sid = host.session.ref.live;
+      const r = await host.gw.request("model.options", sid ? { session_id: sid } : {});
       const list8 = r.providers ?? [];
       rememberCaps(list8);
       const names = providerDisplayNames(list8);
@@ -61623,7 +61537,7 @@ function openModelPicker(app2) {
       state = "error";
       message = errorText(error);
     }
-    app2.changed();
+    host.changed();
   };
   const choose = async (id, confirmed = false) => {
     const row2 = rows.find((r) => r.id === id);
@@ -61632,24 +61546,24 @@ function openModelPicker(app2) {
     }
     busy = true;
     try {
-      const r = await switchModel(app2, pickerValue(row2.model, row2.provider.slug, canSave && global2), confirmed);
+      const r = await switchModel(host, pickerValue(row2.model, row2.provider.slug, canSave && global2), confirmed);
       if (r.confirm_required) {
         confirm = { row: row2, text: r.confirm_message || r.warning || `${row2.model} is expensive. Switch anyway?` };
       } else {
-        app2.close(overlay);
+        host.close(overlay);
         if (levelsFor(caps(row2)).some((l) => l.id === effort) && (canSave && global2 || effort !== startEffort)) {
-          await app2.setEffort(effort, canSave && global2 ? "global" : "session");
+          await host.setEffort(effort, canSave && global2 ? "global" : "session");
         }
         if (fastTouched && fastable(row2)) {
-          await setFast(app2, fast ? "fast" : "normal");
+          await setFast(host, fast ? "fast" : "normal");
         }
       }
     } catch (error) {
-      app2.transcript.notice(errorText(error), "error");
-      app2.close(overlay);
+      host.transcript.notice(errorText(error), "error");
+      host.close(overlay);
     }
     busy = false;
-    app2.changed();
+    host.changed();
   };
   const view = () => {
     const inScope = scope === ALL ? rows : rows.filter((r) => `provider:${r.provider.slug}` === scope);
@@ -61681,7 +61595,7 @@ function openModelPicker(app2) {
     return { hits, order: order2 };
   };
   const overlay = {
-    key: KEY6,
+    key: KEY5,
     modal: true,
     node: () => {
       const { hits, order: order2 } = view();
@@ -61722,31 +61636,31 @@ function openModelPicker(app2) {
           onAction: {
             cancel: () => {
               confirm = null;
-              app2.changed();
+              host.changed();
             },
             clear: () => {
               query = "";
-              app2.changed();
+              host.changed();
             },
-            close: () => app2.close(overlay),
+            close: () => host.close(overlay),
             confirm: () => void choose(confirm?.row.id, true),
             fast: () => {
               fast = !fast;
               fastTouched = true;
-              app2.changed();
+              host.changed();
             },
             global: () => {
               global2 = !global2;
-              app2.changed();
+              host.changed();
             },
             retry: () => void load2(),
             scope: (ev) => {
               scope = ev.value ?? ALL;
-              app2.changed();
+              host.changed();
             },
             strip: (ev) => {
               effort = levels.find((l) => l.id === ev.value)?.id ?? effort;
-              app2.changed();
+              host.changed();
             },
             use: () => void choose(selected)
           },
@@ -61754,7 +61668,7 @@ function openModelPicker(app2) {
           onSelect: (ev) => {
             selected = ev.item;
             confirm = null;
-            app2.changed();
+            host.changed();
           },
           order: order2,
           placeholder: "Search models\u2026",
@@ -61774,7 +61688,7 @@ function openModelPicker(app2) {
           total: rows.length,
           children: row2 ? preview3(row2, row2.id === current) : null
         },
-        KEY6
+        KEY5
       );
     },
     onKey: (k) => {
@@ -61787,7 +61701,7 @@ function openModelPicker(app2) {
         return true;
       }
       if (k.name === "escape") {
-        app2.close(overlay);
+        host.close(overlay);
         return true;
       }
       if (k.name === "enter") {
@@ -61830,7 +61744,7 @@ function openModelPicker(app2) {
       return true;
     }
   };
-  app2.open(overlay);
+  host.open(overlay);
   void load2();
 }
 var caps = (row2) => row2.provider.capabilities?.[row2.model];
@@ -63351,10 +63265,10 @@ function sessionLabel(s2) {
 }
 
 // src/overlays/sessions.tsx
-var KEY7 = "sessions";
+var KEY6 = "sessions";
 var LIMIT = 400;
 var DAY = 864e5;
-function openSessionPicker(app2) {
+function openSessionPicker(host) {
   let state = "loading";
   let sessions = [];
   let running = /* @__PURE__ */ new Set();
@@ -63365,14 +63279,14 @@ function openSessionPicker(app2) {
   let deleting = null;
   let shown = [];
   const replies = /* @__PURE__ */ new Map();
-  const current = app2.storedSid ?? app2.sid ?? "";
+  const current = host.session.ref.stored ?? host.session.ref.live ?? "";
   const load2 = async () => {
     state = "loading";
-    app2.changed();
-    const cwd = app2.info?.cwd || process.env.HERMES_CWD || process.cwd();
+    host.changed();
+    const cwd = host.session.info?.cwd || process.env.HERMES_CWD || process.cwd();
     const [key2, live] = await Promise.all([
       workspaceOf(cwd),
-      app2.gw.request("session.list", { limit: 200 }).catch(() => ({ sessions: [] }))
+      host.gw.request("session.list", { limit: 200 }).catch(() => ({ sessions: [] }))
     ]);
     workspace = key2;
     running = new Set((live.sessions ?? []).filter((s2) => s2.running && s2.id).map((s2) => s2.id));
@@ -63380,7 +63294,7 @@ function openSessionPicker(app2) {
     tab2 = sessions.some((s2) => inWorkspace(s2, workspace)) ? "here" : "all";
     selected = rows().find((s2) => s2.id !== current)?.id ?? rows()[0]?.id;
     state = "ready";
-    app2.changed();
+    host.changed();
   };
   const here = (s2) => inWorkspace(s2, workspace);
   const rows = () => tab2 === "here" ? sessions.filter(here) : sessions;
@@ -63389,30 +63303,30 @@ function openSessionPicker(app2) {
     if (!s2) {
       return;
     }
-    app2.close(overlay);
+    host.close(overlay);
     if (s2.id !== current) {
-      app2.resume(s2.id).catch((error) => {
-        app2.transcript.notice(`Could not resume: ${errorText(error)}`, "error");
-        app2.changed();
+      host.resume(s2.id).catch((error) => {
+        host.transcript.notice(`Could not resume: ${errorText(error)}`, "error");
+        host.changed();
       });
     }
   };
   const remove = async (id) => {
     deleting = null;
     try {
-      await (app2.gw.isCanonical ? mutateSession(app2.gw, id, "delete", {}) : app2.gw.request("session.delete", { session_id: id }));
+      await (host.gw.isCanonical ? mutateSession(host.gw, id, "delete", {}) : host.gw.request("session.delete", { session_id: id }));
       sessions = sessions.filter((s2) => s2.id !== id);
     } catch (error) {
-      app2.transcript.notice(errorText(error), "error");
+      host.transcript.notice(errorText(error), "error");
     }
-    app2.changed();
+    host.changed();
   };
   const askDelete = () => {
     if (!selected) {
       return;
     }
     if (selected === current) {
-      app2.transcript.notice("The open session cannot be deleted; start a new one first.", "warning");
+      host.transcript.notice("The open session cannot be deleted; start a new one first.", "warning");
     } else {
       deleting = selected;
     }
@@ -63452,7 +63366,7 @@ ${s2.preview} ${s2.cwd} ${s2.branch} ${s2.id}`, { scattered: false });
     return { hits, order: order2 };
   };
   const overlay = {
-    key: KEY7,
+    key: KEY6,
     modal: true,
     node: () => {
       const now = Date.now();
@@ -63486,13 +63400,13 @@ ${s2.preview} ${s2.cwd} ${s2.branch} ${s2.id}`, { scattered: false });
           onAction: {
             cancel: () => {
               deleting = null;
-              app2.changed();
+              host.changed();
             },
             clear: () => {
               query = "";
-              app2.changed();
+              host.changed();
             },
-            close: () => app2.close(overlay),
+            close: () => host.close(overlay),
             confirm: () => {
               if (deleting) {
                 void remove(deleting);
@@ -63500,20 +63414,20 @@ ${s2.preview} ${s2.cwd} ${s2.branch} ${s2.id}`, { scattered: false });
             },
             delete: () => {
               askDelete();
-              app2.changed();
+              host.changed();
             },
             resume: () => resume(selected),
             retry: () => void load2(),
             tab: (ev) => {
               setTab(ev.value === "here" ? "here" : "all");
-              app2.changed();
+              host.changed();
             }
           },
           onActivate: (ev) => resume(ev.item),
           onSelect: (ev) => {
             selected = ev.item;
             deleting = null;
-            app2.changed();
+            host.changed();
           },
           order: order2,
           placeholder: "Search titles, prompts, folders, branches\u2026",
@@ -63532,7 +63446,7 @@ ${s2.preview} ${s2.cwd} ${s2.branch} ${s2.id}`, { scattered: false });
           total: rows().length,
           children: s2 ? preview4(s2, now, s2.id === current, running.has(s2.id), replies.get(s2.id) ?? "") : null
         },
-        KEY7
+        KEY6
       );
     },
     onKey: (k) => {
@@ -63548,7 +63462,7 @@ ${s2.preview} ${s2.cwd} ${s2.branch} ${s2.id}`, { scattered: false });
         if (query) {
           query = "";
         } else {
-          app2.close(overlay);
+          host.close(overlay);
         }
       } else if (k.name === "enter") {
         resume(selected);
@@ -63568,7 +63482,7 @@ ${s2.preview} ${s2.cwd} ${s2.branch} ${s2.id}`, { scattered: false });
       return true;
     }
   };
-  app2.open(overlay);
+  host.open(overlay);
   setTimeout(() => void load2(), 0);
 }
 function itemOf2(s2, now, running, elsewhere) {
@@ -63639,7 +63553,7 @@ function dateOf(at) {
 }
 
 // src/overlays/theme.tsx
-var KEY8 = "theme";
+var KEY7 = "theme";
 var MODES = [
   { detail: "Your Tern theme, light and dark, with no colors of its own", icon: "palette", id: "tern", label: "Tern" },
   { detail: "Bone ink and quiet grays; gold only for the moments that earn it", icon: "sparkle", id: "nous", label: "Nous" },
@@ -63648,22 +63562,22 @@ var MODES = [
 function isThemeMode(v) {
   return MODES.some((m) => m.id === v);
 }
-function openThemePicker(app2) {
-  const before = app2.theme;
+function openThemePicker(host) {
+  const before = host.theme;
   let selected = before;
   const pick = (mode) => {
     if (mode) {
       selected = mode;
-      app2.setTheme(mode);
+      host.setTheme(mode);
     }
   };
   const overlay = {
-    key: KEY8,
+    key: KEY7,
     modal: true,
     // As Esc: the theme being previewed goes back.
     cancel: () => {
-      app2.setTheme(before);
-      app2.close(overlay);
+      host.setTheme(before);
+      host.close(overlay);
     },
     node: () => /* @__PURE__ */ jsx(
       "picker",
@@ -63678,36 +63592,36 @@ function openThemePicker(app2) {
         noun: "themes",
         onAction: {
           cancel: () => {
-            app2.setTheme(before);
-            app2.close(overlay);
+            host.setTheme(before);
+            host.close(overlay);
           },
-          close: () => app2.close(overlay),
-          use: () => app2.close(overlay)
+          close: () => host.close(overlay),
+          use: () => host.close(overlay)
         },
         onActivate: (ev) => {
           pick(ev.item);
-          app2.close(overlay);
+          host.close(overlay);
         },
         onSelect: (ev) => pick(ev.item),
         selected,
         size: "md",
         title: "Theme"
       },
-      KEY8
+      KEY7
     ),
     onKey: (k) => {
       if (k.name === "escape") {
-        app2.setTheme(before);
-        app2.close(overlay);
+        host.setTheme(before);
+        host.close(overlay);
       } else if (k.name === "enter") {
-        app2.close(overlay);
+        host.close(overlay);
       } else {
         pick(moveSelection(k, MODES.map((m) => m.id), selected));
       }
       return true;
     }
   };
-  app2.open(overlay);
+  host.open(overlay);
 }
 
 // src/watch/spec.ts
@@ -63788,20 +63702,20 @@ async function openHermesSplit(args, cwd, env2 = process.env) {
 
 // src/refusedCommands.ts
 var words2 = (arg) => arg.trim().split(/\s+/).filter(Boolean);
-async function cliPanel(app2, title, argv) {
-  const r = await app2.gw.request("cli.exec", { argv });
+async function cliPanel(host, title, argv) {
+  const r = await host.gw.request("cli.exec", { argv });
   if (r?.blocked) {
-    return app2.transcript.notice(r.hint || `\`hermes ${argv.join(" ")}\` cannot run here.`, "warning");
+    return host.transcript.notice(r.hint || `\`hermes ${argv.join(" ")}\` cannot run here.`, "warning");
   }
-  app2.transcript.panel(title, r?.output?.trim() || "(no output)");
+  host.transcript.panel(title, r?.output?.trim() || "(no output)");
   if (r?.code) {
-    app2.transcript.notice(`\`hermes ${argv.join(" ")}\` exited with code ${r.code}.`, "warning");
+    host.transcript.notice(`\`hermes ${argv.join(" ")}\` exited with code ${r.code}.`, "warning");
   }
 }
-async function browser(app2, arg) {
+async function browser(host, arg) {
   const [first = "status", ...rest] = words2(arg);
   const action = first.toLowerCase();
-  const note = (text11, tone) => app2.transcript.notice(text11, tone);
+  const note = (text11, tone) => host.transcript.notice(text11, tone);
   if (!["connect", "disconnect", "status", "use"].includes(action)) {
     return note("Usage: /browser [status|use [on|off]|connect [url]|disconnect]", "warning");
   }
@@ -63812,9 +63726,9 @@ async function browser(app2, arg) {
   const url = action === "connect" ? rest.join(" ").trim() || "http://127.0.0.1:9222" : void 0;
   let r;
   try {
-    r = await app2.gw.request("browser.manage", {
+    r = await host.gw.request("browser.manage", {
       action,
-      session_id: app2.sid,
+      session_id: host.session.ref.live,
       ...url ? { url } : {},
       ...mode ? { enabled: mode === "on" } : {}
     });
@@ -63849,23 +63763,23 @@ function pluginLines(rows) {
     return `- ${mark2(p3.status)} **${p3.name}**${facts ? ` (${facts})` : ""}${p3.description ? ` \u2014 ${p3.description}` : ""}`;
   });
 }
-async function plugins(app2, arg) {
+async function plugins(host, arg) {
   const sub = (words2(arg)[0] ?? "list").toLowerCase();
   if (sub !== "list" && sub !== "ls" && sub !== "all") {
-    return app2.transcript.notice(
+    return host.transcript.notice(
       `Usage: /plugins [list|all]. To ${sub} a plugin, run \`hermes plugins ${sub} \u2026\` in a terminal.`,
       "warning"
     );
   }
-  const r = await app2.gw.request("plugins.manage", { action: "list" });
+  const r = await host.gw.request("plugins.manage", { action: "list" });
   const rows = r?.plugins ?? [];
   const user = rows.filter((p3) => p3.source !== "bundled");
   const shown = sub === "all" || !user.length ? rows : user;
   const hidden2 = rows.length - shown.length;
   if (!rows.length) {
-    return app2.transcript.notice("No plugins installed.");
+    return host.transcript.notice("No plugins installed.");
   }
-  app2.transcript.panel(
+  host.transcript.panel(
     "Plugins",
     [
       ...pluginLines(shown),
@@ -63903,70 +63817,70 @@ function subscriptionText(s2) {
   const change = s2.can_change_plan === false ? "Only an admin of this account can change the plan." : url ? `[Change your plan](${url}) on the Nous Portal.` : "Change your plan on the Nous Portal.";
   return [...lines, "", change].join("\n");
 }
-async function subscription(app2) {
-  const s2 = await app2.gw.request("subscription.state", {});
+async function subscription(host) {
+  const s2 = await host.gw.request("subscription.state", {});
   if (!s2?.logged_in) {
-    return app2.transcript.notice(
+    return host.transcript.notice(
       s2?.error ? `Could not load the subscription: ${s2.error}` : "Not logged into Nous Portal: run /login, then /subscription.",
       "warning"
     );
   }
-  app2.transcript.panel("Subscription", subscriptionText(s2));
+  host.transcript.panel("Subscription", subscriptionText(s2));
 }
-function config(app2, arg) {
+function config(host, arg) {
   const argv = words2(arg);
-  return cliPanel(app2, `/config${argv.length ? ` ${argv.join(" ")}` : ""}`, [
+  return cliPanel(host, `/config${argv.length ? ` ${argv.join(" ")}` : ""}`, [
     "config",
     ...argv.length ? argv : ["show"]
   ]);
 }
-function worktree(app2, arg) {
+function worktree(host, arg) {
   const [first = "list", ...rest] = words2(arg);
   const sub = first.toLowerCase();
-  const cwd = app2.info?.cwd;
+  const cwd = host.session.info?.cwd;
   if (sub === "new") {
-    return app2.transcript.notice(
+    return host.transcript.notice(
       "/worktree new runs only in the classic CLI. Start a session in a new worktree with `hermes -w` in a terminal.",
       "warning"
     );
   }
   const head2 = sub === "status" || sub === "show" ? "list" : sub;
   if (!["audit", "list", "ls", "prune"].includes(head2)) {
-    return app2.transcript.notice("Usage: /worktree [list|prune [--dry-run]]", "warning");
+    return host.transcript.notice("Usage: /worktree [list|prune [--dry-run]]", "warning");
   }
   if (!cwd) {
-    return app2.transcript.notice("Wait for the session to start: /worktree needs its folder.", "warning");
+    return host.transcript.notice("Wait for the session to start: /worktree needs its folder.", "warning");
   }
-  return cliPanel(app2, `/worktree ${[head2, ...rest].join(" ")}`, ["worktree", head2, ...rest, "--repo", cwd]);
+  return cliPanel(host, `/worktree ${[head2, ...rest].join(" ")}`, ["worktree", head2, ...rest, "--repo", cwd]);
 }
-function snapshot2(app2, arg) {
+function snapshot2(host, arg) {
   const [first = "", ...rest] = words2(arg);
   if (first.toLowerCase() !== "create") {
-    return app2.transcript.notice(
+    return host.transcript.notice(
       "/snapshot list, restore and prune run only in the classic CLI (hermes --cli). Here, /snapshot create [label] takes one.",
       "warning"
     );
   }
   const label = rest.join(" ");
-  return cliPanel(app2, "/snapshot create", ["backup", "--quick", ...label ? ["--label", label] : []]);
+  return cliPanel(host, "/snapshot create", ["backup", "--quick", ...label ? ["--label", label] : []]);
 }
-async function update(app2) {
-  if (await openHermesSplit(["update"], app2.info?.cwd || process.env.HOME || "/")) {
-    return app2.transcript.notice(
+async function update(host) {
+  if (await openHermesSplit(["update"], host.session.info?.cwd || process.env.HOME || "/")) {
+    return host.transcript.notice(
       "Running `hermes update` in the split below. Hermes may restart the gateway when it finishes."
     );
   }
-  app2.transcript.notice("Run `hermes update` in a terminal to update Hermes.");
+  host.transcript.notice("Run `hermes update` in a terminal to update Hermes.");
 }
-var guarded = (name, run5) => async (app2, arg) => {
+var guarded = (name, run5) => async (host, arg) => {
   try {
-    return await run5(app2, arg);
+    return await run5(host, arg);
   } catch (e) {
-    app2.transcript.notice(`/${name} failed: ${errorText(e)}`, "error");
+    host.transcript.notice(`/${name} failed: ${errorText(e)}`, "error");
   }
 };
 var ROUTED = [
-  { name: "cron", run: (app2) => openBackground(app2, { tab: "cron" }) },
+  { name: "cron", run: (host) => openBackground(host, { tab: "cron" }) },
   { name: "browser", run: browser },
   { name: "plugins", run: plugins },
   { aliases: ["upgrade"], name: "subscription", run: subscription },
@@ -64013,7 +63927,7 @@ var REFUSED_COMMANDS = [
   ...HIDDEN.map((h2) => ({
     aliases: h2.aliases,
     name: h2.name,
-    run: (app2) => app2.transcript.notice(h2.why(h2.name), "warning")
+    run: (host) => host.transcript.notice(h2.why(h2.name), "warning")
   }))
 ];
 
@@ -64993,32 +64907,32 @@ var COMMANDS3 = [
     // `/q` is Hermes' /queue.
     aliases: ["exit"],
     name: "quit",
-    run: (app2) => app2.quit()
+    run: (host) => host.quit()
   },
   {
     // Hermes' `/clear` clears the screen AND starts a new session: the agent forgets the old one.
     aliases: ["reset", "clear"],
     name: "new",
-    run: (app2, arg) => {
-      if (app2.busy) {
-        return app2.transcript.notice("Wait for the current turn to finish (or press Esc twice) before starting a new session.", "warning");
+    run: (host, arg) => {
+      if (host.busy) {
+        return host.transcript.notice("Wait for the current turn to finish (or press Esc twice) before starting a new session.", "warning");
       }
-      return app2.newSession(arg.trim() || void 0);
+      return host.newSession(arg.trim() || void 0);
     }
   },
   {
     name: "model",
-    run: async (app2, arg) => {
+    run: async (host, arg) => {
       if (!arg) {
-        return openModelPicker(app2);
+        return openModelPicker(host);
       }
-      const r = await switchModel(app2, arg);
+      const r = await switchModel(host, arg);
       if (r.confirm_required) {
-        app2.open(
-          confirmOverlay(app2, {
+        host.open(
+          confirmOverlay(host, {
             confirm: "Switch anyway",
             detail: r.confirm_message || r.warning || "",
-            onConfirm: () => void switchModel(app2, arg, true),
+            onConfirm: () => void switchModel(host, arg, true),
             title: "Switch to an expensive model?"
           })
         );
@@ -65028,58 +64942,58 @@ var COMMANDS3 = [
   {
     aliases: ["resume", "session", "switch"],
     name: "sessions",
-    run: (app2, arg) => {
+    run: (host, arg) => {
       if (!arg) {
-        return openSessionPicker(app2);
+        return openSessionPicker(host);
       }
-      return arg === "new" ? app2.newSession() : app2.resume(arg);
+      return arg === "new" ? host.newSession() : host.resume(arg);
     }
   },
   {
     help: "Pick the colors: Tern, Nous or the Hermes skin [tern|nous|skin]",
     name: "theme",
-    run: (app2, arg) => {
+    run: (host, arg) => {
       if (!arg) {
-        return openThemePicker(app2);
+        return openThemePicker(host);
       }
       if (!isThemeMode(arg)) {
-        app2.transcript.notice("Usage: /theme [tern|nous|skin]", "warning");
+        host.transcript.notice("Usage: /theme [tern|nous|skin]", "warning");
         return;
       }
-      app2.setTheme(arg);
+      host.setTheme(arg);
     }
   },
   {
     // Ink's `/agents pause|resume|status`: the shared gateway's slash.exec refuses them.
     aliases: ["tasks"],
     name: "agents",
-    run: (app2, arg) => agents(app2, arg)
+    run: (host, arg) => agents(host, arg)
   },
   {
     // Hermes has no command by these names (its `/bg` runs a prompt in a side agent: controlCommands.ts).
     aliases: ["bashes", "shells", "processes"],
     help: "Background processes and cron jobs",
     name: "ps",
-    run: (app2) => openBackground(app2)
+    run: (host) => openBackground(host)
   },
   {
     help: "Pick the reasoning effort [level] [--global]",
     name: "effort",
-    run: (app2, arg) => {
+    run: (host, arg) => {
       const words3 = arg.trim().split(/\s+/).filter(Boolean);
       const global2 = words3.includes("--global") || words3.includes("default");
       const level = words3.find((w) => LEVELS.some((l) => l.id === w || l.label === w));
       if (!level) {
-        return openEffortPicker(app2, global2);
+        return openEffortPicker(host, global2);
       }
-      void app2.setEffort(LEVELS.find((l) => l.id === level || l.label === level).id, global2 ? "global" : "session");
+      void host.setEffort(LEVELS.find((l) => l.id === level || l.label === level).id, global2 ? "global" : "session");
     }
   },
   {
     // `/reasoning <level> [--global]` sets the level as the pill does (on the shared gateway, the
     // session mutation every viewer sees); its other forms (show, hide, status) stay the backend's.
     name: "reasoning",
-    run: (app2, arg) => {
+    run: (host, arg) => {
       const words3 = arg.trim().toLowerCase().split(/\s+/).filter(Boolean);
       const global2 = words3.includes("--global");
       const rest = words3.filter((w) => w !== "--global");
@@ -65087,90 +65001,90 @@ var COMMANDS3 = [
       if (!level) {
         return false;
       }
-      return void app2.setEffort(level.id, global2 ? "global" : "session");
+      return void host.setEffort(level.id, global2 ? "global" : "session");
     }
   },
   {
     // The shared gateway sends no session.info after a typed /fast, so the bolt would not move.
     name: "fast",
-    run: (app2, arg) => fastCommand(app2, arg)
+    run: (host, arg) => fastCommand(host, arg)
   },
   {
     // The shared gateway refuses /skin in slash.exec; Ink sets the profile's skin through config.set,
     // and the skin.changed broadcast repaints.
     name: "skin",
-    run: async (app2, arg) => {
+    run: async (host, arg) => {
       if (!arg.trim()) {
-        const r = await app2.gw.request("config.get", { key: "skin" });
-        app2.transcript.notice(`skin: ${r?.value || "default"}`);
+        const r = await host.gw.request("config.get", { key: "skin" });
+        host.transcript.notice(`skin: ${r?.value || "default"}`);
       } else {
-        const r = await app2.gw.request("config.set", { key: "skin", value: arg.trim() });
-        app2.transcript.notice(`skin \u2192 ${r?.value || arg.trim()}`);
+        const r = await host.gw.request("config.set", { key: "skin", value: arg.trim() });
+        host.transcript.notice(`skin \u2192 ${r?.value || arg.trim()}`);
       }
-      if (app2.theme !== "skin") {
-        app2.transcript.notice("Hermes wears the skin in the skin theme: /theme skin");
+      if (host.theme !== "skin") {
+        host.transcript.notice("Hermes wears the skin in the skin theme: /theme skin");
       }
     }
   },
   {
     // The Ink TUI's `/paste`: the clipboard's image on the next prompt.
     name: "paste",
-    run: (app2, arg) => arg ? app2.transcript.notice("Usage: /paste", "warning") : void app2.attachClipboardImage(false)
+    run: (host, arg) => arg ? host.transcript.notice("Usage: /paste", "warning") : void host.attachClipboardImage(false)
   },
   {
     // Hermes' `/image <path>`: that file on the next prompt.
     name: "image",
-    run: (app2, arg) => arg.trim() ? app2.attachImagePath(arg) : app2.transcript.notice("Usage: /image <path>", "warning")
+    run: (host, arg) => arg.trim() ? host.attachImagePath(arg) : host.transcript.notice("Usage: /image <path>", "warning")
   },
   {
     aliases: ["side"],
     help: "Show or hide the session sidebar: branch, PRs, changes",
     name: "sidebar",
-    run: (app2) => app2.toggleSidebar()
+    run: (host) => host.toggleSidebar()
   },
   {
     aliases: ["diff"],
     help: "The working tree changes, file by file",
     name: "changes",
-    run: (app2) => openChanges(app2)
+    run: (host) => openChanges(host)
   },
   {
     aliases: ["pr", "pulls"],
     help: "Pull requests Hermes linked, beside the chat (/prs 22 opens #22)",
     name: "prs",
-    run: (app2, arg) => prsCommand(app2, arg)
+    run: (host, arg) => prsCommand(host, arg)
   },
   {
     // The gateway refuses its own /copy and /history (cli_only); Ink runs them on its transcript, as these do.
     name: "copy",
-    run: (app2, arg) => copyAnswer(app2, arg)
+    run: (host, arg) => copyAnswer(host, arg)
   },
   {
     name: "history",
-    run: (app2, arg) => app2.transcript.panel("/history", historyText(app2.transcript.entries, arg))
+    run: (host, arg) => host.transcript.panel("/history", historyText(host.transcript.entries, arg))
   },
   {
     // `/help <command>` is the backend's detailed usage.
     name: "help",
-    run: (app2, arg) => arg ? false : openHelp(app2)
+    run: (host, arg) => arg ? false : host.openHelp()
   },
-  ...CONTROL_COMMANDS.map((c) => ({ ...c, run: (app2, arg) => c.run(app2.control(), arg) })),
-  ...SESSION_COMMANDS.map((c) => ({ ...c, run: (app2, arg) => c.run(app2.control(), arg) })),
+  ...CONTROL_COMMANDS.map((c) => ({ ...c, run: (host, arg) => c.run(host.control(), arg) })),
+  ...SESSION_COMMANDS.map((c) => ({ ...c, run: (host, arg) => c.run(host.control(), arg) })),
   ...REFUSED_COMMANDS
 ];
-function copyAnswer(app2, arg) {
+function copyAnswer(host, arg) {
   const n = arg.trim() ? Number.parseInt(arg, 10) : void 0;
   if (n !== void 0 && !(n >= 1)) {
-    return app2.transcript.notice("Usage: /copy [n] (n counts answers from the first)", "warning");
+    return host.transcript.notice("Usage: /copy [n] (n counts answers from the first)", "warning");
   }
-  const answers = app2.transcript.entries.flatMap((e) => e.kind === "turn" && answerText(e) ? [answerText(e)] : []);
+  const answers = host.transcript.entries.flatMap((e) => e.kind === "turn" && answerText(e) ? [answerText(e)] : []);
   const at = n === void 0 ? answers.length : Math.min(n, answers.length);
   const text11 = answers[at - 1];
   if (!text11) {
-    return app2.transcript.notice("No answer to copy yet.", "warning");
+    return host.transcript.notice("No answer to copy yet.", "warning");
   }
   copyToClipboard(text11);
-  app2.transcript.notice(`Copied ${n === void 0 ? "the last answer" : `answer ${at}`} (${text11.length} characters).`);
+  host.transcript.notice(`Copied ${n === void 0 ? "the last answer" : `answer ${at}`} (${text11.length} characters).`);
 }
 function historyText(entries, arg) {
   const preview5 = Math.max(80, Number.parseInt(arg, 10) || 400);
@@ -65188,24 +65102,24 @@ ${clipped}`];
   });
   return lines.length ? lines.join("\n\n") : "No conversation yet.";
 }
-async function agents(app2, arg) {
+async function agents(host, arg) {
   const sub = arg.trim().toLowerCase();
   if (!sub) {
-    return openAgents(app2);
+    return openAgents(host);
   }
   if (sub === "pause" || sub === "resume" || sub === "unpause") {
-    const paused = await app2.agents.pause(sub === "pause");
-    return app2.transcript.notice(
+    const paused = await host.agents.pause(sub === "pause");
+    return host.transcript.notice(
       paused ? "Subagent spawning paused for every chat on this gateway. Running agents keep going." : "Subagent spawning resumed."
     );
   }
   if (sub === "status") {
-    const paused = app2.agents.paused;
-    return app2.transcript.notice(
+    const paused = host.agents.paused;
+    return host.transcript.notice(
       paused === void 0 ? "Subagent spawning: active, unless another client paused it (the gateway does not report it)." : `Subagent spawning: ${paused ? "paused (gateway-wide)" : "active"}.`
     );
   }
-  app2.transcript.notice("Usage: /agents [pause|resume|status]", "warning");
+  host.transcript.notice("Usage: /agents [pause|resume|status]", "warning");
 }
 function localCommand(name) {
   const lower = name.toLowerCase();
@@ -65693,26 +65607,26 @@ function loopBody(l, owner, now) {
     /* @__PURE__ */ jsx("kv", { items: facts }, "facts")
   ];
 }
-function openAutomation(app2, which) {
+function openAutomation(host, which) {
   const key2 = `automation:${which}`;
   const run5 = (b) => {
-    if (app2.automation.pending) {
+    if (host.automation.pending) {
       return;
     }
     if (b.confirm) {
-      app2.open(
-        confirmOverlay(app2, {
+      host.open(
+        confirmOverlay(host, {
           confirm: b.label,
           detail: which === "goal" ? "Hermes stops working toward it. /goal sets a new one." : "No more runs. /loop starts a new one.",
-          onConfirm: () => void app2.automation.act(b.action),
+          onConfirm: () => void host.automation.act(b.action),
           title: b.confirm
         })
       );
       return;
     }
-    void app2.automation.act(b.action);
+    void host.automation.act(b.action);
   };
-  const current = () => which === "goal" ? app2.automation.goal : app2.automation.loop();
+  const current = () => which === "goal" ? host.automation.goal : host.automation.loop();
   const overlay = {
     key: key2,
     modal: true,
@@ -65720,12 +65634,12 @@ function openAutomation(app2, which) {
       const now = Date.now();
       const view = current();
       if (!view) {
-        queueMicrotask(() => app2.close(overlay));
+        queueMicrotask(() => host.close(overlay));
         return /* @__PURE__ */ jsx("overlay", { anchor: "bottom", modal: true, size: "md" }, key2);
       }
-      const pending = app2.automation.pending;
+      const pending = host.automation.pending;
       const buttons = [
-        { hint: "escape", key: "close", keys: ["escape"], label: "Close", onClick: () => app2.close(overlay) },
+        { hint: "escape", key: "close", keys: ["escape"], label: "Close", onClick: () => host.close(overlay) },
         ...automationButtons(which, view).map((b, i) => ({
           hint: i === 0 ? `enter \xB7 ${b.keys.join(" \xB7 ")}` : b.keys.join(" \xB7 "),
           key: b.action,
@@ -65744,7 +65658,7 @@ function openAutomation(app2, which) {
           role: "hermes.automation.sheet",
           size: "md",
           children: /* @__PURE__ */ jsxs("col", { gap: "md", children: [
-            which === "goal" ? goalBody(view) : loopBody(view, app2.automation.loopSnapshot ?? view, now),
+            which === "goal" ? goalBody(view) : loopBody(view, host.automation.loopSnapshot ?? view, now),
             actionsRow(buttons)
           ] }, "body")
         },
@@ -65753,7 +65667,7 @@ function openAutomation(app2, which) {
     },
     onKey: (k) => {
       if (k.name === "escape") {
-        app2.close(overlay);
+        host.close(overlay);
         return true;
       }
       const view = current();
@@ -65766,7 +65680,7 @@ function openAutomation(app2, which) {
       return true;
     }
   };
-  app2.open(overlay);
+  host.open(overlay);
 }
 
 // .hermes-src/ui-tui/src/app/slash/fuzzyScore.ts
@@ -66094,6 +66008,137 @@ function requestFor(before, sid) {
     return request;
   }
   return request.method === "complete.slash" ? { ...request, replaceFrom: request.replaceFrom + lineStart2, skillsOnly: true } : { ...request, replaceFrom: request.replaceFrom + lineStart2 };
+}
+
+// src/overlays/help.tsx
+var KEY8 = "help";
+var HOTKEYS = [
+  {
+    group: "Editing",
+    rows: [
+      [["enter"], "Send message"],
+      [["shift+enter", "alt+enter"], "New line"],
+      [["up", "down"], "Move between lines / browse history"],
+      [["tab"], "Accept the completion"],
+      [["alt+left", "alt+right", "alt+f"], "Move by word"],
+      [["ctrl+a", "ctrl+e"], "Start / end of line"],
+      [["ctrl+w", "alt+backspace"], "Delete word backwards"],
+      [["ctrl+u"], "Delete to start of line"],
+      [["alt+d"], "Delete word forward"],
+      [["ctrl+k"], "Delete to end of line (joins the next line at its end)"],
+      [["ctrl+y"], "Paste the last deleted text"],
+      [["ctrl+z", "shift+ctrl+z"], "Undo / redo"],
+      [["cmd+b", "cmd+i"], "Bold / italic (Markdown) on the selection or at the caret"],
+      [["shift+left", "shift+right"], "Select"],
+      [["shift+enter"], "In a list item: the next item (an empty item ends the list)"]
+    ]
+  },
+  {
+    group: "Control",
+    rows: [
+      [["escape"], "Close the completion"],
+      [["escape escape"], "Clear the draft into the history (Up brings it back) / stop the agent"],
+      [["shift+tab"], "Cycle the reasoning effort (/effort picks one; Ctrl+G there saves it as the default)"],
+      [["alt+up"], "Edit the oldest queued prompt"],
+      [["alt+enter"], "Steer the running turn with the oldest queued prompt (empty prompt)"],
+      [["alt+a"], "Agents"],
+      [["alt+j"], "Background processes and cron jobs (/ps)"],
+      [["alt+p"], "Pull requests Hermes linked (/prs)"],
+      [["alt+s"], "Session sidebar: branch, PRs, changes (/sidebar)"],
+      [["ctrl+v"], "Attach the clipboard image (also \u2318V of an image, a dropped image file, /paste)"],
+      [["down"], "Focus the agents / shells / PR pills (empty prompt); \u2190 \u2192 switch, Enter opens, Esc returns"],
+      [["ctrl+c"], "Answer no to the open sheet / clear the draft and images / interrupt / exit (twice)"],
+      [["ctrl+d"], "Delete forward / exit (empty prompt)"]
+    ]
+  }
+];
+async function openHelp(host) {
+  let catalog = {};
+  const sid = host.session.ref.live;
+  try {
+    catalog = await host.gw.request("commands.catalog", sid ? { session_id: sid } : {});
+  } catch (error) {
+    host.transcript.notice(
+      `Could not load the command list: ${errorText(error)}`,
+      "warning"
+    );
+  }
+  const own13 = localCommands().flatMap(
+    (c) => c.help ? [[[`/${c.name}`, ...(c.aliases ?? []).map((a2) => `/${a2}`)].join(" \xB7 "), c.help]] : []
+  );
+  const runs3 = ([command = ""]) => !HIDDEN_COMMANDS.has(command.replace(/^\//, "").split(/\s/)[0] ?? "");
+  const categories = [
+    { name: "Tern", pairs: own13 },
+    ...(catalog.categories?.length ? catalog.categories : [{ name: "Commands", pairs: catalog.pairs ?? [] }]).map((c) => ({ ...c, pairs: (c.pairs ?? []).filter(runs3) })).filter((c) => c.pairs.length)
+  ];
+  const overlay = {
+    key: KEY8,
+    modal: true,
+    node: () => /* @__PURE__ */ jsx("overlay", { anchor: "center", head: "Commands and shortcuts", modal: true, role: "omp.overlay.hotkeys", size: "lg", children: /* @__PURE__ */ jsxs("col", { gap: "lg", children: [
+      HOTKEYS.map(({ group, rows }) => /* @__PURE__ */ jsx("section", { head: group, role: "omp.hotkeys.group", children: /* @__PURE__ */ jsx(
+        "table",
+        {
+          cols: [
+            { head: "Key", id: "keys" },
+            { grow: 1, head: "Action", id: "action" }
+          ],
+          role: "omp.hotkeys.table",
+          rows: rows.map(([keys2, action], i) => ({
+            cells: {
+              action: [{ t: action }],
+              keys: keys2.flatMap((k, j) => [...j ? [{ s: "dim", t: " " }] : [], { s: "key", t: k }])
+            },
+            id: String(i)
+          }))
+        },
+        "table"
+      ) }, `keys-${group}`)),
+      categories.map((c) => /* @__PURE__ */ jsx("section", { head: c.name, role: "omp.hotkeys.group", children: /* @__PURE__ */ jsx(
+        "table",
+        {
+          cols: [
+            { head: "Command", id: "command" },
+            { grow: 1, head: "Description", id: "action" }
+          ],
+          role: "omp.hotkeys.table",
+          rows: (c.pairs ?? []).map(([command = "", text11 = ""], i) => ({
+            // The `(usage: …)` tail is `/help <command>`'s business; the table keeps the summary.
+            cells: {
+              action: [{ t: text11.replace(/\s*\(usage: .+\)\s*$/, "") }],
+              command: [{ s: "mono", t: command }]
+            },
+            id: String(i)
+          }))
+        },
+        "table"
+      ) }, `cmd-${c.name}`)),
+      /* @__PURE__ */ jsxs("row", { align: "center", gap: "sm", role: "omp.actions", children: [
+        /* @__PURE__ */ jsx("spacer", { grow: 1 }, "fill"),
+        /* @__PURE__ */ jsxs(
+          "row",
+          {
+            align: "center",
+            gap: "xs",
+            onClick: () => host.close(overlay),
+            role: "omp.btn",
+            title: "Close  escape",
+            children: [
+              /* @__PURE__ */ jsx("text", { text: "Close" }, "label"),
+              /* @__PURE__ */ jsx("kbd", { keys: ["escape"] }, "keys")
+            ]
+          },
+          "close"
+        )
+      ] }, "actions")
+    ] }, "body") }, KEY8),
+    onKey: (k) => {
+      if (k.name === "escape" || k.name === "enter" || k.name === "q") {
+        host.close(overlay);
+      }
+      return true;
+    }
+  };
+  host.open(overlay);
 }
 
 // src/view/styles.ts
@@ -67925,39 +67970,29 @@ var PullRequests = class {
 
 // src/prs/aside.tsx
 var PrAside = class {
-  #app;
+  #host;
   #view;
-  constructor(app2) {
-    this.#app = app2;
+  /** `host` is what the PR view reaches; the aside lends it the same one. */
+  constructor(host) {
+    this.#host = host;
   }
   get open() {
     return this.#view !== void 0;
   }
   show(focus) {
     if (!this.#view) {
-      const app2 = this.#app;
-      this.#view = new PrView({
-        changed: () => app2.changed(),
-        notice: (text11, tone) => {
-          app2.transcript.notice(text11, tone);
-          app2.changed();
-        },
-        open: openUrl,
-        prs: app2.prs,
-        reveal: (id) => app2.reveal(id),
-        scroll: (id, to) => app2.scroll(id, to)
-      });
+      this.#view = new PrView(this.#host);
     }
     if (focus) {
       this.#view.select(focus);
     }
-    this.#app.prs.poke();
-    this.#app.changed();
+    this.#host.prs.poke();
+    this.#host.changed();
   }
   close() {
     this.#view?.dispose();
     this.#view = void 0;
-    this.#app.changed();
+    this.#host.changed();
   }
   node(id) {
     const view = this.#view;
@@ -67999,7 +68034,7 @@ var POLL_MS3 = 5e3;
 var ACTS = ["close", "page", "copy-branch", "open-pr", "diff", "all-files"];
 var MAX_FILES = 40;
 var Sidebar = class {
-  #app;
+  #host;
   #open = false;
   #state;
   #cwd = null;
@@ -68007,8 +68042,8 @@ var Sidebar = class {
   #reading = false;
   #copied = false;
   #copiedTimer;
-  constructor(app2) {
-    this.#app = app2;
+  constructor(host) {
+    this.#host = host;
   }
   get open() {
     return this.#open;
@@ -68022,7 +68057,7 @@ var Sidebar = class {
     if (this.#open) {
       void this.refresh();
     }
-    this.#app.changed();
+    this.#host.changed();
   }
   /** Reads git again now (a tool changed files, the turn ended). */
   poke() {
@@ -68035,7 +68070,7 @@ var Sidebar = class {
     clearTimeout(this.#timer);
   }
   async refresh() {
-    const cwd = this.#app.info?.cwd || null;
+    const cwd = this.#host.session.info?.cwd || null;
     if (this.#reading) {
       return;
     }
@@ -68049,16 +68084,16 @@ var Sidebar = class {
       if (this.#open) {
         this.#timer = setTimeout(() => void this.refresh(), POLL_MS3);
       }
-      this.#app.changed();
+      this.#host.changed();
     }
   }
   node(id) {
     if (!this.#open) {
       return null;
     }
-    const app2 = this.#app;
+    const host = this.#host;
     const git3 = this.#state;
-    const prs = app2.prs.entries().toReversed();
+    const prs = host.prs.entries().toReversed();
     const files = git3?.files ?? [];
     const added = files.reduce((n, f) => n + f.additions, 0);
     const removed = files.reduce((n, f) => n + f.deletions, 0);
@@ -68091,7 +68126,7 @@ var Sidebar = class {
     return /* @__PURE__ */ jsx(
       "prefs",
       {
-        lead: git3 ? git3.root.replace(process.env.HOME ?? "\0", "~") : app2.info?.cwd ?? "",
+        lead: git3 ? git3.root.replace(process.env.HOME ?? "\0", "~") : host.session.info?.cwd ?? "",
         onAction: Object.fromEntries(ACTS.map((act) => [act, (ev) => this.#action(act, ev.value)])),
         page: "session",
         pages: [{ icon: "branch", id: "session", label: "Session" }],
@@ -68129,17 +68164,17 @@ var Sidebar = class {
           clearTimeout(this.#copiedTimer);
           this.#copiedTimer = setTimeout(() => {
             this.#copied = false;
-            this.#app.changed();
+            this.#host.changed();
           }, 1500);
-          this.#app.changed();
+          this.#host.changed();
         }
         return;
       case "open-pr":
-        return openPullRequests(this.#app, row2.replace(/^pr:/, ""));
+        return openPullRequests(this.#host, row2.replace(/^pr:/, ""));
       case "diff":
-        return openChanges(this.#app, row2.replace(/^file:/, ""));
+        return openChanges(this.#host, row2.replace(/^file:/, ""));
       case "all-files":
-        return openChanges(this.#app);
+        return openChanges(this.#host);
     }
   }
 };
@@ -69017,8 +69052,6 @@ var App = class {
   processes = new Processes(this, { author: hermesAuthor(), enabled: () => this.#jobCharts, memory: chartMemory() });
   cron = new Cron(this);
   sidebar = new Sidebar(this);
-  /** The pull request docked at the pane's right edge (the PR aside). */
-  prAside = new PrAside(this);
   /** The session's standing /goal and /loop (the dock line above the pills and its sheets). */
   automation = new Automation(this);
   /** The session's title, as Hermes names it (`session.title`). */
@@ -69031,12 +69064,23 @@ var App = class {
     cwd: () => this.info?.cwd || null,
     sid: () => this.storedSid ?? this.sid
   });
+  /** The pull request docked at the pane's right edge (the PR aside). */
+  prAside = new PrAside({
+    changed: () => this.changed(),
+    notice: (text11, tone) => this.notice(text11, tone),
+    open: openUrl,
+    prs: this.prs,
+    reveal: (id) => this.reveal(id),
+    scroll: (id, to) => this.scroll(id, to)
+  });
   composer = new Composer();
   overlays = [];
   sid = null;
   /** The stored (database) id of the open session: what `session.list` rows are keyed by. */
   storedSid = null;
   info = null;
+  /** The session as the ports read it: `sid`, `storedSid` and `info`, live. */
+  session = sessionView(this);
   usage = null;
   busy = null;
   /** Prompts held here until they can be sent: no session yet, a switch in flight, or a private gateway's busy turn. */
@@ -69204,6 +69248,11 @@ var App = class {
       this.#render();
     });
   }
+  /** A notice in the transcript, rendered now. */
+  notice(text11, tone) {
+    this.transcript.notice(text11, tone);
+    this.changed();
+  }
   /** An error nothing caught (a rejected promise no caller awaited): shown, so the pane lives on. */
   fault(reason) {
     this.transcript.notice(`Unexpected error: ${errorText(reason)}`, "error");
@@ -69257,7 +69306,7 @@ var App = class {
       return;
     }
     if (key2.shift && key2.name === "tab") {
-      return this.#cycleEffort();
+      return cycleEffort(this);
     }
     if (key2.alt && !key2.ctrl && !key2.meta) {
       switch (key2.name) {
@@ -69633,6 +69682,10 @@ var App = class {
     if (!await openSidebar(specOf(a2, agentName(a2), this.sid, this.storedSid), cwd)) {
       openAgents(this, { id, watch: true });
     }
+  }
+  /** `/help`: the keyboard shortcuts and every command, in the help sheet. */
+  openHelp() {
+    return openHelp(this);
   }
   /** Text or images in the composer: Ctrl+C clears them before it interrupts, Ctrl+D never exits over them. */
   #hasDraft() {
@@ -70733,45 +70786,9 @@ ${this.composer.text}` : text11 || this.composer.text);
       this.changed();
     });
   }
-  /** Steps the session's reasoning effort up the levels its model takes; session.info echoes it back. */
-  #cycleEffort() {
-    const next3 = nextEffort(this.info?.reasoning_effort ?? "", capsOf(this.info));
-    if (!next3) {
-      this.transcript.notice("This model has no reasoning effort to set.", "warning");
-      return this.changed();
-    }
-    void this.setEffort(next3, "session");
-  }
-  /**
-   * Sets the reasoning effort: `session` for this session only (the pill, ⇧⇥), `global` also as
-   * config.yaml's `agent.reasoning_effort`, the default of every new session (Hermes' `/reasoning
-   * <level> --global`). On the shared gateway the session level is its revision-fenced `reasoning`
-   * mutation, as Ink and desktop send it: stored with the session, and session.info to every viewer.
-   */
-  async setEffort(value, scope) {
-    const sid = this.sid;
-    if (!sid) {
-      return;
-    }
-    const before = this.info && { reasoning_effort: this.info.reasoning_effort, reasoning_effort_wire: this.info.reasoning_effort_wire };
-    this.info = this.info && { ...this.info, reasoning_effort: value, reasoning_effort_wire: void 0 };
-    this.changed();
-    try {
-      if (scope === "session" && this.#gw.isCanonical) {
-        await mutateSession(this.#gw, sid, "reasoning", { effort: value });
-      } else {
-        await this.#gw.request("config.set", { key: "reasoning", scope, session_id: sid, value });
-      }
-      if (scope === "global") {
-        this.transcript.notice(`Reasoning effort ${value === "none" ? "off" : value} is now the default for new sessions.`);
-      }
-    } catch (error) {
-      if (sid === this.sid && this.info && before && this.info.reasoning_effort === value) {
-        this.info = { ...this.info, ...before };
-      }
-      this.transcript.notice(`Could not set the reasoning effort: ${errorText(error)}`, "error");
-    }
-    this.changed();
+  /** Sets the reasoning effort for this session, or also as the default of every new one (session/effort.ts). */
+  setEffort(value, scope) {
+    return applyEffort(this, value, scope);
   }
   /** Prompts waiting behind the turn: this pane's own queue, then the shared gateway's. */
   #queuedCount() {
@@ -70977,7 +70994,7 @@ ${this.composer.text}` : text11 || this.composer.text);
           this.composer.edit(ev);
           this.changed();
         },
-        onEffort: () => this.#cycleEffort(),
+        onEffort: () => cycleEffort(this),
         onEffortMenu: {
           "choose-effort": () => openEffortPicker(this),
           "save-effort-as-default": () => void this.setEffort(this.info?.reasoning_effort || DEFAULT_EFFORT, "global")

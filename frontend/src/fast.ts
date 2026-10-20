@@ -6,6 +6,7 @@
 import type { SessionLiveInfo } from '@hermes/shared/gateway-events'
 import type { GatewayClient } from '@tui/gatewayClient.js'
 
+import type { SessionView } from './app/ports.js'
 import { errorText } from './core/errors.js'
 import type { NoticeEntry } from './model.js'
 
@@ -14,8 +15,7 @@ export type FastWord = 'fast' | 'normal' | 'ultrafast'
 /** What the fast commands reach of the app. */
 export interface FastHost {
   readonly gw: Pick<GatewayClient, 'request'>
-  readonly sid: string | null
-  info: SessionLiveInfo | null
+  readonly session: SessionView
   readonly transcript: { notice(text: string, tone?: NoticeEntry['tone']): void }
   changed(): void
 }
@@ -43,7 +43,7 @@ const describe = (word: FastWord) =>
 
 /** Sets the session's tier (`fast`, `ultrafast`, `normal` or `toggle`); true when it took. */
 export async function setFast(host: FastHost, value: string): Promise<boolean> {
-  const sid = host.sid
+  const sid = host.session.ref.live
 
   if (!sid) {
     return false
@@ -53,8 +53,8 @@ export async function setFast(host: FastHost, value: string): Promise<boolean> {
     const r = await host.gw.request<{ value?: string }>('config.set', { key: 'fast', session_id: sid, value })
     const word = fastWord(r?.value)
 
-    if (sid === host.sid) {
-      host.info = { ...host.info, fast: word !== 'normal', service_tier: TIERS[word] }
+    if (sid === host.session.ref.live) {
+      host.session.info = { ...host.session.info, fast: word !== 'normal', service_tier: TIERS[word] }
     }
 
     host.transcript.notice(describe(word))
@@ -77,7 +77,7 @@ export async function setFast(host: FastHost, value: string): Promise<boolean> {
 /** `/fast [on|off|fast|ultrafast|normal|toggle|status]`: no word toggles. */
 export async function fastCommand(host: FastHost, arg: string) {
   if (arg.trim().toLowerCase() === 'status') {
-    const r = await host.gw.request<{ value?: string }>('config.get', { key: 'fast', session_id: host.sid })
+    const r = await host.gw.request<{ value?: string }>('config.get', { key: 'fast', session_id: host.session.ref.live })
 
     return host.transcript.notice(`Fast mode: ${fastWord(r?.value)}.`)
   }

@@ -1,8 +1,7 @@
 import type { CompletionItem } from '@hermes/shared/gateway-events'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import type { App } from '../app.js'
-import { HIDDEN_COMMANDS, localCommand } from '../commands.js'
+import { type CommandHost, HIDDEN_COMMANDS, localCommand } from '../commands.js'
 import type { Overlay } from '../overlay.js'
 import { openBackground } from '../overlays/background.js'
 import { slashItems } from '../overlays/completion.js'
@@ -14,22 +13,21 @@ import { openHermesSplit } from '../watch/spec.js'
 vi.mock('../overlays/background.js', () => ({ openBackground: vi.fn() }))
 vi.mock('../watch/spec.js', () => ({ openHermesSplit: vi.fn(async () => true) }))
 
-/** The slice of App these commands reach; `reply` answers every request. */
+/** The slice of the command host these commands reach; `reply` answers every request. */
 function app(reply: (method: string, params: unknown) => unknown = () => null, cwd: string | null = '/repo') {
   const request = vi.fn(async (method: string, params?: unknown) => reply(method, params))
 
   return {
     gw: { request },
-    info: cwd ? { cwd } : null,
     request,
-    sid: 'sid-1',
+    session: { info: cwd ? { cwd } : null, ref: { live: 'sid-1', stored: null } },
     transcript: { notice: vi.fn(), panel: vi.fn() }
   }
 }
 
 type Fake = ReturnType<typeof app>
 
-const run = (a: Fake, name: string, arg = '') => localCommand(name)!.run(a as unknown as App, arg)
+const run = (a: Fake, name: string, arg = '') => localCommand(name)!.run(a as unknown as CommandHost, arg)
 
 beforeEach(() => vi.clearAllMocks())
 
@@ -373,7 +371,7 @@ describe('hidden commands', () => {
     const help = {
       gw: { request: async () => ({ categories }) },
       open: (o: Overlay) => (sheet = o),
-      sid: 's1',
+      session: { info: null, ref: { live: 's1', stored: null } },
       transcript: { notice: vi.fn() }
     }
 

@@ -61,7 +61,7 @@ handling the rest; when the switch should cover every member, end it with
 - `effect` and `effect/*`: this package does not use Effect. Brands, tagged unions, the Epoch
   ticket and disposables are plain TypeScript (the bundle size and per-pane startup decided it).
 - `app.js` from below `src/`: only the root modules import App. A module declares the ports it
-  uses (`Pick<ChatPorts, …>`) and App passes itself in.
+  uses (`Pick<ChatPorts, …>`, src/app/ports.ts) and App passes itself in.
 - Value imports from `@tui/*` outside `src/hermes/**` and `src/wire/**`: the Hermes sources move
   with `hermes update`, so their runtime code comes in through those two directories.
   `import type` from `@tui/*` is fine anywhere.

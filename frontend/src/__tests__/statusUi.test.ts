@@ -18,7 +18,7 @@ const { App } = await import('../app.js')
 const { localCommand } = await import('../commands.js')
 const { fastValue, fastTier } = await import('../fast.js')
 const { forgetCaps, rememberCaps } = await import('../modelCaps.js')
-const { effortText, levelsFor, nextEffort } = await import('../overlays/effort.js')
+const { effortText, levelsFor, nextEffort } = await import('../session/effort.js')
 const { openModelPicker } = await import('../overlays/models.js')
 
 const settle = () => new Promise(resolve => setTimeout(resolve, 5))

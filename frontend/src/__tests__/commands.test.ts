@@ -1,14 +1,13 @@
 import { describe, expect, it, vi } from 'vitest'
 
-import type { App } from '../app.js'
 import { copyToClipboard } from '../clipboard.js'
-import { historyText, localCommand } from '../commands.js'
+import { type CommandHost, historyText, localCommand } from '../commands.js'
 import { CONTROL_COMMANDS, type ControlHost } from '../controlCommands.js'
 import type { Entry } from '../model.js'
 
 vi.mock('../clipboard.js', () => ({ copyToClipboard: vi.fn() }))
 
-/** The slice of App `/agents <sub>` reaches. */
+/** The slice of the command host `/agents <sub>` reaches. */
 function app(paused?: boolean) {
   const agents = {
     pause: vi.fn(async (p: boolean) => {
@@ -22,7 +21,7 @@ function app(paused?: boolean) {
   return { agents, transcript: { notice: vi.fn() } }
 }
 
-const agents = (a: ReturnType<typeof app>, arg: string) => localCommand('agents')!.run(a as unknown as App, arg)
+const agents = (a: ReturnType<typeof app>, arg: string) => localCommand('agents')!.run(a as unknown as CommandHost, arg)
 
 describe('/agents', () => {
   it('pauses and resumes spawns itself instead of sending them to slash.exec', async () => {
@@ -70,7 +69,7 @@ function local(over: Record<string, unknown> = {}) {
     request,
     transcript: { notice: vi.fn() },
     ...over
-  } as unknown as App & { request: typeof request }
+  } as unknown as CommandHost & { request: typeof request }
 }
 
 describe('local commands', () => {

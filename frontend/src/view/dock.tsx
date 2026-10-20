@@ -7,7 +7,7 @@ import type { EditEvent, JSX, SendEvent, Tone } from '@stencil-hq/tern'
 import type { Composer } from '../composer.js'
 import type { Pill } from '../hud.js'
 import type { ImageSource, Todo } from '../model.js'
-import { DEFAULT_EFFORT, effortText } from '../overlays/effort.js'
+import { DEFAULT_EFFORT, effortText } from '../session/effort.js'
 import { type ChartEntry, glance, glanceSpans, hovercard, latest, miniSpark, summary } from '../processes/widgets/view.js'
 import { COMPACTING_LABEL } from '../status.js'
 

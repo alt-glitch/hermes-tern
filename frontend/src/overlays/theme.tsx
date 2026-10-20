@@ -3,11 +3,14 @@
 
 import type { Key, PickerItem } from '@stencil-hq/tern'
 
-import type { App } from '../app.js'
+import type { ChatPorts } from '../app/ports.js'
 import type { Overlay } from '../overlay.js'
 import type { ThemeMode } from '../settings.js'
 
 import { moveSelection } from './search.js'
+
+/** What the theme picker reaches of the app. */
+export type ThemeHost = Pick<ChatPorts, 'close' | 'open' | 'setTheme' | 'theme'>
 
 const KEY = 'theme'
 
@@ -22,14 +25,14 @@ export function isThemeMode(v: string): v is ThemeMode {
 }
 
 /** Opens the theme picker; the selection previews live and Esc puts the old mode back. */
-export function openThemePicker(app: App) {
-  const before = app.theme
+export function openThemePicker(host: ThemeHost) {
+  const before = host.theme
   let selected: ThemeMode = before
 
   const pick = (mode: ThemeMode | undefined) => {
     if (mode) {
       selected = mode
-      app.setTheme(mode)
+      host.setTheme(mode)
     }
   }
 
@@ -38,8 +41,8 @@ export function openThemePicker(app: App) {
     modal: true,
     // As Esc: the theme being previewed goes back.
     cancel: () => {
-      app.setTheme(before)
-      app.close(overlay)
+      host.setTheme(before)
+      host.close(overlay)
     },
     node: () => (
       <picker
@@ -54,15 +57,15 @@ export function openThemePicker(app: App) {
         noun="themes"
         onAction={{
           cancel: () => {
-            app.setTheme(before)
-            app.close(overlay)
+            host.setTheme(before)
+            host.close(overlay)
           },
-          close: () => app.close(overlay),
-          use: () => app.close(overlay)
+          close: () => host.close(overlay),
+          use: () => host.close(overlay)
         }}
         onActivate={ev => {
           pick(ev.item as ThemeMode)
-          app.close(overlay)
+          host.close(overlay)
         }}
         onSelect={ev => pick(ev.item as ThemeMode)}
         selected={selected}
@@ -72,10 +75,10 @@ export function openThemePicker(app: App) {
     ),
     onKey: (k: Key) => {
       if (k.name === 'escape') {
-        app.setTheme(before)
-        app.close(overlay)
+        host.setTheme(before)
+        host.close(overlay)
       } else if (k.name === 'enter') {
-        app.close(overlay)
+        host.close(overlay)
       } else {
         pick(moveSelection(k, MODES.map(m => m.id), selected) as ThemeMode | undefined)
       }
@@ -84,5 +87,5 @@ export function openThemePicker(app: App) {
     }
   }
 
-  app.open(overlay)
+  host.open(overlay)
 }

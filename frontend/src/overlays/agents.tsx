@@ -8,7 +8,7 @@
 
 import type { JSX, Key, PickerColumn, PickerItem, Tone } from '@stencil-hq/tern'
 
-import type { App } from '../app.js'
+import type { ChatPorts } from '../app/ports.js'
 import { errorText } from '../core/errors.js'
 import type { Subagent } from '../model.js'
 import type { Overlay } from '../overlay.js'
@@ -19,6 +19,9 @@ import { duration } from '../view/time.js'
 import { agentNode, briefOf } from '../view/tools.js'
 
 import { editQuery, moveSelection } from './search.js'
+
+/** What the agents hub reaches of the app. */
+export type AgentsSheetHost = Pick<ChatPorts, 'agents' | 'changed' | 'close' | 'open' | 'openAgent' | 'overlays' | 'transcript'>
 
 const KEY = 'agents'
 /** Timers and the timeline follow the clock while the sheet is open. */
@@ -57,9 +60,9 @@ const TOOL_ICON: Record<string, string> = {
 }
 
 /** Opens the hub, on agent `focus` when given (its timeline when `watch`). */
-export function openAgents(app: App, focus?: { id: string; watch?: boolean }) {
-  const agents = () => app.agents.all()
-  let tab: Tab = app.agents.running().length ? 'running' : 'all'
+export function openAgents(host: AgentsSheetHost, focus?: { id: string; watch?: boolean }) {
+  const agents = () => host.agents.all()
+  let tab: Tab = host.agents.running().length ? 'running' : 'all'
   let selected = focus?.id ?? agents().find(isRunning)?.id ?? agents()[0]?.id
   /** The agent whose timeline is open, if any. */
   let watching: string | undefined
@@ -70,11 +73,11 @@ export function openAgents(app: App, focus?: { id: string; watch?: boolean }) {
   let stopping = false
 
   // Ends with the sheet, however it closed (Esc, a session switch replacing the overlays).
-  const timer = setInterval(() => (app.overlays.includes(overlay) ? app.changed() : clearInterval(timer)), TICK_MS)
+  const timer = setInterval(() => (host.overlays.includes(overlay) ? host.changed() : clearInterval(timer)), TICK_MS)
 
   const close = () => {
     clearInterval(timer)
-    app.close(overlay)
+    host.close(overlay)
   }
 
   const current = () => agents().find(a => a.id === (watching ?? selected))
@@ -88,14 +91,14 @@ export function openAgents(app: App, focus?: { id: string; watch?: boolean }) {
 
     watching = a.id
     step = undefined
-    void app.agents.refresh(a)
+    void host.agents.refresh(a)
   }
 
   /** Opens the agent in a split beside the chat and closes the hub; its timeline here when no split can open. */
   const beside = (id: string | undefined) => {
     if (id) {
       close()
-      void app.openAgent(id)
+      void host.openAgent(id)
     }
   }
 
@@ -105,20 +108,20 @@ export function openAgents(app: App, focus?: { id: string; watch?: boolean }) {
     steer = undefined
 
     if (!a || !text) {
-      return app.changed()
+      return host.changed()
     }
 
     try {
-      const queued = await app.agents.steer(a, text)
-      app.transcript.notice(
+      const queued = await host.agents.steer(a, text)
+      host.transcript.notice(
         queued ? `Steering queued for ${agentName(a)}.` : `${agentName(a)} is not taking steering now.`,
         queued ? 'info' : 'warning'
       )
     } catch (error) {
-      app.transcript.notice(errorText(error), 'error')
+      host.transcript.notice(errorText(error), 'error')
     }
 
-    app.changed()
+    host.changed()
   }
 
   const stop = async () => {
@@ -126,30 +129,30 @@ export function openAgents(app: App, focus?: { id: string; watch?: boolean }) {
     stopping = false
 
     if (!a || !isRunning(a)) {
-      return app.changed()
+      return host.changed()
     }
 
     try {
-      if (!(await app.agents.stop(a))) {
-        app.transcript.notice(`${agentName(a)} already finished.`, 'warning')
+      if (!(await host.agents.stop(a))) {
+        host.transcript.notice(`${agentName(a)} already finished.`, 'warning')
       }
     } catch (error) {
-      app.transcript.notice(errorText(error), 'error')
+      host.transcript.notice(errorText(error), 'error')
     }
 
-    app.changed()
+    host.changed()
   }
 
   /** Blocks or unblocks new spawns (`delegation.pause`, every chat on the gateway); running agents keep going. */
   const togglePause = async () => {
     try {
-      const paused = await app.agents.pause(!app.agents.paused)
-      app.transcript.notice(paused ? 'Subagent spawning paused for every chat on this gateway.' : 'Subagent spawning resumed.')
+      const paused = await host.agents.pause(!host.agents.paused)
+      host.transcript.notice(paused ? 'Subagent spawning paused for every chat on this gateway.' : 'Subagent spawning resumed.')
     } catch (error) {
-      app.transcript.notice(errorText(error), 'error')
+      host.transcript.notice(errorText(error), 'error')
     }
 
-    app.changed()
+    host.changed()
   }
 
   const shown = (): Subagent[] => (tab === 'running' ? agents().filter(isRunning) : agents())
@@ -251,7 +254,7 @@ export function openAgents(app: App, focus?: { id: string; watch?: boolean }) {
         : [
             { id: 'watch', keys: ['t'], label: 'Timeline' },
             { id: 'beside', keys: ['enter'], label: 'Open beside', primary: true },
-            { id: 'pause', keys: ['p'], label: app.agents.paused ? 'Resume spawns' : 'Pause spawns' }
+            { id: 'pause', keys: ['p'], label: host.agents.paused ? 'Resume spawns' : 'Pause spawns' }
           ]),
       {
         disabled: running ? (a?.steerable === false ? ('Not taking steering now' as const) : undefined) : ('Finished' as const),
@@ -267,13 +270,13 @@ export function openAgents(app: App, focus?: { id: string; watch?: boolean }) {
   const handlers = {
     cancel: () => {
       stopping = false
-      app.changed()
+      host.changed()
     },
     close: () => {
       if (watching) {
         selected = watching
         watching = undefined
-        app.changed()
+        host.changed()
       } else {
         close()
       }
@@ -282,25 +285,25 @@ export function openAgents(app: App, focus?: { id: string; watch?: boolean }) {
     pause: () => void togglePause(),
     steer: () => {
       steer = ''
-      app.changed()
+      host.changed()
     },
     'steer-cancel': () => {
       steer = undefined
-      app.changed()
+      host.changed()
     },
     'steer-send': () => void sendSteer(),
     stop: () => {
       stopping = true
-      app.changed()
+      host.changed()
     },
     tab: (ev: { value?: string }) => {
       tab = ev.value === 'running' ? 'running' : 'all'
-      app.changed()
+      host.changed()
     },
     beside: () => beside(selected),
     watch: () => {
       watch(selected)
-      app.changed()
+      host.changed()
     }
   }
 
@@ -335,7 +338,7 @@ export function openAgents(app: App, focus?: { id: string; watch?: boolean }) {
         onSelect={ev => {
           selected = ev.item
           stopping = false
-          app.changed()
+          host.changed()
         }}
         order={list.map(x => x.id)}
         preview="side"
@@ -343,7 +346,7 @@ export function openAgents(app: App, focus?: { id: string; watch?: boolean }) {
         size="lg"
         subtitle={[
           { s: 'muted', t: summary(all) },
-          ...(app.agents.paused ? [{ s: 'warning', t: ' · spawns paused (gateway-wide)' }] : [])
+          ...(host.agents.paused ? [{ s: 'warning', t: ' · spawns paused (gateway-wide)' }] : [])
         ]}
         tab={tab}
         tabs={[
@@ -354,7 +357,7 @@ export function openAgents(app: App, focus?: { id: string; watch?: boolean }) {
         total={all.length}
         {...steerProps(a)}
       >
-        {a ? hubPreview(a, now, briefFor(app, a)) : null}
+        {a ? hubPreview(a, now, briefFor(host, a)) : null}
       </picker>
     )
   }
@@ -382,7 +385,7 @@ export function openAgents(app: App, focus?: { id: string; watch?: boolean }) {
         onAction={handlers}
         onSelect={ev => {
           step = ev.item === ids.at(-1) ? undefined : ev.item
-          app.changed()
+          host.changed()
         }}
         preview="side"
         selected={sel}
@@ -392,12 +395,12 @@ export function openAgents(app: App, focus?: { id: string; watch?: boolean }) {
         total={entries.length}
         {...steerProps(a)}
       >
-        {at >= 0 ? stepPreview(entries[at]!, a, briefFor(app, a)) : [agentNode(a, now)]}
+        {at >= 0 ? stepPreview(entries[at]!, a, briefFor(host, a)) : [agentNode(a, now)]}
       </picker>
     )
   }
 
-  app.open(overlay)
+  host.open(overlay)
 
   if (focus?.watch) {
     watch(focus.id)
@@ -434,8 +437,8 @@ function hubItem(a: Subagent, now: number): PickerItem {
 }
 
 /** The brief agent `a` was given with its goal, from the delegation that started it. */
-function briefFor(app: App, a: Subagent): string | undefined {
-  const call = app.transcript.delegations().find(c => c.subagents?.includes(a))
+function briefFor(host: AgentsSheetHost, a: Subagent): string | undefined {
+  const call = host.transcript.delegations().find(c => c.subagents?.includes(a))
 
   return call ? briefOf(call, a.index) : undefined
 }

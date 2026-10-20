@@ -115,7 +115,7 @@ describe('/help', () => {
     const app = {
       gw: { request: async () => ({ categories }) },
       open: (o: Overlay) => (sheet = o),
-      sid: 's1',
+      session: { info: null, ref: { live: 's1', stored: null } },
       transcript: { notice: vi.fn() }
     }
 

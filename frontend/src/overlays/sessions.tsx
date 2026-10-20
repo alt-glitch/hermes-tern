@@ -10,7 +10,7 @@ import { basename } from 'node:path'
 
 import type { JSX, Key, PickerGroup, PickerItem, Span } from '@stencil-hq/tern'
 
-import type { App } from '../app.js'
+import type { ChatPorts } from '../app/ports.js'
 import { errorText } from '../core/errors.js'
 import { mutateSession } from '../hermes/mutate.js'
 import { inWorkspace, lastReply, sessionLabel, type StoredSession, storedSessions, workspaceOf } from '../hermes/sessionIndex.js'
@@ -19,6 +19,9 @@ import { oneLine } from '../view/describe.js'
 
 import { editQuery, hitRuns, moveSelection, rank } from './search.js'
 
+/** What the session picker reaches of the app. */
+export type SessionsHost = Pick<ChatPorts, 'changed' | 'close' | 'gw' | 'open' | 'resume' | 'session' | 'transcript'>
+
 const KEY = 'sessions'
 const LIMIT = 400
 const DAY = 86_400_000
@@ -26,7 +29,7 @@ const DAY = 86_400_000
 type Tab = 'all' | 'here'
 
 /** Opens the session picker; picking a row resumes that session. */
-export function openSessionPicker(app: App) {
+export function openSessionPicker(host: SessionsHost) {
   let state: 'loading' | 'ready' | 'error' = 'loading'
   let sessions: StoredSession[] = []
   let running = new Set<string>()
@@ -37,17 +40,17 @@ export function openSessionPicker(app: App) {
   let deleting: string | null = null
   let shown: string[] = []
   const replies = new Map<string, string>()
-  const current = app.storedSid ?? app.sid ?? ''
+  const current = host.session.ref.stored ?? host.session.ref.live ?? ''
 
   const load = async () => {
     state = 'loading'
-    app.changed()
+    host.changed()
 
-    const cwd = app.info?.cwd || process.env.HERMES_CWD || process.cwd()
+    const cwd = host.session.info?.cwd || process.env.HERMES_CWD || process.cwd()
     // The open session may have no messages yet; every other empty one is litter.
     const [key, live] = await Promise.all([
       workspaceOf(cwd),
-      app.gw.request<{ sessions?: { id?: string; running?: boolean }[] }>('session.list', { limit: 200 }).catch(() => ({ sessions: [] }))
+      host.gw.request<{ sessions?: { id?: string; running?: boolean }[] }>('session.list', { limit: 200 }).catch(() => ({ sessions: [] }))
     ])
 
     workspace = key
@@ -56,7 +59,7 @@ export function openSessionPicker(app: App) {
     tab = sessions.some(s => inWorkspace(s, workspace)) ? 'here' : 'all'
     selected = rows().find(s => s.id !== current)?.id ?? rows()[0]?.id
     state = 'ready'
-    app.changed()
+    host.changed()
   }
 
   const here = (s: StoredSession) => inWorkspace(s, workspace)
@@ -69,13 +72,13 @@ export function openSessionPicker(app: App) {
       return
     }
 
-    app.close(overlay)
+    host.close(overlay)
 
     if (s.id !== current) {
       // A refusal (deleted elsewhere, gateway down) is a notice; the view stays where it was.
-      app.resume(s.id).catch((error: unknown) => {
-        app.transcript.notice(`Could not resume: ${errorText(error)}`, 'error')
-        app.changed()
+      host.resume(s.id).catch((error: unknown) => {
+        host.transcript.notice(`Could not resume: ${errorText(error)}`, 'error')
+        host.changed()
       })
     }
   }
@@ -85,13 +88,13 @@ export function openSessionPicker(app: App) {
 
     try {
       // The shared gateway deletes through a revision-fenced mutation (the whole lineage).
-      await (app.gw.isCanonical ? mutateSession(app.gw, id, 'delete', {}) : app.gw.request('session.delete', { session_id: id }))
+      await (host.gw.isCanonical ? mutateSession(host.gw, id, 'delete', {}) : host.gw.request('session.delete', { session_id: id }))
       sessions = sessions.filter(s => s.id !== id)
     } catch (error) {
-      app.transcript.notice(errorText(error), 'error')
+      host.transcript.notice(errorText(error), 'error')
     }
 
-    app.changed()
+    host.changed()
   }
 
   const askDelete = () => {
@@ -100,7 +103,7 @@ export function openSessionPicker(app: App) {
     }
 
     if (selected === current) {
-      app.transcript.notice('The open session cannot be deleted; start a new one first.', 'warning')
+      host.transcript.notice('The open session cannot be deleted; start a new one first.', 'warning')
     } else {
       deleting = selected
     }
@@ -187,13 +190,13 @@ export function openSessionPicker(app: App) {
           onAction={{
             cancel: () => {
               deleting = null
-              app.changed()
+              host.changed()
             },
             clear: () => {
               query = ''
-              app.changed()
+              host.changed()
             },
-            close: () => app.close(overlay),
+            close: () => host.close(overlay),
             confirm: () => {
               if (deleting) {
                 void remove(deleting)
@@ -201,20 +204,20 @@ export function openSessionPicker(app: App) {
             },
             delete: () => {
               askDelete()
-              app.changed()
+              host.changed()
             },
             resume: () => resume(selected),
             retry: () => void load(),
             tab: ev => {
               setTab(ev.value === 'here' ? 'here' : 'all')
-              app.changed()
+              host.changed()
             }
           }}
           onActivate={ev => resume(ev.item)}
           onSelect={ev => {
             selected = ev.item
             deleting = null
-            app.changed()
+            host.changed()
           }}
           order={order}
           placeholder="Search titles, prompts, folders, branches…"
@@ -251,7 +254,7 @@ export function openSessionPicker(app: App) {
         if (query) {
           query = ''
         } else {
-          app.close(overlay)
+          host.close(overlay)
         }
       } else if (k.name === 'enter') {
         resume(selected)
@@ -274,7 +277,7 @@ export function openSessionPicker(app: App) {
     }
   }
 
-  app.open(overlay)
+  host.open(overlay)
   // After the sheet is up: the read is synchronous.
   setTimeout(() => void load(), 0)
 }
