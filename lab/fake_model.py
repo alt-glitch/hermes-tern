@@ -6,7 +6,7 @@ Writes a disposable HERMES_HOME at DIR (config pointing at this server, the plug
 first-run prompts answered) and then serves until killed. What the model does is picked by
 the user's prompt, so one home covers every flow:
 
-    "approve"   -> a terminal call Hermes flags as dangerous (approval sheet)
+    "approve"   -> a terminal call Hermes flags as dangerous (approval sheet); "approve long": a long one
     "clarify"   -> a clarify call with choices (clarify sheet)
     "tool"      -> a harmless terminal call (tool card)
     "steps"     -> four calls in a row (commands, a read, a search), then an answer
@@ -245,6 +245,10 @@ def _calls(prompt: str, target: Path) -> list[dict] | None:
         return [_call("terminal", {"command": SCRIPT})]
     if "approve" in words:
         target.mkdir(exist_ok=True)
+        if "long" in words:
+            # A chained command longer than the sheet is wide, as agents write them.
+            loop = " && ".join(f"for f in agent/{m}.py tests/test_{m}.py; do wc -l $f; done" for m in ("chat", "tools", "memory"))
+            return [_call("terminal", {"command": f"cd {target} && {loop} && rm -rf -- {target}"})]
         return [_call("terminal", {"command": f"rm -rf -- {target}"})]
     if "clarify" in words:
         return [_call("clarify", {"questions": [{"question": "Which colour?", "choices": ["red", "green", "blue"]}]})]
