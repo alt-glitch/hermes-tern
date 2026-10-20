@@ -63,8 +63,9 @@ const POLL_MS = 1000
 /** Polls a child with no log this process can read may go unlisted before it counts as ended (it can finish inside the first one). */
 const GRACE_POLLS = 3
 /**
- * Reads that found no log file before the store stops looking for it: a child may not have
- * written it yet, but a gateway on another machine writes it where this process never sees it.
+ * Reads that found no log file while the child runs before the store stops looking for it: a
+ * child may not have written it yet, but a gateway on another machine writes it where this
+ * process never sees it. A queued child (behind the concurrency limit) writes none yet.
  */
 const MISSING_READS = 3
 
@@ -444,7 +445,12 @@ export class Agents {
           return false
 
         case 'notYet': {
-          // Not written yet, or written on another machine: after a few reads, the tail it is.
+          // Not written yet, or written on another machine: after a few reads while it runs, the
+          // tail it is. A queued child has not started writing.
+          if (a.status !== 'running') {
+            break
+          }
+
           const misses = (this.#missing.get(path) ?? 0) + 1
           this.#missing.set(path, misses)
 

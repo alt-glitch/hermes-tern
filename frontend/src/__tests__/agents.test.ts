@@ -170,6 +170,41 @@ describe('Agents', () => {
     expect(changes).toBeGreaterThan(0)
   })
 
+  it('counts a missing log against a child only while it runs, not while it is queued', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'hermes-tern-agents-'))
+    const path = join(dir, 'task-0.log')
+    const transcript = dispatched([path])
+    const gw = stub<GatewayClient>({ request: async () => ({ subagents: [] }) })
+    store = new Agents({ changed: () => undefined, gw, sid: liveSessionId('s1'), transcript })
+    store.scan()
+    const agent = must(store.all()[0])
+
+    // Behind the concurrency limit: no log yet, however many reads find none.
+    for (let i = 0; i < 5; i++) {
+      await store.refresh(agent)
+    }
+
+    await writeFile(path, DONE)
+    await store.refresh(agent)
+    expect(agent).toMatchObject({ logPath: path, status: 'done' })
+
+    // A running child whose log never appears (written on another machine) is given up on.
+    const other = join(dir, 'task-1.log')
+    const ran = new Agents({ changed: () => undefined, gw, sid: liveSessionId('s1'), transcript: dispatched([other]) })
+    ran.scan()
+    const child = must(ran.all()[0])
+    child.status = 'running'
+
+    for (let i = 0; i < 3; i++) {
+      await ran.refresh(child)
+    }
+
+    await writeFile(other, DONE)
+    await ran.refresh(child)
+    expect(child.status).toBe('running')
+    ran.dispose()
+  })
+
   it('finds a resumed session\'s running children, whose dispatch result the history dropped', async () => {
     const home = await mkdtemp(join(tmpdir(), 'hermes-tern-home-'))
     const dir = join(home, 'cache', 'delegation', 'live', 'deleg_9')
