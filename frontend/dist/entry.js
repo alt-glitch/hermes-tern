@@ -20906,7 +20906,7 @@ var Session = class {
   /** Attempts every close and mode reset, even after an output failure. */
   #leave() {
     let failure3;
-    const attempt = (fn) => {
+    const attempt2 = (fn) => {
       try {
         fn();
       } catch (error) {
@@ -20914,16 +20914,16 @@ var Session = class {
       }
     };
     for (const surface of this.#surfaces.values())
-      attempt(() => {
+      attempt2(() => {
         void surface.close();
       });
     if (this.#modesArmed) {
       if (this.#options.kittyKeyboard !== false)
-        attempt(() => {
+        attempt2(() => {
           this.#output.write(KITTY_POP);
         });
       if (this.#options.bracketedPaste !== false)
-        attempt(() => {
+        attempt2(() => {
           this.#output.write(PASTE_OFF);
         });
       this.#modesArmed = false;
@@ -21514,10 +21514,10 @@ var JsonRpcRequestChannel = class {
 var DEFAULT_BASE_DELAY_MS = 300;
 var DEFAULT_CAP_MS = 15e3;
 var MAX_EXPONENT = 32;
-function reconnectBackoffDelayMs(attempt, options = {}) {
+function reconnectBackoffDelayMs(attempt2, options = {}) {
   const baseDelayMs = options.baseDelayMs ?? DEFAULT_BASE_DELAY_MS;
   const capMs = options.capMs ?? DEFAULT_CAP_MS;
-  const exponent = Math.min(Math.max(0, Math.trunc(attempt)), MAX_EXPONENT);
+  const exponent = Math.min(Math.max(0, Math.trunc(attempt2)), MAX_EXPONENT);
   const ceiling = Math.min(capMs, baseDelayMs * 2 ** exponent);
   return options.jitter === false ? ceiling : Math.random() * ceiling;
 }
@@ -23571,7 +23571,7 @@ var userMessagesEn = {
       /** `{0}` = seconds until the next attempt. */
       reconnecting: (secs) => `retrying in ${secs}s`,
       /** `{0}` = seconds until the next attempt, `{1}` = attempt number. */
-      reconnectingAttempt: (secs, attempt) => `retrying in ${secs}s (attempt ${attempt})`,
+      reconnectingAttempt: (secs, attempt2) => `retrying in ${secs}s (attempt ${attempt2})`,
       slowStart: "Hermes is taking longer than usual to start. Still waiting\u2026 If it never connects: /logs shows the last backend output; /quit and run `hermes doctor`.",
       slowStartStatus: "still starting\u2026",
       stderrProblem: "Something went wrong inside Hermes \xB7 /logs for details",
@@ -27215,6 +27215,15 @@ import { existsSync as existsSync2, mkdirSync as mkdirSync2, readdirSync, rmSync
 import { homedir as homedir5 } from "node:os";
 import { join as join2 } from "node:path";
 
+// src/core/result.ts
+function attempt(fn) {
+  try {
+    return { kind: "ok", value: fn() };
+  } catch (error) {
+    return { error, kind: "failed" };
+  }
+}
+
 // src/wire/files.ts
 import { readFileSync } from "node:fs";
 
@@ -28706,7 +28715,7 @@ var alive = (pid) => {
     process.kill(pid, 0);
     return true;
   } catch (error) {
-    return error instanceof Error && "code" in error && error.code === "EPERM";
+    return errorCode(error) === "EPERM";
   }
 };
 function readCard(key2, dir2 = dataDir(), now = Date.now()) {
@@ -28749,12 +28758,14 @@ function findCard(call, dir2 = dataDir()) {
   return keys2.map((key2) => ({ gap: Math.abs(createdAt(key2) - call.startedAt), key: key2 })).sort((a2, b) => a2.gap - b.gap)[0]?.key;
 }
 function claimTold(key2, dir2 = dataDir()) {
-  try {
-    writeFileSync(join2(dir2, "connections", `${key2}.told`), "", { flag: "wx" });
-    return true;
-  } catch {
-    return false;
+  const claim = attempt(() => writeFileSync(join2(dir2, "connections", `${key2}.told`), "", { flag: "wx" }));
+  if (claim.kind === "ok") {
+    return { kind: "claimed" };
   }
+  return errorCode(claim.error) === "EEXIST" ? { kind: "taken" } : { error: claim.error, kind: "failed" };
+}
+function mayTell(card, dir2 = dataDir()) {
+  return !card.key || claimTold(card.key, dir2).kind !== "taken";
 }
 var TERN_PANE_VARS = ["TERN_PANE", "TERN_PANE_SOCKET", "TERN_WINDOW_KEY", "TERN_WINDOW_SOCKET", "TERN_DAEMON_SOCKET"];
 function ternPane(env2 = process.env) {
@@ -63652,8 +63663,9 @@ function supersededSegments(conn) {
   }
   const superseded = [];
   for (const { value } of receipts) {
-    const receipt = lineageReceipt.safeParse(decodeJson(value));
-    if (!receipt.success) {
+    const text15 = attempt(() => decodeJson(value));
+    const receipt = text15.kind === "ok" ? lineageReceipt.safeParse(text15.value) : void 0;
+    if (!receipt?.success) {
       continue;
     }
     const ids = receipt.data.lineage;
@@ -70213,8 +70225,8 @@ var Automation = class {
   #host;
   #sid = null;
   #snapshot = null;
-  /** Bumped by every update, so a read that started before one never overwrites it. */
-  #seq = 0;
+  /** Ended by every adopt and update, so a read that started before one never overwrites it. */
+  #updates = new Epoch();
   #timer;
   #watchers = /* @__PURE__ */ new Set();
   /** The verb in flight, if any (the sheet's buttons wait for it). */
@@ -70241,6 +70253,7 @@ var Automation = class {
   /** Another session is shown: forget the last one's state and read this one's. */
   adopt(sid) {
     this.#sid = sid;
+    this.#updates.next();
     this.#set(null);
     void this.#read(sid);
   }
@@ -70249,14 +70262,14 @@ var Automation = class {
     if (sid && sid !== this.#sid) {
       return;
     }
-    this.#seq++;
+    this.#updates.next();
     this.#set(control ?? null);
   }
   async #read(sid) {
-    const seq = this.#seq;
+    const ticket = this.#updates.current();
     try {
       const r = await rpc(this.#host.gw, "session.control.read", { session_id: sid });
-      if (sid === this.#sid && seq === this.#seq) {
+      if (ticket.isCurrent()) {
         this.#set(r?.control ?? null);
       }
     } catch {
@@ -70335,9 +70348,9 @@ var Reconnect = class {
     return attached ? { text: "Lost the connection to Hermes; reconnecting\u2026", tone: "warning" } : { text: `The agent backend exited${code7 === null ? "" : ` (${code7})`}.`, tone: "error" };
   }
   /** One line for the whole outage: each try replaces it, and re-renders when the wait ends. */
-  redialing(attempt, delayMs) {
+  redialing(attempt2, delayMs) {
     clearTimeout(this.#timer);
-    this.#redial = { attempt, dueAt: Date.now() + delayMs };
+    this.#redial = { attempt: attempt2, dueAt: Date.now() + delayMs };
     this.#timer = setTimeout(() => this.#host.changed(), delayMs + 50);
     this.#timer.unref?.();
   }
@@ -71022,15 +71035,19 @@ var Theme = class {
 };
 
 // src/connections/watcher.ts
+var NO_CARD_MS = 3e4;
 var ConnectWatcher = class {
   #host;
   /** Where the card files are; unset: the plugin's data folder, read at each poll. */
   #dir;
-  #timer;
+  /** The poll: every POLL_MS while some card is watched. */
+  #poller = new Poller({ cadence: () => this.#open ? POLL_MS : "off", run: async () => this.#tick() });
+  /** Some card's apps still move (the last read found one watched and not settled). */
+  #open = false;
   /** Connect cards (by file) this pane saw with an app still waiting. */
   #seen = /* @__PURE__ */ new Set();
-  /** Connect calls that drew no card (a status read, a call with nothing to authorize): never again. */
-  #noCard = /* @__PURE__ */ new WeakSet();
+  /** Connect calls that drew no card, and when: not read again for NO_CARD_MS. */
+  #noCard = /* @__PURE__ */ new WeakMap();
   /** `dir`: the plugin's data folder the card files are under (tests point it at their own). */
   constructor(host, { dir: dir2 } = {}) {
     this.#host = host;
@@ -71041,8 +71058,7 @@ var ConnectWatcher = class {
    * poll), then polls while some card is watched: a settled card never moves again.
    */
   watch() {
-    clearTimeout(this.#timer);
-    this.#tick();
+    this.#poller.poke();
   }
   /** A connect card's Continue: tell the agent which apps the user authorized, as the tool asks. */
   continue(ref) {
@@ -71055,7 +71071,7 @@ var ConnectWatcher = class {
       card.told = true;
       card.settled = "continued";
     });
-    if (!card.key || claimTold(card.key, this.#dir)) {
+    if (mayTell(card, this.#dir)) {
       this.#host.tell(continueMessage(card.targets));
     }
     this.#host.changed();
@@ -71072,22 +71088,24 @@ var ConnectWatcher = class {
     this.#host.transcript.mutateCall(call, () => card.opened = [.../* @__PURE__ */ new Set([...card.opened, name])]);
     this.#host.changed();
   }
-  /** Stops the poll. */
+  /** Stops the poll for good. */
   dispose() {
-    clearTimeout(this.#timer);
+    this.#poller.dispose();
   }
   #tick() {
-    this.#timer = void 0;
     let open = false;
+    const now = Date.now();
     for (const call of this.#host.transcript.calls(CONNECT_TOOL)) {
-      if (call.connect?.settled || call.status === "running" || this.#noCard.has(call)) {
+      const missed = this.#noCard.get(call);
+      if (call.connect?.settled || call.status === "running" || missed !== void 0 && now - missed < NO_CARD_MS) {
         continue;
       }
       const next2 = loadConnect(call, this.#dir);
       if (!next2) {
-        this.#noCard.add(call);
+        this.#noCard.set(call, now);
         continue;
       }
+      this.#noCard.delete(call);
       if (JSON.stringify(next2) !== JSON.stringify(call.connect)) {
         this.#host.transcript.mutateCall(call, (c) => c.connect = next2);
         this.#host.changed();
@@ -71096,7 +71114,7 @@ var ConnectWatcher = class {
       if (next2.targets.some(waiting2) && !next2.settled) {
         this.#seen.add(seen);
       }
-      if (!next2.told && this.#seen.has(seen) && allConnected(next2) && (!next2.key || claimTold(next2.key, this.#dir))) {
+      if (!next2.told && this.#seen.has(seen) && allConnected(next2) && mayTell(next2, this.#dir)) {
         this.#host.transcript.mutateCall(call, () => next2.told = true);
         this.#host.tell(connectedMessage(next2.targets));
         this.#host.changed();
@@ -71104,9 +71122,7 @@ var ConnectWatcher = class {
         open = true;
       }
     }
-    if (open) {
-      this.#timer = setTimeout(() => this.#tick(), POLL_MS);
-    }
+    this.#open = open;
   }
   /** The connect card `ref` names (its file, or its call id when it has none). */
   #call(ref) {

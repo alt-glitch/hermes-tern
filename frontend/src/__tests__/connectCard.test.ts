@@ -1,6 +1,6 @@
 // The connect card in the app: the poll that follows the watcher's file, the message that tells the
 // agent, Continue, and a resume that draws each card as it ended.
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
+import { chmodSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -21,7 +21,7 @@ vi.mock('../hermes/sessionIndex.js', async importOriginal => ({
 
 const { App } = await import('../app/chat.js')
 const { POLL_MS } = await import('../connections.js')
-const { ConnectWatcher } = await import('../connections/watcher.js')
+const { ConnectWatcher, NO_CARD_MS } = await import('../connections/watcher.js')
 const { Transcript } = await import('../transcript.js')
 const { toolNode } = await import('../view/tools/shell.js')
 
@@ -92,6 +92,8 @@ describe('the connect card', () => {
     const call = must(app.transcript.call(toolCallId('call_a')))
     expect(call.connect).toMatchObject({ key: 'call_a.op1', settled: undefined, told: false })
 
+    // The next read is set once the first round settles.
+    await flush()
     writeCard('call_a.op1', drive('connected', { settled_by: 'all_resolved', watching: false }))
     vi.advanceTimersByTime(POLL_MS)
     await flush()
@@ -190,13 +192,13 @@ describe('ConnectWatcher on a fake host', () => {
     writeFileSync(join(dir, 'connections', `${stem}.json`), JSON.stringify({ pid: process.pid, updated_at: Date.now() / 1000, ...data }))
   }
 
-  function watcher() {
+  function watcher(folder = dir) {
     const transcript = new Transcript()
     const mutate = vi.spyOn(transcript, 'mutateCall')
     const told: string[] = []
     const opened: string[] = []
     const changed = vi.fn()
-    const w = new ConnectWatcher({ changed, openUrl: url => void opened.push(url), tell: text => void told.push(text), transcript }, { dir })
+    const w = new ConnectWatcher({ changed, openUrl: url => void opened.push(url), tell: text => void told.push(text), transcript }, { dir: folder })
 
     /** A finished manage_connections call for operation `op`. */
     const call = (id: string, op: string) => {
@@ -210,10 +212,10 @@ describe('ConnectWatcher on a fake host', () => {
       return c
     }
 
-    return { call, changed, mutate, opened, told, w }
+    return { call, changed, mutate, opened, told, transcript, w }
   }
 
-  it('polls an open card, writes through mutateCall, tells once, and stops once it settles', () => {
+  it('polls an open card, writes through mutateCall, tells once, and stops once it settles', async () => {
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
     const { call, mutate, told, w } = watcher()
     card('call_w.op1', drive('initiated'))
@@ -222,6 +224,8 @@ describe('ConnectWatcher on a fake host', () => {
     w.watch()
     expect(c.connect).toMatchObject({ key: 'call_w.op1', settled: undefined, told: false })
     expect(mutate).toHaveBeenCalledTimes(1)
+    // The next read is set once the round settles.
+    await flush()
     expect(vi.getTimerCount()).toBe(1)
 
     card('call_w.op1', drive('connected', { settled_by: 'all_resolved', watching: false }))
@@ -263,16 +267,70 @@ describe('ConnectWatcher on a fake host', () => {
     expect(c.connect).toMatchObject({ settled: 'continued', told: true })
   })
 
-  it('dispose stops the poll', () => {
+  it('dispose stops the poll', async () => {
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
     const { call, w } = watcher()
     card('call_d.op1', drive('initiated'))
     call('call_d', 'op1')
 
     w.watch()
+    await flush()
     expect(vi.getTimerCount()).toBe(1)
 
     w.dispose()
     expect(vi.getTimerCount()).toBe(0)
+  })
+
+  it('tells the agent when the claim cannot be written: only a claim another pane holds means it was told', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    const own = mkdtempSync(join(tmpdir(), 'hermes-tern-watcher-'))
+    const cards = join(own, 'connections')
+    mkdirSync(cards)
+    const { call, told, w } = watcher(own)
+    const write = (data: Record<string, unknown>) => writeFileSync(join(cards, 'call_r.op1.json'), JSON.stringify({ pid: process.pid, updated_at: Date.now() / 1000, ...data }))
+    write(drive('initiated'))
+    call('call_r', 'op1')
+
+    w.watch()
+    await flush()
+    write(drive('connected', { settled_by: 'all_resolved', watching: false }))
+    // The pane may read the cards but not write beside them (EACCES).
+    chmodSync(cards, 0o555)
+
+    try {
+      vi.advanceTimersByTime(POLL_MS)
+      await flush()
+    } finally {
+      chmodSync(cards, 0o755)
+    }
+
+    // Root writes anyway, and so claims as before.
+    expect(told).toEqual(['Google Drive is connected now. Carry on.'])
+    w.dispose()
+  })
+
+  it('reads a call that drew no card again once a while has passed: the card may land late', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] })
+    const own = mkdtempSync(join(tmpdir(), 'hermes-tern-watcher-'))
+    const { transcript, w } = watcher(own)
+    transcript.toolComplete({ name: 'manage_connections', result: JSON.stringify({ status: 'ok' }), tool_id: 'call_l' })
+    const c = must(transcript.call(toolCallId('call_l')))
+
+    w.watch()
+    await flush()
+    expect(c.connect).toBeUndefined()
+
+    mkdirSync(join(own, 'connections'))
+    writeFileSync(join(own, 'connections', 'call_l.op1.json'), JSON.stringify({ pid: process.pid, updated_at: Date.now() / 1000, ...drive('initiated') }))
+
+    // Within the limit the miss stands.
+    w.watch()
+    await flush()
+    expect(c.connect).toBeUndefined()
+
+    vi.setSystemTime(Date.now() + NO_CARD_MS)
+    w.watch()
+    expect(c.connect).toMatchObject({ key: 'call_l.op1', settled: undefined })
+    w.dispose()
   })
 })

@@ -18,7 +18,9 @@ import { homedir } from 'node:os'
 import { join } from 'node:path'
 
 import { appTitle } from './bridge.js'
+import { errorCode } from './core/errors.js'
 import type { DurableSessionId } from './core/ids.js'
+import { attempt } from './core/result.js'
 import type { ToolCall } from './model.js'
 import { cardCreatedAt, readCardFile } from './wire/files.js'
 import { record } from './wire/json.js'
@@ -69,7 +71,7 @@ const alive = (pid: number | undefined) => {
 
     return true
   } catch (error) {
-    return error instanceof Error && 'code' in error && error.code === 'EPERM'
+    return errorCode(error) === 'EPERM'
   }
 }
 
@@ -133,15 +135,26 @@ export function findCard(call: Pick<ToolCall, 'id' | 'result' | 'startedAt'>, di
   return keys.map(key => ({ gap: Math.abs(createdAt(key) - call.startedAt), key })).sort((a, b) => a.gap - b.gap)[0]?.key
 }
 
-/** Records that a pane told the agent about card `key`; false when one already had (two panes, one message). */
-export function claimTold(key: string, dir = dataDir()): boolean {
-  try {
-    writeFileSync(join(dir, 'connections', `${key}.told`), '', { flag: 'wx' })
+/**
+ * Who tells the agent about a card: this pane (`claimed`), a pane that claimed it first (`taken`),
+ * or nobody knows, as the claim could not be written (`failed`: no folder, no permission).
+ */
+export type Claim = { kind: 'claimed' } | { kind: 'taken' } | { kind: 'failed'; error: unknown }
 
-    return true
-  } catch {
-    return false
+/** Records that a pane told the agent about card `key`; `taken` when one already had (two panes, one message). */
+export function claimTold(key: string, dir = dataDir()): Claim {
+  const claim = attempt(() => writeFileSync(join(dir, 'connections', `${key}.told`), '', { flag: 'wx' }))
+
+  if (claim.kind === 'ok') {
+    return { kind: 'claimed' }
   }
+
+  return errorCode(claim.error) === 'EEXIST' ? { kind: 'taken' } : { error: claim.error, kind: 'failed' }
+}
+
+/** Whether this pane tells the agent about `card`: no other pane claimed it (a claim it cannot write tells all the same). */
+export function mayTell(card: Pick<ConnectCard, 'key'>, dir = dataDir()): boolean {
+  return !card.key || claimTold(card.key, dir).kind !== 'taken'
 }
 
 /** The Tern variables that name this pane, its window and their sockets: the agent's tools get them, so `tern` finds this pane. */

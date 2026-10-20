@@ -8,6 +8,7 @@
 import type { GoalSnapshot, LoopSnapshot, SessionControlSnapshot } from '@hermes/shared/gateway-events'
 import type { GatewayClient } from '@tui/gatewayClient.js'
 
+import { Epoch } from './core/epoch.js'
 import { errorText } from './core/errors.js'
 import type { NoticeEntry } from './model.js'
 import { rpc } from './wire/rpc.js'
@@ -163,8 +164,8 @@ export class Automation {
   readonly #host: AutomationHost
   #sid: string | null = null
   #snapshot: SessionControlSnapshot | null = null
-  /** Bumped by every update, so a read that started before one never overwrites it. */
-  #seq = 0
+  /** Ended by every adopt and update, so a read that started before one never overwrites it. */
+  readonly #updates = new Epoch()
   #timer: NodeJS.Timeout | undefined
   readonly #watchers = new Set<() => void>()
   /** The verb in flight, if any (the sheet's buttons wait for it). */
@@ -198,6 +199,7 @@ export class Automation {
   /** Another session is shown: forget the last one's state and read this one's. */
   adopt(sid: string) {
     this.#sid = sid
+    this.#updates.next()
     this.#set(null)
     void this.#read(sid)
   }
@@ -208,17 +210,17 @@ export class Automation {
       return
     }
 
-    this.#seq++
+    this.#updates.next()
     this.#set(control ?? null)
   }
 
   async #read(sid: string) {
-    const seq = this.#seq
+    const ticket = this.#updates.current()
 
     try {
       const r = await rpc(this.#host.gw, 'session.control.read', { session_id: sid })
 
-      if (sid === this.#sid && seq === this.#seq) {
+      if (ticket.isCurrent()) {
         this.#set(r?.control ?? null)
       }
     } catch {

@@ -16,7 +16,7 @@ export const text = z.catch(z.nullable(z.string()), null)
 export const real = z.catch(z.nullable(z.number()), null)
 
 /** The rows `stmt` returns for `params`, each read by `row`; a row `row` cannot read is skipped. */
-export function rows<T>(stmt: StatementSync, row: z.ZodMiniType<T>, ...params: SQLInputValue[]): T[] {
+export function rows<T>(stmt: Pick<StatementSync, 'all'>, row: z.ZodMiniType<T>, ...params: SQLInputValue[]): T[] {
   return rowsOf(row, stmt.all(...params))
 }
 

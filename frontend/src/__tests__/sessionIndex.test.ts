@@ -5,7 +5,7 @@ import { DatabaseSync } from 'node:sqlite'
 
 import { describe, expect, it } from 'vitest'
 
-import { inWorkspace, lastReply, sessionLabel, storedSessions } from '../hermes/sessionIndex.js'
+import { inWorkspace, lastReply, sessionLabel, storedSessions, supersededSegments } from '../hermes/sessionIndex.js'
 
 function db(): string {
   const path = join(mkdtempSync(join(tmpdir(), 'tern-sessions-')), 'state.db')
@@ -71,6 +71,18 @@ describe('storedSessions', () => {
     conn.close()
 
     expect(storedSessions(50, path).map(r => r.id)).toEqual(['seg3', 'root', 'plain', 'keep'])
+  })
+
+  it('skips a receipt JavaScript cannot read, in place of losing the whole listing', () => {
+    const receipts = [{ value: '{"lineage": ["a", "b"], ' }, { value: JSON.stringify({ lineage: ['a', 'b'], session_id: 'a' }) }]
+    const segments = [
+      { end_reason: 'session_reset', id: 'a' },
+      { end_reason: null, id: 'b' }
+    ]
+    // SQLite's json_valid keeps such text out today; the reader does not lean on it.
+    const conn = { prepare: (sql: string) => ({ all: () => (sql.includes('state_meta') ? receipts : segments) }) }
+
+    expect(supersededSegments(conn)).toEqual(['a'])
   })
 
   it('is empty without a database', () => {

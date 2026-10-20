@@ -8,11 +8,12 @@
 // (hermes_state_sessions.workspace_key): the same repo root, or the folder or one under it.
 
 import { execFile } from 'node:child_process'
-import { DatabaseSync } from 'node:sqlite'
+import { DatabaseSync, type StatementSync } from 'node:sqlite'
 import { promisify } from 'node:util'
 
 import * as z from 'zod/mini'
 
+import { attempt } from '../core/result.js'
 import { decodeJson } from '../wire/json.js'
 import { first, real, rows, text } from '../wire/sqlite.js'
 
@@ -62,7 +63,7 @@ const segmentRow = z.object({ id: z.string(), end_reason: text })
  * lineage holds every segment, and a segment starts after one that ended `session_reset`. Only the
  * newest such start stands for the conversation.
  */
-function supersededSegments(conn: DatabaseSync): string[] {
+export function supersededSegments(conn: { prepare(sql: string): Pick<StatementSync, 'all'> }): string[] {
   let receipts: { value: string }[]
 
   try {
@@ -78,10 +79,11 @@ function supersededSegments(conn: DatabaseSync): string[] {
   const superseded: string[] = []
 
   for (const { value } of receipts) {
-    // The query keeps valid JSON only; text that is not throws, as it did before the schema.
-    const receipt = lineageReceipt.safeParse(decodeJson(value))
+    // The query keeps SQLite's valid JSON only; a receipt JavaScript cannot read is skipped, not the listing.
+    const text = attempt(() => decodeJson(value))
+    const receipt = text.kind === 'ok' ? lineageReceipt.safeParse(text.value) : undefined
 
-    if (!receipt.success) {
+    if (!receipt?.success) {
       continue
     }
 

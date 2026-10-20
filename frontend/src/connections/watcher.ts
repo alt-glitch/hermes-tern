@@ -4,8 +4,15 @@
 // here too: Continue tells the agent which apps the user authorized, and Authorize opens an
 // app's link. The card files are connections.ts's; this module only reads and claims them.
 
-import { allConnected, claimTold, CONNECT_TOOL, connectedMessage, continueMessage, loadConnect, POLL_MS, waiting } from '../connections.js'
+import { allConnected, CONNECT_TOOL, connectedMessage, continueMessage, loadConnect, mayTell, POLL_MS, waiting } from '../connections.js'
+import { Poller } from '../core/poller.js'
 import type { Transcript } from '../transcript.js'
+
+/**
+ * How long a connect call that drew no card (a status read, a call with nothing to authorize) is
+ * not read again. Its card may still land (a write the pane read half of): it is read once more after.
+ */
+export const NO_CARD_MS = 30_000
 
 /** What the connect watcher reaches of the app. */
 export interface WatcherHost {
@@ -18,16 +25,19 @@ export interface WatcherHost {
   openUrl(url: string): void
 }
 
-/** Follows the open connect cards; one owner for the poll's timer. */
+/** Follows the open connect cards; one owner for the poll. */
 export class ConnectWatcher {
   readonly #host: WatcherHost
   /** Where the card files are; unset: the plugin's data folder, read at each poll. */
   readonly #dir: string | undefined
-  #timer: NodeJS.Timeout | undefined
+  /** The poll: every POLL_MS while some card is watched. */
+  readonly #poller: Poller = new Poller({ cadence: () => (this.#open ? POLL_MS : 'off'), run: async () => this.#tick() })
+  /** Some card's apps still move (the last read found one watched and not settled). */
+  #open = false
   /** Connect cards (by file) this pane saw with an app still waiting. */
   readonly #seen = new Set<string>()
-  /** Connect calls that drew no card (a status read, a call with nothing to authorize): never again. */
-  readonly #noCard = new WeakSet<object>()
+  /** Connect calls that drew no card, and when: not read again for NO_CARD_MS. */
+  readonly #noCard = new WeakMap<object, number>()
 
   /** `dir`: the plugin's data folder the card files are under (tests point it at their own). */
   constructor(host: WatcherHost, { dir }: { dir?: string } = {}) {
@@ -40,8 +50,7 @@ export class ConnectWatcher {
    * poll), then polls while some card is watched: a settled card never moves again.
    */
   watch() {
-    clearTimeout(this.#timer)
-    this.#tick()
+    this.#poller.poke()
   }
 
   /** A connect card's Continue: tell the agent which apps the user authorized, as the tool asks. */
@@ -60,7 +69,7 @@ export class ConnectWatcher {
     })
 
     // Another pane's message already told the agent.
-    if (!card.key || claimTold(card.key, this.#dir)) {
+    if (mayTell(card, this.#dir)) {
       this.#host.tell(continueMessage(card.targets))
     }
 
@@ -82,27 +91,31 @@ export class ConnectWatcher {
     this.#host.changed()
   }
 
-  /** Stops the poll. */
+  /** Stops the poll for good. */
   dispose() {
-    clearTimeout(this.#timer)
+    this.#poller.dispose()
   }
 
   #tick() {
-    this.#timer = undefined
     let open = false
+    const now = Date.now()
 
     for (const call of this.#host.transcript.calls(CONNECT_TOOL)) {
+      const missed = this.#noCard.get(call)
+
       // A running call has no card yet; by its call id alone it would take an earlier call's.
-      if (call.connect?.settled || call.status === 'running' || this.#noCard.has(call)) {
+      if (call.connect?.settled || call.status === 'running' || (missed !== undefined && now - missed < NO_CARD_MS)) {
         continue
       }
 
       const next = loadConnect(call, this.#dir)
 
       if (!next) {
-        this.#noCard.add(call)
+        this.#noCard.set(call, now)
         continue
       }
+
+      this.#noCard.delete(call)
 
       if (JSON.stringify(next) !== JSON.stringify(call.connect)) {
         this.#host.transcript.mutateCall(call, c => (c.connect = next))
@@ -117,7 +130,7 @@ export class ConnectWatcher {
 
       // Only a card this pane saw waiting: a resumed session's long-settled card stays quiet. Only
       // one pane tells: the claim is the card's.
-      if (!next.told && this.#seen.has(seen) && allConnected(next) && (!next.key || claimTold(next.key, this.#dir))) {
+      if (!next.told && this.#seen.has(seen) && allConnected(next) && mayTell(next, this.#dir)) {
         this.#host.transcript.mutateCall(call, () => (next.told = true))
         this.#host.tell(connectedMessage(next.targets))
         this.#host.changed()
@@ -126,9 +139,7 @@ export class ConnectWatcher {
       }
     }
 
-    if (open) {
-      this.#timer = setTimeout(() => this.#tick(), POLL_MS)
-    }
+    this.#open = open
   }
 
   /** The connect card `ref` names (its file, or its call id when it has none). */

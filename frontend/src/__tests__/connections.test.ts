@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -162,10 +162,27 @@ describe('manage_connections without its card', () => {
   it('one pane tells the agent about a card, once', () => {
     const dir = dataDir({ 'c1.op1': watched('connected') })
 
-    expect(claimTold('c1.op1', dir)).toBe(true)
-    expect(claimTold('c1.op1', dir)).toBe(false)
+    expect(claimTold('c1.op1', dir)).toEqual({ kind: 'claimed' })
+    expect(claimTold('c1.op1', dir)).toEqual({ kind: 'taken' })
     expect(readCard('c1.op1', dir)?.told).toBe(true)
     expect(loadConnect(stripped(), dir)?.told).toBe(true)
+  })
+
+  it('a claim that cannot be written failed: it is not one another pane holds', () => {
+    // No connections folder (ENOENT).
+    expect(claimTold('c1.op1', mkdtempSync(join(tmpdir(), 'tern-claims-')))).toMatchObject({ error: expect.objectContaining({ code: 'ENOENT' }), kind: 'failed' })
+
+    // A folder this pane may not write (EACCES); root writes anyway.
+    const dir = dataDir({ 'c2.op1': watched('connected') })
+    chmodSync(join(dir, 'connections'), 0o555)
+
+    try {
+      if (process.getuid?.() !== 0) {
+        expect(claimTold('c2.op1', dir)).toMatchObject({ error: expect.objectContaining({ code: 'EACCES' }), kind: 'failed' })
+      }
+    } finally {
+      chmodSync(join(dir, 'connections'), 0o755)
+    }
   })
 
   it('marks this pane as the viewer of one session at a time', () => {
