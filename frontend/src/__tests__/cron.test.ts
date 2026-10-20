@@ -3,11 +3,9 @@ import { describe, expect, it, vi } from 'vitest'
 
 import { toolCallId } from '../core/ids.js'
 import type { ToolCall } from '../model.js'
-import { Cron, CRON_POLL_MS, type CronJob, isMonitor, isPaused, jobTone, ownJobs, relative } from '../processes/cron.js'
+import { Cron, CRON_POLL_MS, type CronJob, isMonitor, isPaused, jobTone, ownJobs } from '../processes/cron.js'
 
 import { stub } from './fakes.js'
-
-const NOW = Date.parse('2026-10-17T12:00:00Z')
 
 const job = (over: Partial<CronJob> = {}): CronJob => ({ enabled: true, job_id: 'j1', name: 'digest', schedule: 'every 30m', ...over })
 
@@ -43,16 +41,6 @@ describe('cron jobs', () => {
     ]
 
     expect([...ownJobs(calls)]).toEqual(['a', 'b'])
-  })
-
-  it('says how far a time is in its largest whole unit', () => {
-    const at = (ms: number) => new Date(NOW + ms).toISOString()
-
-    expect(relative(at(10_000), NOW)).toBe('now')
-    expect(relative(at(29 * 60_000), NOW)).toBe('in 29m')
-    expect(relative(at(-3 * 3_600_000), NOW)).toBe('3h ago')
-    expect(relative(at(2 * 86_400_000), NOW)).toBe('in 2d')
-    expect(relative(null, NOW)).toBe('')
   })
 })
 

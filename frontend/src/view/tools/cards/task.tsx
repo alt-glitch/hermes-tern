@@ -4,10 +4,10 @@ import type { JSX } from '@stencil-hq/tern'
 
 import { agentNode } from '../../../agents/agentRow.js'
 import { optional } from '../../../core/assert.js'
+import { plural } from '../../../core/text.js'
 import type { ToolCall } from '../../../model.js'
 import { detailOf } from '../../../tools/detail.js'
 import type { TaskDetail, TaskResult } from '../../../tools/task.js'
-import { plural } from '../../format.js'
 import { namedStep } from '../steps.js'
 import type { Card, ToolView } from '../types.js'
 

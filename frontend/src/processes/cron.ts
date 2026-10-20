@@ -147,18 +147,3 @@ export class Cron {
     this.#host.changed()
   }
 }
-
-/** `in 12m`, `3h ago`, `now`: how far `iso` is from `now`, in its largest whole unit. */
-export function relative(iso: string | null | undefined, now: number): string {
-  const at = iso ? Date.parse(iso) : NaN
-
-  if (Number.isNaN(at)) {
-    return ''
-  }
-
-  const d = at - now
-  const s = Math.abs(d) / 1000
-  const [n, unit] = s < 45 ? [0, ''] : s < 3600 ? [Math.round(s / 60), 'm'] : s < 86_400 ? [Math.round(s / 3600), 'h'] : [Math.round(s / 86_400), 'd']
-
-  return n === 0 ? 'now' : d > 0 ? `in ${n}${unit}` : `${n}${unit} ago`
-}

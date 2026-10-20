@@ -8,6 +8,7 @@ import type { CompressionSummary } from '@hermes/shared/gateway-events'
 
 import { errorText } from '../core/errors.js'
 import { type StoredSessionId, storedSessionId } from '../core/ids.js'
+import { plural } from '../core/text.js'
 import { lineTokens } from '../hermes/compactions.js'
 import { type MutationResult, mutateSession } from '../hermes/mutate.js'
 import { lastTurnRewind, retryText, retryTurnRewind } from '../hermes/rewind.js'
@@ -38,8 +39,6 @@ export interface SessionCommand {
   /** Returning false hands the command to `slash.exec` (a private gateway, which still serves it). */
   run(host: SessionHost, arg: string): Promise<boolean | void> | boolean | void
 }
-
-const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`
 
 /** `/undo` and `/retry`: rewind to before the newest user turn; `/retry` then resends that turn's text. */
 async function rewind(host: SessionHost, intent: 'retry' | 'undo') {

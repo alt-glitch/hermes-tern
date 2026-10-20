@@ -1,7 +1,9 @@
-import { describe, expect, expectTypeOf, it } from 'vitest'
+import { describe, expect, expectTypeOf, it, vi } from 'vitest'
 
 import { assertNever, isDefined, isNonEmpty, type NonEmpty, oneOf } from '../core/assert.js'
 import { errorText } from '../core/errors.js'
+import { Flash, FLASH_MS } from '../core/flash.js'
+import { withoutEscapes } from '../core/text.js'
 import { record } from '../wire/json.js'
 
 import { stub } from './fakes.js'
@@ -85,5 +87,40 @@ describe('record', () => {
     expect(record('not json')).toBeUndefined()
     expect(record([1])).toBeUndefined()
     expect(record(null)).toBeUndefined()
+  })
+})
+
+describe('Flash', () => {
+  it('holds a value for FLASH_MS after each set, then clears it, asking for a render each time', () => {
+    vi.useFakeTimers()
+
+    try {
+      const changed = vi.fn()
+      const flash = new Flash<string>(changed)
+      flash.set('a')
+      expect([flash.value, changed.mock.calls.length]).toEqual(['a', 1])
+
+      // A new value restarts the time.
+      vi.advanceTimersByTime(FLASH_MS - 1)
+      flash.set('b')
+      vi.advanceTimersByTime(FLASH_MS - 1)
+      expect(flash.value).toBe('b')
+      vi.advanceTimersByTime(1)
+      expect([flash.value, changed.mock.calls.length]).toEqual([undefined, 3])
+
+      // Disposed, it never fires.
+      flash.set('c')
+      flash.dispose()
+      vi.advanceTimersByTime(FLASH_MS)
+      expect([flash.value, changed.mock.calls.length]).toEqual(['c', 4])
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+})
+
+describe('withoutEscapes', () => {
+  it('drops CSI, OSC and two-byte escapes, and keeps \\r and the other control characters', () => {
+    expect(withoutEscapes('\x1b[1;32mok\x1b[0m \x1b]0;title\x07a\rb\x1bM\x01')).toBe('ok a\rb\x01')
   })
 })

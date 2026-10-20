@@ -2,7 +2,7 @@
 // tool card heads. The command itself stays one click away in the card's body; this only has
 // to say what the step is for, in a few words, without a model call.
 
-import { clip } from './format.js'
+import { clip } from '../core/text.js'
 
 /** How long a title may get before it is cut. */
 const MAX = 72

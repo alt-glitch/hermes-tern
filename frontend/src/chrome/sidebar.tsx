@@ -10,6 +10,7 @@ import { copyToClipboard } from '../clipboard.js'
 import { launchEnv } from '../config/env.js'
 import { optional } from '../core/assert.js'
 import type { Ticket } from '../core/epoch.js'
+import { Flash } from '../core/flash.js'
 import { type LiveSessionId, prKey } from '../core/ids.js'
 import { Poller } from '../core/poller.js'
 import { type GitState, gitState } from '../git/status.js'
@@ -38,8 +39,8 @@ export class Sidebar {
     run: ticket => this.#refresh(ticket),
     settled: () => this.#host.changed()
   })
-  #copied = false
-  #copiedTimer: NodeJS.Timeout | undefined
+  /** The branch was just copied: its button reads Copied. */
+  readonly #copied = new Flash<true>(() => this.#host.changed())
 
   /** `read`: how a folder's git state is read (tests hold it). */
   constructor(host: SidebarHost, read: (cwd: string) => Promise<GitState | undefined> = gitState) {
@@ -82,7 +83,7 @@ export class Sidebar {
   dispose() {
     this.#open = false
     this.#poller.dispose()
-    clearTimeout(this.#copiedTimer)
+    this.#copied.dispose()
   }
 
   async #refresh(ticket: Ticket) {
@@ -120,7 +121,7 @@ export class Sidebar {
     const branchRows: PrefsRow[] = git
       ? [
           {
-            ...optional('control', git.branch ? { act: 'copy-branch', k: 'action', label: this.#copied ? 'Copied' : 'Copy' } : undefined),
+            ...optional('control', git.branch ? { act: 'copy-branch', k: 'action', label: this.#copied.value ? 'Copied' : 'Copy' } : undefined),
             hint: git.branch ? where : 'Detached HEAD',
             id: 'branch',
             label: git.branch ?? 'No branch'
@@ -202,13 +203,7 @@ export class Sidebar {
       case 'copy-branch':
         if (this.#state?.branch) {
           copyToClipboard(this.#state.branch)
-          this.#copied = true
-          clearTimeout(this.#copiedTimer)
-          this.#copiedTimer = setTimeout(() => {
-            this.#copied = false
-            this.#host.changed()
-          }, 1500)
-          this.#host.changed()
+          this.#copied.set(true)
         }
 
         return

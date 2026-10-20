@@ -4,11 +4,11 @@
 import type { JSX, SpanData, Tone } from '@stencil-hq/tern'
 
 import { optional } from '../core/assert.js'
+import { plural } from '../core/text.js'
 import type { ActivityItem, PullRequest } from '../github/pullRequest.js'
 import { shown } from '../github/remote.js'
 import type { Entry } from '../github/store.js'
-import { relative } from '../processes/cron.js'
-import { plural } from '../view/format.js'
+import { relative } from '../view/format.js'
 
 import { type BodyLinks, bodyNodes } from './body.js'
 

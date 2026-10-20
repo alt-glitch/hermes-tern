@@ -2,9 +2,9 @@
 
 import type { JSX } from '@stencil-hq/tern'
 
+import { clip, plural } from '../../../core/text.js'
 import type { ToolCall } from '../../../model.js'
 import type { FetchDetail, WebSearchDetail } from '../../../tools/web.js'
-import { clip, plural } from '../../format.js'
 import { compact } from '../../time.js'
 import type { Card, ToolView } from '../types.js'
 

@@ -4,8 +4,9 @@
 import type { JSX, Tone } from '@stencil-hq/tern'
 
 import { optional } from '../core/assert.js'
+import { plural } from '../core/text.js'
 import { type Check, checkGroup, checksSummary, failedRuns, type PullRequest } from '../github/pullRequest.js'
-import { durationWhole, plural } from '../view/format.js'
+import { durationWhole } from '../view/format.js'
 
 import { checksTone } from './look.js'
 

@@ -11,12 +11,13 @@ import type { JSX, Key, ScrollTo, Tone } from '@stencil-hq/tern'
 import { copyToClipboard } from '../clipboard.js'
 import { optional } from '../core/assert.js'
 import { errorText } from '../core/errors.js'
+import { Flash } from '../core/flash.js'
 import { type PrKey, prKey } from '../core/ids.js'
+import { clip, plural } from '../core/text.js'
 import { checksSummary, failedRuns, type MergeMethod, type PullRequest } from '../github/pullRequest.js'
 import { shown } from '../github/remote.js'
 import type { Entry, PrAction, PullRequests } from '../github/store.js'
-import { relative } from '../processes/cron.js'
-import { clip, plural } from '../view/format.js'
+import { relative } from '../view/format.js'
 import { button, type ButtonProps } from '../view/ui/button.js'
 
 import { checksTab } from './checks.js'
@@ -42,7 +43,6 @@ export interface PrViewHost {
 }
 
 const METHOD_LABEL: Record<MergeMethod, string> = { merge: 'Merge', rebase: 'Rebase and merge', squash: 'Squash and merge' }
-const COPIED_MS = 1500
 const DECISION: Record<string, [string, Tone]> = {
   APPROVED: ['Approved', 'success'],
   CHANGES_REQUESTED: ['Changes requested', 'error'],
@@ -57,8 +57,8 @@ export class PrView {
   #selected: PrKey | undefined
   #tab: PrTab = 'conversation'
   #confirm: 'close' | 'merge' | undefined
-  #copied: string | undefined
-  #copiedTimer: NodeJS.Timeout | undefined
+  /** The PR whose URL was just copied, while its button says so. */
+  readonly #copied = new Flash<PrKey | undefined>(() => this.#host.changed())
   /** The node id the body's nodes sit under, from the last render (for scroll and reveal). */
   #bodyId = ''
 
@@ -68,7 +68,7 @@ export class PrView {
   }
 
   dispose() {
-    clearTimeout(this.#copiedTimer)
+    this.#copied.dispose()
   }
 
   /** The PRs in the order the switcher lists them: newest link first. */
@@ -175,13 +175,7 @@ export class PrView {
     }
 
     copyToClipboard(e.pr?.url ?? e.ref.url)
-    this.#copied = this.#selected
-    clearTimeout(this.#copiedTimer)
-    this.#copiedTimer = setTimeout(() => {
-      this.#copied = undefined
-      this.#host.changed()
-    }, COPIED_MS)
-    this.#host.changed()
+    this.#copied.set(this.#selected)
   }
 
   openOnGitHub(path = '') {
@@ -469,7 +463,7 @@ export class PrView {
         {prButton({
           hint: 'c',
           key: 'copy',
-          label: this.#copied && this.#copied === this.#selected ? 'Copied' : 'Copy URL',
+          label: this.#copied.value && this.#copied.value === this.#selected ? 'Copied' : 'Copy URL',
           onClick: () => this.copy()
         })}
         {prButton({ hint: 'o', key: 'open', label: 'Open on GitHub', onClick: () => this.openOnGitHub() })}

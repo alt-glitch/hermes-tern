@@ -19,6 +19,7 @@ import type { LaunchEnv } from '../config/env.js'
 import type { ConnectWatcher } from '../connections/watcher.js'
 import type { Disposables } from '../core/disposables.js'
 import { errorText } from '../core/errors.js'
+import { Flash } from '../core/flash.js'
 import type { PrKey } from '../core/ids.js'
 import type { Attachments } from '../draft/attachments.js'
 import type { Composer } from '../draft/composer.js'
@@ -58,9 +59,6 @@ import { rpc } from '../wire/rpc.js'
 
 import type { ChatPorts } from './ports.js'
 
-/** How long a prompt's Copy button reads Copied. */
-const COPIED_MS = 1500
-
 /** The stores the actions act on, and the app's ports for the sheets they open. */
 export interface ActionsCx {
   readonly chat: ChatPorts
@@ -94,9 +92,8 @@ export interface ActionsCx {
 /** The app's actions and the contexts its entry points reach, made once. */
 export class AppActions {
   readonly #cx: ActionsCx
-  /** The prompt whose Copy button reads Copied, until the timer clears it. */
-  #copied: string | undefined
-  #copiedTimer: NodeJS.Timeout | undefined
+  /** The entry whose Copy button reads Copied, until its time is up. */
+  readonly #copied = new Flash<string>(() => this.#cx.changed())
   /** The folder last reported to Tern by OSC 7. */
   #reportedCwd: string | undefined
   /** What the dock's buttons and fields do. */
@@ -208,25 +205,19 @@ export class AppActions {
 
   /** The entry whose Copy button reads Copied. */
   get copied(): string | undefined {
-    return this.#copied
+    return this.#copied.value
   }
 
   /** A Copy button: `text` to the clipboard, and its button reads Copied for a moment. */
   readonly copy = (text: string, id: string) => {
     copyToClipboard(text)
-    this.#copied = id
-    // Node handlers consume their event, so the input loop's re-render never sees this one.
-    this.#cx.changed()
-    clearTimeout(this.#copiedTimer)
-    this.#copiedTimer = setTimeout(() => {
-      this.#copied = undefined
-      this.#cx.changed()
-    }, COPIED_MS)
+    // It asks for a render: node handlers consume their event, so the input loop's re-render never sees this one.
+    this.#copied.set(id)
   }
 
   /** Clears the Copied timer. */
   dispose() {
-    clearTimeout(this.#copiedTimer)
+    this.#copied.dispose()
   }
 
   // ── Prompts and commands ───────────────────────────────────────────

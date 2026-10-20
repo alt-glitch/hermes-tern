@@ -6,6 +6,7 @@
 
 import type { JSX } from '@stencil-hq/tern'
 
+import { clip } from '../../../core/text.js'
 import { shownImage } from '../../../media.js'
 import type { ToolCall } from '../../../model.js'
 import { tilesNode } from '../../../processes/widgets/view.js'
@@ -15,7 +16,7 @@ import type { GenericFields, PullRequestDetail } from '../../../tools/misc.js'
 import { isWatchCall } from '../../../transcript/calls.js'
 import { record } from '../../../wire/json.js'
 import { commandLine } from '../../describe.js'
-import { clip, nonEmpty } from '../../format.js'
+import { nonEmpty } from '../../format.js'
 import { namedStep } from '../steps.js'
 import type { CallView, Card, ToolView } from '../types.js'
 

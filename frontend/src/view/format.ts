@@ -1,33 +1,15 @@
-// Words and numbers as the views write them: cut text, counted nouns, durations, clock times
-// and paths. Each helper is one format; where two views write a thing differently, each way has
-// its own name, so a view picks the one it means.
+// Words and numbers as the views write them: durations, clock times, how long ago, and paths (a
+// count with its noun and a cut text are core/text.ts's). Each helper is one format; where two
+// views write a thing differently, each way has its own name, so a view picks the one it means.
 
 /** A string with something in it, else undefined: how views read an optional text field. */
 export function nonEmpty(v: unknown): string | undefined {
   return typeof v === 'string' && v ? v : undefined
 }
 
-/**
- * `text` cut to `max` characters. `mark: 'end'` (the default) ends a cut text with `…` inside
- * `max`, for a title or a label; `mark: 'line'` keeps `max` characters and puts `…` on a line of
- * its own, for a body whose end is dropped.
- */
-export function clip(text: string, o: { max: number; mark?: 'end' | 'line' }): string {
-  if (text.length <= o.max) {
-    return text
-  }
-
-  return o.mark === 'line' ? `${text.slice(0, o.max)}\n…` : `${text.slice(0, o.max - 1)}…`
-}
-
 /** `text` on one line: each run of whitespace (newlines too) one space, the ends trimmed. */
 export function flat(text: string): string {
   return text.replace(/\s+/g, ' ').trim()
-}
-
-/** `1 file`, `3 files`: a count and its noun; `many` defaults to `one` with an `s`. */
-export function plural(n: number, one: string, many = `${one}s`): string {
-  return `${n} ${n === 1 ? one : many}`
 }
 
 /** `12s`, `3m 05s`, `1h 02m`: a duration as omp's turn footers write it. */
@@ -87,6 +69,38 @@ export function durationWhole(ms: number): string {
   const s = Math.max(0, Math.round(ms / 1000))
 
   return s < 60 ? `${s}s` : s < 3600 ? `${Math.floor(s / 60)}m ${s % 60}s` : `${Math.floor(s / 3600)}h ${Math.floor((s % 3600) / 60)}m`
+}
+
+/** `25m`, `2h`, `3d`, `1w`, `2mo`, `1y`: how long, in its largest whole unit (a minute at least), as omp's session list writes an age. */
+export function ageShort(ms: number): string {
+  const m = Math.max(0, Math.round(ms / 60_000))
+
+  if (m < 60) {
+    return `${Math.max(1, m)}m`
+  }
+
+  const h = Math.round(m / 60)
+
+  if (h < 24) {
+    return `${h}h`
+  }
+
+  const d = Math.round(h / 24)
+
+  return d < 7 ? `${d}d` : d < 30 ? `${Math.round(d / 7)}w` : d < 365 ? `${Math.round(d / 30)}mo` : `${Math.round(d / 365)}y`
+}
+
+/** `in 12m`, `3h ago`, `now`: how far `iso` is from `now`, in ageShort's units; '' for no time. */
+export function relative(iso: string | null | undefined, now: number): string {
+  const at = iso ? Date.parse(iso) : NaN
+
+  if (Number.isNaN(at)) {
+    return ''
+  }
+
+  const d = at - now
+
+  return Math.abs(d) < 45_000 ? 'now' : d > 0 ? `in ${ageShort(d)}` : `${ageShort(-d)} ago`
 }
 
 /** `6:15 pm`: a time of day to the minute, in the locale's hour style, lower case. */

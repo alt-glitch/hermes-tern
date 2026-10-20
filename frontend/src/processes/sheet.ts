@@ -1,6 +1,5 @@
 // The Background sheet's state: the tab, the picked process and cron job, whether the output
-// has the whole sheet, the stop or remove question it asks, and the process whose command was
-// just copied. A key (sheetKey) and a click (SHEET_CLICKS) become the same SheetAction, and
+// has the whole sheet, and the stop or remove question it asks. A key (sheetKey) and a click (SHEET_CLICKS) become the same SheetAction, and
 // reduceSheet gives the next state and the one effect the sheet runs for it (close, stop one or
 // all, act on a job, copy). The reducer is pure: it reads the processes and jobs from the facts
 // the sheet passes in.
@@ -29,8 +28,6 @@ export interface SheetState {
   /** Enter: the output takes the whole sheet. */
   readonly expanded: boolean
   readonly confirm: SheetConfirm | undefined
-  /** The process whose command was just copied, while the button says so. */
-  readonly copied: string | undefined
 }
 
 /** What the reducer reads of the stores. */
@@ -63,8 +60,6 @@ export type SheetAction =
   | { type: 'cancel' }
   | { type: 'confirm' }
   | { type: 'copy' }
-  /** The copied mark's time is up. */
-  | { type: 'uncopy' }
 
 /** What the sheet runs after an action: the parts that reach outside it. */
 export type SheetEffect =
@@ -72,7 +67,8 @@ export type SheetEffect =
   | { kind: 'stopOne'; process: BackgroundProcess }
   | { kind: 'stopAll' }
   | { kind: 'job'; action: CronAction; job: CronJob }
-  | { kind: 'copy'; command: string }
+  /** Copies process `id`'s command; the sheet marks its button for a moment. */
+  | { kind: 'copy'; command: string; id: string }
 
 /** The next state, and the effect to run for the action, if any. */
 export interface SheetStep {
@@ -89,7 +85,6 @@ export function initialSheet(processes: readonly BackgroundProcess[], at?: strin
 
   return {
     confirm: undefined,
-    copied: undefined,
     expanded: false,
     job: undefined,
     selected: focus ?? processes.find(isRunning)?.id ?? processes[0]?.id,
@@ -177,11 +172,8 @@ export function reduceSheet(state: SheetState, action: SheetAction, facts: Sheet
     case 'copy': {
       const p = currentProcess(state, facts)
 
-      return p ? { effect: { command: p.command, kind: 'copy' }, state: { ...state, copied: p.id } } : { state }
+      return p ? { effect: { command: p.command, id: p.id, kind: 'copy' }, state } : { state }
     }
-
-    case 'uncopy':
-      return { state: { ...state, copied: undefined } }
   }
 }
 

@@ -195,11 +195,10 @@ describe('the Background sheet reducer', () => {
     expect(sheetKey({ ...start, expanded: true }, key('tab'), FACTS)).toBeUndefined()
   })
 
-  it('marks the copied command until its time is up', () => {
+  it("copies the picked process's command, naming it for the button's Copied mark", () => {
     const copied = reduceSheet(start, { type: 'copy' }, FACTS)
 
-    expect(copied.effect).toEqual({ command: 'run p1', kind: 'copy' })
-    expect(copied.state.copied).toBe('p1')
-    expect(sheet(copied.state, { type: 'uncopy' }).state).toEqual(start)
+    expect(copied.effect).toEqual({ command: 'run p1', id: 'p1', kind: 'copy' })
+    expect(copied.state).toEqual(start)
   })
 })

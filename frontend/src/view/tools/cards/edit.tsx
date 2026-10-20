@@ -3,9 +3,9 @@
 import { diffStats, hunks, plainDiff } from '../../../code/diff.js'
 import { langOf } from '../../../code/lang.js'
 import { optional } from '../../../core/assert.js'
+import { plural } from '../../../core/text.js'
 import type { ToolCall } from '../../../model.js'
 import type { EditDetail } from '../../../tools/files.js'
-import { plural } from '../../format.js'
 import { shortPath } from '../steps.js'
 import type { Card, ToolView } from '../types.js'
 

@@ -7,6 +7,7 @@
 
 import { isConnectCall } from '../connections/cards.js'
 import { isNonEmpty } from '../core/assert.js'
+import { plural } from '../core/text.js'
 import { shownImage } from '../media.js'
 import type { Block, ToolCall, TurnEntry } from '../model.js'
 import { appOf, appsOf, batchOf } from '../tools/bridge.js'
@@ -16,7 +17,7 @@ import { compactionEndedAt } from '../transcript/compactions.js'
 import { turnEndedAt } from '../transcript/turns.js'
 import { commandProgramName } from '../vendor/t3code/commandLabel.js'
 
-import { durationCompact, flat, plural } from './format.js'
+import { durationCompact, flat } from './format.js'
 import { ACTION_ICON, withView } from './tools/registry.js'
 import type { Action } from './tools/types.js'
 

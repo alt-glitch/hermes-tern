@@ -5,6 +5,8 @@
 
 import type { Tone } from '@stencil-hq/tern'
 
+import { withoutEscapes } from '../../core/text.js'
+
 import { formatNumber, formatRatio, formatTrend } from './format.js'
 import {
   type Agg,
@@ -64,13 +66,11 @@ export interface TextSource {
   read(from: number): TextChunk
 }
 
-// eslint-disable-next-line no-control-regex -- terminal escapes and control characters are what this strips
-const ESCAPES = /\x1b\[[0-?]*[ -/]*[@-~]|\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)|\x1b[@-_]|[\x00-\x08\x0b-\x1f\x7f]/g
+// eslint-disable-next-line no-control-regex -- control characters are what this strips
+const CONTROLS = /[\x00-\x08\x0b-\x1f\x7f]/g
 
 /** A line as rules read it: escapes and control characters gone, tabs as spaces. */
-function clean(line: string): string {
-  return line.replace(/\t/g, ' ').replace(ESCAPES, '')
-}
+const clean = (line: string): string => withoutEscapes(line.replace(/\t/g, ' ')).replace(CONTROLS, '')
 
 /**
  * Reads one source between refreshes: keeps a cursor, carries the trailing partial line to the

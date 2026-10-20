@@ -1,8 +1,8 @@
 // The small cards with no family of their own: the todo list, memory, and the skill tools.
 
+import { clip, plural } from '../../../core/text.js'
 import type { Todo, ToolCall } from '../../../model.js'
 import type { MemoryDetail, SkillDetail, SkillsDetail } from '../../../tools/misc.js'
-import { clip, plural } from '../../format.js'
 import { checklistNode } from '../../todos.js'
 import { namedStep } from '../steps.js'
 import type { Card, ToolView } from '../types.js'

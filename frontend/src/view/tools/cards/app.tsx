@@ -3,9 +3,9 @@
 import type { JSX } from '@stencil-hq/tern'
 
 import type { NonEmpty } from '../../../core/assert.js'
+import { clip } from '../../../core/text.js'
 import type { ToolCall } from '../../../model.js'
 import { appOf, type AppTool, appsOf, type BatchEntry } from '../../../tools/bridge.js'
-import { clip } from '../../format.js'
 import type { Card } from '../types.js'
 
 import { errorOf, genericBody, humanize, pretty } from './generic.js'

@@ -15,10 +15,11 @@ import { launchEnv } from '../config/env.js'
 import { optional } from '../core/assert.js'
 import { errorText } from '../core/errors.js'
 import { durable, storedSessionId } from '../core/ids.js'
+import { plural } from '../core/text.js'
 import { mutateSession } from '../hermes/mutate.js'
 import { inWorkspace, lastReply, sessionLabel, type StoredSession, storedSessions, workspaceOf } from '../hermes/sessionIndex.js'
 import { oneLine } from '../view/describe.js'
-import { homeTilde, plural } from '../view/format.js'
+import { ageShort, homeTilde } from '../view/format.js'
 import { facts } from '../view/ui/facts.js'
 import { rpc } from '../wire/rpc.js'
 
@@ -299,7 +300,7 @@ function itemOf(s: StoredSession, now: number, running: boolean, elsewhere: bool
       ...(elsewhere && s.cwd ? [{ text: basename(s.cwd), title: s.cwd }] : [])
     ],
     ...optional('detail', s.title && s.preview ? oneLine(s.preview) : undefined),
-    facts: { size: plural(s.messages, 'msg'), when: ageOf(s.lastActive, now) },
+    facts: { size: plural(s.messages, 'msg'), when: ageShort(now - s.lastActive) },
     id: s.id,
     label,
     ...optional('title', s.cwd || undefined)
@@ -320,7 +321,7 @@ function preview(s: StoredSession, now: number, isCurrent: boolean, running: boo
         ['Status', status],
         ['Folder', s.cwd && [{ s: 'mono', t: shortPath(s.cwd) }]],
         ['Branch', s.branch && [{ s: 'mono', t: s.branch }]],
-        ['Last active', `${dateOf(s.lastActive)} · ${ageOf(s.lastActive, now)} ago`],
+        ['Last active', `${dateOf(s.lastActive)} · ${ageShort(now - s.lastActive)} ago`],
         ['Started', dateOf(s.startedAt)],
         ['Messages', String(s.messages)],
         ['Model', s.model && [{ s: 'mono', t: s.model }]],
@@ -346,25 +347,6 @@ function preview(s: StoredSession, now: number, isCurrent: boolean, running: boo
 }
 
 const shortPath = (path: string) => homeTilde(path, launchEnv().home)
-
-/** `25m`, `2h`, `3d`, `1w`, `2mo`, `1y`: how long ago, as omp's session list writes it. */
-function ageOf(at: number, now: number): string {
-  const m = Math.max(0, Math.round((now - at) / 60_000))
-
-  if (m < 60) {
-    return `${Math.max(1, m)}m`
-  }
-
-  const h = Math.round(m / 60)
-
-  if (h < 24) {
-    return `${h}h`
-  }
-
-  const d = Math.round(h / 24)
-
-  return d < 7 ? `${d}d` : d < 30 ? `${Math.round(d / 7)}w` : d < 365 ? `${Math.round(d / 30)}mo` : `${Math.round(d / 365)}y`
-}
 
 /** Today / Yesterday / This week / This month / Earlier, by local calendar day. */
 function dayOf(at: number, now: number): string {

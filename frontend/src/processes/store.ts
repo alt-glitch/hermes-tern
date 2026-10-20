@@ -11,6 +11,7 @@ import type { GatewayClient } from '@tui/gatewayClient.js'
 
 import type { LiveSessionId } from '../core/ids.js'
 import { Poller } from '../core/poller.js'
+import { withoutEscapes } from '../core/text.js'
 import type { BackgroundProcess, ProcessEnd, ProcessState, ToolCall } from '../model.js'
 import { withoutTernEnv } from '../tools/terminal.js'
 import { isWatchCall } from '../transcript/calls.js'
@@ -52,12 +53,9 @@ export function processStatus(entry: Pick<ProcessRow, 'completion_reason' | 'exi
   return REASON_STATUS[entry.completion_reason ?? ''] ?? (entry.exit_code ? 'failed' : 'done')
 }
 
-// eslint-disable-next-line no-control-regex -- terminal escapes are what this strips
-const ESCAPES = /\x1b\[[0-?]*[ -/]*[@-~]|\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)|\x1b[@-_]/g
-
 /** The last non-empty line of `output`, without escapes; a `\r`-redrawn line reads as its newest draw. */
 export function lastLine(output: string): string {
-  const lines = output.replace(ESCAPES, '').split('\n')
+  const lines = withoutEscapes(output).split('\n')
 
   for (const line of lines.toReversed()) {
     const draws = line.split('\r')

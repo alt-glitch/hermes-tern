@@ -11,8 +11,10 @@ import type { JSX, Key, PickerColumn, PickerItem } from '@stencil-hq/tern'
 import type { ChatPorts } from '../app/ports.js'
 import { copyToClipboard } from '../clipboard.js'
 import { optional } from '../core/assert.js'
+import { Flash } from '../core/flash.js'
+import { plural } from '../core/text.js'
 import type { BackgroundProcess, ToolCall } from '../model.js'
-import { type CronAction, type CronJob, isMonitor, isPaused, jobError, jobTone, ownJobs, relative } from '../processes/cron.js'
+import { type CronAction, type CronJob, isMonitor, isPaused, jobError, jobTone, ownJobs } from '../processes/cron.js'
 import { PROCESS_LOOK } from '../processes/look.js'
 import {
   initialSheet,
@@ -38,7 +40,7 @@ import {
 import { chartNode } from '../processes/widgets/view.js'
 import { isBackgroundCall } from '../transcript/calls.js'
 import { commandLine, describeCommand, oneLine } from '../view/describe.js'
-import { clockSeconds, duration, plural } from '../view/format.js'
+import { clockSeconds, duration, relative } from '../view/format.js'
 import { type Fact, facts } from '../view/ui/facts.js'
 
 import type { Overlay } from './overlay.js'
@@ -50,13 +52,13 @@ export type BackgroundHost = Pick<ChatPorts, 'changed' | 'close' | 'cron' | 'ope
 const KEY = 'background'
 /** Run times follow the clock while the sheet is open. */
 const TICK_MS = 1000
-const COPIED_MS = 1500
 
 /** Opens the sheet, on process `focus` when given, or on the Cron tab (`/cron`). */
 export function openBackground(host: BackgroundHost, at?: string | { tab: 'cron' }) {
   const procs = () => host.processes.all()
   let state: SheetState = initialSheet(procs(), at)
-  let copiedTimer: NodeJS.Timeout | undefined
+  /** The process whose command was just copied, while its button says so. */
+  const copied = new Flash<string>(() => host.changed())
   const release = host.processes.watch()
   const releaseCron = host.cron.watch()
 
@@ -97,13 +99,9 @@ export function openBackground(host: BackgroundHost, at?: string | { tab: 'cron'
     host.changed()
   }
 
-  const copy = (command: string) => {
+  const copy = (command: string, id: string) => {
     copyToClipboard(command)
-    clearTimeout(copiedTimer)
-    copiedTimer = setTimeout(() => {
-      act({ type: 'uncopy' })
-      host.changed()
-    }, COPIED_MS)
+    copied.set(id)
   }
 
   const run = (effect: SheetEffect) => {
@@ -121,7 +119,7 @@ export function openBackground(host: BackgroundHost, at?: string | { tab: 'cron'
         return void actJob(effect.action, effect.job)
 
       case 'copy':
-        return copy(effect.command)
+        return copy(effect.command, effect.id)
     }
   }
 
@@ -155,7 +153,7 @@ export function openBackground(host: BackgroundHost, at?: string | { tab: 'cron'
     // Ends with the sheet, however it closed (Esc, a session switch replacing the overlays).
     onClose: () => {
       stopTicking()
-      clearTimeout(copiedTimer)
+      copied.dispose()
       release()
       releaseCron()
     },
@@ -241,7 +239,7 @@ export function openBackground(host: BackgroundHost, at?: string | { tab: 'cron'
 
     act({ ids: list.map(x => x.id), type: 'listed' })
 
-    const { confirm, copied, expanded } = state
+    const { confirm, expanded } = state
     const p = list.find(x => x.id === state.selected)
     const call = p && callOf(host, p.id)
     const columns: PickerColumn[] = [
@@ -254,7 +252,7 @@ export function openBackground(host: BackgroundHost, at?: string | { tab: 'cron'
       <picker
         actions={[
           { id: 'expand', keys: ['enter'], label: expanded ? 'List' : 'Output', primary: true },
-          { id: 'copy', keys: ['c'], label: copied && copied === p?.id ? 'Copied' : 'Copy command' },
+          { id: 'copy', keys: ['c'], label: copied.value && copied.value === p?.id ? 'Copied' : 'Copy command' },
           {
             danger: true,
             ...optional('disabled', p && isRunning(p) ? (host.processes.stopping(p.id) ? 'Stopping' : undefined) : 'Not running'),

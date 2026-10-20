@@ -2,6 +2,7 @@
 
 import type { JSX } from '@stencil-hq/tern'
 
+import { clip } from '../../../core/text.js'
 import type { ToolCall } from '../../../model.js'
 import { PROCESS_LOOK } from '../../../processes/look.js'
 import { isRunning as processRuns, processElapsed, processIdOf, processTone, processVerdict, watchersOf } from '../../../processes/store.js'
@@ -9,7 +10,7 @@ import { primaryNode } from '../../../processes/widgets/view.js'
 import type { TerminalDetail } from '../../../tools/terminal.js'
 import { commandDisplayText } from '../../../vendor/t3code/commandLabel.js'
 import { commandLine, describeCommand } from '../../describe.js'
-import { clip, duration, flat } from '../../format.js'
+import { duration, flat } from '../../format.js'
 import { age } from '../../time.js'
 import type { Card, ToolView } from '../types.js'
 

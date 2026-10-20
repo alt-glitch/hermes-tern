@@ -2,10 +2,10 @@
 
 import type { JSX } from '@stencil-hq/tern'
 
+import { clip } from '../../../core/text.js'
 import { localSource } from '../../../media.js'
 import type { ToolCall } from '../../../model.js'
 import type { GenericFields } from '../../../tools/misc.js'
-import { clip } from '../../format.js'
 import type { Card } from '../types.js'
 
 /** The image itself, open; what the tool said of it under it (not the JSON it came in). */

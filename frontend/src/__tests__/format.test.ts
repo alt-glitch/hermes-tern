@@ -1,18 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import {
-  clip,
-  clockSeconds,
-  clockShort,
-  duration,
-  durationCompact,
-  durationWhole,
-  flat,
-  homeTilde,
-  nonEmpty,
-  plural,
-  relativePath
-} from '../view/format.js'
+import { clip, plural } from '../core/text.js'
+import { ageShort, clockSeconds, clockShort, duration, durationCompact, durationWhole, flat, homeTilde, nonEmpty, relative, relativePath } from '../view/format.js'
 
 const timeString = Date.prototype.toLocaleTimeString
 
@@ -55,6 +44,20 @@ describe('format', () => {
     expect([400, 4_300, 42_000, 185_000, 3_725_000].map(duration)).toEqual(['400ms', '4.3s', '42s', '3m 05s', '1h 02m'])
     expect([820, 4_300, 42_000, 62_000, 3_725_000, -1].map(durationCompact)).toEqual(['820ms', '4.3s', '42s', '1m 2s', '1h 2m 5s', '0ms'])
     expect([400, 42_000, 185_000, 3_725_000].map(durationWhole)).toEqual(['0s', '42s', '3m 5s', '1h 2m'])
+  })
+
+  it('says how long ago, and how far a time is, in the largest whole unit', () => {
+    const NOW = Date.parse('2026-10-17T12:00:00Z')
+    const at = (ms: number) => new Date(NOW + ms).toISOString()
+
+    expect([ageShort(20_000), ageShort(25 * 60_000), ageShort(2 * 3_600_000), ageShort(3 * 86_400_000)]).toEqual(['1m', '25m', '2h', '3d'])
+    expect([ageShort(14 * 86_400_000), ageShort(60 * 86_400_000), ageShort(400 * 86_400_000)]).toEqual(['2w', '2mo', '1y'])
+    expect(relative(at(10_000), NOW)).toBe('now')
+    expect(relative(at(29 * 60_000), NOW)).toBe('in 29m')
+    expect(relative(at(-3 * 3_600_000), NOW)).toBe('3h ago')
+    expect(relative(at(2 * 86_400_000), NOW)).toBe('in 2d')
+    expect(relative(at(-14 * 86_400_000), NOW)).toBe('2w ago')
+    expect(relative(null, NOW)).toBe('')
   })
 
   it('writes a clock time to the minute or to the second', () => {
