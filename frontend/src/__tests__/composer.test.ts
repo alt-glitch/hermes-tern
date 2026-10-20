@@ -1,7 +1,13 @@
+import { mkdtempSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+
 import type { Key } from '@stencil-hq/tern'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { Composer } from '../composer.js'
+
+import { FakeGateway, fakeTern, given, settle } from './fakes.js'
 
 const history: string[] = []
 
@@ -55,7 +61,7 @@ describe('Composer', () => {
 
   it('Ctrl+K at a line end joins the next line', () => {
     const c = new Composer()
-    c.set('ab\ncd', 2)
+    c.set('ab\ncd', { cursor: 2 })
     c.key(key('k', { ctrl: true }))
     expect(c.text).toBe('abcd')
   })
@@ -113,7 +119,7 @@ describe('Composer', () => {
 
   it('Home at offset 0 stays at 0 when the text starts with a newline', () => {
     const c = new Composer()
-    c.set('\nab', 0)
+    c.set('\nab', { cursor: 0 })
     c.key(key('home'))
     expect(c.cursor).toBe(0)
     c.key(key('a', { ctrl: true }))
@@ -126,7 +132,7 @@ describe('Composer', () => {
     c.set('ab😀c\nxyz')
     c.key(key('up'))
     expect(c.cursor).toBe(2)
-    c.set('xyz\nab😀c', 3)
+    c.set('xyz\nab😀c', { cursor: 3 })
     c.key(key('down'))
     expect(c.cursor).toBe(6)
   })
@@ -171,5 +177,55 @@ describe('Composer', () => {
     c.key(key('enter', { shift: true }))
     expect(c.text).toBe('a\n\n')
     expect(c.key(key('enter'))).toBe('submit')
+  })
+})
+
+// WP24: a paste is the draft's only while the draft holds it.
+describe('Composer: the pastes a draft holds', () => {
+  it('forgets them when set() replaces the draft, unless the caller passes them', () => {
+    const c = new Composer()
+    c.key(key('paste', { text: '!rm -rf x' }))
+    expect(c.pasted).toEqual(['!rm -rf x'])
+
+    c.set('')
+    expect(c.pasted).toEqual([])
+
+    c.set('!rm -rf x', { pasted: ['!rm -rf x'] })
+    expect(c.pasted).toEqual(['!rm -rf x'])
+    expect(c.cursor).toBe(9)
+  })
+
+  it('places the caret where set() says', () => {
+    const c = new Composer()
+    c.set('hello', { cursor: 2 })
+    expect([c.text, c.cursor]).toEqual(['hello', 2])
+  })
+
+  it('a `!cmd` typed after Ctrl+C cleared a pasted one runs: the old paste is not the new draft', async () => {
+    process.env['HERMES_HOME'] = mkdtempSync(join(tmpdir(), 'hermes-tern-composer-'))
+    const { App } = await import('../app/chat.js')
+    const gw = new FakeGateway({ replies: { 'shell.exec': () => ({ code: 0, stderr: '', stdout: 'hi' }) } })
+    const tern = fakeTern()
+    const app = new App(tern.session, gw.client, '')
+    void app.run()
+    given.session(app, 's1')
+    const press = async (k: Key) => {
+      await vi.waitFor(() => expect(tern.reading).toBe(true))
+      tern.press(k)
+      await settle(gw)
+    }
+
+    await press(key('paste', { text: '!echo hi' }))
+    await press(key('c', { ctrl: true }))
+    expect(app.composer.text).toBe('')
+
+    for (const ch of '!echo hi') {
+      await press(key(ch, { text: ch }))
+    }
+
+    await press(key('enter'))
+
+    expect(gw.sent('shell.exec')).toEqual([{ command: 'echo hi', session_id: 's1' }])
+    expect(gw.sent('prompt.submit')).toEqual([])
   })
 })

@@ -60,14 +60,9 @@ export class Composer {
     return this.#decor.decor
   }
 
-  /** The draft's pastes that hold `{!…}` or start with `!`; `take()` forgets them. */
+  /** The draft's pastes that hold `{!…}` or start with `!`; `take()` and `set()` forget them. */
   get pasted(): readonly string[] {
     return this.#pasted
-  }
-
-  /** Marks `texts` as pasted again (a refused prompt back in the composer). */
-  repasted(texts: readonly string[]) {
-    this.#pasted.push(...texts)
   }
 
   /** Up/Down are walking the prompt history (Down still has somewhere to go). */
@@ -75,10 +70,16 @@ export class Composer {
     return this.#browse >= 0
   }
 
-  set(text: string, cursor = text.length) {
+  /**
+   * Replaces the draft with `text`, the caret at `cursor` (the end by default). The pastes the
+   * last draft held go with it: `pasted` names the ones `text` holds (a prompt back in the
+   * composer, with the draft it went in front of).
+   */
+  set(text: string, { cursor = text.length, pasted = [] }: { cursor?: number; pasted?: readonly string[] } = {}) {
     this.#record({ merge: false })
     this.#text = text
     this.#cursor = clamp(cursor, text.length)
+    this.#pasted = [...pasted]
   }
 
   /** Clears the draft after a submit, remembering it in the prompt history. */

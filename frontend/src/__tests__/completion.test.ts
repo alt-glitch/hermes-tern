@@ -130,7 +130,7 @@ describe('Completion: accepting an @ mention', () => {
 
   async function pick(before: string, after: string, text: string) {
     const { completion, composer } = setup()
-    composer.set(after, 0)
+    composer.set(after, { cursor: 0 })
     type(completion, composer, before)
     pending[0]?.resolve({ items: [row(text)] })
     await vi.runAllTimersAsync()

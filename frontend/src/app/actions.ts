@@ -250,8 +250,7 @@ export class AppActions {
 
     // An image still uploading would miss the prompt: the words wait in the composer for it.
     if (draft && attachments.uploading && !text.startsWith('/')) {
-      composer.set(raw)
-      composer.repasted(pasted)
+      composer.set(raw, { pasted })
       transcript.notice('An image is still attaching. Send again in a moment.', 'warning')
 
       return
@@ -298,8 +297,10 @@ export class AppActions {
     const { composer } = this.#cx
     const text = shownText(prompt)
 
-    composer.set(text && composer.text ? `${text}\n${composer.text}` : text || composer.text)
-    composer.repasted(prompt.kind === 'typed' ? prompt.pasted : [])
+    // The draft keeps its own pastes, and the prompt's come with it.
+    composer.set(text && composer.text ? `${text}\n${composer.text}` : text || composer.text, {
+      pasted: [...composer.pasted, ...(prompt.kind === 'typed' ? prompt.pasted : [])]
+    })
     this.#cx.attachments.restore(prompt.images)
   }
 

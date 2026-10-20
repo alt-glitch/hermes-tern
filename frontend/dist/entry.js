@@ -62853,22 +62853,24 @@ var Composer = class {
     }
     return this.#decor.decor;
   }
-  /** The draft's pastes that hold `{!…}` or start with `!`; `take()` forgets them. */
+  /** The draft's pastes that hold `{!…}` or start with `!`; `take()` and `set()` forget them. */
   get pasted() {
     return this.#pasted;
-  }
-  /** Marks `texts` as pasted again (a refused prompt back in the composer). */
-  repasted(texts2) {
-    this.#pasted.push(...texts2);
   }
   /** Up/Down are walking the prompt history (Down still has somewhere to go). */
   get browsing() {
     return this.#browse >= 0;
   }
-  set(text15, cursor = text15.length) {
+  /**
+   * Replaces the draft with `text`, the caret at `cursor` (the end by default). The pastes the
+   * last draft held go with it: `pasted` names the ones `text` holds (a prompt back in the
+   * composer, with the draft it went in front of).
+   */
+  set(text15, { cursor = text15.length, pasted = [] } = {}) {
     this.#record({ merge: false });
     this.#text = text15;
     this.#cursor = clamp(cursor, text15.length);
+    this.#pasted = [...pasted];
   }
   /** Clears the draft after a submit, remembering it in the prompt history. */
   take() {
@@ -69176,8 +69178,7 @@ var AppActions = class {
     const { attachments, composer: composer2, transcript } = this.#cx;
     const text15 = raw2.trim();
     if (draft && attachments.uploading && !text15.startsWith("/")) {
-      composer2.set(raw2);
-      composer2.repasted(pasted);
+      composer2.set(raw2, { pasted });
       transcript.notice("An image is still attaching. Send again in a moment.", "warning");
       return;
     }
@@ -69211,8 +69212,9 @@ var AppActions = class {
     const { composer: composer2 } = this.#cx;
     const text15 = shownText(prompt);
     composer2.set(text15 && composer2.text ? `${text15}
-${composer2.text}` : text15 || composer2.text);
-    composer2.repasted(prompt.kind === "typed" ? prompt.pasted : []);
+${composer2.text}` : text15 || composer2.text, {
+      pasted: [...composer2.pasted, ...prompt.kind === "typed" ? prompt.pasted : []]
+    });
     this.#cx.attachments.restore(prompt.images);
   }
   /** `!cmd`: runs `command` in the session's folder and shows its output; nothing reaches the model. */
