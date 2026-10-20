@@ -14,6 +14,7 @@ import { todoProgress } from '../transcript/todos.js'
 
 import { type AutomationLine, automationNode, type Reconnecting, reconnectNode } from './automation.js'
 import { plural } from './format.js'
+import { type QueuedRow, queuedNode } from './queued.js'
 import { compact } from './time.js'
 import { checklistNode } from './todos.js'
 import { workingRow } from './ui/live.js'
@@ -84,19 +85,6 @@ export interface DockContext {
   reconnecting?: Reconnecting
 }
 
-/**
- * A prompt waiting behind the turn (t3code's queued row): what its Edit and Steer can do. A row
- * still on its way to the gateway is `pending`; another window's row (`note`) is shown, not acted on.
- */
-export interface QueuedRow {
-  text: string
-  edit?: boolean
-  steer?: boolean
-  pending?: boolean
-  /** `elsewhere`: queued by another window (or before a reconnect); `unknown`: its turn's outcome is unknown. */
-  note?: 'elsewhere' | 'unknown'
-}
-
 /** An image attached to the draft. */
 export interface ComposerImage {
   label: string
@@ -160,47 +148,7 @@ export function dockNodes(cx: DockContext): JSX.Element[] {
   }
 
   if (cx.queued.length) {
-    nodes.push(
-      <col gap="xs" key="queue" role="omp.queue">
-        {cx.queued.map((q, i) => (
-          <row align="center" gap="sm" key={`q${i}`} role="omp.queue.item" title={queuedTitle(q)}>
-            <icon key="icon" name={q.pending ? 'clock' : 'corner-down-right'} />
-            <text grow={1} key="text" text={q.text.replace(/\s*\r?\n\s*/g, ' ↵ ')} truncate="end" wrap="none" />
-            {i === 0 && cx.queued.length > 1 ? (
-              <badge key="count" role="omp.queue.count" text={`${cx.queued.length}`} />
-            ) : null}
-            {q.note === 'unknown' ? <badge key="note" text="unknown" tone="warning" /> : null}
-            {cx.onQueueSteer && q.steer ? (
-              <row
-                align="center"
-                gap="xs"
-                key="steer"
-                onClick={() => cx.onQueueSteer?.(i)}
-                role="omp.queue.steer"
-                title={`Steer the running turn with this instead${i === 0 ? '  ⌥↵' : ''}`}
-              >
-                <icon key="i" name="corner-up-right" />
-                {i === 0 ? <kbd key="k" keys={['alt', 'enter']} /> : null}
-                <text key="t" text="Steer" />
-              </row>
-            ) : null}
-            {q.edit ? (
-              <row
-                align="center"
-                gap="xs"
-                key="edit"
-                onClick={() => cx.onQueueEdit(i)}
-                role="omp.queue.edit"
-                title={`Edit in the composer${i === 0 ? '  ⌥↑' : ''}`}
-              >
-                {i === 0 ? <kbd key="k" keys={['alt', 'up']} /> : null}
-                <text key="t" text="Edit" />
-              </row>
-            ) : null}
-          </row>
-        ))}
-      </col>
-    )
+    nodes.push(queuedNode(cx.queued, { edit: cx.onQueueEdit, steer: cx.onQueueSteer }))
   }
 
   if (cx.todos?.open) {
@@ -244,16 +192,6 @@ export function dockNodes(cx: DockContext): JSX.Element[] {
   nodes.push(statusLine(cx))
 
   return nodes
-}
-
-function queuedTitle(q: QueuedRow): string {
-  return q.pending
-    ? 'Queuing…'
-    : q.note === 'elsewhere'
-      ? 'Queued by another window (or before a reconnect)'
-      : q.note === 'unknown'
-        ? 'Queued behind a turn whose outcome is unknown'
-        : 'Queued'
 }
 
 /** The todo pill: a ring that fills as items are done, `2/5`, and the item under way. */

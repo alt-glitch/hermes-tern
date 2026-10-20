@@ -1,5 +1,6 @@
 // Schemas for the gateway shapes that differ between gateway versions: the rows of process.list,
-// the counters of a session.usage tick and the shared gateway's FIFO (`pending_submissions`).
+// the counters of a session.usage tick, the shared gateway's FIFO (`pending_submissions`) and the
+// fields a queued row's own completion adds.
 // Each one reads what it can and falls back where the code before it fell back: a malformed row is
 // skipped, a missing list reads as none.
 
@@ -84,6 +85,19 @@ export function pendingRows(info: SessionLiveInfo | null | undefined): PendingRo
   const { pending_submissions: rows } = info ?? {}
 
   return Array.isArray(rows) ? rowsOf(pendingRow, rows) : undefined
+}
+
+/** The two fields a queued row's own completion carries; anything else reads as neither. */
+const settle = z.catch(z.object({ admission_id: loose(z.string()), outcome: z.optional(z.unknown()) }), {})
+
+/**
+ * The admission a message.complete settles as `cancelled` (prompt.cancel's completion of a row
+ * nobody started); undefined for any other completion. MessageCompletePayload names neither field.
+ */
+export function cancelledAdmission(payload: unknown): AdmissionId | undefined {
+  const { admission_id: id, outcome } = settle.parse(payload ?? {})
+
+  return outcome === 'cancelled' && id !== undefined ? admissionId(id) : undefined
 }
 
 /** A counter as the tick was read before: missing is 0, anything else goes through Number (NaN refuses the tick). */

@@ -80,7 +80,7 @@ describe('session lifecycle', () => {
     gw.handlers.set('image.attach_bytes', () => ({ path: '/uploads/1.png' }))
     const app = new App(fakeTern().session, gw.client, '', { launch: readLaunchEnv({ HERMES_TUI_IMAGE: 'shot.png' }, dir) })
     void app.run()
-    expect(app.queue).toEqual([{ images: [], text: 'What do you see in this image?' }])
+    expect(app.queue).toEqual([{ images: [], kind: 'app', text: 'What do you see in this image?' }])
 
     gw.event({ type: 'gateway.ready', payload: {} })
     await vi.waitFor(() => expect(gw.methods('prompt.submit')).toHaveLength(1))
@@ -260,13 +260,13 @@ describe('session lifecycle', () => {
   it('/new waits while a turn runs, so its queue never lands in the new session', async () => {
     const app = await started(gw)
     app.busy = { label: 'Working…', since: {}, startedAt: Date.now() }
-    app.queue.push({ images: [], text: 'for the old chat' })
+    app.queue.push({ images: [], kind: 'app', text: 'for the old chat' })
 
     await app.newSession()
 
     expect(app.sid).toBe('s1')
     expect(gw.methods('session.create')).toHaveLength(1)
-    expect(app.queue).toEqual([{ images: [], text: 'for the old chat' }])
+    expect(app.queue).toEqual([{ images: [], kind: 'app', text: 'for the old chat' }])
     expect(notices(app).at(-1)).toMatch(/Wait for the current turn/)
   })
 

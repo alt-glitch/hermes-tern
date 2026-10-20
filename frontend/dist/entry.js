@@ -25846,8 +25846,8 @@ var Hud = class {
     this.#host.changed();
   }
   /** Each frame: a pill that left (its last process aged out) hands the keys back. */
-  prune(shown) {
-    this.#focused = this.#focused && shown.includes(this.#focused) ? this.#focused : void 0;
+  prune(shown2) {
+    this.#focused = this.#focused && shown2.includes(this.#focused) ? this.#focused : void 0;
   }
   /** The composer took the focus back (a click in it). */
   release() {
@@ -27779,10 +27779,10 @@ function hovercard(entries) {
   if (!entries.length) {
     return void 0;
   }
-  const shown = entries.slice(0, HOVERCARD_JOBS);
-  const rest = entries.length - shown.length;
+  const shown2 = entries.slice(0, HOVERCARD_JOBS);
+  const rest = entries.length - shown2.length;
   const card = /* @__PURE__ */ jsxs("col", { gap: "md", role: "omp.jobs.hovercard", children: [
-    tilesNode(shown),
+    tilesNode(shown2),
     rest > 0 ? /* @__PURE__ */ jsx("text", { role: "omp.jobs.hovercard.more", spans: [sp(`+${rest} more \xB7 /ps`, "dim")], wrap: "none" }, "more") : null
   ] });
   return card instanceof Node ? card.toJSON() : void 0;
@@ -30015,9 +30015,19 @@ function pipe(in_, out) {
 }
 
 // src/core/assert.ts
+function assertNever(value, what = "variant") {
+  throw new Error(`Unexpected ${what}: ${shown(value)}`);
+}
 function oneOf(values) {
   const known2 = new Set(values);
   return (value) => known2.has(value);
+}
+function shown(value) {
+  try {
+    return typeof value === "string" ? value : JSON.stringify(value) ?? String(value);
+  } catch {
+    return String(value);
+  }
 }
 
 // src/wire/schemas.ts
@@ -30057,6 +30067,11 @@ var pendingRow = object({
 function pendingRows(info) {
   const { pending_submissions: rows } = info ?? {};
   return Array.isArray(rows) ? rowsOf(pendingRow, rows) : void 0;
+}
+var settle = _catch(object({ admission_id: loose(string2()), outcome: optional(unknown()) }), {});
+function cancelledAdmission(payload) {
+  const { admission_id: id, outcome: outcome2 } = settle.parse(payload ?? {});
+  return outcome2 === "cancelled" && id !== void 0 ? admissionId(id) : void 0;
 }
 var counter = pipe(optional(unknown()), transform((value) => Number(value ?? 0)));
 var tick = _catch(
@@ -32004,9 +32019,9 @@ var Processes = class {
     this.#charts.retain(new Set(this.#byId.keys()));
     changed = this.#chart([...this.#byId.values()]) || changed;
     changed = this.#link(touched) || touched.size > 0 || changed;
-    const shown = this.recent(now).map((p3) => `${p3.id}:${p3.status}`).join();
-    if (shown !== this.#shown) {
-      this.#shown = shown;
+    const shown2 = this.recent(now).map((p3) => `${p3.id}:${p3.status}`).join();
+    if (shown2 !== this.#shown) {
+      this.#shown = shown2;
       changed = true;
     }
     if (changed) {
@@ -33593,7 +33608,7 @@ function openAgents(host, focus) {
     });
     host.changed();
   };
-  const shown = () => tab2 === "running" ? agents2().filter(isRunning) : agents2();
+  const shown2 = () => tab2 === "running" ? agents2().filter(isRunning) : agents2();
   const steps = (a2) => a2.log?.entries ?? [];
   const overlay = {
     key: KEY,
@@ -33654,7 +33669,7 @@ function openAgents(host, focus) {
       } else {
         selected = moveSelection(
           k,
-          shown().map((x) => x.id),
+          shown2().map((x) => x.id),
           selected
         ) ?? selected;
       }
@@ -33727,7 +33742,7 @@ function openAgents(host, focus) {
   };
   function hubNode(now) {
     const all8 = agents2();
-    const list9 = shown();
+    const list9 = shown2();
     const running = all8.filter(isRunning).length;
     if (!list9.some((a3) => a3.id === selected)) {
       selected = list9[0]?.id;
@@ -34099,7 +34114,7 @@ function openBackground(host, at) {
   const releaseCron = host.cron.watch();
   const stopTicking = tickWhileOpen(host, TICK_MS2);
   const close = () => host.close(overlay);
-  const shown = () => tab2 === "running" ? procs().filter(isRunning2) : procs();
+  const shown2 = () => tab2 === "running" ? procs().filter(isRunning2) : procs();
   const current = () => procs().find((p3) => p3.id === selected);
   const stopOne = async () => {
     const p3 = current();
@@ -34164,7 +34179,7 @@ function openBackground(host, at) {
       confirm = "job";
     }
   };
-  const settle = () => void (confirm === "all" ? stopAll() : confirm === "job" ? actJob("remove") : stopOne());
+  const settle2 = () => void (confirm === "all" ? stopAll() : confirm === "job" ? actJob("remove") : stopOne());
   const overlay = {
     key: KEY2,
     modal: true,
@@ -34180,7 +34195,7 @@ function openBackground(host, at) {
     onKey: (k) => {
       if (confirm) {
         if (k.name === "enter" || k.name === "y") {
-          settle();
+          settle2();
         } else if (k.name === "escape" || k.name === "n") {
           confirm = void 0;
         }
@@ -34218,7 +34233,7 @@ function openBackground(host, at) {
       } else {
         selected = moveSelection(
           k,
-          shown().map((p3) => p3.id),
+          shown2().map((p3) => p3.id),
           selected
         ) ?? selected;
       }
@@ -34242,7 +34257,7 @@ function openBackground(host, at) {
         close();
       }
     },
-    confirm: settle,
+    confirm: settle2,
     copy,
     expand: () => {
       expanded = Boolean(current()) && !expanded;
@@ -34327,7 +34342,7 @@ function openBackground(host, at) {
   }
   function processNode(now) {
     const all8 = procs();
-    const list9 = shown();
+    const list9 = shown2();
     const running = all8.filter(isRunning2).length;
     if (!list9.some((p4) => p4.id === selected)) {
       selected = list9[0]?.id;
@@ -34793,8 +34808,8 @@ function nextEffort(current, caps2) {
   return cycle.find((id) => rank2(id) > at) ?? cycle[0];
 }
 function effortText(effort, wire) {
-  const shown = effort === "none" ? "off" : effort || DEFAULT_EFFORT;
-  return wire && effort && wire !== effort && effort !== "none" ? `${shown}\u2192${wire}` : shown;
+  const shown2 = effort === "none" ? "off" : effort || DEFAULT_EFFORT;
+  return wire && effort && wire !== effort && effort !== "none" ? `${shown2}\u2192${wire}` : shown2;
 }
 async function applyEffort(host, value, scope) {
   const session2 = host.session;
@@ -62570,7 +62585,7 @@ function openModelPicker(host) {
   let fastTouched = false;
   let confirm = null;
   let busy = false;
-  let shown = [];
+  let shown2 = [];
   const load2 = async () => {
     state = "loading";
     host.changed();
@@ -62648,9 +62663,9 @@ function openModelPicker(host) {
         }
       }
     }
-    shown = order2.filter((o) => typeof o === "string");
-    if (!selected || !shown.includes(selected)) {
-      selected = shown[0];
+    shown2 = order2.filter((o) => typeof o === "string");
+    if (!selected || !shown2.includes(selected)) {
+      selected = shown2[0];
     }
     return { hits, order: order2 };
   };
@@ -62792,7 +62807,7 @@ function openModelPicker(host) {
         scope = ids[(ids.indexOf(scope) + (k.shift ? ids.length - 1 : 1)) % ids.length] ?? ALL;
         return true;
       }
-      const moved2 = moveSelection(k, shown, selected);
+      const moved2 = moveSelection(k, shown2, selected);
       if (moved2 !== void 0) {
         selected = moved2;
         return true;
@@ -64414,7 +64429,7 @@ function openSessionPicker(host) {
   let query = "";
   let selected;
   let deleting = null;
-  let shown = [];
+  let shown2 = [];
   const replies = /* @__PURE__ */ new Map();
   const current = durable(host.session.ref) ?? "";
   const load2 = async () => {
@@ -64496,9 +64511,9 @@ ${s2.preview} ${s2.cwd} ${s2.branch} ${s2.id}`, { scattered: false });
         hits[item3.id] = hitRuns(positions, sessionLabel(item3).length);
       }
     }
-    shown = order2.filter((o) => typeof o === "string");
-    if (!selected || !shown.includes(selected)) {
-      selected = shown[0];
+    shown2 = order2.filter((o) => typeof o === "string");
+    if (!selected || !shown2.includes(selected)) {
+      selected = shown2[0];
     }
     return { hits, order: order2 };
   };
@@ -64608,7 +64623,7 @@ ${s2.preview} ${s2.cwd} ${s2.branch} ${s2.id}`, { scattered: false });
       } else if (k.name === "backspace" && !query) {
         askDelete();
       } else {
-        const moved2 = moveSelection(k, shown, selected);
+        const moved2 = moveSelection(k, shown2, selected);
         const edited = moved2 === void 0 ? editQuery(k, query) : void 0;
         if (moved2 !== void 0) {
           selected = moved2;
@@ -64910,15 +64925,15 @@ async function plugins(host, arg) {
   const r = await rpc(host.gw, "plugins.manage", { action: "list" });
   const rows = r?.plugins ?? [];
   const user = rows.filter((p3) => p3.source !== "bundled");
-  const shown = sub === "all" || !user.length ? rows : user;
-  const hidden2 = rows.length - shown.length;
+  const shown2 = sub === "all" || !user.length ? rows : user;
+  const hidden2 = rows.length - shown2.length;
   if (!rows.length) {
     return host.transcript.notice("No plugins installed.");
   }
   host.transcript.panel(
     "Plugins",
     [
-      ...pluginLines(shown),
+      ...pluginLines(shown2),
       ...hidden2 ? ["", `${hidden2} bundled plugin${hidden2 === 1 ? "" : "s"} not shown: /plugins all lists them.`] : []
     ].join("\n")
   );
@@ -65429,9 +65444,9 @@ function displayNotice(kind, metadata) {
     return void 0;
   }
   const meta3 = record(metadata);
-  const shown = typeof meta3?.display_text === "string" ? meta3.display_text.trim() : "";
-  if (shown) {
-    return shown;
+  const shown2 = typeof meta3?.display_text === "string" ? meta3.display_text.trim() : "";
+  if (shown2) {
+    return shown2;
   }
   if (kind === "process_complete") {
     return "Background command finished";
@@ -66214,30 +66229,30 @@ function foldNode(part, id, children3) {
   });
 }
 function workNode(items, parent, live, now) {
-  const shown = visibleItems(items);
-  if (!shown.length) {
+  const shown2 = visibleItems(items);
+  if (!shown2.length) {
     return null;
   }
   const key2 = `w${items[0].id}`;
   const id = `${parent}.${key2}`;
-  if (!live && shown.length === 1) {
-    return itemNode(shown[0], parent, now, key2);
+  if (!live && shown2.length === 1) {
+    return itemNode(shown2[0], parent, now, key2);
   }
-  const calls = shown.flatMap((i) => i.kind === "tool" ? [i.call] : []);
+  const calls = shown2.flatMap((i) => i.kind === "tool" ? [i.call] : []);
   const failed = calls.at(-1)?.status === "error";
-  const latest2 = shown.findLast((i) => i.kind === "tool" && i.call.status === "running") ?? shown.at(-1);
+  const latest2 = shown2.findLast((i) => i.kind === "tool" && i.call.status === "running") ?? shown2.at(-1);
   const head2 = live ? /* @__PURE__ */ jsxs("row", { align: "center", gap: "sm", children: [
     /* @__PURE__ */ jsx("icon", { name: itemIcon(latest2) }, "icon"),
     liveText(liveLabel(latest2, true)),
     /* @__PURE__ */ jsx("icon", { name: "chev", role: "hermes.work.chev" }, "chev")
   ] }, "head") : /* @__PURE__ */ jsxs("row", { align: "center", gap: "sm", children: [
-    /* @__PURE__ */ jsx("icon", { name: groupIcon(shown), tone: failed ? "error" : void 0 }, "icon"),
-    /* @__PURE__ */ jsx("text", { spans: [{ s: "muted", t: summarize(shown) }], truncate: "end", wrap: "none" }, "label"),
+    /* @__PURE__ */ jsx("icon", { name: groupIcon(shown2), tone: failed ? "error" : void 0 }, "icon"),
+    /* @__PURE__ */ jsx("text", { spans: [{ s: "muted", t: summarize(shown2) }], truncate: "end", wrap: "none" }, "label"),
     /* @__PURE__ */ jsx("icon", { name: "chev", role: "hermes.work.chev" }, "chev"),
     /* @__PURE__ */ jsx("spacer", { grow: 1 }, "gap"),
-    /* @__PURE__ */ jsx("text", { role: "hermes.work.time", spans: [{ s: "dim", t: clockShort(startOf(shown[0])) }], wrap: "none" }, "time")
+    /* @__PURE__ */ jsx("text", { role: "hermes.work.time", spans: [{ s: "dim", t: clockShort(startOf(shown2[0])) }], wrap: "none" }, "time")
   ] }, "head");
-  return foldSection({ body: shown.map((i) => itemNode(i, id, now)), head: head2, id, key: key2, role: "hermes.work.group" });
+  return foldSection({ body: shown2.map((i) => itemNode(i, id, now)), head: head2, id, key: key2, role: "hermes.work.group" });
 }
 function itemNode(item3, parent, now, key2 = item3.id) {
   const id = `${parent}.${key2}`;
@@ -68740,12 +68755,12 @@ var SessionViews = class {
    * gateway gives this view one subscription per session, so a stale result for the shown session
    * is the live view's own and stays; others detach with no end reason (nobody chose to close them).
    */
-  release(shown) {
+  release(shown2) {
     const stale = this.#stale;
     this.#stale = [];
     for (const r of stale) {
       const { ref, subscription: subscription2 } = snapshotIds(r);
-      if (ref.live === shown || subscription2 && this.#subscriptions.get(ref.live) === subscription2) {
+      if (ref.live === shown2 || subscription2 && this.#subscriptions.get(ref.live) === subscription2) {
         continue;
       }
       if (!this.#gw.isCanonical) {
@@ -69237,10 +69252,26 @@ function fileSettings(file2) {
   };
 }
 
-// src/serverQueue.ts
+// src/turn/prompt.ts
+var IMAGE_ONLY_PROMPT = "What do you see in this image?";
+function shownText(prompt) {
+  return (prompt.kind === "command" ? prompt.display : void 0) ?? prompt.text;
+}
+function userText(text12, images) {
+  const count = images.length ? `\u{1F4CE} ${images.length} image${images.length === 1 ? "" : "s"}` : "";
+  return [text12, count].filter(Boolean).join("\n\n");
+}
+function userImages(images) {
+  return images.map((i) => ({ kind: "image", name: i.name, ...i.preview ? { source: i.preview } : {} }));
+}
+
+// src/turn/serverQueue.ts
 function busyModeOf(raw2) {
   const v = typeof raw2 === "string" ? raw2.trim().toLowerCase() : "";
   return v === "interrupt" || v === "steer" ? v : "queue";
+}
+function ownRow(own14) {
+  return own14.admission.kind === "admitted" ? { id: own14.admission.id, kind: "mine", own: own14, text: own14.display } : { kind: "sending", own: own14, text: own14.display };
 }
 var isServerQueued = (row2) => row2.status === "queued" || row2.status === "unknown";
 var ServerQueue = class {
@@ -69326,21 +69357,234 @@ var ServerQueue = class {
   }
   /** A message.complete that only settles a queued row nobody started (prompt.cancel's), not the running turn. */
   settlesQueuedRow(payload) {
-    const p3 = payload ?? {};
-    return p3.outcome === "cancelled" && typeof p3.admission_id === "string" && this.#queuedOnly.has(admissionId(p3.admission_id));
+    const id = cancelledAdmission(payload);
+    return id !== void 0 && this.#queuedOnly.has(id);
   }
   /** The rows that still wait, oldest first: the FIFO's, then admissions it does not list yet. */
   queued() {
-    const rows = this.rows.filter(isServerQueued).map((row2) => ({
-      own: this.#own.find((o) => o.inputId === row2.input_id),
-      row: row2,
-      text: row2.user
-    }));
+    const rows = this.rows.filter(isServerQueued).map((row2) => {
+      const own14 = this.#own.find((o) => o.inputId === row2.input_id);
+      return own14 ? ownRow(own14) : { kind: "theirs", row: row2, text: row2.user };
+    });
     const listed = new Set(this.rows.map((r) => r.input_id));
+    return [...rows, ...this.#own.filter((o) => !listed.has(o.inputId)).map(ownRow)];
+  }
+};
+
+// src/turn/queue.ts
+var PromptQueue = class {
+  /** Prompts held here until they can be sent: no session yet, a switch in flight, or a private gateway's busy turn. */
+  held = [];
+  /** The shared gateway's queue for this session: its FIFO, this pane's admissions, the bubbles they owe. */
+  server = new ServerQueue();
+  #host;
+  constructor(host) {
+    this.#host = host;
+  }
+  /** Holds `prompt` behind the others. */
+  hold(prompt) {
+    this.held.push(prompt);
+  }
+  /** Holds `prompt` ahead of the others (a send that found a switch in flight). */
+  holdFirst(prompt) {
+    this.held.unshift(prompt);
+  }
+  /**
+   * The startup image goes to the startup query at the queue's head, into its images in place;
+   * false when nothing is held.
+   */
+  attachToHead(image3) {
+    const head2 = this.held[0];
+    head2?.images.push(image3);
+    return Boolean(head2);
+  }
+  /** Prompts waiting behind the turn: this pane's own queue, then the shared gateway's. */
+  count() {
+    return this.held.length + this.server.queued().length;
+  }
+  /** The dock's queued rows, in count()'s order, with what each one's Edit and Steer can do. */
+  rows() {
+    const steer2 = this.#host.busy();
     return [
-      ...rows.map((r) => r.own ? { ...r, text: r.own.display } : r),
-      ...this.#own.filter((o) => !listed.has(o.inputId)).map((own14) => ({ own: own14, text: own14.display }))
+      ...this.held.map((p3) => ({ kind: "local", steer: steer2, text: userText(shownText(p3), p3.images) })),
+      ...this.server.queued().map((q2) => {
+        switch (q2.kind) {
+          case "theirs":
+            return { kind: "foreign", note: q2.row.status === "unknown" ? "unknown" : "elsewhere", text: internalNotice(q2.text) ?? q2.text };
+          // Withdrawing it needs the gateway's id for it: until prompt.submit answers it is on its way.
+          case "sending":
+            return { kind: "sending", text: q2.text };
+          case "mine":
+            return { kind: "mine", steer: steer2 && !q2.own.item.prompt.images.length, text: q2.text };
+        }
+      })
     ];
+  }
+  /**
+   * Admits `prompt` into session `sid`'s FIFO now (Ink's busy-time admission): crash-durable, and in
+   * every viewer's queue. Its bubble waits until the gateway starts it; a refusal puts it back in
+   * the composer. `sent`: what to send instead of expanding the prompt again (a re-queued steer).
+   */
+  async admit(sid, prompt, sent) {
+    const host = this.#host;
+    const ready = sent === void 0 ? await host.expanded(sid, prompt) : { images: prompt.images, text: sent };
+    if (!ready || sid !== host.sid()) {
+      return;
+    }
+    const own14 = {
+      admission: { kind: "pending" },
+      display: userText(shownText(prompt), prompt.images),
+      inputId: newInputId(),
+      item: { prompt, sent: ready.text }
+    };
+    const attachments = ready.images.map(({ mime, path: path2 }) => ({ mime, path: path2 }));
+    this.server.admit(own14);
+    host.changed();
+    try {
+      const r = await rpc(host.gw, "prompt.submit", {
+        queued: true,
+        session_id: sid,
+        submission_id: own14.inputId,
+        text: ready.text || (attachments.length ? IMAGE_ONLY_PROMPT : ""),
+        ...attachments.length ? { attachments } : {}
+      });
+      const id = admissionOf(r);
+      if (id !== void 0) {
+        own14.admission = { id, kind: "admitted" };
+      }
+    } catch (error) {
+      this.server.drop(own14);
+      if (sid === host.sid()) {
+        host.transcript.notice(`Not queued: ${errorText(error)}. Your message is back in the composer.`, "error");
+        host.restore(prompt);
+      }
+    }
+    host.changed();
+  }
+  /** Alt+Up / a queued row's Edit: queued prompt `index` (the oldest by default) back into the composer. */
+  dequeue(index2 = 0) {
+    const host = this.#host;
+    if (index2 < this.held.length) {
+      const [next3] = this.held.splice(index2, 1);
+      if (next3) {
+        host.restore(next3);
+        host.changed();
+      }
+      return;
+    }
+    const sid = host.sid();
+    const q2 = this.#mine(index2);
+    if (!sid || !q2) {
+      return;
+    }
+    void this.#withdraw(sid, q2).then((out) => {
+      if (out && sid === host.sid()) {
+        host.restore(q2.own.item.prompt);
+      }
+      host.changed();
+    });
+  }
+  /** Alt+Enter / a queued row's Steer: injects queued prompt `index` into the running turn instead of waiting for it to end. */
+  steer(index2) {
+    const host = this.#host;
+    const sid = host.sid();
+    if (!host.busy() || !sid) {
+      return;
+    }
+    if (index2 >= this.held.length) {
+      return void this.#steerServerQueued(sid, index2);
+    }
+    const prompt = this.held[index2];
+    if (!prompt) {
+      return;
+    }
+    if (prompt.images.length) {
+      host.transcript.notice("A queued prompt with images cannot steer the turn. It stays queued.", "warning");
+      return host.changed();
+    }
+    const { text: text12 } = prompt;
+    this.held.splice(index2, 1);
+    host.changed();
+    void steerTurn(host.gw, sid, text12).then((r) => {
+      if (r.ok) {
+        host.transcript.steer(text12);
+      } else {
+        this.held.splice(index2, 0, prompt);
+        host.transcript.notice(
+          r.error ? `Steer failed: ${r.error}. It stays queued.` : "The turn ended before the steer landed. It will send as the next prompt.",
+          "warning"
+        );
+        this.drain();
+      }
+      host.changed();
+    });
+  }
+  /** Sends the oldest held prompt once the session is adopted and idle (no turn, switch or startup image pending). */
+  drain() {
+    if (!this.#host.canDrain()) {
+      return;
+    }
+    const next3 = this.held.shift();
+    if (next3) {
+      this.#host.send(next3);
+    }
+  }
+  /** The shared gateway's queued row at dock index `index`, if this pane can act on it. */
+  #mine(index2) {
+    const q2 = this.server.queued()[index2 - this.held.length];
+    return q2?.kind === "mine" ? q2 : void 0;
+  }
+  /**
+   * Takes this pane's admission out of the gateway's queue (prompt.cancel); true once withdrawn,
+   * false when it started meanwhile (it runs as its own turn) or the gateway refused.
+   */
+  async #withdraw(sid, q2) {
+    this.server.withdrawn(q2.id);
+    try {
+      const r = await rpc(this.#host.gw, "prompt.cancel", { admission_id: q2.id, session_id: sid });
+      if (r?.status !== "terminal") {
+        return false;
+      }
+    } catch (error) {
+      this.#host.transcript.notice(`Could not take the prompt out of the queue: ${errorText(error)}`, "error");
+      this.#host.changed();
+      return false;
+    }
+    this.server.drop(q2.own);
+    return true;
+  }
+  /**
+   * A Steer on a row in the gateway's queue: withdrawn from it, then steered into the turn; a steer
+   * that does not land goes back into the queue, at its end.
+   */
+  async #steerServerQueued(sid, index2) {
+    const host = this.#host;
+    const q2 = this.#mine(index2);
+    if (!q2) {
+      return;
+    }
+    const { prompt, sent } = q2.own.item;
+    if (prompt.images.length) {
+      host.transcript.notice("A queued prompt with images cannot steer the turn. It stays queued.", "warning");
+      return host.changed();
+    }
+    if (!await this.#withdraw(sid, q2) || sid !== host.sid()) {
+      return;
+    }
+    const r = await steerTurn(host.gw, sid, sent);
+    if (sid !== host.sid()) {
+      return;
+    }
+    if (r.ok) {
+      host.transcript.steer(shownText(prompt));
+    } else {
+      host.transcript.notice(
+        r.error ? `Steer failed: ${r.error}. Queued again, at the end.` : "The turn ended before the steer landed. Queued again.",
+        "warning"
+      );
+      void this.admit(sid, prompt, sent);
+    }
+    host.changed();
   }
 };
 
@@ -70232,9 +70476,9 @@ var Compactions = class {
   }
   /** Marks the turn or entry showing `c` changed. */
   #touch(c) {
-    const shown = this.#host.entries().findLast((e) => e.kind === "compaction" && e.compaction === c || e.kind === "turn" && e.blocks.some((b) => b.kind === "compaction" && b.compaction === c));
-    if (shown?.kind === "compaction" || shown?.kind === "turn") {
-      shown.rev++;
+    const shown2 = this.#host.entries().findLast((e) => e.kind === "compaction" && e.compaction === c || e.kind === "turn" && e.blocks.some((b) => b.kind === "compaction" && b.compaction === c));
+    if (shown2?.kind === "compaction" || shown2?.kind === "turn") {
+      shown2.rev++;
     }
   }
 };
@@ -70960,6 +71204,63 @@ function shownArgs(args) {
   return typeof args.command === "string" ? { ...args, command: withoutTernEnv(args.command) } : args;
 }
 
+// src/view/queued.tsx
+function queuedNode(queued, on) {
+  return /* @__PURE__ */ jsx("col", { gap: "xs", role: "omp.queue", children: queued.map((q2, i) => /* @__PURE__ */ jsxs("row", { align: "center", gap: "sm", role: "omp.queue.item", title: queuedTitle(q2), children: [
+    /* @__PURE__ */ jsx("icon", { name: q2.kind === "sending" ? "clock" : "corner-down-right" }, "icon"),
+    /* @__PURE__ */ jsx("text", { grow: 1, text: q2.text.replace(/\s*\r?\n\s*/g, " \u21B5 "), truncate: "end", wrap: "none" }, "text"),
+    i === 0 && queued.length > 1 ? /* @__PURE__ */ jsx("badge", { role: "omp.queue.count", text: `${queued.length}` }, "count") : null,
+    q2.kind === "foreign" && q2.note === "unknown" ? /* @__PURE__ */ jsx("badge", { text: "unknown", tone: "warning" }, "note") : null,
+    on.steer && editable(q2) && q2.steer ? /* @__PURE__ */ jsxs(
+      "row",
+      {
+        align: "center",
+        gap: "xs",
+        onClick: () => on.steer?.(i),
+        role: "omp.queue.steer",
+        title: `Steer the running turn with this instead${i === 0 ? "  \u2325\u21B5" : ""}`,
+        children: [
+          /* @__PURE__ */ jsx("icon", { name: "corner-up-right" }, "i"),
+          i === 0 ? /* @__PURE__ */ jsx("kbd", { keys: ["alt", "enter"] }, "k") : null,
+          /* @__PURE__ */ jsx("text", { text: "Steer" }, "t")
+        ]
+      },
+      "steer"
+    ) : null,
+    editable(q2) ? /* @__PURE__ */ jsxs(
+      "row",
+      {
+        align: "center",
+        gap: "xs",
+        onClick: () => on.edit(i),
+        role: "omp.queue.edit",
+        title: `Edit in the composer${i === 0 ? "  \u2325\u2191" : ""}`,
+        children: [
+          i === 0 ? /* @__PURE__ */ jsx("kbd", { keys: ["alt", "up"] }, "k") : null,
+          /* @__PURE__ */ jsx("text", { text: "Edit" }, "t")
+        ]
+      },
+      "edit"
+    ) : null
+  ] }, `q${i}`)) }, "queue");
+}
+function queuedTitle(q2) {
+  switch (q2.kind) {
+    case "local":
+    case "mine":
+      return "Queued";
+    case "sending":
+      return "Queuing\u2026";
+    case "foreign":
+      return q2.note === "elsewhere" ? "Queued by another window (or before a reconnect)" : "Queued behind a turn whose outcome is unknown";
+    default:
+      return assertNever(q2, "queued row");
+  }
+}
+function editable(q2) {
+  return q2.kind === "local" || q2.kind === "mine";
+}
+
 // src/view/dock.tsx
 function dockNodes(cx) {
   const nodes2 = [];
@@ -70969,45 +71270,7 @@ function dockNodes(cx) {
     );
   }
   if (cx.queued.length) {
-    nodes2.push(
-      /* @__PURE__ */ jsx("col", { gap: "xs", role: "omp.queue", children: cx.queued.map((q2, i) => /* @__PURE__ */ jsxs("row", { align: "center", gap: "sm", role: "omp.queue.item", title: queuedTitle(q2), children: [
-        /* @__PURE__ */ jsx("icon", { name: q2.pending ? "clock" : "corner-down-right" }, "icon"),
-        /* @__PURE__ */ jsx("text", { grow: 1, text: q2.text.replace(/\s*\r?\n\s*/g, " \u21B5 "), truncate: "end", wrap: "none" }, "text"),
-        i === 0 && cx.queued.length > 1 ? /* @__PURE__ */ jsx("badge", { role: "omp.queue.count", text: `${cx.queued.length}` }, "count") : null,
-        q2.note === "unknown" ? /* @__PURE__ */ jsx("badge", { text: "unknown", tone: "warning" }, "note") : null,
-        cx.onQueueSteer && q2.steer ? /* @__PURE__ */ jsxs(
-          "row",
-          {
-            align: "center",
-            gap: "xs",
-            onClick: () => cx.onQueueSteer?.(i),
-            role: "omp.queue.steer",
-            title: `Steer the running turn with this instead${i === 0 ? "  \u2325\u21B5" : ""}`,
-            children: [
-              /* @__PURE__ */ jsx("icon", { name: "corner-up-right" }, "i"),
-              i === 0 ? /* @__PURE__ */ jsx("kbd", { keys: ["alt", "enter"] }, "k") : null,
-              /* @__PURE__ */ jsx("text", { text: "Steer" }, "t")
-            ]
-          },
-          "steer"
-        ) : null,
-        q2.edit ? /* @__PURE__ */ jsxs(
-          "row",
-          {
-            align: "center",
-            gap: "xs",
-            onClick: () => cx.onQueueEdit(i),
-            role: "omp.queue.edit",
-            title: `Edit in the composer${i === 0 ? "  \u2325\u2191" : ""}`,
-            children: [
-              i === 0 ? /* @__PURE__ */ jsx("kbd", { keys: ["alt", "up"] }, "k") : null,
-              /* @__PURE__ */ jsx("text", { text: "Edit" }, "t")
-            ]
-          },
-          "edit"
-        ) : null
-      ] }, `q${i}`)) }, "queue")
-    );
+    nodes2.push(queuedNode(cx.queued, { edit: cx.onQueueEdit, steer: cx.onQueueSteer }));
   }
   if (cx.todos?.open) {
     nodes2.push(
@@ -71040,9 +71303,6 @@ function dockNodes(cx) {
   nodes2.push(composerNode(cx));
   nodes2.push(statusLine(cx));
   return nodes2;
-}
-function queuedTitle(q2) {
-  return q2.pending ? "Queuing\u2026" : q2.note === "elsewhere" ? "Queued by another window (or before a reconnect)" : q2.note === "unknown" ? "Queued behind a turn whose outcome is unknown" : "Queued";
 }
 function todosPillNode(t2, focused) {
   const { current, done, total } = todoProgress(t2.list);
@@ -71337,7 +71597,6 @@ function imageChip(a2, i) {
 var EXIT_ARM_MS = 1500;
 var DOUBLE_ESC_MS = 500;
 var COPIED_MS3 = 1500;
-var IMAGE_ONLY_PROMPT = "What do you see in this image?";
 var QUIT_DETACH_MS = 1500;
 var App = class {
   transcript = new Transcript();
@@ -71379,10 +71638,8 @@ var App = class {
   session = sessionView(this, () => this.#ids);
   usage = null;
   busy = null;
-  /** Prompts held here until they can be sent: no session yet, a switch in flight, or a private gateway's busy turn. */
-  queue = [];
-  /** The shared gateway's queue for this session: its FIFO, this pane's admissions, the bubbles they owe. */
-  #server = new ServerQueue();
+  /** The prompts waiting behind the turn: held here, and the shared gateway's queue for this session. */
+  #queue;
   /** What Enter does while a turn runs (`display.busy_input_mode`); queue until the gateway says. */
   #busyMode = "queue";
   #tern;
@@ -71447,7 +71704,7 @@ var App = class {
     this.#settings = settings2;
     this.#attachments = new Attachments(
       {
-        attachToHead: (image3) => this.#attachToHead(image3),
+        attachToHead: (image3) => this.#queue.attachToHead(image3),
         blob: (bytes, mime) => this.#blob(bytes, mime),
         changed: () => this.changed(),
         cwd: () => this.info?.cwd || launch3.cwd,
@@ -71458,6 +71715,17 @@ var App = class {
       },
       { startup: launch3.image }
     );
+    this.#queue = new PromptQueue({
+      busy: () => Boolean(this.busy),
+      canDrain: () => !(this.busy || this.#compacting || !this.sid || this.#switches.pending || this.#attachments.awaitingStartup),
+      changed: () => this.changed(),
+      expanded: (sid, prompt) => this.#expanded(sid, prompt),
+      gw: gw2,
+      restore: (prompt) => this.#restore(prompt),
+      send: (prompt) => this.#send(prompt, { queued: true }),
+      sid: () => this.sid,
+      transcript: this.transcript
+    });
     const saved = settings2.load();
     this.#theme = new Theme({ palette: (palette) => this.#surface.palette(palette), settings: settings2 }, saved.theme ?? "tern");
     this.#jobCharts = saved.jobCharts !== false;
@@ -71475,6 +71743,13 @@ var App = class {
   /** Sets the runtime id, keeping the stored one (tests arrange a session this way). */
   set sid(id) {
     this.#ids = { live: id === null ? null : liveSessionId(id), stored: this.#ids.stored };
+  }
+  /** Prompts held here until they can be sent (tests read and arrange it). */
+  get queue() {
+    return this.#queue.held;
+  }
+  set queue(prompts) {
+    this.#queue.held = prompts;
   }
   /** The stored (database) id of the open session: what `session.list` rows are keyed by. */
   get storedSid() {
@@ -71501,7 +71776,7 @@ var App = class {
     this.transcript.push({ id: entryId("welcome"), kind: "welcome" });
     const query = this.#launch.query;
     if (query || this.#attachments.awaitingStartup) {
-      this.queue.push({ images: [], text: query || "What do you see in this image?" });
+      this.#queue.hold({ images: [], kind: "app", text: query || IMAGE_ONLY_PROMPT });
     }
     const log = this.#launch.eventLog;
     this.#gw.on("event", (ev) => {
@@ -71647,11 +71922,11 @@ var App = class {
           return openPrMenu(this);
       }
     }
-    if (key2.alt && key2.name === "up" && this.#queuedCount()) {
-      return this.#dequeue(0);
+    if (key2.alt && key2.name === "up" && this.#queue.count()) {
+      return this.#queue.dequeue(0);
     }
-    if (key2.alt && key2.name === "enter" && this.busy && this.#queuedCount() && !this.composer.text) {
-      return this.#steerQueued(0);
+    if (key2.alt && key2.name === "enter" && this.busy && this.#queue.count() && !this.composer.text) {
+      return this.#queue.steer(0);
     }
     if (key2.ctrl && key2.name === "d" && !this.#hasDraft()) {
       return this.quit();
@@ -71746,15 +72021,6 @@ var App = class {
   /** `/image <path>`: attaches that image file (resolved against the session's folder) to the next prompt. */
   attachImagePath(raw2) {
     return this.#attachments.fromPath(raw2);
-  }
-  /**
-   * The startup image goes to the startup query at the queue's head, into its images in place;
-   * false when the queue is empty.
-   */
-  #attachToHead(image3) {
-    const head2 = this.queue[0];
-    head2?.images.push(image3);
-    return Boolean(head2);
   }
   /** `bytes` sent to Tern as a blob; undefined where it takes none, or for more than a blob holds. */
   #blob(bytes, mime) {
@@ -71900,9 +72166,9 @@ var App = class {
       void this.#shell(text12.slice(1).trim());
       return;
     }
-    const item3 = { expand: true, images: draft ? this.#attachments.take() : [], pasted, text: text12 };
+    const item3 = { images: draft ? this.#attachments.take() : [], kind: "typed", pasted, text: text12 };
     if (!this.sid || this.#switches.pending) {
-      this.queue.push(item3);
+      this.#queue.hold(item3);
       return;
     }
     if (this.busy) {
@@ -71932,7 +72198,7 @@ var App = class {
       return;
     }
     if (r.ok) {
-      this.transcript.steer(item3.display ?? item3.text);
+      this.transcript.steer(shownText(item3));
     } else {
       if (r.error) {
         this.transcript.notice(`${mode === "steer" ? "Steer" : "Redirect"} failed: ${r.error}. Queued instead.`, "warning");
@@ -71945,47 +72211,15 @@ var App = class {
   #queueBehind(item3) {
     const sid = this.sid;
     if (!this.#gw.isCanonical || !sid || this.#switches.pending) {
-      this.queue.push(item3);
+      this.#queue.hold(item3);
       this.#drainQueue();
       return this.changed();
     }
-    void this.#admit(sid, item3);
-  }
-  /**
-   * Admits `item` into session `sid`'s FIFO now (Ink's busy-time admission): crash-durable, and in
-   * every viewer's queue. Its bubble waits until the gateway starts it; a refusal puts it back in
-   * the composer. `text`: what to send instead of expanding the item again (a re-queued steer).
-   */
-  async #admit(sid, item3, text12) {
-    const ready = text12 === void 0 ? await this.#expanded(sid, item3) : { images: item3.images, text: text12 };
-    if (!ready || sid !== this.sid) {
-      return;
-    }
-    const own14 = { display: userText(item3.display ?? item3.text, item3.images), inputId: newInputId(), item: { item: item3, text: ready.text } };
-    const attachments = ready.images.map(({ mime, path: path2 }) => ({ mime, path: path2 }));
-    this.#server.admit(own14);
-    this.changed();
-    try {
-      const r = await rpc(this.#gw, "prompt.submit", {
-        queued: true,
-        session_id: sid,
-        submission_id: own14.inputId,
-        text: ready.text || (attachments.length ? IMAGE_ONLY_PROMPT : ""),
-        ...attachments.length ? { attachments } : {}
-      });
-      own14.admissionId = admissionOf(r);
-    } catch (error) {
-      this.#server.drop(own14);
-      if (sid === this.sid) {
-        this.transcript.notice(`Not queued: ${errorText(error)}. Your message is back in the composer.`, "error");
-        this.#restore(item3);
-      }
-    }
-    this.changed();
+    void this.#queue.admit(sid, item3);
   }
   /** `item` with its `{!cmd}`s run (a typed prompt's); undefined when one failed (the prompt is back in the composer). */
   async #expanded(sid, item3) {
-    if (!item3.expand || !typedCommands(item3.text, item3.pasted).length) {
+    if (item3.kind !== "typed" || !typedCommands(item3.text, item3.pasted).length) {
       return item3;
     }
     try {
@@ -72002,18 +72236,18 @@ var App = class {
    * with it). A typed prompt's `{!cmd}`s run first and their output takes their place; `display` is
    * what the transcript shows.
    */
-  #send(item3, { display = item3.display, queued = false } = {}) {
+  #send(item3, { display = item3.kind === "command" ? item3.display : void 0, queued = false } = {}) {
     const sid = this.sid;
     if (!sid || this.#switches.pending) {
-      this.queue.unshift(item3);
+      this.#queue.holdFirst(item3);
       return;
     }
-    if (item3.expand && typedCommands(item3.text, item3.pasted).length) {
+    if (item3.kind === "typed" && typedCommands(item3.text, item3.pasted).length) {
       this.#startBusy("Running {!\u2026}");
       void interpolate(this.#gw, sid, item3.text, item3.pasted).then(
         (text13) => {
           this.busy = null;
-          this.#send({ images: item3.images, text: text13 }, { display: item3.text, queued });
+          this.#send({ images: item3.images, kind: "app", text: text13 }, { display: item3.text, queued });
         },
         (error) => {
           this.busy = null;
@@ -72030,7 +72264,7 @@ var App = class {
     const attachments = images.map(({ mime, path: path2 }) => ({ mime, path: path2 }));
     const submission = newInputId();
     this.transcript.user({ attachments: userImages(images), text: display?.trim() || item3.text });
-    this.#server.shown(submission);
+    this.#queue.server.shown(submission);
     this.#startBusy("Working\u2026");
     rpc(this.#gw, "prompt.submit", {
       session_id: sid,
@@ -72047,12 +72281,12 @@ var App = class {
     });
   }
   /** Puts a prompt that did not go back into the composer, before any text there, with its images. */
-  #restore({ display, images, pasted = [], text: sent }) {
-    const text12 = display ?? sent;
+  #restore(prompt) {
+    const text12 = shownText(prompt);
     this.composer.set(text12 && this.composer.text ? `${text12}
 ${this.composer.text}` : text12 || this.composer.text);
-    this.composer.repasted(pasted);
-    this.#attachments.restore(images);
+    this.composer.repasted(prompt.kind === "typed" ? prompt.pasted : []);
+    this.#attachments.restore(prompt.images);
   }
   /** `!cmd`: runs `command` in the session's folder and shows its output; nothing reaches the model. */
   async #shell(command) {
@@ -72165,7 +72399,7 @@ ${this.composer.text}` : text12 || this.composer.text);
       busy: Boolean(this.busy),
       // A steer that fell back to the queue: steering carries no images.
       canonical: this.#gw.isCanonical,
-      enqueue: (text12) => this.#queueBehind({ images: [], text: text12 }),
+      enqueue: (text12) => this.#queueBehind({ images: [], kind: "app", text: text12 }),
       gw: this.#gw,
       notice: (text12, tone) => {
         this.transcript.notice(text12, tone);
@@ -72191,13 +72425,13 @@ ${this.composer.text}` : text12 || this.composer.text);
         this.#setCompacting(state === "start");
         this.changed();
       },
-      queued: this.#queuedCount(),
+      queued: this.#queue.count(),
       reload: async () => {
         if (sid && this.sid === sid) {
           await this.#resume(sid);
         }
       },
-      send: (text12) => this.#send({ images: [], text: text12 }),
+      send: (text12) => this.#send({ images: [], kind: "app", text: text12 }),
       sid,
       stale: () => this.sid !== sid,
       steered: (text12) => {
@@ -72371,7 +72605,7 @@ ${this.composer.text}` : text12 || this.composer.text);
       this.#busyMode = "queue";
     }
     void this.#readBusyMode(ref.live);
-    this.#server.reset(pendingRows(r.info));
+    this.#queue.server.reset(pendingRows(r.info));
     const previousStored = this.#ids.stored;
     this.#ids = ref;
     showThoughts({ gw: this.#gw, notice: (text12, tone) => this.notice(text12, tone), settings: this.#settings }, ref.live);
@@ -72437,12 +72671,12 @@ ${this.composer.text}` : text12 || this.composer.text);
       case "alias":
         return this.#slash(`/${d.target}${arg ? ` ${arg}` : ""}`);
       case "skill":
-        return d.message?.trim() ? this.#prompt({ display: d.display || title, images: this.#attachments.take(), text: d.message }) : this.transcript.notice(`${title}: the skill sent no message`, "error");
+        return d.message?.trim() ? this.#prompt({ display: d.display || title, images: this.#attachments.take(), kind: "command", text: d.message }) : this.transcript.notice(`${title}: the skill sent no message`, "error");
       case "send":
         if (d.notice?.trim()) {
           this.transcript.notice(d.notice);
         }
-        return d.message?.trim() ? this.#prompt({ display: d.display, images: this.#attachments.take(), text: d.message }) : void 0;
+        return d.message?.trim() ? this.#prompt({ display: d.display, images: this.#attachments.take(), kind: "command", text: d.message }) : void 0;
       case "prefill":
         if (d.notice?.trim()) {
           this.transcript.notice(d.notice);
@@ -72492,9 +72726,9 @@ ${this.composer.text}` : text12 || this.composer.text);
         this.info = ev.payload ? { ...this.info, ...ev.payload } : this.info;
         this.usage = ev.payload?.usage ?? this.usage;
         t2.contextUsed(this.usage?.context_used ?? 0);
-        for (const started of this.#server.update(pendingRows(ev.payload))) {
-          const own14 = started.own?.item.item;
-          t2.started(own14 ? own14.display ?? own14.text : started.text, void 0, own14 ? userImages(own14.images) : []);
+        for (const started of this.#queue.server.update(pendingRows(ev.payload))) {
+          const own14 = started.own?.item.prompt;
+          t2.started(own14 ? shownText(own14) : started.text, void 0, own14 ? userImages(own14.images) : []);
         }
         this.#title.set(typeof ev.payload?.title === "string" ? ev.payload.title : void 0);
         if (this.info?.cwd && this.info.cwd !== cwd) {
@@ -72622,7 +72856,7 @@ ${this.composer.text}` : text12 || this.composer.text);
         }
         break;
       case "message.complete":
-        if (this.#server.settlesQueuedRow(ev.payload)) {
+        if (this.#queue.server.settlesQueuedRow(ev.payload)) {
           return;
         }
         t2.complete(ev.payload ?? {});
@@ -72713,10 +72947,10 @@ ${this.composer.text}` : text12 || this.composer.text);
       case "request.cancel": {
         const id = ev.payload?.id;
         const notice = promptTimeoutNotice(ev.payload?.method, ev.payload?.reason);
-        const shown = this.#heldRequests.some((r) => r.id === id) || this.#sheets.shows(id);
+        const shown2 = this.#heldRequests.some((r) => r.id === id) || this.#sheets.shows(id);
         this.#heldRequests = this.#heldRequests.filter((r) => r.id !== id);
         this.#sheets.drop(id);
-        if (notice && shown) {
+        if (notice && shown2) {
           t2.notice(notice, "warning");
         }
         break;
@@ -72779,137 +73013,6 @@ ${this.composer.text}` : text12 || this.composer.text);
   setEffort(value, scope) {
     return applyEffort(this, value, scope);
   }
-  /** Prompts waiting behind the turn: this pane's own queue, then the shared gateway's. */
-  #queuedCount() {
-    return this.queue.length + this.#server.queued().length;
-  }
-  /** The dock's queued rows, in #queuedCount's order, with what each one's Edit and Steer can do. */
-  #queuedRows() {
-    const steer2 = Boolean(this.busy);
-    return [
-      ...this.queue.map((q2) => ({ edit: true, steer: steer2, text: userText(q2.display ?? q2.text, q2.images) })),
-      ...this.#server.queued().map((q2) => {
-        if (!q2.own) {
-          return { note: q2.row?.status === "unknown" ? "unknown" : "elsewhere", text: internalNotice(q2.text) ?? q2.text };
-        }
-        return q2.own.admissionId ? { edit: true, steer: steer2 && !q2.own.item.item.images.length, text: q2.text } : { pending: true, text: q2.text };
-      })
-    ];
-  }
-  /** The shared gateway's queued row at dock index `index`, if this pane can act on it. */
-  #serverQueued(index2) {
-    const q2 = this.#server.queued()[index2 - this.queue.length];
-    return q2?.own?.admissionId ? q2 : void 0;
-  }
-  /**
-   * Takes this pane's admission out of the gateway's queue (prompt.cancel); true once withdrawn,
-   * false when it started meanwhile (it runs as its own turn) or the gateway refused.
-   */
-  async #withdraw(sid, q2) {
-    const own14 = q2.own;
-    const admissionId2 = own14.admissionId;
-    this.#server.withdrawn(admissionId2);
-    try {
-      const r = await rpc(this.#gw, "prompt.cancel", { admission_id: admissionId2, session_id: sid });
-      if (r?.status !== "terminal") {
-        return false;
-      }
-    } catch (error) {
-      this.transcript.notice(`Could not take the prompt out of the queue: ${errorText(error)}`, "error");
-      this.changed();
-      return false;
-    }
-    this.#server.drop(own14);
-    return true;
-  }
-  /** Alt+Up / a queued row's Edit: queued prompt `index` (the oldest by default) back into the composer. */
-  #dequeue(index2 = 0) {
-    if (index2 < this.queue.length) {
-      const [next3] = this.queue.splice(index2, 1);
-      if (next3) {
-        this.#restore(next3);
-        this.changed();
-      }
-      return;
-    }
-    const sid = this.sid;
-    const q2 = this.#serverQueued(index2);
-    if (!sid || !q2) {
-      return;
-    }
-    void this.#withdraw(sid, q2).then((out) => {
-      if (out && sid === this.sid) {
-        this.#restore(q2.own.item.item);
-      }
-      this.changed();
-    });
-  }
-  /** Alt+Enter / a queued row's Steer: injects queued prompt `index` into the running turn instead of waiting for it to end. */
-  #steerQueued(index2) {
-    const sid = this.sid;
-    if (!this.busy || !sid) {
-      return;
-    }
-    if (index2 >= this.queue.length) {
-      return void this.#steerServerQueued(sid, index2);
-    }
-    const item3 = this.queue[index2];
-    if (!item3) {
-      return;
-    }
-    if (item3.images.length) {
-      this.transcript.notice("A queued prompt with images cannot steer the turn. It stays queued.", "warning");
-      return this.changed();
-    }
-    const { text: text12 } = item3;
-    this.queue.splice(index2, 1);
-    this.changed();
-    void steerTurn(this.#gw, sid, text12).then((r) => {
-      if (r.ok) {
-        this.transcript.steer(text12);
-      } else {
-        this.queue.splice(index2, 0, item3);
-        this.transcript.notice(
-          r.error ? `Steer failed: ${r.error}. It stays queued.` : "The turn ended before the steer landed. It will send as the next prompt.",
-          "warning"
-        );
-        this.#drainQueue();
-      }
-      this.changed();
-    });
-  }
-  /**
-   * A Steer on a row in the gateway's queue: withdrawn from it, then steered into the turn; a steer
-   * that does not land goes back into the queue, at its end.
-   */
-  async #steerServerQueued(sid, index2) {
-    const q2 = this.#serverQueued(index2);
-    if (!q2) {
-      return;
-    }
-    const { item: item3, text: text12 } = q2.own.item;
-    if (item3.images.length) {
-      this.transcript.notice("A queued prompt with images cannot steer the turn. It stays queued.", "warning");
-      return this.changed();
-    }
-    if (!await this.#withdraw(sid, q2) || sid !== this.sid) {
-      return;
-    }
-    const r = await steerTurn(this.#gw, sid, text12);
-    if (sid !== this.sid) {
-      return;
-    }
-    if (r.ok) {
-      this.transcript.steer(item3.display ?? item3.text);
-    } else {
-      this.transcript.notice(
-        r.error ? `Steer failed: ${r.error}. Queued again, at the end.` : "The turn ended before the steer landed. Queued again.",
-        "warning"
-      );
-      void this.#admit(sid, item3, text12);
-    }
-    this.changed();
-  }
   /** Reads session `sid`'s busy_input_mode; an older gateway without it leaves Enter queueing (the TUI default). */
   async #readBusyMode(sid) {
     try {
@@ -72922,13 +73025,7 @@ ${this.composer.text}` : text12 || this.composer.text);
   }
   /** Sends the oldest queued prompt once the session is adopted and idle (no turn, switch or startup image pending). */
   #drainQueue() {
-    if (this.busy || this.#compacting || !this.sid || this.#switches.pending || this.#attachments.awaitingStartup) {
-      return;
-    }
-    const next3 = this.queue.shift();
-    if (next3) {
-      this.#send(next3, { queued: true });
-    }
+    this.#queue.drain();
   }
   // ── View ───────────────────────────────────────────────────────────
   #render() {
@@ -72990,8 +73087,8 @@ ${this.composer.text}` : text12 || this.composer.text);
         },
         onInterrupt: () => this.#interrupt(),
         onModel: () => openModelPicker(this),
-        onQueueEdit: (i) => this.#dequeue(i),
-        onQueueSteer: this.busy ? (i) => this.#steerQueued(i) : void 0,
+        onQueueEdit: (i) => this.#queue.dequeue(i),
+        onQueueSteer: this.busy ? (i) => this.#queue.steer(i) : void 0,
         onSend: (ev) => {
           this.#submit(ev.text);
           this.changed();
@@ -73035,7 +73132,7 @@ ${this.composer.text}` : text12 || this.composer.text);
           tps: typeof usage?.avg_tps === "number" && usage.avg_tps > 0 ? usage.avg_tps : void 0
         },
         placeholder: "Ask Hermes \u2014 / commands \xB7 @ files",
-        queued: this.#queuedRows(),
+        queued: this.#queue.rows(),
         ready: this.sid !== null
       }),
       layer: [
@@ -73050,13 +73147,6 @@ ${this.composer.text}` : text12 || this.composer.text);
     this.#surface.follow(focus);
   }
 };
-function userText(text12, images) {
-  const count = images.length ? `\u{1F4CE} ${images.length} image${images.length === 1 ? "" : "s"}` : "";
-  return [text12, count].filter(Boolean).join("\n\n");
-}
-function userImages(images) {
-  return images.map((i) => ({ kind: "image", name: i.name, ...i.preview ? { source: i.preview } : {} }));
-}
 function kaomojiLabel(text12) {
   const word = text12.match(/([A-Za-z][A-Za-z ]*[A-Za-z])\.{2,}\s*$/)?.[1];
   return word ? `${word.charAt(0).toUpperCase()}${word.slice(1)}\u2026` : "";

@@ -5,8 +5,8 @@
 // Its user bubble waits until the authority starts it, so it lands after the reply it waited
 // for. Ported from Ink's app/pendingBubbles.ts and hooks/useQueue.ts (server rows).
 
-import { type AdmissionId, admissionId, type InputId } from './core/ids.js'
-import type { PendingRow } from './wire/schemas.js'
+import type { AdmissionId, InputId } from '../core/ids.js'
+import { cancelledAdmission, type PendingRow } from '../wire/schemas.js'
 
 /** What Enter does while a turn runs (`display.busy_input_mode`, read with `config.get {key:'busy'}`). */
 export type BusyMode = 'interrupt' | 'queue' | 'steer'
@@ -18,23 +18,41 @@ export function busyModeOf(raw: unknown): BusyMode {
   return v === 'interrupt' || v === 'steer' ? v : 'queue'
 }
 
+/** Whether the authority answered an admission's prompt.submit: once it did, its id names the row. */
+export type Admission = { kind: 'pending' } | { kind: 'admitted'; id: AdmissionId }
+
 /** A prompt this pane admitted behind the turn: what its bubble shows, and what Edit restores. */
 export interface OwnAdmission<T> {
   /** The submission id it was admitted under. */
   inputId: InputId
-  /** The authority's id for it, once prompt.submit answered. */
-  admissionId?: AdmissionId
+  /** Pending until prompt.submit answers with the authority's id for it. */
+  admission: Admission
   /** The bubble's text (what was typed, before `{!cmd}`s ran). */
   display: string
   item: T
 }
 
-/** One queued row the dock shows: an admission still on its way, or a row of the FIFO. */
-export interface ServerQueued<T> {
+/**
+ * One queued row the dock shows. `sending`: this pane's admission before prompt.submit answered
+ * (nothing can withdraw it yet); `mine`: this pane's admission the authority named (Edit and Steer
+ * withdraw it by `id`); `theirs`: another viewer's row of the FIFO, shown and not acted on.
+ */
+export type ServerQueued<T> =
+  | { kind: 'sending'; text: string; own: OwnAdmission<T> }
+  | { kind: 'mine'; text: string; own: OwnAdmission<T>; id: AdmissionId }
+  | { kind: 'theirs'; text: string; row: PendingRow }
+
+/** A started row's owed bubble: its text, and this pane's admission when it was one (undefined for another viewer's). */
+export interface Started<T> {
   text: string
-  row?: PendingRow
-  /** This pane's own admission (Edit and Steer act on it); absent for another viewer's row. */
-  own?: OwnAdmission<T>
+  own: OwnAdmission<T> | undefined
+}
+
+/** This pane's admission as a dock row: `mine` once the authority named it. */
+function ownRow<T>(own: OwnAdmission<T>): ServerQueued<T> {
+  return own.admission.kind === 'admitted'
+    ? { id: own.admission.id, kind: 'mine', own, text: own.display }
+    : { kind: 'sending', own, text: own.display }
 }
 
 /** The FIFO's rows that still wait (Ink's isServerQueued). */
@@ -85,13 +103,13 @@ export class ServerQueue<T> {
    * in order: this pane's admissions that started, and another viewer's rows this pane saw move
    * from queued to started (a resume snapshot's started row is already in the replayed history).
    */
-  update(rows: PendingRow[] | undefined): { text: string; own?: OwnAdmission<T> }[] {
+  update(rows: PendingRow[] | undefined): Started<T>[] {
     if (!rows) {
       return []
     }
 
     const was = new Set(this.rows.filter(r => r.status === 'queued').map(r => r.admission_id))
-    const owed: { text: string; own?: OwnAdmission<T> }[] = []
+    const owed: Started<T>[] = []
 
     for (const row of rows) {
       if (row.status === 'queued') {
@@ -145,23 +163,20 @@ export class ServerQueue<T> {
 
   /** A message.complete that only settles a queued row nobody started (prompt.cancel's), not the running turn. */
   settlesQueuedRow(payload: unknown): boolean {
-    const p = (payload ?? {}) as { admission_id?: unknown; outcome?: unknown }
+    const id = cancelledAdmission(payload)
 
-    return p.outcome === 'cancelled' && typeof p.admission_id === 'string' && this.#queuedOnly.has(admissionId(p.admission_id))
+    return id !== undefined && this.#queuedOnly.has(id)
   }
 
   /** The rows that still wait, oldest first: the FIFO's, then admissions it does not list yet. */
   queued(): ServerQueued<T>[] {
-    const rows = this.rows.filter(isServerQueued).map(row => ({
-      own: this.#own.find(o => o.inputId === row.input_id),
-      row,
-      text: row.user
-    }))
+    const rows = this.rows.filter(isServerQueued).map((row): ServerQueued<T> => {
+      const own = this.#own.find(o => o.inputId === row.input_id)
+
+      return own ? ownRow(own) : { kind: 'theirs', row, text: row.user }
+    })
     const listed = new Set(this.rows.map(r => r.input_id))
 
-    return [
-      ...rows.map(r => (r.own ? { ...r, text: r.own.display } : r)),
-      ...this.#own.filter(o => !listed.has(o.inputId)).map(own => ({ own, text: own.display }))
-    ]
+    return [...rows, ...this.#own.filter(o => !listed.has(o.inputId)).map(ownRow)]
   }
 }

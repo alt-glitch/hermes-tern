@@ -57,7 +57,7 @@ import { moaLabel, moaReferenceLabel } from './moa.js'
 import type { Overlay } from './overlay.js'
 import { writeActiveSessionFile } from './hermes/activeSessionFile.js'
 import { Media } from './media.js'
-import type { NoticeEntry, ToolCall, UserAttachment } from './model.js'
+import type { NoticeEntry, ToolCall } from './model.js'
 import { interpolate, shellError, shellExec, shellLines, typedCommands } from './hermes/shell.js'
 import { sharedPromptId, sharedPromptRequest } from './hermes/sharedPrompts.js'
 import { openAgents } from './overlays/agents.js'
@@ -88,17 +88,18 @@ import { isRunning as processRuns, Processes, processTone } from './processes/st
 import { hermesAuthor } from './processes/widgets/author.js'
 import { chartMemory } from './processes/widgets/memory.js'
 import { fileSettings, type SettingsSource, type ThemeMode } from './settings.js'
-import { type BusyMode, busyModeOf, type OwnAdmission, ServerQueue, type ServerQueued } from './serverQueue.js'
+import { PromptQueue } from './turn/queue.js'
+import { IMAGE_ONLY_PROMPT, type Prompt, shownText, userImages } from './turn/prompt.js'
+import { type BusyMode, busyModeOf } from './turn/serverQueue.js'
 import { INPUT_ID, SurfaceHost } from './surface/host.js'
 import { runInput } from './surface/input.js'
 import { reportCwd } from './surface/osc.js'
 import { Transcript } from './transcript.js'
-import { internalNotice } from './transcript/messages.js'
 import { storedCompactions } from './compaction.js'
-import { dockNodes, type QueuedRow } from './view/dock.js'
+import { dockNodes } from './view/dock.js'
 import { homeTilde } from './view/format.js'
 import { entryNode } from './view/transcript.js'
-import { type AdaptedSnapshot, admissionOf, rpc } from './wire/rpc.js'
+import { type AdaptedSnapshot, rpc } from './wire/rpc.js'
 import { pendingRows, usageCounters } from './wire/schemas.js'
 import { busyLabel, preparingLabel } from './workLog.js'
 import { openSidebar, specOf } from './watch/spec.js'
@@ -119,32 +120,8 @@ type Snapshot = Pick<AdaptedSnapshot, 'session_id'> &
     info?: SessionInfo
   }
 
-/**
- * What a prompt of images alone asks, as Ink (ui-tui/src/app/submissionCore.ts) and the desktop
- * (use-prompt-actions/submit.ts) send it: Hermes takes no empty prompt text.
- */
-const IMAGE_ONLY_PROMPT = 'What do you see in this image?'
-
 /** How long quitting waits for the sessions to detach. */
 const QUIT_DETACH_MS = 1500
-
-/** A prompt waiting for the turn, with the images that were attached when it was entered. */
-export interface Queued {
-  text: string
-  images: Image[]
-  /** Typed by the user: its `{!cmd}`s run when it is sent. */
-  expand?: boolean
-  /** Text pasted into it: a `{!cmd}` from a paste stays as written. */
-  pasted?: readonly string[]
-  /** What the transcript, the queue and Edit show instead of `text` (a skill's invocation, not its body). */
-  display?: string
-}
-
-/** A prompt this pane admitted into the shared gateway's queue: as typed (for Edit), and as sent. */
-interface Admitted {
-  item: Queued
-  text: string
-}
 
 /** Runs the Tern frontend until the user quits; resolves the exit code. */
 export class App implements ChatPorts {
@@ -187,10 +164,8 @@ export class App implements ChatPorts {
   readonly session: SessionView = sessionView(this, () => this.#ids)
   usage: Usage | null = null
   busy: Busy | null = null
-  /** Prompts held here until they can be sent: no session yet, a switch in flight, or a private gateway's busy turn. */
-  queue: Queued[] = []
-  /** The shared gateway's queue for this session: its FIFO, this pane's admissions, the bubbles they owe. */
-  readonly #server = new ServerQueue<Admitted>()
+  /** The prompts waiting behind the turn: held here, and the shared gateway's queue for this session. */
+  readonly #queue: PromptQueue
   /** What Enter does while a turn runs (`display.busy_input_mode`); queue until the gateway says. */
   #busyMode: BusyMode = 'queue'
   readonly #tern: Session
@@ -256,7 +231,7 @@ export class App implements ChatPorts {
     this.#settings = settings
     this.#attachments = new Attachments(
       {
-        attachToHead: image => this.#attachToHead(image),
+        attachToHead: image => this.#queue.attachToHead(image),
         blob: (bytes, mime) => this.#blob(bytes, mime),
         changed: () => this.changed(),
         cwd: () => this.info?.cwd || launch.cwd,
@@ -267,6 +242,17 @@ export class App implements ChatPorts {
       },
       { startup: launch.image }
     )
+    this.#queue = new PromptQueue({
+      busy: () => Boolean(this.busy),
+      canDrain: () => !(this.busy || this.#compacting || !this.sid || this.#switches.pending || this.#attachments.awaitingStartup),
+      changed: () => this.changed(),
+      expanded: (sid, prompt) => this.#expanded(sid, prompt),
+      gw,
+      restore: prompt => this.#restore(prompt),
+      send: prompt => this.#send(prompt, { queued: true }),
+      sid: () => this.sid,
+      transcript: this.transcript
+    })
     const saved = settings.load()
     this.#theme = new Theme({ palette: palette => this.#surface.palette(palette), settings }, saved.theme ?? 'tern')
     this.#jobCharts = saved.jobCharts !== false
@@ -286,6 +272,15 @@ export class App implements ChatPorts {
   /** Sets the runtime id, keeping the stored one (tests arrange a session this way). */
   set sid(id: string | null) {
     this.#ids = { live: id === null ? null : liveSessionId(id), stored: this.#ids.stored }
+  }
+
+  /** Prompts held here until they can be sent (tests read and arrange it). */
+  get queue(): Prompt[] {
+    return this.#queue.held
+  }
+
+  set queue(prompts: Prompt[]) {
+    this.#queue.held = prompts
   }
 
   /** The stored (database) id of the open session: what `session.list` rows are keyed by. */
@@ -322,7 +317,7 @@ export class App implements ChatPorts {
     const query = this.#launch.query
 
     if (query || this.#attachments.awaitingStartup) {
-      this.queue.push({ images: [], text: query || 'What do you see in this image?' })
+      this.#queue.hold({ images: [], kind: 'app', text: query || IMAGE_ONLY_PROMPT })
     }
 
     const log = this.#launch.eventLog
@@ -519,12 +514,12 @@ export class App implements ChatPorts {
       }
     }
 
-    if (key.alt && key.name === 'up' && this.#queuedCount()) {
-      return this.#dequeue(0)
+    if (key.alt && key.name === 'up' && this.#queue.count()) {
+      return this.#queue.dequeue(0)
     }
 
-    if (key.alt && key.name === 'enter' && this.busy && this.#queuedCount() && !this.composer.text) {
-      return this.#steerQueued(0)
+    if (key.alt && key.name === 'enter' && this.busy && this.#queue.count() && !this.composer.text) {
+      return this.#queue.steer(0)
     }
 
     if (key.ctrl && key.name === 'd' && !this.#hasDraft()) {
@@ -652,17 +647,6 @@ export class App implements ChatPorts {
   /** `/image <path>`: attaches that image file (resolved against the session's folder) to the next prompt. */
   attachImagePath(raw: string): Promise<void> {
     return this.#attachments.fromPath(raw)
-  }
-
-  /**
-   * The startup image goes to the startup query at the queue's head, into its images in place;
-   * false when the queue is empty.
-   */
-  #attachToHead(image: Image): boolean {
-    const head = this.queue[0]
-    head?.images.push(image)
-
-    return Boolean(head)
   }
 
   /** `bytes` sent to Tern as a blob; undefined where it takes none, or for more than a blob holds. */
@@ -857,10 +841,10 @@ export class App implements ChatPorts {
     }
 
     // The draft's images go with this prompt, whenever it is sent; a message the app writes leaves them.
-    const item: Queued = { expand: true, images: draft ? this.#attachments.take() : [], pasted, text }
+    const item: Prompt = { images: draft ? this.#attachments.take() : [], kind: 'typed', pasted, text }
 
     if (!this.sid || this.#switches.pending) {
-      this.queue.push(item)
+      this.#queue.hold(item)
 
       return
     }
@@ -882,7 +866,7 @@ export class App implements ChatPorts {
    * `interrupt` redirects the turn with it, `queue` puts it behind the turn. A steer or redirect
    * carries no images, and one the gateway refuses is queued instead.
    */
-  async #busyInput(item: Queued, mode: BusyMode) {
+  async #busyInput(item: Prompt, mode: BusyMode) {
     const sid = this.sid
 
     if (!sid || mode === 'queue' || item.images.length) {
@@ -902,7 +886,7 @@ export class App implements ChatPorts {
     }
 
     if (r.ok) {
-      this.transcript.steer(item.display ?? item.text)
+      this.transcript.steer(shownText(item))
     } else {
       if (r.error) {
         this.transcript.notice(`${mode === 'steer' ? 'Steer' : 'Redirect'} failed: ${r.error}. Queued instead.`, 'warning')
@@ -915,62 +899,22 @@ export class App implements ChatPorts {
   }
 
   /** Puts `item` behind the running turn: into the shared gateway's queue at once, else held here. */
-  #queueBehind(item: Queued) {
+  #queueBehind(item: Prompt) {
     const sid = this.sid
 
     if (!this.#gw.isCanonical || !sid || this.#switches.pending) {
-      this.queue.push(item)
+      this.#queue.hold(item)
       this.#drainQueue()
 
       return this.changed()
     }
 
-    void this.#admit(sid, item)
-  }
-
-  /**
-   * Admits `item` into session `sid`'s FIFO now (Ink's busy-time admission): crash-durable, and in
-   * every viewer's queue. Its bubble waits until the gateway starts it; a refusal puts it back in
-   * the composer. `text`: what to send instead of expanding the item again (a re-queued steer).
-   */
-  async #admit(sid: string, item: Queued, text?: string) {
-    const ready = text === undefined ? await this.#expanded(sid, item) : { images: item.images, text }
-
-    if (!ready || sid !== this.sid) {
-      return
-    }
-
-    const own: OwnAdmission<Admitted> = { display: userText(item.display ?? item.text, item.images), inputId: newInputId(), item: { item, text: ready.text } }
-    const attachments = ready.images.map(({ mime, path }) => ({ mime, path }))
-    this.#server.admit(own)
-    this.changed()
-
-    try {
-      const r = await rpc(this.#gw, 'prompt.submit', {
-        queued: true,
-        session_id: sid,
-        submission_id: own.inputId,
-        text: ready.text || (attachments.length ? IMAGE_ONLY_PROMPT : ''),
-        ...(attachments.length ? { attachments } : {})
-      })
-
-      // Only the shared gateway admits into a queue; its receipt names the admission.
-      own.admissionId = admissionOf(r)
-    } catch (error) {
-      this.#server.drop(own)
-
-      if (sid === this.sid) {
-        this.transcript.notice(`Not queued: ${errorText(error)}. Your message is back in the composer.`, 'error')
-        this.#restore(item)
-      }
-    }
-
-    this.changed()
+    void this.#queue.admit(sid, item)
   }
 
   /** `item` with its `{!cmd}`s run (a typed prompt's); undefined when one failed (the prompt is back in the composer). */
-  async #expanded(sid: string, item: Queued): Promise<{ images: Image[]; text: string } | undefined> {
-    if (!item.expand || !typedCommands(item.text, item.pasted).length) {
+  async #expanded(sid: string, item: Prompt): Promise<{ images: Image[]; text: string } | undefined> {
+    if (item.kind !== 'typed' || !typedCommands(item.text, item.pasted).length) {
       return item
     }
 
@@ -990,22 +934,22 @@ export class App implements ChatPorts {
    * with it). A typed prompt's `{!cmd}`s run first and their output takes their place; `display` is
    * what the transcript shows.
    */
-  #send(item: Queued, { display = item.display, queued = false }: { display?: string; queued?: boolean } = {}) {
+  #send(item: Prompt, { display = item.kind === 'command' ? item.display : undefined, queued = false }: { display?: string | undefined; queued?: boolean } = {}) {
     const sid = this.sid
 
     // A session switch in flight: the prompt belongs to the session it adopts.
     if (!sid || this.#switches.pending) {
-      this.queue.unshift(item)
+      this.#queue.holdFirst(item)
 
       return
     }
 
-    if (item.expand && typedCommands(item.text, item.pasted).length) {
+    if (item.kind === 'typed' && typedCommands(item.text, item.pasted).length) {
       this.#startBusy('Running {!…}')
       void interpolate(this.#gw, sid, item.text, item.pasted).then(
         text => {
           this.busy = null
-          this.#send({ images: item.images, text }, { display: item.text, queued })
+          this.#send({ images: item.images, kind: 'app', text }, { display: item.text, queued })
         },
         (error: unknown) => {
           // A command that could not run refuses the whole prompt: it goes back to the composer to edit.
@@ -1026,7 +970,7 @@ export class App implements ChatPorts {
     const submission = newInputId()
     this.transcript.user({ attachments: userImages(images), text: display?.trim() || item.text })
     // Its bubble is up: the gateway's queued → started for it owes none.
-    this.#server.shown(submission)
+    this.#queue.server.shown(submission)
     this.#startBusy('Working…')
     // The shared gateway admits a prompt by its submission id (a retry with the same id is one turn).
     rpc(this.#gw, 'prompt.submit', {
@@ -1046,11 +990,11 @@ export class App implements ChatPorts {
   }
 
   /** Puts a prompt that did not go back into the composer, before any text there, with its images. */
-  #restore({ display, images, pasted = [], text: sent }: Queued) {
-    const text = display ?? sent
+  #restore(prompt: Prompt) {
+    const text = shownText(prompt)
     this.composer.set(text && this.composer.text ? `${text}\n${this.composer.text}` : text || this.composer.text)
-    this.composer.repasted(pasted)
-    this.#attachments.restore(images)
+    this.composer.repasted(prompt.kind === 'typed' ? prompt.pasted : [])
+    this.#attachments.restore(prompt.images)
   }
 
   /** `!cmd`: runs `command` in the session's folder and shows its output; nothing reaches the model. */
@@ -1203,7 +1147,7 @@ export class App implements ChatPorts {
       busy: Boolean(this.busy),
       // A steer that fell back to the queue: steering carries no images.
       canonical: this.#gw.isCanonical,
-      enqueue: text => this.#queueBehind({ images: [], text }),
+      enqueue: text => this.#queueBehind({ images: [], kind: 'app', text }),
       gw: this.#gw,
       notice: (text, tone) => {
         this.transcript.notice(text, tone)
@@ -1232,13 +1176,13 @@ export class App implements ChatPorts {
 
         this.changed()
       },
-      queued: this.#queuedCount(),
+      queued: this.#queue.count(),
       reload: async () => {
         if (sid && this.sid === sid) {
           await this.#resume(sid)
         }
       },
-      send: text => this.#send({ images: [], text }),
+      send: text => this.#send({ images: [], kind: 'app', text }),
       sid,
       stale: () => this.sid !== sid,
       steered: text => {
@@ -1471,7 +1415,7 @@ export class App implements ChatPorts {
     void this.#readBusyMode(ref.live)
 
     // The session's own queue, from the snapshot (a reattach's rows of this pane become read-only rows).
-    this.#server.reset(pendingRows(r.info))
+    this.#queue.server.reset(pendingRows(r.info))
 
     const previousStored = this.#ids.stored
     this.#ids = ref
@@ -1519,7 +1463,7 @@ export class App implements ChatPorts {
 
   /** Acts on a slash.exec / command.dispatch answer: output, a skill or message to send, an alias or a prefill. */
   /** A prompt a slash command made (a skill, a `send`): while a turn runs it takes the busy path a typed one does. */
-  #prompt(item: Queued) {
+  #prompt(item: Prompt) {
     if (this.busy) {
       return void this.#busyInput(item, this.#busyMode)
     }
@@ -1563,7 +1507,7 @@ export class App implements ChatPorts {
       case 'skill':
         // `message` is the expanded skill body for the model; the transcript shows the invocation.
         return d.message?.trim()
-          ? this.#prompt({ display: d.display || title, images: this.#attachments.take(), text: d.message })
+          ? this.#prompt({ display: d.display || title, images: this.#attachments.take(), kind: 'command', text: d.message })
           : this.transcript.notice(`${title}: the skill sent no message`, 'error')
 
       case 'send':
@@ -1571,7 +1515,7 @@ export class App implements ChatPorts {
           this.transcript.notice(d.notice)
         }
 
-        return d.message?.trim() ? this.#prompt({ display: d.display, images: this.#attachments.take(), text: d.message }) : undefined
+        return d.message?.trim() ? this.#prompt({ display: d.display, images: this.#attachments.take(), kind: 'command', text: d.message }) : undefined
 
       case 'prefill':
         if (d.notice?.trim()) {
@@ -1645,9 +1589,9 @@ export class App implements ChatPorts {
         t.contextUsed(this.usage?.context_used ?? 0)
 
         // A queued prompt the gateway started gets its bubble now, after the reply it waited for.
-        for (const started of this.#server.update(pendingRows(ev.payload))) {
-          const own = started.own?.item.item
-          t.started(own ? (own.display ?? own.text) : started.text, undefined, own ? userImages(own.images) : [])
+        for (const started of this.#queue.server.update(pendingRows(ev.payload))) {
+          const own = started.own?.item.prompt
+          t.started(own ? shownText(own) : started.text, undefined, own ? userImages(own.images) : [])
         }
 
         this.#title.set(typeof ev.payload?.title === 'string' ? ev.payload.title : undefined)
@@ -1842,7 +1786,7 @@ export class App implements ChatPorts {
 
       case 'message.complete':
         // prompt.cancel settles a withdrawn queued row with a completion of its own.
-        if (this.#server.settlesQueuedRow(ev.payload)) {
+        if (this.#queue.server.settlesQueuedRow(ev.payload)) {
           return
         }
 
@@ -2072,182 +2016,6 @@ export class App implements ChatPorts {
     return applyEffort(this, value, scope)
   }
 
-  /** Prompts waiting behind the turn: this pane's own queue, then the shared gateway's. */
-  #queuedCount(): number {
-    return this.queue.length + this.#server.queued().length
-  }
-
-  /** The dock's queued rows, in #queuedCount's order, with what each one's Edit and Steer can do. */
-  #queuedRows(): QueuedRow[] {
-    const steer = Boolean(this.busy)
-
-    return [
-      ...this.queue.map(q => ({ edit: true, steer, text: userText(q.display ?? q.text, q.images) })),
-      ...this.#server.queued().map((q): QueuedRow => {
-        if (!q.own) {
-          return { note: q.row?.status === 'unknown' ? 'unknown' : 'elsewhere', text: internalNotice(q.text) ?? q.text }
-        }
-
-        // Withdrawing it needs the gateway's id for it: until prompt.submit answers it is on its way.
-        return q.own.admissionId
-          ? { edit: true, steer: steer && !q.own.item.item.images.length, text: q.text }
-          : { pending: true, text: q.text }
-      })
-    ]
-  }
-
-  /** The shared gateway's queued row at dock index `index`, if this pane can act on it. */
-  #serverQueued(index: number): ServerQueued<Admitted> | undefined {
-    const q = this.#server.queued()[index - this.queue.length]
-
-    return q?.own?.admissionId ? q : undefined
-  }
-
-  /**
-   * Takes this pane's admission out of the gateway's queue (prompt.cancel); true once withdrawn,
-   * false when it started meanwhile (it runs as its own turn) or the gateway refused.
-   */
-  async #withdraw(sid: string, q: ServerQueued<Admitted>): Promise<boolean> {
-    const own = q.own!
-    const admissionId = own.admissionId!
-    // Its `cancelled` completion can come before the reply.
-    this.#server.withdrawn(admissionId)
-
-    try {
-      const r = await rpc(this.#gw, 'prompt.cancel', { admission_id: admissionId, session_id: sid })
-
-      if (r?.status !== 'terminal') {
-        return false
-      }
-    } catch (error) {
-      this.transcript.notice(`Could not take the prompt out of the queue: ${errorText(error)}`, 'error')
-      this.changed()
-
-      return false
-    }
-
-    this.#server.drop(own)
-
-    return true
-  }
-
-  /** Alt+Up / a queued row's Edit: queued prompt `index` (the oldest by default) back into the composer. */
-  #dequeue(index = 0) {
-    if (index < this.queue.length) {
-      const [next] = this.queue.splice(index, 1)
-
-      if (next) {
-        this.#restore(next)
-        this.changed()
-      }
-
-      return
-    }
-
-    const sid = this.sid
-    const q = this.#serverQueued(index)
-
-    if (!sid || !q) {
-      return
-    }
-
-    void this.#withdraw(sid, q).then(out => {
-      if (out && sid === this.sid) {
-        this.#restore(q.own!.item.item)
-      }
-
-      this.changed()
-    })
-  }
-
-  /** Alt+Enter / a queued row's Steer: injects queued prompt `index` into the running turn instead of waiting for it to end. */
-  #steerQueued(index: number) {
-    const sid = this.sid
-
-    if (!this.busy || !sid) {
-      return
-    }
-
-    if (index >= this.queue.length) {
-      return void this.#steerServerQueued(sid, index)
-    }
-
-    const item = this.queue[index]
-
-    if (!item) {
-      return
-    }
-
-    // A steer is text only: a prompt with images waits for its own turn.
-    if (item.images.length) {
-      this.transcript.notice('A queued prompt with images cannot steer the turn. It stays queued.', 'warning')
-
-      return this.changed()
-    }
-
-    const { text } = item
-    this.queue.splice(index, 1)
-    this.changed()
-    void steerTurn(this.#gw, sid, text).then(r => {
-      if (r.ok) {
-        this.transcript.steer(text)
-      } else {
-        this.queue.splice(index, 0, item)
-        this.transcript.notice(
-          r.error
-            ? `Steer failed: ${r.error}. It stays queued.`
-            : 'The turn ended before the steer landed. It will send as the next prompt.',
-          'warning'
-        )
-        this.#drainQueue()
-      }
-
-      this.changed()
-    })
-  }
-
-  /**
-   * A Steer on a row in the gateway's queue: withdrawn from it, then steered into the turn; a steer
-   * that does not land goes back into the queue, at its end.
-   */
-  async #steerServerQueued(sid: string, index: number) {
-    const q = this.#serverQueued(index)
-
-    if (!q) {
-      return
-    }
-
-    const { item, text } = q.own!.item
-
-    if (item.images.length) {
-      this.transcript.notice('A queued prompt with images cannot steer the turn. It stays queued.', 'warning')
-
-      return this.changed()
-    }
-
-    if (!(await this.#withdraw(sid, q)) || sid !== this.sid) {
-      return
-    }
-
-    const r = await steerTurn(this.#gw, sid, text)
-
-    if (sid !== this.sid) {
-      return
-    }
-
-    if (r.ok) {
-      this.transcript.steer(item.display ?? item.text)
-    } else {
-      this.transcript.notice(
-        r.error ? `Steer failed: ${r.error}. Queued again, at the end.` : 'The turn ended before the steer landed. Queued again.',
-        'warning'
-      )
-      void this.#admit(sid, item, text)
-    }
-
-    this.changed()
-  }
-
   /** Reads session `sid`'s busy_input_mode; an older gateway without it leaves Enter queueing (the TUI default). */
   async #readBusyMode(sid: string) {
     try {
@@ -2263,15 +2031,7 @@ export class App implements ChatPorts {
 
   /** Sends the oldest queued prompt once the session is adopted and idle (no turn, switch or startup image pending). */
   #drainQueue() {
-    if (this.busy || this.#compacting || !this.sid || this.#switches.pending || this.#attachments.awaitingStartup) {
-      return
-    }
-
-    const next = this.queue.shift()
-
-    if (next) {
-      this.#send(next, { queued: true })
-    }
+    this.#queue.drain()
   }
 
   // ── View ───────────────────────────────────────────────────────────
@@ -2342,8 +2102,8 @@ export class App implements ChatPorts {
         },
         onInterrupt: () => this.#interrupt(),
         onModel: () => openModelPicker(this),
-        onQueueEdit: i => this.#dequeue(i),
-        onQueueSteer: this.busy ? i => this.#steerQueued(i) : undefined,
+        onQueueEdit: i => this.#queue.dequeue(i),
+        onQueueSteer: this.busy ? i => this.#queue.steer(i) : undefined,
         onSend: ev => {
           this.#submit(ev.text)
           this.changed()
@@ -2390,7 +2150,7 @@ export class App implements ChatPorts {
           tps: typeof usage?.avg_tps === 'number' && usage.avg_tps > 0 ? usage.avg_tps : undefined
         },
         placeholder: 'Ask Hermes — / commands · @ files',
-        queued: this.#queuedRows(),
+        queued: this.#queue.rows(),
         ready: this.sid !== null
       }),
       layer: [
@@ -2409,19 +2169,6 @@ export class App implements ChatPorts {
 
     this.#surface.follow(focus)
   }
-}
-
-/** A prompt's bubble: its text, and how many images went with it. */
-/** A queued prompt's dock line: its words and how many images it carries. */
-function userText(text: string, images: readonly unknown[]): string {
-  const count = images.length ? `📎 ${images.length} image${images.length === 1 ? '' : 's'}` : ''
-
-  return [text, count].filter(Boolean).join('\n\n')
-}
-
-/** A sent prompt's images, drawn as thumbnails in its bubble. */
-function userImages(images: readonly Image[]): UserAttachment[] {
-  return images.map(i => ({ kind: 'image', name: i.name, ...(i.preview ? { source: i.preview } : {}) }))
 }
 
 /** `( •_•)>⌐■-■ cogitating...` → `Cogitating…`: hermes's kawaii status without the face. */
