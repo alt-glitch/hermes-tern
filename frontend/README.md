@@ -46,10 +46,18 @@ history, completion requests); nothing here imports React or Ink.
 bun run bundle        # builds dist/entry.js (TSP_OUT=… overrides)
 bun run typecheck
 bun run test          # vitest
-bun run check         # both
+bun run check         # the Hermes pin, then both
+bun run bundle:report # bytes per src/ module against a saved baseline (--save records one)
 ```
 
+`hermes-src.lock` holds the Hermes commit this frontend builds against. `bun run check` warns
+when `.hermes-src` points somewhere else (`hermes update` moves it); a Hermes bump rewrites the
+lock in its own commit.
+
 `TERN_TSP_RECORD=<file>` records every TSP message as JSONL; Tern's `surface-play` replays it.
+`HERMES_TERN_EVENT_LOG=<file>` writes every gateway event, and every server request as
+`{"request": …}`, one JSON line each: the format of the golden replays' fixtures
+(`src/__tests__/fixtures/`), which `golden.test.ts` feeds through the app between scripted keys.
 
 The Tern SDK is [`@stencil-hq/tern`](https://www.npmjs.com/package/@stencil-hq/tern) from npm
 ([stencil-hq/tern-sdk](https://github.com/stencil-hq/tern-sdk)), pinned like every other dependency.

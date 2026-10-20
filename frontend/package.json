@@ -7,9 +7,10 @@
   "scripts": {
     "setup": "node scripts/hermes-src.mjs && bun install",
     "bundle": "node scripts/hermes-src.mjs && node scripts/build.mjs",
+    "bundle:report": "node scripts/bundle-report.mjs",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run",
-    "check": "bun run typecheck && bun run test"
+    "check": "node scripts/check-hermes-src.mjs && bun run typecheck && bun run test"
   },
   "dependencies": {
     "@hermes/shared": "file:.hermes-src/apps/shared",

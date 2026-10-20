@@ -9,9 +9,9 @@ import { fileURLToPath } from 'node:url'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 
-/** Bundles `src/entry.ts` into `outfile`. */
-export async function bundle({ outfile, logLevel = 'warning' }) {
-  await build({
+/** Bundles `src/entry.ts` into `outfile`; `metafile`: the result carries esbuild's input and output map. */
+export async function bundle({ outfile, logLevel = 'warning', metafile = false }) {
+  return build({
     absWorkingDir: root,
     entryPoints: [resolve(root, 'src/entry.ts')],
     bundle: true,
@@ -29,7 +29,8 @@ export async function bundle({ outfile, logLevel = 'warning' }) {
     banner: {
       js: "import { createRequire as __createRequire } from 'node:module'; const require = __createRequire(import.meta.url);"
     },
-    logLevel
+    logLevel,
+    metafile
   })
 }
 
