@@ -65,14 +65,14 @@ describe('format', () => {
   })
 
   it('puts ~ for home, and makes a path relative to the working folder', () => {
-    expect(homeTilde('/Users/sid/code/x', '/Users/sid')).toBe('~/code/x')
-    expect(homeTilde('/opt/x', '/Users/sid')).toBe('/opt/x')
-    expect(homeTilde('/Users/sid/x', undefined)).toBe('/Users/sid/x')
+    expect(homeTilde('/home/u/code/x', '/home/u')).toBe('~/code/x')
+    expect(homeTilde('/opt/x', '/home/u')).toBe('/opt/x')
+    expect(homeTilde('/home/u/x', undefined)).toBe('/home/u/x')
 
-    const where = { cwd: '/Users/sid/code/', home: '/Users/sid' }
+    const where = { cwd: '/home/u/code/', home: '/home/u' }
 
-    expect(relativePath('/Users/sid/code/src/a.ts', where)).toBe('src/a.ts')
-    expect(relativePath('/Users/sid/notes.md', where)).toBe('~/notes.md')
+    expect(relativePath('/home/u/code/src/a.ts', where)).toBe('src/a.ts')
+    expect(relativePath('/home/u/notes.md', where)).toBe('~/notes.md')
     expect(relativePath('./b.ts', where)).toBe('b.ts')
     expect(relativePath('/etc/hosts', where)).toBe('/etc/hosts')
   })
