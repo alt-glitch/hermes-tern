@@ -12,7 +12,9 @@
     "test": "vitest run",
     "check:size": "node scripts/check-size.mjs",
     "check:strict": "node scripts/check-strict.mjs",
-    "check": "node scripts/check-hermes-src.mjs && bun run typecheck && bun run test && bun run check:size && bun run check:strict"
+    "check:suppressions": "node scripts/check-suppressions.mjs",
+    "lint": "node scripts/lint.mjs",
+    "check": "node scripts/check-hermes-src.mjs && bun run typecheck && bun run test && bun run lint && bun run check:size && bun run check:strict && bun run check:suppressions"
   },
   "dependencies": {
     "@hermes/shared": "file:.hermes-src/apps/shared",
@@ -35,7 +37,9 @@
   "devDependencies": {
     "@types/node": "22.20.1",
     "esbuild": "0.28.1",
+    "eslint": "10.13.0",
     "typescript": "6.0.3",
+    "typescript-eslint": "8.72.0",
     "vitest": "4.1.10"
   }
 }

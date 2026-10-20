@@ -46,7 +46,8 @@ history, completion requests); nothing here imports React or Ink.
 bun run bundle        # builds dist/entry.js (TSP_OUT=… overrides)
 bun run typecheck
 bun run test          # vitest
-bun run check         # the Hermes pin, then both
+bun run lint          # eslint, held to scripts/lint-legacy.json (docs/conventions.md)
+bun run check         # the Hermes pin, typecheck, tests, lint and the ratchets
 bun run bundle:report # bytes per src/ module against a saved baseline (--save records one)
 ```
 

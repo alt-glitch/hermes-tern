@@ -1157,7 +1157,7 @@ export function checklistNode(todos: Todo[]): JSX.Element {
 
 /** The unified diff in hermes's colored `inline_diff`, without ANSI and the review header. */
 export function plainDiff(raw: string): string | undefined {
-  // eslint-disable-next-line no-control-regex
+  // eslint-disable-next-line no-control-regex -- ANSI color escapes are what this strips
   return hunks(raw.replace(/\x1b\[[0-9;]*m/g, ''))
 }
 

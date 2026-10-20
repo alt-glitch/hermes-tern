@@ -32,9 +32,10 @@ const sorted = entries => Object.fromEntries(entries.sort(([a], [b]) => (a < b ?
  * Checks `counts` (file → count) against the ceilings in `file`, or with `--update` lowers them.
  * `limit` is the ceiling of a file with no entry. `cap`, when given, is a hard cap only a file
  * whose committed ceiling is already over it may pass. `pooled` checks raises against the total.
+ * `items` names what a key counts, for the summary line.
  * Exits non-zero on a failure.
  */
-export function ratchet({ name, file, counts, limit, cap, unit, pooled = false }) {
+export function ratchet({ name, file, counts, limit, cap, unit, items = 'files', pooled = false }) {
   const ceilings = existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')) : {}
   const base = committed(file)
   const at = relative(root, file)
@@ -91,5 +92,5 @@ export function ratchet({ name, file, counts, limit, cap, unit, pooled = false }
     process.exit(1)
   }
 
-  console.log(`${name}: ok (${Object.keys(counts).length} files, ${Object.keys(now).length} with ceilings)`)
+  console.log(`${name}: ok (${Object.keys(counts).length} ${items}, ${Object.keys(now).length} with ceilings)`)
 }
