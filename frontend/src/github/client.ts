@@ -1,10 +1,8 @@
-// GitHub over HTTPS with the user's own token, as T3 Code reads it (GitHubCredentials.ts): GH_TOKEN
-// or GITHUB_TOKEN, else `gh auth token` for the host. No token, no PR data: callers show why.
-
-import { execFile } from 'node:child_process'
-import { promisify } from 'node:util'
-
-const run = promisify(execFile)
+// GitHub over HTTPS with the user's own token. The token comes through Hermes: `GITHUB_TOKEN` is a
+// credential Hermes manages (`hermes config set GITHUB_TOKEN …` stores it in the profile's .env,
+// which Hermes loads into the processes it starts, this frontend among them); `GH_TOKEN` from the
+// environment works too. Another tool's login (the GitHub CLI's) is never read: the plugin catalog's
+// rule 11. No token, no PR data: callers show why.
 
 /** Why GitHub could not answer, in words for the sheet. */
 export class GitHubError extends Error {
@@ -24,45 +22,20 @@ export interface GitHub {
 const api = (host: string) => (host === 'github.com' ? 'https://api.github.com' : `https://${host}/api/v3`)
 const graphqlUrl = (host: string) => (host === 'github.com' ? 'https://api.github.com/graphql' : `https://${host}/api/graphql`)
 
-/** The token for `host`; cached, so `gh` runs once per host. */
+/** The token for `host`, from the environment Hermes gives this process. */
 export function tokens(env: NodeJS.ProcessEnv = process.env): (host: string) => Promise<string> {
-  const cache = new Map<string, Promise<string>>()
+  return async host => {
+    const own =
+      host === 'github.com' ? env.GITHUB_TOKEN || env.GH_TOKEN : env.GITHUB_ENTERPRISE_TOKEN || env.GH_ENTERPRISE_TOKEN
 
-  return host => {
-    let token = cache.get(host)
-
-    if (!token) {
-      token = read(host, env)
-      cache.set(host, token)
-      // A failure (gh missing, logged out) is asked again next time.
-      token.catch(() => cache.delete(host))
+    if (own) {
+      return own
     }
 
-    return token
+    const name = host === 'github.com' ? 'GITHUB_TOKEN' : 'GITHUB_ENTERPRISE_TOKEN'
+
+    throw new GitHubError(`No GitHub token for ${host}. Set one with \`hermes config set ${name} <token>\`, then open a new pane.`)
   }
-}
-
-async function read(host: string, env: NodeJS.ProcessEnv): Promise<string> {
-  const own = host === 'github.com' ? env.GH_TOKEN || env.GITHUB_TOKEN : env.GH_ENTERPRISE_TOKEN || env.GITHUB_ENTERPRISE_TOKEN
-
-  if (own) {
-    return own
-  }
-
-  try {
-    const { stdout } = await run('gh', ['auth', 'token', '--hostname', host], { timeout: 10_000 })
-    const token = stdout.trim()
-
-    if (token) {
-      return token
-    }
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
-      throw new GitHubError('The GitHub CLI (gh) is not installed. Install it and run `gh auth login`, or set GH_TOKEN.')
-    }
-  }
-
-  throw new GitHubError(`Not logged in to ${host}. Run \`gh auth login --hostname ${host}\`, or set GH_TOKEN.`)
 }
 
 export function github(token = tokens()): GitHub {
