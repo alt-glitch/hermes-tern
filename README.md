@@ -153,9 +153,9 @@ rebuild against a newer Hermes when they change.
 
 ```sh
 cd frontend
-HERMES_SRC=~/path/to/hermes-agent npm run setup   # links .hermes-src, installs
-npm run check                                     # typecheck + tests
-npm run bundle                                    # rebuilds dist/entry.js
+HERMES_SRC=~/path/to/hermes-agent bun run setup   # links .hermes-src, installs (bun)
+bun run check                                     # typecheck + tests
+bun run bundle                                    # rebuilds dist/entry.js
 ```
 
 `lab/fake_model.py --home DIR` writes a disposable `HERMES_HOME` pointed at a loopback model and

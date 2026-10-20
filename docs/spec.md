@@ -21,7 +21,7 @@ prove it.
 - **Ship small.** One feature per branch in `~/github/hermes-tern-subagents`; PR to `main`,
   merge, fast-forward `~/github/hermes-tern` (the plugin Hermes loads), play a sound.
 - **Prove it in the lab.** `lab/fake_model.py` plus a headless `tern serve` for screenshots;
-  a tab in Sid's window for the demo. Tests for the logic (`npm run check`).
+  a tab in Sid's window for the demo. Tests for the logic (`bun run check`).
 
 ## Shipped
 

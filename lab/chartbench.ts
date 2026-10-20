@@ -5,7 +5,7 @@
 // the 15 s mark, so the model is first asked on the early lines, as in a pane, and a decline is
 // asked again once the output has grown. The final view is what the pane would show.
 //
-//   npx --prefix frontend esbuild lab/chartbench.ts --bundle --platform=node --format=esm --outfile=/tmp/chartbench.mjs
+//   (cd frontend && bunx esbuild ../lab/chartbench.ts --bundle --platform=node --format=esm --outfile=/tmp/chartbench.mjs)
 //   HERMES_PYTHON=… HERMES_PYTHON_SRC_ROOT=… HERMES_TUI_DIR=$PWD/frontend node /tmp/chartbench.mjs JOBS.json OUT_DIR
 //
 // JOBS.json is a list of {id, command, text, file?: {path, text}}. Jobs and results are the

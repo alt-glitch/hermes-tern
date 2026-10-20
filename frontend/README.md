@@ -43,10 +43,10 @@ history, completion requests); nothing here imports React or Ink.
 ## Developing
 
 ```sh
-npm run bundle        # fast build to dist/entry.js (TSP_OUT=… overrides)
-npm run build         # the receipted product build (scripts/build/tsp.mjs)
-npm run typecheck
-npm test
+bun run bundle        # builds dist/entry.js (TSP_OUT=… overrides)
+bun run typecheck
+bun run test          # vitest
+bun run check         # both
 ```
 
 `TERN_TSP_RECORD=<file>` records every TSP message as JSONL; Tern's `surface-play` replays it.
