@@ -126,7 +126,7 @@ describe('Processes', () => {
   it('follows process.list and links the background card that started each process', async () => {
     vi.useFakeTimers({ now: NOW })
     const transcript = new Transcript()
-    transcript.start()
+    transcript.messageStart()
     transcript.toolStart({ args: { background: true, command: 'sleep 90' }, name: 'terminal', tool_id: 't1' })
     transcript.toolComplete({
       name: 'terminal',

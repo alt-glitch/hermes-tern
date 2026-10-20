@@ -67205,7 +67205,7 @@ function moaStep(ev, cx) {
 var turnHandlers = {
   "message.start": (ev, cx) => {
     cx.activity.turnStarted();
-    cx.transcript.start();
+    cx.transcript.messageStart();
     if (ev.payload?.display_kind === "async_delegation_complete" && ev.payload.text) {
       cx.agents.settle(ev.payload.text);
     }
@@ -73743,6 +73743,38 @@ function foldSubagent(call, { type, event, at }) {
   }
 }
 
+// src/transcript/turns.ts
+function endThinking(turn, at) {
+  for (const b of turn.blocks) {
+    if (b.kind === "thinking" && b.endedAt === void 0) {
+      b.endedAt = at;
+    }
+  }
+}
+function trailingText(turn) {
+  let out = "";
+  for (const b of turn.blocks) {
+    if (b.kind === "tool" || b.kind === "text" && !b.text) {
+      out = "";
+    } else if (b.kind === "text") {
+      out += b.text;
+    }
+  }
+  return out;
+}
+function usageSince(now, before) {
+  const less = (key2) => {
+    const a2 = now[key2];
+    const b = before?.[key2];
+    return typeof a2 === "number" ? Math.max(0, a2 - (typeof b === "number" ? b : 0)) : void 0;
+  };
+  return { ...now, cost_usd: less("cost_usd"), input: less("input"), output: less("output"), total: less("total") };
+}
+function shownArgs(args) {
+  const command = args["command"];
+  return typeof command === "string" ? { ...args, command: withoutTernEnv(command) } : args;
+}
+
 // src/transcript.ts
 var Transcript = class {
   #entries = [];
@@ -73755,6 +73787,11 @@ var Transcript = class {
   #live;
   /** The reason line for the next turn, when Hermes' own notice started it. */
   #continued;
+  /**
+   * The turn complete() closed last, until another opens: a reasoning block or a tool result that
+   * comes after it lands there, and opens no live turn of its own.
+   */
+  #ended;
   #compactions = new Compactions({ entries: () => this.#entries, id: (prefix2) => this.id(prefix2), live: () => this.#live });
   /** The entries, oldest first; only the transcript's own methods change the list. */
   get entries() {
@@ -73769,6 +73806,7 @@ var Transcript = class {
   reset({ session: session2, usage }) {
     this.#entries = [{ id: this.id("w"), kind: "welcome" }];
     this.#live = void 0;
+    this.#ended = void 0;
     this.#continued = void 0;
     this.#sessionUsage = usage;
     if (session2 === "other") {
@@ -73885,8 +73923,15 @@ var Transcript = class {
   summarize(stored) {
     this.#compactions.summarize(stored);
   }
-  /** Opens a live turn unless one is already streaming. */
-  start(at = Date.now()) {
+  /** message.start: opens the live turn, unless one is already streaming. */
+  messageStart(at = Date.now()) {
+    return this.#open(at);
+  }
+  /**
+   * Opens a live turn unless one is already streaming. Only the reducer calls it, and only once
+   * the event proved it has something for the turn.
+   */
+  #open(at) {
     const live = this.live;
     if (live) {
       return live;
@@ -73904,6 +73949,7 @@ var Transcript = class {
     };
     this.push(turn);
     this.#live = turn;
+    this.#ended = void 0;
     this.#continued = void 0;
     return turn;
   }
@@ -73911,7 +73957,7 @@ var Transcript = class {
     if (!text15) {
       return;
     }
-    const turn = this.start(at);
+    const turn = this.#open(at);
     const last = turn.blocks.at(-1);
     if (last?.kind === "thinking" && last.endedAt === void 0) {
       last.text += text15;
@@ -73923,20 +73969,22 @@ var Transcript = class {
   /**
    * A whole reasoning block from a provider that doesn't stream it; ignored once reasoning streamed.
    * Hermes also relays each response's visible text through `reasoning.available`, so text the
-   * turn already shows is not a thought either.
+   * turn already shows is not a thought either. One that comes after its turn ended goes in that
+   * turn.
    */
   reasoningBlock(text15, at = Date.now()) {
-    const turn = this.start(at);
+    const shown3 = this.#live ?? this.#ended;
     const incoming = text15.trim();
-    if (!incoming || turn.blocks.some((b) => b.kind === "thinking" && !b.label || b.kind === "text" && b.text.includes(incoming))) {
+    if (!incoming || shown3?.blocks.some((b) => b.kind === "thinking" && !b.label || b.kind === "text" && b.text.includes(incoming))) {
       return;
     }
+    const turn = shown3 ?? this.#open(at);
     turn.blocks.push({ endedAt: at, id: this.id("k"), kind: "thinking", startedAt: at, text: text15 });
     turn.rev++;
   }
   /** A Mixture-of-Agents reference model's answer: a sealed thought block of its own, under `label`. */
   reference(label, text15, at = Date.now()) {
-    const turn = this.start(at);
+    const turn = this.#open(at);
     endThinking(turn, at);
     turn.blocks.push({ endedAt: at, id: this.id("k"), kind: "thinking", label, startedAt: at, text: text15.trim() });
     turn.rev++;
@@ -73945,7 +73993,7 @@ var Transcript = class {
     if (!text15) {
       return;
     }
-    const turn = this.start(at);
+    const turn = this.#open(at);
     endThinking(turn, at);
     const last = turn.blocks.at(-1);
     if (last?.kind === "text") {
@@ -73957,7 +74005,7 @@ var Transcript = class {
   }
   /** Interim commentary: seals the streamed text so the next delta starts a new block. */
   interim(text15, { alreadyStreamed }, at = Date.now()) {
-    const turn = this.start(at);
+    const turn = this.#open(at);
     endThinking(turn, at);
     if (!alreadyStreamed && text15.trim()) {
       turn.blocks.push({ id: this.id("x"), kind: "text", text: text15 });
@@ -73966,11 +74014,14 @@ var Transcript = class {
     turn.rev++;
   }
   toolStart(p3, at = Date.now()) {
-    const turn = this.start(at);
+    const turn = this.#open(at);
     endThinking(turn, at);
-    if (this.#tool(p3.tool_id)) {
-      return;
+    if (!this.#tool(p3.tool_id)) {
+      this.#addCall(turn, p3, at);
     }
+  }
+  /** Adds the call tool.start `p` names to `turn`, running. */
+  #addCall(turn, p3, at) {
     const u = unwrap(p3.name, p3.args ?? {});
     const call = {
       args: shownArgs(u.args),
@@ -73996,7 +74047,9 @@ var Transcript = class {
   toolComplete(p3, at = Date.now()) {
     let found = this.#tool(p3.tool_id);
     if (!found) {
-      this.toolStart({ args: p3.args ?? {}, name: p3.name, tool_id: p3.tool_id }, at);
+      const turn2 = this.#live ?? this.#ended ?? this.#open(at);
+      endThinking(turn2, at);
+      this.#addCall(turn2, { args: p3.args ?? {}, name: p3.name, tool_id: p3.tool_id }, at);
       found = this.#tool(p3.tool_id);
     }
     if (!found) {
@@ -74041,7 +74094,7 @@ var Transcript = class {
     found.turn.rev++;
   }
   complete(p3, at = Date.now()) {
-    const turn = this.live ?? this.start(at);
+    const turn = this.#open(at);
     endThinking(turn, at);
     const final2 = typeof p3.text === "string" ? p3.text : "";
     const tail = trailingText(turn);
@@ -74062,6 +74115,7 @@ var Transcript = class {
     }
     turn.endedAt = at;
     this.#live = void 0;
+    this.#ended = turn;
     if (p3.usage) {
       turn.usage = usageSince(p3.usage, this.#sessionUsage);
       this.#sessionUsage = p3.usage;
@@ -74091,6 +74145,7 @@ var Transcript = class {
   load(messages2, stored = []) {
     const kept = this.#entries.filter((e) => e.kind === "welcome");
     this.#live = void 0;
+    this.#ended = void 0;
     this.#entries = history({ compactions: this.#compactions.restore(stored), id: (prefix2) => this.id(prefix2), kept, messages: messages2 });
   }
   /** A resumed session's unfinished turn: its prompt, then a live turn holding what streamed so far. */
@@ -74103,7 +74158,7 @@ var Transcript = class {
       this.push(storedUser(this.id("u"), user, at));
     }
     if (turn.assistant || turn.streaming) {
-      this.start(at);
+      this.#open(at);
       this.text(turn.assistant ?? "", at);
     }
   }
@@ -74153,35 +74208,6 @@ var Transcript = class {
     return this.live ?? this.#entries.findLast((e) => e.kind === "turn");
   }
 };
-function endThinking(turn, at) {
-  for (const b of turn.blocks) {
-    if (b.kind === "thinking" && b.endedAt === void 0) {
-      b.endedAt = at;
-    }
-  }
-}
-function trailingText(turn) {
-  let out = "";
-  for (const b of turn.blocks) {
-    if (b.kind === "tool" || b.kind === "text" && !b.text) {
-      out = "";
-    } else if (b.kind === "text") {
-      out += b.text;
-    }
-  }
-  return out;
-}
-function usageSince(now, before) {
-  const less = (key2) => {
-    const a2 = now[key2];
-    const b = before?.[key2];
-    return typeof a2 === "number" ? Math.max(0, a2 - (typeof b === "number" ? b : 0)) : void 0;
-  };
-  return { ...now, cost_usd: less("cost_usd"), input: less("input"), output: less("output"), total: less("total") };
-}
-function shownArgs(args) {
-  return typeof args.command === "string" ? { ...args, command: withoutTernEnv(args.command) } : args;
-}
 
 // src/turn/activity.ts
 var NO_COMPACTION = { kind: "none" };

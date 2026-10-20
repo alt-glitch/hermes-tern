@@ -491,7 +491,7 @@ describe('App: Enter while a turn runs (busy_input_mode)', () => {
       'session.steer': () => ({ status: 'queued' })
     })
     given.busy(app, { ...busy })
-    app.transcript.start()
+    app.transcript.messageStart()
     await type('use tabs')
     await press(key('enter'))
     const row = { admission_id: 'a1', input_id: must(sent('prompt.submit')[0]).submission_id, status: 'queued', user: 'use tabs' }
@@ -539,7 +539,7 @@ describe('App: Enter while a turn runs (busy_input_mode)', () => {
     await vi.waitFor(() => expect(sent('config.get')).toContainEqual({ key: 'busy', session_id: 's1' }))
     await settle()
     given.busy(app, { ...busy })
-    app.transcript.start()
+    app.transcript.messageStart()
 
     await type('look at the tests too')
     await press(key('enter'))

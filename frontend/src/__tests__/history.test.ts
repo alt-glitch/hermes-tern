@@ -201,7 +201,7 @@ describe('async delegation notices without display_kind', () => {
 describe('Transcript.started: a prompt Hermes queued itself', () => {
   it('a loop run becomes the reason line of the turn it opens, not a bubble', () => {
     const t = new Transcript()
-    t.start()
+    t.messageStart()
     t.started('[/loop wakeup #2, every 2m] Recurring task: say hi')
     expect(t.entries.map(e => e.kind)).toEqual(['turn'])
     expect(t.live?.continued).toBe('Loop run #2 · every 2m')
@@ -210,7 +210,7 @@ describe('Transcript.started: a prompt Hermes queued itself', () => {
   it('before its turn starts, the turn takes it', () => {
     const t = new Transcript()
     t.started('[Continuing toward your standing goal]\nGoal: ship')
-    t.start()
+    t.messageStart()
     expect(t.entries.map(e => e.kind)).toEqual(['turn'])
     expect(t.live?.continued).toBe('Continuing toward the goal')
   })

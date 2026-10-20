@@ -75,7 +75,7 @@ describe('stored compactions', () => {
 describe('compaction in the transcript', () => {
   it('is a step of the turn it happened in, and a split its fold leaves in view', () => {
     const t = new Transcript()
-    t.start(0)
+    t.messageStart(0)
     t.text('reading the repo', 1)
     t.compacting({ at: 1_000, before: 182_000 })
 
@@ -100,7 +100,7 @@ describe('compaction in the transcript', () => {
   it('goes before the turn it was compacted for, and between turns for /compress', () => {
     const t = new Transcript()
     t.user({ at: 0, text: 'go on' })
-    t.start(1)
+    t.messageStart(1)
     t.compacting({ at: 2 })
     expect(shape(t.entries)).toEqual(['user', 'compaction', 'turn()'])
     t.compacted(3)
@@ -133,7 +133,7 @@ describe('compaction in the transcript', () => {
 
   it('drops a compaction Hermes aborted (no done edge before the turn ended)', () => {
     const t = new Transcript()
-    t.start(0)
+    t.messageStart(0)
     t.text('x', 1)
     t.compacting({ at: 2, before: 1 })
     t.complete({ status: 'complete', text: 'x' }, 3)
@@ -179,10 +179,10 @@ describe('compaction in the transcript', () => {
 
   it('does not count a compaction as the turn the next one continues', () => {
     const t = new Transcript()
-    t.start(0)
+    t.messageStart(0)
     t.complete({ status: 'complete', text: 'a' }, 1)
     t.compacting({ at: 2, before: 1, manual: true })
     t.compacted(3)
-    expect(t.start(4).continued).toBe('Continued on its own')
+    expect(t.messageStart(4).continued).toBe('Continued on its own')
   })
 })

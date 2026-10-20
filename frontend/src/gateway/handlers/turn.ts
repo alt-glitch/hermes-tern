@@ -26,11 +26,11 @@ export interface TurnCx extends ToolFanout, MessageFanout {
     | 'compacting'
     | 'complete'
     | 'interim'
+    | 'messageStart'
     | 'notice'
     | 'reasoning'
     | 'reasoningBlock'
     | 'reference'
-    | 'start'
     | 'text'
     | 'todos'
     | 'toolComplete'
@@ -72,7 +72,7 @@ export const turnHandlers = {
     // The turn owns the working row from here: a send's late answer no longer ends it.
     cx.activity.turnStarted()
 
-    cx.transcript.start()
+    cx.transcript.messageStart()
 
     // A delegation's completion turn carries its model text: each task's outcome, which a log
     // this process cannot read (a remote gateway) never told.

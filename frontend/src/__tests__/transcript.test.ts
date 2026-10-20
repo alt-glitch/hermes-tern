@@ -31,7 +31,7 @@ function kinds(turn: TurnEntry): Block['kind'][] {
 describe('Transcript', () => {
   it('keeps streaming into the live turn after a notice lands mid-turn', () => {
     const t = new Transcript()
-    t.start(0)
+    t.messageStart(0)
     t.text('Working on it.', 1)
     t.notice('Wait for the current turn to finish.', 'warning')
     t.text(' Still here.', 2)
@@ -58,12 +58,12 @@ describe('Transcript', () => {
 
   it('forgets the live turn on reset and load', () => {
     const t = new Transcript()
-    t.start(0)
+    t.messageStart(0)
     t.reset({ session: 'other', usage: undefined })
     expect(t.live).toBeUndefined()
     expect(t.entries.map(e => e.kind)).toEqual(['welcome'])
 
-    t.start(1)
+    t.messageStart(1)
     t.load([{ role: 'user', text: 'hi' }])
     expect(t.live).toBeUndefined()
     t.text('fresh', 2)
@@ -72,7 +72,7 @@ describe('Transcript', () => {
 
   it('starts a new text block after an interim seal', () => {
     const t = new Transcript()
-    t.start(0)
+    t.messageStart(0)
     t.text('Let me look ', 1)
     t.text('around first.', 2)
     t.interim('Let me look around first.', { alreadyStreamed: true }, 3)
@@ -84,7 +84,7 @@ describe('Transcript', () => {
 
   it('adds an interim text that never streamed, then seals it', () => {
     const t = new Transcript()
-    t.start(0)
+    t.messageStart(0)
     t.interim('Checking the tests.', { alreadyStreamed: false }, 1)
     t.text('Done.', 2)
     t.complete({ status: 'complete', text: 'Done.' }, 3)
@@ -94,7 +94,7 @@ describe('Transcript', () => {
 
   it('does not repeat message.complete text that streamed after an interim seal', () => {
     const t = new Transcript()
-    t.start(0)
+    t.messageStart(0)
     t.text('Looking first.', 1)
     t.interim('Looking first.', { alreadyStreamed: true }, 2)
     t.text('All done.', 3)
@@ -107,7 +107,7 @@ describe('Transcript', () => {
 
   it('takes message.complete text when nothing streamed after the last tool', () => {
     const t = new Transcript()
-    t.start(0)
+    t.messageStart(0)
     t.toolStart({ args: { command: 'ls' }, name: 'terminal', tool_id: 'c1' }, 1)
     t.toolComplete({ name: 'terminal', result: { exit_code: 0, output: 'a' }, tool_id: 'c1' }, 2)
     t.complete({ status: 'complete', text: 'Listed.' }, 3)
@@ -118,7 +118,7 @@ describe('Transcript', () => {
 
   it('ignores reasoning.available once reasoning streamed', () => {
     const t = new Transcript()
-    t.start(0)
+    t.messageStart(0)
     t.reasoning('Thinking it ', 1)
     t.reasoning('through.', 2)
     t.reasoningBlock('A different summary.', 3)
@@ -130,7 +130,7 @@ describe('Transcript', () => {
 
   it('ignores reasoning.available that repeats the streamed answer', () => {
     const t = new Transcript()
-    t.start(0)
+    t.messageStart(0)
     t.text('Hi! What should we work on?', 1)
     t.reasoningBlock('Hi! What should we work on?', 2)
 
@@ -139,7 +139,7 @@ describe('Transcript', () => {
 
   it('keeps reasoning.available from a provider that does not stream reasoning', () => {
     const t = new Transcript()
-    t.start(0)
+    t.messageStart(0)
     t.reasoningBlock('Weighing the options.', 1)
     t.text('Use SQLite.', 2)
 
@@ -148,7 +148,7 @@ describe('Transcript', () => {
 
   it('keeps a Mixture-of-Agents reference as its own labelled, sealed thought', () => {
     const t = new Transcript()
-    t.start(0)
+    t.messageStart(0)
     t.reasoning('Planning.', 1)
     t.reference('Reference 1/2 · gpt-5', '  Use SQLite.  ', 2)
     t.reasoning('Next.', 3)
@@ -162,7 +162,7 @@ describe('Transcript', () => {
 
   it('keeps reasoning.available after a reference answer (it is not the agent’s own thought)', () => {
     const t = new Transcript()
-    t.start(0)
+    t.messageStart(0)
     t.reference('Reference · gpt-5', 'Use SQLite.', 1)
     t.reasoningBlock('Weighing the references.', 2)
 
@@ -171,7 +171,7 @@ describe('Transcript', () => {
 
   it('opens a call from tool.complete without tool.start', () => {
     const t = new Transcript()
-    t.start(0)
+    t.messageStart(0)
     t.toolComplete(
       { args: { path: 'a.py' }, duration_s: 0.25, name: 'read_file', result: { content: '1|x' }, tool_id: 'c1' },
       5
@@ -183,7 +183,7 @@ describe('Transcript', () => {
 
   it('fails a terminal call with a non-zero exit and cancels an interrupted one', () => {
     const t = new Transcript()
-    t.start(0)
+    t.messageStart(0)
     t.toolComplete({ name: 'terminal', result: { error: null, exit_code: 2, output: 'boom' }, tool_id: 'c1' }, 1)
     t.toolComplete(
       {
@@ -199,7 +199,7 @@ describe('Transcript', () => {
 
   it('cancels calls still running when the turn is interrupted', () => {
     const t = new Transcript()
-    t.start(0)
+    t.messageStart(0)
     t.toolStart({ name: 'terminal', tool_id: 'c1' }, 1)
     t.complete({ status: 'interrupted' }, 3)
 
@@ -210,7 +210,7 @@ describe('Transcript', () => {
 
   it('splits a failed request into code, message and advice', () => {
     const t = new Transcript()
-    t.start(0)
+    t.messageStart(0)
     t.complete(
       {
         error: 'HTTP 500: upstream exploded',
@@ -233,9 +233,9 @@ describe('Transcript', () => {
   it('reports each turn its share of the session usage', () => {
     const t = new Transcript()
     t.reset({ session: 'other', usage: { input: 100, output: 10, total: 110 } })
-    t.start(0)
+    t.messageStart(0)
     t.complete({ status: 'complete', text: 'a', usage: { input: 1300, output: 190, total: 1490 } }, 1)
-    t.start(2)
+    t.messageStart(2)
     t.complete({ status: 'complete', text: 'b', usage: { input: 2500, output: 370, total: 2870 } }, 3)
 
     const turns = t.entries.filter(e => e.kind === 'turn')
@@ -245,14 +245,14 @@ describe('Transcript', () => {
   it("counts a turn from zero when the counters go back (a new agent's), not below it", () => {
     const t = new Transcript()
     t.usageTick({ prompt: 20_000, read: 15_000, total: 21_560 }, undefined)
-    const turn = t.start(0)
+    const turn = t.messageStart(0)
     t.usageTick({ prompt: 3_000, read: 2_250, total: 3_080 }, undefined)
     expect([turn.tickTokens, turn.cacheHit]).toEqual([3_080, 75])
   })
 
   it('shows todo_list args while running and the snapshot once done', () => {
     const t = new Transcript()
-    t.start(0)
+    t.messageStart(0)
     t.toolStart(
       { args: { todos: [{ content: 'Plan', id: '1', status: 'in_progress' }] }, name: 'todo_list', tool_id: 'c1' },
       1
@@ -271,7 +271,7 @@ describe('Transcript', () => {
 
   it('folds background subagents into the delegating call after its turn ended', () => {
     const t = new Transcript()
-    t.start(0)
+    t.messageStart(0)
     t.toolStart({ args: { tasks: [{ goal: 'a' }, { goal: 'b' }] }, name: 'delegate_task', tool_id: 'd1' }, 1)
     t.toolComplete(
       {
@@ -283,7 +283,7 @@ describe('Transcript', () => {
     )
     t.complete({ status: 'complete', text: 'Dispatched.' }, 3)
     t.user({ at: 4, text: 'next' })
-    t.start(5)
+    t.messageStart(5)
 
     const base = { delegation_id: 'deleg_1', task_count: 2 }
     t.subagent('subagent.start', { ...base, goal: 'b', subagent_id: 's1', task_index: 1 }, 6)
@@ -365,7 +365,7 @@ describe('Transcript', () => {
     ]
 
     const live = new Transcript()
-    live.start(0)
+    live.messageStart(0)
     live.toolStart({ args: full, name: 'todo_list', tool_id: 'c1' }, 1)
     live.toolComplete({ name: 'todo_list', tool_id: 'c1' }, 2)
     live.toolStart({ args: patch, name: 'todo_list', tool_id: 'c2' }, 3)
@@ -385,7 +385,7 @@ describe('Transcript', () => {
 
   it('treats the legacy `todo` tool as the todo list', () => {
     const t = new Transcript()
-    t.start(0)
+    t.messageStart(0)
     t.toolStart({ args: { todos: [{ content: 'Plan', id: '1', status: 'pending' }] }, name: 'todo', tool_id: 'c1' }, 1)
     t.todos([{ content: 'Plan', id: '1', status: 'completed' }])
     expect(tools(turnOf(t.entries))[0]?.todos).toEqual([{ content: 'Plan', id: '1', status: 'completed' }])
@@ -393,7 +393,7 @@ describe('Transcript', () => {
 
   it('finds a call by its tool id', () => {
     const t = new Transcript()
-    t.start(0)
+    t.messageStart(0)
     t.toolStart({ args: { path: 'a.ts' }, name: 'read_file', tool_id: 'c1' }, 1)
     expect(t.call(toolCallId('c1'))?.name).toBe('read_file')
     expect(t.call(toolCallId('nope'))).toBeUndefined()
@@ -417,10 +417,10 @@ describe('Transcript', () => {
 
   it('bumps the turn holding a call that changes outside the reducer', () => {
     const t = new Transcript()
-    t.start(0)
+    t.messageStart(0)
     t.toolStart({ args: { command: 'sleep 9', background: true }, name: 'terminal', tool_id: 'c1' }, 1)
     t.complete({ status: 'complete' }, 2)
-    t.start(3)
+    t.messageStart(3)
     const revs = () => t.entries.flatMap(e => (e.kind === 'turn' ? [e.rev] : []))
     const call = tools(turnOf(t.entries.slice(0, 1)))[0]
     const [first = 0, second] = revs()
@@ -440,5 +440,74 @@ describe('Transcript', () => {
     // A call no turn holds changes nothing else.
     t.mutateCall({ ...call }, () => {})
     expect(revs()).toEqual([first + 1, second])
+  })
+})
+
+// WP24: an event that comes after message.complete closed its turn opens no turn of its own.
+describe('Transcript: late events after a turn ended', () => {
+  /** A transcript whose one turn said `text` and ended. */
+  function ended(text: string): Transcript {
+    const t = new Transcript()
+    t.messageStart(0)
+    t.text(text, 1)
+    t.complete({ status: 'complete', text }, 2)
+
+    return t
+  }
+
+  const turns = (t: Transcript) => t.entries.filter(e => e.kind === 'turn')
+
+  it('a late reasoning.available that repeats the answer, or says nothing, leaves no live turn', () => {
+    const t = ended('The answer.')
+
+    t.reasoningBlock('The answer.', 3)
+    t.reasoningBlock('  ', 4)
+
+    expect(t.live).toBeUndefined()
+    expect(turns(t)).toHaveLength(1)
+    expect(kinds(turnOf(t.entries))).toEqual(['text'])
+  })
+
+  it('a late reasoning.available with a thought of its own goes in the turn that ended', () => {
+    const t = ended('The answer.')
+
+    t.reasoningBlock('Why it is so.', 3)
+
+    expect(t.live).toBeUndefined()
+    expect(turns(t)).toHaveLength(1)
+    expect(kinds(turnOf(t.entries))).toEqual(['text', 'thinking'])
+  })
+
+  it('a late tool.complete for a call never started goes in the turn that ended, settled', () => {
+    const t = ended('Done.')
+
+    t.toolComplete({ name: 'read_file', result: { content: 'x' }, tool_id: 'late' }, 3)
+
+    expect(t.live).toBeUndefined()
+    expect(turns(t)).toHaveLength(1)
+    expect(tools(turnOf(t.entries)).map(c => [c.id, c.status])).toEqual([['late', 'done']])
+  })
+
+  it('the next turn starts fresh after them, not inside the turn that ended', () => {
+    const t = ended('First.')
+    t.reasoningBlock('A late thought.', 3)
+    t.toolComplete({ name: 'read_file', tool_id: 'late' }, 4)
+
+    t.messageStart(5)
+    t.text('Second.', 6)
+
+    expect(turns(t)).toHaveLength(2)
+    // Only its own text: the late thought and call stay with the turn they came after.
+    expect(kinds(turnOf(t.entries))).toEqual(['text'])
+  })
+
+  it('a tool.complete with no turn ended here (a resumed session mid-turn) still opens the live turn', () => {
+    const t = new Transcript()
+    t.load([{ role: 'user', text: 'go' }])
+
+    t.toolComplete({ name: 'read_file', tool_id: 'c1' }, 1)
+
+    expect(t.live).toBeDefined()
+    expect(tools(turnOf(t.entries)).map(c => c.id)).toEqual(['c1'])
   })
 })

@@ -100,7 +100,7 @@ describe('Agents', () => {
   /** A transcript holding one dispatched delegate_task call whose children log to `paths`. */
   function dispatched(paths: string[]) {
     const transcript = new Transcript()
-    transcript.start(0)
+    transcript.messageStart(0)
     transcript.toolStart({ name: 'delegate_task', tool_id: 'c1' } as never, 0)
     transcript.toolComplete(
       {
@@ -330,7 +330,7 @@ describe('Agents', () => {
     /** A dispatched call of `n` background tasks whose logs are not on this machine. */
     function remote(n: number) {
       const transcript = new Transcript()
-      transcript.start(0)
+      transcript.messageStart(0)
       transcript.toolStart({ name: 'delegate_task', tool_id: 'c1' } as never, 0)
       transcript.toolComplete(
         {

@@ -24,6 +24,7 @@ import { history, storedUser } from './transcript/history.js'
 import { continuation, displayNotice, failure, internalNotice, passable, type UserPrompt, userEntry } from './transcript/messages.js'
 import { foldSubagent } from './transcript/subagents.js'
 import { currentTodos, todosOf, toTodos } from './transcript/todos.js'
+import { endThinking, shownArgs, trailingText, usageSince } from './transcript/turns.js'
 import { withoutTernEnv } from './view/describe.js'
 import { record } from './wire/json.js'
 
@@ -39,6 +40,11 @@ export class Transcript {
   #live: TurnEntry | undefined
   /** The reason line for the next turn, when Hermes' own notice started it. */
   #continued: string | undefined
+  /**
+   * The turn complete() closed last, until another opens: a reasoning block or a tool result that
+   * comes after it lands there, and opens no live turn of its own.
+   */
+  #ended: TurnEntry | undefined
   readonly #compactions = new Compactions({ entries: () => this.#entries, id: prefix => this.id(prefix), live: () => this.#live })
 
   /** The entries, oldest first; only the transcript's own methods change the list. */
@@ -55,6 +61,7 @@ export class Transcript {
   reset({ session, usage }: { session: 'other' | 'same'; usage: Usage | undefined }) {
     this.#entries = [{ id: this.id('w'), kind: 'welcome' }]
     this.#live = undefined
+    this.#ended = undefined
     this.#continued = undefined
     this.#sessionUsage = usage
 
@@ -203,8 +210,16 @@ export class Transcript {
     this.#compactions.summarize(stored)
   }
 
-  /** Opens a live turn unless one is already streaming. */
-  start(at = Date.now()): TurnEntry {
+  /** message.start: opens the live turn, unless one is already streaming. */
+  messageStart(at = Date.now()): TurnEntry {
+    return this.#open(at)
+  }
+
+  /**
+   * Opens a live turn unless one is already streaming. Only the reducer calls it, and only once
+   * the event proved it has something for the turn.
+   */
+  #open(at: number): TurnEntry {
     const live = this.live
 
     if (live) {
@@ -224,6 +239,7 @@ export class Transcript {
     }
     this.push(turn)
     this.#live = turn
+    this.#ended = undefined
     this.#continued = undefined
 
     return turn
@@ -234,7 +250,7 @@ export class Transcript {
       return
     }
 
-    const turn = this.start(at)
+    const turn = this.#open(at)
     const last = turn.blocks.at(-1)
 
     if (last?.kind === 'thinking' && last.endedAt === undefined) {
@@ -249,23 +265,25 @@ export class Transcript {
   /**
    * A whole reasoning block from a provider that doesn't stream it; ignored once reasoning streamed.
    * Hermes also relays each response's visible text through `reasoning.available`, so text the
-   * turn already shows is not a thought either.
+   * turn already shows is not a thought either. One that comes after its turn ended goes in that
+   * turn.
    */
   reasoningBlock(text: string, at = Date.now()) {
-    const turn = this.start(at)
+    const shown = this.#live ?? this.#ended
     const incoming = text.trim()
 
-    if (!incoming || turn.blocks.some(b => (b.kind === 'thinking' && !b.label) || (b.kind === 'text' && b.text.includes(incoming)))) {
+    if (!incoming || shown?.blocks.some(b => (b.kind === 'thinking' && !b.label) || (b.kind === 'text' && b.text.includes(incoming)))) {
       return
     }
 
+    const turn = shown ?? this.#open(at)
     turn.blocks.push({ endedAt: at, id: this.id('k'), kind: 'thinking', startedAt: at, text })
     turn.rev++
   }
 
   /** A Mixture-of-Agents reference model's answer: a sealed thought block of its own, under `label`. */
   reference(label: string, text: string, at = Date.now()) {
-    const turn = this.start(at)
+    const turn = this.#open(at)
     endThinking(turn, at)
     turn.blocks.push({ endedAt: at, id: this.id('k'), kind: 'thinking', label, startedAt: at, text: text.trim() })
     turn.rev++
@@ -276,7 +294,7 @@ export class Transcript {
       return
     }
 
-    const turn = this.start(at)
+    const turn = this.#open(at)
     endThinking(turn, at)
     const last = turn.blocks.at(-1)
 
@@ -291,7 +309,7 @@ export class Transcript {
 
   /** Interim commentary: seals the streamed text so the next delta starts a new block. */
   interim(text: string, { alreadyStreamed }: { alreadyStreamed: boolean }, at = Date.now()) {
-    const turn = this.start(at)
+    const turn = this.#open(at)
     endThinking(turn, at)
 
     if (!alreadyStreamed && text.trim()) {
@@ -304,13 +322,16 @@ export class Transcript {
   }
 
   toolStart(p: ToolStartPayload, at = Date.now()) {
-    const turn = this.start(at)
+    const turn = this.#open(at)
     endThinking(turn, at)
 
-    if (this.#tool(p.tool_id)) {
-      return
+    if (!this.#tool(p.tool_id)) {
+      this.#addCall(turn, p, at)
     }
+  }
 
+  /** Adds the call tool.start `p` names to `turn`, running. */
+  #addCall(turn: TurnEntry, p: ToolStartPayload, at: number) {
     // A bridge call shows as the tool it runs (a connector batch as its entries).
     const u = unwrap(p.name, p.args ?? {})
     const call: ToolCall = {
@@ -345,7 +366,11 @@ export class Transcript {
     let found = this.#tool(p.tool_id)
 
     if (!found) {
-      this.toolStart({ args: p.args ?? {}, name: p.name, tool_id: p.tool_id }, at)
+      // A call never started goes in the live turn; after its turn ended, in that turn (a late
+      // result opens none); with neither (a resumed session mid-turn), in a new live turn.
+      const turn = this.#live ?? this.#ended ?? this.#open(at)
+      endThinking(turn, at)
+      this.#addCall(turn, { args: p.args ?? {}, name: p.name, tool_id: p.tool_id }, at)
       found = this.#tool(p.tool_id)
     }
 
@@ -413,7 +438,7 @@ export class Transcript {
   }
 
   complete(p: MessageCompletePayload, at = Date.now()) {
-    const turn = this.live ?? this.start(at)
+    const turn = this.#open(at)
     endThinking(turn, at)
     const final = typeof p.text === 'string' ? p.text : ''
     const tail = trailingText(turn)
@@ -439,6 +464,7 @@ export class Transcript {
 
     turn.endedAt = at
     this.#live = undefined
+    this.#ended = turn
 
     if (p.usage) {
       turn.usage = usageSince(p.usage, this.#sessionUsage)
@@ -476,6 +502,7 @@ export class Transcript {
   load(messages: TranscriptMessage[], stored: readonly StoredCompaction[] = []) {
     const kept = this.#entries.filter(e => e.kind === 'welcome')
     this.#live = undefined
+    this.#ended = undefined
     this.#entries = history({ compactions: this.#compactions.restore(stored), id: prefix => this.id(prefix), kept, messages })
   }
 
@@ -491,7 +518,7 @@ export class Transcript {
     }
 
     if (turn.assistant || turn.streaming) {
-      this.start(at)
+      this.#open(at)
       this.text(turn.assistant ?? '', at)
     }
   }
@@ -552,46 +579,4 @@ export class Transcript {
   #current(): TurnEntry | undefined {
     return this.live ?? this.#entries.findLast((e): e is TurnEntry => e.kind === 'turn')
   }
-}
-
-/** Ends the thoughts of `turn` still streaming. */
-function endThinking(turn: TurnEntry, at: number) {
-  for (const b of turn.blocks) {
-    if (b.kind === 'thinking' && b.endedAt === undefined) {
-      b.endedAt = at
-    }
-  }
-}
-
-/** The text after the last tool call: what message.complete's `text` repeats. */
-function trailingText(turn: TurnEntry): string {
-  let out = ''
-
-  for (const b of turn.blocks) {
-    // A tool call or an interim seal (an empty text block) starts a new response.
-    if (b.kind === 'tool' || (b.kind === 'text' && !b.text)) {
-      out = ''
-    } else if (b.kind === 'text') {
-      out += b.text
-    }
-  }
-
-  return out
-}
-
-/** One turn's share of the session totals: `now` minus `before`, field by field. */
-function usageSince(now: Usage, before: Usage | undefined): Usage {
-  const less = (key: 'cost_usd' | 'input' | 'output' | 'total') => {
-    const a = now[key]
-    const b = before?.[key]
-
-    return typeof a === 'number' ? Math.max(0, a - (typeof b === 'number' ? b : 0)) : undefined
-  }
-
-  return { ...now, cost_usd: less('cost_usd'), input: less('input'), output: less('output'), total: less('total') }
-}
-
-/** A call's args as views show them: a shell command as the agent wrote it, without the pane prefix the plugin's middleware adds (completion events carry the args that ran). */
-function shownArgs(args: Record<string, unknown>): Record<string, unknown> {
-  return typeof args.command === 'string' ? { ...args, command: withoutTernEnv(args.command) } : args
 }

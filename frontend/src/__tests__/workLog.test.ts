@@ -99,7 +99,7 @@ describe('todo lists in a turn', () => {
 
   it('draws only the newest list as its card; older ones are steps saying what changed', () => {
     const t = new Transcript()
-    t.start(0)
+    t.messageStart(0)
     t.toolStart({ args: { todos: [{ content: 'Plan', id: '1', status: 'in_progress' }, { content: 'Build', id: '2', status: 'pending' }] }, name: 'todo_list', tool_id: 'c1' }, 1)
     t.toolStart({ args: { command: 'ls' }, name: 'terminal', tool_id: 'c2' }, 2)
     t.toolStart({ args: { merge: true, todos: [{ id: '1', status: 'completed' }, { id: '2', status: 'in_progress' }] }, name: 'todo_list', tool_id: 'c3' }, 3)

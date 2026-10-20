@@ -33,7 +33,7 @@ describe('the tool_call bridge', () => {
 
   it('settles a live connector call and a batch from the results list', () => {
     const t = new Transcript()
-    t.start()
+    t.messageStart()
     t.toolStart({ args: { arguments: { limit: 3 }, name: 'connectors__linear__LINEAR_LIST_ISSUES' }, name: 'tool_call', tool_id: 'one' })
     t.toolComplete({ name: 'tool_call', result: results({ response: { issues: [] } }), tool_id: 'one' })
     t.toolStart({ args: { calls: [{ name: 'connectors__linear__A' }, { name: 'connectors__slack__B' }] }, name: 'tool_call', tool_id: 'two' })
