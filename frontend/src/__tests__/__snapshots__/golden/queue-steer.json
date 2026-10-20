@@ -1,0 +1,7110 @@
+{
+ "answers": [],
+ "frames": [
+  {
+   "frame": {
+    "dock": [
+     {
+      "k": "col",
+      "p": {
+       "role": "omp.editor",
+       "key": "composer"
+      },
+      "c": [
+       {
+        "k": "row",
+        "p": {
+         "gap": "sm",
+         "hidden": true,
+         "role": "omp.composer.chips",
+         "wrap": true,
+         "key": "chips"
+        }
+       },
+       {
+        "k": "row",
+        "p": {
+         "align": "start",
+         "gap": "sm",
+         "role": "omp.composer.line",
+         "key": "line"
+        },
+        "c": [
+         {
+          "k": "editor",
+          "p": {
+           "cursor": 0,
+           "decor": [],
+           "maxLines": 18,
+           "placeholder": "Ask Hermes — / commands · @ files",
+           "sendable": true,
+           "text": "",
+           "key": "input"
+          }
+         }
+        ]
+       },
+       {
+        "k": "row",
+        "p": {
+         "align": "center",
+         "gap": "sm",
+         "role": "omp.composer.bar",
+         "key": "bar"
+        },
+        "c": [
+         {
+          "k": "row",
+          "p": {
+           "align": "center",
+           "gap": "xs",
+           "role": "omp.composer.effort",
+           "title": "Reasoning effort: medium (the default) · click to cycle  ⇧⇥ · right-click to choose or save as default",
+           "key": "effort",
+           "actions": {
+            "click": "click",
+            "menu": [
+             "choose-effort",
+             "save-effort-as-default"
+            ]
+           }
+          },
+          "c": [
+           {
+            "k": "effort",
+            "p": {
+             "level": "medium",
+             "key": "glyph"
+            }
+           },
+           {
+            "k": "text",
+            "p": {
+             "spans": [
+              {
+               "s": "muted",
+               "t": "medium"
+              }
+             ],
+             "wrap": "none",
+             "key": "level"
+            }
+           }
+          ]
+         },
+         {
+          "k": "status",
+          "p": {
+           "grow": 1,
+           "role": "omp.composer.extras",
+           "transparent": true,
+           "key": "extras"
+          }
+         },
+         {
+          "k": "kbd",
+          "p": {
+           "keys": [
+            "enter"
+           ],
+           "role": "omp.composer.send",
+           "title": "Send  ⏎",
+           "key": "send",
+           "actions": {
+            "click": "click"
+           }
+          }
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "k": "status",
+      "p": {
+       "role": "hermes.statusline",
+       "key": "statusline"
+      },
+      "c": [
+       {
+        "k": "seg",
+        "p": {
+         "priority": 9,
+         "role": "hermes.statusline.brand",
+         "spans": [
+          {
+           "t": "☤ hermes"
+          }
+         ],
+         "key": "brand"
+        }
+       },
+       {
+        "k": "seg",
+        "p": {
+         "priority": 1,
+         "side": "right",
+         "spans": [
+          {
+           "s": "muted",
+           "t": "⇧⏎ newline"
+          }
+         ],
+         "key": "newline"
+        }
+       },
+       {
+        "k": "seg",
+        "p": {
+         "priority": 10,
+         "role": "hermes.statusline.send",
+         "side": "right",
+         "spans": [
+          {
+           "t": "⏎ send"
+          }
+         ],
+         "key": "action",
+         "actions": {
+          "click": "click"
+         }
+        }
+       }
+      ]
+     }
+    ],
+    "layer": [],
+    "main": [
+     {
+      "k": "card",
+      "p": {
+       "role": "omp.welcome",
+       "key": "w0"
+      },
+      "c": [
+       {
+        "k": "row",
+        "p": {
+         "align": "center",
+         "gap": "md",
+         "role": "omp.welcome.lockup",
+         "key": "lockup"
+        },
+        "c": [
+         {
+          "k": "col",
+          "p": {
+           "role": "omp.welcome.mark",
+           "key": "mark"
+          },
+          "c": [
+           {
+            "k": "text",
+            "p": {
+             "role": "omp.welcome.wordmark",
+             "spans": [
+              {
+               "s": "strong",
+               "t": "hermes"
+              }
+             ],
+             "wrap": "none",
+             "key": "wordmark"
+            }
+           },
+           {
+            "k": "text",
+            "p": {
+             "role": "omp.welcome.version",
+             "spans": [
+              {
+               "s": "dim mono",
+               "t": "v1.0.0"
+              }
+             ],
+             "wrap": "none",
+             "key": "version"
+            }
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     }
+    ]
+   },
+   "step": "feed 1"
+  },
+  {
+   "frame": {
+    "dock": [
+     {
+      "k": "col",
+      "p": {
+       "role": "omp.editor",
+       "key": "composer"
+      },
+      "c": [
+       {
+        "k": "row",
+        "p": {
+         "gap": "sm",
+         "hidden": true,
+         "role": "omp.composer.chips",
+         "wrap": true,
+         "key": "chips"
+        }
+       },
+       {
+        "k": "row",
+        "p": {
+         "align": "start",
+         "gap": "sm",
+         "role": "omp.composer.line",
+         "key": "line"
+        },
+        "c": [
+         {
+          "k": "editor",
+          "p": {
+           "cursor": 15,
+           "decor": [],
+           "maxLines": 18,
+           "placeholder": "Ask Hermes — / commands · @ files",
+           "sendable": true,
+           "text": "format the code",
+           "key": "input"
+          }
+         }
+        ]
+       },
+       {
+        "k": "row",
+        "p": {
+         "align": "center",
+         "gap": "sm",
+         "role": "omp.composer.bar",
+         "key": "bar"
+        },
+        "c": [
+         {
+          "k": "row",
+          "p": {
+           "align": "center",
+           "gap": "xs",
+           "role": "omp.composer.effort",
+           "title": "Reasoning effort: medium (the default) · click to cycle  ⇧⇥ · right-click to choose or save as default",
+           "key": "effort",
+           "actions": {
+            "click": "click",
+            "menu": [
+             "choose-effort",
+             "save-effort-as-default"
+            ]
+           }
+          },
+          "c": [
+           {
+            "k": "effort",
+            "p": {
+             "level": "medium",
+             "key": "glyph"
+            }
+           },
+           {
+            "k": "text",
+            "p": {
+             "spans": [
+              {
+               "s": "muted",
+               "t": "medium"
+              }
+             ],
+             "wrap": "none",
+             "key": "level"
+            }
+           }
+          ]
+         },
+         {
+          "k": "status",
+          "p": {
+           "grow": 1,
+           "role": "omp.composer.extras",
+           "transparent": true,
+           "key": "extras"
+          }
+         },
+         {
+          "k": "kbd",
+          "p": {
+           "keys": [
+            "enter"
+           ],
+           "role": "omp.composer.send",
+           "title": "Send  ⏎",
+           "key": "send",
+           "actions": {
+            "click": "click"
+           }
+          }
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "k": "status",
+      "p": {
+       "role": "hermes.statusline",
+       "key": "statusline"
+      },
+      "c": [
+       {
+        "k": "seg",
+        "p": {
+         "priority": 9,
+         "role": "hermes.statusline.brand",
+         "spans": [
+          {
+           "t": "☤ hermes"
+          }
+         ],
+         "key": "brand"
+        }
+       },
+       {
+        "k": "seg",
+        "p": {
+         "priority": 1,
+         "side": "right",
+         "spans": [
+          {
+           "s": "muted",
+           "t": "⇧⏎ newline"
+          }
+         ],
+         "key": "newline"
+        }
+       },
+       {
+        "k": "seg",
+        "p": {
+         "priority": 10,
+         "role": "hermes.statusline.send",
+         "side": "right",
+         "spans": [
+          {
+           "t": "⏎ send"
+          }
+         ],
+         "key": "action",
+         "actions": {
+          "click": "click"
+         }
+        }
+       }
+      ]
+     }
+    ],
+    "layer": [],
+    "main": [
+     {
+      "k": "card",
+      "p": {
+       "role": "omp.welcome",
+       "key": "w0"
+      },
+      "c": [
+       {
+        "k": "row",
+        "p": {
+         "align": "center",
+         "gap": "md",
+         "role": "omp.welcome.lockup",
+         "key": "lockup"
+        },
+        "c": [
+         {
+          "k": "col",
+          "p": {
+           "role": "omp.welcome.mark",
+           "key": "mark"
+          },
+          "c": [
+           {
+            "k": "text",
+            "p": {
+             "role": "omp.welcome.wordmark",
+             "spans": [
+              {
+               "s": "strong",
+               "t": "hermes"
+              }
+             ],
+             "wrap": "none",
+             "key": "wordmark"
+            }
+           },
+           {
+            "k": "text",
+            "p": {
+             "role": "omp.welcome.version",
+             "spans": [
+              {
+               "s": "dim mono",
+               "t": "v1.0.0"
+              }
+             ],
+             "wrap": "none",
+             "key": "version"
+            }
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     }
+    ]
+   },
+   "step": "type format the code"
+  },
+  {
+   "frame": {
+    "dock": [
+     {
+      "k": "col",
+      "p": {
+       "role": "omp.hud.status",
+       "key": "hud"
+      },
+      "c": [
+       {
+        "k": "row",
+        "p": {
+         "align": "center",
+         "gap": "sm",
+         "role": "omp.working",
+         "key": "working"
+        },
+        "c": [
+         {
+          "k": "spinner",
+          "p": {
+           "style": "starburst",
+           "tone": "accent",
+           "key": "spinner"
+          }
+         },
+         {
+          "k": "shimmer",
+          "p": {
+           "mode": "classic",
+           "palette": {
+            "high": "accent",
+            "low": "dim",
+            "mid": "muted"
+           },
+           "role": "omp.working.label",
+           "spans": [
+            {
+             "s": "muted",
+             "t": "Working…"
+            }
+           ],
+           "key": "label"
+          }
+         },
+         {
+          "k": "text",
+          "p": {
+           "role": "omp.working.sep",
+           "text": "·",
+           "key": "sep"
+          }
+         },
+         {
+          "k": "elapsed",
+          "p": {
+           "age": 0,
+           "format": "short",
+           "key": "elapsed"
+          }
+         },
+         {
+          "k": "row",
+          "p": {
+           "grow": 1,
+           "key": "fill"
+          }
+         },
+         {
+          "k": "row",
+          "p": {
+           "align": "center",
+           "gap": "xs",
+           "role": "omp.working.stop",
+           "title": "Stop  esc esc",
+           "key": "stop",
+           "actions": {
+            "click": "click"
+           }
+          },
+          "c": [
+           {
+            "k": "kbd",
+            "p": {
+             "keys": [
+              "esc"
+             ],
+             "key": "k"
+            }
+           },
+           {
+            "k": "kbd",
+            "p": {
+             "keys": [
+              "esc"
+             ],
+             "key": "k2"
+            }
+           },
+           {
+            "k": "text",
+            "p": {
+             "text": "Stop",
+             "key": "t"
+            }
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "k": "col",
+      "p": {
+       "role": "omp.editor",
+       "key": "composer"
+      },
+      "c": [
+       {
+        "k": "row",
+        "p": {
+         "role": "hermes.streak",
+         "key": "streak"
+        }
+       },
+       {
+        "k": "row",
+        "p": {
+         "gap": "sm",
+         "hidden": true,
+         "role": "omp.composer.chips",
+         "wrap": true,
+         "key": "chips"
+        }
+       },
+       {
+        "k": "row",
+        "p": {
+         "align": "start",
+         "gap": "sm",
+         "role": "omp.composer.line",
+         "key": "line"
+        },
+        "c": [
+         {
+          "k": "editor",
+          "p": {
+           "cursor": 0,
+           "decor": [],
+           "maxLines": 18,
+           "placeholder": "Ask Hermes — / commands · @ files",
+           "sendable": true,
+           "text": "",
+           "key": "input"
+          }
+         }
+        ]
+       },
+       {
+        "k": "row",
+        "p": {
+         "align": "center",
+         "gap": "sm",
+         "role": "omp.composer.bar",
+         "key": "bar"
+        },
+        "c": [
+         {
+          "k": "row",
+          "p": {
+           "align": "center",
+           "gap": "xs",
+           "role": "omp.composer.effort",
+           "title": "Reasoning effort: medium (the default) · click to cycle  ⇧⇥ · right-click to choose or save as default",
+           "key": "effort",
+           "actions": {
+            "click": "click",
+            "menu": [
+             "choose-effort",
+             "save-effort-as-default"
+            ]
+           }
+          },
+          "c": [
+           {
+            "k": "effort",
+            "p": {
+             "level": "medium",
+             "key": "glyph"
+            }
+           },
+           {
+            "k": "text",
+            "p": {
+             "spans": [
+              {
+               "s": "muted",
+               "t": "medium"
+              }
+             ],
+             "wrap": "none",
+             "key": "level"
+            }
+           }
+          ]
+         },
+         {
+          "k": "status",
+          "p": {
+           "grow": 1,
+           "role": "omp.composer.extras",
+           "transparent": true,
+           "key": "extras"
+          }
+         },
+         {
+          "k": "text",
+          "p": {
+           "role": "omp.composer.stop",
+           "text": "Stop",
+           "title": "Stop  esc esc",
+           "tone": "error",
+           "key": "stop",
+           "actions": {
+            "click": "click"
+           }
+          }
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "k": "status",
+      "p": {
+       "role": "hermes.statusline",
+       "key": "statusline"
+      },
+      "c": [
+       {
+        "k": "seg",
+        "p": {
+         "priority": 9,
+         "role": "hermes.statusline.brand",
+         "spans": [
+          {
+           "t": "☤ hermes"
+          }
+         ],
+         "key": "brand"
+        }
+       },
+       {
+        "k": "seg",
+        "p": {
+         "priority": 1,
+         "side": "right",
+         "spans": [
+          {
+           "s": "muted",
+           "t": "⇧⏎ newline"
+          }
+         ],
+         "key": "newline"
+        }
+       },
+       {
+        "k": "seg",
+        "p": {
+         "priority": 10,
+         "role": "hermes.statusline.stop",
+         "side": "right",
+         "spans": [
+          {
+           "t": "esc esc stop"
+          }
+         ],
+         "key": "action",
+         "actions": {
+          "click": "click"
+         }
+        }
+       }
+      ]
+     }
+    ],
+    "layer": [],
+    "main": [
+     {
+      "k": "card",
+      "p": {
+       "role": "omp.welcome",
+       "key": "w0"
+      },
+      "c": [
+       {
+        "k": "row",
+        "p": {
+         "align": "center",
+         "gap": "md",
+         "role": "omp.welcome.lockup",
+         "key": "lockup"
+        },
+        "c": [
+         {
+          "k": "col",
+          "p": {
+           "role": "omp.welcome.mark",
+           "key": "mark"
+          },
+          "c": [
+           {
+            "k": "text",
+            "p": {
+             "role": "omp.welcome.wordmark",
+             "spans": [
+              {
+               "s": "strong",
+               "t": "hermes"
+              }
+             ],
+             "wrap": "none",
+             "key": "wordmark"
+            }
+           },
+           {
+            "k": "text",
+            "p": {
+             "role": "omp.welcome.version",
+             "spans": [
+              {
+               "s": "dim mono",
+               "t": "v1.0.0"
+              }
+             ],
+             "wrap": "none",
+             "key": "version"
+            }
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "k": "card",
+      "p": {
+       "role": "omp.user",
+       "tone": "user",
+       "key": "u1"
+      },
+      "c": [
+       {
+        "k": "row",
+        "p": {
+         "gap": "xs",
+         "role": "omp.user.tools",
+         "key": "tools"
+        },
+        "c": [
+         {
+          "k": "text",
+          "p": {
+           "role": "omp.user.time",
+           "spans": [
+            {
+             "s": "dim mono",
+             "t": "03:04 AM"
+            }
+           ],
+           "title": "1/2/2026, 3:04:05 AM",
+           "key": "time"
+          }
+         },
+         {
+          "k": "icon",
+          "p": {
+           "name": "copy",
+           "role": "omp.user.tool",
+           "title": "Copy message",
+           "key": "copy",
+           "actions": {
+            "click": "click"
+           }
+          }
+         }
+        ]
+       },
+       {
+        "k": "md",
+        "p": {
+         "key": "body",
+         "text": "format the code"
+        }
+       }
+      ]
+     }
+    ]
+   },
+   "step": "press enter"
+  },
+  {
+   "frame": {
+    "dock": [
+     {
+      "k": "col",
+      "p": {
+       "role": "omp.hud.status",
+       "key": "hud"
+      },
+      "c": [
+       {
+        "k": "row",
+        "p": {
+         "align": "center",
+         "gap": "sm",
+         "role": "omp.working",
+         "key": "working"
+        },
+        "c": [
+         {
+          "k": "spinner",
+          "p": {
+           "style": "starburst",
+           "tone": "accent",
+           "key": "spinner"
+          }
+         },
+         {
+          "k": "shimmer",
+          "p": {
+           "mode": "classic",
+           "palette": {
+            "high": "accent",
+            "low": "dim",
+            "mid": "muted"
+           },
+           "role": "omp.working.label",
+           "spans": [
+            {
+             "s": "muted",
+             "t": "Writing…"
+            }
+           ],
+           "key": "label"
+          }
+         },
+         {
+          "k": "text",
+          "p": {
+           "role": "omp.working.sep",
+           "text": "·",
+           "key": "sep"
+          }
+         },
+         {
+          "k": "elapsed",
+          "p": {
+           "age": 0,
+           "format": "short",
+           "key": "elapsed"
+          }
+         },
+         {
+          "k": "row",
+          "p": {
+           "grow": 1,
+           "key": "fill"
+          }
+         },
+         {
+          "k": "row",
+          "p": {
+           "align": "center",
+           "gap": "xs",
+           "role": "omp.working.stop",
+           "title": "Stop  esc esc",
+           "key": "stop",
+           "actions": {
+            "click": "click"
+           }
+          },
+          "c": [
+           {
+            "k": "kbd",
+            "p": {
+             "keys": [
+              "esc"
+             ],
+             "key": "k"
+            }
+           },
+           {
+            "k": "kbd",
+            "p": {
+             "keys": [
+              "esc"
+             ],
+             "key": "k2"
+            }
+           },
+           {
+            "k": "text",
+            "p": {
+             "text": "Stop",
+             "key": "t"
+            }
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "k": "col",
+      "p": {
+       "role": "omp.editor",
+       "key": "composer"
+      },
+      "c": [
+       {
+        "k": "row",
+        "p": {
+         "role": "hermes.streak",
+         "key": "streak"
+        }
+       },
+       {
+        "k": "row",
+        "p": {
+         "gap": "sm",
+         "hidden": true,
+         "role": "omp.composer.chips",
+         "wrap": true,
+         "key": "chips"
+        }
+       },
+       {
+        "k": "row",
+        "p": {
+         "align": "start",
+         "gap": "sm",
+         "role": "omp.composer.line",
+         "key": "line"
+        },
+        "c": [
+         {
+          "k": "editor",
+          "p": {
+           "cursor": 0,
+           "decor": [],
+           "maxLines": 18,
+           "placeholder": "Ask Hermes — / commands · @ files",
+           "sendable": true,
+           "text": "",
+           "key": "input"
+          }
+         }
+        ]
+       },
+       {
+        "k": "row",
+        "p": {
+         "align": "center",
+         "gap": "sm",
+         "role": "omp.composer.bar",
+         "key": "bar"
+        },
+        "c": [
+         {
+          "k": "row",
+          "p": {
+           "align": "center",
+           "gap": "xs",
+           "role": "omp.composer.effort",
+           "title": "Reasoning effort: medium (the default) · click to cycle  ⇧⇥ · right-click to choose or save as default",
+           "key": "effort",
+           "actions": {
+            "click": "click",
+            "menu": [
+             "choose-effort",
+             "save-effort-as-default"
+            ]
+           }
+          },
+          "c": [
+           {
+            "k": "effort",
+            "p": {
+             "level": "medium",
+             "key": "glyph"
+            }
+           },
+           {
+            "k": "text",
+            "p": {
+             "spans": [
+              {
+               "s": "muted",
+               "t": "medium"
+              }
+             ],
+             "wrap": "none",
+             "key": "level"
+            }
+           }
+          ]
+         },
+         {
+          "k": "status",
+          "p": {
+           "grow": 1,
+           "role": "omp.composer.extras",
+           "transparent": true,
+           "key": "extras"
+          }
+         },
+         {
+          "k": "text",
+          "p": {
+           "role": "omp.composer.stop",
+           "text": "Stop",
+           "title": "Stop  esc esc",
+           "tone": "error",
+           "key": "stop",
+           "actions": {
+            "click": "click"
+           }
+          }
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "k": "status",
+      "p": {
+       "role": "hermes.statusline",
+       "key": "statusline"
+      },
+      "c": [
+       {
+        "k": "seg",
+        "p": {
+         "priority": 9,
+         "role": "hermes.statusline.brand",
+         "spans": [
+          {
+           "t": "☤ hermes"
+          }
+         ],
+         "key": "brand"
+        }
+       },
+       {
+        "k": "seg",
+        "p": {
+         "priority": 1,
+         "side": "right",
+         "spans": [
+          {
+           "s": "muted",
+           "t": "⇧⏎ newline"
+          }
+         ],
+         "key": "newline"
+        }
+       },
+       {
+        "k": "seg",
+        "p": {
+         "priority": 10,
+         "role": "hermes.statusline.stop",
+         "side": "right",
+         "spans": [
+          {
+           "t": "esc esc stop"
+          }
+         ],
+         "key": "action",
+         "actions": {
+          "click": "click"
+         }
+        }
+       }
+      ]
+     }
+    ],
+    "layer": [],
+    "main": [
+     {
+      "k": "card",
+      "p": {
+       "role": "omp.welcome",
+       "key": "w0"
+      },
+      "c": [
+       {
+        "k": "row",
+        "p": {
+         "align": "center",
+         "gap": "md",
+         "role": "omp.welcome.lockup",
+         "key": "lockup"
+        },
+        "c": [
+         {
+          "k": "col",
+          "p": {
+           "role": "omp.welcome.mark",
+           "key": "mark"
+          },
+          "c": [
+           {
+            "k": "text",
+            "p": {
+             "role": "omp.welcome.wordmark",
+             "spans": [
+              {
+               "s": "strong",
+               "t": "hermes"
+              }
+             ],
+             "wrap": "none",
+             "key": "wordmark"
+            }
+           },
+           {
+            "k": "text",
+            "p": {
+             "role": "omp.welcome.version",
+             "spans": [
+              {
+               "s": "dim mono",
+               "t": "v1.0.0"
+              }
+             ],
+             "wrap": "none",
+             "key": "version"
+            }
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "k": "card",
+      "p": {
+       "role": "omp.user",
+       "tone": "user",
+       "key": "u1"
+      },
+      "c": [
+       {
+        "k": "row",
+        "p": {
+         "gap": "xs",
+         "role": "omp.user.tools",
+         "key": "tools"
+        },
+        "c": [
+         {
+          "k": "text",
+          "p": {
+           "role": "omp.user.time",
+           "spans": [
+            {
+             "s": "dim mono",
+             "t": "03:04 AM"
+            }
+           ],
+           "title": "1/2/2026, 3:04:05 AM",
+           "key": "time"
+          }
+         },
+         {
+          "k": "icon",
+          "p": {
+           "name": "copy",
+           "role": "omp.user.tool",
+           "title": "Copy message",
+           "key": "copy",
+           "actions": {
+            "click": "click"
+           }
+          }
+         }
+        ]
+       },
+       {
+        "k": "md",
+        "p": {
+         "key": "body",
+         "text": "format the code"
+        }
+       }
+      ]
+     },
+     {
+      "k": "col",
+      "p": {
+       "role": "omp.assistant",
+       "key": "t2"
+      },
+      "c": [
+       {
+        "k": "row",
+        "p": {
+         "align": "center",
+         "gap": "xs",
+         "role": "hermes.turn.working",
+         "key": "working"
+        },
+        "c": [
+         {
+          "k": "text",
+          "p": {
+           "spans": [
+            {
+             "s": "muted",
+             "t": "Working for"
+            }
+           ],
+           "wrap": "none",
+           "key": "label"
+          }
+         },
+         {
+          "k": "elapsed",
+          "p": {
+           "age": 0,
+           "format": "short",
+           "key": "age"
+          }
+         }
+        ]
+       },
+       {
+        "k": "md",
+        "p": {
+         "stream": true,
+         "key": "x3",
+         "text": "Formatting the files"
+        }
+       }
+      ]
+     }
+    ]
+   },
+   "step": "feed 2"
+  },
+  {
+   "frame": {
+    "dock": [
+     {
+      "k": "col",
+      "p": {
+       "role": "omp.hud.status",
+       "key": "hud"
+      },
+      "c": [
+       {
+        "k": "row",
+        "p": {
+         "align": "center",
+         "gap": "sm",
+         "role": "omp.working",
+         "key": "working"
+        },
+        "c": [
+         {
+          "k": "spinner",
+          "p": {
+           "style": "starburst",
+           "tone": "accent",
+           "key": "spinner"
+          }
+         },
+         {
+          "k": "shimmer",
+          "p": {
+           "mode": "classic",
+           "palette": {
+            "high": "accent",
+            "low": "dim",
+            "mid": "muted"
+           },
+           "role": "omp.working.label",
+           "spans": [
+            {
+             "s": "muted",
+             "t": "Writing…"
+            }
+           ],
+           "key": "label"
+          }
+         },
+         {
+          "k": "text",
+          "p": {
+           "role": "omp.working.sep",
+           "text": "·",
+           "key": "sep"
+          }
+         },
+         {
+          "k": "elapsed",
+          "p": {
+           "age": 0,
+           "format": "short",
+           "key": "elapsed"
+          }
+         },
+         {
+          "k": "row",
+          "p": {
+           "grow": 1,
+           "key": "fill"
+          }
+         },
+         {
+          "k": "row",
+          "p": {
+           "align": "center",
+           "gap": "xs",
+           "role": "omp.working.stop",
+           "title": "Stop  esc esc",
+           "key": "stop",
+           "actions": {
+            "click": "click"
+           }
+          },
+          "c": [
+           {
+            "k": "kbd",
+            "p": {
+             "keys": [
+              "esc"
+             ],
+             "key": "k"
+            }
+           },
+           {
+            "k": "kbd",
+            "p": {
+             "keys": [
+              "esc"
+             ],
+             "key": "k2"
+            }
+           },
+           {
+            "k": "text",
+            "p": {
+             "text": "Stop",
+             "key": "t"
+            }
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "k": "col",
+      "p": {
+       "role": "omp.editor",
+       "key": "composer"
+      },
+      "c": [
+       {
+        "k": "row",
+        "p": {
+         "role": "hermes.streak",
+         "key": "streak"
+        }
+       },
+       {
+        "k": "row",
+        "p": {
+         "gap": "sm",
+         "hidden": true,
+         "role": "omp.composer.chips",
+         "wrap": true,
+         "key": "chips"
+        }
+       },
+       {
+        "k": "row",
+        "p": {
+         "align": "start",
+         "gap": "sm",
+         "role": "omp.composer.line",
+         "key": "line"
+        },
+        "c": [
+         {
+          "k": "editor",
+          "p": {
+           "cursor": 8,
+           "decor": [],
+           "maxLines": 18,
+           "placeholder": "Ask Hermes — / commands · @ files",
+           "sendable": true,
+           "text": "use tabs",
+           "key": "input"
+          }
+         }
+        ]
+       },
+       {
+        "k": "row",
+        "p": {
+         "align": "center",
+         "gap": "sm",
+         "role": "omp.composer.bar",
+         "key": "bar"
+        },
+        "c": [
+         {
+          "k": "row",
+          "p": {
+           "align": "center",
+           "gap": "xs",
+           "role": "omp.composer.effort",
+           "title": "Reasoning effort: medium (the default) · click to cycle  ⇧⇥ · right-click to choose or save as default",
+           "key": "effort",
+           "actions": {
+            "click": "click",
+            "menu": [
+             "choose-effort",
+             "save-effort-as-default"
+            ]
+           }
+          },
+          "c": [
+           {
+            "k": "effort",
+            "p": {
+             "level": "medium",
+             "key": "glyph"
+            }
+           },
+           {
+            "k": "text",
+            "p": {
+             "spans": [
+              {
+               "s": "muted",
+               "t": "medium"
+              }
+             ],
+             "wrap": "none",
+             "key": "level"
+            }
+           }
+          ]
+         },
+         {
+          "k": "status",
+          "p": {
+           "grow": 1,
+           "role": "omp.composer.extras",
+           "transparent": true,
+           "key": "extras"
+          }
+         },
+         {
+          "k": "text",
+          "p": {
+           "role": "omp.composer.stop",
+           "text": "Stop",
+           "title": "Stop  esc esc",
+           "tone": "error",
+           "key": "stop",
+           "actions": {
+            "click": "click"
+           }
+          }
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "k": "status",
+      "p": {
+       "role": "hermes.statusline",
+       "key": "statusline"
+      },
+      "c": [
+       {
+        "k": "seg",
+        "p": {
+         "priority": 9,
+         "role": "hermes.statusline.brand",
+         "spans": [
+          {
+           "t": "☤ hermes"
+          }
+         ],
+         "key": "brand"
+        }
+       },
+       {
+        "k": "seg",
+        "p": {
+         "priority": 1,
+         "side": "right",
+         "spans": [
+          {
+           "s": "muted",
+           "t": "⇧⏎ newline"
+          }
+         ],
+         "key": "newline"
+        }
+       },
+       {
+        "k": "seg",
+        "p": {
+         "priority": 10,
+         "role": "hermes.statusline.stop",
+         "side": "right",
+         "spans": [
+          {
+           "t": "esc esc stop"
+          }
+         ],
+         "key": "action",
+         "actions": {
+          "click": "click"
+         }
+        }
+       }
+      ]
+     }
+    ],
+    "layer": [],
+    "main": [
+     {
+      "k": "card",
+      "p": {
+       "role": "omp.welcome",
+       "key": "w0"
+      },
+      "c": [
+       {
+        "k": "row",
+        "p": {
+         "align": "center",
+         "gap": "md",
+         "role": "omp.welcome.lockup",
+         "key": "lockup"
+        },
+        "c": [
+         {
+          "k": "col",
+          "p": {
+           "role": "omp.welcome.mark",
+           "key": "mark"
+          },
+          "c": [
+           {
+            "k": "text",
+            "p": {
+             "role": "omp.welcome.wordmark",
+             "spans": [
+              {
+               "s": "strong",
+               "t": "hermes"
+              }
+             ],
+             "wrap": "none",
+             "key": "wordmark"
+            }
+           },
+           {
+            "k": "text",
+            "p": {
+             "role": "omp.welcome.version",
+             "spans": [
+              {
+               "s": "dim mono",
+               "t": "v1.0.0"
+              }
+             ],
+             "wrap": "none",
+             "key": "version"
+            }
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "k": "card",
+      "p": {
+       "role": "omp.user",
+       "tone": "user",
+       "key": "u1"
+      },
+      "c": [
+       {
+        "k": "row",
+        "p": {
+         "gap": "xs",
+         "role": "omp.user.tools",
+         "key": "tools"
+        },
+        "c": [
+         {
+          "k": "text",
+          "p": {
+           "role": "omp.user.time",
+           "spans": [
+            {
+             "s": "dim mono",
+             "t": "03:04 AM"
+            }
+           ],
+           "title": "1/2/2026, 3:04:05 AM",
+           "key": "time"
+          }
+         },
+         {
+          "k": "icon",
+          "p": {
+           "name": "copy",
+           "role": "omp.user.tool",
+           "title": "Copy message",
+           "key": "copy",
+           "actions": {
+            "click": "click"
+           }
+          }
+         }
+        ]
+       },
+       {
+        "k": "md",
+        "p": {
+         "key": "body",
+         "text": "format the code"
+        }
+       }
+      ]
+     },
+     {
+      "k": "col",
+      "p": {
+       "role": "omp.assistant",
+       "key": "t2"
+      },
+      "c": [
+       {
+        "k": "row",
+        "p": {
+         "align": "center",
+         "gap": "xs",
+         "role": "hermes.turn.working",
+         "key": "working"
+        },
+        "c": [
+         {
+          "k": "text",
+          "p": {
+           "spans": [
+            {
+             "s": "muted",
+             "t": "Working for"
+            }
+           ],
+           "wrap": "none",
+           "key": "label"
+          }
+         },
+         {
+          "k": "elapsed",
+          "p": {
+           "age": 0,
+           "format": "short",
+           "key": "age"
+          }
+         }
+        ]
+       },
+       {
+        "k": "md",
+        "p": {
+         "stream": true,
+         "key": "x3",
+         "text": "Formatting the files"
+        }
+       }
+      ]
+     }
+    ]
+   },
+   "step": "type use tabs"
+  },
+  {
+   "frame": {
+    "dock": [
+     {
+      "k": "col",
+      "p": {
+       "role": "omp.hud.status",
+       "key": "hud"
+      },
+      "c": [
+       {
+        "k": "row",
+        "p": {
+         "align": "center",
+         "gap": "sm",
+         "role": "omp.working",
+         "key": "working"
+        },
+        "c": [
+         {
+          "k": "spinner",
+          "p": {
+           "style": "starburst",
+           "tone": "accent",
+           "key": "spinner"
+          }
+         },
+         {
+          "k": "shimmer",
+          "p": {
+           "mode": "classic",
+           "palette": {
+            "high": "accent",
+            "low": "dim",
+            "mid": "muted"
+           },
+           "role": "omp.working.label",
+           "spans": [
+            {
+             "s": "muted",
+             "t": "Writing…"
+            }
+           ],
+           "key": "label"
+          }
+         },
+         {
+          "k": "text",
+          "p": {
+           "role": "omp.working.sep",
+           "text": "·",
+           "key": "sep"
+          }
+         },
+         {
+          "k": "elapsed",
+          "p": {
+           "age": 0,
+           "format": "short",
+           "key": "elapsed"
+          }
+         },
+         {
+          "k": "row",
+          "p": {
+           "grow": 1,
+           "key": "fill"
+          }
+         },
+         {
+          "k": "row",
+          "p": {
+           "align": "center",
+           "gap": "xs",
+           "role": "omp.working.stop",
+           "title": "Stop  esc esc",
+           "key": "stop",
+           "actions": {
+            "click": "click"
+           }
+          },
+          "c": [
+           {
+            "k": "kbd",
+            "p": {
+             "keys": [
+              "esc"
+             ],
+             "key": "k"
+            }
+           },
+           {
+            "k": "kbd",
+            "p": {
+             "keys": [
+              "esc"
+             ],
+             "key": "k2"
+            }
+           },
+           {
+            "k": "text",
+            "p": {
+             "text": "Stop",
+             "key": "t"
+            }
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "k": "col",
+      "p": {
+       "gap": "xs",
+       "role": "omp.queue",
+       "key": "queue"
+      },
+      "c": [
+       {
+        "k": "row",
+        "p": {
+         "align": "center",
+         "gap": "sm",
+         "role": "omp.queue.item",
+         "title": "Queued",
+         "key": "q0"
+        },
+        "c": [
+         {
+          "k": "icon",
+          "p": {
+           "name": "corner-down-right",
+           "key": "icon"
+          }
+         },
+         {
+          "k": "text",
+          "p": {
+           "grow": 1,
+           "text": "use tabs",
+           "truncate": "end",
+           "wrap": "none",
+           "key": "text"
+          }
+         },
+         {
+          "k": "row",
+          "p": {
+           "align": "center",
+           "gap": "xs",
+           "role": "omp.queue.steer",
+           "title": "Steer the running turn with this instead  ⌥↵",
+           "key": "steer",
+           "actions": {
+            "click": "click"
+           }
+          },
+          "c": [
+           {
+            "k": "icon",
+            "p": {
+             "name": "corner-up-right",
+             "key": "i"
+            }
+           },
+           {
+            "k": "kbd",
+            "p": {
+             "keys": [
+              "alt",
+              "enter"
+             ],
+             "key": "k"
+            }
+           },
+           {
+            "k": "text",
+            "p": {
+             "text": "Steer",
+             "key": "t"
+            }
+           }
+          ]
+         },
+         {
+          "k": "row",
+          "p": {
+           "align": "center",
+           "gap": "xs",
+           "role": "omp.queue.edit",
+           "title": "Edit in the composer  ⌥↑",
+           "key": "edit",
+           "actions": {
+            "click": "click"
+           }
+          },
+          "c": [
+           {
+            "k": "kbd",
+            "p": {
+             "keys": [
+              "alt",
+              "up"
+             ],
+             "key": "k"
+            }
+           },
+           {
+            "k": "text",
+            "p": {
+             "text": "Edit",
+             "key": "t"
+            }
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "k": "col",
+      "p": {
+       "role": "omp.editor",
+       "key": "composer"
+      },
+      "c": [
+       {
+        "k": "row",
+        "p": {
+         "role": "hermes.streak",
+         "key": "streak"
+        }
+       },
+       {
+        "k": "row",
+        "p": {
+         "gap": "sm",
+         "hidden": true,
+         "role": "omp.composer.chips",
+         "wrap": true,
+         "key": "chips"
+        }
+       },
+       {
+        "k": "row",
+        "p": {
+         "align": "start",
+         "gap": "sm",
+         "role": "omp.composer.line",
+         "key": "line"
+        },
+        "c": [
+         {
+          "k": "editor",
+          "p": {
+           "cursor": 0,
+           "decor": [],
+           "maxLines": 18,
+           "placeholder": "Ask Hermes — / commands · @ files",
+           "sendable": true,
+           "text": "",
+           "key": "input"
+          }
+         }
+        ]
+       },
+       {
+        "k": "row",
+        "p": {
+         "align": "center",
+         "gap": "sm",
+         "role": "omp.composer.bar",
+         "key": "bar"
+        },
+        "c": [
+         {
+          "k": "row",
+          "p": {
+           "align": "center",
+           "gap": "xs",
+           "role": "omp.composer.effort",
+           "title": "Reasoning effort: medium (the default) · click to cycle  ⇧⇥ · right-click to choose or save as default",
+           "key": "effort",
+           "actions": {
+            "click": "click",
+            "menu": [
+             "choose-effort",
+             "save-effort-as-default"
+            ]
+           }
+          },
+          "c": [
+           {
+            "k": "effort",
+            "p": {
+             "level": "medium",
+             "key": "glyph"
+            }
+           },
+           {
+            "k": "text",
+            "p": {
+             "spans": [
+              {
+               "s": "muted",
+               "t": "medium"
+              }
+             ],
+             "wrap": "none",
+             "key": "level"
+            }
+           }
+          ]
+         },
+         {
+          "k": "status",
+          "p": {
+           "grow": 1,
+           "role": "omp.composer.extras",
+           "transparent": true,
+           "key": "extras"
+          }
+         },
+         {
+          "k": "text",
+          "p": {
+           "role": "omp.composer.stop",
+           "text": "Stop",
+           "title": "Stop  esc esc",
+           "tone": "error",
+           "key": "stop",
+           "actions": {
+            "click": "click"
+           }
+          }
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "k": "status",
+      "p": {
+       "role": "hermes.statusline",
+       "key": "statusline"
+      },
+      "c": [
+       {
+        "k": "seg",
+        "p": {
+         "priority": 9,
+         "role": "hermes.statusline.brand",
+         "spans": [
+          {
+           "t": "☤ hermes"
+          }
+         ],
+         "key": "brand"
+        }
+       },
+       {
+        "k": "seg",
+        "p": {
+         "priority": 1,
+         "side": "right",
+         "spans": [
+          {
+           "s": "muted",
+           "t": "⇧⏎ newline"
+          }
+         ],
+         "key": "newline"
+        }
+       },
+       {
+        "k": "seg",
+        "p": {
+         "priority": 10,
+         "role": "hermes.statusline.stop",
+         "side": "right",
+         "spans": [
+          {
+           "t": "esc esc stop"
+          }
+         ],
+         "key": "action",
+         "actions": {
+          "click": "click"
+         }
+        }
+       }
+      ]
+     }
+    ],
+    "layer": [],
+    "main": [
+     {
+      "k": "card",
+      "p": {
+       "role": "omp.welcome",
+       "key": "w0"
+      },
+      "c": [
+       {
+        "k": "row",
+        "p": {
+         "align": "center",
+         "gap": "md",
+         "role": "omp.welcome.lockup",
+         "key": "lockup"
+        },
+        "c": [
+         {
+          "k": "col",
+          "p": {
+           "role": "omp.welcome.mark",
+           "key": "mark"
+          },
+          "c": [
+           {
+            "k": "text",
+            "p": {
+             "role": "omp.welcome.wordmark",
+             "spans": [
+              {
+               "s": "strong",
+               "t": "hermes"
+              }
+             ],
+             "wrap": "none",
+             "key": "wordmark"
+            }
+           },
+           {
+            "k": "text",
+            "p": {
+             "role": "omp.welcome.version",
+             "spans": [
+              {
+               "s": "dim mono",
+               "t": "v1.0.0"
+              }
+             ],
+             "wrap": "none",
+             "key": "version"
+            }
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "k": "card",
+      "p": {
+       "role": "omp.user",
+       "tone": "user",
+       "key": "u1"
+      },
+      "c": [
+       {
+        "k": "row",
+        "p": {
+         "gap": "xs",
+         "role": "omp.user.tools",
+         "key": "tools"
+        },
+        "c": [
+         {
+          "k": "text",
+          "p": {
+           "role": "omp.user.time",
+           "spans": [
+            {
+             "s": "dim mono",
+             "t": "03:04 AM"
+            }
+           ],
+           "title": "1/2/2026, 3:04:05 AM",
+           "key": "time"
+          }
+         },
+         {
+          "k": "icon",
+          "p": {
+           "name": "copy",
+           "role": "omp.user.tool",
+           "title": "Copy message",
+           "key": "copy",
+           "actions": {
+            "click": "click"
+           }
+          }
+         }
+        ]
+       },
+       {
+        "k": "md",
+        "p": {
+         "key": "body",
+         "text": "format the code"
+        }
+       }
+      ]
+     },
+     {
+      "k": "col",
+      "p": {
+       "role": "omp.assistant",
+       "key": "t2"
+      },
+      "c": [
+       {
+        "k": "row",
+        "p": {
+         "align": "center",
+         "gap": "xs",
+         "role": "hermes.turn.working",
+         "key": "working"
+        },
+        "c": [
+         {
+          "k": "text",
+          "p": {
+           "spans": [
+            {
+             "s": "muted",
+             "t": "Working for"
+            }
+           ],
+           "wrap": "none",
+           "key": "label"
+          }
+         },
+         {
+          "k": "elapsed",
+          "p": {
+           "age": 0,
+           "format": "short",
+           "key": "age"
+          }
+         }
+        ]
+       },
+       {
+        "k": "md",
+        "p": {
+         "stream": true,
+         "key": "x3",
+         "text": "Formatting the files"
+        }
+       }
+      ]
+     }
+    ]
+   },
+   "step": "press enter"
+  },
+  {
+   "frame": {
+    "dock": [
+     {
+      "k": "col",
+      "p": {
+       "role": "omp.hud.status",
+       "key": "hud"
+      },
+      "c": [
+       {
+        "k": "row",
+        "p": {
+         "align": "center",
+         "gap": "sm",
+         "role": "omp.working",
+         "key": "working"
+        },
+        "c": [
+         {
+          "k": "spinner",
+          "p": {
+           "style": "starburst",
+           "tone": "accent",
+           "key": "spinner"
+          }
+         },
+         {
+          "k": "shimmer",
+          "p": {
+           "mode": "classic",
+           "palette": {
+            "high": "accent",
+            "low": "dim",
+            "mid": "muted"
+           },
+           "role": "omp.working.label",
+           "spans": [
+            {
+             "s": "muted",
+             "t": "Writing…"
+            }
+           ],
+           "key": "label"
+          }
+         },
+         {
+          "k": "text",
+          "p": {
+           "role": "omp.working.sep",
+           "text": "·",
+           "key": "sep"
+          }
+         },
+         {
+          "k": "elapsed",
+          "p": {
+           "age": 0,
+           "format": "short",
+           "key": "elapsed"
+          }
+         },
+         {
+          "k": "row",
+          "p": {
+           "grow": 1,
+           "key": "fill"
+          }
+         },
+         {
+          "k": "row",
+          "p": {
+           "align": "center",
+           "gap": "xs",
+           "role": "omp.working.stop",
+           "title": "Stop  esc esc",
+           "key": "stop",
+           "actions": {
+            "click": "click"
+           }
+          },
+          "c": [
+           {
+            "k": "kbd",
+            "p": {
+             "keys": [
+              "esc"
+             ],
+             "key": "k"
+            }
+           },
+           {
+            "k": "kbd",
+            "p": {
+             "keys": [
+              "esc"
+             ],
+             "key": "k2"
+            }
+           },
+           {
+            "k": "text",
+            "p": {
+             "text": "Stop",
+             "key": "t"
+            }
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "k": "col",
+      "p": {
+       "gap": "xs",
+       "role": "omp.queue",
+       "key": "queue"
+      },
+      "c": [
+       {
+        "k": "row",
+        "p": {
+         "align": "center",
+         "gap": "sm",
+         "role": "omp.queue.item",
+         "title": "Queued",
+         "key": "q0"
+        },
+        "c": [
+         {
+          "k": "icon",
+          "p": {
+           "name": "corner-down-right",
+           "key": "icon"
+          }
+         },
+         {
+          "k": "text",
+          "p": {
+           "grow": 1,
+           "text": "use tabs",
+           "truncate": "end",
+           "wrap": "none",
+           "key": "text"
+          }
+         },
+         {
+          "k": "row",
+          "p": {
+           "align": "center",
+           "gap": "xs",
+           "role": "omp.queue.steer",
+           "title": "Steer the running turn with this instead  ⌥↵",
+           "key": "steer",
+           "actions": {
+            "click": "click"
+           }
+          },
+          "c": [
+           {
+            "k": "icon",
+            "p": {
+             "name": "corner-up-right",
+             "key": "i"
+            }
+           },
+           {
+            "k": "kbd",
+            "p": {
+             "keys": [
+              "alt",
+              "enter"
+             ],
+             "key": "k"
+            }
+           },
+           {
+            "k": "text",
+            "p": {
+             "text": "Steer",
+             "key": "t"
+            }
+           }
+          ]
+         },
+         {
+          "k": "row",
+          "p": {
+           "align": "center",
+           "gap": "xs",
+           "role": "omp.queue.edit",
+           "title": "Edit in the composer  ⌥↑",
+           "key": "edit",
+           "actions": {
+            "click": "click"
+           }
+          },
+          "c": [
+           {
+            "k": "kbd",
+            "p": {
+             "keys": [
+              "alt",
+              "up"
+             ],
+             "key": "k"
+            }
+           },
+           {
+            "k": "text",
+            "p": {
+             "text": "Edit",
+             "key": "t"
+            }
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "k": "col",
+      "p": {
+       "role": "omp.editor",
+       "key": "composer"
+      },
+      "c": [
+       {
+        "k": "row",
+        "p": {
+         "role": "hermes.streak",
+         "key": "streak"
+        }
+       },
+       {
+        "k": "row",
+        "p": {
+         "gap": "sm",
+         "hidden": true,
+         "role": "omp.composer.chips",
+         "wrap": true,
+         "key": "chips"
+        }
+       },
+       {
+        "k": "row",
+        "p": {
+         "align": "start",
+         "gap": "sm",
+         "role": "omp.composer.line",
+         "key": "line"
+        },
+        "c": [
+         {
+          "k": "editor",
+          "p": {
+           "cursor": 0,
+           "decor": [],
+           "maxLines": 18,
+           "placeholder": "Ask Hermes — / commands · @ files",
+           "sendable": true,
+           "text": "",
+           "key": "input"
+          }
+         }
+        ]
+       },
+       {
+        "k": "row",
+        "p": {
+         "align": "center",
+         "gap": "sm",
+         "role": "omp.composer.bar",
+         "key": "bar"
+        },
+        "c": [
+         {
+          "k": "row",
+          "p": {
+           "align": "center",
+           "gap": "xs",
+           "role": "omp.composer.effort",
+           "title": "Reasoning effort: medium (the default) · click to cycle  ⇧⇥ · right-click to choose or save as default",
+           "key": "effort",
+           "actions": {
+            "click": "click",
+            "menu": [
+             "choose-effort",
+             "save-effort-as-default"
+            ]
+           }
+          },
+          "c": [
+           {
+            "k": "effort",
+            "p": {
+             "level": "medium",
+             "key": "glyph"
+            }
+           },
+           {
+            "k": "text",
+            "p": {
+             "spans": [
+              {
+               "s": "muted",
+               "t": "medium"
+              }
+             ],
+             "wrap": "none",
+             "key": "level"
+            }
+           }
+          ]
+         },
+         {
+          "k": "status",
+          "p": {
+           "grow": 1,
+           "role": "omp.composer.extras",
+           "transparent": true,
+           "key": "extras"
+          }
+         },
+         {
+          "k": "text",
+          "p": {
+           "role": "omp.composer.stop",
+           "text": "Stop",
+           "title": "Stop  esc esc",
+           "tone": "error",
+           "key": "stop",
+           "actions": {
+            "click": "click"
+           }
+          }
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "k": "status",
+      "p": {
+       "role": "hermes.statusline",
+       "key": "statusline"
+      },
+      "c": [
+       {
+        "k": "seg",
+        "p": {
+         "priority": 9,
+         "role": "hermes.statusline.brand",
+         "spans": [
+          {
+           "t": "☤ hermes"
+          }
+         ],
+         "key": "brand"
+        }
+       },
+       {
+        "k": "seg",
+        "p": {
+         "priority": 1,
+         "side": "right",
+         "spans": [
+          {
+           "s": "muted",
+           "t": "⇧⏎ newline"
+          }
+         ],
+         "key": "newline"
+        }
+       },
+       {
+        "k": "seg",
+        "p": {
+         "priority": 10,
+         "role": "hermes.statusline.stop",
+         "side": "right",
+         "spans": [
+          {
+           "t": "esc esc stop"
+          }
+         ],
+         "key": "action",
+         "actions": {
+          "click": "click"
+         }
+        }
+       }
+      ]
+     }
+    ],
+    "layer": [],
+    "main": [
+     {
+      "k": "card",
+      "p": {
+       "role": "omp.welcome",
+       "key": "w0"
+      },
+      "c": [
+       {
+        "k": "row",
+        "p": {
+         "align": "center",
+         "gap": "md",
+         "role": "omp.welcome.lockup",
+         "key": "lockup"
+        },
+        "c": [
+         {
+          "k": "col",
+          "p": {
+           "role": "omp.welcome.mark",
+           "key": "mark"
+          },
+          "c": [
+           {
+            "k": "text",
+            "p": {
+             "role": "omp.welcome.wordmark",
+             "spans": [
+              {
+               "s": "strong",
+               "t": "hermes"
+              }
+             ],
+             "wrap": "none",
+             "key": "wordmark"
+            }
+           },
+           {
+            "k": "text",
+            "p": {
+             "role": "omp.welcome.version",
+             "spans": [
+              {
+               "s": "dim mono",
+               "t": "v1.0.0"
+              }
+             ],
+             "wrap": "none",
+             "key": "version"
+            }
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "k": "card",
+      "p": {
+       "role": "omp.user",
+       "tone": "user",
+       "key": "u1"
+      },
+      "c": [
+       {
+        "k": "row",
+        "p": {
+         "gap": "xs",
+         "role": "omp.user.tools",
+         "key": "tools"
+        },
+        "c": [
+         {
+          "k": "text",
+          "p": {
+           "role": "omp.user.time",
+           "spans": [
+            {
+             "s": "dim mono",
+             "t": "03:04 AM"
+            }
+           ],
+           "title": "1/2/2026, 3:04:05 AM",
+           "key": "time"
+          }
+         },
+         {
+          "k": "icon",
+          "p": {
+           "name": "copy",
+           "role": "omp.user.tool",
+           "title": "Copy message",
+           "key": "copy",
+           "actions": {
+            "click": "click"
+           }
+          }
+         }
+        ]
+       },
+       {
+        "k": "md",
+        "p": {
+         "key": "body",
+         "text": "format the code"
+        }
+       }
+      ]
+     },
+     {
+      "k": "col",
+      "p": {
+       "role": "omp.assistant",
+       "key": "t2"
+      },
+      "c": [
+       {
+        "k": "row",
+        "p": {
+         "align": "center",
+         "gap": "xs",
+         "role": "hermes.turn.working",
+         "key": "working"
+        },
+        "c": [
+         {
+          "k": "text",
+          "p": {
+           "spans": [
+            {
+             "s": "muted",
+             "t": "Working for"
+            }
+           ],
+           "wrap": "none",
+           "key": "label"
+          }
+         },
+         {
+          "k": "elapsed",
+          "p": {
+           "age": 0,
+           "format": "short",
+           "key": "age"
+          }
+         }
+        ]
+       },
+       {
+        "k": "md",
+        "p": {
+         "stream": true,
+         "key": "x3",
+         "text": "Formatting the files"
+        }
+       }
+      ]
+     }
+    ]
+   },
+   "step": "feed 1"
+  },
+  {
+   "frame": {
+    "dock": [
+     {
+      "k": "col",
+      "p": {
+       "role": "omp.hud.status",
+       "key": "hud"
+      },
+      "c": [
+       {
+        "k": "row",
+        "p": {
+         "align": "center",
+         "gap": "sm",
+         "role": "omp.working",
+         "key": "working"
+        },
+        "c": [
+         {
+          "k": "spinner",
+          "p": {
+           "style": "starburst",
+           "tone": "accent",
+           "key": "spinner"
+          }
+         },
+         {
+          "k": "shimmer",
+          "p": {
+           "mode": "classic",
+           "palette": {
+            "high": "accent",
+            "low": "dim",
+            "mid": "muted"
+           },
+           "role": "omp.working.label",
+           "spans": [
+            {
+             "s": "muted",
+             "t": "Writing…"
+            }
+           ],
+           "key": "label"
+          }
+         },
+         {
+          "k": "text",
+          "p": {
+           "role": "omp.working.sep",
+           "text": "·",
+           "key": "sep"
+          }
+         },
+         {
+          "k": "elapsed",
+          "p": {
+           "age": 0,
+           "format": "short",
+           "key": "elapsed"
+          }
+         },
+         {
+          "k": "row",
+          "p": {
+           "grow": 1,
+           "key": "fill"
+          }
+         },
+         {
+          "k": "row",
+          "p": {
+           "align": "center",
+           "gap": "xs",
+           "role": "omp.working.stop",
+           "title": "Stop  esc esc",
+           "key": "stop",
+           "actions": {
+            "click": "click"
+           }
+          },
+          "c": [
+           {
+            "k": "kbd",
+            "p": {
+             "keys": [
+              "esc"
+             ],
+             "key": "k"
+            }
+           },
+           {
+            "k": "kbd",
+            "p": {
+             "keys": [
+              "esc"
+             ],
+             "key": "k2"
+            }
+           },
+           {
+            "k": "text",
+            "p": {
+             "text": "Stop",
+             "key": "t"
+            }
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "k": "col",
+      "p": {
+       "gap": "xs",
+       "role": "omp.queue",
+       "key": "queue"
+      },
+      "c": [
+       {
+        "k": "row",
+        "p": {
+         "align": "center",
+         "gap": "sm",
+         "role": "omp.queue.item",
+         "title": "Queued by another window (or before a reconnect)",
+         "key": "q0"
+        },
+        "c": [
+         {
+          "k": "icon",
+          "p": {
+           "name": "corner-down-right",
+           "key": "icon"
+          }
+         },
+         {
+          "k": "text",
+          "p": {
+           "grow": 1,
+           "text": "use tabs",
+           "truncate": "end",
+           "wrap": "none",
+           "key": "text"
+          }
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "k": "col",
+      "p": {
+       "role": "omp.editor",
+       "key": "composer"
+      },
+      "c": [
+       {
+        "k": "row",
+        "p": {
+         "role": "hermes.streak",
+         "key": "streak"
+        }
+       },
+       {
+        "k": "row",
+        "p": {
+         "gap": "sm",
+         "hidden": true,
+         "role": "omp.composer.chips",
+         "wrap": true,
+         "key": "chips"
+        }
+       },
+       {
+        "k": "row",
+        "p": {
+         "align": "start",
+         "gap": "sm",
+         "role": "omp.composer.line",
+         "key": "line"
+        },
+        "c": [
+         {
+          "k": "editor",
+          "p": {
+           "cursor": 0,
+           "decor": [],
+           "maxLines": 18,
+           "placeholder": "Ask Hermes — / commands · @ files",
+           "sendable": true,
+           "text": "",
+           "key": "input"
+          }
+         }
+        ]
+       },
+       {
+        "k": "row",
+        "p": {
+         "align": "center",
+         "gap": "sm",
+         "role": "omp.composer.bar",
+         "key": "bar"
+        },
+        "c": [
+         {
+          "k": "row",
+          "p": {
+           "align": "center",
+           "gap": "xs",
+           "role": "omp.composer.effort",
+           "title": "Reasoning effort: medium (the default) · click to cycle  ⇧⇥ · right-click to choose or save as default",
+           "key": "effort",
+           "actions": {
+            "click": "click",
+            "menu": [
+             "choose-effort",
+             "save-effort-as-default"
+            ]
+           }
+          },
+          "c": [
+           {
+            "k": "effort",
+            "p": {
+             "level": "medium",
+             "key": "glyph"
+            }
+           },
+           {
+            "k": "text",
+            "p": {
+             "spans": [
+              {
+               "s": "muted",
+               "t": "medium"
+              }
+             ],
+             "wrap": "none",
+             "key": "level"
+            }
+           }
+          ]
+         },
+         {
+          "k": "status",
+          "p": {
+           "grow": 1,
+           "role": "omp.composer.extras",
+           "transparent": true,
+           "key": "extras"
+          }
+         },
+         {
+          "k": "text",
+          "p": {
+           "role": "omp.composer.stop",
+           "text": "Stop",
+           "title": "Stop  esc esc",
+           "tone": "error",
+           "key": "stop",
+           "actions": {
+            "click": "click"
+           }
+          }
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "k": "status",
+      "p": {
+       "role": "hermes.statusline",
+       "key": "statusline"
+      },
+      "c": [
+       {
+        "k": "seg",
+        "p": {
+         "priority": 9,
+         "role": "hermes.statusline.brand",
+         "spans": [
+          {
+           "t": "☤ hermes"
+          }
+         ],
+         "key": "brand"
+        }
+       },
+       {
+        "k": "seg",
+        "p": {
+         "priority": 1,
+         "side": "right",
+         "spans": [
+          {
+           "s": "muted",
+           "t": "⇧⏎ newline"
+          }
+         ],
+         "key": "newline"
+        }
+       },
+       {
+        "k": "seg",
+        "p": {
+         "priority": 10,
+         "role": "hermes.statusline.stop",
+         "side": "right",
+         "spans": [
+          {
+           "t": "esc esc stop"
+          }
+         ],
+         "key": "action",
+         "actions": {
+          "click": "click"
+         }
+        }
+       }
+      ]
+     }
+    ],
+    "layer": [],
+    "main": [
+     {
+      "k": "card",
+      "p": {
+       "role": "omp.welcome",
+       "key": "w0"
+      },
+      "c": [
+       {
+        "k": "row",
+        "p": {
+         "align": "center",
+         "gap": "md",
+         "role": "omp.welcome.lockup",
+         "key": "lockup"
+        },
+        "c": [
+         {
+          "k": "col",
+          "p": {
+           "role": "omp.welcome.mark",
+           "key": "mark"
+          },
+          "c": [
+           {
+            "k": "text",
+            "p": {
+             "role": "omp.welcome.wordmark",
+             "spans": [
+              {
+               "s": "strong",
+               "t": "hermes"
+              }
+             ],
+             "wrap": "none",
+             "key": "wordmark"
+            }
+           },
+           {
+            "k": "text",
+            "p": {
+             "role": "omp.welcome.version",
+             "spans": [
+              {
+               "s": "dim mono",
+               "t": "v1.0.0"
+              }
+             ],
+             "wrap": "none",
+             "key": "version"
+            }
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "k": "card",
+      "p": {
+       "role": "omp.user",
+       "tone": "user",
+       "key": "u1"
+      },
+      "c": [
+       {
+        "k": "row",
+        "p": {
+         "gap": "xs",
+         "role": "omp.user.tools",
+         "key": "tools"
+        },
+        "c": [
+         {
+          "k": "text",
+          "p": {
+           "role": "omp.user.time",
+           "spans": [
+            {
+             "s": "dim mono",
+             "t": "03:04 AM"
+            }
+           ],
+           "title": "1/2/2026, 3:04:05 AM",
+           "key": "time"
+          }
+         },
+         {
+          "k": "icon",
+          "p": {
+           "name": "copy",
+           "role": "omp.user.tool",
+           "title": "Copy message",
+           "key": "copy",
+           "actions": {
+            "click": "click"
+           }
+          }
+         }
+        ]
+       },
+       {
+        "k": "md",
+        "p": {
+         "key": "body",
+         "text": "format the code"
+        }
+       }
+      ]
+     },
+     {
+      "k": "col",
+      "p": {
+       "role": "omp.assistant",
+       "key": "t2"
+      },
+      "c": [
+       {
+        "k": "row",
+        "p": {
+         "align": "center",
+         "gap": "xs",
+         "role": "hermes.turn.working",
+         "key": "working"
+        },
+        "c": [
+         {
+          "k": "text",
+          "p": {
+           "spans": [
+            {
+             "s": "muted",
+             "t": "Working for"
+            }
+           ],
+           "wrap": "none",
+           "key": "label"
+          }
+         },
+         {
+          "k": "elapsed",
+          "p": {
+           "age": 0,
+           "format": "short",
+           "key": "age"
+          }
+         }
+        ]
+       },
+       {
+        "k": "md",
+        "p": {
+         "stream": true,
+         "key": "x3",
+         "text": "Formatting the files"
+        }
+       },
+       {
+        "k": "card",
+        "p": {
+         "role": "omp.user",
+         "tone": "user",
+         "key": "s4"
+        },
+        "c": [
+         {
+          "k": "md",
+          "p": {
+           "key": "body",
+           "text": "use tabs"
+          }
+         },
+         {
+          "k": "row",
+          "p": {
+           "align": "center",
+           "gap": "xs",
+           "role": "omp.user.steered",
+           "key": "how"
+          },
+          "c": [
+           {
+            "k": "icon",
+            "p": {
+             "name": "corner-down-right",
+             "key": "icon"
+            }
+           },
+           {
+            "k": "text",
+            "p": {
+             "spans": [
+              {
+               "s": "dim",
+               "t": "Steered · reaches Hermes after this step"
+              }
+             ],
+             "key": "state"
+            }
+           }
+          ]
+         }
+        ]
+       },
+       {
+        "k": "row",
+        "p": {
+         "align": "center",
+         "gap": "sm",
+         "role": "hermes.work.row",
+         "key": "thinking"
+        },
+        "c": [
+         {
+          "k": "icon",
+          "p": {
+           "name": "brain",
+           "key": "icon"
+          }
+         },
+         {
+          "k": "shimmer",
+          "p": {
+           "mode": "classic",
+           "palette": {
+            "high": "accent",
+            "low": "dim",
+            "mid": "muted"
+           },
+           "role": "hermes.work.live",
+           "spans": [
+            {
+             "s": "muted",
+             "t": "Thinking"
+            }
+           ],
+           "key": "label"
+          }
+         }
+        ]
+       }
+      ]
+     }
+    ]
+   },
+   "step": "press alt+enter"
+  },
+  {
+   "frame": {
+    "dock": [
+     {
+      "k": "col",
+      "p": {
+       "role": "omp.hud.status",
+       "key": "hud"
+      },
+      "c": [
+       {
+        "k": "row",
+        "p": {
+         "align": "center",
+         "gap": "sm",
+         "role": "omp.working",
+         "key": "working"
+        },
+        "c": [
+         {
+          "k": "spinner",
+          "p": {
+           "style": "starburst",
+           "tone": "accent",
+           "key": "spinner"
+          }
+         },
+         {
+          "k": "shimmer",
+          "p": {
+           "mode": "classic",
+           "palette": {
+            "high": "accent",
+            "low": "dim",
+            "mid": "muted"
+           },
+           "role": "omp.working.label",
+           "spans": [
+            {
+             "s": "muted",
+             "t": "Writing…"
+            }
+           ],
+           "key": "label"
+          }
+         },
+         {
+          "k": "text",
+          "p": {
+           "role": "omp.working.sep",
+           "text": "·",
+           "key": "sep"
+          }
+         },
+         {
+          "k": "elapsed",
+          "p": {
+           "age": 0,
+           "format": "short",
+           "key": "elapsed"
+          }
+         },
+         {
+          "k": "row",
+          "p": {
+           "grow": 1,
+           "key": "fill"
+          }
+         },
+         {
+          "k": "row",
+          "p": {
+           "align": "center",
+           "gap": "xs",
+           "role": "omp.working.stop",
+           "title": "Stop  esc esc",
+           "key": "stop",
+           "actions": {
+            "click": "click"
+           }
+          },
+          "c": [
+           {
+            "k": "kbd",
+            "p": {
+             "keys": [
+              "esc"
+             ],
+             "key": "k"
+            }
+           },
+           {
+            "k": "kbd",
+            "p": {
+             "keys": [
+              "esc"
+             ],
+             "key": "k2"
+            }
+           },
+           {
+            "k": "text",
+            "p": {
+             "text": "Stop",
+             "key": "t"
+            }
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "k": "col",
+      "p": {
+       "role": "omp.editor",
+       "key": "composer"
+      },
+      "c": [
+       {
+        "k": "row",
+        "p": {
+         "role": "hermes.streak",
+         "key": "streak"
+        }
+       },
+       {
+        "k": "row",
+        "p": {
+         "gap": "sm",
+         "hidden": true,
+         "role": "omp.composer.chips",
+         "wrap": true,
+         "key": "chips"
+        }
+       },
+       {
+        "k": "row",
+        "p": {
+         "align": "start",
+         "gap": "sm",
+         "role": "omp.composer.line",
+         "key": "line"
+        },
+        "c": [
+         {
+          "k": "editor",
+          "p": {
+           "cursor": 0,
+           "decor": [],
+           "maxLines": 18,
+           "placeholder": "Ask Hermes — / commands · @ files",
+           "sendable": true,
+           "text": "",
+           "key": "input"
+          }
+         }
+        ]
+       },
+       {
+        "k": "row",
+        "p": {
+         "align": "center",
+         "gap": "sm",
+         "role": "omp.composer.bar",
+         "key": "bar"
+        },
+        "c": [
+         {
+          "k": "row",
+          "p": {
+           "align": "center",
+           "gap": "xs",
+           "role": "omp.composer.effort",
+           "title": "Reasoning effort: medium (the default) · click to cycle  ⇧⇥ · right-click to choose or save as default",
+           "key": "effort",
+           "actions": {
+            "click": "click",
+            "menu": [
+             "choose-effort",
+             "save-effort-as-default"
+            ]
+           }
+          },
+          "c": [
+           {
+            "k": "effort",
+            "p": {
+             "level": "medium",
+             "key": "glyph"
+            }
+           },
+           {
+            "k": "text",
+            "p": {
+             "spans": [
+              {
+               "s": "muted",
+               "t": "medium"
+              }
+             ],
+             "wrap": "none",
+             "key": "level"
+            }
+           }
+          ]
+         },
+         {
+          "k": "status",
+          "p": {
+           "grow": 1,
+           "role": "omp.composer.extras",
+           "transparent": true,
+           "key": "extras"
+          }
+         },
+         {
+          "k": "text",
+          "p": {
+           "role": "omp.composer.stop",
+           "text": "Stop",
+           "title": "Stop  esc esc",
+           "tone": "error",
+           "key": "stop",
+           "actions": {
+            "click": "click"
+           }
+          }
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "k": "status",
+      "p": {
+       "role": "hermes.statusline",
+       "key": "statusline"
+      },
+      "c": [
+       {
+        "k": "seg",
+        "p": {
+         "priority": 9,
+         "role": "hermes.statusline.brand",
+         "spans": [
+          {
+           "t": "☤ hermes"
+          }
+         ],
+         "key": "brand"
+        }
+       },
+       {
+        "k": "seg",
+        "p": {
+         "priority": 1,
+         "side": "right",
+         "spans": [
+          {
+           "s": "muted",
+           "t": "⇧⏎ newline"
+          }
+         ],
+         "key": "newline"
+        }
+       },
+       {
+        "k": "seg",
+        "p": {
+         "priority": 10,
+         "role": "hermes.statusline.stop",
+         "side": "right",
+         "spans": [
+          {
+           "t": "esc esc stop"
+          }
+         ],
+         "key": "action",
+         "actions": {
+          "click": "click"
+         }
+        }
+       }
+      ]
+     }
+    ],
+    "layer": [],
+    "main": [
+     {
+      "k": "card",
+      "p": {
+       "role": "omp.welcome",
+       "key": "w0"
+      },
+      "c": [
+       {
+        "k": "row",
+        "p": {
+         "align": "center",
+         "gap": "md",
+         "role": "omp.welcome.lockup",
+         "key": "lockup"
+        },
+        "c": [
+         {
+          "k": "col",
+          "p": {
+           "role": "omp.welcome.mark",
+           "key": "mark"
+          },
+          "c": [
+           {
+            "k": "text",
+            "p": {
+             "role": "omp.welcome.wordmark",
+             "spans": [
+              {
+               "s": "strong",
+               "t": "hermes"
+              }
+             ],
+             "wrap": "none",
+             "key": "wordmark"
+            }
+           },
+           {
+            "k": "text",
+            "p": {
+             "role": "omp.welcome.version",
+             "spans": [
+              {
+               "s": "dim mono",
+               "t": "v1.0.0"
+              }
+             ],
+             "wrap": "none",
+             "key": "version"
+            }
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "k": "card",
+      "p": {
+       "role": "omp.user",
+       "tone": "user",
+       "key": "u1"
+      },
+      "c": [
+       {
+        "k": "row",
+        "p": {
+         "gap": "xs",
+         "role": "omp.user.tools",
+         "key": "tools"
+        },
+        "c": [
+         {
+          "k": "text",
+          "p": {
+           "role": "omp.user.time",
+           "spans": [
+            {
+             "s": "dim mono",
+             "t": "03:04 AM"
+            }
+           ],
+           "title": "1/2/2026, 3:04:05 AM",
+           "key": "time"
+          }
+         },
+         {
+          "k": "icon",
+          "p": {
+           "name": "copy",
+           "role": "omp.user.tool",
+           "title": "Copy message",
+           "key": "copy",
+           "actions": {
+            "click": "click"
+           }
+          }
+         }
+        ]
+       },
+       {
+        "k": "md",
+        "p": {
+         "key": "body",
+         "text": "format the code"
+        }
+       }
+      ]
+     },
+     {
+      "k": "col",
+      "p": {
+       "role": "omp.assistant",
+       "key": "t2"
+      },
+      "c": [
+       {
+        "k": "row",
+        "p": {
+         "align": "center",
+         "gap": "xs",
+         "role": "hermes.turn.working",
+         "key": "working"
+        },
+        "c": [
+         {
+          "k": "text",
+          "p": {
+           "spans": [
+            {
+             "s": "muted",
+             "t": "Working for"
+            }
+           ],
+           "wrap": "none",
+           "key": "label"
+          }
+         },
+         {
+          "k": "elapsed",
+          "p": {
+           "age": 0,
+           "format": "short",
+           "key": "age"
+          }
+         }
+        ]
+       },
+       {
+        "k": "md",
+        "p": {
+         "stream": true,
+         "key": "x3",
+         "text": "Formatting the files"
+        }
+       },
+       {
+        "k": "card",
+        "p": {
+         "role": "omp.user",
+         "tone": "user",
+         "key": "s4"
+        },
+        "c": [
+         {
+          "k": "md",
+          "p": {
+           "key": "body",
+           "text": "use tabs"
+          }
+         },
+         {
+          "k": "row",
+          "p": {
+           "align": "center",
+           "gap": "xs",
+           "role": "omp.user.steered",
+           "key": "how"
+          },
+          "c": [
+           {
+            "k": "icon",
+            "p": {
+             "name": "corner-down-right",
+             "key": "icon"
+            }
+           },
+           {
+            "k": "text",
+            "p": {
+             "spans": [
+              {
+               "s": "dim",
+               "t": "Steered · reaches Hermes after this step"
+              }
+             ],
+             "key": "state"
+            }
+           }
+          ]
+         }
+        ]
+       },
+       {
+        "k": "row",
+        "p": {
+         "align": "center",
+         "gap": "sm",
+         "role": "hermes.work.row",
+         "key": "thinking"
+        },
+        "c": [
+         {
+          "k": "icon",
+          "p": {
+           "name": "brain",
+           "key": "icon"
+          }
+         },
+         {
+          "k": "shimmer",
+          "p": {
+           "mode": "classic",
+           "palette": {
+            "high": "accent",
+            "low": "dim",
+            "mid": "muted"
+           },
+           "role": "hermes.work.live",
+           "spans": [
+            {
+             "s": "muted",
+             "t": "Thinking"
+            }
+           ],
+           "key": "label"
+          }
+         }
+        ]
+       }
+      ]
+     }
+    ]
+   },
+   "step": "feed 2"
+  },
+  {
+   "frame": {
+    "dock": [
+     {
+      "k": "col",
+      "p": {
+       "role": "omp.hud.status",
+       "key": "hud"
+      },
+      "c": [
+       {
+        "k": "row",
+        "p": {
+         "align": "center",
+         "gap": "sm",
+         "role": "omp.working",
+         "key": "working"
+        },
+        "c": [
+         {
+          "k": "spinner",
+          "p": {
+           "style": "starburst",
+           "tone": "accent",
+           "key": "spinner"
+          }
+         },
+         {
+          "k": "shimmer",
+          "p": {
+           "mode": "classic",
+           "palette": {
+            "high": "accent",
+            "low": "dim",
+            "mid": "muted"
+           },
+           "role": "omp.working.label",
+           "spans": [
+            {
+             "s": "muted",
+             "t": "Writing…"
+            }
+           ],
+           "key": "label"
+          }
+         },
+         {
+          "k": "text",
+          "p": {
+           "role": "omp.working.sep",
+           "text": "·",
+           "key": "sep"
+          }
+         },
+         {
+          "k": "elapsed",
+          "p": {
+           "age": 0,
+           "format": "short",
+           "key": "elapsed"
+          }
+         },
+         {
+          "k": "row",
+          "p": {
+           "grow": 1,
+           "key": "fill"
+          }
+         },
+         {
+          "k": "row",
+          "p": {
+           "align": "center",
+           "gap": "xs",
+           "role": "omp.working.stop",
+           "title": "Stop  esc esc",
+           "key": "stop",
+           "actions": {
+            "click": "click"
+           }
+          },
+          "c": [
+           {
+            "k": "kbd",
+            "p": {
+             "keys": [
+              "esc"
+             ],
+             "key": "k"
+            }
+           },
+           {
+            "k": "kbd",
+            "p": {
+             "keys": [
+              "esc"
+             ],
+             "key": "k2"
+            }
+           },
+           {
+            "k": "text",
+            "p": {
+             "text": "Stop",
+             "key": "t"
+            }
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "k": "col",
+      "p": {
+       "role": "omp.editor",
+       "key": "composer"
+      },
+      "c": [
+       {
+        "k": "row",
+        "p": {
+         "role": "hermes.streak",
+         "key": "streak"
+        }
+       },
+       {
+        "k": "row",
+        "p": {
+         "gap": "sm",
+         "hidden": true,
+         "role": "omp.composer.chips",
+         "wrap": true,
+         "key": "chips"
+        }
+       },
+       {
+        "k": "row",
+        "p": {
+         "align": "start",
+         "gap": "sm",
+         "role": "omp.composer.line",
+         "key": "line"
+        },
+        "c": [
+         {
+          "k": "editor",
+          "p": {
+           "cursor": 13,
+           "decor": [],
+           "maxLines": 18,
+           "placeholder": "Ask Hermes — / commands · @ files",
+           "sendable": true,
+           "text": "then the docs",
+           "key": "input"
+          }
+         }
+        ]
+       },
+       {
+        "k": "row",
+        "p": {
+         "align": "center",
+         "gap": "sm",
+         "role": "omp.composer.bar",
+         "key": "bar"
+        },
+        "c": [
+         {
+          "k": "row",
+          "p": {
+           "align": "center",
+           "gap": "xs",
+           "role": "omp.composer.effort",
+           "title": "Reasoning effort: medium (the default) · click to cycle  ⇧⇥ · right-click to choose or save as default",
+           "key": "effort",
+           "actions": {
+            "click": "click",
+            "menu": [
+             "choose-effort",
+             "save-effort-as-default"
+            ]
+           }
+          },
+          "c": [
+           {
+            "k": "effort",
+            "p": {
+             "level": "medium",
+             "key": "glyph"
+            }
+           },
+           {
+            "k": "text",
+            "p": {
+             "spans": [
+              {
+               "s": "muted",
+               "t": "medium"
+              }
+             ],
+             "wrap": "none",
+             "key": "level"
+            }
+           }
+          ]
+         },
+         {
+          "k": "status",
+          "p": {
+           "grow": 1,
+           "role": "omp.composer.extras",
+           "transparent": true,
+           "key": "extras"
+          }
+         },
+         {
+          "k": "text",
+          "p": {
+           "role": "omp.composer.stop",
+           "text": "Stop",
+           "title": "Stop  esc esc",
+           "tone": "error",
+           "key": "stop",
+           "actions": {
+            "click": "click"
+           }
+          }
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "k": "status",
+      "p": {
+       "role": "hermes.statusline",
+       "key": "statusline"
+      },
+      "c": [
+       {
+        "k": "seg",
+        "p": {
+         "priority": 9,
+         "role": "hermes.statusline.brand",
+         "spans": [
+          {
+           "t": "☤ hermes"
+          }
+         ],
+         "key": "brand"
+        }
+       },
+       {
+        "k": "seg",
+        "p": {
+         "priority": 1,
+         "side": "right",
+         "spans": [
+          {
+           "s": "muted",
+           "t": "⇧⏎ newline"
+          }
+         ],
+         "key": "newline"
+        }
+       },
+       {
+        "k": "seg",
+        "p": {
+         "priority": 10,
+         "role": "hermes.statusline.stop",
+         "side": "right",
+         "spans": [
+          {
+           "t": "esc esc stop"
+          }
+         ],
+         "key": "action",
+         "actions": {
+          "click": "click"
+         }
+        }
+       }
+      ]
+     }
+    ],
+    "layer": [],
+    "main": [
+     {
+      "k": "card",
+      "p": {
+       "role": "omp.welcome",
+       "key": "w0"
+      },
+      "c": [
+       {
+        "k": "row",
+        "p": {
+         "align": "center",
+         "gap": "md",
+         "role": "omp.welcome.lockup",
+         "key": "lockup"
+        },
+        "c": [
+         {
+          "k": "col",
+          "p": {
+           "role": "omp.welcome.mark",
+           "key": "mark"
+          },
+          "c": [
+           {
+            "k": "text",
+            "p": {
+             "role": "omp.welcome.wordmark",
+             "spans": [
+              {
+               "s": "strong",
+               "t": "hermes"
+              }
+             ],
+             "wrap": "none",
+             "key": "wordmark"
+            }
+           },
+           {
+            "k": "text",
+            "p": {
+             "role": "omp.welcome.version",
+             "spans": [
+              {
+               "s": "dim mono",
+               "t": "v1.0.0"
+              }
+             ],
+             "wrap": "none",
+             "key": "version"
+            }
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "k": "card",
+      "p": {
+       "role": "omp.user",
+       "tone": "user",
+       "key": "u1"
+      },
+      "c": [
+       {
+        "k": "row",
+        "p": {
+         "gap": "xs",
+         "role": "omp.user.tools",
+         "key": "tools"
+        },
+        "c": [
+         {
+          "k": "text",
+          "p": {
+           "role": "omp.user.time",
+           "spans": [
+            {
+             "s": "dim mono",
+             "t": "03:04 AM"
+            }
+           ],
+           "title": "1/2/2026, 3:04:05 AM",
+           "key": "time"
+          }
+         },
+         {
+          "k": "icon",
+          "p": {
+           "name": "copy",
+           "role": "omp.user.tool",
+           "title": "Copy message",
+           "key": "copy",
+           "actions": {
+            "click": "click"
+           }
+          }
+         }
+        ]
+       },
+       {
+        "k": "md",
+        "p": {
+         "key": "body",
+         "text": "format the code"
+        }
+       }
+      ]
+     },
+     {
+      "k": "col",
+      "p": {
+       "role": "omp.assistant",
+       "key": "t2"
+      },
+      "c": [
+       {
+        "k": "row",
+        "p": {
+         "align": "center",
+         "gap": "xs",
+         "role": "hermes.turn.working",
+         "key": "working"
+        },
+        "c": [
+         {
+          "k": "text",
+          "p": {
+           "spans": [
+            {
+             "s": "muted",
+             "t": "Working for"
+            }
+           ],
+           "wrap": "none",
+           "key": "label"
+          }
+         },
+         {
+          "k": "elapsed",
+          "p": {
+           "age": 0,
+           "format": "short",
+           "key": "age"
+          }
+         }
+        ]
+       },
+       {
+        "k": "md",
+        "p": {
+         "stream": true,
+         "key": "x3",
+         "text": "Formatting the files"
+        }
+       },
+       {
+        "k": "card",
+        "p": {
+         "role": "omp.user",
+         "tone": "user",
+         "key": "s4"
+        },
+        "c": [
+         {
+          "k": "md",
+          "p": {
+           "key": "body",
+           "text": "use tabs"
+          }
+         },
+         {
+          "k": "row",
+          "p": {
+           "align": "center",
+           "gap": "xs",
+           "role": "omp.user.steered",
+           "key": "how"
+          },
+          "c": [
+           {
+            "k": "icon",
+            "p": {
+             "name": "corner-down-right",
+             "key": "icon"
+            }
+           },
+           {
+            "k": "text",
+            "p": {
+             "spans": [
+              {
+               "s": "dim",
+               "t": "Steered · reaches Hermes after this step"
+              }
+             ],
+             "key": "state"
+            }
+           }
+          ]
+         }
+        ]
+       },
+       {
+        "k": "row",
+        "p": {
+         "align": "center",
+         "gap": "sm",
+         "role": "hermes.work.row",
+         "key": "thinking"
+        },
+        "c": [
+         {
+          "k": "icon",
+          "p": {
+           "name": "brain",
+           "key": "icon"
+          }
+         },
+         {
+          "k": "shimmer",
+          "p": {
+           "mode": "classic",
+           "palette": {
+            "high": "accent",
+            "low": "dim",
+            "mid": "muted"
+           },
+           "role": "hermes.work.live",
+           "spans": [
+            {
+             "s": "muted",
+             "t": "Thinking"
+            }
+           ],
+           "key": "label"
+          }
+         }
+        ]
+       }
+      ]
+     }
+    ]
+   },
+   "step": "type then the docs"
+  },
+  {
+   "frame": {
+    "dock": [
+     {
+      "k": "col",
+      "p": {
+       "role": "omp.hud.status",
+       "key": "hud"
+      },
+      "c": [
+       {
+        "k": "row",
+        "p": {
+         "align": "center",
+         "gap": "sm",
+         "role": "omp.working",
+         "key": "working"
+        },
+        "c": [
+         {
+          "k": "spinner",
+          "p": {
+           "style": "starburst",
+           "tone": "accent",
+           "key": "spinner"
+          }
+         },
+         {
+          "k": "shimmer",
+          "p": {
+           "mode": "classic",
+           "palette": {
+            "high": "accent",
+            "low": "dim",
+            "mid": "muted"
+           },
+           "role": "omp.working.label",
+           "spans": [
+            {
+             "s": "muted",
+             "t": "Writing…"
+            }
+           ],
+           "key": "label"
+          }
+         },
+         {
+          "k": "text",
+          "p": {
+           "role": "omp.working.sep",
+           "text": "·",
+           "key": "sep"
+          }
+         },
+         {
+          "k": "elapsed",
+          "p": {
+           "age": 0,
+           "format": "short",
+           "key": "elapsed"
+          }
+         },
+         {
+          "k": "row",
+          "p": {
+           "grow": 1,
+           "key": "fill"
+          }
+         },
+         {
+          "k": "row",
+          "p": {
+           "align": "center",
+           "gap": "xs",
+           "role": "omp.working.stop",
+           "title": "Stop  esc esc",
+           "key": "stop",
+           "actions": {
+            "click": "click"
+           }
+          },
+          "c": [
+           {
+            "k": "kbd",
+            "p": {
+             "keys": [
+              "esc"
+             ],
+             "key": "k"
+            }
+           },
+           {
+            "k": "kbd",
+            "p": {
+             "keys": [
+              "esc"
+             ],
+             "key": "k2"
+            }
+           },
+           {
+            "k": "text",
+            "p": {
+             "text": "Stop",
+             "key": "t"
+            }
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "k": "col",
+      "p": {
+       "gap": "xs",
+       "role": "omp.queue",
+       "key": "queue"
+      },
+      "c": [
+       {
+        "k": "row",
+        "p": {
+         "align": "center",
+         "gap": "sm",
+         "role": "omp.queue.item",
+         "title": "Queued",
+         "key": "q0"
+        },
+        "c": [
+         {
+          "k": "icon",
+          "p": {
+           "name": "corner-down-right",
+           "key": "icon"
+          }
+         },
+         {
+          "k": "text",
+          "p": {
+           "grow": 1,
+           "text": "then the docs",
+           "truncate": "end",
+           "wrap": "none",
+           "key": "text"
+          }
+         },
+         {
+          "k": "row",
+          "p": {
+           "align": "center",
+           "gap": "xs",
+           "role": "omp.queue.steer",
+           "title": "Steer the running turn with this instead  ⌥↵",
+           "key": "steer",
+           "actions": {
+            "click": "click"
+           }
+          },
+          "c": [
+           {
+            "k": "icon",
+            "p": {
+             "name": "corner-up-right",
+             "key": "i"
+            }
+           },
+           {
+            "k": "kbd",
+            "p": {
+             "keys": [
+              "alt",
+              "enter"
+             ],
+             "key": "k"
+            }
+           },
+           {
+            "k": "text",
+            "p": {
+             "text": "Steer",
+             "key": "t"
+            }
+           }
+          ]
+         },
+         {
+          "k": "row",
+          "p": {
+           "align": "center",
+           "gap": "xs",
+           "role": "omp.queue.edit",
+           "title": "Edit in the composer  ⌥↑",
+           "key": "edit",
+           "actions": {
+            "click": "click"
+           }
+          },
+          "c": [
+           {
+            "k": "kbd",
+            "p": {
+             "keys": [
+              "alt",
+              "up"
+             ],
+             "key": "k"
+            }
+           },
+           {
+            "k": "text",
+            "p": {
+             "text": "Edit",
+             "key": "t"
+            }
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "k": "col",
+      "p": {
+       "role": "omp.editor",
+       "key": "composer"
+      },
+      "c": [
+       {
+        "k": "row",
+        "p": {
+         "role": "hermes.streak",
+         "key": "streak"
+        }
+       },
+       {
+        "k": "row",
+        "p": {
+         "gap": "sm",
+         "hidden": true,
+         "role": "omp.composer.chips",
+         "wrap": true,
+         "key": "chips"
+        }
+       },
+       {
+        "k": "row",
+        "p": {
+         "align": "start",
+         "gap": "sm",
+         "role": "omp.composer.line",
+         "key": "line"
+        },
+        "c": [
+         {
+          "k": "editor",
+          "p": {
+           "cursor": 0,
+           "decor": [],
+           "maxLines": 18,
+           "placeholder": "Ask Hermes — / commands · @ files",
+           "sendable": true,
+           "text": "",
+           "key": "input"
+          }
+         }
+        ]
+       },
+       {
+        "k": "row",
+        "p": {
+         "align": "center",
+         "gap": "sm",
+         "role": "omp.composer.bar",
+         "key": "bar"
+        },
+        "c": [
+         {
+          "k": "row",
+          "p": {
+           "align": "center",
+           "gap": "xs",
+           "role": "omp.composer.effort",
+           "title": "Reasoning effort: medium (the default) · click to cycle  ⇧⇥ · right-click to choose or save as default",
+           "key": "effort",
+           "actions": {
+            "click": "click",
+            "menu": [
+             "choose-effort",
+             "save-effort-as-default"
+            ]
+           }
+          },
+          "c": [
+           {
+            "k": "effort",
+            "p": {
+             "level": "medium",
+             "key": "glyph"
+            }
+           },
+           {
+            "k": "text",
+            "p": {
+             "spans": [
+              {
+               "s": "muted",
+               "t": "medium"
+              }
+             ],
+             "wrap": "none",
+             "key": "level"
+            }
+           }
+          ]
+         },
+         {
+          "k": "status",
+          "p": {
+           "grow": 1,
+           "role": "omp.composer.extras",
+           "transparent": true,
+           "key": "extras"
+          }
+         },
+         {
+          "k": "text",
+          "p": {
+           "role": "omp.composer.stop",
+           "text": "Stop",
+           "title": "Stop  esc esc",
+           "tone": "error",
+           "key": "stop",
+           "actions": {
+            "click": "click"
+           }
+          }
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "k": "status",
+      "p": {
+       "role": "hermes.statusline",
+       "key": "statusline"
+      },
+      "c": [
+       {
+        "k": "seg",
+        "p": {
+         "priority": 9,
+         "role": "hermes.statusline.brand",
+         "spans": [
+          {
+           "t": "☤ hermes"
+          }
+         ],
+         "key": "brand"
+        }
+       },
+       {
+        "k": "seg",
+        "p": {
+         "priority": 1,
+         "side": "right",
+         "spans": [
+          {
+           "s": "muted",
+           "t": "⇧⏎ newline"
+          }
+         ],
+         "key": "newline"
+        }
+       },
+       {
+        "k": "seg",
+        "p": {
+         "priority": 10,
+         "role": "hermes.statusline.stop",
+         "side": "right",
+         "spans": [
+          {
+           "t": "esc esc stop"
+          }
+         ],
+         "key": "action",
+         "actions": {
+          "click": "click"
+         }
+        }
+       }
+      ]
+     }
+    ],
+    "layer": [],
+    "main": [
+     {
+      "k": "card",
+      "p": {
+       "role": "omp.welcome",
+       "key": "w0"
+      },
+      "c": [
+       {
+        "k": "row",
+        "p": {
+         "align": "center",
+         "gap": "md",
+         "role": "omp.welcome.lockup",
+         "key": "lockup"
+        },
+        "c": [
+         {
+          "k": "col",
+          "p": {
+           "role": "omp.welcome.mark",
+           "key": "mark"
+          },
+          "c": [
+           {
+            "k": "text",
+            "p": {
+             "role": "omp.welcome.wordmark",
+             "spans": [
+              {
+               "s": "strong",
+               "t": "hermes"
+              }
+             ],
+             "wrap": "none",
+             "key": "wordmark"
+            }
+           },
+           {
+            "k": "text",
+            "p": {
+             "role": "omp.welcome.version",
+             "spans": [
+              {
+               "s": "dim mono",
+               "t": "v1.0.0"
+              }
+             ],
+             "wrap": "none",
+             "key": "version"
+            }
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "k": "card",
+      "p": {
+       "role": "omp.user",
+       "tone": "user",
+       "key": "u1"
+      },
+      "c": [
+       {
+        "k": "row",
+        "p": {
+         "gap": "xs",
+         "role": "omp.user.tools",
+         "key": "tools"
+        },
+        "c": [
+         {
+          "k": "text",
+          "p": {
+           "role": "omp.user.time",
+           "spans": [
+            {
+             "s": "dim mono",
+             "t": "03:04 AM"
+            }
+           ],
+           "title": "1/2/2026, 3:04:05 AM",
+           "key": "time"
+          }
+         },
+         {
+          "k": "icon",
+          "p": {
+           "name": "copy",
+           "role": "omp.user.tool",
+           "title": "Copy message",
+           "key": "copy",
+           "actions": {
+            "click": "click"
+           }
+          }
+         }
+        ]
+       },
+       {
+        "k": "md",
+        "p": {
+         "key": "body",
+         "text": "format the code"
+        }
+       }
+      ]
+     },
+     {
+      "k": "col",
+      "p": {
+       "role": "omp.assistant",
+       "key": "t2"
+      },
+      "c": [
+       {
+        "k": "row",
+        "p": {
+         "align": "center",
+         "gap": "xs",
+         "role": "hermes.turn.working",
+         "key": "working"
+        },
+        "c": [
+         {
+          "k": "text",
+          "p": {
+           "spans": [
+            {
+             "s": "muted",
+             "t": "Working for"
+            }
+           ],
+           "wrap": "none",
+           "key": "label"
+          }
+         },
+         {
+          "k": "elapsed",
+          "p": {
+           "age": 0,
+           "format": "short",
+           "key": "age"
+          }
+         }
+        ]
+       },
+       {
+        "k": "md",
+        "p": {
+         "stream": true,
+         "key": "x3",
+         "text": "Formatting the files"
+        }
+       },
+       {
+        "k": "card",
+        "p": {
+         "role": "omp.user",
+         "tone": "user",
+         "key": "s4"
+        },
+        "c": [
+         {
+          "k": "md",
+          "p": {
+           "key": "body",
+           "text": "use tabs"
+          }
+         },
+         {
+          "k": "row",
+          "p": {
+           "align": "center",
+           "gap": "xs",
+           "role": "omp.user.steered",
+           "key": "how"
+          },
+          "c": [
+           {
+            "k": "icon",
+            "p": {
+             "name": "corner-down-right",
+             "key": "icon"
+            }
+           },
+           {
+            "k": "text",
+            "p": {
+             "spans": [
+              {
+               "s": "dim",
+               "t": "Steered · reaches Hermes after this step"
+              }
+             ],
+             "key": "state"
+            }
+           }
+          ]
+         }
+        ]
+       },
+       {
+        "k": "row",
+        "p": {
+         "align": "center",
+         "gap": "sm",
+         "role": "hermes.work.row",
+         "key": "thinking"
+        },
+        "c": [
+         {
+          "k": "icon",
+          "p": {
+           "name": "brain",
+           "key": "icon"
+          }
+         },
+         {
+          "k": "shimmer",
+          "p": {
+           "mode": "classic",
+           "palette": {
+            "high": "accent",
+            "low": "dim",
+            "mid": "muted"
+           },
+           "role": "hermes.work.live",
+           "spans": [
+            {
+             "s": "muted",
+             "t": "Thinking"
+            }
+           ],
+           "key": "label"
+          }
+         }
+        ]
+       }
+      ]
+     }
+    ]
+   },
+   "step": "press enter"
+  },
+  {
+   "frame": {
+    "dock": [
+     {
+      "k": "col",
+      "p": {
+       "role": "omp.hud.status",
+       "key": "hud"
+      },
+      "c": [
+       {
+        "k": "row",
+        "p": {
+         "align": "center",
+         "gap": "sm",
+         "role": "omp.working",
+         "key": "working"
+        },
+        "c": [
+         {
+          "k": "spinner",
+          "p": {
+           "style": "starburst",
+           "tone": "accent",
+           "key": "spinner"
+          }
+         },
+         {
+          "k": "shimmer",
+          "p": {
+           "mode": "classic",
+           "palette": {
+            "high": "accent",
+            "low": "dim",
+            "mid": "muted"
+           },
+           "role": "omp.working.label",
+           "spans": [
+            {
+             "s": "muted",
+             "t": "Writing…"
+            }
+           ],
+           "key": "label"
+          }
+         },
+         {
+          "k": "text",
+          "p": {
+           "role": "omp.working.sep",
+           "text": "·",
+           "key": "sep"
+          }
+         },
+         {
+          "k": "elapsed",
+          "p": {
+           "age": 0,
+           "format": "short",
+           "key": "elapsed"
+          }
+         },
+         {
+          "k": "row",
+          "p": {
+           "grow": 1,
+           "key": "fill"
+          }
+         },
+         {
+          "k": "row",
+          "p": {
+           "align": "center",
+           "gap": "xs",
+           "role": "omp.working.stop",
+           "title": "Stop  esc esc",
+           "key": "stop",
+           "actions": {
+            "click": "click"
+           }
+          },
+          "c": [
+           {
+            "k": "kbd",
+            "p": {
+             "keys": [
+              "esc"
+             ],
+             "key": "k"
+            }
+           },
+           {
+            "k": "kbd",
+            "p": {
+             "keys": [
+              "esc"
+             ],
+             "key": "k2"
+            }
+           },
+           {
+            "k": "text",
+            "p": {
+             "text": "Stop",
+             "key": "t"
+            }
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "k": "col",
+      "p": {
+       "gap": "xs",
+       "role": "omp.queue",
+       "key": "queue"
+      },
+      "c": [
+       {
+        "k": "row",
+        "p": {
+         "align": "center",
+         "gap": "sm",
+         "role": "omp.queue.item",
+         "title": "Queued",
+         "key": "q0"
+        },
+        "c": [
+         {
+          "k": "icon",
+          "p": {
+           "name": "corner-down-right",
+           "key": "icon"
+          }
+         },
+         {
+          "k": "text",
+          "p": {
+           "grow": 1,
+           "text": "then the docs",
+           "truncate": "end",
+           "wrap": "none",
+           "key": "text"
+          }
+         },
+         {
+          "k": "row",
+          "p": {
+           "align": "center",
+           "gap": "xs",
+           "role": "omp.queue.steer",
+           "title": "Steer the running turn with this instead  ⌥↵",
+           "key": "steer",
+           "actions": {
+            "click": "click"
+           }
+          },
+          "c": [
+           {
+            "k": "icon",
+            "p": {
+             "name": "corner-up-right",
+             "key": "i"
+            }
+           },
+           {
+            "k": "kbd",
+            "p": {
+             "keys": [
+              "alt",
+              "enter"
+             ],
+             "key": "k"
+            }
+           },
+           {
+            "k": "text",
+            "p": {
+             "text": "Steer",
+             "key": "t"
+            }
+           }
+          ]
+         },
+         {
+          "k": "row",
+          "p": {
+           "align": "center",
+           "gap": "xs",
+           "role": "omp.queue.edit",
+           "title": "Edit in the composer  ⌥↑",
+           "key": "edit",
+           "actions": {
+            "click": "click"
+           }
+          },
+          "c": [
+           {
+            "k": "kbd",
+            "p": {
+             "keys": [
+              "alt",
+              "up"
+             ],
+             "key": "k"
+            }
+           },
+           {
+            "k": "text",
+            "p": {
+             "text": "Edit",
+             "key": "t"
+            }
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "k": "col",
+      "p": {
+       "role": "omp.editor",
+       "key": "composer"
+      },
+      "c": [
+       {
+        "k": "row",
+        "p": {
+         "role": "hermes.streak",
+         "key": "streak"
+        }
+       },
+       {
+        "k": "row",
+        "p": {
+         "gap": "sm",
+         "hidden": true,
+         "role": "omp.composer.chips",
+         "wrap": true,
+         "key": "chips"
+        }
+       },
+       {
+        "k": "row",
+        "p": {
+         "align": "start",
+         "gap": "sm",
+         "role": "omp.composer.line",
+         "key": "line"
+        },
+        "c": [
+         {
+          "k": "editor",
+          "p": {
+           "cursor": 0,
+           "decor": [],
+           "maxLines": 18,
+           "placeholder": "Ask Hermes — / commands · @ files",
+           "sendable": true,
+           "text": "",
+           "key": "input"
+          }
+         }
+        ]
+       },
+       {
+        "k": "row",
+        "p": {
+         "align": "center",
+         "gap": "sm",
+         "role": "omp.composer.bar",
+         "key": "bar"
+        },
+        "c": [
+         {
+          "k": "row",
+          "p": {
+           "align": "center",
+           "gap": "xs",
+           "role": "omp.composer.effort",
+           "title": "Reasoning effort: medium (the default) · click to cycle  ⇧⇥ · right-click to choose or save as default",
+           "key": "effort",
+           "actions": {
+            "click": "click",
+            "menu": [
+             "choose-effort",
+             "save-effort-as-default"
+            ]
+           }
+          },
+          "c": [
+           {
+            "k": "effort",
+            "p": {
+             "level": "medium",
+             "key": "glyph"
+            }
+           },
+           {
+            "k": "text",
+            "p": {
+             "spans": [
+              {
+               "s": "muted",
+               "t": "medium"
+              }
+             ],
+             "wrap": "none",
+             "key": "level"
+            }
+           }
+          ]
+         },
+         {
+          "k": "status",
+          "p": {
+           "grow": 1,
+           "role": "omp.composer.extras",
+           "transparent": true,
+           "key": "extras"
+          }
+         },
+         {
+          "k": "text",
+          "p": {
+           "role": "omp.composer.stop",
+           "text": "Stop",
+           "title": "Stop  esc esc",
+           "tone": "error",
+           "key": "stop",
+           "actions": {
+            "click": "click"
+           }
+          }
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "k": "status",
+      "p": {
+       "role": "hermes.statusline",
+       "key": "statusline"
+      },
+      "c": [
+       {
+        "k": "seg",
+        "p": {
+         "priority": 9,
+         "role": "hermes.statusline.brand",
+         "spans": [
+          {
+           "t": "☤ hermes"
+          }
+         ],
+         "key": "brand"
+        }
+       },
+       {
+        "k": "seg",
+        "p": {
+         "priority": 1,
+         "side": "right",
+         "spans": [
+          {
+           "s": "muted",
+           "t": "⇧⏎ newline"
+          }
+         ],
+         "key": "newline"
+        }
+       },
+       {
+        "k": "seg",
+        "p": {
+         "priority": 10,
+         "role": "hermes.statusline.stop",
+         "side": "right",
+         "spans": [
+          {
+           "t": "esc esc stop"
+          }
+         ],
+         "key": "action",
+         "actions": {
+          "click": "click"
+         }
+        }
+       }
+      ]
+     }
+    ],
+    "layer": [],
+    "main": [
+     {
+      "k": "card",
+      "p": {
+       "role": "omp.welcome",
+       "key": "w0"
+      },
+      "c": [
+       {
+        "k": "row",
+        "p": {
+         "align": "center",
+         "gap": "md",
+         "role": "omp.welcome.lockup",
+         "key": "lockup"
+        },
+        "c": [
+         {
+          "k": "col",
+          "p": {
+           "role": "omp.welcome.mark",
+           "key": "mark"
+          },
+          "c": [
+           {
+            "k": "text",
+            "p": {
+             "role": "omp.welcome.wordmark",
+             "spans": [
+              {
+               "s": "strong",
+               "t": "hermes"
+              }
+             ],
+             "wrap": "none",
+             "key": "wordmark"
+            }
+           },
+           {
+            "k": "text",
+            "p": {
+             "role": "omp.welcome.version",
+             "spans": [
+              {
+               "s": "dim mono",
+               "t": "v1.0.0"
+              }
+             ],
+             "wrap": "none",
+             "key": "version"
+            }
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "k": "card",
+      "p": {
+       "role": "omp.user",
+       "tone": "user",
+       "key": "u1"
+      },
+      "c": [
+       {
+        "k": "row",
+        "p": {
+         "gap": "xs",
+         "role": "omp.user.tools",
+         "key": "tools"
+        },
+        "c": [
+         {
+          "k": "text",
+          "p": {
+           "role": "omp.user.time",
+           "spans": [
+            {
+             "s": "dim mono",
+             "t": "03:04 AM"
+            }
+           ],
+           "title": "1/2/2026, 3:04:05 AM",
+           "key": "time"
+          }
+         },
+         {
+          "k": "icon",
+          "p": {
+           "name": "copy",
+           "role": "omp.user.tool",
+           "title": "Copy message",
+           "key": "copy",
+           "actions": {
+            "click": "click"
+           }
+          }
+         }
+        ]
+       },
+       {
+        "k": "md",
+        "p": {
+         "key": "body",
+         "text": "format the code"
+        }
+       }
+      ]
+     },
+     {
+      "k": "col",
+      "p": {
+       "role": "omp.assistant",
+       "key": "t2"
+      },
+      "c": [
+       {
+        "k": "row",
+        "p": {
+         "align": "center",
+         "gap": "xs",
+         "role": "hermes.turn.working",
+         "key": "working"
+        },
+        "c": [
+         {
+          "k": "text",
+          "p": {
+           "spans": [
+            {
+             "s": "muted",
+             "t": "Working for"
+            }
+           ],
+           "wrap": "none",
+           "key": "label"
+          }
+         },
+         {
+          "k": "elapsed",
+          "p": {
+           "age": 0,
+           "format": "short",
+           "key": "age"
+          }
+         }
+        ]
+       },
+       {
+        "k": "md",
+        "p": {
+         "stream": true,
+         "key": "x3",
+         "text": "Formatting the files"
+        }
+       },
+       {
+        "k": "card",
+        "p": {
+         "role": "omp.user",
+         "tone": "user",
+         "key": "s4"
+        },
+        "c": [
+         {
+          "k": "md",
+          "p": {
+           "key": "body",
+           "text": "use tabs"
+          }
+         },
+         {
+          "k": "row",
+          "p": {
+           "align": "center",
+           "gap": "xs",
+           "role": "omp.user.steered",
+           "key": "how"
+          },
+          "c": [
+           {
+            "k": "icon",
+            "p": {
+             "name": "corner-down-right",
+             "key": "icon"
+            }
+           },
+           {
+            "k": "text",
+            "p": {
+             "spans": [
+              {
+               "s": "dim",
+               "t": "Steered · reaches Hermes after this step"
+              }
+             ],
+             "key": "state"
+            }
+           }
+          ]
+         }
+        ]
+       },
+       {
+        "k": "row",
+        "p": {
+         "align": "center",
+         "gap": "sm",
+         "role": "hermes.work.row",
+         "key": "thinking"
+        },
+        "c": [
+         {
+          "k": "icon",
+          "p": {
+           "name": "brain",
+           "key": "icon"
+          }
+         },
+         {
+          "k": "shimmer",
+          "p": {
+           "mode": "classic",
+           "palette": {
+            "high": "accent",
+            "low": "dim",
+            "mid": "muted"
+           },
+           "role": "hermes.work.live",
+           "spans": [
+            {
+             "s": "muted",
+             "t": "Thinking"
+            }
+           ],
+           "key": "label"
+          }
+         }
+        ]
+       }
+      ]
+     }
+    ]
+   },
+   "step": "feed 1"
+  },
+  {
+   "frame": {
+    "dock": [
+     {
+      "k": "col",
+      "p": {
+       "role": "omp.hud.status",
+       "key": "hud"
+      },
+      "c": [
+       {
+        "k": "row",
+        "p": {
+         "align": "center",
+         "gap": "sm",
+         "role": "omp.working",
+         "key": "working"
+        },
+        "c": [
+         {
+          "k": "spinner",
+          "p": {
+           "style": "starburst",
+           "tone": "accent",
+           "key": "spinner"
+          }
+         },
+         {
+          "k": "shimmer",
+          "p": {
+           "mode": "classic",
+           "palette": {
+            "high": "accent",
+            "low": "dim",
+            "mid": "muted"
+           },
+           "role": "omp.working.label",
+           "spans": [
+            {
+             "s": "muted",
+             "t": "Working…"
+            }
+           ],
+           "key": "label"
+          }
+         },
+         {
+          "k": "text",
+          "p": {
+           "role": "omp.working.sep",
+           "text": "·",
+           "key": "sep"
+          }
+         },
+         {
+          "k": "elapsed",
+          "p": {
+           "age": 0,
+           "format": "short",
+           "key": "elapsed"
+          }
+         },
+         {
+          "k": "row",
+          "p": {
+           "grow": 1,
+           "key": "fill"
+          }
+         },
+         {
+          "k": "row",
+          "p": {
+           "align": "center",
+           "gap": "xs",
+           "role": "omp.working.stop",
+           "title": "Stop  esc esc",
+           "key": "stop",
+           "actions": {
+            "click": "click"
+           }
+          },
+          "c": [
+           {
+            "k": "kbd",
+            "p": {
+             "keys": [
+              "esc"
+             ],
+             "key": "k"
+            }
+           },
+           {
+            "k": "kbd",
+            "p": {
+             "keys": [
+              "esc"
+             ],
+             "key": "k2"
+            }
+           },
+           {
+            "k": "text",
+            "p": {
+             "text": "Stop",
+             "key": "t"
+            }
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "k": "col",
+      "p": {
+       "role": "omp.editor",
+       "key": "composer"
+      },
+      "c": [
+       {
+        "k": "row",
+        "p": {
+         "role": "hermes.streak",
+         "key": "streak"
+        }
+       },
+       {
+        "k": "row",
+        "p": {
+         "gap": "sm",
+         "hidden": true,
+         "role": "omp.composer.chips",
+         "wrap": true,
+         "key": "chips"
+        }
+       },
+       {
+        "k": "row",
+        "p": {
+         "align": "start",
+         "gap": "sm",
+         "role": "omp.composer.line",
+         "key": "line"
+        },
+        "c": [
+         {
+          "k": "editor",
+          "p": {
+           "cursor": 0,
+           "decor": [],
+           "maxLines": 18,
+           "placeholder": "Ask Hermes — / commands · @ files",
+           "sendable": true,
+           "text": "",
+           "key": "input"
+          }
+         }
+        ]
+       },
+       {
+        "k": "row",
+        "p": {
+         "align": "center",
+         "gap": "sm",
+         "role": "omp.composer.bar",
+         "key": "bar"
+        },
+        "c": [
+         {
+          "k": "row",
+          "p": {
+           "align": "center",
+           "gap": "xs",
+           "role": "omp.composer.effort",
+           "title": "Reasoning effort: medium (the default) · click to cycle  ⇧⇥ · right-click to choose or save as default",
+           "key": "effort",
+           "actions": {
+            "click": "click",
+            "menu": [
+             "choose-effort",
+             "save-effort-as-default"
+            ]
+           }
+          },
+          "c": [
+           {
+            "k": "effort",
+            "p": {
+             "level": "medium",
+             "key": "glyph"
+            }
+           },
+           {
+            "k": "text",
+            "p": {
+             "spans": [
+              {
+               "s": "muted",
+               "t": "medium"
+              }
+             ],
+             "wrap": "none",
+             "key": "level"
+            }
+           }
+          ]
+         },
+         {
+          "k": "status",
+          "p": {
+           "grow": 1,
+           "role": "omp.composer.extras",
+           "transparent": true,
+           "key": "extras"
+          }
+         },
+         {
+          "k": "text",
+          "p": {
+           "role": "omp.composer.stop",
+           "text": "Stop",
+           "title": "Stop  esc esc",
+           "tone": "error",
+           "key": "stop",
+           "actions": {
+            "click": "click"
+           }
+          }
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "k": "status",
+      "p": {
+       "role": "hermes.statusline",
+       "key": "statusline"
+      },
+      "c": [
+       {
+        "k": "seg",
+        "p": {
+         "priority": 9,
+         "role": "hermes.statusline.brand",
+         "spans": [
+          {
+           "t": "☤ hermes"
+          }
+         ],
+         "key": "brand"
+        }
+       },
+       {
+        "k": "seg",
+        "p": {
+         "priority": 1,
+         "side": "right",
+         "spans": [
+          {
+           "s": "muted",
+           "t": "⇧⏎ newline"
+          }
+         ],
+         "key": "newline"
+        }
+       },
+       {
+        "k": "seg",
+        "p": {
+         "priority": 10,
+         "role": "hermes.statusline.stop",
+         "side": "right",
+         "spans": [
+          {
+           "t": "esc esc stop"
+          }
+         ],
+         "key": "action",
+         "actions": {
+          "click": "click"
+         }
+        }
+       }
+      ]
+     }
+    ],
+    "layer": [],
+    "main": [
+     {
+      "k": "card",
+      "p": {
+       "role": "omp.welcome",
+       "key": "w0"
+      },
+      "c": [
+       {
+        "k": "row",
+        "p": {
+         "align": "center",
+         "gap": "md",
+         "role": "omp.welcome.lockup",
+         "key": "lockup"
+        },
+        "c": [
+         {
+          "k": "col",
+          "p": {
+           "role": "omp.welcome.mark",
+           "key": "mark"
+          },
+          "c": [
+           {
+            "k": "text",
+            "p": {
+             "role": "omp.welcome.wordmark",
+             "spans": [
+              {
+               "s": "strong",
+               "t": "hermes"
+              }
+             ],
+             "wrap": "none",
+             "key": "wordmark"
+            }
+           },
+           {
+            "k": "text",
+            "p": {
+             "role": "omp.welcome.version",
+             "spans": [
+              {
+               "s": "dim mono",
+               "t": "v1.0.0"
+              }
+             ],
+             "wrap": "none",
+             "key": "version"
+            }
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "k": "card",
+      "p": {
+       "role": "omp.user",
+       "tone": "user",
+       "key": "u1"
+      },
+      "c": [
+       {
+        "k": "row",
+        "p": {
+         "gap": "xs",
+         "role": "omp.user.tools",
+         "key": "tools"
+        },
+        "c": [
+         {
+          "k": "text",
+          "p": {
+           "role": "omp.user.time",
+           "spans": [
+            {
+             "s": "dim mono",
+             "t": "03:04 AM"
+            }
+           ],
+           "title": "1/2/2026, 3:04:05 AM",
+           "key": "time"
+          }
+         },
+         {
+          "k": "icon",
+          "p": {
+           "name": "copy",
+           "role": "omp.user.tool",
+           "title": "Copy message",
+           "key": "copy",
+           "actions": {
+            "click": "click"
+           }
+          }
+         }
+        ]
+       },
+       {
+        "k": "md",
+        "p": {
+         "key": "body",
+         "text": "format the code"
+        }
+       }
+      ]
+     },
+     {
+      "k": "col",
+      "p": {
+       "role": "omp.assistant",
+       "key": "t2"
+      },
+      "c": [
+       {
+        "k": "section",
+        "p": {
+         "collapsed": true,
+         "collapsible": true,
+         "head": "main.t2.foldx3.head",
+         "key": "foldx3",
+         "role": "hermes.turn.fold"
+        },
+        "c": [
+         {
+          "k": "row",
+          "p": {
+           "align": "center",
+           "gap": "xs",
+           "key": "head"
+          },
+          "c": [
+           {
+            "k": "text",
+            "p": {
+             "spans": [
+              {
+               "s": "muted",
+               "t": "Worked"
+              }
+             ],
+             "wrap": "none",
+             "key": "label"
+            }
+           }
+          ]
+         },
+         {
+          "k": "md",
+          "p": {
+           "key": "x3",
+           "text": "Formatting the files"
+          }
+         }
+        ]
+       },
+       {
+        "k": "card",
+        "p": {
+         "role": "omp.user",
+         "tone": "user",
+         "key": "s4"
+        },
+        "c": [
+         {
+          "k": "md",
+          "p": {
+           "key": "body",
+           "text": "use tabs"
+          }
+         },
+         {
+          "k": "row",
+          "p": {
+           "align": "center",
+           "gap": "xs",
+           "role": "omp.user.steered",
+           "key": "how"
+          },
+          "c": [
+           {
+            "k": "icon",
+            "p": {
+             "name": "corner-down-right",
+             "key": "icon"
+            }
+           },
+           {
+            "k": "text",
+            "p": {
+             "spans": [
+              {
+               "s": "dim",
+               "t": "Steered"
+              }
+             ],
+             "key": "state"
+            }
+           }
+          ]
+         }
+        ]
+       },
+       {
+        "k": "md",
+        "p": {
+         "key": "x5",
+         "text": "Formatting the files with tabs."
+        }
+       },
+       {
+        "k": "row",
+        "p": {
+         "align": "center",
+         "gap": "xs",
+         "role": "omp.turn.usage",
+         "key": "usage"
+        },
+        "c": [
+         {
+          "k": "icon",
+          "p": {
+           "name": "copy",
+           "role": "omp.turn.copy",
+           "title": "Copy answer",
+           "key": "copy",
+           "actions": {
+            "click": "click"
+           }
+          }
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "k": "card",
+      "p": {
+       "role": "omp.user",
+       "tone": "user",
+       "key": "u7"
+      },
+      "c": [
+       {
+        "k": "row",
+        "p": {
+         "gap": "xs",
+         "role": "omp.user.tools",
+         "key": "tools"
+        },
+        "c": [
+         {
+          "k": "text",
+          "p": {
+           "role": "omp.user.time",
+           "spans": [
+            {
+             "s": "dim mono",
+             "t": "03:04 AM"
+            }
+           ],
+           "title": "1/2/2026, 3:04:05 AM",
+           "key": "time"
+          }
+         },
+         {
+          "k": "icon",
+          "p": {
+           "name": "copy",
+           "role": "omp.user.tool",
+           "title": "Copy message",
+           "key": "copy",
+           "actions": {
+            "click": "click"
+           }
+          }
+         }
+        ]
+       },
+       {
+        "k": "md",
+        "p": {
+         "key": "body",
+         "text": "then the docs"
+        }
+       }
+      ]
+     },
+     {
+      "k": "col",
+      "p": {
+       "role": "omp.assistant",
+       "key": "t6"
+      },
+      "c": [
+       {
+        "k": "row",
+        "p": {
+         "align": "center",
+         "gap": "xs",
+         "role": "hermes.turn.working",
+         "key": "working"
+        },
+        "c": [
+         {
+          "k": "text",
+          "p": {
+           "spans": [
+            {
+             "s": "muted",
+             "t": "Working for"
+            }
+           ],
+           "wrap": "none",
+           "key": "label"
+          }
+         },
+         {
+          "k": "elapsed",
+          "p": {
+           "age": 0,
+           "format": "short",
+           "key": "age"
+          }
+         }
+        ]
+       },
+       {
+        "k": "row",
+        "p": {
+         "align": "center",
+         "gap": "sm",
+         "role": "hermes.work.row",
+         "key": "thinking"
+        },
+        "c": [
+         {
+          "k": "icon",
+          "p": {
+           "name": "brain",
+           "key": "icon"
+          }
+         },
+         {
+          "k": "shimmer",
+          "p": {
+           "mode": "classic",
+           "palette": {
+            "high": "accent",
+            "low": "dim",
+            "mid": "muted"
+           },
+           "role": "hermes.work.live",
+           "spans": [
+            {
+             "s": "muted",
+             "t": "Thinking"
+            }
+           ],
+           "key": "label"
+          }
+         }
+        ]
+       }
+      ]
+     }
+    ]
+   },
+   "step": "feed 3"
+  },
+  {
+   "frame": {
+    "dock": [
+     {
+      "k": "col",
+      "p": {
+       "role": "omp.editor",
+       "key": "composer"
+      },
+      "c": [
+       {
+        "k": "row",
+        "p": {
+         "gap": "sm",
+         "hidden": true,
+         "role": "omp.composer.chips",
+         "wrap": true,
+         "key": "chips"
+        }
+       },
+       {
+        "k": "row",
+        "p": {
+         "align": "start",
+         "gap": "sm",
+         "role": "omp.composer.line",
+         "key": "line"
+        },
+        "c": [
+         {
+          "k": "editor",
+          "p": {
+           "cursor": 0,
+           "decor": [],
+           "maxLines": 18,
+           "placeholder": "Ask Hermes — / commands · @ files",
+           "sendable": true,
+           "text": "",
+           "key": "input"
+          }
+         }
+        ]
+       },
+       {
+        "k": "row",
+        "p": {
+         "align": "center",
+         "gap": "sm",
+         "role": "omp.composer.bar",
+         "key": "bar"
+        },
+        "c": [
+         {
+          "k": "row",
+          "p": {
+           "align": "center",
+           "gap": "xs",
+           "role": "omp.composer.effort",
+           "title": "Reasoning effort: medium (the default) · click to cycle  ⇧⇥ · right-click to choose or save as default",
+           "key": "effort",
+           "actions": {
+            "click": "click",
+            "menu": [
+             "choose-effort",
+             "save-effort-as-default"
+            ]
+           }
+          },
+          "c": [
+           {
+            "k": "effort",
+            "p": {
+             "level": "medium",
+             "key": "glyph"
+            }
+           },
+           {
+            "k": "text",
+            "p": {
+             "spans": [
+              {
+               "s": "muted",
+               "t": "medium"
+              }
+             ],
+             "wrap": "none",
+             "key": "level"
+            }
+           }
+          ]
+         },
+         {
+          "k": "status",
+          "p": {
+           "grow": 1,
+           "role": "omp.composer.extras",
+           "transparent": true,
+           "key": "extras"
+          }
+         },
+         {
+          "k": "kbd",
+          "p": {
+           "keys": [
+            "enter"
+           ],
+           "role": "omp.composer.send",
+           "title": "Send  ⏎",
+           "key": "send",
+           "actions": {
+            "click": "click"
+           }
+          }
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "k": "status",
+      "p": {
+       "role": "hermes.statusline",
+       "key": "statusline"
+      },
+      "c": [
+       {
+        "k": "seg",
+        "p": {
+         "priority": 9,
+         "role": "hermes.statusline.brand",
+         "spans": [
+          {
+           "t": "☤ hermes"
+          }
+         ],
+         "key": "brand"
+        }
+       },
+       {
+        "k": "seg",
+        "p": {
+         "priority": 1,
+         "side": "right",
+         "spans": [
+          {
+           "s": "muted",
+           "t": "⇧⏎ newline"
+          }
+         ],
+         "key": "newline"
+        }
+       },
+       {
+        "k": "seg",
+        "p": {
+         "priority": 10,
+         "role": "hermes.statusline.send",
+         "side": "right",
+         "spans": [
+          {
+           "t": "⏎ send"
+          }
+         ],
+         "key": "action",
+         "actions": {
+          "click": "click"
+         }
+        }
+       }
+      ]
+     }
+    ],
+    "layer": [],
+    "main": [
+     {
+      "k": "card",
+      "p": {
+       "role": "omp.welcome",
+       "key": "w0"
+      },
+      "c": [
+       {
+        "k": "row",
+        "p": {
+         "align": "center",
+         "gap": "md",
+         "role": "omp.welcome.lockup",
+         "key": "lockup"
+        },
+        "c": [
+         {
+          "k": "col",
+          "p": {
+           "role": "omp.welcome.mark",
+           "key": "mark"
+          },
+          "c": [
+           {
+            "k": "text",
+            "p": {
+             "role": "omp.welcome.wordmark",
+             "spans": [
+              {
+               "s": "strong",
+               "t": "hermes"
+              }
+             ],
+             "wrap": "none",
+             "key": "wordmark"
+            }
+           },
+           {
+            "k": "text",
+            "p": {
+             "role": "omp.welcome.version",
+             "spans": [
+              {
+               "s": "dim mono",
+               "t": "v1.0.0"
+              }
+             ],
+             "wrap": "none",
+             "key": "version"
+            }
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "k": "card",
+      "p": {
+       "role": "omp.user",
+       "tone": "user",
+       "key": "u1"
+      },
+      "c": [
+       {
+        "k": "row",
+        "p": {
+         "gap": "xs",
+         "role": "omp.user.tools",
+         "key": "tools"
+        },
+        "c": [
+         {
+          "k": "text",
+          "p": {
+           "role": "omp.user.time",
+           "spans": [
+            {
+             "s": "dim mono",
+             "t": "03:04 AM"
+            }
+           ],
+           "title": "1/2/2026, 3:04:05 AM",
+           "key": "time"
+          }
+         },
+         {
+          "k": "icon",
+          "p": {
+           "name": "copy",
+           "role": "omp.user.tool",
+           "title": "Copy message",
+           "key": "copy",
+           "actions": {
+            "click": "click"
+           }
+          }
+         }
+        ]
+       },
+       {
+        "k": "md",
+        "p": {
+         "key": "body",
+         "text": "format the code"
+        }
+       }
+      ]
+     },
+     {
+      "k": "col",
+      "p": {
+       "role": "omp.assistant",
+       "key": "t2"
+      },
+      "c": [
+       {
+        "k": "section",
+        "p": {
+         "collapsed": true,
+         "collapsible": true,
+         "head": "main.t2.foldx3.head",
+         "key": "foldx3",
+         "role": "hermes.turn.fold"
+        },
+        "c": [
+         {
+          "k": "row",
+          "p": {
+           "align": "center",
+           "gap": "xs",
+           "key": "head"
+          },
+          "c": [
+           {
+            "k": "text",
+            "p": {
+             "spans": [
+              {
+               "s": "muted",
+               "t": "Worked"
+              }
+             ],
+             "wrap": "none",
+             "key": "label"
+            }
+           }
+          ]
+         },
+         {
+          "k": "md",
+          "p": {
+           "key": "x3",
+           "text": "Formatting the files"
+          }
+         }
+        ]
+       },
+       {
+        "k": "card",
+        "p": {
+         "role": "omp.user",
+         "tone": "user",
+         "key": "s4"
+        },
+        "c": [
+         {
+          "k": "md",
+          "p": {
+           "key": "body",
+           "text": "use tabs"
+          }
+         },
+         {
+          "k": "row",
+          "p": {
+           "align": "center",
+           "gap": "xs",
+           "role": "omp.user.steered",
+           "key": "how"
+          },
+          "c": [
+           {
+            "k": "icon",
+            "p": {
+             "name": "corner-down-right",
+             "key": "icon"
+            }
+           },
+           {
+            "k": "text",
+            "p": {
+             "spans": [
+              {
+               "s": "dim",
+               "t": "Steered"
+              }
+             ],
+             "key": "state"
+            }
+           }
+          ]
+         }
+        ]
+       },
+       {
+        "k": "md",
+        "p": {
+         "key": "x5",
+         "text": "Formatting the files with tabs."
+        }
+       },
+       {
+        "k": "row",
+        "p": {
+         "align": "center",
+         "gap": "xs",
+         "role": "omp.turn.usage",
+         "key": "usage"
+        },
+        "c": [
+         {
+          "k": "icon",
+          "p": {
+           "name": "copy",
+           "role": "omp.turn.copy",
+           "title": "Copy answer",
+           "key": "copy",
+           "actions": {
+            "click": "click"
+           }
+          }
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "k": "card",
+      "p": {
+       "role": "omp.user",
+       "tone": "user",
+       "key": "u7"
+      },
+      "c": [
+       {
+        "k": "row",
+        "p": {
+         "gap": "xs",
+         "role": "omp.user.tools",
+         "key": "tools"
+        },
+        "c": [
+         {
+          "k": "text",
+          "p": {
+           "role": "omp.user.time",
+           "spans": [
+            {
+             "s": "dim mono",
+             "t": "03:04 AM"
+            }
+           ],
+           "title": "1/2/2026, 3:04:05 AM",
+           "key": "time"
+          }
+         },
+         {
+          "k": "icon",
+          "p": {
+           "name": "copy",
+           "role": "omp.user.tool",
+           "title": "Copy message",
+           "key": "copy",
+           "actions": {
+            "click": "click"
+           }
+          }
+         }
+        ]
+       },
+       {
+        "k": "md",
+        "p": {
+         "key": "body",
+         "text": "then the docs"
+        }
+       }
+      ]
+     },
+     {
+      "k": "col",
+      "p": {
+       "role": "omp.assistant",
+       "key": "t6"
+      },
+      "c": [
+       {
+        "k": "md",
+        "p": {
+         "key": "x8",
+         "text": "Docs updated."
+        }
+       },
+       {
+        "k": "row",
+        "p": {
+         "align": "center",
+         "gap": "xs",
+         "role": "omp.turn.usage",
+         "key": "usage"
+        },
+        "c": [
+         {
+          "k": "icon",
+          "p": {
+           "name": "copy",
+           "role": "omp.turn.copy",
+           "title": "Copy answer",
+           "key": "copy",
+           "actions": {
+            "click": "click"
+           }
+          }
+         }
+        ]
+       }
+      ]
+     }
+    ]
+   },
+   "step": "feed 1"
+  }
+ ],
+ "requests": [
+  {
+   "method": "setup.status",
+   "params": {}
+  },
+  {
+   "method": "session.create",
+   "params": {}
+  },
+  {
+   "method": "config.get",
+   "params": {
+    "key": "busy",
+    "session_id": "s1"
+   }
+  },
+  {
+   "method": "config.set",
+   "params": {
+    "key": "show_reasoning",
+    "session_id": "s1",
+    "value": "on"
+   }
+  },
+  {
+   "method": "process.list",
+   "params": {
+    "session_id": "s1"
+   }
+  },
+  {
+   "method": "session.control.read",
+   "params": {
+    "session_id": "s1"
+   }
+  },
+  {
+   "method": "prompt.submit",
+   "params": {
+    "session_id": "s1",
+    "submission_id": "00000000-0000-4000-8000-000000000001",
+    "text": "format the code"
+   }
+  },
+  {
+   "method": "prompt.submit",
+   "params": {
+    "queued": true,
+    "session_id": "s1",
+    "submission_id": "00000000-0000-4000-8000-000000000002",
+    "text": "use tabs"
+   }
+  },
+  {
+   "method": "prompt.cancel",
+   "params": {
+    "admission_id": "a1",
+    "session_id": "s1"
+   }
+  },
+  {
+   "method": "session.resume",
+   "params": {
+    "session_id": "s1"
+   }
+  },
+  {
+   "method": "session.steer",
+   "params": {
+    "session_id": "s1",
+    "execution_generation": 1,
+    "text": "use tabs"
+   }
+  },
+  {
+   "method": "prompt.submit",
+   "params": {
+    "queued": true,
+    "session_id": "s1",
+    "submission_id": "00000000-0000-4000-8000-000000000003",
+    "text": "then the docs"
+   }
+  }
+ ]
+}

@@ -1,0 +1,7264 @@
+{
+ "answers": [
+  {
+   "id": "r1",
+   "result": {
+    "choice": "deny"
+   }
+  }
+ ],
+ "frames": [
+  {
+   "frame": {
+    "dock": [
+     {
+      "k": "col",
+      "p": {
+       "role": "omp.editor",
+       "key": "composer"
+      },
+      "c": [
+       {
+        "k": "row",
+        "p": {
+         "gap": "sm",
+         "hidden": true,
+         "role": "omp.composer.chips",
+         "wrap": true,
+         "key": "chips"
+        }
+       },
+       {
+        "k": "row",
+        "p": {
+         "align": "start",
+         "gap": "sm",
+         "role": "omp.composer.line",
+         "key": "line"
+        },
+        "c": [
+         {
+          "k": "editor",
+          "p": {
+           "cursor": 0,
+           "decor": [],
+           "maxLines": 18,
+           "placeholder": "Ask Hermes — / commands · @ files",
+           "sendable": true,
+           "text": "",
+           "key": "input"
+          }
+         }
+        ]
+       },
+       {
+        "k": "row",
+        "p": {
+         "align": "center",
+         "gap": "sm",
+         "role": "omp.composer.bar",
+         "key": "bar"
+        },
+        "c": [
+         {
+          "k": "row",
+          "p": {
+           "align": "center",
+           "gap": "xs",
+           "role": "omp.composer.effort",
+           "title": "Reasoning effort: medium (the default) · click to cycle  ⇧⇥ · right-click to choose or save as default",
+           "key": "effort",
+           "actions": {
+            "click": "click",
+            "menu": [
+             "choose-effort",
+             "save-effort-as-default"
+            ]
+           }
+          },
+          "c": [
+           {
+            "k": "effort",
+            "p": {
+             "level": "medium",
+             "key": "glyph"
+            }
+           },
+           {
+            "k": "text",
+            "p": {
+             "spans": [
+              {
+               "s": "muted",
+               "t": "medium"
+              }
+             ],
+             "wrap": "none",
+             "key": "level"
+            }
+           }
+          ]
+         },
+         {
+          "k": "status",
+          "p": {
+           "grow": 1,
+           "role": "omp.composer.extras",
+           "transparent": true,
+           "key": "extras"
+          }
+         },
+         {
+          "k": "kbd",
+          "p": {
+           "keys": [
+            "enter"
+           ],
+           "role": "omp.composer.send",
+           "title": "Send  ⏎",
+           "key": "send",
+           "actions": {
+            "click": "click"
+           }
+          }
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "k": "status",
+      "p": {
+       "role": "hermes.statusline",
+       "key": "statusline"
+      },
+      "c": [
+       {
+        "k": "seg",
+        "p": {
+         "priority": 9,
+         "role": "hermes.statusline.brand",
+         "spans": [
+          {
+           "t": "☤ hermes"
+          }
+         ],
+         "key": "brand"
+        }
+       },
+       {
+        "k": "seg",
+        "p": {
+         "priority": 1,
+         "side": "right",
+         "spans": [
+          {
+           "s": "muted",
+           "t": "⇧⏎ newline"
+          }
+         ],
+         "key": "newline"
+        }
+       },
+       {
+        "k": "seg",
+        "p": {
+         "priority": 10,
+         "role": "hermes.statusline.send",
+         "side": "right",
+         "spans": [
+          {
+           "t": "⏎ send"
+          }
+         ],
+         "key": "action",
+         "actions": {
+          "click": "click"
+         }
+        }
+       }
+      ]
+     }
+    ],
+    "layer": [],
+    "main": [
+     {
+      "k": "card",
+      "p": {
+       "role": "omp.welcome",
+       "key": "w0"
+      },
+      "c": [
+       {
+        "k": "row",
+        "p": {
+         "align": "center",
+         "gap": "md",
+         "role": "omp.welcome.lockup",
+         "key": "lockup"
+        },
+        "c": [
+         {
+          "k": "col",
+          "p": {
+           "role": "omp.welcome.mark",
+           "key": "mark"
+          },
+          "c": [
+           {
+            "k": "text",
+            "p": {
+             "role": "omp.welcome.wordmark",
+             "spans": [
+              {
+               "s": "strong",
+               "t": "hermes"
+              }
+             ],
+             "wrap": "none",
+             "key": "wordmark"
+            }
+           },
+           {
+            "k": "text",
+            "p": {
+             "role": "omp.welcome.version",
+             "spans": [
+              {
+               "s": "dim mono",
+               "t": "v1.0.0"
+              }
+             ],
+             "wrap": "none",
+             "key": "version"
+            }
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     }
+    ]
+   },
+   "step": "feed 1"
+  },
+  {
+   "frame": {
+    "dock": [
+     {
+      "k": "col",
+      "p": {
+       "role": "omp.editor",
+       "key": "composer"
+      },
+      "c": [
+       {
+        "k": "row",
+        "p": {
+         "gap": "sm",
+         "hidden": true,
+         "role": "omp.composer.chips",
+         "wrap": true,
+         "key": "chips"
+        }
+       },
+       {
+        "k": "row",
+        "p": {
+         "align": "start",
+         "gap": "sm",
+         "role": "omp.composer.line",
+         "key": "line"
+        },
+        "c": [
+         {
+          "k": "editor",
+          "p": {
+           "cursor": 8,
+           "decor": [],
+           "maxLines": 18,
+           "placeholder": "Ask Hermes — / commands · @ files",
+           "sendable": true,
+           "text": "clean up",
+           "key": "input"
+          }
+         }
+        ]
+       },
+       {
+        "k": "row",
+        "p": {
+         "align": "center",
+         "gap": "sm",
+         "role": "omp.composer.bar",
+         "key": "bar"
+        },
+        "c": [
+         {
+          "k": "row",
+          "p": {
+           "align": "center",
+           "gap": "xs",
+           "role": "omp.composer.effort",
+           "title": "Reasoning effort: medium (the default) · click to cycle  ⇧⇥ · right-click to choose or save as default",
+           "key": "effort",
+           "actions": {
+            "click": "click",
+            "menu": [
+             "choose-effort",
+             "save-effort-as-default"
+            ]
+           }
+          },
+          "c": [
+           {
+            "k": "effort",
+            "p": {
+             "level": "medium",
+             "key": "glyph"
+            }
+           },
+           {
+            "k": "text",
+            "p": {
+             "spans": [
+              {
+               "s": "muted",
+               "t": "medium"
+              }
+             ],
+             "wrap": "none",
+             "key": "level"
+            }
+           }
+          ]
+         },
+         {
+          "k": "status",
+          "p": {
+           "grow": 1,
+           "role": "omp.composer.extras",
+           "transparent": true,
+           "key": "extras"
+          }
+         },
+         {
+          "k": "kbd",
+          "p": {
+           "keys": [
+            "enter"
+           ],
+           "role": "omp.composer.send",
+           "title": "Send  ⏎",
+           "key": "send",
+           "actions": {
+            "click": "click"
+           }
+          }
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "k": "status",
+      "p": {
+       "role": "hermes.statusline",
+       "key": "statusline"
+      },
+      "c": [
+       {
+        "k": "seg",
+        "p": {
+         "priority": 9,
+         "role": "hermes.statusline.brand",
+         "spans": [
+          {
+           "t": "☤ hermes"
+          }
+         ],
+         "key": "brand"
+        }
+       },
+       {
+        "k": "seg",
+        "p": {
+         "priority": 1,
+         "side": "right",
+         "spans": [
+          {
+           "s": "muted",
+           "t": "⇧⏎ newline"
+          }
+         ],
+         "key": "newline"
+        }
+       },
+       {
+        "k": "seg",
+        "p": {
+         "priority": 10,
+         "role": "hermes.statusline.send",
+         "side": "right",
+         "spans": [
+          {
+           "t": "⏎ send"
+          }
+         ],
+         "key": "action",
+         "actions": {
+          "click": "click"
+         }
+        }
+       }
+      ]
+     }
+    ],
+    "layer": [],
+    "main": [
+     {
+      "k": "card",
+      "p": {
+       "role": "omp.welcome",
+       "key": "w0"
+      },
+      "c": [
+       {
+        "k": "row",
+        "p": {
+         "align": "center",
+         "gap": "md",
+         "role": "omp.welcome.lockup",
+         "key": "lockup"
+        },
+        "c": [
+         {
+          "k": "col",
+          "p": {
+           "role": "omp.welcome.mark",
+           "key": "mark"
+          },
+          "c": [
+           {
+            "k": "text",
+            "p": {
+             "role": "omp.welcome.wordmark",
+             "spans": [
+              {
+               "s": "strong",
+               "t": "hermes"
+              }
+             ],
+             "wrap": "none",
+             "key": "wordmark"
+            }
+           },
+           {
+            "k": "text",
+            "p": {
+             "role": "omp.welcome.version",
+             "spans": [
+              {
+               "s": "dim mono",
+               "t": "v1.0.0"
+              }
+             ],
+             "wrap": "none",
+             "key": "version"
+            }
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     }
+    ]
+   },
+   "step": "type clean up"
+  },
+  {
+   "frame": {
+    "dock": [
+     {
+      "k": "col",
+      "p": {
+       "role": "omp.hud.status",
+       "key": "hud"
+      },
+      "c": [
+       {
+        "k": "row",
+        "p": {
+         "align": "center",
+         "gap": "sm",
+         "role": "omp.working",
+         "key": "working"
+        },
+        "c": [
+         {
+          "k": "spinner",
+          "p": {
+           "style": "starburst",
+           "tone": "accent",
+           "key": "spinner"
+          }
+         },
+         {
+          "k": "shimmer",
+          "p": {
+           "mode": "classic",
+           "palette": {
+            "high": "accent",
+            "low": "dim",
+            "mid": "muted"
+           },
+           "role": "omp.working.label",
+           "spans": [
+            {
+             "s": "muted",
+             "t": "Working…"
+            }
+           ],
+           "key": "label"
+          }
+         },
+         {
+          "k": "text",
+          "p": {
+           "role": "omp.working.sep",
+           "text": "·",
+           "key": "sep"
+          }
+         },
+         {
+          "k": "elapsed",
+          "p": {
+           "age": 0,
+           "format": "short",
+           "key": "elapsed"
+          }
+         },
+         {
+          "k": "row",
+          "p": {
+           "grow": 1,
+           "key": "fill"
+          }
+         },
+         {
+          "k": "row",
+          "p": {
+           "align": "center",
+           "gap": "xs",
+           "role": "omp.working.stop",
+           "title": "Stop  esc esc",
+           "key": "stop",
+           "actions": {
+            "click": "click"
+           }
+          },
+          "c": [
+           {
+            "k": "kbd",
+            "p": {
+             "keys": [
+              "esc"
+             ],
+             "key": "k"
+            }
+           },
+           {
+            "k": "kbd",
+            "p": {
+             "keys": [
+              "esc"
+             ],
+             "key": "k2"
+            }
+           },
+           {
+            "k": "text",
+            "p": {
+             "text": "Stop",
+             "key": "t"
+            }
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "k": "col",
+      "p": {
+       "role": "omp.editor",
+       "key": "composer"
+      },
+      "c": [
+       {
+        "k": "row",
+        "p": {
+         "role": "hermes.streak",
+         "key": "streak"
+        }
+       },
+       {
+        "k": "row",
+        "p": {
+         "gap": "sm",
+         "hidden": true,
+         "role": "omp.composer.chips",
+         "wrap": true,
+         "key": "chips"
+        }
+       },
+       {
+        "k": "row",
+        "p": {
+         "align": "start",
+         "gap": "sm",
+         "role": "omp.composer.line",
+         "key": "line"
+        },
+        "c": [
+         {
+          "k": "editor",
+          "p": {
+           "cursor": 0,
+           "decor": [],
+           "maxLines": 18,
+           "placeholder": "Ask Hermes — / commands · @ files",
+           "sendable": true,
+           "text": "",
+           "key": "input"
+          }
+         }
+        ]
+       },
+       {
+        "k": "row",
+        "p": {
+         "align": "center",
+         "gap": "sm",
+         "role": "omp.composer.bar",
+         "key": "bar"
+        },
+        "c": [
+         {
+          "k": "row",
+          "p": {
+           "align": "center",
+           "gap": "xs",
+           "role": "omp.composer.effort",
+           "title": "Reasoning effort: medium (the default) · click to cycle  ⇧⇥ · right-click to choose or save as default",
+           "key": "effort",
+           "actions": {
+            "click": "click",
+            "menu": [
+             "choose-effort",
+             "save-effort-as-default"
+            ]
+           }
+          },
+          "c": [
+           {
+            "k": "effort",
+            "p": {
+             "level": "medium",
+             "key": "glyph"
+            }
+           },
+           {
+            "k": "text",
+            "p": {
+             "spans": [
+              {
+               "s": "muted",
+               "t": "medium"
+              }
+             ],
+             "wrap": "none",
+             "key": "level"
+            }
+           }
+          ]
+         },
+         {
+          "k": "status",
+          "p": {
+           "grow": 1,
+           "role": "omp.composer.extras",
+           "transparent": true,
+           "key": "extras"
+          }
+         },
+         {
+          "k": "text",
+          "p": {
+           "role": "omp.composer.stop",
+           "text": "Stop",
+           "title": "Stop  esc esc",
+           "tone": "error",
+           "key": "stop",
+           "actions": {
+            "click": "click"
+           }
+          }
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "k": "status",
+      "p": {
+       "role": "hermes.statusline",
+       "key": "statusline"
+      },
+      "c": [
+       {
+        "k": "seg",
+        "p": {
+         "priority": 9,
+         "role": "hermes.statusline.brand",
+         "spans": [
+          {
+           "t": "☤ hermes"
+          }
+         ],
+         "key": "brand"
+        }
+       },
+       {
+        "k": "seg",
+        "p": {
+         "priority": 1,
+         "side": "right",
+         "spans": [
+          {
+           "s": "muted",
+           "t": "⇧⏎ newline"
+          }
+         ],
+         "key": "newline"
+        }
+       },
+       {
+        "k": "seg",
+        "p": {
+         "priority": 10,
+         "role": "hermes.statusline.stop",
+         "side": "right",
+         "spans": [
+          {
+           "t": "esc esc stop"
+          }
+         ],
+         "key": "action",
+         "actions": {
+          "click": "click"
+         }
+        }
+       }
+      ]
+     }
+    ],
+    "layer": [],
+    "main": [
+     {
+      "k": "card",
+      "p": {
+       "role": "omp.welcome",
+       "key": "w0"
+      },
+      "c": [
+       {
+        "k": "row",
+        "p": {
+         "align": "center",
+         "gap": "md",
+         "role": "omp.welcome.lockup",
+         "key": "lockup"
+        },
+        "c": [
+         {
+          "k": "col",
+          "p": {
+           "role": "omp.welcome.mark",
+           "key": "mark"
+          },
+          "c": [
+           {
+            "k": "text",
+            "p": {
+             "role": "omp.welcome.wordmark",
+             "spans": [
+              {
+               "s": "strong",
+               "t": "hermes"
+              }
+             ],
+             "wrap": "none",
+             "key": "wordmark"
+            }
+           },
+           {
+            "k": "text",
+            "p": {
+             "role": "omp.welcome.version",
+             "spans": [
+              {
+               "s": "dim mono",
+               "t": "v1.0.0"
+              }
+             ],
+             "wrap": "none",
+             "key": "version"
+            }
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "k": "card",
+      "p": {
+       "role": "omp.user",
+       "tone": "user",
+       "key": "u1"
+      },
+      "c": [
+       {
+        "k": "row",
+        "p": {
+         "gap": "xs",
+         "role": "omp.user.tools",
+         "key": "tools"
+        },
+        "c": [
+         {
+          "k": "text",
+          "p": {
+           "role": "omp.user.time",
+           "spans": [
+            {
+             "s": "dim mono",
+             "t": "03:04 AM"
+            }
+           ],
+           "title": "1/2/2026, 3:04:05 AM",
+           "key": "time"
+          }
+         },
+         {
+          "k": "icon",
+          "p": {
+           "name": "copy",
+           "role": "omp.user.tool",
+           "title": "Copy message",
+           "key": "copy",
+           "actions": {
+            "click": "click"
+           }
+          }
+         }
+        ]
+       },
+       {
+        "k": "md",
+        "p": {
+         "key": "body",
+         "text": "clean up"
+        }
+       }
+      ]
+     }
+    ]
+   },
+   "step": "press enter"
+  },
+  {
+   "frame": {
+    "dock": [
+     {
+      "k": "col",
+      "p": {
+       "role": "omp.hud.status",
+       "key": "hud"
+      },
+      "c": [
+       {
+        "k": "row",
+        "p": {
+         "align": "center",
+         "gap": "sm",
+         "role": "omp.working",
+         "key": "working"
+        },
+        "c": [
+         {
+          "k": "spinner",
+          "p": {
+           "style": "starburst",
+           "tone": "accent",
+           "key": "spinner"
+          }
+         },
+         {
+          "k": "shimmer",
+          "p": {
+           "mode": "classic",
+           "palette": {
+            "high": "accent",
+            "low": "dim",
+            "mid": "muted"
+           },
+           "role": "omp.working.label",
+           "spans": [
+            {
+             "s": "muted",
+             "t": "Running rm…"
+            }
+           ],
+           "key": "label"
+          }
+         },
+         {
+          "k": "text",
+          "p": {
+           "role": "omp.working.sep",
+           "text": "·",
+           "key": "sep"
+          }
+         },
+         {
+          "k": "elapsed",
+          "p": {
+           "age": 0,
+           "format": "short",
+           "key": "elapsed"
+          }
+         },
+         {
+          "k": "row",
+          "p": {
+           "grow": 1,
+           "key": "fill"
+          }
+         },
+         {
+          "k": "row",
+          "p": {
+           "align": "center",
+           "gap": "xs",
+           "role": "omp.working.stop",
+           "title": "Stop  esc esc",
+           "key": "stop",
+           "actions": {
+            "click": "click"
+           }
+          },
+          "c": [
+           {
+            "k": "kbd",
+            "p": {
+             "keys": [
+              "esc"
+             ],
+             "key": "k"
+            }
+           },
+           {
+            "k": "kbd",
+            "p": {
+             "keys": [
+              "esc"
+             ],
+             "key": "k2"
+            }
+           },
+           {
+            "k": "text",
+            "p": {
+             "text": "Stop",
+             "key": "t"
+            }
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "k": "col",
+      "p": {
+       "role": "omp.editor",
+       "key": "composer"
+      },
+      "c": [
+       {
+        "k": "row",
+        "p": {
+         "role": "hermes.streak",
+         "key": "streak"
+        }
+       },
+       {
+        "k": "row",
+        "p": {
+         "gap": "sm",
+         "hidden": true,
+         "role": "omp.composer.chips",
+         "wrap": true,
+         "key": "chips"
+        }
+       },
+       {
+        "k": "row",
+        "p": {
+         "align": "start",
+         "gap": "sm",
+         "role": "omp.composer.line",
+         "key": "line"
+        },
+        "c": [
+         {
+          "k": "editor",
+          "p": {
+           "cursor": 0,
+           "decor": [],
+           "maxLines": 18,
+           "placeholder": "Ask Hermes — / commands · @ files",
+           "sendable": true,
+           "text": "",
+           "key": "input"
+          }
+         }
+        ]
+       },
+       {
+        "k": "row",
+        "p": {
+         "align": "center",
+         "gap": "sm",
+         "role": "omp.composer.bar",
+         "key": "bar"
+        },
+        "c": [
+         {
+          "k": "row",
+          "p": {
+           "align": "center",
+           "gap": "xs",
+           "role": "omp.composer.effort",
+           "title": "Reasoning effort: medium (the default) · click to cycle  ⇧⇥ · right-click to choose or save as default",
+           "key": "effort",
+           "actions": {
+            "click": "click",
+            "menu": [
+             "choose-effort",
+             "save-effort-as-default"
+            ]
+           }
+          },
+          "c": [
+           {
+            "k": "effort",
+            "p": {
+             "level": "medium",
+             "key": "glyph"
+            }
+           },
+           {
+            "k": "text",
+            "p": {
+             "spans": [
+              {
+               "s": "muted",
+               "t": "medium"
+              }
+             ],
+             "wrap": "none",
+             "key": "level"
+            }
+           }
+          ]
+         },
+         {
+          "k": "status",
+          "p": {
+           "grow": 1,
+           "role": "omp.composer.extras",
+           "transparent": true,
+           "key": "extras"
+          }
+         },
+         {
+          "k": "text",
+          "p": {
+           "role": "omp.composer.stop",
+           "text": "Stop",
+           "title": "Stop  esc esc",
+           "tone": "error",
+           "key": "stop",
+           "actions": {
+            "click": "click"
+           }
+          }
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "k": "status",
+      "p": {
+       "role": "hermes.statusline",
+       "key": "statusline"
+      },
+      "c": [
+       {
+        "k": "seg",
+        "p": {
+         "priority": 9,
+         "role": "hermes.statusline.brand",
+         "spans": [
+          {
+           "t": "☤ hermes"
+          }
+         ],
+         "key": "brand"
+        }
+       },
+       {
+        "k": "seg",
+        "p": {
+         "priority": 1,
+         "side": "right",
+         "spans": [
+          {
+           "s": "muted",
+           "t": "⇧⏎ newline"
+          }
+         ],
+         "key": "newline"
+        }
+       },
+       {
+        "k": "seg",
+        "p": {
+         "priority": 10,
+         "role": "hermes.statusline.stop",
+         "side": "right",
+         "spans": [
+          {
+           "t": "esc esc stop"
+          }
+         ],
+         "key": "action",
+         "actions": {
+          "click": "click"
+         }
+        }
+       }
+      ]
+     }
+    ],
+    "layer": [
+     {
+      "k": "overlay",
+      "p": {
+       "anchor": "bottom",
+       "modal": true,
+       "role": "omp.overlay.ask",
+       "size": "md",
+       "key": "prompt:shared:p1"
+      },
+      "c": [
+       {
+        "k": "col",
+        "p": {
+         "gap": "md",
+         "key": "body"
+        },
+        "c": [
+         {
+          "k": "md",
+          "p": {
+           "role": "omp.ask.question",
+           "text": "Allow this command?",
+           "key": "question"
+          }
+         },
+         {
+          "k": "code",
+          "p": {
+           "lang": "bash",
+           "text": "rm -rf build",
+           "key": "command"
+          }
+         },
+         {
+          "k": "row",
+          "p": {
+           "align": "center",
+           "gap": "xs",
+           "key": "why"
+          },
+          "c": [
+           {
+            "k": "icon",
+            "p": {
+             "name": "shield",
+             "tone": "warning",
+             "key": "icon"
+            }
+           },
+           {
+            "k": "md",
+            "p": {
+             "text": "**Flagged** · recursive delete",
+             "key": "text"
+            }
+           }
+          ]
+         },
+         {
+          "k": "list",
+          "p": {
+           "role": "omp.ask.options",
+           "selected": "layer.prompt:shared:p1.body.options.once",
+           "key": "options"
+          },
+          "c": [
+           {
+            "k": "item",
+            "p": {
+             "detail": [
+              {
+               "t": "Run it this time only"
+              }
+             ],
+             "label": [
+              {
+               "t": "Allow once"
+              }
+             ],
+             "role": "omp.ask.option",
+             "key": "once"
+            }
+           },
+           {
+            "k": "item",
+            "p": {
+             "detail": [
+              {
+               "t": "Allow matching commands until the session ends"
+              }
+             ],
+             "label": [
+              {
+               "t": "Allow for this session"
+              }
+             ],
+             "role": "omp.ask.option",
+             "key": "session"
+            }
+           },
+           {
+            "k": "item",
+            "p": {
+             "detail": [
+              {
+               "t": "Remember this approval for every session"
+              }
+             ],
+             "label": [
+              {
+               "t": "Always allow"
+              }
+             ],
+             "role": "omp.ask.option",
+             "key": "always"
+            }
+           },
+           {
+            "k": "item",
+            "p": {
+             "detail": [
+              {
+               "t": "Tell the agent not to run it"
+              }
+             ],
+             "label": [
+              {
+               "t": "Deny"
+              }
+             ],
+             "role": "omp.ask.option",
+             "key": "deny"
+            }
+           }
+          ]
+         },
+         {
+          "k": "row",
+          "p": {
+           "align": "center",
+           "gap": "sm",
+           "role": "omp.actions",
+           "key": "actions"
+          },
+          "c": [
+           {
+            "k": "spacer",
+            "p": {
+             "grow": 1,
+             "key": "fill"
+            }
+           },
+           {
+            "k": "row",
+            "p": {
+             "align": "center",
+             "gap": "xs",
+             "role": "omp.btn",
+             "title": "Deny  n · escape",
+             "key": "deny",
+             "actions": {
+              "click": "click"
+             }
+            },
+            "c": [
+             {
+              "k": "text",
+              "p": {
+               "text": "Deny",
+               "key": "label"
+              }
+             },
+             {
+              "k": "kbd",
+              "p": {
+               "keys": [
+                "escape"
+               ],
+               "key": "keys"
+              }
+             }
+            ]
+           },
+           {
+            "k": "row",
+            "p": {
+             "align": "center",
+             "gap": "xs",
+             "role": "omp.btn",
+             "title": "Choose  enter · y allows once · up/down move",
+             "tone": "accent",
+             "key": "choose",
+             "actions": {
+              "click": "click"
+             }
+            },
+            "c": [
+             {
+              "k": "text",
+              "p": {
+               "text": "Choose",
+               "key": "label"
+              }
+             },
+             {
+              "k": "kbd",
+              "p": {
+               "keys": [
+                "enter"
+               ],
+               "key": "keys"
+              }
+             }
+            ]
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     }
+    ],
+    "main": [
+     {
+      "k": "card",
+      "p": {
+       "role": "omp.welcome",
+       "key": "w0"
+      },
+      "c": [
+       {
+        "k": "row",
+        "p": {
+         "align": "center",
+         "gap": "md",
+         "role": "omp.welcome.lockup",
+         "key": "lockup"
+        },
+        "c": [
+         {
+          "k": "col",
+          "p": {
+           "role": "omp.welcome.mark",
+           "key": "mark"
+          },
+          "c": [
+           {
+            "k": "text",
+            "p": {
+             "role": "omp.welcome.wordmark",
+             "spans": [
+              {
+               "s": "strong",
+               "t": "hermes"
+              }
+             ],
+             "wrap": "none",
+             "key": "wordmark"
+            }
+           },
+           {
+            "k": "text",
+            "p": {
+             "role": "omp.welcome.version",
+             "spans": [
+              {
+               "s": "dim mono",
+               "t": "v1.0.0"
+              }
+             ],
+             "wrap": "none",
+             "key": "version"
+            }
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "k": "card",
+      "p": {
+       "role": "omp.user",
+       "tone": "user",
+       "key": "u1"
+      },
+      "c": [
+       {
+        "k": "row",
+        "p": {
+         "gap": "xs",
+         "role": "omp.user.tools",
+         "key": "tools"
+        },
+        "c": [
+         {
+          "k": "text",
+          "p": {
+           "role": "omp.user.time",
+           "spans": [
+            {
+             "s": "dim mono",
+             "t": "03:04 AM"
+            }
+           ],
+           "title": "1/2/2026, 3:04:05 AM",
+           "key": "time"
+          }
+         },
+         {
+          "k": "icon",
+          "p": {
+           "name": "copy",
+           "role": "omp.user.tool",
+           "title": "Copy message",
+           "key": "copy",
+           "actions": {
+            "click": "click"
+           }
+          }
+         }
+        ]
+       },
+       {
+        "k": "md",
+        "p": {
+         "key": "body",
+         "text": "clean up"
+        }
+       }
+      ]
+     },
+     {
+      "k": "col",
+      "p": {
+       "role": "omp.assistant",
+       "key": "t2"
+      },
+      "c": [
+       {
+        "k": "row",
+        "p": {
+         "align": "center",
+         "gap": "xs",
+         "role": "hermes.turn.working",
+         "key": "working"
+        },
+        "c": [
+         {
+          "k": "text",
+          "p": {
+           "spans": [
+            {
+             "s": "muted",
+             "t": "Working for"
+            }
+           ],
+           "wrap": "none",
+           "key": "label"
+          }
+         },
+         {
+          "k": "elapsed",
+          "p": {
+           "age": 0,
+           "format": "short",
+           "key": "age"
+          }
+         }
+        ]
+       },
+       {
+        "k": "section",
+        "p": {
+         "collapsed": true,
+         "collapsible": true,
+         "head": "main.t2.wt1.head",
+         "key": "wt1",
+         "role": "hermes.work.group"
+        },
+        "c": [
+         {
+          "k": "row",
+          "p": {
+           "align": "center",
+           "gap": "sm",
+           "key": "head"
+          },
+          "c": [
+           {
+            "k": "icon",
+            "p": {
+             "name": "terminal",
+             "key": "icon"
+            }
+           },
+           {
+            "k": "shimmer",
+            "p": {
+             "mode": "classic",
+             "palette": {
+              "high": "accent",
+              "low": "dim",
+              "mid": "muted"
+             },
+             "role": "hermes.work.live",
+             "spans": [
+              {
+               "s": "muted",
+               "t": "Running rm"
+              }
+             ],
+             "key": "label"
+            }
+           },
+           {
+            "k": "icon",
+            "p": {
+             "name": "chev",
+             "role": "hermes.work.chev",
+             "key": "chev"
+            }
+           }
+          ]
+         },
+         {
+          "k": "section",
+          "p": {
+           "collapsed": true,
+           "collapsible": true,
+           "head": "main.t2.wt1.t1.head",
+           "key": "t1",
+           "role": "hermes.work.row"
+          },
+          "c": [
+           {
+            "k": "row",
+            "p": {
+             "align": "center",
+             "gap": "sm",
+             "key": "head"
+            },
+            "c": [
+             {
+              "k": "icon",
+              "p": {
+               "name": "terminal",
+               "key": "icon"
+              }
+             },
+             {
+              "k": "shimmer",
+              "p": {
+               "mode": "classic",
+               "palette": {
+                "high": "accent",
+                "low": "dim",
+                "mid": "muted"
+               },
+               "role": "hermes.work.live",
+               "spans": [
+                {
+                 "s": "muted",
+                 "t": "rm -rf build"
+                }
+               ],
+               "key": "label"
+              }
+             }
+            ]
+           },
+           {
+            "k": "col",
+            "p": {
+             "gap": "xs",
+             "role": "hermes.work.detail",
+             "key": "detail"
+            },
+            "c": [
+             {
+              "k": "code",
+              "p": {
+               "lang": "bash",
+               "max": {
+                "h": "12lines"
+               },
+               "role": "omp.tool.command",
+               "text": "rm -rf build",
+               "key": "cmd"
+              }
+             }
+            ]
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     }
+    ]
+   },
+   "step": "feed 3"
+  },
+  {
+   "frame": {
+    "dock": [
+     {
+      "k": "col",
+      "p": {
+       "role": "omp.hud.status",
+       "key": "hud"
+      },
+      "c": [
+       {
+        "k": "row",
+        "p": {
+         "align": "center",
+         "gap": "sm",
+         "role": "omp.working",
+         "key": "working"
+        },
+        "c": [
+         {
+          "k": "spinner",
+          "p": {
+           "style": "starburst",
+           "tone": "accent",
+           "key": "spinner"
+          }
+         },
+         {
+          "k": "shimmer",
+          "p": {
+           "mode": "classic",
+           "palette": {
+            "high": "accent",
+            "low": "dim",
+            "mid": "muted"
+           },
+           "role": "omp.working.label",
+           "spans": [
+            {
+             "s": "muted",
+             "t": "Running rm…"
+            }
+           ],
+           "key": "label"
+          }
+         },
+         {
+          "k": "text",
+          "p": {
+           "role": "omp.working.sep",
+           "text": "·",
+           "key": "sep"
+          }
+         },
+         {
+          "k": "elapsed",
+          "p": {
+           "age": 0,
+           "format": "short",
+           "key": "elapsed"
+          }
+         },
+         {
+          "k": "row",
+          "p": {
+           "grow": 1,
+           "key": "fill"
+          }
+         },
+         {
+          "k": "row",
+          "p": {
+           "align": "center",
+           "gap": "xs",
+           "role": "omp.working.stop",
+           "title": "Stop  esc esc",
+           "key": "stop",
+           "actions": {
+            "click": "click"
+           }
+          },
+          "c": [
+           {
+            "k": "kbd",
+            "p": {
+             "keys": [
+              "esc"
+             ],
+             "key": "k"
+            }
+           },
+           {
+            "k": "kbd",
+            "p": {
+             "keys": [
+              "esc"
+             ],
+             "key": "k2"
+            }
+           },
+           {
+            "k": "text",
+            "p": {
+             "text": "Stop",
+             "key": "t"
+            }
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "k": "col",
+      "p": {
+       "role": "omp.editor",
+       "key": "composer"
+      },
+      "c": [
+       {
+        "k": "row",
+        "p": {
+         "role": "hermes.streak",
+         "key": "streak"
+        }
+       },
+       {
+        "k": "row",
+        "p": {
+         "gap": "sm",
+         "hidden": true,
+         "role": "omp.composer.chips",
+         "wrap": true,
+         "key": "chips"
+        }
+       },
+       {
+        "k": "row",
+        "p": {
+         "align": "start",
+         "gap": "sm",
+         "role": "omp.composer.line",
+         "key": "line"
+        },
+        "c": [
+         {
+          "k": "editor",
+          "p": {
+           "cursor": 0,
+           "decor": [],
+           "maxLines": 18,
+           "placeholder": "Ask Hermes — / commands · @ files",
+           "sendable": true,
+           "text": "",
+           "key": "input"
+          }
+         }
+        ]
+       },
+       {
+        "k": "row",
+        "p": {
+         "align": "center",
+         "gap": "sm",
+         "role": "omp.composer.bar",
+         "key": "bar"
+        },
+        "c": [
+         {
+          "k": "row",
+          "p": {
+           "align": "center",
+           "gap": "xs",
+           "role": "omp.composer.effort",
+           "title": "Reasoning effort: medium (the default) · click to cycle  ⇧⇥ · right-click to choose or save as default",
+           "key": "effort",
+           "actions": {
+            "click": "click",
+            "menu": [
+             "choose-effort",
+             "save-effort-as-default"
+            ]
+           }
+          },
+          "c": [
+           {
+            "k": "effort",
+            "p": {
+             "level": "medium",
+             "key": "glyph"
+            }
+           },
+           {
+            "k": "text",
+            "p": {
+             "spans": [
+              {
+               "s": "muted",
+               "t": "medium"
+              }
+             ],
+             "wrap": "none",
+             "key": "level"
+            }
+           }
+          ]
+         },
+         {
+          "k": "status",
+          "p": {
+           "grow": 1,
+           "role": "omp.composer.extras",
+           "transparent": true,
+           "key": "extras"
+          }
+         },
+         {
+          "k": "text",
+          "p": {
+           "role": "omp.composer.stop",
+           "text": "Stop",
+           "title": "Stop  esc esc",
+           "tone": "error",
+           "key": "stop",
+           "actions": {
+            "click": "click"
+           }
+          }
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "k": "status",
+      "p": {
+       "role": "hermes.statusline",
+       "key": "statusline"
+      },
+      "c": [
+       {
+        "k": "seg",
+        "p": {
+         "priority": 9,
+         "role": "hermes.statusline.brand",
+         "spans": [
+          {
+           "t": "☤ hermes"
+          }
+         ],
+         "key": "brand"
+        }
+       },
+       {
+        "k": "seg",
+        "p": {
+         "priority": 1,
+         "side": "right",
+         "spans": [
+          {
+           "s": "muted",
+           "t": "⇧⏎ newline"
+          }
+         ],
+         "key": "newline"
+        }
+       },
+       {
+        "k": "seg",
+        "p": {
+         "priority": 10,
+         "role": "hermes.statusline.stop",
+         "side": "right",
+         "spans": [
+          {
+           "t": "esc esc stop"
+          }
+         ],
+         "key": "action",
+         "actions": {
+          "click": "click"
+         }
+        }
+       }
+      ]
+     }
+    ],
+    "layer": [],
+    "main": [
+     {
+      "k": "card",
+      "p": {
+       "role": "omp.welcome",
+       "key": "w0"
+      },
+      "c": [
+       {
+        "k": "row",
+        "p": {
+         "align": "center",
+         "gap": "md",
+         "role": "omp.welcome.lockup",
+         "key": "lockup"
+        },
+        "c": [
+         {
+          "k": "col",
+          "p": {
+           "role": "omp.welcome.mark",
+           "key": "mark"
+          },
+          "c": [
+           {
+            "k": "text",
+            "p": {
+             "role": "omp.welcome.wordmark",
+             "spans": [
+              {
+               "s": "strong",
+               "t": "hermes"
+              }
+             ],
+             "wrap": "none",
+             "key": "wordmark"
+            }
+           },
+           {
+            "k": "text",
+            "p": {
+             "role": "omp.welcome.version",
+             "spans": [
+              {
+               "s": "dim mono",
+               "t": "v1.0.0"
+              }
+             ],
+             "wrap": "none",
+             "key": "version"
+            }
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "k": "card",
+      "p": {
+       "role": "omp.user",
+       "tone": "user",
+       "key": "u1"
+      },
+      "c": [
+       {
+        "k": "row",
+        "p": {
+         "gap": "xs",
+         "role": "omp.user.tools",
+         "key": "tools"
+        },
+        "c": [
+         {
+          "k": "text",
+          "p": {
+           "role": "omp.user.time",
+           "spans": [
+            {
+             "s": "dim mono",
+             "t": "03:04 AM"
+            }
+           ],
+           "title": "1/2/2026, 3:04:05 AM",
+           "key": "time"
+          }
+         },
+         {
+          "k": "icon",
+          "p": {
+           "name": "copy",
+           "role": "omp.user.tool",
+           "title": "Copy message",
+           "key": "copy",
+           "actions": {
+            "click": "click"
+           }
+          }
+         }
+        ]
+       },
+       {
+        "k": "md",
+        "p": {
+         "key": "body",
+         "text": "clean up"
+        }
+       }
+      ]
+     },
+     {
+      "k": "col",
+      "p": {
+       "role": "omp.assistant",
+       "key": "t2"
+      },
+      "c": [
+       {
+        "k": "row",
+        "p": {
+         "align": "center",
+         "gap": "xs",
+         "role": "hermes.turn.working",
+         "key": "working"
+        },
+        "c": [
+         {
+          "k": "text",
+          "p": {
+           "spans": [
+            {
+             "s": "muted",
+             "t": "Working for"
+            }
+           ],
+           "wrap": "none",
+           "key": "label"
+          }
+         },
+         {
+          "k": "elapsed",
+          "p": {
+           "age": 0,
+           "format": "short",
+           "key": "age"
+          }
+         }
+        ]
+       },
+       {
+        "k": "section",
+        "p": {
+         "collapsed": true,
+         "collapsible": true,
+         "head": "main.t2.wt1.head",
+         "key": "wt1",
+         "role": "hermes.work.group"
+        },
+        "c": [
+         {
+          "k": "row",
+          "p": {
+           "align": "center",
+           "gap": "sm",
+           "key": "head"
+          },
+          "c": [
+           {
+            "k": "icon",
+            "p": {
+             "name": "terminal",
+             "key": "icon"
+            }
+           },
+           {
+            "k": "shimmer",
+            "p": {
+             "mode": "classic",
+             "palette": {
+              "high": "accent",
+              "low": "dim",
+              "mid": "muted"
+             },
+             "role": "hermes.work.live",
+             "spans": [
+              {
+               "s": "muted",
+               "t": "Running rm"
+              }
+             ],
+             "key": "label"
+            }
+           },
+           {
+            "k": "icon",
+            "p": {
+             "name": "chev",
+             "role": "hermes.work.chev",
+             "key": "chev"
+            }
+           }
+          ]
+         },
+         {
+          "k": "section",
+          "p": {
+           "collapsed": true,
+           "collapsible": true,
+           "head": "main.t2.wt1.t1.head",
+           "key": "t1",
+           "role": "hermes.work.row"
+          },
+          "c": [
+           {
+            "k": "row",
+            "p": {
+             "align": "center",
+             "gap": "sm",
+             "key": "head"
+            },
+            "c": [
+             {
+              "k": "icon",
+              "p": {
+               "name": "terminal",
+               "key": "icon"
+              }
+             },
+             {
+              "k": "shimmer",
+              "p": {
+               "mode": "classic",
+               "palette": {
+                "high": "accent",
+                "low": "dim",
+                "mid": "muted"
+               },
+               "role": "hermes.work.live",
+               "spans": [
+                {
+                 "s": "muted",
+                 "t": "rm -rf build"
+                }
+               ],
+               "key": "label"
+              }
+             }
+            ]
+           },
+           {
+            "k": "col",
+            "p": {
+             "gap": "xs",
+             "role": "hermes.work.detail",
+             "key": "detail"
+            },
+            "c": [
+             {
+              "k": "code",
+              "p": {
+               "lang": "bash",
+               "max": {
+                "h": "12lines"
+               },
+               "role": "omp.tool.command",
+               "text": "rm -rf build",
+               "key": "cmd"
+              }
+             }
+            ]
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     }
+    ]
+   },
+   "step": "press y"
+  },
+  {
+   "frame": {
+    "dock": [
+     {
+      "k": "col",
+      "p": {
+       "role": "omp.hud.status",
+       "key": "hud"
+      },
+      "c": [
+       {
+        "k": "row",
+        "p": {
+         "align": "center",
+         "gap": "sm",
+         "role": "omp.working",
+         "key": "working"
+        },
+        "c": [
+         {
+          "k": "spinner",
+          "p": {
+           "style": "starburst",
+           "tone": "accent",
+           "key": "spinner"
+          }
+         },
+         {
+          "k": "shimmer",
+          "p": {
+           "mode": "classic",
+           "palette": {
+            "high": "accent",
+            "low": "dim",
+            "mid": "muted"
+           },
+           "role": "omp.working.label",
+           "spans": [
+            {
+             "s": "muted",
+             "t": "Running rm…"
+            }
+           ],
+           "key": "label"
+          }
+         },
+         {
+          "k": "text",
+          "p": {
+           "role": "omp.working.sep",
+           "text": "·",
+           "key": "sep"
+          }
+         },
+         {
+          "k": "elapsed",
+          "p": {
+           "age": 0,
+           "format": "short",
+           "key": "elapsed"
+          }
+         },
+         {
+          "k": "row",
+          "p": {
+           "grow": 1,
+           "key": "fill"
+          }
+         },
+         {
+          "k": "row",
+          "p": {
+           "align": "center",
+           "gap": "xs",
+           "role": "omp.working.stop",
+           "title": "Stop  esc esc",
+           "key": "stop",
+           "actions": {
+            "click": "click"
+           }
+          },
+          "c": [
+           {
+            "k": "kbd",
+            "p": {
+             "keys": [
+              "esc"
+             ],
+             "key": "k"
+            }
+           },
+           {
+            "k": "kbd",
+            "p": {
+             "keys": [
+              "esc"
+             ],
+             "key": "k2"
+            }
+           },
+           {
+            "k": "text",
+            "p": {
+             "text": "Stop",
+             "key": "t"
+            }
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "k": "col",
+      "p": {
+       "role": "omp.editor",
+       "key": "composer"
+      },
+      "c": [
+       {
+        "k": "row",
+        "p": {
+         "role": "hermes.streak",
+         "key": "streak"
+        }
+       },
+       {
+        "k": "row",
+        "p": {
+         "gap": "sm",
+         "hidden": true,
+         "role": "omp.composer.chips",
+         "wrap": true,
+         "key": "chips"
+        }
+       },
+       {
+        "k": "row",
+        "p": {
+         "align": "start",
+         "gap": "sm",
+         "role": "omp.composer.line",
+         "key": "line"
+        },
+        "c": [
+         {
+          "k": "editor",
+          "p": {
+           "cursor": 0,
+           "decor": [],
+           "maxLines": 18,
+           "placeholder": "Ask Hermes — / commands · @ files",
+           "sendable": true,
+           "text": "",
+           "key": "input"
+          }
+         }
+        ]
+       },
+       {
+        "k": "row",
+        "p": {
+         "align": "center",
+         "gap": "sm",
+         "role": "omp.composer.bar",
+         "key": "bar"
+        },
+        "c": [
+         {
+          "k": "row",
+          "p": {
+           "align": "center",
+           "gap": "xs",
+           "role": "omp.composer.effort",
+           "title": "Reasoning effort: medium (the default) · click to cycle  ⇧⇥ · right-click to choose or save as default",
+           "key": "effort",
+           "actions": {
+            "click": "click",
+            "menu": [
+             "choose-effort",
+             "save-effort-as-default"
+            ]
+           }
+          },
+          "c": [
+           {
+            "k": "effort",
+            "p": {
+             "level": "medium",
+             "key": "glyph"
+            }
+           },
+           {
+            "k": "text",
+            "p": {
+             "spans": [
+              {
+               "s": "muted",
+               "t": "medium"
+              }
+             ],
+             "wrap": "none",
+             "key": "level"
+            }
+           }
+          ]
+         },
+         {
+          "k": "status",
+          "p": {
+           "grow": 1,
+           "role": "omp.composer.extras",
+           "transparent": true,
+           "key": "extras"
+          }
+         },
+         {
+          "k": "text",
+          "p": {
+           "role": "omp.composer.stop",
+           "text": "Stop",
+           "title": "Stop  esc esc",
+           "tone": "error",
+           "key": "stop",
+           "actions": {
+            "click": "click"
+           }
+          }
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "k": "status",
+      "p": {
+       "role": "hermes.statusline",
+       "key": "statusline"
+      },
+      "c": [
+       {
+        "k": "seg",
+        "p": {
+         "priority": 9,
+         "role": "hermes.statusline.brand",
+         "spans": [
+          {
+           "t": "☤ hermes"
+          }
+         ],
+         "key": "brand"
+        }
+       },
+       {
+        "k": "seg",
+        "p": {
+         "priority": 1,
+         "side": "right",
+         "spans": [
+          {
+           "s": "muted",
+           "t": "⇧⏎ newline"
+          }
+         ],
+         "key": "newline"
+        }
+       },
+       {
+        "k": "seg",
+        "p": {
+         "priority": 10,
+         "role": "hermes.statusline.stop",
+         "side": "right",
+         "spans": [
+          {
+           "t": "esc esc stop"
+          }
+         ],
+         "key": "action",
+         "actions": {
+          "click": "click"
+         }
+        }
+       }
+      ]
+     }
+    ],
+    "layer": [],
+    "main": [
+     {
+      "k": "card",
+      "p": {
+       "role": "omp.welcome",
+       "key": "w0"
+      },
+      "c": [
+       {
+        "k": "row",
+        "p": {
+         "align": "center",
+         "gap": "md",
+         "role": "omp.welcome.lockup",
+         "key": "lockup"
+        },
+        "c": [
+         {
+          "k": "col",
+          "p": {
+           "role": "omp.welcome.mark",
+           "key": "mark"
+          },
+          "c": [
+           {
+            "k": "text",
+            "p": {
+             "role": "omp.welcome.wordmark",
+             "spans": [
+              {
+               "s": "strong",
+               "t": "hermes"
+              }
+             ],
+             "wrap": "none",
+             "key": "wordmark"
+            }
+           },
+           {
+            "k": "text",
+            "p": {
+             "role": "omp.welcome.version",
+             "spans": [
+              {
+               "s": "dim mono",
+               "t": "v1.0.0"
+              }
+             ],
+             "wrap": "none",
+             "key": "version"
+            }
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "k": "card",
+      "p": {
+       "role": "omp.user",
+       "tone": "user",
+       "key": "u1"
+      },
+      "c": [
+       {
+        "k": "row",
+        "p": {
+         "gap": "xs",
+         "role": "omp.user.tools",
+         "key": "tools"
+        },
+        "c": [
+         {
+          "k": "text",
+          "p": {
+           "role": "omp.user.time",
+           "spans": [
+            {
+             "s": "dim mono",
+             "t": "03:04 AM"
+            }
+           ],
+           "title": "1/2/2026, 3:04:05 AM",
+           "key": "time"
+          }
+         },
+         {
+          "k": "icon",
+          "p": {
+           "name": "copy",
+           "role": "omp.user.tool",
+           "title": "Copy message",
+           "key": "copy",
+           "actions": {
+            "click": "click"
+           }
+          }
+         }
+        ]
+       },
+       {
+        "k": "md",
+        "p": {
+         "key": "body",
+         "text": "clean up"
+        }
+       }
+      ]
+     },
+     {
+      "k": "col",
+      "p": {
+       "role": "omp.assistant",
+       "key": "t2"
+      },
+      "c": [
+       {
+        "k": "row",
+        "p": {
+         "align": "center",
+         "gap": "xs",
+         "role": "hermes.turn.working",
+         "key": "working"
+        },
+        "c": [
+         {
+          "k": "text",
+          "p": {
+           "spans": [
+            {
+             "s": "muted",
+             "t": "Working for"
+            }
+           ],
+           "wrap": "none",
+           "key": "label"
+          }
+         },
+         {
+          "k": "elapsed",
+          "p": {
+           "age": 0,
+           "format": "short",
+           "key": "age"
+          }
+         }
+        ]
+       },
+       {
+        "k": "section",
+        "p": {
+         "collapsed": true,
+         "collapsible": true,
+         "head": "main.t2.wt1.head",
+         "key": "wt1",
+         "role": "hermes.work.group"
+        },
+        "c": [
+         {
+          "k": "row",
+          "p": {
+           "align": "center",
+           "gap": "sm",
+           "key": "head"
+          },
+          "c": [
+           {
+            "k": "icon",
+            "p": {
+             "name": "terminal",
+             "key": "icon"
+            }
+           },
+           {
+            "k": "shimmer",
+            "p": {
+             "mode": "classic",
+             "palette": {
+              "high": "accent",
+              "low": "dim",
+              "mid": "muted"
+             },
+             "role": "hermes.work.live",
+             "spans": [
+              {
+               "s": "muted",
+               "t": "Running rm"
+              }
+             ],
+             "key": "label"
+            }
+           },
+           {
+            "k": "icon",
+            "p": {
+             "name": "chev",
+             "role": "hermes.work.chev",
+             "key": "chev"
+            }
+           }
+          ]
+         },
+         {
+          "k": "section",
+          "p": {
+           "collapsed": true,
+           "collapsible": true,
+           "head": "main.t2.wt1.t1.head",
+           "key": "t1",
+           "role": "hermes.work.row"
+          },
+          "c": [
+           {
+            "k": "row",
+            "p": {
+             "align": "center",
+             "gap": "sm",
+             "key": "head"
+            },
+            "c": [
+             {
+              "k": "icon",
+              "p": {
+               "name": "terminal",
+               "key": "icon"
+              }
+             },
+             {
+              "k": "text",
+              "p": {
+               "grow": 1,
+               "spans": [
+                {
+                 "s": "muted",
+                 "t": "rm -rf build"
+                }
+               ],
+               "truncate": "end",
+               "wrap": "none",
+               "key": "label"
+              }
+             }
+            ]
+           },
+           {
+            "k": "col",
+            "p": {
+             "gap": "xs",
+             "role": "hermes.work.detail",
+             "key": "detail"
+            },
+            "c": [
+             {
+              "k": "code",
+              "p": {
+               "lang": "bash",
+               "max": {
+                "h": "12lines"
+               },
+               "role": "omp.tool.command",
+               "text": "rm -rf build",
+               "key": "cmd"
+              }
+             }
+            ]
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     }
+    ]
+   },
+   "step": "feed 2"
+  },
+  {
+   "frame": {
+    "dock": [
+     {
+      "k": "col",
+      "p": {
+       "role": "omp.hud.status",
+       "key": "hud"
+      },
+      "c": [
+       {
+        "k": "row",
+        "p": {
+         "align": "center",
+         "gap": "sm",
+         "role": "omp.working",
+         "key": "working"
+        },
+        "c": [
+         {
+          "k": "spinner",
+          "p": {
+           "style": "starburst",
+           "tone": "accent",
+           "key": "spinner"
+          }
+         },
+         {
+          "k": "shimmer",
+          "p": {
+           "mode": "classic",
+           "palette": {
+            "high": "accent",
+            "low": "dim",
+            "mid": "muted"
+           },
+           "role": "omp.working.label",
+           "spans": [
+            {
+             "s": "muted",
+             "t": "Running rm…"
+            }
+           ],
+           "key": "label"
+          }
+         },
+         {
+          "k": "text",
+          "p": {
+           "role": "omp.working.sep",
+           "text": "·",
+           "key": "sep"
+          }
+         },
+         {
+          "k": "elapsed",
+          "p": {
+           "age": 0,
+           "format": "short",
+           "key": "elapsed"
+          }
+         },
+         {
+          "k": "row",
+          "p": {
+           "grow": 1,
+           "key": "fill"
+          }
+         },
+         {
+          "k": "row",
+          "p": {
+           "align": "center",
+           "gap": "xs",
+           "role": "omp.working.stop",
+           "title": "Stop  esc esc",
+           "key": "stop",
+           "actions": {
+            "click": "click"
+           }
+          },
+          "c": [
+           {
+            "k": "kbd",
+            "p": {
+             "keys": [
+              "esc"
+             ],
+             "key": "k"
+            }
+           },
+           {
+            "k": "kbd",
+            "p": {
+             "keys": [
+              "esc"
+             ],
+             "key": "k2"
+            }
+           },
+           {
+            "k": "text",
+            "p": {
+             "text": "Stop",
+             "key": "t"
+            }
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "k": "col",
+      "p": {
+       "role": "omp.editor",
+       "key": "composer"
+      },
+      "c": [
+       {
+        "k": "row",
+        "p": {
+         "role": "hermes.streak",
+         "key": "streak"
+        }
+       },
+       {
+        "k": "row",
+        "p": {
+         "gap": "sm",
+         "hidden": true,
+         "role": "omp.composer.chips",
+         "wrap": true,
+         "key": "chips"
+        }
+       },
+       {
+        "k": "row",
+        "p": {
+         "align": "start",
+         "gap": "sm",
+         "role": "omp.composer.line",
+         "key": "line"
+        },
+        "c": [
+         {
+          "k": "editor",
+          "p": {
+           "cursor": 0,
+           "decor": [],
+           "maxLines": 18,
+           "placeholder": "Ask Hermes — / commands · @ files",
+           "sendable": true,
+           "text": "",
+           "key": "input"
+          }
+         }
+        ]
+       },
+       {
+        "k": "row",
+        "p": {
+         "align": "center",
+         "gap": "sm",
+         "role": "omp.composer.bar",
+         "key": "bar"
+        },
+        "c": [
+         {
+          "k": "row",
+          "p": {
+           "align": "center",
+           "gap": "xs",
+           "role": "omp.composer.effort",
+           "title": "Reasoning effort: medium (the default) · click to cycle  ⇧⇥ · right-click to choose or save as default",
+           "key": "effort",
+           "actions": {
+            "click": "click",
+            "menu": [
+             "choose-effort",
+             "save-effort-as-default"
+            ]
+           }
+          },
+          "c": [
+           {
+            "k": "effort",
+            "p": {
+             "level": "medium",
+             "key": "glyph"
+            }
+           },
+           {
+            "k": "text",
+            "p": {
+             "spans": [
+              {
+               "s": "muted",
+               "t": "medium"
+              }
+             ],
+             "wrap": "none",
+             "key": "level"
+            }
+           }
+          ]
+         },
+         {
+          "k": "status",
+          "p": {
+           "grow": 1,
+           "role": "omp.composer.extras",
+           "transparent": true,
+           "key": "extras"
+          }
+         },
+         {
+          "k": "text",
+          "p": {
+           "role": "omp.composer.stop",
+           "text": "Stop",
+           "title": "Stop  esc esc",
+           "tone": "error",
+           "key": "stop",
+           "actions": {
+            "click": "click"
+           }
+          }
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "k": "status",
+      "p": {
+       "role": "hermes.statusline",
+       "key": "statusline"
+      },
+      "c": [
+       {
+        "k": "seg",
+        "p": {
+         "priority": 9,
+         "role": "hermes.statusline.brand",
+         "spans": [
+          {
+           "t": "☤ hermes"
+          }
+         ],
+         "key": "brand"
+        }
+       },
+       {
+        "k": "seg",
+        "p": {
+         "priority": 1,
+         "side": "right",
+         "spans": [
+          {
+           "s": "muted",
+           "t": "⇧⏎ newline"
+          }
+         ],
+         "key": "newline"
+        }
+       },
+       {
+        "k": "seg",
+        "p": {
+         "priority": 10,
+         "role": "hermes.statusline.stop",
+         "side": "right",
+         "spans": [
+          {
+           "t": "esc esc stop"
+          }
+         ],
+         "key": "action",
+         "actions": {
+          "click": "click"
+         }
+        }
+       }
+      ]
+     }
+    ],
+    "layer": [
+     {
+      "k": "overlay",
+      "p": {
+       "anchor": "bottom",
+       "modal": true,
+       "role": "omp.overlay.ask",
+       "size": "md",
+       "key": "prompt:shared:p2"
+      },
+      "c": [
+       {
+        "k": "col",
+        "p": {
+         "gap": "md",
+         "key": "body"
+        },
+        "c": [
+         {
+          "k": "md",
+          "p": {
+           "role": "omp.ask.question",
+           "text": "Which branch should I push?",
+           "key": "question"
+          }
+         },
+         {
+          "k": "list",
+          "p": {
+           "role": "omp.ask.options",
+           "selected": "layer.prompt:shared:p2.body.q0.option:0",
+           "key": "q0"
+          },
+          "c": [
+           {
+            "k": "item",
+            "p": {
+             "label": [
+              {
+               "t": "main"
+              }
+             ],
+             "role": "omp.ask.option",
+             "key": "option:0"
+            }
+           },
+           {
+            "k": "item",
+            "p": {
+             "label": [
+              {
+               "t": "dev"
+              }
+             ],
+             "role": "omp.ask.option",
+             "key": "option:1"
+            }
+           },
+           {
+            "k": "item",
+            "p": {
+             "detail": [
+              {
+               "s": "dim",
+               "t": "Type your own answer"
+              }
+             ],
+             "label": [
+              {
+               "t": "Other…"
+              }
+             ],
+             "role": "omp.ask.other",
+             "key": "other"
+            }
+           }
+          ]
+         },
+         {
+          "k": "row",
+          "p": {
+           "align": "center",
+           "gap": "sm",
+           "role": "omp.actions",
+           "key": "actions"
+          },
+          "c": [
+           {
+            "k": "spacer",
+            "p": {
+             "grow": 1,
+             "key": "fill"
+            }
+           },
+           {
+            "k": "row",
+            "p": {
+             "align": "center",
+             "gap": "xs",
+             "role": "omp.btn",
+             "title": "Skip  escape",
+             "key": "skip",
+             "actions": {
+              "click": "click"
+             }
+            },
+            "c": [
+             {
+              "k": "text",
+              "p": {
+               "text": "Skip",
+               "key": "label"
+              }
+             },
+             {
+              "k": "kbd",
+              "p": {
+               "keys": [
+                "escape"
+               ],
+               "key": "keys"
+              }
+             }
+            ]
+           },
+           {
+            "k": "row",
+            "p": {
+             "align": "center",
+             "gap": "xs",
+             "role": "omp.btn",
+             "title": "Submit  enter · up/down move",
+             "tone": "accent",
+             "key": "submit",
+             "actions": {
+              "click": "click"
+             }
+            },
+            "c": [
+             {
+              "k": "text",
+              "p": {
+               "text": "Submit",
+               "key": "label"
+              }
+             },
+             {
+              "k": "kbd",
+              "p": {
+               "keys": [
+                "enter"
+               ],
+               "key": "keys"
+              }
+             }
+            ]
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     }
+    ],
+    "main": [
+     {
+      "k": "card",
+      "p": {
+       "role": "omp.welcome",
+       "key": "w0"
+      },
+      "c": [
+       {
+        "k": "row",
+        "p": {
+         "align": "center",
+         "gap": "md",
+         "role": "omp.welcome.lockup",
+         "key": "lockup"
+        },
+        "c": [
+         {
+          "k": "col",
+          "p": {
+           "role": "omp.welcome.mark",
+           "key": "mark"
+          },
+          "c": [
+           {
+            "k": "text",
+            "p": {
+             "role": "omp.welcome.wordmark",
+             "spans": [
+              {
+               "s": "strong",
+               "t": "hermes"
+              }
+             ],
+             "wrap": "none",
+             "key": "wordmark"
+            }
+           },
+           {
+            "k": "text",
+            "p": {
+             "role": "omp.welcome.version",
+             "spans": [
+              {
+               "s": "dim mono",
+               "t": "v1.0.0"
+              }
+             ],
+             "wrap": "none",
+             "key": "version"
+            }
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "k": "card",
+      "p": {
+       "role": "omp.user",
+       "tone": "user",
+       "key": "u1"
+      },
+      "c": [
+       {
+        "k": "row",
+        "p": {
+         "gap": "xs",
+         "role": "omp.user.tools",
+         "key": "tools"
+        },
+        "c": [
+         {
+          "k": "text",
+          "p": {
+           "role": "omp.user.time",
+           "spans": [
+            {
+             "s": "dim mono",
+             "t": "03:04 AM"
+            }
+           ],
+           "title": "1/2/2026, 3:04:05 AM",
+           "key": "time"
+          }
+         },
+         {
+          "k": "icon",
+          "p": {
+           "name": "copy",
+           "role": "omp.user.tool",
+           "title": "Copy message",
+           "key": "copy",
+           "actions": {
+            "click": "click"
+           }
+          }
+         }
+        ]
+       },
+       {
+        "k": "md",
+        "p": {
+         "key": "body",
+         "text": "clean up"
+        }
+       }
+      ]
+     },
+     {
+      "k": "col",
+      "p": {
+       "role": "omp.assistant",
+       "key": "t2"
+      },
+      "c": [
+       {
+        "k": "row",
+        "p": {
+         "align": "center",
+         "gap": "xs",
+         "role": "hermes.turn.working",
+         "key": "working"
+        },
+        "c": [
+         {
+          "k": "text",
+          "p": {
+           "spans": [
+            {
+             "s": "muted",
+             "t": "Working for"
+            }
+           ],
+           "wrap": "none",
+           "key": "label"
+          }
+         },
+         {
+          "k": "elapsed",
+          "p": {
+           "age": 0,
+           "format": "short",
+           "key": "age"
+          }
+         }
+        ]
+       },
+       {
+        "k": "section",
+        "p": {
+         "collapsed": true,
+         "collapsible": true,
+         "head": "main.t2.wt1.head",
+         "key": "wt1",
+         "role": "hermes.work.group"
+        },
+        "c": [
+         {
+          "k": "row",
+          "p": {
+           "align": "center",
+           "gap": "sm",
+           "key": "head"
+          },
+          "c": [
+           {
+            "k": "icon",
+            "p": {
+             "name": "terminal",
+             "key": "icon"
+            }
+           },
+           {
+            "k": "shimmer",
+            "p": {
+             "mode": "classic",
+             "palette": {
+              "high": "accent",
+              "low": "dim",
+              "mid": "muted"
+             },
+             "role": "hermes.work.live",
+             "spans": [
+              {
+               "s": "muted",
+               "t": "Running rm"
+              }
+             ],
+             "key": "label"
+            }
+           },
+           {
+            "k": "icon",
+            "p": {
+             "name": "chev",
+             "role": "hermes.work.chev",
+             "key": "chev"
+            }
+           }
+          ]
+         },
+         {
+          "k": "section",
+          "p": {
+           "collapsed": true,
+           "collapsible": true,
+           "head": "main.t2.wt1.t1.head",
+           "key": "t1",
+           "role": "hermes.work.row"
+          },
+          "c": [
+           {
+            "k": "row",
+            "p": {
+             "align": "center",
+             "gap": "sm",
+             "key": "head"
+            },
+            "c": [
+             {
+              "k": "icon",
+              "p": {
+               "name": "terminal",
+               "key": "icon"
+              }
+             },
+             {
+              "k": "text",
+              "p": {
+               "grow": 1,
+               "spans": [
+                {
+                 "s": "muted",
+                 "t": "rm -rf build"
+                }
+               ],
+               "truncate": "end",
+               "wrap": "none",
+               "key": "label"
+              }
+             }
+            ]
+           },
+           {
+            "k": "col",
+            "p": {
+             "gap": "xs",
+             "role": "hermes.work.detail",
+             "key": "detail"
+            },
+            "c": [
+             {
+              "k": "code",
+              "p": {
+               "lang": "bash",
+               "max": {
+                "h": "12lines"
+               },
+               "role": "omp.tool.command",
+               "text": "rm -rf build",
+               "key": "cmd"
+              }
+             }
+            ]
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     }
+    ]
+   },
+   "step": "feed 1"
+  },
+  {
+   "frame": {
+    "dock": [
+     {
+      "k": "col",
+      "p": {
+       "role": "omp.hud.status",
+       "key": "hud"
+      },
+      "c": [
+       {
+        "k": "row",
+        "p": {
+         "align": "center",
+         "gap": "sm",
+         "role": "omp.working",
+         "key": "working"
+        },
+        "c": [
+         {
+          "k": "spinner",
+          "p": {
+           "style": "starburst",
+           "tone": "accent",
+           "key": "spinner"
+          }
+         },
+         {
+          "k": "shimmer",
+          "p": {
+           "mode": "classic",
+           "palette": {
+            "high": "accent",
+            "low": "dim",
+            "mid": "muted"
+           },
+           "role": "omp.working.label",
+           "spans": [
+            {
+             "s": "muted",
+             "t": "Running rm…"
+            }
+           ],
+           "key": "label"
+          }
+         },
+         {
+          "k": "text",
+          "p": {
+           "role": "omp.working.sep",
+           "text": "·",
+           "key": "sep"
+          }
+         },
+         {
+          "k": "elapsed",
+          "p": {
+           "age": 0,
+           "format": "short",
+           "key": "elapsed"
+          }
+         },
+         {
+          "k": "row",
+          "p": {
+           "grow": 1,
+           "key": "fill"
+          }
+         },
+         {
+          "k": "row",
+          "p": {
+           "align": "center",
+           "gap": "xs",
+           "role": "omp.working.stop",
+           "title": "Stop  esc esc",
+           "key": "stop",
+           "actions": {
+            "click": "click"
+           }
+          },
+          "c": [
+           {
+            "k": "kbd",
+            "p": {
+             "keys": [
+              "esc"
+             ],
+             "key": "k"
+            }
+           },
+           {
+            "k": "kbd",
+            "p": {
+             "keys": [
+              "esc"
+             ],
+             "key": "k2"
+            }
+           },
+           {
+            "k": "text",
+            "p": {
+             "text": "Stop",
+             "key": "t"
+            }
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "k": "col",
+      "p": {
+       "role": "omp.editor",
+       "key": "composer"
+      },
+      "c": [
+       {
+        "k": "row",
+        "p": {
+         "role": "hermes.streak",
+         "key": "streak"
+        }
+       },
+       {
+        "k": "row",
+        "p": {
+         "gap": "sm",
+         "hidden": true,
+         "role": "omp.composer.chips",
+         "wrap": true,
+         "key": "chips"
+        }
+       },
+       {
+        "k": "row",
+        "p": {
+         "align": "start",
+         "gap": "sm",
+         "role": "omp.composer.line",
+         "key": "line"
+        },
+        "c": [
+         {
+          "k": "editor",
+          "p": {
+           "cursor": 0,
+           "decor": [],
+           "maxLines": 18,
+           "placeholder": "Ask Hermes — / commands · @ files",
+           "sendable": true,
+           "text": "",
+           "key": "input"
+          }
+         }
+        ]
+       },
+       {
+        "k": "row",
+        "p": {
+         "align": "center",
+         "gap": "sm",
+         "role": "omp.composer.bar",
+         "key": "bar"
+        },
+        "c": [
+         {
+          "k": "row",
+          "p": {
+           "align": "center",
+           "gap": "xs",
+           "role": "omp.composer.effort",
+           "title": "Reasoning effort: medium (the default) · click to cycle  ⇧⇥ · right-click to choose or save as default",
+           "key": "effort",
+           "actions": {
+            "click": "click",
+            "menu": [
+             "choose-effort",
+             "save-effort-as-default"
+            ]
+           }
+          },
+          "c": [
+           {
+            "k": "effort",
+            "p": {
+             "level": "medium",
+             "key": "glyph"
+            }
+           },
+           {
+            "k": "text",
+            "p": {
+             "spans": [
+              {
+               "s": "muted",
+               "t": "medium"
+              }
+             ],
+             "wrap": "none",
+             "key": "level"
+            }
+           }
+          ]
+         },
+         {
+          "k": "status",
+          "p": {
+           "grow": 1,
+           "role": "omp.composer.extras",
+           "transparent": true,
+           "key": "extras"
+          }
+         },
+         {
+          "k": "text",
+          "p": {
+           "role": "omp.composer.stop",
+           "text": "Stop",
+           "title": "Stop  esc esc",
+           "tone": "error",
+           "key": "stop",
+           "actions": {
+            "click": "click"
+           }
+          }
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "k": "status",
+      "p": {
+       "role": "hermes.statusline",
+       "key": "statusline"
+      },
+      "c": [
+       {
+        "k": "seg",
+        "p": {
+         "priority": 9,
+         "role": "hermes.statusline.brand",
+         "spans": [
+          {
+           "t": "☤ hermes"
+          }
+         ],
+         "key": "brand"
+        }
+       },
+       {
+        "k": "seg",
+        "p": {
+         "priority": 1,
+         "side": "right",
+         "spans": [
+          {
+           "s": "muted",
+           "t": "⇧⏎ newline"
+          }
+         ],
+         "key": "newline"
+        }
+       },
+       {
+        "k": "seg",
+        "p": {
+         "priority": 10,
+         "role": "hermes.statusline.stop",
+         "side": "right",
+         "spans": [
+          {
+           "t": "esc esc stop"
+          }
+         ],
+         "key": "action",
+         "actions": {
+          "click": "click"
+         }
+        }
+       }
+      ]
+     }
+    ],
+    "layer": [
+     {
+      "k": "overlay",
+      "p": {
+       "anchor": "bottom",
+       "modal": true,
+       "role": "omp.overlay.ask",
+       "size": "md",
+       "key": "prompt:shared:p2"
+      },
+      "c": [
+       {
+        "k": "col",
+        "p": {
+         "gap": "md",
+         "key": "body"
+        },
+        "c": [
+         {
+          "k": "md",
+          "p": {
+           "role": "omp.ask.question",
+           "text": "Which branch should I push?",
+           "key": "question"
+          }
+         },
+         {
+          "k": "list",
+          "p": {
+           "role": "omp.ask.options",
+           "selected": "layer.prompt:shared:p2.body.q0.option:1",
+           "key": "q0"
+          },
+          "c": [
+           {
+            "k": "item",
+            "p": {
+             "label": [
+              {
+               "t": "main"
+              }
+             ],
+             "role": "omp.ask.option",
+             "key": "option:0"
+            }
+           },
+           {
+            "k": "item",
+            "p": {
+             "label": [
+              {
+               "t": "dev"
+              }
+             ],
+             "role": "omp.ask.option",
+             "key": "option:1"
+            }
+           },
+           {
+            "k": "item",
+            "p": {
+             "detail": [
+              {
+               "s": "dim",
+               "t": "Type your own answer"
+              }
+             ],
+             "label": [
+              {
+               "t": "Other…"
+              }
+             ],
+             "role": "omp.ask.other",
+             "key": "other"
+            }
+           }
+          ]
+         },
+         {
+          "k": "row",
+          "p": {
+           "align": "center",
+           "gap": "sm",
+           "role": "omp.actions",
+           "key": "actions"
+          },
+          "c": [
+           {
+            "k": "spacer",
+            "p": {
+             "grow": 1,
+             "key": "fill"
+            }
+           },
+           {
+            "k": "row",
+            "p": {
+             "align": "center",
+             "gap": "xs",
+             "role": "omp.btn",
+             "title": "Skip  escape",
+             "key": "skip",
+             "actions": {
+              "click": "click"
+             }
+            },
+            "c": [
+             {
+              "k": "text",
+              "p": {
+               "text": "Skip",
+               "key": "label"
+              }
+             },
+             {
+              "k": "kbd",
+              "p": {
+               "keys": [
+                "escape"
+               ],
+               "key": "keys"
+              }
+             }
+            ]
+           },
+           {
+            "k": "row",
+            "p": {
+             "align": "center",
+             "gap": "xs",
+             "role": "omp.btn",
+             "title": "Submit  enter · up/down move",
+             "tone": "accent",
+             "key": "submit",
+             "actions": {
+              "click": "click"
+             }
+            },
+            "c": [
+             {
+              "k": "text",
+              "p": {
+               "text": "Submit",
+               "key": "label"
+              }
+             },
+             {
+              "k": "kbd",
+              "p": {
+               "keys": [
+                "enter"
+               ],
+               "key": "keys"
+              }
+             }
+            ]
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     }
+    ],
+    "main": [
+     {
+      "k": "card",
+      "p": {
+       "role": "omp.welcome",
+       "key": "w0"
+      },
+      "c": [
+       {
+        "k": "row",
+        "p": {
+         "align": "center",
+         "gap": "md",
+         "role": "omp.welcome.lockup",
+         "key": "lockup"
+        },
+        "c": [
+         {
+          "k": "col",
+          "p": {
+           "role": "omp.welcome.mark",
+           "key": "mark"
+          },
+          "c": [
+           {
+            "k": "text",
+            "p": {
+             "role": "omp.welcome.wordmark",
+             "spans": [
+              {
+               "s": "strong",
+               "t": "hermes"
+              }
+             ],
+             "wrap": "none",
+             "key": "wordmark"
+            }
+           },
+           {
+            "k": "text",
+            "p": {
+             "role": "omp.welcome.version",
+             "spans": [
+              {
+               "s": "dim mono",
+               "t": "v1.0.0"
+              }
+             ],
+             "wrap": "none",
+             "key": "version"
+            }
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "k": "card",
+      "p": {
+       "role": "omp.user",
+       "tone": "user",
+       "key": "u1"
+      },
+      "c": [
+       {
+        "k": "row",
+        "p": {
+         "gap": "xs",
+         "role": "omp.user.tools",
+         "key": "tools"
+        },
+        "c": [
+         {
+          "k": "text",
+          "p": {
+           "role": "omp.user.time",
+           "spans": [
+            {
+             "s": "dim mono",
+             "t": "03:04 AM"
+            }
+           ],
+           "title": "1/2/2026, 3:04:05 AM",
+           "key": "time"
+          }
+         },
+         {
+          "k": "icon",
+          "p": {
+           "name": "copy",
+           "role": "omp.user.tool",
+           "title": "Copy message",
+           "key": "copy",
+           "actions": {
+            "click": "click"
+           }
+          }
+         }
+        ]
+       },
+       {
+        "k": "md",
+        "p": {
+         "key": "body",
+         "text": "clean up"
+        }
+       }
+      ]
+     },
+     {
+      "k": "col",
+      "p": {
+       "role": "omp.assistant",
+       "key": "t2"
+      },
+      "c": [
+       {
+        "k": "row",
+        "p": {
+         "align": "center",
+         "gap": "xs",
+         "role": "hermes.turn.working",
+         "key": "working"
+        },
+        "c": [
+         {
+          "k": "text",
+          "p": {
+           "spans": [
+            {
+             "s": "muted",
+             "t": "Working for"
+            }
+           ],
+           "wrap": "none",
+           "key": "label"
+          }
+         },
+         {
+          "k": "elapsed",
+          "p": {
+           "age": 0,
+           "format": "short",
+           "key": "age"
+          }
+         }
+        ]
+       },
+       {
+        "k": "section",
+        "p": {
+         "collapsed": true,
+         "collapsible": true,
+         "head": "main.t2.wt1.head",
+         "key": "wt1",
+         "role": "hermes.work.group"
+        },
+        "c": [
+         {
+          "k": "row",
+          "p": {
+           "align": "center",
+           "gap": "sm",
+           "key": "head"
+          },
+          "c": [
+           {
+            "k": "icon",
+            "p": {
+             "name": "terminal",
+             "key": "icon"
+            }
+           },
+           {
+            "k": "shimmer",
+            "p": {
+             "mode": "classic",
+             "palette": {
+              "high": "accent",
+              "low": "dim",
+              "mid": "muted"
+             },
+             "role": "hermes.work.live",
+             "spans": [
+              {
+               "s": "muted",
+               "t": "Running rm"
+              }
+             ],
+             "key": "label"
+            }
+           },
+           {
+            "k": "icon",
+            "p": {
+             "name": "chev",
+             "role": "hermes.work.chev",
+             "key": "chev"
+            }
+           }
+          ]
+         },
+         {
+          "k": "section",
+          "p": {
+           "collapsed": true,
+           "collapsible": true,
+           "head": "main.t2.wt1.t1.head",
+           "key": "t1",
+           "role": "hermes.work.row"
+          },
+          "c": [
+           {
+            "k": "row",
+            "p": {
+             "align": "center",
+             "gap": "sm",
+             "key": "head"
+            },
+            "c": [
+             {
+              "k": "icon",
+              "p": {
+               "name": "terminal",
+               "key": "icon"
+              }
+             },
+             {
+              "k": "text",
+              "p": {
+               "grow": 1,
+               "spans": [
+                {
+                 "s": "muted",
+                 "t": "rm -rf build"
+                }
+               ],
+               "truncate": "end",
+               "wrap": "none",
+               "key": "label"
+              }
+             }
+            ]
+           },
+           {
+            "k": "col",
+            "p": {
+             "gap": "xs",
+             "role": "hermes.work.detail",
+             "key": "detail"
+            },
+            "c": [
+             {
+              "k": "code",
+              "p": {
+               "lang": "bash",
+               "max": {
+                "h": "12lines"
+               },
+               "role": "omp.tool.command",
+               "text": "rm -rf build",
+               "key": "cmd"
+              }
+             }
+            ]
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     }
+    ]
+   },
+   "step": "press down"
+  },
+  {
+   "frame": {
+    "dock": [
+     {
+      "k": "col",
+      "p": {
+       "role": "omp.hud.status",
+       "key": "hud"
+      },
+      "c": [
+       {
+        "k": "row",
+        "p": {
+         "align": "center",
+         "gap": "sm",
+         "role": "omp.working",
+         "key": "working"
+        },
+        "c": [
+         {
+          "k": "spinner",
+          "p": {
+           "style": "starburst",
+           "tone": "accent",
+           "key": "spinner"
+          }
+         },
+         {
+          "k": "shimmer",
+          "p": {
+           "mode": "classic",
+           "palette": {
+            "high": "accent",
+            "low": "dim",
+            "mid": "muted"
+           },
+           "role": "omp.working.label",
+           "spans": [
+            {
+             "s": "muted",
+             "t": "Running rm…"
+            }
+           ],
+           "key": "label"
+          }
+         },
+         {
+          "k": "text",
+          "p": {
+           "role": "omp.working.sep",
+           "text": "·",
+           "key": "sep"
+          }
+         },
+         {
+          "k": "elapsed",
+          "p": {
+           "age": 0,
+           "format": "short",
+           "key": "elapsed"
+          }
+         },
+         {
+          "k": "row",
+          "p": {
+           "grow": 1,
+           "key": "fill"
+          }
+         },
+         {
+          "k": "row",
+          "p": {
+           "align": "center",
+           "gap": "xs",
+           "role": "omp.working.stop",
+           "title": "Stop  esc esc",
+           "key": "stop",
+           "actions": {
+            "click": "click"
+           }
+          },
+          "c": [
+           {
+            "k": "kbd",
+            "p": {
+             "keys": [
+              "esc"
+             ],
+             "key": "k"
+            }
+           },
+           {
+            "k": "kbd",
+            "p": {
+             "keys": [
+              "esc"
+             ],
+             "key": "k2"
+            }
+           },
+           {
+            "k": "text",
+            "p": {
+             "text": "Stop",
+             "key": "t"
+            }
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "k": "col",
+      "p": {
+       "role": "omp.editor",
+       "key": "composer"
+      },
+      "c": [
+       {
+        "k": "row",
+        "p": {
+         "role": "hermes.streak",
+         "key": "streak"
+        }
+       },
+       {
+        "k": "row",
+        "p": {
+         "gap": "sm",
+         "hidden": true,
+         "role": "omp.composer.chips",
+         "wrap": true,
+         "key": "chips"
+        }
+       },
+       {
+        "k": "row",
+        "p": {
+         "align": "start",
+         "gap": "sm",
+         "role": "omp.composer.line",
+         "key": "line"
+        },
+        "c": [
+         {
+          "k": "editor",
+          "p": {
+           "cursor": 0,
+           "decor": [],
+           "maxLines": 18,
+           "placeholder": "Ask Hermes — / commands · @ files",
+           "sendable": true,
+           "text": "",
+           "key": "input"
+          }
+         }
+        ]
+       },
+       {
+        "k": "row",
+        "p": {
+         "align": "center",
+         "gap": "sm",
+         "role": "omp.composer.bar",
+         "key": "bar"
+        },
+        "c": [
+         {
+          "k": "row",
+          "p": {
+           "align": "center",
+           "gap": "xs",
+           "role": "omp.composer.effort",
+           "title": "Reasoning effort: medium (the default) · click to cycle  ⇧⇥ · right-click to choose or save as default",
+           "key": "effort",
+           "actions": {
+            "click": "click",
+            "menu": [
+             "choose-effort",
+             "save-effort-as-default"
+            ]
+           }
+          },
+          "c": [
+           {
+            "k": "effort",
+            "p": {
+             "level": "medium",
+             "key": "glyph"
+            }
+           },
+           {
+            "k": "text",
+            "p": {
+             "spans": [
+              {
+               "s": "muted",
+               "t": "medium"
+              }
+             ],
+             "wrap": "none",
+             "key": "level"
+            }
+           }
+          ]
+         },
+         {
+          "k": "status",
+          "p": {
+           "grow": 1,
+           "role": "omp.composer.extras",
+           "transparent": true,
+           "key": "extras"
+          }
+         },
+         {
+          "k": "text",
+          "p": {
+           "role": "omp.composer.stop",
+           "text": "Stop",
+           "title": "Stop  esc esc",
+           "tone": "error",
+           "key": "stop",
+           "actions": {
+            "click": "click"
+           }
+          }
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "k": "status",
+      "p": {
+       "role": "hermes.statusline",
+       "key": "statusline"
+      },
+      "c": [
+       {
+        "k": "seg",
+        "p": {
+         "priority": 9,
+         "role": "hermes.statusline.brand",
+         "spans": [
+          {
+           "t": "☤ hermes"
+          }
+         ],
+         "key": "brand"
+        }
+       },
+       {
+        "k": "seg",
+        "p": {
+         "priority": 1,
+         "side": "right",
+         "spans": [
+          {
+           "s": "muted",
+           "t": "⇧⏎ newline"
+          }
+         ],
+         "key": "newline"
+        }
+       },
+       {
+        "k": "seg",
+        "p": {
+         "priority": 10,
+         "role": "hermes.statusline.stop",
+         "side": "right",
+         "spans": [
+          {
+           "t": "esc esc stop"
+          }
+         ],
+         "key": "action",
+         "actions": {
+          "click": "click"
+         }
+        }
+       }
+      ]
+     }
+    ],
+    "layer": [],
+    "main": [
+     {
+      "k": "card",
+      "p": {
+       "role": "omp.welcome",
+       "key": "w0"
+      },
+      "c": [
+       {
+        "k": "row",
+        "p": {
+         "align": "center",
+         "gap": "md",
+         "role": "omp.welcome.lockup",
+         "key": "lockup"
+        },
+        "c": [
+         {
+          "k": "col",
+          "p": {
+           "role": "omp.welcome.mark",
+           "key": "mark"
+          },
+          "c": [
+           {
+            "k": "text",
+            "p": {
+             "role": "omp.welcome.wordmark",
+             "spans": [
+              {
+               "s": "strong",
+               "t": "hermes"
+              }
+             ],
+             "wrap": "none",
+             "key": "wordmark"
+            }
+           },
+           {
+            "k": "text",
+            "p": {
+             "role": "omp.welcome.version",
+             "spans": [
+              {
+               "s": "dim mono",
+               "t": "v1.0.0"
+              }
+             ],
+             "wrap": "none",
+             "key": "version"
+            }
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "k": "card",
+      "p": {
+       "role": "omp.user",
+       "tone": "user",
+       "key": "u1"
+      },
+      "c": [
+       {
+        "k": "row",
+        "p": {
+         "gap": "xs",
+         "role": "omp.user.tools",
+         "key": "tools"
+        },
+        "c": [
+         {
+          "k": "text",
+          "p": {
+           "role": "omp.user.time",
+           "spans": [
+            {
+             "s": "dim mono",
+             "t": "03:04 AM"
+            }
+           ],
+           "title": "1/2/2026, 3:04:05 AM",
+           "key": "time"
+          }
+         },
+         {
+          "k": "icon",
+          "p": {
+           "name": "copy",
+           "role": "omp.user.tool",
+           "title": "Copy message",
+           "key": "copy",
+           "actions": {
+            "click": "click"
+           }
+          }
+         }
+        ]
+       },
+       {
+        "k": "md",
+        "p": {
+         "key": "body",
+         "text": "clean up"
+        }
+       }
+      ]
+     },
+     {
+      "k": "col",
+      "p": {
+       "role": "omp.assistant",
+       "key": "t2"
+      },
+      "c": [
+       {
+        "k": "row",
+        "p": {
+         "align": "center",
+         "gap": "xs",
+         "role": "hermes.turn.working",
+         "key": "working"
+        },
+        "c": [
+         {
+          "k": "text",
+          "p": {
+           "spans": [
+            {
+             "s": "muted",
+             "t": "Working for"
+            }
+           ],
+           "wrap": "none",
+           "key": "label"
+          }
+         },
+         {
+          "k": "elapsed",
+          "p": {
+           "age": 0,
+           "format": "short",
+           "key": "age"
+          }
+         }
+        ]
+       },
+       {
+        "k": "section",
+        "p": {
+         "collapsed": true,
+         "collapsible": true,
+         "head": "main.t2.wt1.head",
+         "key": "wt1",
+         "role": "hermes.work.group"
+        },
+        "c": [
+         {
+          "k": "row",
+          "p": {
+           "align": "center",
+           "gap": "sm",
+           "key": "head"
+          },
+          "c": [
+           {
+            "k": "icon",
+            "p": {
+             "name": "terminal",
+             "key": "icon"
+            }
+           },
+           {
+            "k": "shimmer",
+            "p": {
+             "mode": "classic",
+             "palette": {
+              "high": "accent",
+              "low": "dim",
+              "mid": "muted"
+             },
+             "role": "hermes.work.live",
+             "spans": [
+              {
+               "s": "muted",
+               "t": "Running rm"
+              }
+             ],
+             "key": "label"
+            }
+           },
+           {
+            "k": "icon",
+            "p": {
+             "name": "chev",
+             "role": "hermes.work.chev",
+             "key": "chev"
+            }
+           }
+          ]
+         },
+         {
+          "k": "section",
+          "p": {
+           "collapsed": true,
+           "collapsible": true,
+           "head": "main.t2.wt1.t1.head",
+           "key": "t1",
+           "role": "hermes.work.row"
+          },
+          "c": [
+           {
+            "k": "row",
+            "p": {
+             "align": "center",
+             "gap": "sm",
+             "key": "head"
+            },
+            "c": [
+             {
+              "k": "icon",
+              "p": {
+               "name": "terminal",
+               "key": "icon"
+              }
+             },
+             {
+              "k": "text",
+              "p": {
+               "grow": 1,
+               "spans": [
+                {
+                 "s": "muted",
+                 "t": "rm -rf build"
+                }
+               ],
+               "truncate": "end",
+               "wrap": "none",
+               "key": "label"
+              }
+             }
+            ]
+           },
+           {
+            "k": "col",
+            "p": {
+             "gap": "xs",
+             "role": "hermes.work.detail",
+             "key": "detail"
+            },
+            "c": [
+             {
+              "k": "code",
+              "p": {
+               "lang": "bash",
+               "max": {
+                "h": "12lines"
+               },
+               "role": "omp.tool.command",
+               "text": "rm -rf build",
+               "key": "cmd"
+              }
+             }
+            ]
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     }
+    ]
+   },
+   "step": "press enter"
+  },
+  {
+   "frame": {
+    "dock": [
+     {
+      "k": "col",
+      "p": {
+       "role": "omp.hud.status",
+       "key": "hud"
+      },
+      "c": [
+       {
+        "k": "row",
+        "p": {
+         "align": "center",
+         "gap": "sm",
+         "role": "omp.working",
+         "key": "working"
+        },
+        "c": [
+         {
+          "k": "spinner",
+          "p": {
+           "style": "starburst",
+           "tone": "accent",
+           "key": "spinner"
+          }
+         },
+         {
+          "k": "shimmer",
+          "p": {
+           "mode": "classic",
+           "palette": {
+            "high": "accent",
+            "low": "dim",
+            "mid": "muted"
+           },
+           "role": "omp.working.label",
+           "spans": [
+            {
+             "s": "muted",
+             "t": "Running rm…"
+            }
+           ],
+           "key": "label"
+          }
+         },
+         {
+          "k": "text",
+          "p": {
+           "role": "omp.working.sep",
+           "text": "·",
+           "key": "sep"
+          }
+         },
+         {
+          "k": "elapsed",
+          "p": {
+           "age": 0,
+           "format": "short",
+           "key": "elapsed"
+          }
+         },
+         {
+          "k": "row",
+          "p": {
+           "grow": 1,
+           "key": "fill"
+          }
+         },
+         {
+          "k": "row",
+          "p": {
+           "align": "center",
+           "gap": "xs",
+           "role": "omp.working.stop",
+           "title": "Stop  esc esc",
+           "key": "stop",
+           "actions": {
+            "click": "click"
+           }
+          },
+          "c": [
+           {
+            "k": "kbd",
+            "p": {
+             "keys": [
+              "esc"
+             ],
+             "key": "k"
+            }
+           },
+           {
+            "k": "kbd",
+            "p": {
+             "keys": [
+              "esc"
+             ],
+             "key": "k2"
+            }
+           },
+           {
+            "k": "text",
+            "p": {
+             "text": "Stop",
+             "key": "t"
+            }
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "k": "col",
+      "p": {
+       "role": "omp.editor",
+       "key": "composer"
+      },
+      "c": [
+       {
+        "k": "row",
+        "p": {
+         "role": "hermes.streak",
+         "key": "streak"
+        }
+       },
+       {
+        "k": "row",
+        "p": {
+         "gap": "sm",
+         "hidden": true,
+         "role": "omp.composer.chips",
+         "wrap": true,
+         "key": "chips"
+        }
+       },
+       {
+        "k": "row",
+        "p": {
+         "align": "start",
+         "gap": "sm",
+         "role": "omp.composer.line",
+         "key": "line"
+        },
+        "c": [
+         {
+          "k": "editor",
+          "p": {
+           "cursor": 0,
+           "decor": [],
+           "maxLines": 18,
+           "placeholder": "Ask Hermes — / commands · @ files",
+           "sendable": true,
+           "text": "",
+           "key": "input"
+          }
+         }
+        ]
+       },
+       {
+        "k": "row",
+        "p": {
+         "align": "center",
+         "gap": "sm",
+         "role": "omp.composer.bar",
+         "key": "bar"
+        },
+        "c": [
+         {
+          "k": "row",
+          "p": {
+           "align": "center",
+           "gap": "xs",
+           "role": "omp.composer.effort",
+           "title": "Reasoning effort: medium (the default) · click to cycle  ⇧⇥ · right-click to choose or save as default",
+           "key": "effort",
+           "actions": {
+            "click": "click",
+            "menu": [
+             "choose-effort",
+             "save-effort-as-default"
+            ]
+           }
+          },
+          "c": [
+           {
+            "k": "effort",
+            "p": {
+             "level": "medium",
+             "key": "glyph"
+            }
+           },
+           {
+            "k": "text",
+            "p": {
+             "spans": [
+              {
+               "s": "muted",
+               "t": "medium"
+              }
+             ],
+             "wrap": "none",
+             "key": "level"
+            }
+           }
+          ]
+         },
+         {
+          "k": "status",
+          "p": {
+           "grow": 1,
+           "role": "omp.composer.extras",
+           "transparent": true,
+           "key": "extras"
+          }
+         },
+         {
+          "k": "text",
+          "p": {
+           "role": "omp.composer.stop",
+           "text": "Stop",
+           "title": "Stop  esc esc",
+           "tone": "error",
+           "key": "stop",
+           "actions": {
+            "click": "click"
+           }
+          }
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "k": "status",
+      "p": {
+       "role": "hermes.statusline",
+       "key": "statusline"
+      },
+      "c": [
+       {
+        "k": "seg",
+        "p": {
+         "priority": 9,
+         "role": "hermes.statusline.brand",
+         "spans": [
+          {
+           "t": "☤ hermes"
+          }
+         ],
+         "key": "brand"
+        }
+       },
+       {
+        "k": "seg",
+        "p": {
+         "priority": 1,
+         "side": "right",
+         "spans": [
+          {
+           "s": "muted",
+           "t": "⇧⏎ newline"
+          }
+         ],
+         "key": "newline"
+        }
+       },
+       {
+        "k": "seg",
+        "p": {
+         "priority": 10,
+         "role": "hermes.statusline.stop",
+         "side": "right",
+         "spans": [
+          {
+           "t": "esc esc stop"
+          }
+         ],
+         "key": "action",
+         "actions": {
+          "click": "click"
+         }
+        }
+       }
+      ]
+     }
+    ],
+    "layer": [],
+    "main": [
+     {
+      "k": "card",
+      "p": {
+       "role": "omp.welcome",
+       "key": "w0"
+      },
+      "c": [
+       {
+        "k": "row",
+        "p": {
+         "align": "center",
+         "gap": "md",
+         "role": "omp.welcome.lockup",
+         "key": "lockup"
+        },
+        "c": [
+         {
+          "k": "col",
+          "p": {
+           "role": "omp.welcome.mark",
+           "key": "mark"
+          },
+          "c": [
+           {
+            "k": "text",
+            "p": {
+             "role": "omp.welcome.wordmark",
+             "spans": [
+              {
+               "s": "strong",
+               "t": "hermes"
+              }
+             ],
+             "wrap": "none",
+             "key": "wordmark"
+            }
+           },
+           {
+            "k": "text",
+            "p": {
+             "role": "omp.welcome.version",
+             "spans": [
+              {
+               "s": "dim mono",
+               "t": "v1.0.0"
+              }
+             ],
+             "wrap": "none",
+             "key": "version"
+            }
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "k": "card",
+      "p": {
+       "role": "omp.user",
+       "tone": "user",
+       "key": "u1"
+      },
+      "c": [
+       {
+        "k": "row",
+        "p": {
+         "gap": "xs",
+         "role": "omp.user.tools",
+         "key": "tools"
+        },
+        "c": [
+         {
+          "k": "text",
+          "p": {
+           "role": "omp.user.time",
+           "spans": [
+            {
+             "s": "dim mono",
+             "t": "03:04 AM"
+            }
+           ],
+           "title": "1/2/2026, 3:04:05 AM",
+           "key": "time"
+          }
+         },
+         {
+          "k": "icon",
+          "p": {
+           "name": "copy",
+           "role": "omp.user.tool",
+           "title": "Copy message",
+           "key": "copy",
+           "actions": {
+            "click": "click"
+           }
+          }
+         }
+        ]
+       },
+       {
+        "k": "md",
+        "p": {
+         "key": "body",
+         "text": "clean up"
+        }
+       }
+      ]
+     },
+     {
+      "k": "col",
+      "p": {
+       "role": "omp.assistant",
+       "key": "t2"
+      },
+      "c": [
+       {
+        "k": "row",
+        "p": {
+         "align": "center",
+         "gap": "xs",
+         "role": "hermes.turn.working",
+         "key": "working"
+        },
+        "c": [
+         {
+          "k": "text",
+          "p": {
+           "spans": [
+            {
+             "s": "muted",
+             "t": "Working for"
+            }
+           ],
+           "wrap": "none",
+           "key": "label"
+          }
+         },
+         {
+          "k": "elapsed",
+          "p": {
+           "age": 0,
+           "format": "short",
+           "key": "age"
+          }
+         }
+        ]
+       },
+       {
+        "k": "section",
+        "p": {
+         "collapsed": true,
+         "collapsible": true,
+         "head": "main.t2.wt1.head",
+         "key": "wt1",
+         "role": "hermes.work.group"
+        },
+        "c": [
+         {
+          "k": "row",
+          "p": {
+           "align": "center",
+           "gap": "sm",
+           "key": "head"
+          },
+          "c": [
+           {
+            "k": "icon",
+            "p": {
+             "name": "terminal",
+             "key": "icon"
+            }
+           },
+           {
+            "k": "shimmer",
+            "p": {
+             "mode": "classic",
+             "palette": {
+              "high": "accent",
+              "low": "dim",
+              "mid": "muted"
+             },
+             "role": "hermes.work.live",
+             "spans": [
+              {
+               "s": "muted",
+               "t": "Running rm"
+              }
+             ],
+             "key": "label"
+            }
+           },
+           {
+            "k": "icon",
+            "p": {
+             "name": "chev",
+             "role": "hermes.work.chev",
+             "key": "chev"
+            }
+           }
+          ]
+         },
+         {
+          "k": "section",
+          "p": {
+           "collapsed": true,
+           "collapsible": true,
+           "head": "main.t2.wt1.t1.head",
+           "key": "t1",
+           "role": "hermes.work.row"
+          },
+          "c": [
+           {
+            "k": "row",
+            "p": {
+             "align": "center",
+             "gap": "sm",
+             "key": "head"
+            },
+            "c": [
+             {
+              "k": "icon",
+              "p": {
+               "name": "terminal",
+               "key": "icon"
+              }
+             },
+             {
+              "k": "text",
+              "p": {
+               "grow": 1,
+               "spans": [
+                {
+                 "s": "muted",
+                 "t": "rm -rf build"
+                }
+               ],
+               "truncate": "end",
+               "wrap": "none",
+               "key": "label"
+              }
+             }
+            ]
+           },
+           {
+            "k": "col",
+            "p": {
+             "gap": "xs",
+             "role": "hermes.work.detail",
+             "key": "detail"
+            },
+            "c": [
+             {
+              "k": "code",
+              "p": {
+               "lang": "bash",
+               "max": {
+                "h": "12lines"
+               },
+               "role": "omp.tool.command",
+               "text": "rm -rf build",
+               "key": "cmd"
+              }
+             }
+            ]
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     }
+    ]
+   },
+   "step": "feed 1"
+  },
+  {
+   "frame": {
+    "dock": [
+     {
+      "k": "col",
+      "p": {
+       "role": "omp.hud.status",
+       "key": "hud"
+      },
+      "c": [
+       {
+        "k": "row",
+        "p": {
+         "align": "center",
+         "gap": "sm",
+         "role": "omp.working",
+         "key": "working"
+        },
+        "c": [
+         {
+          "k": "spinner",
+          "p": {
+           "style": "starburst",
+           "tone": "accent",
+           "key": "spinner"
+          }
+         },
+         {
+          "k": "shimmer",
+          "p": {
+           "mode": "classic",
+           "palette": {
+            "high": "accent",
+            "low": "dim",
+            "mid": "muted"
+           },
+           "role": "omp.working.label",
+           "spans": [
+            {
+             "s": "muted",
+             "t": "Running rm…"
+            }
+           ],
+           "key": "label"
+          }
+         },
+         {
+          "k": "text",
+          "p": {
+           "role": "omp.working.sep",
+           "text": "·",
+           "key": "sep"
+          }
+         },
+         {
+          "k": "elapsed",
+          "p": {
+           "age": 0,
+           "format": "short",
+           "key": "elapsed"
+          }
+         },
+         {
+          "k": "row",
+          "p": {
+           "grow": 1,
+           "key": "fill"
+          }
+         },
+         {
+          "k": "row",
+          "p": {
+           "align": "center",
+           "gap": "xs",
+           "role": "omp.working.stop",
+           "title": "Stop  esc esc",
+           "key": "stop",
+           "actions": {
+            "click": "click"
+           }
+          },
+          "c": [
+           {
+            "k": "kbd",
+            "p": {
+             "keys": [
+              "esc"
+             ],
+             "key": "k"
+            }
+           },
+           {
+            "k": "kbd",
+            "p": {
+             "keys": [
+              "esc"
+             ],
+             "key": "k2"
+            }
+           },
+           {
+            "k": "text",
+            "p": {
+             "text": "Stop",
+             "key": "t"
+            }
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "k": "col",
+      "p": {
+       "role": "omp.editor",
+       "key": "composer"
+      },
+      "c": [
+       {
+        "k": "row",
+        "p": {
+         "role": "hermes.streak",
+         "key": "streak"
+        }
+       },
+       {
+        "k": "row",
+        "p": {
+         "gap": "sm",
+         "hidden": true,
+         "role": "omp.composer.chips",
+         "wrap": true,
+         "key": "chips"
+        }
+       },
+       {
+        "k": "row",
+        "p": {
+         "align": "start",
+         "gap": "sm",
+         "role": "omp.composer.line",
+         "key": "line"
+        },
+        "c": [
+         {
+          "k": "editor",
+          "p": {
+           "cursor": 0,
+           "decor": [],
+           "maxLines": 18,
+           "placeholder": "Ask Hermes — / commands · @ files",
+           "sendable": true,
+           "text": "",
+           "key": "input"
+          }
+         }
+        ]
+       },
+       {
+        "k": "row",
+        "p": {
+         "align": "center",
+         "gap": "sm",
+         "role": "omp.composer.bar",
+         "key": "bar"
+        },
+        "c": [
+         {
+          "k": "row",
+          "p": {
+           "align": "center",
+           "gap": "xs",
+           "role": "omp.composer.effort",
+           "title": "Reasoning effort: medium (the default) · click to cycle  ⇧⇥ · right-click to choose or save as default",
+           "key": "effort",
+           "actions": {
+            "click": "click",
+            "menu": [
+             "choose-effort",
+             "save-effort-as-default"
+            ]
+           }
+          },
+          "c": [
+           {
+            "k": "effort",
+            "p": {
+             "level": "medium",
+             "key": "glyph"
+            }
+           },
+           {
+            "k": "text",
+            "p": {
+             "spans": [
+              {
+               "s": "muted",
+               "t": "medium"
+              }
+             ],
+             "wrap": "none",
+             "key": "level"
+            }
+           }
+          ]
+         },
+         {
+          "k": "status",
+          "p": {
+           "grow": 1,
+           "role": "omp.composer.extras",
+           "transparent": true,
+           "key": "extras"
+          }
+         },
+         {
+          "k": "text",
+          "p": {
+           "role": "omp.composer.stop",
+           "text": "Stop",
+           "title": "Stop  esc esc",
+           "tone": "error",
+           "key": "stop",
+           "actions": {
+            "click": "click"
+           }
+          }
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "k": "status",
+      "p": {
+       "role": "hermes.statusline",
+       "key": "statusline"
+      },
+      "c": [
+       {
+        "k": "seg",
+        "p": {
+         "priority": 9,
+         "role": "hermes.statusline.brand",
+         "spans": [
+          {
+           "t": "☤ hermes"
+          }
+         ],
+         "key": "brand"
+        }
+       },
+       {
+        "k": "seg",
+        "p": {
+         "priority": 1,
+         "side": "right",
+         "spans": [
+          {
+           "s": "muted",
+           "t": "⇧⏎ newline"
+          }
+         ],
+         "key": "newline"
+        }
+       },
+       {
+        "k": "seg",
+        "p": {
+         "priority": 10,
+         "role": "hermes.statusline.stop",
+         "side": "right",
+         "spans": [
+          {
+           "t": "esc esc stop"
+          }
+         ],
+         "key": "action",
+         "actions": {
+          "click": "click"
+         }
+        }
+       }
+      ]
+     }
+    ],
+    "layer": [
+     {
+      "k": "overlay",
+      "p": {
+       "anchor": "bottom",
+       "modal": true,
+       "role": "omp.overlay.ask",
+       "size": "md",
+       "key": "prompt:r1"
+      },
+      "c": [
+       {
+        "k": "col",
+        "p": {
+         "gap": "md",
+         "key": "body"
+        },
+        "c": [
+         {
+          "k": "md",
+          "p": {
+           "role": "omp.ask.question",
+           "text": "Allow this command?",
+           "key": "question"
+          }
+         },
+         {
+          "k": "code",
+          "p": {
+           "lang": "bash",
+           "text": "git push --force",
+           "key": "command"
+          }
+         },
+         {
+          "k": "row",
+          "p": {
+           "align": "center",
+           "gap": "xs",
+           "key": "why"
+          },
+          "c": [
+           {
+            "k": "icon",
+            "p": {
+             "name": "shield",
+             "tone": "warning",
+             "key": "icon"
+            }
+           },
+           {
+            "k": "md",
+            "p": {
+             "text": "**Flagged** · force push",
+             "key": "text"
+            }
+           }
+          ]
+         },
+         {
+          "k": "list",
+          "p": {
+           "role": "omp.ask.options",
+           "selected": "layer.prompt:r1.body.options.once",
+           "key": "options"
+          },
+          "c": [
+           {
+            "k": "item",
+            "p": {
+             "detail": [
+              {
+               "t": "Run it this time only"
+              }
+             ],
+             "label": [
+              {
+               "t": "Allow once"
+              }
+             ],
+             "role": "omp.ask.option",
+             "key": "once"
+            }
+           },
+           {
+            "k": "item",
+            "p": {
+             "detail": [
+              {
+               "t": "Allow matching commands until the session ends"
+              }
+             ],
+             "label": [
+              {
+               "t": "Allow for this session"
+              }
+             ],
+             "role": "omp.ask.option",
+             "key": "session"
+            }
+           },
+           {
+            "k": "item",
+            "p": {
+             "detail": [
+              {
+               "t": "Remember this approval for every session"
+              }
+             ],
+             "label": [
+              {
+               "t": "Always allow"
+              }
+             ],
+             "role": "omp.ask.option",
+             "key": "always"
+            }
+           },
+           {
+            "k": "item",
+            "p": {
+             "detail": [
+              {
+               "t": "Tell the agent not to run it"
+              }
+             ],
+             "label": [
+              {
+               "t": "Deny"
+              }
+             ],
+             "role": "omp.ask.option",
+             "key": "deny"
+            }
+           }
+          ]
+         },
+         {
+          "k": "row",
+          "p": {
+           "align": "center",
+           "gap": "sm",
+           "role": "omp.actions",
+           "key": "actions"
+          },
+          "c": [
+           {
+            "k": "spacer",
+            "p": {
+             "grow": 1,
+             "key": "fill"
+            }
+           },
+           {
+            "k": "row",
+            "p": {
+             "align": "center",
+             "gap": "xs",
+             "role": "omp.btn",
+             "title": "Deny  n · escape",
+             "key": "deny",
+             "actions": {
+              "click": "click"
+             }
+            },
+            "c": [
+             {
+              "k": "text",
+              "p": {
+               "text": "Deny",
+               "key": "label"
+              }
+             },
+             {
+              "k": "kbd",
+              "p": {
+               "keys": [
+                "escape"
+               ],
+               "key": "keys"
+              }
+             }
+            ]
+           },
+           {
+            "k": "row",
+            "p": {
+             "align": "center",
+             "gap": "xs",
+             "role": "omp.btn",
+             "title": "Choose  enter · y allows once · up/down move",
+             "tone": "accent",
+             "key": "choose",
+             "actions": {
+              "click": "click"
+             }
+            },
+            "c": [
+             {
+              "k": "text",
+              "p": {
+               "text": "Choose",
+               "key": "label"
+              }
+             },
+             {
+              "k": "kbd",
+              "p": {
+               "keys": [
+                "enter"
+               ],
+               "key": "keys"
+              }
+             }
+            ]
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     }
+    ],
+    "main": [
+     {
+      "k": "card",
+      "p": {
+       "role": "omp.welcome",
+       "key": "w0"
+      },
+      "c": [
+       {
+        "k": "row",
+        "p": {
+         "align": "center",
+         "gap": "md",
+         "role": "omp.welcome.lockup",
+         "key": "lockup"
+        },
+        "c": [
+         {
+          "k": "col",
+          "p": {
+           "role": "omp.welcome.mark",
+           "key": "mark"
+          },
+          "c": [
+           {
+            "k": "text",
+            "p": {
+             "role": "omp.welcome.wordmark",
+             "spans": [
+              {
+               "s": "strong",
+               "t": "hermes"
+              }
+             ],
+             "wrap": "none",
+             "key": "wordmark"
+            }
+           },
+           {
+            "k": "text",
+            "p": {
+             "role": "omp.welcome.version",
+             "spans": [
+              {
+               "s": "dim mono",
+               "t": "v1.0.0"
+              }
+             ],
+             "wrap": "none",
+             "key": "version"
+            }
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "k": "card",
+      "p": {
+       "role": "omp.user",
+       "tone": "user",
+       "key": "u1"
+      },
+      "c": [
+       {
+        "k": "row",
+        "p": {
+         "gap": "xs",
+         "role": "omp.user.tools",
+         "key": "tools"
+        },
+        "c": [
+         {
+          "k": "text",
+          "p": {
+           "role": "omp.user.time",
+           "spans": [
+            {
+             "s": "dim mono",
+             "t": "03:04 AM"
+            }
+           ],
+           "title": "1/2/2026, 3:04:05 AM",
+           "key": "time"
+          }
+         },
+         {
+          "k": "icon",
+          "p": {
+           "name": "copy",
+           "role": "omp.user.tool",
+           "title": "Copy message",
+           "key": "copy",
+           "actions": {
+            "click": "click"
+           }
+          }
+         }
+        ]
+       },
+       {
+        "k": "md",
+        "p": {
+         "key": "body",
+         "text": "clean up"
+        }
+       }
+      ]
+     },
+     {
+      "k": "col",
+      "p": {
+       "role": "omp.assistant",
+       "key": "t2"
+      },
+      "c": [
+       {
+        "k": "row",
+        "p": {
+         "align": "center",
+         "gap": "xs",
+         "role": "hermes.turn.working",
+         "key": "working"
+        },
+        "c": [
+         {
+          "k": "text",
+          "p": {
+           "spans": [
+            {
+             "s": "muted",
+             "t": "Working for"
+            }
+           ],
+           "wrap": "none",
+           "key": "label"
+          }
+         },
+         {
+          "k": "elapsed",
+          "p": {
+           "age": 0,
+           "format": "short",
+           "key": "age"
+          }
+         }
+        ]
+       },
+       {
+        "k": "section",
+        "p": {
+         "collapsed": true,
+         "collapsible": true,
+         "head": "main.t2.wt1.head",
+         "key": "wt1",
+         "role": "hermes.work.group"
+        },
+        "c": [
+         {
+          "k": "row",
+          "p": {
+           "align": "center",
+           "gap": "sm",
+           "key": "head"
+          },
+          "c": [
+           {
+            "k": "icon",
+            "p": {
+             "name": "terminal",
+             "key": "icon"
+            }
+           },
+           {
+            "k": "shimmer",
+            "p": {
+             "mode": "classic",
+             "palette": {
+              "high": "accent",
+              "low": "dim",
+              "mid": "muted"
+             },
+             "role": "hermes.work.live",
+             "spans": [
+              {
+               "s": "muted",
+               "t": "Running rm"
+              }
+             ],
+             "key": "label"
+            }
+           },
+           {
+            "k": "icon",
+            "p": {
+             "name": "chev",
+             "role": "hermes.work.chev",
+             "key": "chev"
+            }
+           }
+          ]
+         },
+         {
+          "k": "section",
+          "p": {
+           "collapsed": true,
+           "collapsible": true,
+           "head": "main.t2.wt1.t1.head",
+           "key": "t1",
+           "role": "hermes.work.row"
+          },
+          "c": [
+           {
+            "k": "row",
+            "p": {
+             "align": "center",
+             "gap": "sm",
+             "key": "head"
+            },
+            "c": [
+             {
+              "k": "icon",
+              "p": {
+               "name": "terminal",
+               "key": "icon"
+              }
+             },
+             {
+              "k": "text",
+              "p": {
+               "grow": 1,
+               "spans": [
+                {
+                 "s": "muted",
+                 "t": "rm -rf build"
+                }
+               ],
+               "truncate": "end",
+               "wrap": "none",
+               "key": "label"
+              }
+             }
+            ]
+           },
+           {
+            "k": "col",
+            "p": {
+             "gap": "xs",
+             "role": "hermes.work.detail",
+             "key": "detail"
+            },
+            "c": [
+             {
+              "k": "code",
+              "p": {
+               "lang": "bash",
+               "max": {
+                "h": "12lines"
+               },
+               "role": "omp.tool.command",
+               "text": "rm -rf build",
+               "key": "cmd"
+              }
+             }
+            ]
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     }
+    ]
+   },
+   "step": "feed 1"
+  },
+  {
+   "frame": {
+    "dock": [
+     {
+      "k": "col",
+      "p": {
+       "role": "omp.hud.status",
+       "key": "hud"
+      },
+      "c": [
+       {
+        "k": "row",
+        "p": {
+         "align": "center",
+         "gap": "sm",
+         "role": "omp.working",
+         "key": "working"
+        },
+        "c": [
+         {
+          "k": "spinner",
+          "p": {
+           "style": "starburst",
+           "tone": "accent",
+           "key": "spinner"
+          }
+         },
+         {
+          "k": "shimmer",
+          "p": {
+           "mode": "classic",
+           "palette": {
+            "high": "accent",
+            "low": "dim",
+            "mid": "muted"
+           },
+           "role": "omp.working.label",
+           "spans": [
+            {
+             "s": "muted",
+             "t": "Running rm…"
+            }
+           ],
+           "key": "label"
+          }
+         },
+         {
+          "k": "text",
+          "p": {
+           "role": "omp.working.sep",
+           "text": "·",
+           "key": "sep"
+          }
+         },
+         {
+          "k": "elapsed",
+          "p": {
+           "age": 0,
+           "format": "short",
+           "key": "elapsed"
+          }
+         },
+         {
+          "k": "row",
+          "p": {
+           "grow": 1,
+           "key": "fill"
+          }
+         },
+         {
+          "k": "row",
+          "p": {
+           "align": "center",
+           "gap": "xs",
+           "role": "omp.working.stop",
+           "title": "Stop  esc esc",
+           "key": "stop",
+           "actions": {
+            "click": "click"
+           }
+          },
+          "c": [
+           {
+            "k": "kbd",
+            "p": {
+             "keys": [
+              "esc"
+             ],
+             "key": "k"
+            }
+           },
+           {
+            "k": "kbd",
+            "p": {
+             "keys": [
+              "esc"
+             ],
+             "key": "k2"
+            }
+           },
+           {
+            "k": "text",
+            "p": {
+             "text": "Stop",
+             "key": "t"
+            }
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "k": "col",
+      "p": {
+       "role": "omp.editor",
+       "key": "composer"
+      },
+      "c": [
+       {
+        "k": "row",
+        "p": {
+         "role": "hermes.streak",
+         "key": "streak"
+        }
+       },
+       {
+        "k": "row",
+        "p": {
+         "gap": "sm",
+         "hidden": true,
+         "role": "omp.composer.chips",
+         "wrap": true,
+         "key": "chips"
+        }
+       },
+       {
+        "k": "row",
+        "p": {
+         "align": "start",
+         "gap": "sm",
+         "role": "omp.composer.line",
+         "key": "line"
+        },
+        "c": [
+         {
+          "k": "editor",
+          "p": {
+           "cursor": 0,
+           "decor": [],
+           "maxLines": 18,
+           "placeholder": "Ask Hermes — / commands · @ files",
+           "sendable": true,
+           "text": "",
+           "key": "input"
+          }
+         }
+        ]
+       },
+       {
+        "k": "row",
+        "p": {
+         "align": "center",
+         "gap": "sm",
+         "role": "omp.composer.bar",
+         "key": "bar"
+        },
+        "c": [
+         {
+          "k": "row",
+          "p": {
+           "align": "center",
+           "gap": "xs",
+           "role": "omp.composer.effort",
+           "title": "Reasoning effort: medium (the default) · click to cycle  ⇧⇥ · right-click to choose or save as default",
+           "key": "effort",
+           "actions": {
+            "click": "click",
+            "menu": [
+             "choose-effort",
+             "save-effort-as-default"
+            ]
+           }
+          },
+          "c": [
+           {
+            "k": "effort",
+            "p": {
+             "level": "medium",
+             "key": "glyph"
+            }
+           },
+           {
+            "k": "text",
+            "p": {
+             "spans": [
+              {
+               "s": "muted",
+               "t": "medium"
+              }
+             ],
+             "wrap": "none",
+             "key": "level"
+            }
+           }
+          ]
+         },
+         {
+          "k": "status",
+          "p": {
+           "grow": 1,
+           "role": "omp.composer.extras",
+           "transparent": true,
+           "key": "extras"
+          }
+         },
+         {
+          "k": "text",
+          "p": {
+           "role": "omp.composer.stop",
+           "text": "Stop",
+           "title": "Stop  esc esc",
+           "tone": "error",
+           "key": "stop",
+           "actions": {
+            "click": "click"
+           }
+          }
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "k": "status",
+      "p": {
+       "role": "hermes.statusline",
+       "key": "statusline"
+      },
+      "c": [
+       {
+        "k": "seg",
+        "p": {
+         "priority": 9,
+         "role": "hermes.statusline.brand",
+         "spans": [
+          {
+           "t": "☤ hermes"
+          }
+         ],
+         "key": "brand"
+        }
+       },
+       {
+        "k": "seg",
+        "p": {
+         "priority": 1,
+         "side": "right",
+         "spans": [
+          {
+           "s": "muted",
+           "t": "⇧⏎ newline"
+          }
+         ],
+         "key": "newline"
+        }
+       },
+       {
+        "k": "seg",
+        "p": {
+         "priority": 10,
+         "role": "hermes.statusline.stop",
+         "side": "right",
+         "spans": [
+          {
+           "t": "esc esc stop"
+          }
+         ],
+         "key": "action",
+         "actions": {
+          "click": "click"
+         }
+        }
+       }
+      ]
+     }
+    ],
+    "layer": [],
+    "main": [
+     {
+      "k": "card",
+      "p": {
+       "role": "omp.welcome",
+       "key": "w0"
+      },
+      "c": [
+       {
+        "k": "row",
+        "p": {
+         "align": "center",
+         "gap": "md",
+         "role": "omp.welcome.lockup",
+         "key": "lockup"
+        },
+        "c": [
+         {
+          "k": "col",
+          "p": {
+           "role": "omp.welcome.mark",
+           "key": "mark"
+          },
+          "c": [
+           {
+            "k": "text",
+            "p": {
+             "role": "omp.welcome.wordmark",
+             "spans": [
+              {
+               "s": "strong",
+               "t": "hermes"
+              }
+             ],
+             "wrap": "none",
+             "key": "wordmark"
+            }
+           },
+           {
+            "k": "text",
+            "p": {
+             "role": "omp.welcome.version",
+             "spans": [
+              {
+               "s": "dim mono",
+               "t": "v1.0.0"
+              }
+             ],
+             "wrap": "none",
+             "key": "version"
+            }
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "k": "card",
+      "p": {
+       "role": "omp.user",
+       "tone": "user",
+       "key": "u1"
+      },
+      "c": [
+       {
+        "k": "row",
+        "p": {
+         "gap": "xs",
+         "role": "omp.user.tools",
+         "key": "tools"
+        },
+        "c": [
+         {
+          "k": "text",
+          "p": {
+           "role": "omp.user.time",
+           "spans": [
+            {
+             "s": "dim mono",
+             "t": "03:04 AM"
+            }
+           ],
+           "title": "1/2/2026, 3:04:05 AM",
+           "key": "time"
+          }
+         },
+         {
+          "k": "icon",
+          "p": {
+           "name": "copy",
+           "role": "omp.user.tool",
+           "title": "Copy message",
+           "key": "copy",
+           "actions": {
+            "click": "click"
+           }
+          }
+         }
+        ]
+       },
+       {
+        "k": "md",
+        "p": {
+         "key": "body",
+         "text": "clean up"
+        }
+       }
+      ]
+     },
+     {
+      "k": "col",
+      "p": {
+       "role": "omp.assistant",
+       "key": "t2"
+      },
+      "c": [
+       {
+        "k": "row",
+        "p": {
+         "align": "center",
+         "gap": "xs",
+         "role": "hermes.turn.working",
+         "key": "working"
+        },
+        "c": [
+         {
+          "k": "text",
+          "p": {
+           "spans": [
+            {
+             "s": "muted",
+             "t": "Working for"
+            }
+           ],
+           "wrap": "none",
+           "key": "label"
+          }
+         },
+         {
+          "k": "elapsed",
+          "p": {
+           "age": 0,
+           "format": "short",
+           "key": "age"
+          }
+         }
+        ]
+       },
+       {
+        "k": "section",
+        "p": {
+         "collapsed": true,
+         "collapsible": true,
+         "head": "main.t2.wt1.head",
+         "key": "wt1",
+         "role": "hermes.work.group"
+        },
+        "c": [
+         {
+          "k": "row",
+          "p": {
+           "align": "center",
+           "gap": "sm",
+           "key": "head"
+          },
+          "c": [
+           {
+            "k": "icon",
+            "p": {
+             "name": "terminal",
+             "key": "icon"
+            }
+           },
+           {
+            "k": "shimmer",
+            "p": {
+             "mode": "classic",
+             "palette": {
+              "high": "accent",
+              "low": "dim",
+              "mid": "muted"
+             },
+             "role": "hermes.work.live",
+             "spans": [
+              {
+               "s": "muted",
+               "t": "Running rm"
+              }
+             ],
+             "key": "label"
+            }
+           },
+           {
+            "k": "icon",
+            "p": {
+             "name": "chev",
+             "role": "hermes.work.chev",
+             "key": "chev"
+            }
+           }
+          ]
+         },
+         {
+          "k": "section",
+          "p": {
+           "collapsed": true,
+           "collapsible": true,
+           "head": "main.t2.wt1.t1.head",
+           "key": "t1",
+           "role": "hermes.work.row"
+          },
+          "c": [
+           {
+            "k": "row",
+            "p": {
+             "align": "center",
+             "gap": "sm",
+             "key": "head"
+            },
+            "c": [
+             {
+              "k": "icon",
+              "p": {
+               "name": "terminal",
+               "key": "icon"
+              }
+             },
+             {
+              "k": "text",
+              "p": {
+               "grow": 1,
+               "spans": [
+                {
+                 "s": "muted",
+                 "t": "rm -rf build"
+                }
+               ],
+               "truncate": "end",
+               "wrap": "none",
+               "key": "label"
+              }
+             }
+            ]
+           },
+           {
+            "k": "col",
+            "p": {
+             "gap": "xs",
+             "role": "hermes.work.detail",
+             "key": "detail"
+            },
+            "c": [
+             {
+              "k": "code",
+              "p": {
+               "lang": "bash",
+               "max": {
+                "h": "12lines"
+               },
+               "role": "omp.tool.command",
+               "text": "rm -rf build",
+               "key": "cmd"
+              }
+             }
+            ]
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     }
+    ]
+   },
+   "step": "press n"
+  },
+  {
+   "frame": {
+    "dock": [
+     {
+      "k": "col",
+      "p": {
+       "role": "omp.editor",
+       "key": "composer"
+      },
+      "c": [
+       {
+        "k": "row",
+        "p": {
+         "gap": "sm",
+         "hidden": true,
+         "role": "omp.composer.chips",
+         "wrap": true,
+         "key": "chips"
+        }
+       },
+       {
+        "k": "row",
+        "p": {
+         "align": "start",
+         "gap": "sm",
+         "role": "omp.composer.line",
+         "key": "line"
+        },
+        "c": [
+         {
+          "k": "editor",
+          "p": {
+           "cursor": 0,
+           "decor": [],
+           "maxLines": 18,
+           "placeholder": "Ask Hermes — / commands · @ files",
+           "sendable": true,
+           "text": "",
+           "key": "input"
+          }
+         }
+        ]
+       },
+       {
+        "k": "row",
+        "p": {
+         "align": "center",
+         "gap": "sm",
+         "role": "omp.composer.bar",
+         "key": "bar"
+        },
+        "c": [
+         {
+          "k": "row",
+          "p": {
+           "align": "center",
+           "gap": "xs",
+           "role": "omp.composer.effort",
+           "title": "Reasoning effort: medium (the default) · click to cycle  ⇧⇥ · right-click to choose or save as default",
+           "key": "effort",
+           "actions": {
+            "click": "click",
+            "menu": [
+             "choose-effort",
+             "save-effort-as-default"
+            ]
+           }
+          },
+          "c": [
+           {
+            "k": "effort",
+            "p": {
+             "level": "medium",
+             "key": "glyph"
+            }
+           },
+           {
+            "k": "text",
+            "p": {
+             "spans": [
+              {
+               "s": "muted",
+               "t": "medium"
+              }
+             ],
+             "wrap": "none",
+             "key": "level"
+            }
+           }
+          ]
+         },
+         {
+          "k": "status",
+          "p": {
+           "grow": 1,
+           "role": "omp.composer.extras",
+           "transparent": true,
+           "key": "extras"
+          }
+         },
+         {
+          "k": "kbd",
+          "p": {
+           "keys": [
+            "enter"
+           ],
+           "role": "omp.composer.send",
+           "title": "Send  ⏎",
+           "key": "send",
+           "actions": {
+            "click": "click"
+           }
+          }
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "k": "status",
+      "p": {
+       "role": "hermes.statusline",
+       "key": "statusline"
+      },
+      "c": [
+       {
+        "k": "seg",
+        "p": {
+         "priority": 9,
+         "role": "hermes.statusline.brand",
+         "spans": [
+          {
+           "t": "☤ hermes"
+          }
+         ],
+         "key": "brand"
+        }
+       },
+       {
+        "k": "seg",
+        "p": {
+         "priority": 1,
+         "side": "right",
+         "spans": [
+          {
+           "s": "muted",
+           "t": "⇧⏎ newline"
+          }
+         ],
+         "key": "newline"
+        }
+       },
+       {
+        "k": "seg",
+        "p": {
+         "priority": 10,
+         "role": "hermes.statusline.send",
+         "side": "right",
+         "spans": [
+          {
+           "t": "⏎ send"
+          }
+         ],
+         "key": "action",
+         "actions": {
+          "click": "click"
+         }
+        }
+       }
+      ]
+     }
+    ],
+    "layer": [],
+    "main": [
+     {
+      "k": "card",
+      "p": {
+       "role": "omp.welcome",
+       "key": "w0"
+      },
+      "c": [
+       {
+        "k": "row",
+        "p": {
+         "align": "center",
+         "gap": "md",
+         "role": "omp.welcome.lockup",
+         "key": "lockup"
+        },
+        "c": [
+         {
+          "k": "col",
+          "p": {
+           "role": "omp.welcome.mark",
+           "key": "mark"
+          },
+          "c": [
+           {
+            "k": "text",
+            "p": {
+             "role": "omp.welcome.wordmark",
+             "spans": [
+              {
+               "s": "strong",
+               "t": "hermes"
+              }
+             ],
+             "wrap": "none",
+             "key": "wordmark"
+            }
+           },
+           {
+            "k": "text",
+            "p": {
+             "role": "omp.welcome.version",
+             "spans": [
+              {
+               "s": "dim mono",
+               "t": "v1.0.0"
+              }
+             ],
+             "wrap": "none",
+             "key": "version"
+            }
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "k": "card",
+      "p": {
+       "role": "omp.user",
+       "tone": "user",
+       "key": "u1"
+      },
+      "c": [
+       {
+        "k": "row",
+        "p": {
+         "gap": "xs",
+         "role": "omp.user.tools",
+         "key": "tools"
+        },
+        "c": [
+         {
+          "k": "text",
+          "p": {
+           "role": "omp.user.time",
+           "spans": [
+            {
+             "s": "dim mono",
+             "t": "03:04 AM"
+            }
+           ],
+           "title": "1/2/2026, 3:04:05 AM",
+           "key": "time"
+          }
+         },
+         {
+          "k": "icon",
+          "p": {
+           "name": "copy",
+           "role": "omp.user.tool",
+           "title": "Copy message",
+           "key": "copy",
+           "actions": {
+            "click": "click"
+           }
+          }
+         }
+        ]
+       },
+       {
+        "k": "md",
+        "p": {
+         "key": "body",
+         "text": "clean up"
+        }
+       }
+      ]
+     },
+     {
+      "k": "col",
+      "p": {
+       "role": "omp.assistant",
+       "key": "t2"
+      },
+      "c": [
+       {
+        "k": "section",
+        "p": {
+         "collapsed": true,
+         "collapsible": true,
+         "head": "main.t2.foldt1.head",
+         "key": "foldt1",
+         "role": "hermes.turn.fold"
+        },
+        "c": [
+         {
+          "k": "row",
+          "p": {
+           "align": "center",
+           "gap": "xs",
+           "key": "head"
+          },
+          "c": [
+           {
+            "k": "text",
+            "p": {
+             "spans": [
+              {
+               "s": "muted",
+               "t": "Worked"
+              }
+             ],
+             "wrap": "none",
+             "key": "label"
+            }
+           }
+          ]
+         },
+         {
+          "k": "section",
+          "p": {
+           "collapsed": true,
+           "collapsible": true,
+           "head": "main.t2.foldt1.wt1.head",
+           "key": "wt1",
+           "role": "hermes.work.row"
+          },
+          "c": [
+           {
+            "k": "row",
+            "p": {
+             "align": "center",
+             "gap": "sm",
+             "key": "head"
+            },
+            "c": [
+             {
+              "k": "icon",
+              "p": {
+               "name": "terminal",
+               "key": "icon"
+              }
+             },
+             {
+              "k": "text",
+              "p": {
+               "grow": 1,
+               "spans": [
+                {
+                 "s": "muted",
+                 "t": "rm -rf build"
+                }
+               ],
+               "truncate": "end",
+               "wrap": "none",
+               "key": "label"
+              }
+             }
+            ]
+           },
+           {
+            "k": "col",
+            "p": {
+             "gap": "xs",
+             "role": "hermes.work.detail",
+             "key": "detail"
+            },
+            "c": [
+             {
+              "k": "code",
+              "p": {
+               "lang": "bash",
+               "max": {
+                "h": "12lines"
+               },
+               "role": "omp.tool.command",
+               "text": "rm -rf build",
+               "key": "cmd"
+              }
+             }
+            ]
+           }
+          ]
+         }
+        ]
+       },
+       {
+        "k": "md",
+        "p": {
+         "key": "x3",
+         "text": "Cleaned the build and left the push for you."
+        }
+       },
+       {
+        "k": "row",
+        "p": {
+         "align": "center",
+         "gap": "xs",
+         "role": "omp.turn.usage",
+         "key": "usage"
+        },
+        "c": [
+         {
+          "k": "icon",
+          "p": {
+           "name": "copy",
+           "role": "omp.turn.copy",
+           "title": "Copy answer",
+           "key": "copy",
+           "actions": {
+            "click": "click"
+           }
+          }
+         }
+        ]
+       }
+      ]
+     }
+    ]
+   },
+   "step": "feed 1"
+  }
+ ],
+ "requests": [
+  {
+   "method": "setup.status",
+   "params": {}
+  },
+  {
+   "method": "session.create",
+   "params": {}
+  },
+  {
+   "method": "config.get",
+   "params": {
+    "key": "busy",
+    "session_id": "s1"
+   }
+  },
+  {
+   "method": "config.set",
+   "params": {
+    "key": "show_reasoning",
+    "session_id": "s1",
+    "value": "on"
+   }
+  },
+  {
+   "method": "process.list",
+   "params": {
+    "session_id": "s1"
+   }
+  },
+  {
+   "method": "session.control.read",
+   "params": {
+    "session_id": "s1"
+   }
+  },
+  {
+   "method": "prompt.submit",
+   "params": {
+    "session_id": "s1",
+    "submission_id": "00000000-0000-4000-8000-000000000001",
+    "text": "clean up"
+   }
+  },
+  {
+   "method": "approval.respond",
+   "params": {
+    "choice": "once",
+    "session_id": "s1",
+    "execution_generation": 1,
+    "prompt_id": "p1"
+   }
+  },
+  {
+   "method": "process.list",
+   "params": {
+    "session_id": "s1"
+   }
+  },
+  {
+   "method": "clarify.respond",
+   "params": {
+    "answer": "dev",
+    "session_id": "s1",
+    "execution_generation": 1,
+    "prompt_id": "p2"
+   }
+  }
+ ]
+}
