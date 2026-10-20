@@ -135,7 +135,8 @@ of. PRs are read from GitHub with your own token (`GH_TOKEN`, else `gh auth toke
   process the agent starts (commands, background processes, a Python cell's commands) the
   `TERN_PANE` and window variables of the pane that shows its conversation, read from the pane's
   marker when the process starts. Plain `tern open`, `tern split` and the rest of Tern's CLI act
-  beside the chat, as they do from `hermes chat` in a Tern pane.
+  beside the chat, as they do from `hermes chat` in a Tern pane. [`docs/tern-blocks.md`](docs/tern-blocks.md) is
+  the short guide to scripting blocks that way: split, run, capture, wait, close.
 - The frontend began as [can1357](https://github.com/can1357)'s `ui-tsp`
   (`can1357/hermes-agent@tern-frontend`) and keeps omp's chat roles (`omp.session`, …), which
   Tern's chat styles, tool folding and Carly integration are written against.
