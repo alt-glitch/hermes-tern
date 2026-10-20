@@ -1,6 +1,6 @@
 // The job chart benchmark: real background jobs from Hermes' sessions, replayed through the
 // plugin's own chart registry (processes/widgets/registry.ts) with Hermes' auxiliary model
-// (task `job_widget`, through `widget_author.py`). Each job's recorded output (and the log file
+// (task `tern_charts`, through `widget_author.py`). Each job's recorded output (and the log file
 // its command wrote, when it is still on disk) arrives in 20 steps a second apart, starting at
 // the 15 s mark, so the model is first asked on the early lines, as in a pane, and a decline is
 // asked again once the output has grown. The final view is what the pane would show.

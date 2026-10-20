@@ -1,6 +1,6 @@
 {
   "name": "hermes-tern-frontend",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "private": true,
   "description": "Hermes for Tern: the chat UI described over the Tern Surface Protocol instead of painted cells",
   "type": "module",

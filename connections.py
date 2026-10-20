@@ -125,10 +125,31 @@ def _lineage(session_id: str) -> list[str]:
 
 
 def _alive(pid: Any) -> bool:
+    """Whether process ``pid`` runs. On Windows ``os.kill(pid, 0)`` would end it, so it asks the OS instead."""
     try:
-        os.kill(int(pid), 0)
+        pid = int(pid)
+    except (ValueError, TypeError):
+        return False
+    if pid <= 0:
+        return False
+    if os.name == "nt":
+        import ctypes
+
+        kernel32 = ctypes.windll.kernel32
+        handle = kernel32.OpenProcess(0x1000, False, pid)  # PROCESS_QUERY_LIMITED_INFORMATION
+        if not handle:
+            return False
+        try:
+            code = ctypes.c_ulong()
+            return bool(kernel32.GetExitCodeProcess(handle, ctypes.byref(code))) and code.value == 259  # STILL_ACTIVE
+        finally:
+            kernel32.CloseHandle(handle)
+    try:
+        os.kill(pid, 0)
         return True
-    except (OSError, ValueError, TypeError):
+    except PermissionError:
+        return True  # it runs, as another user
+    except OSError:
         return False
 
 
