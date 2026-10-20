@@ -9,6 +9,7 @@ import { join } from 'node:path'
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { storedSessionId } from '../core/ids.js'
 import type { TurnEntry } from '../model.js'
 
 import { FakeGateway, fakeTern, must, settle } from './fakes.js'
@@ -72,6 +73,32 @@ describe('adopting another session resets the transcript at once', () => {
     tick('s2', 1_500)
 
     expect(must(turns(app).at(-1)).tickTokens).toBe(1_500)
+  })
+
+  it("a resumed session's first turn counts from its own start too, though its totals are higher; with history, from no guess", async () => {
+    const app = await started()
+    gw.event({ payload: {}, session_id: 's1', type: 'message.start' })
+    tick('s1', 1_000)
+    gw.event({ payload: { text: 'done' }, session_id: 's1', type: 'message.complete' })
+    gw.handlers.set('session.resume', p => ({ info: { stored_session_id: p['session_id'] }, session_id: p['session_id'], subscription_id: 'sub' }))
+
+    await app.resume(storedSessionId('r1'))
+    gw.event({ payload: {}, session_id: 'r1', type: 'message.start' })
+    tick('r1', 1_500)
+    expect(must(turns(app).at(-1)).tickTokens).toBe(1_500)
+
+    // A session with turns before: its counters at the start are not known, so none rather than the last session's.
+    gw.event({ payload: { text: 'done' }, session_id: 'r1', type: 'message.complete' })
+    gw.handlers.set('session.resume', p => ({
+      info: { stored_session_id: p['session_id'] },
+      messages: [{ role: 'user', text: 'hi' }, { role: 'assistant', text: 'hello' }],
+      session_id: p['session_id'],
+      subscription_id: 'sub'
+    }))
+    await app.resume(storedSessionId('r2'))
+    gw.event({ payload: {}, session_id: 'r2', type: 'message.start' })
+    tick('r2', 2_500)
+    expect(must(turns(app).at(-1)).tickTokens).toBeUndefined()
   })
 
   it("the last session's pending reason line does not label the new session's first turn", async () => {
