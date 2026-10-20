@@ -9,6 +9,7 @@ import { setFlagsFromString } from 'node:v8'
 
 import type { Tone } from '@stencil-hq/tern'
 
+import { isDefined } from '../../core/assert.js'
 import { errorText } from '../../core/errors.js'
 
 import { betterValue, choice, cut, FIELD_NAME, fieldName, list, num, str } from './check.js'
@@ -652,17 +653,11 @@ function parseSpec(value: unknown, errors: string[]): Spec | undefined {
 
   const stage = value.stage === undefined ? undefined : fieldName(value.stage, 'stage', errors)
 
-  if (errors.length || title === undefined || !rules || !blocks || rules.some(r => !r) || blocks.some(b => !b)) {
+  if (errors.length || title === undefined || !rules?.every(isDefined) || !blocks?.every(isDefined)) {
     return undefined
   }
 
-  return {
-    blocks: blocks as BlockSpec[],
-    rules: rules as Rule[],
-    title,
-    ...(headline ? { headline } : {}),
-    ...(stage ? { stage } : {})
-  }
+  return { blocks, rules, title, ...(headline ? { headline } : {}), ...(stage ? { stage } : {}) }
 }
 
 function parseRule(value: unknown, where: string, errors: string[]): Rule | undefined {

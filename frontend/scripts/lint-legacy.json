@@ -85,7 +85,6 @@
   "src/processes/store.ts @typescript-eslint/no-non-null-assertion": 2,
   "src/processes/widgets/runtime.ts @typescript-eslint/consistent-type-assertions": 1,
   "src/processes/widgets/runtime.ts @typescript-eslint/no-non-null-assertion": 15,
-  "src/processes/widgets/spec.ts @typescript-eslint/consistent-type-assertions": 2,
   "src/processes/widgets/spec.ts @typescript-eslint/no-non-null-assertion": 4,
   "src/processes/widgets/view.tsx @typescript-eslint/consistent-type-assertions": 1,
   "src/promptRefs.ts @typescript-eslint/no-non-null-assertion": 1,

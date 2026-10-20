@@ -21,7 +21,7 @@ import {
   type SparkSpec,
   type ValueRef
 } from './spec.js'
-import type { Block, ChartState, ChartView, Headline, SparkBlock, Trend } from './types.js'
+import type { ChartBlock, ChartState, ChartView, Headline, SparkBlock, Trend } from './types.js'
 
 /** Longest line kept; longer lines are cut. */
 export const MAX_LINE_CHARS = 4096
@@ -624,7 +624,7 @@ export class ChartRuntime {
     }
   }
 
-  #fallbackBlocks(now: number): Block[] {
+  #fallbackBlocks(now: number): ChartBlock[] {
     const total = this.totalLines
 
     if (!total) {
@@ -701,7 +701,7 @@ export class ChartRuntime {
     return value === undefined ? undefined : { text, ...(ref.label ? { label: ref.label } : {}), ...(trend ? { trend } : {}) }
   }
 
-  #block(block: BlockSpec, now: number): Block {
+  #block(block: BlockSpec, now: number): ChartBlock {
     switch (block.kind) {
       case 'spark':
         return this.#spark(block)
@@ -841,7 +841,7 @@ export function sparkDomain(bounds: readonly number[], specMin?: number, specMax
  */
 const TREND_AGGS = new Set<Agg>(['last'])
 
-function hasData(block: Block): boolean {
+function hasData(block: ChartBlock): boolean {
   switch (block.kind) {
     case 'text':
       return block.text.length > 0

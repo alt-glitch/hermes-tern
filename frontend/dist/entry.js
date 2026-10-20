@@ -26166,6 +26166,9 @@ function isNonEmpty(list9) {
 function assertNever(value, what = "variant") {
   throw new Error(`Unexpected ${what}: ${shown(value)}`);
 }
+function isDefined(value) {
+  return value !== void 0 && value !== null;
+}
 function oneOf(values) {
   const known2 = new Set(values);
   return (value) => known2.has(value);
@@ -30203,16 +30206,10 @@ function parseSpec(value, errors) {
     }
   }
   const stage = value.stage === void 0 ? void 0 : fieldName(value.stage, "stage", errors);
-  if (errors.length || title === void 0 || !rules || !blocks2 || rules.some((r) => !r) || blocks2.some((b) => !b)) {
+  if (errors.length || title === void 0 || !rules?.every(isDefined) || !blocks2?.every(isDefined)) {
     return void 0;
   }
-  return {
-    blocks: blocks2,
-    rules,
-    title,
-    ...headline ? { headline } : {},
-    ...stage ? { stage } : {}
-  };
+  return { blocks: blocks2, rules, title, ...headline ? { headline } : {}, ...stage ? { stage } : {} };
 }
 function parseRule(value, where, errors) {
   if (!isRecord2(value)) {

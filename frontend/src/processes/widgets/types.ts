@@ -76,7 +76,8 @@ export interface TextBlock {
   text: string
 }
 
-export type Block = SparkBlock | BarsBlock | MeterBlock | StatBlock | GridBlock | TextBlock
+/** One block of a chart; named apart from the transcript's turn `Block` (model.ts). */
+export type ChartBlock = SparkBlock | BarsBlock | MeterBlock | StatBlock | GridBlock | TextBlock
 
 /**
  * Where a chart stands: `authoring` while the model writes its spec, `live` once the spec's
@@ -91,7 +92,7 @@ export interface ChartView {
   /** What the process does now: a captured step, else its newest output line. */
   stage?: string
   /** Top to bottom; the first is the primary block that compact views show. */
-  blocks: Block[]
+  blocks: ChartBlock[]
   state: ChartState
   /** Epoch ms of the newest data the view reflects. */
   updatedAt: number

@@ -9,7 +9,7 @@ import { type JSX, Node, node, type NodeJson, type SpanData, type Tone } from '@
 import type { BackgroundProcess } from '../../model.js'
 import { PROCESS_LOOK } from '../look.js'
 
-import type { Block, ChartView, SparkBlock, StatBlock, Trend } from './types.js'
+import type { ChartBlock, ChartView, SparkBlock, StatBlock, Trend } from './types.js'
 
 /** Points the pill's mini chart keeps from the primary spark. */
 const MINI_SPARK_POINTS = 16
@@ -233,7 +233,7 @@ function tileMeter(value: number, tone: Tone = DEFAULT_TONE, key = 'meter'): JSX
 }
 
 /** A tile's picture of its primary block; stats and text read as notes instead. */
-function tileVisual(b: Block | undefined): JSX.Element | undefined {
+function tileVisual(b: ChartBlock | undefined): JSX.Element | undefined {
   switch (b?.kind) {
     case 'spark':
       return b.values.length ? node('chart', { ...sparkProps(b), key: 'visual', role: 'omp.job.tile.chart', size: 'sm' }) : undefined
@@ -343,7 +343,7 @@ export function primaryNode(view: ChartView, key = 'chart'): JSX.Element | undef
   return b ? <col key={key} role="omp.job.widget">{blockNode(b, 'primary')}</col> : undefined
 }
 
-function blockNode(b: Block, key: string): JSX.Element {
+function blockNode(b: ChartBlock, key: string): JSX.Element {
   switch (b.kind) {
     case 'spark':
       return sparkNode(b, key)
