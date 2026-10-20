@@ -68750,12 +68750,23 @@ var ServerQueue = class {
   admit(own14) {
     this.#own.push(own14);
   }
-  /** Forgets an own admission (refused, withdrawn, or back in the composer). */
+  /** Forgets an own admission (refused, or back in the composer); its state stays where it was. */
   drop(own14) {
     const at = this.#own.indexOf(own14);
     if (at >= 0) {
       this.#own.splice(at, 1);
     }
+  }
+  /** prompt.submit named a submitting admission `id`: it can be withdrawn now. One that started or left meanwhile stays so. */
+  admitted(own14, id) {
+    if (own14.admission.kind === "submitting") {
+      own14.admission = { id, kind: "admitted" };
+    }
+  }
+  /** This pane withdrew `own` (prompt.cancel said terminal): it left the FIFO without running. */
+  withdrew(own14) {
+    own14.admission = { kind: "withdrawn" };
+    this.drop(own14);
   }
   /** A prompt whose bubble this pane painted when it sent it. */
   shown(inputId2) {
@@ -68789,6 +68800,7 @@ var ServerQueue = class {
           this.#shown.add(row2.input_id);
         }
         if (own14) {
+          own14.admission = { kind: "started" };
           this.drop(own14);
         }
         owed.push({ own: own14, text: own14?.display ?? row2.user });
@@ -68800,6 +68812,7 @@ var ServerQueue = class {
       if (listed.has(own14.inputId)) {
         this.#listed.add(own14.inputId);
       } else if (this.#listed.has(own14.inputId)) {
+        own14.admission = { kind: "withdrawn" };
         this.drop(own14);
       }
     }
@@ -74313,7 +74326,7 @@ var PromptQueue = class {
       return;
     }
     const own14 = {
-      admission: { kind: "pending" },
+      admission: { kind: "submitting" },
       display: userText(shownText(prompt), prompt.images),
       inputId: newInputId(),
       item: { prompt, sent: ready.text }
@@ -74331,11 +74344,11 @@ var PromptQueue = class {
       });
       const id = admissionOf(r);
       if (id !== void 0) {
-        own14.admission = { id, kind: "admitted" };
+        this.server.admitted(own14, id);
       }
     } catch (error) {
       this.server.drop(own14);
-      if (ticket.isCurrent()) {
+      if (own14.admission.kind === "submitting" && ticket.isCurrent()) {
         host.transcript.notice(`Not queued: ${errorText(error)}. Your message is back in the composer.`, "error");
         host.restore(prompt);
       }
@@ -74443,7 +74456,7 @@ var PromptQueue = class {
       this.#host.changed();
       return false;
     }
-    this.server.drop(q2.own);
+    this.server.withdrew(q2.own);
     return true;
   }
   /**

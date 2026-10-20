@@ -18,14 +18,20 @@ export function busyModeOf(raw: unknown): BusyMode {
   return v === 'interrupt' || v === 'steer' ? v : 'queue'
 }
 
-/** Whether the authority answered an admission's prompt.submit: once it did, its id names the row. */
-export type Admission = { kind: 'pending' } | { kind: 'admitted'; id: AdmissionId }
+/**
+ * Where one of this pane's admissions stands. `submitting`: prompt.submit has not answered, and
+ * nothing can withdraw it yet; `admitted`: the authority named it `id`; `started`: the FIFO started
+ * it (its bubble shows, and it runs as its own turn); `withdrawn`: it left the FIFO without running
+ * (this pane withdrew it, or another viewer cancelled it). Only a submitting admission goes back to
+ * the composer when prompt.submit fails: a late timeout of a started one must not bring it back.
+ */
+export type Admission = { kind: 'submitting' } | { kind: 'admitted'; id: AdmissionId } | { kind: 'started' } | { kind: 'withdrawn' }
 
 /** A prompt this pane admitted behind the turn: what its bubble shows, and what Edit restores. */
 export interface OwnAdmission<T> {
   /** The submission id it was admitted under. */
   inputId: InputId
-  /** Pending until prompt.submit answers with the authority's id for it. */
+  /** Submitting until prompt.submit answers with the authority's id for it; written only by ServerQueue. */
   admission: Admission
   /** The bubble's text (what was typed, before `{!cmd}`s ran). */
   display: string
@@ -84,13 +90,26 @@ export class ServerQueue<T> {
     this.#own.push(own)
   }
 
-  /** Forgets an own admission (refused, withdrawn, or back in the composer). */
+  /** Forgets an own admission (refused, or back in the composer); its state stays where it was. */
   drop(own: OwnAdmission<T>) {
     const at = this.#own.indexOf(own)
 
     if (at >= 0) {
       this.#own.splice(at, 1)
     }
+  }
+
+  /** prompt.submit named a submitting admission `id`: it can be withdrawn now. One that started or left meanwhile stays so. */
+  admitted(own: OwnAdmission<T>, id: AdmissionId) {
+    if (own.admission.kind === 'submitting') {
+      own.admission = { id, kind: 'admitted' }
+    }
+  }
+
+  /** This pane withdrew `own` (prompt.cancel said terminal): it left the FIFO without running. */
+  withdrew(own: OwnAdmission<T>) {
+    own.admission = { kind: 'withdrawn' }
+    this.drop(own)
   }
 
   /** A prompt whose bubble this pane painted when it sent it. */
@@ -134,6 +153,7 @@ export class ServerQueue<T> {
         }
 
         if (own) {
+          own.admission = { kind: 'started' }
           this.drop(own)
         }
 
@@ -149,6 +169,7 @@ export class ServerQueue<T> {
       if (listed.has(own.inputId)) {
         this.#listed.add(own.inputId)
       } else if (this.#listed.has(own.inputId)) {
+        own.admission = { kind: 'withdrawn' }
         this.drop(own)
       }
     }

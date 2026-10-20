@@ -260,3 +260,46 @@ describe('a held prompt whose steer fails goes back where it was', () => {
     expect(u.log).toEqual([])
   })
 })
+
+describe("this pane's admissions into the shared gateway's queue", () => {
+  it('a prompt.submit that fails after the FIFO started its admission does not put it back in the composer', async () => {
+    const submit = held()
+    const { app, emit, enter, gw, notices } = setup({ 'prompt.submit': submit.reply })
+    given.busy(app, { label: 'Working…', since: {}, startedAt: 0 })
+    await enter('next one')
+    const [sent] = gw.sent('prompt.submit')
+    expect(sent).toMatchObject({ queued: true, text: 'next one' })
+
+    // The FIFO lists it and starts it: its bubble shows; then the submit's late timeout comes.
+    const row = { admission_id: 'a1', input_id: sent?.['submission_id'], user: 'next one' }
+    await emit('session.info', { pending_submissions: [{ ...row, status: 'queued' }] })
+    await emit('message.complete', { text: 'first reply' })
+    await emit('session.info', { pending_submissions: [{ ...row, status: 'started' }] })
+    submit.reject(new Error('timed out'))
+    await settle(gw)
+
+    expect(app.transcript.entries.flatMap(e => (e.kind === 'user' ? [e.text] : []))).toEqual(['next one'])
+    expect(app.composer.text).toBe('')
+    expect(notices()).not.toContain('Not queued: timed out. Your message is back in the composer.')
+  })
+
+  it("a withdrawn row's cancelled completion that comes after the session.info dropping it still leaves the turn running", async () => {
+    const { app, emit, enter, gw } = setup({
+      'prompt.cancel': () => ({ status: 'terminal' }),
+      'prompt.submit': () => ({ admission_id: 'a1', status: 'queued' })
+    })
+    given.busy(app, { label: 'Working…', since: {}, startedAt: 0 })
+    await enter('never mind')
+    const row = { admission_id: 'a1', input_id: gw.sent('prompt.submit')[0]?.['submission_id'], status: 'queued', user: 'never mind' }
+    await emit('session.info', { pending_submissions: [row] })
+
+    // Alt+Up withdraws it; the FIFO drops the row before its cancelled completion comes.
+    app.queue.dequeue(0)
+    await settle(gw)
+    await emit('session.info', { pending_submissions: [] })
+    await emit('message.complete', { admission_id: 'a1', outcome: 'cancelled' })
+
+    expect(app.activity.busy).not.toBeNull()
+    expect(app.composer.text).toBe('never mind')
+  })
+})

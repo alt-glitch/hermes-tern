@@ -26,7 +26,7 @@ describe('ServerQueue', () => {
 
   it("lists an own admission before the FIFO does, then by the FIFO's row, and forgets it once it left without starting", () => {
     const q = new ServerQueue<string>()
-    const own: OwnAdmission<string> = { admission: { kind: 'pending' }, display: 'mine (typed)', inputId: inputId('in-x'), item: 'x' }
+    const own: OwnAdmission<string> = { admission: { kind: 'submitting' }, display: 'mine (typed)', inputId: inputId('in-x'), item: 'x' }
     q.admit(own)
     q.update([row('a', 'queued', 'theirs')])
     expect(q.queued()).toEqual([
@@ -36,7 +36,7 @@ describe('ServerQueue', () => {
 
     // Listed by the FIFO, in its place there, and named by prompt.submit's answer: it can be withdrawn.
     q.update([row('x', 'queued', 'mine (sent)'), row('a', 'queued', 'theirs')])
-    own.admission = { id: admissionId('x'), kind: 'admitted' }
+    q.admitted(own, admissionId('x'))
     expect(q.queued()).toEqual([
       { id: 'x', kind: 'mine', own, text: 'mine (typed)' },
       { kind: 'theirs', row: row('a', 'queued', 'theirs'), text: 'theirs' }
@@ -45,6 +45,30 @@ describe('ServerQueue', () => {
     // Cancelled from another window: the row is gone, and so is the own admission.
     q.update([row('a', 'queued', 'theirs')])
     expect(q.queued().map(r => r.kind)).toEqual(['theirs'])
+    expect(own.admission).toEqual({ kind: 'withdrawn' })
+  })
+
+  it('moves an own admission submitting → admitted → started, and never back', () => {
+    const q = new ServerQueue<string>()
+    const own: OwnAdmission<string> = { admission: { kind: 'submitting' }, display: 'mine', inputId: inputId('in-x'), item: 'x' }
+    q.admit(own)
+    q.update([row('x', 'queued')])
+    q.admitted(own, admissionId('x'))
+    expect(own.admission).toEqual({ id: 'x', kind: 'admitted' })
+
+    expect(q.update([row('x', 'started')])).toEqual([{ own, text: 'mine' }])
+    expect(own.admission).toEqual({ kind: 'started' })
+
+    // prompt.submit's answer after the start names nothing it could still withdraw.
+    q.admitted(own, admissionId('x'))
+    expect(own.admission).toEqual({ kind: 'started' })
+
+    const gone: OwnAdmission<string> = { admission: { kind: 'submitting' }, display: 'gone', inputId: inputId('in-y'), item: 'y' }
+    q.admit(gone)
+    q.admitted(gone, admissionId('y'))
+    q.withdrew(gone)
+    expect(gone.admission).toEqual({ kind: 'withdrawn' })
+    expect(q.queued()).toEqual([])
   })
 
   it('tells a withdrawn row’s cancelled completion from the running turn’s', () => {

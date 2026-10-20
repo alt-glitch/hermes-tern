@@ -183,7 +183,7 @@ export class PromptQueue {
     }
 
     const own: OwnAdmission<Admitted> = {
-      admission: { kind: 'pending' },
+      admission: { kind: 'submitting' },
       display: userText(shownText(prompt), prompt.images),
       inputId: newInputId(),
       item: { prompt, sent: ready.text }
@@ -204,12 +204,14 @@ export class PromptQueue {
       const id = admissionOf(r)
 
       if (id !== undefined) {
-        own.admission = { id, kind: 'admitted' }
+        this.server.admitted(own, id)
       }
     } catch (error) {
       this.server.drop(own)
 
-      if (ticket.isCurrent()) {
+      // Back to the composer only while it was still being submitted: one the FIFO started meanwhile
+      // (a late timeout) runs as its own turn, and one withdrawn left the queue on purpose.
+      if (own.admission.kind === 'submitting' && ticket.isCurrent()) {
         host.transcript.notice(`Not queued: ${errorText(error)}. Your message is back in the composer.`, 'error')
         host.restore(prompt)
       }
@@ -356,7 +358,7 @@ export class PromptQueue {
       return false
     }
 
-    this.server.drop(q.own)
+    this.server.withdrew(q.own)
 
     return true
   }
