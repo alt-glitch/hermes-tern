@@ -25,6 +25,9 @@ the user's prompt, so one home covers every flow:
                    do its card, the wait card and /ps
     "errands…"  -> (at the start) a four-item todo list worked through over slow steps
     "connector…" -> (at the start) a tool search, a two-app connector batch and one connector call
+    "replay ID" -> runs recorded job ID from $FAKE_MODEL_REPLAY/commands.json in the background,
+                   and answers its chart request with $FAKE_MODEL_REPLAY/ID.spec.json (the rules
+                   the auxiliary model wrote for it in lab/chartbench.ts): real charts in the lab
     "ternenv"   -> (at the start) prints the TERN_* variables from a command, a background command and a Python cell's command
     "pr [URL…]" -> (at the start) links the PR URLs given, else a real public PR (link_pull_request)
     "cron…"     -> (at the start) two cron jobs: a 30 min digest and a 15 min page monitor
@@ -196,6 +199,10 @@ def _calls(prompt: str, target: Path) -> list[dict] | None:
         return [_call("terminal", {"command": "sleep 8 && echo slept"})]
     if words.lstrip().startswith("background"):
         return [_call("terminal", {"command": TICKS.format(n=90), "background": True, "notify_on_complete": True})]
+    if words.lstrip().startswith("replay ") and REPLAY:
+        # A recorded job from $FAKE_MODEL_REPLAY/commands.json (lab/chartbench.ts's showcase).
+        command = json.loads((REPLAY / "commands.json").read_text()).get(words.split()[1])
+        return [_call("terminal", {"command": command, "background": True})] if command else None
     if words.lstrip().startswith("jobchart"):
         return [_call("terminal", {"command": BENCH, "background": True})]
     if words.lstrip().startswith("watch"):
@@ -254,6 +261,9 @@ def _call(name: str, arguments: dict, call_id: str = "") -> dict:
 BENCH = ("for i in $(seq 1 120); do echo \"step $i tok/s=$((150 + (i * 37) % 70)) loss=0.$((99 - i * 2 / 3))\"; "
          "sleep 1; done  # decode bench, goal 200 tok/s")
 
+# Replays of recorded jobs: their commands and the chart specs the auxiliary model wrote for them.
+REPLAY = Path(os.environ["FAKE_MODEL_REPLAY"]) if os.environ.get("FAKE_MODEL_REPLAY") else None
+
 # The plugin's chart request (frontend/src/processes/widgets/author.ts) and the spec this model writes for BENCH.
 WIDGET_MARKER = "You design the live status widget"
 BENCH_SPEC = {
@@ -296,7 +306,11 @@ class Model(BaseHTTPRequestHandler):
         system = next((m.get("content") for m in messages if m.get("role") == "system"), "") or ""
         if isinstance(system, str) and WIDGET_MARKER in system:
             # The chart request: one `respond` call, a skip for anything but the bench.
-            spec = BENCH_SPEC if "tok/s=" in str(prompt) else {"skip": "nothing to chart"}
+            replayed = re.search(r"replay/([\w-]+)\.src", str(prompt))
+            if replayed and REPLAY and (REPLAY / f"{replayed.group(1)}.spec.json").exists():
+                spec = json.loads((REPLAY / f"{replayed.group(1)}.spec.json").read_text())
+            else:
+                spec = BENCH_SPEC if "tok/s=" in str(prompt) else {"skip": "nothing to chart"}
             content, calls, delay = None, [_call("respond", spec, "call-respond")], 0.5
         elif not names and "summar" in (prompt + str(system)).lower():
             # Context compaction's summary call: a slow, short handoff, so the running rule shows.
