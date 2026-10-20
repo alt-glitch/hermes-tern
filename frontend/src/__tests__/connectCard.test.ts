@@ -1,11 +1,12 @@
 // The connect card in the app: the poll that follows the watcher's file, the message that tells the
 // agent, Continue, and a resume that draws each card as it ended.
-import { EventEmitter } from 'node:events'
 import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+
+import { FakeGateway, fakeTern } from './fakes.js'
 
 const home = mkdtempSync(join(tmpdir(), 'hermes-tern-connect-'))
 process.env.HERMES_HOME = home
@@ -21,53 +22,6 @@ const { POLL_MS } = await import('../connections.js')
 const { toolNode } = await import('../view/tools.js')
 
 const cards = join(home, 'plugin-data', 'hermes-tern', 'connections')
-
-type Handler = (params: Record<string, unknown>) => unknown
-
-class FakeGateway extends EventEmitter {
-  isCanonical = true
-  attached = true
-  readonly calls: { method: string; params: Record<string, unknown> }[] = []
-  readonly handlers = new Map<string, Handler>()
-
-  request(method: string, params: Record<string, unknown> = {}) {
-    this.calls.push({ method, params })
-    const handler = this.handlers.get(method)
-
-    return Promise.resolve(handler ? handler(params) : {})
-  }
-
-  methods(name: string) {
-    return this.calls.filter(c => c.method === name)
-  }
-
-  event(ev: Record<string, unknown>) {
-    this.emit('event', ev)
-  }
-
-  drain() {}
-  kill() {}
-  holdAttach() {
-    return undefined
-  }
-  settleAttach() {}
-  hydrateSharedPrompts() {}
-}
-
-/** A Tern session whose surface draws nothing; `send` delivers one input event. */
-function fakeTern() {
-  const surface: object = new Proxy({}, { get: (_, key) => (key === 'closed' ? true : () => surface) })
-  const waiting: ((v: IteratorResult<unknown>) => void)[] = []
-
-  return {
-    [Symbol.asyncIterator]: () => ({ next: () => new Promise<IteratorResult<unknown>>(resolve => waiting.push(resolve)) }),
-    blob: () => 'blob',
-    caps: { cols: 80, features: [] },
-    close: async () => undefined,
-    open: () => surface,
-    send: (event: Record<string, unknown>) => waiting.shift()?.({ done: false, value: { event, type: 'event' } })
-  }
-}
 
 const flush = () => new Promise(resolve => setImmediate(resolve))
 
@@ -104,7 +58,7 @@ let tern: ReturnType<typeof fakeTern>
 
 async function started() {
   tern = fakeTern()
-  const app = new App(tern as never, gw as never, '')
+  const app = new App(tern.session, gw.client, '')
   void app.run()
   gw.event({ type: 'gateway.ready', payload: {} })
   await flush()

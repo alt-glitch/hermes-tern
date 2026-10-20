@@ -5,6 +5,8 @@ import { join } from 'node:path'
 import type { Key } from '@stencil-hq/tern'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { FakeGateway, fakeTern, key, type Reply } from './fakes.js'
+
 vi.mock('@tui/lib/history.js', () => ({ append: () => undefined, load: () => [] }))
 
 const home = mkdtempSync(join(tmpdir(), 'hermes-tern-app-'))
@@ -12,73 +14,27 @@ process.env.HERMES_HOME = home
 
 const { App } = await import('../app.js')
 
-type Handler = (arg: unknown) => void
-type Reply = (params: Record<string, unknown>) => unknown
-
 /** A PNG on disk, for a pasted image path. */
 const png = join(home, 'shot.png')
 writeFileSync(png, Buffer.from([137, 80, 78, 71, 13, 10, 26, 10, 0, 0]))
 
-function key(name: string, mods: Partial<Key> = {}): Key {
-  return { alt: false, ctrl: false, meta: false, name, shift: false, ...mods } as Key
-}
-
 /** The app on a fake Tern and gateway: keys go in, gateway requests come out (`canonical`: the shared gateway). */
 function setup(replies: Record<string, Reply> = {}, { canonical = true, features = [] as string[] } = {}) {
-  const handlers = new Map<string, Handler>()
-  const requests: { method: string; params: Record<string, unknown> }[] = []
+  const gw = new FakeGateway({ canonical, replies })
   let uploads = 0
 
-  const gw = {
-    drain: () => undefined,
-    isCanonical: canonical,
-    kill: () => undefined,
-    on: (name: string, fn: Handler) => void handlers.set(name, fn),
-    request: (method: string, params: Record<string, unknown>) => {
-      requests.push({ method, params })
-
-      if (method === 'image.attach_bytes' && !replies[method]) {
-        return Promise.resolve({ path: `/uploads/${++uploads}.png` })
-      }
-
-      const reply = replies[method]
-
-      try {
-        return Promise.resolve(reply ? reply(params) : {})
-      } catch (error) {
-        return Promise.reject(error)
-      }
-    }
+  if (!replies['image.attach_bytes']) {
+    gw.handlers.set('image.attach_bytes', () => ({ path: `/uploads/${++uploads}.png` }))
   }
 
-  const waiting: ((r: IteratorResult<{ type: 'key'; key: Key }>) => void)[] = []
-  let rendered: unknown
-  const surface = {
-    closed: false,
-    focus: () => undefined,
-    palette: () => undefined,
-    render: (tree: unknown) => void (rendered = tree),
-    stylesheet: () => undefined
-  }
-
-  const tern = {
-    blob: () => 'blob',
-    caps: { cols: 100, features },
-    close: async () => undefined,
-    open: () => surface,
-    [Symbol.asyncIterator]: () => ({
-      next: () => new Promise<IteratorResult<{ type: 'key'; key: Key }>>(resolve => waiting.push(resolve)),
-      return: async () => ({ done: true as const, value: undefined })
-    })
-  }
-
-  const app = new App(tern as never, gw as never, '1.0.0')
+  const tern = fakeTern({ cols: 100, draws: true, features })
+  const app = new App(tern.session, gw.client, '1.0.0')
   void app.run()
   app.sid = 's1'
 
   const press = async (k: Key) => {
-    await vi.waitFor(() => expect(waiting.length).toBeGreaterThan(0))
-    waiting.shift()?.({ done: false, value: { key: k, type: 'key' } })
+    await vi.waitFor(() => expect(tern.reading).toBe(true))
+    tern.press(k)
     await settle()
   }
 
@@ -90,16 +46,16 @@ function setup(replies: Record<string, Reply> = {}, { canonical = true, features
 
   const attach = async () => {
     await press(key('paste', { text: png }))
-    await vi.waitFor(() => expect(requests.some(r => r.method === 'image.attach_bytes')).toBe(true))
+    await vi.waitFor(() => expect(gw.calls.some(r => r.method === 'image.attach_bytes')).toBe(true))
     await settle()
   }
 
-  const emit = (name: string, arg: unknown) => handlers.get(name)?.(arg)
-  const sent = (method: string) => requests.filter(r => r.method === method).map(r => r.params)
+  const emit = (name: string, arg: unknown) => gw.emit(name, arg)
+  const sent = (method: string) => gw.sent(method)
 
   /** The dock's queued rows as last rendered: their text and which actions they offer. */
   const queuedRows = () => {
-    const dock = JSON.parse(JSON.stringify((rendered as { dock: unknown[] }).dock)) as { k: string; p?: { key?: string; role?: string; text?: string }; c?: never[] }[]
+    const dock = JSON.parse(JSON.stringify((tern.frame as { dock: unknown[] }).dock)) as { k: string; p?: { key?: string; role?: string; text?: string }; c?: never[] }[]
     const rows = dock.find(n => n.p?.role === 'omp.queue')?.c ?? []
 
     return rows.map((r: { c: { p?: { role?: string; text?: string } }[] }) => ({
@@ -108,7 +64,7 @@ function setup(replies: Record<string, Reply> = {}, { canonical = true, features
     }))
   }
 
-  return { app, attach, emit, press, queuedRows, requests, sent, type }
+  return { app, attach, emit, press, queuedRows, sent, type }
 }
 
 const settle = () => new Promise(resolve => setTimeout(resolve, 5))

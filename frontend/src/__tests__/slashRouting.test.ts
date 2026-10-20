@@ -1,10 +1,10 @@
-import { EventEmitter } from 'node:events'
 import { mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import type { Key } from '@stencil-hq/tern'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+
+import { FakeGateway, fakeTern } from './fakes.js'
 
 process.env.HERMES_HOME = mkdtempSync(join(tmpdir(), 'hermes-tern-slash-'))
 
@@ -15,72 +15,6 @@ vi.mock('../hermes/sessionIndex.js', async importOriginal => ({
 }))
 
 const { App } = await import('../app.js')
-
-type Handler = (params: Record<string, unknown>) => unknown
-
-/** A shared-gateway stand-in: `request` answers from `handlers` (else `{}`), `event` feeds the app. */
-class FakeGateway extends EventEmitter {
-  isCanonical = true
-  attached = true
-  readonly calls: { method: string; params: Record<string, unknown> }[] = []
-  readonly handlers = new Map<string, Handler>()
-
-  request(method: string, params: Record<string, unknown> = {}) {
-    this.calls.push({ method, params })
-    const handler = this.handlers.get(method)
-
-    try {
-      return Promise.resolve(handler ? handler(params) : {})
-    } catch (error) {
-      return Promise.reject(error)
-    }
-  }
-
-  methods(name: string) {
-    return this.calls.filter(c => c.method === name)
-  }
-
-  event(ev: Record<string, unknown>) {
-    this.emit('event', ev)
-  }
-
-  drain() {}
-  kill() {}
-  holdAttach() {
-    return undefined
-  }
-  settleAttach() {}
-  hydrateSharedPrompts() {}
-}
-
-/** A Tern session whose surface draws nothing; `type` feeds its input loop. */
-function fakeTern() {
-  const surface: object = new Proxy({}, { get: (_, key) => (key === 'closed' ? true : () => surface) })
-  const inputs: { type: 'key'; key: Key }[] = []
-  let wake: (() => void) | undefined
-
-  const tern = {
-    [Symbol.asyncIterator]: () => ({
-      next: async () => {
-        while (!inputs.length) {
-          await new Promise<void>(resolve => (wake = resolve))
-        }
-
-        return { done: false, value: inputs.shift()! }
-      }
-    }),
-    blob: () => 'blob',
-    caps: { cols: 80, features: [] },
-    close: async () => undefined,
-    open: () => surface,
-    press(name: string) {
-      inputs.push({ key: { alt: false, ctrl: false, meta: false, name, shift: false }, type: 'key' })
-      wake?.()
-    }
-  }
-
-  return tern
-}
 
 const flush = async () => {
   for (let i = 0; i < 4; i++) {
@@ -93,7 +27,7 @@ let created = 0
 
 async function started() {
   const tern = fakeTern()
-  const app = new App(tern as never, gw as never, '')
+  const app = new App(tern.session, gw.client, '')
   void app.run()
   gw.event({ type: 'gateway.ready', payload: {} })
   await flush()

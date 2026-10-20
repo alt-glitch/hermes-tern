@@ -1,9 +1,10 @@
-import { EventEmitter } from 'node:events'
 import { mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+
+import { FakeGateway, fakeTern } from './fakes.js'
 
 process.env.HERMES_HOME = mkdtempSync(join(tmpdir(), 'hermes-tern-lifecycle-'))
 
@@ -22,60 +23,10 @@ vi.mock('../hermes/sessionIndex.js', async importOriginal => ({
 const { App } = await import('../app.js')
 const { openSessionPicker } = await import('../overlays/sessions.js')
 
-type Handler = (params: Record<string, unknown>) => unknown
-
-/** A shared-gateway stand-in: `request` answers from `handlers` (else `{}`), `event` feeds the app. */
-class FakeGateway extends EventEmitter {
-  isCanonical = true
-  attached = true
-  readonly calls: { method: string; params: Record<string, unknown> }[] = []
-  readonly handlers = new Map<string, Handler>()
-
-  request(method: string, params: Record<string, unknown> = {}) {
-    this.calls.push({ method, params })
-    const handler = this.handlers.get(method)
-
-    try {
-      return Promise.resolve(handler ? handler(params) : {})
-    } catch (error) {
-      return Promise.reject(error)
-    }
-  }
-
-  methods(name: string) {
-    return this.calls.filter(c => c.method === name)
-  }
-
-  event(ev: Record<string, unknown>) {
-    this.emit('event', ev)
-  }
-
-  drain() {}
-  kill() {}
-  holdAttach() {
-    return undefined
-  }
-  settleAttach() {}
-  hydrateSharedPrompts() {}
-}
-
-/** A Tern session whose surface draws nothing and whose input never arrives. */
-function fakeTern() {
-  const surface: object = new Proxy({}, { get: (_, key) => (key === 'closed' ? true : () => surface) })
-
-  return {
-    [Symbol.asyncIterator]: () => ({ next: () => new Promise(() => undefined) }),
-    blob: () => 'blob',
-    caps: { cols: 80, features: [] },
-    close: async () => undefined,
-    open: () => surface
-  }
-}
-
 const flush = () => new Promise(resolve => setTimeout(resolve, 0))
 
 async function started(gw: FakeGateway) {
-  const app = new App(fakeTern() as never, gw as never, '')
+  const app = new App(fakeTern().session, gw.client, '')
   void app.run()
   gw.event({ type: 'gateway.ready', payload: {} })
   await flush()

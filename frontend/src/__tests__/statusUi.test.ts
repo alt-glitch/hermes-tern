@@ -8,6 +8,8 @@ import { join } from 'node:path'
 import { type Key, plain } from '@stencil-hq/tern'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
+import { FakeGateway, fakeTern, key, type Reply } from './fakes.js'
+
 vi.mock('@tui/lib/history.js', () => ({ append: () => undefined, load: () => [] }))
 
 process.env.HERMES_HOME = mkdtempSync(join(tmpdir(), 'hermes-tern-status-'))
@@ -19,78 +21,38 @@ const { forgetCaps, rememberCaps } = await import('../modelCaps.js')
 const { effortText, levelsFor, nextEffort } = await import('../overlays/effort.js')
 const { openModelPicker } = await import('../overlays/models.js')
 
-type Reply = (params: Record<string, unknown>) => unknown
-
-const key = (name: string, mods: Partial<Key> = {}): Key =>
-  ({ alt: false, ctrl: false, meta: false, name, shift: false, ...mods }) as Key
-
 const settle = () => new Promise(resolve => setTimeout(resolve, 5))
 
 function setup(replies: Record<string, Reply> = {}, canonical = true) {
-  const handlers = new Map<string, (arg: unknown) => void>()
-  const requests: { method: string; params: Record<string, unknown> }[] = []
-  let view: { dock?: unknown[] } = {}
+  const gw = new FakeGateway({ canonical, replies })
+  const tern = fakeTern({ cols: 100, draws: true })
+  /** The last frame's dock. */
+  const shown = () => (tern.frame as { dock?: unknown[] } | undefined)?.dock ?? []
 
-  const gw = {
-    drain: () => undefined,
-    isCanonical: canonical,
-    kill: () => undefined,
-    on: (name: string, fn: (arg: unknown) => void) => void handlers.set(name, fn),
-    request: (method: string, params: Record<string, unknown>) => {
-      requests.push({ method, params })
-
-      try {
-        return Promise.resolve(replies[method] ? replies[method](params) : {})
-      } catch (error) {
-        return Promise.reject(error)
-      }
-    }
-  }
-
-  const waiting: ((r: IteratorResult<{ type: 'key'; key: Key }>) => void)[] = []
-  const surface = {
-    closed: false,
-    focus: () => undefined,
-    palette: () => undefined,
-    render: (v: typeof view) => void (view = v),
-    stylesheet: () => undefined
-  }
-
-  const tern = {
-    blob: () => 'blob',
-    caps: { cols: 100, features: [] as string[] },
-    close: async () => undefined,
-    open: () => surface,
-    [Symbol.asyncIterator]: () => ({
-      next: () => new Promise<IteratorResult<{ type: 'key'; key: Key }>>(resolve => waiting.push(resolve)),
-      return: async () => ({ done: true as const, value: undefined })
-    })
-  }
-
-  const app = new App(tern as never, gw as never, '1.0.0')
+  const app = new App(tern.session, gw.client, '1.0.0')
   void app.run()
   app.sid = 's1'
 
   const press = async (k: Key) => {
-    await vi.waitFor(() => expect(waiting.length).toBeGreaterThan(0))
-    waiting.shift()?.({ done: false, value: { key: k, type: 'key' } })
+    await vi.waitFor(() => expect(tern.reading).toBe(true))
+    tern.press(k)
     await settle()
   }
 
-  const emit = (name: string, arg: unknown) => handlers.get(name)?.(arg)
-  const sent = (method: string) => requests.filter(r => r.method === method).map(r => r.params)
+  const emit = (name: string, arg: unknown) => gw.emit(name, arg)
+  const sent = (method: string) => gw.sent(method)
   /** The dock as the pane would read it, after the pending render. */
   const dock = async () => {
     await settle()
 
-    return plain({ dock: view.dock ?? [] } as never, 200)
+    return plain({ dock: shown() } as never, 200)
   }
 
   /** The dock's nodes as JSON, for what plain text leaves out (icons). */
   const raw = async () => {
     await settle()
 
-    return JSON.stringify(view.dock ?? [])
+    return JSON.stringify(shown())
   }
 
   return { app, dock, emit, press, raw, sent }
