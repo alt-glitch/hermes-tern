@@ -10,7 +10,6 @@ import type { SessionInfo } from '@tui/types.js'
 import type { Agents } from '../agents/store.js'
 import type { Automation } from '../automation.js'
 import type { PrKey, SessionIds, StoredSessionId } from '../core/ids.js'
-import type { Busy } from '../flow.js'
 import type { GitState } from '../git/status.js'
 import type { PullRequests } from '../github/store.js'
 import type { NoticeEntry } from '../model.js'
@@ -20,6 +19,7 @@ import type { Processes } from '../processes/store.js'
 import type { SessionHost } from '../sessionCommands.js'
 import type { ThemeMode } from '../settings.js'
 import type { Transcript } from '../transcript.js'
+import type { Busy } from '../turn/activity.js'
 
 /** The session as the ports read it, live: each read sees the current ids and info. */
 export interface SessionView {

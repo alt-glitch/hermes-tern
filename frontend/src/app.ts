@@ -30,7 +30,7 @@ import { type LaunchEnv, readLaunchEnv } from './config/env.js'
 import { localCommand } from './commands.js'
 import { Composer } from './composer.js'
 import { ConnectWatcher } from './connections/watcher.js'
-import { interruptTurn, redirectTurn, steerTurn } from './controlCommands.js'
+import { interruptTurn } from './controlCommands.js'
 import { Disposables } from './core/disposables.js'
 import { errorText } from './core/errors.js'
 import {
@@ -40,7 +40,6 @@ import {
   isLive,
   type LiveSessionId,
   liveSessionId,
-  newInputId,
   NO_SESSION,
   type PrKey,
   type SessionIds,
@@ -49,16 +48,16 @@ import {
   toolCallId
 } from './core/ids.js'
 import { RenderScheduler } from './core/scheduler.js'
-import { Attachments, type Image } from './draft/attachments.js'
+import { Attachments } from './draft/attachments.js'
 import { fastTier } from './fast.js'
-import { type Busy, busyFrom, ownsEvent, Switches } from './flow.js'
+import { busyFrom, ownsEvent, Switches } from './flow.js'
 import { protocolNote, slowStartNotes } from './backendNotes.js'
 import { moaLabel, moaReferenceLabel } from './moa.js'
 import type { Overlay } from './overlay.js'
 import { writeActiveSessionFile } from './hermes/activeSessionFile.js'
 import { Media } from './media.js'
 import type { NoticeEntry, ToolCall } from './model.js'
-import { interpolate, shellError, shellExec, shellLines, typedCommands } from './hermes/shell.js'
+import { shellError, shellExec, shellLines } from './hermes/shell.js'
 import { sharedPromptId, sharedPromptRequest } from './hermes/sharedPrompts.js'
 import { openAgents } from './overlays/agents.js'
 import { openAutomation } from './overlays/automation.js'
@@ -88,8 +87,10 @@ import { isRunning as processRuns, Processes, processTone } from './processes/st
 import { hermesAuthor } from './processes/widgets/author.js'
 import { chartMemory } from './processes/widgets/memory.js'
 import { fileSettings, type SettingsSource, type ThemeMode } from './settings.js'
+import { Activity, type Busy } from './turn/activity.js'
 import { PromptQueue } from './turn/queue.js'
 import { IMAGE_ONLY_PROMPT, type Prompt, shownText, userImages } from './turn/prompt.js'
+import { type GateState, gateDrain, PromptRouter } from './turn/router.js'
 import { type BusyMode, busyModeOf } from './turn/serverQueue.js'
 import { INPUT_ID, SurfaceHost } from './surface/host.js'
 import { runInput } from './surface/input.js'
@@ -163,9 +164,12 @@ export class App implements ChatPorts {
   /** The session as the ports read it: its ids and `info`, live. */
   readonly session: SessionView = sessionView(this, () => this.#ids)
   usage: Usage | null = null
-  busy: Busy | null = null
+  /** The working line's busy state and the compaction phase: their one owner. */
+  readonly #activity = new Activity()
   /** The prompts waiting behind the turn: held here, and the shared gateway's queue for this session. */
   readonly #queue: PromptQueue
+  /** Where each prompt goes: sent, the busy path, behind the turn, or held. */
+  readonly #router: PromptRouter
   /** What Enter does while a turn runs (`display.busy_input_mode`); queue until the gateway says. */
   #busyMode: BusyMode = 'queue'
   readonly #tern: Session
@@ -214,11 +218,6 @@ export class App implements ChatPorts {
   #protocolWarned = false
   /** The gateway's keyed notices (credits, a slow start); the newest rides the status strip. */
   readonly #notices = new NoticeStrip(this)
-  /**
-   * A compaction runs (Hermes' own, or /compress): the working line says so until its done edge,
-   * and with no turn running the dock shows it and prompts queue behind it.
-   */
-  #compacting: { since: object; startedAt: number } | undefined
   /** The status warning shown last, so a repeated one stays one line. */
   #lastStatusNote: string | undefined
 
@@ -244,13 +243,22 @@ export class App implements ChatPorts {
     )
     this.#queue = new PromptQueue({
       busy: () => Boolean(this.busy),
-      canDrain: () => !(this.busy || this.#compacting || !this.sid || this.#switches.pending || this.#attachments.awaitingStartup),
+      canDrain: () => gateDrain(this.#gates()),
       changed: () => this.changed(),
-      expanded: (sid, prompt) => this.#expanded(sid, prompt),
+      expanded: (sid, prompt) => this.#router.expanded(sid, prompt),
       gw,
       restore: prompt => this.#restore(prompt),
-      send: prompt => this.#send(prompt, { queued: true }),
+      send: prompt => this.#router.send(prompt, { queued: true }),
       sid: () => this.sid,
+      transcript: this.transcript
+    })
+    this.#router = new PromptRouter({
+      activity: this.#activity,
+      changed: () => this.changed(),
+      gates: () => this.#gates(),
+      gw,
+      queue: this.#queue,
+      restore: prompt => this.#restore(prompt),
       transcript: this.transcript
     })
     const saved = settings.load()
@@ -272,6 +280,15 @@ export class App implements ChatPorts {
   /** Sets the runtime id, keeping the stored one (tests arrange a session this way). */
   set sid(id: string | null) {
     this.#ids = { live: id === null ? null : liveSessionId(id), stored: this.#ids.stored }
+  }
+
+  /** The running turn (or a send's `{!cmd}`s), null when idle; tests arrange it, and Activity owns it. */
+  get busy(): Busy | null {
+    return this.#activity.busy
+  }
+
+  set busy(busy: Busy | null) {
+    this.#activity.set(busy)
   }
 
   /** Prompts held here until they can be sent (tests read and arrange it). */
@@ -348,7 +365,7 @@ export class App implements ChatPorts {
 
       // The runtime session died with the process: prompts queue until the next gateway.ready reattaches.
       this.#ids = { live: null, stored: this.#ids.stored }
-      this.busy = null
+      this.#activity.endBusy()
       // Nothing can answer the sheets now; the reattach re-opens the questions still pending.
       this.#heldRequests = []
       this.#sheets.dropAll()
@@ -841,152 +858,19 @@ export class App implements ChatPorts {
     }
 
     // The draft's images go with this prompt, whenever it is sent; a message the app writes leaves them.
-    const item: Prompt = { images: draft ? this.#attachments.take() : [], kind: 'typed', pasted, text }
-
-    if (!this.sid || this.#switches.pending) {
-      this.#queue.hold(item)
-
-      return
-    }
-
-    if (this.busy) {
-      return void this.#busyInput(item, busy)
-    }
-
-    // /compress holds the session: the prompt waits behind it (no turn runs, so none to steer).
-    if (this.#compacting) {
-      return void this.#queueBehind(item)
-    }
-
-    this.#send(item)
+    this.#router.route({ images: draft ? this.#attachments.take() : [], kind: 'typed', pasted, text }, busy, 'typed')
   }
 
-  /**
-   * A prompt entered while a turn runs, as Ink's handleBusyInput: `steer` injects it into the turn,
-   * `interrupt` redirects the turn with it, `queue` puts it behind the turn. A steer or redirect
-   * carries no images, and one the gateway refuses is queued instead.
-   */
-  async #busyInput(item: Prompt, mode: BusyMode) {
-    const sid = this.sid
-
-    if (!sid || mode === 'queue' || item.images.length) {
-      return this.#queueBehind(item)
+  /** What the router's gates read: the session, the switch in flight, the turn, the compaction and the startup image. */
+  #gates(): GateState {
+    return {
+      awaitingStartup: this.#attachments.awaitingStartup,
+      busy: this.#activity.busy !== null,
+      canonical: this.#gw.isCanonical,
+      compacting: this.#activity.compacting !== undefined,
+      sid: this.sid,
+      switching: this.#switches.pending
     }
-
-    const ready = await this.#expanded(sid, item)
-
-    if (!ready || sid !== this.sid) {
-      return
-    }
-
-    const r = await (mode === 'steer' ? steerTurn : redirectTurn)(this.#gw, sid, ready.text)
-
-    if (sid !== this.sid) {
-      return
-    }
-
-    if (r.ok) {
-      this.transcript.steer(shownText(item))
-    } else {
-      if (r.error) {
-        this.transcript.notice(`${mode === 'steer' ? 'Steer' : 'Redirect'} failed: ${r.error}. Queued instead.`, 'warning')
-      }
-
-      this.#queueBehind(item)
-    }
-
-    this.changed()
-  }
-
-  /** Puts `item` behind the running turn: into the shared gateway's queue at once, else held here. */
-  #queueBehind(item: Prompt) {
-    const sid = this.sid
-
-    if (!this.#gw.isCanonical || !sid || this.#switches.pending) {
-      this.#queue.hold(item)
-      this.#drainQueue()
-
-      return this.changed()
-    }
-
-    void this.#queue.admit(sid, item)
-  }
-
-  /** `item` with its `{!cmd}`s run (a typed prompt's); undefined when one failed (the prompt is back in the composer). */
-  async #expanded(sid: string, item: Prompt): Promise<{ images: Image[]; text: string } | undefined> {
-    if (item.kind !== 'typed' || !typedCommands(item.text, item.pasted).length) {
-      return item
-    }
-
-    try {
-      return { images: item.images, text: await interpolate(this.#gw, sid, item.text, item.pasted) }
-    } catch (error) {
-      this.transcript.notice(`Not sent: a {!…} command failed: ${shellError(error)}.`, 'error')
-      this.#restore(item)
-      this.changed()
-
-      return undefined
-    }
-  }
-
-  /**
-   * Sends `item` now; `queued` marks a drained queue entry (the gateway must queue it, never steer
-   * with it). A typed prompt's `{!cmd}`s run first and their output takes their place; `display` is
-   * what the transcript shows.
-   */
-  #send(item: Prompt, { display = item.kind === 'command' ? item.display : undefined, queued = false }: { display?: string | undefined; queued?: boolean } = {}) {
-    const sid = this.sid
-
-    // A session switch in flight: the prompt belongs to the session it adopts.
-    if (!sid || this.#switches.pending) {
-      this.#queue.holdFirst(item)
-
-      return
-    }
-
-    if (item.kind === 'typed' && typedCommands(item.text, item.pasted).length) {
-      this.#startBusy('Running {!…}')
-      void interpolate(this.#gw, sid, item.text, item.pasted).then(
-        text => {
-          this.busy = null
-          this.#send({ images: item.images, kind: 'app', text }, { display: item.text, queued })
-        },
-        (error: unknown) => {
-          // A command that could not run refuses the whole prompt: it goes back to the composer to edit.
-          this.busy = null
-          this.transcript.notice(`Not sent: a {!…} command failed: ${shellError(error)}.`, 'error')
-          this.#restore(item)
-          this.#drainQueue()
-          this.changed()
-        }
-      )
-
-      return
-    }
-
-    const { images } = item
-    const text = item.text || (images.length ? IMAGE_ONLY_PROMPT : '')
-    const attachments = images.map(({ mime, path }) => ({ mime, path }))
-    const submission = newInputId()
-    this.transcript.user({ attachments: userImages(images), text: display?.trim() || item.text })
-    // Its bubble is up: the gateway's queued → started for it owes none.
-    this.#queue.server.shown(submission)
-    this.#startBusy('Working…')
-    // The shared gateway admits a prompt by its submission id (a retry with the same id is one turn).
-    rpc(this.#gw, 'prompt.submit', {
-      session_id: sid,
-      submission_id: submission,
-      text,
-      ...(queued ? { queued } : {}),
-      ...(attachments.length ? { attachments } : {})
-    }).catch((error: Error) => {
-      // Back to the composer, not re-sent: a timeout may come after the gateway admitted it.
-      this.transcript.notice(`Not sent: ${error.message}. Your message is back in the composer.`, 'error')
-      this.busy = null
-      this.#restore(item)
-      this.#drainQueue()
-      this.changed()
-    })
   }
 
   /** Puts a prompt that did not go back into the composer, before any text there, with its images. */
@@ -1122,16 +1006,16 @@ export class App implements ChatPorts {
       return
     }
 
-    if (this.busy) {
-      this.busy.label = 'Stopping…'
-    }
+    // Last write wins: the stream's next label replaces this one.
+    this.#activity.relabel('Stopping…', { status: true })
 
     interruptTurn(this.#gw, this.sid).catch((error: unknown) => {
       const why = errorText(error)
 
       // A stale generation means the turn already ended: nothing to say.
       if (this.busy && !why.includes('stale_generation')) {
-        this.busy.label = 'Working…'
+        // 'Working…', not the label it replaced: whatever the turn shows now.
+        this.#activity.relabel('Working…', { status: true })
         this.transcript.notice(`Could not stop the turn: ${why}`, 'error')
         this.changed()
       }
@@ -1147,7 +1031,7 @@ export class App implements ChatPorts {
       busy: Boolean(this.busy),
       // A steer that fell back to the queue: steering carries no images.
       canonical: this.#gw.isCanonical,
-      enqueue: text => this.#queueBehind({ images: [], kind: 'app', text }),
+      enqueue: text => this.#router.behind({ images: [], kind: 'app', text }),
       gw: this.#gw,
       notice: (text, tone) => {
         this.transcript.notice(text, tone)
@@ -1172,7 +1056,7 @@ export class App implements ChatPorts {
           this.transcript.compacted(Date.now(), state)
         }
 
-        this.#setCompacting(state === 'start')
+        this.#setCompacting(state === 'start', { manual: true })
 
         this.changed()
       },
@@ -1182,7 +1066,7 @@ export class App implements ChatPorts {
           await this.#resume(sid)
         }
       },
-      send: text => this.#send({ images: [], kind: 'app', text }),
+      send: text => this.#router.send({ images: [], kind: 'app', text }),
       sid,
       stale: () => this.sid !== sid,
       steered: text => {
@@ -1194,11 +1078,16 @@ export class App implements ChatPorts {
     }
   }
 
-  /** A compaction started or ended; prompts held behind one with no turn running go once it ends. */
-  #setCompacting(on: boolean) {
-    this.#compacting = on ? (this.#compacting ?? { since: {}, startedAt: Date.now() }) : undefined
-
-    if (!on) {
+  /**
+   * A compaction started (`manual`: /compress's) or ended. While one runs the working line says so
+   * until its done edge, and with no turn running the dock shows it and prompts queue behind it;
+   * those go once it ends.
+   */
+  #setCompacting(on: boolean, { manual = false }: { manual?: boolean } = {}) {
+    if (on) {
+      this.#activity.startCompaction({ manual })
+    } else {
+      this.#activity.endCompaction()
       this.#drainQueue()
     }
   }
@@ -1219,11 +1108,6 @@ export class App implements ChatPorts {
         this.changed()
       }
     }, delay)
-  }
-
-  #startBusy(label: string) {
-    this.busy = { label, since: {}, startedAt: Date.now() }
-    this.changed()
   }
 
   // ── Sessions ───────────────────────────────────────────────────────
@@ -1429,10 +1313,10 @@ export class App implements ChatPorts {
     this.#title.adopt(typeof r.info?.title === 'string' ? r.info.title : undefined)
     this.#reportCwd()
     // A resumed session may be mid-turn: Esc Esc stops it and new prompts go as busy_input_mode says.
-    this.busy = busyFrom(r)
+    this.#activity.set(busyFrom(r))
     // The last session's notices and status lines are not this one's.
     this.#notices.reset()
-    this.#compacting = undefined
+    this.#activity.endCompaction()
     this.#lastStatusNote = undefined
     this.transcript.usageBase(r.info?.usage ?? undefined)
 
@@ -1464,15 +1348,7 @@ export class App implements ChatPorts {
   /** Acts on a slash.exec / command.dispatch answer: output, a skill or message to send, an alias or a prefill. */
   /** A prompt a slash command made (a skill, a `send`): while a turn runs it takes the busy path a typed one does. */
   #prompt(item: Prompt) {
-    if (this.busy) {
-      return void this.#busyInput(item, this.#busyMode)
-    }
-
-    if (this.#compacting) {
-      return void this.#queueBehind(item)
-    }
-
-    this.#send(item)
+    this.#router.route(item, this.#busyMode, 'command')
   }
 
   async #dispatched(raw: unknown, title: string, arg: string) {
@@ -1641,7 +1517,8 @@ export class App implements ChatPorts {
 
       case 'message.start':
         if (!this.busy) {
-          this.#startBusy('Working…')
+          this.#activity.startBusy('Working…')
+          this.changed()
         }
 
         t.start()
@@ -1656,13 +1533,13 @@ export class App implements ChatPorts {
 
       case 'message.delta':
         t.text(ev.payload?.text ?? '')
-        this.#label('Writing…')
+        this.#activity.relabel('Writing…')
 
         break
 
       case 'reasoning.delta':
         t.reasoning(ev.payload?.text ?? '')
-        this.#label('Thinking…')
+        this.#activity.relabel('Thinking…')
 
         break
 
@@ -1684,12 +1561,12 @@ export class App implements ChatPorts {
       case 'moa.phase':
 
       case 'moa.aggregating':
-        this.#label(moaLabel(ev) ?? '')
+        this.#activity.relabel(moaLabel(ev) ?? '')
 
         break
 
       case 'thinking.delta':
-        this.#label(kaomojiLabel(ev.payload?.text ?? ''))
+        this.#activity.relabel(kaomojiLabel(ev.payload?.text ?? ''))
 
         break
 
@@ -1699,7 +1576,7 @@ export class App implements ChatPorts {
         break
 
       case 'tool.generating':
-        this.#label(ev.payload?.name ? preparingLabel(ev.payload.name) : 'Preparing a tool…')
+        this.#activity.relabel(ev.payload?.name ? preparingLabel(ev.payload.name) : 'Preparing a tool…')
 
         break
 
@@ -1708,7 +1585,7 @@ export class App implements ChatPorts {
           t.toolStart(ev.payload)
           // The call as its step reads (a bridged or connector call as its app), not its wire name.
           const call = t.call(toolCallId(ev.payload.tool_id))
-          this.#label(call ? busyLabel(call) : `Running ${ev.payload.name}…`)
+          this.#activity.relabel(call ? busyLabel(call) : `Running ${ev.payload.name}…`)
           // vision_analyze names its image up front.
           this.#showImage(call)
         }
@@ -1791,8 +1668,8 @@ export class App implements ChatPorts {
         }
 
         t.complete(ev.payload ?? {})
-        this.busy = null
-        this.#compacting = undefined
+        this.#activity.endBusy()
+        this.#activity.endCompaction()
         // A compaction Hermes aborted sends no done edge; one that committed has its summary stored now.
         t.uncompact(true)
         this.#summarize()
@@ -1821,7 +1698,7 @@ export class App implements ChatPorts {
         }
 
         if (effect.label) {
-          this.#label(effect.label, true)
+          this.#activity.relabel(effect.label, { status: true })
         }
 
         if (effect.notice) {
@@ -2004,13 +1881,6 @@ export class App implements ChatPorts {
     this.changed()
   }
 
-  /** Relabels the working line; the stream's labels wait while the context is compacted (`status`: a status line's own). */
-  #label(label: string, status = false) {
-    if (this.busy && label && (status || !this.#compacting)) {
-      this.busy.label = label
-    }
-  }
-
   /** Sets the reasoning effort for this session, or also as the default of every new one (session/effort.ts). */
   setEffort(value: string, scope: 'global' | 'session'): Promise<void> {
     return applyEffort(this, value, scope)
@@ -2070,7 +1940,7 @@ export class App implements ChatPorts {
       dock: dockNodes({
         branch: info?.branch ?? '',
         busy: this.busy ?? undefined,
-        compacting: this.busy ? undefined : this.#compacting,
+        compacting: this.busy ? undefined : this.#activity.compacting,
         composer: this.composer,
         context: max > 0 ? { max, used } : undefined,
         cost: usage?.cost_usd ?? undefined,

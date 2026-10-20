@@ -5,14 +5,7 @@
 import type { SessionResumeResult } from '@hermes/shared/gateway-events'
 
 import type { LiveSessionId } from './core/ids.js'
-
-/** The working row while a turn runs. */
-export interface Busy {
-  startedAt: number
-  /** Owner of the working row's timer age; replaced per turn. */
-  since: object
-  label: string
-}
+import type { Busy } from './turn/activity.js'
 
 /** What to do with a server request: show it, keep it until the switch in flight lands, or drop it. */
 export type RequestRoute = 'show' | 'hold' | 'drop'
