@@ -57,7 +57,7 @@ export interface AdoptHost {
   readonly agents: Pick<Agents, 'adopt' | 'scan'>
   readonly automation: Pick<Automation, 'adopt'>
   readonly connect: Pick<ConnectWatcher, 'watch'>
-  readonly media: Pick<Media, 'showAll'>
+  readonly media: Pick<Media, 'showAll' | 'invalidate'>
   readonly notices: Pick<NoticeStrip, 'reset'>
   readonly processes: Pick<Processes, 'poke'>
   readonly prs: Pick<PullRequests, 'adopt'>
@@ -100,6 +100,9 @@ export function adoptSteps(host: AdoptHost): readonly Adoptable[] {
         const other = ref.live !== previous.live
         // One step, so nothing of the last session's transcript outlives it: its entries, live
         // turn, reason line, and (another session's) counters and compactions.
+        // Every adoption rebuilds the transcript, including reattaching the same session.
+        // Old image fetches may only mutate the previous transcript's tool calls.
+        host.media.invalidate()
         transcript.reset({ session: other ? 'other' : 'same', usage: r.info?.usage ?? undefined })
 
         if (other) {
