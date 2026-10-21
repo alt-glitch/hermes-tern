@@ -4,8 +4,11 @@
 
 import type { Palette, Renderable, RevealAt, ScrollTo, Session, Surface } from '@stencil-hq/tern'
 
+/** The composer's node id (dock → composer): the completion list sits above it. */
+export const COMPOSER_ID = 'dock.composer'
+
 /** The composer's `editor` node id (dock → composer → line → input): where the caret rests. */
-export const INPUT_ID = 'dock.composer.line.input'
+export const INPUT_ID = `${COMPOSER_ID}.line.input`
 
 /** The surface a pane draws on, with the field holding Tern's caret as last sent. */
 export class SurfaceHost {

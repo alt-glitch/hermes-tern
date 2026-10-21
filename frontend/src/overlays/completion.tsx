@@ -1,6 +1,6 @@
 // Completions for the composer: slash commands, inline `/skill` references and
 // `@`/path words, fetched from the gateway as the text before the caret
-// changes and shown as a caret-anchored list (`omp.autocomplete`).
+// changes and shown as a list above the composer (`omp.autocomplete`).
 // Tab accepts; Enter accepts a row that changes the token, else submits.
 
 import type { CompleteSlashResult, CompletionItem } from '@hermes/shared/gateway-events'
@@ -17,8 +17,8 @@ import { rpc } from '../wire/rpc.js'
 import type { OverlayHost } from './overlay.js'
 
 const DEBOUNCE_MS = 60
-/** A row's room in px for its name and description in the 760px list (view/styles.ts), and their faces' rough widths per character. */
-const ROW_PX = 690
+/** A row's room in px for its name and description in the 736px list (view/styles.ts), and their faces' rough widths per character. */
+const ROW_PX = 666
 const NAME_PX = 7.4
 const DETAIL_PX = 6.4
 
@@ -187,8 +187,9 @@ export class Completion {
     }
   }
 
-  /** The overlay nodes for the `layer` region (none while closed). */
-  nodes(inputId: string): JSX.Element[] {
+  /** The overlay nodes for the `layer` region (none while closed): the list sits above the composer
+   * node `composerId` at a fixed place, not at the caret, so it does not move as the user types. */
+  nodes(composerId: string): JSX.Element[] {
     if (!this.open) {
       return []
     }
@@ -199,7 +200,7 @@ export class Completion {
     const more = this.items.some(cutOff) ? detailOf(this.items[this.selected]) : undefined
 
     return [
-      <overlay anchor={{ caret: inputId }} key="complete" role="omp.autocomplete">
+      <overlay anchor={{ node: composerId, side: 'above' }} key="complete" role="omp.autocomplete">
         <col key="select" role="omp.select">
           <list
             empty={this.#for.includes('@') ? 'No files' : 'No items'}

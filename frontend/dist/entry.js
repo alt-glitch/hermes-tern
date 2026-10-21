@@ -65037,7 +65037,8 @@ function fileSettings(file2) {
 }
 
 // src/surface/host.ts
-var INPUT_ID = "dock.composer.line.input";
+var COMPOSER_ID = "dock.composer";
+var INPUT_ID = `${COMPOSER_ID}.line.input`;
 var SurfaceHost = class {
   #surface;
   #focus = INPUT_ID;
@@ -65816,12 +65817,13 @@ var STYLES = css`
     font-size: 12px;
   }
 
-  /* The composer's completion list, readable like t3code's: about as wide as the composer, names in
-     the UI face (paths stay mono), and descriptions one step brighter. The list places rows at fixed
+  /* The composer's completion list, readable like t3code's: it sits above the composer (anchored in
+     overlays/completion.tsx) and is as wide, names in the UI face (paths stay mono), and descriptions
+     one step brighter. The list places rows at fixed
      steps, so a long description shows whole in a footer under the list, not in its row. */
   .sf-overlay[data-role='omp.autocomplete'] .sf-ov-card {
-    width: min(760px, 100%) !important;
-    max-width: min(760px, 100%) !important;
+    width: min(736px, calc(100% - 8px)) !important;
+    max-width: min(736px, calc(100% - 8px)) !important;
   }
 
   .sf-overlay[data-role='omp.autocomplete'] .sf-item-label {
@@ -68974,7 +68976,7 @@ function drawFrame(cx, now = Date.now()) {
     layer: [
       ...cx.aside() ? [cx.prAside.open ? cx.prAside.node("layer.prs") : cx.sidebar.node("layer.sidebar")].filter((n) => n !== null) : [],
       ...cx.overlays.map((o) => o.node(`layer.${o.key}`)),
-      ...modal2 ? [] : cx.completion.nodes(INPUT_ID)
+      ...modal2 ? [] : cx.completion.nodes(COMPOSER_ID)
     ],
     main: cx.transcript.entries.map((e) => entryNode(e, `main.${e.id}`, entries))
   });
@@ -71191,7 +71193,7 @@ var writeActiveSessionFile = (sessionId, file2 = process.env["HERMES_TUI_ACTIVE_
 
 // src/overlays/completion.tsx
 var DEBOUNCE_MS = 60;
-var ROW_PX = 690;
+var ROW_PX = 666;
 var NAME_PX = 7.4;
 var DETAIL_PX = 6.4;
 var Completion = class {
@@ -71312,15 +71314,16 @@ var Completion = class {
         return false;
     }
   }
-  /** The overlay nodes for the `layer` region (none while closed). */
-  nodes(inputId2) {
+  /** The overlay nodes for the `layer` region (none while closed): the list sits above the composer
+   * node `composerId` at a fixed place, not at the caret, so it does not move as the user types. */
+  nodes(composerId) {
     if (!this.open) {
       return [];
     }
     const listId = "layer.complete.select.list";
     const more = this.items.some(cutOff) ? detailOf2(this.items[this.selected]) : void 0;
     return [
-      /* @__PURE__ */ jsx("overlay", { anchor: { caret: inputId2 }, role: "omp.autocomplete", children: /* @__PURE__ */ jsxs("col", { role: "omp.select", children: [
+      /* @__PURE__ */ jsx("overlay", { anchor: { node: composerId, side: "above" }, role: "omp.autocomplete", children: /* @__PURE__ */ jsxs("col", { role: "omp.select", children: [
         /* @__PURE__ */ jsx(
           "list",
           {

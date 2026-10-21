@@ -8,7 +8,7 @@ import type { Sidebar } from '../chrome/sidebar.js'
 import type { Completion } from '../overlays/completion.js'
 import type { Overlay } from '../overlays/overlay.js'
 import type { PrAside } from '../prs/aside.js'
-import { INPUT_ID, type SurfaceHost } from '../surface/host.js'
+import { COMPOSER_ID, INPUT_ID, type SurfaceHost } from '../surface/host.js'
 import type { Transcript } from '../transcript/store.js'
 import { type DockActions, dockNodes } from '../view/dock.js'
 import { type DockSources, dockModel, isModal, shownPills } from '../view/dockModel.js'
@@ -56,7 +56,7 @@ export function drawFrame(cx: FrameCx, now = Date.now()) {
     layer: [
       ...(cx.aside() ? [cx.prAside.open ? cx.prAside.node('layer.prs') : cx.sidebar.node('layer.sidebar')].filter(n => n !== null) : []),
       ...cx.overlays.map(o => o.node(`layer.${o.key}`)),
-      ...(modal ? [] : cx.completion.nodes(INPUT_ID))
+      ...(modal ? [] : cx.completion.nodes(COMPOSER_ID))
     ],
     main: cx.transcript.entries.map(e => entryNode(e, `main.${e.id}`, entries))
   })

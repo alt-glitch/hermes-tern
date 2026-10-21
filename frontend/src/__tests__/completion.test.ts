@@ -160,7 +160,7 @@ describe('Completion: the rows', () => {
     type(completion, composer, text)
     pending[0]?.resolve({ items })
     await vi.runAllTimersAsync()
-    const col = completion.nodes('input').map(tree)[0]?.c?.[0]
+    const col = completion.nodes('composer').map(tree)[0]?.c?.[0]
 
     return {
       items: (col?.c?.[0]?.c ?? []).map(n => ({ detail: n.p?.['detail'], role: n.p?.['role'] })),
