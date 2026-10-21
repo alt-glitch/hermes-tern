@@ -141,7 +141,13 @@ export class Media {
     const data = /^data:image\/[\w.+-]+;base64,(.*)$/s.exec(src)
 
     if (data) {
-      return Buffer.from(data[1] ?? '', 'base64')
+      const encoded = data[1] ?? ''
+      // Bound allocation *before* base64 decoding, not only before Tern blob creation.
+      if (encoded.length > Math.ceil(MAX_BYTES / 3) * 4) {
+        return undefined
+      }
+
+      return Buffer.from(encoded, 'base64')
     }
 
     if (!/^https?:\/\//i.test(src)) {
@@ -149,9 +155,47 @@ export class Media {
     }
 
     const r = await this.#fetch(src, { signal: AbortSignal.timeout(FETCH_MS) })
-    const size = Number(r.headers.get('content-length') ?? 0)
+    const declared = r.headers.get('content-length')
 
-    return r.ok && size <= MAX_BYTES ? Buffer.from(await r.arrayBuffer()) : undefined
+    // Content-Length can be absent or incorrect. Treat it only as an early rejection hint.
+    if (!r.ok || (declared !== null && (!/^\d+$/.test(declared) || Number(declared) > MAX_BYTES))) {
+      return undefined
+    }
+
+    const reader = r.body?.getReader()
+
+    if (!reader) {
+      return undefined
+    }
+
+    const chunks: Uint8Array[] = []
+    let bytes = 0
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read()
+
+        if (done) {
+          break
+        }
+
+        // Check the untyped stream boundary before trusting its chunk or size.
+        const chunk: unknown = value
+
+        if (!(chunk instanceof Uint8Array) || chunk.byteLength > MAX_BYTES - bytes) {
+          // Abort overflow without collecting that chunk or the rest of the response.
+          await reader.cancel()
+          return undefined
+        }
+
+        bytes += chunk.byteLength
+        chunks.push(chunk)
+      }
+    } finally {
+      reader.releaseLock()
+    }
+
+    return Buffer.concat(chunks, bytes)
   }
 
   #blob(bytes: Buffer | undefined): ImageSource | null {

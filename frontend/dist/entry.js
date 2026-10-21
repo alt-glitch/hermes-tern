@@ -29122,14 +29122,44 @@ var Media = class {
   async #bytes(src) {
     const data = /^data:image\/[\w.+-]+;base64,(.*)$/s.exec(src);
     if (data) {
-      return Buffer.from(data[1] ?? "", "base64");
+      const encoded = data[1] ?? "";
+      if (encoded.length > Math.ceil(MAX_BYTES / 3) * 4) {
+        return void 0;
+      }
+      return Buffer.from(encoded, "base64");
     }
     if (!/^https?:\/\//i.test(src)) {
       return void 0;
     }
     const r = await this.#fetch(src, { signal: AbortSignal.timeout(FETCH_MS) });
-    const size = Number(r.headers.get("content-length") ?? 0);
-    return r.ok && size <= MAX_BYTES ? Buffer.from(await r.arrayBuffer()) : void 0;
+    const declared = r.headers.get("content-length");
+    if (!r.ok || declared !== null && (!/^\d+$/.test(declared) || Number(declared) > MAX_BYTES)) {
+      return void 0;
+    }
+    const reader = r.body?.getReader();
+    if (!reader) {
+      return void 0;
+    }
+    const chunks2 = [];
+    let bytes = 0;
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) {
+          break;
+        }
+        const chunk = value;
+        if (!(chunk instanceof Uint8Array) || chunk.byteLength > MAX_BYTES - bytes) {
+          await reader.cancel();
+          return void 0;
+        }
+        bytes += chunk.byteLength;
+        chunks2.push(chunk);
+      }
+    } finally {
+      reader.releaseLock();
+    }
+    return Buffer.concat(chunks2, bytes);
   }
   #blob(bytes) {
     const format = bytes && bytes.length <= MAX_BYTES ? imageFormat(bytes) : null;
