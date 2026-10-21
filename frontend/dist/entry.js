@@ -65816,6 +65816,41 @@ var STYLES = css`
     font-size: 12px;
   }
 
+  /* The composer's completion list, readable like t3code's: about as wide as the composer, names in
+     the UI face (paths stay mono), and descriptions one step brighter. The list places rows at fixed
+     steps, so a long description shows whole in a footer under the list, not in its row. */
+  .sf-overlay[data-role='omp.autocomplete'] .sf-ov-card {
+    width: min(760px, 100%) !important;
+    max-width: min(760px, 100%) !important;
+  }
+
+  .sf-overlay[data-role='omp.autocomplete'] .sf-item-label {
+    max-width: 40% !important;
+    font: 550 13.5px/1.35 var(--sans) !important;
+  }
+
+  .sf-overlay[data-role='omp.autocomplete'] [data-role='hermes.complete.path'] .sf-item-label {
+    font: 13px/1.35 var(--mono) !important;
+  }
+
+  .sf-overlay[data-role='omp.autocomplete'] .sf-item-detail {
+    font: 13px/1.35 var(--sans) !important;
+    color: var(--t2) !important;
+  }
+
+  .sf-overlay[data-role='omp.autocomplete'] .sf-item-label .sf-t-mark {
+    background: none !important;
+    box-shadow: none !important;
+    color: var(--accent) !important;
+  }
+
+  [data-role='hermes.complete.more'] {
+    margin: 4px 0 0;
+    padding: 8px 11px 4px;
+    box-shadow: inset 0 1px 0 var(--l2);
+    font: 13px/1.45 var(--sans);
+    color: var(--t2);
+  }
 `;
 
 // src/transcript/compactions.ts
@@ -71156,6 +71191,9 @@ var writeActiveSessionFile = (sessionId, file2 = process.env["HERMES_TUI_ACTIVE_
 
 // src/overlays/completion.tsx
 var DEBOUNCE_MS = 60;
+var ROW_PX = 690;
+var NAME_PX = 7.4;
+var DETAIL_PX = 6.4;
 var Completion = class {
   items = [];
   selected = 0;
@@ -71280,27 +71318,32 @@ var Completion = class {
       return [];
     }
     const listId = "layer.complete.select.list";
+    const more = this.items.some(cutOff) ? detailOf2(this.items[this.selected]) : void 0;
     return [
-      /* @__PURE__ */ jsx("overlay", { anchor: { caret: inputId2 }, role: "omp.autocomplete", children: /* @__PURE__ */ jsx("col", { role: "omp.select", children: /* @__PURE__ */ jsx(
-        "list",
-        {
-          empty: this.#for.includes("@") ? "No files" : "No items",
-          max: { lines: 8 },
-          onActivate: (ev) => this.#pick(ev.item, listId, { accept: true }),
-          onSelect: (ev) => this.#pick(ev.item, listId, { accept: false }),
-          selected: `${listId}.${this.selected}`,
-          children: this.items.map((item3, i) => /* @__PURE__ */ jsx(
-            "item",
-            {
-              ...optional("detail", item3.meta && item3.meta !== "dir" ? oneLine(item3.meta) : void 0),
-              icon: iconOf(item3),
-              label: labelOf(item3, this.#for, this.#replaceFrom)
-            },
-            String(i)
-          ))
-        },
-        "list"
-      ) }, "select") }, "complete")
+      /* @__PURE__ */ jsx("overlay", { anchor: { caret: inputId2 }, role: "omp.autocomplete", children: /* @__PURE__ */ jsxs("col", { role: "omp.select", children: [
+        /* @__PURE__ */ jsx(
+          "list",
+          {
+            empty: this.#for.includes("@") ? "No files" : "No items",
+            max: { lines: 8 },
+            onActivate: (ev) => this.#pick(ev.item, listId, { accept: true }),
+            onSelect: (ev) => this.#pick(ev.item, listId, { accept: false }),
+            selected: `${listId}.${this.selected}`,
+            children: this.items.map((item3, i) => /* @__PURE__ */ jsx(
+              "item",
+              {
+                ...optional("detail", detailOf2(item3)),
+                icon: iconOf(item3),
+                label: labelOf(item3, this.#for, this.#replaceFrom),
+                role: `hermes.complete.${isPath(item3) ? "path" : item3.kind === "skill" ? "skill" : "command"}`
+              },
+              String(i)
+            ))
+          },
+          "list"
+        ),
+        more ? /* @__PURE__ */ jsx("text", { lines: 3, role: "hermes.complete.more", text: more, wrap: "word" }, "more") : null
+      ] }, "select") }, "complete")
     ];
   }
   #pick(itemId, listId, { accept }) {
@@ -71371,6 +71414,13 @@ var COMMAND_ICONS = {
 };
 function isPath(item3) {
   return !item3.kind && !item3.text.startsWith("/");
+}
+function detailOf2(item3) {
+  return item3?.meta && item3.meta !== "dir" ? oneLine(item3.meta).replace(/^⚡\s*/u, "") || void 0 : void 0;
+}
+function cutOff(item3) {
+  const name = Math.min((item3.display || item3.text).length * NAME_PX, ROW_PX * 0.4);
+  return name + (detailOf2(item3)?.length ?? 0) * DETAIL_PX > ROW_PX;
 }
 function iconOf(item3) {
   if (isPath(item3)) {

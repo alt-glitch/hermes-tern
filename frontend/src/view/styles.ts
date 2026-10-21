@@ -704,4 +704,39 @@ export const STYLES = css`
     font-size: 12px;
   }
 
+  /* The composer's completion list, readable like t3code's: about as wide as the composer, names in
+     the UI face (paths stay mono), and descriptions one step brighter. The list places rows at fixed
+     steps, so a long description shows whole in a footer under the list, not in its row. */
+  .sf-overlay[data-role='omp.autocomplete'] .sf-ov-card {
+    width: min(760px, 100%) !important;
+    max-width: min(760px, 100%) !important;
+  }
+
+  .sf-overlay[data-role='omp.autocomplete'] .sf-item-label {
+    max-width: 40% !important;
+    font: 550 13.5px/1.35 var(--sans) !important;
+  }
+
+  .sf-overlay[data-role='omp.autocomplete'] [data-role='hermes.complete.path'] .sf-item-label {
+    font: 13px/1.35 var(--mono) !important;
+  }
+
+  .sf-overlay[data-role='omp.autocomplete'] .sf-item-detail {
+    font: 13px/1.35 var(--sans) !important;
+    color: var(--t2) !important;
+  }
+
+  .sf-overlay[data-role='omp.autocomplete'] .sf-item-label .sf-t-mark {
+    background: none !important;
+    box-shadow: none !important;
+    color: var(--accent) !important;
+  }
+
+  [data-role='hermes.complete.more'] {
+    margin: 4px 0 0;
+    padding: 8px 11px 4px;
+    box-shadow: inset 0 1px 0 var(--l2);
+    font: 13px/1.45 var(--sans);
+    color: var(--t2);
+  }
 `
