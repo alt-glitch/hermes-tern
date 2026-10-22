@@ -55,7 +55,7 @@ history, completion requests); nothing here imports React or Ink.
 ## Developing
 
 ```sh
-bun run bundle        # builds dist/entry.js (TSP_OUT=… overrides)
+bun run bundle        # builds dist/entry.js for local runs (TSP_OUT=… overrides); main's CI commits it
 bun run typecheck
 bun run test          # vitest
 bun run lint          # eslint, held to scripts/lint-legacy.json (docs/conventions.md)

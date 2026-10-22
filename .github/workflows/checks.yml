@@ -102,39 +102,21 @@ jobs:
         run: bun run check:suppressions
 
   bundle:
-    name: bundle is current
+    name: bundle is built on main
+    # Pull requests carry source only; the `bundle` workflow builds dist/entry.js on main.
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
-    timeout-minutes: 15
-    defaults:
-      run:
-        working-directory: frontend
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          fetch-depth: 0
           persist-credentials: false
-      - id: lock
-        # The lock comes from the PR: accept only a full commit SHA as checkout's ref.
-        run: |
-          sha=$(tr -d '[:space:]' < hermes-src.lock)
-          [[ $sha =~ ^[0-9a-f]{40}$ ]] || { echo "::error file=frontend/hermes-src.lock::not a commit SHA"; exit 1; }
-          echo "sha=$sha" >> "$GITHUB_OUTPUT"
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          repository: NousResearch/hermes-agent
-          ref: ${{ steps.lock.outputs.sha }}
-          path: .hermes-agent
-          persist-credentials: false
-      # ui-tui's own packages, from Hermes' lockfile: the bundle inlines some of them (undici).
-      - run: npm ci --ignore-scripts --workspace ui-tui --no-audit --no-fund
-        working-directory: .hermes-agent
-      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
-      - run: node scripts/hermes-src.mjs && bun install --frozen-lockfile
+      - name: the pull request leaves dist/entry.js alone
         env:
-          HERMES_SRC: ${{ github.workspace }}/.hermes-agent
-      - name: rebuild and compare with dist/entry.js
+          BASE: ${{ github.event.pull_request.base.sha }}
         run: |
-          TSP_OUT="$RUNNER_TEMP/entry.js" node scripts/build.mjs
-          cmp "$RUNNER_TEMP/entry.js" dist/entry.js || {
-            echo "::error file=frontend/dist/entry.js::dist/entry.js is stale: run 'bun run bundle' and commit it"
+          if git diff --name-only "$BASE"...HEAD | grep -qx 'frontend/dist/entry.js'; then
+            echo "::error file=frontend/dist/entry.js::main builds the bundle: drop it with 'git checkout origin/main -- frontend/dist/entry.js' and commit"
             exit 1
-          }
+          fi

@@ -1,0 +1,71 @@
+# Builds frontend/dist/entry.js on main and commits it, so an install (a plain git clone) runs the
+# current frontend with no build step, and pull requests carry only source. The `checks` workflow
+# fails a pull request that changes the bundle itself.
+name: bundle
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'frontend/**'
+      - '!frontend/dist/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# One build at a time, oldest first: each rebuilds from main's newest commit.
+concurrency:
+  group: bundle
+  cancel-in-progress: false
+
+jobs:
+  bundle:
+    name: build and commit dist/entry.js
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          # A deploy key may push past main's ruleset (it requires pull requests); the token may not.
+          ssh-key: ${{ secrets.BUNDLE_DEPLOY_KEY }}
+      - id: lock
+        run: |
+          sha=$(tr -d '[:space:]' < hermes-src.lock)
+          [[ $sha =~ ^[0-9a-f]{40}$ ]] || { echo "::error file=frontend/hermes-src.lock::not a commit SHA"; exit 1; }
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: NousResearch/hermes-agent
+          ref: ${{ steps.lock.outputs.sha }}
+          path: .hermes-agent
+          persist-credentials: false
+      # ui-tui's own packages, from Hermes' lockfile: the bundle inlines some of them (undici).
+      - run: npm ci --ignore-scripts --workspace ui-tui --no-audit --no-fund
+        working-directory: .hermes-agent
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+      - run: node scripts/hermes-src.mjs && bun install --frozen-lockfile
+        env:
+          HERMES_SRC: ${{ github.workspace }}/.hermes-agent
+      - name: build, commit and push when it changed
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          # Main can move while this runs: build again from its newest commit, up to three times.
+          for attempt in 1 2 3; do
+            git fetch -q origin main && git reset -q --hard origin/main
+            node scripts/build.mjs
+            if git diff --quiet -- dist/entry.js; then
+              echo "dist/entry.js is current"
+              exit 0
+            fi
+            git add dist/entry.js
+            git commit -q -m "chore(frontend): build dist/entry.js for $(git rev-parse --short HEAD)"
+            git push -q origin HEAD:main && exit 0
+            echo "main moved; building again"
+          done
+          exit 1
