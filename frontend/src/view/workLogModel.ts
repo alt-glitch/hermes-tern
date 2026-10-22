@@ -100,8 +100,9 @@ export interface Fold {
 }
 
 /**
- * The fold of a finished turn: everything but the answer (its last text) hides behind
- * "Worked for 54s". A background process and a delegation whose agents still run keep their
+ * The fold of a finished turn: everything but its replies hides behind "Worked for 54s". The
+ * replies are the answer (the turn's last text) and each reply a steer cut in on (see
+ * `steeredReplies`). A background process and a delegation whose agents still run keep their
  * cards in view; so does a call after the answer that failed or still runs. A turn that failed
  * or was interrupted does not fold, and neither does one with nothing to hide.
  */
@@ -111,11 +112,12 @@ export function foldOf(turn: TurnEntry): Fold | undefined {
   }
 
   const answer = turn.blocks.findLastIndex(b => b.kind === 'text' && b.text.trim())
+  const replies = steeredReplies(turn.blocks)
   const hidden = new Set<string>()
 
   for (const [i, b] of turn.blocks.entries()) {
-    // The answer stays, and so do the user's own words and the compactions: neither folds away.
-    if (i === answer || b.kind === 'steer' || b.kind === 'compaction') {
+    // The replies stay, and so do the user's own words and the compactions: none folds away.
+    if (i === answer || replies.has(i) || b.kind === 'steer' || b.kind === 'compaction') {
       continue
     }
 
@@ -146,6 +148,33 @@ export function foldOf(turn: TurnEntry): Fold | undefined {
   const ms = (turnEndedAt(turn) ?? turn.startedAt) - turn.startedAt
 
   return { hidden, label: workedFor(ms) }
+}
+
+/**
+ * The indexes of the replies a steer (or a redirect, which the pane marks the same way) cut in
+ * on: the text right before each steer, the agent's last words before the user spoke. The agent
+ * wrote it as its answer (the steer can land while it streams, or after it, before
+ * message.complete), so it stays in view like one. A text with a step after it was a note on the
+ * way, and folds.
+ */
+function steeredReplies(blocks: readonly Block[]): Set<number> {
+  const out = new Set<number>()
+
+  for (const [i, b] of blocks.entries()) {
+    if (b.kind !== 'steer') {
+      continue
+    }
+
+    // Past the seals (empty texts) and the steers sent one after another.
+    const j = blocks.findLastIndex((c, k) => k < i && c.kind !== 'steer' && !(c.kind === 'text' && !c.text.trim()))
+    const reply = blocks[j]
+
+    if (reply?.kind === 'text') {
+      out.add(j)
+    }
+  }
+
+  return out
 }
 
 const workedFor = (ms: number) => (ms > 0 ? `Worked for ${durationCompact(ms)}` : 'Worked')

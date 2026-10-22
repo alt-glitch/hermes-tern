@@ -187,6 +187,25 @@ describe('parts', () => {
     ])
   })
 
+  it('keeps the reply a steer cut in on in view, as an answer of its own', () => {
+    const t = turn([tool('a', call('terminal')), text('reply'), text('seal', ''), steer('s', 44_000), think('k'), text('answer')])
+
+    expect(parts(t).map(p => (p.kind === 'fold' ? `${p.label}: ${p.blocks.map(b => b.id)}` : p.blocks.map(b => b.id).join()))).toEqual([
+      'Worked for 44s: a,seal',
+      'reply,s',
+      'Worked for 10s: k',
+      'answer'
+    ])
+  })
+
+  it('keeps the reply before steers sent one after another, and folds a note with a step after it', () => {
+    const replied = turn([text('reply'), steer('s1', 10_000), steer('s2', 11_000), text('answer')])
+    const noted = turn([text('note'), tool('a', call('terminal')), steer('s', 10_000), text('answer')])
+
+    expect(foldOf(replied)).toBeUndefined()
+    expect([...must(foldOf(noted)).hidden]).toEqual(['note', 'a'])
+  })
+
   it('shows a background card after its stretch fold, not between two folds', () => {
     const bg = tool('bg', call('terminal', { background: true, command: 'sleep 9' }))
     const t = turn([tool('a', call('terminal')), bg, tool('b', call('terminal')), text('answer')])
