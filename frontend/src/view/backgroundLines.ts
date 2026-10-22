@@ -1,6 +1,6 @@
 // The transcript's lines for background work that ended: a subagent (`Agent "Survey the docs"
-// finished · 4m 33s`) and a background process (`Background task keep-dump.sh exited (0) · 11m
-// 30s`), as Claude Code writes `Agent "X" finished · 10s` when one of its background agents ends.
+// finished · 4m 33s`) and a background process (`Background task "Run keep-dump.sh" exited (0) ·
+// 11m 30s`), as Claude Code writes `Agent "X" finished · 10s` when one of its background agents ends.
 
 import { clip } from '../core/text.js'
 import type { BackgroundProcess, NoticeEntry, Subagent } from '../model.js'
@@ -32,9 +32,9 @@ export function agentFinishedLine(a: Subagent): BackgroundLine {
   return { text: `${name} ${verb}${took}`, tone }
 }
 
-/** A background process that ended: its command as a short title, how it ended, how long it ran. */
+/** A background process that ended: its row's title ("Run a loop"), how it ended, how long it ran. */
 export function processExitedLine(p: BackgroundProcess): BackgroundLine {
-  const title = clip(describeCommand(p.command).replace(/^Run /, ''), { max: 60 })
+  const title = clip(describeCommand(p.command), { max: 60 })
   const state = p.state
   const exitedAt = 'exitedAt' in state ? state.exitedAt : undefined
   const took = exitedAt === undefined ? '' : ` · ${durationWhole(exitedAt - p.startedAt)}`
@@ -49,5 +49,5 @@ export function processExitedLine(p: BackgroundProcess): BackgroundLine {
             ? ['was lost (its gateway restarted)', 'warning']
             : [state.status, 'info']
 
-  return { text: `Background task ${title} ${how}${took}`, tone }
+  return { text: `Background task "${title}" ${how}${took}`, tone }
 }
