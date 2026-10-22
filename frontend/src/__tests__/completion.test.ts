@@ -7,7 +7,7 @@ import { Composer } from '../draft/composer.js'
 import { completionRequestForInput } from '../hermes/completion.js'
 import { Completion } from '../overlays/completion.js'
 
-import { stub } from './fakes.js'
+import { stub, tree } from './fakes.js'
 
 const history: string[] = []
 
@@ -151,6 +151,37 @@ describe('Completion: accepting an @ mention', () => {
 
   it('a folder stays open to pick inside it', async () => {
     expect(await pick('@sr', '', '@folder:src/')).toEqual({ cursor: 12, text: '@folder:src/' })
+  })
+})
+
+describe('Completion: the rows', () => {
+  async function rows(text: string, items: CompletionItem[]) {
+    const { completion, composer } = setup()
+    type(completion, composer, text)
+    pending[0]?.resolve({ items })
+    await vi.runAllTimersAsync()
+    const col = completion.nodes('composer').map(tree)[0]?.c?.[0]
+
+    return {
+      items: (col?.c?.[0]?.c ?? []).map(n => ({ detail: n.p?.['detail'], role: n.p?.['role'] })),
+      more: col?.c?.find(n => n.p?.['role'] === 'hermes.complete.more')?.p?.['text']
+    }
+  }
+
+  const skill = (name: string, meta: string): CompletionItem => ({ display: name, kind: 'skill', meta, text: name })
+
+  it("drops Hermes' ⚡ before a skill's description and tags each row by kind", async () => {
+    const { items, more } = await rows('see /gi', [skill('/github-issue-triage', '⚡ Automated batch triage of issues')])
+
+    expect(items).toEqual([{ detail: 'Automated batch triage of issues', role: 'hermes.complete.skill' }])
+    expect(more).toBeUndefined()
+  })
+
+  it('shows the highlighted row whole under the list while a row is cut off', async () => {
+    const long = `Automated batch triage of GitHub issues: ${'label, dedupe and route each one; '.repeat(3)}`
+    const { more } = await rows('see /gi', [skill('/github-issue-triage', `⚡ ${long}`), skill('/gif', 'GIFs')])
+
+    expect(more).toBe(long.trim())
   })
 })
 

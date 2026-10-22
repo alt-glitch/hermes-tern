@@ -1,6 +1,6 @@
 // Completions for the composer: slash commands, inline `/skill` references and
 // `@`/path words, fetched from the gateway as the text before the caret
-// changes and shown as a caret-anchored list (`omp.autocomplete`).
+// changes and shown as a list above the composer (`omp.autocomplete`).
 // Tab accepts; Enter accepts a row that changes the token, else submits.
 
 import type { CompleteSlashResult, CompletionItem } from '@hermes/shared/gateway-events'
@@ -17,6 +17,10 @@ import { rpc } from '../wire/rpc.js'
 import type { OverlayHost } from './overlay.js'
 
 const DEBOUNCE_MS = 60
+/** A row's room in px for its name and description in the 736px list (view/styles.ts), and their faces' rough widths per character. */
+const ROW_PX = 666
+const NAME_PX = 7.4
+const DETAIL_PX = 6.4
 
 /** The composer's completion list: queries the gateway as the text before the caret changes and accepts rows into it. */
 export class Completion {
@@ -183,16 +187,20 @@ export class Completion {
     }
   }
 
-  /** The overlay nodes for the `layer` region (none while closed). */
-  nodes(inputId: string): JSX.Element[] {
+  /** The overlay nodes for the `layer` region (none while closed): the list sits above the composer
+   * node `composerId` at a fixed place, not at the caret, so it does not move as the user types. */
+  nodes(composerId: string): JSX.Element[] {
     if (!this.open) {
       return []
     }
 
     const listId = 'layer.complete.select.list'
+    // While any row is cut off, the footer shows the highlighted row's whole description: shown for
+    // the list, not per row, so the list keeps its height as the highlight moves.
+    const more = this.items.some(cutOff) ? detailOf(this.items[this.selected]) : undefined
 
     return [
-      <overlay anchor={{ caret: inputId }} key="complete" role="omp.autocomplete">
+      <overlay anchor={{ node: composerId, side: 'above' }} key="complete" role="omp.autocomplete">
         <col key="select" role="omp.select">
           <list
             empty={this.#for.includes('@') ? 'No files' : 'No items'}
@@ -205,12 +213,16 @@ export class Completion {
             {this.items.map((item, i) => (
               <item
                 key={String(i)}
-                {...optional('detail', item.meta && item.meta !== 'dir' ? oneLine(item.meta) : undefined)}
+                {...optional('detail', detailOf(item))}
                 icon={iconOf(item)}
                 label={labelOf(item, this.#for, this.#replaceFrom)}
+                role={`hermes.complete.${isPath(item) ? 'path' : item.kind === 'skill' ? 'skill' : 'command'}`}
               />
             ))}
           </list>
+          {more ? (
+            <text key="more" lines={3} role="hermes.complete.more" text={more} wrap="word" />
+          ) : null}
         </col>
       </overlay>
     ]
@@ -318,6 +330,18 @@ const COMMAND_ICONS: Record<string, string> = {
 /** A path row: `@file:src/a.ts` / `@folder:src/`, or a bare listing entry. */
 function isPath(item: CompletionItem): boolean {
   return !item.kind && !item.text.startsWith('/')
+}
+
+/** The row's description on one line; Hermes' `⚡ ` before a skill's says what the skill icon already does. */
+function detailOf(item: CompletionItem | undefined): string | undefined {
+  return item?.meta && item.meta !== 'dir' ? oneLine(item.meta).replace(/^⚡\s*/u, '') || undefined : undefined
+}
+
+/** Whether the row's description likely runs past its end (the name takes at most 40% of the row). */
+function cutOff(item: CompletionItem): boolean {
+  const name = Math.min((item.display || item.text).length * NAME_PX, ROW_PX * 0.4)
+
+  return name + (detailOf(item)?.length ?? 0) * DETAIL_PX > ROW_PX
 }
 
 function iconOf(item: CompletionItem): string {
