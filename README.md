@@ -67,6 +67,8 @@ A pane remembers its conversation. If `hermes tern` dies in a pane (a crash, a k
 
 A turn shows what the agent does while it works: its reasoning, short notes, and its tool calls, grouped into one line per run ("Ran 3 commands"). A todo list stays live in the transcript and in the status line. When the turn ends, the work folds into "Worked for 9.5s", and the answer stays in view.
 
+The thin context meter above the composer shows the current window's percentage, not the session's cumulative token total. Click it, or focus it and press Enter, to open a read-only context snapshot. The sheet shows used/capacity tokens, the gateway's category estimates and count source, and the known compaction count. Unknown counts stay unknown. The gateway does not expose an automatic compaction threshold. The meter's 60% and 85% colors are visual warnings only.
+
 <table>
   <tr>
     <td width="50%"><img alt="A turn in progress with a live todo list" src="docs/images/transcript.png"></td>
@@ -235,6 +237,8 @@ Pair the fake model with a headless Tern (`tern serve --control PORT`, then `ter
 ## Credits
 
 The frontend began as [can1357](https://github.com/can1357)'s `ui-tsp` (`can1357/hermes-agent@tern-frontend`). It keeps omp's chat roles (`omp.session`, …), which Tern's chat styles, tool folding and Carly integration are written against. Some UI patterns come from [T3 Code](https://github.com/pingdotgg/t3code).
+
+The context meter and context-sheet entry point adapt the native meter/report pattern from downstream [Hermes ui-tsp at 724b2aae](https://github.com/kvnloo/hermes-agent/tree/724b2aaec5981eb264f65923f72858faff27bb5b/ui-tsp), with credit to Can Bölük / Stencil for TSP and the OMP roles. The plugin reads the existing gateway's structured context breakdown.
 
 ## License
 

@@ -71,6 +71,11 @@ afterEach(() => {
 
 /** What the switch the dispatcher replaced did with each fixture's events, in order. */
 const TODAY: Record<string, [string, Outcome][]> = {
+  'context-meter': [
+    ['gateway.ready', 'render'],
+    ['session.info', 'render'],
+    ['session.usage', 'render']
+  ],
   'turn-tools': [
     ['gateway.ready', 'render'],
     ['message.start', 'render'],

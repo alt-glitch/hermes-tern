@@ -5,6 +5,39 @@
 import { css } from '@stencil-hq/tern'
 
 export const STYLES = css`
+  /* Tern positions this hairline above the glass. Give its native button a real 24px
+     focus/pointer target, and keep the meter in that target instead of absolute to the glass. */
+  [data-role='omp.composer.context.action'] {
+    display: block;
+    position: absolute;
+    left: 8px;
+    right: 8px;
+    top: -24px;
+    width: auto;
+    height: 24px;
+    padding: 0;
+    border: none;
+    background: transparent;
+    color: inherit;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  [data-role='omp.composer.context.action'] > .sf-meter {
+    position: relative !important;
+    left: 0 !important;
+    right: auto !important;
+    top: 0 !important;
+    bottom: auto !important;
+    width: 100% !important;
+    margin: 0;
+  }
+
+  [data-role='omp.composer.context.action']:focus-visible {
+    outline: 2px solid var(--t3);
+    outline-offset: 2px;
+  }
+
   /* The work log, as t3code draws it: quiet 14px rows in the UI face, a 24px line each. */
   [data-role='hermes.turn.working'],
   [data-role='hermes.turn.fold'] > .sf-section-head,

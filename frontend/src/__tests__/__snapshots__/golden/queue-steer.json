@@ -12,6 +12,37 @@
       },
       "c": [
        {
+        "k": "el",
+        "p": {
+         "aria": "Show context window: Context unknown",
+         "attrs": {
+          "aria-haspopup": "dialog"
+         },
+         "role": "omp.composer.context.action",
+         "tag": "button",
+         "title": "Context usage is not available · Show context window",
+         "key": "context",
+         "actions": {
+          "click": "click"
+         }
+        },
+        "c": [
+         {
+          "k": "meter",
+          "p": {
+           "label": "?",
+           "role": "omp.composer.context",
+           "style": "bar",
+           "thresholds": {
+            "bad": 0.85,
+            "warn": 0.6
+           },
+           "key": "meter"
+          }
+         }
+        ]
+       },
+       {
         "k": "row",
         "p": {
          "gap": "sm",
@@ -246,6 +277,37 @@
        "key": "composer"
       },
       "c": [
+       {
+        "k": "el",
+        "p": {
+         "aria": "Show context window: Context unknown",
+         "attrs": {
+          "aria-haspopup": "dialog"
+         },
+         "role": "omp.composer.context.action",
+         "tag": "button",
+         "title": "Context usage is not available · Show context window",
+         "key": "context",
+         "actions": {
+          "click": "click"
+         }
+        },
+        "c": [
+         {
+          "k": "meter",
+          "p": {
+           "label": "?",
+           "role": "omp.composer.context",
+           "style": "bar",
+           "thresholds": {
+            "bad": 0.85,
+            "warn": 0.6
+           },
+           "key": "meter"
+          }
+         }
+        ]
+       },
        {
         "k": "row",
         "p": {
@@ -597,6 +659,37 @@
          "role": "hermes.streak",
          "key": "streak"
         }
+       },
+       {
+        "k": "el",
+        "p": {
+         "aria": "Show context window: Context unknown",
+         "attrs": {
+          "aria-haspopup": "dialog"
+         },
+         "role": "omp.composer.context.action",
+         "tag": "button",
+         "title": "Context usage is not available · Show context window",
+         "key": "context",
+         "actions": {
+          "click": "click"
+         }
+        },
+        "c": [
+         {
+          "k": "meter",
+          "p": {
+           "label": "?",
+           "role": "omp.composer.context",
+           "style": "bar",
+           "thresholds": {
+            "bad": 0.85,
+            "warn": 0.6
+           },
+           "key": "meter"
+          }
+         }
+        ]
        },
        {
         "k": "row",
@@ -1001,6 +1094,37 @@
          "role": "hermes.streak",
          "key": "streak"
         }
+       },
+       {
+        "k": "el",
+        "p": {
+         "aria": "Show context window: Context unknown",
+         "attrs": {
+          "aria-haspopup": "dialog"
+         },
+         "role": "omp.composer.context.action",
+         "tag": "button",
+         "title": "Context usage is not available · Show context window",
+         "key": "context",
+         "actions": {
+          "click": "click"
+         }
+        },
+        "c": [
+         {
+          "k": "meter",
+          "p": {
+           "label": "?",
+           "role": "omp.composer.context",
+           "style": "bar",
+           "thresholds": {
+            "bad": 0.85,
+            "warn": 0.6
+           },
+           "key": "meter"
+          }
+         }
+        ]
        },
        {
         "k": "row",
@@ -1454,6 +1578,37 @@
          "role": "hermes.streak",
          "key": "streak"
         }
+       },
+       {
+        "k": "el",
+        "p": {
+         "aria": "Show context window: Context unknown",
+         "attrs": {
+          "aria-haspopup": "dialog"
+         },
+         "role": "omp.composer.context.action",
+         "tag": "button",
+         "title": "Context usage is not available · Show context window",
+         "key": "context",
+         "actions": {
+          "click": "click"
+         }
+        },
+        "c": [
+         {
+          "k": "meter",
+          "p": {
+           "label": "?",
+           "role": "omp.composer.context",
+           "style": "bar",
+           "thresholds": {
+            "bad": 0.85,
+            "warn": 0.6
+           },
+           "key": "meter"
+          }
+         }
+        ]
        },
        {
         "k": "row",
@@ -2019,6 +2174,37 @@
         }
        },
        {
+        "k": "el",
+        "p": {
+         "aria": "Show context window: Context unknown",
+         "attrs": {
+          "aria-haspopup": "dialog"
+         },
+         "role": "omp.composer.context.action",
+         "tag": "button",
+         "title": "Context usage is not available · Show context window",
+         "key": "context",
+         "actions": {
+          "click": "click"
+         }
+        },
+        "c": [
+         {
+          "k": "meter",
+          "p": {
+           "label": "?",
+           "role": "omp.composer.context",
+           "style": "bar",
+           "thresholds": {
+            "bad": 0.85,
+            "warn": 0.6
+           },
+           "key": "meter"
+          }
+         }
+        ]
+       },
+       {
         "k": "row",
         "p": {
          "gap": "sm",
@@ -2582,6 +2768,37 @@
         }
        },
        {
+        "k": "el",
+        "p": {
+         "aria": "Show context window: Context unknown",
+         "attrs": {
+          "aria-haspopup": "dialog"
+         },
+         "role": "omp.composer.context.action",
+         "tag": "button",
+         "title": "Context usage is not available · Show context window",
+         "key": "context",
+         "actions": {
+          "click": "click"
+         }
+        },
+        "c": [
+         {
+          "k": "meter",
+          "p": {
+           "label": "?",
+           "role": "omp.composer.context",
+           "style": "bar",
+           "thresholds": {
+            "bad": 0.85,
+            "warn": 0.6
+           },
+           "key": "meter"
+          }
+         }
+        ]
+       },
+       {
         "k": "row",
         "p": {
          "gap": "sm",
@@ -3072,6 +3289,37 @@
          "role": "hermes.streak",
          "key": "streak"
         }
+       },
+       {
+        "k": "el",
+        "p": {
+         "aria": "Show context window: Context unknown",
+         "attrs": {
+          "aria-haspopup": "dialog"
+         },
+         "role": "omp.composer.context.action",
+         "tag": "button",
+         "title": "Context usage is not available · Show context window",
+         "key": "context",
+         "actions": {
+          "click": "click"
+         }
+        },
+        "c": [
+         {
+          "k": "meter",
+          "p": {
+           "label": "?",
+           "role": "omp.composer.context",
+           "style": "bar",
+           "thresholds": {
+            "bad": 0.85,
+            "warn": 0.6
+           },
+           "key": "meter"
+          }
+         }
+        ]
        },
        {
         "k": "row",
@@ -3611,6 +3859,37 @@
         }
        },
        {
+        "k": "el",
+        "p": {
+         "aria": "Show context window: Context unknown",
+         "attrs": {
+          "aria-haspopup": "dialog"
+         },
+         "role": "omp.composer.context.action",
+         "tag": "button",
+         "title": "Context usage is not available · Show context window",
+         "key": "context",
+         "actions": {
+          "click": "click"
+         }
+        },
+        "c": [
+         {
+          "k": "meter",
+          "p": {
+           "label": "?",
+           "role": "omp.composer.context",
+           "style": "bar",
+           "thresholds": {
+            "bad": 0.85,
+            "warn": 0.6
+           },
+           "key": "meter"
+          }
+         }
+        ]
+       },
+       {
         "k": "row",
         "p": {
          "gap": "sm",
@@ -4146,6 +4425,37 @@
          "role": "hermes.streak",
          "key": "streak"
         }
+       },
+       {
+        "k": "el",
+        "p": {
+         "aria": "Show context window: Context unknown",
+         "attrs": {
+          "aria-haspopup": "dialog"
+         },
+         "role": "omp.composer.context.action",
+         "tag": "button",
+         "title": "Context usage is not available · Show context window",
+         "key": "context",
+         "actions": {
+          "click": "click"
+         }
+        },
+        "c": [
+         {
+          "k": "meter",
+          "p": {
+           "label": "?",
+           "role": "omp.composer.context",
+           "style": "bar",
+           "thresholds": {
+            "bad": 0.85,
+            "warn": 0.6
+           },
+           "key": "meter"
+          }
+         }
+        ]
        },
        {
         "k": "row",
@@ -4795,6 +5105,37 @@
         }
        },
        {
+        "k": "el",
+        "p": {
+         "aria": "Show context window: Context unknown",
+         "attrs": {
+          "aria-haspopup": "dialog"
+         },
+         "role": "omp.composer.context.action",
+         "tag": "button",
+         "title": "Context usage is not available · Show context window",
+         "key": "context",
+         "actions": {
+          "click": "click"
+         }
+        },
+        "c": [
+         {
+          "k": "meter",
+          "p": {
+           "label": "?",
+           "role": "omp.composer.context",
+           "style": "bar",
+           "thresholds": {
+            "bad": 0.85,
+            "warn": 0.6
+           },
+           "key": "meter"
+          }
+         }
+        ]
+       },
+       {
         "k": "row",
         "p": {
          "gap": "sm",
@@ -5442,6 +5783,37 @@
         }
        },
        {
+        "k": "el",
+        "p": {
+         "aria": "Show context window: Context unknown",
+         "attrs": {
+          "aria-haspopup": "dialog"
+         },
+         "role": "omp.composer.context.action",
+         "tag": "button",
+         "title": "Context usage is not available · Show context window",
+         "key": "context",
+         "actions": {
+          "click": "click"
+         }
+        },
+        "c": [
+         {
+          "k": "meter",
+          "p": {
+           "label": "?",
+           "role": "omp.composer.context",
+           "style": "bar",
+           "thresholds": {
+            "bad": 0.85,
+            "warn": 0.6
+           },
+           "key": "meter"
+          }
+         }
+        ]
+       },
+       {
         "k": "row",
         "p": {
          "gap": "sm",
@@ -5977,6 +6349,37 @@
          "role": "hermes.streak",
          "key": "streak"
         }
+       },
+       {
+        "k": "el",
+        "p": {
+         "aria": "Show context window: Context unknown",
+         "attrs": {
+          "aria-haspopup": "dialog"
+         },
+         "role": "omp.composer.context.action",
+         "tag": "button",
+         "title": "Context usage is not available · Show context window",
+         "key": "context",
+         "actions": {
+          "click": "click"
+         }
+        },
+        "c": [
+         {
+          "k": "meter",
+          "p": {
+           "label": "?",
+           "role": "omp.composer.context",
+           "style": "bar",
+           "thresholds": {
+            "bad": 0.85,
+            "warn": 0.6
+           },
+           "key": "meter"
+          }
+         }
+        ]
        },
        {
         "k": "row",
@@ -6524,6 +6927,37 @@
        "key": "composer"
       },
       "c": [
+       {
+        "k": "el",
+        "p": {
+         "aria": "Show context window: Context unknown",
+         "attrs": {
+          "aria-haspopup": "dialog"
+         },
+         "role": "omp.composer.context.action",
+         "tag": "button",
+         "title": "Context usage is not available · Show context window",
+         "key": "context",
+         "actions": {
+          "click": "click"
+         }
+        },
+        "c": [
+         {
+          "k": "meter",
+          "p": {
+           "label": "?",
+           "role": "omp.composer.context",
+           "style": "bar",
+           "thresholds": {
+            "bad": 0.85,
+            "warn": 0.6
+           },
+           "key": "meter"
+          }
+         }
+        ]
+       },
        {
         "k": "row",
         "p": {

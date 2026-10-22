@@ -10,6 +10,7 @@ import type { DockSources } from '../view/dockModel.js'
 export function dockActions(over: Partial<DockActions> = {}): DockActions {
   return {
     onAgents: vi.fn(),
+    onContext: vi.fn(),
     onEdit: vi.fn(),
     onEffort: vi.fn(),
     onGoal: vi.fn(),
