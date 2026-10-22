@@ -12,8 +12,6 @@ export const IGNORED = [
   'browser.controller.cancel',
   'browser.controller.command',
   'browser.progress',
-  'connection.request',
-  'connection.update',
   'cron.changed',
   'dashboard.new_session_requested',
   'display.install.done',

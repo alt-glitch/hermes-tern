@@ -265,6 +265,11 @@ export class AppActions {
       return
     }
 
+    // A connect card the tool waits on would hold the typed message until its deadline: it continues.
+    if (draft) {
+      this.#cx.connect.yieldOpen()
+    }
+
     // The draft's images go with this prompt, whenever it is sent; a message the app writes leaves them.
     this.#cx.router.route({ images: draft ? attachments.take() : [], kind: 'typed', pasted, text }, busy)
   }
