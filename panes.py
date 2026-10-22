@@ -26,7 +26,7 @@ import logging
 import os
 import time
 from pathlib import Path
-from typing import Any, Iterator, Optional
+from typing import Any, Iterator, Mapping, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -135,7 +135,7 @@ def _restorable(pane: str, folder: Path, cwd: str) -> Optional[str]:
     return root
 
 
-def plan(flags: list[str], env: Optional[dict[str, str]] = None, cwd: Optional[str] = None) -> tuple[list[str], Optional[str]]:
+def plan(flags: list[str], env: Optional[Mapping[str, str]] = None, cwd: Optional[str] = None) -> tuple[list[str], Optional[str]]:
     """The flags to run ``hermes chat --tui`` with, and the conversation resumed for the pane (or None).
 
     ``--new`` is dropped (``hermes chat`` does not know it) and forgets the pane's conversation."""
