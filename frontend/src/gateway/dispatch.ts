@@ -10,6 +10,7 @@ import type { AnyGatewayEvent, AnyGatewayEventName } from '@tui/gatewayTypes.js'
 import { IGNORED } from './coverage.js'
 import { agentHandlers, type AgentsCx } from './handlers/agents.js'
 import { chromeHandlers, type ChromeCx } from './handlers/chrome.js'
+import { connectionHandlers, type ConnectionsCx } from './handlers/connections.js'
 import { processHandlers, type ProcessesCx } from './handlers/processes.js'
 import { promptHandlers, type PromptsCx } from './handlers/prompts.js'
 import { sessionHandlers, type SessionCx } from './handlers/session.js'
@@ -28,7 +29,7 @@ export type Outcome = 'quiet' | 'render'
 export type Handlers<Cx> = { [K in EventName]?: (ev: EventOf<K>, cx: Cx) => Outcome }
 
 /** Everything the handlers reach of the app. */
-export type EventCx = AgentsCx & ChromeCx & ProcessesCx & PromptsCx & SessionCx & TurnCx
+export type EventCx = AgentsCx & ChromeCx & ConnectionsCx & ProcessesCx & PromptsCx & SessionCx & TurnCx
 
 /** Every handler, by event type; the feature tables name disjoint types (dispatch.test.ts checks). */
 export const HANDLERS = {
@@ -37,6 +38,7 @@ export const HANDLERS = {
   ...agentHandlers,
   ...processHandlers,
   ...promptHandlers,
+  ...connectionHandlers,
   ...chromeHandlers
 } satisfies Handlers<EventCx>
 

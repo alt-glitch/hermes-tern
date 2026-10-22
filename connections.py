@@ -1,8 +1,15 @@
-"""``manage_connections`` for sessions a ``hermes tern`` pane shows.
+"""``manage_connections`` for sessions a ``hermes tern`` pane shows, on a gateway that draws no card.
 
-On the shared gateway nothing answers ``connection.request``, so the tool takes its no-card path
-(``tools/connectors/managed.py`` ``_no_card_result``): it returns at once with every app's
-``connect_url`` and tells the model to show the links. Nothing then watches the authorizations.
+The shared gateway now draws the card itself (hermes-agent 204d6abdb6, ``gateway/local_desktop_ui.py``
+``wire``): every turn a local viewer runs gets ``agent.connection_callback``, so the tool opens an
+operation, sends the pane ``connection.request`` and ``connection.update``, and waits for the card's
+answer (``connection.respond``). The pane answers it (``frontend/src/connections/live.ts``); that
+result carries no ``connect_url``, so this hook leaves it alone. The hook only serves an older
+gateway, where nothing answers ``connection.request``.
+
+There the tool takes its no-card path (``tools/connectors/managed.py`` ``_no_card_result``): it
+returns at once with every app's ``connect_url`` and tells the model to show the links. Nothing
+then watches the authorizations.
 
 For a session a ``hermes tern`` pane shows (it registers itself under
 ``plugin-data/hermes-tern/viewers/``, by the conversation's id; compression gives the agent a new
@@ -295,7 +302,8 @@ def _watch(card: _Card) -> None:
 
 def transform_tool_result(tool_name: str = "", args: Any = None, result: Any = None, session_id: str = "",
                           tool_call_id: str = "", **_kw: Any) -> Any:
-    """The hook: rewrite a no-card connect result for a tern-viewed session, and watch it."""
+    """The hook: rewrite a no-card connect result for a tern-viewed session, and watch it. A result
+    with no ``connect_url`` (a status read, or the card path's settled result) passes unchanged."""
     if tool_name != TOOL or not isinstance(result, str) or not tool_call_id or not viewed_by_tern(session_id):
         return None
     try:

@@ -152,7 +152,7 @@ function recordingHost() {
     agents: { adopt: sid => void log.push(`agents.adopt ${sid}`), scan: rec('agents.scan') },
     automation: { adopt: sid => void log.push(`automation.adopt ${sid}`) },
     changed: rec('changed'),
-    connect: { watch: rec('connect.watch') },
+    connect: { restore: rec('connect.restore'), watch: rec('connect.watch') },
     forgetStatusNote: rec('forgetStatusNote'),
     imageLanded: rec('imageLanded'),
     markPane: id => void log.push(`markPane ${id}`),
@@ -232,6 +232,8 @@ describe('adoptSteps', () => {
       'sidebar.adopt b',
       'automation.adopt b',
       'transcript.inflight',
+      // A connect card the session still waits on, on its running call.
+      'connect.restore',
       'changed'
     ])
   })

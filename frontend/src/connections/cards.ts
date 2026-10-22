@@ -1,12 +1,17 @@
-// `manage_connections` without its card. Hermes draws the connection card only where a surface
-// answers `connection.request` (the desktop, the Ink TUI's own gateway); on the shared gateway the
-// tool takes its no-card path (tools/connectors/managed.py `_no_card_result`): it returns at once
-// with each app's `connect_url`, and nothing watches the authorizations. For a session this pane
+// `manage_connections`' connect card, one model for its two wires. The shared gateway (Hermes from
+// 204d6abdb6 on) installs `agent.connection_callback` on every turn a local viewer runs
+// (gateway/local_desktop_ui.py `wire`): the tool opens an operation, sends the pane
+// `connection.request` and blocks until the card answers or the deadline passes. live.ts reads that
+// wire, and the watcher answers it through the gateway (`connection.respond`,
+// `connectors.operation.wake`, `connectors.connect`).
+//
+// An older gateway draws no card: the tool takes its no-card path (tools/connectors/managed.py
+// `_no_card_result`) and returns at once with each app's `connect_url`. For a session this pane
 // shows, the plugin's Python half (connections.py, a `transform_tool_result` hook) keeps the links
 // out of the model's context, writes the apps and their links to
 // `plugin-data/hermes-tern/connections/<call id>.<op id>.json` and watches the user's accounts,
-// writing each app's state there. The pane draws that file as the desktop's card: an Authorize
-// button per app, the states as they change, and the agent told as soon as every app is connected.
+// writing each app's state there. The pane draws that file as the same card, and tells the agent
+// as soon as every app is connected.
 //
 // The desktop's rules (apps/desktop/src/store/connection-request.ts, connector-tool.tsx) carry over:
 // the card is named by its operation, not its call id, as models reuse call ids; the backend alone
@@ -39,10 +44,11 @@ export const dataDir = (env: NodeJS.ProcessEnv = process.env) => join(env['HERME
 
 /**
  * Why nothing moves a card's rows any more (the desktop's settle reasons, and the plugin's own):
- * every app resolved, the user pressed Continue, the 15 minutes ran out, a newer call asked for its
- * apps again, the watcher failed, or it stopped without a word (its gateway is gone).
+ * every app resolved, the user pressed Continue, the wait ran out, the user stopped the turn, a
+ * newer call asked for its apps again, the watcher failed, or it stopped without a word (its
+ * gateway, or the gateway's operation, is gone).
  */
-export type SettleReason = 'all_resolved' | 'continued' | 'deadline' | 'error' | 'stopped' | 'superseded'
+export type SettleReason = 'all_resolved' | 'continued' | 'deadline' | 'error' | 'interrupt' | 'stopped' | 'superseded'
 
 /** The card the plugin's watcher keeps for one call: the apps, their links and states. */
 export interface CardFile {
@@ -199,11 +205,33 @@ export interface ConnectTarget {
   state: string
   url?: string | undefined
   detail?: string | undefined
+  /** `connector` (a hosted account) or `mcp` (a local server); the file path's rows are connectors. */
+  kind?: string | undefined
+  /** An MCP install's credentials with a default: sent back with Connect. */
+  env?: Record<string, string> | undefined
+  /** An MCP install's required credentials with no default: this pane cannot ask for them. */
+  needs?: string[] | undefined
+}
+
+/** The gateway's operation behind a live card (live.ts): what its answers name. */
+export interface LiveOp {
+  /** The operation's id: it names the card, as models reuse call ids. */
+  id: string
+  /** The newest frame applied; a frame with this seq or an older one moves nothing. */
+  seq: number
+  /** The runtime id of the session that owns it: every answer names it as the owner. */
+  session: string
+  /** Epoch seconds the gateway stops waiting. */
+  deadlineAt: number
+  /** How long the gateway waits in all. */
+  timeoutSeconds: number
 }
 
 /** A connect call's card as the pane last read it. */
 export interface ConnectCard {
-  /** Its file (`CardFile.key`); none when the call's own result carries the links. */
+  /** The gateway's operation, when the card came as `connection.request`: the pane answers it. */
+  op?: LiveOp | undefined
+  /** Its file (`CardFile.key`); none when the call's own result carries the links, or on a live card. */
   key?: string | undefined
   targets: ConnectTarget[]
   /** Nothing moves the rows any more; the card is a summary. */
@@ -252,24 +280,42 @@ export function loadConnect(call: ToolCall, dir = dataDir(), now = Date.now()): 
   }
 }
 
-function parseTargets(targets: unknown[]): ConnectTarget[] {
+/** The rows of a card file, a no-card result or a gateway frame (`Target.snapshot`): each app named. */
+export function parseTargets(targets: unknown[]): ConnectTarget[] {
   return targets.flatMap(t => {
     const r = record(t)
-    const name = typeof r?.['name'] === 'string' ? r['name'] : ''
+    const name = typeof r?.['name'] === 'string' ? r['name'].trim() : ''
+    const fields = Array.isArray(r?.['required_env']) ? r['required_env'].flatMap(f => envField(f)) : []
+    const env = Object.fromEntries(fields.flatMap(f => (f.default ? [[f.name, f.default]] : [])))
+    const needs = fields.filter(f => f.required && !f.default).map(f => f.name)
 
     return name
       ? [
           {
-            alias: typeof r?.['alias'] === 'string' && r['alias'] ? r['alias'] : undefined,
-            detail: typeof r?.['detail'] === 'string' && r['detail'] ? r['detail'] : undefined,
+            alias: text(r?.['alias']),
+            detail: text(r?.['detail']),
+            env: Object.keys(env).length ? env : undefined,
+            kind: text(r?.['kind']),
             name,
+            needs: needs.length ? needs : undefined,
             state: typeof r?.['state'] === 'string' ? r['state'] : 'pending',
             title: appTitle(name),
-            url: typeof r?.['connect_url'] === 'string' && r['connect_url'] ? r['connect_url'] : undefined
+            url: text(r?.['connect_url'])
           }
         ]
       : []
   })
+}
+
+/** A non-empty string, else undefined. */
+const text = (v: unknown) => (typeof v === 'string' && v ? v : undefined)
+
+/** One credential an MCP install asks for (`ConnectionTargetEnvField`). */
+function envField(raw: unknown): { name: string; required: boolean; default: string }[] {
+  const r = record(raw)
+  const name = text(r?.['name'])
+
+  return name ? [{ default: typeof r?.['default'] === 'string' ? r['default'] : '', name, required: r?.['required'] === true }] : []
 }
 
 /** A target still waiting on the user (a link to open, or a link already opened). */
@@ -283,14 +329,25 @@ export const allConnected = (card: ConnectCard) => {
 }
 
 /**
- * The call draws the connect card: it carries at least one link to authorize (here, or in its card
- * file). A card a newer call replaced draws none, as on the desktop: its row is the plain tool call.
+ * The call draws the connect card: the gateway opened its operation (a live card), or it carries at
+ * least one link to authorize (here, or in its card file). A card a newer call replaced draws none,
+ * as on the desktop: its row is the plain tool call.
  */
 export function isConnectCall(call: Pick<ToolCall, 'connect' | 'name' | 'result'>): boolean {
   const card = call.connect
 
+  if (card?.op) {
+    return card.targets.length > 0
+  }
+
   return card ? card.settled !== 'superseded' && card.targets.some(t => t.url) : connectTargets(call).some(t => t.url)
 }
+
+/** A row the user still has to act on: not connected, skipped, or closed by the settle. */
+export const unresolved = (t: Pick<ConnectTarget, 'state'>) => ['expired', 'failed', 'initiated', 'pending'].includes(t.state)
+
+/** The name a card's buttons send: its operation, else its file, else its call. */
+export const cardRef = (call: Pick<ToolCall, 'connect' | 'id'>): string => call.connect?.op?.id ?? call.connect?.key ?? call.id
 
 const and = (names: string[]) => (names.length < 3 ? names.join(' and ') : `${names.slice(0, -1).join(', ')} and ${names.at(-1)}`)
 
