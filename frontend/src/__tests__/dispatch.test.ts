@@ -98,6 +98,16 @@ const TODAY: Record<string, [string, Outcome][]> = {
     ['session.info', 'render'],
     ['message.complete', 'render']
   ],
+  'redirect-reply': [
+    ['gateway.ready', 'render'],
+    ['message.start', 'render'],
+    ['tool.start', 'render'],
+    ['tool.complete', 'render'],
+    ['message.delta', 'render'],
+    ['reasoning.delta', 'render'],
+    ['message.delta', 'render'],
+    ['message.complete', 'render']
+  ],
   'compress-resume': [
     ['gateway.ready', 'render'],
     ['message.start', 'render'],

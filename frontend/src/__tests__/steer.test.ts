@@ -5,6 +5,7 @@ import type { TurnEntry } from '../model.js'
 import { steerState, steerText } from '../transcript/messages.js'
 import { Transcript } from '../transcript/store.js'
 import { turnEndedAt } from '../transcript/turns.js'
+import { parts } from '../view/workLogModel.js'
 
 import { must } from './fakes.js'
 
@@ -183,5 +184,70 @@ describe('stored history as the display projection sends it', () => {
 
     expect(t.entries.filter(e => e.kind === 'user')).toHaveLength(0)
     expect(t.live?.continued).toBe('Background Process Finished: npm test')
+  })
+})
+
+describe('a reply the user steered (or redirected) into', () => {
+  // The live events of a turn the user corrected (busy_input_mode interrupt: session.redirect) while
+  // its reply streamed: Hermes cuts the reply, the turn goes on with the correction, one
+  // message.complete ends it. Session local-d0014882…, 2026-10-22 06:48:16–06:49:30 UTC.
+  const shown = (t: TurnEntry) =>
+    parts(t).map(p => (p.kind === 'fold' ? `fold(${p.label}): ${p.blocks.map(b => b.kind).join()}` : p.blocks.map(b => (b.kind === 'text' ? b.text : b.kind)).join(' | ')))
+
+  it('keeps the reply before the steer in view, and the one after it as the answer', () => {
+    const t = new Transcript()
+    t.user({ at: 0, text: 'split it into its own step' })
+    t.messageStart(0)
+    t.toolStart({ args: { command: 'rg claim' }, name: 'terminal', tool_id: 'one' }, 1_000)
+    t.toolComplete({ name: 'terminal', result: '{"output": ""}', tool_id: 'one' }, 2_000)
+    t.text('Agreed: keep login code untouched', 30_000)
+    t.text(' … is infeas', 40_000)
+    t.steer('only call /claim when we know there is something', 44_000)
+    t.reasoning('Only claim when a guest exists', 45_000)
+    t.text('\n\nAgreed. Only call POST /api/anonymous/claim when', 50_000)
+    t.complete({ text: 'Agreed. Only call POST /api/anonymous/claim when' }, 75_000)
+
+    const turn = must(t.entries.findLast(e => e.kind === 'turn'))
+    expect(shown(turn)).toEqual([
+      'fold(Worked for 44s): tool',
+      'Agreed: keep login code untouched … is infeas | steer',
+      'fold(Worked for 31s): thinking',
+      'Agreed. Only call POST /api/anonymous/claim when'
+    ])
+  })
+
+  it('keeps the reply in view when the steer came after it, before message.complete', () => {
+    const steered = () => {
+      const t = new Transcript()
+      t.user({ at: 0, text: 'split it into its own step' })
+      t.messageStart(0)
+      t.toolStart({ args: { command: 'rg claim' }, name: 'terminal', tool_id: 'one' }, 1_000)
+      t.toolComplete({ name: 'terminal', result: '{"output": ""}', tool_id: 'one' }, 2_000)
+      t.text('Agreed: keep login code untouched.', 30_000)
+      t.steer('only call /claim when we know there is something', 44_000)
+
+      return t
+    }
+
+    // The same turn goes on with it…
+    const same = steered()
+    same.text('Agreed. Only claim when', 50_000)
+    same.complete({ text: 'Agreed. Only claim when' }, 75_000)
+    expect(shown(must(same.entries.findLast(e => e.kind === 'turn')))).toEqual([
+      'fold(Worked for 44s): tool',
+      'Agreed: keep login code untouched. | steer | Agreed. Only claim when'
+    ])
+
+    // …or the turn ends first, and Hermes answers the steer with a turn of its own.
+    const next = steered()
+    next.complete({ text: 'Agreed: keep login code untouched.' }, 45_000)
+    next.messageStart(46_000)
+    next.text('Agreed. Only claim when', 50_000)
+    next.complete({ text: 'Agreed. Only claim when' }, 75_000)
+
+    const [first, second] = next.entries.filter(e => e.kind === 'turn')
+    expect(shown(must(first))).toEqual(['fold(Worked for 44s): tool', 'Agreed: keep login code untouched. | steer'])
+    expect(steerState(must(first), 2)).toBe('next')
+    expect(shown(must(second))).toEqual(['Agreed. Only claim when'])
   })
 })

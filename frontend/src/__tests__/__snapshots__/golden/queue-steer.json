@@ -6259,46 +6259,11 @@
       },
       "c": [
        {
-        "k": "section",
+        "k": "md",
         "p": {
-         "collapsed": true,
-         "collapsible": true,
-         "head": "main.t2.foldx3.head",
-         "key": "foldx3",
-         "role": "hermes.turn.fold"
-        },
-        "c": [
-         {
-          "k": "row",
-          "p": {
-           "align": "center",
-           "gap": "xs",
-           "key": "head"
-          },
-          "c": [
-           {
-            "k": "text",
-            "p": {
-             "spans": [
-              {
-               "s": "muted",
-               "t": "Worked"
-              }
-             ],
-             "wrap": "none",
-             "key": "label"
-            }
-           }
-          ]
-         },
-         {
-          "k": "md",
-          "p": {
-           "key": "x3",
-           "text": "Formatting the files"
-          }
-         }
-        ]
+         "key": "x3",
+         "text": "Formatting the files"
+        }
        },
        {
         "k": "card",
@@ -6806,46 +6771,11 @@
       },
       "c": [
        {
-        "k": "section",
+        "k": "md",
         "p": {
-         "collapsed": true,
-         "collapsible": true,
-         "head": "main.t2.foldx3.head",
-         "key": "foldx3",
-         "role": "hermes.turn.fold"
-        },
-        "c": [
-         {
-          "k": "row",
-          "p": {
-           "align": "center",
-           "gap": "xs",
-           "key": "head"
-          },
-          "c": [
-           {
-            "k": "text",
-            "p": {
-             "spans": [
-              {
-               "s": "muted",
-               "t": "Worked"
-              }
-             ],
-             "wrap": "none",
-             "key": "label"
-            }
-           }
-          ]
-         },
-         {
-          "k": "md",
-          "p": {
-           "key": "x3",
-           "text": "Formatting the files"
-          }
-         }
-        ]
+         "key": "x3",
+         "text": "Formatting the files"
+        }
        },
        {
         "k": "card",

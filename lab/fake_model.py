@@ -14,6 +14,8 @@ the user's prompt, so one home covers every flow:
                    in rounds (commands, reads, a search, a slow command), then a long answer
     "script"    -> a heredoc script with sections and long output, run alone
     "slow"      -> one 8-second command, long enough to queue or steer a message
+    "stream…"   -> (at the start) a quick command, then a long reply streamed over about 20 s, slow
+                   enough to steer or redirect (busy_input_mode: interrupt) while it writes
     "solo…"     -> (at the start) one delegated agent with a long brief (context)
     "delegate…" -> (at the start) a delegate_task batch of three subagents, each running two slow
                    terminal calls before a slowly streamed answer
@@ -52,6 +54,28 @@ REPLY = """Here is **markdown** from the fake model.
 ```python
 print("hello from hermes tern")
 ```
+"""
+
+
+# The "stream" reply: long enough to read as a finished answer, written slowly.
+STREAMED = """Agreed: keep the login code untouched and make the merge its own step.
+
+## A separate handoff step
+
+Login gets one hook, "account saved". The handoff step listens for it and keeps its own state, so
+a failure is visible and can be retried without touching login.
+
+- **State:** the guest token, the attempt count, the last error and the result.
+- **Diagnosis:** every attempt logs one line with its outcome.
+- **Login code:** unchanged apart from the "account saved" event.
+
+## What the old ticket protected against
+
+| Threat | Old defence | New step |
+|---|---|---|
+| Code theft | single use, 15 min | no code exists |
+| Planted link | consent card | no link to plant |
+| Guessing | rate limits | 128-bit token |
 """
 
 
@@ -348,6 +372,14 @@ class Model(BaseHTTPRequestHandler):
                 return
             content = note
             delay = 0.0
+        elif prompt.lower().lstrip().startswith("stream"):
+            # A quick command (so the turn has work to fold), then the reply, slowly.
+            answered = bool(messages) and messages[-1].get("role") == "tool"
+            calls = None if answered else [_call("terminal", {"command": "sleep 1 && echo looked"}, "call-stream")]
+            if request.get("stream"):
+                self._stream(STREAMED if answered else None, calls, 0.5, pieces=40)
+                return
+            content, delay = (STREAMED if answered else None), 0.0
         elif "steps" in prompt.lower():
             # One call per request until the steps run out; the tool results so far count them.
             last_user = max(i for i, m in enumerate(messages) if m.get("role") == "user")
@@ -376,7 +408,8 @@ class Model(BaseHTTPRequestHandler):
                         "choices": [{"index": 0, "message": message, "finish_reason": "tool_calls" if calls else "stop"}],
                         "usage": {"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15}})
 
-    def _stream(self, content: str | None, calls: list[dict] | None, delay: float = 0.0, reasoning: str | None = None):
+    def _stream(self, content: str | None, calls: list[dict] | None, delay: float = 0.0, reasoning: str | None = None,
+                pieces: int = 6):
         self.send_response(200)
         self.send_header("Content-Type", "text/event-stream")
         self.end_headers()
@@ -387,7 +420,7 @@ class Model(BaseHTTPRequestHandler):
         if content and (calls or reasoning) or not calls:
             # A few chunks so the transcript visibly streams.
             text = content or ""
-            step = max(1, len(text) // 6)
+            step = max(1, len(text) // pieces)
             deltas += [{"role": "assistant", "content": text[i:i + step]} for i in range(0, len(text), step)]
         if calls:
             deltas.append({"role": "assistant", "tool_calls": [{**c, "index": i} for i, c in enumerate(calls)]})
