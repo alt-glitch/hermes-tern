@@ -30,6 +30,8 @@ export interface ProcessesHost {
   readonly sid: LiveSessionId | null
   readonly transcript: Transcript
   changed(): void
+  /** A process this pane saw run has ended: once per process (its line in the transcript). */
+  processEnded?(p: BackgroundProcess): void
 }
 
 /** How much output a process keeps between polls: the shared gateway's `output_tail` is 32k. */
@@ -243,6 +245,10 @@ export class Processes {
   readonly #stopping = new Set<string>()
   /** Each process's live chart, kept on `p.chart`. */
   readonly #charts: Charts
+  /** Ids seen running in this pane: only their ends are news (one that had ended before is not). */
+  readonly #seenRunning = new Set<string>()
+  /** Ids whose end processEnded told. */
+  readonly #told = new Set<string>()
 
   constructor(host: ProcessesHost, charts: ChartsOptions = {}) {
     this.#host = host
@@ -425,6 +431,7 @@ export class Processes {
       }
     }
 
+    this.#watchEnds()
     this.#charts.retain(new Set(this.#byId.keys()))
     changed = this.#chart([...this.#byId.values()]) || changed
     changed = this.#link(touched) || touched.size > 0 || changed
@@ -439,6 +446,18 @@ export class Processes {
 
     if (changed) {
       this.#host.changed()
+    }
+  }
+
+  /** Notes each process running now, and tells the host of each one seen running that has ended since. */
+  #watchEnds() {
+    for (const p of this.#byId.values()) {
+      if (isRunning(p)) {
+        this.#seenRunning.add(p.id)
+      } else if (endOf(p) && this.#seenRunning.has(p.id) && !this.#told.has(p.id)) {
+        this.#told.add(p.id)
+        this.#host.processEnded?.(p)
+      }
     }
   }
 

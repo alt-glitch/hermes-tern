@@ -5,7 +5,7 @@ import { mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import type { Key, Node } from '@stencil-hq/tern'
+import { type Key, Node } from '@stencil-hq/tern'
 import { expect, vi } from 'vitest'
 
 import { FakeGateway, fakeTern, given, key, type Reply, settle as settleGateway, topNodes } from './fakes.js'
@@ -62,13 +62,30 @@ export function setup(replies: Record<string, Reply> = {}, { canonical = true, f
   const queuedRows = () => {
     const rows = topNodes(tern.region('dock')).find(n => n.props['role'] === 'omp.queue')?.children ?? []
 
-    return rows.map((r: Node) => ({
-      actions: r.children.flatMap(c => (c.props['role'] === 'omp.queue.steer' ? ['steer'] : c.props['role'] === 'omp.queue.edit' ? ['edit'] : [])),
-      text: r.children.find(c => c.props['text'] !== undefined)?.props['text']
-    }))
+    return rows.map((r: Node) => {
+      const noteNode = r.children.find(c => c.props['role'] === 'omp.queue.note')
+      const note = noteNode ? words(noteNode).join(' ') : undefined
+
+      return {
+        actions: r.children.flatMap(c => (c.props['role'] === 'omp.queue.steer' ? ['steer'] : c.props['role'] === 'omp.queue.edit' ? ['edit'] : [])),
+        ...(note === undefined ? {} : { note }),
+        text: r.children.find(c => c.props['text'] !== undefined && c.props['role'] !== 'omp.queue.note')?.props['text']
+      }
+    })
   }
 
-  return { app, attach, emit, press, queuedRows, sent, type }
+  /** Every word the dock drew last, in order: its texts and spans. */
+  const dockText = () => topNodes(tern.region('dock')).flatMap(words).join(' ')
+
+  return { app, attach, dockText, emit, press, queuedRows, sent, tern, type }
+}
+
+/** The words under `n`: its text, its spans' text and its children's, in order. */
+function words(n: Node): string[] {
+  const own = typeof n.props['text'] === 'string' ? [n.props['text']] : []
+  const spans = Array.isArray(n.props['spans']) ? n.props['spans'].flatMap((s: unknown) => (s && typeof s === 'object' && 't' in s && typeof s.t === 'string' ? [s.t] : [])) : []
+
+  return [...own, ...spans, ...n.children.flatMap(c => (c instanceof Node ? words(c) : []))]
 }
 
 /** Waits until the app has handled what the test fed it (no fixed sleep). */

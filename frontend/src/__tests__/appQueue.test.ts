@@ -78,7 +78,7 @@ describe('App: Enter while a turn runs (busy_input_mode)', () => {
     expect(submit).toMatchObject({ attachments: [{ path: '/uploads/1.png' }], queued: true, session_id: 's1', text: 'next one' })
     expect(app.stores.queue.held).toEqual([])
     expect(users(app)).toEqual([])
-    expect(queuedRows()).toEqual([{ actions: ['edit'], text: 'next one ↵ 📎 1 image' }])
+    expect(queuedRows()).toEqual([{ actions: ['edit'], note: 'has images: waits for this turn', text: 'next one ↵ 📎 1 image' }])
 
     const row = { admission_id: 'a1', input_id: must(submit)['submission_id'], status: 'queued', user: 'next one' }
     emit('event', { payload: { pending_submissions: [row] }, session_id: 's1', type: 'session.info' })

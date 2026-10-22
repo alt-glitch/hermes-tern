@@ -23,7 +23,7 @@ import { type AutomationLine, automationNode, reconnectNode } from './automation
 import { queuedNode } from './queued.js'
 import { compact } from './time.js'
 import { checklistNode } from './todos.js'
-import { workingRow } from './ui/live.js'
+import { waitingAgentsRow, workingRow } from './ui/live.js'
 import { pill } from './ui/pill.js'
 
 /** What the dock shows, by part; dockModel() builds it each frame. */
@@ -47,8 +47,17 @@ export interface DockContext {
  */
 export type DockActivity =
   | { readonly kind: 'idle' }
-  | { readonly kind: 'turn'; readonly since: object; readonly startedAt: number; readonly label: string }
+  | {
+      readonly kind: 'turn'
+      readonly since: object
+      readonly startedAt: number
+      readonly label: string
+      /** The step the label names, when it is not the turn's first: its own age beside the turn's. */
+      readonly step?: { readonly since: object; readonly startedAt: number }
+    }
   | { readonly kind: 'compacting'; readonly since: object; readonly startedAt: number }
+  /** No turn runs, and the session's background agents still do. */
+  | { readonly kind: 'agents'; readonly count: number; readonly since: object; readonly startedAt: number }
 
 /** The composer: the draft, what Tern's editor shows over it, and the images the prompt carries. */
 export interface DockComposer {
@@ -237,6 +246,9 @@ function activityNode(a: Exclude<DockActivity, { kind: 'idle' }>, cx: DockContex
     case 'compacting':
       return compactingNode(a, cx.now)
 
+    case 'agents':
+      return waitingAgentsRow({ ...a, now: cx.now, onOpen: on.onAgents })
+
     default:
       return assertNever(a, 'dock activity')
   }
@@ -377,7 +389,7 @@ function shellsPill(s: ShellsPill, onOpen: () => void, focused: boolean): JSX.El
   const charts = live ? (s.charts ?? []) : []
   const fresh = latest(charts)?.view
   const figure = fresh && glance(fresh)
-  const title = ['Background processes  ⌥J', ...charts.map(c => `${c.process.id}  ${summary(c.view)}`)].join('\n')
+  const title = ['Background tasks (the cards marked background)  ⌥J', ...charts.map(c => `${c.process.id}  ${summary(c.view)}`)].join('\n')
   const card = hovercard(charts)
 
   return pill({
@@ -431,6 +443,7 @@ function workingNode(busy: Extract<DockActivity, { kind: 'turn' }>, cx: DockCont
     now: cx.now,
     since: busy.since,
     startedAt: busy.startedAt,
+    ...(busy.step ? { step: busy.step } : {}),
     trailing: [
       <row grow={1} key="fill" />,
       cx.pills.todos ? todosPillNode(cx.pills.todos, on.onTodos, false) : null,

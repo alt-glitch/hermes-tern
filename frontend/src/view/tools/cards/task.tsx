@@ -66,11 +66,24 @@ function taskCard(call: ToolCall, d: TaskDetail, now: number): Card {
     meta: meta ? [meta] : undefined,
     name: 'task',
     status: working ? 'running' : undefined,
-    target: count ? plural(count, 'agent') : undefined,
+    ...taskHead(d, count),
     targetKind: 'text',
-    title: 'Task',
     took
   }
+}
+
+/** The card's head: `Launched · 3 background agents` for agents that run on their own, else `Task · 3 agents`. */
+function taskHead(d: TaskDetail, count: number): { title: string; target: string | undefined } {
+  return d.background
+    ? { target: count ? plural(count, 'background agent') : undefined, title: 'Launched' }
+    : { target: count ? plural(count, 'agent') : undefined, title: 'Task' }
+}
+
+/** A delegate_task call's card head (its title and target), as taskCard writes it. */
+export function taskViewHead(call: ToolCall): { title: string; target: string | undefined } | undefined {
+  const d = detailOf(call)
+
+  return d.tool === 'delegate_task' ? taskHead(d, d.tasks.length || (d.goal ? 1 : 0) || (call.subagents?.length ?? 0)) : undefined
 }
 
 /**

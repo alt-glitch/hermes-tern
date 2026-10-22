@@ -57,6 +57,8 @@ export interface AgentsHost {
   changed(): void
   /** A subagent ended (the PRs it linked may be new). */
   agentEnded?(): void
+  /** An agent the session spawned, seen running in this pane, has ended now: once per agent (its line in the transcript). */
+  agentFinished?(a: Subagent): void
 }
 
 const POLL_MS = 1000
@@ -119,6 +121,10 @@ export class Agents {
   readonly #unseen = new WeakMap<Subagent, number>()
   /** Rows whose end the host heard of. */
   readonly #ended = new WeakSet<Subagent>()
+  /** Rows seen running in this pane: only their ends are news (a resumed history's are not). */
+  readonly #seenRunning = new WeakSet<Subagent>()
+  /** Rows whose end agentFinished told. */
+  readonly #finished = new WeakSet<Subagent>()
   /** The `subagent.tail` text read so far, by subagent id: each tail (the last 16 KB) is merged onto it. */
   readonly #tails = new Map<string, string>()
   /**
@@ -176,6 +182,8 @@ export class Agents {
       }
     }
 
+    this.#watchEnds()
+
     if (this.running().length) {
       this.#poller.poke()
     } else if (bare) {
@@ -200,6 +208,7 @@ export class Agents {
 
     if (call) {
       transcript.mutateCall(call, c => foldEvent(c, { at, event, type }))
+      this.#watchEnds()
     }
   }
 
@@ -268,6 +277,7 @@ export class Agents {
     }
 
     if (changed) {
+      this.#watchEnds()
       this.#host.changed()
     }
   }
@@ -324,6 +334,7 @@ export class Agents {
 
     if (changed.size) {
       changed.forEach(a => this.#touch(a))
+      this.#watchEnds()
       this.#host.changed()
     }
   }
@@ -501,6 +512,25 @@ export class Agents {
     if (!isRunning(a) && !this.#ended.has(a)) {
       this.#ended.add(a)
       this.#host.agentEnded?.()
+    }
+  }
+
+  /**
+   * Notes each agent running now, and tells the host of each one seen running that has ended since:
+   * the end of an agent this pane never saw run (a resumed history's, a log read late) is old news.
+   */
+  #watchEnds() {
+    for (const a of this.all()) {
+      if (isRunning(a)) {
+        this.#seenRunning.add(a)
+      } else if (this.#seenRunning.has(a) && !this.#finished.has(a)) {
+        this.#finished.add(a)
+
+        // The session's own agents only: a nested child's end is its parent's business.
+        if (!a.depth) {
+          this.#host.agentFinished?.(a)
+        }
+      }
     }
   }
 

@@ -135,7 +135,8 @@ export class AppActions {
         this.submit(ev.text)
         changed()
       },
-      onShells: () => openBackground(chat),
+      // The pill opens the sheet on the process its card opens (the longest running), so both are one thing.
+      onShells: () => openBackground(chat, chat.processes.recent()[0]?.id),
       onSubmit: () => {
         this.submitDraft()
         changed()

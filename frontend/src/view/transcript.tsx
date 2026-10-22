@@ -162,7 +162,8 @@ function turnNode(turn: TurnEntry, id: string, cx: TranscriptContext): JSX.Eleme
     )
   }
 
-  const last = pieces(turn.blocks).at(-1)
+  // A line of background work that ended meanwhile is not the turn's newest step.
+  const last = pieces(turn.blocks).findLast(p => p.kind !== 'block' || p.block.kind !== 'event')
 
   // t3code: once the newest step failed, its group stops shining and "Thinking" carries the turn.
   // A running compaction is its own live line.
@@ -227,10 +228,12 @@ function pieceNodes(turn: TurnEntry, blocks: readonly Block[], parent: string, c
   const live = turn.end.status === 'live'
   const ps = pieces(blocks, turn.blocks)
   const lastText = blocks.findLast(b => b.kind === 'text')
+  // The live line is the last group, past the lines of background work that ended meanwhile.
+  const tail = ps.findLastIndex(p => p.kind !== 'block' || p.block.kind !== 'event')
 
   return ps.map((p, i) => {
     if (p.kind === 'work') {
-      return workNode(p.items, parent, live && i === ps.length - 1 && !latestFailed(p.items), cx.now)
+      return workNode(p.items, parent, live && i === tail && !latestFailed(p.items), cx.now)
     }
 
     const b = p.block
@@ -251,6 +254,9 @@ function pieceNodes(turn: TurnEntry, blocks: readonly Block[], parent: string, c
 
       case 'compaction':
         return compactionNode(b.compaction, b.id, `${parent}.${b.id}`, cx.now)
+
+      case 'event':
+        return eventNode(b)
 
       case 'thinking':
         return null
@@ -380,6 +386,18 @@ function compactionNode(c: Compaction, key: string, id: string, now: number): JS
     key,
     role: 'hermes.compaction'
   })
+}
+
+/** Background work that ended during the turn: a dim line, its icon toned by how it ended. */
+function eventNode(b: Extract<Block, { kind: 'event' }>): JSX.Element {
+  const icon = b.tone === 'success' ? 'done' : b.tone === 'error' ? 'failed' : b.tone === 'warning' ? 'aborted' : 'info'
+
+  return (
+    <row align="center" gap="xs" key={b.id} role="hermes.event">
+      <icon key="icon" name={icon} tone={b.tone === 'info' ? 'muted' : b.tone} />
+      <text key="text" spans={[{ s: 'dim', t: b.text }]} wrap="word" />
+    </row>
+  )
 }
 
 function noticeNode(e: NoticeEntry): JSX.Element {

@@ -162,7 +162,18 @@ export class PromptRouter {
     const ticket = host.ticket()
     const { sid } = ticket
 
-    if (!sid || mode === 'queue' || prompt.images.length) {
+    if (!sid || mode === 'queue') {
+      return this.behind(prompt)
+    }
+
+    // A steer and a redirect carry text only: the images would be dropped, so the prompt waits for
+    // its own turn, and the pane says so rather than queueing it silently.
+    if (prompt.images.length) {
+      host.transcript.notice(
+        `Images cannot join a running turn (a ${mode === 'steer' ? 'steer' : 'redirect'} carries text only), so this prompt waits for the turn to end. Esc Esc stops the turn to send it now.`,
+        'info'
+      )
+
       return this.behind(prompt)
     }
 

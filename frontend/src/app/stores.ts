@@ -25,6 +25,7 @@ import type { Warned } from '../gateway/handlers/chrome.js'
 import { PullRequests } from '../github/store.js'
 import { writeActiveSessionFile } from '../hermes/activeSessionFile.js'
 import { Media } from '../media.js'
+import type { BackgroundProcess, Subagent } from '../model.js'
 import { Completion } from '../overlays/completion.js'
 import { OverlayStack } from '../overlays/overlay.js'
 import { openUrl } from '../overlays/pullRequests.js'
@@ -47,6 +48,7 @@ import { Transcript } from '../transcript/store.js'
 import { Activity } from '../turn/activity.js'
 import { PromptQueue } from '../turn/queue.js'
 import { canDrain, canSwitch, PromptRouter } from '../turn/router.js'
+import { agentFinishedLine, processExitedLine } from '../view/backgroundLines.js'
 import { randomTip, type WelcomeContext } from '../view/welcome.js'
 
 import type { AppActions } from './actions.js'
@@ -85,6 +87,15 @@ export function chatStores(chat: ChatPorts, { act, gw, launch, settings, surface
   const live = {
     // A subagent ended: the PRs it linked are filed under this conversation (pull_requests.py).
     agentEnded: () => prs.relink(),
+    // Background work this pane saw run ended: a line in the transcript, where the turn is now.
+    agentFinished: (a: Subagent) => {
+      const line = agentFinishedLine(a)
+      transcript.event(line.text, line.tone)
+    },
+    processEnded: (p: BackgroundProcess) => {
+      const line = processExitedLine(p)
+      transcript.event(line.text, line.tone)
+    },
     changed,
     gw,
     // A command's dispatch envelope from outside a typed command (a goal or loop sheet's button).
