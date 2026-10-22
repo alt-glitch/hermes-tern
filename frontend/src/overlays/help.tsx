@@ -55,6 +55,7 @@ export const HOTKEYS: readonly { group: string; rows: [string[], string][] }[] =
       [[KEYS.prs.label], 'Pull requests Hermes linked (/prs)'],
       [[KEYS.sidebar.label], 'Session sidebar: branch, PRs, changes (/sidebar)'],
       [[KEYS.clipboardImage.label], 'Attach the clipboard image (also ⌘V of an image, a dropped image file, /paste)'],
+      [['alt+v'], 'After /voice on: dictate into the composer, then end the capture (voice.record_key picks another key; esc cancels)'],
       [['down'], 'Focus the agents / shells / PR pills (empty prompt); ← → switch, Enter opens, Esc returns'],
       [[KEYS.cancel.label], 'Answer no to the open sheet / clear the draft and images / interrupt / exit (twice)'],
       [[KEYS.quit.label], 'Delete forward / exit (empty prompt)']

@@ -12,6 +12,7 @@ import type { PromptQueue } from '../turn/queue.js'
 
 import type { Attachments } from './attachments.js'
 import type { Composer } from './composer.js'
+import type { Dictation } from './dictation.js'
 
 /** A second Ctrl+C within this window quits. */
 export const EXIT_ARM_MS = 1500
@@ -83,6 +84,8 @@ export interface KeyCx {
   readonly completion: Pick<Completion, 'onKey'>
   readonly composer: Pick<Composer, 'key' | 'set' | 'take' | 'text'>
   readonly attachments: Pick<Attachments, 'any' | 'clear' | 'clearAll' | 'paste'>
+  /** The record key and a capture's cancel keys, while `/voice on` holds. */
+  readonly dictation: Pick<Dictation, 'cancel' | 'onKey'>
   readonly queue: Pick<PromptQueue, 'count' | 'dequeue' | 'steer'>
   readonly transcript: Pick<Transcript, 'notice'>
   readonly presses: Presses
@@ -124,8 +127,12 @@ function clearDraft(cx: KeyCx) {
   cx.attachments.clear()
 }
 
-/** Ctrl+C with no sheet open: clears the draft, else stops the turn, else arms the exit (twice quits). */
+/** Ctrl+C with no sheet open: drops a capture, else clears the draft, else stops the turn, else arms the exit (twice quits). */
 function ctrlC(cx: KeyCx) {
+  if (cx.dictation.cancel()) {
+    return
+  }
+
   if (hasDraft(cx)) {
     cx.composer.set('')
     cx.attachments.clearAll()
@@ -169,6 +176,9 @@ const overlay: KeyRule = (key, _cx, top) => top?.onKey(key) === true
 
 /** A modal sheet takes every key, used or not. */
 const modal: KeyRule = (_key, _cx, top) => top?.modal === true
+
+/** Dictation, before the pills and Esc's own rules: the record key, and Esc dropping a capture. */
+const dictation: KeyRule = (key, cx) => cx.dictation.onKey(key)
 
 /** The pills, before the completion: Enter on a focused pill opens it. */
 const hud: KeyRule = (key, cx) => cx.hud(key)
@@ -284,6 +294,7 @@ export const KEY_RULES: readonly KeyRule[] = [
   cancel,
   overlay,
   modal,
+  dictation,
   hud,
   completion,
   doubleEsc,

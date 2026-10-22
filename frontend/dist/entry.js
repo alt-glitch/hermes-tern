@@ -22897,6 +22897,33 @@ function readAuthorReply(stdout) {
   }
   return error ? { kind: "error", message: String(error) } : { kind: "answer", answer };
 }
+var dictationLine = object({
+  error: optional2(string2()),
+  partial: optional2(string2()),
+  state: optional2(_enum(["idle", "listening", "transcribing"])),
+  text: optional2(string2())
+});
+function dictationEvent(line) {
+  const { data } = dictationLine.safeParse(parseJson(line));
+  if (data?.error !== void 0) {
+    return { kind: "error", message: data.error };
+  }
+  if (data?.state) {
+    return { kind: "state", state: data.state };
+  }
+  if (data?.text !== void 0) {
+    return { kind: "text", text: data.text };
+  }
+  return data?.partial === void 0 ? void 0 : { kind: "partial", text: data.partial };
+}
+var checkLine = object({ details: optional2(string2()), error: optional2(string2()), ready: optional2(boolean2()) });
+function readDictationCheck(stdout) {
+  const { data } = checkLine.safeParse(parseJson(stdout.trim().split("\n").at(-1) ?? ""));
+  if (data?.error !== void 0) {
+    return { error: data.error };
+  }
+  return data?.ready === void 0 ? void 0 : { details: data.details ?? "", ready: data.ready };
+}
 
 // src/connections/cards.ts
 var CONNECT_TOOL = "manage_connections";
@@ -23097,6 +23124,9 @@ function clearDraft(cx) {
   cx.attachments.clear();
 }
 function ctrlC(cx) {
+  if (cx.dictation.cancel()) {
+    return;
+  }
   if (hasDraft(cx)) {
     cx.composer.set("");
     cx.attachments.clearAll();
@@ -23127,6 +23157,7 @@ var cancel = (key2, cx, top) => {
 };
 var overlay = (key2, _cx, top) => top?.onKey(key2) === true;
 var modal = (_key, _cx, top) => top?.modal === true;
+var dictation = (key2, cx) => cx.dictation.onKey(key2);
 var hud = (key2, cx) => cx.hud(key2);
 var completion = (key2, cx) => cx.completion.onKey(key2);
 var doubleEsc = (key2, cx) => {
@@ -23200,6 +23231,7 @@ var KEY_RULES = [
   cancel,
   overlay,
   modal,
+  dictation,
   hud,
   completion,
   doubleEsc,
@@ -25083,10 +25115,10 @@ ${body}`
       off: "OFF",
       offHint: "  /voice off  to disable voice mode",
       on: "ON",
-      recordHint: (recordKey) => `  ${recordKey} to start/stop recording`,
+      recordHint: (recordKey2) => `  ${recordKey2} to start/stop recording`,
       requirements: "  Requirements:",
       statusMode: (mode) => `  Mode:       ${mode}`,
-      statusRecordKey: (recordKey) => `  Record key: ${recordKey}`,
+      statusRecordKey: (recordKey2) => `  Record key: ${recordKey2}`,
       statusTitle: "Voice Mode Status",
       statusTts: (tts) => `  TTS:        ${tts}`,
       ttsDisabled: "Voice TTS disabled.",
@@ -27891,12 +27923,135 @@ function followGateway(gw2, cx) {
   gw2.drain();
 }
 
-// src/clipboard.ts
+// src/hermes/dictation.ts
 import { spawn } from "node:child_process";
+import { join as join5 } from "node:path";
+var CHECK_TIMEOUT_MS = 6e4;
+var CANCEL_GRACE_MS = 1e4;
+function hermesRecorder(env2 = process.env) {
+  const python = env2["HERMES_PYTHON"]?.trim();
+  const root7 = env2["HERMES_PYTHON_SRC_ROOT"];
+  const ui = env2["HERMES_TUI_DIR"];
+  if (!python || !root7 || !ui) {
+    return void 0;
+  }
+  const script = join5(ui, "..", "dictation.py");
+  const run6 = (args) => spawn(python, [script, ...args], { cwd: root7, env: { ...env2, PYTHONPATH: root7 }, stdio: ["pipe", "pipe", "ignore"] });
+  return {
+    check: () => new Promise((resolve7) => {
+      const child = run6(["--check"]);
+      let stdout = "";
+      const timer = setTimeout(() => child.kill(), CHECK_TIMEOUT_MS);
+      child.stdin.end();
+      child.stdout.setEncoding("utf8").on("data", (chunk) => stdout += chunk);
+      child.on("error", (error) => resolve7({ error: error.message }));
+      child.on("close", () => {
+        clearTimeout(timer);
+        resolve7(readDictationCheck(stdout) ?? { error: "dictation.py gave no answer" });
+      });
+    }),
+    start: (on) => {
+      const child = run6([]);
+      const closed = Promise.withResolvers();
+      let rest = "";
+      let idle = false;
+      let killer;
+      const send = (line) => {
+        if (child.stdin.writable) {
+          child.stdin.write(`${line}
+`);
+        }
+      };
+      child.stdin.on("error", () => void 0);
+      child.stdout.setEncoding("utf8").on("data", (chunk) => {
+        const lines = (rest + chunk).split("\n");
+        rest = lines.pop() ?? "";
+        for (const line of lines) {
+          const event = dictationEvent(line);
+          idle ||= event?.kind === "state" && event.state === "idle";
+          if (event) {
+            on(event);
+          }
+        }
+      });
+      child.on("error", (error) => on({ kind: "error", message: error.message }));
+      child.on("close", (code7) => {
+        clearTimeout(killer);
+        if (!idle) {
+          on(code7 ? { kind: "error", message: `dictation.py exited with code ${code7}` } : { kind: "state", state: "idle" });
+        }
+        closed.resolve();
+      });
+      return {
+        cancel: () => {
+          send("cancel");
+          child.stdin.end();
+          killer ??= setTimeout(() => child.kill(), CANCEL_GRACE_MS).unref();
+        },
+        closed: closed.promise,
+        stop: () => send("stop")
+      };
+    }
+  };
+}
+async function configuredRecordKey(gw2, sid) {
+  try {
+    const r = await rpc(gw2, "config.get", { key: "full", ...sid ? { session_id: sid } : {} });
+    return record(record(r.config)?.["voice"])?.["record_key"];
+  } catch {
+    return void 0;
+  }
+}
+var DEFAULT_RECORD_KEY = { label: "alt+v", name: "v", with: ["alt"], without: ["ctrl", "meta"] };
+var MODIFIERS = {
+  alt: "alt",
+  control: "ctrl",
+  ctrl: "ctrl",
+  opt: "alt",
+  option: "alt",
+  super: "meta",
+  win: "meta",
+  windows: "meta"
+};
+var NAMED = {
+  backspace: "backspace",
+  bs: "backspace",
+  del: "delete",
+  delete: "delete",
+  enter: "enter",
+  esc: "escape",
+  escape: "escape",
+  ret: "enter",
+  return: "enter",
+  space: "space",
+  spc: "space",
+  tab: "tab"
+};
+function recordKey(raw2) {
+  const parts3 = typeof raw2 === "string" ? raw2.toLowerCase().split("+").map((p3) => p3.trim()).filter(Boolean) : [];
+  const [mod = "", last = ""] = parts3;
+  const modifier = MODIFIERS[mod];
+  const name = last.length === 1 ? last : NAMED[last];
+  if (parts3.length !== 2 || !modifier || !name) {
+    return DEFAULT_RECORD_KEY;
+  }
+  if (modifier === "ctrl" && name === "b" || Object.values(KEYS).some((k) => k.name === name && k.with.includes(modifier))) {
+    return DEFAULT_RECORD_KEY;
+  }
+  return {
+    label: `${modifier === "meta" ? "cmd" : modifier}+${name}`,
+    name,
+    with: [modifier],
+    without: ["alt", "ctrl", "meta"].filter((m) => m !== modifier)
+  };
+}
+
+// src/clipboard.ts
+import { spawn as spawn2 } from "node:child_process";
 function copyToClipboard(text15, env2 = process.env) {
   process.stdout.write(`\x1B]52;c;${Buffer.from(text15).toString("base64")}\x07`);
   if (process.platform === "darwin" && !env2["SSH_CONNECTION"] && !env2["SSH_TTY"]) {
-    const child = spawn("pbcopy", [], { stdio: ["pipe", "ignore", "ignore"] });
+    const child = spawn2("pbcopy", [], { stdio: ["pipe", "ignore", "ignore"] });
     child.on("error", () => {
     });
     child.stdin.end(text15);
@@ -30606,7 +30761,7 @@ var Poller = class {
 // src/processes/widgets/files.ts
 import { closeSync, fstatSync, openSync, readSync } from "node:fs";
 import { homedir as homedir8 } from "node:os";
-import { isAbsolute as isAbsolute2, join as join5, normalize } from "node:path";
+import { isAbsolute as isAbsolute2, join as join6, normalize } from "node:path";
 import { StringDecoder } from "node:string_decoder";
 var TARGET = /(?:^|[\s;&|(])(?:1|&)?>>?\s*([^\s;&|)<>]+)|\btee\s+(?:-a\s+)?([^\s;&|)<>-][^\s;&|)<>]*)/g;
 var CD = /^\s*cd\s+([^\s;&|]+)\s*(?:&&|;)/;
@@ -30626,7 +30781,7 @@ function outputFiles(command, env2 = process.env) {
       continue;
     }
     const path2 = expand(raw2, env2);
-    const full = path2 && (isAbsolute2(path2) ? path2 : base3 && isAbsolute2(base3) ? join5(base3, path2) : void 0);
+    const full = path2 && (isAbsolute2(path2) ? path2 : base3 && isAbsolute2(base3) ? join6(base3, path2) : void 0);
     if (full && !files.includes(normalize(full))) {
       files.push(normalize(full));
     }
@@ -37489,15 +37644,15 @@ function collectText(node3, info) {
     start = end + 1;
   }
   let index2 = -1;
-  let join14;
+  let join15;
   while (++index2 < lines.length) {
     if (lines[index2].charCodeAt(lines[index2].length - 1) === 8203 || index2 < lines.length - 1 && lines[index2 + 1].charCodeAt(0) === 8203) {
       result.push(lines[index2]);
-      join14 = void 0;
+      join15 = void 0;
     } else if (lines[index2]) {
-      if (typeof join14 === "number") result.push(join14);
+      if (typeof join15 === "number") result.push(join15);
       result.push(lines[index2]);
-      join14 = 0;
+      join15 = 0;
     } else if (index2 === 0 || index2 === lines.length - 1) {
       result.push(0);
     }
@@ -40479,7 +40634,7 @@ function htmlKind(value) {
 }
 
 // node_modules/mdast-util-to-markdown/lib/join.js
-var join6 = [joinDefaults];
+var join7 = [joinDefaults];
 function joinDefaults(left, right, parent, state) {
   if (right.type === "code" && formatCodeAsIndented(right, state) && (left.type === "list" || left.type === right.type && formatCodeAsIndented(left, state))) {
     return false;
@@ -43456,7 +43611,7 @@ function toMarkdown(tree, options) {
     handle: void 0,
     indentLines,
     indexStack: [],
-    join: [...join6],
+    join: [...join7],
     options: {},
     safe: safeBound,
     stack: [],
@@ -64672,6 +64827,31 @@ var COMMANDS2 = [
 ];
 var SESSION_COMMANDS = COMMANDS2.map((c) => ({ ...c, run: guarded2(c.name, c.run) }));
 
+// src/commands/voice.ts
+async function voiceCommand(host, arg) {
+  const { dictation: dictation2 } = host;
+  switch (arg.trim().toLowerCase()) {
+    case "on":
+      await dictation2.enable(await configuredRecordKey(host.gw, host.session.ref.live));
+      return;
+    case "off":
+      dictation2.disable();
+      host.notice("Dictation off.");
+      return;
+    case "tts":
+      host.notice("Tern does not read replies aloud. /voice on turns on dictation into the composer.", "warning");
+      return;
+    case "":
+    case "status":
+      host.notice(
+        dictation2.phase === "off" ? "Dictation is off. /voice on turns it on: the record key then dictates into the composer." : `Dictation is on. ${dictation2.key.label} starts and ends a capture, esc cancels it.`
+      );
+      return;
+    default:
+      host.notice("Usage: /voice [on|off|status]", "warning");
+  }
+}
+
 // src/commands/local.ts
 var COMMANDS3 = [
   {
@@ -64733,6 +64913,11 @@ var COMMANDS3 = [
       }
       host.setTheme(arg);
     }
+  },
+  {
+    // Dictation into the composer (commands/voice.ts), not the session's voice mode.
+    name: "voice",
+    run: (host, arg) => voiceCommand(host, arg)
   },
   {
     // Ink's `/agents pause|resume|status`: the shared gateway's slash.exec refuses them.
@@ -64934,6 +65119,7 @@ var HOTKEYS = [
       [[KEYS.prs.label], "Pull requests Hermes linked (/prs)"],
       [[KEYS.sidebar.label], "Session sidebar: branch, PRs, changes (/sidebar)"],
       [[KEYS.clipboardImage.label], "Attach the clipboard image (also \u2318V of an image, a dropped image file, /paste)"],
+      [["alt+v"], "After /voice on: dictate into the composer, then end the capture (voice.record_key picks another key; esc cancels)"],
       [["down"], "Focus the agents / shells / PR pills (empty prompt); \u2190 \u2192 switch, Enter opens, Esc returns"],
       [[KEYS.cancel.label], "Answer no to the open sheet / clear the draft and images / interrupt / exit (twice)"],
       [[KEYS.quit.label], "Delete forward / exit (empty prompt)"]
@@ -65015,9 +65201,9 @@ async function openHelp(host) {
 // src/settings.ts
 import { mkdirSync as mkdirSync3, writeFileSync as writeFileSync2 } from "node:fs";
 import { homedir as homedir9 } from "node:os";
-import { dirname, join as join7 } from "node:path";
+import { dirname, join as join8 } from "node:path";
 function settingsFile2(env2 = process.env) {
-  return join7(env2["HERMES_HOME"] || join7(homedir9(), ".hermes"), "hermes-tern", "settings.json");
+  return join8(env2["HERMES_HOME"] || join8(homedir9(), ".hermes"), "hermes-tern", "settings.json");
 }
 function loadSettings(file2 = settingsFile2()) {
   return readSettings(file2);
@@ -67232,14 +67418,17 @@ function dockModel(src, now) {
   const used = usage?.context_used ?? 0;
   const max = usage?.context_max ?? 0;
   const list9 = shownTodos(src);
+  const { dictation: dictation2 } = src;
   return {
     activity: dockActivity(src.activity),
     composer: {
       attachments: src.attachments.chips(),
+      dictation: dictation2.phase === "off" ? void 0 : { heard: dictation2.heard, key: dictation2.key.label, phase: dictation2.phase },
       draft: src.composer,
       ghost: modal2 ? "" : src.completion.ghost,
       placeholder: PLACEHOLDER,
-      ready: src.session.ref.live !== null
+      // Tern's own send waits while a capture is in flight: Enter ends the capture first.
+      ready: src.session.ref.live !== null && !dictation2.capturing
     },
     now,
     pills: {
@@ -67305,10 +67494,13 @@ var AppActions = class {
   host;
   constructor(cx) {
     this.#cx = cx;
-    const { attachments, chat, composer: composer2, gw: gw2, life, queue: queue2, transcript } = cx;
+    const { attachments, chat, composer: composer2, dictation: dictation2, gw: gw2, life, queue: queue2, transcript } = cx;
     const changed = () => cx.changed();
     this.dock = {
       onAgents: () => openAgents(chat),
+      onDictate: () => dictation2.toggle(),
+      onDictationCancel: () => void dictation2.cancel(),
+      onDictationDone: () => dictation2.finish(),
       onEdit: (ev) => {
         composer2.edit(ev);
         changed();
@@ -67349,6 +67541,7 @@ var AppActions = class {
       completion: cx.completion,
       composer: composer2,
       cycleEffort: () => cycleEffort(chat),
+      dictation: dictation2,
       hud: (key2) => this.hudKey(key2),
       interrupt: () => this.interrupt(),
       now: Date.now,
@@ -67411,8 +67604,11 @@ var AppActions = class {
     this.#copied.dispose();
   }
   // ── Prompts and commands ───────────────────────────────────────────
-  /** Sends the composer's draft, with the pastes it holds. */
+  /** Sends the composer's draft, with the pastes it holds; while dictation listens, ends the capture instead. */
   submitDraft() {
+    if (this.#cx.dictation.capturing) {
+      return this.#cx.dictation.finish();
+    }
     const pasted = [...this.#cx.composer.pasted];
     this.submit(this.#cx.composer.take(), true, this.#cx.state.busyMode, pasted);
   }
@@ -67665,6 +67861,55 @@ ${composer2.text}` : text15 || composer2.text, {
   }
 };
 
+// src/view/ui/live.tsx
+var SHIMMER = { high: "accent", low: "dim", mid: "muted" };
+function shimmerText(o) {
+  return /* @__PURE__ */ jsx("shimmer", { mode: "classic", palette: SHIMMER, ...o.role ? { role: o.role } : {}, spans: [{ s: "muted", t: o.text }] }, o.key);
+}
+function workingRow(w) {
+  return /* @__PURE__ */ jsxs("row", { align: "center", gap: "sm", role: "omp.working", ...w.title ? { title: w.title } : {}, children: [
+    /* @__PURE__ */ jsx("spinner", { style: "starburst", tone: "accent" }, "spinner"),
+    shimmerText({ key: "label", role: "omp.working.label", text: w.label }),
+    /* @__PURE__ */ jsx("text", { role: "omp.working.sep", text: "\xB7" }, "sep"),
+    /* @__PURE__ */ jsx("elapsed", { age: age(w.since, w.startedAt, w.now), format: "short" }, "elapsed"),
+    w.trailing
+  ] }, "working");
+}
+
+// src/view/dictation.tsx
+var LABEL = {
+  listening: "Listening\u2026",
+  starting: "Opening the microphone\u2026",
+  transcribing: "Writing it down\u2026"
+};
+function micButton(d, on) {
+  const live = d.phase !== "ready";
+  return /* @__PURE__ */ jsx(
+    "icon",
+    {
+      name: "mic",
+      onClick: on.onDictate,
+      role: "hermes.composer.mic",
+      title: live ? `Dictating \xB7 ${d.key} or \u23CE ends it, esc cancels` : `Dictate  ${d.key}`,
+      tone: live ? "error" : "muted"
+    },
+    "mic"
+  );
+}
+function dictationRow(d, on) {
+  if (d.phase === "ready") {
+    return null;
+  }
+  return /* @__PURE__ */ jsxs("row", { align: "center", gap: "sm", role: "hermes.dictation", children: [
+    /* @__PURE__ */ jsx("icon", { name: "mic", tone: "error" }, "mic"),
+    shimmerText({ key: "state", role: "hermes.dictation.state", text: LABEL[d.phase] }),
+    d.heard ? /* @__PURE__ */ jsx("text", { role: "hermes.dictation.heard", spans: [{ s: "dim", t: d.heard }] }, "heard") : null,
+    /* @__PURE__ */ jsx("spacer", { grow: 1 }, "fill"),
+    d.phase === "transcribing" ? null : button({ hint: d.key, key: "done", keys: d.key.split("+"), label: "Done", onClick: on.onDictationDone }),
+    button({ hint: "esc", key: "cancel", keys: ["esc"], label: "Cancel", onClick: on.onDictationCancel })
+  ] }, "dictation");
+}
+
 // src/view/queued.tsx
 function queuedNode(queued, on) {
   return /* @__PURE__ */ jsx("col", { gap: "xs", role: "omp.queue", children: queued.map((q2, i) => /* @__PURE__ */ jsxs("row", { align: "center", gap: "sm", role: "omp.queue.item", title: queuedTitle(q2), children: [
@@ -67720,21 +67965,6 @@ function queuedTitle(q2) {
 }
 function editable(q2) {
   return q2.kind === "local" || q2.kind === "mine";
-}
-
-// src/view/ui/live.tsx
-var SHIMMER = { high: "accent", low: "dim", mid: "muted" };
-function shimmerText(o) {
-  return /* @__PURE__ */ jsx("shimmer", { mode: "classic", palette: SHIMMER, ...o.role ? { role: o.role } : {}, spans: [{ s: "muted", t: o.text }] }, o.key);
-}
-function workingRow(w) {
-  return /* @__PURE__ */ jsxs("row", { align: "center", gap: "sm", role: "omp.working", ...w.title ? { title: w.title } : {}, children: [
-    /* @__PURE__ */ jsx("spinner", { style: "starburst", tone: "accent" }, "spinner"),
-    shimmerText({ key: "label", role: "omp.working.label", text: w.label }),
-    /* @__PURE__ */ jsx("text", { role: "omp.working.sep", text: "\xB7" }, "sep"),
-    /* @__PURE__ */ jsx("elapsed", { age: age(w.since, w.startedAt, w.now), format: "short" }, "elapsed"),
-    w.trailing
-  ] }, "working");
 }
 
 // src/view/dock.tsx
@@ -67990,13 +68220,14 @@ function effortChip(r, on) {
   );
 }
 function composerNode(cx, on) {
-  const { draft, attachments } = cx.composer;
+  const { draft, attachments, dictation: dictation2 } = cx.composer;
   const { route } = cx;
   const busy = cx.activity.kind === "turn";
   return /* @__PURE__ */ jsxs("col", { role: "omp.editor", children: [
     busy ? /* @__PURE__ */ jsx("row", { role: "hermes.streak" }, "streak") : null,
     contextMeter(cx.status.context),
     /* @__PURE__ */ jsx("row", { gap: "sm", hidden: !attachments.length, role: "omp.composer.chips", wrap: true, children: attachments.map((a2, i) => imageChip(a2, i, on.onRemoveAttachment)) }, "chips"),
+    dictation2 ? dictationRow(dictation2, on) : null,
     /* @__PURE__ */ jsx("row", { align: "start", gap: "sm", role: "omp.composer.line", children: /* @__PURE__ */ jsx(
       "editor",
       {
@@ -68034,6 +68265,7 @@ function composerNode(cx, on) {
         "model"
       ) : null,
       route.reasons !== false ? effortChip(route, on) : null,
+      dictation2 ? micButton(dictation2, on) : null,
       /* @__PURE__ */ jsx("status", { grow: 1, role: "omp.composer.extras", transparent: true }, "extras"),
       busy ? /* @__PURE__ */ jsx(
         "text",
@@ -68575,7 +68807,7 @@ function headedCard(c) {
 
 // src/view/welcome.tsx
 import { readFileSync as readFileSync3 } from "node:fs";
-import { join as join8 } from "node:path";
+import { join as join9 } from "node:path";
 function welcomeNode(key2, cx) {
   return /* @__PURE__ */ jsxs("card", { role: "omp.welcome", children: [
     /* @__PURE__ */ jsxs("row", { align: "center", gap: "md", role: "omp.welcome.lockup", children: [
@@ -68595,7 +68827,7 @@ var TIP_LINE = /^\s+t\d+:\s+"((?:[^"\\]|\\.)*)"\s*$/;
 function randomTip(root7) {
   let text15;
   try {
-    text15 = readFileSync3(join8(root7, "locales", "en.yaml"), "utf8");
+    text15 = readFileSync3(join9(root7, "locales", "en.yaml"), "utf8");
   } catch {
     return "";
   }
@@ -69000,7 +69232,7 @@ function focusOf(cx) {
 // src/agents/store.ts
 import { readFile as readFile2, stat } from "node:fs/promises";
 import { homedir as homedir10 } from "node:os";
-import { join as join9 } from "node:path";
+import { join as join10 } from "node:path";
 var POLL_MS2 = 1e3;
 var GRACE_POLLS = 3;
 var MISSING_READS = 3;
@@ -69336,10 +69568,10 @@ async function manifestLog(delegationId, index2, env2 = process.env) {
   if (!/^[\w-]+$/.test(delegationId)) {
     return void 0;
   }
-  const home = env2["HERMES_HOME"] || join9(homedir10(), ".hermes");
-  for (const root7 of [join9(home, "delegation_cache", "live"), join9(home, "cache", "delegation", "live")]) {
+  const home = env2["HERMES_HOME"] || join10(homedir10(), ".hermes");
+  for (const root7 of [join10(home, "delegation_cache", "live"), join10(home, "cache", "delegation", "live")]) {
     try {
-      const text15 = await readFile2(join9(root7, delegationId, "manifest.json"), "utf8");
+      const text15 = await readFile2(join10(root7, delegationId, "manifest.json"), "utf8");
       const tasks = record(text15.replace(/^\uFEFF/, ""))?.["tasks"];
       const log = Array.isArray(tasks) ? record(tasks.find((t2) => record(t2)?.["index"] === index2))?.["log"] : void 0;
       if (typeof log === "string" && log) {
@@ -70376,7 +70608,7 @@ import { execFile as execFile5 } from "node:child_process";
 import { existsSync as existsSync3 } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
 import { homedir as homedir11, tmpdir } from "node:os";
-import { join as join10, resolve as resolve4 } from "node:path";
+import { join as join11, resolve as resolve4 } from "node:path";
 import { promisify as promisify4 } from "node:util";
 var execFileP = promisify4(execFile5);
 var runFile = async (file2, args, options) => (await execFileP(file2, args, options)).stdout;
@@ -70419,7 +70651,7 @@ async function extractClipboardImage(dest, env2, platform = process.platform, ru
   if (!root7) {
     return void 0;
   }
-  const stdout = await run6(python, [join10(root7, "ui-tui/scripts/clipboard_image.py"), dest], {
+  const stdout = await run6(python, [join11(root7, "ui-tui/scripts/clipboard_image.py"), dest], {
     cwd: root7,
     env: { ...env2, PYTHONPATH: root7 },
     timeout: 15e3
@@ -70427,9 +70659,9 @@ async function extractClipboardImage(dest, env2, platform = process.platform, ru
   return stdout.trim() === "true" && existsSync3(dest) ? dest : void 0;
 }
 async function withClipboardImage(use, env2 = process.env, extract = extractClipboardImage) {
-  const dir2 = await mkdtemp(join10(tmpdir(), "hermes-tern-clipboard-"));
+  const dir2 = await mkdtemp(join11(tmpdir(), "hermes-tern-clipboard-"));
   try {
-    const path2 = await extract(join10(dir2, "clipboard.png"), env2);
+    const path2 = await extract(join11(dir2, "clipboard.png"), env2);
     return path2 ? await use(path2) : void 0;
   } finally {
     await rm(dir2, { force: true, recursive: true });
@@ -70628,6 +70860,191 @@ var Attachments = class {
     const preview5 = blob ? { blob } : existsSync4(attachment.path) ? { path: attachment.path } : void 0;
     const caption = [size && `${size.w}\xD7${size.h}`, kb >= 1024 ? `${(kb / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(kb))} KB`];
     return { ...attachment, caption: caption.filter(Boolean).join(" \xB7 "), name, ...preview5 ? { preview: preview5 } : {} };
+  }
+};
+
+// src/draft/dictation.ts
+var Dictation = class {
+  #host;
+  #recorder;
+  #phase = "off";
+  #heard = "";
+  #key = recordKey(void 0);
+  /** The capture in flight: lines from any other (one cancelled, one before it) are dropped. */
+  #capture;
+  /** The last capture's helper until it exits: a new one waits for the microphone. */
+  #closing;
+  /** The capture in flight wrote text. */
+  #wrote = false;
+  constructor(host, recorder) {
+    this.#host = host;
+    this.#recorder = recorder;
+  }
+  get phase() {
+    return this.#phase;
+  }
+  /** What a streaming STT provider has heard of the capture so far; shown, never written. */
+  get heard() {
+    return this.#heard;
+  }
+  /** The record key. */
+  get key() {
+    return this.#key;
+  }
+  /** A capture is in flight. */
+  get capturing() {
+    return this.#phase === "starting" || this.#phase === "listening" || this.#phase === "transcribing";
+  }
+  /**
+   * `/voice on`: checks the microphone and the STT provider, then arms the record key
+   * (`rawKey`: config.yaml's `voice.record_key`). True when dictation is on.
+   */
+  async enable(rawKey) {
+    if (!this.#recorder) {
+      this.#host.note("Dictation runs in Hermes\u2019 interpreter, which only `hermes tern` names (HERMES_PYTHON).", "warning");
+      return false;
+    }
+    const found = await this.#recorder.check();
+    if ("error" in found) {
+      this.#host.note(`Dictation is unavailable: ${found.error}`, "error");
+    } else if (!found.ready) {
+      this.#host.note(`Dictation is not set up on this machine.
+${found.details}`, "warning");
+    } else {
+      this.#key = recordKey(rawKey);
+      if (this.#phase === "off") {
+        this.#phase = "ready";
+      }
+      this.#host.note(`Dictation on. ${this.#key.label} starts and ends a capture, esc cancels it. The words go into the composer; nothing is sent until you send it.`);
+    }
+    this.#host.changed();
+    return this.#phase !== "off";
+  }
+  /** `/voice off`: drops any capture and leaves the record key to the composer. */
+  disable() {
+    this.cancel();
+    this.#phase = "off";
+    this.#host.changed();
+  }
+  /** The record key, the mic button: starts a capture, or ends the one that listens. */
+  toggle() {
+    if (this.#phase === "ready") {
+      this.#start();
+    } else if (this.#phase === "starting" || this.#phase === "listening") {
+      this.finish();
+    }
+  }
+  /** Ends the capture; its words follow. */
+  finish() {
+    if (this.#capture && this.#phase !== "transcribing") {
+      this.#capture.stop();
+      this.#phase = "transcribing";
+      this.#host.changed();
+    }
+  }
+  /** Throws the capture away; false when there was none. */
+  cancel() {
+    const capture = this.#capture;
+    if (!capture) {
+      return false;
+    }
+    capture.cancel();
+    this.#end();
+    return true;
+  }
+  /** The key rule: the record key while dictation is on, and Esc while a capture is in flight. */
+  onKey(key2) {
+    if (this.#phase === "off") {
+      return false;
+    }
+    if (matches(key2, this.#key)) {
+      this.toggle();
+      return true;
+    }
+    const bareEsc = key2.name === "escape" && !key2.ctrl && !key2.alt && !key2.meta && !key2.shift;
+    return bareEsc && this.cancel();
+  }
+  /** The pane closes: the helper releases the microphone. */
+  dispose() {
+    this.cancel();
+  }
+  #start() {
+    const recorder = this.#recorder;
+    if (!recorder) {
+      return;
+    }
+    if (this.#closing) {
+      this.#host.note("The microphone is still closing from the last capture. Try again in a moment.", "warning");
+      return;
+    }
+    let capture;
+    try {
+      capture = recorder.start((event) => this.#on(capture, event));
+    } catch (error) {
+      this.#host.note(`Dictation failed: ${errorText(error)}`, "error");
+      return;
+    }
+    const closing = capture.closed.then(() => {
+      if (this.#closing === closing) {
+        this.#closing = void 0;
+      }
+    });
+    this.#capture = capture;
+    this.#closing = closing;
+    this.#phase = "starting";
+    this.#wrote = false;
+    this.#host.changed();
+  }
+  #on(capture, event) {
+    if (!capture || capture !== this.#capture) {
+      return;
+    }
+    switch (event.kind) {
+      case "state":
+        if (event.state === "idle") {
+          if (!this.#wrote && this.#phase === "transcribing") {
+            this.#host.note("Dictation heard nothing.");
+          }
+          this.#end();
+        } else if (this.#phase !== "transcribing") {
+          this.#phase = event.state;
+        }
+        break;
+      case "partial":
+        this.#heard = event.text;
+        break;
+      case "text":
+        this.#write(event.text);
+        break;
+      case "error":
+        this.#host.note(`Dictation failed: ${event.message}`, "error");
+        capture.cancel();
+        this.#end();
+        break;
+    }
+    this.#host.changed();
+  }
+  /** `text` at the caret (over a selection), spaced from the words beside it, as one undo step. */
+  #write(text15) {
+    const words3 = text15.trim();
+    if (!words3) {
+      return;
+    }
+    const { composer: composer2 } = this.#host;
+    const [from, to] = composer2.selection;
+    const before = composer2.text.slice(0, from);
+    const after = composer2.text.slice(to);
+    const inserted = `${before && !/\s$/.test(before) ? " " : ""}${words3}${after && !/^\s/.test(after) ? " " : ""}`;
+    composer2.splice(from, to, inserted);
+    this.#wrote = true;
+  }
+  #end() {
+    this.#capture = void 0;
+    this.#heard = "";
+    if (this.#phase !== "off") {
+      this.#phase = "ready";
+    }
+    this.#host.changed();
   }
 };
 
@@ -71486,8 +71903,8 @@ var OverlayStack = class {
 };
 
 // src/processes/widgets/author.ts
-import { spawn as spawn2 } from "node:child_process";
-import { join as join11 } from "node:path";
+import { spawn as spawn3 } from "node:child_process";
+import { join as join12 } from "node:path";
 var MAX_BRIEF_CHARS = 1500;
 var MAX_SAMPLE_LINE_CHARS = 300;
 var MAX_SAMPLE_BYTES = 12 * 1024;
@@ -71613,9 +72030,9 @@ function hermesAuthor(env2 = process.env) {
   if (!python || !root7 || !ui) {
     return void 0;
   }
-  const script = join11(ui, "..", "widget_author.py");
+  const script = join12(ui, "..", "widget_author.py");
   return (request, signal) => new Promise((resolve7, reject) => {
-    const child = spawn2(python, [script], {
+    const child = spawn3(python, [script], {
       cwd: root7,
       env: { ...env2, PYTHONPATH: root7 },
       signal,
@@ -71642,16 +72059,16 @@ function hermesAuthor(env2 = process.env) {
 
 // src/processes/widgets/memory.ts
 import { mkdirSync as mkdirSync4, readdirSync as readdirSync2, rmSync as rmSync2, statSync, writeFileSync as writeFileSync4 } from "node:fs";
-import { join as join12 } from "node:path";
+import { join as join13 } from "node:path";
 var KEEP_MS = 7 * 24 * 36e5;
 var safe3 = (id) => /^[\w.-]{1,128}$/.test(id);
-function chartMemory(dir2 = join12(dataDir(), "charts"), now = Date.now) {
+function chartMemory(dir2 = join13(dataDir(), "charts"), now = Date.now) {
   return {
     load(id) {
       if (!safe3(id)) {
         return void 0;
       }
-      const value = readJsonFile(join12(dir2, `${id}.json`));
+      const value = readJsonFile(join13(dir2, `${id}.json`));
       const skip = chartSkip(value);
       if (value === void 0 || skip) {
         return skip;
@@ -71669,9 +72086,9 @@ function chartMemory(dir2 = join12(dataDir(), "charts"), now = Date.now) {
       }
       try {
         mkdirSync4(dir2, { recursive: true });
-        writeFileSync4(join12(dir2, `${id}.json`), JSON.stringify(value));
+        writeFileSync4(join13(dir2, `${id}.json`), JSON.stringify(value));
         for (const name of readdirSync2(dir2)) {
-          const file2 = join12(dir2, name);
+          const file2 = join13(dir2, name);
           if (now() - statSync(file2).mtimeMs > KEEP_MS) {
             rmSync2(file2, { force: true });
           }
@@ -73818,7 +74235,7 @@ var PromptRouter = class {
 };
 
 // src/app/stores.ts
-function chatStores(chat, { act, gw: gw2, launch: launch3, settings: settings2, surface, tern, version: version2 }) {
+function chatStores(chat, { act, gw: gw2, launch: launch3, recorder, settings: settings2, surface, tern, version: version2 }) {
   const changed = () => chat.changed();
   const saved = settings2.load();
   const jobCharts = saved.jobCharts !== false;
@@ -73855,6 +74272,7 @@ function chatStores(chat, { act, gw: gw2, launch: launch3, settings: settings2, 
     scroll: (id, to) => chat.scroll(id, to)
   });
   const composer2 = new Composer();
+  const dictation2 = new Dictation({ changed, composer: composer2, note: (text15, tone) => transcript.notice(text15, tone) }, recorder);
   const stack = new OverlayStack({
     changed,
     closed: (overlay2) => sheets2.closed(overlay2),
@@ -73963,10 +74381,11 @@ function chatStores(chat, { act, gw: gw2, launch: launch3, settings: settings2, 
   const theme = new Theme({ palette: (palette) => surface().palette(palette), settings: settings2 }, saved.theme ?? "tern");
   const completion2 = new Completion(chat, gw2, () => session2.ref.live);
   const welcome = { tip: randomTip(launch3.pythonSrcRoot), version: version2 && version2 !== "unknown" ? `v${version2}` : "" };
-  return { ...shared, attachments, completion: completion2, cron, life, router, stack, theme, warned: warned2, welcome };
+  return { ...shared, attachments, completion: completion2, cron, dictation: dictation2, life, router, stack, theme, warned: warned2, welcome };
 }
 function disposeStores(s2) {
   s2.timers.dispose();
+  s2.dictation.dispose();
   s2.connect.dispose();
   s2.notices.dispose();
   s2.reconnect.dispose();
@@ -74003,12 +74422,12 @@ var App = class {
   #surface;
   /** What each frame draws from (app/frame.ts); set once run() opened the surface. */
   #view;
-  /** `launch` and `settings` are what entry.ts read once at startup; unset, each reads its default. */
-  constructor(tern, gw2, version2, { launch: launch3 = readLaunchEnv(), settings: settings2 = fileSettings() } = {}) {
+  /** `launch` and `settings` are what entry.ts read once at startup, `recorder` where dictation records; unset, each is its default. */
+  constructor(tern, gw2, version2, { launch: launch3 = readLaunchEnv(), recorder = hermesRecorder(), settings: settings2 = fileSettings() } = {}) {
     this.#tern = tern;
     this.#gw = gw2;
     this.#launch = launch3;
-    const s2 = chatStores(this, { act: () => this.#act, gw: gw2, launch: launch3, settings: settings2, surface: () => this.#surface, tern, version: version2 });
+    const s2 = chatStores(this, { act: () => this.#act, gw: gw2, launch: launch3, recorder, settings: settings2, surface: () => this.#surface, tern, version: version2 });
     this.stores = s2;
     this.session = s2.session;
     this.transcript = s2.transcript;
@@ -74028,6 +74447,10 @@ var App = class {
   /** The gateway, for overlays that issue their own RPCs. */
   get gw() {
     return this.#gw;
+  }
+  /** Dictation into the composer (`/voice`). */
+  get dictation() {
+    return this.stores.dictation;
   }
   /** Whose colors the surface wears (`/theme`). */
   get theme() {
@@ -74583,9 +75006,9 @@ var CircularBuffer = class {
 // .hermes-src/ui-tui/src/lib/parentLog.ts
 import { appendFileSync as appendFileSync4, mkdirSync as mkdirSync5 } from "node:fs";
 import { homedir as homedir12 } from "node:os";
-import { join as join13 } from "node:path";
-var logDir = join13(process.env.HERMES_HOME?.trim() || join13(homedir12(), ".hermes"), "logs");
-var CRASH_LOG = join13(logDir, "tui_gateway_crash.log");
+import { join as join14 } from "node:path";
+var logDir = join14(process.env.HERMES_HOME?.trim() || join14(homedir12(), ".hermes"), "logs");
+var CRASH_LOG = join14(logDir, "tui_gateway_crash.log");
 var enabled = !process.env.VITEST;
 var MAX_BREADCRUMB = 4096;
 var warned = false;
@@ -75454,6 +75877,9 @@ var WatchApp = class {
   /** The dock's buttons: the composer steers the agent and Stop stops it; this pane has no pills, queue, chips or chips' sheets. */
   #dock = {
     onAgents: none,
+    onDictate: none,
+    onDictationCancel: none,
+    onDictationDone: none,
     onEdit: (ev) => {
       this.composer.edit(ev);
       this.changed();

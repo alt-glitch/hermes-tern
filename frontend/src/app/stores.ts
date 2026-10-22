@@ -20,10 +20,12 @@ import { Disposables } from '../core/disposables.js'
 import { durable } from '../core/ids.js'
 import { Attachments } from '../draft/attachments.js'
 import { Composer } from '../draft/composer.js'
+import { Dictation } from '../draft/dictation.js'
 import type { Presses } from '../draft/keys.js'
 import type { Warned } from '../gateway/handlers/chrome.js'
 import { PullRequests } from '../github/store.js'
 import { writeActiveSessionFile } from '../hermes/activeSessionFile.js'
+import type { Recorder } from '../hermes/dictation.js'
 import { Media } from '../media.js'
 import { Completion } from '../overlays/completion.js'
 import { OverlayStack } from '../overlays/overlay.js'
@@ -58,6 +60,8 @@ export interface StoresDeps {
   readonly version: string
   readonly launch: LaunchEnv
   readonly settings: SettingsSource
+  /** Where dictation's captures come from: dictation.py in Hermes' interpreter, unless a test gives another. */
+  readonly recorder: Recorder | undefined
   /** The actions, made over these stores: read only when a store calls back. */
   act(): AppActions
   /** The surface run() opens. */
@@ -71,7 +75,7 @@ export interface StoresDeps {
 export type ChatStores = ReturnType<typeof chatStores>
 
 /** Makes every store of the chat pane over `chat`'s ports, in the order they depend on each other. */
-export function chatStores(chat: ChatPorts, { act, gw, launch, settings, surface, tern, version }: StoresDeps) {
+export function chatStores(chat: ChatPorts, { act, gw, launch, recorder, settings, surface, tern, version }: StoresDeps) {
   const changed = () => chat.changed()
   const saved = settings.load()
   const jobCharts = saved.jobCharts !== false
@@ -122,6 +126,8 @@ export function chatStores(chat: ChatPorts, { act, gw, launch, settings, surface
     scroll: (id, to) => chat.scroll(id, to)
   })
   const composer = new Composer()
+  /** Speech into the composer, after `/voice on`. */
+  const dictation = new Dictation({ changed, composer, note: (text, tone) => transcript.notice(text, tone) }, recorder)
   /** The open overlays; a modal one takes the keys from the completion list. */
   const stack = new OverlayStack({
     changed,
@@ -245,12 +251,13 @@ export function chatStores(chat: ChatPorts, { act, gw, launch, settings, surface
   const completion = new Completion(chat, gw, () => session.ref.live)
   const welcome: WelcomeContext = { tip: randomTip(launch.pythonSrcRoot), version: version && version !== 'unknown' ? `v${version}` : '' }
 
-  return { ...shared, attachments, completion, cron, life, router, stack, theme, warned, welcome }
+  return { ...shared, attachments, completion, cron, dictation, life, router, stack, theme, warned, welcome }
 }
 
 /** Stops what the stores run on their own: every timer, the polls and the sidebar's reads. */
 export function disposeStores(s: ChatStores) {
   s.timers.dispose()
+  s.dictation.dispose()
   s.connect.dispose()
   s.notices.dispose()
   s.reconnect.dispose()

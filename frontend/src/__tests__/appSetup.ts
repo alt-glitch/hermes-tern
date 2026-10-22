@@ -8,6 +8,8 @@ import { join } from 'node:path'
 import type { Key, Node } from '@stencil-hq/tern'
 import { expect, vi } from 'vitest'
 
+import type { Recorder } from '../hermes/dictation.js'
+
 import { FakeGateway, fakeTern, given, key, type Reply, settle as settleGateway, topNodes } from './fakes.js'
 
 /** This file's HERMES_HOME, set before App loads. */
@@ -23,8 +25,11 @@ writeFileSync(png, Buffer.from([137, 80, 78, 71, 13, 10, 26, 10, 0, 0]))
 /** The gateway of the app the running test set up. */
 let gateway: FakeGateway
 
-/** The app on a fake Tern and gateway: keys go in, gateway requests come out (`canonical`: the shared gateway). */
-export function setup(replies: Record<string, Reply> = {}, { canonical = true, features = [] }: { canonical?: boolean; features?: string[] } = {}) {
+/** The app on a fake Tern and gateway: keys go in, gateway requests come out (`canonical`: the shared gateway; `recorder`: dictation's captures). */
+export function setup(
+  replies: Record<string, Reply> = {},
+  { canonical = true, features = [], recorder }: { canonical?: boolean; features?: string[]; recorder?: Recorder } = {}
+) {
   const gw = (gateway = new FakeGateway({ canonical, replies }))
   let uploads = 0
 
@@ -33,7 +38,7 @@ export function setup(replies: Record<string, Reply> = {}, { canonical = true, f
   }
 
   const tern = fakeTern({ cols: 100, draws: true, features })
-  const app = new App(tern.session, gw.client, '1.0.0')
+  const app = new App(tern.session, gw.client, '1.0.0', recorder ? { recorder } : {})
   void app.run()
   given.session(app, 's1')
 
@@ -68,7 +73,10 @@ export function setup(replies: Record<string, Reply> = {}, { canonical = true, f
     }))
   }
 
-  return { app, attach, emit, press, queuedRows, sent, type }
+  /** The dock's top nodes as last rendered. */
+  const dock = () => topNodes(tern.region('dock'))
+
+  return { app, attach, dock, emit, press, queuedRows, sent, type }
 }
 
 /** Waits until the app has handled what the test fed it (no fixed sleep). */

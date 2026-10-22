@@ -9,6 +9,7 @@ import type { SessionInfo } from '@tui/types.js'
 
 import type { Agents } from '../agents/store.js'
 import type { SessionHost } from '../commands/session.js'
+import type { Dictation } from '../draft/dictation.js'
 import type { PrKey, SessionIds, StoredSessionId } from '../core/ids.js'
 import type { GitState } from '../git/status.js'
 import type { PullRequests } from '../github/store.js'
@@ -44,6 +45,8 @@ export interface ChatPorts extends OverlayHost {
   readonly cron: Cron
   readonly prs: PullRequests
   readonly automation: Automation
+  /** Dictation into the composer: `/voice` turns it on and off. */
+  readonly dictation: Pick<Dictation, 'disable' | 'enable' | 'key' | 'phase'>
   /** The session sidebar's last read of git, which the Changes sheet starts from. */
   readonly sidebar: { readonly state: GitState | undefined }
   /** The open overlays, bottom first. */

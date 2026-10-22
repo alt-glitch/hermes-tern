@@ -24,6 +24,7 @@ import { rpc } from '../wire/rpc.js'
 import { CONTROL_COMMANDS } from './control.js'
 import { REFUSED_COMMANDS, type RefusedHost } from './refused.js'
 import { SESSION_COMMANDS } from './session.js'
+import { voiceCommand, type VoiceHost } from './voice.js'
 
 /** What the commands reach of the app. */
 export type CommandHost = Pick<
@@ -54,7 +55,8 @@ export type CommandHost = Pick<
   PullRequestsSheetHost &
   RefusedHost &
   SessionsHost &
-  ThemeHost
+  ThemeHost &
+  VoiceHost
 
 /** A client-side slash command. */
 export interface LocalCommand {
@@ -140,6 +142,11 @@ const COMMANDS: readonly LocalCommand[] = [
 
       host.setTheme(arg)
     }
+  },
+  {
+    // Dictation into the composer (commands/voice.ts), not the session's voice mode.
+    name: 'voice',
+    run: (host, arg) => voiceCommand(host, arg)
   },
   {
     // Ink's `/agents pause|resume|status`: the shared gateway's slash.exec refuses them.

@@ -3,6 +3,7 @@
 import { vi } from 'vitest'
 
 import { Composer } from '../draft/composer.js'
+import { recordKey } from '../hermes/dictation.js'
 import type { DockActions, DockContext } from '../view/dock.js'
 import type { DockSources } from '../view/dockModel.js'
 
@@ -10,6 +11,9 @@ import type { DockSources } from '../view/dockModel.js'
 export function dockActions(over: Partial<DockActions> = {}): DockActions {
   return {
     onAgents: vi.fn(),
+    onDictate: vi.fn(),
+    onDictationCancel: vi.fn(),
+    onDictationDone: vi.fn(),
     onEdit: vi.fn(),
     onEffort: vi.fn(),
     onGoal: vi.fn(),
@@ -52,6 +56,7 @@ export function dockSources(over: Partial<DockSources> = {}): DockSources {
     automation: { goal: null, loop: () => null, loopSnapshot: null },
     completion: { ghost: '' },
     composer: new Composer(),
+    dictation: { capturing: false, heard: '', key: recordKey(undefined), phase: 'off' },
     hud: { focused: undefined, todosOpen: false },
     notices: { current: () => undefined },
     overlays: [],

@@ -94,6 +94,7 @@ A turn shows what the agent does while it works: its reasoning, short notes, and
 | <kbd>Shift</kbd>+<kbd>Tab</kbd> | Reasoning effort |
 | <kbd>Alt</kbd>+<kbd>S</kbd> · <kbd>Alt</kbd>+<kbd>P</kbd> · <kbd>Alt</kbd>+<kbd>J</kbd> · <kbd>Alt</kbd>+<kbd>A</kbd> | Sidebar · pull requests · background processes · subagents |
 | <kbd>Ctrl</kbd>+<kbd>V</kbd> | Paste an image |
+| <kbd>Alt</kbd>+<kbd>V</kbd> | After `/voice on`: dictate into the composer, then end the capture (<kbd>Esc</kbd> cancels) |
 
 | Command | Does |
 | --- | --- |
@@ -104,6 +105,15 @@ A turn shows what the agent does while it works: its reasoning, short notes, and
 | `/changes` | The working tree's diff |
 | `/prs [N]` | Pull requests, or PR #N |
 | `/theme` | Paint the chat in Tern's colors, Nous colors or the Hermes skin |
+| `/voice on`, `/voice off` | Dictation into the composer |
+
+### Dictation
+
+`/voice on` checks for a microphone and a speech-to-text provider, as `/voice status` does in the Ink TUI, and then arms the record key: <kbd>Alt</kbd>+<kbd>V</kbd>, or the key that `voice.record_key` in `config.yaml` names. Hermes' default record key, <kbd>Ctrl</kbd>+<kbd>B</kbd>, also means <kbd>Alt</kbd>+<kbd>V</kbd> here: Tern's editor keeps <kbd>Ctrl</kbd>+<kbd>B</kbd> (bold, on Linux), so the chat never sees it. Until `/voice on`, the record key types as it did, and nothing opens the microphone.
+
+Press the record key and speak. A row above the composer says that the microphone is open, and shows what a streaming provider has heard so far. The capture ends after a pause (`voice.silence_duration`), or when you press the record key, <kbd>Enter</kbd> or Done. The words are inserted at the caret, as one step that <kbd>Ctrl</kbd>+<kbd>Z</kbd> undoes. They are never sent: you read the draft and send it yourself. <kbd>Esc</kbd>, <kbd>Ctrl</kbd>+<kbd>C</kbd> or Cancel throws the capture away.
+
+Recording and transcription are Hermes' own: the recorder of its push-to-talk and the provider in `stt` in `config.yaml`. They run in `dictation.py`, in Hermes' interpreter, on the machine that runs the pane. The shared gateway has no push-to-talk method (`voice.record`), and the microphone belongs to the pane's machine anyway. The Tern SDK that the frontend uses reports key presses but not releases, so the record key toggles; there is no hold-to-talk.
 
 ## Background processes
 
@@ -177,9 +187,9 @@ This section lists what the plugin does beyond drawing the chat, so you can deci
 
 | | |
 | --- | --- |
-| **Network** | GitHub's API, with the token that Hermes gives it (`GITHUB_TOKEN`). It is used for the pull request view and for the actions you click; merge and close ask first. The job charts send the command and samples of a background process's output to your own auxiliary model (`auxiliary.tern_charts`), once per process, after Hermes redacts them. Nothing else. **No telemetry.** |
+| **Network** | GitHub's API, with the token that Hermes gives it (`GITHUB_TOKEN`). It is used for the pull request view and for the actions you click; merge and close ask first. The job charts send the command and samples of a background process's output to your own auxiliary model (`auxiliary.tern_charts`), once per process, after Hermes redacts them. A dictation capture goes to the speech-to-text provider set in `stt`, which may be local. Nothing else. **No telemetry.** |
 | **Commands** | A `tool_request` middleware adds `export TERN_PANE=…` (the chat's Tern pane) before the agent's shell commands, in sessions that a Tern pane shows. Approvals and guards see the command as it runs. `!cmd` and `{!cmd}` in the composer run through Hermes' own `shell.exec`, so its dangerous-command refusal applies. They run only when you type them: a pasted `{!cmd}` never runs. The composer's `/` commands are Hermes' own. |
-| **Processes** | `hermes tern` runs `hermes chat --tui` in the same process. The chart helper (`widget_author.py`) runs in Hermes' interpreter for one model request, then exits. Opening the sidebar, or a file beside the chat, runs Tern's own `tern` CLI. |
+| **Processes** | `hermes tern` runs `hermes chat --tui` in the same process. The chart helper (`widget_author.py`) runs in Hermes' interpreter for one model request, then exits. After `/voice on`, the dictation helper (`dictation.py`) runs in Hermes' interpreter for each capture that you start: it opens the microphone, and exits when the capture ends. Opening the sidebar, or a file beside the chat, runs Tern's own `tern` CLI. |
 | **Reads outside its data** | Hermes' session database, read-only: a conversation's compression lineage and its subagents' parents. The output of the session's background processes, and the log files that their commands write to (for charts). The files you open from the chat. |
 | **Stored data** | `$HERMES_HOME/plugin-data/hermes-tern/`: linked pull requests, which panes show which sessions (with their Tern variables), chart rules and connect cards. `$HERMES_HOME/hermes-tern/settings.json`: the theme and chart settings. |
 
