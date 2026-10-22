@@ -327,8 +327,13 @@ export class Charts {
       case 'unavailable':
         return 'No chart: no auxiliary model is set up for charts (auxiliary.tern_charts in config.yaml).'
 
-      case 'declined':
-        return a.why ? `Nothing to chart: ${a.why.replace(/\.$/, '')}.` : 'Nothing to chart: the chart model found no quantity in this output.'
+      case 'declined': {
+        // The model's reason often restates the verdict ("nothing to chart"); then the generic line says more.
+        const why = a.why?.trim().replace(/\.$/, '')
+        return why && !/^nothing to chart$/i.test(why)
+          ? `Nothing to chart: ${why}.`
+          : 'Nothing to chart: the chart model found no quantity in this output.'
+      }
 
       case 'idle':
         if (!this.#author) {

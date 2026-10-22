@@ -187,7 +187,7 @@ describe('a background process that exits is a line in the transcript', () => {
 
     expect(ended).toEqual(['proc_a'])
     const { processExitedLine } = await import('../view/backgroundLines.js')
-    expect(processExitedLine(store.get('proc_a') ?? stub({}))).toEqual({ text: 'Background task keep-dump.sh exited (0) · 11m 30s', tone: 'success' })
+    expect(processExitedLine(store.get('proc_a') ?? stub({}))).toEqual({ text: 'Background task "Run keep-dump.sh" exited (0) · 11m 30s', tone: 'success' })
     store.dispose()
   })
 
@@ -228,6 +228,15 @@ describe('a chart that is not drawn says why', () => {
     const p = proc()
     c.view(p)
     await vi.waitFor(() => expect(c.view(p)?.note).toBe('Nothing to chart: a dev server log has no quantity.'))
+  })
+
+  it('the model declined with no real reason: the generic line, not "nothing to chart" twice', async () => {
+    const c = charts(async () => ({ skip: 'Nothing to chart.' }))
+    const p = proc()
+    c.view(p)
+    await vi.waitFor(() =>
+      expect(c.view(p)?.note).toBe('Nothing to chart: the chart model found no quantity in this output.')
+    )
   })
 
   it('no auxiliary model', async () => {
