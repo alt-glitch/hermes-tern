@@ -28956,6 +28956,29 @@ import { homedir as homedir7 } from "node:os";
 import { isAbsolute } from "node:path";
 import { fileURLToPath } from "node:url";
 
+// src/core/epoch.ts
+var Epoch = class {
+  #generation = 0;
+  #controller = new AbortController();
+  /** The present generation: 0 until the first `next()`. */
+  get generation() {
+    return this.#generation;
+  }
+  /** A ticket for the present generation: current until the next `next()`. */
+  current() {
+    const generation = this.#generation;
+    return { isCurrent: () => generation === this.#generation, signal: this.#controller.signal };
+  }
+  /** Ends the present generation (its tickets go stale, their signal aborts) and returns a ticket for the new one. */
+  next() {
+    const ended = this.#controller;
+    this.#controller = new AbortController();
+    this.#generation++;
+    ended.abort();
+    return this.current();
+  }
+};
+
 // src/hermes/images.ts
 import { readFile } from "node:fs/promises";
 import { homedir as homedir6 } from "node:os";
@@ -29069,12 +29092,19 @@ function localSource(src) {
 var Media = class {
   #host;
   #fetch;
+  #lifetime = new Epoch();
   #loads = /* @__PURE__ */ new Map();
   /** What each settled load gave, so a call rebuilt from history gets it before the next frame. */
   #loaded = /* @__PURE__ */ new Map();
   constructor(host, fetcher = (url, init) => fetch(url, init)) {
     this.#host = host;
     this.#fetch = fetcher;
+  }
+  /** Abandon pending previews on every transcript adoption and when this pane closes. */
+  invalidate() {
+    this.#lifetime.next();
+    this.#loads.clear();
+    this.#loaded.clear();
   }
   /**
    * Gets the image `call` shows ready: a URL's bytes land on `call.image` (null when they could
@@ -29089,7 +29119,11 @@ var Media = class {
       call.image = this.#loaded.get(src);
       return;
     }
+    const ticket = this.#lifetime.current();
     void this.load(src).then((image3) => {
+      if (!ticket.isCurrent() || shownImage(call) !== src) {
+        return;
+      }
       call.image = image3;
       done();
     });
@@ -29108,28 +29142,61 @@ var Media = class {
   load(src) {
     let load2 = this.#loads.get(src);
     if (!load2) {
-      load2 = this.#bytes(src).then(
-        (bytes) => this.#blob(bytes),
+      const ticket = this.#lifetime.current();
+      load2 = this.#bytes(src, ticket.signal).then(
+        (bytes) => ticket.isCurrent() ? this.#blob(bytes) : null,
         () => null
       ).then((image3) => {
-        this.#loaded.set(src, image3);
+        if (ticket.isCurrent()) {
+          this.#loaded.set(src, image3);
+        }
         return image3;
       });
       this.#loads.set(src, load2);
     }
     return load2;
   }
-  async #bytes(src) {
+  async #bytes(src, signal) {
     const data = /^data:image\/[\w.+-]+;base64,(.*)$/s.exec(src);
     if (data) {
-      return Buffer.from(data[1] ?? "", "base64");
+      const encoded = data[1] ?? "";
+      if (encoded.length > Math.ceil(MAX_BYTES / 3) * 4) {
+        return void 0;
+      }
+      return Buffer.from(encoded, "base64");
     }
     if (!/^https?:\/\//i.test(src)) {
       return void 0;
     }
-    const r = await this.#fetch(src, { signal: AbortSignal.timeout(FETCH_MS) });
-    const size = Number(r.headers.get("content-length") ?? 0);
-    return r.ok && size <= MAX_BYTES ? Buffer.from(await r.arrayBuffer()) : void 0;
+    const r = await this.#fetch(src, { signal: AbortSignal.any([signal, AbortSignal.timeout(FETCH_MS)]) });
+    const declared = r.headers.get("content-length");
+    if (!r.ok || declared !== null && (!/^\d+$/.test(declared) || Number(declared) > MAX_BYTES)) {
+      return void 0;
+    }
+    const reader = r.body?.getReader();
+    if (!reader) {
+      return void 0;
+    }
+    const chunks2 = [];
+    let bytes = 0;
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) {
+          break;
+        }
+        const chunk = value;
+        if (!(chunk instanceof Uint8Array) || chunk.byteLength > MAX_BYTES - bytes) {
+          await reader.cancel();
+          return void 0;
+        }
+        bytes += chunk.byteLength;
+        chunks2.push(chunk);
+      }
+    } finally {
+      reader.releaseLock();
+    }
+    return Buffer.concat(chunks2, bytes);
   }
   #blob(bytes) {
     const format = bytes && bytes.length <= MAX_BYTES ? imageFormat(bytes) : null;
@@ -30477,29 +30544,6 @@ function searchCard(call, d) {
     title: "Grep"
   };
 }
-
-// src/core/epoch.ts
-var Epoch = class {
-  #generation = 0;
-  #controller = new AbortController();
-  /** The present generation: 0 until the first `next()`. */
-  get generation() {
-    return this.#generation;
-  }
-  /** A ticket for the present generation: current until the next `next()`. */
-  current() {
-    const generation = this.#generation;
-    return { isCurrent: () => generation === this.#generation, signal: this.#controller.signal };
-  }
-  /** Ends the present generation (its tickets go stale, their signal aborts) and returns a ticket for the new one. */
-  next() {
-    const ended = this.#controller;
-    this.#controller = new AbortController();
-    this.#generation++;
-    ended.abort();
-    return this.current();
-  }
-};
 
 // src/core/poller.ts
 var Poller = class {
@@ -71814,6 +71858,7 @@ function adoptSteps(host) {
     {
       adopt: ({ previous: previous3, r, ref }) => {
         const other = ref.live !== previous3.live;
+        host.media.invalidate();
         transcript.reset({ session: other ? "other" : "same", usage: r.info?.usage ?? void 0 });
         if (other) {
           host.sheets.dropAll();
@@ -73966,6 +74011,7 @@ function chatStores(chat, { act, gw: gw2, launch: launch3, settings: settings2, 
   return { ...shared, attachments, completion: completion2, cron, life, router, stack, theme, warned: warned2, welcome };
 }
 function disposeStores(s2) {
+  s2.media.invalidate();
   s2.timers.dispose();
   s2.connect.dispose();
   s2.notices.dispose();

@@ -250,6 +250,7 @@ export function chatStores(chat: ChatPorts, { act, gw, launch, settings, surface
 
 /** Stops what the stores run on their own: every timer, the polls and the sidebar's reads. */
 export function disposeStores(s: ChatStores) {
+  s.media.invalidate()
   s.timers.dispose()
   s.connect.dispose()
   s.notices.dispose()
