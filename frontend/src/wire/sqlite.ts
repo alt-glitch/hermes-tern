@@ -12,6 +12,21 @@ import { loose, rowsOf } from './schemas.js'
 /** A TEXT column that may be NULL; any other value reads as NULL. */
 export const text = z.catch(z.nullable(z.string()), null)
 
+const utf8 = new TextDecoder()
+
+/**
+ * A TEXT column selected as `CAST(col AS BLOB)`, decoded whole; NULL or any other value reads as
+ * NULL. Node 22's node:sqlite cuts TEXT at its first NUL byte, and Hermes stores structured
+ * content behind one (`\x00json:`).
+ */
+export const textBytes = z.catch(
+  z.pipe(
+    z.nullable(z.instanceof(Uint8Array)),
+    z.transform(bytes => (bytes ? utf8.decode(bytes) : null))
+  ),
+  null
+)
+
 /** A numeric column that may be NULL; any other value reads as NULL. */
 export const real = z.catch(z.nullable(z.number()), null)
 

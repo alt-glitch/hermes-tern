@@ -15,7 +15,6 @@ process.env['HERMES_HOME'] = mkdtempSync(join(tmpdir(), 'hermes-tern-lifecycle-'
 // The picker reads state.db; here it lists one other session.
 vi.mock('../hermes/sessionIndex.js', async importOriginal => ({
   ...(await importOriginal<typeof import('../hermes/sessionIndex.js')>()),
-  lastReply: () => '',
   storedSessions: () => [
     {
       branch: '', cwd: '', id: 'gone', lastActive: Date.now(), messages: 2, model: '', pinned: false,

@@ -15,9 +15,10 @@ import * as z from 'zod/mini'
 
 import { attempt } from '../core/result.js'
 import { decodeJson } from '../wire/json.js'
-import { first, real, rows, text } from '../wire/sqlite.js'
+import { real, rows, text } from '../wire/sqlite.js'
 
 import { stateDbPath } from './paths.js'
+import { contentText, skillPrompt } from './sessionTranscript.js'
 
 const run = promisify(execFile)
 
@@ -171,7 +172,7 @@ export function storedSessions(limit = 400, db = stateDbPath()): StoredSession[]
       messages: Number(r.messages) || 0,
       model: r.model ?? '',
       pinned: r.pinned === 1,
-      preview: flat(r.preview).slice(0, 400),
+      preview: flat(skillPrompt(contentText(r.preview))).slice(0, 400),
       repoRoot: r.repo_root ?? '',
       source: r.source ?? '',
       startedAt: Math.round((r.started_at ?? 0) * 1000),
@@ -179,31 +180,6 @@ export function storedSessions(limit = 400, db = stateDbPath()): StoredSession[]
     }))
   } catch {
     return []
-  } finally {
-    conn?.close()
-  }
-}
-
-const replyRow = z.object({ content: text })
-
-/** A conversation's last reply (from its newest segment), for the picker's preview. */
-export function lastReply(id: string, db = stateDbPath()): string {
-  let conn: DatabaseSync | undefined
-
-  try {
-    conn = new DatabaseSync(db, { readOnly: true })
-    const stmt = conn.prepare(
-      `WITH RECURSIVE chain(cur) AS (SELECT ? UNION ALL SELECT child.id FROM chain c
-         JOIN sessions parent ON parent.id = c.cur JOIN sessions child ON child.parent_session_id = c.cur
-         WHERE parent.end_reason = 'compression')
-       SELECT m.content FROM messages m WHERE m.session_id IN (SELECT cur FROM chain)
-         AND m.role = 'assistant' AND m.content IS NOT NULL AND m.content != ''
-       ORDER BY m.timestamp DESC, m.id DESC LIMIT 1`
-    )
-
-    return (first(stmt, replyRow, id)?.content ?? '').trim()
-  } catch {
-    return ''
   } finally {
     conn?.close()
   }
