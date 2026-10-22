@@ -161,7 +161,9 @@ export function fakeTern({ cols = 80, draws = false, features = [] }: FakeTernOp
     /** Delivers key `k` (a name: that key with no modifiers). */
     press: (k: Key | string) => input({ key: typeof k === 'string' ? key(k) : k, type: 'key' }),
     /** Delivers one Tern event. */
-    send: (event: Record<string, unknown>) => input({ event, type: 'event' })
+    send: (event: Record<string, unknown>) => input({ event, type: 'event' }),
+    /** Ends the input, as a pane that closes or a signal does. */
+    end: () => waiting.shift()?.({ done: true, value: undefined })
   }
 }
 

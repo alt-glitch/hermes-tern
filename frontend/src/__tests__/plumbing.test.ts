@@ -134,12 +134,15 @@ describe('readLaunchEnv', () => {
         HERMES_CWD: '/work',
         HERMES_PYTHON_SRC_ROOT: '/src/hermes',
         HERMES_TERN_EVENT_LOG: '/tmp/events.jsonl',
+        HERMES_TERN_LAUNCH_CWD: '/home/me/project',
+        HERMES_TERN_RESTORED: 'root-1',
         HERMES_TUI_CWD: ' /work/tree ',
         HERMES_TUI_IMAGE: ' /tmp/shot.png\n',
         HERMES_TUI_QUERY: '  what is this?  ',
         HERMES_TUI_RESUME: ' 20260101_abc ',
         HERMES_VERSION: '0.9.0',
-        HOME: '/home/me'
+        HOME: '/home/me',
+        TERN_PANE: ' 34505767256143 '
       },
       '/elsewhere'
     )
@@ -149,8 +152,11 @@ describe('readLaunchEnv', () => {
       eventLog: '/tmp/events.jsonl',
       home: '/home/me',
       image: '/tmp/shot.png',
+      pane: '34505767256143',
+      paneCwd: '/home/me/project',
       pythonSrcRoot: '/src/hermes',
       query: 'what is this?',
+      restored: true,
       resume: '20260101_abc',
       sessionCwd: '/work/tree',
       version: '0.9.0'
@@ -164,8 +170,11 @@ describe('readLaunchEnv', () => {
       eventLog: '',
       home: undefined,
       image: '',
+      pane: '',
+      paneCwd: '/elsewhere',
       pythonSrcRoot: '',
       query: '',
+      restored: false,
       resume: '',
       sessionCwd: '',
       version: ''

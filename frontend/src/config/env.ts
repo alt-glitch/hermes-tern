@@ -26,6 +26,12 @@ export interface LaunchEnv {
   readonly pythonSrcRoot: string
   /** HERMES_TERN_EVENT_LOG: the development tap's file ('' for none). */
   readonly eventLog: string
+  /** TERN_PANE: the Tern pane this runs in, whose conversation the plugin keeps ('' outside Tern). */
+  readonly pane: string
+  /** HERMES_TERN_LAUNCH_CWD, else `cwd`: where `hermes tern` started, before a resume moved to the session's folder. */
+  readonly paneCwd: string
+  /** HERMES_TERN_RESTORED set: the launcher resumes the pane's conversation after its program died. */
+  readonly restored: boolean
 }
 
 /**
@@ -33,13 +39,18 @@ export interface LaunchEnv {
  * Bracket reads: the environment is an index signature, and each name here is a launcher's.
  */
 export function readLaunchEnv(env: NodeJS.ProcessEnv = process.env, cwd: string = process.cwd()): LaunchEnv {
+  const launchCwd = env['HERMES_CWD'] || cwd
+
   return Object.freeze({
-    cwd: env['HERMES_CWD'] || cwd,
+    cwd: launchCwd,
     eventLog: env['HERMES_TERN_EVENT_LOG'] ?? '',
     home: env['HOME'],
     image: env['HERMES_TUI_IMAGE']?.trim() ?? '',
+    pane: env['TERN_PANE']?.trim() ?? '',
+    paneCwd: env['HERMES_TERN_LAUNCH_CWD'] || launchCwd,
     pythonSrcRoot: env['HERMES_PYTHON_SRC_ROOT'] ?? '',
     query: env['HERMES_TUI_QUERY']?.trim() ?? '',
+    restored: Boolean(env['HERMES_TERN_RESTORED']?.trim()),
     resume: env['HERMES_TUI_RESUME']?.trim() ?? '',
     sessionCwd: env['HERMES_TUI_CWD']?.trim() ?? '',
     version: env['HERMES_VERSION'] ?? ''
