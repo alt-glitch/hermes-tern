@@ -23973,7 +23973,7 @@ var gatewayMsgEn = {
     },
     protocol: {
       noiseDetected: "protocol noise detected \xB7 /logs to inspect",
-      noise: (preview5) => `protocol noise: ${preview5}`
+      noise: (preview4) => `protocol noise: ${preview4}`
     },
     moa: {
       // {0}=references done {1}=references total (pre-formatted strings)
@@ -24756,12 +24756,12 @@ var slashCmdCoreEn = {
     queue: {
       countOne: (count2) => `${count2} queued message`,
       countOther: (count2) => `${count2} queued messages`,
-      queued: (preview5) => `queued: "${preview5}"`
+      queued: (preview4) => `queued: "${preview4}"`
     },
     steer: {
       usage: "usage: /steer <prompt>",
-      noActiveTurnQueued: (preview5) => `no active turn \u2014 queued for next: "${preview5}"`,
-      queued: (preview5) => `steer queued \u2014 arrives after next tool call: "${preview5}"`,
+      noActiveTurnQueued: (preview4) => `no active turn \u2014 queued for next: "${preview4}"`,
+      queued: (preview4) => `steer queued \u2014 arrives after next tool call: "${preview4}"`,
       rejected: "steer rejected \u2014 no active turn, queued for next turn"
     },
     undo: {
@@ -25607,8 +25607,8 @@ function slowStartNotes(stderrTail) {
     ...problems.map((l) => ({ text: l.slice(0, STDERR_LINE_CAP), tone: "error" }))
   ];
 }
-function protocolNote(preview5, warned2) {
-  return warned2 ? void 0 : { text: `The agent backend wrote unexpected output: ${String(preview5 ?? "").slice(0, STDERR_LINE_CAP)}`, tone: "info" };
+function protocolNote(preview4, warned2) {
+  return warned2 ? void 0 : { text: `The agent backend wrote unexpected output: ${String(preview4 ?? "").slice(0, STDERR_LINE_CAP)}`, tone: "info" };
 }
 function isDeadStream(err) {
   const code7 = typeof err === "object" && err !== null && "code" in err ? err.code : void 0;
@@ -61640,10 +61640,10 @@ var VFile = class {
    * @returns {undefined}
    *   Nothing.
    */
-  set basename(basename5) {
-    assertNonEmpty(basename5, "basename");
-    assertPart(basename5, "basename");
-    this.path = default2.join(this.dirname || "", basename5);
+  set basename(basename6) {
+    assertNonEmpty(basename6, "basename");
+    assertPart(basename6, "basename");
+    this.path = default2.join(this.dirname || "", basename6);
   }
   /**
    * Get the parent path (example: `'~'`).
@@ -63481,12 +63481,186 @@ function prsPill(entries) {
 }
 
 // src/overlays/sessions.tsx
-import { basename as basename2 } from "node:path";
+import { basename as basename3 } from "node:path";
 
 // src/hermes/sessionIndex.ts
 import { execFile as execFile3 } from "node:child_process";
-import { DatabaseSync as DatabaseSync3 } from "node:sqlite";
+import { DatabaseSync as DatabaseSync4 } from "node:sqlite";
 import { promisify as promisify2 } from "node:util";
+
+// src/hermes/sessionTranscript.ts
+import { DatabaseSync as DatabaseSync3 } from "node:sqlite";
+var COMPACTION = "[CONTEXT COMPACTION";
+var JSON_CONTENT = "\0json:";
+var NOTICE_KINDS = /* @__PURE__ */ new Set(["async_delegation_complete", "internal_notification", "model_switch", "process_complete"]);
+var CHAIN = `WITH RECURSIVE chain(cur) AS (
+  SELECT ? UNION ALL
+  SELECT child.id FROM chain c
+  JOIN sessions parent ON parent.id = c.cur
+  JOIN sessions child ON child.parent_session_id = c.cur
+  WHERE parent.end_reason = 'compression'
+    AND ${["_branched_from", "_delegate_from", "_reset_from"].map((k) => `json_extract(CASE WHEN json_valid(child.model_config) THEN child.model_config ELSE '{}' END, '$.${k}') IS NULL`).join(" AND ")}
+)`;
+var nameRow = object({ name: string2() });
+var messageRow = object({
+  id: number2(),
+  role: _catch(string2(), ""),
+  content: text2,
+  tool_calls: text2,
+  timestamp: real,
+  display_kind: text2
+});
+var contentRow = object({ content: text2 });
+function messageColumns(conn) {
+  const has = new Set(rows(conn.prepare("PRAGMA table_info(messages)"), nameRow).map((r) => r.name));
+  const live = has.has("compacted") ? "(m.active = 1 OR m.compacted = 1)" : has.has("active") ? "m.active = 1" : "1";
+  const modelOnly = has.has("display_metadata") ? ` AND COALESCE(json_extract(CASE WHEN json_valid(m.display_metadata) THEN m.display_metadata ELSE '{}' END, '$.model_only'), 0) = 0` : "";
+  const kind = has.has("display_kind") ? "m.display_kind" : "NULL";
+  return {
+    calls: has.has("tool_calls") ? "m.tool_calls" : "NULL",
+    kind,
+    visible: `${live}${modelOnly} AND COALESCE(${kind}, '') != 'hidden'`
+  };
+}
+function readStateDb(db, read) {
+  const conn = new DatabaseSync3(db, { readOnly: true });
+  try {
+    return read(conn);
+  } finally {
+    conn.close();
+  }
+}
+function contentText(raw2) {
+  if (!raw2) {
+    return "";
+  }
+  const json = raw2.startsWith(JSON_CONTENT) ? raw2.slice(JSON_CONTENT.length) : raw2.startsWith("[{") ? raw2 : void 0;
+  if (json === void 0) {
+    return raw2;
+  }
+  const parts3 = parseJson(json);
+  if (typeof parts3 === "string") {
+    return parts3;
+  }
+  return Array.isArray(parts3) ? parts3.map((p3) => p3 && typeof p3 === "object" && "text" in p3 && typeof p3.text === "string" ? p3.text : "").filter(Boolean).join("\n") : raw2;
+}
+var SKILL_PREFIX = "[IMPORTANT: The user has invoked the ";
+var SKILL_INSTRUCTION = "The user has provided the following instruction alongside the skill invocation: ";
+var BUNDLE_INSTRUCTION = "\nUser instruction: ";
+function skillPrompt(raw2) {
+  if (!raw2.startsWith(SKILL_PREFIX)) {
+    return raw2;
+  }
+  const name = /^"(?<name>[^"]*)"/.exec(raw2.slice(SKILL_PREFIX.length))?.groups?.["name"]?.trim() ?? "";
+  const label = name.startsWith("/") ? name : `/${name}`;
+  const bundle = raw2.includes(" skill bundle,");
+  const marker2 = bundle ? BUNDLE_INSTRUCTION : SKILL_INSTRUCTION;
+  const at = bundle ? raw2.indexOf(marker2) : raw2.lastIndexOf(marker2);
+  if (at < 0) {
+    return label;
+  }
+  const rest = raw2.slice(at + marker2.length);
+  const end = rest.indexOf(bundle ? "\n\n[Loaded as part of the " : "\n\n[Runtime note:");
+  const instruction = (end < 0 ? rest : rest.slice(0, end)).trim();
+  return instruction ? `${label} ${instruction}` : label;
+}
+function promptText(raw2) {
+  return skillPrompt(raw2).replace(/^\[[A-Z][A-Z -]+\][^\n]*\n?/gm, "").replace(/^@image:\S+\s*$/gm, "").replace(/^\[Image attached at: [^\]\n]*\]\s*$/gm, "[image]").replace(/\n{3,}/g, "\n\n").trim();
+}
+function previewRows(r) {
+  const body = contentText(r.content);
+  const key2 = `${r.role}|${r.timestamp ?? ""}|${body}`;
+  if (r.role === "user") {
+    if (body.includes(COMPACTION)) {
+      return [{ key: key2, kind: "note", text: "Context compacted: the agent continued from a summary.", tone: "muted" }];
+    }
+    if (r.display_kind && NOTICE_KINDS.has(r.display_kind)) {
+      return [{ key: key2, kind: "note", text: noticeLine(body), tone: "muted" }];
+    }
+    const typed = promptText(body);
+    return typed ? [{ key: key2, kind: "user", steer: r.display_kind === "steer", text: typed }] : [];
+  }
+  if (r.role !== "assistant") {
+    return [];
+  }
+  if (r.display_kind === "failed_turn") {
+    return [{ key: key2, kind: "note", text: firstLine2(body) || "The turn failed.", tone: "error" }];
+  }
+  const out = body.trim() ? [{ key: key2, kind: "assistant", text: body.trim() }] : [];
+  callsOf(r.tool_calls).forEach((call, i) => {
+    out.push({
+      args: storedArgs(call.function?.arguments),
+      key: `${key2}|call${i}|${call.id ?? call.call_id ?? ""}`,
+      kind: "tool",
+      name: call.function?.name ?? "tool"
+    });
+  });
+  return out;
+}
+function callsOf(raw2) {
+  try {
+    return storedCalls(raw2);
+  } catch {
+    return [];
+  }
+}
+function noticeLine(text15) {
+  const line = firstLine2(text15);
+  return /^\[[A-Z][A-Z -]*:\s*(?<said>[^\]]*)\]?$/.exec(line)?.groups?.["said"]?.trim() || line;
+}
+function firstLine2(text15) {
+  return (text15.split("\n").find((l) => l.trim()) ?? "").trim();
+}
+function readTranscriptPage(id, after, limit, db = stateDbPath()) {
+  return readStateDb(db, (conn) => {
+    const { calls, kind, visible } = messageColumns(conn);
+    const stmt = conn.prepare(
+      `${CHAIN}
+       SELECT m.id, m.role, m.content, ${calls} AS tool_calls, m.timestamp, ${kind} AS display_kind
+       FROM messages m WHERE m.session_id IN (SELECT cur FROM chain) AND m.id > ? AND ${visible}
+       ORDER BY m.id LIMIT ?`
+    );
+    const read = rows(stmt, messageRow, id, after, limit);
+    const last = read.at(-1);
+    return { next: read.length >= limit && last ? last.id : null, rows: read.flatMap(previewRows) };
+  });
+}
+function readSessionEnds(id, db = stateDbPath()) {
+  return readStateDb(db, (conn) => {
+    const { kind, visible } = messageColumns(conn);
+    const firstPrompt = conn.prepare(
+      `${CHAIN}
+       SELECT m.content FROM messages m WHERE m.session_id IN (SELECT cur FROM chain) AND m.role = 'user' AND ${visible}
+         AND COALESCE(${kind}, '') IN ('', 'steer') AND instr(COALESCE(m.content, ''), '${COMPACTION}') = 0
+       ORDER BY m.id LIMIT 1`
+    );
+    const lastReply = conn.prepare(
+      `${CHAIN}
+       SELECT m.content FROM messages m WHERE m.session_id IN (SELECT cur FROM chain) AND m.role = 'assistant' AND ${visible}
+         AND COALESCE(${kind}, '') != 'failed_turn' AND m.content IS NOT NULL AND m.content != ''
+       ORDER BY m.id DESC LIMIT 1`
+    );
+    return {
+      firstPrompt: promptText(contentText(first(firstPrompt, contentRow, id)?.content ?? null)),
+      lastReply: contentText(first(lastReply, contentRow, id)?.content ?? null).trim()
+    };
+  });
+}
+function storedTranscripts(db = stateDbPath()) {
+  const later = (read) => new Promise((resolve7, reject) => setImmediate(() => {
+    try {
+      resolve7(read());
+    } catch (error) {
+      reject(error instanceof Error ? error : new Error(String(error)));
+    }
+  }));
+  return {
+    ends: (id) => later(() => readSessionEnds(id, db)),
+    page: (id, after, limit) => later(() => readTranscriptPage(id, after, limit, db))
+  };
+}
+
+// src/hermes/sessionIndex.ts
 var run3 = promisify2(execFile3);
 var SOURCES = ["acp", "cli", "desktop", "gui", "local", "tui"];
 var LISTABLE = `(s.parent_session_id IS NULL
@@ -63572,7 +63746,7 @@ function flat2(text15) {
 function storedSessions(limit = 400, db = stateDbPath()) {
   let conn;
   try {
-    conn = new DatabaseSync3(db, { readOnly: true });
+    conn = new DatabaseSync4(db, { readOnly: true });
     const listed = rows(conn.prepare(QUERY2), sessionRow, ...SOURCES, JSON.stringify(supersededSegments(conn)), limit);
     return listed.map((r) => ({
       branch: r.branch ?? "",
@@ -63582,7 +63756,7 @@ function storedSessions(limit = 400, db = stateDbPath()) {
       messages: Number(r.messages) || 0,
       model: r.model ?? "",
       pinned: r.pinned === 1,
-      preview: flat2(r.preview).slice(0, 400),
+      preview: flat2(skillPrompt(contentText(r.preview))).slice(0, 400),
       repoRoot: r.repo_root ?? "",
       source: r.source ?? "",
       startedAt: Math.round((r.started_at ?? 0) * 1e3),
@@ -63590,26 +63764,6 @@ function storedSessions(limit = 400, db = stateDbPath()) {
     }));
   } catch {
     return [];
-  } finally {
-    conn?.close();
-  }
-}
-var replyRow = object({ content: text2 });
-function lastReply(id, db = stateDbPath()) {
-  let conn;
-  try {
-    conn = new DatabaseSync3(db, { readOnly: true });
-    const stmt = conn.prepare(
-      `WITH RECURSIVE chain(cur) AS (SELECT ? UNION ALL SELECT child.id FROM chain c
-         JOIN sessions parent ON parent.id = c.cur JOIN sessions child ON child.parent_session_id = c.cur
-         WHERE parent.end_reason = 'compression')
-       SELECT m.content FROM messages m WHERE m.session_id IN (SELECT cur FROM chain)
-         AND m.role = 'assistant' AND m.content IS NOT NULL AND m.content != ''
-       ORDER BY m.timestamp DESC, m.id DESC LIMIT 1`
-    );
-    return (first(stmt, replyRow, id)?.content ?? "").trim();
-  } catch {
-    return "";
   } finally {
     conn?.close();
   }
@@ -63638,11 +63792,714 @@ function sessionLabel(s2) {
   return s2.title || s2.preview.split(/(?<=[.?!])\s/)[0]?.slice(0, 110) || "Untitled session";
 }
 
+// src/transcript/compactions.ts
+var Compactions = class {
+  #host;
+  #seen = [];
+  constructor(host) {
+    this.#host = host;
+  }
+  /**
+   * The context started compacting. Inside a running turn that already did something it is a
+   * step of that turn; else it goes between turns, before the turn it was compacted for. Hermes'
+   * later lines of the same compaction only fill in the count. Returns the compaction (the one
+   * already running, when it fills one in): the handle uncompact() takes back.
+   */
+  compacting({ before, at = Date.now(), manual = false }) {
+    const running2 = this.#seen.findLast(isRunning3);
+    if (running2) {
+      running2.before ??= before || void 0;
+      running2.manual ||= manual || void 0;
+      this.#touch(running2);
+      return running2;
+    }
+    const compaction = { startedAt: at, state: { status: "running" }, ...before ? { before } : {}, ...manual ? { manual } : {} };
+    this.#seen.push(compaction);
+    const live = this.#host.live();
+    if (live?.blocks.length) {
+      live.blocks.push({ at, compaction, id: this.#host.id("z"), kind: "compaction" });
+      live.rev++;
+      return compaction;
+    }
+    const entry = { compaction, id: this.#host.id("z"), kind: "compaction", rev: 0 };
+    const entries = this.#host.entries();
+    if (live && entries.at(-1) === live) {
+      entries.splice(-1, 0, entry);
+    } else {
+      entries.push(entry);
+    }
+    return compaction;
+  }
+  /**
+   * The running compaction ended. `tokens` are the owner's own counts (/compress reports them
+   * after its `ready` edge, so they also reach the compaction that just ended).
+   */
+  compacted(at = Date.now(), tokens2 = {}) {
+    const running2 = this.#seen.findLast(isRunning3);
+    const c = running2 ?? (tokens2.before || tokens2.after ? this.#seen.at(-1) : void 0);
+    if (!c) {
+      return;
+    }
+    const done = c.state.status === "running" ? { endedAt: at, status: "done" } : c.state;
+    c.before = tokens2.before || c.before;
+    c.state = { ...done, ...tokens2.after ? { after: tokens2.after } : {} };
+    this.#touch(c);
+  }
+  /**
+   * A compaction did not happen after all. `'running'`: Hermes aborted the last one (no done edge
+   * came before the turn ended), dropped only while it runs; a compaction: the one compacting()
+   * returned to /compress, which changed nothing (another one seen since stays).
+   */
+  uncompact(which) {
+    const last = this.#seen.at(-1);
+    const c = which === "running" ? last && isRunning3(last) ? last : void 0 : which;
+    const seen = c ? this.#seen.indexOf(c) : -1;
+    if (!c || seen < 0) {
+      return;
+    }
+    this.#seen.splice(seen, 1);
+    const entries = this.#host.entries();
+    const at = entries.findIndex((e) => e.kind === "compaction" && e.compaction === c);
+    if (at >= 0) {
+      entries.splice(at, 1);
+      return;
+    }
+    const turn = entries.findLast(
+      (e) => e.kind === "turn" && e.blocks.some((b) => b.kind === "compaction" && b.compaction === c)
+    );
+    if (turn) {
+      turn.blocks = turn.blocks.filter((b) => b.kind !== "compaction" || b.compaction !== c);
+      turn.rev++;
+    }
+  }
+  /**
+   * A context reading (tokens in use): the first one under the last compaction's `before` is what
+   * it left. A reading from before it finished (a stale tick) is not lower, so it is skipped.
+   */
+  contextUsed(used) {
+    const c = this.#seen.at(-1);
+    const state = c?.state;
+    if (!c || state?.status !== "done" || state.after !== void 0 || !(used > 0) || c.before && used >= c.before * 0.95) {
+      return;
+    }
+    c.state = { ...state, after: used };
+    this.#touch(c);
+  }
+  /** The compactions seen here that the store has no summary for yet. */
+  get unsummarized() {
+    return this.#seen.some((c) => c.state.status === "done" && c.state.summary === void 0);
+  }
+  /** Gives each seen compaction the stored summary written while it ran. */
+  summarize(stored) {
+    for (const [mark2, c] of this.#claims(stored)) {
+      if (c.state.status === "done" && c.state.summary === void 0) {
+        c.state = summarized(c.state, mark2);
+        this.#touch(c);
+      }
+    }
+  }
+  /**
+   * The compactions a reload shows for `stored`, oldest first: the one this view saw happen when
+   * there is one (its numbers stay, the store's summary fills in), else one from the store alone.
+   */
+  restore(stored) {
+    const marks = [...stored].sort((a2, b) => a2.at - b.at);
+    const claims = this.#claims(marks);
+    return marks.map((mark2) => ({ at: mark2.at, compaction: restored(mark2, claims.get(mark2)) }));
+  }
+  /** Another session is shown: the compactions seen were the last one's. */
+  forget() {
+    this.#seen = [];
+  }
+  /** Which stored compaction each seen one is: the nearest summary written while it ran, each once. */
+  #claims(stored) {
+    const out = /* @__PURE__ */ new Map();
+    for (const c of this.#seen) {
+      const end = compactionEndedAt(c) ?? c.startedAt;
+      const mark2 = stored.filter((s2) => c.state.status === "done" && !out.has(s2) && within(c, s2.at)).sort((a2, b) => Math.abs(a2.at - end) - Math.abs(b.at - end))[0];
+      if (mark2) {
+        out.set(mark2, c);
+      }
+    }
+    return out;
+  }
+  /** Marks the turn or entry showing `c` changed. */
+  #touch(c) {
+    const shown3 = this.#host.entries().findLast((e) => e.kind === "compaction" && e.compaction === c || e.kind === "turn" && e.blocks.some((b) => b.kind === "compaction" && b.compaction === c));
+    if (shown3?.kind === "compaction" || shown3?.kind === "turn") {
+      shown3.rev++;
+    }
+  }
+};
+function restored(mark2, seen) {
+  if (seen) {
+    if (seen.state.status === "done") {
+      seen.state = summarized(seen.state, mark2);
+    }
+    return seen;
+  }
+  return {
+    startedAt: mark2.at,
+    state: { status: "done", ...mark2.summary ? { summary: mark2.summary } : {}, ...mark2.messages ? { messages: mark2.messages } : {} }
+  };
+}
+function summarized(state, mark2) {
+  const { messages: _, ...rest } = state;
+  return { ...rest, summary: mark2.summary ?? "", ...mark2.messages === void 0 ? {} : { messages: mark2.messages } };
+}
+function compactionEndedAt(c) {
+  return c.state.status === "done" ? c.state.endedAt : void 0;
+}
+var isRunning3 = (c) => c.state.status === "running";
+function within(c, at) {
+  return at >= c.startedAt - 5e3 && at <= (compactionEndedAt(c) ?? Date.now()) + 15e3;
+}
+
+// src/transcript/turns.ts
+function turnEndedAt(turn) {
+  return turn.end.status === "live" ? void 0 : turn.end.endedAt;
+}
+function endThinking(turn, at) {
+  for (const b of turn.blocks) {
+    if (b.kind === "thinking" && b.endedAt === void 0) {
+      b.endedAt = at;
+    }
+  }
+}
+function trailingText(turn) {
+  let out = "";
+  for (const b of turn.blocks) {
+    if (b.kind === "tool" || b.kind === "text" && !b.text) {
+      out = "";
+    } else if (b.kind === "text") {
+      out += b.text;
+    }
+  }
+  return out;
+}
+function answerText(turn) {
+  const last = turn.blocks.findLast((b) => b.kind === "text" && b.text.trim());
+  return last?.kind === "text" ? last.text.trim() : "";
+}
+function usageSince(now, before) {
+  const out = { ...now };
+  for (const key2 of ["cost_usd", "input", "output", "total"]) {
+    const a2 = now[key2];
+    const b = before?.[key2];
+    if (typeof a2 === "number") {
+      out[key2] = Math.max(0, a2 - (typeof b === "number" ? b : 0));
+    } else {
+      delete out[key2];
+    }
+  }
+  return out;
+}
+function shownArgs(args) {
+  const command = args["command"];
+  return typeof command === "string" ? { ...args, command: withoutTernEnv(command) } : args;
+}
+
+// src/view/workLogModel.ts
+var SOLO = /* @__PURE__ */ new Set(["clarify", "delegate_task", "todo", "todo_list"]);
+function ownsCard(call) {
+  return SOLO.has(call.name) || isBackgroundCall(call) || waiting4(call) || isConnectCall(call) || call.name === "image_generate" || showsImage(call);
+}
+function waiting4(call) {
+  return isWatchCall(call) && call.outcome.kind === "running";
+}
+function showsImage(call) {
+  return shownImage(call) !== void 0;
+}
+function pieces(blocks2, turn = blocks2) {
+  const out = [];
+  let items = [];
+  const plan = turn.findLast((b) => b.kind === "tool" && isTodoName(b.call.name) && b.call.todos?.length);
+  for (const b of blocks2) {
+    if (b.kind === "thinking" || b.kind === "tool" && (!ownsCard(b.call) || isTodoName(b.call.name) && b !== plan)) {
+      items.push(b);
+      continue;
+    }
+    if (items.length) {
+      out.push({ items, kind: "work" });
+      items = [];
+    }
+    out.push({ block: b, kind: "block" });
+  }
+  if (items.length) {
+    out.push({ items, kind: "work" });
+  }
+  return out;
+}
+function visibleItems(items) {
+  return items.filter((i) => i.kind === "tool" || i.text.trim());
+}
+function foldOf(turn) {
+  if (turn.end.status !== "done") {
+    return void 0;
+  }
+  const answer = turn.blocks.findLastIndex((b) => b.kind === "text" && b.text.trim());
+  const hidden2 = /* @__PURE__ */ new Set();
+  for (const [i, b] of turn.blocks.entries()) {
+    if (i === answer || b.kind === "steer" || b.kind === "compaction") {
+      continue;
+    }
+    if (b.kind === "tool" && (isBackgroundCall(b.call) || waiting4(b.call) || isConnectCall(b.call) || showsImage(b.call) || b.call.subagents?.some((a2) => a2.status === "running" || a2.status === "queued"))) {
+      continue;
+    }
+    if (answer >= 0 && i > answer && b.kind === "tool" && b.call.outcome.kind !== "done") {
+      continue;
+    }
+    hidden2.add(b.id);
+  }
+  if (hidden2.size === 0) {
+    return void 0;
+  }
+  const ms = (turnEndedAt(turn) ?? turn.startedAt) - turn.startedAt;
+  return { hidden: hidden2, label: workedFor(ms) };
+}
+var workedFor = (ms) => ms > 0 ? `Worked for ${durationCompact(ms)}` : "Worked";
+function parts2(turn) {
+  const fold = foldOf(turn);
+  if (!fold) {
+    return [{ blocks: [...turn.blocks], kind: "shown" }];
+  }
+  const out = [];
+  const show = (b) => {
+    const last = out.at(-1);
+    if (last?.kind === "shown") {
+      last.blocks.push(b);
+    } else {
+      out.push({ blocks: [b], kind: "shown" });
+    }
+  };
+  let stretch = [];
+  let from = turn.startedAt;
+  const flush = (to) => {
+    const hidden2 = stretch.filter((b) => fold.hidden.has(b.id));
+    if (isNonEmpty(hidden2)) {
+      out.push({ blocks: hidden2, key: `fold${hidden2[0].id}`, kind: "fold", label: workedFor(to - from) });
+    }
+    stretch.filter((b) => !fold.hidden.has(b.id)).forEach(show);
+    stretch = [];
+  };
+  for (const b of turn.blocks) {
+    if (b.kind === "steer" || b.kind === "compaction") {
+      flush(b.at);
+      show(b);
+      from = b.kind === "compaction" ? compactionEndedAt(b.compaction) ?? b.at : b.at;
+    } else {
+      stretch.push(b);
+    }
+  }
+  flush(turnEndedAt(turn) ?? from);
+  return out;
+}
+function actionOf(call) {
+  return withView(call, (view) => view.action());
+}
+var and2 = (words3) => words3.length < 3 ? words3.join(" and ") : `${words3.slice(0, -1).join(", ")}, and ${words3.at(-1)}`;
+function actionLabel(action, n, calls = []) {
+  switch (action) {
+    case "app": {
+      const apps = [...new Set(calls.flatMap(appsOf))];
+      const uses = calls.reduce((k, c) => k + (batchOf(c)?.length ?? 1), 0);
+      return apps.length === 1 ? `Used ${apps[0]}${uses > 1 ? ` ${uses} times` : ""}` : `Used ${and2(apps)}`;
+    }
+    case "command":
+      return `Ran ${plural(n, "command")}`;
+    case "read":
+      return `Read ${plural(n, "file")}`;
+    case "edit":
+      return `Changed ${plural(n, "file")}`;
+    case "code-search":
+      return `Searched code ${plural(n, "time")}`;
+    case "search":
+      return `Searched the web ${plural(n, "time")}`;
+    case "fetch":
+      return `Read ${plural(n, "page")}`;
+    case "browser":
+      return `Used browser ${plural(n, "time")}`;
+    case "lookup":
+      return `Looked up tools${n > 1 ? ` ${n} times` : ""}`;
+    case "plan":
+      return `Updated the plan${n > 1 ? ` ${n} times` : ""}`;
+    case "other":
+      return `Used ${plural(n, "tool")}`;
+  }
+}
+var priority = (a2) => a2 === "command" || a2 === "edit" || a2 === "app" ? 0 : a2 === "other" || a2 === "lookup" ? 2 : 1;
+function summarize(items) {
+  const calls = items.flatMap((i) => i.kind === "tool" ? [i.call] : []);
+  if (!calls.length) {
+    return items.length === 1 ? "Thought" : `Thought (\xD7${items.length})`;
+  }
+  const groups = /* @__PURE__ */ new Map();
+  for (const c of calls) {
+    const a2 = actionOf(c);
+    groups.set(a2, [...groups.get(a2) ?? [], c]);
+  }
+  const all8 = [...groups].map(([action, list9], index2) => ({
+    count: list9.length,
+    index: index2,
+    label: actionLabel(action, action === "edit" ? editedFiles(list9) : list9.length, list9),
+    priority: priority(action)
+  }));
+  const picked = [...all8].sort((a2, b) => a2.priority - b.priority || a2.index - b.index).slice(0, 2).sort((a2, b) => a2.index - b.index);
+  const labels = picked.map((p3) => p3.label);
+  const rest = calls.length - picked.reduce((n, p3) => n + p3.count, 0);
+  if (rest > 0) {
+    labels.push(`Performed ${plural(rest, "other action")}`);
+  }
+  const words3 = labels.map((l, i) => i === 0 ? l : l.charAt(0).toLowerCase() + l.slice(1));
+  return words3.length < 3 ? words3.join(" and ") : `${words3.slice(0, -1).join(", ")}, and ${words3.at(-1)}`;
+}
+function editedFiles(calls) {
+  const paths = /* @__PURE__ */ new Set();
+  let unnamed = 0;
+  for (const c of calls) {
+    const d = detailOf(c);
+    const path2 = d.tool === "patch" || d.tool === "write_file" ? d.path : void 0;
+    if (path2) {
+      paths.add(path2);
+    } else {
+      unnamed++;
+    }
+  }
+  return paths.size + unnamed;
+}
+function groupIcon(items) {
+  const actions = new Set(items.flatMap((i) => i.kind === "tool" ? [actionOf(i.call)] : []));
+  const [only] = actions;
+  if (!only) {
+    return "brain";
+  }
+  return actions.size === 1 ? actionIcon(only) : "hammer";
+}
+function actionIcon(action) {
+  return ACTION_ICON[action];
+}
+function stepLabel(call) {
+  return withView(call, (view) => view.step());
+}
+function liveLabel(item3, active = false) {
+  if (item3.kind === "thinking") {
+    return thoughtTitle(item3) || (item3.endedAt === void 0 || active ? "Thinking" : "Thought");
+  }
+  const call = item3.call;
+  const status = active && call.outcome.kind === "done" ? "running" : call.outcome.kind;
+  const d = detailOf(call);
+  const command = d.tool === "terminal" ? d.command ?? call.context : void 0;
+  if (!command) {
+    return status === "running" ? presentTense(stepLabel(call)) : stepLabel(call);
+  }
+  const verb = { cancelled: "Stopped", done: "Ran", error: "Failed", running: "Running" }[status];
+  return `${verb} ${commandProgramName(command) ?? "command"}`;
+}
+function busyLabel(call) {
+  return `${liveLabel({ call, id: call.id, kind: "tool" }, true)}\u2026`;
+}
+function preparingLabel(name) {
+  const app2 = appOf(name);
+  return `Preparing ${app2 ? `${app2.app} \xB7 ${app2.action}` : name.replace(/_/g, " ")}\u2026`;
+}
+var PRESENT = {
+  Edited: "Editing",
+  Linked: "Linking",
+  Listed: "Listing",
+  Looked: "Looking",
+  Read: "Reading",
+  Searched: "Searching",
+  Unlinked: "Unlinking",
+  Used: "Using",
+  Wrote: "Writing"
+};
+function presentTense(label) {
+  const [verb = "", ...rest] = label.split(" ");
+  return PRESENT[verb] ? [PRESENT[verb], ...rest].join(" ") : label;
+}
+function thoughtLine(markdown2) {
+  return flat(
+    markdown2.replace(/!?\[([^\]]*)\]\([^)]*\)/g, "$1").replace(/^[ \t]*(?:#{1,6}|[-*+]|\d+\.)[ \t]+/gm, "").replace(/`+|\*\*|~~/g, "").replace(/(^|[^\w*])[*_]([^*_\n]+)[*_](?![\w*])/g, "$1$2")
+  );
+}
+function thoughtTitle(item3) {
+  const line = thoughtLine(item3.text);
+  return item3.label ? line ? `${item3.label}: ${line}` : item3.label : line;
+}
+
+// src/overlays/sessions/rows.ts
+import { basename as basename2 } from "node:path";
+var DAY = 864e5;
+var SNIPPET = 160;
+function snippet(text15, max = SNIPPET) {
+  const flat3 = text15.replace(/```[\s\S]*?(```|$)/g, " [code] ").replace(/^@image:\S+/gm, "").replace(/\[The user attached [^\]]*\]/g, "").replace(/\[([^\]\n]+)\]\((?:[^)\s]+)\)/g, "$1").replace(/^\s{0,3}(?:#{1,6}\s+|>\s?|[-*+]\s+|\d+[.)]\s+)/gm, "").replace(/`([^`\n]+)`/g, "$1").replace(/(\*\*|__)(.+?)\1/g, "$2").replace(/\s+/g, " ").trim();
+  return clip(flat3, { max });
+}
+function rowDetail(s2) {
+  if (s2.title) {
+    return snippet(s2.preview);
+  }
+  const label = sessionLabel(s2);
+  return s2.preview.startsWith(label) ? snippet(s2.preview.slice(label.length)) : "";
+}
+function itemOf2(s2, now, running2, elsewhere) {
+  const detail = rowDetail(s2);
+  return {
+    badges: [
+      ...running2 ? [{ text: "running", tone: "accent" }] : [],
+      ...s2.pinned ? [{ text: "pinned" }] : [],
+      ...s2.branch ? [{ text: s2.branch, title: `Branch ${s2.branch}` }] : [],
+      ...elsewhere && s2.cwd ? [{ text: basename2(s2.cwd), title: s2.cwd }] : []
+    ],
+    ...optional("detail", detail || void 0),
+    facts: { size: plural(s2.messages, "msg"), when: ageShort(now - s2.lastActive) },
+    id: s2.id,
+    label: sessionLabel(s2),
+    ...optional("title", s2.cwd || void 0)
+  };
+}
+function dayOf(at, now) {
+  const midnight = new Date(now).setHours(0, 0, 0, 0);
+  return at >= midnight ? "Today" : at >= midnight - DAY ? "Yesterday" : at >= midnight - 6 * DAY ? "This week" : at >= midnight - 30 * DAY ? "This month" : "Earlier";
+}
+function dateOf(at) {
+  return new Date(at).toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" });
+}
+
+// src/overlays/sessions/detail.tsx
+var MESSAGE_MAX = 6e3;
+var MORE = "more";
+function sessionDetail(d) {
+  const { session: s2, preview: preview4 } = d;
+  const blocks2 = [];
+  const block = (key2, children3, tone) => {
+    blocks2.push(key2);
+    return /* @__PURE__ */ jsx(
+      "col",
+      {
+        gap: "xs",
+        onClick: () => d.focus(key2),
+        role: d.focused === key2 ? "omp.picker.block.focused" : "omp.picker.block",
+        ...optional("tone", tone),
+        children: children3
+      },
+      key2
+    );
+  };
+  const ends = preview4?.ends;
+  const failed = preview4?.status === "error";
+  const first2 = ends?.firstPrompt || s2.preview;
+  const reply2 = ends ? ends.lastReply : void 0;
+  const nodes = [
+    /* @__PURE__ */ jsx("text", { role: "omp.picker.title", text: sessionLabel(s2), wrap: "word" }, "title"),
+    /* @__PURE__ */ jsx("kv", { items: facts(overview(s2, d)) }, "facts"),
+    /* @__PURE__ */ jsxs("col", { gap: "xs", role: "hermes.sessions.id", children: [
+      /* @__PURE__ */ jsx("text", { spans: [{ s: "muted", t: "Session id" }] }, "head"),
+      /* @__PURE__ */ jsx("text", { spans: [{ s: "mono", t: s2.id }], wrap: "char" }, "value"),
+      /* @__PURE__ */ jsx(
+        "text",
+        {
+          spans: [
+            { s: "dim", t: `${s2.source || "local"} \xB7 ` },
+            d.copied ? { s: "success", t: "Copied" } : { s: "dim", t: "\u2325C copies it" }
+          ]
+        },
+        "hint"
+      )
+    ] }, "id"),
+    block("first", [
+      /* @__PURE__ */ jsx("text", { spans: [{ s: "muted strong", t: "First prompt" }] }, "head"),
+      first2 ? /* @__PURE__ */ jsx("md", { role: "hermes.sessions.prompt", text: first2, tone: "user" }, "text") : /* @__PURE__ */ jsx("text", { spans: [{ s: "dim", t: "No prompt yet." }] }, "text")
+    ]),
+    block("last", [
+      /* @__PURE__ */ jsx("text", { spans: [{ s: "muted strong", t: "Last reply" }] }, "head"),
+      reply2 ? /* @__PURE__ */ jsx("md", { role: "hermes.sessions.reply", text: reply2 }, "text") : /* @__PURE__ */ jsx("text", { spans: [{ s: "dim", t: reply2 === void 0 && !failed ? "Loading\u2026" : "No reply yet." }] }, "text")
+    ]),
+    /* @__PURE__ */ jsx("rule", { label: "Conversation" }, "tx")
+  ];
+  if (!preview4 || preview4.status === "loading") {
+    nodes.push(/* @__PURE__ */ jsx("text", { spans: [{ s: "dim", t: "Loading the conversation\u2026" }] }, "loading"));
+    return { blocks: blocks2, nodes };
+  }
+  if (preview4.status === "error") {
+    nodes.push(/* @__PURE__ */ jsx("text", { spans: [{ s: "error", t: `Could not read this session: ${preview4.error ?? "unknown error"}` }], wrap: "word" }, "error"));
+    return { blocks: blocks2, nodes };
+  }
+  preview4.rows.forEach((row2, i) => nodes.push(block(`m${i}`, rowNode(row2), row2.kind === "note" && row2.tone === "error" ? "error" : void 0)));
+  if (preview4.loadingMore) {
+    nodes.push(block(MORE, /* @__PURE__ */ jsx("text", { spans: [{ s: "dim", t: "Loading more\u2026" }] }, "t")));
+  } else if (preview4.error) {
+    nodes.push(block(MORE, /* @__PURE__ */ jsx("text", { onClick: d.more, spans: [{ s: "error", t: `Could not load more: ${preview4.error}. ` }, { s: "link", t: "Retry" }], wrap: "word" }, "t")));
+  } else if (preview4.next !== null) {
+    nodes.push(block(MORE, /* @__PURE__ */ jsx("text", { onClick: d.more, spans: [{ s: "link", t: "Load more" }, { s: "dim", t: ` \xB7 ${preview4.rows.length} lines so far` }] }, "t")));
+  } else {
+    nodes.push(/* @__PURE__ */ jsx("text", { spans: [{ s: "dim", t: preview4.rows.length ? "End of the conversation." : "No messages." }] }, "end"));
+  }
+  return { blocks: blocks2, nodes };
+}
+function overview(s2, d) {
+  const status = d.isCurrent ? [{ s: "success", t: "open here" }] : d.running ? [{ s: "accent", t: "running in another pane" }] : void 0;
+  return [
+    ["Status", status],
+    ["Folder", s2.cwd && [{ s: "mono", t: homeTilde(s2.cwd, launchEnv().home) }]],
+    ["Branch", s2.branch && [{ s: "mono", t: s2.branch }]],
+    ["Last active", `${dateOf(s2.lastActive)} \xB7 ${ageShort(d.now - s2.lastActive)} ago`],
+    ["Started", dateOf(s2.startedAt)],
+    ["Messages", String(s2.messages)],
+    ["Model", s2.model && [{ s: "mono", t: s2.model }]]
+  ];
+}
+var stepLines = /* @__PURE__ */ new WeakMap();
+function stepOf(row2) {
+  const held = stepLines.get(row2);
+  if (held !== void 0) {
+    return held;
+  }
+  const line = stepLabel({
+    args: row2.args,
+    argsText: "",
+    context: "",
+    id: toolCallId(row2.key),
+    name: row2.name,
+    outcome: { duration: 0, kind: "done" },
+    startedAt: 0,
+    via: { kind: "direct" }
+  });
+  stepLines.set(row2, line);
+  return line;
+}
+function rowNode(row2) {
+  switch (row2.kind) {
+    case "user":
+      return [
+        /* @__PURE__ */ jsx("text", { spans: [{ s: "strong", t: "You" }, ...row2.steer ? [{ s: "dim", t: " \xB7 steer" }] : []] }, "who"),
+        /* @__PURE__ */ jsx("md", { role: "hermes.sessions.user", text: clip(row2.text, { mark: "line", max: MESSAGE_MAX }), tone: "user" }, "text")
+      ];
+    case "assistant":
+      return [
+        /* @__PURE__ */ jsx("text", { spans: [{ s: "strong accent", t: "Hermes" }] }, "who"),
+        /* @__PURE__ */ jsx("md", { role: "hermes.sessions.reply", text: clip(row2.text, { mark: "line", max: MESSAGE_MAX }) }, "text")
+      ];
+    case "tool":
+      return [
+        /* @__PURE__ */ jsxs("row", { align: "center", gap: "xs", role: "hermes.sessions.tool", children: [
+          /* @__PURE__ */ jsx("icon", { name: hubIconOf(row2.name) }, "ic"),
+          /* @__PURE__ */ jsx("text", { spans: [{ s: "dim", t: stepOf(row2) }], truncate: "end", wrap: "none" }, "t")
+        ] }, "line")
+      ];
+    case "note":
+      return [/* @__PURE__ */ jsx("text", { spans: [{ s: row2.tone === "error" ? "error" : "dim", t: row2.text }], wrap: "word" }, "t")];
+  }
+}
+
+// src/overlays/sessions/preview.ts
+var EMPTY_PAGES = 5;
+var PreviewLoader = class {
+  #reader;
+  #changed;
+  #delay;
+  #pageSize;
+  #cache = /* @__PURE__ */ new Map();
+  #timer;
+  #disposed = false;
+  constructor(reader, changed, { delay = 200, pageSize = 40 } = {}) {
+    this.#reader = reader;
+    this.#changed = changed;
+    this.#delay = delay;
+    this.#pageSize = pageSize;
+  }
+  /** The selection moved to `id`: its preview loads once the selection rests `delay` ms, unless it is held. */
+  select(id) {
+    clearTimeout(this.#timer);
+    this.#timer = void 0;
+    if (id === void 0 || this.#disposed) {
+      return;
+    }
+    const held = this.#cache.get(id);
+    if (held && held.status !== "error") {
+      return;
+    }
+    this.#timer = setTimeout(() => {
+      this.#timer = void 0;
+      void this.#first(id);
+    }, this.#delay);
+  }
+  /** Session `id`'s preview; undefined until its read starts. */
+  get(id) {
+    return this.#cache.get(id);
+  }
+  /** Reads `id`'s next page; a no-op at the end, before the first page, or while a page is on its way. */
+  more(id) {
+    const entry = this.#cache.get(id);
+    if (entry?.status === "ready" && entry.next !== null && !entry.loadingMore) {
+      void this.#more(id, entry);
+    }
+  }
+  /** Drops what is held of `id` (a deleted session). */
+  forget(id) {
+    this.#cache.delete(id);
+  }
+  /** The picker closed: no timer left, and reads still on their way change nothing. */
+  dispose() {
+    clearTimeout(this.#timer);
+    this.#disposed = true;
+    this.#cache.clear();
+  }
+  async #first(id) {
+    const entry = { loadingMore: false, next: null, rows: [], seen: /* @__PURE__ */ new Set(), status: "loading" };
+    this.#cache.set(id, entry);
+    this.#changed();
+    try {
+      const [ends, page] = await Promise.all([this.#reader.ends(id), this.#reader.page(id, 0, this.#pageSize)]);
+      entry.ends = ends;
+      entry.status = "ready";
+      entry.next = page.next;
+      this.#keep(entry, page.rows);
+    } catch (error) {
+      entry.status = "error";
+      entry.error = errorText(error);
+    }
+    this.#done(id, entry);
+  }
+  async #more(id, entry) {
+    entry.loadingMore = true;
+    entry.error = void 0;
+    this.#changed();
+    try {
+      for (let i = 0; i < EMPTY_PAGES && entry.next !== null; i++) {
+        const page = await this.#reader.page(id, entry.next, this.#pageSize);
+        entry.next = page.next;
+        if (this.#keep(entry, page.rows)) {
+          break;
+        }
+      }
+    } catch (error) {
+      entry.error = errorText(error);
+    }
+    entry.loadingMore = false;
+    this.#done(id, entry);
+  }
+  /** Appends the rows not seen yet; how many it kept. */
+  #keep(entry, rows2) {
+    const fresh = rows2.filter((r) => !entry.seen.has(r.key));
+    for (const r of fresh) {
+      entry.seen.add(r.key);
+    }
+    entry.rows.push(...fresh);
+    return fresh.length;
+  }
+  #done(id, entry) {
+    if (!this.#disposed && this.#cache.get(id) === entry) {
+      this.#changed();
+    }
+  }
+};
+
 // src/overlays/sessions.tsx
 var KEY6 = "sessions";
 var LIMIT = 400;
-var DAY = 864e5;
-function openSessionPicker(host) {
+var NEAR_END = 3;
+function openSessionPicker(host, reader = storedTranscripts()) {
   let state = "loading";
   let sessions = [];
   let running2 = /* @__PURE__ */ new Set();
@@ -63652,8 +64509,14 @@ function openSessionPicker(host) {
   let selected;
   let deleting = null;
   let shown3 = [];
-  const replies = /* @__PURE__ */ new Map();
+  let focus = "list";
+  let block;
+  let blocks2 = [];
+  let nodeId = `layer.${KEY6}`;
+  let told2;
   const current = durable(host.session.ref) ?? "";
+  const loader = new PreviewLoader(reader, () => host.changed());
+  const copied = new Flash(() => host.changed());
   const load2 = async () => {
     state = "loading";
     host.changed();
@@ -63690,6 +64553,7 @@ function openSessionPicker(host) {
     try {
       await (host.gw.isCanonical ? mutateSession(host.gw, id, "delete", {}) : rpc(host.gw, "session.delete", { session_id: id }));
       sessions = sessions.filter((s2) => s2.id !== id);
+      loader.forget(id);
     } catch (error) {
       host.transcript.notice(errorText(error), "error");
     }
@@ -63705,9 +64569,59 @@ function openSessionPicker(host) {
       deleting = selected;
     }
   };
+  const copyId = () => {
+    if (selected) {
+      copyToClipboard(selected);
+      copied.set(selected);
+    }
+  };
   const setTab = (t2) => {
     tab2 = t2;
     deleting = null;
+    focus = "list";
+  };
+  const focusBlock = (key2) => {
+    if (!key2 || !selected) {
+      return;
+    }
+    focus = "preview";
+    block = key2;
+    host.reveal(`${nodeId}.${key2}`);
+    if (blocks2.length - blocks2.indexOf(key2) <= NEAR_END || key2 === MORE) {
+      loader.more(selected);
+    }
+    host.changed();
+  };
+  const scrollPreview = (to) => {
+    const at = block ?? blocks2[0];
+    if (at) {
+      host.scroll(`${nodeId}.${at}`, to);
+    }
+  };
+  const previewKey = (k) => {
+    const bare = !k.ctrl && !k.alt && !k.meta;
+    const at = block ? blocks2.indexOf(block) : -1;
+    if (k.name === "escape" || bare && k.name === "left") {
+      focus = "list";
+    } else if (bare && (k.name === "down" || k.name === "j")) {
+      focusBlock(blocks2[Math.min(blocks2.length - 1, at + 1)]);
+    } else if (bare && (k.name === "up" || k.name === "k")) {
+      focusBlock(blocks2[Math.max(0, at - 1)]);
+    } else if (k.name === "page_down" || bare && k.name === "space") {
+      scrollPreview("page-down");
+    } else if (k.name === "page_up") {
+      scrollPreview("page-up");
+    } else if (k.name === "home") {
+      focusBlock(blocks2[0]);
+    } else if (k.name === "end") {
+      focusBlock(blocks2.at(-1));
+    } else if (bare && k.name === "c") {
+      copyId();
+    } else {
+      focus = "list";
+      return false;
+    }
+    return true;
   };
   const view = (now) => {
     const rank0 = (x) => x.pinned ? 0 : tab2 === "all" && here(x) ? 1 : 2;
@@ -63722,7 +64636,7 @@ ${s2.preview} ${s2.cwd} ${s2.branch} ${s2.id}`, { scattered: false });
       const groups = /* @__PURE__ */ new Map();
       const add = (label, id) => groups.set(label, [...groups.get(label) ?? [], id]);
       for (const s2 of list9) {
-        add(s2.pinned ? "Pinned" : tab2 === "all" && here(s2) && workspace ? `In ${basename2(workspace)}` : dayOf(s2.lastActive, now), s2.id);
+        add(s2.pinned ? "Pinned" : tab2 === "all" && here(s2) && workspace ? `In ${basename3(workspace)}` : dayOf(s2.lastActive, now), s2.id);
       }
       for (const [label, ids] of groups) {
         order2.push({ count: ids.length, group: label, label }, ...ids);
@@ -63737,25 +64651,43 @@ ${s2.preview} ${s2.cwd} ${s2.branch} ${s2.id}`, { scattered: false });
     if (!selected || !shown3.includes(selected)) {
       selected = shown3[0];
     }
+    if (selected !== told2) {
+      told2 = selected;
+      block = void 0;
+      focus = "list";
+      loader.select(selected);
+    }
     return { hits, order: order2 };
   };
   const overlay2 = {
     key: KEY6,
     modal: true,
-    node: () => {
+    node: (id) => {
+      nodeId = id;
       const now = Date.now();
       const { hits, order: order2 } = view(now);
       const s2 = sessions.find((x) => x.id === selected);
       const hereCount = sessions.filter(here).length;
-      const project = workspace ? basename2(workspace) : "This folder";
-      if (s2 && !replies.has(s2.id)) {
-        replies.set(s2.id, lastReply(s2.id));
-      }
+      const project = workspace ? basename3(workspace) : "This folder";
+      const pane = s2 ? sessionDetail({
+        copied: copied.value === s2.id,
+        focus: (key2) => focusBlock(key2),
+        focused: focus === "preview" ? block : void 0,
+        isCurrent: s2.id === current,
+        more: () => loader.more(s2.id),
+        now,
+        preview: loader.get(s2.id),
+        running: running2.has(s2.id),
+        session: s2
+      }) : void 0;
+      blocks2 = pane?.blocks ?? [];
       return /* @__PURE__ */ jsx(
         "picker",
         {
           actions: [
             { id: "delete", keys: ["backspace"], label: "Delete" },
+            { ...optional("disabled", s2 ? void 0 : "No session"), id: "copy", keys: ["alt+c"], label: "Copy id" },
+            focus === "preview" ? { id: "list", keys: ["left"], label: "Back to list" } : { ...optional("disabled", s2 ? void 0 : "No session"), id: "browse", keys: ["right"], label: "Browse" },
             { end: true, id: "close", keys: ["esc"], label: "Close" },
             { ...optional("disabled", s2 ? void 0 : "No session"), id: "resume", keys: ["enter"], label: s2?.id === current ? "Back to it" : "Resume", primary: true }
           ],
@@ -63766,12 +64698,14 @@ ${s2.preview} ${s2.cwd} ${s2.branch} ${s2.id}`, { scattered: false });
           ...optional("confirm", deleting ? { act: "confirm", label: "Delete", text: `Delete \u201C${sessionLabel(sessions.find((x) => x.id === deleting) ?? { preview: "", title: "" })}\u201D?` } : void 0),
           current: current ? [current] : [],
           empty: tab2 === "here" ? `No sessions in ${project} yet. Tab shows every folder.` : "No saved sessions yet",
+          focus,
           hits,
           icon: "history",
           items: rows2().map((x) => itemOf2(x, now, running2.has(x.id), tab2 === "all" && !here(x))),
           layout: "cards",
           noun: "sessions",
           onAction: {
+            browse: () => focusBlock(block ?? blocks2[0]),
             cancel: () => {
               deleting = null;
               host.changed();
@@ -63786,8 +64720,13 @@ ${s2.preview} ${s2.cwd} ${s2.branch} ${s2.id}`, { scattered: false });
                 void remove(deleting);
               }
             },
+            copy: copyId,
             delete: () => {
               askDelete();
+              host.changed();
+            },
+            list: () => {
+              focus = "list";
               host.changed();
             },
             resume: () => resume(selected),
@@ -63807,10 +64746,11 @@ ${s2.preview} ${s2.cwd} ${s2.branch} ${s2.id}`, { scattered: false });
           placeholder: "Search titles, prompts, folders, branches\u2026",
           preview: "side",
           query,
+          role: "hermes.sessions",
           ...optional("selected", selected),
           size: "lg",
           state,
-          subtitle: [{ s: "muted", t: workspace ? shortPath2(workspace) : "" }],
+          subtitle: [{ s: "muted", t: workspace ? homeTilde(workspace, launchEnv().home) : "" }],
           tab: tab2,
           tabs: [
             { count: hereCount, id: "here", label: project },
@@ -63818,10 +64758,14 @@ ${s2.preview} ${s2.cwd} ${s2.branch} ${s2.id}`, { scattered: false });
           ],
           title: "Sessions",
           total: rows2().length,
-          children: s2 ? preview3(s2, now, s2.id === current, running2.has(s2.id), replies.get(s2.id) ?? "") : null
+          children: pane?.nodes ?? null
         },
         KEY6
       );
+    },
+    onClose: () => {
+      loader.dispose();
+      copied.dispose();
     },
     onKey: (k) => {
       if (deleting) {
@@ -63832,16 +64776,21 @@ ${s2.preview} ${s2.cwd} ${s2.branch} ${s2.id}`, { scattered: false });
         }
         return true;
       }
-      if (k.name === "escape") {
+      if (k.name === "c" && k.alt && !k.ctrl && !k.meta) {
+        copyId();
+      } else if (k.name === "enter") {
+        resume(selected);
+      } else if (k.name === "tab") {
+        setTab(tab2 === "here" ? "all" : "here");
+      } else if (focus === "preview" && previewKey(k)) {
+      } else if (k.name === "escape") {
         if (query) {
           query = "";
         } else {
           host.close(overlay2);
         }
-      } else if (k.name === "enter") {
-        resume(selected);
-      } else if (k.name === "tab") {
-        setTab(tab2 === "here" ? "all" : "here");
+      } else if (k.name === "right" && !k.ctrl && !k.alt && !k.meta && selected) {
+        focusBlock(block ?? blocks2[0]);
       } else if (k.name === "backspace" && !query) {
         askDelete();
       } else {
@@ -63858,57 +64807,6 @@ ${s2.preview} ${s2.cwd} ${s2.branch} ${s2.id}`, { scattered: false });
   };
   host.open(overlay2);
   setTimeout(() => void load2(), 0);
-}
-function itemOf2(s2, now, running2, elsewhere) {
-  const label = sessionLabel(s2);
-  return {
-    badges: [
-      ...running2 ? [{ text: "running", tone: "accent" }] : [],
-      ...s2.branch ? [{ text: s2.branch, title: `Branch ${s2.branch}` }] : [],
-      ...elsewhere && s2.cwd ? [{ text: basename2(s2.cwd), title: s2.cwd }] : []
-    ],
-    ...optional("detail", s2.title && s2.preview ? oneLine(s2.preview) : void 0),
-    facts: { size: plural(s2.messages, "msg"), when: ageShort(now - s2.lastActive) },
-    id: s2.id,
-    label,
-    ...optional("title", s2.cwd || void 0)
-  };
-}
-function preview3(s2, now, isCurrent, running2, reply2) {
-  const status = isCurrent ? [{ s: "success", t: "open here" }] : running2 ? [{ s: "accent", t: "running in another pane" }] : void 0;
-  return [
-    /* @__PURE__ */ jsx("text", { role: "omp.picker.title", text: sessionLabel(s2) }, "title"),
-    /* @__PURE__ */ jsx(
-      "kv",
-      {
-        items: facts([
-          ["Status", status],
-          ["Folder", s2.cwd && [{ s: "mono", t: shortPath2(s2.cwd) }]],
-          ["Branch", s2.branch && [{ s: "mono", t: s2.branch }]],
-          ["Last active", `${dateOf(s2.lastActive)} \xB7 ${ageShort(now - s2.lastActive)} ago`],
-          ["Started", dateOf(s2.startedAt)],
-          ["Messages", String(s2.messages)],
-          ["Model", s2.model && [{ s: "mono", t: s2.model }]],
-          ["Session", [{ s: "mono dim", t: `${s2.source} \xB7 ${s2.id.replace(/^(local-)?(.{12}).*$/, "$1$2\u2026")}` }]]
-        ])
-      },
-      "facts"
-    ),
-    ...s2.preview ? [
-      /* @__PURE__ */ jsx("section", { head: "First prompt", children: /* @__PURE__ */ jsx("md", { max: { h: "8lines" }, text: s2.preview, tone: "user" }, "text") }, "first")
-    ] : [],
-    ...reply2 ? [
-      /* @__PURE__ */ jsx("section", { head: "Last reply", children: /* @__PURE__ */ jsx("md", { max: { h: "14lines" }, text: reply2.slice(0, 2e3) }, "text") }, "last")
-    ] : []
-  ];
-}
-var shortPath2 = (path2) => homeTilde(path2, launchEnv().home);
-function dayOf(at, now) {
-  const midnight = new Date(now).setHours(0, 0, 0, 0);
-  return at >= midnight ? "Today" : at >= midnight - DAY ? "Yesterday" : at >= midnight - 6 * DAY ? "This week" : at >= midnight - 30 * DAY ? "This month" : "Earlier";
-}
-function dateOf(at) {
-  return new Date(at).toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" });
 }
 
 // src/overlays/theme.tsx
@@ -63984,50 +64882,6 @@ function openThemePicker(host) {
   host.open(overlay2);
 }
 
-// src/transcript/turns.ts
-function turnEndedAt(turn) {
-  return turn.end.status === "live" ? void 0 : turn.end.endedAt;
-}
-function endThinking(turn, at) {
-  for (const b of turn.blocks) {
-    if (b.kind === "thinking" && b.endedAt === void 0) {
-      b.endedAt = at;
-    }
-  }
-}
-function trailingText(turn) {
-  let out = "";
-  for (const b of turn.blocks) {
-    if (b.kind === "tool" || b.kind === "text" && !b.text) {
-      out = "";
-    } else if (b.kind === "text") {
-      out += b.text;
-    }
-  }
-  return out;
-}
-function answerText(turn) {
-  const last = turn.blocks.findLast((b) => b.kind === "text" && b.text.trim());
-  return last?.kind === "text" ? last.text.trim() : "";
-}
-function usageSince(now, before) {
-  const out = { ...now };
-  for (const key2 of ["cost_usd", "input", "output", "total"]) {
-    const a2 = now[key2];
-    const b = before?.[key2];
-    if (typeof a2 === "number") {
-      out[key2] = Math.max(0, a2 - (typeof b === "number" ? b : 0));
-    } else {
-      delete out[key2];
-    }
-  }
-  return out;
-}
-function shownArgs(args) {
-  const command = args["command"];
-  return typeof command === "string" ? { ...args, command: withoutTernEnv(command) } : args;
-}
-
 // src/turn/control.ts
 async function interruptTurn(gw2, sid) {
   const execution_generation = await currentGeneration(gw2, sid);
@@ -64053,18 +64907,18 @@ async function redirectTurn(gw2, sid, text15) {
 }
 
 // src/commands/control.ts
-var preview4 = (text15) => text15.length > 60 ? `${text15.slice(0, 57)}\u2026` : text15;
+var preview3 = (text15) => text15.length > 60 ? `${text15.slice(0, 57)}\u2026` : text15;
 async function steer2(host, text15) {
   if (!text15) {
     return host.notice("Usage: /steer <guidance for the active turn>", "warning");
   }
   if (!host.busy || !host.sid) {
     host.enqueue(text15);
-    return host.notice(`No active turn \u2014 queued as next prompt: ${preview4(text15)}`);
+    return host.notice(`No active turn \u2014 queued as next prompt: ${preview3(text15)}`);
   }
   const r = await steerTurn(host.gw, host.sid, text15);
   if (r.ok) {
-    return host.steered ? host.steered(text15) : host.notice(`Steer queued for the active turn: ${preview4(text15)}`);
+    return host.steered ? host.steered(text15) : host.notice(`Steer queued for the active turn: ${preview3(text15)}`);
   }
   if (r.error) {
     return host.notice(`/steer failed: ${r.error}`, "error");
@@ -64133,7 +64987,7 @@ async function side(host, text15, kind) {
     });
     if (r?.task_id) {
       host.notice(
-        kind === "bg" ? `Background task ${r.task_id} started: ${preview4(text15)}` : `btw ${r.task_id}: answering from a snapshot of this conversation`
+        kind === "bg" ? `Background task ${r.task_id} started: ${preview3(text15)}` : `btw ${r.task_id}: answering from a snapshot of this conversation`
       );
     }
   } catch (e) {
@@ -64527,8 +65381,8 @@ async function compress(host, arg) {
     return host.notice("Wait for the current turn to finish (or press Esc twice) before compressing.", "warning");
   }
   const focus = arg.trim();
-  const preview5 = /(^|\s)--preview(\s|$)/.test(focus);
-  if (!preview5) {
+  const preview4 = /(^|\s)--preview(\s|$)/.test(focus);
+  if (!preview4) {
     host.compressing("start");
   }
   let result;
@@ -64538,7 +65392,7 @@ async function compress(host, arg) {
     if (host.stale()) {
       return;
     }
-    if (!preview5) {
+    if (!preview4) {
       host.compressing("none");
     }
     throw e;
@@ -64858,7 +65712,7 @@ function copyAnswer(host, arg) {
   host.transcript.notice(`Copied ${n === void 0 ? "the last answer" : `answer ${at}`} (${text15.length} characters).`);
 }
 function historyText(entries, arg) {
-  const preview5 = Math.max(80, Number.parseInt(arg, 10) || 400);
+  const preview4 = Math.max(80, Number.parseInt(arg, 10) || 400);
   let n = 0;
   const lines = entries.flatMap((e) => {
     if (e.kind !== "user" && e.kind !== "turn") {
@@ -64867,7 +65721,7 @@ function historyText(entries, arg) {
     const tools2 = e.kind === "turn" ? e.blocks.filter((b) => b.kind === "tool").length : 0;
     const said = e.kind === "user" ? e.text.trim() : answerText(e);
     const body = said || (tools2 ? `(${tools2} tool call${tools2 === 1 ? "" : "s"})` : "(empty)");
-    const clipped = body.length > preview5 ? `${body.slice(0, preview5).trimEnd()}\u2026` : body;
+    const clipped = body.length > preview4 ? `${body.slice(0, preview4).trimEnd()}\u2026` : body;
     return [`**${e.kind === "user" ? "You" : "Hermes"} #${++n}**
 ${clipped}`];
   });
@@ -65853,398 +66707,37 @@ var STYLES = css`
     font: 13px/1.45 var(--sans);
     color: var(--t2);
   }
+
+  /* The session picker gives its preview the room: the list about 40%, the preview about 60%,
+     where whole prompts, replies and the conversation are read. */
+  :is(.sf-picker[data-role='hermes.sessions'], .sf-picker[data-id='layer.sessions']) .pk-pv {
+    width: 60% !important;
+  }
+
+  /* Prompts and replies in the preview read as prose (the UI face); their code stays mono. */
+  .pk-pv-slot .sf-md:is([data-role='hermes.sessions.prompt'], [data-role='hermes.sessions.reply'], [data-role='hermes.sessions.user']) {
+    font: 13px/1.55 var(--sans) !important;
+  }
+
+  .pk-pv-slot .sf-md:is([data-role='hermes.sessions.prompt'], [data-role='hermes.sessions.reply'], [data-role='hermes.sessions.user']) :is(code, pre) {
+    font-family: var(--mono) !important;
+    font-size: 12px !important;
+  }
+
+  /* The whole session id, on its own lines, wrapped anywhere, never cut. */
+  [data-role='hermes.sessions.id'] {
+    padding: 8px 10px;
+    border-radius: 8px;
+    background: var(--l1);
+    font-size: 12.5px;
+    overflow-wrap: anywhere;
+    word-break: break-all;
+  }
+
+  [data-role='hermes.sessions.tool'] {
+    font: 12.5px/1.45 var(--mono);
+  }
 `;
-
-// src/transcript/compactions.ts
-var Compactions = class {
-  #host;
-  #seen = [];
-  constructor(host) {
-    this.#host = host;
-  }
-  /**
-   * The context started compacting. Inside a running turn that already did something it is a
-   * step of that turn; else it goes between turns, before the turn it was compacted for. Hermes'
-   * later lines of the same compaction only fill in the count. Returns the compaction (the one
-   * already running, when it fills one in): the handle uncompact() takes back.
-   */
-  compacting({ before, at = Date.now(), manual = false }) {
-    const running2 = this.#seen.findLast(isRunning3);
-    if (running2) {
-      running2.before ??= before || void 0;
-      running2.manual ||= manual || void 0;
-      this.#touch(running2);
-      return running2;
-    }
-    const compaction = { startedAt: at, state: { status: "running" }, ...before ? { before } : {}, ...manual ? { manual } : {} };
-    this.#seen.push(compaction);
-    const live = this.#host.live();
-    if (live?.blocks.length) {
-      live.blocks.push({ at, compaction, id: this.#host.id("z"), kind: "compaction" });
-      live.rev++;
-      return compaction;
-    }
-    const entry = { compaction, id: this.#host.id("z"), kind: "compaction", rev: 0 };
-    const entries = this.#host.entries();
-    if (live && entries.at(-1) === live) {
-      entries.splice(-1, 0, entry);
-    } else {
-      entries.push(entry);
-    }
-    return compaction;
-  }
-  /**
-   * The running compaction ended. `tokens` are the owner's own counts (/compress reports them
-   * after its `ready` edge, so they also reach the compaction that just ended).
-   */
-  compacted(at = Date.now(), tokens2 = {}) {
-    const running2 = this.#seen.findLast(isRunning3);
-    const c = running2 ?? (tokens2.before || tokens2.after ? this.#seen.at(-1) : void 0);
-    if (!c) {
-      return;
-    }
-    const done = c.state.status === "running" ? { endedAt: at, status: "done" } : c.state;
-    c.before = tokens2.before || c.before;
-    c.state = { ...done, ...tokens2.after ? { after: tokens2.after } : {} };
-    this.#touch(c);
-  }
-  /**
-   * A compaction did not happen after all. `'running'`: Hermes aborted the last one (no done edge
-   * came before the turn ended), dropped only while it runs; a compaction: the one compacting()
-   * returned to /compress, which changed nothing (another one seen since stays).
-   */
-  uncompact(which) {
-    const last = this.#seen.at(-1);
-    const c = which === "running" ? last && isRunning3(last) ? last : void 0 : which;
-    const seen = c ? this.#seen.indexOf(c) : -1;
-    if (!c || seen < 0) {
-      return;
-    }
-    this.#seen.splice(seen, 1);
-    const entries = this.#host.entries();
-    const at = entries.findIndex((e) => e.kind === "compaction" && e.compaction === c);
-    if (at >= 0) {
-      entries.splice(at, 1);
-      return;
-    }
-    const turn = entries.findLast(
-      (e) => e.kind === "turn" && e.blocks.some((b) => b.kind === "compaction" && b.compaction === c)
-    );
-    if (turn) {
-      turn.blocks = turn.blocks.filter((b) => b.kind !== "compaction" || b.compaction !== c);
-      turn.rev++;
-    }
-  }
-  /**
-   * A context reading (tokens in use): the first one under the last compaction's `before` is what
-   * it left. A reading from before it finished (a stale tick) is not lower, so it is skipped.
-   */
-  contextUsed(used) {
-    const c = this.#seen.at(-1);
-    const state = c?.state;
-    if (!c || state?.status !== "done" || state.after !== void 0 || !(used > 0) || c.before && used >= c.before * 0.95) {
-      return;
-    }
-    c.state = { ...state, after: used };
-    this.#touch(c);
-  }
-  /** The compactions seen here that the store has no summary for yet. */
-  get unsummarized() {
-    return this.#seen.some((c) => c.state.status === "done" && c.state.summary === void 0);
-  }
-  /** Gives each seen compaction the stored summary written while it ran. */
-  summarize(stored) {
-    for (const [mark2, c] of this.#claims(stored)) {
-      if (c.state.status === "done" && c.state.summary === void 0) {
-        c.state = summarized(c.state, mark2);
-        this.#touch(c);
-      }
-    }
-  }
-  /**
-   * The compactions a reload shows for `stored`, oldest first: the one this view saw happen when
-   * there is one (its numbers stay, the store's summary fills in), else one from the store alone.
-   */
-  restore(stored) {
-    const marks = [...stored].sort((a2, b) => a2.at - b.at);
-    const claims = this.#claims(marks);
-    return marks.map((mark2) => ({ at: mark2.at, compaction: restored(mark2, claims.get(mark2)) }));
-  }
-  /** Another session is shown: the compactions seen were the last one's. */
-  forget() {
-    this.#seen = [];
-  }
-  /** Which stored compaction each seen one is: the nearest summary written while it ran, each once. */
-  #claims(stored) {
-    const out = /* @__PURE__ */ new Map();
-    for (const c of this.#seen) {
-      const end = compactionEndedAt(c) ?? c.startedAt;
-      const mark2 = stored.filter((s2) => c.state.status === "done" && !out.has(s2) && within(c, s2.at)).sort((a2, b) => Math.abs(a2.at - end) - Math.abs(b.at - end))[0];
-      if (mark2) {
-        out.set(mark2, c);
-      }
-    }
-    return out;
-  }
-  /** Marks the turn or entry showing `c` changed. */
-  #touch(c) {
-    const shown3 = this.#host.entries().findLast((e) => e.kind === "compaction" && e.compaction === c || e.kind === "turn" && e.blocks.some((b) => b.kind === "compaction" && b.compaction === c));
-    if (shown3?.kind === "compaction" || shown3?.kind === "turn") {
-      shown3.rev++;
-    }
-  }
-};
-function restored(mark2, seen) {
-  if (seen) {
-    if (seen.state.status === "done") {
-      seen.state = summarized(seen.state, mark2);
-    }
-    return seen;
-  }
-  return {
-    startedAt: mark2.at,
-    state: { status: "done", ...mark2.summary ? { summary: mark2.summary } : {}, ...mark2.messages ? { messages: mark2.messages } : {} }
-  };
-}
-function summarized(state, mark2) {
-  const { messages: _, ...rest } = state;
-  return { ...rest, summary: mark2.summary ?? "", ...mark2.messages === void 0 ? {} : { messages: mark2.messages } };
-}
-function compactionEndedAt(c) {
-  return c.state.status === "done" ? c.state.endedAt : void 0;
-}
-var isRunning3 = (c) => c.state.status === "running";
-function within(c, at) {
-  return at >= c.startedAt - 5e3 && at <= (compactionEndedAt(c) ?? Date.now()) + 15e3;
-}
-
-// src/view/workLogModel.ts
-var SOLO = /* @__PURE__ */ new Set(["clarify", "delegate_task", "todo", "todo_list"]);
-function ownsCard(call) {
-  return SOLO.has(call.name) || isBackgroundCall(call) || waiting4(call) || isConnectCall(call) || call.name === "image_generate" || showsImage(call);
-}
-function waiting4(call) {
-  return isWatchCall(call) && call.outcome.kind === "running";
-}
-function showsImage(call) {
-  return shownImage(call) !== void 0;
-}
-function pieces(blocks2, turn = blocks2) {
-  const out = [];
-  let items = [];
-  const plan = turn.findLast((b) => b.kind === "tool" && isTodoName(b.call.name) && b.call.todos?.length);
-  for (const b of blocks2) {
-    if (b.kind === "thinking" || b.kind === "tool" && (!ownsCard(b.call) || isTodoName(b.call.name) && b !== plan)) {
-      items.push(b);
-      continue;
-    }
-    if (items.length) {
-      out.push({ items, kind: "work" });
-      items = [];
-    }
-    out.push({ block: b, kind: "block" });
-  }
-  if (items.length) {
-    out.push({ items, kind: "work" });
-  }
-  return out;
-}
-function visibleItems(items) {
-  return items.filter((i) => i.kind === "tool" || i.text.trim());
-}
-function foldOf(turn) {
-  if (turn.end.status !== "done") {
-    return void 0;
-  }
-  const answer = turn.blocks.findLastIndex((b) => b.kind === "text" && b.text.trim());
-  const hidden2 = /* @__PURE__ */ new Set();
-  for (const [i, b] of turn.blocks.entries()) {
-    if (i === answer || b.kind === "steer" || b.kind === "compaction") {
-      continue;
-    }
-    if (b.kind === "tool" && (isBackgroundCall(b.call) || waiting4(b.call) || isConnectCall(b.call) || showsImage(b.call) || b.call.subagents?.some((a2) => a2.status === "running" || a2.status === "queued"))) {
-      continue;
-    }
-    if (answer >= 0 && i > answer && b.kind === "tool" && b.call.outcome.kind !== "done") {
-      continue;
-    }
-    hidden2.add(b.id);
-  }
-  if (hidden2.size === 0) {
-    return void 0;
-  }
-  const ms = (turnEndedAt(turn) ?? turn.startedAt) - turn.startedAt;
-  return { hidden: hidden2, label: workedFor(ms) };
-}
-var workedFor = (ms) => ms > 0 ? `Worked for ${durationCompact(ms)}` : "Worked";
-function parts2(turn) {
-  const fold = foldOf(turn);
-  if (!fold) {
-    return [{ blocks: [...turn.blocks], kind: "shown" }];
-  }
-  const out = [];
-  const show = (b) => {
-    const last = out.at(-1);
-    if (last?.kind === "shown") {
-      last.blocks.push(b);
-    } else {
-      out.push({ blocks: [b], kind: "shown" });
-    }
-  };
-  let stretch = [];
-  let from = turn.startedAt;
-  const flush = (to) => {
-    const hidden2 = stretch.filter((b) => fold.hidden.has(b.id));
-    if (isNonEmpty(hidden2)) {
-      out.push({ blocks: hidden2, key: `fold${hidden2[0].id}`, kind: "fold", label: workedFor(to - from) });
-    }
-    stretch.filter((b) => !fold.hidden.has(b.id)).forEach(show);
-    stretch = [];
-  };
-  for (const b of turn.blocks) {
-    if (b.kind === "steer" || b.kind === "compaction") {
-      flush(b.at);
-      show(b);
-      from = b.kind === "compaction" ? compactionEndedAt(b.compaction) ?? b.at : b.at;
-    } else {
-      stretch.push(b);
-    }
-  }
-  flush(turnEndedAt(turn) ?? from);
-  return out;
-}
-function actionOf(call) {
-  return withView(call, (view) => view.action());
-}
-var and2 = (words3) => words3.length < 3 ? words3.join(" and ") : `${words3.slice(0, -1).join(", ")}, and ${words3.at(-1)}`;
-function actionLabel(action, n, calls = []) {
-  switch (action) {
-    case "app": {
-      const apps = [...new Set(calls.flatMap(appsOf))];
-      const uses = calls.reduce((k, c) => k + (batchOf(c)?.length ?? 1), 0);
-      return apps.length === 1 ? `Used ${apps[0]}${uses > 1 ? ` ${uses} times` : ""}` : `Used ${and2(apps)}`;
-    }
-    case "command":
-      return `Ran ${plural(n, "command")}`;
-    case "read":
-      return `Read ${plural(n, "file")}`;
-    case "edit":
-      return `Changed ${plural(n, "file")}`;
-    case "code-search":
-      return `Searched code ${plural(n, "time")}`;
-    case "search":
-      return `Searched the web ${plural(n, "time")}`;
-    case "fetch":
-      return `Read ${plural(n, "page")}`;
-    case "browser":
-      return `Used browser ${plural(n, "time")}`;
-    case "lookup":
-      return `Looked up tools${n > 1 ? ` ${n} times` : ""}`;
-    case "plan":
-      return `Updated the plan${n > 1 ? ` ${n} times` : ""}`;
-    case "other":
-      return `Used ${plural(n, "tool")}`;
-  }
-}
-var priority = (a2) => a2 === "command" || a2 === "edit" || a2 === "app" ? 0 : a2 === "other" || a2 === "lookup" ? 2 : 1;
-function summarize(items) {
-  const calls = items.flatMap((i) => i.kind === "tool" ? [i.call] : []);
-  if (!calls.length) {
-    return items.length === 1 ? "Thought" : `Thought (\xD7${items.length})`;
-  }
-  const groups = /* @__PURE__ */ new Map();
-  for (const c of calls) {
-    const a2 = actionOf(c);
-    groups.set(a2, [...groups.get(a2) ?? [], c]);
-  }
-  const all8 = [...groups].map(([action, list9], index2) => ({
-    count: list9.length,
-    index: index2,
-    label: actionLabel(action, action === "edit" ? editedFiles(list9) : list9.length, list9),
-    priority: priority(action)
-  }));
-  const picked = [...all8].sort((a2, b) => a2.priority - b.priority || a2.index - b.index).slice(0, 2).sort((a2, b) => a2.index - b.index);
-  const labels = picked.map((p3) => p3.label);
-  const rest = calls.length - picked.reduce((n, p3) => n + p3.count, 0);
-  if (rest > 0) {
-    labels.push(`Performed ${plural(rest, "other action")}`);
-  }
-  const words3 = labels.map((l, i) => i === 0 ? l : l.charAt(0).toLowerCase() + l.slice(1));
-  return words3.length < 3 ? words3.join(" and ") : `${words3.slice(0, -1).join(", ")}, and ${words3.at(-1)}`;
-}
-function editedFiles(calls) {
-  const paths = /* @__PURE__ */ new Set();
-  let unnamed = 0;
-  for (const c of calls) {
-    const d = detailOf(c);
-    const path2 = d.tool === "patch" || d.tool === "write_file" ? d.path : void 0;
-    if (path2) {
-      paths.add(path2);
-    } else {
-      unnamed++;
-    }
-  }
-  return paths.size + unnamed;
-}
-function groupIcon(items) {
-  const actions = new Set(items.flatMap((i) => i.kind === "tool" ? [actionOf(i.call)] : []));
-  const [only] = actions;
-  if (!only) {
-    return "brain";
-  }
-  return actions.size === 1 ? actionIcon(only) : "hammer";
-}
-function actionIcon(action) {
-  return ACTION_ICON[action];
-}
-function stepLabel(call) {
-  return withView(call, (view) => view.step());
-}
-function liveLabel(item3, active = false) {
-  if (item3.kind === "thinking") {
-    return thoughtTitle(item3) || (item3.endedAt === void 0 || active ? "Thinking" : "Thought");
-  }
-  const call = item3.call;
-  const status = active && call.outcome.kind === "done" ? "running" : call.outcome.kind;
-  const d = detailOf(call);
-  const command = d.tool === "terminal" ? d.command ?? call.context : void 0;
-  if (!command) {
-    return status === "running" ? presentTense(stepLabel(call)) : stepLabel(call);
-  }
-  const verb = { cancelled: "Stopped", done: "Ran", error: "Failed", running: "Running" }[status];
-  return `${verb} ${commandProgramName(command) ?? "command"}`;
-}
-function busyLabel(call) {
-  return `${liveLabel({ call, id: call.id, kind: "tool" }, true)}\u2026`;
-}
-function preparingLabel(name) {
-  const app2 = appOf(name);
-  return `Preparing ${app2 ? `${app2.app} \xB7 ${app2.action}` : name.replace(/_/g, " ")}\u2026`;
-}
-var PRESENT = {
-  Edited: "Editing",
-  Linked: "Linking",
-  Listed: "Listing",
-  Looked: "Looking",
-  Read: "Reading",
-  Searched: "Searching",
-  Unlinked: "Unlinking",
-  Used: "Using",
-  Wrote: "Writing"
-};
-function presentTense(label) {
-  const [verb = "", ...rest] = label.split(" ");
-  return PRESENT[verb] ? [PRESENT[verb], ...rest].join(" ") : label;
-}
-function thoughtLine(markdown2) {
-  return flat(
-    markdown2.replace(/!?\[([^\]]*)\]\([^)]*\)/g, "$1").replace(/^[ \t]*(?:#{1,6}|[-*+]|\d+\.)[ \t]+/gm, "").replace(/`+|\*\*|~~/g, "").replace(/(^|[^\w*])[*_]([^*_\n]+)[*_](?![\w*])/g, "$1$2")
-  );
-}
-function thoughtTitle(item3) {
-  const line = thoughtLine(item3.text);
-  return item3.label ? line ? `${item3.label}: ${line}` : item3.label : line;
-}
 
 // node_modules/@hermes/shared/src/slash.ts
 var SLASH_COMMAND_RE = /^\/[^\s/]*(?:\s|$)/;
@@ -70369,7 +70862,7 @@ var Disposables = class {
 
 // src/draft/attachments.ts
 import { existsSync as existsSync4 } from "node:fs";
-import { basename as basename3 } from "node:path";
+import { basename as basename4 } from "node:path";
 
 // src/hermes/clipboardImage.ts
 import { execFile as execFile5 } from "node:child_process";
@@ -70496,7 +70989,7 @@ var Attachments = class {
     }
     const path2 = imagePathOf(text15, this.#host.cwd());
     if (path2) {
-      void this.#attach(path2, basename3(path2));
+      void this.#attach(path2, basename4(path2));
       return true;
     }
     return false;
@@ -70526,7 +71019,7 @@ var Attachments = class {
       this.#host.note(`Not an image file: ${raw2.trim()} (PNG, JPEG, GIF or WebP)`, "warning");
       return this.#host.changed();
     }
-    await this.#attach(path2, basename3(path2));
+    await this.#attach(path2, basename4(path2));
   }
   /**
    * `hermes -q … --image …`: attaches the launcher's image to session `sid` (the first one): on the
@@ -70537,7 +71030,7 @@ var Attachments = class {
     const path2 = this.#startup;
     try {
       if (this.#host.gw.isCanonical) {
-        const image3 = this.#image(await uploadImage(this.#host.gw, sid, path2, this.#host.launchCwd), basename3(path2));
+        const image3 = this.#image(await uploadImage(this.#host.gw, sid, path2, this.#host.launchCwd), basename4(path2));
         if (!this.#host.attachToHead(image3)) {
           this.#items.push(image3);
         }
@@ -70625,9 +71118,9 @@ var Attachments = class {
     const size = imageSize(bytes);
     const kb = bytes.length / 1024;
     const blob = this.#host.blob(bytes, attachment.mime);
-    const preview5 = blob ? { blob } : existsSync4(attachment.path) ? { path: attachment.path } : void 0;
+    const preview4 = blob ? { blob } : existsSync4(attachment.path) ? { path: attachment.path } : void 0;
     const caption = [size && `${size.w}\xD7${size.h}`, kb >= 1024 ? `${(kb / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(kb))} KB`];
-    return { ...attachment, caption: caption.filter(Boolean).join(" \xB7 "), name, ...preview5 ? { preview: preview5 } : {} };
+    return { ...attachment, caption: caption.filter(Boolean).join(" \xB7 "), name, ...preview4 ? { preview: preview4 } : {} };
   }
 };
 
@@ -72662,7 +73155,7 @@ var SessionTitle = class {
 
 // src/transcript/promptRefs.ts
 import { existsSync as existsSync5 } from "node:fs";
-import { basename as basename4 } from "node:path";
+import { basename as basename5 } from "node:path";
 var VALUE = "(`[^`\\n]+`|\"[^\"\\n]+\"|'[^'\\n]+'|\\S+)";
 var IMAGE_LINE = new RegExp(`^@image:${VALUE}[ \\t]*$`, "gm");
 var SCREENSHOT_LINE = /^\[screenshot\][ \t]*(?:\n|$)/gm;
@@ -72712,9 +73205,9 @@ function splitPrompt(raw2) {
 function promptAttachments(parts3, exists = existsSync5) {
   const local = (p3) => p3.startsWith("/") && exists(p3);
   return [
-    ...parts3.images.map((p3) => ({ kind: "image", name: basename4(p3), ...local(p3) ? { source: { path: p3 } } : {} })),
+    ...parts3.images.map((p3) => ({ kind: "image", name: basename5(p3), ...local(p3) ? { source: { path: p3 } } : {} })),
     ...parts3.files.map(({ path: path2, ref }) => {
-      const name = basename4(unquote2(ref.replace(/^@\w+:/, "")));
+      const name = basename5(unquote2(ref.replace(/^@\w+:/, "")));
       return path2 && IMAGE_FILE.test(path2) && local(path2) ? { kind: "image", name, source: { path: path2 } } : { kind: "file", name };
     })
   ];
@@ -75019,9 +75512,9 @@ var GatewayClient = class extends EventEmitter {
     }
   }
   protocolError(what, text15, emptyLabel) {
-    const preview5 = text15.trim().slice(0, MAX_LOG_PREVIEW) || emptyLabel;
-    this.pushLog(`[protocol] ${what}: ${preview5}`);
-    this.publish({ type: "gateway.protocol_error", payload: { preview: preview5 } });
+    const preview4 = text15.trim().slice(0, MAX_LOG_PREVIEW) || emptyLabel;
+    this.pushLog(`[protocol] ${what}: ${preview4}`);
+    this.publish({ type: "gateway.protocol_error", payload: { preview: preview4 } });
   }
   startLocalGateway() {
     const generation = ++this.localGeneration;
@@ -75335,8 +75828,8 @@ var GatewayClient = class extends EventEmitter {
 import { readFile as readFile3 } from "node:fs/promises";
 
 // src/watch/child.ts
-import { DatabaseSync as DatabaseSync4 } from "node:sqlite";
-var messageRow = object({
+import { DatabaseSync as DatabaseSync5 } from "node:sqlite";
+var messageRow2 = object({
   id: number2(),
   role: _catch(string2(), ""),
   content: text2,
@@ -75351,7 +75844,7 @@ var lastRow = object({ id: real });
 var ChildStore = class {
   #db;
   constructor(path2 = stateDbPath()) {
-    this.#db = new DatabaseSync4(path2, { readOnly: true });
+    this.#db = new DatabaseSync5(path2, { readOnly: true });
   }
   /**
    * The child session of `parents` whose first prompt is `goal`: a child's first user turn is
@@ -75379,7 +75872,7 @@ var ChildStore = class {
       `SELECT id, role, content, tool_call_id, tool_calls, tool_name, timestamp, reasoning
        FROM messages WHERE session_id = ? AND active = 1 ORDER BY id`
     );
-    return toTranscript(rows(stmt, messageRow, session2));
+    return toTranscript(rows(stmt, messageRow2, session2));
   }
   /** The newest message id of `session`, to tell whether anything changed. */
   last(session2) {

@@ -5,7 +5,7 @@ import { DatabaseSync } from 'node:sqlite'
 
 import { describe, expect, it } from 'vitest'
 
-import { inWorkspace, lastReply, sessionLabel, storedSessions, supersededSegments } from '../hermes/sessionIndex.js'
+import { inWorkspace, sessionLabel, storedSessions, supersededSegments } from '../hermes/sessionIndex.js'
 
 function db(): string {
   const path = join(mkdtempSync(join(tmpdir(), 'tern-sessions-')), 'state.db')
@@ -44,11 +44,8 @@ describe('storedSessions', () => {
     expect(rows[2]?.pinned).toBe(true)
   })
 
-  it('reads the first prompt without Hermes markers, and the last reply from the newest segment', () => {
-    const path = db()
-
-    expect(storedSessions(50, path).find(r => r.id === 'plain')?.preview).toBe('Why is CI red? Look at the logs.')
-    expect(lastReply('root', path)).toBe('newest answer')
+  it('reads the first prompt without Hermes markers', () => {
+    expect(storedSessions(50, db()).find(r => r.id === 'plain')?.preview).toBe('Why is CI red? Look at the logs.')
   })
 
   it('lists a local conversation reset in place once, by its newest segment', () => {

@@ -2,41 +2,47 @@
 // (hermes/sessionIndex.ts), scoped the way `hermes -c` scopes them. The first tab holds this
 // project's sessions (the pane's repo, or its folder); All holds every local one with this
 // project's first. Rows are grouped by last activity, pinned ones on top; a search ranks title,
-// first prompt, folder, branch and id across the tab. The preview shows where the session ran,
-// its first prompt and its last reply. Enter resumes; Tab switches the scope; ⌫ on an empty
-// search deletes after a confirm.
+// first prompt, folder, branch and id across the tab. The preview (sessions/detail.tsx) shows
+// where the session ran, its whole id, its first prompt and last reply, and the conversation a
+// page at a time (sessions/preview.ts reads it once the selection rests). Enter resumes; Tab
+// switches the scope; → focuses the preview, where ↑/↓ step through it; ⌥C copies the id; ⌫ on an
+// empty search deletes after a confirm.
 
 import { basename } from 'node:path'
 
-import type { JSX, Key, PickerGroup, PickerItem, Span } from '@stencil-hq/tern'
+import type { Key, PickerGroup, ScrollTo } from '@stencil-hq/tern'
 
 import type { ChatPorts } from '../app/ports.js'
+import { copyToClipboard } from '../clipboard.js'
 import { launchEnv } from '../config/env.js'
 import { optional } from '../core/assert.js'
 import { errorText } from '../core/errors.js'
+import { Flash } from '../core/flash.js'
 import { durable, storedSessionId } from '../core/ids.js'
-import { plural } from '../core/text.js'
 import { mutateSession } from '../hermes/mutate.js'
-import { inWorkspace, lastReply, sessionLabel, type StoredSession, storedSessions, workspaceOf } from '../hermes/sessionIndex.js'
-import { oneLine } from '../view/describe.js'
-import { ageShort, homeTilde } from '../view/format.js'
-import { facts } from '../view/ui/facts.js'
+import { inWorkspace, sessionLabel, type StoredSession, storedSessions, workspaceOf } from '../hermes/sessionIndex.js'
+import { storedTranscripts, type TranscriptReader } from '../hermes/sessionTranscript.js'
+import { homeTilde } from '../view/format.js'
 import { rpc } from '../wire/rpc.js'
 
 import type { Overlay } from './overlay.js'
 import { editQuery, hitRuns, moveSelection, rank } from './search.js'
+import { MORE, sessionDetail } from './sessions/detail.js'
+import { PreviewLoader } from './sessions/preview.js'
+import { dayOf, itemOf } from './sessions/rows.js'
 
 /** What the session picker reaches of the app. */
-export type SessionsHost = Pick<ChatPorts, 'changed' | 'close' | 'gw' | 'open' | 'resume' | 'session' | 'transcript'>
+export type SessionsHost = Pick<ChatPorts, 'changed' | 'close' | 'gw' | 'open' | 'resume' | 'reveal' | 'scroll' | 'session' | 'transcript'>
 
 const KEY = 'sessions'
 const LIMIT = 400
-const DAY = 86_400_000
+/** Blocks from the end of what is loaded at which the preview reads its next page. */
+const NEAR_END = 3
 
 type Tab = 'all' | 'here'
 
 /** Opens the session picker; picking a row resumes that session. */
-export function openSessionPicker(host: SessionsHost) {
+export function openSessionPicker(host: SessionsHost, reader: TranscriptReader = storedTranscripts()) {
   let state: 'loading' | 'ready' | 'error' = 'loading'
   let sessions: StoredSession[] = []
   let running = new Set<string>()
@@ -46,8 +52,17 @@ export function openSessionPicker(host: SessionsHost) {
   let selected: string | undefined
   let deleting: string | null = null
   let shown: string[] = []
-  const replies = new Map<string, string>()
+  /** Where the keys go: the list (and the search), or the preview's blocks. */
+  let focus: 'list' | 'preview' = 'list'
+  /** The focused block of the preview, and the blocks it had at the last render. */
+  let block: string | undefined
+  let blocks: string[] = []
+  let nodeId = `layer.${KEY}`
+  /** The selection the loader was last told of. */
+  let told: string | undefined
   const current = durable(host.session.ref) ?? ''
+  const loader = new PreviewLoader(reader, () => host.changed())
+  const copied = new Flash<string>(() => host.changed())
 
   const load = async () => {
     state = 'loading'
@@ -98,6 +113,7 @@ export function openSessionPicker(host: SessionsHost) {
       // The shared gateway deletes through a revision-fenced mutation (the whole lineage).
       await (host.gw.isCanonical ? mutateSession(host.gw, id, 'delete', {}) : rpc(host.gw, 'session.delete', { session_id: id }))
       sessions = sessions.filter(s => s.id !== id)
+      loader.forget(id)
     } catch (error) {
       host.transcript.notice(errorText(error), 'error')
     }
@@ -117,9 +133,73 @@ export function openSessionPicker(host: SessionsHost) {
     }
   }
 
+  const copyId = () => {
+    if (selected) {
+      copyToClipboard(selected)
+      copied.set(selected)
+    }
+  }
+
   const setTab = (t: Tab) => {
     tab = t
     deleting = null
+    focus = 'list'
+  }
+
+  /** Focuses preview block `key`, scrolls it into view, and reads the next page when it is near the end. */
+  const focusBlock = (key: string | undefined) => {
+    if (!key || !selected) {
+      return
+    }
+
+    focus = 'preview'
+    block = key
+    host.reveal(`${nodeId}.${key}`)
+
+    if (blocks.length - blocks.indexOf(key) <= NEAR_END || key === MORE) {
+      loader.more(selected)
+    }
+
+    host.changed()
+  }
+
+  const scrollPreview = (to: ScrollTo) => {
+    const at = block ?? blocks[0]
+
+    if (at) {
+      host.scroll(`${nodeId}.${at}`, to)
+    }
+  }
+
+  /** The preview's keys; false for one the list takes. */
+  const previewKey = (k: Key): boolean => {
+    const bare = !k.ctrl && !k.alt && !k.meta
+    const at = block ? blocks.indexOf(block) : -1
+
+    if (k.name === 'escape' || (bare && k.name === 'left')) {
+      focus = 'list'
+    } else if (bare && (k.name === 'down' || k.name === 'j')) {
+      focusBlock(blocks[Math.min(blocks.length - 1, at + 1)])
+    } else if (bare && (k.name === 'up' || k.name === 'k')) {
+      focusBlock(blocks[Math.max(0, at - 1)])
+    } else if (k.name === 'page_down' || (bare && k.name === 'space')) {
+      scrollPreview('page-down')
+    } else if (k.name === 'page_up') {
+      scrollPreview('page-up')
+    } else if (k.name === 'home') {
+      focusBlock(blocks[0])
+    } else if (k.name === 'end') {
+      focusBlock(blocks.at(-1))
+    } else if (bare && k.name === 'c') {
+      copyId()
+    } else {
+      // Anything else (typing, ⌫) goes back to the list and its search.
+      focus = 'list'
+
+      return false
+    }
+
+    return true
   }
 
   const view = (now: number) => {
@@ -158,27 +238,51 @@ export function openSessionPicker(host: SessionsHost) {
       selected = shown[0]
     }
 
+    // A new selection starts its preview at the top, read once the selection rests.
+    if (selected !== told) {
+      told = selected
+      block = undefined
+      focus = 'list'
+      loader.select(selected)
+    }
+
     return { hits, order }
   }
 
   const overlay: Overlay = {
     key: KEY,
     modal: true,
-    node: () => {
+    node: id => {
+      nodeId = id
       const now = Date.now()
       const { hits, order } = view(now)
       const s = sessions.find(x => x.id === selected)
       const hereCount = sessions.filter(here).length
       const project = workspace ? basename(workspace) : 'This folder'
+      const pane = s
+        ? sessionDetail({
+            copied: copied.value === s.id,
+            focus: key => focusBlock(key),
+            focused: focus === 'preview' ? block : undefined,
+            isCurrent: s.id === current,
+            more: () => loader.more(s.id),
+            now,
+            preview: loader.get(s.id),
+            running: running.has(s.id),
+            session: s
+          })
+        : undefined
 
-      if (s && !replies.has(s.id)) {
-        replies.set(s.id, lastReply(s.id))
-      }
+      blocks = pane?.blocks ?? []
 
       return (
         <picker
           actions={[
             { id: 'delete', keys: ['backspace'], label: 'Delete' },
+            { ...optional('disabled', s ? undefined : 'No session'), id: 'copy', keys: ['alt+c'], label: 'Copy id' },
+            focus === 'preview'
+              ? { id: 'list', keys: ['left'], label: 'Back to list' }
+              : { ...optional('disabled', s ? undefined : 'No session'), id: 'browse', keys: ['right'], label: 'Browse' },
             { end: true, id: 'close', keys: ['esc'], label: 'Close' },
             { ...optional('disabled', s ? undefined : 'No session'), id: 'resume', keys: ['enter'], label: s?.id === current ? 'Back to it' : 'Resume', primary: true }
           ]}
@@ -190,12 +294,14 @@ export function openSessionPicker(host: SessionsHost) {
           {...optional('confirm', deleting ? { act: 'confirm', label: 'Delete', text: `Delete “${sessionLabel(sessions.find(x => x.id === deleting) ?? { preview: '', title: '' })}”?` } : undefined)}
           current={current ? [current] : []}
           empty={tab === 'here' ? `No sessions in ${project} yet. Tab shows every folder.` : 'No saved sessions yet'}
+          focus={focus}
           hits={hits}
           icon="history"
           items={rows().map(x => itemOf(x, now, running.has(x.id), tab === 'all' && !here(x)))}
           layout="cards"
           noun="sessions"
           onAction={{
+            browse: () => focusBlock(block ?? blocks[0]),
             cancel: () => {
               deleting = null
               host.changed()
@@ -210,8 +316,13 @@ export function openSessionPicker(host: SessionsHost) {
                 void remove(deleting)
               }
             },
+            copy: copyId,
             delete: () => {
               askDelete()
+              host.changed()
+            },
+            list: () => {
+              focus = 'list'
               host.changed()
             },
             resume: () => resume(selected),
@@ -231,10 +342,11 @@ export function openSessionPicker(host: SessionsHost) {
           placeholder="Search titles, prompts, folders, branches…"
           preview="side"
           query={query}
+          role="hermes.sessions"
           {...optional('selected', selected)}
           size="lg"
           state={state}
-          subtitle={[{ s: 'muted', t: workspace ? shortPath(workspace) : '' }]}
+          subtitle={[{ s: 'muted', t: workspace ? homeTilde(workspace, launchEnv().home) : '' }]}
           tab={tab}
           tabs={[
             { count: hereCount, id: 'here', label: project },
@@ -243,9 +355,13 @@ export function openSessionPicker(host: SessionsHost) {
           title="Sessions"
           total={rows().length}
         >
-          {s ? preview(s, now, s.id === current, running.has(s.id), replies.get(s.id) ?? '') : null}
+          {pane?.nodes ?? null}
         </picker>
       )
+    },
+    onClose: () => {
+      loader.dispose()
+      copied.dispose()
     },
     onKey: (k: Key) => {
       if (deleting) {
@@ -258,16 +374,22 @@ export function openSessionPicker(host: SessionsHost) {
         return true
       }
 
-      if (k.name === 'escape') {
+      if (k.name === 'c' && k.alt && !k.ctrl && !k.meta) {
+        copyId()
+      } else if (k.name === 'enter') {
+        resume(selected)
+      } else if (k.name === 'tab') {
+        setTab(tab === 'here' ? 'all' : 'here')
+      } else if (focus === 'preview' && previewKey(k)) {
+        // The preview took it.
+      } else if (k.name === 'escape') {
         if (query) {
           query = ''
         } else {
           host.close(overlay)
         }
-      } else if (k.name === 'enter') {
-        resume(selected)
-      } else if (k.name === 'tab') {
-        setTab(tab === 'here' ? 'all' : 'here')
+      } else if (k.name === 'right' && !k.ctrl && !k.alt && !k.meta && selected) {
+        focusBlock(block ?? blocks[0])
       } else if (k.name === 'backspace' && !query) {
         askDelete()
       } else {
@@ -288,81 +410,4 @@ export function openSessionPicker(host: SessionsHost) {
   host.open(overlay)
   // After the sheet is up: the read is synchronous.
   setTimeout(() => void load(), 0)
-}
-
-function itemOf(s: StoredSession, now: number, running: boolean, elsewhere: boolean): PickerItem {
-  const label = sessionLabel(s)
-
-  return {
-    badges: [
-      ...(running ? [{ text: 'running', tone: 'accent' as const }] : []),
-      ...(s.branch ? [{ text: s.branch, title: `Branch ${s.branch}` }] : []),
-      ...(elsewhere && s.cwd ? [{ text: basename(s.cwd), title: s.cwd }] : [])
-    ],
-    ...optional('detail', s.title && s.preview ? oneLine(s.preview) : undefined),
-    facts: { size: plural(s.messages, 'msg'), when: ageShort(now - s.lastActive) },
-    id: s.id,
-    label,
-    ...optional('title', s.cwd || undefined)
-  }
-}
-
-function preview(s: StoredSession, now: number, isCurrent: boolean, running: boolean, reply: string): JSX.Element[] {
-  const status: Span[] | undefined = isCurrent
-    ? [{ s: 'success', t: 'open here' }]
-    : running
-      ? [{ s: 'accent', t: 'running in another pane' }]
-      : undefined
-
-  return [
-    <text key="title" role="omp.picker.title" text={sessionLabel(s)} />,
-    <kv
-      items={facts([
-        ['Status', status],
-        ['Folder', s.cwd && [{ s: 'mono', t: shortPath(s.cwd) }]],
-        ['Branch', s.branch && [{ s: 'mono', t: s.branch }]],
-        ['Last active', `${dateOf(s.lastActive)} · ${ageShort(now - s.lastActive)} ago`],
-        ['Started', dateOf(s.startedAt)],
-        ['Messages', String(s.messages)],
-        ['Model', s.model && [{ s: 'mono', t: s.model }]],
-        ['Session', [{ s: 'mono dim', t: `${s.source} · ${s.id.replace(/^(local-)?(.{12}).*$/, '$1$2…')}` }]]
-      ])}
-      key="facts"
-    />,
-    ...(s.preview
-      ? [
-          <section head="First prompt" key="first">
-            <md key="text" max={{ h: '8lines' }} text={s.preview} tone="user" />
-          </section>
-        ]
-      : []),
-    ...(reply
-      ? [
-          <section head="Last reply" key="last">
-            <md key="text" max={{ h: '14lines' }} text={reply.slice(0, 2000)} />
-          </section>
-        ]
-      : [])
-  ]
-}
-
-const shortPath = (path: string) => homeTilde(path, launchEnv().home)
-
-/** Today / Yesterday / This week / This month / Earlier, by local calendar day. */
-function dayOf(at: number, now: number): string {
-  const midnight = new Date(now).setHours(0, 0, 0, 0)
-
-  return at >= midnight
-    ? 'Today'
-    : at >= midnight - DAY
-      ? 'Yesterday'
-      : at >= midnight - 6 * DAY
-        ? 'This week'
-        : at >= midnight - 30 * DAY
-          ? 'This month'
-          : 'Earlier'
-}
-
-function dateOf(at: number): string {
-  return new Date(at).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' })
 }
