@@ -144,6 +144,8 @@ export type Block =
   | { kind: 'steer'; id: EntryId; text: string; at: number }
   /** The context compacted while the turn ran. */
   | { kind: 'compaction'; id: EntryId; at: number; compaction: Compaction }
+  /** Background work that ended while the turn ran (a subagent, a background process): one dim line. */
+  | { kind: 'event'; id: EntryId; at: number; text: string; tone: NoticeEntry['tone'] }
 
 /**
  * One compaction: Hermes summarized the earlier conversation to free context. The agent reads the

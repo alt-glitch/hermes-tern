@@ -941,8 +941,48 @@
           "p": {
            "age": 0,
            "format": "short",
-           "key": "elapsed"
+           "key": "step"
           }
+         },
+         {
+          "k": "row",
+          "p": {
+           "align": "center",
+           "gap": "xs",
+           "role": "omp.working.turn",
+           "title": "This turn has run this long",
+           "key": "turn"
+          },
+          "c": [
+           {
+            "k": "text",
+            "p": {
+             "role": "omp.working.sep",
+             "text": "·",
+             "key": "sep"
+            }
+           },
+           {
+            "k": "text",
+            "p": {
+             "spans": [
+              {
+               "s": "dim",
+               "t": "turn"
+              }
+             ],
+             "key": "t"
+            }
+           },
+           {
+            "k": "elapsed",
+            "p": {
+             "age": 0,
+             "format": "short",
+             "key": "elapsed"
+            }
+           }
+          ]
          },
          {
           "k": "row",
@@ -1722,8 +1762,48 @@
           "p": {
            "age": 0,
            "format": "short",
-           "key": "elapsed"
+           "key": "step"
           }
+         },
+         {
+          "k": "row",
+          "p": {
+           "align": "center",
+           "gap": "xs",
+           "role": "omp.working.turn",
+           "title": "This turn has run this long",
+           "key": "turn"
+          },
+          "c": [
+           {
+            "k": "text",
+            "p": {
+             "role": "omp.working.sep",
+             "text": "·",
+             "key": "sep"
+            }
+           },
+           {
+            "k": "text",
+            "p": {
+             "spans": [
+              {
+               "s": "dim",
+               "t": "turn"
+              }
+             ],
+             "key": "t"
+            }
+           },
+           {
+            "k": "elapsed",
+            "p": {
+             "age": 0,
+             "format": "short",
+             "key": "elapsed"
+            }
+           }
+          ]
          },
          {
           "k": "row",
@@ -2293,8 +2373,48 @@
           "p": {
            "age": 0,
            "format": "short",
-           "key": "elapsed"
+           "key": "step"
           }
+         },
+         {
+          "k": "row",
+          "p": {
+           "align": "center",
+           "gap": "xs",
+           "role": "omp.working.turn",
+           "title": "This turn has run this long",
+           "key": "turn"
+          },
+          "c": [
+           {
+            "k": "text",
+            "p": {
+             "role": "omp.working.sep",
+             "text": "·",
+             "key": "sep"
+            }
+           },
+           {
+            "k": "text",
+            "p": {
+             "spans": [
+              {
+               "s": "dim",
+               "t": "turn"
+              }
+             ],
+             "key": "t"
+            }
+           },
+           {
+            "k": "elapsed",
+            "p": {
+             "age": 0,
+             "format": "short",
+             "key": "elapsed"
+            }
+           }
+          ]
          },
          {
           "k": "row",
@@ -2860,8 +2980,48 @@
           "p": {
            "age": 0,
            "format": "short",
-           "key": "elapsed"
+           "key": "step"
           }
+         },
+         {
+          "k": "row",
+          "p": {
+           "align": "center",
+           "gap": "xs",
+           "role": "omp.working.turn",
+           "title": "This turn has run this long",
+           "key": "turn"
+          },
+          "c": [
+           {
+            "k": "text",
+            "p": {
+             "role": "omp.working.sep",
+             "text": "·",
+             "key": "sep"
+            }
+           },
+           {
+            "k": "text",
+            "p": {
+             "spans": [
+              {
+               "s": "dim",
+               "t": "turn"
+              }
+             ],
+             "key": "t"
+            }
+           },
+           {
+            "k": "elapsed",
+            "p": {
+             "age": 0,
+             "format": "short",
+             "key": "elapsed"
+            }
+           }
+          ]
          },
          {
           "k": "row",
@@ -3590,8 +3750,48 @@
           "p": {
            "age": 0,
            "format": "short",
-           "key": "elapsed"
+           "key": "step"
           }
+         },
+         {
+          "k": "row",
+          "p": {
+           "align": "center",
+           "gap": "xs",
+           "role": "omp.working.turn",
+           "title": "This turn has run this long",
+           "key": "turn"
+          },
+          "c": [
+           {
+            "k": "text",
+            "p": {
+             "role": "omp.working.sep",
+             "text": "·",
+             "key": "sep"
+            }
+           },
+           {
+            "k": "text",
+            "p": {
+             "spans": [
+              {
+               "s": "dim",
+               "t": "turn"
+              }
+             ],
+             "key": "t"
+            }
+           },
+           {
+            "k": "elapsed",
+            "p": {
+             "age": 0,
+             "format": "short",
+             "key": "elapsed"
+            }
+           }
+          ]
          },
          {
           "k": "row",
@@ -4320,8 +4520,48 @@
           "p": {
            "age": 0,
            "format": "short",
-           "key": "elapsed"
+           "key": "step"
           }
+         },
+         {
+          "k": "row",
+          "p": {
+           "align": "center",
+           "gap": "xs",
+           "role": "omp.working.turn",
+           "title": "This turn has run this long",
+           "key": "turn"
+          },
+          "c": [
+           {
+            "k": "text",
+            "p": {
+             "role": "omp.working.sep",
+             "text": "·",
+             "key": "sep"
+            }
+           },
+           {
+            "k": "text",
+            "p": {
+             "spans": [
+              {
+               "s": "dim",
+               "t": "turn"
+              }
+             ],
+             "key": "t"
+            }
+           },
+           {
+            "k": "elapsed",
+            "p": {
+             "age": 0,
+             "format": "short",
+             "key": "elapsed"
+            }
+           }
+          ]
          },
          {
           "k": "row",
@@ -4887,8 +5127,48 @@
           "p": {
            "age": 0,
            "format": "short",
-           "key": "elapsed"
+           "key": "step"
           }
+         },
+         {
+          "k": "row",
+          "p": {
+           "align": "center",
+           "gap": "xs",
+           "role": "omp.working.turn",
+           "title": "This turn has run this long",
+           "key": "turn"
+          },
+          "c": [
+           {
+            "k": "text",
+            "p": {
+             "role": "omp.working.sep",
+             "text": "·",
+             "key": "sep"
+            }
+           },
+           {
+            "k": "text",
+            "p": {
+             "spans": [
+              {
+               "s": "dim",
+               "t": "turn"
+              }
+             ],
+             "key": "t"
+            }
+           },
+           {
+            "k": "elapsed",
+            "p": {
+             "age": 0,
+             "format": "short",
+             "key": "elapsed"
+            }
+           }
+          ]
          },
          {
           "k": "row",
@@ -5454,8 +5734,48 @@
           "p": {
            "age": 0,
            "format": "short",
-           "key": "elapsed"
+           "key": "step"
           }
+         },
+         {
+          "k": "row",
+          "p": {
+           "align": "center",
+           "gap": "xs",
+           "role": "omp.working.turn",
+           "title": "This turn has run this long",
+           "key": "turn"
+          },
+          "c": [
+           {
+            "k": "text",
+            "p": {
+             "role": "omp.working.sep",
+             "text": "·",
+             "key": "sep"
+            }
+           },
+           {
+            "k": "text",
+            "p": {
+             "spans": [
+              {
+               "s": "dim",
+               "t": "turn"
+              }
+             ],
+             "key": "t"
+            }
+           },
+           {
+            "k": "elapsed",
+            "p": {
+             "age": 0,
+             "format": "short",
+             "key": "elapsed"
+            }
+           }
+          ]
          },
          {
           "k": "row",
@@ -6231,8 +6551,48 @@
           "p": {
            "age": 0,
            "format": "short",
-           "key": "elapsed"
+           "key": "step"
           }
+         },
+         {
+          "k": "row",
+          "p": {
+           "align": "center",
+           "gap": "xs",
+           "role": "omp.working.turn",
+           "title": "This turn has run this long",
+           "key": "turn"
+          },
+          "c": [
+           {
+            "k": "text",
+            "p": {
+             "role": "omp.working.sep",
+             "text": "·",
+             "key": "sep"
+            }
+           },
+           {
+            "k": "text",
+            "p": {
+             "spans": [
+              {
+               "s": "dim",
+               "t": "turn"
+              }
+             ],
+             "key": "t"
+            }
+           },
+           {
+            "k": "elapsed",
+            "p": {
+             "age": 0,
+             "format": "short",
+             "key": "elapsed"
+            }
+           }
+          ]
          },
          {
           "k": "row",

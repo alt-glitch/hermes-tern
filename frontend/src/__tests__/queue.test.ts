@@ -72,7 +72,7 @@ describe('PromptQueue', () => {
     expect(t.queue.count()).toBe(6)
     expect(t.queue.rows()).toEqual([
       { kind: 'local', steer: true, text: 'held' },
-      { kind: 'local', steer: true, text: '/skill\n\n📎 1 image' },
+      { kind: 'local', steer: false, text: '/skill\n\n📎 1 image', why: 'has images: waits for this turn' },
       { kind: 'foreign', note: 'elsewhere', text: 'theirs' },
       { kind: 'foreign', note: 'unknown', text: 'lost' },
       { kind: 'mine', steer: true, text: 'mine' },
@@ -91,8 +91,8 @@ describe('PromptQueue', () => {
     t.queue.server.update([{ ...row('x', 'queued'), user: `[IMPORTANT: Background process proc_1 exited (exit code 0).${footer}` }])
 
     expect(t.queue.rows()).toEqual([
-      { kind: 'foreign', note: 'elsewhere', text: 'Background command exited' },
-      { kind: 'mine', steer: false, text: 'look\n\n📎 1 image' }
+      { kind: 'foreign', note: 'elsewhere', text: 'Background command exited', why: 'starts when this turn ends' },
+      { kind: 'mine', steer: false, text: 'look\n\n📎 1 image', why: 'has images: waits for this turn' }
     ])
   })
 
@@ -282,14 +282,14 @@ function drawn(queued: QueuedRow[], steer = true) {
 
 describe('the dock’s queued rows', () => {
   it('draws a held row with Edit, and Steer while a turn runs', () => {
-    const look = { badges: [], icon: 'corner-down-right', title: 'Queued' }
+    const look = { badges: [], icon: 'corner-down-right', title: 'Queued: sent as the next prompt when this turn ends; Steer sends it into this turn now' }
 
     expect(drawn([{ kind: 'local', steer: true, text: 'a' }])).toEqual([{ ...look, actions: ['steer', 'edit'] }])
     expect(drawn([{ kind: 'local', steer: true, text: 'a' }], false)).toEqual([{ ...look, actions: ['edit'] }])
   })
 
   it("draws this pane's admission with Edit, and Steer unless it carries images", () => {
-    const look = { badges: [], icon: 'corner-down-right', title: 'Queued' }
+    const look = { badges: [], icon: 'corner-down-right', title: 'Queued: sent as the next prompt when this turn ends; Steer sends it into this turn now' }
 
     expect(drawn([{ kind: 'mine', steer: true, text: 'a' }])).toEqual([{ ...look, actions: ['steer', 'edit'] }])
     expect(drawn([{ kind: 'mine', steer: false, text: 'a' }])).toEqual([{ ...look, actions: ['edit'] }])

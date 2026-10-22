@@ -57,13 +57,17 @@ function waitsFor(target: HeldTarget, ref: SessionRef): boolean {
  * pane's row in the shared gateway's queue. Both have Edit, and Steer while `steer` says so.
  * `sending`: this pane's row still on its way to the gateway; `foreign`: another window's row
  * (`elsewhere`: queued there or before a reconnect; `unknown`: its turn's outcome is unknown).
- * The last two are shown, not acted on.
+ * The last two are shown, not acted on. `why`: why a row that cannot steer waits, shown on it (a
+ * prompt with images, Hermes' own follow-up turn); a row that can steer says nothing.
  */
 export type QueuedRow =
-  | { kind: 'local'; text: string; steer: boolean }
-  | { kind: 'mine'; text: string; steer: boolean }
-  | { kind: 'sending'; text: string }
-  | { kind: 'foreign'; text: string; note: 'elsewhere' | 'unknown' }
+  | { kind: 'local'; text: string; steer: boolean; why?: string | undefined }
+  | { kind: 'mine'; text: string; steer: boolean; why?: string | undefined }
+  | { kind: 'sending'; text: string; why?: string | undefined }
+  | { kind: 'foreign'; text: string; note: 'elsewhere' | 'unknown'; why?: string | undefined }
+
+/** Why a prompt with images waits: a steer (and a redirect) carries text only (session.steer). */
+export const IMAGES_WAIT = 'has images: waits for this turn'
 
 /** What the prompt queue reaches of the app. */
 export interface QueueHost {
@@ -162,21 +166,28 @@ export class PromptQueue {
 
   /** The dock's queued rows, in count()'s order, with what each one's Edit and Steer can do. */
   rows(): QueuedRow[] {
-    const steer = this.#host.busy()
+    const busy = this.#host.busy()
+    const own = (images: number) => ({ steer: busy && !images, why: busy && images ? IMAGES_WAIT : undefined })
 
     return [
-      ...this.#held.map(({ prompt: p }): QueuedRow => ({ kind: 'local', steer, text: userText(shownText(p), p.images) })),
+      ...this.#held.map(({ prompt: p }): QueuedRow => ({ kind: 'local', ...own(p.images.length), text: userText(shownText(p), p.images) })),
       ...this.server.queued().map((q): QueuedRow => {
         switch (q.kind) {
-          case 'theirs':
-            return { kind: 'foreign', note: q.row.status === 'unknown' ? 'unknown' : 'elsewhere', text: internalNotice(q.text) ?? q.text }
+          case 'theirs': {
+            // Hermes' own row (a delegation's or a process's completion) is a whole turn of its own:
+            // the gateway never steers it into the running one.
+            const notice = internalNotice(q.text)
+            const why = notice ? (busy ? 'starts when this turn ends' : 'starts next') : undefined
+
+            return { kind: 'foreign', note: q.row.status === 'unknown' ? 'unknown' : 'elsewhere', text: notice ?? q.text, why }
+          }
 
           // Withdrawing it needs the gateway's id for it: until prompt.submit answers it is on its way.
           case 'sending':
             return { kind: 'sending', text: q.text }
 
           case 'mine':
-            return { kind: 'mine', steer: steer && !q.own.item.prompt.images.length, text: q.text }
+            return { kind: 'mine', ...own(q.own.item.prompt.images.length), text: q.text }
         }
       })
     ]

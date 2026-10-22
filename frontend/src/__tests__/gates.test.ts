@@ -106,7 +106,7 @@ describe('Activity: replace-only writes, last-write-wins labels', () => {
 
     expect(a.busy).not.toBe(first)
     expect(first?.label).toBe('Working…')
-    expect(a.busy).toEqual({ label: 'Thinking…', since: first?.since, startedAt: 1000 })
+    expect(a.busy).toEqual({ label: 'Thinking…', since: first?.since, startedAt: 1000, step: { at: expect.any(Number), since: expect.any(Object) } })
   })
 
   it("'Stopping…' lasts until the stream's next label", () => {
@@ -204,10 +204,10 @@ describe('App: the working line', () => {
 
     await press('escape')
     await press('escape')
-    expect(app.stores.activity.busy).toEqual({ label: 'Stopping…', since, startedAt: 0 })
+    expect(app.stores.activity.busy).toMatchObject({ label: 'Stopping…', since, startedAt: 0 })
 
     await emit('message.delta', { text: 'still going' })
-    expect(app.stores.activity.busy).toEqual({ label: 'Writing…', since, startedAt: 0 })
+    expect(app.stores.activity.busy).toMatchObject({ label: 'Writing…', since, startedAt: 0 })
   })
 
   it("a failed interrupt writes 'Working…' over whatever label came meanwhile", async () => {

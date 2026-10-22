@@ -770,4 +770,10 @@ export const STYLES = css`
   [data-role='hermes.sessions.tool'] {
     font: 12.5px/1.45 var(--mono);
   }
+
+  /* The Background sheet gives its detail the room: the list about 40%, the detail (command,
+     chart, output) about 60%. A session has few processes, so a wide list is mostly empty. */
+  .sf-picker[data-id='layer.background'] .pk-pv {
+    width: 60% !important;
+  }
 `

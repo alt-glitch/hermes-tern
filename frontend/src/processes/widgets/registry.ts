@@ -136,8 +136,8 @@ const REASK_LINES = 5
 type Authoring =
   /** None in flight; `attempts` requests were made. */
   | { kind: 'idle'; attempts: number }
-  /** The model declined when the output had `atLines` lines; it is asked again once the output doubled. */
-  | { kind: 'declined'; attempts: number; atLines: number }
+  /** The model declined when the output had `atLines` lines (`why`, unless it was another pane's); it is asked again once the output doubled. */
+  | { kind: 'declined'; attempts: number; atLines: number; why?: string }
   /** A request is in flight; `was` (its attempt counted) is where it goes back to unless the answer changes that. */
   | { kind: 'requesting'; controller: AbortController; was: Waiting }
   /** No model can write specs: none is asked for again. */
@@ -158,6 +158,10 @@ interface Entry {
   /** `JSON.stringify(view)`, to keep the view's identity while it does not change. */
   viewKey: string
   authoring: Authoring
+  /** Why the last request gave no spec: its error, or rules that did not fit. */
+  failure?: string | undefined
+  /** Why no chart was drawn when the process ended (its note then; a frozen entry knows no more). */
+  endNote?: string | undefined
 }
 
 /** `a` while a request may be made; undefined while one is in flight or none will be. */
@@ -283,6 +287,7 @@ export class Charts {
     if (settled) {
       // Cleared here, not in the request's `finally`: the view recomputed below is its last.
       abortRequest(entry)
+      entry.endNote = this.#note(entry)
       entry.authoring = { kind: 'frozen' }
     } else {
       this.#maybeAuthor(entry, now)
@@ -292,7 +297,9 @@ export class Charts {
   }
 
   #recompute(entry: Entry): boolean {
-    const view = entry.runtime.view({ authoring: entry.authoring.kind === 'requesting', label: entry.process.command })
+    const drawn = entry.runtime.view({ authoring: entry.authoring.kind === 'requesting', label: entry.process.command })
+    const note = drawn.state === 'fallback' ? this.#note(entry) : undefined
+    const view = note ? { ...drawn, note } : drawn
     const key = JSON.stringify(view)
 
     if (key === entry.viewKey) {
@@ -303,6 +310,45 @@ export class Charts {
     entry.viewKey = key
 
     return true
+  }
+
+  /** Why `entry` has no chart now, in the user's words; undefined while one is being written. */
+  #note(entry: Entry): string | undefined {
+    const a = entry.authoring
+    const failed = entry.failure ? `The chart model failed: ${entry.failure.replace(/\.$/, '')}.` : undefined
+
+    switch (a.kind) {
+      case 'requesting':
+        return undefined
+
+      case 'frozen':
+        return entry.endNote ?? 'The process ended before a chart was written.'
+
+      case 'unavailable':
+        return 'No chart: no auxiliary model is set up for charts (auxiliary.tern_charts in config.yaml).'
+
+      case 'declined': {
+        // The model's reason often restates the verdict ("nothing to chart"); then the generic line says more.
+        const why = a.why?.trim().replace(/\.$/, '')
+        return why && !/^nothing to chart$/i.test(why)
+          ? `Nothing to chart: ${why}.`
+          : 'Nothing to chart: the chart model found no quantity in this output.'
+      }
+
+      case 'idle':
+        if (!this.#author) {
+          return 'No chart: no chart model (the launcher named no Hermes Python to run it).'
+        }
+
+        if (a.attempts >= this.#o.maxAttempts) {
+          return `${failed ?? 'The chart model gave no usable rules.'} No more tries for this process.`
+        }
+
+        return failed ?? `A chart is written once the process has run ${Math.round(this.#o.authorAfterMs / 1000)}s with output.`
+
+      default:
+        return assertNever(a)
+    }
   }
 
   /** Starts a spec request once the process is old and talkative enough, or re-authors a spec that stopped fitting. */
@@ -391,9 +437,11 @@ export class Charts {
           break
         }
 
-        if (specSkip(answer) !== undefined) {
+        const skip = specSkip(answer)
+
+        if (skip !== undefined) {
           // Nothing in the output so far is worth charting.
-          next = { atLines: entry.runtime.totalLines, attempts: counted.attempts, kind: 'declined' }
+          next = { atLines: entry.runtime.totalLines, attempts: counted.attempts, kind: 'declined', why: skip }
           this.#memory?.save(entry.process.id, { skip: next.atLines })
 
           break
@@ -407,8 +455,11 @@ export class Charts {
           request.rejected = { answer: JSON.stringify(answer), errors: checked.errors }
         }
       }
-    } catch {
-      // A failed request counts as an attempt; the next refresh may ask again.
+
+      entry.failure = spec || next.kind !== 'idle' ? undefined : 'its rules did not fit the output'
+    } catch (error) {
+      // A failed request counts as an attempt; the next refresh may ask again. Its note says why.
+      entry.failure = error instanceof Error ? error.message : String(error)
     } finally {
       this.#inFlight--
 

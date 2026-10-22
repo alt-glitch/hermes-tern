@@ -160,7 +160,7 @@ export function steerText(content: string): string | undefined {
  * next prompt).
  */
 export function steerState(turn: TurnEntry, index: number): 'landed' | 'pending' | 'next' {
-  if (turn.blocks.slice(index + 1).some(b => b.kind !== 'steer' && b.kind !== 'compaction')) {
+  if (turn.blocks.slice(index + 1).some(b => b.kind !== 'steer' && b.kind !== 'compaction' && b.kind !== 'event')) {
     return 'landed'
   }
 

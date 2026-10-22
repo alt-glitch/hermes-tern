@@ -169,6 +169,21 @@ export class Transcript {
     this.user({ at, attachments, text })
   }
 
+  /**
+   * Background work that ended now (a subagent, a background process): a line in the live turn,
+   * where it happened, else between the turns.
+   */
+  event(text: string, tone: NoticeEntry['tone'] = 'info', at = Date.now()) {
+    const turn = this.live
+
+    if (!turn) {
+      return this.notice(text, tone)
+    }
+
+    turn.blocks.push({ at, id: this.id('e'), kind: 'event', text, tone })
+    turn.rev++
+  }
+
   notice(text: string, tone: NoticeEntry['tone'] = 'info') {
     this.push({ id: this.id('n'), kind: 'notice', text, tone })
   }
