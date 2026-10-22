@@ -10,8 +10,6 @@ export const IGNORED = [
   'billing.step_up.verification',
   'bot_relay.outbox.pending',
   'browser.progress',
-  'connection.request',
-  'connection.update',
   'cron.changed',
   'dashboard.new_session_requested',
   'display.install.done',

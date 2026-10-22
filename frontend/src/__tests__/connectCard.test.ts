@@ -8,7 +8,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { toolCallId } from '../core/ids.js'
 
-import { FakeGateway, fakeTern, must } from './fakes.js'
+import type { Requester } from '../wire/rpc.js'
+
+import { FakeGateway, fakeTern, must, stub } from './fakes.js'
 
 const home = mkdtempSync(join(tmpdir(), 'hermes-tern-connect-'))
 process.env['HERMES_HOME'] = home
@@ -198,7 +200,11 @@ describe('ConnectWatcher on a fake host', () => {
     const told: string[] = []
     const opened: string[] = []
     const changed = vi.fn()
-    const w = new ConnectWatcher({ changed, openUrl: url => void opened.push(url), tell: text => void told.push(text), transcript }, { dir: folder })
+    const gw = stub<Requester>({ request: () => Promise.resolve({}) })
+    const w = new ConnectWatcher(
+      { changed, gw, openUrl: url => void opened.push(url), sid: () => 's1', tell: text => void told.push(text), transcript },
+      { dir: folder }
+    )
 
     /** A finished manage_connections call for operation `op`. */
     const call = (id: string, op: string) => {
