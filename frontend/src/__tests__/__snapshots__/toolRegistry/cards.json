@@ -306,7 +306,7 @@
      "align": "center",
      "gap": "xs",
      "role": "omp.tool.process",
-     "title": "Open in the Background sheet  ⌥J",
+     "title": "Open in the Background sheet (the shells pill opens it too)  ⌥J",
      "key": "process"
     },
     "c": [
@@ -370,7 +370,7 @@
       "align": "center",
       "gap": "xs",
       "role": "omp.tool.process",
-      "title": "Open in the Background sheet  ⌥J",
+      "title": "Open in the Background sheet (the shells pill opens it too)  ⌥J",
       "key": "process"
      },
      "c": [
@@ -426,7 +426,7 @@
      "align": "center",
      "gap": "xs",
      "role": "omp.tool.process",
-     "title": "Open in the Background sheet  ⌥J",
+     "title": "Open in the Background sheet (the shells pill opens it too)  ⌥J",
      "key": "process"
     },
     "c": [
@@ -490,7 +490,7 @@
       "align": "center",
       "gap": "xs",
       "role": "omp.tool.process",
-      "title": "Open in the Background sheet  ⌥J",
+      "title": "Open in the Background sheet (the shells pill opens it too)  ⌥J",
       "key": "process"
      },
      "c": [
@@ -2675,9 +2675,9 @@
     "collapsible": true,
     "name": "task",
     "status": "running",
-    "target": "2 agents",
+    "target": "2 background agents",
     "targetKind": "text",
-    "title": "Task",
+    "title": "Launched",
     "key": "f46"
    },
    "c": [

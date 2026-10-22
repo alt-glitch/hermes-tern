@@ -94,6 +94,8 @@ export interface ChartView {
   /** Top to bottom; the first is the primary block that compact views show. */
   blocks: ChartBlock[]
   state: ChartState
+  /** Why no chart is drawn (a fallback view): what it waits for, the model's reason to decline, an error. */
+  note?: string
   /** Epoch ms of the newest data the view reflects. */
   updatedAt: number
 }

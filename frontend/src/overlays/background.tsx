@@ -419,12 +419,20 @@ function preview(p: BackgroundProcess, call: ToolCall | undefined, now: number):
       key="facts"
       role="omp.hub.kv"
     />,
-    // The chart once its rules are being written or drive it; a plain count of lines says nothing the output does not.
-    ...(p.chart && p.chart.state !== 'fallback' ? [<section head="Chart" key="chart">{chartNode(p.chart)}</section>] : []),
+    // The chart once its rules are being written or drive it; a plain count of lines says nothing
+    // the output does not, so without one the section says why there is none.
+    <section head="Chart" key="chart">
+      {p.chart && p.chart.state !== 'fallback' ? chartNode(p.chart) : <text key="why" role="hermes.chart.note" spans={[{ s: 'muted', t: chartNote(p) }]} wrap="word" />}
+    </section>,
     <section head="Output" key="output">
       {outputNodes(p)}
     </section>
   ]
+}
+
+/** Why `p` has no chart: the chart's own note, else charts are off (settings.json). */
+function chartNote(p: BackgroundProcess): string {
+  return p.chart ? (p.chart.note ?? 'No chart yet.') : 'Charts are off (`jobCharts: false` in ~/.hermes/hermes-tern/settings.json).'
 }
 
 /** The output in a box of `lines` that follows its end. */
