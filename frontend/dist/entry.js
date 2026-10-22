@@ -23973,7 +23973,7 @@ var gatewayMsgEn = {
     },
     protocol: {
       noiseDetected: "protocol noise detected \xB7 /logs to inspect",
-      noise: (preview5) => `protocol noise: ${preview5}`
+      noise: (preview6) => `protocol noise: ${preview6}`
     },
     moa: {
       // {0}=references done {1}=references total (pre-formatted strings)
@@ -24756,12 +24756,12 @@ var slashCmdCoreEn = {
     queue: {
       countOne: (count2) => `${count2} queued message`,
       countOther: (count2) => `${count2} queued messages`,
-      queued: (preview5) => `queued: "${preview5}"`
+      queued: (preview6) => `queued: "${preview6}"`
     },
     steer: {
       usage: "usage: /steer <prompt>",
-      noActiveTurnQueued: (preview5) => `no active turn \u2014 queued for next: "${preview5}"`,
-      queued: (preview5) => `steer queued \u2014 arrives after next tool call: "${preview5}"`,
+      noActiveTurnQueued: (preview6) => `no active turn \u2014 queued for next: "${preview6}"`,
+      queued: (preview6) => `steer queued \u2014 arrives after next tool call: "${preview6}"`,
       rejected: "steer rejected \u2014 no active turn, queued for next turn"
     },
     undo: {
@@ -25607,8 +25607,8 @@ function slowStartNotes(stderrTail) {
     ...problems.map((l) => ({ text: l.slice(0, STDERR_LINE_CAP), tone: "error" }))
   ];
 }
-function protocolNote(preview5, warned2) {
-  return warned2 ? void 0 : { text: `The agent backend wrote unexpected output: ${String(preview5 ?? "").slice(0, STDERR_LINE_CAP)}`, tone: "info" };
+function protocolNote(preview6, warned2) {
+  return warned2 ? void 0 : { text: `The agent backend wrote unexpected output: ${String(preview6 ?? "").slice(0, STDERR_LINE_CAP)}`, tone: "info" };
 }
 function isDeadStream(err) {
   const code7 = typeof err === "object" && err !== null && "code" in err ? err.code : void 0;
@@ -29730,8 +29730,8 @@ function describeCommand(command) {
   return clip(title.charAt(0).toUpperCase() + title.slice(1), { max: MAX2 });
 }
 function commandLine(command, n = 96) {
-  const flat3 = command.replace(/<<-?\s*['"]?(\w+)['"]?[\s\S]*?\n\s*\1\s*(?=\n|$)/g, "<<'$1' \u2026").replace(/\s+/g, " ").trim();
-  return clip(flat3, { max: n });
+  const flat4 = command.replace(/<<-?\s*['"]?(\w+)['"]?[\s\S]*?\n\s*\1\s*(?=\n|$)/g, "<<'$1' \u2026").replace(/\s+/g, " ").trim();
+  return clip(flat4, { max: n });
 }
 function oneLine(text15) {
   return text15.replace(/\s+/g, " ").trim();
@@ -63984,6 +63984,306 @@ function openThemePicker(host) {
   host.open(overlay2);
 }
 
+// src/hermes/sessionTree.ts
+import { DatabaseSync as DatabaseSync4 } from "node:sqlite";
+var COLUMNS = `s.id, s.parent_session_id AS parent, s.end_reason, s.started_at, s.ended_at, s.source,
+  json_extract(s.model_config, '$._branched_from') AS branched,
+  json_extract(s.model_config, '$._delegate_from') AS delegated,
+  json_extract(s.model_config, '$._reset_from') AS reset`;
+var edgeRow = object({
+  id: string2(),
+  parent: text2,
+  end_reason: text2,
+  started_at: real,
+  ended_at: real,
+  source: text2,
+  branched: optional2(unknown()),
+  delegated: optional2(unknown()),
+  reset: optional2(unknown())
+});
+var detailRow = object({
+  title: text2,
+  archived: optional2(unknown()),
+  preview: text2
+});
+var spanRow = object({ last_active: real, messages: optional2(unknown()) });
+var present = (v) => v !== void 0 && v !== null;
+function kindOf(child, parent) {
+  if (!parent || present(child.delegated) || present(child.reset) || child.source === "tool" || child.source === "subagent") {
+    return "other";
+  }
+  if (present(child.branched)) {
+    return "branch";
+  }
+  if (parent.end_reason === "branched" && (child.started_at ?? 0) >= (parent.ended_at ?? Infinity)) {
+    return "branch";
+  }
+  return parent.end_reason === "compression" ? "continuation" : "other";
+}
+var flat3 = (s2) => (s2 ?? "").replace(/^\[[A-Z][A-Z -]+\][^\n]*\n?/gm, "").replace(/\s+/g, " ").trim();
+function branchFamily(id, db = stateDbPath()) {
+  let conn;
+  try {
+    conn = new DatabaseSync4(db, { readOnly: true });
+    const one5 = conn.prepare(`SELECT ${COLUMNS} FROM sessions s WHERE s.id = ?`);
+    const kids = conn.prepare(`SELECT ${COLUMNS} FROM sessions s WHERE s.parent_session_id = ? ORDER BY s.started_at, s.id`);
+    const cache2 = /* @__PURE__ */ new Map();
+    const get = (sid) => {
+      if (!sid) {
+        return void 0;
+      }
+      if (!cache2.has(sid)) {
+        cache2.set(sid, first(one5, edgeRow, sid));
+      }
+      return cache2.get(sid);
+    };
+    const chainRoot = (sid) => {
+      const seen = /* @__PURE__ */ new Set();
+      let at2 = sid;
+      for (let row2 = get(at2); row2 && !seen.has(at2); row2 = get(at2)) {
+        seen.add(at2);
+        if (kindOf(row2, get(row2.parent)) !== "continuation" || !row2.parent) {
+          break;
+        }
+        at2 = row2.parent;
+      }
+      return at2;
+    };
+    if (!get(id)) {
+      return { at: null, nodes: [] };
+    }
+    const at = chainRoot(id);
+    const path2 = [];
+    let top = at;
+    for (; ; ) {
+      const loop = path2.indexOf(top);
+      if (loop >= 0) {
+        top = path2.slice(loop).sort()[0] ?? top;
+        break;
+      }
+      path2.push(top);
+      const row2 = get(top);
+      if (!row2?.parent || kindOf(row2, get(row2.parent)) !== "branch") {
+        break;
+      }
+      top = chainRoot(row2.parent);
+    }
+    const nodes = [];
+    const placed = /* @__PURE__ */ new Set();
+    const queue2 = [{ parent: null, root: top }];
+    for (let next2 = queue2.shift(); next2; next2 = queue2.shift()) {
+      if (placed.has(next2.root)) {
+        continue;
+      }
+      placed.add(next2.root);
+      const segments2 = [next2.root];
+      for (let i = 0; i < segments2.length; i++) {
+        const seg = segments2[i] ?? "";
+        for (const child of rows(kids, edgeRow, seg)) {
+          cache2.set(child.id, child);
+          const kind = kindOf(child, get(seg));
+          if (kind === "continuation" && !segments2.includes(child.id)) {
+            segments2.push(child.id);
+          } else if (kind === "branch" && !placed.has(child.id)) {
+            queue2.push({ parent: next2.root, root: child.id });
+          }
+        }
+      }
+      nodes.push(nodeOf(conn, next2.root, next2.parent, segments2, get(next2.root)));
+    }
+    return { at, nodes };
+  } catch {
+    return { at: null, nodes: [] };
+  } finally {
+    conn?.close();
+  }
+}
+function nodeOf(conn, root7, parent, segments2, row2) {
+  const marks = segments2.map(() => "?").join(",");
+  const detail = first(
+    conn.prepare(
+      `SELECT COALESCE(NULLIF(s.display_name, ''), s.title, '') AS title, COALESCE(s.archived, 0) AS archived,
+        (SELECT m.content FROM messages m WHERE m.session_id = s.id AND m.role = 'user' ORDER BY m.id LIMIT 1) AS preview
+       FROM sessions s WHERE s.id = ?`
+    ),
+    detailRow,
+    root7
+  );
+  const span2 = first(
+    conn.prepare(
+      `SELECT MAX(COALESCE(last_activity_at, ended_at, started_at)) AS last_active,
+        (SELECT message_count FROM sessions WHERE id IN (${marks}) ORDER BY started_at DESC LIMIT 1) AS messages
+       FROM sessions WHERE id IN (${marks})`
+    ),
+    spanRow,
+    ...segments2,
+    ...segments2
+  );
+  return {
+    archived: detail?.archived === 1,
+    id: root7,
+    lastActive: Math.round((span2?.last_active ?? row2?.started_at ?? 0) * 1e3),
+    messages: Number(span2?.messages) || 0,
+    parent,
+    preview: flat3(detail?.preview).slice(0, 400),
+    startedAt: Math.round((row2?.started_at ?? 0) * 1e3),
+    title: (detail?.title ?? "").trim()
+  };
+}
+function treeRows(nodes) {
+  const ids = new Set(nodes.map((n) => n.id));
+  const under = /* @__PURE__ */ new Map();
+  for (const n of nodes) {
+    const parent = n.parent && ids.has(n.parent) ? n.parent : null;
+    under.set(parent, [...under.get(parent) ?? [], n]);
+  }
+  for (const list9 of under.values()) {
+    list9.sort((a2, b) => a2.startedAt - b.startedAt || (a2.id < b.id ? -1 : 1));
+  }
+  const out = [];
+  const seen = /* @__PURE__ */ new Set();
+  const stack = [...under.get(null) ?? []].reverse().map((node3) => ({ depth: 0, node: node3 }));
+  for (let at = stack.pop(); at; at = stack.pop()) {
+    if (seen.has(at.node.id)) {
+      continue;
+    }
+    seen.add(at.node.id);
+    const children3 = under.get(at.node.id) ?? [];
+    out.push({ children: children3.length, depth: at.depth, node: at.node });
+    stack.push(...[...children3].reverse().map((node3) => ({ depth: at.depth + 1, node: node3 })));
+  }
+  return out;
+}
+
+// src/overlays/tree.tsx
+var KEY8 = "tree";
+function openBranchTree(host, family = (id) => branchFamily(id)) {
+  const shown3 = durable(host.session.ref);
+  const { at: current, nodes } = shown3 ? family(shown3) : { at: null, nodes: [] };
+  if (nodes.length < 2) {
+    host.transcript.notice(
+      nodes.length ? "This conversation has no branches yet. /branch makes one." : "This conversation is not stored yet: nothing to show."
+    );
+    host.changed();
+    return;
+  }
+  const tree = treeRows(nodes);
+  const order2 = tree.map((r) => r.node.id);
+  let selected = current ?? order2[0];
+  const replies = /* @__PURE__ */ new Map();
+  const open = (id) => {
+    const row2 = tree.find((r) => r.node.id === id);
+    if (!row2) {
+      return;
+    }
+    host.close(overlay2);
+    if (row2.node.id !== current) {
+      host.resume(storedSessionId(row2.node.id)).catch((error) => {
+        host.transcript.notice(`Could not open the branch: ${errorText(error)}`, "error");
+        host.changed();
+      });
+    }
+  };
+  const overlay2 = {
+    key: KEY8,
+    modal: true,
+    node: () => {
+      const now = Date.now();
+      const row2 = tree.find((r) => r.node.id === selected);
+      if (row2 && !replies.has(row2.node.id)) {
+        replies.set(row2.node.id, lastReply(row2.node.id));
+      }
+      return /* @__PURE__ */ jsx(
+        "picker",
+        {
+          actions: [
+            { end: true, id: "close", keys: ["esc"], label: "Close" },
+            { ...optional("disabled", row2 ? void 0 : "No branch"), id: "open", keys: ["enter"], label: row2?.node.id === current ? "Back to it" : "Open", primary: true }
+          ],
+          columns: [
+            { format: "dim", id: "size", priority: 1 },
+            { format: "time", id: "when", priority: 2 }
+          ],
+          current: current ? [current] : [],
+          icon: "history",
+          items: tree.map((r) => itemOf3(r, now)),
+          layout: "tree",
+          noun: "branches",
+          onAction: { close: () => host.close(overlay2), open: () => open(selected) },
+          onActivate: (ev) => open(ev.item),
+          onSelect: (ev) => {
+            selected = ev.item;
+            host.changed();
+          },
+          order: order2,
+          preview: "side",
+          ...optional("selected", selected),
+          size: "lg",
+          subtitle: [{ s: "muted", t: plural(tree.length, "conversation") }],
+          title: "Branches",
+          total: tree.length,
+          children: row2 ? preview4(row2, nodes, row2.node.id === current, replies.get(row2.node.id) ?? "", now) : null
+        },
+        KEY8
+      );
+    },
+    onKey: (k) => {
+      if (k.name === "escape") {
+        host.close(overlay2);
+      } else if (k.name === "enter") {
+        open(selected);
+      } else {
+        selected = moveSelection(k, order2, selected) ?? selected;
+      }
+      return true;
+    }
+  };
+  host.open(overlay2);
+}
+function itemOf3({ children: children3, depth, node: node3 }, now) {
+  return {
+    badges: node3.archived ? [{ text: "archived" }] : [],
+    depth,
+    ...optional("detail", node3.title && node3.preview ? oneLine(node3.preview) : void 0),
+    facts: { size: plural(node3.messages, "msg"), when: ageShort(now - node3.lastActive) },
+    id: node3.id,
+    label: sessionLabel(node3),
+    // Only a conversation with branches folds.
+    ...optional("open", children3 ? true : void 0)
+  };
+}
+function preview4({ children: children3, node: node3 }, nodes, isCurrent, reply2, now) {
+  const parent = nodes.find((n) => n.id === node3.parent);
+  const status = isCurrent ? [{ s: "success", t: "open here" }] : void 0;
+  return [
+    /* @__PURE__ */ jsx("text", { role: "omp.picker.title", text: sessionLabel(node3) }, "title"),
+    /* @__PURE__ */ jsx(
+      "kv",
+      {
+        items: facts([
+          ["Status", status],
+          ["Branched from", parent ? sessionLabel(parent) : "nothing: this is where the family starts"],
+          ["Branches", children3 ? String(children3) : void 0],
+          ["Started", dateOf2(node3.startedAt)],
+          ["Last active", `${ageShort(now - node3.lastActive)} ago`],
+          ["Messages", String(node3.messages)],
+          ["Session", [{ s: "mono dim", t: node3.id.replace(/^(local-)?(.{12}).*$/, "$1$2\u2026") }]]
+        ])
+      },
+      "facts"
+    ),
+    ...node3.preview ? [
+      /* @__PURE__ */ jsx("section", { head: "First prompt", children: /* @__PURE__ */ jsx("md", { max: { h: "8lines" }, text: node3.preview, tone: "user" }, "text") }, "first")
+    ] : [],
+    ...reply2 ? [
+      /* @__PURE__ */ jsx("section", { head: "Last reply", children: /* @__PURE__ */ jsx("md", { max: { h: "14lines" }, text: reply2.slice(0, 2e3) }, "text") }, "last")
+    ] : []
+  ];
+}
+function dateOf2(at) {
+  return new Date(at).toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" });
+}
+
 // src/transcript/turns.ts
 function turnEndedAt(turn) {
   return turn.end.status === "live" ? void 0 : turn.end.endedAt;
@@ -64053,18 +64353,18 @@ async function redirectTurn(gw2, sid, text15) {
 }
 
 // src/commands/control.ts
-var preview4 = (text15) => text15.length > 60 ? `${text15.slice(0, 57)}\u2026` : text15;
+var preview5 = (text15) => text15.length > 60 ? `${text15.slice(0, 57)}\u2026` : text15;
 async function steer2(host, text15) {
   if (!text15) {
     return host.notice("Usage: /steer <guidance for the active turn>", "warning");
   }
   if (!host.busy || !host.sid) {
     host.enqueue(text15);
-    return host.notice(`No active turn \u2014 queued as next prompt: ${preview4(text15)}`);
+    return host.notice(`No active turn \u2014 queued as next prompt: ${preview5(text15)}`);
   }
   const r = await steerTurn(host.gw, host.sid, text15);
   if (r.ok) {
-    return host.steered ? host.steered(text15) : host.notice(`Steer queued for the active turn: ${preview4(text15)}`);
+    return host.steered ? host.steered(text15) : host.notice(`Steer queued for the active turn: ${preview5(text15)}`);
   }
   if (r.error) {
     return host.notice(`/steer failed: ${r.error}`, "error");
@@ -64133,7 +64433,7 @@ async function side(host, text15, kind) {
     });
     if (r?.task_id) {
       host.notice(
-        kind === "bg" ? `Background task ${r.task_id} started: ${preview4(text15)}` : `btw ${r.task_id}: answering from a snapshot of this conversation`
+        kind === "bg" ? `Background task ${r.task_id} started: ${preview5(text15)}` : `btw ${r.task_id}: answering from a snapshot of this conversation`
       );
     }
   } catch (e) {
@@ -64527,8 +64827,8 @@ async function compress(host, arg) {
     return host.notice("Wait for the current turn to finish (or press Esc twice) before compressing.", "warning");
   }
   const focus = arg.trim();
-  const preview5 = /(^|\s)--preview(\s|$)/.test(focus);
-  if (!preview5) {
+  const preview6 = /(^|\s)--preview(\s|$)/.test(focus);
+  if (!preview6) {
     host.compressing("start");
   }
   let result;
@@ -64538,7 +64838,7 @@ async function compress(host, arg) {
     if (host.stale()) {
       return;
     }
-    if (!preview5) {
+    if (!preview6) {
       host.compressing("none");
     }
     throw e;
@@ -64826,6 +65126,11 @@ var COMMANDS3 = [
     run: (host, arg) => prsCommand(host, arg)
   },
   {
+    help: "This conversation's branches as a tree: open one",
+    name: "tree",
+    run: (host) => openBranchTree(host)
+  },
+  {
     // The gateway refuses its own /copy and /history (cli_only); Ink runs them on its transcript, as these do.
     name: "copy",
     run: (host, arg) => copyAnswer(host, arg)
@@ -64858,7 +65163,7 @@ function copyAnswer(host, arg) {
   host.transcript.notice(`Copied ${n === void 0 ? "the last answer" : `answer ${at}`} (${text15.length} characters).`);
 }
 function historyText(entries, arg) {
-  const preview5 = Math.max(80, Number.parseInt(arg, 10) || 400);
+  const preview6 = Math.max(80, Number.parseInt(arg, 10) || 400);
   let n = 0;
   const lines = entries.flatMap((e) => {
     if (e.kind !== "user" && e.kind !== "turn") {
@@ -64867,7 +65172,7 @@ function historyText(entries, arg) {
     const tools2 = e.kind === "turn" ? e.blocks.filter((b) => b.kind === "tool").length : 0;
     const said = e.kind === "user" ? e.text.trim() : answerText(e);
     const body = said || (tools2 ? `(${tools2} tool call${tools2 === 1 ? "" : "s"})` : "(empty)");
-    const clipped = body.length > preview5 ? `${body.slice(0, preview5).trimEnd()}\u2026` : body;
+    const clipped = body.length > preview6 ? `${body.slice(0, preview6).trimEnd()}\u2026` : body;
     return [`**${e.kind === "user" ? "You" : "Hermes"} #${++n}**
 ${clipped}`];
   });
@@ -64899,7 +65204,7 @@ function localCommand(name) {
 var localCommands = () => COMMANDS3;
 
 // src/overlays/help.tsx
-var KEY8 = "help";
+var KEY9 = "help";
 var HOTKEYS = [
   {
     group: "Editing",
@@ -64960,7 +65265,7 @@ async function openHelp(host) {
     ...(catalog.categories?.length ? catalog.categories : [{ name: "Commands", pairs: catalog.pairs ?? [] }]).map((c) => ({ ...c, pairs: (c.pairs ?? []).filter(runs3) })).filter((c) => c.pairs.length)
   ];
   const overlay2 = {
-    key: KEY8,
+    key: KEY9,
     modal: true,
     node: () => /* @__PURE__ */ jsx("overlay", { anchor: "center", head: "Commands and shortcuts", modal: true, role: "omp.overlay.hotkeys", size: "lg", children: /* @__PURE__ */ jsxs("col", { gap: "lg", children: [
       HOTKEYS.map(({ group, rows: rows2 }) => /* @__PURE__ */ jsx("section", { head: group, role: "omp.hotkeys.group", children: /* @__PURE__ */ jsx(
@@ -65001,7 +65306,7 @@ async function openHelp(host) {
         "table"
       ) }, `cmd-${c.name}`)),
       actionsRow([{ hint: "escape", key: "close", keys: ["escape"], label: "Close", onClick: () => host.close(overlay2) }])
-    ] }, "body") }, KEY8),
+    ] }, "body") }, KEY9),
     onKey: (k) => {
       if (k.name === "escape" || k.name === "enter" || k.name === "q") {
         host.close(overlay2);
@@ -68175,7 +68480,7 @@ function steerState(turn, index2) {
 // src/preformatted.ts
 var BOX = /[─-╿]/;
 var RULE2 = /^\s*\+[-=+]{3,}\+?\s*$/;
-var COLUMNS = /^\s{0,4}[^\s•\-*>#`|][^\n]*?\S {2,}\S/;
+var COLUMNS2 = /^\s{0,4}[^\s•\-*>#`|][^\n]*?\S {2,}\S/;
 var ESC3 = String.fromCharCode(27);
 function isPreformatted(text15) {
   if (text15.includes(`${ESC3}[`) || BOX.test(text15)) {
@@ -68185,7 +68490,7 @@ function isPreformatted(text15) {
   if (lines.some((l) => RULE2.test(l))) {
     return true;
   }
-  const aligned = lines.filter((l) => COLUMNS.test(l)).length;
+  const aligned = lines.filter((l) => COLUMNS2.test(l)).length;
   return aligned >= 3 && aligned >= lines.length / 2;
 }
 function hardBreaks(text15) {
@@ -69214,13 +69519,13 @@ var Agents = class {
       return;
     }
     const owners = this.#owners();
-    const present = /* @__PURE__ */ new Set();
+    const present2 = /* @__PURE__ */ new Set();
     for (const row2 of rows2) {
       const id = row2.subagent_id;
       if (!id) {
         continue;
       }
-      present.add(id);
+      present2.add(id);
       this.#listed.add(id);
       const a2 = findRow(owners, row2) ?? nestedChild(owners, row2) ?? await this.#attach(owners, row2, ticket);
       if (!ticket.isCurrent()) {
@@ -69235,7 +69540,7 @@ var Agents = class {
       changed.add(a2);
     }
     for (const a2 of owners.keys()) {
-      if (!isRunning(a2) || present.has(a2.id) || this.#logPath(a2)) {
+      if (!isRunning(a2) || present2.has(a2.id) || this.#logPath(a2)) {
         continue;
       }
       if (!this.#listed.has(a2.id)) {
@@ -70625,9 +70930,9 @@ var Attachments = class {
     const size = imageSize(bytes);
     const kb = bytes.length / 1024;
     const blob = this.#host.blob(bytes, attachment.mime);
-    const preview5 = blob ? { blob } : existsSync4(attachment.path) ? { path: attachment.path } : void 0;
+    const preview6 = blob ? { blob } : existsSync4(attachment.path) ? { path: attachment.path } : void 0;
     const caption = [size && `${size.w}\xD7${size.h}`, kb >= 1024 ? `${(kb / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(kb))} KB`];
-    return { ...attachment, caption: caption.filter(Boolean).join(" \xB7 "), name, ...preview5 ? { preview: preview5 } : {} };
+    return { ...attachment, caption: caption.filter(Boolean).join(" \xB7 "), name, ...preview6 ? { preview: preview6 } : {} };
   }
 };
 
@@ -72798,8 +73103,8 @@ function history({ kept, messages: messages2, compactions, id }) {
       }
       const reply2 = typeof m["display_content"] === "string" ? m["display_content"] : text15;
       const notes = Array.isArray(m["display_commentary"]) ? m["display_commentary"].filter((n) => typeof n === "string" && Boolean(n.trim())) : [];
-      const flat3 = (s2) => s2.replace(/\s+/g, " ").trim();
-      if (!reply2.trim() || flat3(notes.join("\n\n")) !== flat3(reply2)) {
+      const flat4 = (s2) => s2.replace(/\s+/g, " ").trim();
+      if (!reply2.trim() || flat4(notes.join("\n\n")) !== flat4(reply2)) {
         turn.blocks.push(...notes.map((n) => ({ id: id("x"), kind: "text", text: n })));
       }
       if (reply2.trim()) {
@@ -75019,9 +75324,9 @@ var GatewayClient = class extends EventEmitter {
     }
   }
   protocolError(what, text15, emptyLabel) {
-    const preview5 = text15.trim().slice(0, MAX_LOG_PREVIEW) || emptyLabel;
-    this.pushLog(`[protocol] ${what}: ${preview5}`);
-    this.publish({ type: "gateway.protocol_error", payload: { preview: preview5 } });
+    const preview6 = text15.trim().slice(0, MAX_LOG_PREVIEW) || emptyLabel;
+    this.pushLog(`[protocol] ${what}: ${preview6}`);
+    this.publish({ type: "gateway.protocol_error", payload: { preview: preview6 } });
   }
   startLocalGateway() {
     const generation = ++this.localGeneration;
@@ -75335,7 +75640,7 @@ var GatewayClient = class extends EventEmitter {
 import { readFile as readFile3 } from "node:fs/promises";
 
 // src/watch/child.ts
-import { DatabaseSync as DatabaseSync4 } from "node:sqlite";
+import { DatabaseSync as DatabaseSync5 } from "node:sqlite";
 var messageRow = object({
   id: number2(),
   role: _catch(string2(), ""),
@@ -75351,7 +75656,7 @@ var lastRow = object({ id: real });
 var ChildStore = class {
   #db;
   constructor(path2 = stateDbPath()) {
-    this.#db = new DatabaseSync4(path2, { readOnly: true });
+    this.#db = new DatabaseSync5(path2, { readOnly: true });
   }
   /**
    * The child session of `parents` whose first prompt is `goal`: a child's first user turn is
