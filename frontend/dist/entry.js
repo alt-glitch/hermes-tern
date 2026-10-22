@@ -21179,6 +21179,10 @@ function sessionHost(cx) {
     get busy() {
       return cx.activity.busy !== null;
     },
+    draft: (text15) => {
+      cx.draft(text15);
+      cx.changed();
+    },
     // A steer that fell back to the queue: steering carries no images.
     canonical: cx.gw.isCanonical,
     enqueue: (text15) => cx.router.behind({ images: [], kind: "app", text: text15 }),
@@ -63480,6 +63484,303 @@ function prsPill(entries) {
   };
 }
 
+// src/hermes/rewind.ts
+var COMPACTION_MARKERS = ["[CONTEXT COMPACTION", "[CONTEXT SUMMARY]:", "[END OF PRIOR CONTEXT"];
+function isUserTurn(row2) {
+  const { content: content5 } = row2;
+  return row2.role === "user" && (!row2.display_kind || row2.display_kind === "steer") && Number.isSafeInteger(row2.row_id) && !(typeof content5 === "string" && COMPACTION_MARKERS.some((marker2) => content5.includes(marker2)));
+}
+var rowsOf2 = (snapshot3) => snapshot3.stored_messages ?? snapshot3.messages ?? [];
+var userTurns = (snapshot3) => rowsOf2(snapshot3).filter(isUserTurn);
+var userTurn = (snapshot3, rowId) => userTurns(snapshot3).find((t2) => t2.row_id === rowId);
+var undoRewind = (n) => (snapshot3) => {
+  const turns = userTurns(snapshot3);
+  const target = turns.at(-Math.min(Math.max(1, n), turns.length));
+  return target ? { target_message_id: target.row_id } : null;
+};
+var lastTurnRewind = undoRewind(1);
+function rowBefore(snapshot3, rowId) {
+  const earlier = rowsOf2(snapshot3).map((row2) => row2.row_id).filter((id) => typeof id === "number" && Number.isSafeInteger(id) && id < rowId);
+  return earlier.length ? Math.max(...earlier) : null;
+}
+var textPart2 = strictObject({ type: _enum(["input_text", "output_text", "text"]), text: string2() });
+function promptText(content5) {
+  const parts3 = typeof content5 === "string" ? [content5] : Array.isArray(content5) ? content5 : [null];
+  let text15 = "";
+  let media2 = false;
+  for (const part of parts3) {
+    const textOf2 = typeof part === "string" ? part : textPart2.safeParse(part).data?.text;
+    if (textOf2 === void 0) {
+      media2 = true;
+    } else {
+      text15 += textOf2;
+    }
+  }
+  return { media: media2, text: text15.trim() ? text15 : "" };
+}
+function promptRows(snapshot3) {
+  const out = [];
+  for (const row2 of rowsOf2(snapshot3)) {
+    if (isUserTurn(row2)) {
+      out.push({ after: 0, reply: "", row: row2.row_id, steer: row2.display_kind === "steer", ...promptText(row2.content) });
+    } else if (row2.role === "assistant" && !row2.display_kind) {
+      const last = out.at(-1);
+      const said = promptText(row2.content).text;
+      if (last && said) {
+        last.reply = said;
+      }
+    }
+  }
+  return out.map((p3, i) => ({ ...p3, after: out.length - 1 - i }));
+}
+function retryText(content5) {
+  const { media: media2, text: text15 } = promptText(content5);
+  return media2 ? null : text15;
+}
+function retryTurnRewind(snapshot3) {
+  const target = userTurns(snapshot3).at(-1);
+  const text15 = target ? retryText(target.content) : "";
+  if (text15 === null) {
+    throw new Error("/retry: retry does not support media or unknown content parts");
+  }
+  return target && text15 ? { target_message_id: target.row_id } : null;
+}
+
+// src/overlays/rewind.tsx
+var KEY6 = "rewind";
+var idOf = (p3) => String(p3.row);
+function blocked(session2) {
+  if (session2.busy || session2.queued) {
+    session2.notice("Wait for the current turn to finish (or press Esc twice) before rewinding.", "warning");
+    return true;
+  }
+  return false;
+}
+function comeback(result, picked) {
+  const target = result["target_message"];
+  return typeof target === "object" && target !== null && "content" in target ? promptText(target.content) : picked;
+}
+async function rewindTo(session2, sid, p3) {
+  const result = await mutateSession(session2.gw, sid, "rewind", (snap) => userTurn(snap, p3.row) ? { target_message_id: p3.row } : null);
+  if (session2.stale()) {
+    return;
+  }
+  if (!result) {
+    return session2.notice("That prompt is no longer in this session: nothing was rewound.", "warning");
+  }
+  const removed = Number(result["rewound_count"] ?? 0);
+  if (removed <= 0) {
+    return session2.notice("Nothing to rewind.");
+  }
+  await session2.reload();
+  if (session2.stale()) {
+    return;
+  }
+  const back = comeback(result, p3);
+  if (back.text) {
+    session2.draft(back.text);
+  }
+  session2.notice(
+    `Rewound ${plural(removed, "message")}.${back.text ? " The prompt is back in the composer." : ""}${back.media ? " Its images are not: attach them again." : ""}`
+  );
+}
+async function branchAt(host, session2, sid, p3) {
+  const result = await mutateSession(session2.gw, sid, "branch", (snap) => {
+    const through = userTurn(snap, p3.row) ? rowBefore(snap, p3.row) : null;
+    return through === null ? null : { through_message_id: through };
+  });
+  if (!result) {
+    return session2.notice("That prompt is no longer in this session: nothing was branched.", "warning");
+  }
+  const child = result.branched_session_id;
+  if (typeof child !== "string" || !child) {
+    throw new Error("the gateway did not name the branch");
+  }
+  if (session2.stale() || !await session2.open(storedSessionId(child))) {
+    return;
+  }
+  const branch2 = host.control();
+  if (p3.text) {
+    branch2.draft(p3.text);
+  }
+  branch2.notice(
+    `Branched before that prompt; the original keeps it.${p3.text ? " The prompt is in the composer." : ""}${p3.media ? " Its images are not: attach them again." : ""}`
+  );
+}
+function openRewind(host) {
+  const session2 = host.control();
+  const sid = session2.sid;
+  if (!session2.canonical) {
+    return session2.notice("Rewinding to an earlier prompt needs Hermes' shared gateway.", "warning");
+  }
+  if (!sid) {
+    return session2.notice("Nothing to rewind.");
+  }
+  if (blocked(session2)) {
+    return;
+  }
+  let state = "loading";
+  let failure3 = "";
+  let prompts = [];
+  let selected;
+  let confirming = false;
+  const load2 = async () => {
+    state = "loading";
+    host.changed();
+    try {
+      const snapshot3 = await rpc(session2.gw, "session.resume", { session_id: sid });
+      if (!snapshot3 || !("revision" in snapshot3)) {
+        throw new Error("the session did not report its stored messages");
+      }
+      prompts = promptRows(snapshot3);
+      const newest = prompts.at(-1);
+      selected = newest ? idOf(newest) : void 0;
+      state = "ready";
+    } catch (error) {
+      failure3 = errorText(error);
+      state = "error";
+    }
+    host.changed();
+  };
+  const picked = () => prompts.find((p3) => idOf(p3) === selected);
+  const act = (run6, name) => {
+    const p3 = picked();
+    if (!p3 || session2.stale()) {
+      return;
+    }
+    host.close(overlay2);
+    if (blocked(session2)) {
+      return;
+    }
+    run6(p3).catch((error) => session2.notice(`${name} failed: ${errorText(error)}`, "error"));
+  };
+  const rewind2 = () => act((p3) => rewindTo(session2, sid, p3), "Rewind");
+  const branch2 = () => {
+    if (picked() !== prompts[0]) {
+      act((p3) => branchAt(host, session2, sid, p3), "Branch");
+    }
+  };
+  const ask = () => {
+    confirming = Boolean(picked());
+  };
+  const overlay2 = {
+    key: KEY6,
+    modal: true,
+    node: () => {
+      const p3 = picked();
+      const noBranch = p3 ? p3 === prompts[0] ? "Nothing comes before the first prompt: /new starts afresh" : void 0 : "No prompt";
+      return /* @__PURE__ */ jsx(
+        "picker",
+        {
+          actions: [
+            { ...optional("disabled", noBranch), id: "branch", keys: ["b"], label: "Branch here" },
+            { end: true, id: "close", keys: ["esc"], label: "Close" },
+            { ...optional("disabled", p3 ? void 0 : "No prompt"), danger: true, id: "rewind", keys: ["enter"], label: "Rewind", primary: true }
+          ],
+          columns: [{ format: "dim", id: "after", priority: 1 }],
+          ...optional(
+            "confirm",
+            confirming && p3 ? {
+              act: "confirm",
+              label: "Rewind",
+              text: `Remove this prompt${p3.after ? ` and ${plural(p3.after, "later one")}` : ""}?`
+            } : void 0
+          ),
+          empty: "No prompts in this session yet",
+          icon: "history",
+          items: prompts.map(itemOf2),
+          layout: "timeline",
+          ...optional("message", state === "error" ? [{ s: "error", t: failure3 }] : void 0),
+          noun: "prompts",
+          onAction: {
+            branch: branch2,
+            cancel: () => {
+              confirming = false;
+              host.changed();
+            },
+            close: () => host.close(overlay2),
+            confirm: rewind2,
+            retry: () => void load2(),
+            rewind: () => {
+              ask();
+              host.changed();
+            }
+          },
+          onActivate: (ev) => {
+            selected = ev.item;
+            ask();
+            host.changed();
+          },
+          onSelect: (ev) => {
+            selected = ev.item;
+            confirming = false;
+            host.changed();
+          },
+          order: prompts.map(idOf),
+          preview: "side",
+          ...optional("selected", selected),
+          size: "lg",
+          state,
+          title: "Rewind",
+          total: prompts.length,
+          children: p3 ? promptPreview(p3, prompts.indexOf(p3)) : null
+        },
+        KEY6
+      );
+    },
+    onKey: (k) => {
+      if (confirming) {
+        if (k.name === "enter" || k.name === "y") {
+          rewind2();
+        } else if (k.name === "escape" || k.name === "n") {
+          confirming = false;
+        }
+        return true;
+      }
+      if (k.name === "escape") {
+        host.close(overlay2);
+      } else if (k.name === "enter") {
+        ask();
+      } else if (k.name === "b" && !k.ctrl && !k.meta) {
+        branch2();
+      } else {
+        selected = moveSelection(k, prompts.map(idOf), selected) ?? selected;
+      }
+      return true;
+    }
+  };
+  host.open(overlay2);
+  void load2();
+}
+function itemOf2(p3) {
+  return {
+    badges: [...p3.steer ? [{ text: "steer" }] : [], ...p3.media ? [{ text: "image", title: "Its images do not come back" }] : []],
+    ...optional("detail", p3.reply ? oneLine(p3.reply) : void 0),
+    facts: { after: p3.after ? `${p3.after} later` : "newest" },
+    id: idOf(p3),
+    label: oneLine(p3.text) || "(no text)"
+  };
+}
+function promptPreview(p3, before) {
+  return [
+    /* @__PURE__ */ jsx(
+      "kv",
+      {
+        items: facts([
+          ["Rewind removes", `this prompt${p3.after ? ` and ${plural(p3.after, "later one")}` : ""}, with the replies`],
+          ["A branch keeps", before ? `${plural(before, "earlier prompt")}; this session stays as it is` : "nothing: this is the first prompt"],
+          ["Files", "stay as they are (/rollback restores them)"]
+        ])
+      },
+      "facts"
+    ),
+    /* @__PURE__ */ jsx("section", { head: "Prompt", children: /* @__PURE__ */ jsx("md", { max: { h: "8lines" }, text: p3.text || "(no text)", tone: "user" }, "text") }, "prompt"),
+    ...p3.reply ? [
+      /* @__PURE__ */ jsx("section", { head: "Reply", children: /* @__PURE__ */ jsx("md", { max: { h: "14lines" }, text: p3.reply.slice(0, 2e3) }, "text") }, "reply")
+    ] : []
+  ];
+}
+
 // src/overlays/sessions.tsx
 import { basename as basename2 } from "node:path";
 
@@ -63639,7 +63940,7 @@ function sessionLabel(s2) {
 }
 
 // src/overlays/sessions.tsx
-var KEY6 = "sessions";
+var KEY7 = "sessions";
 var LIMIT = 400;
 var DAY = 864e5;
 function openSessionPicker(host) {
@@ -63740,7 +64041,7 @@ ${s2.preview} ${s2.cwd} ${s2.branch} ${s2.id}`, { scattered: false });
     return { hits, order: order2 };
   };
   const overlay2 = {
-    key: KEY6,
+    key: KEY7,
     modal: true,
     node: () => {
       const now = Date.now();
@@ -63768,7 +64069,7 @@ ${s2.preview} ${s2.cwd} ${s2.branch} ${s2.id}`, { scattered: false });
           empty: tab2 === "here" ? `No sessions in ${project} yet. Tab shows every folder.` : "No saved sessions yet",
           hits,
           icon: "history",
-          items: rows2().map((x) => itemOf2(x, now, running2.has(x.id), tab2 === "all" && !here(x))),
+          items: rows2().map((x) => itemOf3(x, now, running2.has(x.id), tab2 === "all" && !here(x))),
           layout: "cards",
           noun: "sessions",
           onAction: {
@@ -63820,7 +64121,7 @@ ${s2.preview} ${s2.cwd} ${s2.branch} ${s2.id}`, { scattered: false });
           total: rows2().length,
           children: s2 ? preview3(s2, now, s2.id === current, running2.has(s2.id), replies.get(s2.id) ?? "") : null
         },
-        KEY6
+        KEY7
       );
     },
     onKey: (k) => {
@@ -63859,7 +64160,7 @@ ${s2.preview} ${s2.cwd} ${s2.branch} ${s2.id}`, { scattered: false });
   host.open(overlay2);
   setTimeout(() => void load2(), 0);
 }
-function itemOf2(s2, now, running2, elsewhere) {
+function itemOf3(s2, now, running2, elsewhere) {
   const label = sessionLabel(s2);
   return {
     badges: [
@@ -63912,7 +64213,7 @@ function dateOf(at) {
 }
 
 // src/overlays/theme.tsx
-var KEY7 = "theme";
+var KEY8 = "theme";
 var MODES = [
   { detail: "Your Tern theme, light and dark, with no colors of its own", icon: "palette", id: "tern", label: "Tern" },
   { detail: "Bone ink and quiet grays; gold only for the moments that earn it", icon: "sparkle", id: "nous", label: "Nous" },
@@ -63932,7 +64233,7 @@ function openThemePicker(host) {
     }
   };
   const overlay2 = {
-    key: KEY7,
+    key: KEY8,
     modal: true,
     // As Esc: the theme being previewed goes back.
     cancel: () => {
@@ -63967,7 +64268,7 @@ function openThemePicker(host) {
         size: "md",
         title: "Theme"
       },
-      KEY7
+      KEY8
     ),
     onKey: (k) => {
       if (k.name === "escape") {
@@ -64452,48 +64753,19 @@ var REFUSED_COMMANDS = [
   }))
 ];
 
-// src/hermes/rewind.ts
-var COMPACTION_MARKERS = ["[CONTEXT COMPACTION", "[CONTEXT SUMMARY]:", "[END OF PRIOR CONTEXT"];
-function isUserTurn(row2) {
-  const { content: content5 } = row2;
-  return row2.role === "user" && (!row2.display_kind || row2.display_kind === "steer") && Number.isSafeInteger(row2.row_id) && !(typeof content5 === "string" && COMPACTION_MARKERS.some((marker2) => content5.includes(marker2)));
-}
-var lastUserTurn = (snapshot3) => (snapshot3.stored_messages ?? snapshot3.messages ?? []).findLast(isUserTurn);
-function lastTurnRewind(snapshot3) {
-  const target = lastUserTurn(snapshot3);
-  return target ? { target_message_id: target.row_id } : null;
-}
-var textPart2 = strictObject({ type: _enum(["input_text", "output_text", "text"]), text: string2() });
-function retryText(content5) {
-  const parts3 = typeof content5 === "string" ? [content5] : Array.isArray(content5) ? content5 : [null];
-  let text15 = "";
-  for (const part of parts3) {
-    const textOf2 = typeof part === "string" ? part : textPart2.safeParse(part).data?.text;
-    if (textOf2 === void 0) {
-      return null;
-    }
-    text15 += textOf2;
-  }
-  return text15.trim() ? text15 : "";
-}
-function retryTurnRewind(snapshot3) {
-  const target = lastUserTurn(snapshot3);
-  const text15 = target ? retryText(target.content) : "";
-  if (text15 === null) {
-    throw new Error("/retry: retry does not support media or unknown content parts");
-  }
-  return target && text15 ? { target_message_id: target.row_id } : null;
-}
-
 // src/commands/session.ts
-async function rewind(host, intent) {
+async function rewind(host, intent, arg = "") {
   if (!host.canonical) {
     return false;
+  }
+  const count2 = intent === "undo" && arg.trim() ? Number(arg.trim()) : 1;
+  if (!Number.isSafeInteger(count2) || count2 < 1) {
+    return host.notice("Usage: /undo [N] (N counts prompts back from the newest)", "warning");
   }
   if (!host.sid) {
     return host.notice(`Nothing to ${intent}.`);
   }
-  const result = await mutateSession(host.gw, host.sid, "rewind", intent === "retry" ? retryTurnRewind : lastTurnRewind);
+  const result = await mutateSession(host.gw, host.sid, "rewind", intent === "retry" ? retryTurnRewind : undoRewind(count2));
   const removed = Number(result?.["rewound_count"] ?? 0);
   if (host.stale()) {
     return;
@@ -64660,7 +64932,7 @@ var guarded2 = (name, run6) => async (host, arg) => {
   }
 };
 var COMMANDS2 = [
-  { name: "undo", run: (host) => rewind(host, "undo") },
+  { name: "undo", run: (host, arg) => rewind(host, "undo", arg) },
   { name: "retry", run: (host) => rewind(host, "retry") },
   { aliases: ["compact"], name: "compress", run: compress },
   { aliases: ["fork"], name: "branch", run: branch },
@@ -64826,6 +65098,11 @@ var COMMANDS3 = [
     run: (host, arg) => prsCommand(host, arg)
   },
   {
+    help: "Go back to an earlier prompt: rewind to it, or branch from it",
+    name: "rewind",
+    run: (host) => openRewind(host)
+  },
+  {
     // The gateway refuses its own /copy and /history (cli_only); Ink runs them on its transcript, as these do.
     name: "copy",
     run: (host, arg) => copyAnswer(host, arg)
@@ -64899,7 +65176,7 @@ function localCommand(name) {
 var localCommands = () => COMMANDS3;
 
 // src/overlays/help.tsx
-var KEY8 = "help";
+var KEY9 = "help";
 var HOTKEYS = [
   {
     group: "Editing",
@@ -64960,7 +65237,7 @@ async function openHelp(host) {
     ...(catalog.categories?.length ? catalog.categories : [{ name: "Commands", pairs: catalog.pairs ?? [] }]).map((c) => ({ ...c, pairs: (c.pairs ?? []).filter(runs3) })).filter((c) => c.pairs.length)
   ];
   const overlay2 = {
-    key: KEY8,
+    key: KEY9,
     modal: true,
     node: () => /* @__PURE__ */ jsx("overlay", { anchor: "center", head: "Commands and shortcuts", modal: true, role: "omp.overlay.hotkeys", size: "lg", children: /* @__PURE__ */ jsxs("col", { gap: "lg", children: [
       HOTKEYS.map(({ group, rows: rows2 }) => /* @__PURE__ */ jsx("section", { head: group, role: "omp.hotkeys.group", children: /* @__PURE__ */ jsx(
@@ -65001,7 +65278,7 @@ async function openHelp(host) {
         "table"
       ) }, `cmd-${c.name}`)),
       actionsRow([{ hint: "escape", key: "close", keys: ["escape"], label: "Close", onClick: () => host.close(overlay2) }])
-    ] }, "body") }, KEY8),
+    ] }, "body") }, KEY9),
     onKey: (k) => {
       if (k.name === "escape" || k.name === "enter" || k.name === "q") {
         host.close(overlay2);
@@ -67387,6 +67664,8 @@ var AppActions = class {
     this.host = {
       activity: cx.activity,
       changed,
+      draft: (text15) => composer2.set(composer2.text ? `${text15}
+${composer2.text}` : text15, { pasted: composer2.pasted }),
       gw: gw2,
       life,
       queue: queue2,

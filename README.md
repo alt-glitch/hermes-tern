@@ -99,6 +99,7 @@ A turn shows what the agent does while it works: its reasoning, short notes, and
 | --- | --- |
 | `/model`, `/effort` | Pick the model and the reasoning effort (also the chips on the composer) |
 | `/sessions` | Resume a session from this project, or from any folder |
+| `/rewind` | Go back to an earlier prompt: rewind to it (the prompt returns to the composer), or branch from it |
 | `/ps` | Background processes and cron jobs |
 | `/agents` | Subagents |
 | `/changes` | The working tree's diff |

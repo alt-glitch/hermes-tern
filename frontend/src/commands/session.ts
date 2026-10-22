@@ -1,5 +1,5 @@
 // Session commands the shared gateway serves only through dedicated RPCs: its `slash.exec`
-// refuses them by name. /undo, /retry, /compress and /branch are `session.mutate` operations
+// refuses them by name. /undo [N], /retry, /compress and /branch are `session.mutate` operations
 // (gateway/session_mutations.py); /save, /reload, /reload-skills and /rollback are their own
 // verbs (gateway/session_tui_ops.py, session_tui_side.py,
 // session_ancillary.py). Mirrors Hermes' ui-tui/src/app/slash/commands/{core,session,ops}.ts and
@@ -11,7 +11,7 @@ import { type StoredSessionId, storedSessionId } from '../core/ids.js'
 import { plural } from '../core/text.js'
 import { lineTokens } from '../hermes/compactions.js'
 import { type MutationResult, mutateSession } from '../hermes/mutate.js'
-import { lastTurnRewind, retryText, retryTurnRewind } from '../hermes/rewind.js'
+import { retryText, retryTurnRewind, undoRewind } from '../hermes/rewind.js'
 import { rpc } from '../wire/rpc.js'
 
 import type { ControlHost } from './control.js'
@@ -29,6 +29,8 @@ export interface SessionHost extends ControlHost {
   compressing(state: 'none' | 'start' | { before?: number | undefined; after?: number | undefined }): void
   /** Sends `text` as a prompt now. */
   send(text: string): void
+  /** Puts `text` in the composer to edit and send, before any draft there. */
+  draft(text: string): void
   /** Shows stored session `id` in this view; false when the view did not move to it. */
   open(id: StoredSessionId): Promise<boolean>
 }
@@ -40,17 +42,26 @@ export interface SessionCommand {
   run(host: SessionHost, arg: string): Promise<boolean | void> | boolean | void
 }
 
-/** `/undo` and `/retry`: rewind to before the newest user turn; `/retry` then resends that turn's text. */
-async function rewind(host: SessionHost, intent: 'retry' | 'undo') {
+/**
+ * `/undo [N]` and `/retry`: rewind to before the newest user turn (`/undo N`: the `N`th newest);
+ * `/retry` then resends that turn's text.
+ */
+async function rewind(host: SessionHost, intent: 'retry' | 'undo', arg = '') {
   if (!host.canonical) {
     return false
+  }
+
+  const count = intent === 'undo' && arg.trim() ? Number(arg.trim()) : 1
+
+  if (!Number.isSafeInteger(count) || count < 1) {
+    return host.notice('Usage: /undo [N] (N counts prompts back from the newest)', 'warning')
   }
 
   if (!host.sid) {
     return host.notice(`Nothing to ${intent}.`)
   }
 
-  const result = await mutateSession(host.gw, host.sid, 'rewind', intent === 'retry' ? retryTurnRewind : lastTurnRewind)
+  const result = await mutateSession(host.gw, host.sid, 'rewind', intent === 'retry' ? retryTurnRewind : undoRewind(count))
   const removed = Number(result?.['rewound_count'] ?? 0)
 
   if (host.stale()) {
@@ -302,7 +313,7 @@ const guarded =
   }
 
 const COMMANDS: readonly SessionCommand[] = [
-  { name: 'undo', run: host => rewind(host, 'undo') },
+  { name: 'undo', run: (host, arg) => rewind(host, 'undo', arg) },
   { name: 'retry', run: host => rewind(host, 'retry') },
   { aliases: ['compact'], name: 'compress', run: compress },
   { aliases: ['fork'], name: 'branch', run: branch },
