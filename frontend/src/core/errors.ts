@@ -9,3 +9,8 @@ export function errorText(error: unknown): string {
 export function errorCode(error: unknown): string | undefined {
   return error instanceof Error && 'code' in error && typeof error.code === 'string' ? error.code : undefined
 }
+
+/** A gateway refusal's JSON-RPC error code (`4004`, …); undefined for any other throw. */
+export function rpcErrorCode(error: unknown): number | undefined {
+  return error instanceof Error && 'code' in error && typeof error.code === 'number' ? error.code : undefined
+}

@@ -139,8 +139,8 @@ export function chatStores(chat: ChatPorts, { act, gw, launch, settings, surface
   const presses: Presses = { esc: 0, exit: 0 }
   /** The prompt sheets the gateway's questions opened, and their approval-queue ids. */
   const sheets = new PromptSheets(chat)
-  /** The connect cards, kept current from the plugin's files. */
-  const connect = new ConnectWatcher({ changed, openUrl, tell: text => act().submit(text, false), transcript })
+  /** The connect cards: the gateway's (answered through it), and the plugin's files. */
+  const connect = new ConnectWatcher({ changed, gw, openUrl, sid: () => session.ref.live, tell: text => act().submit(text, false), transcript })
   /** The gateway connection: down until the next gateway.ready, and its redial line. */
   const reconnect = new Reconnect(chat)
   /** The backend warnings shown already (stray output, the last status warning), so each stays one line. */

@@ -15,7 +15,7 @@ export interface ActionCx {
   openProcess(id: string): void
   /** `url` in the browser. */
   openUrl(url: string): void
-  readonly connect: Pick<ConnectWatcher, 'continue' | 'open'>
+  readonly connect: Pick<ConnectWatcher, 'approve' | 'continue' | 'open' | 'retry' | 'skip'>
   /** A modal sheet is on top: the composer's input does not take the keys back. */
   modal(): boolean
   /** The composer's input took Tern's focus: the pills let go of the keys, and the caret stays there. */
@@ -23,21 +23,38 @@ export interface ActionCx {
 }
 
 /** The `act` names with a handler here. */
-export type ActionName = 'connect-continue' | 'connect-open' | 'open-agent' | 'open-process' | 'open-url'
+export type ActionName =
+  | 'connect-approve'
+  | 'connect-continue'
+  | 'connect-open'
+  | 'connect-retry'
+  | 'connect-skip'
+  | 'open-agent'
+  | 'open-process'
+  | 'open-url'
 
 /** What an action does with its (non-empty) value. */
 type ActionHandler = (value: string, cx: ActionCx) => void
 
+/** A connect card row's action value, `<card>:<app>`: the card names the row, as call ids repeat. */
+function cardRow(value: string): [string, string] {
+  const at = value.lastIndexOf(':')
+
+  return [value.slice(0, at), value.slice(at + 1)]
+}
+
 /** Each action's handler. */
 export const ACTIONS = {
+  // A live connect card's Connect on an MCP row: the gateway installs it.
+  'connect-approve': (value, cx) => cx.connect.approve(...cardRow(value)),
   // A connect card's Continue.
   'connect-continue': (value, cx) => cx.connect.continue(value),
-  // `<card>:<app>`: the card names the row, as call ids repeat.
-  'connect-open': (value, cx) => {
-    const at = value.lastIndexOf(':')
-
-    cx.connect.open(value.slice(0, at), value.slice(at + 1))
-  },
+  // A connect card's Authorize: the app's link in the browser.
+  'connect-open': (value, cx) => cx.connect.open(...cardRow(value)),
+  // A live connect card's Try again on a failed or expired link.
+  'connect-retry': (value, cx) => cx.connect.retry(...cardRow(value)),
+  // A live connect card's Skip on one app.
+  'connect-skip': (value, cx) => cx.connect.skip(...cardRow(value)),
   'open-agent': (value, cx) => cx.openAgent(value),
   'open-process': (value, cx) => cx.openProcess(value),
   // A connect card's Authorize: the app's link in the browser.

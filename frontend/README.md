@@ -40,7 +40,7 @@ flowchart LR
 | `src/view/ui/` | The parts the views share: pills, buttons and the action row, the shimmer and working row, sections headed by a child, facts lists |
 | `src/overlays/` | Floating sheets (`overlay.ts` is their contract): approvals, clarify, masked prompts, completions, pickers |
 | `src/prompts/` | The prompt sheets on the overlay stack: their keys, and closing them when the gateway withdraws their questions |
-| `src/connections/` | Connect cards: the card files the plugin writes (`cards.ts`), and the watcher that keeps each card current and tells the agent |
+| `src/connections/` | Connect cards, one model for two wires: the gateway's `connection.request` operation, which the card answers (`live.ts`), and the card files the plugin writes for an older gateway (`cards.ts`); the watcher keeps each card current |
 | `src/hermes/` | Hermes' own runtime and files: the gateway client, its `state.db` (the session index, the compaction boundaries), paths, shell, history |
 
 The views speak omp's chat vocabulary (`omp.session`, `omp.user`, `omp.assistant`,
