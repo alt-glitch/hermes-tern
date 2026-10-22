@@ -62,6 +62,25 @@ export const replays: Record<string, Replay> = {
     ]
   },
 
+  'a reply the user redirected while it streamed': {
+    fixture: 'redirect-reply',
+    replies: {
+      ...started,
+      'config.get': p => (p['key'] === 'busy' ? { value: 'interrupt' } : {}),
+      'session.redirect': () => ({ status: 'redirected' })
+    },
+    steps: [
+      { feed: 1 },
+      { type: 'split it into its own step' },
+      { press: 'enter' },
+      { feed: 4 },
+      { type: 'only claim when we know' },
+      { press: 'enter' },
+      { feed: 2 },
+      { feed: 1 }
+    ]
+  },
+
   '/compress, then a resume': {
     fixture: 'compress-resume',
     replies: {
