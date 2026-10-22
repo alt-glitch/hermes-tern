@@ -21231,13 +21231,17 @@ function sessionHost(cx) {
 
 // src/config/env.ts
 function readLaunchEnv(env2 = process.env, cwd = process.cwd()) {
+  const launchCwd = env2["HERMES_CWD"] || cwd;
   return Object.freeze({
-    cwd: env2["HERMES_CWD"] || cwd,
+    cwd: launchCwd,
     eventLog: env2["HERMES_TERN_EVENT_LOG"] ?? "",
     home: env2["HOME"],
     image: env2["HERMES_TUI_IMAGE"]?.trim() ?? "",
+    pane: env2["TERN_PANE"]?.trim() ?? "",
+    paneCwd: env2["HERMES_TERN_LAUNCH_CWD"] || launchCwd,
     pythonSrcRoot: env2["HERMES_PYTHON_SRC_ROOT"] ?? "",
     query: env2["HERMES_TUI_QUERY"]?.trim() ?? "",
+    restored: Boolean(env2["HERMES_TERN_RESTORED"]?.trim()),
     resume: env2["HERMES_TUI_RESUME"]?.trim() ?? "",
     sessionCwd: env2["HERMES_TUI_CWD"]?.trim() ?? "",
     version: env2["HERMES_VERSION"] ?? ""
@@ -37489,15 +37493,15 @@ function collectText(node3, info) {
     start = end + 1;
   }
   let index2 = -1;
-  let join14;
+  let join15;
   while (++index2 < lines.length) {
     if (lines[index2].charCodeAt(lines[index2].length - 1) === 8203 || index2 < lines.length - 1 && lines[index2 + 1].charCodeAt(0) === 8203) {
       result.push(lines[index2]);
-      join14 = void 0;
+      join15 = void 0;
     } else if (lines[index2]) {
-      if (typeof join14 === "number") result.push(join14);
+      if (typeof join15 === "number") result.push(join15);
       result.push(lines[index2]);
-      join14 = 0;
+      join15 = 0;
     } else if (index2 === 0 || index2 === lines.length - 1) {
       result.push(0);
     }
@@ -65012,20 +65016,45 @@ async function openHelp(host) {
   host.open(overlay2);
 }
 
+// src/session/pane.ts
+import { mkdirSync as mkdirSync3, rmSync as rmSync2, writeFileSync as writeFileSync2 } from "node:fs";
+import { join as join7 } from "node:path";
+var paneFile = (pane, dir2 = dataDir()) => join7(dir2, "panes", `${pane}.json`);
+function markPane(launch3, sid, dir2 = dataDir()) {
+  if (!launch3.pane) {
+    return;
+  }
+  const record3 = { cwd: launch3.paneCwd, pid: process.pid, session_id: sid, updated_at: Date.now() / 1e3 };
+  try {
+    mkdirSync3(join7(dir2, "panes"), { recursive: true });
+    writeFileSync2(paneFile(launch3.pane, dir2), JSON.stringify(record3));
+  } catch {
+  }
+}
+function forgetPane(launch3, dir2 = dataDir()) {
+  if (!launch3.pane) {
+    return;
+  }
+  try {
+    rmSync2(paneFile(launch3.pane, dir2), { force: true });
+  } catch {
+  }
+}
+
 // src/settings.ts
-import { mkdirSync as mkdirSync3, writeFileSync as writeFileSync2 } from "node:fs";
+import { mkdirSync as mkdirSync4, writeFileSync as writeFileSync3 } from "node:fs";
 import { homedir as homedir9 } from "node:os";
-import { dirname, join as join7 } from "node:path";
+import { dirname, join as join8 } from "node:path";
 function settingsFile2(env2 = process.env) {
-  return join7(env2["HERMES_HOME"] || join7(homedir9(), ".hermes"), "hermes-tern", "settings.json");
+  return join8(env2["HERMES_HOME"] || join8(homedir9(), ".hermes"), "hermes-tern", "settings.json");
 }
 function loadSettings(file2 = settingsFile2()) {
   return readSettings(file2);
 }
 function saveSettings(patch6, file2 = settingsFile2()) {
   const next2 = { ...readStoredSettings(file2), ...patch6 };
-  mkdirSync3(dirname(file2), { recursive: true });
-  writeFileSync2(file2, `${JSON.stringify(next2, null, 2)}
+  mkdirSync4(dirname(file2), { recursive: true });
+  writeFileSync3(file2, `${JSON.stringify(next2, null, 2)}
 `);
   return settingsOf(next2);
 }
@@ -68575,7 +68604,7 @@ function headedCard(c) {
 
 // src/view/welcome.tsx
 import { readFileSync as readFileSync3 } from "node:fs";
-import { join as join8 } from "node:path";
+import { join as join9 } from "node:path";
 function welcomeNode(key2, cx) {
   return /* @__PURE__ */ jsxs("card", { role: "omp.welcome", children: [
     /* @__PURE__ */ jsxs("row", { align: "center", gap: "md", role: "omp.welcome.lockup", children: [
@@ -68595,7 +68624,7 @@ var TIP_LINE = /^\s+t\d+:\s+"((?:[^"\\]|\\.)*)"\s*$/;
 function randomTip(root7) {
   let text15;
   try {
-    text15 = readFileSync3(join8(root7, "locales", "en.yaml"), "utf8");
+    text15 = readFileSync3(join9(root7, "locales", "en.yaml"), "utf8");
   } catch {
     return "";
   }
@@ -69000,7 +69029,7 @@ function focusOf(cx) {
 // src/agents/store.ts
 import { readFile as readFile2, stat } from "node:fs/promises";
 import { homedir as homedir10 } from "node:os";
-import { join as join9 } from "node:path";
+import { join as join10 } from "node:path";
 var POLL_MS2 = 1e3;
 var GRACE_POLLS = 3;
 var MISSING_READS = 3;
@@ -69336,10 +69365,10 @@ async function manifestLog(delegationId, index2, env2 = process.env) {
   if (!/^[\w-]+$/.test(delegationId)) {
     return void 0;
   }
-  const home = env2["HERMES_HOME"] || join9(homedir10(), ".hermes");
-  for (const root7 of [join9(home, "delegation_cache", "live"), join9(home, "cache", "delegation", "live")]) {
+  const home = env2["HERMES_HOME"] || join10(homedir10(), ".hermes");
+  for (const root7 of [join10(home, "delegation_cache", "live"), join10(home, "cache", "delegation", "live")]) {
     try {
-      const text15 = await readFile2(join9(root7, delegationId, "manifest.json"), "utf8");
+      const text15 = await readFile2(join10(root7, delegationId, "manifest.json"), "utf8");
       const tasks = record(text15.replace(/^\uFEFF/, ""))?.["tasks"];
       const log = Array.isArray(tasks) ? record(tasks.find((t2) => record(t2)?.["index"] === index2))?.["log"] : void 0;
       if (typeof log === "string" && log) {
@@ -70376,7 +70405,7 @@ import { execFile as execFile5 } from "node:child_process";
 import { existsSync as existsSync3 } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
 import { homedir as homedir11, tmpdir } from "node:os";
-import { join as join10, resolve as resolve4 } from "node:path";
+import { join as join11, resolve as resolve4 } from "node:path";
 import { promisify as promisify4 } from "node:util";
 var execFileP = promisify4(execFile5);
 var runFile = async (file2, args, options) => (await execFileP(file2, args, options)).stdout;
@@ -70419,7 +70448,7 @@ async function extractClipboardImage(dest, env2, platform = process.platform, ru
   if (!root7) {
     return void 0;
   }
-  const stdout = await run6(python, [join10(root7, "ui-tui/scripts/clipboard_image.py"), dest], {
+  const stdout = await run6(python, [join11(root7, "ui-tui/scripts/clipboard_image.py"), dest], {
     cwd: root7,
     env: { ...env2, PYTHONPATH: root7 },
     timeout: 15e3
@@ -70427,9 +70456,9 @@ async function extractClipboardImage(dest, env2, platform = process.platform, ru
   return stdout.trim() === "true" && existsSync3(dest) ? dest : void 0;
 }
 async function withClipboardImage(use, env2 = process.env, extract = extractClipboardImage) {
-  const dir2 = await mkdtemp(join10(tmpdir(), "hermes-tern-clipboard-"));
+  const dir2 = await mkdtemp(join11(tmpdir(), "hermes-tern-clipboard-"));
   try {
-    const path2 = await extract(join10(dir2, "clipboard.png"), env2);
+    const path2 = await extract(join11(dir2, "clipboard.png"), env2);
     return path2 ? await use(path2) : void 0;
   } finally {
     await rm(dir2, { force: true, recursive: true });
@@ -71180,13 +71209,13 @@ var PullRequests = class {
 };
 
 // src/hermes/activeSessionFile.ts
-import { writeFileSync as writeFileSync3 } from "node:fs";
+import { writeFileSync as writeFileSync4 } from "node:fs";
 var writeActiveSessionFile = (sessionId, file2 = process.env["HERMES_TUI_ACTIVE_SESSION_FILE"]) => {
   if (!file2 || !sessionId) {
     return;
   }
   try {
-    writeFileSync3(file2, JSON.stringify({ session_id: sessionId }), { mode: 384 });
+    writeFileSync4(file2, JSON.stringify({ session_id: sessionId }), { mode: 384 });
   } catch {
   }
 };
@@ -71487,7 +71516,7 @@ var OverlayStack = class {
 
 // src/processes/widgets/author.ts
 import { spawn as spawn2 } from "node:child_process";
-import { join as join11 } from "node:path";
+import { join as join12 } from "node:path";
 var MAX_BRIEF_CHARS = 1500;
 var MAX_SAMPLE_LINE_CHARS = 300;
 var MAX_SAMPLE_BYTES = 12 * 1024;
@@ -71613,7 +71642,7 @@ function hermesAuthor(env2 = process.env) {
   if (!python || !root7 || !ui) {
     return void 0;
   }
-  const script = join11(ui, "..", "widget_author.py");
+  const script = join12(ui, "..", "widget_author.py");
   return (request, signal) => new Promise((resolve7, reject) => {
     const child = spawn2(python, [script], {
       cwd: root7,
@@ -71641,17 +71670,17 @@ function hermesAuthor(env2 = process.env) {
 }
 
 // src/processes/widgets/memory.ts
-import { mkdirSync as mkdirSync4, readdirSync as readdirSync2, rmSync as rmSync2, statSync, writeFileSync as writeFileSync4 } from "node:fs";
-import { join as join12 } from "node:path";
+import { mkdirSync as mkdirSync5, readdirSync as readdirSync2, rmSync as rmSync3, statSync, writeFileSync as writeFileSync5 } from "node:fs";
+import { join as join13 } from "node:path";
 var KEEP_MS = 7 * 24 * 36e5;
 var safe3 = (id) => /^[\w.-]{1,128}$/.test(id);
-function chartMemory(dir2 = join12(dataDir(), "charts"), now = Date.now) {
+function chartMemory(dir2 = join13(dataDir(), "charts"), now = Date.now) {
   return {
     load(id) {
       if (!safe3(id)) {
         return void 0;
       }
-      const value = readJsonFile(join12(dir2, `${id}.json`));
+      const value = readJsonFile(join13(dir2, `${id}.json`));
       const skip = chartSkip(value);
       if (value === void 0 || skip) {
         return skip;
@@ -71668,12 +71697,12 @@ function chartMemory(dir2 = join12(dataDir(), "charts"), now = Date.now) {
         return;
       }
       try {
-        mkdirSync4(dir2, { recursive: true });
-        writeFileSync4(join12(dir2, `${id}.json`), JSON.stringify(value));
+        mkdirSync5(dir2, { recursive: true });
+        writeFileSync5(join13(dir2, `${id}.json`), JSON.stringify(value));
         for (const name of readdirSync2(dir2)) {
-          const file2 = join12(dir2, name);
+          const file2 = join13(dir2, name);
           if (now() - statSync(file2).mtimeMs > KEEP_MS) {
-            rmSync2(file2, { force: true });
+            rmSync3(file2, { force: true });
           }
         }
       } catch {
@@ -71830,6 +71859,7 @@ function adoptSteps(host) {
       adopt: ({ previous: previous3, ref }) => {
         host.markViewer(durable(ref), previous3.stored);
         host.writeActiveSession(durable(ref));
+        host.markPane(durable(ref));
       }
     },
     {
@@ -72369,7 +72399,13 @@ var SessionLifecycle = class {
     const host = this.#host;
     const resume = host.launch.resume;
     try {
-      await (resume ? this.resume(storedSessionId(resume)) : this.newSession());
+      if (!resume) {
+        await this.newSession();
+      } else if (host.launch.restored) {
+        await this.#restore(storedSessionId(resume));
+      } else {
+        await this.resume(storedSessionId(resume));
+      }
     } catch (error) {
       host.transcript.notice(`Could not start a session: ${errorText(error)}`, "error");
       host.changed();
@@ -72378,6 +72414,25 @@ var SessionLifecycle = class {
     const sid = host.state.ref.live;
     if (sid && host.awaitingStartup()) {
       await host.attachStartup(sid);
+    }
+  }
+  /**
+   * Resumes the conversation this pane showed when its program died (the launcher found it, panes.py)
+   * and says so; one that no longer resumes gives way to a new session.
+   */
+  async #restore(id) {
+    const host = this.#host;
+    let r;
+    try {
+      r = await this.#resume(id);
+    } catch (error) {
+      await this.newSession();
+      host.transcript.notice(`Could not resume this pane's last session (${errorText(error)}); started a new one.`, "warning");
+      return;
+    }
+    if (r) {
+      const title = typeof r.info?.title === "string" ? r.info.title.trim() : "";
+      host.transcript.notice(`Resumed ${title ? `\u201C${title}\u201D` : "the session"} after the pane restarted.`);
     }
   }
   /** After a reconnect (or a replay gap): resumes the shown session under `id` (its runtime id or subscription died). */
@@ -72432,14 +72487,19 @@ var SessionLifecycle = class {
   }
   /** Resumes stored session `id`: its history replaces the transcript, and the session it leaves is closed. */
   async resume(id) {
+    await this.#resume(id);
+  }
+  /** {@link resume}, answering with the adopted snapshot (undefined when refused or superseded). */
+  async #resume(id) {
     if (this.#refuseSwitch()) {
-      return;
+      return void 0;
     }
     const previous3 = this.#host.state.ref.live;
     const r = await this.reload(id);
     if (r && previous3 && previous3 !== r.session_id) {
       void this.#views.leave(previous3, "tui_close");
     }
+    return r;
   }
   /**
    * Resumes and adopts session `id` (its stored id, or a runtime id when none is known); undefined
@@ -73953,6 +74013,7 @@ function chatStores(chat, { act, gw: gw2, launch: launch3, settings: settings2, 
         warned2.status = void 0;
       },
       imageLanded: (call) => act().imageLanded(call),
+      markPane: (id) => markPane(launch3, id),
       markViewer,
       readBusyMode: () => void act().readBusyMode(),
       reportCwd: () => act().reportCwd(),
@@ -74074,7 +74135,7 @@ var App = class {
       onError: (error) => this.transcript.notice(`Input failed: ${errorText(error)}`, "error"),
       onEvent: (event) => onTernEvent(event, this.#act.events),
       onKey: (key2) => onKey(key2, this.#act.keys, this.overlays.at(-1))
-    }).then(() => this.quit());
+    }).then(() => this.#end());
     const code7 = await this.#done.promise;
     await Promise.race([s2.life.leaveAll("tui_shutdown"), new Promise((resolve7) => s2.timers.timeout(() => resolve7(void 0), QUIT_DETACH_MS))]);
     this.dispose();
@@ -74139,7 +74200,16 @@ var App = class {
   openHelp() {
     return openHelp(this);
   }
+  /** The user quits (Ctrl+C twice, Ctrl+D, /quit): a later `hermes tern` in this pane starts a new session. */
   quit(code7 = 0) {
+    forgetPane(this.#launch);
+    this.#end(code7);
+  }
+  /**
+   * The app ends. Input that stops on its own (the pane closed, a signal) ends it here and keeps the
+   * pane's session, which `hermes tern` resumes if it starts again in the pane.
+   */
+  #end(code7 = 0) {
     markViewer(null, durable(this.session.ref));
     this.#done.resolve(code7);
   }
@@ -74581,11 +74651,11 @@ var CircularBuffer = class {
 };
 
 // .hermes-src/ui-tui/src/lib/parentLog.ts
-import { appendFileSync as appendFileSync4, mkdirSync as mkdirSync5 } from "node:fs";
+import { appendFileSync as appendFileSync4, mkdirSync as mkdirSync6 } from "node:fs";
 import { homedir as homedir12 } from "node:os";
-import { join as join13 } from "node:path";
-var logDir = join13(process.env.HERMES_HOME?.trim() || join13(homedir12(), ".hermes"), "logs");
-var CRASH_LOG = join13(logDir, "tui_gateway_crash.log");
+import { join as join14 } from "node:path";
+var logDir = join14(process.env.HERMES_HOME?.trim() || join14(homedir12(), ".hermes"), "logs");
+var CRASH_LOG = join14(logDir, "tui_gateway_crash.log");
 var enabled = !process.env.VITEST;
 var MAX_BREADCRUMB = 4096;
 var warned = false;
@@ -74596,7 +74666,7 @@ function recordParentLifecycle(line) {
   try {
     const oneLine2 = line.replace(/[\r\n]+/g, " \u21B5 ");
     const capped = oneLine2.length > MAX_BREADCRUMB ? `${oneLine2.slice(0, MAX_BREADCRUMB)}\u2026 [truncated ${oneLine2.length} chars]` : oneLine2;
-    mkdirSync5(logDir, { recursive: true });
+    mkdirSync6(logDir, { recursive: true });
     appendFileSync4(CRASH_LOG, `[tui-parent] ${(/* @__PURE__ */ new Date()).toISOString()} ${capped}
 `);
   } catch {
