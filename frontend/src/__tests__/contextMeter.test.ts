@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { liveSessionId } from '../core/ids.js'
 import { contextFacts, openContext, type ContextHost } from '../overlays/context.js'
 import { OverlayStack } from '../overlays/overlay.js'
-import { contextPercent, contextShare, contextWindow, CONTEXT_THRESHOLDS } from '../session/context.js'
+import { contextPercent, contextShare, contextWindow } from '../session/context.js'
 import { SessionState } from '../session/state.js'
 import { contextMeter } from '../view/context.js'
 import { dockNodes } from '../view/dock.js'
@@ -51,26 +51,35 @@ describe('context-window math', () => {
     expect(contextWindow(usage)).toBeUndefined()
   })
 
-  it('uses visual warning thresholds, not an invented compaction threshold', () => {
-    expect(CONTEXT_THRESHOLDS).toEqual({ bad: 0.85, warn: 0.6 })
+  it('emits the visual warning thresholds on the native meter', () => {
     expect(tree(contextMeter({ max: 1000, used: 600 }, vi.fn())).c?.[0]?.p).toMatchObject({
       thresholds: { bad: 0.85, warn: 0.6 }, value: 0.6
     })
     expect(contextFacts({ compressions: 0, context_max: 1000, context_used: 0 })).toContainEqual({ k: 'Compactions', v: '0' })
-    expect(contextFacts(null)).toContainEqual({ k: 'Auto-compaction threshold', v: 'Unknown (not exposed by the gateway)' })
     expect(contextFacts({ total: 999999, context_max: 1000 })).toContainEqual({ k: 'Context used', v: 'Unknown' })
+  })
+
+  it.each([
+    ['provider_usage', 'Provider-reported'],
+    ['provider_usage_plus_estimate', 'Provider + estimate since last reply'],
+    ['local_estimate', 'Local estimate'],
+    ['estimate', 'Local estimate'],
+    ['future_source', 'future_source'],
+    ['', 'Unknown']
+  ])('names the gateway count source %s', (source, label) => {
+    expect(contextFacts({ context_source: source })).toContainEqual({ k: 'Count source', v: label })
   })
 })
 
 describe('native context action and sheet', () => {
-  it('is a named native button with one meter, including 0% and unknown data', () => {
-    for (const context of [undefined, { max: 1000, used: 0 }]) {
+  it('is a named native button for measured or unknown usage', () => {
+    for (const context of [undefined, { max: 1000, used: 250 }]) {
       const onOpen = vi.fn()
       const n = contextMeter(context, onOpen)
       const json = tree(n)
       expect(json.p).toMatchObject({ attrs: { 'aria-haspopup': 'dialog' }, tag: 'button' })
-      expect(json.p?.['aria']).toBe(context ? 'Show context window: 0% context' : 'Show context window: Context unknown')
-      expect(json.c?.[0]?.p?.['label']).toBe(context ? '0%' : '?')
+      expect(json.p?.['aria']).toBe(context ? 'Show context window: 25% context' : 'Show context window: Context unknown')
+      expect(json.c?.[0]?.p?.['label']).toBe(context ? '25%' : '?')
       if (n instanceof Node) click(n)
       expect(onOpen).toHaveBeenCalledOnce()
     }
@@ -89,7 +98,7 @@ describe('native context action and sheet', () => {
     expect(tree(sheet.node('layer.context')).p?.['head']).toBe('Context window')
     expect(gw.calls.map(c => c.method)).toEqual(['session.context_breakdown'])
     expect(JSON.stringify(tree(sheet.node('layer.context')))).toContain('Conversation')
-    expect(JSON.stringify(tree(sheet.node('layer.context')))).toContain('Estimated')
+    expect(JSON.stringify(tree(sheet.node('layer.context')))).toContain('Local estimate')
     expect(on.onSubmit).not.toHaveBeenCalled()
     expect(sheet.onKey(key('enter'))).toBe(true)
     expect(stack.items).toEqual([])
@@ -116,6 +125,27 @@ describe('native context action and sheet', () => {
     const json = JSON.stringify(tree(must(stack.items[0]).node('layer.context')))
     expect(json).toContain('25%')
     expect(json).toContain('Category breakdown unavailable: Method not found')
+  })
+
+  it('retains live totals when a pre-agent breakdown has empty categories and zero defaults', async () => {
+    const { host, gw, stack } = setup({ context_max: 1000, context_used: 250, context_source: 'estimate' })
+    gw.handlers.set('session.context_breakdown', () => ({ ...snapshot, categories: [], context_used: 0, context_max: 0, estimated_total: 0, context_source: 'provider_usage' }))
+    openContext(host)
+    await flush()
+    const facts = tree(must(stack.items[0]).node('layer.context')).c?.[0]?.c?.find(n => n.k === 'kv')?.p?.['items']
+    expect(facts).toContainEqual({ k: 'Used tokens', v: '250' })
+    expect(facts).toContainEqual({ k: 'Context capacity', v: '1,000' })
+    expect(facts).toContainEqual({ k: 'Context used', v: '25%' })
+  })
+
+  it('shows the gateway category estimate separately from provider-anchored usage', async () => {
+    const { host, gw, stack } = setup()
+    gw.handlers.set('session.context_breakdown', () => ({ ...snapshot, estimated_total: 900, context_source: 'provider_usage' }))
+    openContext(host)
+    await flush()
+    const facts = tree(must(stack.items[0]).node('layer.context')).c?.[0]?.c?.find(n => n.k === 'kv')?.p?.['items']
+    expect(facts).toContainEqual({ k: 'Used tokens', v: '250' })
+    expect(facts).toContainEqual({ k: 'Estimated total (categories)', v: '900' })
   })
 
   it.each(['close', 'switch', 'replace'])('ignores a late snapshot after %s', async action => {

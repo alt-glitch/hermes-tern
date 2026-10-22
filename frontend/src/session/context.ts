@@ -25,7 +25,7 @@ export function contextPercent(context: ContextWindow): number {
   return Math.round((context.used / context.max) * 100)
 }
 
-/** The painted bar is bounded, but the label and token counts retain an over-capacity reading. */
+/** Bound the painted bar defensively. */
 export function contextShare(context: ContextWindow): number {
   return Math.min(1, context.used / context.max)
 }
