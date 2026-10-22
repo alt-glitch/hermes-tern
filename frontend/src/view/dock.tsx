@@ -14,14 +14,15 @@ import type { ComposerImage } from '../draft/attachments.js'
 import type { Composer } from '../draft/composer.js'
 import type { Todo } from '../model.js'
 import { type ChartEntry, glance, glanceSpans, hovercard, latest, miniSpark, summary } from '../processes/widgets/view.js'
+import type { ContextWindow } from '../session/context.js'
 import { DEFAULT_EFFORT, effortText } from '../session/effort.js'
 import { COMPACTING_LABEL } from '../status.js'
 import { todoProgress } from '../transcript/todos.js'
 import type { QueuedRow } from '../turn/queue.js'
 
 import { type AutomationLine, automationNode, reconnectNode } from './automation.js'
+import { contextMeter } from './context.js'
 import { queuedNode } from './queued.js'
-import { compact } from './time.js'
 import { checklistNode } from './todos.js'
 import { workingRow } from './ui/live.js'
 import { pill } from './ui/pill.js'
@@ -109,6 +110,8 @@ export interface DockActions {
   onSubmit(): void
   onUndo(): void
   onInterrupt(): void
+  /** Only the main session has context usage; the subagent watch pane has none. */
+  onContext?(): void
   onModel(): void
   onEffort(): void
   /** The effort pill's context menu, by action: choose a level, save the current one as the default. */
@@ -140,7 +143,7 @@ export interface StatusLine {
   readonly branch: string
   readonly tokens?: number | undefined
   /** The context window's use; also the composer's hairline. */
-  readonly context?: { readonly used: number; readonly max: number } | undefined
+  readonly context?: ContextWindow | undefined
   /** Times the context was compressed this session (Ink's `cmp N`). */
   readonly compressions?: number | undefined
   readonly cost?: number | undefined
@@ -485,7 +488,7 @@ function composerNode(cx: DockContext, on: DockActions): JSX.Element {
   return (
     <col key="composer" role="omp.editor">
       {busy ? <row key="streak" role="hermes.streak" /> : null}
-      {contextMeter(cx.status.context)}
+      {on.onContext ? contextMeter(cx.status.context, on.onContext) : null}
       <row gap="sm" hidden={!attachments.length} key="chips" role="omp.composer.chips" wrap>
         {attachments.map((a, i) => imageChip(a, i, on.onRemoveAttachment))}
       </row>
@@ -540,25 +543,6 @@ function composerNode(cx: DockContext, on: DockActions): JSX.Element {
         )}
       </row>
     </col>
-  )
-}
-
-/**
- * The context bar alone on the composer's edge, from 1% used: its % and total sat in the pills'
- * row and collided with them; the status strip says the % and the tooltip the rest.
- */
-function contextMeter(ctx: StatusLine['context']): JSX.Element | null {
-  const share = ctx && ctx.max > 0 ? ctx.used / ctx.max : undefined
-
-  return !ctx || share === undefined || share < 0.01 ? null : (
-    <meter
-      key="context"
-      role="omp.composer.context"
-      style="bar"
-      thresholds={{ bad: 0.85, warn: 0.6 }}
-      title={`Context ${Math.round(share * 100)}% used\n${compact(ctx.used)} of ${compact(ctx.max)} tokens\n/usage shows the breakdown`}
-      value={share}
-    />
   )
 }
 

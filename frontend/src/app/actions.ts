@@ -32,6 +32,7 @@ import { openAgents } from '../overlays/agents.js'
 import { openAutomation } from '../overlays/automation.js'
 import { openBackground } from '../overlays/background.js'
 import type { Completion } from '../overlays/completion.js'
+import { openContext } from '../overlays/context.js'
 import { openEffortPicker } from '../overlays/effort.js'
 import { openModelPicker } from '../overlays/models.js'
 import { promptOverlay } from '../overlays/prompts.js'
@@ -114,6 +115,7 @@ export class AppActions {
 
     this.dock = {
       onAgents: () => openAgents(chat),
+      onContext: () => openContext({ changed, close: o => chat.close(o), gw, open: o => chat.open(o), session: cx.state }),
       onEdit: ev => {
         composer.edit(ev)
         changed()

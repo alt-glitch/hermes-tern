@@ -67,6 +67,8 @@ A pane remembers its conversation. If `hermes tern` dies in a pane (a crash, a k
 
 A turn shows what the agent does while it works: its reasoning, short notes, and its tool calls, grouped into one line per run ("Ran 3 commands"). A todo list stays live in the transcript and in the status line. When the turn ends, the work folds into "Worked for 9.5s", and the answer stays in view.
 
+The thin context meter above the composer shows the current window's percentage, not the session's cumulative token total. Click it, or focus it and press Enter, to open a read-only context snapshot. The sheet shows used/capacity tokens, the gateway's count source and compaction count, and a separate estimated total for its category rows. These local category estimates need not sum to the used-token count. Unknown or not-yet-measured usage shows `?`.
+
 <table>
   <tr>
     <td width="50%"><img alt="A turn in progress with a live todo list" src="docs/images/transcript.png"></td>

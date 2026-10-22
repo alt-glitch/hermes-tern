@@ -11,8 +11,8 @@ describe('STYLES', () => {
   it('stays byte for byte what it was', () => {
     expect({ bytes: Buffer.byteLength(STYLES), sha256: createHash('sha256').update(STYLES).digest('hex') }).toMatchInlineSnapshot(`
       {
-        "bytes": 22461,
-        "sha256": "e68f3c4fae8250f85ce423c5052ed938abcd2dcfc54994b959d881bdea061d59",
+        "bytes": 23317,
+        "sha256": "2eeb3d43c51e6ab8c97e6a00aaa6cf555ef4995a9bd3a0d4327863619630f566",
       }
     `)
   })

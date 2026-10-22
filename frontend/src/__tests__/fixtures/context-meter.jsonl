@@ -1,0 +1,3 @@
+{"type":"gateway.ready","payload":{}}
+{"type":"session.info","session_id":"s1","payload":{"usage":{"context_max":1000,"context_used":250,"compressions":2,"context_estimated":true,"context_source":"estimate"}}}
+{"type":"session.usage","session_id":"s1","payload":{"usage":{"context_max":1000,"context_used":850,"compressions":3}}}

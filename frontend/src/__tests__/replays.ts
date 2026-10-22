@@ -4,15 +4,15 @@
 // event did to the pane.
 import { readFileSync } from 'node:fs'
 
-import type { Key } from '@stencil-hq/tern'
+import type { Key, Node } from '@stencil-hq/tern'
 import { expect } from 'vitest'
 
 import { parseJson, record } from '../wire/json.js'
 
-import { type Call, FakeGateway, fakeTern, key, type Reply, settle } from './fakes.js'
+import { type Call, FakeGateway, fakeTern, key, must, type Reply, settle, topNodes } from './fakes.js'
 
 /** One scripted step: type text, press a key, or feed the next `feed` lines of the fixture. */
-export type Step = { type: string } | { press: string; mods?: Partial<Key> } | { feed: number }
+export type Step = { type: string } | { press: string; mods?: Partial<Key> } | { feed: number } | { click: string }
 
 export interface Replay {
   /** The fixture's name under fixtures/ (no extension). */
@@ -30,6 +30,19 @@ const started: Record<string, Reply> = {
 
 /** The replays, by name: each one's fixture, the gateway's answers and the scripted steps. */
 export const replays: Record<string, Replay> = {
+  'context usage, its snapshot, and a later usage tick': {
+    fixture: 'context-meter',
+    replies: {
+      ...started,
+      'session.context_breakdown': () => ({
+        categories: [{ color: 'accent', id: 'conversation', label: 'Conversation', tokens: 250 }],
+        context_estimated: true, context_max: 1000, context_percent: 25, context_source: 'estimate',
+        context_used: 250, estimated_total: 250, model: 'fake-model'
+      })
+    },
+    steps: [{ feed: 1 }, { feed: 1 }, { click: 'omp.composer.context.action' }, { press: 'escape' }, { feed: 1 }]
+  },
+
   'a turn with tool calls': {
     fixture: 'turn-tools',
     replies: started,
@@ -134,7 +147,7 @@ export const fixture = (name: string) => logLines(new URL(`./fixtures/${name}.js
 
 /** A short name for `step`, for the snapshot. */
 function label(step: Step): string {
-  return 'feed' in step ? `feed ${step.feed}` : 'type' in step ? `type ${step.type}` : `press ${step.mods?.alt ? 'alt+' : ''}${step.press}`
+  return 'feed' in step ? `feed ${step.feed}` : 'type' in step ? `type ${step.type}` : 'click' in step ? `click ${step.click}` : `press ${step.mods?.alt ? 'alt+' : ''}${step.press}`
 }
 
 /** What a replay leaves: its answers to server requests, the frame after each step, and the requests sent. */
@@ -201,6 +214,10 @@ export async function replay({ fixture: name, replies, steps }: Replay): Promise
       }
 
       next += step.feed
+    } else if ('click' in step) {
+      const walk = (nodes: readonly Node[]): Node[] => nodes.flatMap(n => [n, ...walk(n.children)])
+      const target = must(walk(topNodes(tern.region('dock'))).find(n => n.props['role'] === step.click))
+      must(target.handlers?.onClick)({ act: 'click', ev: 'action', id: 'test', raw: {}, sf: 'hermes' })
     } else if ('type' in step) {
       for (const ch of step.type) {
         await press(key(ch, { text: ch }))
