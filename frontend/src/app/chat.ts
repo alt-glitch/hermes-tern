@@ -29,6 +29,7 @@ import type { Cron } from '../processes/cron.js'
 import type { Processes } from '../processes/store.js'
 import type { Automation } from '../session/automation.js'
 import { applyEffort } from '../session/effort.js'
+import { forgetPane } from '../session/pane.js'
 import type { SessionState } from '../session/state.js'
 import { fileSettings, type SettingsSource, type ThemeMode } from '../settings.js'
 import { onTernEvent } from '../surface/actions.js'
@@ -157,7 +158,7 @@ export class App implements ChatPorts {
       onError: error => this.transcript.notice(`Input failed: ${errorText(error)}`, 'error'),
       onEvent: event => onTernEvent(event, this.#act.events),
       onKey: key => onKey(key, this.#act.keys, this.overlays.at(-1))
-    }).then(() => this.quit())
+    }).then(() => this.#end())
 
     const code = await this.#done.promise
     // Bounded, as Ink's deferExitForClose: a dead socket must not hold the terminal.
@@ -241,7 +242,17 @@ export class App implements ChatPorts {
     return openHelp(this)
   }
 
+  /** The user quits (Ctrl+C twice, Ctrl+D, /quit): a later `hermes tern` in this pane starts a new session. */
   quit(code = 0) {
+    forgetPane(this.#launch)
+    this.#end(code)
+  }
+
+  /**
+   * The app ends. Input that stops on its own (the pane closed, a signal) ends it here and keeps the
+   * pane's session, which `hermes tern` resumes if it starts again in the pane.
+   */
+  #end(code = 0) {
     markViewer(null, durable(this.session.ref))
     this.#done.resolve(code)
   }

@@ -30,8 +30,8 @@ export interface LifecycleHost {
   readonly state: SessionState
   readonly transcript: Pick<Transcript, 'notice'>
   readonly sheets: Pick<PromptSheets, 'dropShared'>
-  /** The launcher's session to resume, and the folder a new session starts in. */
-  readonly launch: Pick<LaunchEnv, 'resume' | 'sessionCwd'>
+  /** The launcher's session to resume (the pane's own after a restart), and the folder a new session starts in. */
+  readonly launch: Pick<LaunchEnv, 'restored' | 'resume' | 'sessionCwd'>
   /** The pane's width, which a private gateway lays its output out for. */
   cols(): number
   /** Whether the view may move to another session now (not while a turn or a compaction runs). */
@@ -169,7 +169,13 @@ export class SessionLifecycle {
     const resume = host.launch.resume
 
     try {
-      await (resume ? this.resume(storedSessionId(resume)) : this.newSession())
+      if (!resume) {
+        await this.newSession()
+      } else if (host.launch.restored) {
+        await this.#restore(storedSessionId(resume))
+      } else {
+        await this.resume(storedSessionId(resume))
+      }
     } catch (error) {
       host.transcript.notice(`Could not start a session: ${errorText(error)}`, 'error')
       host.changed()
@@ -181,6 +187,30 @@ export class SessionLifecycle {
 
     if (sid && host.awaitingStartup()) {
       await host.attachStartup(sid)
+    }
+  }
+
+  /**
+   * Resumes the conversation this pane showed when its program died (the launcher found it, panes.py)
+   * and says so; one that no longer resumes gives way to a new session.
+   */
+  async #restore(id: StoredSessionId) {
+    const host = this.#host
+    let r: Snapshot | undefined
+
+    try {
+      r = await this.#resume(id)
+    } catch (error) {
+      await this.newSession()
+      // After the new session's adopt, which clears the transcript.
+      host.transcript.notice(`Could not resume this pane's last session (${errorText(error)}); started a new one.`, 'warning')
+
+      return
+    }
+
+    if (r) {
+      const title = typeof r.info?.title === 'string' ? r.info.title.trim() : ''
+      host.transcript.notice(`Resumed ${title ? `“${title}”` : 'the session'} after the pane restarted.`)
     }
   }
 
@@ -254,8 +284,13 @@ export class SessionLifecycle {
 
   /** Resumes stored session `id`: its history replaces the transcript, and the session it leaves is closed. */
   async resume(id: StoredSessionId) {
+    await this.#resume(id)
+  }
+
+  /** {@link resume}, answering with the adopted snapshot (undefined when refused or superseded). */
+  async #resume(id: StoredSessionId): Promise<Snapshot | undefined> {
     if (this.#refuseSwitch()) {
-      return
+      return undefined
     }
 
     const previous = this.#host.state.ref.live
@@ -264,6 +299,8 @@ export class SessionLifecycle {
     if (r && previous && previous !== r.session_id) {
       void this.#views.leave(previous, 'tui_close')
     }
+
+    return r
   }
 
   /**

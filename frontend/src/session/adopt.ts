@@ -74,6 +74,8 @@ export interface AdoptHost {
   markViewer(now: DurableSessionId, before: StoredSessionId | null): void
   /** Writes the shown session's id where the plugin's hooks read it. */
   writeActiveSession(id: DurableSessionId): void
+  /** Records the shown session as this Tern pane's, which `hermes tern` resumes after the pane's program dies. */
+  markPane(id: DurableSessionId): void
   /** Tells Tern the session's folder (OSC 7), when it moved. */
   reportCwd(): void
   /** The status warning shown last is the last session's. */
@@ -119,6 +121,7 @@ export function adoptSteps(host: AdoptHost): readonly Adoptable[] {
         // This pane shows the session now: the plugin's Python half sends its connect results here as a card.
         host.markViewer(durable(ref), previous.stored)
         host.writeActiveSession(durable(ref))
+        host.markPane(durable(ref))
       }
     },
     {
