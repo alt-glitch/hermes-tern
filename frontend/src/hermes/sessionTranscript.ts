@@ -12,7 +12,7 @@ import { DatabaseSync } from 'node:sqlite'
 import * as z from 'zod/mini'
 
 import { parseJson } from '../wire/json.js'
-import { first, real, rows, type StoredCall, storedArgs, storedCalls, text } from '../wire/sqlite.js'
+import { first, real, rows, type StoredCall, storedArgs, storedCalls, text, textBytes } from '../wire/sqlite.js'
 
 import { stateDbPath } from './paths.js'
 
@@ -65,7 +65,7 @@ const nameRow = z.object({ name: z.string() })
 const messageRow = z.object({
   id: z.number(),
   role: z.catch(z.string(), ''),
-  content: text,
+  content: textBytes,
   tool_calls: text,
   timestamp: real,
   display_kind: text
@@ -73,7 +73,7 @@ const messageRow = z.object({
 
 type MessageRow = z.infer<typeof messageRow>
 
-const contentRow = z.object({ content: text })
+const contentRow = z.object({ content: textBytes })
 
 /** The columns an older database may not have, each read as NULL there. */
 function messageColumns(conn: DatabaseSync): { calls: string; kind: string; visible: string } {
@@ -237,7 +237,7 @@ export function readTranscriptPage(id: string, after: number, limit: number, db 
     const { calls, kind, visible } = messageColumns(conn)
     const stmt = conn.prepare(
       `${CHAIN}
-       SELECT m.id, m.role, m.content, ${calls} AS tool_calls, m.timestamp, ${kind} AS display_kind
+       SELECT m.id, m.role, CAST(m.content AS BLOB) AS content, ${calls} AS tool_calls, m.timestamp, ${kind} AS display_kind
        FROM messages m WHERE m.session_id IN (SELECT cur FROM chain) AND m.id > ? AND ${visible}
        ORDER BY m.id LIMIT ?`
     )
@@ -254,13 +254,13 @@ export function readSessionEnds(id: string, db = stateDbPath()): SessionEnds {
     const { kind, visible } = messageColumns(conn)
     const firstPrompt = conn.prepare(
       `${CHAIN}
-       SELECT m.content FROM messages m WHERE m.session_id IN (SELECT cur FROM chain) AND m.role = 'user' AND ${visible}
+       SELECT CAST(m.content AS BLOB) AS content FROM messages m WHERE m.session_id IN (SELECT cur FROM chain) AND m.role = 'user' AND ${visible}
          AND COALESCE(${kind}, '') IN ('', 'steer') AND instr(COALESCE(m.content, ''), '${COMPACTION}') = 0
        ORDER BY m.id LIMIT 1`
     )
     const lastReply = conn.prepare(
       `${CHAIN}
-       SELECT m.content FROM messages m WHERE m.session_id IN (SELECT cur FROM chain) AND m.role = 'assistant' AND ${visible}
+       SELECT CAST(m.content AS BLOB) AS content FROM messages m WHERE m.session_id IN (SELECT cur FROM chain) AND m.role = 'assistant' AND ${visible}
          AND COALESCE(${kind}, '') != 'failed_turn' AND m.content IS NOT NULL AND m.content != ''
        ORDER BY m.id DESC LIMIT 1`
     )

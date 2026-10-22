@@ -21666,6 +21666,18 @@ function finalizeIssue(iss, ctx, config3) {
   }
   return rest;
 }
+function issue(...args) {
+  const [iss, input2, inst] = args;
+  if (typeof iss === "string") {
+    return {
+      message: iss,
+      code: "custom",
+      input: input2,
+      inst
+    };
+  }
+  return { ...iss };
+}
 
 // node_modules/zod/v4/core/errors.js
 var initializer = (inst, def) => {
@@ -21748,6 +21760,14 @@ var string = (params) => {
 };
 var number = /^-?\d+(?:\.\d+)?$/;
 var boolean = /^(?:true|false)$/i;
+
+// node_modules/zod/v4/core/checks.js
+var $ZodCheck = /* @__PURE__ */ $constructor("$ZodCheck", (inst, def) => {
+  var _a3;
+  inst._zod ?? (inst._zod = {});
+  inst._zod.def = def;
+  (_a3 = inst._zod).onattach ?? (_a3.onattach = []);
+});
 
 // node_modules/zod/v4/core/versions.js
 var version = {
@@ -22485,6 +22505,39 @@ function handlePipeResult(left, next2, ctx) {
   }
   return next2._zod.run({ value: left.value, issues: left.issues, fallback: left.fallback }, ctx);
 }
+var $ZodCustom = /* @__PURE__ */ $constructor("$ZodCustom", (inst, def) => {
+  $ZodCheck.init(inst, def);
+  $ZodType.init(inst, def);
+  inst._zod.parse = (payload, _) => {
+    return payload;
+  };
+  inst._zod.check = (payload) => {
+    const input2 = payload.value;
+    const r = def.fn(input2);
+    if (r instanceof Promise) {
+      return r.then((r2) => handleRefineResult(r2, payload, input2, inst));
+    }
+    handleRefineResult(r, payload, input2, inst);
+    return;
+  };
+});
+function handleRefineResult(result, payload, input2, inst) {
+  if (!result) {
+    const _iss = {
+      code: "custom",
+      input: input2,
+      inst,
+      // incorporates params.error into issue reporting
+      path: [...inst._zod.def.path ?? []],
+      // incorporates params.error into issue reporting
+      continue: !inst._zod.def.abort
+      // params: inst._zod.def.params,
+    };
+    if (inst._zod.def.params)
+      _iss.params = inst._zod.def.params;
+    payload.issues.push(issue(_iss));
+  }
+}
 
 // node_modules/zod/v4/core/api.js
 // @__NO_SIDE_EFFECTS__
@@ -22521,6 +22574,18 @@ function _never(Class, params) {
     type: "never",
     ...normalizeParams(params)
   });
+}
+// @__NO_SIDE_EFFECTS__
+function _custom(Class, fn, _params) {
+  const norm = normalizeParams(_params);
+  norm.abort ?? (norm.abort = true);
+  const schema2 = new Class({
+    type: "custom",
+    check: "custom",
+    fn,
+    ...norm
+  });
+  return schema2;
 }
 
 // node_modules/zod/v4/mini/schemas.js
@@ -22736,6 +22801,31 @@ function pipe(in_, out) {
     in: in_,
     out
   });
+}
+var ZodMiniCustom = /* @__PURE__ */ $constructor("ZodMiniCustom", (inst, def) => {
+  $ZodCustom.init(inst, def);
+  ZodMiniType.init(inst, def);
+});
+// @__NO_SIDE_EFFECTS__
+function custom(fn, _params) {
+  return _custom(ZodMiniCustom, fn ?? (() => true), _params);
+}
+// @__NO_SIDE_EFFECTS__
+function _instanceof(cls, params = {}) {
+  const inst = /* @__PURE__ */ custom((data) => data instanceof cls, params);
+  inst._zod.bag.Class = cls;
+  inst._zod.check = (payload) => {
+    if (!(payload.value instanceof cls)) {
+      payload.issues.push({
+        code: "invalid_type",
+        expected: cls.name,
+        input: payload.value,
+        inst,
+        path: [...inst._zod.def.path ?? []]
+      });
+    }
+  };
+  return inst;
 }
 
 // src/wire/schemas.ts
@@ -27474,6 +27564,14 @@ function stateDbPath(env2 = process.env) {
 
 // src/wire/sqlite.ts
 var text2 = _catch(nullable(string2()), null);
+var utf8 = new TextDecoder();
+var textBytes = _catch(
+  pipe(
+    nullable(_instanceof(Uint8Array)),
+    transform((bytes) => bytes ? utf8.decode(bytes) : null)
+  ),
+  null
+);
 var real = _catch(nullable(number2()), null);
 function rows(stmt, row2, ...params) {
   return rowsOf(row2, stmt.all(...params));
@@ -63505,12 +63603,12 @@ var nameRow = object({ name: string2() });
 var messageRow = object({
   id: number2(),
   role: _catch(string2(), ""),
-  content: text2,
+  content: textBytes,
   tool_calls: text2,
   timestamp: real,
   display_kind: text2
 });
-var contentRow = object({ content: text2 });
+var contentRow = object({ content: textBytes });
 function messageColumns(conn) {
   const has = new Set(rows(conn.prepare("PRAGMA table_info(messages)"), nameRow).map((r) => r.name));
   const live = has.has("compacted") ? "(m.active = 1 OR m.compacted = 1)" : has.has("active") ? "m.active = 1" : "1";
@@ -63616,7 +63714,7 @@ function readTranscriptPage(id, after, limit, db = stateDbPath()) {
     const { calls, kind, visible } = messageColumns(conn);
     const stmt = conn.prepare(
       `${CHAIN}
-       SELECT m.id, m.role, m.content, ${calls} AS tool_calls, m.timestamp, ${kind} AS display_kind
+       SELECT m.id, m.role, CAST(m.content AS BLOB) AS content, ${calls} AS tool_calls, m.timestamp, ${kind} AS display_kind
        FROM messages m WHERE m.session_id IN (SELECT cur FROM chain) AND m.id > ? AND ${visible}
        ORDER BY m.id LIMIT ?`
     );
@@ -63630,13 +63728,13 @@ function readSessionEnds(id, db = stateDbPath()) {
     const { kind, visible } = messageColumns(conn);
     const firstPrompt = conn.prepare(
       `${CHAIN}
-       SELECT m.content FROM messages m WHERE m.session_id IN (SELECT cur FROM chain) AND m.role = 'user' AND ${visible}
+       SELECT CAST(m.content AS BLOB) AS content FROM messages m WHERE m.session_id IN (SELECT cur FROM chain) AND m.role = 'user' AND ${visible}
          AND COALESCE(${kind}, '') IN ('', 'steer') AND instr(COALESCE(m.content, ''), '${COMPACTION}') = 0
        ORDER BY m.id LIMIT 1`
     );
     const lastReply = conn.prepare(
       `${CHAIN}
-       SELECT m.content FROM messages m WHERE m.session_id IN (SELECT cur FROM chain) AND m.role = 'assistant' AND ${visible}
+       SELECT CAST(m.content AS BLOB) AS content FROM messages m WHERE m.session_id IN (SELECT cur FROM chain) AND m.role = 'assistant' AND ${visible}
          AND COALESCE(${kind}, '') != 'failed_turn' AND m.content IS NOT NULL AND m.content != ''
        ORDER BY m.id DESC LIMIT 1`
     );
