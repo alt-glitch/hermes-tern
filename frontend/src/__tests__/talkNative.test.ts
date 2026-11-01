@@ -18,7 +18,7 @@ describe('Ctrl+L through a connected native SDK session', () => {
     const input = new EventEmitter()
     const tern = new Session(input, { write() {} }, { exitHooks: false, record: '' })
     const connecting = tern.handshake()
-    input.emit('data', `\x1b_tsp;r;${JSON.stringify({ ...tern.caps, r: 'hello', v: 1, term: 'fixture', ver: '0', features: ['blobs'] })}\x1b\\`)
+    input.emit('data', `\x1b_tsp;r;${JSON.stringify({ ...tern.caps, r: 'hello', v: 1, term: 'fixture', ver: '0', features: ['blobs'], credits: 64, apc: 1048576 })}\x1b\\`)
     expect(await connecting).toBe(true)
     let active = false
     const gateway = new FakeGateway({ canonical: true, replies: { 'command.dispatch': p => {
