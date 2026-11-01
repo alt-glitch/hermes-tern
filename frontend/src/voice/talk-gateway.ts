@@ -2,20 +2,19 @@
 // Canonical gateways do not expose the donor voice.live.* RPCs.
 import { EventEmitter } from 'node:events'
 import type { GatewayClient } from '@tui/gatewayClient.js'
+import { record } from '../wire/json.js'
 
 const PHASES = new Set(['idle', 'starting', 'listening', 'thinking', 'speaking', 'stopping', 'error'])
 interface Snapshot { live_id: string; phase: string; active: boolean; error: string }
 interface Owner { sid: string; id: string }
 
 function snapshot(value: unknown, id: string): Snapshot {
-  const result = value as { output?: unknown } | null
-  if (!result || typeof result.output !== 'string') throw new Error('Hermes Talk returned no control receipt')
-  const data: unknown = JSON.parse(result.output)
-  if (!data || typeof data !== 'object') throw new Error('Invalid Hermes Talk receipt')
-  const p = data as Partial<Snapshot>
-  if (p.live_id !== id || typeof p.phase !== 'string' || !PHASES.has(p.phase) ||
-      typeof p.active !== 'boolean' || typeof p.error !== 'string') throw new Error('Invalid Hermes Talk call identity or state')
-  return p as Snapshot
+  const result = record(value)
+  if (!result || typeof result['output'] !== 'string') throw new Error('Hermes Talk returned no control receipt')
+  const p = record(result['output'])
+  if (!p || p['live_id'] !== id || typeof p['phase'] !== 'string' || !PHASES.has(p['phase']) ||
+      typeof p['active'] !== 'boolean' || typeof p['error'] !== 'string') throw new Error('Invalid Hermes Talk call identity or state')
+  return { live_id: id, phase: p['phase'], active: p['active'], error: p['error'] }
 }
 
 /** Heartbeats only while a call exists; missing client heartbeats end the backend call. */
