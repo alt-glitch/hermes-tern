@@ -32,6 +32,8 @@ class Call:
     audio: object = None
 
     def cancel(self):
+        if self.stopping or self.done.is_set():
+            return
         self.stopping = True
         self.phase = "stopping"
         if self.loop is not None and self.task is not None:

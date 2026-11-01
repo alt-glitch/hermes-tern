@@ -10,7 +10,7 @@ import type { Overlay } from '../overlays/overlay.js'
 import type { Transcript } from '../transcript/store.js'
 import type { PromptQueue } from '../turn/queue.js'
 import type { LiveVoice } from '../voice/live.js'
-import { HOLD_UNAVAILABLE, isHoldInfoKey, isVoiceToggleKey } from '../voice/hold.js'
+import { HOLD_UNAVAILABLE, isHoldInfoKey, isTalkToggleKey, isVoiceToggleKey } from '../voice/hold.js'
 
 import type { Attachments } from './attachments.js'
 import type { Composer } from './composer.js'
@@ -217,7 +217,7 @@ const modal: KeyRule = (_key, _cx, top) => top?.modal === true
 
 /** Shortcuts request consent or report missing hold support; neither records a key gesture. */
 const liveKeys: KeyRule = (key, cx) => {
-  if (key.name === 'l' && key.ctrl && !key.alt && !key.meta && !key.shift) {
+  if (isTalkToggleKey(key)) {
     cx.liveVoice.quickToggle()
     return true
   }
