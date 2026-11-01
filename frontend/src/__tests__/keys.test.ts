@@ -80,7 +80,7 @@ function pane(over: Partial<Pane> = {}) {
     fork: did('fork'),
     hud: () => state.hud,
     interrupt: did('interrupt'),
-    liveVoice: { blocked: false, toggle: did('live voice'), control: async () => undefined },
+    liveVoice: { blocked: false, toggle: did('live voice'), quickToggle: did('live voice quick'), control: async () => undefined },
     now: () => state.clock,
     openAgents: did('agents'),
     openBackground: did('background'),

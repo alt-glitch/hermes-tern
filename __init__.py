@@ -124,3 +124,5 @@ def register(ctx) -> None:
         from . import gateway_operations
         gateway_operations.register(ctx)
     plan_gateway.register(ctx)
+    from . import talk_backend
+    talk_backend.register(ctx)

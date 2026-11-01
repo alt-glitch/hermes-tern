@@ -102,7 +102,7 @@ export interface KeyCx {
   readonly queue: Pick<PromptQueue, 'count' | 'dequeue' | 'steer'>
   readonly transcript: Pick<Transcript, 'notice'>
   readonly presses: Presses
-  readonly liveVoice: Pick<LiveVoice, 'blocked' | 'toggle' | 'control'>
+  readonly liveVoice: Pick<LiveVoice, 'blocked' | 'toggle' | 'quickToggle' | 'control'>
   now(): number
   /** A turn (or a send's `{!cmd}`s) runs. */
   busy(): boolean
@@ -217,6 +217,10 @@ const modal: KeyRule = (_key, _cx, top) => top?.modal === true
 
 /** Shortcuts request consent or report missing hold support; neither records a key gesture. */
 const liveKeys: KeyRule = (key, cx) => {
+  if (key.name === 'l' && key.ctrl && !key.alt && !key.meta && !key.shift) {
+    cx.liveVoice.quickToggle()
+    return true
+  }
   if (isVoiceToggleKey(key)) {
     cx.liveVoice.toggle()
     return true

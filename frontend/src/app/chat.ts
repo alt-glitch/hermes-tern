@@ -297,7 +297,11 @@ export class App implements ChatPorts {
     }
 
     this.#orb?.update(
-      this.#orbActivity.state(this.overlays.some(o => o.key.startsWith('prompt:'))),
+      this.liveVoice.blocked && this.liveVoice.phase !== 'consent'
+        ? this.liveVoice.phase === 'speaking' ? 'speaking'
+          : this.liveVoice.phase === 'thinking' || this.liveVoice.phase === 'starting' ? 'thinking'
+            : this.liveVoice.phase === 'error' ? 'error' : 'listening'
+        : this.#orbActivity.state(this.overlays.some(o => o.key.startsWith('prompt:'))),
       this.overlays.at(-1)?.modal === true
     )
     if (!this.#view || this.#surface.closed) {

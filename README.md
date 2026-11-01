@@ -99,6 +99,7 @@ Each active agent tile shows its current tool and its latest two assistant or to
 | <kbd>Shift</kbd>+<kbd>Tab</kbd> | Reasoning effort |
 | <kbd>Alt</kbd>+<kbd>S</kbd> · <kbd>Alt</kbd>+<kbd>P</kbd> · <kbd>Alt</kbd>+<kbd>J</kbd> · <kbd>Alt</kbd>+<kbd>A</kbd> | Sidebar · pull requests · background processes · subagents |
 | <kbd>Ctrl</kbd>+<kbd>V</kbd> | Paste an image |
+| <kbd>Ctrl</kbd>+<kbd>L</kbd> | Start/stop one Hermes Talk realtime conversation; Esc or the visible Stop button also hangs up |
 
 While an agent turn runs, **Enter queues** a follow-up and **Alt+Enter steers** the current turn. Setting `display.busy_input_mode` to `steer` swaps these two actions; native Tern Send follows Enter's mode. An open modal blocks Send without consuming your draft or caret. Typed inline `{!cmd}` commands expand before a correction is steered, but pasted commands remain literal. Failed expansion or rejected steering keeps your editable draft.
 
@@ -111,6 +112,14 @@ While an agent turn runs, **Enter queues** a follow-up and **Alt+Enter steers** 
 | `/changes` | The working tree's diff |
 | `/prs [N]` | Pull requests, or PR #N |
 | `/theme` | Paint the chat in Tern's colors, Nous colors or the Hermes skin |
+
+### Realtime conversation and thinking orb
+
+Enable `hermes-talk` in the same Hermes profile. **Ctrl+L** explicitly starts a duplex call on that machine’s microphone and speaker using Talk’s configured provider/authentication. Press it again, press **Esc**, or click **Stop** to hang up. Alt+Shift+V and `/live` retain a disclosure/Allow flow. No call starts on launch or tab focus.
+
+The existing OMP-derived thinking orb follows the reported conversation phase: listening, thinking, speaking, then normal agent state after hang-up. Hidden panes and reduced-motion retain their existing animation limits. Your draft and caret are not submitted or cleared.
+
+The `tern-talk` plugin command reserves one owner/call before returning, so frontend RPC timeouts cannot create overlapping calls. Stop cancels the owned async task and waits for Talk’s audio/provider teardown; a lost frontend heartbeat also ends the call. Calls made directly with upstream `/talk` are not silently adopted. This adapter uses Talk’s terminal realtime lane; a separately configured GPT-Live lane still requires Talk’s explicit canonical task attachment and is not replaced with STT/TTS.
 
 ## Background processes
 
