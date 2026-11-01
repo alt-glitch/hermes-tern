@@ -15,9 +15,11 @@ import os
 import sys
 from pathlib import Path
 
-from . import browser_backend, connections, panes, plan_gateway, pull_requests, tern_env
+from . import browser_backend, channels, connections, panes, plan_gateway, pull_requests, tern_env
 
 FRONTEND = Path(__file__).resolve().parent / "frontend"
+# How much of a channel's commit `hermes tern channels` shows.
+SHORT_SHA = 12
 
 # frontend/src/entry.ts NO_TSP: the terminal never answered the TSP handshake.
 NO_TSP_EXIT = 75
@@ -71,14 +73,60 @@ def _chat(flags: list[str], tui_dir: str | None, env: dict[str, str] | None = No
     return code if isinstance(code, int) else (0 if code is None else 1)
 
 
-def _run(args: argparse.Namespace) -> None:
+def _without_session_flags(flags: list[str]) -> list[str]:
+    """Drops the flags that pick a session (and a ``-r``/``--resume`` value): a switch names its own."""
+    out, skip = [], False
+    for f in flags:
+        if skip:
+            skip = False
+            continue
+        if f in {"-r", "--resume"}:
+            skip = True
+            continue
+        if f in panes.SESSION_FLAGS or f.split("=", 1)[0] in panes.SESSION_FLAGS or f == panes.NEW_FLAG:
+            continue
+        out.append(f)
+    return out
+
+
+def _subcommand(flags: list[str]) -> bool:
+    """``hermes tern switch NAME [--pane ID]`` and ``hermes tern channels``; True when one ran."""
+    if flags[:1] == ["channels"]:
+        reg = channels.registry_path()
+        chans = channels.load(reg)
+        print(f"registry: {reg}")
+        for name, chan in sorted(chans.items()):
+            alias = f"  (hermes --tui {chan['alias']})" if chan.get("alias") else ""
+            print(f"  {name:10} {chan.get('repo', '')}@{str(chan.get('sha', ''))[:SHORT_SHA]}  {chan['dir']}{alias}")
+        return True
+    if flags[:1] == ["switch"]:
+        rest = flags[1:]
+        pane = channels.current_pane()
+        if "--pane" in rest:
+            i = rest.index("--pane")
+            pane = rest[i + 1] if i + 1 < len(rest) else ""
+            rest = rest[:i] + rest[i + 2:]
+        if len(rest) != 1 or not pane.strip().isdigit():
+            raise SystemExit("usage: hermes tern switch CHANNEL [--pane TERN_PANE_ID]")
+        req = channels.request_switch(rest[0], pane.strip())
+        print(f"hermes tern: pane {pane} -> channel {rest[0]} (session {req['session_id']})")
+        return True
+    return False
+
+
+def _run(args: argparse.Namespace, channel: str | None = None) -> None:
     # An explicit opt-out is the ordinary Ink TUI, even inside a real Tern pane.
     force_ink = os.environ.get("HERMES_TERN", "").strip().lower() in {"0", "false", "off", "no"}
-    bundle = FRONTEND / "dist" / "entry.js"
+    flags = [a for a in args.tui_args if a != "--"]
+    if _subcommand(flags):
+        return
+    flags, chosen = channels.take_channel(flags)
+    channel = chosen or channel or channels.default_channel()
+    front = channels.frontend_dir(channel) if channel and not force_ink else FRONTEND
+    bundle = front / "dist" / "entry.js"
     if not force_ink and not bundle.is_file():
         print(f"hermes tern: {bundle} is missing; reinstall the plugin", file=sys.stderr)
         sys.exit(1)
-    flags = [a for a in args.tui_args if a != "--"]
     # `hermes -w tern`: the top-level flag lands on `args`, not in tui_args; Hermes' TUI launcher is what
     # makes the worktree and points the session, HERMES_CWD and TERMINAL_CWD at it.
     if getattr(args, "worktree", False) and not {"-w", "--worktree"} & set(flags):
@@ -88,11 +136,17 @@ def _run(args: argparse.Namespace) -> None:
     flags, restored = panes.plan(flags)
     if restored:
         env[panes.RESTORED_ENV] = restored
-    code = _chat(flags, None if force_ink else str(FRONTEND), env)
+    code = _chat(flags, None if force_ink else str(front), env)
     if not force_ink and code == NO_TSP_EXIT:
         print("hermes tern: this terminal does not speak the Tern Surface Protocol; "
               "starting the regular TUI", file=sys.stderr)
         code = _chat(flags, None, env)
+    # `hermes tern switch`: this pane's frontend was stopped to come back on another channel.
+    while not force_ink and (switch := channels.pending_switch()):
+        front = channels.frontend_dir(switch["channel"])
+        flags = ["--resume", switch["session_id"], *_without_session_flags(flags)]
+        env.pop(panes.RESTORED_ENV, None)
+        code = _chat(flags, str(front), env)
     sys.exit(code)
 
 
@@ -100,7 +154,14 @@ def register(ctx) -> None:
     ctx.register_cli_command(
         name="tern", help="Chat in Tern's native UI (falls back to the regular TUI elsewhere)",
         setup_fn=_setup, handler_fn=_run,
-        description="Runs `hermes chat --tui` with the Tern frontend; every `hermes chat` flag works.")
+        description="Runs `hermes chat --tui` with the Tern frontend; every `hermes chat` flag works. "
+                    "--channel NAME picks a frontend channel; `switch NAME` moves this pane to one live.")
+    # Channel aliases from the shared registry: `hermes --tui mytern` is `hermes tern --channel main`.
+    for alias, channel in channels.aliases().items():
+        ctx.register_cli_command(
+            name=alias, help=f"hermes tern on frontend channel {channel!r}",
+            setup_fn=_setup, handler_fn=lambda args, _c=channel: _run(args, _c),
+            description=f"`hermes tern --channel {channel}`; every `hermes chat` flag works.")
     # The chart rules of background processes (frontend/src/processes/widgets, widget_author.py):
     # its own `auxiliary.tern_charts` config block and model picker entry.
     ctx.register_auxiliary_task(
