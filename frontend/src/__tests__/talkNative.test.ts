@@ -5,6 +5,10 @@ import { FakeGateway, given } from './fakes.js'
 import { App } from './appSetup.js'
 
 vi.mock('@tui/lib/history.js', () => ({ append: () => undefined, load: () => [] }))
+vi.mock('../../assets/logo.png', async () => {
+  const { readFile } = await import('node:fs/promises')
+  return { default: await readFile(new URL('../../assets/logo.png', import.meta.url)) }
+})
 
 describe('Ctrl+L through a connected native SDK session', () => {
   it('decodes the real chord, paints a listening orb, and hangs up with another chord', async () => {
