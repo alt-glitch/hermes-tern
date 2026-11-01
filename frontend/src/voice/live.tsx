@@ -1,7 +1,6 @@
 // Explicit per-session live conversation. PR #71 owns review-only dictation.
 import { randomUUID } from 'node:crypto'
 import type { JSX } from '@stencil-hq/tern'
-import type { GatewayClient } from '@tui/gatewayClient.js'
 
 import { errorText } from '../core/errors.js'
 
@@ -20,8 +19,10 @@ interface Lease {
 
 /** This mode uses the *gateway* audio devices and Hermes STT/TTS, not a second recorder. */
 export interface LiveVoiceHost {
-  gw: Pick<GatewayClient, 'on' | 'off'> & {
+  gw: {
     request(method: string, params: Record<string, unknown>): Promise<unknown>
+    on(name: 'event' | 'exit', listener: (event: unknown) => void): unknown
+    off(name: 'event' | 'exit', listener: (event: unknown) => void): unknown
   }
   talk?: boolean
   sid(): string | null
