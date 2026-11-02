@@ -1,6 +1,9 @@
-// Geometry adapted from OMP Handsfree's Cairo ThinkingOrb (voice_orb.py).
-// Agent state comes from Hermes events. Only the image animates, never the transcript.
+// The orb is Kevin's thinking-orbs library (github.com/kvnloo/thinking-orbs): its portable engine
+// computes each frame's z-sorted, depth-shaded dots and this file only writes them out as SVG, the
+// way the library's canvas painter fills them. Agent state comes from Hermes events. Only the image
+// animates, never the transcript.
 import type { ImageProps, Session, Surface } from '@stencil-hq/tern'
+import { MODE_FRAMES, type OrbState as LibraryState, resolvePreset } from 'thinking-orbs/engine'
 import type { AnyGatewayEvent } from '@tui/gatewayTypes.js'
 
 export type OrbState = 'idle' | 'working' | 'thinking' | 'composing' | 'listening' | 'speaking' | 'waiting' | 'error'
@@ -140,8 +143,9 @@ export class OrbActivity {
 }
 
 const NODE_ID = 'dock.composer.line.orb'
-const FRAMES = 96
-const FPS = 12
+const FPS = 15
+// 9.6 s of frames, then the cached cycle repeats: bounded blobs per state and theme.
+const FRAMES = 144
 
 /** Finite cached SVG frames; no new blobs after a state's first animation cycle. */
 export class ThinkingOrb {
@@ -246,7 +250,7 @@ export class ThinkingOrb {
 
     if (!blob) {
       blob = this.#tern.blob(
-        Buffer.from(orbSvg(this.#state, (this.#frame / FRAMES) * Math.PI * 2, this.#dark)),
+        Buffer.from(orbSvg(this.#state, this.#frame / FPS, this.#dark)),
         'image/svg+xml'
       )
       this.#frames.set(key, blob)
@@ -256,124 +260,49 @@ export class ThinkingOrb {
   }
 }
 
-/** Same disc, orbit particles, listening rings and ribbon as the OMP live voice control. */
-// t is the normalized cycle angle; integer harmonics make the cached wrap continuous.
-export function orbSvg(state: OrbState, t: number, dark: boolean): string {
-  const ink = dark ? '#f5f5fa' : '#24212b'
-  const dim = dark ? '#b8bdc7' : '#68616e'
-  const disc = dark ? '#17121f' : '#f5f1f8'
+/** Which of the library's nine animations shows each agent state. */
+export const LIBRARY_STATE: Readonly<Record<OrbState, LibraryState>> = {
+  working: 'working', // particles on tilted orbits: tools running
+  thinking: 'solving', // bands scramble and click back: reasoning
+  composing: 'composing', // an undulating multi-band sash: writing the answer
+  listening: 'listening', // a waveform rolling through the rings
+  speaking: 'listening',
+  waiting: 'breathing', // a ring slowly morphing, held still until the user answers
+  idle: 'breathing',
+  error: 'breathing'
+}
 
-  const ring =
-    state === 'error'
-      ? '#ef5754'
-      : state === 'listening'
-        ? '#5ad8e6'
-        : state === 'waiting'
-          ? '#e5b95b'
-          : state === 'idle'
-            ? dark
-              ? '#382e47'
-              : '#cec3d8'
-            : '#ed4abf'
+// The library's avatar-scale tuning (its 64px preset), shown at the composer's 34px image size.
+const SOURCE = 64
+// Still states and reduced motion draw the library's own static frame (ThinkingOrb's frame(0.6)).
+const STILL = 0.6
 
-  const out: string[] = []
-  const n = (v: number) => v.toFixed(2)
+/** One frame of the library orb as SVG; `seconds` is elapsed animation time for animated states. */
+export function orbSvg(state: OrbState, seconds: number, dark: boolean): string {
+  const preset = resolvePreset(LIBRARY_STATE[state], SOURCE)
+  const animated = state !== 'idle' && state !== 'waiting' && state !== 'error'
+  const frame = MODE_FRAMES[preset.mode](SOURCE, animated ? seconds * preset.speed : STILL, preset.opts)
 
-  const circle = (x: number, y: number, r: number, color: string, opacity = 1, stroke = 0) => {
-    out.push(
-      `<circle cx="${n(x)}" cy="${n(y)}" r="${n(r)}" ${stroke ? `fill="none" stroke="${color}" stroke-width="${n(stroke)}"` : `fill="${color}"`} opacity="${n(opacity)}"/>`
-    )
+  // The library's ink: 0 is darkest on paper and dark themes mirror it (paint/paintLines in its core).
+  const grey = (white: number) => {
+    const ink = Math.min(1, Math.max(0, white))
+    const level = Math.round((dark ? 1 - ink : ink) * 255)
+
+    return `#${level.toString(16).padStart(2, '0').repeat(3)}`
   }
 
-  const path = (points: [number, number][], color: string, opacity: number, width: number) => {
-    out.push(
-      `<path d="${points.map(([x, y], i) => `${i ? 'L' : 'M'}${n(x)} ${n(y)}`).join(' ')}" fill="none" stroke="${color}" stroke-width="${n(width)}" stroke-linecap="round" opacity="${n(opacity)}"/>`
-    )
+  // Tenths of a viewBox unit are finer than the 2x image's pixels; shorter frames keep blobs small.
+  const n = (v: number) => v.toFixed(1)
+  const alpha = (v: number | undefined) => (v ?? 1).toFixed(2)
+
+  const marks = frame.lines.map(
+    l =>
+      `<line x1="${n(l.x1)}" y1="${n(l.y1)}" x2="${n(l.x2)}" y2="${n(l.y2)}" stroke="${grey(l.white)}" stroke-width="${n(l.w)}" stroke-opacity="${alpha(l.a)}"/>`
+  )
+
+  for (const d of frame.dots) {
+    marks.push(`<circle cx="${n(d.x)}" cy="${n(d.y)}" r="${n(d.r)}" fill="${grey(d.white)}" fill-opacity="${alpha(d.a)}"/>`)
   }
 
-  const cx = 17,
-    cy = 17,
-    outer = 15.5,
-    radius = outer * 0.72
-
-  circle(cx, cy, outer, disc)
-  circle(cx, cy, outer - 0.8, ring, state === 'idle' ? 1 : 0.85, 1.6)
-
-  if (state === 'idle' || state === 'waiting') {
-    circle(cx, cy, radius * 0.22, ink, 0.92)
-    circle(cx, cy, radius * 0.48, dim, 0.7, 1.3)
-    circle(cx, cy, radius * 0.72, dim, 0.4, 1.1)
-  } else if (state === 'error') {
-    const d = radius * 0.28
-    path(
-      [
-        [cx - d, cy - d],
-        [cx + d, cy + d]
-      ],
-      ring,
-      0.95,
-      1.8
-    )
-    path(
-      [
-        [cx - d, cy + d],
-        [cx + d, cy - d]
-      ],
-      ring,
-      0.95,
-      1.8
-    )
-  } else if (state === 'listening') {
-    for (let i = 0; i < 3; i++) {
-      circle(
-        cx,
-        cy,
-        radius * (0.34 + 0.2 * i + 0.12 * (0.5 + 0.5 * Math.sin(t * (2 + i) + i * 0.7))),
-        ink,
-        0.9 - i * 0.2,
-        1.5
-      )
-    }
-
-    circle(cx, cy, radius * 0.12, ink, 0.95)
-  } else if (state === 'working' || state === 'thinking') {
-    const orbits = state === 'working' ? 3 : 2
-    const particles = state === 'working' ? 9 : 6
-    const speed = state === 'working' ? 2 : 1
-
-    for (let o = 0; o < orbits; o++) {
-      const r = radius * (0.32 + 0.22 * o)
-      circle(cx, cy, r, dim, 0.35, 1)
-
-      for (let p = 0; p < particles; p++) {
-        const a = t * (speed + o) + (p * Math.PI * 2) / particles + o * 0.4
-        circle(
-          cx + Math.cos(a) * r,
-          cy + Math.sin(a) * r,
-          Math.max(1.2, radius * (0.08 + (p % 3) * 0.025)),
-          ink,
-          0.95 - o * 0.12
-        )
-      }
-    }
-
-    circle(cx, cy, radius * 0.1, ink, 0.9)
-  } else {
-    for (let i = 0; i < 3; i++) {
-      const phase = t * (1 + i) + i * 0.85
-      const points: [number, number][] = []
-
-      for (let s = 0; s <= 36; s++) {
-        const u = s / 36,
-          a = u * Math.PI * 2 + phase
-
-        const r = radius * (0.34 + 0.18 * i + 0.12 * Math.sin(u * Math.PI * 4 + phase))
-        points.push([cx + Math.cos(a) * r, cy + Math.sin(a) * r * (0.78 + 0.08 * i)])
-      }
-
-      path(points, ink, 0.85 - i * 0.18, 1.8)
-    }
-  }
-
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="68" height="68" viewBox="0 0 34 34">${out.join('')}</svg>`
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="68" height="68" viewBox="0 0 ${SOURCE} ${SOURCE}">${marks.join('')}</svg>`
 }

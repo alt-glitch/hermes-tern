@@ -166,3 +166,26 @@ describe('orb animation boundaries', () => {
     }
   })
 })
+
+describe('orb drawing', () => {
+  it('draws the thinking-orbs library frame for each agent state, in monochrome ink', async () => {
+    const { MODE_FRAMES, resolvePreset } = await import('thinking-orbs/engine')
+    const { LIBRARY_STATE, orbSvg } = await import('../chrome/orb.js')
+
+    for (const state of ['working', 'thinking', 'composing', 'listening'] as const) {
+      const preset = resolvePreset(LIBRARY_STATE[state], 64)
+      const expected = MODE_FRAMES[preset.mode](64, 1.25 * preset.speed, preset.opts)
+      const svg = orbSvg(state, 1.25, true)
+      const fills = [...svg.matchAll(/fill="#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})"/g)].map(m => m.slice(1))
+      expect(fills.length).toBe(expected.dots.length)
+      expect(svg.match(/<line /g)?.length ?? 0).toBe(expected.lines.length)
+      expect(fills.every(([r, g, b]) => r === g && g === b)).toBe(true)
+    }
+
+    expect(LIBRARY_STATE.thinking).toBe('solving')
+    expect(orbSvg('working', 1, true)).not.toBe(orbSvg('working', 2, true))
+    expect(orbSvg('idle', 1, true)).toBe(orbSvg('idle', 2, true))
+    // A dark substrate takes light ink and a light one dark ink, as the library paints them.
+    expect(orbSvg('idle', 0, true)).not.toBe(orbSvg('idle', 0, false))
+  })
+})

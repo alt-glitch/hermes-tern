@@ -34,6 +34,7 @@
     "remark-gfm": "4.0.1",
     "remark-parse": "11.0.0",
     "remark-rehype": "11.1.2",
+    "thinking-orbs": "github:kvnloo/thinking-orbs#73f4ef1db28c3285dcffb87e720cf01bbec5b1c0",
     "undici": "6.29.0",
     "unified": "11.0.5",
     "unist-util-visit": "5.1.0",

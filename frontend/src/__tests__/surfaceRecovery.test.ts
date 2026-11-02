@@ -9,7 +9,7 @@ import { node, Session, type Surface } from '@stencil-hq/tern'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { App } from '../app/chat.js'
-import { ThinkingOrb } from '../chrome/orb.js'
+import { orbSvg, type OrbState, ThinkingOrb } from '../chrome/orb.js'
 import { readLaunchEnv } from '../config/env.js'
 import { entryId } from '../core/ids.js'
 import { ACK_STALL_MS, MAX_SURFACE_RECOVERIES } from '../surface/lifecycle.js'
@@ -27,6 +27,8 @@ async function painted() {
     await turn()
   }
 }
+
+const ORB_STATES: readonly OrbState[] = ['idle', 'working', 'thinking', 'composing', 'listening', 'speaking', 'waiting', 'error']
 
 /** Direct animation updates, separate from whole-view frames and focus operations. */
 function orbSets(peer: Peer, sf: string) {
@@ -209,7 +211,9 @@ describe('whole Tern document recovery with real SDK frames', () => {
       expect(current.id).toBe('hermes.recovery-1')
       vi.advanceTimersByTime(200)
       expect(orbSets(h.peer, current.id)).toHaveLength(0)
-      expect(blob.mock.calls.some(([bytes, mime]) => mime === 'image/svg+xml' && Buffer.from(bytes).toString().includes('#24212b'))).toBe(true)
+      const light = new Set(ORB_STATES.map(state => orbSvg(state, 0, false)))
+      expect(ORB_STATES.filter(state => light.has(orbSvg(state, 0, true)))).toEqual([])
+      expect(blob.mock.calls.some(([bytes, mime]) => mime === 'image/svg+xml' && light.has(Buffer.from(bytes).toString()))).toBe(true)
       await h.event({ ev: 'motion', reduce: false })
       vi.advanceTimersByTime(200)
       expect(orbSets(h.peer, current.id).length).toBeGreaterThan(0)
