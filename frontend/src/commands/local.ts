@@ -25,6 +25,7 @@ import { openSettings } from '../overlays/settings.js'
 import { openToolResults } from '../overlays/toolResults.js'
 import { isThemeMode, openThemePicker, type ThemeHost } from '../overlays/theme.js'
 import { type VisualPickerHost, openVisualPicker } from '../overlays/visualPicker.js'
+import { openBranchTree } from '../overlays/tree.js'
 import { LEVELS } from '../session/effort.js'
 import { fastCommand, type FastHost } from '../session/fast.js'
 import { answerText } from '../transcript/turns.js'
@@ -354,6 +355,11 @@ const COMMANDS: readonly LocalCommand[] = [
     help: 'Go back to an earlier prompt: rewind to it, or branch from it',
     name: 'rewind',
     run: host => openRewind(host)
+  },
+  {
+    help: "This conversation's branches as a tree: open one",
+    name: 'tree',
+    run: host => openBranchTree(host)
   },
   {
     // The gateway refuses its own /copy and /history (cli_only); Ink runs them on its transcript, as these do.
