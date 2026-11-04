@@ -8,7 +8,7 @@ import { join } from 'node:path'
 import type { Key, Node } from '@stencil-hq/tern'
 import { expect, vi } from 'vitest'
 
-import { FakeGateway, fakeTern, given, key, type Reply, settle as settleGateway, topNodes } from './fakes.js'
+import { face, FakeGateway, fakeTern, given, key, type Reply, settle as settleGateway, topNodes } from './fakes.js'
 
 /** This file's HERMES_HOME, set before App loads. */
 export const home = mkdtempSync(join(tmpdir(), 'hermes-tern-app-'))
@@ -63,7 +63,7 @@ export function setup(replies: Record<string, Reply> = {}, { canonical = true, f
     const rows = topNodes(tern.region('dock')).find(n => n.props['role'] === 'omp.queue')?.children ?? []
 
     return rows.map((r: Node) => ({
-      actions: r.children.flatMap(c => (c.props['role'] === 'omp.queue.steer' ? ['steer'] : c.props['role'] === 'omp.queue.edit' ? ['edit'] : [])),
+      actions: r.children.map(face).flatMap(c => (c.props['role'] === 'omp.queue.steer' ? ['steer'] : c.props['role'] === 'omp.queue.edit' ? ['edit'] : [])),
       text: r.children.find(c => c.props['text'] !== undefined)?.props['text']
     }))
   }

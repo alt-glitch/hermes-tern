@@ -133,12 +133,7 @@ export class AppActions {
     const admit = () => !isModal(chat.overlays) && !life.switching && !attachments.any && !attachments.uploading
     this.#busyDraft = new BusyDraft({ activity: cx.activity, admit, composer, gw, router: cx.router, session: cx.state, transcript, changed })
 
-    this.bindings = new BindingPreferences({
-      gw,
-      session: cx.state,
-      changed,
-      notice: text => chat.notice(text, 'warning')
-    })
+    this.bindings = new BindingPreferences({ gw, session: cx.state, changed, notice: text => chat.notice(text, 'warning') })
     this.dock = {
       onBtwView: notice => cx.btw.viewNotice(notice),
       onBtwDismiss: notice => cx.btw.dismissNotice(notice),

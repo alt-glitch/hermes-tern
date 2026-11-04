@@ -12,6 +12,37 @@
       },
       "c": [
        {
+        "k": "el",
+        "p": {
+         "aria": "Show context window: Context unknown",
+         "attrs": {
+          "aria-haspopup": "dialog"
+         },
+         "role": "omp.composer.context.action",
+         "tag": "button",
+         "title": "Context usage is not available · Show context window",
+         "key": "context",
+         "actions": {
+          "click": "click"
+         }
+        },
+        "c": [
+         {
+          "k": "meter",
+          "p": {
+           "label": "?",
+           "role": "omp.composer.context",
+           "style": "bar",
+           "thresholds": {
+            "bad": 0.85,
+            "warn": 0.6
+           },
+           "key": "meter"
+          }
+         }
+        ]
+       },
+       {
         "k": "row",
         "p": {
          "gap": "sm",
@@ -102,18 +133,29 @@
           }
          },
          {
-          "k": "kbd",
+          "k": "el",
           "p": {
-           "keys": [
-            "enter"
-           ],
+           "tag": "button",
+           "aria": "Send",
+           "class": "hermes-press",
            "role": "omp.composer.send",
-           "title": "Send  ⏎",
            "key": "send",
            "actions": {
             "click": "click"
            }
-          }
+          },
+          "c": [
+           {
+            "k": "kbd",
+            "p": {
+             "keys": [
+              "enter"
+             ],
+             "title": "Send  ⏎",
+             "key": "face"
+            }
+           }
+          ]
          }
         ]
        }
@@ -156,6 +198,7 @@
        {
         "k": "seg",
         "p": {
+         "aria": "Send",
          "priority": 10,
          "role": "hermes.statusline.send",
          "side": "right",
@@ -247,6 +290,37 @@
       },
       "c": [
        {
+        "k": "el",
+        "p": {
+         "aria": "Show context window: Context unknown",
+         "attrs": {
+          "aria-haspopup": "dialog"
+         },
+         "role": "omp.composer.context.action",
+         "tag": "button",
+         "title": "Context usage is not available · Show context window",
+         "key": "context",
+         "actions": {
+          "click": "click"
+         }
+        },
+        "c": [
+         {
+          "k": "meter",
+          "p": {
+           "label": "?",
+           "role": "omp.composer.context",
+           "style": "bar",
+           "thresholds": {
+            "bad": 0.85,
+            "warn": 0.6
+           },
+           "key": "meter"
+          }
+         }
+        ]
+       },
+       {
         "k": "row",
         "p": {
          "gap": "sm",
@@ -337,18 +411,29 @@
           }
          },
          {
-          "k": "kbd",
+          "k": "el",
           "p": {
-           "keys": [
-            "enter"
-           ],
+           "tag": "button",
+           "aria": "Send",
+           "class": "hermes-press",
            "role": "omp.composer.send",
-           "title": "Send  ⏎",
            "key": "send",
            "actions": {
             "click": "click"
            }
-          }
+          },
+          "c": [
+           {
+            "k": "kbd",
+            "p": {
+             "keys": [
+              "enter"
+             ],
+             "title": "Send  ⏎",
+             "key": "face"
+            }
+           }
+          ]
          }
         ]
        }
@@ -391,6 +476,7 @@
        {
         "k": "seg",
         "p": {
+         "aria": "Send",
          "priority": 10,
          "role": "hermes.statusline.send",
          "side": "right",
@@ -541,12 +627,12 @@
           }
          },
          {
-          "k": "row",
+          "k": "el",
           "p": {
-           "align": "center",
-           "gap": "xs",
+           "tag": "button",
+           "aria": "Stop",
+           "class": "hermes-press",
            "role": "omp.working.stop",
-           "title": "Stop  esc esc",
            "key": "stop",
            "actions": {
             "click": "click"
@@ -554,29 +640,40 @@
           },
           "c": [
            {
-            "k": "kbd",
+            "k": "row",
             "p": {
-             "keys": [
-              "esc"
-             ],
-             "key": "k"
-            }
-           },
-           {
-            "k": "kbd",
-            "p": {
-             "keys": [
-              "esc"
-             ],
-             "key": "k2"
-            }
-           },
-           {
-            "k": "text",
-            "p": {
-             "text": "Stop",
-             "key": "t"
-            }
+             "align": "center",
+             "gap": "xs",
+             "title": "Stop  esc esc",
+             "key": "face"
+            },
+            "c": [
+             {
+              "k": "kbd",
+              "p": {
+               "keys": [
+                "esc"
+               ],
+               "key": "k"
+              }
+             },
+             {
+              "k": "kbd",
+              "p": {
+               "keys": [
+                "esc"
+               ],
+               "key": "k2"
+              }
+             },
+             {
+              "k": "text",
+              "p": {
+               "text": "Stop",
+               "key": "t"
+              }
+             }
+            ]
            }
           ]
          }
@@ -597,6 +694,37 @@
          "role": "hermes.streak",
          "key": "streak"
         }
+       },
+       {
+        "k": "el",
+        "p": {
+         "aria": "Show context window: Context unknown",
+         "attrs": {
+          "aria-haspopup": "dialog"
+         },
+         "role": "omp.composer.context.action",
+         "tag": "button",
+         "title": "Context usage is not available · Show context window",
+         "key": "context",
+         "actions": {
+          "click": "click"
+         }
+        },
+        "c": [
+         {
+          "k": "meter",
+          "p": {
+           "label": "?",
+           "role": "omp.composer.context",
+           "style": "bar",
+           "thresholds": {
+            "bad": 0.85,
+            "warn": 0.6
+           },
+           "key": "meter"
+          }
+         }
+        ]
        },
        {
         "k": "row",
@@ -689,17 +817,28 @@
           }
          },
          {
-          "k": "text",
+          "k": "el",
           "p": {
+           "tag": "button",
+           "aria": "Stop",
+           "class": "hermes-press",
            "role": "omp.composer.stop",
-           "text": "Stop",
-           "title": "Stop  esc esc",
-           "tone": "error",
            "key": "stop",
            "actions": {
             "click": "click"
            }
-          }
+          },
+          "c": [
+           {
+            "k": "text",
+            "p": {
+             "text": "Stop",
+             "title": "Stop  esc esc",
+             "tone": "error",
+             "key": "face"
+            }
+           }
+          ]
          }
         ]
        }
@@ -757,6 +896,7 @@
        {
         "k": "seg",
         "p": {
+         "aria": "Stop",
          "priority": 10,
          "role": "hermes.statusline.stop",
          "side": "right",
@@ -864,16 +1004,27 @@
           }
          },
          {
-          "k": "icon",
+          "k": "el",
           "p": {
-           "name": "copy",
-           "role": "omp.user.tool",
-           "title": "Copy message",
+           "tag": "button",
+           "aria": "Copy message",
+           "class": "hermes-press",
            "key": "copy",
            "actions": {
             "click": "click"
            }
-          }
+          },
+          "c": [
+           {
+            "k": "icon",
+            "p": {
+             "name": "copy",
+             "role": "omp.user.tool",
+             "title": "Copy message",
+             "key": "face"
+            }
+           }
+          ]
          }
         ]
        },
@@ -960,12 +1111,12 @@
           }
          },
          {
-          "k": "row",
+          "k": "el",
           "p": {
-           "align": "center",
-           "gap": "xs",
+           "tag": "button",
+           "aria": "Stop",
+           "class": "hermes-press",
            "role": "omp.working.stop",
-           "title": "Stop  esc esc",
            "key": "stop",
            "actions": {
             "click": "click"
@@ -973,29 +1124,40 @@
           },
           "c": [
            {
-            "k": "kbd",
+            "k": "row",
             "p": {
-             "keys": [
-              "esc"
-             ],
-             "key": "k"
-            }
-           },
-           {
-            "k": "kbd",
-            "p": {
-             "keys": [
-              "esc"
-             ],
-             "key": "k2"
-            }
-           },
-           {
-            "k": "text",
-            "p": {
-             "text": "Stop",
-             "key": "t"
-            }
+             "align": "center",
+             "gap": "xs",
+             "title": "Stop  esc esc",
+             "key": "face"
+            },
+            "c": [
+             {
+              "k": "kbd",
+              "p": {
+               "keys": [
+                "esc"
+               ],
+               "key": "k"
+              }
+             },
+             {
+              "k": "kbd",
+              "p": {
+               "keys": [
+                "esc"
+               ],
+               "key": "k2"
+              }
+             },
+             {
+              "k": "text",
+              "p": {
+               "text": "Stop",
+               "key": "t"
+              }
+             }
+            ]
            }
           ]
          }
@@ -1016,6 +1178,37 @@
          "role": "hermes.streak",
          "key": "streak"
         }
+       },
+       {
+        "k": "el",
+        "p": {
+         "aria": "Show context window: Context unknown",
+         "attrs": {
+          "aria-haspopup": "dialog"
+         },
+         "role": "omp.composer.context.action",
+         "tag": "button",
+         "title": "Context usage is not available · Show context window",
+         "key": "context",
+         "actions": {
+          "click": "click"
+         }
+        },
+        "c": [
+         {
+          "k": "meter",
+          "p": {
+           "label": "?",
+           "role": "omp.composer.context",
+           "style": "bar",
+           "thresholds": {
+            "bad": 0.85,
+            "warn": 0.6
+           },
+           "key": "meter"
+          }
+         }
+        ]
        },
        {
         "k": "row",
@@ -1108,17 +1301,28 @@
           }
          },
          {
-          "k": "text",
+          "k": "el",
           "p": {
+           "tag": "button",
+           "aria": "Stop",
+           "class": "hermes-press",
            "role": "omp.composer.stop",
-           "text": "Stop",
-           "title": "Stop  esc esc",
-           "tone": "error",
            "key": "stop",
            "actions": {
             "click": "click"
            }
-          }
+          },
+          "c": [
+           {
+            "k": "text",
+            "p": {
+             "text": "Stop",
+             "title": "Stop  esc esc",
+             "tone": "error",
+             "key": "face"
+            }
+           }
+          ]
          }
         ]
        }
@@ -1176,6 +1380,7 @@
        {
         "k": "seg",
         "p": {
+         "aria": "Stop",
          "priority": 10,
          "role": "hermes.statusline.stop",
          "side": "right",
@@ -1283,16 +1488,27 @@
           }
          },
          {
-          "k": "icon",
+          "k": "el",
           "p": {
-           "name": "copy",
-           "role": "omp.user.tool",
-           "title": "Copy message",
+           "tag": "button",
+           "aria": "Copy message",
+           "class": "hermes-press",
            "key": "copy",
            "actions": {
             "click": "click"
            }
-          }
+          },
+          "c": [
+           {
+            "k": "icon",
+            "p": {
+             "name": "copy",
+             "role": "omp.user.tool",
+             "title": "Copy message",
+             "key": "face"
+            }
+           }
+          ]
          }
         ]
        },
@@ -1467,12 +1683,12 @@
           }
          },
          {
-          "k": "row",
+          "k": "el",
           "p": {
-           "align": "center",
-           "gap": "xs",
+           "tag": "button",
+           "aria": "Stop",
+           "class": "hermes-press",
            "role": "omp.working.stop",
-           "title": "Stop  esc esc",
            "key": "stop",
            "actions": {
             "click": "click"
@@ -1480,29 +1696,40 @@
           },
           "c": [
            {
-            "k": "kbd",
+            "k": "row",
             "p": {
-             "keys": [
-              "esc"
-             ],
-             "key": "k"
-            }
-           },
-           {
-            "k": "kbd",
-            "p": {
-             "keys": [
-              "esc"
-             ],
-             "key": "k2"
-            }
-           },
-           {
-            "k": "text",
-            "p": {
-             "text": "Stop",
-             "key": "t"
-            }
+             "align": "center",
+             "gap": "xs",
+             "title": "Stop  esc esc",
+             "key": "face"
+            },
+            "c": [
+             {
+              "k": "kbd",
+              "p": {
+               "keys": [
+                "esc"
+               ],
+               "key": "k"
+              }
+             },
+             {
+              "k": "kbd",
+              "p": {
+               "keys": [
+                "esc"
+               ],
+               "key": "k2"
+              }
+             },
+             {
+              "k": "text",
+              "p": {
+               "text": "Stop",
+               "key": "t"
+              }
+             }
+            ]
            }
           ]
          }
@@ -1518,118 +1745,11 @@
       },
       "c": [
        {
-        "k": "row",
+        "k": "el",
         "p": {
-         "align": "center",
-         "role": "omp.hud.pill",
-         "title": "Agents  ⌥A",
-         "hovercard": {
-          "k": "col",
-          "p": {
-           "gap": "sm",
-           "role": "hermes.agents.wait",
-           "key": "agent-hover"
-          },
-          "c": [
-           {
-            "k": "row",
-            "p": {
-             "gap": "none",
-             "role": "omp.job.tiles",
-             "wrap": true,
-             "key": "tiles"
-            },
-            "c": [
-             {
-              "k": "col",
-              "p": {
-               "gap": "xs",
-               "role": "omp.job.tile",
-               "tone": "accent",
-               "actions": {
-                "click": "open-agent=solo-agent",
-                "menu": [
-                 "open-agent=solo-agent"
-                ]
-               },
-               "title": "Running · Open Agent 1 beside the chat",
-               "key": "solo-agent"
-              },
-              "c": [
-               {
-                "k": "row",
-                "p": {
-                 "align": "center",
-                 "gap": "xs",
-                 "role": "omp.job.tile.head",
-                 "key": "head"
-                },
-                "c": [
-                 {
-                  "k": "text",
-                  "p": {
-                   "role": "omp.job.tile.dot",
-                   "spans": [
-                    {
-                     "s": "accent",
-                     "t": "●",
-                     "fx": "pulse"
-                    }
-                   ],
-                   "wrap": "none",
-                   "key": "dot"
-                  }
-                 },
-                 {
-                  "k": "text",
-                  "p": {
-                   "grow": 1,
-                   "role": "omp.job.tile.title",
-                   "spans": [
-                    {
-                     "t": "Agent 1"
-                    }
-                   ],
-                   "truncate": "end",
-                   "wrap": "none",
-                   "key": "title"
-                  }
-                 },
-                 {
-                  "k": "row",
-                  "p": {
-                   "align": "center",
-                   "gap": "xs",
-                   "role": "hermes.agent.tile.age",
-                   "key": "age"
-                  },
-                  "c": [
-                   {
-                    "k": "spinner",
-                    "p": {
-                     "style": "dots",
-                     "tone": "accent",
-                     "key": "spin"
-                    }
-                   },
-                   {
-                    "k": "elapsed",
-                    "p": {
-                     "age": 0,
-                     "format": "short",
-                     "key": "elapsed"
-                    }
-                   }
-                  ]
-                 }
-                ]
-               }
-              ]
-             }
-            ]
-           }
-          ]
-         },
+         "tag": "button",
+         "aria": "1 agent running",
+         "class": "hermes-press",
          "key": "pill",
          "actions": {
           "click": "click"
@@ -1640,33 +1760,162 @@
           "k": "row",
           "p": {
            "align": "center",
-           "gap": "xs",
-           "role": "omp.hud.seg",
-           "key": "seg"
+           "role": "omp.hud.pill",
+           "title": "Agents  ⌥A",
+           "hovercard": {
+            "k": "col",
+            "p": {
+             "gap": "sm",
+             "role": "hermes.agents.wait",
+             "key": "agent-hover"
+            },
+            "c": [
+             {
+              "k": "row",
+              "p": {
+               "gap": "none",
+               "role": "omp.job.tiles",
+               "wrap": true,
+               "key": "tiles"
+              },
+              "c": [
+               {
+                "k": "el",
+                "p": {
+                 "tag": "button",
+                 "aria": "Running · Open Agent 1 beside the chat",
+                 "class": "hermes-press",
+                 "actions": {
+                  "click": "open-agent=solo-agent",
+                  "menu": [
+                   "open-agent=solo-agent"
+                  ]
+                 },
+                 "key": "solo-agent"
+                },
+                "c": [
+                 {
+                  "k": "col",
+                  "p": {
+                   "gap": "xs",
+                   "role": "omp.job.tile",
+                   "tone": "accent",
+                   "title": "Running · Open Agent 1 beside the chat",
+                   "key": "face"
+                  },
+                  "c": [
+                   {
+                    "k": "row",
+                    "p": {
+                     "align": "center",
+                     "gap": "xs",
+                     "role": "omp.job.tile.head",
+                     "key": "head"
+                    },
+                    "c": [
+                     {
+                      "k": "text",
+                      "p": {
+                       "role": "omp.job.tile.dot",
+                       "spans": [
+                        {
+                         "s": "accent",
+                         "t": "●",
+                         "fx": "pulse"
+                        }
+                       ],
+                       "wrap": "none",
+                       "key": "dot"
+                      }
+                     },
+                     {
+                      "k": "text",
+                      "p": {
+                       "grow": 1,
+                       "role": "omp.job.tile.title",
+                       "spans": [
+                        {
+                         "t": "Agent 1"
+                        }
+                       ],
+                       "truncate": "end",
+                       "wrap": "none",
+                       "key": "title"
+                      }
+                     },
+                     {
+                      "k": "row",
+                      "p": {
+                       "align": "center",
+                       "gap": "xs",
+                       "role": "hermes.agent.tile.age",
+                       "key": "age"
+                      },
+                      "c": [
+                       {
+                        "k": "spinner",
+                        "p": {
+                         "style": "dots",
+                         "tone": "accent",
+                         "key": "spin"
+                        }
+                       },
+                       {
+                        "k": "elapsed",
+                        "p": {
+                         "age": 0,
+                         "format": "short",
+                         "key": "elapsed"
+                        }
+                       }
+                      ]
+                     }
+                    ]
+                   }
+                  ]
+                 }
+                ]
+               }
+              ]
+             }
+            ]
+           },
+           "key": "face"
           },
           "c": [
            {
-            "k": "icon",
+            "k": "row",
             "p": {
-             "name": "users",
-             "key": "icon"
-            }
-           },
-           {
-            "k": "spinner",
-            "p": {
-             "style": "dots",
-             "tone": "accent",
-             "key": "spin"
-            }
-           },
-           {
-            "k": "text",
-            "p": {
-             "text": "1 agent running",
-             "wrap": "none",
-             "key": "text"
-            }
+             "align": "center",
+             "gap": "xs",
+             "role": "omp.hud.seg",
+             "key": "seg"
+            },
+            "c": [
+             {
+              "k": "icon",
+              "p": {
+               "name": "users",
+               "key": "icon"
+              }
+             },
+             {
+              "k": "spinner",
+              "p": {
+               "style": "dots",
+               "tone": "accent",
+               "key": "spin"
+              }
+             },
+             {
+              "k": "text",
+              "p": {
+               "text": "1 agent running",
+               "wrap": "none",
+               "key": "text"
+              }
+             }
+            ]
            }
           ]
          }
@@ -1687,6 +1936,37 @@
          "role": "hermes.streak",
          "key": "streak"
         }
+       },
+       {
+        "k": "el",
+        "p": {
+         "aria": "Show context window: Context unknown",
+         "attrs": {
+          "aria-haspopup": "dialog"
+         },
+         "role": "omp.composer.context.action",
+         "tag": "button",
+         "title": "Context usage is not available · Show context window",
+         "key": "context",
+         "actions": {
+          "click": "click"
+         }
+        },
+        "c": [
+         {
+          "k": "meter",
+          "p": {
+           "label": "?",
+           "role": "omp.composer.context",
+           "style": "bar",
+           "thresholds": {
+            "bad": 0.85,
+            "warn": 0.6
+           },
+           "key": "meter"
+          }
+         }
+        ]
        },
        {
         "k": "row",
@@ -1779,17 +2059,28 @@
           }
          },
          {
-          "k": "text",
+          "k": "el",
           "p": {
+           "tag": "button",
+           "aria": "Stop",
+           "class": "hermes-press",
            "role": "omp.composer.stop",
-           "text": "Stop",
-           "title": "Stop  esc esc",
-           "tone": "error",
            "key": "stop",
            "actions": {
             "click": "click"
            }
-          }
+          },
+          "c": [
+           {
+            "k": "text",
+            "p": {
+             "text": "Stop",
+             "title": "Stop  esc esc",
+             "tone": "error",
+             "key": "face"
+            }
+           }
+          ]
          }
         ]
        }
@@ -1847,6 +2138,7 @@
        {
         "k": "seg",
         "p": {
+         "aria": "Stop",
          "priority": 10,
          "role": "hermes.statusline.stop",
          "side": "right",
@@ -1954,16 +2246,27 @@
           }
          },
          {
-          "k": "icon",
+          "k": "el",
           "p": {
-           "name": "copy",
-           "role": "omp.user.tool",
-           "title": "Copy message",
+           "tag": "button",
+           "aria": "Copy message",
+           "class": "hermes-press",
            "key": "copy",
            "actions": {
             "click": "click"
            }
-          }
+          },
+          "c": [
+           {
+            "k": "icon",
+            "p": {
+             "name": "copy",
+             "role": "omp.user.tool",
+             "title": "Copy message",
+             "key": "face"
+            }
+           }
+          ]
          }
         ]
        },
@@ -2051,84 +2354,95 @@
             },
             "c": [
              {
-              "k": "col",
+              "k": "el",
               "p": {
-               "gap": "xs",
-               "role": "omp.job.tile",
-               "tone": "accent",
+               "tag": "button",
+               "aria": "Running · Open Agent 1 beside the chat",
+               "class": "hermes-press",
                "actions": {
                 "click": "open-agent=solo-agent",
                 "menu": [
                  "open-agent=solo-agent"
                 ]
                },
-               "title": "Running · Open Agent 1 beside the chat",
                "key": "solo-agent"
               },
               "c": [
                {
-                "k": "row",
+                "k": "col",
                 "p": {
-                 "align": "center",
                  "gap": "xs",
-                 "role": "omp.job.tile.head",
-                 "key": "head"
+                 "role": "omp.job.tile",
+                 "tone": "accent",
+                 "title": "Running · Open Agent 1 beside the chat",
+                 "key": "face"
                 },
                 "c": [
-                 {
-                  "k": "text",
-                  "p": {
-                   "role": "omp.job.tile.dot",
-                   "spans": [
-                    {
-                     "s": "accent",
-                     "t": "●",
-                     "fx": "pulse"
-                    }
-                   ],
-                   "wrap": "none",
-                   "key": "dot"
-                  }
-                 },
-                 {
-                  "k": "text",
-                  "p": {
-                   "grow": 1,
-                   "role": "omp.job.tile.title",
-                   "spans": [
-                    {
-                     "t": "Agent 1"
-                    }
-                   ],
-                   "truncate": "end",
-                   "wrap": "none",
-                   "key": "title"
-                  }
-                 },
                  {
                   "k": "row",
                   "p": {
                    "align": "center",
                    "gap": "xs",
-                   "role": "hermes.agent.tile.age",
-                   "key": "age"
+                   "role": "omp.job.tile.head",
+                   "key": "head"
                   },
                   "c": [
                    {
-                    "k": "spinner",
+                    "k": "text",
                     "p": {
-                     "style": "dots",
-                     "tone": "accent",
-                     "key": "spin"
+                     "role": "omp.job.tile.dot",
+                     "spans": [
+                      {
+                       "s": "accent",
+                       "t": "●",
+                       "fx": "pulse"
+                      }
+                     ],
+                     "wrap": "none",
+                     "key": "dot"
                     }
                    },
                    {
-                    "k": "elapsed",
+                    "k": "text",
                     "p": {
-                     "age": 0,
-                     "format": "short",
-                     "key": "elapsed"
+                     "grow": 1,
+                     "role": "omp.job.tile.title",
+                     "spans": [
+                      {
+                       "t": "Agent 1"
+                      }
+                     ],
+                     "truncate": "end",
+                     "wrap": "none",
+                     "key": "title"
                     }
+                   },
+                   {
+                    "k": "row",
+                    "p": {
+                     "align": "center",
+                     "gap": "xs",
+                     "role": "hermes.agent.tile.age",
+                     "key": "age"
+                    },
+                    "c": [
+                     {
+                      "k": "spinner",
+                      "p": {
+                       "style": "dots",
+                       "tone": "accent",
+                       "key": "spin"
+                      }
+                     },
+                     {
+                      "k": "elapsed",
+                      "p": {
+                       "age": 0,
+                       "format": "short",
+                       "key": "elapsed"
+                      }
+                     }
+                    ]
                    }
                   ]
                  }
@@ -2255,12 +2569,12 @@
           }
          },
          {
-          "k": "row",
+          "k": "el",
           "p": {
-           "align": "center",
-           "gap": "xs",
+           "tag": "button",
+           "aria": "Stop",
+           "class": "hermes-press",
            "role": "omp.working.stop",
-           "title": "Stop  esc esc",
            "key": "stop",
            "actions": {
             "click": "click"
@@ -2268,29 +2582,40 @@
           },
           "c": [
            {
-            "k": "kbd",
+            "k": "row",
             "p": {
-             "keys": [
-              "esc"
-             ],
-             "key": "k"
-            }
-           },
-           {
-            "k": "kbd",
-            "p": {
-             "keys": [
-              "esc"
-             ],
-             "key": "k2"
-            }
-           },
-           {
-            "k": "text",
-            "p": {
-             "text": "Stop",
-             "key": "t"
-            }
+             "align": "center",
+             "gap": "xs",
+             "title": "Stop  esc esc",
+             "key": "face"
+            },
+            "c": [
+             {
+              "k": "kbd",
+              "p": {
+               "keys": [
+                "esc"
+               ],
+               "key": "k"
+              }
+             },
+             {
+              "k": "kbd",
+              "p": {
+               "keys": [
+                "esc"
+               ],
+               "key": "k2"
+              }
+             },
+             {
+              "k": "text",
+              "p": {
+               "text": "Stop",
+               "key": "t"
+              }
+             }
+            ]
            }
           ]
          }
@@ -2306,147 +2631,11 @@
       },
       "c": [
        {
-        "k": "row",
+        "k": "el",
         "p": {
-         "align": "center",
-         "role": "omp.hud.pill",
-         "title": "Agents  ⌥A",
-         "hovercard": {
-          "k": "col",
-          "p": {
-           "gap": "sm",
-           "role": "hermes.agents.wait",
-           "key": "agent-hover"
-          },
-          "c": [
-           {
-            "k": "row",
-            "p": {
-             "gap": "none",
-             "role": "omp.job.tiles",
-             "wrap": true,
-             "key": "tiles"
-            },
-            "c": [
-             {
-              "k": "col",
-              "p": {
-               "gap": "xs",
-               "role": "omp.job.tile",
-               "tone": "accent",
-               "actions": {
-                "click": "open-agent=solo-agent",
-                "menu": [
-                 "open-agent=solo-agent"
-                ]
-               },
-               "title": "Running · Open Agent 1 beside the chat",
-               "key": "solo-agent"
-              },
-              "c": [
-               {
-                "k": "row",
-                "p": {
-                 "align": "center",
-                 "gap": "xs",
-                 "role": "omp.job.tile.head",
-                 "key": "head"
-                },
-                "c": [
-                 {
-                  "k": "text",
-                  "p": {
-                   "role": "omp.job.tile.dot",
-                   "spans": [
-                    {
-                     "s": "accent",
-                     "t": "●",
-                     "fx": "pulse"
-                    }
-                   ],
-                   "wrap": "none",
-                   "key": "dot"
-                  }
-                 },
-                 {
-                  "k": "text",
-                  "p": {
-                   "grow": 1,
-                   "role": "omp.job.tile.title",
-                   "spans": [
-                    {
-                     "t": "Agent 1"
-                    }
-                   ],
-                   "truncate": "end",
-                   "wrap": "none",
-                   "key": "title"
-                  }
-                 },
-                 {
-                  "k": "row",
-                  "p": {
-                   "align": "center",
-                   "gap": "xs",
-                   "role": "hermes.agent.tile.age",
-                   "key": "age"
-                  },
-                  "c": [
-                   {
-                    "k": "spinner",
-                    "p": {
-                     "style": "dots",
-                     "tone": "accent",
-                     "key": "spin"
-                    }
-                   },
-                   {
-                    "k": "elapsed",
-                    "p": {
-                     "age": 0,
-                     "format": "short",
-                     "key": "elapsed"
-                    }
-                   }
-                  ]
-                 }
-                ]
-               },
-               {
-                "k": "text",
-                "p": {
-                 "role": "omp.job.tile.figure",
-                 "spans": [
-                  {
-                   "t": "read_file"
-                  }
-                 ],
-                 "truncate": "end",
-                 "wrap": "none",
-                 "key": "figure"
-                }
-               },
-               {
-                "k": "text",
-                "p": {
-                 "role": "omp.job.tile.note",
-                 "spans": [
-                  {
-                   "s": "dim",
-                   "t": "Reading model fields"
-                  }
-                 ],
-                 "truncate": "end",
-                 "wrap": "none",
-                 "key": "note-0"
-                }
-               }
-              ]
-             }
-            ]
-           }
-          ]
-         },
+         "tag": "button",
+         "aria": "1 agent running",
+         "class": "hermes-press",
          "key": "pill",
          "actions": {
           "click": "click"
@@ -2457,33 +2646,191 @@
           "k": "row",
           "p": {
            "align": "center",
-           "gap": "xs",
-           "role": "omp.hud.seg",
-           "key": "seg"
+           "role": "omp.hud.pill",
+           "title": "Agents  ⌥A",
+           "hovercard": {
+            "k": "col",
+            "p": {
+             "gap": "sm",
+             "role": "hermes.agents.wait",
+             "key": "agent-hover"
+            },
+            "c": [
+             {
+              "k": "row",
+              "p": {
+               "gap": "none",
+               "role": "omp.job.tiles",
+               "wrap": true,
+               "key": "tiles"
+              },
+              "c": [
+               {
+                "k": "el",
+                "p": {
+                 "tag": "button",
+                 "aria": "Running · Open Agent 1 beside the chat",
+                 "class": "hermes-press",
+                 "actions": {
+                  "click": "open-agent=solo-agent",
+                  "menu": [
+                   "open-agent=solo-agent"
+                  ]
+                 },
+                 "key": "solo-agent"
+                },
+                "c": [
+                 {
+                  "k": "col",
+                  "p": {
+                   "gap": "xs",
+                   "role": "omp.job.tile",
+                   "tone": "accent",
+                   "title": "Running · Open Agent 1 beside the chat",
+                   "key": "face"
+                  },
+                  "c": [
+                   {
+                    "k": "row",
+                    "p": {
+                     "align": "center",
+                     "gap": "xs",
+                     "role": "omp.job.tile.head",
+                     "key": "head"
+                    },
+                    "c": [
+                     {
+                      "k": "text",
+                      "p": {
+                       "role": "omp.job.tile.dot",
+                       "spans": [
+                        {
+                         "s": "accent",
+                         "t": "●",
+                         "fx": "pulse"
+                        }
+                       ],
+                       "wrap": "none",
+                       "key": "dot"
+                      }
+                     },
+                     {
+                      "k": "text",
+                      "p": {
+                       "grow": 1,
+                       "role": "omp.job.tile.title",
+                       "spans": [
+                        {
+                         "t": "Agent 1"
+                        }
+                       ],
+                       "truncate": "end",
+                       "wrap": "none",
+                       "key": "title"
+                      }
+                     },
+                     {
+                      "k": "row",
+                      "p": {
+                       "align": "center",
+                       "gap": "xs",
+                       "role": "hermes.agent.tile.age",
+                       "key": "age"
+                      },
+                      "c": [
+                       {
+                        "k": "spinner",
+                        "p": {
+                         "style": "dots",
+                         "tone": "accent",
+                         "key": "spin"
+                        }
+                       },
+                       {
+                        "k": "elapsed",
+                        "p": {
+                         "age": 0,
+                         "format": "short",
+                         "key": "elapsed"
+                        }
+                       }
+                      ]
+                     }
+                    ]
+                   },
+                   {
+                    "k": "text",
+                    "p": {
+                     "role": "omp.job.tile.figure",
+                     "spans": [
+                      {
+                       "t": "read_file"
+                      }
+                     ],
+                     "truncate": "end",
+                     "wrap": "none",
+                     "key": "figure"
+                    }
+                   },
+                   {
+                    "k": "text",
+                    "p": {
+                     "role": "omp.job.tile.note",
+                     "spans": [
+                      {
+                       "s": "dim",
+                       "t": "Reading model fields"
+                      }
+                     ],
+                     "truncate": "end",
+                     "wrap": "none",
+                     "key": "note-0"
+                    }
+                   }
+                  ]
+                 }
+                ]
+               }
+              ]
+             }
+            ]
+           },
+           "key": "face"
           },
           "c": [
            {
-            "k": "icon",
+            "k": "row",
             "p": {
-             "name": "users",
-             "key": "icon"
-            }
-           },
-           {
-            "k": "spinner",
-            "p": {
-             "style": "dots",
-             "tone": "accent",
-             "key": "spin"
-            }
-           },
-           {
-            "k": "text",
-            "p": {
-             "text": "1 agent running",
-             "wrap": "none",
-             "key": "text"
-            }
+             "align": "center",
+             "gap": "xs",
+             "role": "omp.hud.seg",
+             "key": "seg"
+            },
+            "c": [
+             {
+              "k": "icon",
+              "p": {
+               "name": "users",
+               "key": "icon"
+              }
+             },
+             {
+              "k": "spinner",
+              "p": {
+               "style": "dots",
+               "tone": "accent",
+               "key": "spin"
+              }
+             },
+             {
+              "k": "text",
+              "p": {
+               "text": "1 agent running",
+               "wrap": "none",
+               "key": "text"
+              }
+             }
+            ]
            }
           ]
          }
@@ -2504,6 +2851,37 @@
          "role": "hermes.streak",
          "key": "streak"
         }
+       },
+       {
+        "k": "el",
+        "p": {
+         "aria": "Show context window: Context unknown",
+         "attrs": {
+          "aria-haspopup": "dialog"
+         },
+         "role": "omp.composer.context.action",
+         "tag": "button",
+         "title": "Context usage is not available · Show context window",
+         "key": "context",
+         "actions": {
+          "click": "click"
+         }
+        },
+        "c": [
+         {
+          "k": "meter",
+          "p": {
+           "label": "?",
+           "role": "omp.composer.context",
+           "style": "bar",
+           "thresholds": {
+            "bad": 0.85,
+            "warn": 0.6
+           },
+           "key": "meter"
+          }
+         }
+        ]
        },
        {
         "k": "row",
@@ -2596,17 +2974,28 @@
           }
          },
          {
-          "k": "text",
+          "k": "el",
           "p": {
+           "tag": "button",
+           "aria": "Stop",
+           "class": "hermes-press",
            "role": "omp.composer.stop",
-           "text": "Stop",
-           "title": "Stop  esc esc",
-           "tone": "error",
            "key": "stop",
            "actions": {
             "click": "click"
            }
-          }
+          },
+          "c": [
+           {
+            "k": "text",
+            "p": {
+             "text": "Stop",
+             "title": "Stop  esc esc",
+             "tone": "error",
+             "key": "face"
+            }
+           }
+          ]
          }
         ]
        }
@@ -2664,6 +3053,7 @@
        {
         "k": "seg",
         "p": {
+         "aria": "Stop",
          "priority": 10,
          "role": "hermes.statusline.stop",
          "side": "right",
@@ -2771,16 +3161,27 @@
           }
          },
          {
-          "k": "icon",
+          "k": "el",
           "p": {
-           "name": "copy",
-           "role": "omp.user.tool",
-           "title": "Copy message",
+           "tag": "button",
+           "aria": "Copy message",
+           "class": "hermes-press",
            "key": "copy",
            "actions": {
             "click": "click"
            }
-          }
+          },
+          "c": [
+           {
+            "k": "icon",
+            "p": {
+             "name": "copy",
+             "role": "omp.user.tool",
+             "title": "Copy message",
+             "key": "face"
+            }
+           }
+          ]
          }
         ]
        },
@@ -2868,117 +3269,128 @@
             },
             "c": [
              {
-              "k": "col",
+              "k": "el",
               "p": {
-               "gap": "xs",
-               "role": "omp.job.tile",
-               "tone": "accent",
+               "tag": "button",
+               "aria": "Running · Open Agent 1 beside the chat",
+               "class": "hermes-press",
                "actions": {
                 "click": "open-agent=solo-agent",
                 "menu": [
                  "open-agent=solo-agent"
                 ]
                },
-               "title": "Running · Open Agent 1 beside the chat",
                "key": "solo-agent"
               },
               "c": [
                {
-                "k": "row",
+                "k": "col",
                 "p": {
-                 "align": "center",
                  "gap": "xs",
-                 "role": "omp.job.tile.head",
-                 "key": "head"
+                 "role": "omp.job.tile",
+                 "tone": "accent",
+                 "title": "Running · Open Agent 1 beside the chat",
+                 "key": "face"
                 },
                 "c": [
-                 {
-                  "k": "text",
-                  "p": {
-                   "role": "omp.job.tile.dot",
-                   "spans": [
-                    {
-                     "s": "accent",
-                     "t": "●",
-                     "fx": "pulse"
-                    }
-                   ],
-                   "wrap": "none",
-                   "key": "dot"
-                  }
-                 },
-                 {
-                  "k": "text",
-                  "p": {
-                   "grow": 1,
-                   "role": "omp.job.tile.title",
-                   "spans": [
-                    {
-                     "t": "Agent 1"
-                    }
-                   ],
-                   "truncate": "end",
-                   "wrap": "none",
-                   "key": "title"
-                  }
-                 },
                  {
                   "k": "row",
                   "p": {
                    "align": "center",
                    "gap": "xs",
-                   "role": "hermes.agent.tile.age",
-                   "key": "age"
+                   "role": "omp.job.tile.head",
+                   "key": "head"
                   },
                   "c": [
                    {
-                    "k": "spinner",
+                    "k": "text",
                     "p": {
-                     "style": "dots",
-                     "tone": "accent",
-                     "key": "spin"
+                     "role": "omp.job.tile.dot",
+                     "spans": [
+                      {
+                       "s": "accent",
+                       "t": "●",
+                       "fx": "pulse"
+                      }
+                     ],
+                     "wrap": "none",
+                     "key": "dot"
                     }
                    },
                    {
-                    "k": "elapsed",
+                    "k": "text",
                     "p": {
-                     "age": 0,
-                     "format": "short",
-                     "key": "elapsed"
+                     "grow": 1,
+                     "role": "omp.job.tile.title",
+                     "spans": [
+                      {
+                       "t": "Agent 1"
+                      }
+                     ],
+                     "truncate": "end",
+                     "wrap": "none",
+                     "key": "title"
                     }
+                   },
+                   {
+                    "k": "row",
+                    "p": {
+                     "align": "center",
+                     "gap": "xs",
+                     "role": "hermes.agent.tile.age",
+                     "key": "age"
+                    },
+                    "c": [
+                     {
+                      "k": "spinner",
+                      "p": {
+                       "style": "dots",
+                       "tone": "accent",
+                       "key": "spin"
+                      }
+                     },
+                     {
+                      "k": "elapsed",
+                      "p": {
+                       "age": 0,
+                       "format": "short",
+                       "key": "elapsed"
+                      }
+                     }
+                    ]
                    }
                   ]
+                 },
+                 {
+                  "k": "text",
+                  "p": {
+                   "role": "omp.job.tile.figure",
+                   "spans": [
+                    {
+                     "t": "read_file"
+                    }
+                   ],
+                   "truncate": "end",
+                   "wrap": "none",
+                   "key": "figure"
+                  }
+                 },
+                 {
+                  "k": "text",
+                  "p": {
+                   "role": "omp.job.tile.note",
+                   "spans": [
+                    {
+                     "s": "dim",
+                     "t": "Reading model fields"
+                    }
+                   ],
+                   "truncate": "end",
+                   "wrap": "none",
+                   "key": "note-0"
+                  }
                  }
                 ]
-               },
-               {
-                "k": "text",
-                "p": {
-                 "role": "omp.job.tile.figure",
-                 "spans": [
-                  {
-                   "t": "read_file"
-                  }
-                 ],
-                 "truncate": "end",
-                 "wrap": "none",
-                 "key": "figure"
-                }
-               },
-               {
-                "k": "text",
-                "p": {
-                 "role": "omp.job.tile.note",
-                 "spans": [
-                  {
-                   "s": "dim",
-                   "t": "Reading model fields"
-                  }
-                 ],
-                 "truncate": "end",
-                 "wrap": "none",
-                 "key": "note-0"
-                }
                }
               ]
              }
@@ -3101,12 +3513,12 @@
           }
          },
          {
-          "k": "row",
+          "k": "el",
           "p": {
-           "align": "center",
-           "gap": "xs",
+           "tag": "button",
+           "aria": "Stop",
+           "class": "hermes-press",
            "role": "omp.working.stop",
-           "title": "Stop  esc esc",
            "key": "stop",
            "actions": {
             "click": "click"
@@ -3114,29 +3526,40 @@
           },
           "c": [
            {
-            "k": "kbd",
+            "k": "row",
             "p": {
-             "keys": [
-              "esc"
-             ],
-             "key": "k"
-            }
-           },
-           {
-            "k": "kbd",
-            "p": {
-             "keys": [
-              "esc"
-             ],
-             "key": "k2"
-            }
-           },
-           {
-            "k": "text",
-            "p": {
-             "text": "Stop",
-             "key": "t"
-            }
+             "align": "center",
+             "gap": "xs",
+             "title": "Stop  esc esc",
+             "key": "face"
+            },
+            "c": [
+             {
+              "k": "kbd",
+              "p": {
+               "keys": [
+                "esc"
+               ],
+               "key": "k"
+              }
+             },
+             {
+              "k": "kbd",
+              "p": {
+               "keys": [
+                "esc"
+               ],
+               "key": "k2"
+              }
+             },
+             {
+              "k": "text",
+              "p": {
+               "text": "Stop",
+               "key": "t"
+              }
+             }
+            ]
            }
           ]
          }
@@ -3157,6 +3580,37 @@
          "role": "hermes.streak",
          "key": "streak"
         }
+       },
+       {
+        "k": "el",
+        "p": {
+         "aria": "Show context window: Context unknown",
+         "attrs": {
+          "aria-haspopup": "dialog"
+         },
+         "role": "omp.composer.context.action",
+         "tag": "button",
+         "title": "Context usage is not available · Show context window",
+         "key": "context",
+         "actions": {
+          "click": "click"
+         }
+        },
+        "c": [
+         {
+          "k": "meter",
+          "p": {
+           "label": "?",
+           "role": "omp.composer.context",
+           "style": "bar",
+           "thresholds": {
+            "bad": 0.85,
+            "warn": 0.6
+           },
+           "key": "meter"
+          }
+         }
+        ]
        },
        {
         "k": "row",
@@ -3249,17 +3703,28 @@
           }
          },
          {
-          "k": "text",
+          "k": "el",
           "p": {
+           "tag": "button",
+           "aria": "Stop",
+           "class": "hermes-press",
            "role": "omp.composer.stop",
-           "text": "Stop",
-           "title": "Stop  esc esc",
-           "tone": "error",
            "key": "stop",
            "actions": {
             "click": "click"
            }
-          }
+          },
+          "c": [
+           {
+            "k": "text",
+            "p": {
+             "text": "Stop",
+             "title": "Stop  esc esc",
+             "tone": "error",
+             "key": "face"
+            }
+           }
+          ]
          }
         ]
        }
@@ -3317,6 +3782,7 @@
        {
         "k": "seg",
         "p": {
+         "aria": "Stop",
          "priority": 10,
          "role": "hermes.statusline.stop",
          "side": "right",
@@ -3424,16 +3890,27 @@
           }
          },
          {
-          "k": "icon",
+          "k": "el",
           "p": {
-           "name": "copy",
-           "role": "omp.user.tool",
-           "title": "Copy message",
+           "tag": "button",
+           "aria": "Copy message",
+           "class": "hermes-press",
            "key": "copy",
            "actions": {
             "click": "click"
            }
-          }
+          },
+          "c": [
+           {
+            "k": "icon",
+            "p": {
+             "name": "copy",
+             "role": "omp.user.tool",
+             "title": "Copy message",
+             "key": "face"
+            }
+           }
+          ]
          }
         ]
        },
@@ -3486,33 +3963,44 @@
         ]
        },
        {
-        "k": "agent",
+        "k": "el",
         "p": {
+         "tag": "button",
+         "aria": "Open the agent beside the chat",
+         "class": "hermes-press",
          "actions": {
           "click": "open-agent=solo-agent",
           "menu": [
            "open-agent=solo-agent"
           ]
          },
-         "collapsed": true,
-         "collapsible": true,
-         "name": "Background agent",
-         "role": "hermes.task.solo",
-         "stats": {
-          "took": 0
-         },
-         "status": "done",
-         "task": "Audit model",
-         "title": "Open the agent beside the chat",
          "key": "solo"
         },
         "c": [
          {
-          "k": "md",
+          "k": "agent",
           "p": {
-           "key": "o",
-           "text": "Model audited"
-          }
+           "collapsed": true,
+           "collapsible": true,
+           "name": "Background agent",
+           "role": "hermes.task.solo",
+           "stats": {
+            "took": 0
+           },
+           "status": "done",
+           "task": "Audit model",
+           "title": "Open the agent beside the chat",
+           "key": "face"
+          },
+          "c": [
+           {
+            "k": "md",
+            "p": {
+             "key": "o",
+             "text": "Model audited"
+            }
+           }
+          ]
          }
         ]
        },
@@ -3569,6 +4057,37 @@
        "key": "composer"
       },
       "c": [
+       {
+        "k": "el",
+        "p": {
+         "aria": "Show context window: Context unknown",
+         "attrs": {
+          "aria-haspopup": "dialog"
+         },
+         "role": "omp.composer.context.action",
+         "tag": "button",
+         "title": "Context usage is not available · Show context window",
+         "key": "context",
+         "actions": {
+          "click": "click"
+         }
+        },
+        "c": [
+         {
+          "k": "meter",
+          "p": {
+           "label": "?",
+           "role": "omp.composer.context",
+           "style": "bar",
+           "thresholds": {
+            "bad": 0.85,
+            "warn": 0.6
+           },
+           "key": "meter"
+          }
+         }
+        ]
+       },
        {
         "k": "row",
         "p": {
@@ -3660,18 +4179,29 @@
           }
          },
          {
-          "k": "kbd",
+          "k": "el",
           "p": {
-           "keys": [
-            "enter"
-           ],
+           "tag": "button",
+           "aria": "Send",
+           "class": "hermes-press",
            "role": "omp.composer.send",
-           "title": "Send  ⏎",
            "key": "send",
            "actions": {
             "click": "click"
            }
-          }
+          },
+          "c": [
+           {
+            "k": "kbd",
+            "p": {
+             "keys": [
+              "enter"
+             ],
+             "title": "Send  ⏎",
+             "key": "face"
+            }
+           }
+          ]
          }
         ]
        }
@@ -3714,6 +4244,7 @@
        {
         "k": "seg",
         "p": {
+         "aria": "Send",
          "priority": 10,
          "role": "hermes.statusline.send",
          "side": "right",
@@ -3821,16 +4352,27 @@
           }
          },
          {
-          "k": "icon",
+          "k": "el",
           "p": {
-           "name": "copy",
-           "role": "omp.user.tool",
-           "title": "Copy message",
+           "tag": "button",
+           "aria": "Copy message",
+           "class": "hermes-press",
            "key": "copy",
            "actions": {
             "click": "click"
            }
-          }
+          },
+          "c": [
+           {
+            "k": "icon",
+            "p": {
+             "name": "copy",
+             "role": "omp.user.tool",
+             "title": "Copy message",
+             "key": "face"
+            }
+           }
+          ]
          }
         ]
        },
@@ -3884,33 +4426,44 @@
           ]
          },
          {
-          "k": "agent",
+          "k": "el",
           "p": {
+           "tag": "button",
+           "aria": "Open the agent beside the chat",
+           "class": "hermes-press",
            "actions": {
             "click": "open-agent=solo-agent",
             "menu": [
              "open-agent=solo-agent"
             ]
            },
-           "collapsed": true,
-           "collapsible": true,
-           "name": "Background agent",
-           "role": "hermes.task.solo",
-           "stats": {
-            "took": 0
-           },
-           "status": "done",
-           "task": "Audit model",
-           "title": "Open the agent beside the chat",
            "key": "solo"
           },
           "c": [
            {
-            "k": "md",
+            "k": "agent",
             "p": {
-             "key": "o",
-             "text": "Model audited"
-            }
+             "collapsed": true,
+             "collapsible": true,
+             "name": "Background agent",
+             "role": "hermes.task.solo",
+             "stats": {
+              "took": 0
+             },
+             "status": "done",
+             "task": "Audit model",
+             "title": "Open the agent beside the chat",
+             "key": "face"
+            },
+            "c": [
+             {
+              "k": "md",
+              "p": {
+               "key": "o",
+               "text": "Model audited"
+              }
+             }
+            ]
            }
           ]
          }
@@ -3933,16 +4486,27 @@
         },
         "c": [
          {
-          "k": "icon",
+          "k": "el",
           "p": {
-           "name": "copy",
-           "role": "omp.turn.copy",
-           "title": "Copy answer",
+           "tag": "button",
+           "aria": "Copy answer",
+           "class": "hermes-press",
            "key": "copy",
            "actions": {
             "click": "click"
            }
-          }
+          },
+          "c": [
+           {
+            "k": "icon",
+            "p": {
+             "name": "copy",
+             "role": "omp.turn.copy",
+             "title": "Copy answer",
+             "key": "face"
+            }
+           }
+          ]
          }
         ]
        }

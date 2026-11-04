@@ -49,6 +49,13 @@ The views speak omp's chat vocabulary (`omp.session`, `omp.user`, `omp.assistant
 roles, so Hermes gets them as-is. The `hello` names the program `hermes`, which Tern uses for
 its icon, deck tile and branding.
 
+Every control a click works on is a native button, drawn by `pressable()` or `button()`
+(`src/view/ui/button.tsx`). Tern focuses buttons and fields only, so a clickable row has no Tab
+stop, no Enter or Space and no name a screen reader can say. The button wraps the control, which
+keeps omp's role and so its look. `a11y.test.ts` walks what the pane draws and fails on a click
+target that is not a named button. The composer's model and effort chips are the exception: Tern's
+composer lays them out by role, and the test says why.
+
 `@tui/*` imports reach the renderer-free modules of `ui-tui/src` (the gateway transport, skins,
 history, completion requests); nothing here imports React or Ink.
 

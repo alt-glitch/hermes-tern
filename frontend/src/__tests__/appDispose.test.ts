@@ -11,7 +11,7 @@ import { readLaunchEnv } from '../config/env.js'
 import type { Overlay } from '../overlays/overlay.js'
 import type { Settings, SettingsSource } from '../settings.js'
 
-import { FakeGateway, fakeTern } from './fakes.js'
+import { face, FakeGateway, fakeTern } from './fakes.js'
 
 const home = mkdtempSync(join(tmpdir(), 'hermes-tern-dispose-'))
 process.env['HERMES_HOME'] = home
@@ -166,7 +166,7 @@ describe('App.dispose', () => {
     })
     await flush()
     // The answer's Copy button, until it reads Copy again.
-    const copy = mainNodes(tern.frame).find(n => n.props['name'] === 'copy' && n.handlers?.onClick)
+    const copy = mainNodes(tern.frame).find(n => face(n).props['name'] === 'copy' && n.handlers?.onClick)
     expect(copy).toBeDefined()
     void copy?.handlers?.onClick?.({ act: 'click', ev: 'action', id: 'copy', raw: {}, sf: 'hermes' })
 

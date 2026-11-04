@@ -133,18 +133,29 @@
           }
          },
          {
-          "k": "kbd",
+          "k": "el",
           "p": {
-           "keys": [
-            "enter"
-           ],
+           "tag": "button",
+           "aria": "Send",
+           "class": "hermes-press",
            "role": "omp.composer.send",
-           "title": "Send  ⏎",
            "key": "send",
            "actions": {
             "click": "click"
            }
-          }
+          },
+          "c": [
+           {
+            "k": "kbd",
+            "p": {
+             "keys": [
+              "enter"
+             ],
+             "title": "Send  ⏎",
+             "key": "face"
+            }
+           }
+          ]
          }
         ]
        }
@@ -187,6 +198,7 @@
        {
         "k": "seg",
         "p": {
+         "aria": "Send",
          "priority": 10,
          "role": "hermes.statusline.send",
          "side": "right",
@@ -401,18 +413,29 @@
           }
          },
          {
-          "k": "kbd",
+          "k": "el",
           "p": {
-           "keys": [
-            "enter"
-           ],
+           "tag": "button",
+           "aria": "Send",
+           "class": "hermes-press",
            "role": "omp.composer.send",
-           "title": "Send  ⏎",
            "key": "send",
            "actions": {
             "click": "click"
            }
-          }
+          },
+          "c": [
+           {
+            "k": "kbd",
+            "p": {
+             "keys": [
+              "enter"
+             ],
+             "title": "Send  ⏎",
+             "key": "face"
+            }
+           }
+          ]
          }
         ]
        }
@@ -483,6 +506,7 @@
        {
         "k": "seg",
         "p": {
+         "aria": "Send",
          "priority": 10,
          "role": "hermes.statusline.send",
          "side": "right",
@@ -632,7 +656,7 @@
            "decor": [],
            "maxLines": 18,
            "placeholder": "Ask Hermes — / commands · @ files",
-           "sendable": true,
+           "sendable": false,
            "text": "",
            "key": "input"
           }
@@ -697,18 +721,29 @@
           }
          },
          {
-          "k": "kbd",
+          "k": "el",
           "p": {
-           "keys": [
-            "enter"
-           ],
+           "tag": "button",
+           "aria": "Send",
+           "class": "hermes-press",
            "role": "omp.composer.send",
-           "title": "Send  ⏎",
            "key": "send",
            "actions": {
             "click": "click"
            }
-          }
+          },
+          "c": [
+           {
+            "k": "kbd",
+            "p": {
+             "keys": [
+              "enter"
+             ],
+             "title": "Send  ⏎",
+             "key": "face"
+            }
+           }
+          ]
          }
         ]
        }
@@ -779,6 +814,7 @@
        {
         "k": "seg",
         "p": {
+         "aria": "Send",
          "priority": 10,
          "role": "hermes.statusline.send",
          "side": "right",
@@ -907,12 +943,11 @@
             }
            },
            {
-            "k": "row",
+            "k": "el",
             "p": {
-             "align": "center",
-             "gap": "xs",
-             "role": "omp.btn",
-             "title": "Close",
+             "tag": "button",
+             "aria": "Close",
+             "class": "hermes-press",
              "key": "close",
              "actions": {
               "click": "click"
@@ -920,20 +955,32 @@
             },
             "c": [
              {
-              "k": "text",
+              "k": "row",
               "p": {
-               "text": "Close",
-               "key": "label"
-              }
-             },
-             {
-              "k": "kbd",
-              "p": {
-               "keys": [
-                "escape"
-               ],
-               "key": "keys"
-              }
+               "align": "center",
+               "gap": "xs",
+               "role": "omp.btn",
+               "title": "Close",
+               "key": "face"
+              },
+              "c": [
+               {
+                "k": "text",
+                "p": {
+                 "text": "Close",
+                 "key": "label"
+                }
+               },
+               {
+                "k": "kbd",
+                "p": {
+                 "keys": [
+                  "escape"
+                 ],
+                 "key": "keys"
+                }
+               }
+              ]
              }
             ]
            }
@@ -1140,18 +1187,29 @@
           }
          },
          {
-          "k": "kbd",
+          "k": "el",
           "p": {
-           "keys": [
-            "enter"
-           ],
+           "tag": "button",
+           "aria": "Send",
+           "class": "hermes-press",
            "role": "omp.composer.send",
-           "title": "Send  ⏎",
            "key": "send",
            "actions": {
             "click": "click"
            }
-          }
+          },
+          "c": [
+           {
+            "k": "kbd",
+            "p": {
+             "keys": [
+              "enter"
+             ],
+             "title": "Send  ⏎",
+             "key": "face"
+            }
+           }
+          ]
          }
         ]
        }
@@ -1222,6 +1280,7 @@
        {
         "k": "seg",
         "p": {
+         "aria": "Send",
          "priority": 10,
          "role": "hermes.statusline.send",
          "side": "right",
@@ -1436,18 +1495,29 @@
           }
          },
          {
-          "k": "kbd",
+          "k": "el",
           "p": {
-           "keys": [
-            "enter"
-           ],
+           "tag": "button",
+           "aria": "Send",
+           "class": "hermes-press",
            "role": "omp.composer.send",
-           "title": "Send  ⏎",
            "key": "send",
            "actions": {
             "click": "click"
            }
-          }
+          },
+          "c": [
+           {
+            "k": "kbd",
+            "p": {
+             "keys": [
+              "enter"
+             ],
+             "title": "Send  ⏎",
+             "key": "face"
+            }
+           }
+          ]
          }
         ]
        }
@@ -1519,6 +1589,7 @@
        {
         "k": "seg",
         "p": {
+         "aria": "Send",
          "priority": 10,
          "role": "hermes.statusline.send",
          "side": "right",
@@ -1617,6 +1688,13 @@
    }
   },
   {
+   "method": "config.get",
+   "params": {
+    "key": "full",
+    "session_id": "s1"
+   }
+  },
+  {
    "method": "config.set",
    "params": {
     "key": "show_reasoning",
@@ -1634,6 +1712,14 @@
    "method": "session.control.read",
    "params": {
     "session_id": "s1"
+   }
+  },
+  {
+   "method": "config.get",
+   "params": {
+    "key": "full",
+    "session_id": "s1",
+    "profile": "work"
    }
   },
   {

@@ -2,6 +2,8 @@ import type { JSX } from '@stencil-hq/tern'
 
 import type { ComposerImage } from '../draft/attachments.js'
 
+import { pressable } from './ui/button.js'
+
 /**
  * An attached image as omp's composer chip (a card Tern lays out as a 36px thumbnail beside the
  * name and its size), as t3code's composer shows one: a click on the thumbnail opens it large in
@@ -16,7 +18,10 @@ export function imageChip(a: ComposerImage, i: number, onRemove: (index: number)
         spans={[a.pending ? { fx: 'shimmer', s: 'dim', t: 'Attaching…' } : { s: 'dim', t: a.caption ?? 'image' }]}
         wrap="none"
       />
-      <icon key="remove" name="x" onClick={() => onRemove(i)} role="hermes.composer.remove" title={`Remove ${a.label}`} />
+      {pressable(
+        { key: 'remove', name: `Remove ${a.label}`, onClick: () => onRemove(i), role: 'hermes.composer.remove' },
+        <icon key="face" name="x" title={`Remove ${a.label}`} />
+      )}
     </card>
   )
 }

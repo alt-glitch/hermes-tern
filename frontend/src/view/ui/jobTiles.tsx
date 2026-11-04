@@ -2,6 +2,8 @@
 
 import type { Children, JSX, SpanData, Tone } from '@stencil-hq/tern'
 
+import { pressable } from './button.js'
+
 /** Tiles in a compact wait frame or hover card before the overflow link. */
 export const JOB_TILE_LIMIT = 4
 
@@ -21,8 +23,8 @@ export function jobTile(o: {
   hint?: string
   children: Children
 }): JSX.Element {
-  return (
-    <col gap="xs" key={o.key} role="omp.job.tile" tone={o.tone} {...(o.actions ? { actions: o.actions } : {})} {...(o.hint ? { title: o.hint } : {})}>
+  const tile = (
+    <col gap="xs" key={o.actions ? 'face' : o.key} role="omp.job.tile" tone={o.tone} {...(o.hint ? { title: o.hint } : {})}>
       <row align="center" gap="xs" key="head" role="omp.job.tile.head">
         <text key="dot" role="omp.job.tile.dot" spans={[o.dot]} wrap="none" />
         <text grow={1} key="title" role="omp.job.tile.title" spans={[{ t: o.title }]} truncate="end" wrap="none" />
@@ -31,4 +33,7 @@ export function jobTile(o: {
       {o.children}
     </col>
   )
+
+  // A tile a click opens is a native button (view/ui/button.tsx); the tile keeps omp's role and look.
+  return o.actions ? pressable({ action: o.actions.click, key: o.key, menu: o.actions.menu, name: o.hint ?? o.title }, tile) : tile
 }

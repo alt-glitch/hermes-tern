@@ -5,6 +5,7 @@ import type { JSX } from '@stencil-hq/tern'
 import { optional } from '../core/assert.js'
 import type { Subagent } from '../model.js'
 import { age } from '../view/time.js'
+import { pressable } from '../view/ui/button.js'
 
 import { SUBAGENT_LOOK } from './look.js'
 import { agentName, OUTCOME_UNKNOWN } from './rows.js'
@@ -25,11 +26,14 @@ export function agentNode(a: Subagent, now: number, solo?: Solo): JSX.Element {
   const status = SUBAGENT_LOOK[a.status].row
   const running = a.status === 'running'
 
-  return (
+  const title = `Open ${solo ? 'the agent' : agentName(a)} beside the chat`
+
+  // A click (or the context menu) opens the agent beside the chat; App handles the action. The row
+  // sits in a native button (view/ui/button.tsx) so the keyboard and a screen reader can press it.
+  return pressable(
+    { action: `open-agent=${a.id}`, key: solo?.key ?? a.key, menu: [`open-agent=${a.id}`], name: title },
     <agent
-      // A click (or the context menu) opens the agent beside the chat; App handles the action.
-      actions={{ click: `open-agent=${a.id}`, menu: [`open-agent=${a.id}`] }}
-      key={solo?.key ?? a.key}
+      key="face"
       // A done row whose outcome nothing reported says so, rather than reading as a success.
       {...(a.exitReason && (a.status !== 'done' || a.exitReason === OUTCOME_UNKNOWN)
         ? { badges: [{ text: a.exitReason.replace(/_/g, ' '), tone: 'warning' }] }
@@ -48,7 +52,7 @@ export function agentNode(a: Subagent, now: number, solo?: Solo): JSX.Element {
       }}
       status={status}
       task={a.goal}
-      title={`Open ${solo ? 'the agent' : agentName(a)} beside the chat`}
+      title={title}
       {...(running && a.tool
         ? {
             tool: {

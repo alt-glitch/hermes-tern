@@ -140,18 +140,29 @@
           }
          },
          {
-          "k": "kbd",
+          "k": "el",
           "p": {
-           "keys": [
-            "enter"
-           ],
+           "tag": "button",
+           "aria": "Send",
+           "class": "hermes-press",
            "role": "omp.composer.send",
-           "title": "Send  ⏎",
            "key": "send",
            "actions": {
             "click": "click"
            }
-          }
+          },
+          "c": [
+           {
+            "k": "kbd",
+            "p": {
+             "keys": [
+              "enter"
+             ],
+             "title": "Send  ⏎",
+             "key": "face"
+            }
+           }
+          ]
          }
         ]
        }
@@ -194,6 +205,7 @@
        {
         "k": "seg",
         "p": {
+         "aria": "Send",
          "priority": 10,
          "role": "hermes.statusline.send",
          "side": "right",
@@ -406,18 +418,29 @@
           }
          },
          {
-          "k": "kbd",
+          "k": "el",
           "p": {
-           "keys": [
-            "enter"
-           ],
+           "tag": "button",
+           "aria": "Send",
+           "class": "hermes-press",
            "role": "omp.composer.send",
-           "title": "Send  ⏎",
            "key": "send",
            "actions": {
             "click": "click"
            }
-          }
+          },
+          "c": [
+           {
+            "k": "kbd",
+            "p": {
+             "keys": [
+              "enter"
+             ],
+             "title": "Send  ⏎",
+             "key": "face"
+            }
+           }
+          ]
          }
         ]
        }
@@ -460,6 +483,7 @@
        {
         "k": "seg",
         "p": {
+         "aria": "Send",
          "priority": 10,
          "role": "hermes.statusline.send",
          "side": "right",
@@ -610,12 +634,12 @@
           }
          },
          {
-          "k": "row",
+          "k": "el",
           "p": {
-           "align": "center",
-           "gap": "xs",
+           "tag": "button",
+           "aria": "Stop",
+           "class": "hermes-press",
            "role": "omp.working.stop",
-           "title": "Stop  esc esc",
            "key": "stop",
            "actions": {
             "click": "click"
@@ -623,29 +647,40 @@
           },
           "c": [
            {
-            "k": "kbd",
+            "k": "row",
             "p": {
-             "keys": [
-              "esc"
-             ],
-             "key": "k"
-            }
-           },
-           {
-            "k": "kbd",
-            "p": {
-             "keys": [
-              "esc"
-             ],
-             "key": "k2"
-            }
-           },
-           {
-            "k": "text",
-            "p": {
-             "text": "Stop",
-             "key": "t"
-            }
+             "align": "center",
+             "gap": "xs",
+             "title": "Stop  esc esc",
+             "key": "face"
+            },
+            "c": [
+             {
+              "k": "kbd",
+              "p": {
+               "keys": [
+                "esc"
+               ],
+               "key": "k"
+              }
+             },
+             {
+              "k": "kbd",
+              "p": {
+               "keys": [
+                "esc"
+               ],
+               "key": "k2"
+              }
+             },
+             {
+              "k": "text",
+              "p": {
+               "text": "Stop",
+               "key": "t"
+              }
+             }
+            ]
            }
           ]
          }
@@ -789,17 +824,28 @@
           }
          },
          {
-          "k": "text",
+          "k": "el",
           "p": {
+           "tag": "button",
+           "aria": "Stop",
+           "class": "hermes-press",
            "role": "omp.composer.stop",
-           "text": "Stop",
-           "title": "Stop  esc esc",
-           "tone": "error",
            "key": "stop",
            "actions": {
             "click": "click"
            }
-          }
+          },
+          "c": [
+           {
+            "k": "text",
+            "p": {
+             "text": "Stop",
+             "title": "Stop  esc esc",
+             "tone": "error",
+             "key": "face"
+            }
+           }
+          ]
          }
         ]
        }
@@ -857,6 +903,7 @@
        {
         "k": "seg",
         "p": {
+         "aria": "Stop",
          "priority": 10,
          "role": "hermes.statusline.stop",
          "side": "right",
@@ -964,16 +1011,27 @@
           }
          },
          {
-          "k": "icon",
+          "k": "el",
           "p": {
-           "name": "copy",
-           "role": "omp.user.tool",
-           "title": "Copy message",
+           "tag": "button",
+           "aria": "Copy message",
+           "class": "hermes-press",
            "key": "copy",
            "actions": {
             "click": "click"
            }
-          }
+          },
+          "c": [
+           {
+            "k": "icon",
+            "p": {
+             "name": "copy",
+             "role": "omp.user.tool",
+             "title": "Copy message",
+             "key": "face"
+            }
+           }
+          ]
          }
         ]
        },
@@ -1060,12 +1118,12 @@
           }
          },
          {
-          "k": "row",
+          "k": "el",
           "p": {
-           "align": "center",
-           "gap": "xs",
+           "tag": "button",
+           "aria": "Stop",
+           "class": "hermes-press",
            "role": "omp.working.stop",
-           "title": "Stop  esc esc",
            "key": "stop",
            "actions": {
             "click": "click"
@@ -1073,29 +1131,40 @@
           },
           "c": [
            {
-            "k": "kbd",
+            "k": "row",
             "p": {
-             "keys": [
-              "esc"
-             ],
-             "key": "k"
-            }
-           },
-           {
-            "k": "kbd",
-            "p": {
-             "keys": [
-              "esc"
-             ],
-             "key": "k2"
-            }
-           },
-           {
-            "k": "text",
-            "p": {
-             "text": "Stop",
-             "key": "t"
-            }
+             "align": "center",
+             "gap": "xs",
+             "title": "Stop  esc esc",
+             "key": "face"
+            },
+            "c": [
+             {
+              "k": "kbd",
+              "p": {
+               "keys": [
+                "esc"
+               ],
+               "key": "k"
+              }
+             },
+             {
+              "k": "kbd",
+              "p": {
+               "keys": [
+                "esc"
+               ],
+               "key": "k2"
+              }
+             },
+             {
+              "k": "text",
+              "p": {
+               "text": "Stop",
+               "key": "t"
+              }
+             }
+            ]
            }
           ]
          }
@@ -1239,17 +1308,28 @@
           }
          },
          {
-          "k": "text",
+          "k": "el",
           "p": {
+           "tag": "button",
+           "aria": "Stop",
+           "class": "hermes-press",
            "role": "omp.composer.stop",
-           "text": "Stop",
-           "title": "Stop  esc esc",
-           "tone": "error",
            "key": "stop",
            "actions": {
             "click": "click"
            }
-          }
+          },
+          "c": [
+           {
+            "k": "text",
+            "p": {
+             "text": "Stop",
+             "title": "Stop  esc esc",
+             "tone": "error",
+             "key": "face"
+            }
+           }
+          ]
          }
         ]
        }
@@ -1307,6 +1387,7 @@
        {
         "k": "seg",
         "p": {
+         "aria": "Stop",
          "priority": 10,
          "role": "hermes.statusline.stop",
          "side": "right",
@@ -1404,12 +1485,11 @@
             }
            },
            {
-            "k": "row",
+            "k": "el",
             "p": {
-             "align": "center",
-             "gap": "xs",
-             "role": "omp.btn",
-             "title": "Deny  Tell the agent not to run it · escape, n",
+             "tag": "button",
+             "aria": "Deny",
+             "class": "hermes-press",
              "key": "deny",
              "actions": {
               "click": "click"
@@ -1417,30 +1497,41 @@
             },
             "c": [
              {
-              "k": "text",
+              "k": "row",
               "p": {
-               "text": "Deny",
-               "key": "label"
-              }
-             },
-             {
-              "k": "kbd",
-              "p": {
-               "keys": [
-                "escape"
-               ],
-               "key": "keys"
-              }
+               "align": "center",
+               "gap": "xs",
+               "role": "omp.btn",
+               "title": "Deny  Tell the agent not to run it · escape, n",
+               "key": "face"
+              },
+              "c": [
+               {
+                "k": "text",
+                "p": {
+                 "text": "Deny",
+                 "key": "label"
+                }
+               },
+               {
+                "k": "kbd",
+                "p": {
+                 "keys": [
+                  "escape"
+                 ],
+                 "key": "keys"
+                }
+               }
+              ]
              }
             ]
            },
            {
-            "k": "row",
+            "k": "el",
             "p": {
-             "align": "center",
-             "gap": "xs",
-             "role": "omp.btn",
-             "title": "Always allow  Remember this approval for every session · a",
+             "tag": "button",
+             "aria": "Always allow",
+             "class": "hermes-press",
              "key": "always",
              "actions": {
               "click": "click"
@@ -1448,30 +1539,41 @@
             },
             "c": [
              {
-              "k": "text",
+              "k": "row",
               "p": {
-               "text": "Always allow",
-               "key": "label"
-              }
-             },
-             {
-              "k": "kbd",
-              "p": {
-               "keys": [
-                "a"
-               ],
-               "key": "keys"
-              }
+               "align": "center",
+               "gap": "xs",
+               "role": "omp.btn",
+               "title": "Always allow  Remember this approval for every session · a",
+               "key": "face"
+              },
+              "c": [
+               {
+                "k": "text",
+                "p": {
+                 "text": "Always allow",
+                 "key": "label"
+                }
+               },
+               {
+                "k": "kbd",
+                "p": {
+                 "keys": [
+                  "a"
+                 ],
+                 "key": "keys"
+                }
+               }
+              ]
              }
             ]
            },
            {
-            "k": "row",
+            "k": "el",
             "p": {
-             "align": "center",
-             "gap": "xs",
-             "role": "omp.btn",
-             "title": "Allow for this session  Allow matching commands until the session ends · s",
+             "tag": "button",
+             "aria": "Allow for this session",
+             "class": "hermes-press",
              "key": "session",
              "actions": {
               "click": "click"
@@ -1479,31 +1581,41 @@
             },
             "c": [
              {
-              "k": "text",
+              "k": "row",
               "p": {
-               "text": "Allow for this session",
-               "key": "label"
-              }
-             },
-             {
-              "k": "kbd",
-              "p": {
-               "keys": [
-                "s"
-               ],
-               "key": "keys"
-              }
+               "align": "center",
+               "gap": "xs",
+               "role": "omp.btn",
+               "title": "Allow for this session  Allow matching commands until the session ends · s",
+               "key": "face"
+              },
+              "c": [
+               {
+                "k": "text",
+                "p": {
+                 "text": "Allow for this session",
+                 "key": "label"
+                }
+               },
+               {
+                "k": "kbd",
+                "p": {
+                 "keys": [
+                  "s"
+                 ],
+                 "key": "keys"
+                }
+               }
+              ]
              }
             ]
            },
            {
-            "k": "row",
+            "k": "el",
             "p": {
-             "align": "center",
-             "gap": "xs",
-             "role": "omp.btn",
-             "title": "Allow once  Run it this time only · enter, y",
-             "tone": "accent",
+             "tag": "button",
+             "aria": "Allow once",
+             "class": "hermes-press",
              "key": "once",
              "actions": {
               "click": "click"
@@ -1511,20 +1623,33 @@
             },
             "c": [
              {
-              "k": "text",
+              "k": "row",
               "p": {
-               "text": "Allow once",
-               "key": "label"
-              }
-             },
-             {
-              "k": "kbd",
-              "p": {
-               "keys": [
-                "enter"
-               ],
-               "key": "keys"
-              }
+               "align": "center",
+               "gap": "xs",
+               "role": "omp.btn",
+               "title": "Allow once  Run it this time only · enter, y",
+               "tone": "accent",
+               "key": "face"
+              },
+              "c": [
+               {
+                "k": "text",
+                "p": {
+                 "text": "Allow once",
+                 "key": "label"
+                }
+               },
+               {
+                "k": "kbd",
+                "p": {
+                 "keys": [
+                  "enter"
+                 ],
+                 "key": "keys"
+                }
+               }
+              ]
              }
             ]
            }
@@ -1624,16 +1749,27 @@
           }
          },
          {
-          "k": "icon",
+          "k": "el",
           "p": {
-           "name": "copy",
-           "role": "omp.user.tool",
-           "title": "Copy message",
+           "tag": "button",
+           "aria": "Copy message",
+           "class": "hermes-press",
            "key": "copy",
            "actions": {
             "click": "click"
            }
-          }
+          },
+          "c": [
+           {
+            "k": "icon",
+            "p": {
+             "name": "copy",
+             "role": "omp.user.tool",
+             "title": "Copy message",
+             "key": "face"
+            }
+           }
+          ]
          }
         ]
        },
@@ -1887,12 +2023,12 @@
           }
          },
          {
-          "k": "row",
+          "k": "el",
           "p": {
-           "align": "center",
-           "gap": "xs",
+           "tag": "button",
+           "aria": "Stop",
+           "class": "hermes-press",
            "role": "omp.working.stop",
-           "title": "Stop  esc esc",
            "key": "stop",
            "actions": {
             "click": "click"
@@ -1900,29 +2036,40 @@
           },
           "c": [
            {
-            "k": "kbd",
+            "k": "row",
             "p": {
-             "keys": [
-              "esc"
-             ],
-             "key": "k"
-            }
-           },
-           {
-            "k": "kbd",
-            "p": {
-             "keys": [
-              "esc"
-             ],
-             "key": "k2"
-            }
-           },
-           {
-            "k": "text",
-            "p": {
-             "text": "Stop",
-             "key": "t"
-            }
+             "align": "center",
+             "gap": "xs",
+             "title": "Stop  esc esc",
+             "key": "face"
+            },
+            "c": [
+             {
+              "k": "kbd",
+              "p": {
+               "keys": [
+                "esc"
+               ],
+               "key": "k"
+              }
+             },
+             {
+              "k": "kbd",
+              "p": {
+               "keys": [
+                "esc"
+               ],
+               "key": "k2"
+              }
+             },
+             {
+              "k": "text",
+              "p": {
+               "text": "Stop",
+               "key": "t"
+              }
+             }
+            ]
            }
           ]
          }
@@ -2066,17 +2213,28 @@
           }
          },
          {
-          "k": "text",
+          "k": "el",
           "p": {
+           "tag": "button",
+           "aria": "Stop",
+           "class": "hermes-press",
            "role": "omp.composer.stop",
-           "text": "Stop",
-           "title": "Stop  esc esc",
-           "tone": "error",
            "key": "stop",
            "actions": {
             "click": "click"
            }
-          }
+          },
+          "c": [
+           {
+            "k": "text",
+            "p": {
+             "text": "Stop",
+             "title": "Stop  esc esc",
+             "tone": "error",
+             "key": "face"
+            }
+           }
+          ]
          }
         ]
        }
@@ -2134,6 +2292,7 @@
        {
         "k": "seg",
         "p": {
+         "aria": "Stop",
          "priority": 10,
          "role": "hermes.statusline.stop",
          "side": "right",
@@ -2241,16 +2400,27 @@
           }
          },
          {
-          "k": "icon",
+          "k": "el",
           "p": {
-           "name": "copy",
-           "role": "omp.user.tool",
-           "title": "Copy message",
+           "tag": "button",
+           "aria": "Copy message",
+           "class": "hermes-press",
            "key": "copy",
            "actions": {
             "click": "click"
            }
-          }
+          },
+          "c": [
+           {
+            "k": "icon",
+            "p": {
+             "name": "copy",
+             "role": "omp.user.tool",
+             "title": "Copy message",
+             "key": "face"
+            }
+           }
+          ]
          }
         ]
        },
@@ -2504,12 +2674,12 @@
           }
          },
          {
-          "k": "row",
+          "k": "el",
           "p": {
-           "align": "center",
-           "gap": "xs",
+           "tag": "button",
+           "aria": "Stop",
+           "class": "hermes-press",
            "role": "omp.working.stop",
-           "title": "Stop  esc esc",
            "key": "stop",
            "actions": {
             "click": "click"
@@ -2517,29 +2687,40 @@
           },
           "c": [
            {
-            "k": "kbd",
+            "k": "row",
             "p": {
-             "keys": [
-              "esc"
-             ],
-             "key": "k"
-            }
-           },
-           {
-            "k": "kbd",
-            "p": {
-             "keys": [
-              "esc"
-             ],
-             "key": "k2"
-            }
-           },
-           {
-            "k": "text",
-            "p": {
-             "text": "Stop",
-             "key": "t"
-            }
+             "align": "center",
+             "gap": "xs",
+             "title": "Stop  esc esc",
+             "key": "face"
+            },
+            "c": [
+             {
+              "k": "kbd",
+              "p": {
+               "keys": [
+                "esc"
+               ],
+               "key": "k"
+              }
+             },
+             {
+              "k": "kbd",
+              "p": {
+               "keys": [
+                "esc"
+               ],
+               "key": "k2"
+              }
+             },
+             {
+              "k": "text",
+              "p": {
+               "text": "Stop",
+               "key": "t"
+              }
+             }
+            ]
            }
           ]
          }
@@ -2683,17 +2864,28 @@
           }
          },
          {
-          "k": "text",
+          "k": "el",
           "p": {
+           "tag": "button",
+           "aria": "Stop",
+           "class": "hermes-press",
            "role": "omp.composer.stop",
-           "text": "Stop",
-           "title": "Stop  esc esc",
-           "tone": "error",
            "key": "stop",
            "actions": {
             "click": "click"
            }
-          }
+          },
+          "c": [
+           {
+            "k": "text",
+            "p": {
+             "text": "Stop",
+             "title": "Stop  esc esc",
+             "tone": "error",
+             "key": "face"
+            }
+           }
+          ]
          }
         ]
        }
@@ -2751,6 +2943,7 @@
        {
         "k": "seg",
         "p": {
+         "aria": "Stop",
          "priority": 10,
          "role": "hermes.statusline.stop",
          "side": "right",
@@ -2858,16 +3051,27 @@
           }
          },
          {
-          "k": "icon",
+          "k": "el",
           "p": {
-           "name": "copy",
-           "role": "omp.user.tool",
-           "title": "Copy message",
+           "tag": "button",
+           "aria": "Copy message",
+           "class": "hermes-press",
            "key": "copy",
            "actions": {
             "click": "click"
            }
-          }
+          },
+          "c": [
+           {
+            "k": "icon",
+            "p": {
+             "name": "copy",
+             "role": "omp.user.tool",
+             "title": "Copy message",
+             "key": "face"
+            }
+           }
+          ]
          }
         ]
        },
@@ -3117,12 +3321,12 @@
           }
          },
          {
-          "k": "row",
+          "k": "el",
           "p": {
-           "align": "center",
-           "gap": "xs",
+           "tag": "button",
+           "aria": "Stop",
+           "class": "hermes-press",
            "role": "omp.working.stop",
-           "title": "Stop  esc esc",
            "key": "stop",
            "actions": {
             "click": "click"
@@ -3130,29 +3334,40 @@
           },
           "c": [
            {
-            "k": "kbd",
+            "k": "row",
             "p": {
-             "keys": [
-              "esc"
-             ],
-             "key": "k"
-            }
-           },
-           {
-            "k": "kbd",
-            "p": {
-             "keys": [
-              "esc"
-             ],
-             "key": "k2"
-            }
-           },
-           {
-            "k": "text",
-            "p": {
-             "text": "Stop",
-             "key": "t"
-            }
+             "align": "center",
+             "gap": "xs",
+             "title": "Stop  esc esc",
+             "key": "face"
+            },
+            "c": [
+             {
+              "k": "kbd",
+              "p": {
+               "keys": [
+                "esc"
+               ],
+               "key": "k"
+              }
+             },
+             {
+              "k": "kbd",
+              "p": {
+               "keys": [
+                "esc"
+               ],
+               "key": "k2"
+              }
+             },
+             {
+              "k": "text",
+              "p": {
+               "text": "Stop",
+               "key": "t"
+              }
+             }
+            ]
            }
           ]
          }
@@ -3296,17 +3511,28 @@
           }
          },
          {
-          "k": "text",
+          "k": "el",
           "p": {
+           "tag": "button",
+           "aria": "Stop",
+           "class": "hermes-press",
            "role": "omp.composer.stop",
-           "text": "Stop",
-           "title": "Stop  esc esc",
-           "tone": "error",
            "key": "stop",
            "actions": {
             "click": "click"
            }
-          }
+          },
+          "c": [
+           {
+            "k": "text",
+            "p": {
+             "text": "Stop",
+             "title": "Stop  esc esc",
+             "tone": "error",
+             "key": "face"
+            }
+           }
+          ]
          }
         ]
        }
@@ -3364,6 +3590,7 @@
        {
         "k": "seg",
         "p": {
+         "aria": "Stop",
          "priority": 10,
          "role": "hermes.statusline.stop",
          "side": "right",
@@ -3476,12 +3703,11 @@
             }
            },
            {
-            "k": "row",
+            "k": "el",
             "p": {
-             "align": "center",
-             "gap": "xs",
-             "role": "omp.btn",
-             "title": "Skip  escape",
+             "tag": "button",
+             "aria": "Skip",
+             "class": "hermes-press",
              "key": "skip",
              "actions": {
               "click": "click"
@@ -3489,31 +3715,41 @@
             },
             "c": [
              {
-              "k": "text",
+              "k": "row",
               "p": {
-               "text": "Skip",
-               "key": "label"
-              }
-             },
-             {
-              "k": "kbd",
-              "p": {
-               "keys": [
-                "escape"
-               ],
-               "key": "keys"
-              }
+               "align": "center",
+               "gap": "xs",
+               "role": "omp.btn",
+               "title": "Skip  escape",
+               "key": "face"
+              },
+              "c": [
+               {
+                "k": "text",
+                "p": {
+                 "text": "Skip",
+                 "key": "label"
+                }
+               },
+               {
+                "k": "kbd",
+                "p": {
+                 "keys": [
+                  "escape"
+                 ],
+                 "key": "keys"
+                }
+               }
+              ]
              }
             ]
            },
            {
-            "k": "row",
+            "k": "el",
             "p": {
-             "align": "center",
-             "gap": "xs",
-             "role": "omp.btn",
-             "title": "Submit  enter · up/down move",
-             "tone": "accent",
+             "tag": "button",
+             "aria": "Submit",
+             "class": "hermes-press",
              "key": "submit",
              "actions": {
               "click": "click"
@@ -3521,20 +3757,33 @@
             },
             "c": [
              {
-              "k": "text",
+              "k": "row",
               "p": {
-               "text": "Submit",
-               "key": "label"
-              }
-             },
-             {
-              "k": "kbd",
-              "p": {
-               "keys": [
-                "enter"
-               ],
-               "key": "keys"
-              }
+               "align": "center",
+               "gap": "xs",
+               "role": "omp.btn",
+               "title": "Submit  enter · up/down move",
+               "tone": "accent",
+               "key": "face"
+              },
+              "c": [
+               {
+                "k": "text",
+                "p": {
+                 "text": "Submit",
+                 "key": "label"
+                }
+               },
+               {
+                "k": "kbd",
+                "p": {
+                 "keys": [
+                  "enter"
+                 ],
+                 "key": "keys"
+                }
+               }
+              ]
              }
             ]
            }
@@ -3634,16 +3883,27 @@
           }
          },
          {
-          "k": "icon",
+          "k": "el",
           "p": {
-           "name": "copy",
-           "role": "omp.user.tool",
-           "title": "Copy message",
+           "tag": "button",
+           "aria": "Copy message",
+           "class": "hermes-press",
            "key": "copy",
            "actions": {
             "click": "click"
            }
-          }
+          },
+          "c": [
+           {
+            "k": "icon",
+            "p": {
+             "name": "copy",
+             "role": "omp.user.tool",
+             "title": "Copy message",
+             "key": "face"
+            }
+           }
+          ]
          }
         ]
        },
@@ -3893,12 +4153,12 @@
           }
          },
          {
-          "k": "row",
+          "k": "el",
           "p": {
-           "align": "center",
-           "gap": "xs",
+           "tag": "button",
+           "aria": "Stop",
+           "class": "hermes-press",
            "role": "omp.working.stop",
-           "title": "Stop  esc esc",
            "key": "stop",
            "actions": {
             "click": "click"
@@ -3906,29 +4166,40 @@
           },
           "c": [
            {
-            "k": "kbd",
+            "k": "row",
             "p": {
-             "keys": [
-              "esc"
-             ],
-             "key": "k"
-            }
-           },
-           {
-            "k": "kbd",
-            "p": {
-             "keys": [
-              "esc"
-             ],
-             "key": "k2"
-            }
-           },
-           {
-            "k": "text",
-            "p": {
-             "text": "Stop",
-             "key": "t"
-            }
+             "align": "center",
+             "gap": "xs",
+             "title": "Stop  esc esc",
+             "key": "face"
+            },
+            "c": [
+             {
+              "k": "kbd",
+              "p": {
+               "keys": [
+                "esc"
+               ],
+               "key": "k"
+              }
+             },
+             {
+              "k": "kbd",
+              "p": {
+               "keys": [
+                "esc"
+               ],
+               "key": "k2"
+              }
+             },
+             {
+              "k": "text",
+              "p": {
+               "text": "Stop",
+               "key": "t"
+              }
+             }
+            ]
            }
           ]
          }
@@ -4072,17 +4343,28 @@
           }
          },
          {
-          "k": "text",
+          "k": "el",
           "p": {
+           "tag": "button",
+           "aria": "Stop",
+           "class": "hermes-press",
            "role": "omp.composer.stop",
-           "text": "Stop",
-           "title": "Stop  esc esc",
-           "tone": "error",
            "key": "stop",
            "actions": {
             "click": "click"
            }
-          }
+          },
+          "c": [
+           {
+            "k": "text",
+            "p": {
+             "text": "Stop",
+             "title": "Stop  esc esc",
+             "tone": "error",
+             "key": "face"
+            }
+           }
+          ]
          }
         ]
        }
@@ -4140,6 +4422,7 @@
        {
         "k": "seg",
         "p": {
+         "aria": "Stop",
          "priority": 10,
          "role": "hermes.statusline.stop",
          "side": "right",
@@ -4252,12 +4535,11 @@
             }
            },
            {
-            "k": "row",
+            "k": "el",
             "p": {
-             "align": "center",
-             "gap": "xs",
-             "role": "omp.btn",
-             "title": "Skip  escape",
+             "tag": "button",
+             "aria": "Skip",
+             "class": "hermes-press",
              "key": "skip",
              "actions": {
               "click": "click"
@@ -4265,31 +4547,41 @@
             },
             "c": [
              {
-              "k": "text",
+              "k": "row",
               "p": {
-               "text": "Skip",
-               "key": "label"
-              }
-             },
-             {
-              "k": "kbd",
-              "p": {
-               "keys": [
-                "escape"
-               ],
-               "key": "keys"
-              }
+               "align": "center",
+               "gap": "xs",
+               "role": "omp.btn",
+               "title": "Skip  escape",
+               "key": "face"
+              },
+              "c": [
+               {
+                "k": "text",
+                "p": {
+                 "text": "Skip",
+                 "key": "label"
+                }
+               },
+               {
+                "k": "kbd",
+                "p": {
+                 "keys": [
+                  "escape"
+                 ],
+                 "key": "keys"
+                }
+               }
+              ]
              }
             ]
            },
            {
-            "k": "row",
+            "k": "el",
             "p": {
-             "align": "center",
-             "gap": "xs",
-             "role": "omp.btn",
-             "title": "Submit  enter · up/down move",
-             "tone": "accent",
+             "tag": "button",
+             "aria": "Submit",
+             "class": "hermes-press",
              "key": "submit",
              "actions": {
               "click": "click"
@@ -4297,20 +4589,33 @@
             },
             "c": [
              {
-              "k": "text",
+              "k": "row",
               "p": {
-               "text": "Submit",
-               "key": "label"
-              }
-             },
-             {
-              "k": "kbd",
-              "p": {
-               "keys": [
-                "enter"
-               ],
-               "key": "keys"
-              }
+               "align": "center",
+               "gap": "xs",
+               "role": "omp.btn",
+               "title": "Submit  enter · up/down move",
+               "tone": "accent",
+               "key": "face"
+              },
+              "c": [
+               {
+                "k": "text",
+                "p": {
+                 "text": "Submit",
+                 "key": "label"
+                }
+               },
+               {
+                "k": "kbd",
+                "p": {
+                 "keys": [
+                  "enter"
+                 ],
+                 "key": "keys"
+                }
+               }
+              ]
              }
             ]
            }
@@ -4410,16 +4715,27 @@
           }
          },
          {
-          "k": "icon",
+          "k": "el",
           "p": {
-           "name": "copy",
-           "role": "omp.user.tool",
-           "title": "Copy message",
+           "tag": "button",
+           "aria": "Copy message",
+           "class": "hermes-press",
            "key": "copy",
            "actions": {
             "click": "click"
            }
-          }
+          },
+          "c": [
+           {
+            "k": "icon",
+            "p": {
+             "name": "copy",
+             "role": "omp.user.tool",
+             "title": "Copy message",
+             "key": "face"
+            }
+           }
+          ]
          }
         ]
        },
@@ -4669,12 +4985,12 @@
           }
          },
          {
-          "k": "row",
+          "k": "el",
           "p": {
-           "align": "center",
-           "gap": "xs",
+           "tag": "button",
+           "aria": "Stop",
+           "class": "hermes-press",
            "role": "omp.working.stop",
-           "title": "Stop  esc esc",
            "key": "stop",
            "actions": {
             "click": "click"
@@ -4682,29 +4998,40 @@
           },
           "c": [
            {
-            "k": "kbd",
+            "k": "row",
             "p": {
-             "keys": [
-              "esc"
-             ],
-             "key": "k"
-            }
-           },
-           {
-            "k": "kbd",
-            "p": {
-             "keys": [
-              "esc"
-             ],
-             "key": "k2"
-            }
-           },
-           {
-            "k": "text",
-            "p": {
-             "text": "Stop",
-             "key": "t"
-            }
+             "align": "center",
+             "gap": "xs",
+             "title": "Stop  esc esc",
+             "key": "face"
+            },
+            "c": [
+             {
+              "k": "kbd",
+              "p": {
+               "keys": [
+                "esc"
+               ],
+               "key": "k"
+              }
+             },
+             {
+              "k": "kbd",
+              "p": {
+               "keys": [
+                "esc"
+               ],
+               "key": "k2"
+              }
+             },
+             {
+              "k": "text",
+              "p": {
+               "text": "Stop",
+               "key": "t"
+              }
+             }
+            ]
            }
           ]
          }
@@ -4848,17 +5175,28 @@
           }
          },
          {
-          "k": "text",
+          "k": "el",
           "p": {
+           "tag": "button",
+           "aria": "Stop",
+           "class": "hermes-press",
            "role": "omp.composer.stop",
-           "text": "Stop",
-           "title": "Stop  esc esc",
-           "tone": "error",
            "key": "stop",
            "actions": {
             "click": "click"
            }
-          }
+          },
+          "c": [
+           {
+            "k": "text",
+            "p": {
+             "text": "Stop",
+             "title": "Stop  esc esc",
+             "tone": "error",
+             "key": "face"
+            }
+           }
+          ]
          }
         ]
        }
@@ -4916,6 +5254,7 @@
        {
         "k": "seg",
         "p": {
+         "aria": "Stop",
          "priority": 10,
          "role": "hermes.statusline.stop",
          "side": "right",
@@ -5023,16 +5362,27 @@
           }
          },
          {
-          "k": "icon",
+          "k": "el",
           "p": {
-           "name": "copy",
-           "role": "omp.user.tool",
-           "title": "Copy message",
+           "tag": "button",
+           "aria": "Copy message",
+           "class": "hermes-press",
            "key": "copy",
            "actions": {
             "click": "click"
            }
-          }
+          },
+          "c": [
+           {
+            "k": "icon",
+            "p": {
+             "name": "copy",
+             "role": "omp.user.tool",
+             "title": "Copy message",
+             "key": "face"
+            }
+           }
+          ]
          }
         ]
        },
@@ -5282,12 +5632,12 @@
           }
          },
          {
-          "k": "row",
+          "k": "el",
           "p": {
-           "align": "center",
-           "gap": "xs",
+           "tag": "button",
+           "aria": "Stop",
+           "class": "hermes-press",
            "role": "omp.working.stop",
-           "title": "Stop  esc esc",
            "key": "stop",
            "actions": {
             "click": "click"
@@ -5295,29 +5645,40 @@
           },
           "c": [
            {
-            "k": "kbd",
+            "k": "row",
             "p": {
-             "keys": [
-              "esc"
-             ],
-             "key": "k"
-            }
-           },
-           {
-            "k": "kbd",
-            "p": {
-             "keys": [
-              "esc"
-             ],
-             "key": "k2"
-            }
-           },
-           {
-            "k": "text",
-            "p": {
-             "text": "Stop",
-             "key": "t"
-            }
+             "align": "center",
+             "gap": "xs",
+             "title": "Stop  esc esc",
+             "key": "face"
+            },
+            "c": [
+             {
+              "k": "kbd",
+              "p": {
+               "keys": [
+                "esc"
+               ],
+               "key": "k"
+              }
+             },
+             {
+              "k": "kbd",
+              "p": {
+               "keys": [
+                "esc"
+               ],
+               "key": "k2"
+              }
+             },
+             {
+              "k": "text",
+              "p": {
+               "text": "Stop",
+               "key": "t"
+              }
+             }
+            ]
            }
           ]
          }
@@ -5461,17 +5822,28 @@
           }
          },
          {
-          "k": "text",
+          "k": "el",
           "p": {
+           "tag": "button",
+           "aria": "Stop",
+           "class": "hermes-press",
            "role": "omp.composer.stop",
-           "text": "Stop",
-           "title": "Stop  esc esc",
-           "tone": "error",
            "key": "stop",
            "actions": {
             "click": "click"
            }
-          }
+          },
+          "c": [
+           {
+            "k": "text",
+            "p": {
+             "text": "Stop",
+             "title": "Stop  esc esc",
+             "tone": "error",
+             "key": "face"
+            }
+           }
+          ]
          }
         ]
        }
@@ -5529,6 +5901,7 @@
        {
         "k": "seg",
         "p": {
+         "aria": "Stop",
          "priority": 10,
          "role": "hermes.statusline.stop",
          "side": "right",
@@ -5636,16 +6009,27 @@
           }
          },
          {
-          "k": "icon",
+          "k": "el",
           "p": {
-           "name": "copy",
-           "role": "omp.user.tool",
-           "title": "Copy message",
+           "tag": "button",
+           "aria": "Copy message",
+           "class": "hermes-press",
            "key": "copy",
            "actions": {
             "click": "click"
            }
-          }
+          },
+          "c": [
+           {
+            "k": "icon",
+            "p": {
+             "name": "copy",
+             "role": "omp.user.tool",
+             "title": "Copy message",
+             "key": "face"
+            }
+           }
+          ]
          }
         ]
        },
@@ -5895,12 +6279,12 @@
           }
          },
          {
-          "k": "row",
+          "k": "el",
           "p": {
-           "align": "center",
-           "gap": "xs",
+           "tag": "button",
+           "aria": "Stop",
+           "class": "hermes-press",
            "role": "omp.working.stop",
-           "title": "Stop  esc esc",
            "key": "stop",
            "actions": {
             "click": "click"
@@ -5908,29 +6292,40 @@
           },
           "c": [
            {
-            "k": "kbd",
+            "k": "row",
             "p": {
-             "keys": [
-              "esc"
-             ],
-             "key": "k"
-            }
-           },
-           {
-            "k": "kbd",
-            "p": {
-             "keys": [
-              "esc"
-             ],
-             "key": "k2"
-            }
-           },
-           {
-            "k": "text",
-            "p": {
-             "text": "Stop",
-             "key": "t"
-            }
+             "align": "center",
+             "gap": "xs",
+             "title": "Stop  esc esc",
+             "key": "face"
+            },
+            "c": [
+             {
+              "k": "kbd",
+              "p": {
+               "keys": [
+                "esc"
+               ],
+               "key": "k"
+              }
+             },
+             {
+              "k": "kbd",
+              "p": {
+               "keys": [
+                "esc"
+               ],
+               "key": "k2"
+              }
+             },
+             {
+              "k": "text",
+              "p": {
+               "text": "Stop",
+               "key": "t"
+              }
+             }
+            ]
            }
           ]
          }
@@ -6074,17 +6469,28 @@
           }
          },
          {
-          "k": "text",
+          "k": "el",
           "p": {
+           "tag": "button",
+           "aria": "Stop",
+           "class": "hermes-press",
            "role": "omp.composer.stop",
-           "text": "Stop",
-           "title": "Stop  esc esc",
-           "tone": "error",
            "key": "stop",
            "actions": {
             "click": "click"
            }
-          }
+          },
+          "c": [
+           {
+            "k": "text",
+            "p": {
+             "text": "Stop",
+             "title": "Stop  esc esc",
+             "tone": "error",
+             "key": "face"
+            }
+           }
+          ]
          }
         ]
        }
@@ -6142,6 +6548,7 @@
        {
         "k": "seg",
         "p": {
+         "aria": "Stop",
          "priority": 10,
          "role": "hermes.statusline.stop",
          "side": "right",
@@ -6239,12 +6646,11 @@
             }
            },
            {
-            "k": "row",
+            "k": "el",
             "p": {
-             "align": "center",
-             "gap": "xs",
-             "role": "omp.btn",
-             "title": "Deny  Tell the agent not to run it · escape, n",
+             "tag": "button",
+             "aria": "Deny",
+             "class": "hermes-press",
              "key": "deny",
              "actions": {
               "click": "click"
@@ -6252,30 +6658,41 @@
             },
             "c": [
              {
-              "k": "text",
+              "k": "row",
               "p": {
-               "text": "Deny",
-               "key": "label"
-              }
-             },
-             {
-              "k": "kbd",
-              "p": {
-               "keys": [
-                "escape"
-               ],
-               "key": "keys"
-              }
+               "align": "center",
+               "gap": "xs",
+               "role": "omp.btn",
+               "title": "Deny  Tell the agent not to run it · escape, n",
+               "key": "face"
+              },
+              "c": [
+               {
+                "k": "text",
+                "p": {
+                 "text": "Deny",
+                 "key": "label"
+                }
+               },
+               {
+                "k": "kbd",
+                "p": {
+                 "keys": [
+                  "escape"
+                 ],
+                 "key": "keys"
+                }
+               }
+              ]
              }
             ]
            },
            {
-            "k": "row",
+            "k": "el",
             "p": {
-             "align": "center",
-             "gap": "xs",
-             "role": "omp.btn",
-             "title": "Always allow  Remember this approval for every session · a",
+             "tag": "button",
+             "aria": "Always allow",
+             "class": "hermes-press",
              "key": "always",
              "actions": {
               "click": "click"
@@ -6283,30 +6700,41 @@
             },
             "c": [
              {
-              "k": "text",
+              "k": "row",
               "p": {
-               "text": "Always allow",
-               "key": "label"
-              }
-             },
-             {
-              "k": "kbd",
-              "p": {
-               "keys": [
-                "a"
-               ],
-               "key": "keys"
-              }
+               "align": "center",
+               "gap": "xs",
+               "role": "omp.btn",
+               "title": "Always allow  Remember this approval for every session · a",
+               "key": "face"
+              },
+              "c": [
+               {
+                "k": "text",
+                "p": {
+                 "text": "Always allow",
+                 "key": "label"
+                }
+               },
+               {
+                "k": "kbd",
+                "p": {
+                 "keys": [
+                  "a"
+                 ],
+                 "key": "keys"
+                }
+               }
+              ]
              }
             ]
            },
            {
-            "k": "row",
+            "k": "el",
             "p": {
-             "align": "center",
-             "gap": "xs",
-             "role": "omp.btn",
-             "title": "Allow for this session  Allow matching commands until the session ends · s",
+             "tag": "button",
+             "aria": "Allow for this session",
+             "class": "hermes-press",
              "key": "session",
              "actions": {
               "click": "click"
@@ -6314,31 +6742,41 @@
             },
             "c": [
              {
-              "k": "text",
+              "k": "row",
               "p": {
-               "text": "Allow for this session",
-               "key": "label"
-              }
-             },
-             {
-              "k": "kbd",
-              "p": {
-               "keys": [
-                "s"
-               ],
-               "key": "keys"
-              }
+               "align": "center",
+               "gap": "xs",
+               "role": "omp.btn",
+               "title": "Allow for this session  Allow matching commands until the session ends · s",
+               "key": "face"
+              },
+              "c": [
+               {
+                "k": "text",
+                "p": {
+                 "text": "Allow for this session",
+                 "key": "label"
+                }
+               },
+               {
+                "k": "kbd",
+                "p": {
+                 "keys": [
+                  "s"
+                 ],
+                 "key": "keys"
+                }
+               }
+              ]
              }
             ]
            },
            {
-            "k": "row",
+            "k": "el",
             "p": {
-             "align": "center",
-             "gap": "xs",
-             "role": "omp.btn",
-             "title": "Allow once  Run it this time only · enter, y",
-             "tone": "accent",
+             "tag": "button",
+             "aria": "Allow once",
+             "class": "hermes-press",
              "key": "once",
              "actions": {
               "click": "click"
@@ -6346,20 +6784,33 @@
             },
             "c": [
              {
-              "k": "text",
+              "k": "row",
               "p": {
-               "text": "Allow once",
-               "key": "label"
-              }
-             },
-             {
-              "k": "kbd",
-              "p": {
-               "keys": [
-                "enter"
-               ],
-               "key": "keys"
-              }
+               "align": "center",
+               "gap": "xs",
+               "role": "omp.btn",
+               "title": "Allow once  Run it this time only · enter, y",
+               "tone": "accent",
+               "key": "face"
+              },
+              "c": [
+               {
+                "k": "text",
+                "p": {
+                 "text": "Allow once",
+                 "key": "label"
+                }
+               },
+               {
+                "k": "kbd",
+                "p": {
+                 "keys": [
+                  "enter"
+                 ],
+                 "key": "keys"
+                }
+               }
+              ]
              }
             ]
            }
@@ -6459,16 +6910,27 @@
           }
          },
          {
-          "k": "icon",
+          "k": "el",
           "p": {
-           "name": "copy",
-           "role": "omp.user.tool",
-           "title": "Copy message",
+           "tag": "button",
+           "aria": "Copy message",
+           "class": "hermes-press",
            "key": "copy",
            "actions": {
             "click": "click"
            }
-          }
+          },
+          "c": [
+           {
+            "k": "icon",
+            "p": {
+             "name": "copy",
+             "role": "omp.user.tool",
+             "title": "Copy message",
+             "key": "face"
+            }
+           }
+          ]
          }
         ]
        },
@@ -6718,12 +7180,12 @@
           }
          },
          {
-          "k": "row",
+          "k": "el",
           "p": {
-           "align": "center",
-           "gap": "xs",
+           "tag": "button",
+           "aria": "Stop",
+           "class": "hermes-press",
            "role": "omp.working.stop",
-           "title": "Stop  esc esc",
            "key": "stop",
            "actions": {
             "click": "click"
@@ -6731,29 +7193,40 @@
           },
           "c": [
            {
-            "k": "kbd",
+            "k": "row",
             "p": {
-             "keys": [
-              "esc"
-             ],
-             "key": "k"
-            }
-           },
-           {
-            "k": "kbd",
-            "p": {
-             "keys": [
-              "esc"
-             ],
-             "key": "k2"
-            }
-           },
-           {
-            "k": "text",
-            "p": {
-             "text": "Stop",
-             "key": "t"
-            }
+             "align": "center",
+             "gap": "xs",
+             "title": "Stop  esc esc",
+             "key": "face"
+            },
+            "c": [
+             {
+              "k": "kbd",
+              "p": {
+               "keys": [
+                "esc"
+               ],
+               "key": "k"
+              }
+             },
+             {
+              "k": "kbd",
+              "p": {
+               "keys": [
+                "esc"
+               ],
+               "key": "k2"
+              }
+             },
+             {
+              "k": "text",
+              "p": {
+               "text": "Stop",
+               "key": "t"
+              }
+             }
+            ]
            }
           ]
          }
@@ -6897,17 +7370,28 @@
           }
          },
          {
-          "k": "text",
+          "k": "el",
           "p": {
+           "tag": "button",
+           "aria": "Stop",
+           "class": "hermes-press",
            "role": "omp.composer.stop",
-           "text": "Stop",
-           "title": "Stop  esc esc",
-           "tone": "error",
            "key": "stop",
            "actions": {
             "click": "click"
            }
-          }
+          },
+          "c": [
+           {
+            "k": "text",
+            "p": {
+             "text": "Stop",
+             "title": "Stop  esc esc",
+             "tone": "error",
+             "key": "face"
+            }
+           }
+          ]
          }
         ]
        }
@@ -6965,6 +7449,7 @@
        {
         "k": "seg",
         "p": {
+         "aria": "Stop",
          "priority": 10,
          "role": "hermes.statusline.stop",
          "side": "right",
@@ -7072,16 +7557,27 @@
           }
          },
          {
-          "k": "icon",
+          "k": "el",
           "p": {
-           "name": "copy",
-           "role": "omp.user.tool",
-           "title": "Copy message",
+           "tag": "button",
+           "aria": "Copy message",
+           "class": "hermes-press",
            "key": "copy",
            "actions": {
             "click": "click"
            }
-          }
+          },
+          "c": [
+           {
+            "k": "icon",
+            "p": {
+             "name": "copy",
+             "role": "omp.user.tool",
+             "title": "Copy message",
+             "key": "face"
+            }
+           }
+          ]
          }
         ]
        },
@@ -7393,18 +7889,29 @@
           }
          },
          {
-          "k": "kbd",
+          "k": "el",
           "p": {
-           "keys": [
-            "enter"
-           ],
+           "tag": "button",
+           "aria": "Send",
+           "class": "hermes-press",
            "role": "omp.composer.send",
-           "title": "Send  ⏎",
            "key": "send",
            "actions": {
             "click": "click"
            }
-          }
+          },
+          "c": [
+           {
+            "k": "kbd",
+            "p": {
+             "keys": [
+              "enter"
+             ],
+             "title": "Send  ⏎",
+             "key": "face"
+            }
+           }
+          ]
          }
         ]
        }
@@ -7447,6 +7954,7 @@
        {
         "k": "seg",
         "p": {
+         "aria": "Send",
          "priority": 10,
          "role": "hermes.statusline.send",
          "side": "right",
@@ -7554,16 +8062,27 @@
           }
          },
          {
-          "k": "icon",
+          "k": "el",
           "p": {
-           "name": "copy",
-           "role": "omp.user.tool",
-           "title": "Copy message",
+           "tag": "button",
+           "aria": "Copy message",
+           "class": "hermes-press",
            "key": "copy",
            "actions": {
             "click": "click"
            }
-          }
+          },
+          "c": [
+           {
+            "k": "icon",
+            "p": {
+             "name": "copy",
+             "role": "omp.user.tool",
+             "title": "Copy message",
+             "key": "face"
+            }
+           }
+          ]
          }
         ]
        },
@@ -7701,16 +8220,27 @@
         },
         "c": [
          {
-          "k": "icon",
+          "k": "el",
           "p": {
-           "name": "copy",
-           "role": "omp.turn.copy",
-           "title": "Copy answer",
+           "tag": "button",
+           "aria": "Copy answer",
+           "class": "hermes-press",
            "key": "copy",
            "actions": {
             "click": "click"
            }
-          }
+          },
+          "c": [
+           {
+            "k": "icon",
+            "p": {
+             "name": "copy",
+             "role": "omp.turn.copy",
+             "title": "Copy answer",
+             "key": "face"
+            }
+           }
+          ]
          }
         ]
        }
