@@ -380,6 +380,7 @@ describe('/compress takes back only its own compaction, and only in its own sess
       busy: false,
       canonical: true,
       compressing,
+      draft: () => undefined,
       enqueue: () => undefined,
       gw: gw.client,
       notice,
@@ -419,6 +420,7 @@ describe('/compress takes back only its own compaction, and only in its own sess
     const host = sessionHost({
       activity: new Activity(),
       changed: () => undefined,
+      draft: () => undefined,
       gw: new FakeGateway().client,
       life: { reload: () => Promise.resolve(undefined), resume: () => Promise.resolve() },
       queue: { count: () => 0 },

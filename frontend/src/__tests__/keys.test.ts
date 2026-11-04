@@ -543,6 +543,7 @@ describe('sessionHost', () => {
         }
       },
       changed: () => {},
+      draft: () => {},
       gw: gw.client,
       life: {
         reload: async () => undefined,
