@@ -5,19 +5,22 @@
 import { css } from '@stencil-hq/tern'
 
 export const STYLES = css`
-  /* Tern positions this hairline above the glass. Give its native button a real 24px
-     focus/pointer target, and keep the meter in that target instead of absolute to the glass. */
+  /* Tern draws omp's hairline on the glass's top edge (top -12px, its track 11.5px down). The
+     native button sits where omp's meter sits, so the working row above the glass never covers
+     it, and reaches 8px into the glass for a 20px focus/pointer target. */
   [data-role='omp.composer.context.action'] {
     display: block;
     position: absolute;
-    left: 8px;
-    right: 8px;
-    top: -24px;
+    left: 18px;
+    right: 18px;
+    top: -12px;
     width: auto;
-    height: 24px;
+    height: 20px;
     padding: 0;
-    border: none;
-    background: transparent;
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    background: transparent !important;
     color: inherit;
     text-align: left;
     cursor: pointer;
