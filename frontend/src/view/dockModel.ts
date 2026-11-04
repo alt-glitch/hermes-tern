@@ -21,6 +21,7 @@ import type { Overlay } from '../overlays/overlay.js'
 import { prsPill } from '../overlays/pullRequests.js'
 import { isRunning, type Processes, processTone } from '../processes/store.js'
 import type { Automation } from '../session/automation.js'
+import { contextWindow } from '../session/context.js'
 import { fastTier } from '../session/fast.js'
 import type { SessionTitle } from '../session/title.js'
 import type { Transcript } from '../transcript/store.js'
@@ -106,8 +107,6 @@ export function dockActivity(a: DockSources['activity']): DockActivity {
 export function dockModel(src: DockSources, now: number): DockContext {
   const { info, usage } = src.session
   const modal = isModal(src.overlays)
-  const used = usage?.context_used ?? 0
-  const max = usage?.context_max ?? 0
   const list = shownTodos(src)
   const agents = src.agents.running()
   const noticeCount = src.notices.active(now).length
@@ -147,7 +146,7 @@ export function dockModel(src: DockSources, now: number): DockContext {
     status: {
       branch: info?.branch ?? '',
       compressions: typeof usage?.compressions === 'number' ? usage.compressions : undefined,
-      context: max > 0 ? { max, used } : undefined,
+      context: contextWindow(usage),
       cost: usage?.cost_usd ?? undefined,
       notice: src.notices.current(now),
       otherError: src.notices.otherError(now),

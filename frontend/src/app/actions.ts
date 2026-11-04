@@ -35,6 +35,7 @@ import { openAutomation } from '../overlays/automation.js'
 import { openBackground } from '../overlays/background.js'
 import { openBrowserBlocks } from '../overlays/browser.js'
 import type { Completion } from '../overlays/completion.js'
+import { openContext } from '../overlays/context.js'
 import { openEffortPicker } from '../overlays/effort.js'
 import { openModelPicker } from '../overlays/models.js'
 import { openPlanReview } from '../overlays/plan.js'
@@ -143,6 +144,7 @@ export class AppActions {
       onBtwDismiss: notice => cx.btw.dismissNotice(notice),
       onAgents: () => openAgents(chat),
       onNotices: () => chat.openNotices(),
+      onContext: () => openContext({ changed, close: o => chat.close(o), gw, open: o => chat.open(o), session: cx.state }),
       onEdit: ev => {
         if (composer.vim.enabled) return
         composer.edit(ev)

@@ -13,6 +13,7 @@ export function dockActions(over: Partial<DockActions> = {}): DockActions {
     onBtwView: vi.fn(),
     onBtwDismiss: vi.fn(),
     onAgents: vi.fn(),
+    onContext: vi.fn(),
     onEdit: vi.fn(),
     onEffort: vi.fn(),
     onGoal: vi.fn(),
