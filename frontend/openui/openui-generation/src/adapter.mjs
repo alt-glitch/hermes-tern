@@ -1,27 +1,44 @@
-import { LIBRARY, SCHEMA, freeze, assertTelemetryDisabled, loadCore, requireInput } from './catalog.mjs';
+import { LIBRARY, SCHEMA, CATALOG, freeze, assertTelemetryDisabled, loadCore, requireInput } from './catalog.mjs';
 import { bindSelection, projectSelection } from './host.mjs';
+import { INTENT_CATALOG, INTENT_LIBRARY, INTENT_SCHEMA, bindIntent, projectIntent } from './intent.mjs';
 import { checkProgram } from './static-program.mjs';
 
-export async function createGenerationAdapter() {
+const RULES = [
+  'This experiment permits only catalog calls, arrays, small nonnegative integer literals, double-quoted JSON strings and static references.',
+  'Define root. Every declaration must be reachable from root. No comments, fences, objects, operators, state, queries, mutations, actions or builtin calls.',
+];
+// One entry per reviewed native view. The model selects; host code owns data and interaction.
+const LIBRARIES = {
+  repository: {
+    library: LIBRARY, schema: SCHEMA, catalog: CATALOG, root: 'RepoExplorer', project: projectSelection, bind: bindSelection,
+    rules: [
+      'Use only snapshot keys supplied in the task. Repository measurements are host-owned; select metric keys, never fabricate data.',
+      'Include exactly one MetricRow and one HottestFiles. Local interaction behavior belongs to reviewed native code, not generated handlers.',
+    ],
+  },
+  intent: {
+    library: INTENT_LIBRARY, schema: INTENT_SCHEMA, catalog: INTENT_CATALOG, root: 'IntentBoard', project: projectIntent, bind: bindIntent,
+    rules: [
+      'Use only snapshot keys supplied in the task. Intent, contract, receipt and intelligence values are host-owned; select sections, never fabricate data.',
+      'Each section appears at most once. Approval stays with the host: no section approves, executes or publishes anything.',
+    ],
+  },
+};
+
+export async function createGenerationAdapter({ library = 'repository' } = {}) {
+  const spec = LIBRARIES[library];
+  requireInput(spec, 'library', `Unknown OpenUI library: ${library}.`);
   const core = await loadCore();
-  const parser = core.createParser(SCHEMA, 'RepoExplorer');
+  const parser = core.createParser(spec.schema, spec.root);
   // The catalog prompt is generated once, not rebuilt for each snapshot or reply.
   const prompt = core.generateSystemPrompt({
-    library: LIBRARY,
-    promptOptions: {
-      toolCalls: false, bindings: false, editMode: false, inlineMode: false,
-      additionalRules: [
-        'This experiment permits only catalog calls, arrays, small nonnegative integer literals, double-quoted JSON strings and static references.',
-        'Define root. Every declaration must be reachable from root. No comments, fences, objects, operators, state, queries, mutations, actions or builtin calls.',
-        'Use only snapshot keys supplied in the task. Repository measurements are host-owned; select metric keys, never fabricate data.',
-        'Include exactly one MetricRow and one HottestFiles. Local interaction behavior belongs to reviewed native code, not generated handlers.',
-      ],
-    },
+    library: spec.library,
+    promptOptions: { toolCalls: false, bindings: false, editMode: false, inlineMode: false, additionalRules: [...RULES, ...spec.rules] },
   });
 
   function compile(source, context) {
     assertTelemetryDisabled();
-    const count = checkProgram(core, source);
+    const count = checkProgram(core, source, spec.catalog);
     const result = parser.parse(source);
     const meta = result.meta;
     requireInput(meta?.incomplete === false && meta.statementCount === count &&
@@ -32,7 +49,7 @@ export async function createGenerationAdapter() {
     requireInput(Object.keys(result.stateDeclarations ?? {}).length === 0 &&
       (result.queryStatements ?? []).length === 0 && (result.mutationStatements ?? []).length === 0,
       'static-subset', 'State, queries and mutations are disabled.');
-    return bindSelection(projectSelection(result.root), source, context);
+    return spec.bind(spec.project(result.root), source, context);
   }
 
   return freeze({ prompt, compile });

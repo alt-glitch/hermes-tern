@@ -1,0 +1,57 @@
+{
+  "id": "ephemeral-intent/v1",
+  "root": "IntentBoard",
+  "rule": "The model selects a host snapshot key and which sections to show. Every value shown comes from the host document (tools/openui-intent-doc.mjs); the model never supplies data, labels or actions.",
+  "components": {
+    "IntentBoard": {
+      "signature": "IntentBoard(snapshotId: string, sections: Component[])",
+      "description": "Root. Select one host-provided intent snapshot key and 1 to 8 distinct sections, in display order. Never invent snapshot keys or data.",
+      "kind": null
+    },
+    "DeclaredIntent": {
+      "signature": "DeclaredIntent()",
+      "description": "The exact asked words, split into the task and its context, with the immutable source hash.",
+      "kind": "ripple:intent-declare"
+    },
+    "ContractGates": {
+      "signature": "ContractGates()",
+      "description": "Approval state, observed preconditions and acceptance clauses of the pending intent contract.",
+      "kind": "aodl:intent-contract"
+    },
+    "WorkSlices": {
+      "signature": "WorkSlices()",
+      "description": "The contract's implementation slices and their observed state. Implementation is not acceptance.",
+      "kind": "aodl:intent-work"
+    },
+    "ProofReceipts": {
+      "signature": "ProofReceipts()",
+      "description": "Whether the real-turn acceptance receipt exists, and the preconditions observed for it.",
+      "kind": "aodl:intent-proof"
+    },
+    "DecisionMix": {
+      "signature": "DecisionMix(by: \"execution\" | \"providers\" | \"status\")",
+      "description": "z0intelligence decision events broken down by one host-computed dimension.",
+      "kind": "z0intelligence:intel-decisions"
+    },
+    "TokenValue": {
+      "signature": "TokenValue()",
+      "description": "Estimated vs measured vs verified token value, kept apart.",
+      "kind": "z0intelligence:intel-value"
+    },
+    "ContextFlow": {
+      "signature": "ContextFlow()",
+      "description": "Next-context prediction episodes and family top-1 on labeled rows.",
+      "kind": "z0intelligence:intel-context"
+    },
+    "RuntimeHealth": {
+      "signature": "RuntimeHealth()",
+      "description": "Which capture-environment backends are ready.",
+      "kind": "z0intelligence:intel-health"
+    }
+  },
+  "document": {
+    "version": 1,
+    "builder": "node tools/openui-intent-doc.mjs src/data/intent-snapshot.json > intent-board.json",
+    "bounds": { "bytes": 65536, "text": 400, "list": 12 }
+  }
+}

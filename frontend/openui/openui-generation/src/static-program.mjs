@@ -23,7 +23,7 @@ export function checkSource(source) {
 }
 
 /** Serialize only the accepted AST subset, never execute it. */
-function emit(node, refs, budget) {
+function emit(node, refs, budget, catalog) {
   requireInput(node && typeof node === 'object' && --budget.left >= 0, 'nodes', 'OpenUI AST exceeds the experiment limit.');
   switch (node.k) {
     case 'Str': return JSON.stringify(node.v);
@@ -35,13 +35,13 @@ function emit(node, refs, budget) {
       requireInput(/^[a-z][A-Za-z0-9_]{0,63}$/.test(node.n), 'reference', 'Invalid static reference.');
       refs.push(node.n);
       return node.n;
-    case 'Arr': return `[${node.els.map(child => emit(child, refs, budget)).join(',')}]`;
+    case 'Arr': return `[${node.els.map(child => emit(child, refs, budget, catalog)).join(',')}]`;
     case 'Comp': {
-      requireInput(Object.hasOwn(CATALOG, node.name) && !node.mappedProps,
+      requireInput(Object.hasOwn(catalog, node.name) && !node.mappedProps,
         'component', `Unsupported component: ${node.name}.`);
-      const arity = Object.keys(CATALOG[node.name].properties).length;
+      const arity = Object.keys(catalog[node.name].properties).length;
       requireInput(node.args.length === arity, 'arity', `${node.name} requires exactly ${arity} arguments.`);
-      return `${node.name}(${node.args.map(child => emit(child, refs, budget)).join(',')})`;
+      return `${node.name}(${node.args.map(child => emit(child, refs, budget, catalog)).join(',')})`;
     }
     default: throw new VisualInputError('static-subset', 'Runtime expressions, state, builtins and actions are disabled.');
   }
@@ -65,7 +65,8 @@ function checkReferenceGraph(statements) {
   requireInput(reached.size === statements.size, 'orphan', 'Every statement must be reachable from root.');
 }
 
-export function checkProgram(core, source) {
+/** catalog: the active library's components (defaults to the repository catalog). */
+export function checkProgram(core, source, catalog = CATALOG) {
   checkSource(source);
   const tokens = core.tokenize(source);
   const raw = core.split(tokens);
@@ -78,7 +79,7 @@ export function checkProgram(core, source) {
     requireInput(!statements.has(statement.id), 'duplicate', `Duplicate statement: ${statement.id}.`);
     const refs = [];
     const before = budget.left;
-    const expression = emit(core.parseExpression(statement.tokens), refs, budget);
+    const expression = emit(core.parseExpression(statement.tokens), refs, budget, catalog);
     statements.set(statement.id, { refs, cost: before - budget.left });
     canonical.push(`${statement.id}=${expression}`);
   }

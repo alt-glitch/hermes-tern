@@ -71,7 +71,11 @@ export async function openVisual(
                 <text key="title" text={candidate.title} />
                 <text key="status" text="Preview only · not visually verified or published" tone="warning" />
                 <kv items={candidate.metrics.map(metric => ({ k: metric.label, v: String(metric.value) }))} key="metrics" />
-                <text key="mode" text={`Initial mode: ${candidate.mode}`} />
+                {candidate.sections ? (
+                  <text key="mode" text={`Intent board: ${candidate.sections.join(' · ')}`} />
+                ) : (
+                  <text key="mode" text={`Initial mode: ${candidate.mode}`} />
+                )}
                 <text key="identity" text={`Bundle: ${candidate.id}`} />
                 <text key="file" spans={[{ t: 'Open candidate file in Tern', href: candidate.href, s: 'link' }]} />
                 <text

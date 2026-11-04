@@ -3,8 +3,10 @@
 // No dependency install, renderer installation, control input or publication.
 const args = process.argv.slice(2)
 
-if (args.length !== 6 || args[0] !== 'prepare' || args[5] !== '--json') {
-  console.error('Usage: node openui/prepare.mjs prepare <program.openui> <host-document.json> <scope-json> <output-dir> --json')
+// `prepare-intent` compiles an ephemeral-intent/v1 board (the ephemeral-ui intent kit) against an
+// intent-board host document; its snapshot key is "z0".
+if (args.length !== 6 || !['prepare', 'prepare-intent'].includes(args[0]) || args[5] !== '--json') {
+  console.error('Usage: node openui/prepare.mjs prepare|prepare-intent <program.openui> <host-document.json> <scope-json> <output-dir> --json')
   process.exitCode = 1
 } else {
   // The real @openuidev/lang-core parser is used, with telemetry off before

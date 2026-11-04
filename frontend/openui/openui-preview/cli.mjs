@@ -4,6 +4,7 @@ import { readFile, writeFile, mkdir, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import { createBundle, prepareArtifact, validateBundle, fingerprints, assertCurrent, assertOutputDirectory, MAX_BYTES } from './src/bundle.mjs';
 import { createControl, capturePreview } from './src/control.mjs';
+import { INTENT_MAX_BYTES, prepareIntentArtifact } from './src/intent-document.mjs';
 import { digest } from '../openui-generation/src/catalog.mjs';
 
 async function boundedRead(path, cap = MAX_BYTES) {
@@ -16,18 +17,21 @@ async function boundedRead(path, cap = MAX_BYTES) {
 
 const [command, ...args] = process.argv.slice(2);
 // Opt-in machine output for transcript discovery; the default path-only CLI stays unchanged.
-const jsonOutput = command === 'prepare' && args.at(-1) === '--json';
+const jsonOutput = (command === 'prepare' || command === 'prepare-intent') && args.at(-1) === '--json';
 if (jsonOutput) args.pop();
 try {
-  if (command === 'prepare' && args.length === 4) {
+  if ((command === 'prepare' || command === 'prepare-intent') && args.length === 4) {
+    const intent = command === 'prepare-intent';
     const [sourcePath, dataPath, scope, destination] = args;
     const out = await assertOutputDirectory(destination);
     const build = await fingerprints();
-    const artifact = prepareArtifact(await boundedRead(dataPath), build.rendererHash);
+    const raw = await boundedRead(dataPath, intent ? INTENT_MAX_BYTES : MAX_BYTES);
+    const artifact = intent ? prepareIntentArtifact(raw, build.rendererHash) : prepareArtifact(raw, build.rendererHash);
     const { createGenerationAdapter } = await import('../openui-generation/src/adapter.mjs');
-    const adapter = await createGenerationAdapter();
+    const adapter = await createGenerationAdapter({ library: intent ? 'intent' : 'repository' });
+    // The host registers the snapshot key; the program may only name it.
     const selection = adapter.compile(await boundedRead(sourcePath, 32768), {
-      scope, snapshots: new Map([['demo', artifact]]),
+      scope, snapshots: new Map([[intent ? 'z0' : 'demo', artifact]]),
     });
     const bundle = createBundle(selection, artifact, { width: 1280, height: 900, appearance: 'dark' }, build.bridgeHash);
     await mkdir(out, { recursive: true, mode: 0o700 });
@@ -55,7 +59,7 @@ try {
       throw error;
     }
   } else {
-    throw new Error('Usage: node cli.mjs prepare <program.openui> <host-document.json> <session:branch> <output-dir> [--json]\n  or: node cli.mjs capture <bundle.hvisual.json> <control-socket> <tern-shot-output-dir> --allow-control-input');
+    throw new Error('Usage: node cli.mjs prepare <program.openui> <host-document.json> <session:branch> <output-dir> [--json]\n  or: node cli.mjs prepare-intent <program.openui> <intent-board.json> <session:branch> <output-dir> [--json]  (snapshot key "z0")\n  or: node cli.mjs capture <bundle.hvisual.json> <control-socket> <tern-shot-output-dir> --allow-control-input');
   }
 } catch (error) {
   console.error(`${error.code ?? 'error'}: ${error.message}`);

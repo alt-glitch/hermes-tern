@@ -33,6 +33,7 @@ const candidateNotice = z.object({
 const hash = /^[a-f0-9]{64}$/
 const hashedAssets = [
   'openui-preview/src/bundle.mjs',
+  'openui-preview/src/intent-document.mjs',
   'openui-preview/src/control.mjs',
   'openui-preview/src/lifecycle.mjs',
   'openui-preview/tern/plugin.toml',
@@ -42,6 +43,7 @@ const hashedAssets = [
   'openui-generation/src/adapter.mjs',
   'openui-generation/src/catalog.mjs',
   'openui-generation/src/host.mjs',
+  'openui-generation/src/intent.mjs',
   'openui-generation/src/static-program.mjs',
   'openui-generation/package-lock.json'
 ] as const
@@ -149,6 +151,30 @@ describe('packaged OpenUI preview with real donor assets and Tern SDK', () => {
       ]
     })
     expect(summary.href).toBe(pathToFileURL(candidate.path).href)
+  })
+
+  it('prepares an ephemeral-intent/v1 board with the real parser and summarizes the sections the model chose', async () => {
+    const env = { ...process.env }
+    delete env['OPENUI_TELEMETRY_DISABLED']
+    delete env['DO_NOT_TRACK']
+    const { stdout, stderr } = await execute(process.execPath, [
+      join(openui, 'prepare.mjs'),
+      'prepare-intent',
+      join(openui, 'openui-generation/fixtures/intent.openui'),
+      join(openui, 'openui-preview/fixtures/intent-board.json'),
+      scope,
+      join(scratch, 'intent'),
+      '--json'
+    ], { env, timeout: 30_000, maxBuffer: 128 * 1024 })
+    expect(stderr).toBe('')
+    const notice = candidateNotice.parse(decodeJson(stdout))
+    const summary = await readPreparedVisual(notice.path, scope)
+
+    expect(summary).toMatchObject({ id: notice.id, mode: 'intent', metrics: [{ key: 'sections', value: 8 }, { key: 'slices', value: 3 }] })
+    expect(summary.sections).toEqual([
+      'DeclaredIntent', 'ContractGates', 'WorkSlices', 'ProofReceipts', 'DecisionMix(execution)', 'TokenValue', 'ContextFlow', 'RuntimeHealth'
+    ])
+    await expect(readPreparedVisual(notice.path, JSON.stringify(['other', 'main']))).rejects.toThrow()
   })
 
   it('mounts the real validated summary using native @stencil-hq/tern JSX and expires on branch switch', async () => {

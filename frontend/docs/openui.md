@@ -33,8 +33,8 @@ current working directory and a donor checkout are not consulted.
 Every opened candidate is re-read with a bounded regular-file/strict-UTF-8
 read, then the **original** validator checks its exact identity, catalog
 hash, generation contract, artifact/document and current fingerprints.
-`fingerprints()` hashes the four fixed renderer files, three preview modules,
-four generation modules and the generation lockfile. Missing or drifted files
+`fingerprints()` hashes the four fixed renderer files, four preview modules,
+five generation modules and the generation lockfile. Missing or drifted files
 fail closed. The separate `HERMES_SRC` used to build the main frontend's
 gateway client remains pinned to the locked upstream Hermes runtime
 `22063fc099ec9ad8357d7f8f6e6248a0400680d3`; it is **not** an OpenUI
@@ -110,6 +110,31 @@ Discovery accepts only successful completed terminal results, within
 candidate ID must match the validated file. Session/branch/transcript changes
 expire displayed sheets. File links reopen current bytes; they are **not**
 atomic, approved revisions.
+
+## Intent boards (`ephemeral-intent/v1`)
+
+The same pipeline compiles the ephemeral-ui intent kit as a native board: declared intent,
+contract gates, work slices, proof receipts, decision mix, token value, context flow and runtime
+health. The catalog is `openui-generation/src/intent.mjs` (root
+`IntentBoard(snapshotId, sections)`, 1–8 distinct sections, the only argument being
+`DecisionMix(by: "execution" | "providers" | "status")`); its pinned definition
+`fixtures/ephemeral-intent.v1.json` is checked signature for signature against ephemeral-ui's
+`integration/openui/ephemeral-intent.v1.json`. **The model selects sections; the host document
+owns every value.** `openui-preview/src/intent-document.mjs` validates that document field by
+field (64 KiB, 12-item lists, enums, no control characters) and the Luau renderer checks it again.
+No section approves, executes or publishes; approval stays with the host's AODL path.
+
+```sh
+cd /absolute/path/to/hermes-tern/frontend
+node openui/prepare.mjs prepare-intent \
+  openui/openui-generation/fixtures/intent.openui \
+  openui/openui-preview/fixtures/intent-board.json \
+  '["stored-id","main"]' /absolute/output-directory --json
+```
+
+A real host document comes from ephemeral-ui's `tools/openui-intent-doc.mjs`. The shipped
+`fixtures/intent-board.json` is synthetic. `/visual` lists and opens an intent candidate like a
+repository one; its sheet names the chosen sections instead of an initial mode.
 
 ## Optional native route, kept separate
 

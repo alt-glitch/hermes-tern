@@ -13,21 +13,36 @@ interface RepositoryNode {
   readonly children: readonly RepositoryNode[]
 }
 
-export interface VisualBundle {
+interface RepositoryBundle {
   readonly id: string
   readonly selection: {
-    readonly view: { readonly mode: 'code' | 'churn'; readonly metrics: readonly ('files' | 'code' | 'churn')[] }
+    readonly view: { readonly kind?: 'repo-explorer'; readonly mode: 'code' | 'churn'; readonly metrics: readonly ('files' | 'code' | 'churn')[] }
   }
   readonly artifact: {
     readonly document: { readonly title: string; readonly root: RepositoryNode & { readonly code: number; readonly churn: number } }
   }
 }
 
+/** An ephemeral-intent/v1 board (the ephemeral-ui intent kit): the model picked sections, the host document holds the values. */
+interface IntentBundle {
+  readonly id: string
+  readonly selection: {
+    readonly view: { readonly kind: 'intent-board'; readonly sections: readonly { readonly kind: string; readonly by?: string }[] }
+  }
+  readonly artifact: {
+    readonly document: { readonly title: string; readonly work?: { readonly slices?: readonly unknown[] } }
+  }
+}
+
+export type VisualBundle = RepositoryBundle | IntentBundle
+
 export interface VisualSummary {
   readonly id: string
   readonly title: string
-  readonly mode: 'code' | 'churn'
+  readonly mode: 'code' | 'churn' | 'intent'
   readonly metrics: readonly { readonly key: string; readonly label: string; readonly value: number }[]
+  /** An intent board's sections in the order the model chose them (`DecisionMix(providers)`). */
+  readonly sections?: readonly string[]
 }
 
 export interface PreparedVisual extends VisualSummary {
@@ -50,6 +65,30 @@ export function visualScope(host: Pick<ChatPorts, 'session'>): string | undefine
 
 /** Project requested host metrics only, after full validation; never scan Git here. */
 export function summarizeVisual(bundle: VisualBundle): VisualSummary {
+  return isIntent(bundle) ? summarizeIntent(bundle) : summarizeRepository(bundle)
+}
+
+function isIntent(bundle: VisualBundle): bundle is IntentBundle {
+  return 'kind' in bundle.selection.view && bundle.selection.view.kind === 'intent-board'
+}
+
+function summarizeIntent(bundle: IntentBundle): VisualSummary {
+  const { sections } = bundle.selection.view
+  const slices = bundle.artifact.document.work?.slices?.length ?? 0
+
+  return Object.freeze({
+    id: bundle.id,
+    title: bundle.artifact.document.title,
+    mode: 'intent',
+    metrics: Object.freeze([
+      Object.freeze({ key: 'sections', label: 'Sections', value: sections.length }),
+      Object.freeze({ key: 'slices', label: 'Work slices', value: slices })
+    ]),
+    sections: Object.freeze(sections.map(x => (x.by ? `${x.kind}(${x.by})` : x.kind)))
+  })
+}
+
+function summarizeRepository(bundle: RepositoryBundle): VisualSummary {
   const { document } = bundle.artifact
   const { metrics, mode } = bundle.selection.view
   let files = 0
