@@ -10,7 +10,8 @@ import { optional } from '../core/assert.js'
 import { errorText } from '../core/errors.js'
 import { durable, storedSessionId } from '../core/ids.js'
 import { plural } from '../core/text.js'
-import { lastReply, sessionLabel } from '../hermes/sessionIndex.js'
+import { sessionLabel } from '../hermes/sessionIndex.js'
+import { readSessionEnds } from '../hermes/sessionTranscript.js'
 import { type BranchFamily, type BranchNode, branchFamily, type TreeRow, treeRows } from '../hermes/sessionTree.js'
 import { oneLine } from '../view/describe.js'
 import { ageShort } from '../view/format.js'
@@ -69,7 +70,7 @@ export function openBranchTree(host: TreeHost, family: (id: string) => BranchFam
       const row = tree.find(r => r.node.id === selected)
 
       if (row && !replies.has(row.node.id)) {
-        replies.set(row.node.id, lastReply(row.node.id))
+        replies.set(row.node.id, replyOf(row.node.id))
       }
 
       return (
@@ -172,4 +173,13 @@ function preview({ children, node }: TreeRow, nodes: readonly BranchNode[], isCu
 
 function dateOf(at: number): string {
   return new Date(at).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' })
+}
+
+/** `id`'s last reply, or '' when state.db cannot be read (the tree still opens). */
+function replyOf(id: string): string {
+  try {
+    return readSessionEnds(id).lastReply
+  } catch {
+    return ''
+  }
 }
