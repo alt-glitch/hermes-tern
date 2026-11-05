@@ -4,8 +4,10 @@ import { EL_TAGS, type ElTag, html, type JSX, ui } from '@stencil-hq/tern'
 
 import type { EuiCards, EuiCardView } from '../eui/cards.js'
 import type { EuiNode } from '../eui/sandbox.js'
+import { TERN_ATTR } from '../eui/ternCss.js'
 
 const TAGS: ReadonlySet<string> = new Set(EL_TAGS)
+const BOOLEAN = new Set(['checked', 'open', 'hidden', 'disabled'])
 const INLINE = new Set(['a', 'small', 'sup', 'sub', 'abbr', 'time', 's', 'u', 'var', 'cite', 'q', 'output', 'bdi', 'textarea', 'select', 'option'])
 
 function isTag(tag: string): tag is ElTag {
@@ -43,6 +45,12 @@ function convert(n: EuiNode, key: string, card: string, eui: EuiCards): JSX.Elem
   for (const [k, v] of Object.entries(n.attrs)) {
     if (/^(data-|aria-)/.test(k) || k === 'role' || k === 'colspan' || k === 'rowspan') {
       attrs[k] = v
+    }
+
+    // Tern matches attribute selectors on data-* only: mirror the rest for the kit's state rules.
+    // The snapshot writes '' for an unset boolean (checked, open), which must not match [open].
+    if (!k.startsWith('data-') && (v !== '' || !BOOLEAN.has(k))) {
+      attrs[`${TERN_ATTR}${k}`] = v
     }
   }
 

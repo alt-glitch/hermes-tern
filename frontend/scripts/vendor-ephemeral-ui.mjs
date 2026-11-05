@@ -9,7 +9,7 @@ import { join, resolve } from 'node:path'
 
 import { build } from 'esbuild'
 
-import { TERN_BAD_MEDIA, TERN_BAD_SELECTOR, ternBody } from '../src/eui/ternCss.js'
+import { TERN_BAD_MEDIA, TERN_BAD_SELECTOR, ternBody, ternSelector } from '../src/eui/ternCss.js'
 import { root } from './ratchet.mjs'
 
 export const PIN = '63e06b29ffb0d7c5b9d482abebc0312335897321'
@@ -63,8 +63,9 @@ function block(css, open) {
   return css.length
 }
 
-function scoped(sel) {
-  if (!sel || sel === '*') { return sel === '*' ? `${SCOPE} *` : '' }
+function scoped(raw) {
+  if (!raw || raw === '*') { return raw === '*' ? `${SCOPE} *` : '' }
+  const sel = ternSelector(raw)
   // Theme switches and root-level hooks keep their condition on the card root.
   const rooted = sel.replace(/^(:root|html|body)(?![\w-])/, SCOPE)
 

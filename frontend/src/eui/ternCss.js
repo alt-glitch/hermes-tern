@@ -12,6 +12,16 @@ export const TERN_BAD_VALUE = /color-mix\([^;]*currentColor|repeat\(\s*auto-(fil
 export const TERN_BAD_SELECTOR = /:has\(|::-webkit-|::-moz-|::backdrop/
 export const TERN_BAD_MEDIA = /\(\s*(pointer|hover|any-pointer|any-hover)\s*:/
 
+// Tern 0.9.9 matches attribute selectors on data-* attributes only ([aria-checked], [aria-pressed] and
+// [type] never match; probed live). The host mirrors every other kit attribute as data-eui-a-NAME
+// (view/euiCard.tsx) and the kit's selectors follow, so a switch or chip shows its state.
+export const TERN_ATTR = 'data-eui-a-'
+
+/** A selector with each non-data attribute test moved to its data-eui-a- mirror. */
+export function ternSelector(sel) {
+  return sel.replace(/\[\s*(?!data-)([a-zA-Z][\w-]*)/g, `[${TERN_ATTR}$1`)
+}
+
 /** One declaration as Tern parses it: equivalents for logical borders, dvh and env(); undefined drops it. */
 export function ternDecl(decl) {
   const at = decl.indexOf(':')

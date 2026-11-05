@@ -11,7 +11,8 @@ import { entryNode, type TranscriptContext } from '../view/transcript.js'
 import { decodeEuiCard } from '../wire/euiCard.js'
 
 import { tree } from './fakes.js'
-import { ternBody } from '../eui/ternCss.js'
+import { ternBody, ternSelector } from '../eui/ternCss.js'
+import { euiCardNode } from '../view/euiCard.js'
 
 const FENCE = String.fromCharCode(96).repeat(3)
 const KINDS = new EuiCards(() => undefined).kinds
@@ -212,4 +213,20 @@ describe('ephemeral-ui kit stylesheet', () => {
       'border-top:1px solid red;border-bottom:1px solid red')
     expect(ternBody("height:100dvh;padding:env(safe-area-inset-top);content:'a;b'")).toBe("height:100vh;padding:0px;content:'a;b'")
   })
+
+  // Tern 0.9.9 matches [data-*] only (probed live), so a switch never showed aria-checked="true".
+  it('moves state selectors onto the data-eui-a- mirror the host writes', async () => {
+    expect(ternSelector(`.eu-switch[aria-checked="true"] i,[open]>summary,[data-x='1']`)).toBe(
+      `.eu-switch[data-eui-a-aria-checked="true"] i,[data-eui-a-open]>summary,[data-x='1']`)
+    expect(euiStyles()).toContain(`.eu-switch[data-eui-a-aria-checked="true"]`)
+    expect(euiStyles()).not.toMatch(/\[aria-/)
+    const eui = new EuiCards(() => undefined)
+    const spec = { kind: 'home', app: 'home-assistant' }
+    eui.view('h', spec)
+    await vi.waitFor(() => { expect(eui.view('h', spec).node).toBeTruthy() }, { timeout: 5000 })
+    const drawn = JSON.stringify(tree(euiCardNode('h', eui.view('h', spec), eui)))
+    expect(drawn).toContain('"data-eui-a-aria-checked":"true"')
+    expect(drawn).toContain('"data-eui-a-aria-checked":"false"')
+    eui.close()
+  }, 20_000)
 })
