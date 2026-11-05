@@ -18,13 +18,13 @@ export interface Option {
   recommended?: boolean
   checked?: boolean
   /** A radio (the default), a checkbox, or the Other row. */
-  role?: 'omp.ask.check' | 'omp.ask.option' | 'omp.ask.other'
+  role?: 'omp.ask.check' | 'omp.ask.option' | 'omp.ask.other' | 'omp.ask.other.check'
 }
 
 /** Ctrl+C on a question sheet declines it, as Esc does (the TUI's `cancelOverlayFromCtrlC`). */
 export const isCtrlC = (k: Key) => k.ctrl && !k.alt && !k.meta && !k.shift && k.name === 'c'
 
-/** The option list `listKey`, its items keyed under node `id`; a click selects, a double click or Enter picks. */
+/** The option list `listKey`, its items keyed under node `id`; selection and activation never submit a request themselves. */
 export function optionList(
   listKey: string,
   id: string,
@@ -58,7 +58,7 @@ export function optionList(
       {options.map(o => (
         <item
           key={o.id}
-          {...optional('detail', o.detail ? [o.role === 'omp.ask.other' ? { s: 'dim', t: o.detail } : { t: o.detail }] : undefined)}
+          {...optional('detail', o.detail ? [o.role?.startsWith('omp.ask.other') ? { s: 'dim', t: o.detail } : { t: o.detail }] : undefined)}
           {...optional('icon', o.checked ? 'check' : undefined)}
           label={[{ t: o.label }]}
           role={o.role ?? 'omp.ask.option'}
