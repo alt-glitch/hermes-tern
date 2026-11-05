@@ -32,6 +32,7 @@ export const APP_SHORTCUTS: readonly Shortcut[] = [
   { id: 'app.model.cycleForward', group: 'Models', title: 'Next recent model', keys: ['ctrl+p'] },
   { id: 'app.model.cycleBackward', group: 'Models', title: 'Previous recent model', keys: ['ctrl+alt+p'] },
   { id: 'app.palette', group: 'Navigation', title: 'Command palette', keys: ['alt+k'] },
+  { id: 'app.history.search', group: 'Navigation', title: 'Search prompt history', keys: ['ctrl+r'] },
   { id: 'app.help', group: 'Navigation', title: 'Commands and shortcuts', keys: ['f1', 'alt+/'] }
 ]
 
