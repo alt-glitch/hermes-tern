@@ -43,8 +43,7 @@ export function sessionStatFacts(info: SessionInfo | null, usage: Usage | null):
     { k: 'Reasoning tokens', v: count(usage?.reasoning) },
     { k: 'Total tokens', v: count(usage?.total) },
     { k: 'Model API calls', v: count(usage?.calls) },
-    { k: 'Cache-read tokens', v: count(usage?.cache_read) },
-    { k: 'Cache-write tokens', v: count(usage?.cache_write) }
+    { k: 'Cache hit', v: usage?.cache_hit_pct == null ? 'Unknown' : `${usage.cache_hit_pct}%` }
   ]
 }
 
