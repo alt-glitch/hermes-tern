@@ -226,10 +226,7 @@ export async function readVisualFile(path: string, maxBytes: number, signal?: Ab
   }
 }
 
-/**
- * Use the actual #457 validator/fingerprints from the Hermes checkout. A
- * missing donor fails closed; never substitute a partial local schema check.
- */
+/** Read a prepared file using its pinned card schema or the original #457 OpenUI contract. */
 export async function readPreparedVisual(path: string, scope: string, signal?: AbortSignal): Promise<PreparedVisual> {
   signal?.throwIfAborted()
   const loaded = await readVisualFile(path, 8 * 1024 * 1024, signal)
