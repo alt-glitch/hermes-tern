@@ -85356,6 +85356,46 @@ async function createSandbox(dir2, scheme2 = "light", log = () => {
       return { ok: true, status: 200, json: async () => JSON.parse(text16), text: async () => text16 };
     }
   };
+  ctx.getSelection = () => ({ removeAllRanges() {
+  }, addRange() {
+  }, selectAllChildren() {
+  }, collapseToEnd() {
+  }, toString: () => "" });
+  document3.elementFromPoint ??= () => null;
+  document3.createRange ??= () => ({ selectNodeContents() {
+  }, setStart() {
+  }, setEnd() {
+  } });
+  window2.HTMLElement.prototype.select ??= function select2() {
+  };
+  const optionsOf = (sel) => [...sel.querySelectorAll("option")];
+  const chosen = (sel) => Math.max(0, optionsOf(sel).findIndex((o) => o.hasAttribute("selected")));
+  const choose = (sel, i) => {
+    for (const [j, o] of optionsOf(sel).entries()) o.toggleAttribute("selected", j === i);
+  };
+  Object.defineProperties(window2.HTMLSelectElement.prototype, {
+    options: { configurable: true, get() {
+      return optionsOf(this);
+    } },
+    selectedIndex: { configurable: true, get() {
+      return optionsOf(this).length ? chosen(this) : -1;
+    }, set(i) {
+      choose(this, i);
+    } },
+    value: { configurable: true, get() {
+      const o = optionsOf(this)[chosen(this)];
+      return o ? o.getAttribute("value") ?? o.textContent : "";
+    }, set(v) {
+      choose(this, optionsOf(this).findIndex((o) => (o.getAttribute("value") ?? o.textContent) === String(v)));
+    } }
+  });
+  Object.defineProperty(window2.HTMLOptionElement.prototype, "selected", { configurable: true, get() {
+    const sel = this.closest("select");
+    return sel ? optionsOf(sel)[chosen(sel)] === this : this.hasAttribute("selected");
+  }, set(v) {
+    const sel = this.closest("select");
+    if (sel && v) choose(sel, optionsOf(sel).indexOf(this));
+  } });
   ctx.self = ctx;
   ctx.globalThis = ctx;
   vm.createContext(ctx);
@@ -85399,7 +85439,9 @@ async function createSandbox(dir2, scheme2 = "light", log = () => {
     if (el.hidden) attrs.hidden = "true";
     if (el.disabled) attrs.disabled = "true";
     const kids = [];
-    for (const k of el.childNodes) {
+    const shown3 = el.localName === "details" && !el.hasAttribute("open") ? [...el.children].filter((k) => k.localName === "summary") : el.localName === "select" ? [...el.options].filter((o) => o.selected).slice(0, 1) : el.childNodes;
+    if (el.localName === "details") attrs.open = el.hasAttribute("open") ? "true" : "";
+    for (const k of shown3) {
       const s2 = snapshot3(k);
       if (s2) kids.push(s2);
     }
@@ -85413,6 +85455,7 @@ async function createSandbox(dir2, scheme2 = "light", log = () => {
     } catch (err) {
       log(err);
     }
+    return e;
   };
   return {
     kinds: Object.keys(K.KINDS),
@@ -85460,7 +85503,25 @@ async function createSandbox(dir2, scheme2 = "light", log = () => {
           fire(el, "pointerdown");
           if (el.closest(".hold")) return true;
           fire(el, "pointerup");
-          fire(el, "click");
+          const clicked = fire(el, "click");
+          const summary4 = el.closest("summary");
+          const details = summary4?.parentElement;
+          if (!clicked.defaultPrevented && details?.localName === "details" && details.firstElementChild === summary4) {
+            details.toggleAttribute("open");
+            details.dispatchEvent(new window2.Event("toggle"));
+          }
+          const label = el.closest("label");
+          const box = label && (label.htmlFor ? root7.querySelector(`[id="${String(label.htmlFor).replace(/"/g, "")}"]`) : label.querySelector("input"));
+          if (!clicked.defaultPrevented && box && box !== el && (box.type === "checkbox" || box.type === "radio") && !box.disabled) {
+            box.checked = box.type === "radio" ? true : !box.checked;
+            fire(box, "input");
+            fire(box, "change");
+          }
+          if (el.localName === "select" && el.options.length > 1) {
+            el.selectedIndex = (el.selectedIndex + 1) % el.options.length;
+            fire(el, "input");
+            fire(el, "change");
+          }
           return true;
         },
         dispose() {
@@ -85472,6 +85533,80 @@ async function createSandbox(dir2, scheme2 = "light", log = () => {
       };
     }
   };
+}
+
+// src/eui/ternCss.js
+var TERN_DROP = /* @__PURE__ */ new Set([
+  "aspect-ratio",
+  "text-anchor",
+  "vector-effect",
+  "-webkit-appearance",
+  "appearance",
+  "-webkit-touch-callout",
+  "scroll-margin-top",
+  "grid-template-areas",
+  "grid-area",
+  "resize",
+  "offset-rotate",
+  "offset-anchor",
+  "text-underline-offset",
+  "text-decoration-thickness"
+]);
+var TERN_BAD_VALUE = /color-mix\([^;]*currentColor|repeat\(\s*auto-(fill|fit)|conic-gradient|\bNaN|\bundefined|\bnull\b/i;
+function ternDecl(decl) {
+  const at = decl.indexOf(":");
+  if (at < 0) {
+    return decl;
+  }
+  const prop2 = decl.slice(0, at).trim().toLowerCase();
+  let value = decl.slice(at + 1).trim();
+  if (prop2.startsWith("--")) {
+    return decl;
+  }
+  if (!value || TERN_DROP.has(prop2) || TERN_BAD_VALUE.test(value)) {
+    return void 0;
+  }
+  value = value.replace(/(\d)dvh\b/g, "$1vh").replace(/env\([^()]*\)/g, "0px");
+  if (prop2 === "position" && value === "fixed") {
+    return `${decl.slice(0, at)}:absolute`;
+  }
+  if (prop2 === "border-block") {
+    return `border-top:${value};border-bottom:${value}`;
+  }
+  if (prop2 === "border-inline-start") {
+    return `border-left:${value}`;
+  }
+  return `${decl.slice(0, at)}:${value}`;
+}
+function ternBody(body) {
+  const out = [];
+  let depth = 0;
+  let quote2 = "";
+  let start = 0;
+  for (let i = 0; i <= body.length; i++) {
+    const ch = body[i];
+    if (quote2) {
+      if (ch === quote2 && body[i - 1] !== "\\") {
+        quote2 = "";
+      }
+      continue;
+    }
+    if (ch === '"' || ch === "'") {
+      quote2 = ch;
+    } else if (ch === "(") {
+      depth++;
+    } else if (ch === ")") {
+      depth--;
+    } else if (ch === ";" && depth === 0 || i === body.length) {
+      const decl = body.slice(start, i).trim();
+      const kept = decl ? ternDecl(decl) : void 0;
+      if (kept) {
+        out.push(kept);
+      }
+      start = i + 1;
+    }
+  }
+  return out.join(";");
 }
 
 // src/eui/cards.ts
@@ -85580,7 +85715,7 @@ var EuiCards = class {
   }
   click(key3, id) {
     if (this.#slots.get(key3)?.mounted?.click(id)) {
-      this.#bump();
+      this.#bump(key3);
     }
   }
   /** A blob id for one SVG, sent once and reused while it lasts. */
@@ -85602,7 +85737,7 @@ var EuiCards = class {
   style(css2) {
     const key3 = createHash4("sha1").update(css2).digest("hex").slice(0, 10);
     if (!this.#rules.has(key3)) {
-      this.#rules.set(key3, `[data-eui-s='${key3}']{${css2.replace(/[{}<]/g, "")}}`);
+      this.#rules.set(key3, `[data-eui-s='${key3}']{${ternBody(css2.replace(/[{}<]/g, ""))}}`);
       this.#sheetDirty = true;
       queueMicrotask(() => {
         this.#flush();
@@ -85618,7 +85753,7 @@ var EuiCards = class {
     if (!this.#sink) {
       return;
     }
-    if (!euiSheets.has(KIT_SHEET)) {
+    if (this.#slots.size > 0 && !euiSheets.has(KIT_SHEET)) {
       euiSheets.set(KIT_SHEET, euiStyles());
       this.#sink.stylesheet(KIT_SHEET, euiStyles());
     }
@@ -85636,12 +85771,13 @@ var EuiCards = class {
         return;
       }
       slot.mounted = sb.mount(slot.spec.kind, slot.spec.app, () => {
-        this.#bump();
+        this.#bump(key3);
       });
-      this.#bump();
+      this.#flush();
+      this.#bump(key3);
     }).catch((e) => {
       slot.error = e instanceof Error ? e.message : String(e);
-      this.#bump();
+      this.#bump(key3);
     });
   }
   #evict() {
@@ -85664,9 +85800,10 @@ var EuiCards = class {
     this.#slots.clear();
     this.#bump();
   }
-  #bump() {
+  /** `key`: the card that changed, so its transcript row is drawn again even once settled. */
+  #bump(key3) {
     this.revision++;
-    this.#changed();
+    this.#changed(key3);
   }
 };
 function themeSvg(svg3) {
@@ -98098,7 +98235,13 @@ var App = class {
       policy: async () => settings2.load().tableCharts ?? "off",
       plan: hermesTableChartPlanner()
     }, () => this.changed());
-    this.eui = new EuiCards(() => this.changed());
+    this.eui = new EuiCards((key3) => {
+      const entry = key3 === void 0 ? void 0 : this.transcript.entries.find((e) => key3.startsWith(`main.${e.id}.`));
+      if (entry) {
+        this.transcript.changedEntries.add(entry);
+      }
+      this.changed();
+    });
     this.#hostLifecycle = new HostLifecycle(writeHost ?? ((text16) => {
       if (launch3.pane) {
         process.stdout.write(text16);
