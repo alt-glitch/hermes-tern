@@ -171,7 +171,7 @@ export function validateScope(scope) {
   }
   if (!Array.isArray(parts) || parts.length !== 2 || typeof parts[0] !== 'string' ||
       !parts[0] || typeof parts[1] !== 'string' || JSON.stringify(parts) !== scope ||
-      scope.length > 256 || controls.test(scope)) {
+      scope.length > 256 || controls.test(scope) || controls.test(parts[0]) || controls.test(parts[1])) {
     fail('scope must be the exact session/branch JSON pair.')
   }
 }
