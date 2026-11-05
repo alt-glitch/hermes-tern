@@ -40,6 +40,19 @@ describe('Tern app action registry', () => {
     }
   })
 
+  it('keeps Ctrl+R app-owned through rebind, disable, reset and collision validation', () => {
+    const id = 'app.history.search'
+    expect(shortcutMatches(action(id), key('r', { ctrl: true }))).toBe(true)
+    const moved = action(id, { [id]: 'ctrl+alt+r' })
+    expect(shortcutMatches(moved, key('r', { ctrl: true }))).toBe(false)
+    expect(shortcutMatches(moved, key('r', { ctrl: true, alt: true }))).toBe(true)
+    expect(action(id, { [id]: [] }).keys).toEqual([])
+    expect(action(id, { [id]: null }).keys).toEqual(['ctrl+r'])
+    expect(() => effectiveShortcuts({ 'app.palette': 'ctrl+r' })).toThrow(/Overlapping/)
+    const released = effectiveShortcuts({ [id]: [], 'app.palette': 'ctrl+r' })
+    expect(released.find(item => item.id === 'app.palette')?.keys).toEqual(['ctrl+r'])
+  })
+
   it('applies disable, reset, and rebinding atomically', () => {
     const changed = effectiveShortcuts({ 'app.help': ['alt+h'] })
     expect(shortcutMatches(action('app.help', { 'app.help': ['alt+h'] }), key('h', { alt: true }))).toBe(true)
