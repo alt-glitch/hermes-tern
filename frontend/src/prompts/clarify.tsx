@@ -56,12 +56,13 @@ export function clarifyOverlay(host: OverlayHost, prompt: ClarifyPrompt): Overla
   const optionsOf = (q: Question, d: Draft): Option[] => [
     ...q.choices.map((c, i): Option => ({
       checked: q.multi && d.picked.has(i),
+      detail: q.previews?.[i],
       id: `option:${i}`,
       label: c.replace(RECOMMENDED, ''),
       recommended: RECOMMENDED.test(c),
       role: q.multi ? 'omp.ask.check' : 'omp.ask.option'
     })),
-    { detail: d.other.text || 'Type your own answer', id: 'other', label: 'Other…', role: 'omp.ask.other' }
+    { checked: q.multi && Boolean(d.other.text.trim()), detail: d.other.text || 'Type your own answer', id: 'other', label: 'Other…', role: q.multi ? 'omp.ask.other.check' : 'omp.ask.other' }
   ]
 
   /** Records the current question's answer and moves to the next unanswered one, or submits. */
@@ -148,9 +149,8 @@ export function clarifyOverlay(host: OverlayHost, prompt: ClarifyPrompt): Overla
     } else if (q.multi) {
       d.picked.add(i)
     } else {
+      // Even a native activation or a number key only selects. Submit owns the answer.
       d.typing = false
-
-      return submit()
     }
 
     host.changed()
@@ -186,6 +186,8 @@ export function clarifyOverlay(host: OverlayHost, prompt: ClarifyPrompt): Overla
 
       const freeText = !q.choices.length
       const last = questions.every((other, i) => i === step || other.qid in answers)
+      const previewLabel = d.selected < q.choices.length ? q.choices[d.selected]?.replace(RECOMMENDED, '') : undefined
+      const previewDetail = q.previews?.[d.selected]
 
       return (
         <overlay anchor="bottom" key={nativeOverlayKey(id)} modal role="omp.overlay.ask" size="md">
@@ -230,6 +232,12 @@ export function clarifyOverlay(host: OverlayHost, prompt: ClarifyPrompt): Overla
                   },
                   activate
                 )}
+            {previewLabel ? (
+              <col gap="xs" key="preview" role="omp.ask.preview">
+                <text key="label" spans={[{ s: 'strong', t: previewLabel }]} wrap="word" />
+                {previewDetail ? <text key="detail" spans={[{ s: 'dim', t: previewDetail }]} wrap="word" /> : null}
+              </col>
+            ) : null}
             {freeText || d.typing ? (
               <input
                 cursor={d.other.cursor}
@@ -296,7 +304,7 @@ export function clarifyOverlay(host: OverlayHost, prompt: ClarifyPrompt): Overla
         commit(null)
       } else if (k.name === 'enter') {
         if (unmodified(k)) {
-          if (typing || (q.multi && d.selected < q.choices.length)) { submit() }
+          if (typing || d.selected < q.choices.length) { submit() }
           else { activate(d.selected) }
         } else if (typing && !k.ctrl && !k.meta && (k.shift || k.alt)) {
           d.other.key(k)
