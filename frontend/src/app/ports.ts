@@ -10,6 +10,7 @@ import type { SessionInfo } from '@tui/types.js'
 
 import type { Agents } from '../agents/store.js'
 import type { BtwThreads } from '../btw.js'
+import type { Dictation } from '../draft/dictation.js'
 import type { SessionHost } from '../commands/session.js'
 import type { PrKey, SessionIds, StoredSessionId } from '../core/ids.js'
 import type { GitState } from '../git/status.js'
@@ -48,6 +49,8 @@ export interface ChatPorts extends OverlayHost {
   readonly busy: Busy | null
   readonly transcript: Transcript
   readonly liveVoice: LiveVoice
+  /** Dictation into the composer (`/voice`). */
+  readonly dictation: Pick<Dictation, 'disable' | 'enable' | 'key' | 'phase'>
   readonly agents: Agents
   readonly processes: Processes
   readonly cron: Cron

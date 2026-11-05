@@ -23,6 +23,7 @@ import { Flash } from '../core/flash.js'
 import type { PrKey } from '../core/ids.js'
 import type { Attachments } from '../draft/attachments.js'
 import type { Composer } from '../draft/composer.js'
+import type { Dictation } from '../draft/dictation.js'
 import type { KeyCx, Presses } from '../draft/keys.js'
 import { forkSession } from '../fork-session.js'
 import { shellError, shellExec, shellLines } from '../hermes/shell.js'
@@ -103,6 +104,7 @@ export interface ActionsCx {
   readonly completion: Completion
   readonly hud: Hud
   readonly composer: Composer
+  readonly dictation: Dictation
   readonly liveVoice: LiveVoice
   readonly transcript: Transcript
   readonly todoHud: TodoHud
@@ -141,7 +143,7 @@ export class AppActions {
   readonly host: SessionHostCx
   constructor(cx: ActionsCx) {
     this.#cx = cx
-    const { attachments, chat, composer, gw, life, queue, transcript } = cx
+    const { attachments, chat, composer, dictation, gw, life, queue, transcript } = cx
     const changed = () => cx.changed()
     const admit = () => !isModal(chat.overlays) && !life.switching && !attachments.any && !attachments.uploading
     this.#busyDraft = new BusyDraft({ activity: cx.activity, admit, composer, gw, router: cx.router, session: cx.state, transcript, changed })
@@ -151,6 +153,9 @@ export class AppActions {
       onBtwView: notice => cx.btw.viewNotice(notice),
       onBtwDismiss: notice => cx.btw.dismissNotice(notice),
       onAgents: () => openAgents(chat),
+      onDictate: () => dictation.toggle(),
+      onDictationCancel: () => void dictation.cancel(),
+      onDictationDone: () => dictation.finish(),
       onNotices: () => chat.openNotices(),
       onContext: () => openContext({ changed, close: o => chat.close(o), gw, open: o => chat.open(o), session: cx.state }),
       onEdit: ev => {
@@ -196,6 +201,7 @@ export class AppActions {
       close: overlay => chat.close(overlay),
       completion: cx.completion,
       composer,
+      dictation,
       liveVoice: cx.liveVoice,
       vim: composer.vim,
       cycleEffort: () => cycleEffort(chat),
@@ -285,8 +291,12 @@ export class AppActions {
 
   // ── Prompts and commands ───────────────────────────────────────────
 
-  /** Sends the composer's draft, with the pastes it holds. */
+  /** Sends the composer's draft, with the pastes it holds; during dictation Enter ends the capture. */
   submitDraft(alternate = false) {
+    if (this.#cx.dictation.capturing) {
+      this.#cx.dictation.finish()
+      return
+    }
     if (this.#cx.liveVoice.blocked || isModal(this.#cx.chat.overlays)) return
     const raw = this.#cx.composer.text
 
@@ -301,6 +311,10 @@ export class AppActions {
 
   /** Tern native Send obeys the same busy intent as keyboard Enter. */
   submitNative(raw: string) {
+    if (this.#cx.dictation.capturing) {
+      this.#cx.dictation.finish()
+      return
+    }
     if (isModal(this.#cx.chat.overlays)) return
     if (shouldSteer(this.#cx, raw, false)) {
       void this.#busyDraft.steer(raw)

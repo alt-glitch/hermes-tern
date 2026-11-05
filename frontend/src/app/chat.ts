@@ -28,6 +28,7 @@ import { onKey } from '../draft/keys.js'
 import { editExternal as editDraftExternal } from '../draft/external-editor.js'
 import { followGateway } from '../gateway/follow.js'
 import type { PullRequests } from '../github/store.js'
+import { hermesRecorder, type Recorder } from '../hermes/dictation.js'
 import { HostLifecycle } from '../host-lifecycle.js'
 import type { NoticeEntry } from '../model.js'
 import type { OperationalSheets } from '../operations.js'
@@ -99,8 +100,13 @@ export class App implements ChatPorts {
   /** What each frame draws from (app/frame.ts); set once run() opened the surface. */
   #view: FrameCx | undefined
 
-  /** `launch` and `settings` are what entry.ts read once at startup; unset, each reads its default. */
-  constructor(tern: Session, gw: GatewayClient, version: string, { launch = readLaunchEnv(), settings = fileSettings(), writeHost }: { launch?: LaunchEnv; settings?: SettingsSource; writeHost?: (text: string) => void } = {}) {
+  /** Entry defaults are read at startup; `recorder` injects the dictation helper in tests. */
+  constructor(
+    tern: Session,
+    gw: GatewayClient,
+    version: string,
+    { launch = readLaunchEnv(), recorder = hermesRecorder(), settings = fileSettings(), writeHost }: { launch?: LaunchEnv; recorder?: Recorder | undefined; settings?: SettingsSource; writeHost?: (text: string) => void } = {}
+  ) {
     this.#tern = tern
     this.#gw = gw
     this.#launch = launch
@@ -113,7 +119,7 @@ export class App implements ChatPorts {
         process.stdout.write(text)
       }
     }))
-    const s = chatStores(this, { act: () => this.#act, gw, launch, settings, surface: () => this.#surface, tern, version })
+    const s = chatStores(this, { act: () => this.#act, gw, launch, recorder, settings, surface: () => this.#surface, tern, version })
     this.stores = s
     this.session = s.session
     this.transcript = s.transcript
@@ -138,6 +144,11 @@ export class App implements ChatPorts {
   /** The gateway, for overlays that issue their own RPCs. */
   get gw(): GatewayClient {
     return this.#gw
+  }
+
+  /** Dictation into the composer (`/voice`). */
+  get dictation() {
+    return this.stores.dictation
   }
 
   /** Whose colors the surface wears (`/theme`). */
