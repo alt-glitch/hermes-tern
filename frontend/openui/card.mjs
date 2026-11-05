@@ -25,7 +25,6 @@ if (schema.$schema !== 'https://json-schema.org/draft/2020-12/schema' ||
   throw new Error('Pinned card schema is unsupported.')
 }
 
-const kinds = new Set(properties.kind.enum)
 const allowed = new Set([...Object.keys(properties), ...TEXT_KEYS, 'fields', 'buttons'])
 const controls = /[\p{Cc}\u202a-\u202e\u2066-\u2069]/u
 
@@ -218,7 +217,7 @@ async function boundedInput(path) {
 export async function prepareCardFile(inputPath, scope, outputDir) {
   validateScope(scope)
   if (!isAbsolute(outputDir) || controls.test(outputDir)) fail('output directory must be absolute.')
-  const frontend = fileURLToPath(new URL('../', import.meta.url))
+  const frontend = resolve(fileURLToPath(new URL('../', import.meta.url)))
   const output = resolve(outputDir)
   if (output === frontend || output.startsWith(frontend + sep)) fail('output must be outside the plugin.')
   const card = validateCardDocument(await boundedInput(inputPath))
