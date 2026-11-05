@@ -13,20 +13,36 @@ function pane() {
   const calls: string[] = []
   const cx: KeyCx = {
     attachClipboardImage: () => undefined,
-    attachments: { any: false, clear: () => undefined, clearAll: () => { calls.push('clear images') }, paste: () => false },
+    attachments: {
+      any: false,
+      clear: () => undefined,
+      clearAll: () => void calls.push('clear images'),
+      paste: () => false
+    },
     busy: () => true,
     close: () => undefined,
     completion: { onKey: () => false },
     composer: {
       key: () => null,
-      set: value => { text = value; calls.push('clear draft') },
-      take: () => { const old = text; text = ''; calls.push('take draft'); return old },
+      set: value => {
+        text = value
+        calls.push('clear draft')
+      },
+      take: () => {
+        const old = text
+        text = ''
+        calls.push('take draft')
+        return old
+      },
       get text() { return text }
     },
     copyDraft: () => undefined,
     cycleEffort: () => undefined,
     dictation: {
-      cancel: () => { calls.push('cancel capture'); return true },
+      cancel: () => {
+        calls.push('cancel capture')
+        return true
+      },
       onKey: pressed => {
         if (pressed.name !== 'escape') return false
         calls.push('dictation escape')
@@ -35,7 +51,7 @@ function pane() {
     },
     fork: () => undefined,
     hud: () => false,
-    interrupt: () => { calls.push('interrupt') },
+    interrupt: () => void calls.push('interrupt'),
     liveVoice: { blocked: false, toggle: () => undefined, control: async () => undefined },
     now: () => 10_000,
     openAgents: () => undefined,
@@ -46,8 +62,8 @@ function pane() {
     openPlan: () => undefined,
     presses: { esc: 0, exit: 0 },
     queue: { count: () => 0, dequeue: () => undefined, steer: () => undefined },
-    quit: () => { calls.push('quit') },
-    submitDraft: () => { calls.push('send') },
+    quit: () => void calls.push('quit'),
+    submitDraft: () => void calls.push('send'),
     steerDraft: () => undefined,
     toggleSidebar: () => undefined,
     transcript: { notice: () => undefined }
