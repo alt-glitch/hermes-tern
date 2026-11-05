@@ -6,7 +6,8 @@ import { isAbsolute } from 'node:path'
 import { pathToFileURL } from 'node:url'
 
 import type { ChatPorts } from './app/ports.js'
-import { decodeJson } from './wire/json.js'
+import { type CardDocument, openCardContract } from './wire/card.js'
+import { decodeJson, record } from './wire/json.js'
 import { openUiContract } from './wire/openui.js'
 
 interface RepositoryNode {
@@ -39,10 +40,17 @@ export type VisualBundle = RepositoryBundle | IntentBundle
 export interface VisualSummary {
   readonly id: string
   readonly title: string
-  readonly mode: 'code' | 'churn' | 'intent'
+  readonly mode: 'code' | 'churn' | 'intent' | 'card'
   readonly metrics: readonly { readonly key: string; readonly label: string; readonly value: number }[]
   /** An intent board's sections in the order the model chose them (`DecisionMix(providers)`). */
   readonly sections?: readonly string[]
+  readonly card?: {
+    readonly kind: string
+    readonly app: string
+    readonly texts: readonly { readonly label: string; readonly value: string }[]
+    readonly buttons: readonly string[]
+    readonly actions: 'read-only' | 'host-confirmed'
+  }
 }
 
 export interface PreparedVisual extends VisualSummary {
@@ -125,6 +133,43 @@ function summarizeRepository(bundle: RepositoryBundle): VisualSummary {
   })
 }
 
+/** Show only validated inert text and labels, never card instructions or callbacks. */
+function summarizeCard(card: CardDocument, id: string): VisualSummary {
+  const labels: Readonly<Record<string, string>> = {
+    text: 'Text',
+    summary: 'Summary',
+    description: 'Description',
+    subject: 'Subject',
+    status: 'Status',
+    label: 'Label',
+    query: 'Query',
+    body: 'Body',
+    message: 'Message',
+    note: 'Note'
+  }
+  const texts = Object.entries(labels).flatMap(([key, label]) => {
+    const value = card[key]
+
+    return typeof value === 'string' ? [Object.freeze({ label, value })] : []
+  })
+  const extra = Object.entries(card.fields ?? {}).map(([label, value]) => Object.freeze({ label, value }))
+  const buttons = (card.buttons ?? []).map(button => typeof button === 'string' ? button : button.label)
+
+  return Object.freeze({
+    id,
+    title: card.title ?? card.kind + ' · ' + card.app,
+    mode: 'card',
+    metrics: Object.freeze([]),
+    card: Object.freeze({
+      kind: card.kind,
+      app: card.app,
+      texts: Object.freeze([...texts, ...extra]),
+      buttons: Object.freeze(buttons),
+      actions: card.actions ?? 'read-only'
+    })
+  })
+}
+
 /** Byte bound applies to the actual read, including growth after stat. */
 export async function readVisualFile(path: string, maxBytes: number, signal?: AbortSignal): Promise<{ path: string; input: unknown }> {
   signal?.throwIfAborted()
@@ -187,9 +232,24 @@ export async function readVisualFile(path: string, maxBytes: number, signal?: Ab
  */
 export async function readPreparedVisual(path: string, scope: string, signal?: AbortSignal): Promise<PreparedVisual> {
   signal?.throwIfAborted()
+  const loaded = await readVisualFile(path, 8 * 1024 * 1024, signal)
+
+  if (record(loaded.input)?.['kind'] === 'hermes.visual.card') {
+    const validator = await openCardContract()
+    signal?.throwIfAborted()
+    const prepared = validator.validatePreparedCard(loaded.input, scope)
+
+    return Object.freeze({
+      ...summarizeCard(prepared.card, prepared.id),
+      path: loaded.path,
+      href: pathToFileURL(loaded.path).href
+    })
+  }
+
+  // All original OpenUI and intent candidates still use the reviewed donor
+  // validator, current source fingerprints and strict session/branch scope.
   const tools = await openUiContract()
   signal?.throwIfAborted()
-  const loaded = await readVisualFile(path, tools.MAX_BYTES, signal)
   const bundle = tools.validateBundle(loaded.input)
   const current = await tools.fingerprints()
   signal?.throwIfAborted()
