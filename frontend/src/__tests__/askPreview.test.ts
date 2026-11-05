@@ -61,6 +61,16 @@ function preview(overlay: Overlay): string | undefined {
 }
 
 describe('clarify option previews and Other check', () => {
+  it('does not draw previews or change the Other row for legacy string choices', () => {
+    const { overlay } = ask(['main', 'dev'])
+
+    expect(preview(overlay)).toBeUndefined()
+    expect(roleNode(node(overlay), 'omp.ask.other')).toBeDefined()
+    expect(roleNode(node(overlay), 'omp.ask.other.check')).toBeUndefined()
+    overlay.onKey(key('down'))
+    expect(preview(overlay)).toBeUndefined()
+  })
+
   it('previews the highlighted host option and requires Enter after selection', () => {
     const { answers, overlay } = ask([
       { detail: 'Local single-file storage', id: 'sqlite', label: 'SQLite' },
@@ -83,7 +93,8 @@ describe('clarify option previews and Other check', () => {
     const { answers, overlay } = ask(['SQLite', 'Postgres'], true)
     const other = () => roleNode(node(overlay), 'omp.ask.other.check')
 
-    expect(other()?.p?.['icon']).toBeUndefined()
+    expect(roleNode(node(overlay), 'omp.ask.other')).toBeDefined()
+    expect(other()).toBeUndefined()
     overlay.onKey(key('space'))
     overlay.onKey(key('down'))
     overlay.onKey(key('down'))

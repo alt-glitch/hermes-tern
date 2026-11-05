@@ -62,7 +62,7 @@ export function clarifyOverlay(host: OverlayHost, prompt: ClarifyPrompt): Overla
       recommended: RECOMMENDED.test(c),
       role: q.multi ? 'omp.ask.check' : 'omp.ask.option'
     })),
-    { checked: q.multi && Boolean(d.other.text.trim()), detail: d.other.text || 'Type your own answer', id: 'other', label: 'Other…', role: q.multi ? 'omp.ask.other.check' : 'omp.ask.other' }
+    { checked: q.multi && Boolean(d.other.text.trim()), detail: d.other.text || 'Type your own answer', id: 'other', label: 'Other…', role: q.multi && Boolean(d.other.text.trim()) ? 'omp.ask.other.check' : 'omp.ask.other' }
   ]
 
   /** Records the current question's answer and moves to the next unanswered one, or submits. */
@@ -186,7 +186,7 @@ export function clarifyOverlay(host: OverlayHost, prompt: ClarifyPrompt): Overla
 
       const freeText = !q.choices.length
       const last = questions.every((other, i) => i === step || other.qid in answers)
-      const previewLabel = d.selected < q.choices.length ? q.choices[d.selected]?.replace(RECOMMENDED, '') : undefined
+      const previewLabel = q.previews?.some(Boolean) && d.selected < q.choices.length ? q.choices[d.selected]?.replace(RECOMMENDED, '') : undefined
       const previewDetail = q.previews?.[d.selected]
 
       return (

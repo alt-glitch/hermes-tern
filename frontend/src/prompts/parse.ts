@@ -84,19 +84,30 @@ const strings = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x: unkno
  * read only its display fields here and continue to answer with the label, not an action or id.
  * Original schema/provenance: kvnloo/hermes-tern#56, Ripple fast-controls at d160863.
  */
+function clarifyChoice(value: unknown): { label: string; detail: string } | undefined {
+  if (typeof value === 'string') {
+    return { detail: '', label: value }
+  }
+
+  if (!value || typeof value !== 'object' || !('label' in value) || typeof value.label !== 'string' || !value.label.trim()) {
+    return undefined
+  }
+
+  return { detail: 'detail' in value && typeof value.detail === 'string' ? value.detail : '', label: value.label }
+}
+
 function clarifyChoices(raw: unknown): { labels: string[]; previews: string[] } {
   const labels: string[] = []
   const previews: string[] = []
 
-  if (Array.isArray(raw)) {
-    for (const item of raw) {
-      if (typeof item === 'string') {
-        labels.push(item)
-        previews.push('')
-      } else if (item && typeof item === 'object' && 'label' in item && typeof item.label === 'string' && item.label.trim()) {
-        labels.push(item.label)
-        previews.push('detail' in item && typeof item.detail === 'string' ? item.detail : '')
-      }
+  const items: unknown[] = Array.isArray(raw) ? raw : []
+
+  for (const item of items) {
+    const choice = clarifyChoice(item)
+
+    if (choice) {
+      labels.push(choice.label)
+      previews.push(choice.detail)
     }
   }
 

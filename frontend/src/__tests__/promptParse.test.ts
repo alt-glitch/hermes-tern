@@ -1,7 +1,7 @@
 import type { ServerRequest } from '@hermes/shared/json-rpc-channel'
 import { describe, expect, it } from 'vitest'
 
-import { parsePrompt } from '../prompts/parse.js'
+import { parsePrompt, questionsOf } from '../prompts/parse.js'
 
 function request(method: string, params: Record<string, unknown>): ServerRequest {
   return { fail: () => undefined, id: 'r1', method, params, respond: () => undefined }
@@ -43,6 +43,24 @@ describe('parsePrompt: approval', () => {
 })
 
 describe('parsePrompt: clarify and masked values', () => {
+  it('preserves legacy choices and accepts only typed host-authored preview fields', () => {
+    const legacy = questionsOf([{ choices: ['main', 'dev'], qid: 'branch', question: 'Which branch?' }])
+    expect(legacy).toEqual([{ choices: ['main', 'dev'], multi: false, qid: 'branch', question: 'Which branch?' }])
+
+    const rich = questionsOf([{
+      choices: ['main', { label: 'dev', detail: 'Development branch' }, { label: 'release', detail: 4 }, null, { label: 17, detail: 'bad' }, { label: '  ', detail: 'blank' }],
+      qid: 'branch',
+      question: 'Which branch?'
+    }])
+    expect(rich).toEqual([{
+      choices: ['main', 'dev', 'release'],
+      multi: false,
+      previews: ['', 'Development branch', ''],
+      qid: 'branch',
+      question: 'Which branch?'
+    }])
+  })
+
   it('drops questions with no qid or a blank question, and keeps the answers a replay locked', () => {
     expect(
       parsePrompt(
