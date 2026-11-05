@@ -46,6 +46,7 @@ import { runInput } from '../surface/input.js'
 import type { Transcript } from '../transcript/store.js'
 import { hermesTableChartPlanner } from '../transcript/tableChartPlanner.js'
 import { TableCharts } from '../transcript/tableCharts.js'
+import { EuiCards } from '../eui/cards.js'
 import type { Busy } from '../turn/activity.js'
 import { IMAGE_ONLY_PROMPT } from '../turn/prompt.js'
 import { Retention } from '../view/retention.js'
@@ -69,6 +70,7 @@ export class App implements ChatPorts {
   readonly transcript: Transcript
   /** Session-scoped derived charts; never changes transcript or answer copy. */
   readonly tableCharts: TableCharts
+  readonly eui: EuiCards
   readonly liveVoice: LiveVoice
   readonly agents: Agents
   readonly processes: Processes
@@ -108,6 +110,7 @@ export class App implements ChatPorts {
       policy: async () => settings.load().tableCharts ?? 'off',
       plan: hermesTableChartPlanner()
     }, () => this.changed())
+    this.eui = new EuiCards(() => this.changed())
     this.#hostLifecycle = new HostLifecycle(writeHost ?? (text => {
       if (launch.pane) {
         process.stdout.write(text)
@@ -193,6 +196,7 @@ export class App implements ChatPorts {
       hour12: () => this.#tern.caps.hour12,
       nativeMedia: this.#tern.caps.kinds?.includes('media') ?? false,
       charts: this.tableCharts,
+      eui: this.eui,
       ...(this.#orb ? { orb: this.#orb } : {}),
       gateway: this.#gw,
       surface: this.#surface,
@@ -201,6 +205,8 @@ export class App implements ChatPorts {
     s.theme.apply()
     // A card that throws draws as the generic one, and the pane says so once per tool name.
     onCardFault(noticeSink(text => this.notice(text, 'warning')))
+
+    this.eui.attach({ blob: (bytes, mime) => this.#tern.blob(bytes, mime), stylesheet: (name, css) => { this.#surface.raw.stylesheet(name, css) } }, Boolean(this.#tern.caps.dark))
 
     if (this.#tern.caps.features.includes('blobs')) {
       s.welcome.logo = this.#tern.blob(logo, 'image/png')
@@ -278,6 +284,7 @@ export class App implements ChatPorts {
    */
   dispose() {
     this.tableCharts.close()
+    this.eui.close()
     this.#orb?.close()
     this.#surface?.dispose()
     this.#act.dispose()
@@ -390,6 +397,7 @@ export class App implements ChatPorts {
     }
     if (ev.ev === 'theme') {
       this.#orb?.environment({ dark: ev.dark })
+      this.eui.theme(ev.dark)
     }
     if (ev.ev === 'motion') {
       this.#orb?.environment({ reduce: ev.reduce })
