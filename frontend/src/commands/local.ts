@@ -20,6 +20,7 @@ import { type PlanReviewHost, openPlanReview } from '../overlays/plan.js'
 import { confirmOverlay } from '../overlays/prompts.js'
 import { prsCommand, type PullRequestsSheetHost } from '../overlays/pullRequests.js'
 import { openRewind } from '../overlays/rewind.js'
+import { openSessionInfo } from '../overlays/sessionInfo.js'
 import { openSessionPicker, type SessionsHost } from '../overlays/sessions.js'
 import { openSettings } from '../overlays/settings.js'
 import { openToolResults } from '../overlays/toolResults.js'
@@ -360,6 +361,11 @@ const COMMANDS: readonly LocalCommand[] = [
     help: "This conversation's branches as a tree: open one",
     name: 'tree',
     run: host => openBranchTree(host)
+  },
+  {
+    help: 'Read-only session identity, model, context, and tool/token counters',
+    name: 'info',
+    run: host => openSessionInfo(host)
   },
   {
     // The gateway refuses its own /copy and /history (cli_only); Ink runs them on its transcript, as these do.
