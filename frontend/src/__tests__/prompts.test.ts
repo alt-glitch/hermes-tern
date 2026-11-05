@@ -389,7 +389,11 @@ describe('a shared prompt sheet', () => {
     const overlay = must(promptOverlay(host, parsed(req)))
 
     overlay.onKey(key('1'))
+    expect(respond).not.toHaveBeenCalled()
+    overlay.onKey(key('enter'))
     overlay.onKey(key('2'))
+    expect(respond).not.toHaveBeenCalled()
+    overlay.onKey(key('enter'))
     expect(respond).toHaveBeenCalledWith({ answers: { one: 'A', two: 'D' } })
     overlay.onKey(key('tab'))
     overlay.onKey(key('2'))
