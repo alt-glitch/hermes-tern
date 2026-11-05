@@ -35,6 +35,8 @@ export interface Question {
   qid: string
   question: string
   choices: string[]
+  /** Optional host-provided descriptions of Ripple-style choice rows, by index. */
+  previews?: string[]
   multi: boolean
 }
 
@@ -76,6 +78,30 @@ type MaskedParams = Unread<SudoRequestParams & SecretRequestParams & VaultUnlock
 const text = (v: unknown): string => (typeof v === 'string' ? v : '')
 
 const strings = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x: unknown): x is string => typeof x === 'string') : [])
+
+/**
+ * The legacy wire sends labels. Ripple's ControlOption also permits a host-authored detail;
+ * read only its display fields here and continue to answer with the label, not an action or id.
+ * Original schema/provenance: kvnloo/hermes-tern#56, Ripple fast-controls at d160863.
+ */
+function clarifyChoices(raw: unknown): { labels: string[]; previews: string[] } {
+  const labels: string[] = []
+  const previews: string[] = []
+
+  if (Array.isArray(raw)) {
+    for (const item of raw) {
+      if (typeof item === 'string') {
+        labels.push(item)
+        previews.push('')
+      } else if (item && typeof item === 'object' && 'label' in item && typeof item.label === 'string' && item.label.trim()) {
+        labels.push(item.label)
+        previews.push('detail' in item && typeof item.detail === 'string' ? item.detail : '')
+      }
+    }
+  }
+
+  return { labels, previews }
+}
 
 /** The approval answers this frontend knows: an offered choice outside them is dropped. */
 const APPROVAL_CHOICES: ReadonlySet<string> = new Set<ApprovalChoice>(['once', 'session', 'always', 'deny'])
@@ -156,8 +182,10 @@ export function questionsOf(raw: unknown): Question[] {
 
     const question = text(q.question).trim()
 
+    const { labels, previews } = clarifyChoices('choices' in q ? q.choices : undefined)
+
     return question
-      ? [{ choices: 'choices' in q ? strings(q.choices) : [], multi: 'multi_select' in q && q.multi_select === true, qid: text(q.qid), question }]
+      ? [{ choices: labels, ...(previews.some(Boolean) ? { previews } : {}), multi: 'multi_select' in q && q.multi_select === true, qid: text(q.qid), question }]
       : []
   })
 }
