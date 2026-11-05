@@ -21443,9 +21443,9 @@ var Node = class {
   children;
   /** Handlers routed to by the node's id. */
   handlers;
-  constructor(kind, props = {}, children3 = [], handlers3) {
+  constructor(kind, props2 = {}, children3 = [], handlers3) {
     this.kind = kind;
-    this.props = props;
+    this.props = props2;
     this.children = children3;
     this.handlers = handlers3;
   }
@@ -21462,8 +21462,8 @@ var Node = class {
 var FragmentNode = class extends Node {
   /** The children, strings and spans kept for text kinds. */
   parts;
-  constructor(parts3, props = {}) {
-    super("#fragment", props, []);
+  constructor(parts3, props2 = {}) {
+    super("#fragment", props2, []);
     this.parts = parts3;
   }
 };
@@ -21599,8 +21599,8 @@ function takeHandler(handlers3, key3, value) {
       return false;
   }
 }
-function withActions(props, handlers3) {
-  const current = props["actions"];
+function withActions(props2, handlers3) {
+  const current = props2["actions"];
   if (Array.isArray(current))
     return;
   const actions = {};
@@ -21624,7 +21624,7 @@ function withActions(props, handlers3) {
     actions["menu"] = menu;
   }
   if (Object.keys(actions).length > 0)
-    props["actions"] = actions;
+    props2["actions"] = actions;
 }
 var SPAN_TEXT = { text: true, shimmer: true, seg: true };
 var PLAIN_TEXT = {
@@ -21662,7 +21662,7 @@ function containerChildren(parts3) {
   return out;
 }
 function createNode(kind, input2, children3) {
-  const props = {};
+  const props2 = {};
   const handlers3 = {};
   let fromProps;
   if (input2) {
@@ -21676,7 +21676,7 @@ function createNode(kind, input2, children3) {
         continue;
       const json = toJson(value);
       if (json !== void 0)
-        props[key3] = json;
+        props2[key3] = json;
     }
   }
   const parts3 = flatten([fromProps, children3]);
@@ -21692,7 +21692,7 @@ function createNode(kind, input2, children3) {
         run7.push(part);
     }
     if (run7.length > 0)
-      Object.assign(props, textProps(run7));
+      Object.assign(props2, textProps(run7));
   } else if (kind === "el") {
     let text16 = "";
     for (const part of parts3) {
@@ -21708,14 +21708,14 @@ function createNode(kind, input2, children3) {
       }
     }
     if (text16 !== "")
-      props["text"] = text16;
+      props2["text"] = text16;
   } else {
     nodes = containerChildren(parts3);
   }
   const any = Object.keys(handlers3).length > 0;
   if (any)
-    withActions(props, handlers3);
-  return new Node(kind, props, nodes, any ? handlers3 : void 0);
+    withActions(props2, handlers3);
+  return new Node(kind, props2, nodes, any ? handlers3 : void 0);
 }
 function describe(part) {
   if (part instanceof Node)
@@ -21724,8 +21724,8 @@ function describe(part) {
     return "a span";
   return JSON.stringify(part);
 }
-function node(kind, props, children3) {
-  return createNode(kind, props ?? null, children3);
+function node(kind, props2, children3) {
+  return createNode(kind, props2 ?? null, children3);
 }
 function withKey(target, key3) {
   if (key3 === void 0 || target.props["key"] !== void 0)
@@ -21843,16 +21843,16 @@ var html = {
 };
 
 // node_modules/@stencil-hq/tern/dist/jsx-runtime.js
-function spanOf(props) {
+function spanOf(props2) {
   let t2 = "";
-  for (const part of flatten(props["children"])) {
+  for (const part of flatten(props2["children"])) {
     if (typeof part !== "string")
       throw new TypeError("a span takes text children only");
     t2 += part;
   }
-  const s2 = props["s"];
-  const fx = props["fx"];
-  const href = props["href"];
+  const s2 = props2["s"];
+  const fx = props2["fx"];
+  const href = props2["href"];
   const options = {};
   if (typeof fx === "string")
     options.fx = fx;
@@ -21860,16 +21860,16 @@ function spanOf(props) {
     options.href = href;
   return new Span(t2, typeof s2 === "string" ? s2 : void 0, options);
 }
-function jsx(type, props, key3) {
+function jsx(type, props2, key3) {
   if (typeof type === "function") {
-    const built2 = type(key3 === void 0 ? props : { ...props, key: key3 });
+    const built2 = type(key3 === void 0 ? props2 : { ...props2, key: key3 });
     if (built2 === null)
       return new FragmentNode([]);
     return built2 instanceof Node ? withKey(built2, key3) : built2;
   }
   if (type === "span")
-    return spanOf(props);
-  return createNode(type, key3 === void 0 ? props : { ...props, key: key3 }, void 0);
+    return spanOf(props2);
+  return createNode(type, key3 === void 0 ? props2 : { ...props2, key: key3 }, void 0);
 }
 var jsxs = jsx;
 
@@ -34880,8 +34880,8 @@ import { createHash as createHash3 } from "node:crypto";
 import { extname as extname3, isAbsolute as isAbsolute3, resolve as resolve3 } from "node:path";
 
 // src/tern-media.ts
-function mediaNode(props, key3 = "media") {
-  return node("media", { key: key3, ...props });
+function mediaNode(props2, key3 = "media") {
+  return node("media", { key: key3, ...props2 });
 }
 function hasNativeMedia(session2) {
   return Array.isArray(session2.caps.kinds) && session2.caps.kinds.includes("media");
@@ -52005,7 +52005,7 @@ function stringify(values, options) {
 var search = /[#.]/g;
 function parseSelector(selector, defaultTagName) {
   const value = selector || "";
-  const props = {};
+  const props2 = {};
   let start = 0;
   let previous3;
   let tagName19;
@@ -52017,11 +52017,11 @@ function parseSelector(selector, defaultTagName) {
       if (!previous3) {
         tagName19 = subvalue;
       } else if (previous3 === "#") {
-        props.id = subvalue;
-      } else if (Array.isArray(props.className)) {
-        props.className.push(subvalue);
+        props2.id = subvalue;
+      } else if (Array.isArray(props2.className)) {
+        props2.className.push(subvalue);
       } else {
-        props.className = [subvalue];
+        props2.className = [subvalue];
       }
       start += subvalue.length;
     }
@@ -52034,7 +52034,7 @@ function parseSelector(selector, defaultTagName) {
     type: "element",
     // @ts-expect-error: tag name is parsed.
     tagName: tagName19 || defaultTagName || "div",
-    properties: props,
+    properties: props2,
     children: []
   };
 }
@@ -85185,6 +85185,128 @@ function Document4() {
 }
 setPrototypeOf(Document4, Document2).prototype = Document2.prototype;
 
+// src/eui/svgStyle.js
+var KEEP = /^(fill|fill-opacity|stroke|stroke-width|stroke-opacity|stroke-dasharray|stroke-dashoffset|stroke-linecap|stroke-linejoin|opacity|font-size|font-family|font-weight|text-anchor|dominant-baseline|display|visibility|stop-color|stop-opacity)$/;
+var SCOPE = "[data-eui='card'] ";
+var DARK = '[data-scheme="dark"] ';
+function svgRules(css2, scheme2) {
+  const out = [];
+  for (const [, head2, body] of css2.matchAll(/([^{}@]+)\{([^{}]*)\}/g)) {
+    const decls = body.split(";").map((d) => d.split(":")).filter(([p3, ...v]) => p3 && v.length && KEEP.test(p3.trim())).map(([p3, ...v]) => [p3.trim(), v.join(":").trim()]);
+    if (!decls.length) continue;
+    const sels = head2.split(",").map((s2) => s2.trim().replace(SCOPE, "")).filter((s2) => {
+      if (/:(hover|focus|active|focus-visible)/.test(s2)) return false;
+      return scheme2 === "dark" || !s2.includes(DARK.trim());
+    }).map((s2) => s2.replace(DARK, ""));
+    if (sels.length) out.push({ sel: sels.join(", "), decls });
+  }
+  return out;
+}
+var tokenOf = (name) => name.startsWith("--h-") ? name.slice(4).replace("card-solid", "card") : void 0;
+function resolveValue(value, lookup2, depth = 0) {
+  let v = value;
+  for (let i = 0; i < 8 && v.includes("var("); i++) {
+    v = v.replace(/var\((--[\w-]+)\s*(?:,\s*([^()]*(?:\([^()]*\))?[^()]*))?\)/g, (_2, name, fb) => lookup2(name) ?? (fb === void 0 ? "" : fb.trim()));
+  }
+  if (v.includes("currentColor") && depth === 0) v = v.replace(/currentColor/g, lookup2("color") ?? "");
+  v = v.replace(/color-mix\(in srgb,\s*([^,]+?)\s+([\d.]+)%\s*,\s*([^)]+?(?:\([^)]*\))?)\s*\)/g, (_2, a2, p3, b) => mix(a2, Number(p3) / 100, b) ?? _2);
+  v = v.replace(/rgba?\(\s*([\d.]+)\s+([\d.]+)\s+([\d.]+)\s*(?:\/\s*([\d.]+%?))?\s*\)/g, (_2, r, g, b, a2) => a2 === void 0 ? `rgb(${r},${g},${b})` : `rgba(${r},${g},${b},${a2.endsWith("%") ? Number.parseFloat(a2) / 100 : a2})`);
+  v = v.replace(/hsla?\(\s*([\d.]+)(?:deg)?\s+([\d.]+%)\s+([\d.]+%)\s*\)/g, (_2, h2, s2, l) => `hsl(${h2},${s2},${l})`);
+  return v;
+}
+function rgba(c) {
+  c = c.trim();
+  if (c === "transparent") return [0, 0, 0, 0];
+  let m = /^#([0-9a-f]{3,8})$/i.exec(c);
+  if (m) {
+    const h2 = m[1].length < 6 ? [...m[1]].map((x) => x + x).join("") : m[1];
+    return [0, 2, 4].map((i) => Number.parseInt(h2.slice(i, i + 2), 16)).concat(h2.length === 8 ? Number.parseInt(h2.slice(6), 16) / 255 : 1);
+  }
+  m = /^rgba?\(([^)]*)\)$/.exec(c);
+  if (m) {
+    const p3 = m[1].split(/[\s,/]+/).filter(Boolean).map(Number.parseFloat);
+    return p3.length >= 3 ? [p3[0], p3[1], p3[2], p3[3] ?? 1] : void 0;
+  }
+  return void 0;
+}
+function mix(a2, p3, b) {
+  const x = rgba(a2), y = rgba(b);
+  if (!x || !y) return void 0;
+  const al = x[3] * p3 + y[3] * (1 - p3);
+  const ch = (i) => al === 0 ? 0 : Math.round((x[i] * x[3] * p3 + y[i] * y[3] * (1 - p3)) / al);
+  return `rgba(${ch(0)},${ch(1)},${ch(2)},${+al.toFixed(3)})`;
+}
+var props = (style2) => Object.fromEntries((style2 ?? "").split(";").map((d) => d.split(":")).filter(([p3, ...v]) => p3 && v.length).map(([p3, ...v]) => [p3.trim(), v.join(":").trim()]));
+function lengthOf(el) {
+  const n = (k) => Number.parseFloat(el.getAttribute(k) ?? "0");
+  if (el.localName === "line") return Math.hypot(n("x2") - n("x1"), n("y2") - n("y1"));
+  if (el.localName === "circle") return 2 * Math.PI * n("r");
+  return void 0;
+}
+function svgInline(svg3, rules, theme) {
+  const copy = svg3.cloneNode(true);
+  const live = [svg3, ...svg3.querySelectorAll("*")];
+  const out = [copy, ...copy.querySelectorAll("*")];
+  const inherited = {};
+  for (let a2 = svg3.parentElement; a2; a2 = a2.parentElement) {
+    for (const [k, v] of Object.entries(props(a2.getAttribute("style")))) if (!(k in inherited) && (k.startsWith("--") || k === "color")) inherited[k] = v;
+  }
+  const scope = /* @__PURE__ */ new Map([[svg3, inherited]]);
+  live.forEach((el, i) => {
+    const up = scope.get(el.parentElement) ?? inherited;
+    const decl = {};
+    for (const r of rules) {
+      let hit = false;
+      try {
+        hit = el.matches(r.sel);
+      } catch {
+        hit = false;
+      }
+      if (hit) for (const [p3, v] of r.decls) decl[p3] = v;
+    }
+    const own14 = props(el.getAttribute("style"));
+    Object.assign(decl, own14);
+    const vars = { ...up };
+    for (const [k, v] of Object.entries(own14)) if (k.startsWith("--") || k === "color") vars[k] = v;
+    scope.set(el, vars);
+    const lookup2 = (name) => {
+      if (name in vars) return resolveValue(vars[name], lookup2, 1);
+      const t2 = tokenOf(name);
+      if (t2 && theme[t2] !== void 0) return String(theme[t2]);
+      return name === "color" ? String(theme.fg) : void 0;
+    };
+    const style2 = [];
+    for (const [p3, v] of Object.entries(decl)) {
+      if (p3.startsWith("--") || p3 === "color") continue;
+      const r = resolveValue(v, lookup2);
+      if (r && !r.includes("var(") && !r.includes("color-mix(")) style2.push([p3, r]);
+    }
+    const pl = Number.parseFloat(el.getAttribute("pathLength") ?? "");
+    if (pl > 0) {
+      const len = lengthOf(el);
+      const s2 = Object.fromEntries(style2);
+      let done = true;
+      if (len !== void 0) {
+        for (const k of ["stroke-dasharray", "stroke-dashoffset"]) if (k in s2) s2[k] = s2[k].split(/[\s,]+/).map((x) => +(Number.parseFloat(x) * len / pl).toFixed(2)).join(" ");
+      } else if (Number.parseFloat(s2["stroke-dashoffset"] ?? "0") === 0 && Number.parseFloat(s2["stroke-dasharray"] ?? `${pl}`) >= pl) {
+        delete s2["stroke-dasharray"];
+        delete s2["stroke-dashoffset"];
+      } else done = false;
+      style2.length = 0;
+      style2.push(...Object.entries(s2));
+      if (done) out[i].removeAttribute("pathLength");
+    }
+    for (const a2 of ["fill", "stroke", "stop-color"]) {
+      const v = out[i].getAttribute(a2);
+      if (v && (v.includes("var(") || v.includes("currentColor"))) out[i].setAttribute(a2, resolveValue(v, lookup2));
+    }
+    if (style2.length) out[i].setAttribute("style", style2.map(([p3, v]) => `${p3}:${v}`).join(";"));
+    else out[i].removeAttribute("style");
+  });
+  const markup = copy.outerHTML;
+  return markup.includes("xmlns=") ? markup : markup.replace("<svg", '<svg xmlns="http://www.w3.org/2000/svg"');
+}
+
 // src/eui/sandbox.js
 var SVG = "http://www.w3.org/2000/svg";
 var CLICKY = /* @__PURE__ */ new Set(["click", "pointerdown", "pointerup", "dblclick", "change", "input"]);
@@ -85405,6 +85527,8 @@ async function createSandbox(dir2, scheme2 = "light", log = () => {
   const themes = JSON.parse(readFileSync3(data("themes.json"), "utf8")).themes;
   K.theme.themes = themes;
   K.theme.base = themes.find((t2) => t2.id === (scheme2 === "dark" ? "t3-dark" : "t3-light"));
+  const kitCss2 = join13(dir2, "kit.css");
+  const rules = existsSync3(kitCss2) ? svgRules(readFileSync3(kitCss2, "utf8"), scheme2) : [];
   K.motion.speed = 1;
   const ids = /* @__PURE__ */ new WeakMap();
   const byId = /* @__PURE__ */ new Map();
@@ -85427,7 +85551,7 @@ async function createSandbox(dir2, scheme2 = "light", log = () => {
       const box = (el.getAttribute("viewBox") ?? "").split(/[\s,]+/).map(Number);
       const w = Number.parseFloat(el.getAttribute("width") ?? "") || box[2] || 16;
       const h2 = Number.parseFloat(el.getAttribute("height") ?? "") || box[3] || 16;
-      const svg3 = el.outerHTML.includes("xmlns=") ? el.outerHTML : el.outerHTML.replace("<svg", `<svg xmlns="${SVG}"`);
+      const svg3 = svgInline(el, rules, K.theme.base ?? {});
       return { t: "svg", svg: svg3, w, h: h2, cls: el.getAttribute("class") ?? "", style: el.getAttribute("style") ?? "" };
     }
     if (el.localName === "canvas" || el.localName === "script" || el.localName === "style" || el.localName === "template") return null;
@@ -85511,11 +85635,15 @@ async function createSandbox(dir2, scheme2 = "light", log = () => {
             details.dispatchEvent(new window2.Event("toggle"));
           }
           const label = el.closest("label");
-          const box = label && (label.htmlFor ? root7.querySelector(`[id="${String(label.htmlFor).replace(/"/g, "")}"]`) : label.querySelector("input"));
-          if (!clicked.defaultPrevented && box && box !== el && (box.type === "checkbox" || box.type === "radio") && !box.disabled) {
-            box.checked = box.type === "radio" ? true : !box.checked;
-            fire(box, "input");
-            fire(box, "change");
+          const box = label && (label.htmlFor ? root7.querySelector(`[id="${String(label.htmlFor).replace(/"/g, "")}"]`) : label.querySelector("input, button, select, textarea"));
+          if (!clicked.defaultPrevented && box && !box.contains(el) && !box.disabled) {
+            if (box.type === "checkbox" || box.type === "radio") {
+              box.checked = box.type === "radio" ? true : !box.checked;
+              fire(box, "input");
+              fire(box, "change");
+            } else if (box.localName === "button") {
+              fire(box, "click");
+            }
           }
           if (el.localName === "select" && el.options.length > 1) {
             el.selectedIndex = (el.selectedIndex + 1) % el.options.length;
@@ -86815,8 +86943,8 @@ import { extname as extname4 } from "node:path";
 import { fileURLToPath as fileURLToPath7 } from "node:url";
 
 // src/artifacts/media-node.ts
-function mediaNode2(props, key3 = "media") {
-  return node("media", { key: key3, ...props });
+function mediaNode2(props2, key3 = "media") {
+  return node("media", { key: key3, ...props2 });
 }
 
 // src/artifacts/written.ts
@@ -92637,7 +92765,7 @@ function parseColor(input2) {
   return null;
 }
 var toHex = (rgb) => "#" + rgb.map((c) => clampChannel(c).toString(16).padStart(2, "0")).join("");
-function mix(a2, b, t2) {
+function mix2(a2, b, t2) {
   const pa = parseColor(a2);
   const pb = parseColor(b);
   if (!pa || !pb) {
@@ -92702,7 +92830,7 @@ function grayOf(color2) {
   const gray = clampChannel2(0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2]);
   return toHex([gray, gray, gray]);
 }
-var desaturate = (color2, s2) => mix(color2, grayOf(color2), s2);
+var desaturate = (color2, s2) => mix2(color2, grayOf(color2), s2);
 
 // .hermes-src/ui-tui/src/theme.ts
 var XTERM_6_LEVELS = [0, 95, 135, 175, 215, 255];
@@ -92834,7 +92962,7 @@ var DIFF_LIGHT = {
 function buildPalette(seeds, isLight) {
   const tones = deriveTones(seeds);
   const surface = seeds.surface ?? tones.surface;
-  const activeRow = seeds.activeRow ?? (seeds.surface ? mix(surface, seeds.accent, 0.22) : tones.activeRow);
+  const activeRow = seeds.activeRow ?? (seeds.surface ? mix2(surface, seeds.accent, 0.22) : tones.activeRow);
   const muted = seeds.muted ?? tones.muted;
   return {
     primary: seeds.primary,
@@ -92993,19 +93121,19 @@ function referenceBackground(isLight, env2 = process.env) {
 function deriveTones(seeds) {
   const { accent, bg, text: text16 } = seeds;
   const isLight = (relativeLuminance(bg) ?? 0) > 0.5;
-  const surface = mix(bg, desaturate(accent, 0.15), isLight ? 0.045 : 0.09);
+  const surface = mix2(bg, desaturate(accent, 0.15), isLight ? 0.045 : 0.09);
   return {
     // Light knobs are fitted to the lift canon (xterm minimumContrastRatio
     // 4.5 of the classic dark golds against white — see LIGHT_SEEDS), not
     // to ink blends: muted #946C08 ≈ desat(accent .05), label #8E6B13 ≈
     // desat(mix(accent, text, .03), .15), statusFg #6F6F6F ≈ gray 30% lift.
-    muted: isLight ? desaturate(accent, 0.05) : desaturate(mix(accent, bg, 0.19), 0.16),
-    label: isLight ? desaturate(mix(accent, text16, 0.03), 0.15) : desaturate(mix(accent, bg, 0.13), 0.16),
-    statusFg: grayOf(mix(text16, bg, isLight ? 0.3 : 0.24)),
+    muted: isLight ? desaturate(accent, 0.05) : desaturate(mix2(accent, bg, 0.19), 0.16),
+    label: isLight ? desaturate(mix2(accent, text16, 0.03), 0.15) : desaturate(mix2(accent, bg, 0.13), 0.16),
+    statusFg: grayOf(mix2(text16, bg, isLight ? 0.3 : 0.24)),
     surface,
-    activeRow: mix(surface, accent, 0.25),
-    selection: isLight && seeds.shellDollar ? mix(bg, seeds.shellDollar, 0.2) : mix(surface, accent, 0.28),
-    border: mix(accent, bg, 0.25)
+    activeRow: mix2(surface, accent, 0.25),
+    selection: isLight && seeds.shellDollar ? mix2(bg, seeds.shellDollar, 0.2) : mix2(surface, accent, 0.28),
+    border: mix2(accent, bg, 0.25)
   };
 }
 var TRUE_RE = /^(?:1|true|yes|on)$/;
@@ -93121,7 +93249,7 @@ function fromSkin(colors, branding, bannerLogo = "", bannerHero = "", toolPrefix
   };
   const derived = buildPalette(seeds, isLight);
   const surface = c("completion_menu_bg") ?? c("background") ?? derived.completionBg;
-  const activeRow = c("completion_menu_current_bg") ?? (c("completion_menu_bg") ? mix(surface, seeds.accent, 0.22) : derived.completionCurrentBg);
+  const activeRow = c("completion_menu_current_bg") ?? (c("completion_menu_bg") ? mix2(surface, seeds.accent, 0.22) : derived.completionCurrentBg);
   const assembled = {
     ...derived,
     muted: c("banner_dim") ?? derived.muted,
