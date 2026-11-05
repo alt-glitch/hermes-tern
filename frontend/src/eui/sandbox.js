@@ -7,6 +7,8 @@ import vm from 'node:vm'
 
 import { parseHTML } from 'linkedom'
 
+import { svgInline, svgRules } from './svgStyle.js'
+
 const SVG = 'http://www.w3.org/2000/svg'
 const CLICKY = new Set(['click', 'pointerdown', 'pointerup', 'dblclick', 'change', 'input'])
 const NATIVE = new Set(['button', 'a', 'summary', 'input', 'select', 'label'])
@@ -111,6 +113,8 @@ export async function createSandbox(dir, scheme = 'light', log = () => {}) {
   const themes = JSON.parse(readFileSync(data('themes.json'), 'utf8')).themes
   K.theme.themes = themes
   K.theme.base = themes.find(t => t.id === (scheme === 'dark' ? 't3-dark' : 't3-light'))
+  const kitCss = join(dir, 'kit.css')
+  const rules = existsSync(kitCss) ? svgRules(readFileSync(kitCss, 'utf8'), scheme) : []
   K.motion.speed = 1
 
   const ids = new WeakMap()
@@ -127,7 +131,7 @@ export async function createSandbox(dir, scheme = 'light', log = () => {}) {
       const box = (el.getAttribute('viewBox') ?? '').split(/[\s,]+/).map(Number)
       const w = Number.parseFloat(el.getAttribute('width') ?? '') || box[2] || 16
       const h = Number.parseFloat(el.getAttribute('height') ?? '') || box[3] || 16
-      const svg = el.outerHTML.includes('xmlns=') ? el.outerHTML : el.outerHTML.replace('<svg', `<svg xmlns="${SVG}"`)
+      const svg = svgInline(el, rules, K.theme.base ?? {})
       return { t: 'svg', svg, w, h, cls: el.getAttribute('class') ?? '', style: el.getAttribute('style') ?? '' }
     }
     if (el.localName === 'canvas' || el.localName === 'script' || el.localName === 'style' || el.localName === 'template') return null
@@ -196,11 +200,16 @@ export async function createSandbox(dir, scheme = 'light', log = () => {}) {
             details.toggleAttribute('open')
             details.dispatchEvent(new window.Event('toggle'))
           }
+          // A label activates its control: a box toggles, any other control (a switch button) is clicked.
           const label = el.closest('label')
-          const box = label && (label.htmlFor ? root.querySelector(`[id="${String(label.htmlFor).replace(/"/g, '')}"]`) : label.querySelector('input'))
-          if (!clicked.defaultPrevented && box && box !== el && (box.type === 'checkbox' || box.type === 'radio') && !box.disabled) {
-            box.checked = box.type === 'radio' ? true : !box.checked
-            fire(box, 'input'); fire(box, 'change')
+          const box = label && (label.htmlFor ? root.querySelector(`[id="${String(label.htmlFor).replace(/"/g, '')}"]`) : label.querySelector('input, button, select, textarea'))
+          if (!clicked.defaultPrevented && box && !box.contains(el) && !box.disabled) {
+            if (box.type === 'checkbox' || box.type === 'radio') {
+              box.checked = box.type === 'radio' ? true : !box.checked
+              fire(box, 'input'); fire(box, 'change')
+            } else if (box.localName === 'button') {
+              fire(box, 'click')
+            }
           }
           if (el.localName === 'select' && el.options.length > 1) {
             el.selectedIndex = (el.selectedIndex + 1) % el.options.length

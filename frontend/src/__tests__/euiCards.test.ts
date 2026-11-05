@@ -90,6 +90,25 @@ describe('ephemeral-ui kit sandbox', () => {
     expect(empty).toEqual([])
   }, 60_000)
 
+  it('lets a label click flip the switch inside it, as a browser does', async () => {
+    const sb = await createSandbox(euiDir(), 'light')
+    const card = sb.mount('approve', 'snyk', () => undefined)
+    await settle(30)
+    const state = () => {
+      const out: string[] = []
+      walk(card.snapshot(), n => { if (n.t === 'el' && n.tag === 'button' && n.cls.includes('eu-switch')) { out.push(n.attrs['aria-checked'] ?? '') } })
+      return out
+    }
+    let label = -1
+    walk(card.snapshot(), n => { if (label < 0 && n.t === 'el' && n.tag === 'label') { label = n.id } })
+    const before = state()
+    expect(card.click(label)).toBe(true)
+    await settle(10)
+    expect(state()[0]).not.toEqual(before[0])
+    expect(state().slice(1)).toEqual(before.slice(1))
+    card.dispose()
+  })
+
   it('replays a click into the kit, which redraws the card', async () => {
     const sb = await createSandbox(euiDir(), 'light')
     const changed = vi.fn()
@@ -114,6 +133,42 @@ describe('ephemeral-ui kit sandbox', () => {
     expect(changed).toHaveBeenCalled()
     card.dispose()
   }, 30_000)
+})
+
+describe('ephemeral-ui SVG images', () => {
+  // Tern draws a card's SVG as an image, outside the kit sheet: class styling and var() must be baked in.
+  const svgs = async (kind: string, scheme: 'light' | 'dark') => {
+    const sb = await createSandbox(euiDir(), scheme)
+    const app = sb.apps().find(a => a.kinds.includes(kind))?.id ?? 'github'
+    const card = sb.mount(kind, app, () => undefined)
+    await settle(60)
+    const out: string[] = []
+    walk(card.snapshot(), n => { if (n.t === 'svg') { out.push(n.svg) } })
+    card.dispose()
+    return out
+  }
+
+  it.each([['graph', 'graph'], ['metric', 'spark']])('bakes the kit sheet into the %s card\'s %s svg', async (kind, cls) => {
+    const light = (await svgs(kind, 'light')).find(s => s.includes(`class="${cls}"`)) ?? ''
+    const dark = (await svgs(kind, 'dark')).find(s => s.includes(`class="${cls}"`)) ?? ''
+    for (const svg of [light, dark]) {
+      expect(svg).toMatch(/style="[^"]*stroke:#/)
+      expect(svg).not.toMatch(/var\(|currentColor|color-mix\(|pathLength/)
+    }
+    expect(light).not.toEqual(dark)
+  }, 30_000)
+
+  it('resolves the colour forms the kit uses', async () => {
+    const { resolveValue } = await import('../eui/svgStyle.js')
+    const vars: Record<string, string> = { '--a': '#ff0000', '--hue': '200', color: '#111111' }
+    const look = (n: string) => vars[n]
+    expect(resolveValue('var(--a)', look)).toBe('#ff0000')
+    expect(resolveValue('var(--nope, #00ff00)', look)).toBe('#00ff00')
+    expect(resolveValue('currentColor', look)).toBe('#111111')
+    expect(resolveValue('color-mix(in srgb, var(--a) 50%, transparent)', look)).toBe('rgba(255,0,0,0.5)')
+    expect(resolveValue('rgb(0 0 0 / .12)', look)).toBe('rgba(0,0,0,.12)')
+    expect(resolveValue('hsl(var(--hue) 80% 55%)', look)).toBe('hsl(200,80%,55%)')
+  })
 })
 
 describe('ephemeral-ui cards in an answer', () => {
