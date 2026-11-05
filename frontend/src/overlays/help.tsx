@@ -53,6 +53,7 @@ export const HOTKEYS: readonly { group: string; rows: [string[], string][] }[] =
       [[KEYS.plan.label], 'Review latest plan (/plan; /plan <task> generates via Hermes)'],
       [[KEYS.fork.label], 'Fork this session into a new Tern pane (/fork [durable-message-id])'],
       [[KEYS.clipboardImage.label], 'Attach the clipboard image (also ⌘V of an image, a dropped image file, /paste)'],
+      [['alt+v'], 'After /voice on: dictate into the composer, then end the capture (voice.record_key picks another key; esc cancels)'],
       [[KEYS.copyDraft.label, 'alt+shift+c'], 'Copy draft / current line (OSC 52; no submission)'],
       [['down'], 'Focus the agents / shells / PR pills (empty prompt); ← → switch, Enter opens, Esc returns'],
       [[KEYS.cancel.label], 'Answer no to the open sheet / clear the draft and images / interrupt / exit (twice)'],
