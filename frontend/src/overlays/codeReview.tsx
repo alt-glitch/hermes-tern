@@ -7,7 +7,7 @@ import { reviewHunks, reviewSide, reviewTargets, type ReviewHunk } from '../code
 import { optional } from '../core/assert.js'
 import { Composer } from '../draft/composer.js'
 import type { ChangedFile } from '../git/status.js'
-import { actionsRow, button, pressable } from '../view/ui/button.js'
+import { actionsRow, pressable } from '../view/ui/button.js'
 
 import { nativeOverlayKey } from './identity.js'
 import type { Overlay } from './overlay.js'

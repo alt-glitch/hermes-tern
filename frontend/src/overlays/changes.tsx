@@ -8,9 +8,9 @@ import { copyToClipboard } from '../clipboard.js'
 import { optional } from '../core/assert.js'
 import { type ChangedFile, fileDiff, type GitState, gitState } from '../git/status.js'
 
+import { openCodeReview } from './codeReview.js'
 import { nativeOverlayKey } from './identity.js'
 import type { Overlay } from './overlay.js'
-import { openCodeReview } from './codeReview.js'
 import { moveSelection } from './search.js'
 
 /** What the Changes sheet reaches of the app. */
