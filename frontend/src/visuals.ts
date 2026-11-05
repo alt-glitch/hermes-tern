@@ -34,15 +34,30 @@ interface IntentBundle {
   }
 }
 
-export type VisualBundle = RepositoryBundle | IntentBundle
+/** Public ephemeral-ui authored architecture v0; no discovery or verified links. */
+interface ArchitectureBundle {
+  readonly id: string
+  readonly selection: { readonly view: { readonly kind: 'architecture-board' } }
+  readonly artifact: {
+    readonly document: {
+      readonly title: string
+      readonly nodes: readonly { readonly id: string; readonly service: string }[]
+      readonly edges: readonly { readonly from: string; readonly to: string; readonly label: string }[]
+    }
+  }
+}
+
+export type VisualBundle = RepositoryBundle | IntentBundle | ArchitectureBundle
 
 export interface VisualSummary {
   readonly id: string
   readonly title: string
-  readonly mode: 'code' | 'churn' | 'intent'
+  readonly mode: 'code' | 'churn' | 'intent' | 'architecture'
   readonly metrics: readonly { readonly key: string; readonly label: string; readonly value: number }[]
   /** An intent board's sections in the order the model chose them (`DecisionMix(providers)`). */
   readonly sections?: readonly string[]
+  /** Every authored edge explicitly remains intent, not a verified integration. */
+  readonly edges?: readonly string[]
 }
 
 export interface PreparedVisual extends VisualSummary {
@@ -65,7 +80,27 @@ export function visualScope(host: Pick<ChatPorts, 'session'>): string | undefine
 
 /** Project requested host metrics only, after full validation; never scan Git here. */
 export function summarizeVisual(bundle: VisualBundle): VisualSummary {
-  return isIntent(bundle) ? summarizeIntent(bundle) : summarizeRepository(bundle)
+  return isArchitecture(bundle) ? summarizeArchitecture(bundle) : isIntent(bundle) ? summarizeIntent(bundle) : summarizeRepository(bundle)
+}
+
+function isArchitecture(bundle: VisualBundle): bundle is ArchitectureBundle {
+  return 'kind' in bundle.selection.view && bundle.selection.view.kind === 'architecture-board'
+}
+
+function summarizeArchitecture(bundle: ArchitectureBundle): VisualSummary {
+  const { document } = bundle.artifact
+
+  return Object.freeze({
+    id: bundle.id,
+    title: document.title,
+    mode: 'architecture',
+    metrics: Object.freeze([
+      Object.freeze({ key: 'nodes', label: 'Nodes', value: document.nodes.length }),
+      Object.freeze({ key: 'edges', label: 'Intent edges', value: document.edges.length })
+    ]),
+    edges: Object.freeze(document.edges.map(edge =>
+      `Intent only: ${edge.from} → ${edge.to} · ${edge.label} — not verified integration`))
+  })
 }
 
 function isIntent(bundle: VisualBundle): bundle is IntentBundle {

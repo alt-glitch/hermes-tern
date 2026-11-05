@@ -71,7 +71,12 @@ export async function openVisual(
                 <text key="title" text={candidate.title} />
                 <text key="status" text="Preview only · not visually verified or published" tone="warning" />
                 <kv items={candidate.metrics.map(metric => ({ k: metric.label, v: String(metric.value) }))} key="metrics" />
-                {candidate.sections ? (
+                {candidate.edges ? (
+                  <col gap="sm" key="architecture">
+                    <text key="mode" text="Authored architecture · every edge is intent, not verified integration" />
+                    {candidate.edges.map((edge, index) => <text key={`edge-${index}`} text={edge} />)}
+                  </col>
+                ) : candidate.sections ? (
                   <text key="mode" text={`Intent board: ${candidate.sections.join(' · ')}`} />
                 ) : (
                   <text key="mode" text={`Initial mode: ${candidate.mode}`} />

@@ -18,6 +18,7 @@ local function load(path)
     local s, doc = bundle.selection, bundle.artifact.document
     assert(s.status == "validated-not-verified" and s.schema == "native-visual-selection/v1", "Not a validated selection")
     assert(s.snapshot.id == bundle.artifact.id and s.snapshot.rendererHash == bundle.artifact.rendererHash, "Mismatched snapshot")
+    if s.view.kind == "architecture-board" then return bundle end
     assert(doc.version == 1 and type(doc.title) == "string" and #doc.title <= 640, "Invalid document")
     if s.view.kind == "intent-board" then return bundle end
     assert(s.view.kind == "repo-explorer" and s.view.visibleLimit == LIMIT, "Invalid view")
@@ -181,6 +182,74 @@ local function checkIntent(bundle)
     assert(i.context.hit <= i.context.judged and bounded(i.context.top1, 8), "Invalid context")
     assert(type(i.health.ok) == "boolean" and bounded(i.health.backends), "Invalid health")
 end
+
+-- Authored architecture (ephemeral-architecture/v0). Only synthetic host data is displayed.
+-- Every edge is design intent; no integration verification, control or publishing path exists.
+local ARCH_SERVICE = {client = true, ["aws-api"] = true, ["aws-lambda"] = true, ["aws-s3"] = true, ["aws-sqs"] = true, ["aws-eks"] = true, ["aws-db"] = true, ["gcp-run"] = true, ["gcp-pubsub"] = true, ["gcp-gke"] = true, ["gcp-gcs"] = true, ["gcp-sql"] = true, azure = true, ["do"] = true, runpod = true, lambda = true, brev = true, k3s = true, kind = true, k8s = true, ingress = true, registry = true, terraform = true, opentofu = true, pulumi = true, ansible = true, helm = true, argocd = true, z0int = true, kerdoios = true, router = true, dataset = true, unsloth = true, adapter = true, gguf = true, llamacpp = true, ollama = true, vllm = true, comfyui = true}
+local function architectureFields(value, required, optional)
+    assert(type(value) == "table", "Invalid architecture object")
+    local allow = {}
+    for _, name in ipairs(required) do allow[name] = true; assert(value[name] ~= nil, "Missing architecture field") end
+    for _, name in ipairs(optional or {}) do allow[name] = true end
+    for name in pairs(value) do assert(allow[name], "Unknown architecture field") end
+end
+local function architectureText(value, max)
+    if type(value) ~= "string" or #value == 0 or #value > max * 4 or not string.find(value, "%S") then return false end
+    local n = 0
+    for _, code in utf8.codes(value) do
+        n = n + 1
+        if code < 32 or (code >= 127 and code <= 159) or
+            (code >= 0x202A and code <= 0x202E) or (code >= 0x2066 and code <= 0x2069) then return false end
+    end
+    return n <= max
+end
+local function checkArchitecture(bundle)
+    local s, doc = bundle.selection, bundle.artifact.document
+    architectureFields(s.view, {"kind"})
+    assert(s.view.kind == "architecture-board", "Invalid architecture view")
+    architectureFields(doc, {"v", "title", "provenance", "nodes", "edges"})
+    assert(doc.v == 0 and doc.provenance == "authored-example" and architectureText(doc.title, 160), "Invalid authored architecture")
+    assert(type(doc.nodes) == "table" and #doc.nodes >= 1 and #doc.nodes <= 24, "Invalid architecture nodes")
+    assert(type(doc.edges) == "table" and #doc.edges <= 64, "Invalid architecture edges")
+    local seen = {}
+    for _, node in ipairs(doc.nodes) do
+        architectureFields(node, {"id", "service"})
+        assert(type(node.id) == "string" and #node.id <= 40 and
+            string.match(node.id, "^[a-zA-Z][a-zA-Z0-9_-]*$") and not seen[node.id] and
+            ARCH_SERVICE[node.service], "Invalid architecture node")
+        seen[node.id] = true
+    end
+    for _, edge in ipairs(doc.edges) do
+        architectureFields(edge, {"from", "to", "label"})
+        assert(seen[edge.from] and seen[edge.to] and edge.from ~= edge.to and architectureText(edge.label, 100),
+            "Invalid architecture intent edge")
+    end
+end
+local function architectureView(state)
+    if state.cached then return state.cached end
+    local doc = state.bundle.artifact.document
+    local nodes, edges = {}, {}
+    for _, item in ipairs(doc.nodes) do
+        table.insert(nodes, ui.el("div", {class = "ni-line"}, {ui.text(item.id .. " · " .. item.service)}))
+    end
+    for _, edge in ipairs(doc.edges) do
+        table.insert(edges, ui.el("div", {class = "ni-line"}, {
+            ui.text("Intent only: " .. edge.from .. " → " .. edge.to .. " · " .. edge.label .. " — not verified integration")
+        }))
+    end
+    if #edges == 0 then table.insert(edges, ui.text("No intent edges declared.")) end
+    state.cached = {main = ui.col({
+        ui.text(doc.title),
+        ui.text("authored example · " .. #doc.nodes .. " nodes · " .. #doc.edges .. " unverified intent edges"),
+        ui.el("div", {class = "ni-card"}, {ui.el("b", {text = "Service nodes"}), ui.col(nodes)}),
+        ui.el("div", {class = "ni-card"}, {ui.el("b", {text = "Proposed connections — not verified integrations"}), ui.col(edges)}),
+    }), dock = ui.col({
+        ui.text("Preview: " .. state.bundle.id),
+        ui.text("Authored-only topology · all edges are intent"),
+        ui.text("No execution, approval or publication"),
+    })}
+    return state.cached
+end
 local function stat(label, value, foot)
     return ui.el("div", {class = "ni-stat"}, {ui.el("span", {class = "ni-k", text = label}),
         ui.el("b", {class = "ni-v", text = value}), ui.el("small", {class = "ni-f", text = foot})})
@@ -308,16 +377,22 @@ tern.block.define("reply", {
             checkIntent(bundle)
             return {intent = true, bundle = bundle, selected = 1, cached = nil}
         end
+        if bundle.selection.view.kind == "architecture-board" then
+            checkArchitecture(bundle)
+            return {architecture = true, bundle = bundle, cached = nil}
+        end
         local state = {bundle = bundle, files = files, hottest = hottest, current = bundle.artifact.document.root,
             stack = {}, mode = bundle.selection.view.mode, selected = 1, items = {}, projections = {}, cached = nil}
         project(state)
         return state
     end,
     title = function(state)
+        if state.architecture then return "Architecture: " .. state.bundle.artifact.document.title end
         if state.intent then return "Intent: " .. state.bundle.artifact.document.title end
         return "Preview: " .. state.bundle.artifact.document.title
     end,
     view = function(state, _cx)
+        if state.architecture then return architectureView(state) end
         if state.intent then return intentView(state) end
         if state.cached then return state.cached end
         local metrics = {}
@@ -348,7 +423,7 @@ tern.block.define("reply", {
         return state.cached
     end,
     key = function(state, key, _cx)
-        if key.ctrl or key.alt or key.meta then return false end
+        if key.ctrl or key.alt or key.meta or state.architecture then return false end
         if state.intent then
             if key.name == "down" then return selectSection(state, state.selected + 1) end
             if key.name == "up" then return selectSection(state, state.selected - 1) end
@@ -369,7 +444,7 @@ tern.block.define("reply", {
         return false
     end,
     event = function(state, ev, _cx)
-        if ev.ev ~= "action" then return end
+        if ev.ev ~= "action" or state.architecture then return end
         if state.intent then
             local index = tonumber(ev.value)
             if ev.act == "select" and index and index % 1 == 0 then selectSection(state, index) end
