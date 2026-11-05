@@ -8,6 +8,11 @@ import { SessionState } from '../session/state.js'
 
 import { FakeGateway, key, must, stub, tree } from './fakes.js'
 
+const usageWithoutCacheHit = {
+  calls: 3, compressions: 1, context_max: 1000, context_source: 'provider_usage',
+  context_used: 250, input: 1200, output: 300, reasoning: 60, total: 1500
+}
+
 const info = {
   cwd: '/work/repo',
   model: 'fixture-model',
@@ -16,10 +21,7 @@ const info = {
   stored_session_id: 'stored-42',
   title: 'Refactor scope',
   tools: { core: ['read', 'terminal'], extension: ['read', 'browser'] },
-  usage: {
-    calls: 3, compressions: 1, context_max: 1000, context_source: 'provider_usage',
-    context_used: 250, input: 1200, output: 300, reasoning: 60, total: 1500
-  }
+  usage: { ...usageWithoutCacheHit, cache_hit_pct: 92 }
 }
 
 const breakdown = {
@@ -83,6 +85,32 @@ describe('/info native session sheet', () => {
 
     expect(sheet.onKey(key('escape'))).toBe(true)
     expect(stack.items).toEqual([])
+  })
+
+  it('renders the gateway cache hit percent without phantom cache-token counters', async () => {
+    const { host, stack } = setup()
+
+    openSessionInfo(host)
+    await flush()
+    const text = JSON.stringify(rendered(stack).json)
+    expect(sessionStatFacts(info, info.usage)).toContainEqual({ k: 'Cache hit', v: '92%' })
+    expect(text).toContain('"k":"Cache hit","v":"92%"')
+    expect(text).not.toContain('Cache-read tokens')
+    expect(text).not.toContain('Cache-write tokens')
+  })
+
+  it('shows Unknown only when the gateway omits cache_hit_pct', () => {
+    const { host, session, stack } = setup()
+    session.info = { ...info, usage: usageWithoutCacheHit }
+    session.usage = usageWithoutCacheHit
+
+    openSessionInfo(host)
+    const text = JSON.stringify(rendered(stack).json)
+    expect(sessionStatFacts(session.info, session.usage)).toContainEqual({ k: 'Cache hit', v: 'Unknown' })
+    expect(sessionStatFacts(info, { ...usageWithoutCacheHit, cache_hit_pct: 0 }))
+      .toContainEqual({ k: 'Cache hit', v: '0%' })
+    expect(text).toContain('"k":"Cache hit","v":"Unknown"')
+    expect(text).toContain('1,200')
   })
 
   it('shows missing-data state without inventing counts or calling the RPC', () => {
