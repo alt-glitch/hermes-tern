@@ -85655,6 +85655,9 @@ var EuiCards = class {
     }
   }
   #reset() {
+    if (this.#slots.size === 0) {
+      return;
+    }
     for (const s2 of this.#slots.values()) {
       s2.mounted?.dispose();
     }
@@ -98181,7 +98184,7 @@ var App = class {
     };
     s2.theme.apply();
     onCardFault(noticeSink((text16) => this.notice(text16, "warning")));
-    this.eui.attach({ blob: (bytes, mime) => this.#tern.blob(bytes, mime), stylesheet: (name, css2) => {
+    this.eui.attach({ blob: (bytes, mime) => this.#tern.caps.features.includes("blobs") ? this.#tern.blob(bytes, mime) : void 0, stylesheet: (name, css2) => {
       this.#surface.raw.stylesheet(name, css2);
     } }, Boolean(this.#tern.caps.dark));
     if (this.#tern.caps.features.includes("blobs")) {

@@ -259,6 +259,9 @@ export class EuiCards {
   }
 
   #reset() {
+    if (this.#slots.size === 0) {
+      return
+    }
     for (const s of this.#slots.values()) {
       s.mounted?.dispose()
     }

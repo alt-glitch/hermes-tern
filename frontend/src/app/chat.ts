@@ -206,7 +206,7 @@ export class App implements ChatPorts {
     // A card that throws draws as the generic one, and the pane says so once per tool name.
     onCardFault(noticeSink(text => this.notice(text, 'warning')))
 
-    this.eui.attach({ blob: (bytes, mime) => this.#tern.blob(bytes, mime), stylesheet: (name, css) => { this.#surface.raw.stylesheet(name, css) } }, Boolean(this.#tern.caps.dark))
+    this.eui.attach({ blob: (bytes, mime) => (this.#tern.caps.features.includes('blobs') ? this.#tern.blob(bytes, mime) : undefined), stylesheet: (name, css) => { this.#surface.raw.stylesheet(name, css) } }, Boolean(this.#tern.caps.dark))
 
     if (this.#tern.caps.features.includes('blobs')) {
       s.welcome.logo = this.#tern.blob(logo, 'image/png')
