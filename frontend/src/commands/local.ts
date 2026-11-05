@@ -314,7 +314,7 @@ const COMMANDS: readonly LocalCommand[] = [
     }
   },
   {
-    help: 'Inspect a prepared OpenUI preview [/absolute/path/to/file.hvisual.json]',
+    help: 'Inspect a prepared OpenUI preview or ephemeral-ui card [/absolute/path/to/file.hvisual.json]',
     name: 'visual',
     run: (host, arg) => openVisualPicker(host, arg.trim())
   },
