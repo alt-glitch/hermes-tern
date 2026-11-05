@@ -10,10 +10,11 @@ import { type ChangedFile, fileDiff, type GitState, gitState } from '../git/stat
 
 import { nativeOverlayKey } from './identity.js'
 import type { Overlay } from './overlay.js'
+import { openCodeReview } from './codeReview.js'
 import { moveSelection } from './search.js'
 
 /** What the Changes sheet reaches of the app. */
-export type ChangesHost = Pick<ChatPorts, 'changed' | 'close' | 'open' | 'session' | 'sidebar'>
+export type ChangesHost = Pick<ChatPorts, 'changed' | 'close' | 'control' | 'open' | 'overlays' | 'session' | 'sidebar'>
 
 const KEY = 'changes'
 
@@ -59,6 +60,13 @@ export function openChanges(host: ChangesHost, focus?: string) {
   const files = () => state?.files ?? []
   const current = () => files().find(f => f.path === selected)
 
+  const review = () => {
+    const picked = current()
+    if (state && picked) {
+      openCodeReview(host, { diffs, files: state.files, load, parent: overlay }, picked.path)
+    }
+  }
+
   const overlay: Overlay = {
     key: KEY,
     modal: true,
@@ -72,6 +80,8 @@ export function openChanges(host: ChangesHost, focus?: string) {
         copyToClipboard(file.path)
       } else if (k.name === 'r' && k.shift) {
         void read()
+      } else if (k.name === 'v' && !k.ctrl && !k.alt && !k.meta) {
+        review()
       } else {
         selected =
           moveSelection(
@@ -102,6 +112,7 @@ export function openChanges(host: ChangesHost, focus?: string) {
       <picker
         actions={[
           { ...optional('disabled', f ? undefined : 'No file'), id: 'copy', keys: ['c'], label: 'Copy path' },
+          { ...optional('disabled', f ? undefined : 'No file'), id: 'review', keys: ['v'], label: 'Review split' },
           { id: 'refresh', keys: ['shift+r'], label: 'Refresh' },
           { end: true, id: 'close', keys: ['esc'], label: 'Close', primary: true }
         ]}
@@ -114,7 +125,8 @@ export function openChanges(host: ChangesHost, focus?: string) {
         onAction={{
           close: () => host.close(overlay),
           copy: () => f && copyToClipboard(f.path),
-          refresh: () => void read()
+          refresh: () => void read(),
+          review
         }}
         onSelect={ev => {
           selected = ev.item
