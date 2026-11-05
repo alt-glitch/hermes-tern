@@ -11,6 +11,7 @@ import { entryNode, type TranscriptContext } from '../view/transcript.js'
 import { decodeEuiCard } from '../wire/euiCard.js'
 
 import { tree } from './fakes.js'
+import { ternBody } from '../eui/ternCss.js'
 
 const FENCE = String.fromCharCode(96).repeat(3)
 const KINDS = new EuiCards(() => undefined).kinds
@@ -139,4 +140,21 @@ describe('ephemeral-ui cards in an answer', () => {
     expect(sheets.get('ephemeral-ui-inline')).toMatch(/\[data-eui-s='[0-9a-f]{10}'\]/)
     eui.close()
   }, 20_000)
+})
+
+describe('ephemeral-ui kit stylesheet', () => {
+  // Tern 0.9.9 stops delivering pointer events to the window once a surface sheet holds CSS its parser
+  // rejects (bisected live; `tern ctl css NAME PATH` lists rejects). The kit sheet keeps only what it parses.
+  it('carries no declaration, selector or media query Tern rejects', () => {
+    const css = euiStyles()
+    expect(css).not.toMatch(/[{;](-webkit-)?appearance:|aspect-ratio:|text-underline-offset:|border-block:|border-inline-start:/)
+    expect(css).not.toMatch(/:has\(|::-webkit-|\(\s*(pointer|hover)\s*:|\d+dvh|env\(|conic-gradient/)
+    expect(css).toContain('.eu-btn')
+  })
+
+  it('rewrites logical borders and drops layout-less values', () => {
+    expect(ternBody('border-block:1px solid red;aspect-ratio:1;width:undefinedpx;transform:translateX(NaNpx);color:')).toBe(
+      'border-top:1px solid red;border-bottom:1px solid red')
+    expect(ternBody("height:100dvh;padding:env(safe-area-inset-top);content:'a;b'")).toBe("height:100vh;padding:0px;content:'a;b'")
+  })
 })

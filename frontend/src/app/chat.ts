@@ -110,7 +110,14 @@ export class App implements ChatPorts {
       policy: async () => settings.load().tableCharts ?? 'off',
       plan: hermesTableChartPlanner()
     }, () => this.changed())
-    this.eui = new EuiCards(() => this.changed())
+    // A card redraws on its own (a click, a mount): its row is drawn again even once it has settled.
+    this.eui = new EuiCards(key => {
+      const entry = key === undefined ? undefined : this.transcript.entries.find(e => key.startsWith(`main.${e.id}.`))
+      if (entry) {
+        this.transcript.changedEntries.add(entry)
+      }
+      this.changed()
+    })
     this.#hostLifecycle = new HostLifecycle(writeHost ?? (text => {
       if (launch.pane) {
         process.stdout.write(text)

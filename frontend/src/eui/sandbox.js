@@ -87,6 +87,21 @@ export async function createSandbox(dir, scheme = 'light', log = () => {}) {
       return { ok: true, status: 200, json: async () => JSON.parse(text), text: async () => text }
     }
   }
+  // Inert stand-ins for browser APIs a few controls touch: text selection and hit-testing.
+  ctx.getSelection = () => ({ removeAllRanges() {}, addRange() {}, selectAllChildren() {}, collapseToEnd() {}, toString: () => '' })
+  document.elementFromPoint ??= () => null
+  document.createRange ??= () => ({ selectNodeContents() {}, setStart() {}, setEnd() {} })
+  window.HTMLElement.prototype.select ??= function select() {}
+  // linkedom has no select.value/selectedIndex; the kit's change handlers read them.
+  const optionsOf = sel => [...sel.querySelectorAll('option')]
+  const chosen = sel => Math.max(0, optionsOf(sel).findIndex(o => o.hasAttribute('selected')))
+  const choose = (sel, i) => { for (const [j, o] of optionsOf(sel).entries()) o.toggleAttribute('selected', j === i) }
+  Object.defineProperties(window.HTMLSelectElement.prototype, {
+    options: { configurable: true, get() { return optionsOf(this) } },
+    selectedIndex: { configurable: true, get() { return optionsOf(this).length ? chosen(this) : -1 }, set(i) { choose(this, i) } },
+    value: { configurable: true, get() { const o = optionsOf(this)[chosen(this)]; return o ? (o.getAttribute('value') ?? o.textContent) : '' }, set(v) { choose(this, optionsOf(this).findIndex(o => (o.getAttribute('value') ?? o.textContent) === String(v))) } }
+  })
+  Object.defineProperty(window.HTMLOptionElement.prototype, 'selected', { configurable: true, get() { const sel = this.closest('select'); return sel ? optionsOf(sel)[chosen(sel)] === this : this.hasAttribute('selected') }, set(v) { const sel = this.closest('select'); if (sel && v) choose(sel, optionsOf(sel).indexOf(this)) } })
   ctx.self = ctx
   ctx.globalThis = ctx
   vm.createContext(ctx)
@@ -124,7 +139,12 @@ export async function createSandbox(dir, scheme = 'light', log = () => {}) {
     if (el.hidden) attrs.hidden = 'true'
     if (el.disabled) attrs.disabled = 'true'
     const kids = []
-    for (const k of el.childNodes) { const s = snapshot(k); if (s) kids.push(s) }
+    // A closed details shows only its summary; a select shows only its chosen option.
+    const shown = el.localName === 'details' && !el.hasAttribute('open') ? [...el.children].filter(k => k.localName === 'summary')
+      : el.localName === 'select' ? [...el.options].filter(o => o.selected).slice(0, 1)
+      : el.childNodes
+    if (el.localName === 'details') attrs.open = el.hasAttribute('open') ? 'true' : ''
+    for (const k of shown) { const s = snapshot(k); if (s) kids.push(s) }
     return { t: 'el', tag: el.localName, id: idOf(el), cls: el.getAttribute('class') ?? '', style: el.getAttribute('style') ?? '', attrs, click: clickable(el), kids }
   }
 
@@ -132,6 +152,7 @@ export async function createSandbox(dir, scheme = 'light', log = () => {}) {
     const e = new window.Event(type, { bubbles: true, cancelable: true })
     Object.assign(e, { button: 0, buttons: 1, clientX: 0, clientY: 0, pointerId: 1, pointerType: 'mouse', isPrimary: true, detail: 1 })
     try { el.dispatchEvent(e) } catch (err) { log(err) }
+    return e
   }
 
   return {
@@ -166,7 +187,25 @@ export async function createSandbox(dir, scheme = 'light', log = () => {}) {
           // A hold button confirms when its fill animation finishes; releasing early cancels it.
           if (el.closest('.hold')) return true
           fire(el, 'pointerup')
-          fire(el, 'click')
+          const clicked = fire(el, 'click')
+          // A browser's default actions, which the DOM here lacks: a summary opens and closes its
+          // details, and a select (drawn as a single chip in Tern) steps to its next option.
+          const summary = el.closest('summary')
+          const details = summary?.parentElement
+          if (!clicked.defaultPrevented && details?.localName === 'details' && details.firstElementChild === summary) {
+            details.toggleAttribute('open')
+            details.dispatchEvent(new window.Event('toggle'))
+          }
+          const label = el.closest('label')
+          const box = label && (label.htmlFor ? root.querySelector(`[id="${String(label.htmlFor).replace(/"/g, '')}"]`) : label.querySelector('input'))
+          if (!clicked.defaultPrevented && box && box !== el && (box.type === 'checkbox' || box.type === 'radio') && !box.disabled) {
+            box.checked = box.type === 'radio' ? true : !box.checked
+            fire(box, 'input'); fire(box, 'change')
+          }
+          if (el.localName === 'select' && el.options.length > 1) {
+            el.selectedIndex = (el.selectedIndex + 1) % el.options.length
+            fire(el, 'input'); fire(el, 'change')
+          }
           return true
         },
         dispose() { mo.disconnect(); run.stop(); clearTimeout(pending); root.remove() }

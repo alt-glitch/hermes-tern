@@ -11,6 +11,7 @@ import { decodeEuiCard, EUI_FENCE, type EuiCardSpec } from '../wire/euiCard.js'
 import { parseJson } from '../wire/json.js'
 
 import { createSandbox, type EuiMounted, type EuiNode, type EuiSandbox, vendorDir } from './sandbox.js'
+import { ternBody } from './ternCss.js'
 
 export type EuiPart =
   | { readonly kind: 'md'; readonly text: string }
@@ -119,7 +120,7 @@ export class EuiCards {
   readonly dir = euiDir()
   readonly kinds = pinnedKinds(this.dir)
   #sink: EuiSink | undefined
-  #changed: () => void
+  #changed: (key?: string) => void
   #dark = false
   #sandbox: Promise<EuiSandbox> | undefined
   #slots = new Map<string, Slot>()
@@ -127,7 +128,7 @@ export class EuiCards {
   #rules = new Map<string, string>()
   #sheetDirty = false
 
-  constructor(changed: () => void, sink?: EuiSink) {
+  constructor(changed: (key?: string) => void, sink?: EuiSink) {
     this.#changed = changed
     this.#sink = sink
   }
@@ -174,7 +175,7 @@ export class EuiCards {
 
   click(key: string, id: number) {
     if (this.#slots.get(key)?.mounted?.click(id)) {
-      this.#bump()
+      this.#bump(key)
     }
   }
 
@@ -203,7 +204,7 @@ export class EuiCards {
     const key = createHash('sha1').update(css).digest('hex').slice(0, 10)
 
     if (!this.#rules.has(key)) {
-      this.#rules.set(key, `[data-eui-s='${key}']{${css.replace(/[{}<]/g, '')}}`)
+      this.#rules.set(key, `[data-eui-s='${key}']{${ternBody(css.replace(/[{}<]/g, ''))}}`)
       this.#sheetDirty = true
       queueMicrotask(() => { this.#flush() })
     }
@@ -220,7 +221,8 @@ export class EuiCards {
     if (!this.#sink) {
       return
     }
-    if (!euiSheets.has(KIT_SHEET)) {
+    // The kit's sheet goes over only once a card is on screen: a chat without cards pays nothing.
+    if (this.#slots.size > 0 && !euiSheets.has(KIT_SHEET)) {
       euiSheets.set(KIT_SHEET, euiStyles())
       this.#sink.stylesheet(KIT_SHEET, euiStyles())
     }
@@ -238,11 +240,12 @@ export class EuiCards {
       if (this.#slots.get(key) !== slot) {
         return
       }
-      slot.mounted = sb.mount(slot.spec.kind, slot.spec.app, () => { this.#bump() })
-      this.#bump()
+      slot.mounted = sb.mount(slot.spec.kind, slot.spec.app, () => { this.#bump(key) })
+      this.#flush()
+      this.#bump(key)
     }).catch((e: unknown) => {
       slot.error = e instanceof Error ? e.message : String(e)
-      this.#bump()
+      this.#bump(key)
     })
   }
 
@@ -269,9 +272,10 @@ export class EuiCards {
     this.#bump()
   }
 
-  #bump() {
+  /** `key`: the card that changed, so its transcript row is drawn again even once settled. */
+  #bump(key?: string) {
     this.revision++
-    this.#changed()
+    this.#changed(key)
   }
 }
 
@@ -283,3 +287,5 @@ export function themeSvg(svg: string): string {
     .replace(/var\(--h-(mutedFg|border|input)\)/g, 'var(--muted)')
     .replace(/var\(--h-primary\)/g, 'var(--accent)')
 }
+
+

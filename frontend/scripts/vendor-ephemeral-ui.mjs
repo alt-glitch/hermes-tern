@@ -9,6 +9,7 @@ import { join, resolve } from 'node:path'
 
 import { build } from 'esbuild'
 
+import { TERN_BAD_MEDIA, TERN_BAD_SELECTOR, ternBody } from '../src/eui/ternCss.js'
 import { root } from './ratchet.mjs'
 
 export const PIN = '63e06b29ffb0d7c5b9d482abebc0312335897321'
@@ -35,13 +36,15 @@ export function scopeCss(css) {
     const body = css.slice(open + 1, close)
 
     if (/^@(media|supports|container|layer)/.test(head)) {
-      out += `${head}{${scopeCss(body)}}\n`
+      if (!TERN_BAD_MEDIA.test(head)) { out += `${head}{${scopeCss(body)}}\n` }
+    } else if (/^@keyframes/.test(head)) {
+      out += `${head}{${body.replace(/\{([^{}]*)\}/g, (_, b) => `{${ternBody(b)}}`)}}\n`
     } else if (head.startsWith('@')) {
       out += `${head}{${body}}\n`
     } else if (!/::view-transition/.test(head)) {
-      const sel = head.split(/,(?![^(]*\))/).map(s => scoped(s.trim())).filter(Boolean).join(',')
+      const sel = head.split(/,(?![^(]*\))/).filter(s => !TERN_BAD_SELECTOR.test(s)).map(s => scoped(s.trim())).filter(Boolean).join(',')
 
-      if (sel) { out += `${sel}{${body}}\n` }
+      if (sel) { out += `${sel}{${ternBody(body)}}\n` }
     }
 
     i = close + 1

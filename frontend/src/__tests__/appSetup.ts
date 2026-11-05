@@ -68,7 +68,7 @@ export function setup(replies: Record<string, Reply> = {}, { canonical = true, f
     }))
   }
 
-  return { app, attach, emit, press, queuedRows, sent, type }
+  return { app, attach, emit, frame: () => tern.frame, ops: () => tern.ops, press, queuedRows, sent, tern, type }
 }
 
 /** Waits until the app has handled what the test fed it (no fixed sleep). */
