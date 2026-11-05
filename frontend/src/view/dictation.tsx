@@ -6,7 +6,7 @@ import type { JSX } from '@stencil-hq/tern'
 
 import type { DictationPhase } from '../draft/dictation.js'
 
-import { button } from './ui/button.js'
+import { button, pressable } from './ui/button.js'
 import { shimmerText } from './ui/live.js'
 
 /** Dictation as the dock draws it; none while it is off. */
@@ -35,12 +35,11 @@ const LABEL: Record<Exclude<DictationPhase, 'off' | 'ready'>, string> = {
 export function micButton(d: DictationView, on: DictationActions): JSX.Element {
   const live = d.phase !== 'ready'
 
-  return (
+  return pressable(
+    { key: 'mic', name: live ? 'End dictation' : 'Start dictation', onClick: on.onDictate, role: 'hermes.composer.mic' },
     <icon
-      key="mic"
+      key="glyph"
       name="mic"
-      onClick={on.onDictate}
-      role="hermes.composer.mic"
       title={live ? `Dictating · ${d.key} or ⏎ ends it, esc cancels` : `Dictate  ${d.key}`}
       tone={live ? 'error' : 'muted'}
     />
