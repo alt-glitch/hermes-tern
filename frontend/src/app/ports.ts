@@ -3,6 +3,7 @@
 // imports App, and App is the one place that implements them all. The names are the ones the
 // ports keep: a later package changes what stands behind a port, not the code that reads it.
 
+import type { Usage } from '@hermes/shared/gateway-events'
 import type { ScrollTo } from '@stencil-hq/tern'
 
 import type { GatewayClient } from '@tui/gatewayClient.js'
@@ -38,6 +39,8 @@ export interface SessionView {
    * tier shows the change before the gateway's next session.info confirms it.
    */
   info: SessionInfo | null
+  /** Latest token and context counters, refreshed by session.usage between info events. */
+  readonly usage?: Usage | null
 }
 
 /** Everything the app lends; a consumer takes `Pick<ChatPorts, …>` of it. */
