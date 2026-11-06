@@ -11,9 +11,11 @@ import type { MediaDelivery } from '../media-delivery.js'
 import type { SessionIds } from '../core/ids.js'
 import type { Block, Compaction, Entry, NoticeEntry, TurnEntry, UserAttachment, UserEntry } from '../model.js'
 import { steerState } from '../transcript/messages.js'
+import type { EuiCards } from '../eui/cards.js'
 import type { TableCharts } from '../transcript/tableCharts.js'
 import { answerText, turnEndedAt } from '../transcript/turns.js'
 
+import { euiCardNode } from './euiCard.js'
 import { duration } from './format.js'
 import { attachmentImagePath, imagePreviewNode } from './media.js'
 import { slashBody } from './slash.js'
@@ -32,6 +34,8 @@ import { parts, pieces } from './workLogModel.js'
 export interface TranscriptContext {
   /** Presentation-only, session-scoped Markdown table charts. */
   charts?: TableCharts
+  /** Presentation-only ephemeral-ui cards drawn from `ephemeral-ui` fences in answers. */
+  eui?: EuiCards
   now: number
   /** Negotiated Tern clock preference; older hosts default to 24-hour time. */
   hour12?: boolean
@@ -82,7 +86,7 @@ export function entryNode(e: Entry, id: string, cx: TranscriptContext): JSX.Elem
   const built: Built = holder
   // Authority is presentation state: a cached local href must not survive a host/cwd switch.
   const rev = JSON.stringify([e.kind === 'turn' || e.kind === 'compaction' ? e.rev : 0,
-    cx.copied === e.id, e.kind === 'user' ? (cx.hour12 ?? false) : null, cx.lspContext?.hostLocal === true, cx.lspContext?.cwd ?? '', cx.charts?.revision ?? 0, cx.mediaRev ?? '', cx.links?.cwd ?? '', cx.links?.hostLocal ?? false, cx.links?.media ?? false])
+    cx.copied === e.id, e.kind === 'user' ? (cx.hour12 ?? false) : null, cx.lspContext?.hostLocal === true, cx.lspContext?.cwd ?? '', cx.charts?.revision ?? 0, cx.eui?.revision ?? 0, cx.mediaRev ?? '', cx.links?.cwd ?? '', cx.links?.hostLocal ?? false, cx.links?.media ?? false])
   const cached = built[kNode]
 
   if (cached?.rev === rev && cached.browserSource === cx.browserSource) {
@@ -277,12 +281,19 @@ function pieceNodes(turn: TurnEntry, blocks: readonly Block[], parent: string, c
     const b = p.block
 
     switch (b.kind) {
-      case 'text':
+      case 'text': {
+        const cards = cx.eui?.split(b.text, `${parent}.${b.id}`)
+
+        if (cx.eui && cards && cards.some(c => c.kind !== 'md')) {
+          return euiAnswerNode(b.id, cards, cx.eui)
+        }
+
         return (
           <md key={b.id} {...optional('stream', (live && b === lastText) || undefined)}>
             {live ? b.text : displayMarkdown(cx.charts?.markdown(b.text, turn.end.status === 'done') ?? b.text, cx.links?.hostLocal ? cx.links.cwd : '')}
           </md>
         )
+      }
 
       case 'tool':
         return toolNode(b.call, cx.now, cx.lspContext, cx.focusBrowser, cx.media, cx.links)
@@ -422,4 +433,17 @@ function noticeNode(e: NoticeEntry): JSX.Element {
   const tone = e.tone === 'info' ? 'muted' : e.tone
 
   return <text key={e.id} role={`omp.notice.${e.tone}`} spans={[{ s: tone, t: e.text }]} wrap="word" />
+}
+
+/** An answer with `ephemeral-ui` fences: its Markdown around each card, in order. */
+function euiAnswerNode(id: string, parts: ReturnType<EuiCards['split']>, eui: EuiCards): JSX.Element {
+  return (
+    <col key={id} role="eui.answer">
+      {parts.map((p, i) => p.kind === 'card'
+        ? euiCardNode(p.key, eui.view(p.key, p.spec), eui)
+        : p.kind === 'bad'
+          ? <col key={`bad${i}`} role="eui.card.invalid"><text key="e" role="eui.error" text={`ephemeral-ui card not drawn: ${p.error}`} /><md key="src">{p.text}</md></col>
+          : <md key={`md${i}`}>{p.text}</md>)}
+    </col>
+  )
 }

@@ -116,6 +116,7 @@ export function fakeTern({ cols = 80, draws = false, features = [], hour12 = fal
   const waiting: ((r: IteratorResult<TernInput>) => void)[] = []
   const opened: unknown[] = []
   const focused: (string | null)[] = []
+  const ops: unknown[][] = []
   let frame: Renderable | undefined
 
   // The test transport uses the actual pinned Surface contract. Capture Renderable only
@@ -161,6 +162,7 @@ export function fakeTern({ cols = 80, draws = false, features = [], hour12 = fal
         send: message => {
           if (message.verb === 'f') {
             for (const op of message.body.ops) {
+              ops.push([...op])
               if (op[0] === 'focus') {
                 focused.push(op[1])
               }
@@ -193,6 +195,8 @@ export function fakeTern({ cols = 80, draws = false, features = [], hour12 = fal
     opened,
     /** Each caret move a drawing surface was sent, in order. */
     focused,
+    /** Every frame op the surfaces were sent, in order (retained rows draw by op, not by `frame`). */
+    ops,
     /** Whether the app's input loop waits for its next input. */
     get reading(): boolean {
       return waiting.length > 0

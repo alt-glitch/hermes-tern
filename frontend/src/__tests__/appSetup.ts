@@ -75,7 +75,7 @@ export function setup(
   /** The dock's top nodes as last rendered. */
   const dock = () => topNodes(tern.region('dock'))
 
-  return { app, attach, dock, emit, press, queuedRows, sent, type }
+  return { app, attach, dock, emit, frame: () => tern.frame, ops: () => tern.ops, press, queuedRows, sent, tern, type }
 }
 
 /** Waits until the app has handled what the test fed it (no fixed sleep). */

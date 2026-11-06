@@ -3,6 +3,7 @@
 import type { Op, Palette, Renderable, RevealAt, ScrollTo, Session, Surface, TspEvent, WireNode } from '@stencil-hq/tern'
 
 import { SurfaceLifecycle, SurfaceView, type SurfaceLifecycleHost, type SurfaceState } from './lifecycle.js'
+import { euiSheets } from '../eui/cards.js'
 
 /** The composer's node id (dock → composer): the completion list sits above it. */
 export const COMPOSER_ID = 'dock.composer'
@@ -32,6 +33,7 @@ export class SurfaceHost {
         this.#focus = undefined
         this.#track(surface)
         surface.stylesheet('hermes-tern', styles)
+        for (const [name, css] of euiSheets) { surface.stylesheet(name, css) }
         if (this.#palette) {
           surface.palette(this.#palette)
         }
