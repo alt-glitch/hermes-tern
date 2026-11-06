@@ -1,6 +1,7 @@
 import { LIBRARY, SCHEMA, CATALOG, freeze, assertTelemetryDisabled, loadCore, requireInput } from './catalog.mjs';
 import { bindSelection, projectSelection } from './host.mjs';
 import { INTENT_CATALOG, INTENT_LIBRARY, INTENT_SCHEMA, bindIntent, projectIntent } from './intent.mjs';
+import { ARCHITECTURE_CATALOG, ARCHITECTURE_LIBRARY, ARCHITECTURE_SCHEMA, bindArchitecture, projectArchitecture } from './architecture.mjs';
 import { checkProgram } from './static-program.mjs';
 
 const RULES = [
@@ -21,6 +22,14 @@ const LIBRARIES = {
     rules: [
       'Use only snapshot keys supplied in the task. Intent, contract, receipt and intelligence values are host-owned; select sections, never fabricate data.',
       'Each section appears at most once. Approval stays with the host: no section approves, executes or publishes anything.',
+    ],
+  },
+  architecture: {
+    library: ARCHITECTURE_LIBRARY, schema: ARCHITECTURE_SCHEMA, catalog: ARCHITECTURE_CATALOG,
+    root: 'ArchitectureBoard', project: projectArchitecture, bind: bindArchitecture,
+    rules: [
+      'Only the host-approved authored architecture snapshot key may be selected. All nodes and intent edges are host-owned.',
+      'Every edge expresses unverified design intent. Do not infer infrastructure integrations, provide actions or approve, execute or publish anything.',
     ],
   },
 };

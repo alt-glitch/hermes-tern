@@ -95,6 +95,13 @@ export async function openVisual(
                     ) : null}
                     <text key="inert" text="Host-owned read-only summary. No button, action, script or approval runs." />
                   </col>
+                ) : candidate.edges ? (
+                  <col gap="sm" key="architecture">
+                    <kv items={candidate.metrics.map(metric => ({ k: metric.label, v: String(metric.value) }))} key="metrics" />
+                    <text key="mode" text="Authored architecture · every edge is intent, not verified integration" />
+                    {candidate.edges.map((edge, index) => <text key={'edge-' + index} text={edge} />)}
+                    <text key="file" spans={[{ t: 'Open candidate file in Tern', href: candidate.href, s: 'link' }]} />
+                  </col>
                 ) : (
                   <col gap="sm" key="openui-summary">
                     <kv items={candidate.metrics.map(metric => ({ k: metric.label, v: String(metric.value) }))} key="metrics" />

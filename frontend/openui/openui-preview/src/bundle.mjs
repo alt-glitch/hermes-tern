@@ -4,7 +4,9 @@ import { fileURLToPath } from 'node:url';
 import { digest, freeze, requireInput, LIBRARY_HASH } from '../../openui-generation/src/catalog.mjs';
 import { projectSelection } from '../../openui-generation/src/host.mjs';
 import { INTENT_LIBRARY_HASH, projectIntent } from '../../openui-generation/src/intent.mjs';
+import { ARCHITECTURE_LIBRARY_HASH, projectArchitecture } from '../../openui-generation/src/architecture.mjs';
 import { prepareIntentArtifact } from './intent-document.mjs';
+import { prepareArchitectureArtifact } from './architecture-document.mjs';
 
 export const MAX_BYTES = 8 * 1024 * 1024;
 export const RENDERER_FILES = Object.freeze(['plugin.toml', 'host.luau', 'window.luau', 'visual.css']);
@@ -49,10 +51,13 @@ export function prepareArtifact(json, rendererHash) {
 export async function fingerprints() {
   const renderer = await Promise.all(RENDERER_FILES.map(async name => [name,
     digest(await readFile(new URL(`../tern/${name}`, import.meta.url)))]));
-  const files = ['bundle.mjs', 'intent-document.mjs', 'lifecycle.mjs', 'control.mjs'];
+  const files = ['bundle.mjs', 'intent-document.mjs', 'architecture-document.mjs', 'lifecycle.mjs', 'control.mjs'];
   const bridge = await Promise.all(files.map(async name => [name, digest(await readFile(new URL(name, import.meta.url)))]));
-  for (const name of ['adapter.mjs', 'catalog.mjs', 'host.mjs', 'intent.mjs', 'static-program.mjs']) {
+  for (const name of ['adapter.mjs', 'catalog.mjs', 'host.mjs', 'intent.mjs', 'architecture.mjs', 'static-program.mjs']) {
     bridge.push([`generation/${name}`, digest(await readFile(new URL(`../../openui-generation/src/${name}`, import.meta.url)))]);
+  }
+  for (const name of ['architecture.v0.json', 'architecture-services.v0.json']) {
+    bridge.push([`generation/fixtures/${name}`, digest(await readFile(new URL(`../../openui-generation/fixtures/${name}`, import.meta.url)))]);
   }
   bridge.push(['generation/package-lock.json', digest(await readFile(new URL('../../openui-generation/package-lock.json', import.meta.url)))]);
   return freeze({ rendererHash: digest(JSON.stringify(renderer)), bridgeHash: digest(JSON.stringify(bridge)) });
@@ -82,7 +87,16 @@ export function validateBundle(input) {
   exact(s.snapshot, ['key', 'id', 'rendererHash']);
   const el = (typeName, props) => ({ type: 'element', typeName, props, partial: false });
   let artifact;
-  if (s.view?.kind === 'intent-board') {
+  if (s.view?.kind === 'architecture-board') {
+    requireInput(s.libraryHash === ARCHITECTURE_LIBRARY_HASH && digest(JSON.stringify(selectionBody)) === selectionId,
+      'selection', 'Selection identity or catalog changed.');
+    requireInput(s.generator.core === '@openuidev/lang-core@0.3.1' &&
+      s.generator.adapter === 'bounded-architecture-selection/v0', 'generator', 'Unsupported architecture adapter.');
+    exact(s.view, ['kind']);
+    projectArchitecture(el('ArchitectureBoard', { snapshotId: s.snapshot.key }));
+    exact(value.artifact, ['id', 'rendererHash', 'document']);
+    artifact = prepareArchitectureArtifact(JSON.stringify(value.artifact.document), value.artifact.rendererHash);
+  } else if (s.view?.kind === 'intent-board') {
     // Re-project through the same catalog gate the model's program passed.
     requireInput(s.libraryHash === INTENT_LIBRARY_HASH && digest(JSON.stringify(selectionBody)) === selectionId,
       'selection', 'Selection identity or catalog changed.');

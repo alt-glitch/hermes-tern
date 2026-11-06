@@ -136,6 +136,57 @@ A real host document comes from ephemeral-ui's `tools/openui-intent-doc.mjs`. Th
 `fixtures/intent-board.json` is synthetic. `/visual` lists and opens an intent candidate like a
 repository one; its sheet names the chosen sections instead of an initial mode.
 
+## Authored architecture boards (ephemeral-architecture/v0)
+
+This second ephemeral-ui kit shows **authored examples**, not discovered or
+verified infrastructure. Its public reference is the built kvnloo/ephemeral-ui
+gh-pages tree at 63e06b29ffb0d7c5b9d482abebc0312335897321 (the source
+tree is private). The fixture openui-generation/fixtures/architecture.v0.json
+is a byte-identical copy of schema/architecture.v0.json, Git blob
+ce65a7b43ed6e03247ccda391952771e33c021ee. The fixture
+architecture-services.v0.json pins all 39 SERVICES keys from js/infra-data.js,
+blob adce342193527b110e5fc487358697e33b8860a0.
+
+The model selects only ArchitectureBoard("arch"); the host owns all nodes,
+labels and edges. Strict validation bounds UTF-8 JSON to 64 KiB, requires
+v:0 and a nonblank title of 1–160 characters, fixes provenance to
+authored-example (including when absent), and accepts 1–24 distinct nodes
+with ids matching ^[a-zA-Z][a-zA-Z0-9_-]{0,39}$ and services in the pinned
+list. It allows up to 64 edges, only between different existing nodes,
+with a nonblank 1–100-character label. Unknown keys, control and
+bidirectional characters fail closed. Cycles are allowed.
+
+The shipped openui-preview/fixtures/architecture-board.json is **synthetic**:
+it is not a topology, integration or provider-health receipt. Every edge
+in /visual and the separately linked native Luau board says
+**Intent only ... not verified integration**. The renderer cannot execute,
+approve, publish, provision or install anything.
+
+~~~sh
+cd /absolute/path/to/hermes-tern/frontend
+node openui/prepare.mjs prepare-architecture \
+  openui/openui-generation/fixtures/architecture.openui \
+  openui/openui-preview/fixtures/architecture-board.json \
+  '["stored-id","main"]' /absolute/output-directory --json
+~~~
+
+This emits one hermes.visual.candidate JSON notice. /visual lists and
+validates it against the originating session/branch, then opens its
+read-only summary. Native rendering still needs the optional, explicitly
+linked Tern file route. Schema, service list, catalog, validator and
+renderer bytes join the existing fingerprint checks. Neither source
+tests nor a headless text view demonstrate native pixels.
+
+Verification (unrun by the GitHub connector worker):
+
+~~~sh
+cd frontend
+bun run test -- src/__tests__/architectureBoard.test.ts src/__tests__/openuiPackaged.test.ts
+OPENUI_TELEMETRY_DISABLED=1 DO_NOT_TRACK=1 npm test --prefix openui/openui-generation --workspaces=false
+OPENUI_TELEMETRY_DISABLED=1 DO_NOT_TRACK=1 npm test --prefix openui/openui-preview --workspaces=false
+cd openui/openui-preview && npm run test:lua
+~~~
+
 ## Optional native route, kept separate
 
 The fixed Tern `hermes-openui` file route is present at

@@ -34,6 +34,7 @@ const hash = /^[a-f0-9]{64}$/
 const hashedAssets = [
   'openui-preview/src/bundle.mjs',
   'openui-preview/src/intent-document.mjs',
+  'openui-preview/src/architecture-document.mjs',
   'openui-preview/src/control.mjs',
   'openui-preview/src/lifecycle.mjs',
   'openui-preview/tern/plugin.toml',
@@ -44,6 +45,9 @@ const hashedAssets = [
   'openui-generation/src/catalog.mjs',
   'openui-generation/src/host.mjs',
   'openui-generation/src/intent.mjs',
+  'openui-generation/src/architecture.mjs',
+  'openui-generation/fixtures/architecture.v0.json',
+  'openui-generation/fixtures/architecture-services.v0.json',
   'openui-generation/src/static-program.mjs',
   'openui-generation/package-lock.json'
 ] as const
