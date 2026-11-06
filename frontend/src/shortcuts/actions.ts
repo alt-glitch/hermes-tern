@@ -5,7 +5,7 @@
 import type { Key } from '@stencil-hq/tern'
 
 import { KEYS, matches } from '../draft/keys.js'
-import { isHoldInfoKey, isVoiceToggleKey } from '../voice/hold.js'
+import { isHoldInfoKey, isTalkToggleKey, isVoiceToggleKey } from '../voice/hold.js'
 
 type Modifier = 'ctrl' | 'alt' | 'shift' | 'meta'
 
@@ -59,7 +59,7 @@ function fixedChord(chord: string): boolean {
   const name = parts.pop() ?? ''
   const key: Key = { name, ctrl: parts.includes('ctrl'), alt: parts.includes('alt'), shift: parts.includes('shift'), meta: parts.includes('meta') }
   return [KEYS.browser, KEYS.plan, KEYS.fork, KEYS.copyDraft].some(match => matches(key, match)) ||
-    isVoiceToggleKey(key) || isHoldInfoKey(key) || (key.ctrl && name === 'home')
+    isTalkToggleKey(key) || isVoiceToggleKey(key) || isHoldInfoKey(key) || (key.ctrl && name === 'home')
 }
 
 /** Composer actions that may otherwise run when a contextual shortcut declines the key. */

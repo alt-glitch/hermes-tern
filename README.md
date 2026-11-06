@@ -102,6 +102,7 @@ A turn shows what the agent does while it works: its reasoning, short notes, and
 | <kbd>Alt</kbd>+<kbd>S</kbd> · <kbd>Alt</kbd>+<kbd>P</kbd> · <kbd>Alt</kbd>+<kbd>J</kbd> · <kbd>Alt</kbd>+<kbd>A</kbd> | Sidebar · pull requests · background processes · subagents |
 | <kbd>Ctrl</kbd>+<kbd>V</kbd> | Paste an image |
 | <kbd>Alt</kbd>+<kbd>V</kbd> | After `/voice on`: dictate into the composer, then end the capture (<kbd>Esc</kbd> cancels) |
+| <kbd>Ctrl</kbd>+<kbd>L</kbd> | Start/stop one Hermes Talk realtime conversation; Esc or the visible Stop button also hangs up |
 
 | Command | Does |
 | --- | --- |
@@ -121,6 +122,14 @@ A turn shows what the agent does while it works: its reasoning, short notes, and
 Press the record key and speak. A row above the composer says that the microphone is open, and shows what a streaming provider has heard so far. The capture ends after a pause (`voice.silence_duration`), or when you press the record key, <kbd>Enter</kbd> or Done. The words are inserted at the caret, as one step that <kbd>Ctrl</kbd>+<kbd>Z</kbd> undoes. They are never sent: you read the draft and send it yourself. <kbd>Esc</kbd>, <kbd>Ctrl</kbd>+<kbd>C</kbd> or Cancel throws the capture away.
 
 Recording and transcription are Hermes' own: the recorder of its push-to-talk and the provider in `stt` in `config.yaml`. They run in `dictation.py`, in Hermes' interpreter, on the machine that runs the pane. The shared gateway has no push-to-talk method (`voice.record`), and the microphone belongs to the pane's machine anyway. The Tern SDK that the frontend uses reports key presses but not releases, so the record key toggles; there is no hold-to-talk.
+
+### Realtime conversation and thinking orb
+
+Enable `hermes-talk` in the same Hermes profile. **Ctrl+L** explicitly starts a duplex call on that machine’s microphone and speaker using Talk’s configured provider/authentication. Press it again, press **Esc**, or click **Stop** to hang up. Alt+Shift+V and `/live` retain a disclosure/Allow flow. No call starts on launch or tab focus.
+
+The existing OMP-derived thinking orb follows the reported conversation phase: listening, thinking, speaking, then normal agent state after hang-up. Hidden panes and reduced-motion retain their existing animation limits. Your draft and caret are not submitted or cleared.
+
+The `tern-talk` plugin command reserves one owner/call before returning, so frontend RPC timeouts cannot create overlapping calls. Stop cancels the owned async task and waits for Talk’s audio/provider teardown; a lost frontend heartbeat also ends the call. Calls made directly with upstream `/talk` are not silently adopted. This adapter uses Talk’s terminal realtime lane; a separately configured GPT-Live lane still requires Talk’s explicit canonical task attachment and is not replaced with STT/TTS.
 
 ## Background processes
 

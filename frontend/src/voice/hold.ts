@@ -7,6 +7,10 @@ export const HOLD_UNAVAILABLE =
   'Use Mic / Alt+V from dictation PR #71 to start/finish review-only capture; Esc discards. ' +
   'Alt+Shift+Space only displays this message and never opens a microphone.'
 
+/** Explicit duplex-call start/stop; never matches modified variants. */
+export const isTalkToggleKey = (key: Key): boolean =>
+  key.name === 'l' && key.ctrl && !key.alt && !key.meta && !key.shift
+
 /** The voice toggle belongs to the app even when profile shortcuts are configured. */
 export const isVoiceToggleKey = (key: Key): boolean =>
   key.name === 'v' && key.alt && key.shift && !key.ctrl && !key.meta

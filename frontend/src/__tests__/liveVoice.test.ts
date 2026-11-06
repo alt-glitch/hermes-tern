@@ -1,9 +1,8 @@
 import { type JSX, Node } from '@stencil-hq/tern'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { localCommand } from '../commands/local.js'
 import { dockModel } from '../view/dockModel.js'
-
 import { settle, setup } from './appSetup.js'
 import { given, key } from './fakes.js'
 
@@ -12,178 +11,127 @@ vi.mock('@tui/lib/history.js', () => ({ append: () => undefined, load: () => [] 
 beforeEach(() => {
   delete process.env['HERMES_TUI_QUERY']
   delete process.env['HERMES_TUI_IMAGE']
+  delete process.env['HERMES_TUI_SPLASH']
 })
+const disposals: (() => void)[] = []
+afterEach(() => { for (const dispose of disposals.splice(0)) dispose() })
 
 const toggle = key('v', { alt: true, shift: true })
-
-/** The same semantic click contract the dock tests drive. */
+const quick = key('l', { ctrl: true })
+function fixture() {
+  let phase = 'listening', active = false, error = ''
+  const f = setup({ 'command.dispatch': p => {
+    const [action, id] = String(p['arg']).split(' ')
+    if (p['name'] !== 'tern-talk') throw new Error('unexpected command')
+    if (action === 'start') active = true
+    if (action === 'stop') active = false
+    return { type: 'plugin', output: JSON.stringify({ live_id: id, phase: active ? phase : 'idle', active, error }) }
+  } })
+  disposals.push(() => f.app.stores.talkGateway.dispose())
+  return { ...f, calls: () => f.sent('command.dispatch').filter(p => p['name'] === 'tern-talk'),
+    setPhase: (value: string) => { phase = value }, fail: (value: string) => { error = value; active = false } }
+}
 function clickRole(root: JSX.Element | null, role: string): void {
-  const walk = (node: JSX.Element): Node[] =>
-    node instanceof Node ? [node, ...node.children.flatMap(child => walk(child))] : []
+  const walk = (node: JSX.Element): Node[] => node instanceof Node ? [node, ...node.children.flatMap(walk)] : []
   const control = root ? walk(root).find(node => node.props['role'] === role) : undefined
-  if (!control) throw new Error('Missing clickable voice control: ' + role)
+  if (!control) throw new Error('Missing control ' + role)
   control.handlers?.onClick?.({ act: 'click', ev: 'action', id: 'x', raw: {}, sf: 'hermes' })
 }
 
-describe('live voice and consent lifecycle', () => {
-  it('a shortcut opens a disclosure, never audio; consent blocks send without clearing draft', async () => {
-    const { app, press, sent } = setup()
-    app.stores.composer.set('keep this draft')
-    expect(app.liveVoice.blocked).toBe(false)
-    expect(app.liveVoice.node()).toBeNull()
-    await press(toggle)
-    expect(app.liveVoice.node()).not.toBeNull()
-    expect(app.liveVoice.phase).toBe('consent')
-    expect(sent('voice.live.start')).toHaveLength(0)
-    expect(dockModel(app.stores, 0).composer.ready).toBe(false)
-    await press(key('enter'))
-    expect(app.stores.composer.text).toBe('keep this draft')
-    expect(sent('prompt.submit')).toHaveLength(0)
-    await press(key('c', { ctrl: true }))
-    expect(app.liveVoice.blocked).toBe(false)
-    expect(app.stores.composer.text).toBe('keep this draft')
-    expect(sent('voice.live.start')).toHaveLength(0)
+describe('Hermes Talk through the app input loop', () => {
+  it('Ctrl+L starts and stops one actual adapter lease without sending or clearing a draft', async () => {
+    const f = fixture()
+    f.app.stores.composer.set('keep this draft', { cursor: 4 })
+    await f.press(quick)
+    await settle()
+    expect(f.calls().filter(p => String(p['arg']).startsWith('start '))).toHaveLength(1)
+    expect(f.app.liveVoice.phase).toBe('listening')
+    expect(f.app.liveVoice.blocked).toBe(true)
+    await f.press(quick)
+    await settle()
+    expect(f.calls().filter(p => String(p['arg']).startsWith('stop '))).toHaveLength(1)
+    expect(f.app.liveVoice.blocked).toBe(false)
+    expect(f.app.stores.composer.text).toBe('keep this draft')
+    expect(f.app.stores.composer.cursor).toBe(4)
+    expect(f.sent('prompt.submit')).toHaveLength(0)
+    expect(f.sent('voice.live.start')).toHaveLength(0)
   })
 
-  it('starts exactly one lease after Allow; audio cannot send the typed draft', async () => {
-    const { app, press, sent } = setup()
-    app.stores.composer.set('unsent')
-    app.liveVoice.start()
-    expect(sent('voice.live.start')).toHaveLength(0)
-    await press(toggle)
-    clickRole(app.liveVoice.node(), 'omp.live.start')
-    app.liveVoice.start()
+  it('Alt+Shift+V retains its disclosure and Allow; consent itself opens no audio', async () => {
+    const f = fixture()
+    await f.press(toggle)
+    expect(f.app.liveVoice.phase).toBe('consent')
+    expect(f.calls()).toHaveLength(0)
+    clickRole(f.app.liveVoice.node(), 'omp.live.start')
     await settle()
-    expect(sent('voice.live.start')).toHaveLength(1)
-    const start = sent('voice.live.start')[0]
-    expect(start).toMatchObject({ session_id: 's1', consent: true })
-    expect(start?.['live_id']).toEqual(expect.any(String))
-    await press(key('enter'))
-    expect(sent('prompt.submit')).toHaveLength(0)
-    expect(app.stores.composer.text).toBe('unsent')
-    expect(dockModel(app.stores, 0).composer.ready).toBe(false)
+    expect(f.app.liveVoice.phase).toBe('listening')
+    expect(f.calls().filter(p => String(p['arg']).startsWith('start '))).toHaveLength(1)
+    expect(dockModel(f.app.stores, 0).composer.ready).toBe(false)
   })
 
-  it('Escape during start queues Stop behind its acknowledgement; only exact idle releases Send', async () => {
-    const gate = Promise.withResolvers<object>()
-    const { app, emit, press, sent } = setup({ 'voice.live.start': () => gate.promise })
-    await press(toggle)
-    app.liveVoice.start()
-    await press(key('escape'))
-    expect(sent('voice.live.control')).toHaveLength(0)
-    const liveId = sent('voice.live.start')[0]?.['live_id']
-    gate.resolve({})
+  it('Escape and native Stop release the owned call, not the typed draft', async () => {
+    const f = fixture()
+    f.app.stores.composer.set('unsent')
+    await f.press(quick)
+    await f.press(key('escape'))
     await settle()
-    expect(sent('voice.live.control')).toMatchObject([
-      { session_id: 's1', live_id: liveId, action: 'stop' }
-    ])
-    expect(app.liveVoice.blocked).toBe(true)
-    emit('event', { type: 'voice.live', session_id: 's1', payload: { live_id: 'not-ours', phase: 'idle' } })
+    expect(f.app.liveVoice.blocked).toBe(false)
+    await f.press(quick)
+    clickRole(f.app.liveVoice.node(), 'omp.live.stop')
     await settle()
-    expect(app.liveVoice.blocked).toBe(true)
-    emit('event', { type: 'voice.live', session_id: 's1', payload: { live_id: liveId, phase: 'idle' } })
-    await settle()
-    expect(app.liveVoice.blocked).toBe(false)
-    expect(dockModel(app.stores, 0).composer.ready).toBe(true)
+    expect(f.app.liveVoice.blocked).toBe(false)
+    expect(f.app.stores.composer.text).toBe('unsent')
+    expect(f.sent('session.interrupt')).toHaveLength(0)
   })
 
-  it('mute/unmute and interrupt are strictly per-lease; hints never duplicate normal messages', async () => {
-    const { app, emit, press, sent } = setup()
-    await press(toggle)
-    app.liveVoice.start()
-    await settle()
-    const liveId = sent('voice.live.start')[0]?.['live_id']
-    await app.liveVoice.control('mute')
-    await app.liveVoice.control('mute')
-    await app.liveVoice.control('interrupt')
-    expect(sent('voice.live.control')).toMatchObject([
-      { session_id: 's1', live_id: liveId, action: 'mute', muted: true },
-      { session_id: 's1', live_id: liveId, action: 'mute', muted: false },
-      { session_id: 's1', live_id: liveId, action: 'interrupt' }
-    ])
-    emit('event', { type: 'voice.live', session_id: 's2', payload: { live_id: liveId, phase: 'speaking', assistant_text: 'foreign' } })
-    await settle()
-    expect(app.liveVoice.assistant).toBe('')
-    const before = app.transcript.entries.filter(e => e.kind !== 'notice').length
-    emit('event', { type: 'voice.live', session_id: 's1', payload: {
-      live_id: liveId, phase: 'speaking', assistant_text: 'spoken response', user_text: 'spoken user'
-    } })
-    await settle()
-    expect(app.liveVoice.assistant).toBe('spoken response')
-    expect(app.transcript.entries.filter(e => e.kind !== 'notice')).toHaveLength(before)
+  it('does not expose unsupported mute/interrupt controls on the Talk adapter', async () => {
+    const f = fixture()
+    await f.press(quick)
+    expect(() => clickRole(f.app.liveVoice.node(), 'omp.live.mute')).toThrow('Missing control')
+    expect(() => clickRole(f.app.liveVoice.node(), 'omp.live.interrupt')).toThrow('Missing control')
   })
 
-  it('new session identity retires old lease without moving it to the next owner', async () => {
-    const { app, emit, press, sent } = setup()
-    await press(toggle)
-    app.liveVoice.start()
+  it('retires audio on session change without moving a call into the new conversation', async () => {
+    const f = fixture()
+    await f.press(quick)
+    given.session(f.app.stores, 's2')
+    f.app.changed()
     await settle()
-    const liveId = sent('voice.live.start')[0]?.['live_id']
-    emit('event', { type: 'voice.live', session_id: 's1', payload: { live_id: liveId, phase: 'speaking', assistant_text: 'private previous reply' } })
-    await settle()
-    expect(app.liveVoice.assistant).toBe('private previous reply')
-    given.session(app.stores, 's2')
-    await settle()
-    expect(app.liveVoice.assistant).toBe('')
-    expect(sent('voice.live.control').at(-1)).toMatchObject({
-      session_id: 's1', live_id: liveId, action: 'stop'
-    })
-    expect(app.liveVoice.blocked).toBe(true)
-    emit('event', { type: 'voice.live', session_id: 's1', payload: { live_id: liveId, phase: 'idle' } })
-    await settle()
-    expect(app.liveVoice.blocked).toBe(false)
-    expect(app.liveVoice.phase).toBe('idle')
-    expect(sent('voice.live.start')).toHaveLength(1)
+    expect(f.calls().at(-1)).toMatchObject({ session_id: 's1' })
+    expect(String(f.calls().at(-1)?.['arg'])).toMatch(/^stop /)
+    expect(f.app.liveVoice.blocked).toBe(false)
   })
 
-  it('permission failure and failed stop remain visible, and never retry automatically', async () => {
-    const { app, press, sent } = setup({
-      'voice.live.start': () => { throw new Error('Microphone permission denied') }
-    })
-    await press(toggle)
-    app.liveVoice.start()
-    await settle()
-    expect(app.liveVoice.phase).toBe('error')
-    expect(app.liveVoice.blocked).toBe(false)
-    expect(app.liveVoice.error).toContain('permission denied')
-    expect(sent('voice.live.start')).toHaveLength(1)
-
-    const other = setup({ 'voice.live.control': () => { throw new Error('Audio release failed') } })
-    await other.press(toggle)
-    other.app.liveVoice.start()
-    await settle()
-    await other.app.liveVoice.control('stop')
-    expect(other.app.liveVoice.blocked).toBe(true)
-    expect(other.app.liveVoice.error).toContain('Audio release failed')
+  it('provider phases update the real emitted orb rather than guessing from typed turns', async () => {
+    const f = fixture()
+    await f.press(quick)
+    expect(f.app.liveVoice.phase).toBe('listening')
+    f.setPhase('speaking')
+    await vi.waitFor(() => expect(f.app.liveVoice.phase).toBe('speaking'), { timeout: 1500 })
+    f.setPhase('thinking')
+    await vi.waitFor(() => expect(f.app.liveVoice.phase).toBe('thinking'), { timeout: 1500 })
+    await f.press(quick)
+    expect(f.app.liveVoice.phase).toBe('idle')
   })
 
-  it('/live and /ptt stay local; /live off revokes consent without opening audio', async () => {
-    const { app, sent } = setup()
-    const live = localCommand('live')
-    const ptt = localCommand('ptt')
-    expect(live?.name).toBe('live')
-    expect(ptt?.name).toBe('ptt')
-    await live?.run(app, '')
-    expect(app.liveVoice.phase).toBe('consent')
-    await ptt?.run(app, '')
-    expect(app.transcript.entries.some(e => e.kind === 'notice' && e.text.includes('key-down/key-up'))).toBe(true)
-    await live?.run(app, 'off')
-    expect(app.liveVoice.blocked).toBe(false)
-    expect(sent('voice.live.start')).toHaveLength(0)
-    expect(sent('slash.exec')).toHaveLength(0)
+  it('a terminal error releases input, stays visible, and never starts another call automatically', async () => {
+    const f = fixture()
+    await f.press(quick)
+    f.fail('Hermes Talk refused startup: audio')
+    await vi.waitFor(() => expect(f.app.liveVoice.blocked).toBe(false), { timeout: 1500 })
+    expect(f.app.liveVoice.error).toContain('audio')
+    expect(f.calls().filter(p => String(p['arg']).startsWith('start '))).toHaveLength(1)
   })
 
-  it('backend exit revokes local consent/lease; late voice hints are not adopted', async () => {
-    const { app, emit, press, sent } = setup()
-    await press(toggle)
-    app.liveVoice.start()
+  it('/live off revokes disclosure and backend exit clears the local lease', async () => {
+    const f = fixture()
+    await localCommand('live')?.run(f.app, '')
+    expect(f.app.liveVoice.phase).toBe('consent')
+    await localCommand('live')?.run(f.app, 'off')
+    expect(f.calls()).toHaveLength(0)
+    await f.press(quick)
+    f.emit('exit', 1)
     await settle()
-    const liveId = sent('voice.live.start')[0]?.['live_id']
-    emit('exit', 1)
-    await settle()
-    expect(app.liveVoice.blocked).toBe(false)
-    emit('event', { type: 'voice.live', session_id: 's1', payload: { live_id: liveId, phase: 'listening' } })
-    await settle()
-    expect(app.liveVoice.phase).toBe('idle')
+    expect(f.app.liveVoice.blocked).toBe(false)
   })
 })

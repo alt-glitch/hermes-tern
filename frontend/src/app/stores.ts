@@ -56,6 +56,7 @@ import { PromptQueue } from '../turn/queue.js'
 import { canDrain, canSwitch, PromptRouter } from '../turn/router.js'
 import { randomTip, type WelcomeContext } from '../view/welcome.js'
 import { LiveVoice } from '../voice/live.js'
+import { TalkGateway } from '../voice/talk-gateway.js'
 
 import type { AppActions } from './actions.js'
 import type { ChatPorts } from './ports.js'
@@ -280,10 +281,12 @@ export function chatStores(chat: ChatPorts, { act, gw, launch, recorder, setting
       writeActiveSession: writeActiveSessionFile
     })
   )
-  /** Per-connection live voice; audio stays with the gateway. */
+  /** Per-connection duplex Hermes Talk call, not the legacy STT/TTS loop. */
+  const talkGateway = new TalkGateway(gw)
   const liveVoice = new LiveVoice({
     changed,
-    gw,
+    gw: talkGateway,
+    talk: true,
     sid: () => session.ref.live,
     switching: () => life.switching
   })
@@ -292,7 +295,7 @@ export function chatStores(chat: ChatPorts, { act, gw, launch, recorder, setting
   const completion = new Completion(chat, gw, () => session.ref.live, () => session.ref)
   const welcome: WelcomeContext = { tip: randomTip(launch.pythonSrcRoot), version: version && version !== 'unknown' ? `v${version}` : '' }
 
-  return { ...shared, attachments, completion, cron, dictation, life, liveVoice, router, stack, theme, warned, welcome }
+  return { ...shared, attachments, completion, cron, dictation, life, liveVoice, talkGateway, router, stack, theme, warned, welcome }
 }
 
 /** Stops what the stores run on their own: every timer, the polls and the sidebar's reads. */
@@ -300,6 +303,7 @@ export function disposeStores(s: ChatStores) {
   s.mediaDelivery.clear(true)
   s.liveVoice.dispose()
   s.dictation.dispose()
+  s.talkGateway.dispose()
   s.timers.dispose()
   s.connect.dispose()
   s.notices.dispose()
