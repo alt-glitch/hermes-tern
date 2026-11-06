@@ -204,3 +204,71 @@ See the donor's source PRs
 [#461](https://github.com/kvnloo/hermes-agent/pull/461),
 [#464](https://github.com/kvnloo/hermes-agent/pull/464) and
 [#466](https://github.com/kvnloo/hermes-agent/pull/466).
+
+## Ephemeral UI card.v0 (inert native summary)
+
+The second ephemeral-ui integration accepts **data-only cards** via the existing
+/visual candidate mechanism. The exact public schema/card.v0.json fixture is
+copied from kvnloo/ephemeral-ui **gh-pages** commit
+63e06b29ffb0d7c5b9d482abebc0312335897321 (Git blob
+ccafc9d00f95f21c389f8ce8a9aa14491475033f). The package-local
+openui/card.mjs checks that blob identity at import time, then uses the pinned
+schema's **required keys, kind enum and property definitions** to validate the
+document. This is a host validation policy, not a claim that the public site
+implements the same extra restrictions. No private ephemeral-ui source is used.
+
+The original schema permits additional properties. For this read-only host,
+only its declared top-level properties and the explicit text extensions
+title, text, summary, description, subject, status, label, query,
+body, message, note, fields, and buttons are admitted. The fields map holds
+at most 16 short labels with string values. Buttons holds up to 8 strings or
+objects with a label and optional inert action id; its action IDs are ignored,
+not displayed or dispatched. The actions property is the schema's permission
+policy enum, **not** an executable event or a grant of host authority. Trace
+cards cannot request the host-confirmed policy. Values are JSON-only, with no
+control or bidi-control characters, at most 64 KiB per card, eight nested
+levels, 64 elements per array and bounded string lengths. Unknown top-level
+keys fail.
+
+To prepare a **synthetic** card document (no real inbox, user or permission data),
+put this on one line in card.json:
+
+    { "kind": "thread", "app": "gmail", "title": "Synthetic thread", "subject": "Invoice 42", "summary": "Example only", "buttons": [{ "label": "Approve once", "action": "unused-id" }, "Dismiss"] }
+
+1. Open /visual in the owning Hermes session and copy the exact session/branch
+   JSON scope displayed by the sheet.
+2. Run an explicit local terminal command with a writable absolute directory
+   **outside the plugin**, substituting the actual scope:
+
+       cd /absolute/path/to/hermes-tern/frontend
+       node openui/prepare.mjs prepare-card card.json \
+         '["stored-id","main"]' /absolute/output-directory --json
+
+3. The CLI prints one hermes.visual.candidate v1 JSON notice and writes a
+   content-addressed, scope-bound .hvisual.json envelope (version 0).
+   Reopen /visual to select the reported file or provide its absolute path.
+
+Discovery remains the completed-terminal-result-only flow. On selection,
+the frontend re-reads and validates the file, source schema, card identity
+and exact scope. The native sheet shows **kind, app, title and text values**,
+plus any button **labels only**. The host controls theme and layout and draws
+no button for a card-provided action. There is no action handler, approval,
+script execution, runtime fetch, generated HTML/Luau, renderer installation,
+gateway send or file route for cards. The hermes-openui file route remains
+for validated legacy OpenUI and intent bundles only. Session/branch/transcript
+change still expires the sheet.
+
+The CLI prepares data but is **not** a permission prompt or publication path.
+This initial generic summary does not render inbox/thread/approval controls or
+use input as a network source. Three follow-up native kinds:
+**inbox** (read-only result rows), **thread** (message and summary text), and
+**approve** (non-authoritative permission preview; actual approval stays with
+the host). They require separate implementation and native acceptance.
+
+Verification (not executed by this connector-only implementation):
+
+    cd frontend
+    bun run test -- src/__tests__/ephemeralCard.test.ts src/__tests__/visuals.test.ts src/__tests__/visualOverlay.test.ts src/__tests__/openuiPackaged.test.ts
+    bun run typecheck
+    bun run check
+    bun run bundle  # locally only; do not commit dist/

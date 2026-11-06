@@ -1,0 +1,77 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ephemeralui.vercel.app/schema/card.v0.json",
+  "title": "Ephemeral UI card (draft v0)",
+  "description": "A card is data the host renders. The host owns theme, layout and permission prompts; the card never runs code.",
+  "type": "object",
+  "required": ["kind", "app"],
+  "properties": {
+    "kind": { "type": "string", "enum": ["inbox", "thread", "approve", "chat", "notify", "slots", "kanban", "triage", "file", "graph", "search", "feed", "frames", "sign", "context", "receipt", "metric", "track", "crm", "ride", "route", "boarding", "player", "workout", "home", "merge", "ci", "deploy", "incident", "migrate", "trace", "trace-span", "trace-summary", "trace-usage", "trace-tools", "trace-errors", "trace-compare", "trace-frustration", "intent-declare", "intent-contract", "intent-work", "intent-proof", "intel-decisions", "intel-value", "intel-context", "intel-health", "infra-architecture", "infra-cluster", "infra-iac", "infra-models"] },
+    "app": { "type": "string", "description": "Catalog id, e.g. gmail, github, uber. Trace kinds use omp-stats." },
+    "ttl": { "description": "How long the card lives: 'until-done' (default), 'pinned', or milliseconds.", "oneOf": [{ "type": "string", "enum": ["until-done", "pinned"] }, { "type": "integer", "minimum": 0 }] },
+    "actions": { "type": "string", "enum": ["read-only", "host-confirmed"], "description": "Writes are only allowed through a confirmation the host draws (hold, tap). Trace kinds never write." },
+    "render": { "type": "object", "properties": { "host": { "type": "string" }, "theme": { "type": "string" }, "brand": { "enum": ["accent", "full", "mono"] } } },
+    "input": { "description": "Trace kinds: the omp-stats endpoint the card was fed from (path + query), or the payload itself. $defs.traceInput lists the shape each kind takes.", "oneOf": [{ "type": "string", "pattern": "^/api/" }, { "type": "object" }, { "type": "array" }] },
+    "layers": { "type": "array", "description": "Trace kinds: which data layers are drawn. Toggling a layer re-renders the card; it never refetches.", "items": { "$ref": "#/$defs/layer" }, "uniqueItems": true },
+    "options": { "type": "object", "description": "Trace kinds: per-kind view state.", "properties": { "range": { "enum": ["1h", "24h", "7d", "30d", "90d", "all"] }, "view": { "enum": ["models", "providers", "components", "agents"] }, "sort": { "enum": ["calls", "errors", "rate", "p95", "cost"] }, "tab": { "enum": ["requests", "spans"] }, "focusTool": { "type": "string" }, "scope": { "enum": ["trace", "range"] } } }
+  },
+  "additionalProperties": true,
+  "$defs": {
+    "layer": { "enum": ["spans", "tokens", "cost", "errors", "subagents", "transcript"], "description": "spans: span blocks and lanes. tokens: model spans scaled by tokens, token columns. cost: cost cells and per-track cumulative cost lanes. errors: failed spans in red, error columns. subagents: child tracks and per-track rows. transcript: ordered span list under the timeline (message text is never shown on the public site)." },
+    "traceInput": {
+      "description": "What each trace kind takes. Shapes are omp-stats' own (packages/stats/src/shared-types.ts): an agent fetches the endpoint and passes the JSON straight in.",
+      "type": "object",
+      "properties": {
+        "trace": { "description": "SessionTrace from /api/session/trace?file=<session>. Drawer usage (input/output/cached, provider, stop reason) from /api/session/entry?file=<track.file>&id=<span.entryId>." },
+        "trace-span": { "description": "{ span: TraceSpan, track: TraceTrack } from a SessionTrace, plus the span's /api/session/entry." },
+        "trace-summary": { "description": "SessionTrace (summary for the strip, tracks for per-track cost and model time)." },
+        "trace-usage": { "description": "DashboardStats from /api/stats?range=<r> and ProviderDashboardStats from /api/stats/providers?range=<r>." },
+        "trace-tools": { "description": "ToolDashboardStats from /api/stats/tools?range=<r>; SessionTrace[] adds p50/p95 and click-through spans." },
+        "trace-errors": { "description": "MessageStats[] from /api/stats/errors?range=<r>&limit=<n>; SessionTrace[] adds span failures with jump-to-span." },
+        "trace-compare": { "description": "[SessionTrace, SessionTrace], older first." },
+        "trace-frustration": { "description": "FrustrationDashboardStats from /api/stats/frustration?range=<r>." }
+      }
+    },
+    "statsComponent": {
+      "description": "Stats library component (src/js/stats-lib.js, stats-trace.js, stats-routes.js): make(data, opts) returns { el, spec, getSelection(), on(type, cb) → off }. data is the omp-stats API JSON for that component, unchanged. This object describes c.spec.",
+      "type": "object",
+      "required": ["v", "kind"],
+      "properties": {
+        "v": { "const": 0 },
+        "kind": { "type": "string", "description": "Stat, StatGrid, Sparkline, ShareBar, BarList, Legend, Chart, TimeChart, Segmented, RangeControl, SearchInput, Table, Drawer, Modal, JsonBlock, Badge, LiveChip, RequestDrawer, TimelineCanvas, Minimap, SpanDrawer, SummaryStrip, AggregatesPanel, TranscriptList, TraceView, OverviewView, ModelsView, ProvidersView, CostsView, RequestsView, ErrorsView, TracesView, ToolsView, FrustrationView, ProjectsView, GainView, StatsDashboard (tables may name themselves, e.g. RequestLog)." },
+        "range": { "enum": ["1h", "24h", "7d", "30d", "90d", "all", null] },
+        "session": { "type": ["string", "null"] },
+        "selected": {},
+        "layers": { "type": "array", "items": { "$ref": "#/$defs/layer" } }
+      },
+      "additionalProperties": true,
+      "$comment": "opts: range, now, layers, highlight {model, provider, tool, folder, request, span}, density, request(id), trace(file), entry(file, id), windows(provider). Events: see statsEvent."
+    },
+    "statsEvent": {
+      "description": "What a stats component emits (c.on and the bubbling DOM 'stats:event'). Ids only, never DOM or raw text.",
+      "type": "object",
+      "required": ["v", "type", "component", "entities", "ids"],
+      "properties": {
+        "v": { "const": 0 },
+        "type": { "enum": ["select", "pin", "brush", "filter"] },
+        "component": { "type": "string" },
+        "part": { "type": "string", "description": "Child that produced it, e.g. timeline, minimap, drawer, totals." },
+        "session": { "type": "string" },
+        "entities": { "type": "object", "properties": { "span": { "type": "string" }, "entry": { "type": "string" }, "request": { "type": ["integer", "string"] }, "track": { "type": "string" }, "tool": { "type": "string" }, "model": { "type": "string" }, "provider": { "type": "string" }, "signature": { "type": "string" }, "folder": { "type": "string" }, "window": { "type": "string" }, "account": { "type": "string" }, "key": { "type": "string" } } },
+        "ids": { "type": "array", "items": { "type": "string", "pattern": "^[a-z]+:" } },
+        "range": { "type": "array", "items": { "type": "number" }, "minItems": 2, "maxItems": 2, "description": "[t0, t1] in ms epoch." },
+        "filter": { "type": "object" },
+        "label": { "type": "string", "description": "One readable line for the agent." }
+      }
+    },
+    "publicFixtureExtensions": {
+      "description": "Fields the sanitized public fixture adds on top of the omp-stats shapes. A live host may omit them.",
+      "type": "object",
+      "properties": {
+        "SessionSummary.harness": { "enum": ["omp", "hermes"] },
+        "TraceSpan.resultChars": { "type": "integer", "description": "Length of the tool output that was withheld." },
+        "TraceSpan.errorKind": { "type": "string", "description": "Error kind (timeout, non-zero exit, not found, …) in place of the error text." }
+      }
+    }
+  }
+}
