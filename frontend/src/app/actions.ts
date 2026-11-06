@@ -192,6 +192,7 @@ export class AppActions {
     this.host = {
       activity: cx.activity,
       changed,
+      draft: text => composer.set(composer.text ? `${text}\n${composer.text}` : text, { pasted: composer.pasted }),
       gw,
       life,
       queue,

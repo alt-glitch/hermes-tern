@@ -102,6 +102,7 @@ A turn shows what the agent does while it works: its reasoning, short notes, and
 | --- | --- |
 | `/model`, `/effort` | Pick the model and the reasoning effort (also the chips on the composer) |
 | `/sessions` | Search and resume a session from this project, or from any folder. <kbd>→</kbd> browses the selected conversation; <kbd>Alt</kbd>+<kbd>C</kbd> copies its id |
+| `/rewind` | Go back to an earlier prompt: rewind to it (the prompt returns to the composer), or branch from it |
 | `/ps` | Background processes and cron jobs |
 | `/agents` | Subagents |
 | `/changes` | The working tree's diff |
