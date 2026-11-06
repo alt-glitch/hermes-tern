@@ -62,19 +62,23 @@ def pane_env(session_id: str) -> dict[str, str]:
     now = time.monotonic()
     if (hit := _panes.get(session_id)) and now - hit[0] < FRESH_S:
         return hit[1]
-    from . import connections
-
-    env: dict[str, str] = {}
-    viewers = connections._dir("viewers")
-    for sid in _marker_ids(session_id):
-        with contextlib.suppress(OSError, ValueError, KeyError, TypeError, AttributeError):
-            marker = json.loads((viewers / f"{sid}.json").read_text())
-            tern = marker.get("tern") or {}
-            if tern.get("TERN_PANE") and connections._alive(marker["pid"]):
-                env = {k: str(tern[k]) for k in TERN_VARS if tern.get(k)}
-                break
+    tern = (marker := viewer(session_id)) and marker.get("tern") or {}
+    env = {k: str(tern[k]) for k in TERN_VARS if tern.get(k)} if tern.get("TERN_PANE") else {}
     _panes[session_id] = (now, env)
     return env
+
+
+def viewer(session_id: str) -> dict[str, Any] | None:
+    """The viewer marker of the live ``hermes tern`` pane showing ``session_id``'s conversation, else None."""
+    from . import connections
+
+    viewers = connections._dir("viewers")
+    for sid in _marker_ids(session_id) if session_id else ():
+        with contextlib.suppress(OSError, ValueError, KeyError, TypeError, AttributeError):
+            marker = json.loads((viewers / f"{sid}.json").read_text())
+            if connections._alive(marker["pid"]):
+                return marker
+    return None
 
 
 def _assign(env: dict[str, str]) -> str:

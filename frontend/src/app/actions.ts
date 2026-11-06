@@ -4,6 +4,7 @@
 // contexts the key rules, the Tern actions and the commands reach. App makes one AppActions in
 // its constructor; nothing here is made again per frame.
 
+import type { MessageCompletePayload } from '@hermes/shared/gateway-events'
 import type { ServerRequest } from '@hermes/shared/json-rpc-channel'
 import type { Key, Session } from '@stencil-hq/tern'
 import type { GatewayClient } from '@tui/gatewayClient.js'
@@ -24,6 +25,7 @@ import type { PrKey } from '../core/ids.js'
 import type { Attachments } from '../draft/attachments.js'
 import type { Composer } from '../draft/composer.js'
 import type { KeyCx, Presses } from '../draft/keys.js'
+import { claimFigures, figures, fixPrompt, hermesFigureCheck } from '../figures.js'
 import { storedCompactions } from '../hermes/compactions.js'
 import { shellError, shellExec, shellLines } from '../hermes/shell.js'
 import type { Media } from '../media.js'
@@ -96,6 +98,10 @@ export class AppActions {
   readonly #copied = new Flash<string>(() => this.#cx.changed())
   /** The folder last reported to Tern by OSC 7. */
   #reportedCwd: string | undefined
+  /** Checks a finished reply's mermaid and svg figures; undefined without Hermes' interpreter. */
+  readonly #figureCheck = hermesFigureCheck()
+  /** The agent was asked to resend figures since the user's last prompt: it is asked once. */
+  #figuresAsked = false
   /** What the dock's buttons and fields do. */
   readonly dock: DockActions
   /** What the key rules (draft/keys.ts) reach. */
@@ -222,9 +228,32 @@ export class AppActions {
 
   // ── Prompts and commands ───────────────────────────────────────────
 
+  /** A finished reply's figures that would not render: the agent is asked once to send them again. */
+  checkFigures(payload: Pick<MessageCompletePayload, 'status' | 'text'>) {
+    const text = payload.status === 'complete' && typeof payload.text === 'string' ? payload.text : undefined
+    const sid = this.#cx.state.ref.live
+    const figs = text && !this.#figuresAsked ? figures(text) : []
+    const check = this.#figureCheck
+
+    if (!text || !sid || !figs.length || !check) {
+      return
+    }
+
+    void check(figs).then(failed => {
+      if (!failed?.length || this.#cx.state.ref.live !== sid || this.#figuresAsked || !claimFigures(sid, text)) {
+        return
+      }
+
+      this.#figuresAsked = true
+      this.submit(fixPrompt(failed), false)
+    })
+  }
+
   /** Sends the composer's draft, with the pastes it holds. */
   submitDraft() {
     const pasted = [...this.#cx.composer.pasted]
+
+    this.#figuresAsked = false
 
     this.submit(this.#cx.composer.take(), true, this.#cx.state.busyMode, pasted)
   }

@@ -15,7 +15,7 @@ import os
 import sys
 from pathlib import Path
 
-from . import connections, panes, pull_requests, tern_env
+from . import connections, panes, pull_requests, render_hints, tern_env
 
 FRONTEND = Path(__file__).resolve().parent / "frontend"
 
@@ -107,3 +107,4 @@ def register(ctx) -> None:
     pull_requests.register(ctx)
     connections.register(ctx)
     tern_env.register(ctx)
+    render_hints.register(ctx)
