@@ -148,3 +148,28 @@ def test_continue_finds_a_frontend_session_on_the_shared_gateway(monkeypatch, tm
     assert launcher.latest_session() == "s-tui"
     assert asked == [{"limit": 1, "skip_launch_stubs": True, "source": ["tui", "local"],
                       "local_created_sources": ["tui"], "workspace_key": str(tmp_path)}]
+
+
+def test_continue_looks_in_this_workspace_for_either_kind_of_session_before_anywhere(monkeypatch, tmp_path):
+    asked = []
+
+    class Db:
+        def search_sessions(self, **kwargs):
+            asked.append(("ws" if "workspace_key" in kwargs else "any", kwargs["local_created_sources"][0]))
+            return [{"id": "cli-here"}] if asked[-1] == ("ws", "cli") else [{"id": "tui-elsewhere"}] if asked[-1][0] == "any" else []
+
+        def close(self):
+            pass
+
+    monkeypatch.setitem(sys.modules, "hermes_state", types.SimpleNamespace(SessionDB=lambda read_only: Db()))
+    monkeypatch.setattr(launcher, "_workspace", lambda: str(tmp_path))
+    assert launcher.latest_session() == "cli-here"
+    assert asked == [("ws", "tui"), ("ws", "cli")]
+
+
+def test_exported_launch_flags_reach_session_create(monkeypatch):
+    monkeypatch.setattr(launcher, "client_env", lambda: {})
+    monkeypatch.setenv("HERMES_YOLO_MODE", "1")
+    monkeypatch.setenv("HERMES_ACCEPT_HOOKS", "true")
+    monkeypatch.setenv("HERMES_IGNORE_RULES", "0")
+    assert launcher.create_options(parse([])) == {"yolo": True, "accept_hooks": True}
