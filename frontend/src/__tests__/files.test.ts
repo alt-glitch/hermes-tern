@@ -18,7 +18,7 @@ import { storedLinks } from '../github/links.js'
 import { chartMemory } from '../processes/widgets/memory.js'
 import { loadSettings, saveSettings } from '../settings.js'
 import { readWatchSpec, WATCH_ENV, type WatchSpec } from '../watch/spec.js'
-import { readAuthorReply, readJsonFile } from '../wire/files.js'
+import { readJsonFile } from '../wire/files.js'
 import { decodeJson } from '../wire/json.js'
 import { first, rows, storedCalls, text } from '../wire/sqlite.js'
 
@@ -210,21 +210,6 @@ describe('chart memory', () => {
     expect(chartMemory(dir).load('none')).toBeUndefined()
     expect(chartMemory(dir).load('bad')).toBeUndefined()
     expect(chartMemory(dir).load('rules')).toBeUndefined()
-  })
-})
-
-describe("the chart author's reply", () => {
-  it('reads the last line: an answer, no model, or an error', () => {
-    expect(readAuthorReply('log\n{"answer":{"blocks":[]}}\n')).toEqual({ answer: { blocks: [] }, kind: 'answer' })
-    expect(readAuthorReply('{"unavailable":true}')).toEqual({ kind: 'unavailable' })
-    expect(readAuthorReply('{"error":"no key"}')).toEqual({ kind: 'error', message: 'no key' })
-  })
-
-  it('reads no reply from text that is not JSON or from null, and an answer of nothing from any other value', () => {
-    expect(readAuthorReply('')).toBeUndefined()
-    expect(readAuthorReply('Traceback (most recent call last):')).toBeUndefined()
-    expect(readAuthorReply('null')).toBeUndefined()
-    expect(readAuthorReply('42')).toEqual({ answer: undefined, kind: 'answer' })
   })
 })
 
