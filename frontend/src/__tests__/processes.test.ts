@@ -1,4 +1,4 @@
-import type { GatewayClient } from '@tui/gatewayClient.js'
+import type { GatewayClient } from '@hermes/shared/gateway-client'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { type LiveSessionId, liveSessionId } from '../core/ids.js'

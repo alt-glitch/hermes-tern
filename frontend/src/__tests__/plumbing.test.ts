@@ -131,16 +131,17 @@ describe('readLaunchEnv', () => {
   it('reads every launch variable, trimming the ones the launcher passes through', () => {
     const env = readLaunchEnv(
       {
-        HERMES_CWD: '/work',
-        HERMES_PYTHON_SRC_ROOT: '/src/hermes',
+        HERMES_TERN_CREATE: '{"model":"m","yolo":true}',
+        HERMES_TERN_CWD: '/work',
         HERMES_TERN_EVENT_LOG: '/tmp/events.jsonl',
+        HERMES_TERN_HERMES: '{"argv":["/py","-m","hermes_cli.main"],"env":{"PYTHONPATH":"/src"}}',
+        HERMES_TERN_IMAGE: ' /tmp/shot.png\n',
         HERMES_TERN_LAUNCH_CWD: '/home/me/project',
+        HERMES_TERN_QUERY: '  what is this?  ',
         HERMES_TERN_RESTORED: 'root-1',
-        HERMES_TUI_CWD: ' /work/tree ',
-        HERMES_TUI_IMAGE: ' /tmp/shot.png\n',
-        HERMES_TUI_QUERY: '  what is this?  ',
-        HERMES_TUI_RESUME: ' 20260101_abc ',
-        HERMES_VERSION: '0.9.0',
+        HERMES_TERN_RESUME: ' 20260101_abc ',
+        HERMES_TERN_SESSION_CWD: ' /work/tree ',
+        HERMES_TERN_TOOL_PROGRESS: 'verbose',
         HOME: '/home/me',
         TERN_PANE: ' 34505767256143 '
       },
@@ -148,39 +149,42 @@ describe('readLaunchEnv', () => {
     )
 
     expect(env).toEqual({
+      create: { model: 'm', yolo: true },
       cwd: '/work',
       eventLog: '/tmp/events.jsonl',
+      hermes: { argv: ['/py', '-m', 'hermes_cli.main'], env: { PYTHONPATH: '/src' } },
       home: '/home/me',
       image: '/tmp/shot.png',
       pane: '34505767256143',
       paneCwd: '/home/me/project',
-      pythonSrcRoot: '/src/hermes',
       query: 'what is this?',
       restored: true,
       resume: '20260101_abc',
       sessionCwd: '/work/tree',
-      version: '0.9.0'
+      toolProgress: 'verbose'
     })
     expect(Object.isFrozen(env)).toBe(true)
   })
 
-  it('gives empty strings for unset variables, the process folder for the cwd, and HOME as set', () => {
+  it('gives empty values for unset or unreadable variables, the process folder for the cwd, and HOME as set', () => {
     expect(readLaunchEnv({}, '/elsewhere')).toEqual({
+      create: {},
       cwd: '/elsewhere',
       eventLog: '',
+      hermes: undefined,
       home: undefined,
       image: '',
       pane: '',
       paneCwd: '/elsewhere',
-      pythonSrcRoot: '',
       query: '',
       restored: false,
       resume: '',
       sessionCwd: '',
-      version: ''
+      toolProgress: ''
     })
-    // An empty HERMES_CWD is no folder; an empty HOME stays as set.
-    expect(readLaunchEnv({ HERMES_CWD: '', HOME: '' }, '/elsewhere')).toMatchObject({ cwd: '/elsewhere', home: '' })
+    expect(readLaunchEnv({ HERMES_TERN_CREATE: '[1]', HERMES_TERN_HERMES: '{"argv":[]}' }, '/x')).toMatchObject({ create: {}, hermes: undefined })
+    // An empty HERMES_TERN_CWD is no folder; an empty HOME stays as set.
+    expect(readLaunchEnv({ HERMES_TERN_CWD: '', HOME: '' }, '/elsewhere')).toMatchObject({ cwd: '/elsewhere', home: '' })
   })
 
   it('reads the process environment once', () => {

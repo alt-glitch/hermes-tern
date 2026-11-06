@@ -4,7 +4,7 @@
 // Ink's /fast does (ui-tui/src/app/slash/commands/session.ts).
 
 import type { SessionLiveInfo } from '@hermes/shared/gateway-events'
-import type { GatewayClient } from '@tui/gatewayClient.js'
+import type { GatewayClient } from '@hermes/shared/gateway-client'
 
 import type { SessionView } from '../app/ports.js'
 import { errorText } from '../core/errors.js'

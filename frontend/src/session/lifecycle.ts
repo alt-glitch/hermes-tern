@@ -7,8 +7,8 @@
 // drains.
 
 import type { ServerRequest } from '@hermes/shared/json-rpc-channel'
-import type { GatewayClient } from '@tui/gatewayClient.js'
-import type { AnyGatewayEvent } from '@tui/gatewayTypes.js'
+import type { GatewayClient } from '@hermes/shared/gateway-client'
+import type { AnyGatewayEvent } from '@hermes/shared/gateway-types'
 
 import type { LaunchEnv } from '../config/env.js'
 import { errorText } from '../core/errors.js'
@@ -31,7 +31,7 @@ export interface LifecycleHost {
   readonly transcript: Pick<Transcript, 'notice'>
   readonly sheets: Pick<PromptSheets, 'dropShared'>
   /** The launcher's session to resume (the pane's own after a restart), and the folder a new session starts in. */
-  readonly launch: Pick<LaunchEnv, 'restored' | 'resume' | 'sessionCwd'>
+  readonly launch: Pick<LaunchEnv, 'create' | 'restored' | 'resume' | 'sessionCwd'>
   /** The pane's width, which a private gateway lays its output out for. */
   cols(): number
   /** Whether the view may move to another session now (not while a turn or a compaction runs). */
@@ -163,7 +163,7 @@ export class SessionLifecycle {
     return this.#views.leaveAll(endReason)
   }
 
-  /** The first session: HERMES_TUI_RESUME's, else a new one; then the launcher's startup image, if any. */
+  /** The first session: HERMES_TERN_RESUME's, else a new one; then the launcher's startup image, if any. */
   async #bootstrap() {
     const host = this.#host
     const resume = host.launch.resume
@@ -255,7 +255,7 @@ export class SessionLifecycle {
       const r: Snapshot = await rpc(
         host.gw,
         'session.create',
-        createParams({ canonical: host.gw.isCanonical, cols: host.cols(), cwd: host.launch.sessionCwd })
+        createParams({ canonical: host.gw.isCanonical, cols: host.cols(), create: host.launch.create, cwd: host.launch.sessionCwd })
       )
 
       if (!this.#switches.current(token)) {

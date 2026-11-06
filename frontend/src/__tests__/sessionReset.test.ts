@@ -16,7 +16,7 @@ import { FakeGateway, fakeTern, must, settle } from './fakes.js'
 
 process.env['HERMES_HOME'] = mkdtempSync(join(tmpdir(), 'hermes-tern-session-reset-'))
 
-vi.mock('@tui/lib/history.js', () => ({ append: () => undefined, load: () => [] }))
+vi.mock('@hermes/shared/prompt-history', () => ({ append: () => undefined, load: () => [] }))
 
 const { App } = await import('../app/chat.js')
 

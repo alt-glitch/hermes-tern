@@ -7,7 +7,7 @@
 // session's runtime id with it, the running processes show as unknown and the poll slows to the
 // idle cadence until it answers again; only another session's adoption clears them.
 
-import type { GatewayClient } from '@tui/gatewayClient.js'
+import type { GatewayClient } from '@hermes/shared/gateway-client'
 
 import type { LiveSessionId } from '../core/ids.js'
 import { Poller } from '../core/poller.js'

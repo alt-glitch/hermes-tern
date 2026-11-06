@@ -5,8 +5,8 @@
 // the 15 s mark, so the model is first asked on the early lines, as in a pane, and a decline is
 // asked again once the output has grown. The final view is what the pane would show.
 //
-//   (cd frontend && bunx esbuild ../lab/chartbench.ts --bundle --platform=node --format=esm --alias:@tui=./.hermes-src/ui-tui/src --outfile=/tmp/chartbench.mjs)
-//   HERMES_PYTHON=… HERMES_PYTHON_SRC_ROOT=… node /tmp/chartbench.mjs JOBS.json OUT_DIR
+//   (cd frontend && bunx esbuild ../lab/chartbench.ts --bundle --platform=node --format=esm --preserve-symlinks --outfile=/tmp/chartbench.mjs)
+//   HERMES_TERN_HERMES='{"argv":["hermes"]}' node /tmp/chartbench.mjs JOBS.json OUT_DIR
 //
 // It attaches to the profile's gateway as a pane does, in a session of its own; the gateway must
 // have the plugin loaded.
@@ -18,7 +18,8 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 
 import type { BackgroundProcess } from '../frontend/src/model.js'
-import { GatewayClient } from '../frontend/src/hermes/gatewayClient.js'
+import { readLaunchEnv } from '../frontend/src/config/env.js'
+import { createGatewayClient } from '../frontend/src/hermes/gatewayClient.js'
 import { type Author, gatewayAuthor, RejectedAnswer } from '../frontend/src/processes/widgets/author.js'
 import { Charts } from '../frontend/src/processes/widgets/registry.js'
 import { specSkip } from '../frontend/src/processes/widgets/spec.js'
@@ -38,7 +39,7 @@ if (!jobsFile || !outDir) {
   throw new Error('usage: chartbench JOBS.json OUT_DIR')
 }
 
-const gw = new GatewayClient()
+const gw = createGatewayClient(readLaunchEnv())
 const ready = new Promise<void>(resolve => gw.on('event', (ev: { type: string }) => ev.type === 'gateway.ready' && resolve()))
 gw.start()
 await ready

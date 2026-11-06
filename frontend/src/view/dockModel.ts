@@ -3,7 +3,7 @@
 // returns is a handler: the dock's actions are bound once, beside the stores (app/actions.ts).
 
 import type { Usage } from '@hermes/shared/gateway-events'
-import type { SessionInfo } from '@tui/types.js'
+import type { SessionInfo } from '@hermes/shared/gateway-types'
 
 import type { Agents } from '../agents/store.js'
 import { type Hud, type Pill, pills, todos } from '../chrome/hud.js'

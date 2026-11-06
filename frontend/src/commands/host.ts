@@ -3,7 +3,7 @@
 // `sid` is the session it was made for (stale() says when the view left it); the
 // rest, `busy` and `queued` among them, reads the stores live, so a command that awaited sees now.
 
-import type { GatewayClient } from '@tui/gatewayClient.js'
+import type { GatewayClient } from '@hermes/shared/gateway-client'
 
 import { durable, type StoredSessionId } from '../core/ids.js'
 import type { Compaction } from '../model.js'

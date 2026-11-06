@@ -84,7 +84,7 @@ describe('the pane file', () => {
 
 describe('a pane restarted after its program died', () => {
   it('resumes the launcher’s session and says so', async () => {
-    const { app } = await started({ HERMES_TERN_RESTORED: 'root', HERMES_TUI_RESUME: 'tip' })
+    const { app } = await started({ HERMES_TERN_RESTORED: 'root', HERMES_TERN_RESUME: 'tip' })
 
     expect(gw.methods('session.create')).toHaveLength(0)
     expect(app.session.ref.stored).toBe('tip')
@@ -95,14 +95,14 @@ describe('a pane restarted after its program died', () => {
     gw.handlers.set('session.resume', () => {
       throw new Error('session not found')
     })
-    const { app } = await started({ HERMES_TERN_RESTORED: 'root', HERMES_TUI_RESUME: 'tip' })
+    const { app } = await started({ HERMES_TERN_RESTORED: 'root', HERMES_TERN_RESUME: 'tip' })
 
     expect(app.session.ref.live).toBe('new')
     expect(notices(app)).toEqual(["Could not resume this pane's last session (session not found); started a new one."])
   })
 
   it('says nothing for a plain --resume', async () => {
-    const { app } = await started({ HERMES_TUI_RESUME: 'tip' })
+    const { app } = await started({ HERMES_TERN_RESUME: 'tip' })
 
     expect(app.session.ref.stored).toBe('tip')
     expect(notices(app)).toEqual([])

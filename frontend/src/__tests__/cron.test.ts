@@ -1,4 +1,4 @@
-import type { GatewayClient } from '@tui/gatewayClient.js'
+import type { GatewayClient } from '@hermes/shared/gateway-client'
 import { describe, expect, it, vi } from 'vitest'
 
 import { toolCallId } from '../core/ids.js'

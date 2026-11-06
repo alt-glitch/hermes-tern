@@ -3,7 +3,7 @@
 // with session.info and session.title, from the session list when only that changed, and from
 // `/new <title>`'s rename.
 
-import type { GatewayClient } from '@tui/gatewayClient.js'
+import type { GatewayClient } from '@hermes/shared/gateway-client'
 
 import type { ChatPorts } from '../app/ports.js'
 import { errorText } from '../core/errors.js'

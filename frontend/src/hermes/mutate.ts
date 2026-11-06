@@ -5,7 +5,7 @@
 import { randomUUID } from 'node:crypto'
 
 import type { CompressionSummary, SessionMutateResult } from '@hermes/shared/gateway-events'
-import type { GatewayClient } from '@tui/gatewayClient.js'
+import type { GatewayClient } from '@hermes/shared/gateway-client'
 
 import { type AdaptedSnapshot, rpc } from '../wire/rpc.js'
 

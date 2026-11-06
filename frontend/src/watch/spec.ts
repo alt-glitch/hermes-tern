@@ -7,6 +7,7 @@ import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 
 import type { LiveSessionId, StoredSessionId } from '../core/ids.js'
+import { readHermesCommand } from '../hermes/connect.js'
 import type { Subagent } from '../model.js'
 import { readWatchSpecText } from '../wire/files.js'
 
@@ -55,26 +56,23 @@ let sidebar: string | undefined
 
 /**
  * This pane and `hermes <args>` as a split's command line, `vars` set first. Undefined when this
- * isn't a Tern pane Tern's CLI can reach (over ssh, say) or the launcher named no interpreter.
+ * isn't a Tern pane Tern's CLI can reach (over ssh, say) or the launcher named no command for Hermes.
  */
 function hermesSplit(env: NodeJS.ProcessEnv, vars: readonly string[], args: readonly string[]) {
   const pane = env['TERN_PANE']
-  const python = env['HERMES_PYTHON']
-  // The `hermes` wrapper puts its checkout on sys.path; the bare interpreter needs it said.
-  const src = env['HERMES_PYTHON_SRC_ROOT']
+  // The launcher's command for this Hermes: its interpreter, and the checkout on PYTHONPATH.
+  const hermes = readHermesCommand(env['HERMES_TERN_HERMES'])
 
-  if (!pane || !python || !src) {
+  if (!pane || !hermes) {
     return undefined
   }
 
   const command = [
     'env',
-    `PYTHONPATH=${src}`,
+    ...Object.entries(hermes.env).map(([k, v]) => `${k}=${v}`),
     ...(env['HERMES_HOME'] ? [`HERMES_HOME=${env['HERMES_HOME']}`] : []),
     ...vars,
-    python,
-    '-m',
-    'hermes_cli.main',
+    ...hermes.argv,
     ...args
   ]
 
