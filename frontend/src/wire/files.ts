@@ -1,8 +1,9 @@
 // The files and texts this frontend reads that another process wrote: its settings, the watch
 // spec a launching pane hands a watcher, the connection cards and the PR links the plugin's Python
-// half writes, the chart rules a pane keeps for a process, and the chart author's reply. Each is
-// read once, through a schema, into a named type. None carries a version: an old pane keeps
-// running the old bundle after a `git pull`, so every format stays the one it was.
+// half writes, the chart rules a pane keeps for a process, the chart author's reply, and the
+// dictation helper's lines. Each is read once, through a schema, into a named type. None carries
+// a version: an old pane keeps running the old bundle after a `git pull`, so every format stays
+// the one it was.
 // A schema falls back where the code before it fell back: a missing or unreadable file and text
 // that is not JSON read as they did, and a field of the wrong type reads as absent.
 
@@ -184,4 +185,55 @@ export function readAuthorReply(stdout: string): AuthorReply | undefined {
   }
 
   return error ? { kind: 'error', message: String(error) } : { kind: 'answer', answer }
+}
+
+// ── The dictation helper's lines (dictation.py's stdout) ──────────────────────────────────────
+
+/** One line of a capture: the recorder's state, what a streaming STT has heard so far, the final text, or an error. */
+export type DictationEvent =
+  | { kind: 'state'; state: 'idle' | 'listening' | 'transcribing' }
+  | { kind: 'partial'; text: string }
+  | { kind: 'text'; text: string }
+  | { kind: 'error'; message: string }
+
+const dictationLine = z.object({
+  error: z.optional(z.string()),
+  partial: z.optional(z.string()),
+  state: z.optional(z.enum(['idle', 'listening', 'transcribing'])),
+  text: z.optional(z.string())
+})
+
+/** A capture's line; undefined for a line that is none of them (a state Hermes added later, stray output). */
+export function dictationEvent(line: string): DictationEvent | undefined {
+  const { data } = dictationLine.safeParse(parseJson(line))
+
+  if (data?.error !== undefined) {
+    return { kind: 'error', message: data.error }
+  }
+
+  if (data?.state) {
+    return { kind: 'state', state: data.state }
+  }
+
+  if (data?.text !== undefined) {
+    return { kind: 'text', text: data.text }
+  }
+
+  return data?.partial === undefined ? undefined : { kind: 'partial', text: data.partial }
+}
+
+/** What `dictation.py --check` answered: whether the microphone and the STT provider are set up, and its report. */
+export type DictationCheck = { ready: boolean; details: string } | { error: string }
+
+const checkLine = z.object({ details: z.optional(z.string()), error: z.optional(z.string()), ready: z.optional(z.boolean()) })
+
+/** The answer on the last line of `stdout`; undefined when there is none. */
+export function readDictationCheck(stdout: string): DictationCheck | undefined {
+  const { data } = checkLine.safeParse(parseJson(stdout.trim().split('\n').at(-1) ?? ''))
+
+  if (data?.error !== undefined) {
+    return { error: data.error }
+  }
+
+  return data?.ready === undefined ? undefined : { details: data.details ?? '', ready: data.ready }
 }

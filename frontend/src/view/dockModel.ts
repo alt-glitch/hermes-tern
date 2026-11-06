@@ -12,6 +12,7 @@ import type { Reconnect } from '../chrome/reconnect.js'
 import type { SessionIds } from '../core/ids.js'
 import type { Attachments } from '../draft/attachments.js'
 import type { Composer } from '../draft/composer.js'
+import type { Dictation } from '../draft/dictation.js'
 import type { PullRequests } from '../github/store.js'
 import type { Todo } from '../model.js'
 import { capsOf } from '../modelCaps.js'
@@ -36,6 +37,7 @@ export interface DockSources {
   readonly session: { readonly ref: Pick<SessionIds, 'live'>; readonly info: SessionInfo | null; readonly usage: Usage | null }
   readonly activity: Pick<Activity, 'busy' | 'compacting'>
   readonly composer: Composer
+  readonly dictation: Pick<Dictation, 'capturing' | 'heard' | 'key' | 'phase'>
   readonly completion: Pick<Completion, 'ghost'>
   /** The open overlays, bottom first: a modal one on top takes the keys and the completion. */
   readonly overlays: readonly Pick<Overlay, 'modal'>[]
@@ -98,15 +100,18 @@ export function dockModel(src: DockSources, now: number): DockContext {
   const used = usage?.context_used ?? 0
   const max = usage?.context_max ?? 0
   const list = shownTodos(src)
+  const { dictation } = src
 
   return {
     activity: dockActivity(src.activity),
     composer: {
       attachments: src.attachments.chips(),
+      dictation: dictation.phase === 'off' ? undefined : { heard: dictation.heard, key: dictation.key.label, phase: dictation.phase },
       draft: src.composer,
       ghost: modal ? '' : src.completion.ghost,
       placeholder: PLACEHOLDER,
-      ready: src.session.ref.live !== null
+      // Tern's own send waits while a capture is in flight: Enter ends the capture first.
+      ready: src.session.ref.live !== null && !dictation.capturing
     },
     now,
     pills: {

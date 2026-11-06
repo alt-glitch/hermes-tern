@@ -20,6 +20,7 @@ import { todoProgress } from '../transcript/todos.js'
 import type { QueuedRow } from '../turn/queue.js'
 
 import { type AutomationLine, automationNode, reconnectNode } from './automation.js'
+import { type DictationActions, dictationRow, type DictationView, micButton } from './dictation.js'
 import { queuedNode } from './queued.js'
 import { compact } from './time.js'
 import { checklistNode } from './todos.js'
@@ -60,6 +61,8 @@ export interface DockComposer {
   readonly ghost?: string | undefined
   /** Images the next prompt carries, as chips in the composer: a thumbnail (a click opens it large) and a remove button. */
   readonly attachments: readonly ComposerImage[]
+  /** Dictation, after `/voice on`: the mic on the bar and a capture's row. */
+  readonly dictation?: DictationView | undefined
 }
 
 /** The model chip and the effort chip. */
@@ -101,7 +104,7 @@ export interface DockQueue {
 }
 
 /** What the dock's buttons and fields do. Bound once: none of them depends on the frame. */
-export interface DockActions {
+export interface DockActions extends DictationActions {
   /** Native editing: Tern replaced a range of the composer's text. */
   onEdit(ev: EditEvent): void
   /** Tern submitted text into the composer (`send` feature). */
@@ -478,7 +481,7 @@ function effortChip(r: DockRoute, on: DockActions): JSX.Element {
 }
 
 function composerNode(cx: DockContext, on: DockActions): JSX.Element {
-  const { draft, attachments } = cx.composer
+  const { draft, attachments, dictation } = cx.composer
   const { route } = cx
   const busy = cx.activity.kind === 'turn'
 
@@ -489,6 +492,7 @@ function composerNode(cx: DockContext, on: DockActions): JSX.Element {
       <row gap="sm" hidden={!attachments.length} key="chips" role="omp.composer.chips" wrap>
         {attachments.map((a, i) => imageChip(a, i, on.onRemoveAttachment))}
       </row>
+      {dictation ? dictationRow(dictation, on) : null}
       <row align="start" gap="sm" key="line" role="omp.composer.line">
         <editor
           key="input"
@@ -523,6 +527,7 @@ function composerNode(cx: DockContext, on: DockActions): JSX.Element {
           </row>
         ) : null}
         {route.reasons !== false ? effortChip(route, on) : null}
+        {dictation ? micButton(dictation, on) : null}
         {/* Tern puts its folder chip right before the composer's status node: an empty one keeps
             the chip there and the send key at the end. */}
         <status grow={1} key="extras" role="omp.composer.extras" transparent />
