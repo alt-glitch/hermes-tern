@@ -36,8 +36,10 @@ FRONTEND = Path(__file__).resolve().parent / "frontend"
 NO_TSP_EXIT = 75
 # V8 heap for long sessions, as Hermes gives its own TUI (unless NODE_OPTIONS sets one).
 HEAP_MB = 8192
-# Session sources `-c` continues: the shared gateway creates a frontend's sessions as `tui`; then the classic CLI's.
-CONTINUE_SOURCES = ("tui", "cli")
+# What `-c` continues, in order: a session a frontend created on the shared gateway (stored as
+# source `local`, created by `tui`), then a classic CLI session.
+CONTINUE_SOURCES = ({"source": ["tui", "local"], "local_created_sources": ["tui"]},
+                    {"source": ["cli", "local"], "local_created_sources": ["cli"]})
 # The launch variables of an outer `hermes tern`; this launch sets its own.
 OWN_ENV = ("HERMES_TERN_HERMES", "HERMES_TERN_RESUME", "HERMES_TERN_QUERY", "HERMES_TERN_IMAGE", "HERMES_TERN_CWD",
            "HERMES_TERN_SESSION_CWD", "HERMES_TERN_CREATE", "HERMES_TERN_TOOL_PROGRESS",
@@ -153,9 +155,9 @@ def latest_session() -> Optional[str]:
     """The last session of this workspace, else the last one anywhere."""
     with contextlib.suppress(Exception), _db() as db:
         workspace = _workspace()
-        for source in CONTINUE_SOURCES:
+        for sources in CONTINUE_SOURCES:
             for scope in ({"workspace_key": workspace}, {}):
-                found = db.search_sessions(source=source, limit=1, skip_launch_stubs=True, **scope)
+                found = db.search_sessions(limit=1, skip_launch_stubs=True, **sources, **scope)
                 if found:
                     return found[0]["id"]
     return None
