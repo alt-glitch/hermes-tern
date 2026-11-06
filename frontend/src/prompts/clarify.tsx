@@ -56,7 +56,7 @@ export function clarifyOverlay(host: OverlayHost, prompt: ClarifyPrompt): Overla
   const optionsOf = (q: Question, d: Draft): Option[] => [
     ...q.choices.map((c, i): Option => ({
       checked: q.multi && d.picked.has(i),
-      detail: q.previews?.[i],
+      ...(q.previews?.[i] ? { detail: q.previews[i] } : {}),
       id: `option:${i}`,
       label: c.replace(RECOMMENDED, ''),
       recommended: RECOMMENDED.test(c),

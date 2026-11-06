@@ -52,7 +52,7 @@ function pane() {
     fork: () => undefined,
     hud: () => false,
     interrupt: () => void calls.push('interrupt'),
-    liveVoice: { blocked: false, toggle: () => undefined, control: async () => undefined },
+    liveVoice: { blocked: false, toggle: () => undefined, control: async () => undefined, quickToggle: () => undefined },
     now: () => 10_000,
     openAgents: () => undefined,
     openBackground: () => undefined,
