@@ -32,6 +32,8 @@ export interface LifecycleHost {
   readonly sheets: Pick<PromptSheets, 'dropShared'>
   /** The launcher's session to resume (the pane's own after a restart), and the folder a new session starts in. */
   readonly launch: Pick<LaunchEnv, 'create' | 'restored' | 'resume' | 'sessionCwd'>
+  /** Whether another live pane shows conversation `id` (the plugin knows: viewers.py). */
+  shownElsewhere(id: StoredSessionId): Promise<boolean>
   /** The pane's width, which a private gateway lays its output out for. */
   cols(): number
   /** Whether the view may move to another session now (not while a turn or a compaction runs). */
@@ -197,6 +199,13 @@ export class SessionLifecycle {
   async #restore(id: StoredSessionId) {
     const host = this.#host
     let r: Snapshot | undefined
+
+    if (await host.shownElsewhere(id)) {
+      await this.newSession()
+      host.transcript.notice("Another pane shows this pane's last session; started a new one.", 'warning')
+
+      return
+    }
 
     try {
       r = await this.#resume(id)

@@ -10,7 +10,7 @@ import type { SessionInfo } from '@hermes/shared/gateway-types'
 import { describe, expect, it } from 'vitest'
 
 import { Epoch } from '../core/epoch.js'
-import { liveSessionId, NO_SESSION, type SessionIds, storedSessionId } from '../core/ids.js'
+import { durable, liveSessionId, NO_SESSION, type SessionIds, storedSessionId } from '../core/ids.js'
 import { adoptAll, type AdoptHost, adoptSteps, type Snapshot } from '../session/adopt.js'
 import { SessionLifecycle } from '../session/lifecycle.js'
 import { SessionState } from '../session/state.js'
@@ -156,7 +156,7 @@ function recordingHost() {
     forgetStatusNote: rec('forgetStatusNote'),
     imageLanded: rec('imageLanded'),
     markPane: id => void log.push(`markPane ${id}`),
-    markViewer: (now, before) => void log.push(`markViewer ${now} ${before}`),
+    markViewer: (now, before) => void log.push(`markViewer ${durable(now)} ${durable(before)}`),
     media: { showAll: rec('media.showAll') },
     notices: { reset: rec('notices.reset') },
     processes: { poke: rec('processes.poke') },
@@ -276,6 +276,7 @@ function lifecycle() {
       rename: () => Promise.resolve(),
       request: req => void log.push(`request ${req.id}`),
       sheets: { dropShared: () => undefined },
+      shownElsewhere: () => Promise.resolve(false),
       state,
       transcript: new Transcript()
     },

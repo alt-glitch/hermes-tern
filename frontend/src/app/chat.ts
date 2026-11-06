@@ -15,9 +15,8 @@ import type { Sidebar } from '../chrome/sidebar.js'
 import { sessionHost } from '../commands/host.js'
 import type { SessionHost } from '../commands/session.js'
 import { type LaunchEnv, readLaunchEnv } from '../config/env.js'
-import { markViewer } from '../connections/cards.js'
 import { errorText } from '../core/errors.js'
-import { durable, entryId, type PrKey, type StoredSessionId } from '../core/ids.js'
+import { entryId, type PrKey, type StoredSessionId } from '../core/ids.js'
 import { RenderScheduler } from '../core/scheduler.js'
 import { onKey } from '../draft/keys.js'
 import { followGateway } from '../gateway/follow.js'
@@ -161,8 +160,12 @@ export class App implements ChatPorts {
     }).then(() => this.#end())
 
     const code = await this.#done.promise
-    // Bounded, as Ink's deferExitForClose: a dead socket must not hold the terminal.
-    await Promise.race([s.life.leaveAll('tui_shutdown'), new Promise(resolve => s.timers.timeout(() => resolve(undefined), QUIT_DETACH_MS))])
+    // Bounded, as Ink's deferExitForClose: a dead socket must not hold the terminal. The plugin hears
+    // that this pane stops showing the session (bounded too; a dead pane counts for nothing anyway).
+    await Promise.all([
+      s.viewer.leave(this.session.ref),
+      Promise.race([s.life.leaveAll('tui_shutdown'), new Promise(resolve => s.timers.timeout(() => resolve(undefined), QUIT_DETACH_MS))])
+    ])
     this.dispose()
     await this.#tern.close()
     this.#gw.kill('exit')
@@ -253,7 +256,6 @@ export class App implements ChatPorts {
    * pane's session, which `hermes tern` resumes if it starts again in the pane.
    */
   #end(code = 0) {
-    markViewer(null, durable(this.session.ref))
     this.#done.resolve(code)
   }
 

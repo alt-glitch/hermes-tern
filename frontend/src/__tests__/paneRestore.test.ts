@@ -101,6 +101,15 @@ describe('a pane restarted after its program died', () => {
     expect(notices(app)).toEqual(["Could not resume this pane's last session (session not found); started a new one."])
   })
 
+  it('starts a new session when another live pane shows that one (the plugin says so)', async () => {
+    gw.handlers.set('plugin.hermes-tern.viewer.shown', p => ({ shown: JSON.stringify(p['ids']) === '["tip"]' }))
+    const { app } = await started({ HERMES_TERN_RESTORED: 'root', HERMES_TERN_RESUME: 'tip' })
+
+    expect(gw.methods('session.resume')).toHaveLength(0)
+    expect(app.session.ref.live).toBe('new')
+    expect(notices(app)).toEqual(["Another pane shows this pane's last session; started a new one."])
+  })
+
   it('says nothing for a plain --resume', async () => {
     const { app } = await started({ HERMES_TERN_RESUME: 'tip' })
 
