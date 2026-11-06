@@ -347,9 +347,72 @@ export const STYLES = css`
     font: 500 12px/20px var(--sans) !important;
   }
 
-  /* omp's ask theme draws a radio at the start of each option without moving the text over. */
-  [data-role='omp.ask.option'] {
-    padding-left: 34px !important;
+  /* The clarify sheet's options: Tern spaces omp's ask rows inside the dock's ask editor; in a
+     sheet the rows lose their padding, so the radio or checkbox sits under the label. */
+  .sf-overlay[data-role='omp.overlay.ask'] .sf-list[data-role='omp.ask.options'] .sf-item {
+    padding: 8px 12px 8px 40px !important;
+  }
+
+  .sf-overlay[data-role='omp.overlay.ask'] .sf-list[data-role='omp.ask.options'] .sf-item-detail:empty {
+    display: none;
+  }
+
+  /* A long label wraps beside the key that picks it, which stays at the row's end (after its
+     Recommended chip) on the first line. */
+  .sf-overlay[data-role='omp.overlay.ask'] .sf-list[data-role='omp.ask.options'] .sf-item-label {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+
+  .sf-overlay[data-role='omp.overlay.ask'] .sf-list[data-role='omp.ask.options'] .sf-item-value {
+    align-self: flex-start;
+  }
+
+  .sf-overlay[data-role='omp.overlay.ask'] .sf-list[data-role='omp.ask.options'] .sf-item-hint {
+    align-self: flex-start;
+    margin-top: 2px;
+    margin-left: auto;
+  }
+
+  .sf-overlay[data-role='omp.overlay.ask'] .sf-list[data-role='omp.ask.options'] .sf-item-value:not(.sf-hidden) + .sf-item-hint {
+    margin-left: 0;
+  }
+
+  /* A long question's context under its title: body text, scrolling when it is long. */
+  [data-role='hermes.ask.context'] {
+    max-height: 30vh;
+    overflow-y: auto;
+    font: 400 13.5px/1.5 var(--sans) !important;
+    color: var(--t2);
+  }
+
+  /* The keys a question sheet takes, quiet beside its buttons. */
+  .sf-row[data-role='hermes.ask.keys'] {
+    flex: 0 1 auto;
+    min-width: 0;
+    flex-wrap: wrap;
+    row-gap: 4px;
+    font: 500 11.5px/1 var(--sans);
+    color: var(--t3);
+  }
+
+  [data-role='hermes.ask.keys'] .kbd {
+    height: 16px;
+    min-width: 18px;
+    font-size: 10.5px;
+  }
+
+  /* The clarify card: the user's answer, then the choices offered, each after a mark in one column. */
+  :is([data-role='hermes.ask.verdict'], [data-role^='hermes.ask.choice'], [data-role='hermes.ask.waiting']) {
+    font: 400 14px/22px var(--sans) !important;
+  }
+
+  :is([data-role='hermes.ask.verdict'], [data-role^='hermes.ask.choice']) > :first-child {
+    flex: none;
+    width: 16px;
+    height: 22px;
+    justify-content: center;
+    text-align: center;
   }
 
   /* A steer's status under its words is a note, not code. */

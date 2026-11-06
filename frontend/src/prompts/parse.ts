@@ -38,12 +38,23 @@ export interface Question {
   multi: boolean
 }
 
+/** Where one asked question sits in its clarify call: question `index` (from 0) of `total`. */
+export interface QuestionPlace {
+  index: number
+  total: number
+}
+
 /** clarify's questions (none: nothing to ask), with the answers already locked on a replay. */
 export interface ClarifyPrompt {
   kind: 'clarify'
   req: ServerRequest
   questions: Question[]
   answers: Record<string, string | null>
+  /**
+   * The shared gateway asks a call's questions one card at a time: this card's place among them,
+   * when the call asks more than one (hermes/sharedPrompts.ts finds it).
+   */
+  place: QuestionPlace | undefined
 }
 
 /** The methods that ask for one value typed into a field (two for a login). */
@@ -95,7 +106,13 @@ export function parsePrompt(req: ServerRequest): PromptRequest | undefined {
       return approvalOf(req, known)
 
     case 'clarify':
-      return { answers: lockedAnswers(known.params.answers), kind: 'clarify', questions: questionsOf(known.params.questions), req }
+      return {
+        answers: lockedAnswers(known.params.answers),
+        kind: 'clarify',
+        place: placeOf(req.params['place']),
+        questions: questionsOf(known.params.questions),
+        req
+      }
 
     case 'sudo':
 
@@ -160,6 +177,20 @@ export function questionsOf(raw: unknown): Question[] {
       ? [{ choices: 'choices' in q ? strings(q.choices) : [], multi: 'multi_select' in q && q.multi_select === true, qid: text(q.qid), question }]
       : []
   })
+}
+
+/** A card's place in its call: two whole numbers, the index inside the total, of a call asking more than one. */
+function placeOf(raw: unknown): QuestionPlace | undefined {
+  if (!raw || typeof raw !== 'object') {
+    return undefined
+  }
+
+  const index: unknown = Reflect.get(raw, 'index')
+  const total: unknown = Reflect.get(raw, 'total')
+
+  return Number.isInteger(index) && Number.isInteger(total) && typeof index === 'number' && typeof total === 'number' && total > 1 && index >= 0 && index < total
+    ? { index, total }
+    : undefined
 }
 
 /** The answers a replay says the server already locked (a string, or null for skipped). */

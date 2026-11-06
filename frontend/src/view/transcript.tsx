@@ -7,6 +7,7 @@ import type { JSX } from '@stencil-hq/tern'
 
 import { optional } from '../core/assert.js'
 import type { Block, Compaction, Entry, NoticeEntry, TurnEntry, UserAttachment, UserEntry } from '../model.js'
+import { isAsk } from '../transcript/calls.js'
 import { steerState } from '../transcript/messages.js'
 import { answerText, turnEndedAt } from '../transcript/turns.js'
 
@@ -167,8 +168,10 @@ function turnNode(turn: TurnEntry, id: string, cx: TranscriptContext): JSX.Eleme
   // t3code: once the newest step failed, its group stops shining and "Thinking" carries the turn.
   // A running compaction is its own live line.
   const compacting = last?.kind === 'block' && last.block.kind === 'compaction' && last.block.compaction.state.status === 'running'
+  // A clarify card waiting on the user says so itself: the agent is not thinking.
+  const asking = last?.kind === 'block' && last.block.kind === 'tool' && isAsk(last.block.call) && last.block.call.outcome.kind === 'running'
 
-  if (live && !compacting && (!last || (last.kind === 'block' && last.block.kind !== 'text') || (last.kind === 'work' && latestFailed(last.items)))) {
+  if (live && !compacting && !asking && (!last || (last.kind === 'block' && last.block.kind !== 'text') || (last.kind === 'work' && latestFailed(last.items)))) {
     children.push(thinkingRow())
   }
 

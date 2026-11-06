@@ -3126,6 +3126,9 @@
            {
             "k": "item",
             "p": {
+             "hint": [
+              "1"
+             ],
              "label": [
               {
                "t": "main"
@@ -3138,6 +3141,9 @@
            {
             "k": "item",
             "p": {
+             "hint": [
+              "2"
+             ],
              "label": [
               {
                "t": "dev"
@@ -3155,6 +3161,9 @@
                "s": "dim",
                "t": "Type your own answer"
               }
+             ],
+             "hint": [
+              "3"
              ],
              "label": [
               {
@@ -3176,6 +3185,146 @@
            "key": "actions"
           },
           "c": [
+           {
+            "k": "row",
+            "p": {
+             "align": "center",
+             "gap": "md",
+             "role": "hermes.ask.keys",
+             "key": "keys"
+            },
+            "c": [
+             {
+              "k": "row",
+              "p": {
+               "align": "center",
+               "gap": "xs",
+               "key": "k0"
+              },
+              "c": [
+               {
+                "k": "kbd",
+                "p": {
+                 "keys": [
+                  "up",
+                  "down"
+                 ],
+                 "key": "k0"
+                }
+               },
+               {
+                "k": "text",
+                "p": {
+                 "spans": [
+                  {
+                   "s": "dim",
+                   "t": "move"
+                  }
+                 ],
+                 "wrap": "none",
+                 "key": "t"
+                }
+               }
+              ]
+             },
+             {
+              "k": "row",
+              "p": {
+               "align": "center",
+               "gap": "xs",
+               "key": "k1"
+              },
+              "c": [
+               {
+                "k": "kbd",
+                "p": {
+                 "keys": [
+                  "1–3"
+                 ],
+                 "key": "k0"
+                }
+               },
+               {
+                "k": "text",
+                "p": {
+                 "spans": [
+                  {
+                   "s": "dim",
+                   "t": "pick"
+                  }
+                 ],
+                 "wrap": "none",
+                 "key": "t"
+                }
+               }
+              ]
+             },
+             {
+              "k": "row",
+              "p": {
+               "align": "center",
+               "gap": "xs",
+               "key": "k2"
+              },
+              "c": [
+               {
+                "k": "kbd",
+                "p": {
+                 "keys": [
+                  "enter"
+                 ],
+                 "key": "k0"
+                }
+               },
+               {
+                "k": "text",
+                "p": {
+                 "spans": [
+                  {
+                   "s": "dim",
+                   "t": "choose"
+                  }
+                 ],
+                 "wrap": "none",
+                 "key": "t"
+                }
+               }
+              ]
+             },
+             {
+              "k": "row",
+              "p": {
+               "align": "center",
+               "gap": "xs",
+               "key": "k3"
+              },
+              "c": [
+               {
+                "k": "kbd",
+                "p": {
+                 "keys": [
+                  "escape"
+                 ],
+                 "key": "k0"
+                }
+               },
+               {
+                "k": "text",
+                "p": {
+                 "spans": [
+                  {
+                   "s": "dim",
+                   "t": "skip"
+                  }
+                 ],
+                 "wrap": "none",
+                 "key": "t"
+                }
+               }
+              ]
+             }
+            ]
+           },
            {
             "k": "spacer",
             "p": {
@@ -3220,7 +3369,7 @@
              "align": "center",
              "gap": "xs",
              "role": "omp.btn",
-             "title": "Submit  enter · up/down move",
+             "title": "Submit  enter",
              "tone": "accent",
              "key": "submit",
              "actions": {
@@ -3856,6 +4005,9 @@
            {
             "k": "item",
             "p": {
+             "hint": [
+              "1"
+             ],
              "label": [
               {
                "t": "main"
@@ -3868,6 +4020,9 @@
            {
             "k": "item",
             "p": {
+             "hint": [
+              "2"
+             ],
              "label": [
               {
                "t": "dev"
@@ -3885,6 +4040,9 @@
                "s": "dim",
                "t": "Type your own answer"
               }
+             ],
+             "hint": [
+              "3"
              ],
              "label": [
               {
@@ -3906,6 +4064,146 @@
            "key": "actions"
           },
           "c": [
+           {
+            "k": "row",
+            "p": {
+             "align": "center",
+             "gap": "md",
+             "role": "hermes.ask.keys",
+             "key": "keys"
+            },
+            "c": [
+             {
+              "k": "row",
+              "p": {
+               "align": "center",
+               "gap": "xs",
+               "key": "k0"
+              },
+              "c": [
+               {
+                "k": "kbd",
+                "p": {
+                 "keys": [
+                  "up",
+                  "down"
+                 ],
+                 "key": "k0"
+                }
+               },
+               {
+                "k": "text",
+                "p": {
+                 "spans": [
+                  {
+                   "s": "dim",
+                   "t": "move"
+                  }
+                 ],
+                 "wrap": "none",
+                 "key": "t"
+                }
+               }
+              ]
+             },
+             {
+              "k": "row",
+              "p": {
+               "align": "center",
+               "gap": "xs",
+               "key": "k1"
+              },
+              "c": [
+               {
+                "k": "kbd",
+                "p": {
+                 "keys": [
+                  "1–3"
+                 ],
+                 "key": "k0"
+                }
+               },
+               {
+                "k": "text",
+                "p": {
+                 "spans": [
+                  {
+                   "s": "dim",
+                   "t": "pick"
+                  }
+                 ],
+                 "wrap": "none",
+                 "key": "t"
+                }
+               }
+              ]
+             },
+             {
+              "k": "row",
+              "p": {
+               "align": "center",
+               "gap": "xs",
+               "key": "k2"
+              },
+              "c": [
+               {
+                "k": "kbd",
+                "p": {
+                 "keys": [
+                  "enter"
+                 ],
+                 "key": "k0"
+                }
+               },
+               {
+                "k": "text",
+                "p": {
+                 "spans": [
+                  {
+                   "s": "dim",
+                   "t": "choose"
+                  }
+                 ],
+                 "wrap": "none",
+                 "key": "t"
+                }
+               }
+              ]
+             },
+             {
+              "k": "row",
+              "p": {
+               "align": "center",
+               "gap": "xs",
+               "key": "k3"
+              },
+              "c": [
+               {
+                "k": "kbd",
+                "p": {
+                 "keys": [
+                  "escape"
+                 ],
+                 "key": "k0"
+                }
+               },
+               {
+                "k": "text",
+                "p": {
+                 "spans": [
+                  {
+                   "s": "dim",
+                   "t": "skip"
+                  }
+                 ],
+                 "wrap": "none",
+                 "key": "t"
+                }
+               }
+              ]
+             }
+            ]
+           },
            {
             "k": "spacer",
             "p": {
@@ -3950,7 +4248,7 @@
              "align": "center",
              "gap": "xs",
              "role": "omp.btn",
-             "title": "Submit  enter · up/down move",
+             "title": "Submit  enter",
              "tone": "accent",
              "key": "submit",
              "actions": {
