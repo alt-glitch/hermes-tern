@@ -184,7 +184,9 @@ def parse_target(args: dict[str, Any], *, trusted_only: bool = True) -> dict[str
 
 
 def _key(link: dict[str, Any]) -> str:
-    return f"{link['host']}/{link['repository']}#{link['number']}"
+    # Normalised: a link stored before hosts were (`GitHub.com.`, `github.evil.com.`) still matches.
+    host = normalize_host(link["host"]) or link["host"]
+    return f"{host}/{str(link['repository']).lower()}#{link['number']}"
 
 
 # ── Storage ────────────────────────────────────────────────────────────────────────────────────

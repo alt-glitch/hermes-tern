@@ -184,3 +184,13 @@ def test_a_legacy_link_to_an_unlisted_host_can_still_be_unlinked(prs):
 
     assert (out["was_linked"], out["linked"]) == (True, [])
     assert "error" in json.loads(prs.unlink_pull_request({"url": "https://user@github.com/a/b/pull/1"}, session_id="s1"))
+
+
+def test_a_legacy_link_stored_with_a_trailing_dot_is_found_by_its_normalised_host(prs):
+    prs.data_file().write_text(json.dumps({"version": 1, "aliases": {}, "conversations": {"s1": [
+        {"host": "github.evil.com.", "repository": "a/b", "number": 1, "url": "https://github.evil.com./a/b/pull/1"},
+        {"host": "GitHub.com.", "repository": "a/b", "number": 2, "url": "https://GitHub.com./a/b/pull/2"}]}}))
+
+    assert json.loads(prs.unlink_pull_request({"url": "https://github.evil.com./a/b/pull/1"}, session_id="s1"))["was_linked"]
+    assert json.loads(prs.link_pull_request({"url": "https://github.com/a/b/pull/2"}, session_id="s1"))["already_linked"]
+    assert json.loads(prs.unlink_pull_request({"url": "https://github.com/a/b/pull/2"}, session_id="s1"))["linked"] == []

@@ -127,6 +127,33 @@ describe('requests', () => {
     ])
   })
 
+  it('follows a POST answered 303 or 302 with a GET and no body, as fetch would; a 307 keeps the POST', async () => {
+    const fetch = fakeFetch(
+      new Response(null, { headers: { location: '/graphql-moved' }, status: 303 }),
+      Response.json({ data: { ok: 1 } }),
+      new Response(null, { headers: { location: '/graphql-moved' }, status: 302 }),
+      Response.json({ data: { ok: 2 } }),
+      new Response(null, { headers: { location: '/graphql-moved' }, status: 307 }),
+      Response.json({ data: { ok: 3 } })
+    )
+    const gh = github()
+
+    await gh.graphql('github.com', 'query { a }')
+    await gh.graphql('github.com', 'query { b }')
+    await gh.graphql('github.com', 'query { c }')
+
+    const shape = fetch.mock.calls.map(([url, init]) => [String(url), init?.method, init?.body === undefined, new Headers(init?.headers).get('authorization')])
+
+    expect(shape).toEqual([
+      ['https://api.github.com/graphql', 'POST', false, 'Bearer gh-token'],
+      ['https://api.github.com/graphql-moved', 'GET', true, 'Bearer gh-token'],
+      ['https://api.github.com/graphql', 'POST', false, 'Bearer gh-token'],
+      ['https://api.github.com/graphql-moved', 'GET', true, 'Bearer gh-token'],
+      ['https://api.github.com/graphql', 'POST', false, 'Bearer gh-token'],
+      ['https://api.github.com/graphql-moved', 'POST', false, 'Bearer gh-token']
+    ])
+  })
+
   it('gives up after a few redirects', async () => {
     const hop = () => new Response(null, { headers: { location: '/again' }, status: 307 })
     const fetch = fakeFetch(hop(), hop(), hop(), hop(), hop())

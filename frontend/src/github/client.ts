@@ -83,8 +83,9 @@ const MAX_REDIRECTS = 3
  * renamed repository) keeps the token, and a hop anywhere else fails before the token goes there.
  * fetch's own `follow` drops Authorization across origins in current Node, but older runtimes did not.
  */
-async function send(url: URL, origin: string, init: RequestInit): Promise<Response> {
+async function send(url: URL, origin: string, first: RequestInit): Promise<Response> {
   let target = url
+  let init = first
 
   for (let hop = 0; ; hop++) {
     if (target.origin !== origin) {
@@ -105,6 +106,13 @@ async function send(url: URL, origin: string, init: RequestInit): Promise<Respon
     }
 
     target = new URL(location, target)
+
+    // Fetch's rule: a 303, or a 301 or 302 answering a POST, is followed with a GET and no body.
+    if (res.status === 303 || ((res.status === 301 || res.status === 302) && init.method?.toUpperCase() === 'POST')) {
+      const headers = new Headers(init.headers)
+      headers.delete('content-type')
+      init = { headers, method: 'GET' }
+    }
   }
 }
 
