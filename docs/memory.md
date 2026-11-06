@@ -44,6 +44,7 @@ The schema and content encoding are grounded in the runtime lock
 [22063fc099ec9ad8357d7f8f6e6248a0400680d3](https://github.com/kvnloo/hermes-agent/tree/22063fc099ec9ad8357d7f8f6e6248a0400680d3):
 
 - [sessions/messages DDL](https://github.com/kvnloo/hermes-agent/blob/22063fc099ec9ad8357d7f8f6e6248a0400680d3/hermes_state_common.py).
+- [durable UIDs and merged-message witnesses](https://github.com/kvnloo/hermes-agent/blob/22063fc099ec9ad8357d7f8f6e6248a0400680d3/agent/message_metadata.py).
 - [content encoding, edits, rewind and compaction](https://github.com/kvnloo/hermes-agent/blob/22063fc099ec9ad8357d7f8f6e6248a0400680d3/hermes_state_messages.py).
 - [profile resolver](https://github.com/kvnloo/hermes-agent/blob/22063fc099ec9ad8357d7f8f6e6248a0400680d3/hermes_constants.py).
 
@@ -58,6 +59,26 @@ a verified compression lineage; explicit branch/reset conversations and excluded
 sessions stay separate. A rewound newest copy suppresses its older active or
 compacted copies. An older superseded copy does not suppress a newer live one.
 The parent binding of branch/reset markers is checked at each ancestry hop.
+
+A merged user turn keeps its first constituent's UID and carries the others in
+`absorbed_message_uids`. The newest direct or absorbed witness determines whether
+an older constituent is withdrawn. This state resolution is separate from choosing
+the constituent's source text: a live composite beginning with an ordinary request
+does not hide a retained correction that follows it. Rewinding that composite
+suppresses the older correction, while a newer live witness supersedes an older
+composite withdrawal. The original row must still qualify as active or compacted
+history; a live witness alone does not make withdrawn source text extractable.
+Witnesses never merge distinct UIDs by wording or cross the selected lineage.
+Hermes carries flattened constituent lists through nested merges; the reader does
+not infer extra relationships from missing witnesses.
+
+The optional witness column is treated as empty on legacy schemas. NULL, an empty
+stored value and `[]` represent no absorbed UIDs. A present value must be a complete
+JSON array of at most 128 nonempty UTF-8 string UIDs, within 4 KiB of stored bytes;
+duplicates are deduplicated, and self-witnesses are harmless. Malformed, unencodable
+or oversized witnesses in selected user rows from eligible sessions raise `SourceError` before
+retrieval or checkpoint publication. They are never truncated or silently treated
+as empty, which could hide a withdrawal. Excluded sessions contribute no witnesses.
 
 For missing/empty legacy UIDs, exact stored content, timestamp and tool identity
 provide a fallback. A legacy row adopts a unique matching durable UID; ambiguous
@@ -86,8 +107,9 @@ Raw content is capped at 16 KiB, metadata at 4 KiB and each extracted rule at
 ## Atomic refresh and resume
 
 Hermes edits and deactivates existing IDs. Every sync first streams a digest of
-all selected user generations (including withdrawals), their identity fields and
-resolved ancestry paths. Policy changes also invalidate old checkpoints. That pass and
+all selected user generations (including withdrawals), their identity fields,
+complete bounded absorbed-UID witnesses and resolved ancestry paths. Policy changes
+also invalidate old checkpoints. That pass and
 the indexing pass share one read-only SQLite transaction.
 
 Each batch atomically checkpoints its digest, selection, cursor, records and
@@ -133,15 +155,21 @@ only after all users of the store have stopped if a complete local reset is need
 
 ```sh
 python -m pytest -q tests/test_glide_memory.py
+python -m pytest -q tests/test_glide_memory_core.py  # Requires the CI's Hermes core environment.
 python -m pytest -q
 hermes plugins validate .
 ```
 
 Tests use synthetic workflow text in real temporary SQLite databases, the existing
 pytest bootstrap and a network/subprocess prohibition. They cover source eligibility,
-structured content, compression/rewind generations, legacy UID transitions,
-fork and selection boundaries, restart, mutation invalidation, atomic interruption, corruption,
-profile isolation, WAL/read-only behavior, ranking and bounds.
+structured content, compression/rewind generations, merged constituent withdrawals,
+witness-only edits during complete/partial scans, newer live witnesses, bounded witness decoding,
+legacy UID transitions, fork and selection boundaries, restart, mutation invalidation,
+atomic interruption, corruption,
+profile isolation, WAL/read-only behavior, ranking and bounds. The separate core integration
+regression persists synthetic turns with Hermes' real SessionDB, publishes a compression
+child and rewinds its composite through the real APIs. It uses the existing pinned core test
+environment; the standalone SQLite fixture suite remains independent of core imports.
 
 All commands and tests were **UNRUN** when this change was authored through the
 GitHub connector. The fork's existing checks workflow can provide execution evidence;

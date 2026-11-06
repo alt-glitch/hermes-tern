@@ -32,7 +32,7 @@ CREATE TABLE messages (
     role TEXT NOT NULL, content TEXT, timestamp REAL NOT NULL,
     _compressed_summary INTEGER NOT NULL DEFAULT 0,
     active INTEGER NOT NULL DEFAULT 1, compacted INTEGER NOT NULL DEFAULT 0,
-    display_kind TEXT, display_metadata TEXT, message_uid TEXT,
+    display_kind TEXT, display_metadata TEXT, message_uid TEXT, absorbed_message_uids TEXT,
     tool_call_id TEXT, tool_calls TEXT, tool_name TEXT
 );
 CREATE INDEX idx_messages_session_id ON messages(session_id, id);
@@ -322,6 +322,7 @@ def test_legacy_schema_without_uid_still_resolves_rewind_copies(world):
     world.message(text, active=0, compacted=1, message_uid=None)
     world.message(text, active=0, compacted=0, message_uid=None)
     world.db.execute("ALTER TABLE messages DROP COLUMN message_uid")
+    world.db.execute("ALTER TABLE messages DROP COLUMN absorbed_message_uids")
     world.db.commit()
     world.memory.sync(["owner"], batch_size=1)
     assert world.memory.search("obsolete") == []
@@ -362,6 +363,187 @@ def test_unresolved_compression_lineage_cannot_publish_memory(world, monkeypatch
     with pytest.raises(SourceError, match="lineage"):
         world.memory.sync(["owner", "continued"])
     assert not world.memory.state_path.exists()
+
+
+@pytest.fixture
+def merged_turn(world):
+    world.db.execute("UPDATE sessions SET end_reason='compression' WHERE id='owner'")
+    world.db.commit()
+    world.session("continued", parent="owner")
+    retained = world.message("Correction: Keep historical checks offline.", active=0, compacted=1)
+    world.message("Please inspect the parser.", active=0, compacted=1, message_uid="anchor")
+    constituent = world.message("Correction: Use obsolete parser flags.", active=0, compacted=1,
+                                message_uid="absorbed-correction")
+    carrier = world.message("Please inspect the parser.\nCorrection: Use obsolete parser flags.",
+                            sid="continued", message_uid="anchor",
+                            absorbed_message_uids=json.dumps(["absorbed-correction"]))
+    return types.SimpleNamespace(scope=["owner", "continued"], retained=retained,
+                                 constituent=constituent, carrier=carrier)
+
+
+@pytest.mark.parametrize("parent_flags", [(0, 1), (1, 0)], ids=["compacted", "active"])
+@pytest.mark.parametrize("warm_checkpoint", [False, True], ids=["cold", "resync"])
+def test_merged_rewind_withdraws_absorbed_correction(world, merged_turn, parent_flags, warm_checkpoint):
+    world.db.execute("UPDATE messages SET active=?, compacted=? WHERE id=?",
+                     (*parent_flags, merged_turn.constituent))
+    world.db.commit()
+    if warm_checkpoint:
+        assert world.memory.sync(merged_turn.scope, batch_size=1).corrections == 2
+        # The live composite has an ordinary prefix: retain the constituent's text.
+        assert world.memory.search("obsolete")[0].message_id == merged_turn.constituent
+    world.db.execute("UPDATE messages SET active=0, compacted=0 WHERE id=?", (merged_turn.carrier,))
+    world.db.commit()
+    if warm_checkpoint:
+        with pytest.raises(MemoryNotReady):
+            world.memory.search("obsolete")
+    result = GlideMemory(world.home).sync(merged_turn.scope, batch_size=1)
+    assert result.complete and result.corrections == 1
+    assert world.memory.search("obsolete") == []
+    assert world.memory.context("obsolete") == ""
+    assert world.memory.search("historical")[0].message_id == merged_turn.retained
+
+
+@pytest.mark.parametrize("partial", [False, True], ids=["complete", "partial"])
+def test_absorbed_witness_only_edits_invalidate_and_restart(world, merged_turn, partial):
+    world.db.execute("UPDATE messages SET active=0, absorbed_message_uids='[]' WHERE id=?",
+                     (merged_turn.carrier,))
+    world.db.commit()
+    result = world.memory.sync(merged_turn.scope, batch_size=2, max_batches=1 if partial else None)
+    assert result.complete is not partial
+    before = payload(world)
+    assert any(record["message_id"] == merged_turn.constituent for record in before["records"])
+    # No row IDs, text, flags or session metadata change in either edit.
+    world.db.execute("UPDATE messages SET absorbed_message_uids=? WHERE id=?",
+                     (json.dumps(["absorbed-correction"]), merged_turn.carrier))
+    world.db.commit()
+    with pytest.raises(MemoryNotReady):
+        world.memory.search("obsolete")
+    resumed = GlideMemory(world.home)
+    assert resumed.sync(merged_turn.scope, batch_size=1).corrections == 1
+    assert payload(world)["source_digest"] != before["source_digest"]
+    assert resumed.search("obsolete") == []
+    world.db.execute("UPDATE messages SET absorbed_message_uids='[]' WHERE id=?", (merged_turn.carrier,))
+    world.db.commit()
+    with pytest.raises(MemoryNotReady):
+        resumed.search("obsolete")
+    assert resumed.sync(merged_turn.scope, batch_size=1).corrections == 2
+    assert resumed.search("obsolete")[0].message_id == merged_turn.constituent
+
+
+@pytest.mark.parametrize("newer_kind", ["direct", "composite"])
+def test_newer_live_witness_overrides_older_composite_withdrawal(world, merged_turn, newer_kind):
+    world.db.execute("UPDATE messages SET active=0 WHERE id=?", (merged_turn.carrier,))
+    world.db.commit()
+    world.memory.sync(merged_turn.scope)
+    assert world.memory.search("obsolete") == []
+    if newer_kind == "direct":
+        newer = world.message("Correction: Use obsolete parser flags.", sid="continued",
+                              message_uid="absorbed-correction")
+        expected = newer
+    else:
+        newer = world.message("Please inspect the parser.\nCorrection: Use obsolete parser flags.",
+                              sid="continued", message_uid="anchor",
+                              absorbed_message_uids=json.dumps(["absorbed-correction"]))
+        expected = merged_turn.constituent
+    world.memory.sync(merged_turn.scope, batch_size=1)
+    assert world.memory.search("obsolete")[0].message_id == expected
+    world.db.execute("UPDATE messages SET active=0 WHERE id=?", (newer,))
+    world.db.commit()
+    world.memory.sync(merged_turn.scope, batch_size=1)
+    assert world.memory.search("obsolete") == []
+    assert world.memory.search("historical")[0].message_id == merged_turn.retained
+
+
+@pytest.mark.parametrize("kind", [
+    "branch", "reset", "unrelated", "hidden", "delegate", "remote", "malformed", "unselected",
+])
+def test_absorbed_withdrawal_respects_lineage_and_selection(world, kind):
+    world.db.execute("UPDATE sessions SET end_reason='compression' WHERE id='owner'")
+    world.db.commit()
+    options = {"parent": "owner"}
+    if kind in ("branch", "reset", "delegate"):
+        marker = {"branch": "_branched_from", "reset": "_reset_from", "delegate": "_delegate_from"}[kind]
+        options["config"] = {marker: "owner"}
+    elif kind == "unrelated":
+        options = {}
+    elif kind == "hidden":
+        options["hidden"] = 1
+    elif kind == "remote":
+        options["source"] = "telegram"
+    elif kind == "malformed":
+        options["config"] = "{broken"
+    world.session("other", **options)
+    retained = world.message("Correction: Keep parser checks offline.", active=0, compacted=1,
+                             message_uid="constituent")
+    world.message("Please inspect the parser.\nCorrection: Keep parser checks offline.",
+                  sid="other", active=0, compacted=0, message_uid="carrier",
+                  absorbed_message_uids=json.dumps(["constituent"]))
+    scope = ["owner"] if kind == "unselected" else ["owner", "other"]
+    world.memory.sync(scope, batch_size=1)
+    assert world.memory.search("parser")[0].message_id == retained
+
+
+@pytest.mark.parametrize("carrier_uid", [None, "anchor"], ids=["missing-primary", "durable-primary"])
+def test_absorbed_uid_decoding_preserves_distinct_identical_corrections(world, carrier_uid):
+    text = "Correction: Keep parser checks offline."
+    retained = world.message(text, active=0, compacted=1, message_uid="independent")
+    world.message(text, active=0, compacted=1, message_uid="workflow-\u03c0")
+    # Escaped Unicode matches exact UTF-8 UID bytes; duplicates/self are harmless.
+    world.message("Please inspect the parser.", active=0, compacted=0, message_uid=carrier_uid,
+                  absorbed_message_uids=json.dumps(["anchor", "workflow-\u03c0", "workflow-\u03c0"]))
+    world.memory.sync(["owner"], batch_size=1)
+    hits = world.memory.search("parser")
+    assert len(hits) == 1 and hits[0].message_id == retained
+
+
+def test_absorbed_withdrawal_includes_unique_legacy_alias(world):
+    text = "Correction: Use obsolete parser flags."
+    world.message(text, active=0, compacted=1, message_uid="constituent")
+    world.message(text, active=0, compacted=1, message_uid=None)
+    world.message("Please inspect the parser.", active=0, compacted=0, message_uid="carrier",
+                  absorbed_message_uids=json.dumps(["constituent"]))
+    world.memory.sync(["owner"], batch_size=1)
+    assert world.memory.search("obsolete") == []
+
+
+@pytest.mark.parametrize("raw", [
+    "{broken", "{}", '"constituent"', '[""]', '["constituent", 1]',
+    b"\xff", '["\\ud800"]',
+    '["constituent"]' + " " * source.MAX_METADATA_BYTES,
+    json.dumps(["constituent"] * (source.MAX_ABSORBED_UIDS + 1)),
+    json.dumps(["\u00e9" * source.MAX_METADATA_BYTES], ensure_ascii=False),
+], ids=["syntax", "object", "scalar", "empty-uid", "mixed-types", "encoding",
+        "surrogate", "byte-limit", "count-limit", "unicode-byte-limit"])
+def test_invalid_absorbed_witness_cannot_serve_or_publish_memory(world, raw):
+    world.message("Correction: Use obsolete parser flags.", message_uid="constituent")
+    carrier = world.message("Please inspect the parser.", active=0, compacted=0,
+                            message_uid="carrier")
+    world.memory.sync(["owner"])
+    before = world.memory.state_path.read_bytes()
+    world.db.execute("UPDATE messages SET absorbed_message_uids=? WHERE id=?", (raw, carrier))
+    world.db.commit()
+    with pytest.raises(SourceError, match="absorbed-message"):
+        world.memory.search("obsolete")
+    with pytest.raises(SourceError, match="absorbed-message"):
+        world.memory.sync(["owner"])
+    assert world.memory.state_path.read_bytes() == before
+    # A cold scan fails before publishing a checkpoint, too.
+    world.memory.state_path.unlink()
+    with pytest.raises(SourceError, match="absorbed-message"):
+        GlideMemory(world.home).sync(["owner"])
+    assert not world.memory.state_path.exists()
+
+
+def test_absorbed_witness_accepts_full_byte_and_count_bounds(world):
+    world.message("Correction: Use obsolete parser flags.", message_uid="constituent")
+    uids = [f"part-{i}" for i in range(source.MAX_ABSORBED_UIDS - 1)] + ["constituent"]
+    raw = json.dumps(uids)
+    raw += " " * (source.MAX_METADATA_BYTES - len(raw.encode("utf-8")))
+    assert len(raw.encode("utf-8")) == source.MAX_METADATA_BYTES
+    world.message("Please inspect the parser.", active=0, compacted=0, message_uid="carrier",
+                  absorbed_message_uids=raw)
+    world.memory.sync(["owner"], batch_size=1)
+    assert world.memory.search("obsolete") == []
 
 
 def test_malformed_literal_encoded_and_oversized_content_is_ignored(world):

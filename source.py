@@ -17,9 +17,10 @@ import unicodedata
 
 MAX_CONTENT_BYTES = 16_384
 MAX_METADATA_BYTES = 4_096
+MAX_ABSORBED_UIDS = 128
 MAX_CORRECTION_CHARS = 1_024
 MAX_SESSIONS = 100
-POLICY_VERSION = 2
+POLICY_VERSION = 3
 LOCAL_SOURCES = frozenset({"acp", "cli", "desktop", "gui", "local", "tui"})
 _JSON_PREFIX = "\x00json:"
 _CORRECTION = re.compile(r"^(?:correction\s*:\s*|actually,\s*|no,\s*)(.+)$", re.I | re.S)
@@ -65,6 +66,25 @@ def _object(raw: bytes | None) -> dict | None:
     except (ValueError, UnicodeError, RecursionError):
         return None
     return value if isinstance(value, dict) else None
+
+
+def _absorbed_uids(raw: bytes | None) -> tuple[bytes, ...]:
+    """Read the complete bounded merge witness; truncation cannot hide a withdrawal."""
+    if raw is None or raw == b"":
+        return ()
+    try:
+        if len(raw) > MAX_METADATA_BYTES:
+            raise ValueError("oversized witness")
+        value = json.loads(raw.decode("utf-8"))
+        if (not isinstance(value, list) or len(value) > MAX_ABSORBED_UIDS
+                or any(not isinstance(uid, str) or not uid for uid in value)):
+            raise ValueError("invalid witness")
+        uids = tuple(dict.fromkeys(uid.encode("utf-8") for uid in value))
+        if any(len(uid) > MAX_METADATA_BYTES for uid in uids):
+            raise ValueError("oversized identity")
+        return uids
+    except (ValueError, UnicodeError, RecursionError) as error:
+        raise SourceError("Cannot resolve malformed or oversized Hermes absorbed-message identities.") from error
 
 
 def _text(raw: bytes | None) -> str:
@@ -150,6 +170,8 @@ class Snapshot:
         connection.create_function("glide_uid_identity", 3, self._uid_identity, deterministic=True)
         connection.create_function("glide_legacy_identity", 7, self._legacy_identity,
                                    deterministic=True)
+        connection.create_function("glide_absorbed_identities", 3, self._absorbed_identities,
+                                   deterministic=True)
         self._batch_cursor = None
         self._batch_after = None
         self._lookahead = []
@@ -160,6 +182,7 @@ class Snapshot:
             f"substr(CAST(m.{field} AS BLOB), 1, {limit + 1}) AS {field}"
             if field in message_columns else f"NULL AS {field}"
             for field, limit in (("message_uid", MAX_METADATA_BYTES),
+                                 ("absorbed_message_uids", MAX_METADATA_BYTES),
                                  ("tool_call_id", MAX_METADATA_BYTES),
                                  ("tool_calls", MAX_CONTENT_BYTES),
                                  ("tool_name", MAX_METADATA_BYTES)))
@@ -223,6 +246,12 @@ class Snapshot:
             return self._identity_key([sid, "row", mid])
         return self._identity_key([self.lineages[sid], "uid", uid.hex()])
 
+    def _absorbed_identities(self, mid, sid, raw):
+        row = self._session(sid)
+        if row is None or _session_config(row) is None:
+            return "[]"
+        return json.dumps([self._uid_identity(mid, sid, uid) for uid in _absorbed_uids(raw)])
+
     def _legacy_identity(self, mid, sid, timestamp, content, call_id, calls, tool_name):
         fields = (content, call_id, calls, tool_name)
         limits = (MAX_CONTENT_BYTES, MAX_METADATA_BYTES, MAX_CONTENT_BYTES, MAX_METADATA_BYTES)
@@ -241,6 +270,10 @@ class Snapshot:
         cursor = self.connection.execute(self.query + " ORDER BY m.id", self.scope)
         try:
             for row in cursor:
+                # Validate even on a completed checkpoint: silently dropping an invalid
+                # witness could serve a constituent that a composite withdrew.
+                if _session_config(row) is not None:
+                    _absorbed_uids(row["absorbed_message_uids"])
                 values = [v.hex() if isinstance(v, bytes) else v for v in row]
                 digest.update(json.dumps(values, ensure_ascii=True, separators=(",", ":")).encode("ascii"))
                 digest.update(b"\n")
@@ -269,19 +302,42 @@ class Snapshot:
                            MAX(uid_key) AS only_uid
                     FROM identities GROUP BY legacy_key
                 ),
-                ranked AS (
-                    SELECT i.*, u.uid_count, ROW_NUMBER() OVER (
-                        PARTITION BY COALESCE(i.uid_key,
-                            CASE WHEN u.uid_count = 1 THEN u.only_uid ELSE i.legacy_key END)
-                        ORDER BY i.id DESC
-                    ) AS generation
+                resolved AS (
+                    SELECT i.*, u.uid_count, COALESCE(i.uid_key,
+                        CASE WHEN u.uid_count = 1 THEN u.only_uid ELSE i.legacy_key END
+                    ) AS identity_key
                     FROM identities i JOIN legacy_uids u ON u.legacy_key = i.legacy_key
+                ),
+                ranked AS (
+                    SELECT resolved.*, ROW_NUMBER() OVER (
+                        PARTITION BY identity_key ORDER BY id DESC
+                    ) AS generation
+                    FROM resolved
+                ),
+                witnesses AS (
+                    SELECT id, identity_key, active, compacted FROM resolved
+                    UNION ALL
+                    SELECT i.id, absorbed.value, i.active, i.compacted
+                    FROM identities i, json_each(glide_absorbed_identities(
+                        i.id, i.session_id, i.absorbed_message_uids)) AS absorbed
+                ),
+                latest_witnesses AS (
+                    SELECT witnesses.*, ROW_NUMBER() OVER (
+                        PARTITION BY identity_key ORDER BY id DESC
+                    ) AS witness_generation
+                    FROM witnesses
                 )
-                SELECT * FROM ranked
-                WHERE generation = 1 AND (uid_key IS NOT NULL OR uid_count <= 1)
-                      AND id > ? ORDER BY id
+                SELECT r.* FROM ranked r JOIN latest_witnesses w
+                    ON w.identity_key = r.identity_key AND w.witness_generation = 1
+                WHERE r.generation = 1 AND (r.uid_key IS NOT NULL OR r.uid_count <= 1)
+                      AND (w.id = r.id OR w.active = 1 OR w.compacted = 1)
+                      AND r.id > ? ORDER BY r.id
             """, (*self.scope, after))
             self._lookahead = []
+        # A composite supplies state for every constituent, not replacement text:
+        # an ordinary leading turn may hide a correction from prefix extraction.
+        # Newer live witnesses override older composite withdrawals without merging
+        # distinct UIDs; a withdrawal only suppresses older constituent generations.
         # A legacy row can adopt its unique exact-match UID; ambiguous legacy rows
         # are omitted rather than reviving a potentially withdrawn instruction.
         # Keep one streaming cursor so SQLite ranks once per sync, not once per batch.
