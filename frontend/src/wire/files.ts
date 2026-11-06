@@ -1,6 +1,6 @@
 // The files and texts this frontend reads that another process wrote: its settings, the watch
 // spec a launching pane hands a watcher, the connection cards and the PR links the plugin's Python
-// half writes, the chart rules a pane keeps for a process, and the chart author's reply. Each is
+// half writes, and the chart rules a pane keeps for a process. Each is
 // read once, through a schema, into a named type. None carries a version: an old pane keeps
 // running the old bundle after a `git pull`, so every format stays the one it was.
 // A schema falls back where the code before it fell back: a missing or unreadable file and text
@@ -155,33 +155,4 @@ const skipped = z.object({ skip: z.number() })
 /** A kept decline: the model declined the chart at `skip` lines. Undefined for anything else (rules, or no file). */
 export function chartSkip(value: unknown): { skip: number } | undefined {
   return skipped.safeParse(value).data
-}
-
-// ── The chart author's reply (widget_author.py's last stdout line) ────────────────────────────
-
-/** What widget_author.py answered: the rules, that no auxiliary model is set up, or its error. */
-export type AuthorReply = { kind: 'answer'; answer: unknown } | { kind: 'unavailable' } | { kind: 'error'; message: string }
-
-/** A reply that is not an object reads as an answer of nothing. */
-const reply = z.catch(z.object({ answer: z.optional(z.unknown()), error: z.optional(z.unknown()), unavailable: z.optional(z.unknown()) }), {
-  answer: undefined,
-  error: undefined,
-  unavailable: undefined
-})
-
-/** The reply on the last line of `stdout`; undefined when that line is not JSON, or is `null`. */
-export function readAuthorReply(stdout: string): AuthorReply | undefined {
-  const line = parseJson(stdout.trim().split('\n').at(-1) ?? '')
-
-  if (line === undefined || line === null) {
-    return undefined
-  }
-
-  const { answer, error, unavailable } = reply.parse(line)
-
-  if (unavailable) {
-    return { kind: 'unavailable' }
-  }
-
-  return error ? { kind: 'error', message: String(error) } : { kind: 'answer', answer }
 }

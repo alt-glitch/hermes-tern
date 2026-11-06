@@ -15,7 +15,7 @@ import os
 import sys
 from pathlib import Path
 
-from . import connections, panes, pull_requests, tern_env
+from . import charts, connections, panes, pull_requests, tern_env
 
 FRONTEND = Path(__file__).resolve().parent / "frontend"
 
@@ -99,11 +99,12 @@ def register(ctx) -> None:
         name="tern", help="Chat in Tern's native UI (falls back to the regular TUI elsewhere)",
         setup_fn=_setup, handler_fn=_run,
         description="Runs `hermes chat --tui` with the Tern frontend; every `hermes chat` flag works.")
-    # The chart rules of background processes (frontend/src/processes/widgets, widget_author.py):
-    # its own `auxiliary.tern_charts` config block and model picker entry.
+    # The chart rules of background processes (frontend/src/processes/widgets, charts.py):
+    # its own `auxiliary.tern_charts` config block and model picker entry, and the RPC that runs it.
     ctx.register_auxiliary_task(
-        "tern_charts", display_name="Tern job charts",
+        charts.TASK, display_name="Tern job charts",
         description="Writes the rules behind a background process's live chart in `hermes tern`, once per process.")
+    charts.register(ctx)
     pull_requests.register(ctx)
     connections.register(ctx)
     tern_env.register(ctx)
