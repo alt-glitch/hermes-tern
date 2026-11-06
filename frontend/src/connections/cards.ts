@@ -178,6 +178,17 @@ export interface ConnectTarget {
   env?: Record<string, string> | undefined
   /** An MCP install's required credentials with no default: this pane cannot ask for them. */
   needs?: string[] | undefined
+  /** What approving an MCP row runs or contacts (the gateway's scrubbed `launch` line): shown before Connect. */
+  launch?: Launch | undefined
+}
+
+/** `Target.launch` (tools/connectors/mcp_launch.py): a command it runs, or an endpoint it connects to. */
+export interface Launch {
+  kind: 'remote' | 'stdio'
+  target: string
+  cwd?: string | undefined
+  /** The names of the variables it sets; never their values. */
+  env?: string[] | undefined
 }
 
 /** The gateway's operation behind a live card (live.ts): what its answers name. */
@@ -266,6 +277,7 @@ export function parseTargets(targets: unknown[]): ConnectTarget[] {
             detail: text(r?.['detail']),
             env: Object.keys(env).length ? env : undefined,
             kind: text(r?.['kind']),
+            launch: launchOf(r?.['launch']),
             name,
             needs: needs.length ? needs : undefined,
             state: typeof r?.['state'] === 'string' ? r['state'] : 'pending',
@@ -275,6 +287,21 @@ export function parseTargets(targets: unknown[]): ConnectTarget[] {
         ]
       : []
   })
+}
+
+/** A target's `launch` descriptor, when it names what it runs or contacts. */
+function launchOf(raw: unknown): Launch | undefined {
+  const r = record(raw)
+  const kind = r?.['kind']
+  const target = text(r?.['target'])
+
+  if ((kind !== 'remote' && kind !== 'stdio') || !target) {
+    return undefined
+  }
+
+  const env = Array.isArray(r?.['env']) ? r['env'].filter((k): k is string => typeof k === 'string' && k !== '') : []
+
+  return { cwd: text(r?.['cwd']), env: env.length ? env : undefined, kind, target }
 }
 
 /** A non-empty string, else undefined. */

@@ -101,6 +101,9 @@ export function verbOf(t: ConnectTarget): Verb {
   }
 }
 
+/** Whole minutes (at least 1) until the gateway stops waiting on `op`: the card's hint, and when the watcher redraws it. */
+export const minutesLeft = (op: Pick<LiveOp, 'deadlineAt'>, now: number) => Math.max(1, Math.ceil((op.deadlineAt * 1000 - now) / 60_000))
+
 /** The card is the gateway's and still waits on the user. */
 export const liveOpen = (card: ConnectCard | undefined): card is ConnectCard & { op: LiveOp } =>
   Boolean(card?.op && !card.settled && card.targets.some(unresolved))

@@ -301,6 +301,14 @@ export const STYLES = css`
     min-height: 30px;
   }
 
+  /* What an MCP row runs or contacts, under its name, in full. */
+  [data-role='hermes.connect.launch'] {
+    margin: -4px 0 4px 22px;
+    font: 400 11.5px/16px var(--mono) !important;
+    white-space: pre-wrap;
+    word-break: break-all;
+  }
+
   /* The mark's lane is one width, so a spinner does not push its row's name over. */
   [data-role='hermes.connect.row'] > :is(.sf-icon, .sf-spinner) {
     flex: none;
