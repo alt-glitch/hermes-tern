@@ -20,16 +20,19 @@ local_excerpt = memory.context("parser checks", max_chars=2048)
 ```
 
 The caller must obtain the user's session selection first; there is no implicit
-scan of every session. Pass 1–100 exact session IDs. Only those IDs are read;
-compression descendants are not silently added. An explicit list can contain a
-session with no messages or a since-deleted session, yielding an empty contribution.
+scan of every session. Pass 1–100 exact session IDs. Only those IDs contribute
+message content; bounded ancestry metadata is read to resolve compression copies.
+Compression descendants are not silently added. Select one continuation path per
+compression root: incomparable sibling continuations raise `SourceError`, as do
+cyclic or overlong (more than 100 sessions) ancestry paths. An explicit list can
+contain a session with no messages or a since-deleted session, yielding an empty contribution.
 
 Construction lazily calls Hermes' `hermes_constants.get_hermes_home()`,
 which honors the routed context override before the environment or platform default.
 One instance stays bound to that profile; create a new instance when routing changes.
 An explicit profile path is supported for local callers and tests.
 
-All derived files are under `<profile>/glide/`: `memory.json`,
+Persistent memory state is under `<profile>/glide/`: `memory.json`,
 `memory.json.bak` and `.memory.lock`. The source is
 `<profile>/state.db`, opened with an escaped `mode=ro` URI and
 `query_only`. A live WAL remains visible. Missing or incompatible sources raise
@@ -49,7 +52,21 @@ acp, cli, desktop, gui, local or tui. Hidden sessions, delegated sessions, and
 unclassified child sessions are excluded. Explicit branch/reset children and
 compression continuations can contribute when selected.
 
-Only user-role rows that are active or retained as compacted history qualify.
+Before extraction, the newest physical generation of each logical user message
+wins, including inactive generations. Durable `message_uid` identifies copies within
+a verified compression lineage; explicit branch/reset conversations and excluded
+sessions stay separate. A rewound newest copy suppresses its older active or
+compacted copies. An older superseded copy does not suppress a newer live one.
+The parent binding of branch/reset markers is checked at each ancestry hop.
+
+For missing/empty legacy UIDs, exact stored content, timestamp and tool identity
+provide a fallback. A legacy row adopts a unique matching durable UID; ambiguous
+legacy rows are omitted. Distinct nonempty UIDs are never merged by wording or
+timestamp. UIDs larger than 4 KiB are omitted rather than compared by a truncated
+prefix. Already-migrated historical copies with different nonempty UIDs, or
+legacy copies whose identity fields changed, cannot safely be inferred as copies.
+
+Only resolved user-role rows that are active or retained as compacted history qualify.
 Summary carriers, hidden/internal notices, model-only rows and undrained queued
 prompts are excluded. Malformed or oversized metadata fails closed. Session
 selection matters: the schema has no per-message field proving a human owner.
@@ -69,7 +86,8 @@ Raw content is capped at 16 KiB, metadata at 4 KiB and each extracted rule at
 ## Atomic refresh and resume
 
 Hermes edits and deactivates existing IDs. Every sync first streams a digest of
-the selected user rows and the session fields affecting extraction. That pass and
+all selected user generations (including withdrawals), their identity fields and
+resolved ancestry paths. Policy changes also invalidate old checkpoints. That pass and
 the indexing pass share one read-only SQLite transaction.
 
 Each batch atomically checkpoints its digest, selection, cursor, records and
@@ -86,9 +104,12 @@ versions raise `StateVersionError` and preserve the files.
 
 Search recomputes the digest and raises `MemoryNotReady` for incomplete or
 changed state, or when recovery requires an explicit selection. Sync again and retry. A partial rebuild is never served. The digest
-requires O(N) work over selected user rows on each sync/search, while source reads
-remain bounded in memory. It is a snapshot check, not a lock against a source edit
-after the read transaction finishes.
+requires O(N) work over selected user rows on each sync/search. A sync also ranks
+generations in SQLite once, with a streaming cursor across batches; Python holds
+only a batch, one lookahead row and bounded ancestry metadata. SQLite may use
+temporary sorting storage. Large-profile performance has not been measured.
+This is a snapshot check, not a lock against a source edit after the read
+transaction finishes.
 
 ## Retrieval and privacy
 
@@ -118,7 +139,8 @@ hermes plugins validate .
 
 Tests use synthetic workflow text in real temporary SQLite databases, the existing
 pytest bootstrap and a network/subprocess prohibition. They cover source eligibility,
-structured content, restart, mutation invalidation, atomic interruption, corruption,
+structured content, compression/rewind generations, legacy UID transitions,
+fork and selection boundaries, restart, mutation invalidation, atomic interruption, corruption,
 profile isolation, WAL/read-only behavior, ranking and bounds.
 
 All commands and tests were **UNRUN** when this change was authored through the
