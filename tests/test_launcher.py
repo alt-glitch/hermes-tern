@@ -118,3 +118,22 @@ def test_no_tsp_runs_the_regular_tui_as_a_process(launched, tmp_path):
     assert argv == ["/py", "-m", "hermes_cli.main", "chat", "--tui", "--model=x", "--query=hi"]
     assert env["PYTHONPATH"] == "/src" and env["HERMES_HOME"] == str(tmp_path / "home")
     assert "HERMES_TERN_QUERY" not in env
+
+
+def test_continue_finds_a_frontend_session_on_the_shared_gateway(monkeypatch, tmp_path):
+    # The shared gateway stores a frontend's session as source `local`, created by `tui`.
+    asked = []
+
+    class Db:
+        def search_sessions(self, **kwargs):
+            asked.append(kwargs)
+            return [{"id": "s-tui"}] if kwargs.get("local_created_sources") == ["tui"] and "workspace_key" in kwargs else []
+
+        def close(self):
+            pass
+
+    monkeypatch.setitem(sys.modules, "hermes_state", types.SimpleNamespace(SessionDB=lambda read_only: Db()))
+    monkeypatch.setattr(launcher, "_workspace", lambda: str(tmp_path))
+    assert launcher.latest_session() == "s-tui"
+    assert asked == [{"limit": 1, "skip_launch_stubs": True, "source": ["tui", "local"],
+                      "local_created_sources": ["tui"], "workspace_key": str(tmp_path)}]
