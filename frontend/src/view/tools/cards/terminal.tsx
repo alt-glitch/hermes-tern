@@ -12,6 +12,7 @@ import { commandDisplayText } from '../../../vendor/t3code/commandLabel.js'
 import { commandLine, describeCommand } from '../../describe.js'
 import { duration, flat } from '../../format.js'
 import { age } from '../../time.js'
+import { pressable } from '../../ui/button.js'
 import type { Card, ToolView } from '../types.js'
 
 /**
@@ -101,15 +102,9 @@ function processLine(call: ToolCall, id: string, now: number): JSX.Element {
   const live = !p || processRuns(p)
   const tone = p ? processTone(p.state.status) : 'muted'
 
-  return (
-    <row
-      actions={{ click: `open-process=${id}`, menu: [`open-process=${id}`] }}
-      align="center"
-      gap="xs"
-      key="process"
-      role="omp.tool.process"
-      title="Open in the Background sheet  ⌥J"
-    >
+  return pressable(
+    { action: `open-process=${id}`, key: 'process', menu: [`open-process=${id}`], name: `Process ${p ? processVerdict(p) : 'starting'}: open in the Background sheet` },
+    <row align="center" gap="xs" key="face" role="omp.tool.process" title="Open in the Background sheet  ⌥J">
       {p && live ? (
         <spinner key="state-icon" style="dots" tone="accent" />
       ) : (

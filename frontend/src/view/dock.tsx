@@ -23,6 +23,7 @@ import { type AutomationLine, automationNode, reconnectNode } from './automation
 import { queuedNode } from './queued.js'
 import { compact } from './time.js'
 import { checklistNode } from './todos.js'
+import { pressable } from './ui/button.js'
 import { workingRow } from './ui/live.js'
 import { pill } from './ui/pill.js'
 
@@ -266,6 +267,7 @@ function todosPillNode(t: TodosPill, onToggle: () => void, focused: boolean): JS
     ],
     focused,
     key: 'todos',
+    name: `Todos, ${done} of ${total} done`,
     onClick: onToggle,
     seg: 'hermes.todos.pill',
     title: t.open ? 'Hide the todo list' : 'Show the todo list'
@@ -340,9 +342,9 @@ function statusLine(cx: DockContext, on: DockActions): JSX.Element {
       {s.cost ? <seg key="cost" priority={3} side="right" spans={[{ t: `$${s.cost.toFixed(2)}` }]} title="Session cost" /> : null}
       <seg key="newline" priority={1} side="right" spans={[{ s: 'muted', t: '⇧⏎ newline' }]} />
       {cx.activity.kind === 'turn' ? (
-        <seg key="action" onClick={on.onInterrupt} priority={10} role="hermes.statusline.stop" side="right" spans={[{ t: 'esc esc stop' }]} />
+        <seg aria="Stop" key="action" onClick={on.onInterrupt} priority={10} role="hermes.statusline.stop" side="right" spans={[{ t: 'esc esc stop' }]} />
       ) : (
-        <seg key="action" onClick={on.onSubmit} priority={10} role="hermes.statusline.send" side="right" spans={[{ t: '⏎ send' }]} />
+        <seg aria="Send" key="action" onClick={on.onSubmit} priority={10} role="hermes.statusline.send" side="right" spans={[{ t: '⏎ send' }]} />
       )}
     </status>
   )
@@ -361,6 +363,7 @@ function agentsPill(running: number, onOpen: () => void, focused: boolean): JSX.
     ],
     focused,
     key: 'pill',
+    name: `${plural(running, 'agent')} running`,
     onClick: onOpen,
     title: 'Agents  ⌥A'
   })
@@ -395,6 +398,7 @@ function shellsPill(s: ShellsPill, onOpen: () => void, focused: boolean): JSX.El
     focused,
     hovercard: card,
     key: 'shells',
+    name: `${plural(n, 'shell')}${live ? ' running' : ' exited'}`,
     onClick: onOpen,
     title
   })
@@ -406,6 +410,7 @@ function prsPillNode(p: PrsPill, onOpen: () => void, focused: boolean): JSX.Elem
     children: [<icon key="icon" name="merge" {...optional('tone', p.tone === 'muted' ? undefined : p.tone)} />, <text key="text" text={p.text} wrap="none" />],
     focused,
     key: 'prs',
+    name: `Pull requests: ${p.text}`,
     onClick: onOpen,
     title: 'Pull requests  ⌥P'
   })
@@ -434,11 +439,16 @@ function workingNode(busy: Extract<DockActivity, { kind: 'turn' }>, cx: DockCont
     trailing: [
       <row grow={1} key="fill" />,
       cx.pills.todos ? todosPillNode(cx.pills.todos, on.onTodos, false) : null,
-      <row align="center" gap="xs" key="stop" onClick={on.onInterrupt} role="omp.working.stop" title="Stop  esc esc">
-        <kbd key="k" keys={['esc']} />
-        <kbd key="k2" keys={['esc']} />
-        <text key="t" text="Stop" />
-      </row>
+      // The role on the button: Tern hides omp's working-row Stop (the composer has one), and a
+      // hidden button must not keep a place in the focus order.
+      pressable(
+        { key: 'stop', name: 'Stop', onClick: on.onInterrupt, role: 'omp.working.stop' },
+        <row align="center" gap="xs" key="face" title="Stop  esc esc">
+          <kbd key="k" keys={['esc']} />
+          <kbd key="k2" keys={['esc']} />
+          <text key="t" text="Stop" />
+        </row>
+      )
     ]
   })
 }
@@ -526,18 +536,9 @@ function composerNode(cx: DockContext, on: DockActions): JSX.Element {
         {/* Tern puts its folder chip right before the composer's status node: an empty one keeps
             the chip there and the send key at the end. */}
         <status grow={1} key="extras" role="omp.composer.extras" transparent />
-        {busy ? (
-          <text
-            key="stop"
-            onClick={on.onInterrupt}
-            role="omp.composer.stop"
-            text="Stop"
-            title="Stop  esc esc"
-            tone="error"
-          />
-        ) : (
-          <kbd key="send" keys={['enter']} onClick={on.onSubmit} role="omp.composer.send" title="Send  ⏎" />
-        )}
+        {busy
+          ? pressable({ key: 'stop', name: 'Stop', onClick: on.onInterrupt, role: 'omp.composer.stop' }, <text key="face" text="Stop" title="Stop  esc esc" tone="error" />)
+          : pressable({ key: 'send', name: 'Send', onClick: on.onSubmit, role: 'omp.composer.send' }, <kbd key="face" keys={['enter']} title="Send  ⏎" />)}
       </row>
     </col>
   )
@@ -576,7 +577,10 @@ export function imageChip(a: ComposerImage, i: number, onRemove: (index: number)
         spans={[a.pending ? { fx: 'shimmer', s: 'dim', t: 'Attaching…' } : { s: 'dim', t: a.caption ?? 'image' }]}
         wrap="none"
       />
-      <icon key="remove" name="x" onClick={() => onRemove(i)} role="hermes.composer.remove" title={`Remove ${a.label}`} />
+      {pressable(
+        { key: 'remove', name: `Remove ${a.label}`, onClick: () => onRemove(i), role: 'hermes.composer.remove' },
+        <icon key="face" name="x" title={`Remove ${a.label}`} />
+      )}
     </card>
   )
 }
