@@ -206,15 +206,78 @@ export const STYLES = css`
     }
   }
 
-  /* The todo list, opened from its pill: a panel above the composer. */
+  /* The todo list, opened from its pill: a panel above the composer, filled as the composer is.
+     That fill (--pop-bg, --raise) and --l1 can be translucent, so it lies on --panel and the
+     transcript never shows through. A head with the count; the list scrolls under it. */
   [data-role='hermes.todos'] {
-    width: min(736px, calc(100% - 8px));
+    width: min(736px, calc(100% - 24px));
     margin: 0 auto 8px !important;
-    padding: 8px 12px !important;
-    border-radius: 10px;
-    background: var(--l1);
-    max-height: 260px;
-    overflow: auto;
+    border-radius: 12px;
+    background:
+      linear-gradient(light-dark(var(--pop-bg), var(--raise)), light-dark(var(--pop-bg), var(--raise))),
+      var(--panel);
+    backdrop-filter: blur(18px) saturate(130%);
+    box-shadow: 0 0 0 1px var(--l2);
+    overflow: hidden;
+    font: 400 13px/20px var(--sans) !important;
+  }
+
+  [data-role='hermes.todos.head'] {
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 8px 14px 7px !important;
+    box-shadow: inset 0 -1px 0 var(--l2);
+  }
+
+  [data-role='hermes.todos.title'] {
+    font: 600 12px/18px var(--sans) !important;
+    color: var(--t2);
+  }
+
+  [data-role='hermes.todos.count'] {
+    font: 400 12px/18px var(--sans) !important;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* The list fades out over its bottom padding: at its end the fade covers only that padding,
+     and while more is below, the last row it shows fades into the edge. */
+  [data-role='hermes.todos.list'] {
+    max-height: min(280px, 40vh);
+    overflow: hidden auto;
+    padding: 6px 14px 18px !important;
+    mask-image: linear-gradient(to bottom, var(--t1) calc(100% - 18px), transparent);
+  }
+
+  /* A checklist item (the panel's and the Todo card's): a wrapped item keeps its mark on its first
+     line, and a done one recedes, its check plain and its strike faint. */
+  .sf-checklist.full .sf-ck-item {
+    align-items: flex-start;
+  }
+
+  .sf-checklist.full .sf-ck-item > .sf-ck-t {
+    padding: 2px 0;
+    line-height: 20px;
+  }
+
+  .sf-checklist.full .sf-ck-item > .sf-ck-g {
+    margin-top: 5px;
+  }
+
+  .sf-checklist.full .sf-ck-item.st-done .sf-ck-g {
+    background: none;
+    color: var(--ok);
+    opacity: 0.7;
+  }
+
+  .sf-checklist.full .sf-ck-item.st-done .sf-ck-g .ico {
+    width: 12px;
+    height: 12px;
+  }
+
+  .sf-checklist.full .sf-ck-item.st-done .sf-ck-t {
+    color: var(--t3);
+    text-decoration-color: var(--l3);
   }
 
   [data-role='hermes.todos.pill'] .sf-meter {

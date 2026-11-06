@@ -1,0 +1,147 @@
+{
+ "k": "col",
+ "p": {
+  "role": "hermes.todos",
+  "key": "todos"
+ },
+ "c": [
+  {
+   "k": "row",
+   "p": {
+    "role": "hermes.todos.head",
+    "key": "head"
+   },
+   "c": [
+    {
+     "k": "text",
+     "p": {
+      "role": "hermes.todos.title",
+      "spans": [
+       {
+        "t": "Todos"
+       }
+      ],
+      "wrap": "none",
+      "key": "title"
+     }
+    },
+    {
+     "k": "text",
+     "p": {
+      "role": "hermes.todos.count",
+      "spans": [
+       {
+        "s": "muted",
+        "t": "2 of 7 done"
+       }
+      ],
+      "wrap": "none",
+      "key": "count"
+     }
+    }
+   ]
+  },
+  {
+   "k": "col",
+   "p": {
+    "role": "hermes.todos.list",
+    "key": "body"
+   },
+   "c": [
+    {
+     "k": "col",
+     "p": {
+      "role": "hermes.todos.phases",
+      "key": "list"
+     },
+     "c": [
+      {
+       "k": "checklist",
+       "p": {
+        "mode": "full",
+        "phases": [
+         {
+          "id": "loose:a",
+          "items": [
+           {
+            "id": "a",
+            "status": "done",
+            "text": "item a"
+           },
+           {
+            "id": "b",
+            "status": "active",
+            "text": "item b"
+           }
+          ]
+         }
+        ],
+        "key": "loose:a"
+       }
+      },
+      {
+       "k": "checklist",
+       "p": {
+        "mode": "full",
+        "phases": [
+         {
+          "collapsed": false,
+          "id": "parent:c",
+          "items": [
+           {
+            "id": "c1",
+            "status": "done",
+            "text": "item c1"
+           },
+           {
+            "id": "c2",
+            "status": "active",
+            "text": "item c2"
+           },
+           {
+            "id": "c2a",
+            "status": "pending",
+            "text": "item c2a"
+           },
+           {
+            "id": "c3",
+            "status": "dropped",
+            "text": "item c3"
+           }
+          ],
+          "title": "item c"
+         }
+        ],
+        "key": "parent:c"
+       }
+      },
+      {
+       "k": "checklist",
+       "p": {
+        "mode": "full",
+        "phases": [
+         {
+          "id": "loose:d",
+          "items": [
+           {
+            "id": "d",
+            "status": "pending",
+            "text": "item d"
+           },
+           {
+            "id": "e",
+            "status": "dropped",
+            "text": "item e"
+           }
+          ]
+         }
+        ],
+        "key": "loose:d"
+       }
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}
