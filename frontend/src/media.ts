@@ -8,6 +8,7 @@ import { homedir } from 'node:os'
 import { isAbsolute } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
+import { Epoch } from './core/epoch.js'
 import { imageFormat } from './hermes/images.js'
 import type { Entry, ImageSource, ToolCall } from './model.js'
 import { record } from './wire/json.js'
@@ -74,6 +75,7 @@ type Fetch = (url: string, init: { signal: AbortSignal }) => Promise<Response>
 export class Media {
   readonly #host: MediaHost
   readonly #fetch: Fetch
+  readonly #lifetime = new Epoch()
   readonly #loads = new Map<string, Promise<ImageSource | null>>()
   /** What each settled load gave, so a call rebuilt from history gets it before the next frame. */
   readonly #loaded = new Map<string, ImageSource | null>()
@@ -81,6 +83,13 @@ export class Media {
   constructor(host: MediaHost, fetcher: Fetch = (url, init) => fetch(url, init)) {
     this.#host = host
     this.#fetch = fetcher
+  }
+
+  /** Abandon pending previews on every transcript adoption and when this pane closes. */
+  invalidate(): void {
+    this.#lifetime.next()
+    this.#loads.clear()
+    this.#loaded.clear()
   }
 
   /**
@@ -99,7 +108,13 @@ export class Media {
       return
     }
 
+    const ticket = this.#lifetime.current()
+
     void this.load(src).then(image => {
+      if (!ticket.isCurrent() || shownImage(call) !== src) {
+        return
+      }
+
       call.image = image
       done()
     })
@@ -121,13 +136,16 @@ export class Media {
     let load = this.#loads.get(src)
 
     if (!load) {
-      load = this.#bytes(src)
+      const ticket = this.#lifetime.current()
+      load = this.#bytes(src, ticket.signal)
         .then(
-          bytes => this.#blob(bytes),
+          bytes => (ticket.isCurrent() ? this.#blob(bytes) : null),
           () => null
         )
         .then(image => {
-          this.#loaded.set(src, image)
+          if (ticket.isCurrent()) {
+            this.#loaded.set(src, image)
+          }
 
           return image
         })
@@ -137,21 +155,65 @@ export class Media {
     return load
   }
 
-  async #bytes(src: string): Promise<Buffer | undefined> {
+  async #bytes(src: string, signal: AbortSignal): Promise<Buffer | undefined> {
     const data = /^data:image\/[\w.+-]+;base64,(.*)$/s.exec(src)
 
     if (data) {
-      return Buffer.from(data[1] ?? '', 'base64')
+      const encoded = data[1] ?? ''
+      // Bound allocation *before* base64 decoding, not only before Tern blob creation.
+      if (encoded.length > Math.ceil(MAX_BYTES / 3) * 4) {
+        return undefined
+      }
+
+      return Buffer.from(encoded, 'base64')
     }
 
     if (!/^https?:\/\//i.test(src)) {
       return undefined
     }
 
-    const r = await this.#fetch(src, { signal: AbortSignal.timeout(FETCH_MS) })
-    const size = Number(r.headers.get('content-length') ?? 0)
+    const r = await this.#fetch(src, { signal: AbortSignal.any([signal, AbortSignal.timeout(FETCH_MS)]) })
+    const declared = r.headers.get('content-length')
 
-    return r.ok && size <= MAX_BYTES ? Buffer.from(await r.arrayBuffer()) : undefined
+    // Content-Length can be absent or incorrect. Treat it only as an early rejection hint.
+    if (!r.ok || (declared !== null && (!/^\d+$/.test(declared) || Number(declared) > MAX_BYTES))) {
+      return undefined
+    }
+
+    const reader = r.body?.getReader()
+
+    if (!reader) {
+      return undefined
+    }
+
+    const chunks: Uint8Array[] = []
+    let bytes = 0
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read()
+
+        if (done) {
+          break
+        }
+
+        // Check the untyped stream boundary before trusting its chunk or size.
+        const chunk: unknown = value
+
+        if (!(chunk instanceof Uint8Array) || chunk.byteLength > MAX_BYTES - bytes) {
+          // Abort overflow without collecting that chunk or the rest of the response.
+          await reader.cancel()
+          return undefined
+        }
+
+        bytes += chunk.byteLength
+        chunks.push(chunk)
+      }
+    } finally {
+      reader.releaseLock()
+    }
+
+    return Buffer.concat(chunks, bytes)
   }
 
   #blob(bytes: Buffer | undefined): ImageSource | null {

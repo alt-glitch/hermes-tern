@@ -157,7 +157,7 @@ function recordingHost() {
     imageLanded: rec('imageLanded'),
     markPane: id => void log.push(`markPane ${id}`),
     markViewer: (now, before) => void log.push(`markViewer ${now} ${before}`),
-    media: { showAll: rec('media.showAll') },
+    media: { invalidate: rec('media.invalidate'), showAll: rec('media.showAll') },
     notices: { reset: rec('notices.reset') },
     processes: { poke: rec('processes.poke') },
     prs: { adopt: rec('prs.adopt') },
@@ -201,6 +201,8 @@ describe('adoptSteps', () => {
 
     expect(log).toEqual([
       'ref b',
+      // Every transcript adoption expires old media loads before resetting the view.
+      'media.invalidate',
       // Another session: the transcript starts over at once, and the last one's sheets and busy-input mode go.
       'transcript.reset other',
       'sheets.dropAll',
@@ -247,7 +249,7 @@ describe('adoptSteps', () => {
     expect(log).not.toContain('busyMode queue')
     expect(log).not.toContain('transcript.load')
     expect(log).not.toContain('transcript.inflight')
-    expect(log.slice(0, 4)).toEqual(['ref a', 'transcript.reset same', 'readBusyMode', 'queue.reset'])
+    expect(log.slice(0, 5)).toEqual(['ref a', 'media.invalidate', 'transcript.reset same', 'readBusyMode', 'queue.reset'])
     expect(log.at(-1)).toBe('changed')
   })
 })
