@@ -86,7 +86,7 @@
         "phases": [
          {
           "collapsed": false,
-          "id": "c",
+          "id": "parent:c",
           "items": [
            {
             "id": "c1",
@@ -112,7 +112,7 @@
           "title": "item c"
          }
         ],
-        "key": "c"
+        "key": "parent:c"
        }
       },
       {

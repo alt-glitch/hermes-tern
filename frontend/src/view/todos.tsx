@@ -85,6 +85,7 @@ export function todoPhases(todos: readonly Todo[]): ChecklistPhase[] {
     }
   }
 
+  // Phase ids key the checklists, so each kind has its own prefix: a todo id cannot collide.
   const phases: ChecklistPhase[] = []
   let loose: Todo[] = []
 
@@ -109,7 +110,7 @@ export function todoPhases(todos: readonly Todo[]): ChecklistPhase[] {
     }
 
     flush()
-    phases.push({ collapsed: kids.every(k => k.status === 'completed'), id: t.id, items: kids.map(item), title: t.content })
+    phases.push({ collapsed: kids.every(k => k.status === 'completed'), id: `parent:${t.id}`, items: kids.map(item), title: t.content })
   }
 
   flush()

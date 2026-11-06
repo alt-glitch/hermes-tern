@@ -47,6 +47,11 @@ describe('todoPhases', () => {
     expect(phases.map(p => p.collapsed ?? false)).toEqual([true, false])
   })
 
+  it('keys every phase apart, whatever the todo ids', () => {
+    const ids = todoPhases([todo('a', 'pending'), todo('loose:a', 'pending'), todo('k', 'pending', 'loose:a')]).map(p => p.id)
+    expect(new Set(ids).size).toBe(ids.length)
+  })
+
   it('keeps an item whose parent is missing, or in a cycle, at the top', () => {
     expect(shape(todoPhases([todo('x', 'pending', 'gone'), todo('y', 'pending')]))).toEqual([['-', ['x', 'y']]])
     expect(shape(todoPhases([todo('m', 'pending', 'n'), todo('n', 'pending', 'm')])).flatMap(([, ids]) => ids)).toEqual(['m', 'n'])
