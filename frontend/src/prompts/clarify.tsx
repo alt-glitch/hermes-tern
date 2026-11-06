@@ -11,15 +11,13 @@ import type { JSX } from '@stencil-hq/tern'
 
 import { Composer } from '../draft/composer.js'
 import type { Overlay, OverlayHost } from '../overlays/overlay.js'
-import { splitQuestion } from '../tools/ask.js'
+import { RECOMMENDED, splitQuestion } from '../tools/ask.js'
 import { actionsRow } from '../view/ui/button.js'
 
 import { answerWith, isCtrlC, moved, type Option, optionList, type Sending, sendingLine } from './ask.js'
 import type { ClarifyPrompt, Question } from './parse.js'
 import { promptKey } from './sheets.js'
 
-/** Strips the backend's `(Recommended)` suffix from clarify's first choice. */
-const RECOMMENDED = /\s*\(recommended\)\s*$/i
 
 /** One question's answer state, kept while the user moves between questions. */
 interface Draft {
@@ -27,6 +25,8 @@ interface Draft {
   picked: Set<number>
   typing: boolean
   other: Composer
+  /** A multiple choice's Other row is checked: its draft goes with the picks. Unchecking keeps the draft. */
+  otherOn: boolean
 }
 
 /** One key hint beside the buttons: the keys that do one thing (each a combo), then what they do. */
@@ -61,6 +61,7 @@ export function clarifyOverlay(host: OverlayHost, prompt: ClarifyPrompt): Overla
   const answers = { ...prompt.answers }
   const drafts: Draft[] = questions.map(() => ({
     other: new Composer(),
+    otherOn: false,
     picked: new Set(),
     selected: 0,
     typing: false
@@ -87,7 +88,7 @@ export function clarifyOverlay(host: OverlayHost, prompt: ClarifyPrompt): Overla
       role: q.multi ? 'omp.ask.check' : 'omp.ask.option'
     })),
     {
-      checked: q.multi && d.other.text.trim() !== '',
+      checked: q.multi && d.otherOn && d.other.text.trim() !== '',
       // While the field below is open it holds the text; the row says it only once the field closes.
       ...(d.typing ? {} : { detail: d.other.text || 'Type your own answer' }),
       id: 'other',
@@ -156,18 +157,23 @@ export function clarifyOverlay(host: OverlayHost, prompt: ClarifyPrompt): Overla
     }
 
     const picked = [...d.picked].sort((a, b) => a - b).map(i => q.choices[i]?.replace(RECOMMENDED, '') ?? '')
+    // The Other draft counts while its row is checked, or while it is being typed.
+    const other = d.otherOn || d.typing ? typed : ''
 
     // Nothing checked: Enter takes the highlighted row, as a single pick would.
-    if (!picked.length && !typed && d.selected < q.choices.length) {
+    if (!picked.length && !other && d.selected < q.choices.length) {
       picked.push(q.choices[d.selected]?.replace(RECOMMENDED, '') ?? '')
     }
 
-    const values = typed ? [...picked, typed] : picked
+    const values = other ? [...picked, other] : picked
 
     commit(values.length ? JSON.stringify(values) : null)
   }
 
-  /** A click or Enter on row `i`: a radio answers, a checkbox toggles, Other starts typing. */
+  /**
+   * A click or Enter on row `i`: a radio answers, a checkbox toggles, Other starts typing. In a
+   * multiple choice, a checked Other with a draft unchecks instead (its draft stays for later).
+   */
   const activate = (i: number) => {
     const q = questions[step]
     const d = drafts[step]
@@ -178,8 +184,11 @@ export function clarifyOverlay(host: OverlayHost, prompt: ClarifyPrompt): Overla
 
     d.selected = i
 
-    if (i >= q.choices.length) {
+    if (i >= q.choices.length && q.multi && d.otherOn && !d.typing && d.other.text.trim()) {
+      d.otherOn = false
+    } else if (i >= q.choices.length) {
       d.typing = true
+      d.otherOn = true
     } else if (q.multi && d.picked.has(i)) {
       d.picked.delete(i)
     } else if (q.multi) {
@@ -319,7 +328,8 @@ export function clarifyOverlay(host: OverlayHost, prompt: ClarifyPrompt): Overla
         d.typing = false
       } else if (k.name === 'escape') {
         commit(null)
-      } else if (k.name === 'enter' && (typing || (q.multi && d.selected < q.choices.length))) {
+      } else if (k.name === 'enter' && (typing || (q.multi && (d.selected < q.choices.length || d.other.text.trim())))) {
+        // A multiple choice submits on Enter; only an empty Other row opens its field instead.
         submit()
       } else if (k.name === 'enter') {
         activate(d.selected)
@@ -331,6 +341,7 @@ export function clarifyOverlay(host: OverlayHost, prompt: ClarifyPrompt): Overla
           d.selected = to
         } else if (k.name !== 'up' && k.name !== 'down') {
           d.other.key(k)
+          d.otherOn = true
         }
       } else {
         const to = moved(k, d.selected, count)
@@ -346,6 +357,7 @@ export function clarifyOverlay(host: OverlayHost, prompt: ClarifyPrompt): Overla
           // Typing on the list starts the Other answer.
           d.selected = q.choices.length
           d.typing = true
+          d.otherOn = true
           d.other.key(k)
         }
       }
