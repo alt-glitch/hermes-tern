@@ -10,6 +10,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { toolCallId } from '../core/ids.js'
 import type { ToolCall } from '../model.js'
+import type { TranscriptContext } from '../view/transcript.js'
 
 import { FakeGateway, fakeTern, must } from './fakes.js'
 
@@ -32,6 +33,7 @@ vi.mock('../hermes/sessionIndex.js', async importOriginal => ({
 const { App } = await import('../app/chat.js')
 const { ownsCard } = await import('../view/workLogModel.js')
 const { toolNode } = await import('../view/tools/shell.js')
+const { entryNode } = await import('../view/transcript.js')
 
 const flush = () => new Promise(resolve => setImmediate(resolve))
 
@@ -119,7 +121,7 @@ describe('the connect card on the gateway wire', () => {
     const { call } = await waitingOnFigma()
 
     expect(call.outcome.kind).toBe('running')
-    expect(call.connect).toMatchObject({ op: { id: 'op1', seq: 2, session: 's1', timeoutSeconds: 300 }, settled: undefined })
+    expect(call.connect).toMatchObject({ gateway: true, op: { id: 'op1', seq: 2, session: 's1' }, settled: undefined })
     expect(call.connect?.targets).toMatchObject([{ kind: 'connector', name: 'figma', state: 'initiated', title: 'Figma', url: FIGMA }])
     // The card stays out of the work group's fold while the tool runs.
     expect(ownsCard(call)).toBe(true)
@@ -129,7 +131,37 @@ describe('the connect card on the gateway wire', () => {
     expect(drawn).toContain('connect-open=op1:figma')
     expect(drawn).toContain('connect-skip=op1:figma')
     expect(drawn).toContain('connect-continue=op1')
-    expect(drawn).toContain('up to 5 minutes')
+    expect(drawn).toContain('Not now')
+    // The wait counts down from the gateway's deadline (300 s ahead here).
+    expect(drawn).toContain('Hermes waits up to 5 more minutes.')
+  })
+
+  it('an update that beats its request draws the card, and the wait still comes from the deadline', async () => {
+    const app = await started()
+    gw.event({ payload: {}, session_id: 's1', type: 'message.start' })
+    gw.event(toolStart())
+    // The gateway's first row change is published before connection.request (local_desktop_ui.py).
+    const deadline = { deadline_at: Date.now() / 1000 + 600 }
+    gw.event(update(1, [figma('initiated')], deadline))
+    gw.event({ ...request(), payload: { ...request().payload, ...deadline, seq: 1, timeout_seconds: 600 } })
+    await flush()
+
+    const call = must(app.transcript.call(toolCallId('call_f')))
+    expect(call.connect).toMatchObject({ op: { id: 'op1', seq: 1 } })
+    expect(view(call)).toContain('Hermes waits up to 10 more minutes.')
+  })
+
+  it('no Thinking line runs under a card the tool waits on', async () => {
+    const { app, call } = await waitingOnFigma()
+    const cx: TranscriptContext = { copy: () => undefined, now: Date.now(), welcome: { tip: '', version: '' } }
+    const turn = () => JSON.stringify(entryNode(must(app.transcript.entries.findLast(e => e.kind === 'turn')), 'main.t', cx))
+
+    expect(turn()).not.toContain('"t":"Thinking"')
+
+    // Settled, the model runs again: Thinking carries the turn.
+    gw.event(update(3, [figma('skipped')], { settled: true, settled_at: Date.now() / 1000, settled_by: 'all_resolved' }))
+    expect(call.connect?.settled).toBe('all_resolved')
+    expect(turn()).toContain('"t":"Thinking"')
   })
 
   it('Authorize opens the link and wakes the operation', async () => {
@@ -181,8 +213,10 @@ describe('the connect card on the gateway wire', () => {
     gw.event(update(6, [figma('failed')]))
     expect(call.connect?.targets[0]?.state).toBe('connected')
     const drawn = view(call)
-    expect(drawn).toContain('All connected.')
+    expect(drawn).toContain('App connected')
     expect(drawn).not.toContain('connect-')
+    // Every app resolved: the summary needs no line under it.
+    expect(drawn).not.toContain('hermes.connect.note')
   })
 
   it('Try again re-mints a failed link through connectors.connect and draws the reply', async () => {
@@ -201,6 +235,28 @@ describe('the connect card on the gateway wire', () => {
 
     expect(gw.sent('connectors.connect')).toEqual([{ connectors: ['figma'], owner: OWNER, reconnect: true }])
     expect(call.connect?.targets[0]).toMatchObject({ state: 'initiated', url: 'https://portal/connect/figma-2' })
+  })
+
+  it('a Try again in flight says so, and the row takes no other answer meanwhile', async () => {
+    const { call } = await waitingOnFigma()
+    gw.event(update(3, [figma('failed', { connect_url: null, detail: 'the link failed' })]))
+    let reply: (v: unknown) => void = () => undefined
+    gw.handlers.set('connectors.connect', () => new Promise(resolve => (reply = resolve)))
+
+    await click('connect-retry', 'op1:figma')
+    const busy = view(call)
+    expect(busy).toContain('Retrying…')
+    expect(busy).not.toContain('connect-retry=op1:figma')
+    expect(busy).not.toContain('connect-skip=op1:figma')
+    // A Skip that slipped through (a stale frame's button) waits too.
+    await click('connect-skip', 'op1:figma')
+    expect(gw.sent('connection.respond')).toEqual([])
+
+    reply({ deadline_at: Date.now() / 1000 + 200, op_id: 'op1', seq: 4, settled: false, targets: [figma('initiated', { connect_url: 'https://portal/connect/figma-2' })] })
+    await flush()
+    await flush()
+    expect(call.connect?.sending).toBeUndefined()
+    expect(view(call)).toContain('connect-open=op1:figma')
   })
 
   it('an MCP row starts on Connect with its default credentials', async () => {
@@ -228,6 +284,24 @@ describe('the connect card on the gateway wire', () => {
 
     expect(app.transcript.call(toolCallId('call_f'))?.connect).toMatchObject({ settled: 'continued', targets: [{ state: 'not_connected', url: FIGMA }] })
     expect(view(call)).not.toContain('connect-')
+  })
+
+  it('a settled result draws the summary on a call that never had a card', async () => {
+    const app = await started()
+    gw.event({ payload: {}, session_id: 's1', type: 'message.start' })
+    gw.event(toolStart('call_s'))
+    const result = { op_id: 'op8', seq: 3, settled_at: Date.now() / 1000, settled_by: 'all_resolved', status: 'settled', targets: [{ kind: 'connector', name: 'figma', state: 'skipped' }] }
+    gw.event({ payload: { name: 'manage_connections', result: JSON.stringify(result), tool_id: 'call_s' }, session_id: 's1', type: 'tool.complete' })
+    await flush()
+    await flush()
+
+    const call = must(app.transcript.call(toolCallId('call_s')))
+    // Not read as a card file: the watcher leaves it alone.
+    expect(call.connect).toBeUndefined()
+    expect(ownsCard(call)).toBe(true)
+    const drawn = view(call)
+    expect(drawn).toContain('skipped')
+    expect(drawn).not.toContain('connect-')
   })
 
   it('a typed message continues a card the tool waits on', async () => {

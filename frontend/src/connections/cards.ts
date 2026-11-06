@@ -221,16 +221,18 @@ export interface LiveOp {
   seq: number
   /** The runtime id of the session that owns it: every answer names it as the owner. */
   session: string
-  /** Epoch seconds the gateway stops waiting. */
+  /** Epoch seconds the gateway stops waiting: every frame carries it, so the card's wait is right whichever frame drew it. */
   deadlineAt: number
-  /** How long the gateway waits in all. */
-  timeoutSeconds: number
 }
 
 /** A connect call's card as the pane last read it. */
 export interface ConnectCard {
   /** The gateway's operation, when the card came as `connection.request`: the pane answers it. */
   op?: LiveOp | undefined
+  /** The card is the gateway's operation (live, or settled and read back from the tool's result), not a card file. */
+  gateway?: true | undefined
+  /** Answers in flight, `<verb>:<app>` (`skip`, `approve`, `retry`) or CONTINUE: their buttons say so and take no second press. */
+  sending?: string[] | undefined
   /** Its file (`CardFile.key`); none when the call's own result carries the links, or on a live card. */
   key?: string | undefined
   targets: ConnectTarget[]
@@ -257,7 +259,8 @@ export function connectTargets(call: Pick<ToolCall, 'name' | 'result'>, card?: P
 
 /** `call`'s card: its file when the watcher keeps one, else its own result (links there, nothing watching). */
 export function loadConnect(call: ToolCall, dir = dataDir(), now = Date.now()): ConnectCard | undefined {
-  if (call.name !== CONNECT_TOOL) {
+  // A settled operation's result is the gateway's card (resultCard), never a card file's.
+  if (call.name !== CONNECT_TOOL || resultCard(call)) {
     return undefined
   }
 
@@ -321,6 +324,13 @@ function envField(raw: unknown): { name: string; required: boolean; default: str
 /** A target still waiting on the user (a link to open, or a link already opened). */
 export const waiting = (t: Pick<ConnectTarget, 'state'>) => t.state === 'initiated' || t.state === 'pending'
 
+/** The `sending` entry of a live card's Continue. */
+export const CONTINUE = 'continue'
+
+/** The verb whose answer for app `name` is in flight on `card`, if one is. */
+export const sendingVerb = (card: Pick<ConnectCard, 'sending'>, name: string): string | undefined =>
+  card.sending?.find(r => r.endsWith(`:${name}`))?.split(':')[0]
+
 /** Every app the card still stands for is connected. */
 export const allConnected = (card: ConnectCard) => {
   const own = card.targets.filter(t => t.state !== 'superseded')
@@ -328,10 +338,41 @@ export const allConnected = (card: ConnectCard) => {
   return own.length > 0 && own.every(t => t.state === 'connected')
 }
 
+/** Why a gateway frame says its operation settled (its `settled_by`, in this module's words); undefined while it is open. */
+export function settleReason(r: Record<string, unknown>): SettleReason | undefined {
+  if (r['settled'] !== true && typeof r['settled_at'] !== 'number') {
+    return undefined
+  }
+
+  switch (r['settled_by']) {
+    case 'all_resolved':
+    case 'deadline':
+    case 'interrupt':
+      return r['settled_by']
+    case 'continue':
+      return 'continued'
+    default:
+      return 'stopped'
+  }
+}
+
 /**
- * The call draws the connect card: the gateway opened its operation (a live card), or it carries at
- * least one link to authorize (here, or in its card file). A card a newer call replaced draws none,
- * as on the desktop: its row is the plain tool call.
+ * The summary card a settled operation's tool result reads as (`ConnectionOperation.result`:
+ * `status: settled`, its `settled_by` and the rows as they ended). A reloaded call has only this,
+ * so its card stays the same summary the live one settled into. Undefined for any other result.
+ */
+export function resultCard(call: Pick<ToolCall, 'name' | 'result'>): ConnectCard | undefined {
+  const r = call.name === CONNECT_TOOL ? record(call.result) : undefined
+  const settled = r && r['status'] === 'settled' && typeof r['op_id'] === 'string' ? settleReason(r) : undefined
+  const targets = settled && Array.isArray(r?.['targets']) ? parseTargets(r['targets']) : []
+
+  return targets.length ? { gateway: true, opened: [], settled, targets, told: false } : undefined
+}
+
+/**
+ * The call draws the connect card: the gateway opened its operation (a live card) or settled it (its
+ * result), or the call carries at least one link to authorize (here, or in its card file). A card a
+ * newer call replaced draws none, as on the desktop: its row is the plain tool call.
  */
 export function isConnectCall(call: Pick<ToolCall, 'connect' | 'name' | 'result'>): boolean {
   const card = call.connect
@@ -340,7 +381,11 @@ export function isConnectCall(call: Pick<ToolCall, 'connect' | 'name' | 'result'
     return card.targets.length > 0
   }
 
-  return card ? card.settled !== 'superseded' && card.targets.some(t => t.url) : connectTargets(call).some(t => t.url)
+  if (card) {
+    return card.settled !== 'superseded' && card.targets.some(t => t.url)
+  }
+
+  return resultCard(call) !== undefined || connectTargets(call).some(t => t.url)
 }
 
 /** A row the user still has to act on: not connected, skipped, or closed by the settle. */
