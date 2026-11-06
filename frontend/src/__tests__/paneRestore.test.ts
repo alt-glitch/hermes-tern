@@ -110,6 +110,27 @@ describe('a pane restarted after its program died', () => {
     expect(notices(app)).toEqual(["Another pane shows this pane's last session; started a new one."])
   })
 
+  it('starts that new session where the pane launched, not in the other conversation\'s folder', async () => {
+    gw.handlers.set('plugin.hermes-tern.viewer.shown', () => ({ shown: true }))
+    await started({ HERMES_TERN_RESTORED: 'root', HERMES_TERN_RESUME: 'tip', HERMES_TERN_SESSION_CWD: '/elsewhere/repo' })
+
+    expect(gw.methods('session.create').map(c => c.params['cwd'])).toEqual(['/work'])
+  })
+
+  it('leaves a switch the user made while the plugin was answering alone', async () => {
+    let answer: (shown: { shown: boolean }) => void = () => undefined
+    gw.handlers.set('plugin.hermes-tern.viewer.shown', () => new Promise(resolve => (answer = resolve)))
+    const { app } = await started({ HERMES_TERN_RESTORED: 'root', HERMES_TERN_RESUME: 'tip' })
+
+    await app.stores.life.newSession()
+    answer({ shown: true })
+    await flush()
+
+    expect(gw.methods('session.create')).toHaveLength(1)
+    expect(gw.methods('session.resume')).toHaveLength(0)
+    expect(notices(app)).toEqual([])
+  })
+
   it('says nothing for a plain --resume', async () => {
     const { app } = await started({ HERMES_TERN_RESUME: 'tip' })
 
