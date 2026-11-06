@@ -1,3 +1,4 @@
+import type { ActionEvent } from '@stencil-hq/tern'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { EuiApprovalContext } from '../eui/host.js'
@@ -30,7 +31,7 @@ function buttonId(value: unknown, label: string, owner?: string): string | undef
   return Object.values(value).map(v => buttonId(v, label, id)).find(Boolean)
 }
 
-function click(id: string) {
+function click(id: string): ActionEvent {
   return { ev: 'action', sf: 'hermes', id, act: 'click', raw: {} }
 }
 
@@ -64,16 +65,19 @@ describe('App host card authority', () => {
       approval: { label: 'Apply reviewed plan', description: 'Create only the revised local files.' }
     }, run)
     // Deliver the old event while the previous native paint may still be visible.
-    tern.send(click(oldId))
+    await tern.dispatch(click(oldId))?.()
     await settle()
     expect(oldRun).not.toHaveBeenCalled()
     expect(run).not.toHaveBeenCalled()
     const nextId = must(buttonId(ops().slice(before), 'Apply reviewed plan'))
     expect(nextId).not.toBe(oldId)
     expect(JSON.stringify(ops().slice(before))).toContain('Updated plan')
-    tern.send(click(oldId))
-    tern.send(click(nextId))
-    tern.send(click(nextId))
+    await tern.dispatch(click(oldId))?.()
+    const current = tern.dispatch(click(nextId))
+    expect(current).toBeTypeOf('function')
+    await current?.()
+    await current?.()
+    await tern.dispatch(click(nextId))?.()
     await settle()
     expect(oldRun).not.toHaveBeenCalled()
     expect(run).toHaveBeenCalledTimes(1)

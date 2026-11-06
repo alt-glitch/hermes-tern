@@ -4,7 +4,7 @@
 // arranges what a test starts from through the stores' own APIs.
 import { EventEmitter } from 'node:events'
 
-import { type JSX, type Key, node, Node, type NodeJson, type OpenOptions, type Region, type RegionName, type Renderable, type Session, Span, Surface, type SurfaceLink, type ViewInput } from '@stencil-hq/tern'
+import { type JSX, type Key, node, Node, type NodeJson, type OpenOptions, type Region, type RegionName, type Renderable, type Session, Span, Surface, type SurfaceLink, type TspEvent, type ViewInput } from '@stencil-hq/tern'
 import { vi } from 'vitest'
 import type { GatewayClient } from '@tui/gatewayClient.js'
 import type { SessionInfo } from '@tui/types.js'
@@ -205,6 +205,9 @@ export function fakeTern({ cols = 80, draws = false, features = [], hour12 = fal
     press: (k: Key | string) => input({ key: typeof k === 'string' ? key(k) : k, type: 'key' }),
     /** Delivers one Tern event. */
     send: (event: Record<string, unknown>) => input({ event, type: 'event' }),
+    /** The real SDK resolves node handlers before yielding unhandled events to App. */
+    dispatch: (event: TspEvent) =>
+      [...surfaces].find(surface => 'sf' in event && event.sf === surface.id)?.dispatch(event),
     /** Ends the input, as a pane that closes or a signal does. */
     end: () => waiting.shift()?.({ done: true, value: undefined })
   }
