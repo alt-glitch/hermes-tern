@@ -14,6 +14,7 @@ import { HOLD_UNAVAILABLE, isHoldInfoKey, isVoiceToggleKey } from '../voice/hold
 
 import type { Attachments } from './attachments.js'
 import type { Composer } from './composer.js'
+import type { Dictation } from './dictation.js'
 import type { VimComposer } from './vim.js'
 
 /** A second Ctrl+C within this window quits. */
@@ -96,6 +97,8 @@ export interface KeyCx {
   hud(key: Key): boolean
   readonly completion: Pick<Completion, 'onKey'>
   readonly composer: Pick<Composer, 'key' | 'set' | 'take' | 'text'>
+  /** Record key and capture cancellation, only after /voice on. */
+  readonly dictation: Pick<Dictation, 'cancel' | 'onKey'>
   /** Optional modal editor; tests and non-Vim hosts retain the original key contract. */
   readonly vim?: Pick<VimComposer, 'key' | 'enabled'>
   readonly attachments: Pick<Attachments, 'any' | 'clear' | 'clearAll' | 'paste'>
@@ -161,8 +164,9 @@ function clearDraft(cx: KeyCx) {
   cx.attachments.clear()
 }
 
-/** Ctrl+C with no sheet open: clears the draft, else stops the turn, else arms the exit (twice quits). */
+/** Ctrl+C with no sheet open: cancels dictation, else clears the draft, stops the turn or arms exit. */
 function ctrlC(cx: KeyCx) {
+  if (cx.dictation.cancel()) return
   if (hasDraft(cx)) {
     cx.composer.set('')
     cx.attachments.clearAll()
@@ -215,6 +219,9 @@ const overlay: KeyRule = (key, _cx, top) => top?.onKey(key) === true
 
 /** A modal sheet takes every key, used or not. */
 const modal: KeyRule = (_key, _cx, top) => top?.modal === true
+
+/** Dictation owns the record key and Escape under the top modal, before other input. */
+const dictation: KeyRule = (key, cx) => cx.dictation.onKey(key)
 
 /** Shortcuts request consent or report missing hold support; neither records a key gesture. */
 const liveKeys: KeyRule = (key, cx) => {
@@ -403,6 +410,7 @@ export const KEY_RULES: readonly KeyRule[] = [
   cancel,
   overlay,
   modal,
+  dictation,
   liveKeys,
   hud,
   completion,

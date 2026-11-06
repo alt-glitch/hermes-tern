@@ -148,6 +148,18 @@ describe('every control is a named native button', () => {
     expect(unreachable(wire(imageChip({ label: 'shot.png' }, 0, vi.fn())))).toEqual([])
   })
 
+  it('in the dictated composer: microphone, Done and Cancel are named native buttons', () => {
+    const on = dockActions()
+    const composer = dockContext().composer
+    const ready = dockContext({ composer: { ...composer, dictation: { heard: '', key: 'alt+v', phase: 'ready' } } })
+    const listening = dockContext({ composer: { ...composer, dictation: { heard: 'hello', key: 'alt+v', phase: 'listening' } } })
+
+    expect(unreachable(wire(dockNodes(ready, on)))).toEqual([])
+    expect(unreachable(wire(dockNodes(listening, on)))).toEqual([])
+    expect(JSON.stringify(wire(dockNodes(ready, on)))).toContain('"hermes.composer.mic"')
+    expect(JSON.stringify(wire(dockNodes(listening, on)))).toContain('"hermes.dictation"')
+  })
+
   it('in the goal and loop line', () => {
     const line = automationNode(
       {

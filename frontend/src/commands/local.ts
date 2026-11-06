@@ -36,6 +36,7 @@ import { rpc } from '../wire/rpc.js'
 import { CONTROL_COMMANDS } from './control.js'
 import { REFUSED_COMMANDS, type RefusedHost } from './refused.js'
 import { SESSION_COMMANDS } from './session.js'
+import { voiceCommand, type VoiceHost } from './voice.js'
 
 /** What the commands reach of the app. */
 export type CommandHost = Pick<
@@ -76,6 +77,7 @@ export type CommandHost = Pick<
   RefusedHost &
   SessionsHost &
   ThemeHost &
+  VoiceHost &
   VisualPickerHost
 
 /** A client-side slash command. */
@@ -95,6 +97,11 @@ export interface LocalCommand {
 }
 
 const COMMANDS: readonly LocalCommand[] = [
+  {
+    // Dictation into the composer, distinct from /live conversation mode.
+    name: 'voice',
+    run: (host, arg) => voiceCommand(host, arg)
+  },
   {
     name: 'notices',
     help: 'Inspect retained gateway notices',
