@@ -57,6 +57,7 @@ import type { LiveVoice } from '../voice/live.js'
 
 import { AppActions } from './actions.js'
 import { drawFrame, type FrameCx } from './frame.js'
+import { euiHostPort } from './eui-host.js'
 import type { ChatPorts } from './ports.js'
 import { type ChatStores, chatStores, disposeStores } from './stores.js'
 
@@ -117,7 +118,8 @@ export class App implements ChatPorts {
         this.transcript.changedEntries.add(entry)
       }
       this.changed()
-    })
+    }, undefined, euiHostPort(this, () => this.#visible && this.#surface?.state === 'visible' &&
+      !this.stores.life.switching && !this.overlays.some(o => o.modal)))
     this.#hostLifecycle = new HostLifecycle(writeHost ?? (text => {
       if (launch.pane) {
         process.stdout.write(text)
@@ -229,7 +231,10 @@ export class App implements ChatPorts {
     }
 
     // Exit retires the owning transport even before a reconnect adopts a new runtime id.
-    this.#gw.on('exit', () => this.tableCharts.transportLost())
+    this.#gw.on('exit', () => {
+      this.tableCharts.transportLost()
+      this.eui.host.invalidate()
+    })
     followGateway(this.#gw, {
       ...s,
       drain: () => s.queue.drain(),
@@ -424,6 +429,7 @@ export class App implements ChatPorts {
 
   changed() {
     this.stores?.liveVoice.syncOwner()
+    this.eui?.host.sync()
     if (this.session && this.stores) {
       this.#hostLifecycle.project({
         sid: this.session.ref.live,

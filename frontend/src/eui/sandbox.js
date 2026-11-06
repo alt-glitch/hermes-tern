@@ -12,11 +12,18 @@ import { svgInline, svgRules } from './svgStyle.js'
 const SVG = 'http://www.w3.org/2000/svg'
 const CLICKY = new Set(['click', 'pointerdown', 'pointerup', 'dblclick', 'change', 'input'])
 const NATIVE = new Set(['button', 'a', 'summary', 'input', 'select', 'label'])
-const remote = {}
 
 /** The first directory holding the vendored kit: beside the source, or the bundle's ../src copy. */
 export function vendorDir(candidates) {
   return candidates.find(d => existsSync(join(d, 'kit.js'))) ?? ''
+}
+
+/** Only packaged, named data assets. Reject URLs and traversal before touching the filesystem. */
+export function readOfflineData(dir, request) {
+  const match = /^(?:\.\/)?data\/(apps|themes|trace-fixture|intent-snapshot|ops-fixture)\.json$/.exec(request)
+  if (!match) return undefined
+  const file = join(dir, 'data', match[1] + '.json')
+  return existsSync(file) ? readFileSync(file, 'utf8') : undefined
 }
 
 export async function createSandbox(dir, scheme = 'light', log = () => {}) {
@@ -56,16 +63,8 @@ export async function createSandbox(dir, scheme = 'light', log = () => {}) {
   EP.blur ??= function () {}
 
   const timer = f => (fn, ms, ...a) => { const t = f(() => { try { fn(...a) } catch (e) { log(e) } }, ms); t.unref?.(); return t }
-  const data = name => join(dir, 'data', name.replace(/^.*data\//, '').replace(/[?#].*$/, ''))
-  const pin = JSON.parse(readFileSync(join(dir, 'PIN.json'), 'utf8'))
-  // A fixture not vendored comes from the kit repo at the pinned commit, once per process.
-  const dataText = name => {
-    const file = data(name)
-    if (existsSync(file)) return Promise.resolve(readFileSync(file, 'utf8'))
-    const base = file.slice(join(dir, 'data').length + 1)
-    if (!/^[a-z0-9-]+\.json$/.test(base) || !pin.remoteData) return Promise.resolve(undefined)
-    return (remote[base] ??= globalThis.fetch(pin.remoteData + base).then(r => (r.ok ? r.text() : undefined)).catch(() => undefined))
-  }
+  // The VM has an offline data facade, never access to the host's network fetch.
+  const dataText = name => Promise.resolve(readOfflineData(dir, name))
   const ctx = {
     window, document, Node: window.Node, Element: window.Element, HTMLElement: window.HTMLElement, SVGElement: window.SVGElement,
     Event: window.Event, CustomEvent: window.CustomEvent, KeyboardEvent: window.KeyboardEvent ?? window.Event, PointerEvent: window.Event,
@@ -110,7 +109,7 @@ export async function createSandbox(dir, scheme = 'light', log = () => {}) {
   vm.runInContext(readFileSync(join(dir, 'kit.js'), 'utf8'), ctx, { filename: 'ephemeral-ui/kit.js' })
   const K = ctx.__EUI
   await K.loadApps()
-  const themes = JSON.parse(readFileSync(data('themes.json'), 'utf8')).themes
+  const themes = JSON.parse(readFileSync(join(dir, 'data', 'themes.json'), 'utf8')).themes
   K.theme.themes = themes
   K.theme.base = themes.find(t => t.id === (scheme === 'dark' ? 't3-dark' : 't3-light'))
   const kitCss = join(dir, 'kit.css')

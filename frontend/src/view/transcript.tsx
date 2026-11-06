@@ -33,7 +33,7 @@ import { parts, pieces } from './workLogModel.js'
 export interface TranscriptContext {
   /** Presentation-only, session-scoped Markdown table charts. */
   charts?: TableCharts
-  /** Presentation-only ephemeral-ui cards drawn from `ephemeral-ui` fences in answers. */
+  /** Demo fences plus separately registered, session-owned host panels. */
   eui?: EuiCards
   now: number
   /** Negotiated Tern clock preference; older hosts default to 24-hour time. */
@@ -112,12 +112,15 @@ function buildEntry(e: Exclude<Entry, { kind: 'welcome' }>, id: string, cx: Tran
     case 'compaction':
       return compactionNode(e.compaction, e.id, id, cx.now)
 
-    case 'panel':
+    case 'panel': {
+      const hosted = cx.eui?.hostView(e)
+      if (hosted && cx.eui) return <col key={e.id} role="eui.host-panel">{euiCardNode(id + '.host', hosted, cx.eui)}</col>
       return (
         <card collapsible head={[{ s: 'strong', t: e.title }]} key={e.id} role="omp.custom" tone="neutral">
           {slashBody(e)}
         </card>
       )
+    }
   }
 }
 

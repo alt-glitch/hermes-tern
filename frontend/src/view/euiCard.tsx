@@ -1,5 +1,6 @@
 // Draws one ephemeral-ui card: the kit's DOM snapshot as Tern `el` nodes, its SVG as images and
-// its inline styles as stylesheet rules. A click replays into the kit, which redraws the card.
+// its inline styles as stylesheet rules. Demo clicks stay in the kit; host clicks use the exact
+// publication's callback and revision-bearing native path.
 import { EL_TAGS, type ElTag, html, type JSX, ui } from '@stencil-hq/tern'
 
 import type { EuiCards, EuiCardView } from '../eui/cards.js'
@@ -23,7 +24,7 @@ function ternTag(tag: string, attrs: Readonly<Record<string, string>>): ElTag {
   return isTag(tag) ? tag : INLINE.has(tag) ? 'span' : 'div'
 }
 
-function convert(n: EuiNode, key: string, card: string, eui: EuiCards): JSX.Element | string | null {
+function convert(n: EuiNode, key: string, eui: EuiCards, activate: (id: number) => void): JSX.Element | string | null {
   if (n.t === 'text') {
     return n.text
   }
@@ -62,7 +63,7 @@ function convert(n: EuiNode, key: string, card: string, eui: EuiCards): JSX.Elem
     attrs['data-eui-s'] = eui.style(n.style)
   }
 
-  const kids = n.kids.map((k, i) => convert(k, k.t === 'el' ? `n${k.id}` : `${key}.${i}`, card, eui))
+  const kids = n.kids.map((k, i) => convert(k, k.t === 'el' ? `n${k.id}` : `${key}.${i}`, eui, activate))
 
   if (n.tag === 'input' && tag === 'span') {
     kids.push(n.attrs['value'] || n.attrs['placeholder'] || '')
@@ -77,7 +78,7 @@ function convert(n: EuiNode, key: string, card: string, eui: EuiCards): JSX.Elem
     ...(n.attrs['disabled'] ? { disabled: true } : {}),
     ...(tag === 'input' ? { type: n.attrs['type'] ?? 'checkbox', checked: Boolean(n.attrs['checked']) } : {}),
     ...(n.attrs['title'] ? { title: n.attrs['title'] } : {}),
-    ...(n.click ? { onClick: () => { eui.click(card, n.id) } } : {})
+    ...(n.click ? { onClick: () => { activate(n.id) } } : {})
   }, kids)
 }
 
@@ -92,7 +93,9 @@ export function euiCardNode(card: string, view: EuiCardView, eui: EuiCards): JSX
   }
 
   const root = view.node
+  const key = view.identity === undefined ? card : `${card}.${view.identity}`
+  const activate = view.activate ?? ((id: number) => { eui.click(card, id) })
 
-  return html.div({ key: card, attrs: { 'data-eui': 'card', 'data-eui-kind': view.spec.kind, 'data-eui-app': view.app }, class: root.t === 'el' ? root.cls : '', role: 'eui.card' },
-    root.t === 'el' ? root.kids.map((k, i) => convert(k, k.t === 'el' ? `n${k.id}` : `t${i}`, card, eui)) : [])
+  return html.div({ key, attrs: { 'data-eui': 'card', 'data-eui-kind': view.spec.kind, 'data-eui-app': view.app }, class: root.t === 'el' ? root.cls : '', role: 'eui.card' },
+    root.t === 'el' ? root.kids.map((k, i) => convert(k, k.t === 'el' ? `n${k.id}` : `t${i}`, eui, activate)) : [])
 }

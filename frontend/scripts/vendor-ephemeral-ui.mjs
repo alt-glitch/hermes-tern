@@ -15,8 +15,8 @@ import { root } from './ratchet.mjs'
 export const PIN = '63e06b29ffb0d7c5b9d482abebc0312335897321'
 const REGISTRIES = ['a', 'b', 'c', 'e', 'f', 't', 'i', 'infra', 'ops']
 const CSS = ['styles.css', 'trace.css', 'intent.css', 'stats.css', 'ops.css', 'infra.css', 'flow.css']
-// Public catalog data only. The trace, ops and intent fixtures are sanitized captures of the owner's
-// own runs: they are read at runtime from the kit repo at PIN (sandbox.js), never republished here.
+// Public catalog data only. Trace, ops and intent captures are neither republished nor fetched
+// at runtime. Without local data the kit displays its explicit unavailable states.
 const DATA = ['apps.json', 'themes.json']
 export const SCOPE = "[data-eui='card']"
 
@@ -96,7 +96,7 @@ globalThis.__EUI = { KINDS: { ${REGISTRIES.map(r => `...KINDS_${r.toUpperCase()}
   for (const f of DATA) { copyFileSync(join(src, 'data', f), join(out, 'data', f)) }
 
   const kinds = JSON.parse(readFileSync(join(src, 'schema/card.v0.json'), 'utf8')).properties.kind.enum
-  writeFileSync(join(out, 'PIN.json'), `${JSON.stringify({ repo: 'kvnloo/ephemeral-ui', sha: PIN, remoteData: `https://raw.githubusercontent.com/kvnloo/ephemeral-ui/${PIN}/data/`, kinds }, null, 2)}\n`)
+  writeFileSync(join(out, 'PIN.json'), `${JSON.stringify({ repo: 'kvnloo/ephemeral-ui', sha: PIN, kinds }, null, 2)}\n`)
   console.log(`vendored ephemeral-ui@${PIN.slice(0, 12)}: ${kinds.length} schema kinds`)
 }
 
