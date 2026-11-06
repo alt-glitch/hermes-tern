@@ -272,7 +272,7 @@ function lifecycle() {
       cols: () => 80,
       drain: () => void log.push('drain'),
       gw: gw.client,
-      launch: { create: {}, restored: false, resume: '', sessionCwd: '' },
+      launch: { create: {}, paneCwd: '', restored: false, resume: '', sessionCwd: '' },
       rename: () => Promise.resolve(),
       request: req => void log.push(`request ${req.id}`),
       sheets: { dropShared: () => undefined },
