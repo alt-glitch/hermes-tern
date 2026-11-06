@@ -16,3 +16,12 @@ optional_env:
   - name: GITHUB_TOKEN
     description: "GitHub token for the pull request view and its checks (`hermes config set GITHUB_TOKEN <token>`)"
     password: true
+  - name: GITHUB_ENTERPRISE_TOKEN
+    description: "GitHub Enterprise token, sent only to the hosts in the plugin's enterprise_hosts setting"
+    password: true
+config_schema:
+  enterprise_hosts:
+    type: list
+    default: []
+    label: GitHub Enterprise hosts
+    description: "GitHub Enterprise Server hosts (e.g. github.mycompany.com) that tern may read pull requests from and send GITHUB_ENTERPRISE_TOKEN to. github.com is always allowed. Any other host is refused."

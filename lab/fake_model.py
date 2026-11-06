@@ -224,7 +224,8 @@ def _calls(prompt: str, target: Path) -> list[dict] | None:
     if words.lstrip().startswith("pr"):
         # A real public PR, linked the way an agent links one it opened (through the tool_call bridge
         # in case Tool Search defers the plugin's tools).
-        urls = re.findall(r"https://github\.com/[^\s/]+/[^\s/]+/pull/\d+", words) or ["https://github.com/alt-glitch/hermes-tern/pull/22"]
+        # Any host: the tool, not the model, decides which hosts a link may name.
+        urls = re.findall(r"https://[^\s/]+/[^\s/]+/[^\s/]+/pull/\d+", words) or ["https://github.com/alt-glitch/hermes-tern/pull/22"]
         return [_call("tool_call", {"calls": [{"name": "link_pull_request", "arguments": {"url": u}} for u in urls]}, "call-link")]
     if words.lstrip().startswith("cron"):
         # cronjob_manage is a deferred tool: the model reaches it through the tool_call bridge.

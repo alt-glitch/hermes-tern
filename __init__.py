@@ -86,6 +86,8 @@ def _run(args: argparse.Namespace) -> None:
     flags, restored = panes.plan(flags)
     if restored:
         env[panes.RESTORED_ENV] = restored
+    # The only hosts besides github.com the frontend sends a GitHub token to; empty unsets an inherited value.
+    env["HERMES_TERN_GITHUB_ENTERPRISE_HOSTS"] = ",".join(pull_requests.enterprise_hosts())
     code = _chat(flags, str(FRONTEND), env)
     if code == NO_TSP_EXIT:
         print("hermes tern: this terminal does not speak the Tern Surface Protocol; "

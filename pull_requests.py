@@ -11,13 +11,19 @@ session of its own; its links go to the conversation that delegated it:
      "aliases": {SESSION_ID: ROOT}}
 
 Nothing here calls GitHub: a link is the URL's host, repository and number. The frontend reads the
-rest from the GitHub API.
+rest from the GitHub API, with the user's token for that host.
+
+A link may name only github.com or a GitHub Enterprise host the user listed in the plugin's
+``enterprise_hosts`` setting (``plugins.entries.hermes-tern.settings.enterprise_hosts``): the host
+comes from the model, and the frontend sends the enterprise token to it. The frontend checks the
+same list again before every request (frontend/src/github/hosts.ts).
 """
 
 from __future__ import annotations
 
 import contextlib
 import json
+import logging
 import os
 import re
 import tempfile
@@ -25,13 +31,28 @@ import time
 from pathlib import Path
 from typing import Any
 
+logger = logging.getLogger(__name__)
+
 PLUGIN = "hermes-tern"
 TOOLSET = "hermes-tern"
 FILE = "pull-requests.json"
 
+GITHUB = "github.com"
+# The plugin setting that lists the GitHub Enterprise hosts the user trusts with GITHUB_ENTERPRISE_TOKEN.
+CONFIG_KEY = "enterprise_hosts"
+CONFIG_PATH = f"plugins.entries.{PLUGIN}.settings.{CONFIG_KEY}"
+
 # T3 Code's parseChangeRequestUrl (packages/shared/src/changeRequestUrl.ts) for GitHub.
 _PATH = re.compile(r"^/([^/]+/[^/]+)/pull/(\d+)(?:/|$)")
 _REPO = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
+# One DNS label, ASCII only: an IDN host must be given in its punycode (xn--) form.
+_LABEL = re.compile(r"[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?")
+_PORT = re.compile(r"[1-9][0-9]{0,4}")
+# A last label that a URL parser reads as an IPv4 number (WHATWG's "ends in a number").
+_NUMERIC = re.compile(r"[0-9]+|0x[0-9a-f]*")
+
+# The plugin context register() was given: ctx.get_config reads the user's plugin settings.
+_ctx: Any = None
 
 PROMPT = """<pull_request_linking>
 Use link_pull_request to register every pull request you create or work on in this session. Call it with the full PR URL right after you create a PR or start work on an existing PR. For a stack, call it for every layer, not only the current branch or the top PR. This applies when you create or update PRs through gh, gh stack, another CLI, or the API: those operations do not register the PR. Linking an already-linked PR is safe. The linked PRs show beside the chat in hermes tern. Before you finish PR work, call list_pull_requests and link any PR from your work that is missing. Do not link unrelated PRs that are mentioned only as background. If a link call fails, report the failure instead of saying the PR is linked.
@@ -45,7 +66,8 @@ _TARGET = {
     },
     "repository": {"type": "string", "description": "owner/repo; with number, when url is omitted."},
     "number": {"type": "integer", "minimum": 1, "description": "The PR number; with repository, when url is omitted."},
-    "host": {"type": "string", "description": "The GitHub host for repository + number. Default github.com."},
+    "host": {"type": "string", "description": "The GitHub host for repository + number: github.com (the default) "
+                                              "or a GitHub Enterprise host the user listed."},
 }
 
 LINK_SCHEMA = {
@@ -75,39 +97,96 @@ class TargetError(ValueError):
     pass
 
 
-def parse_target(args: dict[str, Any]) -> dict[str, Any]:
-    """``{host, repository, number, url}`` from a PR URL, or from repository + number (+ host)."""
+def normalize_host(raw: Any) -> str | None:
+    """``raw`` as tern compares hosts: lower case, one trailing dot dropped, ``name`` or
+    ``name:port``. None for anything else: userinfo, a path, an IP literal, a non-ASCII or empty
+    label, a bad port."""
+    if not isinstance(raw, str):
+        return None
+    host = raw.strip().lower()
+    name, colon, port = host.rpartition(":") if ":" in host else (host, "", "")
+    if colon and (not _PORT.fullmatch(port) or int(port) > 65535):
+        return None
+    if name.endswith("."):
+        name = name[:-1]
+    labels = name.split(".")
+    if not name or len(name) > 253 or not all(_LABEL.fullmatch(label) for label in labels):
+        return None
+    if _NUMERIC.fullmatch(labels[-1]):
+        return None
+    return f"{name}:{port}" if colon else name
+
+
+def enterprise_hosts() -> list[str]:
+    """The GitHub Enterprise hosts the user listed in the plugin's ``enterprise_hosts`` setting (a
+    list, or one comma-separated string), normalised. An entry that is not a plain host is dropped,
+    and github.com always takes the github.com token, never the enterprise one."""
+    raw: Any = None
+    with contextlib.suppress(Exception):
+        raw = _ctx.get_config(CONFIG_KEY) if _ctx is not None else None
+    if isinstance(raw, str):
+        raw = [part for part in re.split(r"[,\s]+", raw) if part]
+    if not isinstance(raw, (list, tuple)):
+        return []
+    hosts: list[str] = []
+    for item in raw:
+        host = normalize_host(item)
+        if host is None:
+            logger.warning("hermes-tern: ignoring %r in %s: not a plain host name", item, CONFIG_PATH)
+        elif host != GITHUB and host not in hosts:
+            hosts.append(host)
+    return hosts
+
+
+def _untrusted(host: str) -> TargetError:
+    return TargetError(
+        f"{host} is not a GitHub host tern trusts. tern reads pull requests from github.com and from the "
+        f"GitHub Enterprise hosts the user lists in the plugin setting {CONFIG_PATH}. If the user trusts "
+        f"{host}, they can add it there; do not add it yourself.")
+
+
+def _plain_repository(repository: str) -> bool:
+    return bool(_REPO.match(repository)) and not {".", ".."} & set(repository.split("/"))
+
+
+def parse_target(args: dict[str, Any], *, trusted_only: bool = True) -> dict[str, Any]:
+    """``{host, repository, number, url}`` from a PR URL, or from repository + number (+ host).
+    The host must be github.com or a listed enterprise host. ``trusted_only=False`` (unlink) takes
+    any plain host, so a link stored before hosts were checked can still be removed."""
     url = str(args.get("url") or "").strip()
     if url:
-        from urllib.parse import urlparse
+        from urllib.parse import urlsplit
 
-        parsed = urlparse(url if "://" in url else f"https://{url}")
-        host = (parsed.hostname or "").lower()
+        parsed = urlsplit(url if "://" in url else f"https://{url}")
+        # netloc, not hostname: hostname drops userinfo and the port without a word.
+        host = normalize_host(parsed.netloc) if parsed.scheme.lower() in ("http", "https") else None
         match = _PATH.match(parsed.path or "")
-        if not match or not _is_github(host):
-            raise TargetError("This is not a GitHub pull request URL. Pass repository and number instead.")
-        repository, number = match.group(1).lower(), int(match.group(2))
+        repository = match.group(1).lower() if match else ""
+        if not host or not match or not _plain_repository(repository):
+            raise TargetError("This is not a GitHub pull request URL (https://github.com/owner/repo/pull/123). "
+                              "Pass repository and number instead.")
+        number = int(match.group(2))
     else:
         repository = str(args.get("repository") or "").strip().lower()
         number = args.get("number")
-        host = str(args.get("host") or "github.com").strip().lower()
+        raw_host = str(args.get("host") or GITHUB)
         if not repository or not isinstance(number, int) or isinstance(number, bool) or number < 1:
             raise TargetError("Pass the PR url, or repository (owner/repo) and number.")
-        if not _REPO.match(repository):
+        if not _plain_repository(repository):
             raise TargetError(f"repository must be owner/repo, not {repository!r}.")
-        if not _is_github(host):
-            raise TargetError(f"{host} is not a GitHub host.")
+        host = normalize_host(raw_host)
+        if not host:
+            raise TargetError(f"host must be a plain host name such as github.com, not {raw_host!r}.")
+    if trusted_only and host != GITHUB and host not in enterprise_hosts():
+        raise _untrusted(host)
     return {"host": host, "repository": repository, "number": number,
             "url": f"https://{host}/{repository}/pull/{number}"}
 
 
-def _is_github(host: str) -> bool:
-    # github.com, a subdomain of it, or a GitHub Enterprise host with a `github` label.
-    return host == "github.com" or host.endswith(".github.com") or "github" in host.split(".")
-
-
 def _key(link: dict[str, Any]) -> str:
-    return f"{link['host']}/{link['repository']}#{link['number']}"
+    # Normalised: a link stored before hosts were (`GitHub.com.`, `github.evil.com.`) still matches.
+    host = normalize_host(link["host"]) or link["host"]
+    return f"{host}/{str(link['repository']).lower()}#{link['number']}"
 
 
 # ── Storage ────────────────────────────────────────────────────────────────────────────────────
@@ -268,7 +347,7 @@ def unlink_pull_request(args: dict[str, Any], session_id: str | None = None) -> 
     from tools.registry import tool_error, tool_result
 
     try:
-        target = parse_target(args or {})
+        target = parse_target(args or {}, trusted_only=False)
     except TargetError as error:
         return tool_error(str(error))
     sid = _session(session_id)
@@ -297,6 +376,8 @@ def list_pull_requests(_args: dict[str, Any], session_id: str | None = None) -> 
 
 
 def register(ctx) -> None:
+    global _ctx
+    _ctx = ctx
     for name, schema, handler in (
         ("link_pull_request", LINK_SCHEMA, link_pull_request),
         ("unlink_pull_request", UNLINK_SCHEMA, unlink_pull_request),
