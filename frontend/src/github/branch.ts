@@ -11,6 +11,7 @@ import { type StackKey, stackKey } from '../core/ids.js'
 import { rowsOf } from '../wire/schemas.js'
 
 import type { GitHub } from './client.js'
+import { type GitHubHosts, githubHosts } from './hosts.js'
 import type { PrRef } from './pullRequest.js'
 
 const run = promisify(execFile)
@@ -23,20 +24,25 @@ export interface BranchTarget {
   head: string
 }
 
-/** `git@github.com:Owner/Repo.git`, `https://github.com/owner/repo`, `ssh://git@host/o/r.git` → host and repo. */
-export function parseRemote(url: string): { host: string; repository: string } | undefined {
-  const m = (
-    /^[\w.-]+@(?<host>[^:/]+):(?<repo>[^/]+\/[^/]+?)(?:\.git)?\/?$/.exec(url) ??
-    /^(?:https?|ssh|git):\/\/(?:[^@/]+@)?(?<host>[^/:]+)(?::\d+)?\/(?<repo>[^/]+\/[^/]+?)(?:\.git)?\/?$/.exec(url)
-  )?.groups
+/**
+ * `git@github.com:Owner/Repo.git`, `https://github.com/owner/repo`, `ssh://git@host/o/r.git` → host
+ * and repo, for a host tern trusts (hosts.ts): github.com or a listed enterprise host. The checkout
+ * names the remote, so a clone of another server gets no token.
+ */
+export function parseRemote(url: string, hosts: GitHubHosts = githubHosts()): { host: string; repository: string } | undefined {
+  const scp = /^[\w.-]+@(?<host>[^:/]+):(?<repo>[^/]+\/[^/]+?)(?:\.git)?\/?$/.exec(url)?.groups
+  const full = /^(?<scheme>https?|ssh|git):\/\/(?:[^@/]+@)?(?<host>[^/:]+)(?<port>:\d+)?\/(?<repo>[^/]+\/[^/]+?)(?:\.git)?\/?$/.exec(url)?.groups
+  const m = scp ?? full
 
   if (!m) {
     return undefined
   }
 
-  const host = (m['host'] ?? '').toLowerCase()
+  // An https remote's port is the web server's, and so the API's; an ssh one's is not.
+  const port = full?.['scheme']?.startsWith('http') ? (full['port'] ?? '') : ''
+  const trusted = hosts.trusted(`${m['host'] ?? ''}${port}`)
 
-  return host === 'github.com' || host.split('.').includes('github') ? { host, repository: (m['repo'] ?? '').toLowerCase() } : undefined
+  return trusted ? { host: trusted.host, repository: (m['repo'] ?? '').toLowerCase() } : undefined
 }
 
 async function git(cwd: string, ...args: string[]): Promise<string> {
@@ -46,14 +52,14 @@ async function git(cwd: string, ...args: string[]): Promise<string> {
 }
 
 /** Where the checkout at `cwd` pushes its branch; undefined off a branch, on the default branch, or off GitHub. */
-export async function branchTarget(cwd: string): Promise<BranchTarget | undefined> {
+export async function branchTarget(cwd: string, hosts: GitHubHosts = githubHosts()): Promise<BranchTarget | undefined> {
   try {
     const branch = await git(cwd, 'symbolic-ref', '--quiet', '--short', 'HEAD')
     const [remote = '', ref = ''] = (
       await git(cwd, 'for-each-ref', '--format=%(upstream:remotename)%00%(upstream:remoteref)', `refs/heads/${branch}`)
     ).split('\u0000')
     const name = remote || 'origin'
-    const parsed = parseRemote(await git(cwd, 'remote', 'get-url', name))
+    const parsed = parseRemote(await git(cwd, 'remote', 'get-url', name), hosts)
     const head = ref.replace(/^refs\/heads\//, '') || branch
     const fallback = ['main', 'master']
     const defaultBranch = (await git(cwd, 'symbolic-ref', '--quiet', '--short', `refs/remotes/${name}/HEAD`).catch(() => '')).replace(

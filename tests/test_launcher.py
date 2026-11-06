@@ -16,6 +16,7 @@ def tern(monkeypatch):
     # The package's Python halves are not under test here.
     for name in ("connections", "pull_requests"):
         monkeypatch.setitem(sys.modules, f"tern_pkg.{name}", types.ModuleType(name))
+    sys.modules["tern_pkg.pull_requests"].enterprise_hosts = lambda: []
     spec = importlib.util.spec_from_file_location("tern_pkg", ROOT / "__init__.py", submodule_search_locations=[str(ROOT)])
     module = importlib.util.module_from_spec(spec)
     monkeypatch.setitem(sys.modules, "tern_pkg", module)
@@ -50,4 +51,15 @@ def test_a_restored_pane_tells_the_frontend(tern, monkeypatch, tmp_path):
     with pytest.raises(SystemExit):
         tern._run(argparse.Namespace(tui_args=["-m", "x"], worktree=False))
     assert seen == [(["--resume", "root", "-m", "x"],
-                     {"HERMES_TERN_LAUNCH_CWD": str(tmp_path), "HERMES_TERN_RESTORED": "root"})]
+                     {"HERMES_TERN_LAUNCH_CWD": str(tmp_path), "HERMES_TERN_RESTORED": "root",
+                      "HERMES_TERN_GITHUB_ENTERPRISE_HOSTS": ""})]
+
+
+def test_the_frontend_learns_the_listed_enterprise_hosts(tern, monkeypatch):
+    # The frontend sends the enterprise token only to these; an empty list clears an inherited value.
+    monkeypatch.setattr(tern.pull_requests, "enterprise_hosts", lambda: ["ghe.corp.example", "git.corp.example:8443"])
+    seen = []
+    monkeypatch.setattr(tern, "_chat", lambda flags, tui_dir, env=None: seen.append(env) or 0)
+    with pytest.raises(SystemExit):
+        tern._run(argparse.Namespace(tui_args=[], worktree=False))
+    assert seen[0]["HERMES_TERN_GITHUB_ENTERPRISE_HOSTS"] == "ghe.corp.example,git.corp.example:8443"
