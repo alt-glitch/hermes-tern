@@ -30363,19 +30363,70 @@ function toTodos(raw2) {
 
 // src/view/todos.tsx
 function checklistNode(todos2) {
+  const phases = todoPhases(todos2);
+  if (phases.length < 2) {
+    return /* @__PURE__ */ jsx("checklist", { mode: "full", phases }, "list");
+  }
+  return /* @__PURE__ */ jsx("col", { role: "hermes.todos.phases", children: phases.map((ph) => /* @__PURE__ */ jsx("checklist", { mode: "full", phases: [ph] }, ph.id ?? "")) }, "list");
+}
+function todoPanelNode(todos2) {
+  const { done, total } = todoProgress(todos2);
+  return /* @__PURE__ */ jsxs("col", { role: "hermes.todos", children: [
+    /* @__PURE__ */ jsxs("row", { role: "hermes.todos.head", children: [
+      /* @__PURE__ */ jsx("text", { role: "hermes.todos.title", spans: [{ t: "Todos" }], wrap: "none" }, "title"),
+      /* @__PURE__ */ jsx("text", { role: "hermes.todos.count", spans: [{ s: "muted", t: `${done} of ${total} done` }], wrap: "none" }, "count")
+    ] }, "head"),
+    /* @__PURE__ */ jsx("col", { role: "hermes.todos.list", children: checklistNode(todos2) }, "body")
+  ] }, "todos");
+}
+function todoPhases(todos2) {
   const item3 = (t2) => ({ id: t2.id, status: TODO_LOOK[t2.status].item, text: t2.content });
-  const roots = todos2.filter((t2) => !t2.parent);
-  const nested = todos2.some((t2) => t2.parent);
-  const phases = nested ? roots.map((r) => {
-    const kids = todos2.filter((t2) => t2.parent === r.id);
-    return {
-      collapsed: kids.length > 0 && kids.every((k) => k.status === "completed"),
-      id: r.id,
-      items: kids.length ? kids.map(item3) : [item3(r)],
-      title: r.content
-    };
-  }) : [{ id: "all", items: roots.map(item3) }];
-  return /* @__PURE__ */ jsx("checklist", { mode: "full", phases }, "list");
+  if (!todos2.some((t2) => t2.parent)) {
+    return [{ id: "all", items: todos2.map(item3) }];
+  }
+  const byId = new Map(todos2.map((t2) => [t2.id, t2]));
+  const rootOf = (t2) => {
+    const seen = /* @__PURE__ */ new Set();
+    let cur = t2;
+    while (cur.parent && !seen.has(cur.id)) {
+      seen.add(cur.id);
+      const up = byId.get(cur.parent);
+      if (!up) {
+        break;
+      }
+      cur = up;
+    }
+    return cur;
+  };
+  const under = /* @__PURE__ */ new Map();
+  for (const t2 of todos2) {
+    const root7 = rootOf(t2);
+    if (root7 !== t2) {
+      under.set(root7.id, [...under.get(root7.id) ?? [], t2]);
+    }
+  }
+  const phases = [];
+  let loose2 = [];
+  const flush = () => {
+    if (loose2.length) {
+      phases.push({ id: `loose:${loose2[0]?.id ?? ""}`, items: loose2.map(item3) });
+      loose2 = [];
+    }
+  };
+  for (const t2 of todos2) {
+    if (rootOf(t2) !== t2) {
+      continue;
+    }
+    const kids = under.get(t2.id);
+    if (!kids) {
+      loose2.push(t2);
+      continue;
+    }
+    flush();
+    phases.push({ collapsed: kids.every((k) => k.status === "completed"), id: `parent:${t2.id}`, items: kids.map(item3), title: t2.content });
+  }
+  flush();
+  return phases;
 }
 
 // src/view/tools/cards/inline.tsx
@@ -30439,7 +30490,8 @@ function todoCount(todos2) {
   if (!todos2?.length) {
     return void 0;
   }
-  return `${todos2.filter((t2) => t2.status === "completed").length}/${todos2.length}`;
+  const { done, total } = todoProgress(todos2);
+  return `${done}/${total}`;
 }
 var MARK = { cancelled: "\u2717", completed: "\u2713", in_progress: "\u2192", pending: "\u25CB" };
 function planStep(before, after) {
@@ -66300,15 +66352,78 @@ var STYLES = css`
     }
   }
 
-  /* The todo list, opened from its pill: a panel above the composer. */
+  /* The todo list, opened from its pill: a panel above the composer, filled as the composer is.
+     That fill (--pop-bg, --raise) and --l1 can be translucent, so it lies on --panel and the
+     transcript never shows through. A head with the count; the list scrolls under it. */
   [data-role='hermes.todos'] {
-    width: min(736px, calc(100% - 8px));
+    width: min(736px, calc(100% - 24px));
     margin: 0 auto 8px !important;
-    padding: 8px 12px !important;
-    border-radius: 10px;
-    background: var(--l1);
-    max-height: 260px;
-    overflow: auto;
+    border-radius: 12px;
+    background:
+      linear-gradient(light-dark(var(--pop-bg), var(--raise)), light-dark(var(--pop-bg), var(--raise))),
+      var(--panel);
+    backdrop-filter: blur(18px) saturate(130%);
+    box-shadow: 0 0 0 1px var(--l2);
+    overflow: hidden;
+    font: 400 13px/20px var(--sans) !important;
+  }
+
+  [data-role='hermes.todos.head'] {
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 8px 14px 7px !important;
+    box-shadow: inset 0 -1px 0 var(--l2);
+  }
+
+  [data-role='hermes.todos.title'] {
+    font: 600 12px/18px var(--sans) !important;
+    color: var(--t2);
+  }
+
+  [data-role='hermes.todos.count'] {
+    font: 400 12px/18px var(--sans) !important;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* The list fades out over its bottom padding: at its end the fade covers only that padding,
+     and while more is below, the last row it shows fades into the edge. */
+  [data-role='hermes.todos.list'] {
+    max-height: min(280px, 40vh);
+    overflow: hidden auto;
+    padding: 6px 14px 18px !important;
+    mask-image: linear-gradient(to bottom, var(--t1) calc(100% - 18px), transparent);
+  }
+
+  /* A checklist item (the panel's and the Todo card's): a wrapped item keeps its mark on its first
+     line, and a done one recedes, its check plain and its strike faint. */
+  .sf-checklist.full .sf-ck-item {
+    align-items: flex-start;
+  }
+
+  .sf-checklist.full .sf-ck-item > .sf-ck-t {
+    padding: 2px 0;
+    line-height: 20px;
+  }
+
+  .sf-checklist.full .sf-ck-item > .sf-ck-g {
+    margin-top: 5px;
+  }
+
+  .sf-checklist.full .sf-ck-item.st-done .sf-ck-g {
+    background: none;
+    color: var(--ok);
+    opacity: 0.7;
+  }
+
+  .sf-checklist.full .sf-ck-item.st-done .sf-ck-g .ico {
+    width: 12px;
+    height: 12px;
+  }
+
+  .sf-checklist.full .sf-ck-item.st-done .sf-ck-t {
+    color: var(--t3);
+    text-decoration-color: var(--l3);
   }
 
   [data-role='hermes.todos.pill'] .sf-meter {
@@ -68371,9 +68486,7 @@ function dockNodes(cx, on) {
     nodes.push(queuedNode(cx.queue.rows, { edit: on.onQueueEdit, steer: cx.queue.canSteer ? on.onQueueSteer : void 0 }));
   }
   if (p3.todos?.open) {
-    nodes.push(
-      /* @__PURE__ */ jsx("col", { role: "hermes.todos", children: checklistNode(p3.todos.list) }, "todos")
-    );
+    nodes.push(todoPanelNode(p3.todos.list));
   }
   const reconnect = reconnectNode(p3.reconnecting, cx.now);
   if (reconnect) {
