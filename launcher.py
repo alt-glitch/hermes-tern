@@ -52,6 +52,9 @@ CLIENT_ENV_NAMES = ("PATH", "VIRTUAL_ENV", "GOPATH", "GOROOT", "CARGO_HOME", "RU
 CLIENT_ENV_PREFIXES = ("CONDA_", "NODE_", "NVM_", "PYENV_")
 SECRET_WORDS = ("KEY", "TOKEN", "SECRET", "PASSWORD", "PASSWD", "AUTH", "CREDENTIAL", "COOKIE", "SESSION")
 
+# Launch flags a shell can export instead of passing (as `hermes chat` reads them).
+ENV_FLAGS = {"yolo": "HERMES_YOLO_MODE", "ignore_rules": "HERMES_IGNORE_RULES", "accept_hooks": "HERMES_ACCEPT_HOOKS"}
+
 S = argparse.SUPPRESS
 # (flags, argparse options, the `hermes chat` flag it maps back to). SUPPRESS defaults: a flag left
 # out keeps the value Hermes' top-level parser put on the namespace (`hermes -m x tern`).
@@ -83,6 +86,10 @@ FLAGS: list[tuple[tuple[str, ...], dict[str, Any]]] = [
 def setup(parser: argparse.ArgumentParser) -> None:
     for names, options in FLAGS:
         parser.add_argument(*names, default=S, **options)
+
+
+def _truthy(value: Optional[str]) -> bool:
+    return (value or "").strip().lower() in {"1", "true", "yes", "on"}
 
 
 def _opt(args: argparse.Namespace, name: str) -> Any:
@@ -155,8 +162,9 @@ def latest_session() -> Optional[str]:
     """The last session of this workspace, else the last one anywhere."""
     with contextlib.suppress(Exception), _db() as db:
         workspace = _workspace()
-        for sources in CONTINUE_SOURCES:
-            for scope in ({"workspace_key": workspace}, {}):
+        # This workspace first, for either kind of session; only then anywhere.
+        for scope in ({"workspace_key": workspace}, {}):
+            for sources in CONTINUE_SOURCES:
                 found = db.search_sessions(limit=1, skip_launch_stubs=True, **sources, **scope)
                 if found:
                     return found[0]["id"]
@@ -236,7 +244,7 @@ def create_options(args: argparse.Namespace) -> dict[str, Any]:
     if (turns := _opt(args, "max_turns")) is not None:
         options["max_turns"] = int(turns) if str(turns).lstrip("-").isdigit() else str(turns).strip()
     for field in ("yolo", "ignore_rules", "checkpoints", "pass_session_id", "accept_hooks"):
-        if _opt(args, field):
+        if _opt(args, field) or _truthy(os.environ.get(ENV_FLAGS.get(field, ""))):
             options[field] = True
     if env := client_env():
         options["client_env"] = env
