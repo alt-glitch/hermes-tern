@@ -4,7 +4,7 @@
 // commands' sends. Two gates read the session's state: canSend (where a prompt goes) and
 // canSwitch (whether the view may move to another session); each entry point reads one of them.
 
-import type { GatewayClient } from '@tui/gatewayClient.js'
+import type { GatewayClient } from '@hermes/shared/gateway-client'
 
 import { type LiveSessionId, newInputId } from '../core/ids.js'
 import type { SessionState, SessionTicket } from '../session/state.js'

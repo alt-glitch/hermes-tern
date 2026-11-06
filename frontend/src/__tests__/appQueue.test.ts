@@ -4,11 +4,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { type App, busy, settle, setup } from './appSetup.js'
 import { given, key, must, type Reply } from './fakes.js'
 
-vi.mock('@tui/lib/history.js', () => ({ append: () => undefined, load: () => [] }))
+vi.mock('@hermes/shared/prompt-history', () => ({ append: () => undefined, load: () => [] }))
 
 beforeEach(() => {
-  delete process.env['HERMES_TUI_QUERY']
-  delete process.env['HERMES_TUI_IMAGE']
+  delete process.env['HERMES_TERN_QUERY']
+  delete process.env['HERMES_TERN_IMAGE']
 })
 
 afterEach(() => {

@@ -13,7 +13,7 @@ import { canDrain, canSend, canSwitch, type GateState } from '../turn/router.js'
 
 import { FakeGateway, fakeTern, given, key, type Reply, settle } from './fakes.js'
 
-vi.mock('@tui/lib/history.js', () => ({ append: () => undefined, load: () => [] }))
+vi.mock('@hermes/shared/prompt-history', () => ({ append: () => undefined, load: () => [] }))
 
 process.env['HERMES_HOME'] = mkdtempSync(join(tmpdir(), 'hermes-tern-gates-'))
 

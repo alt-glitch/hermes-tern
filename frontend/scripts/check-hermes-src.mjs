@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Compares the Hermes checkout `.hermes-src` points at with the commit this frontend is pinned to
 // (`hermes-src.lock`). `hermes update` moves that checkout under us, and the bundle inlines its
-// ui-tui and apps/shared sources, so a typecheck or test failure after an update may be Hermes'
+// apps/shared sources, so a typecheck or test failure after an update may be Hermes'
 // change, not ours. A mismatch only warns: bumping Hermes is a deliberate commit that rewrites the
 // lock (`git -C .hermes-src rev-parse HEAD > hermes-src.lock`).
 import { execFileSync } from 'node:child_process'
@@ -31,7 +31,7 @@ function git(...args) {
 
 const head = git('rev-parse', 'HEAD')
 // Only the sources the bundle inlines matter.
-const dirty = git('status', '--porcelain', '--', 'ui-tui/src', 'apps/shared')
+const dirty = git('status', '--porcelain', '--', 'apps/shared')
 
 console.log(`hermes-src: lock ${locked || '(none)'}, linked ${head ?? '(not a git checkout)'}${dirty ? ' with local changes' : ''}`)
 
@@ -46,5 +46,5 @@ if (!locked) {
 }
 
 if (dirty) {
-  console.warn('hermes-src: warning: the checkout has uncommitted changes under ui-tui/src or apps/shared')
+  console.warn('hermes-src: warning: the checkout has uncommitted changes under apps/shared')
 }

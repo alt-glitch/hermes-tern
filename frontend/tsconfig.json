@@ -2,6 +2,7 @@
   "compilerOptions": {
     "target": "ES2024",
     "lib": ["ES2024"],
+    "types": ["node"],
     "module": "nodenext",
     "moduleResolution": "nodenext",
     "jsx": "react-jsx",
@@ -17,10 +18,7 @@
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
     "noEmit": true,
-    "preserveSymlinks": true,
-    "paths": {
-      "@tui/*": ["./.hermes-src/ui-tui/src/*"]
-    }
+    "preserveSymlinks": true
   },
   "include": ["src/**/*.ts", "src/**/*.tsx"],
   "exclude": ["node_modules", "dist"]

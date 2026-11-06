@@ -49,12 +49,13 @@ def test_the_tools_hook_and_middleware_are_the_declared_ones(ctx):
     assert "provides_middleware: [tool_request]" in MANIFEST
 
 
-def test_the_tern_command_hands_its_flags_to_hermes_chat(ctx):
+def test_the_tern_command_parses_its_own_flags(ctx):
     ((_, cmd),) = ctx.of("register_cli_command")
     assert cmd["name"] == "tern"
     parser = argparse.ArgumentParser()
     cmd["setup_fn"](parser)
-    assert parser.parse_args(["-c", "--image", "a.png"]).tui_args == ["-c", "--image", "a.png"]
+    args = parser.parse_args(["-c", "--image", "a.png"])
+    assert args.continue_last is True and args.image == "a.png"
 
 
 def test_the_chart_task_has_a_plugin_namespaced_key(ctx):

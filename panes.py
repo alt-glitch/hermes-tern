@@ -7,9 +7,8 @@ writes ``plugin-data/hermes-tern/panes/<TERN_PANE>.json`` (``{session_id, cwd, u
 frontend/src/session/pane.ts) each time it adopts a session, and removes it when the user quits.
 
 When ``hermes tern`` starts again in that pane with no session flag (``-r``, ``-c``, ``-w``, or the
-plugin's own ``--new``), and the file's process is dead, the launcher resumes that conversation as
-``hermes chat --tui --resume <root id>`` would: Hermes follows the root to its compression tip and
-restores its folder. It does not when:
+plugin's own ``--new``), and the file's process is dead, the launcher resumes that conversation
+(``launcher.py``, its root id: the gateway follows it to its compression tip). It does not when:
 
 - the shell runs in another folder than the pane's launch folder or the session's own;
 - the session is gone from ``state.db``;
@@ -136,7 +135,8 @@ def _restorable(pane: str, folder: Path, cwd: str) -> Optional[str]:
 
 
 def plan(flags: list[str], env: Optional[Mapping[str, str]] = None, cwd: Optional[str] = None) -> tuple[list[str], Optional[str]]:
-    """The flags to run ``hermes chat --tui`` with, and the conversation resumed for the pane (or None).
+    """The launch's flags (as ``hermes chat`` takes them) with the pane's conversation resumed, and that
+    conversation's root id (or None).
 
     ``--new`` is dropped (``hermes chat`` does not know it) and forgets the pane's conversation."""
     env = os.environ if env is None else env

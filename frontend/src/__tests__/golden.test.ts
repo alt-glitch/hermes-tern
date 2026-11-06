@@ -17,7 +17,7 @@ vi.mock('node:crypto', async importOriginal => ({
   ...(await importOriginal<typeof import('node:crypto')>()),
   randomUUID: () => `00000000-0000-4000-8000-${String(++ids.n).padStart(12, '0')}`
 }))
-vi.mock('@tui/lib/history.js', () => ({ append: () => undefined, load: () => [] }))
+vi.mock('@hermes/shared/prompt-history', () => ({ append: () => undefined, load: () => [] }))
 vi.mock('../hermes/sessionIndex.js', async importOriginal => ({
   ...(await importOriginal<typeof import('../hermes/sessionIndex.js')>()),
   lastReply: () => '',

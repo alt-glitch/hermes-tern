@@ -6,7 +6,7 @@ import { join } from 'node:path'
 
 import type { Usage } from '@hermes/shared/gateway-events'
 import type { ServerRequest } from '@hermes/shared/json-rpc-channel'
-import type { SessionInfo } from '@tui/types.js'
+import type { SessionInfo } from '@hermes/shared/gateway-types'
 import { describe, expect, it } from 'vitest'
 
 import { Epoch } from '../core/epoch.js'
@@ -176,8 +176,7 @@ function recordingHost() {
       inflight: rec('transcript.inflight'),
       load: rec('transcript.load'),
       reset: ({ session }) => void log.push(`transcript.reset ${session}`)
-    },
-    writeActiveSession: id => void log.push(`writeActiveSession ${id}`)
+    }
   }
 
   return { host, log }
@@ -209,7 +208,6 @@ describe('adoptSteps', () => {
       'queue.reset',
       'showThoughts b',
       'markViewer sb sa',
-      'writeActiveSession sb',
       'markPane sb',
       'info',
       'usage',
@@ -274,7 +272,7 @@ function lifecycle() {
       cols: () => 80,
       drain: () => void log.push('drain'),
       gw: gw.client,
-      launch: { restored: false, resume: '', sessionCwd: '' },
+      launch: { create: {}, restored: false, resume: '', sessionCwd: '' },
       rename: () => Promise.resolve(),
       request: req => void log.push(`request ${req.id}`),
       sheets: { dropShared: () => undefined },

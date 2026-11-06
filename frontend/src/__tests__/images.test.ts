@@ -108,7 +108,7 @@ describe('splitPrompt: what a stored prompt carried', () => {
 })
 
 describe('a resumed prompt with images', () => {
-  const cx: TranscriptContext = { copy: () => undefined, now: 0, welcome: { tip: '', version: '' } }
+  const cx: TranscriptContext = { copy: () => undefined, now: 0, welcome: { version: '' } }
 
   it('shows its words without the refs, and its images as thumbnails over them', () => {
     const t = new Transcript()
@@ -306,15 +306,15 @@ describe('imageSize', () => {
   })
 })
 
-/** A clipboard read through Hermes' extractor (as off macOS), with `runner` in the extractor's place. */
+/** A clipboard read as on Linux under X11, with `runner` in xclip's place. */
 const clipboardOf = (runner: Runner): ClipboardReader => use =>
-  withClipboardImage(use, { HERMES_PYTHON_SRC_ROOT: dir }, (dest, env) => extractClipboardImage(dest, env, 'linux', runner))
+  withClipboardImage(use, { DISPLAY: ':0' }, (dest, env) => extractClipboardImage(dest, env, 'linux', runner))
 
-/** An extractor that writes the PNG to its destination, as one finding an image does. */
+/** A reader that writes the PNG to its destination, as one finding an image does. */
 const holding: Runner = async (_file, args) => {
-  writeFileSync(args[1] ?? '', PNG)
+  writeFileSync(args.at(-1) ?? '', PNG)
 
-  return 'true'
+  return ''
 }
 
 /** An extractor that finds no image. */
@@ -381,7 +381,7 @@ describe('Attachments: the draft\'s images', () => {
   })
 
   it('a clipboard that cannot be read says why', async () => {
-    const { a, notes } = attachments({ clipboard: clipboardOf(() => Promise.reject(new Error('no display'))) })
+    const { a, notes } = attachments({ clipboard: use => withClipboardImage(use, {}, () => Promise.reject(new Error('no display'))) })
 
     await a.fromClipboard(false)
 

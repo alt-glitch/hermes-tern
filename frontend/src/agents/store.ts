@@ -14,7 +14,7 @@ import { homedir } from 'node:os'
 import { join } from 'node:path'
 
 import type { SubagentEventPayload } from '@hermes/shared/gateway-events'
-import type { GatewayClient } from '@tui/gatewayClient.js'
+import type { GatewayClient } from '@hermes/shared/gateway-client'
 
 import type { Ticket } from '../core/epoch.js'
 import { errorCode } from '../core/errors.js'

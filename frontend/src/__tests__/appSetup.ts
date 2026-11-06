@@ -1,6 +1,6 @@
 // The app on the fakes, for the App tests: a fake Tern session and gateway, keys in and requests
-// out (see fakes.ts). A test file using it mocks '@tui/lib/history.js' itself, as vi.mock is
-// hoisted per file, and resets HERMES_TUI_QUERY and HERMES_TUI_IMAGE before each test.
+// out (see fakes.ts). A test file using it mocks '@hermes/shared/prompt-history' itself, as vi.mock is
+// hoisted per file, and resets HERMES_TERN_QUERY and HERMES_TERN_IMAGE before each test.
 import { mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'

@@ -30,7 +30,7 @@ describe('imagePathOf', () => {
 })
 
 describe('withClipboardImage', () => {
-  const env = { HERMES_PYTHON_SRC_ROOT: '/hermes' }
+  const env = {}
 
   it('hands the image to its user, then removes the temporary folder', async () => {
     let seen = ''
@@ -66,15 +66,14 @@ describe('extractClipboardImage', () => {
   const dir = mkdtempSync(join(tmpdir(), 'tern clip-'))
   const finder = join(dir, 'Photo 1.jpg')
   writeFileSync(finder, 'jpg')
-  const env = { HERMES_PYTHON_SRC_ROOT: '/hermes' }
 
-  /** A runner that answers osascript with `mac` (writing `dest` for 'true') and python with `py`. */
-  function runner(mac: string | Error, py = 'false') {
+  /** A runner that answers osascript with `mac` (writing `dest` for 'true'), and runs the Linux readers in `linux` (writing for 'png'). */
+  function runner(mac: string | Error, linux: Record<string, 'png' | 'none'> = {}) {
     const calls: string[] = []
     const run: Runner = async (file, args) => {
-      calls.push(file)
-
       if (file === 'osascript') {
+        calls.push(file)
+
         if (mac instanceof Error) {
           throw mac
         }
@@ -86,46 +85,52 @@ describe('extractClipboardImage', () => {
         return `${mac}\n`
       }
 
-      if (py === 'true') {
-        writeFileSync(must(args.at(-1)), 'png')
+      const tool = must(args[1]).split(' ')[0] ?? ''
+      calls.push(tool)
+
+      if (linux[tool] !== 'png') {
+        writeFileSync(must(args.at(-1)), '')
+        throw new Error(`${tool}: no image`)
       }
 
-      return py
+      writeFileSync(must(args.at(-1)), 'png')
+
+      return ''
     }
 
     return { calls, run }
   }
 
-  it('macOS: reads the pasteboard with JXA alone, without Hermes’ extractor', async () => {
+  it('macOS: reads the pasteboard with JXA', async () => {
     const dest = join(dir, 'a.png')
     const r = runner('true')
-    expect(await extractClipboardImage(dest, env, 'darwin', r.run)).toBe(dest)
+    expect(await extractClipboardImage(dest, {}, 'darwin', r.run)).toBe(dest)
     expect(r.calls).toEqual(['osascript'])
   })
 
-  it('macOS: no image is no image; the extractor is not asked again', async () => {
-    const r = runner('false', 'true')
-    expect(await extractClipboardImage(join(dir, 'b.png'), env, 'darwin', r.run)).toBeUndefined()
-    expect(r.calls).toEqual(['osascript'])
+  it('macOS: no image, or no osascript, is no image', async () => {
+    expect(await extractClipboardImage(join(dir, 'b.png'), {}, 'darwin', runner('false').run)).toBeUndefined()
+    expect(await extractClipboardImage(join(dir, 'b.png'), {}, 'darwin', runner(new Error('osascript: not found')).run)).toBeUndefined()
   })
 
   it('macOS: a Finder-copied image file is attached as it is; another file is no image', async () => {
-    expect(await extractClipboardImage(join(dir, 'c.png'), env, 'darwin', runner(`file:${finder}`).run)).toBe(finder)
-    expect(await extractClipboardImage(join(dir, 'c.png'), env, 'darwin', runner(`file:${join(dir, 'notes.txt')}`).run)).toBeUndefined()
+    expect(await extractClipboardImage(join(dir, 'c.png'), {}, 'darwin', runner(`file:${finder}`).run)).toBe(finder)
+    expect(await extractClipboardImage(join(dir, 'c.png'), {}, 'darwin', runner(`file:${join(dir, 'notes.txt')}`).run)).toBeUndefined()
   })
 
-  it('macOS: falls back to Hermes’ extractor only when osascript fails', async () => {
-    const dest = join(dir, 'd.png')
-    const r = runner(new Error('osascript: not found'), 'true')
-    expect(await extractClipboardImage(dest, env, 'darwin', r.run)).toBe(dest)
-    expect(r.calls).toEqual(['osascript', 'python3'])
-  })
+  it('Linux: wl-paste under Wayland, then xclip under X11; nothing without a display', async () => {
+    const both = { DISPLAY: ':0', WAYLAND_DISPLAY: 'wayland-0' }
+    const wayland = runner('false', { 'wl-paste': 'png' })
+    expect(await extractClipboardImage(join(dir, 'e.png'), both, 'linux', wayland.run)).toBe(join(dir, 'e.png'))
+    expect(wayland.calls).toEqual(['wl-paste'])
 
-  it('elsewhere: Hermes’ extractor; nothing without Hermes source to run it from', async () => {
-    const dest = join(dir, 'e.png')
-    const r = runner('true', 'true')
-    expect(await extractClipboardImage(dest, env, 'linux', r.run)).toBe(dest)
-    expect(r.calls).toEqual(['python3'])
-    expect(await extractClipboardImage(join(dir, 'f.png'), {}, 'linux', runner('true', 'true').run)).toBeUndefined()
+    const x11 = runner('false', { xclip: 'png' })
+    expect(await extractClipboardImage(join(dir, 'f.png'), both, 'linux', x11.run)).toBe(join(dir, 'f.png'))
+    expect(x11.calls).toEqual(['wl-paste', 'xclip'])
+
+    expect(await extractClipboardImage(join(dir, 'g.png'), both, 'linux', runner('false').run)).toBeUndefined()
+    const none = runner('false', { xclip: 'png' })
+    expect(await extractClipboardImage(join(dir, 'h.png'), {}, 'linux', none.run)).toBeUndefined()
+    expect(none.calls).toEqual([])
   })
 })
