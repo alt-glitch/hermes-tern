@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { EuiApprovalContext } from '../eui/host.js'
 import { HOST_APPROVE_ID } from '../eui/hostSnapshot.js'
 import { storedSessionId } from '../core/ids.js'
+import { RETAIN_TURNS } from '../view/retention-policy.js'
 
 import { settle, setup } from './appSetup.js'
 import { approvalCard } from './euiHostFixtures.js'
@@ -43,6 +44,20 @@ describe('App host card authority', () => {
     await settle()
     const oldId = must(buttonId(ops(), 'Create workspace'))
     expect(oldId).toContain('host-' + handle.revision)
+    if (retention) {
+      // Move the host panel beyond the retained turns, then prove the peer settled it.
+      const beforeSettlement = ops().length
+      for (let i = 0; i < RETAIN_TURNS + 1; i++) {
+        app.transcript.push({
+          kind: 'turn', id: app.transcript.id('fixture'), rev: 0, startedAt: i,
+          blocks: [{ kind: 'text', id: app.transcript.id('text'), text: 'Synthetic completed turn ' + i }],
+          end: { status: 'done', endedAt: i + 1 }
+        })
+      }
+      app.changed()
+      await settle()
+      expect(ops().slice(beforeSettlement)).toContainEqual(['settle', 'main.' + handle.id])
+    }
     const before = ops().length
     handle.update({
       ...approvalCard(), title: 'Updated plan',
