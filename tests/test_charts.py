@@ -107,3 +107,27 @@ def test_bad_params_fail_the_call_before_any_model_request(params, session_id):
 def test_an_older_hermes_without_plugin_rpc_gets_no_method():
     ctx = types.SimpleNamespace(llm=Llm(None))
     charts.register(ctx)  # no register_rpc: nothing to do, nothing raised
+
+
+def test_a_full_queue_refuses_and_a_request_that_waited_too_long_skips_the_model(monkeypatch):
+    llm = Llm(result(parsed={}))
+    ctx = Ctx(llm)
+    charts.register(ctx)
+    monkeypatch.setattr(charts, "_pending", charts.MAX_PENDING)
+    with pytest.raises(RuntimeError):
+        ctx.rpc["charts.author"](dict(PARAMS), session_id="s1")
+    monkeypatch.setattr(charts, "_pending", 0)
+
+    clock = iter([0.0, charts.DEADLINE_S])  # admitted at 0, started at the deadline
+    monkeypatch.setattr(charts.time, "monotonic", lambda: next(clock))
+    ctx.rpc["charts.author"](dict(PARAMS), session_id="s1")
+    assert ctx.done.wait(5)
+    assert ctx.events[0][2] == {"job": "j1", "error": "the request waited too long for a free model slot"}
+    assert not llm.calls and charts._pending == 0
+
+
+def test_the_model_call_gets_what_is_left_of_the_deadline(monkeypatch):
+    clock = iter([0.0, 30.0])
+    monkeypatch.setattr(charts.time, "monotonic", lambda: next(clock))
+    _, _, kwargs = call(result(parsed={}))
+    assert kwargs["timeout"] == min(charts.TIMEOUT_S, charts.DEADLINE_S - 30)

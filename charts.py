@@ -32,6 +32,7 @@ from __future__ import annotations
 import contextvars
 import logging
 import threading
+import time
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 
@@ -42,8 +43,13 @@ METHOD = "charts.author"
 EVENT = "charts.authored"
 MAX_TOKENS = 3000
 TIMEOUT_S = 90
-# Model calls at once, across the gateway's panes; more wait their turn.
+# Model calls at once, across the gateway's panes; more wait their turn, up to MAX_PENDING in all.
 WORKERS = 2
+MAX_PENDING = 8
+# The pane stops waiting after 120 s (author.ts REQUEST_TIMEOUT_MS), queue time included: a call
+# that waited too long in the queue is answered at once instead of spending a model request.
+DEADLINE_S = 110
+MIN_CALL_S = 20
 # Bounds on what a caller may send (any client this gateway authenticated can call the method).
 MAX_JOB_CHARS = 64
 MAX_TEXT_CHARS = 64 * 1024
@@ -52,6 +58,7 @@ INSTRUCTIONS = "Write the widget spec for this background process, as one JSON o
 
 _pool: ThreadPoolExecutor | None = None
 _pool_lock = threading.Lock()
+_pending = 0
 
 
 def _executor() -> ThreadPoolExecutor:
@@ -75,7 +82,7 @@ def _unavailable(error: BaseException) -> bool:
     return any(cls.__name__ == "AuxiliaryClientUnavailable" for cls in type(error).__mro__)
 
 
-def write_spec(llm: Any, system: str, user: str) -> dict[str, Any]:
+def write_spec(llm: Any, system: str, user: str, timeout: float = TIMEOUT_S) -> dict[str, Any]:
     """One model request; the reply as the event carries it (without ``job``)."""
     from agent.redact import redact_sensitive_text
 
@@ -83,7 +90,7 @@ def write_spec(llm: Any, system: str, user: str) -> dict[str, Any]:
         result = llm.complete_structured(
             task=TASK, system_prompt=system, instructions=INSTRUCTIONS,
             input=[{"type": "text", "text": redact_sensitive_text(user, force=True)}],
-            json_mode=True, max_tokens=MAX_TOKENS, timeout=TIMEOUT_S, purpose="job chart spec")
+            json_mode=True, max_tokens=MAX_TOKENS, timeout=timeout, purpose="job chart spec")
     except Exception as error:  # noqa: BLE001 - each failure is one of the reply's kinds
         if _unavailable(error):
             return {"unavailable": True}
@@ -106,11 +113,26 @@ def register(ctx) -> None:
             raise ValueError(f"job must be a non-empty string of at most {MAX_JOB_CHARS} characters")
         system, user = _text(params, "system"), _text(params, "user")
 
+        global _pending
+        with _pool_lock:
+            if _pending >= MAX_PENDING:
+                raise RuntimeError(f"{MAX_PENDING} chart requests are already waiting; try again later")
+            _pending += 1
+        admitted = time.monotonic()
+
         def run() -> None:
+            global _pending
             try:
-                reply = write_spec(ctx.llm, system, user)
+                left = DEADLINE_S - (time.monotonic() - admitted)
+                if left < MIN_CALL_S:
+                    reply = {"error": "the request waited too long for a free model slot"}
+                else:
+                    reply = write_spec(ctx.llm, system, user, timeout=min(TIMEOUT_S, left))
             except Exception as error:  # noqa: BLE001 - the pane must hear back either way
                 reply = {"error": f"{type(error).__name__}: {error}"}
+            finally:
+                with _pool_lock:
+                    _pending -= 1
             try:
                 ctx.emit_to_session(session_id, EVENT, {"job": job, **reply})
             except Exception:  # noqa: BLE001 - the session went away; nobody waits

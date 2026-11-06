@@ -249,19 +249,25 @@ export function gatewayAuthor(gw: AuthorGateway, sid: () => null | string): Auth
       waiting.set(job, r => (done(), resolve(r)))
     })
 
-    try {
-      await gw.request(AUTHOR_METHOD, { job, session_id: session, system: SYSTEM_PROMPT, user: renderPrompt(request) })
-    } catch (error) {
-      waiting.get(job)?.(undefined)
+    // A failed call ends the wait for its reply.
+    const ack = gw
+      .request(AUTHOR_METHOD, { job, session_id: session, system: SYSTEM_PROMPT, user: renderPrompt(request) })
+      .catch((error: unknown) => {
+        waiting.get(job)?.(undefined)
+        throw error
+      })
+    let answer: ReturnType<typeof readChartReply>
 
+    try {
+      // Both at once: an abort or a timeout while the call is still unanswered rejects right away.
+      ;[, answer] = await Promise.all([ack, reply])
+    } catch (error) {
       if (unknownMethod(error)) {
         return undefined
       }
 
       throw error
     }
-
-    const answer = await reply
 
     switch (answer?.kind) {
       case 'answer':

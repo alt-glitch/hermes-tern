@@ -79,6 +79,15 @@ describe('the gateway author', () => {
     await expect(gatewayAuthor(gateway(job => ({ answer: LOAD, job })), () => null)(request, signal())).rejects.toThrow('no session')
   })
 
+  it('stops waiting when the request is aborted before the call is answered', async () => {
+    const gw = Object.assign(new EventEmitter(), { request: () => new Promise<never>(() => undefined) })
+    const controller = new AbortController()
+    const asked = gatewayAuthor(gw, () => 'live-1')(request, controller.signal)
+
+    controller.abort(new Error('process ended'))
+    await expect(asked).rejects.toThrow('process ended')
+  })
+
   it('stops waiting when the request is aborted', async () => {
     const controller = new AbortController()
     const asked = gatewayAuthor(gateway(null), () => 'live-1')(request, controller.signal)
