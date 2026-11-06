@@ -20,7 +20,7 @@ import {
   unresolved,
   waiting
 } from '../../../connections/cards.js'
-import { verbOf } from '../../../connections/live.js'
+import { minutesLeft, verbOf } from '../../../connections/live.js'
 import { optional } from '../../../core/assert.js'
 import type { ToolCall } from '../../../model.js'
 import { namedStep } from '../steps.js'
@@ -164,10 +164,30 @@ function hintOf(card: ConnectCard, now: number): string {
     return 'Authorize in your browser. Hermes hears when every app is connected.'
   }
 
-  const minutes = Math.max(1, Math.ceil((card.op.deadlineAt * 1000 - now) / 60_000))
+  const minutes = minutesLeft(card.op, now)
   const authorize = card.targets.some(t => verbOf(t) === 'open' && t.url) ? 'Authorize in your browser. ' : ''
 
   return `${authorize}Hermes waits up to ${minutes} more minute${minutes === 1 ? '' : 's'}.`
+}
+
+/**
+ * What approving an MCP row runs or contacts, under the row until it resolves (Desktop's
+ * mcp-setup-tool.tsx): the gateway's scrubbed line in full, so the user sees what they consent to.
+ */
+function launchNode(card: ConnectCard, t: ConnectTarget, i: number): JSX.Element | null {
+  const l = t.launch
+
+  if (!l || card.settled || card.told || !unresolved(t)) {
+    return null
+  }
+
+  const lines = [l.kind === 'stdio' ? `Runs: ${l.target}` : `Connects to: ${l.target}`, ...(l.cwd ? [`Working dir: ${l.cwd}`] : []), ...(l.env ? [`Env: ${l.env.join(', ')}`] : [])]
+
+  return (
+    <row key={`l${i}`} role="hermes.connect.launch">
+      <text grow={1} key="t" spans={[{ s: 'mono muted', t: lines.join('\n') }]} wrap="word" />
+    </row>
+  )
 }
 
 /** One app's row: its mark, its name (and account), its state and why it failed, and its controls. */
@@ -222,7 +242,7 @@ function connectCard(call: ToolCall, now: number): Card {
   ) : null
 
   return {
-    body: [...targets.map((t, i) => rowNode(card, ref, t, i)), ...(foot ? [foot] : [])],
+    body: [...targets.flatMap((t, i) => [rowNode(card, ref, t, i), launchNode(card, t, i)].filter(n => n !== null)), ...(foot ? [foot] : [])],
     name: 'plug',
     // One app names itself on its row; several get a count.
     target: own.length > 1 ? `${own.filter(t => t.state === 'connected').length} of ${own.length} connected` : undefined,

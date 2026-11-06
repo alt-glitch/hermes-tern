@@ -28,6 +28,8 @@ the user's prompt, so one home covers every flow:
                    subtasks under parents), then a long answer for the open panel to sit over
     "connect APP…" -> (at the start) a manage_connections connect for the apps named (the
                    gateway's connection card; it mints real links under a guest identity)
+    "install APP…" -> (at the start) a manage_connections install of those local MCP servers (the
+                   card shows what Connect runs; approving it installs the server into the lab home)
     "connector…" -> (at the start) a tool search, a two-app connector batch and one connector call
     "replay ID" -> runs recorded job ID from $FAKE_MODEL_REPLAY/commands.json in the background,
                    and answers its chart request with $FAKE_MODEL_REPLAY/ID.spec.json (the rules
@@ -217,6 +219,11 @@ def _calls(prompt: str, target: Path) -> list[dict] | None:
         # connect, so the scratch home gets a guest identity and real links (nothing is authorized).
         apps = re.findall(r"[a-z][a-z0-9_-]*", words.split(None, 1)[1]) or ["figma"]
         return [_call("manage_connections", {"action": "connect", "connectors": apps}, "call-connect")]
+    if words.lstrip().startswith("install "):
+        # A manage_connections install of the catalog's local MCP servers named: the card shows what
+        # Connect would run. Approving it really installs the server into the lab's home.
+        apps = re.findall(r"[a-z][a-z0-9_-]*", words.split(None, 1)[1]) or ["figma"]
+        return [_call("manage_connections", {"action": "install", "connectors": [{"name": a, "mcp": True} for a in apps]}, "call-install")]
     if words.lstrip().startswith("connector"):
         # Connectors come through the tool_call bridge as a batch; the lab has none connected,
         # so each entry fails, which is what the batch view must show too.

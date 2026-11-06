@@ -304,6 +304,79 @@ describe('the connect card on the gateway wire', () => {
     expect(drawn).not.toContain('connect-')
   })
 
+  it('an MCP row shows what Connect runs before the user approves it', async () => {
+    const app = await started()
+    gw.event({ payload: {}, session_id: 's1', type: 'message.start' })
+    gw.event(toolStart('call_m'))
+    const launch = { cwd: '/tmp/work', env: ['LINEAR_URL'], kind: 'stdio', target: 'npx -y @linear/mcp --port 3000' }
+    gw.event(request('op6', 'call_m', [{ action: 'install', kind: 'mcp', launch, name: 'linear', state: 'pending' }]))
+    await flush()
+
+    const call = must(app.transcript.call(toolCallId('call_m')))
+    const drawn = view(call)
+    expect(drawn).toContain('Runs: npx -y @linear/mcp --port 3000')
+    expect(drawn).toContain('Working dir: /tmp/work')
+    expect(drawn).toContain('Env: LINEAR_URL')
+
+    // Resolved, the line goes: there is nothing left to consent to.
+    gw.event(update(3, [{ action: 'install', kind: 'mcp', launch, name: 'linear', state: 'connected' }], {}, 'op6'))
+    expect(view(call)).not.toContain('Runs:')
+  })
+
+  it('a request naming a finished call of the same id gets a row of its own', async () => {
+    const app = await started()
+    gw.event({ payload: {}, session_id: 's1', type: 'message.start' })
+    gw.event(toolStart())
+    gw.event({ payload: { name: 'manage_connections', result: '{"status": "ok"}', tool_id: 'call_f' }, session_id: 's1', type: 'tool.complete' })
+    await flush()
+
+    // A later turn's call reused the id: its card must not land on the finished row.
+    gw.event(request('op7', 'call_f'))
+    await flush()
+
+    expect(app.transcript.call(toolCallId('call_f'))?.connect).toBeUndefined()
+    expect(app.transcript.call(toolCallId('connect-op7'))?.connect).toMatchObject({ op: { id: 'op7' }, settled: undefined })
+  })
+
+  it("the tool's result replaces a stop the pane inferred from a 4004", async () => {
+    const { app, call } = await waitingOnFigma()
+    gw.handlers.set('connectors.operation.status', () => {
+      throw Object.assign(new Error('No open operation with that op_id.'), { code: 4004 })
+    })
+    app.stores.connect.watch()
+    await flush()
+    await flush()
+    expect(call.connect?.settled).toBe('stopped')
+
+    // The gateway dropped the operation just before the tool returned; the result says how it ended.
+    const result = { op_id: 'op1', seq: 5, settled_at: Date.now() / 1000, settled_by: 'continue', status: 'settled', targets: [{ kind: 'connector', name: 'figma', state: 'skipped' }] }
+    gw.event({ payload: { name: 'manage_connections', result: JSON.stringify(result), tool_id: 'call_f' }, session_id: 's1', type: 'tool.complete' })
+    await flush()
+    await flush()
+
+    expect(call.connect).toMatchObject({ settled: 'continued', targets: [{ state: 'skipped', url: FIGMA }] })
+    expect(view(call)).not.toContain('stopped watching')
+  })
+
+  it('the wait redraws as its minutes count down', async () => {
+    const { app, call } = await waitingOnFigma()
+    const start = Date.now()
+    const cx = (now: number): TranscriptContext => ({ copy: () => undefined, now, welcome: { tip: '', version: '' } })
+    const turn = (now: number) => JSON.stringify(entryNode(must(app.transcript.entries.findLast(e => e.kind === 'turn')), 'main.t', cx(now)))
+    gw.handlers.set('connectors.operation.status', () => ({ deadline_at: start / 1000 + 300, op_id: 'op1', seq: 2, settled: false, targets: [figma('initiated')] }))
+
+    app.stores.connect.watch()
+    await flush()
+    expect(turn(start)).toContain('up to 5 more minutes')
+    expect(call.connect?.settled).toBeUndefined()
+
+    // Two minutes on, nothing about the card changed but its countdown.
+    vi.spyOn(Date, 'now').mockReturnValue(start + 121_000)
+    app.stores.connect.watch()
+    await flush()
+    expect(turn(start + 121_000)).toContain('up to 3 more minutes')
+  })
+
   it('a typed message continues a card the tool waits on', async () => {
     const { app } = await waitingOnFigma()
 

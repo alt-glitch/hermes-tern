@@ -32,9 +32,10 @@ import {
   loadConnect,
   mayTell,
   POLL_MS,
+  resultCard,
   waiting
 } from './cards.js'
-import { answers, applyFrame, type LiveCard, liveCard, liveOpen, opParams, respondParams, retryParams, verbOf } from './live.js'
+import { answers, applyFrame, type LiveCard, liveCard, liveOpen, minutesLeft, opParams, respondParams, retryParams, verbOf } from './live.js'
 
 /**
  * How long a connect call that drew no card (a status read, a call with nothing to authorize) is
@@ -73,6 +74,10 @@ export class ConnectWatcher {
   readonly #seen = new Set<string>()
   /** Connect calls that drew no card, and when: not read again for NO_CARD_MS. */
   readonly #noCard = new WeakMap<object, number>()
+  /** The minutes each open live card's hint last showed. */
+  readonly #minutes = new WeakMap<ToolCall, number>()
+  /** Calls whose result already had its say over a `stopped` card. */
+  readonly #finals = new WeakSet<ToolCall>()
 
   /** `dir`: the plugin's data folder the card files are under (tests point it at their own). */
   constructor(host: WatcherHost, { dir }: { dir?: string } = {}) {
@@ -284,8 +289,23 @@ export class ConnectWatcher {
   #tickLive(call: ToolCall): boolean {
     const card = call.connect
 
+    if (card?.op && card.settled === 'stopped' && call.result !== undefined) {
+      this.#final(call, card.op)
+
+      return false
+    }
+
     if (!card?.op || card.settled) {
       return false
+    }
+
+    // The hint counts minutes down; an unchanged card is not redrawn, so the watcher redraws it.
+    const minutes = minutesLeft(card.op, Date.now())
+
+    if (this.#minutes.get(call) !== minutes) {
+      this.#minutes.set(call, minutes)
+      this.#host.transcript.mutateCall(call, () => undefined)
+      this.#host.changed()
     }
 
     if (call.result !== undefined) {
@@ -317,11 +337,14 @@ export class ConnectWatcher {
   /** Draws `live` on its call: the one its tool call id names, else a row for it, as the desktop upserts one. */
   #draw({ callId, card }: LiveCard) {
     const { transcript } = this.#host
-    let call = callId ? transcript.call(toolCallId(callId)) : transcript.lastCall(c => c.name === CONNECT_TOOL && c.outcome.kind === 'running' && !c.connect)
+    const named = callId ? transcript.call(toolCallId(callId)) : undefined
+    // A finished call of the same id (a model reusing ids across turns) is not this operation's.
+    const stale = named !== undefined && named.outcome.kind !== 'running'
+    let call = stale ? undefined : (named ?? transcript.lastCall(c => c.name === CONNECT_TOOL && c.outcome.kind === 'running' && !c.connect))
 
     if (!call) {
       // Its tool.start has not come, or a resume's history lacks the running call.
-      const id = callId ?? `connect-${card.op.id}`
+      const id = callId && !stale ? callId : `connect-${card.op.id}`
 
       transcript.toolStart({ args: { action: 'connect', connectors: card.targets.map(t => t.name) }, name: CONNECT_TOOL, tool_id: id })
       call = transcript.call(toolCallId(id))
@@ -370,7 +393,27 @@ export class ConnectWatcher {
     }
   }
 
-  /** Settles `call`'s live card by the pane's own word (`stopped`): nothing moves it any more. */
+  /**
+   * The tool's result over a card the pane settled as `stopped` by itself (its status read found no
+   * operation: the gateway drops it just before the tool returns). The result is the gateway's own
+   * account of how the rows ended, so it replaces the pane's guess, once.
+   */
+  #final(call: ToolCall, op: LiveOp) {
+    const card = call.connect
+    const final = this.#finals.has(call) ? undefined : resultCard(call)
+
+    this.#finals.add(call)
+
+    if (card && final && record(call.result)?.['op_id'] === op.id) {
+      const before = new Map(card.targets.map(t => [t.name, t]))
+      const targets = final.targets.map(t => ({ ...t, url: t.url ?? before.get(t.name)?.url }))
+
+      this.#host.transcript.mutateCall(call, c => (c.connect = { ...card, settled: final.settled, targets }))
+      this.#host.changed()
+    }
+  }
+
+  /** Settles `call`'s live card by the pane's own word (`stopped`): nothing moves it any more until the tool's result (#final). */
   #settle(call: ToolCall, reason: 'stopped') {
     const card = call.connect
 
