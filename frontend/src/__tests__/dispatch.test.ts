@@ -13,6 +13,7 @@ import { IGNORED } from '../gateway/coverage.js'
 import { HANDLERS, type Outcome } from '../gateway/dispatch.js'
 import { agentHandlers } from '../gateway/handlers/agents.js'
 import { chromeHandlers } from '../gateway/handlers/chrome.js'
+import { connectionHandlers } from '../gateway/handlers/connections.js'
 import { processHandlers } from '../gateway/handlers/processes.js'
 import { promptHandlers } from '../gateway/handlers/prompts.js'
 import { sessionHandlers } from '../gateway/handlers/session.js'
@@ -227,7 +228,7 @@ describe('what each event does to the pane', () => {
 
 describe('the handler tables', () => {
   it('name each event type once, and none of the ignored ones', () => {
-    const tables = [agentHandlers, chromeHandlers, processHandlers, promptHandlers, sessionHandlers, turnHandlers]
+    const tables = [agentHandlers, chromeHandlers, connectionHandlers, processHandlers, promptHandlers, sessionHandlers, turnHandlers]
     const names = tables.flatMap(table => Object.keys(table))
     const ignored: readonly string[] = IGNORED
 

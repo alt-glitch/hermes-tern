@@ -3360,7 +3360,7 @@
      {
       "k": "icon",
       "p": {
-       "name": "clock",
+       "name": "pending",
        "tone": "muted",
        "key": "i"
       }
@@ -3387,11 +3387,10 @@
      {
       "k": "row",
       "p": {
+       "align": "center",
        "actions": {
         "click": "connect-open=f61:linear"
        },
-       "align": "center",
-       "gap": "xs",
        "role": "hermes.connect.open",
        "title": "https://auth/l",
        "key": "go"
@@ -3401,6 +3400,7 @@
         "k": "text",
         "p": {
          "text": "Authorize ↗",
+         "wrap": "none",
          "key": "t"
         }
        }
@@ -3413,6 +3413,7 @@
     "p": {
      "align": "center",
      "gap": "sm",
+     "role": "hermes.connect.foot",
      "key": "foot"
     },
     "c": [
@@ -3423,7 +3424,7 @@
        "spans": [
         {
          "s": "muted",
-         "t": "Authorize in the browser. Hermes hears when every app is connected."
+         "t": "Authorize in your browser. Hermes hears when every app is connected."
         }
        ],
        "wrap": "word",
@@ -3433,10 +3434,10 @@
      {
       "k": "row",
       "p": {
+       "align": "center",
        "actions": {
         "click": "connect-continue=f61"
        },
-       "align": "center",
        "role": "hermes.connect.continue",
        "key": "go"
       },
@@ -3444,7 +3445,8 @@
        {
         "k": "text",
         "p": {
-         "text": "Done, continue",
+         "text": "Continue",
+         "wrap": "none",
          "key": "t"
         }
        }
@@ -3460,9 +3462,7 @@
     "collapsible": true,
     "name": "plug",
     "status": "done",
-    "target": "0 of 1 connected",
-    "targetKind": "text",
-    "title": "Connect apps",
+    "title": "Connect an app",
     "took": 1200,
     "key": "f61"
    },
@@ -3479,7 +3479,7 @@
       {
        "k": "icon",
        "p": {
-        "name": "clock",
+        "name": "pending",
         "tone": "muted",
         "key": "i"
        }
@@ -3506,11 +3506,10 @@
       {
        "k": "row",
        "p": {
+        "align": "center",
         "actions": {
          "click": "connect-open=f61:linear"
         },
-        "align": "center",
-        "gap": "xs",
         "role": "hermes.connect.open",
         "title": "https://auth/l",
         "key": "go"
@@ -3520,6 +3519,7 @@
          "k": "text",
          "p": {
           "text": "Authorize ↗",
+          "wrap": "none",
           "key": "t"
          }
         }
@@ -3532,6 +3532,7 @@
      "p": {
       "align": "center",
       "gap": "sm",
+      "role": "hermes.connect.foot",
       "key": "foot"
      },
      "c": [
@@ -3542,7 +3543,7 @@
         "spans": [
          {
           "s": "muted",
-          "t": "Authorize in the browser. Hermes hears when every app is connected."
+          "t": "Authorize in your browser. Hermes hears when every app is connected."
          }
         ],
         "wrap": "word",
@@ -3552,10 +3553,10 @@
       {
        "k": "row",
        "p": {
+        "align": "center",
         "actions": {
          "click": "connect-continue=f61"
         },
-        "align": "center",
         "role": "hermes.connect.continue",
         "key": "go"
        },
@@ -3563,7 +3564,8 @@
         {
          "k": "text",
          "p": {
-          "text": "Done, continue",
+          "text": "Continue",
+          "wrap": "none",
           "key": "t"
          }
         }

@@ -109,6 +109,16 @@ def test_other_surfaces_keep_the_tool_result(conn):
     assert conn.transform_tool_result(tool_name="terminal", result=RESULT, session_id="s1", tool_call_id="c1") is None
 
 
+def test_the_card_paths_settled_result_passes_unchanged(conn):
+    """The shared gateway draws the card itself: its settled result has no links, so no card file."""
+    view(conn, "s1")
+    settled = json.dumps({"op_id": "op7", "seq": 4, "settled_at": 1.0, "settled_by": "all_resolved", "status": "settled",
+                          "targets": [{"name": "figma", "kind": "connector", "state": "connected"}]})
+
+    assert hook(conn, settled) is None
+    assert not (conn.root / "connections" / "c1.op7.json").exists()
+
+
 def test_links_leave_the_model_result_and_the_watcher_sees_apps_connect(conn):
     view(conn, "s1")
     conn.lists.extend([
