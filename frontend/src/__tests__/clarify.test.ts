@@ -98,6 +98,23 @@ describe('the clarify sheet', () => {
     expect(texts(must(byRole(shown(), 'hermes.ask.keys')))).toEqual(['move', '/', 'toggle', 'submit', 'skip'])
   })
 
+  it('unchecks a drafted Other in a multiple choice, keeping its draft, and leaves it out of the answer', () => {
+    const { answers, overlay, shown } = sheet({ questions: [{ choices: ['a', 'b'], multi_select: true, qid: 'q0', question: 'Which?' }] })
+    const other = () => (must(byRole(shown(), 'omp.ask.options')).c ?? []).at(-1)?.p
+
+    overlay.onKey(key('1'))
+    overlay.onKey(key('3'))
+    overlay.onKey(key('x', { text: 'x' }))
+    overlay.onKey(key('escape'))
+    expect([other()?.['icon'], other()?.['detail']]).toEqual(['check', [{ s: 'dim', t: 'x' }]])
+
+    overlay.onKey(key('3'))
+    expect([other()?.['icon'], other()?.['detail']]).toEqual([undefined, [{ s: 'dim', t: 'x' }]])
+
+    overlay.onKey(key('enter'))
+    expect(answers).toEqual([{ answers: { q0: '["a"]' } }])
+  })
+
   it("shows the shared call's place and says Next until its last card", () => {
     const at = (index: number) =>
       texts(sheet({ place: { index, total: 3 }, questions: [{ choices: ['a'], qid: 'p1', question: 'Which?' }] }).shown())
@@ -110,7 +127,7 @@ describe('the clarify sheet', () => {
 })
 
 describe('a shared clarify card finds its place in the running call', () => {
-  function asked(running: ToolCall | undefined, question: string) {
+  function asked(running: ToolCall | undefined, question: string, choices?: string[]) {
     const requests: ServerRequest[] = []
     const cx: PromptsCx = {
       changed: () => undefined,
@@ -121,7 +138,7 @@ describe('a shared clarify card finds its place in the running call', () => {
       transcript: { lastCall: match => (running && match(running) ? running : undefined), notice: () => undefined }
     }
 
-    promptHandlers['clarify.request']({ payload: { execution_generation: 1, prompt_id: 'p1', question }, session_id: 's1', type: 'clarify.request' }, cx)
+    promptHandlers['clarify.request']({ payload: { execution_generation: 1, prompt_id: 'p1', question, ...(choices ? { choices } : {}) }, session_id: 's1', type: 'clarify.request' }, cx)
 
     const prompt = parsePrompt(must(requests[0]))
 
@@ -132,6 +149,15 @@ describe('a shared clarify card finds its place in the running call', () => {
 
   it('by its question among the call’s questions', () => {
     expect(asked(call(three, { outcome: { kind: 'running' } }), 'Two?')).toEqual({ index: 1, total: 3 })
+  })
+
+  it('by its choices when two questions read alike, and none when they still match both', () => {
+    const twins = { questions: [{ choices: ['a', 'b'], question: 'Which?' }, { choices: ['c', 'd'], question: 'Which?' }] }
+    const running = call(twins, { outcome: { kind: 'running' } })
+
+    expect(asked(running, 'Which?', ['c (Recommended)', 'd'])).toEqual({ index: 1, total: 2 })
+    expect(asked(running, 'Which?', ['e'])).toBeUndefined()
+    expect(asked(call({ questions: [{ question: 'Same?' }, { question: 'Same?' }] }, { outcome: { kind: 'running' } }), 'Same?')).toBeUndefined()
   })
 
   it('and has none for a one-question call, a question the call does not ask, or no running call', () => {

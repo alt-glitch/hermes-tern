@@ -62,6 +62,9 @@ export function askDetail({ args, result }: Raw): AskDetail {
   }
 }
 
+/** The `(Recommended)` suffix the backend adds to clarify's first choice on the wire (the call's args lack it). */
+export const RECOMMENDED = /\s*\(recommended\)\s*$/i
+
 /**
  * A question as the sheet and the card show it: the question itself (the sheet's title, the card's
  * head), and the context around it (the agent's reasons, its options spelled out). A question of several

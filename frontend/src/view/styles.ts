@@ -347,7 +347,7 @@ export const STYLES = css`
     font: 500 12px/20px var(--sans) !important;
   }
 
-  /* The clarify and approval sheets: Tern spaces omp's ask rows inside the dock's ask editor; in a
+  /* The clarify sheet's options: Tern spaces omp's ask rows inside the dock's ask editor; in a
      sheet the rows lose their padding, so the radio or checkbox sits under the label. */
   .sf-overlay[data-role='omp.overlay.ask'] .sf-list[data-role='omp.ask.options'] .sf-item {
     padding: 8px 12px 8px 40px !important;
