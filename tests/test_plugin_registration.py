@@ -36,7 +36,7 @@ def ctx():
 def test_registers_only_public_plugin_apis(ctx):
     assert {n for n, _, _ in ctx.calls} == {
         "register_cli_command", "register_auxiliary_task", "register_tool", "register_system_prompt_section",
-        "register_hook", "register_middleware", "register_rpc"}
+        "register_hook", "register_rpc", "register_session_env"}
 
 
 def test_the_tools_hook_and_middleware_are_the_declared_ones(ctx):
@@ -45,8 +45,7 @@ def test_the_tools_hook_and_middleware_are_the_declared_ones(ctx):
     assert f"provides_tools: [{', '.join(tools)}]" in MANIFEST
     assert [a[0] for a, _ in ctx.of("register_hook")] == ["transform_tool_result"]
     assert "provides_hooks: [transform_tool_result]" in MANIFEST
-    assert [a[0] for a, _ in ctx.of("register_middleware")] == ["tool_request"]
-    assert "provides_middleware: [tool_request]" in MANIFEST
+    assert not ctx.of("register_middleware") and "provides_middleware" not in MANIFEST
 
 
 def test_the_tern_command_parses_its_own_flags(ctx):
@@ -64,4 +63,4 @@ def test_the_chart_task_has_a_plugin_namespaced_key(ctx):
 
 
 def test_the_chart_writer_is_a_plugin_rpc_method(ctx):
-    assert [a[0] for a, _ in ctx.of("register_rpc")] == ["charts.author"]
+    assert [a[0] for a, _ in ctx.of("register_rpc")] == ["charts.author", "viewer.set", "viewer.clear", "viewer.shown"]

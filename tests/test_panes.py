@@ -17,14 +17,13 @@ def world(tmp_path, monkeypatch):
     folder = tmp_path / "panes"
     folder.mkdir()
     w = types.SimpleNamespace(
-        folder=folder, viewed=set(), alive={os.getpid()},
+        folder=folder, alive={os.getpid()},
         sessions={"root": {"cwd": "/work/repo"}, "tip": {"cwd": "/work/repo"}},
         lineage={"tip": ["root", "tip"]})
     monkeypatch.setattr(panes, "_connections", lambda: types.SimpleNamespace(
         _dir=lambda name: folder,
         _alive=lambda pid: pid in w.alive,
-        _lineage=lambda sid: w.lineage.get(sid, [sid]),
-        viewed_by_tern=lambda sid: bool(set(w.lineage.get(sid, [sid])) & w.viewed)))
+        _lineage=lambda sid: w.lineage.get(sid, [sid])))
     monkeypatch.setattr(panes, "_session", lambda sid: w.sessions.get(sid))
 
     def pane(name="7", **record):
@@ -82,11 +81,8 @@ def test_a_live_program_a_gone_session_or_a_broken_file_resume_nothing(world):
 
 
 def test_two_panes_never_take_one_conversation(world):
+    # A live pane showing it is the gateway's to know: the frontend asks before it resumes (viewer.shown).
     world.pane()
-    world.viewed.add("root")  # a live pane shows it, under its root
-    assert plan()[1] is None
-
-    world.viewed.clear()
     world.pane("8")
     assert plan(pane="7")[1] == "root"
     # Pane 7's launcher (this process) holds the claim; another launcher's pane 8 does not get it.

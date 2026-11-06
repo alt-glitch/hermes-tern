@@ -5,49 +5,33 @@ inherits ``TERN_PANE`` and Tern's CLI finds the chat's block. ``hermes tern`` at
 profile's shared gateway instead, which no pane started (or another pane did): its commands would
 run without the chat's pane, and ``tern`` would act beside whatever block Tern has focused.
 
-The pane writes its Tern variables into its viewer marker (``plugin-data/hermes-tern/viewers/
-<session>.json``, the frontend's ``markViewer``). A ``tool_request`` middleware (a public plugin
-API) prefixes each ``terminal`` command of a session such a pane shows (in the foreground, in the
-background, and the ones a Python cell's ``terminal()`` runs) with an ``export`` of that pane's
-variables, read when the call is made: concurrent sessions in one gateway each get their own
-pane, a subagent gets the pane of the conversation that delegated it, and a conversation resumed
-in another pane follows it. The middleware changes only what runs; the model's history keeps the
-command as it wrote it, and the frontend leaves the prefix out of what it shows.
+So the plugin gives each session's commands the Tern variables of the pane that shows it, through
+Hermes' public ``ctx.register_session_env``: Hermes calls :func:`pane_env` with the session id each
+time it starts a command's process (foreground, background, a Python cell's ``terminal()``). The
+pane says which session it shows over plugin RPC (``viewers.py``). The command itself is not
+changed, so what the agent wrote, what the approval sheet shows and what runs are the same text.
 
-A session no live pane shows keeps the gateway's own values: a gateway a pane started (the Ink
-TUI's, ``hermes chat``) keeps its pane, as before. A session that had a pane and lost it gets the
-gateway's values back (or none), so a stale pane does not linger in its shell.
+Concurrent sessions in one gateway each get their own pane, a subagent gets the pane of the
+conversation that delegated it, and a conversation resumed in another pane follows it. A session no
+live pane shows keeps the gateway's own values.
 """
 
 from __future__ import annotations
 
-import contextlib
-import json
 import logging
-import os
-import shlex
-import time
-from typing import Any
+from typing import Optional
+
+from . import viewers
 
 logger = logging.getLogger(__name__)
 
-# The variables a Tern pane sets that Tern's CLI reads to find the pane and its window.
-TERN_VARS = ("TERN_PANE", "TERN_PANE_SOCKET", "TERN_WINDOW_KEY", "TERN_WINDOW_SOCKET", "TERN_DAEMON_SOCKET")
-# The tools whose `command` runs in the session's shell.
-SHELL_TOOLS = frozenset({"terminal"})
-# Calls in a burst read one marker.
-FRESH_S = 1.0
-# What the prefix starts with; the frontend matches it to leave the prefix out of what it shows.
-MARK = "export TERN_PANE="
+TERN_VARS = viewers.TERN_VARS
 
-# Session id -> the ids its marker may be under (its delegator's compression lineage), newest first.
+# Session id -> the ids its pane may be under (its delegator's compression lineage), newest first.
 _ids: dict[str, list[str]] = {}
-_panes: dict[str, tuple[float, dict[str, str]]] = {}
-# Sessions whose commands were given a pane, so the pane can be taken back when it goes.
-_given: set[str] = set()
 
 
-def _marker_ids(session_id: str) -> list[str]:
+def _viewer_ids(session_id: str) -> list[str]:
     if session_id not in _ids:
         from . import connections, pull_requests
 
@@ -55,65 +39,18 @@ def _marker_ids(session_id: str) -> list[str]:
     return _ids[session_id]
 
 
-def pane_env(session_id: str) -> dict[str, str]:
-    """The Tern variables of the live ``hermes tern`` pane showing ``session_id``'s conversation, else {}."""
+def pane_env(session_id: str) -> dict[str, Optional[str]]:
+    """The Tern variables of the live ``hermes tern`` pane showing ``session_id``'s conversation (a
+    variable that pane lacks is unset), else {}: the command keeps the gateway's own values."""
     if not session_id:
         return {}
-    now = time.monotonic()
-    if (hit := _panes.get(session_id)) and now - hit[0] < FRESH_S:
-        return hit[1]
-    from . import connections
-
-    env: dict[str, str] = {}
-    viewers = connections._dir("viewers")
-    for sid in _marker_ids(session_id):
-        with contextlib.suppress(OSError, ValueError, KeyError, TypeError, AttributeError):
-            marker = json.loads((viewers / f"{sid}.json").read_text())
-            tern = marker.get("tern") or {}
-            if tern.get("TERN_PANE") and connections._alive(marker["pid"]):
-                env = {k: str(tern[k]) for k in TERN_VARS if tern.get(k)}
-                break
-    _panes[session_id] = (now, env)
-    return env
-
-
-def _assign(env: dict[str, str]) -> str:
-    """`export` of the set variables and `unset` of the others; starts with :data:`MARK` when the pane is set."""
-    names = sorted(TERN_VARS, key=lambda k: k != "TERN_PANE")
-    parts = []
-    if present := [k for k in names if env.get(k)]:
-        parts.append("export " + " ".join(f"{k}={shlex.quote(env[k])}" for k in present) + ";")
-    if absent := [k for k in names if not env.get(k)]:
-        parts.append("unset " + " ".join(absent) + ";")
-    return " ".join(parts) + " "
-
-
-def prefix(session_id: str) -> str:
-    """What goes before a command of ``session_id``: its pane's variables, the gateway's own once
-    a pane it had is gone, else nothing."""
-    if env := pane_env(session_id):
-        _given.add(session_id)
-        return _assign(env)
-    if session_id in _given:
-        _given.discard(session_id)
-        return _assign({k: os.environ[k] for k in TERN_VARS if os.environ.get(k)})
-    return ""
-
-
-def tool_request(tool_name: str = "", args: Any = None, session_id: str = "", **_: Any) -> dict[str, Any] | None:
-    """``tool_request`` middleware: a shell command runs with the session's pane."""
-    if tool_name not in SHELL_TOOLS or os.name == "nt" or not isinstance(args, dict):
-        return None
-    command = args.get("command")
-    if not isinstance(command, str) or not command.strip():
-        return None
-    try:
-        head = prefix(session_id)
-    except Exception:  # noqa: BLE001 - a broken marker must never stop a command
-        logger.debug("hermes-tern: no pane for %s", session_id, exc_info=True)
-        return None
-    return {"args": {**args, "command": head + command}} if head else None
+    viewer = viewers.viewer_of([session_id, *_viewer_ids(session_id)])
+    if viewer is None or not viewer.tern.get("TERN_PANE"):
+        return {}
+    return {k: viewer.tern.get(k) for k in TERN_VARS}
 
 
 def register(ctx) -> None:
-    ctx.register_middleware("tool_request", tool_request)
+    # Hermes before per-session environments: commands keep the gateway's own values.
+    if hasattr(ctx, "register_session_env"):
+        ctx.register_session_env(list(TERN_VARS), pane_env)

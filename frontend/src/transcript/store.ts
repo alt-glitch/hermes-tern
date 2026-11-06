@@ -18,7 +18,6 @@ import type { StoredCompaction } from '../hermes/compactions.js'
 import type { Counters, Entry, NoticeEntry, Todo, ToolCall, TurnEntry, UserAttachment } from '../model.js'
 import { nextVia, settleBridge, unwrap } from '../tools/bridge.js'
 import { detailOf } from '../tools/detail.js'
-import { withoutTernEnv } from '../tools/terminal.js'
 import { record } from '../wire/json.js'
 
 import { callIn, callsWhere, findCall, isBackgroundCall, isTodoName, isToolError, isWatchCall, type Located } from './calls.js'
@@ -26,7 +25,7 @@ import { Compactions } from './compactions.js'
 import { history, storedUser } from './history.js'
 import { continuation, displayNotice, failure, internalNotice, passable, type UserPrompt, userEntry } from './messages.js'
 import { currentTodos, todosOf, toTodos } from './todos.js'
-import { endThinking, shownArgs, trailingText, usageSince } from './turns.js'
+import { endThinking, trailingText, usageSince } from './turns.js'
 
 /** The ordered entries of one session, plus the event reducer that grows them. */
 export class Transcript {
@@ -302,9 +301,9 @@ export class Transcript {
     // A bridge call shows as the tool it runs (a connector batch as its entries).
     const u = unwrap(p.name, p.args ?? {})
     const call: ToolCall = {
-      args: shownArgs(u.args),
+      args: u.args,
       argsText: p.args_text ?? '',
-      context: withoutTernEnv(p.context ?? ''),
+      context: p.context ?? '',
       id: toolCallId(p.tool_id),
       name: u.name,
       outcome: { kind: 'running' },
@@ -362,7 +361,7 @@ export class Transcript {
 
     if (p.args) {
       const u = unwrap(p.name, p.args)
-      call.args = shownArgs(u.args)
+      call.args = u.args
       call.name = u.name
       call.via = nextVia(call.via, u.via)
     }

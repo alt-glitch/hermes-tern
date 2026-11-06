@@ -7048,6 +7048,14 @@
    }
   },
   {
+   "method": "plugin.hermes-tern.viewer.set",
+   "params": {
+    "session_id": "s1",
+    "pid": "<PID>",
+    "tern": {}
+   }
+  },
+  {
    "method": "process.list",
    "params": {
     "session_id": "s1"

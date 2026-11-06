@@ -10,7 +10,7 @@ import type { Agents } from '../agents/store.js'
 import type { NoticeStrip } from '../chrome/notices.js'
 import type { Sidebar } from '../chrome/sidebar.js'
 import type { ConnectWatcher } from '../connections/watcher.js'
-import { durable, type DurableSessionId, type LiveSessionId, type SessionIds, type SessionRef, type StoredSessionId } from '../core/ids.js'
+import { durable, type DurableSessionId, type LiveSessionId, type SessionIds, type SessionRef } from '../core/ids.js'
 import type { PullRequests } from '../github/store.js'
 import { storedCompactions } from '../hermes/compactions.js'
 import type { Media } from '../media.js'
@@ -70,8 +70,8 @@ export interface AdoptHost {
   readBusyMode(): void
   /** Asks the gateway to stream session `sid`'s reasoning. */
   showThoughts(sid: LiveSessionId): void
-  /** Names this pane the viewer of `now` (the plugin's connect results come here), no longer of `before`. */
-  markViewer(now: DurableSessionId, before: StoredSessionId | null): void
+  /** Tells the plugin this pane shows `now` (its commands get this pane, its connect results come here), no longer `before`. */
+  markViewer(now: SessionRef, before: SessionIds): void
   /** Records the shown session as this Tern pane's, which `hermes tern` resumes after the pane's program dies. */
   markPane(id: DurableSessionId): void
   /** Tells Tern the session's folder (OSC 7), when it moved. */
@@ -116,8 +116,8 @@ export function adoptSteps(host: AdoptHost): readonly Adoptable[] {
     { adopt: ({ ref }) => host.showThoughts(ref.live) },
     {
       adopt: ({ previous, ref }) => {
-        // This pane shows the session now: the plugin's Python half sends its connect results here as a card.
-        host.markViewer(durable(ref), previous.stored)
+        // This pane shows the session now: the plugin's Python half gives its commands this pane, and sends its connect results here.
+        host.markViewer(ref, previous)
         host.markPane(durable(ref))
       }
     },

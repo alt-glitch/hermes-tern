@@ -27,12 +27,13 @@ vi.mock('../hermes/sessionIndex.js', async importOriginal => ({
 const home = mkdtempSync(join(tmpdir(), 'hermes-tern-golden-'))
 process.env['HERMES_HOME'] = home
 
-/** `text` with this machine's paths replaced, so the snapshot reads the same anywhere. */
+/** `text` with this machine's paths and this process's id replaced, so the snapshot reads the same anywhere. */
 function scrub(text: string): string {
   const paths: [string, string][] = [
     [home, '<HERMES_HOME>'],
     [process.cwd(), '<CWD>'],
-    [homedir(), '<HOME>']
+    [homedir(), '<HOME>'],
+    [`"pid": ${process.pid}`, '"pid": "<PID>"']
   ]
 
   return paths.reduce((out, [path, name]) => out.split(path).join(name), text)

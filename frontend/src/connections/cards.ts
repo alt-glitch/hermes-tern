@@ -13,12 +13,11 @@
 // moves a row; a newer call for the same account replaces the card; a settled card is a static
 // summary with no controls and no polling, its unresolved rows not connected.
 
-import { existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, readdirSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 
 import { errorCode } from '../core/errors.js'
-import type { DurableSessionId } from '../core/ids.js'
 import { attempt } from '../core/result.js'
 import type { ToolCall } from '../model.js'
 import { appTitle } from '../tools/bridge.js'
@@ -155,38 +154,6 @@ export function claimTold(key: string, dir = dataDir()): Claim {
 /** Whether this pane tells the agent about `card`: no other pane claimed it (a claim it cannot write tells all the same). */
 export function mayTell(card: Pick<ConnectCard, 'key'>, dir = dataDir()): boolean {
   return !card.key || claimTold(card.key, dir).kind !== 'taken'
-}
-
-/** The Tern variables that name this pane, its window and their sockets: the agent's tools get them, so `tern` finds this pane. */
-export const TERN_PANE_VARS = ['TERN_PANE', 'TERN_PANE_SOCKET', 'TERN_WINDOW_KEY', 'TERN_WINDOW_SOCKET', 'TERN_DAEMON_SOCKET'] as const
-
-/** This pane's Tern variables (only the set ones), or undefined outside a Tern pane. */
-export function ternPane(env: NodeJS.ProcessEnv = process.env): Record<string, string> | undefined {
-  const vars = Object.fromEntries(TERN_PANE_VARS.flatMap(k => (env[k] ? [[k, env[k]]] : [])))
-
-  return vars['TERN_PANE'] ? vars : undefined
-}
-
-/**
- * Tells the plugin's Python half that this pane shows session `sid` (and stops claiming `previous`),
- * so its connect results come here as a card and the agent's `tern` commands find this pane. The
- * marker names this process; a dead one counts for nothing.
- */
-export function markViewer(sid: DurableSessionId | null, previous: DurableSessionId | null, dir = dataDir(), env: NodeJS.ProcessEnv = process.env) {
-  const viewers = join(dir, 'viewers')
-
-  try {
-    if (previous && previous !== sid) {
-      rmSync(join(viewers, `${previous}.json`), { force: true })
-    }
-
-    if (sid) {
-      mkdirSync(viewers, { recursive: true })
-      writeFileSync(join(viewers, `${sid}.json`), JSON.stringify({ pid: process.pid, tern: ternPane(env) }))
-    }
-  } catch {
-    // Without the marker, connect results keep the tool's own links: the card still reads them.
-  }
 }
 
 /** One app the call asked the user to authorize. */
