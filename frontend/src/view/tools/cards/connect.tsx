@@ -1,4 +1,10 @@
-// The manage_connections tool's connect card: the apps to authorize, their states, and Continue.
+// The manage_connections tool's connect card, after Hermes Desktop's (connector-tool.tsx,
+// connector-card.tsx): one row per app with its mark, its state and at most one verb (Authorize,
+// Connect, Try again), Not now while the app is still open, and Continue at the foot. Settled, it
+// is a static summary: the rows as they ended, no controls, and a line only when the wait ended
+// without the user (the deadline, a stopped turn, a link nobody watches).
+
+import type { JSX } from '@stencil-hq/tern'
 
 import {
   allConnected,
@@ -6,7 +12,10 @@ import {
   type ConnectCard,
   type ConnectTarget,
   connectTargets,
+  CONTINUE,
   isConnectCall,
+  resultCard,
+  sendingVerb,
   type SettleReason,
   unresolved,
   waiting
@@ -19,38 +28,59 @@ import type { Card, ToolView } from '../types.js'
 
 import { genericCard, humanize } from './generic.js'
 
-/** The manage_connections tool's view: the connect card while it has apps to authorize, else the generic card. */
+/** The manage_connections tool's view: the connect card when the call has apps to show, else the generic card. */
 export const connectView: ToolView<'manage_connections'> = {
   action: 'other',
-  card: (call, d) => (isConnectCall(call) ? connectCard(call) : genericCard(call, d, { name: call.name, title: humanize(call.name) })),
+  card: (call, d, now) => (isConnectCall(call) ? connectCard(call, now) : genericCard(call, d, { name: call.name, title: humanize(call.name) })),
   step: namedStep
 }
 
-interface ConnectLook {
-  icon: string
-  tone?: 'error' | 'muted' | 'pending' | 'success'
+type Tone = 'error' | 'muted' | 'pending' | 'success'
+
+/** A row's mark (an icon, or a spinner while the gateway or the browser works) and its state word. */
+interface Look {
+  mark: { icon: string; tone: Tone } | 'spinner'
+  tone: Tone
   word: string
 }
 
-/** Minted, not opened yet: the desktop's waiting cue belongs to a row the user opened. */
-const PENDING: ConnectLook = { icon: 'clock', tone: 'muted', word: 'needs authorizing' }
+const look = (icon: string, tone: Tone, word: string): Look => ({ mark: { icon, tone }, tone, word })
 
-const CONNECT_STATE: Record<string, ConnectLook> = {
-  connected: { icon: 'check', tone: 'success', word: 'connected' },
-  expired: { icon: 'clock', tone: 'error', word: 'link expired' },
-  failed: { icon: 'x', tone: 'error', word: 'failed' },
-  initiated: { icon: 'clock', tone: 'pending', word: 'waiting for your browser' },
-  not_connected: { icon: 'minus', tone: 'muted', word: 'not connected' },
-  pending: PENDING,
-  skipped: { icon: 'minus', tone: 'muted', word: 'skipped' },
-  superseded: { icon: 'minus', tone: 'muted', word: 'asked again below' }
+/** A link minted, not opened yet: the desktop's waiting cue belongs to a row the user opened. */
+const NEEDS = look('pending', 'muted', 'needs authorizing')
+const BROWSER: Look = { mark: 'spinner', tone: 'pending', word: 'waiting for your browser…' }
+/** An MCP row the gateway is installing or enabling, with no link for the user (yet). */
+const SETTING_UP: Look = { mark: 'spinner', tone: 'pending', word: 'setting up…' }
+const NOT_CONNECTED = look('minus', 'muted', 'not connected')
+
+const STATE: Record<string, Look> = {
+  connected: look('check', 'success', 'connected'),
+  expired: look('clock', 'error', 'link expired'),
+  failed: look('x', 'error', 'failed'),
+  not_connected: NOT_CONNECTED,
+  skipped: look('minus', 'muted', 'skipped'),
+  superseded: look('minus', 'muted', 'asked again below')
 }
 
-/** An MCP row the gateway is installing or enabling, with no link for the user (yet). */
-const WORKING: ConnectLook = { icon: 'clock', tone: 'pending', word: 'setting up' }
+/** What a row shows: as it ended once the card settled (an open row did not connect), else its live state. */
+function lookOf(card: ConnectCard, t: ConnectTarget): Look {
+  if (card.settled && waiting(t)) {
+    return NOT_CONNECTED
+  }
 
-/** Why a settled card stopped short of connecting every app. */
-const SETTLED_NOTE: Record<SettleReason, string> = {
+  if (t.state === 'pending' || t.state === 'initiated') {
+    if (!t.url) {
+      return t.state === 'initiated' ? SETTING_UP : NOT_CONNECTED
+    }
+
+    return card.opened.includes(t.name) ? BROWSER : NEEDS
+  }
+
+  return STATE[t.state] ?? NOT_CONNECTED
+}
+
+/** Why a card file settled short of connecting every app (the plugin's own watcher). */
+const FILE_NOTE: Record<SettleReason, string> = {
   all_resolved: 'All connected.',
   continued: 'Sent to Hermes.',
   deadline: 'Stopped waiting after 15 minutes. Ask Hermes to connect again.',
@@ -60,137 +90,143 @@ const SETTLED_NOTE: Record<SettleReason, string> = {
   superseded: 'A later request replaced this one.'
 }
 
-/** A clickable word on a row (`gap`) or the card's foot. */
-function button(key: string, act: string, label: string, role: string, { gap, title }: { gap?: 'xs'; title?: string | undefined } = { gap: 'xs' }) {
+/** Why the gateway's wait ended without the user; none when every app resolved or the user pressed Continue. */
+const GATEWAY_NOTE: Partial<Record<SettleReason, string>> = {
+  deadline: 'Hermes stopped waiting. Ask it to connect again.',
+  interrupt: 'The turn stopped before every app connected.',
+  stopped: 'Hermes stopped watching these links.'
+}
+
+/** A button: a verb (`go`), the quiet Not now (`quiet`), Continue (`foot`), or an answer in flight (no action). */
+function button(key: string, label: string, role: string, act?: string, title?: string): JSX.Element {
   return (
-    <row key={key} actions={{ click: act }} align="center" {...optional('gap', gap)} role={role} {...optional('title', title)}>
-      <text key="t" text={label} />
+    <row align="center" key={key} {...optional('actions', act ? { click: act } : undefined)} role={act ? role : 'hermes.connect.busy'} {...optional('title', title)}>
+      <text key="t" text={label} wrap="none" />
     </row>
   )
 }
 
-/** A row's buttons: the file path's Authorize, or the gateway's verb (Authorize, Connect, Try again) and Skip. */
-function rowButtons(card: ConnectCard, ref: string, t: ConnectTarget) {
-  if (card.settled) {
+/** What a row's answer in flight says, by the verb that sent it. */
+const SENDING: Record<string, string> = { approve: 'Connecting…', retry: 'Retrying…', skip: 'Skipping…' }
+
+/** A row's controls: its verb (Authorize, Connect, Try again) and Not now; one busy word while an answer is in flight. */
+function rowButtons(card: ConnectCard, ref: string, t: ConnectTarget): JSX.Element[] {
+  if (card.settled || card.told) {
     return []
   }
 
   const row = `${ref}:${t.name}`
+  const open = (label: string) => button('go', label, 'hermes.connect.open', `connect-open=${row}`, t.url)
 
+  // A card file has links only: Authorize, and the agent hears about the rest from Continue.
   if (!card.op) {
-    return t.url && waiting(t) ? [button('go', `connect-open=${row}`, 'Authorize ↗', 'hermes.connect.open', { gap: 'xs', title: t.url })] : []
+    return t.url && waiting(t) ? [open('Authorize ↗')] : []
   }
 
   const verb = verbOf(t)
 
+  const sending = sendingVerb(card, t.name)
+
+  if (sending) {
+    return [button('busy', SENDING[sending] ?? 'Sending…', '')]
+  }
+
   return [
-    ...(verb === 'open' && t.url ? [button('go', `connect-open=${row}`, 'Authorize ↗', 'hermes.connect.open', { gap: 'xs', title: t.url })] : []),
-    ...(verb === 'approve' ? [button('go', `connect-approve=${row}`, 'Connect', 'hermes.connect.approve')] : []),
-    ...(verb === 'retry' ? [button('go', `connect-retry=${row}`, 'Try again', 'hermes.connect.retry')] : []),
-    ...(unresolved(t) ? [button('skip', `connect-skip=${row}`, 'Skip', 'hermes.connect.skip')] : [])
+    ...(verb === 'open' && t.url ? [open(card.opened.includes(t.name) ? 'Open again ↗' : 'Authorize ↗')] : []),
+    ...(verb === 'approve' ? [button('go', 'Connect', 'hermes.connect.approve', `connect-approve=${row}`)] : []),
+    ...(verb === 'retry' ? [button('go', 'Try again', 'hermes.connect.retry', `connect-retry=${row}`)] : []),
+    ...(unresolved(t) ? [button('skip', 'Not now', 'hermes.connect.skip', `connect-skip=${row}`)] : [])
   ]
 }
 
-/** The card's last line once nothing waits on the user, or undefined while something does. */
-function noteOf(card: ConnectCard, open: readonly ConnectTarget[]): string | undefined {
+/** The line under a card nothing waits on any more, when it has something to say. */
+function noteOf(card: ConnectCard): string | undefined {
   const { settled } = card
 
   if (card.told) {
-    return open.length || (settled && settled !== 'all_resolved') ? 'Sent to Hermes.' : 'All connected. Hermes carries on.'
+    return settled && settled !== 'all_resolved' ? 'Sent to Hermes.' : 'All connected. Hermes carries on.'
   }
 
   if (!settled) {
     return undefined
   }
 
-  if (card.op) {
-    // The tool returned with the rows as they ended; Hermes reads them itself.
-    if (settled === 'all_resolved' || settled === 'continued') {
-      return allConnected(card) ? 'All connected.' : 'Hermes carries on.'
-    }
-
-    return settled === 'deadline' ? 'Hermes stopped waiting. Ask it to connect again.' : SETTLED_NOTE[settled]
+  if (card.gateway) {
+    return GATEWAY_NOTE[settled]
   }
 
-  return `${SETTLED_NOTE[settled]}${settled === 'error' && card.error ? ` ${card.error}` : ''}`
+  return `${FILE_NOTE[settled]}${settled === 'error' && card.error ? ` ${card.error}` : ''}`
 }
 
-/** The foot's hint while apps wait: what to do, and how long the gateway waits for a live card. */
-function hintOf(card: ConnectCard, open: readonly ConnectTarget[]): string {
-  if (!open.length) {
-    return 'All set.'
+/** The foot's hint while apps wait: what to do, and how much longer the gateway waits. */
+function hintOf(card: ConnectCard, now: number): string {
+  if (!card.op) {
+    return 'Authorize in your browser. Hermes hears when every app is connected.'
   }
 
-  if (card.op) {
-    const minutes = Math.max(1, Math.round(card.op.timeoutSeconds / 60))
+  const minutes = Math.max(1, Math.ceil((card.op.deadlineAt * 1000 - now) / 60_000))
+  const authorize = card.targets.some(t => verbOf(t) === 'open' && t.url) ? 'Authorize in your browser. ' : ''
 
-    return `Authorize in the browser, or skip. Hermes waits for every app, up to ${minutes} minute${minutes === 1 ? '' : 's'}.`
-  }
+  return `${authorize}Hermes waits up to ${minutes} more minute${minutes === 1 ? '' : 's'}.`
+}
 
-  return 'Authorize in the browser. Hermes hears when every app is connected.'
+/** One app's row: its mark, its name (and account), its state and why it failed, and its controls. */
+function rowNode(card: ConnectCard, ref: string, t: ConnectTarget, i: number): JSX.Element {
+  const l = lookOf(card, t)
+  const live = !card.settled && !card.told
+  const why = live && t.detail && l.tone === 'error' ? [{ s: 'muted', t: ` · ${t.detail}` }] : []
+  const needs = live && t.needs ? [{ s: 'muted', t: ` · needs ${t.needs.join(', ')}: set it up in Hermes Desktop` }] : []
+
+  return (
+    <row align="center" gap="sm" key={`t${i}`} role="hermes.connect.row">
+      {l.mark === 'spinner' ? <spinner key="i" style="dots" tone="accent" /> : <icon key="i" name={l.mark.icon} tone={l.mark.tone} />}
+      <text
+        grow={1}
+        key="n"
+        spans={[
+          { s: 'strong', t: t.title },
+          ...(t.alias ? [{ s: 'muted', t: ` (${t.alias})` }] : []),
+          { s: l.tone, t: `  ${l.word}` },
+          ...why,
+          ...needs
+        ]}
+        truncate="end"
+        wrap="none"
+      />
+      {rowButtons(card, ref, t)}
+    </row>
+  )
 }
 
 /**
- * The connect card `manage_connections` gets on the desktop: one row per app with its state and its
- * button (Authorize opens its link; on a live card also Connect, Try again and Skip), then Continue.
- * On a live card Continue ends the tool's wait; on a card file it tells the agent the user is done
- * (the tool's note asks it to wait for that, then check status). Settled, it is the desktop's
- * static summary: the rows as they ended, no controls.
+ * The connect card `manage_connections` gets on the desktop. On a live card Continue ends the
+ * tool's wait; on a card file it tells the agent the user is done (the tool's note asks it to wait
+ * for that, then check status).
  */
-function connectCard(call: ToolCall): Card {
-  const card = call.connect ?? { opened: [], targets: connectTargets(call), told: false }
-  const { settled, targets } = card
+function connectCard(call: ToolCall, now: number): Card {
+  const card = call.connect ?? resultCard(call) ?? { opened: [], targets: connectTargets(call), told: false }
+  const { targets } = card
   const ref = cardRef(call)
+  const own = targets.filter(t => t.state !== 'superseded')
+  const open = card.settled || card.told ? [] : targets.filter(card.op ? unresolved : waiting)
+  const note = noteOf(card)
+  const continuing = card.sending?.includes(CONTINUE)
 
-  // A settled card's unresolved rows did not connect (the desktop's settle).
-  const stateOf = (t: ConnectTarget) =>
-    settled && waiting(t) ? 'not_connected' : t.state === 'initiated' && t.url && !card.opened.includes(t.name) ? 'pending' : t.state
-
-  const lookOf = (t: ConnectTarget) => (!settled && t.state === 'initiated' && !t.url ? WORKING : (CONNECT_STATE[stateOf(t)] ?? PENDING))
-  const open = settled ? [] : targets.filter(card.op ? unresolved : waiting)
-
-  const rows = targets.map((t, i) => {
-    const look = lookOf(t)
-    const needs = !settled && t.needs ? [{ s: 'muted', t: ` · needs ${t.needs.join(', ')}: set it up in Hermes Desktop` }] : []
-
-    return (
-      <row align="center" gap="sm" key={`t${i}`} role="hermes.connect.row">
-        <icon key="i" name={look.icon} {...optional('tone', look.tone)} />
-        <text
-          grow={1}
-          key="n"
-          spans={[
-            { s: 'strong', t: t.title },
-            ...(t.alias ? [{ s: 'muted', t: ` (${t.alias})` }] : []),
-            { s: look.tone ?? 'muted', t: `  ${look.word}` },
-            ...(t.detail && look.tone === 'error' ? [{ s: 'muted', t: ` · ${t.detail}` }] : []),
-            ...needs
-          ]}
-          truncate="end"
-          wrap="none"
-        />
-        {rowButtons(card, ref, t)}
-      </row>
-    )
-  })
-
-  const note = noteOf(card, open)
+  const foot = open.length ? (
+    <row align="center" gap="sm" key="foot" role="hermes.connect.foot">
+      <text grow={1} key="hint" spans={[{ s: 'muted', t: hintOf(card, now) }]} wrap="word" />
+      {continuing ? button('go', 'Continuing…', '') : button('go', 'Continue', 'hermes.connect.continue', `connect-continue=${ref}`)}
+    </row>
+  ) : note ? (
+    <text key="note" role="hermes.connect.note" spans={[{ s: 'muted', t: note }]} wrap="word" />
+  ) : null
 
   return {
-    body: [
-      ...rows,
-      ...(note
-        ? [<text key="done" spans={[{ s: 'muted', t: note }]} wrap="word" />]
-        : [
-            <row align="center" gap="sm" key="foot">
-              <text grow={1} key="hint" spans={[{ s: 'muted', t: hintOf(card, open) }]} wrap="word" />
-              {open.length ? button('go', `connect-continue=${ref}`, 'Done, continue', 'hermes.connect.continue', {}) : null}
-            </row>
-          ])
-    ],
+    body: [...targets.map((t, i) => rowNode(card, ref, t, i)), ...(foot ? [foot] : [])],
     name: 'plug',
-    target: `${targets.filter(t => t.state === 'connected').length} of ${targets.filter(t => t.state !== 'superseded').length} connected`,
+    // One app names itself on its row; several get a count.
+    target: own.length > 1 ? `${own.filter(t => t.state === 'connected').length} of ${own.length} connected` : undefined,
     targetKind: 'text',
-    title: allConnected(card) ? 'Apps connected' : 'Connect apps'
+    title: allConnected(card) ? (own.length > 1 ? 'Apps connected' : 'App connected') : own.length > 1 ? 'Connect apps' : 'Connect an app'
   }
 }

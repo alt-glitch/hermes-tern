@@ -24,6 +24,7 @@ import {
   allConnected,
   cardRef,
   CONNECT_TOOL,
+  CONTINUE,
   type ConnectTarget,
   connectedMessage,
   continueMessage,
@@ -72,8 +73,6 @@ export class ConnectWatcher {
   readonly #seen = new Set<string>()
   /** Connect calls that drew no card, and when: not read again for NO_CARD_MS. */
   readonly #noCard = new WeakMap<object, number>()
-  /** A live card's answers in flight (`<op>:<app>`, `<op>:` for Continue): a second press waits for the first. */
-  readonly #sending = new Set<string>()
 
   /** `dir`: the plugin's data folder the card files are under (tests point it at their own). */
   constructor(host: WatcherHost, { dir }: { dir?: string } = {}) {
@@ -147,7 +146,7 @@ export class ConnectWatcher {
     }
 
     if (card.op) {
-      this.#answer(call, '', answers.continue())
+      this.#answer(call, CONTINUE, answers.continue())
 
       return
     }
@@ -173,7 +172,7 @@ export class ConnectWatcher {
   yieldOpen() {
     for (const call of this.#host.transcript.calls(CONNECT_TOOL)) {
       if (liveOpen(call.connect)) {
-        this.#answer(call, '', answers.continue())
+        this.#answer(call, CONTINUE, answers.continue())
       }
     }
   }
@@ -201,19 +200,21 @@ export class ConnectWatcher {
 
   /** A live card's Skip on app `name`. */
   skip(ref: string, name: string) {
-    this.#row(ref, name, (call, target) => this.#answer(call, name, answers.skip(target)))
+    this.#row(ref, name, (call, target) => this.#answer(call, `skip:${name}`, answers.skip(target)))
   }
 
   /** A live card's Connect on MCP app `name`: the gateway starts its install. */
   approve(ref: string, name: string) {
-    this.#row(ref, name, (call, target) => verbOf(target) === 'approve' && this.#answer(call, name, answers.approve(target)))
+    this.#row(ref, name, (call, target) => verbOf(target) === 'approve' && this.#answer(call, `approve:${name}`, answers.approve(target)))
   }
 
   /** A live card's Try again on app `name`, whose link failed or expired: the gateway mints a new one. */
   retry(ref: string, name: string) {
     this.#row(ref, name, (call, target, op) => {
       if (verbOf(target) === 'retry') {
-        this.#send(call, name, () => rpc(this.#host.gw, 'connectors.connect', retryParams(op, name)), `Could not start ${target.title} again`, reply =>
+        // The new link is not opened yet: the row waits on the user again, not on the browser.
+        this.#host.transcript.mutateCall(call, c => c.connect && (c.connect = { ...c.connect, opened: c.connect.opened.filter(n => n !== name) }))
+        this.#send(call, `retry:${name}`, () => rpc(this.#host.gw, 'connectors.connect', retryParams(op, name)), `Could not start ${target.title} again`, reply =>
           this.#apply(call, reply)
         )
       }
@@ -352,7 +353,7 @@ export class ConnectWatcher {
     this.#host.changed()
 
     if (answered) {
-      const params = respondParams({ deadlineAt: 0, id: op, seq: 0, session: sid, timeoutSeconds: 0 }, answers.continue())
+      const params = respondParams({ deadlineAt: 0, id: op, seq: 0, session: sid }, answers.continue())
 
       void rpc(this.#host.gw, 'connection.respond', params).catch((error: unknown) => this.#failed('Could not answer the connection card', error))
     }
@@ -390,7 +391,7 @@ export class ConnectWatcher {
     }
   }
 
-  /** `connection.respond` for `call`'s card (`row`: the app it answers, '' for Continue); the gateway's frames move the rows. */
+  /** `connection.respond` for `call`'s card (`row`: `<verb>:<app>`, or CONTINUE); the gateway's frames move the rows. */
   #answer(call: ToolCall, row: string, answer: ConnectionAnswer) {
     const op = call.connect?.op
 
@@ -399,21 +400,39 @@ export class ConnectWatcher {
     }
   }
 
-  /** Starts one answer of `call`'s card, unless that row's last one is still in flight; a refusal is a notice. */
+  /**
+   * Starts one answer of `call`'s card, unless that row's last one is still in flight; a refusal is a
+   * notice. The row is on the card's `sending` meanwhile, so its button says so.
+   */
   #send<T>(call: ToolCall, row: string, start: () => Promise<T>, failure: string, then?: (reply: T) => void) {
-    const key = `${call.connect?.op?.id ?? ''}:${row}`
+    const app = row.slice(row.indexOf(':') + 1)
 
-    if (this.#sending.has(key)) {
+    // One answer per row at a time (a Skip waits for a Try again of the same app), and one Continue.
+    if (!call.connect || call.connect.sending?.some(r => r === row || (row !== CONTINUE && r.endsWith(`:${app}`)))) {
       return
     }
 
-    this.#sending.add(key)
+    this.#sending(call, row, true)
     void start()
       .then(
         reply => then?.(reply),
         (error: unknown) => this.#failed(failure, error)
       )
-      .finally(() => this.#sending.delete(key))
+      .finally(() => this.#sending(call, row, false))
+  }
+
+  /** Puts row `row` of `call`'s card on its `sending` list, or takes it off. */
+  #sending(call: ToolCall, row: string, on: boolean) {
+    this.#host.transcript.mutateCall(call, c => {
+      const card = c.connect
+
+      if (card) {
+        const rest = (card.sending ?? []).filter(r => r !== row)
+
+        c.connect = { ...card, sending: on ? [...rest, row] : rest.length ? rest : undefined }
+      }
+    })
+    this.#host.changed()
   }
 
   /** An answer the gateway refused or never got: a notice, and the card stays as the gateway left it. */

@@ -25,10 +25,7 @@ import type {
 
 import { record } from '../wire/json.js'
 
-import { type ConnectCard, type ConnectTarget, type LiveOp, parseTargets, type SettleReason, unresolved } from './cards.js'
-
-/** How long the gateway waits when a payload does not say (operation.py OPERATION_DEADLINE_SECONDS). */
-export const DEFAULT_TIMEOUT_S = 300
+import { type ConnectCard, type ConnectTarget, type LiveOp, parseTargets, settleReason, unresolved } from './cards.js'
 
 /** A live card read from a payload, and the tool call that opened its operation. */
 export interface LiveCard {
@@ -57,9 +54,9 @@ export function liveCard(payload: unknown, session: string): LiveCard | undefine
   }
 
   const callId = typeof r['tool_call_id'] === 'string' && r['tool_call_id'] ? r['tool_call_id'] : undefined
-  const op: LiveOp = { deadlineAt, id, seq, session, timeoutSeconds: num(r['timeout_seconds']) ?? DEFAULT_TIMEOUT_S }
+  const op: LiveOp = { deadlineAt, id, seq, session }
 
-  return { callId, card: { op, opened: [], settled: settledBy(r), targets, told: false } }
+  return { callId, card: { gateway: true, op, opened: [], settled: settleReason(r), targets, told: false } }
 }
 
 /**
@@ -82,25 +79,7 @@ export function applyFrame(card: ConnectCard, frame: unknown): ConnectCard | und
   const before = new Map(card.targets.map(t => [t.name, t]))
   const targets = rows.length ? rows.map(t => ({ ...t, url: t.url ?? before.get(t.name)?.url })) : card.targets
 
-  return { ...card, op: { ...op, deadlineAt: num(r['deadline_at']) ?? op.deadlineAt, seq }, settled: settledBy(r), targets }
-}
-
-/** Why a frame says its operation settled (its `settled_by`, as cards.ts words it); undefined while it is open. */
-function settledBy(r: Record<string, unknown>): SettleReason | undefined {
-  if (r['settled'] !== true && num(r['settled_at']) === undefined) {
-    return undefined
-  }
-
-  switch (r['settled_by']) {
-    case 'all_resolved':
-    case 'deadline':
-    case 'interrupt':
-      return r['settled_by']
-    case 'continue':
-      return 'continued'
-    default:
-      return 'stopped'
-  }
+  return { ...card, op: { ...op, deadlineAt: num(r['deadline_at']) ?? op.deadlineAt, seq }, settled: settleReason(r), targets }
 }
 
 /** What a live row's button does: open its link, start an MCP install, run a dead link again, or nothing. */
