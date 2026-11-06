@@ -2,7 +2,7 @@
 // (shell.tsx) turns into a `tool` node, and the view each tool has in the registry
 // (registry.ts): its card, its step line and what it counts as in a work group.
 
-import type { JSX, Tone } from '@stencil-hq/tern'
+import type { JSX, Spans, Tone } from '@stencil-hq/tern'
 
 import type { ToolCall } from '../../model.js'
 import type { DetailOf, ToolKey } from '../../tools/detail.js'
@@ -11,7 +11,8 @@ import type { DetailOf, ToolKey } from '../../tools/detail.js'
 export interface Card {
   name: string
   title: string
-  target?: string | undefined
+  /** What the call acts on; styled spans when part of it should stand out (clarify's answer). */
+  target?: Spans | undefined
   targetKind?: 'command' | 'path' | 'pattern' | 'query' | 'text' | undefined
   role?: string | undefined
   /** The language of a command head; Tern's ToolProps has no `lang` yet, so the shell passes it through. */

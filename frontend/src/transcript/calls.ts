@@ -51,6 +51,9 @@ export function tookMs(call: Pick<ToolCall, 'outcome'>): number | undefined {
   return call.outcome.kind === 'running' ? undefined : call.outcome.duration
 }
 
+/** A clarify call: questions put to the user. */
+export const isAsk = (call: Pick<ToolCall, 'name'>) => call.name === 'clarify'
+
 /** The task tool's names: `todo_list`, and `todo`, the legacy alias in stored transcripts. */
 export function isTodoName(name: string): boolean {
   return name === 'todo_list' || name === 'todo'

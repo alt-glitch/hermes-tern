@@ -7,7 +7,9 @@ first-run prompts answered) and then serves until killed. What the model does is
 the user's prompt, so one home covers every flow:
 
     "approve"   -> a terminal call Hermes flags as dangerous (approval sheet); "approve long": a long one
-    "clarify"   -> a clarify call with choices (clarify sheet)
+    "clarify"   -> a clarify call with choices (clarify sheet); "clarify free": a typed answer,
+                   "clarify long": a multi-paragraph question, "clarify many": four long multi-select
+                   choices, "clarify several": three questions in one card
     "tool"      -> a harmless terminal call (tool card)
     "steps"     -> four calls in a row (commands, a read, a search), then an answer
     "work…"     -> (at the start) a turn like a real one: reasoning, short notes and tool calls
@@ -254,10 +256,39 @@ def _calls(prompt: str, target: Path) -> list[dict] | None:
             return [_call("terminal", {"command": f"cd {target} && {loop} && rm -rf -- {target}"})]
         return [_call("terminal", {"command": f"rm -rf -- {target}"})]
     if "clarify" in words:
-        return [_call("clarify", {"questions": [{"question": "Which colour?", "choices": ["red", "green", "blue"]}]})]
+        return [_call("clarify", {"questions": _clarify_questions(words)})]
     if "tool" in words:
         return [_call("terminal", {"command": "echo tool-ok && ls"})]
     return None
+
+
+CLARIFY_LONG = """I found two ways to migrate the session store, and they trade speed for safety:
+
+1. **Rewrite in place.** One pass over `state.db`, about 40 s on a 2 GB profile. A crash midway leaves a half-migrated file, so it needs a backup first.
+2. **Copy, then swap.** Writes a new file beside the old one and renames it at the end. Twice the disk for a minute, but the old file stays intact until the swap.
+
+Which one should I use for the profiles on this machine?"""
+
+# What each "clarify …" prompt asks: the clarify tool caps a question at four choices.
+CLARIFY = {
+    "free": [{"question": "What should the release be called?"}],
+    "long": [{"question": CLARIFY_LONG, "choices": ["Copy, then swap", "Rewrite in place, after a backup"]}],
+    "many": [{"question": "Which test suites should run before the merge?",
+              "choices": ["Unit tests for the gateway and the tools (fast, about 40 s, run on every push)",
+                          "The golden replays: every fixture in src/__tests__/fixtures fed through the app between scripted keys",
+                          "End-to-end in a headless Tern: the lab's fake model, each flow screenshotted and checked against the tree",
+                          "Everything above, then the slow model-backed evals on the nightly runner"],
+              "multi_select": True}],
+    "several": [{"question": "Which branch should the fix go on?", "choices": ["main", "release/0.22", "a new branch"]},
+                {"question": "Should I open the PR as a draft?", "choices": ["Yes, a draft", "No, ready for review"]},
+                {"question": "Anything the PR description must mention?"}],
+}
+
+
+def _clarify_questions(words: str) -> list[dict]:
+    """The questions for "clarify [free|long|many|several]"; plain "clarify" picks a colour."""
+    picked = next((k for k in CLARIFY if k in words.split()), None)
+    return CLARIFY[picked] if picked else [{"question": "Which colour?", "choices": ["red", "green", "blue"]}]
 
 
 def _call(name: str, arguments: dict, call_id: str = "") -> dict:
@@ -479,6 +510,8 @@ def write_home(home: Path, base_url: str) -> Path:
     (home / "config.yaml").write_text(json.dumps({
         "model": {"provider": "custom", "default": "fake-model", "base_url": base_url},
         "approvals": {"mode": "manual", "timeout": 300},
+        # FAKE_MODEL_CLARIFY_TIMEOUT=20 lets a clarify card time out while you watch.
+        "clarify": {"timeout": int(os.environ.get("FAKE_MODEL_CLARIFY_TIMEOUT") or 300)},
         "auxiliary": {"title_generation": {"enabled": False}},
         "plugins": {"enabled": ["hermes-tern"], "disabled": []},
         "telemetry": {"shared_metrics": {"enabled": False, "send": False, "offer_version": 2}},

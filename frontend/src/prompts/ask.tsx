@@ -17,8 +17,10 @@ export interface Option {
   detail?: string
   recommended?: boolean
   checked?: boolean
-  /** A radio (the default), a checkbox, or the Other row. */
-  role?: 'omp.ask.check' | 'omp.ask.option' | 'omp.ask.other'
+  /** The key that picks it, drawn at the row's end. */
+  key?: string
+  /** A radio (the default), a checkbox, or the Other row (with a checkbox in a multiple choice). */
+  role?: 'omp.ask.check' | 'omp.ask.option' | 'omp.ask.other' | 'omp.ask.other.check'
 }
 
 /** Ctrl+C on a question sheet declines it, as Esc does (the TUI's `cancelOverlayFromCtrlC`). */
@@ -58,7 +60,8 @@ export function optionList(
       {options.map(o => (
         <item
           key={o.id}
-          {...optional('detail', o.detail ? [o.role === 'omp.ask.other' ? { s: 'dim', t: o.detail } : { t: o.detail }] : undefined)}
+          {...optional('detail', o.detail ? [o.role?.startsWith('omp.ask.other') ? { s: 'dim', t: o.detail } : { t: o.detail }] : undefined)}
+          {...optional('hint', o.key ? [o.key] : undefined)}
           {...optional('icon', o.checked ? 'check' : undefined)}
           label={[{ t: o.label }]}
           role={o.role ?? 'omp.ask.option'}
