@@ -1,12 +1,12 @@
 [project]
 name = "hermes-tern"
-version = "0.1.0"
+version = "0.2.0"
 description = "Hermes for Tern: the chat UI drawn natively by the Tern terminal over its Surface Protocol (community plugin)"
 readme = "README.md"
 license = { text = "MIT" }
-authors = [{ name = "alt-glitch" }]
+authors = [{ name = "alt-glitch" }, { name = "Kevin Rajan" }]
 requires-python = ">=3.11"
 dependencies = []
 
 [project.urls]
-Homepage = "https://github.com/alt-glitch/hermes-tern"
+Homepage = "https://github.com/kvnloo/hermes-tern"
