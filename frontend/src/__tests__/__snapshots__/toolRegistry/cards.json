@@ -2765,7 +2765,9 @@
    {
     "k": "row",
     "p": {
-     "role": "omp.tool.answer.off",
+     "align": "start",
+     "gap": "sm",
+     "role": "hermes.ask.choice",
      "key": "q0.o0"
     },
     "c": [
@@ -2778,7 +2780,7 @@
          "t": "·"
         }
        ],
-       "key": "c"
+       "key": "mark"
       }
      },
      {
@@ -2786,9 +2788,11 @@
       "p": {
        "spans": [
         {
+         "s": "muted",
          "t": "a"
         }
        ],
+       "wrap": "word",
        "key": "t"
       }
      }
@@ -2797,20 +2801,18 @@
    {
     "k": "row",
     "p": {
-     "role": "omp.tool.answer",
+     "align": "start",
+     "gap": "sm",
+     "role": "hermes.ask.choice.on",
      "key": "q0.o1"
     },
     "c": [
      {
-      "k": "text",
+      "k": "icon",
       "p": {
-       "spans": [
-        {
-         "s": "success",
-         "t": "✓"
-        }
-       ],
-       "key": "c"
+       "name": "check",
+       "tone": "success",
+       "key": "mark"
       }
      },
      {
@@ -2821,6 +2823,7 @@
          "t": "b"
         }
        ],
+       "wrap": "word",
        "key": "t"
       }
      }
@@ -2831,10 +2834,23 @@
   "node": {
    "k": "tool",
    "p": {
+    "collapsed": true,
     "collapsible": true,
     "name": "ask",
     "status": "done",
-    "target": "Pick?",
+    "target": [
+     {
+      "t": "Pick?"
+     },
+     {
+      "s": "dim",
+      "t": "  →  "
+     },
+     {
+      "s": "success",
+      "t": "b"
+     }
+    ],
     "targetKind": "text",
     "title": "Ask",
     "took": 1200,
@@ -2844,7 +2860,9 @@
     {
      "k": "row",
      "p": {
-      "role": "omp.tool.answer.off",
+      "align": "start",
+      "gap": "sm",
+      "role": "hermes.ask.choice",
       "key": "q0.o0"
      },
      "c": [
@@ -2857,7 +2875,7 @@
           "t": "·"
          }
         ],
-        "key": "c"
+        "key": "mark"
        }
       },
       {
@@ -2865,9 +2883,11 @@
        "p": {
         "spans": [
          {
+          "s": "muted",
           "t": "a"
          }
         ],
+        "wrap": "word",
         "key": "t"
        }
       }
@@ -2876,20 +2896,18 @@
     {
      "k": "row",
      "p": {
-      "role": "omp.tool.answer",
+      "align": "start",
+      "gap": "sm",
+      "role": "hermes.ask.choice.on",
       "key": "q0.o1"
      },
      "c": [
       {
-       "k": "text",
+       "k": "icon",
        "p": {
-        "spans": [
-         {
-          "s": "success",
-          "t": "✓"
-         }
-        ],
-        "key": "c"
+        "name": "check",
+        "tone": "success",
+        "key": "mark"
        }
       },
       {
@@ -2900,6 +2918,7 @@
           "t": "b"
          }
         ],
+        "wrap": "word",
         "key": "t"
        }
       }
@@ -2913,26 +2932,47 @@
    {
     "k": "md",
     "p": {
+     "role": "hermes.ask.question",
      "key": "q0",
      "text": "One?"
     }
    },
    {
-    "k": "text",
+    "k": "row",
     "p": {
-     "role": "omp.tool.notice",
-     "spans": [
-      {
-       "s": "muted",
-       "t": "No answer"
-      }
-     ],
+     "align": "start",
+     "gap": "sm",
+     "role": "hermes.ask.verdict",
      "key": "q0.none"
-    }
+    },
+    "c": [
+     {
+      "k": "icon",
+      "p": {
+       "name": "minus",
+       "tone": "muted",
+       "key": "icon"
+      }
+     },
+     {
+      "k": "text",
+      "p": {
+       "spans": [
+        {
+         "s": "muted",
+         "t": "No answer"
+        }
+       ],
+       "wrap": "word",
+       "key": "t"
+      }
+     }
+    ]
    },
    {
     "k": "md",
     "p": {
+     "role": "hermes.ask.question",
      "key": "q1",
      "text": "Two?"
     }
@@ -2940,7 +2980,9 @@
    {
     "k": "row",
     "p": {
-     "role": "omp.tool.answer.off",
+     "align": "start",
+     "gap": "sm",
+     "role": "hermes.ask.choice",
      "key": "q1.o0"
     },
     "c": [
@@ -2953,7 +2995,7 @@
          "t": "·"
         }
        ],
-       "key": "c"
+       "key": "mark"
       }
      },
      {
@@ -2961,36 +3003,78 @@
       "p": {
        "spans": [
         {
+         "s": "muted",
          "t": "x"
         }
        ],
+       "wrap": "word",
        "key": "t"
       }
      }
     ]
    },
    {
-    "k": "text",
+    "k": "row",
     "p": {
-     "role": "omp.tool.notice",
-     "spans": [
-      {
-       "s": "muted",
-       "t": "Skipped"
-      }
-     ],
+     "align": "start",
+     "gap": "sm",
+     "role": "hermes.ask.verdict",
      "key": "q1.none"
-    }
+    },
+    "c": [
+     {
+      "k": "icon",
+      "p": {
+       "name": "minus",
+       "tone": "muted",
+       "key": "icon"
+      }
+     },
+     {
+      "k": "text",
+      "p": {
+       "spans": [
+        {
+         "s": "muted",
+         "t": "Skipped"
+        }
+       ],
+       "wrap": "word",
+       "key": "t"
+      }
+     }
+    ]
    }
   ],
   "name": "clarify",
   "node": {
    "k": "tool",
    "p": {
+    "collapsed": true,
     "collapsible": true,
     "name": "ask",
     "status": "done",
-    "target": "2 questions",
+    "target": [
+     {
+      "t": "2 questions"
+     },
+     {
+      "s": "dim",
+      "t": "  →  "
+     },
+     {
+      "s": "muted",
+      "t": "No answer"
+     },
+     {
+      "s": "dim",
+      "t": " · "
+     },
+     {
+      "s": "muted",
+      "t": "Skipped"
+     }
+    ],
     "targetKind": "text",
     "title": "Ask",
     "took": 1200,
@@ -3000,26 +3084,47 @@
     {
      "k": "md",
      "p": {
+      "role": "hermes.ask.question",
       "key": "q0",
       "text": "One?"
      }
     },
     {
-     "k": "text",
+     "k": "row",
      "p": {
-      "role": "omp.tool.notice",
-      "spans": [
-       {
-        "s": "muted",
-        "t": "No answer"
-       }
-      ],
+      "align": "start",
+      "gap": "sm",
+      "role": "hermes.ask.verdict",
       "key": "q0.none"
-     }
+     },
+     "c": [
+      {
+       "k": "icon",
+       "p": {
+        "name": "minus",
+        "tone": "muted",
+        "key": "icon"
+       }
+      },
+      {
+       "k": "text",
+       "p": {
+        "spans": [
+         {
+          "s": "muted",
+          "t": "No answer"
+         }
+        ],
+        "wrap": "word",
+        "key": "t"
+       }
+      }
+     ]
     },
     {
      "k": "md",
      "p": {
+      "role": "hermes.ask.question",
       "key": "q1",
       "text": "Two?"
      }
@@ -3027,7 +3132,9 @@
     {
      "k": "row",
      "p": {
-      "role": "omp.tool.answer.off",
+      "align": "start",
+      "gap": "sm",
+      "role": "hermes.ask.choice",
       "key": "q1.o0"
      },
      "c": [
@@ -3040,7 +3147,7 @@
           "t": "·"
          }
         ],
-        "key": "c"
+        "key": "mark"
        }
       },
       {
@@ -3048,26 +3155,47 @@
        "p": {
         "spans": [
          {
+          "s": "muted",
           "t": "x"
          }
         ],
+        "wrap": "word",
         "key": "t"
        }
       }
      ]
     },
     {
-     "k": "text",
+     "k": "row",
      "p": {
-      "role": "omp.tool.notice",
-      "spans": [
-       {
-        "s": "muted",
-        "t": "Skipped"
-       }
-      ],
+      "align": "start",
+      "gap": "sm",
+      "role": "hermes.ask.verdict",
       "key": "q1.none"
-     }
+     },
+     "c": [
+      {
+       "k": "icon",
+       "p": {
+        "name": "minus",
+        "tone": "muted",
+        "key": "icon"
+       }
+      },
+      {
+       "k": "text",
+       "p": {
+        "spans": [
+         {
+          "s": "muted",
+          "t": "Skipped"
+         }
+        ],
+        "wrap": "word",
+        "key": "t"
+       }
+      }
+     ]
     }
    ]
   }

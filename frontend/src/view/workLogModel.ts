@@ -12,7 +12,7 @@ import { shownImage } from '../media.js'
 import type { Block, ToolCall, TurnEntry } from '../model.js'
 import { appOf, appsOf, batchOf } from '../tools/bridge.js'
 import { detailOf } from '../tools/detail.js'
-import { isBackgroundCall, isTodoName, isWatchCall } from '../transcript/calls.js'
+import { isAsk, isBackgroundCall, isTodoName, isWatchCall } from '../transcript/calls.js'
 import { compactionEndedAt } from '../transcript/compactions.js'
 import { turnEndedAt } from '../transcript/turns.js'
 import { commandProgramName } from '../vendor/t3code/commandLabel.js'
@@ -101,7 +101,7 @@ export interface Fold {
 
 /**
  * The fold of a finished turn: everything but the answer (its last text) hides behind
- * "Worked for 54s". A background process and a delegation whose agents still run keep their
+ * "Worked for 54s". A clarify card, a background process and a delegation whose agents still run keep their
  * cards in view; so does a call after the answer that failed or still runs. A turn that failed
  * or was interrupted does not fold, and neither does one with nothing to hide.
  */
@@ -120,10 +120,12 @@ export function foldOf(turn: TurnEntry): Fold | undefined {
     }
 
     // Cards that still want the user stay out of the fold: a background process, a wait on one,
-    // running agents, apps to authorize, an image.
+    // running agents, apps to authorize, an image. So does a clarify card: what the user answered
+    // is their own words, as a steer is.
     if (
       b.kind === 'tool' &&
-      (isBackgroundCall(b.call) ||
+      (isAsk(b.call) ||
+        isBackgroundCall(b.call) ||
         waiting(b.call) ||
         isConnectCall(b.call) ||
         showsImage(b.call) ||
@@ -371,9 +373,9 @@ export function liveLabel(item: WorkItem, active = false): string {
   return `${verb} ${commandProgramName(command) ?? 'command'}`
 }
 
-/** The working line for a call that just started: its live step ("Reading a.ts…", "Linear · create issue…"). */
+/** The working line for a call that just started: its live step ("Reading a.ts…", "Linear · create issue…"), or that the agent waits on the user. */
 export function busyLabel(call: ToolCall): string {
-  return `${liveLabel({ call, id: call.id, kind: 'tool' }, true)}…`
+  return isAsk(call) ? 'Waiting for your answer…' : `${liveLabel({ call, id: call.id, kind: 'tool' }, true)}…`
 }
 
 /** The working line while the model writes a call: only its name is known yet. */

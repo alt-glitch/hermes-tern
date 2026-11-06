@@ -1,11 +1,17 @@
 // The clarify sheet: one to five questions, each a single or multiple choice with an Other row,
 // or a typed answer. Tabs move between the questions; each keeps its draft until the card is
-// answered as a whole (`{answers}`), and an empty answer cancels every question at once.
+// answered as a whole (`{answers}`), and an empty answer cancels every question at once. The
+// question is the sheet's title and any context the agent gave reads under it; every option shows
+// the number that picks it, and a line beside the buttons names the keys the sheet takes now. On
+// the shared gateway, which asks a call's questions one card at a time, the sheet says which
+// question of the call it is.
 
 import type { ClarifyResult } from '@hermes/shared/gateway-events'
+import type { JSX } from '@stencil-hq/tern'
 
 import { Composer } from '../draft/composer.js'
 import type { Overlay, OverlayHost } from '../overlays/overlay.js'
+import { splitQuestion } from '../tools/ask.js'
 import { actionsRow } from '../view/ui/button.js'
 
 import { answerWith, isCtrlC, moved, type Option, optionList, type Sending, sendingLine } from './ask.js'
@@ -21,6 +27,26 @@ interface Draft {
   picked: Set<number>
   typing: boolean
   other: Composer
+}
+
+/** One key hint beside the buttons: the keys that do one thing (each a combo), then what they do. */
+type KeyHint = readonly [keys: readonly (readonly string[])[], does: string]
+
+/** The keys the sheet takes right now, in a quiet line beside its buttons. */
+function keysLine(hints: readonly KeyHint[]): JSX.Element {
+  return (
+    <row align="center" gap="md" key="keys" role="hermes.ask.keys">
+      {hints.map(([alternatives, does], i) => (
+        <row align="center" gap="xs" key={`k${i}`}>
+          {alternatives.flatMap((keys, j) => [
+            ...(j ? [<text key={`or${j}`} spans={[{ s: 'dim', t: '/' }]} wrap="none" />] : []),
+            <kbd key={`k${j}`} keys={[...keys]} />
+          ])}
+          <text key="t" spans={[{ s: 'dim', t: does }]} wrap="none" />
+        </row>
+      ))}
+    </row>
+  )
 }
 
 /** The first few words of a question, for its tab. */
@@ -55,12 +81,39 @@ export function clarifyOverlay(host: OverlayHost, prompt: ClarifyPrompt): Overla
     ...q.choices.map((c, i): Option => ({
       checked: q.multi && d.picked.has(i),
       id: `option:${i}`,
+      key: String(i + 1),
       label: c.replace(RECOMMENDED, ''),
       recommended: RECOMMENDED.test(c),
       role: q.multi ? 'omp.ask.check' : 'omp.ask.option'
     })),
-    { detail: d.other.text || 'Type your own answer', id: 'other', label: 'Other…', role: 'omp.ask.other' }
+    {
+      checked: q.multi && d.other.text.trim() !== '',
+      // While the field below is open it holds the text; the row says it only once the field closes.
+      ...(d.typing ? {} : { detail: d.other.text || 'Type your own answer' }),
+      id: 'other',
+      key: String(q.choices.length + 1),
+      label: 'Other…',
+      role: q.multi ? 'omp.ask.other.check' : 'omp.ask.other'
+    }
   ]
+
+  /** The keys the current question takes, as its key line names them. */
+  const hintsOf = (q: Question, d: Draft): KeyHint[] => {
+    const typing = d.typing || !q.choices.length
+    const tab: KeyHint[] = questions.length > 1 ? [[[['tab']], 'next question']] : []
+
+    if (typing) {
+      return [[[['enter']], 'submit'], [[['escape']], q.choices.length ? 'back to the choices' : 'skip'], ...tab]
+    }
+
+    const numbers = [`1–${q.choices.length + 1}`]
+    const move: KeyHint = [[['up', 'down']], 'move']
+    const skip: KeyHint = [[['escape']], 'skip']
+
+    return q.multi
+      ? [move, [[['space'], numbers], 'toggle'], [[['enter']], 'submit'], skip, ...tab]
+      : [move, [[numbers], 'pick'], [[['enter']], 'choose'], skip, ...tab]
+  }
 
   /** Records the current question's answer and moves to the next unanswered one, or submits. */
   const commit = (answer: string | null) => {
@@ -165,11 +218,19 @@ export function clarifyOverlay(host: OverlayHost, prompt: ClarifyPrompt): Overla
       }
 
       const freeText = !q.choices.length
-      const last = questions.every((other, i) => i === step || other.qid in answers)
+      const place = prompt.place
+      // The card's last open question submits; on the shared wire, the call's last card does.
+      const last = questions.every((other, i) => i === step || other.qid in answers) && (!place || place.index === place.total - 1)
+      const { ask, context } = splitQuestion(q.question)
 
       return (
         <overlay anchor="bottom" key={key} modal role="omp.overlay.ask" size="md">
           <col gap="md" key="body">
+            {place ? (
+              <row align="center" gap="sm" key="place" role="omp.ask.head">
+                <text key="count" spans={[{ s: 'dim', t: `Question ${place.index + 1} of ${place.total}` }]} wrap="none" />
+              </row>
+            ) : null}
             {questions.length > 1 ? (
               <row align="center" gap="sm" key="head" role="omp.ask.head">
                 <tabs
@@ -192,7 +253,8 @@ export function clarifyOverlay(host: OverlayHost, prompt: ClarifyPrompt): Overla
                 <text key="count" spans={[{ s: 'dim', t: `${step + 1} of ${questions.length}` }]} wrap="none" />
               </row>
             ) : null}
-            <md key="question" role="omp.ask.question" text={q.question} />
+            <md key="question" role="omp.ask.question" text={ask} />
+            {context ? <md key="context" role="hermes.ask.context" text={context} /> : null}
             {freeText
               ? null
               : optionList(
@@ -225,17 +287,13 @@ export function clarifyOverlay(host: OverlayHost, prompt: ClarifyPrompt): Overla
               />
             ) : null}
             {sendingLine(sending)}
-            {actionsRow([
-              { hint: 'escape', key: 'skip', keys: ['escape'], label: 'Skip', onClick: () => commit(null) },
-              {
-                hint: `enter${q.multi && !d.typing ? ' · space toggles' : ''} · up/down move${questions.length > 1 ? ' · tab switches question' : ''}`,
-                key: 'submit',
-                keys: ['enter'],
-                kind: 'primary',
-                label: last ? 'Submit' : 'Next',
-                onClick: submit
-              }
-            ])}
+            {actionsRow(
+              [
+                { hint: 'escape', key: 'skip', keys: ['escape'], label: 'Skip', onClick: () => commit(null) },
+                { hint: 'enter', key: 'submit', keys: ['enter'], kind: 'primary', label: last ? 'Submit' : 'Next', onClick: submit }
+              ],
+              keysLine(hintsOf(q, d))
+            )}
           </col>
         </overlay>
       )

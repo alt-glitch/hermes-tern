@@ -35,10 +35,11 @@ export function button(b: ButtonProps): JSX.Element {
   )
 }
 
-/** omp's action row: the buttons at the end of the line. */
-export function actionsRow(buttons: readonly ButtonProps[]): JSX.Element {
+/** omp's action row: the buttons at the end of the line, after `lead` (a sheet's keys) at its start. */
+export function actionsRow(buttons: readonly ButtonProps[], lead?: JSX.Element): JSX.Element {
   return (
     <row align="center" gap="sm" key="actions" role="omp.actions">
+      {lead ?? null}
       <spacer grow={1} key="fill" />
       {buttons.map(button)}
     </row>

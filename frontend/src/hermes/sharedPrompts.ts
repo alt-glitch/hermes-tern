@@ -7,6 +7,7 @@
 import type { ServerRequest } from '@hermes/shared/json-rpc-channel'
 import type { AnyGatewayEvent, CanonicalClarifyPrompt } from '@hermes/shared/gateway-types'
 
+import type { QuestionPlace } from '../prompts/parse.js'
 import { type Requester, type ResultOf, rpc } from '../wire/rpc.js'
 
 /** The shared gateway's prompt events. */
@@ -15,7 +16,16 @@ export type SharedPromptEvent = Extract<AnyGatewayEvent, { type: 'approval.reque
 /** The request id a shared prompt's sheet carries: `prompt:<id>` is its overlay key. */
 export const sharedPromptId = (promptId: unknown) => `shared:${String(promptId)}`
 
-export function sharedPromptRequest(ev: SharedPromptEvent, gw: Requester, onNotice: (message: string) => void): ServerRequest | null {
+/**
+ * The ServerRequest a shared prompt's sheet answers. `place` is a clarify card's place among its
+ * call's questions, which the event does not carry (the handler finds it from the call).
+ */
+export function sharedPromptRequest(
+  ev: SharedPromptEvent,
+  gw: Requester,
+  onNotice: (message: string) => void,
+  place?: QuestionPlace
+): ServerRequest | null {
   const kind = ev.type === 'approval.request' ? 'approval' : 'clarify'
   const shared = ev.payload
 
@@ -51,7 +61,7 @@ export function sharedPromptRequest(ev: SharedPromptEvent, gw: Requester, onNoti
   return {
     id: sharedPromptId(shared.prompt_id),
     method: kind,
-    params: { ...shared, questions, session_id: ev.session_id },
+    params: { ...shared, questions, session_id: ev.session_id, ...(place ? { place } : {}) },
     respond: ({ answers, choice }) =>
       kind === 'approval'
         ? send(() => rpc(gw, 'approval.respond', { choice: typeof choice === 'string' ? choice : 'deny', ...control }))
