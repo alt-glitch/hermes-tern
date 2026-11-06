@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 // Points `.hermes-src` at the Hermes checkout the frontend compiles against
-// ($HERMES_SRC). The bundle inlines that checkout's renderer-free ui-tui
-// modules (gateway client, skins) and apps/shared, so build against the Hermes
-// release the plugin targets.
+// ($HERMES_SRC). The bundle inlines that checkout's apps/shared (`@hermes/shared`:
+// the gateway client, its types, skins), so build against the Hermes release the
+// plugin targets.
 import { execFileSync } from 'node:child_process'
 import { existsSync, lstatSync, readlinkSync, rmSync, symlinkSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
@@ -19,7 +19,7 @@ if (!src) {
   process.exit(1)
 }
 
-for (const needed of ['ui-tui/src/gatewayClient.ts', 'apps/shared/package.json']) {
+for (const needed of ['apps/shared/package.json', 'apps/shared/src/node/gateway-client.ts']) {
   if (!existsSync(resolve(src, needed))) {
     console.error(`hermes-src: ${src} has no ${needed}; not a hermes-agent checkout`)
     process.exit(1)

@@ -1,9 +1,9 @@
-// What a refused slash command leads to, as Hermes' Ink TUI decides it (ui-tui/src/app/userMessages.ts):
+// What a refused slash command leads to, as Hermes' Ink TUI decides it (rpcErrors.ts holds tern's copy):
 // only "slash.exec does not own this command" (skills, bundles) falls through to command.dispatch;
 // re-dispatching any other refusal could run a mutating command twice.
-import { describeSlashExecError, isUnsupportedCommand, shouldFallbackToDispatch } from '@tui/app/userMessages.js'
-
 import type { NoticeEntry } from '../model.js'
+
+import { describeSlashExecError, isUnsupportedCommand, shouldFallbackToDispatch } from './rpcErrors.js'
 
 /** What a failed `slash.exec` of `/name` leads to: command.dispatch, or a notice that says why. */
 export type ExecRefusal = { kind: 'dispatch' } | { kind: 'notice'; text: string; tone: NoticeEntry['tone'] }

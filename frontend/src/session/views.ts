@@ -3,7 +3,7 @@
 // gateway closes the session instead. Switches that a later switch superseded may have attached a
 // session nobody will show; they are released once the switches settle.
 
-import type { GatewayClient } from '@tui/gatewayClient.js'
+import type { GatewayClient } from '@hermes/shared/gateway-client'
 
 import type { DurableSessionId, LiveSessionId, SessionRef, SubscriptionId } from '../core/ids.js'
 import { rpc, snapshotIds, type SnapshotIdFields } from '../wire/rpc.js'

@@ -12,7 +12,11 @@ vi.mock('node:child_process', () => ({
   )
 }))
 
-const env = { HERMES_HOME: '/h', HERMES_PYTHON: '/venv/python', HERMES_PYTHON_SRC_ROOT: '/src', TERN_PANE: 'b3' }
+const env = {
+  HERMES_HOME: '/h',
+  HERMES_TERN_HERMES: JSON.stringify({ argv: ['/venv/python', '-m', 'hermes_cli.main'], env: { PYTHONPATH: '/src' } }),
+  TERN_PANE: 'b3'
+}
 
 describe('openHermesSplit', () => {
   it('runs `hermes <args>` in a kept-open split below this pane', async () => {
@@ -38,10 +42,11 @@ describe('openHermesSplit', () => {
     ])
   })
 
-  it('is false outside a Tern pane, running nothing', async () => {
+  it('is false outside a Tern pane or without the launcher\'s command, running nothing', async () => {
     vi.mocked(execFile).mockClear()
 
     expect(await openHermesSplit(['update'], '/repo', { ...env, TERN_PANE: undefined })).toBe(false)
+    expect(await openHermesSplit(['update'], '/repo', { ...env, HERMES_TERN_HERMES: undefined })).toBe(false)
     expect(execFile).not.toHaveBeenCalled()
   })
 })

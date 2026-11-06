@@ -7,7 +7,7 @@
 
 <p align="center">
   <a href="LICENSE"><img alt="MIT license" src="https://img.shields.io/badge/license-MIT-blue"></a>
-  <img alt="Hermes Agent 0.22.2 or later" src="https://img.shields.io/badge/hermes--agent-%E2%89%A50.22.2-6f42c1">
+  <img alt="Hermes Agent 0.23.1 or later" src="https://img.shields.io/badge/hermes--agent-%E2%89%A50.23.1-6f42c1">
   <img alt="Tern 0.9.5" src="https://img.shields.io/badge/tern-0.9.5-2b7a78">
 </p>
 
@@ -35,13 +35,13 @@ hermes plugins install hermes-tern            # from the plugin catalog, once li
 hermes plugins install alt-glitch/hermes-tern # or from GitHub
 ```
 
-You need Hermes Agent 0.22.2 or later and [Tern](https://stencil.so/tern). The plugin is built and tested on Tern 0.9.5.
+You need Hermes Agent 0.23.1 or later and [Tern](https://stencil.so/tern). The plugin is built and tested on Tern 0.9.5.
 
 Then, in a Tern pane:
 
 ```sh
 hermes tern        # the chat, drawn by Tern
-hermes tern -c     # every `hermes chat` flag works: -m, -q, --image, --resume, --worktree, …
+hermes tern -c     # also: -r ID, -m MODEL, -q QUERY, --image PATH, -s SKILL, --yolo, … (`hermes tern -h`)
 hermes tern --new  # a new session, where the pane would resume its last one
 ```
 
@@ -56,7 +56,7 @@ A pane remembers its conversation. If `hermes tern` dies in a pane (a crash, a k
 
 | | |
 | --- | --- |
-| `hermes tern` | `hermes chat --tui` with this plugin's Tern frontend; the Ink TUI outside Tern |
+| `hermes tern` | The chat in this plugin's Tern frontend; `hermes chat --tui` outside Tern |
 | `link_pull_request`, `unlink_pull_request`, `list_pull_requests` | Tools: the PRs a conversation works on, shown above the composer |
 | `transform_tool_result` hook | A connector's connect result becomes a card in the chat that started it |
 | `tool_request` middleware | The agent's shell commands run with the chat's `TERN_PANE`, so `tern open` works beside the chat |
@@ -182,7 +182,7 @@ This section lists what the plugin does beyond drawing the chat, so you can deci
 | --- | --- |
 | **Network** | GitHub's API, with the token that Hermes gives it (`GITHUB_TOKEN`). It is used for the pull request view and for the actions you click; merge and close ask first. The job charts send the command and samples of a background process's output to your own auxiliary model (`auxiliary.tern_charts`), once per process, after Hermes redacts them. Nothing else. **No telemetry.** |
 | **Commands** | A `tool_request` middleware adds `export TERN_PANE=…` (the chat's Tern pane) before the agent's shell commands, in sessions that a Tern pane shows. Approvals and guards see the command as it runs. `!cmd` and `{!cmd}` in the composer run through Hermes' own `shell.exec`, so its dangerous-command refusal applies. They run only when you type them: a pasted `{!cmd}` never runs. The composer's `/` commands are Hermes' own. |
-| **Processes** | `hermes tern` runs `hermes chat --tui` in the same process. Opening the sidebar, or a file beside the chat, runs Tern's own `tern` CLI. |
+| **Processes** | `hermes tern` runs the frontend with Node, and the frontend runs `hermes gateway attach` each time it connects. Outside Tern it runs `hermes chat --tui`. Opening the sidebar, or a file beside the chat, runs Tern's own `tern` CLI. |
 | **Reads outside its data** | Hermes' session database, read-only: a conversation's compression lineage and its subagents' parents. The output of the session's background processes, and the log files that their commands write to (for charts). The files you open from the chat. |
 | **Stored data** | `$HERMES_HOME/plugin-data/hermes-tern/`: linked pull requests, which panes show which sessions (with their Tern variables), chart rules and connect cards. `$HERMES_HOME/hermes-tern/settings.json`: the theme and chart settings. |
 
@@ -196,18 +196,18 @@ flowchart LR
   F <-->|JSON-RPC| G[Hermes gateway<br/>shared by the profile]
   subgraph Hermes
     G --> A[agent + tools]
-    P[hermes-tern plugin<br/>__init__.py · tern_env.py ·<br/>pull_requests.py · connections.py] -.hooks.-> G
+    P[hermes-tern plugin<br/>tern_env.py · charts.py ·<br/>pull_requests.py · connections.py] -.hooks, RPC.-> G
   end
   A -->|shell commands, with<br/>the pane's TERN_PANE| T
 ```
 
-- **`__init__.py`** registers `hermes tern`. It runs `hermes chat --tui <flags>` with `HERMES_TUI_DIR` pointing at `frontend/`, so Hermes' own launcher still handles the profile, the working folder, resume, worktrees, the gateway attach and the exit summary. Exit code 75 (no TSP) reruns `hermes chat --tui` without the plugin's frontend. In a Tern pane whose last chat died, **`panes.py`** adds `--resume <root id>` to the flags: the frontend records each pane's conversation in `$HERMES_HOME/plugin-data/hermes-tern/panes/<TERN_PANE>.json`, because Tern's daemon restarts only omp after a crash.
-- **`frontend/`** is the TSP frontend: a TypeScript app on [`@stencil-hq/tern`](https://www.npmjs.com/package/@stencil-hq/tern). It talks to the profile's shared Hermes gateway (`hermes-gateway-v1`) through Hermes' own gateway client. `frontend/dist/entry.js` is committed, so an install needs no build step. CI builds it on `main` after each merge (`.github/workflows/bundle.yml`); pull requests carry source only. [`frontend/README.md`](frontend/README.md) maps its modules.
+- **`launcher.py`** is `hermes tern`. It parses its own flags, picks the session (`-r`, `-c`, or the pane's own), and runs `node frontend/dist/entry.js` with `HERMES_TERN_*` variables: the session, the first prompt, the launch flags as `session.create` fields, and the command that runs this Hermes (this interpreter, so the same install and profile). Exit code 75 (no TSP) runs `hermes chat --tui` with the same flags instead. In a Tern pane whose last chat died, **`panes.py`** picks that pane's conversation: the frontend records each pane's conversation in `$HERMES_HOME/plugin-data/hermes-tern/panes/<TERN_PANE>.json`, because Tern's daemon restarts only omp after a crash. `-w`/`--worktree` and the "resume with" line Hermes prints when its TUI exits are not supported yet: Hermes has no public API for them.
+- **`frontend/`** is the TSP frontend: a TypeScript app on [`@stencil-hq/tern`](https://www.npmjs.com/package/@stencil-hq/tern). It attaches to the profile's shared Hermes gateway with `hermes gateway attach --json` and talks to it (`hermes-gateway-v1`) through Hermes' shared Node client, `@hermes/shared/gateway-client`. `frontend/dist/entry.js` is committed, so an install needs no build step. CI builds it on `main` after each merge (`.github/workflows/bundle.yml`); pull requests carry source only. [`frontend/README.md`](frontend/README.md) maps its modules.
 - **`tern_env.py`** is needed because the agent's tools run in that shared gateway, not in the chat's pane. This `tool_request` middleware puts an `export` of the pane's `TERN_PANE` and window variables before each shell command that the agent runs: in the foreground, in the background, and from a Python cell. It reads them from the pane's marker when the call is made. The model's history keeps the command as the model wrote it, and the frontend leaves the prefix out of what it shows. So plain `tern open`, `tern split` and the rest of Tern's CLI act beside the chat. [`docs/tern-blocks.md`](docs/tern-blocks.md) is a short guide to scripting blocks that way: split, run, capture, wait and close.
 - **`charts.py`** serves the plugin RPC method `plugin.hermes-tern.charts.author`. The frontend calls it on its gateway connection when it wants a background process's chart rules. The Python half redacts the samples, asks the auxiliary model (task `tern_charts`, through `ctx.llm`) for one JSON answer, and sends the answer back to the session as a plugin event. The frontend validates the rules and runs them (`frontend/src/processes/widgets/`, ported from omp's job widgets). It uses Node's linear-time regex engine, so no rule can stall the chat.
 
 > [!NOTE]
-> **Compatibility.** The bundle inlines Hermes' renderer-free ui-tui modules (the gateway client and skins) and `apps/shared`, from the Hermes commit in `frontend/hermes-src.lock`. At run time it runs that client against the installed Hermes, which starts the gateway through `ui-tui/scripts/gateway_bootstrap.py`. That script and the gateway's wire format are Hermes internals: when they change, rebuild against the newer Hermes.
+> **Compatibility.** The bundle inlines `@hermes/shared` (`apps/shared`) from the Hermes commit in `frontend/hermes-src.lock`: the gateway client, its types and skins. At run time it attaches with `hermes gateway attach --json` and speaks the gateway's public `hermes-gateway-v1` contract.
 
 ## Development
 

@@ -6,7 +6,7 @@
 import { appendFileSync } from 'node:fs'
 
 import type { ServerRequest } from '@hermes/shared/json-rpc-channel'
-import type { AnyGatewayEvent } from '@tui/gatewayTypes.js'
+import type { AnyGatewayEvent } from '@hermes/shared/gateway-types'
 
 /** The tap: what it writes for each event, server request and unknown event type. */
 export interface EventLog {

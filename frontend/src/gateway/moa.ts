@@ -1,7 +1,7 @@
 // Mixture-of-Agents events, after Ink's createGatewayEventHandler: the working row's label for each
 // phase, and the label a reference model's answer carries as its own thought block.
 
-import type { AnyGatewayEvent } from '@tui/gatewayTypes.js'
+import type { AnyGatewayEvent } from '@hermes/shared/gateway-types'
 
 /** The events that set the working row's label during a Mixture-of-Agents turn. */
 export type MoaStepEvent = Extract<AnyGatewayEvent, { type: 'moa.aggregating' | 'moa.phase' | 'moa.progress' }>

@@ -15,7 +15,6 @@ import { FakeGateway, fakeTern, settle } from './fakes.js'
 process.env['HERMES_HOME'] = mkdtempSync(join(tmpdir(), 'hermes-tern-ids-'))
 
 const spy = vi.hoisted(() => ({
-  active: vi.fn(),
   compactions: vi.fn((_sid: string) => []),
   links: vi.fn((_sid: string) => []),
   markViewer: vi.fn()
@@ -25,7 +24,6 @@ vi.mock('../connections/cards.js', async importOriginal => ({
   ...(await importOriginal<typeof import('../connections/cards.js')>()),
   markViewer: spy.markViewer
 }))
-vi.mock('../hermes/activeSessionFile.js', () => ({ writeActiveSessionFile: spy.active }))
 vi.mock('../hermes/compactions.js', async importOriginal => ({
   ...(await importOriginal<typeof import('../hermes/compactions.js')>()),
   storedCompactions: spy.compactions
@@ -88,7 +86,6 @@ describe('a session with a stored id', () => {
     expect(app.session.ref.stored).toBe('stored-1')
     expect(app.session.ref).toEqual({ live: 'live-1', stored: 'stored-1' })
     expect(spy.markViewer.mock.calls).toEqual([['stored-1', null]])
-    expect(spy.active.mock.calls).toEqual([['stored-1']])
     expect(spy.links.mock.calls).toEqual([['stored-1']])
   })
 
@@ -107,7 +104,6 @@ describe('a session with a stored id', () => {
 
     expect(app.session.ref.live).toBe('live-2')
     expect(spy.markViewer.mock.calls.at(-1)).toEqual(['stored-2', 'stored-1'])
-    expect(spy.active.mock.calls.at(-1)).toEqual(['stored-2'])
     expect(spy.compactions.mock.calls).toEqual([['stored-2']])
     expect(spy.links.mock.calls.at(-1)).toEqual(['stored-2'])
   })
@@ -184,7 +180,6 @@ describe('a session with no stored id', () => {
     expect(app.session.ref.stored).toBeNull()
     expect(app.session.ref).toEqual({ live: 'live-1', stored: null })
     expect(spy.markViewer.mock.calls).toEqual([['live-1', null]])
-    expect(spy.active.mock.calls).toEqual([['live-1']])
     expect(spy.links.mock.calls).toEqual([['live-1']])
 
     app.quit()

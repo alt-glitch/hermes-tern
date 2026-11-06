@@ -7,7 +7,7 @@
 // runs the pane until it quits.
 
 import type { ScrollTo, Session } from '@stencil-hq/tern'
-import type { GatewayClient } from '@tui/gatewayClient.js'
+import type { GatewayClient } from '@hermes/shared/gateway-client'
 
 import logo from '../../assets/logo.png'
 import type { Agents } from '../agents/store.js'
