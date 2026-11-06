@@ -12,10 +12,13 @@ This port uses the existing Hermes Tern gateway, app ports, native `@stencil-hq/
 | Alt+M | Select model (session-aware native picker) |
 | Ctrl+P / Ctrl+Alt+P | Next / previous recent model |
 | Alt+K | Native command palette |
+| Ctrl+R | Search this profile's previous prompts; Enter fills the draft, Esc leaves it unchanged |
 | F1 / Alt+/ | Help and current bindings |
 | /palette | Open the command palette |
 
 Ctrl+C, Ctrl+D, Ctrl+V, Esc Esc and the composer's readline keys remain owned by their existing handlers. The overlay stack, modal questions, HUD and completion keep precedence. In particular, Alt+P still opens **pull requests**, not the donor frontend's temporary model selector.
+
+Ctrl+R opens a native fuzzy picker over the same owning-profile `.hermes_history` entries as Up/Down. Newest prompts appear first before a query; matching ranks word starts before scattered subsequences. Enter replaces the composer text without submitting it, and Esc leaves its text, caret and attachments untouched. Recalled shell syntax remains literal.
 
 ## Owning-profile bindings
 

@@ -127,6 +127,7 @@ export interface KeyCx {
   shortcut?(id: string, key: Key): boolean
   openModel?(): void
   openPalette?(): void
+  openHistorySearch?(): void
   openHelp?(): void
   cycleModel?(direction: -1 | 1): void
   /** Sends the composer's draft. */
@@ -259,6 +260,7 @@ const appShortcuts: KeyRule = (key, cx) => {
     ['app.model.cycleForward', cx.cycleModel && (() => cx.cycleModel?.(1))],
     ['app.model.cycleBackward', cx.cycleModel && (() => cx.cycleModel?.(-1))],
     ['app.palette', cx.openPalette],
+    ['app.history.search', cx.openHistorySearch],
     ['app.help', cx.openHelp]
   ]
   const found = actions.find(([id, run]) => Boolean(run && cx.shortcut?.(id, key)))

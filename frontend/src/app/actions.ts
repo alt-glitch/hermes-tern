@@ -37,6 +37,7 @@ import { openBrowserBlocks } from '../overlays/browser.js'
 import type { Completion } from '../overlays/completion.js'
 import { openContext } from '../overlays/context.js'
 import { openEffortPicker } from '../overlays/effort.js'
+import { openPromptHistorySearch } from '../overlays/historySearch.js'
 import { openModelPicker } from '../overlays/models.js'
 import { openPlanReview } from '../overlays/plan.js'
 import { promptOverlay } from '../overlays/prompts.js'
@@ -197,6 +198,7 @@ export class AppActions {
       openPrs: () => openPrMenu(chat),
       openModel: () => openModelPicker(chat),
       openPalette: () => this.openPalette(),
+      openHistorySearch: () => openPromptHistorySearch(chat, composer),
       openHelp: () => void chat.openHelp(),
       cycleModel: direction => void cycleModel(chat, direction),
       shortcut: (id, key) => this.bindings.matches(id, key),
