@@ -32,7 +32,8 @@ CREATE TABLE messages (
     role TEXT NOT NULL, content TEXT, timestamp REAL NOT NULL,
     _compressed_summary INTEGER NOT NULL DEFAULT 0,
     active INTEGER NOT NULL DEFAULT 1, compacted INTEGER NOT NULL DEFAULT 0,
-    display_kind TEXT, display_metadata TEXT
+    display_kind TEXT, display_metadata TEXT, message_uid TEXT,
+    tool_call_id TEXT, tool_calls TEXT, tool_name TEXT
 );
 CREATE INDEX idx_messages_session_id ON messages(session_id, id);
 """
@@ -69,12 +70,17 @@ def world(tmp_path):
                    (sid, source, hidden, parent, config, end_reason))
         db.commit()
 
+    message_number = 0
+
     def message(text, sid="owner", **changes):
+        nonlocal message_number
+        message_number += 1
         if isinstance(text, (list, dict)):
             text = "\x00json:" + json.dumps(text)
         values = {"session_id": sid, "role": "user", "content": text, "timestamp": 2.0,
                   "active": 1, "compacted": 0, "_compressed_summary": 0,
-                  "display_kind": None, "display_metadata": None, **changes}
+                  "display_kind": None, "display_metadata": None,
+                  "message_uid": f"{message_number:032x}", **changes}
         cursor = db.execute(
             f"INSERT INTO messages ({','.join(values)}) VALUES ({','.join('?' for _ in values)})",
             tuple(values.values()))
@@ -148,6 +154,214 @@ def test_compaction_copies_deduplicate_and_preserve_historical_user_rows(world):
     hits = world.memory.search("offline")
     assert result.corrections == 1 and len(hits) == 1
     assert (hits[0].session_id, hits[0].message_id) == ("continued", clone)
+
+
+@pytest.mark.parametrize("parent_flags", [(0, 1), (1, 0)], ids=["compacted", "active"])
+@pytest.mark.parametrize("uids", [
+    ("copied-correction", "copied-correction"), (None, None), (None, "copied-correction"),
+], ids=["durable-uid", "legacy", "legacy-to-uid"])
+@pytest.mark.parametrize("warm_checkpoint", [False, True], ids=["cold", "resync"])
+def test_rewind_suppresses_older_compression_copies(world, parent_flags, uids, warm_checkpoint):
+    world.db.execute("UPDATE sessions SET end_reason='compression' WHERE id='owner'")
+    world.db.commit()
+    world.session("continued", parent="owner")
+    retained = world.message("Correction: Keep historical parser checks offline.", active=0, compacted=1)
+    world.message("Correction: Use obsolete parser flags.", active=parent_flags[0],
+                  compacted=parent_flags[1], message_uid=uids[0])
+    clone = world.message("Correction: Use obsolete parser flags.", sid="continued", message_uid=uids[1])
+    scope = ["owner", "continued"]
+    if warm_checkpoint:
+        world.memory.sync(scope, batch_size=1)
+        assert world.memory.search("obsolete")[0].message_id == clone
+    # Hermes rewind changes the active continuation, not its retained ancestors.
+    world.db.execute("UPDATE messages SET active=0, compacted=0 WHERE id=?", (clone,))
+    world.db.commit()
+    if warm_checkpoint:
+        with pytest.raises(MemoryNotReady):
+            world.memory.search("obsolete")
+    result = GlideMemory(world.home).sync(scope, batch_size=1)
+    assert result.complete and result.corrections == 1
+    assert world.memory.search("obsolete") == []
+    assert world.memory.context("obsolete") == ""
+    assert world.memory.search("historical")[0].message_id == retained
+
+
+def test_in_place_generations_prefer_new_live_copy_then_honor_its_rewind(world):
+    uid = "in-place-correction"
+    world.message("Correction: Keep parser checks offline.", active=0, compacted=1, message_uid=uid)
+    world.message("Correction: Keep parser checks offline.", active=0, compacted=0, message_uid=uid)
+    live = world.message("Correction: Keep parser checks offline.", message_uid=uid)
+    world.memory.sync(["owner"], batch_size=1)
+    assert world.memory.search("parser")[0].message_id == live
+    world.db.execute("UPDATE messages SET active=0 WHERE id=?", (live,))
+    world.db.commit()
+    world.memory.sync(["owner"], batch_size=1)
+    assert world.memory.search("parser") == []
+
+
+def test_rewind_during_partial_sync_restarts_without_resurrecting_ancestors(world):
+    world.db.execute("UPDATE sessions SET end_reason='compression' WHERE id='owner'")
+    world.db.commit()
+    world.session("continued", parent="owner")
+    world.message("Correction: Use obsolete parser flags.", active=0, compacted=1, message_uid="copied")
+    world.message("Correction: Keep packaging checks local.")
+    world.message("Correction: Keep release checks local.")
+    clone = world.message("Correction: Use obsolete parser flags.", sid="continued", message_uid="copied")
+    scope = ["owner", "continued"]
+    assert not world.memory.sync(scope, batch_size=1, max_batches=1).complete
+    world.db.execute("UPDATE messages SET active=0 WHERE id=?", (clone,))
+    world.db.commit()
+    resumed = GlideMemory(world.home)
+    assert not resumed.sync(scope, batch_size=1, max_batches=1).complete
+    with pytest.raises(MemoryNotReady):
+        resumed.search("obsolete")
+    result = resumed.sync(scope, batch_size=1)
+    assert result.complete and result.corrections == 2
+    assert resumed.search("obsolete") == []
+    assert {hit.text for hit in resumed.search("checks")} == {
+        "Keep packaging checks local.", "Keep release checks local."}
+
+
+def test_withdrawal_does_not_erase_distinct_uid_with_identical_text_and_timestamp(world):
+    world.db.execute("UPDATE sessions SET end_reason='compression' WHERE id='owner'")
+    world.db.commit()
+    world.session("continued", parent="owner")
+    text = "Correction: Keep parser checks offline."
+    retained = world.message(text, active=0, compacted=1, message_uid="independent")
+    world.message(text, active=0, compacted=1, message_uid="withdrawn")
+    world.message(text, sid="continued", active=0, compacted=0, message_uid="withdrawn")
+    world.memory.sync(["owner", "continued"], batch_size=1)
+    hits = world.memory.search("parser")
+    assert len(hits) == 1 and hits[0].message_id == retained
+
+
+@pytest.mark.parametrize("kind", [
+    "branch", "reset", "unrelated", "hidden", "delegate", "remote", "malformed", "unselected",
+])
+def test_withdrawal_cannot_cross_fork_eligibility_or_selection_boundaries(world, kind):
+    world.db.execute("UPDATE sessions SET end_reason='compression' WHERE id='owner'")
+    world.db.commit()
+    options = {"parent": "owner"}
+    if kind in ("branch", "reset", "delegate"):
+        marker = {"branch": "_branched_from", "reset": "_reset_from", "delegate": "_delegate_from"}[kind]
+        options["config"] = {marker: "owner"}
+    elif kind == "unrelated":
+        options = {}
+    elif kind == "hidden":
+        options["hidden"] = 1
+    elif kind == "remote":
+        options["source"] = "telegram"
+    elif kind == "malformed":
+        options["config"] = "{broken"
+    world.session("other", **options)
+    retained = world.message("Correction: Keep parser checks offline.", active=0, compacted=1,
+                             message_uid="shared-by-copy")
+    world.message("Correction: Keep parser checks offline.", sid="other", active=0, compacted=0,
+                  message_uid="shared-by-copy")
+    scope = ["owner"] if kind == "unselected" else ["owner", "other"]
+    world.memory.sync(scope, batch_size=1)
+    assert world.memory.search("parser")[0].message_id == retained
+
+
+def test_unselected_ancestry_metadata_resolves_copies_and_invalidates_fork_changes(world):
+    world.db.execute("UPDATE sessions SET end_reason='compression' WHERE id='owner'")
+    world.db.commit()
+    world.session("middle", parent="owner", end_reason="compression")
+    # A copied marker naming an older ancestor is not bound to this hop's parent.
+    world.session("continued", parent="middle", config={"_branched_from": "owner"})
+    retained = world.message("Correction: Use obsolete parser flags.", active=0, compacted=1,
+                             message_uid="copied")
+    world.message("Correction: Keep unselected packaging checks.", sid="middle")
+    world.message("Correction: Use obsolete parser flags.", sid="continued", active=0, compacted=0,
+                  message_uid="copied")
+    scope = ["owner", "continued"]
+    world.memory.sync(scope, batch_size=1)
+    assert world.memory.search("obsolete") == []
+    assert world.memory.search("unselected") == []
+    world.db.execute("UPDATE sessions SET model_config=? WHERE id='middle'",
+                     (json.dumps({"_branched_from": "owner"}),))
+    world.db.commit()
+    with pytest.raises(MemoryNotReady):
+        world.memory.search("obsolete")
+    world.memory.sync(scope, batch_size=1)
+    assert world.memory.search("obsolete")[0].message_id == retained
+    assert world.memory.search("unselected") == []
+
+
+@pytest.mark.parametrize("field", ["message_uid", "timestamp"])
+def test_identity_changes_invalidate_resolved_withdrawals(world, field):
+    uid = "copied" if field == "message_uid" else None
+    original = world.message("Correction: Keep parser checks offline.", active=0, compacted=1,
+                             message_uid=uid)
+    withdrawn = world.message("Correction: Keep parser checks offline.", active=0, compacted=0,
+                              message_uid=uid)
+    world.memory.sync(["owner"])
+    assert world.memory.search("parser") == []
+    if field == "message_uid":
+        world.db.execute("UPDATE messages SET message_uid='different' WHERE id=?", (withdrawn,))
+    else:
+        world.db.execute("UPDATE messages SET timestamp=3.0 WHERE id=?", (withdrawn,))
+    world.db.commit()
+    with pytest.raises(MemoryNotReady):
+        world.memory.search("parser")
+    world.memory.sync(["owner"])
+    assert world.memory.search("parser")[0].message_id == original
+
+
+def test_ambiguous_legacy_copy_cannot_revive_withdrawn_uid_generations(world):
+    text = "Correction: Use obsolete parser flags."
+    world.message(text, active=0, compacted=1, message_uid=None)
+    world.message(text, active=0, compacted=0, message_uid="first-logical-turn")
+    world.message(text, active=0, compacted=0, message_uid="second-logical-turn")
+    world.memory.sync(["owner"], batch_size=1)
+    assert world.memory.search("obsolete") == []
+
+
+def test_legacy_schema_without_uid_still_resolves_rewind_copies(world):
+    text = "Correction: Use obsolete parser flags."
+    world.message(text, active=0, compacted=1, message_uid=None)
+    world.message(text, active=0, compacted=0, message_uid=None)
+    world.db.execute("ALTER TABLE messages DROP COLUMN message_uid")
+    world.db.commit()
+    world.memory.sync(["owner"], batch_size=1)
+    assert world.memory.search("obsolete") == []
+
+
+def test_selected_compression_siblings_require_an_unambiguous_scope(world):
+    world.db.execute("UPDATE sessions SET end_reason='compression' WHERE id='owner'")
+    world.db.commit()
+    world.session("live", parent="owner")
+    world.session("rewound", parent="owner")
+    text = "Correction: Keep parser checks offline."
+    world.message(text, active=0, compacted=1, message_uid="copied")
+    live = world.message(text, sid="live", message_uid="copied")
+    world.message(text, sid="rewound", active=0, compacted=0, message_uid="copied")
+    with pytest.raises(SourceError, match="one continuation"):
+        world.memory.sync(["owner", "live", "rewound"])
+    assert not world.memory.state_path.exists()
+    world.memory.sync(["owner", "live"])
+    assert world.memory.search("parser")[0].message_id == live
+    world.memory.sync(["owner", "rewound"])
+    assert world.memory.search("parser") == []
+
+
+@pytest.mark.parametrize("invalid_lineage", ["cycle", "too_deep"])
+def test_unresolved_compression_lineage_cannot_publish_memory(world, monkeypatch, invalid_lineage):
+    world.db.execute("UPDATE sessions SET end_reason='compression' WHERE id='owner'")
+    world.db.commit()
+    world.session("middle", parent="owner", end_reason="compression")
+    world.session("continued", parent="middle", end_reason="compression")
+    world.message("Correction: Use obsolete parser flags.", active=0, compacted=1, message_uid="copied")
+    world.message("Correction: Use obsolete parser flags.", sid="continued", active=0, compacted=0,
+                  message_uid="copied")
+    if invalid_lineage == "cycle":
+        world.db.execute("UPDATE sessions SET parent_session_id='continued' WHERE id='owner'")
+        world.db.commit()
+    else:
+        monkeypatch.setattr(source, "MAX_SESSIONS", 2)
+    with pytest.raises(SourceError, match="lineage"):
+        world.memory.sync(["owner", "continued"])
+    assert not world.memory.state_path.exists()
 
 
 def test_malformed_literal_encoded_and_oversized_content_is_ignored(world):
