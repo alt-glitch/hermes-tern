@@ -5,7 +5,6 @@ import type { ValueResult } from '@hermes/shared/gateway-events'
 
 import { Composer } from '../draft/composer.js'
 import type { Overlay, OverlayHost } from '../overlays/overlay.js'
-import { withoutTernEnv } from '../tools/terminal.js'
 import { actionsRow } from '../view/ui/button.js'
 
 import { answerWith, isCtrlC, type Sending, sendingLine } from './ask.js'
@@ -86,7 +85,7 @@ export function maskedOverlay(host: OverlayHost, prompt: MaskedPrompt): Overlay 
           {note ? (
             <text key="note" spans={[{ s: method === 'secret' ? 'mono dim' : 'muted', t: note }]} wrap="word" />
           ) : null}
-          {prompt.command ? <code key="command" lang="bash" text={withoutTernEnv(prompt.command)} /> : null}
+          {prompt.command ? <code key="command" lang="bash" text={prompt.command} /> : null}
           {fields.map((f, i) => (
             <input
               cursor={f.masked ? maskedOffset(f.value.text, f.value.cursor) : f.value.cursor}

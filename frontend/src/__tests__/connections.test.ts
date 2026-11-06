@@ -1,4 +1,4 @@
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
+import { chmodSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -14,15 +14,12 @@ import {
   findCard,
   isConnectCall,
   loadConnect,
-  markViewer,
   readCard,
-  STALE_MS,
-  ternPane
+  STALE_MS
 } from '../connections/cards.js'
-import { entryId, liveSessionId, storedSessionId, toolCallId } from '../core/ids.js'
+import { entryId, toolCallId } from '../core/ids.js'
 import type { ToolCall, TurnEntry } from '../model.js'
 import { foldOf, ownsCard } from '../view/workLogModel.js'
-import { decodeJson } from '../wire/json.js'
 
 const result = {
   note: 'Show each connect_url to the user; they open it in a browser to authorize.',
@@ -185,27 +182,6 @@ describe('manage_connections without its card', () => {
     } finally {
       chmodSync(join(dir, 'connections'), 0o755)
     }
-  })
-
-  it('marks this pane as the viewer of one session at a time', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'tern-viewers-'))
-
-    markViewer(storedSessionId('s1'), null, dir, {})
-    expect(decodeJson(readFileSync(join(dir, 'viewers', 's1.json'), 'utf8'))).toEqual({ pid: process.pid })
-    markViewer(storedSessionId('s2'), storedSessionId('s1'), dir)
-    expect(existsSync(join(dir, 'viewers', 's1.json'))).toBe(false)
-    expect(existsSync(join(dir, 'viewers', 's2.json'))).toBe(true)
-  })
-
-  it("records the pane's Tern variables, for the agent's tools", () => {
-    const dir = mkdtempSync(join(tmpdir(), 'tern-viewers-'))
-
-    markViewer(liveSessionId('s1'), null, dir, { HOME: '/h', TERN_PANE: '42', TERN_PANE_SOCKET: '/s/pane', TERN_WINDOW_KEY: '' })
-    expect(decodeJson(readFileSync(join(dir, 'viewers', 's1.json'), 'utf8'))).toEqual({
-      pid: process.pid,
-      tern: { TERN_PANE: '42', TERN_PANE_SOCKET: '/s/pane' }
-    })
-    expect(ternPane({ TERN_WINDOW_KEY: '3' })).toBeUndefined()
   })
 
   it('tells the agent which apps the user authorized, or that all are connected', () => {

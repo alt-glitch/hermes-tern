@@ -14,7 +14,6 @@ import { Sidebar } from '../chrome/sidebar.js'
 import { Theme } from '../chrome/theme.js'
 import { dispatched } from '../commands/slash.js'
 import type { LaunchEnv } from '../config/env.js'
-import { markViewer } from '../connections/cards.js'
 import { ConnectWatcher } from '../connections/watcher.js'
 import { Disposables } from '../core/disposables.js'
 import { durable } from '../core/ids.js'
@@ -29,6 +28,7 @@ import { OverlayStack } from '../overlays/overlay.js'
 import { openUrl } from '../overlays/pullRequests.js'
 import { Cron } from '../processes/cron.js'
 import { Processes } from '../processes/store.js'
+import { Viewer } from '../hermes/viewer.js'
 import { gatewayAuthor } from '../processes/widgets/author.js'
 import { chartMemory } from '../processes/widgets/memory.js'
 import { PromptSheets } from '../prompts/sheets.js'
@@ -77,6 +77,8 @@ export function chatStores(chat: ChatPorts, { act, gw, launch, settings, surface
   const jobCharts = saved.jobCharts !== false
   /** The open session: its ids, info, usage and busy-input mode; every write renders. */
   const session = new SessionState(changed)
+  /** Tells the plugin which session this pane shows (hermes/viewer.ts). */
+  const viewer = new Viewer(gw)
   const transcript = new Transcript()
   /** The working line's busy state and the compaction phase: their one owner. */
   const activity = new Activity()
@@ -222,6 +224,7 @@ export function chatStores(chat: ChatPorts, { act, gw, launch, settings, surface
       gw,
       launch,
       rename: (sid, text) => title.rename(sid, text),
+      shownElsewhere: id => viewer.shown(id),
       request: req => act().onRequest(req),
       sheets,
       state: session,
@@ -234,7 +237,7 @@ export function chatStores(chat: ChatPorts, { act, gw, launch, settings, surface
       },
       imageLanded: call => act().imageLanded(call),
       markPane: id => markPane(launch, id),
-      markViewer,
+      markViewer: (now, before) => viewer.show(now, before),
       readBusyMode: () => void act().readBusyMode(),
       reportCwd: () => act().reportCwd(),
       showThoughts: sid => showThoughts({ gw, notice: (text, tone) => chat.notice(text, tone), settings }, sid)
@@ -245,7 +248,7 @@ export function chatStores(chat: ChatPorts, { act, gw, launch, settings, surface
   const completion = new Completion(chat, gw, () => session.ref.live)
   const welcome: WelcomeContext = { version: version && version !== 'unknown' ? `v${version}` : '' }
 
-  return { ...shared, attachments, completion, cron, life, router, stack, theme, warned, welcome }
+  return { ...shared, attachments, completion, cron, life, router, stack, theme, viewer, warned, welcome }
 }
 
 /** Stops what the stores run on their own: every timer, the polls and the sidebar's reads. */

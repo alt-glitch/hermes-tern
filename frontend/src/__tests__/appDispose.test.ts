@@ -1,6 +1,6 @@
 // What the app owns and ends: an overlay hears when it leaves the stack (closed or replaced), and
 // dispose() stops every timer the app armed, so quitting leaves nothing running.
-import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -179,33 +179,28 @@ describe('App.dispose', () => {
 })
 
 describe('quitting', () => {
-  const viewer = join(home, 'plugin-data', 'hermes-tern', 'viewers', 's1.json')
-
-  it('unmarks the viewer and detaches, then disposes, then closes Tern', async () => {
+  it('tells the plugin this pane stops showing the session and detaches, then disposes, then closes Tern', async () => {
     const { app, done, gw, tern } = await started()
     const dispose = vi.spyOn(app, 'dispose')
     const close = vi.spyOn(tern.session, 'close')
-    expect(existsSync(viewer)).toBe(true)
+    expect(gw.sent('plugin.hermes-tern.viewer.set')).toMatchObject([{ pid: process.pid, session_id: 's1' }])
 
     app.quit(3)
 
     await expect(done).resolves.toBe(3)
-    expect(existsSync(viewer)).toBe(false)
+    expect(gw.sent('plugin.hermes-tern.viewer.clear')).toEqual([{ pid: process.pid, session_id: 's1' }])
     expect(gw.sent('session.detach')).toEqual([{ end_reason: 'tui_shutdown', session_id: 's1', subscription_id: 'sub1' }])
     expect(dispose).toHaveBeenCalledTimes(1)
     expect(close).toHaveBeenCalledTimes(1)
     expect(dispose.mock.invocationCallOrder[0]).toBeLessThan(close.mock.invocationCallOrder[0] ?? 0)
   })
 
-  it('unmarks the viewer at once, before the run ends and the sessions detach', async () => {
+  it('quits even when the plugin never answers viewer.clear', async () => {
     const { app, done, gw } = await started()
-    expect(existsSync(viewer)).toBe(true)
+    gw.handlers.set('plugin.hermes-tern.viewer.clear', () => new Promise(() => undefined))
 
     app.quit()
 
-    // markViewer runs inside quit(); the detach waits for the run to see `done`.
-    expect(existsSync(viewer)).toBe(false)
-    expect(gw.sent('session.detach')).toEqual([])
     await expect(done).resolves.toBe(0)
     expect(gw.sent('session.detach')).toHaveLength(1)
   })

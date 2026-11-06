@@ -4,9 +4,9 @@ On the shared gateway nothing answers ``connection.request``, so the tool takes 
 (``tools/connectors/managed.py`` ``_no_card_result``): it returns at once with every app's
 ``connect_url`` and tells the model to show the links. Nothing then watches the authorizations.
 
-For a session a ``hermes tern`` pane shows (it registers itself under
-``plugin-data/hermes-tern/viewers/``, by the conversation's id; compression gives the agent a new
-one, so the whole compression lineage counts), a ``transform_tool_result`` hook:
+For a session a ``hermes tern`` pane shows (the pane says so over plugin RPC, ``viewers.py``, by the
+conversation's id; compression gives the agent a new one, so the whole compression lineage counts),
+a ``transform_tool_result`` hook:
 
 - keeps the links out of the model's context and tells it the user has a card instead;
 - writes the apps, their links and their states to
@@ -154,16 +154,10 @@ def _alive(pid: Any) -> bool:
 
 
 def viewed_by_tern(session_id: str) -> bool:
-    """A live ``hermes tern`` pane shows ``session_id``'s conversation: a marker under any id of its
-    compression lineage names a running process."""
-    viewers = _dir("viewers")
-    for sid in reversed(_lineage(session_id)):
-        try:
-            if _alive(json.loads((viewers / f"{sid}.json").read_text())["pid"]):
-                return True
-        except (OSError, ValueError, KeyError, TypeError):
-            continue
-    return False
+    """A live ``hermes tern`` pane shows ``session_id``'s conversation (any id of its compression lineage)."""
+    from . import viewers
+
+    return viewers.viewer_of([session_id, *reversed(_lineage(session_id))]) is not None
 
 
 def _write(card: _Card) -> None:
