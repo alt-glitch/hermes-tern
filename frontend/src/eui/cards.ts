@@ -1,15 +1,17 @@
 // ephemeral-ui cards in the transcript: finds `ephemeral-ui` fences in an answer, mounts each
 // card in the kit's DOM sandbox, and hands the view a snapshot, a click path, blobs for the
-// card's SVG and stylesheet rules for its inline styles. Presentation only: no card reaches the
-// gateway, and a card's buttons act on the card alone (its demo content is the kit's, synthetic).
+// card's SVG and stylesheet rules for its inline styles. Model fences remain demo-only. Trusted
+// host panels use a separate object-owned registry; their approvals never enter the kit sandbox.
 import { createHash } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
+import type { PanelEntry } from '../model.js'
 import { decodeEuiCard, EUI_FENCE, type EuiCardSpec } from '../wire/euiCard.js'
 import { parseJson } from '../wire/json.js'
 
+import { EuiHostCards, type EuiHostPort } from './host.js'
 import { createSandbox, type EuiMounted, type EuiNode, type EuiSandbox, vendorDir } from './sandbox.js'
 import { ternBody } from './ternCss.js'
 
@@ -24,6 +26,9 @@ export interface EuiCardView {
   readonly label: string
   readonly node: EuiNode | null
   readonly error?: string
+  /** Host revisions are part of native paths, so queued old taps cannot target a replacement. */
+  readonly identity?: string
+  readonly activate?: (id: number) => void
 }
 
 export interface EuiSink {
@@ -59,6 +64,12 @@ export function euiStyles(): string {
   kitCss = `${kit}
 [data-eui='card'] { --h-bg: var(--l1); --h-fg: var(--t1); --h-card: var(--card, var(--l1)); --h-card-solid: var(--card, var(--l1)); --h-muted: var(--l2); --h-mutedFg: var(--t3); --h-accent: var(--l2); --h-border: var(--l3); --h-input: var(--l3); --h-primary: var(--accent); --h-primaryFg: var(--accent-ink, var(--card)); --h-font: var(--sans); --h-mono: var(--mono); display: block; max-width: 560px; margin: 8px 0; color: var(--h-fg); font: 14px/1.45 var(--h-font); }
 [data-eui='card'] [data-eui-svg] { display: inline-block; vertical-align: middle; flex: none; }
+[data-eui='card'] .eui-host { padding: 16px; }
+[data-eui='card'] .eui-host-title { font-size: 16px; margin: 0 0 8px; }
+[data-eui='card'] .eui-host-rows { display: grid; grid-template-columns: 1fr 2fr; gap: 6px 12px; }
+[data-eui='card'] .eui-host-rows dt { color: var(--h-mutedFg); }
+[data-eui='card'] .eui-host-rows dd { margin: 0; white-space: pre-wrap; }
+[data-eui='card'] .eui-host-operation { white-space: pre-wrap; }
 [data-role='eui.error'] { color: var(--sf-c-error, var(--t2)); font: 12px/1.4 var(--mono); }
 `
 
@@ -119,6 +130,7 @@ export class EuiCards {
   revision = 0
   readonly dir = euiDir()
   readonly kinds = pinnedKinds(this.dir)
+  readonly host: EuiHostCards
   #sink: EuiSink | undefined
   #changed: (key?: string) => void
   #dark = false
@@ -128,9 +140,10 @@ export class EuiCards {
   #rules = new Map<string, string>()
   #sheetDirty = false
 
-  constructor(changed: (key?: string) => void, sink?: EuiSink) {
+  constructor(changed: (key?: string) => void, sink?: EuiSink, host?: EuiHostPort) {
     this.#changed = changed
     this.#sink = sink
+    this.host = new EuiHostCards(this.kinds, key => { this.#bump(key) }, host)
   }
 
   attach(sink: EuiSink, dark: boolean) {
@@ -173,6 +186,13 @@ export class EuiCards {
     return { spec, app: m?.app ?? spec.app, label: m?.label ?? spec.kind, node: m ? m.snapshot() : null, ...(slot.error === undefined ? {} : { error: slot.error }) }
   }
 
+  /** A trusted host panel, through the same stylesheet and node renderer as demo cards. */
+  hostView(entry: PanelEntry): EuiCardView | undefined {
+    const view = this.host.view(entry)
+    if (view) this.#flush()
+    return view
+  }
+
   click(key: string, id: number) {
     if (this.#slots.get(key)?.mounted?.click(id)) {
       this.#bump(key)
@@ -213,6 +233,7 @@ export class EuiCards {
   }
 
   close() {
+    this.host.close()
     this.#reset()
     this.#sink = undefined
   }
@@ -222,7 +243,7 @@ export class EuiCards {
       return
     }
     // The kit's sheet goes over only once a card is on screen: a chat without cards pays nothing.
-    if (this.#slots.size > 0 && !euiSheets.has(KIT_SHEET)) {
+    if ((this.#slots.size > 0 || this.host.size > 0) && !euiSheets.has(KIT_SHEET)) {
       euiSheets.set(KIT_SHEET, euiStyles())
       this.#sink.stylesheet(KIT_SHEET, euiStyles())
     }
@@ -244,6 +265,7 @@ export class EuiCards {
       this.#flush()
       this.#bump(key)
     }).catch((e: unknown) => {
+      if (this.#slots.get(key) !== slot) return
       slot.error = e instanceof Error ? e.message : String(e)
       this.#bump(key)
     })

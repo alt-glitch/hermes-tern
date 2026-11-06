@@ -1,7 +1,6 @@
 {
   "repo": "kvnloo/ephemeral-ui",
   "sha": "63e06b29ffb0d7c5b9d482abebc0312335897321",
-  "remoteData": "https://raw.githubusercontent.com/kvnloo/ephemeral-ui/63e06b29ffb0d7c5b9d482abebc0312335897321/data/",
   "kinds": [
     "inbox",
     "thread",

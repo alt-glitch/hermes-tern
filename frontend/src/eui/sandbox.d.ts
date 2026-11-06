@@ -54,3 +54,6 @@ export interface EuiSandbox {
 
 export function vendorDir(candidates: readonly string[]): string
 export function createSandbox(dir: string, scheme?: 'light' | 'dark', log?: (error: unknown) => void): Promise<EuiSandbox>
+
+/** Reads only the fixed packaged-data allowlist; URLs and traversal return undefined. */
+export function readOfflineData(dir: string, request: string): string | undefined
