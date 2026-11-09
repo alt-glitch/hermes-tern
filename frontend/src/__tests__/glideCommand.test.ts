@@ -83,4 +83,34 @@ describe('/glide', () => {
     expect(titles()).toEqual([])
     expect(JSON.stringify(transcript.entries.at(-1))).toContain('method not found')
   })
+
+  it('falls back to the plugin command on cores without plugin gateway methods', async () => {
+    const dispatched: string[] = []
+    const { host, titles } = setup({
+      'glide.detect': undefined, 'glide.sync': undefined, 'glide.enable': undefined
+    })
+    const request = vi.fn(async (method: string, params: Record<string, unknown>) => {
+      if (method !== 'command.dispatch') throw new Error(`unknown method: ${method}`)
+      dispatched.push(String(params.arg))
+      expect(params).toMatchObject({ name: 'glide', session_id: 'glide-session' })
+      return { type: 'plugin', output: JSON.stringify(detected) }
+    })
+    host.gw = stub<GlideHost['gw']>({ request })
+    await glideCommand(host, '')
+    expect(dispatched).toEqual(['json detect {}'])
+    expect(titles()[0]).toBe('This machine')
+  })
+
+  it('shows the plugin command error instead of a card', async () => {
+    const { host, transcript, panels } = setup()
+    host.gw = stub<GlideHost['gw']>({
+      request: vi.fn(async (method: string) => {
+        if (method !== 'command.dispatch') throw new Error(`unknown method: ${method}`)
+        return { output: JSON.stringify({ error: 'Build your memory first: /glide build' }) }
+      })
+    })
+    await glideCommand(host, 'recall staging')
+    expect(panels()).toEqual([])
+    expect(JSON.stringify(transcript.entries)).toContain('Build your memory first')
+  })
 })

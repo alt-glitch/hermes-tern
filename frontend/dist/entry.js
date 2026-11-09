@@ -74548,7 +74548,21 @@ async function glideCommand(host, arg) {
     host.transcript.notice("/glide needs an attached session with ephemeral-ui cards", "warning");
     return;
   }
-  const call = (verb2, params = {}) => host.gw.request(`${NS2}.${verb2}`, { session_id: sid, ...params });
+  const call = async (verb2, params = {}) => {
+    try {
+      return await host.gw.request(`${NS2}.${verb2}`, { session_id: sid, ...params });
+    } catch (error) {
+      if (!/unknown method/i.test(error instanceof Error ? error.message : String(error))) throw error;
+    }
+    const { output } = await host.gw.request("command.dispatch", {
+      name: "glide",
+      arg: `json ${verb2} ${JSON.stringify(params)}`,
+      session_id: sid
+    });
+    const result = JSON.parse(output);
+    if (result.error) throw new Error(result.error);
+    return result;
+  };
   const fail = (error) => {
     host.transcript.notice(`/glide: ${error instanceof Error ? error.message : String(error)}`, "error");
   };

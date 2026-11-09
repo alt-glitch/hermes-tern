@@ -44,8 +44,21 @@ export async function glideCommand(host: GlideHost, arg: string): Promise<void> 
     host.transcript.notice('/glide needs an attached session with ephemeral-ui cards', 'warning')
     return
   }
-  const call = <T>(verb: string, params: Record<string, unknown> = {}) =>
-    host.gw.request<T>(`${NS}.${verb}`, { session_id: sid, ...params })
+  // Cores without plugin gateway methods answer "unknown method"; the same call then goes
+  // through the plugin's `/glide json` command, which every core dispatches.
+  const call = async <T>(verb: string, params: Record<string, unknown> = {}): Promise<T> => {
+    try {
+      return await host.gw.request<T>(`${NS}.${verb}`, { session_id: sid, ...params })
+    } catch (error) {
+      if (!/unknown method/i.test(error instanceof Error ? error.message : String(error))) throw error
+    }
+    const { output } = await host.gw.request<{ output: string }>('command.dispatch', {
+      name: 'glide', arg: `json ${verb} ${JSON.stringify(params)}`, session_id: sid
+    })
+    const result = JSON.parse(output) as T & { error?: string }
+    if (result.error) throw new Error(result.error)
+    return result
+  }
   const fail = (error: unknown) => {
     host.transcript.notice(`/glide: ${error instanceof Error ? error.message : String(error)}`, 'error')
   }
