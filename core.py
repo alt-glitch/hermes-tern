@@ -232,6 +232,9 @@ def command(raw_args: str = "", session_id: str | None = None) -> str:
 
 
 def register(ctx) -> None:
+    from . import gateway
+
     ctx.register_hook("pre_llm_call", pre_llm_call)
+    gateway.register(ctx)  # Card-drawing frontends (Tern); a no-op on cores without gateway methods.
     ctx.register_command("glide", command, description="Local corrections memory: build, on, off, recall",
                          args_hint="[build|on|off|recall <words>]")

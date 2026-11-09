@@ -33,6 +33,14 @@ Nothing happens until you run `/glide build` and `/glide on`.
 
 Details and the extraction contract: [docs/memory.md](docs/memory.md).
 
+## Frontends that draw cards
+
+Glide also registers four gateway methods, bound to the caller's attached session: `glide.detect`,
+`glide.sync`, `glide.enable` and `glide.recall`. A frontend such as
+[Tern](https://github.com/alt-glitch/hermes-tern) can call them to show `/glide` as cards with
+approve buttons. On a Hermes core without plugin gateway methods they are skipped, and `/glide`
+works as text.
+
 ## Security and privacy
 
 - **Network:** none. No telemetry, no uploads, no downloads.

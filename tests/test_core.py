@@ -104,3 +104,26 @@ def test_z0int_doctor_is_summarized_from_its_json(home, monkeypatch):
                                       {"id": "py.torch", "ok": False, "required": False}]}
     monkeypatch.setattr(gateway, "_run", lambda argv: json.dumps(doctor) if argv[1:] == ["doctor", "--json"] else None)
     assert gateway.detect(home)["z0int"] == {"installed": True, "ok": False, "failed": ["git"]}
+
+
+def test_gateway_methods_are_namespaced_schema_checked_and_session_bound(home):
+    methods, hooks, commands = {}, [], []
+    ctx = types.SimpleNamespace(register_hook=lambda name, fn: hooks.append(name),
+                                register_command=lambda name, fn, **kw: commands.append(name),
+                                register_gateway_method=lambda name, fn, schema: methods.__setitem__(name, (fn, schema)))
+    gateway.register(ctx)
+    assert hooks == ["pre_llm_call"] and commands == ["glide"]
+    assert sorted(methods) == [f"glide.{v}" for v in ("detect", "enable", "recall", "sync")]
+    assert all(schema.model_config["extra"] == "forbid" for _, schema in methods.values())
+    request = types.SimpleNamespace(session_id="live", assert_attached=lambda: None)
+    fn, _ = methods["glide.enable"]
+    assert fn(request, {"session_id": "live", "on": True})["on"] is True
+    with pytest.raises(PermissionError):
+        fn(request, {"session_id": "other", "on": False})
+
+
+def test_cores_without_gateway_methods_still_get_the_command(home):
+    hooks, commands = [], []
+    gateway.register(types.SimpleNamespace(register_hook=lambda name, fn: hooks.append(name),
+                                           register_command=lambda name, fn, **kw: commands.append(name)))
+    assert hooks == ["pre_llm_call"] and commands == ["glide"]
