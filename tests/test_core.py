@@ -34,6 +34,7 @@ def home(tmp_path, monkeypatch):
     monkeypatch.setattr(gateway, "_home", lambda: home)
     monkeypatch.setattr(gateway, "_run", lambda argv: None)  # no nvidia-smi / z0int on the test host
     monkeypatch.setattr(gateway.shutil, "which", lambda name: None)
+    monkeypatch.setattr(gateway, "find_spec", lambda name: None)
     return home
 
 
@@ -86,3 +87,11 @@ def test_gateway_methods_are_namespaced_schema_checked_and_session_bound(home):
     assert fn(request, {"session_id": "live", "on": True})["on"] is True
     with pytest.raises(PermissionError):
         fn(request, {"session_id": "other", "on": False})
+
+
+def test_z0int_doctor_is_summarized_from_its_json(home, monkeypatch):
+    monkeypatch.setattr(gateway.shutil, "which", lambda name: "/bin/z0int" if name == "z0int" else None)
+    doctor = {"ok": False, "checks": [{"id": "git", "ok": False, "required": True},
+                                      {"id": "py.torch", "ok": False, "required": False}]}
+    monkeypatch.setattr(gateway, "_run", lambda argv: json.dumps(doctor) if argv[1:] == ["doctor", "--json"] else None)
+    assert gateway.detect(home)["z0int"] == {"installed": True, "ok": False, "failed": ["git"]}
