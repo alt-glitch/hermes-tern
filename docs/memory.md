@@ -1,14 +1,13 @@
 # Glide local corrections memory
 
-This is the independent memory prerequisite for [#209](https://github.com/kvnloo/hermes-tern/issues/209).
-The repository root is the plugin package, so its Python module is
-`glide/`. It adds no dependencies, registration, slash command, model call, or prompt hook.
-The onboarding and per-turn host integration remain separate work.
+The memory layer under `/glide` (`memory.py`, `source.py`, `storage.py`). It makes no model
+calls, adds no dependencies and never writes Hermes' database. `core.py` wires it to the
+`/glide` command and the `pre_llm_call` hook.
 
 ## Calling it from the plugin
 
 ```python
-from .glide import GlideMemory, MemoryNotReady
+from . import GlideMemory, MemoryNotReady
 
 memory = GlideMemory()  # Create within the current profile's routed context.
 progress = memory.sync(selected_session_ids, batch_size=128, max_batches=1)
@@ -154,7 +153,7 @@ only after all users of the store have stopped if a complete local reset is need
 ## Verification
 
 ```sh
-python -m pytest -q tests/test_glide_memory.py
+python -m pytest -q tests/tests/test_memory.py
 python -m pytest -q tests/test_glide_memory_core.py  # Requires the CI's Hermes core environment.
 python -m pytest -q
 hermes plugins validate .

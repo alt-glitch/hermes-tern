@@ -1,4 +1,4 @@
-"""`/glide` backend: detect local intelligence, build opt-in corrections memory, recall it per turn.
+"""`/glide`: detect local intelligence, build opt-in corrections memory, recall it per turn.
 
 Every z0intelligence call goes through its CLI's JSON output, so z0int stays optional.
 Nothing here downloads, installs or uploads. Memory stays under <profile>/glide/.
@@ -16,34 +16,14 @@ import sys
 from importlib.util import find_spec
 from pathlib import Path
 
-from pydantic import BaseModel, ConfigDict, Field
-
 from . import source
 from .memory import GlideMemory, MemoryNotReady
 
-NAMESPACE = "hermes-tern.glide"
 RUNTIMES = ("ollama", "llama-server", "llama-cli", "lms", "vllm", "mlx_lm.server")
 _TIMEOUT = 20
 # Function words match every correction under plain BM25; the hook queries content words only.
 _STOP = frozenset("""a an and are as at be but by can do for from have how i if in is it its me my of on
 or please so that the this to us was we what when with you your""".split())
-
-
-class SessionParams(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-    session_id: str = Field(min_length=1)
-
-
-class SyncParams(SessionParams):
-    limit: int = Field(default=source.MAX_SESSIONS, ge=1, le=source.MAX_SESSIONS, strict=True)
-
-
-class EnableParams(SessionParams):
-    on: bool = Field(strict=True)
-
-
-class RecallParams(SessionParams):
-    query: str = Field(min_length=1, max_length=512)
 
 
 def _home() -> Path:
@@ -198,22 +178,60 @@ def pre_llm_call(user_message=None, **_kwargs):
                        f"current instructions take precedence):\n{lines}"}
 
 
+USAGE = """/glide            show this machine and your memory
+/glide build      read your last 100 local sessions and keep the corrections you gave
+/glide on | off   quote up to three matching corrections into each turn
+/glide recall <words>   show what would be quoted"""
+
+
+def _rows(m: dict) -> str:
+    return (f"Sessions read: {m['sessions']} · corrections kept: {m['corrections']} · "
+            f"quoted into turns: {'on' if m['on'] else 'off'}")
+
+
+def command(raw_args: str = "", session_id: str | None = None) -> str:
+    """The `/glide` slash command, for every Hermes frontend (CLI, TUI, desktop, gateway)."""
+    home = _home()
+    verb, _, rest = (raw_args or "").strip().partition(" ")
+    verb = verb.lower()
+    if verb in ("help", "-h", "--help"):
+        return USAGE
+    if verb == "build":
+        m = sync(home, source.MAX_SESSIONS, session_id or "")
+        return f"Local memory built from {m['scanned']} messages. {_rows(m)}" + (
+            "" if m["on"] else "\nTurn it on with /glide on.")
+    if verb in ("on", "off"):
+        m = status(home)
+        if verb == "on" and not m["complete"]:
+            return "Build your memory first: /glide build"
+        return f"Glide memory is {verb}. {_rows(set_enabled(home, verb == 'on'))}"
+    if verb == "recall":
+        if not rest.strip():
+            return "Usage: /glide recall <words>"
+        try:
+            hits = recall(home, rest.strip()[:512])
+        except MemoryNotReady:
+            return "Build your memory first: /glide build"
+        return "\n".join(f"- ({h['score']}) {h['text']}" for h in hits) or "No matching correction."
+    if verb:
+        return USAGE
+    found = detect(home)
+    z0 = found["z0int"]
+    z0_line = (("ready" if z0.get("ok") else "needs " + ", ".join(z0.get("failed") or ["attention"]))
+               if z0["installed"] else f"optional, not installed ({z0['hint']})")
+    ram = "unknown" if found["ram_gib"] is None else f"{found['ram_gib']} GiB"
+    return "\n".join([
+        f"This machine: {found['os']}, {found['cpus']} CPU threads, {ram} RAM",
+        f"GPU: {', '.join(found['gpus']) or 'none found'}",
+        f"Local runtimes: {', '.join(found['runtimes']) or 'none on PATH'}",
+        f"z0intelligence: {z0_line}",
+        _rows(found["memory"]),
+        "",
+        USAGE,
+    ])
+
+
 def register(ctx) -> None:
     ctx.register_hook("pre_llm_call", pre_llm_call)
-    registrar = getattr(ctx, "register_gateway_method", None)
-    if not callable(registrar):
-        return
-
-    def attached(request, params: dict) -> Path:
-        request.assert_attached()
-        if params["session_id"] != request.session_id:
-            raise PermissionError("not the attached session")
-        return _home()
-
-    registrar(f"{NAMESPACE}.detect", lambda r, p: detect(attached(r, p)), schema=SessionParams)
-    registrar(f"{NAMESPACE}.sync",
-              lambda r, p: sync(attached(r, p), p.get("limit", source.MAX_SESSIONS), p["session_id"]),
-              schema=SyncParams)
-    registrar(f"{NAMESPACE}.enable", lambda r, p: set_enabled(attached(r, p), p["on"]), schema=EnableParams)
-    registrar(f"{NAMESPACE}.recall", lambda r, p: {"hits": recall(attached(r, p), p["query"])},
-              schema=RecallParams)
+    ctx.register_command("glide", command, description="Local corrections memory: build, on, off, recall",
+                         args_hint="[build|on|off|recall <words>]")

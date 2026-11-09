@@ -16,8 +16,8 @@ import types
 
 import pytest
 
-from hermes_tern_plugin.glide import GlideMemory, MemoryNotReady, SourceError, StateVersionError
-from hermes_tern_plugin.glide import memory, source, storage
+from glide_plugin import GlideMemory, MemoryNotReady, SourceError, StateVersionError
+from glide_plugin import memory, source, storage
 
 SCHEMA = """
 CREATE TABLE sessions (

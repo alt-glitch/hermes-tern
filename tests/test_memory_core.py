@@ -1,7 +1,7 @@
 """Regression through Hermes' real persistence, compression and rewind APIs.
 
 Requires the existing pinned Hermes core test environment. All transcript text is
-synthetic workflow data; the standalone SQLite fixtures remain in test_glide_memory.py.
+synthetic workflow data; the standalone SQLite fixtures remain in test_memory.py.
 """
 
 import json
@@ -10,7 +10,7 @@ import subprocess
 
 import pytest
 
-from hermes_tern_plugin.glide import GlideMemory, MemoryNotReady
+from glide_plugin import GlideMemory, MemoryNotReady
 
 
 @pytest.fixture(autouse=True)

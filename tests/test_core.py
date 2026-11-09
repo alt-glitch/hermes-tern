@@ -6,12 +6,12 @@ import types
 
 import pytest
 
-from hermes_tern_plugin.glide import gateway
+from glide_plugin import core as gateway
 
 import importlib.util
 from pathlib import Path
 
-_spec = importlib.util.spec_from_file_location("_glide_memory_fixtures", Path(__file__).with_name("test_glide_memory.py"))
+_spec = importlib.util.spec_from_file_location("_glide_memory_fixtures", Path(__file__).with_name("test_memory.py"))
 _fixtures = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(_fixtures)
 make_database = _fixtures.make_database  # The real sessions/messages contract, defined once.
@@ -74,19 +74,28 @@ def test_recall_refreshes_the_same_scope_after_new_messages(home):
     assert gateway.recall(home, "sign the commits")[0]["text"].startswith("always sign commits")
 
 
-def test_gateway_methods_are_namespaced_schema_checked_and_session_bound(home):
-    methods, hooks = {}, []
+def test_register_adds_the_hook_and_a_slash_command_for_every_frontend(home):
+    hooks, commands = [], {}
     ctx = types.SimpleNamespace(register_hook=lambda name, fn: hooks.append(name),
-                                register_gateway_method=lambda name, fn, schema: methods.__setitem__(name, (fn, schema)))
+                                register_command=lambda name, fn, **kw: commands.__setitem__(name, fn))
     gateway.register(ctx)
-    assert hooks == ["pre_llm_call"]
-    assert sorted(methods) == [f"hermes-tern.glide.{v}" for v in ("detect", "enable", "recall", "sync")]
-    assert all(schema.model_config["extra"] == "forbid" for _, schema in methods.values())
-    request = types.SimpleNamespace(session_id="live", assert_attached=lambda: None)
-    fn, _ = methods["hermes-tern.glide.enable"]
-    assert fn(request, {"session_id": "live", "on": True})["on"] is True
-    with pytest.raises(PermissionError):
-        fn(request, {"session_id": "other", "on": False})
+    assert hooks == ["pre_llm_call"] and list(commands) == ["glide"]
+
+
+def test_command_walks_build_on_recall_off(home):
+    run = gateway.command
+    assert "This machine" in run("") and "corrections kept: 0" in run("")
+    assert run("on") == "Build your memory first: /glide build"
+    assert "corrections kept: 2" in run("build", session_id="none")
+    assert "quoted into turns: on" in run("on")
+    assert "never push to main" in run("recall push to main")
+    assert run("recall") == "Usage: /glide recall <words>"
+    assert "quoted into turns: off" in run("off")
+    assert run("bogus").startswith("/glide ")
+
+
+def test_build_skips_the_session_that_ran_it(home):
+    assert "corrections kept: 1" in gateway.command("build", session_id="new")
 
 
 def test_z0int_doctor_is_summarized_from_its_json(home, monkeypatch):
