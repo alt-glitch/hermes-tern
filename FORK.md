@@ -44,7 +44,9 @@ Each row links to the feature's own document. Merged PR numbers are in this fork
 | Launcher | Frontend channels: `hermes tern --channel NAME`, `hermes tern switch NAME` | | #193 |
 | | Qualified Ink fallback on exit 75 | [below](#exit-75-fallback) | #19 |
 
-Demo videos for open work are listed in the PR that ships each feature.
+Demo videos are in the PR that ships each feature. The tool-card fixes also have one film, the same
+turn on upstream and on this fork for each fix: [hermes-tern-fixes-v2.mp4](https://github.com/kvnloo/hermes-tern/blob/0ddcb949dda3ed0cd8c5762cf0e4387673b6eacd/films/v2/hermes-tern-fixes-v2.mp4)
+(78 s, 1080p60; files on the `pr-films` branch, which is never merged).
 
 ## Behavior that differs from upstream
 
