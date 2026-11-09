@@ -186,5 +186,8 @@ def register(ctx) -> None:
         from . import gateway_operations
         gateway_operations.register(ctx)
     plan_gateway.register(ctx)
+    # /glide: local hardware/z0 detection and opt-in corrections memory (pre_llm_call).
+    from .glide import gateway as glide_gateway
+    glide_gateway.register(ctx)
     from . import talk_backend
     talk_backend.register(ctx)

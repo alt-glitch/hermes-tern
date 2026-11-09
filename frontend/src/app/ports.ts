@@ -28,6 +28,7 @@ import type { Busy } from '../turn/activity.js'
 import type { LiveVoice } from '../voice/live.js'
 
 import type { Ticket } from '../core/epoch.js'
+import type { EuiCards } from '../eui/cards.js'
 
 /** The session as the ports read it, live: each read sees the current ids and info. */
 export interface SessionView {
@@ -48,6 +49,8 @@ export interface SessionView {
 export interface ChatPorts extends OverlayHost {
   readonly session: SessionView
   readonly gw: GatewayClient
+  /** Host-owned ephemeral-ui cards (/glide); absent in panes without the pinned kit. */
+  readonly eui?: Pick<EuiCards, 'host'>
   /** The running turn, null when idle. */
   readonly busy: Busy | null
   readonly transcript: Transcript
