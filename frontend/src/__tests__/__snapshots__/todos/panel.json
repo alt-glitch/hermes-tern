@@ -1,0 +1,113 @@
+{
+ "k": "col",
+ "p": {
+  "role": "hermes.todos",
+  "key": "todos"
+ },
+ "c": [
+  {
+   "k": "row",
+   "p": {
+    "role": "hermes.todos.head",
+    "key": "head"
+   },
+   "c": [
+    {
+     "k": "text",
+     "p": {
+      "role": "hermes.todos.title",
+      "spans": [
+       {
+        "t": "Todos"
+       }
+      ],
+      "wrap": "none",
+      "key": "title"
+     }
+    },
+    {
+     "k": "text",
+     "p": {
+      "role": "hermes.todos.count",
+      "spans": [
+       {
+        "s": "muted",
+        "t": "2 of 7 done"
+       }
+      ],
+      "wrap": "none",
+      "key": "count"
+     }
+    }
+   ]
+  },
+  {
+   "k": "col",
+   "p": {
+    "role": "hermes.todos.list",
+    "key": "body"
+   },
+   "c": [
+    {
+     "k": "checklist",
+     "p": {
+      "mode": "full",
+      "phases": [
+       {
+        "id": "all",
+        "items": [
+         {
+          "id": "todo:0",
+          "status": "done",
+          "text": "item a (a)"
+         },
+         {
+          "id": "todo:1",
+          "status": "active",
+          "text": "item b (b)"
+         },
+         {
+          "id": "todo:2",
+          "status": "pending",
+          "text": "item c (c)"
+         },
+         {
+          "id": "todo:3",
+          "status": "done",
+          "text": "item c1 (c1) — under item c (c)"
+         },
+         {
+          "id": "todo:4",
+          "status": "active",
+          "text": "item c2 (c2) — under item c (c)"
+         },
+         {
+          "id": "todo:5",
+          "status": "pending",
+          "text": "item c2a (c2a) — under item c2 (c2)"
+         },
+         {
+          "id": "todo:6",
+          "status": "dropped",
+          "text": "item c3 (c3) — under item c (c)"
+         },
+         {
+          "id": "todo:7",
+          "status": "pending",
+          "text": "item d (d)"
+         },
+         {
+          "id": "todo:8",
+          "status": "dropped",
+          "text": "item e (e)"
+         }
+        ]
+       }
+      ],
+      "key": "list"
+     }
+    }
+   ]
+  }
+ ]
+}

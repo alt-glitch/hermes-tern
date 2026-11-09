@@ -25,6 +25,8 @@ the user's prompt, so one home covers every flow:
                    for its chart spec, and the shells pill charts it (hover it for the tiles), as
                    do its card, the wait card and /ps
     "errands…"  -> (at the start) a four-item todo list worked through over slow steps
+    "todos…"    -> (at the start) a long todo list (16 items: long ones that wrap, done, cancelled,
+                   subtasks under parents), then a long answer for the open panel to sit over
     "connector…" -> (at the start) a tool search, a two-app connector batch and one connector call
     "replay ID" -> runs recorded job ID from $FAKE_MODEL_REPLAY/commands.json in the background,
                    and answers its chart request with $FAKE_MODEL_REPLAY/ID.spec.json (the rules
@@ -244,7 +246,8 @@ def _calls(prompt: str, target: Path) -> list[dict] | None:
     if words.lstrip().startswith("pr"):
         # A real public PR, linked the way an agent links one it opened (through the tool_call bridge
         # in case Tool Search defers the plugin's tools).
-        urls = re.findall(r"https://github\.com/[^\s/]+/[^\s/]+/pull/\d+", words) or ["https://github.com/alt-glitch/hermes-tern/pull/22"]
+        # Any host: the tool, not the model, decides which hosts a link may name.
+        urls = re.findall(r"https://[^\s/]+/[^\s/]+/[^\s/]+/pull/\d+", words) or ["https://github.com/alt-glitch/hermes-tern/pull/22"]
         return [_call("tool_call", {"calls": [{"name": "link_pull_request", "arguments": {"url": u}} for u in urls]}, "call-link")]
     if words.lstrip().startswith("cron"):
         # cronjob_manage is a deferred tool: the model reaches it through the tool_call bridge.
@@ -307,6 +310,46 @@ BENCH_SPEC = {
 
 class Server(ThreadingHTTPServer):
     target: Path
+
+
+# A list as long as a real plan gets: items that wrap, done and dropped ones, subtasks.
+LONG_TODOS = [
+    {"id": "setup", "content": "Set up the scratch box, audit the prompts and take stock of the skills", "status": "completed"},
+    {"id": "plan", "content": "Plan the second audit with the reviewer: the per-system loop, the checkpoints and the pilot", "status": "in_progress"},
+    {"id": "run", "content": "Run the second audit on the scratch box once the plan is agreed", "status": "pending"},
+    {"id": "run-a", "parent": "run", "content": "Gateway and sessions", "status": "completed"},
+    {"id": "run-b", "parent": "run", "content": "Tools, the terminal and background processes, with their approvals and the guards that wrap them", "status": "in_progress"},
+    {"id": "run-c", "parent": "run", "content": "Memory and skills", "status": "pending"},
+    {"id": "run-d", "parent": "run", "content": "Cron jobs", "status": "cancelled"},
+    {"id": "rearch", "content": "Make the rearchitecture plan from the audit's results, and shape the tickets with the two leads", "status": "pending"},
+    {"id": "phase0", "content": "Monorepo phase 0: guide the spec; the work runs on the scratch box in the pane beside this session", "status": "pending"},
+    {"id": "flows", "content": "Spec the execution flows: session and subagent skill bundles (the dev skill, the architecture skill, the rules)", "status": "pending"},
+    {"id": "review", "content": "Encode PR review babysitting: both reviewers until reviewed, clear PR descriptions", "status": "pending"},
+    {"id": "issues", "content": "Encode issue artifacts: an HTML explainer per stacked PR, train, issue or PR", "status": "pending"},
+    {"id": "skill", "content": "Write the architecture-work skill that the execution flows load", "status": "pending"},
+    {"id": "docs", "content": "Update the docs", "status": "pending"},
+    {"id": "ship", "content": "Ship it", "status": "pending"},
+    {"id": "retro", "content": "Write the retro", "status": "pending"},
+]
+
+LONG_ANSWER = """The plan is in the todo list: sixteen items, one under way.
+
+- **Scratch box:** set up. The prompt audit and the skills inventory are done, and nothing on
+  the main checkout changed.
+- **Second audit:** the per-system loop runs one subagent per system, with a checkpoint after
+  each so you can stop it. The pilot is the gateway, because its sessions are the smallest part.
+- **Rearchitecture:** waits for the audit. The tickets come from its findings, not before.
+
+Nothing stays read-only on the repo after the plan is agreed. No test runs unless a brief
+allows one. The skills the loop needs were missing on the scratch box; the setup subagent
+installed them and pushed the rules.
+
+Open the todo list from its pill to follow along."""
+
+TODOS_FLOW = [
+    ("I'll lay the work out as a todo list first.", [("tool_call", {"name": "todo_list", "arguments": {"todos": LONG_TODOS}})]),
+    (LONG_ANSWER, []),
+]
 
 
 class Model(BaseHTTPRequestHandler):
@@ -376,6 +419,12 @@ class Model(BaseHTTPRequestHandler):
                 return
             content = note
             delay = 0.0
+        elif prompt.lower().lstrip().startswith("todos"):
+            last_user = max(i for i, m in enumerate(messages) if m.get("role") == "user")
+            done = sum(1 for m in messages[last_user:] if m.get("role") == "assistant")
+            note, round_calls = TODOS_FLOW[min(done, len(TODOS_FLOW) - 1)]
+            calls = [_call(name, args, f"call-t{done}-{i}") for i, (name, args) in enumerate(round_calls)] or None
+            content, delay = note, 0.0
         elif "steps" in prompt.lower():
             # One call per request until the steps run out; the tool results so far count them.
             last_user = max(i for i, m in enumerate(messages) if m.get("role") == "user")

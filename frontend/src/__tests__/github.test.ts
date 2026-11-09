@@ -354,8 +354,38 @@ describe('branch and stacks', () => {
   it('reads GitHub remotes in every URL form, and nothing else', () => {
     expect(parseRemote('git@github.com:Acme/App.git')).toEqual({ host: 'github.com', repository: 'acme/app' })
     expect(parseRemote('https://github.com/acme/app')).toEqual({ host: 'github.com', repository: 'acme/app' })
-    expect(parseRemote('ssh://git@github.example.com:22/acme/app.git')).toEqual({ host: 'github.example.com', repository: 'acme/app' })
     expect(parseRemote('git@gitlab.com:acme/app.git')).toBeUndefined()
+  })
+
+  it('reads a remote only on github.com or a listed enterprise host: the checkout names it, not the user', () => {
+    vi.stubEnv('HERMES_TERN_GITHUB_ENTERPRISE_HOSTS', 'ghe.corp.example,git.corp.example:8443')
+
+    try {
+      expect(parseRemote('git@github.evil.com:acme/app.git')).toBeUndefined()
+      expect(parseRemote('https://github.mycompany.com/acme/app')).toBeUndefined()
+      expect(parseRemote('https://GitHub.com./acme/app')).toEqual({ host: 'github.com', repository: 'acme/app' })
+      // An ssh remote's port is not the web server's; an https one's is.
+      expect(parseRemote('ssh://git@ghe.corp.example:22/acme/app.git')).toEqual({ host: 'ghe.corp.example', repository: 'acme/app' })
+      expect(parseRemote('https://git.corp.example:8443/acme/app.git')).toEqual({ host: 'git.corp.example:8443', repository: 'acme/app' })
+      expect(parseRemote('https://git.corp.example/acme/app.git')).toBeUndefined()
+    } finally {
+      vi.unstubAllEnvs()
+    }
+  })
+
+  it('shows a stored link to a host the user did not list, and never reads it', async () => {
+    // Linked before the tool checked hosts: pull-requests.json may still name one.
+    const evil: PrRef = { host: 'github.evil.com', number: 1, repository: 'acme/app', url: 'https://github.evil.com/acme/app/pull/1' }
+    const graphql = vi.fn(async (_host: string) => ({ p0: prJson() }))
+    const rest = vi.fn(async (_host: string) => [])
+    const store = new PullRequests({ changed: vi.fn(), cwd: () => null, sid: () => storedSessionId('s1') }, { graphql, rest }, () => [evil, ref(5)])
+
+    store.adopt()
+    await vi.waitFor(() => expect(store.entries()[1]?.pr?.title).toBe('Fix it'))
+    expect(new Set([...graphql.mock.calls, ...rest.mock.calls].map(c => c[0]))).toEqual(new Set(['github.com']))
+    expect(store.entries()[0]?.error).toContain('plugins.entries.hermes-tern.settings.enterprise_hosts')
+    expect(store.error).toBeUndefined()
+    store.dispose()
   })
 
   it('decodes /stacks bottom first, merged layers as merged', () => {
