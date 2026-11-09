@@ -127,3 +127,16 @@ def test_cores_without_gateway_methods_still_get_the_command(home):
     gateway.register(types.SimpleNamespace(register_hook=lambda name, fn: hooks.append(name),
                                            register_command=lambda name, fn, **kw: commands.append(name)))
     assert hooks == ["pre_llm_call"] and commands == ["glide"]
+
+
+def test_json_command_gives_card_frontends_the_methods_on_cores_without_them(home):
+    def run(arg):
+        return json.loads(gateway.command(arg, session_id="live"))
+    assert run("json recall {\"query\": \"staging\"}") == {"error": "Build your memory first: /glide build"}
+    built = run("json sync {\"limit\": 10}")
+    assert built["complete"] is True and built["corrections"] >= 1
+    assert run("json enable {\"on\": true}")["on"] is True
+    assert "cpus" in run("json detect")
+    assert "error" in run("json enable {\"on\": \"yes\"}")  # strict schema, same as the gateway method
+    assert "error" in run("json session_id {}") and "error" in run("json detect not-json")
+

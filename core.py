@@ -190,6 +190,24 @@ def _rows(m: dict) -> str:
             f"quoted into turns: {'on' if m['on'] else 'off'}")
 
 
+def _json_call(home: Path, rest: str, session_id: str) -> str:
+    """`/glide json <verb> [params]`: the glide.* methods for cores without gateway methods.
+
+    Card frontends reach it through the core's command.dispatch; the session is the caller's own.
+    """
+    from . import gateway
+    verb, _, raw = rest.strip().partition(" ")
+    try:
+        params = {**json.loads(raw or "{}"), "session_id": session_id}
+        if verb not in gateway.VERBS:
+            raise ValueError(f"unknown glide verb: {verb or '(none)'}")
+        return json.dumps(gateway.call(home, verb, params))
+    except MemoryNotReady:
+        return json.dumps({"error": "Build your memory first: /glide build"})
+    except (ValueError, TypeError) as error:
+        return json.dumps({"error": str(error).splitlines()[0]})
+
+
 def command(raw_args: str = "", session_id: str | None = None) -> str:
     """The `/glide` slash command, for every Hermes frontend (CLI, TUI, desktop, gateway)."""
     home = _home()
@@ -218,6 +236,8 @@ def command(raw_args: str = "", session_id: str | None = None) -> str:
         except MemoryNotReady:
             return "Build your memory first: /glide build"
         return "\n".join(f"- ({h['score']}) {h['text']}" for h in hits) or "No matching correction."
+    if verb == "json":
+        return _json_call(home, rest, session_id or "")
     if verb:
         return USAGE
     found = detect(home)
