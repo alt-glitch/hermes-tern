@@ -10,7 +10,7 @@ homepage: https://github.com/kvnloo/hermes-tern
 tags: [tern, tui, frontend]
 requires_hermes: ">=0.22.2"
 provides_tools: [link_pull_request, unlink_pull_request, list_pull_requests]
-provides_hooks: [transform_tool_result]
+provides_hooks: [transform_tool_result, pre_llm_call]
 provides_middleware: [tool_request]
 optional_env:
   - name: GITHUB_TOKEN

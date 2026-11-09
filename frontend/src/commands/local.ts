@@ -34,6 +34,7 @@ import { HOLD_UNAVAILABLE } from '../voice/hold.js'
 import { rpc } from '../wire/rpc.js'
 
 import { CONTROL_COMMANDS } from './control.js'
+import { glideCommand } from './glide.js'
 import { REFUSED_COMMANDS, type RefusedHost } from './refused.js'
 import { SESSION_COMMANDS } from './session.js'
 import { voiceCommand, type VoiceHost } from './voice.js'
@@ -46,6 +47,7 @@ export type CommandHost = Pick<
   | 'attachImagePath'
   | 'busy'
   | 'btw'
+  | 'eui'
   | 'operations'
   | 'control'
   | 'gw'
@@ -368,6 +370,11 @@ const COMMANDS: readonly LocalCommand[] = [
     help: "This conversation's branches as a tree: open one",
     name: 'tree',
     run: host => openBranchTree(host)
+  },
+  {
+    help: 'Onboard to local intelligence: this machine, z0, and a local corrections memory [off | recall <words>]',
+    name: 'glide',
+    run: (host, arg) => glideCommand(host, arg)
   },
   {
     help: 'Read-only session identity, model, context, and tool/token counters',
