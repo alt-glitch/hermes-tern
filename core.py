@@ -181,7 +181,8 @@ def pre_llm_call(user_message=None, **_kwargs):
 USAGE = """/glide            show this machine and your memory
 /glide build      read your last 100 local sessions and keep the corrections you gave
 /glide on | off   quote up to three matching corrections into each turn
-/glide recall <words>   show what would be quoted"""
+/glide recall <words>   show what would be quoted
+/glide setup      guided first run: build, show what was kept, self-test recall"""
 
 
 def _rows(m: dict) -> str:
@@ -205,6 +206,10 @@ def command(raw_args: str = "", session_id: str | None = None) -> str:
         if verb == "on" and not m["complete"]:
             return "Build your memory first: /glide build"
         return f"Glide memory is {verb}. {_rows(set_enabled(home, verb == 'on'))}"
+    if verb == "setup":
+        from . import onboarding
+
+        return onboarding.render(onboarding.run(home, exclude=session_id or ""))
     if verb == "recall":
         if not rest.strip():
             return "Usage: /glide recall <words>"
@@ -231,10 +236,29 @@ def command(raw_args: str = "", session_id: str | None = None) -> str:
     ])
 
 
+def _setup_cli(parser) -> None:
+    from . import onboarding
+
+    sub = parser.add_subparsers(dest="glide_command", required=True)
+    onboarding.setup_cli(sub.add_parser("onboard", help="build, review and self-test the memory"))
+
+
+def _cli(args) -> int:
+    from . import onboarding
+
+    return onboarding.cli(args)
+
+
 def register(ctx) -> None:
-    from . import gateway
+    from . import gateway, onboarding
 
     ctx.register_hook("pre_llm_call", pre_llm_call)
+    if callable(getattr(ctx, "register_cli_command", None)):  # `hermes glide onboard`
+        ctx.register_cli_command("glide", "Glide corrections memory", _setup_cli, _cli,
+                                 description="Glide: guided onboarding for the corrections memory")
+    if callable(getattr(ctx, "register_skill", None)):  # The model's half of onboarding.
+        ctx.register_skill("onboarding", Path(__file__).with_name("skills") / "onboarding" / "SKILL.md",
+                           description="Use when the user installs or sets up Glide, or asks what it remembers.")
     gateway.register(ctx)  # Card-drawing frontends (Tern); a no-op on cores without gateway methods.
     ctx.register_command("glide", command, description="Local corrections memory: build, on, off, recall",
                          args_hint="[build|on|off|recall <words>]")
