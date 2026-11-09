@@ -12,6 +12,8 @@ import platform
 import shutil
 import sqlite3
 import subprocess
+import sys
+from importlib.util import find_spec
 from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -89,9 +91,10 @@ def _gpus() -> list[str]:
 
 def _z0int() -> dict:
     exe = shutil.which("z0int")
-    if not exe:
+    argv = [exe] if exe else [sys.executable, "-m", "z0int"] if find_spec("z0int") else None
+    if not argv:
         return {"installed": False, "hint": "pip install git+https://github.com/kvnloo/z0intelligence"}
-    raw = _run([exe, "doctor", "--json"])
+    raw = _run([*argv, "doctor", "--json"])
     try:
         doctor = json.loads(raw or "")
     except ValueError:
