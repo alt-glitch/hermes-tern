@@ -11,4 +11,3 @@ tags: [memory, corrections, local]
 requires_hermes: ">=0.22.2"
 provides_tools: []
 provides_hooks: [pre_llm_call]
-provides_middleware: []
