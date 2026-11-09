@@ -22,7 +22,7 @@ export interface GlideDetect {
   ram_gib: number | null
   gpus: string[]
   runtimes: string[]
-  z0int: { installed: boolean; ok?: boolean; failed?: string[]; hint?: string }
+  z0int: { installed: boolean; ok?: boolean; failed?: string[]; hint?: string; unchecked?: boolean }
   memory: GlideMemory
 }
 
@@ -98,9 +98,12 @@ export async function glideCommand(host: GlideHost, arg: string): Promise<void> 
     const z0 = found.z0int
     cards.publish({
       kind: 'intel-health', app: APP, title: 'z0intelligence',
-      summary: z0.installed ? (z0.ok ? 'Ready for training loops and hill climbs.' : `Needs: ${(z0.failed ?? []).join(', ')}`)
-        : 'Optional. Adds local training loops, hill climbs and model management.',
-      rows: z0.installed ? [{ label: 'doctor', value: z0.ok ? 'ok' : 'attention' }] : [{ label: 'Install', value: z0.hint ?? 'pip install z0intelligence' }]
+      summary: !z0.installed ? 'Optional. Adds local training loops, hill climbs and model management.'
+        : z0.ok ? 'Ready for training loops and hill climbs.'
+          : z0.unchecked || !z0.failed?.length ? 'Installed. Run `z0int doctor` for details.'
+            : `Needs: ${z0.failed.join(', ')}`,
+      rows: z0.installed ? [{ label: 'doctor', value: z0.ok ? 'ok' : z0.unchecked ? 'not checked' : 'attention' }]
+        : [{ label: 'Install', value: z0.hint ?? 'pip install z0intelligence' }]
     })
 
     const enable = () => cards.publish({
