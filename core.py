@@ -78,7 +78,7 @@ def _z0int() -> dict:
     try:
         doctor = json.loads(raw or "")
     except ValueError:
-        return {"installed": True, "ok": False, "failed": ["doctor did not answer"]}
+        return {"installed": True, "ok": False, "failed": [], "unchecked": True}
     failed = [c["id"] for c in doctor.get("checks", []) if c.get("required") and not c.get("ok")]
     return {"installed": True, "ok": bool(doctor.get("ok")), "failed": failed}
 
@@ -199,7 +199,7 @@ def command(raw_args: str = "", session_id: str | None = None) -> str:
         return USAGE
     if verb == "build":
         m = sync(home, source.MAX_SESSIONS, session_id or "")
-        return f"Local memory built from {m['scanned']} messages. {_rows(m)}" + (
+        return f"Memory up to date ({m['scanned']} new messages read). {_rows(m)}" + (
             "" if m["on"] else "\nTurn it on with /glide on.")
     if verb in ("on", "off"):
         m = status(home)
@@ -222,8 +222,12 @@ def command(raw_args: str = "", session_id: str | None = None) -> str:
         return USAGE
     found = detect(home)
     z0 = found["z0int"]
-    z0_line = (("ready" if z0.get("ok") else "needs " + ", ".join(z0.get("failed") or ["attention"]))
-               if z0["installed"] else f"optional, not installed ({z0['hint']})")
+    if not z0["installed"]:
+        z0_line = f"optional, not installed ({z0['hint']})"
+    elif z0.get("unchecked"):
+        z0_line = "installed (run `z0int doctor` for details)"
+    else:
+        z0_line = "ready" if z0.get("ok") else "needs " + ", ".join(z0.get("failed") or ["attention"])
     ram = "unknown" if found["ram_gib"] is None else f"{found['ram_gib']} GiB"
     return "\n".join([
         f"This machine: {found['os']}, {found['cpus']} CPU threads, {ram} RAM",
