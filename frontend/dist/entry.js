@@ -74533,7 +74533,7 @@ var CONTROL_COMMANDS = [
 ];
 
 // src/commands/glide.ts
-var NS2 = "hermes-tern.glide";
+var NS2 = "glide";
 var APP = "glide";
 var SESSIONS = 100;
 var memoryRows = (m) => [

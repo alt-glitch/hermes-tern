@@ -26,7 +26,8 @@ export interface GlideDetect {
   memory: GlideMemory
 }
 
-const NS = 'hermes-tern.glide'
+// Served by the standalone glide plugin (github.com/kvnloo/glide).
+const NS = 'glide'
 const APP = 'glide'
 const SESSIONS = 100
 

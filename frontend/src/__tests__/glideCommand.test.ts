@@ -23,9 +23,9 @@ function setup(answers: Record<string, unknown> = {}) {
   const transcript = new Transcript()
   const eui = new EuiCards(vi.fn(), undefined, euiHostPort({ session, transcript }, () => true))
   const replies: Record<string, unknown> = {
-    'hermes-tern.glide.detect': detected,
-    'hermes-tern.glide.sync': memory({ sessions: 42, corrections: 7, complete: true, scanned: 310 }),
-    'hermes-tern.glide.enable': memory({ sessions: 42, corrections: 7, complete: true, on: true }),
+    'glide.detect': detected,
+    'glide.sync': memory({ sessions: 42, corrections: 7, complete: true, scanned: 310 }),
+    'glide.enable': memory({ sessions: 42, corrections: 7, complete: true, on: true }),
     ...answers
   }
   const request = vi.fn(async (method: string, _params: Record<string, unknown>) => {
@@ -50,28 +50,28 @@ describe('/glide', () => {
     const { host, request, view, titles } = setup()
     await glideCommand(host, '')
     expect(titles()).toEqual(['This machine', 'z0intelligence', 'Build your local memory'])
-    expect(request.mock.calls.map(c => c[0])).toEqual(['hermes-tern.glide.detect'])
+    expect(request.mock.calls.map(c => c[0])).toEqual(['glide.detect'])
     expect(request.mock.calls[0]?.[1]).toEqual({ session_id: 'glide-session' })
 
     must(view(2).activate)(HOST_APPROVE_ID)
     await settle()
-    expect(request.mock.calls.at(-1)).toEqual(['hermes-tern.glide.sync', { session_id: 'glide-session', limit: 100 }])
+    expect(request.mock.calls.at(-1)).toEqual(['glide.sync', { session_id: 'glide-session', limit: 100 }])
     expect(titles().slice(3)).toEqual(['Local memory built', 'Quote them into matching turns'])
-    expect(request.mock.calls.some(c => c[0] === 'hermes-tern.glide.enable')).toBe(false)
+    expect(request.mock.calls.some(c => c[0] === 'glide.enable')).toBe(false)
 
     must(view(4).activate)(HOST_APPROVE_ID)
     await settle()
-    expect(request.mock.calls.at(-1)).toEqual(['hermes-tern.glide.enable', { session_id: 'glide-session', on: true }])
+    expect(request.mock.calls.at(-1)).toEqual(['glide.enable', { session_id: 'glide-session', on: true }])
     expect(titles().at(-1)).toBe('Glide memory is on')
   })
 
   it('recalls and turns off on request', async () => {
     const { host, request, titles } = setup({
-      'hermes-tern.glide.recall': { hits: [{ text: 'never push to main untested', score: 2.1 }] },
-      'hermes-tern.glide.enable': memory({ on: false })
+      'glide.recall': { hits: [{ text: 'never push to main untested', score: 2.1 }] },
+      'glide.enable': memory({ on: false })
     })
     await glideCommand(host, 'recall push main')
-    expect(request.mock.calls[0]).toEqual(['hermes-tern.glide.recall', { session_id: 'glide-session', query: 'push main' }])
+    expect(request.mock.calls[0]).toEqual(['glide.recall', { session_id: 'glide-session', query: 'push main' }])
     await glideCommand(host, 'off')
     expect(titles()).toEqual(['Your corrections about “push main”', 'Glide memory is off'])
   })
