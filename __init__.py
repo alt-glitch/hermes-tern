@@ -15,7 +15,7 @@ import os
 import sys
 from pathlib import Path
 
-from . import browser_backend, channels, connections, panes, plan_gateway, pull_requests, tern_env
+from . import browser_backend, channels, connections, ephemeral_cards, panes, plan_gateway, pull_requests, tern_env
 
 FRONTEND = Path(__file__).resolve().parent / "frontend"
 # How much of a channel's commit `hermes tern channels` shows.
@@ -172,6 +172,7 @@ def register(ctx) -> None:
         "table_charts", display_name="Tern table charts",
         description="Selects bar, line or no visualization for a settled Markdown table in `hermes tern`.")
     pull_requests.register(ctx)
+    ephemeral_cards.register(ctx)
     connections.register(ctx)
     tern_env.register(ctx)
     # Gateway RPCs are optional: older Hermes still launches and uploads normally.
@@ -185,3 +186,8 @@ def register(ctx) -> None:
         from . import gateway_operations
         gateway_operations.register(ctx)
     plan_gateway.register(ctx)
+    # /glide: local hardware/z0 detection and opt-in corrections memory (pre_llm_call).
+    from .glide import gateway as glide_gateway
+    glide_gateway.register(ctx)
+    from . import talk_backend
+    talk_backend.register(ctx)

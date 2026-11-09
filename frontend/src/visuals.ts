@@ -6,28 +6,66 @@ import { isAbsolute } from 'node:path'
 import { pathToFileURL } from 'node:url'
 
 import type { ChatPorts } from './app/ports.js'
-import { decodeJson } from './wire/json.js'
+import { type CardDocument, openCardContract } from './wire/card.js'
+import { decodeJson, record } from './wire/json.js'
 import { openUiContract } from './wire/openui.js'
 
 interface RepositoryNode {
   readonly children: readonly RepositoryNode[]
 }
 
-export interface VisualBundle {
+interface RepositoryBundle {
   readonly id: string
   readonly selection: {
-    readonly view: { readonly mode: 'code' | 'churn'; readonly metrics: readonly ('files' | 'code' | 'churn')[] }
+    readonly view: { readonly kind?: 'repo-explorer'; readonly mode: 'code' | 'churn'; readonly metrics: readonly ('files' | 'code' | 'churn')[] }
   }
   readonly artifact: {
     readonly document: { readonly title: string; readonly root: RepositoryNode & { readonly code: number; readonly churn: number } }
   }
 }
 
+/** An ephemeral-intent/v1 board (the ephemeral-ui intent kit): the model picked sections, the host document holds the values. */
+interface IntentBundle {
+  readonly id: string
+  readonly selection: {
+    readonly view: { readonly kind: 'intent-board'; readonly sections: readonly { readonly kind: string; readonly by?: string }[] }
+  }
+  readonly artifact: {
+    readonly document: { readonly title: string; readonly work?: { readonly slices?: readonly unknown[] } }
+  }
+}
+
+/** Public ephemeral-ui authored architecture v0; no discovery or verified links. */
+interface ArchitectureBundle {
+  readonly id: string
+  readonly selection: { readonly view: { readonly kind: 'architecture-board' } }
+  readonly artifact: {
+    readonly document: {
+      readonly title: string
+      readonly nodes: readonly { readonly id: string; readonly service: string }[]
+      readonly edges: readonly { readonly from: string; readonly to: string; readonly label: string }[]
+    }
+  }
+}
+
+export type VisualBundle = RepositoryBundle | IntentBundle | ArchitectureBundle
+
 export interface VisualSummary {
   readonly id: string
   readonly title: string
-  readonly mode: 'code' | 'churn'
+  readonly mode: 'code' | 'churn' | 'intent' | 'card' | 'architecture'
   readonly metrics: readonly { readonly key: string; readonly label: string; readonly value: number }[]
+  /** An intent board's sections in the order the model chose them (`DecisionMix(providers)`). */
+  readonly sections?: readonly string[]
+  readonly card?: {
+    readonly kind: string
+    readonly app: string
+    readonly texts: readonly { readonly label: string; readonly value: string }[]
+    readonly buttons: readonly string[]
+    readonly actions: 'read-only' | 'host-confirmed'
+  }
+  /** Every authored edge explicitly remains intent, not a verified integration. */
+  readonly edges?: readonly string[]
 }
 
 export interface PreparedVisual extends VisualSummary {
@@ -50,6 +88,50 @@ export function visualScope(host: Pick<ChatPorts, 'session'>): string | undefine
 
 /** Project requested host metrics only, after full validation; never scan Git here. */
 export function summarizeVisual(bundle: VisualBundle): VisualSummary {
+  return isArchitecture(bundle) ? summarizeArchitecture(bundle) : isIntent(bundle) ? summarizeIntent(bundle) : summarizeRepository(bundle)
+}
+
+function isArchitecture(bundle: VisualBundle): bundle is ArchitectureBundle {
+  return 'kind' in bundle.selection.view && bundle.selection.view.kind === 'architecture-board'
+}
+
+function summarizeArchitecture(bundle: ArchitectureBundle): VisualSummary {
+  const { document } = bundle.artifact
+
+  return Object.freeze({
+    id: bundle.id,
+    title: document.title,
+    mode: 'architecture',
+    metrics: Object.freeze([
+      Object.freeze({ key: 'nodes', label: 'Nodes', value: document.nodes.length }),
+      Object.freeze({ key: 'edges', label: 'Intent edges', value: document.edges.length })
+    ]),
+    edges: Object.freeze(document.edges.map(edge =>
+      `Intent only: ${edge.from} → ${edge.to} · ${edge.label} — not verified integration`))
+  })
+}
+
+function isIntent(bundle: VisualBundle): bundle is IntentBundle {
+  return 'kind' in bundle.selection.view && bundle.selection.view.kind === 'intent-board'
+}
+
+function summarizeIntent(bundle: IntentBundle): VisualSummary {
+  const { sections } = bundle.selection.view
+  const slices = bundle.artifact.document.work?.slices?.length ?? 0
+
+  return Object.freeze({
+    id: bundle.id,
+    title: bundle.artifact.document.title,
+    mode: 'intent',
+    metrics: Object.freeze([
+      Object.freeze({ key: 'sections', label: 'Sections', value: sections.length }),
+      Object.freeze({ key: 'slices', label: 'Work slices', value: slices })
+    ]),
+    sections: Object.freeze(sections.map(x => (x.by ? `${x.kind}(${x.by})` : x.kind)))
+  })
+}
+
+function summarizeRepository(bundle: RepositoryBundle): VisualSummary {
   const { document } = bundle.artifact
   const { metrics, mode } = bundle.selection.view
   let files = 0
@@ -83,6 +165,43 @@ export function summarizeVisual(bundle: VisualBundle): VisualSummary {
     title: document.title,
     mode,
     metrics: Object.freeze(metrics.map(key => Object.freeze({ key, ...values[key] })))
+  })
+}
+
+/** Show only validated inert text and labels, never card instructions or callbacks. */
+function summarizeCard(card: CardDocument, id: string): VisualSummary {
+  const labels: Readonly<Record<string, string>> = {
+    text: 'Text',
+    summary: 'Summary',
+    description: 'Description',
+    subject: 'Subject',
+    status: 'Status',
+    label: 'Label',
+    query: 'Query',
+    body: 'Body',
+    message: 'Message',
+    note: 'Note'
+  }
+  const texts = Object.entries(labels).flatMap(([key, label]) => {
+    const value = card[key]
+
+    return typeof value === 'string' ? [Object.freeze({ label, value })] : []
+  })
+  const extra = Object.entries(card.fields ?? {}).map(([label, value]) => Object.freeze({ label, value }))
+  const buttons = (card.buttons ?? []).map(button => typeof button === 'string' ? button : button.label)
+
+  return Object.freeze({
+    id,
+    title: card.title ?? card.kind + ' · ' + card.app,
+    mode: 'card',
+    metrics: Object.freeze([]),
+    card: Object.freeze({
+      kind: card.kind,
+      app: card.app,
+      texts: Object.freeze([...texts, ...extra]),
+      buttons: Object.freeze(buttons),
+      actions: card.actions ?? 'read-only'
+    })
   })
 }
 
@@ -142,15 +261,27 @@ export async function readVisualFile(path: string, maxBytes: number, signal?: Ab
   }
 }
 
-/**
- * Use the actual #457 validator/fingerprints from the Hermes checkout. A
- * missing donor fails closed; never substitute a partial local schema check.
- */
+/** Read a prepared file using its pinned card schema or the original #457 OpenUI contract. */
 export async function readPreparedVisual(path: string, scope: string, signal?: AbortSignal): Promise<PreparedVisual> {
   signal?.throwIfAborted()
+  const loaded = await readVisualFile(path, 8 * 1024 * 1024, signal)
+
+  if (record(loaded.input)?.['kind'] === 'hermes.visual.card') {
+    const validator = await openCardContract()
+    signal?.throwIfAborted()
+    const prepared = validator.validatePreparedCard(loaded.input, scope)
+
+    return Object.freeze({
+      ...summarizeCard(prepared.card, prepared.id),
+      path: loaded.path,
+      href: pathToFileURL(loaded.path).href
+    })
+  }
+
+  // All original OpenUI and intent candidates still use the reviewed donor
+  // validator, current source fingerprints and strict session/branch scope.
   const tools = await openUiContract()
   signal?.throwIfAborted()
-  const loaded = await readVisualFile(path, tools.MAX_BYTES, signal)
   const bundle = tools.validateBundle(loaded.input)
   const current = await tools.fingerprints()
   signal?.throwIfAborted()

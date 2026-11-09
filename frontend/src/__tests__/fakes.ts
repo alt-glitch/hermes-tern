@@ -4,7 +4,7 @@
 // arranges what a test starts from through the stores' own APIs.
 import { EventEmitter } from 'node:events'
 
-import { type JSX, type Key, node, Node, type NodeJson, type OpenOptions, type Region, type RegionName, type Renderable, type Session, Span, Surface, type SurfaceLink, type ViewInput } from '@stencil-hq/tern'
+import { type JSX, type Key, node, Node, type NodeJson, type OpenOptions, type Region, type RegionName, type Renderable, type Session, Span, Surface, type SurfaceLink, type TspEvent, type ViewInput } from '@stencil-hq/tern'
 import { vi } from 'vitest'
 import type { GatewayClient } from '@tui/gatewayClient.js'
 import type { SessionInfo } from '@tui/types.js'
@@ -116,6 +116,7 @@ export function fakeTern({ cols = 80, draws = false, features = [], hour12 = fal
   const waiting: ((r: IteratorResult<TernInput>) => void)[] = []
   const opened: unknown[] = []
   const focused: (string | null)[] = []
+  const ops: unknown[][] = []
   let frame: Renderable | undefined
 
   // The test transport uses the actual pinned Surface contract. Capture Renderable only
@@ -161,6 +162,7 @@ export function fakeTern({ cols = 80, draws = false, features = [], hour12 = fal
         send: message => {
           if (message.verb === 'f') {
             for (const op of message.body.ops) {
+              ops.push([...op])
               if (op[0] === 'focus') {
                 focused.push(op[1])
               }
@@ -193,6 +195,8 @@ export function fakeTern({ cols = 80, draws = false, features = [], hour12 = fal
     opened,
     /** Each caret move a drawing surface was sent, in order. */
     focused,
+    /** Every frame op the surfaces were sent, in order (retained rows draw by op, not by `frame`). */
+    ops,
     /** Whether the app's input loop waits for its next input. */
     get reading(): boolean {
       return waiting.length > 0
@@ -201,6 +205,9 @@ export function fakeTern({ cols = 80, draws = false, features = [], hour12 = fal
     press: (k: Key | string) => input({ key: typeof k === 'string' ? key(k) : k, type: 'key' }),
     /** Delivers one Tern event. */
     send: (event: Record<string, unknown>) => input({ event, type: 'event' }),
+    /** The real SDK resolves node handlers before yielding unhandled events to App. */
+    dispatch: (event: TspEvent) =>
+      [...surfaces].find(surface => 'sf' in event && event.sf === surface.id)?.dispatch(event),
     /** Ends the input, as a pane that closes or a signal does. */
     end: () => waiting.shift()?.({ done: true, value: undefined })
   }
@@ -281,6 +288,19 @@ export function ofKind<T extends { kind: string }, K extends T['kind']>(value: T
   }
 
   return value
+}
+
+/**
+ * The control a node draws: for the native button `pressable` puts around one (view/ui/button.tsx),
+ * the control inside, which keeps omp's role; any other node is its own.
+ */
+export function face(n: Node): Node {
+  return n.kind === 'el' && n.props['tag'] === 'button' && n.props['role'] === undefined ? (n.children[0] ?? n) : n
+}
+
+/** `face()` on the wire form. */
+export function faceJson(n: NodeJson): NodeJson {
+  return n.k === 'el' && n.p?.['tag'] === 'button' && n.p['role'] === undefined ? (n.c?.[0] ?? n) : n
 }
 
 /** `n` as it goes on the wire, `{k, p?, c?}`. */

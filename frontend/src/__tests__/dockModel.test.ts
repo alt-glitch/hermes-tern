@@ -20,7 +20,7 @@ import { dockNodes } from '../view/dock.js'
 import { dockModel, shownPills } from '../view/dockModel.js'
 
 import { dockActions, dockContext, dockSources } from './dockFakes.js'
-import { FakeGateway, stub } from './fakes.js'
+import { face, FakeGateway, stub } from './fakes.js'
 
 const NOW = 1_000_000
 const busy = { label: 'Working…', since: {}, startedAt: NOW - 5000 }
@@ -33,6 +33,9 @@ function walk(nodes: readonly JSX.Element[]): Node[] {
 
 /** The nodes with role `role`. */
 const byRole = (nodes: readonly JSX.Element[], role: string) => walk(nodes).filter(n => n.props['role'] === role)
+
+/** The buttons that press a control of role `role`. */
+const buttons = (nodes: readonly JSX.Element[], role: string) => walk(nodes).filter(n => n.handlers?.onClick && face(n).props['role'] === role)
 
 /** Clicks `n` as Tern would. */
 const click = (n: Node | undefined) => n?.handlers?.onClick?.({ act: 'click', ev: 'action', id: 'x', raw: {}, sf: 'hermes' })
@@ -122,8 +125,8 @@ describe('dockModel: the queue', () => {
     const running = dockNodes(dockContext({ queue: { canSteer: true, hint: busyHint('queue'), rows: [...rows()] } }), on)
 
     expect(byRole(idle, 'omp.queue.steer')).toEqual([])
-    click(byRole(running, 'omp.queue.steer')[1])
-    click(byRole(running, 'omp.queue.edit')[0])
+    click(buttons(running, 'omp.queue.steer')[1])
+    click(buttons(running, 'omp.queue.edit')[0])
     expect(on.onQueueSteer).toHaveBeenCalledWith(1)
     expect(on.onQueueEdit).toHaveBeenCalledWith(0)
   })

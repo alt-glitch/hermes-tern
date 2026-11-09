@@ -8,11 +8,11 @@ import { given, key, must, tree } from './fakes.js'
 
 vi.mock('@tui/lib/history.js', () => ({ append: () => undefined, load: () => [] }))
 
-async function configured(binding = 'ctrl+alt+c') {
+async function configured(binding = 'ctrl+alt+c', overrides: Record<string, unknown> = {}) {
   const f = setup({
     'session.resume': () => ({ session_id: 's1', info: { stored_session_id: 's1', profile_name: 'work' }, revision: 1, execution_generation: 1 }),
     'config.get': p => p['key'] === 'full'
-      ? { config: { display: { tern_keybindings: { 'app.help': binding } } } }
+      ? { config: { display: { tern_keybindings: { 'app.help': binding, ...overrides } } } }
       : { value: p['key'] === 'approvals.mode' ? 'manual' : 'queue' }
   })
   await f.app.resume(storedSessionId('s1'))
@@ -115,11 +115,41 @@ describe('profile shortcut ownership through the App input loop', () => {
     await f.press(key('c', { ctrl: true }))
     await vi.waitFor(() => expect(f.sent('session.interrupt')).toHaveLength(1))
   })
+
+  it('opens prompt-history search with Ctrl+R without changing or submitting the draft', async () => {
+    const f = await configured()
+    const composer = f.app.stores.composer
+    composer.set('unsent draft', { cursor: 4, pasted: ['draft'], literal: true })
+    const before = { text: composer.text, cursor: composer.cursor, pasted: [...composer.pasted], revision: composer.revision }
+
+    await f.press(key('r', { ctrl: true }))
+    expect(f.app.overlays.some(o => o.key === 'prompt-history-search')).toBe(true)
+    expect({ text: composer.text, cursor: composer.cursor, pasted: [...composer.pasted], revision: composer.revision }).toEqual(before)
+    expect(f.sent('prompt.submit')).toEqual([])
+
+    await f.press(key('escape'))
+    expect(f.app.overlays.some(o => o.key === 'prompt-history-search')).toBe(false)
+  })
+
+  it('moves the history picker to a reconfigured chord instead of keeping Ctrl+R active', async () => {
+    const f = await configured('ctrl+alt+c', { 'app.history.search': 'ctrl+alt+r' })
+
+    await f.press(key('r', { ctrl: true }))
+    expect(f.app.overlays.some(o => o.key === 'prompt-history-search')).toBe(false)
+
+    await f.press(key('r', { ctrl: true, alt: true }))
+    expect(f.app.overlays.some(o => o.key === 'prompt-history-search')).toBe(true)
+    expect(f.sent('prompt.submit')).toEqual([])
+  })
 })
 
 describe('configured chord validation', () => {
-  it('retains the distinct Ctrl+Alt+C override and existing host reservations', () => {
-    expect(effectiveShortcuts({ 'app.thinking.cycle': 'shift+tab', 'app.message.dequeue': 'alt+up', 'app.help': 'ctrl+alt+c' })).toHaveLength(12)
+  it('retains twelve preexisting app actions and unchanged host reservations', () => {
+    const actions = effectiveShortcuts({ 'app.thinking.cycle': 'shift+tab', 'app.message.dequeue': 'alt+up', 'app.help': 'ctrl+alt+c' })
+    // This list is the app action registry, not the host-reservation list.
+    expect(actions.filter(a => a.id !== 'app.history.search')).toHaveLength(12)
+    expect(actions.find(a => a.id === 'app.history.search')?.keys).toEqual(['ctrl+r'])
+    expect(actions).toHaveLength(13)
     expect(effectiveShortcuts({ 'app.help': 'ctrl+alt+c' }).find(a => a.id === 'app.help')?.keys).toEqual(['ctrl+alt+c'])
     for (const chord of ['ctrl+shift+c', 'ctrl+shift+v', 'ctrl+shift+p', 'ctrl+shift+k', 'meta+c']) {
       expect(() => effectiveShortcuts({ 'app.help': chord })).toThrow('Host-reserved')

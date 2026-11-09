@@ -6,6 +6,6 @@
   "engines": { "node": ">=22 <23" },
   "scripts": {
     "test": "node --test test/*.test.mjs",
-    "test:lua": "lua5.4 test/renderer.lua tern/host.luau"
+    "test:lua": "lua5.4 test/renderer.lua tern/host.luau && lua5.4 test/intent-renderer.lua tern/host.luau && lua5.4 test/architecture-renderer.lua tern/host.luau"
   }
 }

@@ -56,11 +56,11 @@ export async function openVisual(
             ) : !path ? (
               <col gap="sm" key="usage">
                 <text key="command" text="/visual /absolute/path/to/candidate.hvisual.json" />
-                <text key="scope-label" text="Prepare the existing OpenUI bundle with this exact scope argument:" />
+                <text key="scope-label" text="Prepare an OpenUI bundle or a card.v0 document with this exact scope argument:" />
                 <text key="scope" text={scope} />
                 <text
                   key="discovery"
-                  text="Run the existing ui-tsp OpenUI prepare CLI through the agent terminal with --json, then reopen /visual to select its result."
+                  text="Run openui/prepare.mjs prepare, prepare-intent or prepare-card through the agent terminal with --json, then reopen /visual."
                 />
                 <text key="note" text="No generation, validation bypass, approval, installation, publication or sharing occurs here." />
               </col>
@@ -70,14 +70,54 @@ export async function openVisual(
               <col gap="sm" key="candidate">
                 <text key="title" text={candidate.title} />
                 <text key="status" text="Preview only · not visually verified or published" tone="warning" />
-                <kv items={candidate.metrics.map(metric => ({ k: metric.label, v: String(metric.value) }))} key="metrics" />
-                <text key="mode" text={`Initial mode: ${candidate.mode}`} />
-                <text key="identity" text={`Bundle: ${candidate.id}`} />
-                <text key="file" spans={[{ t: 'Open candidate file in Tern', href: candidate.href, s: 'link' }]} />
-                <text
-                  key="route"
-                  text="The separately enabled hermes-openui file route opens the Luau viewer. Opening the file reads current bytes again."
-                />
+                {candidate.card ? (
+                  <col gap="sm" key="card-summary">
+                    <kv
+                      key="card-fields"
+                      items={[
+                        { k: 'Kind', v: candidate.card.kind },
+                        { k: 'App', v: candidate.card.app },
+                        { k: 'Title', v: candidate.title },
+                        ...candidate.card.texts.map(field => ({ k: field.label, v: field.value }))
+                      ]}
+                    />
+                    <text
+                      key="action-policy"
+                      text={'Card action policy: ' + candidate.card.actions + ' (informational only)'}
+                    />
+                    {candidate.card.buttons.length ? (
+                      <col gap="sm" key="card-buttons">
+                        <text key="buttons-label" text="Buttons (labels only, disabled)" />
+                        {candidate.card.buttons.map((label, index) => (
+                          <text key={'button-label-' + index} text={label} />
+                        ))}
+                      </col>
+                    ) : null}
+                    <text key="inert" text="Host-owned read-only summary. No button, action, script or approval runs." />
+                  </col>
+                ) : candidate.edges ? (
+                  <col gap="sm" key="architecture">
+                    <kv items={candidate.metrics.map(metric => ({ k: metric.label, v: String(metric.value) }))} key="metrics" />
+                    <text key="mode" text="Authored architecture · every edge is intent, not verified integration" />
+                    {candidate.edges.map((edge, index) => <text key={'edge-' + index} text={edge} />)}
+                    <text key="file" spans={[{ t: 'Open candidate file in Tern', href: candidate.href, s: 'link' }]} />
+                  </col>
+                ) : (
+                  <col gap="sm" key="openui-summary">
+                    <kv items={candidate.metrics.map(metric => ({ k: metric.label, v: String(metric.value) }))} key="metrics" />
+                    {candidate.sections ? (
+                      <text key="mode" text={'Intent board: ' + candidate.sections.join(' · ')} />
+                    ) : (
+                      <text key="mode" text={'Initial mode: ' + candidate.mode} />
+                    )}
+                    <text key="file" spans={[{ t: 'Open candidate file in Tern', href: candidate.href, s: 'link' }]} />
+                    <text
+                      key="route"
+                      text="The separately enabled hermes-openui file route opens the Luau viewer. Opening the file reads current bytes again."
+                    />
+                  </col>
+                )}
+                <text key="identity" text={'Bundle: ' + candidate.id} />
               </col>
             ) : (
               <text key="loading" text="Checking prepared visual…" />

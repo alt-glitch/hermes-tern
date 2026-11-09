@@ -199,6 +199,7 @@ describe('the fork shortcut', () => {
     const called = vi.fn()
     const ctx = stub<KeyCx>({
       completion: { onKey: () => false },
+      dictation: { cancel: () => false, onKey: () => false },
       fork: called,
       liveVoice: { blocked: false },
       hud: () => false

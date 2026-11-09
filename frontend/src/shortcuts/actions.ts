@@ -5,7 +5,7 @@
 import type { Key } from '@stencil-hq/tern'
 
 import { KEYS, matches } from '../draft/keys.js'
-import { isHoldInfoKey, isVoiceToggleKey } from '../voice/hold.js'
+import { isHoldInfoKey, isTalkToggleKey, isVoiceToggleKey } from '../voice/hold.js'
 
 type Modifier = 'ctrl' | 'alt' | 'shift' | 'meta'
 
@@ -32,6 +32,7 @@ export const APP_SHORTCUTS: readonly Shortcut[] = [
   { id: 'app.model.cycleForward', group: 'Models', title: 'Next recent model', keys: ['ctrl+p'] },
   { id: 'app.model.cycleBackward', group: 'Models', title: 'Previous recent model', keys: ['ctrl+alt+p'] },
   { id: 'app.palette', group: 'Navigation', title: 'Command palette', keys: ['alt+k'] },
+  { id: 'app.history.search', group: 'Navigation', title: 'Search prompt history', keys: ['ctrl+r'] },
   { id: 'app.help', group: 'Navigation', title: 'Commands and shortcuts', keys: ['f1', 'alt+/'] }
 ]
 
@@ -58,7 +59,7 @@ function fixedChord(chord: string): boolean {
   const name = parts.pop() ?? ''
   const key: Key = { name, ctrl: parts.includes('ctrl'), alt: parts.includes('alt'), shift: parts.includes('shift'), meta: parts.includes('meta') }
   return [KEYS.browser, KEYS.plan, KEYS.fork, KEYS.copyDraft].some(match => matches(key, match)) ||
-    isVoiceToggleKey(key) || isHoldInfoKey(key) || (key.ctrl && name === 'home')
+    isTalkToggleKey(key) || isVoiceToggleKey(key) || isHoldInfoKey(key) || (key.ctrl && name === 'home')
 }
 
 /** Composer actions that may otherwise run when a contextual shortcut declines the key. */

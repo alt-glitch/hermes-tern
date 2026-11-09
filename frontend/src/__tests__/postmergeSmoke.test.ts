@@ -120,8 +120,10 @@ describe('post-merge App smoke', () => {
     // The browser card comes from the real tool completion, not an isolated card fixture.
     completeTool(gw, 'browser-1', 'browser_navigate', {}, JSON.stringify({ success: true, tern_target: target }))
     await settle(gw)
-    const focus = must(mainNodes(tern).find(n => n.props['title'] === 'Focus Tern block 7'), 'rendered browser Focus control')
-    expect(focus.props['role']).toBe('omp.btn')
+    const face = must(mainNodes(tern).find(n => n.props['title'] === 'Focus Tern block 7'), 'rendered browser Focus control')
+    expect(face.props['role']).toBe('omp.btn')
+    // The click lands on the native button the face sits in (view/ui/button.tsx).
+    const focus = must(mainNodes(tern).find(n => n.props['aria'] === 'Focus Tern block 7'), 'native browser Focus button')
 
     const blocks = await listBrowserBlocks(gw.client, must(browserCaller(app.session)))
     expect(blocks.blocks).toHaveLength(1)

@@ -23,6 +23,7 @@ Each row links to the feature's own document. Merged PR numbers are in this fork
 | Transcript | LSP diagnostics as native result cards | | #2 |
 | | Charts drawn from settled Markdown tables | [table-charts](frontend/docs/table-charts.md) | #3 |
 | | OpenUI visual previews | [openui](frontend/docs/openui.md) | #4 |
+| | Native ephemeral-ui intent boards (`ephemeral-intent/v1`) | [openui](frontend/docs/openui.md#intent-boards-ephemeral-intentv1) | parity wave 2026-11-04 |
 | | Written artifacts, session links and pasted attachments | [artifacts-links](frontend/docs/artifacts-links.md) | #6 |
 | | 3D tool artifacts beside the chat | | #28 |
 | | Settled-turn retention and manual history paging | [retention](frontend/docs/retention.md) | #9 |
@@ -30,6 +31,7 @@ Each row links to the feature's own document. Merged PR numbers are in this fork
 | Media and browser | Tern browser blocks, with a consent-gated gateway backend | [browser-blocks](frontend/docs/browser-blocks.md) | #5, #22 |
 | | Image delivery across local and remote hosts | [MEDIA-DELIVERY](docs/MEDIA-DELIVERY.md) | #16, #24 |
 | Composer | Optional Vim composer and external editor | [vim-editor](frontend/docs/vim-editor.md) | #8 |
+| | Context meter opens a per-category context breakdown | | upstream #86 |
 | | Shortcut preferences, command palette, model cycling | [SHORTCUTS](frontend/SHORTCUTS.md) | #10 |
 | | Busy input: queue or steer while a turn runs | [below](#behavior-that-differs-from-upstream) | #14 |
 | | Thinking orb on the composer | | #14, #194 |
@@ -39,6 +41,9 @@ Each row links to the feature's own document. Merged PR numbers are in this fork
 | Agents and panes | Live OMP-style wait tiles for subagents | | #18 |
 | | Delegation IDs isolated across overlapping sessions | | #11 |
 | | Fork a session into a sibling pane | | #7 |
+| | `/rewind` to any earlier prompt (rewind or branch), `/undo N` | | upstream #68 |
+| | `/tree`: a conversation's branches, open one | | upstream #69 |
+| Accessibility | Every clickable control is a named native button, incl. agent rows and wait tiles | | upstream #70 |
 | Settings | Native `/settings` and the `/models` provider hub | [below](#behavior-that-differs-from-upstream) | #20 |
 | | Overlay ownership: stale sheets cannot act | | #23 |
 | Launcher | Frontend channels: `hermes tern --channel NAME`, `hermes tern switch NAME` | | #193 |

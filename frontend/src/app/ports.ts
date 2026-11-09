@@ -3,6 +3,7 @@
 // imports App, and App is the one place that implements them all. The names are the ones the
 // ports keep: a later package changes what stands behind a port, not the code that reads it.
 
+import type { Usage } from '@hermes/shared/gateway-events'
 import type { ScrollTo } from '@stencil-hq/tern'
 
 import type { GatewayClient } from '@tui/gatewayClient.js'
@@ -10,6 +11,7 @@ import type { SessionInfo } from '@tui/types.js'
 
 import type { Agents } from '../agents/store.js'
 import type { BtwThreads } from '../btw.js'
+import type { Dictation } from '../draft/dictation.js'
 import type { SessionHost } from '../commands/session.js'
 import type { PrKey, SessionIds, StoredSessionId } from '../core/ids.js'
 import type { GitState } from '../git/status.js'
@@ -26,6 +28,7 @@ import type { Busy } from '../turn/activity.js'
 import type { LiveVoice } from '../voice/live.js'
 
 import type { Ticket } from '../core/epoch.js'
+import type { EuiCards } from '../eui/cards.js'
 
 /** The session as the ports read it, live: each read sees the current ids and info. */
 export interface SessionView {
@@ -38,16 +41,22 @@ export interface SessionView {
    * tier shows the change before the gateway's next session.info confirms it.
    */
   info: SessionInfo | null
+  /** Latest token and context counters, refreshed by session.usage between info events. */
+  readonly usage?: Usage | null
 }
 
 /** Everything the app lends; a consumer takes `Pick<ChatPorts, …>` of it. */
 export interface ChatPorts extends OverlayHost {
   readonly session: SessionView
   readonly gw: GatewayClient
+  /** Host-owned ephemeral-ui cards (/glide); absent in panes without the pinned kit. */
+  readonly eui?: Pick<EuiCards, 'host'>
   /** The running turn, null when idle. */
   readonly busy: Busy | null
   readonly transcript: Transcript
   readonly liveVoice: LiveVoice
+  /** Dictation into the composer (`/voice`). */
+  readonly dictation: Pick<Dictation, 'disable' | 'enable' | 'key' | 'phase'>
   readonly agents: Agents
   readonly processes: Processes
   readonly cron: Cron

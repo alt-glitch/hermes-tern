@@ -13,6 +13,7 @@ import type { Reconnect } from '../chrome/reconnect.js'
 import type { SessionIds } from '../core/ids.js'
 import type { Attachments } from '../draft/attachments.js'
 import type { Composer } from '../draft/composer.js'
+import type { Dictation } from '../draft/dictation.js'
 import type { PullRequests } from '../github/store.js'
 import type { Todo } from '../model.js'
 import { capsOf } from '../modelCaps.js'
@@ -21,6 +22,7 @@ import type { Overlay } from '../overlays/overlay.js'
 import { prsPill } from '../overlays/pullRequests.js'
 import { isRunning, type Processes, processTone } from '../processes/store.js'
 import type { Automation } from '../session/automation.js'
+import { contextWindow } from '../session/context.js'
 import { fastTier } from '../session/fast.js'
 import type { SessionTitle } from '../session/title.js'
 import type { Transcript } from '../transcript/store.js'
@@ -42,6 +44,7 @@ export interface DockSources {
   readonly session: { readonly ref: Pick<SessionIds, 'live'>; readonly info: SessionInfo | null; readonly usage: Usage | null; readonly busyMode: BusyMode }
   readonly activity: Pick<Activity, 'busy' | 'compacting'>
   readonly composer: Composer
+  readonly dictation: Pick<Dictation, 'capturing' | 'heard' | 'key' | 'phase'>
   readonly liveVoice: Pick<LiveVoice, 'blocked'>
   readonly completion: Pick<Completion, 'ghost'>
   /** The open overlays, bottom first: a modal one on top takes the keys and the completion. */
@@ -106,8 +109,6 @@ export function dockActivity(a: DockSources['activity']): DockActivity {
 export function dockModel(src: DockSources, now: number): DockContext {
   const { info, usage } = src.session
   const modal = isModal(src.overlays)
-  const used = usage?.context_used ?? 0
-  const max = usage?.context_max ?? 0
   const list = shownTodos(src)
   const agents = src.agents.running()
   const noticeCount = src.notices.active(now).length
@@ -117,12 +118,13 @@ export function dockModel(src: DockSources, now: number): DockContext {
     btwNotices: src.btw.notices,
     composer: {
       attachments: src.attachments.chips(),
+      dictation: src.dictation.phase === 'off' ? undefined : { heard: src.dictation.heard, key: src.dictation.key.label, phase: src.dictation.phase },
       draft: src.composer,
       ghost: modal ? '' : src.completion.ghost,
       placeholder: PLACEHOLDER,
       // Native Send may carry different text from the painted draft. During an upload, do not
       // advertise admission for arbitrary text even though keyboard slash commands remain usable.
-      ready: src.session.ref.live !== null && !src.liveVoice.blocked && !modal &&
+      ready: src.session.ref.live !== null && !src.liveVoice.blocked && !src.dictation.capturing && !modal &&
         !src.composer.vim.enabled && !src.attachments.uploading
     },
     now,
@@ -147,7 +149,7 @@ export function dockModel(src: DockSources, now: number): DockContext {
     status: {
       branch: info?.branch ?? '',
       compressions: typeof usage?.compressions === 'number' ? usage.compressions : undefined,
-      context: max > 0 ? { max, used } : undefined,
+      context: contextWindow(usage),
       cost: usage?.cost_usd ?? undefined,
       notice: src.notices.current(now),
       otherError: src.notices.otherError(now),

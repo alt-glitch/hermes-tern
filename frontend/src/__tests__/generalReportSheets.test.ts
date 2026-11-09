@@ -191,7 +191,7 @@ describe('native general report sheets', () => {
     const root = report.node('layer.overlay-1')
     if (!(root instanceof Node)) throw new Error('expected report node')
     const flatten = (n: Node): Node[] => [n, ...n.children.filter((child): child is Node => child instanceof Node).flatMap(flatten)]
-    const copy = must(flatten(root).find(n => n.props['title'] === 'Copy')?.handlers?.onClick)
+    const copy = must(flatten(root).find(n => n.props['aria'] === 'Copy')?.handlers?.onClick)
     const approval = stubOverlay('approval', { modal: true })
     f.app.open(approval)
     const before = f.app.session.ref

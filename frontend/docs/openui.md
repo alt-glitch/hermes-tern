@@ -33,8 +33,8 @@ current working directory and a donor checkout are not consulted.
 Every opened candidate is re-read with a bounded regular-file/strict-UTF-8
 read, then the **original** validator checks its exact identity, catalog
 hash, generation contract, artifact/document and current fingerprints.
-`fingerprints()` hashes the four fixed renderer files, three preview modules,
-four generation modules and the generation lockfile. Missing or drifted files
+`fingerprints()` hashes the four fixed renderer files, four preview modules,
+five generation modules and the generation lockfile. Missing or drifted files
 fail closed. The separate `HERMES_SRC` used to build the main frontend's
 gateway client remains pinned to the locked upstream Hermes runtime
 `22063fc099ec9ad8357d7f8f6e6248a0400680d3`; it is **not** an OpenUI
@@ -111,6 +111,82 @@ candidate ID must match the validated file. Session/branch/transcript changes
 expire displayed sheets. File links reopen current bytes; they are **not**
 atomic, approved revisions.
 
+## Intent boards (`ephemeral-intent/v1`)
+
+The same pipeline compiles the ephemeral-ui intent kit as a native board: declared intent,
+contract gates, work slices, proof receipts, decision mix, token value, context flow and runtime
+health. The catalog is `openui-generation/src/intent.mjs` (root
+`IntentBoard(snapshotId, sections)`, 1–8 distinct sections, the only argument being
+`DecisionMix(by: "execution" | "providers" | "status")`); its pinned definition
+`fixtures/ephemeral-intent.v1.json` is checked signature for signature against ephemeral-ui's
+`integration/openui/ephemeral-intent.v1.json`. **The model selects sections; the host document
+owns every value.** `openui-preview/src/intent-document.mjs` validates that document field by
+field (64 KiB, 12-item lists, enums, no control characters) and the Luau renderer checks it again.
+No section approves, executes or publishes; approval stays with the host's AODL path.
+
+```sh
+cd /absolute/path/to/hermes-tern/frontend
+node openui/prepare.mjs prepare-intent \
+  openui/openui-generation/fixtures/intent.openui \
+  openui/openui-preview/fixtures/intent-board.json \
+  '["stored-id","main"]' /absolute/output-directory --json
+```
+
+A real host document comes from ephemeral-ui's `tools/openui-intent-doc.mjs`. The shipped
+`fixtures/intent-board.json` is synthetic. `/visual` lists and opens an intent candidate like a
+repository one; its sheet names the chosen sections instead of an initial mode.
+
+## Authored architecture boards (ephemeral-architecture/v0)
+
+This second ephemeral-ui kit shows **authored examples**, not discovered or
+verified infrastructure. Its public reference is the built kvnloo/ephemeral-ui
+gh-pages tree at 63e06b29ffb0d7c5b9d482abebc0312335897321 (the source
+tree is private). The fixture openui-generation/fixtures/architecture.v0.json
+is a byte-identical copy of schema/architecture.v0.json, Git blob
+ce65a7b43ed6e03247ccda391952771e33c021ee. The fixture
+architecture-services.v0.json pins all 39 SERVICES keys from js/infra-data.js,
+blob adce342193527b110e5fc487358697e33b8860a0.
+
+The model selects only ArchitectureBoard("arch"); the host owns all nodes,
+labels and edges. Strict validation bounds UTF-8 JSON to 64 KiB, requires
+v:0 and a nonblank title of 1–160 characters, fixes provenance to
+authored-example (including when absent), and accepts 1–24 distinct nodes
+with ids matching ^[a-zA-Z][a-zA-Z0-9_-]{0,39}$ and services in the pinned
+list. It allows up to 64 edges, only between different existing nodes,
+with a nonblank 1–100-character label. Unknown keys, control and
+bidirectional characters fail closed. Cycles are allowed.
+
+The shipped openui-preview/fixtures/architecture-board.json is **synthetic**:
+it is not a topology, integration or provider-health receipt. Every edge
+in /visual and the separately linked native Luau board says
+**Intent only ... not verified integration**. The renderer cannot execute,
+approve, publish, provision or install anything.
+
+~~~sh
+cd /absolute/path/to/hermes-tern/frontend
+node openui/prepare.mjs prepare-architecture \
+  openui/openui-generation/fixtures/architecture.openui \
+  openui/openui-preview/fixtures/architecture-board.json \
+  '["stored-id","main"]' /absolute/output-directory --json
+~~~
+
+This emits one hermes.visual.candidate JSON notice. /visual lists and
+validates it against the originating session/branch, then opens its
+read-only summary. Native rendering still needs the optional, explicitly
+linked Tern file route. Schema, service list, catalog, validator and
+renderer bytes join the existing fingerprint checks. Neither source
+tests nor a headless text view demonstrate native pixels.
+
+Verification (unrun by the GitHub connector worker):
+
+~~~sh
+cd frontend
+bun run test -- src/__tests__/architectureBoard.test.ts src/__tests__/openuiPackaged.test.ts
+OPENUI_TELEMETRY_DISABLED=1 DO_NOT_TRACK=1 npm test --prefix openui/openui-generation --workspaces=false
+OPENUI_TELEMETRY_DISABLED=1 DO_NOT_TRACK=1 npm test --prefix openui/openui-preview --workspaces=false
+cd openui/openui-preview && npm run test:lua
+~~~
+
 ## Optional native route, kept separate
 
 The fixed Tern `hermes-openui` file route is present at
@@ -179,3 +255,71 @@ See the donor's source PRs
 [#461](https://github.com/kvnloo/hermes-agent/pull/461),
 [#464](https://github.com/kvnloo/hermes-agent/pull/464) and
 [#466](https://github.com/kvnloo/hermes-agent/pull/466).
+
+## Ephemeral UI card.v0 (inert native summary)
+
+The second ephemeral-ui integration accepts **data-only cards** via the existing
+/visual candidate mechanism. The exact public schema/card.v0.json fixture is
+copied from kvnloo/ephemeral-ui **gh-pages** commit
+63e06b29ffb0d7c5b9d482abebc0312335897321 (Git blob
+ccafc9d00f95f21c389f8ce8a9aa14491475033f). The package-local
+openui/card.mjs checks that blob identity at import time, then uses the pinned
+schema's **required keys, kind enum and property definitions** to validate the
+document. This is a host validation policy, not a claim that the public site
+implements the same extra restrictions. No private ephemeral-ui source is used.
+
+The original schema permits additional properties. For this read-only host,
+only its declared top-level properties and the explicit text extensions
+title, text, summary, description, subject, status, label, query,
+body, message, note, fields, and buttons are admitted. The fields map holds
+at most 16 short labels with string values. Buttons holds up to 8 strings or
+objects with a label and optional inert action id; its action IDs are ignored,
+not displayed or dispatched. The actions property is the schema's permission
+policy enum, **not** an executable event or a grant of host authority. Trace
+cards cannot request the host-confirmed policy. Values are JSON-only, with no
+control or bidi-control characters, at most 64 KiB per card, eight nested
+levels, 64 elements per array and bounded string lengths. Unknown top-level
+keys fail.
+
+To prepare a **synthetic** card document (no real inbox, user or permission data),
+put this on one line in card.json:
+
+    { "kind": "thread", "app": "gmail", "title": "Synthetic thread", "subject": "Invoice 42", "summary": "Example only", "buttons": [{ "label": "Approve once", "action": "unused-id" }, "Dismiss"] }
+
+1. Open /visual in the owning Hermes session and copy the exact session/branch
+   JSON scope displayed by the sheet.
+2. Run an explicit local terminal command with a writable absolute directory
+   **outside the plugin**, substituting the actual scope:
+
+       cd /absolute/path/to/hermes-tern/frontend
+       node openui/prepare.mjs prepare-card card.json \
+         '["stored-id","main"]' /absolute/output-directory --json
+
+3. The CLI prints one hermes.visual.candidate v1 JSON notice and writes a
+   content-addressed, scope-bound .hvisual.json envelope (version 0).
+   Reopen /visual to select the reported file or provide its absolute path.
+
+Discovery remains the completed-terminal-result-only flow. On selection,
+the frontend re-reads and validates the file, source schema, card identity
+and exact scope. The native sheet shows **kind, app, title and text values**,
+plus any button **labels only**. The host controls theme and layout and draws
+no button for a card-provided action. There is no action handler, approval,
+script execution, runtime fetch, generated HTML/Luau, renderer installation,
+gateway send or file route for cards. The hermes-openui file route remains
+for validated legacy OpenUI and intent bundles only. Session/branch/transcript
+change still expires the sheet.
+
+The CLI prepares data but is **not** a permission prompt or publication path.
+This initial generic summary does not render inbox/thread/approval controls or
+use input as a network source. Three follow-up native kinds:
+**inbox** (read-only result rows), **thread** (message and summary text), and
+**approve** (non-authoritative permission preview; actual approval stays with
+the host). They require separate implementation and native acceptance.
+
+Verification (not executed by this connector-only implementation):
+
+    cd frontend
+    bun run test -- src/__tests__/ephemeralCard.test.ts src/__tests__/visuals.test.ts src/__tests__/visualOverlay.test.ts src/__tests__/openuiPackaged.test.ts
+    bun run typecheck
+    bun run check
+    bun run bundle  # locally only; do not commit dist/

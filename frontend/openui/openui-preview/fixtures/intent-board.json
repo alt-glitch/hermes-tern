@@ -1,0 +1,249 @@
+{
+  "version": 1,
+  "title": "Intent → contract → proof → intelligence (synthetic example)",
+  "intent": {
+    "revision": 3,
+    "sourceHash": "9bf37ce7b680f0d8ed3c856917ac1a556d0df2e3268104aa61b70594bc2545aa",
+    "sentences": [
+      {
+        "text": "When a background job is still running, the chat should show the turn as working, not idle.",
+        "role": "task"
+      },
+      {
+        "text": "A status line that says done while work continues is misleading.",
+        "role": "context"
+      }
+    ]
+  },
+  "contract": {
+    "approval": "pending",
+    "contractHash": "a0250f4f9750981100162f7e42cb68096ed432f0db8105c3bfeb052a4d2093d2",
+    "preconditions": [
+      {
+        "label": "build gate",
+        "state": "pass"
+      },
+      {
+        "label": "example/app#101",
+        "state": "pass"
+      },
+      {
+        "label": "example/agent#202",
+        "state": "pass"
+      }
+    ],
+    "acceptance": {
+      "receipt": "missing",
+      "clauses": [
+        ".working_while_running == true",
+        ".settled_after_exit == true",
+        ".idle_after_cancel == true",
+        "(.thread_id|type==\"string\")"
+      ]
+    },
+    "facts": [
+      {
+        "text": "The client already renders a working state for other providers.",
+        "label": "observed"
+      },
+      {
+        "text": "The agent records the job; the projection omits it.",
+        "label": "observed"
+      },
+      {
+        "text": "The observed case was a background job.",
+        "label": "observed"
+      },
+      {
+        "text": "Only the live-path wiring is missing.",
+        "label": "observed"
+      },
+      {
+        "text": "Heavy verification runs off the main host.",
+        "label": "claimed"
+      }
+    ]
+  },
+  "work": {
+    "slices": [
+      {
+        "id": "S1",
+        "title": "forward background reports to the gateway",
+        "where": "example/agent",
+        "state": "built"
+      },
+      {
+        "id": "S2",
+        "title": "client provider flavor",
+        "where": "example/app",
+        "state": "not-started"
+      },
+      {
+        "id": "S3",
+        "title": "real-turn proof",
+        "where": "after S1 → S2",
+        "state": "blocked"
+      }
+    ]
+  },
+  "intel": {
+    "decisions": {
+      "rows": 156,
+      "last": "2026-01-01T00:00Z",
+      "execution": [
+        {
+          "label": "live",
+          "value": 84
+        },
+        {
+          "label": "log_only",
+          "value": 31
+        },
+        {
+          "label": "unknown",
+          "value": 22
+        },
+        {
+          "label": "orchestration",
+          "value": 12
+        },
+        {
+          "label": "shadow",
+          "value": 5
+        },
+        {
+          "label": "canary",
+          "value": 2
+        }
+      ],
+      "providers": [
+        {
+          "label": "provider-a / model-1",
+          "value": 52
+        },
+        {
+          "label": "provider-b / model-2",
+          "value": 33
+        },
+        {
+          "label": "provider-a / model-3",
+          "value": 24
+        },
+        {
+          "label": "provider-c / model-4",
+          "value": 18
+        },
+        {
+          "label": "provider-d / model-5",
+          "value": 12
+        },
+        {
+          "label": "provider-e / model-6",
+          "value": 9
+        },
+        {
+          "label": "provider-f / model-7",
+          "value": 6
+        },
+        {
+          "label": "provider-g / model-8",
+          "value": 2
+        }
+      ],
+      "status": [
+        {
+          "label": "completed",
+          "value": 88
+        },
+        {
+          "label": "started",
+          "value": 34
+        },
+        {
+          "label": "released",
+          "value": 15
+        },
+        {
+          "label": "acquired",
+          "value": 9
+        },
+        {
+          "label": "rejected",
+          "value": 4
+        },
+        {
+          "label": "failed",
+          "value": 3
+        },
+        {
+          "label": "delivered_to_hook",
+          "value": 2
+        },
+        {
+          "label": "none",
+          "value": 1
+        }
+      ]
+    },
+    "value": {
+      "estimatedAvoided": 1200,
+      "pairedRows": 40,
+      "reportedSaved": 900,
+      "verifiedTasks": 3
+    },
+    "context": {
+      "episodes": 120,
+      "imported": 96,
+      "predictions": 80,
+      "judged": 60,
+      "hit": 42,
+      "top1": [
+        {
+          "label": "stay",
+          "value": 40
+        },
+        {
+          "label": "switch_app",
+          "value": 18
+        },
+        {
+          "label": "resume_previous",
+          "value": 12
+        },
+        {
+          "label": "switch_workspace",
+          "value": 6
+        },
+        {
+          "label": "harness",
+          "value": 4
+        }
+      ]
+    },
+    "health": {
+      "ok": false,
+      "backends": [
+        {
+          "id": "local-small",
+          "ready": false,
+          "local": true
+        },
+        {
+          "id": "hosted-typed",
+          "ready": true,
+          "local": false
+        },
+        {
+          "id": "local-medium",
+          "ready": false,
+          "local": true
+        },
+        {
+          "id": "local-tiny",
+          "ready": true,
+          "local": true
+        }
+      ]
+    }
+  }
+}

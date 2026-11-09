@@ -35,6 +35,8 @@ export interface Question {
   qid: string
   question: string
   choices: string[]
+  /** Optional host-provided descriptions of Ripple-style choice rows, by index. */
+  previews?: string[]
   multi: boolean
 }
 
@@ -76,6 +78,41 @@ type MaskedParams = Unread<SudoRequestParams & SecretRequestParams & VaultUnlock
 const text = (v: unknown): string => (typeof v === 'string' ? v : '')
 
 const strings = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x: unknown): x is string => typeof x === 'string') : [])
+
+/**
+ * The legacy wire sends labels. Ripple's ControlOption also permits a host-authored detail;
+ * read only its display fields here and continue to answer with the label, not an action or id.
+ * Original schema/provenance: kvnloo/hermes-tern#56, Ripple fast-controls at d160863.
+ */
+function clarifyChoice(value: unknown): { label: string; detail: string } | undefined {
+  if (typeof value === 'string') {
+    return { detail: '', label: value }
+  }
+
+  if (!value || typeof value !== 'object' || !('label' in value) || typeof value.label !== 'string' || !value.label.trim()) {
+    return undefined
+  }
+
+  return { detail: 'detail' in value && typeof value.detail === 'string' ? value.detail : '', label: value.label }
+}
+
+function clarifyChoices(raw: unknown): { labels: string[]; previews: string[] } {
+  const labels: string[] = []
+  const previews: string[] = []
+
+  const items: unknown[] = Array.isArray(raw) ? raw : []
+
+  for (const item of items) {
+    const choice = clarifyChoice(item)
+
+    if (choice) {
+      labels.push(choice.label)
+      previews.push(choice.detail)
+    }
+  }
+
+  return { labels, previews }
+}
 
 /** The approval answers this frontend knows: an offered choice outside them is dropped. */
 const APPROVAL_CHOICES: ReadonlySet<string> = new Set<ApprovalChoice>(['once', 'session', 'always', 'deny'])
@@ -156,8 +193,10 @@ export function questionsOf(raw: unknown): Question[] {
 
     const question = text(q.question).trim()
 
+    const { labels, previews } = clarifyChoices('choices' in q ? q.choices : undefined)
+
     return question
-      ? [{ choices: 'choices' in q ? strings(q.choices) : [], multi: 'multi_select' in q && q.multi_select === true, qid: text(q.qid), question }]
+      ? [{ choices: labels, ...(previews.some(Boolean) ? { previews } : {}), multi: 'multi_select' in q && q.multi_select === true, qid: text(q.qid), question }]
       : []
   })
 }

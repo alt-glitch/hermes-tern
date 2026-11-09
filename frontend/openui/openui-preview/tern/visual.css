@@ -10,3 +10,20 @@
 [data-surface='plugin.hermes-openui.reply'] .nv-cell:hover { background: var(--l2); }
 [data-surface='plugin.hermes-openui.reply'] .nv-selected { box-shadow: inset 0 0 0 2px var(--accent); }
 [data-surface='plugin.hermes-openui.reply'] .nv-button { padding: 4px 10px; border-radius: 5px; background: var(--card); color: var(--t1); }
+/* Intent board (ephemeral-intent/v1): one card per selected section, same tokens. */
+[data-surface='plugin.hermes-openui.reply'] .ni-card { display: flex; flex-direction: column; gap: 6px; margin: 6px 0; padding: 10px 12px; border-radius: 8px; background: var(--card); color: var(--t1); box-shadow: inset 0 0 0 1px var(--l4); font-family: var(--sans); }
+[data-surface='plugin.hermes-openui.reply'] .ni-card:hover { background: var(--l2); }
+[data-surface='plugin.hermes-openui.reply'] .ni-selected { box-shadow: inset 0 0 0 2px var(--accent); }
+[data-surface='plugin.hermes-openui.reply'] .ni-head { display: flex; flex-direction: row; gap: 8px; align-items: baseline; }
+[data-surface='plugin.hermes-openui.reply'] .ni-body { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+[data-surface='plugin.hermes-openui.reply'] .ni-stats { display: flex; flex-direction: row; gap: 6px; flex-wrap: wrap; }
+[data-surface='plugin.hermes-openui.reply'] .ni-stat { display: flex; flex-direction: column; min-width: 120px; padding: 6px 8px; border-radius: 6px; box-shadow: inset 0 0 0 1px var(--l4); }
+[data-surface='plugin.hermes-openui.reply'] .ni-v { font-size: 18px; }
+[data-surface='plugin.hermes-openui.reply'] .ni-big { font-size: 28px; color: var(--accent); }
+[data-surface='plugin.hermes-openui.reply'] .ni-line { display: flex; flex-direction: row; gap: 8px; align-items: center; min-width: 0; }
+[data-surface='plugin.hermes-openui.reply'] .ni-grow { flex: 1; min-width: 0; overflow: hidden; }
+[data-surface='plugin.hermes-openui.reply'] .ni-quote { flex: 1; min-width: 0; }
+[data-surface='plugin.hermes-openui.reply'] .ni-node { min-width: 28px; }
+[data-surface='plugin.hermes-openui.reply'] .ni-chip { padding: 1px 6px; border-radius: 4px; box-shadow: inset 0 0 0 1px var(--l4); }
+[data-surface='plugin.hermes-openui.reply'] .ni-ok, [data-surface='plugin.hermes-openui.reply'] .ni-accent { color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+[data-surface='plugin.hermes-openui.reply'] .ni-code { font-family: var(--mono); }

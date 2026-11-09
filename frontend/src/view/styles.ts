@@ -5,6 +5,42 @@
 import { css } from '@stencil-hq/tern'
 
 export const STYLES = css`
+  /* Tern draws omp's hairline on the glass's top edge (top -12px, its track 11.5px down). The
+     native button sits where omp's meter sits, so the working row above the glass never covers
+     it, and reaches 8px into the glass for a 20px focus/pointer target. */
+  [data-role='omp.composer.context.action'] {
+    display: block;
+    position: absolute;
+    left: 18px;
+    right: 18px;
+    top: -12px;
+    width: auto;
+    height: 20px;
+    padding: 0;
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    background: transparent !important;
+    color: inherit;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  [data-role='omp.composer.context.action'] > .sf-meter {
+    position: relative !important;
+    left: 0 !important;
+    right: auto !important;
+    top: 0 !important;
+    bottom: auto !important;
+    width: 100% !important;
+    margin: 0;
+  }
+
+  [data-role='omp.composer.context.action']:focus-visible {
+    outline: 2px solid var(--t3);
+    outline-offset: 2px;
+  }
+
   /* The work log, as t3code draws it: quiet 14px rows in the UI face, a 24px line each. */
   [data-role='hermes.turn.working'],
   [data-role='hermes.turn.fold'] > .sf-section-head,
@@ -259,6 +295,8 @@ export const STYLES = css`
   /* An image the next prompt carries: Tern's omp chip (thumbnail, name, size) with a ✕ after
      them, in a third column of its grid. */
   .sf-card[data-role='omp.composer.chip'] > .sf-card-body > [data-role='hermes.composer.remove'] {
+    align-items: center;
+    justify-content: center;
     grid-column: 3;
     grid-row: 1 / 3;
     align-self: center;
@@ -769,5 +807,35 @@ export const STYLES = css`
 
   [data-role='hermes.sessions.tool'] {
     font: 12.5px/1.45 var(--mono);
+  }
+
+  /* The native button a control sits in (pressable, view/ui/button.tsx) draws nothing itself: as
+     wide as the control in a row, as wide as the line in a column. One that carries a role of
+     omp's (Send, Stop) keeps the display omp's sheets give it; one of ours lays out its content
+     as the control did. A goal or loop capsule may still give way. */
+  button.sf-el.hermes-press {
+    flex: none;
+    min-width: 0;
+  }
+
+  button.sf-el.hermes-press:is(:not([data-role]), [data-role^='hermes.']) {
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* A wait tile a click opens sits in its button: the button takes the tile's place in omp's grid. */
+  [data-role='omp.job.tiles'] > button.sf-el.hermes-press {
+    flex: 1 1 240px;
+    display: flex;
+    min-width: 0;
+  }
+
+  [data-role='omp.job.tiles'] > button.sf-el.hermes-press > [data-role='omp.job.tile'] {
+    flex: 1 1 auto;
+  }
+
+  [data-role='hermes.automation'] > button.sf-el.hermes-press {
+    flex: 0 1 auto;
+    max-width: 100%;
   }
 `

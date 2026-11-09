@@ -135,7 +135,7 @@ describe('profile policy keyboard confirmation through App', () => {
       type Tree = NonNullable<View['regions'][number]>
       const descendants = (nodes: readonly Tree[]): Tree[] => nodes.flatMap(n => [n, ...descendants(n.children)])
       const roots = view.regions.find(region => region?.id === 'layer')?.children ?? []
-      const confirm = must(descendants(roots).find(n => n.props['key'] === 'confirm' && n.props['role'] === 'omp.btn'))
+      const confirm = must(descendants(roots).find(n => n.props['key'] === 'confirm' && n.props['tag'] === 'button'))
       const captured = surface.dispatch({ ev: 'action', sf: 'hermes', id: confirm.id, act: 'click', raw: {} })
       expect(captured).toBeTypeOf('function')
       if (transition === 'close') f.app.close(sheet)

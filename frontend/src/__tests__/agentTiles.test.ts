@@ -17,6 +17,9 @@ const nodes = (n: NodeJson): NodeJson[] => [n, ...(n.c ?? []).flatMap(nodes)]
 const role = (n: NodeJson, value: string): NodeJson[] => nodes(n).filter(x => x.p?.['role'] === value)
 const words = (n: NodeJson): string[] => nodes(n).flatMap(x => [...spanTexts(x.p?.['spans']), ...(typeof x.p?.['text'] === 'string' ? [x.p['text']] : [])])
 const wait = (agents: readonly Subagent[], now = 6000) => tree(must(agentWaitNode(agents, now)))
+/** The click a tile sends: on the native button the tile sits in (view/ui/button.tsx). */
+const tileActions = (n: NodeJson): unknown[] =>
+  nodes(n).filter(x => x.k === 'el' && x.p?.['tag'] === 'button' && x.c?.[0]?.p?.['role'] === 'omp.job.tile').map(x => x.p?.['actions'])
 
 function delegation(agents: Subagent[]): ToolCall {
   return { args: { tasks: agents.map(a => ({ goal: a.goal })) }, argsText: '', context: '', id: toolCallId('d1'), name: 'delegate_task', outcome: { duration: 0, kind: 'done' }, result: { delegation_id: 'deleg_1', mode: 'background', status: 'dispatched' }, startedAt: 0, subagents: agents, via: { kind: 'direct' } }
@@ -32,7 +35,7 @@ describe('agent wait tiles', () => {
     expect(role(n, 'omp.job.tiles')).toHaveLength(1)
     const tile = must(role(n, 'omp.job.tile')[0])
     expect(words(tile).join(' ')).toContain('Worker a')
-    expect(tile.p?.['actions']).toMatchObject({ click: 'open-agent=a' })
+    expect(tileActions(n)[0]).toMatchObject({ click: 'open-agent=a' })
     expect(words(tile).join(' ')).toContain('read_file')
     expect(words(tile).join(' ')).toContain('Found the entry point.')
     expect(nodes(tile).some(x => x.k === 'spinner')).toBe(true)
@@ -52,7 +55,7 @@ describe('agent wait tiles', () => {
     const n = wait([agent('done', { status: 'done' }), ...Array.from({ length: 7 }, (_, i) => agent(`${i}`, { index: i, status: i === 6 ? 'queued' : 'running' }))])
     expect(role(n, 'omp.job.tile')).toHaveLength(4)
     expect(words(n).join(' ')).toContain('+3 more agents · /agents')
-    expect(role(n, 'omp.job.tile').map(x => x.p?.['actions'])).toEqual(['0', '1', '2', '3'].map(id => ({ click: `open-agent=${id}`, menu: [`open-agent=${id}`] })))
+    expect(tileActions(n)).toEqual(['0', '1', '2', '3'].map(id => ({ click: `open-agent=${id}`, menu: [`open-agent=${id}`] })))
     expect(words(n).join(' ')).not.toContain('Worker done')
     expect(nodes(n).map(x => x.p?.['actions'])).toContainEqual({ click: 'open-agents=all' })
   })
@@ -61,9 +64,9 @@ describe('agent wait tiles', () => {
     const children = [agent('a'), agent('q', { status: 'queued' })]
     expect(role(wait(children), 'omp.job.tile')).toHaveLength(2)
     must(children[0]).status = 'done'
-    expect(role(wait(children), 'omp.job.tile').map(x => x.p?.['actions'])).toEqual([{ click: 'open-agent=q', menu: ['open-agent=q'] }])
+    expect(tileActions(wait(children))).toEqual([{ click: 'open-agent=q', menu: ['open-agent=q'] }])
     must(children[1]).status = 'running'
-    expect(role(wait(children), 'omp.job.tile').map(x => x.p?.['actions'])).toEqual([{ click: 'open-agent=q', menu: ['open-agent=q'] }])
+    expect(tileActions(wait(children))).toEqual([{ click: 'open-agent=q', menu: ['open-agent=q'] }])
     must(children[1]).status = 'done'
     expect(agentWaitNode(children, 9000)).toBeUndefined()
     expect(agentWaitNode([agent('f', { status: 'failed' }), agent('c', { status: 'cancelled' })], 9000)).toBeUndefined()

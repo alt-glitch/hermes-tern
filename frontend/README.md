@@ -31,7 +31,7 @@ flowchart LR
 | `src/model.ts` | The structured transcript's types (prompts, turns of thinking/text/tool blocks, notices, panels) |
 | `src/transcript/` | The transcript folded from gateway events (`store.ts`) and its parts: compactions, a reload from history, finding calls, todos, subagent rows, what a stored prompt carried, and what a message says (Hermes' notices, steers) |
 | `src/turn/` | Prompts on their way to the agent: the `Prompt` kinds (typed, the app's, a command's), the router that sends, steers, queues or holds each one through its entry point's gate, `{!cmd}` expansion, the turn's controls (interrupt, steer, redirect), the working line's busy state and compaction phase (`Activity`), and the queue behind the turn (held here, and the shared gateway's FIFO with this pane's admissions) with its Edit, Steer and drain |
-| `src/draft/` | The draft: the prompt editor's model (`composer.ts`: text, caret, undo, history, kill ring), its live Markdown, its keys, and what it carries beside its text: the attached images (clipboard, pasted paths, `/image`, the launcher's `--image`) and those still uploading |
+| `src/draft/` | The draft: the prompt editor's model (`composer.ts`: text, caret, undo, history, kill ring), its live Markdown, its keys, and what it carries beside its text: the attached images (clipboard, pasted paths, `/image`, the launcher's `--image`) and those still uploading, and dictation into it (`dictation.ts`) |
 | `src/commands/` | Slash commands: those this frontend runs itself (`local.ts`), the turn controls and session commands the shared gateway serves through their own RPCs (`control.ts`, `session.ts`), those its `slash.exec` refuses (`refused.ts`), a typed name's resolution (`resolve.ts`) and the `slash.exec` path (`slash.ts`) |
 | `src/view/` | Node builders (TSX on the Tern SDK's runtime) for the transcript, tool cards, dock and welcome card; `format.ts` holds how they write text, durations, times and paths, and `workLogModel.ts` how a turn's work groups and its steps and working line read. Only the modules that draw import it (docs/conventions.md) |
 | `src/tools/` | Tool details: each call's args and result read once (lenient: a field of the wrong type reads as absent) into a variant keyed by its tool, `detail.ts` holding the union and the parse memo; Tool Search's `tool_call` bridge unpacked (`bridge.ts`) |
@@ -41,13 +41,20 @@ flowchart LR
 | `src/overlays/` | Floating sheets (`overlay.ts` is their contract): approvals, clarify, masked prompts, completions, pickers |
 | `src/prompts/` | The prompt sheets on the overlay stack: their keys, and closing them when the gateway withdraws their questions |
 | `src/connections/` | Connect cards: the card files the plugin writes (`cards.ts`), and the watcher that keeps each card current and tells the agent |
-| `src/hermes/` | Hermes' own runtime and files: the gateway client, its `state.db` (the session index, the compaction boundaries), paths, shell, history |
+| `src/hermes/` | Hermes' own runtime and files: the gateway client, its `state.db` (the session index, the compaction boundaries), paths, shell, history, and the dictation helper's process (`dictation.ts`, running `../dictation.py`) |
 
 The views speak omp's chat vocabulary (`omp.session`, `omp.user`, `omp.assistant`,
 `omp.thinking`, `omp.editor`, `tool` names like `bash`/`read`/`edit`): Tern's chat styles
 (Reader, Spine, Console), tool folding and Carly's agent integration are written against those
 roles, so Hermes gets them as-is. The `hello` names the program `hermes`, which Tern uses for
 its icon, deck tile and branding.
+
+Every control a click works on is a native button, drawn by `pressable()` or `button()`
+(`src/view/ui/button.tsx`). Tern focuses buttons and fields only, so a clickable row has no Tab
+stop, no Enter or Space and no name a screen reader can say. The button wraps the control, which
+keeps omp's role and so its look. `a11y.test.ts` walks what the pane draws and fails on a click
+target that is not a named button. The composer's model and effort chips are the exception: Tern's
+composer lays them out by role, and the test says why.
 
 `@tui/*` imports reach the renderer-free modules of `ui-tui/src` (the gateway transport, skins,
 history, completion requests); nothing here imports React or Ink.

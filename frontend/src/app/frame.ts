@@ -15,6 +15,7 @@ import type { Overlay, OverlayStack } from '../overlays/overlay.js'
 import type { PrAside } from '../prs/aside.js'
 import { COMPOSER_ID, INPUT_ID, type SurfaceHost } from '../surface/host.js'
 import type { Transcript } from '../transcript/store.js'
+import type { EuiCards } from '../eui/cards.js'
 import type { TableCharts } from '../transcript/tableCharts.js'
 import { type DockActions, dockNodes } from '../view/dock.js'
 import { type DockSources, dockModel, isModal, shownPills } from '../view/dockModel.js'
@@ -36,6 +37,7 @@ export interface FrameCx extends DockSources {
   readonly completion: Pick<Completion, 'ghost' | 'nodes' | 'update'>
   readonly mediaDelivery?: MediaDelivery
   readonly charts: TableCharts
+  readonly eui?: EuiCards
   readonly overlays: readonly Overlay[]
   readonly stack: Pick<OverlayStack, 'rootOf'>
   readonly transcript: Pick<Transcript, 'changedEntries' | 'currentTodos' | 'entries'>
@@ -97,13 +99,14 @@ export function drawFrame(cx: FrameCx, now = Date.now()) {
 }
 
 /** What the transcript's entries draw with this frame. */
-export function transcriptContext(cx: Pick<FrameCx, 'session' | 'copies' | 'welcome' | 'gateway'> & Partial<Pick<FrameCx, 'charts' | 'browser' | 'mediaDelivery' | 'hostLocal' | 'nativeMedia' | 'hour12'>>, now: number): TranscriptContext {
+export function transcriptContext(cx: Pick<FrameCx, 'session' | 'copies' | 'welcome' | 'gateway'> & Partial<Pick<FrameCx, 'charts' | 'eui' | 'browser' | 'mediaDelivery' | 'hostLocal' | 'nativeMedia' | 'hour12'>>, now: number): TranscriptContext {
   const info = cx.session.info
   const focusBrowser = cx.browser ? bindBrowserFocus(cx.browser, cx.session.ref) : undefined
   const backend = info?.version && info.version !== 'unknown' ? `v${info.version}` : ''
 
   return {
     ...(cx.charts ? { charts: cx.charts } : {}),
+    ...(cx.eui ? { eui: cx.eui } : {}),
     copied: cx.copies.copied,
     copy: cx.copies.copy,
     hour12: cx.hour12?.() ?? false,

@@ -77,10 +77,11 @@ function pane(over: Partial<Pane> = {}) {
       }
     },
     cycleEffort: did('effort'),
+    dictation: { cancel: () => false, onKey: () => false },
     fork: did('fork'),
     hud: () => state.hud,
     interrupt: did('interrupt'),
-    liveVoice: { blocked: false, toggle: did('live voice'), control: async () => undefined },
+    liveVoice: { blocked: false, toggle: did('live voice'), quickToggle: did('live voice quick'), control: async () => undefined },
     now: () => state.clock,
     openAgents: did('agents'),
     openBackground: did('background'),
@@ -100,7 +101,6 @@ function pane(over: Partial<Pane> = {}) {
     toggleSidebar: did('sidebar'),
     transcript: { notice: text => void log.push(`notice ${text}`) }
   }
-
   return { cx, log, state }
 }
 
@@ -120,7 +120,6 @@ function sheet(over: Partial<Overlay> & { takes?: boolean } = {}): Overlay & { s
     ...over
   }
 }
-
 const ctrl = (name: string) => key(name, { ctrl: true })
 const alt = (name: string) => key(name, { alt: true })
 
@@ -131,6 +130,7 @@ describe('the key rules', () => {
       'cancel',
       'overlay',
       'modal',
+      'dictation',
       'liveKeys',
       'hud',
       'completion',
@@ -542,7 +542,7 @@ describe('sessionHost', () => {
           return busy
         }
       },
-      changed: () => {},
+      changed: () => {}, draft: () => {},
       gw: gw.client,
       life: {
         reload: async () => undefined,

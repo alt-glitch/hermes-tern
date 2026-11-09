@@ -16,6 +16,7 @@ import type { ComposerImage } from '../draft/attachments.js'
 import type { Composer } from '../draft/composer.js'
 import type { Subagent, Todo } from '../model.js'
 import { type ChartEntry, glance, glanceSpans, hovercard, latest, miniSpark, summary } from '../processes/widgets/view.js'
+import type { ContextWindow } from '../session/context.js'
 import { DEFAULT_EFFORT, effortText } from '../session/effort.js'
 import { COMPACTING_LABEL } from '../status.js'
 import { todoProgress } from '../transcript/todos.js'
@@ -23,11 +24,13 @@ import type { QueuedRow } from '../turn/queue.js'
 
 import { type AutomationLine, automationNode, reconnectNode } from './automation.js'
 import { btwNoticesNode } from './btwNotices.js'
+import { type DictationActions, dictationRow, type DictationView, micButton } from './dictation.js'
 import { imageChip } from './image-chip.js'
+import { contextMeter } from './context.js'
 import { queuedNode } from './queued.js'
 import { statusNotices } from './statusNotice.js'
-import { compact } from './time.js'
 import { checklistNode } from './todos.js'
+import { pressable } from './ui/button.js'
 import { workingRow } from './ui/live.js'
 import { pill } from './ui/pill.js'
 
@@ -68,6 +71,8 @@ export interface DockComposer {
   readonly ghost?: string | undefined
   /** Images the next prompt carries, as chips in the composer: a thumbnail (a click opens it large) and a remove button. */
   readonly attachments: readonly ComposerImage[]
+  /** Dictation's mic on the bar and capture row, only after /voice on. */
+  readonly dictation?: DictationView | undefined
 }
 
 /** The model chip and the effort chip. */
@@ -112,7 +117,7 @@ export interface DockQueue {
 }
 
 /** What the dock's buttons and fields do. Bound once: none of them depends on the frame. */
-export interface DockActions {
+export interface DockActions extends DictationActions {
   onBtwView(notice: BtwNotice): void
   onBtwDismiss(notice: BtwNotice): void
   /** Native editing: Tern replaced a range of the composer's text. */
@@ -122,6 +127,8 @@ export interface DockActions {
   onSubmit(): void
   onUndo(): void
   onInterrupt(): void
+  /** Only the main session has context usage; the subagent watch pane has none. */
+  onContext?(): void
   onModel(): void
   onEffort(): void
   /** The effort pill's context menu, by action: choose a level, save the current one as the default. */
@@ -155,7 +162,7 @@ export interface StatusLine {
   readonly branch: string
   readonly tokens?: number | undefined
   /** The context window's use; also the composer's hairline. */
-  readonly context?: { readonly used: number; readonly max: number } | undefined
+  readonly context?: ContextWindow | undefined
   /** Times the context was compressed this session (Ink's `cmp N`). */
   readonly compressions?: number | undefined
   readonly cost?: number | undefined
@@ -289,6 +296,7 @@ function todosPillNode(t: TodosPill, onToggle: () => void, focused: boolean): JS
     ],
     focused,
     key: 'todos',
+    name: `Todos, ${done} of ${total} done`,
     onClick: onToggle,
     seg: 'hermes.todos.pill',
     title: t.open ? 'Hide the todo list' : 'Show the todo list'
@@ -358,9 +366,9 @@ function statusLine(cx: DockContext, on: DockActions): JSX.Element {
       ) : null}
       <seg key="newline" priority={1} side="right" spans={[{ s: 'muted', t: '⇧⏎ newline' }]} />
       {cx.activity.kind === 'turn' ? (
-        <seg key="action" onClick={on.onInterrupt} priority={10} role="hermes.statusline.stop" side="right" spans={[{ t: 'esc esc stop' }]} />
+        <seg aria="Stop" key="action" onClick={on.onInterrupt} priority={10} role="hermes.statusline.stop" side="right" spans={[{ t: 'esc esc stop' }]} />
       ) : (
-        <seg key="action" onClick={on.onSubmit} priority={10} role="hermes.statusline.send" side="right" spans={[{ t: '⏎ send' }]} />
+        <seg aria="Send" key="action" onClick={on.onSubmit} priority={10} role="hermes.statusline.send" side="right" spans={[{ t: '⏎ send' }]} />
       )}
     </status>
   )
@@ -380,6 +388,7 @@ function agentsPill(running: number, agents: readonly Subagent[], now: number, o
     focused,
     hovercard: agentHovercard(agents, now),
     key: 'pill',
+    name: `${plural(running, 'agent')} running`,
     onClick: onOpen,
     title: 'Agents  ⌥A'
   })
@@ -414,6 +423,7 @@ function shellsPill(s: ShellsPill, onOpen: () => void, focused: boolean): JSX.El
     focused,
     hovercard: card,
     key: 'shells',
+    name: `${plural(n, 'shell')}${live ? ' running' : ' exited'}`,
     onClick: onOpen,
     title
   })
@@ -425,6 +435,7 @@ function prsPillNode(p: PrsPill, onOpen: () => void, focused: boolean): JSX.Elem
     children: [<icon key="icon" name="merge" {...optional('tone', p.tone === 'muted' ? undefined : p.tone)} />, <text key="text" text={p.text} wrap="none" />],
     focused,
     key: 'prs',
+    name: `Pull requests: ${p.text}`,
     onClick: onOpen,
     title: 'Pull requests  ⌥P'
   })
@@ -453,11 +464,16 @@ function workingNode(busy: Extract<DockActivity, { kind: 'turn' }>, cx: DockCont
     trailing: [
       <row grow={1} key="fill" />,
       cx.pills.todos ? todosPillNode(cx.pills.todos, on.onTodos, false) : null,
-      <row align="center" gap="xs" key="stop" onClick={on.onInterrupt} role="omp.working.stop" title="Stop  esc esc">
-        <kbd key="k" keys={['esc']} />
-        <kbd key="k2" keys={['esc']} />
-        <text key="t" text="Stop" />
-      </row>
+      // The role on the button: Tern hides omp's working-row Stop (the composer has one), and a
+      // hidden button must not keep a place in the focus order.
+      pressable(
+        { key: 'stop', name: 'Stop', onClick: on.onInterrupt, role: 'omp.working.stop' },
+        <row align="center" gap="xs" key="face" title="Stop  esc esc">
+          <kbd key="k" keys={['esc']} />
+          <kbd key="k2" keys={['esc']} />
+          <text key="t" text="Stop" />
+        </row>
+      )
     ]
   })
 }
@@ -497,17 +513,18 @@ function effortChip(r: DockRoute, on: DockActions): JSX.Element {
 }
 
 function composerNode(cx: DockContext, on: DockActions): JSX.Element {
-  const { draft, attachments } = cx.composer
+  const { draft, attachments, dictation } = cx.composer
   const { route } = cx
   const busy = cx.activity.kind === 'turn'
 
   return (
     <col key="composer" role="omp.editor">
       {busy ? <row key="streak" role="hermes.streak" /> : null}
-      {contextMeter(cx.status.context)}
+      {on.onContext ? contextMeter(cx.status.context, on.onContext) : null}
       <row gap="sm" hidden={!attachments.length} key="chips" role="omp.composer.chips" wrap>
         {attachments.map((a, i) => imageChip(a, i, on.onRemoveAttachment))}
       </row>
+      {dictation ? dictationRow(dictation, on) : null}
       <row align="start" gap="sm" key="line" role="omp.composer.line">
         {cx.orb ? <image key="orb" role="hermes.agent.orb" {...cx.orb} /> : null}
         <editor
@@ -547,45 +564,18 @@ function composerNode(cx: DockContext, on: DockActions): JSX.Element {
           </row>
         ) : null}
         {route.reasons !== false ? effortChip(route, on) : null}
+        {dictation ? micButton(dictation, on) : null}
         {draft.vim.enabled ? (
           <text key="vim" role="omp.composer.vim" spans={[{ s: 'muted', t: `${draft.vim.mode.toUpperCase()}${draft.vim.pending ? ` ${draft.vim.pending}` : ''}` }]} />
         ) : null}
         {/* Tern puts its folder chip right before the composer's status node: an empty one keeps
             the chip there and the send key at the end. */}
         <status grow={1} key="extras" role="omp.composer.extras" transparent />
-        {busy ? (
-          <text
-            key="stop"
-            onClick={on.onInterrupt}
-            role="omp.composer.stop"
-            text="Stop"
-            title="Stop  esc esc"
-            tone="error"
-          />
-        ) : (
-          <kbd key="send" keys={['enter']} onClick={on.onSubmit} role="omp.composer.send" title="Send  ⏎" />
-        )}
+        {busy
+          ? pressable({ key: 'stop', name: 'Stop', onClick: on.onInterrupt, role: 'omp.composer.stop' }, <text key="face" text="Stop" title="Stop  esc esc" tone="error" />)
+          : pressable({ key: 'send', name: 'Send', onClick: on.onSubmit, role: 'omp.composer.send' }, <kbd key="face" keys={['enter']} title="Send  ⏎" />)}
       </row>
     </col>
-  )
-}
-
-/**
- * The context bar alone on the composer's edge, from 1% used: its % and total sat in the pills'
- * row and collided with them; the status strip says the % and the tooltip the rest.
- */
-function contextMeter(ctx: StatusLine['context']): JSX.Element | null {
-  const share = ctx && ctx.max > 0 ? ctx.used / ctx.max : undefined
-
-  return !ctx || share === undefined || share < 0.01 ? null : (
-    <meter
-      key="context"
-      role="omp.composer.context"
-      style="bar"
-      thresholds={{ bad: 0.85, warn: 0.6 }}
-      title={`Context ${Math.round(share * 100)}% used\n${compact(ctx.used)} of ${compact(ctx.max)} tokens\n/usage shows the breakdown`}
-      value={share}
-    />
   )
 }
 

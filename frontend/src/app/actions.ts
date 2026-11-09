@@ -19,13 +19,12 @@ import { runSlash, type SlashCx } from '../commands/slash.js'
 import type { LaunchEnv } from '../config/env.js'
 import type { ConnectWatcher } from '../connections/watcher.js'
 import type { Disposables } from '../core/disposables.js'
-import { errorText } from '../core/errors.js'
 import { Flash } from '../core/flash.js'
 import type { PrKey } from '../core/ids.js'
 import type { Attachments } from '../draft/attachments.js'
 import type { Composer } from '../draft/composer.js'
+import type { Dictation } from '../draft/dictation.js'
 import type { KeyCx, Presses } from '../draft/keys.js'
-import { storedCompactions } from '../hermes/compactions.js'
 import { forkSession } from '../fork-session.js'
 import { shellError, shellExec, shellLines } from '../hermes/shell.js'
 import type { Media } from '../media.js'
@@ -35,12 +34,12 @@ import { openAutomation } from '../overlays/automation.js'
 import { openBackground } from '../overlays/background.js'
 import { openBrowserBlocks } from '../overlays/browser.js'
 import type { Completion } from '../overlays/completion.js'
+import { openContext } from '../overlays/context.js'
 import { openEffortPicker } from '../overlays/effort.js'
+import { openPromptHistorySearch } from '../overlays/historySearch.js'
 import { openModelPicker } from '../overlays/models.js'
 import { openPlanReview } from '../overlays/plan.js'
-import { promptOverlay } from '../overlays/prompts.js'
-import { openPrMenu, openPrSheet, openUrl } from '../overlays/pullRequests.js'
-import { parsePrompt } from '../prompts/parse.js'
+import { openPrMenu, openUrl } from '../overlays/pullRequests.js'
 import type { PromptSheets } from '../prompts/sheets.js'
 import type { PrAside } from '../prs/aside.js'
 import { cycleEffort, DEFAULT_EFFORT } from '../session/effort.js'
@@ -55,21 +54,38 @@ import type { Transcript } from '../transcript/store.js'
 import type { TodoHud } from '../todo-hud.js'
 import type { Activity } from '../turn/activity.js'
 import { BusyDraft, busyIntent } from '../turn/busyInput.js'
-import { interruptTurn } from '../turn/control.js'
-import { type Prompt, shownText } from '../turn/prompt.js'
+import type { Prompt } from '../turn/prompt.js'
 import type { PromptQueue } from '../turn/queue.js'
 import type { GateState, PromptRouter } from '../turn/router.js'
-import { type BusyMode, busyModeOf } from '../turn/serverQueue.js'
+import type { BusyMode } from '../turn/serverQueue.js'
 import type { DockActions } from '../view/dock.js'
-import { isModal, shownPills } from '../view/dockModel.js'
+import { isModal } from '../view/dockModel.js'
 import type { LiveVoice } from '../voice/live.js'
-import { rpc } from '../wire/rpc.js'
 
-import { openAgentPane } from './agent-pane.js'
 import { openAppPalette } from './palette.js'
 import { copyComposer, attachNativeImage } from './native-artifacts.js'
-import { toolBlob } from './tool-blob.js'
 import { shouldSteer } from './busy-intent.js'
+import {
+  attachStartupImage as attachActionStartupImage,
+  gates as actionGates,
+  interrupt as interruptAction,
+  onRequest as onActionRequest,
+  readBusyMode as readActionBusyMode,
+  restore as restoreAction,
+  setCompacting as setActionCompacting,
+  summarize as summarizeAction
+} from './actions-session.js'
+import {
+  blob as actionBlob,
+  hudKey as actionHudKey,
+  imageLanded as actionImageLanded,
+  openAgent as openActionAgent,
+  openPill as openActionPill,
+  openPrAside as openActionPrAside,
+  showArtifacts as showActionArtifacts,
+  showImage as showActionImage,
+  toggleSidebar as toggleActionSidebar
+} from './actions-ui.js'
 import type { ChatPorts } from './ports.js'
 
 /** The stores the actions act on, and the app's ports for the sheets they open. */
@@ -89,6 +105,7 @@ export interface ActionsCx {
   readonly completion: Completion
   readonly hud: Hud
   readonly composer: Composer
+  readonly dictation: Dictation
   readonly liveVoice: LiveVoice
   readonly transcript: Transcript
   readonly todoHud: TodoHud
@@ -127,22 +144,21 @@ export class AppActions {
   readonly host: SessionHostCx
   constructor(cx: ActionsCx) {
     this.#cx = cx
-    const { attachments, chat, composer, gw, life, queue, transcript } = cx
+    const { attachments, chat, composer, dictation, gw, life, queue, transcript } = cx
     const changed = () => cx.changed()
     const admit = () => !isModal(chat.overlays) && !life.switching && !attachments.any && !attachments.uploading
     this.#busyDraft = new BusyDraft({ activity: cx.activity, admit, composer, gw, router: cx.router, session: cx.state, transcript, changed })
 
-    this.bindings = new BindingPreferences({
-      gw,
-      session: cx.state,
-      changed,
-      notice: text => chat.notice(text, 'warning')
-    })
+    this.bindings = new BindingPreferences({ gw, session: cx.state, changed, notice: text => chat.notice(text, 'warning') })
     this.dock = {
       onBtwView: notice => cx.btw.viewNotice(notice),
       onBtwDismiss: notice => cx.btw.dismissNotice(notice),
       onAgents: () => openAgents(chat),
+      onDictate: () => dictation.toggle(),
+      onDictationCancel: () => void dictation.cancel(),
+      onDictationDone: () => dictation.finish(),
       onNotices: () => chat.openNotices(),
+      onContext: () => openContext({ changed, close: o => chat.close(o), gw, open: o => chat.open(o), session: cx.state }),
       onEdit: ev => {
         if (composer.vim.enabled) return
         composer.edit(ev)
@@ -186,6 +202,7 @@ export class AppActions {
       close: overlay => chat.close(overlay),
       completion: cx.completion,
       composer,
+      dictation,
       liveVoice: cx.liveVoice,
       vim: composer.vim,
       cycleEffort: () => cycleEffort(chat),
@@ -200,6 +217,7 @@ export class AppActions {
       openPrs: () => openPrMenu(chat),
       openModel: () => openModelPicker(chat),
       openPalette: () => this.openPalette(),
+      openHistorySearch: () => openPromptHistorySearch(chat, composer),
       openHelp: () => void chat.openHelp(),
       cycleModel: direction => void cycleModel(chat, direction),
       shortcut: (id, key) => this.bindings.matches(id, key),
@@ -239,6 +257,7 @@ export class AppActions {
     this.host = {
       activity: cx.activity,
       changed,
+      draft: text => composer.set(composer.text ? `${text}\n${composer.text}` : text, { pasted: composer.pasted }),
       gw,
       life,
       queue,
@@ -274,8 +293,12 @@ export class AppActions {
 
   // ── Prompts and commands ───────────────────────────────────────────
 
-  /** Sends the composer's draft, with the pastes it holds. */
+  /** Sends the composer's draft, with the pastes it holds; during dictation Enter ends the capture. */
   submitDraft(alternate = false) {
+    if (this.#cx.dictation.capturing) {
+      this.#cx.dictation.finish()
+      return
+    }
     if (this.#cx.liveVoice.blocked || isModal(this.#cx.chat.overlays)) return
     const raw = this.#cx.composer.text
 
@@ -290,6 +313,10 @@ export class AppActions {
 
   /** Tern native Send obeys the same busy intent as keyboard Enter. */
   submitNative(raw: string) {
+    if (this.#cx.dictation.capturing) {
+      this.#cx.dictation.finish()
+      return
+    }
     if (isModal(this.#cx.chat.overlays)) return
     if (shouldSteer(this.#cx, raw, false)) {
       void this.#busyDraft.steer(raw)
@@ -344,29 +371,12 @@ export class AppActions {
 
   /** What the router's gates read: the session, the switch in flight, the turn, the compaction and the startup image. */
   gates(): GateState {
-    const { activity } = this.#cx
-
-    return {
-      awaitingStartup: this.#cx.attachments.awaitingStartup,
-      busy: activity.busy !== null,
-      canonical: this.#cx.gw.isCanonical,
-      compacting: activity.compacting !== undefined,
-      sid: this.#cx.state.ref.live,
-      switching: this.#cx.life.switching
-    }
+    return actionGates(this.#cx)
   }
 
   /** Puts a prompt that did not go back into the composer, before any text there, with its images. */
   restore(prompt: Prompt) {
-    const { composer } = this.#cx
-    const text = shownText(prompt)
-
-    // The draft keeps its own pastes, and the prompt's come with it.
-    composer.set(text && composer.text ? `${text}\n${composer.text}` : text || composer.text, {
-      literal: composer.literal || prompt.kind !== 'typed',
-      pasted: [...composer.pasted, ...(prompt.kind === 'typed' ? prompt.pasted : [])]
-    })
-    this.#cx.attachments.restore(prompt.images)
+    restoreAction(this.#cx, prompt)
   }
 
   /** `!cmd`: runs `command` in the session's folder and shows its output; nothing reaches the model. */
@@ -399,30 +409,7 @@ export class AppActions {
    * failure speaks only for the turn it tried to stop: once that row is gone, it says nothing.
    */
   interrupt() {
-    const { activity } = this.#cx
-    const sid = this.#cx.state.ref.live
-    // The turn being stopped, by its row (a relabel keeps it; the next turn's row is another).
-    const row = activity.busy?.since
-
-    if (!sid) {
-      return
-    }
-
-    // Last write wins: the stream's next label replaces this one.
-    activity.relabel('Stopping…', { status: true })
-
-    interruptTurn(this.#cx.gw, sid).catch((error: unknown) => {
-      const why = errorText(error)
-
-      // A stale generation means the turn already ended: nothing to say.
-      if (row && activity.busy?.since === row && !why.includes('stale_generation')) {
-        // 'Working…', not the label it replaced: whatever the turn shows now.
-        activity.relabel('Working…', { status: true })
-        this.#cx.transcript.notice(`Could not stop the turn: ${why}`, 'error')
-        this.#cx.changed()
-      }
-    })
-    this.#cx.changed()
+    interruptAction(this.#cx)
   }
 
   /**
@@ -430,102 +417,49 @@ export class AppActions {
    * until its done edge, and with no turn running the dock shows it and prompts queue behind it;
    * those go once it ends.
    */
-  setCompacting(on: boolean, { manual = false }: { manual?: boolean } = {}) {
-    if (on) {
-      this.#cx.activity.startCompaction({ manual })
-    } else {
-      this.#cx.activity.endCompaction()
-      this.#cx.queue.drain()
-    }
+  setCompacting(on: boolean, options: { manual?: boolean } = {}) {
+    setActionCompacting(this.#cx, on, options)
   }
 
   /** Gives the compactions seen here their summaries from the store, `delay` ms from now. */
   summarize(delay = 0) {
-    const { state, transcript } = this.#cx
-    const ticket = state.ticket()
-
-    if (!transcript.compactions.unsummarized) {
-      return
-    }
-
-    this.#cx.timers.timeout(() => {
-      const stored = state.info?.stored_session_id || state.ref.stored
-
-      if (ticket.isCurrent() && stored && transcript.compactions.unsummarized) {
-        transcript.compactions.summarize(storedCompactions(stored))
-        this.#cx.changed()
-      }
-    }, delay)
+    summarizeAction(this.#cx, delay)
   }
 
   /** Reads the shown session's busy_input_mode; an older gateway without it leaves Enter queueing (the TUI default). */
   async readBusyMode() {
-    const ticket = this.#cx.state.ticket()
-
-    if (!ticket.sid) {
-      return
-    }
-
-    try {
-      const r = await rpc(this.#cx.gw, 'config.get', { key: 'busy', session_id: ticket.sid })
-
-      if (ticket.isCurrent()) {
-        this.#cx.state.busyMode = busyModeOf(r?.value)
-      }
-    } catch {
-      // Keeps `queue`.
-    }
+    return readActionBusyMode(this.#cx)
   }
 
   /** `hermes -q … --image …`: attaches the image to the first session, then lets the startup query go. */
   async attachStartupImage(sid: string) {
-    await this.#cx.attachments.attachStartup(sid)
-    this.#cx.queue.drain()
-    this.#cx.changed()
+    return attachActionStartupImage(this.#cx, sid)
   }
 
 
   /** A server request: its prompt sheet, unless a switch holds it or it is another session's. */
   onRequest(req: ServerRequest) {
-    // Held while a switch is in flight, or another session's prompt (it settles when that session closes).
-    if (this.#cx.life.route(req) !== 'show') {
-      return
-    }
-
-    const prompt = parsePrompt(req)
-    const overlay = prompt && promptOverlay(this.#cx.chat, prompt)
-
-    if (!prompt || !overlay) {
-      req.fail(-32601, `${req.method} is not supported by the Tern frontend`)
-
-      return
-    }
-
-    this.#cx.sheets.open(overlay, prompt)
+    onActionRequest(this.#cx, req)
   }
 
   /** `bytes` sent to Tern as a blob; undefined where it takes none, or for more than a blob holds. */
   blob(bytes: Uint8Array, mime: string): string | undefined {
-    return toolBlob(this.#cx.tern, bytes, mime)
+    return actionBlob(this.#cx, bytes, mime)
   }
 
   /** Has `call`'s image (a URL's) fetched; its card shows it once it lands. */
   showImage(call: ToolCall | undefined) {
-    if (call) this.#cx.media.show(call, () => this.imageLanded(call))
+    showActionImage(this.#cx, call, landed => this.imageLanded(landed))
   }
 
   /** Opens model outputs beside the live chat. */
   showArtifacts(call: ToolCall | undefined) {
-    this.#artifacts.show(call, this.#cx.state.info?.cwd ?? process.cwd(), text => {
-      this.#cx.transcript.notice(text, 'warning')
-      this.#cx.changed()
-    })
+    showActionArtifacts(this.#cx, this.#artifacts, call)
   }
 
   /** A tool call's image landed: its card draws again. */
   imageLanded(call: ToolCall) {
-    this.#cx.transcript.touchCall(call)
-    this.#cx.changed()
+    actionImageLanded(this.#cx, call)
   }
 
   /** Tells Tern the session's folder when it moved (`hermes -w tern`, a moved workspace): OSC 7. */
@@ -542,58 +476,26 @@ export class AppActions {
 
   /** Down from an empty prompt focuses the pills; ←/→, Enter and Esc/↑ while one holds the keys. */
   hudKey(key: Key): boolean {
-    const { activity, chat, completion, composer, transcript, todoHud } = this.#cx
-    const { agents, automation, processes, prs } = chat
-
-    return this.#cx.hud.key(key, {
-      idle: !composer.text && !composer.browsing && !completion.open,
-      pills: shownPills({ activity, agents, automation, processes, prs, todoHud, transcript }, Date.now())
-    })
+    return actionHudKey(this.#cx, key)
   }
 
   /** Opens the sheet behind a pill. */
   openPill(pill: SheetPill) {
-    const chat = this.#cx.chat
-    if (pill === 'agents') openAgents(chat)
-    else if (pill === 'shells') openBackground(chat)
-    else if (pill === 'prs') openPrMenu(chat)
-    else openAutomation(chat, pill)
+    openActionPill(this.#cx, pill)
   }
 
   /** Opens or closes the session sidebar (Tern's aside); says why where Tern has none. */
   toggleSidebar() {
-    const { prAside, sidebar } = this.#cx
-
-    if (!this.#cx.tern.caps.features.includes('aside')) {
-      this.#cx.transcript.notice('This Tern has no side panel (the aside feature). /changes and /prs still work.', 'warning')
-      this.#cx.changed()
-
-      return
-    }
-
-    // One sheet docks at the edge at a time: the session sidebar takes the PR aside's place.
-    if (!sidebar.open && prAside.open) {
-      prAside.close()
-    }
-
-    sidebar.toggle()
+    toggleActionSidebar(this.#cx)
   }
 
   /** Docks PR `key` at the pane's right edge, in place of the session sidebar. */
   openPrAside(key: PrKey | undefined) {
-    if (!this.#cx.tern.caps.features.includes('aside')) {
-      return openPrSheet(this.#cx.chat, key)
-    }
-
-    if (this.#cx.sidebar.open) {
-      this.#cx.sidebar.toggle()
-    }
-
-    this.#cx.prAside.show(key)
+    openActionPrAside(this.#cx, key)
   }
 
   /** Shows subagent `id` beside the chat in a Tern split; its timeline sheet where no split can open. */
   async openAgent(id: string) {
-    return openAgentPane(this.#cx, id)
+    return openActionAgent(this.#cx, id)
   }
 }

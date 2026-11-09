@@ -10,10 +10,11 @@ import type { Overlay } from '../overlays/overlay.js'
 import type { Transcript } from '../transcript/store.js'
 import type { PromptQueue } from '../turn/queue.js'
 import type { LiveVoice } from '../voice/live.js'
-import { HOLD_UNAVAILABLE, isHoldInfoKey, isVoiceToggleKey } from '../voice/hold.js'
+import { HOLD_UNAVAILABLE, isHoldInfoKey, isTalkToggleKey, isVoiceToggleKey } from '../voice/hold.js'
 
 import type { Attachments } from './attachments.js'
 import type { Composer } from './composer.js'
+import type { Dictation } from './dictation.js'
 import type { VimComposer } from './vim.js'
 
 /** A second Ctrl+C within this window quits. */
@@ -96,13 +97,15 @@ export interface KeyCx {
   hud(key: Key): boolean
   readonly completion: Pick<Completion, 'onKey'>
   readonly composer: Pick<Composer, 'key' | 'set' | 'take' | 'text'>
+  /** Record key and capture cancellation, only after /voice on. */
+  readonly dictation: Pick<Dictation, 'cancel' | 'onKey'>
   /** Optional modal editor; tests and non-Vim hosts retain the original key contract. */
   readonly vim?: Pick<VimComposer, 'key' | 'enabled'>
   readonly attachments: Pick<Attachments, 'any' | 'clear' | 'clearAll' | 'paste'>
   readonly queue: Pick<PromptQueue, 'count' | 'dequeue' | 'steer'>
   readonly transcript: Pick<Transcript, 'notice'>
   readonly presses: Presses
-  readonly liveVoice: Pick<LiveVoice, 'blocked' | 'toggle' | 'control'>
+  readonly liveVoice: Pick<LiveVoice, 'blocked' | 'toggle' | 'quickToggle' | 'control'>
   now(): number
   /** A turn (or a send's `{!cmd}`s) runs. */
   busy(): boolean
@@ -127,6 +130,7 @@ export interface KeyCx {
   shortcut?(id: string, key: Key): boolean
   openModel?(): void
   openPalette?(): void
+  openHistorySearch?(): void
   openHelp?(): void
   cycleModel?(direction: -1 | 1): void
   /** Sends the composer's draft. */
@@ -160,8 +164,9 @@ function clearDraft(cx: KeyCx) {
   cx.attachments.clear()
 }
 
-/** Ctrl+C with no sheet open: clears the draft, else stops the turn, else arms the exit (twice quits). */
+/** Ctrl+C with no sheet open: cancels dictation, else clears the draft, stops the turn or arms exit. */
 function ctrlC(cx: KeyCx) {
+  if (cx.dictation.cancel()) return
   if (hasDraft(cx)) {
     cx.composer.set('')
     cx.attachments.clearAll()
@@ -215,8 +220,15 @@ const overlay: KeyRule = (key, _cx, top) => top?.onKey(key) === true
 /** A modal sheet takes every key, used or not. */
 const modal: KeyRule = (_key, _cx, top) => top?.modal === true
 
+/** Dictation owns the record key and Escape under the top modal, before other input. */
+const dictation: KeyRule = (key, cx) => cx.dictation.onKey(key)
+
 /** Shortcuts request consent or report missing hold support; neither records a key gesture. */
 const liveKeys: KeyRule = (key, cx) => {
+  if (isTalkToggleKey(key)) {
+    cx.liveVoice.quickToggle()
+    return true
+  }
   if (isVoiceToggleKey(key)) {
     cx.liveVoice.toggle()
     return true
@@ -259,6 +271,7 @@ const appShortcuts: KeyRule = (key, cx) => {
     ['app.model.cycleForward', cx.cycleModel && (() => cx.cycleModel?.(1))],
     ['app.model.cycleBackward', cx.cycleModel && (() => cx.cycleModel?.(-1))],
     ['app.palette', cx.openPalette],
+    ['app.history.search', cx.openHistorySearch],
     ['app.help', cx.openHelp]
   ]
   const found = actions.find(([id, run]) => Boolean(run && cx.shortcut?.(id, key)))
@@ -401,6 +414,7 @@ export const KEY_RULES: readonly KeyRule[] = [
   cancel,
   overlay,
   modal,
+  dictation,
   liveKeys,
   hud,
   completion,

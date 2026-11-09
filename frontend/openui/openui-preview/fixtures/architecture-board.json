@@ -1,0 +1,36 @@
+{
+  "v": 0,
+  "title": "Synthetic architecture · local inference proposal",
+  "provenance": "authored-example",
+  "nodes": [
+    {
+      "id": "browser",
+      "service": "client"
+    },
+    {
+      "id": "selector",
+      "service": "router"
+    },
+    {
+      "id": "inference",
+      "service": "llamacpp"
+    }
+  ],
+  "edges": [
+    {
+      "from": "browser",
+      "to": "selector",
+      "label": "proposed request"
+    },
+    {
+      "from": "selector",
+      "to": "inference",
+      "label": "proposed routing"
+    },
+    {
+      "from": "inference",
+      "to": "browser",
+      "label": "proposed response"
+    }
+  ]
+}

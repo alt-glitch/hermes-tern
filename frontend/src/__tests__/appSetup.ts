@@ -8,7 +8,8 @@ import { join } from 'node:path'
 import type { Key, Node } from '@stencil-hq/tern'
 import { expect, vi } from 'vitest'
 
-import { FakeGateway, fakeTern, given, key, type Reply, settle as settleGateway, topNodes } from './fakes.js'
+import { face, FakeGateway, fakeTern, given, key, type Reply, settle as settleGateway, topNodes } from './fakes.js'
+import type { Recorder } from '../hermes/dictation.js'
 
 /** This file's HERMES_HOME, set before App loads. */
 export const home = mkdtempSync(join(tmpdir(), 'hermes-tern-app-'))
@@ -24,7 +25,10 @@ writeFileSync(png, Buffer.from([137, 80, 78, 71, 13, 10, 26, 10, 0, 0]))
 let gateway: FakeGateway
 
 /** The app on a fake Tern and gateway: keys go in, gateway requests come out (`canonical`: the shared gateway). */
-export function setup(replies: Record<string, Reply> = {}, { canonical = true, features = [] }: { canonical?: boolean; features?: string[] } = {}) {
+export function setup(
+  replies: Record<string, Reply> = {},
+  { canonical = true, features = [], recorder }: { canonical?: boolean; features?: string[]; recorder?: Recorder } = {}
+) {
   const gw = (gateway = new FakeGateway({ canonical, replies }))
   let uploads = 0
 
@@ -33,7 +37,7 @@ export function setup(replies: Record<string, Reply> = {}, { canonical = true, f
   }
 
   const tern = fakeTern({ cols: 100, draws: true, features })
-  const app = new App(tern.session, gw.client, '1.0.0')
+  const app = new App(tern.session, gw.client, '1.0.0', recorder ? { recorder } : {})
   void app.run()
   given.session(app, 's1')
 
@@ -63,12 +67,15 @@ export function setup(replies: Record<string, Reply> = {}, { canonical = true, f
     const rows = topNodes(tern.region('dock')).find(n => n.props['role'] === 'omp.queue')?.children ?? []
 
     return rows.map((r: Node) => ({
-      actions: r.children.flatMap(c => (c.props['role'] === 'omp.queue.steer' ? ['steer'] : c.props['role'] === 'omp.queue.edit' ? ['edit'] : [])),
+      actions: r.children.map(face).flatMap(c => (c.props['role'] === 'omp.queue.steer' ? ['steer'] : c.props['role'] === 'omp.queue.edit' ? ['edit'] : [])),
       text: r.children.find(c => c.props['text'] !== undefined)?.props['text']
     }))
   }
 
-  return { app, attach, emit, press, queuedRows, sent, type }
+  /** The dock's top nodes as last rendered. */
+  const dock = () => topNodes(tern.region('dock'))
+
+  return { app, attach, dock, emit, frame: () => tern.frame, ops: () => tern.ops, press, queuedRows, sent, tern, type }
 }
 
 /** Waits until the app has handled what the test fed it (no fixed sleep). */

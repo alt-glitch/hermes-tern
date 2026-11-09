@@ -28,6 +28,7 @@ import { onKey } from '../draft/keys.js'
 import { editExternal as editDraftExternal } from '../draft/external-editor.js'
 import { followGateway } from '../gateway/follow.js'
 import type { PullRequests } from '../github/store.js'
+import { hermesRecorder, type Recorder } from '../hermes/dictation.js'
 import { HostLifecycle } from '../host-lifecycle.js'
 import type { NoticeEntry } from '../model.js'
 import type { OperationalSheets } from '../operations.js'
@@ -46,6 +47,7 @@ import { runInput } from '../surface/input.js'
 import type { Transcript } from '../transcript/store.js'
 import { hermesTableChartPlanner } from '../transcript/tableChartPlanner.js'
 import { TableCharts } from '../transcript/tableCharts.js'
+import { EuiCards } from '../eui/cards.js'
 import type { Busy } from '../turn/activity.js'
 import { IMAGE_ONLY_PROMPT } from '../turn/prompt.js'
 import { Retention } from '../view/retention.js'
@@ -56,6 +58,7 @@ import type { LiveVoice } from '../voice/live.js'
 
 import { AppActions } from './actions.js'
 import { drawFrame, type FrameCx } from './frame.js'
+import { euiHostPort } from './eui-host.js'
 import type { ChatPorts } from './ports.js'
 import { type ChatStores, chatStores, disposeStores } from './stores.js'
 
@@ -69,6 +72,7 @@ export class App implements ChatPorts {
   readonly transcript: Transcript
   /** Session-scoped derived charts; never changes transcript or answer copy. */
   readonly tableCharts: TableCharts
+  readonly eui: EuiCards
   readonly liveVoice: LiveVoice
   readonly agents: Agents
   readonly processes: Processes
@@ -99,8 +103,13 @@ export class App implements ChatPorts {
   /** What each frame draws from (app/frame.ts); set once run() opened the surface. */
   #view: FrameCx | undefined
 
-  /** `launch` and `settings` are what entry.ts read once at startup; unset, each reads its default. */
-  constructor(tern: Session, gw: GatewayClient, version: string, { launch = readLaunchEnv(), settings = fileSettings(), writeHost }: { launch?: LaunchEnv; settings?: SettingsSource; writeHost?: (text: string) => void } = {}) {
+  /** Entry defaults are read at startup; `recorder` injects the dictation helper in tests. */
+  constructor(
+    tern: Session,
+    gw: GatewayClient,
+    version: string,
+    { launch = readLaunchEnv(), recorder = hermesRecorder(), settings = fileSettings(), writeHost }: { launch?: LaunchEnv; recorder?: Recorder | undefined; settings?: SettingsSource; writeHost?: (text: string) => void } = {}
+  ) {
     this.#tern = tern
     this.#gw = gw
     this.#launch = launch
@@ -108,12 +117,21 @@ export class App implements ChatPorts {
       policy: async () => settings.load().tableCharts ?? 'off',
       plan: hermesTableChartPlanner()
     }, () => this.changed())
+    // A card redraws on its own (a click, a mount): its row is drawn again even once it has settled.
+    this.eui = new EuiCards(key => {
+      const entry = key === undefined ? undefined : this.transcript.entries.find(e => key.startsWith(`main.${e.id}.`))
+      if (entry) {
+        this.transcript.changedEntries.add(entry)
+      }
+      this.changed()
+    }, undefined, euiHostPort(this, () => this.#visible && this.#surface?.state === 'visible' &&
+      !this.stores.life.switching && !this.overlays.some(o => o.modal)))
     this.#hostLifecycle = new HostLifecycle(writeHost ?? (text => {
       if (launch.pane) {
         process.stdout.write(text)
       }
     }))
-    const s = chatStores(this, { act: () => this.#act, gw, launch, settings, surface: () => this.#surface, tern, version })
+    const s = chatStores(this, { act: () => this.#act, gw, launch, recorder, settings, surface: () => this.#surface, tern, version })
     this.stores = s
     this.session = s.session
     this.transcript = s.transcript
@@ -138,6 +156,11 @@ export class App implements ChatPorts {
   /** The gateway, for overlays that issue their own RPCs. */
   get gw(): GatewayClient {
     return this.#gw
+  }
+
+  /** Dictation into the composer (`/voice`). */
+  get dictation() {
+    return this.stores.dictation
   }
 
   /** Whose colors the surface wears (`/theme`). */
@@ -193,6 +216,7 @@ export class App implements ChatPorts {
       hour12: () => this.#tern.caps.hour12,
       nativeMedia: this.#tern.caps.kinds?.includes('media') ?? false,
       charts: this.tableCharts,
+      eui: this.eui,
       ...(this.#orb ? { orb: this.#orb } : {}),
       gateway: this.#gw,
       surface: this.#surface,
@@ -201,6 +225,8 @@ export class App implements ChatPorts {
     s.theme.apply()
     // A card that throws draws as the generic one, and the pane says so once per tool name.
     onCardFault(noticeSink(text => this.notice(text, 'warning')))
+
+    this.eui.attach({ blob: (bytes, mime) => (this.#tern.caps.features.includes('blobs') ? this.#tern.blob(bytes, mime) : undefined), stylesheet: (name, css) => { this.#surface.raw.stylesheet(name, css) } }, Boolean(this.#tern.caps.dark))
 
     if (this.#tern.caps.features.includes('blobs')) {
       s.welcome.logo = this.#tern.blob(logo, 'image/png')
@@ -216,7 +242,10 @@ export class App implements ChatPorts {
     }
 
     // Exit retires the owning transport even before a reconnect adopts a new runtime id.
-    this.#gw.on('exit', () => this.tableCharts.transportLost())
+    this.#gw.on('exit', () => {
+      this.tableCharts.transportLost()
+      this.eui.host.invalidate()
+    })
     followGateway(this.#gw, {
       ...s,
       drain: () => s.queue.drain(),
@@ -278,6 +307,7 @@ export class App implements ChatPorts {
    */
   dispose() {
     this.tableCharts.close()
+    this.eui.close()
     this.#orb?.close()
     this.#surface?.dispose()
     this.#act.dispose()
@@ -297,7 +327,11 @@ export class App implements ChatPorts {
     }
 
     this.#orb?.update(
-      this.#orbActivity.state(this.overlays.some(o => o.key.startsWith('prompt:'))),
+      this.liveVoice.blocked && this.liveVoice.phase !== 'consent'
+        ? this.liveVoice.phase === 'speaking' ? 'speaking'
+          : this.liveVoice.phase === 'thinking' || this.liveVoice.phase === 'starting' ? 'thinking'
+            : this.liveVoice.phase === 'error' ? 'error' : 'listening'
+        : this.#orbActivity.state(this.overlays.some(o => o.key.startsWith('prompt:'))),
       this.overlays.at(-1)?.modal === true
     )
     if (!this.#view || this.#surface.closed) {
@@ -390,6 +424,7 @@ export class App implements ChatPorts {
     }
     if (ev.ev === 'theme') {
       this.#orb?.environment({ dark: ev.dark })
+      this.eui.theme(ev.dark)
     }
     if (ev.ev === 'motion') {
       this.#orb?.environment({ reduce: ev.reduce })
@@ -409,6 +444,7 @@ export class App implements ChatPorts {
 
   changed() {
     this.stores?.liveVoice.syncOwner()
+    this.eui?.host.sync()
     if (this.session && this.stores) {
       this.#hostLifecycle.project({
         sid: this.session.ref.live,

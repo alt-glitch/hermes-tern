@@ -1,7 +1,6 @@
 // Explicit per-session live conversation. PR #71 owns review-only dictation.
 import { randomUUID } from 'node:crypto'
 import type { JSX } from '@stencil-hq/tern'
-import type { GatewayClient } from '@tui/gatewayClient.js'
 
 import { errorText } from '../core/errors.js'
 
@@ -20,7 +19,12 @@ interface Lease {
 
 /** This mode uses the *gateway* audio devices and Hermes STT/TTS, not a second recorder. */
 export interface LiveVoiceHost {
-  gw: GatewayClient
+  gw: {
+    request(method: string, params: Record<string, unknown>): Promise<unknown>
+    on(name: 'event' | 'exit', listener: (event: unknown) => void): unknown
+    off(name: 'event' | 'exit', listener: (event: unknown) => void): unknown
+  }
+  talk?: boolean
   sid(): string | null
   switching(): boolean
   changed(): void
@@ -105,6 +109,12 @@ export class LiveVoice {
   }
 
   /** Serialize control behind a possibly pending start, including stop on key cancellation. */
+  quickToggle(): void {
+    if (this.#lease || this.phase === 'consent') { this.toggle(); return }
+    this.toggle()
+    this.start()
+  }
+
   async control(action: Control): Promise<void> {
     const lease = this.#lease
     if (!lease) {
@@ -217,12 +227,12 @@ export class LiveVoice {
     if (!active && this.phase === 'idle') return null
     return (
       <col key="live-voice" role="omp.live.voice">
-        <row key="toggle" role="omp.live.toggle" onClick={() => this.toggle()} title="Live voice · Alt+Shift+V">
+        <row key="toggle" role="omp.live.toggle" onClick={() => this.toggle()} title="Live voice · Ctrl+L / Alt+Shift+V">
           <text key="label" text={active ? 'Stop live voice' : 'Live voice…'} />
         </row>
         {this.phase === 'consent' ? (
           <col key="consent" role="omp.live.consent" gap="sm">
-            <text key="notice" text={LIVE_CONSENT} wrap="word" />
+            <text key="notice" text={this.#host.talk ? 'Hermes Talk uses this machine’s microphone and speaker with your configured realtime provider. Ctrl+L starts/stops a call; Esc or Stop hangs up. Your typed draft stays unsent.' : LIVE_CONSENT} wrap="word" />
             <row key="allow" role="omp.live.start" onClick={() => this.start()}>
               <text key="text" text="Allow microphone + automatic spoken turns" />
             </row>
@@ -236,12 +246,14 @@ export class LiveVoice {
             <text key="phase" role="omp.live.phase" text={'Live voice: ' + this.phase +
               (this.muted ? ' · microphone muted' : '') + ' · draft Send disabled'} />
             <row key="controls" gap="sm">
-              <row key="mute" role="omp.live.mute" onClick={() => void this.control('mute')}>
-                <text key="text" text={this.muted ? 'Unmute' : 'Mute'} />
-              </row>
-              <row key="barge" role="omp.live.interrupt" onClick={() => void this.control('interrupt')}>
-                <text key="text" text="Barge in / silence reply" />
-              </row>
+              {!this.#host.talk ? <row key="legacy-controls" gap="sm">
+                <row key="mute" role="omp.live.mute" onClick={() => void this.control('mute')}>
+                  <text key="text" text={this.muted ? 'Unmute' : 'Mute'} />
+                </row>
+                <row key="barge" role="omp.live.interrupt" onClick={() => void this.control('interrupt')}>
+                  <text key="text" text="Barge in / silence reply" />
+                </row>
+              </row> : null}
               <row key="stop" role="omp.live.stop" onClick={() => void this.control('stop')}>
                 <text key="text" text="Stop" />
               </row>

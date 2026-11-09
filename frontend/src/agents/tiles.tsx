@@ -3,6 +3,7 @@
 import { type JSX, Node, type NodeJson } from '@stencil-hq/tern'
 
 import type { Subagent } from '../model.js'
+import { pressable } from '../view/ui/button.js'
 import { JOB_TILE_LIMIT, jobTile, jobTiles } from '../view/ui/jobTiles.js'
 import { record } from '../wire/json.js'
 
@@ -98,7 +99,10 @@ export function agentWaitNode(agents: readonly Subagent[], now: number, key = 'a
     <col gap="sm" key={key} role="hermes.agents.wait">
       {jobTiles(shown.map(a => agentTile(a, now)))}
       {rest > 0 ? (
-        <text actions={{ click: 'open-agents=all' }} key="more" role="omp.jobs.hovercard.more" spans={[{ s: 'dim', t: `+${rest} more agents · /agents` }]} wrap="none" />
+        pressable(
+          { action: 'open-agents=all', key: 'more', name: `${rest} more agents: open /agents` },
+          <text key="face" role="omp.jobs.hovercard.more" spans={[{ s: 'dim', t: `+${rest} more agents · /agents` }]} wrap="none" />
+        )
       ) : null}
     </col>
   )
