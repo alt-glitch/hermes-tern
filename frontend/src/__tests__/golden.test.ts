@@ -22,6 +22,7 @@ vi.mock('node:crypto', async importOriginal => ({
 vi.mock('@hermes/shared/prompt-history', () => ({ append: () => undefined, load: () => [] }))
 const home = mkdtempSync(join(tmpdir(), 'hermes-tern-golden-'))
 process.env['HERMES_HOME'] = home
+await import('../app/chat.js')
 
 // The replays record the pane's Tern variables (viewer.set): the same snapshot inside and outside a Tern pane.
 const ternVars = Object.fromEntries(TERN_PANE_VARS.map(k => [k, process.env[k]]))
