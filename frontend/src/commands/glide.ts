@@ -7,6 +7,7 @@ import type { GatewayClient } from '@tui/gatewayClient.js'
 
 import type { SessionView } from '../app/ports.js'
 import type { Transcript } from '../transcript/store.js'
+import { commandReply } from '../wire/json.js'
 
 export interface GlideHost {
   readonly gw: Pick<GatewayClient, 'request'>
@@ -22,11 +23,12 @@ export interface GlideDetect {
   ram_gib: number | null
   gpus: string[]
   runtimes: string[]
-  z0int: { installed: boolean; ok?: boolean; failed?: string[]; hint?: string }
+  z0int: { installed: boolean; ok?: boolean; failed?: string[]; hint?: string; unchecked?: boolean }
   memory: GlideMemory
 }
 
-const NS = 'hermes-tern.glide'
+// Served by the standalone glide plugin (github.com/kvnloo/glide).
+const NS = 'glide'
 const APP = 'glide'
 const SESSIONS = 100
 
@@ -43,8 +45,19 @@ export async function glideCommand(host: GlideHost, arg: string): Promise<void> 
     host.transcript.notice('/glide needs an attached session with ephemeral-ui cards', 'warning')
     return
   }
-  const call = <T>(verb: string, params: Record<string, unknown> = {}) =>
-    host.gw.request<T>(`${NS}.${verb}`, { session_id: sid, ...params })
+  // Cores without plugin gateway methods answer "unknown method"; the same call then goes
+  // through the plugin's `/glide json` command, which every core dispatches.
+  const call = async <T>(verb: string, params: Record<string, unknown> = {}): Promise<T> => {
+    try {
+      return await host.gw.request<T>(`${NS}.${verb}`, { session_id: sid, ...params })
+    } catch (error) {
+      if (!/unknown method/i.test(error instanceof Error ? error.message : String(error))) throw error
+    }
+    const { output } = await host.gw.request<{ output: string }>('command.dispatch', {
+      name: 'glide', arg: `json ${verb} ${JSON.stringify(params)}`, session_id: sid
+    })
+    return commandReply<T>(output)
+  }
   const fail = (error: unknown) => {
     host.transcript.notice(`/glide: ${error instanceof Error ? error.message : String(error)}`, 'error')
   }
@@ -84,9 +97,12 @@ export async function glideCommand(host: GlideHost, arg: string): Promise<void> 
     const z0 = found.z0int
     cards.publish({
       kind: 'intel-health', app: APP, title: 'z0intelligence',
-      summary: z0.installed ? (z0.ok ? 'Ready for training loops and hill climbs.' : `Needs: ${(z0.failed ?? []).join(', ')}`)
-        : 'Optional. Adds local training loops, hill climbs and model management.',
-      rows: z0.installed ? [{ label: 'doctor', value: z0.ok ? 'ok' : 'attention' }] : [{ label: 'Install', value: z0.hint ?? 'pip install z0intelligence' }]
+      summary: !z0.installed ? 'Optional. Adds local training loops, hill climbs and model management.'
+        : z0.ok ? 'Ready for training loops and hill climbs.'
+          : z0.unchecked || !z0.failed?.length ? 'Installed. Run `z0int doctor` for details.'
+            : `Needs: ${z0.failed.join(', ')}`,
+      rows: z0.installed ? [{ label: 'doctor', value: z0.ok ? 'ok' : z0.unchecked ? 'not checked' : 'attention' }]
+        : [{ label: 'Install', value: z0.hint ?? 'pip install z0intelligence' }]
     })
 
     const enable = () => cards.publish({

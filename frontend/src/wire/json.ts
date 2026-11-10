@@ -26,3 +26,11 @@ export function parseJson(text: string): unknown {
 export function decodeJson(text: string): unknown {
   return JSON.parse(text)
 }
+
+/** A plugin command's JSON reply standing in for a gateway method's: its `error` thrown, the rest the reply. */
+export function commandReply<T>(output: string): T {
+  const reply = record(output)
+  if (!reply) throw new Error('the command did not answer with JSON')
+  if (typeof reply['error'] === 'string') throw new Error(reply['error'])
+  return reply as T
+}
