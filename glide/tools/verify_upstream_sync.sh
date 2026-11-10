@@ -42,6 +42,7 @@ case "${1:-all}" in
     uv sync --project .hermes-agent --frozen --python 3.14
     export PATH="$ROOT/.hermes-agent/.venv/bin:$PATH"
     (cd frontend && bun run typecheck && bun run lint && bun run check:size && bun run check:strict && bun run check:suppressions && bun run test --reporter=junit --outputFile="$RUNNER_TEMP/frontend.xml" && bun run bundle)
+    python3 glide/tools/smoke_upstream_sync.py
     ;;
   *) echo 'usage: verify_upstream_sync.sh python|regenerate|frontend' >&2; exit 2 ;;
 esac
