@@ -4,7 +4,7 @@
 // project's first. Rows are grouped by last activity, pinned ones on top; a search ranks title,
 // first prompt, folder, branch and id across the tab. The preview (sessions/detail.tsx) shows
 // where the session ran, its whole id, its first prompt and last reply, and the conversation a
-// page at a time (sessions/preview.ts reads it once the selection rests). Enter resumes; Tab
+// page at a time, newest first (sessions/preview.ts reads it once the selection rests). Enter resumes; Tab
 // switches the scope; → focuses the preview, where ↑/↓ step through it; ⌥C copies the id; ⌫ on an
 // empty search deletes after a confirm.
 
@@ -21,7 +21,7 @@ import { Flash } from '../core/flash.js'
 import { storedSessionId } from '../core/ids.js'
 import { mutateSession } from '../hermes/mutate.js'
 import { inWorkspace, listSessions, type ListedSession, sessionLabel, workspaceOf } from '../hermes/sessionList.js'
-import { storedTranscripts, type TranscriptReader } from '../hermes/sessionTranscript.js'
+import { gatewayTranscripts, type TranscriptReader } from '../hermes/sessionTranscript.js'
 import { homeTilde } from '../view/format.js'
 
 import type { Overlay } from './overlay.js'
@@ -40,7 +40,7 @@ const NEAR_END = 3
 type Tab = 'all' | 'here'
 
 /** Opens the session picker; picking a row resumes that session. */
-export function openSessionPicker(host: SessionsHost, reader: TranscriptReader = storedTranscripts()) {
+export function openSessionPicker(host: SessionsHost, reader: TranscriptReader = gatewayTranscripts(host.gw)) {
   let state: 'loading' | 'ready' | 'error' = 'loading'
   let sessions: ListedSession[] = []
   let workspace = ''

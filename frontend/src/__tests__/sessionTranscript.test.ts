@@ -1,120 +1,72 @@
-import { mkdtempSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
-import { DatabaseSync } from 'node:sqlite'
-
+import type { StoredTranscriptRow } from '@hermes/shared/gateway-events'
 import { describe, expect, it } from 'vitest'
 
-import { contentText, promptText, readTranscriptPage, skillPrompt } from '../hermes/sessionTranscript.js'
+import { compactionOf, gatewayTranscripts, previewRows } from '../hermes/sessionTranscript.js'
 
-function tempDb(): { path: string; conn: DatabaseSync } {
-  const path = join(mkdtempSync(join(tmpdir(), 'tern-transcript-')), 'state.db')
+import { FakeGateway } from './fakes.js'
 
-  return { conn: new DatabaseSync(path), path }
-}
+const message = (row: Partial<StoredTranscriptRow> & Pick<StoredTranscriptRow, 'role'>): StoredTranscriptRow => ({ row_kind: 'message', ...row })
 
-/** A compressed conversation (root → tip), a branch off the root, and rows a display read hides. */
-function db(): string {
-  const { conn, path } = tempDb()
-  conn.exec(`CREATE TABLE sessions (id TEXT PRIMARY KEY, parent_session_id TEXT, model_config TEXT, end_reason TEXT);
-    CREATE TABLE messages (id INTEGER PRIMARY KEY, session_id TEXT, role TEXT, content TEXT, tool_call_id TEXT,
-      tool_calls TEXT, tool_name TEXT, timestamp REAL, active INTEGER DEFAULT 1, compacted INTEGER DEFAULT 0,
-      display_kind TEXT, display_metadata TEXT);`)
-  const session = conn.prepare('INSERT INTO sessions VALUES (?,?,?,?)')
-  session.run('root', null, '{}', 'compression')
-  session.run('tip', 'root', '{}', null)
-  session.run('fork', 'root', '{"_branched_from":"root"}', null)
-  const msg = conn.prepare(`INSERT INTO messages (session_id, role, content, tool_calls, timestamp, active, compacted, display_kind, display_metadata)
-    VALUES (?,?,?,?,?,?,?,?,?)`)
-  const calls = JSON.stringify([{ function: { arguments: '{"path":"src/app.ts"}', name: 'read_file' }, id: 'c1' }])
-  msg.run('root', 'user', '[OUT-OF-BAND USER MESSAGE] note\nFix the build\n@image:/tmp/a.png', null, 1, 1, 0, null, null)
-  msg.run('root', 'assistant', '', calls, 2, 1, 0, null, null)
-  msg.run('root', 'tool', '{"content":"…"}', null, 3, 1, 0, null, null)
-  msg.run('root', 'assistant', 'Looking at it.', null, 4, 0, 1, null, null)
-  msg.run('root', 'assistant', 'model only', null, 5, 1, 0, null, '{"model_only":true}')
-  msg.run('root', 'user', 'undone prompt', null, 6, 0, 0, null, null)
-  msg.run('tip', 'user', '[CONTEXT COMPACTION] summary …', null, 7, 1, 0, null, null)
-  // The protected tail a compaction copies into the continuation: shown once.
-  msg.run('tip', 'assistant', 'Looking at it.', null, 4, 1, 0, null, null)
-  msg.run('tip', 'user', 'also run the tests', null, 8, 1, 0, 'steer', null)
-  msg.run('tip', 'user', '[SYSTEM: Background process completed]\nexit 0', null, 9, 1, 0, 'process_complete', null)
-  msg.run('tip', 'assistant', 'hidden', null, 10, 1, 0, 'hidden', null)
-  msg.run('tip', 'assistant', '\x00json:[{"type":"text","text":"Done: the build is green."}]', null, 11, 1, 0, null, null)
-  msg.run('fork', 'assistant', 'a branch reply', null, 12, 1, 0, null, null)
-  conn.close()
+const handoff: StoredTranscriptRow = { compacted_messages: 41, role: 'system', row_id: 7, row_kind: 'compaction', text: '## Goal\nShip it.', timestamp: 200 }
 
-  return path
-}
+describe('previewRows', () => {
+  it('shows prompts, replies, a tool call per line, notices and failures, and leaves system rows out', () => {
+    const rows = [
+      message({ role: 'user', row_id: 1, text: 'Fix the build' }),
+      message({ args: { path: 'src/app.ts' }, name: 'read_file', role: 'tool', tool_call_id: 'c1' }),
+      message({ display_kind: 'steer', role: 'user', row_id: 2, text: 'also run the tests' }),
+      message({ display_kind: 'process_complete', role: 'user', row_id: 3, text: '[SYSTEM: Background process completed]\nexit 0' }),
+      message({ display_kind: 'failed_turn', role: 'assistant', row_id: 4, text: 'Provider error\nmore' }),
+      message({ role: 'assistant', row_id: 5, text: 'Done.' }),
+      message({ role: 'system', row_id: 6, text: 'a system line' })
+    ].flatMap(previewRows)
 
-describe('readTranscriptPage', () => {
-  it('reads the conversation across its compression chain, a tool call per line, hidden rows out', () => {
-    const page = readTranscriptPage('root', 0, 100, db())
-
-    expect(page.next).toBeNull()
-    expect(page.rows.map(r => [r.kind, 'text' in r ? r.text : 'name' in r ? r.name : ''])).toEqual([
-      ['user', 'Fix the build'],
-      ['tool', 'read_file'],
-      ['assistant', 'Looking at it.'],
-      ['note', 'Context compacted: the agent continued from a summary.'],
-      ['assistant', 'Looking at it.'],
-      ['user', 'also run the tests'],
-      ['note', 'Background process completed'],
-      ['assistant', 'Done: the build is green.']
+    expect(rows).toEqual([
+      { key: 'row1', kind: 'user', steer: false, text: 'Fix the build' },
+      { args: { path: 'src/app.ts' }, key: 'tool||c1', kind: 'tool', name: 'read_file' },
+      { key: 'row2', kind: 'user', steer: true, text: 'also run the tests' },
+      { key: 'row3', kind: 'note', text: 'Background process completed', tone: 'muted' },
+      { key: 'row4', kind: 'note', text: 'Provider error', tone: 'error' },
+      { key: 'row5', kind: 'assistant', text: 'Done.' }
     ])
-    expect(page.rows[5]).toMatchObject({ kind: 'user', steer: true })
-    expect(page.rows[1]).toMatchObject({ args: { path: 'src/app.ts' }, kind: 'tool' })
-    // The copied tail carries the original's key, so the loader keeps one of the two.
-    expect(page.rows[4]?.key).toBe(page.rows[2]?.key)
   })
 
-  it('pages by row id: the cursor is the last row read, null at the end', () => {
-    const path = db()
-    const one = readTranscriptPage('root', 0, 3, path)
-    const two = readTranscriptPage('root', one.next ?? -1, 3, path)
-
-    expect(one.next).toBe(3)
-    expect(one.rows.map(r => r.kind)).toEqual(['user', 'tool'])
-    expect(two.rows.map(r => r.kind)).toEqual(['assistant', 'note', 'assistant'])
-    expect(readTranscriptPage('root', 100, 3, path)).toEqual({ next: null, rows: [] })
-  })
-
-  it('reads an older database without the display columns', () => {
-    const { conn, path } = tempDb()
-    conn.exec(`CREATE TABLE sessions (id TEXT PRIMARY KEY, parent_session_id TEXT, model_config TEXT, end_reason TEXT);
-      CREATE TABLE messages (id INTEGER PRIMARY KEY, session_id TEXT, role TEXT, content TEXT, timestamp REAL);
-      INSERT INTO sessions VALUES ('s', NULL, NULL, NULL);
-      INSERT INTO messages (session_id, role, content, timestamp) VALUES ('s', 'user', 'hi', 1), ('s', 'assistant', 'hello', 2);`)
-    conn.close()
-
-    expect(readTranscriptPage('s', 0, 10, path).rows.map(r => r.kind)).toEqual(['user', 'assistant'])
-  })
-
-  it('throws without a database, for the loader to show', () => {
-    expect(() => readTranscriptPage('s', 0, 10, '/nonexistent/state.db')).toThrow()
+  it('shows a compaction row as a note with the messages it covers', () => {
+    expect(previewRows(handoff)).toEqual([{ key: 'row7', kind: 'note', text: 'Context compacted (41 messages): the agent continued from a summary.', tone: 'muted' }])
   })
 })
 
-describe('contentText', () => {
-  it('reads text out of structured content', () => {
-    expect(contentText('\x00json:[{"type":"text","text":"a"},{"type":"image_url"},{"type":"text","text":"b"}]')).toBe('a\nb')
-    expect(contentText('plain')).toBe('plain')
-    expect(contentText(null)).toBe('')
+describe('compactionOf', () => {
+  it('reads a compaction row as its time, summary and count, and nothing else', () => {
+    expect(compactionOf(handoff)).toEqual({ at: 200_000, messages: 41, summary: '## Goal\nShip it.' })
+    expect(compactionOf({ ...handoff, timestamp: null })).toBeUndefined()
+    expect(compactionOf(message({ role: 'user', text: '[CONTEXT COMPACTION] looks like one' }))).toBeUndefined()
   })
 })
 
-describe('skillPrompt', () => {
-  const head = '[IMPORTANT: The user has invoked the "work" skill, indicating they want you to follow its instructions. The full skill content is loaded below.]\n\n---\nname: work\n---\nBody that quotes The user has provided the following instruction alongside the skill invocation: not this\n\n'
+describe('gatewayTranscripts', () => {
+  it('reads newest first with the cursor it was given, and shows a page newest line first', async () => {
+    const gw = new FakeGateway({
+      replies: {
+        'session.transcript': () => ({
+          next_cursor: 'older',
+          reset: false,
+          rows: [message({ role: 'user', row_id: 1, text: 'one' }), message({ role: 'assistant', row_id: 2, text: 'two' })],
+          session_id: 's'
+        })
+      }
+    })
 
-  it('reads a /skill turn as the user typed it', () => {
-    expect(skillPrompt(`${head}The user has provided the following instruction alongside the skill invocation: fix the title leak\n\n[Runtime note: x]`)).toBe(
-      '/work fix the title leak'
-    )
-    expect(skillPrompt(head.slice(0, head.indexOf('Body')))).toBe('/work')
-    expect(skillPrompt('[IMPORTANT: The user has invoked the "/a /b" skill bundle, …]\nUser instruction: ship it\n\n[Loaded as part of the bundle]')).toBe('/a /b ship it')
-    expect(skillPrompt('plain prompt')).toBe('plain prompt')
-  })
+    const page = await gatewayTranscripts(gw.client).page('s', 'cur', 40)
 
-  it('reads an attached image as [image], not its cache path', () => {
-    expect(promptText('look at this\n\n[Image attached at: /h/cache/a.png]\n@image:/tmp/b.png')).toBe('look at this\n\n[image]')
+    expect(gw.sent('session.transcript')).toEqual([{ cursor: 'cur', limit: 40, order: 'latest', session_id: 's' }])
+    expect(page).toEqual({
+      next: 'older',
+      reset: false,
+      rows: [
+        { key: 'row2', kind: 'assistant', text: 'two' },
+        { key: 'row1', kind: 'user', steer: false, text: 'one' }
+      ]
+    })
   })
 })

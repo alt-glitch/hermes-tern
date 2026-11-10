@@ -29,10 +29,12 @@ const user = (text: string): PreviewRow => ({ key: text, kind: 'user', steer: fa
 function setup() {
   const reads: string[] = []
   const reader: TranscriptReader = {
-    page: (id, after) => {
-      reads.push(`page ${id} ${after}`)
+    page: (id, cursor) => {
+      reads.push(`page ${id} ${cursor ?? 'first'}`)
 
-      return Promise.resolve(after === 0 ? { next: 5, rows: [user('one'), user('two'), user('three')] } : { next: null, rows: [user('four')] })
+      return Promise.resolve(
+        cursor === null ? { next: 'p5', reset: true, rows: [user('one'), user('two'), user('three')] } : { next: null, reset: false, rows: [user('four')] }
+      )
     }
   }
   let overlay: Overlay | undefined
@@ -107,14 +109,14 @@ describe('the session picker', () => {
 
     await vi.advanceTimersByTimeAsync(1)
 
-    expect(reads).toEqual(['page a 0'])
+    expect(reads).toEqual(['page a first'])
 
     press('down')
     await vi.advanceTimersByTimeAsync(200)
     press('up')
     await vi.advanceTimersByTimeAsync(200)
 
-    expect(reads).toEqual(['page a 0', 'page b 0'])
+    expect(reads).toEqual(['page a first', 'page b first'])
   })
 
   it('→ focuses the preview, ↓ steps through it, and stepping near the end reads the next page', async () => {
@@ -131,12 +133,12 @@ describe('the session picker', () => {
     press('down')
 
     expect(host.reveal).toHaveBeenLastCalledWith('layer.sessions.m0')
-    expect(reads).not.toContain('page a 5')
+    expect(reads).not.toContain('page a p5')
 
     press('down')
 
     expect(host.reveal).toHaveBeenLastCalledWith('layer.sessions.m1')
-    expect(reads).toContain('page a 5')
+    expect(reads).toContain('page a p5')
 
     press('page_down')
 

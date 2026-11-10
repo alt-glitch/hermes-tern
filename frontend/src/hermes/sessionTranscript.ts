@@ -1,20 +1,14 @@
-// A stored conversation as the session picker previews it, read from the profile's `state.db`
-// (read-only). The gateway has no read for a session nobody holds: classic `session.history` and
-// the shared gateway's `session.events.since` serve an attached session only, and a
-// `session.resume` would attach this pane to it. So, like the listing (sessionIndex.ts) and a
-// subagent's transcript (watch/child.ts), this reads the rows Hermes wrote: the conversation's
-// root and its compression continuations, the rows a display read shows (live, or archived by an
-// in-place compaction), in insertion order. A page is keyed by the last row id it read, so the
-// next one starts after it; rows a compaction copied into a later segment are left out by key.
+// A stored conversation read through the gateway's `session.transcript`
+// (gateway/session_stored_reads.py): its display rows, as `session.resume` shows them, with its
+// compaction handoffs put back as rows of their own (`row_kind: 'compaction'`). The read attaches
+// nothing, so the session picker previews a conversation without opening it. Newest first
+// (`order: 'latest'`): each next page is older, and `next_cursor` is null after the oldest.
 
-import { DatabaseSync } from 'node:sqlite'
+import type { StoredTranscriptResult, StoredTranscriptRow } from '@hermes/shared/gateway-events'
 
-import * as z from 'zod/mini'
+import { type Requester, rpc } from '../wire/rpc.js'
 
-import { parseJson } from '../wire/json.js'
-import { real, rows, type StoredCall, storedArgs, storedCalls, text, textBytes } from '../wire/sqlite.js'
-
-import { stateDbPath } from './paths.js'
+import type { StoredCompaction } from './compactions.js'
 
 /** One line of the preview's transcript. */
 export type PreviewRow =
@@ -23,191 +17,68 @@ export type PreviewRow =
   | { kind: 'tool'; key: string; name: string; args: Record<string, unknown> }
   | { kind: 'note'; key: string; text: string; tone: 'error' | 'muted' }
 
-/** One page: its rows, and the cursor of the next page (null at the end). */
+/** One page, newest line first: its lines, and the cursor of the next (older) page, null after the oldest. */
 export interface TranscriptPage {
   rows: PreviewRow[]
-  next: number | null
+  next: string | null
+  /** The gateway restarted the transcript from its newest page: what was held before is stale. */
+  reset: boolean
 }
 
-/** What the preview reads; the picker's loader takes it so the tests can stand in for the database. */
+/** What the preview reads; the picker's loader takes it so the tests can stand in for the gateway. */
 export interface TranscriptReader {
-  page(id: string, after: number, limit: number): Promise<TranscriptPage>
+  page(id: string, cursor: string | null, limit: number): Promise<TranscriptPage>
 }
 
-/** Where Hermes' compaction handoff starts (agent/context_compressor.py). */
-const COMPACTION = '[CONTEXT COMPACTION'
-/** Structured content (a list of parts) is stored as this prefix and JSON (hermes_state `_encode_content`). */
-const JSON_CONTENT = '\x00json:'
 /** User rows Hermes writes for the agent, not typed by the user: one line each in the preview. */
 const NOTICE_KINDS = new Set(['async_delegation_complete', 'internal_notification', 'model_switch', 'process_complete'])
 
-/** The conversation's segments: `?` and its compression continuations (branches, delegations and resets are their own). */
-const CHAIN = `WITH RECURSIVE chain(cur) AS (
-  SELECT ? UNION ALL
-  SELECT child.id FROM chain c
-  JOIN sessions parent ON parent.id = c.cur
-  JOIN sessions child ON child.parent_session_id = c.cur
-  WHERE parent.end_reason = 'compression'
-    AND ${['_branched_from', '_delegate_from', '_reset_from']
-      .map(k => `json_extract(CASE WHEN json_valid(child.model_config) THEN child.model_config ELSE '{}' END, '$.${k}') IS NULL`)
-      .join(' AND ')}
-)`
+/** Conversation `id`'s page of up to `limit` rows older than `cursor` (the newest page without one). */
+export function readTranscript(gw: Requester, id: string, cursor: string | null, limit: number): Promise<StoredTranscriptResult> {
+  return rpc(gw, 'session.transcript', { cursor, limit, order: 'latest', session_id: id })
+}
 
-const nameRow = z.object({ name: z.string() })
-
-const messageRow = z.object({
-  id: z.number(),
-  role: z.catch(z.string(), ''),
-  content: textBytes,
-  tool_calls: text,
-  timestamp: real,
-  display_kind: text
-})
-
-type MessageRow = z.infer<typeof messageRow>
-
-/** The columns an older database may not have, each read as NULL there. */
-function messageColumns(conn: DatabaseSync): { calls: string; kind: string; visible: string } {
-  const has = new Set(rows(conn.prepare('PRAGMA table_info(messages)'), nameRow).map(r => r.name))
-  const live = has.has('compacted') ? '(m.active = 1 OR m.compacted = 1)' : has.has('active') ? 'm.active = 1' : '1'
-  const modelOnly = has.has('display_metadata')
-    ? ` AND COALESCE(json_extract(CASE WHEN json_valid(m.display_metadata) THEN m.display_metadata ELSE '{}' END, '$.model_only'), 0) = 0`
-    : ''
-
-  const kind = has.has('display_kind') ? 'm.display_kind' : 'NULL'
+/** A compaction handoff row as the transcript shows it: when it was written, its summary and the messages it covers. */
+export function compactionOf(row: StoredTranscriptRow): StoredCompaction | undefined {
+  if (row.row_kind !== 'compaction' || typeof row.timestamp !== 'number') {
+    return undefined
+  }
 
   return {
-    calls: has.has('tool_calls') ? 'm.tool_calls' : 'NULL',
-    kind,
-    visible: `${live}${modelOnly} AND COALESCE(${kind}, '') != 'hidden'`
+    at: row.timestamp * 1000,
+    ...(row.text ? { summary: row.text } : {}),
+    ...(typeof row.compacted_messages === 'number' ? { messages: row.compacted_messages } : {})
   }
 }
 
-function readStateDb<T>(db: string, read: (conn: DatabaseSync) => T): T {
-  const conn = new DatabaseSync(db, { readOnly: true })
+/** The preview's lines for one row; none for a row it does not show (system rows, empty ones). */
+export function previewRows(r: StoredTranscriptRow): PreviewRow[] {
+  const text = (r.text ?? '').trim()
+  const key = typeof r.row_id === 'number' ? `row${r.row_id}` : `${r.role}|${r.timestamp ?? ''}|${r.tool_call_id ?? text}`
 
-  try {
-    return read(conn)
-  } finally {
-    conn.close()
-  }
-}
+  if (r.row_kind === 'compaction') {
+    const covered = typeof r.compacted_messages === 'number' ? ` (${r.compacted_messages} messages)` : ''
 
-/** A stored row's text: plain text, or the text parts of structured content. */
-export function contentText(raw: string | null): string {
-  if (!raw) {
-    return ''
+    return [{ key, kind: 'note', text: `Context compacted${covered}: the agent continued from a summary.`, tone: 'muted' }]
   }
 
-  const json = raw.startsWith(JSON_CONTENT) ? raw.slice(JSON_CONTENT.length) : raw.startsWith('[{') ? raw : undefined
+  switch (r.role) {
+    case 'user':
+      if (r.display_kind && NOTICE_KINDS.has(r.display_kind)) {
+        return [{ key, kind: 'note', text: noticeLine(text), tone: 'muted' }]
+      }
 
-  if (json === undefined) {
-    return raw
-  }
+      return text ? [{ key, kind: 'user', steer: r.display_kind === 'steer', text }] : []
+    case 'assistant':
+      if (r.display_kind === 'failed_turn') {
+        return [{ key, kind: 'note', text: firstLine(text) || 'The turn failed.', tone: 'error' }]
+      }
 
-  const parts = parseJson(json)
-
-  if (typeof parts === 'string') {
-    return parts
-  }
-
-  return Array.isArray(parts)
-    ? parts
-        .map((p: unknown) => (p && typeof p === 'object' && 'text' in p && typeof p.text === 'string' ? p.text : ''))
-        .filter(Boolean)
-        .join('\n')
-    : raw
-}
-
-/** Hermes' `/skill` scaffold (agent/skill_commands.py): the skill's body wrapped around what the user typed. */
-const SKILL_PREFIX = '[IMPORTANT: The user has invoked the '
-const SKILL_INSTRUCTION = 'The user has provided the following instruction alongside the skill invocation: '
-const BUNDLE_INSTRUCTION = '\nUser instruction: '
-
-/**
- * A `/skill` turn as the user typed it (`/name instruction`, `describe_skill_invocation`): the
- * stored row holds the whole skill body. Any other text comes back as it is.
- */
-export function skillPrompt(raw: string): string {
-  if (!raw.startsWith(SKILL_PREFIX)) {
-    return raw
-  }
-
-  const name = /^"(?<name>[^"]*)"/.exec(raw.slice(SKILL_PREFIX.length))?.groups?.['name']?.trim() ?? ''
-  const label = name.startsWith('/') ? name : `/${name}`
-  const bundle = raw.includes(' skill bundle,')
-  const marker = bundle ? BUNDLE_INSTRUCTION : SKILL_INSTRUCTION
-  // A bundle's instruction comes before its skills; a single skill's follows the body (which may quote the marker).
-  const at = bundle ? raw.indexOf(marker) : raw.lastIndexOf(marker)
-
-  if (at < 0) {
-    return label
-  }
-
-  const rest = raw.slice(at + marker.length)
-  const end = rest.indexOf(bundle ? '\n\n[Loaded as part of the ' : '\n\n[Runtime note:')
-  const instruction = (end < 0 ? rest : rest.slice(0, end)).trim()
-
-  return instruction ? `${label} ${instruction}` : label
-}
-
-/** A prompt as the user typed it: a `/skill` turn as its invocation, no Hermes marker lines, an attached image as `[image]`. */
-export function promptText(raw: string): string {
-  return skillPrompt(raw)
-    .replace(/^\[[A-Z][A-Z -]+\][^\n]*\n?/gm, '')
-    .replace(/^@image:\S+\s*$/gm, '')
-    .replace(/^\[Image attached at: [^\]\n]*\]\s*$/gm, '[image]')
-    .replace(/\n{3,}/g, '\n\n')
-    .trim()
-}
-
-/** The preview's lines for one stored row; none for a row it does not show (a tool's result, system rows). */
-export function previewRows(r: MessageRow): PreviewRow[] {
-  const body = contentText(r.content)
-  const key = `${r.role}|${r.timestamp ?? ''}|${body}`
-
-  if (r.role === 'user') {
-    if (body.includes(COMPACTION)) {
-      return [{ key, kind: 'note', text: 'Context compacted: the agent continued from a summary.', tone: 'muted' }]
-    }
-
-    if (r.display_kind && NOTICE_KINDS.has(r.display_kind)) {
-      return [{ key, kind: 'note', text: noticeLine(body), tone: 'muted' }]
-    }
-
-    const typed = promptText(body)
-
-    return typed ? [{ key, kind: 'user', steer: r.display_kind === 'steer', text: typed }] : []
-  }
-
-  if (r.role !== 'assistant') {
-    return []
-  }
-
-  if (r.display_kind === 'failed_turn') {
-    return [{ key, kind: 'note', text: firstLine(body) || 'The turn failed.', tone: 'error' }]
-  }
-
-  const out: PreviewRow[] = body.trim() ? [{ key, kind: 'assistant', text: body.trim() }] : []
-
-  callsOf(r.tool_calls).forEach((call, i) => {
-    out.push({
-      args: storedArgs(call.function?.arguments),
-      key: `${key}|call${i}|${call.id ?? call.call_id ?? ''}`,
-      kind: 'tool',
-      name: call.function?.name ?? 'tool'
-    })
-  })
-
-  return out
-}
-
-/** A row's calls; none when its list holds a null (storedCalls throws there), so one bad row costs its calls, not the page. */
-function callsOf(raw: string | null): StoredCall[] {
-  try {
-    return storedCalls(raw)
-  } catch {
-    return []
+      return text ? [{ key, kind: 'assistant', text }] : []
+    case 'tool':
+      return [{ args: r.args ?? {}, key, kind: 'tool', name: r.name ?? 'tool' }]
+    default:
+      return []
   }
 }
 
@@ -222,34 +93,13 @@ function firstLine(text: string): string {
   return (text.split('\n').find(l => l.trim()) ?? '').trim()
 }
 
-/** Up to `limit` stored rows of conversation `id` after row id `after`, as preview lines. */
-export function readTranscriptPage(id: string, after: number, limit: number, db = stateDbPath()): TranscriptPage {
-  return readStateDb(db, conn => {
-    const { calls, kind, visible } = messageColumns(conn)
-    const stmt = conn.prepare(
-      `${CHAIN}
-       SELECT m.id, m.role, CAST(m.content AS BLOB) AS content, ${calls} AS tool_calls, m.timestamp, ${kind} AS display_kind
-       FROM messages m WHERE m.session_id IN (SELECT cur FROM chain) AND m.id > ? AND ${visible}
-       ORDER BY m.id LIMIT ?`
-    )
-    const read = rows(stmt, messageRow, id, after, limit)
-    const last = read.at(-1)
-
-    return { next: read.length >= limit && last ? last.id : null, rows: read.flatMap(previewRows) }
-  })
-}
-
-/** The reader over the profile's state.db. Reads are synchronous; each runs after the caller's turn. */
-export function storedTranscripts(db = stateDbPath()): TranscriptReader {
-  const later = <T>(read: () => T) => new Promise<T>((resolve, reject) => setImmediate(() => {
-    try {
-      resolve(read())
-    } catch (error) {
-      reject(error instanceof Error ? error : new Error(String(error)))
-    }
-  }))
-
+/** The reader over the gateway: a page's rows come oldest first, and the preview shows them newest first. */
+export function gatewayTranscripts(gw: Requester): TranscriptReader {
   return {
-    page: (id, after, limit) => later(() => readTranscriptPage(id, after, limit, db))
+    page: async (id, cursor, limit) => {
+      const r = await readTranscript(gw, id, cursor, limit)
+
+      return { next: r.next_cursor, reset: r.reset, rows: r.rows.flatMap(previewRows).reverse() }
+    }
   }
 }
