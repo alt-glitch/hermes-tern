@@ -76,7 +76,9 @@ function scoped(raw) {
 }
 
 async function main() {
-  const src = resolve(process.argv[2] ?? '/mnt/zer0models/github/ephemeral-ui')
+  const arg = process.argv[2] ?? process.env.EPHEMERAL_UI_DIR
+  if (!arg) { throw new Error('usage: node scripts/vendor-ephemeral-ui.mjs <ephemeral-ui checkout> (or set EPHEMERAL_UI_DIR)') }
+  const src = resolve(arg)
   const head = execFileSync('git', ['-C', src, 'rev-parse', 'HEAD'], { encoding: 'utf8' }).trim()
 
   if (head !== PIN) { throw new Error(`ephemeral-ui checkout is ${head}, expected ${PIN}`) }

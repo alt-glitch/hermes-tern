@@ -76,4 +76,3 @@ describe('commandLine', () => {
     expect(commandLine('x'.repeat(200), 20)).toHaveLength(20)
   })
 })
-
