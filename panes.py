@@ -6,8 +6,8 @@ back as a shell with its scrollback. So the pane remembers its conversation itse
 writes ``plugin-data/hermes-tern/panes/<TERN_PANE>.json`` (``{session_id, cwd, updated_at, pid}``,
 frontend/src/session/pane.ts) each time it adopts a session, and removes it when the user quits.
 
-When ``hermes tern`` starts again in that pane with no session flag (``-r``, ``-c``, ``-w``, or the
-plugin's own ``--new``), and the file's process is dead, the launcher resumes that conversation
+When ``hermes tern`` starts again in that pane with no session flag (``-r``, ``-c`` or ``--new``),
+and the file's process is dead, the launcher resumes that conversation
 (``launcher.py``, its root id: the gateway follows it to its compression tip). It does not when:
 
 - the shell runs in another folder than the pane's launch folder or the session's own;
@@ -31,10 +31,6 @@ from typing import Any, Iterator, Mapping, Optional
 
 logger = logging.getLogger(__name__)
 
-# The plugin's own flag: a fresh session in a pane that has one to resume.
-NEW_FLAG = "--new"
-# `hermes chat` flags that name the session (or a new worktree's): the pane's own does not apply.
-SESSION_FLAGS = frozenset({"-r", "--resume", "-c", "--continue", "-w", "--worktree"})
 # Tells the frontend its first session is the pane's, resumed after a restart (its notice).
 RESTORED_ENV = "HERMES_TERN_RESTORED"
 # The folder `hermes tern` started in, before a resume moves to the session's: the pane file records it.
@@ -107,11 +103,6 @@ def _prune(folder: Path, now: float) -> None:
                 path.unlink()
 
 
-def explicit(flags: list[str]) -> bool:
-    """Whether the flags choose the session (or a new worktree) themselves."""
-    return any(f in SESSION_FLAGS or f.split("=", 1)[0] in SESSION_FLAGS for f in flags)
-
-
 def _restorable(pane: str, folder: Path, cwd: str) -> Optional[str]:
     """The root id of the conversation pane ``pane`` showed when its program died, if this launch may take it."""
     conn = _connections()
@@ -134,32 +125,31 @@ def _restorable(pane: str, folder: Path, cwd: str) -> Optional[str]:
     return root
 
 
-def plan(flags: list[str], env: Optional[Mapping[str, str]] = None, cwd: Optional[str] = None) -> tuple[list[str], Optional[str]]:
-    """The launch's flags (as ``hermes chat`` takes them) with the pane's conversation resumed, and that
-    conversation's root id (or None).
+def plan(*, fresh: bool = False, explicit: bool = False, env: Optional[Mapping[str, str]] = None,
+         cwd: Optional[str] = None) -> Optional[str]:
+    """The root id of the conversation this pane resumes, or None.
 
-    ``--new`` is dropped (``hermes chat`` does not know it) and forgets the pane's conversation."""
+    ``fresh`` (``--new``) forgets the pane's conversation. ``explicit``: the launch names its session
+    itself (``-r``, ``-c``), so the pane's own does not apply."""
     env = os.environ if env is None else env
     cwd = os.getcwd() if cwd is None else cwd
-    fresh = NEW_FLAG in flags
-    flags = [f for f in flags if f != NEW_FLAG]
     pane = (env.get("TERN_PANE") or "").strip()
     if not pane or not pane.isdigit():
-        return flags, None
+        return None
     try:
         folder = _connections()._dir("panes")
         (folder / "claims").mkdir(exist_ok=True)
         with _locked(folder):
             if fresh:
                 (folder / f"{pane}.json").unlink(missing_ok=True)
-                return flags, None
-            if explicit(flags):
-                return flags, None
+                return None
+            if explicit:
+                return None
             root = _restorable(pane, folder, cwd)
             if root:
                 _write(folder / "claims" / f"{root}.json", {"pid": os.getpid(), "pane": pane, "updated_at": time.time()})
             _prune(folder, time.time())
     except Exception:  # noqa: BLE001 - a broken pane file must never stop the launch
         logger.debug("hermes-tern: no pane restore for %s", pane, exc_info=True)
-        return flags, None
-    return (["--resume", root, *flags], root) if root else (flags, None)
+        return None
+    return root

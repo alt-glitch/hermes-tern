@@ -1,4 +1,4 @@
-"""`hermes tern`'s own launcher: its flags, the frontend's environment, and the NO_TSP fallback."""
+"""`hermes tern`'s own launcher: its flags, the frontend's environment, and a terminal that is not Tern."""
 
 import argparse
 import json
@@ -57,11 +57,6 @@ def test_tern_flags_and_hermes_top_level_flags_both_count():
     assert not hasattr(parse([]), "model")
 
 
-def test_the_flags_map_back_to_hermes_chat():
-    args = parse(["-m", "x", "-s", "a,b", "-s", "b", "--yolo", "--max-turns", "5", "-Q", "--new"])
-    assert launcher.chat_flags(args) == ["--model=x", "--skills=a,b", "--max-turns=5", "--yolo", "--quiet", "--new"]
-
-
 def test_the_launch_policy_rides_session_create():
     args = parse(["-m", "x", "--provider", "p", "-t", "web, file", "-s", "a", "--max-turns", "5", "--yolo", "--ignore-rules"])
     options = launcher.create_options(args)
@@ -112,9 +107,20 @@ def test_resume_and_continue_pick_the_session(launched, monkeypatch):
 
 
 def test_a_restored_pane_tells_the_frontend(launched, monkeypatch):
-    monkeypatch.setattr(launcher.panes, "plan", lambda flags: (["--resume", "root", *flags], "root"))
+    asked = []
+    monkeypatch.setattr(launcher.panes, "plan", lambda **how: asked.append(how) or "root")
     _, [(_, env)] = launched(parse(["-m", "x"]))
     assert env["HERMES_TERN_RESUME"] == env["HERMES_TERN_RESTORED"] == "root"
+    assert asked == [{"fresh": False, "explicit": False}]
+
+
+def test_a_session_flag_or_new_keeps_the_pane_from_resuming_its_own(launched, monkeypatch):
+    asked = []
+    monkeypatch.setattr(launcher.panes, "plan", lambda **how: asked.append(how))
+    monkeypatch.setattr(launcher, "resolve_session", lambda name: "tip-1")
+    launched(parse(["-r", "my chat"]))
+    launched(parse(["--new"]))
+    assert asked == [{"fresh": False, "explicit": True}, {"fresh": True, "explicit": False}]
 
 
 def test_worktree_is_refused_until_hermes_has_a_public_api(launched):
@@ -122,13 +128,11 @@ def test_worktree_is_refused_until_hermes_has_a_public_api(launched):
     assert launched(parse([], worktree=True))[0] == 2
 
 
-def test_no_tsp_runs_the_regular_tui_as_a_process(launched, tmp_path):
+def test_a_terminal_that_is_not_tern_gets_one_line_and_no_other_program(launched, capsys):
     code, runs = launched(parse(["-m", "x", "-q", "hi"]), code=launcher.NO_TSP_EXIT)
-    assert code == 0
-    argv, env = runs[1]
-    assert argv == ["/py", "-m", "hermes_cli.main", "chat", "--tui", "--model=x", "--query=hi"]
-    assert env["PYTHONPATH"] == "/src" and env["HERMES_HOME"] == str(tmp_path / "home")
-    assert "HERMES_TERN_QUERY" not in env
+    assert code == 1
+    assert len(runs) == 1  # the frontend only: nothing runs in its place
+    assert "not a Tern pane" in capsys.readouterr().err
 
 
 def test_continue_finds_a_frontend_session_on_the_shared_gateway(monkeypatch, tmp_path):

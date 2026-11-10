@@ -10,7 +10,7 @@ toolsets, skills, yolo, …) goes in ``HERMES_TERN_CREATE`` as the fields of the
 ``session.create``.
 
 When the terminal does not answer the Tern Surface Protocol handshake, the frontend exits
-:data:`NO_TSP_EXIT`, and the launcher runs ``hermes chat --tui`` with the same flags instead.
+:data:`NO_TSP_EXIT`. The launcher then says so and exits: ``hermes tern`` runs only in Tern.
 
 Not supported, for want of a public API: ``-w``/``--worktree`` (Hermes' worktree setup and its exit
 choice), and the "resume with" summary Hermes prints when its TUI exits.
@@ -56,8 +56,8 @@ SECRET_WORDS = ("KEY", "TOKEN", "SECRET", "PASSWORD", "PASSWD", "AUTH", "CREDENT
 ENV_FLAGS = {"yolo": "HERMES_YOLO_MODE", "ignore_rules": "HERMES_IGNORE_RULES", "accept_hooks": "HERMES_ACCEPT_HOOKS"}
 
 S = argparse.SUPPRESS
-# (flags, argparse options, the `hermes chat` flag it maps back to). SUPPRESS defaults: a flag left
-# out keeps the value Hermes' top-level parser put on the namespace (`hermes -m x tern`).
+# (flags, argparse options). SUPPRESS defaults: a flag left out keeps the value Hermes' top-level
+# parser put on the namespace (`hermes -m x tern`).
 FLAGS: list[tuple[tuple[str, ...], dict[str, Any]]] = [
     (("-r", "--resume"), dict(metavar="SESSION", help="resume a session by id or title")),
     (("-c", "--continue"), dict(dest="continue_last", nargs="?", const=True, metavar="NAME",
@@ -77,7 +77,7 @@ FLAGS: list[tuple[tuple[str, ...], dict[str, Any]]] = [
     (("--accept-hooks",), dict(dest="accept_hooks", action="store_true", help="run shell hooks without asking")),
     (("-v", "--verbose"), dict(action="store_true", help="verbose tool progress")),
     (("-Q", "--quiet"), dict(action="store_true", help="no tool progress")),
-    ((panes.NEW_FLAG,), dict(dest="new", action="store_true",
+    (("--new",), dict(action="store_true",
                              help="a new session, where the pane would resume its last one")),
     (("-w", "--worktree"), dict(action="store_true", help="not supported in `hermes tern` yet")),
 ]
@@ -105,21 +105,6 @@ def _skills(args: argparse.Namespace) -> list[str]:
             if name.strip():
                 seen.setdefault(name.strip(), None)
     return list(seen)
-
-
-def chat_flags(args: argparse.Namespace) -> list[str]:
-    """The flags as ``hermes chat`` takes them (the NO_TSP fallback, and what ``panes.plan`` reads)."""
-    flags: list[str] = []
-    for names, options in FLAGS:
-        dest = options.get("dest") or names[-1].lstrip("-").replace("-", "_")
-        value = _opt(args, dest)
-        if dest == "skills":
-            flags += [f"--skills={','.join(_skills(args))}"] if _skills(args) else []
-        elif value is True:
-            flags.append(names[-1])
-        elif value not in (None, False):
-            flags.append(f"{names[-1]}={value}")
-    return flags
 
 
 # ── The session to open ──────────────────────────────────────────────────────────────────────
@@ -304,46 +289,29 @@ def frontend_env(args: argparse.Namespace, resume: Optional[str], restored: Opti
     return env
 
 
-def fallback(flags: list[str]) -> int:
-    """``hermes chat --tui FLAGS``, the regular TUI, as a process of this same install and profile."""
-    from hermes_constants import get_hermes_home
-
-    command = hermes_command()
-    env = {k: v for k, v in os.environ.items() if k not in OWN_ENV}
-    env.update(command["env"], HERMES_HOME=str(get_hermes_home()))
-    try:
-        return subprocess.call([*command["argv"], "chat", "--tui", *flags], env=env)
-    except KeyboardInterrupt:
-        return 130
-
-
 def run(args: argparse.Namespace) -> None:
     bundle = FRONTEND / "dist" / "entry.js"
     if not bundle.is_file():
         print(f"hermes tern: {bundle} is missing; reinstall the plugin", file=sys.stderr)
         sys.exit(1)
     if _opt(args, "worktree"):
-        print("hermes tern: --worktree is not supported yet (Hermes has no public API to make and keep the worktree); "
-              "use `hermes chat --tui --worktree`", file=sys.stderr)
+        print("hermes tern: --worktree is not supported (Hermes has no public API to make and keep the worktree). "
+              "Make one with `git worktree add`, then run `hermes tern` in it.", file=sys.stderr)
         sys.exit(2)
     if image := _opt(args, "image"):
         # Read here: a resume may move to the session's folder.
         args.image = os.path.abspath(os.path.expanduser(image))
     launch_cwd = os.getcwd()
     resume = pick_session(args)
-    flags = chat_flags(args)
-    if resume:
-        flags = [f for f in flags if not f.startswith(("--resume=", "--continue"))]
-        flags = ["--resume", resume, *flags]
-    flags, restored = panes.plan(flags)
+    restored = panes.plan(fresh=bool(_opt(args, "new")), explicit=bool(resume))
     resume = restored or resume
     # A resumed session opens in its own folder, as `hermes chat --resume` does.
     if resume and (cwd := _session_cwd(resume)) and os.path.realpath(cwd) != os.path.realpath(launch_cwd):
         os.chdir(cwd)
     node = node_binary()
     if not node:
-        print("hermes tern: Node.js was not found; install it from https://nodejs.org (`hermes doctor` shows how), "
-              "or run `hermes chat --tui`", file=sys.stderr)
+        print("hermes tern: Node.js was not found; install it from https://nodejs.org (`hermes doctor` shows how)",
+              file=sys.stderr)
         sys.exit(1)
     env = frontend_env(args, resume, restored, launch_cwd)
     try:
@@ -351,7 +319,8 @@ def run(args: argparse.Namespace) -> None:
     except KeyboardInterrupt:
         code = 130
     if code == NO_TSP_EXIT:
-        print("hermes tern: this terminal does not speak the Tern Surface Protocol; starting the regular TUI",
+        print("hermes tern: this terminal did not answer the Tern Surface Protocol, so it is not a Tern pane "
+              "this program can draw in. Run `hermes tern` in Tern (https://stencil.so/tern), or use `hermes chat`.",
               file=sys.stderr)
-        code = fallback(flags)
+        code = 1
     sys.exit(code)

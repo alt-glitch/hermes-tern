@@ -11,8 +11,8 @@ gateway over the same JSON-RPC contract (`hermes-gateway-v1`).
 The plugin's `hermes tern` command (`../launcher.py`) runs `node dist/entry.js` with its own
 `HERMES_TERN_*` variables: the session to open, the first prompt, the launch flags as
 `session.create` fields, and the command that runs this Hermes. The frontend asks the terminal for
-TSP first. A terminal that does not answer makes it exit with code 75, and `hermes tern` runs
-`hermes chat --tui` in its place. Otherwise it attaches to the profile's gateway with
+TSP first. A terminal that does not answer makes it exit with code 75, and `hermes tern` says
+that it needs a Tern pane. Otherwise it attaches to the profile's gateway with
 `hermes gateway attach --json` (`src/hermes/connect.ts`) and dials it with Hermes' shared Node
 client (`@hermes/shared/gateway-client`).
 
