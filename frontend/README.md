@@ -3,8 +3,9 @@
 The chat UI that `hermes tern` runs. It describes the UI to [Tern](https://stencil.so/tern) over
 the Tern Surface Protocol (TSP) instead of painting terminal cells: the transcript, tool calls,
 thinking, the composer and every sheet are semantic nodes that the terminal lays out, draws and
-animates natively. It is a sibling of Hermes' Ink TUI (`ui-tui/`), and it talks to the same
-gateway over the same JSON-RPC contract (`hermes-gateway-v1`).
+animates natively. It talks to the profile's shared Hermes gateway over its public JSON-RPC
+contract (`hermes-gateway-v1`), as Hermes' own TUI and desktop app do. It opens none of Hermes'
+files: sessions, transcripts, subagents and connect cards all come from the gateway.
 
 ## Running
 
@@ -43,8 +44,8 @@ flowchart LR
 | `src/view/ui/` | The parts the views share: pills, buttons and the action row, the shimmer and working row, sections headed by a child, facts lists |
 | `src/overlays/` | Floating sheets (`overlay.ts` is their contract): approvals, clarify, masked prompts, completions, pickers |
 | `src/prompts/` | The prompt sheets on the overlay stack: their keys, and closing them when the gateway withdraws their questions |
-| `src/connections/` | Connect cards, one model for two wires: the gateway's `connection.request` operation, which the card answers (`live.ts`), and the card files the plugin writes for an older gateway (`cards.ts`); the watcher keeps each card current |
-| `src/hermes/` | Hermes' own runtime and files: the gateway client, its `state.db` (the session index, the compaction boundaries), paths, shell, history |
+| `src/connections/` | Connect cards: the gateway's `connection.request` operation, which the card answers (`live.ts`), the card's model (`cards.ts`), and the watcher that keeps each card current |
+| `src/hermes/` | What the frontend asks of Hermes: the gateway client and the attach (`connect.ts`), the capabilities it needs (`requirements.ts`), the session list and stored transcripts (`sessionList.ts`, `sessionTranscript.ts`, `compactions.ts`), the plugin's own RPC methods (`viewer.ts`), the clipboard image, shell, history |
 
 The views speak omp's chat vocabulary (`omp.session`, `omp.user`, `omp.assistant`,
 `omp.thinking`, `omp.editor`, `tool` names like `bash`/`read`/`edit`): Tern's chat styles
