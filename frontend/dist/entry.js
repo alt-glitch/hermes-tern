@@ -22975,22 +22975,6 @@ var skipped = object({ skip: number2() });
 function chartSkip(value) {
   return skipped.safeParse(value).data;
 }
-var reply = _catch(object({ answer: optional2(unknown()), error: optional2(unknown()), unavailable: optional2(unknown()) }), {
-  answer: void 0,
-  error: void 0,
-  unavailable: void 0
-});
-function readAuthorReply(stdout) {
-  const line = parseJson(stdout.trim().split("\n").at(-1) ?? "");
-  if (line === void 0 || line === null) {
-    return void 0;
-  }
-  const { answer, error, unavailable } = reply.parse(line);
-  if (unavailable) {
-    return { kind: "unavailable" };
-  }
-  return error ? { kind: "error", message: String(error) } : { kind: "answer", answer };
-}
 
 // src/connections/cards.ts
 var CONNECT_TOOL = "manage_connections";
@@ -30757,6 +30741,217 @@ var Poller = class {
   }
 };
 
+// src/processes/widgets/author.ts
+import { randomUUID as randomUUID2 } from "node:crypto";
+
+// src/wire/charts.ts
+var reply = object({
+  job: string2(),
+  answer: optional2(unknown()),
+  rejected: optional2(object({ answer: _catch(string2(), ""), errors: _catch(array(string2()), []) })),
+  unavailable: optional2(unknown()),
+  error: optional2(unknown())
+});
+function readChartReply(payload) {
+  const parsed2 = reply.safeParse(payload);
+  if (!parsed2.success) {
+    return void 0;
+  }
+  const { answer, error, job, rejected, unavailable } = parsed2.data;
+  if (unavailable) {
+    return { job, kind: "unavailable" };
+  }
+  if (error) {
+    return { job, kind: "error", message: String(error) };
+  }
+  if (rejected) {
+    return { answer: rejected.answer, errors: rejected.errors.length ? rejected.errors : ["the answer was refused"], job, kind: "rejected" };
+  }
+  return { answer, job, kind: "answer" };
+}
+
+// src/processes/widgets/author.ts
+var RejectedAnswer = class {
+  constructor(answer, errors) {
+    this.answer = answer;
+    this.errors = errors;
+  }
+  answer;
+  errors;
+};
+var MAX_BRIEF_CHARS = 1500;
+var MAX_SAMPLE_LINE_CHARS = 300;
+var MAX_SAMPLE_BYTES = 12 * 1024;
+var MAX_SHAPE_REPEATS = 3;
+var REQUEST_TIMEOUT_MS = 12e4;
+var SYSTEM_PROMPT = `You design the live status widget of a coding agent's background process (benchmark, eval, CI, tests, build, training, server). From the command and samples of its output you write a spec once; plain code then runs its regexes on every new line and redraws the widget until the process ends. Nobody can fix it later: its rules MUST match the real lines.
+
+A widget charts a quantity that shows how the process is going: throughput, latency, loss, tests or trials passed, progress toward a total the process states. When the output has none, answer with only \`{"skip":"<why>"}\`; no widget beats a meaningless one. Never chart activity: lines or matches seen, words like \`error\` inside file contents.
+
+Otherwise answer with one JSON object of:
+- \`title\` (\u2264 48 chars): what is watched.
+- \`rules\` (1\u201312) \`{from, match, key?, text?, count?, scale?}\`:
+  - \`from\`: the sample source id carrying the data (\`out\` for the process's output, \`file:1\` for a log file the command writes to), \`*\` for all.
+  - \`match\`: a JavaScript regex on one line; no lookaround or backreferences. Copy the literal text around the data from the samples; allow varying digits (\`[\\d.]+\`) and widths (\`\\s+\`).
+  - Each named group \`(?P<name>\u2026)\` feeds field \`name\` (\`[a-z][a-z0-9_]*\`) with its number (\`1,234\`, \`4.5k\` parse). One rule can capture several fields of a line.
+  - \`key\`: the rule's group naming a series (model, shard, CI job); the rule's fields keep one series per key. Not a field itself.
+  - \`text\`: the rule's group kept as text (status word, test name).
+  - \`count\`: a field counting matching lines.
+  - \`scale\`: multiplies the rule's numbers.
+- \`blocks\` (1\u20134, most important first), each on a \`field\`:
+  - \`spark\`: numbers over time. \`label\`, \`key?\` (one key value, e.g. \`gpt-5\`), \`unit?\`, \`better?\` (\`higher\`|\`lower\`), \`target?\` + \`targetLabel?\` (goal line the command or output states), \`min?\`, \`max?\`.
+  - \`bars\`: one bar per key, reduced by \`agg\`. \`label\`, \`unit?\`, \`max?\`, \`better?\`.
+  - \`meter\`: \`agg\` out of a \`total\` (a value ref, or a number the process or its output states; never a guess), \`label\`, \`unit?\`.
+  - \`stat\`: \`items\`, 1\u20134 value refs with \`label\`.
+  - \`grid\`: a cell per key, coloured by latest text. \`label\`, \`tones\`: lowercase status substring \u2192 \`success\`|\`error\`|\`warning\`|\`pending\`|\`info\`|\`muted\`|\`neutral\`.
+  - \`text\`: the field's latest text.
+- \`headline?\`: the value ref to glance at. \`stage?\`: field whose latest text is the current step.
+
+Value ref: \`{field, agg, label?, key?, unit?, digits?, better?}\`; \`key\` is one key value, \`better\` adds a trend arrow. \`agg\` over numbers: \`last\` \`first\` \`min\` \`max\` \`mean\` \`sum\` \`delta\` \`change\` (%); over matches: \`count\`, \`rate\` (/s, last minute).
+
+Chart what a watcher wants: throughput or latency against the goal, progress toward a known total, per-model results, failures. Few accurate blocks; never invent lines the samples lack. Omit optional properties you do not need.
+
+Examples:
+
+\`req 8 rps=56 p50=41ms\`, goal 60 req/s:
+{"title":"load test \xB7 rps","rules":[{"from":"out","match":"^req \\\\d+ rps=(?P<rps>[\\\\d.]+) p50=(?P<p50>[\\\\d.]+)ms"}],"blocks":[{"kind":"spark","field":"rps","label":"req/s","unit":"req/s","better":"higher","target":60,"targetLabel":"goal 60"},{"kind":"stat","items":[{"field":"p50","agg":"last","label":"p50","unit":"ms","better":"lower"}]}],"headline":{"field":"rps","agg":"last","unit":"req/s","better":"higher"}}
+
+\`finish bash openai/gpt-5 t2: reward=1 tests=27/36 turns=5\`, 9 trials:
+{"title":"eval \xB7 tests passed per model","rules":[{"from":"out","match":"^finish \\\\S+ (?P<model>\\\\S+) t\\\\d+: .*tests=(?P<passed>\\\\d+)/\\\\d+","key":"model","count":"trials"}],"blocks":[{"kind":"bars","field":"passed","agg":"mean","label":"tests passed","max":36,"better":"higher"},{"kind":"meter","field":"trials","agg":"count","total":9,"label":"trials"}]}
+
+\`\u2713 lint (1m02s)\` / \`\u2717 test-linux (4m11s)\` / \`* build-macos\`:
+{"title":"CI \xB7 6 jobs","rules":[{"from":"*","match":"^(?P<mark>[\u2713\u2717*-])\\\\s+(?P<name>\\\\S+)","key":"name","text":"mark"}],"blocks":[{"kind":"grid","field":"mark","label":"jobs","tones":{"\u2713":"success","\u2717":"error","*":"pending","-":"muted"}}]}
+
+pytest, \`tests/test_api.py::test_login PASSED [ 12%]\`:
+{"title":"pytest \xB7 tests/","rules":[{"from":"out","match":" PASSED ","count":"pass"},{"from":"out","match":" FAILED ","count":"fail"},{"from":"out","match":"^(?P<current>\\\\S+::\\\\S+) \\\\w+\\\\s+\\\\[\\\\s*(?P<pct>\\\\d+)%\\\\]","text":"current"}],"blocks":[{"kind":"meter","field":"pct","agg":"last","total":100,"label":"progress","unit":"%"},{"kind":"stat","items":[{"field":"pass","agg":"count","label":"passed"},{"field":"fail","agg":"count","label":"failed"}]}],"stage":"current"}`;
+var byteLength = (s2) => Buffer.byteLength(s2) + 1;
+function promptSources(sources) {
+  let budget = MAX_SAMPLE_BYTES;
+  return sources.map((source2, index2) => {
+    const share = Math.floor(budget / (sources.length - index2));
+    const take = (lines, limit) => {
+      const out = [];
+      const shapes = /* @__PURE__ */ new Map();
+      let used = 0;
+      for (const line of lines) {
+        const trimmed = line.trimStart();
+        if (trimmed.startsWith("```") || trimmed.startsWith("~~~")) {
+          continue;
+        }
+        const shape = trimmed.replace(/\d+/g, "0").replace(/\s+/g, " ");
+        const repeats = shapes.get(shape) ?? 0;
+        if (repeats >= MAX_SHAPE_REPEATS) {
+          continue;
+        }
+        shapes.set(shape, repeats + 1);
+        const sample = clip(line, { max: MAX_SAMPLE_LINE_CHARS });
+        if (used + byteLength(sample) > limit) {
+          break;
+        }
+        used += byteLength(sample);
+        out.push(sample);
+      }
+      budget -= used;
+      return out;
+    };
+    const tail = take(source2.tail.slice().reverse(), source2.head.length ? Math.floor(share * 2 / 3) : share).reverse();
+    const head2 = take(source2.head, share - tail.reduce((n, l) => n + byteLength(l), 0));
+    return {
+      head: head2,
+      id: source2.id,
+      label: source2.label,
+      lines: source2.lines,
+      omitted: Math.max(0, source2.lines - head2.length - tail.length),
+      size: source2.size,
+      tail
+    };
+  });
+}
+function renderPrompt(request) {
+  const fence = (body) => `\`\`\`
+${body}
+\`\`\``;
+  const out = ["<job>", "Background process. Command:", fence(clip(request.command.trim(), { max: MAX_BRIEF_CHARS })), "</job>", "", "<sources>"];
+  for (const s2 of promptSources(request.sources)) {
+    const omitted = s2.omitted ? ` ${s2.omitted} not shown: the middle, and repeats of a line that differ only in numbers.` : "";
+    const tail = s2.tail.length ? [...s2.omitted ? ["[\u2026]"] : [], ...s2.tail] : [];
+    out.push(`## \`${s2.id}\` \u2014 ${s2.label}`, `${s2.lines} lines so far (${s2.size} characters).${omitted}`, fence([...s2.head, ...tail].join("\n")));
+  }
+  out.push("</sources>");
+  if (request.previous) {
+    out.push(
+      "",
+      `A spec is already in place, but ${request.previous.reason}. Write a replacement that matches the lines above:`,
+      fence(JSON.stringify(request.previous.spec))
+    );
+  }
+  if (request.rejected) {
+    out.push(
+      "",
+      "Your previous answer was rejected:",
+      ...request.rejected.answer ? [fence(clip(request.rejected.answer, { max: 4e3 }))] : [],
+      "Problems:",
+      ...request.rejected.errors.map((e) => `- ${e}`),
+      "Fix every problem and answer again."
+    );
+  }
+  return out.join("\n");
+}
+var AUTHOR_METHOD = "plugin.hermes-tern.charts.author";
+var AUTHOR_EVENT = "plugin.hermes-tern.charts.authored";
+var unknownMethod = (error) => typeof error === "object" && error !== null && "code" in error && error.code === -32601;
+function gatewayAuthor(gw2, sid) {
+  const waiting5 = /* @__PURE__ */ new Map();
+  gw2.on("event", (ev) => {
+    const reply2 = ev.type === AUTHOR_EVENT ? readChartReply(ev.payload) : void 0;
+    if (reply2) {
+      waiting5.get(reply2.job)?.(reply2);
+    }
+  });
+  return async (request, signal) => {
+    const session2 = sid();
+    if (!session2) {
+      throw new Error("no session to send the chart request from");
+    }
+    const job = randomUUID2();
+    const reply2 = new Promise((resolve7, reject) => {
+      const done = () => {
+        waiting5.delete(job);
+        clearTimeout(timer);
+        signal.removeEventListener("abort", abort);
+      };
+      const abort = () => (done(), reject(signal.reason));
+      const timer = setTimeout(() => (done(), reject(new Error("the chart request timed out"))), REQUEST_TIMEOUT_MS);
+      signal.addEventListener("abort", abort, { once: true });
+      waiting5.set(job, (r) => (done(), resolve7(r)));
+    });
+    const ack = gw2.request(AUTHOR_METHOD, { job, session_id: session2, system: SYSTEM_PROMPT, user: renderPrompt(request) }).catch((error) => {
+      waiting5.get(job)?.(void 0);
+      throw error;
+    });
+    let answer;
+    try {
+      ;
+      [, answer] = await Promise.all([ack, reply2]);
+    } catch (error) {
+      if (unknownMethod(error)) {
+        return void 0;
+      }
+      throw error;
+    }
+    switch (answer?.kind) {
+      case "answer":
+        return answer.answer;
+      case "rejected":
+        return new RejectedAnswer(answer.answer, answer.errors);
+      case "error":
+        throw new Error(answer.message);
+      default:
+        return void 0;
+    }
+  };
+}
+
 // src/processes/widgets/files.ts
 import { closeSync, fstatSync, openSync, readSync } from "node:fs";
 import { homedir as homedir8 } from "node:os";
@@ -31034,62 +31229,6 @@ var MAX_GRID_TONES = 12;
 var GROUP_NAME = /^[A-Za-z_][A-Za-z0-9_]{0,31}$/;
 var SOURCE_ID = /^(?:\*|[A-Za-z0-9_:.-]{1,64}\*?)$/;
 var NAMED_GROUP = /\(\?P?<([A-Za-z_][A-Za-z0-9_]*)>/g;
-var STRING = { type: "string" };
-var NUMBER = { type: "number" };
-var BETTER = { enum: ["higher", "lower"] };
-var VALUE_REF_SCHEMA = {
-  properties: {
-    agg: { enum: AGGS },
-    better: BETTER,
-    digits: { type: "integer" },
-    field: STRING,
-    key: STRING,
-    label: STRING,
-    unit: STRING
-  },
-  required: ["field", "agg"],
-  type: "object"
-};
-var SPEC_SCHEMA = {
-  properties: {
-    blocks: {
-      items: {
-        properties: {
-          agg: { enum: AGGS },
-          better: BETTER,
-          field: STRING,
-          items: { items: VALUE_REF_SCHEMA, type: "array" },
-          key: STRING,
-          kind: { enum: ["spark", "bars", "meter", "stat", "grid", "text"] },
-          label: STRING,
-          max: NUMBER,
-          min: NUMBER,
-          target: NUMBER,
-          targetLabel: STRING,
-          tones: { additionalProperties: { enum: TONES2 }, type: "object" },
-          total: { anyOf: [NUMBER, VALUE_REF_SCHEMA] },
-          unit: STRING
-        },
-        required: ["kind"],
-        type: "object"
-      },
-      type: "array"
-    },
-    headline: VALUE_REF_SCHEMA,
-    rules: {
-      items: {
-        properties: { count: STRING, from: STRING, key: STRING, match: STRING, scale: NUMBER, text: STRING },
-        required: ["from", "match"],
-        type: "object"
-      },
-      type: "array"
-    },
-    skip: STRING,
-    stage: STRING,
-    title: STRING
-  },
-  type: "object"
-};
 var linear;
 function linearEngine() {
   if (linear === void 0) {
@@ -32366,6 +32505,10 @@ var Charts = class {
         if (answer === void 0) {
           next2 = { kind: "unavailable" };
           break;
+        }
+        if (answer instanceof RejectedAnswer) {
+          request.rejected = { answer: answer.answer, errors: answer.errors };
+          continue;
         }
         if (specSkip(answer) !== void 0) {
           next2 = { atLines: entry.runtime.totalLines, attempts: counted2.attempts, kind: "declined" };
@@ -35333,7 +35476,7 @@ async function loadCaps(gw2, sid) {
 }
 
 // src/hermes/mutate.ts
-import { randomUUID as randomUUID2 } from "node:crypto";
+import { randomUUID as randomUUID3 } from "node:crypto";
 var isSafeInteger = (value) => Number.isSafeInteger(value);
 async function currentGeneration(gw2, sid) {
   const snapshot3 = await rpc(gw2, "session.resume", { session_id: sid });
@@ -35354,7 +35497,7 @@ async function mutateSession(gw2, sid, operation, payload) {
   }
   const result = await rpc(gw2, "session.mutate", {
     session_id: sid,
-    request_id: randomUUID2(),
+    request_id: randomUUID3(),
     expected_revision: snapshot3.revision,
     ...operation === "rename" ? {} : { expected_generation: snapshot3.execution_generation },
     operation,
@@ -37643,15 +37786,15 @@ function collectText(node3, info) {
     start = end + 1;
   }
   let index2 = -1;
-  let join15;
+  let join14;
   while (++index2 < lines.length) {
     if (lines[index2].charCodeAt(lines[index2].length - 1) === 8203 || index2 < lines.length - 1 && lines[index2 + 1].charCodeAt(0) === 8203) {
       result.push(lines[index2]);
-      join15 = void 0;
+      join14 = void 0;
     } else if (lines[index2]) {
-      if (typeof join15 === "number") result.push(join15);
+      if (typeof join14 === "number") result.push(join14);
       result.push(lines[index2]);
-      join15 = 0;
+      join14 = 0;
     } else if (index2 === 0 || index2 === lines.length - 1) {
       result.push(0);
     }
@@ -72299,173 +72442,18 @@ var OverlayStack = class {
   }
 };
 
-// src/processes/widgets/author.ts
-import { spawn as spawn2 } from "node:child_process";
-import { join as join12 } from "node:path";
-var MAX_BRIEF_CHARS = 1500;
-var MAX_SAMPLE_LINE_CHARS = 300;
-var MAX_SAMPLE_BYTES = 12 * 1024;
-var MAX_SHAPE_REPEATS = 3;
-var REQUEST_TIMEOUT_MS = 12e4;
-var SYSTEM_PROMPT = `You design the live status widget of a coding agent's background process (benchmark, eval, CI, tests, build, training, server). From the command and samples of its output you write a spec once; plain code then runs its regexes on every new line and redraws the widget until the process ends. Nobody can fix it later: its rules MUST match the real lines.
-
-A widget charts a quantity that shows how the process is going: throughput, latency, loss, tests or trials passed, progress toward a total the process states. When the output has none, call \`respond\` with only \`{"skip":"<why>"}\`; no widget beats a meaningless one. Never chart activity: lines or matches seen, words like \`error\` inside file contents.
-
-Otherwise call \`respond\` with:
-- \`title\` (\u2264 48 chars): what is watched.
-- \`rules\` (1\u201312) \`{from, match, key?, text?, count?, scale?}\`:
-  - \`from\`: the sample source id carrying the data (\`out\` for the process's output, \`file:1\` for a log file the command writes to), \`*\` for all.
-  - \`match\`: a JavaScript regex on one line; no lookaround or backreferences. Copy the literal text around the data from the samples; allow varying digits (\`[\\d.]+\`) and widths (\`\\s+\`).
-  - Each named group \`(?P<name>\u2026)\` feeds field \`name\` (\`[a-z][a-z0-9_]*\`) with its number (\`1,234\`, \`4.5k\` parse). One rule can capture several fields of a line.
-  - \`key\`: the rule's group naming a series (model, shard, CI job); the rule's fields keep one series per key. Not a field itself.
-  - \`text\`: the rule's group kept as text (status word, test name).
-  - \`count\`: a field counting matching lines.
-  - \`scale\`: multiplies the rule's numbers.
-- \`blocks\` (1\u20134, most important first), each on a \`field\`:
-  - \`spark\`: numbers over time. \`label\`, \`key?\` (one key value, e.g. \`gpt-5\`), \`unit?\`, \`better?\` (\`higher\`|\`lower\`), \`target?\` + \`targetLabel?\` (goal line the command or output states), \`min?\`, \`max?\`.
-  - \`bars\`: one bar per key, reduced by \`agg\`. \`label\`, \`unit?\`, \`max?\`, \`better?\`.
-  - \`meter\`: \`agg\` out of a \`total\` (a value ref, or a number the process or its output states; never a guess), \`label\`, \`unit?\`.
-  - \`stat\`: \`items\`, 1\u20134 value refs with \`label\`.
-  - \`grid\`: a cell per key, coloured by latest text. \`label\`, \`tones\`: lowercase status substring \u2192 \`success\`|\`error\`|\`warning\`|\`pending\`|\`info\`|\`muted\`|\`neutral\`.
-  - \`text\`: the field's latest text.
-- \`headline?\`: the value ref to glance at. \`stage?\`: field whose latest text is the current step.
-
-Value ref: \`{field, agg, label?, key?, unit?, digits?, better?}\`; \`key\` is one key value, \`better\` adds a trend arrow. \`agg\` over numbers: \`last\` \`first\` \`min\` \`max\` \`mean\` \`sum\` \`delta\` \`change\` (%); over matches: \`count\`, \`rate\` (/s, last minute).
-
-Chart what a watcher wants: throughput or latency against the goal, progress toward a known total, per-model results, failures. Few accurate blocks; never invent lines the samples lack. Omit optional properties you do not need.
-
-Examples:
-
-\`req 8 rps=56 p50=41ms\`, goal 60 req/s:
-{"title":"load test \xB7 rps","rules":[{"from":"out","match":"^req \\\\d+ rps=(?P<rps>[\\\\d.]+) p50=(?P<p50>[\\\\d.]+)ms"}],"blocks":[{"kind":"spark","field":"rps","label":"req/s","unit":"req/s","better":"higher","target":60,"targetLabel":"goal 60"},{"kind":"stat","items":[{"field":"p50","agg":"last","label":"p50","unit":"ms","better":"lower"}]}],"headline":{"field":"rps","agg":"last","unit":"req/s","better":"higher"}}
-
-\`finish bash openai/gpt-5 t2: reward=1 tests=27/36 turns=5\`, 9 trials:
-{"title":"eval \xB7 tests passed per model","rules":[{"from":"out","match":"^finish \\\\S+ (?P<model>\\\\S+) t\\\\d+: .*tests=(?P<passed>\\\\d+)/\\\\d+","key":"model","count":"trials"}],"blocks":[{"kind":"bars","field":"passed","agg":"mean","label":"tests passed","max":36,"better":"higher"},{"kind":"meter","field":"trials","agg":"count","total":9,"label":"trials"}]}
-
-\`\u2713 lint (1m02s)\` / \`\u2717 test-linux (4m11s)\` / \`* build-macos\`:
-{"title":"CI \xB7 6 jobs","rules":[{"from":"*","match":"^(?P<mark>[\u2713\u2717*-])\\\\s+(?P<name>\\\\S+)","key":"name","text":"mark"}],"blocks":[{"kind":"grid","field":"mark","label":"jobs","tones":{"\u2713":"success","\u2717":"error","*":"pending","-":"muted"}}]}
-
-pytest, \`tests/test_api.py::test_login PASSED [ 12%]\`:
-{"title":"pytest \xB7 tests/","rules":[{"from":"out","match":" PASSED ","count":"pass"},{"from":"out","match":" FAILED ","count":"fail"},{"from":"out","match":"^(?P<current>\\\\S+::\\\\S+) \\\\w+\\\\s+\\\\[\\\\s*(?P<pct>\\\\d+)%\\\\]","text":"current"}],"blocks":[{"kind":"meter","field":"pct","agg":"last","total":100,"label":"progress","unit":"%"},{"kind":"stat","items":[{"field":"pass","agg":"count","label":"passed"},{"field":"fail","agg":"count","label":"failed"}]}],"stage":"current"}`;
-var byteLength = (s2) => Buffer.byteLength(s2) + 1;
-function promptSources(sources) {
-  let budget = MAX_SAMPLE_BYTES;
-  return sources.map((source2, index2) => {
-    const share = Math.floor(budget / (sources.length - index2));
-    const take = (lines, limit) => {
-      const out = [];
-      const shapes = /* @__PURE__ */ new Map();
-      let used = 0;
-      for (const line of lines) {
-        const trimmed = line.trimStart();
-        if (trimmed.startsWith("```") || trimmed.startsWith("~~~")) {
-          continue;
-        }
-        const shape = trimmed.replace(/\d+/g, "0").replace(/\s+/g, " ");
-        const repeats = shapes.get(shape) ?? 0;
-        if (repeats >= MAX_SHAPE_REPEATS) {
-          continue;
-        }
-        shapes.set(shape, repeats + 1);
-        const sample = clip(line, { max: MAX_SAMPLE_LINE_CHARS });
-        if (used + byteLength(sample) > limit) {
-          break;
-        }
-        used += byteLength(sample);
-        out.push(sample);
-      }
-      budget -= used;
-      return out;
-    };
-    const tail = take(source2.tail.slice().reverse(), source2.head.length ? Math.floor(share * 2 / 3) : share).reverse();
-    const head2 = take(source2.head, share - tail.reduce((n, l) => n + byteLength(l), 0));
-    return {
-      head: head2,
-      id: source2.id,
-      label: source2.label,
-      lines: source2.lines,
-      omitted: Math.max(0, source2.lines - head2.length - tail.length),
-      size: source2.size,
-      tail
-    };
-  });
-}
-function renderPrompt(request) {
-  const fence = (body) => `\`\`\`
-${body}
-\`\`\``;
-  const out = ["<job>", "Background process. Command:", fence(clip(request.command.trim(), { max: MAX_BRIEF_CHARS })), "</job>", "", "<sources>"];
-  for (const s2 of promptSources(request.sources)) {
-    const omitted = s2.omitted ? ` ${s2.omitted} not shown: the middle, and repeats of a line that differ only in numbers.` : "";
-    const tail = s2.tail.length ? [...s2.omitted ? ["[\u2026]"] : [], ...s2.tail] : [];
-    out.push(`## \`${s2.id}\` \u2014 ${s2.label}`, `${s2.lines} lines so far (${s2.size} characters).${omitted}`, fence([...s2.head, ...tail].join("\n")));
-  }
-  out.push("</sources>");
-  if (request.previous) {
-    out.push(
-      "",
-      `A spec is already in place, but ${request.previous.reason}. Write a replacement that matches the lines above:`,
-      fence(JSON.stringify(request.previous.spec))
-    );
-  }
-  if (request.rejected) {
-    out.push(
-      "",
-      "Your previous answer was rejected:",
-      fence(clip(request.rejected.answer, { max: 4e3 })),
-      "Problems:",
-      ...request.rejected.errors.map((e) => `- ${e}`),
-      "Fix every problem and call `respond` again."
-    );
-  }
-  return out.join("\n");
-}
-function hermesAuthor(env2 = process.env) {
-  const python = env2["HERMES_PYTHON"]?.trim();
-  const root7 = env2["HERMES_PYTHON_SRC_ROOT"];
-  const ui = env2["HERMES_TUI_DIR"];
-  if (!python || !root7 || !ui) {
-    return void 0;
-  }
-  const script = join12(ui, "..", "widget_author.py");
-  return (request, signal) => new Promise((resolve7, reject) => {
-    const child = spawn2(python, [script], {
-      cwd: root7,
-      env: { ...env2, PYTHONPATH: root7 },
-      signal,
-      stdio: ["pipe", "pipe", "ignore"],
-      timeout: REQUEST_TIMEOUT_MS
-    });
-    let stdout = "";
-    child.stdout.setEncoding("utf8").on("data", (chunk) => stdout += chunk);
-    child.on("error", reject);
-    child.stdin.on("error", () => void 0);
-    child.on("close", () => {
-      const reply2 = readAuthorReply(stdout);
-      if (!reply2) {
-        reject(new Error("widget_author.py gave no answer"));
-      } else if (reply2.kind === "error") {
-        reject(new Error(reply2.message));
-      } else {
-        resolve7(reply2.kind === "answer" ? reply2.answer : void 0);
-      }
-    });
-    child.stdin.end(JSON.stringify({ schema: SPEC_SCHEMA, system: SYSTEM_PROMPT, user: renderPrompt(request) }));
-  });
-}
-
 // src/processes/widgets/memory.ts
 import { mkdirSync as mkdirSync5, readdirSync as readdirSync2, rmSync as rmSync3, statSync, writeFileSync as writeFileSync5 } from "node:fs";
-import { join as join13 } from "node:path";
+import { join as join12 } from "node:path";
 var KEEP_MS = 7 * 24 * 36e5;
 var safe3 = (id) => /^[\w.-]{1,128}$/.test(id);
-function chartMemory(dir2 = join13(dataDir(), "charts"), now = Date.now) {
+function chartMemory(dir2 = join12(dataDir(), "charts"), now = Date.now) {
   return {
     load(id) {
       if (!safe3(id)) {
         return void 0;
       }
-      const value = readJsonFile(join13(dir2, `${id}.json`));
+      const value = readJsonFile(join12(dir2, `${id}.json`));
       const skip = chartSkip(value);
       if (value === void 0 || skip) {
         return skip;
@@ -72483,9 +72471,9 @@ function chartMemory(dir2 = join13(dataDir(), "charts"), now = Date.now) {
       }
       try {
         mkdirSync5(dir2, { recursive: true });
-        writeFileSync5(join13(dir2, `${id}.json`), JSON.stringify(value));
+        writeFileSync5(join12(dir2, `${id}.json`), JSON.stringify(value));
         for (const name of readdirSync2(dir2)) {
-          const file2 = join13(dir2, name);
+          const file2 = join12(dir2, name);
           if (now() - statSync(file2).mtimeMs > KEEP_MS) {
             rmSync3(file2, { force: true });
           }
@@ -72856,13 +72844,13 @@ var Automation = class {
 };
 
 // .hermes-src/ui-tui/src/canonicalGateway.ts
-import { randomUUID as randomUUID3 } from "node:crypto";
+import { randomUUID as randomUUID4 } from "node:crypto";
 function canonicalRequest(method, original, contract) {
   const params = { ...original };
   if (method === "session.create") {
     delete params.cols;
     params.source = "tui";
-    params.request_id ??= randomUUID3();
+    params.request_id ??= randomUUID4();
     if (!contract?.sources.includes("tui")) {
       throw new Error(t("canonical.launch.noTuiPolicy"));
     }
@@ -74684,7 +74672,7 @@ function chatStores(chat, { act, gw: gw2, launch: launch3, settings: settings2, 
   };
   const media2 = new Media({ blob: (bytes, mime) => act().blob(bytes, mime) });
   const agents2 = new Agents(live);
-  const processes = new Processes(live, { author: hermesAuthor(), enabled: () => jobCharts, memory: chartMemory() });
+  const processes = new Processes(live, { author: gatewayAuthor(gw2, () => session2.ref.live), enabled: () => jobCharts, memory: chartMemory() });
   const cron = new Cron(chat);
   const sidebar2 = new Sidebar(chat);
   const automation = new Automation(live);
@@ -75438,9 +75426,9 @@ var CircularBuffer = class {
 // .hermes-src/ui-tui/src/lib/parentLog.ts
 import { appendFileSync as appendFileSync4, mkdirSync as mkdirSync6 } from "node:fs";
 import { homedir as homedir12 } from "node:os";
-import { join as join14 } from "node:path";
-var logDir = join14(process.env.HERMES_HOME?.trim() || join14(homedir12(), ".hermes"), "logs");
-var CRASH_LOG = join14(logDir, "tui_gateway_crash.log");
+import { join as join13 } from "node:path";
+var logDir = join13(process.env.HERMES_HOME?.trim() || join13(homedir12(), ".hermes"), "logs");
+var CRASH_LOG = join13(logDir, "tui_gateway_crash.log");
 var enabled = !process.env.VITEST;
 var MAX_BREADCRUMB = 4096;
 var warned = false;
