@@ -16,7 +16,6 @@ import type { LiveSessionId } from '../core/ids.js'
 import { Poller } from '../core/poller.js'
 import type { Subagent, ToolCall } from '../model.js'
 import type { Transcript } from '../transcript/store.js'
-import { JOB_TILE_LIMIT } from '../view/ui/jobTiles.js'
 import { rpc } from '../wire/rpc.js'
 
 import { eventOwner, foldOwnedEvent } from './ownership.js'
@@ -291,7 +290,7 @@ export class Agents {
 
   #visibleAgents(): Subagent[] {
     return this.#host.transcript.delegations().flatMap(call =>
-      (call.subagents ?? []).filter(isRunning).slice(0, JOB_TILE_LIMIT)
+      (call.subagents ?? []).filter(isRunning).slice(0, 4)
     )
   }
 
