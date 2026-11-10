@@ -216,12 +216,12 @@ function chunkEnd(body, start, limit) {
   const target2 = start + Math.max(1, limit);
   if (target2 >= body.length)
     return body.length;
-  const safe4 = (at) => ((body[at] ?? 0) & 192) !== 128 && !leadsWithParameter(body, at);
+  const safe3 = (at) => ((body[at] ?? 0) & 192) !== 128 && !leadsWithParameter(body, at);
   for (let at = target2; at > start; at--)
-    if (safe4(at))
+    if (safe3(at))
       return at;
   for (let at = target2 + 1; at < body.length; at++)
-    if (safe4(at))
+    if (safe3(at))
       return at;
   return body.length;
 }
@@ -6275,27 +6275,6 @@ function readWatchSpecText(raw2) {
   const spec = watchSpec.safeParse(raw2 ? parseJson(raw2) : void 0);
   return spec.success ? spec.data : void 0;
 }
-var SETTLED_BY = ["all_resolved", "continued", "deadline", "error", "superseded"];
-var cardFile = object({
-  /** Each app's row: kept as written, read by connections/cards.ts as a tool result's rows are. */
-  targets: array(unknown()),
-  error: loose(string2()),
-  /** Epoch seconds of the watcher's last write. */
-  updated_at: loose(number2()),
-  /** Why the card stopped; another value reads as none. */
-  settled_by: loose(_enum(SETTLED_BY)),
-  watching: loose(boolean2()),
-  /** The watcher's process. */
-  pid: loose(number2())
-});
-function readCardFile(file2) {
-  const card = cardFile.safeParse(readJsonFile(file2));
-  return card.success ? card.data : void 0;
-}
-var created = object({ created_at: number2() });
-function cardCreatedAt(file2) {
-  return created.safeParse(readJsonFile(file2)).data?.created_at ?? 0;
-}
 var linksFile = _catch(
   object({
     /** Session id → the conversation root its links are filed under; a non-text root reads as none. */
@@ -6512,20 +6491,6 @@ function counted(text16) {
   return tokens2.before || tokens2.after ? { tokens: tokens2 } : {};
 }
 
-// src/connections/cards.ts
-import { existsSync as existsSync2, readdirSync, writeFileSync } from "node:fs";
-import { homedir as homedir4 } from "node:os";
-import { join as join4 } from "node:path";
-
-// src/core/result.ts
-function attempt(fn) {
-  try {
-    return { kind: "ok", value: fn() };
-  } catch (error) {
-    return { error, kind: "failed" };
-  }
-}
-
 // src/tools/bridge.ts
 var BRIDGE = "tool_call";
 var BATCH = "connectors__execute";
@@ -6646,97 +6611,6 @@ function callApp(call) {
 // src/connections/cards.ts
 var CONNECT_TOOL = "manage_connections";
 var POLL_MS = 2e3;
-var STALE_MS = 2 * 6e4;
-var dataDir = (env2 = process.env) => join4(env2["HERMES_HOME"] || join4(homedir4(), ".hermes"), "plugin-data", "hermes-tern");
-var safe = (part) => part.replace(/[^A-Za-z0-9_-]/g, "_");
-var cardStem = (callId, opId) => opId ? `${safe(callId)}.${safe(opId)}` : safe(callId);
-var alive = (pid) => {
-  if (pid === void 0) {
-    return true;
-  }
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch (error) {
-    return errorCode(error) === "EPERM";
-  }
-};
-function readCard(key2, dir2 = dataDir(), now = Date.now()) {
-  const data = readCardFile(join4(dir2, "connections", `${key2}.json`));
-  if (!data) {
-    return void 0;
-  }
-  const error = data.error || void 0;
-  const updated = data.updated_at === void 0 ? now : data.updated_at * 1e3;
-  let settled2;
-  if (data.settled_by) {
-    settled2 = data.settled_by;
-  } else if (data.watching !== true) {
-    settled2 = error ? "error" : data.targets.some((t) => waiting({ state: String(record2(t)?.["state"] ?? "") })) ? "deadline" : "all_resolved";
-  } else if (!alive(data.pid) || now - updated > STALE_MS) {
-    settled2 = "stopped";
-  }
-  return { error, key: key2, settled: settled2, targets: data.targets, told: existsSync2(join4(dir2, "connections", `${key2}.told`)) };
-}
-function findCard(call, dir2 = dataDir()) {
-  const op = record2(call.result)?.["op_id"];
-  const prefix2 = `${safe(call.id)}.`;
-  if (typeof op === "string" && op) {
-    return existsSync2(join4(dir2, "connections", `${cardStem(call.id, op)}.json`)) ? cardStem(call.id, op) : void 0;
-  }
-  let names;
-  try {
-    names = readdirSync(join4(dir2, "connections"));
-  } catch {
-    return void 0;
-  }
-  const keys2 = names.flatMap((n) => {
-    const key2 = n.endsWith(".json") ? n.slice(0, -5) : "";
-    return key2 === safe(call.id) || key2.startsWith(prefix2) && !key2.slice(prefix2.length).includes(".") ? [key2] : [];
-  });
-  if (keys2.length < 2) {
-    return keys2[0];
-  }
-  const createdAt = (key2) => cardCreatedAt(join4(dir2, "connections", `${key2}.json`)) * 1e3;
-  return keys2.map((key2) => ({ gap: Math.abs(createdAt(key2) - call.startedAt), key: key2 })).sort((a2, b) => a2.gap - b.gap)[0]?.key;
-}
-function claimTold(key2, dir2 = dataDir()) {
-  const claim = attempt(() => writeFileSync(join4(dir2, "connections", `${key2}.told`), "", { flag: "wx" }));
-  if (claim.kind === "ok") {
-    return { kind: "claimed" };
-  }
-  return errorCode(claim.error) === "EEXIST" ? { kind: "taken" } : { error: claim.error, kind: "failed" };
-}
-function mayTell(card, dir2 = dataDir()) {
-  return !card.key || claimTold(card.key, dir2).kind !== "taken";
-}
-function connectTargets(call, card) {
-  if (call.name !== CONNECT_TOOL) {
-    return [];
-  }
-  const targets = card?.targets ?? record2(call.result)?.["targets"];
-  return parseTargets(Array.isArray(targets) ? targets : []);
-}
-function loadConnect(call, dir2 = dataDir(), now = Date.now()) {
-  if (call.name !== CONNECT_TOOL || resultCard(call)) {
-    return void 0;
-  }
-  const key2 = call.connect?.key ?? findCard(call, dir2);
-  const file2 = key2 ? readCard(key2, dir2, now) : void 0;
-  const targets = connectTargets(call, file2);
-  if (!targets.length) {
-    return void 0;
-  }
-  return {
-    error: file2?.error,
-    key: file2?.key,
-    opened: call.connect?.opened ?? [],
-    // Continue settles the card at once, as on the desktop; the watcher sees the claim on its next read.
-    settled: file2?.settled ?? (file2?.told || call.connect?.told ? "continued" : void 0),
-    targets,
-    told: Boolean(file2?.told || call.connect?.told)
-  };
-}
 function parseTargets(targets) {
   return targets.flatMap((t) => {
     const r = record2(t);
@@ -6802,29 +6676,12 @@ function resultCard(call) {
   const r = call.name === CONNECT_TOOL ? record2(call.result) : void 0;
   const settled2 = r && r["status"] === "settled" && typeof r["op_id"] === "string" ? settleReason(r) : void 0;
   const targets = settled2 && Array.isArray(r?.["targets"]) ? parseTargets(r["targets"]) : [];
-  return targets.length ? { gateway: true, opened: [], settled: settled2, targets, told: false } : void 0;
+  return targets.length ? { opened: [], settled: settled2, targets } : void 0;
 }
-function isConnectCall(call) {
-  const card = call.connect;
-  if (card?.op) {
-    return card.targets.length > 0;
-  }
-  if (card) {
-    return card.settled !== "superseded" && card.targets.some((t) => t.url);
-  }
-  return resultCard(call) !== void 0 || connectTargets(call).some((t) => t.url);
-}
+var connectCardOf = (call) => call.connect ?? resultCard(call);
+var isConnectCall = (call) => connectCardOf(call) !== void 0;
 var unresolved = (t) => ["expired", "failed", "initiated", "pending"].includes(t.state);
-var cardRef = (call) => call.connect?.op?.id ?? call.connect?.key ?? call.id;
-var and = (names) => names.length < 3 ? names.join(" and ") : `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`;
-function continueMessage(targets) {
-  const names = targets.filter((t) => t.state === "connected" || waiting(t)).map((t) => t.title);
-  return `I've authorized ${and(names) || "the apps"}. Check with manage_connections status and carry on.`;
-}
-function connectedMessage(targets) {
-  const names = targets.filter((t) => t.state === "connected").map((t) => t.title);
-  return `${and(names)} ${names.length === 1 ? "is" : "are"} connected now. Carry on.`;
-}
+var cardRef = (call) => call.connect?.op?.id ?? call.id;
 
 // src/turn/fanout.ts
 var CHANGES_FILES = ["patch", "terminal", "write_file", "execute_code"];
@@ -8049,9 +7906,9 @@ function resultOf(call) {
 }
 
 // src/view/tools/steps.ts
-import { homedir as homedir5 } from "node:os";
+import { homedir as homedir4 } from "node:os";
 function shortPath(path2) {
-  return relativePath(path2, { cwd: launchEnv().cwd, home: homedir5() });
+  return relativePath(path2, { cwd: launchEnv().cwd, home: homedir4() });
 }
 function namedStep(call) {
   const name = call.name.replace(/_/g, " ");
@@ -8152,13 +8009,13 @@ function briefNode(head2, text16) {
 }
 
 // src/media.ts
-import { homedir as homedir7 } from "node:os";
+import { homedir as homedir6 } from "node:os";
 import { isAbsolute } from "node:path";
 import { fileURLToPath } from "node:url";
 
 // src/hermes/images.ts
 import { readFile } from "node:fs/promises";
-import { homedir as homedir6 } from "node:os";
+import { homedir as homedir5 } from "node:os";
 import { extname as extname2, resolve } from "node:path";
 var MAX_IMAGE_BYTES = 20 * 1024 * 1024;
 function imageFormat(bytes) {
@@ -8214,7 +8071,7 @@ function imageSize(bytes) {
   return void 0;
 }
 async function uploadImage(gw2, sid, raw2, cwd) {
-  const path2 = resolve(cwd, raw2.replace(/^~(?=$|\/)/, homedir6()));
+  const path2 = resolve(cwd, raw2.replace(/^~(?=$|\/)/, homedir5()));
   const bytes = await readFile(path2);
   if (bytes.length > MAX_IMAGE_BYTES) {
     throw new Error("the image is larger than 20 MB");
@@ -8263,7 +8120,7 @@ function localSource(src) {
       return void 0;
     }
   }
-  const path2 = src.replace(/^~(?=\/)/, homedir7());
+  const path2 = src.replace(/^~(?=\/)/, homedir6());
   return isAbsolute(path2) ? { path: path2 } : void 0;
 }
 var Media = class {
@@ -9174,7 +9031,7 @@ function liveCard(payload, session2) {
   }
   const callId = typeof r["tool_call_id"] === "string" && r["tool_call_id"] ? r["tool_call_id"] : void 0;
   const op = { deadlineAt, id, seq, session: session2 };
-  return { callId, card: { gateway: true, op, opened: [], settled: settleReason(r), targets, told: false } };
+  return { callId, card: { op, opened: [], settled: settleReason(r), targets } };
 }
 function applyFrame(card, frame) {
   const r = record2(frame);
@@ -9218,7 +9075,10 @@ var answers = {
 // src/view/tools/cards/connect.tsx
 var connectView = {
   action: "other",
-  card: (call, d, now) => isConnectCall(call) ? connectCard(call, now) : genericCard(call, d, { name: call.name, title: humanize(call.name) }),
+  card: (call, d, now) => {
+    const card = connectCardOf(call);
+    return card ? connectCard(call, card, now) : genericCard(call, d, { name: call.name, title: humanize(call.name) });
+  },
   step: namedStep
 };
 var look = (icon, tone, word) => ({ mark: { icon, tone }, tone, word });
@@ -9246,16 +9106,7 @@ function lookOf(card, t) {
   }
   return STATE[t.state] ?? NOT_CONNECTED;
 }
-var FILE_NOTE = {
-  all_resolved: "All connected.",
-  continued: "Sent to Hermes.",
-  deadline: "Stopped waiting after 15 minutes. Ask Hermes to connect again.",
-  error: "Hermes stopped watching these links.",
-  interrupt: "The turn was stopped before every app connected.",
-  stopped: "Hermes stopped watching these links. Ask Hermes to connect again.",
-  superseded: "A later request replaced this one."
-};
-var GATEWAY_NOTE = {
+var NOTE = {
   deadline: "Hermes stopped waiting. Ask it to connect again.",
   interrupt: "The turn stopped before every app connected.",
   stopped: "Hermes stopped watching these links."
@@ -9265,14 +9116,11 @@ function button2(key2, label, role, act, title) {
 }
 var SENDING = { approve: "Connecting\u2026", retry: "Retrying\u2026", skip: "Skipping\u2026" };
 function rowButtons(card, ref, t) {
-  if (card.settled || card.told) {
+  if (card.settled || !card.op) {
     return [];
   }
   const row2 = `${ref}:${t.name}`;
   const open = (label) => button2("go", label, "hermes.connect.open", `connect-open=${row2}`, t.url);
-  if (!card.op) {
-    return t.url && waiting(t) ? [open("Authorize \u2197")] : [];
-  }
   const verb = verbOf(t);
   const sending = sendingVerb(card, t.name);
   if (sending) {
@@ -9285,30 +9133,14 @@ function rowButtons(card, ref, t) {
     ...unresolved(t) ? [button2("skip", "Not now", "hermes.connect.skip", `connect-skip=${row2}`)] : []
   ];
 }
-function noteOf(card) {
-  const { settled: settled2 } = card;
-  if (card.told) {
-    return settled2 && settled2 !== "all_resolved" ? "Sent to Hermes." : "All connected. Hermes carries on.";
-  }
-  if (!settled2) {
-    return void 0;
-  }
-  if (card.gateway) {
-    return GATEWAY_NOTE[settled2];
-  }
-  return `${FILE_NOTE[settled2]}${settled2 === "error" && card.error ? ` ${card.error}` : ""}`;
-}
-function hintOf(card, now) {
-  if (!card.op) {
-    return "Authorize in your browser. Hermes hears when every app is connected.";
-  }
-  const minutes = minutesLeft(card.op, now);
+function hintOf(card, op, now) {
+  const minutes = minutesLeft(op, now);
   const authorize = card.targets.some((t) => verbOf(t) === "open" && t.url) ? "Authorize in your browser. " : "";
   return `${authorize}Hermes waits up to ${minutes} more minute${minutes === 1 ? "" : "s"}.`;
 }
 function launchNode(card, t, i) {
   const l = t.launch;
-  if (!l || card.settled || card.told || !unresolved(t)) {
+  if (!l || card.settled || !unresolved(t)) {
     return null;
   }
   const lines = [l.kind === "stdio" ? `Runs: ${l.target}` : `Connects to: ${l.target}`, ...l.cwd ? [`Working dir: ${l.cwd}`] : [], ...l.env ? [`Env: ${l.env.join(", ")}`] : []];
@@ -9316,7 +9148,7 @@ function launchNode(card, t, i) {
 }
 function rowNode(card, ref, t, i) {
   const l = lookOf(card, t);
-  const live = !card.settled && !card.told;
+  const live = !card.settled;
   const why = live && t.detail && l.tone === "error" ? [{ s: "muted", t: ` \xB7 ${t.detail}` }] : [];
   const needs = live && t.needs ? [{ s: "muted", t: ` \xB7 needs ${t.needs.join(", ")}: set it up in Hermes Desktop` }] : [];
   return /* @__PURE__ */ jsxs("row", { align: "center", gap: "sm", role: "hermes.connect.row", children: [
@@ -9340,16 +9172,16 @@ function rowNode(card, ref, t, i) {
     rowButtons(card, ref, t)
   ] }, `t${i}`);
 }
-function connectCard(call, now) {
-  const card = call.connect ?? resultCard(call) ?? { opened: [], targets: connectTargets(call), told: false };
+function connectCard(call, card, now) {
   const { targets } = card;
   const ref = cardRef(call);
   const own14 = targets.filter((t) => t.state !== "superseded");
-  const open = card.settled || card.told ? [] : targets.filter(card.op ? unresolved : waiting);
-  const note = noteOf(card);
+  const op = card.settled ? void 0 : card.op;
+  const open = op ? targets.filter(unresolved) : [];
+  const note = card.settled && NOTE[card.settled];
   const continuing = card.sending?.includes(CONTINUE);
-  const foot = open.length ? /* @__PURE__ */ jsxs("row", { align: "center", gap: "sm", role: "hermes.connect.foot", children: [
-    /* @__PURE__ */ jsx("text", { grow: 1, spans: [{ s: "muted", t: hintOf(card, now) }], wrap: "word" }, "hint"),
+  const foot = op && open.length ? /* @__PURE__ */ jsxs("row", { align: "center", gap: "sm", role: "hermes.connect.foot", children: [
+    /* @__PURE__ */ jsx("text", { grow: 1, spans: [{ s: "muted", t: hintOf(card, op, now) }], wrap: "word" }, "hint"),
     continuing ? button2("go", "Continuing\u2026", "") : button2("go", "Continue", "hermes.connect.continue", `connect-continue=${ref}`)
   ] }, "foot") : note ? /* @__PURE__ */ jsx("text", { role: "hermes.connect.note", spans: [{ s: "muted", t: note }], wrap: "word" }, "note") : null;
   return {
@@ -9726,11 +9558,11 @@ function planStep(before, after) {
 // src/view/tools/cards/read.tsx
 var readView = {
   action: "read",
-  card: readCard2,
+  card: readCard,
   hubIcon: "read",
   step: (_call, d) => d.path ? `Read ${shortPath(d.path)}` : "Read file"
 };
-function readCard2(call, d) {
+function readCard(call, d) {
   const path2 = d.path ?? call.context;
   const content5 = d.content;
   const total = d.totalLines;
@@ -10185,15 +10017,15 @@ function gatewayAuthor(gw2, sid) {
 
 // src/processes/widgets/files.ts
 import { closeSync, fstatSync, openSync, readSync } from "node:fs";
-import { homedir as homedir8 } from "node:os";
-import { isAbsolute as isAbsolute2, join as join5, normalize } from "node:path";
+import { homedir as homedir7 } from "node:os";
+import { isAbsolute as isAbsolute2, join as join4, normalize } from "node:path";
 import { StringDecoder } from "node:string_decoder";
 var TARGET = /(?:^|[\s;&|(])(?:1|&)?>>?\s*([^\s;&|)<>]+)|\btee\s+(?:-a\s+)?([^\s;&|)<>-][^\s;&|)<>]*)/g;
 var CD = /^\s*cd\s+([^\s;&|]+)\s*(?:&&|;)/;
 var SKIP = /^\/dev\/|^&/;
 var unquote = (s2) => s2.replace(/^(['"])(.*)\1$/, "$2");
 function expand(path2, env2) {
-  const out = unquote(path2).replace(/^~(?=\/|$)/, env2["HOME"] || homedir8()).replace(/\$\{?(HOME|TMPDIR|USER)\}?/g, (_, name) => env2[name]?.replace(/\/$/, "") ?? `$${name}`);
+  const out = unquote(path2).replace(/^~(?=\/|$)/, env2["HOME"] || homedir7()).replace(/\$\{?(HOME|TMPDIR|USER)\}?/g, (_, name) => env2[name]?.replace(/\/$/, "") ?? `$${name}`);
   return out.includes("$") ? void 0 : out;
 }
 function outputFiles(command2, env2 = process.env) {
@@ -10206,7 +10038,7 @@ function outputFiles(command2, env2 = process.env) {
       continue;
     }
     const path2 = expand(raw2, env2);
-    const full = path2 && (isAbsolute2(path2) ? path2 : base3 && isAbsolute2(base3) ? join5(base3, path2) : void 0);
+    const full = path2 && (isAbsolute2(path2) ? path2 : base3 && isAbsolute2(base3) ? join4(base3, path2) : void 0);
     if (full && !files.includes(normalize(full))) {
       files.push(normalize(full));
     }
@@ -20007,7 +19839,7 @@ function htmlKind(value) {
 }
 
 // node_modules/mdast-util-to-markdown/lib/join.js
-var join6 = [joinDefaults];
+var join5 = [joinDefaults];
 function joinDefaults(left, right, parent, state) {
   if (right.type === "code" && formatCodeAsIndented(right, state) && (left.type === "list" || left.type === right.type && formatCodeAsIndented(left, state))) {
     return false;
@@ -22825,7 +22657,7 @@ function indentLines(value, map4) {
 
 // node_modules/mdast-util-to-markdown/lib/util/safe.js
 var own7 = {}.hasOwnProperty;
-function safe2(state, input2, config3) {
+function safe(state, input2, config3) {
   const value = (config3.before || "") + (input2 || "") + (config3.after || "");
   const positions = [];
   const result = [];
@@ -22984,7 +22816,7 @@ function toMarkdown(tree, options) {
     handle: void 0,
     indentLines,
     indexStack: [],
-    join: [...join6],
+    join: [...join5],
     options: {},
     safe: safeBound,
     stack: [],
@@ -23039,7 +22871,7 @@ function containerFlowBound(parent, info) {
   return containerFlow(parent, this, info);
 }
 function safeBound(value, config3) {
-  return safe2(this, value, config3);
+  return safe(this, value, config3);
 }
 
 // node_modules/mdast-util-gfm-table/lib/index.js
@@ -33714,17 +33546,17 @@ function properties(state, properties2) {
   for (key2 in properties_) {
     if (own10.call(properties_, key2)) {
       const unsafe2 = properties_[key2];
-      let safe4 = propertyValue(
+      let safe3 = propertyValue(
         state,
         findDefinition(specific, key2),
         key2,
         unsafe2
       );
-      if (safe4 === null || safe4 === void 0) {
-        safe4 = propertyValue(state, findDefinition(defaults, key2), key2, unsafe2);
+      if (safe3 === null || safe3 === void 0) {
+        safe3 = propertyValue(state, findDefinition(defaults, key2), key2, unsafe2);
       }
-      if (safe4 !== null && safe4 !== void 0) {
-        result[key2] = safe4;
+      if (safe3 !== null && safe3 !== void 0) {
+        result[key2] = safe3;
       }
     }
   }
@@ -39514,11 +39346,11 @@ function compiler(options) {
     }
     events[start][1]._spread = listSpread;
   }
-  function opener(create5, and3) {
+  function opener(create5, and2) {
     return open;
     function open(token) {
       enter.call(this, create5(token), token);
-      if (and3) and3.call(this, token);
+      if (and2) and2.call(this, token);
     }
   }
   function buffer() {
@@ -39539,10 +39371,10 @@ function compiler(options) {
       end: void 0
     };
   }
-  function closer(and3) {
+  function closer(and2) {
     return close;
     function close(token) {
-      if (and3) and3.call(this, token);
+      if (and2) and2.call(this, token);
       exit3.call(this, token);
     }
   }
@@ -43016,6 +42848,15 @@ import { execFile as execFile4 } from "node:child_process";
 import { DatabaseSync as DatabaseSync4 } from "node:sqlite";
 import { promisify as promisify2 } from "node:util";
 
+// src/core/result.ts
+function attempt(fn) {
+  try {
+    return { kind: "ok", value: fn() };
+  } catch (error) {
+    return { error, kind: "failed" };
+  }
+}
+
 // src/hermes/sessionTranscript.ts
 import { DatabaseSync as DatabaseSync3 } from "node:sqlite";
 var COMPACTION = "[CONTEXT COMPACTION";
@@ -43621,13 +43462,13 @@ function parts2(turn) {
 function actionOf(call) {
   return withView(call, (view) => view.action());
 }
-var and2 = (words3) => words3.length < 3 ? words3.join(" and ") : `${words3.slice(0, -1).join(", ")}, and ${words3.at(-1)}`;
+var and = (words3) => words3.length < 3 ? words3.join(" and ") : `${words3.slice(0, -1).join(", ")}, and ${words3.at(-1)}`;
 function actionLabel(action, n, calls = []) {
   switch (action) {
     case "app": {
       const apps = [...new Set(calls.flatMap(appsOf))];
       const uses = calls.reduce((k, c) => k + (batchOf(c)?.length ?? 1), 0);
-      return apps.length === 1 ? `Used ${apps[0]}${uses > 1 ? ` ${uses} times` : ""}` : `Used ${and2(apps)}`;
+      return apps.length === 1 ? `Used ${apps[0]}${uses > 1 ? ` ${uses} times` : ""}` : `Used ${and(apps)}`;
     }
     case "command":
       return `Ran ${plural(n, "command")}`;
@@ -45373,8 +45214,15 @@ async function openHelp(host) {
 }
 
 // src/session/pane.ts
-import { mkdirSync as mkdirSync2, rmSync, writeFileSync as writeFileSync2 } from "node:fs";
+import { mkdirSync as mkdirSync2, rmSync, writeFileSync } from "node:fs";
 import { join as join7 } from "node:path";
+
+// src/config/dataDir.ts
+import { homedir as homedir8 } from "node:os";
+import { join as join6 } from "node:path";
+var dataDir = (env2 = process.env) => join6(env2["HERMES_HOME"] || join6(homedir8(), ".hermes"), "plugin-data", "hermes-tern");
+
+// src/session/pane.ts
 var paneFile = (pane, dir2 = dataDir()) => join7(dir2, "panes", `${pane}.json`);
 function markPane(launch3, sid, dir2 = dataDir()) {
   if (!launch3.pane) {
@@ -45383,7 +45231,7 @@ function markPane(launch3, sid, dir2 = dataDir()) {
   const record3 = { cwd: launch3.paneCwd, pid: process.pid, session_id: sid, updated_at: Date.now() / 1e3 };
   try {
     mkdirSync2(join7(dir2, "panes"), { recursive: true });
-    writeFileSync2(paneFile(launch3.pane, dir2), JSON.stringify(record3));
+    writeFileSync(paneFile(launch3.pane, dir2), JSON.stringify(record3));
   } catch {
   }
 }
@@ -45398,7 +45246,7 @@ function forgetPane(launch3, dir2 = dataDir()) {
 }
 
 // src/settings.ts
-import { mkdirSync as mkdirSync3, writeFileSync as writeFileSync3 } from "node:fs";
+import { mkdirSync as mkdirSync3, writeFileSync as writeFileSync2 } from "node:fs";
 import { homedir as homedir9 } from "node:os";
 import { dirname, join as join8 } from "node:path";
 function settingsFile2(env2 = process.env) {
@@ -45410,7 +45258,7 @@ function loadSettings(file2 = settingsFile2()) {
 function saveSettings(patch6, file2 = settingsFile2()) {
   const next2 = { ...readStoredSettings(file2), ...patch6 };
   mkdirSync3(dirname(file2), { recursive: true });
-  writeFileSync3(file2, `${JSON.stringify(next2, null, 2)}
+  writeFileSync2(file2, `${JSON.stringify(next2, null, 2)}
 `);
   return settingsOf(next2);
 }
@@ -47644,7 +47492,7 @@ var AppActions = class {
       router: cx.router,
       setCompacting: (on, opts) => this.setCompacting(on, opts),
       state: cx.state,
-      submit: (text16) => this.submit(text16, true, "queue"),
+      submit: (text16) => this.submit(text16, "queue"),
       transcript
     };
   }
@@ -47665,23 +47513,22 @@ var AppActions = class {
   /** Sends the composer's draft, with the pastes it holds. */
   submitDraft() {
     const pasted = [...this.#cx.composer.pasted];
-    this.submit(this.#cx.composer.take(), true, this.#cx.state.busyMode, pasted);
+    this.submit(this.#cx.composer.take(), this.#cx.state.busyMode, pasted);
   }
   /**
-   * Sends or queues a prompt, or runs a command; `draft`: the user entered it (it takes the draft's
-   * images). While a turn runs the prompt goes as `busy` says: the session's busy_input_mode for
-   * a typed one; a message the app writes (a connect result) waits behind the turn. `pasted`:
-   * the draft's pastes, whose `{!cmd}`s and leading `!` stay as written.
+   * Sends or queues a prompt the user entered, or runs a command; the prompt takes the draft's
+   * images. While a turn runs the prompt goes as `busy` says (the session's busy_input_mode by
+   * default). `pasted`: the draft's pastes, whose `{!cmd}`s and leading `!` stay as written.
    */
-  submit(raw2, draft = true, busy = draft ? this.#cx.state.busyMode : "queue", pasted = []) {
+  submit(raw2, busy = this.#cx.state.busyMode, pasted = []) {
     const { attachments, composer: composer2, transcript } = this.#cx;
     const text16 = raw2.trim();
-    if (draft && attachments.uploading && !text16.startsWith("/")) {
+    if (attachments.uploading && !text16.startsWith("/")) {
       composer2.set(raw2, { pasted });
       transcript.notice("An image is still attaching. Send again in a moment.", "warning");
       return;
     }
-    if (!text16 && !(draft && attachments.items.length)) {
+    if (!text16 && !attachments.items.length) {
       return;
     }
     if (text16.startsWith("/")) {
@@ -47692,10 +47539,8 @@ var AppActions = class {
       void this.#shell(text16.slice(1).trim());
       return;
     }
-    if (draft) {
-      this.#cx.connect.yieldOpen();
-    }
-    this.#cx.router.route({ images: draft ? attachments.take() : [], kind: "typed", pasted, text: text16 }, busy);
+    this.#cx.connect.yieldOpen();
+    this.#cx.router.route({ images: attachments.take(), kind: "typed", pasted, text: text16 }, busy);
   }
   /** What the router's gates read: the session, the switch in flight, the turn, the compaction and the startup image. */
   gates() {
@@ -49954,32 +49799,23 @@ var Theme = class {
 };
 
 // src/connections/watcher.ts
-var NO_CARD_MS = 3e4;
 var UNKNOWN_OPERATION = 4004;
 var ConnectWatcher = class {
   #host;
-  /** Where the card files are; unset: the plugin's data folder, read at each poll. */
-  #dir;
   /** The poll: every POLL_MS while some card is watched. */
   #poller = new Poller({ cadence: () => this.#open ? POLL_MS : "off", run: async () => this.#tick() });
-  /** Some card's apps still move (the last read found one watched and not settled). */
+  /** Some card's operation is still open (the last poll found one not settled). */
   #open = false;
-  /** Connect cards (by file) this pane saw with an app still waiting. */
-  #seen = /* @__PURE__ */ new Set();
-  /** Connect calls that drew no card, and when: not read again for NO_CARD_MS. */
-  #noCard = /* @__PURE__ */ new WeakMap();
   /** The minutes each open live card's hint last showed. */
   #minutes = /* @__PURE__ */ new WeakMap();
   /** Calls whose result already had its say over a `stopped` card. */
   #finals = /* @__PURE__ */ new WeakSet();
-  /** `dir`: the plugin's data folder the card files are under (tests point it at their own). */
-  constructor(host, { dir: dir2 } = {}) {
+  constructor(host) {
     this.#host = host;
-    this.#dir = dir2;
   }
   /**
-   * Reads every connect card now (a new call or a reloaded transcript does not wait for the next
-   * poll), then polls while some card is watched: a settled card never moves again.
+   * Polls every open card now (a finished call or a reloaded transcript does not wait for the next
+   * poll), then while some card is open: a settled card never moves again.
    */
   watch() {
     this.#poller.poke();
@@ -50019,25 +49855,12 @@ var ConnectWatcher = class {
       this.#draw(live);
     }
   }
-  /** A connect card's Continue: a live card's tool returns now; a card file tells the agent which apps the user authorized. */
+  /** A connect card's Continue: the tool returns now, its unresolved apps not connected. */
   continue(ref) {
     const call = this.#call(ref);
-    const card = call?.connect;
-    if (!call || !card || card.told || card.settled) {
-      return;
-    }
-    if (card.op) {
+    if (call && !call.connect?.settled) {
       this.#answer(call, CONTINUE, answers.continue());
-      return;
     }
-    this.#host.transcript.mutateCall(call, () => {
-      card.told = true;
-      card.settled = "continued";
-    });
-    if (mayTell(card, this.#dir)) {
-      this.#host.tell(continueMessage(card.targets));
-    }
-    this.#host.changed();
   }
   /**
    * A typed message while a live card waits ends the wait, as the desktop's composer does: else
@@ -50055,15 +49878,13 @@ var ConnectWatcher = class {
     const call = this.#call(ref);
     const card = call?.connect;
     const target2 = card?.targets.find((t) => t.name === name);
-    if (!call || !card || !target2?.url || card.settled) {
+    if (!call || !card?.op || !target2?.url || card.settled) {
       return;
     }
     this.#host.openUrl(target2.url);
     this.#host.transcript.mutateCall(call, () => card.opened = [.../* @__PURE__ */ new Set([...card.opened, name])]);
     this.#host.changed();
-    if (card.op) {
-      void rpc(this.#host.gw, "connectors.operation.wake", opParams(card.op)).catch(() => void 0);
-    }
+    void rpc(this.#host.gw, "connectors.operation.wake", opParams(card.op)).catch(() => void 0);
   }
   /** A live card's Skip on app `name`. */
   skip(ref, name) {
@@ -50094,37 +49915,8 @@ var ConnectWatcher = class {
   }
   #tick() {
     let open = false;
-    const now = Date.now();
     for (const call of this.#host.transcript.calls(CONNECT_TOOL)) {
-      if (call.connect?.op) {
-        open = this.#tickLive(call) || open;
-        continue;
-      }
-      const missed = this.#noCard.get(call);
-      if (call.connect?.settled || call.outcome.kind === "running" || missed !== void 0 && now - missed < NO_CARD_MS) {
-        continue;
-      }
-      const next2 = loadConnect(call, this.#dir);
-      if (!next2) {
-        this.#noCard.set(call, now);
-        continue;
-      }
-      this.#noCard.delete(call);
-      if (JSON.stringify(next2) !== JSON.stringify(call.connect)) {
-        this.#host.transcript.mutateCall(call, (c) => c.connect = next2);
-        this.#host.changed();
-      }
-      const seen = next2.key ?? call.id;
-      if (next2.targets.some(waiting) && !next2.settled) {
-        this.#seen.add(seen);
-      }
-      if (!next2.told && this.#seen.has(seen) && allConnected(next2) && mayTell(next2, this.#dir)) {
-        this.#host.transcript.mutateCall(call, () => next2.told = true);
-        this.#host.tell(connectedMessage(next2.targets));
-        this.#host.changed();
-      } else if (next2.key && !next2.settled) {
-        open = true;
-      }
+      open = this.#tickLive(call) || open;
     }
     this.#open = open;
   }
@@ -50283,7 +50075,7 @@ var ConnectWatcher = class {
   #byOp(op) {
     return typeof op === "string" && op ? this.#host.transcript.calls(CONNECT_TOOL).findLast((c) => c.connect?.op?.id === op) : void 0;
   }
-  /** The connect card `ref` names (its operation, its file, or its call id when it has neither). */
+  /** The connect card `ref` names (its operation, or its call id when it has none). */
   #call(ref) {
     return this.#host.transcript.calls(CONNECT_TOOL).findLast((c) => cardRef(c) === ref);
   }
@@ -50345,12 +50137,12 @@ var Disposables = class {
 };
 
 // src/draft/attachments.ts
-import { existsSync as existsSync4 } from "node:fs";
+import { existsSync as existsSync3 } from "node:fs";
 import { basename as basename4 } from "node:path";
 
 // src/hermes/clipboardImage.ts
 import { execFile as execFile6 } from "node:child_process";
-import { existsSync as existsSync3, statSync } from "node:fs";
+import { existsSync as existsSync2, statSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
 import { homedir as homedir11, tmpdir } from "node:os";
 import { join as join10, resolve as resolve4 } from "node:path";
@@ -50390,9 +50182,9 @@ async function extractClipboardImage(dest, env2, platform = process.platform, ru
     }
     if (answer.startsWith("file:")) {
       const file2 = answer.slice("file:".length);
-      return IMAGE.test(file2) && existsSync3(file2) ? file2 : void 0;
+      return IMAGE.test(file2) && existsSync2(file2) ? file2 : void 0;
     }
-    return answer === "true" && existsSync3(dest) ? dest : void 0;
+    return answer === "true" && existsSync2(dest) ? dest : void 0;
   }
   for (const reader of platform === "linux" ? LINUX_READERS.filter((r) => r.when(env2)) : []) {
     try {
@@ -50400,7 +50192,7 @@ async function extractClipboardImage(dest, env2, platform = process.platform, ru
     } catch {
       continue;
     }
-    if (existsSync3(dest) && statSync(dest).size > 0) {
+    if (existsSync2(dest) && statSync(dest).size > 0) {
       return dest;
     }
   }
@@ -50433,7 +50225,7 @@ function imagePathOf(text16, cwd) {
     return void 0;
   }
   const path2 = resolve4(cwd, raw2);
-  return existsSync3(path2) ? path2 : void 0;
+  return existsSync2(path2) ? path2 : void 0;
 }
 
 // src/draft/attachments.ts
@@ -50605,7 +50397,7 @@ var Attachments = class {
     const size = imageSize(bytes);
     const kb = bytes.length / 1024;
     const blob = this.#host.blob(bytes, attachment.mime);
-    const preview4 = blob ? { blob } : existsSync4(attachment.path) ? { path: attachment.path } : void 0;
+    const preview4 = blob ? { blob } : existsSync3(attachment.path) ? { path: attachment.path } : void 0;
     const caption = [size && `${size.w}\xD7${size.h}`, kb >= 1024 ? `${(kb / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(kb))} KB`];
     return { ...attachment, caption: caption.filter(Boolean).join(" \xB7 "), name, ...preview4 ? { preview: preview4 } : {} };
   }
@@ -51588,14 +51380,14 @@ var Viewer = class {
 };
 
 // src/processes/widgets/memory.ts
-import { mkdirSync as mkdirSync4, readdirSync as readdirSync2, rmSync as rmSync2, statSync as statSync2, writeFileSync as writeFileSync4 } from "node:fs";
+import { mkdirSync as mkdirSync4, readdirSync, rmSync as rmSync2, statSync as statSync2, writeFileSync as writeFileSync3 } from "node:fs";
 import { join as join11 } from "node:path";
 var KEEP_MS = 7 * 24 * 36e5;
-var safe3 = (id) => /^[\w.-]{1,128}$/.test(id);
+var safe2 = (id) => /^[\w.-]{1,128}$/.test(id);
 function chartMemory(dir2 = join11(dataDir(), "charts"), now = Date.now) {
   return {
     load(id) {
-      if (!safe3(id)) {
+      if (!safe2(id)) {
         return void 0;
       }
       const value = readJsonFile(join11(dir2, `${id}.json`));
@@ -51611,13 +51403,13 @@ function chartMemory(dir2 = join11(dataDir(), "charts"), now = Date.now) {
       }
     },
     save(id, value) {
-      if (!safe3(id)) {
+      if (!safe2(id)) {
         return;
       }
       try {
         mkdirSync4(dir2, { recursive: true });
-        writeFileSync4(join11(dir2, `${id}.json`), JSON.stringify(value));
-        for (const name of readdirSync2(dir2)) {
+        writeFileSync3(join11(dir2, `${id}.json`), JSON.stringify(value));
+        for (const name of readdirSync(dir2)) {
           const file2 = join11(dir2, name);
           if (now() - statSync2(file2).mtimeMs > KEEP_MS) {
             rmSync2(file2, { force: true });
@@ -52557,7 +52349,7 @@ var SessionTitle = class {
 };
 
 // src/transcript/promptRefs.ts
-import { existsSync as existsSync5 } from "node:fs";
+import { existsSync as existsSync4 } from "node:fs";
 import { basename as basename5 } from "node:path";
 var VALUE = "(`[^`\\n]+`|\"[^\"\\n]+\"|'[^'\\n]+'|\\S+)";
 var IMAGE_LINE = new RegExp(`^@image:${VALUE}[ \\t]*$`, "gm");
@@ -52605,7 +52397,7 @@ function splitPrompt(raw2) {
   }
   return { files, images: [...refs, ...hinted], text: text16.replace(CONTEXT_WARNINGS, "").replace(/\n{3,}/g, "\n\n").trim() };
 }
-function promptAttachments(parts3, exists = existsSync5) {
+function promptAttachments(parts3, exists = existsSync4) {
   const local = (p3) => p3.startsWith("/") && exists(p3);
   return [
     ...parts3.images.map((p3) => ({ kind: "image", name: basename5(p3), ...local(p3) ? { source: { path: p3 } } : {} })),
@@ -53764,7 +53556,7 @@ function chatStores(chat, { act, gw: gw2, launch: launch3, settings: settings2, 
   const timers = new Disposables();
   const presses = { esc: 0, exit: 0 };
   const sheets2 = new PromptSheets(chat);
-  const connect2 = new ConnectWatcher({ changed, gw: gw2, openUrl, sid: () => session2.ref.live, tell: (text16) => act().submit(text16, false), transcript });
+  const connect2 = new ConnectWatcher({ changed, gw: gw2, openUrl, sid: () => session2.ref.live, transcript });
   const reconnect = new Reconnect(chat);
   const warned = { protocol: false, status: void 0 };
   const notices = new NoticeStrip(chat);
