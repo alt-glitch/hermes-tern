@@ -1,5 +1,5 @@
 // Hermes for Tern. Asks the terminal for the Tern Surface Protocol; without it
-// exits with NO_TSP so the launcher falls back to the Ink TUI. With it, attaches
+// exits with NO_TSP, and the launcher tells the user this is not a Tern pane. With it, attaches
 // to the profile's gateway (`hermes gateway attach`, hermes/connect.ts) and
 // runs the app until the user quits: the chat, or (opened as a sidebar by the
 // chat) one subagent's pane.
