@@ -2,20 +2,21 @@
 // fields (gateway/session_picker_fields.py). The gateway lists them in two scopes, as Ink's session
 // switcher reads them: `live` holds the sessions its authority serves (open in a pane, or running),
 // `stored` the ones it can resume from history (closed by their last viewer, older local rows, and
-// messaging conversations). The picker shows both, once each. Each call returns at most 200 rows,
-// with no cursor.
+// messaging conversations). The live scope is one short list. The stored scope is read a page at
+// a time: each page holds at most 200 rows and names the cursor of the next one.
 
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 
 import * as z from 'zod/mini'
 
+import { optional } from '../core/assert.js'
 import { type Requester, rpcParsed } from '../wire/rpc.js'
 import { loose, rowsOf } from '../wire/schemas.js'
 
 const run = promisify(execFile)
 
-/** The most rows one `session.list` call returns. */
+/** The most rows one `session.list` call returns: the gateway's cap. */
 const LIMIT = 200
 
 /** One conversation as the picker shows it. */
@@ -61,7 +62,22 @@ const listRow = z.object({
   pinned: loose(z.nullable(z.boolean()))
 })
 
-const listResult = z.object({ sessions: z.catch(z.array(z.unknown()), []) })
+const listResult = z.object({
+  next_cursor: loose(z.nullable(z.string())),
+  sessions: z.catch(z.array(z.unknown()), [])
+})
+
+/** What narrows a listing: a folder (the gateway's `hermes -c` rule), and text in a title or id (stored scope only). */
+export interface SessionFilter {
+  workspace?: string | undefined
+  query?: string | undefined
+}
+
+/** One page of the stored scope, and the cursor of the next page (null when there is none). */
+export interface StoredPage {
+  rows: ListedSession[]
+  next: string | null
+}
 
 function listed(r: z.infer<typeof listRow>): ListedSession {
   const startedAt = Math.round((r.started_at ?? 0) * 1000)
@@ -85,27 +101,26 @@ function listed(r: z.infer<typeof listRow>): ListedSession {
   }
 }
 
-async function scope(gw: Requester, which: 'live' | 'stored'): Promise<ListedSession[]> {
-  const r = await rpcParsed(gw, 'session.list', { limit: LIMIT, picker: true, scope: which }, listResult)
+/** The sessions the gateway serves now, in `workspace` when one is named. */
+export async function liveSessions(gw: Requester, workspace?: string): Promise<ListedSession[]> {
+  const r = await rpcParsed(gw, 'session.list', { limit: LIMIT, picker: true, scope: 'live', ...optional('workspace', workspace) }, listResult)
 
   return rowsOf(listRow, r.sessions).map(listed)
 }
 
-/** Every conversation the gateway offers, once each, newest activity first. */
-export async function listSessions(gw: Requester): Promise<ListedSession[]> {
-  const [live, stored] = await Promise.all([scope(gw, 'live'), scope(gw, 'stored')])
-  const seen = new Set<string>()
-  const out: ListedSession[] = []
-
-  // A live row comes first: only it says whether the session runs.
-  for (const s of [...live, ...stored]) {
-    if (!seen.has(s.conversation) && !seen.has(s.id)) {
-      seen.add(s.conversation).add(s.id)
-      out.push(s)
-    }
+/** The stored page after `cursor` (the first page with none), narrowed by `filter`. */
+export async function storedPage(gw: Requester, filter: SessionFilter, cursor?: string): Promise<StoredPage> {
+  const params = {
+    limit: LIMIT,
+    picker: true,
+    scope: 'stored' as const,
+    ...optional('workspace', filter.workspace),
+    ...optional('query', filter.query),
+    ...optional('cursor', cursor)
   }
+  const r = await rpcParsed(gw, 'session.list', params, listResult)
 
-  return out.sort((a, b) => b.lastActive - a.lastActive)
+  return { next: r.next_cursor ?? null, rows: rowsOf(listRow, r.sessions).map(listed) }
 }
 
 /** The folder sessions group under: the git repo holding `cwd`, else `cwd` itself (the CLI's workspace key). */
