@@ -7,7 +7,7 @@
 import { assertNever } from '../../core/assert.js'
 import type { BackgroundProcess } from '../../model.js'
 
-import type { Author, AuthorRequest } from './author.js'
+import { type Author, type AuthorRequest, RejectedAnswer } from './author.js'
 import { FileTap, outputFiles } from './files.js'
 import type { ChartMemory } from './memory.js'
 import { ChartRuntime, sampleLines, type TextChunk, type TextSource } from './runtime.js'
@@ -389,6 +389,13 @@ export class Charts {
           next = { kind: 'unavailable' }
 
           break
+        }
+
+        if (answer instanceof RejectedAnswer) {
+          // Not one JSON object, or not the schema's shape: asked once more with the reasons.
+          request.rejected = { answer: answer.answer, errors: answer.errors }
+
+          continue
         }
 
         if (specSkip(answer) !== undefined) {

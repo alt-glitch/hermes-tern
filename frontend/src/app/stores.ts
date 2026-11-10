@@ -30,7 +30,7 @@ import { OverlayStack } from '../overlays/overlay.js'
 import { openUrl } from '../overlays/pullRequests.js'
 import { Cron } from '../processes/cron.js'
 import { Processes } from '../processes/store.js'
-import { hermesAuthor } from '../processes/widgets/author.js'
+import { gatewayAuthor } from '../processes/widgets/author.js'
 import { chartMemory } from '../processes/widgets/memory.js'
 import { PromptSheets } from '../prompts/sheets.js'
 import { PrAside } from '../prs/aside.js'
@@ -102,7 +102,7 @@ export function chatStores(chat: ChatPorts, { act, gw, launch, settings, surface
    * The session's background processes (the shells pill, the Background sheet, background cards),
    * with live charts unless settings.json's `jobCharts` is false.
    */
-  const processes = new Processes(live, { author: hermesAuthor(), enabled: () => jobCharts, memory: chartMemory() })
+  const processes = new Processes(live, { author: gatewayAuthor(gw, () => session.ref.live), enabled: () => jobCharts, memory: chartMemory() })
   const cron = new Cron(chat)
   const sidebar = new Sidebar(chat)
   /** The session's standing /goal and /loop (the dock line above the pills and its sheets). */
