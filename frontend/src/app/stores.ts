@@ -36,7 +36,7 @@ import { PrAside } from '../prs/aside.js'
 import { adoptSteps } from '../session/adopt.js'
 import { Automation } from '../session/automation.js'
 import { SessionLifecycle } from '../session/lifecycle.js'
-import { markPane } from '../session/pane.js'
+import { markPane, writeSessionFile } from '../session/pane.js'
 import { SessionState } from '../session/state.js'
 import { showThoughts } from '../session/thoughts.js'
 import { SessionTitle } from '../session/title.js'
@@ -237,7 +237,10 @@ export function chatStores(chat: ChatPorts, { act, gw, launch, settings, surface
         warned.status = undefined
       },
       imageLanded: call => act().imageLanded(call),
-      markPane: id => markPane(launch, id),
+      markPane: id => {
+        markPane(launch, id)
+        writeSessionFile(launch, id)
+      },
       markViewer: (now, before) => viewer.show(now, before),
       readBusyMode: () => void act().readBusyMode(),
       reportCwd: () => act().reportCwd(),

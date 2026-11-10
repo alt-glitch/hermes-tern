@@ -6,7 +6,7 @@
 // asked again once the output has grown. The final view is what the pane would show.
 //
 //   (cd frontend && bunx esbuild ../lab/chartbench.ts --bundle --platform=node --format=esm --preserve-symlinks --outfile=/tmp/chartbench.mjs)
-//   HERMES_TERN_HERMES='{"argv":["hermes"]}' node /tmp/chartbench.mjs JOBS.json OUT_DIR
+//   HERMES_TERN_HERMES='["hermes"]' node /tmp/chartbench.mjs JOBS.json OUT_DIR
 //
 // It attaches to the profile's gateway as a pane does, in a session of its own; the gateway must
 // have the plugin loaded.

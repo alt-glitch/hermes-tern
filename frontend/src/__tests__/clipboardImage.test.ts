@@ -31,7 +31,7 @@ describe('imagePathOf', () => {
 })
 
 /** The Hermes command the launcher hands the pane. */
-const HERMES: HermesCommand = { argv: ['/venv/bin/python', '-m', 'hermes_cli.main'], env: { HERMES_HOME: '/profile' } }
+const HERMES: HermesCommand = ['/venv/bin/python', '-I', '-c', 'boot']
 
 describe('withClipboardImage', () => {
   it('hands the image to its user, then removes the temporary folder', async () => {
@@ -75,7 +75,6 @@ const ANSWERS = {
 interface Call {
   file: string
   args: readonly string[]
-  env: NodeJS.ProcessEnv | undefined
 }
 
 /**
@@ -84,8 +83,8 @@ interface Call {
  */
 function runner(mac: string | Error, hermes: keyof typeof ANSWERS = 'no_image', raw?: Ran) {
   const calls: Call[] = []
-  const run: Runner = async (file, args, options) => {
-    calls.push({ args, env: options.env, file })
+  const run: Runner = async (file, args) => {
+    calls.push({ args, file })
 
     if (file === 'osascript') {
       if (mac instanceof Error) {
@@ -144,7 +143,7 @@ describe('extractClipboardImage', () => {
     expect(r.calls.map(c => c.file)).toEqual(['osascript', '/venv/bin/python'])
   })
 
-  it('elsewhere: runs `hermes clipboard image --out PATH --json` with the launcher\'s command and environment', async () => {
+  it('elsewhere: runs `hermes clipboard image --out PATH --json` with the launcher\'s command', async () => {
     const dest = join(dir, 'e.png')
     const r = runner('false', 'image')
     expect(await extractClipboardImage(dest, HERMES, 'linux', r.run)).toBe(dest)
@@ -152,8 +151,7 @@ describe('extractClipboardImage', () => {
 
     const [call] = r.calls
     expect(call?.file).toBe('/venv/bin/python')
-    expect(call?.args).toEqual(['-m', 'hermes_cli.main', 'clipboard', 'image', '--out', dest, '--json'])
-    expect(call?.env?.['HERMES_HOME']).toBe('/profile')
+    expect(call?.args).toEqual(['-I', '-c', 'boot', 'clipboard', 'image', '--out', dest, '--json'])
   })
 
   it('elsewhere: no_image is no image, not an error', async () => {

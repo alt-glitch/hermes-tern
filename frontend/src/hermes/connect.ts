@@ -1,6 +1,5 @@
 // Where the gateway connection comes from: `hermes gateway attach --json`, run with the command the
-// launcher hands the pane (HERMES_TERN_HERMES: this install's interpreter on its checkout), once per
-// dial. `--start` ensures the profile's gateway on the first dial; `--recover` re-ensures one that is
+// launcher hands the pane (HERMES_TERN_HERMES: Hermes' own `hermes_command()`), once per dial. `--start` ensures the profile's gateway on the first dial; `--recover` re-ensures one that is
 // not ready when the client asks. Each run mints a new single-use ticket.
 //
 // The only module that knows how: when Hermes ships a library call for the attach step, it replaces
@@ -13,15 +12,12 @@ import * as z from 'zod/mini'
 
 import { parseJson } from '../wire/json.js'
 
-/** How to run this Hermes: `argv` (the interpreter and `-m hermes_cli.main`), and what its environment adds. */
-export interface HermesCommand {
-  readonly argv: readonly [string, ...string[]]
-  readonly env: Readonly<Record<string, string>>
-}
+/** How to run this Hermes: an argv that needs nothing added to the environment. */
+export type HermesCommand = readonly [string, ...string[]]
 
-const command = z.object({ argv: z.tuple([z.string()], z.string()), env: z.catch(z.record(z.string(), z.string()), {}) })
+const command = z.tuple([z.string()], z.string())
 
-/** The command HERMES_TERN_HERMES names (JSON); undefined when it is unset or unreadable. */
+/** The argv HERMES_TERN_HERMES holds (a JSON list); undefined when it is unset or unreadable. */
 export function readHermesCommand(raw: string | undefined): HermesCommand | undefined {
   return raw ? command.safeParse(parseJson(raw)).data : undefined
 }
@@ -83,9 +79,9 @@ const lastJson = (text: string): unknown =>
  */
 export function attachGateway(hermes: HermesCommand, run: Runner = runFile, env: NodeJS.ProcessEnv = process.env): ConnectGateway {
   return async (start: boolean, recover: boolean): Promise<GatewayConnection> => {
-    const [file, ...args] = hermes.argv
+    const [file, ...args] = hermes
     const flags = start ? ['--start'] : recover ? ['--recover'] : []
-    const ran = await run(file, [...args, 'gateway', 'attach', '--json', ...flags], { ...env, ...hermes.env })
+    const ran = await run(file, [...args, 'gateway', 'attach', '--json', ...flags], env)
     const reply = lastJson(ran.stdout)
 
     if (ran.code === 0) {

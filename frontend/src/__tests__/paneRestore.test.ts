@@ -68,6 +68,19 @@ describe('the pane file', () => {
     expect(read(String(pane))).toMatchObject({ cwd: '/work', session_id: 'old' })
   })
 
+  it("writes each shown session to the launcher's session file, which outlives a quit", async () => {
+    const file = join(mkdtempSync(join(tmpdir(), 'hermes-tern-session-')), 'session.json')
+    const { app, done } = await started({ HERMES_TERN_SESSION_FILE: file })
+    const shown = () => record(parseJson(readFileSync(file, 'utf8')))
+
+    expect(shown()).toEqual({ session_id: 'new' })
+    await app.resume(storedSessionId('old'))
+    expect(shown()).toEqual({ session_id: 'old' })
+    app.quit()
+    await done
+    expect(shown()).toEqual({ session_id: 'old' })
+  })
+
   it('is removed when the user quits, and kept when the input ends on its own', async () => {
     const quitting = await started()
     quitting.app.quit()

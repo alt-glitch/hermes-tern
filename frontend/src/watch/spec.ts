@@ -45,7 +45,7 @@ let sidebar: string | undefined
  */
 function hermesSplit(env: NodeJS.ProcessEnv, vars: readonly string[], args: readonly string[]) {
   const pane = env['TERN_PANE']
-  // The launcher's command for this Hermes: its interpreter, and the checkout on PYTHONPATH.
+  // The launcher's command for this Hermes (Hermes' own `hermes_command()`).
   const hermes = readHermesCommand(env['HERMES_TERN_HERMES'])
 
   if (!pane || !hermes) {
@@ -54,10 +54,9 @@ function hermesSplit(env: NodeJS.ProcessEnv, vars: readonly string[], args: read
 
   const command = [
     'env',
-    ...Object.entries(hermes.env).map(([k, v]) => `${k}=${v}`),
     ...(env['HERMES_HOME'] ? [`HERMES_HOME=${env['HERMES_HOME']}`] : []),
     ...vars,
-    ...hermes.argv,
+    ...hermes,
     ...args
   ]
 

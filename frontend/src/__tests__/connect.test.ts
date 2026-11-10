@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest'
 import { AttachError, attachGateway, type Ran, readHermesCommand, terminalAttachFailure } from '../hermes/connect.js'
 import { skinColors } from '../hermes/theme.js'
 
-const HERMES = { argv: ['/py', '-m', 'hermes_cli.main'] as const, env: { PYTHONPATH: '/src' } }
+const HERMES = ['/py', '-I', '-c', 'boot'] as const
 
 const GRANT = {
   endpoint: { instance_id: 'inst-1', profile_id: 'default' },
@@ -31,17 +31,18 @@ function runner(ran: Partial<Ran>) {
 describe('attachGateway', () => {
   it('runs attach with --start first and --recover when asked, and maps the grant', async () => {
     const r = runner({ stdout: `${JSON.stringify(GRANT)}\n` })
-    const connect = attachGateway(HERMES, r.run, { HOME: '/me', PYTHONPATH: '/old' })
+    const connect = attachGateway(HERMES, r.run, { HOME: '/me' })
 
     expect(await connect(true, false)).toEqual({ instance_id: 'inst-1', profile_id: 'default', protocols: GRANT.protocols, url: GRANT.url })
     await connect(false, true)
     await connect(false, false)
     expect(r.calls.map(c => [c.file, ...c.args].join(' '))).toEqual([
-      '/py -m hermes_cli.main gateway attach --json --start',
-      '/py -m hermes_cli.main gateway attach --json --recover',
-      '/py -m hermes_cli.main gateway attach --json'
+      '/py -I -c boot gateway attach --json --start',
+      '/py -I -c boot gateway attach --json --recover',
+      '/py -I -c boot gateway attach --json'
     ])
-    expect(r.calls[0]?.env).toMatchObject({ HOME: '/me', PYTHONPATH: '/src' })
+    // The command needs nothing added: the environment is the process's own.
+    expect(r.calls[0]?.env).toEqual({ HOME: '/me' })
   })
 
   it("throws attach's own verdict, terminal only for what no retry fixes", async () => {
@@ -69,10 +70,11 @@ describe('attachGateway', () => {
 
 describe('readHermesCommand', () => {
   it('reads the launcher command, and nothing from a missing or broken one', () => {
-    expect(readHermesCommand(JSON.stringify(HERMES))).toEqual({ argv: ['/py', '-m', 'hermes_cli.main'], env: { PYTHONPATH: '/src' } })
-    expect(readHermesCommand('{"argv":["/py"]}')).toEqual({ argv: ['/py'], env: {} })
+    expect(readHermesCommand(JSON.stringify(HERMES))).toEqual(['/py', '-I', '-c', 'boot'])
+    expect(readHermesCommand('["/hermes"]')).toEqual(['/hermes'])
     expect(readHermesCommand(undefined)).toBeUndefined()
-    expect(readHermesCommand('{"argv":[]}')).toBeUndefined()
+    expect(readHermesCommand('[]')).toBeUndefined()
+    expect(readHermesCommand('{"argv":["/py"]}')).toBeUndefined()
     expect(readHermesCommand('nope')).toBeUndefined()
   })
 })
