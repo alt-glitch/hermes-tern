@@ -37,6 +37,12 @@ case "${1:-all}" in
     export PATH="$ROOT/.hermes-agent/.venv/bin:$PATH"
     (cd frontend && bun run typecheck && bun run test src/__tests__/toolRegistry.test.ts --update && bun run bundle)
     ;;
+  snapshots)
+    runtime
+    uv sync --project .hermes-agent --frozen --python 3.14
+    export PATH="$ROOT/.hermes-agent/.venv/bin:$PATH"
+    (cd frontend && bun run test src/__tests__/agents.test.ts src/__tests__/overlayOwnership.test.ts src/__tests__/terminalAsyncNotify.test.ts src/__tests__/readConflictIntegration.test.ts src/__tests__/ptyComposer.test.ts && bun run test src/__tests__/golden.test.ts --update && bun run test src/__tests__/golden.test.ts)
+    ;;
   frontend)
     runtime
     uv sync --project .hermes-agent --frozen --python 3.14
@@ -44,5 +50,5 @@ case "${1:-all}" in
     (cd frontend && bun run typecheck && bun run lint && bun run check:size && bun run check:strict && bun run check:suppressions && bun run test --reporter=junit --outputFile="$RUNNER_TEMP/frontend.xml" && bun run bundle)
     python3 glide/tools/smoke_upstream_sync.py
     ;;
-  *) echo 'usage: verify_upstream_sync.sh python|regenerate|frontend' >&2; exit 2 ;;
+  *) echo 'usage: verify_upstream_sync.sh python|regenerate|snapshots|frontend' >&2; exit 2 ;;
 esac

@@ -83,7 +83,6 @@ FLAGS: list[tuple[tuple[str, ...], dict[str, Any]]] = [
     (("--channel",), dict(metavar="NAME", help="use a registered frontend channel instead of the default")),
 ]
 
-# How much of a channel's pinned commit the listing shows.
 SHORT_SHA = 12
 
 
@@ -348,7 +347,6 @@ def run(args: argparse.Namespace, channel: Optional[str] = None) -> None:
         front = channels.frontend_dir(switch["channel"])
         bundle = front / "dist" / "entry.js"
         env["HERMES_TERN_RESUME"] = switch["session_id"]
-        # A live switch is not a crash restore or a new submission of the launch prompt.
         for key in (panes.RESTORED_ENV, "HERMES_TERN_QUERY", "HERMES_TERN_IMAGE"):
             env.pop(key, None)
     if code == NO_TSP_EXIT:

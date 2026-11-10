@@ -48,10 +48,15 @@ const ASYNC_UNSUPPORTED = 'notify_on_complete / watch_patterns are not available
   'an async completion after the turn ends (a one-shot runner such as `hermes -z`, a cron ' +
   'job, a Kanban worker, or a stateless HTTP endpoint). The process is running in the ' +
   "background; retrieve its result with process(action='poll') or process(action='wait')."
+const ASYNC_UNSUPPORTED_CURRENT = 'notify_on_complete / watch_patterns are not available in this session — it cannot receive ' +
+  'an async completion after the turn ends (a one-shot runner such as `hermes -z`, a /bg ' +
+  'background task, a cron job, a Kanban worker, or a stateless HTTP endpoint). The process is running in the ' +
+  "background; retrieve its result with process(action='poll') or process(action='wait')."
 
 function asyncNotifyUnavailable(result: Raw['result']): boolean {
   try {
-    if (!result || !Object.hasOwn(result, 'notify_unsupported') || result['notify_unsupported'] !== ASYNC_UNSUPPORTED) return false
+    if (!result || !Object.hasOwn(result, 'notify_unsupported') ||
+      (result['notify_unsupported'] !== ASYNC_UNSUPPORTED && result['notify_unsupported'] !== ASYNC_UNSUPPORTED_CURRENT)) return false
     if (!Object.hasOwn(result, 'notify_on_complete') || result['notify_on_complete'] !== false) return false
     if (!Object.hasOwn(result, 'session_id') || typeof result['session_id'] !== 'string' || !result['session_id']) return false
     if (!Object.hasOwn(result, 'output') || result['output'] !== 'Background process started') return false

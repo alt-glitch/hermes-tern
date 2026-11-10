@@ -16,6 +16,7 @@ import type { LiveSessionId } from '../core/ids.js'
 import { Poller } from '../core/poller.js'
 import type { Subagent, ToolCall } from '../model.js'
 import type { Transcript } from '../transcript/store.js'
+import { JOB_TILE_LIMIT } from '../view/ui/jobTiles.js'
 import { rpc } from '../wire/rpc.js'
 
 import { eventOwner, foldOwnedEvent } from './ownership.js'
@@ -166,7 +167,6 @@ export class Agents {
       })
     }
 
-    // Streamed rows still need their gateway transcript for the wait tiles.
     if (call || (!listed && this.#needsList())) {
       this.#poller.poke()
     }
@@ -183,7 +183,7 @@ export class Agents {
 
     this.#followed = a
 
-    if (a && !this.running().slice(0, 4).includes(a)) {
+    if (a && !this.#visibleAgents().includes(a)) {
       this.#poller.poke()
     }
   }
@@ -289,7 +289,13 @@ export class Agents {
     return Boolean(a && !this.#transcripts.get(a.id)?.finished)
   }
 
-  /** One round: the list when a probe or a row needs it, then the followed agent's transcript. */
+  #visibleAgents(): Subagent[] {
+    return this.#host.transcript.delegations().flatMap(call =>
+      (call.subagents ?? []).filter(isRunning).slice(0, JOB_TILE_LIMIT)
+    )
+  }
+
+  /** One round: list state, visible Task progress, and the followed agent's transcript. */
   async #round(ticket: Ticket) {
     const probe = this.#probe
     this.#probe = false
@@ -299,7 +305,7 @@ export class Agents {
       await this.#poll(changed, ticket)
     }
 
-    const visible = this.running().slice(0, 4)
+    const visible = this.#visibleAgents()
     if (this.#followed && !visible.includes(this.#followed)) {
       visible.push(this.#followed)
     }

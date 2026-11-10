@@ -159,6 +159,28 @@ describe('Agents', () => {
     expect(store.all()[4]?.steps).toBeUndefined()
   })
 
+  it('reads a newer Task card even while four older agents keep running', async () => {
+    vi.useFakeTimers()
+    const transcript = dispatched(4)
+    transcript.toolStart(stub({ name: 'delegate_task', tool_id: 'c2' }), 0)
+    transcript.toolComplete(stub({ name: 'delegate_task', tool_id: 'c2', result: {
+      delegation_id: 'deleg_2', goals: ['new goal'], mode: 'background',
+      status: 'dispatched', subagent_ids: ['new-agent']
+    } }), 0)
+    const gw = new FakeGateway({ replies: {
+      'session.transcript': () => ({ available: true, next_cursor: null, reset: true, rows: ROWS, running: true })
+    } })
+    store = new Agents({ changed: () => undefined, gw: gw.client, sid: liveSessionId('s1'), transcript })
+    store.scan()
+
+    await vi.advanceTimersByTimeAsync(0)
+
+    expect(gw.sent('session.transcript').map(p => p['subagent_id'])).toEqual([
+      'sa-0-abcd', 'sa-1-abcd', 'sa-2-abcd', 'sa-3-abcd', 'new-agent'
+    ])
+    expect(store.all().find(a => a.id === 'new-agent')?.steps).toHaveLength(4)
+  })
+
   it('replaces the rows it holds on a reset, and shows the tool a running agent has not stored yet', async () => {
     vi.useFakeTimers()
     const pages = [

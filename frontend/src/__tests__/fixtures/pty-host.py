@@ -53,6 +53,8 @@ def run(app_path: str, mode: str) -> dict:
         output = bytearray()
         scanned = 0
         frames = 0
+        paste_active = False
+        pending_acks = []
 
         def read_status() -> dict:
             try:
@@ -86,7 +88,11 @@ def run(app_path: str, mode: str) -> dict:
                         frame = json.loads(found.group(1))
                         if isinstance(frame, dict) and isinstance(frame.get("s"), int):
                             ack = {"ev": "ack", "sf": frame["sf"], "s": frame["s"]}
-                            os.write(master, b"\x1b_tsp;e;" + json.dumps(ack).encode("utf-8") + b"\x1b\\")
+                            encoded = b"\x1b_tsp;e;" + json.dumps(ack).encode("utf-8") + b"\x1b\\"
+                            if paste_active:
+                                pending_acks.append(encoded)
+                            else:
+                                os.write(master, encoded)
                     except (ValueError, KeyError):
                         # A chunked frame has its own envelope; the SDK also has 32 credits.
                         pass
@@ -172,7 +178,12 @@ def run(app_path: str, mode: str) -> dict:
             # reinterpret its contents as Normal commands or shell instructions.
             data = PASTE.encode("utf-8")
             cut = data.index("🧩".encode("utf-8")) + 2
+            paste_active = True
             send([b"\x1b[20", b"0~", data[:cut], data[cut:], b"\x1b[20", b"1~"])
+            paste_active = False
+            for ack in pending_acks:
+                os.write(master, ack)
+            pending_acks.clear()
             wait("paste remains literal with command provenance", lambda:
                  read_status().get("draft") == PASTE and read_status().get("pasted") == [PASTE])
             send([b"\r"])
