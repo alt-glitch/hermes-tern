@@ -395,7 +395,7 @@ export function openSessionPicker(host: SessionsHost, reader: TranscriptReader =
             host.changed()
           }}
           order={order}
-          placeholder="Search all titles and ids, loaded prompts, folders, branches…"
+          placeholder="Search titles, prompts, folders, branches…"
           preview="side"
           query={query}
           role="hermes.sessions"
