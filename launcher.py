@@ -280,6 +280,11 @@ def run(args: argparse.Namespace) -> None:
         # Read here: a resume may move to the session's folder.
         args.image = os.path.abspath(os.path.expanduser(image))
     launch_cwd = os.getcwd()
+    node = node_binary()
+    if not node:
+        print("hermes tern: Node.js was not found; install it from https://nodejs.org (`hermes doctor` shows how)",
+              file=sys.stderr)
+        sys.exit(1)
     resume = pick_session(args)
     restored = panes.plan(fresh=bool(_opt(args, "new")), explicit=bool(resume))
     resume = restored or resume
@@ -296,25 +301,25 @@ def run(args: argparse.Namespace) -> None:
         # A resumed session opens in its own folder, as `hermes chat --resume` does.
         if (cwd := _session_cwd(resume)) and os.path.realpath(cwd) != os.path.realpath(launch_cwd):
             os.chdir(cwd)
-    node = node_binary()
-    if not node:
-        print("hermes tern: Node.js was not found; install it from https://nodejs.org (`hermes doctor` shows how)",
-              file=sys.stderr)
-        sys.exit(1)
-    fd, session_file = tempfile.mkstemp(prefix="hermes-tern-session-", suffix=".json")
-    os.close(fd)
-    env = frontend_env(args, resume, restored, launch_cwd, hermes, session_file)
+    code, shown, session_file = None, resume, None
     try:
-        code = subprocess.call([node, "--expose-gc", str(bundle)], env=env)
-    except KeyboardInterrupt:
-        code = 130
-    shown = _shown_session(session_file) or resume
-    with contextlib.suppress(OSError):
-        os.unlink(session_file)
-    if code in QUIT_CODES and shown:
-        hermes.print_exit_summary(shown, command="hermes tern")
-    if worktree:
-        hermes.finish_worktree(worktree, shown, ask=code in QUIT_CODES)
+        fd, session_file = tempfile.mkstemp(prefix="hermes-tern-session-", suffix=".json")
+        os.close(fd)
+        env = frontend_env(args, resume, restored, launch_cwd, hermes, session_file)
+        try:
+            code = subprocess.call([node, "--expose-gc", str(bundle)], env=env)
+        except KeyboardInterrupt:
+            code = 130
+        shown = _shown_session(session_file) or resume
+        if code in QUIT_CODES and shown:
+            hermes.print_exit_summary(shown, command="hermes tern")
+    finally:
+        if session_file:
+            with contextlib.suppress(OSError):
+                os.unlink(session_file)
+        if worktree:
+            # Also when the frontend did not start: the tree made for this launch is not left behind.
+            hermes.finish_worktree(worktree, shown, ask=code in QUIT_CODES)
     if code == NO_TSP_EXIT:
         print("hermes tern: this terminal did not answer the Tern Surface Protocol, so it is not a Tern pane "
               "this program can draw in. Run `hermes tern` in Tern (https://stencil.so/tern), or use `hermes chat`.",

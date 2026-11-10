@@ -179,6 +179,23 @@ def test_worktree_is_made_before_the_frontend_and_finished_after_it(launched, he
     assert hermes.calls[-1] == ("finish", tree, "s-1", ask)
 
 
+def test_no_worktree_is_made_when_node_is_missing(launched, hermes, monkeypatch):
+    monkeypatch.setattr(launcher, "node_binary", lambda: None)
+    code, runs = launched(parse(["-w"]))
+    assert code == 1 and runs == []
+    assert not [c for c in hermes.calls if c[0] == "create"]
+
+
+def test_worktree_is_finished_when_the_frontend_cannot_start(launched, hermes, monkeypatch, tmp_path):
+    def call(argv, env=None, **_):
+        raise OSError("exec format error")
+
+    monkeypatch.setattr(launcher.subprocess, "call", call)
+    with pytest.raises(OSError):
+        launcher.run(parse(["-w"]))
+    assert hermes.calls[-1] == ("finish", str(tmp_path / "tree"), None, False)
+
+
 def test_worktree_that_cannot_be_made_stops_the_launch(launched, hermes):
     hermes.tree = None
     code, runs = launched(parse(["-w"]))
