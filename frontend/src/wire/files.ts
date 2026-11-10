@@ -1,8 +1,7 @@
 // The files and texts this frontend reads that another process wrote: its settings, the watch
-// spec a launching pane hands a watcher, the PR links the plugin's Python half writes, and the
-// chart rules a pane keeps for a process. Each is read once, through a schema, into a named type.
-// None carries a version: an old pane keeps running the old bundle after a `git pull`, so every
-// format stays the one it was.
+// spec a launching pane hands a watcher, and the chart rules a pane keeps for a process. Each is
+// read once, through a schema, into a named type. None carries a version: an old pane keeps
+// running the old bundle after a `git pull`, so every format stays the one it was.
 // A schema falls back where the code before it fell back: a missing or unreadable file and text
 // that is not JSON read as they did, and a field of the wrong type reads as absent.
 
@@ -79,36 +78,6 @@ export function readWatchSpecText(raw: string | undefined): WatchSpec | undefine
   const spec = watchSpec.safeParse(raw ? parseJson(raw) : undefined)
 
   return spec.success ? spec.data : undefined
-}
-
-// ── PR links (plugin-data/hermes-tern/pull-requests.json, pull_requests.py) ───────────────────
-
-const linksFile = z.catch(
-  z.object({
-    /** Session id → the conversation root its links are filed under; a non-text root reads as none. */
-    aliases: z.catch(z.record(z.string(), loose(z.string())), {}),
-    /** Root → its links, read by links.ts as a tool result's are. */
-    conversations: z.catch(z.record(z.string(), z.unknown()), {})
-  }),
-  { aliases: {}, conversations: {} }
-)
-
-/** pull-requests.json's two maps. */
-export type LinksFile = z.infer<typeof linksFile>
-
-/**
- * The links file's maps; undefined when it cannot be read or is not JSON, and empty maps for JSON
- * that is not an object. A file holding `null` throws, as reading `data.aliases` on it did before
- * the schema.
- */
-export function readLinksFile(file: string): LinksFile | undefined {
-  const data = readJsonFile(file)
-
-  if (data === null) {
-    throw new TypeError('pull-requests.json holds null')
-  }
-
-  return data === undefined ? undefined : linksFile.parse(data)
 }
 
 // ── Chart memory (plugin-data/hermes-tern/charts/<id>.json) ───────────────────────────────────

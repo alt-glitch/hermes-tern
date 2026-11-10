@@ -1,11 +1,11 @@
 // A resumed session's entries, rebuilt from its stored messages: prompts, turns of thoughts,
-// text and tool calls, the notices Hermes wrote itself, and the compactions the gateway's history
-// leaves out, placed where they happened.
+// text and tool calls, the notices Hermes wrote itself; and the compactions the gateway's history
+// leaves out, placed where they happened once they are read.
 
 import type { TranscriptMessage } from '@hermes/shared/gateway-events'
 
 import { type EntryId, type ToolCallId, toolCallId } from '../core/ids.js'
-import type { Entry, Todo, ToolCall, TurnEnd, TurnEntry, UserEntry } from '../model.js'
+import type { Block, Compaction, Entry, Todo, ToolCall, TurnEnd, TurnEntry, UserEntry } from '../model.js'
 import { settleBridge, unwrap } from '../tools/bridge.js'
 import { detailOf } from '../tools/detail.js'
 import { parseJson, record } from '../wire/json.js'
@@ -22,33 +22,14 @@ export interface HistorySource {
   /** The entries a reload keeps (the welcome card): the rebuilt ones follow them. */
   kept: Entry[]
   messages: TranscriptMessage[]
-  /** The stored compactions, oldest first (Compactions.restore). */
-  compactions: readonly RestoredCompaction[]
   /** A fresh id for an entry or block, unique within the transcript. */
   id: (prefix: string) => EntryId
 }
 
-/**
- * The entries of a resumed session: `kept`, then what its stored messages make, with its
- * compactions where they happened: in the turn that went on after one, else between turns.
- */
-export function history({ kept, messages, compactions, id }: HistorySource): Entry[] {
+/** The entries of a resumed session: `kept`, then what its stored messages make. */
+export function history({ kept, messages, id }: HistorySource): Entry[] {
   const entries = [...kept]
   let turn: TurnEntry | undefined
-  const marks = [...compactions]
-  let due: RestoredCompaction[] = []
-
-  const place = (inTurn: boolean) => {
-    for (const { at, compaction } of due) {
-      if (inTurn && turn) {
-        turn.blocks.push({ at, compaction, id: id('z'), kind: 'compaction' })
-      } else {
-        entries.push({ compaction, id: id('z'), kind: 'compaction', rev: 0 })
-      }
-    }
-
-    due = []
-  }
   let pendingContinued: string | undefined
   // When the row that opened the next turn (a prompt or a notice) was written.
   let promptAt = 0
@@ -63,14 +44,6 @@ export function history({ kept, messages, compactions, id }: HistorySource): Ent
     // A steer is stored as its own user row inside the turn it joined. The display projection
     // tags it `steer` and already unwraps Hermes' marker; a raw snapshot still carries the marker.
     const steered = m.role === 'user' ? (m.display_kind === 'steer' ? text.trim() : steerText(text)) : undefined
-
-    while (at > 0 && marks[0] && marks[0].at <= at) {
-      due.push(marks[0])
-      marks.shift()
-    }
-
-    // The turn going on after it (its next step or a steer) holds it; a prompt or a notice starts afresh.
-    place(m.role === 'assistant' || m.role === 'tool' || (m.role === 'user' && steered !== undefined))
 
     if (steered !== undefined && turn) {
       turn.blocks.push({ at, id: id('s'), kind: 'steer', text: steered })
@@ -218,10 +191,55 @@ export function history({ kept, messages, compactions, id }: HistorySource): Ent
     }
   }
 
-  due.push(...marks)
-  place(false)
-
   return entries
+}
+
+/** When block `b` started, for a block that knows (text does not). */
+function blockAt(b: Block): number | undefined {
+  switch (b.kind) {
+    case 'thinking':
+      return b.startedAt
+    case 'tool':
+      return b.call.startedAt
+    case 'steer':
+    case 'compaction':
+      return b.at
+    case 'text':
+      return undefined
+  }
+}
+
+/**
+ * Puts stored compactions into `entries` that a reload built without them (they are read after the
+ * transcript shows), where history() would have put them: in the turn that was still going on
+ * after one, else before the first prompt written after it. One already shown stays where it is.
+ */
+export function placeCompactions(entries: Entry[], compactions: readonly RestoredCompaction[], id: (prefix: string) => EntryId) {
+  for (const { at, compaction } of compactions) {
+    // A stored one restored again is a new object: the same compaction starts at the same time.
+    const same = (c: Compaction) => c === compaction || c.startedAt === compaction.startedAt
+    const shown = entries.some(
+      e => (e.kind === 'compaction' && same(e.compaction)) || (e.kind === 'turn' && e.blocks.some(b => b.kind === 'compaction' && same(b.compaction)))
+    )
+
+    if (shown) {
+      continue
+    }
+
+    const found = entries.findIndex(e => (e.kind === 'user' && e.at >= at) || (e.kind === 'turn' && e.startedAt >= at))
+    const next = found < 0 ? entries.length : found
+    const before = entries.slice(0, next).findLast(e => e.kind === 'user' || e.kind === 'turn')
+    const ended = before?.kind === 'turn' ? turnEndedAt(before) : undefined
+
+    if (before?.kind === 'turn' && (ended === undefined || ended >= at)) {
+      // Right after the turn's last step known to come before it (a text block knows no time).
+      const step = before.blocks.findLastIndex(b => (blockAt(b) ?? Infinity) < at)
+      before.blocks.splice(step + 1, 0, { at, compaction, id: id('z'), kind: 'compaction' })
+      before.rev++
+    } else {
+      entries.splice(next, 0, { compaction, id: id('z'), kind: 'compaction', rev: 0 })
+    }
+  }
 }
 
 /** A stored prompt: its words, and as attachments the image refs and attached context Hermes stored with them. */

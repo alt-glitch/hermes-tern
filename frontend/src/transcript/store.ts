@@ -22,7 +22,7 @@ import { record } from '../wire/json.js'
 
 import { callIn, callsWhere, findCall, isBackgroundCall, isTodoName, isToolError, isWatchCall, type Located } from './calls.js'
 import { Compactions } from './compactions.js'
-import { history, storedUser } from './history.js'
+import { history, placeCompactions, storedUser } from './history.js'
 import { continuation, displayNotice, failure, internalNotice, passable, type UserPrompt, userEntry } from './messages.js'
 import { currentTodos, todosOf, toTodos } from './todos.js'
 import { endThinking, trailingText, usageSince } from './turns.js'
@@ -444,16 +444,20 @@ export class Transcript {
     }
   }
 
-  /**
-   * Rebuilds the entries of a resumed session from its stored messages, with its compactions
-   * (`stored`, which the gateway's history leaves out) where they happened: in the turn that went
-   * on after one, else between turns.
-   */
-  load(messages: TranscriptMessage[], stored: readonly StoredCompaction[] = []) {
+  /** Rebuilds the entries of a resumed session from its stored messages. */
+  load(messages: TranscriptMessage[]) {
     const kept = this.#entries.filter(e => e.kind === 'welcome')
     this.#live = undefined
     this.#ended = undefined
-    this.#entries = history({ compactions: this.compactions.restore(stored), id: prefix => this.id(prefix), kept, messages })
+    this.#entries = history({ id: prefix => this.id(prefix), kept, messages })
+  }
+
+  /**
+   * Shows the conversation's stored compactions (`stored`, which the gateway's history leaves out)
+   * where they happened: in the turn that went on after one, else between turns.
+   */
+  placeCompactions(stored: readonly StoredCompaction[]) {
+    placeCompactions(this.#entries, this.compactions.restore(stored), prefix => this.id(prefix))
   }
 
   /** A resumed session's unfinished turn: its prompt, then a live turn holding what streamed so far. */

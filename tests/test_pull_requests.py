@@ -95,6 +95,37 @@ def test_a_subagent_links_to_the_conversation_that_delegated_it(prs, monkeypatch
     assert [p["number"] for p in json.loads(prs.list_pull_requests({}, session_id="child"))["linked"]] == [1, 2, 3]
 
 
+def test_the_rpc_method_reads_the_calling_sessions_conversation(prs):
+    prs.link_pull_request({"url": "https://github.com/a/b/pull/1"}, session_id="root")
+
+    assert prs.linked({}, session_id="tip") == {"linked": [
+        {"url": "https://github.com/a/b/pull/1", "repository": "a/b", "number": 1, "host": "github.com"}]}
+    assert prs.linked({}, session_id="other") == {"linked": []}
+    with pytest.raises(ValueError):
+        prs.linked({}, session_id=None)
+
+
+def test_a_change_tells_the_panes_of_the_conversation_once(prs, monkeypatch):
+    told = []
+
+    def emit(session_id, event, payload):
+        told.append((session_id, event, payload))
+        return session_id == "tip"  # the pane holds the conversation under its newer id
+
+    monkeypatch.setattr(prs, "_ctx", types.SimpleNamespace(emit_to_session=emit, get_config=lambda *a: None), raising=False)
+
+    prs.link_pull_request({"url": "https://github.com/a/b/pull/1"}, session_id="tip")
+    assert told == [("root", "pull_requests.changed", {}), ("tip", "pull_requests.changed", {})]
+
+    told.clear()
+    prs.link_pull_request({"url": "https://github.com/a/b/pull/1"}, session_id="tip")
+    prs.unlink_pull_request({"url": "https://github.com/a/b/pull/9"}, session_id="tip")
+    assert told == []
+
+    prs.unlink_pull_request({"url": "https://github.com/a/b/pull/1"}, session_id="tip")
+    assert [sid for sid, _, _ in told] == ["root", "tip"]
+
+
 # ── Which hosts a link may name (the enterprise token goes only to a host the user listed) ─────
 
 KEY = "plugins.entries.hermes-tern.settings.enterprise_hosts"

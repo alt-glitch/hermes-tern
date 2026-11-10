@@ -3,7 +3,7 @@
 // writes. What the new code writes stays readable by the reader before it (an old pane runs the old
 // bundle after a `git pull`): the `before*` functions below are those readers, kept as they were.
 
-import { copyFileSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
@@ -13,15 +13,12 @@ import * as z from 'zod/mini'
 
 import { liveSessionId, storedSessionId } from '../core/ids.js'
 import { parseStacks } from '../github/branch.js'
-import { storedLinks } from '../github/links.js'
 import { chartMemory } from '../processes/widgets/memory.js'
 import { loadSettings, saveSettings } from '../settings.js'
 import { readWatchSpec, WATCH_ENV, type WatchSpec } from '../watch/spec.js'
 import { readJsonFile } from '../wire/files.js'
 import { decodeJson } from '../wire/json.js'
 import { first, rows, storedCalls, text } from '../wire/sqlite.js'
-
-const FIXTURES = join(import.meta.dirname, 'fixtures', 'files')
 
 const scratch = () => mkdtempSync(join(tmpdir(), 'files-'))
 
@@ -107,31 +104,6 @@ describe('the watch spec', () => {
     expect(readWatchSpec({})).toBeUndefined()
     expect(readWatchSpec({ [WATCH_ENV]: '{"sid":' })).toBeUndefined()
     expect(readWatchSpec({ [WATCH_ENV]: 'null' })).toBeUndefined()
-  })
-})
-
-describe('the PR links file', () => {
-  it('reads a file the Python tool wrote, through an alias', () => {
-    const file = join(scratch(), 'pull-requests.json')
-    copyFileSync(join(FIXTURES, 'pull-requests.json'), file)
-
-    expect(storedLinks('sess_2', file, sid => [sid])).toEqual([{ host: 'github.com', number: 7, repository: 'acme/app', url: 'https://github.com/acme/app/pull/7' }])
-  })
-
-  it('finds the root by its conversation when the aliases are missing', () => {
-    const file = fileWith(JSON.stringify({ conversations: { root: [{ host: 'github.com', number: 3, repository: 'a/b' }] } }))
-
-    expect(storedLinks('child', file, () => ['child', 'root']).map(r => r.number)).toEqual([3])
-  })
-
-  it('reads no links from a missing file, text that is not JSON, or JSON that is not an object', () => {
-    expect(storedLinks('s', join(scratch(), 'none.json'), sid => [sid])).toEqual([])
-    expect(storedLinks('s', fileWith('{"conv'), sid => [sid])).toEqual([])
-    expect(storedLinks('s', fileWith('5'), sid => [sid])).toEqual([])
-  })
-
-  it('throws for a file holding null, as reading its fields did before the schema', () => {
-    expect(() => storedLinks('s', fileWith('null'), sid => [sid])).toThrow(TypeError)
   })
 })
 

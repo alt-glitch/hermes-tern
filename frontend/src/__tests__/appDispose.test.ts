@@ -17,12 +17,6 @@ const home = mkdtempSync(join(tmpdir(), 'hermes-tern-dispose-'))
 process.env['HERMES_HOME'] = home
 
 vi.mock('../clipboard.js', () => ({ copyToClipboard: () => undefined }))
-vi.mock('../hermes/sessionIndex.js', async importOriginal => ({
-  ...(await importOriginal<typeof import('../hermes/sessionIndex.js')>()),
-  lastReply: () => '',
-  storedSessions: () => []
-}))
-
 const { App } = await import('../app/chat.js')
 
 const flush = () => new Promise(resolve => setImmediate(resolve))

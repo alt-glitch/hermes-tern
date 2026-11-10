@@ -1,27 +1,20 @@
-// The PRs the agent linked to this conversation (`link_pull_request`, the plugin's own tool).
-// The tool keeps them in `<HERMES_HOME>/plugin-data/hermes-tern/pull-requests.json` under the
-// conversation's root session (pull_requests.py); a live turn's link calls carry the whole list in
-// their results, so the sheet follows them without reading the file again.
+// The PRs the agent linked to this conversation (`link_pull_request`, the plugin's own tool). The
+// plugin's Python half keeps them under the conversation's root (pull_requests.py) and answers the
+// plugin RPC method below with them. A live turn's link calls carry the whole list in their
+// results; a subagent's, which run in a session of their own, reach the pane as the session event
+// `LINKS_CHANGED`, after which it reads the list again.
 
-import { homedir } from 'node:os'
-import { join } from 'node:path'
-import { DatabaseSync } from 'node:sqlite'
-
-import * as z from 'zod/mini'
-
-import { stateDbPath } from '../hermes/paths.js'
 import type { ToolCall } from '../model.js'
-import { readLinksFile } from '../wire/files.js'
 import { record } from '../wire/json.js'
-import { first, text } from '../wire/sqlite.js'
+import type { Requester } from '../wire/rpc.js'
 
 import type { PrRef } from './pullRequest.js'
 
 export const LINK_TOOLS = new Set(['link_pull_request', 'list_pull_requests', 'unlink_pull_request'])
 
-export function linksPath(env: NodeJS.ProcessEnv = process.env): string {
-  return join(env['HERMES_HOME'] || join(homedir(), '.hermes'), 'plugin-data', 'hermes-tern', 'pull-requests.json')
-}
+/** The plugin RPC method that answers a conversation's links, and the session event that says they changed (pull_requests.py). */
+export const LINKED_METHOD = 'plugin.hermes-tern.pull_requests.linked'
+export const LINKS_CHANGED = 'plugin.hermes-tern.pull_requests.changed'
 
 function refOf(v: unknown): PrRef | undefined {
   const r = record(v)
@@ -45,65 +38,9 @@ export function linkedFromResult(call: Pick<ToolCall, 'name' | 'outcome' | 'resu
   return Array.isArray(linked) ? linked.map(refOf).filter((r): r is PrRef => Boolean(r)) : undefined
 }
 
-// The parent a session continues: one that ended in compression. A /branch, delegate, reset or tool
-// child also names its parent, but it is its own conversation. Its marker names that parent (a
-// continuation copies `model_config`, so a marker naming another row is inherited). Core's rule
-// (get_compression_lineage, which the link tools in pull_requests.py use).
-const marker = (k: string) => `COALESCE(json_extract(CASE WHEN json_valid(c.model_config) THEN c.model_config ELSE '{}' END, '$.${k}'), '') != p.id`
-const CONTINUES = `SELECT p.id AS p FROM sessions c JOIN sessions p ON p.id = c.parent_session_id
-  WHERE c.id = ? AND p.end_reason = 'compression' AND COALESCE(c.source, '') != 'tool'
-    AND ${['_branched_from', '_delegate_from', '_reset_from'].map(marker).join(' AND ')}`
+/** The links of session `sid`'s conversation, oldest first, as the plugin answers them. */
+export async function linkedPullRequests(gw: Requester, sid: string): Promise<PrRef[]> {
+  const linked = record(await gw.request<unknown>(LINKED_METHOD, { session_id: sid }))?.['linked']
 
-const parentRow = z.object({ p: text })
-
-/**
- * Session `sid`'s ancestors, itself first: compression gives a conversation a new session whose
- * `parent_session_id` is the one it continues. Read-only, and empty when the database is not there.
- */
-export function ancestry(sid: string, db = stateDbPath()): string[] {
-  const chain = [sid]
-
-  try {
-    const conn = new DatabaseSync(db, { readOnly: true })
-
-    try {
-      const parent = conn.prepare(CONTINUES)
-
-      for (let i = 0; i < 100; i++) {
-        const p = first(parent, parentRow, chain.at(-1) ?? sid)?.p
-
-        if (!p || chain.includes(p)) {
-          break
-        }
-
-        chain.push(p)
-      }
-    } finally {
-      conn.close()
-    }
-  } catch {
-    // No database (another profile layout, a fresh install): the session alone.
-  }
-
-  return chain
-}
-
-/** The links stored for session `sid`'s conversation, oldest first. */
-export function storedLinks(sid: string, file = linksPath(), lineage: (sid: string) => string[] = ancestry): PrRef[] {
-  const data = readLinksFile(file)
-
-  if (!data) {
-    return []
-  }
-
-  const { aliases, conversations } = data
-  const root = lineage(sid).find(id => aliases[id] || conversations[id])
-
-  if (!root) {
-    return []
-  }
-
-  const links = conversations[aliases[root] ?? root]
-
-  return Array.isArray(links) ? links.map(refOf).filter((r): r is PrRef => Boolean(r)) : []
+  return Array.isArray(linked) ? linked.map(refOf).filter((r): r is PrRef => Boolean(r)) : []
 }

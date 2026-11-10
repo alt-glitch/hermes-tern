@@ -7066,6 +7066,12 @@
    }
   },
   {
+   "method": "plugin.hermes-tern.pull_requests.linked",
+   "params": {
+    "session_id": "s1"
+   }
+  },
+  {
    "method": "session.control.read",
    "params": {
     "session_id": "s1"

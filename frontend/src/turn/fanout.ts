@@ -24,7 +24,7 @@ const CHANGES_FILES = ['patch', 'terminal', 'write_file', 'execute_code']
 export interface ToolFanout {
   readonly transcript: Pick<Transcript, 'call' | 'calls'>
   readonly agents: Pick<Agents, 'scan'>
-  readonly prs: Pick<PullRequests, 'onCall' | 'relink'>
+  readonly prs: Pick<PullRequests, 'onCall'>
   readonly sidebar: Pick<Sidebar, 'poke'>
   readonly connect: Pick<ConnectWatcher, 'watch'>
   readonly processes: Pick<Processes, 'poke'>
@@ -40,11 +40,6 @@ export function afterToolComplete(p: Pick<ToolCompletePayload, 'name' | 'tool_id
   cx.showImage(cx.transcript.call(toolCallId(p.tool_id)))
   // A dispatched delegation: its agents' rows start following the owner.
   cx.agents.scan()
-
-  if (p.name === 'delegate_task') {
-    // Its subagents (a foreground call's have ended) may have linked PRs.
-    cx.prs.relink()
-  }
 
   if (LINK_TOOLS.has(p.name)) {
     const call = cx.transcript.calls(p.name).at(-1)

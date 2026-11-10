@@ -36,6 +36,9 @@ the user's prompt, so one home covers every flow:
                    the auxiliary model wrote for it in lab/chartbench.ts): real charts in the lab
     "ternenv"   -> (at the start) prints the TERN_* variables from a command, a background command and a Python cell's command
     "pr [URL…]" -> (at the start) links the PR URLs given, else a real public PR (link_pull_request)
+    "sublink [URL]" -> (at the start) one subagent that links the PR URL given, else a real public PR:
+                   the parent's transcript gets no link result, so its pane learns of the link
+                   from the plugin's event alone
     "cron…"     -> (at the start) two cron jobs: a 30 min digest and a 15 min page monitor
     anything else -> a streamed markdown reply
 """
@@ -184,9 +187,20 @@ ERRANDS = [
 ]
 
 
-def _subagent_calls(messages: list[dict]) -> list[dict] | None:
-    """A subagent's next move: one slow terminal step per earlier tool result, then the answer."""
+PR_URL = r"https://[^\s/]+/[^\s/]+/[^\s/]+/pull/\d+"
+DEFAULT_PR = "https://github.com/alt-glitch/hermes-tern/pull/22"
+# The goal the "sublink" prompt gives its subagent; the subagent's first move reads the URL from it.
+SUBLINK_GOAL = "Link the pull request "
+
+
+def _subagent_calls(messages: list[dict], goal: str) -> list[dict] | None:
+    """A subagent's next move: one slow terminal step per earlier tool result, then the answer. The
+    "sublink" subagent links its pull request first."""
     done = sum(1 for m in messages if m.get("role") == "tool")
+    if SUBLINK_GOAL.lower() in goal.lower():
+        url = re.search(PR_URL, goal)
+        link = _call("tool_call", {"calls": [{"name": "link_pull_request", "arguments": {"url": url.group(0) if url else DEFAULT_PR}}]}, "call-sublink")
+        return None if done else [link]
     if done >= len(SUBAGENT_STEPS):
         return None
     return [_call("terminal", {"command": SUBAGENT_STEPS[done]}, f"call-step{done}")]
@@ -235,11 +249,14 @@ def _calls(prompt: str, target: Path) -> list[dict] | None:
             ]}, "call-batch"),
             _call("tool_call", {"name": "connectors__linear__LINEAR_LIST_ISSUES", "arguments": {"limit": 3}}, "call-one"),
         ]
+    if words.lstrip().startswith("sublink"):
+        url = re.search(PR_URL, prompt)
+        return [_call("delegate_task", {"goal": SUBLINK_GOAL + (url.group(0) if url else DEFAULT_PR)})]
     if words.lstrip().startswith("pr"):
         # A real public PR, linked the way an agent links one it opened (through the tool_call bridge
         # in case Tool Search defers the plugin's tools).
         # Any host: the tool, not the model, decides which hosts a link may name.
-        urls = re.findall(r"https://[^\s/]+/[^\s/]+/[^\s/]+/pull/\d+", words) or ["https://github.com/alt-glitch/hermes-tern/pull/22"]
+        urls = re.findall(PR_URL, words) or [DEFAULT_PR]
         return [_call("tool_call", {"calls": [{"name": "link_pull_request", "arguments": {"url": u}} for u in urls]}, "call-link")]
     if words.lstrip().startswith("cron"):
         # cronjob_manage is a deferred tool: the model reaches it through the tool_call bridge.
@@ -378,7 +395,7 @@ class Model(BaseHTTPRequestHandler):
             content, delay = COMPACTION_SUMMARY, 2.5
             calls = None
         elif isinstance(system, str) and SUBAGENT_MARKER in system:
-            calls = _subagent_calls(messages)
+            calls = _subagent_calls(messages, str(prompt))
             content = None if calls else SUBAGENT_REPLY
             delay = 0.15
         elif prompt.lower().lstrip().startswith("work"):
