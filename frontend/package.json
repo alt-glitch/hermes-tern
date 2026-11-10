@@ -8,7 +8,7 @@
     "setup": "node scripts/hermes-src.mjs && bun install",
     "bundle": "node scripts/hermes-src.mjs && node scripts/build.mjs",
     "bundle:report": "node scripts/bundle-report.mjs",
-    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "typecheck": "node scripts/typecheck.mjs",
     "test": "vitest run",
     "check:size": "node scripts/check-size.mjs",
     "check:strict": "node scripts/check-strict.mjs",

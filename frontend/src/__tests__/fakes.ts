@@ -10,6 +10,7 @@ import type { SessionInfo } from '@hermes/shared/gateway-types'
 
 import type { SessionView } from '../app/ports.js'
 import { liveSessionId } from '../core/ids.js'
+import { REQUIRED_CAPABILITIES } from '../hermes/requirements.js'
 import type { Overlay } from '../overlays/overlay.js'
 import type { SessionState } from '../session/state.js'
 import type { Activity, Busy } from '../turn/activity.js'
@@ -38,7 +39,8 @@ export class FakeGateway extends EventEmitter {
   constructor({ canonical = true, replies = {} }: { canonical?: boolean; replies?: Record<string, Reply> } = {}) {
     super()
     this.isCanonical = canonical
-    this.handlers = new Map(Object.entries(replies))
+    // A current gateway: it lists what the frontend needs (hermes/requirements.ts).
+    this.handlers = new Map(Object.entries({ 'runtime.describe': () => ({ capabilities: REQUIRED_CAPABILITIES }), ...replies }))
   }
 
   /** This fake as the gateway type App takes. */

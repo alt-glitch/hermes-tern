@@ -14,6 +14,7 @@ import type { LaunchEnv } from '../config/env.js'
 import { errorText } from '../core/errors.js'
 import { durable, type DurableSessionId, isLive, type LiveSessionId, type StoredSessionId, storedSessionId } from '../core/ids.js'
 import { createParams } from '../hermes/create.js'
+import { missingCapabilities, tooOldNotice } from '../hermes/requirements.js'
 import type { PromptSheets } from '../prompts/sheets.js'
 import type { Transcript } from '../transcript/store.js'
 import type { SwitchGate } from '../turn/router.js'
@@ -98,11 +99,37 @@ export class SessionLifecycle {
     this.#deliver = deliver
   }
 
-  /** gateway.ready: a reconnect's reattaches the shown session; only a sessionless app bootstraps. */
+  /**
+   * gateway.ready: a reconnect's reattaches the shown session; only a sessionless app bootstraps.
+   * Neither happens on a gateway that lacks what this frontend needs: the pane says so instead.
+   */
   ready() {
-    const { stored } = this.#host.state.ref
+    void this.#ready()
+  }
 
-    void (stored ? this.reattach(stored) : this.#bootstrap())
+  async #ready() {
+    const host = this.#host
+
+    try {
+      const missing = await missingCapabilities(host.gw)
+
+      if (missing.length > 0) {
+        host.transcript.notice(tooOldNotice(missing), 'error')
+        host.changed()
+
+        return
+      }
+    } catch (error) {
+      // The socket went away under the question: the next gateway.ready asks again.
+      host.transcript.notice(`Could not read what the agent backend supports: ${errorText(error)}`, 'error')
+      host.changed()
+
+      return
+    }
+
+    const { stored } = host.state.ref
+
+    await (stored ? this.reattach(stored) : this.#bootstrap())
   }
 
   /** The gateway went away: the runtime session died with it, and nothing can answer the held requests. */

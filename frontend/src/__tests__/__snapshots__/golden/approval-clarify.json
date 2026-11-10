@@ -7170,6 +7170,10 @@
  ],
  "requests": [
   {
+   "method": "runtime.describe",
+   "params": {}
+  },
+  {
    "method": "setup.status",
    "params": {}
   },
