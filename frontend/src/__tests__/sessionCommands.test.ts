@@ -1,11 +1,14 @@
 import { describe, expect, it, vi } from 'vitest'
 
+import { sessionHost, type SessionHostCx } from '../commands/host.js'
 import { compressReport, SESSION_COMMANDS, type SessionHost } from '../commands/session.js'
-import { liveSessionId } from '../core/ids.js'
+import { liveSessionId, storedSessionId } from '../core/ids.js'
 import { mutateSession } from '../hermes/mutate.js'
 import { lastTurnRewind, retryText, retryTurnRewind } from '../hermes/rewind.js'
 
-import { must, stub } from './fakes.js'
+import type { Busy } from '../turn/activity.js'
+
+import { FakeGateway, must, stub } from './fakes.js'
 
 const MESSAGES = [
   { content: 'first', role: 'user', row_id: 1 },
@@ -272,4 +275,63 @@ describe('session commands', () => {
     expect(h.notice).toHaveBeenCalledWith('Rollback restored src/a.ts: restored to abcdef1')
   })
 
+})
+
+describe('sessionHost', () => {
+  it('reads busy and queued live, the sid it was made for, and the session live', async () => {
+    const gw = new FakeGateway()
+    let busy: Busy | null = { label: 'Working…', since: {}, startedAt: 0 }
+    let queued = 2
+    let ref = { live: liveSessionId('s1'), stored: storedSessionId('stored-1') }
+    const resumed: string[] = []
+
+    const cx: SessionHostCx = {
+      activity: {
+        get busy() {
+          return busy
+        }
+      },
+      changed: () => {}, draft: () => {},
+      gw: gw.client,
+      life: {
+        reload: async () => undefined,
+        resume: async id => {
+          resumed.push(id)
+          ref = { live: liveSessionId('s2'), stored: id }
+        }
+      },
+      queue: { count: () => queued },
+      router: { behind: () => {}, send: () => {} },
+      setCompacting: () => {},
+      state: {
+        get ref() {
+          return ref
+        },
+        ticket: () => ({ isCurrent: () => true, signal: new AbortController().signal, sid: ref.live }),
+        usage: null
+      },
+      submit: () => {},
+      transcript: {
+        compactions: { compacted: () => {}, compacting: () => ({ startedAt: 0, state: { status: 'running' } }), uncompact: () => {} },
+        notice: () => {},
+        panel: () => {},
+        steer: () => {}
+      }
+    }
+
+    const host = sessionHost(cx)
+
+    expect(host.busy).toBe(true)
+    expect(host.queued).toBe(2)
+
+    // A command that awaited reads them as they are now.
+    busy = null
+    queued = 0
+    expect(host.busy).toBe(false)
+    expect(host.queued).toBe(0)
+    expect(host.sid).toBe('s1')
+    await expect(host.open(storedSessionId('stored-2'))).resolves.toBe(true)
+    expect(resumed).toEqual(['stored-2'])
+    expect(sessionHost(cx).busy).toBe(false)
+  })
 })

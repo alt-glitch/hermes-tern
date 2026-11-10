@@ -514,10 +514,7 @@ export class Transcript {
     this.#entries = history({ id: prefix => this.id(prefix), kept, messages })
   }
 
-  /**
-   * Shows the conversation's stored compactions (`stored`, which the gateway's history leaves out)
-   * where they happened: in the turn that went on after one, else between turns.
-   */
+  /** Places gateway compaction markers where they happened in the conversation. */
   placeCompactions(stored: readonly StoredCompaction[]) {
     placeCompactions(this.#entries, this.compactions.restore(stored), prefix => this.id(prefix))
   }
